@@ -4,7 +4,7 @@
   - 默认顺序完整性（len(_REPORT_SECTION_DEFAULT) 个模块，summary 开头/llm_usage 结尾）
   - 序号 1~N 连续递增
   - get_report_section_keys 完备性
-  - 5 种可见性类型计数正确（always=6, history=2, b_series=5, news=1, llm=5）
+  - 6 种可见性类型计数正确（always=6, history=2, b_series=6, news=1, llm=5, evolution=1）
   - 基金深度分析 data_flag 各不相同
   - 空配置与无配置行为一致
 
@@ -64,18 +64,24 @@ class TestScenarioSectionOrder(unittest.TestCase):
         expected = {s["key"] for s in self._default}
         self.assertEqual(keys, expected)
 
-    def test_default_always_type_has_7_sections(self):
-        """always 类型模块共 7 个（含数据源可用性矩阵、组合演进）；除组合演进外均无 data_flag（组合演进用 data_flag 控制可见性，available=False 时展示层写占位，见 technical.md §4.12）。"""
+    def test_default_always_type_has_6_sections(self):
+        """always 类型模块共 6 个（含数据源可用性矩阵），均无 data_flag。"""
         always = [s for s in self._default if s["type"] == "always"]
-        self.assertEqual(len(always), 7)
+        self.assertEqual(len(always), 6)
         keys = {s["key"] for s in always}
         self.assertIn("data_source_status", keys)
-        self.assertIn("portfolio_evolution", keys)
+        self.assertNotIn("portfolio_evolution", keys)
         for sec in always:
-            if sec["key"] == "portfolio_evolution":
-                self.assertEqual(sec["data_flag"], "evolution_data")
-            else:
-                self.assertIsNone(sec["data_flag"])
+            self.assertIsNone(sec["data_flag"])
+
+    def test_default_evolution_type_has_1_section(self):
+        """evolution 类型模块共 1 个（组合演进，data_flag=evolution_data 控制可见性，
+        available=False 时展示层写占位，见 technical.md §4.12）。"""
+        evolution = [s for s in self._default if s["type"] == "evolution"]
+        self.assertEqual(len(evolution), 1)
+        sec = evolution[0]
+        self.assertEqual(sec["key"], "portfolio_evolution")
+        self.assertEqual(sec["data_flag"], "evolution_data")
 
     def test_default_fund_deep_analysis_type_has_6_sections(self):
         """基金深度分析类型模块共 6 个（含因子暴露、持仓相关性）。"""
@@ -116,17 +122,18 @@ class TestScenarioSectionOrder(unittest.TestCase):
             self.assertEqual(s1["key"], s2["key"])
             self.assertEqual(s1["number"], s2["number"])
 
-    def test_5_visibility_types(self):
-        """5 种 type 都有对应模块。"""
+    def test_6_visibility_types(self):
+        """6 种 type 都有对应模块（含组合演进专属 evolution 类型）。"""
         type_counts: dict[str, int] = {}
         for sec in self._default:
             type_counts[sec["type"]] = type_counts.get(sec["type"], 0) + 1
-        self.assertEqual(set(type_counts.keys()), {"always", "history", "b_series", "news", "llm"})
-        self.assertEqual(type_counts["always"], 7)
+        self.assertEqual(set(type_counts.keys()), {"always", "history", "b_series", "news", "llm", "evolution"})
+        self.assertEqual(type_counts["always"], 6)
         self.assertEqual(type_counts["history"], 2)
         self.assertEqual(type_counts["b_series"], 6)
         self.assertEqual(type_counts["news"], 1)
         self.assertEqual(type_counts["llm"], 5)
+        self.assertEqual(type_counts["evolution"], 1)
 
 
 class TestScenarioCustomSectionOrder(unittest.TestCase):

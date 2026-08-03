@@ -584,6 +584,17 @@ def is_enable_fund_deep_analysis(config: dict | None = None) -> bool:
     return bool(val)
 
 
+def is_enable_portfolio_evolution(config: dict | None = None) -> bool:
+    """组合演进章节（#19）是否启用。缺失时返回 True。"""
+    if config is None:
+        config = get_config()
+    val = config.get("enable_portfolio_evolution")
+    if val is None:
+        logger.debug("config.json 缺少 enable_portfolio_evolution，使用默认值 true")
+        return True
+    return bool(val)
+
+
 def is_enable_news(config: dict | None = None) -> bool:
     """市场新闻（#12）是否启用。缺失时返回 True。"""
     if config is None:

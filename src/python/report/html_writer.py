@@ -90,6 +90,7 @@ def _compute_section_visibility(
     enable_news: bool = True,  # board 层：市场新闻是否开启（配置驱动，不是 include_news！）
     enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
+    enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     factor_exposure: dict | None = None,  # data 层：因子暴露 C19 dict（None=无数据，章节隐藏）
     correlation_data: dict | None = None,  # data 层：持仓相关性 C19 dict（None=无数据，章节隐藏）
@@ -109,6 +110,7 @@ def _compute_section_visibility(
         "b_series": enable_fund_deep_analysis,
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
+        "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
         "llm": enable_llm,  # ← board 层
     }
     # data 层：各模块数据就绪状态
@@ -379,6 +381,7 @@ def write_html_report(
     enable_fund_deep_analysis: bool = True,
     enable_news: bool = True,
     enable_history: bool = True,
+    enable_portfolio_evolution: bool = True,
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
@@ -527,6 +530,7 @@ def write_html_report(
         enable_news=enable_news,
         enable_fund_deep_analysis=enable_fund_deep_analysis,
         enable_history=enable_history,
+        enable_portfolio_evolution=enable_portfolio_evolution,
         enable_llm=enable_llm,  # enable_llm is the board param for LLM
         factor_exposure=factor_exposure,
         correlation_data=correlation_data,

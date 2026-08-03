@@ -80,7 +80,7 @@
 | 选项 | 功能 | 说明 |
 |:----:|:-----|:------|
 | **报告生成** | | |
-| E | 生成基础版 Excel 分析报告 | 投资分析汇总、市值核算明细表、持仓分类表、资产穿透TOP10、基金业绩分析、组合演进、数据源可用性矩阵（始终显示的7个核心模块，不含基金深度分析/新闻/历史走势） |
+| E | 生成基础版 Excel 分析报告 | 投资分析汇总、市值核算明细表、持仓分类表、资产穿透TOP10、基金业绩分析、组合演进、数据源可用性矩阵（6 个始终显示 + 组合演进默认开启，由 `enable_portfolio_evolution` 控制；不含基金深度分析/新闻/历史走势） |
 | B | 生成标准报告（Excel+HTML）按章节配置 | 同时生成 HTML + Excel，含新闻（如有）、基金深度分析（如有）、历史走势（如有），不含 LLM 增补。各章节按 [P] 菜单配置决定是否包含 |
 | L | 生成完整报告（Excel+HTML）含 LLM，按章节配置 | 同时生成 HTML + Excel，含新闻、基金深度分析、历史走势、LLM 增补。各章节按配置决定是否包含 |
 | W | 调仓 What-if 模拟（对比两份持仓，独立报告） | 选择基准/目标两份持仓 xlsx，生成独立调仓 diff 报告（Excel 3+1 页签 / HTML），可选指定生效日触发时序回测（见 §6.11） |
@@ -550,6 +550,7 @@ LLM 五维度量化评分，每项满分 100：
 | R-EVO-01 | 组合演进基于本地快照聚合，零网络请求；快照数不足时降级占位（可用性由 `evolution_data.available` 控制） |
 | R-EVO-02 | 历史快照缺市值时权重回退成本口径，占比数据口径在说明区注明 |
 | R-EVO-03 | 演进数据注入 C19 `evolution_data` 键，Excel「组合演进」页签与 HTML「组合演进」章节双端消费 |
+| R-EVO-04 | 组合演进章节可见性由独立配置项 `enable_portfolio_evolution` 控制（默认开启），与 `enable_history`/`enable_fund_deep_analysis` 相互独立；关闭仅隐藏报告章节，不影响持仓快照自动记录 |
 
 #### 6.4.20 数据源可用性矩阵
 
@@ -948,6 +949,7 @@ LLM 五维度量化评分，每项满分 100：
 | `enable_fund_deep_analysis` | bool | true | ✅ P | 基金深度分析启停 |
 | `enable_news` | bool | true | ✅ P | 市场新闻启停 |
 | `enable_history` | bool | true | ✅ P | 历史走势启停 |
+| `enable_portfolio_evolution` | bool | true | ✅ P | 组合演进启停 |
 | `market_hour_aware` | list | `["price","index"]` | — | 交易时段短 TTL 的数据类型 |
 | `market_hour_ttl` | int | 30 | — | 交易时段缓存有效期（秒） |
 | `market_hours` | dict | `{start:"09:30",end:"15:00"}` | — | 交易时段配置 |

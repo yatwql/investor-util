@@ -72,6 +72,7 @@ from src.python.config._core import (
     is_enable_history,
     is_enable_llm,
     is_enable_news,
+    is_enable_portfolio_evolution,
     set_config,
     del_config,
 )
@@ -114,6 +115,7 @@ __all__ = [
     "is_enable_news",
     "is_enable_history",
     "is_enable_llm",
+    "is_enable_portfolio_evolution",
     # LLM 配置
     "get_llm_settings_path",
     "_KNOWN_LLM_SETTINGS_KEYS",

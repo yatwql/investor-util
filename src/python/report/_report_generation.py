@@ -272,6 +272,7 @@ def _generate_full_html_report(
     factor_exposure: dict | None = None,
     correlation_data: dict | None = None,
     evolution_data: dict | None = None,
+    enable_portfolio_evolution: bool = True,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -284,6 +285,7 @@ def _generate_full_html_report(
             基金深度分析关闭或数据不足时为 None/available=False。
         evolution_data: 组合演进 C19 契约 dict（多快照趋势聚合），
             数据不足时 available=False（模板写占位）。
+        enable_portfolio_evolution: board 层 — 组合演进章节是否开启。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -316,6 +318,7 @@ def _generate_full_html_report(
             enable_fund_deep_analysis=enable_fund_deep_analysis,
             enable_news=enable_news,
             enable_history=enable_history,
+            enable_portfolio_evolution=enable_portfolio_evolution,
             enable_llm=enable_llm,
             debate_info=debate_info,
             chart_datasets=chart_datasets,
@@ -354,6 +357,7 @@ def _generate_full_excel_report(
     enable_llm: bool,
     debate_info: dict | None,
     result,
+    enable_portfolio_evolution: bool = True,
 ) -> bool:
     """full 路径的 Excel 报告生成，返回是否成功。"""
     from src.python.report.excel_generator import generate_excel_report
@@ -379,6 +383,7 @@ def _generate_full_excel_report(
             enable_fund_deep_analysis=enable_fund_deep_analysis,
             enable_news=enable_news,
             enable_history=enable_history,
+            enable_portfolio_evolution=enable_portfolio_evolution,
             enable_llm=enable_llm,
             debate_info=debate_info,
         )
@@ -406,7 +411,12 @@ def _generate_report_both(
     流程：_compute_details() → capture_snapshot() → fetch_history_data()
           → write_html_report() → generate_excel_report()
     """
-    from src.python.config import is_enable_fund_deep_analysis, is_enable_history, is_enable_news
+    from src.python.config import (
+        is_enable_fund_deep_analysis,
+        is_enable_history,
+        is_enable_news,
+        is_enable_portfolio_evolution,
+    )
     from src.python.config.features import is_feature_enabled
     from src.python.core.perf import PerfCollector
     from src.python.core.registry import get_report_section_order
@@ -425,6 +435,7 @@ def _generate_report_both(
     _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
+    _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
@@ -438,8 +449,9 @@ def _generate_report_both(
     # ── 2. 快照对比（始终执行） ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, details, config, reporter)
-    # 2b. 组合演进数据（聚合多期快照，C19 evolution_data）
-    pipeline_data = _inject_evolution_data(pipeline_data)
+    # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
+    if _enable_portfolio_evolution:
+        pipeline_data = _inject_evolution_data(pipeline_data)
     perf.stop()
     # [checkpoint] pipeline_data 类型断言
     if pipeline_data is not None:
@@ -479,6 +491,7 @@ def _generate_report_both(
             enable_fund_deep_analysis=_enable_fund_deep_analysis,
             enable_news=_enable_news,
             enable_history=_enable_history,
+            enable_portfolio_evolution=_enable_portfolio_evolution,
             enable_llm=False,
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
@@ -509,6 +522,7 @@ def _generate_report_both(
             enable_fund_deep_analysis=_enable_fund_deep_analysis,
             enable_news=_enable_news,
             enable_history=_enable_history,
+            enable_portfolio_evolution=_enable_portfolio_evolution,
             enable_llm=False,
         )
         reporter.ok("Excel 报告已生成")
@@ -591,7 +605,13 @@ def _generate_report_full(
           → get_sector_fund_flow() → _fetch_llm_and_news()
           → write_html_report() → generate_excel_report()
     """
-    from src.python.config import is_enable_fund_deep_analysis, is_enable_history, is_enable_llm, is_enable_news
+    from src.python.config import (
+        is_enable_fund_deep_analysis,
+        is_enable_history,
+        is_enable_llm,
+        is_enable_news,
+        is_enable_portfolio_evolution,
+    )
     from src.python.config.features import is_feature_enabled
     from src.python.fetcher.akshare import get_sector_fund_flow
     from src.python.core.perf import PerfCollector
@@ -608,6 +628,7 @@ def _generate_report_full(
     _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
+    _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
     _enable_llm = is_enable_llm(config)
     sec_order = get_report_section_order(config)
 
@@ -626,8 +647,9 @@ def _generate_report_full(
         pipeline_data["factor_exposure"] = prep.get("factor_exposure")
         pipeline_data["correlation_data"] = prep.get("correlation_data")
     _validate_pipeline_snapshot(pipeline_data)
-    # 2b. 组合演进数据（聚合多期快照，C19 evolution_data）
-    pipeline_data = _inject_evolution_data(pipeline_data)
+    # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
+    if _enable_portfolio_evolution:
+        pipeline_data = _inject_evolution_data(pipeline_data)
     perf.stop()
 
     # ── 3. 历史走势 + 全量量化指标 ──
@@ -700,6 +722,7 @@ def _generate_report_full(
         prep.get("factor_exposure"),
         prep.get("correlation_data"),
         (pipeline_data or {}).get("evolution_data"),
+        _enable_portfolio_evolution,
     )
 
     # ── 7. Excel 报告 ──
@@ -721,6 +744,7 @@ def _generate_report_full(
         _enable_llm,
         debate_info,
         result,
+        _enable_portfolio_evolution,
     )
 
     result.news_ok = news_ok

@@ -39,6 +39,7 @@ _DEFAULT_CONFIG = {
     "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露+相关性（#6~11）
     "enable_news": True,  # 市场新闻（#12）
     "enable_history": True,  # 组合历史走势+回撤（#17~18）
+    "enable_portfolio_evolution": True,  # 组合演进（#19）
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -148,6 +149,7 @@ def _build_template_from_defaults() -> str:
         f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露+相关性（#6~11）',
         f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#12）',
         f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#17~18）',
+        f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进（#19）',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",

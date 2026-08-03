@@ -934,3 +934,27 @@ class TestDefaultConfigTemplateConsistency:
                 assert parsed[key] == cfg._DEFAULT_CONFIG[key], (
                     f"键 {key!r} 值不匹配:\n  模板: {parsed[key]!r}\n  配置: {cfg._DEFAULT_CONFIG[key]!r}"
                 )
+
+
+class TestIsEnablePortfolioEvolution(unittest.TestCase):
+    """is_enable_portfolio_evolution 访问器测试（组合演进章节开关）。"""
+
+    def test_default_true_when_missing(self):
+        """配置缺省 → 返回 True（默认启用）。"""
+        self.assertTrue(cfg.is_enable_portfolio_evolution({}))
+        self.assertTrue(cfg.is_enable_portfolio_evolution({"enable_fund_deep_analysis": False}))
+
+    def test_false_when_disabled(self):
+        """显式 false → 返回 False。"""
+        self.assertFalse(cfg.is_enable_portfolio_evolution({"enable_portfolio_evolution": False}))
+
+    def test_true_when_enabled(self):
+        """显式 true → 返回 True。"""
+        self.assertTrue(cfg.is_enable_portfolio_evolution({"enable_portfolio_evolution": True}))
+
+    def test_independent_from_fund_deep_analysis(self):
+        """组合演进开关独立于基金深度分析开关。"""
+        self.assertTrue(cfg.is_enable_portfolio_evolution({"enable_fund_deep_analysis": False}))
+        self.assertFalse(
+            cfg.is_enable_portfolio_evolution({"enable_fund_deep_analysis": True, "enable_portfolio_evolution": False})
+        )

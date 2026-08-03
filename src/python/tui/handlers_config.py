@@ -354,12 +354,13 @@ def _remove_comparison_index(config: dict, indices: dict[str, str]) -> None:
 
 
 def _cmd_config_report_boards() -> None:
-    """配置报告可选章节（基金分析 / 市场新闻 / 历史走势）。"""
+    """配置报告可选章节（基金分析 / 市场新闻 / 历史走势 / 组合演进）。"""
     from src.python.config import (
         get_config,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_news,
+        is_enable_portfolio_evolution,
         set_config,
     )
 
@@ -368,22 +369,25 @@ def _cmd_config_report_boards() -> None:
         fund_deep_analysis = is_enable_fund_deep_analysis(config)
         news = is_enable_news(config)
         history = is_enable_history(config)
+        portfolio_evolution = is_enable_portfolio_evolution(config)
 
         print()
         print("  ┌── 配置报告可选章节 ────────────────────┐")
         fund_status = f"{GREEN}启用{RESET}" if fund_deep_analysis else f"{RED}禁用{RESET}"
         n_status = f"{GREEN}启用{RESET}" if news else f"{RED}禁用{RESET}"
         h_status = f"{GREEN}启用{RESET}" if history else f"{RED}禁用{RESET}"
+        e_status = f"{GREEN}启用{RESET}" if portfolio_evolution else f"{RED}禁用{RESET}"
         print(f"  │ 1. 基金深度分析（#6~11）        [{fund_status}]{' ' * 8}│")
         print(f"  │ 2. 市场新闻（#12）              [{n_status}]{' ' * 8}│")
         print(f"  │ 3. 组合历史走势+回撤（#17~18）  [{h_status}]{' ' * 8}│")
+        print(f"  │ 4. 组合演进（#19）              [{e_status}]{' ' * 8}│")
         print("  │                                   │")
-        print("  │ 4. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
+        print("  │ 5. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
         print(f"  └{'─' * 42}┘")
         print()
         try:
-            choice = input("  输入编号切换 (0-4): ").strip()
+            choice = input("  输入编号切换 (0-5): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -401,6 +405,9 @@ def _cmd_config_report_boards() -> None:
             set_config("enable_history", not history)
             print(f"  {GREEN}[OK]{RESET} 组合历史走势已{'禁用' if history else '启用'}")
         elif choice == "4":
+            set_config("enable_portfolio_evolution", not portfolio_evolution)
+            print(f"  {GREEN}[OK]{RESET} 组合演进已{'禁用' if portfolio_evolution else '启用'}")
+        elif choice == "5":
             print(f"  {YELLOW}[!]{RESET} LLM 分析章节配置请使用菜单 [S]")
         else:
             print(f"  {YELLOW}[!]{RESET} 无效编号")

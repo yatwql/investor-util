@@ -9,6 +9,7 @@
 ### Feat
 
 - HTML 报告暗色模式（plan-11）：主报告与调仓 What-if 报告均可切换深/浅色，右上角浮动按钮，主题偏好 localStorage 持久化（首次默认浅色）；页面级颜色统一为 CSS 变量，Chart.js 图表随主题重绘，打印自动切浅色
+- 组合演进纳入报告可选环节配置（plan-12）：新增独立开关 `enable_portfolio_evolution`（默认开启），控制 #19 组合演进章节显示/隐藏；与 `enable_fund_deep_analysis`、`enable_history` 相互独立。持仓快照不受影响、始终自动记录，开关仅影响报告展示。菜单 `P` 新增第 4 项切换
 
 ### Refactor
 

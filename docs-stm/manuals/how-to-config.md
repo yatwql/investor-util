@@ -16,6 +16,7 @@
   "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露+相关性（#6~11）
   "enable_news": true,      // 市场新闻（#12）
   "enable_history": true,   // 组合历史走势+回撤（#17~18）
+  "enable_portfolio_evolution": true,  // 组合演进（#19）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -148,6 +149,7 @@
 | `enable_fund_deep_analysis` | `true` | 基金深度分析章节可见性（模块 #6~#11），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
 | `enable_news` | `true` | 市场新闻章节可见性（模块 #12），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
 | `enable_history` | `true` | 历史走势章节可见性（模块 #17~#18），关闭后对应章节完全隐藏。持仓快照不受影响，始终自动执行 | 菜单 `P` |
+| `enable_portfolio_evolution` | `true` | 组合演进章节可见性（模块 #19），关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
 
 ---
 
@@ -159,7 +161,7 @@
 
 ### B. 报告章节可见性
 
-`enable_fund_deep_analysis`、`enable_news`、`enable_history` 三个配置项控制报告按章节组显示或隐藏对应的章节。LLM 分析章节的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个章节组后，该组涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
+`enable_fund_deep_analysis`、`enable_news`、`enable_history`、`enable_portfolio_evolution` 四个配置项控制报告按章节组显示或隐藏对应的章节。LLM 分析章节的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个章节组后，该组涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
 
 通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换各章节组的可见性。
 
@@ -168,6 +170,7 @@
 | `enable_fund_deep_analysis` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析、#10 因子暴露分析、#11 持仓相关性矩阵 | 基金深度分析章节组 |
 | `enable_news` | `true` | `config.json` | #12 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
 | `enable_history` | `true` | `config.json` | #17 组合历史走势、#18 历史回撤分析 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
+| `enable_portfolio_evolution` | `true` | `config.json` | #19 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
 | `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #13 全球政经局势、#14 智囊团深度复盘、#15 持仓体检报告、#16 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
@@ -375,7 +378,7 @@
 | 16 | `penetration_deep` | 穿透深度分析 | LLM |
 | 17 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
 | 18 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 19 | `portfolio_evolution` | 组合演进 | 始终显示（数据不可用时占位） |
+| 19 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
 | 20 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
 | 21 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 

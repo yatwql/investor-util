@@ -52,32 +52,36 @@ class TestReadSectionFlags:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
+            patch("src.python.config.is_enable_portfolio_evolution", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=True),
         ):
             flags = _read_section_flags({})
-        assert flags == {"b_series": True, "news": True, "history": True, "llm": True}
+        assert flags == {"b_series": True, "news": True, "history": True, "evolution": True, "llm": True}
 
     def test_all_disabled(self):
         with (
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=False),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
+            patch("src.python.config.is_enable_portfolio_evolution", return_value=False),
             patch("src.python.config.is_enable_llm", return_value=False),
         ):
             flags = _read_section_flags({})
-        assert flags == {"b_series": False, "news": False, "history": False, "llm": False}
+        assert flags == {"b_series": False, "news": False, "history": False, "evolution": False, "llm": False}
 
     def test_partial_flags(self):
         with (
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=True),
+            patch("src.python.config.is_enable_portfolio_evolution", return_value=False),
             patch("src.python.config.is_enable_llm", return_value=False),
         ):
             flags = _read_section_flags({})
         assert flags["news"] is False
         assert flags["llm"] is False
         assert flags["b_series"] is True
+        assert flags["evolution"] is False
 
 
 @pytest.mark.unit

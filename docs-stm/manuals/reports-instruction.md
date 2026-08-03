@@ -113,11 +113,11 @@
 
 ## 页面/章节分组
 
-21 个报告页签/章节按 `type` 划分为 5 组，各组显示条件和用途不同：
+21 个报告页签/章节按 `type` 划分为 6 组，各组显示条件和用途不同：
 
 ### ① 基础核心（type=always）
 
-始终显示，报告的基础骨架。共 7 个模块：
+始终显示，报告的基础骨架。共 6 个模块：
 
 | # | 页签 | type | 说明 |
 |:-:|------|:----:|------|
@@ -126,7 +126,6 @@
 | 3 | **持仓分类表** | always | 资产属性 + 投资分类聚合 |
 | 4 | **资产穿透TOP10** | always | 基金底层资产合并排序 |
 | 5 | **基金业绩分析** | always | 收益率、评级、基准对比 |
-| 19 | **组合演进** | always | 多快照组合净值/仓位趋势演进（数据不可用时占位） |
 | 20 | **数据源可用性矩阵** | always | 各数据源实时可用性状态汇总 |
 
 ### ② 基金深度分析（type=b_series）
@@ -189,10 +188,20 @@
 
 > 菜单 B/L 可输出，由 `history.fetch_mode` 配置（`"off"` / `"prompt"` / `"auto"`）控制获取行为，数据不可用时不阻断报告生成。
 
+### ⑥ 组合演进（type=evolution）
+
+由独立开关 `enable_portfolio_evolution` 控制，数据不可用时显示占位文本。共 1 个模块：
+
+| # | 页签 | type | 说明 |
+|:-:|------|:----:|------|
+| 19 | **组合演进** | evolution | 多快照组合净值/仓位趋势演进（数据不可用时占位） |
+
+> 菜单 E/B/L 可输出，依赖 `enable_portfolio_evolution = true`。持仓快照不受开关影响，始终自动记录，开关仅控制报告展示。
+
 ### 可见性规则总览
 
 两层可见性模型：
-- **board 层**：用户配置的章节开关（`enable_fund_deep_analysis`/`enable_news`/`enable_history`/`enabled_llm`），关闭则整个类型的章节完全隐藏
+- **board 层**：用户配置的章节开关（`enable_fund_deep_analysis`/`enable_news`/`enable_history`/`enable_portfolio_evolution`/`enabled_llm`），关闭则整个类型的章节完全隐藏
 - **data 层**：运行时数据可用性，某模块数据不可用时仅隐藏该模块自身
 - 两层 AND 关系：board 层关闭 → 隐藏全部；board 层开启但 data 层不可用 → 仅隐藏该模块
 
@@ -203,6 +212,7 @@
 | `news` | `enable_news` | 新闻获取成功 | B / L |
 | `llm` | `enabled_llm`（任一报告模块启用） | LLM 内容生成成功 | L |
 | `history` | `enable_history` | 历史走势数据可用（不可用时占位） | B / L |
+| `evolution` | `enable_portfolio_evolution` | 演进快照数据可用（不可用时占位） | E / B / L |
 
 ---
 

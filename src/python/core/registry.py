@@ -548,14 +548,14 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
     {"key": "portfolio_history", "name": "组合历史走势", "number": 17, "type": "history", "data_flag": None},
     {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 18, "type": "history", "data_flag": None},
-    # ── always 类型（始终显示；数据不足时展示层写占位文本） ──
+    # ── evolution 类型（独立开关 enable_portfolio_evolution 控制） ──
     # 组合演进：聚合本地多期快照，data_flag 控制章节可见性，
     # available=False 时模板/页签写占位（与 correlation 的降级模式一致）
     {
         "key": "portfolio_evolution",
         "name": "组合演进",
         "number": 19,
-        "type": "always",
+        "type": "evolution",
         "data_flag": "evolution_data",
     },
     # ── always 类型（始终显示） ──

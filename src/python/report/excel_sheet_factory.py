@@ -28,6 +28,7 @@ def create_sheets(
     enable_fund_deep_analysis: bool = False,
     enable_news: bool = True,  # board 层
     enable_history: bool = True,  # board 层
+    enable_portfolio_evolution: bool = True,  # board 层：组合演进
     enable_llm: bool = True,  # board 层
     data_availability: dict[str, bool] | None = None,  # data 层
 ) -> dict[str, Any]:
@@ -52,6 +53,7 @@ def create_sheets(
         "b_series": enable_fund_deep_analysis,
         "news": enable_news,  # ← 配置驱动的 board 层值
         "history": enable_history,
+        "evolution": enable_portfolio_evolution,
         "llm": enable_llm,
     }
 

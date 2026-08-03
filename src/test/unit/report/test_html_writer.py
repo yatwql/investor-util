@@ -1104,6 +1104,60 @@ class TestSectionOrderTemplateRendering(unittest.TestCase):
 
 
 # ============================================================
+#  组合演进可见性 — enable_portfolio_evolution board 层开关
+# ============================================================
+
+
+class TestComputeSectionVisibilityEvolution(unittest.TestCase):
+    """_compute_section_visibility 对组合演进章节的 board 层门控。"""
+
+    def _compute(self, enable_portfolio_evolution: bool, evolution_data: dict | None) -> dict:
+        from src.python.core.registry import get_report_section_order
+        from src.python.report.html_writer import _compute_section_visibility
+
+        order = get_report_section_order({})
+        _, svis, _ = _compute_section_visibility(
+            order,
+            None,
+            None,
+            None,
+            None,
+            include_news=True,
+            llm_enabled_flag=False,
+            enable_news=True,
+            enable_fund_deep_analysis=True,
+            enable_history=True,
+            enable_portfolio_evolution=enable_portfolio_evolution,
+            enable_llm=False,
+            factor_exposure=None,
+            correlation_data=None,
+            evolution_data=evolution_data,
+        )
+        return svis
+
+    def test_disabled_hides_section_even_with_data(self):
+        """enable_portfolio_evolution=False → 即使 evolution_data 可用章节也隐藏。"""
+        svis = self._compute(False, {"available": True, "periods": []})
+        self.assertFalse(svis.get("portfolio_evolution"), "关闭组合演进开关时章节应隐藏")
+
+    def test_enabled_with_data_shows_section(self):
+        """enable_portfolio_evolution=True + evolution_data 可用 → 章节可见。"""
+        svis = self._compute(True, {"available": True, "periods": []})
+        self.assertTrue(svis.get("portfolio_evolution"), "开启组合演进且数据可用时章节应可见")
+
+    def test_enabled_no_data_hides_section(self):
+        """enable_portfolio_evolution=True + evolution_data=None → 章节隐藏（data 层）。"""
+        svis = self._compute(True, None)
+        self.assertFalse(svis.get("portfolio_evolution"), "无组合演进数据时章节应隐藏")
+
+    def test_disabled_does_not_affect_other_sections(self):
+        """关闭组合演进不影响其他 always 章节（如 summary / data_source_status）。"""
+        svis = self._compute(False, None)
+        self.assertTrue(svis.get("summary"), "summary 应始终可见")
+        self.assertTrue(svis.get("data_source_status"), "数据源可用性矩阵应始终可见")
+
+
+# ============================================================
 #  app_version 页脚 — 版本号透传测试
 # ============================================================
 

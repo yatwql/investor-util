@@ -259,15 +259,15 @@ class TestReportSectionDefault:
             assert "data_flag" in sec, f"缺少 data_flag: {sec}"
 
     def test_type_values_are_valid(self):
-        """type 只能是 always/history/b_series/news/llm 之一。"""
-        valid_types = {"always", "history", "b_series", "news", "llm"}
+        """type 只能是 always/history/b_series/news/llm/evolution 之一。"""
+        valid_types = {"always", "history", "b_series", "news", "llm", "evolution"}
         for sec in _REPORT_SECTION_DEFAULT:
             assert sec["type"] in valid_types, f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"
 
     def test_always_type_has_no_data_flag(self):
-        """always 类型的 data_flag 应为 None（唯一例外：portfolio_evolution 用 data_flag 控制可见性，available=False 时展示层写占位，见 technical.md §4.12）。"""
+        """always 类型的 data_flag 应为 None。"""
         for sec in _REPORT_SECTION_DEFAULT:
-            if sec["type"] == "always" and sec["key"] != "portfolio_evolution":
+            if sec["type"] == "always":
                 assert sec["data_flag"] is None, f"{sec['key']}: always 类型不应有 data_flag"
 
     def test_non_always_type_has_data_flag(self):
@@ -300,6 +300,16 @@ class TestReportSectionDefault:
         assert sec["type"] == "b_series"
         assert sec["data_flag"] == "factor_exposure_data"
         assert sec["number"] == 10
+
+    def test_portfolio_evolution_registered_as_evolution_type(self):
+        """portfolio_evolution 应注册为 evolution 类型（独立开关 enable_portfolio_evolution 控制，
+        data_flag=evolution_data，available=False 时展示层写占位）。"""
+        evo = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "portfolio_evolution"]
+        assert len(evo) == 1, "缺少 portfolio_evolution 模块条目"
+        sec = evo[0]
+        assert sec["type"] == "evolution"
+        assert sec["data_flag"] == "evolution_data"
+        assert sec["number"] == 19
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""

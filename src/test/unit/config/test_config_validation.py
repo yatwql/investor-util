@@ -32,6 +32,7 @@ class TestValidationModuleImport(unittest.TestCase):
     def test_module_imported(self):
         """_validation 模块可导入。"""
         import src.python.config._validation as _v
+
         self.assertIsNotNone(_v)
 
     def test_constants_accessible(self):
@@ -300,6 +301,16 @@ class TestValidateEnableBoards(unittest.TestCase):
         n = val._validate_enable_boards({"enable_fund_deep_analysis": "yes"}, 0)
         self.assertEqual(n, 1)
 
+    def test_portfolio_evolution_non_bool_warns(self):
+        """enable_portfolio_evolution 非布尔值 → 告警。"""
+        n = val._validate_enable_boards({"enable_portfolio_evolution": "yes"}, 0)
+        self.assertEqual(n, 1)
+
+    def test_portfolio_evolution_valid_bool_no_issue(self):
+        """enable_portfolio_evolution 为合法布尔值 → 正常。"""
+        n = val._validate_enable_boards({"enable_portfolio_evolution": False}, 0)
+        self.assertEqual(n, 0)
+
 
 class TestValidateMarketHours(unittest.TestCase):
     """_validate_market_hours 测试。"""
@@ -438,11 +449,13 @@ class TestValidateConfigEntryPoint(unittest.TestCase):
 
     def test_multiple_issues_accumulate(self):
         """多个问题累加计数。"""
-        n = val.validate_config({
-            "holdings_filename": "",
-            "news_top_count": -5,
-            "cache_ttl": "invalid",
-        })
+        n = val.validate_config(
+            {
+                "holdings_filename": "",
+                "news_top_count": -5,
+                "cache_ttl": "invalid",
+            }
+        )
         self.assertEqual(n, 3)
 
     def test_validate_enable_llm_warns_on_unknown_key(self):
