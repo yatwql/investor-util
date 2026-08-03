@@ -648,7 +648,7 @@
 |:-------|:------:|:-----|
 | `llm_*`（5 项） | true（features.py 全部默认 true；news_correlation 实际启停通过 llm_settings.json 的 `enabled_llm` 控制，默认 false） | LLM 各模块独立启停 |
 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | **false**（全部默认关闭） | 辩论模式三增强通路：正反辩论/条件推理/集中度问答。菜单 **[S]** 可交互开关 |
-| `b_series_*`（4 项） | true | 基金深度分析模块 |
+| `fund_deep_analysis_*`（4 项） | true | 基金深度分析模块 |
 | `news_*`（5 项） | true（cls 默认 false） | 新闻源启停 |
 | `history_portfolio` / `history_benchmark` | true | 历史走势与基准指数开关 |
 | `metrics_*`（7 项） | true | 量化指标（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |

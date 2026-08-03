@@ -56,7 +56,7 @@ class TestReadSectionFlags:
             patch("src.python.config.is_enable_llm", return_value=True),
         ):
             flags = _read_section_flags({})
-        assert flags == {"b_series": True, "news": True, "history": True, "evolution": True, "llm": True}
+        assert flags == {"fund_deep_analysis": True, "news": True, "history": True, "evolution": True, "llm": True}
 
     def test_all_disabled(self):
         with (
@@ -67,7 +67,7 @@ class TestReadSectionFlags:
             patch("src.python.config.is_enable_llm", return_value=False),
         ):
             flags = _read_section_flags({})
-        assert flags == {"b_series": False, "news": False, "history": False, "evolution": False, "llm": False}
+        assert flags == {"fund_deep_analysis": False, "news": False, "history": False, "evolution": False, "llm": False}
 
     def test_partial_flags(self):
         with (
@@ -80,7 +80,7 @@ class TestReadSectionFlags:
             flags = _read_section_flags({})
         assert flags["news"] is False
         assert flags["llm"] is False
-        assert flags["b_series"] is True
+        assert flags["fund_deep_analysis"] is True
         assert flags["evolution"] is False
 
 

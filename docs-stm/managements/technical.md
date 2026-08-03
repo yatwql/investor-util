@@ -1201,12 +1201,12 @@ verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使�
 
 ```python
 board_flags = {
-    "always":    True,
-    "b_series":  enable_fund_deep_analysis,
-    "news":      enable_news,
-    "history":   enable_history,
-    "evolution": enable_portfolio_evolution,
-    "llm":       enable_llm,
+    "always":             True,
+    "fund_deep_analysis": enable_fund_deep_analysis,
+    "news":               enable_news,
+    "history":            enable_history,
+    "evolution":          enable_portfolio_evolution,
+    "llm":                enable_llm,
 }
 
 for sec in section_order:
@@ -1224,12 +1224,12 @@ for sec in section_order:
 | data_flag | 判定依据 | 对应 section.type | 说明 |
 |:----------|:---------|:-----------------|:------|
 | `None` | 始终可见 | `always` / `history` | 不依赖数据状态 |
-| `manager_data` | `manager_analysis is not None` | `b_series` | 基金经理变更监控 |
-| `overlap_data` | `overlap_matrix is not None` | `b_series` | 持仓重合度矩阵 |
-| `concentration_data` | `concentration_analysis is not None` | `b_series` | 持仓集中度监控 |
-| `style_data` | `style_analysis is not None` | `b_series` | 基金风格分析 |
-| `factor_exposure_data` | `factor_exposure is not None` | `b_series` | 因子暴露分析 |
-| `correlation_data` | `correlation_data is not None` | `b_series` | 持仓相关性矩阵 |
+| `manager_data` | `manager_analysis is not None` | `fund_deep_analysis` | 基金经理变更监控 |
+| `overlap_data` | `overlap_matrix is not None` | `fund_deep_analysis` | 持仓重合度矩阵 |
+| `concentration_data` | `concentration_analysis is not None` | `fund_deep_analysis` | 持仓集中度监控 |
+| `style_data` | `style_analysis is not None` | `fund_deep_analysis` | 基金风格分析 |
+| `factor_exposure_data` | `factor_exposure is not None` | `fund_deep_analysis` | 因子暴露分析 |
+| `correlation_data` | `correlation_data is not None` | `fund_deep_analysis` | 持仓相关性矩阵 |
 | `evolution_data` | `evolution_data is not None` | `evolution` | 组合演进（多快照趋势） |
 | `news_data_available` | `include_news` flag（新闻数据可用） | `news` | 新闻关联分析 |
 | `llm_data_available` | `llm_enabled_flag`（LLM 生成成功） | `llm` | LLM 全部 5 模块 |
@@ -1249,7 +1249,7 @@ for sec in section_order:
     "key": "fund_manager",      # 模块标识
     "name": "基金经理变更监控",   # 显示名称
     "number": 6,                 # 默认序号
-    "type": "b_series",          # 可见性类型
+    "type": "fund_deep_analysis",          # 可见性类型
     "data_flag": "manager_data", # 数据标志键名
 }
 ```
@@ -1644,7 +1644,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 柱状图 +
 |:-----|:---------|
 | **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定；因子指数**不作为 `_A_INDICES` 成员**（避免污染实时指数行情循环与报告"指数对比"章节噪声），代码集合定义为分析模块内部常量 |
 | **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "sina"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（降级接受），Tencent 故障时因子章节落 §1.4.5 数据不足分支 |
-| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`b_series`、data_flag=`factor_exposure_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号 |
+| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`factor_exposure_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号 |
 | **C14** (渲染期数据不可写入模块级全局变量) | 因子暴露数据通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
 | **C19** (pipeline_data Schema 契约) | 新增 `factor_exposure` 键（类型 `dict`），键结构见附录 H，先定义类型再使用 |
 | **§1.4.5** (数据降级治理) | 区分两分支：① **数据不足**——因子指数历史不足 36 期或有效样本 < 36，标记 `factor_exposure.available=false`，显示"数据不足"占位文本，**不走 DegradationTracker**（系数据量不足，非故障）；② **数据源故障**——`fetch_index_history` 返回空（chain 全失败），走 DegradationTracker 记录 T2 降级事件，显示"数据源暂不可用"，与数据不足文案区分。**绝不输出误导性数字** |
@@ -2690,9 +2690,9 @@ investor-util/
 | correlation_data | dict | 是 | 已实现 | prepare_report_data |
 | evolution_data | dict | 是 | 已实现 | prepare_report_data |
 
-> `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 §4.6（type=`b_series`、data_flag=`factor_exposure_data`），计算方案/架构约束/降级分支见 §4.8 因子暴露分析。
+> `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 §4.6（type=`fund_deep_analysis`、data_flag=`factor_exposure_data`），计算方案/架构约束/降级分支见 §4.8 因子暴露分析。
 
-> `correlation_data`（持仓相关性矩阵，C19 契约，11 键）：`{"available": bool, "status": str, "window": int, "sample_count": int, "codes": list[str], "names": {code: str}, "matrix": list[list[float\|None]], "p_values": list[list[float\|None]], "pairs": list[dict], "insufficient_codes": list[str], "note": str}`。下三角矩阵（row>col 有值、对角=1.0、上三角 None），配对明细含 code_a/name_a/code_b/name_b/pearson/p_value/significant/samples。由 `analysis/correlation.py` 计算、`report/orchestrator.py::compute_correlation_data` 注入。C7 注册见 §8.3（type=`b_series`、data_flag=`correlation_data`），数据不足（重叠样本 <60 / 品种 <2）落 §1.4.5 降级。
+> `correlation_data`（持仓相关性矩阵，C19 契约，11 键）：`{"available": bool, "status": str, "window": int, "sample_count": int, "codes": list[str], "names": {code: str}, "matrix": list[list[float\|None]], "p_values": list[list[float\|None]], "pairs": list[dict], "insufficient_codes": list[str], "note": str}`。下三角矩阵（row>col 有值、对角=1.0、上三角 None），配对明细含 code_a/name_a/code_b/name_b/pearson/p_value/significant/samples。由 `analysis/correlation.py` 计算、`report/orchestrator.py::compute_correlation_data` 注入。C7 注册见 §8.3（type=`fund_deep_analysis`、data_flag=`correlation_data`），数据不足（重叠样本 <60 / 品种 <2）落 §1.4.5 降级。
 
 > `evolution_data`（组合演进，C19 契约，多快照趋势聚合）：`{"available": bool, "snapshot_count": int, "min_snapshots": int, "periods": list[str], "total_value": list[float], "total_cost": list[float], "total_pnl": list[float], "holding_counts": list[int], "account_flows": {account: list[float]}, "hhi": list[float\|None], "top_holdings": list[dict], "reason": str}`。`top_holdings` 每项含 code/name/weights（各期占比 %）/present_count（出现期数）；历史快照 `market_value=0.0` 时权重回退成本口径。由 `analysis/portfolio_evolution.py` 计算、`report/orchestrator.py` 注入（C7 注册 type=`evolution`、data_flag=`evolution_data`，见 §4.12），有效快照 < MIN_SNAPSHOTS=3 时 `available=false` 落 §1.4.5 降级。
 

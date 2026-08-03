@@ -28,12 +28,12 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "category",           "name": "持仓分类表",                       "number": 3,  "type": "always"},
     {"key": "penetration",        "name": "资产穿透TOP10",                    "number": 4,  "type": "always"},
     {"key": "fund_performance",   "name": "基金业绩分析",                     "number": 5,  "type": "always"},
-    {"key": "fund_manager",       "name": "基金经理变更监控",                 "number": 6,  "type": "b_series"},
-    {"key": "fund_overlap",       "name": "持仓重合度矩阵",                   "number": 7,  "type": "b_series"},
-    {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8,  "type": "b_series"},
-    {"key": "fund_style",         "name": "基金风格分析",                     "number": 9,  "type": "b_series"},
-    {"key": "factor_exposure",    "name": "因子暴露分析",                     "number": 10, "type": "b_series"},
-    {"key": "correlation_analysis", "name": "持仓相关性矩阵",                 "number": 11, "type": "b_series"},
+    {"key": "fund_manager",       "name": "基金经理变更监控",                 "number": 6,  "type": "fund_deep_analysis"},
+    {"key": "fund_overlap",       "name": "持仓重合度矩阵",                   "number": 7,  "type": "fund_deep_analysis"},
+    {"key": "fund_concentration", "name": "持仓集中度监控",                   "number": 8,  "type": "fund_deep_analysis"},
+    {"key": "fund_style",         "name": "基金风格分析",                     "number": 9,  "type": "fund_deep_analysis"},
+    {"key": "factor_exposure",    "name": "因子暴露分析",                     "number": 10, "type": "fund_deep_analysis"},
+    {"key": "correlation_analysis", "name": "持仓相关性矩阵",                 "number": 11, "type": "fund_deep_analysis"},
     {"key": "news_correlation",   "name": "财经新闻热点与持仓关联分析",        "number": 12, "type": "news"},
     {"key": "global_macro",       "name": "全球政经局势",                     "number": 13, "type": "llm"},
     {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 14, "type": "llm"},
@@ -110,7 +110,7 @@ class TestExcelSheetOrder(unittest.TestCase):
                                 enable_fund_deep_analysis=True, enable_news=False, enable_llm=False,
                                 enable_history=False)
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT
-                         if sec["type"] in ("always", "b_series")]
+                         if sec["type"] in ("always", "fund_deep_analysis")]
         self.assertEqual(list(sheets.keys()), expected_keys)
         self.assertEqual(len(sheets), 12, "always + 基金深度分析 = 12")
 

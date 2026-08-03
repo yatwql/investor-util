@@ -107,7 +107,7 @@ def _compute_section_visibility(
     # board 层：内联 dict（与 Excel 端结构一致）
     board_flags: dict[str, bool] = {
         "always": True,
-        "b_series": enable_fund_deep_analysis,
+        "fund_deep_analysis": enable_fund_deep_analysis,
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "evolution": enable_portfolio_evolution,  # ← board 层：组合演进

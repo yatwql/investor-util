@@ -9,7 +9,7 @@
 >   - [按菜单快速索引](#按菜单快速索引)
 > - [页面/章节分组](#页面章节分组)
 >   - [基础核心（type=always）](#基础核心typealways)
->   - [基金深度分析（type=b_series）](#基金深度分析typeb_series)
+>   - [基金深度分析（type=fund_deep_analysis）](#基金深度分析typefund_deep_analysis)
 >   - [市场新闻（type=news）](#市场新闻typenews)
 >   - [LLM 分析（type=llm）](#llm-分析typellm)
 >   - [历史走势（type=history）](#历史走势typehistory)
@@ -94,11 +94,11 @@
 | 功能 | 报告位置 | 菜单 | 类型 |
 |:-----|:---------|:----:|:-----|
 | **基金业绩 5 级评级**（差异化阈值 + 超额收益修正，5 色标识） | §5 基金业绩分析 业绩评价/业绩基准/同类排名列 | E/B/L | always |
-| **基金经理变更监控**（快照式变更检测，1/3/6 月窗口三级预警） | §6 基金经理变更监控 | B/L | b_series |
-| **持仓重合度矩阵**（Jaccard + Overlap Ratio 双指标热力图） | §7 持仓重合度矩阵 | B/L | b_series |
-| **持仓集中度监控**（TOP3/5/10 占比 + 环比变化 + 三级预警） | §8 持仓集中度监控 | B/L | b_series |
-| **基金风格漂移**（市值/PE 加权六宫格 + 曼哈顿距离评分 0-4） | §9 基金风格分析 | B/L | b_series |
-| **因子暴露分析**（价值/成长/质量 3 因子 OLS 回归 + β 系数/显著性/风格归属占比） | §10 因子暴露分析 | B/L | b_series |
+| **基金经理变更监控**（快照式变更检测，1/3/6 月窗口三级预警） | §6 基金经理变更监控 | B/L | fund_deep_analysis |
+| **持仓重合度矩阵**（Jaccard + Overlap Ratio 双指标热力图） | §7 持仓重合度矩阵 | B/L | fund_deep_analysis |
+| **持仓集中度监控**（TOP3/5/10 占比 + 环比变化 + 三级预警） | §8 持仓集中度监控 | B/L | fund_deep_analysis |
+| **基金风格漂移**（市值/PE 加权六宫格 + 曼哈顿距离评分 0-4） | §9 基金风格分析 | B/L | fund_deep_analysis |
+| **因子暴露分析**（价值/成长/质量 3 因子 OLS 回归 + β 系数/显著性/风格归属占比） | §10 因子暴露分析 | B/L | fund_deep_analysis |
 
 ### 按菜单快速索引
 
@@ -128,18 +128,18 @@
 | 5 | **基金业绩分析** | always | 收益率、评级、基准对比 |
 | 20 | **数据源可用性矩阵** | always | 各数据源实时可用性状态汇总 |
 
-### ② 基金深度分析（type=b_series）
+### ② 基金深度分析（type=fund_deep_analysis）
 
 需要基金持仓数据，有数据才显示。共 6 个模块：
 
 | # | 页签 | type | 说明 |
 |:-:|------|:----:|------|
-| 6 | **基金经理变更监控** | b_series | 快照式变更检测，1/3/6 月窗口 |
-| 7 | **持仓重合度矩阵** | b_series | Jaccard + Overlap Ratio 双指标 |
-| 8 | **持仓集中度监控** | b_series | TOP3/5/10 占比 + 三级预警 |
-| 9 | **基金风格分析** | b_series | 市值/PE 加权六宫格 + 漂移评分 |
-| 10 | **因子暴露分析** | b_series | 价值/成长/质量 3 因子 OLS 回归 + 风格归属占比 |
-| 11 | **持仓相关性矩阵** | b_series | 下三角 Pearson 相关热力图 + 显著性标注 |
+| 6 | **基金经理变更监控** | fund_deep_analysis | 快照式变更检测，1/3/6 月窗口 |
+| 7 | **持仓重合度矩阵** | fund_deep_analysis | Jaccard + Overlap Ratio 双指标 |
+| 8 | **持仓集中度监控** | fund_deep_analysis | TOP3/5/10 占比 + 三级预警 |
+| 9 | **基金风格分析** | fund_deep_analysis | 市值/PE 加权六宫格 + 漂移评分 |
+| 10 | **因子暴露分析** | fund_deep_analysis | 价值/成长/质量 3 因子 OLS 回归 + 风格归属占比 |
+| 11 | **持仓相关性矩阵** | fund_deep_analysis | 下三角 Pearson 相关热力图 + 显著性标注 |
 
 > 菜单 B/L 可输出，有基金持仓数据且基金深度分析计算完成后才渲染。
 
@@ -208,7 +208,7 @@
 | type | board 层控制 | data 层条件 | 菜单来源 |
 |:-----|:------------|:------------|:---------|
 | `always` | 无条件 | 无 | E / B / L |
-| `b_series` | `enable_fund_deep_analysis` | 有基金持仓数据 | B / L |
+| `fund_deep_analysis` | `enable_fund_deep_analysis` | 有基金持仓数据 | B / L |
 | `news` | `enable_news` | 新闻获取成功 | B / L |
 | `llm` | `enabled_llm`（任一报告模块启用） | LLM 内容生成成功 | L |
 | `history` | `enable_history` | 历史走势数据可用（不可用时占位） | B / L |

@@ -4,7 +4,7 @@
   - 默认顺序完整性（len(_REPORT_SECTION_DEFAULT) 个模块，summary 开头/llm_usage 结尾）
   - 序号 1~N 连续递增
   - get_report_section_keys 完备性
-  - 6 种可见性类型计数正确（always=6, history=2, b_series=6, news=1, llm=5, evolution=1）
+  - 6 种可见性类型计数正确（always=6, history=2, fund_deep_analysis=6, news=1, llm=5, evolution=1）
   - 基金深度分析 data_flag 各不相同
   - 空配置与无配置行为一致
 
@@ -85,7 +85,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
 
     def test_default_fund_deep_analysis_type_has_6_sections(self):
         """基金深度分析类型模块共 6 个（含因子暴露、持仓相关性）。"""
-        fund_deep_analysis = [s for s in self._default if s["type"] == "b_series"]
+        fund_deep_analysis = [s for s in self._default if s["type"] == "fund_deep_analysis"]
         self.assertEqual(len(fund_deep_analysis), 6)
         keys = [s["key"] for s in fund_deep_analysis]
         self.assertIn("fund_manager", keys)
@@ -110,7 +110,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
 
     def test_different_data_flags_in_fund_deep_analysis(self):
         """基金深度分析的 data_flag 各不相同。"""
-        fund_deep_analysis = [s for s in self._default if s["type"] == "b_series"]
+        fund_deep_analysis = [s for s in self._default if s["type"] == "fund_deep_analysis"]
         flags = [s["data_flag"] for s in fund_deep_analysis]
         self.assertEqual(len(set(flags)), len(flags), f"data_flag 应各不相同: {flags}")
 
@@ -127,10 +127,12 @@ class TestScenarioSectionOrder(unittest.TestCase):
         type_counts: dict[str, int] = {}
         for sec in self._default:
             type_counts[sec["type"]] = type_counts.get(sec["type"], 0) + 1
-        self.assertEqual(set(type_counts.keys()), {"always", "history", "b_series", "news", "llm", "evolution"})
+        self.assertEqual(
+            set(type_counts.keys()), {"always", "history", "fund_deep_analysis", "news", "llm", "evolution"}
+        )
         self.assertEqual(type_counts["always"], 6)
         self.assertEqual(type_counts["history"], 2)
-        self.assertEqual(type_counts["b_series"], 6)
+        self.assertEqual(type_counts["fund_deep_analysis"], 6)
         self.assertEqual(type_counts["news"], 1)
         self.assertEqual(type_counts["llm"], 5)
         self.assertEqual(type_counts["evolution"], 1)

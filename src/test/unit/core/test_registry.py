@@ -259,8 +259,8 @@ class TestReportSectionDefault:
             assert "data_flag" in sec, f"缺少 data_flag: {sec}"
 
     def test_type_values_are_valid(self):
-        """type 只能是 always/history/b_series/news/llm/evolution 之一。"""
-        valid_types = {"always", "history", "b_series", "news", "llm", "evolution"}
+        """type 只能是 always/history/fund_deep_analysis/news/llm/evolution 之一。"""
+        valid_types = {"always", "history", "fund_deep_analysis", "news", "llm", "evolution"}
         for sec in _REPORT_SECTION_DEFAULT:
             assert sec["type"] in valid_types, f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"
 
@@ -293,11 +293,11 @@ class TestReportSectionDefault:
         assert keys.index("data_source_status") < keys.index("llm_usage")
 
     def test_factor_exposure_registered_as_fund_deep_analysis(self):
-        """factor_exposure 应注册为 b_series 模块（data_flag=factor_exposure_data），跟随 B2~B5 之后。"""
+        """factor_exposure 应注册为 fund_deep_analysis 模块（data_flag=factor_exposure_data），跟随 B2~B5 之后。"""
         fe = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "factor_exposure"]
         assert len(fe) == 1, "缺少 factor_exposure 模块条目"
         sec = fe[0]
-        assert sec["type"] == "b_series"
+        assert sec["type"] == "fund_deep_analysis"
         assert sec["data_flag"] == "factor_exposure_data"
         assert sec["number"] == 10
 

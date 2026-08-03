@@ -46,7 +46,7 @@ def _read_section_flags(config: dict) -> dict:
     )
 
     return {
-        "b_series": is_enable_fund_deep_analysis(config),
+        "fund_deep_analysis": is_enable_fund_deep_analysis(config),
         "news": is_enable_news(config),
         "history": is_enable_history(config),
         "evolution": is_enable_portfolio_evolution(config),

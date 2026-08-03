@@ -507,29 +507,41 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "penetration", "name": "资产穿透TOP10", "number": 4, "type": "always", "data_flag": None},
     {"key": "fund_performance", "name": "基金业绩分析", "number": 5, "type": "always", "data_flag": None},
     # ── 基金深度分析 类型（有数据才显示） ──
-    {"key": "fund_manager", "name": "基金经理变更监控", "number": 6, "type": "b_series", "data_flag": "manager_data"},
-    {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7, "type": "b_series", "data_flag": "overlap_data"},
+    {
+        "key": "fund_manager",
+        "name": "基金经理变更监控",
+        "number": 6,
+        "type": "fund_deep_analysis",
+        "data_flag": "manager_data",
+    },
+    {
+        "key": "fund_overlap",
+        "name": "持仓重合度矩阵",
+        "number": 7,
+        "type": "fund_deep_analysis",
+        "data_flag": "overlap_data",
+    },
     {
         "key": "fund_concentration",
         "name": "持仓集中度监控",
         "number": 8,
-        "type": "b_series",
+        "type": "fund_deep_analysis",
         "data_flag": "concentration_data",
     },
-    {"key": "fund_style", "name": "基金风格分析", "number": 9, "type": "b_series", "data_flag": "style_data"},
+    {"key": "fund_style", "name": "基金风格分析", "number": 9, "type": "fund_deep_analysis", "data_flag": "style_data"},
     # ── 基金深度分析 类型（有数据才显示；跟随 B2~B5 之后） ──
     {
         "key": "factor_exposure",
         "name": "因子暴露分析",
         "number": 10,
-        "type": "b_series",
+        "type": "fund_deep_analysis",
         "data_flag": "factor_exposure_data",
     },
     {
         "key": "correlation_analysis",
         "name": "持仓相关性矩阵",
         "number": 11,
-        "type": "b_series",
+        "type": "fund_deep_analysis",
         "data_flag": "correlation_data",
     },
     # ── news 类型（需启用新闻功能） ──
