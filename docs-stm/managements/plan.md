@@ -40,6 +40,8 @@
 
 Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做多用户/LLM 在线修改/实时日志流。**运维与安全成本最高，单人工具需谨慎，建议作为 P3 最后项。**
 
+> 详细评估与实施拆分见 [`plan-web-ui-implementation.md`](../plan/plan-web-ui-implementation.md)（收益/风险/架构约束 C1-C20 符合性/`src/python/web/` 模块拆分/安全设计/API/测试/实施阶段）。
+
 | 阶段 | 工作量 |
 |------|:------:|
 | MVP 核心 | 3d |

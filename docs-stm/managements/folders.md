@@ -617,7 +617,8 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
-│   │   └── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
+│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
+│   │   └── plan-web-ui-implementation.md #   plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
