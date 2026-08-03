@@ -40,7 +40,7 @@
 | `core/provider_registry.py` | 100% 熔断/缓存/策略 | Provider 注册/熔断（默认 3 次→冷却 300s→自动恢复，批量 API 如 eastmoney_industry 为 6 次→120s）、会话缓存 get/set/contains/clear/淘汰、策略选择(交易时段/熔断/QDII豁免)、链式熔断检测、并发安全、审计报告、phase_timeout 嵌套保护 |
 | `tui/handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
 | `tui/tui_menu.py` | 所有 16 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航 |
-| `analysis/correlation.py` | Pearson 相关矩阵计算+降级 | 已知答案（r=±1/缩放不变）、不显著配对、下三角布局、配对 |r| 降序、数据不足/单品种/无有效收益降级、名称回退、C19 契约键、NaN/Inf/None 过滤（rf-157 回归）、重复日期去重、日期缺口对齐、极大幅值钳位、多品种大矩阵 |
+| `analysis/correlation.py` | Pearson 相关矩阵计算+降级 | 已知答案（r=±1/缩放不变）、不显著配对、下三角布局、配对 |r| 降序、数据不足/单品种/无有效收益降级、名称回退、C19 契约键、NaN/Inf/None 过滤、重复日期去重、日期缺口对齐、极大幅值钳位、多品种大矩阵 |
 | `report/correlation_sheet.py` | 相关性页签 Excel 呈现 | 矩阵/配对/说明三区齐全、下三角+对角+上三角空、N/A 格、available=False/None 占位、配对 |r| 降序 |
 | `report/report_template.html`（correlation 模块） | 相关性章节 HTML 呈现 | 汇总卡+相关度最高+热力矩阵+配对明细、单元格样式分支（强正/强负/不显著/N/A）、不足品种提示、available=False 降级占位、correlation_data=None 章节隐藏 |
 | `analysis/portfolio_evolution.py` | 多快照趋势聚合计算 | 多账户合并、快照缺市值回退成本权重、HHI 计算、TOP 持仓变迁、快照数不足 available=False、历史快照容错跳过 |
@@ -218,7 +218,7 @@
 | **辩论配置段缺失** | llm_settings.json 无 debate 段 → 使用全缺省配置 | ✅ `test_debate_edge.py` `test_missing_config_section` |
 | **辩论 Token 预算 1× 超限** | pro+con 总和超过 1× 预算 → 跳过 synthesis | ✅ `test_debate_token_budget.py` `test_budget_exceeded_skips_synthesis` |
 | **辩论 Token 预算 2× 超限** | pro 单独超过 2× 预算 → 跳过全部 debate | ✅ `test_debate_token_budget.py` `test_budget_2x_skips_all` |
-| **相关性 NaN 虚假相关（rf-157）** | NaN 收益不得产生虚假 r=1.0/p=0.0 显著相关 | ✅ `test_correlation_edge.py` `TestNaNReturnRegression`（单 NaN 过滤贴近干净数据 / 全 NaN 序列剔除降级 / NaN 混入常数序列仍受守卫） |
+| **相关性 NaN 虚假相关** | NaN 收益不得产生虚假 r=1.0/p=0.0 显著相关 | ✅ `test_correlation_edge.py` `TestNaNReturnRegression`（单 NaN 过滤贴近干净数据 / 全 NaN 序列剔除降级 / NaN 混入常数序列仍受守卫） |
 | **相关性全 NaN 品种剔除** | 全 NaN 序列整条剔除，跌破 MIN_HOLDINGS → available=False | ✅ `test_correlation_edge.py` `test_all_nan_series_dropped` |
 | **相关性日期缺口对齐** | 缺失中间日期/重复日期 → 仅用交集对齐不崩溃 | ✅ `test_correlation_edge.py` `TestDateHandling` |
 
@@ -499,7 +499,7 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量）+ `python scripts/check-history-traces.py --ci`（注释历史痕迹检查）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
+9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + 手动菜单 E/B/L + Excel/HTML 视觉检查 + Provider 联通性
 11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + 断网降级/旧缓存兼容/跨池污染确认
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。

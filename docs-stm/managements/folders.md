@@ -560,7 +560,8 @@ investor-util/
 │   ├── check-version-consistency.py #   版本号一致性检查
 │   ├── calibrate-dedup-threshold.py #   新闻去重阈值校准
 │   ├── collect-test-coverage.py     #   测试覆盖计数收集（pytest --collect-only 快照，供 test-coverage.md 更新）
-│   ├── check-history-traces.py      #   注释历史痕迹检查
+│   ├── check-code-traces.py         #   代码注释历史痕迹检查
+│   ├── check-doc-traces.py          #   文档历史痕迹检查
 │   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
 │   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
 │   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）

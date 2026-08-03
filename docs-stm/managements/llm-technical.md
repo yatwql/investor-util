@@ -985,7 +985,7 @@ _session_usage ──→ format_session_usage()
 
 ### 10.1 定价合并规则
 
-`_PRICING_MERGED` 运行时合并自两层：
+`_PRICING_MERGED` 在运行时合并两层：
 
 1. **内置默认**（`core/constants.py` 中的 `MODEL_PRICING` 字典）
 2. **用户覆盖**（`llm_settings.json` → `pricing` 字段，模块加载时 `reload_pricing()` 自动合并）
