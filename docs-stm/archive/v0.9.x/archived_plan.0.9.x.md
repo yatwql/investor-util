@@ -2,8 +2,8 @@
 
 > 归档时间：2026-08-03
 > 原始文件：`docs-stm/managements/plan.md`（当前迭代部分）
-> 涵盖版本：v0.9.0 ~ v0.9.9（2026-07-30 ~ 2026-08-03）
-> 归档内容：本迭代已实现的计划项（plan-1/2/3/5/6/7/9/12）及其迭代设计文件
+> 涵盖版本：v0.9.0 ~ v0.9.11（2026-07-30 ~ 2026-08-03）
+> 归档内容：本迭代已实现的计划项（plan-1/2/3/5/6/7/9/11/12/13）及其迭代设计文件
 
 ---
 
@@ -23,9 +23,10 @@
 - [`plan-portfolio-evolution.md`](portfolio-evolution/plan-portfolio-evolution.md) — plan-6 多快照趋势追踪/组合演进设计（原 `plan-advanced-analysis.md` §3）
 - [`plan-fix-deepseek-thinking-exhaustion.md`](fix-deepseek-thinking/plan-fix-deepseek-thinking-exhaustion.md) — rf-122 DeepSeek thinking 思考耗尽修复设计
 - [`plan-fix-qa-concentration-and-chart-optimization.md`](qa-concentration-chart-optimization/plan-fix-qa-concentration-and-chart-optimization.md) — rf-150 集中度问答输出 + 穿透柱状图区分/布局优化修复设计
+- [`dark-mode-implementation.md`](dark-mode/dark-mode-implementation.md) — plan-11 HTML 暗色模式实施记录（CSS 变量统一 + localStorage 主题切换 + Chart.js 随主题重绘 + 打印切浅色）
 
-> 已完成项设计文档均已归档至本目录（2026-08-03）：plan-2/3（`correlation-drawdown/`）、plan-9（`first-run-wizard/`）、plan-5（`whatif-simulation/`）、plan-6（`portfolio-evolution/`）、rf-122（`fix-deepseek-thinking/`）、rf-150（`qa-concentration-chart-optimization/`）。plan-12（TOC）无独立设计文档（直接实现），不涉及归档。
-> 未完成项（plan-4 已放弃 / plan-8/10/11）设计文档保留在 `docs-stm/plan/`：`plan-advanced-analysis.md`（仅 plan-4 已放弃）、`plan-web-ui.md`（plan-8/10/11）、`plan-engineering.md`（rf-1 已随 v0.8.x 归档，文件为 stub）。
+> 已完成项设计文档均已归档至本目录（2026-08-03）：plan-2/3（`correlation-drawdown/`）、plan-9（`first-run-wizard/`）、plan-5（`whatif-simulation/`）、plan-6（`portfolio-evolution/`）、plan-11（`dark-mode/`）、rf-122（`fix-deepseek-thinking/`）、rf-150（`qa-concentration-chart-optimization/`）。plan-12（TOC）/plan-13 无独立设计文档（直接实现），不涉及归档。
+> 未完成项（plan-4 已放弃 / plan-8/10）设计文档保留在 `docs-stm/plan/`：`plan-advanced-analysis.md`（仅 plan-4 已放弃）、`plan-web-ui.md`（plan-8/10）、`plan-engineering.md`（rf-1 已随 v0.8.x 归档，文件为 stub）。
 
 ## v0.9.x 已完成项
 
@@ -39,11 +40,14 @@
 | plan-12 | **HTML 报告左侧可折叠 TOC** | 左侧固定目录栏（列出全部可见章节，点击平滑定位）+ 一键收起/展开（localStorage 持久化）+ 滚动高亮当前章节 + 窄屏隐藏 + 打印隐藏 | 0.5d | ✅ 已完成（v0.9.7，2026-08-03） |
 | plan-6 | **多快照趋势追踪（组合演进）** | 多期快照聚合 → 总市值/HHI/TOP 变迁趋势 + 账户配置流（`analysis/portfolio_evolution.py` + Excel/HTML 3 图渲染） | 3d | ✅ 已完成（v0.9.8，2026-08-03） |
 | plan-5 | **调仓 What-if 模拟** | 双持仓成本口径 diff 报告（`whatif` CLI + Excel 3 页签 + HTML 双栏双环图独立页） | 5d | ✅ 已完成（v0.9.8，2026-08-03） |
+| plan-11 | **HTML 报告暗色模式** | 页面级颜色统一为 CSS 变量，右上角浮动切换按钮（浅/深），主题偏好 localStorage 持久化（首次默认浅色）；Chart.js 图表随主题重绘，打印自动切浅色；主报告 + 调仓 What-if 独立页双端生效 | 0.5d | ✅ 已完成（v0.9.11，2026-08-03） |
+| plan-13 | **组合演进纳入报告可选环节配置** | 组合演进（#19）由 `always` 改为独立 `evolution` 类型，新增 `enable_portfolio_evolution`（默认 `true`）控制 board 层可见性；与 `enable_fund_deep_analysis`、`enable_history` 相互独立；持仓快照始终自动记录；菜单 `P` 新增第 4 项切换 | 0.5d | ✅ 已完成（v0.9.11，2026-08-03） |
 
 ## 归档说明
 
 - plan-1 三个设计文档（实施方案/风险分析/验证清单）2026-08-02 由 `docs-stm/plan/` 移入本目录 `chartjs-upgrade/`。
 - plan-7 设计内容为原 `docs-stm/plan/plan-advanced-analysis.md` §4，2026-08-02 抽取为独立文件移入本目录 `factor-exposure/`；`plan-advanced-analysis.md` 已同步裁剪（保留 plan-4/5/6 内容）。
 - 2026-08-03 追加归档已完成项记录（迁移自 `plan.md`）：plan-2/3/9/12（v0.9.7 发布）、plan-5/6（v0.9.8 发布）。
-- 2026-08-03 完成项设计文档统一归档至本目录（目录名与内容相关、混合内容按任务拆分）：plan-2/3 → `correlation-drawdown/`（设计 + 实施总纲，原 `plan-implement-2-3-9.md` 按内容拆分）、plan-9 → `first-run-wizard/`、plan-5 → `whatif-simulation/`、plan-6 → `portfolio-evolution/`、rf-122 → `fix-deepseek-thinking/`、rf-150 → `qa-concentration-chart-optimization/`；`docs-stm/plan/` 仅保留未完成项（plan-4 已放弃 / plan-8/10/11）设计文档。
-- 版本号：本归档涵盖已发布版本 v0.9.0 ~ v0.9.9（当前开发版本 v0.9.10-dev，归档时点为 2026-08-03），归档目录按版本段命名 v0.9.x。
+- 2026-08-03 完成项设计文档统一归档至本目录（目录名与内容相关、混合内容按任务拆分）：plan-2/3 → `correlation-drawdown/`（设计 + 实施总纲，原 `plan-implement-2-3-9.md` 按内容拆分）、plan-9 → `first-run-wizard/`、plan-5 → `whatif-simulation/`、plan-6 → `portfolio-evolution/`、rf-122 → `fix-deepseek-thinking/`、rf-150 → `qa-concentration-chart-optimization/`；`docs-stm/plan/` 仅保留未完成项（plan-4 已放弃 / plan-8/10）设计文档。
+- 版本号：本归档涵盖已发布版本 v0.9.0 ~ v0.9.11（当前开发版本 v0.9.12-dev，归档时点为 2026-08-03），归档目录按版本段命名 v0.9.x。
+- 2026-08-03 追加归档已完成项记录（迁移自 `plan.md`）：plan-11 HTML 暗色模式、plan-13 组合演进开关（v0.9.11 发布）。其中「组合演进纳入报告可选环节配置」原编号 plan-12 与已归档的 plan-12（HTML 左侧可折叠 TOC）序号复用，按「已归档序号不回收」规则重编号为 plan-13。
