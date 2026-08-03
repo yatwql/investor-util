@@ -14,12 +14,18 @@
 ### Fix
 
 - **rf-166** TUI 按 W 调仓模拟 output_dir 相对路径 bug：`get_config_cache()` 未初始化时回退 `{}` 导致输出目录依赖启动目录；改为回退 `get_config()`（absolutized 路径），与 CLI 一致
-- **rf-165** TUI 按 W 调仓模拟单持仓文件场景：持仓目录只有基准一份文件时候选为空直接退出不生成报告；改为引导手动输入目标文件完整路径（`_input_candidate_path`）
+- **rf-165** TUI 按 W 调仓模拟单持仓文件场景：持仓目录只有基准一份文件时候选为空直接退出不生成报告；改为引导选择目标文件（自动复制模板 / 手动输入完整路径 / 取消），不再直接退出
 - **rf-167** 缓存原子写测试隔离缺陷：`test_set_atomic_write_content` 误扫全局系统临时目录（断言对象与原子写实际目录/后缀不符），并行测试下偶发失败；改为扫描缓存目录内 `.tmp` 残留
 
 ### Docs
 
 - 发布门禁（P2）补充代码/文档历史痕迹检查：`check-code-traces.py --ci` + `check-doc-traces.py --ci`（与 P0 一致），见 `testplan.md` §6.3 第 11 条与 `CLAUDE.md` 发布门禁（P2）
+
+### Test
+
+- 新增 `test_whatif_writer.py`（4 用例）：调仓模拟报告输出归档格式——Excel/HTML 最新版固定名 + 日期目录归档版 + 触发 `_cleanup_old_archives` + 最新版被占用抛 PermissionError / 归档版写失败仅告警
+- `test_handlers_whatif.py` 增 3 用例：单文件场景选 `[1]` 自动复制模板返回模板路径 / 无效选择后复制 / 复制失败（OSError）返回 None
+- `test_set_atomic_write_content` 隔离修复（rf-167 回归）：扫描缓存目录 `.tmp` 残留而非全局系统临时目录
 
 ---
 
