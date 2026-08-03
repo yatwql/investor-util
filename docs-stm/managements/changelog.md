@@ -12,7 +12,7 @@
 
 ### Refactor
 
-- plan-12 序号复用修正（rf-160）：组合演进开关重编号 plan-13，与已归档的 plan-12（HTML 左侧可折叠 TOC）冲突消除；plan.md / changelog 同步
+- plan-12 序号复用修正（rf-170）：组合演进开关重编号 plan-13，与已归档的 plan-12（HTML 左侧可折叠 TOC）冲突消除；plan.md / changelog 同步
 
 ## [0.9.11] - 2026-08-03
 

@@ -48,7 +48,7 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
-| **rf-160** | plan-12 序号复用：组合演进开关（v0.9.11）与已归档的 plan-12（HTML 左侧可折叠 TOC，v0.9.7）同名，违反「已归档或已完成的序号不回收」 | 重编号为 plan-13：plan.md 完成注记/详情块、changelog [0.9.11] 条目同步改名；归档时 v0.9.x 序列无重复 | changelog [0.9.12-dev] Refactor |
+| **rf-170** | plan-12 序号复用：组合演进开关（v0.9.11）与已归档的 plan-12（HTML 左侧可折叠 TOC，v0.9.7）同名，违反「已归档或已完成的序号不回收」 | 重编号为 plan-13：plan.md 完成注记/详情块、changelog [0.9.11] 条目同步改名；归档时 v0.9.x 序列无重复 | changelog [0.9.12-dev] Refactor |
 
 
 ---
@@ -57,7 +57,7 @@
 
 ### 归档档案
 
-- [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.10（2026-07-30 ~ 2026-08-03）
+- [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.11（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
 - [`archived_review-findings.0.7.x.md`](../archive/v0.7.x/archived_review-findings.0.7.x.md) 
 - [`archived_review-findings.0.6.x.md`](../archive/v0.6.x/archived_review-findings.0.6.x.md)
