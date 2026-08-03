@@ -1931,9 +1931,11 @@ report/ 渲染                      # Excel 页签 + HTML 章节（模板 contex
 
 双持仓（基准 base / 目标 candidate）**成本口径截面比较**，输出 diff 报告（`analysis/whatif.py` 计算 → `report/whatif_writer.py` 输出 Excel + HTML 独立报告）。
 
-**设计边界（[`plan-whatif-simulation.md`](../archive/v0.9.x/whatif-simulation/plan-whatif-simulation.md) §1 风险）**：
+**设计边界（数据源可行性约束）**：
 - **成本口径**：candidate 无市场历史，无法取实时市值/净值，所有指标（权重/集中度）基于 `成本 = 份额 × 每份成本`，纯结构层、**零网络请求**（"只能做截面比较"）。
-- **不可回测**：What-if 无真实交易数据，不产出任何回测类结论（夏普/波动率等）。
+- **不可回测**：What-if 无真实交易数据，不产出任何回测类结论（夏普/波动率等）；量化指标仅作**截面结构对比**（权重/集中度/HHI），不表达预期收益。
+- **双份数据内存**：同时加载 base + candidate 两份持仓计算，内存与缓存用量约为单份的 2 倍；净值曲线无历史（新持仓未经历市场），不做时间序列比较。
+- **勿用于回测误用**：用户不得把 What-if 的量化指标当作回测结果——它没有真实交易数据支撑，仅反映结构差异。
 
 **变动类型**（复用 `schemas/history.py _DiffAction` 语义）：新增 / 清仓 / 加仓 / 减仓 / 不变。
 
