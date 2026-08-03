@@ -1,6 +1,6 @@
 # LLM 集成层技术设计
 
-> 文档版本：0.9.7-dev
+> 文档版本：0.9.12-dev
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -100,8 +100,8 @@
               │ Token预算/摘要   │          │ MD→HTML 转换       │
               └──────────────────┘          └────────────────────┘
               ┌──────────────────┐          ┌────────────────────┐
-              │ circuit_breaker  │          │ fact_checker.py    │
-              │ .py              │          │ 事实锚定校验        │
+              │ circuit_breaker  │          │ fact_checker/      │
+              │ .py              │          │ 子包，9 个模块      │
               │ LLM 端点熔断器    │          └────────────────────┘
               └──────────────────┘
               ┌──────────────────┐
@@ -160,7 +160,7 @@ skeleton.py:generate_llm_content()
 | `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、单 Provider 分派 | `call_llm()` / `call_single_provider()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `call_llm_with_retry()` |
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
-| `fact_checker.py` | 基础设施 | LLM 输出事实锚定校验（数值一致性/品种存在性/排名正确性）+ 自动修正 | `run_fact_check()` |
+| `fact_checker/`（子包 9 模块，`__init__.py` 重导出 4 公开函数） | 基础设施 | LLM 输出事实锚定校验（数值一致性/品种存在性/排名正确性）+ 自动修正 | `run_fact_check()` |
 | `fallback.py` | 基础设施 | 全模块失败时的降级占位模板 | `get_fallback_content()` |
 | `prompts_core.py` | 工具 | System Prompt 常量 + 上下文构建块（数据降级/收益归因/竞争语境/再平衡/概念板块/管线差异） | `_SYSTEM_*` 常量 + `_build_system_debate_synthesis()` |
 | `prompts_tables.py` | 工具 | 持仓/穿透/指标/情景/数据质量/汇率等数据块格式化为 Markdown | `_format_holdings_block()` / `_build_holdings_summary()` |
@@ -172,7 +172,6 @@ skeleton.py:generate_llm_content()
 | `circuit_breaker.py` | 工具 | LLM 端点熔断器（连续 3 次失败 + 固定 60s 冷却） | `get_circuit_status()` |
 | `markdown.py` | 工具 | Markdown→HTML 转换 | `markdown_to_html()` |
 | `_api_claude.py` / `_api_gemini.py` / `_api_openai.py` | 私有 | 各 Provider 单次调用实现（自包含依赖，委托 api_base 重试 + Extended Thinking 注入），api.py 分派目标 | `call_claude()` / `call_gemini()` / `call_openai()` |
-| `_call_claude.py` / `_call_gemini.py` / `_call_openai.py` | 私有 | 各 Provider 单次调用实现（与 `_api_*.py` 功能等价的并列入口） | `call_claude()` 等 |
 | `_batch_mode.py` | 私有 | 批量模式分块执行（`_BATCH_CHUNK_SIZE=10` 每批、并行度 6） | `run_batch_mode()` |
 
 ### 2.2 四大+一模块详情
@@ -447,7 +446,7 @@ if not any(needs.values()):
 
 ### 4.4 pipeline_data 注入与 history_data 暴露
 
-`pipeline_data`（组合历史走势时间维度上下文，含 F1→F2 diff 差异摘要）可选传递给 `expert_review` 和 `health_check`，使 LLM 能感知持仓环比变化（新增/清仓/加仓/减仓品种、总市值/总盈亏变化百分比）。
+`pipeline_data`（组合历史走势时间维度上下文，含快照 diff 差异摘要）可选传递给 `expert_review` 和 `health_check`，使 LLM 能感知持仓环比变化（新增/清仓/加仓/减仓品种、总市值/总盈亏变化百分比）。
 
 **history_data 暴露**：`generate_all_llm()` 接收 `history_data` 参数，包含组合历史日收益率序列、基准指数日收益率序列等时间序列数据。该数据在 prompt 中以紧凑图表形式注入，使 LLM 能感知组合的历史波动特征和相对大盘表现，增强智囊团深度复盘和持仓体检报告中的趋势分析能力。
 
@@ -481,14 +480,14 @@ call_llm(system_prompt, user_prompt, llm_config, ...)
     │            └─ 无 ref → 内联字段回退
     │
     │          _call_provider_entry(entry, ...)
-    │            ├─ "claude"  → _call_claude()
+    │            ├─ "claude"  → call_claude()（_api_claude.py）
     │            │   Anthropic Messages API
     │            │   + Extended Thinking 注入
     │            │   + Prompt Caching (cache_control)
-    │            ├─ "openai"  → _call_openai()
+    │            ├─ "openai"  → call_openai()（_api_openai.py）
     │            │   OpenAI Chat Completions API
     │            │   (也兼容 DeepSeek 等 OpenAI 兼容端点)
-    │            └─ "gemini"  → _call_gemini()
+    │            └─ "gemini"  → call_gemini()（_api_gemini.py）
     │                Google Gemini API (generateContent)
     │                + ThinkingConfig 注入 (generationConfig.thinkingConfig.thinkingBudget)
     │
@@ -847,6 +846,7 @@ cache_get(optimistic_key, ttl) → 命中 → 直接返回（+ 缓存标记）
 - 流动性（场内场外/停牌/封闭期）
 - 收益合理性（与市场/同类对比）
 - 成本结构（分布与浮盈浮亏比）
+- 数据质量（输入数据完整性与可靠性，引用【数据质量降级】事件）
 
 **穿透深度分析** (`_SYSTEM_PENETRATION_DEEP`)：三节分析（行业集中度、品种集中度、国别/币种暴露）+ 综合建议。
 
@@ -984,7 +984,7 @@ _session_usage ──→ format_session_usage()
 
 ### 10.1 定价合并规则
 
-`_PRICING_MERGED` 运行时合并自两层：
+`_PRICING_MERGED` 在运行时合并两层：
 
 1. **内置默认**（`core/constants.py` 中的 `MODEL_PRICING` 字典）
 2. **用户覆盖**（`llm_settings.json` → `pricing` 字段，模块加载时 `reload_pricing()` 自动合并）

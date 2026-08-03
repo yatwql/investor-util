@@ -236,22 +236,59 @@ class TestDebateProconFlow(unittest.TestCase):
         """pro + con 超 token 预算时不调用 synthesis，返回 (pro, con, None)。"""
         from src.python.llm.generators import generate_debate_procon
 
-        # 较长文本触发 token 预算上限（threshold ≈ 10400 chars, 2x ≈ 20800 chars）
-        long_pro = "600519 " + "好" * 6000
+        # 显式低预算（threshold = 100 chars，2x = 200 chars）触发守卫：
+        # pro 短（pro 单独 < 2x 不回退全部）、con 长（pro+con 超 1x 跳过 synthesis）。
+        # 正常三段输出远低于默认预算（48000），守卫仅在病态输出时触发，
+        # 故用显式低预算构造超限场景。
+        kwargs = dict(self.base_kwargs)
+        kwargs["llm_config"] = {
+            "debate": {
+                "max_total_tokens_per_report": 100,
+                "per_call_timeout_override": 30,
+                "procon": {"per_call_max_tokens": 8192, "synthesis_temperature": 0.5},
+            },
+        }
         long_con = "600519 " + "差" * 6000
 
         with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
             mock_gen.side_effect = [
-                (long_pro, False),
+                ("600519 适合长期持有。", False),
                 (long_con, False),
             ]
-            pro, con, syn = generate_debate_procon(**self.base_kwargs)
+            pro, con, syn = generate_debate_procon(**kwargs)
 
             self.assertIsNotNone(pro)
             self.assertIsNotNone(con)
             self.assertIsNone(syn)
             # 超预算后 synthesis 不调用
             self.assertEqual(mock_gen.call_count, 2)
+
+    def test_per_call_max_tokens_passed_as_override(self):
+        """per_call_max_tokens 通过 max_tokens_override 生效。
+
+        max_tokens_override 优先于模块级 max_tokens_{module_key}（expert_review=24000），
+        使 per_call_max_tokens 真正限定每阶段输出上限。三段调用均须携带该参数。
+        """
+        from src.python.llm.generators import generate_debate_procon
+
+        kwargs = dict(self.base_kwargs)
+        kwargs["llm_config"] = {
+            "debate": {
+                "max_total_tokens_per_report": 100,
+                "per_call_timeout_override": 30,
+                "procon": {"per_call_max_tokens": 4096, "synthesis_temperature": 0.5},
+            },
+        }
+        with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
+            mock_gen.side_effect = [
+                ("pro 文本", False),
+                ("con 文本", False),
+                ("syn 文本", False),
+            ]
+            generate_debate_procon(**kwargs)
+            self.assertEqual(mock_gen.call_count, 3)
+            for call in mock_gen.call_args_list:
+                self.assertEqual(call.kwargs.get("max_tokens_override"), 4096)
 
     # ── 测试：穿透资产代码加入 valid_codes（幻觉过滤误伤修复） ──
 

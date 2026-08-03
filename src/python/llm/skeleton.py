@@ -417,6 +417,7 @@ def _run_standard_mode(
     system_prompt_default: str,
     prompt_builder: Any,
     max_tokens_default: int,
+    max_tokens_override: int | None,
     timeout_default: float,
     output_brief_limit: int,
     system_prompt: str | None = None,
@@ -431,6 +432,8 @@ def _run_standard_mode(
     """标准 LLM 单篇生成模式：缓存 → 调用 → 处理结果。
 
     Args:
+        max_tokens_override: 不为 None 时强制作为本次调用 max_tokens，
+            优先于模块级 ``max_tokens_{module_key}`` 配置。
         system_prompt: 不为 None 时覆盖 system prompt（不走 llm_config 配置）。
         user_prompt: 不为 None 时跳过 prompt_builder，直接使用此值。
         raw_filter_fn: 在 markdown_to_html 之前对 LLM 原始输出应用的过滤函数。
@@ -466,7 +469,11 @@ def _run_standard_mode(
         _user,
         cache_enabled,
         force,
-        max_tokens=llm_config.get(f"max_tokens_{module_key}", max_tokens_default),
+        max_tokens=(
+            max_tokens_override
+            if max_tokens_override is not None
+            else llm_config.get(f"max_tokens_{module_key}", max_tokens_default)
+        ),
         timeout=llm_config.get(f"timeout_{module_key}", timeout_default),
         temperature=llm_config.get(f"temperature_{module_key}"),
         model=llm_config.get(f"model_{module_key}"),
@@ -488,6 +495,7 @@ def generate_llm_module(
     system_prompt_default: str = "",
     prompt_builder: Any = None,
     max_tokens_default: int = 4096,
+    max_tokens_override: int | None = None,
     timeout_default: float = 120.0,
     output_brief_limit: int = 300,
     # ── 辩论模式覆盖参数（None 时使用默认行为） ──
@@ -510,6 +518,10 @@ def generate_llm_module(
 
     标准模式（无 batch_preparer）：生成单篇分析内容。
     批量模式（有 batch_preparer）：逐条缓存、分批并行、JSON 解析。
+
+    ``max_tokens_override`` 显式覆盖单次调用 max_tokens，优先于模块级
+    ``max_tokens_{module_key}`` 配置（辩论模式用 ``debate.procon.per_call_max_tokens``
+    限定每阶段输出，避免继承 expert_review 模块的宽松上限）。None 时回退现有逻辑。
 
     ``raw_filter_fn`` 在 markdown_to_html 之前对 LLM 原始输出应用
     （如辩论模式的虚构代码过滤），保证过滤作用于带换行的 Markdown
@@ -559,6 +571,7 @@ def generate_llm_module(
         system_prompt_default,
         prompt_builder,
         max_tokens_default,
+        max_tokens_override,
         timeout_default,
         output_brief_limit,
         system_prompt=system_prompt,

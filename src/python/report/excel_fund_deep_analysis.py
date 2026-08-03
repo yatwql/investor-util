@@ -51,11 +51,14 @@ def write_fund_deep_analysis_sheets(
     modules: dict[str, Any],
     prog: ProgressReporter,
     factor_exposure: dict[str, Any] | None = None,
+    correlation_data: dict[str, Any] | None = None,
 ) -> None:
     """写入基金深度分析页签。
 
     Args:
         factor_exposure: 因子暴露 C19 契约 dict，来自 pipeline_data；
+            未提供或 available=False 时页签写入占位（§1.4.5 降级治理）。
+        correlation_data: 持仓相关性 C19 契约 dict，来自 pipeline_data；
             未提供或 available=False 时页签写入占位（§1.4.5 降级治理）。
     """
     if not enable_fund_deep_analysis:
@@ -200,3 +203,15 @@ def write_fund_deep_analysis_sheets(
         except Exception as e:
             logger.warning("因子暴露分析页签写入失败: %s", e)
             prog.add_error("因子暴露分析页签写入失败")
+
+    # ── 持仓相关性矩阵（数据已在编排层组装，见 pipeline_data["correlation_data"]） ──
+    write_corr = modules.get("write_correlation_sheet")
+    ws_corr = sheets.get("correlation_analysis")
+    if ws_corr is not None and write_corr is not None:
+        prog.info("正在写入持仓相关性矩阵页签...")
+        try:
+            write_corr(ws_corr, correlation_data)
+            prog.ok("持仓相关性矩阵页签写入完成")
+        except Exception as e:
+            logger.warning("持仓相关性矩阵页签写入失败: %s", e)
+            prog.add_error("持仓相关性矩阵页签写入失败")

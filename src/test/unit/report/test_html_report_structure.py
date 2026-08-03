@@ -531,6 +531,18 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         "drawdown_start": "2026-01-01",
         "drawdown_end": "2026-01-01",
         "annualized_volatility": 0.18,
+        "drawdown_available": True,  # 有效交易日 ≥ MIN_SPAN 才渲染回撤明细（上游计算）
+        "drawdown_events": [
+            {
+                "peak_date": "2026-01-01",
+                "trough_date": "2026-01-01",
+                "recovery_date": "",
+                "drawdown_pct": 5.0,
+                "duration_days": 0,
+                "recovery_days": None,
+                "recovered": False,
+            }
+        ],
         "warnings": None,
         "failed_holdings": None,
         "successful_holdings": None,
@@ -700,6 +712,54 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNone(section.find(id="chart_industry_bar"))
         self.assertIsNone(section.find(id="chart_penetration_bar"))
 
+    def test_all_charts_have_captions(self) -> None:
+        """6 张图均在下方渲染图下说明（.chart-caption），标注该图是什么图表。
+
+        用户需求：报告中每个图表下方标注图表说明（如「TOP 10 持仓资产」）。
+        说明置于 .chart-box 容器外（避免固定高度溢出），跟随 canvas 渲染分支。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+            "industry_bar": {"labels": ["白酒", "电池"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台", "宁德时代"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "radar": {"labels": ["夏普比率"], "datasets": [{"label": "量化指标", "data": [1.2]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        captions = soup.select(".chart-caption")
+        self.assertEqual(len(captions), 6, "6 张图应恰好渲染 6 个图下说明")
+        texts = [c.get_text(strip=True) for c in captions]
+        for expected in (
+            "组合净值走势",
+            "历史回撤走势",
+            "资产构成分布",
+            "持仓行业分布",
+            "TOP 10 持仓资产",
+            "组合量化指标画像",
+        ):
+            self.assertIn(expected, texts, f"图下说明应包含「{expected}」")
+        # 穿透 TOP10 图注位于其 canvas 之后
+        pen_caption = soup.find("div", class_="chart-caption", string="TOP 10 持仓资产")
+        self.assertIsNotNone(pen_caption)
+        pen_canvas = soup.find(id="chart_penetration_bar")
+        pen_box = pen_canvas.parent  # .chart-box
+        box_next = pen_box.find_next_sibling()
+        self.assertEqual(box_next, pen_caption, "穿透 TOP10 图注应紧跟其图表容器")
+
+    def test_caption_not_rendered_when_chart_empty(self) -> None:
+        """图表数据为空时对应图注不渲染（说明跟随 canvas 渲染分支）。
+
+        净值/回撤 canvas 无条件渲染（无 labels 守卫）→ 图注仍出现；
+        Doughnut/行业/穿透/Radar 空数据 → 渲染占位而非图注。
+        """
+        soup = self._render_interactive()  # chart_datasets 全空
+        captions = soup.select(".chart-caption")
+        texts = [c.get_text(strip=True) for c in captions]
+        self.assertEqual(len(captions), 2, "仅净值+回撤两图有图注（其余四图空数据）")
+        self.assertIn("组合净值走势", texts)
+        self.assertIn("历史回撤走势", texts)
+        for absent in ("资产构成分布", "持仓行业分布", "TOP 10 持仓资产", "组合量化指标画像"):
+            self.assertNotIn(absent, texts, f"空数据时不应渲染图注「{absent}」")
+
     def test_radar_chart_rendered_when_labels(self) -> None:
         """量化指标 radar 有 labels 时渲染 canvas。"""
         overrides = {
@@ -771,10 +831,10 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
             )
 
     def test_chart_scripts_loaded_in_order(self) -> None:
-        """加载顺序：chart-print → chart-config → chart-export → chart-init（登记/导出先于初始化）。"""
+        """加载顺序：chart-print → chart-config → chart-export → chart-common → chart-init（登记/导出/公共 helper 先于初始化）。"""
         soup = self._render_interactive()
         chart_scripts = [s.get("src") for s in soup.select("script[src]") if (s.get("src") or "").startswith("chart-")]
-        for fname in ("chart-print.js", "chart-config.js", "chart-export.js", "chart-init.js"):
+        for fname in ("chart-print.js", "chart-config.js", "chart-export.js", "chart-common.js", "chart-init.js"):
             self.assertIn(fname, chart_scripts, f"{fname} 应被模板引用")
         self.assertLess(
             chart_scripts.index("chart-print.js"),
@@ -788,8 +848,13 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         )
         self.assertLess(
             chart_scripts.index("chart-export.js"),
+            chart_scripts.index("chart-common.js"),
+            "chart-export.js 必须在 chart-common.js 之前加载",
+        )
+        self.assertLess(
+            chart_scripts.index("chart-common.js"),
             chart_scripts.index("chart-init.js"),
-            "chart-export.js 必须在 chart-init.js 之前加载",
+            "chart-common.js 必须在 chart-init.js 之前加载（chart-init 依赖 ChartCommon）",
         )
 
     def test_print_css_forces_light_theme(self) -> None:
@@ -837,6 +902,318 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNotNone(soup.find(id="portfolioChart"), "Flag OFF 时应保留旧净值 Canvas")
         self.assertIsNotNone(soup.find(id="drawdownChart"), "Flag OFF 时应保留旧回撤 Canvas")
         self.assertIn("drawSimpleChart", str(soup), "Flag OFF 时应保留旧绘图函数")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 暗色模式（主题切换）
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlTheme(unittest.TestCase):
+    """HTML 暗色模式（主题切换）结构测试 — 按钮/脚本/CSS 变量/打印隐藏。
+
+    主题元素为模板静态结构（不受章节可见性影响），用 _render_interactive
+    渲染完整页面后断言：
+      - 浮动切换按钮存在且带 aria-label
+      - theme.js 脚本被引用
+      - :root 页面级 CSS 变量（--bg/--surface/--text）
+      - [data-theme="dark"] 深色覆盖块
+      - @media print 隐藏切换按钮
+    """
+
+    def _render_theme_soup(self) -> BeautifulSoup:
+        """渲染完整交互模板（主题元素为静态结构，与章节可见性无关）。"""
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["enable_interactive_charts"] = True
+        data["chart_datasets"] = {k: {"labels": [], "datasets": []} for k in TestHtmlInteractiveCharts._DATASET_KEYS}
+        return _render_template(data)
+
+    def test_theme_toggle_button_present(self) -> None:
+        """浮动右上角切换按钮存在，含 aria-label 与 title（可访问性）。"""
+        soup = self._render_theme_soup()
+        btn = soup.select_one("button.theme-toggle-btn")
+        self.assertIsNotNone(btn, "应存在 theme-toggle-btn 浮动切换按钮")
+        self.assertEqual(btn.get("aria-label"), "切换深色模式", "按钮 aria-label 应描述主题切换")
+        self.assertIsNotNone(btn.get("title"), "按钮应含 title 提示")
+        self.assertIn("🌙", btn.get_text(), "浅色默认态按钮应显示 🌙 图标（可切深色）")
+
+    def test_theme_js_loaded(self) -> None:
+        """模板引用 theme.js（主题切换 主题切换脚本）。"""
+        soup = self._render_theme_soup()
+        scripts = [s.get("src") for s in soup.select("script[src]")]
+        self.assertIn("theme.js", scripts, "模板应加载 theme.js")
+
+    def test_theme_js_loaded_after_toc(self) -> None:
+        """theme.js 在 toc.js 之后加载（保证按钮可访问性逻辑不与 toc 冲突）。"""
+        soup = self._render_theme_soup()
+        srcs = [s.get("src") for s in soup.select("script[src]")]
+        toc_idx = srcs.index("toc.js")
+        theme_idx = srcs.index("theme.js")
+        self.assertLess(toc_idx, theme_idx, "toc.js 应早于 theme.js 加载")
+
+    def test_root_css_variables(self) -> None:
+        """:root 定义页面级 CSS 变量（--bg/--surface/--text 等）。"""
+        soup = self._render_theme_soup()
+        style = soup.find("style").get_text()
+        for var_name in ("--bg:", "--surface:", "--text:", "--profit:", "--loss:"):
+            self.assertIn(var_name, style, f":root 应定义 {var_name} 页面级变量")
+
+    def test_dark_theme_override_block(self) -> None:
+        """存在 [data-theme="dark"] 深色覆盖块（含深色背景/提亮语义色）。"""
+        soup = self._render_theme_soup()
+        style = soup.find("style").get_text()
+        self.assertIn('[data-theme="dark"]', style, 'style 应含 [data-theme="dark"] 覆盖块')
+        self.assertIn("--bg: #121212", style, "深色块应定义深色背景")
+        self.assertIn("--surface: #1e1e1e", style, "深色块应定义深色卡片表面")
+
+    def test_theme_button_hidden_in_print(self) -> None:
+        """@media print 隐藏切换按钮（打印不出现浮动控件）。"""
+        soup = self._render_theme_soup()
+        style = soup.find("style").get_text()
+        self.assertIn("@media print", style, "模板应含打印媒体查询")
+        self.assertIn(".theme-toggle-btn { display: none", style, "打印时应隐藏主题切换按钮")
+
+    def test_css_variables_used_for_theme_aware_colors(self) -> None:
+        """语义色使用 var(--xxx) 而非硬编码（暗色下自动适配）。"""
+        soup = self._render_theme_soup()
+        html = str(soup)
+        # 盈利/亏损色应通过变量引用；不应再出现旧硬编码红绿
+        self.assertNotIn("color: #CC0000", html, "盈利色不应硬编码 #CC0000")
+        self.assertNotIn("color: #009900", html, "亏损色不应硬编码 #009900")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 章节底部"回到顶部"链接
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlBackToTop(unittest.TestCase):
+    """每个章节底部都应有一个回到顶部链接，点击跳转 #report-top。
+
+    用户需求：HTML 报告中每个章节底部提供链接，快速回到报告头部。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+
+    def test_report_top_anchor_exists(self):
+        """报告头部存在唯一 #report-top 锚点。"""
+        anchors = self.soup.find_all(id="report-top")
+        self.assertEqual(len(anchors), 1, f"应恰好存在 1 个 #report-top 锚点，实际 {len(anchors)}")
+        self.assertIn(
+            "report-header",
+            anchors[0].get("class", []),
+            "#report-top 锚点应位于报告头部",
+        )
+
+    def test_every_section_has_exactly_one_back_to_top_link(self):
+        """每个 .section 底部都有且仅有一个指向 #report-top 的链接。"""
+        sections = self.soup.select("div.section")
+        self.assertGreaterEqual(len(sections), 1, "模板应渲染至少一个章节")
+        for sec in sections:
+            links = sec.select('.back-to-top-link a[href="#report-top"]')
+            self.assertEqual(
+                len(links),
+                1,
+                f"#{sec.get('id')} 应恰好有 1 个指向 #report-top 的链接，实际 {len(links)}",
+            )
+
+    def test_back_to_top_link_has_visible_text(self):
+        """回到顶部链接含可读文字（标题 + 箭头）。"""
+        first = self.soup.select_one("div.section .back-to-top-link a[href='#report-top']")
+        self.assertIsNotNone(first, "应至少渲染一个回到顶部链接")
+        text = first.get_text(strip=True)
+        self.assertIn("回到顶部", text, f"链接文字应含「回到顶部」，实际为「{text}」")
+
+    def test_back_to_top_is_last_child_of_section(self):
+        """回到顶部链接是每个章节的最后一个子元素（紧贴章节底部）。"""
+        sections = self.soup.select("div.section")
+        for sec in sections:
+            children = sec.find_all(recursive=False)
+            self.assertTrue(children, f"#{sec.get('id')} 应有子元素")
+            last = children[-1]
+            self.assertTrue(
+                last.name == "div" and "back-to-top-link" in last.get("class", []),
+                f"#{sec.get('id')} 最后一个子元素应为 .back-to-top-link，实际 <{last.name}> class={last.get('class')}",
+            )
+
+
+class TestHtmlTocSidebar(unittest.TestCase):
+    """左侧目录 TOC 结构测试 — 可展开/收起的章节快速定位栏。
+
+    用户需求：HTML 报告左侧提供 TOC，点击快速定位到具体章节，且可展开/收起。
+    渲染侧校验：目录项 ↔ section 一一对应、折叠/展开按钮存在、JS 加载。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+
+    # ── TOC sidebar 本体 ──────────────────────────────────────
+
+    def test_toc_sidebar_present(self):
+        """存在唯一的 #toc-sidebar 左侧栏，且带章节 aria-label。"""
+        sidebars = self.soup.find_all(id="toc-sidebar")
+        self.assertEqual(len(sidebars), 1, f"应恰好 1 个 #toc-sidebar，实际 {len(sidebars)}")
+        self.assertEqual(sidebars[0].name, "aside", "#toc-sidebar 应为 <aside> 语义元素")
+        self.assertEqual(sidebars[0].get("aria-label"), "章节目录")
+
+    def test_toc_link_count_matches_sections(self):
+        """目录链接数量 = 可见模块数（全部可见 = 17）。"""
+        links = self.soup.select("#toc-sidebar a[href^='#sec-']")
+        self.assertEqual(len(links), 17, f"目录应有 17 个链接，实际 {len(links)}")
+
+    def test_every_toc_link_has_corresponding_section(self):
+        """每个目录链接的 href 指向一个存在的 section id。"""
+        links = self.soup.select("#toc-sidebar a[href^='#sec-']")
+        for link in links:
+            href = link.get("href", "")
+            section_id = _get_section_id_from_href(href)
+            target = self.soup.find(id=section_id)
+            self.assertIsNotNone(target, f"目录链接 {href} 无对应 section")
+            self.assertTrue("section" in target.get("class", []), f"{href} 对应元素应带 .section 类")
+
+    def test_toc_link_text_shows_number_and_name(self):
+        """目录链接文字含「编号、章节名」。"""
+        for sec in self.order:
+            link = self.soup.select_one(f"#toc-sidebar a[href='#sec-{sec['key']}']")
+            self.assertIsNotNone(link, f"目录缺少章节 {sec['key']}")
+            text = link.get_text(strip=True)
+            expected = f"{sec['number']}、{sec['name']}"
+            self.assertEqual(text, expected, f"{sec['key']} 目录文案应为「{expected}」，实际「{text}」")
+
+    # ── 折叠/展开控件 ─────────────────────────────────────────
+
+    def test_collapse_button_in_header(self):
+        """目录头部含「收起」按钮（折叠 TOC 用）。"""
+        btn = self.soup.select_one("#toc-sidebar .toc-collapse-btn")
+        self.assertIsNotNone(btn, "目录头部应有收起按钮")
+        self.assertIn("收起", btn.get_text(strip=True))
+        self.assertEqual(btn.get("aria-label"), "收起目录")
+
+    def test_expand_toggle_button_present(self):
+        """存在独立的展开按钮 #toc-toggle-btn（收起后悬浮显示）。"""
+        btn = self.soup.select_one("button#toc-toggle-btn")
+        self.assertIsNotNone(btn, "应有展开目录的悬浮按钮")
+        self.assertEqual(btn.get("aria-label"), "展开目录")
+
+    def test_toc_js_loaded(self):
+        """模板引用 toc.js（R21 本地 bundle 加载）。"""
+        self.assertIn("toc.js", str(self.soup), "模板应加载 toc.js")
+
+    def test_toc_links_follow_section_order(self):
+        """目录项顺序 = section_order 顺序。"""
+        links = self.soup.select("#toc-sidebar a[href^='#sec-']")
+        order_keys = [sec["key"] for sec in self.order]
+        link_keys = [link.get("href").replace("#sec-", "") for link in links]
+        self.assertEqual(link_keys, order_keys, "目录顺序应与 section_order 一致")
+
+
+class TestHtmlTocVisibility(unittest.TestCase):
+    """左侧目录 TOC 可见性测试 — 不可见模块不出现在目录中。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+
+    def _render_with_visibility(self, visible_keys: set[str]) -> BeautifulSoup:
+        sv_dict = {sec["key"]: sec["key"] in visible_keys for sec in self.order}
+        return _render_template(
+            _build_minimal_render_data(self.order, self.numbers, sv_dict),
+        )
+
+    def test_toc_only_always_visible(self):
+        """仅 always 模块可见时，目录也只有对应链接。"""
+        soup = self._render_with_visibility(_ALWAYS_KEYS)
+        links = soup.select("#toc-sidebar a[href^='#sec-']")
+        link_keys = {link.get("href", "").replace("#sec-", "") for link in links}
+        self.assertEqual(link_keys, _ALWAYS_KEYS, f"目录应只含 always 模块: {_ALWAYS_KEYS}")
+
+    def test_toc_tracks_nav_when_subset(self):
+        """部分模块可见时，目录链接集合 = 横向 section-nav 链接集合。"""
+        visible = _ALWAYS_KEYS | _FUND_DEEP_ANALYSIS_KEYS | _LLM_KEYS
+        soup = self._render_with_visibility(visible)
+        toc_keys = {a.get("href") for a in soup.select("#toc-sidebar a[href^='#sec-']")}
+        nav_keys = {a.get("href") for a in soup.select("nav.section-nav a")}
+        self.assertEqual(toc_keys, nav_keys, "目录与横向导航的链接集合应一致")
+
+
+class TestSummaryDateTimeValueStyles(unittest.TestCase):
+    """投资分析汇总：统计时间/所属交易日 值单元格样式（加粗 / 加粗+加大+蓝色）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+
+    def _value_td_style(self, label: str) -> str:
+        """在投资分析汇总中按标签名找对应行的值单元格（第2列）内联 style。"""
+        summary = self.soup.find(id="sec-summary")
+        self.assertIsNotNone(summary, "未找到 #sec-summary")
+        for tr in summary.select("table.kv-table tr"):
+            tds = tr.find_all("td")
+            if len(tds) == 2 and tds[0].get_text(strip=True) == label:
+                return tds[1].get("style", "")
+        self.fail(f"未找到「{label}」行")
+
+    def test_stat_time_value_bold(self):
+        """统计时间值加粗。"""
+        style = self._value_td_style("统计时间")
+        self.assertRegex(
+            style,
+            r"font-weight:\s*(?:700|bold)",
+            f"统计时间值应加粗，style={style!r}",
+        )
+
+    def test_trading_day_value_bold_larger_blue(self):
+        """所属交易日值加粗+加大+蓝色。"""
+        style = self._value_td_style("所属交易日")
+        self.assertRegex(
+            style,
+            r"font-weight:\s*(?:700|bold)",
+            f"所属交易日值应加粗，style={style!r}",
+        )
+        self.assertRegex(
+            style,
+            r"font-size:\s*1[5-9]px",
+            f"所属交易日字号应加大，style={style!r}",
+        )
+        self.assertRegex(
+            style,
+            r"color:\s*#2E75B6",
+            f"所属交易日值应为蓝色 2E75B6，style={style!r}",
+        )
+
+    def test_kv_label_style_unaffected(self):
+        """标签列不新增内联样式（仅值列加样式）。"""
+        summary = self.soup.find(id="sec-summary")
+        for tr in summary.select("table.kv-table tr"):
+            tds = tr.find_all("td")
+            if len(tds) == 2 and tds[0].get_text(strip=True) in ("统计时间", "所属交易日"):
+                self.assertEqual(
+                    tds[0].get("style", ""),
+                    "",
+                    "标签列不应新增内联样式",
+                )
 
 
 if __name__ == "__main__":

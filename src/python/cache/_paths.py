@@ -18,12 +18,18 @@ _CACHE_DIR = os.path.join(PROJECT_ROOT, "data/cache")
 _GZIP_THRESHOLD = 100 * 1024  # 100KB 以上的缓存自动 gzip
 _GZIP_SUFFIX = ".gz"
 
+# 缓存 schema 版本号：变更缓存载荷结构/键语义时递增。
+# 版本号作为键后缀（{key}_v{N}），升级后旧缓存键全部对不上 → 自动失效重建。
+# 采用后缀而非前缀：前缀匹配的清理/统计/敏感前缀识别（price_/holding_ 等）
+# 不受影响，无需额外剥离逻辑。
+_CACHE_KEY_VERSION = "v2"
+
 
 def _cache_path(key: str) -> str:
     """返回缓存文件完整路径（始终带 .json 后缀，由 get/set 决定是否追加 .gz）。"""
     # 防止目录穿越
     safe_name = key.replace("/", "_").replace("\\", "_").replace("..", "_")
-    return os.path.join(_CACHE_DIR, f"{safe_name}.json")
+    return os.path.join(_CACHE_DIR, f"{safe_name}_{_CACHE_KEY_VERSION}.json")
 
 
 def get_cache_dir() -> str:

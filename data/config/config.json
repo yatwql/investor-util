@@ -79,13 +79,15 @@
   },
 
   // ── F. 业绩基准与无风险利率 ──
-  "risk_free_rate": null,
+  "risk_free_rate": null,  // Rf 手动配置（None=自动获取，填小数如0.0174或百分比如1.74）
   "user_fund_benchmarks": {},
+  // 竞争语境对比指数池（默认沪深300+中证500+中证全债）
   "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
 
   // ── G. 组合历史走势与持仓快照 ──
   "history": {
-    "analysis": "auto",
+    "fetch_mode": "auto",  // 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
+    "lookback_days": 90,  // 历史走势取数窗口（K 线条数/交易日），需≥60（回撤分析最少交易日）才计算回撤分析，上限 365
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,
@@ -96,26 +98,26 @@
 
   // ── H. 业绩评价配置 ──
   "performance_evaluation": {
-    "excess_threshold_up": 80,
-    "excess_threshold_down": 40
+    "excess_threshold_up": 80,  // 超额收益 ≥ 此值 → 评级上调一级
+    "excess_threshold_down": 40  // 超额收益 < 此值 → 评级下调一级
   },
 
   // ── I. 再平衡配置 ──
   "rebalance": {
-    "threshold": 0.15,
-    "deviation_threshold": 0.05,
-    "profile": "moderate",
-    "silence_days": 30,
-    "target_allocation": {},
-    "equity_fixed_income": {}
+    "threshold": 0.15,  // 单品种权重超限阈值（默认 15%）
+    "deviation_threshold": 0.05,  // 大类/品种配置偏离阈值（默认 5%）
+    "profile": "moderate",  // 预设阈值集: conservative / moderate / aggressive / custom
+    "silence_days": 30,  // 再平衡信号静默期天数（默认 30 天）
+    "target_allocation": {},  // 目标配置 Schema（空=不启用目标配置检查）
+    "equity_fixed_income": {}  // 权益/固收超大类目标配置（空=不启用）
   },
 
   // ── J. 流动性配置 ──
-  "redemption_limits": {},
+  "redemption_limits": {},  // 场外基金单日赎回上限（code → 金额，空=未配置）
 
   // ── K. 匿名化配置 ──
   "anonymization": {
-    "mode": "off"
+    "mode": "off"  // 匿名化模式：off/code_display/full_anonymous/summary
   },
 
   // ── L. 批量并行调度 ──
@@ -130,6 +132,5 @@
     "eastmoney": 0.1,  // 东方财富行情（100ms）
     "tiantian": 0.5,  // 天天基金（500ms）
     "eastmoney_industry": 0.05  // 东方财富行业（50ms）
-  },
-  "_privacy_notice_shown": true
+  }
 }

@@ -25,6 +25,7 @@ MENU_ITEMS: list[MenuItem] = [
     ("E", "生成基础版Excel分析报告", None, False),
     ("B", "生成标准报告(Excel+HTML) [按章节配置]", None, False),
     ("L", "生成完整报告(Excel+HTML) [含LLM，按章节配置]", None, False),
+    ("W", "调仓 What-if 模拟（对比两份持仓，独立报告）", None, False),
     ("C", "配置持仓信息目录", None, False),
     ("F", "配置持仓信息文件名", None, False),
     ("O", "配置报告输出目录", None, False),
@@ -32,7 +33,7 @@ MENU_ITEMS: list[MenuItem] = [
     ("2", "更新行情类缓存（含价格/指数等）", None, False),
     ("3", "清理过期缓存文件", None, False),
     ("4", "查看缓存/状态统计", None, False),
-    ("P", "配置报告可选章节（基金分析/市场新闻/历史走势）", None, False),
+    ("P", "配置报告可选章节（基金分析/市场新闻/历史走势/组合演进）", None, False),
     ("I", "管理对比指数池（自定义基准指数）", None, False),
     ("A", "配置持仓匿名化（代码/名称脱敏）", None, False),
     ("S", "配置LLM分析章节", None, False),
@@ -56,7 +57,7 @@ def get_config_cache() -> dict | None:
 
 
 # ── LLM 菜单隐藏模块 ──────────────────────────────────────
-# 旧设计遗留的辩论三模块（debate_pro/con/synthesis）在注册表中保留
+# 辩论三模块（debate_pro/con/synthesis）在注册表中保留
 # （缓存 TTL/前缀清理仍依赖），但不在菜单/状态面板展示，避免误导为可开关模块。
 # 实际辩论开关由 features.json 的实验性 Flag（正反辩论/条件推理/集中度问答）控制。
 LLM_MENU_HIDDEN_KEYS: frozenset[str] = frozenset({"debate_pro", "debate_con", "debate_synthesis"})
@@ -137,8 +138,10 @@ def _show_privacy_and_security_status() -> None:
     _anon_labels = {"off": "关闭", "code_display": "代码显示", "full_anonymous": "完全匿名", "summary": "汇总"}
     _anon_display = _anon_labels.get(_anon_mode, _anon_mode)
 
-    # 检查隐私提示是否已显示过
-    _privacy_shown = _cfg.get("_privacy_notice_shown", False)
+    # 检查隐私提示是否已显示过（机器本地状态）
+    from src.python.config._local_state import get_flag
+
+    _privacy_shown = get_flag("_privacy_notice_shown")
     _privacy_icon = f"{GREEN}✓{RESET}" if _privacy_shown else f"{YELLOW}待首次报告生成时显示{RESET}"
 
     print(f"  持仓匿名化: {_anon_display}")

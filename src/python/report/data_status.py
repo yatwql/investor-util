@@ -82,6 +82,10 @@ STATUS_MESSAGES: dict[str, str] = {
     "concentration_unavailable": "持仓集中度数据暂不可用",
     "style_unavailable": "基金风格数据暂不可用",
     "factor_exposure_unavailable": "因子暴露数据暂不可用",
+    "correlation_unavailable": "持仓相关性数据暂不可用",
+    "evolution_unavailable": "组合演进数据暂不可用（快照不足，趋势待积累）",
+    "whatif_unavailable": "调仓对比数据暂不可用（基准或目标持仓为空）",
+    "whatif_backtest_unavailable": "时序回测不可用（未指定生效日或生效日后数据不足）",
     # 新闻 / 预警
     "news_all_failed": "新闻数据暂不可用，请检查网络连接",
     "warning_unavailable": "预警数据暂不可用",

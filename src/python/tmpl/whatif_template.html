@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>调仓 What-if 模拟 - {{ now }}</title>
+    <style>
+        :root {
+            /* 页面级主题变量（暗色模式（主题切换）；与 report_template.html 同套，浅色默认值 = 原硬编码色） */
+            --bg: #f0f2f5;
+            --surface: #ffffff;
+            --surface-2: #f8f9fa;
+            --text: #333333;
+            --text-secondary: #555555;
+            --text-tertiary: #666666;
+            --text-muted: #888888;
+            --text-faint: #999999;
+            --border: #dddddd;
+            --border-light: #eeeeee;
+            --border-dashed: #d0d5dd;
+            --table-th-bg: #f0f4f8;
+            --table-even: #f8f9fa;
+            --table-hover: #eef5fb;
+            --notice-bg: #E3F2FD;
+            --notice-border: #1976D2;
+            --empty-section-bg: #fafafa;
+            --profit: #CC0000;
+            --loss: #009900;
+            --success: #2e7d32;
+            --file-card-bg: #f8f9fa;
+            --file-card-border: #e3e8ef;
+            --file-arrow: #bbb;
+            --arrow-up: #2E7D32;
+            --arrow-down: #CC0000;
+            --arrow-flat: #888;
+            --whatif-added-bg: #C6EFCE;
+            --whatif-removed-bg: #FFC7CE;
+            --whatif-increased-bg: #FFEB9C;
+            --whatif-decreased-bg: #DDEBF7;
+            --whatif-unchanged-bg: #F2F2F2;
+            --badge-added-bg: #d4edda;
+            --badge-added-text: #155724;
+            --badge-removed-bg: #f8d7da;
+            --badge-removed-text: #721c24;
+            --badge-increased-bg: #fff3cd;
+            --badge-increased-text: #856404;
+            --badge-decreased-bg: #d1ecf1;
+            --badge-decreased-text: #0c5460;
+            --badge-unchanged-bg: #e9ecef;
+            --badge-unchanged-text: #6c757d;
+            /* Chart.js 主题色（与主报告 chart-config.js 读取一致） */
+            --chart-primary: #2E75B6;
+            --chart-bar-2: #E68A00;
+            --chart-secondary: #CC0000;
+            --chart-danger: #CC0000;
+            --chart-danger-transparent: rgba(204, 0, 0, 0.15);
+            --chart-success: #2E7D32;
+            --chart-warning: #E68A00;
+            --chart-grid: rgba(128, 128, 128, 0.15);
+            --chart-text: #333333;
+            --chart-bg: #FFFFFF;
+        }
+        /* 暗色模式（主题切换）：根元素 data-theme="dark"，theme.js 切换 */
+        [data-theme="dark"] {
+            --bg: #121212;
+            --surface: #1e1e1e;
+            --surface-2: #252525;
+            --text: #e0e0e0;
+            --text-secondary: #c0c0c0;
+            --text-tertiary: #b0b0b0;
+            --text-muted: #9a9a9a;
+            --text-faint: #8a8a8a;
+            --border: #3a3a3a;
+            --border-light: #333333;
+            --border-dashed: #444444;
+            --table-th-bg: #2a2a2a;
+            --table-even: #242424;
+            --table-hover: #2e3a4a;
+            --notice-bg: #1e3a5f;
+            --notice-border: #4a90d9;
+            --empty-section-bg: #1a1a1a;
+            --profit: #ff6b6b;
+            --loss: #4caf50;
+            --success: #4caf50;
+            --file-card-bg: #252525;
+            --file-card-border: #333333;
+            --file-arrow: #6a6a6a;
+            --arrow-up: #66bb6a;
+            --arrow-down: #ff6b6b;
+            --arrow-flat: #888888;
+            --whatif-added-bg: #1f3a24;
+            --whatif-removed-bg: #3a1f20;
+            --whatif-increased-bg: #3d3512;
+            --whatif-decreased-bg: #1e2f3d;
+            --whatif-unchanged-bg: #2a2a2a;
+            --badge-added-bg: #1f3a24;
+            --badge-added-text: #81c784;
+            --badge-removed-bg: #3a1f20;
+            --badge-removed-text: #e57373;
+            --badge-increased-bg: #3d3512;
+            --badge-increased-text: #e6c15c;
+            --badge-decreased-bg: #1e2f3d;
+            --badge-decreased-text: #7fd4e0;
+            --badge-unchanged-bg: #2a2a2a;
+            --badge-unchanged-text: #a0a0a0;
+            /* Chart.js 深色变量 */
+            --chart-grid: rgba(255, 255, 255, 0.12);
+            --chart-text: #e0e0e0;
+            --chart-bg: #1e1e1e;
+            --chart-danger-transparent: rgba(255, 107, 107, 0.15);
+        }
+        /* 主题切换按钮（暗色模式（主题切换）；浮动右上角，与主报告一致） */
+        .theme-toggle-btn {
+            position: fixed; right: 12px; top: 12px; z-index: 101;
+            width: 38px; height: 38px; border-radius: 50%;
+            background: #2E75B6; color: #fff; border: none; cursor: pointer;
+            font-size: 18px; line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-toggle-btn:hover { background: #1f5a91; }
+        @media print { .theme-toggle-btn { display: none !important; } }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; }
+
+        .report-header { background: #2E75B6; color: #fff; padding: 20px 30px; border-radius: 8px; margin-bottom: 24px; }
+        .report-header h1 { font-size: 22px; margin-bottom: 4px; }
+        .report-header .subtitle { font-size: 14px; opacity: 0.85; }
+
+        .section { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
+        .section-title { background: #2E75B6; color: #fff; padding: 12px 20px; font-size: 16px; font-weight: 600; }
+        .section-content { padding: 16px 20px; }
+        .report-footer { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
+        .back-to-top-link { text-align: center; padding: 12px 0; }
+        .back-to-top-link a { color: #2E75B6; text-decoration: none; font-size: 12px; }
+
+        /* ── 文件对比 ───────────────────────────── */
+        .compare-files { display: flex; align-items: stretch; gap: 16px; }
+        .file-card { flex: 1; background: var(--file-card-bg); border: 1px solid var(--file-card-border); border-radius: 8px; padding: 14px 18px; }
+        .file-card .file-role { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+        .file-card .file-name { font-size: 15px; font-weight: 600; color: #2E75B6; word-break: break-all; }
+        .file-arrow { display: flex; align-items: center; font-size: 28px; color: var(--file-arrow); }
+        .summary-tag { font-size: 13px; color: var(--text-secondary); }
+        .summary-tag strong { color: #2E75B6; }
+
+        /* ── 汇总指标卡 ─────────────────────────── */
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .summary-card { background: var(--surface-2); border-radius: 6px; padding: 14px 18px; }
+        .summary-card h3 { font-size: 13px; color: var(--text-tertiary); margin-bottom: 6px; }
+        .summary-card .value { font-size: 22px; font-weight: 700; }
+        .summary-card .meta { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+        .arrow { font-weight: 700; margin-left: 6px; font-size: 15px; }
+        .arrow-up { color: var(--arrow-up); }
+        .arrow-down { color: var(--arrow-down); }
+        .arrow-flat { color: var(--arrow-flat); }
+
+        /* ── 资产配置对比图 ─────────────────────── */
+        .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .chart-col .chart-box { position: relative; height: 280px; }
+        .chart-caption { font-size: 12px; color: var(--text-muted); text-align: center; padding: 6px 0 2px; }
+
+        /* ── 表格 ───────────────────────────────── */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+        th { background: var(--table-th-bg); padding: 8px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; }
+        td { padding: 6px 10px; text-align: center; border-bottom: 1px solid var(--border-light); }
+        tr:nth-child(even) { background: var(--table-even); }
+        tr:hover { background: var(--table-hover); }
+        .text-left { text-align: left; }
+        .text-right { text-align: right; }
+
+        /* ── 持仓变动行底色 ─────────────────────── */
+        tr.whatif-added td { background: var(--whatif-added-bg); }
+        tr.whatif-removed td { background: var(--whatif-removed-bg); }
+        tr.whatif-increased td { background: var(--whatif-increased-bg); }
+        tr.whatif-decreased td { background: var(--whatif-decreased-bg); }
+        tr.whatif-unchanged td { background: var(--whatif-unchanged-bg); }
+        tr.whatif-unchanged:hover td { background: #EEF5FB; }
+        .action-badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+        .badge-added { background: var(--badge-added-bg); color: var(--badge-added-text); }
+        .badge-removed { background: var(--badge-removed-bg); color: var(--badge-removed-text); }
+        .badge-increased { background: var(--badge-increased-bg); color: var(--badge-increased-text); }
+        .badge-decreased { background: var(--badge-decreased-bg); color: var(--badge-decreased-text); }
+        .badge-unchanged { background: var(--badge-unchanged-bg); color: var(--badge-unchanged-text); }
+
+        .notice-banner { background: var(--notice-bg); border-left: 4px solid var(--notice-border); padding: 10px 14px; font-size: 13px; border-radius: 4px; }
+        .empty-note { padding: 20px; text-align: center; color: var(--text-faint); }
+        .placeholder-note { background: var(--empty-section-bg); border: 1px dashed var(--border-dashed); border-radius: 6px; }
+        .chart-export-btn { position: absolute; top: 6px; right: 6px; z-index: 5; font-size: 11px; }
+    </style>
+</head>
+<body id="report-top">
+<!-- 主题切换（暗色模式（主题切换））：浮动右上角，theme.js 接管 icon/aria-label -->
+<button type="button" class="theme-toggle-btn" id="theme-toggle-btn" aria-label="切换深色模式" title="切换深色模式">🌙</button>
+<div class="container">
+    <div class="report-header">
+        <h1>调仓 What-if 模拟</h1>
+        <div class="subtitle">基准 → 目标 · 成本口径截面比较 · {{ now }}</div>
+    </div>
+
+    {% if whatif_data and whatif_data.get("available") %}
+    {% set _w = whatif_data %}
+    {% set _stats = _w.get("stats", {}) %}
+    {% set _action_slug = {'新增': 'added', '清仓': 'removed', '加仓': 'increased', '减仓': 'decreased', '不变': 'unchanged'} %}
+    {% set _bt = _w.get("backtest") %}
+
+    <!-- ① 对比文件 -->
+    <div class="section">
+        <div class="section-title">① 对比文件</div>
+        <div class="section-content">
+            <div class="compare-files">
+                <div class="file-card">
+                    <div class="file-role">基准（调仓前）</div>
+                    <div class="file-name">{{ _w.get("base_file", "基准持仓") }}</div>
+                </div>
+                <div class="file-arrow">→</div>
+                <div class="file-card">
+                    <div class="file-role">目标（调仓后 / 假设）</div>
+                    <div class="file-name">{{ _w.get("candidate_file", "目标持仓") }}</div>
+                </div>
+            </div>
+            <div class="summary-tag" style="margin-top:12px;">
+                变动统计：新增 <strong>{{ _stats.get("added", 0) }}</strong> ·
+                清仓 <strong>{{ _stats.get("removed", 0) }}</strong> ·
+                加仓 <strong>{{ _stats.get("increased", 0) }}</strong> ·
+                减仓 <strong>{{ _stats.get("decreased", 0) }}</strong> ·
+                不变 <strong>{{ _stats.get("unchanged", 0) }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- ② 汇总指标对比 -->
+    <div class="section">
+        <div class="section-title">② 汇总指标对比（成本口径）</div>
+        <div class="section-content">
+            <div class="summary-grid">
+                {% for s in _w.get("summary", []) %}
+                {% if s.get("arrow") == "↑" %}{% set _arrow_cls = "arrow-up" %}
+                {% elif s.get("arrow") == "↓" %}{% set _arrow_cls = "arrow-down" %}
+                {% else %}{% set _arrow_cls = "arrow-flat" %}{% endif %}
+                <div class="summary-card">
+                    <h3>{{ s.get("label") }} <span class="arrow {{ _arrow_cls }}">{{ s.get("arrow", "→") }}</span></h3>
+                    {% if s.get("unit") == "money" %}
+                    <div class="value">{{ s.get("candidate", 0) | money }}</div>
+                    <div class="meta">基准 {{ s.get("base", 0) | money }} → 目标 {{ s.get("candidate", 0) | money }} · 变化 {{ s.get("delta", 0) | money }}</div>
+                    {% elif s.get("unit") == "shares" %}
+                    <div class="value">{{ s.get("candidate", 0) | shares }}</div>
+                    <div class="meta">基准 {{ s.get("base", 0) | shares }} → 目标 {{ s.get("candidate", 0) | shares }} · 变化 {{ s.get("delta", 0) | shares }}</div>
+                    {% elif s.get("unit") == "count" %}
+                    <div class="value">{{ s.get("candidate", 0) }}</div>
+                    <div class="meta">基准 {{ s.get("base", 0) }} → 目标 {{ s.get("candidate", 0) }} · 变化 {{ s.get("delta", 0) }}</div>
+                    {% else %}
+                    <div class="value">{{ "%.4f" | format(s.get("candidate", 0)) }}</div>
+                    <div class="meta">基准 {{ "%.4f" | format(s.get("base", 0)) }} → 目标 {{ "%.4f" | format(s.get("candidate", 0)) }} · 变化 {{ "%+.4f" | format(s.get("delta", 0)) }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ③ 资产配置对比图 -->
+    {% set _cats = _w.get("categories", []) %}
+    {% if _cats | length > 0 %}
+    <div class="section">
+        <div class="section-title">③ 资产配置对比（成本口径）</div>
+        <div class="section-content">
+            <div class="chart-row">
+                <div class="chart-col">
+                    <div class="chart-box">
+                        <canvas id="chart_whatif_base" width="400" height="280" style="width:100%;height:100%;" aria-label="基准持仓资产大类成本权重环形图（悬停查看精确值）" role="img">图表无法显示，数据见下方表格</canvas>
+                    </div>
+                    <div class="chart-caption">基准持仓资产大类成本权重分布（%）</div>
+                </div>
+                <div class="chart-col">
+                    <div class="chart-box">
+                        <canvas id="chart_whatif_candidate" width="400" height="280" style="width:100%;height:100%;" aria-label="目标持仓资产大类成本权重环形图（悬停查看精确值）" role="img">图表无法显示，数据见下方表格</canvas>
+                    </div>
+                    <div class="chart-caption">目标持仓资产大类成本权重分布（%）</div>
+                </div>
+            </div>
+            <script type="application/json" id="whatif-chart-data">{{ whatif_chart_data | tojson }}</script>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if _bt and _bt.get("available") %}
+    <!-- ④ 时序回测（生效日后推演） -->
+    <div class="section">
+        <div class="section-title">④ 时序回测（{{ _bt.get("effective_date", "") }} 生效，假设推演）</div>
+        <div class="section-content">
+            {% if _bt.get("status") == "degraded" %}
+            <div class="notice-banner" style="margin-bottom:12px;">{{ _bt.get("reason", "部分持仓无历史数据，回测基于可用品种") }}</div>
+            {% endif %}
+            <div class="summary-grid">
+                {% for m in _bt.get("metrics", []) %}
+                {% if m.get("arrow") == "↑" %}{% set _m_arrow = "arrow-up" %}
+                {% elif m.get("arrow") == "↓" %}{% set _m_arrow = "arrow-down" %}
+                {% else %}{% set _m_arrow = "arrow-flat" %}{% endif %}
+                <div class="summary-card">
+                    <h3>{{ m.get("label", "") }} <span class="arrow {{ _m_arrow }}">{{ m.get("arrow", "→") }}</span></h3>
+                    <div class="value">
+                        {% if m.get("candidate") is not none %}{{ "%.2f" | format(m.get("candidate")) }}{% else %}--{% endif %}{% if m.get("unit") == "pct" %}%{% endif %}
+                    </div>
+                    <div class="meta">
+                        基准 {% if m.get("base") is not none %}{{ "%.2f" | format(m.get("base")) }}{% else %}--{% endif %}{% if m.get("unit") == "pct" %}%{% endif %}
+                        → 目标 {% if m.get("candidate") is not none %}{{ "%.2f" | format(m.get("candidate")) }}{% else %}--{% endif %}{% if m.get("unit") == "pct" %}%{% endif %}
+                        · 变化 {% if m.get("delta") is not none %}{{ "%.2f" | format(m.get("delta")) }}{% else %}--{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="chart-row" style="margin-top:16px;">
+                <div class="chart-col">
+                    <div class="chart-box">
+                        <canvas id="chart_whatif_bt_nav" width="400" height="280" style="width:100%;height:100%;" aria-label="基准与目标组合归一化净值曲线（生效日后，100 基点）" role="img">图表无法显示，数据见 Excel 时序回测页签</canvas>
+                    </div>
+                    <div class="chart-caption">基准 vs 目标 归一化净值（100 基点）</div>
+                </div>
+                <div class="chart-col">
+                    <div class="chart-box">
+                        <canvas id="chart_whatif_bt_dd" width="400" height="280" style="width:100%;height:100%;" aria-label="基准与目标组合回撤曲线（生效日后，%）" role="img">图表无法显示，数据见 Excel 时序回测页签</canvas>
+                    </div>
+                    <div class="chart-caption">基准 vs 目标 回撤（%）</div>
+                </div>
+            </div>
+            <script type="application/json" id="whatif-backtest-chart-data">{{ whatif_backtest_chart_data | tojson }}</script>
+            <div class="notice-banner" style="margin-top:12px;">
+                <div>* 口径：as-if 市值 = 份额 × 每日价格；生效日后各自归一化到 100 基点后比较。</div>
+                <div style="margin-top:6px;">* 局限：假设推演、不构成收益承诺；数据不足时回测降级，不阻塞主报告。</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ⑤ 分类配置对比表 -->
+    {% if _cats | length > 0 %}
+    <div class="section">
+        <div class="section-title">⑤ 分类配置对比</div>
+        <div class="section-content">
+            <table>
+                <thead>
+                    <tr>
+                        <th>资产大类</th>
+                        <th>基准权重(%)</th>
+                        <th>目标权重(%)</th>
+                        <th>变化(百分点)</th>
+                        <th>基准成本(元)</th>
+                        <th>目标成本(元)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in _cats %}
+                    <tr>
+                        <td class="text-left">{{ c.get("label", c.get("key", "")) }}</td>
+                        <td class="text-right">{{ "%.2f" | format(c.get("base_weight", 0.0)) }}</td>
+                        <td class="text-right">{{ "%.2f" | format(c.get("cand_weight", 0.0)) }}</td>
+                        <td class="text-right" style="color: {{ 'var(--profit)' if c.get('delta_pct', 0.0) > 0 else ('var(--loss)' if c.get('delta_pct', 0.0) < 0 else 'var(--text-muted)') }};">{{ "%+.2f" | format(c.get("delta_pct", 0.0)) }}</td>
+                        <td class="text-right">{{ c.get("base_cost", 0.0) | money }}</td>
+                        <td class="text-right">{{ c.get("cand_cost", 0.0) | money }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ⑥ 持仓变动明细 -->
+    {% set _changes = _w.get("changes", []) %}
+    <div class="section">
+        <div class="section-title">⑥ 持仓变动明细（共 {{ _changes | length }} 条）</div>
+        <div class="section-content">
+            <table>
+                <thead>
+                    <tr>
+                        <th>变动</th>
+                        <th>名称</th>
+                        <th>代码</th>
+                        <th>基准份额</th>
+                        <th>目标份额</th>
+                        <th>份额变化</th>
+                        <th>基准权重(%)</th>
+                        <th>目标权重(%)</th>
+                        <th>权重变化(百分点)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in _changes %}
+                    {% set _slug = _action_slug.get(c.get('action', '不变'), 'unchanged') %}
+                    <tr class="whatif-{{ _slug }}">
+                        <td><span class="action-badge badge-{{ _slug }}">{{ c.get("action", "不变") }}</span></td>
+                        <td class="text-left">{{ c.get("name", "") }}</td>
+                        <td>{{ c.get("code", "") }}</td>
+                        <td class="text-right">{{ "%.2f" | format(c.get("base_shares", 0.0)) }}</td>
+                        <td class="text-right">{{ "%.2f" | format(c.get("cand_shares", 0.0)) }}</td>
+                        <td class="text-right">{{ "%+.2f" | format(c.get("shares_diff", 0.0)) }}</td>
+                        <td class="text-right">{{ "%.2f" | format(c.get("base_weight", 0.0)) }}</td>
+                        <td class="text-right">{{ "%.2f" | format(c.get("cand_weight", 0.0)) }}</td>
+                        <td class="text-right">{{ "%+.2f" | format(c.get("weight_delta_pct", 0.0)) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ⑦ 说明 -->
+    <div class="section">
+        <div class="section-title">⑦ 说明</div>
+        <div class="section-content">
+            <div class="notice-banner">
+                <div>* 口径：权重基于成本 = 份额 × 每份成本（成本口径截面比较，本地计算、零网络请求）。</div>
+                <div style="margin-top:6px;">* 时序回测：指定调仓生效日时 opt-in 联网取生效日后行情，追加④时序回测区（假设推演、不构成收益承诺）；数据不足时回测降级，不阻塞主报告。</div>
+                <div style="margin-top:6px;">* 数据来源：本地两份持仓文件；仅启用时序回测时联网。</div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="section">
+        <div class="section-content">
+            <div class="empty-note placeholder-note">
+                <p><strong>调仓对比数据暂不可用</strong></p>
+                <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+                    {% if whatif_data and whatif_data.get("reason") %}{{ whatif_data["reason"] }}{% else %}基准或目标持仓为空，无法对比{% endif %}。
+                </p>
+                <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">请提供基准（调仓前）与目标（调仓后）两份持仓文件后重试。</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="report-footer">
+        <div class="back-to-top-link"><a href="#report-top">↑ 回到顶部</a></div>
+    </div>
+</div>
+
+{# Chart.js 本地 bundle：相对路径，离线自包含（与主报告一致） #}
+<script defer src="chart.min.js"></script>
+<script defer src="chart-config.js"></script>
+<script defer src="chart-export.js"></script>
+<script defer src="chart-common.js"></script>
+<script defer src="theme.js"></script>
+<script>
+/* 调仓 What-if 双环图。复用 ChartCommon（chart-common.js 公共 helper）：
+ * trackChart/doughnutOptions 与主报告 chart-init.js 共用，消除配置复制。
+ * O1 隔离：每图独立 try/catch。ES5 保守语法。 */
+(function () {
+  'use strict';
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.ChartCommon) {
+      console.warn('[whatif] chart-common.js 未加载，图表跳过');
+      return;
+    }
+    var dataEl = document.getElementById('whatif-chart-data');
+    if (!dataEl) return;
+    var whatif;
+    try { whatif = JSON.parse(dataEl.textContent || '{}'); } catch (e) { console.warn('[whatif] 图表数据解析失败'); return; }
+    var cats = whatif && whatif.categories ? whatif.categories : [];
+    if (!cats.length) return;
+
+    var labels = [];
+    var baseData = [];
+    var candData = [];
+    for (var i = 0; i < cats.length; i++) {
+      labels.push(cats[i].label || cats[i].key || '');
+      baseData.push(cats[i].base_weight || 0);
+      candData.push(cats[i].cand_weight || 0);
+    }
+    var palette = (window.ChartTheme && window.ChartTheme.doughnutColors) ||
+      ['#2E75B6', '#E68A00', '#2E7D32', '#8E44AD', '#7B8A9E', '#C0392B', '#16A085'];
+
+    function build(canvasId, data) {
+      var el = document.getElementById(canvasId);
+      if (!el) return;
+      try {
+        window.ChartCommon.trackChart(new Chart(el, {
+          type: 'doughnut',
+          data: { labels: labels, datasets: [{ data: data, backgroundColor: palette }] },
+          options: window.ChartCommon.doughnutOptions(true)
+        }), canvasId);
+      } catch (err) {
+        console.warn('[whatif] 图表 ' + canvasId + ' 初始化失败: ', err);
+      }
+    }
+
+    build('chart_whatif_base', baseData);
+    build('chart_whatif_candidate', candData);
+
+    /* ── 时序回测线图（生效日后推演）─ 复用 ChartCommon.lineOptions ── */
+    var btDataEl = document.getElementById('whatif-backtest-chart-data');
+    if (btDataEl) {
+      var btData;
+      try { btData = JSON.parse(btDataEl.textContent || '{}'); } catch (e) { btData = null; }
+      if (btData && btData.series && btData.series.labels && btData.series.labels.length) {
+        function buildLine(canvasId, data, yLabel) {
+          var el = document.getElementById(canvasId);
+          if (!el) return;
+          try {
+            window.ChartCommon.trackChart(new Chart(el, {
+              type: 'line',
+              data: {
+                labels: data.labels,
+                datasets: [
+                  { label: '基准', data: data.base, borderColor: '#2E75B6', backgroundColor: 'rgba(46,117,182,0.08)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.1 },
+                  { label: '目标', data: data.candidate, borderColor: '#E68A00', backgroundColor: 'rgba(230,138,0,0.08)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.1 }
+                ]
+              },
+              options: window.ChartCommon.lineOptions(yLabel)
+            }), canvasId);
+          } catch (err) {
+            console.warn('[whatif] 图表 ' + canvasId + ' 初始化失败: ', err);
+          }
+        }
+        buildLine('chart_whatif_bt_nav', {
+          labels: btData.series.labels,
+          base: btData.series.base,
+          candidate: btData.series.candidate
+        }, '归一化净值（100 基点）');
+        buildLine('chart_whatif_bt_dd', {
+          labels: btData.series.labels,
+          base: btData.series.base_drawdown,
+          candidate: btData.series.candidate_drawdown
+        }, '回撤（%）');
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>

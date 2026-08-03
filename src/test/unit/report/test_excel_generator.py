@@ -675,10 +675,10 @@ class TestCreateSheets(unittest.TestCase):
         from src.python.core.registry import _REPORT_SECTION_DEFAULT
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
-        # always(6) + history(2) = 8 个页签，连续编号 1-8
+        # always(6) + history(2) + evolution(1) = 9 个页签，连续编号 1-9（组合演进为独立 evolution 类型）
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
                                 enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
-        self.assertEqual(len(sheets), 8)
+        self.assertEqual(len(sheets), 9)
         expected_titles = {
             "summary":          "1.投资分析汇总",
             "market_value":     "2.市值核算明细表",
@@ -687,7 +687,8 @@ class TestCreateSheets(unittest.TestCase):
             "fund_performance": "5.基金业绩分析",
             "portfolio_history":"6.组合历史走势",
             "drawdown_analysis":"7.历史回撤分析",
-            "data_source_status":"8.数据源可用性矩阵",
+            "portfolio_evolution":"8.组合演进",
+            "data_source_status":"9.数据源可用性矩阵",
         }
         for key, title in expected_titles.items():
             self.assertIn(key, sheets, f"{key} should be created")
@@ -714,10 +715,35 @@ class TestCreateSheets(unittest.TestCase):
                                 enable_fund_deep_analysis=False, enable_news=True, enable_llm=False,
                                 data_availability={"news_data_available": True})
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
-        # always(6) + history(2) + news(1) = 9
-        self.assertEqual(len(sheets), 9)
+        # always(6) + history(2) + evolution(1) + news(1) = 10
+        self.assertEqual(len(sheets), 10)
         for key in news_keys:
             self.assertIn(key, sheets)
+
+    def test_evolution_disabled_hides_sheet(self):
+        """enable_portfolio_evolution=False → 组合演进页签不创建。"""
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT
+        from src.python.report.excel_sheet_factory import create_sheets
+        wb = self._make_wb()
+        # always(6) + history(2) = 8（evolution 关闭，无组合演进页签）
+        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
+                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False,
+                                enable_portfolio_evolution=False)
+        self.assertEqual(len(sheets), 8)
+        self.assertNotIn("portfolio_evolution", sheets)
+        # 其他 always 页签不受影响
+        self.assertIn("summary", sheets)
+        self.assertIn("data_source_status", sheets)
+
+    def test_evolution_enabled_creates_sheet(self):
+        """enable_portfolio_evolution=True（默认）→ 组合演进页签创建。"""
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT
+        from src.python.report.excel_sheet_factory import create_sheets
+        wb = self._make_wb()
+        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
+                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
+        self.assertEqual(len(sheets), 9)
+        self.assertIn("portfolio_evolution", sheets)
 
 
 if __name__ == "__main__":

@@ -52,32 +52,36 @@ class TestReadSectionFlags:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
+            patch("src.python.config.is_enable_portfolio_evolution", return_value=True),
             patch("src.python.config.is_enable_llm", return_value=True),
         ):
             flags = _read_section_flags({})
-        assert flags == {"b_series": True, "news": True, "history": True, "llm": True}
+        assert flags == {"fund_deep_analysis": True, "news": True, "history": True, "evolution": True, "llm": True}
 
     def test_all_disabled(self):
         with (
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=False),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
+            patch("src.python.config.is_enable_portfolio_evolution", return_value=False),
             patch("src.python.config.is_enable_llm", return_value=False),
         ):
             flags = _read_section_flags({})
-        assert flags == {"b_series": False, "news": False, "history": False, "llm": False}
+        assert flags == {"fund_deep_analysis": False, "news": False, "history": False, "evolution": False, "llm": False}
 
     def test_partial_flags(self):
         with (
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=True),
+            patch("src.python.config.is_enable_portfolio_evolution", return_value=False),
             patch("src.python.config.is_enable_llm", return_value=False),
         ):
             flags = _read_section_flags({})
         assert flags["news"] is False
         assert flags["llm"] is False
-        assert flags["b_series"] is True
+        assert flags["fund_deep_analysis"] is True
+        assert flags["evolution"] is False
 
 
 @pytest.mark.unit
@@ -118,6 +122,11 @@ class TestPrepareReportData:
                 "src.python.report.orchestrator.compute_factor_exposure_data",
                 return_value={"available": False, "status": "insufficient"},
             ),
+            # 持仓相关性编排同样含真实网络拉取（持仓历史 K 线），必须 mock
+            patch(
+                "src.python.report.orchestrator.compute_correlation_data",
+                return_value={"available": False, "status": "insufficient"},
+            ),
         ):
             result = prepare_report_data(mock_holdings, mock_reporter, config={})
 
@@ -137,6 +146,7 @@ class TestPrepareReportData:
             "news_top_count",
             "risk_metrics",
             "factor_exposure",
+            "correlation_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 
@@ -266,7 +276,7 @@ class TestGenerateReport:
         config = {
             "output_dir": "reports",
             "news_top_count": 100,
-            "history": {"analysis": "auto"},
+            "history": {"fetch_mode": "auto"},
         }
 
         mock_detail = MagicMock()
@@ -293,7 +303,7 @@ class TestGenerateReport:
                 config=config,
                 reporter=mock_reporter,
                 report_type="both",
-                history_mode="auto",
+                fetch_history=True,
             )
 
         assert isinstance(result, ReportResult)
@@ -314,7 +324,7 @@ class TestGenerateReport:
         assert _xls_kwargs.get("enable_llm") is False
 
     def test_generate_report_both_history_off(self):
-        """both 路径 history_mode=off 时不调用 fetch_history_data。"""
+        """both 路径历史走势关闭（enable_history=False）时不调用 fetch_history_data。"""
         mock_reporter = MagicMock()
         mock_holdings = [MagicMock()]
         config = {"output_dir": "reports"}
@@ -335,11 +345,11 @@ class TestGenerateReport:
                 config=config,
                 reporter=mock_reporter,
                 report_type="both",
-                history_mode="off",
+                fetch_history=True,
             )
 
         assert result.report_generated is True
-        # history 关闭时 fetch_history_data 不应被调用
+        # history 关闭时 fetch_history_data 不应被调用（即使 fetch_history=True）
         mock_hist.assert_not_called()
 
     def test_generate_report_both_no_prepare_report_data(self):
@@ -408,7 +418,7 @@ class TestGenerateReport:
         config = {
             "output_dir": "reports",
             "news_top_count": 100,
-            "history": {"analysis": "auto"},
+            "history": {"fetch_mode": "auto"},
         }
 
         with (
@@ -453,7 +463,7 @@ class TestGenerateReport:
                 config=config,
                 reporter=mock_reporter,
                 report_type="full",
-                history_mode="auto",
+                fetch_history=True,
                 force_llm=False,
             )
 
@@ -1171,8 +1181,8 @@ class TestCaptureSnapshot:
 class TestFetchHistoryData:
     """fetch_history_data 历史走势数据获取测试。"""
 
-    def test_fetch_history_data_auto_mode(self):
-        """auto 模式返回 PortfolioHistoryCalculator 计算结果。"""
+    def test_fetch_history_data_fetch_true(self):
+        """fetch=True 返回 PortfolioHistoryCalculator 计算结果。"""
         mock_reporter = MagicMock()
         mock_holding = MagicMock()
         mock_holding.code = "SH600001"
@@ -1194,6 +1204,7 @@ class TestFetchHistoryData:
                 [mock_holding],
                 {"history": {"coverage_threshold": 0.9}},
                 mock_reporter,
+                fetch=True,
             )
 
         assert result is not None
@@ -1204,15 +1215,15 @@ class TestFetchHistoryData:
             benchmark_indices={},
         )
 
-    def test_fetch_history_data_off_mode(self):
-        """非 auto 模式直接返回 None。"""
+    def test_fetch_history_data_fetch_false(self):
+        """fetch=False 直接返回 None。"""
         mock_reporter = MagicMock()
 
         result = fetch_history_data(
             [],
             {"history": {}},
             mock_reporter,
-            mode="off",
+            fetch=False,
         )
 
         assert result is None
@@ -1252,3 +1263,57 @@ class TestFetchHistoryData:
             )
 
         assert result is None
+
+    def test_fetch_history_data_uses_lookback_days(self):
+        """history.lookback_days 配置透传给 get_combined_timeseries 的 days 参数。
+
+        回归防护：回撤分析需 ≥60 交易日（MIN_SPAN），若取数窗口未随配置放大，
+        主报告回撤分析将一直判定数据不足。此处断言配置 → days 透传。
+        """
+        mock_reporter = MagicMock()
+        mock_holding = MagicMock()
+        mock_holding.code = "SH600001"
+        mock_holding.name = "测试"
+        mock_holding.shares = 100
+
+        with patch("src.python.report.portfolio_history.PortfolioHistoryCalculator") as mock_cls:
+            mock_calc = MagicMock()
+            mock_calc.get_combined_timeseries.return_value = {"status": "ok", "bars": []}
+            mock_cls.return_value = mock_calc
+
+            fetch_history_data(
+                [mock_holding],
+                {"history": {"lookback_days": 120}},
+                mock_reporter,
+                fetch=True,
+            )
+
+        mock_calc.get_combined_timeseries.assert_called_once_with(
+            [("SH600001", "测试", 100)],
+            days=120,
+        )
+
+    def test_fetch_history_data_lookback_days_default_90(self):
+        """未配置 lookback_days 时取数窗口默认 90。"""
+        mock_reporter = MagicMock()
+        mock_holding = MagicMock()
+        mock_holding.code = "SH600001"
+        mock_holding.name = "测试"
+        mock_holding.shares = 100
+
+        with patch("src.python.report.portfolio_history.PortfolioHistoryCalculator") as mock_cls:
+            mock_calc = MagicMock()
+            mock_calc.get_combined_timeseries.return_value = {"status": "ok", "bars": []}
+            mock_cls.return_value = mock_calc
+
+            fetch_history_data(
+                [mock_holding],
+                {"history": {}},
+                mock_reporter,
+                fetch=True,
+            )
+
+        mock_calc.get_combined_timeseries.assert_called_once_with(
+            [("SH600001", "测试", 100)],
+            days=90,
+        )

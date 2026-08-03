@@ -152,6 +152,34 @@ def _write_drawdown_analysis_sheet(ws, history_data: dict) -> None:
             flist.append(bm_fmt if bm_key else none_fmt)
         row = write_data_row(ws, row, values, formats=flist)
 
+    # ── 回撤明细表（独立回撤事件 + 恢复耗时） ──
+    dd_events = pd.get("drawdown_events") or []
+    dd_ncols = 8
+    ncols_eff = max(ncols, dd_ncols)
+    row += 1
+    row = write_title_row(ws, row, "回撤明细", ncols_eff)
+    dd_headers = ["序号", "起峰日", "最深日", "恢复日", "最大回撤(%)", "持续天数", "恢复耗时(天)", "当前状态"]
+    dd_headers += [""] * (ncols_eff - dd_ncols)
+    row = write_header_row(ws, row, dd_headers)
+    if not dd_events:
+        row = write_data_row(ws, row, ["未检测到显著回撤事件（或历史数据不足）"] + [None] * (ncols_eff - 1))
+    else:
+        for idx, e in enumerate(dd_events, start=1):
+            cells: list[Any] = [
+                idx,
+                e.get("peak_date", ""),
+                e.get("trough_date", ""),
+                e.get("recovery_date") or "未恢复",
+                round(e.get("drawdown_pct", 0.0) / 100, 4),
+                e.get("duration_days", 0),
+                e.get("recovery_days") if e.get("recovery_days") is not None else "--",
+                "已恢复" if e.get("recovered") else "未恢复",
+            ]
+            cells += [None] * (ncols_eff - dd_ncols)
+            dd_fmts: list[str | None] = [None] * 4 + [pct_fmt] + [None] * 3
+            dd_fmts += [None] * (ncols_eff - dd_ncols)
+            row = write_data_row(ws, row, cells, formats=dd_fmts)
+
     freeze_header(ws, row=2)
     auto_width(ws, min_width=10, max_width=28)
 
@@ -189,6 +217,7 @@ def generate_excel_report(
     enable_news: bool = True,  # board 层：市场新闻是否开启（配置值）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
+    enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
     pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
@@ -213,6 +242,7 @@ def generate_excel_report(
         enable_news: board 层 — 市场新闻是否开启（配置值）
         enable_llm: board 层 — LLM 分析章节是否开启
         enable_history: board 层 — 历史走势章节是否开启
+        enable_portfolio_evolution: board 层 — 组合演进章节是否开启
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
         pipeline_data: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
@@ -246,6 +276,7 @@ def generate_excel_report(
         enable_fund_deep_analysis=enable_fund_deep_analysis,
         enable_news=enable_news,
         enable_history=enable_history,
+        enable_portfolio_evolution=enable_portfolio_evolution,
         enable_llm=enable_llm,
         data_availability=data_availability,
     )
@@ -266,6 +297,7 @@ def generate_excel_report(
         modules,
         prog,
         factor_exposure=(pipeline_data or {}).get("factor_exposure"),
+        correlation_data=(pipeline_data or {}).get("correlation_data"),
     )
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）
     from src.python.report._debate_utils import detect_debate_mode
@@ -278,7 +310,7 @@ def generate_excel_report(
         sheets, include_llm, llm_content, prog, section_order=order, debate_mode_label=_debate_mode_label
     )
 
-    # ── 组合历史走势 + 回撤分析页签（F2 数据） ──
+    # ── 组合历史走势 + 回撤分析页签（历史走势数据） ──
     if enable_history:
         ws_ph = sheets.get("portfolio_history")
         ws_dd = sheets.get("drawdown_analysis")
@@ -288,6 +320,17 @@ def generate_excel_report(
                 _write_history_sheets(sheets, history_data)
             except Exception:
                 logger.debug("[excel] 组合历史走势页签写入失败（非关键）", exc_info=True)
+
+    # ── 组合演进页签（多快照趋势，C19 evolution_data） ──
+    ws_evo = sheets.get("portfolio_evolution")
+    if ws_evo is not None:
+        prog.info("正在写入组合演进页签...")
+        try:
+            from src.python.report.evolution_sheet import write_evolution_sheet
+
+            write_evolution_sheet(ws_evo, (pipeline_data or {}).get("evolution_data"))
+        except Exception:
+            logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
 
     # ── 数据源可用性矩阵页签 ──
     ws_ds = sheets.get("data_source_status")

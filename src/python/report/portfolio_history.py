@@ -1,4 +1,4 @@
-"""F2 组合历史走势计算器 — PortfolioHistoryCalculator。
+"""组合历史走势计算器 — PortfolioHistoryCalculator。
 
 职责：
   1. 遍历持仓 → 按代码类型路由（A 股/ETF → history_stock，OTC 基金 → history_fund_otc）
@@ -28,6 +28,11 @@ from src.python.core.code_utils import (
     is_otc_code_overlap,
     is_otc_fund_by_name,
     is_qdii_extended,
+)
+from src.python.analysis.drawdown_events import (
+    MIN_SPAN,
+    compute_recovery_times,
+    extract_drawdown_events,
 )
 from src.python.fetcher.chain import fetch_with_incremental_fallback
 from src.python.report._history_quality import _diagnose_return, _validate_bars
@@ -67,7 +72,13 @@ class PortfolioHistoryCalculator:
         # 基准指数配置：{代码: 名称}，空 dict 表示禁用
         self._benchmark_indices = benchmark_indices if benchmark_indices is not None else {}
 
-    def calculate_for_holding(self, holding_code: str, holding_name: str, shares: float) -> list[dict] | None:
+    def calculate_for_holding(
+        self,
+        holding_code: str,
+        holding_name: str,
+        shares: float,
+        days: int = 30,
+    ) -> list[dict] | None:
         """计算单只持仓的 as-if 历史市值序列。
 
         as-if 语义：假设当前持仓份额在过去 N 天不变，用历史价格 × 当前份额。
@@ -76,6 +87,7 @@ class PortfolioHistoryCalculator:
             holding_code: 证券代码
             holding_name: 证券名称
             shares: 当前持有份额
+            days: 历史天数（透传给 chain 层取数）
 
         Returns:
             list[dict]: [{date, value, close}, ...] 按日期升序排列。
@@ -88,11 +100,11 @@ class PortfolioHistoryCalculator:
 
         # 路由：按代码类型确定数据源（使用 code_utils 统一入口）
         if is_exchange_fund_code(code) or is_a_share_code(code):
-            bars = self._get_stock_history(code)
+            bars = self._get_stock_history(code, days)
             # 降级：A 股/OTC 基金代码重叠区（00 开头），股票历史全空时尝试基金历史
             if not bars and is_otc_code_overlap(code):
                 logger.info("[history]%s K 线链路全部失败（该代码为场外基金），降级尝试基金净值链路", _tag)
-                bars = self._get_fund_history(code)
+                bars = self._get_fund_history(code, days)
                 if bars:
                     logger.info("[history]%s 降级成功——通过基金净值链路获取到历史数据", _tag)
                 else:
@@ -104,17 +116,17 @@ class PortfolioHistoryCalculator:
             return None
         elif is_qdii_extended(name):
             logger.info("[history]%s QDII 基金→基金净值链路", _tag)
-            bars = self._get_fund_history(code)
+            bars = self._get_fund_history(code, days)
         elif is_bond_fund_by_name(name):
             logger.info("[history]%s 债券基金→基金净值链路", _tag)
-            bars = self._get_fund_history(code)
+            bars = self._get_fund_history(code, days)
         elif is_otc_fund_by_name(name, code):
             logger.info("[history]%s OTC 基金→基金净值链路", _tag)
-            bars = self._get_fund_history(code)
+            bars = self._get_fund_history(code, days)
         elif len(code) == 6 and code.isdigit():
             # 兜底：非 00 前缀的 6 位基金代码（如 011506、161725 等）
             logger.info("[history]%s 基金→基金净值链路", _tag)
-            bars = self._get_fund_history(code)
+            bars = self._get_fund_history(code, days)
         else:
             logger.info("[history]%s 不支持的类型，跳过", _tag)
             return None
@@ -148,15 +160,19 @@ class PortfolioHistoryCalculator:
 
         Args:
             holdings: [(code, name, shares), ...] 持仓列表
-            days: 历史天数。⚠️ 仅作用于基准指数（_fetch_benchmarks）；
-                  持仓历史长度由 chain 默认 days=30 决定（_fetch_all_histories 不带 days）。
-                  若需控制持仓历史长度，应改 _fetch_all_histories 透传 days。
+            days: 历史天数，同时决定持仓历史长度（_fetch_all_histories 透传）
+                  与基准指数历史长度（_fetch_benchmarks）。
 
         Returns:
             {
                 "bars": [{date, total_value, daily_return, drawdown}, ...],
                 "max_drawdown": float,
                 "max_drawdown_pct": float,
+                "drawdown_events": [{peak_date, trough_date, recovery_date,
+                                     drawdown_pct, duration_days, recovery_days,
+                                     recovered}, ...],  # 独立回撤事件
+                "recovery_times": [{start_date, end_date, days}, ...],  # 恢复耗时明细
+                "drawdown_available": bool,  # len(bars) >= MIN_SPAN，§1.4.5
                 "annualized_volatility": float,
                 "total_return": float,
                 "total_return_pct": float,
@@ -168,7 +184,7 @@ class PortfolioHistoryCalculator:
             }
         """
         # 1) 收集每只持仓的走势（并行获取，显著提速）
-        all_series, success_count, failed_holdings, successful_holdings = self._fetch_all_histories(holdings)
+        all_series, success_count, failed_holdings, successful_holdings = self._fetch_all_histories(holdings, days)
         warnings: list[str] = []
 
         if not all_series:
@@ -232,12 +248,20 @@ class PortfolioHistoryCalculator:
         # 8) 基准指数历史走势
         benchmarks = self._fetch_benchmarks(bars, days)
 
+        # 9) 独立回撤事件 + 恢复耗时（span < MIN_SPAN 标记数据不足，§1.4.5）
+        drawdown_events = extract_drawdown_events(bars)
+        recovery_times = compute_recovery_times(drawdown_events)
+        drawdown_available = len(bars) >= MIN_SPAN
+
         return {
             "bars": bars,
             "max_drawdown": round(-max_drawdown_val, 2),
             "max_drawdown_pct": round(-max_drawdown_pct, 2),
             "drawdown_start": drawdown_start,
             "drawdown_end": drawdown_end,
+            "drawdown_events": drawdown_events,
+            "recovery_times": recovery_times,
+            "drawdown_available": drawdown_available,
             "annualized_volatility": round(annualized_vol, 4),
             "total_return": round(total_return, 2),
             "total_return_pct": round(total_return_pct, 2),
@@ -255,12 +279,15 @@ class PortfolioHistoryCalculator:
     # ── 子函数 ──────────────────────────────────────────
 
     def _fetch_all_histories(
-        self, holdings: list[tuple[str, str, float]]
+        self,
+        holdings: list[tuple[str, str, float]],
+        days: int = 30,
     ) -> tuple[list[list[dict]], int, list[str], list[str]]:
         """并行收集每只持仓的历史走势。
 
         Args:
             holdings: [(code, name, shares), ...] 持仓列表
+            days: 历史天数（透传给 calculate_for_holding）
 
         Returns:
             (all_series, success_count, failed_holdings, successful_holdings)
@@ -274,7 +301,7 @@ class PortfolioHistoryCalculator:
         _max_workers = min(8, total_holdings) if total_holdings > 1 else 1
         with ThreadPoolExecutor(max_workers=_max_workers) as _pool:
             _futures = {
-                _pool.submit(self.calculate_for_holding, code, name, shares): (code, name)
+                _pool.submit(self.calculate_for_holding, code, name, shares, days): (code, name)
                 for code, name, shares in holdings
             }
             for _fut in as_completed(_futures):
@@ -476,25 +503,25 @@ class PortfolioHistoryCalculator:
 
     # ── 内部路由 ──────────────────────────────────────────
 
-    def _get_stock_history(self, code: str) -> list[dict]:
+    def _get_stock_history(self, code: str, days: int = 30) -> list[dict]:
         """获取股票/ETF 历史 K 线数据。"""
         # C4 约束：会话内重复请求免 HTTP
         cache_key = f"history_stock_{code}"
         if cache_key in self._session_cache:
             return self._session_cache[cache_key]
 
-        bars = fetch_with_incremental_fallback("history_stock", code)
+        bars = fetch_with_incremental_fallback("history_stock", code, days)
         if bars:
             self._session_cache[cache_key] = bars
         return bars
 
-    def _get_fund_history(self, code: str) -> list[dict]:
+    def _get_fund_history(self, code: str, days: int = 30) -> list[dict]:
         """获取 OTC 基金历史净值数据。"""
         cache_key = f"history_fund_otc_{code}"
         if cache_key in self._session_cache:
             return self._session_cache[cache_key]
 
-        bars = fetch_with_incremental_fallback("history_fund_otc", code)
+        bars = fetch_with_incremental_fallback("history_fund_otc", code, days)
         if bars:
             self._session_cache[cache_key] = bars
         return bars

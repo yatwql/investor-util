@@ -1,0 +1,292 @@
+"""测试：历史痕迹检查脚本 — check-code-traces.py / check-doc-traces.py
+
+覆盖：
+  - 工具自身豁免（_is_tool_self 模式识别，重命名/新增同类工具不失效）
+  - 补强模式能检出真实历史痕迹（此前/曾经/原始/历史实现/旧逻辑/迁移到新/重构前）
+  - 合法运行时/当前状态描述不被误伤（历史数据/当前版本/此前已配置/之前缓存过）
+  - 文档「工具说明」元描述行豁免
+  - 测试文件回归场景元描述豁免（仅 src/test/：旧实现/修复前/回归场景/rf-xxx 批次修复）
+  - 版本号/任务编号等既有模式仍工作
+
+测试通过脚本 import 方式直接复用 PATTERNS / EXCLUDE_LINE / 各扫描函数，
+不运行真实 CLI（避免扫描全仓、受控制台 GBK 编码影响）。
+"""
+
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+
+import pytest
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]  # D:/codebase/zoo/investor-util
+_SCRIPTS_DIR = _REPO_ROOT / "scripts"
+
+
+def _load_script(name: str):
+    """按文件名加载 scripts/ 下的检查脚本（规避 import 路径限制）。"""
+    fpath = _SCRIPTS_DIR / name
+    mod_name = name.replace(".py", "").replace("-", "_")
+    spec = importlib.util.spec_from_file_location(mod_name, fpath)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.fixture(scope="module")
+def code_traces():
+    return _load_script("check-code-traces.py")
+
+
+@pytest.fixture(scope="module")
+def doc_traces():
+    return _load_script("check-doc-traces.py")
+
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.unit_scripts,
+]
+
+
+def _code_hit(mod, line: str) -> str | None:
+    """返回 check-code-traces 命中的 desc；未命中返回 None。"""
+    if mod._is_excluded(line):
+        return None
+    for pat, cat, desc in mod.PATTERNS:
+        if __import__("re").search(pat, line):
+            return desc
+    return None
+
+
+def _doc_hit(mod, line: str) -> str | None:
+    """返回 check-doc-traces 命中的 desc；未命中返回 None。"""
+    if mod._is_excluded(line):
+        return None
+    for pat, cat, desc in mod._DOC_PATTERNS:
+        if __import__("re").search(pat, line):
+            return desc
+    return None
+
+
+# ── 工具自身豁免 ─────────────────────────────────────────────
+
+
+class TestToolSelfExemption:
+    def test_recognizes_self(self, code_traces):
+        assert code_traces._is_tool_self("check-code-traces.py") is True
+        assert code_traces._is_tool_self("check-doc-traces.py") is True
+
+    def test_recognizes_future_sibling(self, code_traces):
+        """未来新增同类工具（check-xml-traces.py）自动豁免，无需改豁免列表。"""
+        assert code_traces._is_tool_self("check-xml-traces.py") is True
+
+    def test_does_not_exempt_other_scripts(self, code_traces):
+        assert code_traces._is_tool_self("test_runner.py") is False
+        assert code_traces._is_tool_self("check-version-consistency.py") is False
+        assert code_traces._is_tool_self("chart.min.js") is False
+
+
+# ── check-code-traces：补强模式能检出历史痕迹 ──────────────
+
+
+class TestCodeTraceDetection:
+    """补强后 check-code-traces 应能检出此前/曾经/原始/历史/旧逻辑/迁移等痕迹。"""
+
+    def test_prior_state_narrative(self, code_traces):
+        assert _code_hit(code_traces, "之前是直接读取文件") is not None
+
+    def test_prior_noun(self, code_traces):
+        assert _code_hit(code_traces, "此前的判断逻辑") is not None
+        assert _code_hit(code_traces, "以前的实现方案") is not None
+
+    def test_once_implemented(self, code_traces):
+        assert _code_hit(code_traces, "曾经的实现逻辑") is not None
+
+    def test_considered_alternative(self, code_traces):
+        assert _code_hit(code_traces, "曾考虑过A方案") is not None
+
+    def test_original_version(self, code_traces):
+        assert _code_hit(code_traces, "原始版本") is not None
+
+    def test_historical_implementation(self, code_traces):
+        assert _code_hit(code_traces, "历史实现") is not None
+
+    def test_old_logic(self, code_traces):
+        assert _code_hit(code_traces, "旧逻辑") is not None
+
+    def test_refactored_before(self, code_traces):
+        assert _code_hit(code_traces, "重构前逻辑") is not None
+
+    def test_migrated_to_new(self, code_traces):
+        assert _code_hit(code_traces, "迁移到新模块") is not None
+
+    def test_replaced_old(self, code_traces):
+        assert _code_hit(code_traces, "替代了旧方案") is not None
+
+    # ── 合法运行时/当前状态描述不应误伤 ──
+
+    def test_runtime_descriptions_not_flagged(self, code_traces):
+        legit = [
+            "当前版本为 1.0",
+            "保留了历史数据",
+            "该字段为历史值",
+            "回测使用历史序列",
+            "此前已配置",
+            "之前缓存过",
+            "回退到默认配置",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"合法描述被误伤: {line}"
+
+    # ── 既有模式仍工作 ──
+
+    def test_version_marker(self, code_traces):
+        assert _code_hit(code_traces, "该功能在 v0.9.9 引入") is not None
+
+    def test_task_id(self, code_traces):
+        assert _code_hit(code_traces, "见 rf-117 修复") is not None
+
+    def test_source_narrative(self, code_traces):
+        assert _code_hit(code_traces, "从 utils.py 拆分而来") is not None
+
+
+# ── 测试文件回归场景元描述豁免（仅 src/test/ 生效） ─────────
+
+
+class TestTestFileMetaExemption:
+    """回归测试 docstring/注释描述"旧实现做错什么、修复后如何"属测试元数据，
+    test_file=True 时豁免；非测试文件（test_file=False）不受影响仍检出。"""
+
+    def test_regression_scene_exempted_in_test_file(self, code_traces):
+        """含"回归场景/回归断言/回归："的回归测试说明行应豁免。"""
+        legit = [
+            "回归场景：建设银行'今日下跌3.41%'曾被误修正为 1.9%（误当收益率）。",
+            "回归断言 1.9 → 187.1（而非旧实现把 3.41/4.43 修正成 1.9）。",
+            "# ── 回归：百分单位契约 + 单日涨跌语境 + 表格行归因（rf-159 批次修复） ──",
+        ]
+        for line in legit:
+            assert code_traces._is_excluded(line, test_file=True) is True, f"回归元描述未豁免: {line}"
+
+    def test_old_behavior_narrative_exempted_in_test_file(self, code_traces):
+        """测试注释描述旧实现错误行为（旧实现+误/把/会）应豁免。"""
+        legit = [
+            "旧实现'整句最近'误归因到 016055",
+            "旧实现会误报'016055 为最大持仓'",
+            "修复后 orchestrator 源头 ×100、单日涨跌语境按 change_pct 校验。",
+        ]
+        for line in legit:
+            assert code_traces._is_excluded(line, test_file=True) is True, f"旧行为描述未豁免: {line}"
+
+    def test_rf_task_id_batch_note_exempted_in_test_file(self, code_traces):
+        """引用历史任务编号的修复批次说明（rf-xxx 批次修复）在测试文件应豁免。"""
+        assert code_traces._is_excluded("表格行归因（rf-159 批次修复）", test_file=True) is True
+        assert code_traces._is_excluded("表格行归因（rf-159 批次修复）", test_file=False) is False
+
+    def test_not_exempted_outside_test_file(self, code_traces):
+        """同样的旧实现叙述在非测试文件（test_file=False）仍应被检出——工具应检出此历史痕迹，源码侧不削弱。"""
+        assert code_traces._is_excluded("旧实现把 3.41/4.43 修正成 1.9", test_file=False) is False
+        assert _code_hit(code_traces, "旧实现把 3.41/4.43 修正成 1.9") is not None
+
+
+# ── check-doc-traces：补强模式能检出文档历史痕迹 ───────────
+
+
+class TestDocTraceDetection:
+    def test_prior_state_narrative(self, doc_traces):
+        assert _doc_hit(doc_traces, "之前是直接读取文件") is not None
+
+    def test_prior_noun(self, doc_traces):
+        assert _doc_hit(doc_traces, "此前的判断逻辑") is not None
+        assert _doc_hit(doc_traces, "以前的实现方案") is not None
+
+    def test_once_implemented(self, doc_traces):
+        assert _doc_hit(doc_traces, "曾经的实现逻辑") is not None
+
+    def test_original_version(self, doc_traces):
+        assert _doc_hit(doc_traces, "原始版本") is not None
+
+    def test_historical_implementation(self, doc_traces):
+        assert _doc_hit(doc_traces, "历史实现") is not None
+
+    def test_old_logic(self, doc_traces):
+        assert _doc_hit(doc_traces, "旧逻辑") is not None
+
+    def test_migrated_to_new(self, doc_traces):
+        assert _doc_hit(doc_traces, "迁移到新模块") is not None
+
+    def test_refactored_before(self, doc_traces):
+        assert _doc_hit(doc_traces, "重构前逻辑") is not None
+
+    def test_replaced_old(self, doc_traces):
+        assert _doc_hit(doc_traces, "替代了旧方案") is not None
+
+    def test_considered_alternative(self, doc_traces):
+        assert _doc_hit(doc_traces, "曾考虑过A方案") is not None
+
+    # ── 合法当前状态/工具说明应豁免 ──
+
+    def test_runtime_descriptions_not_flagged(self, doc_traces):
+        legit = [
+            "当前版本为 1.0",
+            "保留了历史数据",
+            "回测使用历史序列",
+            "此前已配置",
+            "之前缓存过",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"合法描述被误伤: {line}"
+
+    def test_tool_description_exempted(self, doc_traces):
+        """描述"检查哪些历史痕迹"的工具说明行（元描述）应豁免，而非视为痕迹。"""
+        legit = [
+            "检查历史痕迹的规则说明",
+            "文档正文不得带历史痕迹，只反映当前状态",
+            "文档不得包含来源叙述、原/旧实现、迁移/重命名",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"工具说明被误伤: {line}"
+
+    def test_version_header_exempted(self, doc_traces):
+        """文档版本头（行首锚定）应豁免。"""
+        assert doc_traces._is_excluded("> 文档版本：0.9.10-dev") is True
+        assert doc_traces._is_excluded("## 文档版本：v0.9.10") is True
+
+    # ── 既有模式仍工作 ──
+
+    def test_archive_reference(self, doc_traces):
+        assert _doc_hit(doc_traces, "见 docs-stm/archive/ 归档") is not None
+
+    def test_task_id(self, doc_traces):
+        assert _doc_hit(doc_traces, "见 rf-117 修复") is not None
+
+
+# ── 注释提取：多行 docstring 状态不泄漏 ─────────────────────
+
+
+class TestCommentExtraction:
+    """_py_comment_lines 对多行 docstring 的 in_docstring 状态必须正确开关，
+    否则 docstring 后的 assert/代码行会被误当作 docstring 提取（泄漏误报）。"""
+
+    def test_triple_quote_close_line_with_trailing_text(self, code_traces):
+        """内容结尾的关闭三引号行（…内容\"\"\"，不以三引号开头）应识别为仅关闭行。"""
+        is_oc, is_open = code_traces._is_triple_quote_line('test_file=True 时豁免；不受影响仍检出。"""')
+        assert (is_oc, is_open) == (False, True)
+
+    def test_close_line_with_trailing_text_no_leak(self, code_traces):
+        """关闭行含内容（…内容\"\"\"）时正确关闭，docstring 后的 assert 不泄漏。"""
+        sample = 'x = 1\n"""这是说明，\n第二行内容。"""\nassert _doc_hit(doc_traces, "此前直接读取文件") is not None\n'
+        extracted = [txt for _, txt in code_traces._py_comment_lines(sample)]
+        assert "此前直接读取文件" not in "".join(extracted), "docstring 状态泄漏到 assert 行"
+
+    def test_plain_close_line_no_leak(self, code_traces):
+        """单独一行的关闭三引号（\"\"\"）正常关闭，后续代码不泄漏。"""
+        sample = (
+            '"""回归场景：旧实现把 3.41/4.43 修正成 1.9（描述被测行为）。\n'
+            "这是 docstring 第二行。\n"
+            '"""\n'
+            'assert _doc_hit(doc_traces, "历史实现") is not None\n'
+        )
+        extracted = [txt for _, txt in code_traces._py_comment_lines(sample)]
+        assert '历史实现" is not None' not in "".join(extracted), "docstring 状态泄漏到 assert 行"

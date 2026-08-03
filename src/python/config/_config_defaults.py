@@ -36,9 +36,10 @@ _DEFAULT_CONFIG = {
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
     # ── B. 报告章节可见性 ──
-    "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露（#6~10）
-    "enable_news": True,  # 市场新闻（#11）
-    "enable_history": True,  # 组合历史走势+回撤（#16~17）
+    "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露+相关性（#6~11）
+    "enable_news": True,  # 市场新闻（#12）
+    "enable_history": True,  # 组合历史走势+回撤（#17~18）
+    "enable_portfolio_evolution": True,  # 组合演进（#19）
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -73,7 +74,9 @@ _DEFAULT_CONFIG = {
     "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
     # ── G. 持仓快照 ──
     "history": {
-        "analysis": "auto",
+        "fetch_mode": "auto",  # 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
+        # 历史走势取数窗口（K 线条数/交易日），需 ≥ drawdown MIN_SPAN(60) 才能计算回撤分析
+        "lookback_days": 90,
         "snapshot_retention_days": 60,
         "snapshot_max_count": 365,
         "coverage_threshold": 0.8,
@@ -145,9 +148,10 @@ def _build_template_from_defaults() -> str:
         "",
         # ── B ──
         "  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──",
-        f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露（#6~10）',
-        f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#11）',
-        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#16~17）',
+        f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露+相关性（#6~11）',
+        f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#12）',
+        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#17~18）',
+        f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进（#19）',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",
@@ -170,29 +174,49 @@ def _build_template_from_defaults() -> str:
         "",
         # ── F ──
         "  // ── F. 业绩基准与无风险利率 ──",
-        f'  "risk_free_rate": {json.dumps(d["risk_free_rate"])},',
+        f'  "risk_free_rate": {json.dumps(d["risk_free_rate"])},  // Rf 手动配置（None=自动获取，填小数如0.0174或百分比如1.74）',
         f'  "user_fund_benchmarks": {json.dumps(d["user_fund_benchmarks"])},',
+        "  // 竞争语境对比指数池（默认沪深300+中证500+中证全债）",
         f'  "comparison_indices": {json.dumps(d["comparison_indices"], ensure_ascii=False)},',
         "",
         # ── G ──
         "  // ── G. 组合历史走势与持仓快照 ──",
-        f'  "history": {json.dumps(d["history"], indent=2, ensure_ascii=False).replace(chr(10), chr(10) + "  ")},',
+        '  "history": {',
+        f'    "fetch_mode": {json.dumps(d["history"]["fetch_mode"])},  // 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取',
+        f'    "lookback_days": {d["history"]["lookback_days"]},  // 历史走势取数窗口（K 线条数/交易日），需≥60（回撤分析最少交易日）才计算回撤分析，上限 365',
+        f'    "snapshot_retention_days": {d["history"]["snapshot_retention_days"]},',
+        f'    "snapshot_max_count": {d["history"]["snapshot_max_count"]},',
+        f'    "coverage_threshold": {d["history"]["coverage_threshold"]},',
+        f'    "benchmark_indices": {json.dumps(d["history"]["benchmark_indices"], ensure_ascii=False, indent=2).replace(chr(10), chr(10) + "    ")}',
+        "  },",
         "",
         # ── H ──
         "  // ── H. 业绩评价配置 ──",
-        f'  "performance_evaluation": {json.dumps(d["performance_evaluation"], indent=2).replace(chr(10), chr(10) + "  ")},',
+        '  "performance_evaluation": {',
+        f'    "excess_threshold_up": {d["performance_evaluation"]["excess_threshold_up"]},  // 超额收益 ≥ 此值 → 评级上调一级',
+        f'    "excess_threshold_down": {d["performance_evaluation"]["excess_threshold_down"]}  // 超额收益 < 此值 → 评级下调一级',
+        "  },",
         "",
         # ── I ──
         "  // ── I. 再平衡配置 ──",
-        f'  "rebalance": {json.dumps(d["rebalance"], indent=2).replace(chr(10), chr(10) + "  ")},',
+        '  "rebalance": {',
+        f'    "threshold": {d["rebalance"]["threshold"]},  // 单品种权重超限阈值（默认 15%）',
+        f'    "deviation_threshold": {d["rebalance"]["deviation_threshold"]},  // 大类/品种配置偏离阈值（默认 5%）',
+        f'    "profile": {json.dumps(d["rebalance"]["profile"])},  // 预设阈值集: conservative / moderate / aggressive / custom',
+        f'    "silence_days": {d["rebalance"]["silence_days"]},  // 再平衡信号静默期天数（默认 30 天）',
+        f'    "target_allocation": {json.dumps(d["rebalance"]["target_allocation"])},  // 目标配置 Schema（空=不启用目标配置检查）',
+        f'    "equity_fixed_income": {json.dumps(d["rebalance"]["equity_fixed_income"])}  // 权益/固收超大类目标配置（空=不启用）',
+        "  },",
         "",
         # ── J ──
         "  // ── J. 流动性配置 ──",
-        f'  "redemption_limits": {json.dumps(d["redemption_limits"])},',
+        f'  "redemption_limits": {json.dumps(d["redemption_limits"])},  // 场外基金单日赎回上限（code → 金额，空=未配置）',
         "",
         # ── K ──
         "  // ── K. 匿名化配置 ──",
-        f'  "anonymization": {json.dumps(d["anonymization"], indent=2).replace(chr(10), chr(10) + "  ")},',
+        '  "anonymization": {',
+        f'    "mode": {json.dumps(d["anonymization"]["mode"])}  // 匿名化模式：off/code_display/full_anonymous/summary',
+        "  },",
         "",
         # ── L ──
         # batch/batch_rate_limit 手动构建（json.dumps 会丢 _DEFAULT_CONFIG 行尾注释）：

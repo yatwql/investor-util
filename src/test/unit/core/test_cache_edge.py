@@ -45,7 +45,9 @@ class _CacheTestBase:
 
     def _write_cache(self, key, data, ts=None):
         """写入一个 .json 缓存文件（可选带时间戳）。"""
-        path = os.path.join(self.cache_dir.name, f"{key}.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path(key)
         payload = {"data": data}
         if ts is not None:
             payload["timestamp"] = ts
@@ -55,7 +57,10 @@ class _CacheTestBase:
     def _write_gz_cache(self, key, data, ts=None):
         """写入一个 .json.gz 缓存文件（可选带时间戳）。"""
         import gzip
-        path = os.path.join(self.cache_dir.name, f"{key}.json.gz")
+
+        from src.python.cache import _cache_path
+
+        path = _cache_path(key) + ".gz"
         payload = {"data": data}
         if ts is not None:
             payload["timestamp"] = ts
@@ -202,7 +207,9 @@ class TestGzipCacheEdge(unittest.TestCase, _CacheTestBase):
         boundary_data = "x" * (100 * 1024 - 50)  # 留余量给 JSON 序列化开销
         set("boundary_key", boundary_data)
 
-        json_path = os.path.join(self.cache_dir.name, "boundary_key.json")
+        from src.python.cache import _cache_path
+
+        json_path = _cache_path("boundary_key")
         gz_path = json_path + ".gz"
         self.assertTrue(os.path.exists(json_path),
                         "≤100KB 数据应仍为 .json")
@@ -213,7 +220,9 @@ class TestGzipCacheEdge(unittest.TestCase, _CacheTestBase):
         """损坏的 .json.gz → 删除并返回 None。"""
         mock_time.return_value = 1000.0
         # 创建一个损坏的 .json.gz 文件
-        gz_path = os.path.join(self.cache_dir.name, "corrupted_gz.json.gz")
+        from src.python.cache import _cache_path
+
+        gz_path = _cache_path("corrupted_gz") + ".gz"
         with open(gz_path, "wb") as f:
             f.write(b"this is not valid gzip data")
 

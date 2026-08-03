@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
 
-> 文档版本：0.9.7-dev
+> 文档版本：0.9.12-dev
 
 ---
 
@@ -39,7 +39,18 @@
 | `core/market_hours.py` | 所有时段边界 | 开盘/收盘/午休/周末/节假日/UTC 时区、config 覆盖、API 掉线回退 |
 | `core/provider_registry.py` | 100% 熔断/缓存/策略 | Provider 注册/熔断（默认 3 次→冷却 300s→自动恢复，批量 API 如 eastmoney_industry 为 6 次→120s）、会话缓存 get/set/contains/clear/淘汰、策略选择(交易时段/熔断/QDII豁免)、链式熔断检测、并发安全、审计报告、phase_timeout 嵌套保护 |
 | `tui/handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
-| `tui/tui_menu.py` | 所有 16 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航 |
+| `tui/tui_menu.py` | 所有 17 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航 |
+| `analysis/correlation.py` | Pearson 相关矩阵计算+降级 | 已知答案（r=±1/缩放不变）、不显著配对、下三角布局、配对 |r| 降序、数据不足/单品种/无有效收益降级、名称回退、C19 契约键、NaN/Inf/None 过滤、重复日期去重、日期缺口对齐、极大幅值钳位、多品种大矩阵 |
+| `report/correlation_sheet.py` | 相关性页签 Excel 呈现 | 矩阵/配对/说明三区齐全、下三角+对角+上三角空、N/A 格、available=False/None 占位、配对 |r| 降序 |
+| `report/report_template.html`（correlation 模块） | 相关性章节 HTML 呈现 | 汇总卡+相关度最高+热力矩阵+配对明细、单元格样式分支（强正/强负/不显著/N/A）、不足品种提示、available=False 降级占位、correlation_data=None 章节隐藏 |
+| `analysis/portfolio_evolution.py` | 多快照趋势聚合计算 | 多账户合并、快照缺市值回退成本权重、HHI 计算、TOP 持仓变迁、快照数不足 available=False、历史快照容错跳过 |
+| `report/evolution_sheet.py` + `report_template.html`（evolution 模块） | 组合演进双端呈现 | 汇总/总市值/HHI/TOP/账户流/说明顺序、多账户流表、单账户无流表、HHI 无效期记 "-"、available=False 占位、evolution_data=None 章节隐藏、enable_portfolio_evolution=False 章节隐藏（board 层）、3 图各带 .chart-caption（C20） |
+| `analysis/whatif.py` | 双持仓成本口径 diff 计算 | 新增/清仓/加仓/减仓/不变识别、份额容差(<1e-3)、成本权重+HHI、汇总 delta+箭头、分类配置（_CATEGORY_ORDER 排序）、多账户合并、两侧空降级、单侧空=全清仓仍可算 |
+| `analysis/whatif_backtest.py` | 生效日时序回测纯计算 | 生效日→请求天数折算/钳位/坏格式/未来日期、并集+LOCF+锚点对齐、归一化/收益率/回撤序列数值、5 指标对比、数据不足/两侧空/不可对齐 available=False、status 降级传播 |
+| `report/whatif_operations.py` | whatif 共享层编排 | build_whatif_data→校验→写报告；未指定生效日不调用回测且无 backtest 键；指定生效日合并进 data；回测异常→ok=True 且 available=False；返回 None 不加键 |
+| `report/whatif_sheet.py` | 调仓 What-if Excel 页签呈现 | 摘要(文件对比+变动统计+汇总+箭头)、分类配置权重%、变动明细行底色（新增绿/清仓红/加仓黄/减仓蓝/不变灰）、时序回测页签（指标表+净值/回撤序列+占位）、available=False/None 占位 |
+| `report/whatif_writer.py` + `whatif_template.html` | 调仓 What-if 独立 HTML 页 | ①~⑦ 段齐全（未指定生效日④时序回测隐藏）、双环形图+回测 2 折线图各带 .chart-caption（C20）+#whatif-chart-data/#whatif-backtest-chart-data JSON（R9 最小化）、行动作行 class + badge、箭头类、available=False 占位 |
+| `cli/cli.py`（whatif 子命令） | whatif argparse + 处理器 | --candidate 必填、--base 可选、--effective-date 解析并透传、_handle_whatif 委托（显式 base/config 默认/读取失败/目标失败/不可用数据不写报告）、main 透传 |
 
 ### 1.2 数据边界 Edge Case 强制清单（通用规范）
 
@@ -103,7 +114,7 @@
 | **S11: LLM 混合缓存+真实调用** | — | `test_llm_mixed_cache.py` | 4 模块（假设 news_correlation 关闭）：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 模块列表正确 |
 | **S12: LLM 全部失败（5 种原因）** | — | `test_llm_all_fail.py` | API Key 无效 / 网络断开 / 超时 / 熔断 / 配置缺失 | 菜单 L | 各模块分别显示 NOT_CONFIGURED / API_ERROR / NETWORK_ERROR / TIMEOUT / CIRCUIT_OPEN，颜色均为灰色/红色 |
 | **S13: Extended Thinking 混合** | — | `test_llm_extended_thinking.py` | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用模块行，Excel/HTML/Summary 三种输出一致 |
-| **S14: LLM 不启用** | — | `test_llm_disabled.py` | TUI 不按 L，直接生成报告 | 菜单 E / B 等（无 L） | 核心报告完整生成；无 LLM API 用量页签（Excel 无页签 19、HTML 无第 19 节）；LLM 分析章节整体不出现 |
+| **S14: LLM 不启用** | — | `test_llm_disabled.py` | TUI 不按 L，直接生成报告 | 菜单 E / B 等（无 L） | 核心报告完整生成；无 LLM API 用量页签（Excel 无页签 21、HTML 无第 21 节）；LLM 分析章节整体不出现 |
 | **S15: 禁用+缓存混合** | — | `test_llm_disabled_cache.py` | 1 模块 llm_settings 中 enable=false、1 模块缓存命中、1 模块成功 | 菜单 L | 禁用模块显示"已禁用"（灰色），禁用优先于缓存或 per_module 数据 |
 | **S16: 断网下 LLM 降级** | — | `test_llm_network_error.py` | 网络断开 + 持仓缓存存在 | 菜单 L | 所有 LLM 模块降级为 NETWORK_ERROR 占位文本，不阻塞报告生成 |
 | **S17: LLM 部分缓存超期** | — | `test_llm_partial_cache.py` | 2 模块缓存 TTL 内 + 2 模块缓存已过期 | 菜单 L | 过期模块重新调用 API（显示 Token 和费用），未过期模块显示缓存状态 |
@@ -128,7 +139,7 @@
 | **D2: 辩论降级回退普通模式** | — | `test_debate_pipeline.py` | 正反辩论启用但 pro 或 con 返回 None | 菜单 L（模拟 LLM pro 失败） | 自动回退普通 expert_review；返回 8 元组（无 debate_info）；HTML 不显示辩论块，显示普通结果 |
 | **D3: Token 预算触发生成截断** | — | `test_debate_token_budget.py` | 配置极低 `max_total_tokens_per_report`，持仓数据量大使 pro+con 超 1× 预算 | 菜单 L（模拟长篇输出） | 超过 1× 预算跳过 synthesis，返回 pro+con 拼接；超过 2× 跳过全部 debate 回退普通模式；日志输出 budget 告警 |
 
-> LLM 相关的场景按 S11-S17 分组拆分为 7 个子文件（`scenario/llm/test_llm_mixed_cache.py` ~ `test_llm_partial_cache.py`），S18-S20 归入 `test_llm_empty_holdings.py` / `test_llm_output_consistency.py` / `test_llm_non_trading_day.py` / `test_llm_multi_account.py`。
+> LLM 相关的场景：S11-S17 分布在 7 个子文件（`scenario/llm/test_llm_mixed_cache.py` ~ `test_llm_partial_cache.py`），S18/S19 归入 `test_llm_empty_holdings.py`、S20 归入 `test_llm_output_consistency.py`；另有 `test_llm_non_trading_day.py` / `test_llm_multi_account.py` 覆盖跨日/多账户 LLM 场景。
 > S0a/S0b/S0d（持仓质量，不含 S0c）统一放在 `test_scenario_holdings_quality.py`；S0c（超多持仓）和 S10（极端值）放在 `test_scenario_extreme.py`。
 > S21-S28（特殊品种）统一放在 `test_scenario_special_securities.py`。
 > S29-S33（操作行为）统一放在 `test_scenario_operational_behavior.py`。
@@ -145,7 +156,7 @@
 
 单元测试按被测模块分组，通过 **父子双层 marker** 实现灵活筛选：
 
-- **父标记 `unit`** 匹配全部 11 个子组，用于全量单元测试运行（`-m "unit"`）
+- **父标记 `unit`** 匹配全部 10 个子组，用于全量单元测试运行（`-m "unit"`）
 - **子标记**如 `unit_providers`、`unit_fetcher`、`unit_llm` 等支持单独运行指定模块的测试（`-m "unit_providers"`）
 - 新增单元测试文件时，必须为其测试类标注子标记和父标记，缺一不可
 
@@ -209,6 +220,9 @@
 | **辩论配置段缺失** | llm_settings.json 无 debate 段 → 使用全缺省配置 | ✅ `test_debate_edge.py` `test_missing_config_section` |
 | **辩论 Token 预算 1× 超限** | pro+con 总和超过 1× 预算 → 跳过 synthesis | ✅ `test_debate_token_budget.py` `test_budget_exceeded_skips_synthesis` |
 | **辩论 Token 预算 2× 超限** | pro 单独超过 2× 预算 → 跳过全部 debate | ✅ `test_debate_token_budget.py` `test_budget_2x_skips_all` |
+| **相关性 NaN 虚假相关** | NaN 收益不得产生虚假 r=1.0/p=0.0 显著相关 | ✅ `test_correlation_edge.py` `TestNaNReturnRegression`（单 NaN 过滤贴近干净数据 / 全 NaN 序列剔除降级 / NaN 混入常数序列仍受守卫） |
+| **相关性全 NaN 品种剔除** | 全 NaN 序列整条剔除，跌破 MIN_HOLDINGS → available=False | ✅ `test_correlation_edge.py` `test_all_nan_series_dropped` |
+| **相关性日期缺口对齐** | 缺失中间日期/重复日期 → 仅用交集对齐不崩溃 | ✅ `test_correlation_edge.py` `TestDateHandling` |
 
 ### 1.7 日期/时间数据获取场景测试（T1-T21）
 
@@ -307,11 +321,11 @@
 
 | 验证项 | 标准 | 现有测试 |
 |:-------|:-----|:--------:|
-| **TUI 菜单** | 16 选项完整、中文字符正常、按键响应正确 | ✅ |
+| **TUI 菜单** | 17 选项完整、中文字符正常、按键响应正确 | ✅ |
 | **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
 | **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | ✅ |
 | **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | ✅ | `test_tui_edge.py` |
-| **Excel 页签结构** | 页签编号排序（1.~19.，LLM API 用量强制末位）、冻结首行、列宽自适应 | ✅ |
+| **Excel 页签结构** | 页签编号排序（1.~21.，LLM API 用量强制末位）、冻结首行、列宽自适应 | ✅ |
 | **Excel 盈亏着色** | 正数绿/红色（RGB 正绿/红），覆盖所有盈亏列（本日盈亏/持仓盈亏/收益率） | ✅ |
 | **Excel LLM 状态颜色** | 蓝底=缓存、绿底=成功、红底=失败、灰底=禁用+各色图标 | ✅ |
 | **Excel 取价方式标识** | 蓝色字体标注（实时价/收盘价/官方净值） | ✅ |
@@ -487,16 +501,18 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量）+ `python scripts/check-history-traces.py --ci`（注释历史痕迹检查）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
+9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + 手动菜单 E/B/L + Excel/HTML 视觉检查 + Provider 联通性
-11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + 断网降级/旧缓存兼容/跨池污染确认
+11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ 断网降级/旧缓存兼容/跨池污染确认
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
 ### 6.4 人工验证
 
 12. **异常场景不崩溃**：对 §1.6 异常场景清单中的 🔴/🟡 状态项，人工确认至少不导致程序崩溃
 13. **报告文件视觉检查**：Excel 和 HTML 输出文件无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）
-14. **TUI 菜单功能正常**：所有菜单选项（[E]/[B]/[L]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[X]）响应正确，无崩溃
+14. **TUI 菜单功能正常**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[X]）响应正确，无崩溃
+15. **whatif CLI 手动验证**：`python -m src.python.cli whatif --base 调仓前.xlsx --candidate 调仓后.xlsx [--effective-date 2026-07-01]` 生成 `调仓模拟.xlsx/.html`（最新版固定名，历史归档至日期子目录）；缺省 --base 用 config 持仓；--candidate 缺失报参数错误；指定 --effective-date 时输出时序回测（见第 16 项）；HTML 双环图正常渲染、Excel 变动行底色正确
+16. **whatif 生效日时序回测验证**：① 指定 `--effective-date 2026-07-01`（过去日期）→ Excel 出现第 4 页签「时序回测」、HTML 出现④时序回测区（指标卡 + 2 张折线图 + 图下说明）；② 不指定生效日 → 维持现状（3 页签，无回测区，不联网）；③ 未来生效日（如 `--effective-date 2099-01-01`）或格式错误 → 回测降级占位、主报告正常生成；④ 断网/缓存为空时回测不可用 → 报告仍生成（回测区隐藏/占位）
 
 ---
 

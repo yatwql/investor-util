@@ -11,6 +11,8 @@
 指标清单：
   sharpe_ratio(portfolio_daily_returns, rf_annual) → float | None
   calmar_ratio(portfolio_daily_returns) → float | None
+  annualized_return(daily_returns) → float | None
+  max_drawdown_pct(daily_returns) → float | None
   hhi(weights) → float
   win_rate(holdings) -> dict
   turnover_rate(holdings_before, holdings_after) → float | None
@@ -46,6 +48,8 @@ __all__ = [
     # 指标算法
     "sharpe_ratio",
     "calmar_ratio",
+    "annualized_return",
+    "max_drawdown_pct",
     "hhi",
     "win_rate",
     "turnover_rate",
@@ -223,25 +227,10 @@ def calmar_ratio(
     Returns:
         卡玛比率，数据不足或最大回撤接近 0 时返回 None
     """
-    if check_data_sufficiency(portfolio_daily_returns) == 0:
+    annual_return = annualized_return(portfolio_daily_returns, trading_days)
+    max_dd = max_drawdown_pct(portfolio_daily_returns)
+    if annual_return is None or max_dd is None:
         return None
-
-    # 计算年化收益率
-    total_return = 1.0
-    for r in portfolio_daily_returns:
-        total_return *= 1.0 + r
-    annual_return = total_return ** (trading_days / len(portfolio_daily_returns)) - 1.0
-
-    # 计算最大回撤
-    peak = 1.0
-    max_dd = 0.0
-    cumulative = 1.0
-    for r in portfolio_daily_returns:
-        cumulative *= 1.0 + r
-        if cumulative > peak:
-            peak = cumulative
-        dd = (cumulative - peak) / peak  # 负值（回撤）
-        max_dd = min(max_dd, dd)
 
     max_dd_abs = abs(max_dd)
     if max_dd_abs < _MAX_DRAWDOWN_EPSILON:
@@ -249,6 +238,59 @@ def calmar_ratio(
 
     result = annual_return / max_dd_abs
     return sanitize_metric(result)
+
+
+# ── 年化收益 / 最大回撤 ─────────────────────────
+
+
+def annualized_return(
+    daily_returns: list[float],
+    trading_days: int = _TRADING_DAYS_PER_YEAR,
+) -> float | None:
+    """计算年化收益率（几何年化）。
+
+    annualized = (Π(1+r_i))^(trading_days/n) - 1
+
+    Args:
+        daily_returns: 日收益率序列（百分比小数，如 0.01=1%）
+        trading_days: 年化交易日数
+
+    Returns:
+        年化收益率（小数），数据不足时返回 None
+    """
+    if check_data_sufficiency(daily_returns) == 0:
+        return None
+
+    total = 1.0
+    for r in daily_returns:
+        total *= 1.0 + r
+    result = total ** (trading_days / len(daily_returns)) - 1.0
+    return sanitize_metric(result)
+
+
+def max_drawdown_pct(daily_returns: list[float]) -> float | None:
+    """计算最大回撤幅度（返回正数，如 0.123 = 12.3%）。
+
+    Args:
+        daily_returns: 日收益率序列（百分比小数，如 0.01=1%）
+
+    Returns:
+        最大回撤幅度（正数），数据不足时返回 None
+    """
+    if check_data_sufficiency(daily_returns) == 0:
+        return None
+
+    peak = 1.0
+    max_dd = 0.0
+    cumulative = 1.0
+    for r in daily_returns:
+        cumulative *= 1.0 + r
+        if cumulative > peak:
+            peak = cumulative
+        dd = (cumulative - peak) / peak  # 负值（回撤）
+        if dd < max_dd:
+            max_dd = dd
+    return sanitize_metric(-max_dd)
 
 
 # ── HHI 集中度指数 ──────────────────────────────

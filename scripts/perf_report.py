@@ -227,7 +227,7 @@ def run_perf_test() -> dict[str, float]:
             holdings,
             config,
             reporter,
-            history_mode="off",
+            fetch_history=False,
             output_dir=tmp_dir.name,
         )
         t_elapsed = time.perf_counter() - t_start

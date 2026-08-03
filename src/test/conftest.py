@@ -32,6 +32,7 @@ _KNOWN_MARKERS: set[str] = {
     # unit 分支
     "unit", "unit_providers", "unit_fetcher", "unit_llm", "unit_news", "unit_report",
     "unit_config", "unit_config_edge", "unit_core", "unit_cli", "unit_ui", "unit_analysis",
+    "unit_scripts",
     # 跨领域标记
     "llm", "edge", "smoke", "data", "integration",
     # integration 分支
@@ -74,6 +75,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit_cli: CLI 命令行模式单元测试")
     config.addinivalue_line("markers", "unit_ui: TUI/UI 交互单元测试")
     config.addinivalue_line("markers", "unit_analysis: 分析计算模块单元测试（流动性/再平衡/汇率/无风险利率）")
+    config.addinivalue_line("markers", "unit_scripts: scripts/ 工程脚本单元测试（历史痕迹检查/版本一致性等）")
     config.addinivalue_line("markers", "llm: LLM 相关测试（全部 mock，无需 API key）")
     config.addinivalue_line("markers", "edge: 边缘/异常场景测试 — 必须放在 *_edge.py 文件中，不得与普通测试混搭")
     config.addinivalue_line("markers", "smoke: 冒烟测试（快速验证核心功能）")
@@ -148,6 +150,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.analysis.rebalance._SILENCE_FILE",
         str(tmp_path / "data/state/rebalance_silence.json"),
     )
+    # local_state.json 机器本地状态隔离（首次运行引导/隐私提示已读标志等）
+    monkeypatch.setattr(
+        "src.python.config._local_state._LOCAL_STATE_FILE",
+        str(tmp_path / "data/state/local_state.json"),
+    )
     # perf_history.jsonl 性能历史文件隔离
     monkeypatch.setattr(
         "src.python.core.perf._PERF_HISTORY_FILE",
@@ -184,6 +191,21 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         _cfg_defaults._DEFAULT_CONFIG,
         "llm_settings_file",
         str(tmp_path / "data/config/llm_settings.json"),
+    )
+    # C13: llm_key.json / llm_providers.json 路径同样 seed 到默认配置。
+    # _get_llm_key_path()/_get_llm_providers_path() 优先读 config["llm_key_file"]
+    # / config["llm_providers_file"]（来自 _DEFAULT_CONFIG），仅靠 patch
+    # _LLM_KEY_FILE_DEFAULT 会被默认配置里的真实路径绕过 —— 必须同步 seed，
+    # 否则测试会读写用户真实凭据文件（data/config/llm_key.json）。
+    monkeypatch.setitem(
+        _cfg_defaults._DEFAULT_CONFIG,
+        "llm_key_file",
+        str(tmp_path / "data/config/llm_key.json"),
+    )
+    monkeypatch.setitem(
+        _cfg_defaults._DEFAULT_CONFIG,
+        "llm_providers_file",
+        str(tmp_path / "data/config/llm_providers.json"),
     )
     _cfg_core._clear_config_cache()
     # 注：llm_settings.json 不在此处 seed 隔离路径。需要读写真实配置的测试

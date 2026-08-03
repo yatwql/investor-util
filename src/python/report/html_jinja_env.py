@@ -66,24 +66,25 @@ def _jinja_price_type_color(price_type: str, name: str = "") -> str:
     """取价方式颜色：蓝色代表数据时效性高/可靠。
 
     着色规则同 Excel 端 _apply_price_type_colors：
-      - "场内收盘价(T)"、"场内午市收盘(T)"、"官方净值(T)" → #0066CC
-      - QDII 基金 "官方净值(T-1)" → #0066CC
+      - "场内收盘价(T)"、"场内午市收盘(T)"、"官方净值(T)" → var(--rating-stable)
+      - QDII 基金 "官方净值(T-1)" → var(--rating-stable)
+    返回 CSS 变量表达式（暗色模式（主题切换）），模板中直接用于 style="color: ..."。
     """
     if price_type in ("场内收盘价(T)", "场内午市收盘(T)", "官方净值(T)"):
-        return "#0066CC"
+        return "var(--rating-stable)"
     if price_type == "官方净值(T-1)" and name and is_qdii_extended(name):
-        return "#0066CC"
+        return "var(--rating-stable)"
     return ""
 
 
 def _jinja_profit_color(value: Any) -> str:
-    """盈亏颜色：盈利红 #CC0000，亏损绿 #009900"""
+    """盈亏颜色：盈利红 var(--profit)，亏损绿 var(--loss)（跟随主题）。"""
     try:
         v = float(value)
         if v > 0:
-            return "#CC0000"
+            return "var(--profit)"
         elif v < 0:
-            return "#009900"
+            return "var(--loss)"
         return ""
     except (ValueError, TypeError):
         return ""
@@ -100,13 +101,13 @@ def _jinja_thousands(value: Any) -> str:
 def _jinja_sentiment_colorize(text: str) -> str:
     """将 [利好]/[利空] 标记着色为 HTML 内联样式，其余文本保持原样。
 
-    [利好] → 红色 (#CC0000)，[利空] → 绿色 (#009900)。
+    [利好] → 红 var(--profit)，[利空] → 绿 var(--loss)（跟随主题）。
     返回的 HTML 已在过滤器层处理，模板中使用 ``| safe`` 避免二次转义。
     """
     if not text:
         return text
-    text = text.replace("[利好]", '<span style="color:#CC0000;font-weight:bold">[利好]</span>')
-    text = text.replace("[利空]", '<span style="color:#009900;font-weight:bold">[利空]</span>')
+    text = text.replace("[利好]", '<span style="color:var(--profit);font-weight:bold">[利好]</span>')
+    text = text.replace("[利空]", '<span style="color:var(--loss);font-weight:bold">[利空]</span>')
     return text
 
 

@@ -40,6 +40,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", metavar="PATH", help="备用配置文件路径（默认: data/config/config.json）")
     parser.add_argument("--output", metavar="DIR", help="报告输出目录（覆盖 config.json 的 output_dir）")
     parser.add_argument("--verbose", action="store_true", help="将进度消息同步到 stderr（默认仅写入 logs/app.log）")
+    parser.add_argument("--non-interactive", action="store_true", help="跳过首次运行交互式引导（定时任务/脚本使用）")
     parser.add_argument("--version", action="version", version=f"%(prog)s v{APP_VERSION}")
 
     sub = parser.add_subparsers(dest="command", required=True)
@@ -76,6 +77,23 @@ def _build_parser() -> argparse.ArgumentParser:
         "  cache --update basic           仅更新基础类缓存\n"
         "  cache --clean                  清理过期缓存\n"
         "  cache --stats                  查看缓存统计"
+    )
+
+    # ── whatif 子命令 ──
+    whatif_p = sub.add_parser("whatif", help="调仓 What-if 模拟：对比两份持仓生成 diff 报告")
+    whatif_p.add_argument("--candidate", metavar="PATH", required=True, help="目标持仓文件（调仓后/假设，必填）")
+    whatif_p.add_argument("--base", metavar="PATH", help="基准持仓文件（调仓前）；缺省用 config 配置的持仓文件")
+    whatif_p.add_argument(
+        "--effective-date",
+        metavar="YYYY-MM-DD",
+        help="调仓生效日（可选）：指定后 opt-in 联网取生效日后行情，追加时序回测页（区间/年化收益、波动率、夏普、最大回撤）",
+    )
+    whatif_p.epilog = (
+        "示例:\n"
+        "  whatif --candidate 调仓后.xlsx              对比当前持仓 vs 目标持仓（成本口径截面比较）\n"
+        "  whatif --base 调仓前.xlsx --candidate 调仓后.xlsx   显式指定两份持仓\n"
+        "  whatif --candidate 调仓后.xlsx --effective-date 2026-07-01   指定生效日，追加时序回测\n"
+        "输出: 调仓模拟.xlsx / .html（最新版固定名，历史归档至日期子目录；默认零网络请求，指定生效日时联网取历史做假设推演，不构成收益承诺）"
     )
 
     # ── check-sources 子命令 ──
@@ -237,7 +255,7 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
         config=config,
         reporter=reporter,
         report_type=args.type,
-        history_mode=args.history,
+        fetch_history=(args.history == "auto"),
         force_llm=args.force_llm,
         output_dir=args.output,
         warm_cache=args.warm,
@@ -308,6 +326,59 @@ def _handle_cache_update(update_type: str, config: dict, reporter) -> int:
     return _EXIT_SEVERE
 
 
+def _handle_whatif(args: argparse.Namespace, config: dict) -> int:
+    """处理 whatif 子命令——调仓 What-if 模拟。
+
+    对比基准（--base，缺省为 config 持仓文件）与目标（--candidate）两份持仓，
+    生成调仓 diff 报告（Excel + HTML）。全程本地计算，零网络请求。
+    业务链（build→校验→输出）委托共享层 run_whatif_simulation，
+    本函数仅保留文件来源解析与退出码映射。
+    """
+    from src.python.core.reader import read_holdings
+    from src.python.report.cli_progress import CliProgressReporter
+    from src.python.report.whatif_operations import run_whatif_simulation
+
+    reporter = CliProgressReporter(verbose=args.verbose)
+
+    # ── 基准持仓（--base 或 config 默认）──
+    base_file = args.base
+    if base_file:
+        base_holdings = read_holdings(base_file)
+    else:
+        base_file = os.path.join(
+            config.get("holdings_dir", "data/holdings"),
+            config.get("holdings_filename", "个人投资持仓信息.xlsx"),
+        )
+        base_holdings = _cli_read_holdings(config)
+    if not base_holdings:
+        reporter.error(f"基准持仓读取失败或为空: {base_file}")
+        return _EXIT_SEVERE
+
+    # ── 目标持仓（--candidate，必填）──
+    cand_file = args.candidate
+    cand_holdings = read_holdings(cand_file)
+    if not cand_holdings:
+        reporter.error(f"目标持仓读取失败或为空: {cand_file}")
+        return _EXIT_SEVERE
+
+    output_dir = args.output or config.get("output_dir", "reports")
+    result = run_whatif_simulation(
+        base_holdings,
+        cand_holdings,
+        base_file=base_file,
+        candidate_file=cand_file,
+        output_dir=output_dir,
+        reporter=reporter,
+        effective_date=args.effective_date,
+    )
+    if not result.ok:
+        reporter.error(f"调仓对比数据不可用: {result.reason}")
+        return _EXIT_SEVERE
+
+    reporter.print_timing_summary()
+    return _EXIT_SUCCESS
+
+
 def _handle_check_sources() -> int:
     """处理 check-sources 子命令——数据源健康检查。
 
@@ -345,10 +416,22 @@ def main() -> int:
     init_config(config_path=args.config)
     config = get_config()
 
+    # 首次运行引导（非交互/CI/脚本环境自动跳过，不阻塞命令执行）
+    try:
+        from src.python.startup_wizard import show_startup_wizard_if_needed
+
+        show_startup_wizard_if_needed(non_interactive=args.non_interactive)
+    except Exception:
+        import logging
+
+        logging.getLogger("invest").debug("首次运行引导显示失败（非关键）", exc_info=True)
+
     if args.command == "report":
         return _handle_report(args, config)
     elif args.command == "cache":
         return _handle_cache(args, config)
+    elif args.command == "whatif":
+        return _handle_whatif(args, config)
     return _EXIT_SEVERE
 
 

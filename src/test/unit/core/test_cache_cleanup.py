@@ -52,8 +52,9 @@ class CacheTestBase(unittest.TestCase):
 
     def _write_cache(self, key: str, data: object, ts: float) -> str:
         """向缓存目录写入指定内容的 JSON 文件，返回完整路径。"""
-        safe = key.replace("/", "_").replace("\\", "_").replace("..", "_")
-        path = os.path.join(self.cache_dir, f"{safe}.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path(key)
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"_ts": ts, "_data": data}, f, ensure_ascii=False)
         return path
@@ -62,8 +63,9 @@ class CacheTestBase(unittest.TestCase):
         """向缓存目录写入 gzip 压缩的 JSON 文件，返回完整路径。"""
         import gzip
 
-        safe = key.replace("/", "_").replace("\\", "_").replace("..", "_")
-        path = os.path.join(self.cache_dir, f"{safe}.json.gz")
+        from src.python.cache import _cache_path
+
+        path = _cache_path(key) + ".gz"
         with gzip.open(path, "wt", encoding="utf-8") as f:
             json.dump({"_ts": ts, "_data": data}, f, ensure_ascii=False)
         return path
@@ -147,7 +149,11 @@ class TestCacheGetStats(CacheTestBase):
 
     def test_no_underscore_goes_to_other(self):
         """文件名不含下划线 → 归入 other 分组。"""
-        self._write_cache("abc", 1, 100.0)
+        # _cache_path 生成的键名带 _v2 后缀（必然含下划线），
+        # 这里手动写入无下划线文件以覆盖分组逻辑的 other 兜底分支。
+        path = os.path.join(self.cache_dir, "plain.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"_ts": 100.0, "_data": 1}, f, ensure_ascii=False)
 
         from src.python.cache import get_cache_stats
 
@@ -168,7 +174,9 @@ class TestCleanupExpired(CacheTestBase):
         return self._write_cache(key, data, ts)
 
     def _read_ts_file(self, key: str) -> float:
-        path = os.path.join(self.cache_dir, f"{key}.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path(key)
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f).get("_ts", 0)
 
@@ -208,8 +216,10 @@ class TestCleanupExpired(CacheTestBase):
         count = cleanup_expired()
         self.assertEqual(count, 1)
 
-        old_path = os.path.join(self.cache_dir, "price_old.json")
-        fresh_path = os.path.join(self.cache_dir, "price_fresh.json")
+        from src.python.cache import _cache_path
+
+        old_path = _cache_path("price_old")
+        fresh_path = _cache_path("price_fresh")
         self.assertFalse(os.path.exists(old_path))
         self.assertTrue(os.path.exists(fresh_path))
 
@@ -227,7 +237,9 @@ class TestCleanupExpired(CacheTestBase):
 
         count = cleanup_expired(dry_run=True)
         self.assertEqual(count, 1)
-        old_path = os.path.join(self.cache_dir, "price_old.json")
+        from src.python.cache import _cache_path
+
+        old_path = _cache_path("price_old")
         self.assertTrue(os.path.exists(old_path))
 
     @patch("src.python.cache._cleanup.time.time")
@@ -294,8 +306,10 @@ class TestCleanupExpired(CacheTestBase):
 
         count = cleanup_expired()
         self.assertEqual(count, 1)
-        self.assertFalse(os.path.exists(os.path.join(self.cache_dir, "price_old.json")))
-        self.assertTrue(os.path.exists(os.path.join(self.cache_dir, "news_old.json")))
+        from src.python.cache import _cache_path
+
+        self.assertFalse(os.path.exists(_cache_path("price_old")))
+        self.assertTrue(os.path.exists(_cache_path("news_old")))
 
     @patch("src.python.cache._cleanup.time.time")
     @patch("src.python.cache._cleanup.get_ttl")
@@ -334,7 +348,9 @@ class TestCleanupExpired(CacheTestBase):
 
         count = cleanup_expired()
         self.assertEqual(count, 0)
-        path = os.path.join(self.cache_dir, "trading_calendar.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("trading_calendar")
         self.assertTrue(os.path.exists(path))
 
     @patch("src.python.cache._cleanup.time.time")
@@ -374,9 +390,11 @@ class TestClearByGroup(CacheTestBase):
 
         result = clear_by_group("refresh")
 
+        from src.python.cache import _cache_path
+
         for key in ("fund_perf_000001", "news_abc", "industry_600000", "dividend_600000"):
-            self.assertFalse(os.path.exists(os.path.join(self.cache_dir, f"{key}.json")))
-        self.assertTrue(os.path.exists(os.path.join(self.cache_dir, "price_600000.json")))
+            self.assertFalse(os.path.exists(_cache_path(key)))
+        self.assertTrue(os.path.exists(_cache_path("price_600000")))
         self.assertIn("基金业绩排名", result)
 
     def test_clear_preload_group(self):
@@ -390,9 +408,11 @@ class TestClearByGroup(CacheTestBase):
 
         result = clear_by_group("preload")
 
+        from src.python.cache import _cache_path
+
         for key in ("price_000001", "index_sh000001", "llm_global_macro_abc"):
-            self.assertFalse(os.path.exists(os.path.join(self.cache_dir, f"{key}.json")))
-        self.assertTrue(os.path.exists(os.path.join(self.cache_dir, "news_abc.json")))
+            self.assertFalse(os.path.exists(_cache_path(key)))
+        self.assertTrue(os.path.exists(_cache_path("news_abc")))
         self.assertIn("股票价格", result)
 
     def test_clear_refresh_clears_exact_keys(self):
@@ -401,7 +421,9 @@ class TestClearByGroup(CacheTestBase):
         from src.python.cache import clear_by_group
 
         result = clear_by_group("refresh")
-        self.assertFalse(os.path.exists(os.path.join(self.cache_dir, "fund_benchmarks.json")))
+        from src.python.cache import _cache_path
+
+        self.assertFalse(os.path.exists(_cache_path("fund_benchmarks")))
         self.assertIn("基金业绩基准", result)
 
     def test_clear_unknown_group(self):

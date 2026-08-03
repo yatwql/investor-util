@@ -261,7 +261,7 @@ def _classify_and_group(
 
 
 def _prefetch_manager_data(code: str) -> None:
-    """预取基金经理数据并写入缓存（供 B2 变更监控使用）。
+    """预取基金经理数据并写入缓存（供基金经理变更监控章节使用）。
 
     与 fetch_fund_holdings 共用同一基金主页面 HTML，首次调用
     时发起 HTTP 请求，后续运行命中缓存（TTL=1天）零额外请求。
@@ -298,7 +298,7 @@ def _merge_fund_layer(
         tag = _fund_type_tag(ftype)
 
         holdings_data = holdings_batch.get(fund.code)
-        # 同页面顺带获取基金经理数据并缓存，供 B2 基金经理变更监控使用
+        # 同页面顺带获取基金经理数据并缓存，供基金经理变更监控章节使用
         _prefetch_manager_data(fund.code)
 
         if holdings_data is None or not holdings_data.get("holdings"):

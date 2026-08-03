@@ -22,6 +22,7 @@ import pytest
 
 from src.python.config import _validation as val
 from src.python.core.constants import PROJECT_ROOT
+from src.python.analysis.drawdown_events import MIN_SPAN
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 
@@ -32,6 +33,7 @@ class TestValidationModuleImport(unittest.TestCase):
     def test_module_imported(self):
         """_validation 模块可导入。"""
         import src.python.config._validation as _v
+
         self.assertIsNotNone(_v)
 
     def test_constants_accessible(self):
@@ -300,6 +302,16 @@ class TestValidateEnableBoards(unittest.TestCase):
         n = val._validate_enable_boards({"enable_fund_deep_analysis": "yes"}, 0)
         self.assertEqual(n, 1)
 
+    def test_portfolio_evolution_non_bool_warns(self):
+        """enable_portfolio_evolution 非布尔值 → 告警。"""
+        n = val._validate_enable_boards({"enable_portfolio_evolution": "yes"}, 0)
+        self.assertEqual(n, 1)
+
+    def test_portfolio_evolution_valid_bool_no_issue(self):
+        """enable_portfolio_evolution 为合法布尔值 → 正常。"""
+        n = val._validate_enable_boards({"enable_portfolio_evolution": False}, 0)
+        self.assertEqual(n, 0)
+
 
 class TestValidateMarketHours(unittest.TestCase):
     """_validate_market_hours 测试。"""
@@ -407,6 +419,35 @@ class TestValidateRebalanceConfig(unittest.TestCase):
         self.assertEqual(n, 1)
 
 
+class TestValidateHistoryLookbackDays(unittest.TestCase):
+    """_validate_history_lookback_days 校验函数测试。"""
+
+    def test_missing_returns_zero(self):
+        """缺失 lookback_days → 0 问题（走默认值）。"""
+        n = val._validate_history_lookback_days({"history": {}}, 0)
+        self.assertEqual(n, 0)
+
+    def test_valid_returns_zero(self):
+        """合法值 90 → 0 问题。"""
+        n = val._validate_history_lookback_days({"history": {"lookback_days": 90}}, 0)
+        self.assertEqual(n, 0)
+
+    def test_below_min_span_warns(self):
+        """低于 MIN_SPAN（回撤分析最少交易日）→ 告警。"""
+        n = val._validate_history_lookback_days({"history": {"lookback_days": MIN_SPAN - 1}}, 0)
+        self.assertEqual(n, 1)
+
+    def test_above_max_warns(self):
+        """超过上限 365（K 线数据源最多返回条数）→ 告警。"""
+        n = val._validate_history_lookback_days({"history": {"lookback_days": 366}}, 0)
+        self.assertEqual(n, 1)
+
+    def test_non_integer_warns(self):
+        """非整数 → 告警。"""
+        n = val._validate_history_lookback_days({"history": {"lookback_days": "abc"}}, 0)
+        self.assertEqual(n, 1)
+
+
 class TestValidateConfigEntryPoint(unittest.TestCase):
     """validate_config 入口函数测试。"""
 
@@ -438,11 +479,13 @@ class TestValidateConfigEntryPoint(unittest.TestCase):
 
     def test_multiple_issues_accumulate(self):
         """多个问题累加计数。"""
-        n = val.validate_config({
-            "holdings_filename": "",
-            "news_top_count": -5,
-            "cache_ttl": "invalid",
-        })
+        n = val.validate_config(
+            {
+                "holdings_filename": "",
+                "news_top_count": -5,
+                "cache_ttl": "invalid",
+            }
+        )
         self.assertEqual(n, 3)
 
     def test_validate_enable_llm_warns_on_unknown_key(self):

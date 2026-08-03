@@ -12,6 +12,7 @@ from typing import Any
 
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.registry import get_known_enabled_llm_keys, get_report_section_keys
+from src.python.analysis.drawdown_events import MIN_SPAN
 
 logger = logging.getLogger("invest")
 
@@ -223,8 +224,8 @@ def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
 
 
 def _validate_enable_boards(config: dict, issues: int) -> int:
-    """验证章节可见性配置（enable_fund_deep_analysis / enable_news / enable_history）。"""
-    for key in ("enable_fund_deep_analysis", "enable_news", "enable_history"):
+    """验证章节可见性配置（enable_fund_deep_analysis / enable_news / enable_history / enable_portfolio_evolution）。"""
+    for key in ("enable_fund_deep_analysis", "enable_news", "enable_history", "enable_portfolio_evolution"):
         val = config.get(key)
         if val is None:
             continue  # 缺失视为 True（默认启用）
@@ -340,6 +341,56 @@ def _validate_benchmark_indices(config: dict, issues: int) -> int:
         if not isinstance(val, str):
             logger.warning("config.json history.benchmark_indices.%s = %r 不是字符串", key, val)
             issues += 1
+    return issues
+
+
+_FETCH_MODES = frozenset({"off", "prompt", "auto"})  # history.fetch_mode 合法取值
+
+
+def _validate_history_fetch_mode(config: dict, issues: int) -> int:
+    """验证 history.fetch_mode 配置（历史走势获取模式三态）。"""
+    history = config.get("history", {})
+    if not isinstance(history, dict):
+        return issues
+    mode = history.get("fetch_mode")
+    if mode is None:
+        return issues  # 缺失时使用默认值，正常
+    if not isinstance(mode, str) or mode not in _FETCH_MODES:
+        logger.warning(
+            "config.json history.fetch_mode = %r 非法（应为 off/prompt/auto），将使用默认值 auto",
+            mode,
+        )
+        return issues + 1
+    return issues
+
+
+def _validate_history_lookback_days(config: dict, issues: int) -> int:
+    """验证 history.lookback_days 配置（历史走势取数窗口天数）。
+
+    下限绑定 MIN_SPAN（回撤分析所需最少交易日），低于下限时回撤分析
+    将判定数据不足；上限 365 对齐历史 K 线数据源最多返回条数。
+    """
+    history = config.get("history", {})
+    if not isinstance(history, dict):
+        return issues
+    lookback = history.get("lookback_days")
+    if lookback is None:
+        return issues  # 缺失时使用默认值 90，正常
+    try:
+        days = int(lookback)
+    except (ValueError, TypeError):
+        logger.warning("config.json history.lookback_days = %r 不是有效整数，将使用默认值 90", lookback)
+        return issues + 1
+    if days < MIN_SPAN:
+        logger.warning(
+            "config.json history.lookback_days = %s 低于回撤分析所需最少 %d 个交易日，回撤分析将判定数据不足",
+            days,
+            MIN_SPAN,
+        )
+        issues += 1
+    if days > 365:
+        logger.warning("config.json history.lookback_days = %s 超过上限 365，历史 K 线数据源最多返回 365 条", days)
+        issues += 1
     return issues
 
 
@@ -470,6 +521,8 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)
     issues = _validate_benchmark_indices(config, issues)
+    issues = _validate_history_fetch_mode(config, issues)
+    issues = _validate_history_lookback_days(config, issues)
     issues = _validate_comparison_indices(config, issues)
     issues = _validate_rebalance_config(config, issues)
     issues = _validate_enable_llm(issues)

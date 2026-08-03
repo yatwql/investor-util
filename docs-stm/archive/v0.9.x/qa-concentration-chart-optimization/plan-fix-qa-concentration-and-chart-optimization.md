@@ -1,6 +1,6 @@
 # 修复：集中度问答无输出内容 + 资产穿透TOP10 两柱状图区分优化
 
-> **状态**：rf-150 已实现并通过回归验证（v0.9.6 发布，当前开发版本 v0.9.7-dev）。设计文档保留在 `docs-stm/plan/`，待 release 后随版本段归档。
+> **状态**：rf-150 已实现并通过回归验证（v0.9.6 发布，修复记录见 [`archived_review-findings.0.9.x.md`](../archived_review-findings.0.9.x.md)）。本设计文档已于 2026-08-03 归档至 `docs-stm/archive/v0.9.x/qa-concentration-chart-optimization/`。
 
 ## Context
 

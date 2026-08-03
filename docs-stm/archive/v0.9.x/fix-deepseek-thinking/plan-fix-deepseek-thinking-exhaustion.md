@@ -1,6 +1,6 @@
 # 修复 DeepSeek Extended Thinking 思考耗尽 max_tokens 预算（rf-122）
 
-> **状态**：rf-122 已实现并修复（竞态 + 配置缓解，v0.9.x 已发布，修复记录见 `archived_review-findings.0.9.x.md`）。设计文档保留在 `docs-stm/plan/` 供历史参考，待 release 后随版本段归档。
+> **状态**：rf-122 已实现并修复（竞态 + 配置缓解，v0.9.5 已发布，修复记录见 [`archived_review-findings.0.9.x.md`](../archived_review-findings.0.9.x.md)）。本设计文档已于 2026-08-03 归档至 `docs-stm/archive/v0.9.x/fix-deepseek-thinking/`。
 
 ## Context
 

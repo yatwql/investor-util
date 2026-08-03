@@ -52,8 +52,9 @@ class CacheTestBase(unittest.TestCase):
 
     def _write_cache(self, key: str, data: object, ts: float) -> str:
         """向缓存目录写入指定内容的 JSON 文件，返回完整路径。"""
-        safe = key.replace("/", "_").replace("\\", "_").replace("..", "_")
-        path = os.path.join(self.cache_dir, f"{safe}.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path(key)
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"_ts": ts, "_data": data}, f, ensure_ascii=False)
         return path
@@ -62,8 +63,9 @@ class CacheTestBase(unittest.TestCase):
         """向缓存目录写入 gzip 压缩的 JSON 文件，返回完整路径。"""
         import gzip
 
-        safe = key.replace("/", "_").replace("\\", "_").replace("..", "_")
-        path = os.path.join(self.cache_dir, f"{safe}.json.gz")
+        from src.python.cache import _cache_path
+
+        path = _cache_path(key) + ".gz"
         with gzip.open(path, "wt", encoding="utf-8") as f:
             json.dump({"_ts": ts, "_data": data}, f, ensure_ascii=False)
         return path
@@ -81,11 +83,11 @@ class TestGzipCache(CacheTestBase):
     def test_small_file_not_gzipped(self, mock_time):
         """小文件 (<100KB) 仍写入 .json。"""
         mock_time.return_value = 1000.0
-        from src.python.cache import set
+        from src.python.cache import set, _cache_path
 
         set("small_key", "small_data")
 
-        json_path = os.path.join(self.cache_dir, "small_key.json")
+        json_path = _cache_path("small_key")
         gz_path = json_path + ".gz"
         self.assertTrue(os.path.exists(json_path))
         self.assertFalse(os.path.exists(gz_path))
@@ -99,7 +101,9 @@ class TestGzipCache(CacheTestBase):
         large_data = "x" * 110000
         set("large_key", large_data)
 
-        json_path = os.path.join(self.cache_dir, "large_key.json")
+        from src.python.cache import _cache_path
+
+        json_path = _cache_path("large_key")
         gz_path = json_path + ".gz"
         self.assertTrue(os.path.exists(gz_path))
         self.assertFalse(os.path.exists(json_path))
@@ -140,8 +144,10 @@ class TestGzipCache(CacheTestBase):
         count = clear_by_prefix("price_")
         self.assertEqual(count, 2)
 
-        json_path = os.path.join(self.cache_dir, "price_000001.json")
-        gz_path = os.path.join(self.cache_dir, "price_000002.json.gz")
+        from src.python.cache import _cache_path
+
+        json_path = _cache_path("price_000001")
+        gz_path = _cache_path("price_000002") + ".gz"
         self.assertFalse(os.path.exists(json_path))
         self.assertFalse(os.path.exists(gz_path))
 
@@ -159,8 +165,10 @@ class TestGzipCache(CacheTestBase):
         count = cleanup_expired()
         self.assertEqual(count, 1)
 
-        old_path = os.path.join(self.cache_dir, "price_gz_old.json.gz")
-        fresh_path = os.path.join(self.cache_dir, "price_gz_fresh.json.gz")
+        from src.python.cache import _cache_path
+
+        old_path = _cache_path("price_gz_old") + ".gz"
+        fresh_path = _cache_path("price_gz_fresh") + ".gz"
         self.assertFalse(os.path.exists(old_path))
         self.assertTrue(os.path.exists(fresh_path))
 
@@ -201,12 +209,12 @@ class TestGzipTransparentCompression(CacheTestBase):
     def test_small_data_not_gzip(self, mock_time):
         """小数据（<100KB）→ 存储为 .json 而非 .json.gz。"""
         mock_time.return_value = 1000.0
-        from src.python.cache import set
+        from src.python.cache import set, _cache_path
 
         data = {"small": "hello"}
         set("small_key", data)
 
-        json_path = os.path.join(self.cache_dir, "small_key.json")
+        json_path = _cache_path("small_key")
         gz_path = json_path + ".gz"
         self.assertTrue(os.path.exists(json_path))
         self.assertFalse(os.path.exists(gz_path))
@@ -220,7 +228,9 @@ class TestGzipTransparentCompression(CacheTestBase):
         big = self._big_data(150)
         set("big_key", big)
 
-        json_path = os.path.join(self.cache_dir, "big_key.json")
+        from src.python.cache import _cache_path
+
+        json_path = _cache_path("big_key")
         gz_path = json_path + ".gz"
 
         self.assertFalse(os.path.exists(json_path), ".json 文件应被清理")
@@ -254,7 +264,9 @@ class TestGzipTransparentCompression(CacheTestBase):
         big = self._big_data(110)
         set("expire_gz", big)
 
-        gz_path = os.path.join(self.cache_dir, "expire_gz.json.gz")
+        from src.python.cache import _cache_path
+
+        gz_path = _cache_path("expire_gz") + ".gz"
         self.assertTrue(os.path.exists(gz_path))
 
         mock_time.return_value = 999999.0
@@ -275,8 +287,10 @@ class TestGzipTransparentCompression(CacheTestBase):
         set("price_gz_a", big1)
         set("price_gz_b", big2)
 
-        gz_a = os.path.join(self.cache_dir, "price_gz_a.json.gz")
-        gz_b = os.path.join(self.cache_dir, "price_gz_b.json.gz")
+        from src.python.cache import _cache_path
+
+        gz_a = _cache_path("price_gz_a") + ".gz"
+        gz_b = _cache_path("price_gz_b") + ".gz"
         self.assertTrue(os.path.exists(gz_a))
         self.assertTrue(os.path.exists(gz_b))
 
@@ -290,7 +304,9 @@ class TestGzipTransparentCompression(CacheTestBase):
         """同时存在 .json 和 .json.gz → 优先读取 .json.gz。"""
         mock_time.return_value = 1000.0
 
-        json_path = os.path.join(self.cache_dir, "duel.json")
+        from src.python.cache import _cache_path
+
+        json_path = _cache_path("duel")
         gz_path = json_path + ".gz"
 
         with open(json_path, "w", encoding="utf-8") as f:

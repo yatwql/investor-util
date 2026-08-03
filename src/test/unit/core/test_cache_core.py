@@ -54,8 +54,9 @@ class CacheTestBase(unittest.TestCase):
 
     def _write_cache(self, key: str, data: object, ts: float) -> str:
         """向缓存目录写入指定内容的 JSON 文件，返回完整路径。"""
-        safe = key.replace("/", "_").replace("\\", "_").replace("..", "_")
-        path = os.path.join(self.cache_dir, f"{safe}.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path(key)
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"_ts": ts, "_data": data}, f, ensure_ascii=False)
         return path
@@ -64,8 +65,9 @@ class CacheTestBase(unittest.TestCase):
         """向缓存目录写入 gzip 压缩的 JSON 文件，返回完整路径。"""
         import gzip
 
-        safe = key.replace("/", "_").replace("\\", "_").replace("..", "_")
-        path = os.path.join(self.cache_dir, f"{safe}.json.gz")
+        from src.python.cache import _cache_path
+
+        path = _cache_path(key) + ".gz"
         with gzip.open(path, "wt", encoding="utf-8") as f:
             json.dump({"_ts": ts, "_data": data}, f, ensure_ascii=False)
         return path
@@ -84,7 +86,7 @@ class TestCachePath(unittest.TestCase):
         from src.python.cache import _cache_path
 
         path = _cache_path("my_key")
-        self.assertTrue(path.endswith("my_key.json"))
+        self.assertTrue(path.endswith("my_key_v2.json"))
         self.assertIn("data", path)
         self.assertIn("cache", path)
 
@@ -149,8 +151,9 @@ class TestCacheGet(CacheTestBase):
 
     def test_corrupted_json_deletes_file(self):
         """损坏的 JSON → 返回 None 且文件被自动删除。"""
-        safe = "corrupted"
-        path = os.path.join(self.cache_dir, f"{safe}.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("corrupted")
         with open(path, "w", encoding="utf-8") as f:
             f.write("not json at all")
 
@@ -162,8 +165,9 @@ class TestCacheGet(CacheTestBase):
 
     def test_corrupted_json_io_error_returns_none(self):
         """文件权限/IO 损坏 → 返回 None（文件可能残留在磁盘）。"""
-        safe = "ioerr"
-        path = os.path.join(self.cache_dir, f"{safe}.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("ioerr")
         with open(path, "w", encoding="utf-8") as f:
             f.write("{broken")
 
@@ -176,7 +180,9 @@ class TestCacheGet(CacheTestBase):
     def test_missing_timestamp_treated_as_expired(self, mock_time):
         """缺少 _ts 字段 → 按过期处理返回 None。"""
         mock_time.return_value = 2000.0
-        path = os.path.join(self.cache_dir, "no_ts.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("no_ts")
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"_data": "hello"}, f)
         from src.python.cache import get
@@ -189,7 +195,9 @@ class TestCacheGet(CacheTestBase):
     def test_missing_data_returns_none(self, mock_time):
         """缺少 _data 字段 → 返回 None。"""
         mock_time.return_value = 2000.0
-        path = os.path.join(self.cache_dir, "no_data.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("no_data")
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"_ts": 1999.0}, f)
         from src.python.cache import get
@@ -234,7 +242,9 @@ class TestCacheSet(CacheTestBase):
 
         set("newkey", "hello")
 
-        path = os.path.join(self.cache_dir, "newkey.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("newkey")
         self.assertTrue(os.path.exists(path))
         with open(path, "r", encoding="utf-8") as f:
             payload = json.load(f)
@@ -255,7 +265,9 @@ class TestCacheSet(CacheTestBase):
         set("nested", "data")
 
         self.assertTrue(os.path.exists(self.cache_dir))
-        path = os.path.join(self.cache_dir, "nested.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("nested")
         self.assertTrue(os.path.exists(path))
 
     @patch("src.python.cache._store.time.time")
@@ -269,7 +281,9 @@ class TestCacheSet(CacheTestBase):
 
         set("overwrite", "new")
 
-        path = os.path.join(self.cache_dir, "overwrite.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("overwrite")
         with open(path, "r", encoding="utf-8") as f:
             payload = json.load(f)
         self.assertEqual(payload["_ts"], 2000.0)
@@ -293,24 +307,31 @@ class TestCacheSet(CacheTestBase):
 
         set("listkey", data)
 
-        path = os.path.join(self.cache_dir, "listkey.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("listkey")
         with open(path, "r", encoding="utf-8") as f:
             payload = json.load(f)
         self.assertEqual(payload["_data"], data)
 
     @patch("src.python.cache._store.time.time")
     def test_set_atomic_write_content(self, mock_time):
-        """原子写入 → 最终文件内容正确，临时文件被清理。"""
+        """原子写入 → 最终文件内容正确，临时文件被清理。
+
+        临时文件由 `_store.set` 用 `tempfile.mkstemp(dir=<缓存目录>, suffix=".tmp")`
+        创建，故在缓存目录内扫描 `.tmp` 残留，即可验证原子写入的临时文件被清理。
+        """
         mock_time.return_value = 3000.0
         from src.python.cache import set
 
         set("atomic", {"hello": "world"})
 
-        path = os.path.join(self.cache_dir, "atomic.json")
+        from src.python.cache import _cache_path
 
-        import tempfile
-        tmp_dir = tempfile.gettempdir()
-        tmp_files = [f for f in os.listdir(tmp_dir) if f.startswith("tmp") and f.endswith(".json")]
+        path = _cache_path("atomic")
+
+        cache_dir = os.path.dirname(path)
+        tmp_files = [f for f in os.listdir(cache_dir) if f.endswith(".tmp")]
         self.assertEqual(len(tmp_files), 0, "临时文件未被清理")
 
     @patch("src.python.cache._store.time.time")
@@ -322,7 +343,9 @@ class TestCacheSet(CacheTestBase):
 
             set("winlock", "data")
 
-            path = os.path.join(self.cache_dir, "winlock.json")
+            from src.python.cache import _cache_path
+
+            path = _cache_path("winlock")
             self.assertTrue(os.path.exists(path))
             with open(path, "r", encoding="utf-8") as f:
                 payload = json.load(f)
@@ -340,7 +363,9 @@ class TestCacheClear(CacheTestBase):
     def test_clear_existing_file(self):
         """清除存在的文件 → 文件被删除。"""
         self._write_cache("toclear", "x", ts=100.0)
-        path = os.path.join(self.cache_dir, "toclear.json")
+        from src.python.cache import _cache_path
+
+        path = _cache_path("toclear")
         self.assertTrue(os.path.exists(path))
 
         from src.python.cache import clear
@@ -385,9 +410,11 @@ class TestCacheClearByPrefix(CacheTestBase):
 
         count = clear_by_prefix("price_")
         self.assertEqual(count, 2)
-        self.assertFalse(os.path.exists(os.path.join(self.cache_dir, "price_000001.json")))
-        self.assertFalse(os.path.exists(os.path.join(self.cache_dir, "price_000002.json")))
-        self.assertTrue(os.path.exists(os.path.join(self.cache_dir, "index_000300.json")))
+        from src.python.cache import _cache_path
+
+        self.assertFalse(os.path.exists(_cache_path("price_000001")))
+        self.assertFalse(os.path.exists(_cache_path("price_000002")))
+        self.assertTrue(os.path.exists(_cache_path("index_000300")))
 
     def test_clear_by_prefix_no_match(self):
         """无前缀匹配 → 返回 0。"""
@@ -561,12 +588,15 @@ class TestCacheConstants(unittest.TestCase):
 
     def test_cache_daily(self):
         from src.python.cache import CACHE_DAILY
+
         self.assertEqual(CACHE_DAILY, 86400)
 
     def test_cache_weekly(self):
         from src.python.core.constants import CACHE_WEEKLY
+
         self.assertEqual(CACHE_WEEKLY, 604800)
 
     def test_cache_monthly(self):
         from src.python.core.constants import CACHE_MONTHLY
+
         self.assertEqual(CACHE_MONTHLY, 2592000)

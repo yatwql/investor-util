@@ -23,6 +23,7 @@ class TestCalculateForHolding(unittest.TestCase):
 
     def _make_calculator(self, session_cache: dict | None = None) -> object:
         from src.python.report.portfolio_history import PortfolioHistoryCalculator
+
         return PortfolioHistoryCalculator(session_cache or {})
 
     # ── 正常路由 ──────────────────────────────────────────
@@ -36,7 +37,7 @@ class TestCalculateForHolding(unittest.TestCase):
         calc = self._make_calculator()
         result = calc.calculate_for_holding("600900", "长江电力", 800)
         self.assertIsNotNone(result)
-        mock_fetch.assert_called_once_with("history_stock", "600900")
+        mock_fetch.assert_called_once_with("history_stock", "600900", 30)
 
     @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_zero_prefix_code_routes_to_stock(self, mock_fetch):
@@ -47,7 +48,7 @@ class TestCalculateForHolding(unittest.TestCase):
         calc = self._make_calculator()
         result = calc.calculate_for_holding("000001", "平安银行", 500)
         self.assertIsNotNone(result)
-        mock_fetch.assert_called_once_with("history_stock", "000001")
+        mock_fetch.assert_called_once_with("history_stock", "000001", 30)
 
     @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_five_prefix_etf_routes_to_stock(self, mock_fetch):
@@ -58,7 +59,7 @@ class TestCalculateForHolding(unittest.TestCase):
         calc = self._make_calculator()
         result = calc.calculate_for_holding("511880", "银华日利", 100)
         self.assertIsNotNone(result)
-        mock_fetch.assert_called_once_with("history_stock", "511880")
+        mock_fetch.assert_called_once_with("history_stock", "511880", 30)
 
     @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_six_digit_code_routes_to_fund(self, mock_fetch):
@@ -69,7 +70,7 @@ class TestCalculateForHolding(unittest.TestCase):
         calc = self._make_calculator()
         result = calc.calculate_for_holding("011506", "某基金", 1000)
         self.assertIsNotNone(result)
-        mock_fetch.assert_called_once_with("history_fund_otc", "011506")
+        mock_fetch.assert_called_once_with("history_fund_otc", "011506", 30)
 
     @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_bond_fund_routes_to_fund(self, mock_fetch):
@@ -80,7 +81,7 @@ class TestCalculateForHolding(unittest.TestCase):
         calc = self._make_calculator()
         result = calc.calculate_for_holding("012325", "招商鑫福中短债A", 5000)
         self.assertIsNotNone(result)
-        mock_fetch.assert_called_once_with("history_fund_otc", "012325")
+        mock_fetch.assert_called_once_with("history_fund_otc", "012325", 30)
 
     def test_hk_stock_returns_none(self):
         """港股通代码 → None。"""
@@ -100,7 +101,7 @@ class TestCalculateForHolding(unittest.TestCase):
     def test_code_fallback_to_fund(self, mock_fetch):
         """00 代码 K 线全空 → 降级至基金净值。"""
         mock_fetch.side_effect = [
-            None,                     # history_stock → 失败
+            None,  # history_stock → 失败
             [{"date": "2026-07-01", "nav": 1.2345}],  # history_fund_otc → 成功
         ]
 
@@ -121,7 +122,7 @@ class TestCalculateForHolding(unittest.TestCase):
         calc = self._make_calculator()
         result = calc.calculate_for_holding("000001", "平安银行", 500)
         self.assertIsNotNone(result)
-        mock_fetch.assert_called_once_with("history_stock", "000001")
+        mock_fetch.assert_called_once_with("history_stock", "000001", 30)
 
     @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_code_fallback_all_fail(self, mock_fetch):
@@ -138,9 +139,11 @@ class TestCalculateForHolding(unittest.TestCase):
     @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_session_cache_stock(self, mock_fetch):
         """_get_stock_history 复用会话缓存。"""
-        calc = self._make_calculator({
-            "history_stock_600900": [{"date": "2026-07-01", "close": 26.65}],
-        })
+        calc = self._make_calculator(
+            {
+                "history_stock_600900": [{"date": "2026-07-01", "close": 26.65}],
+            }
+        )
         result = calc.calculate_for_holding("600900", "长江电力", 800)
         self.assertIsNotNone(result)
         self.assertEqual(result[0]["close"], 26.65)
@@ -150,9 +153,11 @@ class TestCalculateForHolding(unittest.TestCase):
     def test_session_cache_fund(self, mock_fetch):
         """_get_fund_history 复用会话缓存（00 代码触发降级路径）。"""
         mock_fetch.return_value = None  # stock 路径也 mock 掉
-        calc = self._make_calculator({
-            "history_fund_otc_002943": [{"date": "2026-07-01", "nav": 1.2345}],
-        })
+        calc = self._make_calculator(
+            {
+                "history_fund_otc_002943": [{"date": "2026-07-01", "nav": 1.2345}],
+            }
+        )
         result = calc.calculate_for_holding("002943", "广发多因子", 1000)
         self.assertIsNotNone(result)
         self.assertEqual(result[0]["close"], 1.2345)
@@ -170,8 +175,8 @@ class TestCalculateForHolding(unittest.TestCase):
         calc = self._make_calculator()
         result = calc.calculate_for_holding("600900", "长江电力", 800)
         self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]["value"], 8000.0)   # 10.0 × 800
-        self.assertEqual(result[1]["value"], 8800.0)   # 11.0 × 800
+        self.assertEqual(result[0]["value"], 8000.0)  # 10.0 × 800
+        self.assertEqual(result[1]["value"], 8800.0)  # 11.0 × 800
 
     @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
     def test_as_if_skips_zero_close(self, mock_fetch):
@@ -192,26 +197,31 @@ class TestGetCombinedTimeseries(unittest.TestCase):
 
     def _make_calculator(self):
         from src.python.report.portfolio_history import PortfolioHistoryCalculator
+
         return PortfolioHistoryCalculator({})
 
-    def _bars(self, close_values: list[float], shares: float = 1,
-              start: str = "2026-07-01") -> list[dict]:
+    def _bars(self, close_values: list[float], shares: float = 1, start: str = "2026-07-01") -> list[dict]:
         """生成 calculate_for_holding 的返回格式（含 value）。"""
-        return [{"date": f"2026-07-{1 + i:02d}", "close": v, "value": round(v * shares, 2)}
-                for i, v in enumerate(close_values)]
+        return [
+            {"date": f"2026-07-{1 + i:02d}", "close": v, "value": round(v * shares, 2)}
+            for i, v in enumerate(close_values)
+        ]
 
     @patch("src.python.report.portfolio_history.PortfolioHistoryCalculator.calculate_for_holding")
     def test_all_success_status_ok(self, mock_calc):
         """全部成功 → status=ok。"""
         mock_calc.side_effect = [
-            self._bars([10, 11, 12]),      # 持仓 1
-            self._bars([20, 21, 22]),      # 持仓 2
+            self._bars([10, 11, 12]),  # 持仓 1
+            self._bars([20, 21, 22]),  # 持仓 2
         ]
         calc = self._make_calculator()
-        result = calc.get_combined_timeseries([
-            ("600900", "长江电力", 100),
-            ("002943", "广发多因子", 200),
-        ], days=3)
+        result = calc.get_combined_timeseries(
+            [
+                ("600900", "长江电力", 100),
+                ("002943", "广发多因子", 200),
+            ],
+            days=3,
+        )
         self.assertEqual(result["status"], "ok")
         self.assertEqual(len(result["bars"]), 3)
 
@@ -219,14 +229,17 @@ class TestGetCombinedTimeseries(unittest.TestCase):
     def test_partial_fail_status_degraded(self, mock_calc):
         """部分失败 → status=degraded。"""
         mock_calc.side_effect = [
-            self._bars([10, 11, 12]),      # 成功
-            None,                           # 失败
+            self._bars([10, 11, 12]),  # 成功
+            None,  # 失败
         ]
         calc = self._make_calculator()
-        result = calc.get_combined_timeseries([
-            ("600900", "长江电力", 100),
-            ("002943", "广发多因子", 200),
-        ], days=3)
+        result = calc.get_combined_timeseries(
+            [
+                ("600900", "长江电力", 100),
+                ("002943", "广发多因子", 200),
+            ],
+            days=3,
+        )
         self.assertEqual(result["status"], "degraded")
         self.assertTrue(any("部分持仓" in w for w in result["warnings"]))
 
@@ -235,12 +248,43 @@ class TestGetCombinedTimeseries(unittest.TestCase):
         """全部失败 → status=unavailable。"""
         mock_calc.side_effect = [None, None]
         calc = self._make_calculator()
-        result = calc.get_combined_timeseries([
-            ("600900", "长江电力", 100),
-            ("002943", "广发多因子", 200),
-        ])
+        result = calc.get_combined_timeseries(
+            [
+                ("600900", "长江电力", 100),
+                ("002943", "广发多因子", 200),
+            ]
+        )
         self.assertEqual(result["status"], "unavailable")
         self.assertEqual(len(result["bars"]), 0)
+
+    @patch("src.python.report.portfolio_history.PortfolioHistoryCalculator.calculate_for_holding")
+    def test_days_passthrough_to_holdings(self, mock_calc):
+        """days 透传：get_combined_timeseries 指定 days → calculate_for_holding 收到相同 days。"""
+        mock_calc.side_effect = [
+            self._bars([10, 11, 12]),
+            self._bars([20, 21, 22]),
+        ]
+        calc = self._make_calculator()
+        result = calc.get_combined_timeseries(
+            [
+                ("600900", "长江电力", 100),
+                ("002943", "广发多因子", 200),
+            ],
+            days=365,
+        )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(mock_calc.call_count, 2)
+        self.assertEqual(mock_calc.call_args_list[0].args, ("600900", "长江电力", 100, 365))
+        self.assertEqual(mock_calc.call_args_list[1].args, ("002943", "广发多因子", 200, 365))
+
+    @patch("src.python.report.portfolio_history.PortfolioHistoryCalculator.calculate_for_holding")
+    def test_days_default_30(self, mock_calc):
+        """days 缺省 → calculate_for_holding 收到默认 30。"""
+        mock_calc.side_effect = [self._bars([10, 11, 12])]
+        calc = self._make_calculator()
+        result = calc.get_combined_timeseries([("600900", "长江电力", 100)])
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(mock_calc.call_args_list[0].args, ("600900", "长江电力", 100, 30))
 
     # ── Benchmark integration ──────────────────────────────
 
@@ -250,11 +294,21 @@ class TestGetCombinedTimeseries(unittest.TestCase):
     def test_benchmark_indices_provided_calls_fetch(self, mock_calc, mock_fetch, mock_norm):
         """传入 benchmark_indices → 调用 fetch_benchmarks + normalize_benchmarks。"""
         from src.python.report.portfolio_history import PortfolioHistoryCalculator
+
         mock_calc.side_effect = [self._bars([10, 11, 12])]
         mock_fetch.return_value = {"sh000300": {"name": "沪深300", "bars": []}}
-        mock_norm.return_value = [{"code": "sh000300", "name": "沪深300", "bars": [],
-                                    "total_return_pct": 2.0, "max_drawdown_pct": -1.0,
-                                    "data_start": "", "data_end": "", "status": "ok"}]
+        mock_norm.return_value = [
+            {
+                "code": "sh000300",
+                "name": "沪深300",
+                "bars": [],
+                "total_return_pct": 2.0,
+                "max_drawdown_pct": -1.0,
+                "data_start": "",
+                "data_end": "",
+                "status": "ok",
+            }
+        ]
 
         calc = PortfolioHistoryCalculator(
             {},
@@ -273,6 +327,7 @@ class TestGetCombinedTimeseries(unittest.TestCase):
     def test_benchmark_indices_empty_skips_fetch(self, mock_calc, mock_fetch, mock_norm):
         """benchmark_indices 为空字典 → 不调用 fetch_benchmarks。"""
         from src.python.report.portfolio_history import PortfolioHistoryCalculator
+
         mock_calc.side_effect = [self._bars([10, 11, 12])]
 
         calc = PortfolioHistoryCalculator(
@@ -290,6 +345,7 @@ class TestGetCombinedTimeseries(unittest.TestCase):
     def test_benchmark_fetch_exception_handled(self, mock_calc, mock_fetch, mock_norm):
         """fetch_benchmarks 抛出异常 → 不阻塞，返回空列表。"""
         from src.python.report.portfolio_history import PortfolioHistoryCalculator
+
         mock_calc.side_effect = [self._bars([10, 11, 12])]
         mock_fetch.side_effect = RuntimeError("网络错误")
 
@@ -309,6 +365,7 @@ class TestComputeAnnualizedVolatility(unittest.TestCase):
 
     def _call(self, daily_returns: list[float]) -> float:
         from src.python.report.portfolio_history import PortfolioHistoryCalculator
+
         return PortfolioHistoryCalculator._compute_annualized_volatility(daily_returns)
 
     def test_annualized_volatility_normal_returns_positive(self):
@@ -334,19 +391,24 @@ class TestValidateBars(unittest.TestCase):
 
     def _call(self, bars: list[dict]) -> list[str]:
         from src.python.report.portfolio_history import _validate_bars
+
         return _validate_bars(bars)
 
     def test_clean_bars_no_warnings(self):
         """正常数据 → 无警告。"""
-        warnings = self._call([
-            {"date": "2026-07-01", "close": 10.0},
-            {"date": "2026-07-02", "close": 11.0},
-        ])
+        warnings = self._call(
+            [
+                {"date": "2026-07-01", "close": 10.0},
+                {"date": "2026-07-02", "close": 11.0},
+            ]
+        )
         self.assertEqual(warnings, [])
 
     def test_zero_close_warning(self):
         """收盘价为 0 → 警告。"""
-        warnings = self._call([
-            {"date": "2026-07-01", "close": 0.0},
-        ])
+        warnings = self._call(
+            [
+                {"date": "2026-07-01", "close": 0.0},
+            ]
+        )
         self.assertTrue(any("收盘价为 0" in w for w in warnings))

@@ -2,6 +2,7 @@
 
 覆盖参数解析、CliProgressReporter、报告/缓存路由、退出码。
 """
+
 from __future__ import annotations
 
 import pytest
@@ -17,8 +18,10 @@ from src.python.cli import (
     _build_parser,
     _cli_read_holdings,
     _handle_cache_update,
+    _handle_whatif,
     main,
 )
+from src.python.report.whatif_operations import WhatifRunResult
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -114,6 +117,31 @@ class TestArgparse:
         with pytest.raises(SystemExit) as exc:
             _build_parser().parse_args(["cache"])
         assert exc.value.code == 2
+
+    def test_whatif_subcommand(self):
+        """whatif 子命令：--candidate 必填、--base 可选。"""
+        args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx"])
+        assert args.command == "whatif"
+        assert args.candidate == "after.xlsx"
+        assert args.base is None
+
+        args = _build_parser().parse_args(["whatif", "--base", "before.xlsx", "--candidate", "after.xlsx"])
+        assert args.base == "before.xlsx"
+        assert args.candidate == "after.xlsx"
+
+    def test_whatif_missing_candidate(self):
+        """whatif 不带 --candidate → SystemExit(2)。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["whatif"])
+        assert exc.value.code == 2
+
+    def test_whatif_effective_date_parse(self):
+        """whatif --effective-date 解析。"""
+        args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx", "--effective-date", "2026-07-01"])
+        assert args.effective_date == "2026-07-01"
+
+        args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx"])
+        assert args.effective_date is None
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -264,8 +292,7 @@ class TestCliReadHoldings:
         config = {"holdings_dir": "/nonexistent", "holdings_filename": "test.xlsx"}
         result = _cli_read_holdings(config)
         assert result is None
-        assert any("持仓文件不存在" in r.message for r in caplog.records
-                    if r.levelname == "ERROR")
+        assert any("持仓文件不存在" in r.message for r in caplog.records if r.levelname == "ERROR")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -324,6 +351,91 @@ class TestHandleCacheUpdate:
 
 
 # ═══════════════════════════════════════════════════════════════
+# _handle_whatif
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestHandleWhatif:
+    """_handle_whatif 委托测试。"""
+
+    def _args(self, base=None, candidate="after.xlsx"):
+        return _build_parser().parse_args(["whatif", "--candidate", candidate] + (["--base", base] if base else []))
+
+    def test_success_explicit_base(self):
+        """显式 --base + --candidate → 委托共享层生成报告并返回成功。"""
+        with (
+            patch("src.python.core.reader.read_holdings", side_effect=[[MagicMock()], [MagicMock()]]),
+            patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
+        ):
+            mock_run.return_value = WhatifRunResult(ok=True, excel="/r/调仓模拟.xlsx", html="/r/调仓模拟.html")
+            code = _handle_whatif(self._args(base="before.xlsx"), {})
+        assert code == _EXIT_SUCCESS
+        mock_run.assert_called_once()
+        assert mock_run.call_args.kwargs["base_file"] == "before.xlsx"
+        assert mock_run.call_args.kwargs["output_dir"] == "reports"
+
+    def test_success_config_default_base(self):
+        """缺省 --base → 用 config 持仓文件（_cli_read_holdings）。"""
+        with (
+            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.core.reader.read_holdings", return_value=[MagicMock()]),
+            patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
+        ):
+            mock_run.return_value = WhatifRunResult(ok=True, excel="/r/e.xlsx", html="/r/e.html")
+            code = _handle_whatif(self._args(), {"holdings_dir": "data/holdings", "holdings_filename": "cur.xlsx"})
+        assert code == _EXIT_SUCCESS
+        mock_run.assert_called_once()
+
+    def test_base_read_failure_severe(self):
+        """基准持仓读取失败 → 返回 _EXIT_SEVERE，不触发共享层。"""
+        with (
+            patch("src.python.cli.cli._cli_read_holdings", return_value=None),
+            patch("src.python.core.reader.read_holdings", return_value=None),
+            patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
+        ):
+            code = _handle_whatif(self._args(base="before.xlsx"), {})
+        assert code == _EXIT_SEVERE
+        mock_run.assert_not_called()
+
+    def test_candidate_read_failure_severe(self):
+        """目标持仓读取失败 → 返回 _EXIT_SEVERE，不触发共享层。"""
+        with (
+            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.core.reader.read_holdings", return_value=None),
+            patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
+        ):
+            code = _handle_whatif(self._args(), {})
+        assert code == _EXIT_SEVERE
+        mock_run.assert_not_called()
+
+    def test_unavailable_data_severe(self):
+        """共享层返回不可用 → 返回 _EXIT_SEVERE。"""
+        with (
+            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.core.reader.read_holdings", return_value=[MagicMock()]),
+            patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
+        ):
+            mock_run.return_value = WhatifRunResult(ok=False, reason="调仓对比数据为空")
+            code = _handle_whatif(self._args(), {})
+        assert code == _EXIT_SEVERE
+        mock_run.assert_called_once()
+
+    def test_effective_date_passthrough(self):
+        """--effective-date → 透传到 run_whatif_simulation kwargs。"""
+        with (
+            patch("src.python.core.reader.read_holdings", side_effect=[[MagicMock()], [MagicMock()]]),
+            patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
+        ):
+            mock_run.return_value = WhatifRunResult(ok=True, excel="/r/e.xlsx", html="/r/e.html")
+            args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx", "--effective-date", "2026-07-01"])
+            code = _handle_whatif(args, {})
+        assert code == _EXIT_SUCCESS
+        mock_run.assert_called_once()
+        assert mock_run.call_args.kwargs["effective_date"] == "2026-07-01"
+
+
+# ═══════════════════════════════════════════════════════════════
 # main() — 参数透传
 # ═══════════════════════════════════════════════════════════════
 
@@ -341,7 +453,8 @@ class TestMain:
             patch("src.python.core.logger.setup_logger"),
         ):
             with patch.object(
-                __import__("sys"), "argv",
+                __import__("sys"),
+                "argv",
                 ["cli.py", "report", "--type", "full", "--history", "auto", "--force-llm", "--warm"],
             ):
                 main()
@@ -362,7 +475,8 @@ class TestMain:
             patch("src.python.core.logger.setup_logger"),
         ):
             with patch.object(
-                __import__("sys"), "argv",
+                __import__("sys"),
+                "argv",
                 ["cli.py", "cache", "--update", "all"],
             ):
                 main()
@@ -370,3 +484,52 @@ class TestMain:
         mock_cache.assert_called_once()
         args = mock_cache.call_args[0][0]
         assert args.update == "all"
+
+    def test_whatif_param_passthrough(self):
+        """whatif 子命令参数正确透传给 _handle_whatif。"""
+        with (
+            patch("src.python.cli.cli._handle_whatif", return_value=_EXIT_SUCCESS) as mock_whatif,
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config", return_value={}),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(
+                __import__("sys"),
+                "argv",
+                ["cli.py", "whatif", "--base", "before.xlsx", "--candidate", "after.xlsx"],
+            ):
+                main()
+
+        mock_whatif.assert_called_once()
+        args = mock_whatif.call_args[0][0]
+        assert args.command == "whatif"
+        assert args.base == "before.xlsx"
+        assert args.candidate == "after.xlsx"
+
+    def test_whatif_effective_date_param_passthrough(self):
+        """whatif --effective-date → _handle_whatif 收到 args.effective_date。"""
+        with (
+            patch("src.python.cli.cli._handle_whatif", return_value=_EXIT_SUCCESS) as mock_whatif,
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config", return_value={}),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(
+                __import__("sys"),
+                "argv",
+                [
+                    "cli.py",
+                    "whatif",
+                    "--base",
+                    "before.xlsx",
+                    "--candidate",
+                    "after.xlsx",
+                    "--effective-date",
+                    "2026-07-01",
+                ],
+            ):
+                main()
+
+        mock_whatif.assert_called_once()
+        args = mock_whatif.call_args[0][0]
+        assert args.effective_date == "2026-07-01"

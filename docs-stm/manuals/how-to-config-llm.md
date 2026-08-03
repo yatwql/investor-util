@@ -6,7 +6,7 @@ LLM 配置由三个独立文件管理：
 
 | 文件 | 内容 | 用途 |
 |------|------|------|
-| `data/config/llm_key.json` | 4 个必填 + 4 个可选回退字段，或 `credentials_ref` 多键凭据块 | API 调用渠道（必填：provider / api_key / model / endpoint；可选：fallback_provider / fallback_api_key / fallback_endpoint / fallback_model） |
+| `data/config/llm_key.json` | 4 个必填字段，或 `credentials_ref` 多键凭据块 | API 调用渠道（必填：provider / api_key / model / endpoint） |
 | `data/config/llm_providers.json` | Provider 路由配置（多链模式） | 定义多个 Provider 的切换顺序、策略和凭据引用 |
 | `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature、timeout、cache、system_prompt 等） |
 
@@ -28,22 +28,18 @@ LLM 配置由三个独立文件管理：
 
 ## 快速配置
 
-**Step 1**：编辑 `data/config/llm_key.json`，填入必填字段和（可选）回退字段：
+**Step 1**：编辑 `data/config/llm_key.json`，填入必填字段：
 
 ```json
 {
   "provider": "claude",
   "api_key": "sk-ant-xxxxxxxxxxxxx",
   "model": "claude-sonnet-4-20250514",
-  "endpoint": "https://api.anthropic.com/v1/messages",
-  "fallback_provider": "openai",
-  "fallback_api_key": "sk-your-fallback-key",
-  "fallback_endpoint": "https://api.openai.com/v1/chat/completions",
-  "fallback_model": "gpt-4o-mini"
+  "endpoint": "https://api.anthropic.com/v1/messages"
 }
 ```
 
-> **必填字段**：仅前 4 项（`provider` / `api_key` / `model` / `endpoint`）即可运行。`fallback_*` 回退字段可选，配置后主 provider 连续失败时自动切换，适用于高可用场景（如主用 DeepSeek 低成本、回退 Anthropic Claude 高稳定性）。非敏感参数统一在 `llm_settings.json` 中管理。
+> **必填字段**：仅前 4 项（`provider` / `api_key` / `model` / `endpoint`）即可运行。Provider 高可用/自动降级场景统一使用 `llm_providers.json` 多 Provider 链式配置（见下文「多 Provider 链式服务」）。非敏感参数统一在 `llm_settings.json` 中管理。
 
 **Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数。示意结构如下（完整配置项见「配置项总览」章节）：
 
@@ -297,7 +293,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
-- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
+- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，null=默认 8192）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 48000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
 
 ### 模块级配置
 
@@ -347,6 +343,15 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 3. 偏差 ≤ `tolerance`（或模块对应的 override 值）→ 标记为绿色 ✅ 通过
 4. 偏差 > 容差 → 标记为红色 ❌ 疑似幻觉，并用真实值自动替换错误数值
 5. 批量修正后，报告末尾追加一段"事实校验"摘要（显示修正前后的对比）
+
+**内置语境感知（自动跳过，无需配置）**：
+- **回撤语境**：「历史最大回撤 19.0%」等回撤数值与实际最大回撤比较，不按收益率校验
+- **环比/同比变化率语境**：「总市值变化-96.02%」「较上期+3.21%」等相对上期/上年的变化比例，与收益率（相对成本）维度不同，**自动跳过不校验**——避免被误当成收益率改写为某个品种的收益率（如 96.02% 被修正为 27.6%）
+- **占比/仓位/归因/假设/调仓目标等语境**：仓位占比、收益归因贡献度、假设情景（"如果下跌 20%"）、调仓目标（"降至 30%"）、币种敞口等数值同样自动跳过，不与收益率直接比较
+
+**品种存在性校验（穿透 TOP10 代码豁免）**：
+- 除数值一致性外，事实校验器还检查 LLM 提到的 6 位品种代码是否真实存在（持仓代码 + 常见指数代码如沪深300 `000300` 视为有效）
+- **穿透 TOP10 代码豁免**：智囊团深度复盘 / 持仓体检报告 / 穿透深度分析三模块的提示词均含【穿透 TOP10】数据（如宁德时代 `300750`、阳光电源 `300274`），这些股票**非直接持仓但属组合穿透范围**——LLM 引用它们不算幻觉，不触发"品种代码不在当前持仓中"告警。全球政经局势提示词不含穿透数据，保持严格校验
 
 **推荐配置**：
 - **`expert_review`（智囊团深度复盘）= 2.0**：该模块综合判断较多，LLM 可能对收益率进行"约数"表述（如"约 15%"而非精确的 14.7%），给予更宽松容差可减少误报
@@ -459,6 +464,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "debate": {
     // 正反辩论 — 三段式(白脸→黑脸→综合)
     "procon": {
+      // 每阶段 max_tokens 覆盖（null=默认 8192；经 max_tokens_override 优先于 max_tokens_expert_review）
       "per_call_max_tokens": null,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
@@ -477,7 +483,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
-    "max_total_tokens_per_report": 16000,
+    "max_total_tokens_per_report": 48000,
     // 辩论模式单次 API 调用超时覆盖（秒）
     "per_call_timeout_override": 90
   },
@@ -788,7 +794,7 @@ python -m src.python.tui
 | `gemini-3.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比 |
 | `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 轻量 |
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
-| `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 旧版轻量 |
+| `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
 
 > **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash：输入 3000 tokens × ¥1 + 输出 2000 tokens × ¥2 = ¥0.007/次。缓存命中时输入部分按 `input_cache_hit` 计费。
 >

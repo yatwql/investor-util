@@ -14,6 +14,8 @@
 
 > **安装验证**：启动脚本执行后首次运行菜单 **E** 生成基础报告。如报告成功生成到 `reports/` 目录，则安装正确。如遇报错，检查 `logs/app.log` 中最近的 ERROR 行。
 
+> **💡 机器本地状态**：首次运行引导、隐私提示的"已读"状态记录在 `data/state/local_state.json`（仅本机、git 忽略），**不写入 config.json**。因此跨机器同步项目目录时 config.json 保持一致，各机器的个性化状态互不干扰；每台新机器的引导/隐私提示会独立显示一次。
+
 > **💡 外部虚拟环境管理：** 设置环境变量 `VENV_PATH` 可将 `.venv` 放在项目目录外部，
 > 方便多个项目共享或集中管理虚拟环境：
 > ```bash
@@ -65,6 +67,9 @@ python -m src.python.cli cache --update all
 # 查看缓存状态
 python -m src.python.cli cache --stats
 
+# 调仓 What-if 模拟（对比两份持仓，生成独立 diff 报告）
+python -m src.python.cli whatif --base data/holdings/调仓前.xlsx --candidate data/holdings/调仓后.xlsx
+
 # 详细模式（终端显示彩色进度前缀）
 python -m src.python.cli --verbose report --type basic
 ```
@@ -80,6 +85,7 @@ python -m src.python.cli --verbose report --type basic
 | `--config PATH` | 配置文件路径，默认 `data/config/config.json` |
 | `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir` |
 | `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
+| `--non-interactive` | 跳过首次运行交互式引导（定时任务/脚本使用） |
 | `--version` | 显示版本号并退出 |
 
 **`report` 子命令**：
@@ -99,6 +105,16 @@ python -m src.python.cli --verbose report --type basic
 | `--clean` | 按 TTL 删除过期缓存文件 |
 | `--stats` | 查看缓存状态统计（文件数、总大小、过期文件预览等） |
 
+**`whatif` 子命令**（调仓 What-if 模拟，独立报告）：
+
+| 参数 | 说明 |
+|:-----|:-----|
+| `--base PATH` | 基准持仓文件（调仓前）。缺省使用 `config.json` 的 `holdings_dir` + `holdings_filename` |
+| `--candidate PATH` | 目标持仓文件（调仓后/假设），**必填** |
+| `--effective-date YYYY-MM-DD` | 调仓生效日（可选）。指定后 opt-in 联网取生效日后行情，追加时序回测（区间/年化收益、波动率、夏普、最大回撤） |
+
+对比两份持仓生成独立调仓 diff 报告（Excel 3 页签 + 指定生效日时第 4 页签「时序回测」+ HTML 双栏对比页），产物输出到报告输出目录：最新版固定名 `调仓模拟.xlsx` / `调仓模拟.html`（每次覆盖为最新对比），历史归档至 `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx/.html` 日期子目录（超 180 天自动清理）。默认全程本地计算、零网络请求，不并入主报告管线；指定 `--effective-date` 时联网取历史做假设推演（不构成收益承诺），数据不足时回测降级不阻塞主报告。
+
 **使用示例**：
 
 ```bash
@@ -110,6 +126,15 @@ python -m src.python.cli --output D:/my_reports report --type basic
 
 # 使用自定义配置文件
 python -m src.python.cli --config D:/config/my_config.json cache --stats
+
+# 调仓 What-if：基准用配置默认持仓，目标指定另一份文件
+python -m src.python.cli whatif --candidate D:/holdings/调仓方案.xlsx
+
+# 调仓 What-if：显式指定两份持仓
+python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx
+
+# 调仓 What-if：指定生效日，追加时序回测
+python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx --effective-date 2026-07-01
 ```
 
 **数据源健康检查**（直接通过主程序运行，无需 TUI 界面）：
@@ -163,6 +188,7 @@ python -m src.python.cli check-sources
   > [E] 生成基础版Excel分析报告
     [B] 生成标准报告(Excel+HTML) [按章节配置]
     [L] 生成完整报告(Excel+HTML) [含LLM，按章节配置]
+    [W] 调仓 What-if 模拟（对比两份持仓，独立报告）
     [C] 配置持仓信息目录    [F] 配置持仓信息文件名
     [O] 配置报告输出目录
     [1] 更新基础类缓存        [2] 更新行情类缓存
@@ -176,13 +202,15 @@ python -m src.python.cli check-sources
 
 | 内容 | E | B | L |
 |:-----|:-:|:-:|:-:|
-| 核心报告（投资分析汇总/市值/分类/穿透/基金业绩/数据源可用性矩阵） | ✅ | ✅ | ✅ |
+| 核心报告（投资分析汇总/市值/分类/穿透/基金业绩/组合演进/数据源可用性矩阵） | ✅ | ✅ | ✅ |
 | 财经新闻与关联分析 | — | ✅ | ✅ |
 | 基金深度分析 | — | ☆ | ☆ |
 | 组合历史走势 + 回撤分析 | — | ☆ | ☆ |
 | LLM 全模块分析 | — | — | ☆ |
 
 > ☆ 表示受章节可见性配置控制。各菜单的详细说明参见 [菜单操作手册](how-to-menu.md)。
+>
+> **W（调仓 What-if 模拟）** 不在此表中：它对比两份持仓生成独立 diff 报告（Excel + HTML），不并入主报告管线。
 
 > 建议首次使用直接按 **L** 生成全量报告。
 

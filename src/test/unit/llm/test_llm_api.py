@@ -374,12 +374,12 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Provider 回退链路测试
+#  Provider 失败链路测试（旧 fallback 字段已移除，回退统一走多链）
 # ═══════════════════════════════════════════════════════════════
 
 
 class TestProviderFallback(unittest.TestCase):
-    """测试 call_llm 在主 provider 失败时回退到 fallback provider。"""
+    """测试 call_llm 主 provider 失败行为（旧 fallback 字段不再生效）。"""
 
     @patch("src.python.llm.api.call_single_provider")
     def test_main_provider_success_no_fallback(self, mock_call):
@@ -388,35 +388,32 @@ class TestProviderFallback(unittest.TestCase):
         config = {
             "provider": "claude",
             "api_key": "sk-main",
-            "fallback_provider": "openai",
-            "fallback_api_key": "sk-fb",
         }
         content, usage, _ = call_llm("sys", "user", config)
         self.assertEqual(content, "main result")
         self.assertEqual(mock_call.call_count, 1)
 
     @patch("src.python.llm.api.call_single_provider")
-    def test_main_failure_fallback_used(self, mock_call):
-        """主 provider 返回 None → fallback 被调用。"""
-        mock_call.side_effect = [
-            (None, None),  # 主 provider 失败
-            ("fb result", {"prompt_tokens": 50}),  # fallback 成功
-        ]
+    def test_fallback_fields_ignored_on_failure(self, mock_call):
+        """旧 fallback 字段已移除：主 provider 失败 → 返回 None，不额外调用。"""
+        mock_call.side_effect = [(None, None)]  # 主 provider 失败
         config = {
             "provider": "claude",
             "api_key": "sk-main",
+            # 残留旧 fallback 字段——不再生效
             "fallback_provider": "openai",
             "fallback_api_key": "sk-fb",
             "fallback_endpoint": "https://api.openai.com/v1",
             "fallback_model": "gpt-4o",
         }
         content, usage, _ = call_llm("sys", "user", config)
-        self.assertEqual(content, "fb result")
-        self.assertEqual(mock_call.call_count, 2)
+        self.assertIsNone(content)
+        self.assertIsNone(usage)
+        self.assertEqual(mock_call.call_count, 1)
 
     @patch("src.python.llm.api.call_single_provider")
-    def test_main_and_fallback_both_fail(self, mock_call):
-        """主 + fallback 均失败 → (None, None)。"""
+    def test_fallback_fields_ignored_both_fail(self, mock_call):
+        """残留 fallback 字段 + 主 provider 失败 → (None, None)，只调主 provider。"""
         mock_call.return_value = (None, None)
         config = {
             "provider": "claude",
@@ -427,7 +424,7 @@ class TestProviderFallback(unittest.TestCase):
         content, usage, _ = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertIsNone(usage)
-        self.assertEqual(mock_call.call_count, 2)
+        self.assertEqual(mock_call.call_count, 1)
 
     @patch("src.python.llm.api.call_single_provider")
     def test_no_fallback_configured(self, mock_call):
@@ -437,21 +434,6 @@ class TestProviderFallback(unittest.TestCase):
         content, usage, _ = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertEqual(mock_call.call_count, 1)
-
-    @patch("src.python.llm.api.call_single_provider")
-    def test_fallback_same_as_main_no_loop(self, mock_call):
-        """fallback_provider == provider → 不重复调用。"""
-        mock_call.return_value = (None, None)
-        config = {
-            "provider": "claude",
-            "api_key": "sk-main",
-            "fallback_provider": "claude",
-            "fallback_api_key": "sk-fb",
-        }
-        content, usage, _ = call_llm("sys", "user", config)
-        self.assertIsNone(content)
-        self.assertEqual(mock_call.call_count, 1)
-
 
 # ═══════════════════════════════════════════════════════════════
 #  LLM content_filter 空返回安抚重试测试
@@ -481,12 +463,11 @@ class TestContentFilterRecovery(unittest.TestCase):
         self.assertIn("注意：请确保你的回答包含实质性的分析内容", second_call_system)
 
     @patch("src.python.llm.api.call_single_provider")
-    def test_empty_content_then_still_empty(self, mock_call):
-        """安抚重试后仍为空 → 尝试 fallback provider。"""
+    def test_empty_content_then_still_empty_returns_none(self, mock_call):
+        """安抚重试后仍为空 → 返回 None（旧 fallback 字段已移除）。"""
         mock_call.side_effect = [
             ("", {"input_tokens": 10}),  # 主 provider 空
             ("", {"input_tokens": 20}),  # 安抚重试仍空
-            ("fb ok", {"prompt_tokens": 5}),  # fallback 成功
         ]
         config = {
             "provider": "claude",
@@ -495,8 +476,9 @@ class TestContentFilterRecovery(unittest.TestCase):
             "fallback_api_key": "sk-fb",
         }
         content, usage, _ = call_llm("sys", "user", config)
-        self.assertEqual(content, "fb ok")
-        self.assertEqual(mock_call.call_count, 3)
+        self.assertIsNone(content)
+        # 只调 2 次（原始 + 安抚重试），无 fallback 调用
+        self.assertEqual(mock_call.call_count, 2)
 
     @patch("src.python.llm.api.call_single_provider")
     def test_empty_content_no_fallback_returns_none(self, mock_call):
@@ -518,12 +500,9 @@ class TestContentFilterRecovery(unittest.TestCase):
         self.assertEqual(mock_call.call_count, 1)
 
     @patch("src.python.llm.api.call_single_provider")
-    def test_none_from_provider_triggers_fallback_not_retry(self, mock_call):
-        """provider 返回 None（格式异常）→ 不触发安抚重试，直接走 fallback。"""
-        mock_call.side_effect = [
-            (None, None),  # 主 provider 格式异常
-            ("fb result", None),  # fallback 成功
-        ]
+    def test_none_from_provider_returns_none(self, mock_call):
+        """provider 返回 None（格式异常）→ 返回 None，无安抚重试。"""
+        mock_call.side_effect = [(None, None)]  # 主 provider 格式异常
         config = {
             "provider": "claude",
             "api_key": "sk-main",
@@ -531,6 +510,6 @@ class TestContentFilterRecovery(unittest.TestCase):
             "fallback_api_key": "sk-fb",
         }
         content, usage, _ = call_llm("sys", "user", config)
-        self.assertEqual(content, "fb result")
-        # 只调用了 2 次（主 + fallback），没有安抚重试
-        self.assertEqual(mock_call.call_count, 2)
+        self.assertIsNone(content)
+        # 只调 1 次（主 provider），没有安抚重试也没有 fallback
+        self.assertEqual(mock_call.call_count, 1)

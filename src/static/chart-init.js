@@ -1,20 +1,24 @@
-/* chart-init.js — 6 张 Chart.js 图表初始化。
+/* chart-init.js — 6 张核心 Chart.js 图表 + 3 张组合演进图表初始化。
  *
- * 读取模板内联 chart-data（chart_datasets），为每个 <canvas id="chart_<key>">
- * 初始化对应图表。O1 隔离：每图独立 try/catch，单图失败仅 console.warn。
- * 守卫：Chart 引擎缺失（R21）或 canvas 不存在（模块隐藏）→ 跳过该图。
+ * 核心 6 图读取模板内联 chart-data（chart_datasets）；组合演进 3 图
+ * 读取独立内联数据段 #evolution-chart-data（evolution_data 契约 dict）。
+ * O1 隔离：每图独立 try/catch，单图失败仅 console.warn。
+ * 守卫：Chart 引擎（chart.min.js）或 ChartCommon（chart-common.js）缺失
+ * （R21）→ 全部跳过；canvas 不存在（模块隐藏）→ 跳过该图。
  * ES5 保守语法（R17/R22）。打印快照降级见 chart-print.js。
  * 键名契约（§4.11 O2）：portfolio_line / drawdown / category_doughnut /
- * industry_bar / penetration_bar / radar。行数预算 ≤300（§4.11 O4）。
+ * industry_bar / penetration_bar / radar；evolution_total / evolution_hhi /
+ * evolution_top（组合演进扩展）。
  */
 
 (function () {
   'use strict';
 
-  /* ── 引擎守卫：chart.min.js 未加载 → 全部跳过 ───────── */
-  if (typeof Chart === 'undefined') {
+  /* ── 引擎守卫：chart.min.js / chart-common.js 未加载 → 全部跳过 ───────── */
+  if (typeof Chart === 'undefined' || !window.ChartCommon) {
     return;
   }
+  var common = window.ChartCommon;
 
   /* ── 读取模板内联数据 ───────────────────────────────── */
   var dataEl = document.getElementById('chart-data');
@@ -29,35 +33,18 @@
 
   var theme = window.ChartTheme || {};
 
-  /* ── 登记图表实例（打印快照 + 导出按钮，见 chart-print.js / chart-export.js）── */
+  /* ── 登记图表实例 + 折线图配置：统一委托 chart-common.js ──
+   * 薄封装保持调用点可读；实现与 What-if 页共用，消除配置复制。 */
   function trackChart(chart, key) {
-    if (window.ChartPrint && typeof window.ChartPrint.register === 'function') {
-      window.ChartPrint.register(chart);
-    }
-    if (window.ChartExport && typeof window.ChartExport.register === 'function') {
-      window.ChartExport.register(chart, key);
-    }
-    return chart;
+    return common.trackChart(chart, key);
   }
 
-  /* ── 折线图通用配置（净值/回撤共用）────────────────── */
   function lineOptions(yLabel) {
-    var opts = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: theme.text || '#333', boxWidth: 12 } },
-        tooltip: { enabled: true }
-      }
-    };
-    opts.scales = {
-      x: { ticks: { color: theme.text }, grid: { color: theme.grid } },
-      y: { ticks: { color: theme.text }, grid: { color: theme.grid } }
-    };
-    if (yLabel) {
-      opts.scales.y.title = { display: true, text: yLabel, color: theme.text };
-    }
-    return opts;
+    return common.lineOptions(yLabel);
+  }
+
+  function doughnutOptions(percent) {
+    return common.doughnutOptions(percent);
   }
 
   /* ── 单图初始化函数（O1：每个独立 try/catch）────────── */
@@ -159,14 +146,7 @@
           backgroundColor: d.backgroundColor || (theme.doughnutColors || ['#2E75B6', '#E68A00', '#2E7D32', '#8E44AD', '#7B8A9E'])
         }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'right', labels: { color: theme.text || '#333', boxWidth: 12 } },
-          tooltip: { enabled: true }
-        }
-      }
+      options: doughnutOptions(false)
     }), 'category_doughnut');
   }
 
@@ -279,6 +259,87 @@
     }), 'radar');
   }
 
+  /* ── 组合演进图表（读取独立内联数据段）────────── */
+
+  function readEvolutionChartData() {
+    var dataEl = document.getElementById('evolution-chart-data');
+    if (!dataEl) return null;
+    try {
+      var d = JSON.parse(dataEl.textContent || '{}');
+      if (!d || !d.periods || !d.periods.length) return null;
+      return d;
+    } catch (e) {
+      console.warn('[chart] evolution-chart-data 解析失败，组合演进图表跳过');
+      return null;
+    }
+  }
+
+  function initEvolutionTotalChart() {
+    var d = readEvolutionChartData();
+    var el = document.getElementById('chart_evolution_total');
+    if (!d || !el) return;
+    var datasets = [
+      { label: '总市值', data: d.total_value || [], borderColor: theme.primary || '#2E75B6', borderWidth: 2, pointRadius: 2, fill: false, tension: 0.1 },
+      { label: '总盈亏', data: d.total_pnl || [], borderColor: '#E68A00', borderWidth: 2, pointRadius: 2, fill: false, tension: 0.1 }
+    ];
+    trackChart(new Chart(el, {
+      type: 'line',
+      data: { labels: d.periods, datasets: datasets },
+      options: lineOptions('金额 (元)')
+    }), 'evolution_total');
+  }
+
+  function initEvolutionHhiChart() {
+    var d = readEvolutionChartData();
+    var el = document.getElementById('chart_evolution_hhi');
+    if (!d || !el) return;
+    var hhi = (d.hhi || []).map(function (v) {
+      return (v === null || v === undefined) ? null : v;
+    });
+    trackChart(new Chart(el, {
+      type: 'line',
+      data: {
+        labels: d.periods,
+        datasets: [{
+          label: 'HHI 集中度',
+          data: hhi,
+          borderColor: theme.danger || '#CC0000',
+          backgroundColor: 'rgba(204,0,0,0.1)',
+          borderWidth: 2,
+          pointRadius: 3,
+          fill: true,
+          tension: 0.1
+        }]
+      },
+      options: lineOptions('HHI (0~1)')
+    }), 'evolution_hhi');
+  }
+
+  function initEvolutionTopChart() {
+    var d = readEvolutionChartData();
+    var el = document.getElementById('chart_evolution_top');
+    if (!d || !el) return;
+    var top = (d.top_holdings || []).slice(0, 6);
+    if (!top.length) return;
+    var palette = ['#2E75B6', '#E68A00', '#2E7D32', '#8E44AD', '#CC0000', '#7B8A9E'];
+    var datasets = top.map(function (h, i) {
+      return {
+        label: h.name || h.code,
+        data: h.weights || [],
+        borderColor: palette[i % palette.length],
+        borderWidth: 2,
+        pointRadius: 2,
+        fill: false,
+        tension: 0.1
+      };
+    });
+    trackChart(new Chart(el, {
+      type: 'line',
+      data: { labels: d.periods, datasets: datasets },
+      options: lineOptions('占比 (%)')
+    }), 'evolution_top');
+  }
+
   /* ── 注册初始化函数（O1：每个独立 try/catch）────────── */
   var inits = {
     portfolio_line: initPortfolioChart,
@@ -286,7 +347,10 @@
     category_doughnut: initCategoryDoughnut,
     industry_bar: initIndustryBar,
     penetration_bar: initPenetrationBar,
-    radar: initRadarChart
+    radar: initRadarChart,
+    evolution_total: initEvolutionTotalChart,
+    evolution_hhi: initEvolutionHhiChart,
+    evolution_top: initEvolutionTopChart
   };
 
   Object.keys(inits).forEach(function (key) {

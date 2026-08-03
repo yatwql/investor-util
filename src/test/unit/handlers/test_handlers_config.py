@@ -68,7 +68,9 @@ class TestWriteLlmSettings:
     @patch("src.python.config.get_llm_config")
     @patch("src.python.tui.handlers_config.json.dump")
     @patch("src.python.tui.handlers_config.open")
-    def test_write_settings(self, mock_open, mock_json_dump, mock_get_llm, mock_makedirs, mock_mkstemp, mock_fdopen, mock_replace):
+    def test_write_settings(
+        self, mock_open, mock_json_dump, mock_get_llm, mock_makedirs, mock_mkstemp, mock_fdopen, mock_replace
+    ):
         """正确写入并刷新配置（fs 写路径全 mock，避免依赖 /fake 目录可写权限）。"""
         from src.python.tui.handlers_config import _write_llm_settings
 
@@ -137,7 +139,7 @@ class TestRefreshOneFundCache:
 
 
 class TestFilterMenuLlmModules:
-    """菜单层隐藏旧设计遗留的辩论三模块（注册表条目保留）。"""
+    """菜单层隐藏辩论三模块（注册表条目保留）。"""
 
     def test_filter_hides_legacy_debate_modules(self):
         """过滤后仅剩 5 个标准模块，不含 debate_pro/con/synthesis。"""

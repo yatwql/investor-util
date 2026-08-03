@@ -101,8 +101,11 @@
 
 <script>
 /* 调试页引导脚本（ES5，R17/R22）：按 ?s= 场景填充 chart-data 并注入引擎 script。
- * 注入顺序与报告模板一致：chart.min.js → chart-print.js → chart-config.js → chart-export.js → chart-init.js。
- * offline 场景去掉 chart.min.js，模拟"引擎文件缺失"——其余 script 靠 typeof Chart 守卫静默跳过。
+ * 注入顺序与报告模板一致：chart.min.js → chart-print.js → chart-config.js →
+ * chart-export.js → chart-common.js → chart-init.js（chart-common.js 为 chart-init.js
+ * 的必需依赖，提供 window.ChartCommon）。
+ * offline 场景去掉 chart.min.js，模拟"引擎文件缺失"——chart-init.js 靠
+ * typeof Chart 守卫静默跳过，其余 script 无副作用。
  */
 (function () {
   'use strict';
@@ -231,7 +234,7 @@
   }
 
   /* ── 注入引擎 script（顺序保证：非 async 动态注入按序执行）── */
-  var scripts = ['chart.min.js', 'chart-print.js', 'chart-config.js', 'chart-export.js', 'chart-init.js'];
+  var scripts = ['chart.min.js', 'chart-print.js', 'chart-config.js', 'chart-export.js', 'chart-common.js', 'chart-init.js'];
   if (scenario === 'offline') { scripts.shift(); } /* 模拟 chart.min.js 缺失 */
 
   for (var si = 0; si < scripts.length; si++) {

@@ -15,6 +15,7 @@ from src.python.cache import get_cache_hit_rate
 from src.python.core.constants import APP_VERSION
 from src.python.core.models import Holding
 from src.python.core.registry import get_llm_module_names, get_report_section_order
+from src.python.analysis.drawdown_events import MIN_SPAN as DRAW_DOWN_MIN_SPAN
 from src.python.report.category import build_category_data_status
 from src.python.report.data_status import STATUS_MESSAGES, DataStatus, DataStatusItem
 from src.python.report.fund_performance import build_perf_data_status, is_fund
@@ -89,8 +90,11 @@ def _compute_section_visibility(
     enable_news: bool = True,  # board 层：市场新闻是否开启（配置驱动，不是 include_news！）
     enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
+    enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     factor_exposure: dict | None = None,  # data 层：因子暴露 C19 dict（None=无数据，章节隐藏）
+    correlation_data: dict | None = None,  # data 层：持仓相关性 C19 dict（None=无数据，章节隐藏）
+    evolution_data: dict | None = None,  # data 层：组合演进 C19 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
     """计算报告模块序号 + 可见性字典 + 闭包函数。
 
@@ -103,9 +107,10 @@ def _compute_section_visibility(
     # board 层：内联 dict（与 Excel 端结构一致）
     board_flags: dict[str, bool] = {
         "always": True,
-        "b_series": enable_fund_deep_analysis,
+        "fund_deep_analysis": enable_fund_deep_analysis,
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
+        "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
         "llm": enable_llm,  # ← board 层
     }
     # data 层：各模块数据就绪状态
@@ -119,6 +124,11 @@ def _compute_section_visibility(
         # factor_exposure 非 None（含 available=False 降级占位）→ 章节可见，
         # 模板依据 available/status 在"完整内容/数据不足/数据源暂不可用"间切换（§1.4.5）
         "factor_exposure_data": factor_exposure is not None,
+        # correlation_data 同上：非 None（含降级占位）→ 章节可见
+        "correlation_data": correlation_data is not None,
+        # evolution_data 同上：始终由编排层计算注入（非 None）→ 章节可见，
+        # available=False 时模板写占位文本（快照不足，§1.4.5）
+        "evolution_data": evolution_data is not None,
     }
 
     # 两层合并：section_visible = board_ok AND data_ok
@@ -274,8 +284,13 @@ def _render_template(
     enable_interactive_charts: bool = False,
     factor_exposure: dict | None = None,
     factor_names: dict | None = None,
+    correlation_data: dict | None = None,
+    evolution_data: dict | None = None,
+    drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
+    from src.python.report.chart_data_builder import build_evolution_chart_data
+
     return _ENV.get_template("report_template.html").render(
         now=now_str,
         today=today_str,
@@ -336,6 +351,10 @@ def _render_template(
         enable_interactive_charts=enable_interactive_charts,
         factor_exposure=factor_exposure,
         factor_names=factor_names or {},
+        correlation_data=correlation_data,
+        evolution_data=evolution_data,
+        evolution_chart_data=build_evolution_chart_data(evolution_data),
+        drawdown_min_span=drawdown_min_span,
     )
 
 
@@ -362,10 +381,14 @@ def write_html_report(
     enable_fund_deep_analysis: bool = True,
     enable_news: bool = True,
     enable_history: bool = True,
+    enable_portfolio_evolution: bool = True,
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
     factor_exposure: dict | None = None,
+    correlation_data: dict | None = None,
+    evolution_data: dict | None = None,
+    drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -507,8 +530,11 @@ def write_html_report(
         enable_news=enable_news,
         enable_fund_deep_analysis=enable_fund_deep_analysis,
         enable_history=enable_history,
+        enable_portfolio_evolution=enable_portfolio_evolution,
         enable_llm=enable_llm,  # enable_llm is the board param for LLM
         factor_exposure=factor_exposure,
+        correlation_data=correlation_data,
+        evolution_data=evolution_data,
     )
 
     # ── 10b) 数据源状态摘要 ──
@@ -571,6 +597,9 @@ def write_html_report(
         style_analysis=style_analysis,
         factor_exposure=factor_exposure,
         factor_names=_factor_names,
+        correlation_data=correlation_data,
+        evolution_data=evolution_data,
+        drawdown_min_span=drawdown_min_span,
         llm_enabled_flag=llm_enabled_flag,
         global_macro_content=global_macro_content,
         expert_review_content=expert_review_content,
@@ -611,8 +640,8 @@ def _copy_js_assets(output_dir: str) -> None:
     """将 src/static/ 下 Chart.js 前端 JS 资产复制到报告输出目录（R21 本地 bundle）。
 
     模板以相对路径引用（chart.min.js / chart-print.js / chart-config.js /
-    chart-export.js / chart-init.js），报告完全离线自包含。文件缺失时仅告警，
-    不阻断报告生成（防御性）。
+    chart-export.js / chart-common.js / chart-init.js / toc.js / theme.js），
+    报告完全离线自包含。文件缺失时仅告警，不阻断报告生成（防御性）。
 
     Args:
         output_dir: 报告输出目录（与 HTML 同目录）
@@ -621,7 +650,16 @@ def _copy_js_assets(output_dir: str) -> None:
 
     from src.python.core.constants import PROJECT_ROOT
 
-    _JS_ASSETS = ("chart.min.js", "chart-print.js", "chart-config.js", "chart-export.js", "chart-init.js")
+    _JS_ASSETS = (
+        "chart.min.js",
+        "chart-print.js",
+        "chart-config.js",
+        "chart-export.js",
+        "chart-common.js",
+        "chart-init.js",
+        "toc.js",
+        "theme.js",
+    )
     src_dir = os.path.join(PROJECT_ROOT, "src", "static")
     os.makedirs(output_dir, exist_ok=True)
     for fname in _JS_ASSETS:

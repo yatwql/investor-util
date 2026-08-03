@@ -247,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 19
+        assert len(_REPORT_SECTION_DEFAULT) == 21
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -259,8 +259,8 @@ class TestReportSectionDefault:
             assert "data_flag" in sec, f"缺少 data_flag: {sec}"
 
     def test_type_values_are_valid(self):
-        """type 只能是 always/history/b_series/news/llm 之一。"""
-        valid_types = {"always", "history", "b_series", "news", "llm"}
+        """type 只能是 always/history/fund_deep_analysis/news/llm/evolution 之一。"""
+        valid_types = {"always", "history", "fund_deep_analysis", "news", "llm", "evolution"}
         for sec in _REPORT_SECTION_DEFAULT:
             assert sec["type"] in valid_types, f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"
 
@@ -287,19 +287,29 @@ class TestReportSectionDefault:
         assert _REPORT_SECTION_DEFAULT[-1]["key"] == "llm_usage"
 
     def test_data_source_status_before_llm_usage(self):
-        """data_source_status 应在 llm_usage 之前（序号 19 vs 18）。"""
+        """data_source_status 应在 llm_usage 之前（序号 20 vs 21）。"""
         keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         assert "data_source_status" in keys
         assert keys.index("data_source_status") < keys.index("llm_usage")
 
     def test_factor_exposure_registered_as_fund_deep_analysis(self):
-        """factor_exposure 应注册为 b_series 模块（data_flag=factor_exposure_data），跟随 B2~B5 之后。"""
+        """factor_exposure 应注册为 fund_deep_analysis 模块（data_flag=factor_exposure_data），跟随 B2~B5 之后。"""
         fe = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "factor_exposure"]
         assert len(fe) == 1, "缺少 factor_exposure 模块条目"
         sec = fe[0]
-        assert sec["type"] == "b_series"
+        assert sec["type"] == "fund_deep_analysis"
         assert sec["data_flag"] == "factor_exposure_data"
         assert sec["number"] == 10
+
+    def test_portfolio_evolution_registered_as_evolution_type(self):
+        """portfolio_evolution 应注册为 evolution 类型（独立开关 enable_portfolio_evolution 控制，
+        data_flag=evolution_data，available=False 时展示层写占位）。"""
+        evo = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "portfolio_evolution"]
+        assert len(evo) == 1, "缺少 portfolio_evolution 模块条目"
+        sec = evo[0]
+        assert sec["type"] == "evolution"
+        assert sec["data_flag"] == "evolution_data"
+        assert sec["number"] == 19
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""
@@ -400,7 +410,7 @@ class TestGetReportSectionOrder:
         assert summary_entry["number"] == -5
 
     def test_full_config_reverse_order(self):
-        """全部 19 项都配了 → 按配置序号排序，llm_usage 最后。"""
+        """全部 21 项都配了 → 按配置序号排序，llm_usage 最后。"""
         all_keys = [s["key"] for s in _REPORT_SECTION_DEFAULT if s["key"] != "llm_usage"]
         # 反序配置
         full_config = {k: i + 1 for i, k in enumerate(reversed(all_keys))}

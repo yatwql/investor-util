@@ -553,7 +553,7 @@ def call_llm_with_retry(
 ) -> tuple[str | None, dict | None]:
     """LLM API 调用通用重试骨架。
 
-    合并 _call_claude 和 _call_openai 中完全相同的重试/超时/错误处理逻辑。
+    retry/超时/错误处理逻辑在单 Provider 调用间统一复用；
     API 特有的部分（payload 构造、响应提取、截断检测）通过回调参数注入。
 
     Args:

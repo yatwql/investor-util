@@ -50,6 +50,8 @@ _SECTION_FONT = Font(size=11, bold=True, color="2E75B6")  # 章节标题：深�
 _BLUE_FONT = Font(size=10, bold=True, color="2E75B6")  # 更新完成：蓝色
 _RED_FONT = Font(size=10, bold=True, color="CC0000")  # 未完成：红色
 _NORMAL_FONT = Font(size=10)
+_STAT_TIME_FONT = Font(size=10, bold=True)  # 统计时间值：加粗
+_TRADING_DAY_FONT = Font(size=12, bold=True, color="2E75B6")  # 所属交易日值：加粗+加大+蓝色
 
 
 def _write_section(ws, row: int, label: str) -> int:
@@ -112,7 +114,11 @@ def _write_basic_info(ws: Worksheet, row: int, now: datetime | None = None) -> i
     """
     now = now or datetime.now()
     row = _write_kv_row(ws, row, "统计时间", now.strftime("%Y-%m-%d %H:%M:%S"))
+    # 统计时间值加粗
+    ws.cell(row=row - 1, column=2).font = _STAT_TIME_FONT
     row = _write_kv_row(ws, row, "所属交易日", get_last_trading_day())
+    # 所属交易日值加粗+加大+蓝色
+    ws.cell(row=row - 1, column=2).font = _TRADING_DAY_FONT
     row = _write_blanks(ws, row)
     return row
 

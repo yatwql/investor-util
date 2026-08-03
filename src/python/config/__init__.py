@@ -19,6 +19,7 @@
 from src.python.config import _comments as _comments
 from src.python.config import _config_defaults as _config_defaults
 from src.python.config import _core as _core
+from src.python.config import _json_patch as _json_patch
 from src.python.config import _llm_defaults as _llm_defaults
 from src.python.config import _validation as _validation
 
@@ -71,7 +72,9 @@ from src.python.config._core import (
     is_enable_history,
     is_enable_llm,
     is_enable_news,
+    is_enable_portfolio_evolution,
     set_config,
+    del_config,
 )
 
 # ── 默认模板（llm_settings.json）──
@@ -92,6 +95,7 @@ __all__ = [
     # 核心逻辑
     "get_config",
     "set_config",
+    "del_config",
     "init_config",
     "set_config_path_override",
     "invalidate_config_cache",
@@ -111,6 +115,7 @@ __all__ = [
     "is_enable_news",
     "is_enable_history",
     "is_enable_llm",
+    "is_enable_portfolio_evolution",
     # LLM 配置
     "get_llm_settings_path",
     "_KNOWN_LLM_SETTINGS_KEYS",

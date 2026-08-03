@@ -368,8 +368,11 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "fund_overlap": "持仓重合度矩阵",
     "fund_concentration": "持仓集中度监控",
     "fund_style": "基金风格分析",
+    "factor_exposure": "因子暴露分析",
+    "correlation_analysis": "持仓相关性矩阵",
     "portfolio_history": "组合历史走势",
     "drawdown_analysis": "历史回撤分析",
+    "portfolio_evolution": "组合演进",
 }
 
 
@@ -504,44 +507,73 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "penetration", "name": "资产穿透TOP10", "number": 4, "type": "always", "data_flag": None},
     {"key": "fund_performance", "name": "基金业绩分析", "number": 5, "type": "always", "data_flag": None},
     # ── 基金深度分析 类型（有数据才显示） ──
-    {"key": "fund_manager", "name": "基金经理变更监控", "number": 6, "type": "b_series", "data_flag": "manager_data"},
-    {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7, "type": "b_series", "data_flag": "overlap_data"},
+    {
+        "key": "fund_manager",
+        "name": "基金经理变更监控",
+        "number": 6,
+        "type": "fund_deep_analysis",
+        "data_flag": "manager_data",
+    },
+    {
+        "key": "fund_overlap",
+        "name": "持仓重合度矩阵",
+        "number": 7,
+        "type": "fund_deep_analysis",
+        "data_flag": "overlap_data",
+    },
     {
         "key": "fund_concentration",
         "name": "持仓集中度监控",
         "number": 8,
-        "type": "b_series",
+        "type": "fund_deep_analysis",
         "data_flag": "concentration_data",
     },
-    {"key": "fund_style", "name": "基金风格分析", "number": 9, "type": "b_series", "data_flag": "style_data"},
-    # ── 基金深度分析 类型（有数据才显示；跟随 B2~B5 之后） ──
+    {"key": "fund_style", "name": "基金风格分析", "number": 9, "type": "fund_deep_analysis", "data_flag": "style_data"},
+    # ── 基金深度分析 类型（有数据才显示） ──
     {
         "key": "factor_exposure",
         "name": "因子暴露分析",
         "number": 10,
-        "type": "b_series",
+        "type": "fund_deep_analysis",
         "data_flag": "factor_exposure_data",
+    },
+    {
+        "key": "correlation_analysis",
+        "name": "持仓相关性矩阵",
+        "number": 11,
+        "type": "fund_deep_analysis",
+        "data_flag": "correlation_data",
     },
     # ── news 类型（需启用新闻功能） ──
     {
         "key": "news_correlation",
         "name": "财经新闻热点与持仓关联分析",
-        "number": 11,
+        "number": 12,
         "type": "news",
         "data_flag": "news_data_available",
     },
     # ── llm 类型（需启用 LLM 功能） ──
-    {"key": "global_macro", "name": "全球政经局势", "number": 12, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "health_check", "name": "持仓体检报告", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 15, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "global_macro", "name": "全球政经局势", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "health_check", "name": "持仓体检报告", "number": 15, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 16, "type": "llm", "data_flag": "llm_data_available"},
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
-    {"key": "portfolio_history", "name": "组合历史走势", "number": 16, "type": "history", "data_flag": None},
-    {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 17, "type": "history", "data_flag": None},
+    {"key": "portfolio_history", "name": "组合历史走势", "number": 17, "type": "history", "data_flag": None},
+    {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 18, "type": "history", "data_flag": None},
+    # ── evolution 类型（独立开关 enable_portfolio_evolution 控制） ──
+    # 组合演进：聚合本地多期快照，data_flag 控制章节可见性，
+    # available=False 时模板/页签写占位（与 correlation 的降级模式一致）
+    {
+        "key": "portfolio_evolution",
+        "name": "组合演进",
+        "number": 19,
+        "type": "evolution",
+        "data_flag": "evolution_data",
+    },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 20, "type": "always", "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 21, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 
@@ -578,7 +610,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 
     处理逻辑：
-      1. 无配置或配置为空 → 返回完整 19 项默认顺序（与当前硬编码一致）
+      1. 无配置或配置为空 → 返回完整 21 项默认顺序（与当前硬编码一致）
       2. 用户配置的模块使用配置序号，其余保持默认序号
       3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
       4. llm_usage 始终固定在最后一位
@@ -588,7 +620,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
                 为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
 
     Returns:
-        [{key, name, number, type, data_flag}, ...] 共 19 项
+        [{key, name, number, type, data_flag}, ...] 共 21 项
     """
     if config is None:
         return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
