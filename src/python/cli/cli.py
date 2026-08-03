@@ -83,11 +83,17 @@ def _build_parser() -> argparse.ArgumentParser:
     whatif_p = sub.add_parser("whatif", help="调仓 What-if 模拟：对比两份持仓生成 diff 报告")
     whatif_p.add_argument("--candidate", metavar="PATH", required=True, help="目标持仓文件（调仓后/假设，必填）")
     whatif_p.add_argument("--base", metavar="PATH", help="基准持仓文件（调仓前）；缺省用 config 配置的持仓文件")
+    whatif_p.add_argument(
+        "--effective-date",
+        metavar="YYYY-MM-DD",
+        help="调仓生效日（可选）：指定后 opt-in 联网取生效日后行情，追加时序回测页（区间/年化收益、波动率、夏普、最大回撤）",
+    )
     whatif_p.epilog = (
         "示例:\n"
-        "  whatif --candidate 调仓后.xlsx              对比当前持仓 vs 目标持仓\n"
+        "  whatif --candidate 调仓后.xlsx              对比当前持仓 vs 目标持仓（成本口径截面比较）\n"
         "  whatif --base 调仓前.xlsx --candidate 调仓后.xlsx   显式指定两份持仓\n"
-        "输出: 调仓模拟.xlsx / .html（最新版固定名，历史归档至日期子目录；成本口径截面比较，零网络请求）"
+        "  whatif --candidate 调仓后.xlsx --effective-date 2026-07-01   指定生效日，追加时序回测\n"
+        "输出: 调仓模拟.xlsx / .html（最新版固定名，历史归档至日期子目录；默认零网络请求，指定生效日时联网取历史做假设推演，不构成收益承诺）"
     )
 
     # ── check-sources 子命令 ──
@@ -363,6 +369,7 @@ def _handle_whatif(args: argparse.Namespace, config: dict) -> int:
         candidate_file=cand_file,
         output_dir=output_dir,
         reporter=reporter,
+        effective_date=args.effective_date,
     )
     if not result.ok:
         reporter.error(f"调仓对比数据不可用: {result.reason}")

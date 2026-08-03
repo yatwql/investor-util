@@ -1,9 +1,10 @@
 """调仓 What-if 模拟 Excel 页签写入模块。
 
-输出 3 个页签：
+输出 3 个固定页签 + 1 个条件页签：
   1. 调仓摘要 — 基准/目标文件 + 变动统计 + 汇总指标对比（含箭头）
   2. 分类配置对比 — 资产大类成本权重基准 vs 目标（成本口径）
   3. 持仓变动明细 — 新增/清仓/加仓/减仓/不变，行底色按变动类型标注
+  4. 时序回测（条件）— 指定调仓生效日时追加；未指定或数据不足时写占位文本
 
 数据不足（whatif_data=None 或 available=False）时摘要页写占位文本
 （§1.4.5 数据降级治理）。
@@ -51,6 +52,12 @@ _UNIT_FORMATS: dict[str, str | None] = {
     "shares": FMT_SHARES,
     "count": None,
     "hhi": "0.000000",
+}
+
+# 回测指标行单位 → 数字格式（pct 后拼 % 号）
+_BT_UNIT_FORMATS: dict[str, str | None] = {
+    "pct": '0.00"%"',
+    "ratio": "0.00",
 }
 
 
@@ -114,9 +121,9 @@ def write_whatif_summary_sheet(ws: Worksheet, whatif_data: dict[str, Any] | None
     row += 1
     row = write_title_row(ws, row, "说明", ncols=_ncols)
     notes = [
-        "口径：权重基于成本 = 份额 × 每份成本（candidate 无市场历史，仅做成本口径截面比较）",
-        "局限：What-if 无真实交易数据，量化指标（夏普/波动率等）不可回测",
-        "数据来源：本地两份持仓文件，零网络请求",
+        "口径：权重基于成本 = 份额 × 每份成本（成本口径截面比较，本地计算、零网络请求）",
+        "时序回测：指定调仓生效日时 opt-in 联网取生效日后行情，追加第 4 页签「时序回测」",
+        "假设推演：回测为模拟推演，不构成收益承诺",
     ]
     for n in notes:
         row = write_data_row(ws, row, [n] + [""] * (_ncols - 1))
@@ -237,3 +244,101 @@ def write_whatif_changes_sheet(ws: Worksheet, whatif_data: dict[str, Any] | None
     freeze_header(ws, row=2)
     auto_width(ws, min_width=8, max_width=26)
     logger.info("持仓变动明细页签写入完成: %d 条", len(whatif_data.get("changes", [])))
+
+
+def write_whatif_backtest_sheet(ws: Worksheet, whatif_data: dict[str, Any] | None) -> None:
+    """写入「时序回测」页签（指定调仓生效日时才有数据）。
+
+    结构：生效日信息行 + 回测指标对比（5 行，unit 映射 _BT_UNIT_FORMATS，
+    变化列拼 arrow）+ 归一化净值与回撤序列数据表 + 口径/局限说明。
+    未指定生效日 / backtest 缺失 / 回测不可用 → 写占位文本（不阻塞主报告）。
+
+    Args:
+        ws: openpyxl Worksheet 对象
+        whatif_data: C19 契约 dict（含可选 backtest 键）
+    """
+    _ncols = 6
+    write_title_row(ws, 1, "时序回测（指定生效日后行情推演）", ncols=_ncols)
+
+    bt = (whatif_data or {}).get("backtest") if whatif_data else None
+    if not bt or not bt.get("available"):
+        _write_placeholder(
+            ws,
+            (bt or {}).get("reason") or STATUS_MESSAGES.get("whatif_backtest_unavailable", "时序回测不可用"),
+            row=3,
+            max_cols=_ncols,
+        )
+        freeze_header(ws, row=2)
+        auto_width(ws)
+        return
+
+    row = 2
+    eff = bt.get("effective_date") or "—"
+    row = write_data_row(
+        ws,
+        row,
+        [f"调仓生效日：{eff}；基准/目标组合在生效日后的 as-if 净值均归一化到 100 基点"] + [""] * (_ncols - 1),
+    )
+
+    # ── 指标对比 ──
+    row += 1
+    row = write_title_row(ws, row, "回测指标对比（生效日后，假设推演）", ncols=4)
+    row = write_header_row(ws, row, ["指标", "基准", "目标", "变化"])
+    for m in bt.get("metrics", []):
+        _fmt = _BT_UNIT_FORMATS.get(m.get("unit", ""))
+        row = write_data_row(
+            ws,
+            row,
+            [
+                m.get("label", ""),
+                m.get("base"),
+                m.get("candidate"),
+                m.get("delta"),
+            ],
+            formats=[None, _fmt, _fmt, _fmt],
+        )
+        # 变化列拼方向箭头（与摘要页一致）
+        delta_v = m.get("delta")
+        ws.cell(row=row - 1, column=4).value = (
+            f"{delta_v} {m.get('arrow', '')}" if delta_v is not None else f"-- {m.get('arrow', '')}"
+        )
+
+    # ── 归一化净值与回撤序列 ──
+    row += 1
+    row = write_title_row(ws, row, "归一化净值与回撤序列（基准/目标）", ncols=_ncols)
+    series = bt.get("series") or {}
+    labels = series.get("labels") or []
+    if labels:
+        row = write_header_row(
+            ws, row, ["日期", "基准净值(100基点)", "目标净值(100基点)", "基准回撤(%)", "目标回撤(%)"]
+        )
+        for i, d in enumerate(labels):
+            row = write_data_row(
+                ws,
+                row,
+                [
+                    d,
+                    series.get("base", [])[i],
+                    series.get("candidate", [])[i],
+                    series.get("base_drawdown", [])[i],
+                    series.get("candidate_drawdown", [])[i],
+                ],
+                formats=[None, "0.0000", "0.0000", "0.0000", "0.0000"],
+            )
+    else:
+        row = write_data_row(ws, row, ["无有效净值序列"] + [""] * (_ncols - 1))
+
+    # ── 说明 ──
+    row += 1
+    row = write_title_row(ws, row, "说明", ncols=_ncols)
+    notes = [
+        "口径：as-if 市值 = 份额 × 每日价格；基准/目标组合各自归一化到 100 基点后比较",
+        "局限：假设推演、不构成收益承诺；未指定生效日时无本页签",
+        "数据来源：生效日后行情历史（opt-in 联网获取）；数据不足时回测降级不阻塞主报告",
+    ]
+    for n in notes:
+        row = write_data_row(ws, row, [n] + [""] * (_ncols - 1))
+
+    freeze_header(ws, row=2)
+    auto_width(ws, min_width=10, max_width=40)
+    logger.info("时序回测页签写入完成: %s", eff)

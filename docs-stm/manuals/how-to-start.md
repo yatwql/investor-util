@@ -108,8 +108,9 @@ python -m src.python.cli --verbose report --type basic
 |:-----|:-----|
 | `--base PATH` | 基准持仓文件（调仓前）。缺省使用 `config.json` 的 `holdings_dir` + `holdings_filename` |
 | `--candidate PATH` | 目标持仓文件（调仓后/假设），**必填** |
+| `--effective-date YYYY-MM-DD` | 调仓生效日（可选）。指定后 opt-in 联网取生效日后行情，追加时序回测（区间/年化收益、波动率、夏普、最大回撤） |
 
-对比两份持仓生成独立调仓 diff 报告（Excel 3 页签 + HTML 双栏对比页），产物输出到报告输出目录：最新版固定名 `调仓模拟.xlsx` / `调仓模拟.html`（每次覆盖为最新对比），历史归档至 `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx/.html` 日期子目录（超 180 天自动清理）。全程本地计算、零网络请求，不并入主报告管线。
+对比两份持仓生成独立调仓 diff 报告（Excel 3 页签 + 指定生效日时第 4 页签「时序回测」+ HTML 双栏对比页），产物输出到报告输出目录：最新版固定名 `调仓模拟.xlsx` / `调仓模拟.html`（每次覆盖为最新对比），历史归档至 `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx/.html` 日期子目录（超 180 天自动清理）。默认全程本地计算、零网络请求，不并入主报告管线；指定 `--effective-date` 时联网取历史做假设推演（不构成收益承诺），数据不足时回测降级不阻塞主报告。
 
 **使用示例**：
 
@@ -128,6 +129,9 @@ python -m src.python.cli whatif --candidate D:/holdings/调仓方案.xlsx
 
 # 调仓 What-if：显式指定两份持仓
 python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx
+
+# 调仓 What-if：指定生效日，追加时序回测
+python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx --effective-date 2026-07-01
 ```
 
 **数据源健康检查**（直接通过主程序运行，无需 TUI 界面）：

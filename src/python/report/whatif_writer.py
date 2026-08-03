@@ -1,8 +1,9 @@
 """调仓 What-if 模拟报告输出。
 
 编排双产物输出：
-  - Excel 调仓模拟工作簿（调仓摘要 / 分类配置对比 / 持仓变动明细）
-  - HTML 双栏对比页（含资产配置对比环形图，复用 Chart.js 本地 bundle）
+  - Excel 调仓模拟工作簿（调仓摘要 / 分类配置对比 / 持仓变动明细
+    + 指定生效日时的「时序回测」页签）
+  - HTML 双栏对比页（含资产配置对比环形图 + 回测折线图，复用 Chart.js 本地 bundle）
 
 报告按主报告归档惯例输出到 output_dir（与主报告分离）：
   - 最新版固定名 `调仓模拟.xlsx` / `调仓模拟.html`（每次覆盖为最新对比）
@@ -21,6 +22,7 @@ from typing import Any
 from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.report.html_writer import _copy_js_assets
 from src.python.report.whatif_sheet import (
+    write_whatif_backtest_sheet,
     write_whatif_category_sheet,
     write_whatif_changes_sheet,
     write_whatif_summary_sheet,
@@ -52,6 +54,8 @@ def write_whatif_excel(whatif_data: dict[str, Any], output_dir: str = "reports")
     write_whatif_category_sheet(ws_cat, whatif_data)
     ws_chg = wb.create_sheet("持仓变动明细")
     write_whatif_changes_sheet(ws_chg, whatif_data)
+    ws_bt = wb.create_sheet("时序回测")
+    write_whatif_backtest_sheet(ws_bt, whatif_data)
 
     now = datetime.now()
     date_str = now.strftime("%Y%m%d")
@@ -84,6 +88,31 @@ def _trim_whatif_chart_data(whatif_data: dict[str, Any] | None) -> dict[str, Any
     return {"available": True, "categories": whatif_data.get("categories") or []}
 
 
+def _trim_whatif_backtest_chart_data(whatif_data: dict[str, Any] | None) -> dict[str, Any] | None:
+    """时序回测图表数据专用裁剪（R9 数据最小化）。
+
+    只透传 series 字段（labels/base/candidate/base_drawdown/candidate_drawdown），
+    避免把 metrics/reason 等表格字段整包 tojson 到前端。回测缺失/不可用时返回 None。
+    """
+    bt = (whatif_data or {}).get("backtest") if whatif_data else None
+    if not bt or not bt.get("available"):
+        return None
+    series = bt.get("series")
+    if not series or not series.get("labels"):
+        return None
+    return {
+        "available": True,
+        "effective_date": bt.get("effective_date"),
+        "series": {
+            "labels": series.get("labels"),
+            "base": series.get("base"),
+            "candidate": series.get("candidate"),
+            "base_drawdown": series.get("base_drawdown"),
+            "candidate_drawdown": series.get("candidate_drawdown"),
+        },
+    }
+
+
 def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
     """渲染 whatif_template.html，返回完整 HTML 字符串。
 
@@ -100,6 +129,7 @@ def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
         whatif_data=whatif_data,
         now=now_str,
         whatif_chart_data=_trim_whatif_chart_data(whatif_data),
+        whatif_backtest_chart_data=_trim_whatif_backtest_chart_data(whatif_data),
     )
 
 

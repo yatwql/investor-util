@@ -172,6 +172,7 @@ class TestWhatifExcelSheets(unittest.TestCase):
         from openpyxl import Workbook
 
         from src.python.report.whatif_sheet import (
+            write_whatif_backtest_sheet,
             write_whatif_category_sheet,
             write_whatif_changes_sheet,
             write_whatif_summary_sheet,
@@ -183,6 +184,7 @@ class TestWhatifExcelSheets(unittest.TestCase):
             "write_whatif_summary_sheet": write_whatif_summary_sheet,
             "write_whatif_category_sheet": write_whatif_category_sheet,
             "write_whatif_changes_sheet": write_whatif_changes_sheet,
+            "write_whatif_backtest_sheet": write_whatif_backtest_sheet,
         }[fn_name](ws, whatif_data)
         return ws
 
@@ -283,3 +285,99 @@ class TestWhatifExcelSheets(unittest.TestCase):
         ws = self._write_sheet("write_whatif_changes_sheet", None)
         flat = self._flat(ws)
         self.assertTrue(any("调仓对比数据暂不可用" in v for v in flat))
+
+
+def _bt_data(**extra) -> dict:
+    """构造含可用 backtest 键的 C19 契约（Excel 呈现用，数值无需自洽）。"""
+    d = _whatif_data(
+        backtest={
+            "available": True,
+            "status": "ok",
+            "effective_date": "2026-07-01",
+            "reason": "",
+            "metrics": [
+                {
+                    "key": "period_return_pct",
+                    "label": "区间收益",
+                    "unit": "pct",
+                    "base": 24.0,
+                    "candidate": 48.0,
+                    "delta": 24.0,
+                    "arrow": "↑",
+                },
+                {
+                    "key": "sharpe_ratio",
+                    "label": "夏普比率",
+                    "unit": "ratio",
+                    "base": 1.2,
+                    "candidate": 0.8,
+                    "delta": -0.4,
+                    "arrow": "↓",
+                },
+            ],
+            "series": {
+                "labels": ["2026-07-01", "2026-07-02"],
+                "base": [100.0, 124.0],
+                "candidate": [100.0, 148.0],
+                "base_drawdown": [0.0, 0.0],
+                "candidate_drawdown": [0.0, 0.0],
+            },
+        }
+    )
+    d.update(extra)
+    return d
+
+
+class TestWhatifBacktestSheet(unittest.TestCase):
+    """时序回测页签 Excel 呈现测试。"""
+
+    def _write(self, whatif_data) -> "object":
+        from openpyxl import Workbook
+
+        from src.python.report.whatif_sheet import write_whatif_backtest_sheet
+
+        wb = Workbook()
+        ws = wb.active
+        write_whatif_backtest_sheet(ws, whatif_data)
+        return ws
+
+    def _flat(self, ws) -> list[str]:
+        return [str(c.value) if c.value is not None else "" for row in ws.iter_rows() for c in row]
+
+    def test_backtest_sheet_full(self):
+        """available=True → 生效日行 + 指标表（%单位 + 箭头）+ 序列表 + 说明。"""
+        ws = self._write(_bt_data())
+        flat = self._flat(ws)
+        self.assertTrue(any("时序回测" in v for v in flat), "应含页标题")
+        self.assertTrue(any("2026-07-01" in v for v in flat), "应含生效日")
+        self.assertTrue(any("区间收益" in v for v in flat))
+        self.assertTrue(any("夏普比率" in v for v in flat))
+        self.assertTrue(any("24.0 ↑" in v for v in flat), "pct 变化列应带箭头")
+        self.assertTrue(any("-0.4 ↓" in v for v in flat), "ratio 变化列应带箭头")
+        self.assertTrue(any("2026-07-02" in v for v in flat), "应含净值序列日期")
+        self.assertTrue(any("100.0" in v for v in flat), "应含归一化净值")
+        self.assertTrue(any("口径" in v for v in flat), "应含口径说明")
+
+    def test_backtest_sheet_missing_key_placeholder(self):
+        """whatif_data 无 backtest 键 → 通用占位。"""
+        ws = self._write(_whatif_data())
+        flat = self._flat(ws)
+        self.assertTrue(any("时序回测不可用" in v for v in flat), "应写占位")
+
+    def test_backtest_sheet_none_placeholder(self):
+        """whatif_data=None → 占位。"""
+        ws = self._write(None)
+        flat = self._flat(ws)
+        self.assertTrue(any("时序回测不可用" in v for v in flat), "None 应写占位")
+
+    def test_backtest_sheet_unavailable_reason_placeholder(self):
+        """backtest available=False → reason 优先于通用文案。"""
+        bt = {
+            "available": False,
+            "status": "unavailable",
+            "reason": "生效日后数据不足",
+            "effective_date": "2026-07-20",
+        }
+        ws = self._write(_whatif_data(backtest=bt))
+        flat = self._flat(ws)
+        self.assertTrue(any("生效日后数据不足" in v for v in flat), "应写回测 reason")

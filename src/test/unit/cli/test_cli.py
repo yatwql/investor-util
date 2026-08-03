@@ -135,6 +135,14 @@ class TestArgparse:
             _build_parser().parse_args(["whatif"])
         assert exc.value.code == 2
 
+    def test_whatif_effective_date_parse(self):
+        """whatif --effective-date 解析。"""
+        args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx", "--effective-date", "2026-07-01"])
+        assert args.effective_date == "2026-07-01"
+
+        args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx"])
+        assert args.effective_date is None
+
 
 # ═══════════════════════════════════════════════════════════════
 # CliProgressReporter
@@ -413,6 +421,19 @@ class TestHandleWhatif:
         assert code == _EXIT_SEVERE
         mock_run.assert_called_once()
 
+    def test_effective_date_passthrough(self):
+        """--effective-date → 透传到 run_whatif_simulation kwargs。"""
+        with (
+            patch("src.python.core.reader.read_holdings", side_effect=[[MagicMock()], [MagicMock()]]),
+            patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
+        ):
+            mock_run.return_value = WhatifRunResult(ok=True, excel="/r/e.xlsx", html="/r/e.html")
+            args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx", "--effective-date", "2026-07-01"])
+            code = _handle_whatif(args, {})
+        assert code == _EXIT_SUCCESS
+        mock_run.assert_called_once()
+        assert mock_run.call_args.kwargs["effective_date"] == "2026-07-01"
+
 
 # ═══════════════════════════════════════════════════════════════
 # main() — 参数透传
@@ -484,3 +505,31 @@ class TestMain:
         assert args.command == "whatif"
         assert args.base == "before.xlsx"
         assert args.candidate == "after.xlsx"
+
+    def test_whatif_effective_date_param_passthrough(self):
+        """whatif --effective-date → _handle_whatif 收到 args.effective_date。"""
+        with (
+            patch("src.python.cli.cli._handle_whatif", return_value=_EXIT_SUCCESS) as mock_whatif,
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config", return_value={}),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(
+                __import__("sys"),
+                "argv",
+                [
+                    "cli.py",
+                    "whatif",
+                    "--base",
+                    "before.xlsx",
+                    "--candidate",
+                    "after.xlsx",
+                    "--effective-date",
+                    "2026-07-01",
+                ],
+            ):
+                main()
+
+        mock_whatif.assert_called_once()
+        args = mock_whatif.call_args[0][0]
+        assert args.effective_date == "2026-07-01"

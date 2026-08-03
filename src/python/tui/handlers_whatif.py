@@ -2,7 +2,8 @@
 
 对比基准（调仓前）与目标（调仓后/假设）两份持仓，生成独立调仓 diff 报告
 （Excel + HTML，最新版固定名 `调仓模拟.xlsx/.html` + 日期目录归档版）。
-全程本地计算、零网络请求，不并入主报告管线（独立产物，设计边界见 technical.md §4.13）。
+默认全程本地计算、零网络请求；可选输入调仓生效日（回车跳过）时 opt-in 联网
+取生效日后行情，追加时序回测。不并入主报告管线（独立产物，设计边界见 technical.md §4.13）。
 """
 
 from __future__ import annotations
@@ -131,11 +132,24 @@ def _copy_base_as_template(base_file: str) -> str | None:
     return target
 
 
+def _prompt_effective_date() -> str:
+    """提示输入调仓生效日（YYYY-MM-DD）；回车/中断返回空串。
+
+    仅做交互采集，**不校验格式**——格式错误由共享层 compute_backtest_days
+    降级处理，入口层不承载业务逻辑。
+    """
+    try:
+        return input("  [..] 调仓生效日 YYYY-MM-DD（可选，回车跳过以启用时序回测）: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return ""
+
+
 def _cmd_whatif() -> None:
     """调仓 What-if 模拟：对比基准与目标持仓，生成独立 diff 报告。
 
     业务链（build→校验→输出）委托共享层 run_whatif_simulation，
-    本函数仅保留文件选择、判空与结果呈现。
+    本函数仅保留文件选择、生效日交互采集、判空与结果呈现。
     """
     from src.python.report.whatif_operations import run_whatif_simulation
 
@@ -166,6 +180,7 @@ def _cmd_whatif() -> None:
             press_any_key()
             return
         print(f"  [OK] 基准 {len(base)} 条 / 目标 {len(cand)} 条持仓")
+        eff = _prompt_effective_date()
         result = run_whatif_simulation(
             base,
             cand,
@@ -173,6 +188,7 @@ def _cmd_whatif() -> None:
             candidate_file=cand_file,
             output_dir=output_dir,
             reporter=reporter,
+            effective_date=eff or None,
         )
         if not result.ok:
             print(f"  [ERR] 调仓对比数据不可用: {result.reason}")

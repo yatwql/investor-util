@@ -1929,37 +1929,43 @@ report/ 渲染                      # Excel 页签 + HTML 章节（模板 contex
 
 ### 4.13 调仓 What-if 模拟
 
-双持仓（基准 base / 目标 candidate）**成本口径截面比较**，输出 diff 报告（`analysis/whatif.py` 计算 → `report/whatif_writer.py` 输出 Excel + HTML 独立报告）。
+双持仓（基准 base / 目标 candidate）**成本口径截面比较**，输出 diff 报告（`analysis/whatif.py` 计算 → `report/whatif_operations.py` 编排 → `report/whatif_writer.py` 输出 Excel + HTML 独立报告）。
 
 **设计边界（数据源可行性约束）**：
 - **成本口径**：candidate 无市场历史，无法取实时市值/净值，所有指标（权重/集中度）基于 `成本 = 份额 × 每份成本`，纯结构层、**零网络请求**（"只能做截面比较"）。
-- **不可回测**：What-if 无真实交易数据，不产出任何回测类结论（夏普/波动率等）；量化指标仅作**截面结构对比**（权重/集中度/HHI），不表达预期收益。
-- **双份数据内存**：同时加载 base + candidate 两份持仓计算，内存与缓存用量约为单份的 2 倍；净值曲线无历史（新持仓未经历市场），不做时间序列比较。
-- **勿用于回测误用**：用户不得把 What-if 的量化指标当作回测结果——它没有真实交易数据支撑，仅反映结构差异。
+- **回测 opt-in**：默认不产出任何回测类结论；仅当指定**调仓生效日**（CLI `--effective-date` / TUI 生效日提示）时，opt-in 联网取生效日后行情做时序回测（`report/whatif_operations.py::build_whatif_backtest` 取历史 → `analysis/whatif_backtest.py` 纯计算）。
+- **回测为假设推演**：回测结果（区间/年化收益、波动率、夏普、最大回撤）为 as-if 市值模拟、**不构成收益承诺**；数据不足/不可对齐 → 回测 `available=false` 降级，**不阻塞主报告**。
+- **双份数据内存**：同时加载 base + candidate 两份持仓计算，内存与缓存用量约为单份的 2 倍；未指定生效日时不做时间序列比较。
+- **勿用于回测误用**：用户不得把 What-if 的截面量化指标当作回测结果——它没有真实交易数据支撑，仅反映结构差异。
 
 **变动类型**（复用 `schemas/history.py _DiffAction` 语义）：新增 / 清仓 / 加仓 / 减仓 / 不变。
 
-**模块分层（C14 依赖）**：
+**模块分层（C14 依赖 + analysis 单向依赖纪律）**：
 
 ```
 analysis/whatif.py               # 纯计算：_merge_holdings(按 code 合并多账户) → 成本权重/HHI → 变动分类
-    ↑ 复用 analysis/rebalance.py 的 classify_holding/_CATEGORY_ORDER/_CATEGORY_LABELS
-report/whatif_sheet.py           # Excel 3 页签：调仓摘要 / 分类配置对比 / 持仓变动明细（行底色按变动类型）
+analysis/whatif_backtest.py      # 纯计算（不联网、不 import report/）：生效日→请求天数、并集+LOCF 对齐、
+                                 #   归一化到 100、区间/年化收益/波动率/夏普/最大回撤、回撤序列
+    ↑ 复用 analysis/metrics.py 的 sharpe_ratio/annualized_return/max_drawdown_pct、analysis/whatif.py 的 _arrow
+report/portfolio_history.py      # as-if 时序引擎：close×shares 综合走势（days 已透传到持仓历史链路）
+report/whatif_operations.py      # 共享层编排：build_whatif_data → build_whatif_backtest（联网取历史）→ 写报告
+report/whatif_sheet.py           # Excel 3 页签 + 条件第 4 页签「时序回测」（指定生效日时）
 report/whatif_writer.py          # 编排双产物：调仓模拟.xlsx / .html（最新版固定名 + 日期目录归档版）+ Chart.js 资产复制
-cli/cli.py                       # whatif 子命令：--candidate 必填、--base 可选（缺省用 config 持仓）
+cli/cli.py                       # whatif 子命令：--candidate 必填、--base 可选（缺省用 config 持仓）、--effective-date 可选（只传参）
+tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互提示（_prompt_effective_date，只传参、不校验）
 ```
 
-**C19 契约 `whatif_data`（独立报告，非 pipeline_data 键）**：`{"available", "status", "base_file", "candidate_file", "base", "candidate", "summary", "categories", "changes", "stats", "reason"}`。两侧均为空 → `available=false` 降级；单侧为空视为合法的「全部清仓/全部新增」对比，仍可计算。
+**C19 契约 `whatif_data`（独立报告，非 pipeline_data 键）**：`{"available", "status", "base_file", "candidate_file", "base", "candidate", "summary", "categories", "changes", "stats", "reason", "backtest"?}`（`backtest` 仅指定生效日时存在）。两侧均为空 → `available=false` 降级；单侧为空视为合法的「全部清仓/全部新增」对比，仍可计算。`backtest` 子契约：`{"available", "status("ok"/"degraded"/"unavailable"), "reason", "effective_date", "metrics":[{key,label,unit("pct"/"ratio"),base,candidate,delta,arrow}]（5 行）, "series":{labels, base, candidate, base_drawdown, candidate_drawdown}}`，净值归一化到 100、回撤为负百分比。
 
 **架构约束遵从**：
 
 | 约束 | 适配方式 |
 |:-----|:---------|
 | **C7** (报告序号可配置) | whatif 为**独立报告产物**（调仓模拟.xlsx/.html，最新版固定名 + 日期目录归档版），不注册进主报告 `_REPORT_SECTION_DEFAULT` |
-| **C14** (渲染期数据不可写入模块级全局变量) | whatif_data 通过模板 `render()` context 传递，不写 `_ENV.globals` |
+| **C14** (渲染期数据不可写入模块级全局变量) | whatif_data 通过模板 `render()` context 传递，不写 `_ENV.globals`；回测图表负载经 `_trim_whatif_backtest_chart_data` 裁剪 |
 | **C19** (pipeline_data Schema 契约) | `whatif_data` 契约独立于主报告管线（不经 `pipeline_data_builder.build()`），本报告自建契约并在模块 docstring 声明 |
-| **C20** (HTML 图表图下说明强制) | 资产配置对比双环形图各配 `.chart-caption` 图下说明，随 canvas 渲染分支同步出现 |
-| **§1.4.5** (数据降级治理) | 两侧为空 → `available=false`，Excel 摘要页/HTML 写「调仓对比数据暂不可用」占位；CLI 层对空持仓文件直接报错返回 `_EXIT_SEVERE` |
+| **C20** (HTML 图表图下说明强制) | 资产配置对比双环形图 + 时序回测 2 张线图（归一化净值/回撤）各配 `.chart-caption` 图下说明，随 canvas 渲染分支同步出现 |
+| **§1.4.5** (数据降级治理) | 两侧为空 → `available=false`，Excel 摘要页/HTML 写「调仓对比数据暂不可用」占位；回测不可用 → 回测区隐藏/占位、不阻塞主报告；CLI 层对空持仓文件直接报错返回 `_EXIT_SEVERE` |
 
 [↑ 回到顶部](#目录)
 

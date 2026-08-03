@@ -96,5 +96,125 @@ class TestRunWhatifSimulation(unittest.TestCase):
         mock_write.assert_not_called()
 
 
+class TestRunWhatifSimulationBacktest(unittest.TestCase):
+    """run_whatif_simulation 指定生效日时序回测集成（mock build_whatif_backtest）。"""
+
+    @patch("src.python.report.whatif_operations.write_whatif_report")
+    @patch("src.python.report.whatif_operations.build_whatif_data")
+    @patch("src.python.report.whatif_operations.build_whatif_backtest")
+    def test_no_effective_date_no_backtest_call(
+        self,
+        mock_bt: MagicMock,
+        mock_build: MagicMock,
+        mock_write: MagicMock,
+    ) -> None:
+        """未指定生效日 → 不调用 build_whatif_backtest，data 无 backtest 键。"""
+        from src.python.report.whatif_operations import run_whatif_simulation
+
+        mock_build.return_value = {"available": True, "changes": []}
+        mock_write.return_value = {"excel": "/r/调仓模拟.xlsx", "html": "/r/调仓模拟.html"}
+
+        run_whatif_simulation(
+            [MagicMock()],
+            [MagicMock()],
+            base_file="/x/基准.xlsx",
+            candidate_file="/x/目标.xlsx",
+            output_dir="reports",
+        )
+
+        mock_bt.assert_not_called()
+        written = mock_write.call_args.args[0]
+        self.assertNotIn("backtest", written)
+
+    @patch("src.python.report.whatif_operations.write_whatif_report")
+    @patch("src.python.report.whatif_operations.build_whatif_data")
+    @patch("src.python.report.whatif_operations.build_whatif_backtest")
+    def test_effective_date_merges_backtest(
+        self,
+        mock_bt: MagicMock,
+        mock_build: MagicMock,
+        mock_write: MagicMock,
+    ) -> None:
+        """指定生效日 → 调用回测构建并合并进 data。"""
+        from src.python.report.whatif_operations import run_whatif_simulation
+
+        mock_build.return_value = {"available": True, "changes": []}
+        mock_bt.return_value = {"available": True, "status": "ok", "effective_date": "2026-07-01"}
+        mock_write.return_value = {"excel": "/r/e.xlsx", "html": "/r/e.html"}
+
+        result = run_whatif_simulation(
+            [MagicMock()],
+            [MagicMock()],
+            "/x/base.xlsx",
+            "/x/cand.xlsx",
+            effective_date="2026-07-01",
+        )
+
+        self.assertTrue(result.ok)
+        mock_bt.assert_called_once()
+        self.assertEqual(mock_bt.call_args.kwargs["effective_date"], "2026-07-01")
+        written = mock_write.call_args.args[0]
+        self.assertEqual(written["backtest"]["status"], "ok")
+        self.assertEqual(written["backtest"]["effective_date"], "2026-07-01")
+
+    @patch("src.python.report.whatif_operations.write_whatif_report")
+    @patch("src.python.report.whatif_operations.build_whatif_data")
+    @patch("src.python.report.whatif_operations.build_whatif_backtest")
+    def test_effective_date_exception_degrades(
+        self,
+        mock_bt: MagicMock,
+        mock_build: MagicMock,
+        mock_write: MagicMock,
+    ) -> None:
+        """回测异常 → 主报告仍 ok=True，backtest 降级 available=False。"""
+        from src.python.report.whatif_operations import run_whatif_simulation
+
+        mock_build.return_value = {"available": True, "changes": []}
+        mock_bt.side_effect = RuntimeError("boom")
+        mock_write.return_value = {"excel": "/r/e.xlsx", "html": "/r/e.html"}
+
+        result = run_whatif_simulation(
+            [MagicMock()],
+            [MagicMock()],
+            "/x/base.xlsx",
+            "/x/cand.xlsx",
+            effective_date="2026-07-01",
+        )
+
+        self.assertTrue(result.ok)
+        written = mock_write.call_args.args[0]
+        self.assertFalse(written["backtest"]["available"])
+        self.assertEqual(written["backtest"]["status"], "unavailable")
+        self.assertIn("时序回测计算失败", written["backtest"]["reason"])
+
+    @patch("src.python.report.whatif_operations.write_whatif_report")
+    @patch("src.python.report.whatif_operations.build_whatif_data")
+    @patch("src.python.report.whatif_operations.build_whatif_backtest")
+    def test_effective_date_bt_none_no_key(
+        self,
+        mock_bt: MagicMock,
+        mock_build: MagicMock,
+        mock_write: MagicMock,
+    ) -> None:
+        """build_whatif_backtest 返回 None → 不加 backtest 键。"""
+        from src.python.report.whatif_operations import run_whatif_simulation
+
+        mock_build.return_value = {"available": True, "changes": []}
+        mock_bt.return_value = None
+        mock_write.return_value = {"excel": "/r/e.xlsx", "html": "/r/e.html"}
+
+        result = run_whatif_simulation(
+            [MagicMock()],
+            [MagicMock()],
+            "/x/base.xlsx",
+            "/x/cand.xlsx",
+            effective_date="2026-07-01",
+        )
+
+        self.assertTrue(result.ok)
+        written = mock_write.call_args.args[0]
+        self.assertNotIn("backtest", written)
+
+
 if __name__ == "__main__":
     unittest.main()

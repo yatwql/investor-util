@@ -19,7 +19,7 @@
 | **项目文档** | Markdown | **96** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 88 | — | 各版本 changelog/plan/review-findings 等（84 md + 3 py + 1 txt） |
-| ├ plan/ | 中间设计文件 | 6 | — | 当前迭代中的设计方案 |
+| ├ plan/ | 中间设计文件 | 7 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -112,7 +112,8 @@ investor-util/
 │   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
 │   │   │   ├── scenario.py                    #   情景分析（Beta 推导 → 6 种市场情景预期变动）
 │   │   │   ├── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
-│   │   │   └── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比）
+│   │   │   ├── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比）
+│   │   │   └── whatif_backtest.py             #   调仓 What-if 时序回测（纯计算：生效日折算/序列对齐/5 指标）
 │   │   │
 │   │   ├── llm/                      # LLM 智能分析
 │   │   │   ├── __init__.py           #   子包标记
@@ -304,7 +305,9 @@ investor-util/
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
 │       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口）
 │       │   │   ├── test_portfolio_evolution.py #  组合演进聚合计算（多快照趋势/HHI/TOP 变迁）
-│       │   │   └── test_whatif.py             #   调仓 What-if 计算（变动识别/成本权重/HHI/降级）
+│       │   │   ├── test_whatif.py             #   调仓 What-if 计算（变动识别/成本权重/HHI/降级）
+│       │   │   ├── test_whatif_backtest.py    #   调仓 What-if 时序回测（天数折算/序列对齐/5 指标/降级）
+│       │   │   └── test_whatif_backtest_edge.py #  时序回测边缘场景（未来日期/单 bar/首值 0/极端涨跌）
 │       │   ├── config/              #   配置单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_config.py            #   配置管理核心测试
@@ -596,7 +599,8 @@ investor-util/
 │   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
 │   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
 │   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（业绩归因设计）
-│   │   └── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
+│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
+│   │   └── plan-whatif-backtest.md     #     调仓 What-if 指定生效日时序回测设计
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档

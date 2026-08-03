@@ -1,8 +1,10 @@
 """调仓 What-if 独立 HTML 页呈现测试。
 
 覆盖：
-  - available=True → ①对比文件 + ②汇总指标 + ③资产配置对比图 + ④分类对比 +
-    ⑤持仓变动明细 + ⑥说明 六段齐全
+  - available=True → ①对比文件 + ②汇总指标 + ③资产配置对比图 + ⑤分类对比 +
+    ⑥持仓变动明细 + ⑦说明 六段齐全（未指定生效日时④时序回测隐藏）
+  - 指定生效日 → ④时序回测出现：指标卡 + 2 张线图 canvas + 2 条 .chart-caption
+    （C20）+ #whatif-backtest-chart-data JSON（R9 数据最小化）
   - 双环形图 canvas + 2 条 .chart-caption（C20）+ #whatif-chart-data JSON
   - 变动明细行 class 与 action-badge 渲染
   - 箭头方向类（arrow-up/down/flat）
@@ -149,11 +151,83 @@ class TestWhatifHtmlPage(unittest.TestCase):
 
         return render_whatif_html(whatif_data, "2026-08-03 12:00:00")
 
-    def test_full_rendering_six_sections(self):
-        """available=True → ①~⑥ 六段齐全。"""
+    def test_full_rendering_sections_without_backtest(self):
+        """available=True 且未指定生效日 → ①~⑦ 六段齐全（④时序回测隐藏）。"""
         text = self._render(_whatif_data())
-        for heading in ("① 对比文件", "② 汇总指标对比", "③ 资产配置对比", "④ 分类配置对比", "⑤ 持仓变动明细", "⑥ 说明"):
+        for heading in ("① 对比文件", "② 汇总指标对比", "③ 资产配置对比", "⑤ 分类配置对比", "⑥ 持仓变动明细", "⑦ 说明"):
             self.assertIn(heading, text, f"缺章节 {heading}")
+        self.assertNotIn("④ 时序回测", text, "未指定生效日时④时序回测不应出现")
+
+    def test_backtest_section_rendered(self):
+        """指定生效日 + 回测可用 → ④时序回测出现：指标卡 + 2 线图 + 2 caption + R9 负载。"""
+        import json
+
+        bt = {
+            "available": True,
+            "status": "ok",
+            "reason": "",
+            "effective_date": "2026-07-01",
+            "metrics": [
+                {
+                    "key": "period_return_pct",
+                    "label": "区间收益",
+                    "unit": "pct",
+                    "base": 1.25,
+                    "candidate": 2.50,
+                    "delta": 1.25,
+                    "arrow": "↑",
+                },
+                {
+                    "key": "sharpe_ratio",
+                    "label": "夏普比率",
+                    "unit": "ratio",
+                    "base": 0.85,
+                    "candidate": 1.2,
+                    "delta": 0.35,
+                    "arrow": "↑",
+                },
+            ],
+            "series": {
+                "labels": ["2026-07-01", "2026-07-02", "2026-07-03"],
+                "base": [100.0, 101.0, 101.25],
+                "candidate": [100.0, 102.0, 102.5],
+                "base_drawdown": [0.0, -0.1, -0.05],
+                "candidate_drawdown": [0.0, -0.2, -0.1],
+            },
+        }
+        text = self._render(_whatif_data(backtest=bt))
+        self.assertIn("④ 时序回测", text)
+        self.assertIn("2026-07-01 生效", text)
+        self.assertIn('id="chart_whatif_bt_nav"', text)
+        self.assertIn('id="chart_whatif_bt_dd"', text)
+        self.assertIn("2.50%", text, "pct 值应拼 % 号")
+        self.assertEqual(text.count('class="chart-caption"'), 4, "双环图 + 2 线图各带 caption（C20）")
+        # 回测图表 JSON 负载可解析且只含 series 字段（R9 数据最小化）
+        m = 'id="whatif-backtest-chart-data">'
+        start = text.index(m) + len(m)
+        end = text.index("</script>", start)
+        payload = json.loads(text[start:end])
+        self.assertEqual(payload["available"], True)
+        self.assertEqual(payload["effective_date"], "2026-07-01")
+        self.assertEqual(
+            set(payload["series"].keys()),
+            {"labels", "base", "candidate", "base_drawdown", "candidate_drawdown"},
+            "图表负载只应含 series 字段",
+        )
+        self.assertNotIn("metrics", payload, "图表负载不应含回测指标 metrics")
+        self.assertNotIn("reason", payload, "图表负载不应含 reason")
+
+    def test_backtest_unavailable_hidden(self):
+        """backtest 存在但 available=False → ④时序回测隐藏。"""
+        bt = {
+            "available": False,
+            "status": "unavailable",
+            "reason": "生效日后的交易日不足 20 天",
+            "effective_date": "2026-07-20",
+        }
+        text = self._render(_whatif_data(backtest=bt))
+        self.assertNotIn("④ 时序回测", text)
+        self.assertNotIn('id="chart_whatif_bt_nav"', text)
 
     def test_compare_files_cards(self):
         """对比文件卡 + 变动统计。"""

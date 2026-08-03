@@ -85,6 +85,7 @@
     {% set _w = whatif_data %}
     {% set _stats = _w.get("stats", {}) %}
     {% set _action_slug = {'新增': 'added', '清仓': 'removed', '加仓': 'increased', '减仓': 'decreased', '不变': 'unchanged'} %}
+    {% set _bt = _w.get("backtest") %}
 
     <!-- ① 对比文件 -->
     <div class="section">
@@ -164,10 +165,61 @@
             <script type="application/json" id="whatif-chart-data">{{ whatif_chart_data | tojson }}</script>
         </div>
     </div>
+    {% endif %}
 
-    <!-- ④ 分类配置对比表 -->
+    {% if _bt and _bt.get("available") %}
+    <!-- ④ 时序回测（生效日后推演） -->
     <div class="section">
-        <div class="section-title">④ 分类配置对比</div>
+        <div class="section-title">④ 时序回测（{{ _bt.get("effective_date", "") }} 生效，假设推演）</div>
+        <div class="section-content">
+            {% if _bt.get("status") == "degraded" %}
+            <div class="notice-banner" style="margin-bottom:12px;">{{ _bt.get("reason", "部分持仓无历史数据，回测基于可用品种") }}</div>
+            {% endif %}
+            <div class="summary-grid">
+                {% for m in _bt.get("metrics", []) %}
+                {% if m.get("arrow") == "↑" %}{% set _m_arrow = "arrow-up" %}
+                {% elif m.get("arrow") == "↓" %}{% set _m_arrow = "arrow-down" %}
+                {% else %}{% set _m_arrow = "arrow-flat" %}{% endif %}
+                <div class="summary-card">
+                    <h3>{{ m.get("label", "") }} <span class="arrow {{ _m_arrow }}">{{ m.get("arrow", "→") }}</span></h3>
+                    <div class="value">
+                        {% if m.get("candidate") is not none %}{{ "%.2f" | format(m.get("candidate")) }}{% else %}--{% endif %}{% if m.get("unit") == "pct" %}%{% endif %}
+                    </div>
+                    <div class="meta">
+                        基准 {% if m.get("base") is not none %}{{ "%.2f" | format(m.get("base")) }}{% else %}--{% endif %}{% if m.get("unit") == "pct" %}%{% endif %}
+                        → 目标 {% if m.get("candidate") is not none %}{{ "%.2f" | format(m.get("candidate")) }}{% else %}--{% endif %}{% if m.get("unit") == "pct" %}%{% endif %}
+                        · 变化 {% if m.get("delta") is not none %}{{ "%.2f" | format(m.get("delta")) }}{% else %}--{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="chart-row" style="margin-top:16px;">
+                <div class="chart-col">
+                    <div class="chart-box">
+                        <canvas id="chart_whatif_bt_nav" width="400" height="280" style="width:100%;height:100%;" aria-label="基准与目标组合归一化净值曲线（生效日后，100 基点）" role="img">图表无法显示，数据见 Excel 时序回测页签</canvas>
+                    </div>
+                    <div class="chart-caption">基准 vs 目标 归一化净值（100 基点）</div>
+                </div>
+                <div class="chart-col">
+                    <div class="chart-box">
+                        <canvas id="chart_whatif_bt_dd" width="400" height="280" style="width:100%;height:100%;" aria-label="基准与目标组合回撤曲线（生效日后，%）" role="img">图表无法显示，数据见 Excel 时序回测页签</canvas>
+                    </div>
+                    <div class="chart-caption">基准 vs 目标 回撤（%）</div>
+                </div>
+            </div>
+            <script type="application/json" id="whatif-backtest-chart-data">{{ whatif_backtest_chart_data | tojson }}</script>
+            <div class="notice-banner" style="margin-top:12px;">
+                <div>* 口径：as-if 市值 = 份额 × 每日价格；生效日后各自归一化到 100 基点后比较。</div>
+                <div style="margin-top:6px;">* 局限：假设推演、不构成收益承诺；数据不足时回测降级，不阻塞主报告。</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ⑤ 分类配置对比表 -->
+    {% if _cats | length > 0 %}
+    <div class="section">
+        <div class="section-title">⑤ 分类配置对比</div>
         <div class="section-content">
             <table>
                 <thead>
@@ -197,10 +249,10 @@
     </div>
     {% endif %}
 
-    <!-- ⑤ 持仓变动明细 -->
+    <!-- ⑥ 持仓变动明细 -->
     {% set _changes = _w.get("changes", []) %}
     <div class="section">
-        <div class="section-title">⑤ 持仓变动明细（共 {{ _changes | length }} 条）</div>
+        <div class="section-title">⑥ 持仓变动明细（共 {{ _changes | length }} 条）</div>
         <div class="section-content">
             <table>
                 <thead>
@@ -236,14 +288,14 @@
         </div>
     </div>
 
-    <!-- ⑥ 说明 -->
+    <!-- ⑦ 说明 -->
     <div class="section">
-        <div class="section-title">⑥ 说明</div>
+        <div class="section-title">⑦ 说明</div>
         <div class="section-content">
             <div class="notice-banner">
-                <div>* 口径：权重基于成本 = 份额 × 每份成本。目标持仓无市场历史，仅做成本口径截面比较。</div>
-                <div style="margin-top:6px;">* 局限：What-if 无真实交易数据，量化指标（夏普/波动率等）不可回测。</div>
-                <div style="margin-top:6px;">* 数据来源：本地两份持仓文件，零网络请求。</div>
+                <div>* 口径：权重基于成本 = 份额 × 每份成本（成本口径截面比较，本地计算、零网络请求）。</div>
+                <div style="margin-top:6px;">* 时序回测：指定调仓生效日时 opt-in 联网取生效日后行情，追加④时序回测区（假设推演、不构成收益承诺）；数据不足时回测降级，不阻塞主报告。</div>
+                <div style="margin-top:6px;">* 数据来源：本地两份持仓文件；仅启用时序回测时联网。</div>
             </div>
         </div>
     </div>
@@ -316,6 +368,44 @@
 
     build('chart_whatif_base', baseData);
     build('chart_whatif_candidate', candData);
+
+    /* ── 时序回测线图（生效日后推演）─ 复用 ChartCommon.lineOptions ── */
+    var btDataEl = document.getElementById('whatif-backtest-chart-data');
+    if (btDataEl) {
+      var btData;
+      try { btData = JSON.parse(btDataEl.textContent || '{}'); } catch (e) { btData = null; }
+      if (btData && btData.series && btData.series.labels && btData.series.labels.length) {
+        function buildLine(canvasId, data, yLabel) {
+          var el = document.getElementById(canvasId);
+          if (!el) return;
+          try {
+            window.ChartCommon.trackChart(new Chart(el, {
+              type: 'line',
+              data: {
+                labels: data.labels,
+                datasets: [
+                  { label: '基准', data: data.base, borderColor: '#2E75B6', backgroundColor: 'rgba(46,117,182,0.08)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.1 },
+                  { label: '目标', data: data.candidate, borderColor: '#E68A00', backgroundColor: 'rgba(230,138,0,0.08)', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.1 }
+                ]
+              },
+              options: window.ChartCommon.lineOptions(yLabel)
+            }), canvasId);
+          } catch (err) {
+            console.warn('[whatif] 图表 ' + canvasId + ' 初始化失败: ', err);
+          }
+        }
+        buildLine('chart_whatif_bt_nav', {
+          labels: btData.series.labels,
+          base: btData.series.base,
+          candidate: btData.series.candidate
+        }, '归一化净值（100 基点）');
+        buildLine('chart_whatif_bt_dd', {
+          labels: btData.series.labels,
+          base: btData.series.base_drawdown,
+          candidate: btData.series.candidate_drawdown
+        }, '回撤（%）');
+      }
+    }
   });
 })();
 </script>

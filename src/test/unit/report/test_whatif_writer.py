@@ -97,6 +97,117 @@ class TestWriteWhatifExcel:
         mock_cleanup.assert_called_once_with(output_dir)
 
 
+class TestWriteWhatifExcelSheets:
+    """write_whatif_excel 固定 4 页签结构。"""
+
+    def test_writes_four_sheets(self, tmp_path) -> None:
+        """工作簿页签：摘要 / 分类配置 / 持仓变动明细 / 时序回测。"""
+        from src.python.report.whatif_writer import write_whatif_excel
+
+        with (
+            patch("src.python.report.whatif_writer.write_whatif_summary_sheet"),
+            patch("src.python.report.whatif_writer.write_whatif_category_sheet"),
+            patch("src.python.report.whatif_writer.write_whatif_changes_sheet"),
+            patch("src.python.report.whatif_writer.write_whatif_backtest_sheet") as mock_bt,
+            patch("src.python.report.whatif_writer._cleanup_old_archives"),
+        ):
+            write_whatif_excel(_sample_data(), str(tmp_path))
+
+        wb = openpyxl.load_workbook(tmp_path / "调仓模拟.xlsx")
+        assert wb.sheetnames == ["调仓摘要", "分类配置对比", "持仓变动明细", "时序回测"]
+        mock_bt.assert_called_once()
+
+
+def _full_bt_data() -> dict:
+    """构造含可用 backtest 的完整 C19 契约。"""
+    return {
+        "available": True,
+        "backtest": {
+            "available": True,
+            "status": "ok",
+            "effective_date": "2026-07-01",
+            "reason": "",
+            "metrics": [{"key": "period_return_pct", "label": "区间收益"}],
+            "series": {
+                "labels": ["2026-07-01", "2026-07-02"],
+                "base": [100.0, 124.0],
+                "candidate": [100.0, 148.0],
+                "base_drawdown": [0.0, 0.0],
+                "candidate_drawdown": [0.0, 0.0],
+            },
+        },
+    }
+
+
+class TestTrimBacktestChartData:
+    """_trim_whatif_backtest_chart_data R9 数据最小化。"""
+
+    def test_trim_payload_only_series_fields(self) -> None:
+        """只透传 available/effective_date/series，不携带 metrics/reason。"""
+        from src.python.report.whatif_writer import _trim_whatif_backtest_chart_data
+
+        trimmed = _trim_whatif_backtest_chart_data(_full_bt_data())
+        assert trimmed is not None
+        assert set(trimmed.keys()) == {"available", "effective_date", "series"}
+        assert "metrics" not in trimmed
+        assert "reason" not in trimmed
+        assert trimmed["effective_date"] == "2026-07-01"
+        assert trimmed["series"]["labels"] == ["2026-07-01", "2026-07-02"]
+        assert trimmed["series"]["base"] == [100.0, 124.0]
+
+    def test_trim_none_when_unavailable(self) -> None:
+        """回测缺失/不可用/无序列 → None（模板不输出数据段）。"""
+        from src.python.report.whatif_writer import _trim_whatif_backtest_chart_data
+
+        assert _trim_whatif_backtest_chart_data(None) is None
+        assert _trim_whatif_backtest_chart_data({"available": True}) is None
+
+        degraded = _full_bt_data()
+        degraded["backtest"]["available"] = False
+        assert _trim_whatif_backtest_chart_data(degraded) is None
+
+        empty_series = _full_bt_data()
+        empty_series["backtest"]["series"] = {"labels": []}
+        assert _trim_whatif_backtest_chart_data(empty_series) is None
+
+
+class TestRenderWhatifHtmlContext:
+    """render_whatif_html 向模板透传裁剪后的回测图表数据。"""
+
+    def test_passes_backtest_chart_data(self) -> None:
+        from unittest.mock import MagicMock
+
+        from src.python.report.whatif_writer import render_whatif_html
+
+        with patch("src.python.report.html_jinja_env._ENV") as mock_env:
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html/>"
+            mock_env.get_template.return_value = tmpl
+
+            render_whatif_html(_full_bt_data(), "2026-08-03 00:00:00")
+
+        kwargs = tmpl.render.call_args.kwargs
+        assert "whatif_backtest_chart_data" in kwargs
+        payload = kwargs["whatif_backtest_chart_data"]
+        assert payload is not None
+        assert set(payload.keys()) == {"available", "effective_date", "series"}
+
+    def test_passes_none_when_no_backtest(self) -> None:
+        """未指定生效日/无回测 → 裁剪结果 None。"""
+        from unittest.mock import MagicMock
+
+        from src.python.report.whatif_writer import render_whatif_html
+
+        with patch("src.python.report.html_jinja_env._ENV") as mock_env:
+            tmpl = MagicMock()
+            tmpl.render.return_value = "<html/>"
+            mock_env.get_template.return_value = tmpl
+
+            render_whatif_html({"available": True}, "2026-08-03 00:00:00")
+
+        assert tmpl.render.call_args.kwargs["whatif_backtest_chart_data"] is None
+
+
 class TestWriteWhatifHtml:
     """write_whatif_html 最新版固定名 + 日期目录归档。"""
 
