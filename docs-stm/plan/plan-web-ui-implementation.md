@@ -12,7 +12,7 @@
 
 **plan-8 目标**：新增第三个入口 `src/python/web/`，启动一个轻量 Web 服务，浏览器内即可完成「上传持仓 Excel → 选择报告格式 → 触发生成 → 实时进度 → 预览/下载」。
 
-**定位**：单人投资工具，局域网（或本机）使用；**MVP 明确不做**——多用户/登录、LLM 配置在线修改、实时日志流（实时进度≠日志流）。
+**定位**：单人投资工具，局域网（或本机）使用；**MVP 明确不做**——多用户/登录、LLM 配置在线修改、实时日志流。**边界（与 plan-10 日志可视化区分）**：Web 的「实时进度」是 run 内结构化事件消息（`/api/runs/{id}/events`），不是 `logs/app.log` 文件流；完整日志查看归 plan-10（`--view-logs`），Web 不重复实现。
 
 **可行性结论（调研前置）**：管线复用面极大。`generate_report(holdings, config, reporter, ...)` 是一个同步函数，通过可注入的 `ProgressReporter` 接口输出阶段消息，与终端完全解耦；`core/reader.read_holdings` 完成持仓解析；`config.get_config` 提供全部默认参数。**Web 层只需做「HTTP 通道 + 上传安全 + 后台任务 + 进度缓冲」，管线代码零改动**。
 
@@ -20,11 +20,12 @@
 
 ## 2. 收益分析
 
-| 收益 | 说明 |
-|------|------|
-| **零学习成本** | 打开浏览器上传 Excel 即可，无需记命令/参数 |
-| **分享简单** | 局域网内给 URL 即可查看报告 |
-| **后台排队不阻塞** | 报告生成（full 实测 100~300s）在后台线程跑，浏览器可轮询进度，可同时发起多次生成 |
+| 收益 | 说明 | 达成层级 |
+|------|------|----------|
+| **零学习成本** | 打开浏览器上传 Excel 即可，无需记命令/参数（对不会 CLI/TUI 的新手价值最大） | **MVP** |
+| **本机便捷** | 本机浏览器即可操作，免终端 | **MVP** |
+| **局域网分享** | `--host 0.0.0.0` 显式开启后，局域网内给 URL 即可查看报告 | 阶段 3+（默认 127.0.0.1） |
+| **后台排队不阻塞** | 报告生成（full 实测 100~300s）在后台线程跑，浏览器可轮询进度；**单 worker 串行队列**，可排队多个任务（一次一个） | **MVP** |
 | **复用现有管线** | `generate_report` + `ProgressReporter` + `read_holdings` + `get_config` 四组件覆盖全部需求，编排层零改动 |
 | **进度通道现成** | `report/progress.py` 的 `ProgressReporter` 抽象基类（`info/ok/warn/error/add_error/timer`）即可注入 Web 缓冲实现 |
 | **健康检查/历史记录现成 JSON** | `core/check_sources.run_health_checks()` 返回结构化 dict；`core/perf.load_history()` 读 `perf_history.jsonl`——可直接做 `/api/health` 与「历史运行记录」接口，免再造轮子 |
@@ -44,6 +45,10 @@
 | R6 | **依赖新增** | 低——增量小 | 仅引入 Flask（含 werkzeug）；`pyproject.toml` + `requirements.txt` 同步；`launch.sh` 按 sha256 增量安装自动感知 |
 | R7 | **并发/配置**：`get_config` 线程安全、`config.json` 不被 web 改写 | 低 | `get_config` 已有 mtime 缓存线程安全；web 只读配置不写入（改配置仍走文件/CLI） |
 | R8 | **launch 脚本只启 TUI** | 低 | `launch.sh`/`launch.ps1` 扩展 `web` 参数选入口 |
+| R9 | **数据源熔断/降级**：full 长时间跑可能触发 provider 熔断（C4 指数退避），生成失败 | 中 | run 失败提示区分"数据源暂不可用，稍后重试"（复用 `DegradationTracker` 状态）；前端给重试按钮 |
+| R10 | **配置一致性**：Web 运行期外部改 `config.json`，run 内读到不一致参数 | 低 | **每个 run 启动时取一次 `get_config()` 快照**，run 期间不受外部修改影响（对齐 `_handle_report` 一次性读取语义） |
+| R11 | **磁盘占用**：产物归档（180 天）+ `perf_history.jsonl` + 上传文件长期增长 | 低 | 上传文件生成后即清理；产物沿用 `excel_writer` 180 天保留；`perf_history.jsonl` 增长记录为观察项（后续补清理） |
+| R12 | **浏览器兼容**：前端 JS 兼容性 | 低 | 目标 Chrome/Edge 90+、Firefox 90+（对齐 plan-1 兼容基线）；进度轮询用标准 fetch/EventSource |
 
 ---
 
@@ -52,6 +57,8 @@
 ### 4.1 分层原则
 
 **web/ 是「薄入口层」**，与 cli/、tui/ 完全同构：只保留「HTTP 通道 + 交互外壳 + 上传/任务/进度差异化逻辑」，一切业务委托现有共享层。禁止在 web/ 内复制管线逻辑。
+
+> **DRY 决策（三振法则）**：`handlers.py` 生成调用逻辑（读持仓→建 reporter→`generate_report`→映射 exit_code）与 `cli.py:_handle_report` 相似约 20 行，但 CLI 版含 `CliProgressReporter`/`sys.exit` 特有逻辑，抽取需动 `report/` 共享层、回归风险高。**MVP 不抽公共层**，Web 自实现薄逻辑；仅当出现第三处复用时再抽取。记技术债观察项。
 
 ```
 浏览器
@@ -74,19 +81,30 @@ core/perf.load_history()                 # 历史运行记录
 | FastAPI | ⚠️ 备选 | 需引入 starlette+pydantic+uvicorn；异步风格对同步阻塞的 `generate_report` 无增益，反增心智负担 |
 | 标准库 `http.server` | ❌ 不取 | 路由/上传/静态/安全需手写，工作量大且安全边界易漏 |
 
-依赖增量：`flask==3.1.x`（含 `werkzeug>=3.x`、`itsdangerous`、`click`、`blinker`）。MVP 用 Flask 自带开发服务器（`app.run()`），文档注明生产可选 waitress。不引入 uvicorn/gunicorn。
+依赖增量：`flask==3.1.x`，传递依赖 `werkzeug`、`itsdangerous`、`click`、`blinker` 同步 `==` 锁定进 `requirements.txt`（对齐仓库既有 `==` 锁定惯例；`launch.sh` 按 requirements sha256 增量安装自动感知）。
+
+**服务器**：MVP 用 Flask 自带开发服务器 **`app.run(threaded=True)`**（线程池模式，对单人工具低并发足够；不引入 uvicorn/gunicorn 避免技术债）。waitress **不默认引入**——仅当出现并发请求排队明显卡顿或需 Windows 服务化时再评估（记录为已知演进路径，非 MVP 依赖）。
 
 ### 4.3 异步模型：后台线程 + WebProgressReporter + 轮询
 
 管线本身**同步阻塞**（无内建队列/asyncio）。Web 层方案：
 
-1. **RunManager**：`submit(...)` 用 `threading.Thread` 包一层 `generate_report`，返回 `run_id`；线程名 `web_run_*`（对齐既有 `orch_llm_news` 风格）。
-2. **WebProgressReporter(ProgressReporter)**：重写 `info/ok/warn/error/add_error/timer`，事件追加到进程内 `dict[run_id, deque[(seq, level, msg, phase)]]`。管线零改动（只注入 reporter）。
-3. **轮询**：`GET /api/runs/{id}/events?after=N` 返回序号 > N 的增量事件；前端 setInterval 轮询。
-4. **完成**：线程结束写 run 记录（`ReportResult.exit_code`、`errors`、耗时、产物路径）；`perf_history.jsonl` 由管线自动落盘，`load_history()` 供「历史记录」页。
-5. **并发限制**：MVP 不做任务队列上限，但 RunManager 记录运行中数量，前端提示当前并行任务数（建议 ≤ 2，LLM/行情并发有内部池保护）。
+1. **RunManager**：维护**单 worker 串行队列**——同一时刻仅执行一个生成任务，后续任务排队等待（消除并发产物覆盖竞态，见复盘 6）。`submit(...)` 把任务排入队列，worker 线程逐个执行，返回 `run_id`；线程名 `web_run_*`（对齐既有 `orch_llm_news` 风格）。**每个 run 在出队执行时取一次 `get_config()` 快照**，run 期间不受外部配置修改影响（R10）。
+2. **WebProgressReporter(ProgressReporter)**：重写 `info/ok/warn/error/add_error/timer`，事件追加到进程内 `dict[run_id, deque[(seq, level, msg, phase)]]`。管线零改动（只注入 reporter）。**事件缓冲每 run 上限 500 条**（滚动丢弃最旧），防内存膨胀（复盘 13）。
+3. **轮询**：`GET /api/runs/{id}/events?after=N` 返回序号 > N 的增量事件；前端 setInterval 轮询（2s，见复盘 15 节流）。
+4. **完成**：worker 结束写 run 记录（`ReportResult.exit_code`、`errors`、耗时、产物路径）；`perf_history.jsonl` 由管线自动落盘，`load_history()` 供「历史记录」页。
+5. **队列长度**：队列容量上限（如 ≤3，含运行中）；超出时 `POST /api/runs` 返回 429 与中文提示，避免任务无限堆积。
+6. **run 记录保留**：内存 run 记录（含事件）**保留最近 20 个**，超出清理最旧（防服务长跑内存膨胀）。
 
 > 取消机制：管线无内建取消，MVP 不做（R4 文档化）。
+
+**演进路径（触发条件驱动，避免提前建设）**：
+| 演进 | 触发条件 | 路径 |
+|------|----------|------|
+| 轮询 → SSE | 进度延迟感知成为问题（单 worker 下事件本就低频，MVP 轮询已够） | Flask 流式响应（response 生成器推送 `/events`），前端 `EventSource`，改动集中于 progress/runs + handlers |
+| 单 worker → 并发 | 排队等待成为实际痛点（full 100~300s，MVP 单 worker 可能不够） | `ThreadPoolExecutor(max_workers=2)` + **每个 run 独立 `output_dir` 子目录**（解决最新版产物覆盖竞态） |
+| 历史报告页 | 用户需要回看历史版本 | 读 `output_dir/YYYYMMDD/` 归档（180 天保留），`/api/reports/history` + 前端列表 |
+| LLM 在线配置 | 明确需求 + 鉴权方案 | 复用 `set_config`（单键 patch），前端表单 + 密码/token 保护（MVP 已定为不做） |
 
 ### 4.4 模块拆分 `src/python/web/`
 
@@ -113,12 +131,12 @@ src/python/web/
 
 | 模块 | 职责 | 复用点 |
 |------|------|--------|
-| `server.py` | sys.path 注入（对齐 `cli.py:13-17`）、`main()`、`setup_logger()`、`init_config()`、端口检测、`app.run()` | `core.logger.setup_logger`、`config.init_config` |
-| `app.py` | `create_app()` 工厂（Flask test_client 可测）、路由蓝图注册、JSON 错误处理 | — |
+| `server.py` | sys.path 注入（对齐 `cli.py:13-17`）、`main()`、`setup_logger()`、`init_config(config_path)`、**参数 `--host`（默认 `127.0.0.1`）/`--port`（默认 `8000`）/`--config`（对齐 CLI）**、**端口占用检测**（占用则报错并提示换端口）、`app.run(host, port, threaded=True)`。**生成线程 `daemon=True`**：`Ctrl+C` 时进程可正常退出（任务丢弃，R4 文档化） | `core.logger.setup_logger`、`config.init_config` |
+| `app.py` | `create_app(run_manager=None)` 工厂（Flask test_client 可测）：支持**注入 run_manager**（默认全局单例，测试传内存 fake 免 patch 全局）、路由蓝图注册、**统一 JSON 错误处理**：`errorhandler(500)` 返回 `{"ok": false, "error": "服务器内部错误"}` + 记录 error 日志（不泄绝对路径）；413→中文上传超限提示 | — |
 | `handlers.py` | 各路由 handler；生成 handler 复刻 `cli.py:_handle_report` 模板（读持仓→建 reporter→generate_report→映射 exit_code） | `orchestrator.generate_report`、`core.reader.read_holdings`、`core.check_sources.run_health_checks`、`core.perf.load_history` |
 | `upload.py` | 上传文件校验/净化/`mkstemp` 落盘/清理（纯函数） | `tempfile`、`core.reader.get_xlsx_info`（可选预览元信息） |
-| `progress.py` | `WebProgressReporter` 按 run_id 缓冲事件 | `report.progress.ProgressReporter`（继承） |
-| `runs.py` | RunManager 后台线程 + run 状态/事件队列 | `threading.Thread`（对齐既有线程池风格） |
+| `progress.py` | `WebProgressReporter` 按 run_id 缓冲事件；事件 `seq` 用**单调递增整数**（非时间戳，测试确定性） | `report.progress.ProgressReporter`（继承） |
+| `runs.py` | RunManager 单 worker 队列 + run 状态/事件队列；**注册表与事件队列均用 `threading.Lock` 保护**（worker 写、HTTP 线程读；事件读取做快照避免遍历中变更） | `threading.Thread` + `threading.Lock`（对齐既有线程池风格） |
 
 ---
 
@@ -135,13 +153,13 @@ src/python/web/
 | C5 | HTTP 客户端统一 | **遵守项**：Web 若发起出站 HTTP（未来）必须走 `core/http_client.py` |
 | C6 | Provider Chain 必经 | **继承项**：管线内部 |
 | C7 | 报告序号不可硬编码 | **继承项**：管线内部 |
-| C8 | 日志统一（禁 print） | **遵守项**：Web 服务日志用 `logging.getLogger("invest")`；`WebProgressReporter` 事件进内存队列并写 logger，不 print |
+| C8 | 日志统一（禁 print） | **遵守项**：Web 服务日志用 `logging.getLogger("invest")`；`WebProgressReporter` 事件进内存队列并写 logger，不 print。**werkzeug/Flask 自带访问日志纳入 invest logger 统一通道（级别调低或关闭），禁止双通道** |
 | C9 | LLM 模块注册 | **继承项**：管线内部 |
 | C10 | 新闻召回策略可配置 | **继承项**：管线内部 |
 | C11 | 测试标记强制 | **遵守项**：新增 `unit_web` marker 注册到 `conftest.py`，web 测试必标注 |
 | C12 | 边缘测试文件隔离 | **遵守项**：上传安全等极端用例放 `*_edge.py` |
 | C13 | 测试敏感路径隔离 | **遵守项**：web 测试遵守 `_isolate_sensitive_paths`；新增持久化文件（如 run 状态）须加入该 fixture |
-| C14 | 渲染期数据不可写模块级全局 | **遵守项**：`runs.py` 的 run 注册表属运行态单例（与 `get_tracker()` 同类），须在 conftest 加 autouse 重置 fixture |
+| C14 | 渲染期数据不可写模块级全局 | **遵守项**：`runs.py` 的 run 注册表属**运行态任务管理**（与 `get_tracker()` 同类），非渲染期数据——报告渲染数据仍经 reporter/模板 context 传递，不落入 run 注册表；该边界在 `runs.py` docstring 明确。须在 conftest 加 autouse 重置 fixture |
 | C15 | 控制台日志着色 | **继承项**：logger 已处理（非 TTY 降级） |
 | C16 | 路径绝对化 | **遵守项**：Web 只用 `get_config()` 绝对化路径，不依赖 CWD（对齐 cli/tui 已移除 `os.chdir`） |
 | C17 | Multi-LLM Provider Chain | **继承项**：管线内部 |
@@ -163,20 +181,29 @@ src/python/web/
 | 扩展名校验 | 仅接受 `.xlsx`（拒绝 `.xls`/`.xlsm`/宏等，openpyxl 不支持 xls） |
 | 大小上限 | 10MB 上限（读流计数，超限即拒） |
 | 内容校验 | 读前 4 字节校验 PK zip 魔数（`PK\x03\x04`），防改扩展名伪装；zip-bomb 由大小上限兜底 |
-| 落盘 | `tempfile.mkstemp` 到 `data/holdings/uploads/`（受控目录，gitignore 排除），`os.replace` 原子写 |
+| 落盘 | `tempfile.mkstemp` 到 `data/holdings/uploads/`（基于 `PROJECT_ROOT` 绝对化拼接，不依赖 CWD，对齐 C16；gitignore 排除），`os.replace` 原子写 |
 | 解析 | 复用 `read_holdings`（表头/数值/行级容错已有）；空持仓/无有效账户则拒绝并返回中文错误 |
-| 清理 | 生成任务结束后删除上传临时文件；启动时清理残留 |
+| 清理 | 生成任务结束**立即删除**上传临时文件；**未消费文件设 TTL（1h）定时清理**；启动时清理全部残留。`file_id→路径` 为内存映射，服务重启即失效，残留由启动清理兜底（R11 关联） |
 
 ### 6.2 预览/下载防穿越
 
 - 预览/下载路由用 `flask.send_from_directory(output_dir, filename)`——**内置 `..` 净化**；
-- 叠加**扩展名白名单**：仅 `html/js/map/css/png/svg/json/xlsx`；
+- 叠加**扩展名白名单**：仅 `html/js/map/css/png/svg/json/xlsx`，**先 `.lower()` 大小写归一化再校验**（防 `.HTML`/`.XLSX` 绕过）；
 - 不挂载整个 `data/` 为静态目录（避免暴露 config/cache/llm_key）。
 
-### 6.3 威胁模型与部署
+### 6.3 威胁模型（STRIDE）与部署
+
+| 威胁类别 | 场景 | 缓解 |
+|----------|------|------|
+| **S 伪装** | 无认证、伪造来源 | 默认 `127.0.0.1`；同源校验（`Sec-Fetch-Site`/`Origin`）；LAN 部署文档化 basic auth |
+| **T 篡改** | 恶意上传/数据投毒 | 上传链路 §6.1（净化/白名单/大小/魔数/原子写）；报告 HTML 由 Jinja2 autoescape 防护（既有） |
+| **R 抵赖** | 操作无痕 | 请求/生成/错误经 invest logger 记录（C8），可追溯 |
+| **I 信息泄露** | 路径/凭据/绝对路径回显 | 扩展名大小写归一化；错误不回显绝对路径；`llm_key` 不上传不回显（C18）；`/api/runs` 不返回敏感字段 |
+| **D 拒绝服务** | 频繁上传/轮询/健康检查 | `MAX_CONTENT_LENGTH`；单 worker 队列 + 429；**`/api/health` 结果缓存（如 60s），避免每次轮询真实跑数据源健康检查**；前端轮询节流 |
+| **E 提权** | 路径穿越/任意文件读 | `secure_filename` + `send_from_directory` + 扩展名白名单 多层防护 |
 
 - 默认绑定 `127.0.0.1`（本机）；`--host 0.0.0.0` 需显式传参，文档警告仅限可信局域网。
-- MVP 无认证/CSRF（单人工具）；副作用操作（触发生成）做**轻量同源校验**（校验 `Sec-Fetch-Site`/`Origin`，或未来加 token）。文档化：公网部署必须前置反向代理认证（basic auth）。
+- MVP 无认证/CSRF（单人工具）；副作用操作（触发生成）做**轻量同源校验**（校验 `Sec-Fetch-Site`/`Origin`）。文档化：公网部署必须前置反向代理认证（basic auth）。
 - 日志不泄漏：LLM key 脱敏已由 `_mask_api_key` 处理；Web 错误信息不回显文件系统绝对路径（对齐 `test_security.py` HTML 不泄路径基线）。
 
 ---
@@ -184,6 +211,8 @@ src/python/web/
 ## 7. API 设计
 
 响应统一信封：`{"ok": bool, "data": ..., "error": str|null}`（对齐仓库 API Response Format 惯例）。
+
+> **应用级限制**：`MAX_CONTENT_LENGTH = 10MB`（超限 Flask 返回 413）；上传路由额外读流计数兜底。上传/轮询/健康等端点均设合理超时。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -195,7 +224,7 @@ src/python/web/
 | GET | `/api/runs/{id}/events?after=N` | 增量进度事件（轮询），`N` 为最后已读序号 |
 | GET | `/api/runs/history` | `load_history()` 历史运行记录（perf 快照，含阶段耗时） |
 | GET | `/api/reports/<path>` | `send_from_directory(output_dir, path)` 预览/下载（扩展名白名单） |
-| GET | `/api/health` | `run_health_checks()` 数据源健康 JSON（复用现成结构化数据） |
+| GET | `/api/health` | `run_health_checks()` 数据源健康 JSON（复用现成结构化数据）；**历史趋势读 `datasource_health.jsonl`（与 plan-10 共享该数据源，避免重复实现）**；结果缓存 60s（§6.3 D 类缓解） |
 
 `report_type` 映射：`basic`→仅 Excel / `both`→HTML+Excel（无 LLM）/ `full`→HTML+Excel+LLM（对齐 CLI `--type` 语义）。
 
@@ -206,10 +235,18 @@ src/python/web/
 单页 `index.html` 三段式：
 
 1. **上传区**：拖拽/选择 xlsx → 上传校验 → 显示账户/sheet 预览（`get_xlsx_info`）；
-2. **生成区**：报告格式（basic/both/full）、历史走势、强制 LLM 开关 → 提交 → 进度条（阶段名 + 序号，来自 `/events` 轮询）→ 完成后显示产物按钮（预览 HTML / 下载 Excel）；
+2. **生成区**：报告格式（basic/both/full）、历史走势、强制 LLM 开关 → 提交 → 进度条（阶段名 + 序号，来自 `/events` 轮询）→ 完成后显示产物按钮（预览 HTML / 下载 Excel）。**失败态**：按 `exit_code` 映射展示（0 成功 / 1 部分失败=黄色告警列 errors / 2 严重=红色），`errors` 逐条展示 + 通用建议文案（如"数据源暂不可用，稍后重试"——复用 R9 熔断提示）；提供「重新生成」按钮；
 3. **状态区**：数据源健康（`/api/health`）+ 历史运行记录（`/api/runs/history`）。
 
 样式遵循 `design-quality` 原则（不做默认模板感）；语言中文；加载态/错误态明确。
+
+**可访问性（a11y）**：
+- 键盘可达：上传区（`<label for=file>` + 按钮）、表单、进度条全部可 Tab 聚焦 + Enter 操作；
+- 进度条 `role="progressbar"` + `aria-valuenow`（阶段序号）——阶段 1 就建立语义，避免后期返工；
+- 对比度达标、`prefers-reduced-motion` 时降级动画；
+- 错误/成功状态 `aria-live="polite"` 播报。
+
+**轮询节流**：`setInterval` 2s 固定轮询（增量 `after=N` 已省流量）；页面不可见时 `visibilitychange` 暂停，恢复可见立即同步一次。
 
 ---
 
@@ -224,7 +261,14 @@ src/python/web/
 - **管线 mock 强制**：任何触发 `generate_report` 的测试 mock 之（`@patch("src.python.report.orchestrator.generate_report")`），LLM 一律 mock（CLAUDE.md 强制）。
 - **output_dir 重定向**：涉及真实生成路径的测试把 `output_dir` 指向 `tmp_path`。
 
-### 9.2 用例清单（示例）
+### 9.2 门禁集成（关键）
+
+- `unit_web` marker **必须纳入 `scripts/test_runner.py` MODES**：dev-verify（提交前）、verify（合入前）、regression（发布前）的 unit 集合均加 `unit_web`，否则 web 测试写了但门禁不跑（形同虚设）。
+- `edge` 测试被 dev-verify 排除：上传/预览安全边缘用例在 **verify / regression** 模式覆盖（对齐既有 `test_security_edge.py` 的归属）。
+- 新增 web 测试后刷新 `docs-stm/managements/test-coverage.md` 数据快照（发布前 `collect-test-coverage.py` 强制，见 §11）。
+- **发布前验证**：`launch.sh` 增量安装 Flask 在干净环境可离线完成（依赖从 PyPI 拉取，发布回归清单确认有网环境可安装）。
+
+### 9.3 用例清单（示例）
 
 | 模块 | 用例 |
 |------|------|
@@ -242,7 +286,7 @@ src/python/web/
 |------|------|:--:|------|
 | **阶段 1 MVP 核心** | 依赖接入（pyproject/requirements/launch 脚本 `web` 参数）；`web/` 骨架（server/app/handlers/upload/progress/runs）；上传→生成→轮询→预览/下载全链路；上传安全（§6.1）；`unit_web` marker 注册 + 核心测试 | 3d | 浏览器完成一次 basic 报告生成并预览；上传安全用例绿；P0 门禁过 |
 | **阶段 2 功能补齐** | 配置显示（`get_config()` 默认参数回填表单）；进度步骤展示（阶段名+序号）；历史运行记录页；`/api/health` 数据源状态；错误处理完善 | 1.5d | full 报告进度可观察；历史记录/健康页可用；错误路径有中文反馈 |
-| **阶段 3 体验打磨** | 样式落地（design-quality）；加载态/按钮禁用/轮询节流；响应式（375px 移动端可用）；文档（how-to-start 新增 web 入口说明）；folders.md/数据快照刷新 | 1d | 视觉达标；移动端不溢出；用户文档齐全 |
+| **阶段 3 体验打磨** | 样式落地（design-quality）；加载态/按钮禁用/轮询节流；响应式（375px 移动端可用）；文档（how-to-start 新增 web 入口说明 + faq.md 补端口冲突/无法访问/进度卡住常见问题 + README 功能提点）；folders.md/数据快照刷新；**实施完成后本文档与 `plan-web-ui.md` 归档至 `archive/v0.x.x/web-ui/`** | 1d | 视觉达标；移动端不溢出；用户文档齐全 |
 
 **依赖次序**：阶段 1 不依赖阶段 2/3；每阶段独立可交付。全程遵守 §5 约束与 §9 测试规范。
 
@@ -258,13 +302,15 @@ src/python/web/
 
 ### 修改
 - `pyproject.toml`：dependencies 增 `flask==3.1.x`
-- `requirements.txt`：同步
-- `scripts/launch.sh` / `launch.ps1`：支持 `web` 入口参数（默认仍 TUI）
+- `requirements.txt`：同步 `flask==3.1.x` 及传递依赖 `werkzeug==x.y.z`/`itsdangerous==x.y.z`/`click==x.y.z`/`blinker==x.y.z` **全链 `==` 锁定**（`launch.sh` 按 requirements sha256 增量安装：requirements 变更→`.deps_installed` 标记失效→自动重装）
+- `scripts/launch.sh` / `launch.ps1`：支持 `web` 入口参数（默认仍 TUI）；`launch.sh web [--host 127.0.0.1] [--port 8000]`
+- `scripts/test_runner.py`：MODES 的 dev-verify / verify 模式 unit 集合加 `unit_web`（门禁集成，见 §9.2）
 - `src/test/conftest.py`：注册 `unit_web` marker + run 管理器重置 fixture（+ uploads 目录隔离）
 - `src/test/unit/conftest.py`：`_DIR_TO_MARKER` 登记 `unit_web`
 - `docs-stm/managements/folders.md`：目录树登记 `src/python/web/`、`src/test/unit/web/`、`docs-stm/plan/plan-web-ui-implementation.md`；项目统计表更新
 - `docs-stm/managements/plan.md`：plan-8 条目加本文档链接（不展开细节）
 - `docs-stm/manuals/how-to-start.md`：新增 Web 入口启动说明（阶段 3）
+- `docs-stm/managements/test-coverage.md`：新增 web 测试计数数据快照（发布前 `collect-test-coverage.py` 刷新）
 
 ### 明确不动
 - `report/orchestrator.py`、`report/progress.py`、`core/reader.py`、`config/*`：全部复用，**零改动**
@@ -276,6 +322,47 @@ src/python/web/
 - plan.md 当前 `plan-8 轻量 Web UI`（P3，推荐②）条目**仅补一行链接**指向本文档，不展开细节。
 - plan-8 实施编号沿用 `plan-8`（不新占编号）；`plan-next` 不变（未新增任务）。
 - 实施时按 §10 阶段推进，每阶段完成回填 changelog、自审 review-findings。
+
+---
+
+## 13. 迭代复盘记录（20 轮）
+
+> **复盘方法**：每轮聚焦一个维度，综合审视收益/风险/技术债，受 C1~C20 架构约束，从整体架构出发。每轮发现即**回落优化**到正文相关章节，再进入下一轮，保证设计随复盘收敛。
+
+| 轮 | 维度 | 核心发现 | 回落优化（章节） |
+|:--:|------|----------|------------------|
+| 1 | 收益与 MVP 范围 | 「局域网分享」收益与默认 127.0.0.1 矛盾；「同时多次生成」无并发约束 | §2 拆分本机/局域网收益层级；§4.3 明确单 worker 串行队列 |
+| 2 | 风险再评估 | 漏数据源熔断/配置快照/磁盘占用 3 项风险 | §3 补 R9/R10/R11；§4.3 补 config 快照 |
+| 3 | 技术债引入 | Flask dev server 生产可用性、依赖锁定粒度 | §4.2 默认 threaded=True、waitress 不默认；依赖 == 锁定 |
+| 4 | 架构约束深挖 | run 注册表与 C14 边界、上传目录绝对化、werkzeug 日志 | §5 补边界说明；§6.1 用 PROJECT_ROOT；§5 C8 补日志 |
+| 5 | 数据流与文件生命周期 | 上传文件残留、MAX_CONTENT_LENGTH、file_id 内存映射 | §6.1 补 TTL/启动清理；§7 补 MAX_CONTENT_LENGTH |
+| 6 | 并发与竞态 | 多 run 并发覆盖最新版产物 | §4.3 串行队列消除竞态；runs.py 加锁 |
+| 7 | 安全 STRIDE | 扩展名大小写绕过、健康检查 DoS | §6.2 大小写归一化；§6.3 健康检查缓存 |
+| 8 | 错误处理与可观测性 | 500 裸错误、失败引导文案 | §7/§8 统一 JSON errorhandler、失败建议 |
+| 9 | 依赖管理 | 传递依赖锁定、launch.sh 增量感知 | §4.2/§11 锁定全链 |
+| 10 | 测试与门禁集成 | unit_web 未纳入 dev-verify/verify 模式 | §9 补门禁 marker 集成 |
+| 11 | 模块边界与 DRY | 生成调用与 CLI 重复 | §4.4 三振法则，不抽公共层 |
+| 12 | 可测试性深化 | 全局单例 patch、时间依赖 | §4.4 create_app 注入；progress seq 单调整数 |
+| 13 | 性能与资源 | 事件缓冲/run 记录无上限 | §4.3 事件上限 500、run 保留 20 |
+| 14 | 部署与运维 | 线程 daemon、端口冲突、参数 | §4.4/§4.2 server 参数、daemon=True |
+| 15 | 前端与可访问性 | a11y 缺失、轮询节流 | §8 补键盘可达/aria/reduced-motion/visibilitychange |
+| 16 | 演进与可扩展 | SSE/并发升级/历史页 | §4.3 补演进路径（YAGNI 触发条件） |
+| 17 | 用户文档 | faq/README、设计文档归档 | §10 补 faq 与归档路径 |
+| 18 | 版本发布与回归 | verify 模式 marker、数据快照 | §9 补 verify；§11 补 test-coverage 快照 |
+| 19 | 与 plan-10 协同 | 健康数据共享、日志流边界 | §7 共享 datasource_health；MVP 不做日志流 |
+| 20 | 整体一致性收尾 | 汇总评审、无过度设计 | 全文档一致性核验 |
+
+### 第 20 轮：最终一致性评审结论
+
+经 20 轮迭代，设计已收敛。最终状态核验：
+
+1. **MVP 范围聚焦**：新增项均为设计层约束（STRIDE 威胁模型、演进路径、a11y 规范），MVP 实现工作量未膨胀——上传 TTL 清理、队列上限、事件缓冲上限均为小成本防护，未引入 SSE/并发/历史页/LLM 在线配置到 MVP。
+2. **"明确不动"守住**：`report/orchestrator.py`、`report/progress.py`、`core/reader.py`、`config/*` 全部复用零改动；仅 `scripts/test_runner.py`（MODES）与测试基础设施按 §9.2 扩展。
+3. **无过度设计（YAGNI）**：全部演进项（SSE、并发升级、历史报告页、LLM 在线配置）均带触发条件，不在 MVP 实现。
+4. **约束合规**：C1~C20 逐条核对表经 4 轮深挖（C8 日志统一、C14 边界、C16 绝对化、C18 凭据隔离）无遗漏。
+5. **正文与复盘一致性**：§1~§12 修订均可在 §13 复盘表找到对应轮次，可追溯。
+
+**设计冻结**：本文档作为 plan-8 实施依据，实施阶段 1~3 按 §10 推进，回归验收按 §9 门禁集成。
 
 ---
 
