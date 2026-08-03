@@ -20,7 +20,7 @@ logger = setup_logger()
 
 
 def _prompt_history(reporter: TuiProgressReporter) -> bool:
-    """TUI 专属：决定是否获取历史走势数据（F2）。
+    """TUI 专属：决定是否获取历史走势数据。
 
     读取 config.history.fetch_mode（off/prompt/auto）：
       - off    → False（不获取）

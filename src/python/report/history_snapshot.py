@@ -1,4 +1,4 @@
-"""F1 快照持久化：保存/加载/列表/清理。
+"""持仓快照持久化：保存/加载/列表/清理。
 
 C3 约束：所有文件写入使用 tempfile.mkstemp + os.replace 确保原子性。
 竞争条件防护：快照文件名使用时间戳（snapshot_{timestamp}.json）。

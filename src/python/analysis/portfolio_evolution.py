@@ -1,6 +1,6 @@
 """组合演进分析 — 多快照趋势聚合。
 
-聚合 `data/history/snapshots/` 下已持久化的多期 F1 快照，输出组合
+聚合 `data/history/snapshots/` 下已持久化的多期持仓快照，输出组合
 演进趋势数据（C19 契约 `evolution_data`），供 HTML「组合演进」章节
 与 Excel 页签消费。
 

@@ -1,6 +1,6 @@
 """快照与历史数据 — 持仓快照创建/环比差异计算/组合历史走势。
 
-管理 F1 快照和 F2 历史走势两个工序。
+管理快照对比和历史走势两个工序。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ def capture_snapshot(
     reporter: ProgressReporter,
     **extra,
 ) -> dict | None:
-    """F1 持仓快照创建 + 差异计算 + 保存 + 清理。
+    """持仓快照创建 + 差异计算 + 保存 + 清理。
 
     Args:
         holdings: 持仓列表
@@ -134,7 +134,7 @@ def capture_snapshot(
                 pipeline_data.update(extra)
         reporter.ok("环比对比数据准备完成")
     except Exception:
-        logger.info("[F1] 环比数据准备跳过（首次运行或异常）", exc_info=True)
+        logger.info("[环比] 数据准备跳过（首次运行或异常）", exc_info=True)
     return pipeline_data
 
 
@@ -178,5 +178,5 @@ def fetch_history_data(
             reporter.warn("组合历史走势数据获取失败（部分持仓可能不支持历史数据）")
         return history_data
     except Exception:
-        logger.info("[F2] 历史走势数据获取跳过", exc_info=True)
+        logger.info("[历史走势] 数据获取跳过", exc_info=True)
         return None

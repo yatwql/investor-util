@@ -307,7 +307,7 @@ def generate_excel_report(
         sheets, include_llm, llm_content, prog, section_order=order, debate_mode_label=_debate_mode_label
     )
 
-    # ── 组合历史走势 + 回撤分析页签（F2 数据） ──
+    # ── 组合历史走势 + 回撤分析页签（历史走势数据） ──
     if enable_history:
         ws_ph = sheets.get("portfolio_history")
         ws_dd = sheets.get("drawdown_analysis")

@@ -125,7 +125,7 @@ def _generate_report_both(
     details = _compute_details(holdings, config, reporter)
     perf.stop()
 
-    # ── 2. F1 快照对比 ──
+    # ── 2. 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, details, config, reporter)
     perf.stop()
@@ -135,7 +135,7 @@ def _generate_report_both(
         if _diff is not None and not isinstance(_diff, dict):
             logger.warning("[checkpoint] pipeline_data.diff 类型异常(both): %s", type(_diff).__name__)
 
-    # ── 3. F2 历史走势（条件获取） ──
+    # ── 3. 历史走势（条件获取） ──
     if _enable_history:
         perf.start("历史走势")
         history_data = fetch_history_data(holdings, config, reporter, fetch=fetch_history)
@@ -525,7 +525,7 @@ def _generate_report_full(
 
     perf.stop()
 
-    # ── 2. F1 快照对比 ──
+    # ── 2. 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
     if pipeline_data is not None:
@@ -536,7 +536,7 @@ def _generate_report_full(
 
     perf.stop()
 
-    # ── 3. F2 历史走势 + 全量量化指标 + 情景分析 + 口径修正 ──
+    # ── 3. 历史走势 + 全量量化指标 + 情景分析 + 口径修正 ──
     perf.start("历史走势")
     history_data, _metrics = _fetch_history_with_metrics(
         holdings,

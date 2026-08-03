@@ -447,7 +447,7 @@ if not any(needs.values()):
 
 ### 4.4 pipeline_data 注入与 history_data 暴露
 
-`pipeline_data`（组合历史走势时间维度上下文，含 F1→F2 diff 差异摘要）可选传递给 `expert_review` 和 `health_check`，使 LLM 能感知持仓环比变化（新增/清仓/加仓/减仓品种、总市值/总盈亏变化百分比）。
+`pipeline_data`（组合历史走势时间维度上下文，含快照 diff 差异摘要）可选传递给 `expert_review` 和 `health_check`，使 LLM 能感知持仓环比变化（新增/清仓/加仓/减仓品种、总市值/总盈亏变化百分比）。
 
 **history_data 暴露**：`generate_all_llm()` 接收 `history_data` 参数，包含组合历史日收益率序列、基准指数日收益率序列等时间序列数据。该数据在 prompt 中以紧凑图表形式注入，使 LLM 能感知组合的历史波动特征和相对大盘表现，增强智囊团深度复盘和持仓体检报告中的趋势分析能力。
 

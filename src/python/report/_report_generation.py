@@ -149,7 +149,7 @@ def _validate_pipeline_snapshot(pipeline_data: dict | None) -> None:
                 logger.warning("[checkpoint] pipeline_data.diff 类型异常: %s", type(_diff).__name__)
 
 
-# ── 全量量化指标（F2 + 风险指标 + 情景分析 + 口径修正）──
+# ── 全量量化指标（历史走势 + 风险指标 + 情景分析 + 口径修正）──
 
 
 def _prepare_full_risk_metrics(
@@ -162,7 +162,7 @@ def _prepare_full_risk_metrics(
     prep: dict,
     pipeline_data: dict | None,
 ) -> tuple[dict | None, dict | None]:
-    """F2 历史走势获取 + 全量量化指标 + 情景分析 + 口径修正。
+    """历史走势获取 + 全量量化指标 + 情景分析 + 口径修正。
 
     返回 (history_data, metrics)，就地注入 prep 和 pipeline_data 的 risk_metrics。
     enable_history 为 False 或数据不可用时返回 (None, None)。
@@ -435,7 +435,7 @@ def _generate_report_both(
     details = _compute_details(holdings, config, reporter)
     perf.stop()
 
-    # ── 2. F1 快照对比（始终执行） ──
+    # ── 2. 快照对比（始终执行） ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, details, config, reporter)
     # 2b. 组合演进数据（聚合多期快照，C19 evolution_data）
@@ -448,7 +448,7 @@ def _generate_report_both(
         if _diff is not None and not isinstance(_diff, dict):
             logger.warning("[checkpoint] pipeline_data.diff 类型异常(both): %s", type(_diff).__name__)
 
-    # ── 3. F2 历史走势（条件获取） ──
+    # ── 3. 历史走势（条件获取） ──
     if _enable_history:
         perf.start("历史走势")
         history_data = fetch_history_data(holdings, config, reporter, fetch=fetch_history)
@@ -541,7 +541,7 @@ def _build_chart_datasets_for_report(
     - Flag 关闭 → None（模板不渲染 Chart.js，回退旧 Canvas）
     - Flag 开启 → build_chart_datasets()（内部对单图失败独立 try/except，R11）
 
-    metrics_* Flag（§6.6 F1）：收集雷达子开关值传给预处理器，
+    metrics_* 功能开关（Flag）：收集雷达子开关值传给预处理器，
     关闭的指标在 radar 数据集输出 "N/A"。注：metrics_risk_contribution
     是指标级熔断开关（circuit_breaker_wrapper 消费），非雷达轴，不在此收集。
     """
@@ -617,7 +617,7 @@ def _generate_report_full(
     _validate_prep_completeness(prep)
     perf.stop()
 
-    # ── 2. F1 快照对比 ──
+    # ── 2. 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
     # 因子暴露 / 持仓相关性：prep 中已组装（C19 契约），注入 pipeline_data 供 HTML/Excel 消费；
@@ -630,7 +630,7 @@ def _generate_report_full(
     pipeline_data = _inject_evolution_data(pipeline_data)
     perf.stop()
 
-    # ── 3. F2 历史走势 + 全量量化指标 ──
+    # ── 3. 历史走势 + 全量量化指标 ──
     history_data, _metrics = _prepare_full_risk_metrics(
         holdings,
         config,

@@ -1,4 +1,4 @@
-"""F1 差异计算引擎：HistoryDiff.compute(new, old) → DiffSummary。
+"""快照差异计算引擎：HistoryDiff.compute(new, old) → DiffSummary。
 
 比较新旧两份 SnapshotData，识别组合级 Δ 值和持仓级变动。
 

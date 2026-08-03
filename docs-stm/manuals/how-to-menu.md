@@ -225,7 +225,7 @@
 
 ---
 
-## F1 快照自动清理
+## 持仓快照自动清理
 
 B/L 菜单生成报告时自动保存持仓快照（环比对比用），并清理超过 60 天的旧快照（保留天数可通过 `config.json` 的 `history.snapshot_retention_days` 配置），避免 `data/history/snapshots/` 目录无限堆积。
 

@@ -44,7 +44,7 @@ EVOLUTION_CHART_KEYS = (
 # 统一提供（A3 色盲安全 palette，§4.8），避免 Python/JS 调色板漂移。
 _CATEGORY_ORDER = ("股票", "基金", "债券", "现金", "其他")
 
-# ── 雷达轴 → metrics_* Feature Flag 映射（§6.6 F1）──────
+# ── 雷达轴 → metrics_* 功能开关（Feature Flag）映射 ──────
 # 子开关逐个过滤雷达轴：Flag 关闭 → 该轴值转为 "N/A"（非 0）。
 _RADAR_FLAG_MAP = {
     "sharpe_ratio": "metrics_sharpe",
@@ -76,7 +76,7 @@ def build_chart_datasets(
     """构建 6 张图的数据集，返回 dict → template context（C14 合规）。
 
     关键数据源：risk_metrics（5 基本字段，full）/ all_metrics（14 项全量，full）/
-    metric_flags（§6.6 F1，关闭 → "N/A"）；both 路径传入 None 时，radar 从
+    metric_flags（metrics_* 功能开关，关闭 → "N/A"）；both 路径传入 None 时，radar 从
     history_data 提取 3 个基本轴兜底。
     ⚠ R11：每个 dataset 独立 try/except——单图脏数据失败仅跳过该图，不影响整份报告。
     """
@@ -372,7 +372,7 @@ def _build_radar_dataset(
        双路径均有——确保 both 路径也能显示 3 个基本轴）
 
     数据最小化（R9）：只传指标数值，不含内部明细。
-    Flag 过滤（§6.6 F1）：metrics_* 关闭 → 该轴值转为 "N/A"（非 0）。
+    Flag 过滤（metrics_* 功能开关）：metrics_* 关闭 → 该轴值转为 "N/A"（非 0）。
     降级标注：risk_metrics / history_data 兜底时 datasets[0]["note"]="仅限基础指标"。
     """
     degraded = False

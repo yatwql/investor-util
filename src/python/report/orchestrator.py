@@ -397,7 +397,7 @@ def generate_report(
     full:  HTML+Excel+LLM
 
     Args:
-        fetch_history: 是否获取组合历史走势数据（F2，as-if 模拟），仅 both/full 有效
+        fetch_history: 是否获取组合历史走势数据（as-if 模拟），仅 both/full 有效
     """
     result = ReportResult()
 

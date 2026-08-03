@@ -583,7 +583,7 @@ fetcher/
 ├── akshare.py          AKShare 数据获取（备用数据源）
 ├── bond_yield.py       债券收益率数据
 ├── news.py             新闻数据获取
-└── history_diff.py     F1 快照差异计算（纯计算，无 I/O）
+└── history_diff.py     持仓快照差异计算（纯计算，无 I/O）
 ```
 
 **并行预热**：`preload_cache()` 对 preload 组使用 `ThreadPoolExecutor` 并行获取，减少串行等待。
@@ -1030,11 +1030,11 @@ def _get_pool() -> ThreadPoolExecutor:
             │                           ▼                      ▼
             ▼                  excel_generator.py       html_writer.py
       ┌──────────┐                 (编排器 437 行)         │
-      │ F1 快照  │                     │                   ▼
-      │ 比较     │                     ▼           html_builders.py
+      │ 快照对比 │                     │                   ▼
+      │          │                     ▼           html_builders.py
       │          │           excel_sheet_factory.py   (数据构建器)
-      │ F2 历史  │                     │                   │
-      │ 走势计算 │                     ▼                   ▼
+      │ 历史走势 │                     │                   │
+      │ 计算     │                     ▼                   ▼
       └──────────┘           excel_module_loader.py  tmpl/report_template.html
             │                 (动态加载写入器)         (Jinja2 模板)
             ▼                       │
@@ -1055,8 +1055,8 @@ def _get_pool() -> ThreadPoolExecutor:
 `report/orchestrator.py` 是 TUI 和 CLI 共用的报告编排共享层，负责：
 
 1. **数据准备**：行情获取、指数获取、资产穿透 TOP10
-2. **快照创建与差异计算**：F1 持仓快照 + 环比差异
-3. **历史走势计算**：F2 组合 as-if 走势 + 基准指数对比
+2. **快照创建与差异计算**：持仓快照 + 环比差异
+3. **历史走势计算**：组合 as-if 走势 + 基准指数对比
 4. **行业资金流向获取**
 5. **LLM + 新闻并行获取**（4 分支统一处理）
 6. **双管线生成**：HTML + Excel
@@ -1083,7 +1083,7 @@ generate_report("basic")
 ```
 _generate_report_both()
     → _compute_details()           轻量行情获取（无指数/穿透/分类）
-    → capture_snapshot()           F1 快照对比
+    → capture_snapshot()           快照对比
     → fetch_history_data()         条件：enable_history=True
     → write_html_report()          HTML 管线
     → generate_excel_report()      Excel 管线
@@ -1094,7 +1094,7 @@ _generate_report_both()
 ```
 _generate_report_full()
     → prepare_report_data()        完整数据准备（含指数/穿透/分类/明细）
-    → capture_snapshot()           F1 快照
+    → capture_snapshot()           快照对比
     → fetch_history_data()         条件：enable_history=True
     → get_sector_fund_flow()       行业资金流向
     → _fetch_llm_and_news()        LLM+新闻并行（4 分支：均开/仅 LLM/仅新闻/均关）
@@ -1466,7 +1466,7 @@ get_combined_timeseries()
 
 **Excel 渲染**：`portfolio_history` 页签每基准一列（归一化值），`drawdown_analysis` 页签对比指标矩阵。
 
-#### F1 快照存储与清理（history_snapshot.py）
+#### 持仓快照存储与清理（history_snapshot.py）
 
 ```
 save():
@@ -2338,8 +2338,8 @@ report/orchestrator.py (报告编排层)
   → report/market_value.py (行情获取)
   → fetcher/index.py (指数)
   → report/penetration.py (资产穿透)
-  → report/history_snapshot.py (F1 快照)
-  → report/portfolio_history.py (F2 历史走势)
+  → report/history_snapshot.py (持仓快照)
+  → report/portfolio_history.py (历史走势)
   → report/news_correlation.py (新闻关联)
   → llm/generators_orchestrator.py (LLM 编排)
   → report/html_writer.py (HTML 管线)

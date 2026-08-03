@@ -1,4 +1,4 @@
-"""F2 组合历史走势计算器 — PortfolioHistoryCalculator。
+"""组合历史走势计算器 — PortfolioHistoryCalculator。
 
 职责：
   1. 遍历持仓 → 按代码类型路由（A 股/ETF → history_stock，OTC 基金 → history_fund_otc）

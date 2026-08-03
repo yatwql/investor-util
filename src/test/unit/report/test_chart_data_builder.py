@@ -494,7 +494,7 @@ class TestRadar:
         ]
 
     def test_radar_flag_off_shows_na(self) -> None:
-        """§6.6 F1：metrics_sharpe=False → 该指标输出 "N/A"（非 0）。"""
+        """metrics_* 功能开关：metrics_sharpe=False → 该指标输出 "N/A"（非 0）。"""
         ds = build_chart_datasets(
             history_data=None,
             all_metrics=self._ALL_METRICS,
@@ -507,7 +507,7 @@ class TestRadar:
         assert chart["datasets"][0]["data"][1] == 0.8
 
     def test_radar_flag_map_all_axes(self) -> None:
-        """§6.6 F1：6 个雷达轴均被 metrics_* Flag 覆盖（映射完整）。"""
+        """metrics_* 功能开关：6 个雷达轴均被 metrics_* Flag 覆盖（映射完整）。"""
         flags = {
             "metrics_sharpe": False,
             "metrics_calmar": False,

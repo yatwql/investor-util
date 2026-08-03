@@ -147,7 +147,7 @@
 | `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）/ `code_display`（名称→"品种X"，保留代码和盈亏）/ `full_anonymous`（名称→"品种X"，代码→"000XXX"，盈亏→±XX%）/ `summary`（仅大类汇总） | 菜单 `A` |
 | `enable_fund_deep_analysis` | `true` | 基金深度分析章节可见性（模块 #6~#11），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
 | `enable_news` | `true` | 市场新闻章节可见性（模块 #12），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
-| `enable_history` | `true` | 历史走势章节可见性（模块 #17~#18），关闭后对应章节完全隐藏。F1 持仓快照不受影响，始终自动执行 | 菜单 `P` |
+| `enable_history` | `true` | 历史走势章节可见性（模块 #17~#18），关闭后对应章节完全隐藏。持仓快照不受影响，始终自动执行 | 菜单 `P` |
 
 ---
 
@@ -167,7 +167,7 @@
 |:-----|:------:|:---------|:---------|:-----|
 | `enable_fund_deep_analysis` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析、#10 因子暴露分析、#11 持仓相关性矩阵 | 基金深度分析章节组 |
 | `enable_news` | `true` | `config.json` | #12 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
-| `enable_history` | `true` | `config.json` | #17 组合历史走势、#18 历史回撤分析 | 历史走势章节组（F1 持仓快照不受影响，始终自动执行） |
+| `enable_history` | `true` | `config.json` | #17 组合历史走势、#18 历史回撤分析 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
 | `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #13 全球政经局势、#14 智囊团深度复盘、#15 持仓体检报告、#16 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
@@ -301,9 +301,9 @@
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
-| `history_stock` | `history_stock_{code}*.json` | 7 天 | — | 股票/ETF 历史 K 线（腾讯/新浪），F2 组合走势计算输入 |
-| `history_fund_otc` | `history_fund_otc_{code}*.json` | 30 天 | — | 场外基金历史净值（天天基金→东方财富备用链路），F2 组合走势计算输入 |
-| `history_index` | `history_index_{code}*.json` | 30 天 | — | 指数历史 K 线（腾讯/新浪），F2 基准指数走势计算输入 |
+| `history_stock` | `history_stock_{code}*.json` | 7 天 | — | 股票/ETF 历史 K 线（腾讯/新浪），历史走势计算输入 |
+| `history_fund_otc` | `history_fund_otc_{code}*.json` | 30 天 | — | 场外基金历史净值（天天基金→东方财富备用链路），历史走势计算输入 |
+| `history_index` | `history_index_{code}*.json` | 30 天 | — | 指数历史 K 线（腾讯/新浪），基准指数走势计算输入 |
 
 > **指纹驱动失效：** 文件名中的 `{fingerprint}` 是输入数据的 MD5 哈希。持仓/指数数据变化时指纹自动改变，原缓存失效，无需手动清除。
 > 
@@ -451,7 +451,7 @@
 
 #### history.fetch_mode 历史走势获取模式
 
-`history.fetch_mode` 控制组合历史走势（F2）的获取行为：
+`history.fetch_mode` 控制组合历史走势的获取行为：
 
 | 模式 | 说明 |
 |:----|:------|
@@ -463,11 +463,11 @@
 >
 > **累计收益率起算**：从 `history.coverage_threshold` 比例持仓覆盖的日期起算（**双向截断**：起算点正向扫描 ≥阈值，截止点反向扫描 ≥阈值），避免因 QDII/债券基金数据起点较晚导致早期组合市值偏低、收益率虚高，也避免尾端部分基金净值未更新导致收益率虚低。早期数据保留在走势图上但排除出收益率计算。阈值默认 `0.8`（80%），可在 `config.json` 的 `history.coverage_threshold` 中调整。
 
-#### 持仓快照（F1）
+#### 持仓快照（快照对比）
 
-快照对比（F1）不受 `history.fetch_mode` 配置影响，在 B/L 菜单生成报告时**始终自动执行**。每次生成报告时自动保存持仓快照到 `data/history/snapshots/`，供下次环比对比。
+快照对比不受 `history.fetch_mode` 配置影响，在 B/L 菜单生成报告时**始终自动执行**。每次生成报告时自动保存持仓快照到 `data/history/snapshots/`，供下次环比对比。
 
-> **F1 快照自动清理**：保存新快照后自动清理旧文件。清理规则由 `history` 块中的以下字段控制：
+> **持仓快照自动清理**：保存新快照后自动清理旧文件。清理规则由 `history` 块中的以下字段控制：
 
 | 字段 | 默认值 | 说明 |
 |:-----|:------:|:-----|
