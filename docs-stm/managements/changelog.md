@@ -4,7 +4,7 @@
 
 ---
 
-## [0.9.10-dev] - 2026-08-03
+## [0.9.10] - 2026-08-03
 
 ### Feat
 
@@ -23,6 +23,7 @@
 ### Docs
 
 - 发布门禁（P2）补充代码/文档历史痕迹检查：`check-code-traces.py --ci` + `check-doc-traces.py --ci`（与 P0 一致），见 `testplan.md` §6.3 第 11 条与 `CLAUDE.md` 发布门禁（P2）
+- **rf-169** 管理/用户文档正文一致性审计 + `check-doc-traces.py` 打磨（2026-08-03）：① `folders.md` 目录树移除 4 处行数注释（`_numerical.py`/`chart_data_builder.py`/`chart-config.js`/`chart-init.js`，行数不必要且随迭代过时）；② `requirements.md` §6.4 字段定义补齐缺失小节——6.4.10 因子暴露分析 / 6.4.11 持仓相关性矩阵 / 6.4.13-16 LLM 模块（全球政经局势/智囊团深度复盘/持仓体检报告/穿透深度分析）/ 6.4.21 LLM API 用量（字段按代码实况），编号恢复连续 6.4.1~6.4.21 对齐 §6.3 模块号；③ `technical.md` 与代码实况同步——LLM 包子模块数 16→36、excel_generator 编排器 437→477 行、STATUS_MESSAGES 16→23 条、附录 A 目录补 `src/static/` + `startup_wizard.py`；④ `testplan.md` unit 子组计数 11→10（与 test-coverage.md 一致）、§6.4 人工验证菜单清单补 [W]、whatif CLI 示例补 `--effective-date`、LLM 场景文件组织描述去历史化；⑤ `check-doc-traces.py` 新增无 v 前缀裸版本号检测（`0.9.8` 在散文中命中 HIGH，限 0 开头避免误伤章节号/包版本），并补充相应豁免
 
 ### Test
 
