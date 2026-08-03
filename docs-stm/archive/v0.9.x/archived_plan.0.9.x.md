@@ -13,7 +13,7 @@
 
 - [`plan-chartjs-report-upgrade.md`](chartjs-upgrade/plan-chartjs-report-upgrade.md) — plan-1 交互式 HTML 报告升级实施方案（8 迭代）
 - [`plan-chartjs-risk-analysis.md`](chartjs-upgrade/plan-chartjs-risk-analysis.md) — plan-1 风险/收益/架构分析
-- [`plan-1-iter7-verification-checklist.md`](chartjs-upgrade/plan-1-iter7-verification-checklist.md) — plan-1 Iter 7 浏览器人工验证清单（rf-113）
+- [`iter7-verification-checklist.md`](chartjs-upgrade/iter7-verification-checklist.md) — plan-1 Iter 7 浏览器人工验证清单（rf-113）
 - [`plan-factor-exposure.md`](factor-exposure/plan-factor-exposure.md) — plan-7 因子暴露分析设计（原 `plan-advanced-analysis.md` §4）
 - [`plan-correlation-drawdown.md`](correlation-drawdown/plan-correlation-drawdown.md) — plan-2/3 分析功能基础增强设计（相关性矩阵 + 回撤/净值）
 - [`plan-correlation-drawdown-implementation.md`](correlation-drawdown/plan-correlation-drawdown-implementation.md) — plan-2/3 实施总纲（原 `plan-implement-2-3-9.md`，按内容拆分后 plan-2/3 部分）

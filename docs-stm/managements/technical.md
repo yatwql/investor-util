@@ -33,8 +33,8 @@
   - [4.9 资产穿透 TOP10](#49-资产穿透-top10)
   - [4.10 财经新闻热点与持仓关联分析](#410-财经新闻热点与持仓关联分析)
   - [4.11 数据降级治理体系](#411-数据降级治理体系)
-  - [4.12 组合演进（多快照趋势，plan-6）](#412-组合演进多快照趋势plan-6)
-  - [4.13 调仓 What-if 模拟（plan-5）](#413-调仓-what-if-模拟plan-5)
+  - [4.12 组合演进（多快照趋势）](#412-组合演进多快照趋势)
+  - [4.13 调仓 What-if 模拟](#413-调仓-what-if-模拟)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -1899,7 +1899,7 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
     跨会话持久化
 ```
 
-### 4.12 组合演进（多快照趋势，plan-6）
+### 4.12 组合演进（多快照趋势）
 
 聚合 `data/history/snapshots/snapshot_{timestamp}.json` 多期快照，输出组合市值/HHI/TOP 持仓占比的趋势数据（`analysis/portfolio_evolution.py` / `report/orchestrator.py` 组装），供 Excel「组合演进」页签与 HTML「组合演进」章节消费（3 张 Chart.js 图：总市值与总盈亏 / HHI / TOP 持仓占比变迁）。
 
@@ -1927,7 +1927,7 @@ report/ 渲染                      # Excel 页签 + HTML 章节（模板 contex
 | **C20** (HTML 图表图下说明强制) | 3 张 Chart.js 图各配 `.chart-caption` 图下说明，随 canvas 渲染分支同步出现 |
 | **§1.4.5** (数据降级治理) | 有效快照 < MIN_SNAPSHOTS → `available=false`，章节写占位（数据量不足，非故障，不走 DegradationTracker）；快照文件缺失/损坏时逐文件跳过并告警 |
 
-### 4.13 调仓 What-if 模拟（plan-5）
+### 4.13 调仓 What-if 模拟
 
 双持仓（基准 base / 目标 candidate）**成本口径截面比较**，输出 diff 报告（`analysis/whatif.py` 计算 → `report/whatif_writer.py` 输出 Excel + HTML 独立报告）。
 

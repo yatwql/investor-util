@@ -8,7 +8,7 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 205 | 48,051 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`；rf-76 将 `fact_checker.py` 拆为 `fact_checker/` 子包 10 文件，rf-77 提取 `config/_json_patch.py`） |
+| 主程序代码 | Python | 205 | 48,051 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 3 | 2,910 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
 | 辅助脚本 | Python | 12 | 4,113 | `scripts/`（启动脚本、测试驱动、工具检查、性能测试、LLM 幻觉率评估、测试覆盖计数） |
 | **源代码合计** | — | **220** | **55,074** | 主程序 + 模板 + 脚本 |
@@ -18,7 +18,7 @@
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **96** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 80 | — | 各版本 changelog/plan/review-findings 等（76 md + 3 py + 1 txt） |
+| ├ archive/ | 版本归档 | 88 | — | 各版本 changelog/plan/review-findings 等（84 md + 3 py + 1 txt） |
 | ├ plan/ | 中间设计文件 | 6 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -48,7 +48,7 @@ investor-util/
 │   │   │   ├── _comments.py          #   配置文件注释读写
 │   │   │   ├── _config_defaults.py   #   config.json 默认值定义
 │   │   │   ├── _core.py              #   配置加载/保存/校验核心逻辑
-│   │   │   ├── _json_patch.py        #   JSON 字段级文本替换（dict 区块 brace 平衡，rf-77 自 handlers_config 提取）
+│   │   │   ├── _json_patch.py        #   JSON 字段级文本替换（dict 区块 brace 平衡）
 │   │   │   ├── _llm_defaults.py      #   llm_settings.json 默认值定义
 │   │   │   ├── _llm_providers.py     #   LLM 提供程序配置解析
 │   │   │   ├── _llm_providers_defaults.py # llm_providers.json 默认值定义
@@ -108,11 +108,11 @@ investor-util/
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
-│   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → C19 evolution_data，plan-6）
+│   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → C19 evolution_data）
 │   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
 │   │   │   ├── scenario.py                    #   情景分析（Beta 推导 → 6 种市场情景预期变动）
 │   │   │   ├── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
-│   │   │   └── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比，plan-5）
+│   │   │   └── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比）
 │   │   │
 │   │   ├── llm/                      # LLM 智能分析
 │   │   │   ├── __init__.py           #   子包标记
@@ -121,7 +121,7 @@ investor-util/
 │   │   │   ├── _thinking.py          #   Extended Thinking 配置
 │   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）
 │   │   │   ├── cost_tracker.py       #   Token 成本跟踪与预算管理（会话级 Token 守卫）
-│   │   │   ├── fact_checker/         # LLM 事实锚定校验器（数值/品种/排名一致性校验，rf-76 拆分）
+│   │   │   ├── fact_checker/         # LLM 事实锚定校验器（数值/品种/排名一致性校验）
 │   │   │   │   ├── __init__.py       #       子包标记，re-export run_fact_check 等 4 个公开函数
 │   │   │   │   ├── _constants.py     #       关键词词表/指数代码集/默认容差
 │   │   │   │   ├── _context.py       #       语境检测（回撤/变化率/贡献度/仓位/假设/建议）
@@ -197,7 +197,7 @@ investor-util/
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── factor_exposure_sheet.py #  因子暴露 Excel 页签（β/t/显著性/风格归属）
 │   │   │   ├── correlation_sheet.py  #   持仓相关性矩阵 Excel 页签（热力格/配对明细）
-│   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁，plan-6）
+│   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
@@ -217,13 +217,13 @@ investor-util/
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
 │   │   │   ├── progress.py           #   报告生成进度跟踪
 │   │   │   ├── cli_progress.py         #   CLI 进度报告器（CliProgressReporter）
-│   │   │   ├── whatif_sheet.py       #   调仓 What-if Excel 页签（摘要/分类/变动明细，plan-5）
-│   │   │   ├── whatif_writer.py      #   调仓 What-if 报告输出编排（Excel+HTML，plan-5）
+│   │   │   ├── whatif_sheet.py       #   调仓 What-if Excel 页签（摘要/分类/变动明细）
+│   │   │   ├── whatif_writer.py      #   调仓 What-if 报告输出编排（Excel+HTML）
 │   │   │   └── styles.py             #   Excel 样式定义
 │   │   │
 │   │   ├── tmpl/                     # HTML 报告模板
 │   │   │   ├── report_template.html  #   Jinja2 HTML 报告主模板
-│   │   │   ├── whatif_template.html  #   调仓 What-if 独立 HTML 页（双环图+变动明细，plan-5）
+│   │   │   ├── whatif_template.html  #   调仓 What-if 独立 HTML 页（双环图+变动明细）
 │   │   │   └── partials/             #   章节级 partial（report_template.html include 引入，拆大模板）
 │   │   │       └── evolution_section.html  #   组合演进章节（多快照趋势，含 #evolution-chart-data 裁剪负载）
 │   │   │
@@ -256,6 +256,7 @@ investor-util/
 │   │   │   ├── handlers_cache.py     #   缓存管理命令处理器
 │   │   │   ├── handlers_config.py    #   配置管理命令处理器
 │   │   │   ├── handlers_report.py    #   报告生成命令处理器
+│   │   │   ├── handlers_whatif.py    #   调仓 What-if 模拟命令处理器（对比两份持仓生成独立报告）
 │   │   │   ├── tui.py                #   主循环入口
 │   │   │   ├── tui_handlers.py       #   键盘/事件处理
 │   │   │   ├── tui_keys.py           #   终端键盘输入封装
@@ -300,9 +301,9 @@ investor-util/
 │       │   │   ├── test_drawdown_warning.py   #   回撤历史分位预警
 │       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
-│       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口，rf-157 回归）
-│       │   │   ├── test_portfolio_evolution.py #  组合演进聚合计算（多快照趋势/HHI/TOP 变迁，plan-6）
-│       │   │   └── test_whatif.py             #   调仓 What-if 计算（变动识别/成本权重/HHI/降级，plan-5）
+│       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口）
+│       │   │   ├── test_portfolio_evolution.py #  组合演进聚合计算（多快照趋势/HHI/TOP 变迁）
+│       │   │   └── test_whatif.py             #   调仓 What-if 计算（变动识别/成本权重/HHI/降级）
 │       │   ├── config/              #   配置单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_config.py            #   配置管理核心测试
@@ -352,7 +353,8 @@ investor-util/
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_handlers_cache.py  #   缓存管理命令处理测试
 │       │   │   ├── test_handlers_config.py #   命令处理器配置测试
-│       │   │   └── test_handlers_report.py #   报告生成命令处理测试
+│       │   │   ├── test_handlers_report.py #   报告生成命令处理测试
+│       │   │   └── test_handlers_whatif.py #   调仓 What-if 命令处理测试
 │       │   ├── llm/                 #   LLM 单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_llm_cache_multi.py         #   多 Provider 缓存测试
@@ -442,11 +444,8 @@ investor-util/
 │       │   │   ├── test_fund_style_analysis.py    #   基金风格测试
 │       │   │   ├── test_correlation_html.py       #   持仓相关性章节 HTML 呈现
 │       │   │   ├── test_correlation_sheet.py      #   持仓相关性矩阵 Excel 页签呈现
-│       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明，plan-6）
-│       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现（plan-6）
-│       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现（plan-5）
-│       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现（plan-5）
-│       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
+│       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
+│       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现│       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现│       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现│       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试
@@ -589,8 +588,8 @@ investor-util/
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
 │   │   ├── plan-engineering.md         #     工程化迭代计划（批量并行等）
-│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（仅保留 plan-4 业绩归因，已放弃）
-│   │   └── plan-web-ui.md              #     轻量 Web UI 计划（plan-8/10/11 未完成项）
+│   │   ├── plan-advanced-analysis.md   #     高级分析迭代计划（业绩归因设计）
+│   │   └── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
@@ -626,7 +625,7 @@ investor-util/
 │   │   │   ├── refactor-cache-engine/             # 缓存引擎重构
 │   │   │   │   └── cache-refactor-plan.md         # 缓存引擎重构计划
 │   │   │   ├── refactor-excel-generator/          # Excel 生成器重构
-│   │   │   │   └── R-206-excel-generator-split-plan.md # Excel 生成器拆分计划
+│   │   │   │   └── excel-generator-split-plan.md # Excel 生成器拆分计划
 │   │   │   ├── refactor-html_writer/              # HTML 写入器重构
 │   │   │   │   └── r178_html_writer_split.md      # HTML 写入器拆分
 │   │   │   ├── refactor-llm_split_design/         # LLM 拆分重构
@@ -634,7 +633,7 @@ investor-util/
 │   │   │   ├── refactor-market_value_split_design/ # 市值拆分重构
 │   │   │   │   └── r197_market_value_split.md     # 市值拆分设计
 │   │   │   ├── refactor-summary-llm-usage/        # LLM 用量摘要重构
-│   │   │   │   └── R-207-summary-llm-usage-split-plan.md # LLM 用量摘要拆分计划
+│   │   │   │   └── summary-llm-usage-split-plan.md # LLM 用量摘要拆分计划
 │   │   │   └── test-verify-mode-optimization/     # 测试verify 模式运行优化
 │   │   │       └── r200_verify_mode_optimization.md # 测试verify 模式运行优化
 │   │   ├── v0.4.x/                            # v0.4.x 版本归档
@@ -700,30 +699,30 @@ investor-util/
 │   │   │   ├── batch-parallel/             #   批量并行调度重构（BatchDispatcher + 线程池配置）
 │   │   │   │   ├── batch-parallel-design.md #      批量并行调度技术设计
 │   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
-│   │   ├── v0.9.x/                           # v0.9.x 版本归档（changelog/plan/review-findings + 已完成项设计文档）
-│   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（已完成项 + 设计文档索引）
+│   │   ├── v0.9.x/                           # v0.9.x 版本归档（changelog/plan/review-findings + 设计文档）
+│   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（设计文档索引）
 │   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x（0.9.0 ~ 0.9.8）
-│   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x（rf-90 ~ rf-159）
-│   │   │   ├── chartjs-upgrade/               #   plan-1 交互式 HTML 报告升级设计（8 迭代）
-│   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案（plan-1）
-│   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析（plan-1）
-│   │   │   │   └── plan-1-iter7-verification-checklist.md # plan-1 Iter 7 浏览器人工验证清单（rf-113）
-│   │   │   ├── factor-exposure/                 #   plan-7 因子暴露分析设计（原 plan-advanced-analysis §4）
-│   │   │   │   └── plan-factor-exposure.md      #     因子暴露分析设计（plan-7）
-│   │   │   ├── correlation-drawdown/            #   plan-2/3 相关性矩阵 + 回撤/净值设计与实施
-│   │   │   │   ├── plan-correlation-drawdown.md #     分析功能基础增强设计（plan-2/3）
-│   │   │   │   └── plan-correlation-drawdown-implementation.md # 实施总纲（plan-2/3）
-│   │   │   ├── first-run-wizard/                #   plan-9 首次运行引导设计与实施
-│   │   │   │   ├── plan-first-run-wizard.md     #     首次运行引导设计（plan-9）
-│   │   │   │   └── plan-first-run-wizard-implementation.md # 实施细节（plan-9）
-│   │   │   ├── whatif-simulation/               #   plan-5 调仓 What-if 模拟设计
-│   │   │   │   └── plan-whatif-simulation.md    #     调仓 What-if 模拟设计（plan-5）
-│   │   │   ├── portfolio-evolution/             #   plan-6 多快照趋势追踪/组合演进设计
-│   │   │   │   └── plan-portfolio-evolution.md  #     多快照趋势追踪设计（plan-6）
-│   │   │   ├── fix-deepseek-thinking/           #   rf-122 DeepSeek thinking 思考耗尽修复设计
-│   │   │   │   └── plan-fix-deepseek-thinking-exhaustion.md # 思考耗尽修复方案（rf-122）
-│   │   │   └── qa-concentration-chart-optimization/ # rf-150 集中度问答 + 穿透柱状图优化修复设计
-│   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复（rf-150）
+│   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x
+│   │   │   ├── chartjs-upgrade/               #   交互式 HTML 报告升级设计（8 迭代）
+│   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案
+│   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析
+│   │   │   │   └── iter7-verification-checklist.md # Iter 7 浏览器人工验证清单
+│   │   │   ├── factor-exposure/                 #   因子暴露分析设计
+│   │   │   │   └── plan-factor-exposure.md      #     因子暴露分析设计
+│   │   │   ├── correlation-drawdown/            #   相关性矩阵 + 回撤/净值设计与实施
+│   │   │   │   ├── plan-correlation-drawdown.md #     分析功能基础增强设计
+│   │   │   │   └── plan-correlation-drawdown-implementation.md # 实施总纲
+│   │   │   ├── first-run-wizard/                #   首次运行引导设计与实施
+│   │   │   │   ├── plan-first-run-wizard.md     #     首次运行引导设计
+│   │   │   │   └── plan-first-run-wizard-implementation.md # 实施细节
+│   │   │   ├── whatif-simulation/               #   调仓 What-if 模拟设计
+│   │   │   │   └── plan-whatif-simulation.md    #     调仓 What-if 模拟设计
+│   │   │   ├── portfolio-evolution/             #   多快照趋势追踪/组合演进设计
+│   │   │   │   └── plan-portfolio-evolution.md  #     多快照趋势追踪设计
+│   │   │   ├── fix-deepseek-thinking/           #   DeepSeek thinking 思考耗尽修复设计
+│   │   │   │   └── plan-fix-deepseek-thinking-exhaustion.md # 思考耗尽修复方案
+│   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
+│   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
