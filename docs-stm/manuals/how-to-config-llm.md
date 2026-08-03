@@ -6,7 +6,7 @@ LLM 配置由三个独立文件管理：
 
 | 文件 | 内容 | 用途 |
 |------|------|------|
-| `data/config/llm_key.json` | 4 个必填 + 4 个可选回退字段，或 `credentials_ref` 多键凭据块 | API 调用渠道（必填：provider / api_key / model / endpoint；可选：fallback_provider / fallback_api_key / fallback_endpoint / fallback_model） |
+| `data/config/llm_key.json` | 4 个必填字段，或 `credentials_ref` 多键凭据块 | API 调用渠道（必填：provider / api_key / model / endpoint） |
 | `data/config/llm_providers.json` | Provider 路由配置（多链模式） | 定义多个 Provider 的切换顺序、策略和凭据引用 |
 | `data/config/llm_settings.json` | 所有非敏感配置 | 参数调优（temperature、timeout、cache、system_prompt 等） |
 
@@ -28,22 +28,18 @@ LLM 配置由三个独立文件管理：
 
 ## 快速配置
 
-**Step 1**：编辑 `data/config/llm_key.json`，填入必填字段和（可选）回退字段：
+**Step 1**：编辑 `data/config/llm_key.json`，填入必填字段：
 
 ```json
 {
   "provider": "claude",
   "api_key": "sk-ant-xxxxxxxxxxxxx",
   "model": "claude-sonnet-4-20250514",
-  "endpoint": "https://api.anthropic.com/v1/messages",
-  "fallback_provider": "openai",
-  "fallback_api_key": "sk-your-fallback-key",
-  "fallback_endpoint": "https://api.openai.com/v1/chat/completions",
-  "fallback_model": "gpt-4o-mini"
+  "endpoint": "https://api.anthropic.com/v1/messages"
 }
 ```
 
-> **必填字段**：仅前 4 项（`provider` / `api_key` / `model` / `endpoint`）即可运行。`fallback_*` 回退字段可选，配置后主 provider 连续失败时自动切换，适用于高可用场景（如主用 DeepSeek 低成本、回退 Anthropic Claude 高稳定性）。非敏感参数统一在 `llm_settings.json` 中管理。
+> **必填字段**：仅前 4 项（`provider` / `api_key` / `model` / `endpoint`）即可运行。Provider 高可用/自动降级场景统一使用 `llm_providers.json` 多 Provider 链式配置（见下文「多 Provider 链式服务」）。非敏感参数统一在 `llm_settings.json` 中管理。
 
 **Step 2**（可选，使用默认值即可跳过）：编辑 `data/config/llm_settings.json`，根据偏好微调参数。示意结构如下（完整配置项见「配置项总览」章节）：
 

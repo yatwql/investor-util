@@ -40,6 +40,64 @@ _PATH_KEYS_IN_TEMPLATE = frozenset({
 
 
 
+class TestMergeLlmDefaults(unittest.TestCase):
+    """_merge_llm_defaults 运行时补默认语义测试。
+
+    语义（与 get_config 的 config.json 合并策略一致）：
+      - 默认值打底，用户覆盖
+      - 用户显式 null 不覆盖默认
+      - 嵌套 dict 一层合并
+      - 未知键透传
+    """
+
+    def setUp(self):
+        from src.python.config._core import _merge_llm_defaults
+
+        self._merge = _merge_llm_defaults
+
+    def test_empty_base_returns_full_defaults(self):
+        """空用户配置 → 返回完整默认配置。"""
+        merged = self._merge({})
+        self.assertEqual(merged["max_retries"], 2)
+        self.assertEqual(merged["temperature_global_macro"], 0.3)
+        self.assertIn("pricing", merged)
+        self.assertIn("fact_check", merged)
+        self.assertIn("debate", merged)
+
+    def test_user_scalar_overrides_default(self):
+        """用户标量覆盖默认值，其余默认保留。"""
+        merged = self._merge({"max_retries": 5})
+        self.assertEqual(merged["max_retries"], 5)
+        self.assertEqual(merged["llm_max_concurrency"], 3)
+
+    def test_null_does_not_override_default(self):
+        """用户显式 null → 不覆盖默认值（null 不覆盖）。"""
+        merged = self._merge({"max_retries": None, "temperature_global_macro": None})
+        self.assertEqual(merged["max_retries"], 2)
+        self.assertEqual(merged["temperature_global_macro"], 0.3)
+
+    def test_dict_one_level_merge(self):
+        """嵌套 dict 一层合并，只覆盖部分子键不丢默认。"""
+        merged = self._merge({"enabled_llm": {"global_macro": False}})
+        self.assertFalse(merged["enabled_llm"]["global_macro"])
+        self.assertTrue(merged["enabled_llm"]["expert_review"])
+
+        merged2 = self._merge({"pricing": {"currency": "USD"}})
+        self.assertEqual(merged2["pricing"]["currency"], "USD")
+        self.assertIn("claude-sonnet-4-6", merged2["pricing"])
+
+    def test_unknown_key_passthrough(self):
+        """默认中不存在的键原样透传（未知键透传）。"""
+        merged = self._merge({"custom_field": "custom_value"})
+        self.assertEqual(merged["custom_field"], "custom_value")
+
+    def test_debate_defaults_preserved(self):
+        """debate 段缺失 → 默认值保留（schema 校验由 _load_debate_config 兜底）。"""
+        merged = self._merge({})
+        self.assertEqual(merged["debate"]["max_total_tokens_per_report"], 48000)
+        self.assertEqual(merged["debate"]["qa_concentration"]["threshold"], 0.20)
+
+
 class TestGetConfig(unittest.TestCase):
     """get_config 的异常场景测试。"""
 

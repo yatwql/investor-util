@@ -443,32 +443,6 @@ def _call_llm_legacy(
         if result2 is not None:
             return result2, usage2, {"name": provider or None, "model": resolved_model, "endpoint": endpoint or ""}
 
-    # 回退 provider（旧 fallback 字段）
-    fallback_provider = llm_config.get("fallback_provider", "")
-    if fallback_provider and fallback_provider != provider:
-        fb_api_key = llm_config.get("fallback_api_key", api_key)
-        fb_endpoint = llm_config.get("fallback_endpoint", endpoint)
-        fb_model = llm_config.get("fallback_model", resolved_model)
-        logger.warning("主 provider (%s) 已失败，回退到 %s", provider, fallback_provider)
-        result, usage = call_single_provider(
-            fallback_provider,
-            system_prompt,
-            user_prompt,
-            fb_api_key,
-            fb_model,
-            fb_endpoint,
-            resolved_max_tokens,
-            timeout,
-            max_retries,
-            http_client,
-            config_field,
-            temperature,
-            llm_config,
-        )
-        if result is not None:
-            return result, usage, {"name": fallback_provider or None, "model": fb_model, "endpoint": fb_endpoint or ""}
-        logger.warning("回退 provider (%s) 同样失败", fallback_provider)
-
     return (None, None, None)
 
 

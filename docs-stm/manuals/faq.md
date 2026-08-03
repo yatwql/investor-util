@@ -401,7 +401,7 @@ A: 以 DeepSeek V4 Flash 为例，一次完整菜单 L（4+1 个模块）约消�
 
 **Q: LLM 调用时报错怎么办？**
 
-A: 常见排查步骤：① 检查网络连接是否能访问 API 端点；② 确认 `llm_key.json` 中 API Key 未过期/余额充足；③ 查看 `logs/app.log` 中的具体错误信息（如 401 鉴权失败、429 限流、超时等）；④ 可在 `llm_settings.json` 中配置 `fallback_provider` 实现自动降级。
+A: 常见排查步骤：① 检查网络连接是否能访问 API 端点；② 确认 `llm_key.json` 中 API Key 未过期/余额充足；③ 查看 `logs/app.log` 中的具体错误信息（如 401 鉴权失败、429 限流、超时等）；④ 多 Provider 高可用/自动降级请使用 `llm_providers.json` 链式配置。
 
 **Q: 为什么报告中缺少某些 LLM 分析章节？**
 
