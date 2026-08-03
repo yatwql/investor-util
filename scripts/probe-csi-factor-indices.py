@@ -138,10 +138,7 @@ def evaluate(
             "available": available,
             "stale_codes": stale_codes,
             "stale_threshold_days": stale,
-            "message": (
-                f"✅ 至少 3 个因子代理指数可用且数据新鲜 → MVP 3 因子可行{suffix}，"
-                "动量/低波标记为实验性"
-            ),
+            "message": (f"✅ 至少 3 个因子代理指数可用且数据新鲜 → MVP 3 因子可行{suffix}，动量/低波标记为实验性"),
         }
     return {
         "verdict": "infeasible",
@@ -158,9 +155,18 @@ def main() -> int:
     )
     parser.add_argument("--days", type=int, default=30, help="K 线窗口天数（默认 30）")
     parser.add_argument("--threshold", type=int, default=20, help="有效数据条数阈值（默认 20）")
-    parser.add_argument("--stale", type=int, default=120, help="数据新鲜度阈值（天，默认 120；最新日期距今超过即视为停更）")
-    parser.add_argument("--provider", choices=["tencent", "sina"], default="tencent", help="探测数据源（默认 tencent；sina 用于对照验证）")
-    parser.add_argument("--codes", nargs="*", default=None, help="覆盖候选代码（可传多个，格式 sh000919；不传则用内置候选表）")
+    parser.add_argument(
+        "--stale", type=int, default=120, help="数据新鲜度阈值（天，默认 120；最新日期距今超过即视为停更）"
+    )
+    parser.add_argument(
+        "--provider",
+        choices=["tencent", "sina"],
+        default="tencent",
+        help="探测数据源（默认 tencent；sina 用于对照验证）",
+    )
+    parser.add_argument(
+        "--codes", nargs="*", default=None, help="覆盖候选代码（可传多个，格式 sh000919；不传则用内置候选表）"
+    )
     parser.add_argument("--no-extra", action="store_true", help="不探测附加代码（000931 低波）")
     args = parser.parse_args()
 
@@ -187,7 +193,9 @@ def main() -> int:
     freshness: dict[str, int] = {}
     details: dict[str, dict[str, Any]] = {}
 
-    print(f"\n[..] 探测 {len(candidates)} 个候选代码（provider={args.provider}，窗口 {days} 天，阈值 {threshold} 条，新鲜度 {stale} 天）…")
+    print(
+        f"\n[..] 探测 {len(candidates)} 个候选代码（provider={args.provider}，窗口 {days} 天，阈值 {threshold} 条，新鲜度 {stale} 天）…"
+    )
 
     for code, name in candidates:
         try:
@@ -223,10 +231,7 @@ def main() -> int:
             marker = "[ERR]"
         print(f"  {marker} {code} {name}: {n} 条", end="")
         if bars:
-            print(
-                f"（{bars[0]['date']} ~ {last_date}，距今天数 {age}d，"
-                f"最新收盘 {last_close}）"
-            )
+            print(f"（{bars[0]['date']} ~ {last_date}，距今天数 {age}d，最新收盘 {last_close}）")
         else:
             print(" — 无有效数据")
 

@@ -116,9 +116,7 @@ def write_correlation_sheet(
     pairs = correlation_data.get("pairs", [])
 
     # ── 1. 矩阵表（下三角） ──
-    row = write_header_row(
-        ws, 2, [""] + [f"{names.get(c, c)} ({c})" for c in codes]
-    )
+    row = write_header_row(ws, 2, [""] + [f"{names.get(c, c)} ({c})" for c in codes])
     for i, ci in enumerate(codes):
         row += 1
         ws.cell(row=row, column=1, value=f"{names.get(ci, ci)} ({ci})")
@@ -131,11 +129,7 @@ def write_correlation_sheet(
                 cell.font = _FONT_LIGHT
             elif j < i:
                 r_val = matrix[i][j]
-                p_val = (
-                    p_values[i][j]
-                    if i < len(p_values) and j < len(p_values[i])
-                    else None
-                )
+                p_val = p_values[i][j] if i < len(p_values) and j < len(p_values[i]) else None
                 if r_val is None:
                     cell.value = "N/A"
                     cell.fill, cell.font = _FILL_NA, _FONT_GREY

@@ -12,7 +12,8 @@
 
 ### Fix
 
-（开发中）
+- **rf-163：持仓相关性常数序列标准差容差判定（修复 GitHub CI Python 3.11.15 失败）** — CI `test_pearson_pvalue_constant_series` 断言 `1.373948616504741e-17 == 0.0` 失败。根因：CPython `sum()` 实现差异——3.12+ 误差补偿求和 vs 3.11 朴素累加，常数序列 `[0.01]*60` 在 3.11 下均值舍入为 `0.010000000000000005`、标准差 `sx=4.03e-17`（非精确 0.0），绕过 `sx == 0` 常数序列保护，与噪声序列算出虚假近零相关。修复：`analysis/correlation.py` 新增 `_CONSTANT_EPS=1e-12`（常数/近常数序列判定阈值，与 `metrics._VARIANCE_EPSILON`/`whatif._EPS` 项目容差模式一致），`sx < _CONSTANT_EPS or sy < _CONSTANT_EPS` → 返回 `(0.0, 1.0)` 绝不硬算。修复后常数序列在两种 CPython 版本下均稳定判定不显著
+- **rf-164：test_config 过期行尾注释断言同步（#11→#12）** — rf-160 将模板市场新闻模块注释 `#11`→`#12`（基金深度分析范围扩至 #6~11 后顺延），但 `test_preserves_comment_groups_and_inline` 仍断言 `// 市场新闻（#11）` → 断言失败。根因：dev-verify Phase A marker（`unit_core or unit_providers or unit_fetcher or unit_analysis`）不含 `unit_config`，config 目录测试不在 P0 门禁内，过期断言漏检。修复：断言同步为 `// 市场新闻（#12）`；暴露门禁盲区（`unit_config` 不在 dev-verify Phase A 覆盖范围）
 
 ### Refactor
 
@@ -28,6 +29,12 @@
 ### Test
 
 - **rf-161：场外基金净值盘后新鲜度 + 跨日残留强刷路径回归测试** — `test_fetcher_price.py` 新增 8 例：`TestPriceCacheFresh` 5 例（盘中不校验恒新鲜 / 盘后 price_date ≥ 最近交易日新鲜 / price_date < 最近交易日跨日残留不新鲜 / 无 price_date 不新鲜 / 校验异常保守视新鲜，mock `is_market_open` + `get_last_trading_day`）；`TestFetchPriceCacheRefresh` 3 例（跨日残留 → `cache.clear` 被调用 + 二次拉取返回最新净值 / 新鲜缓存 → 仅一次 fetch 且不清缓存 / 首次 fetch 即 None → 不进强刷分支，mock `_price_cache_fresh` + `fetch_with_fallback` + `cache.clear`）。直接断言缺陷场景，而非仅正常路径
+- **rf-163 回归测试** — `test_correlation.py` 新增 `test_pearson_pvalue_near_constant_series`（近常数序列波动 ~1e-14 仍判常数返回 (0.0, 1.0)，不因浮点误差硬算）；`test_pearson_pvalue_constant_series` 断言由精确 `== 0.0` 改为容差 `abs(r) < 1e-12 and p == 1.0`——验证"行为"（不硬算）而非实现细节，两种 CPython `sum` 实现（3.11 朴素累加 / 3.12+ 误差补偿求和）下均稳定
+- **rf-164 回归测试** — `test_config.py::test_preserves_comment_groups_and_inline` 行尾注释断言 `// 市场新闻（#11）`→`// 市场新闻（#12）` 与模板注释一致，锁定单键 patch 保留注释行为不回退
+
+### Chore
+
+- **CI ruff format 检查修复（6 文件格式修正）** — GitHub CI `ruff format --check src/python/ scripts/` 报 6 个文件未格式化（历史遗留格式债务，非本次改动引入）：`scripts/probe-csi-factor-indices.py`、`src/python/analysis/drawdown_events.py`、`src/python/config/_core.py`、`src/python/llm/prompts_action.py`、`src/python/report/_history_quality.py`、`src/python/report/correlation_sheet.py`。全量运行 `ruff format src/python/ scripts/`（217 文件）修复，纯空白/换行调整零逻辑变更（对齐 v0.9.0 ruff 全量格式修正惯例）
 
 ---
 

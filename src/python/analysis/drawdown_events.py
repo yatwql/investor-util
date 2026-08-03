@@ -144,5 +144,5 @@ def compute_recovery_times(events: list[dict]) -> list[dict]:
         end = e.get("recovery_date", "")
         days = e.get("recovery_days")
         out.append({"start_date": start, "end_date": end, "days": days})
-    out.sort(key=lambda r: (r["start_date"] or ""))
+    out.sort(key=lambda r: r["start_date"] or "")
     return out

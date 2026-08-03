@@ -365,7 +365,7 @@ def _patch_config_key(raw: str, key: str, new_value_text: str) -> str:
     else:
         # 顶层最后一个成员后补逗号 + 换行 + 新键（逗号紧跟最后成员闭合符）
         stripped = before.rstrip()
-        tail = before[len(stripped):]
+        tail = before[len(stripped) :]
         new_raw = stripped + f",\n  {key_text}: {new_value_text}" + tail + raw[top_close:]
     return new_raw
 

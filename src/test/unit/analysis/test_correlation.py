@@ -116,7 +116,19 @@ class TestKnownAnswerCorrelation:
         const = [0.01] * 60
         noise = _sin(60)
         r, p = _pearson_pvalue(const, noise)
-        assert r == 0.0 and p == 1.0
+        # 容差断言：CPython sum 实现差异（3.12+ 误差补偿求和 vs 3.11 朴素累加）
+        # 使常数序列标准差可能是 ~1e-17 的极小非零值而非精确 0.0，
+        # 断言应验证"行为"（不硬算）而非精确等于 0.0
+        assert abs(r) < 1e-12 and p == 1.0
+
+    def test_pearson_pvalue_near_constant_series(self):
+        """近常数序列（波动 ~1e-14）→ 仍判常数返回 (0.0, 1.0)，不因浮点误差硬算。"""
+        const = [0.01] * 60
+        # 叠加 1e-14 量级抖动，模拟均值舍入误差导致的极小非零标准差
+        const = [v + 1e-14 * (i % 3) for i, v in enumerate(const)]
+        noise = _sin(60)
+        r, p = _pearson_pvalue(const, noise)
+        assert abs(r) < 1e-12 and p == 1.0
 
 
 class TestInsignificantPair:

@@ -155,8 +155,7 @@ def _build_qa_concentration_block(
     top3_ratio = sum((h.get("mv", 0) or 0) for h in sorted_by_mv[:3]) / total_mv
     if top3_ratio > 0.60:
         questions.append(
-            f"2. **前 3 大品种合计 {top3_ratio:.1%}**，超过 60% 集中度警戒线，"
-            "前 3 品种同时回调将对组合造成较大影响。"
+            f"2. **前 3 大品种合计 {top3_ratio:.1%}**，超过 60% 集中度警戒线，前 3 品种同时回调将对组合造成较大影响。"
         )
 
     # 触发器③：行业穿透集中度
@@ -341,12 +340,7 @@ def _build_expert_review_prompt(
             from src.python.config._core import get_llm_config
 
             _cfg = get_llm_config()
-            _threshold = (
-                (_cfg or {})
-                .get("debate", {})
-                .get("qa_concentration", {})
-                .get("threshold", 0.20)
-            )
+            _threshold = (_cfg or {}).get("debate", {}).get("qa_concentration", {}).get("threshold", 0.20)
         except Exception:
             _threshold = 0.20
         _qa_block = _build_qa_concentration_block(
@@ -548,12 +542,7 @@ def _build_debate_synthesis_prompt(
             from src.python.config._core import get_llm_config
 
             _cfg = get_llm_config()
-            _threshold = (
-                (_cfg or {})
-                .get("debate", {})
-                .get("qa_concentration", {})
-                .get("threshold", 0.20)
-            )
+            _threshold = (_cfg or {}).get("debate", {}).get("qa_concentration", {}).get("threshold", 0.20)
         except Exception:
             _threshold = 0.20
         _qa_block = _build_qa_concentration_block(
@@ -565,8 +554,7 @@ def _build_debate_synthesis_prompt(
         if _qa_block:
             prompt += (
                 "\n\n请结合上述白脸和黑脸对集中度的分析，在综合权衡中输出"
-                "'### 集中度问答'章节（置于调仓建议之前）。"
-                + _qa_block
+                "'### 集中度问答'章节（置于调仓建议之前）。" + _qa_block
             )
 
     return prompt
