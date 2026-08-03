@@ -225,8 +225,8 @@ investor-util/
 │   │   ├── tmpl/                     # HTML 报告模板
 │   │   │   ├── report_template.html  #   Jinja2 HTML 报告主模板
 │   │   │   ├── whatif_template.html  #   调仓 What-if 独立 HTML 页（双环图+变动明细）
-│   │   │   └── partials/             #   章节级 partial（report_template.html include 引入，拆大模板）
-│   │   │       └── evolution_section.html  #   组合演进章节（多快照趋势，含 #evolution-chart-data 裁剪负载）
+│   │   │   └── partials/             #   章节级 partial（report_template.html 经 Jinja include 引入）
+│   │   │       └── evolution_section.html  #   组合演进章节（多快照趋势，含专用图表数据段）
 │   │   │
 │   │   ├── core/                     # 核心基础设施
 │   │   │   ├── __init__.py           #   子包标记
@@ -263,16 +263,16 @@ investor-util/
 │   │   │   ├── tui_keys.py           #   终端键盘输入封装
 │   │   │   └── tui_menu.py           #   菜单系统
 │   │
-│   ├── static/                       # 前端静态资产（R21 本地 bundle + 调试页）
+│   ├── static/                       # 前端静态资产（本地 bundle + 调试页）
 │   │   ├── chart.min.js              #   Chart.js v4.4.3 UMD（本地 bundle，205KB，离线自包含）
-│   │   ├── chart-print.js            #   打印降级（beforeprint 快照 <img> / afterprint 恢复，§4.5）
+│   │   ├── chart-print.js            #   打印降级（beforeprint 快照 <img> / afterprint 恢复）
 │   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制，≤150 行）
 │   │   ├── chart-export.js           #   单图导出 PNG 按钮（.chart-box 注入，2x 分辨率下载）
 │   │   ├── chart-common.js           #   Chart.js 公共初始化 helper（trackChart/lineOptions/doughnutOptions，chart-init 与 What-if 页共用）
-│   │   ├── chart-init.js             #   6 张图初始化（O1 隔离 + degraded 虚线，≤300 行）
+│   │   ├── chart-init.js             #   6 张图初始化（单图异常隔离 + degraded 虚线，≤300 行）
 │   │   ├── toc.js                    #   左侧目录 TOC（折叠/展开 + IntersectionObserver 滚动高亮，离线自包含）
-│   │   ├── test-chart.html           #   独立调试页（TD8）：6 图渲染/降级/离线场景自检（S2 升级载体）
-│   │   └── README.md                 #   资产说明 + Chart.js 版本号记录（S2 升级指引）
+│   │   ├── test-chart.html           #   独立调试页：6 图渲染/降级/离线场景自检（Chart.js 升级验证载体）
+│   │   └── README.md                 #   资产说明 + Chart.js 版本号记录（升级指引：替换引擎后先在此页验证）
 │   │
 │   └── test/                         # 测试套件
 │       ├── __init__.py               #   包标记（空文件）
@@ -446,7 +446,11 @@ investor-util/
 │       │   │   ├── test_correlation_html.py       #   持仓相关性章节 HTML 呈现
 │       │   │   ├── test_correlation_sheet.py      #   持仓相关性矩阵 Excel 页签呈现
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
-│       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现│       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现│       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现│       │   │   ├── test_whatif_operations.py      #   调仓 What-if 操作共享层测试│       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
+│       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现
+│       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现
+│       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现
+│       │   │   ├── test_whatif_operations.py      #   调仓 What-if 操作共享层测试
+│       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试
