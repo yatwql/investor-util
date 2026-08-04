@@ -2016,6 +2016,19 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
         </div>
         {% endif %}
+
+        <!-- 行动摘要子块：引用 20 章行动建议结果（单源计算、两处呈现，C14/C19） -->
+        {% if section_visible("action") and action_data and action_data.available %}
+        <div class="section-content" style="margin-top: 12px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;">
+            <div style="font-weight: bold; font-size: 14px; color: #2E75B6; margin-bottom: 6px;">
+                行动摘要（详见第 {{ section_numbers['action'] }} 章「行动建议」）
+            </div>
+            <div class="summary-tag" style="margin-bottom: 0;">
+                {% if action_data.get("summary") %}{{ action_data["summary"] }}{% else %}暂无行动建议{% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         {{ render_back_to_top() }}
     </div>
 
@@ -2386,9 +2399,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
     {% include "partials/evolution_section.html" with context %}
 
+    {% include "partials/action_section.html" with context %}
+
     {% if section_visible("data_source_status") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 20: 数据源可用性矩阵                           -->
+    <!--  MODULE 21: 数据源可用性矩阵                           -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-data_source_status" style="order: {{ section_numbers['data_source_status'] }};">
         <div class="section-title">{{ section_numbers['data_source_status'] }}、数据源可用性矩阵</div>
@@ -2532,7 +2547,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 21: LLM API Usage -->
+    <!--  MODULE 22: LLM API Usage -->
     <div class="section" id="sec-llm_usage" style="order: {{ section_numbers['llm_usage'] }};">
         <div class="section-title">{{ section_numbers['llm_usage'] }}、LLM API 用量</div>
         <div class="section-content">

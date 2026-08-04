@@ -373,6 +373,7 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "portfolio_history": "组合历史走势",
     "drawdown_analysis": "历史回撤分析",
     "portfolio_evolution": "组合演进",
+    "action": "行动建议",
 }
 
 
@@ -570,10 +571,19 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "evolution",
         "data_flag": "evolution_data",
     },
+    # ── action 类型（独立顶层开关 enable_action 控制，默认关） ──
+    # 行动建议：再平衡信号 + 交易纪律 + 调仓建议 + 收益归因（纯算法，basic/both/full 均可见）
+    {
+        "key": "action",
+        "name": "行动建议",
+        "number": 20,
+        "type": "action",
+        "data_flag": None,
+    },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 20, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 21, "type": "always", "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 21, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 22, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 

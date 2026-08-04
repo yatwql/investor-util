@@ -1,0 +1,157 @@
+{# ==============================================================
+   行动建议章节 partial（供 report_template.html 经 include 引入）。
+
+   独立顶层章节（20 章，type=action，board 层 enable_action 开关，默认关）。
+   数据源为 C19 `action_data` 契约（analysis/action_advisor.build_action_data
+   组装、orchestrator 注入 pipeline_data）——与 14 章「行动摘要」子块共享同一
+   计算对象（单源计算，两处呈现）。
+
+   依赖 context 变量（report_template.html 以 `{% include ... with context %}`
+   引入）：section_visible / section_numbers / action_data；过滤器 money /
+   profit_color 为模板环境全局（html_jinja_env 注册）。
+
+   数据不可用（available=False）时写占位文本（§1.4.5 数据降级治理）。
+   底部「回到顶部」与 report_template.html 的 render_back_to_top() 宏同构
+   （partial 无法访问父模板宏，此处内联等价 HTML）。
+   ============================================================== #}
+{% if section_visible("action") %}
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  MODULE 20: 行动建议（决策闭环）                    -->
+<!-- ═══════════════════════════════════════════════════════ -->
+{% set _action = action_data or {} %}
+<div class="section" id="sec-action" style="order: {{ section_numbers['action'] }};">
+    <div class="section-title">
+        {{ section_numbers['action'] }}、行动建议
+        <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">再平衡信号 · 交易纪律 · 调仓建议 · 收益归因</span>
+    </div>
+    {% if _action.get("available") %}
+    <div class="section-content">
+        {% if _action.get("summary") %}
+        <div class="summary-tag" style="margin-bottom: 8px;">{{ _action["summary"] }}</div>
+        {% endif %}
+
+        <!-- ① 再平衡信号（单品占比超警戒线） -->
+        {% set _rb = _action.get("rebalance_signals") or [] %}
+        <div style="font-weight: bold; font-size: 14px; margin: 10px 0 6px;">① 再平衡信号（单品占比超警戒线）</div>
+        {% if _rb %}
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>代码</th><th>名称</th><th>占比</th><th>警戒线</th><th>建议动作</th></tr>
+            </thead>
+            <tbody>
+                {% for s in _rb %}
+                <tr>
+                    <td>{{ s.get("code", "") }}</td>
+                    <td class="text-left">{{ s.get("name", "") }}</td>
+                    <td style="text-align:right;">{{ "%.1f"|format((s.get("weight", 0) or 0) * 100) }}%</td>
+                    <td style="text-align:right;">{{ "%.0f"|format((s.get("threshold", 0) or 0) * 100) }}%</td>
+                    <td class="text-left">{{ s.get("action", "") }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="empty-note placeholder-note"><p>组合内无品种超警戒线</p></div>
+        {% endif %}
+
+        <!-- ② 交易纪律（止盈/止损/回撤，后续轮次填充） -->
+        {% set _ds = _action.get("discipline_signals") or [] %}
+        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">② 交易纪律（止盈/止损/回撤）</div>
+        {% if _ds %}
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>代码</th><th>名称</th><th>规则</th><th>当前值</th><th>触发状态</th></tr>
+            </thead>
+            <tbody>
+                {% for s in _ds %}
+                <tr>
+                    <td>{{ s.get("code", "") }}</td>
+                    <td class="text-left">{{ s.get("name", "") }}</td>
+                    <td class="text-left">{{ s.get("rule", "") }}</td>
+                    <td style="text-align:right;">{{ s.get("value", "") }}</td>
+                    <td class="text-left">{{ s.get("status_label", "") }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="empty-note placeholder-note"><p>暂无触发</p></div>
+        {% endif %}
+
+        <!-- ③ 调仓建议（可行化清单：份额取整一手/费用估算/现金缓冲） -->
+        {% set _adv = _action.get("rebalance_advice") or [] %}
+        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">③ 调仓建议清单</div>
+        {% if _adv %}
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>代码</th><th>名称</th><th>操作</th><th>份额</th><th>金额</th><th>预估费用</th><th>调仓后现金</th></tr>
+            </thead>
+            <tbody>
+                {% for s in _adv %}
+                <tr>
+                    <td>{{ s.get("code", "") }}</td>
+                    <td class="text-left">{{ s.get("name", "") }}</td>
+                    <td class="text-left">{{ s.get("operation", "") }}</td>
+                    <td style="text-align:right;">{{ s.get("shares", "") }}</td>
+                    <td style="text-align:right;">{{ "%.2f"|format(s.get("amount", 0) or 0) }}</td>
+                    <td style="text-align:right;">{{ "%.2f"|format(s.get("fee", 0) or 0) }}</td>
+                    <td style="text-align:right;">{{ "%.2f"|format(s.get("cash_after", 0) or 0) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="empty-note placeholder-note"><p>暂无触发</p></div>
+        {% endif %}
+
+        <!-- ④ 收益归因（品种贡献占比，后续轮次填充） -->
+        {% set _attr = _action.get("attribution") %}
+        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">④ 收益归因（品种贡献占比）</div>
+        {% if _attr and _attr.get("available") %}
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>来源</th><th>品种</th><th>贡献占比</th><th>盈亏金额</th><th></th></tr>
+            </thead>
+            <tbody>
+                {% for src in ("盈利来源", "亏损来源") %}
+                {% for item in (_attr.get(src) or []) %}
+                <tr>
+                    <td>{{ src }}</td>
+                    <td class="text-left">{{ item.get("name", "") }}</td>
+                    <td style="text-align:right;">{{ item.get("contribution_pp", "") }}</td>
+                    <td style="text-align:right;">{{ item.get("profit", "") }}</td>
+                    <td></td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="empty-note placeholder-note"><p>待生成</p></div>
+        {% endif %}
+
+        <div class="penetration-notes" style="margin-top: 12px;">
+            <div>* 再平衡信号阈值：单品市值占比超警戒线（默认 15%）触发建议</div>
+            <div>* 交易纪律：止盈/止损线按成本收益率触发（可配置）；回撤纪律需组合历史峰值数据</div>
+            <div>* 调仓建议：份额已按一手取整（A 股/场内基金 100 份），费用为本地静态费率估算，金额与现金按建议执行顺序累计；收益归因为后续增强能力，报告结构保持稳定</div>
+        </div>
+    </div>
+    {% else %}
+    <div class="section-content">
+        <div class="empty-note placeholder-note">
+            <p><strong>无持仓数据，行动建议无法生成</strong></p>
+            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">行情数据不可用或持仓为空，待数据就绪后自动生成。</p>
+        </div>
+    </div>
+    {% endif %}
+    <div class="back-to-top-link"><a href="#report-top" title="回到报告顶部">↑ 回到顶部</a></div>
+</div>
+{% endif %}

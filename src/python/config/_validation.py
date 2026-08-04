@@ -224,13 +224,24 @@ def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
 
 
 def _validate_enable_boards(config: dict, issues: int) -> int:
-    """验证章节可见性配置（enable_fund_deep_analysis / enable_news / enable_history / enable_portfolio_evolution）。"""
-    for key in ("enable_fund_deep_analysis", "enable_news", "enable_history", "enable_portfolio_evolution"):
+    """验证章节可见性配置（enable_fund_deep_analysis / enable_news / enable_history /
+    enable_portfolio_evolution / enable_action）。
+
+    enable_action（行动建议独立章 17）默认关，缺失视为 False（沿用默认值），
+    类型校验逻辑与其余 enable_xxx 一致。
+    """
+    for key in (
+        "enable_fund_deep_analysis",
+        "enable_news",
+        "enable_history",
+        "enable_portfolio_evolution",
+        "enable_action",
+    ):
         val = config.get(key)
         if val is None:
-            continue  # 缺失视为 True（默认启用）
+            continue  # 缺失视为默认值（启用类默认 True，enable_action 默认 False）
         if not isinstance(val, bool):
-            logger.warning("config.json %s = %r 不是布尔值，将使用默认值 true", key, val)
+            logger.warning("config.json %s = %r 不是布尔值，将使用默认值", key, val)
             issues += 1
     return issues
 
@@ -492,6 +503,50 @@ def _validate_rebalance_config(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_discipline_config(config: dict, issues: int) -> int:
+    """验证 discipline 配置段（交易纪律：止盈/止损/回撤线 + 静默期）。
+
+    数值语义约束：
+      - 三类阈值必须为数字
+      - 止盈线应为正数、止损线应为负数（符号约束同时保证「止盈线 > 止损线」，
+        杜绝同一品种同时触发止盈与止损的误配）
+    """
+    ds, issues = _section(config, "discipline", dict, "交易纪律配置无效，将使用默认值", issues)
+    if ds is _MISSING:
+        return issues
+    pcts: dict[str, float] = {}
+    for key, default in (("take_profit_pct", 20.0), ("stop_loss_pct", -15.0), ("drawdown_pct", -10.0)):
+        val = ds.get(key)
+        if val is None:
+            continue
+        try:
+            pcts[key] = float(val)
+        except (ValueError, TypeError):
+            logger.warning("config.json discipline.%s = %r 不是数字，将使用默认值 %s", key, val, default)
+            issues += 1
+    take_profit = pcts.get("take_profit_pct")
+    if take_profit is not None and take_profit <= 0:
+        logger.warning("config.json discipline.take_profit_pct = %s 应为正数，将使用默认值 20.0", take_profit)
+        issues += 1
+    stop_loss = pcts.get("stop_loss_pct")
+    if stop_loss is not None and stop_loss >= 0:
+        logger.warning("config.json discipline.stop_loss_pct = %s 应为负数，将使用默认值 -15.0", stop_loss)
+        issues += 1
+    # 符号约束（take_profit > 0 且 stop_loss < 0）已自动保证 take_profit > stop_loss，
+    # 无需单独交叉校验，避免同一误配重复告警。
+    silence = ds.get("silence_days")
+    if silence is not None:
+        try:
+            s = int(silence)
+            if s < 0:
+                logger.warning("config.json discipline.silence_days = %s 不能为负数，将使用默认值 30", s)
+                issues += 1
+        except (ValueError, TypeError):
+            logger.warning("config.json discipline.silence_days = %r 不是有效整数，将使用默认值 30", silence)
+            issues += 1
+    return issues
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 配置校验入口
 # ═══════════════════════════════════════════════════════════════════
@@ -525,6 +580,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_history_lookback_days(config, issues)
     issues = _validate_comparison_indices(config, issues)
     issues = _validate_rebalance_config(config, issues)
+    issues = _validate_discipline_config(config, issues)
     issues = _validate_enable_llm(issues)
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)

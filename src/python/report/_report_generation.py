@@ -273,9 +273,11 @@ def _generate_full_html_report(
     correlation_data: dict | None = None,
     evolution_data: dict | None = None,
     enable_portfolio_evolution: bool = True,
+    enable_action: bool = False,
     enable_data_quality: bool = False,
     position_status: dict | None = None,
     data_freshness: dict | None = None,
+    action_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -294,6 +296,9 @@ def _generate_full_html_report(
             18 章品种覆盖区块数据源（开关关闭时忽略）。
         data_freshness: 可信度摘要 C19 `data_freshness` 契约 dict，
             18 章可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
+        enable_action: board 层 — 行动建议章节是否开启（默认关）。
+        action_data: 行动建议单一数据源 C19 `action_data` 契约 dict，
+            20 章行动板块 + 14 章行动摘要数据源（开关关闭时忽略）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -327,6 +332,7 @@ def _generate_full_html_report(
             enable_news=enable_news,
             enable_history=enable_history,
             enable_portfolio_evolution=enable_portfolio_evolution,
+            enable_action=enable_action,
             enable_llm=enable_llm,
             debate_info=debate_info,
             chart_datasets=chart_datasets,
@@ -337,6 +343,7 @@ def _generate_full_html_report(
             enable_data_quality=enable_data_quality,
             position_status=position_status,
             data_freshness=data_freshness,
+            action_data=action_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -369,6 +376,7 @@ def _generate_full_excel_report(
     debate_info: dict | None,
     result,
     enable_portfolio_evolution: bool = True,
+    enable_action: bool = False,
     enable_data_quality: bool = False,
 ) -> bool:
     """full 路径的 Excel 报告生成，返回是否成功。"""
@@ -396,6 +404,7 @@ def _generate_full_excel_report(
             enable_news=enable_news,
             enable_history=enable_history,
             enable_portfolio_evolution=enable_portfolio_evolution,
+            enable_action=enable_action,
             enable_llm=enable_llm,
             debate_info=debate_info,
             enable_data_quality=enable_data_quality,
@@ -425,6 +434,7 @@ def _generate_report_both(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import (
+        is_enable_action,
         is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
@@ -450,6 +460,7 @@ def _generate_report_both(
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
     _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
+    _enable_action = is_enable_action(config)
     _enable_data_quality = is_enable_data_quality(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
@@ -469,6 +480,7 @@ def _generate_report_both(
         pipeline_data = _inject_evolution_data(pipeline_data)
     # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
     #    （C19 position_status + data_freshness）
+    from src.python.analysis.action_advisor import build_action_data
     from src.python.core.data_freshness import build_freshness_summary
     from src.python.core.holding_status import build_coverage_summary
     from src.python.report.market_value import get_last_trading_day, get_prev_trading_day
@@ -482,6 +494,26 @@ def _generate_report_both(
             details,
             trading_day=get_last_trading_day(),
             prev_trading_day=get_prev_trading_day(),
+        ),
+        # 行动建议单一数据源（C19 action_data）：20 章行动板块 + 14 章行动摘要共享。
+        # 传递完整估值字段（含 profit_rate/cost/profit），交易纪律（止盈/止损）
+        # 依赖收益率数据。profit_rate 契约为百分比（小数 ×100，同 orchestrator 组装口径），
+        # 纪律引擎以百分数阈值（如 +20%）比较，此处统一换算避免单位不一致。
+        action_data=build_action_data(
+            [
+                {
+                    "name": d.name,
+                    "code": d.code,
+                    "market_value": d.market_value,
+                    "cost": d.cost,
+                    "profit": d.profit,
+                    "profit_rate": (d.profit_rate * 100) if d.profit_rate is not None else None,
+                    "shares": d.shares,
+                    "price": d.price,
+                }
+                for d in details
+            ],
+            sum(d.market_value for d in details),
         ),
     )
     perf.stop()
@@ -524,6 +556,7 @@ def _generate_report_both(
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_portfolio_evolution=_enable_portfolio_evolution,
+            enable_action=_enable_action,
             enable_llm=False,
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
@@ -531,6 +564,7 @@ def _generate_report_both(
             enable_data_quality=_enable_data_quality,
             position_status=(pipeline_data or {}).get("position_status"),
             data_freshness=(pipeline_data or {}).get("data_freshness"),
+            action_data=(pipeline_data or {}).get("action_data"),
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -558,6 +592,7 @@ def _generate_report_both(
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_portfolio_evolution=_enable_portfolio_evolution,
+            enable_action=_enable_action,
             enable_llm=False,
             enable_data_quality=_enable_data_quality,
         )
@@ -642,6 +677,7 @@ def _generate_report_full(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import (
+        is_enable_action,
         is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
@@ -666,6 +702,7 @@ def _generate_report_full(
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
     _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
+    _enable_action = is_enable_action(config)
     _enable_llm = is_enable_llm(config)
     _enable_data_quality = is_enable_data_quality(config)
     sec_order = get_report_section_order(config)
@@ -686,6 +723,7 @@ def _generate_report_full(
         pipeline_data["correlation_data"] = prep.get("correlation_data")
         pipeline_data["position_status"] = prep.get("position_status")
         pipeline_data["data_freshness"] = prep.get("data_freshness")
+        pipeline_data["action_data"] = prep.get("action_data")
     _validate_pipeline_snapshot(pipeline_data)
     # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
@@ -763,9 +801,11 @@ def _generate_report_full(
         prep.get("correlation_data"),
         (pipeline_data or {}).get("evolution_data"),
         _enable_portfolio_evolution,
+        _enable_action,
         _enable_data_quality,
         (pipeline_data or {}).get("position_status"),
         (pipeline_data or {}).get("data_freshness"),
+        (pipeline_data or {}).get("action_data"),
     )
 
     # ── 7. Excel 报告 ──
@@ -788,6 +828,7 @@ def _generate_report_full(
         debate_info,
         result,
         _enable_portfolio_evolution,
+        _enable_action,
         _enable_data_quality,
     )
 

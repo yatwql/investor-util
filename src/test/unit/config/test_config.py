@@ -1006,3 +1006,25 @@ class TestIsEnableDataQuality(unittest.TestCase):
         self.assertFalse(
             cfg.is_enable_data_quality({"report_submodules": {"data_quality": False, "tail_risk": True}})
         )
+
+
+class TestIsEnableAction(unittest.TestCase):
+    """is_enable_action 访问器测试（行动建议独立章 20 章开关，默认关）。"""
+
+    def test_default_false_when_missing(self):
+        """config 缺失 enable_action → 返回 False（默认关，向后兼容）。"""
+        self.assertFalse(cfg.is_enable_action({}))
+        self.assertFalse(cfg.is_enable_action({"enable_fund_deep_analysis": True}))
+
+    def test_false_when_disabled(self):
+        """显式 false → 返回 False。"""
+        self.assertFalse(cfg.is_enable_action({"enable_action": False}))
+
+    def test_true_when_enabled(self):
+        """显式 true → 返回 True。"""
+        self.assertTrue(cfg.is_enable_action({"enable_action": True}))
+
+    def test_independent_from_portfolio_evolution(self):
+        """行动建议开关独立于组合演进开关。"""
+        self.assertFalse(cfg.is_enable_action({"enable_portfolio_evolution": True}))
+        self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": False, "enable_action": True}))

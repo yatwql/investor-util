@@ -291,6 +291,7 @@ def generate_excel_report(
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
+    enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
     enable_data_quality: bool = False,  # 子模块：18 章数据质量仪表盘（report_submodules.data_quality）
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
@@ -353,6 +354,7 @@ def generate_excel_report(
         enable_news=enable_news,
         enable_history=enable_history,
         enable_portfolio_evolution=enable_portfolio_evolution,
+        enable_action=enable_action,
         enable_llm=enable_llm,
         data_availability=data_availability,
     )
@@ -407,6 +409,17 @@ def generate_excel_report(
             write_evolution_sheet(ws_evo, (pipeline_data or {}).get("evolution_data"))
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
+
+    # ── 行动建议页签（20 章行动板块，C19 action_data） ──
+    ws_action = sheets.get("action")
+    if ws_action is not None:
+        prog.info("正在写入行动建议页签...")
+        try:
+            from src.python.report.action_sheet import write_action_sheet
+
+            write_action_sheet(ws_action, (pipeline_data or {}).get("action_data"))
+        except Exception:
+            logger.debug("[excel] 行动建议页签写入失败（非关键）", exc_info=True)
 
     # ── 数据质量仪表盘 / 数据源可用性矩阵页签 ──
     ws_ds = sheets.get("data_source_status")

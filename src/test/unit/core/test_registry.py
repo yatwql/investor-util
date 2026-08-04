@@ -247,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 21
+        assert len(_REPORT_SECTION_DEFAULT) == 22
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -259,8 +259,8 @@ class TestReportSectionDefault:
             assert "data_flag" in sec, f"缺少 data_flag: {sec}"
 
     def test_type_values_are_valid(self):
-        """type 只能是 always/history/fund_deep_analysis/news/llm/evolution 之一。"""
-        valid_types = {"always", "history", "fund_deep_analysis", "news", "llm", "evolution"}
+        """type 只能是 always/history/fund_deep_analysis/news/llm/evolution/action 之一。"""
+        valid_types = {"always", "history", "fund_deep_analysis", "news", "llm", "evolution", "action"}
         for sec in _REPORT_SECTION_DEFAULT:
             assert sec["type"] in valid_types, f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"
 
@@ -271,9 +271,14 @@ class TestReportSectionDefault:
                 assert sec["data_flag"] is None, f"{sec['key']}: always 类型不应有 data_flag"
 
     def test_non_always_type_has_data_flag(self):
-        """非 always/history 类型必须有 data_flag。"""
+        """非 always/history/action 类型必须有 data_flag。
+
+        action 类型（行动建议）由独立顶层开关 enable_action 控制（默认关），
+        数据可视为纯算法产出，无 data_flag 依赖（data_flag=None），
+        available=False 时展示层写占位（§1.4.5 数据降级治理）。
+        """
         for sec in _REPORT_SECTION_DEFAULT:
-            if sec["type"] not in ("always", "history"):
+            if sec["type"] not in ("always", "history", "action"):
                 assert sec["data_flag"] is not None, f"{sec['key']}: {sec['type']} 类型缺少 data_flag"
 
     def test_default_numbers_are_unique(self):
@@ -287,7 +292,7 @@ class TestReportSectionDefault:
         assert _REPORT_SECTION_DEFAULT[-1]["key"] == "llm_usage"
 
     def test_data_source_status_before_llm_usage(self):
-        """data_source_status 应在 llm_usage 之前（序号 20 vs 21）。"""
+        """data_source_status 应在 llm_usage 之前（序号 21 vs 22）。"""
         keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         assert "data_source_status" in keys
         assert keys.index("data_source_status") < keys.index("llm_usage")
@@ -310,6 +315,16 @@ class TestReportSectionDefault:
         assert sec["type"] == "evolution"
         assert sec["data_flag"] == "evolution_data"
         assert sec["number"] == 19
+
+    def test_action_registered_as_action_type(self):
+        """action 应注册为 action 类型（独立顶层开关 enable_action 控制，默认关，
+        data_flag=None，序号 20 紧跟 portfolio_evolution）。"""
+        act = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "action"]
+        assert len(act) == 1, "缺少 action 模块条目"
+        sec = act[0]
+        assert sec["type"] == "action"
+        assert sec["data_flag"] is None
+        assert sec["number"] == 20
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""

@@ -92,10 +92,11 @@ class TestHtmlCssStructure(unittest.TestCase):
             self.assertIn('style="order:', sec_tag, f"section div 缺少 order 样式: {sec_tag}")
 
     def test_section_count(self):
-        """模板 + partials 应共含 21 个 .section 容器（含 factor_exposure、correlation_analysis、portfolio_evolution）。
+        """模板 + partials 应共含 22 个 .section 容器（含 factor_exposure、correlation_analysis、
+        portfolio_evolution、action）。
 
-        组合演进章节已拆入 partials/evolution_section.html（经 include 引入），
-        因此统计需覆盖 tmpl/partials/ 下的 partial 文件。
+        组合演进/行动建议章节已拆入 partials/evolution_section.html 与 partials/action_section.html
+        （经 include 引入），因此统计需覆盖 tmpl/partials/ 下的 partial 文件。
         """
         sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
         partials_dir = os.path.join(os.path.dirname(_TEMPLATE_PATH), "partials")
@@ -108,8 +109,8 @@ class TestHtmlCssStructure(unittest.TestCase):
                     extra += len(re.findall(r'<div\s+class="section"[^>]*>', f.read()))
         self.assertEqual(
             len(sections) + extra,
-            21,
-            f"应有 21 个 .section 容器（主模板 {len(sections)} + partial {extra}），实际 {len(sections) + extra}",
+            22,
+            f"应有 22 个 .section 容器（主模板 {len(sections)} + partial {extra}），实际 {len(sections) + extra}",
         )
 
     # ── section-title pattern ──────────────────────────────────

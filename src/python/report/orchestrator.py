@@ -73,6 +73,7 @@ def prepare_report_data(
 
     from src.python.core.data_freshness import build_freshness_summary
     from src.python.core.holding_status import build_coverage_summary
+    from src.python.analysis.action_advisor import build_action_data
     from src.python.fetcher.index import fetch_indices, fetch_us_indices
     from src.python.report.market_value import (
         _generate_details,
@@ -121,6 +122,8 @@ def prepare_report_data(
         prev_trading_day=get_prev_trading_day(),
     )
 
+    # 行动建议单一数据源：再平衡信号等纯算法产出，C19 action_data 契约
+    # （单源计算，20 章行动板块与 14 章行动摘要共享同一对象）
     holdings_details = [
         {
             "name": d.name,
@@ -139,9 +142,15 @@ def prepare_report_data(
             ),
             "nav_date": d.nav_date,
             "source_api": d.source_api,
+            # shares/price 供调仓建议可行化层计算可执行卖出份额与金额
+            "shares": d.shares,
+            "price": d.price,
         }
         for d in details
     ]
+
+    # 行动建议：组装 C19 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）
+    action_data = build_action_data(holdings_details, total_mv)
 
     return {
         "details": details,
@@ -167,6 +176,8 @@ def prepare_report_data(
         "position_status": coverage_status,
         # 可信度摘要（C19 契约 data_freshness；新鲜度分类 + 单日跳变检测）
         "data_freshness": freshness_summary,
+        # 行动建议单一数据源（C19 契约 action_data；20 章行动板块 + 14 章行动摘要）
+        "action_data": action_data,
     }
 
 

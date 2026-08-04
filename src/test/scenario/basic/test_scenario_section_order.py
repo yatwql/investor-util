@@ -123,12 +123,13 @@ class TestScenarioSectionOrder(unittest.TestCase):
             self.assertEqual(s1["number"], s2["number"])
 
     def test_6_visibility_types(self):
-        """6 种 type 都有对应模块（含组合演进专属 evolution 类型）。"""
+        """7 种 type 都有对应模块（含组合演进专属 evolution 类型、行动建议专属 action 类型）。"""
         type_counts: dict[str, int] = {}
         for sec in self._default:
             type_counts[sec["type"]] = type_counts.get(sec["type"], 0) + 1
         self.assertEqual(
-            set(type_counts.keys()), {"always", "history", "fund_deep_analysis", "news", "llm", "evolution"}
+            set(type_counts.keys()),
+            {"always", "history", "fund_deep_analysis", "news", "llm", "evolution", "action"},
         )
         self.assertEqual(type_counts["always"], 6)
         self.assertEqual(type_counts["history"], 2)
@@ -136,6 +137,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(type_counts["news"], 1)
         self.assertEqual(type_counts["llm"], 5)
         self.assertEqual(type_counts["evolution"], 1)
+        self.assertEqual(type_counts["action"], 1)
 
 
 class TestScenarioCustomSectionOrder(unittest.TestCase):

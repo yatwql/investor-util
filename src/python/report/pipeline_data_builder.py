@@ -37,6 +37,8 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "position_status",
     # 可信度摘要：数据质量仪表盘可信度区块数据源（新鲜度 + 单日跳变）
     "data_freshness",
+    # 行动建议单一数据源：20 章行动板块 + 14 章行动摘要（单源计算两处呈现）
+    "action_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -60,6 +62,8 @@ _PREP_KNOWN_KEYS: set[str] = {
     "position_status",
     # 可信度摘要：由 prepare_report_data 组装（新鲜度 + 单日跳变）
     "data_freshness",
+    # 行动建议单一数据源：由 prepare_report_data 组装（单源计算两处呈现）
+    "action_data",
 }
 
 # ── 类型映射（用于自动类型断言） ──
@@ -74,6 +78,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "evolution_data": (dict, type(None)),
     "position_status": (dict, type(None)),
     "data_freshness": (dict, type(None)),
+    "action_data": (dict, type(None)),
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
@@ -93,6 +98,7 @@ _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "risk_metrics": dict,
     "position_status": dict,
     "data_freshness": dict,
+    "action_data": dict,
 }
 
 

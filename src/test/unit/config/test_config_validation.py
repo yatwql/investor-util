@@ -312,6 +312,16 @@ class TestValidateEnableBoards(unittest.TestCase):
         n = val._validate_enable_boards({"enable_portfolio_evolution": False}, 0)
         self.assertEqual(n, 0)
 
+    def test_action_non_bool_warns(self):
+        """enable_action 非布尔值 → 告警。"""
+        n = val._validate_enable_boards({"enable_action": "yes"}, 0)
+        self.assertEqual(n, 1)
+
+    def test_action_valid_bool_no_issue(self):
+        """enable_action 为合法布尔值 → 正常。"""
+        n = val._validate_enable_boards({"enable_action": False}, 0)
+        self.assertEqual(n, 0)
+
 
 class TestValidateMarketHours(unittest.TestCase):
     """_validate_market_hours 测试。"""
@@ -416,6 +426,62 @@ class TestValidateRebalanceConfig(unittest.TestCase):
     def test_target_allocation_not_dict_warns(self):
         """target_allocation 不是 dict → 告警。"""
         n = val._validate_rebalance_config({"rebalance": {"target_allocation": "invalid"}}, 0)
+        self.assertEqual(n, 1)
+
+
+class TestValidateDisciplineConfig(unittest.TestCase):
+    """_validate_discipline_config 校验函数测试（交易纪律配置段）。"""
+
+    def test_missing_no_issue(self):
+        """缺失 → 正常。"""
+        n = val._validate_discipline_config({}, 0)
+        self.assertEqual(n, 0)
+
+    def test_not_dict_warns(self):
+        """不是 dict → 告警。"""
+        n = val._validate_discipline_config({"discipline": "invalid"}, 0)
+        self.assertEqual(n, 1)
+
+    def test_non_numeric_threshold_warns(self):
+        """阈值不是数字 → 告警。"""
+        n = val._validate_discipline_config({"discipline": {"take_profit_pct": "abc"}}, 0)
+        self.assertEqual(n, 1)
+
+    def test_valid_defaults_no_issue(self):
+        """默认语义合法值 → 无告警。"""
+        cfg = {"discipline": {"take_profit_pct": 20.0, "stop_loss_pct": -15.0, "drawdown_pct": -10.0}}
+        n = val._validate_discipline_config(cfg, 0)
+        self.assertEqual(n, 0)
+
+    def test_non_positive_take_profit_warns(self):
+        """止盈线 ≤ 0 → 告警（与"盈"语义矛盾）。"""
+        n = val._validate_discipline_config({"discipline": {"take_profit_pct": 0}}, 0)
+        self.assertEqual(n, 1)
+
+    def test_non_negative_stop_loss_warns(self):
+        """止损线 ≥ 0 → 告警（与"损"语义矛盾）。"""
+        n = val._validate_discipline_config({"discipline": {"stop_loss_pct": 5}}, 0)
+        self.assertEqual(n, 1)
+
+    def test_sign_constraints_prevent_double_trigger(self):
+        """符号约束共同保证「止盈线 > 止损线」：止损线误配为正值即告警。
+
+        止损线为 +15 时（本应为负），会与止盈线 +10 冲突导致同一品种
+        可能同时触发止盈与止损，符号校验即拦截。
+        """
+        cfg = {"discipline": {"take_profit_pct": 10.0, "stop_loss_pct": 15.0}}
+        n = val._validate_discipline_config(cfg, 0)
+        self.assertEqual(n, 1)
+
+    def test_valid_custom_thresholds_no_issue(self):
+        """合法自定义阈值（正止盈/负止损，止盈线高于止损线）→ 无告警。"""
+        cfg = {"discipline": {"take_profit_pct": 10.0, "stop_loss_pct": -8.0}}
+        n = val._validate_discipline_config(cfg, 0)
+        self.assertEqual(n, 0)
+
+    def test_negative_silence_days_warns(self):
+        """负数的 silence_days → 告警。"""
+        n = val._validate_discipline_config({"discipline": {"silence_days": -1}}, 0)
         self.assertEqual(n, 1)
 
 

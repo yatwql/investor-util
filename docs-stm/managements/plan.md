@@ -9,7 +9,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：投资功能优化 + 章节归并（21 章 → 19 章）。详细设计与实施轮次见 [`plan-investment-features.md`](../plan/plan-investment-features.md)（设计层，含 §4 章节归并方案与 §4.4 架构合规自查表）与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md)（实施层，21 轮每轮量化验收）。本文档仅收录**任务摘要**，按优先级分类。
+**当前迭代**：投资功能优化 + 章节归并（22 章 → 19 章：行动建议独立章已在轮 4 新增，后续 3 处物理合并减至 19）。详细设计与实施轮次见 [`plan-investment-features.md`](../plan/plan-investment-features.md)（设计层，含 §4 章节归并方案与 §4.4 架构合规自查表）与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md)（实施层，21 轮每轮量化验收）。本文档仅收录**任务摘要**，按优先级分类。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -48,7 +48,7 @@
 
 #### `plan-18` 行动建议章（[`plan-investment-iteration.md` 阶段B](./plan-investment-iteration.md)）— **推荐②**
 
-新增 17 章「行动建议」（`always` 类型，`enable_action` 默认关）：调仓建议（可行化层，份额取整/现金约束/费用）+ 交易纪律 + 收益归因（品种贡献占比，复用 `_build_profit_attribution_block`）；12 章加「行动摘要」子块（单源计算、两处呈现）。**对应轮 4~7**。
+新增 20 章「行动建议」（`always` 类型，`enable_action` 默认关）：调仓建议（可行化层，份额取整/现金约束/费用）+ 交易纪律 + 收益归因（品种贡献占比，复用 `_build_profit_attribution_block`）；14 章加「行动摘要」子块（单源计算、两处呈现）。**对应轮 4~7**。
 
 #### `plan-19` 持仓关系矩阵合并（[`plan-investment-iteration.md` 阶段B′](./plan-investment-iteration.md)）— **推荐③**
 

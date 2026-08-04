@@ -91,6 +91,7 @@ def _compute_section_visibility(
     enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
+    enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     factor_exposure: dict | None = None,  # data 层：因子暴露 C19 dict（None=无数据，章节隐藏）
     correlation_data: dict | None = None,  # data 层：持仓相关性 C19 dict（None=无数据，章节隐藏）
@@ -111,6 +112,7 @@ def _compute_section_visibility(
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
+        "action": enable_action,  # ← board 层：行动建议（默认关）
         "llm": enable_llm,  # ← board 层
     }
     # data 层：各模块数据就绪状态
@@ -290,6 +292,7 @@ def _render_template(
     data_quality_enabled: bool = False,  # 子模块：18 章数据质量仪表盘开关
     position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status
     data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness
+    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（20 章行动板块 + 14 章行动摘要）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.report.chart_data_builder import build_evolution_chart_data
@@ -361,6 +364,7 @@ def _render_template(
         data_quality_enabled=data_quality_enabled,
         position_status=position_status,
         data_freshness=data_freshness,
+        action_data=action_data,
     )
 
 
@@ -388,9 +392,11 @@ def write_html_report(
     enable_news: bool = True,
     enable_history: bool = True,
     enable_portfolio_evolution: bool = True,
+    enable_action: bool = False,  # 行动建议独立章（20 章，enable_action 默认关）
     enable_data_quality: bool = False,  # 子模块：18 章数据质量仪表盘（report_submodules.data_quality）
     position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status（18 章品种覆盖区块）
     data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness（18 章可信度区块 + 头部摘要行）
+    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（20 章行动板块 + 14 章行动摘要）
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
@@ -540,6 +546,7 @@ def write_html_report(
         enable_fund_deep_analysis=enable_fund_deep_analysis,
         enable_history=enable_history,
         enable_portfolio_evolution=enable_portfolio_evolution,
+        enable_action=enable_action,
         enable_llm=enable_llm,  # enable_llm is the board param for LLM
         factor_exposure=factor_exposure,
         correlation_data=correlation_data,
@@ -637,6 +644,7 @@ def write_html_report(
         data_quality_enabled=enable_data_quality,
         position_status=position_status,
         data_freshness=data_freshness,
+        action_data=action_data,
     )
 
     if enable_interactive_charts:

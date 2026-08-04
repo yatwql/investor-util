@@ -17,6 +17,7 @@
   "enable_news": true,      // 市场新闻（#12）
   "enable_history": true,   // 组合历史走势+回撤（#17~18）
   "enable_portfolio_evolution": true,  // 组合演进（#19）
+  "enable_action": false,     // 行动建议（#20，默认关）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -83,6 +84,14 @@
     "equity_fixed_income": {}
   },
 
+  // ── I2. 交易纪律配置 ──
+  "discipline": {
+    "take_profit_pct": 20.0,
+    "stop_loss_pct": -15.0,
+    "drawdown_pct": -10.0,
+    "silence_days": 30
+  },
+
   // ── J. 流动性配置 ──
   "redemption_limits": {},
 
@@ -146,12 +155,17 @@
 | `rebalance.silence_days` | `30` | 再平衡信号静默期天数。同一品种触发再平衡后 N 天内不再重复 | 手动编辑 |
 | `rebalance.target_allocation` | `{}` | 目标配置 Schema（空=不启用）。格式 `{"equity":{"min":30,"max":70,"target":50}, "bond":{...}}` | 手动编辑 |
 | `rebalance.equity_fixed_income` | `{}` | 权益/固收超大类目标配置（空=不启用）。格式 `{"equity":{"min":30,"max":70}}` | 手动编辑 |
+| `discipline.take_profit_pct` | `20.0` | 止盈线（%）：单品种收益率 ≥ 此值 → 建议部分止盈 | 手动编辑 |
+| `discipline.stop_loss_pct` | `-15.0` | 止损线（%）：单品种收益率 ≤ 此值 → 建议止损/减仓 | 手动编辑 |
+| `discipline.drawdown_pct` | `-10.0` | 回撤线（%）：组合相对历史峰值回撤 ≥ 此绝对值 → 建议控回撤（需组合历史估值数据提供峰值） | 手动编辑 |
+| `discipline.silence_days` | `30` | 交易纪律信号静默期天数。同一品种触发纪律后 N 天内不再重复告警 | 手动编辑 |
 | `redemption_limits` | `{}` | 场外基金单日赎回上限，格式 `{基金代码: 金额}`。配置后程序可计算场外品种全量赎回所需天数。未配置品种标记"需手动确认赎回上限" | 手动编辑 |
 | `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）/ `code_display`（名称→"品种X"，保留代码和盈亏）/ `full_anonymous`（名称→"品种X"，代码→"000XXX"，盈亏→±XX%）/ `summary`（仅大类汇总） | 菜单 `A` |
 | `enable_fund_deep_analysis` | `true` | 基金深度分析章节可见性（模块 #6~#11），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
 | `enable_news` | `true` | 市场新闻章节可见性（模块 #12），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
 | `enable_history` | `true` | 历史走势章节可见性（模块 #17~#18），关闭后对应章节完全隐藏。持仓快照不受影响，始终自动执行 | 菜单 `P` |
 | `enable_portfolio_evolution` | `true` | 组合演进章节可见性（模块 #19），关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
+| `enable_action` | `false` | 行动建议章节可见性（模块 #20），**默认关闭**，开启后显示 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。14 章智囊团深度复盘同步显示「行动摘要」子块 | 菜单 `P` |
 
 ---
 
@@ -163,7 +177,7 @@
 
 ### B. 报告章节可见性
 
-`enable_fund_deep_analysis`、`enable_news`、`enable_history`、`enable_portfolio_evolution` 四个配置项控制报告按章节组显示或隐藏对应的章节。LLM 分析章节的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个章节组后，该组涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
+`enable_fund_deep_analysis`、`enable_news`、`enable_history`、`enable_portfolio_evolution`、`enable_action` 五个配置项控制报告按章节组显示或隐藏对应的章节。LLM 分析章节的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个章节组后，该组涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
 
 通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换各章节组的可见性。
 
@@ -173,6 +187,7 @@
 | `enable_news` | `true` | `config.json` | #12 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
 | `enable_history` | `true` | `config.json` | #17 组合历史走势、#18 历史回撤分析 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
 | `enable_portfolio_evolution` | `true` | `config.json` | #19 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
+| `enable_action` | `false` | `config.json` | #20 行动建议 | 行动建议章节组（再平衡信号/交易纪律/调仓建议/收益归因，纯算法） |
 | `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #13 全球政经局势、#14 智囊团深度复盘、#15 持仓体检报告、#16 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
@@ -358,7 +373,7 @@
 | 键 | 模块标识 | 报告模块的唯一标识，见下方列表 |
 | 值 | 正整数 | 显示序号（1~99），决定该模块在报告中的视觉位置 |
 
-**21 个模块标识及默认顺序：**
+**22 个模块标识及默认顺序：**
 
 | 默认序号 | 模块标识 | 显示名称 | 类型 |
 |:--------:|:---------|:---------|:-----|
@@ -381,8 +396,9 @@
 | 17 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
 | 18 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
 | 19 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 20 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
-| 21 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 20 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认关**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 21 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
+| 22 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 

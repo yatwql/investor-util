@@ -595,6 +595,21 @@ def is_enable_portfolio_evolution(config: dict | None = None) -> bool:
     return bool(val)
 
 
+def is_enable_action(config: dict | None = None) -> bool:
+    """行动建议独立章（20 章，决策行动）是否启用。缺失时返回 False（默认关）。
+
+    行动建议章是新增能力，默认关闭——不开时报告维持现状（无此章），
+    开启才出现第 20 章行动板块与 14 章行动摘要。
+    """
+    if config is None:
+        config = get_config()
+    val = config.get("enable_action")
+    if val is None:
+        logger.debug("config.json 缺少 enable_action，使用默认值 false")
+        return False
+    return bool(val)
+
+
 def is_enable_news(config: dict | None = None) -> bool:
     """市场新闻（#12）是否启用。缺失时返回 True。"""
     if config is None:
