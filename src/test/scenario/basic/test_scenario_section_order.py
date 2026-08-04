@@ -4,7 +4,7 @@
   - 默认顺序完整性（len(_REPORT_SECTION_DEFAULT) 个模块，summary 开头/llm_usage 结尾）
   - 序号 1~N 连续递增
   - get_report_section_keys 完备性
-  - 6 种可见性类型计数正确（always=6, history=1（合并章）, fund_deep_analysis=5, news=1, llm=5, evolution=1）
+  - 6 种可见性类型计数正确（always=6, history=1, fund_deep_analysis=5, news=1, llm=5, evolution=1）
   - 基金深度分析 data_flag 各不相同
   - 空配置与无配置行为一致
 
@@ -84,7 +84,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(sec["data_flag"], "evolution_data")
 
     def test_default_fund_deep_analysis_type_has_4_sections(self):
-        """基金深度分析类型模块共 4 个（风格与因子分析为合并章，替代原 fund_style/factor_exposure 两章）。"""
+        """基金深度分析类型模块共 4 个（含风格与因子分析一章三区块）。"""
         fund_deep_analysis = [s for s in self._default if s["type"] == "fund_deep_analysis"]
         self.assertEqual(len(fund_deep_analysis), 4)
         keys = [s["key"] for s in fund_deep_analysis]

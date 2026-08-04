@@ -2,7 +2,7 @@
 
 用于支持 ``//`` 注释的 JSON 文件（config.json / llm_settings.json / llm_key.json /
 llm_providers.json）：写入时保留原文件注释与空白，仅替换发生变化的字段。
-字段级替换自 tui/handlers_config.py 提取，顶层键扫描引擎自 config/_core.py 迁入。
+模块内含字段级替换与顶层键扫描/patch 两类引擎，共用注释感知的扫描基元。
 
 对外提供：
   _update_json_raw_text(raw, current, new) — 字段级文本替换（llm_settings 用）
@@ -99,7 +99,7 @@ def _replace_dict_block(text: str, key: str, new_val: dict) -> str:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 顶层键扫描/patch 引擎（自 config/_core.py 迁入，与字段级替换同属本模块）
+# 顶层键扫描/patch 引擎（与字段级替换同属本模块）
 # ═══════════════════════════════════════════════════════════════
 
 

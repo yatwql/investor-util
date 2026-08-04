@@ -306,7 +306,7 @@ class TestReportSectionDefault:
         assert sec["type"] == "fund_deep_analysis"
         assert sec["data_flag"] == "style_factor_data"
         assert sec["number"] == 9
-        # 合并后旧章节 key 与旧 data_flag 不再注册
+        # 旧章节 key 与旧 data_flag 不应注册
         keys = [s["key"] for s in _REPORT_SECTION_DEFAULT]
         assert "fund_style" not in keys, "旧基金风格章节 key 不应再注册"
         assert "factor_exposure" not in keys, "旧因子暴露章节 key 不应再注册"
@@ -338,7 +338,7 @@ class TestReportSectionDefault:
         assert not duplicates, f"重复的 key: {duplicates}"
 
     def test_old_relationship_sections_removed(self):
-        """持仓关系矩阵合并后：旧章节 key 与旧 data_flag 不再注册，position_relationship 以序号 7 注册。"""
+        """持仓关系矩阵一章两区块：旧章节 key 与旧 data_flag 不再注册，position_relationship 以序号 7 注册。"""
         keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         assert "fund_overlap" not in keys, "旧重合度章节 key 不应再注册"
         assert "correlation_analysis" not in keys, "旧相关性章节 key 不应再注册"

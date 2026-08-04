@@ -1856,7 +1856,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div>* 轻度(1分) / 中度(2分) / 严重(≥3分) — 首次运行记录基线，基准确立中</div>
             </div>
             {% else %}
-            <div class="empty-section">📭 暂无基金风格分析数据（未检测到基金持仓或 API 返回为空）</div>
+            <div class="empty-section">📭 暂无基金风格表数据（未检测到基金持仓或 API 返回为空）</div>
             {% endif %}
 
             <!-- 区块二：风格因子回归 -->
@@ -2286,7 +2286,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% else %}
             <div class="chart-caption">组合净值走势</div>
             {% endif %}
-            <!-- 指标汇总（合并章唯一指标区：累计收益/最大回撤/波动率/起止日 + 回撤状态，不重复） -->
+            <!-- 指标汇总（组合历史走势与回撤章唯一指标区：累计收益/最大回撤/波动率/起止日 + 回撤状态，不重复） -->
             <div class="summary-grid" style="margin-top:16px;">
                 <div class="summary-card">
                     <h3>累计收益</h3>
@@ -2452,7 +2452,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
             <div class="chart-caption">说明：阴影/高亮区间为历史上 A 股主要危机时段；区间与报告数据窗口重叠时统计区间最大回撤与恢复耗时</div>
             {% endif %}
-            <!-- 数据加载状态（合并章单一份） -->
+            <!-- 数据加载状态（组合历史走势与回撤章单一份） -->
             {% if history_data.warnings or history_data.failed_holdings or history_data.successful_holdings %}
             <div class="data-status" style="margin-top:12px;">
                 {% if history_data.warnings %}

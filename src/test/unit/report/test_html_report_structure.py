@@ -1292,12 +1292,12 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 "fund_concentration",
                 "style_factor",
             ],
-            "「基金深度」组应含基金业绩 + 基金深度分析四章（含合并章持仓关系矩阵/风格与因子分析）",
+            "「基金深度」组应含基金业绩 + 基金深度分析四章（含持仓关系矩阵/风格与因子分析）",
         )
         self.assertEqual(
             _group_keys("history"),
             ["portfolio_history_drawdown"],
-            "「历史」组应含组合历史走势与回撤合并章",
+            "「历史」组应含组合历史走势与回撤章",
         )
         self.assertEqual(
             _group_keys("llm"),

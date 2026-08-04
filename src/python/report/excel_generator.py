@@ -21,7 +21,7 @@ from src.python.report.progress import ProgressReporter, SilentProgressReporter,
 logger = setup_logger()
 
 
-# ── 组合历史走势与回撤页签写入（合并章：走势表 + 回撤矩阵 + 危机区间标注） ──────
+# ── 组合历史走势与回撤页签写入（一章两区块：走势表 + 回撤矩阵 + 危机区间标注） ──────
 
 
 def _write_portfolio_history_drawdown_sheet(
@@ -30,7 +30,7 @@ def _write_portfolio_history_drawdown_sheet(
     crisis_annotation: dict[str, Any] | None = None,
     tail_risk: dict[str, Any] | None = None,
 ) -> None:
-    """写入组合历史走势与回撤合并页签（一章两区块 + 危机区间标注 + 尾部风险）。
+    """写入组合历史走势与回撤页签（一章两区块 + 危机区间标注 + 尾部风险）。
 
     Args:
         sheets: 页签字典，读取 `portfolio_history_drawdown` 键。
@@ -280,7 +280,7 @@ def generate_excel_report(
         sheets, include_llm, llm_content, prog, section_order=order, debate_mode_label=_debate_mode_label
     )
 
-    # ── 组合历史走势与回撤页签（合并章：走势表 + 回撤矩阵 + 危机区间标注） ──
+    # ── 组合历史走势与回撤页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注） ──
     if enable_history:
         ws_hd = sheets.get("portfolio_history_drawdown")
         if ws_hd is not None:

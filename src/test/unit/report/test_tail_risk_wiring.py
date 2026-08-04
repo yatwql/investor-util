@@ -3,7 +3,7 @@
 覆盖：
   - _prepare_full_risk_metrics 将 tail_risk_data 注入 pipeline_data（充足 / 不足）
   - Excel：write_portfolio_history_drawdown_sheet 尾部指标行（可用 / 占位）
-  - HTML：合并章尾部风险卡（可用 / 样本不足 / 未恢复 / 图下说明）
+  - HTML：组合历史走势与回撤章尾部风险卡（可用 / 样本不足 / 未恢复 / 图下说明）
 """
 
 from __future__ import annotations
@@ -155,7 +155,7 @@ class TestPipelineInjection:
 
 
 class TestExcelTailRiskRows:
-    """Excel 合并章尾部指标行呈现。"""
+    """Excel 组合历史走势与回撤章尾部指标行呈现。"""
 
     def _write(self, history_data, tail_risk=None):
         from openpyxl import Workbook
@@ -223,7 +223,7 @@ class TestExcelTailRiskRows:
 
 
 class TestHtmlTailRiskCards:
-    """HTML 合并章尾部风险卡呈现。"""
+    """HTML 组合历史走势与回撤章尾部风险卡呈现。"""
 
     def _render_section(self, tail_risk: dict | None) -> "object":
         order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]

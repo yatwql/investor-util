@@ -1,10 +1,5 @@
 """数据源注册中心 — 集中管理熔断状态、会话缓存、获取策略。
 
-取代：
-  - chain.py 的 4 个全局变量（_PROVIDER_SKIP / _SKIP_TIME / _CONSECUTIVE_FAILURES / _LOCK）
-  - fund_style_analysis._ext_memo / eastmoney_industry._ext_memo / eastmoney_industry_rest._ext_memo
-  - fund_style_analysis._tencent_failures
-
 与 data_status.py DegradationTracker 边界：
   DataSourceRegistry（熔断层）:
     管"这个 Provider 能不能调用"（HTTP 层面的快速跳过）

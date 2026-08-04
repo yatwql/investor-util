@@ -122,7 +122,7 @@ def _compute_section_visibility(
         "style_data": style_analysis is not None,
         "news_data_available": include_news,  # ← data 层（菜单类型+数据状态）
         "llm_data_available": llm_enabled_flag,  # ← data 层（LLM 生成成功？）
-        # 风格与因子合并章可见性：风格表（渲染期派生）或因子数据（数据契约）任一就绪即可见；
+        # 风格与因子章可见性：风格表（渲染期派生）或因子数据（数据契约）任一就绪即可见；
         # 模板依据 available/status 在"完整内容/数据不足/数据源暂不可用"间切换（§1.4.5）
         "style_factor_data": style_factor_data is not None or style_analysis is not None,
         # 持仓关系矩阵 = 重合度区块（render 时计算）∪ 相关性区块（数据契约 数据源）：
@@ -467,8 +467,8 @@ def _render_template(
     position_status: dict | None = None,  # 品种覆盖诊断 position_status
     data_freshness: dict | None = None,  # 可信度摘要 data_freshness
     action_data: dict | None = None,  # 行动建议单一数据源 action_data（行动板块 + 智囊团深度复盘行动摘要）
-    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data（合并章）
-    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（合并章指标卡）
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data
+    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部）
     fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源）
     valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（穿透估值列，None=开关关闭）
@@ -482,8 +482,8 @@ def _render_template(
     valuation_enabled = valuation_data is not None
     penetration_display = _attach_valuation_to_penetration(penetration, valuation_data)
     market_temperature = _build_temperature_display(market_temperature_data)
-    # 目录分组导航：按「基础/基金深度/风险/历史/LLM」五组折叠（section_visible 闭包过滤不可见章节）
-    section_groups = _build_section_nav_groups(order, section_visible, section_numbers)
+    # 目录分组导航：按「基础/基金深度/风险/历史/LLM」五组折叠（_sv_fn 闭包过滤不可见章节）
+    section_groups = _build_section_nav_groups(order, _sv_fn, section_numbers)
 
     return _ENV.get_template("report_template.html").render(
         flow_display=_build_flow_display(fund_flow_data),
@@ -601,8 +601,8 @@ def write_html_report(
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
-    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data（合并章）
-    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（合并章指标卡）
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data
+    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部变化摘要）
     fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源，None=开关关闭）
     valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（「资产穿透TOP10」估值分位列，None=开关关闭）

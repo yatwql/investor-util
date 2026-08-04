@@ -788,7 +788,7 @@ class TestCreateSheets(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
 
         wb = self._make_wb()
-        # always(6) + history(1，合并章) + evolution(1) = 8 个页签，连续编号 1-8（组合演进为独立 evolution 类型）
+        # always(6) + history(1) + evolution(1) = 8 个页签，连续编号 1-8（组合演进为独立 evolution 类型）
         sheets = create_sheets(
             wb, _REPORT_SECTION_DEFAULT, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False
         )
@@ -806,7 +806,7 @@ class TestCreateSheets(unittest.TestCase):
         for key, title in expected_titles.items():
             self.assertIn(key, sheets, f"{key} should be created")
             self.assertEqual(sheets[key].title, title, f"{key} title mismatch")
-        # 回归：组合历史走势与回撤渲染为单一 sheet，不再生成独立 sheet
+        # 回归：组合历史走势与回撤渲染为单一 sheet（走势表 + 回撤矩阵区块合一）
         self.assertNotIn("portfolio_history", sheets)
         self.assertNotIn("drawdown_analysis", sheets)
 
@@ -839,7 +839,7 @@ class TestCreateSheets(unittest.TestCase):
             data_availability={"news_data_available": True},
         )
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
-        # always(6) + history(1，合并章) + evolution(1) + news(1) = 9
+        # always(6) + history(1) + evolution(1) + news(1) = 9
         self.assertEqual(len(sheets), 9)
         for key in news_keys:
             self.assertIn(key, sheets)
@@ -850,7 +850,7 @@ class TestCreateSheets(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
 
         wb = self._make_wb()
-        # always(6) + history(1，合并章) = 7（evolution 关闭，无组合演进页签）
+        # always(6) + history(1) = 7（evolution 关闭，无组合演进页签）
         sheets = create_sheets(
             wb,
             _REPORT_SECTION_DEFAULT,
