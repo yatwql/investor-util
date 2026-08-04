@@ -153,6 +153,10 @@ class TestPrepareReportData:
             "data_freshness",
             # 行动建议单一数据源：「行动建议」章行动板块 + 「智囊团深度复盘」章行动摘要共享（数据契约）
             "action_data",
+            # 估值分位契约（report_submodules.valuation_percentile 关闭时为 None）
+            "valuation_data",
+            # 市场温度契约（report_submodules.market_temperature 关闭时为 None）
+            "market_temperature_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 

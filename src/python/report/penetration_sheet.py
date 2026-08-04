@@ -52,6 +52,38 @@ _HEADERS = [
     "年均股息",
     "来源明细",
 ]
+# 估值分位列（report_submodules.valuation_percentile 开启时追加，ncols=11）
+_VALUATION_HEADER = "估值分位"
+
+
+def _get_valuation_text(valuation_data: dict | None, codes: list[str]) -> str:
+    """根据估值分位数据契约与代码列表，生成估值分位列文本。
+
+    Args:
+        valuation_data: 估值分位数据契约（valuation_data，by_code 子键）。
+        codes: 穿透标的关联的证券代码列表（依次查找首个有数据的代码）。
+
+    Returns:
+        展示文本（如 "PE 12.3 · PB 1.56 · 分位 45%（合理）"）；无数据返回 "--"。
+    """
+    if not valuation_data:
+        return "--"
+    by_code = valuation_data.get("by_code") or {}
+    for code in codes:
+        info = by_code.get(code)
+        if not info:
+            continue
+        parts: list[str] = []
+        pe = info.get("pe")
+        pb = info.get("pb")
+        if pe is not None:
+            parts.append(f"PE {pe:.1f}")
+        if pb is not None:
+            parts.append(f"PB {pb:.2f}")
+        if info.get("percentile_available") and info.get("price_percentile") is not None:
+            parts.append(f"分位 {info['price_percentile']:.0f}%（{info.get('tier', '--')}）")
+        return " · ".join(parts) if parts else "--"
+    return "--"
 
 
 def _get_eps_text(forecast: dict, codes: list[str]) -> str:
@@ -228,6 +260,7 @@ def write_penetration_sheet(
     holdings: list[Holding],
     details: list[DetailRow],
     penetration_data: dict | None = None,
+    valuation_data: dict | None = None,
 ) -> None:
     """写入资产穿透TOP10。
 
@@ -239,9 +272,16 @@ def write_penetration_sheet(
         details: 市值核算明细行列表
         penetration_data: 预计算穿透数据。为 None 时自动计算，提供时跳过
                           内部重复计算，用于调用方已算过一轮的场景
+        valuation_data: 估值分位数据契约（valuation_data）。非 None 时追加
+            「估值分位」列（ncols 10→11，表尾附免责声明），当前 PE/PB + 价格
+            分位代理；None 时保持既有 10 列输出（report_submodules.valuation_percentile 关闭）
     """
-    row = write_title_row(ws, 1, get_report_sheet_name("penetration"), _NCOLS)
-    row = write_header_row(ws, row, _HEADERS)
+    from src.python.analysis.valuation_percentile import DISCLAIMER
+
+    ncols = _NCOLS + (1 if valuation_data is not None else 0)
+    headers = _HEADERS + ([_VALUATION_HEADER] if valuation_data is not None else [])
+    row = write_title_row(ws, 1, get_report_sheet_name("penetration"), ncols)
+    row = write_header_row(ws, row, headers)
 
     result = penetration_data if penetration_data is not None else compute_penetration_top10(holdings, details)
 
@@ -277,10 +317,17 @@ def write_penetration_sheet(
             div_text,
             "; ".join(entry["sources"]),
         ]
-        write_data_row(ws, row, vals, _num_formats())
+        if valuation_data is not None:
+            vals.append(_get_valuation_text(valuation_data, codes))
+        write_data_row(ws, row, vals, _num_formats(ncols))
         row += 1
 
     row = _write_penetration_footer(ws, row, summary)
+    # 估值分位免责声明（价格分位代理，非真实历史估值分位）
+    if valuation_data is not None:
+        row += 1
+        write_data_row(ws, row, [f"* 估值分位说明：{DISCLAIMER}（PE/PB 为当前行情值）"])
+        row += 1
     data_status = build_penetration_data_status(result, profit_success, dividend_success)
     _write_data_status_foot(ws, data_status, start_row=row)
     freeze_header(ws, 2)
@@ -289,9 +336,13 @@ def write_penetration_sheet(
     logger.info("%s写入完成，合并 %d 个标的", get_report_sheet_name("penetration"), summary["merged_count"])
 
 
-def _num_formats() -> list[str | None]:
-    """每列的 Excel 数字格式。"""
-    return [
+def _num_formats(ncols: int = _NCOLS) -> list[str | None]:
+    """每列的 Excel 数字格式。
+
+    Args:
+        ncols: 总列数（估值分位开关开启时为 11）。
+    """
+    formats = [
         "",  # 1  排名
         "",  # 2  名称
         "",  # 3  代码
@@ -303,3 +354,6 @@ def _num_formats() -> list[str | None]:
         "",  # 9  年均股息
         "",  # 10 来源明细
     ]
+    if ncols > _NCOLS:
+        formats.append("")  # 11 估值分位
+    return formats

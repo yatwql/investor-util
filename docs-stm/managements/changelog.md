@@ -8,6 +8,14 @@
 
 ### 开发中（未发布）
 
+#### 估值分位 + 市场温度（plan-23 轮17/轮18，`valuation_data`/`market_temperature_data` 契约）
+
+- **估值分位（轮17）**：新增 `src/python/analysis/valuation_percentile.py`（纯计算层）——`extract_closes()` 收盘价提取（股票 `close` 优先、场外基金回退 `nav`，过滤 None/NaN）、`price_percentile()` 价格分位（0~100，`MIN_SAMPLES=60` 样本下限）、`compute_price_percentile()` 分位+三档刻度（低估/合理/高估）契约、`DISCLAIMER`（"价格分位代理，非真实历史估值分位"）；`providers/eastmoney_industry.py` push2 扩展字段 `fetch_valuation_fields()`（PE/PB，复用既有 push2 请求通道 + 会话缓存）。「资产穿透TOP10」章追加「估值分位」列（Excel `penetration_sheet` ncols 10→11 + 表尾免责声明；HTML `report_template.html` 条件列），开关 `report_submodules.valuation_percentile` **默认关**（关闭时列隐藏、输出与改造前一致）。
+- **市场温度（轮18）**：新增 `src/python/analysis/market_temperature.py`（纯计算层）——`ma_deviation()` 均线偏离（小数比例）、`returns_volatility()` 年化波动率（√252 年化）、`temperature_score()` 三因子合成（0.5×分位 + 0.3×均线偏离分量 + 0.2×波动率分量，各分量 clamp 0~100）、`compute_temperature()` 温度契约（`MA_DEVIATION_SPAN=±20%`、`VOLATILITY_SPAN=50%` 映射区间）；**温度计只给刻度、无仓位指令**（`TEMPERATURE_DISCLAIMER` 渲染层必须展示）。「投资分析汇总」章「市场指数」后追加「市场温度」刻度行（Excel `summary._write_market_temperature`；HTML kv-table），三因子行展示转百分数（`dev/vol ×100`，分位已为 0~100）。开关 `report_submodules.market_temperature` **默认关**（与 `cost_lots` 同章不同行、开关独立互不影响）。
+- **编排与契约**：`orchestrator.py` 新增 `compute_valuation_data()`（A 股去重 → ThreadPoolExecutor 并行 `_fetch_valuation_for_code`：push2 PE/PB + 历史 K 线价格分位，PE/PB 与分位任一可得即计入）、`compute_market_temperature_data()`（`fetch_index_history` 沪深300 → `compute_temperature`，指数 K 线不足 `insufficient` 占位）；`prepare_report_data` 注入 `valuation_data`/`market_temperature_data` 键；`pipeline_data_builder.py` 注册两键（已知键 + 类型映射，None 允许）；`_report_generation.py` both/full 路径透传；`excel_generator`/`excel_content_sheets`/`html_writer` 同步接线（`_build_temperature_display`/`_attach_valuation_to_penetration` 不可变展示映射）。
+- **测试**：新增 `src/test/unit/analysis/test_valuation_percentile.py`（16 例：收盘价提取/分位解析解/三档刻度/数据不足/局限标注）、`test_valuation_percentile_edge.py`（边缘）、`src/test/unit/analysis/test_market_temperature.py`（17 例：均线偏离/波动率/三因子合成/刻度映射/免责声明/数据不足）、`test_market_temperature_edge.py`（边缘）；报告层接线 `src/test/unit/report/test_valuation_temperature_wiring.py`（24 例：HTML 展示构建器/穿透估值列文本/汇总温度行/编排开关降级与契约）；`test_orchestrator.py` 期望键补 `valuation_data`/`market_temperature_data`；修复温度展示小数比例转百分数 bug（`dev/vol ×100`）。dev-verify 1694 passed + 3 check 全 [OK]。
+- **文档同步**：plan.md（plan-23 轮17~18 已完成）、plan-investment-iteration.md（轮17/轮18 验收）、technical.md（附录 H 两契约行 + 数据契约键记录）、folders.md 目录树（analysis 两模块 + 5 个新测试文件）。
+
 ## [0.10.3] - 2026-08-05
 
 #### 风格与因子分析合并章 + 行业 Beta 子表（plan-21 轮12，章节数 20→19）

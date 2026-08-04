@@ -262,6 +262,77 @@ def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
     }
 
 
+def _build_temperature_display(market_temperature_data: dict | None) -> dict | None:
+    """将市场温度数据契约（market_temperature_data）转成 HTML 模板友好展示映射。
+
+    Args:
+        market_temperature_data: 市场温度数据契约（None = 开关关闭）。
+
+    Returns:
+        含 available/score/tier/components/index_name/disclaimer 的展示 dict，或 None。
+    """
+    from src.python.analysis.market_temperature import TEMPERATURE_DISCLAIMER
+
+    if not market_temperature_data:
+        return None
+    if not market_temperature_data.get("available"):
+        return {
+            "available": False,
+            "score": None,
+            "tier": None,
+            "components": None,
+            "index_name": market_temperature_data.get("index_name") or "沪深300",
+            "disclaimer": market_temperature_data.get("disclaimer") or TEMPERATURE_DISCLAIMER,
+        }
+    pct = market_temperature_data.get("price_percentile")
+    dev = market_temperature_data.get("ma_deviation")
+    vol = market_temperature_data.get("volatility")
+    components = None
+    if all(v is not None for v in (pct, dev, vol)):
+        # 分位为 0~100，均线偏离/波动率为小数比例（0.032=3.2%），转百分数展示
+        components = {
+            "price_percentile": f"{pct:.1f}%",
+            "ma_deviation": f"{dev * 100:+.1f}%",
+            "volatility": f"{vol * 100:.1f}%",
+        }
+    return {
+        "available": True,
+        "score": market_temperature_data.get("score"),
+        "tier": market_temperature_data.get("tier") or "合理",
+        "components": components,
+        "index_name": market_temperature_data.get("index_name") or "沪深300",
+        "disclaimer": market_temperature_data.get("disclaimer") or TEMPERATURE_DISCLAIMER,
+    }
+
+
+def _attach_valuation_to_penetration(
+    penetration: dict | None,
+    valuation_data: dict | None,
+) -> dict | None:
+    """为穿透 TOP10 数据附加估值分位文本（返回新 dict，不修改原对象）。
+
+    Args:
+        penetration: 穿透 TOP10 数据（含 top10/summary）。
+        valuation_data: 估值分位数据契约；None 时原样返回（不附加列）。
+
+    Returns:
+        新 penetration dict（每个 top10 条目增加 valuation_text 字段），
+        或原 penetration（valuation_data 为 None）。
+    """
+    if not valuation_data or not penetration:
+        return penetration
+    from src.python.report.penetration_sheet import _get_valuation_text
+
+    display = dict(penetration)
+    top10 = []
+    for entry in display.get("top10", []):
+        e = dict(entry)
+        e["valuation_text"] = _get_valuation_text(valuation_data, entry.get("codes", []))
+        top10.append(e)
+    display["top10"] = top10
+    return display
+
+
 def _render_template(
     *,
     now_str: str,
@@ -329,12 +400,22 @@ def _render_template(
     tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（合并章指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部）
     fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源）
+    valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（穿透估值列，None=开关关闭）
+    market_temperature_data: dict
+    | None = None,  # 市场温度数据契约 market_temperature_data（汇总温度行，None=开关关闭）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.report.chart_data_builder import build_evolution_chart_data
 
+    # 估值分位 + 市场温度：开关关闭时为 None（模板保持既有输出）
+    valuation_enabled = valuation_data is not None
+    penetration_display = _attach_valuation_to_penetration(penetration, valuation_data)
+    market_temperature = _build_temperature_display(market_temperature_data)
+
     return _ENV.get_template("report_template.html").render(
         flow_display=_build_flow_display(fund_flow_data),
+        valuation_enabled=valuation_enabled,
+        market_temperature=market_temperature,
         now=now_str,
         today=today_str,
         trading_day=trading_day,
@@ -351,7 +432,7 @@ def _render_template(
         accounts=accounts,
         account_totals=account_totals,
         cat_data=cat_data,
-        penetration=penetration,
+        penetration=penetration_display,
         perf_data=perf_data,
         candidate_data=candidate_data,
         # SAC: news_data[*].enriched_keywords[*].display 来自外部 API
@@ -450,6 +531,9 @@ def write_html_report(
     tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（合并章指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部变化摘要）
     fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源，None=开关关闭）
+    valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（「资产穿透TOP10」估值分位列，None=开关关闭）
+    market_temperature_data: dict
+    | None = None,  # 市场温度数据契约 market_temperature_data（「投资分析汇总」温度行，None=开关关闭）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -697,6 +781,8 @@ def write_html_report(
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,
         fund_flow_data=fund_flow_data,
+        valuation_data=valuation_data,
+        market_temperature_data=market_temperature_data,
     )
 
     if enable_interactive_charts:

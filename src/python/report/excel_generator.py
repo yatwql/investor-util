@@ -152,6 +152,9 @@ def generate_excel_report(
     enable_cost_lots: bool = False,  # 子模块：成本流水（成本分档 + XIRR + 分红累计，report_submodules.cost_lots）
     transactions: list | None = None,  # 交易流水记录（「交易流水」页签，无则 None）
     dividends: list | None = None,  # 分红流水记录（「分红流水」页签，无则 None）
+    valuation_data: dict | None = None,  # 估值分位数据契约（「资产穿透TOP10」估值分位列；None 时从 pipeline_data 读取）
+    market_temperature_data: dict
+    | None = None,  # 市场温度数据契约（「投资分析汇总」温度刻度行；None 时从 pipeline_data 读取）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -183,6 +186,10 @@ def generate_excel_report(
             默认 False（向后兼容，「投资分析汇总」/「市值核算明细表」/「持仓分类表」保持既有输出）
         transactions: 交易流水记录（「交易流水」页签），成本分档/FIFO 批次与 XIRR 现金流用
         dividends: 分红流水记录（「分红流水」页签），分红累计与 XIRR 现金流用
+        valuation_data: 估值分位数据契约（当前 PE/PB + 价格分位代理），
+            report_submodules.valuation_percentile 关闭或传入 None 时穿透页签保持既有输出。
+        market_temperature_data: 市场温度数据契约（三因子合成温度计），
+            report_submodules.market_temperature 关闭或传入 None 时汇总页签保持既有输出。
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
@@ -233,7 +240,22 @@ def generate_excel_report(
     a_idx, us_idx = resolve_indices(a_indices, us_indices, modules, prog)
 
     # ── 各页签写入 ──
-    pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog, enable_cost_lots=enable_cost_lots)
+    pen_result = write_content_sheets(
+        sheets,
+        holdings,
+        data,
+        a_idx,
+        us_idx,
+        modules,
+        prog,
+        enable_cost_lots=enable_cost_lots,
+        valuation_data=valuation_data if valuation_data is not None else (pipeline_data or {}).get("valuation_data"),
+        market_temperature_data=(
+            market_temperature_data
+            if market_temperature_data is not None
+            else (pipeline_data or {}).get("market_temperature_data")
+        ),
+    )
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
     # 风格与因子分析：数据契约 数据在编排层注入 pipeline_data（style_factor_data 主键），
     # 此处透传页签写入（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）

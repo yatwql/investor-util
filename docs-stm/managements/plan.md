@@ -24,7 +24,7 @@
 
 ### 推荐实施顺序
 
-> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑧ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列；plan-8/plan-10 已归 P4 实验功能，不列入当前实施序列。**标记 ✅ 的为已完成项**（P1 轮 1~11 + 阶段 D 轮 12~13 + 阶段 E 轮 14~16，changelog v0.10.1/v0.10.3），保留在表中供追溯；待办序列自 ⑦ 起。
+> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑧ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列；plan-8/plan-10 已归 P4 实验功能，不列入当前实施序列。**标记 ✅ 的为已完成项**（P1 轮 1~11 + 阶段 D 轮 12~13 + 阶段 E 轮 14~16 + 阶段 F 轮 17~18，changelog v0.10.1/v0.10.3/v0.10.4-dev），保留在表中供追溯；待办序列自 ⑧ 起。
 
 | 次序 | 计划项 | 归类 | 工作量 | 推荐理由 |
 |:--:|:--|:--:|:--:|:--|
@@ -34,7 +34,7 @@
 | ④ | ✅ **plan-20** 历史增强 | P1 | 轮9~11 | 合并组合历史+回撤 + 危机标注 + 尾部风险 |
 | ⑤ | ✅ **plan-21** 风格与选基 | P2 | 轮12~13 | 风格与因子合并 + 行业 Beta（20→19 章）+ 候选基金比较增强（`candidate_compare` 默认关），changelog v0.10.3 |
 | ⑥ | ✅ **plan-22** 成本流水 | P2 | 轮14~16 | 依赖持仓文件格式扩展，输入→计算→渲染 |
-| ⑦ | **plan-23** 估值与温度 | P3 | 轮17~18 | 免费代理信号，合规敏感，放最后 |
+| ⑦ | ✅ **plan-23** 估值与温度 | P3 | 轮17~18 | 免费代理信号，合规敏感，放最后 |
 | ⑧ | **plan-24** 导航与收尾 | P3 | 轮19~20 | 分组导航 + 文档快照，收尾性质 |
 
 ### P1 — 已完成（轮 1~11）
@@ -67,11 +67,13 @@
 
 持仓 Excel 新增**可选**「交易流水」「分红流水」页签（不破坏既有 4 列）+ 资金加权收益（XIRR）+ 成本分档；「投资分析汇总」/「市值核算明细表」/「持仓分类表」章渲染（Excel + HTML）。**对应轮 14~16，已完成**——轮 14 持仓文件格式扩展（`TradeRecord`/`DividendRecord` + `read_flow_sheets()`/`read_holdings_with_flows()`，20 例解析测试、覆盖率 93%）；轮 15 XIRR 资金加权收益 + 成本分档（`analysis/cost_flow.py` 纯计算层，24 例、覆盖率 94%）；轮 16 三页签渲染（`report_submodules.cost_lots` 默认关 + `fund_flow_data` 数据契约 + CLI/TUI 接线，新增测试 32 个、受影响套件 267 passed，dev-verify 1638 passed）；**HTML 渲染补齐**（轮16 补遗：`html_writer._build_flow_display` 复用加权成本/分档标签组装展示映射 + 模板三处条件渲染，新增测试 12 个）。
 
+### P3 — 已完成（轮 17~18）
+
+#### ✅ `plan-23` 估值与温度（[`plan-investment-iteration.md` 阶段F](./plan-investment-iteration.md)）— **推荐⑦ · 已完成**
+
+「资产穿透TOP10」章估值分位（当前 PE/PB + 价格分位代理，显式标注局限）+「投资分析汇总」章市场温度（价格分位+均线偏离+波动率三因子，温度计无仓位指令）。**对应轮 17~18，已完成**——轮 17 估值分位（`analysis/valuation_percentile.py` 纯计算层 + `providers/eastmoney_industry.py` push2 扩展 PE/PB + 编排层 `compute_valuation_data`，穿透 TOP10 追加「估值分位」列，开关 `report_submodules.valuation_percentile` 默认关）；轮 18 市场温度（`analysis/market_temperature.py` 纯计算层，复用价格分位机制，编排层 `compute_market_temperature_data`，汇总章追加「市场温度」刻度行，开关 `report_submodules.market_temperature` 默认关）；双开关独立、同章不同行互不影响，`valuation_data`/`market_temperature_data` 数据契约注册，dev-verify 1694 passed + 3 check 全 [OK]。
+
 ### P3 — 预期实施
-
-#### `plan-23` 估值与温度（[`plan-investment-iteration.md` 阶段F](./plan-investment-iteration.md)）— **推荐⑦**
-
-「资产穿透TOP10」章估值分位（当前 PE/PB + 价格分位代理，显式标注局限）+「投资分析汇总」章市场温度（价格分位+均线偏离+波动率三因子，温度计无仓位指令）。**对应轮 17~18**。
 
 #### `plan-24` 导航与收尾（[`plan-investment-iteration.md` 阶段G](./plan-investment-iteration.md)）— **推荐⑧**
 

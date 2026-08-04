@@ -92,15 +92,15 @@ def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -
 def _inject_evolution_data(pipeline_data: dict | None) -> dict:
     """计算组合演进数据并注入 pipeline_data（`evolution_data` 键）。
 
-    聚合 `data/history/snapshots/` 多期快照，供 HTML「组合演进」章节与
-    Excel 页签消费。计算失败或数据不足时注入 available=False 的降级 dict，
- 展示层写占位文本（§1.4.5），不阻断报告生成（隔离）。
+       聚合 `data/history/snapshots/` 多期快照，供 HTML「组合演进」章节与
+       Excel 页签消费。计算失败或数据不足时注入 available=False 的降级 dict，
+    展示层写占位文本（§1.4.5），不阻断报告生成（隔离）。
 
-    Args:
-        pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
+       Args:
+           pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
 
-    Returns:
-        注入 evolution_data 后的 pipeline_data（None 时新建字典）
+       Returns:
+           注入 evolution_data 后的 pipeline_data（None 时新建字典）
     """
     if pipeline_data is None:
         pipeline_data = {}
@@ -117,16 +117,16 @@ def _inject_evolution_data(pipeline_data: dict | None) -> dict:
 def _inject_snapshot_diff_data(pipeline_data: dict | None) -> dict:
     """计算快照差异摘要并注入 pipeline_data（`snapshot_diff_data` 键）。
 
-    对比 `data/history/snapshots/` 去重后最近两次快照，输出组合演进章顶部
-    「自上次快照变化摘要」（新增/移除品种 + 集中度 HHI 变化 + 超警戒线品种）。
-    有效快照 < 2 期时返回 available=False 的降级 dict，展示层写占位
- （§1.4.5），不阻断报告生成（隔离）。
+       对比 `data/history/snapshots/` 去重后最近两次快照，输出组合演进章顶部
+       「自上次快照变化摘要」（新增/移除品种 + 集中度 HHI 变化 + 超警戒线品种）。
+       有效快照 < 2 期时返回 available=False 的降级 dict，展示层写占位
+    （§1.4.5），不阻断报告生成（隔离）。
 
-    Args:
-        pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
+       Args:
+           pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
 
-    Returns:
-        注入 snapshot_diff_data 后的 pipeline_data（None 时新建字典）
+       Returns:
+           注入 snapshot_diff_data 后的 pipeline_data（None 时新建字典）
     """
     if pipeline_data is None:
         pipeline_data = {}
@@ -321,6 +321,8 @@ def _generate_full_html_report(
     tail_risk_data: dict | None = None,
     snapshot_diff_data: dict | None = None,
     fund_flow_data: dict | None = None,
+    valuation_data: dict | None = None,
+    market_temperature_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -345,6 +347,10 @@ def _generate_full_html_report(
         fund_flow_data: 成本流水数据 dict
             （汇总 XIRR / 持仓分类成本分档与分红 / 市值核算资金加权成本渲染数据源，
             开关关闭或传入 None 时模板保持既有输出）。
+        valuation_data: 估值分位数据契约 dict（「资产穿透TOP10」估值分位列数据源，
+            开关关闭或传入 None 时模板保持既有输出）。
+        market_temperature_data: 市场温度数据契约 dict
+            （「投资分析汇总」市场温度刻度行数据源，开关关闭或传入 None 时保持既有输出）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -394,6 +400,8 @@ def _generate_full_html_report(
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=snapshot_diff_data,
             fund_flow_data=fund_flow_data,
+            valuation_data=valuation_data,
+            market_temperature_data=market_temperature_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -532,6 +540,16 @@ def _generate_report_both(
     details = _compute_details(holdings, config, reporter)
     perf.stop()
 
+    # 估值分位 + 市场温度（数据契约）：both 路径同样渲染「资产穿透TOP10」估值列
+    # 与「投资分析汇总」温度行；开关关闭时编排函数返回 None（保持既有输出）
+    from src.python.report.orchestrator import (
+        compute_market_temperature_data,
+        compute_valuation_data,
+    )
+
+    valuation_data = compute_valuation_data(holdings, details, config, reporter)
+    market_temperature_data = compute_market_temperature_data(config, reporter)
+
     # ── 2. 快照对比（始终执行） ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, details, config, reporter)
@@ -578,6 +596,9 @@ def _generate_report_both(
             ],
             sum(d.market_value for d in details),
         ),
+        # 估值分位 + 市场温度（数据契约）：both 路径此处组装，开关关闭时为 None
+        valuation_data=valuation_data,
+        market_temperature_data=market_temperature_data,
     )
     perf.stop()
     # [checkpoint] pipeline_data 类型断言
@@ -651,6 +672,8 @@ def _generate_report_both(
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
             fund_flow_data=fund_flow_data,
+            valuation_data=valuation_data,
+            market_temperature_data=market_temperature_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -684,6 +707,8 @@ def _generate_report_both(
             enable_cost_lots=_enable_cost_lots,
             transactions=transactions,
             dividends=dividends,
+            valuation_data=valuation_data,
+            market_temperature_data=market_temperature_data,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True
@@ -712,12 +737,12 @@ def _build_chart_datasets_for_report(
 ) -> dict | None:
     """构建 Chart.js 数据集（Flag 关闭或数据缺失时返回 None/空 dict）。
 
-    - Flag 关闭 → None（模板不渲染 Chart.js，回退旧 Canvas）
- - Flag 开启 → build_chart_datasets（内部对单图失败独立 try/except，）
+       - Flag 关闭 → None（模板不渲染 Chart.js，回退旧 Canvas）
+    - Flag 开启 → build_chart_datasets（内部对单图失败独立 try/except，）
 
-    metrics_* 功能开关（Flag）：收集雷达子开关值传给预处理器，
-    关闭的指标在 radar 数据集输出 "N/A"。注：metrics_risk_contribution
-    是指标级熔断开关（circuit_breaker_wrapper 消费），非雷达轴，不在此收集。
+       metrics_* 功能开关（Flag）：收集雷达子开关值传给预处理器，
+       关闭的指标在 radar 数据集输出 "N/A"。注：metrics_risk_contribution
+       是指标级熔断开关（circuit_breaker_wrapper 消费），非雷达轴，不在此收集。
     """
     if not enable_interactive:
         return None
@@ -743,7 +768,7 @@ def _build_chart_datasets_for_report(
             metric_flags=metric_flags,
         )
     except Exception:
- # 预处理器顶层兜底：任何异常 → 返回空 dict（报告仍有表格/占位）
+        # 预处理器顶层兜底：任何异常 → 返回空 dict（报告仍有表格/占位）
         logger.warning("[chart] 数据集构建失败，图表整体跳过（报告仍正常）", exc_info=True)
         return {}
 
@@ -817,6 +842,9 @@ def _generate_report_full(
         pipeline_data["position_status"] = prep.get("position_status")
         pipeline_data["data_freshness"] = prep.get("data_freshness")
         pipeline_data["action_data"] = prep.get("action_data")
+        # 估值分位 + 市场温度（数据契约，prep 中已组装；开关关闭时为 None）
+        pipeline_data["valuation_data"] = prep.get("valuation_data")
+        pipeline_data["market_temperature_data"] = prep.get("market_temperature_data")
     _validate_pipeline_snapshot(pipeline_data)
     # 2b. 组合演进数据（聚合多期快照，evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
@@ -911,6 +939,8 @@ def _generate_report_full(
         (pipeline_data or {}).get("tail_risk_data"),
         (pipeline_data or {}).get("snapshot_diff_data"),
         fund_flow_data,
+        (pipeline_data or {}).get("valuation_data"),
+        (pipeline_data or {}).get("market_temperature_data"),
     )
 
     # ── 7. Excel 报告 ──

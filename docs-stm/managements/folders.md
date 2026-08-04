@@ -113,6 +113,7 @@ investor-util/
 │   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → crisis_annotation_data）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
+│   │   │   ├── market_temperature.py          #   市场温度（价格分位+均线偏离+波动率三因子合成温度计，无仓位指令）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
 │   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → evolution_data）
 │   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
@@ -123,6 +124,7 @@ investor-util/
 │   │   │   ├── snapshot_diff.py               #   快照差异摘要（去重后最近两快照对比：新增/移除 + HHI 变化 + 超限项 → snapshot_diff_data）
 │   │   │   ├── tail_risk.py                   #   尾部风险统计（历史模拟法 VaR95/99 + 最大单日跌幅 + 连续下跌 + 恢复天数 → tail_risk_data）
 │   │   │   ├── trade_discipline.py            #   交易纪律引擎（止盈/止损/回撤触发检测，复用 _silence 静默机制）
+│   │   │   ├── valuation_percentile.py        #   估值分位（东财 push2 当前 PE/PB + 价格分位代理，显式标注局限）
 │   │   │   ├── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比）
 │   │   │   └── whatif_backtest.py             #   调仓 What-if 时序回测（纯计算：生效日折算/序列对齐/5 指标）
 │   │   │
@@ -326,6 +328,10 @@ investor-util/
 │       │   │   ├── test_drawdown_events_edge.py #  回撤事件识别边缘场景
 │       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
 │       │   │   ├── test_industry_beta.py      #   行业 Beta 分析（暴露占比/已知答案回归/数据不足降级/契约）
+│       │   │   ├── test_market_temperature.py #   市场温度纯计算层（三因子合成/刻度映射/免责声明/数据不足）
+│       │   │   ├── test_market_temperature_edge.py # 市场温度边缘场景（样本边界/恒平序列/极端波动）
+│       │   │   ├── test_valuation_percentile.py #  估值分位纯计算层（收盘价提取/分位解析解/三档刻度）
+│       │   │   ├── test_valuation_percentile_edge.py # 估值分位边缘场景（样本边界/恒平/极端值）
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
 │       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口）
 │       │   │   ├── test_crisis_annotation.py   #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复耗时/重叠）
@@ -516,7 +522,8 @@ investor-util/
 │       │   │   ├── test_qdii_timezone_edge.py     #   QDII 时区边缘场景
 │       │   │   ├── test_security_edge.py          #   证券边缘场景
 │       │   │   ├── test_orchestrator.py           #   报告编排器单元测试
-│       │   │   └── test_summary.py                #   摘要生成测试
+│       │   │   ├── test_summary.py                #   摘要生成测试
+│       │   │   └── test_valuation_temperature_wiring.py # 估值分位+市场温度报告层接线测试
 │       │   ├── scripts/              #   工程脚本单元测试（历史痕迹检查工具自检/豁免/补强模式）
 │       │   │   ├── __init__.py       #       子包标记
 │       │   │   └── test_trace_check_scripts.py  #   check-code/doc-traces 工具自身豁免+时序模式检出/豁免回归

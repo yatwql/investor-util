@@ -1035,6 +1035,29 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     {% endif %}
                 </div>
             </div>
+
+            {% if market_temperature %}
+            <!-- 市场温度（report_submodules.market_temperature 子模块） -->
+            <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【市场温度】</h3>
+            <table class="kv-table">
+                {% if market_temperature.available and market_temperature.score is not none %}
+                <tr><td>市场温度</td><td style="font-weight: 700;">{{ market_temperature.score | round(0) | int }} / 100（{{ market_temperature.tier }}）</td></tr>
+                {% else %}
+                <tr><td>市场温度</td><td>--（数据不足，暂不显示）</td></tr>
+                {% endif %}
+                {% if market_temperature.components %}
+                <tr>
+                    <td>三因子（{{ market_temperature.index_name }}）</td>
+                    <td>
+                        价格分位 {{ market_temperature.components.price_percentile }}
+                        · 20日均线偏离 {{ market_temperature.components.ma_deviation }}
+                        · 年化波动率 {{ market_temperature.components.volatility }}
+                    </td>
+                </tr>
+                {% endif %}
+                <tr><td>注</td><td style="font-size: 12px; color: #888;">{{ market_temperature.disclaimer }}</td></tr>
+            </table>
+            {% endif %}
         </div>
 
         {{ render_data_status(data_status_summary) }}
@@ -1249,7 +1272,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <table>
                 <thead>
                     <tr>
-                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>概念</th><th>预测EPS({{ report_year }}E)</th><th>年均股息</th><th>来源明细</th>
+                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>概念</th><th>预测EPS({{ report_year }}E)</th><th>年均股息</th>{% if valuation_enabled %}<th>估值分位</th>{% endif %}<th>来源明细</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1265,6 +1288,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td style="font-size: 12px;">{{ entry.get("concepts", []) | join(" / ") if entry.get("concepts") else "--" }}</td>
                         <td>{{ entry.get("eps_text", "--") }}</td>
                         <td>{{ entry.get("dividend_text", "--") }}</td>
+                        {% if valuation_enabled %}<td style="font-size: 12px;">{{ entry.get("valuation_text", "--") }}</td>{% endif %}
                         <td class="text-left" style="font-size: 12px;">
                             {% for src in entry["sources"] %}
                             <span class="source-tag">{{ src }}</span>
@@ -1293,6 +1317,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 基金 {{ s["total_funds"] }} 只（{{ s["fund_breakdown"] }}） + 直接持股 {{ s["total_stocks"] }} 只
                 → 穿透合并 {{ s["merged_count"] }} 个标的，TOP10 覆盖 {{ s["top10_coverage_pct"] }}%
             </div>
+            {% if valuation_enabled %}
+            <div>* 估值分位说明：价格分位代理，非真实历史估值分位（PE/PB 为当前行情值）</div>
+            {% endif %}
         </div>
         {% else %}
         <div class="empty-note">暂无穿透数据</div>

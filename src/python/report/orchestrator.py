@@ -130,6 +130,13 @@ def prepare_report_data(
         prev_trading_day=get_prev_trading_day(),
     )
 
+    # 估值分位（数据契约 valuation_data）：report_submodules.valuation_percentile
+    # 开启时计算（当前 PE/PB + 价格分位代理）；关闭返回 None（「资产穿透TOP10」列隐藏）
+    valuation_data = compute_valuation_data(holdings, details, config, reporter)
+    # 市场温度（数据契约 market_temperature_data）：report_submodules.market_temperature
+    # 开启时计算（价格分位+均线偏离+波动率三因子温度计）；关闭返回 None（汇总行隐藏）
+    market_temperature_data = compute_market_temperature_data(config, reporter)
+
     # 行动建议单一数据源：再平衡信号等纯算法产出，action_data数据契约
     # （单源计算，行动建议板块与智囊团深度复盘行动摘要共享同一对象）
     holdings_details = [
@@ -187,6 +194,10 @@ def prepare_report_data(
         "data_freshness": freshness_summary,
         # 行动建议单一数据源（数据契约 action_data；行动建议板块 + 智囊团深度复盘行动摘要）
         "action_data": action_data,
+        # 估值分位（数据契约 valuation_data；report_submodules.valuation_percentile 关闭时为 None）
+        "valuation_data": valuation_data,
+        # 市场温度（数据契约 market_temperature_data；report_submodules.market_temperature 关闭时为 None）
+        "market_temperature_data": market_temperature_data,
     }
 
 
@@ -460,6 +471,155 @@ def compute_industry_beta_data(
     except Exception:
         logger.exception("[industry_beta] 行业 Beta 编排异常，章节子表降级")
         return unavailable_result("source_failed")
+
+
+def compute_valuation_data(
+    holdings: list,
+    details: list,
+    config: dict,
+    reporter: ProgressReporter,
+) -> dict | None:
+    """编排估值分位数据（`valuation_data` 数据契约）。
+
+    流程：A 股持仓 → push2 当前 PE/PB（复用既有请求通道 + 会话缓存，
+    同一代码同会话不重复请求）→ 历史 K 线价格分位（Chain + session_cache）
+    → 三档刻度。PE/PB 与 K 线任一可得即计入该代码，两者皆不可得才剔除。
+
+    Args:
+        holdings: 持仓列表（Holding 对象，含 code/name/shares）
+        details: market_value 计算的 DetailRow 列表（含 code/market_value）
+        config: 完整配置（只读）
+        reporter: 进度上报
+
+    Returns:
+        数据子契约 dict（含 available/status/by_code）；
+        report_submodules.valuation_percentile 关闭时返回 None（列隐藏）；
+        push2/K 线均不可用时 available=False（占位，§1.4.5）。
+    """
+    from src.python.config import is_enable_valuation_percentile
+
+    if not is_enable_valuation_percentile(config):
+        return None
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    from src.python.analysis.valuation_percentile import unavailable_valuation
+    from src.python.core.code_utils import is_a_share_code
+
+    try:
+        reporter.info("正在计算估值分位...")
+
+        # ── 1. 去重 A 股持仓（code+name，供 push2/K 线路由） ──
+        pairs = list(dict.fromkeys((d.code, d.name) for d in details if is_a_share_code(d.code)))
+
+        # ── 2. 并行拉取 PE/PB + 价格分位（复用 push2 请求通道 + 会话缓存） ──
+        by_code: dict[str, dict] = {}
+        if pairs:
+            with ThreadPoolExecutor(max_workers=min(6, max(1, len(pairs))), thread_name_prefix="orch_val") as _pool:
+                _futs = {_pool.submit(_fetch_valuation_for_code, code, name): code for code, name in pairs}
+                for _fut in _futs:
+                    code = _futs[_fut]
+                    try:
+                        _val = _fut.result()
+                    except Exception:
+                        _val = None
+                    if _val:
+                        by_code[code] = _val
+
+        if not by_code:
+            reporter.warn("估值分位：push2/K 线均不可用，写入占位")
+            return unavailable_valuation("source_failed")
+
+        reporter.ok("估值分位计算完成")
+        return {"available": True, "status": "ok", "by_code": by_code}
+    except Exception:
+        logger.exception("[valuation] 估值分位编排异常，章节降级")
+        return unavailable_valuation("source_failed")
+
+
+def _fetch_valuation_for_code(
+    code: str,
+    name: str,
+    days: int = 750,
+) -> dict | None:
+    """拉取单只 A 股估值字段 + 价格分位（编排层内部辅助，供线程池调用）。
+
+    Args:
+        code: 6 位证券代码
+        name: 证券名称（供 K 线路由）
+        days: 历史 K 线回看天数（默认 750 ≈ 3 年）
+
+    Returns:
+        单代码估值子契约 dict；PE/PB 与价格分位皆不可得返回 None。
+    """
+    from src.python.analysis.valuation_percentile import compute_price_percentile
+    from src.python.providers.eastmoney_industry import fetch_valuation_fields
+
+    pe_pb = fetch_valuation_fields(code)
+    bars = _fetch_holding_bars(code, name, days) or []
+    pct = compute_price_percentile(bars)
+    if not pe_pb and not pct.get("available"):
+        return None
+    return {
+        "pe": (pe_pb or {}).get("pe"),
+        "pb": (pe_pb or {}).get("pb"),
+        "price_percentile": pct.get("price_percentile"),
+        "tier": pct.get("tier"),
+        "sample_count": pct.get("sample_count", 0),
+        "percentile_available": bool(pct.get("available")),
+    }
+
+
+def compute_market_temperature_data(
+    config: dict,
+    reporter: ProgressReporter,
+) -> dict | None:
+    """编排市场温度数据（`market_temperature_data` 数据契约）。
+
+    流程：沪深300 指数历史 K 线（Chain + session_cache，腾讯→新浪自动降级，
+    复用既有 history_index 降级链）→ 三因子合成温度计（价格分位+均线偏离+波动率）。
+
+    Args:
+        config: 完整配置（只读）
+        reporter: 进度上报
+
+    Returns:
+        数据子契约 dict（含 available/status/score/tier/disclaimer）；
+        report_submodules.market_temperature 关闭时返回 None（行隐藏）；
+        指数 K 线不足时 available=False（占位，§1.4.5）。
+    """
+    from src.python.config import is_enable_market_temperature
+
+    if not is_enable_market_temperature(config):
+        return None
+
+    from src.python.analysis.market_temperature import (
+        DEFAULT_INDEX_CODE,
+        DEFAULT_INDEX_NAME,
+        DEFAULT_LOOKBACK_DAYS,
+        TEMPERATURE_DISCLAIMER,
+        compute_temperature,
+        unavailable_temperature,
+    )
+    from src.python.fetcher.index import fetch_index_history
+
+    try:
+        reporter.info("正在计算市场温度...")
+        bars = fetch_index_history(DEFAULT_INDEX_CODE, DEFAULT_LOOKBACK_DAYS) or []
+        result = compute_temperature(bars)
+        if not result.get("available"):
+            reporter.warn("市场温度：指数 K 线不足，写入占位")
+            return unavailable_temperature("insufficient")
+
+        result["status"] = "ok"
+        result["index_code"] = DEFAULT_INDEX_CODE
+        result["index_name"] = DEFAULT_INDEX_NAME
+        result["disclaimer"] = TEMPERATURE_DISCLAIMER
+        reporter.ok("市场温度计算完成")
+        return result
+    except Exception:
+        logger.exception("[temperature] 市场温度编排异常，章节降级")
+        return unavailable_temperature("source_failed")
 
 
 def compute_correlation_data(

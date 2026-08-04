@@ -131,8 +131,25 @@ def _extract_industry(inner: dict, key: str) -> str:
     return ""
 
 
+def _extract_number(inner: dict, key: str) -> float | None:
+    """从 push2 响应中提取数值字段（如 f9 市盈率 / f23 市净率）。
+
+    返回 float；字段缺失、非数值或 "-"（占位）返回 None。
+    """
+    raw = inner.get(key)
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return float(raw)
+    if isinstance(raw, str):
+        try:
+            value = float(raw.strip())
+            return value
+        except ValueError:
+            return None
+    return None
+
+
 def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
-    """获取一只证券的行业分类和概念板块归属。
+    """获取一只证券的行业分类、概念板块归属与扩展估值字段。
 
     会话级内存复用：同一代码在同一会话内仅首次发起 HTTP 请求，
     后续调用直接返回缓存结果，避免重复网络/文件 I/O。
@@ -161,6 +178,10 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
         "industry_id": _extract_industry(inner, "f198"),
         "concepts": _extract_concept_list(inner),
         "concept_ids": [],
+        # 扩展估值字段（f9=动态市盈率, f23=市净率）：供估值分位子模块复用，
+        # 同一次 push2 请求带出，不重复发请求（复用既有请求通道纪律）。
+        "pe": _extract_number(inner, "f9"),
+        "pb": _extract_number(inner, "f23"),
     }
 
     logger.debug(
@@ -168,6 +189,24 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     )
     reg.session_cache_set("industry", code, result)
     return result
+
+
+def fetch_valuation_fields(code: str) -> dict[str, float | None] | None:
+    """获取一只证券的当前 PE/PB（东财 push2 扩展字段）。
+
+    复用 ``fetch_industry_and_concepts`` 的 push2 请求与会话缓存——同一代码
+    同一会话内不重复发起 HTTP 请求（复用既有 push2 请求通道纪律）。
+
+    Args:
+        code: 6 位证券代码
+
+    Returns:
+        {"pe": float|None, "pb": float|None}；API 异常返回 None。
+    """
+    result = fetch_industry_and_concepts(code)
+    if result is None:
+        return None
+    return {"pe": result.get("pe"), "pb": result.get("pb")}
 
 
 def fetch_industry(code: str) -> str | None:
