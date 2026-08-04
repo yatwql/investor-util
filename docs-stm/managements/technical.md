@@ -66,6 +66,7 @@
   - [附录 F：指标降级依赖矩阵](#附录-f指标降级依赖矩阵)
   - [附录 G：报告生成降级路径矩阵](#附录-g报告生成降级路径矩阵)
   - [附录 H：pipeline_data Schema 定义](#附录-hpipeline_data-schema-定义)
+  - [附录 I：配置文件矩阵](#附录-i配置文件矩阵)
 
 ---
 
@@ -2171,6 +2172,8 @@ config/
 
 配置文件（`set_config`）和缓存写入（`_write_atomic`）均使用 `tempfile.mkstemp` + `os.replace` 模式。
 
+> **各配置文件的缺省/模板/解析/消费矩阵见 [附录 I：配置文件矩阵](#附录-i配置文件矩阵)**（含消费方与消费模式）。
+
 ### 6.2 中央注册表
 
 **设计目标**：消除 `config/` / `cache/cache.py` / `core/constants.py` 三处分散维护的遗漏风险，做到"一处注册，全局生效"。
@@ -2738,5 +2741,37 @@ investor-util/
 > `data_freshness`（数据可信度诊断，C19 契约）：`{"available": bool, "items": list[dict], "abnormal_count": int, "summary": str}`。`items` 每项含 code/name/account/freshness/freshness_label/reason/jump/jump_label/change_pct；freshness 取值 `fresh`（净值=当日）/`cached`（=上一交易日，正常 T-1）/`stale`（更早或缺失）/`degraded`（无有效行情）。单日跳变仅对 fresh/cached 品种判定（|涨跌幅| ≥ ±20% 标记 jump，label「疑似数据错误（单日 +X.XX%）」），stale/degraded 跳过以免跨非交易日累计涨跌误报。由 `core/data_freshness.py`（`classify_freshness`/`detect_price_jumps`/`build_freshness_summary`）计算，交易日依据 `report/market_value.py::get_last_trading_day/get_prev_trading_day`（akshare 日历缓存）。由 `report/orchestrator.py::prepare_report_data` 组装，both 路径在 `_report_generation.py` 直接以 `build_freshness_summary` 注入。消费方：数据质量仪表盘（`report_submodules.data_quality`，「可信度」区块 + 报告头部「N 个品种数据异常」摘要行，Excel 见 `report/data_quality_sheet.py`、HTML 见模板 `report_template.html`）；basic 路径无行情数据时 available=False，可信度区块落降级占位。
 
 > `action_data`（行动建议，C19 契约，单源计算两处呈现）：`{"available": bool, "summary": str, "rebalance_signals": list[dict], "discipline_signals": list[dict], "rebalance_advice": list[dict], "attribution": dict\|None}`。`rebalance_signals` 每项含 code/name/weight/threshold/action（超警戒线品种再平衡信号）；`discipline_signals` 每项含 code/name/rule/value/status_label/triggered/distance_pct/action（止盈/止损/回撤触发信号，输出「触发 + 距触发幅度 + 建议动作」，由 `analysis/trade_discipline.py::compute_discipline_signals` 计算，复用 `analysis/_silence.py` 静默期机制）；`rebalance_advice` 每项含 code/name/operation/shares/amount/fee/cash_after（可执行调仓建议清单，由 `analysis/rebalance_advisor.py::build_rebalance_advice` 可行化层计算——把再平衡/纪律触发信号转成订单，份额取整一手（A 股/场内基金 100 份，场外基金整数份，复用 `core/code_utils.py` 判定，C1 合规）、费用估算（本地静态费率表：佣金/印花税仅 A 股/赎回费仅场外基金）、现金缓冲防负值、按优先级 止损 > 部分止盈 > 卖出减仓 排序）；`attribution` 为收益归因结果 `{"available": bool, "盈利来源": list[dict], "亏损来源": list[dict], "summary": str}`——TOP5 品种按贡献占比（pp，非收益率）排序、正负分列 + 净额合计摘要，每项含 name/code/profit/contribution_pp（全精度浮点，渲染层格式化展示 +pp / +,），由 `analysis/return_attribution.py::build_return_attribution` 适配（复用共享纯计算 `compute_return_attribution`，与智囊团深度复盘提示词段落 `llm/prompts_core._build_profit_attribution_block` 同一数据两处呈现，零新增外部依赖）；无盈亏（Σ|profit|==0）或无持仓时 attribution=None，渲染层写「待生成」占位。由 `analysis/action_advisor.py::build_action_data` 计算（纯计算层，不依赖 report/），`report/orchestrator.py::prepare_report_data` 组装（full 路径 holdings_details 含 shares/price 供可行化层计算卖出份额），both 路径在 `_report_generation.py` 直接以 `build_action_data` 注入。消费方（同一对象两处呈现，C14/C19）：行动建议（HTML `partials/action_section.html`，Excel `report/action_sheet.py`）+ 智囊团深度复盘「行动摘要」子块；无持仓数据或开关关闭时 available=False / 不渲染，落 §1.4.5 降级占位。C7 注册：`action` 注册于 `_REPORT_SECTION_DEFAULT`（type=`action`、data_flag=`action_data`、number=18），独立顶层开关 `enable_action`（默认关）控制 board 层可见性，序号/名称可配置，不硬编码。
+
+### 附录 I：配置文件矩阵
+
+> 与 §6.1 配置管理配套。按「5 个配置文件 × 缺省/模板 × 解析/读取 × 缺失时行为 × 写入方 × 消费方/消费模式」组织；各文件的「dict 缺省 + 模板函数」双结构模式见下文「模式小结」。
+
+#### I.1 主矩阵
+
+| 配置文件 | 缺省定义模块 | 模板生成 | 解析/读取入口 | 缺失时行为 | 写入方 | 主要消费方 |
+|:---------|:------------|:---------|:-------------|:-----------|:-------|:-----------|
+| `config.json`（基础配置） | `_config_defaults._DEFAULT_CONFIG`（A~L 共 12 组，含全部业务键默认值） | `_config_defaults._get_default_config_template()`（`_build_template_from_defaults()` 逐行手拼，保留分组注释） | `_core.get_config()`：mtime+size 双键缓存失效、null 过滤（不允许 null 覆盖默认）、嵌套 dict 子键浅合并、`_absolutize_paths()` 相对→绝对、旧键惰性迁移（`history.analysis`→`history.fetch_mode`） | `init_config()` 自动创建（模板原子写入），并级联 `_ensure_llm_settings_file()` + `_ensure_llm_providers_file()` | `_core.set_config()`/`del_config()`（原子写，`_json_patch` 字段级文本替换保留注释）；TUI `handlers_config.py`（菜单改配置）；`config/anonymizer.py`；`config/_local_state.py`（旧键迁移后删除） | 全模块（`get_config()` 取合并后整表）。章节开关 `is_enable_*()` 系列 → `report/_report_generation.py`/`orchestrator.py`；`cache_ttl` → `cache/_ttl.py`；`degradation` → `report/data_status.py`；`market_hours`/`market_hour_ttl` → `core/market_hours.py`；`rebalance` → `analysis/rebalance.py`；`discipline` → `analysis/trade_discipline.py`；`anonymization` → `config/anonymizer.py`；`batch`/`batch_rate_limit` → `fetcher/batch.py`；`risk_free_rate` → `fetcher/bond_yield.py`；`preferred_provider` → `fetcher/chain.py`；`history` → `report/portfolio_history.py`；`default_menu_key` → `tui/tui_menu.py` |
+| `llm_settings.json`（非敏感 LLM 设置） | `_llm_settings_defaults._DEFAULT_LLM_SETTINGS`（全局 2 项 + 5 模块块 + 辩论 + 事实校验 + 计价） | `_llm_settings_defaults._get_default_llm_settings_template()`（逐行手拼，与 dict 深等，见一致性测试） | `_llm_settings.get_llm_config()`：合并 settings+key+providers 三文件，联合 mtime/size 失效；`_merge_llm_defaults()` 运行时按 `_DEFAULT_LLM_SETTINGS` 补齐缺失键 | `_ensure_llm_settings_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑；`_ensure_llm_settings_file` 仅首次创建） | `llm/pricing.py`（计价覆盖）、`llm/generators.py`、`llm/generators_orchestrator.py`、`llm/prompts_action.py`、`llm/skeleton.py`、`report/news_correlation.py`、`cli/cli.py`、`tui/tui_menu.py` + `tui/handlers_config.py`、`config/_validation.py` |
+| `llm_key.json`（敏感凭据） | 无（**C18 凭据分离**，代码默认值禁止内置 api_key） | 无模板 | `_llm_providers._load_llm_key_credentials()`（多凭据块字典；单凭据 flat 自动升级为 `_default`）；`get_llm_config()` 内联读取并合并覆盖同名字段（provider/endpoint 合法性告警） | 不自动创建；缺失时 `get_llm_config()` 回退判断 providers 链模式，两者皆无则 LLM 不可用（`generators_orchestrator` 降级占位） | `startup_wizard._write_llm_key_flat()`（首次引导交互式写入，C3 原子写） | `get_llm_config()` 合并主体；`_load_llm_key_credentials()` → providers 链 `credentials_ref` 凭据注入 |
+| `llm_providers.json`（多 Provider 链） | `_llm_providers_defaults._DEFAULT_LLM_PROVIDERS`（strategy=priority + 2 条示例链） | `_llm_providers_defaults._get_default_llm_providers_template()` | `_llm_providers._load_llm_providers()`（原始 JSON，根非 object/解析失败返回 None）；`get_llm_config()` 链模式（无 llm_key.json 时直接注入链数据）；`_inject_provider_chain_data()` 注入多链路由结果 | `_core._ensure_llm_providers_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑 / init 自动创建） | `get_llm_config()`（链模式无 key 依赖）；`startup_wizard.py`（就绪检查：key 存在 或 providers 有链）；`_inject_provider_chain_data` |
+| `features.json`（Feature Flag 覆写） | `features._FEATURE_FLAGS_DEFAULT`（29 项默认值：LLM 5 + 辩论 3 + 基金深度 4 + 新闻 5 + 量化指标 7 + 历史 2 + 功能 3） | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；未知键仍加载、非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态） |
+
+#### I.2 消费模式
+
+- **config.json — 全局整表共享**：所有模块经 `get_config()` 取合并后整表，按需读键；单入口缓存 + 双键（mtime+size）自动失效，无 per-key 订阅。章节可见性走 `_core.is_enable_*()` 读取器封装（缺失键返回各自默认值，语义见 §4.5 两层模型）。
+- **LLM 三件套 — 合一层**：`get_llm_config()` 是唯一 LLM 配置入口，将 settings（非敏感主体）+ key（凭据覆盖）+ providers（链注入）合并为**单份 dict** 下发给生成器/计价/提示词层；消费方不直接读文件。settings 读取时 `_merge_llm_defaults()` 运行时补默认，避免消费端 `.get()` 硬编码兜底与模板默认值两套值漂移。
+- **features — 全局内存开关 + 覆写文件**：默认值全量在代码内（`_FEATURE_FLAGS_DEFAULT`），`features.json` 只存覆写子集；模块导入时自动加载覆写，消费方只调 `is_feature_enabled(flag)`，不感知文件存在与否。
+- **凭据读写分离**：llm_key.json 是唯一「只写不自动读模板、无缺省」的文件——凭据由启动向导交互写入（C3 原子写），运行时由 providers 链 `credentials_ref` 或 `get_llm_config()` 合并引用，遵守 C18 凭据分离。
+
+#### I.3 模式小结
+
+| 模式 | 说明 | 应用文件 |
+|:-----|:-----|:---------|
+| **dict 缺省 + 模板函数 双结构** | 缺省值定义在 dict，模板函数逐行手拼 `"key": value,  // comment`；模板经 `_strip_json_comments()` 剥离后 `json.loads` 与 dict **深等**（有一致性测试保证，防模板坏 JSON） | config / llm_settings / llm_providers 三家 `*_defaults.py` |
+| 注释友好 JSON | `_comments._strip_json_comments()` 剥离 `//` 与 `/* */`（正确处理字符串内转义），模板与真实文件均带中文分组注释 | 全部配置文件 |
+| 原子写入 | `tempfile.mkstemp` + `os.replace`，Windows 并发安全 | `set_config` / `save_feature_overrides` / `startup_wizard` / 缓存 `_write_atomic` |
+| 路径绝对化 | `_DEFAULT_CONFIG` 存绝对路径（不依赖 CWD），模板存相对路径；运行时 `_validation._absolutize_paths()` 相对→绝对（模板生成前 `_deabsolutize_paths()` 反绝对化） | config.json 路径键 |
+| 运行时补默认 | 读取时按缺省 dict 补齐缺失键，消除「消费端 `.get()` 兜底」与「模板默认值」两套默认值漂移 | llm_settings（`_merge_llm_defaults`）、config.json（`get_config` 合并） |
+| 缺失时自动创建 vs 惰性创建 | config/llm_settings/llm_providers 缺失时由 `init_config()` 级联自动创建（C13 路径 seed）；features.json **不自动创建**（无文件即默认值，仅写入时才产生文件）；llm_key.json 永不自动创建（C18） | 见主矩阵「缺失时行为」列 |
 
 [↑ 回到顶部](#目录)

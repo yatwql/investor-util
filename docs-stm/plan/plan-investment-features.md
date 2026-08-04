@@ -46,7 +46,7 @@
 | `industry_beta` | 行业 Beta 暴露 | 9 风格与因子分析 | 风险/暴露 | `report_submodules.industry_beta`（默认关） |
 | `crisis_annotation` | 危机区间标注 | 15 组合历史走势与回撤 | 风险/暴露 | `report_submodules.tail_risk`（默认关，随 15 章） |
 | `tail_risk` | 尾部风险 | 15 组合历史走势与回撤 | 风险/暴露 | `report_submodules.tail_risk`（默认关） |
-| `snapshot_diff` | 快照差异 | 16 组合演进 | 监控 | `report_submodules.snapshot_diff`（默认关） |
+| `snapshot_diff` | 快照差异 | 16 组合演进 | 监控 | 随 `enable_portfolio_evolution`（组合演进开启才计算注入） |
 | `data_quality` | 数据质量仪表盘 | 18 数据源可用性矩阵 | 监控 | `report_submodules.data_quality`（默认关） |
 | `holding_diagnosis` | 品种覆盖诊断 | 并入 `data_quality` | 监控 | 随 `data_quality` |
 
@@ -172,7 +172,7 @@
 | 9 风格与因子分析 | **合并原「基金风格分析」+「因子暴露分析」**（章节 sheet key 统一为 `style_factor`）+ 行业 Beta 子表 | 风格+因子并区块 + 行业 Beta 子表 | `report_submodules.industry_beta` |
 | 14 智囊团深度复盘 | **引用行动建议章（与 20 章共享）** | 复盘板块 + 「行动摘要」子块（指向 20 章） | `enable_action` |
 | 15 组合历史走势与回撤 | **合并原「组合历史走势」+「历史回撤分析」**（章节 sheet key 统一为 `portfolio_history_drawdown`）+ 危机区间标注、尾部风险 | 走势表 + 回撤矩阵区块 + 标注层 + 指标列 | `report_submodules.tail_risk` |
-| 16 组合演进 | 快照差异 | 顶部加差异摘要 | `report_submodules.snapshot_diff` |
+| 16 组合演进 | 快照差异 | 顶部加差异摘要 | 随 `enable_portfolio_evolution` |
 | 20 行动建议 | **再平衡信号、交易纪律、调仓建议、收益归因（决策行动）** | **新增独立顶层章节**（`always` 类型，`enable_action` 默认关） | `enable_action` |
 | 18 数据源可用性矩阵 | 数据质量 + 品种覆盖诊断 | 改造为「源健康 + 品种覆盖 + 可信度」三区块 | `report_submodules.data_quality` |
 
