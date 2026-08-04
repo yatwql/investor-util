@@ -63,7 +63,7 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
             # 基金深度分析数据
             patch("src.python.report.fund_manager_analysis.detect_manager_changes",
                   return_value=[]),
-            patch("src.python.report.fund_overlap.compute_overlap_matrix",
+            patch("src.python.report.position_overlap.compute_overlap_matrix",
                   return_value={"funds": [], "matrix": [], "pairs": []}),
             patch("src.python.report.fund_concentration.compute_concentration",
                   return_value=[]),

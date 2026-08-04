@@ -107,9 +107,9 @@ def prepare_report_data(
     pen_result = compute_penetration_top10(holdings, details)
     penetrated_assets = (pen_result or {}).get("top10", [])
 
-    # 因子暴露分析：基金深度分析关闭时为 None（章节隐藏），
+    # 风格与因子分析：基金深度分析关闭时为 None（章节隐藏），
     # 开启时计算 dict（数据不足/故障时 available=False，不阻塞主报告）。
-    # 风格与因子合并：style_factor_data dict 主键（保留全部子键，不重复定义），
+    # style_factor_data dict 主键（保留全部子键，不重复定义），
     # 内嵌 industry_beta 子键（行业 Beta 子表）。
     factor_exposure = compute_factor_exposure_data(holdings, config, reporter)
     if factor_exposure is not None:
@@ -201,7 +201,7 @@ def prepare_report_data(
     }
 
 
-# ── factor_exposure 编排（因子暴露分析） ──
+# ── style_factor_regression 编排（风格因子回归） ──
 
 
 def _fetch_holding_bars(code: str, name: str, days: int) -> list[dict] | None:
@@ -250,7 +250,7 @@ def compute_factor_exposure_data(
     config: dict,
     reporter: ProgressReporter,
 ) -> dict | None:
-    """编排因子暴露分析并返回数据契约 dict。
+    """编排风格因子回归并返回数据契约 dict。
 
     流程：拉取组合 as-if 日收益（days=90）+ 因子指数 K 线 + 沪深300 基准
           → 新鲜度剔除 → 对齐 → 纯计算 OLS → dict。
@@ -271,7 +271,7 @@ def compute_factor_exposure_data(
 
     from concurrent.futures import ThreadPoolExecutor
 
-    from src.python.analysis.factor_exposure import (
+    from src.python.analysis.style_factor_regression import (
         BASELINE_INDEX,
         DEFAULT_WINDOW,
         FACTOR_INDICES,
@@ -291,7 +291,7 @@ def compute_factor_exposure_data(
 
     try:
         # ── 1. 拉取组合 as-if 日收益（并行） ──
-        reporter.info("正在计算因子暴露分析...")
+        reporter.info("正在计算风格因子回归...")
         holdings_bars: dict[str, dict] = {}
         _n = len(holdings)
         with ThreadPoolExecutor(max_workers=min(6, max(1, _n)), thread_name_prefix="orch_factor") as _pool:
@@ -348,7 +348,7 @@ def compute_factor_exposure_data(
         if excluded:
             result["stale_factors"] = excluded
         if result.get("available"):
-            reporter.ok("因子暴露分析完成")
+            reporter.ok("风格因子回归完成")
         else:
             reporter.warn(f"因子暴露数据不足（有效样本 {result.get('sample_count', 0)}）")
         return result
@@ -367,7 +367,7 @@ def compute_industry_beta_data(
 
     流程：A 股持仓行业分类（push2）→ 按市值加权行业暴露占比
           → 各行业指数 K 线（Chain + session_cache，会话级API复用/Provider Chain 必经）→ 组合 as-if 日收益
-          → 纯计算逐行业一元 OLS（复用 factor_exposure 机制）。
+          → 纯计算逐行业一元 OLS（复用 style_factor_regression 机制）。
 
     Args:
         holdings: 持仓列表（Holding 对象，含 code/name/shares）
@@ -390,7 +390,7 @@ def compute_industry_beta_data(
 
     from concurrent.futures import ThreadPoolExecutor
 
-    from src.python.analysis.factor_exposure import asif_portfolio_daily_returns, klines_to_returns
+    from src.python.analysis.style_factor_regression import asif_portfolio_daily_returns, klines_to_returns
     from src.python.analysis.industry_beta import (
         INDUSTRY_INDEX_MAP,
         compute_industry_beta_analysis,
@@ -454,7 +454,7 @@ def compute_industry_beta_data(
                     except Exception:
                         industry_klines[i] = []
 
-        # ── 5. 纯计算：逐行业一元 OLS（复用 factor_exposure 机制） ──
+        # ── 5. 纯计算：逐行业一元 OLS（复用 style_factor_regression 机制） ──
         industry_returns = {i: klines_to_returns(bars) for i, bars in industry_klines.items() if bars}
         result = compute_industry_beta_analysis(portfolio_returns, industry_returns)
         if not result.get("available"):
@@ -655,7 +655,7 @@ def compute_correlation_data(
         compute_correlation_matrix,
         unavailable_result,
     )
-    from src.python.analysis.factor_exposure import klines_to_returns
+    from src.python.analysis.style_factor_regression import klines_to_returns
 
     try:
         reporter.info("正在计算持仓相关性矩阵...")

@@ -107,7 +107,7 @@ investor-util/
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
 │   │   │   ├── drawdown_events.py             #   回撤事件识别（新高/回撤起止/幅度）
-│   │   │   ├── factor_exposure.py             #   风格因子回归（MVP 3 因子：价值/成长/质量，OLS 回归）
+│   │   │   ├── style_factor_regression.py     #   风格因子回归（MVP 3 因子：价值/成长/质量，OLS 回归）
 │   │   │   ├── industry_beta.py               #   行业 Beta 分析（纯计算：暴露占比 + 逐行业一元 OLS，复用 factor_exposure）
 │   │   │   ├── correlation.py                 #   持仓相关性矩阵（Pearson 相关/显著性/下三角矩阵）
 │   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → crisis_annotation_data）
@@ -204,7 +204,7 @@ investor-util/
 │   │   │   ├── fund_concentration_sheet.py # 集中度 Excel 页签
 │   │   │   ├── fund_manager_analysis.py # 基金经理分析
 │   │   │   ├── fund_manager_sheet.py #   基金经理 Excel 页签
-│   │   │   ├── fund_overlap.py       #   基金持仓重叠分析（重合度计算引擎）
+│   │   │   ├── position_overlap.py   #   基金持仓重叠分析（重合度计算引擎）
 │   │   │   ├── fund_style_base.py       #   基金风格基础（常量/快照/PECity阈值）
 │   │   │   ├── fund_style_classify.py   #   基金风格分类计算（push2→Tencent→兜底降级）
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
@@ -326,7 +326,7 @@ investor-util/
 │       │   │   ├── test_drawdown_warning.py   #   回撤历史分位预警
 │       │   │   ├── test_drawdown_events.py    #   回撤事件识别
 │       │   │   ├── test_drawdown_events_edge.py #  回撤事件识别边缘场景
-│       │   │   ├── test_factor_exposure.py    #   风格因子回归（OLS 回归/样本下限/停更剔除）
+│       │   │   ├── test_style_factor_regression.py # 风格因子回归（OLS 回归/样本下限/停更剔除）
 │       │   │   ├── test_industry_beta.py      #   行业 Beta 分析（暴露占比/已知答案回归/数据不足降级/契约）
 │       │   │   ├── test_market_temperature.py #   市场温度纯计算层（三因子合成/刻度映射/免责声明/数据不足）
 │       │   │   ├── test_market_temperature_edge.py # 市场温度边缘场景（样本边界/恒平序列/极端波动）
@@ -484,9 +484,9 @@ investor-util/
 │       │   │   ├── test_fund_concentration.py     #   基金集中度测试
 │       │   │   ├── test_fund_manager_analysis.py  #   基金经理分析测试
 │       │   │   ├── test_fund_manager_sheet.py     #   基金经理页签测试
-│       │   │   ├── test_fund_overlap.py           #   基金重叠分析测试
+│       │   │   ├── test_position_overlap.py       #   持仓重合度计算测试
 │       │   │   ├── test_fund_performance.py       #   基金业绩测试
-│       │   │   ├── test_fund_style_analysis.py    #   基金风格测试
+│       │   │   ├── test_fund_style.py             #   基金风格判定测试
 │       │   │   ├── test_style_factor_sheet.py     #   风格与因子分析页签呈现（一章三区块：风格表+因子回归+行业 Beta）
 │       │   │   ├── test_correlation_html.py       #   持仓关系矩阵章节（相关性/重合度区块）HTML 呈现
 │       │   │   ├── test_correlation_sheet.py      #   持仓关系矩阵页签（一章两区块）Excel 呈现
@@ -562,7 +562,7 @@ investor-util/
 │       │   │   ├── test_scenario_penetration_mixed.py   #   穿透分析混合场景
 │       │   │   ├── test_scenario_penetration_edge.py    #   穿透分析边缘场景
 │       │   │   ├── test_scenario_special_securities.py # 特殊证券场景测试
-│       │   │   └── test_pipeline_factor_exposure.py     #   风格因子回归管线场景测试
+│       │   │   └── test_pipeline_style_factor_regression.py # 风格因子回归管线场景测试
 │       │   ├── datetime/            #   日期时间场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   └── test_datetime_scenarios.py #   日期时间场景测试

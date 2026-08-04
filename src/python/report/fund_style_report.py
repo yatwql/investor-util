@@ -92,7 +92,7 @@ def analyze_style_for_all_funds(
     for idx, (code, info) in enumerate(fund_holdings.items(), 1):
         name = info.get("name", code)
         holdings = info.get("holdings", [])
-        logger.info("基金风格分析 [%d/%d]: %s (%s)", idx, _total, name, code)
+        logger.info("基金风格表 [%d/%d]: %s (%s)", idx, _total, name, code)
         if not holdings:
             continue
 

@@ -1,4 +1,4 @@
-"""因子暴露分析纯计算层单元测试。
+"""风格因子回归纯计算层单元测试。
 
 覆盖：
   1. 满秩已知答案 OLS（精确还原 β/α）
@@ -11,7 +11,7 @@
 
 运行：
   cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/analysis/test_factor_exposure.py -v
+  python -m pytest src/test/unit/analysis/test_style_factor_regression.py -v
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from datetime import date, timedelta
 import numpy as np
 import pytest
 
-from src.python.analysis.factor_exposure import (
+from src.python.analysis.style_factor_regression import (
     FACTOR_STALE_DAYS,
     asif_portfolio_daily_returns,
     compute_factor_exposure,

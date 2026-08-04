@@ -69,7 +69,7 @@ def _price_transform_tencent(raw: dict, source: str) -> dict | None:
         "price_date": raw.get("price_date", ""),
         "source_api": "tencent",
         "source": source,
-        # 扩展字段（用于基金风格分析等下游模块）
+        # 扩展字段（用于风格与因子分析等下游模块）
         "market_cap": raw.get("market_cap", 0.0),
         "pe": raw.get("pe", 0.0),
     }

@@ -1,4 +1,4 @@
-"""report/fund_overlap.py 单元测试。
+"""report/position_overlap.py 单元测试。
 
 测试目标：
   - _jaccard_similarity：Jaccard 系数计算
@@ -17,7 +17,7 @@
   9. 空输入 → 空结构
 
 运行：
-  pytest src/test/ -m "unit_report" -k "fund_overlap" -v
+  pytest src/test/ -m "unit_report" -k "position_overlap" -v
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ import unittest
 
 import pytest
 
-from src.python.report.fund_overlap import (
+from src.python.report.position_overlap import (
     _jaccard_similarity,
     _overlap_ratio,
     compute_overlap_matrix,

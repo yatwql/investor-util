@@ -683,13 +683,13 @@ def write_html_report(
     # ── 13) 基金经理变更监控 ──
     manager_analysis = _render_manager_analysis(holdings, enable_fund_deep_analysis, prog)
 
-    # ── 14) 持仓重合度矩阵 ──
+    # ── 14) 持仓关系矩阵·重合度区块 ──
     overlap_matrix = _render_overlap_matrix(holdings, details, enable_fund_deep_analysis, prog)
 
     # ── 15) 持仓集中度监控 ──
     concentration_analysis = _render_concentration(holdings, enable_fund_deep_analysis, prog)
 
-    # ── 16) 基金风格分析 ──
+    # ── 16) 风格与因子分析 ──
     style_analysis = _render_style_analysis(holdings, enable_fund_deep_analysis, prog)
 
     # ── 8) 财经新闻 ──
@@ -783,7 +783,7 @@ def write_html_report(
     _factor_names: dict = {}
     if style_factor_data:
         try:
-            from src.python.analysis.factor_exposure import FACTOR_NAMES
+            from src.python.analysis.style_factor_regression import FACTOR_NAMES
 
             _factor_names = FACTOR_NAMES
         except Exception:

@@ -10,7 +10,7 @@
     `available=False`，渲染层不输出比较子表；
   - 候选超过 10 只 → 截断前 10，`exceed_limit=True`，渲染层提示。
 
-与现有持仓重合度复用 `fund_overlap.compute_overlap_matrix`（Jaccard 系数，
+与现有持仓重合度复用 `position_overlap.compute_overlap_matrix`（Jaccard 系数，
 不重复实现）；风格判定复用 `fund_style_classify.classify_fund_style`（复用中心化分类）。
 """
 
@@ -23,7 +23,7 @@ from typing import Any
 from src.python.config import get_comparison_candidates, is_enable_candidate_compare
 from src.python.core.code_utils import is_fund_holding
 from src.python.fetcher.fund import fetch_fund_holdings_cached, fetch_fund_rankings_cached
-from src.python.report.fund_overlap import compute_overlap_matrix
+from src.python.report.position_overlap import compute_overlap_matrix
 from src.python.report.fund_style_classify import classify_fund_style
 
 logger = logging.getLogger("invest")

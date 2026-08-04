@@ -13,7 +13,7 @@ from src.python.core.models import Holding
 from src.python.report.fund_candidate import build_candidate_compare_data
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
-from src.python.report.fund_overlap import compute_overlap_matrix
+from src.python.report.position_overlap import compute_overlap_matrix
 from src.python.report.fund_performance import is_fund
 from src.python.report.fund_style_report import analyze_style_for_all_funds
 from src.python.report.html_builders import _build_category_data, _build_perf_data
@@ -367,7 +367,7 @@ def _render_style_analysis(
     enable_fund_deep_analysis: bool,
     prog: ProgressReporter,
 ) -> dict | None:
-    """构建基金风格分析数据。
+    """构建风格与因子分析·基金风格表数据。
 
     Returns:
         {results: [...], ...} 或 None（不启用时）
@@ -387,14 +387,14 @@ def _render_style_analysis(
                 }
             else:
                 _name = fh.get("name", code) if fh else code
-                logger.debug("基金风格分析跳过（无持仓数据）: %s (%s)", _name, code)
+                logger.debug("风格与因子分析跳过（无持仓数据）: %s (%s)", _name, code)
         if not fund_holdings:
             return {"results": []}
         result = analyze_style_for_all_funds(fund_holdings)
-        prog.ok("基金风格分析完成")
+        prog.ok("风格与因子分析完成")
         return result
     except Exception as e:
-        logger.warning("基金风格分析失败: %s", e)
+        logger.warning("风格与因子分析失败: %s", e)
         return {"results": []}
 
 
