@@ -619,7 +619,8 @@ investor-util/
 │   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
 │   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
 │   │   ├── plan-web-ui-implementation.md #   plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API）
-│   │   └── plan-investment-features.md #   投资分析功能优化建议（需求×数据源可行性 10 轮探索）
+│   │   ├── plan-investment-features.md #   投资分析功能优化建议（需求×数据源可行性 10 轮探索）
+│   │   └── plan-investment-iteration.md #  投资功能优化 20 轮迭代实施计划（每轮量化验收）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
