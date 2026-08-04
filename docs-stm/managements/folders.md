@@ -223,8 +223,8 @@ investor-util/
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
-│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（报告章节 #20）
-│   │   │   ├── data_quality_sheet.py #   数据质量仪表盘页签写入（18 章源健康+品种覆盖，开关 data_quality）
+│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（数据质量仪表盘关闭时的旧样式回退）
+│   │   │   ├── data_quality_sheet.py #   数据质量仪表盘页签写入（源健康+品种覆盖，开关 data_quality）
 │   │   │   ├── downsample.py         #   P1 服务端下采样（日频→周/月聚合）
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告（块级 HTML 分段 + 事实校验摘要分块着色）
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
@@ -458,7 +458,7 @@ investor-util/
 │       │   │   ├── test_classification_utils.py   #   分类工具测试
 │       │   │   ├── test_data_integrity.py         #   数据完整性测试
 │       │   │   ├── test_data_quality_edge.py      #   数据质量边缘场景
-│       │   │   ├── test_data_quality_sheet.py     #   数据质量仪表盘页签写入测试（18 章改造）
+│       │   │   ├── test_data_quality_sheet.py     #   数据质量仪表盘页签写入测试（源健康+品种覆盖+可信度区块）
 │       │   │   ├── test_data_source_matrix.py     #   数据源可用性矩阵测试
 │       │   │   ├── test_data_status.py            #   数据状态测试
 │       │   │   ├── test_downsample.py             #   P1 服务端下采样测试（§4.9）
@@ -481,7 +481,7 @@ investor-util/
 │       │   │   ├── test_correlation_sheet.py      #   持仓关系矩阵页签（一章两区块）Excel 呈现
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
 │       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现
-│       │   │   ├── test_action_html.py            #   行动建议章节 + 14 章「行动摘要」HTML 呈现（单源计算断言）
+│       │   │   ├── test_action_html.py            #   行动建议章节 + 智囊团深度复盘「行动摘要」HTML 呈现（单源计算断言）
 │       │   │   ├── test_action_sheet.py           #   行动建议 Excel 页签呈现
 │       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现
 │       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现
