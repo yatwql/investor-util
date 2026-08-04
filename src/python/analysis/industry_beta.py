@@ -4,7 +4,7 @@
       → 输出行业暴露占比 + 逐行业一元 OLS Beta / t 显著性 / 相关性。
 
 - 无数据获取、无报告依赖，纯 pandas/numpy（日志走 logging，不用 print）。
-- Beta 复用 ``factor_exposure.compute_factor_exposure`` 的单因子调用，
+- Beta 复用 ``style_factor_regression.compute_factor_exposure`` 的单因子调用，
   不重复实现 OLS（「复用 OLS 回归机制，无重复实现」约束）。
 - 行业分类判定复用 ``core/code_utils.py``（代码类型判定中心化）；指数 K 线由编排层
   （report/orchestrator.py）走 Chain + session_cache（会话缓存 + Chain 路由），本模块不联网。
@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 
-from src.python.analysis.factor_exposure import compute_factor_exposure
+from src.python.analysis.style_factor_regression import compute_factor_exposure
 
 logger = logging.getLogger("invest")
 
@@ -129,7 +129,7 @@ def compute_industry_beta_analysis(
     """计算组合对各行业指数的 Beta（逐行业一元 OLS）。
 
     每个行业独立回归：y = 组合日收益，x = 该行业指数日收益（含常数项）。
-    复用 ``factor_exposure.compute_factor_exposure`` 的单因子调用，
+    复用 ``style_factor_regression.compute_factor_exposure`` 的单因子调用，
     避免重复实现 OLS。相关系数 r 为对齐后「组合 vs 行业」的 Pearson 相关。
 
     Args:

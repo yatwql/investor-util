@@ -122,7 +122,7 @@ def _compute_section_visibility(
         "style_data": style_analysis is not None,
         "news_data_available": include_news,  # ← data 层（菜单类型+数据状态）
         "llm_data_available": llm_enabled_flag,  # ← data 层（LLM 生成成功？）
-        # 风格与因子合并章可见性：风格表（渲染期派生）或因子数据（数据契约）任一就绪即可见；
+        # 风格与因子章可见性：风格表（渲染期派生）或因子数据（数据契约）任一就绪即可见；
         # 模板依据 available/status 在"完整内容/数据不足/数据源暂不可用"间切换（§1.4.5）
         "style_factor_data": style_factor_data is not None or style_analysis is not None,
         # 持仓关系矩阵 = 重合度区块（render 时计算）∪ 相关性区块（数据契约 数据源）：
@@ -156,6 +156,77 @@ def _compute_section_visibility(
     # 创建渲染期 section_visible 闭包（不写入 _ENV.globals）
     _sv_fn = lambda key, _d=section_visible_dict: bool(_d.get(key, False))
     return visible_numbers, section_visible_dict, _sv_fn
+
+
+# ── HTML 目录分组导航（「基础/基金深度/风险/历史/LLM」五组，导航折叠收尾） ──
+
+# 分组展示顺序（组名, 组 key），空组不渲染
+_NAV_GROUP_LABELS: list[tuple[str, str]] = [
+    ("基础", "basic"),
+    ("基金深度", "fund_deep"),
+    ("风险", "risk"),
+    ("历史", "history"),
+    ("LLM", "llm"),
+]
+
+# 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础」组）
+_SECTION_NAV_GROUP_MAP: dict[str, str] = {
+    # 基础：汇总/明细/分类/穿透/数据源可用性
+    "summary": "basic",
+    "market_value": "basic",
+    "category": "basic",
+    "penetration": "basic",
+    "data_source_status": "basic",
+    # 基金深度：基金业绩 + 基金深度分析系列章节
+    "fund_performance": "fund_deep",
+    "fund_manager": "fund_deep",
+    "position_relationship": "fund_deep",
+    "fund_concentration": "fund_deep",
+    "style_factor": "fund_deep",
+    # 风险：行动建议（再平衡信号/交易纪律/调仓建议/收益归因）
+    "action": "risk",
+    # 历史：组合历史走势与回撤 + 组合演进
+    "portfolio_history_drawdown": "history",
+    "portfolio_evolution": "history",
+    # LLM：新闻关联 + LLM 文本分析系列 + API 用量
+    "news_correlation": "llm",
+    "global_macro": "llm",
+    "expert_review": "llm",
+    "health_check": "llm",
+    "penetration_deep": "llm",
+    "llm_usage": "llm",
+}
+
+
+def _build_section_nav_groups(
+    order: list[dict],
+    section_visible,
+    section_numbers: dict,
+) -> list[dict]:
+    """按「基础/基金深度/风险/历史/LLM」五组构建 HTML 目录分组导航数据。
+
+    仅收录当前可见章节；组序固定为五组顺序，组内按报告序号升序。
+    返回 [{key, name, sections: [{key, number, name}, ...]}, ...]；
+    空组（无可见章节）保留在返回列表中，模板端跳过渲染（无 `<details>`）。
+    """
+    groups: dict[str, list[dict]] = {gk: [] for _, gk in _NAV_GROUP_LABELS}
+    for sec in order:
+        key = sec.get("key", "")
+        if not section_visible(key):
+            continue
+        group_key = _SECTION_NAV_GROUP_MAP.get(key, "basic")
+        groups.setdefault(group_key, []).append(
+            {
+                "key": key,
+                "number": section_numbers.get(key, 0),
+                "name": sec.get("name", key),
+            }
+        )
+    result: list[dict] = []
+    for label, group_key in _NAV_GROUP_LABELS:
+        sections = sorted(groups.get(group_key, []), key=lambda s: s["number"])
+        result.append({"key": group_key, "name": label, "sections": sections})
+    return result
 
 
 def _build_data_status_sections(
@@ -262,6 +333,77 @@ def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
     }
 
 
+def _build_temperature_display(market_temperature_data: dict | None) -> dict | None:
+    """将市场温度数据契约（market_temperature_data）转成 HTML 模板友好展示映射。
+
+    Args:
+        market_temperature_data: 市场温度数据契约（None = 开关关闭）。
+
+    Returns:
+        含 available/score/tier/components/index_name/disclaimer 的展示 dict，或 None。
+    """
+    from src.python.analysis.market_temperature import TEMPERATURE_DISCLAIMER
+
+    if not market_temperature_data:
+        return None
+    if not market_temperature_data.get("available"):
+        return {
+            "available": False,
+            "score": None,
+            "tier": None,
+            "components": None,
+            "index_name": market_temperature_data.get("index_name") or "沪深300",
+            "disclaimer": market_temperature_data.get("disclaimer") or TEMPERATURE_DISCLAIMER,
+        }
+    pct = market_temperature_data.get("price_percentile")
+    dev = market_temperature_data.get("ma_deviation")
+    vol = market_temperature_data.get("volatility")
+    components = None
+    if all(v is not None for v in (pct, dev, vol)):
+        # 分位为 0~100，均线偏离/波动率为小数比例（0.032=3.2%），转百分数展示
+        components = {
+            "price_percentile": f"{pct:.1f}%",
+            "ma_deviation": f"{dev * 100:+.1f}%",
+            "volatility": f"{vol * 100:.1f}%",
+        }
+    return {
+        "available": True,
+        "score": market_temperature_data.get("score"),
+        "tier": market_temperature_data.get("tier") or "合理",
+        "components": components,
+        "index_name": market_temperature_data.get("index_name") or "沪深300",
+        "disclaimer": market_temperature_data.get("disclaimer") or TEMPERATURE_DISCLAIMER,
+    }
+
+
+def _attach_valuation_to_penetration(
+    penetration: dict | None,
+    valuation_data: dict | None,
+) -> dict | None:
+    """为穿透 TOP10 数据附加估值分位文本（返回新 dict，不修改原对象）。
+
+    Args:
+        penetration: 穿透 TOP10 数据（含 top10/summary）。
+        valuation_data: 估值分位数据契约；None 时原样返回（不附加列）。
+
+    Returns:
+        新 penetration dict（每个 top10 条目增加 valuation_text 字段），
+        或原 penetration（valuation_data 为 None）。
+    """
+    if not valuation_data or not penetration:
+        return penetration
+    from src.python.report.penetration_sheet import _get_valuation_text
+
+    display = dict(penetration)
+    top10 = []
+    for entry in display.get("top10", []):
+        e = dict(entry)
+        e["valuation_text"] = _get_valuation_text(valuation_data, entry.get("codes", []))
+        top10.append(e)
+    display["top10"] = top10
+    return display
+
+
 def _render_template(
     *,
     now_str: str,
@@ -325,16 +467,29 @@ def _render_template(
     position_status: dict | None = None,  # 品种覆盖诊断 position_status
     data_freshness: dict | None = None,  # 可信度摘要 data_freshness
     action_data: dict | None = None,  # 行动建议单一数据源 action_data（行动板块 + 智囊团深度复盘行动摘要）
-    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data（合并章）
-    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（合并章指标卡）
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data
+    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部）
     fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源）
+    valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（穿透估值列，None=开关关闭）
+    market_temperature_data: dict
+    | None = None,  # 市场温度数据契约 market_temperature_data（汇总温度行，None=开关关闭）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.report.chart_data_builder import build_evolution_chart_data
 
+    # 估值分位 + 市场温度：开关关闭时为 None（模板保持既有输出）
+    valuation_enabled = valuation_data is not None
+    penetration_display = _attach_valuation_to_penetration(penetration, valuation_data)
+    market_temperature = _build_temperature_display(market_temperature_data)
+    # 目录分组导航：按「基础/基金深度/风险/历史/LLM」五组折叠（_sv_fn 闭包过滤不可见章节）
+    section_groups = _build_section_nav_groups(order, _sv_fn, section_numbers)
+
     return _ENV.get_template("report_template.html").render(
         flow_display=_build_flow_display(fund_flow_data),
+        section_groups=section_groups,
+        valuation_enabled=valuation_enabled,
+        market_temperature=market_temperature,
         now=now_str,
         today=today_str,
         trading_day=trading_day,
@@ -351,7 +506,7 @@ def _render_template(
         accounts=accounts,
         account_totals=account_totals,
         cat_data=cat_data,
-        penetration=penetration,
+        penetration=penetration_display,
         perf_data=perf_data,
         candidate_data=candidate_data,
         # SAC: news_data[*].enriched_keywords[*].display 来自外部 API
@@ -446,10 +601,13 @@ def write_html_report(
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
-    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data（合并章）
-    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（合并章指标卡）
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data
+    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部变化摘要）
     fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源，None=开关关闭）
+    valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（「资产穿透TOP10」估值分位列，None=开关关闭）
+    market_temperature_data: dict
+    | None = None,  # 市场温度数据契约 market_temperature_data（「投资分析汇总」温度行，None=开关关闭）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -525,13 +683,13 @@ def write_html_report(
     # ── 13) 基金经理变更监控 ──
     manager_analysis = _render_manager_analysis(holdings, enable_fund_deep_analysis, prog)
 
-    # ── 14) 持仓重合度矩阵 ──
+    # ── 14) 持仓关系矩阵·重合度区块 ──
     overlap_matrix = _render_overlap_matrix(holdings, details, enable_fund_deep_analysis, prog)
 
     # ── 15) 持仓集中度监控 ──
     concentration_analysis = _render_concentration(holdings, enable_fund_deep_analysis, prog)
 
-    # ── 16) 基金风格分析 ──
+    # ── 16) 风格与因子分析 ──
     style_analysis = _render_style_analysis(holdings, enable_fund_deep_analysis, prog)
 
     # ── 8) 财经新闻 ──
@@ -625,7 +783,7 @@ def write_html_report(
     _factor_names: dict = {}
     if style_factor_data:
         try:
-            from src.python.analysis.factor_exposure import FACTOR_NAMES
+            from src.python.analysis.style_factor_regression import FACTOR_NAMES
 
             _factor_names = FACTOR_NAMES
         except Exception:
@@ -697,6 +855,8 @@ def write_html_report(
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,
         fund_flow_data=fund_flow_data,
+        valuation_data=valuation_data,
+        market_temperature_data=market_temperature_data,
     )
 
     if enable_interactive_charts:

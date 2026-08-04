@@ -65,7 +65,7 @@ class TestCheckpointSmoke:
         mock_load: MagicMock,
     ):
         """capture_snapshot 签名支持 extra 参数。"""
-        from src.python.report.orchestrator import capture_snapshot
+        from src.python.report._snapshot import capture_snapshot
 
         mock_load.return_value = None
 

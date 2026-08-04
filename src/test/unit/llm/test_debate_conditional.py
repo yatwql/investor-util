@@ -52,7 +52,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
 
     # ── test 1: Mode 2 启用 + 3 情景 ──────────────────────────
 
-    @patch("src.python.config._core.get_llm_config")
+    @patch("src.python.config._llm_settings.get_llm_config")
     def test_mode2_enabled_3_scenarios(self, mock_get_llm_config):
         """Mode 2 启用 + 3 情景 → prompt 末尾出现 3 段情景指令，含 '+20%'。"""
         mock_get_llm_config.return_value = _mock_llm_config_with_scenarios([
@@ -104,7 +104,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
 
     # ── test 3: 单情景 ───────────────────────────────────────
 
-    @patch("src.python.config._core.get_llm_config")
+    @patch("src.python.config._llm_settings.get_llm_config")
     def test_mode2_enabled_1_scenario(self, mock_get_llm_config):
         """1 情景 → prompt 末尾仅 1 段情景指令。"""
         mock_get_llm_config.return_value = _mock_llm_config_with_scenarios([
@@ -128,7 +128,7 @@ class TestDebateConditionalMode2(unittest.TestCase):
 
     # ── test 4: scenarios=[] ─────────────────────────────────
 
-    @patch("src.python.config._core.get_llm_config")
+    @patch("src.python.config._llm_settings.get_llm_config")
     def test_mode2_enabled_empty_scenarios(self, mock_get_llm_config):
         """scenarios=[] → prompt 末尾段落与 Mode 2 关闭一致，无情景段。"""
         mock_get_llm_config.return_value = _mock_llm_config_with_scenarios([])

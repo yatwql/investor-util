@@ -1,4 +1,4 @@
-"""因子暴露分析管线场景测试。
+"""风格因子回归管线场景测试。
 
 覆盖：
   1. compute_factor_exposure_data 返回完整数据契约（available=True，全部 13 键）

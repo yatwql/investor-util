@@ -19,7 +19,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.python.config._core import (
+from src.python.config._llm_providers import (
     _load_llm_providers,
     _parse_providers_list,
     _validate_provider_entry,

@@ -19,7 +19,7 @@
   "enable_portfolio_evolution": true,  // 组合演进
   "enable_action": false,     // 行动建议（默认关）
   // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": false, "candidate_compare": false},  // 数据质量仪表盘 / 基金业绩分析候选基金比较 默认关
+  "report_submodules": {"data_quality": false, "candidate_compare": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘 / 候选基金比较 / 估值分位 / 市场温度 默认关
   "comparison_candidates": [],  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合 candidate_compare）
 
   // ── C. 数据源与提供商 ──
@@ -139,7 +139,7 @@
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
 | `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/W/C/F/O/1/2/3/4/P/I/A/S/R/X），启动后光标自动定位 | 手动编辑 |
-| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（20 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
+| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（19 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `comparison_indices` | `{"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}` | 竞争语境对比指数池。智囊团深度复盘中对比组合 vs 多指数的今日涨跌幅、区间累计收益和指标（夏普/波动率/最大回撤）。格式 `{指数代码: 显示名称}`。禁用时设为空对象 `{}` | 手动编辑 |
@@ -172,6 +172,8 @@
 | `report_submodules.data_quality` | `false` | 数据质量仪表盘子模块开关，**默认关闭**。开启后报告展示数据质量仪表盘区块（数据覆盖/时效性/降级状态） | 手动编辑 |
 | `report_submodules.candidate_compare` | `false` | 「基金业绩分析」章候选基金比较子表开关，**默认关闭**。开启后报告在该章主业绩表下方展示候选基金横向比较表（候选来自 `comparison_candidates`，比较维度：收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度） | 手动编辑 |
 | `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
+| `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 手动编辑 |
+| `report_submodules.market_temperature` | `false` | 「投资分析汇总」章市场温度刻度行开关，**默认关闭**。开启后该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明） | 手动编辑 |
 
 ---
 
@@ -413,7 +415,7 @@
     "fund_manager": 1,
     "position_relationship": 2,
     "fund_concentration": 3,
-    "fund_style": 4,
+    "style_factor": 4,
     "summary": 5
   }
 }
@@ -421,7 +423,7 @@
 
 > 效果：基金经理/持仓关系矩阵/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
-> 空对象 `{}` 或缺失此字段时使用上述 20 项默认顺序。
+> 空对象 `{}` 或缺失此字段时使用上述 19 项默认顺序。
 
 **实用示例** — 将组合历史走势与回撤提到前面，关注回撤风险：
 
@@ -724,6 +726,4 @@
 | `_startup_wizard_shown` | 首次运行引导是否已显示 |
 | `_privacy_notice_shown` | 隐私声明是否已显示 |
 
-**为什么独立存放：** config.json 受 git 跟踪、用于跨机器同步。若把"本机是否已看过引导"这类个性化标志写入 config.json，每台机器会写入各自不同的值，导致 config.json 难以同步。故机器个性化状态统一放 `data/state/` 目录（与熔断器状态、再平衡静默期等同目录），不参与同步。
-
-**兼容迁移：** 如 config.json 中存在这两个键，程序首次读取时会自动迁移到 `local_state.json` 并从 config.json 删除，无需手动清理。
+**为什么独立存放：** config.json 受 git 跟踪、用于跨机器同步。若把"本机是否已看过引导"这类个性化标志写入 config.json，每台机器会写入各自不同的值，导致 config.json 难以同步。故机器个性化状态统一放 `data/state/` 目录（与熔断器状态、再平衡静默期等同目录），不参与同步。这两个键仅由 `config/_local_state.py` 在 `data/state/local_state.json` 中读写，不做任何 config.json 迁移。

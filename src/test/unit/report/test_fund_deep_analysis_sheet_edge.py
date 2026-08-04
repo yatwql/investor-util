@@ -4,7 +4,7 @@
   - fund_manager_sheet：manager_data 为空 → 写占位
   - position_relationship_sheet：重合度区块基金数 < 2 → 写占位（STATUS_MESSAGES）
   - fund_concentration_sheet：concentration_data 为空 → 写占位
-  - style_factor_sheet：风格表 style_data 为空 → 写占位（合并章区块一）
+  - style_factor_sheet：风格表 style_data 为空 → 写占位（风格与因子分析章区块一）
 
 运行：
   pytest src/test/unit/report/test_fund_deep_analysis_sheet_edge.py -v
@@ -89,7 +89,7 @@ class TestFundConcentrationSheetEmpty(unittest.TestCase):
 
 
 class TestFundStyleSheetEmpty(unittest.TestCase):
-    """style_factor_sheet 风格表空数据占位（合并章区块一）"""
+    """style_factor_sheet 风格表空数据占位（风格与因子分析章区块一）"""
 
     def setUp(self):
         self.wb = openpyxl.Workbook()

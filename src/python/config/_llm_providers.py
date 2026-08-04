@@ -194,20 +194,17 @@ def _parse_providers_list(raw_config: dict) -> list[dict] | None:
             "timeout": float(entry.get("timeout", 60.0)),
             "proxy_preferred": entry.get("proxy_preferred", False),
         }
-        # 凭据来源：credentials_ref 或内嵌 api_key/model
+        # 凭据来源：credentials_ref 引用或内嵌 api_key/model（运行时宽容读取）
         if entry.get("credentials_ref"):
             entry_dict["credentials_ref"] = entry["credentials_ref"]
         else:
-            # 凭据分离：强制使用 credentials_ref
+            # 保留内嵌字段供运行时直接读取（api.py 内联回退）
             logger.warning(
-                "provider '%s' 内嵌 api_key 违反 凭据分离 凭据分离约束，"
-                "将在运行时自动迁入凭据字典。请将 api_key 迁移到 "
-                "llm_key.json 并使用 credentials_ref 引用",
+                "provider '%s' 内嵌 api_key，建议迁移到 llm_key.json 并使用 credentials_ref 引用",
                 name,
             )
-            entry_dict["credentials_ref"] = f"_inline_{name}"
-            entry_dict["_inline_api_key"] = entry["api_key"].strip()
-            entry_dict["_inline_model"] = entry["model"]
+            entry_dict["api_key"] = entry["api_key"].strip()
+            entry_dict["model"] = entry["model"]
         validated.append(entry_dict)
 
     if not validated:
@@ -276,23 +273,5 @@ def _inject_provider_chain_data(config: dict) -> dict:
                         entry["name"],
                         ref,
                     )
-
-        # ── 内联 api_key 自动注入凭据字典（凭据分离） ──
-        provider_list = config.get("_provider_list")
-        if provider_list:
-            for entry in provider_list:
-                inline_key = entry.pop("_inline_api_key", None)
-                inline_model = entry.pop("_inline_model", None)
-                if inline_key:
-                    ref = entry.get("credentials_ref", "")
-                    if ref:
-                        creds = config.get("_llm_credentials")
-                        if creds is None:
-                            creds = {}
-                            config["_llm_credentials"] = creds
-                        if ref not in creds:
-                            creds[ref] = {"api_key": inline_key}
-                            if inline_model:
-                                creds[ref]["model"] = inline_model
 
     return config

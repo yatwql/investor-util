@@ -99,13 +99,10 @@ def _generate_report_both(
     from src.python.report.excel_generator import generate_excel_report
     from src.python.report.html_writer import write_html_report
 
-    # 从 orchestrator 获取数据准备函数和 ReportResult
-    from src.python.report.orchestrator import (
-        ReportResult,
-        _compute_details,
-        capture_snapshot,
-        fetch_history_data,
-    )
+    # ReportResult 定义于 orchestrator；数据准备函数从各自实现模块导入
+    from src.python.report._report_generation import _compute_details
+    from src.python.report._snapshot import capture_snapshot, fetch_history_data
+    from src.python.report.orchestrator import ReportResult
 
     perf = PerfCollector(report_type="both", holdings=holdings)
     result = ReportResult()
@@ -378,7 +375,7 @@ def _fetch_history_with_metrics(
         (history_data, metrics) — 关闭时均为 None
     """
     from src.python.config import is_enable_history
-    from src.python.report.orchestrator import fetch_history_data
+    from src.python.report._snapshot import fetch_history_data
 
     if not is_enable_history(config):
         reporter.info("[章节配置] 历史走势已关闭，跳过")
@@ -483,12 +480,9 @@ def _generate_report_full(
     from src.python.report.excel_generator import generate_excel_report
     from src.python.report.html_writer import write_html_report
 
-    # 从 orchestrator 获取数据准备函数
-    from src.python.report.orchestrator import (
-        ReportResult,
-        capture_snapshot,
-        prepare_report_data,
-    )
+    # ReportResult/prepare_report_data 定义于 orchestrator；快照函数从 _snapshot 导入
+    from src.python.report._snapshot import capture_snapshot
+    from src.python.report.orchestrator import ReportResult, prepare_report_data
 
     perf = PerfCollector(report_type="full", holdings=holdings)
     result = ReportResult()

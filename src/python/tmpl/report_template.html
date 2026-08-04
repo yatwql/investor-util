@@ -331,6 +331,22 @@
         }
         .toc-list a:hover { background: var(--source-tag-bg); }
         .toc-list a.active { background: var(--source-tag-bg); border-left-color: #2E75B6; color: var(--source-tag-text); font-weight: 600; }
+        /* 分组折叠：按「基础/基金深度/风险/历史/LLM」五组（<details>/<summary> 原生折叠，键盘可达） */
+        .toc-group { border-bottom: 1px solid var(--toc-border); }
+        .toc-group:last-child { border-bottom: none; }
+        .toc-group-title {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 9px 16px; font-size: 12px; font-weight: 600;
+            color: #2E75B6; cursor: pointer; list-style: none;
+            background: rgba(46,117,182,0.07); user-select: none;
+            border-left: 3px solid #2E75B6;
+        }
+        .toc-group-title::-webkit-details-marker { display: none; }
+        .toc-group-title:hover { background: rgba(46,117,182,0.14); }
+        .toc-group-count {
+            font-size: 11px; color: var(--text-muted); font-weight: 400;
+            background: var(--source-tag-bg); border-radius: 8px; padding: 1px 7px;
+        }
         /* 收起状态：侧栏移出视口 + 浮动展开按钮 */
         .toc-toggle-btn {
             position: fixed; left: 12px; top: 12px; z-index: 101;
@@ -866,9 +882,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
         <nav aria-label="章节快速定位">
             <div class="toc-list">
-                {% for sec in section_order %}
-                {% if section_visible(sec["key"]) %}
-                <a href="#sec-{{ sec['key'] }}">{{ section_numbers[sec["key"]] }}、{{ sec["name"] }}</a>
+                {% for group in section_groups %}
+                {% if group.sections %}
+                <details class="toc-group" data-group="{{ group.key }}" open>
+                    <summary class="toc-group-title">{{ group.name }}<span class="toc-group-count">{{ group.sections | length }}</span></summary>
+                    {% for sec in group.sections %}
+                    <a href="#sec-{{ sec['key'] }}">{{ sec.number }}、{{ sec.name }}</a>
+                    {% endfor %}
+                </details>
                 {% endif %}
                 {% endfor %}
             </div>
@@ -1035,6 +1056,29 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     {% endif %}
                 </div>
             </div>
+
+            {% if market_temperature %}
+            <!-- 市场温度（report_submodules.market_temperature 子模块） -->
+            <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【市场温度】</h3>
+            <table class="kv-table">
+                {% if market_temperature.available and market_temperature.score is not none %}
+                <tr><td>市场温度</td><td style="font-weight: 700;">{{ market_temperature.score | round(0) | int }} / 100（{{ market_temperature.tier }}）</td></tr>
+                {% else %}
+                <tr><td>市场温度</td><td>--（数据不足，暂不显示）</td></tr>
+                {% endif %}
+                {% if market_temperature.components %}
+                <tr>
+                    <td>三因子（{{ market_temperature.index_name }}）</td>
+                    <td>
+                        价格分位 {{ market_temperature.components.price_percentile }}
+                        · 20日均线偏离 {{ market_temperature.components.ma_deviation }}
+                        · 年化波动率 {{ market_temperature.components.volatility }}
+                    </td>
+                </tr>
+                {% endif %}
+                <tr><td>注</td><td style="font-size: 12px; color: #888;">{{ market_temperature.disclaimer }}</td></tr>
+            </table>
+            {% endif %}
         </div>
 
         {{ render_data_status(data_status_summary) }}
@@ -1249,7 +1293,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <table>
                 <thead>
                     <tr>
-                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>概念</th><th>预测EPS({{ report_year }}E)</th><th>年均股息</th><th>来源明细</th>
+                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>概念</th><th>预测EPS({{ report_year }}E)</th><th>年均股息</th>{% if valuation_enabled %}<th>估值分位</th>{% endif %}<th>来源明细</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1265,6 +1309,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td style="font-size: 12px;">{{ entry.get("concepts", []) | join(" / ") if entry.get("concepts") else "--" }}</td>
                         <td>{{ entry.get("eps_text", "--") }}</td>
                         <td>{{ entry.get("dividend_text", "--") }}</td>
+                        {% if valuation_enabled %}<td style="font-size: 12px;">{{ entry.get("valuation_text", "--") }}</td>{% endif %}
                         <td class="text-left" style="font-size: 12px;">
                             {% for src in entry["sources"] %}
                             <span class="source-tag">{{ src }}</span>
@@ -1293,6 +1338,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 基金 {{ s["total_funds"] }} 只（{{ s["fund_breakdown"] }}） + 直接持股 {{ s["total_stocks"] }} 只
                 → 穿透合并 {{ s["merged_count"] }} 个标的，TOP10 覆盖 {{ s["top10_coverage_pct"] }}%
             </div>
+            {% if valuation_enabled %}
+            <div>* 估值分位说明：价格分位代理，非真实历史估值分位（PE/PB 为当前行情值）</div>
+            {% endif %}
         </div>
         {% else %}
         <div class="empty-note">暂无穿透数据</div>
@@ -1808,7 +1856,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div>* 轻度(1分) / 中度(2分) / 严重(≥3分) — 首次运行记录基线，基准确立中</div>
             </div>
             {% else %}
-            <div class="empty-section">📭 暂无基金风格分析数据（未检测到基金持仓或 API 返回为空）</div>
+            <div class="empty-section">📭 暂无基金风格表数据（未检测到基金持仓或 API 返回为空）</div>
             {% endif %}
 
             <!-- 区块二：风格因子回归 -->
@@ -2238,7 +2286,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% else %}
             <div class="chart-caption">组合净值走势</div>
             {% endif %}
-            <!-- 指标汇总（合并章唯一指标区：累计收益/最大回撤/波动率/起止日 + 回撤状态，不重复） -->
+            <!-- 指标汇总（组合历史走势与回撤章唯一指标区：累计收益/最大回撤/波动率/起止日 + 回撤状态，不重复） -->
             <div class="summary-grid" style="margin-top:16px;">
                 <div class="summary-card">
                     <h3>累计收益</h3>
@@ -2404,7 +2452,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
             <div class="chart-caption">说明：阴影/高亮区间为历史上 A 股主要危机时段；区间与报告数据窗口重叠时统计区间最大回撤与恢复耗时</div>
             {% endif %}
-            <!-- 数据加载状态（合并章单一份） -->
+            <!-- 数据加载状态（组合历史走势与回撤章单一份） -->
             {% if history_data.warnings or history_data.failed_holdings or history_data.successful_holdings %}
             <div class="data-status" style="margin-top:12px;">
                 {% if history_data.warnings %}

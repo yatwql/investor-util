@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import copy
 import logging
-import warnings
 from typing import Any
 
 from src.python.core.models import Holding
@@ -34,15 +33,6 @@ logger = logging.getLogger("invest")
 # ── 模式定义 ──────────────────────────────────────────────────────
 
 _ANONYMIZATION_MODES = frozenset({"off", "code_display", "full_anonymous", "summary"})
-
-# 模式名别名映射（别名 → 当前命名）
-_DEPRECATED_MODE_MAP: dict[str, str] = {
-    "name_replace": "code_display",
-    "quantity_blur": "full_anonymous",
-}
-
-# 别名提示消息模板
-_DEPRECATION_WARNING_TPL = "匿名化模式 '%s' 已重命名为 '%s'，请更新配置"
 
 __all__ = [
     "anonymize_holdings",
@@ -64,12 +54,7 @@ ANONYMIZATION_MODE_DESCRIPTIONS: dict[str, str] = {
 
 
 def _resolve_mode(mode: str) -> str:
-    """解析模式字符串：处理废弃别名，未知时回退到 'off'。"""
-    if mode in _DEPRECATED_MODE_MAP:
-        new_mode = _DEPRECATED_MODE_MAP[mode]
-        warnings.warn(_DEPRECATION_WARNING_TPL % (mode, new_mode), DeprecationWarning, stacklevel=3)
-        logger.warning("[anonymizer] " + _DEPRECATION_WARNING_TPL, mode, new_mode)
-        return new_mode
+    """解析模式字符串：未知模式回退到 'off'。"""
     if mode not in _ANONYMIZATION_MODES:
         logger.warning("[anonymizer] 未知匿名化模式 '%s'，使用 'off'", mode)
         return "off"
@@ -355,7 +340,7 @@ def get_anonymization_mode() -> str:
     config = get_config()
     anon_config = config.get("anonymization", {})
     mode = anon_config.get("mode", "off")
-    if mode not in _ANONYMIZATION_MODES and mode not in _DEPRECATED_MODE_MAP:
+    if mode not in _ANONYMIZATION_MODES:
         logger.warning("[anonymizer] 配置中的匿名化模式 '%s' 无效，使用 'off'", mode)
         mode = "off"
     return mode

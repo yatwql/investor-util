@@ -1,5 +1,5 @@
 # 个人投资分析报告生成小助手 — 实现计划
-> 文档版本：0.10.3
+> 文档版本：0.10.4
 > **编号源**：`plan-next = 25`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-24，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
@@ -20,11 +20,12 @@
 
 ### P0 — 发布门禁
 
+- ✅ **全链回归与发布门禁**（迭代计划轮 21）：`test_runner.py --mode verify,regression` 3256 全过 + 3 check 脚本 `--ci` 全 [OK] + 版本号全链一致（v0.10.4）+ 数据快照刷新（test-coverage 5038 / folders 统计）+ registry.number 连续编号复核 + 数据契约增删复核。**v0.10.4 已发布**（2026-08-05）。
 - ✅ **全链回归与发布门禁**（迭代计划轮 21）：`test_runner.py --mode verify,regression` 3169 全过 + 3 check 脚本 `--ci` 全 [OK] + 版本号全链一致（v0.10.3）+ 数据快照刷新（test-coverage 4916 / folders 统计）+ registry.number 连续编号复核 + 数据契约增删复核。**v0.10.3 已发布**（2026-08-05）。
 
 ### 推荐实施顺序
 
-> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑧ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列；plan-8/plan-10 已归 P4 实验功能，不列入当前实施序列。**标记 ✅ 的为已完成项**（P1 轮 1~11 + 阶段 D 轮 12~13 + 阶段 E 轮 14~16，changelog v0.10.1/v0.10.3），保留在表中供追溯；待办序列自 ⑦ 起。
+> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑧ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列；plan-8/plan-10 已归 P4 实验功能，不列入当前实施序列。**标记 ✅ 的为已完成项**（P1 轮 1~11 + 阶段 D 轮 12~13 + 阶段 E 轮 14~16 + 阶段 F 轮 17~18，changelog v0.10.1/v0.10.3/v0.10.4），保留在表中供追溯；待办序列自 ⑧ 起。
 
 | 次序 | 计划项 | 归类 | 工作量 | 推荐理由 |
 |:--:|:--|:--:|:--:|:--|
@@ -34,8 +35,8 @@
 | ④ | ✅ **plan-20** 历史增强 | P1 | 轮9~11 | 合并组合历史+回撤 + 危机标注 + 尾部风险 |
 | ⑤ | ✅ **plan-21** 风格与选基 | P2 | 轮12~13 | 风格与因子合并 + 行业 Beta（20→19 章）+ 候选基金比较增强（`candidate_compare` 默认关），changelog v0.10.3 |
 | ⑥ | ✅ **plan-22** 成本流水 | P2 | 轮14~16 | 依赖持仓文件格式扩展，输入→计算→渲染 |
-| ⑦ | **plan-23** 估值与温度 | P3 | 轮17~18 | 免费代理信号，合规敏感，放最后 |
-| ⑧ | **plan-24** 导航与收尾 | P3 | 轮19~20 | 分组导航 + 文档快照，收尾性质 |
+| ⑦ | ✅ **plan-23** 估值与温度 | P3 | 轮17~18 | 免费代理信号，合规敏感，放最后 |
+| ⑧ | ✅ **plan-24** 导航与收尾 | P3 | 轮19~20 | 分组导航 + 文档快照，收尾性质 |
 
 ### P1 — 已完成（轮 1~11）
 
@@ -67,15 +68,15 @@
 
 持仓 Excel 新增**可选**「交易流水」「分红流水」页签（不破坏既有 4 列）+ 资金加权收益（XIRR）+ 成本分档；「投资分析汇总」/「市值核算明细表」/「持仓分类表」章渲染（Excel + HTML）。**对应轮 14~16，已完成**——轮 14 持仓文件格式扩展（`TradeRecord`/`DividendRecord` + `read_flow_sheets()`/`read_holdings_with_flows()`，20 例解析测试、覆盖率 93%）；轮 15 XIRR 资金加权收益 + 成本分档（`analysis/cost_flow.py` 纯计算层，24 例、覆盖率 94%）；轮 16 三页签渲染（`report_submodules.cost_lots` 默认关 + `fund_flow_data` 数据契约 + CLI/TUI 接线，新增测试 32 个、受影响套件 267 passed，dev-verify 1638 passed）；**HTML 渲染补齐**（轮16 补遗：`html_writer._build_flow_display` 复用加权成本/分档标签组装展示映射 + 模板三处条件渲染，新增测试 12 个）。
 
-### P3 — 预期实施
+### P3 — 已完成（轮 17~20）
 
-#### `plan-23` 估值与温度（[`plan-investment-iteration.md` 阶段F](./plan-investment-iteration.md)）— **推荐⑦**
+#### ✅ `plan-23` 估值与温度（[`plan-investment-iteration.md` 阶段F](./plan-investment-iteration.md)）— **推荐⑦ · 已完成**
 
-「资产穿透TOP10」章估值分位（当前 PE/PB + 价格分位代理，显式标注局限）+「投资分析汇总」章市场温度（价格分位+均线偏离+波动率三因子，温度计无仓位指令）。**对应轮 17~18**。
+「资产穿透TOP10」章估值分位（当前 PE/PB + 价格分位代理，显式标注局限）+「投资分析汇总」章市场温度（价格分位+均线偏离+波动率三因子，温度计无仓位指令）。**对应轮 17~18，已完成**——轮 17 估值分位（`analysis/valuation_percentile.py` 纯计算层 + `providers/eastmoney_industry.py` push2 扩展 PE/PB + 编排层 `compute_valuation_data`，穿透 TOP10 追加「估值分位」列，开关 `report_submodules.valuation_percentile` 默认关）；轮 18 市场温度（`analysis/market_temperature.py` 纯计算层，复用价格分位机制，编排层 `compute_market_temperature_data`，汇总章追加「市场温度」刻度行，开关 `report_submodules.market_temperature` 默认关）；双开关独立、同章不同行互不影响，`valuation_data`/`market_temperature_data` 数据契约注册，dev-verify 1694 passed + 3 check 全 [OK]。
 
-#### `plan-24` 导航与收尾（[`plan-investment-iteration.md` 阶段G](./plan-investment-iteration.md)）— **推荐⑧**
+#### ✅ `plan-24` 导航与收尾（[`plan-investment-iteration.md` 阶段G](./plan-investment-iteration.md)）— **推荐⑧ · 已完成**
 
-HTML 按「基础/基金深度/风险/历史/LLM」分组导航折叠（新增图表 图下说明）；管理文档版本头/数据快照/用户手册同步。**对应轮 19~20**。
+HTML 报告左侧目录按「基础/基金深度/风险/历史/LLM」五组折叠导航。**对应轮 19~20，已完成**——轮 19 分组导航（`html_writer.py` 新增 `_NAV_GROUP_LABELS`/`_SECTION_NAV_GROUP_MAP`/`_build_section_nav_groups()`：五组固定顺序、仅收录可见章节、组内按报告序号升序；`report_template.html` 目录改 `<details>/<summary>` 折叠分组 + 组标题徽标计数；窄屏扁平 `section-nav` 兜底；`TestHtmlTocGroupedNav` 11 例全通过）；轮 20 文档快照与用户手册同步（folders.md 统计表、test-coverage.md 实时计数、how-to-config.md 新开关行 + `report_section_order` 19 项核对、reports-instruction.md 目录五组说明 + 「页面/章节分组」序号全面核对、registry.py docstring 20→19、faq.md 19 项修正），dev-verify 1694 passed + 3 check 全 [OK]。
 
 ### P4 — 实验功能
 

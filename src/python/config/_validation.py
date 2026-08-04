@@ -253,7 +253,7 @@ def _validate_enable_llm(issues: int) -> int:
     仅检查格式/拼写错误，不判断业务语义（全关正常——可能是用户主动关闭
     所有 LLM 报告模块但仍需 news_correlation）。缺失视为正常（默认启用）。
     """
-    from src.python.config._core import get_llm_config
+    from src.python.config._llm_settings import get_llm_config
 
     llm_config = get_llm_config()
     if not llm_config:

@@ -30,7 +30,7 @@ MIN_SAMPLES: int = 60
 MIN_HOLDINGS: int = 2
 # 显著性阈值（双侧 p < 0.05）
 SIGNIFICANCE_LEVEL: float = 0.05
-# 拉取条数（编排层使用，预留对齐/dropna 头部损耗，与 factor_exposure 一致）
+# 拉取条数（编排层使用，预留对齐/dropna 头部损耗，与 style_factor_regression 一致）
 FETCH_DAYS: int = 90
 # 常数序列检测阈值：标准差低于此值视为方差为 0（常数/近常数序列），
 # 返回 (0.0, 1.0) 绝不硬算。用容差而非精确 == 0——均值舍入误差可能使

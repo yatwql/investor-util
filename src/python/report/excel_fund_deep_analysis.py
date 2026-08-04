@@ -1,6 +1,6 @@
 """基金深度分析页签写入模块。
 
-职责：基金经理变更监控、持仓重合度矩阵、持仓集中度监控、基金风格漂移分析。
+职责：基金经理变更监控、持仓关系矩阵、持仓集中度监控、风格与因子分析。
 
 注：三个模块（重合度/集中度/风格）共享相同的数据准备模板，
 通过 _process_fund_deep_analysis_module 辅助函数消除重复代码。
@@ -178,19 +178,19 @@ def write_fund_deep_analysis_sheets(
                 if sf_fund_holdings:
                     style_result = analyze_style(sf_fund_holdings)
                     if (style_result or {}).get("results"):
-                        prog.ok("基金风格分析计算完成")
+                        prog.ok("风格与因子分析计算完成")
                     else:
-                        logger.info("基金风格分析：无结果")
+                        logger.info("风格与因子分析：无结果")
                 else:
-                    logger.info("基金风格分析：无基金持仓数据")
+                    logger.info("风格与因子分析：无基金持仓数据")
             except Exception as e:
-                logger.warning("基金风格分析数据获取/计算失败: %s", e)
-                prog.add_error("基金风格分析数据获取失败")
+                logger.warning("风格与因子分析数据获取/计算失败: %s", e)
+                prog.add_error("风格与因子分析数据获取失败")
 
         _factor_names = None
         if style_factor_data:
             try:
-                from src.python.analysis.factor_exposure import FACTOR_NAMES
+                from src.python.analysis.style_factor_regression import FACTOR_NAMES
 
                 _factor_names = FACTOR_NAMES
             except Exception:

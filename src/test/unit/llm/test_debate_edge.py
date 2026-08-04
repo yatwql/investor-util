@@ -329,7 +329,7 @@ class TestDebateEdgeFilterHallucinatedCodes(unittest.TestCase):
 class TestDebateEdgeConfigMissingSection(unittest.TestCase):
     """features.json flag=true 但配置段缺失 → 使用全缺省配置。"""
 
-    @patch("src.python.config._core.get_llm_config")
+    @patch("src.python.config._llm_settings.get_llm_config")
     @patch(
         "src.python.llm.generators.generate_llm_module",
         side_effect=[

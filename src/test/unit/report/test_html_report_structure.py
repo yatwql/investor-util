@@ -163,11 +163,21 @@ def _build_minimal_render_data(
 def _render_template(render_data: dict) -> BeautifulSoup:
     """用 html_writer._ENV 渲染模板并返回 BeautifulSoup 对象。"""
     from src.python.report.html_jinja_env import _ENV
+    from src.python.report.html_writer import _build_section_nav_groups
 
-    # 注入 section_visible 闭包（与生产代码相同的 context 变量方式，不写入 _ENV.globals）
+    # 注入 section_visible 闭包 + section_groups 分组导航（与生产代码相同的 context 变量方式，不写入 _ENV.globals）
     _sv_dict = render_data.get("section_visible_dict", {})
     _sv_fn = lambda key, _d=_sv_dict: bool(_d.get(key, False))
-    html = _ENV.get_template("report_template.html").render(**render_data, section_visible=_sv_fn)
+    section_groups = _build_section_nav_groups(
+        render_data.get("section_order", []),
+        _sv_fn,
+        render_data.get("section_numbers", {}),
+    )
+    html = _ENV.get_template("report_template.html").render(
+        **render_data,
+        section_visible=_sv_fn,
+        section_groups=section_groups,
+    )
     return BeautifulSoup(html, "html.parser")
 
 
@@ -1114,12 +1124,30 @@ class TestHtmlTocSidebar(unittest.TestCase):
         """模板引用 toc.js（本地 bundle 加载）。"""
         self.assertIn("toc.js", str(self.soup), "模板应加载 toc.js")
 
-    def test_toc_links_follow_section_order(self):
-        """目录项顺序 = section_order 顺序。"""
+    def test_toc_links_follow_grouped_order(self):
+        """目录项按「基础/基金深度/风险/历史/LLM」分组顺序，组内按报告序号升序。"""
         links = self.soup.select("#toc-sidebar a[href^='#sec-']")
-        order_keys = [sec["key"] for sec in self.order]
+        # 预期分组顺序（测试常量）：基础 → 基金深度 → 历史 → LLM（风险组空，跳过）
+        expected_keys = [
+            "summary",
+            "market_value",
+            "category",
+            "penetration",
+            "fund_performance",
+            "fund_manager",
+            "position_relationship",
+            "fund_concentration",
+            "style_factor",
+            "portfolio_history_drawdown",
+            "news_correlation",
+            "global_macro",
+            "expert_review",
+            "health_check",
+            "penetration_deep",
+            "llm_usage",
+        ]
         link_keys = [link.get("href").replace("#sec-", "") for link in links]
-        self.assertEqual(link_keys, order_keys, "目录顺序应与 section_order 一致")
+        self.assertEqual(link_keys, expected_keys, "目录顺序应为五组分组顺序（组内按序号升序）")
 
 
 class TestHtmlTocVisibility(unittest.TestCase):
@@ -1213,6 +1241,201 @@ class TestSummaryDateTimeValueStyles(unittest.TestCase):
                     "",
                     "标签列不应新增内联样式",
                 )
+
+
+class TestHtmlTocGroupedNav(unittest.TestCase):
+    """目录分组导航测试 — 「基础/基金深度/风险/历史/LLM」五组折叠。
+
+    覆盖导航收尾验收：分组渲染 / 折叠交互 / 移动端不溢出 / 键盘可达。
+    左侧目录（toc-sidebar）按五组折叠；窄屏横向 section-nav 保持扁平兜底。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+
+    # ── 分组渲染 ──────────────────────────────────────────────
+
+    def test_four_nonempty_group_details_rendered(self):
+        """目录按五组渲染 <details class='toc-group'>，非空组默认 open（展开）。"""
+        details = self.soup.select("#toc-sidebar details.toc-group")
+        # 测试常量下：基础/基金深度/历史/LLM 四组有章节，风险组空跳过
+        self.assertEqual(len(details), 4, f"应有 4 个非空分组，实际 {len(details)}")
+        for d in details:
+            self.assertIsNotNone(d.get("open"), "非空分组应默认展开（open 属性）")
+
+    def test_group_renders_correct_sections(self):
+        """各组内渲染正确章节链接（组序固定，组内按报告序号升序）。"""
+
+        def _group_keys(group_key: str) -> list[str]:
+            d = self.soup.select_one(f"#toc-sidebar details.toc-group[data-group='{group_key}']")
+            if d is None:
+                return []
+            return [a.get("href", "").replace("#sec-", "") for a in d.select("a[href^='#sec-']")]
+
+        self.assertEqual(
+            _group_keys("basic"),
+            ["summary", "market_value", "category", "penetration"],
+            "「基础」组应含 4 个基础章节",
+        )
+        self.assertEqual(
+            _group_keys("fund_deep"),
+            [
+                "fund_performance",
+                "fund_manager",
+                "position_relationship",
+                "fund_concentration",
+                "style_factor",
+            ],
+            "「基金深度」组应含基金业绩 + 基金深度分析四章（含持仓关系矩阵/风格与因子分析）",
+        )
+        self.assertEqual(
+            _group_keys("history"),
+            ["portfolio_history_drawdown"],
+            "「历史」组应含组合历史走势与回撤章",
+        )
+        self.assertEqual(
+            _group_keys("llm"),
+            [
+                "news_correlation",
+                "global_macro",
+                "expert_review",
+                "health_check",
+                "penetration_deep",
+                "llm_usage",
+            ],
+            "「LLM」组应含新闻关联 + LLM 文本章 + API 用量",
+        )
+
+    def test_group_title_shows_name_and_count(self):
+        """分组标题显示组名 + 章节数徽标（徽标数 = 组内链接数）。"""
+        for d in self.soup.select("#toc-sidebar details.toc-group"):
+            summary = d.select_one("summary.toc-group-title")
+            self.assertIsNotNone(summary, "每组应有 <summary> 标题")
+            badge = summary.select_one(".toc-group-count")
+            self.assertIsNotNone(badge, "分组标题应含章节数徽标")
+            self.assertEqual(
+                int(badge.get_text(strip=True)),
+                len(d.select("a[href^='#sec-']")),
+                f"组 {d.get('data-group')} 徽标数应等于组内章节数",
+            )
+
+    def test_real_registry_group_mapping(self):
+        """真实注册表分组映射正确（含数据源可用性/组合演进/行动建议）。"""
+        from src.python.core.registry import get_report_section_order
+        from src.python.report.html_writer import _build_section_nav_groups
+
+        order = get_report_section_order()
+        numbers = {s["key"]: s["number"] for s in order}
+        groups = _build_section_nav_groups(order, lambda key: True, numbers)
+        by_key = {g["key"]: [s["key"] for s in g["sections"]] for g in groups}
+
+        self.assertEqual(
+            by_key["basic"],
+            ["summary", "market_value", "category", "penetration", "data_source_status"],
+            "「基础」组应含数据源可用性矩阵",
+        )
+        self.assertEqual(
+            by_key["fund_deep"],
+            [
+                "fund_performance",
+                "fund_manager",
+                "position_relationship",
+                "fund_concentration",
+                "style_factor",
+            ],
+        )
+        self.assertEqual(by_key["risk"], ["action"], "「风险」组应含行动建议章")
+        self.assertEqual(
+            by_key["history"],
+            ["portfolio_history_drawdown", "portfolio_evolution"],
+            "「历史」组应含组合历史走势与回撤 + 组合演进",
+        )
+        self.assertEqual(
+            by_key["llm"],
+            [
+                "news_correlation",
+                "global_macro",
+                "expert_review",
+                "health_check",
+                "penetration_deep",
+                "llm_usage",
+            ],
+        )
+
+    # ── 折叠交互 ──────────────────────────────────────────────
+
+    def test_group_collapse_toggleable(self):
+        """分组折叠经 <details>/<summary> 原生交互（点击 summary 展开/收起，无需 JS）。"""
+        details = self.soup.select("#toc-sidebar details.toc-group")
+        self.assertGreaterEqual(len(details), 1, "应至少渲染一个分组")
+        for d in details:
+            summary = d.select_one("summary")
+            self.assertEqual(summary.name, "summary", "每组折叠开关应为 <summary>")
+            self.assertIsNotNone(d.get("open"), "渲染侧默认 open 保证全量可见")
+
+    def test_empty_group_skipped(self):
+        """无可见章节的分组不渲染 <details>（测试常量下风险组空 → 跳过）。"""
+        self.assertIsNone(
+            self.soup.select_one("#toc-sidebar details.toc-group[data-group='risk']"),
+            "风险组无可见章节时不应渲染 <details>",
+        )
+
+    def test_action_visible_adds_risk_group(self):
+        """enable_action 开启（action 可见）时，「风险」组出现且含行动建议章。"""
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        order.append({"key": "action", "name": "行动建议", "number": 17})
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        soup = _render_template(_build_minimal_render_data(order, numbers, sv_dict))
+        risk = soup.select_one("#toc-sidebar details.toc-group[data-group='risk']")
+        self.assertIsNotNone(risk, "enable_action 开启时「风险」组应渲染")
+        keys = [a.get("href", "").replace("#sec-", "") for a in risk.select("a[href^='#sec-']")]
+        self.assertEqual(keys, ["action"], "「风险」组应含行动建议章")
+
+    # ── 键盘可达 ──────────────────────────────────────────────
+
+    def test_group_summary_keyboard_focusable(self):
+        """每组折叠开关为 <summary>（原生可聚焦，Enter/Space 切换），满足键盘可达。"""
+        for d in self.soup.select("#toc-sidebar details.toc-group"):
+            summary = d.select_one("summary")
+            self.assertIsNotNone(summary, "每组应有 <summary> 折叠开关（原生可聚焦）")
+            self.assertNotEqual(
+                summary.get("tabindex"),
+                "-1",
+                "分组标题不应被移出键盘焦点序列",
+            )
+
+    # ── 移动端不溢出 ──────────────────────────────────────────
+
+    def test_mobile_fallback_nav_complete(self):
+        """窄屏横向 section-nav 保持扁平并包含全部可见章节（移动端导航不因分组丢失章节）。"""
+        links = self.soup.select("nav.section-nav a")
+        self.assertEqual(len(links), len(self.sv_dict), "section-nav 应包含全部可见章节")
+        self.assertGreaterEqual(len(links), 1)
+
+    def test_section_nav_wraps_not_overflow(self):
+        """section-nav 采用 flex-wrap（换行而非横向溢出）。"""
+        self.assertIn("flex-wrap: wrap", self._template_css(), "section-nav 应允许换行避免横向溢出")
+
+    def test_toc_hidden_on_narrow_screen(self):
+        """窄屏（≤899px）隐藏左侧目录，移动端不因目录溢出。"""
+        css = self._template_css()
+        self.assertRegex(css, r"@media \(max-width: 899px\)", "应存在窄屏断点样式")
+        self.assertRegex(
+            css,
+            r"\.toc-sidebar[\s,]*\.toc-toggle-btn\s*\{[^}]*display:\s*none",
+            "窄屏应隐藏 .toc-sidebar 与悬浮展开按钮",
+        )
+
+    def _template_css(self) -> str:
+        """读取渲染后 HTML 中全部 <style> 文本。"""
+        return "\n".join(s.get_text() for s in self.soup.select("style"))
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ from src.python.report.progress import ProgressReporter, SilentProgressReporter,
 logger = setup_logger()
 
 
-# ── 组合历史走势与回撤页签写入（合并章：走势表 + 回撤矩阵 + 危机区间标注） ──────
+# ── 组合历史走势与回撤页签写入（一章两区块：走势表 + 回撤矩阵 + 危机区间标注） ──────
 
 
 def _write_portfolio_history_drawdown_sheet(
@@ -30,7 +30,7 @@ def _write_portfolio_history_drawdown_sheet(
     crisis_annotation: dict[str, Any] | None = None,
     tail_risk: dict[str, Any] | None = None,
 ) -> None:
-    """写入组合历史走势与回撤合并页签（一章两区块 + 危机区间标注 + 尾部风险）。
+    """写入组合历史走势与回撤页签（一章两区块 + 危机区间标注 + 尾部风险）。
 
     Args:
         sheets: 页签字典，读取 `portfolio_history_drawdown` 键。
@@ -152,6 +152,9 @@ def generate_excel_report(
     enable_cost_lots: bool = False,  # 子模块：成本流水（成本分档 + XIRR + 分红累计，report_submodules.cost_lots）
     transactions: list | None = None,  # 交易流水记录（「交易流水」页签，无则 None）
     dividends: list | None = None,  # 分红流水记录（「分红流水」页签，无则 None）
+    valuation_data: dict | None = None,  # 估值分位数据契约（「资产穿透TOP10」估值分位列；None 时从 pipeline_data 读取）
+    market_temperature_data: dict
+    | None = None,  # 市场温度数据契约（「投资分析汇总」温度刻度行；None 时从 pipeline_data 读取）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -173,16 +176,20 @@ def generate_excel_report(
         enable_history: board 层 — 历史走势章节是否开启
         enable_portfolio_evolution: board 层 — 组合演进章节是否开启
         enable_data_quality: 子模块 — 数据质量仪表盘（源健康+品种覆盖），
-            默认 False（向后兼容，该章保持旧「数据源可用性矩阵」样式）
+            默认 False（未开启时该章保持旧「数据源可用性矩阵」样式）
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
         pipeline_data: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
         history_data: 组合历史走势数据（含基准指数），来自 PortfolioHistoryCalculator。
                       未提供或 status=unavailable 时页签显示占位文本。
         enable_cost_lots: 子模块 — 成本流水（成本分档 + XIRR + 分红累计）。
-            默认 False（向后兼容，「投资分析汇总」/「市值核算明细表」/「持仓分类表」保持既有输出）
+            默认 False（未开启时「投资分析汇总」/「市值核算明细表」/「持仓分类表」保持既有输出）
         transactions: 交易流水记录（「交易流水」页签），成本分档/FIFO 批次与 XIRR 现金流用
         dividends: 分红流水记录（「分红流水」页签），分红累计与 XIRR 现金流用
+        valuation_data: 估值分位数据契约（当前 PE/PB + 价格分位代理），
+            report_submodules.valuation_percentile 关闭或传入 None 时穿透页签保持既有输出。
+        market_temperature_data: 市场温度数据契约（三因子合成温度计），
+            report_submodules.market_temperature 关闭或传入 None 时汇总页签保持既有输出。
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
@@ -233,7 +240,22 @@ def generate_excel_report(
     a_idx, us_idx = resolve_indices(a_indices, us_indices, modules, prog)
 
     # ── 各页签写入 ──
-    pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog, enable_cost_lots=enable_cost_lots)
+    pen_result = write_content_sheets(
+        sheets,
+        holdings,
+        data,
+        a_idx,
+        us_idx,
+        modules,
+        prog,
+        enable_cost_lots=enable_cost_lots,
+        valuation_data=valuation_data if valuation_data is not None else (pipeline_data or {}).get("valuation_data"),
+        market_temperature_data=(
+            market_temperature_data
+            if market_temperature_data is not None
+            else (pipeline_data or {}).get("market_temperature_data")
+        ),
+    )
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
     # 风格与因子分析：数据契约 数据在编排层注入 pipeline_data（style_factor_data 主键），
     # 此处透传页签写入（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
@@ -258,7 +280,7 @@ def generate_excel_report(
         sheets, include_llm, llm_content, prog, section_order=order, debate_mode_label=_debate_mode_label
     )
 
-    # ── 组合历史走势与回撤页签（合并章：走势表 + 回撤矩阵 + 危机区间标注） ──
+    # ── 组合历史走势与回撤页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注） ──
     if enable_history:
         ws_hd = sheets.get("portfolio_history_drawdown")
         if ws_hd is not None:
@@ -318,7 +340,7 @@ def generate_excel_report(
             except Exception:
                 logger.debug("[excel] 数据质量仪表盘页签写入失败（非关键）", exc_info=True)
         else:
-            # 开关关闭：该章保持旧「数据源可用性矩阵」样式（向后兼容）
+            # 开关关闭：该章保持旧「数据源可用性矩阵」样式
             _write_data_source_matrix_sheet(ws_ds, prog)
 
     # ── 组合历史走势：环比对比摘要（写入 summary 页签底部） ──

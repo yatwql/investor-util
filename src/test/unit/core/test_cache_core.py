@@ -86,7 +86,7 @@ class TestCachePath(unittest.TestCase):
         from src.python.cache import _cache_path
 
         path = _cache_path("my_key")
-        self.assertTrue(path.endswith("my_key_v2.json"))
+        self.assertTrue(path.endswith("my_key_v3.json"))
         self.assertIn("data", path)
         self.assertIn("cache", path)
 

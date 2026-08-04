@@ -23,6 +23,7 @@ from src.python.llm.fact_checker._context import (
     _is_daily_change_context,
     _is_drawdown_context,
     _is_hypothetical_context,
+    _is_portfolio_level_context,
     _is_position_weight_context,
     _is_weight_context,
     _is_win_rate_context,
@@ -134,6 +135,18 @@ def _evaluate_percent_value(
     # 构建参考收益率列表：个股收益率 + 组合总收益率
     ref_rates: dict[str, float] = dict(stock_rates_abs)
     ref_rates["_portfolio"] = profit_rate
+
+    # 组合级收益语境（"组合累计收益约10.0%"）→ 数值归到组合总收益率而非某个个股。
+    # 必须在主体定位前判定：同句含多个持仓代码时（如"组合累计收益10%，招商银行上涨8%，
+    # 贵州茅台上涨15%"），组合收益数值若走个股路由会被误归到数值最近的个股。
+    if _is_portfolio_level_context(sentence, anchor):
+        if abs(value - profit_rate) <= tolerance_pct:
+            return None, None
+        signed = profit_rate_signed if profit_rate_signed is not None else profit_rate
+        correct_str = f"{signed:.1f}"
+        _ctx = _sentence_snippet(sentence)
+        issue = f"收益相关数值 {value}% 与实际累计收益率 {correct_str}%（{profit_sign}）偏差超过容差（句段：{_ctx}）"
+        return issue, (value_str, correct_str, sentence, f"组合实际收益率{correct_str}%")
 
     # 定位句中明确持仓主体：优先按句中持仓代码（单个）或名称指代校验，而非全局最近邻。
     # 否则句中已写明确主体（如"建设银行收益率 3.2%"）、数值却接近无关品种

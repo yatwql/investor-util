@@ -20,6 +20,8 @@ def write_content_sheets(
     modules: dict[str, Any],
     prog: ProgressReporter,
     enable_cost_lots: bool = False,
+    valuation_data: dict | None = None,
+    market_temperature_data: dict | None = None,
 ) -> dict:
     """写入汇总 / 分类 / 穿透 / 基金业绩页签，返回穿透结果。
 
@@ -27,6 +29,10 @@ def write_content_sheets(
         enable_cost_lots: 成本流水子模块开关。关闭时 fund_flow_data 不传
             （汇总/分类两章保持既有输出）；开启时透传 data["fund_flow_data"]
             （数据契约：成本分档 + XIRR + 分红累计，无流水时 available=False）。
+        valuation_data: 估值分位数据契约（「资产穿透TOP10」估值分位列），
+            开关关闭或 None 时穿透页签保持既有输出（10 列）。
+        market_temperature_data: 市场温度数据契约（「投资分析汇总」温度刻度行），
+            开关关闭或 None 时汇总页签保持既有输出。
     """
     fund_flow_data = data.get("fund_flow_data") if enable_cost_lots else None
 
@@ -43,6 +49,7 @@ def write_content_sheets(
         a_indices=a_indices,
         us_indices=us_indices,
         fund_flow_data=fund_flow_data,
+        market_temperature_data=market_temperature_data,
     )
 
     prog.call_sheet(
@@ -64,6 +71,7 @@ def write_content_sheets(
         holdings,
         data["details"],
         penetration_data=pen_result,
+        valuation_data=valuation_data,
     )
 
     prog.call_sheet(

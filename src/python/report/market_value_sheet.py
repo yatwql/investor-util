@@ -242,7 +242,7 @@ def write_market_value_sheet(
         today_str: 日期字符串（YYYY-MM-DD），默认当天
         details: 预计算明细行（必须传入，由编排器预计算）
         fund_flow_data: 成本流水数据契约（非 None 时追加「资金加权成本」列；
-            None 时保持既有 15 列输出，向后兼容）
+            None 时保持既有 15 列输出）
 
     Returns:
         (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)

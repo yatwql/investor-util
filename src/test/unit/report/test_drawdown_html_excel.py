@@ -1,4 +1,4 @@
-"""回撤明细 + 危机区间标注在 HTML/Excel 报告中的呈现测试（合并章）。
+"""回撤明细 + 危机区间标注在 HTML/Excel 报告中的呈现测试（组合历史走势与回撤章）。
 
 对应「组合历史走势与回撤」（portfolio_history_drawdown）一章两区块：
   一、走势表（净值趋势 + 指标汇总矩阵）
@@ -92,7 +92,7 @@ def _crisis(in_range: bool = True) -> dict:
 
 
 class TestHtmlDrawdownSection(unittest.TestCase):
-    """回撤章节（合并章二区块）HTML 呈现测试。"""
+    """回撤区块（组合历史走势与回撤章二区块）HTML 呈现测试。"""
 
     def _section(self, history_data, crisis_annotation=None):
         soup = _render_drawdown(history_data, crisis_annotation)
@@ -235,7 +235,7 @@ class TestExcelDrawdownSheet(unittest.TestCase):
         return [[str(c.value) if c.value is not None else "" for c in row] for row in ws.iter_rows()]
 
     def test_merged_chapter_two_blocks(self):
-        """合并章：走势表 + 回撤矩阵两区块 + 危机标注，标题带章节序号。"""
+        """组合历史走势与回撤章：走势表 + 回撤矩阵两区块 + 危机标注，标题带章节序号。"""
         events = [
             {
                 "peak_date": "2026-01-10",
@@ -250,7 +250,7 @@ class TestExcelDrawdownSheet(unittest.TestCase):
         ws = self._write(_history(events))
         titles = [r[0] for r in self._all_text(ws)]
         joined = [str(t) for t in titles]
-        self.assertTrue(any("组合历史走势与回撤" in t for t in joined), "标题应含合并章中文名")
+        self.assertTrue(any("组合历史走势与回撤" in t for t in joined), "标题应含组合历史走势与回撤中文名")
         self.assertIn("一、走势表", titles)
         self.assertIn("二、回撤矩阵", titles)
         # 区块顺序：走势表 → 回撤矩阵

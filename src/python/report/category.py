@@ -283,7 +283,7 @@ def write_category_sheet(
         holdings: 原始持仓列表
         details: 市值核算明细行列表
         fund_flow_data: 成本流水数据契约（非 None 时追加「成本分档」「分红累计」
-            子列；None 时保持既有 10 列输出，向后兼容）
+            子列；None 时保持既有 10 列输出）
     """
     has_flow = fund_flow_data is not None
     ncols = _NCOLS_WITH_FLOW if has_flow else _NCOLS

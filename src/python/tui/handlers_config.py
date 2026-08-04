@@ -419,7 +419,8 @@ def _cmd_config_report_boards() -> None:
 def _cmd_refresh_config() -> None:
     """重新加载所有配置（config.json + llm_settings.json + llm_key.json）。"""
     from src.python.config import get_config, get_llm_config
-    from src.python.config._core import invalidate_config_cache, invalidate_llm_config_cache
+    from src.python.config._core import invalidate_config_cache
+    from src.python.config._llm_settings import invalidate_llm_config_cache
     from src.python.llm.pricing import reload_pricing
 
     invalidate_config_cache()

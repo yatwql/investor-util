@@ -286,6 +286,53 @@ def _write_us_indices(ws: Worksheet, row: int, us_indices: dict[str, dict[str, A
     return row
 
 
+def _write_market_temperature(ws: Worksheet, row: int, temperature: dict | None) -> int:
+    """写入市场温度刻度行（三因子合成温度计，无仓位指令）。
+
+    Args:
+        ws: 目标工作表
+        row: 起始行
+        temperature: 市场温度数据契约（market_temperature_data）。None/不可用时
+            写占位文本 + 免责声明；可用时写分数刻度 + 三因子明细。
+
+    Returns:
+        写入后的下一行行号。
+    """
+    row = _write_section(ws, row, "【市场温度】")
+    disclaimer = (temperature or {}).get(
+        "disclaimer"
+    ) or "市场温度为价格分位、均线偏离与波动率三因子合成的信号，仅供参考，不构成任何仓位建议"
+    if not temperature or not temperature.get("available"):
+        write_data_row(ws, row, ["市场温度", "--（数据不足，暂不显示）"])
+        row += 1
+        row = _write_kv_row(ws, row, "注", disclaimer)
+        return row
+
+    score = temperature.get("score")
+    tier = temperature.get("tier") or "合理"
+    index_name = temperature.get("index_name") or "沪深300"
+    pct = temperature.get("price_percentile")
+    dev = temperature.get("ma_deviation")
+    vol = temperature.get("volatility")
+    if score is not None:
+        write_data_row(ws, row, ["市场温度", f"{score:.0f} / 100（{tier}）"])
+    else:
+        write_data_row(ws, row, ["市场温度", f"--（{tier}）"])
+    row += 1
+    if all(v is not None for v in (pct, dev, vol)):
+        # 分位为 0~100，均线偏离/波动率为小数比例（0.032=3.2%），转百分数展示
+        row = _write_kv_row(
+            ws,
+            row,
+            f"三因子（{index_name}）",
+            f"价格分位 {pct:.1f}% · 20日均线偏离 {dev * 100:+.1f}% · 年化波动率 {vol * 100:.1f}%",
+        )
+    else:
+        row = _write_kv_row(ws, row, f"三因子（{index_name}）", "因子数据不完整")
+    row = _write_kv_row(ws, row, "注", disclaimer)
+    return row
+
+
 def build_index_data_status(
     a_indices: dict[str, dict[str, Any]] | None,
     us_indices: dict[str, dict[str, Any]] | None,
@@ -357,6 +404,7 @@ def write_summary_sheet(
     a_indices: dict[str, dict[str, Any]] | None = None,
     us_indices: dict[str, dict[str, Any]] | None = None,
     fund_flow_data: dict | None = None,
+    market_temperature_data: dict | None = None,
 ) -> None:
     """写入投资分析汇总。
 
@@ -372,6 +420,8 @@ def write_summary_sheet(
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
         fund_flow_data: 成本流水数据契约（非 None 时盈亏汇总追加 XIRR 行；
             None 时保持既有输出，report_submodules.cost_lots 关闭）
+        market_temperature_data: 市场温度数据契约（非 None 时在「市场指数」后
+            追加「市场温度」刻度行；None 时保持既有输出，report_submodules.market_temperature 关闭）
     """
     row = write_title_row(ws, 1, get_report_sheet_name("summary"), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
@@ -386,6 +436,11 @@ def write_summary_sheet(
     row = _write_a_share_indices(ws, row, a_indices)
     row = _write_blanks(ws, row)
     row = _write_us_indices(ws, row, us_indices)
+
+    # 市场温度刻度行（report_submodules.market_temperature 子模块，非 None 才渲染）
+    if market_temperature_data is not None:
+        row = _write_blanks(ws, row)
+        row = _write_market_temperature(ws, row, market_temperature_data)
 
     # 指数数据源状态
     data_status = build_index_data_status(a_indices, us_indices)

@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.python.config._core import (
+from src.python.config._llm_providers import (
     _inject_provider_chain_data,
     _load_llm_providers,
     _parse_providers_list,
@@ -206,7 +206,7 @@ class TestParseProvidersList(unittest.TestCase):
     # ── api_key 清理 ──
 
     def test_api_key_stripped(self):
-        """api_key 两端空格被去除。"""
+        """api_key 两端空格被去除，内联字段保留在 entry 中（运行时直接读取）。"""
         raw = {
             "providers": [
                 {"name": "p1", "provider": "claude", "api_key": "  sk-test-key  ", "model": "m1"},
@@ -214,9 +214,9 @@ class TestParseProvidersList(unittest.TestCase):
         }
         result = _parse_providers_list(raw)
         self.assertIsNotNone(result)
-        # 凭据分离：内联 api_key 被迁入 _inline_api_key 并设置 credentials_ref
-        self.assertEqual(result[0]["_inline_api_key"], "sk-test-key")
-        self.assertEqual(result[0]["credentials_ref"], "_inline_p1")
+        self.assertEqual(result[0]["api_key"], "sk-test-key")
+        self.assertEqual(result[0]["model"], "m1")
+        self.assertNotIn("credentials_ref", result[0])
 
     # ── 非 dict entry ──
 

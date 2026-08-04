@@ -70,6 +70,8 @@ from src.python.config._core import (
     is_enable_data_quality,
     is_enable_candidate_compare,
     is_enable_cost_lots,
+    is_enable_valuation_percentile,
+    is_enable_market_temperature,
     get_comparison_candidates,
     set_config,
     del_config,
@@ -135,6 +137,8 @@ __all__ = [
     "is_enable_data_quality",
     "is_enable_candidate_compare",
     "is_enable_cost_lots",
+    "is_enable_valuation_percentile",
+    "is_enable_market_temperature",
     "get_comparison_candidates",
     # LLM 配置
     "get_llm_settings_path",

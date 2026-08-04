@@ -43,6 +43,12 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     # 成本流水：成本分档 + XIRR + 分红累计（report_submodules.cost_lots，
     # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
     "fund_flow_data",
+    # 估值分位：当前 PE/PB + 价格分位代理（report_submodules.valuation_percentile，
+    # 由编排层 compute_valuation_data 组装；开关关闭时为 None）
+    "valuation_data",
+    # 市场温度：价格分位+均线偏离+波动率三因子合成温度计（report_submodules.market_temperature，
+    # 由编排层 compute_market_temperature_data 组装；开关关闭时为 None）
+    "market_temperature_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -71,6 +77,12 @@ _PREP_KNOWN_KEYS: set[str] = {
     # 成本流水：成本分档 + XIRR + 分红累计（report_submodules.cost_lots，
     # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
     "fund_flow_data",
+    # 估值分位：当前 PE/PB + 价格分位代理（report_submodules.valuation_percentile，
+    # 由编排层 compute_valuation_data 组装；开关关闭时为 None）
+    "valuation_data",
+    # 市场温度：价格分位+均线偏离+波动率三因子合成温度计（report_submodules.market_temperature，
+    # 由编排层 compute_market_temperature_data 组装；开关关闭时为 None）
+    "market_temperature_data",
 }
 
 # ── 类型映射（用于自动类型断言） ──
@@ -87,6 +99,8 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "data_freshness": (dict, type(None)),
     "action_data": (dict, type(None)),
     "fund_flow_data": (dict, type(None)),
+    "valuation_data": (dict, type(None)),
+    "market_temperature_data": (dict, type(None)),
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
@@ -108,6 +122,8 @@ _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "data_freshness": dict,
     "action_data": dict,
     "fund_flow_data": dict,
+    "valuation_data": dict,
+    "market_temperature_data": dict,
 }
 
 

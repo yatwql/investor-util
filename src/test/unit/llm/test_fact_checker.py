@@ -56,6 +56,20 @@ def holdings_with_rates() -> list[dict]:
     ]
 
 
+@pytest.fixture
+def portfolio_mixed_holdings() -> list[dict]:
+    """组合级+个股级收益同句场景的持仓：组合总收益率≈9.9%，招商银行 8.0%，茅台 15.0%。
+
+    回归：组合累计收益与个股涨跌同句时，组合收益归组合总收益率、
+    个股收益归各自代码（原误路由到数值最近个股）。
+    """
+    return [
+        {"name": "工商银行", "code": "601398", "market_value": 200000.0, "cost": 185000.0, "profit_rate": 8.11},
+        {"name": "招商银行", "code": "600036", "market_value": 108000.0, "cost": 100000.0, "profit_rate": 8.0},
+        {"name": "贵州茅台", "code": "600519", "market_value": 115000.0, "cost": 100000.0, "profit_rate": 15.0},
+    ]
+
+
 # ── check_numerical_consistency ───────────────────────────────
 
 
@@ -168,6 +182,31 @@ class TestCheckNumericalConsistency:
         assert checked >= 1
         assert passed == checked
         assert corrections == []
+
+    def test_portfolio_level_plus_stock_level_same_sentence(self, portfolio_mixed_holdings):
+        """组合级收益与个股级收益同句：组合收益归组合、个股收益归各自代码（回归）。
+
+        修复前：组合累计收益 10.0% 被整句主体定位误路由到数值最近的个股（招商银行 8.0%），
+        报「10.0% 与 600036 实际 8.0% 偏差超容差」假阳性。
+        """
+        text = "组合累计收益约10.0%，招商银行(600036)上涨8.0%，贵州茅台(600519)上涨15.0%"
+        issues, checked, passed, corrections = check_numerical_consistency(text, portfolio_mixed_holdings)
+        assert issues == []
+        assert checked == 3
+        assert passed == 3
+        assert corrections == []
+
+    def test_portfolio_level_mismatch_attributed_to_portfolio(self, portfolio_mixed_holdings):
+        """组合级收益数值错误时归因到组合总收益率而非个股（回归路由）。"""
+        text = "组合累计收益约20.0%，招商银行(600036)上涨8.0%，贵州茅台(600519)上涨15.0%"
+        issues, checked, passed, corrections = check_numerical_consistency(text, portfolio_mixed_holdings)
+        assert checked == 3
+        assert passed == 2
+        assert len(issues) == 1
+        # 归因到组合总收益率（"实际累计收益率"为组合级专用消息），不写成某个个股的收益率
+        assert "实际累计收益率" in issues[0]
+        assert len(corrections) == 1
+        assert corrections[0][3] == "组合实际收益率9.9%"
 
     def test_pp_vs_rate_confusion_detected(self):
         """LLM 混淆贡献占比 pp 与个股收益率 → 检测并修正。"""

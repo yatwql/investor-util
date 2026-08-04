@@ -50,15 +50,15 @@ class TestConfigNoLlmKeyFile(unittest.TestCase):
     @patch("src.python.config._llm_providers._get_llm_key_path")
     @patch("src.python.config._llm_providers._load_llm_providers")
     @patch("src.python.config._core.os.path.exists")
-    @patch("src.python.config._core.get_llm_settings_path")
+    @patch("src.python.config._llm_settings.get_llm_settings_path")
     def test_llm_providers_as_key_source(
         self, mock_settings_path: MagicMock,
         mock_exists: MagicMock, mock_load: MagicMock,
         mock_get_key_path: MagicMock,
     ) -> None:
         """llm_key.json 不存在 + llm_settings.json 无 api_key + llm_providers.json 有 provider → 成功。"""
-        import src.python.config._core as core
         import src.python.config._llm_providers as llm_providers
+        import src.python.config._llm_settings as core
 
         # settings 无 api_key
         mock_settings_path.return_value = "/tmp/nonexistent/settings.json"

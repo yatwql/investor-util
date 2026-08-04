@@ -120,12 +120,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("基金经理变更监控模块缺失 (fund_manager)")
 
     try:
-        from src.python.report.fund_overlap import compute_overlap_matrix
+        from src.python.report.position_overlap import compute_overlap_matrix
 
         modules["compute_overlap_matrix"] = compute_overlap_matrix
     except ImportError:
         modules["compute_overlap_matrix"] = lambda _fh, _mv=None: {}
-        prog.add_error("持仓重合度计算模块缺失 (fund_overlap)")
+        prog.add_error("持仓重合度计算模块缺失 (position_overlap)")
 
     try:
         from src.python.report.position_relationship_sheet import write_position_relationship_sheet

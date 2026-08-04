@@ -1,5 +1,5 @@
 # 个人投资分析报告生成小助手 — 技术设计
-> 文档版本：0.10.3
+> 文档版本：0.10.4
 
 ## 目录
 
@@ -1502,11 +1502,10 @@ prune()：两阶段自动清理
         快照比对检测          重合度+相关性一章两区块
               │               Jaccard+重叠率 / Pearson+显著性
               │
-        持仓集中度监控          基金风格分析
-        TOP N 占比+环比      市值/PE 加权判定
-              │
-          因子暴露分析
-        OLS 回归风格画像
+        持仓集中度监控          风格与因子分析
+        TOP N 占比+环比       一章三区块
+              │              风格表+因子回归+行业Beta
+              │              OLS 回归风格画像
 ```
 
 #### 基金经理变更监控
@@ -1535,7 +1534,7 @@ fund_manager_snapshot 快照（精确键名，每日更新）
 
 一章两区块合一页签（`report/position_relationship_sheet.py`）：**一、持仓重合度矩阵**（基金×基金 Jaccard + 配对明细）；**二、持仓相关性矩阵**（品种×品种 Pearson 下三角矩阵 + 配对明细 + 说明）。任一区块数据不足时该区块独立降级（§1.4.5），互不影响；两区块均无数据时整页写占位。章节可见性由 `position_relationship_data` 判定：`overlap_matrix is not None or position_relationship_data is not None`（二者任一有数据即渲染章节）。
 
-重合度计算（`fund_overlap.py::compute_overlap_matrix`，双指标）：
+重合度计算（`position_overlap.py::compute_overlap_matrix`，双指标）：
 
 ```
 Jaccard 系数 = |A ∩ B| / |A ∪ B|
@@ -1575,9 +1574,9 @@ Excel 热力图着色：
 
 #### 风格与因子分析（一章三区块：风格表 + 因子回归 + 行业 Beta）
 
-> **章节合并说明**：原「基金风格分析」+「因子暴露分析」两章已合并为单一「风格与因子分析」章节（section key=`style_factor`，type=`fund_deep_analysis`、data_flag=`style_factor_data`），章节内分三区块：一、基金风格表（每只基金截面分类）；二、风格因子回归（组合整体时间序列回归）；三、行业 Beta 子表（组合对各行业指数敏感性，开关 `report_submodules.industry_beta` 默认关）。区块间数据独立降级，任一块无数据不影响其余区块。原 `fund_style`/`factor_exposure` 两个 C7 注册条目已删除，序号全局重排。
+> **章节结构说明**：「风格与因子分析」章节（section key=`style_factor`，type=`fund_deep_analysis`、data_flag=`style_factor_data`）一章三区块：一、基金风格表（每只基金截面分类）；二、风格因子回归（组合整体时间序列回归）；三、行业 Beta 子表（组合对各行业指数敏感性，开关 `report_submodules.industry_beta` 默认关）。区块间数据独立降级，任一块无数据不影响其余区块。C7 注册见 §4.6 架构约束遵从表，序号为注册表 19 模块之一（连续编号）。
 
-##### 区块一：基金风格表（原基金风格分析）
+##### 区块一：基金风格表
 
 基于持仓个股市值 + PE 数据的加权风格判定（`fund_style_classify.py` / `fund_style_report.py`）：
 
@@ -1602,9 +1601,9 @@ Excel 热力图着色：
 - Tencent 二级降级基于 registry 熔断器（provider="tencent_style"），避免网络不可达时逐只等待超时
 - 独立快照 `fund_style_snapshot` 精确键名，月级 TTL，不受菜单缓存命令影响
 
-##### 区块二：风格因子回归（原因子暴露分析）
+##### 区块二：风格因子回归
 
-基于组合整体时间序列回归估算组合在价值/成长/质量因子上的暴露（β），输出"组合风格画像"（`analysis/factor_exposure.py` / `report/orchestrator.py::compute_factor_exposure_data`）。
+基于组合整体时间序列回归估算组合在价值/成长/质量因子上的暴露（β），输出"组合风格画像"（`analysis/style_factor_regression.py` / `report/orchestrator.py::compute_factor_exposure_data`）。
 
 > **与区块一（基金风格表）的差异化**：基金风格表是**每只基金的截面分类**（六宫格：市值×风格，基于 PE/市值阈值），回答"这只基金长什么样"；因子回归是**组合整体的时间序列回归**（因子收益回归组合收益得 β），回答"组合收益由什么风格因子驱动"。方法论与粒度均不同，报告 UI 文案需注明差异（"分类" vs "回归估算"），避免混淆"风格归属柱状图"与六宫格。
 
@@ -1617,7 +1616,7 @@ R_p = β₁R_value + β₂R_growth + β₃R_quality + α + ε
 **模块分层（C14 依赖）**：
 
 ```
-analysis/factor_exposure.py   # 纯计算：接收(组合收益序列+因子收益序列) → OLS → 输出
+analysis/style_factor_regression.py   # 纯计算：接收(组合收益序列+因子收益序列) → OLS → 输出
     ↑ 无数据获取、无报告依赖，纯 pandas/numpy
 analysis/industry_beta.py      # 纯计算：复用 compute_factor_exposure 单因子调用算行业 β（不重复实现）
 report/orchestrator.py         # 编排：拉取组合收益(独立拉持仓历史 days=60 算 as-if) + 因子K线 + 行业指数K线
@@ -1631,7 +1630,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 | 因子 | 中证指数代码 | 说明 | probe 实测（2026-08-01，Tencent 主链路，365 天窗口） |
 |:----|:-----------:|:-----|:-----|
 | 大盘价值 | 000919（300 价值） | 沪深 300 中价值因子得分最高 | ✅ 365 条，新鲜 |
-| 大盘成长 | 000920（300 成长） | 沪深 300 中成长因子得分最高 | ❌ **停更**（自 2023-02-17 无数据，距今 >120 天）→ 由 500 成长替代 |
+| 大盘成长 | 000920（300 成长） | 沪深 300 中成长因子得分最高 | ❌ **停更**（自 2023-02-17 无数据，距今 >120 天）→ 成长因子采用 500 成长代理 |
 | 小盘价值 | 000922（500 价值） | 中证 500 中价值因子得分最高 | ✅ 365 条，新鲜 |
 | 小盘成长 | 000925（500 成长） | 中证 500 中成长因子得分最高 | ✅ 365 条，新鲜 |
 | 质量因子 | 000930（中证 300 质量） | 沪深 300 中 ROE/杠杆/盈利稳定性高 | ✅ 365 条，新鲜 |
@@ -1673,7 +1672,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 |:-----|:---------|
 | **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定；因子指数**不作为 `_A_INDICES` 成员**（避免污染实时指数行情循环与报告"指数对比"章节噪声），代码集合定义为分析模块内部常量 |
 | **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "sina"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（降级接受），Tencent 故障时因子章节落 §1.4.5 数据不足分支 |
-| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。原 `fund_style`/`factor_exposure` 两条目已合并删除 |
+| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 19 个模块序号连续（1~19），`style_factor` 为基金深度分析一章三区块（风格表 + 风格因子回归 + 行业 Beta 子表） |
 | **C14** (渲染期数据不可写入模块级全局变量) | 风格与因子数据通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
 | **C19** (pipeline_data Schema 契约) | 新增 `style_factor_data` 键（类型 `dict`，内嵌 `industry_beta` 子键），键结构见附录 H，先定义类型再使用 |
 | **§1.4.5** (数据降级治理) | 区分两分支：① **数据不足**——因子指数历史不足 36 期或有效样本 < 36，标记 `style_factor_data.available=false`，显示"数据不足"占位文本，**不走 DegradationTracker**（系数据量不足，非故障）；② **数据源故障**——`fetch_index_history` 返回空（chain 全失败），走 DegradationTracker 记录 T2 降级事件，显示"数据源暂不可用"，与数据不足文案区分。行业 Beta 子表独立降级（`industry_beta=None` 开关关闭隐藏 / `available=false` 标题+占位），**绝不输出误导性数字** |
@@ -2163,7 +2162,7 @@ config.json (基础配置)       → get_config() 内存缓存，按 mtime 自�
 llm_settings.json (非敏感)    → get_llm_config() 合并读取，联合 mtime 失效
 llm_key.json (敏感凭据)       → 覆盖 llm_settings.json 的同名字段；多凭据块供 credentials_ref 引用
 llm_providers.json (链配置)   → _load_llm_providers() 读取，_inject_provider_chain_data 注入
-local_state.json (机器本地)   → get_flag()/set_flag() 读写；config.json 旧键惰性迁移（_migrate_legacy_keys）
+local_state.json (机器本地)   → get_flag()/set_flag() 读写
 ```
 
 `config/` 子包结构：
@@ -2174,7 +2173,7 @@ config/
 ├── _comments.py                  # JSON 注释剥离（_strip_json_comments）
 ├── _config_defaults.py           # config.json 默认值定义 + 模板生成
 ├── _core.py                      # 核心读写：get_config()、set_config()、del_config()、init_config()
-├── _local_state.py               # 机器本地状态读写（get_flag/set_flag，data/state/local_state.json，含 config.json 旧键惰性迁移）
+├── _local_state.py               # 机器本地状态读写（get_flag/set_flag，data/state/local_state.json）
 ├── _json_patch.py                # JSON 字段级文本替换（_update_json_raw_text/_replace_dict_block）
 ├── _validation.py                # 配置校验：validate_config()、_absolutize_paths()
 ├── _llm_settings.py              # llm_settings.json 读取/合并/缓存与 LLM 配置入口
@@ -2185,7 +2184,7 @@ config/
 
 #### 机器本地状态
 
-`data/state/local_state.json`（git 忽略）存放仅本机有意义的状态标志——首次运行引导（`_startup_wizard_shown`）、隐私提示已读（`_privacy_notice_shown`）。不混入 config.json，避免 config.json 跨机器同步时各机器写入个性化差异。`config/_local_state.py` 提供 `get_flag`/`set_flag`；首次读取时经 `_migrate_legacy_keys` 惰性搬移 config.json 中遗留旧键并调用 `del_config()` 删除（基于磁盘文本 span 定位键行、保留注释与邻居键，末位键自动清理残留尾随逗号），local_state 已有值则不覆盖、不误删。
+`data/state/local_state.json`（git 忽略）存放仅本机有意义的状态标志——首次运行引导（`_startup_wizard_shown`）、隐私提示已读（`_privacy_notice_shown`）。不混入 config.json，避免 config.json 跨机器同步时各机器写入个性化差异。`config/_local_state.py` 提供 `get_flag`/`set_flag`，直接读写 `data/state/local_state.json`，不做任何旧键迁移。
 
 #### JSON 注释支持
 
@@ -2745,14 +2744,20 @@ investor-util/
 | tail_risk_data | dict | 是 | 已实现 | prepare_report_data |
 | snapshot_diff_data | dict | 是 | 已实现 | prepare_report_data |
 | fund_flow_data | dict | 是 | 已实现 | prepare_report_data |
+| valuation_data | dict | 是 | 已实现 | prepare_report_data |
+| market_temperature_data | dict | 是 | 已实现 | prepare_report_data |
 
-> `style_factor_data`（风格与因子分析，C19 契约，13 键 + 内嵌 `industry_beta` 子键）：主键 `{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。子键 `industry_beta`（行业 Beta，`industry_beta.py::compute_industry_beta_analysis`，开关 `report_submodules.industry_beta` 默认关；关闭 → None → 区块隐藏）：`{"available": bool, "exposure": {industry: float}, "index_codes": {industry: str}, "betas": {industry: float}, "t_stats": {industry: float}, "significant": {industry: bool}, "correlations": {industry: float}, "unmapped_industries": list[str]}`——行业暴露占比按持仓市值聚合，行业指数为中证行业指数（`INDUSTRY_INDEX_MAP`），β 复用 `compute_factor_exposure` 单因子 OLS。C7 注册见 §4.6（type=`fund_deep_analysis`、data_flag=`style_factor_data`，原 `fund_style`/`factor_exposure` 两条目已合并删除），计算方案/架构约束/降级分支见 §4.8 风格与因子分析。
+> `valuation_data`（估值分位，C19 契约，3 键 + 内嵌 `by_code` 子键）：`{"available": bool, "status": str, "by_code": {code: {"pe": float\|None, "pb": float\|None, "price_percentile": float\|None, "tier": str\|None, "sample_count": int, "percentile_available": bool}}}`。当前 PE/PB 由 `providers/eastmoney_industry.py::fetch_valuation_fields`（东财 push2 扩展字段，复用既有请求通道 + 会话缓存）；`price_percentile` 为历史 K 线价格分位代理（0~100，`analysis/valuation_percentile.py`，MIN_SAMPLES=60），非真实历史估值分位（盈利增长未纳入，渲染层必须展示 `DISCLAIMER`"价格分位代理，非真实历史估值分位"）。由 `report/orchestrator.py::compute_valuation_data` 计算（开关 `report_submodules.valuation_percentile` 默认关；关闭 → None → 「资产穿透TOP10」估值列隐藏；PE/PB 与 K 线皆不可得 → available=False 落 §1.4.5 占位）。消费方：穿透 TOP10 Excel `penetration_sheet` 估值分位列（ncols 10→11 + 表尾免责）与 HTML `report_template.html` 条件列（`valuation_enabled`）。
+
+> `market_temperature_data`（市场温度，C19 契约，9 键）：`{"available": bool, "status": str, "index_code": str, "index_name": str, "price_percentile": float\|None, "ma_deviation": float\|None, "volatility": float\|None, "score": float\|None, "tier": str\|None, "disclaimer": str}`。价格分位（复用估值分位的价格分位机制）+ 均线偏离 + 年化波动率三因子合成温度分（0~100，`analysis/market_temperature.py`，权重 0.5/0.3/0.2，各分量 clamp）；**温度计只给刻度、无仓位指令**（`TEMPERATURE_DISCLAIMER` 渲染层必须展示）。`ma_deviation`/`volatility` 为小数比例（0.032=3.2%），渲染层须 ×100 转百分数展示。由 `report/orchestrator.py::compute_market_temperature_data` 计算（指数 K 线 `fetch_index_history` 沪深300 走 Chain + session_cache；开关 `report_submodules.market_temperature` 默认关；关闭 → None → 「投资分析汇总」温度行隐藏；K 线不足 → `insufficient` 占位）。消费方：汇总 Excel `summary._write_market_temperature`（「市场指数」后刻度行）与 HTML kv-table（`market_temperature` 展示映射）。
+
+> `style_factor_data`（风格与因子分析，C19 契约，13 键 + 内嵌 `industry_beta` 子键）：主键 `{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/style_factor_regression.py` 计算、`report/orchestrator.py` 组装。子键 `industry_beta`（行业 Beta，`industry_beta.py::compute_industry_beta_analysis`，开关 `report_submodules.industry_beta` 默认关；关闭 → None → 区块隐藏）：`{"available": bool, "exposure": {industry: float}, "index_codes": {industry: str}, "betas": {industry: float}, "t_stats": {industry: float}, "significant": {industry: bool}, "correlations": {industry: float}, "unmapped_industries": list[str]}`——行业暴露占比按持仓市值聚合，行业指数为中证行业指数（`INDUSTRY_INDEX_MAP`），β 复用 `compute_factor_exposure` 单因子 OLS。C7 注册见 §4.6（type=`fund_deep_analysis`、data_flag=`style_factor_data`），计算方案/架构约束/降级分支见 §4.8 风格与因子分析。
 
 > `position_relationship_data`（持仓关系矩阵·相关性区块数据，C19 契约，11 键）：`{"available": bool, "status": str, "window": int, "sample_count": int, "codes": list[str], "names": {code: str}, "matrix": list[list[float\|None]], "p_values": list[list[float\|None]], "pairs": list[dict], "insufficient_codes": list[str], "note": str}`。下三角矩阵（row>col 有值、对角=1.0、上三角 None），配对明细含 code_a/name_a/code_b/name_b/pearson/p_value/significant/samples。由 `analysis/correlation.py` 计算、`report/orchestrator.py::compute_correlation_data` 注入，作为「持仓关系矩阵」的二、相关性区块数据源（一章两区块，见 §4.8 持仓关系矩阵）。C7 注册见 §8.3（type=`fund_deep_analysis`、data_flag=`position_relationship_data`，章节可见性 = `overlap_matrix is not None or position_relationship_data is not None`），数据不足（重叠样本 <60 / 品种 <2）落 §1.4.5 降级。
 
 > `evolution_data`（组合演进，C19 契约，多快照趋势聚合）：`{"available": bool, "snapshot_count": int, "min_snapshots": int, "periods": list[str], "total_value": list[float], "total_cost": list[float], "total_pnl": list[float], "holding_counts": list[int], "account_flows": {account: list[float]}, "hhi": list[float\|None], "top_holdings": list[dict], "reason": str}`。`top_holdings` 每项含 code/name/weights（各期占比 %）/present_count（出现期数）；历史快照 `market_value=0.0` 时权重回退成本口径。由 `analysis/portfolio_evolution.py` 计算、`report/orchestrator.py` 注入（C7 注册 type=`evolution`、data_flag=`evolution_data`，见 §4.12），有效快照 < MIN_SNAPSHOTS=3 时 `available=false` 落 §1.4.5 降级。
 
-> `history_data`（组合历史走势 + 回撤，C19 契约，供合并章复用）：`{"bars": list[dict], "max_drawdown": float, "max_drawdown_pct": float, "drawdown_events": list[dict], "recovery_times": list[dict], "drawdown_available": bool, "annualized_volatility": float, "total_return": float, "daily_returns": list[float], "warnings": list[str], "benchmarks": list[dict], "successful_holdings": list}`。`drawdown_events`（独立回撤事件）含 peak_date/trough_date/recovery_date/drawdown_pct/duration_days/recovery_days/recovered；`recovery_times`（恢复耗时明细）含 start_date/end_date/days。由 `report/portfolio_history.py` 组装（C7 注册 type=`history`），`drawdown_available` 表示有效交易日 ≥ MIN_SPAN 才渲染回撤明细，否则落 §1.4.5 降级。消费方为「组合历史走势与回撤」（`portfolio_history_drawdown`，一章多区块，Excel 见 `report/portfolio_history_drawdown_sheet.py`、HTML 见模板 `report_template.html`），区块数据由本契约 + 下方 `crisis_annotation_data`/`tail_risk_data` 提供。
+> `history_data`（组合历史走势 + 回撤，C19 契约，供组合历史走势与回撤章复用）：`{"bars": list[dict], "max_drawdown": float, "max_drawdown_pct": float, "drawdown_events": list[dict], "recovery_times": list[dict], "drawdown_available": bool, "annualized_volatility": float, "total_return": float, "daily_returns": list[float], "warnings": list[str], "benchmarks": list[dict], "successful_holdings": list}`。`drawdown_events`（独立回撤事件）含 peak_date/trough_date/recovery_date/drawdown_pct/duration_days/recovery_days/recovered；`recovery_times`（恢复耗时明细）含 start_date/end_date/days。由 `report/portfolio_history.py` 组装（C7 注册 type=`history`），`drawdown_available` 表示有效交易日 ≥ MIN_SPAN 才渲染回撤明细，否则落 §1.4.5 降级。消费方为「组合历史走势与回撤」（`portfolio_history_drawdown`，一章多区块，Excel 见 `report/portfolio_history_drawdown_sheet.py`、HTML 见模板 `report_template.html`），区块数据由本契约 + 下方 `crisis_annotation_data`/`tail_risk_data` 提供。
 
 > `crisis_annotation_data`（危机区间标注，C19 契约，8 键）：`{"available": bool, "intervals": list[dict]}`。`intervals` 每项含 name/start/end/desc/in_range/interval_drawdown_pct/trough_date/recovery_days/recovered——基于 `history_data.bars` 对预设历史危机区间（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整，`analysis/crisis_annotation.py::CRISIS_INTERVALS` 静态历史事实表，不随持仓变化、不拉长 lookback、无新增网络请求）做窗口重叠裁剪与区间统计：`in_range` 表示与报告数据窗口重叠；`interval_drawdown_pct` 为区间内 running-peak 最大回撤（正数 %，窗口内无 bar 时为 None）；`trough_date` 为区间最深日；`recovery_days` 为最深日→首个回到峰值的恢复耗时（数据窗口内未恢复为 None）；`recovered` 为是否已恢复。由 `analysis/crisis_annotation.py::build_crisis_annotation(history_data)` 计算（纯标准库、analysis 层隔离，无 report/llm 依赖），both 路径在 `report/_report_generation.py` 以 `build_crisis_annotation(history_data)` 注入 pipeline_data，Chart.js 净值图阴影带（`chart_data_builder.py` 计算起止索引 → `chart-init.js::buildCrisisBandPlugin`）与 HTML 危机表/Excel 危机区块消费。危机标注净值图必须 C20 图下说明（`.chart-caption` 跟随是否有 in_range 区间数据）。
 
@@ -2776,7 +2781,7 @@ investor-util/
 
 | 配置文件 | 缺省定义模块 | 模板生成 | 解析/读取入口 | 缺失时行为 | 写入方 | 主要消费方 |
 |:---------|:------------|:---------|:-------------|:-----------|:-------|:-----------|
-| `config.json`（基础配置） | `_config_defaults._DEFAULT_CONFIG`（A~L 共 12 组，含全部业务键默认值） | `_config_defaults._get_default_config_template()`（`_build_template_from_defaults()` 逐行手拼，保留分组注释） | `_core.get_config()`：mtime+size 双键缓存失效、null 过滤（不允许 null 覆盖默认）、嵌套 dict 子键浅合并、`_absolutize_paths()` 相对→绝对、旧键惰性迁移（`history.analysis`→`history.fetch_mode`） | `init_config()` 自动创建（模板原子写入），并级联 `_ensure_llm_settings_file()` + `_ensure_llm_providers_file()` | `_core.set_config()`/`del_config()`（原子写，`_json_patch` 字段级文本替换保留注释）；TUI `handlers_config.py`（菜单改配置）；`config/anonymizer.py`；`config/_local_state.py`（旧键迁移后删除） | 全模块（`get_config()` 取合并后整表）。章节开关 `is_enable_*()` 系列 → `report/_report_generation.py`/`orchestrator.py`；`cache_ttl` → `cache/_ttl.py`；`degradation` → `report/data_status.py`；`market_hours`/`market_hour_ttl` → `core/market_hours.py`；`rebalance` → `analysis/rebalance.py`；`discipline` → `analysis/trade_discipline.py`；`anonymization` → `config/anonymizer.py`；`batch`/`batch_rate_limit` → `fetcher/batch.py`；`risk_free_rate` → `fetcher/bond_yield.py`；`preferred_provider` → `fetcher/chain.py`；`history` → `report/portfolio_history.py`；`default_menu_key` → `tui/tui_menu.py` |
+| `config.json`（基础配置） | `_config_defaults._DEFAULT_CONFIG`（A~L 共 12 组，含全部业务键默认值） | `_config_defaults._get_default_config_template()`（`_build_template_from_defaults()` 逐行手拼，保留分组注释） | `_core.get_config()`：mtime+size 双键缓存失效、null 过滤（不允许 null 覆盖默认）、嵌套 dict 子键浅合并、`_absolutize_paths()` 相对→绝对 | `init_config()` 自动创建（模板原子写入），并级联 `_ensure_llm_settings_file()` + `_ensure_llm_providers_file()` | `_core.set_config()`/`del_config()`（原子写，`_json_patch` 字段级文本替换保留注释）；TUI `handlers_config.py`（菜单改配置）；`config/anonymizer.py` | 全模块（`get_config()` 取合并后整表）。章节开关 `is_enable_*()` 系列 → `report/_report_generation.py`/`orchestrator.py`；`cache_ttl` → `cache/_ttl.py`；`degradation` → `report/data_status.py`；`market_hours`/`market_hour_ttl` → `core/market_hours.py`；`rebalance` → `analysis/rebalance.py`；`discipline` → `analysis/trade_discipline.py`；`anonymization` → `config/anonymizer.py`；`batch`/`batch_rate_limit` → `fetcher/batch.py`；`risk_free_rate` → `fetcher/bond_yield.py`；`preferred_provider` → `fetcher/chain.py`；`history` → `report/portfolio_history.py`；`default_menu_key` → `tui/tui_menu.py` |
 | `llm_settings.json`（非敏感 LLM 设置） | `_llm_settings_defaults._DEFAULT_LLM_SETTINGS`（全局 2 项 + 5 模块块 + 辩论 + 事实校验 + 计价） | `_llm_settings_defaults._get_default_llm_settings_template()`（逐行手拼，与 dict 深等，见一致性测试） | `_llm_settings.get_llm_config()`：合并 settings+key+providers 三文件，联合 mtime/size 失效；`_merge_llm_defaults()` 运行时按 `_DEFAULT_LLM_SETTINGS` 补齐缺失键 | `_ensure_llm_settings_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑；`_ensure_llm_settings_file` 仅首次创建） | `llm/pricing.py`（计价覆盖）、`llm/generators.py`、`llm/generators_orchestrator.py`、`llm/prompts_action.py`、`llm/skeleton.py`、`report/news_correlation.py`、`cli/cli.py`、`tui/tui_menu.py` + `tui/handlers_config.py`、`config/_validation.py` |
 | `llm_key.json`（敏感凭据） | 无（**C18 凭据分离**，代码默认值禁止内置 api_key） | 无模板 | `_llm_providers._load_llm_key_credentials()`（多凭据块字典；单凭据 flat 自动升级为 `_default`）；`get_llm_config()` 内联读取并合并覆盖同名字段（provider/endpoint 合法性告警） | 不自动创建；缺失时 `get_llm_config()` 回退判断 providers 链模式，两者皆无则 LLM 不可用（`generators_orchestrator` 降级占位） | `startup_wizard._write_llm_key_flat()`（首次引导交互式写入，C3 原子写） | `get_llm_config()` 合并主体；`_load_llm_key_credentials()` → providers 链 `credentials_ref` 凭据注入 |
 | `llm_providers.json`（多 Provider 链） | `_llm_providers_defaults._DEFAULT_LLM_PROVIDERS`（strategy=priority + 2 条示例链） | `_llm_providers_defaults._get_default_llm_providers_template()` | `_llm_providers._load_llm_providers()`（原始 JSON，根非 object/解析失败返回 None）；`get_llm_config()` 链模式（无 llm_key.json 时直接注入链数据）；`_inject_provider_chain_data()` 注入多链路由结果 | `_core._ensure_llm_providers_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑 / init 自动创建） | `get_llm_config()`（链模式无 key 依赖）；`startup_wizard.py`（就绪检查：key 存在 或 providers 有链）；`_inject_provider_chain_data` |
@@ -2784,11 +2789,11 @@ investor-util/
 
 #### I.1.1 解析职责归属（协调者 vs 委托）
 
-> **config.json 的解析中枢在 `_core.py`，但不是独占解析器**：`_core.get_config()` 是 config.json 的唯一读取入口，注释剥离、路径绝对化分别委托 `_comments`/`_validation`，默认值合并以 `_config_defaults._DEFAULT_CONFIG` 为基准，null 过滤/嵌套子键合并/旧键迁移由自身内联完成；其余 4 个配置文件各有独立解析器，`_core.py` 仅触发文件存在性（`_ensure_llm_settings_file()` / `_ensure_llm_providers_file()`），**不代解析**。
+> **config.json 的解析中枢在 `_core.py`，但不是独占解析器**：`_core.get_config()` 是 config.json 的唯一读取入口，注释剥离、路径绝对化分别委托 `_comments`/`_validation`，默认值合并以 `_config_defaults._DEFAULT_CONFIG` 为基准，null 过滤/嵌套子键合并由自身内联完成；其余 4 个配置文件各有独立解析器，`_core.py` 仅触发文件存在性（`_ensure_llm_settings_file()` / `_ensure_llm_providers_file()`），**不代解析**。
 
 | 配置文件 | 解析协调者（入口） | 注释剥离 | 主要委托/依赖 |
 |:---------|:-------------------|:---------|:--------------|
-| `config.json` | `_core.get_config()` | `_comments._strip_json_comments()` | `_config_defaults._DEFAULT_CONFIG`（合并基准）；`_validation._absolutize_paths()`（相对→绝对）；null 过滤、嵌套 dict 子键浅合并、旧键迁移（`history.analysis`→`fetch_mode`）内联自持 |
+| `config.json` | `_core.get_config()` | `_comments._strip_json_comments()` | `_config_defaults._DEFAULT_CONFIG`（合并基准）；`_validation._absolutize_paths()`（相对→绝对）；null 过滤、嵌套 dict 子键浅合并由自身内联 |
 | `llm_settings.json` | `_llm_settings.get_llm_config()` | `_comments._strip_json_comments()` | 合并 settings+key+providers 三文件为单份 dict 下发给消费方；`_merge_llm_defaults()` 运行时补默认 |
 | `llm_key.json` | `_llm_providers._load_llm_key_credentials()` | `_comments._strip_json_comments()` | 单凭据 flat 自动升级为 `_default` 块（自持）；`get_llm_config()` 内联读取合并覆盖同名字段 |
 | `llm_providers.json` | `_llm_providers._load_llm_providers()` | `_comments._strip_json_comments()` | 根非 object / 解析失败返回 None 判定（自持）；`_inject_provider_chain_data()` 链模式注入 |

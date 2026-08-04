@@ -1,5 +1,5 @@
 # 个人投资分析报告生成小助手 — 需求文档
-> 文档版本：0.10.3
+> 文档版本：0.10.4
 
 ---
 
@@ -991,7 +991,7 @@ LLM 五维度量化评分，每项满分 100：
 | R-PERF-03 | 取价批量请求应使用异步并发，避免逐只串行 |
 | R-PERF-04 | 运行时配置读取应有内存缓存，按 mtime 自动检查更新 |
 | R-PERF-05 | LLM 提示词应控制 token 消耗（精简模式 ≤300 字） |
-| R-PERF-06 | 基金风格分析中同一品种的 API 数据应在会话内跨基金复用 |
+| R-PERF-06 | 风格与因子分析中同一品种的 API 数据应在会话内跨基金复用 |
 | R-PERF-07 | 历史数据获取应使用增量模式（缓存底座 + 增量新数据），避免全量重取 |
 | R-PERF-08 | 历史走势获取应阶段超时保护（超时后已完成部分保留，未完成部分以占位处理） |
 | R-PERF-09 | 每次报告生成应自动记录各阶段耗时（行情获取/数据准备/HTML生成/Excel生成/LLM+新闻等），持久化到 `data/state/perf_history.jsonl` 用于跨版本性能趋势追踪 |
@@ -1046,7 +1046,7 @@ LLM 五维度量化评分，每项满分 100：
 | `llm_providers_file` | str | `data/config/llm_providers.json` | — | LLM Provider 多链配置文件路径 |
 | `llm_settings_file` | str | `data/config/llm_settings.json` | — | LLM 参数文件路径 |
 
-> **config.json 跨机器同步**：config.json 受 git 跟踪，是可跨机器同步的配置文件，仅存放可共享的业务配置。机器个性化运行时标志（首次运行引导 `_startup_wizard_shown`、隐私提示已读 `_privacy_notice_shown`）**不存放于 config.json**，而是存于 `data/state/local_state.json`（git 忽略、仅本机可见），避免各机器写入差异导致 config.json 难以同步。config.json 中若存在这两个键，会在首次读取时惰性迁移（`config/_local_state.py` `_migrate_legacy_keys`），迁移后自动删除，无需手动清理。
+> **config.json 跨机器同步**：config.json 受 git 跟踪，是可跨机器同步的配置文件，仅存放可共享的业务配置。机器个性化运行时标志（首次运行引导 `_startup_wizard_shown`、隐私提示已读 `_privacy_notice_shown`）**不存放于 config.json**，而是存于 `data/state/local_state.json`（git 忽略、仅本机可见），避免各机器写入差异导致 config.json 难以同步。这两个键只在 `data/state/local_state.json` 中读写，不做任何 config.json 旧键迁移。
 
 ### 11.2 llm_key.json（敏感凭据文件，建议纳入 .gitignore）
 
