@@ -14,7 +14,7 @@
 
 消费方：
   `report/orchestrator.prepare_report_data()` 组装为 `data_freshness`
-  C19 契约注入 pipeline_data，供 20 章「数据质量仪表盘」可信度区块与
+  C19 契约注入 pipeline_data，供「数据质量仪表盘」可信度区块与
   报告头部数据异常摘要行渲染。
 """
 
@@ -49,9 +49,7 @@ FRESHNESS_REASONS: dict[str, str] = {
 }
 
 # 需要提示的异常新鲜度集合（实时不计入）
-_ABNORMAL_FRESHNESS: frozenset[str] = frozenset(
-    {FRESHNESS_STALE, FRESHNESS_DEGRADED}
-)
+_ABNORMAL_FRESHNESS: frozenset[str] = frozenset({FRESHNESS_STALE, FRESHNESS_DEGRADED})
 
 # 单日跳变阈值（默认 ±20%）
 _JUMP_THRESHOLD_DEFAULT = 0.20
@@ -197,7 +195,7 @@ def build_freshness_summary(
     """构建可信度摘要 C19 契约（`data_freshness` 键结构）。
 
     逐品种标注新鲜度分类与单日跳变事件，聚合异常计数供报告头部
-    数据异常摘要行与 20 章可信度区块消费。
+    数据异常摘要行与可信度区块消费。
 
     Args:
         holdings: Holding 列表

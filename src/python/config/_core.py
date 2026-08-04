@@ -574,7 +574,7 @@ def init_config(config_path: str | None = None) -> None:
 
 
 def is_enable_fund_deep_analysis(config: dict | None = None) -> bool:
-    """基金深度分析章节（#6~11）是否启用。缺失时返回 True。"""
+    """基金深度分析章节（基金业绩分析、基金经理变更监控等）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_fund_deep_analysis")
@@ -585,7 +585,7 @@ def is_enable_fund_deep_analysis(config: dict | None = None) -> bool:
 
 
 def is_enable_portfolio_evolution(config: dict | None = None) -> bool:
-    """组合演进章节（#19）是否启用。缺失时返回 True。"""
+    """组合演进章节是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_portfolio_evolution")
@@ -596,10 +596,10 @@ def is_enable_portfolio_evolution(config: dict | None = None) -> bool:
 
 
 def is_enable_action(config: dict | None = None) -> bool:
-    """行动建议独立章（19 章，决策行动）是否启用。缺失时返回 False（默认关）。
+    """行动建议独立章（决策行动）是否启用。缺失时返回 False（默认关）。
 
     行动建议章是新增能力，默认关闭——不开时报告维持现状（无此章），
-    开启才出现第 19 章行动板块与 13 章行动摘要。
+    开启才出现行动板块与智囊团深度复盘行动摘要。
     """
     if config is None:
         config = get_config()
@@ -611,7 +611,7 @@ def is_enable_action(config: dict | None = None) -> bool:
 
 
 def is_enable_news(config: dict | None = None) -> bool:
-    """市场新闻（#12）是否启用。缺失时返回 True。"""
+    """市场新闻（财经新闻热点与持仓关联分析）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_news")
@@ -622,7 +622,7 @@ def is_enable_news(config: dict | None = None) -> bool:
 
 
 def is_enable_history(config: dict | None = None) -> bool:
-    """组合历史走势+回撤分析（#17~18）是否启用。缺失时返回 True。"""
+    """组合历史走势+回撤分析（组合历史走势与回撤）是否启用。缺失时返回 True。"""
     if config is None:
         config = get_config()
     val = config.get("enable_history")
@@ -633,9 +633,9 @@ def is_enable_history(config: dict | None = None) -> bool:
 
 
 def is_enable_data_quality(config: dict | None = None) -> bool:
-    """数据质量仪表盘子模块（20 章改造）是否启用。
+    """数据质量仪表盘子模块是否启用。
 
-    读取 `report_submodules.data_quality`，默认关（向后兼容，既有 20 章
+    读取 `report_submodules.data_quality`，默认关（向后兼容，既有
     「数据源可用性矩阵」输出不变）。
 
     Args:

@@ -125,7 +125,7 @@ def prepare_report_data(
     )
 
     # 行动建议单一数据源：再平衡信号等纯算法产出，C19 action_data 契约
-    # （单源计算，19 章行动板块与 13 章行动摘要共享同一对象）
+    # （单源计算，行动建议板块与智囊团深度复盘行动摘要共享同一对象）
     holdings_details = [
         {
             "name": d.name,
@@ -178,7 +178,7 @@ def prepare_report_data(
         "position_status": coverage_status,
         # 可信度摘要（C19 契约 data_freshness；新鲜度分类 + 单日跳变检测）
         "data_freshness": freshness_summary,
-        # 行动建议单一数据源（C19 契约 action_data；19 章行动板块 + 13 章行动摘要）
+        # 行动建议单一数据源（C19 契约 action_data；行动建议板块 + 智囊团深度复盘行动摘要）
         "action_data": action_data,
     }
 
@@ -472,7 +472,7 @@ def generate_report(
                 output_dir=output,
                 section_order=sec_order,
                 progress=reporter,
-                # 20 章数据质量仪表盘子模块开关（basic 无行情数据，品种覆盖区块显示降级占位）
+                # 数据质量仪表盘子模块开关（basic 无行情数据，品种覆盖区块显示降级占位）
                 enable_data_quality=is_enable_data_quality(config),
             )
             perf.stop()

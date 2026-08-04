@@ -907,7 +907,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </nav>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 1: 汇总 (Summary)                              -->
+    <!--  汇总 (Summary)                                        -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-summary" style="order: {{ section_numbers['summary'] }};">
         <div class="section-title">{{ section_numbers['summary'] }}、投资分析汇总</div>
@@ -1035,7 +1035,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 2: 市值核算 (Market Value)                     -->
+    <!--  市值核算 (Market Value)                               -->
     <div class="section" id="sec-market_value" style="order: {{ section_numbers['market_value'] }};">
         <div class="section-title">{{ section_numbers['market_value'] }}、市值核算明细表</div>
         <div class="section-content" style="padding: 0;">
@@ -1108,7 +1108,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 3: 持仓分类表 (Category Summary)                 -->
+    <!--  持仓分类表 (Category Summary)                         -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-category" style="order: {{ section_numbers['category'] }};">
         <div class="section-title">{{ section_numbers['category'] }}、持仓分类表</div>
@@ -1189,7 +1189,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 4: 资产穿透TOP10 (Penetration)                 -->
+    <!--  资产穿透TOP10 (Penetration)                           -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-penetration" style="order: {{ section_numbers['penetration'] }};">
         <div class="section-title">{{ section_numbers['penetration'] }}、资产穿透TOP10</div>
@@ -1281,7 +1281,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 5: 基金业绩分析 (Fund Performance)              -->
+    <!--  基金业绩分析 (Fund Performance)                       -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-fund_performance" style="order: {{ section_numbers['fund_performance'] }};">
         <div class="section-title">{{ section_numbers['fund_performance'] }}、基金业绩分析</div>
@@ -1324,7 +1324,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 6: 基金经理变更监控                             -->
+    <!--  基金经理变更监控                                     -->
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("fund_manager") %}
     <div class="section" id="sec-fund_manager" style="order: {{ section_numbers['fund_manager'] }};">
@@ -1378,7 +1378,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 7: 持仓关系矩阵（重合度 + 相关性 一章两区块）     -->
+    <!--  持仓关系矩阵（重合度 + 相关性 一章两区块）               -->
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("position_relationship") %}
     {% set _fund_names = overlap_matrix.get("fund_names", {}) %}
@@ -1629,7 +1629,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 8: 持仓集中度监控                               -->
+    <!--  持仓集中度监控                                       -->
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("fund_concentration") %}
     {% set conc_results = concentration_analysis["results"] %}
@@ -1694,7 +1694,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 9: 基金风格分析                                 -->
+    <!--  基金风格分析                                         -->
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("fund_style") %}
     {% set style_results = style_analysis["results"] %}
@@ -1748,7 +1748,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
     {% if section_visible("factor_exposure") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 10: 因子暴露分析                              -->
+    <!--  因子暴露分析                                        -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-factor_exposure" style="order: {{ section_numbers['factor_exposure'] }};">
         <div class="section-title">{{ section_numbers['factor_exposure'] }}、因子暴露分析</div>
@@ -1838,7 +1838,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
     {% if section_visible("news_correlation") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 12: 财经新闻热点与持仓关联分析 (News)            -->
+    <!--  财经新闻热点与持仓关联分析 (News)                        -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-news_correlation" style="order: {{ section_numbers['news_correlation'] }};">
         <div class="section-title">{{ section_numbers['news_correlation'] }}、财经新闻热点与持仓关联分析</div>
@@ -1952,7 +1952,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
     {% if section_visible("global_macro") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 13: 全球政经局势 (Global Macro, LLM augment)     -->
+    <!--  全球政经局势 (Global Macro, LLM augment)                 -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-global_macro" style="order: {{ section_numbers['global_macro'] }};">
         <div class="section-title">{{ section_numbers['global_macro'] }}、全球政经局势</div>
@@ -1982,7 +1982,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 14: 智囊团深度复盘 (Expert Review, LLM augment)  -->
+    <!--  智囊团深度复盘 (Expert Review, LLM augment)              -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-expert_review" style="order: {{ section_numbers['expert_review'] }};">
         <div class="section-title">{{ section_numbers['expert_review'] }}、智囊团深度复盘
@@ -2029,7 +2029,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
         {% endif %}
 
-        <!-- 行动摘要子块：引用 19 章行动建议结果（单源计算、两处呈现，C14/C19） -->
+        <!-- 行动摘要子块：引用行动建议结果（单源计算、两处呈现，C14/C19） -->
         {% if section_visible("action") and action_data and action_data.available %}
         <div class="section-content" style="margin-top: 12px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;">
             <div style="font-weight: bold; font-size: 14px; color: #2E75B6; margin-bottom: 6px;">
@@ -2045,7 +2045,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 15: 持仓体检报告 (Health Check, LLM augment)    -->
+    <!--  持仓体检报告 (Health Check, LLM augment)                -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-health_check" style="order: {{ section_numbers['health_check'] }};">
         <div class="section-title">{{ section_numbers['health_check'] }}、持仓体检报告</div>
@@ -2074,7 +2074,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 16: 穿透深度分析 (Penetration Deep, LLM augment)-->
+    <!--  穿透深度分析 (Penetration Deep, LLM augment)             -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-penetration_deep" style="order: {{ section_numbers['penetration_deep'] }};">
         <div class="section-title">{{ section_numbers['penetration_deep'] }}、穿透深度分析</div>
@@ -2108,7 +2108,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     
     {% if section_visible("portfolio_history_drawdown") %}
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <!--  MODULE 16: 组合历史走势与回撤（一章两区块：走势表 + 回撤矩阵）  -->
+    <!--  组合历史走势与回撤（一章两区块：走势表 + 回撤矩阵）        -->
     <!--  危机区间标注：净值曲线分段着色（2015/2018/2020/2022，C20 图下说明） -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <div class="section" id="sec-portfolio_history_drawdown" style="order: {{ section_numbers['portfolio_history_drawdown'] }};">
@@ -2442,7 +2442,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
     {% if section_visible("data_source_status") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 21: 数据源可用性矩阵                           -->
+    <!--  数据源可用性矩阵                                       -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-data_source_status" style="order: {{ section_numbers['data_source_status'] }};">
         <div class="section-title">{{ section_numbers['data_source_status'] }}、数据源可用性矩阵</div>
@@ -2586,7 +2586,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 22: LLM API Usage -->
+    <!--  LLM API Usage -->
     <div class="section" id="sec-llm_usage" style="order: {{ section_numbers['llm_usage'] }};">
         <div class="section-title">{{ section_numbers['llm_usage'] }}、LLM API 用量</div>
         <div class="section-content">

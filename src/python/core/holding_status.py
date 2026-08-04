@@ -17,7 +17,7 @@
 
 消费方：
   `report/orchestrator.prepare_report_data()` 组装为 `position_status`
-  C19 契约注入 pipeline_data，供 20 章「数据质量仪表盘」品种覆盖区块渲染。
+  C19 契约注入 pipeline_data，供「数据质量仪表盘」品种覆盖区块渲染。
 """
 
 from __future__ import annotations

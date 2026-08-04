@@ -36,14 +36,14 @@ _DEFAULT_CONFIG = {
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
     # ── B. 报告章节可见性 ──
-    "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露+相关性（#6~11）
-    "enable_news": True,  # 市场新闻（#12）
-    "enable_history": True,  # 组合历史走势+回撤（#17~18）
-    "enable_portfolio_evolution": True,  # 组合演进（#19）
+    "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露+相关性
+    "enable_news": True,  # 市场新闻
+    "enable_history": True,  # 组合历史走势+回撤
+    "enable_portfolio_evolution": True,  # 组合演进
     "enable_action": False,  # 行动建议独立章（再平衡信号+交易纪律+调仓建议+收益归因，默认关）
     # 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
     "report_submodules": {
-        "data_quality": False,  # 20 章「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖）
+        "data_quality": False,  # 「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖）
     },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
@@ -160,13 +160,13 @@ def _build_template_from_defaults() -> str:
         "",
         # ── B ──
         "  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──",
-        f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露+相关性（#6~11）',
-        f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#12）',
-        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#17~18）',
-        f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进（#19）',
+        f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露+相关性',
+        f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻',
+        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤',
+        f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进',
         f'  "enable_action": {json.dumps(d["enable_action"])},  // 行动建议独立章（决策行动，默认关）',
-        "  // 报告子模块开关（新增能力默认关闭，避免既有报告突然\"变胖\"）",
-        f'  "report_submodules": {json.dumps(d["report_submodules"], ensure_ascii=False)},  // 数据质量仪表盘（20 章）默认关',
+        '  // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）',
+        f'  "report_submodules": {json.dumps(d["report_submodules"], ensure_ascii=False)},  // 数据质量仪表盘默认关',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",

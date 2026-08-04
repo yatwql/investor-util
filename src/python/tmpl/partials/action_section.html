@@ -1,10 +1,10 @@
 {# ==============================================================
    行动建议章节 partial（供 report_template.html 经 include 引入）。
 
-   独立顶层章节（19 章，type=action，board 层 enable_action 开关，默认关）。
+   独立顶层章节（type=action，board 层 enable_action 开关，默认关）。
    数据源为 C19 `action_data` 契约（analysis/action_advisor.build_action_data
-   组装、orchestrator 注入 pipeline_data）——与 13 章「行动摘要」子块共享同一
-   计算对象（单源计算，两处呈现）。
+   组装、orchestrator 注入 pipeline_data）——与智囊团深度复盘「行动摘要」子块
+   共享同一计算对象（单源计算，两处呈现）。
 
    依赖 context 变量（report_template.html 以 `{% include ... with context %}`
    引入）：section_visible / section_numbers / action_data；过滤器 money /
@@ -16,7 +16,7 @@
    ============================================================== #}
 {% if section_visible("action") %}
 <!-- ═══════════════════════════════════════════════════════ -->
-<!--  MODULE 20: 行动建议（决策闭环）                    -->
+<!--  行动建议（决策闭环）                              -->
 <!-- ═══════════════════════════════════════════════════════ -->
 {% set _action = action_data or {} %}
 <div class="section" id="sec-action" style="order: {{ section_numbers['action'] }};">

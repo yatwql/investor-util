@@ -143,7 +143,7 @@ def generate_excel_report(
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
     enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
-    enable_data_quality: bool = False,  # 子模块：20 章数据质量仪表盘（report_submodules.data_quality）
+    enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
     pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
@@ -169,8 +169,8 @@ def generate_excel_report(
         enable_llm: board 层 — LLM 分析章节是否开启
         enable_history: board 层 — 历史走势章节是否开启
         enable_portfolio_evolution: board 层 — 组合演进章节是否开启
-        enable_data_quality: 子模块 — 20 章「数据质量仪表盘」（源健康+品种覆盖），
-            默认 False（向后兼容，20 章保持旧「数据源可用性矩阵」样式）
+        enable_data_quality: 子模块 — 数据质量仪表盘（源健康+品种覆盖），
+            默认 False（向后兼容，该章保持旧「数据源可用性矩阵」样式）
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
         pipeline_data: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
@@ -269,7 +269,7 @@ def generate_excel_report(
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
 
-    # ── 行动建议页签（19 章行动板块，C19 action_data） ──
+    # ── 行动建议页签（行动板块，C19 action_data） ──
     ws_action = sheets.get("action")
     if ws_action is not None:
         prog.info("正在写入行动建议页签...")
@@ -284,7 +284,7 @@ def generate_excel_report(
     ws_ds = sheets.get("data_source_status")
     if ws_ds is not None:
         if enable_data_quality:
-            # 子模块开关开启：20 章改造为「数据质量仪表盘」（源健康 + 品种覆盖 + 可信度）
+            # 子模块开关开启：该章改造为「数据质量仪表盘」（源健康 + 品种覆盖 + 可信度）
             prog.info("正在写入数据质量仪表盘...")
             try:
                 from src.python.report.data_quality_sheet import write_data_quality_sheet
@@ -299,7 +299,7 @@ def generate_excel_report(
             except Exception:
                 logger.debug("[excel] 数据质量仪表盘页签写入失败（非关键）", exc_info=True)
         else:
-            # 开关关闭：20 章保持旧「数据源可用性矩阵」样式（向后兼容）
+            # 开关关闭：该章保持旧「数据源可用性矩阵」样式（向后兼容）
             _write_data_source_matrix_sheet(ws_ds, prog)
 
     # ── 组合历史走势：环比对比摘要（写入 summary 页签底部） ──

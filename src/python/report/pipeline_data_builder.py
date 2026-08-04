@@ -37,7 +37,7 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "position_status",
     # 可信度摘要：数据质量仪表盘可信度区块数据源（新鲜度 + 单日跳变）
     "data_freshness",
-    # 行动建议单一数据源：19 章行动板块 + 13 章行动摘要（单源计算两处呈现）
+    # 行动建议单一数据源：行动板块 + 智囊团深度复盘行动摘要（单源计算两处呈现）
     "action_data",
 }
 

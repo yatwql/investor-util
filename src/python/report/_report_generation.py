@@ -333,14 +333,14 @@ def _generate_full_html_report(
         evolution_data: 组合演进 C19 契约 dict（多快照趋势聚合），
             数据不足时 available=False（模板写占位）。
         enable_portfolio_evolution: board 层 — 组合演进章节是否开启。
-        enable_data_quality: 子模块 — 20 章数据质量仪表盘（默认关，保持旧样式）。
+        enable_data_quality: 子模块 — 数据质量仪表盘（默认关，保持旧样式）。
         position_status: 品种覆盖诊断 C19 `position_status` 契约 dict，
-            20 章品种覆盖区块数据源（开关关闭时忽略）。
+            品种覆盖区块数据源（开关关闭时忽略）。
         data_freshness: 可信度摘要 C19 `data_freshness` 契约 dict，
-            20 章可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
+            可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
         enable_action: board 层 — 行动建议章节是否开启（默认关）。
         action_data: 行动建议单一数据源 C19 `action_data` 契约 dict，
-            19 章行动板块 + 13 章行动摘要数据源（开关关闭时忽略）。
+            行动建议板块 + 智囊团深度复盘行动摘要数据源（开关关闭时忽略）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -543,7 +543,7 @@ def _generate_report_both(
             trading_day=get_last_trading_day(),
             prev_trading_day=get_prev_trading_day(),
         ),
-        # 行动建议单一数据源（C19 action_data）：19 章行动板块 + 13 章行动摘要共享。
+        # 行动建议单一数据源（C19 action_data）：行动建议板块 + 智囊团深度复盘行动摘要共享。
         # 传递完整估值字段（含 profit_rate/cost/profit），交易纪律（止盈/止损）
         # 依赖收益率数据。profit_rate 契约为百分比（小数 ×100，同 orchestrator 组装口径），
         # 纪律引擎以百分数阈值（如 +20%）比较，此处统一换算避免单位不一致。

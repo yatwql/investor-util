@@ -289,12 +289,12 @@ def _render_template(
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
-    data_quality_enabled: bool = False,  # 子模块：20 章数据质量仪表盘开关
+    data_quality_enabled: bool = False,  # 子模块：数据质量仪表盘开关
     position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status
     data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness
-    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（19 章行动板块 + 13 章行动摘要）
-    crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（15 章合并章）
-    tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（15 章合并章指标卡）
+    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（行动板块 + 智囊团深度复盘行动摘要）
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（合并章）
+    tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（合并章指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 C19 snapshot_diff_data（组合演进章顶部）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
@@ -398,11 +398,11 @@ def write_html_report(
     enable_news: bool = True,
     enable_history: bool = True,
     enable_portfolio_evolution: bool = True,
-    enable_action: bool = False,  # 行动建议独立章（19 章，enable_action 默认关）
-    enable_data_quality: bool = False,  # 子模块：20 章数据质量仪表盘（report_submodules.data_quality）
-    position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status（20 章品种覆盖区块）
-    data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness（20 章可信度区块 + 头部摘要行）
-    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（19 章行动板块 + 13 章行动摘要）
+    enable_action: bool = False,  # 行动建议独立章（enable_action 默认关）
+    enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
+    position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status（品种覆盖区块）
+    data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness（可信度区块 + 头部摘要行）
+    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（行动板块 + 智囊团深度复盘行动摘要）
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
@@ -410,8 +410,8 @@ def write_html_report(
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
-    crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（15 章合并章）
-    tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（15 章合并章指标卡）
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（合并章）
+    tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（合并章指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 C19 snapshot_diff_data（组合演进章顶部变化摘要）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
