@@ -229,29 +229,29 @@ def _build_data_degradation_block(pipeline_data: dict | None) -> str:
 
 
 def _build_profit_attribution_block(holdings_details: list[dict] | None) -> str:
-    """构建收益归因段落（TOP 5 品种按贡献排序）。"""
-    if not holdings_details:
-        return ""
-    profits = [(h.get("name", ""), h.get("code", ""), h.get("profit", 0) or 0) for h in holdings_details]
-    total_abs = sum(abs(p[2]) for p in profits)
-    if total_abs == 0:
+    """构建收益归因段落（TOP 5 品种按贡献排序）。
+
+    复用 `analysis.return_attribution.compute_return_attribution` 的单一计算实现
+    （与 20 章行动建议归因子块表格共享，避免重复实现），此处仅做提示词段落格式化。
+    """
+    from src.python.analysis.return_attribution import compute_return_attribution
+
+    data = compute_return_attribution(holdings_details)
+    if not data:
         return ""
 
-    profits_sorted = sorted(profits, key=lambda x: abs(x[2]), reverse=True)
     lines = ["【收益归因】（以下数值为贡献占比 pp，非个股收益率，两者不可混用）"]
-    top5 = profits_sorted[:5]
-    pos = [(n, c, p) for n, c, p in top5 if p > 0]
-    neg = [(n, c, p) for n, c, p in top5 if p < 0]
-
+    pos = data["盈利来源"]
+    neg = data["亏损来源"]
     if pos:
-        pos_parts = [f"{n}(+{p / total_abs * 100:.1f}pp)" for n, c, p in pos]
+        pos_parts = [f"{i['name']}(+{i['contribution_pp']:.1f}pp)" for i in pos]
         lines.append(f"主要盈利来源: {'、'.join(pos_parts)}")
     if neg:
-        neg_parts = [f"{n}({p / total_abs * 100:.1f}pp)" for n, c, p in neg]
+        neg_parts = [f"{i['name']}({i['contribution_pp']:.1f}pp)" for i in neg]
         lines.append(f"主要亏损来源: {'、'.join(neg_parts)}")
 
-    pos_total = sum(p for _, _, p in profits if p > 0)
-    neg_total = sum(p for _, _, p in profits if p < 0)
+    pos_total = data["pos_total"]
+    neg_total = data["neg_total"]
     if pos_total > 0 and neg_total < 0:
         lines.append(
             f"盈利品种合计 +{_fmt_wan(pos_total)}，亏损品种合计 {_fmt_wan(neg_total)}（净{_fmt_wan(pos_total + neg_total)}）"

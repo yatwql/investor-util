@@ -43,6 +43,16 @@
 - **现金缓冲**：从 available_cash 起按执行顺序累计卖出净额（金额 - 费用），任一条执行后现金为负则剔除（现金负值防护）；同品种触发多条（再平衡 + 纪律）时去重保留优先级最高（止损 > 部分止盈 > 卖出减仓）。
 - **接入**：`action_advisor.build_action_data()` 在信号计算后调用可行化层填充 `rebalance_advice`；full 路径 orchestrator 的 holdings_details 补充 shares/price（供计算卖出份额，both 路径本就具备）；HTML 20 章调仓建议表格与 Excel 子块补 金额/调仓后现金 两列；附录 H 契约更新。
 - **测试**：新增 `src/test/unit/analysis/test_rebalance_advisor.py`（27 例：份额取整一手 5 / 操作生成 3 / 费用估算 7 / 现金缓冲 3 / 优先级去重 2 / 多品种与守卫 7，含债券基金赎回费、港股整数份、名称缺失、未知操作守卫回归）；`test_action_advisor.py` 新增 shares/price 字段与调仓建议流经、摘要计数；`test_action_html.py`/`test_action_sheet.py` 补调仓建议表格行渲染；`test_code_utils.py` 补 `is_otc_fund_by_name` 债券/指数/股票关键词与股票负例。可行化层覆盖率 ≥85%。
+
+### 收益归因（行动建议 20 章，轮7 落地）
+
+- **共享纯计算**：新增 `src/python/analysis/return_attribution.py`，`compute_return_attribution()` 单一计算实现（纯本地、零新增外部依赖）——组合收益按品种贡献排序，TOP 5 盈利/亏损来源（贡献占比 pp，非收益率，两者不可混用）、正负分列，每项含 name/code/profit/contribution_pp（全精度浮点，正数盈利 / 负数亏损）；pos_total/neg_total 为全部持仓（非仅 TOP5）正负盈亏合计。无持仓或 Σ|profit|==0 返回 None（渲染层写「待生成」占位）。
+- **提示词段落复用（架构遵从，llm → analysis 单向依赖）**：`llm/prompts_core.py::_build_profit_attribution_block` 改为惰性 import `compute_return_attribution` 复用同一计算（与 `_build_rebalance_block` 复用 simple_rebalance 同构），段落输出逐字节一致——14 章 LLM 段落与 20 章表格为同一数据的两处格式化，无重复实现；`prompts_action.py` 既有引用（模块级 import）自动继承。
+- **渲染适配层**：`build_return_attribution()` 把共享计算结果塑形为 20 章表格契约（C19 `attribution`：`available/盈利来源/亏损来源/summary`），summary 净额合计摘要分三类文案（混合盈亏「盈利品种合计 +…，亏损品种合计 …（净…）」/ 全部盈利 / 全部亏损）。20 章 Excel（`report/action_sheet.py` 子块 4）与 HTML（`partials/action_section.html` ④ 区块）渲染适配：贡献占比 `+X.Xpp`、盈亏金额 `+,.2f` 格式化 + 净额合计摘要行（HTML 用 str.format 风格 `{:+.1f}`/`{:+,.2f}`，% 风格不支持千分位逗号）。
+- **契约更新**：`action_advisor.build_action_data()` 在持仓可用且总市值 >0 时调用适配层填充 `attribution`（Σ|profit|=0 时 None）；C19 契约 docstring 同步；technical.md 附录 H `action_data` 契约更新 attribution 字段描述（含 return_attribution 实现与降级）。
+- **测试**：新增 `src/test/unit/analysis/test_return_attribution.py`（14 例：TOP5 排序/正负分列 3 / 固定 fixture 精度 <0.01% / pos_neg_total 覆盖全部持仓 / 空/零盈亏保护 / 缺省 profit / C19 契约 / 浮点值保留 / 摘要三态 / 不可归因透传 / 提示词段落逐字节一致复用断言 ×2）；`test_action_advisor.py` 更新归因零盈亏保护断言 + 新增有盈有亏填充断言；`test_action_sheet.py`/`test_action_html.py` 归因 fixture 改浮点契约 + 渲染格式/净额摘要断言。`return_attribution.py` 覆盖率 97%（≥85%）。测试用例总数 4,623 → 4,639。
+- **向后兼容**：`enable_action` 默认关；开关开启且有盈亏时 20 章归因子块由「待生成」占位升级为真实表格 + 净额摘要，报告结构不变。
+
 ### 任务编号冲突消解（rf-205~213 重编号为 rf-209~217）
 
 - **背景**：行动建议 20 章（轮4~6）开发期间，上游分支（任务编号保障机制）同时合并了已修复条目 rf-204~208（含 fact_checker 数值校验/门禁补强/版本一致性回归）。rebase 落盘后「已提交侧已用 rf-205~208」与「本侧开发用的 rf-205~213」重叠，编号源与已修复表交叉冲突。

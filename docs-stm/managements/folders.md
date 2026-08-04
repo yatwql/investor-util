@@ -8,12 +8,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 216 | 51,539 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| 主程序代码 | Python | 217 | 51,672 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 4 | 3,547 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 16 | 5,064 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **236** | **60,150** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **258** | **72,732** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,623 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **源代码合计** | — | **237** | **60,283** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **259** | **72,959** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,639 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
@@ -115,6 +115,7 @@ investor-util/
 │   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → C19 evolution_data）
 │   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
 │   │   │   ├── rebalance_advisor.py           #   调仓建议可行化层（份额取整一手/费用估算/现金缓冲/优先级 → C19 rebalance_advice）
+│   │   │   ├── return_attribution.py          #   收益归因（TOP5 品种贡献占比/正负分列/净额合计 → C19 attribution，提示词段落与20章表格共用）
 │   │   │   ├── scenario.py                    #   情景分析（Beta 推导 → 6 种市场情景预期变动）
 │   │   │   ├── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
 │   │   │   ├── trade_discipline.py            #   交易纪律引擎（止盈/止损/回撤触发检测，复用 _silence 静默机制）
@@ -311,6 +312,7 @@ investor-util/
 │       │   │   ├── test_rebalance.py          #   再平衡信号计算
 │       │   │   ├── test_rebalance_edge.py     #   再平衡边缘场景
 │       │   │   ├── test_rebalance_advisor.py    #   调仓建议可行化层（份额取整/费用/现金缓冲/优先级/守卫）
+│       │   │   ├── test_return_attribution.py   #   收益归因（TOP5 贡献占比/正负分列/净额合计/复用断言）
 │       │   │   ├── test_scenario_analysis.py       #   情景分析测试
 │       │   │   ├── test_alignment_correction.py #   口径修正因子计算
 │       │   │   ├── test_action_advisor.py       #   行动建议计算（再平衡信号/交易纪律/调仓建议/收益归因/降级）

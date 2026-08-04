@@ -141,6 +141,21 @@ class TestHtmlActionSection(unittest.TestCase):
         self.assertIn("暂无触发", text)
         self.assertIn("待生成", text)  # 收益归因 available 缺省 → 待生成
 
+    def test_attribution_render_when_available(self):
+        """收益归因可用 → 盈利/亏损来源明细（+pp 与 +, 格式）+ 净额合计摘要。"""
+        attr = {
+            "available": True,
+            "盈利来源": [{"name": "测试基金A", "contribution_pp": 12.3, "profit": 1000.0}],
+            "亏损来源": [{"name": "测试基金B", "contribution_pp": -3.5, "profit": -200.0}],
+            "summary": "盈利品种合计 +1,000.00，亏损品种合计 -200.00（净+800.00）",
+        }
+        section = self._section(_action_data(attribution=attr))
+        text = section.get_text()
+        self.assertIn("+12.3pp", text)
+        self.assertIn("-3.5pp", text)
+        self.assertIn("净额合计", text)
+        self.assertIn("净+800.00", text)
+
     def test_unavailable_placeholder(self):
         """available=False（无持仓数据）→ 降级占位。"""
         data = _action_data(available=False)

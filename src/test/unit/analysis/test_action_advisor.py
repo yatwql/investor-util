@@ -113,10 +113,25 @@ class TestBuildActionData:
         assert rules["600900"] == "止盈线 +20%"
         assert rules["000001"] == "止损线 -15%"
 
-    def test_attribution_skeleton_empty(self):
-        """收益归因为后续增强能力：当前返回 None（其余子块已填充）。"""
+    def test_attribution_none_when_no_pnl(self):
+        """全部品种无盈亏（Σ|profit|==0）→ 归因返回 None（渲染层写「待生成」占位）。"""
         data = build_action_data(_concentrated_holdings(), 10000.0)
         assert data["attribution"] is None
+
+    def test_attribution_populated_with_profits(self):
+        """有盈有亏 → 归因契约填充（盈利/亏损来源分列 + 净额合计摘要）。"""
+        holdings = [
+            _holding("品种甲", "600900", 1250.0, 250.0),
+            _holding("品种乙", "000001", 850.0, -150.0),
+        ]
+        data = build_action_data(holdings, 2100.0)
+        attr = data["attribution"]
+        assert attr is not None
+        assert attr["available"] is True
+        assert {"盈利来源", "亏损来源", "summary"} <= set(attr.keys())
+        assert {i["code"] for i in attr["盈利来源"]} == {"600900"}
+        assert {i["code"] for i in attr["亏损来源"]} == {"000001"}
+        assert "净" in attr["summary"]  # 净额合计摘要
 
     def test_rebalance_advice_flows_through_with_shares_price(self):
         """提供 shares/price 时，再平衡/纪律触发信号转成可执行调仓建议。"""

@@ -4,11 +4,11 @@
   1. 再平衡信号 — 单品占比超警戒线（复用 simple_rebalance 计算）
   2. 交易纪律   — 止盈/止损/回撤触发（analysis/trade_discipline 计算）
   3. 调仓建议   — 可行化调仓清单（analysis/rebalance_advisor 计算，份额取整/费用/现金）
-  4. 收益归因   — 品种收益贡献占比（后续轮次填充）
+  4. 收益归因   — 品种收益贡献占比（TOP5 正负分列 + 净额合计摘要）
 
 数据源为 C19 `action_data` 契约（`analysis/action_advisor.build_action_data` 组装、
-orchestrator 注入 pipeline_data）。子块为空时写「暂无」占位——收益归因框架先行，
-后续轮次逐步填充，报告结构保持稳定。
+orchestrator 注入 pipeline_data）。子块为空时写「暂无」占位——收益归因无可归因
+数据（Σ|profit|=0 / 无持仓）时写「待生成」占位，报告结构保持稳定。
 
 数据不可用（available=False）时写入占位文本（§1.4.5 数据降级治理）。
 """
@@ -156,7 +156,7 @@ def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> Non
         ],
     )
 
-    # 子块 4：收益归因（框架，后续轮次填充）
+    # 子块 4：收益归因（TOP5 贡献占比，正负分列 + 净额合计）
     _attr = action_data.get("attribution")
     row += 1
     ws.cell(row=row, column=1, value="收益归因（品种贡献占比）").font = _FONT_SUB_BLOCK
@@ -167,11 +167,17 @@ def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> Non
         row = write_header_row(ws, row, ["来源", "品种", "贡献占比", "盈亏金额", ""])
         for src in ("盈利来源", "亏损来源"):
             for item in _attr.get(src) or []:
+                _pp = item.get("contribution_pp", 0) or 0
+                _profit = item.get("profit", 0) or 0
                 row = write_data_row(
                     ws,
                     row,
-                    [src, item.get("name", ""), item.get("contribution_pp", ""), item.get("profit", ""), ""],
+                    [src, item.get("name", ""), f"{_pp:+.1f}pp", f"{_profit:+,.2f}", ""],
                 )
+        _summary = (_attr.get("summary") or "").strip()
+        if _summary:
+            ws.cell(row=row, column=1, value=f"净额合计：{_summary}").font = _FONT_SUB_BLOCK
+            row += 1
 
     auto_width(ws)
     logger.info("行动建议页签已写入")

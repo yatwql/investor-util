@@ -33,8 +33,9 @@ def _action_data(**extra) -> dict:
         "rebalance_advice": [],
         "attribution": {
             "available": True,
-            "盈利来源": [{"name": "测试基金A", "contribution_pp": "12.3%", "profit": "+1000.00"}],
-            "亏损来源": [{"name": "测试基金B", "contribution_pp": "-3.5%", "profit": "-200.00"}],
+            "盈利来源": [{"name": "测试基金A", "contribution_pp": 12.3, "profit": 1000.0}],
+            "亏损来源": [{"name": "测试基金B", "contribution_pp": -3.5, "profit": -200.0}],
+            "summary": "盈利品种合计 +1,000.00，亏损品种合计 -200.00（净+800.00）",
         },
     }
     d.update(extra)
@@ -122,13 +123,17 @@ class TestExcelActionSheet(unittest.TestCase):
         self.assertIn("待生成", flat)
 
     def test_attribution_render_when_available(self):
-        """收益归因可用 → 盈利来源/亏损来源明细。"""
+        """收益归因可用 → 盈利/亏损来源明细（贡献占比 +pp、盈亏金额 +,、净额合计摘要）。"""
         ws = self._write(_action_data())
         flat = self._flat(ws)
         self.assertIn("盈利来源", flat)
         self.assertIn("亏损来源", flat)
-        self.assertIn("12.3%", flat)
-        self.assertIn("-3.5%", flat)
+        self.assertIn("+12.3pp", flat)
+        self.assertIn("-3.5pp", flat)
+        self.assertIn("+1,000.00", flat)
+        self.assertIn("-200.00", flat)
+        self.assertTrue(any("净额合计" in v for v in flat), "净额合计摘要行")
+        self.assertTrue(any("净+800.00" in v for v in flat), "净额合计摘要含净额")
 
     def test_unavailable_placeholder(self):
         """available=False（无持仓数据）→ 整页占位。"""

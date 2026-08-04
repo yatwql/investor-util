@@ -10,9 +10,9 @@ C19 契约 `action_data`：
   {
     "available": bool,           # 持仓明细可用
     "rebalance_signals": list,   # 再平衡信号（单品超限，复用 simple_rebalance）
-    "discipline_signals": list,  # 交易纪律触发（止盈/止损/回撤，后续轮次填充）
+    "discipline_signals": list,  # 交易纪律触发（止盈/止损/回撤）
     "rebalance_advice": list,    # 调仓建议清单（可行化层：份额取整/费用估算/现金缓冲）
-    "attribution": dict | None,  # 收益归因（贡献占比，后续轮次填充）
+    "attribution": dict | None,  # 收益归因（TOP5 贡献占比，正负分列 + 合计摘要）
     "summary": str,              # 行动摘要一句话
   }
 
@@ -28,6 +28,7 @@ import logging
 from typing import Any
 
 from src.python.analysis.rebalance_advisor import build_rebalance_advice
+from src.python.analysis.return_attribution import build_return_attribution
 from src.python.analysis.simple_rebalance import compute_simple_rebalance_signals
 from src.python.analysis.trade_discipline import compute_discipline_signals
 
@@ -83,12 +84,14 @@ def build_action_data(
 
     Returns:
         C19 契约 dict（结构见模块 docstring）。available 表示持仓明细可用；
-        再平衡/纪律/调仓建议子块已填充；收益归因为后续增强能力，返回空骨架。
+        再平衡/纪律/调仓建议/收益归因子块均已填充；Σ|profit|=0 时归因返回 None
+        （渲染层写「待生成」占位）。
     """
     available = bool(holdings_details)
     rebalance_signals: list[dict[str, Any]] = []
     discipline_signals: list[dict[str, Any]] = []
     rebalance_advice: list[dict[str, Any]] = []
+    attribution: dict[str, Any] | None = None
     if available and total_mv > 0:
         rebalance_signals = compute_simple_rebalance_signals(holdings_details, total_mv)
         discipline_signals = compute_discipline_signals(
@@ -105,9 +108,8 @@ def build_action_data(
             holdings_details,
             total_mv,
         )
-
-    # 收益归因（贡献占比）为后续增强能力，当前返回空骨架保持结构稳定。
-    attribution: dict[str, Any] | None = None
+        # 收益归因（贡献占比）：TOP5 盈利/亏损来源，正负分列 + 合计摘要
+        attribution = build_return_attribution(holdings_details)
 
     summary = _build_summary(rebalance_signals, discipline_signals, rebalance_advice, attribution)
     return {
