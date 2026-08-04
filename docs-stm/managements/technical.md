@@ -2153,7 +2153,9 @@ config/
 ├── _local_state.py               # 机器本地状态读写（get_flag/set_flag，data/state/local_state.json，含 config.json 旧键惰性迁移）
 ├── _json_patch.py                # JSON 字段级文本替换（_update_json_raw_text/_replace_dict_block）
 ├── _validation.py                # 配置校验：validate_config()、_absolutize_paths()
-├── _llm_defaults.py              # llm_settings.json 默认模板生成
+├── _llm_settings.py              # llm_settings.json 读取/合并/缓存与 LLM 配置入口
+├── _llm_settings_defaults.py     # llm_settings.json 默认模板生成
+├── _llm_providers.py             # llm_providers.json 多链解析/凭据注入
 └── _llm_providers_defaults.py    # llm_providers.json 默认模板生成
 ```
 

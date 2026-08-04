@@ -21,7 +21,7 @@ import threading
 from typing import Any
 
 from src.python.config import _comments, _llm_providers
-from src.python.config._llm_defaults import _DEFAULT_LLM_SETTINGS, _get_default_llm_settings_template
+from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS, _get_default_llm_settings_template
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.registry import get_known_llm_settings_keys
 

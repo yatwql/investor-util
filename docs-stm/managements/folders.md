@@ -50,10 +50,10 @@ investor-util/
 │   │   │   ├── _config_defaults.py   #   config.json 默认值定义
 │   │   │   ├── _core.py              #   配置加载/保存/校验核心逻辑
 │   │   │   ├── _json_patch.py        #   JSON 字段级文本替换（dict 区块 brace 平衡）
-│   │   │   ├── _llm_defaults.py      #   llm_settings.json 默认值定义
 │   │   │   ├── _llm_providers.py     #   LLM 提供程序配置解析
 │   │   │   ├── _llm_providers_defaults.py # llm_providers.json 默认值定义
 │   │   │   ├── _llm_settings.py      #   llm_settings.json 读取/合并/缓存与 LLM 配置入口
+│   │   │   ├── _llm_settings_defaults.py # llm_settings.json 默认值定义
 │   │   │   ├── _local_state.py       #   机器本地状态标志读写（首次引导/隐私已读，存 data/state/local_state.json，含 config.json 旧键惰性迁移）
 │   │   │   ├── _validation.py        #   配置校验函数集
 │   │   │   ├── anonymizer.py         #   匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）

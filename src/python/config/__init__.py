@@ -10,7 +10,7 @@
 架构：config/ 子包
   _config_defaults.py      — config.json 默认配置 & 模板生成
   _json_patch.py           — JSON 字段级文本替换（dict 区块 brace 平衡）
-  _llm_defaults.py         — llm_settings.json 缺省模板
+  _llm_settings_defaults.py — llm_settings.json 缺省模板
   _llm_providers_defaults.py — llm_providers.json 缺省模板
   _llm_settings.py         — llm_settings.json 读取/合并/缓存与 LLM 配置入口
   _llm_providers.py        — llm_providers.json 多链解析/凭据注入
@@ -24,8 +24,8 @@ from src.python.config import _comments as _comments
 from src.python.config import _config_defaults as _config_defaults
 from src.python.config import _core as _core
 from src.python.config import _json_patch as _json_patch
-from src.python.config import _llm_defaults as _llm_defaults
 from src.python.config import _llm_settings as _llm_settings
+from src.python.config import _llm_settings_defaults as _llm_settings_defaults
 from src.python.config import _validation as _validation
 
 # ── JSON 注释剥离 ──
@@ -90,7 +90,7 @@ from src.python.config._llm_settings import (
 )
 
 # ── 默认模板（llm_settings.json）──
-from src.python.config._llm_defaults import (
+from src.python.config._llm_settings_defaults import (
     _get_default_llm_settings_template,
 )
 
