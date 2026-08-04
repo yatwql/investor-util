@@ -190,6 +190,33 @@
 - **暂不合并**：LLM 文本章（12/13/14 智囊团/体检/穿透）——改造成本高、收益有限，不做物理合并，仅以 HTML 分组导航缓解入口繁杂。
 - **轻合并**：HTML 报告按「基础/基金深度/风险/历史/LLM」**分组导航折叠**；Excel 沿用 `report_section_order` 自定义排序 + `enable_*` 开关（用户可自行把不常用章节后置/关闭）。
 
+### 4.4 架构合规自查表
+
+> 本设计所有功能触达的架构约束（C1~C20，定义见 `technical.md` §8）逐条自检表。实施时每轮对照本表自查，物理合并轮与新增模块轮必须满足对应约束，否则视为架构违规。C20 定义见 `technical.md` §8.3。
+
+| 约束 | 设计触达点 | 实施要求 |
+|:--|:--|:--|
+| **C1** 代码类型判定中心化 | 轮 6 调仓份额取整（A 股一手 100 股）、轮 12 行业 Beta 穿透行业分类、轮 13 候选基金比较 | 一律复用 `core/code_utils.py`（`is_a_share_code()`/`is_otc_fund_by_name()` 等），禁止模块自行实现判定 |
+| **C2** 缓存统一管理 | 估值分位/市场温度/行业 Beta 的 K 线缓存；数据质量消费 `datasource_health.jsonl` | 持久化缓存一律经 `cache/` 子包 `get()`/`set()`，新增缓存键定义 TTL 前缀 |
+| **C3** 缓存原子写入 | 快照差异复用既有多快照（无新写入）；新增持久化状态文件 | 新增持久化文件一律 `tempfile.mkstemp` + `os.replace` 原子写 |
+| **C4** 会话级 API 复用 | 行业 Beta、估值分位、市场温度均拉指数/持仓历史 K 线；危机 as-if 净值复用 `portfolio_history.py` | 复用 `DataSourceRegistry.session_cache`（参考 `factor_exposure` 编排层拉 60 天增量补既有模式），同一会话不重复请求 |
+| **C5** HTTP 客户端统一 | 全部新增数据获取模块 | 一律经 `core/http_client.py` 工厂创建客户端 |
+| **C6** Provider Chain 必经 | 行业指数 K 线、push2 扩展字段、天天基金单代码（候选比较） | 走 `fetch_with_fallback()` Chain；指数场景沿用 index.py 双链路 fallback 例外 |
+| **C7** 报告序号不可硬编码 | 合并后 19 章、`registry.number` 重排 1~19 | 更新约束正文与 registry 注释「21 个模块」→「19 章」；删除旧注册、插入 `action` |
+| **C8** 日志统一 | 新增 7 个计算模块（归因适配/纪律/可行化/尾部/危机标注/快照差异/数据质量） | 一律 `logging.getLogger("invest")`，禁用 `print()` 输出运行时诊断 |
+| **C9** LLM 模块注册 | 无新增 LLM 分析模块（收益归因复用 `_build_profit_attribution_block` 段落；12 章行动摘要为纯算法引用） | 不新增 LLM 模块，无需注册 |
+| **C10** 新闻召回策略可配置 | 不触达 | — |
+| **C11** 测试标记强制 | 全部新增测试 | 标注 `unit_*` marker（§2 通用标准已覆盖） |
+| **C12** 边缘测试文件隔离 | 尾部风险 VaR/连续下跌、危机区间、估值分位边界 | 极端值/异常场景测试标 `@pytest.mark.edge` 放 `*_edge.py` |
+| **C13** 测试敏感路径隔离 | 轮 14 流水解析、新增持久化状态 | 新路径/新状态文件加入 `_isolate_sensitive_paths` fixture 重定向（§2 通用标准已覆盖） |
+| **C14** 渲染期数据不可写入模块级全局变量 | 行动建议单源计算两处呈现（17 章 + 12 章摘要） | 计算结果经 orchestrator 组装进 pipeline_data（C19），两处渲染均从模板 context 取；**禁止模块级全局变量共享** |
+| **C15** 控制台日志着色 | 不触达（沿用 `core/logger.py`） | — |
+| **C16** 路径绝对化 | 轮 13 `comparison_candidates` 若支持文件路径 | 路径型输入经 `_absolutize_paths()` 转换，下游不依赖 CWD |
+| **C17** Multi-LLM Provider Chain | 12 章行动摘要无 LLM 调用（纯算法引用） | 若未来加 LLM 解读，经 `call_llm()` 三元组 |
+| **C18** credentials_ref 凭据分离 | 不触达 | — |
+| **C19** pipeline_data Schema 契约 | **合并章数据契约增删**：删 `fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure` 六个旧契约；新建 `position_relationship_data`/`style_factor_data`/`action_data`/`data_quality_data` 等 | 契约先在附录 H 预定义类型/版本/写入消费模块，后使用；物理合并轮同步增删（详见轮 8/9/12） |
+| **C20** HTML 图表图下说明 | 新增图表：危机区间标注净值图、尾部风险、市场温度计、行动建议（若图表化） | 每图渲染分支跟随 `.chart-caption` 图下说明（有数据→说明出，无数据→说明不出） |
+
 ---
 
 ## 5. 实施次序
