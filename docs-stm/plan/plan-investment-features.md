@@ -33,22 +33,22 @@
 
 > 英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。命名纪律：**语义名即代码名**，任务代号不进入实现层。
 
-| 语义 slug | 中文名（文档/UI） | 归入章节 | 决策链环节 |
-|:--|:--|:--|:--|
-| `candidate_compare` | 候选基金比较 | 5 基金业绩分析 | 买入/选基 |
-| `valuation_percentile` | 估值分位 | 4 资产穿透TOP10 | 买入/选基 |
-| `market_temperature` | 市场温度 | 1 投资分析汇总 | 买入/选基 |
-| `rebalance_advice` | 调仓建议 | 17 行动建议 | 调仓 |
-| `trade_discipline` | 交易纪律 | 17 行动建议 | 调仓 |
-| `return_attribution` | 收益归因 | 17 行动建议 | 调仓 |
-| `fund_flow` | 资金流水与资金加权收益 | 1/2/3 章 + 输入扩展 | 成本/现金流 |
-| `dividend_flow` | 分红现金流 | 并入 `fund_flow` | 成本/现金流 |
-| `industry_beta` | 行业 Beta 暴露 | 9 风格与因子分析 | 风险/暴露 |
-| `crisis_annotation` | 危机区间标注 | 15 组合历史走势与回撤 | 风险/暴露 |
-| `tail_risk` | 尾部风险 | 15 组合历史走势与回撤 | 风险/暴露 |
-| `snapshot_diff` | 快照差异 | 16 组合演进 | 监控 |
-| `data_quality` | 数据质量仪表盘 | 18 数据源可用性矩阵 | 监控 |
-| `holding_diagnosis` | 品种覆盖诊断 | 并入 `data_quality` | 监控 |
+| 语义 slug | 中文名（文档/UI） | 归入章节 | 决策链环节 | config 开关 |
+|:--|:--|:--|:--|:--|
+| `candidate_compare` | 候选基金比较 | 5 基金业绩分析 | 买入/选基 | `report_submodules.candidate_compare`（默认关） |
+| `valuation_percentile` | 估值分位 | 4 资产穿透TOP10 | 买入/选基 | `report_submodules.valuation_percentile`（默认关） |
+| `market_temperature` | 市场温度 | 1 投资分析汇总 | 买入/选基 | `report_submodules.market_temperature`（默认关） |
+| `rebalance_advice` | 调仓建议 | 17 行动建议 | 调仓 | `enable_action`（默认关） |
+| `trade_discipline` | 交易纪律 | 17 行动建议 | 调仓 | `enable_action`（默认关） |
+| `return_attribution` | 收益归因 | 17 行动建议 | 调仓 | `enable_action`（默认关） |
+| `fund_flow` | 资金流水与资金加权收益 | 1/2/3 章 + 输入扩展 | 成本/现金流 | 随持仓文件流水页签（可选输入，无独立开关） |
+| `dividend_flow` | 分红现金流 | 并入 `fund_flow` | 成本/现金流 | 随 `fund_flow`（本地分红流水） |
+| `industry_beta` | 行业 Beta 暴露 | 9 风格与因子分析 | 风险/暴露 | `report_submodules.industry_beta`（默认关） |
+| `crisis_annotation` | 危机区间标注 | 15 组合历史走势与回撤 | 风险/暴露 | `report_submodules.tail_risk`（默认关，随 15 章） |
+| `tail_risk` | 尾部风险 | 15 组合历史走势与回撤 | 风险/暴露 | `report_submodules.tail_risk`（默认关） |
+| `snapshot_diff` | 快照差异 | 16 组合演进 | 监控 | `report_submodules.snapshot_diff`（默认关） |
+| `data_quality` | 数据质量仪表盘 | 18 数据源可用性矩阵 | 监控 | `report_submodules.data_quality`（默认关） |
+| `holding_diagnosis` | 品种覆盖诊断 | 并入 `data_quality` | 监控 | 随 `data_quality` |
 
 > **合并章代码标识符**：三个合并章 sheet key 统一为语义名——`position_relationship`（持仓关系矩阵，合并 `fund_overlap` + `correlation_analysis`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key 或以任何任务代号命名。
 >
@@ -142,8 +142,7 @@
 | 东财/天天 基金净值/排名/持仓 | ✅ | ✅ | 最稳净值源；排名/持仓为唯一链路（HTML 解析易受改版影响） |
 | 东财 push2 行业 + PE/PB/市值扩展字段 | ✅ | ✅ | 估值当前值可用；概念板块字段可能为空 |
 | 5 源新闻聚合 | ✅ | ⚠️ | 财联社需签名鉴权默认关；源级降级已兜底 |
-| akshare（盈利预测/资金流向/分红/利率） | ✅ | ❌ | 接口签名/格式变更频繁，静默降级为空；**不可作为核心功能依赖** |
-| 中证官网指数估值 | ✅ | ⚠️ | 网页结构易变，解析脆弱；仅作可选项 |
+| akshare（分红/盈利预测/资金流向/利率） | ✅ | ❌ | 接口签名/格式变更频繁，静默降级为空；**既有功能沿用（降级兜底），本迭代新增功能不依赖** |
 | 理杏仁/乌龟量化/韭圈儿 | ❌ 付费 | — | **不可用**，真实估值分位放弃 |
 | Wind/Choice/iFinD | ❌ 付费 | — | **不可用**，财务基本面深度放弃 |
 
@@ -185,7 +184,7 @@
 >
 > **12 章重组**：分「复盘」板块（现状 LLM 圆桌 + 情景 + 口径 + 量化指标 + 竞争语境，不变）与「行动摘要」子块（引用 17 章行动建议结果，不重复计算）——12 章仍是决策解读中枢，17 章是行动明细宿主。
 
-### 4.3 旧章节处理（防繁杂的另一面）
+### 4.3 章节合并落地
 
 - **物理合并 3 处**：①「持仓重合度矩阵」+「持仓相关性矩阵」→ **「持仓关系矩阵」**——同属"持仓关系"维度，两矩阵分区块合并；②「组合历史走势」+「历史回撤分析」→ **「组合历史走势与回撤」**——数据同源（同一 `history_data`）、回撤为净值衍生指标，合并消除指标区重复；③「基金风格分析」+「因子暴露分析」→ **「风格与因子分析」**——因子暴露列头即"风格因子"，与风格分析语义同源，并章分「基金风格表 + 风格因子回归」两区块。合计 -3，加上行动建议新增 +1，**总数 21 章减至 19 章**。
 - **暂不合并**：LLM 文本章（12/13/14 智囊团/体检/穿透）——改造成本高、收益有限，不做物理合并，仅以 HTML 分组导航缓解入口繁杂。
