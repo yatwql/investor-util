@@ -17,12 +17,15 @@ from src.python.llm.fact_checker._constants import (
     _REBALANCE_TARGET_KEYWORDS,
 )
 from src.python.llm.fact_checker._context import (
+    _is_benchmark_relative_context,
     _is_contribution_sentence,
     _is_change_rate_context,
     _is_daily_change_context,
     _is_drawdown_context,
     _is_hypothetical_context,
     _is_position_weight_context,
+    _is_weight_context,
+    _is_win_rate_context,
 )
 from src.python.llm.fact_checker._patterns import _CODE_PATTERN, _PERCENT_PATTERN
 from src.python.llm.fact_checker._utils import (
@@ -52,6 +55,11 @@ def _evaluate_percent_value(
     stock_changes: dict[str, float] | None = None,
     name_to_code: dict[str, str] | None = None,
     anchor: int = 0,
+    stock_rates: dict[str, float] | None = None,
+    profit_rate_signed: float | None = None,
+    is_win_rate: bool = False,
+    is_weight: bool = False,
+    is_benchmark_relative: bool = False,
 ) -> tuple[str | None, tuple[str, str, str, str] | None]:
     """评估单个百分比数值。
 
@@ -59,7 +67,7 @@ def _evaluate_percent_value(
         value: 数值浮点。
         value_str: 数值原始文本（用于修正替换）。
         sentence: 所在句子。
-        stock_rates_abs: {code: abs_profit_rate} 映射。
+        stock_rates_abs: {code: abs_profit_rate} 映射（最近邻比较用）。
         holding_codes: 持仓代码集合。
         profit_rate: 组合总收益率（绝对值）。
         profit_sign: "盈利" / "亏损"。
@@ -71,14 +79,20 @@ def _evaluate_percent_value(
         stock_changes: {code: change_pct} 单日涨跌映射（单日涨跌语境校验用）。
         name_to_code: {name: code} 名称映射（句中以名称指代持仓时定位用）。
         anchor: 百分比数值在句子中的位置（match.start()），用于定位主体。
+        stock_rates: {code: profit_rate} 带符号映射（修正输出用，保留盈亏方向）。
+        profit_rate_signed: 组合总收益率带符号（修正输出用）。
+        is_win_rate: 是否为胜率语境（盈利品种占比，非收益率）。
+        is_weight: 是否为评分权重语境（维度权数，非收益率）。
+        is_benchmark_relative: 是否为相对基准跑输/跑赢语境（指数差，非收益率）。
 
     Returns:
         (issue_str_or_None, correction_or_None)
         correction = (wrong_value_str, correct_value_str, context_sentence, reason)
         reason 为修正语义（如"601939实际收益率187.1%"），供修正明细展示。
     """
-    # 环比/同比变化率语境 → 数值为相对上期的变化比例而非收益率，不可比较
-    if is_change_rate:
+    # 环比/同比变化率、胜率、评分权重、相对基准跑输/跑赢 → 数值均非收益率，不可比较。
+    # 均用近邻窗口检测（数值紧邻对应语境词），避免同句其他真实收益率被连带跳过。
+    if is_change_rate or is_win_rate or is_weight or is_benchmark_relative:
         return None, None
 
     # 单日/当日涨跌语境 → 数值为单日行情涨跌而非收益率。
@@ -121,17 +135,38 @@ def _evaluate_percent_value(
     ref_rates: dict[str, float] = dict(stock_rates_abs)
     ref_rates["_portfolio"] = profit_rate
 
-    closest_ref = min(ref_rates, key=lambda k: abs(value - ref_rates[k]))
-    closest_diff = abs(value - ref_rates[closest_ref])
-
-    # 策略 1：最接近的参考值在容差内
-    if closest_diff <= tolerance_pct:
-        return None, None
-
-    # 策略 2：句中代码全部为指数代码
+    # 定位句中明确持仓主体：优先按句中持仓代码（单个）或名称指代校验，而非全局最近邻。
+    # 否则句中已写明确主体（如"建设银行收益率 3.2%"）、数值却接近无关品种
+    # （240012 的 2.24%，差 0.96≤容差）时，全局最近邻会误判通过 → 漏检。
     codes_in_sentence = _CODE_PATTERN.findall(sentence)
     index_codes_in_sentence = [c for c in codes_in_sentence if c in _INDEX_CODES]
     holding_codes_in_sentence = [c for c in codes_in_sentence if c in holding_codes]
+
+    if len(holding_codes_in_sentence) > 1:
+        best_code = min(holding_codes_in_sentence, key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
+    elif holding_codes_in_sentence:
+        best_code = holding_codes_in_sentence[0]
+    else:
+        # 句中无代码但以名称指代持仓（如"建设银行收益率+1.87%"）→ 名称定位到代码，
+        # 否则该收益声称无法归因到具体品种，会误修正到数值最接近的无关品种。
+        # 仅当该品种确有收益率数据（在 stock_rates_abs 中）时采用，否则回退组合收益率。
+        name_code = _locate_subject_code(sentence, holding_codes, name_to_code, anchor)
+        best_code = name_code if name_code in stock_rates_abs else None
+
+    closest_ref = min(ref_rates, key=lambda k: abs(value - ref_rates[k]))
+
+    # 策略 1：句中有明确持仓主体 → 按该主体实际收益率校验（容差内通过）；
+    # 主体无收益率数据（ref 为 None）或无主体 → 回退全局最近邻（历史语义）。
+    if best_code is not None:
+        ref = stock_rates_abs.get(best_code)
+        if ref is not None and abs(value - ref) <= tolerance_pct:
+            return None, None
+        if ref is None and abs(value - ref_rates[closest_ref]) <= tolerance_pct:
+            return None, None
+    elif abs(value - ref_rates[closest_ref]) <= tolerance_pct:
+        return None, None
+
+    # 策略 2：句中代码全部为指数代码
     if not holding_codes_in_sentence and index_codes_in_sentence:
         return None, None
 
@@ -159,32 +194,26 @@ def _evaluate_percent_value(
     if any(kw in sentence for kw in _EXPOSURE_KEYWORDS):
         return None, None
 
-    # 全部策略均未通过 → 标记为不一致
-    if len(holding_codes_in_sentence) > 1:
-        best_code = min(holding_codes_in_sentence, key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
-    elif holding_codes_in_sentence:
-        best_code = holding_codes_in_sentence[0]
-    else:
-        # 句中无代码但以名称指代持仓（如"建设银行收益率+1.87%"）→ 名称定位到代码，
-        # 否则该收益声称无法归因到具体品种，会误修正到数值最接近的无关品种。
-        # 仅当该品种确有收益率数据（在 stock_rates_abs 中）时采用，否则回退组合收益率。
-        name_code = _locate_subject_code(sentence, holding_codes, name_to_code, anchor)
-        best_code = name_code if name_code in stock_rates_abs else None
+    # 全部策略均未通过 → 标记为不一致（best_code 已在策略 1 前解析）
 
+    # 修正输出用带符号收益率（stock_rates / profit_rate_signed），保留盈亏方向：
+    # 亏损品种（如 518880 实际 -8.86%）修正时必须输出 -8.9%，不得写成 +8.9%。
+    # 最近邻比较仍用绝对值（_PERCENT_PATTERN 不捕获负号，value 恒为正，幅度匹配）。
     if best_code:
-        stock_rate = stock_rates_abs.get(best_code, 0)
+        stock_rate = (stock_rates or stock_rates_abs).get(best_code, 0)
         correct_str = f"{stock_rate:.1f}"
         _ctx = _sentence_snippet(sentence)
         issue = f"收益相关数值 {value}% 与 {best_code} 的实际收益率 {correct_str}%（{profit_sign}）偏差超过容差（句段：{_ctx}）"
         return issue, (value_str, correct_str, sentence, f"{best_code}实际收益率{correct_str}%")
     elif closest_ref != "_portfolio":
-        stock_rate = stock_rates_abs.get(closest_ref, 0)
+        stock_rate = (stock_rates or stock_rates_abs).get(closest_ref, 0)
         correct_str = f"{stock_rate:.1f}"
         _ctx = _sentence_snippet(sentence)
         issue = f"收益相关数值 {value}% 与 {closest_ref} 的实际收益率 {correct_str}%（{profit_sign}）偏差超过容差（句段：{_ctx}）"
         return issue, (value_str, correct_str, sentence, f"{closest_ref}实际收益率{correct_str}%")
     else:
-        correct_str = f"{profit_rate:.1f}"
+        signed = profit_rate_signed if profit_rate_signed is not None else profit_rate
+        correct_str = f"{signed:.1f}"
         _ctx = _sentence_snippet(sentence)
         issue = f"收益相关数值 {value}% 与实际累计收益率 {correct_str}%（{profit_sign}）偏差超过容差（句段：{_ctx}）"
         return issue, (value_str, correct_str, sentence, f"组合实际收益率{correct_str}%")
@@ -281,6 +310,13 @@ def check_numerical_consistency(
                 stock_changes=stock_changes,
                 name_to_code=name_to_code,
                 anchor=match.start(),
+                # 带符号收益率（修正输出保留盈亏方向）
+                stock_rates=stock_rates,
+                profit_rate_signed=values["total_profit_rate"],
+                # 非收益率语境（胜率/评分权重/相对基准跑输跑赢）
+                is_win_rate=_is_win_rate_context(sentence, match.start()),
+                is_weight=_is_weight_context(sentence, match.start()),
+                is_benchmark_relative=_is_benchmark_relative_context(sentence, match.start()),
             )
             if issue is None:
                 passed += 1

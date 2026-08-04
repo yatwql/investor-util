@@ -1,6 +1,5 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
-
-> 文档版本：0.10.0
+> 文档版本：0.10.2
 
 ---
 
@@ -134,7 +133,7 @@
 | **S31: 部分调仓卖出** | — | `test_scenario_operational_behavior.py` | 持仓含卖出一半/90%/全部清仓 | 菜单 E | 卖出后剩余份额市值盈亏正确；全部清仓不崩溃 |
 | **S32: 跨账户转仓** | — | `test_scenario_operational_behavior.py` | 同一代码出现在两个账户 | 菜单 E | 各账户独立计算明细、分类各自汇总、总计=账户和 |
 | **S33: 新股中签待上市** | — | `test_scenario_operational_behavior.py` | 持仓含无行情新股尚未上市 | 菜单 E | 无行情降级 cost 正确显示、上市后正常计算、多只新股不干扰 |
-| **S34: 组合历史走势基准指数对比** | — | 单元测试（见下方注） | 持仓含 A 股+基金，config.json 含 `benchmark_indices: {"sh000300": "沪深300"}` | 菜单 L | 组合走势 + 基准指数走势归一化正确；HTML 走势图显示组合曲线+基准虚线+图例；Excel portfolio_history/drawdown_analysis 页签含基准列；benchmark_indices 为空时走势正常不崩溃 |
+| **S34: 组合历史走势基准指数对比** | — | 单元测试（见下方注） | 持仓含 A 股+基金，config.json 含 `benchmark_indices: {"sh000300": "沪深300"}` | 菜单 L | 组合走势 + 基准指数走势归一化正确；HTML 走势图显示组合曲线+基准虚线+图例；Excel portfolio_history_drawdown 页签含基准列；benchmark_indices 为空时走势正常不崩溃 |
 | **D1: 辩论模式-正反辩论三段正常生成** | — | `test_debate_pipeline.py` | 含多品种持仓，Feature Flag `llm_debate_procon=true` | 菜单 L | pro（白脸）→ con（黑脸）→ synthesis（综合）三段完整生成；HTML 显示三色块+实验模式标签；Excel 显示"🧪 辩论模式"灰字注记；LLM 用量表正确归入"实验模式"行 |
 | **D2: 辩论降级回退普通模式** | — | `test_debate_pipeline.py` | 正反辩论启用但 pro 或 con 返回 None | 菜单 L（模拟 LLM pro 失败） | 自动回退普通 expert_review；返回 8 元组（无 debate_info）；HTML 不显示辩论块，显示普通结果 |
 | **D3: Token 预算触发生成截断** | — | `test_debate_token_budget.py` | 配置极低 `max_total_tokens_per_report`，持仓数据量大使 pro+con 超 1× 预算 | 菜单 L（模拟长篇输出） | 超过 1× 预算跳过 synthesis，返回 pro+con 拼接；超过 2× 跳过全部 debate 回退普通模式；日志输出 budget 告警 |
@@ -325,7 +324,7 @@
 | **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
 | **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | ✅ |
 | **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | ✅ | `test_tui_edge.py` |
-| **Excel 页签结构** | 页签编号排序（1.~21.，LLM API 用量强制末位）、冻结首行、列宽自适应 | ✅ |
+| **Excel 页签结构** | 页签编号排序（1.~20.，LLM API 用量强制末位）、冻结首行、列宽自适应 | ✅ |
 | **Excel 盈亏着色** | 正数绿/红色（RGB 正绿/红），覆盖所有盈亏列（本日盈亏/持仓盈亏/收益率） | ✅ |
 | **Excel LLM 状态颜色** | 蓝底=缓存、绿底=成功、红底=失败、灰底=禁用+各色图标 | ✅ |
 | **Excel 取价方式标识** | 蓝色字体标注（实时价/收盘价/官方净值） | ✅ |

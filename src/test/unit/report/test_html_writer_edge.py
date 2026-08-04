@@ -481,7 +481,7 @@ class TestWriteHtmlReportFundDeepAnalysisEmpty(unittest.TestCase):
         _, kwargs = tmpl.render.call_args
         svis = kwargs.get("section_visible_dict", {})
         self.assertTrue(svis.get("fund_manager"), "基金经理 section 应可见")
-        self.assertTrue(svis.get("fund_overlap"), "重合度 section 应可见")
+        self.assertTrue(svis.get("position_relationship"), "持仓关系 section 应可见")
         self.assertTrue(svis.get("fund_concentration"), "集中度 section 应可见")
         self.assertTrue(svis.get("fund_style"), "风格分析 section 应可见")
 

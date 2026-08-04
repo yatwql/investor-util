@@ -115,46 +115,46 @@ def _get_default_llm_settings_template() -> str:
 
     从 _DEFAULT_LLM_SETTINGS 自动生成，确保值与代码定义一致。
     支持 // 注释风格，由 _strip_json_comments() 剥离后解析。
+
+    与 _config_defaults._build_template_from_defaults() 同构：逐行手拼
+    带键名，保证生成的 JSON 可被 _strip_json_comments + json.loads 解析。
     """
     d = _DEFAULT_LLM_SETTINGS
     lines = ["{"]
 
-    def _kv(key: str, indent: int = 2) -> str:
-        val = d[key]
-        if isinstance(val, dict):
-            dumped = json.dumps(val, indent=2, ensure_ascii=False)
-            prefix = " " * indent
-            return prefix + dumped.replace("\n", "\n" + prefix)
-        return " " * indent + json.dumps(val, ensure_ascii=False)
+    def _section(title: str) -> None:
+        """生成区块分隔注释。"""
+        lines.append("")
+        lines.append("  // ═══════════════════════════════════════════")
+        lines.append(f"  // {title}")
+        lines.append("  // ═══════════════════════════════════════════")
 
-    def _module_block(module: str):
-        """生成单个模块的配置块（包含注释标题和所有键值）。"""
+    def _kv(key: str, comment: str = "", indent: int = 2) -> str:
+        """生成 '  "key": value,  // comment' 形式的单行键值对。
+
+        嵌套 dict 由调用方手拼，本函数仅处理标量/数组值。
+        """
+        val = d[key]
+        pad = " " * indent
+        return f'{pad}"{key}": {json.dumps(val, ensure_ascii=False)},  {comment}'.rstrip()
+
+    def _module_block(module: str) -> None:
+        """生成单个模块的配置块（注释标题 + 该模块全部 *_<module> 键）。"""
         prefix = module.replace("-", "_")
         label = _MODULE_LABELS.get(module, module)
-        lines.append("")
-        lines.append(f"  // ═══════════════════════════════════════════")
-        lines.append(f"  // {label} — {module}")
-        lines.append(f"  // ═══════════════════════════════════════════")
+        _section(f"{label} — {module}")
         for key in d:
             if key.endswith(f"_{prefix}"):
-                lines.append(f"  {_kv(key)},")
-
-    def _scalar(key: str, comment: str = ""):
-        lines.append(f"  {_kv(key)}{',' if comment else ''}  {comment}")
+                lines.append(_kv(key))
 
     # ── 全局设置 ──
-    lines.append("  // ═══════════════════════════════════════════")
-    lines.append("  // 全局设置")
-    lines.append("  // ═══════════════════════════════════════════")
-    _scalar("max_retries")
-    _scalar("llm_max_concurrency")
-    lines.append("")
+    _section("全局设置")
+    lines.append(f'  "max_retries": {d["max_retries"]},')
+    lines.append(f'  "llm_max_concurrency": {d["llm_max_concurrency"]},')
 
     # ── 模块开关 ──
-    lines.append("  // ═══════════════════════════════════════════")
-    lines.append("  // 模块开关 — 控制各 LLM 分析功能的启用/停用")
-    lines.append("  // ═══════════════════════════════════════════")
-    lines.append(f'  "enabled_llm": {json.dumps(d["enabled_llm"], indent=4, ensure_ascii=False)}')
+    _section("模块开关 — 控制各 LLM 分析功能的启用/停用")
+    lines.append(f'  "enabled_llm": {json.dumps(d["enabled_llm"], indent=2, ensure_ascii=False)},')
 
     _module_block("global_macro")
     _module_block("expert_review")
@@ -162,66 +162,58 @@ def _get_default_llm_settings_template() -> str:
     _module_block("penetration_deep")
 
     # ── news_correlation ──
-    lines.append("")
-    lines.append("  // ═══════════════════════════════════════════")
-    lines.append("  // 财经新闻热点与持仓关联分析 — news_correlation")
+    _section("财经新闻热点与持仓关联分析 — news_correlation")
     lines.append("  // （注：news_correlation 不支持 output_brief 模式）")
-    lines.append("  // ═══════════════════════════════════════════")
     for key in d:
         if key.endswith("_news_correlation"):
-            lines.append(f"  {_kv(key)},")
+            lines.append(_kv(key))
     lines.append(f'  "news_correlation_top_n": {d["news_correlation_top_n"]},')
 
     # ── 辩论模式 ──
-    lines.append("")
-    lines.append("  // ═══════════════════════════════════════════")
-    lines.append("  // 辩论模式（实验功能，缺省关闭）")
+    _section("辩论模式（实验功能，缺省关闭）")
     lines.append("  // 通过 Feature Flag 控制启停，菜单 [S] 可交互开关")
-    lines.append("  // ═══════════════════════════════════════════")
     debate = d["debate"]
-    lines.append(f'  "debate": {{')
-    lines.append(f"    // 正反辩论 — 三段式(白脸→黑脸→综合)")
+    lines.append('  "debate": {')
+    lines.append("    // 正反辩论 — 三段式(白脸→黑脸→综合)")
     lines.append(f'    "procon": {json.dumps(debate["procon"], indent=4, ensure_ascii=False)},')
-    lines.append(f"    // 条件推理 — 情景化分析")
-    lines.append(f'    "conditional": {{')
-    lines.append(f"      // 情景列表：每条含 name(情景名)/change(涨跌幅)/desc(描述)")
-    lines.append(f'      "scenarios": [')
-    for s in debate["conditional"]["scenarios"]:
-        lines.append(f"        {json.dumps(s, ensure_ascii=False)},")
-    lines.append(f"      ]")
-    lines.append(f"    }},")
-    lines.append(f"    // 集中度问答 — 集中度风险问答块")
+    lines.append("    // 条件推理 — 情景化分析")
+    lines.append('    "conditional": {')
+    lines.append("      // 情景列表：每条含 name(情景名)/change(涨跌幅)/desc(描述)")
+    lines.append('      "scenarios": [')
+    scenarios = debate["conditional"]["scenarios"]
+    for i, s in enumerate(scenarios):
+        comma = "," if i < len(scenarios) - 1 else ""
+        lines.append(f"        {json.dumps(s, ensure_ascii=False)}{comma}")
+    lines.append("      ]")
+    lines.append("    },")
+    lines.append("    // 集中度问答 — 集中度风险问答块")
     lines.append(f'    "qa_concentration": {json.dumps(debate["qa_concentration"])},')
-    lines.append(f"    // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）")
+    lines.append("    // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）")
     lines.append(f'    "max_total_tokens_per_report": {debate["max_total_tokens_per_report"]},')
-    lines.append(f"    // 辩论模式单次 API 调用超时覆盖（秒）")
+    lines.append("    // 辩论模式单次 API 调用超时覆盖（秒）")
     lines.append(f'    "per_call_timeout_override": {debate["per_call_timeout_override"]}')
-    lines.append(f"  }},")
+    lines.append("  },")
 
     # ── 事实校验 ──
-    lines.append("")
-    lines.append("  // ═══════════════════════════════════════════")
-    lines.append("  // 事实校验（fact_check）— LLM 输出数值一致性检测")
-    lines.append("  // ═══════════════════════════════════════════")
+    _section("事实校验（fact_check）— LLM 输出数值一致性检测")
     fc = d["fact_check"]
-    lines.append(f'  "fact_check": {{')
-    lines.append(f"    // 全局数值偏差容差（百分点），默认 1.0 — LLM 声称的收益率/占比等")
-    lines.append(f"    // 与真实值偏差在 ±tolerance 百分点内即视为通过校验")
+    lines.append('  "fact_check": {')
+    lines.append("    // 全局数值偏差容差（百分点），默认 1.0 — LLM 声称的收益率/占比等")
+    lines.append("    // 与真实值偏差在 ±tolerance 百分点内即视为通过校验")
     lines.append(f'    "tolerance": {fc["tolerance"]},')
-    lines.append(f"    // 按模块覆盖容差（模块名 → 百分点）— 覆盖全局 tolerance")
-    lines.append(f"    // 对于需要更大容差的分析模块（如 expert_review 综合判断多）,")
-    lines.append(f"    // 可单独设置较宽松的阈值，避免过度告警")
-    lines.append(f'    "tolerance_overrides": {{')
-    for mod, val in fc["tolerance_overrides"].items():
-        lines.append(f'      "{mod}": {val},')
-    lines.append(f"    }}")
-    lines.append(f"  }},")
+    lines.append("    // 按模块覆盖容差（模块名 → 百分点）— 覆盖全局 tolerance")
+    lines.append("    // 对于需要更大容差的分析模块（如 expert_review 综合判断多）,")
+    lines.append("    // 可单独设置较宽松的阈值，避免过度告警")
+    lines.append('    "tolerance_overrides": {')
+    overrides = fc["tolerance_overrides"]
+    for i, (mod, val) in enumerate(overrides.items()):
+        comma = "," if i < len(overrides) - 1 else ""
+        lines.append(f'      "{mod}": {val}{comma}')
+    lines.append("    }")
+    lines.append("  },")
 
     # ── 计价配置 ──
-    lines.append("")
-    lines.append("  // ═══════════════════════════════════════════")
-    lines.append("  // 计价配置（默认使用 constants.py MODEL_PRICING，此处可覆盖）")
-    lines.append("  // ═══════════════════════════════════════════")
+    _section("计价配置（默认使用 constants.py MODEL_PRICING，此处可覆盖）")
     lines.append(f'  "pricing": {json.dumps(d["pricing"], indent=2, ensure_ascii=False)}')
 
     lines.append("}")

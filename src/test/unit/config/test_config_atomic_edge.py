@@ -213,10 +213,10 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
-        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
              patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
             # 清缓存
-            cfg._core._llm_config_cache = None
+            cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -244,9 +244,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
-        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
              patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
-            cfg._core._llm_config_cache = None
+            cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -267,9 +267,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "  sk-test-with-spaces  ", "provider": "claude"}, f)
 
-        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
              patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
-            cfg._core._llm_config_cache = None
+            cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -285,10 +285,10 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "\t sk-ant-from-settings \n", "temperature": 0.7}, f)
 
-        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
              patch("src.python.config._llm_providers._get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")), \
              patch("src.python.config._llm_providers._get_llm_providers_path", return_value=os.path.join(self.tmp.name, "llm_providers_not_exists.json")):
-            cfg._core._llm_config_cache = None
+            cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
         # C18 约束：无 llm_key.json 且无 llm_providers.json → 返回 None
@@ -309,9 +309,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "openai"}, f)
 
-        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
              patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
-            cfg._core._llm_config_cache = None
+            cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
@@ -331,9 +331,9 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
-        with patch("src.python.config._core.get_llm_settings_path", return_value=settings_path), \
+        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
              patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
-            cfg._core._llm_config_cache = None
+            cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)

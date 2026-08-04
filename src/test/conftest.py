@@ -150,6 +150,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.analysis.rebalance._SILENCE_FILE",
         str(tmp_path / "data/state/rebalance_silence.json"),
     )
+    # 交易纪律静默期文件隔离（独立于再平衡静默文件，避免信号互相抑制）
+    monkeypatch.setattr(
+        "src.python.analysis.trade_discipline._SILENCE_FILE",
+        str(tmp_path / "data/state/discipline_silence.json"),
+    )
     # local_state.json 机器本地状态隔离（首次运行引导/隐私提示已读标志等）
     monkeypatch.setattr(
         "src.python.config._local_state._LOCAL_STATE_FILE",
@@ -173,6 +178,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "src.python.config._llm_providers._LLM_PROVIDERS_FILE_DEFAULT",
         str(tmp_path / "data/config/llm_providers.json"),
+    )
+    # features.json 功能开关覆写文件隔离（save_feature_overrides 写入）
+    monkeypatch.setattr(
+        "src.python.config.features._FEATURES_FILE",
+        str(tmp_path / "data/config/features.json"),
     )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(

@@ -1,6 +1,7 @@
 """code_utils 指数代码判定函数单元测试。
 
-覆盖：is_index_code / is_us_index_code / get_index_exchange_prefix。
+覆盖：is_index_code / is_us_index_code / get_index_exchange_prefix /
+      is_otc_fund_by_name（00 重叠区场外基金辅助判定）。
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ import pytest
 from src.python.core.code_utils import (
     get_index_exchange_prefix,
     is_index_code,
+    is_otc_fund_by_name,
     is_us_index_code,
 )
 
@@ -98,3 +100,38 @@ class TestGetIndexExchangePrefix:
     def test_empty_code(self) -> None:
         """空字符串返回空字符串。"""
         assert get_index_exchange_prefix("") == ""
+
+
+class TestIsOtcFundByName:
+    """is_otc_fund_by_name 00 重叠区场外基金辅助判定测试。
+
+    覆盖 00 前缀 + 基金特征关键词（含债券/指数/股票等细分）→ 判定为场外基金；
+    00 前缀 + 股票名（无基金特征词）或非 00 前缀 → 判定为非场外基金。
+    """
+
+    def test_bond_fund_with_bare_bond_keyword(self) -> None:
+        """00 前缀 + 名称含"债券"（无细分词）→ 场外基金（如 000311 景顺长城景颐双利债券A）。"""
+        assert is_otc_fund_by_name("景顺长城景颐双利债券A", "000311") is True
+
+    def test_index_fund_with_index_keyword(self) -> None:
+        """00 前缀 + 名称含"指数" → 场外基金（如 001552 天弘中证证券保险指数A）。"""
+        assert is_otc_fund_by_name("天弘中证证券保险指数A", "001552") is True
+
+    def test_stock_fund_with_stock_keyword(self) -> None:
+        """00 前缀 + 名称含"股票" → 场外基金（如 004851 广发医疗保健股票A）。"""
+        assert is_otc_fund_by_name("广发医疗保健股票A", "004851") is True
+
+    def test_a_share_stock_00_prefix_not_fund(self) -> None:
+        """00 前缀 + 深市股票名（无基金特征词）→ 非场外基金（如 000651 格力电器）。"""
+        assert is_otc_fund_by_name("格力电器", "000651") is False
+
+    def test_non_00_prefix_returns_false(self) -> None:
+        """非 00 前缀（A 股/场内基金/港股）→ 非场外基金，与名称无关。"""
+        assert is_otc_fund_by_name("招商中证白酒指数A", "161725") is False
+        assert is_otc_fund_by_name("沪深300ETF", "510300") is False
+        assert is_otc_fund_by_name("腾讯控股", "00700") is False
+
+    def test_empty_name_or_code_returns_false(self) -> None:
+        """名称或代码缺失 → 非场外基金（防御性，不抛异常）。"""
+        assert is_otc_fund_by_name("", "000311") is False
+        assert is_otc_fund_by_name("景顺长城景颐双利债券A", "") is False

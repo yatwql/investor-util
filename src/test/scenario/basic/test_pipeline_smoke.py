@@ -135,14 +135,26 @@ class TestCheckpointSmoke:
 
         DetailRow = namedtuple(
             "DetailRow",
-            ["name", "code", "price", "yesterday_close", "nav_date",
-             "market_value", "cost", "profit", "profit_rate", "today_profit", "source_api"],
+            [
+                "name",
+                "code",
+                "price",
+                "yesterday_close",
+                "nav_date",
+                "market_value",
+                "cost",
+                "profit",
+                "profit_rate",
+                "today_profit",
+                "source_api",
+                "shares",
+            ],
         )
         return [
-            DetailRow("长江电力", "600900", 25.0, 24.5, "2026-07-18",
-                      2500.0, 1000.0, 1500.0, 0.6, 50.0, "mock"),
-            DetailRow("贵州茅台", "600519", 1800.0, 1780.0, "2026-07-18",
-                      90000.0, 10000.0, 80000.0, 0.8, 1000.0, "mock"),
+            DetailRow("长江电力", "600900", 25.0, 24.5, "2026-07-18", 2500.0, 1000.0, 1500.0, 0.6, 50.0, "mock", 100.0),
+            DetailRow(
+                "贵州茅台", "600519", 1800.0, 1780.0, "2026-07-18", 90000.0, 10000.0, 80000.0, 0.8, 1000.0, "mock", 50.0
+            ),
         ]
 
     @staticmethod

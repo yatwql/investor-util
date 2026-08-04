@@ -114,6 +114,32 @@ def _inject_evolution_data(pipeline_data: dict | None) -> dict:
     return pipeline_data
 
 
+def _inject_snapshot_diff_data(pipeline_data: dict | None) -> dict:
+    """计算快照差异摘要并注入 pipeline_data（C19 `snapshot_diff_data` 键）。
+
+    对比 `data/history/snapshots/` 去重后最近两次快照，输出组合演进章顶部
+    「自上次快照变化摘要」（新增/移除品种 + 集中度 HHI 变化 + 超警戒线品种）。
+    有效快照 < 2 期时返回 available=False 的降级 dict，展示层写占位
+    （§1.4.5），不阻断报告生成（R11 隔离）。
+
+    Args:
+        pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
+
+    Returns:
+        注入 snapshot_diff_data 后的 pipeline_data（None 时新建字典）
+    """
+    if pipeline_data is None:
+        pipeline_data = {}
+    try:
+        from src.python.analysis.snapshot_diff import build_snapshot_diff
+
+        pipeline_data["snapshot_diff_data"] = build_snapshot_diff()
+    except Exception:
+        logger.warning("[snapshot_diff] 快照差异摘要构建失败（非关键）", exc_info=True)
+        pipeline_data["snapshot_diff_data"] = {"available": False, "reason": "快照差异摘要构建失败"}
+    return pipeline_data
+
+
 # ── 校验函数 ──
 
 
@@ -179,6 +205,19 @@ def _prepare_full_risk_metrics(
     perf.start("历史走势")
     history_data = fetch_history_data(holdings, config, reporter, fetch=fetch_history)
     perf.stop()
+
+    # 危机区间标注（C19 crisis_annotation_data）：基于既有 bars 重叠裁剪，
+    # 复用历史数据不拉长 lookback（以 history.lookback_days 为准）
+    if pipeline_data is not None:
+        from src.python.analysis.crisis_annotation import build_crisis_annotation
+
+        pipeline_data["crisis_annotation_data"] = build_crisis_annotation(history_data)
+
+        # 尾部风险统计（C19 tail_risk_data）：复用历史日收益序列计算 VaR/最大单日跌幅/
+        # 连续下跌/恢复天数；样本不足时 available=False（§1.4.5 数据降级）
+        from src.python.analysis.tail_risk import compute_tail_risk
+
+        pipeline_data["tail_risk_data"] = compute_tail_risk((history_data or {}).get("bars"))
 
     # 从 history_data 提取风险指标，注入 prep 和 pipeline_data
     if history_data and history_data.get("status") not in ("unavailable",):
@@ -270,9 +309,17 @@ def _generate_full_html_report(
     result,
     metrics: dict | None = None,
     factor_exposure: dict | None = None,
-    correlation_data: dict | None = None,
+    position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     enable_portfolio_evolution: bool = True,
+    enable_action: bool = False,
+    enable_data_quality: bool = False,
+    position_status: dict | None = None,
+    data_freshness: dict | None = None,
+    action_data: dict | None = None,
+    crisis_annotation_data: dict | None = None,
+    tail_risk_data: dict | None = None,
+    snapshot_diff_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -281,11 +328,19 @@ def _generate_full_html_report(
             用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
         factor_exposure: 因子暴露分析 C19 契约 dict，
             基金深度分析关闭或数据不足时为 None/available=False。
-        correlation_data: 持仓相关性矩阵 C19 契约 dict，
+        position_relationship_data: 持仓关系矩阵 C19 契约 dict（相关性区块数据源），
             基金深度分析关闭或数据不足时为 None/available=False。
         evolution_data: 组合演进 C19 契约 dict（多快照趋势聚合），
             数据不足时 available=False（模板写占位）。
         enable_portfolio_evolution: board 层 — 组合演进章节是否开启。
+        enable_data_quality: 子模块 — 数据质量仪表盘（默认关，保持旧样式）。
+        position_status: 品种覆盖诊断 C19 `position_status` 契约 dict，
+            品种覆盖区块数据源（开关关闭时忽略）。
+        data_freshness: 可信度摘要 C19 `data_freshness` 契约 dict，
+            可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
+        enable_action: board 层 — 行动建议章节是否开启（默认关）。
+        action_data: 行动建议单一数据源 C19 `action_data` 契约 dict，
+            行动建议板块 + 智囊团深度复盘行动摘要数据源（开关关闭时忽略）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -319,13 +374,21 @@ def _generate_full_html_report(
             enable_news=enable_news,
             enable_history=enable_history,
             enable_portfolio_evolution=enable_portfolio_evolution,
+            enable_action=enable_action,
             enable_llm=enable_llm,
             debate_info=debate_info,
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
             factor_exposure=factor_exposure,
-            correlation_data=correlation_data,
+            position_relationship_data=position_relationship_data,
             evolution_data=evolution_data,
+            enable_data_quality=enable_data_quality,
+            position_status=position_status,
+            data_freshness=data_freshness,
+            action_data=action_data,
+            crisis_annotation_data=crisis_annotation_data,
+            tail_risk_data=tail_risk_data,
+            snapshot_diff_data=snapshot_diff_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -358,6 +421,8 @@ def _generate_full_excel_report(
     debate_info: dict | None,
     result,
     enable_portfolio_evolution: bool = True,
+    enable_action: bool = False,
+    enable_data_quality: bool = False,
 ) -> bool:
     """full 路径的 Excel 报告生成，返回是否成功。"""
     from src.python.report.excel_generator import generate_excel_report
@@ -384,8 +449,10 @@ def _generate_full_excel_report(
             enable_news=enable_news,
             enable_history=enable_history,
             enable_portfolio_evolution=enable_portfolio_evolution,
+            enable_action=enable_action,
             enable_llm=enable_llm,
             debate_info=debate_info,
+            enable_data_quality=enable_data_quality,
         )
         reporter.ok("Excel 报告已生成")
         return True
@@ -412,6 +479,8 @@ def _generate_report_both(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import (
+        is_enable_action,
+        is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_news,
@@ -436,6 +505,8 @@ def _generate_report_both(
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
     _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
+    _enable_action = is_enable_action(config)
+    _enable_data_quality = is_enable_data_quality(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
@@ -452,6 +523,47 @@ def _generate_report_both(
     # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
         pipeline_data = _inject_evolution_data(pipeline_data)
+        # 2b1. 快照差异摘要（C19 snapshot_diff_data）：组合演进章顶部变化摘要，
+        #      与演进数据同开关（同属组合演进章节）
+        pipeline_data = _inject_snapshot_diff_data(pipeline_data)
+    # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
+    #    （C19 position_status + data_freshness）
+    from src.python.analysis.action_advisor import build_action_data
+    from src.python.core.data_freshness import build_freshness_summary
+    from src.python.core.holding_status import build_coverage_summary
+    from src.python.report.market_value import get_last_trading_day, get_prev_trading_day
+    from src.python.report.pipeline_data_builder import merge_pipeline_data
+
+    pipeline_data = merge_pipeline_data(
+        pipeline_data,
+        position_status=build_coverage_summary(holdings, details),
+        data_freshness=build_freshness_summary(
+            holdings,
+            details,
+            trading_day=get_last_trading_day(),
+            prev_trading_day=get_prev_trading_day(),
+        ),
+        # 行动建议单一数据源（C19 action_data）：行动建议板块 + 智囊团深度复盘行动摘要共享。
+        # 传递完整估值字段（含 profit_rate/cost/profit），交易纪律（止盈/止损）
+        # 依赖收益率数据。profit_rate 契约为百分比（小数 ×100，同 orchestrator 组装口径），
+        # 纪律引擎以百分数阈值（如 +20%）比较，此处统一换算避免单位不一致。
+        action_data=build_action_data(
+            [
+                {
+                    "name": d.name,
+                    "code": d.code,
+                    "market_value": d.market_value,
+                    "cost": d.cost,
+                    "profit": d.profit,
+                    "profit_rate": (d.profit_rate * 100) if d.profit_rate is not None else None,
+                    "shares": d.shares,
+                    "price": d.price,
+                }
+                for d in details
+            ],
+            sum(d.market_value for d in details),
+        ),
+    )
     perf.stop()
     # [checkpoint] pipeline_data 类型断言
     if pipeline_data is not None:
@@ -468,6 +580,20 @@ def _generate_report_both(
     else:
         history_data = None
         reporter.info("[章节配置] 历史走势已关闭，跳过")
+
+    # 危机区间标注（C19 crisis_annotation_data）：基于既有 bars 重叠裁剪，不拉长 lookback
+    from src.python.analysis.crisis_annotation import build_crisis_annotation
+
+    crisis_annotation_data = build_crisis_annotation(history_data)
+    if pipeline_data is not None:
+        pipeline_data["crisis_annotation_data"] = crisis_annotation_data
+
+    # 尾部风险统计（C19 tail_risk_data）：复用历史日收益序列，样本不足时 available=False
+    from src.python.analysis.tail_risk import compute_tail_risk
+
+    tail_risk_data = compute_tail_risk((history_data or {}).get("bars"))
+    if pipeline_data is not None:
+        pipeline_data["tail_risk_data"] = tail_risk_data
 
     # ── 4. HTML 报告 ──
     _news_label = "含新闻" if _enable_news else "无新闻"
@@ -492,10 +618,18 @@ def _generate_report_both(
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_portfolio_evolution=_enable_portfolio_evolution,
+            enable_action=_enable_action,
             enable_llm=False,
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
             evolution_data=(pipeline_data or {}).get("evolution_data"),
+            enable_data_quality=_enable_data_quality,
+            position_status=(pipeline_data or {}).get("position_status"),
+            data_freshness=(pipeline_data or {}).get("data_freshness"),
+            action_data=(pipeline_data or {}).get("action_data"),
+            crisis_annotation_data=crisis_annotation_data,
+            tail_risk_data=tail_risk_data,
+            snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -523,7 +657,9 @@ def _generate_report_both(
             enable_news=_enable_news,
             enable_history=_enable_history,
             enable_portfolio_evolution=_enable_portfolio_evolution,
+            enable_action=_enable_action,
             enable_llm=False,
+            enable_data_quality=_enable_data_quality,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True
@@ -606,6 +742,8 @@ def _generate_report_full(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import (
+        is_enable_action,
+        is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_llm,
@@ -629,7 +767,9 @@ def _generate_report_full(
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
     _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
+    _enable_action = is_enable_action(config)
     _enable_llm = is_enable_llm(config)
+    _enable_data_quality = is_enable_data_quality(config)
     sec_order = get_report_section_order(config)
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
@@ -641,15 +781,21 @@ def _generate_report_full(
     # ── 2. 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
-    # 因子暴露 / 持仓相关性：prep 中已组装（C19 契约），注入 pipeline_data 供 HTML/Excel 消费；
-    # capture_snapshot 在降级路径可能返回 None，需判空
+    # 因子暴露 / 持仓关系矩阵 / 品种覆盖诊断：prep 中已组装（C19 契约），
+    # 注入 pipeline_data 供 HTML/Excel 消费；capture_snapshot 在降级路径可能返回 None，需判空
     if pipeline_data is not None:
         pipeline_data["factor_exposure"] = prep.get("factor_exposure")
-        pipeline_data["correlation_data"] = prep.get("correlation_data")
+        pipeline_data["position_relationship_data"] = prep.get("position_relationship_data")
+        pipeline_data["position_status"] = prep.get("position_status")
+        pipeline_data["data_freshness"] = prep.get("data_freshness")
+        pipeline_data["action_data"] = prep.get("action_data")
     _validate_pipeline_snapshot(pipeline_data)
     # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
         pipeline_data = _inject_evolution_data(pipeline_data)
+        # 2b1. 快照差异摘要（C19 snapshot_diff_data）：组合演进章顶部变化摘要，
+        #      与演进数据同开关（同属组合演进章节）
+        pipeline_data = _inject_snapshot_diff_data(pipeline_data)
     perf.stop()
 
     # ── 3. 历史走势 + 全量量化指标 ──
@@ -720,9 +866,17 @@ def _generate_report_full(
         result,
         _metrics,
         prep.get("factor_exposure"),
-        prep.get("correlation_data"),
+        prep.get("position_relationship_data"),
         (pipeline_data or {}).get("evolution_data"),
         _enable_portfolio_evolution,
+        _enable_action,
+        _enable_data_quality,
+        (pipeline_data or {}).get("position_status"),
+        (pipeline_data or {}).get("data_freshness"),
+        (pipeline_data or {}).get("action_data"),
+        (pipeline_data or {}).get("crisis_annotation_data"),
+        (pipeline_data or {}).get("tail_risk_data"),
+        (pipeline_data or {}).get("snapshot_diff_data"),
     )
 
     # ── 7. Excel 报告 ──
@@ -745,6 +899,8 @@ def _generate_report_full(
         debate_info,
         result,
         _enable_portfolio_evolution,
+        _enable_action,
+        _enable_data_quality,
     )
 
     result.news_ok = news_ok

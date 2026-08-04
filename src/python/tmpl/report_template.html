@@ -565,7 +565,7 @@
         @media print { .chart-export-btn { display: none; } }
     </style>
 
-{% if section_visible("portfolio_history") or section_visible("drawdown_analysis") %}
+{% if section_visible("portfolio_history_drawdown") %}
 <script>
 /* --- Native Canvas 2D chart renderer (multi-dataset, no external deps) --- */
 window.drawSimpleChart = function(canvasId, a, b, c) {
@@ -665,6 +665,21 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         ctx.fillStyle = '#666';
         ctx.textAlign = 'right';
         ctx.fillText(label, margin.left - 6, y);
+    }
+
+    /* 危机区间带（opts.crisisBands: [{startIndex, endIndex, label}]）——
+       折线之前绘制半透明阴影，标注 2015/2018/2020/2022 主要危机时段 */
+    if (opts.crisisBands && opts.crisisBands.length) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(231,76,60,0.07)';
+        for (var bi = 0; bi < opts.crisisBands.length; bi++) {
+            var band = opts.crisisBands[bi];
+            var bx0 = xPos(band.startIndex);
+            var bx1 = xPos(band.endIndex);
+            if (bx1 <= bx0) continue;
+            ctx.fillRect(bx0, margin.top, bx1 - bx0, plotH);
+        }
+        ctx.restore();
     }
 
     /* 图例（多 dataset 时绘制，右上角） */
@@ -871,6 +886,12 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <div class="report-header" id="report-top">
         <h1>个人投资分析报告</h1>
         <div class="subtitle">统计时间: {{ now }} | 所属交易日: {{ trading_day }}</div>
+        {% if data_quality_enabled and data_freshness and data_freshness.available and data_freshness.abnormal_count > 0 %}
+        <div class="data-status" style="margin-top:10px;">
+            <span class="src-matrix-failed">&#9888; {{ data_freshness.summary }}</span>
+            <span style="margin-left:8px;color:#888;">含净值滞后/行情缺失/疑似跳变，详见第 {{ section_numbers["data_source_status"] }} 章</span>
+        </div>
+        {% endif %}
     </div>
 
 
@@ -886,7 +907,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </nav>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 1: 汇总 (Summary)                              -->
+    <!--  汇总 (Summary)                                        -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-summary" style="order: {{ section_numbers['summary'] }};">
         <div class="section-title">{{ section_numbers['summary'] }}、投资分析汇总</div>
@@ -1014,7 +1035,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 2: 市值核算 (Market Value)                     -->
+    <!--  市值核算 (Market Value)                               -->
     <div class="section" id="sec-market_value" style="order: {{ section_numbers['market_value'] }};">
         <div class="section-title">{{ section_numbers['market_value'] }}、市值核算明细表</div>
         <div class="section-content" style="padding: 0;">
@@ -1087,7 +1108,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 3: 持仓分类表 (Category Summary)                 -->
+    <!--  持仓分类表 (Category Summary)                         -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-category" style="order: {{ section_numbers['category'] }};">
         <div class="section-title">{{ section_numbers['category'] }}、持仓分类表</div>
@@ -1168,7 +1189,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 4: 资产穿透TOP10 (Penetration)                 -->
+    <!--  资产穿透TOP10 (Penetration)                           -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-penetration" style="order: {{ section_numbers['penetration'] }};">
         <div class="section-title">{{ section_numbers['penetration'] }}、资产穿透TOP10</div>
@@ -1260,7 +1281,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 5: 基金业绩分析 (Fund Performance)              -->
+    <!--  基金业绩分析 (Fund Performance)                       -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-fund_performance" style="order: {{ section_numbers['fund_performance'] }};">
         <div class="section-title">{{ section_numbers['fund_performance'] }}、基金业绩分析</div>
@@ -1303,7 +1324,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 6: 基金经理变更监控                             -->
+    <!--  基金经理变更监控                                     -->
     <!-- ═══════════════════════════════════════════════════════ -->
     {% if section_visible("fund_manager") %}
     <div class="section" id="sec-fund_manager" style="order: {{ section_numbers['fund_manager'] }};">
@@ -1357,16 +1378,24 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 7: 持仓重合度矩阵                              -->
+    <!--  持仓关系矩阵（重合度 + 相关性 一章两区块）               -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("fund_overlap") %}
+    {% if section_visible("position_relationship") %}
     {% set _fund_names = overlap_matrix.get("fund_names", {}) %}
     {% set _funds = overlap_matrix.get("funds", []) %}
     {% set _matrix = overlap_matrix.get("matrix", []) %}
     {% set _pairs = overlap_matrix.get("pairs", []) %}
-    <div class="section" id="sec-fund_overlap" style="order: {{ section_numbers['fund_overlap'] }};">
-        <div class="section-title">{{ section_numbers['fund_overlap'] }}、持仓重合度矩阵</div>
+    {% set _corr_data = position_relationship_data or {} %}
+    {% set _corr_codes = _corr_data.get("codes", []) %}
+    {% set _corr_names = _corr_data.get("names", {}) %}
+    {% set _corr_matrix = _corr_data.get("matrix", []) %}
+    {% set _corr_pvals = _corr_data.get("p_values", []) %}
+    {% set _corr_pairs = _corr_data.get("pairs", []) %}
+    <div class="section" id="sec-position_relationship" style="order: {{ section_numbers['position_relationship'] }};">
+        <div class="section-title">{{ section_numbers['position_relationship'] }}、持仓关系矩阵</div>
         <div class="section-content">
+            <!-- 区块一：持仓重合度矩阵 -->
+            <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">一、持仓重合度矩阵</div>
             {% if _funds and _pairs %}
             <div class="summary-tag" style="margin-bottom: 8px;">
                 📊 <strong>{{ _funds | length }}</strong> 只基金，共 <strong>{{ _pairs | length }}</strong> 对组合
@@ -1459,233 +1488,12 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% else %}
             <div class="empty-section">📭 暂无重合度数据（需要至少 2 只基金持仓方可计算持仓重合度矩阵）</div>
             {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
-
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 8: 持仓集中度监控                               -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("fund_concentration") %}
-    {% set conc_results = concentration_analysis["results"] %}
-    <div class="section" id="sec-fund_concentration" style="order: {{ section_numbers['fund_concentration'] }};">
-        <div class="section-title">{{ section_numbers['fund_concentration'] }}、持仓集中度监控</div>
-        <div class="section-content">
-            {% if conc_results %}
-            {% set high_risk = conc_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
-            {% if high_risk %}
+            <!-- 区块二：持仓相关性矩阵 -->
+            <br>
+            <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">二、持仓相关性矩阵</div>
+            {% if position_relationship_data and position_relationship_data.get("available") and _corr_codes %}
             <div class="summary-tag" style="margin-bottom: 8px;">
-                ⚠️ <strong>{{ high_risk | length }}</strong> 只基金存在集中度风险
-            </div>
-            {% endif %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>基金名称</th><th>代码</th><th>前3占比</th><th>前5占比</th><th>前10占比</th>
-                        <th>上期前10</th><th>环比变化</th><th>预警</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in conc_results %}
-                    {% set _alert = r.get("alert_level", "") %}
-                    <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% endif %}">
-                        <td class="text-left">{{ r["name"] }}</td>
-                        <td>{{ r["code"] }}</td>
-                        <td>{{ "%.2f"|format(r["top3_pct"]) }}%</td>
-                        <td>{{ "%.2f"|format(r["top5_pct"]) }}%</td>
-                        <td>{{ "%.2f"|format(r["top10_pct"]) }}%</td>
-                        {% if r.get("prev_top10_pct") is not none %}
-                        <td>{{ "%.2f"|format(r["prev_top10_pct"]) }}%</td>
-                        {% else %}
-                        <td style="color: #888;">—</td>
-                        {% endif %}
-                        {% if r.get("is_first_check") %}
-                        <td><span class="gray-text">基线已记录</span></td>
-                        <td><span class="gray-text">📋 首次</span></td>
-                        {% elif r.get("change_pct") is not none %}
-                        {% set cp = r["change_pct"] %}
-                        <td style="{% if cp > 10 %}color: var(--profit); font-weight: bold;{% endif %}">
-                            {% if cp > 0 %}↑{% elif cp < 0 %}↓{% else %}→{% endif %}
-                            {{ "%+.2f"|format(cp) }}%
-                        </td>
-                        <td>{{ r["alert_level"] }}</td>
-                        {% else %}
-                        <td>—</td>
-                        <td>{{ r["alert_level"] }}</td>
-                        {% endif %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <div class="penetration-notes">
-                <div>* 环比变化 >+20% → 🔴 紧急，>+10% → ⚠️ 关注，前10占比 >80% → ⚠️ 关注</div>
-            </div>
-            {% else %}
-            <div class="empty-section">📭 暂无持仓集中度数据（未检测到基金持仓或 API 返回为空）</div>
-            {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
-
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 9: 基金风格分析                                 -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("fund_style") %}
-    {% set style_results = style_analysis["results"] %}
-    <div class="section" id="sec-fund_style" style="order: {{ section_numbers['fund_style'] }};">
-        <div class="section-title">{{ section_numbers['fund_style'] }}、基金风格分析</div>
-        <div class="section-content">
-            {% if style_results %}
-            {% set drifted = style_results | selectattr("drift_level", "in", ["轻度", "中度", "严重"]) | list %}
-            {% if drifted %}
-            <div class="summary-tag" style="margin-bottom: 8px;">
-                ⚠️ <strong>{{ drifted | length }}</strong> 只基金存在风格漂移
-            </div>
-            {% endif %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>基金名称</th><th>代码</th><th>当前风格</th><th>上期风格</th>
-                        <th>漂移等级</th><th>漂移评分</th><th>备注</th><th>标识</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in style_results %}
-                    {% set _drift = r.get("drift_level", "") %}
-                    <tr class="{% if _drift == '严重' %}row-danger{% elif _drift == '中度' %}row-warning{% elif _drift == '基准确立中' %}row-first-check{% endif %}">
-                        <td class="text-left">{{ r["name"] }}</td>
-                        <td>{{ r["code"] }}</td>
-                        <td>{{ r.get("current_style", "--") }}</td>
-                        <td>{{ r.get("prev_style", "--") }}</td>
-                        <td class="{% if _drift == '严重' %}red-text{% elif _drift == '中度' %}orange-text{% elif _drift == '基准确立中' %}gray-text{% endif %}">
-                            {% if _drift == "严重" %}🔴 {{ _drift }}{% elif _drift == "中度" %}⚠️ {{ _drift }}{% elif _drift == "轻度" %}▲ {{ _drift }}{% elif _drift == "基准确立中" %}📋 {{ _drift }}{% else %}✅ {{ _drift }}{% endif %}
-                        </td>
-                        <td>{{ r.get("drift_score", "--") if r.get("drift_score") is not none else "--" }}</td>
-                        <td style="font-size: 12px;">{{ r.get("remark", "") if r.get("remark") else "" }}</td>
-                        <td>{% if r.get("is_first_check") %}📋 基线{% else %}✅{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <div class="penetration-notes">
-                <div>* 风格判定：按持仓个股的市值×PE 加权（东方财富 push2 数据），无数据时按代码段降级</div>
-                <div>* 漂移评分 = 网格曼哈顿距离（size差 + style差，0~4）</div>
-                <div>* 轻度(1分) / 中度(2分) / 严重(≥3分) — 首次运行记录基线，基准确立中</div>
-            </div>
-            {% else %}
-            <div class="empty-section">📭 暂无基金风格分析数据（未检测到基金持仓或 API 返回为空）</div>
-            {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
-
-    {% if section_visible("factor_exposure") %}
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 10: 因子暴露分析                              -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section" id="sec-factor_exposure" style="order: {{ section_numbers['factor_exposure'] }};">
-        <div class="section-title">{{ section_numbers['factor_exposure'] }}、因子暴露分析</div>
-        <div class="section-content">
-            {% if factor_exposure and factor_exposure.get("available") %}
-            <div class="summary-tag" style="margin-bottom: 8px;">
-                基于最近 <strong>{{ factor_exposure["window"] }}</strong> 个交易日 OLS 回归（有效样本 {{ factor_exposure["sample_count"] }} 期）
-                {% if factor_exposure.get("stale_factors") %}
-                <span style="color:var(--warn-text);"> · 已剔除停更因子：{{ factor_exposure["stale_factors"] | join("、") }}</span>
-                {% endif %}
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>风格因子</th><th>暴露系数 β</th><th>t 值</th><th>显著（95%）</th><th style="width: 32%;">风格归属占比</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for f in ["value", "growth", "quality"] %}
-                    {% if f in factor_exposure["betas"] %}
-                    {% set _alloc = factor_exposure["style_allocation"].get(f, 0) %}
-                    {% set _bar_w = (_alloc * 100) | round(1) %}
-                    <tr>
-                        <td>{{ factor_names.get(f, f) }}</td>
-                        <td>{{ factor_exposure["betas"][f] }}</td>
-                        <td>{{ factor_exposure["t_stats"].get(f, "--") }}</td>
-                        <td>{% if factor_exposure["significant"].get(f) %}✅ 显著{% else %}—{% endif %}</td>
-                        <td>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <div style="flex:1; background:var(--progress-track); border-radius:4px; height:14px;">
-                                    <div style="width: {{ _bar_w }}%; height:14px; background:{% if _alloc >= 0.5 %}#2E75B6{% elif _alloc >= 0.3 %}#70AD47{% else %}#C00000{% endif %}; border-radius:4px;"></div>
-                                </div>
-                                <span style="font-size:12px; white-space:nowrap;">{{ (_alloc * 100) | round(1) }}%</span>
-                            </div>
-                        </td>
-                    </tr>
-                    {% endif %}
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% if factor_exposure.get("factor_correlations") %}
-            <div class="penetration-notes">
-                <div>* 因子间相关性：{% for pair, v in factor_exposure["factor_correlations"].items() %}{{ pair }}={{ v }}　{% endfor %}</div>
-                {% if factor_exposure.get("correlation_note") %}
-                <div style="color:var(--warn-text);">* {{ factor_exposure["correlation_note"] }}</div>
-                {% endif %}
-            </div>
-            {% endif %}
-            {% if factor_exposure.get("baseline_betas") %}
-            <div class="summary-tag" style="margin: 10px 0 4px;">基准对照（沪深300 同窗口回归）</div>
-            <table>
-                <thead>
-                    <tr><th>风格因子</th><th>组合 β</th><th>基准 β</th><th>相对暴露</th></tr>
-                </thead>
-                <tbody>
-                    {% for f in ["value", "growth", "quality"] %}
-                    {% if f in factor_exposure["betas"] and f in factor_exposure["baseline_betas"] %}
-                    {% set _rel = factor_exposure["betas"][f] - factor_exposure["baseline_betas"][f] %}
-                    <tr>
-                        <td>{{ factor_names.get(f, f) }}</td>
-                        <td>{{ factor_exposure["betas"][f] }}</td>
-                        <td>{{ factor_exposure["baseline_betas"][f] }}</td>
-                        <td class="{% if _rel > 0.1 %}red-text{% elif _rel < -0.1 %}green-text{% endif %}">{{ _rel | round(3) }}</td>
-                    </tr>
-                    {% endif %}
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-            <div class="penetration-notes">
-                <div>* 因子暴露 = 组合日收益对因子指数日收益的 OLS 回归系数 β（窗口 {{ factor_exposure["window"] }} 期）</div>
-                <div>* α（截距）={{ factor_exposure.get("alpha", 0) }}；t 值显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
-                <div>* 风格归属占比 = |β| 归一化；基准对照用于判断组合相对市场风格的偏离</div>
-            </div>
-            {% elif factor_exposure %}
-            {% if factor_exposure.get("status") == "source_failed" %}
-            <div class="empty-section">📭 因子数据源暂不可用，请稍后重试</div>
-            {% else %}
-            <div class="empty-section">📭 因子暴露数据不足（有效样本 {{ factor_exposure.get("sample_count", 0) }} 期，低于阈值 36），暂不计算</div>
-            {% endif %}
-            {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
-
-    {% if section_visible("correlation_analysis") %}
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 11: 持仓相关性矩阵                              -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    {% set _corr_codes = correlation_data.get("codes", []) %}
-    {% set _corr_names = correlation_data.get("names", {}) %}
-    {% set _corr_matrix = correlation_data.get("matrix", []) %}
-    {% set _corr_pvals = correlation_data.get("p_values", []) %}
-    {% set _corr_pairs = correlation_data.get("pairs", []) %}
-    <div class="section" id="sec-correlation_analysis" style="order: {{ section_numbers['correlation_analysis'] }};">
-        <div class="section-title">{{ section_numbers['correlation_analysis'] }}、持仓相关性矩阵</div>
-        <div class="section-content">
-            {% if correlation_data and correlation_data.get("available") and _corr_codes %}
-            <div class="summary-tag" style="margin-bottom: 8px;">
-                📊 <strong>{{ _corr_codes | length }}</strong> 个品种，最近 <strong>{{ correlation_data["window"] }}</strong> 个交易日重叠样本（有效 {{ correlation_data["sample_count"] }} 期）
+                📊 <strong>{{ _corr_codes | length }}</strong> 个品种，最近 <strong>{{ position_relationship_data["window"] }}</strong> 个交易日重叠样本（有效 {{ position_relationship_data["sample_count"] }} 期）
             </div>
             {% if _corr_pairs %}
             {% set _corr_top = _corr_pairs[0] %}
@@ -1797,20 +1605,229 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </table>
             {% endif %}
 
-            {% if correlation_data.get("insufficient_codes") %}
+            {% if position_relationship_data.get("insufficient_codes") %}
             <div class="penetration-notes">
-                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ correlation_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ correlation_data["insufficient_codes"] | join("、") }}</div>
+                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ position_relationship_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ position_relationship_data["insufficient_codes"] | join("、") }}</div>
             </div>
             {% endif %}
             <div class="penetration-notes">
                 <div>* 相关系数 r = 两品种日收益率的 Pearson 相关系数（窗口内重叠样本）；显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
                 <div>* 下三角矩阵：数值为行品种 × 列品种 的相关性；r&gt;0 同向波动（伪分散风险），r&lt;0 反向对冲</div>
             </div>
-            {% elif correlation_data %}
-            {% if correlation_data.get("status") == "source_failed" %}
+            {% elif position_relationship_data %}
+            {% if position_relationship_data.get("status") == "source_failed" %}
             <div class="empty-section">📭 持仓相关性数据源暂不可用，请稍后重试</div>
             {% else %}
-            <div class="empty-section">📭 持仓相关性数据不足（有效样本 {{ correlation_data.get("sample_count", 0) }} 期，低于阈值 {{ correlation_data.get("window", 60) }}），暂不计算</div>
+            <div class="empty-section">📭 持仓相关性数据不足（有效样本 {{ position_relationship_data.get("sample_count", 0) }} 期，低于阈值 {{ position_relationship_data.get("window", 60) }}），暂不计算</div>
+            {% endif %}
+            {% else %}
+            <div class="empty-section">📭 持仓相关性数据不足（需要至少 2 只重叠样本品种方可计算持仓相关性矩阵）</div>
+            {% endif %}
+        </div>
+        {{ render_back_to_top() }}
+    </div>
+    {% endif %}
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  持仓集中度监控                                       -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    {% if section_visible("fund_concentration") %}
+    {% set conc_results = concentration_analysis["results"] %}
+    <div class="section" id="sec-fund_concentration" style="order: {{ section_numbers['fund_concentration'] }};">
+        <div class="section-title">{{ section_numbers['fund_concentration'] }}、持仓集中度监控</div>
+        <div class="section-content">
+            {% if conc_results %}
+            {% set high_risk = conc_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
+            {% if high_risk %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                ⚠️ <strong>{{ high_risk | length }}</strong> 只基金存在集中度风险
+            </div>
+            {% endif %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>基金名称</th><th>代码</th><th>前3占比</th><th>前5占比</th><th>前10占比</th>
+                        <th>上期前10</th><th>环比变化</th><th>预警</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in conc_results %}
+                    {% set _alert = r.get("alert_level", "") %}
+                    <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% endif %}">
+                        <td class="text-left">{{ r["name"] }}</td>
+                        <td>{{ r["code"] }}</td>
+                        <td>{{ "%.2f"|format(r["top3_pct"]) }}%</td>
+                        <td>{{ "%.2f"|format(r["top5_pct"]) }}%</td>
+                        <td>{{ "%.2f"|format(r["top10_pct"]) }}%</td>
+                        {% if r.get("prev_top10_pct") is not none %}
+                        <td>{{ "%.2f"|format(r["prev_top10_pct"]) }}%</td>
+                        {% else %}
+                        <td style="color: #888;">—</td>
+                        {% endif %}
+                        {% if r.get("is_first_check") %}
+                        <td><span class="gray-text">基线已记录</span></td>
+                        <td><span class="gray-text">📋 首次</span></td>
+                        {% elif r.get("change_pct") is not none %}
+                        {% set cp = r["change_pct"] %}
+                        <td style="{% if cp > 10 %}color: var(--profit); font-weight: bold;{% endif %}">
+                            {% if cp > 0 %}↑{% elif cp < 0 %}↓{% else %}→{% endif %}
+                            {{ "%+.2f"|format(cp) }}%
+                        </td>
+                        <td>{{ r["alert_level"] }}</td>
+                        {% else %}
+                        <td>—</td>
+                        <td>{{ r["alert_level"] }}</td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 环比变化 >+20% → 🔴 紧急，>+10% → ⚠️ 关注，前10占比 >80% → ⚠️ 关注</div>
+            </div>
+            {% else %}
+            <div class="empty-section">📭 暂无持仓集中度数据（未检测到基金持仓或 API 返回为空）</div>
+            {% endif %}
+        </div>
+        {{ render_back_to_top() }}
+    </div>
+    {% endif %}
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  基金风格分析                                         -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    {% if section_visible("fund_style") %}
+    {% set style_results = style_analysis["results"] %}
+    <div class="section" id="sec-fund_style" style="order: {{ section_numbers['fund_style'] }};">
+        <div class="section-title">{{ section_numbers['fund_style'] }}、基金风格分析</div>
+        <div class="section-content">
+            {% if style_results %}
+            {% set drifted = style_results | selectattr("drift_level", "in", ["轻度", "中度", "严重"]) | list %}
+            {% if drifted %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                ⚠️ <strong>{{ drifted | length }}</strong> 只基金存在风格漂移
+            </div>
+            {% endif %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>基金名称</th><th>代码</th><th>当前风格</th><th>上期风格</th>
+                        <th>漂移等级</th><th>漂移评分</th><th>备注</th><th>标识</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in style_results %}
+                    {% set _drift = r.get("drift_level", "") %}
+                    <tr class="{% if _drift == '严重' %}row-danger{% elif _drift == '中度' %}row-warning{% elif _drift == '基准确立中' %}row-first-check{% endif %}">
+                        <td class="text-left">{{ r["name"] }}</td>
+                        <td>{{ r["code"] }}</td>
+                        <td>{{ r.get("current_style", "--") }}</td>
+                        <td>{{ r.get("prev_style", "--") }}</td>
+                        <td class="{% if _drift == '严重' %}red-text{% elif _drift == '中度' %}orange-text{% elif _drift == '基准确立中' %}gray-text{% endif %}">
+                            {% if _drift == "严重" %}🔴 {{ _drift }}{% elif _drift == "中度" %}⚠️ {{ _drift }}{% elif _drift == "轻度" %}▲ {{ _drift }}{% elif _drift == "基准确立中" %}📋 {{ _drift }}{% else %}✅ {{ _drift }}{% endif %}
+                        </td>
+                        <td>{{ r.get("drift_score", "--") if r.get("drift_score") is not none else "--" }}</td>
+                        <td style="font-size: 12px;">{{ r.get("remark", "") if r.get("remark") else "" }}</td>
+                        <td>{% if r.get("is_first_check") %}📋 基线{% else %}✅{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 风格判定：按持仓个股的市值×PE 加权（东方财富 push2 数据），无数据时按代码段降级</div>
+                <div>* 漂移评分 = 网格曼哈顿距离（size差 + style差，0~4）</div>
+                <div>* 轻度(1分) / 中度(2分) / 严重(≥3分) — 首次运行记录基线，基准确立中</div>
+            </div>
+            {% else %}
+            <div class="empty-section">📭 暂无基金风格分析数据（未检测到基金持仓或 API 返回为空）</div>
+            {% endif %}
+        </div>
+        {{ render_back_to_top() }}
+    </div>
+    {% endif %}
+
+    {% if section_visible("factor_exposure") %}
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!--  因子暴露分析                                        -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div class="section" id="sec-factor_exposure" style="order: {{ section_numbers['factor_exposure'] }};">
+        <div class="section-title">{{ section_numbers['factor_exposure'] }}、因子暴露分析</div>
+        <div class="section-content">
+            {% if factor_exposure and factor_exposure.get("available") %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                基于最近 <strong>{{ factor_exposure["window"] }}</strong> 个交易日 OLS 回归（有效样本 {{ factor_exposure["sample_count"] }} 期）
+                {% if factor_exposure.get("stale_factors") %}
+                <span style="color:var(--warn-text);"> · 已剔除停更因子：{{ factor_exposure["stale_factors"] | join("、") }}</span>
+                {% endif %}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>风格因子</th><th>暴露系数 β</th><th>t 值</th><th>显著（95%）</th><th style="width: 32%;">风格归属占比</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in ["value", "growth", "quality"] %}
+                    {% if f in factor_exposure["betas"] %}
+                    {% set _alloc = factor_exposure["style_allocation"].get(f, 0) %}
+                    {% set _bar_w = (_alloc * 100) | round(1) %}
+                    <tr>
+                        <td>{{ factor_names.get(f, f) }}</td>
+                        <td>{{ factor_exposure["betas"][f] }}</td>
+                        <td>{{ factor_exposure["t_stats"].get(f, "--") }}</td>
+                        <td>{% if factor_exposure["significant"].get(f) %}✅ 显著{% else %}—{% endif %}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <div style="flex:1; background:var(--progress-track); border-radius:4px; height:14px;">
+                                    <div style="width: {{ _bar_w }}%; height:14px; background:{% if _alloc >= 0.5 %}#2E75B6{% elif _alloc >= 0.3 %}#70AD47{% else %}#C00000{% endif %}; border-radius:4px;"></div>
+                                </div>
+                                <span style="font-size:12px; white-space:nowrap;">{{ (_alloc * 100) | round(1) }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if factor_exposure.get("factor_correlations") %}
+            <div class="penetration-notes">
+                <div>* 因子间相关性：{% for pair, v in factor_exposure["factor_correlations"].items() %}{{ pair }}={{ v }}　{% endfor %}</div>
+                {% if factor_exposure.get("correlation_note") %}
+                <div style="color:var(--warn-text);">* {{ factor_exposure["correlation_note"] }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if factor_exposure.get("baseline_betas") %}
+            <div class="summary-tag" style="margin: 10px 0 4px;">基准对照（沪深300 同窗口回归）</div>
+            <table>
+                <thead>
+                    <tr><th>风格因子</th><th>组合 β</th><th>基准 β</th><th>相对暴露</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in ["value", "growth", "quality"] %}
+                    {% if f in factor_exposure["betas"] and f in factor_exposure["baseline_betas"] %}
+                    {% set _rel = factor_exposure["betas"][f] - factor_exposure["baseline_betas"][f] %}
+                    <tr>
+                        <td>{{ factor_names.get(f, f) }}</td>
+                        <td>{{ factor_exposure["betas"][f] }}</td>
+                        <td>{{ factor_exposure["baseline_betas"][f] }}</td>
+                        <td class="{% if _rel > 0.1 %}red-text{% elif _rel < -0.1 %}green-text{% endif %}">{{ _rel | round(3) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            <div class="penetration-notes">
+                <div>* 因子暴露 = 组合日收益对因子指数日收益的 OLS 回归系数 β（窗口 {{ factor_exposure["window"] }} 期）</div>
+                <div>* α（截距）={{ factor_exposure.get("alpha", 0) }}；t 值显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
+                <div>* 风格归属占比 = |β| 归一化；基准对照用于判断组合相对市场风格的偏离</div>
+            </div>
+            {% elif factor_exposure %}
+            {% if factor_exposure.get("status") == "source_failed" %}
+            <div class="empty-section">📭 因子数据源暂不可用，请稍后重试</div>
+            {% else %}
+            <div class="empty-section">📭 因子暴露数据不足（有效样本 {{ factor_exposure.get("sample_count", 0) }} 期，低于阈值 36），暂不计算</div>
             {% endif %}
             {% endif %}
         </div>
@@ -1818,9 +1835,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
     {% endif %}
 
+
     {% if section_visible("news_correlation") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 12: 财经新闻热点与持仓关联分析 (News)            -->
+    <!--  财经新闻热点与持仓关联分析 (News)                        -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-news_correlation" style="order: {{ section_numbers['news_correlation'] }};">
         <div class="section-title">{{ section_numbers['news_correlation'] }}、财经新闻热点与持仓关联分析</div>
@@ -1934,7 +1952,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
     {% if section_visible("global_macro") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 13: 全球政经局势 (Global Macro, LLM augment)     -->
+    <!--  全球政经局势 (Global Macro, LLM augment)                 -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-global_macro" style="order: {{ section_numbers['global_macro'] }};">
         <div class="section-title">{{ section_numbers['global_macro'] }}、全球政经局势</div>
@@ -1964,7 +1982,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 14: 智囊团深度复盘 (Expert Review, LLM augment)  -->
+    <!--  智囊团深度复盘 (Expert Review, LLM augment)              -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-expert_review" style="order: {{ section_numbers['expert_review'] }};">
         <div class="section-title">{{ section_numbers['expert_review'] }}、智囊团深度复盘
@@ -2010,11 +2028,24 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
         </div>
         {% endif %}
+
+        <!-- 行动摘要子块：引用行动建议结果（单源计算、两处呈现，C14/C19） -->
+        {% if section_visible("action") and action_data and action_data.available %}
+        <div class="section-content" style="margin-top: 12px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;">
+            <div style="font-weight: bold; font-size: 14px; color: #2E75B6; margin-bottom: 6px;">
+                行动摘要（详见第 {{ section_numbers['action'] }} 章「行动建议」）
+            </div>
+            <div class="summary-tag" style="margin-bottom: 0;">
+                {% if action_data.get("summary") %}{{ action_data["summary"] }}{% else %}暂无行动建议{% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 15: 持仓体检报告 (Health Check, LLM augment)    -->
+    <!--  持仓体检报告 (Health Check, LLM augment)                -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-health_check" style="order: {{ section_numbers['health_check'] }};">
         <div class="section-title">{{ section_numbers['health_check'] }}、持仓体检报告</div>
@@ -2043,7 +2074,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 16: 穿透深度分析 (Penetration Deep, LLM augment)-->
+    <!--  穿透深度分析 (Penetration Deep, LLM augment)             -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-penetration_deep" style="order: {{ section_numbers['penetration_deep'] }};">
         <div class="section-title">{{ section_numbers['penetration_deep'] }}、穿透深度分析</div>
@@ -2075,27 +2106,36 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
     <!-- ═══════════════════════════════════════════════════════ -->
     
-    {% if section_visible("portfolio_history") %}
+    {% if section_visible("portfolio_history_drawdown") %}
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <!--  MODULE 17: 组合历史走势                           -->
+    <!--  组合历史走势与回撤（一章两区块：走势表 + 回撤矩阵）        -->
+    <!--  危机区间标注：净值曲线分段着色（2015/2018/2020/2022，C20 图下说明） -->
     <!-- ═══════════════════════════════════════════════════════════ -->
-    <div class="section" id="sec-portfolio_history" style="order: {{ section_numbers['portfolio_history'] }};">
+    <div class="section" id="sec-portfolio_history_drawdown" style="order: {{ section_numbers['portfolio_history_drawdown'] }};">
         <div class="section-title">
-            {{ section_numbers['portfolio_history'] }}、组合历史走势
+            {{ section_numbers['portfolio_history_drawdown'] }}、组合历史走势与回撤
             {% if history_data and history_data.status != "unavailable" %}
             <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">⚠ as-if 模拟（历史净值 × 当前份额）</span>
             {% endif %}
         </div>
         {% if history_data and history_data.status != "unavailable" %}
         <div class="section-content">
+            {% set _crisis_ok = crisis_annotation_data and crisis_annotation_data.available %}
+            {% set _crisis_in_range = _crisis_ok and (crisis_annotation_data.intervals | selectattr("in_range") | list) %}
+            <!-- ── 一、走势表：净值趋势图 + 危机区间着色 ── -->
             {% if enable_interactive_charts %}
             <div class="chart-box" style="height:350px;">
                 <canvas id="chart_portfolio_line" width="800" height="350" style="width:100%;height:100%;" aria-label="净值趋势图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
             </div>
-            <div class="chart-caption">组合净值走势</div>
             {% else %}
             <canvas id="portfolioChart" width="800" height="350" style="width:100%;height:350px;"></canvas>
             {% endif %}
+            {% if _crisis_in_range %}
+            <div class="chart-caption">组合净值走势（阴影区间为 2015/2018/2020/2022 主要危机时段）</div>
+            {% else %}
+            <div class="chart-caption">组合净值走势</div>
+            {% endif %}
+            <!-- 指标汇总（合并章唯一指标区：累计收益/最大回撤/波动率/起止日 + 回撤状态，不重复） -->
             <div class="summary-grid" style="margin-top:16px;">
                 <div class="summary-card">
                     <h3>累计收益</h3>
@@ -2109,20 +2149,77 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     <h3>最大回撤</h3>
                     <div class="value" style="color: var(--profit);">{{ history_data.max_drawdown_pct | abs | change }}</div>
                     <div class="meta">
-                        {% if history_data.drawdown_start %}始于 {{ history_data.drawdown_start }}{% endif %}
-                        {% if history_data.drawdown_end %} · 终于 {{ history_data.drawdown_end }}{% endif %}
+                        {{ history_data.max_drawdown | abs | money }}
+                        {% if history_data.drawdown_start %} · {{ history_data.drawdown_start }} → {{ history_data.drawdown_end or "至今" }}{% endif %}
                     </div>
                 </div>
                 <div class="summary-card">
                     <h3>年化波动率</h3>
                     <div class="value">{{ history_data.annualized_volatility | change }}</div>
                 </div>
+                <div class="summary-card">
+                    <h3>当前回撤状态</h3>
+                    {% set _dd_last = (history_data.drawdown_events[-1] if history_data.drawdown_events else none) %}
+                    <div class="value" style="font-size:20px; {% if _dd_last and not _dd_last.recovered %}color:var(--profit);{% else %}color:var(--success);{% endif %}">
+                        {% if _dd_last and not _dd_last.recovered %}回撤中{% elif history_data.drawdown_events %}已恢复{% else %}无显著回撤{% endif %}
+                    </div>
+                    <div class="meta">
+                        {% if _dd_last and _dd_last.recovery_days %}最近一次恢复耗时 {{ _dd_last.recovery_days }} 天{% elif history_data.drawdown_events %}共 {{ history_data.drawdown_events | length }} 次显著回撤{% else %}窗口内未检测到 {{ history_data.get("min_depth_pct", 5) }}% 以上回撤{% endif %}
+                    </div>
+                </div>
             </div>
+            <!-- 尾部风险统计（VaR95/99、最大单日跌幅、连续下跌、恢复天数；样本不足写占位，C20 附说明） -->
+            {% set _tail_ok = tail_risk_data and tail_risk_data.available %}
+            <div class="summary-grid" style="margin-top:16px;">
+                {% if _tail_ok %}
+                <div class="summary-card">
+                    <h3>VaR(95)</h3>
+                    <div class="value" style="color:var(--profit);">{{ tail_risk_data.var95 | change }}</div>
+                    <div class="meta">单日最大可能损失（95% 置信）</div>
+                </div>
+                <div class="summary-card">
+                    <h3>VaR(99)</h3>
+                    <div class="value" style="color:var(--profit);">{{ tail_risk_data.var99 | change }}</div>
+                    <div class="meta">单日最大可能损失（99% 置信）</div>
+                </div>
+                <div class="summary-card">
+                    <h3>最大单日跌幅</h3>
+                    <div class="value" style="color:var(--profit);">{{ tail_risk_data.max_single_day_drop | change }}</div>
+                    {% if tail_risk_data.max_single_day_drop_date %}
+                    <div class="meta">{{ tail_risk_data.max_single_day_drop_date }}</div>
+                    {% endif %}
+                </div>
+                <div class="summary-card">
+                    <h3>最长连续下跌</h3>
+                    <div class="value">{{ tail_risk_data.consecutive_down_days }} 天</div>
+                    {% if tail_risk_data.consecutive_down_start %}
+                    <div class="meta">{{ tail_risk_data.consecutive_down_start }} → {{ tail_risk_data.consecutive_down_end }}</div>
+                    {% endif %}
+                </div>
+                <div class="summary-card">
+                    <h3>最大跌幅后恢复</h3>
+                    {% if tail_risk_data.recovery_state == "unrecovered" %}
+                    <div class="value" style="color:var(--profit);">未恢复</div>
+                    <div class="meta">数据窗口内未回到跌幅前水平</div>
+                    {% elif tail_risk_data.recovery_state == "none" %}
+                    <div class="value">—</div>
+                    <div class="meta">窗口内无下跌日</div>
+                    {% else %}
+                    <div class="value">{{ tail_risk_data.recovery_days_after_drop }} 天</div>
+                    <div class="meta">自最大单日跌幅日收复</div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="summary-card">
+                    <h3>尾部风险统计</h3>
+                    <div class="value" style="font-size:16px;">样本不足</div>
+                    <div class="meta">有效交易日不足，尾部指标暂不可用</div>
+                </div>
+                {% endif %}
+            </div>
+            <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">说明：尾部风险基于历史日收益序列（历史模拟法 VaR）；恢复天数指自最大单日跌幅日收复跌幅前水平所需交易日</div>
             {% if enable_interactive_charts %}
-            {# 量化指标 Radar：3 张摘要卡片 + 雷达图增强。
-               数据源三级降级（all_metrics / risk_metrics / history_data，builder 处理）。
-               空值语义：data_unavailable → "持仓市值数据不可用，量化指标暂停计算"；
-               radar 无 labels → "量化指标数据不足"。 #}
+            {# 量化指标 Radar：3 张摘要卡片 + 雷达图增强（三级降级，同改造前） #}
             <div class="chart-box" style="height:320px;margin-top:16px;">
                 {% if data_unavailable %}
                 <div class="chart-empty-note">持仓市值数据不可用，量化指标暂停计算</div>
@@ -2135,11 +2232,76 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") %}
             <div class="chart-caption">组合量化指标画像</div>
             {% endif %}
-            {# 降级 note 置于固定高度容器外，避免溢出 320px 边界 #}
             {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") and chart_datasets["radar"]["datasets"][0].get("note") %}
             <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:4px;">{{ chart_datasets["radar"]["datasets"][0]["note"] }}</div>
             {% endif %}
             {% endif %}
+            <!-- ── 二、回撤矩阵：回撤走势 + 回撤明细表 ── -->
+            {% if history_data.bars and history_data.get("drawdown_available") %}
+            {% if enable_interactive_charts %}
+            <div class="chart-box" style="height:250px;margin-top:16px;">
+                <canvas id="chart_drawdown" width="800" height="250" style="width:100%;height:100%;" aria-label="回撤分析图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
+            </div>
+            {% else %}
+            <canvas id="drawdownChart" width="800" height="250" style="width:100%;height:250px;"></canvas>
+            {% endif %}
+            <div class="chart-caption">历史回撤走势</div>
+            {% if history_data.drawdown_events %}
+            <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">回撤明细（{{ history_data.drawdown_events | length }} 次显著回撤）</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th><th>起峰日</th><th>最深日</th><th>恢复日</th><th>最大回撤</th><th>持续天数</th><th>恢复耗时</th><th>是否已恢复</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in history_data.drawdown_events %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ e.peak_date }}</td>
+                        <td>{{ e.trough_date }}</td>
+                        <td>{{ e.recovery_date or "—" }}</td>
+                        <td style="color:var(--profit); font-weight:600;">{{ "%.2f"|format(e.drawdown_pct) }}%</td>
+                        <td>{{ e.duration_days }} 天</td>
+                        <td>{% if e.recovery_days is not none %}{{ e.recovery_days }} 天{% else %}—{% endif %}</td>
+                        <td>{% if e.recovered %}✅ 已恢复{% else %}⏳ 未恢复{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            {% elif history_data.bars %}
+            <div class="empty-section" style="margin-top:16px;">📭 历史回撤数据不足（有效交易日不足 {{ drawdown_min_span }} 天），暂不计算回撤事件</div>
+            {% endif %}
+            <!-- ── 三、危机区间标注表（区间统计：区间回撤/恢复天数，C20 图下说明） ── -->
+            {% if _crisis_ok %}
+            <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">危机区间标注（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整）</div>
+            {% if _crisis_in_range %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>危机名称</th><th>区间</th><th>区间最大回撤</th><th>最深日</th><th>恢复耗时</th><th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for it in crisis_annotation_data.intervals if it.in_range %}
+                    <tr>
+                        <td>{{ it.name }}</td>
+                        <td>{{ it.start }} ~ {{ it.end }}</td>
+                        <td style="color:var(--profit); font-weight:600;">{% if it.interval_drawdown_pct is not none %}{{ "%.2f"|format(it.interval_drawdown_pct) }}%{% else %}—{% endif %}</td>
+                        <td>{{ it.trough_date or "—" }}</td>
+                        <td>{% if it.recovery_days is not none %}{{ it.recovery_days }} 天{% else %}—{% endif %}</td>
+                        <td>{% if it.recovered %}✅ 已恢复{% elif it.recovered is false %}⏳ 未恢复{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-section">报告数据窗口内无历史危机区间（2015/2018/2020/2022）</div>
+            {% endif %}
+            <div class="chart-caption">说明：阴影/高亮区间为历史上 A 股主要危机时段；区间与报告数据窗口重叠时统计区间最大回撤与恢复耗时</div>
+            {% endif %}
+            <!-- 数据加载状态（合并章单一份） -->
             {% if history_data.warnings or history_data.failed_holdings or history_data.successful_holdings %}
             <div class="data-status" style="margin-top:12px;">
                 {% if history_data.warnings %}
@@ -2200,17 +2362,67 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     });
                 }
             }
-            window.drawSimpleChart('portfolioChart', datasets, { yFormat: 'index', labels: labels });
+            /* 危机区间带：从 crisis_annotation_data 计算起止索引（无重叠为空 → 说明不出） */
+            var crisisBands = [];
+            var crisisAnnotation = {{ (crisis_annotation_data or {}) | tojson }};
+            if (crisisAnnotation && crisisAnnotation.intervals) {
+                for (var ci = 0; ci < crisisAnnotation.intervals.length; ci++) {
+                    var iv = crisisAnnotation.intervals[ci];
+                    if (!iv.in_range) continue;
+                    var si = -1, ei = -1;
+                    for (var k2 = 0; k2 < labels.length; k2++) {
+                        if (si === -1 && labels[k2] >= iv.start) si = k2;
+                        if (labels[k2] <= iv.end) ei = k2;
+                    }
+                    if (si !== -1 && ei !== -1 && si <= ei) {
+                        crisisBands.push({ startIndex: si, endIndex: ei, label: iv.name });
+                    }
+                }
+            }
+            window.drawSimpleChart('portfolioChart', datasets, { yFormat: 'index', labels: labels, crisisBands: crisisBands });
+
+            /* 回撤走势图（独立 canvas，透明红填充；无 canvas 时 drawSimpleChart 安全跳过） */
+            var drawdowns = bars.map(function(b){ return b.drawdown_pct; });
+            var ddDatasets = [{
+                label: '组合回撤',
+                values: drawdowns,
+                color: '#CC0000',
+                fillColor: 'rgba(204,0,0,0.15)',
+                width: 1.5
+            }];
+            if (benchmarks && benchmarks.length) {
+                var bmColors2 = ['#9CA3AF', '#B0BEC5', '#90A4AE'];
+                for (var di = 0; di < benchmarks.length; di++) {
+                    var bm2 = benchmarks[di];
+                    if (!bm2.bars || !bm2.bars.length) continue;
+                    var bmValues = bm2.bars.map(function(b){ return b.value; });
+                    var bmDrawdowns = [], bmPeak = bmValues[0];
+                    for (var vi = 0; vi < bmValues.length; vi++) {
+                        if (bmValues[vi] > bmPeak) bmPeak = bmValues[vi];
+                        bmDrawdowns.push(-(bmPeak - bmValues[vi]) / bmPeak * 100);
+                    }
+                    ddDatasets.push({
+                        label: bm2.name,
+                        values: bmDrawdowns,
+                        color: bmColors2[di % bmColors2.length],
+                        width: 1,
+                        dash: [4, 3],
+                        fill: false
+                    });
+                }
+            }
+            window.drawSimpleChart('drawdownChart', ddDatasets, { yFormat: 'percent', labels: labels });
         })();
         </script>
         {% endif %}
         {% else %}
         <div class="section-content">
             <div class="empty-note placeholder-note">
-                <p><strong>组合历史走势数据暂不可用</strong></p>
+                <p><strong>组合历史走势与回撤数据暂不可用</strong></p>
                 <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
                     模块说明：基于当前持仓份额假设历史持仓不变（as-if 模拟），使用历史股价/净值
-                    回溯计算组合的模拟走势，包括累计收益率、最大回撤、年化波动率等关键指标。
+                    回溯计算组合的模拟走势与回撤，包括累计收益率、最大回撤、年化波动率等关键指标，
+                    并标注 2015/2018/2020/2022 主要历史危机时段。
                 </p>
                 <p style="margin-top:12px;font-size:12px;color:#aaa;">
                     功能入口：菜单 L（生成全系列完整版报告）将自动获取历史数据 |
@@ -2224,165 +2436,13 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
     {% endif %}
 
-    {% if section_visible("drawdown_analysis") %}
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <!--  MODULE 18: 回撤分析                           -->
-    <!-- ═══════════════════════════════════════════════════════════ -->
-    <div class="section" id="sec-drawdown_analysis" style="order: {{ section_numbers['drawdown_analysis'] }};">
-        <div class="section-title">{{ section_numbers['drawdown_analysis'] }}、历史回撤分析</div>
-        {% if history_data and history_data.status != "unavailable" and history_data.bars and history_data.get("drawdown_available") %}
-        <div class="section-content">
-            {% if enable_interactive_charts %}
-            <div class="chart-box" style="height:250px;">
-                <canvas id="chart_drawdown" width="800" height="250" style="width:100%;height:100%;" aria-label="回撤分析图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
-            </div>
-            <div class="chart-caption">历史回撤走势</div>
-            {% else %}
-            <canvas id="drawdownChart" width="800" height="250" style="width:100%;height:250px;"></canvas>
-            {% endif %}
-            <div class="summary-grid" style="margin-top:16px;">
-                <div class="summary-card">
-                    <h3>最大回撤幅度</h3>
-                    <div class="value" style="color:var(--profit);">{{ history_data.max_drawdown_pct | abs | change }}</div>
-                </div>
-                <div class="summary-card">
-                    <h3>最大回撤金额</h3>
-                    <div class="value" style="color:var(--profit);">{{ history_data.max_drawdown | abs | money }}</div>
-                </div>
-                <div class="summary-card">
-                    <h3>回撤区间</h3>
-                    <div class="meta" style="font-size:16px;">
-                        {{ history_data.drawdown_start or "--" }} → {{ history_data.drawdown_end or "--" }}
-                    </div>
-                </div>
-                <div class="summary-card">
-                    <h3>当前回撤状态</h3>
-                    {% set _dd_last = (history_data.drawdown_events[-1] if history_data.drawdown_events else none) %}
-                    <div class="value" style="font-size:20px; {% if _dd_last and not _dd_last.recovered %}color:var(--profit);{% else %}color:var(--success);{% endif %}">
-                        {% if _dd_last and not _dd_last.recovered %}回撤中{% elif history_data.drawdown_events %}已恢复{% else %}无显著回撤{% endif %}
-                    </div>
-                    <div class="meta">
-                        {% if _dd_last and _dd_last.recovery_days %}最近一次恢复耗时 {{ _dd_last.recovery_days }} 天{% elif history_data.drawdown_events %}共 {{ history_data.drawdown_events | length }} 次显著回撤{% else %}窗口内未检测到 {{ history_data.get("min_depth_pct", 5) }}% 以上回撤{% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- 回撤明细表（独立回撤事件 + 恢复耗时） -->
-            {% if history_data.drawdown_events %}
-            <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">回撤明细（{{ history_data.drawdown_events | length }} 次显著回撤）</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>序号</th><th>起峰日</th><th>最深日</th><th>恢复日</th><th>最大回撤</th><th>持续天数</th><th>恢复耗时</th><th>是否已恢复</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for e in history_data.drawdown_events %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ e.peak_date }}</td>
-                        <td>{{ e.trough_date }}</td>
-                        <td>{{ e.recovery_date or "—" }}</td>
-                        <td style="color:var(--profit); font-weight:600;">{{ "%.2f"|format(e.drawdown_pct) }}%</td>
-                        <td>{{ e.duration_days }} 天</td>
-                        <td>{% if e.recovery_days is not none %}{{ e.recovery_days }} 天{% else %}—{% endif %}</td>
-                        <td>{% if e.recovered %}✅ 已恢复{% else %}⏳ 未恢复{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-        </div>
-        {% if not enable_interactive_charts %}
-        <script>
-        (function(){
-            var bars = {{ history_data.bars | tojson }};
-            if(!bars || !bars.length) return;
-            var drawdowns = bars.map(function(b){ return b.drawdown_pct; });
-            var labels = bars.map(function(b){ return b.date; });
-            var datasets = [{
-                label: '组合回撤',
-                values: drawdowns,
-                color: '#CC0000',
-                fillColor: 'rgba(204,0,0,0.15)',
-                width: 1.5
-            }];
-            /* 叠加基准指数回撤（从归一化值计算逐日回撤） */
-            var benchmarks = {{ (history_data.benchmarks or []) | tojson }};
-            var bmColors = ['#9CA3AF', '#B0BEC5', '#90A4AE'];
-            if (benchmarks && benchmarks.length) {
-                for (var bi = 0; bi < benchmarks.length; bi++) {
-                    var bm = benchmarks[bi];
-                    if (!bm.bars || !bm.bars.length) continue;
-                    var bmValues = bm.bars.map(function(b){ return b.value; });
-                    var bmDrawdowns = [], bmPeak = bmValues[0];
-                    for (var vi = 0; vi < bmValues.length; vi++) {
-                        if (bmValues[vi] > bmPeak) bmPeak = bmValues[vi];
-                        bmDrawdowns.push(-(bmPeak - bmValues[vi]) / bmPeak * 100);
-                    }
-                    datasets.push({
-                        label: bm.name,
-                        values: bmDrawdowns,
-                        color: bmColors[bi % bmColors.length],
-                        width: 1,
-                        dash: [4, 3],
-                        fill: false
-                    });
-                }
-            }
-            window.drawSimpleChart('drawdownChart', datasets, { yFormat: 'percent', labels: labels });
-        })();
-        </script>
-        {% endif %}
-        <div class="data-status" style="margin-top:12px;margin-left:20px;margin-right:20px;margin-bottom:4px;">
-            {% if history_data.successful_holdings or history_data.failed_holdings %}
-            <div class="data-status-title">持仓历史数据纳入状态</div>
-            {% if history_data.successful_holdings %}
-            <div style="margin-top:6px;font-size:13px;">
-                <div style="font-weight:600;color:var(--success);margin-bottom:4px;">✓ 已纳入回撤计算（{{ history_data.successful_holdings | length }}）：</div>
-                {% for h in history_data.successful_holdings %}
-                <div class="data-status-ok">✓ {{ h }}</div>
-                {% endfor %}
-            </div>
-            {% endif %}
-            {% if history_data.failed_holdings %}
-            <div style="margin-top:6px;font-size:13px;">
-                <div style="font-weight:600;color:var(--text-muted);margin-bottom:4px;">✗ 无历史走势数据（{{ history_data.failed_holdings | length }}）：</div>
-                {% for h in history_data.failed_holdings %}
-                <div class="data-status-warn" style="border-left-color:#95a5a6;">✗ {{ h }}</div>
-                {% endfor %}
-            </div>
-            {% endif %}
-            {% endif %}
-            {% if history_data.warnings %}
-            <div class="data-status-title" style="margin-top:8px;">数据质量</div>
-            {% for w in history_data.warnings %}
-            <div class="data-status-info">ℹ {{ w }}</div>
-            {% endfor %}
-            {% endif %}
-        </div>
-        {% elif history_data and history_data.status != "unavailable" and history_data.bars %}
-        <div class="section-content">
-            <div class="empty-section">📭 历史回撤数据不足（有效交易日不足 {{ drawdown_min_span }} 天），暂不计算回撤事件</div>
-        </div>
-        {% else %}
-        <div class="section-content">
-            <div class="empty-note placeholder-note">
-                <p><strong>回撤分析数据暂不可用</strong></p>
-                <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">生成全系列完整版报告后自动回撤分析数据。</p>
-                <p style="margin-top:12px;font-size:12px;color:#aaa;">也可在 config.json 的 history.fetch_mode 中设为 "auto" 自动获取</p>
-            </div>
-        </div>
-        {% endif %}
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
-
     {% include "partials/evolution_section.html" with context %}
+
+    {% include "partials/action_section.html" with context %}
 
     {% if section_visible("data_source_status") %}
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 20: 数据源可用性矩阵                           -->
+    <!--  数据源可用性矩阵                                       -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-data_source_status" style="order: {{ section_numbers['data_source_status'] }};">
         <div class="section-title">{{ section_numbers['data_source_status'] }}、数据源可用性矩阵</div>
@@ -2449,13 +2509,84 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div class="data-status-ok" style="border-left-color:#27ae60;padding-left:8px;">所有数据源运行正常</div>
             </div>
             {% endif %}
+            {% if data_quality_enabled %}
+            <!-- 品种覆盖区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">品种覆盖（逐品种数据状态）</div>
+                {% if position_status and position_status.available and position_status.items %}
+                <table>
+                    <tr>
+                        <th>代码</th>
+                        <th>名称</th>
+                        <th>账户</th>
+                        <th>状态</th>
+                        <th>原因</th>
+                    </tr>
+                    {% for item in position_status.items %}
+                    <tr>
+                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.name }}</td>
+                        <td style="text-align:left;">{{ item.account }}</td>
+                        <td>
+                            {% if item.status == "ok" %}
+                            <span class="src-matrix-ok">&#10003; {{ item.status_label }}</span>
+                            {% else %}
+                            <span class="src-matrix-failed">{{ item.status_label }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:left;">{{ item.reason }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="data-status-info">&#8505; 未获取行情数据，品种覆盖无法判定</div>
+                {% endif %}
+            </div>
+            <!-- 可信度区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">可信度（数据新鲜度 + 单日跳变）</div>
+                {% if data_freshness and data_freshness.available and data_freshness.items %}
+                <table>
+                    <tr>
+                        <th>代码</th>
+                        <th>名称</th>
+                        <th>账户</th>
+                        <th>新鲜度</th>
+                        <th>单日变化 / 跳变</th>
+                    </tr>
+                    {% for item in data_freshness.items %}
+                    <tr>
+                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.name }}</td>
+                        <td style="text-align:left;">{{ item.account }}</td>
+                        <td>
+                            {% if item.jump %}
+                            <span class="src-matrix-failed">&#9888; {{ item.freshness_label }}</span>
+                            {% elif item.freshness in ("stale", "degraded") %}
+                            <span class="src-matrix-failed">{{ item.freshness_label }}</span>
+                            {% else %}
+                            <span class="src-matrix-ok">&#10003; {{ item.freshness_label }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:left;">
+                            {% if item.jump_label %}<span class="src-matrix-failed">{{ item.jump_label }}</span>
+                            {% else %}{{ "%.2f"|format(item.change_pct) }}%{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="data-status-info">&#8505; 未获取可信度数据，新鲜度/跳变无法判定</div>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
         {{ render_back_to_top() }}
     </div>
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 21: LLM API Usage -->
+    <!--  LLM API Usage -->
     <div class="section" id="sec-llm_usage" style="order: {{ section_numbers['llm_usage'] }};">
         <div class="section-title">{{ section_numbers['llm_usage'] }}、LLM API 用量</div>
         <div class="section-content">

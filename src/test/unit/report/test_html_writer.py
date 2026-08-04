@@ -1130,7 +1130,7 @@ class TestComputeSectionVisibilityEvolution(unittest.TestCase):
             enable_portfolio_evolution=enable_portfolio_evolution,
             enable_llm=False,
             factor_exposure=None,
-            correlation_data=None,
+            position_relationship_data=None,
             evolution_data=evolution_data,
         )
         return svis

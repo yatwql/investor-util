@@ -148,7 +148,7 @@ from src.python.core.registry import (
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
 - `get_report_section_number("fund_manager")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
-- `get_report_section_keys()` → 全部 21 个模块键名（见下表）
+- `get_report_section_keys()` → 全部 20 个模块键名（见下表）
 
 全部键名及对应中文标题：
 
@@ -160,25 +160,24 @@ from src.python.core.registry import (
 | `penetration` | 资产穿透TOP10 | 始终显示 |
 | `fund_performance` | 基金业绩分析 | 始终显示 |
 | `fund_manager` | 基金经理变更监控 | 基金深度分析 |
-| `fund_overlap` | 持仓重合度矩阵 | 基金深度分析 |
+| `position_relationship` | 持仓关系矩阵 | 基金深度分析（一章两区块：重合度 + 相关性） |
 | `fund_concentration` | 持仓集中度监控 | 基金深度分析 |
 | `fund_style` | 基金风格分析 | 基金深度分析 |
 | `factor_exposure` | 因子暴露分析 | 基金深度分析 |
-| `correlation_analysis` | 持仓相关性矩阵 | 基金深度分析 |
 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻 |
 | `global_macro` | 全球政经局势 | LLM |
 | `expert_review` | 智囊团深度复盘 | LLM |
 | `health_check` | 持仓体检报告 | LLM |
 | `penetration_deep` | 穿透深度分析 | LLM |
-| `portfolio_history` | 组合历史走势 | 历史走势 |
-| `drawdown_analysis` | 历史回撤分析 | 历史走势 |
-| `portfolio_evolution` | 组合演进 | 独立开关（`enable_portfolio_evolution`，数据不可用时占位） |
+| `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（一章多区块：走势表 + 回撤矩阵 + 危机区间标注 + 尾部风险统计） |
+| `portfolio_evolution` | 组合演进 | 独立开关（`enable_portfolio_evolution`，数据不可用时占位；一章多区块：顶部自上次快照变化摘要 + 净值/持仓结构趋势演进） |
+| `action` | 行动建议 | 独立顶层开关（`enable_action`，默认关；再平衡信号/交易纪律/调仓建议/收益归因） |
 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
 | `llm_usage` | LLM API 用量 | LLM（强制末位） |
 
 > LLM 模块（`global_macro`/`expert_review`/`health_check`/`penetration_deep`/`news_correlation`）的页签标题统一通过 `get_llm_module_name(settings_suffix)` 获取；`llm_usage` 的序号和名称也在 registry 中注册，内容（Token/费用数据）由程序动态计算。
 
-完整 21 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
+完整 20 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
 
 ### 计算模块查询
 

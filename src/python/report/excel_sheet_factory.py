@@ -29,6 +29,7 @@ def create_sheets(
     enable_news: bool = True,  # board 层
     enable_history: bool = True,  # board 层
     enable_portfolio_evolution: bool = True,  # board 层：组合演进
+    enable_action: bool = False,  # board 层：行动建议（默认关）
     enable_llm: bool = True,  # board 层
     data_availability: dict[str, bool] | None = None,  # data 层
 ) -> dict[str, Any]:
@@ -44,6 +45,7 @@ def create_sheets(
         enable_fund_deep_analysis: board 层 — 基金深度分析是否开启（配置驱动）
         enable_news: board 层 — 市场新闻是否开启（配置驱动）
         enable_history: board 层 — 历史走势章节是否开启
+        enable_action: board 层 — 行动建议章节是否开启（默认关）
         enable_llm: board 层 — LLM 分析章节是否开启
         data_availability: data 层 — 各模块 data_flag 的就绪状态
     """
@@ -54,6 +56,7 @@ def create_sheets(
         "news": enable_news,  # ← 配置驱动的 board 层值
         "history": enable_history,
         "evolution": enable_portfolio_evolution,
+        "action": enable_action,
         "llm": enable_llm,
     }
 

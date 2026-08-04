@@ -1,10 +1,10 @@
-"""持仓相关性矩阵页签 Excel 呈现测试。
+"""持仓关系矩阵页签·相关性区块 Excel 呈现测试。
 
-覆盖：
+覆盖（position_relationship_sheet 的 _write_correlation_block）：
   - available=True → 写入下三角矩阵 + 配对明细 + 说明区
   - 配对按 |r| 降序、显著标记、r 颜色字体
   - available=False（数据不足）→ 占位文本
-  - correlation_data=None → 整页占位
+  - 相关性数据 None → 相关性区块占位
   - 上三角留空、对角线=1.00、重叠样本不足格=N/A
 """
 
@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 def _correlation_data(**extra) -> dict:
-    """构造 C19 契约 correlation_data mock（2 品种，强负相关）。"""
+    """构造持仓关系矩阵·相关性区块 C19 契约 mock（2 品种，强负相关）。"""
     d = {
         "available": True,
         "status": "ok",
@@ -48,16 +48,16 @@ def _correlation_data(**extra) -> dict:
 
 
 class TestExcelCorrelationSheet(unittest.TestCase):
-    """持仓相关性矩阵页签 Excel 呈现测试。"""
+    """持仓关系矩阵页签·相关性区块 Excel 呈现测试。"""
 
     def _write(self, correlation_data) -> "object":
         from openpyxl import Workbook
 
-        from src.python.report.correlation_sheet import write_correlation_sheet
+        from src.python.report.position_relationship_sheet import write_position_relationship_sheet
 
         wb = Workbook()
         ws = wb.active
-        write_correlation_sheet(ws, correlation_data)
+        write_position_relationship_sheet(ws, overlap_result=None, correlation_data=correlation_data)
         return ws
 
     def _all_text(self, ws) -> list[list[str]]:
@@ -181,3 +181,85 @@ class TestExcelCorrelationSheet(unittest.TestCase):
         # 显著标记出现在 0.9 那对
         flat_pairs = [v for r in rows[pairs_idx:] for v in r]
         self.assertTrue(any("显著" in v for v in flat_pairs))
+
+
+def _overlap_result(**extra) -> dict:
+    """构造持仓关系矩阵·重合度区块结构（2 只基金，部分重合 50%）。"""
+    d = {
+        "fund_names": {"a": "基金A", "b": "基金B"},
+        "funds": ["a", "b"],
+        "matrix": [
+            [1.0, 0.5],
+            [0.5, 1.0],
+        ],
+        "pairs": [
+            {
+                "fund_a": "a",
+                "fund_b": "b",
+                "name_a": "基金A",
+                "name_b": "基金B",
+                "code_a": "a",
+                "code_b": "b",
+                "common_count": 2,
+                "jaccard": 0.5,
+                "common_stocks": [
+                    {"name": "贵州茅台", "code": "600519"},
+                    {"name": "五粮液", "code": "000858"},
+                ],
+            }
+        ],
+    }
+    d.update(extra)
+    return d
+
+
+class TestExcelMergedRelationshipSheet(unittest.TestCase):
+    """持仓关系矩阵页签·一章两区块（重合度 + 相关性）Excel 呈现测试。"""
+
+    def _write(self, overlap_result, correlation_data) -> "object":
+        from openpyxl import Workbook
+
+        from src.python.report.position_relationship_sheet import write_position_relationship_sheet
+
+        wb = Workbook()
+        ws = wb.active
+        write_position_relationship_sheet(ws, overlap_result=overlap_result, correlation_data=correlation_data)
+        return ws
+
+    def _flat(self, ws) -> list[str]:
+        return [str(c.value) if c.value is not None else "" for row in ws.iter_rows() for c in row]
+
+    def test_both_blocks_render_in_one_sheet(self):
+        """重合度 + 相关性同时提供 → 一章两区块同页呈现（章节标题带序号 7）。"""
+        ws = self._write(_overlap_result(), _correlation_data())
+        flat = self._flat(ws)
+        self.assertTrue(any("7. 持仓关系矩阵" in v for v in flat), f"应含章节标题（序号 7），实际: {flat[:3]}")
+        self.assertTrue(any("一、持仓重合度矩阵" in v for v in flat), "应含重合度区块标题")
+        self.assertTrue(any("二、持仓相关性矩阵" in v for v in flat), "应含相关性区块标题")
+        self.assertTrue(any("基金A" in v for v in flat), "重合度区块应含基金名")
+        self.assertTrue(any("资产A" in v for v in flat), "相关性区块应含资产名")
+        # 区块顺序：重合度在上、相关性在下
+        overlap_idx = next(i for i, v in enumerate(flat) if "一、持仓重合度矩阵" in v)
+        corr_idx = next(i for i, v in enumerate(flat) if "二、持仓相关性矩阵" in v)
+        self.assertLess(overlap_idx, corr_idx, "重合度区块应位于相关性区块之前")
+
+    def test_overlap_placeholder_when_correlation_only(self):
+        """仅提供相关性数据 → 重合度区块写占位（相关度矩阵照常呈现）。"""
+        ws = self._write(None, _correlation_data())
+        flat = self._flat(ws)
+        self.assertTrue(any("无法计算重合度" in v for v in flat), "重合度区块应写占位")
+        self.assertTrue(any("资产B" in v for v in flat), "相关性矩阵应正常呈现")
+
+    def test_correlation_placeholder_when_overlap_only(self):
+        """仅提供重合度数据 → 相关性区块写占位（重合度矩阵照常呈现）。"""
+        ws = self._write(_overlap_result(), None)
+        flat = self._flat(ws)
+        self.assertTrue(any("基金A" in v for v in flat), "重合度矩阵应正常呈现")
+        self.assertTrue(any("持仓相关性数据暂不可用" in v for v in flat), "相关性区块应写占位")
+
+    def test_overlap_jaccard_value_rendered(self):
+        """重合度区块 Jaccard 系数值以百分比呈现。"""
+        ws = self._write(_overlap_result(), _correlation_data())
+        flat = self._flat(ws)
+        self.assertTrue(any("50.00%" in v for v in flat), "重合度 Jaccard 0.5 应呈现为 50.00%")
+        self.assertTrue(any("100.00%" in v for v in flat), "对角线 1.0 应呈现为 100.00%")

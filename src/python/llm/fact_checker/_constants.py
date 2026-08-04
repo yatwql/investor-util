@@ -46,6 +46,21 @@ _POSITION_WEIGHT_KEYWORDS = frozenset(
     ]
 )
 
+# 胜率上下文——数值为品种盈利比例（如"持仓胜率80%"），非收益率。
+# 例句含"盈利"会触发收益语境，但"胜率"后的数值是盈利品种占比，不可与收益率比较。
+_WIN_RATE_KEYWORDS: frozenset[str] = frozenset(["胜率"])
+
+# 评分权重上下文——数值为维度权重（如"风险分散度权重20%"），非收益率。
+# 注意与 _POSITION_WEIGHT_KEYWORDS 分开：体重/体检评分权重用"权重"，
+# 而"占比/仓位/集中度"由 _is_position_weight_context 全句兜底。
+_WEIGHT_KEYWORDS: frozenset[str] = frozenset(["权重"])
+
+# 相对基准跑输/跑赢上下文——数值为相对指数的表现差（如"跑输沪深300达1.10%"），
+# 单位是百分点而非收益率。直接与持仓收益率比较会误修正为某品种收益率。
+_BENCHMARK_RELATIVE_KEYWORDS: frozenset[str] = frozenset(
+    ["跑输", "跑赢", "落后于", "领先于"]
+)
+
 # 品种计数/比例上下文——数值为品种计数比例而非收益率（如"80%的品种处于盈利"）
 _PROPORTION_KEYWORDS: tuple[str, ...] = (
     "的品种",

@@ -1,6 +1,5 @@
 # 目录结构
-
-> 文档版本：0.10.0
+> 文档版本：0.10.2
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,12 +7,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 209 | 49,353 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 3 | 3,298 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/evolution_section.html`（组合演进章节 partial） |
-| 辅助脚本 | Python | 16 | 4,900 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **228** | **57,551** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **247** | **69,599** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,425 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| 主程序代码 | Python | 221 | 52,726 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 4 | 3,605 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 辅助脚本 | Python | 16 | 5,064 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
+| **源代码合计** | — | **241** | **61,395** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **265** | **74,738** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,720 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
@@ -49,10 +48,11 @@ investor-util/
 │   │   │   ├── _comments.py          #   配置文件注释读写
 │   │   │   ├── _config_defaults.py   #   config.json 默认值定义
 │   │   │   ├── _core.py              #   配置加载/保存/校验核心逻辑
-│   │   │   ├── _json_patch.py        #   JSON 字段级文本替换（dict 区块 brace 平衡）
-│   │   │   ├── _llm_defaults.py      #   llm_settings.json 默认值定义
+│   │   │   ├── _json_patch.py        #   带注释 JSON 顶层键扫描/patch 引擎 + 字段级文本替换
 │   │   │   ├── _llm_providers.py     #   LLM 提供程序配置解析
 │   │   │   ├── _llm_providers_defaults.py # llm_providers.json 默认值定义
+│   │   │   ├── _llm_settings.py      #   llm_settings.json 读取/合并/缓存与 LLM 配置入口
+│   │   │   ├── _llm_settings_defaults.py # llm_settings.json 默认值定义
 │   │   │   ├── _local_state.py       #   机器本地状态标志读写（首次引导/隐私已读，存 data/state/local_state.json，含 config.json 旧键惰性迁移）
 │   │   │   ├── _validation.py        #   配置校验函数集
 │   │   │   ├── anonymizer.py         #   匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）
@@ -102,19 +102,26 @@ investor-util/
 │   │   │   ├── _fee_estimation.py             #   组合综合费率估算
 │   │   │   ├── _math_utils.py                 #   数学工具函数（Beta/t-分布）
 │   │   │   ├── _silence.py                    #   再平衡静默期管理
+│   │   │   ├── action_advisor.py              #   行动建议（再平衡信号+交易纪律+调仓建议+收益归因 → C19 action_data）
 │   │   │   ├── alignment_correction.py        #   口径修正因子计算（估值偏差校准）
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
 │   │   │   ├── drawdown_events.py             #   回撤事件识别（新高/回撤起止/幅度）
 │   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
 │   │   │   ├── correlation.py                 #   持仓相关性矩阵（Pearson 相关/显著性/下三角矩阵）
+│   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → C19 crisis_annotation_data）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
 │   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → C19 evolution_data）
 │   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
+│   │   │   ├── rebalance_advisor.py           #   调仓建议可行化层（份额取整一手/费用估算/现金缓冲/优先级 → C19 rebalance_advice）
+│   │   │   ├── return_attribution.py          #   收益归因（TOP5 品种贡献占比/正负分列/净额合计 → C19 attribution，提示词段落与行动建议章表格共用）
 │   │   │   ├── scenario.py                    #   情景分析（Beta 推导 → 6 种市场情景预期变动）
 │   │   │   ├── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
+│   │   │   ├── snapshot_diff.py               #   快照差异摘要（去重后最近两快照对比：新增/移除 + HHI 变化 + 超限项 → C19 snapshot_diff_data）
+│   │   │   ├── tail_risk.py                   #   尾部风险统计（历史模拟法 VaR95/99 + 最大单日跌幅 + 连续下跌 + 恢复天数 → C19 tail_risk_data）
+│   │   │   ├── trade_discipline.py            #   交易纪律引擎（止盈/止损/回撤触发检测，复用 _silence 静默机制）
 │   │   │   ├── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比）
 │   │   │   └── whatif_backtest.py             #   调仓 What-if 时序回测（纯计算：生效日折算/序列对齐/5 指标）
 │   │   │
@@ -193,16 +200,17 @@ investor-util/
 │   │   │   ├── fund_concentration_sheet.py # 集中度 Excel 页签
 │   │   │   ├── fund_manager_analysis.py # 基金经理分析
 │   │   │   ├── fund_manager_sheet.py #   基金经理 Excel 页签
-│   │   │   ├── fund_overlap.py       #   基金持仓重叠分析
-│   │   │   ├── fund_overlap_sheet.py #   重叠分析 Excel 页签
+│   │   │   ├── fund_overlap.py       #   基金持仓重叠分析（重合度计算引擎）
 │   │   │   ├── fund_style_base.py       #   基金风格基础（常量/快照/PECity阈值）
 │   │   │   ├── fund_style_classify.py   #   基金风格分类计算（push2→Tencent→兜底降级）
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── factor_exposure_sheet.py #  因子暴露 Excel 页签（β/t/显著性/风格归属）
-│   │   │   ├── correlation_sheet.py  #   持仓相关性矩阵 Excel 页签（热力格/配对明细）
 │   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
+│   │   │   ├── action_sheet.py       #   行动建议 Excel 页签（再平衡信号/交易纪律/调仓建议/收益归因）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
+│   │   │   ├── portfolio_history_drawdown_sheet.py # 组合历史走势与回撤 Excel 页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注）
+│   │   │   ├── position_relationship_sheet.py # 持仓关系矩阵 Excel 页签（一章两区块：重合度 + 相关性）
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
 │   │   │   ├── _snapshot.py          #   快照与历史数据（持仓快照/环比差异/组合历史走势）
@@ -215,7 +223,8 @@ investor-util/
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
-│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（报告章节 #20）
+│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（数据质量仪表盘关闭时的旧样式回退）
+│   │   │   ├── data_quality_sheet.py #   数据质量仪表盘页签写入（源健康+品种覆盖，开关 data_quality）
 │   │   │   ├── downsample.py         #   P1 服务端下采样（日频→周/月聚合）
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告（块级 HTML 分段 + 事实校验摘要分块着色）
 │   │   │   ├── llm_module_info.py    #   LLM 模块信息构建（共享函数）
@@ -230,7 +239,8 @@ investor-util/
 │   │   │   ├── report_template.html  #   Jinja2 HTML 报告主模板
 │   │   │   ├── whatif_template.html  #   调仓 What-if 独立 HTML 页（双环图+变动明细）
 │   │   │   └── partials/             #   章节级 partial（report_template.html 经 Jinja include 引入）
-│   │   │       └── evolution_section.html  #   组合演进章节（多快照趋势，含专用图表数据段）
+│   │   │       ├── evolution_section.html  #   组合演进章节（多快照趋势，含专用图表数据段）
+│   │   │       └── action_section.html     #   行动建议章节（再平衡信号/交易纪律/调仓建议/收益归因，开关 enable_action）
 │   │   │
 │   │   ├── core/                     # 核心基础设施
 │   │   │   ├── __init__.py           #   子包标记
@@ -245,6 +255,8 @@ investor-util/
 │   │   │   ├── logger.py             #   日志模块（文件+控制台，自动轮转）
 │   │   │   ├── market_hours.py       #   交易时段判断（A股/港股/QDII）
 │   │   │   ├── models.py             #   数据模型（持仓/行情/基金/新闻）
+│   │   │   ├── holding_status.py     #   品种级数据状态标注（品种覆盖诊断，C19 position_status）
+│   │   │   ├── data_freshness.py     #   数据可信度诊断（新鲜度分类 + 单日跳变检测，C19 data_freshness）
 │   │   │   ├── perf.py               #   性能收集（PerfCollector 计时 + 数据源健康检查持久化）
 │   │   │   ├── provider_registry.py  #   数据源注册中心（熔断器/会话缓存）
 │   │   │   ├── reader.py             #   持仓 xlsx 文件读取
@@ -302,15 +314,24 @@ investor-util/
 │       │   │   ├── test_liquidity_otc_edge.py #   流动性分析：场外边缘场景
 │       │   │   ├── test_rebalance.py          #   再平衡信号计算
 │       │   │   ├── test_rebalance_edge.py     #   再平衡边缘场景
+│       │   │   ├── test_rebalance_advisor.py    #   调仓建议可行化层（份额取整/费用/现金缓冲/优先级/守卫）
+│       │   │   ├── test_return_attribution.py   #   收益归因（TOP5 贡献占比/正负分列/净额合计/复用断言）
 │       │   │   ├── test_scenario_analysis.py       #   情景分析测试
 │       │   │   ├── test_alignment_correction.py #   口径修正因子计算
+│       │   │   ├── test_action_advisor.py       #   行动建议计算（再平衡信号/交易纪律/调仓建议/收益归因/降级）
+│       │   │   ├── test_trade_discipline.py     #   交易纪律引擎（止盈/止损/回撤/距触发幅度/静默期/多品种）
 │       │   │   ├── test_drawdown_warning.py   #   回撤历史分位预警
 │       │   │   ├── test_drawdown_events.py    #   回撤事件识别
 │       │   │   ├── test_drawdown_events_edge.py #  回撤事件识别边缘场景
 │       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
 │       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口）
+│       │   │   ├── test_crisis_annotation.py   #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复耗时/重叠）
+│       │   │   ├── test_tail_risk.py           #   尾部风险统计（VaR95/99 固定 fixture 精度 + 最大单日跌幅 + 连续下跌 + 恢复三态）
+│       │   │   ├── test_tail_risk_edge.py      #   尾部风险边缘场景（0/负/NaN 跳过、量级、样本边界、持平序列）
 │       │   │   ├── test_portfolio_evolution.py #  组合演进聚合计算（多快照趋势/HHI/TOP 变迁）
+│       │   │   ├── test_snapshot_diff.py      #   快照差异摘要（新增/移除 + HHI 变化 + 超限项 + 无上次快照占位 + 同日去重）
+│       │   │   ├── test_snapshot_diff_edge.py #   快照差异边缘场景（空目录/空持仓/全 0 权重/阈值 0/损坏文件/多账户聚合）
 │       │   │   ├── test_whatif.py             #   调仓 What-if 计算（变动识别/成本权重/HHI/降级）
 │       │   │   ├── test_whatif_backtest.py    #   调仓 What-if 时序回测（天数折算/序列对齐/5 指标/降级）
 │       │   │   └── test_whatif_backtest_edge.py #  时序回测边缘场景（未来日期/单 bar/首值 0/极端涨跌）
@@ -333,6 +354,8 @@ investor-util/
 │       │   │   ├── test_cache_edge.py       #   缓存边缘场景测试
 │       │   │   ├── test_code_utils.py       #   证券代码工具测试
 │       │   │   ├── test_filesystem_edge.py  #   文件系统边缘场景
+│       │   │   ├── test_holding_status.py   #   品种级数据状态标注测试（品种覆盖诊断）
+│       │   │   ├── test_data_freshness.py   #   数据可信度诊断测试（新鲜度 + 单日跳变）
 │       │   │   ├── test_http_client.py      #   HTTP 客户端测试
 │       │   │   ├── test_market_hours.py     #   交易时段判断测试
 │       │   │   ├── test_market_hours_edge.py #   交易时段边缘场景
@@ -435,6 +458,7 @@ investor-util/
 │       │   │   ├── test_classification_utils.py   #   分类工具测试
 │       │   │   ├── test_data_integrity.py         #   数据完整性测试
 │       │   │   ├── test_data_quality_edge.py      #   数据质量边缘场景
+│       │   │   ├── test_data_quality_sheet.py     #   数据质量仪表盘页签写入测试（源健康+品种覆盖+可信度区块）
 │       │   │   ├── test_data_source_matrix.py     #   数据源可用性矩阵测试
 │       │   │   ├── test_data_status.py            #   数据状态测试
 │       │   │   ├── test_downsample.py             #   P1 服务端下采样测试（§4.9）
@@ -453,15 +477,18 @@ investor-util/
 │       │   │   ├── test_fund_overlap.py           #   基金重叠分析测试
 │       │   │   ├── test_fund_performance.py       #   基金业绩测试
 │       │   │   ├── test_fund_style_analysis.py    #   基金风格测试
-│       │   │   ├── test_correlation_html.py       #   持仓相关性章节 HTML 呈现
-│       │   │   ├── test_correlation_sheet.py      #   持仓相关性矩阵 Excel 页签呈现
+│       │   │   ├── test_correlation_html.py       #   持仓关系矩阵章节（相关性/重合度区块）HTML 呈现
+│       │   │   ├── test_correlation_sheet.py      #   持仓关系矩阵页签（一章两区块）Excel 呈现
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
 │       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现
+│       │   │   ├── test_action_html.py            #   行动建议章节 + 智囊团深度复盘「行动摘要」HTML 呈现（单源计算断言）
+│       │   │   ├── test_action_sheet.py           #   行动建议 Excel 页签呈现
 │       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现
 │       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现
 │       │   │   ├── test_whatif_operations.py      #   调仓 What-if 操作共享层测试
 │       │   │   ├── test_whatif_writer.py          #   调仓 What-if 报告输出（固定名+日期归档+清理）
 │       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
+│       │   │   ├── test_tail_risk_wiring.py       #   尾部风险统计接线（pipeline 注入 + Excel 五行 + HTML 卡 + C20 说明）
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试
@@ -617,7 +644,11 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
-│   │   └── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
+│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
+│   │   ├── plan-web-ui-implementation.md #   plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API）
+│   │   ├── plan-investment-features.md #   投资分析功能优化建议（需求×数据源可行性 10 轮探索）
+│   │   ├── plan-investment-iteration.md #  投资功能优化 20 轮迭代实施计划（每轮量化验收）
+│   │   └── plan-task-code-traces-gate.md # 任务编号标识符/注释门禁增强设计（check-code-traces 扩展）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档

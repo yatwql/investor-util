@@ -48,6 +48,8 @@ def _get_app_version() -> str:
 #   断言类型:
 #     "exact"       → 正则匹配整个字符串
 #     "contains"    → 文件内容包含某子串
+#     "header"      → 「文档版本：」头部版本行精确匹配（行首锚定，
+#                     防止正文偶然出现的版本号导致全文 contains 误判）
 
 CHECKS: list[tuple[Path, str, tuple[str, ...]]] = []
 
@@ -60,22 +62,27 @@ def add_contains(path: Path, *patterns: str):
     CHECKS.append((REPO_ROOT / path, "contains", patterns))
 
 
+def add_header(path: Path):
+    CHECKS.append((REPO_ROOT / path, "header", ()))
+
+
 # 代码文件
 CHECKS.append((REPO_ROOT / "pyproject.toml", "pyproject_version", ()))
 CHECKS.append((REPO_ROOT / "src" / "python" / "core" / "constants.py", "exact", (r'^APP_VERSION\s*=\s*"[^"]*"$',)))
 
 # Markdown 管理文档
 add_exact(REPO_ROOT / "README.md", r"> 当前版本：{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "plan.md", "{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "technical.md", "{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "requirements.md", "{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "testplan.md", "{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md", "{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md", "{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "folders.md", "{v}")
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md", "{v}")
+add_header(REPO_ROOT / "docs-stm" / "managements" / "plan.md")
+add_header(REPO_ROOT / "docs-stm" / "managements" / "technical.md")
+add_header(REPO_ROOT / "docs-stm" / "managements" / "requirements.md")
+add_header(REPO_ROOT / "docs-stm" / "managements" / "testplan.md")
+add_header(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md")
+add_header(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md")
+add_header(REPO_ROOT / "docs-stm" / "managements" / "folders.md")
+add_header(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md")
+# changelog 无「文档版本：」头，用 [X.Y.Z] 标题行 contains 校验
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md", "[{v}]")
-add_contains(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md", "{v}")
+add_header(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md")
 
 
 # ── 校验逻辑 ────────────────────────────────────────────────
@@ -88,6 +95,32 @@ def _check_exact(text: str, pattern_template: str, version: str) -> bool:
 
 def _check_contains(text: str, patterns_template: tuple[str, ...], version: str) -> bool:
     return any(p.replace("{v}", version) in text for p in patterns_template)
+
+
+def _check_header(text: str, version: str) -> bool:
+    """校验「文档版本：」头部版本行与目标版本精确一致（行首锚定）。
+
+    仅匹配整行 `> 文档版本：{version}`，避免正文偶然出现的版本号
+    导致全文 contains 误判。
+    """
+    pattern = rf'^\s*>\s*文档版本：{re.escape(version)}\s*$'
+    return bool(re.search(pattern, text, re.MULTILINE))
+
+
+def _auto_fix_header(path: Path, version: str) -> bool:
+    """自动修正「文档版本：」头部版本行为目标版本。"""
+    text = path.read_text(encoding="utf-8")
+    new_text, count = re.subn(
+        r'^\s*>\s*文档版本：.*$',
+        lambda m: f"> 文档版本：{version}",
+        text,
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if count > 0 and new_text != text:
+        path.write_text(new_text, encoding="utf-8")
+        return True
+    return False
 
 
 def _check_pyproject_version(text: str, version: str) -> bool:
@@ -146,13 +179,23 @@ def main() -> None:
             ok = bool(re.search(pattern, text, re.MULTILINE))
         elif assert_type == "contains":
             ok = _check_contains(text, args, version)
+        elif assert_type == "header":
+            ok = _check_header(text, version)
+            if not ok and do_fix:
+                if _auto_fix_header(full_path, version):
+                    print(f"  [OK] {rel} — 已自动修正头部版本号为 {version}")
+                    fixed += 1
+                    ok = True
         else:
             ok = False
 
         if ok:
             print(f"  [OK] {rel}")
         else:
-            print(f"  [ERR] {rel} — 版本号未同步，期望包含 {version}")
+            if assert_type == "header":
+                print(f"  [ERR] {rel} — 头部版本行未同步，期望 `> 文档版本：{version}`")
+            else:
+                print(f"  [ERR] {rel} — 版本号未同步，期望包含 {version}")
             all_ok = False
 
     print()
@@ -161,7 +204,7 @@ def main() -> None:
         return
 
     if do_fix and fixed > 0:
-        print(f"[!] 已自动修正 {fixed} 项（pyproject.toml）。其他文件需手动更新。")
+        print(f"[!] 已自动修正 {fixed} 项（pyproject 版本字段 / 管理文档头部版本行）。其他文件需手动更新。")
         sys.exit(0)
 
     print("[ERR] 版本号不一致 — 请先手动更新后重试。")

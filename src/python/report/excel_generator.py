@@ -21,184 +21,108 @@ from src.python.report.progress import ProgressReporter, SilentProgressReporter,
 logger = setup_logger()
 
 
-# ── 组合历史走势 + 回撤分析页签写入 ──────────────────────
+# ── 组合历史走势与回撤页签写入（合并章：走势表 + 回撤矩阵 + 危机区间标注） ──────
 
 
-def _write_portfolio_history_sheet(ws, history_data: dict) -> None:
-    """写入组合历史走势页签（含基准指数归一化列）。"""
-    from src.python.report.excel_writer import (
-        _write_placeholder,
-        auto_width,
-        freeze_header,
-        write_data_row,
-        write_header_row,
-        write_title_row,
-    )
-    from src.python.report.styles import FMT_MONEY, FMT_PERCENT
-
-    if history_data is None:
-        _write_placeholder(ws, "组合历史走势数据暂不可用（配置或网络原因）", max_cols=5)
-        auto_width(ws)
-        return
-
-    bars = history_data.get("bars", [])
-    if not bars:
-        _write_placeholder(ws, "组合历史走势数据暂不可用（配置或网络原因）", max_cols=5)
-        auto_width(ws)
-        return
-
-    benchmarks = history_data.get("benchmarks", [])
-    first_value = bars[0]["total_value"] if bars and bars[0].get("total_value") else 0
-    n_bm = len(benchmarks)
-    ncols = 4 + n_bm  # 日期 + 市值 + 收益(%) + 归一化(%) + N 基准
-
-    headers = ["日期", "组合市值", "组合收益(%)", "组合归一化(%)"]
-    for bm in benchmarks:
-        headers.append(bm.get("name", bm.get("code", "基准")))
-
-    row = write_title_row(ws, 1, "组合历史走势", ncols)
-    row = write_header_row(ws, row, headers)
-
-    for i, bar in enumerate(bars):
-        tv = bar.get("total_value", 0)
-        cum_return = (tv - first_value) / first_value if first_value > 0 else 0
-        norm_value = tv / first_value * 100 if first_value > 0 else 0
-
-        values = [bar.get("date", ""), tv, cum_return, round(norm_value, 2)]
-        for bm in benchmarks:
-            bm_bars = bm.get("bars", [])
-            bm_value = bm_bars[i].get("value") if i < len(bm_bars) else None
-            values.append(bm_value)
-
-        fmts: list[str | None] = [None, FMT_MONEY, FMT_PERCENT, "0.00"]
-        for _ in range(n_bm):
-            fmts.append("0.00")
-        row = write_data_row(ws, row, values, formats=fmts)
-
-    # ── 指标汇总区 ──
-    row += 1
-    row = write_title_row(ws, row, "指标汇总", ncols)
-
-    pd = history_data
-    summary_items: list[tuple[str, Any, str | None]] = [
-        ("累计收益率(%)", round(pd.get("total_return_pct", 0) / 100, 4), FMT_PERCENT),
-        ("累计收益(元)", pd.get("total_return", 0), FMT_MONEY),
-        ("最大回撤(%)", round(pd.get("max_drawdown_pct", 0) / 100, 4), FMT_PERCENT),
-        ("年化波动率", pd.get("annualized_volatility", 0), FMT_PERCENT),
-        ("起算日", pd.get("data_start", ""), None),
-        ("终止日", pd.get("data_end", ""), None),
-    ]
-    for label, val, fmt in summary_items:
-        cells = [label, val] + [None] * (ncols - 2)
-        fmts_line: list[str | None] = [None, fmt] + [None] * (ncols - 2)
-        row = write_data_row(ws, row, cells, formats=fmts_line)
-
-    freeze_header(ws, row=2)
-    auto_width(ws, min_width=10, max_width=28)
-
-
-def _write_drawdown_analysis_sheet(ws, history_data: dict) -> None:
-    """写入历史回撤分析页签（组合 vs 基准对比矩阵）。"""
-    from src.python.report.excel_writer import (
-        _write_placeholder,
-        auto_width,
-        freeze_header,
-        write_data_row,
-        write_header_row,
-        write_title_row,
-    )
-    from src.python.report.styles import FMT_PERCENT
-
-    if history_data is None:
-        _write_placeholder(ws, "历史回撤分析数据暂不可用（配置或网络原因）", max_cols=5)
-        auto_width(ws)
-        return
-
-    benchmarks = history_data.get("benchmarks", [])
-    n_bm = len(benchmarks)
-    ncols = 2 + n_bm
-
-    headers = ["指标", "组合"]
-    for bm in benchmarks:
-        headers.append(bm.get("name", bm.get("code", "基准")))
-
-    row = write_title_row(ws, 1, "历史回撤分析", ncols)
-    row = write_header_row(ws, row, headers)
-
-    pd = history_data
-    pct_fmt = FMT_PERCENT
-    none_fmt: str | None = None
-
-    metrics: list[tuple[str, Any, str | None, str, str | None]] = [
-        ("累计收益率(%)", round(pd.get("total_return_pct", 0) / 100, 4), pct_fmt, "total_return_pct", pct_fmt),
-        ("最大回撤(%)", round(pd.get("max_drawdown_pct", 0) / 100, 4), pct_fmt, "max_drawdown_pct", pct_fmt),
-        ("年化波动率", pd.get("annualized_volatility", 0), pct_fmt, None, None),
-        ("起算日", pd.get("data_start", ""), none_fmt, "data_start", none_fmt),
-        ("终止日", pd.get("data_end", ""), none_fmt, "data_end", none_fmt),
-    ]
-
-    for metric_name, portfolio_val, portfolio_fmt, bm_key, bm_fmt in metrics:
-        values = [metric_name, portfolio_val]
-        for bm in benchmarks:
-            if bm_key and bm.get(bm_key) is not None:
-                raw = bm[bm_key]
-                bm_val = round(raw / 100, 4) if bm_fmt == pct_fmt else raw
-            else:
-                bm_val = None
-            values.append(bm_val)
-
-        flist: list[str | None] = [none_fmt, portfolio_fmt]
-        for _ in range(n_bm):
-            flist.append(bm_fmt if bm_key else none_fmt)
-        row = write_data_row(ws, row, values, formats=flist)
-
-    # ── 回撤明细表（独立回撤事件 + 恢复耗时） ──
-    dd_events = pd.get("drawdown_events") or []
-    dd_ncols = 8
-    ncols_eff = max(ncols, dd_ncols)
-    row += 1
-    row = write_title_row(ws, row, "回撤明细", ncols_eff)
-    dd_headers = ["序号", "起峰日", "最深日", "恢复日", "最大回撤(%)", "持续天数", "恢复耗时(天)", "当前状态"]
-    dd_headers += [""] * (ncols_eff - dd_ncols)
-    row = write_header_row(ws, row, dd_headers)
-    if not dd_events:
-        row = write_data_row(ws, row, ["未检测到显著回撤事件（或历史数据不足）"] + [None] * (ncols_eff - 1))
-    else:
-        for idx, e in enumerate(dd_events, start=1):
-            cells: list[Any] = [
-                idx,
-                e.get("peak_date", ""),
-                e.get("trough_date", ""),
-                e.get("recovery_date") or "未恢复",
-                round(e.get("drawdown_pct", 0.0) / 100, 4),
-                e.get("duration_days", 0),
-                e.get("recovery_days") if e.get("recovery_days") is not None else "--",
-                "已恢复" if e.get("recovered") else "未恢复",
-            ]
-            cells += [None] * (ncols_eff - dd_ncols)
-            dd_fmts: list[str | None] = [None] * 4 + [pct_fmt] + [None] * 3
-            dd_fmts += [None] * (ncols_eff - dd_ncols)
-            row = write_data_row(ws, row, cells, formats=dd_fmts)
-
-    freeze_header(ws, row=2)
-    auto_width(ws, min_width=10, max_width=28)
-
-
-def _write_history_sheets(
+def _write_portfolio_history_drawdown_sheet(
     sheets: dict[str, Any],
     history_data: dict | None,
+    crisis_annotation: dict[str, Any] | None = None,
+    tail_risk: dict[str, Any] | None = None,
 ) -> None:
-    """写入组合历史走势和回撤分析页签（含基准指数列）。"""
-    ws_ph = sheets.get("portfolio_history")
-    ws_dd = sheets.get("drawdown_analysis")
+    """写入组合历史走势与回撤合并页签（一章两区块 + 危机区间标注 + 尾部风险）。
+
+    Args:
+        sheets: 页签字典，读取 `portfolio_history_drawdown` 键。
+        history_data: `history_data` C19 契约 dict；不可用时整页写占位。
+        crisis_annotation: `crisis_annotation_data` C19 契约 dict（危机区间标注）；
+            None 时危机区块写占位。
+        tail_risk: `tail_risk_data` C19 契约 dict（尾部风险统计）；
+            None 时尾部指标行写占位。
+    """
+    ws = sheets.get("portfolio_history_drawdown")
+    if ws is None:
+        return
 
     data_ok = history_data and history_data.get("status") != "unavailable" and history_data.get("bars")
     effective = history_data if data_ok else None
 
-    if ws_ph is not None:
-        _write_portfolio_history_sheet(ws_ph, effective)
-    if ws_dd is not None:
-        _write_drawdown_analysis_sheet(ws_dd, effective)
+    from src.python.report.portfolio_history_drawdown_sheet import write_portfolio_history_drawdown_sheet
+
+    write_portfolio_history_drawdown_sheet(ws, effective, crisis_annotation, tail_risk)
+
+
+def _write_data_source_matrix_sheet(ws, prog) -> None:
+    """写入数据源可用性矩阵页签（旧样式，数据质量仪表盘开关关闭时使用）。
+
+    Args:
+        ws: data_source_status 页签 worksheet
+        prog: 进度上报接口
+    """
+    prog.info("正在写入数据源可用性矩阵...")
+    try:
+        from src.python.report.data_source_matrix import build_data_source_matrix
+        from src.python.report.excel_writer import (
+            auto_width,
+            write_data_row,
+            write_header_row,
+            write_title_row,
+        )
+        from openpyxl.styles import Font
+
+        _FONT_RED = Font(color="CC0000")
+        _FONT_GREEN = Font(color="009900")
+        _FONT_ORANGE = Font(color="E67E22")
+
+        matrix = build_data_source_matrix()
+        if matrix:
+            ncols = 5
+            row = write_title_row(ws, 1, "数据源可用性矩阵", ncols)
+            row = write_header_row(
+                ws,
+                row,
+                ["数据源", "状态", "详情", "成功", "失败/降级"],
+            )
+            for m in matrix:
+                if m["status"] == "ok":
+                    status_label = "✅ 正常"
+                    _font = _FONT_GREEN
+                elif m["status"] == "degraded":
+                    status_label = "⚠️ 降级"
+                    _font = _FONT_ORANGE
+                else:
+                    status_label = "❌ 失败"
+                    _font = _FONT_RED
+                row = write_data_row(
+                    ws,
+                    row,
+                    [m["name"], status_label, m["detail"], m["ok"], f"{m['degraded']}/{m['failed']}"],
+                )
+                if m["status"] != "ok":
+                    for col in range(1, 6):
+                        ws.cell(row=row - 1, column=col).font = _font
+
+            has_degraded = any(m["degraded_list"] for m in matrix)
+            if has_degraded:
+                row += 1
+                row = write_title_row(ws, row, "降级明细", ncols)
+                for m in matrix:
+                    for dg in m.get("degraded_list", []):
+                        row = write_data_row(ws, row, [m["name"], dg, "", "", ""])
+
+            has_failures = any(m["sample_failures"] for m in matrix)
+            if has_failures:
+                row += 1
+                row = write_title_row(ws, row, "失败明细", ncols)
+                for m in matrix:
+                    for sf in m.get("sample_failures", []):
+                        row = write_data_row(ws, row, [m["name"], sf, "", "", ""])
+            auto_width(ws)
+            logger.info("数据源可用性矩阵页签已写入")
+        else:
+            logger.debug("[excel] 数据源矩阵为空，跳过页签写入")
+    except Exception:
+        logger.debug("[excel] 数据源可用性矩阵页签写入失败（非关键）", exc_info=True)
 
 
 def generate_excel_report(
@@ -218,6 +142,8 @@ def generate_excel_report(
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
+    enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
+    enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
     pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
@@ -243,6 +169,8 @@ def generate_excel_report(
         enable_llm: board 层 — LLM 分析章节是否开启
         enable_history: board 层 — 历史走势章节是否开启
         enable_portfolio_evolution: board 层 — 组合演进章节是否开启
+        enable_data_quality: 子模块 — 数据质量仪表盘（源健康+品种覆盖），
+            默认 False（向后兼容，该章保持旧「数据源可用性矩阵」样式）
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
         pipeline_data: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
@@ -277,6 +205,7 @@ def generate_excel_report(
         enable_news=enable_news,
         enable_history=enable_history,
         enable_portfolio_evolution=enable_portfolio_evolution,
+        enable_action=enable_action,
         enable_llm=enable_llm,
         data_availability=data_availability,
     )
@@ -297,7 +226,7 @@ def generate_excel_report(
         modules,
         prog,
         factor_exposure=(pipeline_data or {}).get("factor_exposure"),
-        correlation_data=(pipeline_data or {}).get("correlation_data"),
+        position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
     )
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）
     from src.python.report._debate_utils import detect_debate_mode
@@ -310,16 +239,20 @@ def generate_excel_report(
         sheets, include_llm, llm_content, prog, section_order=order, debate_mode_label=_debate_mode_label
     )
 
-    # ── 组合历史走势 + 回撤分析页签（历史走势数据） ──
+    # ── 组合历史走势与回撤页签（合并章：走势表 + 回撤矩阵 + 危机区间标注） ──
     if enable_history:
-        ws_ph = sheets.get("portfolio_history")
-        ws_dd = sheets.get("drawdown_analysis")
-        if ws_ph is not None or ws_dd is not None:
-            prog.info("正在写入组合历史走势页签...")
+        ws_hd = sheets.get("portfolio_history_drawdown")
+        if ws_hd is not None:
+            prog.info("正在写入组合历史走势与回撤页签...")
             try:
-                _write_history_sheets(sheets, history_data)
+                _write_portfolio_history_drawdown_sheet(
+                    sheets,
+                    history_data,
+                    (pipeline_data or {}).get("crisis_annotation_data"),
+                    (pipeline_data or {}).get("tail_risk_data"),
+                )
             except Exception:
-                logger.debug("[excel] 组合历史走势页签写入失败（非关键）", exc_info=True)
+                logger.debug("[excel] 组合历史走势与回撤页签写入失败（非关键）", exc_info=True)
 
     # ── 组合演进页签（多快照趋势，C19 evolution_data） ──
     ws_evo = sheets.get("portfolio_evolution")
@@ -328,77 +261,46 @@ def generate_excel_report(
         try:
             from src.python.report.evolution_sheet import write_evolution_sheet
 
-            write_evolution_sheet(ws_evo, (pipeline_data or {}).get("evolution_data"))
+            write_evolution_sheet(
+                ws_evo,
+                (pipeline_data or {}).get("evolution_data"),
+                snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
+            )
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
 
-    # ── 数据源可用性矩阵页签 ──
+    # ── 行动建议页签（行动板块，C19 action_data） ──
+    ws_action = sheets.get("action")
+    if ws_action is not None:
+        prog.info("正在写入行动建议页签...")
+        try:
+            from src.python.report.action_sheet import write_action_sheet
+
+            write_action_sheet(ws_action, (pipeline_data or {}).get("action_data"))
+        except Exception:
+            logger.debug("[excel] 行动建议页签写入失败（非关键）", exc_info=True)
+
+    # ── 数据质量仪表盘 / 数据源可用性矩阵页签 ──
     ws_ds = sheets.get("data_source_status")
     if ws_ds is not None:
-        prog.info("正在写入数据源可用性矩阵...")
-        try:
-            from src.python.report.data_source_matrix import build_data_source_matrix
-            from src.python.report.excel_writer import (
-                auto_width,
-                write_data_row,
-                write_header_row,
-                write_title_row,
-            )
-            from openpyxl.styles import Font
+        if enable_data_quality:
+            # 子模块开关开启：该章改造为「数据质量仪表盘」（源健康 + 品种覆盖 + 可信度）
+            prog.info("正在写入数据质量仪表盘...")
+            try:
+                from src.python.report.data_quality_sheet import write_data_quality_sheet
+                from src.python.report.data_source_matrix import build_data_source_matrix
 
-            _FONT_RED = Font(color="CC0000")
-            _FONT_GREEN = Font(color="009900")
-            _FONT_ORANGE = Font(color="E67E22")
-
-            matrix = build_data_source_matrix()
-            if matrix:
-                ncols = 5
-                row = write_title_row(ws_ds, 1, "数据源可用性矩阵", ncols)
-                row = write_header_row(
+                write_data_quality_sheet(
                     ws_ds,
-                    row,
-                    ["数据源", "状态", "详情", "成功", "失败/降级"],
+                    build_data_source_matrix(),
+                    (pipeline_data or {}).get("position_status"),
+                    (pipeline_data or {}).get("data_freshness"),
                 )
-                for m in matrix:
-                    if m["status"] == "ok":
-                        status_label = "✅ 正常"
-                        _font = _FONT_GREEN
-                    elif m["status"] == "degraded":
-                        status_label = "⚠️ 降级"
-                        _font = _FONT_ORANGE
-                    else:
-                        status_label = "❌ 失败"
-                        _font = _FONT_RED
-                    row = write_data_row(
-                        ws_ds,
-                        row,
-                        [m["name"], status_label, m["detail"], m["ok"], f"{m['degraded']}/{m['failed']}"],
-                    )
-                    if m["status"] != "ok":
-                        for col in range(1, 6):
-                            ws_ds.cell(row=row - 1, column=col).font = _font
-
-                has_degraded = any(m["degraded_list"] for m in matrix)
-                if has_degraded:
-                    row += 1
-                    row = write_title_row(ws_ds, row, "降级明细", ncols)
-                    for m in matrix:
-                        for dg in m.get("degraded_list", []):
-                            row = write_data_row(ws_ds, row, [m["name"], dg, "", "", ""])
-
-                has_failures = any(m["sample_failures"] for m in matrix)
-                if has_failures:
-                    row += 1
-                    row = write_title_row(ws_ds, row, "失败明细", ncols)
-                    for m in matrix:
-                        for sf in m.get("sample_failures", []):
-                            row = write_data_row(ws_ds, row, [m["name"], sf, "", "", ""])
-                auto_width(ws_ds)
-                logger.info("数据源可用性矩阵页签已写入")
-            else:
-                logger.debug("[excel] 数据源矩阵为空，跳过页签写入")
-        except Exception:
-            logger.debug("[excel] 数据源可用性矩阵页签写入失败（非关键）", exc_info=True)
+            except Exception:
+                logger.debug("[excel] 数据质量仪表盘页签写入失败（非关键）", exc_info=True)
+        else:
+            # 开关关闭：该章保持旧「数据源可用性矩阵」样式（向后兼容）
+            _write_data_source_matrix_sheet(ws_ds, prog)
 
     # ── 组合历史走势：环比对比摘要（写入 summary 页签底部） ──
     if pipeline_data and pipeline_data.get("diff") and "summary" in sheets:

@@ -412,7 +412,7 @@ class TestSetConfigSingleKeyPatch(unittest.TestCase):
         self.assertIn("// ── A. 路径与文件 ──", raw)
         self.assertIn("// ── L. 批量并行调度 ──", raw)
         # enable_news 行尾注释保留
-        self.assertIn("// 市场新闻（#12）", raw)
+        self.assertIn("// 市场新闻", raw)
         # 值已更新
         data = json.loads(_comments._strip_json_comments(raw))
         self.assertFalse(data["enable_news"])
@@ -953,6 +953,33 @@ class TestDefaultConfigTemplateConsistency:
                 )
 
 
+class TestLlmSettingsTemplateConsistency:
+    """验证 _get_default_llm_settings_template() 生成的 JSON 模板与 _DEFAULT_LLM_SETTINGS 等效。
+
+    当在 _DEFAULT_LLM_SETTINGS 中新增配置项时，必须在模板字符串中同步添加；
+    反之，从模板中移除的键也应在 _DEFAULT_LLM_SETTINGS 中删除。
+    本测试通过解析模板并与 _DEFAULT_LLM_SETTINGS 深度比较来检测不一致。
+    """
+
+    @pytest.mark.unit_config
+    def test_template_equals_default_settings(self):
+        """llm_settings 模板 JSON 解析后应与 _DEFAULT_LLM_SETTINGS 深度相等。"""
+        import json
+
+        from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS, _get_default_llm_settings_template
+
+        template_str = _get_default_llm_settings_template()
+        cleaned = cfg._strip_json_comments(template_str)
+        parsed = json.loads(cleaned)
+
+        assert parsed == _DEFAULT_LLM_SETTINGS, (
+            f"llm_settings 模板与 _DEFAULT_LLM_SETTINGS 不一致\n"
+            f"模板独有键: {parsed.keys() - _DEFAULT_LLM_SETTINGS.keys()}\n"
+            f"默认独有键: {_DEFAULT_LLM_SETTINGS.keys() - parsed.keys()}\n"
+            f"值差异: {[k for k in parsed if parsed.get(k) != _DEFAULT_LLM_SETTINGS.get(k)]}"
+        )
+
+
 class TestIsEnablePortfolioEvolution(unittest.TestCase):
     """is_enable_portfolio_evolution 访问器测试（组合演进章节开关）。"""
 
@@ -975,3 +1002,54 @@ class TestIsEnablePortfolioEvolution(unittest.TestCase):
         self.assertFalse(
             cfg.is_enable_portfolio_evolution({"enable_fund_deep_analysis": True, "enable_portfolio_evolution": False})
         )
+
+
+class TestIsEnableDataQuality(unittest.TestCase):
+    """数据质量仪表盘子模块开关（report_submodules.data_quality）。"""
+
+    def test_default_false_when_missing(self):
+        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
+        self.assertFalse(cfg.is_enable_data_quality({}))
+        self.assertFalse(cfg.is_enable_data_quality({"enable_fund_deep_analysis": True}))
+
+    def test_false_when_submodules_not_dict(self):
+        """report_submodules 非 dict → 关闭。"""
+        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": "not-a-dict"}))
+        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": None}))
+
+    def test_false_when_disabled(self):
+        """report_submodules.data_quality=false → 关闭。"""
+        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": {"data_quality": False}}))
+
+    def test_true_when_enabled(self):
+        """report_submodules.data_quality=true → 开启。"""
+        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": {"data_quality": True}}))
+
+    def test_independent_from_other_submodules(self):
+        """data_quality 开关独立于同容器其他键。"""
+        self.assertTrue(
+            cfg.is_enable_data_quality({"report_submodules": {"data_quality": True, "industry_beta": False}})
+        )
+        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": {"data_quality": False, "tail_risk": True}}))
+
+
+class TestIsEnableAction(unittest.TestCase):
+    """is_enable_action 访问器测试（行动建议独立章 20 章开关，默认关）。"""
+
+    def test_default_false_when_missing(self):
+        """config 缺失 enable_action → 返回 False（默认关，向后兼容）。"""
+        self.assertFalse(cfg.is_enable_action({}))
+        self.assertFalse(cfg.is_enable_action({"enable_fund_deep_analysis": True}))
+
+    def test_false_when_disabled(self):
+        """显式 false → 返回 False。"""
+        self.assertFalse(cfg.is_enable_action({"enable_action": False}))
+
+    def test_true_when_enabled(self):
+        """显式 true → 返回 True。"""
+        self.assertTrue(cfg.is_enable_action({"enable_action": True}))
+
+    def test_independent_from_portfolio_evolution(self):
+        """行动建议开关独立于组合演进开关。"""
+        self.assertFalse(cfg.is_enable_action({"enable_portfolio_evolution": True}))
+        self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": False, "enable_action": True}))

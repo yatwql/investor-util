@@ -36,10 +36,15 @@ _DEFAULT_CONFIG = {
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
     # ── B. 报告章节可见性 ──
-    "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露+相关性（#6~11）
-    "enable_news": True,  # 市场新闻（#12）
-    "enable_history": True,  # 组合历史走势+回撤（#17~18）
-    "enable_portfolio_evolution": True,  # 组合演进（#19）
+    "enable_fund_deep_analysis": True,  # 基金深度分析+因子暴露+相关性
+    "enable_news": True,  # 市场新闻
+    "enable_history": True,  # 组合历史走势+回撤
+    "enable_portfolio_evolution": True,  # 组合演进
+    "enable_action": False,  # 行动建议独立章（再平衡信号+交易纪律+调仓建议+收益归因，默认关）
+    # 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
+    "report_submodules": {
+        "data_quality": False,  # 「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖）
+    },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -96,6 +101,13 @@ _DEFAULT_CONFIG = {
         "target_allocation": {},  # 目标配置 Schema（空=不启用目标配置检查）
         "equity_fixed_income": {},  # 权益/固收超大类目标配置（空=不启用）
     },
+    # ── I2. 交易纪律配置 ──
+    "discipline": {
+        "take_profit_pct": 20.0,  # 止盈线：单品种收益率 ≥ 此值 → 建议部分止盈
+        "stop_loss_pct": -15.0,  # 止损线：单品种收益率 ≤ 此值 → 建议止损/减仓
+        "drawdown_pct": -10.0,  # 回撤线：组合相对历史峰值回撤 ≥ 此绝对值 → 建议控回撤
+        "silence_days": 30,  # 交易纪律信号静默期天数（默认 30 天）
+    },
     # ── J. 流动性配置 ──
     "redemption_limits": {},  # 场外基金单日赎回上限（code → 金额，空=未配置）
     # ── K. 匿名化配置 ──
@@ -148,10 +160,13 @@ def _build_template_from_defaults() -> str:
         "",
         # ── B ──
         "  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──",
-        f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露+相关性（#6~11）',
-        f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#12）',
-        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#17~18）',
-        f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进（#19）',
+        f'  "enable_fund_deep_analysis": {json.dumps(d["enable_fund_deep_analysis"])},  // 基金深度分析+因子暴露+相关性',
+        f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻',
+        f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤',
+        f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进',
+        f'  "enable_action": {json.dumps(d["enable_action"])},  // 行动建议独立章（决策行动，默认关）',
+        '  // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）',
+        f'  "report_submodules": {json.dumps(d["report_submodules"], ensure_ascii=False)},  // 数据质量仪表盘默认关',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",
@@ -206,6 +221,15 @@ def _build_template_from_defaults() -> str:
         f'    "silence_days": {d["rebalance"]["silence_days"]},  // 再平衡信号静默期天数（默认 30 天）',
         f'    "target_allocation": {json.dumps(d["rebalance"]["target_allocation"])},  // 目标配置 Schema（空=不启用目标配置检查）',
         f'    "equity_fixed_income": {json.dumps(d["rebalance"]["equity_fixed_income"])}  // 权益/固收超大类目标配置（空=不启用）',
+        "  },",
+        "",
+        # ── I2 ──
+        "  // ── I2. 交易纪律配置 ──",
+        '  "discipline": {',
+        f'    "take_profit_pct": {d["discipline"]["take_profit_pct"]},  // 止盈线：单品种收益率 ≥ 此值 → 建议部分止盈',
+        f'    "stop_loss_pct": {d["discipline"]["stop_loss_pct"]},  // 止损线：单品种收益率 ≤ 此值 → 建议止损/减仓',
+        f'    "drawdown_pct": {d["discipline"]["drawdown_pct"]},  // 回撤线：组合相对历史峰值回撤 ≥ 此绝对值 → 建议控回撤',
+        f'    "silence_days": {d["discipline"]["silence_days"]}  // 交易纪律信号静默期天数（默认 30 天）',
         "  },",
         "",
         # ── J ──

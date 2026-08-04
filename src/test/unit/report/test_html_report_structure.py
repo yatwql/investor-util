@@ -41,7 +41,7 @@ _ALL_KEYS_DEFAULT = [
     "penetration",
     "fund_performance",
     "fund_manager",
-    "fund_overlap",
+    "position_relationship",
     "fund_concentration",
     "fund_style",
     "news_correlation",
@@ -49,16 +49,15 @@ _ALL_KEYS_DEFAULT = [
     "expert_review",
     "health_check",
     "penetration_deep",
-    "portfolio_history",
-    "drawdown_analysis",
+    "portfolio_history_drawdown",
     "llm_usage",
 ]
 
 _ALWAYS_KEYS = {"summary", "market_value", "category", "penetration", "fund_performance"}
-_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "fund_overlap", "fund_concentration", "fund_style"}
+_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_relationship", "fund_concentration", "fund_style"}
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
-_HISTORY_KEYS = {"portfolio_history", "drawdown_analysis"}
+_HISTORY_KEYS = {"portfolio_history_drawdown"}
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary", "name": "投资分析汇总", "number": 1},
@@ -67,7 +66,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "penetration", "name": "资产穿透TOP10", "number": 4},
     {"key": "fund_performance", "name": "基金业绩分析", "number": 5},
     {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
-    {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7},
+    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
     {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
     {"key": "fund_style", "name": "基金风格分析", "number": 9},
     {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
@@ -75,9 +74,8 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "expert_review", "name": "智囊团深度复盘", "number": 12},
     {"key": "health_check", "name": "持仓体检报告", "number": 13},
     {"key": "penetration_deep", "name": "穿透深度分析", "number": 14},
-    {"key": "portfolio_history", "name": "组合历史走势", "number": 15},
-    {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 16},
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 17},
+    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 15},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 16},
 ]
 
 
@@ -125,6 +123,8 @@ def _build_minimal_render_data(
         "has_llm_analysis": False,
         "manager_analysis": None,
         "overlap_matrix": None,
+        # 持仓关系矩阵：相关性区块 C19 契约（空 dict 触发模板内 .get() 默认值降级）
+        "position_relationship_data": {},
         "concentration_analysis": None,
         "style_analysis": None,
         "llm_enabled": True,
@@ -204,9 +204,9 @@ class TestHtmlNavStructure(unittest.TestCase):
     # ── Nav links ──────────────────────────────────────────────
 
     def test_nav_link_count(self):
-        """导航链接数量应等于可见模块数（全部可见 = 17）。"""
+        """导航链接数量应等于可见模块数（全部可见 = 16）。"""
         links = self.soup.select("nav.section-nav a")
-        self.assertEqual(len(links), 17, f"导航应有 17 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 16, f"导航应有 16 个链接，实际 {len(links)}")
 
     def test_every_nav_link_has_corresponding_section(self):
         """每个导航链接的 href 指向一个存在的 section id。"""
@@ -378,7 +378,7 @@ class TestHtmlSectionVisibility(unittest.TestCase):
         # 无条件渲染的 section 容器
         sections = soup.select("div.section")
         self.assertGreaterEqual(len(sections), 5, "至少 5 个 always 模块应无条件渲染")
-        self.assertLess(len(sections), 17, "不可见模块的 div 不应渲染")
+        self.assertLess(len(sections), 16, "不可见模块的 div 不应渲染")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -400,7 +400,7 @@ class TestHtmlCustomOrder(unittest.TestCase):
             {"key": "penetration", "name": "资产穿透TOP10", "number": 5},
             # 基金深度分析保持默认
             {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
-            {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7},
+            {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
             {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
             {"key": "fund_style", "name": "基金风格分析", "number": 9},
             # news 保持默认
@@ -410,9 +410,8 @@ class TestHtmlCustomOrder(unittest.TestCase):
             {"key": "expert_review", "name": "智囊团深度复盘", "number": 12},
             {"key": "health_check", "name": "持仓体检报告", "number": 13},
             {"key": "penetration_deep", "name": "穿透深度分析", "number": 14},
-            {"key": "portfolio_history", "name": "组合历史走势", "number": 15},
-            {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 16},
-            {"key": "llm_usage", "name": "LLM API 用量", "number": 17},
+            {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 15},
+            {"key": "llm_usage", "name": "LLM API 用量", "number": 16},
         ]
         cls.numbers = {sec["key"]: sec["number"] for sec in cls.custom_order}
         cls.sv_dict = {sec["key"]: True for sec in cls.custom_order}
@@ -463,8 +462,8 @@ class TestHtmlCustomOrder(unittest.TestCase):
                 orders[sec_id] = int(m.group(1))
 
         self.assertIn("sec-llm_usage", orders)
-        # llm_usage 的 order 应为 17（默认值，未配置时保持）
-        self.assertEqual(orders["sec-llm_usage"], 17, "llm_usage 的 order 应为 17（末位）")
+        # llm_usage 的 order 应为 16（默认值，未配置时保持）
+        self.assertEqual(orders["sec-llm_usage"], 16, "llm_usage 的 order 应为 16（末位）")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -769,7 +768,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
             },
         }
         soup = self._render_interactive(chart_overrides=overrides)
-        section = soup.find(id="sec-portfolio_history")
+        section = soup.find(id="sec-portfolio_history_drawdown")
         self.assertIsNotNone(section)
         radar_canvas = section.find(id="chart_radar")
         self.assertIsNotNone(radar_canvas)
@@ -779,7 +778,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
     def test_radar_empty_note_when_no_labels(self) -> None:
         """radar 无 labels 时显示"量化指标数据不足"占位，不渲染 canvas。"""
         soup = self._render_interactive()
-        section = soup.find(id="sec-portfolio_history")
+        section = soup.find(id="sec-portfolio_history_drawdown")
         note = section.select_one(".chart-empty-note")
         self.assertIsNotNone(note)
         self.assertIn("量化指标数据不足", note.get_text())
@@ -798,7 +797,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         data["chart_datasets"].update(overrides)
         data["history_data"] = self._HISTORY
         soup = _render_template(data)
-        section = soup.find(id="sec-portfolio_history")
+        section = soup.find(id="sec-portfolio_history_drawdown")
         note = section.select_one(".chart-empty-note")
         self.assertIsNotNone(note)
         self.assertIn("持仓市值数据不可用，量化指标暂停计算", note.get_text())
@@ -1073,9 +1072,9 @@ class TestHtmlTocSidebar(unittest.TestCase):
         self.assertEqual(sidebars[0].get("aria-label"), "章节目录")
 
     def test_toc_link_count_matches_sections(self):
-        """目录链接数量 = 可见模块数（全部可见 = 17）。"""
+        """目录链接数量 = 可见模块数（全部可见 = 16）。"""
         links = self.soup.select("#toc-sidebar a[href^='#sec-']")
-        self.assertEqual(len(links), 17, f"目录应有 17 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 16, f"目录应有 16 个链接，实际 {len(links)}")
 
     def test_every_toc_link_has_corresponding_section(self):
         """每个目录链接的 href 指向一个存在的 section id。"""

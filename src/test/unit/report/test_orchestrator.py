@@ -122,7 +122,7 @@ class TestPrepareReportData:
                 "src.python.report.orchestrator.compute_factor_exposure_data",
                 return_value={"available": False, "status": "insufficient"},
             ),
-            # 持仓相关性编排同样含真实网络拉取（持仓历史 K 线），必须 mock
+            # 持仓关系矩阵·相关性编排同样含真实网络拉取（持仓历史 K 线），必须 mock
             patch(
                 "src.python.report.orchestrator.compute_correlation_data",
                 return_value={"available": False, "status": "insufficient"},
@@ -146,7 +146,13 @@ class TestPrepareReportData:
             "news_top_count",
             "risk_metrics",
             "factor_exposure",
-            "correlation_data",
+            "position_relationship_data",
+            # 品种覆盖诊断：品种级数据状态标注契约
+            "position_status",
+            # 可信度摘要：新鲜度分类 + 单日跳变检测契约
+            "data_freshness",
+            # 行动建议单一数据源：20 章行动板块 + 14 章行动摘要共享（C19 契约）
+            "action_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 
@@ -210,13 +216,14 @@ class TestGenerateReport:
         assert result.holdings_ok is True
         assert result.report_generated is True
         assert result.exit_code == 0
-        # 验证 generate_excel_report 被正确调用
+        # 验证 generate_excel_report 被正确调用（数据质量仪表盘子模块默认关）
         mock_gen.assert_called_once_with(
             mock_holdings,
             include_news=False,
             output_dir="reports",
             section_order=[{"key": "overview"}],
             progress=mock_reporter,
+            enable_data_quality=False,
         )
         # 验证不调用数据准备/快照/历史等函数
         with pytest.raises(AssertionError):
@@ -294,6 +301,21 @@ class TestGenerateReport:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
+            # 品种覆盖诊断：mock_detail 无真实价格字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.holding_status.build_coverage_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            # 可信度摘要：同样依赖真实价格/净值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            # 行动建议单一数据源：mock_detail 无真实市值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.analysis.action_advisor.build_action_data",
+                return_value={"available": True, "summary": "", "rebalance_signals": []},
+            ),
         ):
             mock_cap.return_value = {"diff": {}}
             mock_hist.return_value = {"dates": [], "status": "available"}
@@ -339,6 +361,16 @@ class TestGenerateReport:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
+            # 可信度摘要：MagicMock detail 无真实价格/净值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            # 行动建议单一数据源：MagicMock detail 无真实市值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.analysis.action_advisor.build_action_data",
+                return_value={"available": True, "summary": "", "rebalance_signals": []},
+            ),
         ):
             result = generate_report(
                 holdings=mock_holdings,
@@ -368,6 +400,16 @@ class TestGenerateReport:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
+            # 可信度摘要：MagicMock detail 无真实价格/净值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            # 行动建议单一数据源：MagicMock detail 无真实市值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.analysis.action_advisor.build_action_data",
+                return_value={"available": True, "summary": "", "rebalance_signals": []},
+            ),
             # 使用 wrapt 确保 prepare_report_data 不被调用
         ):
             result = generate_report(
@@ -398,6 +440,16 @@ class TestGenerateReport:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
+            # 可信度摘要：MagicMock detail 无真实价格/净值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            # 行动建议单一数据源：MagicMock detail 无真实市值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.analysis.action_advisor.build_action_data",
+                return_value={"available": True, "summary": "", "rebalance_signals": []},
+            ),
         ):
             result = generate_report(
                 holdings=mock_holdings,
@@ -410,6 +462,70 @@ class TestGenerateReport:
         assert result.excel_ok is True
         assert result.report_generated is True  # Excel 成功，不算失败
         mock_xls.assert_called_once()
+
+    def test_generate_report_both_passes_percent_profit_rate(self):
+        """both 路径传入纪律引擎的 profit_rate 为百分数（小数 ×100）。
+
+        回归验证：交易纪律（止盈/止损）以百分数阈值（如 +20%）比较，
+        both 路径必须把 DetailRow 的小数收益率换算为百分数，否则纪律
+        信号永不触发（与 full 路径 orchestrator 组装口径一致）。
+        """
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock(code="SH600001", name="测试", shares=100, cost_price=10.0)]
+
+        mock_detail = MagicMock()
+        mock_detail.code = "SH600001"
+        mock_detail.name = "测试"
+        mock_detail.market_value = 1250.0
+        mock_detail.cost = 1000.0
+        mock_detail.profit = 250.0
+        mock_detail.profit_rate = 0.25  # 小数字段（DetailRow 契约）
+        mock_detail.shares = 100
+        mock_detail.price = 12.5
+
+        captured: dict = {}
+
+        def _fake_build(holdings_details, total_mv, **kwargs):
+            captured["holdings_details"] = holdings_details
+            return {"available": True, "summary": "", "rebalance_signals": []}
+
+        with (
+            patch("src.python.report.market_value._generate_details", return_value=[mock_detail]),
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            patch("src.python.report._snapshot.fetch_history_data"),
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
+            patch("src.python.core.registry.get_report_section_order", return_value=[]),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=True),
+            patch("src.python.config.is_enable_history", return_value=True),
+            patch(
+                "src.python.core.holding_status.build_coverage_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            # 拦截 build_action_data，捕获其收到的 holdings_details
+            patch(
+                "src.python.analysis.action_advisor.build_action_data",
+                side_effect=_fake_build,
+            ),
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config={"output_dir": "reports", "history": {"fetch_mode": "auto"}},
+                reporter=mock_reporter,
+                report_type="both",
+            )
+
+        assert result.report_generated is True
+        detail = captured["holdings_details"][0]
+        # 0.25（小数）→ 25.0（百分数），纪律引擎以 20.0 阈值比较能正确触发止盈
+        assert detail["profit_rate"] == pytest.approx(25.0)
+        assert detail["profit"] == pytest.approx(250.0)
+        assert detail["market_value"] == pytest.approx(1250.0)
 
     def test_generate_report_full_calls_prepare_report_data(self):
         """full 路径调用 prepare_report_data（含指数/穿透/分类）。"""
