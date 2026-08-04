@@ -114,6 +114,32 @@ def _inject_evolution_data(pipeline_data: dict | None) -> dict:
     return pipeline_data
 
 
+def _inject_snapshot_diff_data(pipeline_data: dict | None) -> dict:
+    """计算快照差异摘要并注入 pipeline_data（C19 `snapshot_diff_data` 键）。
+
+    对比 `data/history/snapshots/` 去重后最近两次快照，输出组合演进章顶部
+    「自上次快照变化摘要」（新增/移除品种 + 集中度 HHI 变化 + 超警戒线品种）。
+    有效快照 < 2 期时返回 available=False 的降级 dict，展示层写占位
+    （§1.4.5），不阻断报告生成（R11 隔离）。
+
+    Args:
+        pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
+
+    Returns:
+        注入 snapshot_diff_data 后的 pipeline_data（None 时新建字典）
+    """
+    if pipeline_data is None:
+        pipeline_data = {}
+    try:
+        from src.python.analysis.snapshot_diff import build_snapshot_diff
+
+        pipeline_data["snapshot_diff_data"] = build_snapshot_diff()
+    except Exception:
+        logger.warning("[snapshot_diff] 快照差异摘要构建失败（非关键）", exc_info=True)
+        pipeline_data["snapshot_diff_data"] = {"available": False, "reason": "快照差异摘要构建失败"}
+    return pipeline_data
+
+
 # ── 校验函数 ──
 
 
@@ -293,6 +319,7 @@ def _generate_full_html_report(
     action_data: dict | None = None,
     crisis_annotation_data: dict | None = None,
     tail_risk_data: dict | None = None,
+    snapshot_diff_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -361,6 +388,7 @@ def _generate_full_html_report(
             action_data=action_data,
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
+            snapshot_diff_data=snapshot_diff_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -495,6 +523,9 @@ def _generate_report_both(
     # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
         pipeline_data = _inject_evolution_data(pipeline_data)
+        # 2b1. 快照差异摘要（C19 snapshot_diff_data）：组合演进章顶部变化摘要，
+        #      与演进数据同开关（同属组合演进章节）
+        pipeline_data = _inject_snapshot_diff_data(pipeline_data)
     # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
     #    （C19 position_status + data_freshness）
     from src.python.analysis.action_advisor import build_action_data
@@ -598,6 +629,7 @@ def _generate_report_both(
             action_data=(pipeline_data or {}).get("action_data"),
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
+            snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -761,6 +793,9 @@ def _generate_report_full(
     # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
         pipeline_data = _inject_evolution_data(pipeline_data)
+        # 2b1. 快照差异摘要（C19 snapshot_diff_data）：组合演进章顶部变化摘要，
+        #      与演进数据同开关（同属组合演进章节）
+        pipeline_data = _inject_snapshot_diff_data(pipeline_data)
     perf.stop()
 
     # ── 3. 历史走势 + 全量量化指标 ──
@@ -841,6 +876,7 @@ def _generate_report_full(
         (pipeline_data or {}).get("action_data"),
         (pipeline_data or {}).get("crisis_annotation_data"),
         (pipeline_data or {}).get("tail_risk_data"),
+        (pipeline_data or {}).get("snapshot_diff_data"),
     )
 
     # ── 7. Excel 报告 ──

@@ -261,7 +261,11 @@ def generate_excel_report(
         try:
             from src.python.report.evolution_sheet import write_evolution_sheet
 
-            write_evolution_sheet(ws_evo, (pipeline_data or {}).get("evolution_data"))
+            write_evolution_sheet(
+                ws_evo,
+                (pipeline_data or {}).get("evolution_data"),
+                snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
+            )
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
 

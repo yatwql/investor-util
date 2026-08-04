@@ -563,6 +563,17 @@ LLM 五维度量化评分，每项满分 100：
 | R-EVO-03 | 演进数据注入 C19 `evolution_data` 键，Excel「组合演进」页签与 HTML「组合演进」章节双端消费 |
 | R-EVO-04 | 组合演进章节可见性由独立配置项 `enable_portfolio_evolution` 控制（默认开启），与 `enable_history`/`enable_fund_deep_analysis` 相互独立；关闭仅隐藏报告章节，不影响持仓快照自动记录 |
 
+**自上次快照变化摘要（组合演进章顶部区块）**：对比去重后最近两次快照，输出新增/移除品种（按 code 合并比对，复用 `fetcher/history_diff.HistoryDiff` 引擎）、集中度 HHI 变化（本期 - 上期，权重口径与演进一致：市值优先、市值为 0 回退成本）、超 15% 警戒线品种（阈值复用 `analysis/simple_rebalance._THRESHOLD`，按权重降序），生成一段中文变化摘要文本供双端直接渲染。数据来源复用 `data/history/snapshots/` 本地快照，零网络请求。去重后有效快照 < 2 期（无上次快照可对比）时 `available=false`，写「快照差异不足」占位（§1.4.5 降级）。由 `analysis/snapshot_diff.py::build_snapshot_diff()` 计算（纯标准库、analysis 层隔离，复用 `portfolio_evolution` 的 `_dedup_by_date`/`_compute_hhi`/`_holding_weight`），注入 C19 `snapshot_diff_data` 键。
+
+**需求标识**：
+
+| 需求标识 | 需求描述 |
+|:---------|:---------|
+| R-DIFF-01 | 自上次快照变化摘要基于本地快照对比，零网络请求；复用既有多快照数据（`data/history/snapshots/`），与组合演进同数据源 |
+| R-DIFF-02 | 输出新增/移除品种、集中度 HHI 变化（本期-上期，权重口径与演进一致）、超 15% 警戒线品种（按权重降序）；HHI 无可比权重时跳过 HHI 变化点 |
+| R-DIFF-03 | 去重后有效快照 < 2 期时 `snapshot_diff_data.available=false`、reason 说明，Excel/HTML 均写「快照差异不足」占位（§1.4.5 降级），不阻断报告生成 |
+| R-DIFF-04 | 快照差异摘要注入 C19 `snapshot_diff_data` 键，Excel 组合演进页签顶部「自上次快照变化摘要」区块 + HTML 组合演进章顶部摘要卡双端消费，与演进数据同开关（`enable_portfolio_evolution`） |
+
 #### 6.4.18 行动建议
 
 **字段说明**：

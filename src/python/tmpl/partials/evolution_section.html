@@ -32,6 +32,22 @@
             <strong>{{ _evo_n }}</strong> 个有效观察日（每日取最后一次快照）。
             数据来自每次报告自动生成的本地快照，无需联网。
         </div>
+
+        <!-- ⑤ 自上次快照变化摘要（C19 snapshot_diff_data，组合演进章顶部） -->
+        {% set _sd = snapshot_diff_data or {} %}
+        <div class="notice-banner" style="margin: 14px 0 4px;">
+            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">⑤ 自上次快照变化摘要</div>
+            {% if _sd.get("available") %}
+            <div style="font-size: 13px; line-height: 1.9;">{{ _sd.get("summary", "与上次快照相比持仓结构无变化。") }}</div>
+            <div style="margin-top: 6px; font-size: 12px; opacity: 0.75;">
+                对比区间：{{ _sd.get("previous_date") }} → {{ _sd.get("current_date") }}（本地快照，每日取最后一次）
+            </div>
+            {% else %}
+            <div style="font-size: 13px; opacity: 0.75;">
+                {% if _sd.get("reason") %}{{ _sd["reason"] }}{% else %}暂无上次快照可对比，变化摘要待积累{% endif %}。
+            </div>
+            {% endif %}
+        </div>
         {% if enable_interactive_charts %}
         <script type="application/json" id="evolution-chart-data">{{ evolution_chart_data | tojson }}</script>
         {% endif %}

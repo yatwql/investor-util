@@ -37,12 +37,18 @@ _FONT_POS = Font(color="CC0000")
 _FONT_NEG = Font(color="009900")
 
 
-def write_evolution_sheet(ws: Worksheet, evolution_data: dict[str, Any] | None) -> None:
+def write_evolution_sheet(
+    ws: Worksheet,
+    evolution_data: dict[str, Any] | None,
+    snapshot_diff_data: dict[str, Any] | None = None,
+) -> None:
     """写入组合演进页签。
 
     Args:
         ws: openpyxl Worksheet 对象
         evolution_data: C19 契约 dict；None 或 available=False 时写入占位。
+        snapshot_diff_data: 快照差异摘要 C19 契约 dict（页签顶部「自上次快照变化摘要」）；
+            未提供或 available=False 时写入占位/提示文本。
     """
     _name = get_report_sheet_name("portfolio_evolution")
     _ncols = 8
@@ -69,6 +75,40 @@ def write_evolution_sheet(ws: Worksheet, evolution_data: dict[str, Any] | None) 
         ]
         + [""] * (_ncols - 1),
     )
+
+    # ── 1.5 自上次快照变化摘要（C19 snapshot_diff_data） ──
+    row += 1
+    row = write_title_row(ws, row, "自上次快照变化摘要", ncols=_ncols)
+    diff = snapshot_diff_data or {}
+    if not diff.get("available"):
+        row = write_data_row(
+            ws,
+            row,
+            [diff.get("reason") or STATUS_MESSAGES["evolution_unavailable"]] + [""] * (_ncols - 1),
+        )
+    else:
+        _diff_rows: list[str] = []
+        if diff.get("added"):
+            _diff_rows.append(
+                "新增品种：" + "、".join(f"{d['name'] or d['code']} ({d['code']})" for d in diff["added"])
+            )
+        if diff.get("removed"):
+            _diff_rows.append(
+                "移除品种：" + "、".join(f"{d['name'] or d['code']} ({d['code']})" for d in diff["removed"])
+            )
+        hhi_p = diff.get("hhi_previous")
+        hhi_c = diff.get("hhi_current")
+        if hhi_p is not None and hhi_c is not None:
+            _diff_rows.append(f"集中度 HHI：{hhi_p:.4f} → {hhi_c:.4f}（变化 {diff.get('hhi_change', 0):+.4f}）")
+        for _o in diff.get("over_limit", []):
+            _diff_rows.append(
+                f"超限品种：{_o['name'] or _o['code']} ({_o['code']}) "
+                f"权重 {_o['weight_pct']}% > 警戒线 {_o['threshold_pct']:.0f}%"
+            )
+        if not _diff_rows:
+            _diff_rows.append("与上次快照相比持仓结构无变化")
+        for _r in _diff_rows:
+            row = write_data_row(ws, row, [_r] + [""] * (_ncols - 1))
 
     # ── 2. 总市值趋势表 ──
     row += 1

@@ -141,6 +141,15 @@
 - **测试**：新增 `src/test/unit/analysis/test_tail_risk.py`（15 例，`@pytest.mark.unit`+`unit_analysis`：VaR95/99 固定 fixture 精度 <0.01% / 置信度排序 / 无损失日 VaR=0 / 最大单日跌幅值+日期 / 并列最深取首 / 连续下跌天数+区间 / 更长区间优先 / 无下跌 0 天 / 恢复已恢复/未恢复/none 三态 / 样本不足/None/空占位 / 契约字段完整）、`src/test/unit/analysis/test_tail_risk_edge.py`（10 例，`@pytest.mark.edge` 放 `*_edge.py`：0/负/NaN/缺失 total_value 跳过 / 缺失日期容错 / 1e12 量级不溢出 / 1e-4 精度 / 恰 20 available / 19 unavailable / 单点 / 持平序列）、`src/test/unit/report/test_tail_risk_wiring.py`（10 例，`@pytest.mark.unit`+`unit_report`：pipeline 注入充足/不足/None 跳过 / Excel 五行+未恢复+占位 / HTML 卡渲染+未恢复+样本不足占位+C20 说明）。`tail_risk.py` 覆盖率 96%，全部 ≥85%。轮10 验收「新增测试 ≥8 个、固定 fixture 精度 <0.01%、行为断言、C12 边缘合规」全部满足。
 - **向后兼容**：`tail_risk_data` 为新增键、`write_portfolio_history_drawdown_sheet`/`write_html_report`/`_render_html_template` 新增参数均带默认值，既有调用与测试不受影响；样本不足时落「样本不足」占位，既有报告结构稳定。
 
+### 自上次快照变化摘要（17 章组合演进顶部，轮11 新区块）
+
+- **计算模块**：新增 `src/python/analysis/snapshot_diff.py`（`build_snapshot_diff(threshold_pct=15.0, min_snapshots=2)`，纯标准库、analysis 层隔离，无 report/llm 依赖，日志走 logging）。复用 `data/history/snapshots/` 多期快照本地数据（零新增网络请求），按日去重（复用 `portfolio_evolution._dedup_by_date`）后取最近两次对比，输出 C19 契约 `snapshot_diff_data`（12 键：`available/snapshot_count/previous_date/current_date/added/removed/hhi_previous/hhi_current/hhi_change/over_limit/summary/reason`）——新增/移除品种按 code 跨账户合并比对（复用 `fetcher/history_diff.HistoryDiff` 引擎），集中度 HHI 变化（本期-上期，市值口径优先、市值为 0 回退成本，与演进同口径，复用 `_compute_hhi`/`_holding_weight`），超 15% 警戒线品种（阈值复用 `analysis/simple_rebalance._THRESHOLD`，按权重降序）。去重后有效快照 < 2 期（无上次快照可对比）时 available=false、reason 说明，落 §1.4.5 降级。
+- **全接线**：both/full 路径 `report/_report_generation.py` 新增 `_inject_snapshot_diff_data`，在组合演进注入旁同步注入 pipeline_data（与 `evolution_data` 同开关 `enable_portfolio_evolution`），经 `_generate_full_html_report` → `html_writer.write_html_report` → `_render_html_template` 传入模板；Excel 经 `excel_generator` → `evolution_sheet.write_evolution_sheet` 新增 `snapshot_diff_data` 参数，写入页签顶部「自上次快照变化摘要」区块（新增/移除品种、HHI 变化、超限项逐行）。
+- **HTML 摘要卡**：`partials/evolution_section.html` 组合演进章顶部新增「⑤ 自上次快照变化摘要」notice-banner 摘要卡（summary 全文 + 对比区间 previous_date → current_date），数据不足时显示 reason 占位文本。
+- **C19 契约注册**：`snapshot_diff_data` 在 technical.md 附录 H 注册（12 键契约 + 计算/注入/消费/降级说明）。
+- **测试**：新增 `src/test/unit/analysis/test_snapshot_diff.py`（8 例，`@pytest.mark.unit`+`unit_analysis`：无上次快照占位 / 新增移除检测 / HHI 变化 / 超限项降序 / 相同快照持平 / summary 覆盖全部变化点 / 市值 0 成本回退 / 同日去重保留最后）、`src/test/unit/analysis/test_snapshot_diff_edge.py`（6 例，`@pytest.mark.edge` 放 `*_edge.py`：空目录 / 空持仓 / 全 0 权重防除零 / 阈值 0 全超限 / 损坏文件跳过 / 多账户聚合）。`snapshot_diff.py` 覆盖率 100%，全部 ≥85%。轮11 验收「新增测试 ≥6 个、行为断言、无上次快照占位、C12 边缘合规」全部满足。
+- **向后兼容**：`snapshot_diff_data` 为新增键、`write_html_report`/`_render_html_template`/`write_evolution_sheet`/`_generate_full_html_report` 新增参数均带默认值，既有调用与测试不受影响；无上次快照时落占位，既有报告结构稳定。
+
 ---
 
 ## 归档

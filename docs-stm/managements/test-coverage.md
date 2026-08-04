@@ -10,22 +10,22 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **4387** | ~30s |
-| `standard` | **3777** | ~30s |
+| `unit` | **4401** | ~30s |
+| `standard` | **3785** | ~30s |
 | `scenario` | **232** | **~6min** |
 | `regression` | **232** | **~6min** |
-| `dev-verify` | **1546** | **~1min** |
-| `verify` | **2807** | **~1min** |
+| `dev-verify` | **1554** | **~1min** |
+| `verify` | **2821** | **~1min** |
 | `integration` | **272** | **~50s** |
-| `edge` | 547 | ~15s |
+| `edge` | 553 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **4705** | **~10min** |
+| `all` | **4719** | **~10min** |
 | `smoke` | 26 | ~2s |
 | `report` | **1365** | ~15s |
 | `all_no_unit` | 318 | **~7min** |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
-> 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 4705 项（2026-08-04 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
+> 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 4719 项（2026-08-04 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
 
 ### 功能域对应测试源
 
@@ -40,7 +40,7 @@
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content, cost_tracker, fallback) | `unit/llm/`(含 API 路由/熔断/重试/降级/骨架/prompts/generators/辩论/cache 等) | 739 |
 | **配置管理** | `config/`, `core/constants.py` | `unit/config/test_config*.py` | 243 |
 | **核心基础设施** | `core/`(cache, models, reader, registry, http_client, market_hours, metrics, code_utils, filesystem)、`provider_registry.py`、`tui/handlers_*.py` | `unit/core/` 全部 + `unit/cache/` + `unit/handlers/`（含 `*_edge.py`） | 612 |
-| **分析计算** | `analysis/`(liquidity, rebalance, fx_exposure, bond_yield, alignment_correction, drawdown_warning, drawdown_events, factor_exposure, correlation, crisis_annotation, tail_risk, portfolio_evolution, action_advisor, trade_discipline, rebalance_advisor, return_attribution, whatif, whatif_backtest) | `unit/analysis/test_{liquidity,rebalance,bond_yield,fx_exposure,alignment_correction,drawdown_warning,drawdown_events,factor_exposure}*.py` + `test_correlation.py` + `test_correlation_edge.py` + `test_crisis_annotation.py` + `test_tail_risk.py` + `test_tail_risk_edge.py` + `test_portfolio_evolution.py` + `test_action_advisor.py` + `test_trade_discipline.py` + `test_rebalance_advisor.py` + `test_return_attribution.py` + `test_whatif.py` + `test_whatif_backtest.py` + `test_whatif_backtest_edge.py` | 475 |
+| **分析计算** | `analysis/`(liquidity, rebalance, fx_exposure, bond_yield, alignment_correction, drawdown_warning, drawdown_events, factor_exposure, correlation, crisis_annotation, tail_risk, portfolio_evolution, snapshot_diff, action_advisor, trade_discipline, rebalance_advisor, return_attribution, whatif, whatif_backtest) | `unit/analysis/test_{liquidity,rebalance,bond_yield,fx_exposure,alignment_correction,drawdown_warning,drawdown_events,factor_exposure}*.py` + `test_correlation.py` + `test_correlation_edge.py` + `test_crisis_annotation.py` + `test_tail_risk.py` + `test_tail_risk_edge.py` + `test_portfolio_evolution.py` + `test_snapshot_diff.py` + `test_snapshot_diff_edge.py` + `test_action_advisor.py` + `test_trade_discipline.py` + `test_rebalance_advisor.py` + `test_return_attribution.py` + `test_whatif.py` + `test_whatif_backtest.py` + `test_whatif_backtest_edge.py` | 489 |
 | **TUI 交互** | `tui/tui*.py`, `tui/handlers*.py`, `tui/tui_keys.py` | `unit/ui/test_{tui,tui_handlers,tui_menu,log_sanitize}.py` + `test_tui_edge.py` | 164 |
 | **CLI 命令行模式** | `cli/cli.py`, `report/cli_progress.py` | `unit/cli/test_cli*.py` | 51 |
 | **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组，含 `scenario_extreme` 单列) + `integration/test_cli_integration.py` | 272 |
@@ -73,7 +73,7 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 11 子组合计 | **4387** |
+| `unit`（父标记） | 11 子组合计 | **4401** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等） | 194 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 271 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪/降级回退） | 739 |
@@ -81,7 +81,7 @@
 | ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、基金深度分析模块、数据降级/占位/可用性矩阵、调仓 What-if/组合演进/行动建议双端呈现、数据质量仪表盘、尾部风险接线、Chart.js 图表数据构建/裁剪、暗色模式 theme.js） | 1365 |
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验、enable_action 等板层开关） | 243 |
 | ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/熔断/持仓追踪器/批处理调度/命令处理器） | 612 |
-| ├─ `unit_analysis` | 分析计算（流动性/再平衡/汇率/口径修正/回撤预警/回撤事件/因子暴露/相关性矩阵/危机区间标注/尾部风险统计/组合演进/行动建议/交易纪律/调仓建议可行化层/收益归因/调仓 What-if 时序回测） | 475 |
+| ├─ `unit_analysis` | 分析计算（流动性/再平衡/汇率/口径修正/回撤预警/回撤事件/因子暴露/相关性矩阵/危机区间标注/尾部风险统计/组合演进/快照差异摘要/行动建议/交易纪律/调仓建议可行化层/收益归因/调仓 What-if 时序回测） | 489 |
 | ├─ `unit_cli` | CLI 命令行模式（参数解析/路由/退出码/日志/whatif 子命令） | 51 |
 | ├─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 164 |
 | └─ `unit_scripts` | scripts/ 工程脚本（历史痕迹检查工具自检/豁免/补强模式/回归场景元描述豁免/多行 docstring 提取/任务编号一致性检查） | 83 |
@@ -92,7 +92,7 @@
 |:-------|:---------|:--------:|
 | `llm` | 全部 LLM 相关（带 `llm` 跨类标记），**全部为 mock 测试，无需真实 API key** | **568** |
 | `smoke` | 关键节点冒烟覆盖，共 26 项 | **26** |
-| `edge` | 异常/边界场景（含熔断冷却探针） | **547** |
+| `edge` | 异常/边界场景（含熔断冷却探针） | **553** |
 | `data` | 数据正确性验证 | **69** |
 
 详细方法名和验证点见 `pytest src/test/ -m "smoke" -v` 输出。

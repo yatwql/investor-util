@@ -295,6 +295,7 @@ def _render_template(
     action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（19 章行动板块 + 13 章行动摘要）
     crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（15 章合并章）
     tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（15 章合并章指标卡）
+    snapshot_diff_data: dict | None = None,  # 快照差异摘要 C19 snapshot_diff_data（组合演进章顶部）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.report.chart_data_builder import build_evolution_chart_data
@@ -369,6 +370,7 @@ def _render_template(
         action_data=action_data,
         crisis_annotation_data=crisis_annotation_data,
         tail_risk_data=tail_risk_data,
+        snapshot_diff_data=snapshot_diff_data,
     )
 
 
@@ -410,6 +412,7 @@ def write_html_report(
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
     crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（15 章合并章）
     tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（15 章合并章指标卡）
+    snapshot_diff_data: dict | None = None,  # 快照差异摘要 C19 snapshot_diff_data（组合演进章顶部变化摘要）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -653,6 +656,7 @@ def write_html_report(
         action_data=action_data,
         crisis_annotation_data=crisis_annotation_data,
         tail_risk_data=tail_risk_data,
+        snapshot_diff_data=snapshot_diff_data,
     )
 
     if enable_interactive_charts:
