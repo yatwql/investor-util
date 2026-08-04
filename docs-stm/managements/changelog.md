@@ -8,6 +8,12 @@
 
 ### 开发中（未发布）
 
+#### HTML 报告目录分组导航折叠 + 文档快照同步（plan-24 轮19/轮20，导航收尾）
+
+- **分组导航（轮19）**：HTML 报告左侧目录按「基础/基金深度/风险/历史/LLM」五组折叠导航，原生 `<details>/<summary>`（键盘可达、无需 JS）。`html_writer.py` 新增 `_NAV_GROUP_LABELS`（五组顺序）/`_SECTION_NAV_GROUP_MAP`（19 章节→组归属）/`_build_section_nav_groups()`（仅收录可见章节、组序固定、组内按报告序号升序、空组保留由模板跳过）；`_render_template` 计算并注入 `section_groups` 到模板。`report_template.html` 目录改为分组结构（`.toc-group` details + 组标题徽标计数 `.toc-group-count`），空组不渲染；窄屏扁平 `section-nav` 保留作移动端兜底，两种导航均不依赖 JS。
+- **测试**：`test_html_report_structure.py` 新增 `TestHtmlTocGroupedNav`（11 例：五组分组渲染/组内章节正确/标题+徽标数/空组跳过/真实 registry 映射含 action·evolution·data_source_status/折叠原生交互/键盘可达/窄屏不溢出），`_render_template` helper 同步注入 `section_groups`（与生产一致）；原 TOC 顺序测试改为分组序断言。dev-verify 1694 passed + 3 check 全 [OK]。
+- **文档快照（轮20）**：folders.md 统计表（主程序 225/55,697、HTML 4/3,756、脚本 16/5,581、源代码合计 245/65,034、测试代码 275/78,856、测试用例 5,009）；test-coverage.md 模式/功能域/unit 子分组按 `collect-test-coverage.py` 实时值刷新（all 5009、unit 4691、report 1475、unit_report 1475、unit_analysis 580、unit_providers 199、edge 566 等）；how-to-config.md 补 `report_submodules.valuation_percentile`/`market_temperature` 开关行 + `report_section_order` 19 项核对（示例键 `fund_style`→`style_factor`）；reports-instruction.md HTML 目录五组折叠说明 + 「页面/章节分组」序号全面核对（19 个页签；数据源可用性矩阵 18、llm_usage 19、风格与因子 9 等）；registry.py docstring「20 项」→「19 项」；faq.md / how-to-config.md「20 项默认顺序」→「19 项」。datasource*.md 已覆盖 push2 PE/PB 扩展字段与指数 K 线通道，无需变更。
+
 #### 估值分位 + 市场温度（plan-23 轮17/轮18，`valuation_data`/`market_temperature_data` 契约）
 
 - **估值分位（轮17）**：新增 `src/python/analysis/valuation_percentile.py`（纯计算层）——`extract_closes()` 收盘价提取（股票 `close` 优先、场外基金回退 `nav`，过滤 None/NaN）、`price_percentile()` 价格分位（0~100，`MIN_SAMPLES=60` 样本下限）、`compute_price_percentile()` 分位+三档刻度（低估/合理/高估）契约、`DISCLAIMER`（"价格分位代理，非真实历史估值分位"）；`providers/eastmoney_industry.py` push2 扩展字段 `fetch_valuation_fields()`（PE/PB，复用既有 push2 请求通道 + 会话缓存）。「资产穿透TOP10」章追加「估值分位」列（Excel `penetration_sheet` ncols 10→11 + 表尾免责声明；HTML `report_template.html` 条件列），开关 `report_submodules.valuation_percentile` **默认关**（关闭时列隐藏、输出与改造前一致）。

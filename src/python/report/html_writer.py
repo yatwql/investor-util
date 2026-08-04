@@ -158,6 +158,77 @@ def _compute_section_visibility(
     return visible_numbers, section_visible_dict, _sv_fn
 
 
+# ── HTML 目录分组导航（「基础/基金深度/风险/历史/LLM」五组，导航折叠收尾） ──
+
+# 分组展示顺序（组名, 组 key），空组不渲染
+_NAV_GROUP_LABELS: list[tuple[str, str]] = [
+    ("基础", "basic"),
+    ("基金深度", "fund_deep"),
+    ("风险", "risk"),
+    ("历史", "history"),
+    ("LLM", "llm"),
+]
+
+# 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础」组）
+_SECTION_NAV_GROUP_MAP: dict[str, str] = {
+    # 基础：汇总/明细/分类/穿透/数据源可用性
+    "summary": "basic",
+    "market_value": "basic",
+    "category": "basic",
+    "penetration": "basic",
+    "data_source_status": "basic",
+    # 基金深度：基金业绩 + 基金深度分析系列章节
+    "fund_performance": "fund_deep",
+    "fund_manager": "fund_deep",
+    "position_relationship": "fund_deep",
+    "fund_concentration": "fund_deep",
+    "style_factor": "fund_deep",
+    # 风险：行动建议（再平衡信号/交易纪律/调仓建议/收益归因）
+    "action": "risk",
+    # 历史：组合历史走势与回撤 + 组合演进
+    "portfolio_history_drawdown": "history",
+    "portfolio_evolution": "history",
+    # LLM：新闻关联 + LLM 文本分析系列 + API 用量
+    "news_correlation": "llm",
+    "global_macro": "llm",
+    "expert_review": "llm",
+    "health_check": "llm",
+    "penetration_deep": "llm",
+    "llm_usage": "llm",
+}
+
+
+def _build_section_nav_groups(
+    order: list[dict],
+    section_visible,
+    section_numbers: dict,
+) -> list[dict]:
+    """按「基础/基金深度/风险/历史/LLM」五组构建 HTML 目录分组导航数据。
+
+    仅收录当前可见章节；组序固定为五组顺序，组内按报告序号升序。
+    返回 [{key, name, sections: [{key, number, name}, ...]}, ...]；
+    空组（无可见章节）保留在返回列表中，模板端跳过渲染（无 `<details>`）。
+    """
+    groups: dict[str, list[dict]] = {gk: [] for _, gk in _NAV_GROUP_LABELS}
+    for sec in order:
+        key = sec.get("key", "")
+        if not section_visible(key):
+            continue
+        group_key = _SECTION_NAV_GROUP_MAP.get(key, "basic")
+        groups.setdefault(group_key, []).append(
+            {
+                "key": key,
+                "number": section_numbers.get(key, 0),
+                "name": sec.get("name", key),
+            }
+        )
+    result: list[dict] = []
+    for label, group_key in _NAV_GROUP_LABELS:
+        sections = sorted(groups.get(group_key, []), key=lambda s: s["number"])
+        result.append({"key": group_key, "name": label, "sections": sections})
+    return result
+
+
 def _build_data_status_sections(
     a_indices: dict,
     us_indices: dict,
@@ -411,9 +482,12 @@ def _render_template(
     valuation_enabled = valuation_data is not None
     penetration_display = _attach_valuation_to_penetration(penetration, valuation_data)
     market_temperature = _build_temperature_display(market_temperature_data)
+    # 目录分组导航：按「基础/基金深度/风险/历史/LLM」五组折叠（section_visible 闭包过滤不可见章节）
+    section_groups = _build_section_nav_groups(order, section_visible, section_numbers)
 
     return _ENV.get_template("report_template.html").render(
         flow_display=_build_flow_display(fund_flow_data),
+        section_groups=section_groups,
         valuation_enabled=valuation_enabled,
         market_temperature=market_temperature,
         now=now_str,

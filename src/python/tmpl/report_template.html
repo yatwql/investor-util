@@ -331,6 +331,22 @@
         }
         .toc-list a:hover { background: var(--source-tag-bg); }
         .toc-list a.active { background: var(--source-tag-bg); border-left-color: #2E75B6; color: var(--source-tag-text); font-weight: 600; }
+        /* 分组折叠：按「基础/基金深度/风险/历史/LLM」五组（<details>/<summary> 原生折叠，键盘可达） */
+        .toc-group { border-bottom: 1px solid var(--toc-border); }
+        .toc-group:last-child { border-bottom: none; }
+        .toc-group-title {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 9px 16px; font-size: 12px; font-weight: 600;
+            color: #2E75B6; cursor: pointer; list-style: none;
+            background: rgba(46,117,182,0.07); user-select: none;
+            border-left: 3px solid #2E75B6;
+        }
+        .toc-group-title::-webkit-details-marker { display: none; }
+        .toc-group-title:hover { background: rgba(46,117,182,0.14); }
+        .toc-group-count {
+            font-size: 11px; color: var(--text-muted); font-weight: 400;
+            background: var(--source-tag-bg); border-radius: 8px; padding: 1px 7px;
+        }
         /* 收起状态：侧栏移出视口 + 浮动展开按钮 */
         .toc-toggle-btn {
             position: fixed; left: 12px; top: 12px; z-index: 101;
@@ -866,9 +882,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
         <nav aria-label="章节快速定位">
             <div class="toc-list">
-                {% for sec in section_order %}
-                {% if section_visible(sec["key"]) %}
-                <a href="#sec-{{ sec['key'] }}">{{ section_numbers[sec["key"]] }}、{{ sec["name"] }}</a>
+                {% for group in section_groups %}
+                {% if group.sections %}
+                <details class="toc-group" data-group="{{ group.key }}" open>
+                    <summary class="toc-group-title">{{ group.name }}<span class="toc-group-count">{{ group.sections | length }}</span></summary>
+                    {% for sec in group.sections %}
+                    <a href="#sec-{{ sec['key'] }}">{{ sec.number }}、{{ sec.name }}</a>
+                    {% endfor %}
+                </details>
                 {% endif %}
                 {% endfor %}
             </div>

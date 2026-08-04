@@ -6,7 +6,7 @@
 >
 > 前置：`plan-investment-features.md` §4 已定章节归并对照表。本文档按 §5 实施次序拆分为 21 轮。
 >
-> **进度**：阶段 A 数据质量地基 / B 决策中枢 / B′ 持仓关系合并 / C 历史增强（轮 1~11）**已完成并验收通过**（对应 P1 计划项 `plan-17`~`plan-20`，changelog v0.10.1）；阶段 D 轮 12「风格与因子合并 + 行业 Beta」**已完成并验收通过**（章节数 20→19）；轮 13「候选基金比较增强模式」**已完成并验收通过**（`candidate_compare` 默认关）；阶段 E 轮 14~16 成本流水（对应 P2 计划项 `plan-22`）**已完成并验收通过**——轮 14 流水页签解析（20 例、覆盖率 93%）、轮 15 XIRR 资金加权收益 + 成本分档（24 例、覆盖率 94%）、轮 16 三页签渲染（`fund_flow_data` 数据契约 + `cost_lots` 默认关 + CLI/TUI 接线，新增测试 32 个、267 passed，dev-verify 1638 passed）+ **HTML 渲染补齐**（轮16 补遗：`_build_flow_display` 展示映射 + 模板三处条件渲染，新增测试 12 个）；轮 17~21 待实施。
+> **进度**：阶段 A 数据质量地基 / B 决策中枢 / B′ 持仓关系合并 / C 历史增强（轮 1~11）**已完成并验收通过**（对应 P1 计划项 `plan-17`~`plan-20`，changelog v0.10.1）；阶段 D 轮 12「风格与因子合并 + 行业 Beta」**已完成并验收通过**（章节数 20→19）；轮 13「候选基金比较增强模式」**已完成并验收通过**（`candidate_compare` 默认关）；阶段 E 轮 14~16 成本流水（对应 P2 计划项 `plan-22`）**已完成并验收通过**——轮 14 流水页签解析（20 例、覆盖率 93%）、轮 15 XIRR 资金加权收益 + 成本分档（24 例、覆盖率 94%）、轮 16 三页签渲染（`fund_flow_data` 数据契约 + `cost_lots` 默认关 + CLI/TUI 接线，新增测试 32 个、267 passed，dev-verify 1638 passed）+ **HTML 渲染补齐**（轮16 补遗：`_build_flow_display` 展示映射 + 模板三处条件渲染，新增测试 12 个）；阶段 F 轮 17~18 估值与温度（对应 P3 计划项 `plan-23`）**已完成并验收通过**——轮 17 估值分位、轮 18 市场温度；阶段 G 轮 19 HTML 分组导航**已完成并验收通过**（`_build_section_nav_groups` 五组折叠 + `TestHtmlTocGroupedNav` 11 例）、轮 20 文档快照与用户手册**已完成并验收通过**（folders/test-coverage 快照、reports-instruction「页面/章节分组」序号核对、how-to-config 新开关行）；轮 21 待实施（发布门禁）。
 
 ---
 
@@ -314,6 +314,8 @@
   - [ ] 章节内容不因分组/折叠改变渲染（回归断言）；
   - [ ] §2 通用标准全部满足。
 
+> ✅ **轮 19 验收签字（2026-08-05）**：HTML 分组导航完成——`html_writer.py` 新增 `_NAV_GROUP_LABELS`/`_SECTION_NAV_GROUP_MAP`/`_build_section_nav_groups()`（五组固定顺序、仅收录可见章节、组内按报告序号升序）+ `_render_template` 注入 `section_groups`；`report_template.html` 目录改 `<details>/<summary>` 分组折叠 + 组徽标计数 + 窄屏扁平导航兜底；新增 `TestHtmlTocGroupedNav` 11 例（分组渲染/折叠交互/移动端不溢出/键盘可达，≥4 达标，DOM 断言），test_html_report_structure 70 passed；合并章（持仓关系矩阵/组合历史走势与回撤/风格与因子分析）分组归属正确、`enable_action` 开时行动建议章纳入「风险」组；图下说明合规：危机标注/尾部风险等既有新增图表均随 `.chart-caption` 渲染分支（有数据→出、无→不出）；章节内容不因分组/折叠改变渲染（回归断言覆盖）。
+
 #### 轮 20：文档、数据快照与用户手册
 
 - **目标**：管理文档版本头一致、数据快照刷新、用户手册补充新子模块说明。
@@ -325,6 +327,8 @@
   - [ ] 用户手册覆盖新增子模块（reports-instruction / how-to-config 含新开关说明）；
   - [ ] `check-doc-traces --ci`、`check-task-numbering --ci` 通过；
   - [ ] §2 通用标准全部满足。
+
+> ✅ **轮 20 验收签字（2026-08-05）**：文档快照与用户手册同步完成——folders.md 统计表（源代码合计 245/65,034、测试代码 275/78,856、测试用例 5,009）+ 目录树、test-coverage.md 按 `collect-test-coverage.py` 实时值刷新（all 5009、unit 4691、report 1475、analysis 580、edge 566 等）、reports-instruction.md HTML 目录五组折叠说明 + 「页面/章节分组」序号全面核对（19 个页签；数据源可用性矩阵 18、llm_usage 19）、how-to-config.md 新开关行（`report_submodules.valuation_percentile`/`market_temperature`）+ `report_section_order` 19 项核对（示例键 `fund_style`→`style_factor`）、registry.py docstring「20 项」→「19 项」、faq.md「20 项默认顺序」→「19 项」；datasource*.md 已覆盖 push2 PE/PB 扩展字段与指数 K 线通道无需变更；`check-version-consistency` 13 项 [OK]、`check-doc-traces --ci`/`check-task-numbering --ci` 通过。
 
 #### 轮 21：全链回归与发布门禁
 
