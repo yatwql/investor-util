@@ -36,6 +36,7 @@
   - 跨文档引用时**必须带前缀**（`plan-`/`rf-`），避免歧义
   - 历史数据保持原名（如 `P3-09`、`P4-91`），不追溯重命名
   - **编号源标记**：各管理文档头部维护「编号源」标记记录**下一个可用编号**——`plan.md` → `plan-next`、`review-findings.md` → `rf-next`。新增任务时**取当前值**作为编号，完成后**递增更新标记**（+1）。标记单调递增、绝不回退，保证与历史归档（含 `docs-stm/archive/*/`）编号不冲突。若标记遗漏递增或初值异常，`scripts/check-task-numbering.py --ci` 会扫描当前文档+全部归档报错并提示修正值（已用最大+1）
+- **语义化命名**：代码标识符（函数/变量/类/模块/config 键）与文档正文一律用**语义名**，**禁止用任务代号**（`plan-N`/`rf-N`/B 系列/F 系列等）。任务代号仅存在于内部计划表（`plan.md`/`review-findings.md`）作链接锚点，不扩散到实现层。新增功能**先定语义名再设计**（语义名即代码名），语义名映射表记录在各功能设计文档（如 `plan-investment-features.md` §2.0 功能语义命名表），保证「代码标识符 = 文档中文描述」一致。
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, llm-technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md, folders.md）
 - **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-menu.md, how-to-config.md, how-to-config-llm.md, how-to-use-registry.md, datasource.md, datasource-reliability.md, reports-instruction.md, faq.md, how-to-test-my-code.md, how-to-schedule.md, scripts-reference.md）
