@@ -1,6 +1,6 @@
 # 目录结构
 
-> 文档版本：0.10.1-dev
+> 文档版本：0.10.1
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -8,10 +8,10 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 220 | 52,541 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 4 | 3,589 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 主程序代码 | Python | 220 | 52,625 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 4 | 3,605 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 16 | 5,064 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **240** | **61,194** | 主程序 + 模板 + 脚本 |
+| **源代码合计** | — | **240** | **61,294** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **265** | **74,708** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **4,719 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
