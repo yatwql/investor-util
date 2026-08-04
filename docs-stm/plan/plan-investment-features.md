@@ -51,6 +51,8 @@
 | `data_quality` | 数据质量仪表盘 | 18 数据源可用性矩阵 | 监控 |
 | `holding_diagnosis` | 品种覆盖诊断 | 并入 `data_quality` | 监控 |
 
+> **合并章代码标识符**：章节 sheet key 统一为语义名——`style_factor`（风格与因子分析，合并原 `fund_style` + `factor_exposure`）；实现层（模块 `style_factor_sheet.py`、函数、变量、注释）一律用该语义名，禁止沿用旧 key 或以任何任务代号命名。
+
 ### 2.1 买入与选基
 
 **候选基金比较**（→ 5 章「候选比较」子模式，开关默认关）
@@ -85,7 +87,7 @@
 - **痛点**："组合收益从哪来、亏在哪只？"——哪几只品种贡献了主要盈利/亏损。
 - **数据源**：各品种盈亏（本地市值核算，现有）。**纯本地，零新增外部依赖**。
 - **形态**：TOP 5 品种按贡献占比（pp，非收益率）排序，正负分列（盈利来源/亏损来源）+ 正负合计摘要——**v0.7.x 已实现**（`prompts_core._build_profit_attribution_block`，注入 LLM 提示词），本轮扩展为行动建议章内的可读清单。
-- **范围边界（重要）**：只做「品种收益贡献」归因，**不做 Brinson 分解**（配置效应/选股效应/交互效应）。Brinson 分解已在 v0.7.x §4.2 不做清单与 v0.9.x plan-4 归档中**两次确认放弃**——3/4 关键输入不可突破（行业指数 K 线不稳定、基准行业权重无免费公开源、非 A 股/场外基金无行业归属），详见 [`archive/v0.9.x/abandoned-design/plan-4-brinson-attribution-abandoned.md`](../archive/v0.9.x/abandoned-design/plan-4-brinson-attribution-abandoned.md)。
+- **范围边界（重要）**：只做「品种收益贡献」归因，**不做 Brinson 分解**（配置效应/选股效应/交互效应）。Brinson 分解已在 v0.7.x §4.2 不做清单与 v0.9.x 归档设计文档「业绩归因（Brinson 分解）已放弃」中**两次确认放弃**——3/4 关键输入不可突破（行业指数 K 线不稳定、基准行业权重无免费公开源、非 A 股/场外基金无行业归属），详见[归档设计文档](../archive/v0.9.x/abandoned-design/plan-4-brinson-attribution-abandoned.md)。
 
 **调仓成本模拟**（→ what-if 独立报告）
 - **痛点**：what-if 回测不含交易成本，高估调仓收益；小资金高频调仓可能被摩擦成本完全吞噬。
@@ -179,7 +181,7 @@
 | 4 资产穿透TOP10 | 估值分位 | 加估值分位列 | `report_submodules.valuation_percentile` |
 | 5 基金业绩分析 | 候选基金比较模式 | 增强模式（候选来自 config/CLI，≤10） | `report_submodules.candidate_compare`（默认关） |
 | 7 持仓关系矩阵 | **合并原「持仓重合度矩阵」+「持仓相关性矩阵」** | 两矩阵并入一章，分上下两个矩阵区块 | 随 `enable_fund_deep_analysis` |
-| 9 风格与因子分析 | **合并原「基金风格分析」+「因子暴露分析」** + 行业 Beta 子表 | 风格+因子并区块 + 行业 Beta 子表 | `report_submodules.industry_beta` |
+| 9 风格与因子分析 | **合并原「基金风格分析」+「因子暴露分析」**（章节 sheet key 统一为 `style_factor`）+ 行业 Beta 子表 | 风格+因子并区块 + 行业 Beta 子表 | `report_submodules.industry_beta` |
 | 12 智囊团深度复盘 | **引用行动建议章（与 17 章共享）** | 复盘板块 + 「行动摘要」子块（指向 17 章） | `enable_action` |
 | 15 组合历史走势与回撤 | **合并原「组合历史走势」+「历史回撤分析」** + 危机区间标注、尾部风险 | 走势表 + 回撤矩阵区块 + 标注层 + 指标列 | `report_submodules.tail_risk` |
 | 16 组合演进 | 快照差异 | 顶部加差异摘要 | `report_submodules.snapshot_diff` |
