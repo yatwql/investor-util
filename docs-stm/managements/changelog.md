@@ -4,7 +4,31 @@
 
 ---
 
-## [0.10.2-dev] - 2026-08-04
+## [0.10.2] - 2026-08-04
+
+### 配置家族模块化重构（config 包）
+
+- **llm_settings 解析拆分为独立模块**：新增 `src/python/config/_llm_settings.py`（`get_llm_config()` 解析入口从 `_core.py` 迁出），`_core.py` 减 299 行回归 config.json 读写协调者角色；`__init__.py` 导出同步。
+- **命名对称**：`_llm_defaults.py` 更名为 `_llm_settings_defaults.py`（与 `_llm_settings.py` 解析入口配对、与 `<配置文件名>_defaults` 命名风格统一），`_llm_providers_defaults.py` 模板 dict 化。
+- **顶层键 patch 引擎迁入 `_json_patch.py`**：`_core.py` 中 6 个 JSON 文本 patch 引擎函数（顶层键扫描/替换/删除）迁入 `_json_patch.py`，`_core.py` 聚焦 config.json 读写协调，职责边界清晰。
+- **llm_settings 模板坏 JSON 修复**：`_get_default_llm_settings_template()` 生成的模板剥注释后无法解析（模块块缺键名、尾逗号），按 `_config_defaults.py` 手拼风格重写，模板现可解析且与 `_DEFAULT_LLM_SETTINGS` 深度一致；`data/config/config.json` 补齐 4 个缺失默认键（`enable_portfolio_evolution`/`enable_action`/`report_submodules`/`discipline`）并清理 B 区历史章节编号注释。
+- **测试隔离补齐**：features.json 持久化路径加入 `_isolate_sensitive_paths` fixture；新增 `TestLlmSettingsTemplateConsistency` 一致性测试（对照 config 模板测试）。
+
+### 语义命名与章节引用清理
+
+- **语义命名审计修复**：修复 3 处合并后语义残留（plural `_write_history_sheets`→`_write_portfolio_history_drawdown_sheet`、docstring「§阶段 C 轮 9」、注释「行动建议独立章 17」）。
+- **源码/模板注释章节数字引用清理**：统一为章节标题语义，消除过期编号与历史变更描述。
+- **文档章节引用标题化**：技术文档/用户手册（reports-instruction 等）章节引用统一改为标题语义，清理过期页签编号（22→20、21→20）。
+
+### 文档与计划状态同步
+
+- **管理+用户文档序号漂移修正**：requirements 页签编号 1~22→1~20、testplan 1.~21.→1.~20.、README 分六组→分七组 + 行动建议组、how-to-menu 补行动建议列、faq 1.~22.→1.~20.、folders 20 章表格→行动建议章表格共用。
+- **plan.md P1 状态更新**：plan-17~20（轮 1~11）标记已完成，推荐实施顺序 ①~④ 标 ✅，待办序列自 ⑤ 起；迭代计划文档阶段 A~C 状态列标注已完成。
+- **README 章节编号修正**：主报告 21 页签→20、数据源健康检查 #20→#19（与 registry 20 模块对齐）。
+
+### 工程与门禁
+
+- **启用 git pre-commit 任务编号校验 hook**（`.githooks/pre-commit` 补执行位），提交涉及编号文档时自动校验，与 `check-task-numbering.py` 双轨保障。
 
 ## [0.10.1] - 2026-08-04
 
