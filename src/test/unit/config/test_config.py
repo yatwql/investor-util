@@ -953,6 +953,33 @@ class TestDefaultConfigTemplateConsistency:
                 )
 
 
+class TestLlmSettingsTemplateConsistency:
+    """验证 _get_default_llm_settings_template() 生成的 JSON 模板与 _DEFAULT_LLM_SETTINGS 等效。
+
+    当在 _DEFAULT_LLM_SETTINGS 中新增配置项时，必须在模板字符串中同步添加；
+    反之，从模板中移除的键也应在 _DEFAULT_LLM_SETTINGS 中删除。
+    本测试通过解析模板并与 _DEFAULT_LLM_SETTINGS 深度比较来检测不一致。
+    """
+
+    @pytest.mark.unit_config
+    def test_template_equals_default_settings(self):
+        """llm_settings 模板 JSON 解析后应与 _DEFAULT_LLM_SETTINGS 深度相等。"""
+        import json
+
+        from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS, _get_default_llm_settings_template
+
+        template_str = _get_default_llm_settings_template()
+        cleaned = cfg._strip_json_comments(template_str)
+        parsed = json.loads(cleaned)
+
+        assert parsed == _DEFAULT_LLM_SETTINGS, (
+            f"llm_settings 模板与 _DEFAULT_LLM_SETTINGS 不一致\n"
+            f"模板独有键: {parsed.keys() - _DEFAULT_LLM_SETTINGS.keys()}\n"
+            f"默认独有键: {_DEFAULT_LLM_SETTINGS.keys() - parsed.keys()}\n"
+            f"值差异: {[k for k in parsed if parsed.get(k) != _DEFAULT_LLM_SETTINGS.get(k)]}"
+        )
+
+
 class TestIsEnablePortfolioEvolution(unittest.TestCase):
     """is_enable_portfolio_evolution 访问器测试（组合演进章节开关）。"""
 
@@ -1003,9 +1030,7 @@ class TestIsEnableDataQuality(unittest.TestCase):
         self.assertTrue(
             cfg.is_enable_data_quality({"report_submodules": {"data_quality": True, "industry_beta": False}})
         )
-        self.assertFalse(
-            cfg.is_enable_data_quality({"report_submodules": {"data_quality": False, "tail_risk": True}})
-        )
+        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": {"data_quality": False, "tail_risk": True}}))
 
 
 class TestIsEnableAction(unittest.TestCase):
