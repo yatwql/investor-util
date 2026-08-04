@@ -390,6 +390,41 @@ class TestValidateComparisonIndices(unittest.TestCase):
         self.assertEqual(n, 1)
 
 
+class TestValidateComparisonCandidates(unittest.TestCase):
+    """_validate_comparison_candidates 校验函数测试（候选基金比较子表候选列表）。"""
+
+    def test_missing_no_issue(self):
+        """缺失 → 正常。"""
+        n = val._validate_comparison_candidates({}, 0)
+        self.assertEqual(n, 0)
+
+    def test_not_list_warns(self):
+        """不是列表 → 告警（按空处理）。"""
+        n = val._validate_comparison_candidates({"comparison_candidates": "000001"}, 0)
+        self.assertEqual(n, 1)
+
+    def test_invalid_item_warns(self):
+        """含非法项（非 6 位码）→ 告警。"""
+        n = val._validate_comparison_candidates({"comparison_candidates": ["000001", "abc123"]}, 0)
+        self.assertEqual(n, 1)
+
+    def test_numeric_item_allowed(self):
+        """数值项（可归一化为 6 位码）→ 不告警。"""
+        n = val._validate_comparison_candidates({"comparison_candidates": [110022]}, 0)
+        self.assertEqual(n, 0)
+
+    def test_over_limit_warns(self):
+        """超过 10 只 → 告警（运行期截断）。"""
+        codes = [f"{i:06d}" for i in range(1, 12)]
+        n = val._validate_comparison_candidates({"comparison_candidates": codes}, 0)
+        self.assertEqual(n, 1)
+
+    def test_valid_list_no_issue(self):
+        """合法列表 → 无告警。"""
+        n = val._validate_comparison_candidates({"comparison_candidates": ["000001", "110022"]}, 0)
+        self.assertEqual(n, 0)
+
+
 class TestValidateRebalanceConfig(unittest.TestCase):
     """_validate_rebalance_config 测试。"""
 

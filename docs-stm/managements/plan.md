@@ -32,7 +32,7 @@
 | ② | ✅ **plan-18** 行动建议章 | P1 | 轮4~7 | 决策价值最高，纯算法 always 类型全报告可见 |
 | ③ | ✅ **plan-19** 持仓关系矩阵合并 | P1 | 轮8 | 物理合并流程模板，确立 C19 契约增删范式 |
 | ④ | ✅ **plan-20** 历史增强 | P1 | 轮9~11 | 合并组合历史+回撤 + 危机标注 + 尾部风险 |
-| ⑤ | **plan-21** 风格与选基 | P2 | 轮12~13 | ✅轮12 风格与因子合并 + 行业 Beta（已完成，20→19 章）；轮13 候选比较待实施 |
+| ⑤ | **plan-21** 风格与选基 | P2 | 轮12~13 | ✅轮12 风格与因子合并 + 行业 Beta（已完成，20→19 章）；✅轮13 候选基金比较增强（已完成，`candidate_compare` 默认关） |
 | ⑥ | **plan-22** 成本流水 | P2 | 轮14~16 | 依赖持仓文件格式扩展，输入→计算→渲染 |
 | ⑦ | **plan-23** 估值与温度 | P3 | 轮17~18 | 免费代理信号，合规敏感，放最后 |
 | ⑧ | **plan-24** 导航与收尾 | P3 | 轮19~20 | 分组导航 + 文档快照，收尾性质 |
@@ -61,7 +61,7 @@
 
 #### `plan-21` 风格与选基（[`plan-investment-iteration.md` 阶段D](./plan-investment-iteration.md)）— **推荐⑤**
 
-物理合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」（`style_factor`，一章三区块：风格表 + 因子回归 + 行业 Beta 子表）——**轮 12 已完成**（章节数 20→19，registry.number 重新编号，C19 契约 `style_factor_data` 删旧建新，dev-verify 1568 passed + 3 check 全 [OK]）；5 章候选基金比较增强模式（`candidate_compare` 默认关）——**轮 13 待实施**。
+物理合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」（`style_factor`，一章三区块：风格表 + 因子回归 + 行业 Beta 子表）——**轮 12 已完成**（章节数 20→19，registry.number 重新编号，C19 契约 `style_factor_data` 删旧建新，dev-verify 1568 passed + 3 check 全 [OK]）；基金业绩分析章候选基金比较增强模式（`candidate_compare` 默认关）——**轮 13 已完成**（核心模块 `report/fund_candidate.py`，Excel/HTML 双渲染，新增测试 23 个，覆盖率 99%，dev-verify 1568 passed）。
 
 #### `plan-22` 成本流水（[`plan-investment-iteration.md` 阶段E](./plan-investment-iteration.md)）— **推荐⑥**
 

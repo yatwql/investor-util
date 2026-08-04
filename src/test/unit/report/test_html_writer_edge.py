@@ -215,11 +215,11 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
                     return_value=({"top10": [], "summary": {}, "industry_success": False}, False, True),
                 )
             )
-            # 基金业绩子函数 mock
+            # 基金业绩子函数 mock（第二项为候选比较数据，开关关闭时为 None）
             stack.enter_context(
                 patch(
                     "src.python.report.html_writer._render_fund_performance_section",
-                    return_value=([], True),
+                    return_value=([], None),
                 )
             )
             # data_status mock — industry 失败
@@ -275,11 +275,11 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
                     return_value=({"top10": [], "summary": {}, "industry_success": True}, True, True),
                 )
             )
-            # 基金业绩子函数 — profit_success=False
+            # 基金业绩子函数 — profit_success=False（第二项为候选比较数据，开关关闭时为 None）
             stack.enter_context(
                 patch(
                     "src.python.report.html_writer._render_fund_performance_section",
-                    return_value=([], False),
+                    return_value=([], None),
                 )
             )
             stack.enter_context(
@@ -337,7 +337,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
             stack.enter_context(
                 patch(
                     "src.python.report.html_writer._render_fund_performance_section",
-                    return_value=([], True),
+                    return_value=([], None),
                 )
             )
             # 穿透 data_status 抛异常 → 被辅助函数捕获，结果为 {}
@@ -432,7 +432,7 @@ class TestWriteHtmlReportFundDeepAnalysisEmpty(unittest.TestCase):
         stack.enter_context(
             patch(
                 "src.python.report.html_writer._render_fund_performance_section",
-                return_value=([], True),
+                return_value=([], None),
             )
         )
         # 4 个基金深度分析模块返回空数据

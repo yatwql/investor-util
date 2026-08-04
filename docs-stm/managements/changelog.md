@@ -18,6 +18,15 @@
 - **测试**：新增 `src/test/unit/analysis/test_industry_beta.py`（11 例：行业暴露占比 / Beta 回归 / 显著性 / 数据不足 / 开关关隐藏 / push2 行业分类降级占位 / 固定 fixture 解析解误差 <0.01）、`src/test/unit/report/test_style_factor_sheet.py`（合并章三区块渲染 / 行业 Beta 三态 / 可见性）；旧 `fund_style`/`factor_exposure` 测试迁移适配；`test_orchestrator.py`/`test_html_report_structure*.py`/`test_registry.py`/`test_config*.py`/`test_scenario_section_order.py` 同步（键 `factor_exposure`→`style_factor_data`、19 章、7 种可见性类型）。新增模块覆盖率：industry_beta 94% / style_factor_sheet 97%。
 - **文档同步**：technical.md（模块数 20→19、data_flag 表、§4.8 一章三区块、附录 H 契约）、requirements.md（§6.3/6.4 章节合并重编号）、全部用户手册（how-to-menu / how-to-config / how-to-use-registry / reports-instruction / faq / datasource）、test-coverage.md（模式计数 + 功能域 + unit 子分组）、folders.md 目录树。
 
+#### 基金业绩分析章候选基金比较增强模式（plan-21 轮13，`candidate_compare` 默认关）
+
+- **核心模块**：新增 `src/python/report/fund_candidate.py`——`resolve_candidates()`（6 位代码校验 / 去重 / 超 10 截断 + `exceed_limit` 标记）、`build_candidate_compare_data()`（开关门控 → 无有效候选降级 → 正常）、`_build_candidate_row()`（收益近1月/3月/6月/1年 + 同类排名 + 评级 + 最大回撤 + 风格 + 与现有持仓重合度，单候选失败 `available=False` 短路不阻塞其余）。比较维度不含规模/费率（无数据源，已验证）；重合度复用 `fund_overlap.compute_overlap_matrix`（Jaccard），风格复用 `fund_style_classify.classify_fund_style`（C1 复用）；`risk_analysis` 最大回撤百分数数值 `/100.0` 归一化为小数与 `syl_*_raw` 口径一致（Excel FMT_PERCENT 直接可用）。
+- **配置层**：`report_submodules.candidate_compare` **默认关**（关闭时 `build_candidate_compare_data` 返回 None，基金业绩分析章输出与改造前一致）+ 顶层 `comparison_candidates`（6 位基金代码列表 ≤10）；`_core.py` 新增访问器 `is_enable_candidate_compare` / `get_comparison_candidates`（镜像既有 data_quality 模式，非 list/str/int 数值归一化容错）；`_validation.py` 新增 `_validate_comparison_candidates`（非列表 / 非法项 / >10 告警，数值项允许）。
+- **Excel 渲染**：`fund_performance.py` 末尾（数据状态脚注后、冻结/列宽前）条件渲染候选比较子表 `_write_candidate_compare_block`（11 列：候选基金/代码/评级/近1月/近3月/近6月/近1年/同类排名/最大回撤/风格/与持仓重合），可用行百分比列 FMT_PERCENT，失败行"获取失败"占位，`exceed_limit`/`invalid` 各写提示行。
+- **HTML 渲染**：`html_renderers._render_fund_performance_section` 返回 `(perf_data, candidate_data)`，`html_writer` 传入模板；`report_template.html` 基金业绩分析章主业绩表后新增候选比较区块（`.block-title`「候选基金比较（候选来自 config.comparison_candidates）」+ 11 列表格 + 失败占位行 + 超限/无效脚注），`candidate_data` 不可用时整块不输出（行为断言）。
+- **测试**：新增 `src/test/unit/report/test_fund_candidate.py`（23 例：候选校验/截断/开关门控/全维度行/单候选失败降级/CLI 合并/缺期间非法值/风格与重合度失败降级/现有持仓收集），`test_html_writer.py` 新增 `TestCandidateCompareTemplate`（7 例，从真实模板配平截取候选区块渲染，断言开关关无子表、开启 11 列正确、失败占位、超限/无效脚注），`test_config.py`/`test_config_validation.py` 新增候选配置访问器与校验测试。fund_candidate 覆盖率 99%。
+- **文档同步**：plan.md（plan-21 轮13 已完成）、plan-investment-iteration.md（轮13 验收签字）、how-to-config.md（开关 + 候选列表说明）、reports-instruction.md（基金业绩分析比较子表说明）、folders.md 目录树补 `fund_candidate.py`/`test_fund_candidate.py`。
+
 ## [0.10.2] - 2026-08-04
 
 ### 配置家族模块化重构（config 包）

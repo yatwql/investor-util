@@ -401,6 +401,54 @@ def is_enable_data_quality(config: dict | None = None) -> bool:
     return bool(val)
 
 
+def is_enable_candidate_compare(config: dict | None = None) -> bool:
+    """5 章候选基金比较子表是否启用。
+
+    读取 `report_submodules.candidate_compare`，默认关（向后兼容，既有
+    5 章「基金业绩分析」输出不变）。
+
+    Args:
+        config: 完整配置字典，为 None 时读取全局配置
+    """
+    if config is None:
+        config = get_config()
+    submodules = config.get("report_submodules")
+    if not isinstance(submodules, dict):
+        return False
+    val = submodules.get("candidate_compare")
+    if val is None:
+        logger.debug("config.json 缺少 report_submodules.candidate_compare，使用默认值 false")
+        return False
+    return bool(val)
+
+
+def get_comparison_candidates(config: dict | None = None) -> list[str]:
+    """候选基金比较子表候选基金代码列表。
+
+    读取 `comparison_candidates`，返回 6 位基金代码字符串列表；
+    缺失或非法类型返回空列表（安全降级，不抛错）。
+
+    Args:
+        config: 完整配置字典，为 None 时读取全局配置
+    """
+    if config is None:
+        config = get_config()
+    raw = config.get("comparison_candidates")
+    if not isinstance(raw, list):
+        if raw not in (None, ""):
+            logger.warning("config.json comparison_candidates 非法（应为列表），忽略")
+        return []
+    result: list[str] = []
+    for item in raw:
+        if isinstance(item, str):
+            result.append(item.strip())
+        elif isinstance(item, (int, float)):
+            result.append(str(int(item)).zfill(6))
+        else:
+            logger.warning("config.json comparison_candidates 含非法项 %r，忽略", item)
+    return [c for c in result if c]
+
+
 def _ensure_llm_providers_file() -> None:
     """若 llm_providers.json 不存在，用默认值自动创建。"""
     providers_path = _llm_providers._get_llm_providers_path()

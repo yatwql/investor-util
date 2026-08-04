@@ -10,6 +10,7 @@ from src.python.fetcher.akshare import get_dividend_data, get_profit_forecast
 from src.python.fetcher.fund import fetch_fund_holdings_cached
 from src.python.fetcher.index import fetch_indices, fetch_us_indices
 from src.python.core.models import Holding
+from src.python.report.fund_candidate import build_candidate_compare_data
 from src.python.report.fund_concentration import compute_concentration
 from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
 from src.python.report.fund_overlap import compute_overlap_matrix
@@ -244,15 +245,19 @@ def _render_fund_performance_section(
     holdings: list[Holding],
     details: list,
     prog: ProgressReporter,
-) -> tuple[list[dict[str, Any]], bool]:
+) -> tuple[list[dict[str, Any]], dict | None]:
     """构建基金业绩分析数据。
 
     Returns:
-        (perf_data, True) — 第二项为固定值
+        (perf_data, candidate_data) — 第二项为候选基金比较数据
+        （开关 `report_submodules.candidate_compare` 关闭时返回 None，5 章不渲染比较子表）
     """
     prog.info("正在获取基金业绩排名...")
     perf_data = _build_perf_data(holdings, details, progress=prog)
-    return perf_data, True
+    candidate_data = build_candidate_compare_data(holdings)
+    if candidate_data is not None and candidate_data.get("available"):
+        prog.ok("候选基金比较数据构建完成")
+    return perf_data, candidate_data
 
 
 def _render_manager_analysis(

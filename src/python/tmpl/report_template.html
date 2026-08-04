@@ -1317,6 +1317,50 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {% else %}
         <div class="empty-note">未检测到基金持仓</div>
         {% endif %}
+        {% if candidate_data and candidate_data.get("available") %}
+        <div class="block-title">候选基金比较（候选来自 config.comparison_candidates）</div>
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>候选基金</th><th>代码</th><th>评级</th><th>近1月</th><th>近3月</th><th>近6月</th><th>近1年</th>
+                        <th>同类排名</th><th>最大回撤</th><th>风格</th><th>与持仓重合</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in candidate_data["rows"] %}
+                    {% if c.get("available") %}
+                    <tr>
+                        <td class="text-left">{{ c["name"] }}</td>
+                        <td>{{ c["code"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{{ c["rating"] }}</td>
+                        <td class="{% if c.get('syl_近1月_raw') is number %}{% if c['syl_近1月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近1月"] }}</td>
+                        <td class="{% if c.get('syl_近3月_raw') is number %}{% if c['syl_近3月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近3月"] }}</td>
+                        <td class="{% if c.get('syl_近6月_raw') is number %}{% if c['syl_近6月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近6月"] }}</td>
+                        <td class="{% if c.get('syl_近1年_raw') is number %}{% if c['syl_近1年_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近1年"] }}</td>
+                        <td>{{ c["rank_text"] }}</td>
+                        <td class="{% if c.get('max_drawdown_raw') is number and c['max_drawdown_raw'] < 0 %}loss{% endif %}">{{ c["max_drawdown"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{{ c["style"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{% if c.get("overlap_name") %}{{ c["overlap_jaccard"] }}（{{ c["overlap_name"] }}）{% else %}{{ c["overlap_jaccard"] }}{% endif %}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="text-left">{{ c.get("name", c["code"]) }}</td>
+                        <td>{{ c["code"] }}</td>
+                        <td colspan="9" class="text-left" style="font-size: 12px; color: #b0413e;">数据获取失败（排名接口不可用），该候选跳过</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if candidate_data.get("exceed_limit") %}
+        <div class="penetration-notes"><div>* 候选基金超过 10 只，仅比较前 10 只（超出部分忽略）。</div></div>
+        {% endif %}
+        {% if candidate_data.get("invalid") %}
+        <div class="penetration-notes"><div>* 无效候选代码（忽略）: {{ candidate_data["invalid"] | join('、') }}。</div></div>
+        {% endif %}
+        {% endif %}
         <div class="penetration-notes">
             <div>* 业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿)；超额收益评分≥80上调一级、&lt;40下调一级</div>
         </div>

@@ -1049,6 +1049,10 @@ def _get_pool() -> ThreadPoolExecutor:
                                  基金深度分析 6 个 /
                                  excel_writer.py +
                                  styles.py
+                                 基金业绩分析候选比较子表:
+                                 fund_candidate.py
+                                 (candidate_compare 默认关,
+                                 Excel/HTML 双端渲染)
 ```
 
 ### 4.2 报告编排器

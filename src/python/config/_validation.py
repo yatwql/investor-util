@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any
 
 from src.python.core.constants import PROJECT_ROOT
@@ -420,6 +421,33 @@ def _validate_comparison_indices(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_comparison_candidates(config: dict, issues: int) -> int:
+    """验证 comparison_candidates 候选基金代码列表。
+
+    - 非列表 → 告警（候选比较子表按空处理）
+    - 项非 6 位数字 → 告警（该项忽略）
+    - 超过 10 只 → 告警（运行期截断前 10）
+    """
+    raw = config.get("comparison_candidates")
+    if raw is None:
+        return issues
+    if not isinstance(raw, list):
+        logger.warning("config.json comparison_candidates = %r 不是列表，将按空处理", raw)
+        return issues + 1
+    code_re = re.compile(r"^\d{6}$")
+    for idx, item in enumerate(raw):
+        if isinstance(item, str) and code_re.match(item.strip()):
+            continue
+        if isinstance(item, (int, float)):
+            continue  # 数值型可经 get_comparison_candidates 归一化为 6 位码
+        logger.warning("config.json comparison_candidates[%d] = %r 非法（应为 6 位基金代码），忽略", idx, item)
+        issues += 1
+    if len(raw) > 10:
+        logger.warning("config.json comparison_candidates 超过 10 只上限，运行期仅比较前 10 只")
+        issues += 1
+    return issues
+
+
 def _validate_rebalance_config(config: dict, issues: int) -> int:
     """验证 rebalance 配置段。"""
     rb, issues = _section(config, "rebalance", dict, "再平衡配置无效，将使用默认值", issues)
@@ -579,6 +607,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_history_fetch_mode(config, issues)
     issues = _validate_history_lookback_days(config, issues)
     issues = _validate_comparison_indices(config, issues)
+    issues = _validate_comparison_candidates(config, issues)
     issues = _validate_rebalance_config(config, issues)
     issues = _validate_discipline_config(config, issues)
     issues = _validate_enable_llm(issues)

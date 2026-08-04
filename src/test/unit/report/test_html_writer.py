@@ -191,6 +191,177 @@ class TestNewsLlmMetaTemplate(unittest.TestCase):
 
 
 # ============================================================
+#  候选基金比较子表 — 5 章「基金业绩分析」模板区块
+# ============================================================
+
+
+class TestCandidateCompareTemplate(unittest.TestCase):
+    """验证候选基金比较子表在真实模板中的渲染结果。
+
+    行为断言（对应轮13 验收标准）：
+      - 开关默认关（candidate_data 为空/不可用）→ 5 章无比较子表
+      - 开关开启且 available → 正确渲染 11 列比较表
+      - 单候选获取失败 → 该行显示"数据获取失败"占位
+      - 候选 >10 / 存在无效代码 → 渲染提示行
+    """
+
+    def setUp(self):
+        from jinja2 import Environment
+
+        self.env = Environment()
+        tmpl_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "python",
+            "tmpl",
+            "report_template.html",
+        )
+        self.tmpl_path = os.path.normpath(tmpl_path)
+
+    def _extract_candidate_block(self) -> str:
+        """从真实模板中提取候选基金比较区块（按 if/endif 配平截取）。"""
+        with open(self.tmpl_path, encoding="utf-8") as f:
+            html = f.read()
+        start_marker = '{% if candidate_data and candidate_data.get("available") %}'
+        start = html.find(start_marker)
+        self.assertNotEqual(start, -1, "模板中未找到候选基金比较区块起点")
+        depth = 0
+        pos = start
+        while True:
+            nxt_if = html.find("{% if", pos)
+            nxt_endif = html.find("{% endif %}", pos)
+            self.assertNotEqual(nxt_endif, -1, "模板中候选基金比较区块未闭合")
+            if nxt_if != -1 and nxt_if < nxt_endif:
+                depth += 1
+                pos = nxt_if + len("{% if")
+            else:
+                depth -= 1
+                pos = nxt_endif + len("{% endif %}")
+                if depth == 0:
+                    return html[start:pos]
+
+    def _render_candidate_block(self, candidate_data: dict | None) -> str:
+        """渲染真实模板的候选比较区块。"""
+        tpl = self.env.from_string(self._extract_candidate_block())
+        return tpl.render(candidate_data=candidate_data or {})
+
+    def test_switch_off_no_candidate_block(self):
+        """开关默认关（candidate_data=None/不可用）→ 无比较子表。"""
+        for data in (None, {"available": False, "reason": "no_valid_candidate", "rows": []}):
+            html = self._render_candidate_block(data)
+            self.assertEqual(html.strip(), "", f"candidate_data={data!r} 不应渲染比较子表")
+
+    def test_available_renders_table_headers(self):
+        """开启且 available → 渲染 11 列比较表。"""
+        candidate_data = {
+            "available": True,
+            "exceed_limit": False,
+            "invalid": [],
+            "rows": [self._sample_row()],
+        }
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("候选基金比较", html)
+        for header in (
+            "候选基金",
+            "代码",
+            "评级",
+            "近1月",
+            "近3月",
+            "近6月",
+            "近1年",
+            "同类排名",
+            "最大回撤",
+            "风格",
+            "与持仓重合",
+        ):
+            self.assertIn(f"<th>{header}</th>", html)
+
+    def test_available_renders_row_values(self):
+        """候选行各维度数值正确渲染（收益/排名/回撤/风格/重合度）。"""
+        candidate_data = {
+            "available": True,
+            "exceed_limit": False,
+            "invalid": [],
+            "rows": [self._sample_row()],
+        }
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("候选基金A", html)
+        self.assertIn("000001", html)
+        self.assertIn("优秀", html)
+        self.assertIn("1.23%", html)
+        self.assertIn("159/358", html)
+        self.assertIn("-18.50%", html)
+        self.assertIn("大盘成长", html)
+        self.assertIn("50.00%（现有基金X）", html)
+
+    def test_failed_row_shows_placeholder(self):
+        """单候选获取失败 → 显示'数据获取失败'占位行。"""
+        row = self._sample_row()
+        row["available"] = False
+        row["reason"] = "rank_unavailable"
+        candidate_data = {"available": True, "exceed_limit": False, "invalid": [], "rows": [row]}
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("数据获取失败", html)
+
+    def test_exceed_limit_footnote_rendered(self):
+        """候选 >10 只截断 → 渲染超限提示。"""
+        candidate_data = {
+            "available": True,
+            "exceed_limit": True,
+            "invalid": [],
+            "rows": [self._sample_row()],
+        }
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("候选基金超过 10 只", html)
+
+    def test_invalid_codes_footnote_rendered(self):
+        """存在无效候选代码 → 渲染忽略提示。"""
+        candidate_data = {
+            "available": True,
+            "exceed_limit": False,
+            "invalid": ["abc123", "123"],
+            "rows": [self._sample_row()],
+        }
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("无效候选代码（忽略）", html)
+        self.assertIn("abc123、123", html)
+
+    def test_candidate_block_present_in_template(self):
+        """模板确实包含候选基金比较区块（结构性自检）。"""
+        block = self._extract_candidate_block()
+        self.assertIn("候选基金比较", block)
+        self.assertIn("comparison_candidates", block)
+
+    @staticmethod
+    def _sample_row() -> dict:
+        """构造一个 available 候选行样例。"""
+        return {
+            "code": "000001",
+            "name": "候选基金A",
+            "rating": "优秀",
+            "syl_近1月": "1.23%",
+            "syl_近1月_raw": 0.0123,
+            "syl_近3月": "5.67%",
+            "syl_近3月_raw": 0.0567,
+            "syl_近6月": "11.01%",
+            "syl_近6月_raw": 0.1101,
+            "syl_近1年": "-2.01%",
+            "syl_近1年_raw": -0.0201,
+            "rank_text": "159/358",
+            "max_drawdown": "-18.50%",
+            "max_drawdown_raw": -0.185,
+            "style": "大盘成长",
+            "overlap_name": "现有基金X",
+            "overlap_jaccard": "50.00%",
+            "overlap_jaccard_raw": 0.5,
+            "available": True,
+            "reason": "",
+        }
+
+
+# ============================================================
 #  write_html_report — news_llm_meta 参数透传
 # ============================================================
 

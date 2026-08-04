@@ -45,6 +45,7 @@ _DEFAULT_CONFIG = {
     "report_submodules": {
         "data_quality": False,  # 「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖）
         "industry_beta": False,  # 「风格与因子分析」→ 行业 Beta 子表（穿透行业暴露占比 + 行业指数 β）
+        "candidate_compare": False,  # 5章「基金业绩分析」→ 候选基金比较子表（候选来自 comparison_candidates）
     },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
@@ -78,6 +79,7 @@ _DEFAULT_CONFIG = {
     "user_fund_benchmarks": {},
     # 竞争语境对比指数池（默认沪深300+中证500+中证全债）
     "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
+    "comparison_candidates": [],  # 候选基金比较子表候选（6 位基金代码列表，≤10；与 report_submodules.candidate_compare 配合）
     # ── G. 持仓快照 ──
     "history": {
         "fetch_mode": "auto",  # 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
@@ -194,6 +196,8 @@ def _build_template_from_defaults() -> str:
         f'  "user_fund_benchmarks": {json.dumps(d["user_fund_benchmarks"])},',
         "  // 竞争语境对比指数池（默认沪深300+中证500+中证全债）",
         f'  "comparison_indices": {json.dumps(d["comparison_indices"], ensure_ascii=False)},',
+        "  // 候选基金比较子表候选（6 位基金代码列表，≤10；与 report_submodules.candidate_compare 配合）",
+        f'  "comparison_candidates": {json.dumps(d["comparison_candidates"])},',
         "",
         # ── G ──
         "  // ── G. 组合历史走势与持仓快照 ──",

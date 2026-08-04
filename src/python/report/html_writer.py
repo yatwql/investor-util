@@ -252,6 +252,7 @@ def _render_template(
     cat_data: list,
     penetration: dict,
     perf_data: list,
+    candidate_data: dict | None,
     news_data: list,
     _news_llm_meta: dict | None,
     has_llm_analysis: bool,
@@ -320,6 +321,7 @@ def _render_template(
         cat_data=cat_data,
         penetration=penetration,
         perf_data=perf_data,
+        candidate_data=candidate_data,
         # SAC: news_data[*].enriched_keywords[*].display 来自外部 API
         # 模板中已禁用 |safe 过滤器，依赖 autoescape 防 XSS —— 勿加 |safe
         news_data=news_data,
@@ -461,7 +463,7 @@ def write_html_report(
     # ── 5~7) 分类表 / 穿透 / 基金业绩 ──
     cat_data, cat_dividend_ok = _render_category_table(holdings, details, prog)
     penetration, penetration_profit_ok, penetration_dividend_ok = _render_penetration_section(holdings, details, prog)
-    perf_data, _ = _render_fund_performance_section(holdings, details, prog)
+    perf_data, candidate_data = _render_fund_performance_section(holdings, details, prog)
 
     # ── 5b) Chart.js 数据集补齐：category_doughnut / industry_bar / penetration_bar ──
     # 这三张图的数据源（cat_data / penetration）只在 write_html_report 内计算，
@@ -615,6 +617,7 @@ def write_html_report(
         cat_data=cat_data,
         penetration=penetration,
         perf_data=perf_data,
+        candidate_data=candidate_data,
         news_data=news_data,
         _news_llm_meta=_news_llm_meta,
         has_llm_analysis=has_llm_analysis,

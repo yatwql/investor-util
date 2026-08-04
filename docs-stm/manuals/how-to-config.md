@@ -19,7 +19,8 @@
   "enable_portfolio_evolution": true,  // 组合演进
   "enable_action": false,     // 行动建议（默认关）
   // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": false},  // 数据质量仪表盘默认关
+  "report_submodules": {"data_quality": false, "candidate_compare": false},  // 数据质量仪表盘 / 基金业绩分析候选基金比较 默认关
+  "comparison_candidates": [],  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合 candidate_compare）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -169,6 +170,8 @@
 | `enable_portfolio_evolution` | `true` | 组合演进章节可见性，关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
 | `enable_action` | `false` | 行动建议章节可见性，**默认关闭**，开启后显示 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。智囊团深度复盘同步显示「行动摘要」子块 | 菜单 `P` |
 | `report_submodules.data_quality` | `false` | 数据质量仪表盘子模块开关，**默认关闭**。开启后报告展示数据质量仪表盘区块（数据覆盖/时效性/降级状态） | 手动编辑 |
+| `report_submodules.candidate_compare` | `false` | 「基金业绩分析」章候选基金比较子表开关，**默认关闭**。开启后报告在该章主业绩表下方展示候选基金横向比较表（候选来自 `comparison_candidates`，比较维度：收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度） | 手动编辑 |
+| `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
 
 ---
 
