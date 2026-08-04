@@ -1,7 +1,7 @@
 """候选基金比较增强模块 —「基金业绩分析」章候选比较子表。
 
 候选基金横向比较（收益 / 同类排名 / 评级 / 最大回撤 / 风格 / 与现有持仓重合度）。
-开关 `report_submodules.candidate_compare`（**默认关**，向后兼容既有输出），
+开关 `report_submodules.candidate_compare`（**默认关**，未开启时维持既有输出），
 候选基金代码来自 config `comparison_candidates`（6 位基金代码列表，≤10 只）。
 
 数据降级：

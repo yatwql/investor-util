@@ -303,7 +303,7 @@ def _build_expert_review_prompt(
         _scenario_appended = False
         if enable_conditional:
             try:
-                from src.python.config._core import get_llm_config
+                from src.python.config._llm_settings import get_llm_config
 
                 _cfg = get_llm_config()
                 _scenarios = (_cfg or {}).get("debate", {}).get("conditional", {}).get("scenarios", [])
@@ -337,7 +337,7 @@ def _build_expert_review_prompt(
     # ── 集中度问答引导 ──────────────────────────────────
     if enable_qa_concentration:
         try:
-            from src.python.config._core import get_llm_config
+            from src.python.config._llm_settings import get_llm_config
 
             _cfg = get_llm_config()
             _threshold = (_cfg or {}).get("debate", {}).get("qa_concentration", {}).get("threshold", 0.20)
@@ -516,7 +516,7 @@ def _build_debate_synthesis_prompt(
 
     if enable_conditional:
         try:
-            from src.python.config._core import get_llm_config
+            from src.python.config._llm_settings import get_llm_config
 
             _cfg = get_llm_config()
             _scenarios = (_cfg or {}).get("debate", {}).get("conditional", {}).get("scenarios", [])
@@ -539,7 +539,7 @@ def _build_debate_synthesis_prompt(
  # ── 集中度问答（对齐需求 R-LLM-DB-QA-） ────
     if enable_qa_concentration:
         try:
-            from src.python.config._core import get_llm_config
+            from src.python.config._llm_settings import get_llm_config
 
             _cfg = get_llm_config()
             _threshold = (_cfg or {}).get("debate", {}).get("qa_concentration", {}).get("threshold", 0.20)

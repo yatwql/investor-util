@@ -8,13 +8,13 @@
   "llm_providers_file": "data/config/llm_providers.json",
 
   // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──
-  "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露+相关性
+  "enable_fund_deep_analysis": true,  // 基金深度分析（业绩/经理变更/持仓关系/集中度/风格因子）
   "enable_news": true,  // 市场新闻
   "enable_history": true,  // 组合历史走势+回撤
   "enable_portfolio_evolution": true,  // 组合演进
   "enable_action": false,  // 行动建议独立章（决策行动，默认关）
   // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": false},  // 数据质量仪表盘默认关
+  "report_submodules": {"data_quality": false, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘默认关
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -87,6 +87,8 @@
   "user_fund_benchmarks": {},
   // 竞争语境对比指数池（默认沪深300+中证500+中证全债）
   "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
+  // 候选基金比较子表候选（6 位基金代码列表，≤10；与 report_submodules.candidate_compare 配合）
+  "comparison_candidates": [],
 
   // ── G. 组合历史走势与持仓快照 ──
   "history": {
@@ -116,7 +118,7 @@
     "equity_fixed_income": {}  // 权益/固收超大类目标配置（空=不启用）
   },
 
-  // ── I2. 交易纪律配置 ──
+  // ── 交易纪律配置 ──
   "discipline": {
     "take_profit_pct": 20.0,  // 止盈线：单品种收益率 ≥ 此值 → 建议部分止盈
     "stop_loss_pct": -15.0,  // 止损线：单品种收益率 ≤ 此值 → 建议止损/减仓

@@ -726,6 +726,4 @@
 | `_startup_wizard_shown` | 首次运行引导是否已显示 |
 | `_privacy_notice_shown` | 隐私声明是否已显示 |
 
-**为什么独立存放：** config.json 受 git 跟踪、用于跨机器同步。若把"本机是否已看过引导"这类个性化标志写入 config.json，每台机器会写入各自不同的值，导致 config.json 难以同步。故机器个性化状态统一放 `data/state/` 目录（与熔断器状态、再平衡静默期等同目录），不参与同步。
-
-**兼容迁移：** 如 config.json 中存在这两个键，程序首次读取时会自动迁移到 `local_state.json` 并从 config.json 删除，无需手动清理。
+**为什么独立存放：** config.json 受 git 跟踪、用于跨机器同步。若把"本机是否已看过引导"这类个性化标志写入 config.json，每台机器会写入各自不同的值，导致 config.json 难以同步。故机器个性化状态统一放 `data/state/` 目录（与熔断器状态、再平衡静默期等同目录），不参与同步。这两个键仅由 `config/_local_state.py` 在 `data/state/local_state.json` 中读写，不做任何 config.json 迁移。

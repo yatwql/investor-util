@@ -35,7 +35,7 @@ def _mock_short_result() -> tuple[str, bool]:
 class TestDebateTokenBudgetExceeded(unittest.TestCase):
     """Token 预算超限 → 跳过 synthesis，返回 pro+con 拼接。"""
 
-    @patch("src.python.config._core.get_llm_config")
+    @patch("src.python.config._llm_settings.get_llm_config")
     @patch("src.python.llm.generators.generate_llm_module")
     def test_budget_exceeded_skips_synthesis(self, mock_gen, mock_config):
         """低预算下 pro+con 后跳过 synthesis。"""
@@ -74,7 +74,7 @@ class TestDebateTokenBudgetExceeded(unittest.TestCase):
 class TestDebateTokenBudgetNormal(unittest.TestCase):
     """Token 未超限 → 正常执行。"""
 
-    @patch("src.python.config._core.get_llm_config")
+    @patch("src.python.config._llm_settings.get_llm_config")
     @patch("src.python.llm.generators.generate_llm_module")
     def test_budget_ok_full_execution(self, mock_gen, mock_config):
         """正常预算下三段全部执行。"""
@@ -111,7 +111,7 @@ class TestDebateTokenBudgetNormal(unittest.TestCase):
 class TestDebateTokenBudget2xFallback(unittest.TestCase):
     """超过 2× 预算 → 跳过所有 debate，回退普通模式。"""
 
-    @patch("src.python.config._core.get_llm_config")
+    @patch("src.python.config._llm_settings.get_llm_config")
     @patch("src.python.llm.generators.generate_llm_module")
     def test_budget_2x_skips_all(self, mock_gen, mock_config):
         """超 2× 预算 → 返回 (None, None, None)。"""

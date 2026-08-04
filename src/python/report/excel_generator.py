@@ -176,14 +176,14 @@ def generate_excel_report(
         enable_history: board 层 — 历史走势章节是否开启
         enable_portfolio_evolution: board 层 — 组合演进章节是否开启
         enable_data_quality: 子模块 — 数据质量仪表盘（源健康+品种覆盖），
-            默认 False（向后兼容，该章保持旧「数据源可用性矩阵」样式）
+            默认 False（未开启时该章保持旧「数据源可用性矩阵」样式）
         progress: 进度报告接口（默认 SilentProgressReporter，不输出）
         section_order: 可选的自定义报告模块顺序，来自 get_report_section_order(config)
         pipeline_data: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
         history_data: 组合历史走势数据（含基准指数），来自 PortfolioHistoryCalculator。
                       未提供或 status=unavailable 时页签显示占位文本。
         enable_cost_lots: 子模块 — 成本流水（成本分档 + XIRR + 分红累计）。
-            默认 False（向后兼容，「投资分析汇总」/「市值核算明细表」/「持仓分类表」保持既有输出）
+            默认 False（未开启时「投资分析汇总」/「市值核算明细表」/「持仓分类表」保持既有输出）
         transactions: 交易流水记录（「交易流水」页签），成本分档/FIFO 批次与 XIRR 现金流用
         dividends: 分红流水记录（「分红流水」页签），分红累计与 XIRR 现金流用
         valuation_data: 估值分位数据契约（当前 PE/PB + 价格分位代理），
@@ -340,7 +340,7 @@ def generate_excel_report(
             except Exception:
                 logger.debug("[excel] 数据质量仪表盘页签写入失败（非关键）", exc_info=True)
         else:
-            # 开关关闭：该章保持旧「数据源可用性矩阵」样式（向后兼容）
+            # 开关关闭：该章保持旧「数据源可用性矩阵」样式
             _write_data_source_matrix_sheet(ws_ds, prog)
 
     # ── 组合历史走势：环比对比摘要（写入 summary 页签底部） ──

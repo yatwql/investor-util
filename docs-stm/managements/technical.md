@@ -2162,7 +2162,7 @@ config.json (基础配置)       → get_config() 内存缓存，按 mtime 自�
 llm_settings.json (非敏感)    → get_llm_config() 合并读取，联合 mtime 失效
 llm_key.json (敏感凭据)       → 覆盖 llm_settings.json 的同名字段；多凭据块供 credentials_ref 引用
 llm_providers.json (链配置)   → _load_llm_providers() 读取，_inject_provider_chain_data 注入
-local_state.json (机器本地)   → get_flag()/set_flag() 读写；config.json 旧键惰性迁移（_migrate_legacy_keys）
+local_state.json (机器本地)   → get_flag()/set_flag() 读写
 ```
 
 `config/` 子包结构：
@@ -2173,7 +2173,7 @@ config/
 ├── _comments.py                  # JSON 注释剥离（_strip_json_comments）
 ├── _config_defaults.py           # config.json 默认值定义 + 模板生成
 ├── _core.py                      # 核心读写：get_config()、set_config()、del_config()、init_config()
-├── _local_state.py               # 机器本地状态读写（get_flag/set_flag，data/state/local_state.json，含 config.json 旧键惰性迁移）
+├── _local_state.py               # 机器本地状态读写（get_flag/set_flag，data/state/local_state.json）
 ├── _json_patch.py                # JSON 字段级文本替换（_update_json_raw_text/_replace_dict_block）
 ├── _validation.py                # 配置校验：validate_config()、_absolutize_paths()
 ├── _llm_settings.py              # llm_settings.json 读取/合并/缓存与 LLM 配置入口
@@ -2184,7 +2184,7 @@ config/
 
 #### 机器本地状态
 
-`data/state/local_state.json`（git 忽略）存放仅本机有意义的状态标志——首次运行引导（`_startup_wizard_shown`）、隐私提示已读（`_privacy_notice_shown`）。不混入 config.json，避免 config.json 跨机器同步时各机器写入个性化差异。`config/_local_state.py` 提供 `get_flag`/`set_flag`；首次读取时经 `_migrate_legacy_keys` 惰性搬移 config.json 中遗留旧键并调用 `del_config()` 删除（基于磁盘文本 span 定位键行、保留注释与邻居键，末位键自动清理残留尾随逗号），local_state 已有值则不覆盖、不误删。
+`data/state/local_state.json`（git 忽略）存放仅本机有意义的状态标志——首次运行引导（`_startup_wizard_shown`）、隐私提示已读（`_privacy_notice_shown`）。不混入 config.json，避免 config.json 跨机器同步时各机器写入个性化差异。`config/_local_state.py` 提供 `get_flag`/`set_flag`，直接读写 `data/state/local_state.json`，不做任何旧键迁移。
 
 #### JSON 注释支持
 
@@ -2781,7 +2781,7 @@ investor-util/
 
 | 配置文件 | 缺省定义模块 | 模板生成 | 解析/读取入口 | 缺失时行为 | 写入方 | 主要消费方 |
 |:---------|:------------|:---------|:-------------|:-----------|:-------|:-----------|
-| `config.json`（基础配置） | `_config_defaults._DEFAULT_CONFIG`（A~L 共 12 组，含全部业务键默认值） | `_config_defaults._get_default_config_template()`（`_build_template_from_defaults()` 逐行手拼，保留分组注释） | `_core.get_config()`：mtime+size 双键缓存失效、null 过滤（不允许 null 覆盖默认）、嵌套 dict 子键浅合并、`_absolutize_paths()` 相对→绝对、旧键惰性迁移（`history.analysis`→`history.fetch_mode`） | `init_config()` 自动创建（模板原子写入），并级联 `_ensure_llm_settings_file()` + `_ensure_llm_providers_file()` | `_core.set_config()`/`del_config()`（原子写，`_json_patch` 字段级文本替换保留注释）；TUI `handlers_config.py`（菜单改配置）；`config/anonymizer.py`；`config/_local_state.py`（旧键迁移后删除） | 全模块（`get_config()` 取合并后整表）。章节开关 `is_enable_*()` 系列 → `report/_report_generation.py`/`orchestrator.py`；`cache_ttl` → `cache/_ttl.py`；`degradation` → `report/data_status.py`；`market_hours`/`market_hour_ttl` → `core/market_hours.py`；`rebalance` → `analysis/rebalance.py`；`discipline` → `analysis/trade_discipline.py`；`anonymization` → `config/anonymizer.py`；`batch`/`batch_rate_limit` → `fetcher/batch.py`；`risk_free_rate` → `fetcher/bond_yield.py`；`preferred_provider` → `fetcher/chain.py`；`history` → `report/portfolio_history.py`；`default_menu_key` → `tui/tui_menu.py` |
+| `config.json`（基础配置） | `_config_defaults._DEFAULT_CONFIG`（A~L 共 12 组，含全部业务键默认值） | `_config_defaults._get_default_config_template()`（`_build_template_from_defaults()` 逐行手拼，保留分组注释） | `_core.get_config()`：mtime+size 双键缓存失效、null 过滤（不允许 null 覆盖默认）、嵌套 dict 子键浅合并、`_absolutize_paths()` 相对→绝对 | `init_config()` 自动创建（模板原子写入），并级联 `_ensure_llm_settings_file()` + `_ensure_llm_providers_file()` | `_core.set_config()`/`del_config()`（原子写，`_json_patch` 字段级文本替换保留注释）；TUI `handlers_config.py`（菜单改配置）；`config/anonymizer.py` | 全模块（`get_config()` 取合并后整表）。章节开关 `is_enable_*()` 系列 → `report/_report_generation.py`/`orchestrator.py`；`cache_ttl` → `cache/_ttl.py`；`degradation` → `report/data_status.py`；`market_hours`/`market_hour_ttl` → `core/market_hours.py`；`rebalance` → `analysis/rebalance.py`；`discipline` → `analysis/trade_discipline.py`；`anonymization` → `config/anonymizer.py`；`batch`/`batch_rate_limit` → `fetcher/batch.py`；`risk_free_rate` → `fetcher/bond_yield.py`；`preferred_provider` → `fetcher/chain.py`；`history` → `report/portfolio_history.py`；`default_menu_key` → `tui/tui_menu.py` |
 | `llm_settings.json`（非敏感 LLM 设置） | `_llm_settings_defaults._DEFAULT_LLM_SETTINGS`（全局 2 项 + 5 模块块 + 辩论 + 事实校验 + 计价） | `_llm_settings_defaults._get_default_llm_settings_template()`（逐行手拼，与 dict 深等，见一致性测试） | `_llm_settings.get_llm_config()`：合并 settings+key+providers 三文件，联合 mtime/size 失效；`_merge_llm_defaults()` 运行时按 `_DEFAULT_LLM_SETTINGS` 补齐缺失键 | `_ensure_llm_settings_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑；`_ensure_llm_settings_file` 仅首次创建） | `llm/pricing.py`（计价覆盖）、`llm/generators.py`、`llm/generators_orchestrator.py`、`llm/prompts_action.py`、`llm/skeleton.py`、`report/news_correlation.py`、`cli/cli.py`、`tui/tui_menu.py` + `tui/handlers_config.py`、`config/_validation.py` |
 | `llm_key.json`（敏感凭据） | 无（**C18 凭据分离**，代码默认值禁止内置 api_key） | 无模板 | `_llm_providers._load_llm_key_credentials()`（多凭据块字典；单凭据 flat 自动升级为 `_default`）；`get_llm_config()` 内联读取并合并覆盖同名字段（provider/endpoint 合法性告警） | 不自动创建；缺失时 `get_llm_config()` 回退判断 providers 链模式，两者皆无则 LLM 不可用（`generators_orchestrator` 降级占位） | `startup_wizard._write_llm_key_flat()`（首次引导交互式写入，C3 原子写） | `get_llm_config()` 合并主体；`_load_llm_key_credentials()` → providers 链 `credentials_ref` 凭据注入 |
 | `llm_providers.json`（多 Provider 链） | `_llm_providers_defaults._DEFAULT_LLM_PROVIDERS`（strategy=priority + 2 条示例链） | `_llm_providers_defaults._get_default_llm_providers_template()` | `_llm_providers._load_llm_providers()`（原始 JSON，根非 object/解析失败返回 None）；`get_llm_config()` 链模式（无 llm_key.json 时直接注入链数据）；`_inject_provider_chain_data()` 注入多链路由结果 | `_core._ensure_llm_providers_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑 / init 自动创建） | `get_llm_config()`（链模式无 key 依赖）；`startup_wizard.py`（就绪检查：key 存在 或 providers 有链）；`_inject_provider_chain_data` |
@@ -2789,11 +2789,11 @@ investor-util/
 
 #### I.1.1 解析职责归属（协调者 vs 委托）
 
-> **config.json 的解析中枢在 `_core.py`，但不是独占解析器**：`_core.get_config()` 是 config.json 的唯一读取入口，注释剥离、路径绝对化分别委托 `_comments`/`_validation`，默认值合并以 `_config_defaults._DEFAULT_CONFIG` 为基准，null 过滤/嵌套子键合并/旧键迁移由自身内联完成；其余 4 个配置文件各有独立解析器，`_core.py` 仅触发文件存在性（`_ensure_llm_settings_file()` / `_ensure_llm_providers_file()`），**不代解析**。
+> **config.json 的解析中枢在 `_core.py`，但不是独占解析器**：`_core.get_config()` 是 config.json 的唯一读取入口，注释剥离、路径绝对化分别委托 `_comments`/`_validation`，默认值合并以 `_config_defaults._DEFAULT_CONFIG` 为基准，null 过滤/嵌套子键合并由自身内联完成；其余 4 个配置文件各有独立解析器，`_core.py` 仅触发文件存在性（`_ensure_llm_settings_file()` / `_ensure_llm_providers_file()`），**不代解析**。
 
 | 配置文件 | 解析协调者（入口） | 注释剥离 | 主要委托/依赖 |
 |:---------|:-------------------|:---------|:--------------|
-| `config.json` | `_core.get_config()` | `_comments._strip_json_comments()` | `_config_defaults._DEFAULT_CONFIG`（合并基准）；`_validation._absolutize_paths()`（相对→绝对）；null 过滤、嵌套 dict 子键浅合并、旧键迁移（`history.analysis`→`fetch_mode`）内联自持 |
+| `config.json` | `_core.get_config()` | `_comments._strip_json_comments()` | `_config_defaults._DEFAULT_CONFIG`（合并基准）；`_validation._absolutize_paths()`（相对→绝对）；null 过滤、嵌套 dict 子键浅合并由自身内联 |
 | `llm_settings.json` | `_llm_settings.get_llm_config()` | `_comments._strip_json_comments()` | 合并 settings+key+providers 三文件为单份 dict 下发给消费方；`_merge_llm_defaults()` 运行时补默认 |
 | `llm_key.json` | `_llm_providers._load_llm_key_credentials()` | `_comments._strip_json_comments()` | 单凭据 flat 自动升级为 `_default` 块（自持）；`get_llm_config()` 内联读取合并覆盖同名字段 |
 | `llm_providers.json` | `_llm_providers._load_llm_providers()` | `_comments._strip_json_comments()` | 根非 object / 解析失败返回 None 判定（自持）；`_inject_provider_chain_data()` 链模式注入 |

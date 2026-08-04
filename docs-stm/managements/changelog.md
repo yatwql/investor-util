@@ -8,6 +8,16 @@
 
 ### 开发中（未发布）
 
+#### 重构期历史兼容负担清理（移除旧配置键迁移 / import 再导出 / LLM 内嵌凭据自动改写）
+
+- **配置键迁移移除**：`_core.get_config()` 不再做 `history.analysis`→`history.fetch_mode` 惰性迁移（旧键直接忽略，回落到默认 `fetch_mode=auto`）；`config/_local_state.py` 移除 `_migrate_legacy_keys` 旧键搬移（`_startup_wizard_shown`/`_privacy_notice_shown` 只在本机 `local_state.json` 读写，不做 config.json 迁移）；`anonymizer.py` 移除匿名化模式废弃别名映射（未知模式回退 `off`）。
+- **import 再导出移除**：`config/_core.py` 不再再导出 `_llm_providers`/`_llm_settings` 符号；`report/orchestrator.py` 移除对 `_snapshot`/`_llm_news`/`_report_generation` 的 bridge 转发 import——消费方改从源模块直接导入。
+- **LLM 内嵌 api_key 行为修正**：`_parse_providers_list` 不再把 `_inline_api_key`/`_inline_model`/`_inline_credentials_ref` 自动注入 `_llm_credentials`；内嵌 `api_key`/`model` 直接保留在 entry 中，由 `api.py:_resolve_entry_credentials` 运行时内联回退读取（宽容行为保留，仅移除自动改写）。
+- **缓存 schema 版本递增**：`cache/_paths.py` `_CACHE_KEY_VERSION` v2→v3，旧缓存文件自然失效重建。
+- **向后兼容措辞清理**：`report/` 多模块（data_quality_sheet / fund_candidate / category / market_value_sheet / excel_generator）与 `_config_defaults` 中"向后兼容"措辞改为描述当前行为；`tui/handlers_config.py`、`llm/generators.py`、`llm/prompts_action.py` 同步清理旧名注释。
+- **文档同步**：technical.md（local_state 迁移描述移除、config.json 解析职责三处去迁移、主矩阵写入方去 `_local_state`）、requirements.md（跨机器同步段去迁移）、folders.md（`_local_state.py`/`test_local_state.py` 描述去旧键迁移）、how-to-config.md（机器本地状态段去兼容迁移说明）；llm-technical.md 内联凭据运行时回退描述保持不变（合法行为）；data/config/config.json 由模板程序重新生成（同步 `enable_fund_deep_analysis` 新注释 + 补齐 `report_submodules` 5 个子键与 `comparison_candidates`）。
+- **测试**：`test_config.py` 迁移用例改断言忽略旧键回落默认；`test_local_state.py` 删 TestLegacyMigration 类；`test_config_llm_multi*.py`/`test_integration_multi.py`/`test_debate_*.py`/`test_config_validation.py` patch 目标改到 `_llm_settings`/`_llm_providers` 源模块；`test_orchestrator.py`/`test_pipeline_smoke.py` 导入改源模块；`test_cache_core.py`/`test_cache_cleanup.py` 断言 v3 缓存文件名。
+
 #### HTML 报告目录分组导航折叠 + 文档快照同步（plan-24 轮19/轮20，导航收尾）
 
 - **分组导航（轮19）**：HTML 报告左侧目录按「基础/基金深度/风险/历史/LLM」五组折叠导航，原生 `<details>/<summary>`（键盘可达、无需 JS）。`html_writer.py` 新增 `_NAV_GROUP_LABELS`（五组顺序）/`_SECTION_NAV_GROUP_MAP`（19 章节→组归属）/`_build_section_nav_groups()`（仅收录可见章节、组序固定、组内按报告序号升序、空组保留由模板跳过）；`_render_template` 计算并注入 `section_groups` 到模板。`report_template.html` 目录改为分组结构（`.toc-group` details + 组标题徽标计数 `.toc-group-count`），空组不渲染；窄屏扁平 `section-nav` 保留作移动端兜底，两种导航均不依赖 JS。

@@ -56,7 +56,7 @@ class TestMergeLlmDefaults(unittest.TestCase):
     """
 
     def setUp(self):
-        from src.python.config._core import _merge_llm_defaults
+        from src.python.config._llm_settings import _merge_llm_defaults
 
         self._merge = _merge_llm_defaults
 
@@ -172,27 +172,15 @@ class TestGetConfig(unittest.TestCase):
         self.assertEqual(result["holdings_dir"], "/a")
         self.assertEqual(result["news_top_count"], 50)
 
-    def test_legacy_history_analysis_migrates_to_fetch_mode(self):
-        """旧配置键 history.analysis → 自动迁移为 history.fetch_mode。"""
+    def test_legacy_history_analysis_ignored(self):
+        """旧配置键 history.analysis 不再迁移，fetch_mode 取默认值。"""
         os.makedirs(self.tmp.name, exist_ok=True)
         legacy = {"history": {"analysis": "off"}}
         with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(legacy, f)
         result = cfg.get_config()
         hist = result.get("history", {})
-        self.assertEqual(hist.get("fetch_mode"), "off")
-        self.assertNotIn("analysis", hist)
-
-    def test_legacy_history_analysis_kept_when_fetch_mode_present(self):
-        """旧键与新键并存时，显式 fetch_mode 优先，analysis 被清理。"""
-        os.makedirs(self.tmp.name, exist_ok=True)
-        mixed = {"history": {"analysis": "off", "fetch_mode": "auto"}}
-        with open(cfg._config_defaults._CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(mixed, f)
-        result = cfg.get_config()
-        hist = result.get("history", {})
-        self.assertEqual(hist.get("fetch_mode"), "auto")
-        self.assertNotIn("analysis", hist)
+        self.assertEqual(hist.get("fetch_mode"), "auto")  # 默认值，不再读取旧键
 
     def test_fetch_mode_default_is_auto(self):
         """未配置 history 时 fetch_mode 默认 auto。"""

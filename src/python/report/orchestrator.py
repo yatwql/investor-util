@@ -812,27 +812,3 @@ def generate_report(
     result.report_generated = True
     reporter.info("generate_report: 骨架模式—未知 report_type")
     return result
-
-
-# bridge imports — 保持向后兼容
-from src.python.report._snapshot import capture_snapshot, fetch_history_data  # noqa: E402, F401
-from src.python.report._llm_news import (  # noqa: E402, F401
-    _fetch_llm_and_news,
-    _report_llm_module_results,
-    _submit_llm_future,
-    _submit_news_future,
-    _collect_llm_future_result,
-    _collect_news_future_result,
-)
-from src.python.report._report_generation import (  # noqa: E402, F401
-    _compute_details,
-    _generate_report_both,
-    _generate_report_full,
-    _prepare_full_risk_metrics,
-    _generate_full_html_report,
-    _generate_full_excel_report,
-    _spawn_health_checks,
-    _collect_health_checks,
-    _validate_prep_completeness,
-    _validate_pipeline_snapshot,
-)

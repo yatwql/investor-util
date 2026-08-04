@@ -305,7 +305,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         self.assertNotIn("集中度问答", prompt)
         self.assertNotIn("警戒线", prompt)
 
-    @mock.patch("src.python.config._core.get_llm_config")
+    @mock.patch("src.python.config._llm_settings.get_llm_config")
     def test_synthesis_prompt_qa_uses_config_threshold(self, mock_get):
         """合成阶段 threshold 从 llm_settings 读取（18% 占比 + 15% 阈值 → 触发）。
 
@@ -334,7 +334,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         self.assertIn("甲", prompt)
         self.assertIn("警戒线", prompt)
 
-    @mock.patch("src.python.config._core.get_llm_config")
+    @mock.patch("src.python.config._llm_settings.get_llm_config")
     def test_synthesis_prompt_qa_config_threshold_below_skips(self, mock_get):
         """合成阶段 threshold 读配置为 20% 时，18% 占比不触发集中度问答。"""
         from src.python.llm.prompts import _build_debate_synthesis_prompt
@@ -392,7 +392,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
 
     # ── _build_expert_review_prompt threshold 配置读取 ──────────
 
-    @mock.patch("src.python.config._core.get_llm_config")
+    @mock.patch("src.python.config._llm_settings.get_llm_config")
     def test_expert_review_prompt_threshold_from_config(self, mock_get):
         """标准模式 expert_review 的 threshold 从配置读取（22% 占比 + 15% 阈值 → 触发）。"""
         from src.python.llm.prompts import _build_expert_review_prompt
@@ -421,7 +421,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         self.assertIn("甲", prompt)
         self.assertIn("警戒线", prompt)
 
-    @mock.patch("src.python.config._core.get_llm_config")
+    @mock.patch("src.python.config._llm_settings.get_llm_config")
     def test_expert_review_prompt_threshold_higher_skips(self, mock_get):
         """threshold 高于单品种占比（30% 阈值 + 22% 占比）→ 不触发集中度问答。
 

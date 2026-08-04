@@ -11,15 +11,13 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 from unittest.mock import MagicMock, patch
 
+from src.python.report._llm_news import _fetch_llm_and_news, _report_llm_module_results
+from src.python.report._snapshot import capture_snapshot, fetch_history_data
 from src.python.report.orchestrator import (
     ReportResult,
     _read_section_flags,
     generate_report,
     prepare_report_data,
-    capture_snapshot,
-    fetch_history_data,
-    _report_llm_module_results,
-    _fetch_llm_and_news,
 )
 
 

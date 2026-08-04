@@ -53,7 +53,7 @@ investor-util/
 │   │   │   ├── _llm_providers_defaults.py # llm_providers.json 默认值定义
 │   │   │   ├── _llm_settings.py      #   llm_settings.json 读取/合并/缓存与 LLM 配置入口
 │   │   │   ├── _llm_settings_defaults.py # llm_settings.json 默认值定义
-│   │   │   ├── _local_state.py       #   机器本地状态标志读写（首次引导/隐私已读，存 data/state/local_state.json，含 config.json 旧键惰性迁移）
+│   │   │   ├── _local_state.py       #   机器本地状态标志读写（首次引导/隐私已读，存 data/state/local_state.json）
 │   │   │   ├── _validation.py        #   配置校验函数集
 │   │   │   ├── anonymizer.py         #   匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）
 │   │   │   └── features.py           #   Feature Flag 注册中心（开关集中管理，含默认值与运行时控制，持久化到 data/config/features.json）
@@ -353,7 +353,7 @@ investor-util/
 │       │   │   ├── test_config_llm_multi.py      #   LLM 多配置测试
 │       │   │   ├── test_config_llm_multi_edge.py #   LLM 多配置边缘场景
 │       │   │   ├── test_config_validation.py     #   配置校验函数测试
-│       │   │   └── test_local_state.py           #   机器本地状态读写与旧键迁移测试
+│       │   │   └── test_local_state.py           #   机器本地状态读写测试
 │       │   ├── core/                #   核心模块单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_cache_core.py       #   缓存核心功能测试（含 TTL/目录/常量）

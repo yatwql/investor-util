@@ -592,13 +592,13 @@ class TestValidateConfigEntryPoint(unittest.TestCase):
     def test_validate_enable_llm_warns_on_unknown_key(self):
         """_validate_enable_llm 对 llm_settings.json 中未知模块告警。"""
         mock_llm_config = {"enabled_llm": {"nonexistent_module": True}}
-        with patch("src.python.config._core.get_llm_config", return_value=mock_llm_config):
+        with patch("src.python.config._llm_settings.get_llm_config", return_value=mock_llm_config):
             n = val._validate_enable_llm(0)
             self.assertEqual(n, 1)
 
     def test_validate_enable_llm_non_dict_warns(self):
         """enabled_llm 不是 dict → 告警。"""
         mock_llm_config = {"enabled_llm": "not_a_dict"}
-        with patch("src.python.config._core.get_llm_config", return_value=mock_llm_config):
+        with patch("src.python.config._llm_settings.get_llm_config", return_value=mock_llm_config):
             n = val._validate_enable_llm(0)
             self.assertEqual(n, 1)

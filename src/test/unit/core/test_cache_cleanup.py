@@ -149,7 +149,7 @@ class TestCacheGetStats(CacheTestBase):
 
     def test_no_underscore_goes_to_other(self):
         """文件名不含下划线 → 归入 other 分组。"""
-        # _cache_path 生成的键名带 _v2 后缀（必然含下划线），
+        # _cache_path 生成的键名带 _v3 后缀（必然含下划线），
         # 这里手动写入无下划线文件以覆盖分组逻辑的 other 兜底分支。
         path = os.path.join(self.cache_dir, "plain.json")
         with open(path, "w", encoding="utf-8") as f:

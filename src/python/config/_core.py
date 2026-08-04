@@ -31,29 +31,8 @@ from src.python.config._validation import (
     validate_config,
 )
 
-# 从 _llm_providers 模块再导出（保持向后兼容，供测试导入）
-from src.python.config._llm_providers import (
-    _inject_provider_chain_data,
-    _load_llm_providers,
-    _parse_providers_list,
-    _validate_provider_entry,
-)
-
-# 从 _llm_settings 模块再导出（保持向后兼容，供外部/测试从 _core 导入）
-from src.python.config._llm_settings import (
-    _KNOWN_LLM_SETTINGS_KEYS,
-    _check_unknown_llm_keys,
-    _ensure_llm_settings_file,
-    _llm_config_cache,
-    _llm_config_lock,
-    _llm_config_mtime,
-    _llm_config_size,
-    _merge_llm_defaults,
-    get_llm_config,
-    get_llm_settings_path,
-    invalidate_llm_config_cache,
-    is_enable_llm,
-)
+# 本模块 init_config 触发的 llm_settings.json 存在性确保
+from src.python.config._llm_settings import _ensure_llm_settings_file
 
 logger = logging.getLogger("invest")
 
@@ -143,15 +122,6 @@ def get_config(_strict: bool = False) -> dict:
                     merged[key] = {**merged[key], **val}
                 else:
                     merged[key] = val
-            # 兼容旧配置键：history.analysis 自动迁移为 history.fetch_mode
-            # 依据原始用户配置判断（合并后 history 始终含默认 fetch_mode，无法区分来源）
-            _raw_history = config.get("history")
-            if isinstance(_raw_history, dict) and "analysis" in _raw_history:
-                _hist = merged.setdefault("history", {})
-                if "fetch_mode" not in _raw_history:
-                    _hist["fetch_mode"] = _raw_history["analysis"]
-                _hist.pop("analysis", None)
-                logger.warning("config.json history.analysis 已更名为 history.fetch_mode，已自动迁移")
             # 绝对化路径键：用户 config.json 中可使用相对路径，运行时统一转为绝对路径
             _absolutize_paths(merged)
             _config_cache = merged
@@ -383,7 +353,7 @@ def is_enable_history(config: dict | None = None) -> bool:
 def is_enable_data_quality(config: dict | None = None) -> bool:
     """数据质量仪表盘子模块是否启用。
 
-    读取 `report_submodules.data_quality`，默认关（向后兼容，既有
+    读取 `report_submodules.data_quality`，默认关（未开启时既有
     「数据源可用性矩阵」输出不变）。
 
     Args:
@@ -404,7 +374,7 @@ def is_enable_data_quality(config: dict | None = None) -> bool:
 def is_enable_candidate_compare(config: dict | None = None) -> bool:
     """候选基金比较子表是否启用。
 
-    读取 `report_submodules.candidate_compare`，默认关（向后兼容，既有
+    读取 `report_submodules.candidate_compare`，默认关（未开启时既有
     「基金业绩分析」章输出不变）。
 
     Args:
@@ -425,7 +395,7 @@ def is_enable_candidate_compare(config: dict | None = None) -> bool:
 def is_enable_cost_lots(config: dict | None = None) -> bool:
     """成本流水子模块是否启用（成本分档 + XIRR + 分红累计渲染）。
 
-    读取 `report_submodules.cost_lots`，默认关（向后兼容，既有
+    读取 `report_submodules.cost_lots`，默认关（未开启时既有
     「投资分析汇总」/「市值核算明细表」/「持仓分类表」输出不变）。
     持仓 Excel 含「交易流水」「分红流水」页签时才建议开启。
 
@@ -447,7 +417,7 @@ def is_enable_cost_lots(config: dict | None = None) -> bool:
 def is_enable_valuation_percentile(config: dict | None = None) -> bool:
     """估值分位子模块是否启用（「资产穿透TOP10」章估值分位列）。
 
-    读取 `report_submodules.valuation_percentile`，默认关（向后兼容，
+    读取 `report_submodules.valuation_percentile`，默认关（未开启时
     「资产穿透TOP10」章既有输出不变）。
 
     Args:
@@ -468,7 +438,7 @@ def is_enable_valuation_percentile(config: dict | None = None) -> bool:
 def is_enable_market_temperature(config: dict | None = None) -> bool:
     """市场温度子模块是否启用（「投资分析汇总」章市场温度刻度行）。
 
-    读取 `report_submodules.market_temperature`，默认关（向后兼容，
+    读取 `report_submodules.market_temperature`，默认关（未开启时
     「投资分析汇总」章既有输出不变）。
 
     Args:

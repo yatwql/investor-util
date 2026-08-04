@@ -22,7 +22,7 @@ _GZIP_SUFFIX = ".gz"
 # 版本号作为键后缀（{key}_v{N}），升级后旧缓存键全部对不上 → 自动失效重建。
 # 采用后缀而非前缀：前缀匹配的清理/统计/敏感前缀识别（price_/holding_ 等）
 # 不受影响，无需额外剥离逻辑。
-_CACHE_KEY_VERSION = "v2"
+_CACHE_KEY_VERSION = "v3"
 
 
 def _cache_path(key: str) -> str:
