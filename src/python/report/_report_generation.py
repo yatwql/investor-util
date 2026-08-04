@@ -320,6 +320,7 @@ def _generate_full_html_report(
     crisis_annotation_data: dict | None = None,
     tail_risk_data: dict | None = None,
     snapshot_diff_data: dict | None = None,
+    fund_flow_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -341,6 +342,9 @@ def _generate_full_html_report(
         enable_action: board 层 — 行动建议章节是否开启（默认关）。
         action_data: 行动建议单一数据源 C19 `action_data` 契约 dict，
             行动建议板块 + 智囊团深度复盘行动摘要数据源（开关关闭时忽略）。
+        fund_flow_data: 成本流水数据 dict
+            （汇总 XIRR / 持仓分类成本分档与分红 / 市值核算资金加权成本渲染数据源，
+            开关关闭或传入 None 时模板保持既有输出）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -389,6 +393,7 @@ def _generate_full_html_report(
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=snapshot_diff_data,
+            fund_flow_data=fund_flow_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -615,6 +620,11 @@ def _generate_report_both(
             details=details,
             enable_interactive=_enable_interactive_charts,
         )
+        # 成本流水数据（fund_flow_data）：复用 excel_market_data 组装逻辑，
+        # 开关关闭返回 None（HTML 模板保持既有输出）。
+        from src.python.report.excel_market_data import _build_flow_data
+
+        fund_flow_data = _build_flow_data(_enable_cost_lots, transactions, dividends, holdings, details)
         path = write_html_report(
             holdings,
             output_dir=output,
@@ -640,6 +650,7 @@ def _generate_report_both(
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
+            fund_flow_data=fund_flow_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -864,6 +875,11 @@ def _generate_report_full(
     perf.stop()
 
     # ── 6. HTML 报告 ──
+    # 成本流水数据（fund_flow_data）：复用 excel_market_data 组装逻辑，
+    # 开关关闭返回 None（HTML 模板保持既有输出）。
+    from src.python.report.excel_market_data import _build_flow_data
+
+    fund_flow_data = _build_flow_data(_enable_cost_lots, transactions, dividends, holdings, prep["details"])
     result.html_ok = _generate_full_html_report(
         holdings,
         prep,
@@ -894,6 +910,7 @@ def _generate_report_full(
         (pipeline_data or {}).get("crisis_annotation_data"),
         (pipeline_data or {}).get("tail_risk_data"),
         (pipeline_data or {}).get("snapshot_diff_data"),
+        fund_flow_data,
     )
 
     # ── 7. Excel 报告 ──

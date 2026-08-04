@@ -36,6 +36,15 @@
 - **三页签渲染（轮16）**：开关 `report_submodules.cost_lots`（默认关，`is_enable_cost_lots()` 访问器，镜像 candidate_compare 模式）贯穿 CLI/TUI → `generate_report(transactions=…, dividends=…)` → `excel_market_data.resolve_market_data` 组装 `fund_flow_data` 注入 data dict（`pipeline_data_builder.py` 注册 + technical.md 附录 H）——「持仓分类表」加「成本分档」「分红累计」子列（category.py）、「市值核算明细表」加可选「资金加权成本」列（market_value_sheet.py）、「投资分析汇总」加「资金加权收益率 (XIRR)」汇总行（summary.py，无流水写「未录入流水」占位）；CLI `_cli_read_holdings_with_flows()` / TUI `prepare_holdings()` 接线透传；新增测试 32 个（summary 3 + category 6 + market_value_sheet 8 + config 5 + cli 5 + excel_market_data 5，远超 ≥8），受影响套件 267 passed。
 - **测试**：新增 `src/test/unit/analysis/test_cost_flow.py`（24 例：XIRR 精度 / guess 无关性 / 空值与同日退化、FIFO 批次、成本分档边界、分红累计，pytestmark unit/unit_analysis），覆盖率 94%。
 
+#### 成本流水 HTML 渲染补齐（plan-22 轮16 补遗，`fund_flow_data` 三处 HTML 渲染）
+
+- **HTML 接线**：`html_writer.py` 的 `write_html_report()` / `_render_template()` 新增 `fund_flow_data` 参数，并新增 `_build_flow_display()` 将成本流水数据转为模板友好展示映射（复用 `market_value_sheet._weighted_avg_cost` 资金加权成本 + `category._tier_label` 分档标签计算逻辑，避免双实现）；`_report_generation.py` 两条路径（`_generate_report_both` / `_generate_report_full`）复用 `excel_market_data._build_flow_data` 组装成本流水数据并透传 HTML 渲染（Excel 侧仍按原路径内部组装，无重复计算）。
+- **模板三处渲染**（`report_template.html`，`flow_display` 不可用时整体不输出，与开关关闭行为一致）：
+  - 「投资分析汇总」盈亏汇总卡组新增「资金加权收益率 (XIRR)」卡（`xirr_rate` 经 pct 过滤器 ×100 加 %，profit_color 着色；无可用现金流不渲染）
+  - 「市值核算明细表」追加可选「资金加权成本」列（批次加权成本价按 price 过滤器，缺码 `--`，小计/总计列留空）
+  - 「持仓分类表」追加可选「成本分档」「分红累计」子列（分档标签复用 `_tier_label`、分红累计按 `money` 金额渲染，缺码 `--`/0.00）
+- **测试**：`test_html_writer.py` 新增 `TestFundFlowTemplate`（9 例，从真实模板配平截取三处条件区块渲染，断言开关关不渲染 / 开启正确输出 / 缺码占位）+ `TestBuildFlowDisplay`（3 例，展示映射组装 / 契约键缺失降级）；修复 `test_orchestrator.py::test_generate_report_basic` 断言的 `enable_cost_lots`/`transactions`/`dividends` 参数透传（轮16 遗漏同步）。受影响套件 test_html_writer 74 passed、test_orchestrator 45 passed。
+
 #### 语义命名与章节/轮次引用清理（语义命名审计，2026-08-04）
 
 - **章节编号暗号全面清理**（rf-218/rf-219）：源码与测试注释、docstring、fixture 中 `N 章`/`第 N 章`/`报告第 N 页` 一律改为纯语义章节名；`test_excel_report_structure.py`/`test_action_html.py` fixture 编号对齐当前 registry（style_factor=9、action=17、expert_review=12、global_macro=11、data_source_status=18、llm_usage=19），页签计数断言同步（全部启用 17 个、always+基金深度 10 个）。

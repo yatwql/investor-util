@@ -216,7 +216,7 @@ class TestGenerateReport:
         assert result.holdings_ok is True
         assert result.report_generated is True
         assert result.exit_code == 0
-        # 验证 generate_excel_report 被正确调用（数据质量仪表盘子模块默认关）
+        # 验证 generate_excel_report 被正确调用（数据质量仪表盘/成本流式子模块默认关）
         mock_gen.assert_called_once_with(
             mock_holdings,
             include_news=False,
@@ -224,6 +224,9 @@ class TestGenerateReport:
             section_order=[{"key": "overview"}],
             progress=mock_reporter,
             enable_data_quality=False,
+            enable_cost_lots=False,
+            transactions=None,
+            dividends=None,
         )
         # 验证不调用数据准备/快照/历史等函数
         with pytest.raises(AssertionError):

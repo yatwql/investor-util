@@ -232,6 +232,36 @@ def _build_history_data_status(history_data: dict | None) -> DataStatus:
     return data_status_history
 
 
+def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
+    """将成本流水数据（fund_flow_data）转成 HTML 模板友好展示映射（per-code 展示值）。
+
+    复用 market_value_sheet._weighted_avg_cost / category._tier_label 计算逻辑，
+    避免双实现。无数据或开关关闭时返回 None（模板不渲染成本流水列）。
+
+    Args:
+        fund_flow_data: 成本流水数据（None = 开关关闭）
+
+    Returns:
+        含 xirr_rate/cost_map/tier_map/div_map/div_total 的展示 dict，或 None
+    """
+    if not fund_flow_data:
+        return None
+    from src.python.report.category import _tier_label
+    from src.python.report.market_value_sheet import _weighted_avg_cost
+
+    cost_tiers = (fund_flow_data.get("cost_tiers") or {}).get("per_code", {})
+    dividends = (fund_flow_data.get("dividends") or {}).get("per_code", {})
+    xirr = fund_flow_data.get("xirr") or {}
+    return {
+        "available": bool(fund_flow_data.get("available")),
+        "xirr_rate": xirr.get("rate"),
+        "cost_map": {code: _weighted_avg_cost(buckets) for code, buckets in cost_tiers.items()},
+        "tier_map": {code: _tier_label(buckets) for code, buckets in cost_tiers.items()},
+        "div_map": dict(dividends),
+        "div_total": float((fund_flow_data.get("dividends") or {}).get("total", 0.0) or 0.0),
+    }
+
+
 def _render_template(
     *,
     now_str: str,
@@ -298,11 +328,13 @@ def _render_template(
     crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（合并章）
     tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（合并章指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 C19 snapshot_diff_data（组合演进章顶部）
+    fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.report.chart_data_builder import build_evolution_chart_data
 
     return _ENV.get_template("report_template.html").render(
+        flow_display=_build_flow_display(fund_flow_data),
         now=now_str,
         today=today_str,
         trading_day=trading_day,
@@ -417,6 +449,7 @@ def write_html_report(
     crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（合并章）
     tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（合并章指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 C19 snapshot_diff_data（组合演进章顶部变化摘要）
+    fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源，None=开关关闭）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -663,6 +696,7 @@ def write_html_report(
         crisis_annotation_data=crisis_annotation_data,
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,
+        fund_flow_data=fund_flow_data,
     )
 
     if enable_interactive_charts:

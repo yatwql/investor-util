@@ -6,7 +6,7 @@
 >
 > 前置：`plan-investment-features.md` §4 已定章节归并对照表。本文档按 §5 实施次序拆分为 21 轮。
 >
-> **进度**：阶段 A 数据质量地基 / B 决策中枢 / B′ 持仓关系合并 / C 历史增强（轮 1~11）**已完成并验收通过**（对应 P1 计划项 `plan-17`~`plan-20`，changelog v0.10.1）；阶段 D 轮 12「风格与因子合并 + 行业 Beta」**已完成并验收通过**（章节数 20→19）；轮 13「候选基金比较增强模式」**已完成并验收通过**（`candidate_compare` 默认关）；阶段 E 轮 14~16 成本流水（对应 P2 计划项 `plan-22`）**已完成并验收通过**——轮 14 流水页签解析（20 例、覆盖率 93%）、轮 15 XIRR 资金加权收益 + 成本分档（24 例、覆盖率 94%）、轮 16 三页签渲染（`fund_flow_data` C19 契约 + `cost_lots` 默认关 + CLI/TUI 接线，新增测试 32 个、267 passed，dev-verify 1638 passed）；轮 17~21 待实施。
+> **进度**：阶段 A 数据质量地基 / B 决策中枢 / B′ 持仓关系合并 / C 历史增强（轮 1~11）**已完成并验收通过**（对应 P1 计划项 `plan-17`~`plan-20`，changelog v0.10.1）；阶段 D 轮 12「风格与因子合并 + 行业 Beta」**已完成并验收通过**（章节数 20→19）；轮 13「候选基金比较增强模式」**已完成并验收通过**（`candidate_compare` 默认关）；阶段 E 轮 14~16 成本流水（对应 P2 计划项 `plan-22`）**已完成并验收通过**——轮 14 流水页签解析（20 例、覆盖率 93%）、轮 15 XIRR 资金加权收益 + 成本分档（24 例、覆盖率 94%）、轮 16 三页签渲染（`fund_flow_data` 数据契约 + `cost_lots` 默认关 + CLI/TUI 接线，新增测试 32 个、267 passed，dev-verify 1638 passed）+ **HTML 渲染补齐**（轮16 补遗：`_build_flow_display` 展示映射 + 模板三处条件渲染，新增测试 12 个）；轮 17~21 待实施。
 
 ---
 
@@ -272,6 +272,8 @@
   - [x] §2 通用标准全部满足。
 
 > ✅ **轮 16 验收签字（2026-08-04）**：开关 `report_submodules.cost_lots`（默认关，`is_enable_cost_lots` 访问器，镜像 candidate_compare 模式）贯穿 CLI/TUI→`generate_report(transactions=…, dividends=…)`→`excel_market_data.resolve_market_data` 组装 `fund_flow_data`（C19 契约：available/xirr/cost_tiers/dividends，pipeline_data_builder 注册 + technical.md 附录 H）；三页签渲染——「持仓分类表」加「成本分档」「分红累计」子列（category.py）、「市值核算明细表」加可选「资金加权成本」列（market_value_sheet.py）、「投资分析汇总」加「资金加权收益率 (XIRR)」汇总行（summary.py，无流水写占位）；新增测试 32 个（summary 3 + category 6 + market_value_sheet 8 + config 5 + cli 5 + excel_market_data 5，远超 ≥8），受影响套件 267 passed；全仓 check-code-traces / check-doc-traces `--ci` 干净。
+>
+> ✅ **轮 16 补遗——HTML 渲染补齐（2026-08-04）**：`html_writer.py` 新增 `_build_flow_display()`（复用 `_weighted_avg_cost`/`_tier_label` 组装展示映射，避免双实现）并把 `fund_flow_data` 透传模板（两条报告路径复用 `excel_market_data._build_flow_data` 组装）；`report_template.html` 三处条件渲染——盈亏汇总「资金加权收益率 (XIRR)」卡、市值核算「资金加权成本」列、持仓分类「成本分档」+「分红累计」子列（`flow_display` 不可用时整块不输出）；新增 `TestFundFlowTemplate` 9 例 + `TestBuildFlowDisplay` 3 例，test_html_writer 74 passed；修复 `test_orchestrator.py::test_generate_report_basic` 断言参数透传；全仓 check-code-traces / check-doc-traces `--ci` 干净。
 
 ### 阶段 F 估值与温度（轮 17~18，改造「资产穿透TOP10」/「投资分析汇总」章）
 

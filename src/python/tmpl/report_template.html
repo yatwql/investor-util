@@ -985,6 +985,12 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     <h3>本日收益率</h3>
                     <div class="value" style="color: {{ today_profit_rate | profit_color }}">{{ today_profit_rate | pct }}</div>
                 </div>
+                {% if flow_display and flow_display.xirr_rate is not none %}
+                <div class="summary-card">
+                    <h3>资金加权收益率 (XIRR)</h3>
+                    <div class="value" style="color: {{ flow_display.xirr_rate | profit_color }}">{{ flow_display.xirr_rate | pct }}</div>
+                </div>
+                {% endif %}
             </div>
 
             <br>
@@ -1046,6 +1052,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <th>账户</th><th>名称</th><th>代码</th><th>最新价</th><th>净值日期</th>
                         <th>昨日价</th><th>取价方式</th><th>溢价率</th><th>份额</th><th>市值</th>
                         <th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>取价渠道</th>
+                        {% if flow_display %}<th>资金加权成本</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -1071,6 +1078,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ d.profit_rate | profit_color }}">{{ d.profit_rate | pct }}</td>
                             <td class="text-right" style="color: {{ d.today_profit | profit_color }}">{{ d.today_profit | money }}</td>
                             <td>{{ d.source }}</td>
+                            {% if flow_display %}
+                            {% set wac = flow_display.cost_map.get(d.code) %}
+                            <td class="text-right">{% if wac is not none %}{{ wac | price }}{% else %}--{% endif %}</td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                         {% set acc_tot = account_totals.get(acc_name, {}) %}
@@ -1084,6 +1095,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ acc_tot.get("profit_rate", 0) | profit_color }}">{{ acc_tot.get("profit_rate", 0) | pct }}</td>
                             <td class="text-right" style="color: {{ acc_tot.get("today_profit", 0) | profit_color }}">{{ acc_tot.get("today_profit", 0) | money }}</td>
                             <td></td>
+                            {% if flow_display %}<td></td>{% endif %}
                         </tr>
                         {% set grand_mv.v = grand_mv.v + acc_tot.get("market_value", 0) %}
                         {% set grand_cost.v = grand_cost.v + acc_tot.get("cost", 0) %}
@@ -1101,6 +1113,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td class="text-right" style="color: {{ (g_rate / 100) | profit_color }}">{{ g_rate | change }}</td>
                         <td class="text-right" style="color: {{ grand_today.v | profit_color }}">{{ grand_today.v | money }}</td>
                         <td></td>
+                        {% if flow_display %}<td></td>{% endif %}
                     </tr>
                 </tbody>
             </table>
@@ -1119,6 +1132,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     <tr>
                         <th>资产属性</th><th>投资分类</th><th>名称</th><th>代码</th>
                         <th>市值</th><th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>年均股息率</th>
+                        {% if flow_display %}<th>成本分档</th><th>分红累计</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -1139,6 +1153,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ item["profit_rate"] | profit_color }}">{{ item["profit_rate"] | pct }}</td>
                             <td class="text-right" style="color: {{ item["today_profit"] | profit_color }}">{{ item["today_profit"] | money }}</td>
                             <td>{{ item.get("yield_text", "--") }}</td>
+                            {% if flow_display %}
+                            <td>{{ flow_display.tier_map.get(item["code"], "--") }}</td>
+                            <td class="text-right">{{ flow_display.div_map.get(item["code"], 0.0) | money }}</td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                         <tr class="subtotal-row">
@@ -1150,6 +1168,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ group["sub_rate"] | profit_color }}">{{ group["sub_rate"] | pct }}</td>
                             <td class="text-right" style="color: {{ group["sub_today"] | profit_color }}">{{ group["sub_today"] | money }}</td>
                             <td></td>
+                            {% if flow_display %}<td></td><td></td>{% endif %}
                         </tr>
                         </tr>
                         {% set cat_grand_mv.v = cat_grand_mv.v + group["sub_mv"] %}
@@ -1166,6 +1185,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td class="text-right" style="color: {{ (cat_g_rate / 100) | profit_color }}">{{ cat_g_rate | change }}</td>
                         <td class="text-right" style="color: {{ cat_grand_today.v | profit_color }}">{{ cat_grand_today.v | money }}</td>
                         <td></td>
+                        {% if flow_display %}<td></td><td></td>{% endif %}
                     </tr>
                 </tbody>
             </table>
