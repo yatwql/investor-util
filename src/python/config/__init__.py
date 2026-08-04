@@ -8,11 +8,15 @@
   （自动剥离后解析），方便按业务场景分组管理配置项。
 
 架构：config/ 子包
-  _config_defaults.py  — config.json 默认配置 & 模板生成
-  _llm_defaults.py     — llm_settings.json 缺省模板
-  _comments.py         — JSON 注释剥离
-  _validation.py       — config.json 配置校验函数集
-  _core.py             — 配置读写/缓存/LLM 配置（核心逻辑）
+  _config_defaults.py      — config.json 默认配置 & 模板生成
+  _json_patch.py           — JSON 字段级文本替换（dict 区块 brace 平衡）
+  _llm_defaults.py         — llm_settings.json 缺省模板
+  _llm_providers_defaults.py — llm_providers.json 缺省模板
+  _llm_settings.py         — llm_settings.json 读取/合并/缓存与 LLM 配置入口
+  _llm_providers.py        — llm_providers.json 多链解析/凭据注入
+  _comments.py             — JSON 注释剥离
+  _validation.py           — config.json 配置校验函数集
+  _core.py                 — config.json 读写/缓存（配置中枢）
 """
 
 # 保留子模块引用，供测试和外部直接访问
@@ -21,6 +25,7 @@ from src.python.config import _config_defaults as _config_defaults
 from src.python.config import _core as _core
 from src.python.config import _json_patch as _json_patch
 from src.python.config import _llm_defaults as _llm_defaults
+from src.python.config import _llm_settings as _llm_settings
 from src.python.config import _validation as _validation
 
 # ── JSON 注释剥离 ──
@@ -47,36 +52,41 @@ from src.python.config._validation import (
 
 # ── 核心逻辑 ──
 from src.python.config._core import (
-    _KNOWN_LLM_SETTINGS_KEYS,
-    _check_unknown_llm_keys,
     _clear_config_cache,
     _config_cache,
     _config_lock,
     _config_mtime,
     _config_size,
-    _ensure_llm_settings_file,
     invalidate_config_cache,
-    invalidate_llm_config_cache,
-    _llm_config_cache,
-    _llm_config_lock,
-    _llm_config_mtime,
-    _llm_config_size,
     # 配置缓存 & 读写
     get_config,
-    # LLM 配置
-    get_llm_config,
-    get_llm_settings_path,
     init_config,
     # 章节可见性
     is_enable_fund_deep_analysis,
     is_enable_history,
-    is_enable_llm,
     is_enable_news,
     is_enable_portfolio_evolution,
     is_enable_action,
     is_enable_data_quality,
     set_config,
     del_config,
+)
+
+# ── LLM 设置解析（llm_settings.json）──
+from src.python.config._llm_settings import (
+    _KNOWN_LLM_SETTINGS_KEYS,
+    _check_unknown_llm_keys,
+    _ensure_llm_settings_file,
+    _llm_config_cache,
+    _llm_config_lock,
+    _llm_config_mtime,
+    _llm_config_size,
+    invalidate_llm_config_cache,
+    # LLM 配置
+    get_llm_config,
+    get_llm_settings_path,
+    # 章节可见性
+    is_enable_llm,
 )
 
 # ── 默认模板（llm_settings.json）──
