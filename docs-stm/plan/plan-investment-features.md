@@ -31,7 +31,7 @@
 
 ### 2.0 功能语义命名表
 
-> 英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。命名纪律：**语义名即代码名**，任务代号不进入实现层。
+> 英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。命名纪律：**语义名即代码名**，任务代号不进入实现层——**禁止用任何任务编号命名**（含 F 系列、`plan-18`、`rf-198` 等），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表链接锚点，不扩散到实现层。
 
 | 语义 slug | 中文名（文档/UI） | 归入章节 | 决策链环节 | config 开关 |
 |:--|:--|:--|:--|:--|
@@ -50,7 +50,7 @@
 | `data_quality` | 数据质量仪表盘 | 18 数据源可用性矩阵 | 监控 | `report_submodules.data_quality`（默认关） |
 | `holding_diagnosis` | 品种覆盖诊断 | 并入 `data_quality` | 监控 | 随 `data_quality` |
 
-> **合并章代码标识符**：三个合并章 sheet key 统一为语义名——`position_relationship`（持仓关系矩阵，合并 `fund_overlap` + `correlation_analysis`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key 或以任何任务代号命名。
+> **合并章代码标识符**：三个合并章 sheet key 统一为语义名——`position_relationship`（持仓关系矩阵，合并 `fund_overlap` + `correlation_analysis`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号（F 系列/`plan-N`/`rf-N`）命名。
 >
 > **registry.number 重排**：实现时 `registry._REPORT_SECTION_DEFAULT` 的 `number` 需整体重排为 1~19（删除三个被合并的 sheet 注册 + 插入 `action` 章，保持其余相对顺序）；被合并的 key（`fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure`）在用户 config `report_section_order` 中会变为未知标识——`config/_validation.py` 仅对未知 key 告警不报错，但需在配置文档注明「被合并的章节 key 已失效，可清理」。章节序号全部以本表为准（1~19 连续编号）。
 
