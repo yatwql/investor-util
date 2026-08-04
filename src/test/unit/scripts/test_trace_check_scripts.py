@@ -14,7 +14,10 @@
 
 from __future__ import annotations
 
+import ast
 import importlib.util
+import os
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -261,6 +264,14 @@ class TestDocTraceDetection:
     def test_task_id(self, doc_traces):
         assert _doc_hit(doc_traces, "见 rf-117 修复") is not None
 
+    def test_series_alias(self, doc_traces):
+        assert _doc_hit(doc_traces, "G系列 方案") is not None
+        assert _doc_hit(doc_traces, "b_series 说明") is not None
+
+    def test_legit_letter_digit_not_flagged(self, doc_traces):
+        assert _doc_hit(doc_traces, "全系列报告") is None
+        assert _doc_hit(doc_traces, "C20 约束") is None
+
 
 # ── 注释提取：多行 docstring 状态不泄漏 ─────────────────────
 
@@ -290,3 +301,110 @@ class TestCommentExtraction:
         )
         extracted = [txt for _, txt in code_traces._py_comment_lines(sample)]
         assert '历史实现" is not None' not in "".join(extracted), "docstring 状态泄漏到 assert 行"
+
+
+# ── check-code-traces：任务编号标识符/注释检查 ─────────────
+
+
+def _ident_hit(code_traces, source: str) -> str | None:
+    """返回 _scan_identifiers 对临时 .py 代码片段的命中 desc；未命中返回 None。
+
+    每次调用生成唯一临时文件，避免并行 worker 写同一路径冲突。
+    """
+    fd, path = tempfile.mkstemp(suffix=".py", prefix="trace_ident_")
+    os.close(fd)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(source)
+    try:
+        hits = code_traces._scan_identifiers(Path(path))
+        return hits[0][2] if hits else None
+    finally:
+        os.remove(path)
+
+
+class TestTaskCodeCommentPatterns:
+    """注释 CODE 模式应检出任务编号/系列代号，不误伤合法字母+数字引用。"""
+
+    def test_series_alias_english(self, code_traces):
+        assert _code_hit(code_traces, "b_series 说明") is not None
+
+    def test_series_alias_chinese(self, code_traces):
+        assert _code_hit(code_traces, "G系列 方案") is not None
+        assert _code_hit(code_traces, "B系列 批次") is not None
+
+    def test_existing_task_id_patterns_still_work(self, code_traces):
+        assert _code_hit(code_traces, "见 rf-117 修复") is not None
+        assert _code_hit(code_traces, "plan-18 任务") is not None
+
+    def test_legit_series_words_not_flagged(self, code_traces):
+        legit = [
+            "drawdown_series 列表",
+            "holding_series",
+            "全系列报告",
+            "中证指数系列",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"合法系列词被误伤: {line}"
+
+    def test_legit_letter_digit_not_flagged(self, code_traces):
+        legit = [
+            "C20 约束",
+            "P1 优先级",
+            "S-P1 场景",
+            "f9=市盈率",
+            "合并 A1:B1",
+            "数据在 B2~B5",
+            "R17 兼容",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"合法字母+数字被误伤: {line}"
+
+
+class TestTaskCodeIdentifierCheck:
+    """代码标识符不得使用任务编号/系列代号（IDENT 扫描）。"""
+
+    def test_task_code_identifiers_flagged(self, code_traces):
+        flagged = [
+            "F4 = 1",
+            "b_series = []",
+            "G系列 = 1",
+            "rf_205_fix = 1",
+            "plan18_hack = 1",
+            "def rf_100_helper():\n    pass",
+        ]
+        for src in flagged:
+            assert _ident_hit(code_traces, src) is not None, f"应命中: {src}"
+
+    def test_legit_short_locals_not_flagged(self, code_traces):
+        legit = [
+            "h1 = 1",
+            "f1 = 1",
+            "x0 = 0.0",
+            "p50 = 1",
+            "drawdown_series = []",
+            "def test_provider(x1, y1):\n    pass",
+        ]
+        for src in legit:
+            assert _ident_hit(code_traces, src) is None, f"不应命中: {src}"
+
+
+class TestIdentifierExtraction:
+    """_iter_identifiers 应从代码中提取到预期标识符名。"""
+
+    def test_py_ast_extracts_names(self, code_traces):
+        src = (
+            "import math as m\n"
+            "class PortfolioModel:\n"
+            "    def compute(self, data):\n"
+            "        result = data + 1\n"
+            "        return result\n"
+        )
+        names = {n for _, n in code_traces._py_identifier_names(ast.parse(src))}
+        assert {"PortfolioModel", "compute", "data", "result", "m"} <= names
+
+    def test_js_decl_extracts_names(self, code_traces):
+        src = "var B6 = 1;\nconst chart = new Chart();\nfunction draw() {}\n"
+        names = sorted(n for _, n in code_traces._js_identifier_names(src))
+        assert "B6" in names
+        assert "chart" in names
+        assert "draw" in names

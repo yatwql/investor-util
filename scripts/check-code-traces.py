@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
-"""代码注释历史变更痕迹检查脚本（与 check-doc-traces.py 相对）。
+"""代码注释历史变更痕迹 + 任务编号标识符检查脚本（与 check-doc-traces.py 相对）。
 
 扫描 src/ 与 scripts/ 下的 .py / .js / .mjs / .html / .sh / .ps1 /
 .bat / .cmd 文件，检查注释和文档字符串中是否含有关代码历史迭代、
-重构拆分、版本号标记、文件迁入迁出等变更痕迹。各语言注释形式：
-Python（# 与三引号 docstring）、JS（// 与 /* */）、HTML（<!-- --> 与
-Jinja {# #} 及 CSS /* */）、Shell（#）、PowerShell（# 与 <# #>）、
-Windows 批处理（REM / ::）。
+重构拆分、版本号标记、文件迁入迁出等变更痕迹，以及代码标识符
+（变量/函数/类名）与注释中是否夹带任务编号/系列代号（语义命名纪律）。
+各语言注释形式：Python（# 与三引号 docstring）、JS（// 与 /* */）、
+HTML（<!-- --> 与 Jinja {# #} 及 CSS /* */）、Shell（#）、
+PowerShell（# 与 <# #>）、Windows 批处理（REM / ::）。
 
 在代码和测试的注释/文档串中，只应描述"当前代码是什么/做什么"，
 不应记录"从哪里来、怎么变的"。此类信息应放在管理文档
-（changelog.md / review-findings.md）中。
+（changelog.md / review-findings.md）中。标识符/注释中也不得出现
+任务编号（plan-N / rf-N）或系列代号（B 系列/F 系列、b_series、F4 等）。
+
+两类扫描：
+  - 注释痕迹扫描：PATTERNS 匹配注释/文档串行
+  - 标识符扫描：IDENTIFIER_PATTERNS 匹配代码中的完整标识符 token
+    （.py 用 ast 提取，.js/.mjs 用正则提取声明）
 
 用法：
   python scripts/check-code-traces.py           # 检查全部
@@ -20,13 +27,14 @@ Windows 批处理（REM / ::）。
 退出码：
   0 — 全部通过（无可疑痕迹）
   1 — 发现高置信度痕迹（HIGH/ORIGIN/VERSION）
-  2 — 发现任务编号引用（CODE），应从注释中移除
+  2 — 发现任务编号引用（CODE/IDENT），应从注释/标识符中移除
   3 — 仅 LOW 级别痕迹，建议人工复核
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import sys
 from collections.abc import Iterator
@@ -143,9 +151,15 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"(?:旧设计|旧架构|历史遗留)", "HIGH", "旧设计/历史遗留（历史迭代叙述）"),
     #
     # ═══ CODE：任务/编号引用 ═══
-    #   代码注释中不应出现管理任务的编号（形如 编号前缀-数字）。
+    #   代码注释中不应出现管理任务的编号（形如 编号前缀-数字）或系列代号。
+    #   注：大写裸字母+数字（如 C20/P1/S-P1/A3/R17）多为约束/优先级/场景/需求
+    #   的合法交叉引用，且单字母+数字与 Excel 单元格（A1/B2/F4）结构性冲突，
+    #   故注释侧不捕获裸"族字母+数字"——F4/B6 作为**标识符**由 IDENTIFIER_PATTERNS
+    #   捕获（见下）。注释侧仅捕获无歧义的系列代号形状（_series/系列）。
     #
     (r"(?:rf|plan|R)-\d+", "CODE", "任务编号引用（如 rf-117、R-086）"),
+    (r"(?<![A-Za-z])[A-Za-z]_series\b", "CODE", "任务批次系列别名英文形式（如 b_series）"),
+    (r"[A-Za-z]系列", "CODE", "任务批次系列别名（如 B系列/F系列/G系列）"),
     #
     # ═══ VERSION：版本号 / 发布 / 迭代标记 ═══
     #   代码注释中不应出现版本号、迭代信息、项目编号等变更记录。
@@ -193,6 +207,21 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"尚未[实现处理支持完成覆盖]", "TODO", "尚未完成/实现（需加 issue 跟踪）"),
     (r"待[办做处补充修复]", "TODO", "待办/待处理"),
     (r"后续\s*(?:版本|迭代|优化|需要|再处理)", "TODO", "后续版本/迭代（需加 issue 跟踪）"),
+]
+
+# ═══ IDENT：标识符任务代号（语义命名纪律） ═══
+# 匹配**完整标识符 token**——变量/函数/类名不得使用任务编号或系列代号。
+# 捕获形状（全仓实证 0 误报）：
+#   - 大写裸字母+数字（F4、B6）——无语义的大写常量名（小写 f1/h1/t1 为短局部，合法）
+#   - 单字母 + _series（b_series）——多字母词+series（drawdown_series）合法
+#   - 单字母 + 系列（G系列）——Python 3 允许 unicode 标识符
+#   - 嵌入 rf/plan + 数字（rf_205_fix、plan18_hack）——任务编号混入语义名
+IDENTIFIER_PATTERNS: list[tuple[str, str, str]] = [
+    (r"^[A-Z][0-9]{1,3}$", "IDENT", "大写裸字母+数字独立标识符（如 F4、B6），无语义"),
+    (r"^[A-Za-z]_series$", "IDENT", "单字母+_series 标识符（如 b_series）"),
+    (r"^[A-Za-z]系列$", "IDENT", "单字母+系列 标识符（如 G系列）"),
+    (r"rf[_-]?\d+", "IDENT", "任务编号嵌入标识符（如 rf_205_fix）"),
+    (r"plan[_-]?\d+", "IDENT", "任务编号嵌入标识符（如 plan18_hack）"),
 ]
 
 # 行内排除模式：即使行命中 PATTERNS，若匹配以下任意模式则跳过
@@ -328,7 +357,7 @@ def _is_excluded(line: str, test_file: bool = False) -> bool:
 
 
 def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
-    """扫描单个文件，返回 [(行号, 分类, 模式说明, 行内容), ...]"""
+    """扫描单个文件，返回 [(行号, 分类, 模式说明, 行内容/标识符), ...]"""
     hits: list[tuple[int, str, str, str]] = []
     if fpath.name in SKIP_FILES or _is_tool_self(fpath.name):
         return hits
@@ -347,7 +376,77 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
                 hits.append((lineno, cat, desc, ctext[:120]))
                 break  # first match only per line
 
+    # 标识符扫描（变量/函数/类名任务代号，语义命名纪律）
+    hits.extend(_scan_identifiers(fpath))
+
     return hits
+
+
+def _scan_identifiers(fpath: Path) -> list[tuple[int, str, str, str]]:
+    """扫描单个文件的代码标识符，返回 [(行号, 分类, 模式说明, 标识符), ...]"""
+    hits: list[tuple[int, str, str, str]] = []
+    for lineno, ident in _iter_identifiers(fpath):
+        for pat, cat, desc in IDENTIFIER_PATTERNS:
+            if re.search(pat, ident):
+                hits.append((lineno, cat, desc, ident))
+                break  # first match only per identifier
+    return hits
+
+
+def _iter_identifiers(fpath: Path) -> Iterator[tuple[int, str]]:
+    """按文件类型提取代码标识符，产出 (行号, 标识符)。
+
+    .py 用 ast 精确提取（函数/类/参数/赋值目标/导入别名）；
+    .js/.mjs 用正则提取声明（var/let/const/function/class 名）。
+    其余类型（.html/.sh/.ps1/.bat/.cmd）不参与标识符扫描。
+    """
+    suffix = fpath.suffix.lower()
+    try:
+        text = fpath.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+    if suffix == ".py":
+        try:
+            tree = ast.parse(text, filename=str(fpath))
+        except SyntaxError:
+            return
+        yield from _py_identifier_names(tree)
+    elif suffix in (".js", ".mjs"):
+        yield from _js_identifier_names(text)
+
+
+def _py_identifier_names(tree: ast.AST) -> Iterator[tuple[int, str]]:
+    """从 Python AST 提取全部标识符名（函数/类/参数/赋值目标/导入别名）。"""
+    for node in ast.walk(tree):
+        names: list[str] = []
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.append(node.name)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            _a = node.args
+            names.extend(x.arg for x in (*_a.posonlyargs, *_a.args, *_a.kwonlyargs))
+            if _a.vararg:
+                names.append(_a.vararg.arg)
+            if _a.kwarg:
+                names.append(_a.kwarg.arg)
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Param)):
+            names.append(node.id)
+        elif isinstance(node, ast.arg):
+            names.append(node.arg)
+        elif isinstance(node, ast.alias):
+            names.append(node.asname or node.name.split(".")[0])
+        for name in names:
+            if name:
+                yield node.lineno, name
+
+
+_JS_DECL_RE = re.compile(r"\b(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)\b")
+
+
+def _js_identifier_names(text: str) -> Iterator[tuple[int, str]]:
+    """从 JS 文本提取声明名（const/let/var/function/class 后的标识符）。"""
+    for lineno, line in enumerate(text.split("\n"), 1):
+        for m in _JS_DECL_RE.finditer(line):
+            yield lineno, m.group(1)
 
 
 def _iter_comment_lines(fpath: Path) -> Iterator[tuple[int, str]]:
@@ -548,7 +647,7 @@ def main() -> None:
                 is_high = cat in ("HIGH", "ORIGIN", "VERSION")
                 if is_high:
                     high_count += 1
-                elif cat == "CODE":
+                elif cat in ("CODE", "IDENT"):
                     code_count += 1
                 else:
                     low_count += 1
@@ -574,7 +673,7 @@ def main() -> None:
         sys.exit(1)
 
     if code_count > 0:
-        print(f"    {code_count} 处任务编号引用（CODE），应从注释中移除")
+        print(f"    {code_count} 处任务编号引用（CODE/IDENT），应从注释/标识符中移除")
         sys.exit(2)
 
     if low_count > 0:

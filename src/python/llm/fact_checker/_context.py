@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from src.python.llm.fact_checker._constants import (
+    _BENCHMARK_RELATIVE_KEYWORDS,
     _CHANGE_RATE_KEYWORDS,
     _CONTRIBUTION_KEYWORDS,
     _DAILY_MOVE_KEYWORDS,
@@ -16,6 +17,8 @@ from src.python.llm.fact_checker._constants import (
     _POSITION_WEIGHT_KEYWORDS,
     _PROFIT_KEYWORDS,
     _SUGGESTION_KEYWORDS,
+    _WEIGHT_KEYWORDS,
+    _WIN_RATE_KEYWORDS,
 )
 
 
@@ -67,6 +70,36 @@ def _is_daily_change_context(sentence: str, match_start: int) -> bool:
     has_time = any(kw in nearby for kw in _DAILY_TIME_KEYWORDS)
     has_move = any(kw in nearby for kw in _DAILY_MOVE_KEYWORDS)
     return has_time and has_move
+
+
+def _is_win_rate_context(sentence: str, match_start: int) -> bool:
+    """判断百分比数值是否在胜率语境中（如"持仓胜率80%"）。
+
+    胜率是盈利品种占比，非收益率；但句子常含"盈利"等收益关键词触发收益语境。
+    用 match 前 15 字符内的"胜率"判定，而非全句——避免同句首部的真实收益率被连带跳过。
+    """
+    nearby = sentence[max(0, match_start - 15) : match_start + 5]
+    return any(kw in nearby for kw in _WIN_RATE_KEYWORDS)
+
+
+def _is_weight_context(sentence: str, match_start: int) -> bool:
+    """判断百分比数值是否在评分权重语境中（如"风险分散度权重20%"）。
+
+    评分权重是维度权数，非收益率。用 match 前 15 字符内的"权重"判定，
+    不纳入"占比/仓位/集中度"（那些由 _is_position_weight_context 全句兜底）。
+    """
+    nearby = sentence[max(0, match_start - 15) : match_start + 5]
+    return any(kw in nearby for kw in _WEIGHT_KEYWORDS)
+
+
+def _is_benchmark_relative_context(sentence: str, match_start: int) -> bool:
+    """判断百分比数值是否在相对基准跑输/跑赢语境中（如"跑输沪深300达1.10%"）。
+
+    相对指数的表现差是百分点而非收益率，直接与持仓收益率比较会误修正。
+    用 match 前 20 字符内的"跑输/跑赢/落后于/领先于"判定。
+    """
+    nearby = sentence[max(0, match_start - 20) : match_start + 10]
+    return any(kw in nearby for kw in _BENCHMARK_RELATIVE_KEYWORDS)
 
 
 def _is_contribution_sentence(sentence: str) -> bool:

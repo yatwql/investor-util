@@ -118,6 +118,8 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         (r"\brf-\d+", "CODE", "任务编号引用（rf-N）"),
         (r"\bplan-\d+", "CODE", "任务编号引用（plan-N）"),
         (r"\bR-\d+(?!-?[A-Z])", "CODE", "任务编号引用（R-N）"),
+        (r"[A-Za-z]系列", "CODE", "任务批次系列别名（如 B系列/F系列/G系列）"),
+        (r"(?<![A-Za-z])[A-Za-z]_series\b", "CODE", "任务批次系列别名英文形式（如 b_series）"),
         # ── HIGH：来源叙述 / 历史实现 / 变更节点 / 迭代 / 版本号 ──
         (
             r"(?:自|从|由)\s*[`\w./_-]+\.(?:py|js|html|md)\s*(?:提取|拆分|迁移|合并|复用|分离)",

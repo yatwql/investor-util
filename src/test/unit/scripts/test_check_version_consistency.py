@@ -113,8 +113,10 @@ class TestDocHeaderRegistration:
     ]
 
     def test_doc_header_docs_registered_as_header(self, version_script):
+        # relative_to 在 Windows 返回反斜杠分隔，规范化 / 与 HEADER_DOCS 对齐
+        # （Linux/macOS 无副作用）。
         types = {
-            str(path.relative_to(version_script.REPO_ROOT)): assert_type
+            str(path.relative_to(version_script.REPO_ROOT)).replace("\\", "/"): assert_type
             for path, assert_type, _args in version_script.CHECKS
         }
         for rel in self.HEADER_DOCS:

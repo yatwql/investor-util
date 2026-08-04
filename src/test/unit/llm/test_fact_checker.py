@@ -1042,3 +1042,161 @@ class TestRegressionTableRowRankAttribution:
         assert "040046" in issues[0]
         assert "016055" in issues[0]
         assert "040046" in issues[0] and issues[0].startswith("声称 040046")
+
+
+# ── 回归：非收益率语境不被误修正 + 亏损品种符号保留（rf-205） ──
+
+
+class TestRegressionFalseCorrectionContexts:
+    """回归：胜率/权重/相对指数差等非收益率百分比不误判为收益率；
+    亏损品种修正时保留负号。
+
+    胜率/评分权重/相对指数差均非收益率，不得与持仓收益率比较；
+    亏损品种（如 518880 实际 -8.86%）修正时必须保留负号，不得输出 +8.9%。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_llm,
+        pytest.mark.llm,
+    ]
+
+    @pytest.fixture
+    def real_holdings(self) -> list[dict]:
+        """真实组合子集：各品种 profit_rate 为百分单位（含正负），含市值/成本。
+
+        market_value = cost × (1 + profit_rate/100)，组合整体盈利，
+        确保数值校验不会因组合 profit_rate<0.01 被整体跳过（复现真实报告场景）。
+        """
+        return [
+            {"name": "长江电力", "code": "600900", "market_value": 160.62, "cost": 100.0, "profit_rate": 60.62},
+            {"name": "工商银行", "code": "601398", "market_value": 173.81, "cost": 100.0, "profit_rate": 73.81},
+            {"name": "建设银行", "code": "601939", "market_value": 278.36, "cost": 100.0, "profit_rate": 178.36},
+            {"name": "黄金ETF华安", "code": "518880", "market_value": 91.14, "cost": 100.0, "profit_rate": -8.86},
+            {"name": "华宝增强债券A", "code": "240012", "market_value": 102.24, "cost": 100.0, "profit_rate": 2.24},
+            {"name": "永赢科技智选C", "code": "022365", "market_value": 116.64, "cost": 100.0, "profit_rate": 16.64},
+        ]
+
+    def test_win_rate_not_corrected(self, real_holdings):
+        """「持仓胜率80%」是品种盈利比例（非收益率）→ 不修正。
+
+        句子含「盈利」会触发收益语境，但数值本身是胜率。
+        """
+        text = "双方一致认可组合整体盈利能力和分散化结构（胜率80%、HHI仅0.0792）。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"胜率不应被误修正: {corrections}"
+
+    def test_score_weight_not_corrected(self, real_holdings):
+        """「风险分散度权重20%」是评分权重（非收益率）→ 不修正。"""
+        text = "风险分散度权重20%、收益合理性权重25%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"权重不应被误修正: {corrections}"
+
+    def test_underperform_index_not_corrected(self, real_holdings):
+        """「跑输沪深300达1.10%」是相对指数的表现差（非收益率）→ 不修正。
+
+        句子尾部「收益平平」会触发收益语境，但开头的 1.10% 是相对基准差。
+        """
+        text = (
+            "组合今日跑输沪深300达1.10%，主要受低波动红利资产拖累，"
+            "而夏普比率仅0.09显示风险调整后收益平平。"
+        )
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"跑输指数差不应被误修正: {corrections}"
+
+    def test_losing_position_correction_keeps_sign(self, real_holdings):
+        """亏损品种（518880 实际 -8.86%）被修正时输出带负号。
+
+        修正输出用带符号收益率，不得把亏损写成盈利（+8.9%）。
+        """
+        text = "华安黄金ETF（518880）收益率为 80%，表现突出。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert len(corrections) == 1
+        assert corrections[0][0] == "80"
+        assert corrections[0][1] == "-8.9"
+        assert "518880" in corrections[0][3]
+
+    def test_win_rate_run_fact_check_not_rewritten(self, real_holdings):
+        """run_fact_check 整链路：胜率不被自动修正，摘要无修正明细。
+
+        胜率是盈利品种占比，不应被改写为任何品种收益率。
+        """
+        html = "<p>双方一致认可组合整体盈利能力和分散化结构（胜率80%、HHI仅0.0792）。</p>"
+        corr, summ = run_fact_check(html, real_holdings, "智囊团深度复盘")
+        assert "80%" in corr
+        assert "8.9%" not in corr
+        assert "已修正明细" not in summ
+
+
+# ── 回归：句中明确主体优先于全局最近邻（漏检） ──
+
+
+class TestRegressionExplicitSubjectBeatsGlobalNearest:
+    """回归：句中明确指代某品种（代码/名称）时，按该品种实际收益率校验，
+    不得落入全局最近邻——否则句中已写明确主体、数值却接近无关品种时漏检。
+
+    复现场景：601939 实际 1.87%、240012 实际 2.24%（两品种差 0.37 < 2×容差），
+    「建设银行收益率 3.2%」：3.2 与 240012 差 0.96≤容差（旧实现按全局最近邻误判
+    通过），但与句中主体 601939 差 1.33>容差 → 应修正为 601939 的 1.9%。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_llm,
+        pytest.mark.llm,
+    ]
+
+    @staticmethod
+    def _close_pair_holdings() -> list[dict]:
+        """两品种收益率差 0.37（<2×容差），能复现"接近无关品种"的漏检场景。"""
+        return [
+            {"name": "建设银行", "code": "601939", "market_value": 101.87, "cost": 100.0, "profit_rate": 1.87},
+            {"name": "华宝增强债券A", "code": "240012", "market_value": 102.24, "cost": 100.0, "profit_rate": 2.24},
+        ]
+
+    def test_explicit_name_wrong_value_corrected_to_subject(self):
+        """句中以名称指代主体且数值偏离 → 按主体收益率修正，而非按无关品种通过。"""
+        holdings = self._close_pair_holdings()
+        text = "建设银行收益率为 3.2%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert len(corrections) == 1, f"句中主体 601939 偏差超容差，应被检出: {corrections}"
+        assert corrections[0][0] == "3.2"
+        assert corrections[0][1] == "1.9"
+        assert "601939" in corrections[0][3]
+
+    def test_explicit_code_wrong_value_corrected_to_subject(self):
+        """句中以代码指代主体且数值偏离 → 按主体收益率修正。"""
+        holdings = self._close_pair_holdings()
+        text = "华宝增强债券A（240012）收益率为 3.9%。"
+        # 3.9 与 601939 的 1.87 差 2.03、与组合 2.055 差 1.845，均 > 容差；
+        # 与主体 240012 的 2.24 差 1.66 > 容差 → 应按 240012 修正。
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert len(corrections) == 1
+        assert corrections[0][1] == "2.2"
+        assert "240012" in corrections[0][3]
+
+    def test_explicit_name_right_value_passes(self):
+        """句中主体数值与主体实际一致（容差内）→ 通过，不误修。"""
+        holdings = self._close_pair_holdings()
+        text = "建设银行收益率为 1.8%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert corrections == [], f"主体数值本就接近实际，不应修正: {corrections}"
+
+    def test_no_subject_falls_back_to_global_nearest(self):
+        """句中无任何持仓主体 → 保留全局最近邻行为（历史语义不变）。"""
+        holdings = self._close_pair_holdings()
+        # 组合收益率 (101.87+102.24-200)/200*100 = 2.055；2.2 与组合差 0.145≤容差 → 通过
+        text = "组合当前收益率为 2.2%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert corrections == [], f"无主体时全局最近邻应判定一致: {corrections}"
+
+    def test_subject_without_rate_data_falls_back(self):
+        """句中主体在持仓中但无收益率数据 → 回退全局最近邻，不崩溃。"""
+        holdings = self._close_pair_holdings() + [
+            {"name": "永赢科技智选C", "code": "022365", "market_value": 100.0, "cost": 100.0},
+        ]
+        # 022365 无 profit_rate → 不在 stock_rates_abs；句子提到它但无法校验，
+        # 全局最近邻（2.4 与组合 1.87~2.05 区间接近）不误报。
+        text = "永赢科技智选C（022365）收益率为 2.4%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert not any("022365" in c[3] for c in corrections), f"无数据主体不应被修正: {corrections}"
