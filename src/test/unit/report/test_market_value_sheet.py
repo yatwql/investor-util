@@ -582,3 +582,115 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         if call_kwargs:
             written_cell = ws.cell.return_value
             self.assertIsNotNone(written_cell.font)
+
+
+# ═══════════════════════════════════════════════════════════
+#  _weighted_avg_cost — 资金加权成本计算（成本流水子模块）
+# ═══════════════════════════════════════════════════════════
+
+
+class TestWeightedAvgCost(unittest.TestCase):
+    """_weighted_avg_cost 单元测试：批次成本价按份额加权（含费用摊薄）。"""
+
+    def test_returns_weighted_cost(self):
+        """多档批次按份额加权 = 总成本 / 总份额。"""
+        buckets = {
+            "low": {"shares": 100.0, "cost": 900.0},
+            "high": {"shares": 50.0, "cost": 600.0},
+            "unpriced": {"shares": 0.0, "cost": 0.0},
+        }
+        # (900 + 600) / (100 + 50) = 1500 / 150 = 10.0
+        self.assertAlmostEqual(mvs._weighted_avg_cost(buckets), 10.0)
+
+    def test_single_low_bucket(self):
+        """仅低成本档时返回其平均成本价。"""
+        buckets = {
+            "low": {"shares": 100.0, "cost": 950.0},
+            "high": {"shares": 0.0, "cost": 0.0},
+            "unpriced": {"shares": 0.0, "cost": 0.0},
+        }
+        self.assertAlmostEqual(mvs._weighted_avg_cost(buckets), 9.5)
+
+    def test_none_for_missing_or_empty(self):
+        """缺码/空桶/零份额时返回 None（渲染层写空）。"""
+        self.assertIsNone(mvs._weighted_avg_cost(None))
+        self.assertIsNone(mvs._weighted_avg_cost({}))
+        self.assertIsNone(mvs._weighted_avg_cost({}))
+        self.assertIsNone(
+            mvs._weighted_avg_cost(
+                {"low": {"shares": 0.0, "cost": 0.0}, "high": {"shares": 0.0, "cost": 0.0}}
+            )
+        )
+
+
+# ═══════════════════════════════════════════════════════════
+#  资金加权成本列渲染（成本流水子模块）
+# ═══════════════════════════════════════════════════════════
+
+
+class TestWriteMarketValueSheetFlow(unittest.TestCase):
+    """write_market_value_sheet 资金加权成本列渲染测试。
+
+    开关 `report_submodules.cost_lots` 对应 fund_flow_data 是否传入：
+    None → 保持既有 15 列；非 None → 追加「资金加权成本」列（第 16 列）。
+    """
+
+    def setUp(self):
+        self.wb = Workbook()
+        self.ws = self.wb.active
+        self.detail = mvs.DetailRow(
+            account="证券账户", name="电池ETF", code="561910",
+            price=10.0, nav_date="2026-06-26", yesterday_close=9.5,
+            price_type="场内收盘价(T)", premium="--",
+            shares=100.0, market_value=1000.0, cost=100.0,
+            profit=900.0, profit_rate=9.0, today_profit=50.0,
+            source="腾讯财经", source_api="tencent",
+        )
+
+    def _flow(self, low_shares=0.0, cost=0.0):
+        return {
+            "available": True,
+            "cost_tiers": {
+                "per_code": {
+                    "561910": {
+                        "low": {"shares": low_shares, "cost": cost},
+                        "high": {"shares": 0.0, "cost": 0.0},
+                        "unpriced": {"shares": 0.0, "cost": 0.0},
+                    }
+                }
+            },
+            "dividends": {"per_code": {}},
+        }
+
+    def test_flow_weighted_cost_header_when_enabled(self):
+        """开关开启时表头第 16 列为「资金加权成本」，原 15 列保持不变。"""
+        mvs.write_market_value_sheet(self.ws, [], "2026-06-26", details=[self.detail],
+                                     fund_flow_data=self._flow())
+        headers = [self.ws.cell(row=2, column=c).value for c in range(1, 17)]
+        self.assertEqual(len(headers), 16)
+        self.assertEqual(headers[14], "取价渠道")
+        self.assertEqual(headers[15], "资金加权成本")
+
+    def test_flow_weighted_cost_value(self):
+        """开关开启时数据行「资金加权成本」列 = 批次成本价按份额加权。"""
+        flow = self._flow(low_shares=100.0, cost=950.0)
+        mvs.write_market_value_sheet(self.ws, [], "2026-06-26", details=[self.detail],
+                                     fund_flow_data=flow)
+        # 数据行 row 3，列 16 = 950 / 100 = 9.5
+        self.assertAlmostEqual(self.ws.cell(row=3, column=16).value, 9.5)
+
+    def test_flow_weighted_cost_none_when_no_buckets(self):
+        """开关开启但代码无批次数据时，「资金加权成本」列为空。"""
+        flow = {"available": True, "cost_tiers": {"per_code": {}}, "dividends": {"per_code": {}}}
+        mvs.write_market_value_sheet(self.ws, [], "2026-06-26", details=[self.detail],
+                                     fund_flow_data=flow)
+        self.assertIsNone(self.ws.cell(row=3, column=16).value)
+
+    def test_no_flow_column_when_disabled(self):
+        """开关关闭（fund_flow_data=None）时保持既有 15 列，无「资金加权成本」列。"""
+        mvs.write_market_value_sheet(self.ws, [], "2026-06-26", details=[self.detail],
+                                     fund_flow_data=None)
+        headers = [self.ws.cell(row=2, column=c).value for c in range(1, 16)]
+        self.assertEqual(len(headers), 15)
+        self.assertEqual(headers[14], "取价渠道")
+        self.assertNotIn("资金加权成本", headers)

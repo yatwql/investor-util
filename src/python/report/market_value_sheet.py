@@ -58,6 +58,31 @@ _HEADERS = [
     "取价渠道",
 ]
 _NCOLS = len(_HEADERS)
+# 成本流水子列（report_submodules.cost_lots 开启时追加，默认关不渲染）
+_EXTRA_HEADERS = ["资金加权成本"]
+_NCOLS_WITH_FLOW = _NCOLS + len(_EXTRA_HEADERS)
+
+
+def _weighted_avg_cost(buckets: dict | None) -> float | None:
+    """资金加权成本（批次成本价按份额加权，含费用摊薄）。
+
+    Args:
+        buckets: cost_tiers.per_code 中某代码的分档桶 dict，缺码时为 None
+
+    Returns:
+        加权成本价浮点（无批次数据返回 None，渲染层写空）
+    """
+    if not isinstance(buckets, dict):
+        return None
+    shares = 0.0
+    cost = 0.0
+    for bucket in ("low", "high", "unpriced"):
+        b = buckets.get(bucket) or {}
+        shares += float(b.get("shares", 0.0) or 0.0)
+        cost += float(b.get("cost", 0.0) or 0.0)
+    if shares <= 0:
+        return None
+    return cost / shares
 
 _PRICE_TYPE_COL = 7
 _NAME_COL = 2
@@ -84,9 +109,9 @@ def _detail_to_row_values(d: DetailRow) -> list[Any]:
     ]
 
 
-def _num_formats() -> list[str | None]:
+def _num_formats(has_flow: bool = False) -> list[str | None]:
     """每列的 Excel 数字格式。"""
-    return [
+    fmt = [
         "",  # 1  账户
         "",  # 2  名称
         "",  # 3  代码
@@ -103,6 +128,9 @@ def _num_formats() -> list[str | None]:
         FMT_MONEY,  # 14 本日盈亏
         "",  # 15 取价渠道
     ]
+    if has_flow:
+        fmt += [FMT_PRICE]  # 16 资金加权成本（批次成本价按份额加权）
+    return fmt
 
 
 def _apply_profit_colors(ws, start_row: int, end_row: int, profit_col: int, rate_col: int, today_col: int) -> None:
@@ -135,12 +163,19 @@ def _write_account_groupings(
     ws,
     details: list[DetailRow],
     data_start: int,
+    fund_flow_data: dict | None = None,
 ) -> tuple[float, float, float, float, int]:
     """按账户分组写入明细行和小计，返回汇总数据及最终行号。
+
+    fund_flow_data 非 None 时明细行追加「资金加权成本」列（C19 契约）。
 
     Returns:
         (grand_mv, grand_cost, grand_profit, grand_today, final_row)
     """
+    has_flow = fund_flow_data is not None
+    ncols = _NCOLS_WITH_FLOW if has_flow else _NCOLS
+    cost_map = (fund_flow_data or {}).get("cost_tiers", {}).get("per_code", {})
+
     accounts: dict[str, list[DetailRow]] = {}
     for d in details:
         accounts.setdefault(d.account, []).append(d)
@@ -151,7 +186,9 @@ def _write_account_groupings(
     for acc_name, acc_details in accounts.items():
         for d in acc_details:
             vals = _detail_to_row_values(d)
-            write_data_row(ws, row, vals, _num_formats())
+            if has_flow:
+                vals += [_weighted_avg_cost(cost_map.get(d.code))]
+            write_data_row(ws, row, vals, _num_formats(has_flow))
             row += 1
 
         acc_mv = sum(d.market_value for d in acc_details)
@@ -177,7 +214,9 @@ def _write_account_groupings(
             acc_today,
             "",
         ]
-        write_subtotal_row(ws, row, f"{acc_name} 小计", subtotal_vals[1:], _NCOLS, _num_formats())
+        if has_flow:
+            subtotal_vals += [""]  # 资金加权成本小计列留空（批次口径不跨账户聚合）
+        write_subtotal_row(ws, row, f"{acc_name} 小计", subtotal_vals[1:], ncols, _num_formats(has_flow))
         row += 1
 
         grand_mv += acc_mv
@@ -189,7 +228,11 @@ def _write_account_groupings(
 
 
 def write_market_value_sheet(
-    ws: Worksheet, holdings: list, today_str: str = "", details: list[DetailRow] | None = None
+    ws: Worksheet,
+    holdings: list,
+    today_str: str = "",
+    details: list[DetailRow] | None = None,
+    fund_flow_data: dict | None = None,
 ) -> tuple[float, float, float, float, list[DetailRow]]:
     """写入市值核算明细表，返回汇总数据供汇总页签使用。
 
@@ -198,12 +241,18 @@ def write_market_value_sheet(
         holdings: 持仓列表
         today_str: 日期字符串（YYYY-MM-DD），默认当天
         details: 预计算明细行（必须传入，由编排器预计算）
+        fund_flow_data: 成本流水 C19 契约（非 None 时追加「资金加权成本」列；
+            None 时保持既有 15 列输出，向后兼容）
 
     Returns:
         (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)
     """
-    row = write_title_row(ws, 1, get_report_sheet_name("market_value"), _NCOLS)
-    row = write_header_row(ws, row, _HEADERS)
+    has_flow = fund_flow_data is not None
+    ncols = _NCOLS_WITH_FLOW if has_flow else _NCOLS
+    headers = _HEADERS + _EXTRA_HEADERS if has_flow else _HEADERS
+
+    row = write_title_row(ws, 1, get_report_sheet_name("market_value"), ncols)
+    row = write_header_row(ws, row, headers)
     data_start = row
 
     # 若所有行情数据全零，写一行醒目提示
@@ -212,11 +261,13 @@ def write_market_value_sheet(
         _WARN_FONT = Font(size=10, bold=True, color="CC0000")
         ws.cell(row=row, column=1).font = _WARN_FONT
         ws.cell(row=row, column=1, value="⚠ 行情数据全部不可用（非交易时段/网络异常），以下市值/盈亏均为占位 —")
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=15)
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
         row += 1
 
     # 按账户分组写入明细 + 小计
-    grand_mv, grand_cost, grand_profit, grand_today, row = _write_account_groupings(ws, details or [], data_start)
+    grand_mv, grand_cost, grand_profit, grand_today, row = _write_account_groupings(
+        ws, details or [], data_start, fund_flow_data
+    )
 
     # 总计
     grand_rate = grand_profit / grand_cost if grand_cost > 0 else 0.0
@@ -237,7 +288,9 @@ def write_market_value_sheet(
         grand_today,
         "",
     ]
-    write_total_row(ws, row, "总计", total_vals[1:], _NCOLS, _num_formats())
+    if has_flow:
+        total_vals += [""]  # 资金加权成本总计列留空（批次口径不跨账户聚合）
+    write_total_row(ws, row, "总计", total_vals[1:], ncols, _num_formats(has_flow))
 
     # 对盈亏列着色
     _apply_profit_colors(ws, data_start, row, profit_col=12, rate_col=13, today_col=14)

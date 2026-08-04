@@ -1061,6 +1061,34 @@ class TestIsEnableCandidateCompare(unittest.TestCase):
         )
 
 
+class TestIsEnableCostLots(unittest.TestCase):
+    """成本流水子模块开关（report_submodules.cost_lots，默认关）。"""
+
+    def test_default_false_when_missing(self):
+        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
+        self.assertFalse(cfg.is_enable_cost_lots({}))
+        self.assertFalse(cfg.is_enable_cost_lots({"enable_fund_deep_analysis": True}))
+
+    def test_false_when_submodules_not_dict(self):
+        """report_submodules 非 dict → 关闭。"""
+        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": "not-a-dict"}))
+        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": None}))
+
+    def test_false_when_disabled(self):
+        """report_submodules.cost_lots=false → 关闭。"""
+        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": False}}))
+
+    def test_true_when_enabled(self):
+        """report_submodules.cost_lots=true → 开启。"""
+        self.assertTrue(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True}}))
+
+    def test_independent_from_other_submodules(self):
+        """cost_lots 开关独立于同容器其他键。"""
+        self.assertTrue(
+            cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True, "candidate_compare": False}})
+        )
+
+
 class TestGetComparisonCandidates(unittest.TestCase):
     """get_comparison_candidates 候选代码列表访问器。"""
 

@@ -17,7 +17,9 @@ from src.python.cli import (
     _EXIT_SUCCESS,
     _build_parser,
     _cli_read_holdings,
+    _cli_read_holdings_with_flows,
     _handle_cache_update,
+    _handle_report,
     _handle_whatif,
     main,
 )
@@ -293,6 +295,99 @@ class TestCliReadHoldings:
         result = _cli_read_holdings(config)
         assert result is None
         assert any("持仓文件不存在" in r.message for r in caplog.records if r.levelname == "ERROR")
+
+
+@pytest.mark.unit
+class TestCliReadHoldingsWithFlows:
+    """_cli_read_holdings_with_flows 行为测试（含交易/分红流水页签）。"""
+
+    def test_returns_holdings_and_flows(self):
+        """有流水页签时返回 (holdings, transactions, dividends) 三元组。"""
+        mock_parsed = MagicMock()
+        mock_parsed.holdings = [MagicMock(), MagicMock()]
+        mock_parsed.transactions = [MagicMock()]
+        mock_parsed.dividends = [MagicMock()]
+        with (
+            patch("src.python.cli.cli._cli_resolve_holdings_file", return_value="/tmp/h.xlsx"),
+            patch("src.python.core.reader.read_holdings_with_flows", return_value=mock_parsed),
+        ):
+            result = _cli_read_holdings_with_flows({"holdings_dir": "/tmp", "holdings_filename": "h.xlsx"})
+        assert result is not None
+        holdings, transactions, dividends = result
+        assert len(holdings) == 2
+        assert len(transactions) == 1
+        assert len(dividends) == 1
+
+    def test_empty_flows_when_no_flow_sheets(self):
+        """无流水页签时 transactions/dividends 为空列表。"""
+        mock_parsed = MagicMock()
+        mock_parsed.holdings = [MagicMock()]
+        mock_parsed.transactions = []
+        mock_parsed.dividends = []
+        with (
+            patch("src.python.cli.cli._cli_resolve_holdings_file", return_value="/tmp/h.xlsx"),
+            patch("src.python.core.reader.read_holdings_with_flows", return_value=mock_parsed),
+        ):
+            result = _cli_read_holdings_with_flows({})
+        assert result is not None
+        holdings, transactions, dividends = result
+        assert len(holdings) == 1
+        assert transactions == []
+        assert dividends == []
+
+    def test_none_when_holdings_empty(self, caplog):
+        """主表为空 → 返回 None + ERROR 日志。"""
+        caplog.set_level(10)
+        mock_parsed = MagicMock()
+        mock_parsed.holdings = []
+        with (
+            patch("src.python.cli.cli._cli_resolve_holdings_file", return_value="/tmp/h.xlsx"),
+            patch("src.python.core.reader.read_holdings_with_flows", return_value=mock_parsed),
+        ):
+            result = _cli_read_holdings_with_flows({})
+        assert result is None
+        assert any("持仓文件为空" in r.message for r in caplog.records if r.levelname == "ERROR")
+
+
+@pytest.mark.unit
+class TestHandleReport:
+    """_handle_report 委托 generate_report 并透传交易/分红流水。"""
+
+    def test_threads_transactions_and_dividends(self):
+        """报告生成将持仓 + 交易/分红流水一并传给 generate_report。"""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        with (
+            patch("src.python.cli.cli._cli_read_holdings_with_flows",
+                  return_value=([MagicMock()], [MagicMock()], [MagicMock()])),
+            patch("src.python.report.cli_progress.CliProgressReporter"),
+            patch("src.python.report.orchestrator.generate_report", return_value=mock_result) as mock_gen,
+        ):
+            args = MagicMock()
+            args.type = "basic"
+            args.history = "auto"
+            args.force_llm = False
+            args.output = None
+            args.warm = False
+            args.verbose = False
+            code = _handle_report(args, {})
+        assert code == 0
+        kwargs = mock_gen.call_args[1]
+        assert len(kwargs["holdings"]) == 1
+        assert len(kwargs["transactions"]) == 1
+        assert len(kwargs["dividends"]) == 1
+
+    def test_none_holdings_returns_severe(self):
+        """持仓读取失败 → 返回 SEVERE 且不调用 generate_report。"""
+        with (
+            patch("src.python.cli.cli._cli_read_holdings_with_flows", return_value=None),
+            patch("src.python.report.orchestrator.generate_report") as mock_gen,
+        ):
+            args = MagicMock()
+            args.verbose = False
+            code = _handle_report(args, {})
+        assert code == _EXIT_SEVERE
+        mock_gen.assert_not_called()
 
 
 # ═══════════════════════════════════════════════════════════════

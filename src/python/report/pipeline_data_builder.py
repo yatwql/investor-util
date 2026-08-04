@@ -40,6 +40,9 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "data_freshness",
     # 行动建议单一数据源：行动板块 + 智囊团深度复盘行动摘要（单源计算两处呈现）
     "action_data",
+    # 成本流水：成本分档 + XIRR + 分红累计（report_submodules.cost_lots，
+    # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
+    "fund_flow_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -65,6 +68,9 @@ _PREP_KNOWN_KEYS: set[str] = {
     "data_freshness",
     # 行动建议单一数据源：由 prepare_report_data 组装（单源计算两处呈现）
     "action_data",
+    # 成本流水：成本分档 + XIRR + 分红累计（report_submodules.cost_lots，
+    # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
+    "fund_flow_data",
 }
 
 # ── 类型映射（用于自动类型断言） ──
@@ -80,6 +86,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "position_status": (dict, type(None)),
     "data_freshness": (dict, type(None)),
     "action_data": (dict, type(None)),
+    "fund_flow_data": (dict, type(None)),
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
@@ -100,6 +107,7 @@ _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "position_status": dict,
     "data_freshness": dict,
     "action_data": dict,
+    "fund_flow_data": dict,
 }
 
 

@@ -19,8 +19,17 @@ def write_content_sheets(
     us_indices: dict,
     modules: dict[str, Any],
     prog: ProgressReporter,
+    enable_cost_lots: bool = False,
 ) -> dict:
-    """写入汇总 / 分类 / 穿透 / 基金业绩页签，返回穿透结果。"""
+    """写入汇总 / 分类 / 穿透 / 基金业绩页签，返回穿透结果。
+
+    Args:
+        enable_cost_lots: 成本流水子模块开关。关闭时 fund_flow_data 不传
+            （汇总/分类两章保持既有输出）；开启时透传 data["fund_flow_data"]
+            （C19 契约：成本分档 + XIRR + 分红累计，无流水时 available=False）。
+    """
+    fund_flow_data = data.get("fund_flow_data") if enable_cost_lots else None
+
     prog.call_sheet(
         get_report_sheet_name("summary"),
         modules.get("write_summary_sheet"),
@@ -33,6 +42,7 @@ def write_content_sheets(
         update_status=data["update_status"],
         a_indices=a_indices,
         us_indices=us_indices,
+        fund_flow_data=fund_flow_data,
     )
 
     prog.call_sheet(
@@ -41,6 +51,7 @@ def write_content_sheets(
         sheets["category"],
         holdings,
         data["details"],
+        fund_flow_data=fund_flow_data,
     )
 
     compute_pen = modules.get("compute_penetration_top10", lambda _a, _b: {})

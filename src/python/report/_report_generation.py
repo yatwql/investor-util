@@ -423,6 +423,9 @@ def _generate_full_excel_report(
     enable_portfolio_evolution: bool = True,
     enable_action: bool = False,
     enable_data_quality: bool = False,
+    enable_cost_lots: bool = False,
+    transactions: list | None = None,
+    dividends: list | None = None,
 ) -> bool:
     """full 路径的 Excel 报告生成，返回是否成功。"""
     from src.python.report.excel_generator import generate_excel_report
@@ -453,6 +456,9 @@ def _generate_full_excel_report(
             enable_llm=enable_llm,
             debate_info=debate_info,
             enable_data_quality=enable_data_quality,
+            enable_cost_lots=enable_cost_lots,
+            transactions=transactions,
+            dividends=dividends,
         )
         reporter.ok("Excel 报告已生成")
         return True
@@ -472,6 +478,8 @@ def _generate_report_both(
     reporter: ProgressReporter,
     fetch_history: bool = False,
     output_dir: str | None = None,
+    transactions: list | None = None,
+    dividends: list | None = None,
 ) -> "ReportResult":
     """both 报告路径：生成 HTML + Excel，不含 LLM 分析章节。
 
@@ -480,6 +488,7 @@ def _generate_report_both(
     """
     from src.python.config import (
         is_enable_action,
+        is_enable_cost_lots,
         is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
@@ -507,6 +516,7 @@ def _generate_report_both(
     _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
     _enable_action = is_enable_action(config)
     _enable_data_quality = is_enable_data_quality(config)
+    _enable_cost_lots = is_enable_cost_lots(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
@@ -660,6 +670,9 @@ def _generate_report_both(
             enable_action=_enable_action,
             enable_llm=False,
             enable_data_quality=_enable_data_quality,
+            enable_cost_lots=_enable_cost_lots,
+            transactions=transactions,
+            dividends=dividends,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True
@@ -734,6 +747,8 @@ def _generate_report_full(
     fetch_history: bool = False,
     force_llm: bool = False,
     output_dir: str | None = None,
+    transactions: list | None = None,
+    dividends: list | None = None,
 ) -> "ReportResult":
     """full 报告路径：生成 HTML + Excel + LLM 分析章节。
 
@@ -743,6 +758,7 @@ def _generate_report_full(
     """
     from src.python.config import (
         is_enable_action,
+        is_enable_cost_lots,
         is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
@@ -770,6 +786,7 @@ def _generate_report_full(
     _enable_action = is_enable_action(config)
     _enable_llm = is_enable_llm(config)
     _enable_data_quality = is_enable_data_quality(config)
+    _enable_cost_lots = is_enable_cost_lots(config)
     sec_order = get_report_section_order(config)
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
@@ -901,6 +918,9 @@ def _generate_report_full(
         _enable_portfolio_evolution,
         _enable_action,
         _enable_data_quality,
+        _enable_cost_lots,
+        transactions,
+        dividends,
     )
 
     result.news_ok = news_ok

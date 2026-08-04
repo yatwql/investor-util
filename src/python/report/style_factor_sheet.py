@@ -1,6 +1,6 @@
 """风格与因子分析 Excel 写入模块 — 报告页签 9（一章三区块）。
 
-物理合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」
+「风格与因子分析」一章分「基金风格表 + 风格因子回归」两区块
 （sheet key `style_factor`），另含可选「行业 Beta」子表：
 
   一、基金风格表 —— 基金名称/当前风格/漂移等级等（数据不足写占位）
@@ -272,9 +272,7 @@ def _write_industry_beta_block(
     correlations = industry_beta.get("correlations", {})
 
     # 有 Beta 的行业优先，再补仅有暴露占比的行业（无指数映射）
-    industries: list[str] = list(betas.keys()) + [
-        i for i in exposure if i not in betas
-    ]
+    industries: list[str] = list(betas.keys()) + [i for i in exposure if i not in betas]
 
     for ind in industries:
         _sig = bool(significant.get(ind))
@@ -289,7 +287,9 @@ def _write_industry_beta_block(
                 correlations.get(ind, "--") if correlations.get(ind) is not None else "--",
             ]
             write_data_row(
-                ws, row, row_data,
+                ws,
+                row,
+                row_data,
                 formats=[None, "0.00%", None, "0.0000", "0.000", None, "0.0000"],
             )
             if _sig:

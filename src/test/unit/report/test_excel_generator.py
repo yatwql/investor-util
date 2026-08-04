@@ -806,7 +806,7 @@ class TestCreateSheets(unittest.TestCase):
         for key, title in expected_titles.items():
             self.assertIn(key, sheets, f"{key} should be created")
             self.assertEqual(sheets[key].title, title, f"{key} title mismatch")
-        # 回归：旧「组合历史走势」「历史回撤分析」独立 sheet 不再生成（已物理合并）
+        # 回归：组合历史走势与回撤渲染为单一 sheet，不再生成独立 sheet
         self.assertNotIn("portfolio_history", sheets)
         self.assertNotIn("drawdown_analysis", sheets)
 

@@ -111,6 +111,12 @@ class TestToolSelfExemption:
         assert code_traces._is_tool_self("check-version-consistency.py") is False
         assert code_traces._is_tool_self("chart.min.js") is False
 
+    def test_self_file_scan_clean(self, code_traces):
+        """工具自身文件（含新增强模式特征字面量——合并历史与中文数字章节/轮次字样）应
+        整文件豁免——扫描 check-code-traces.py 自身不命中任何痕迹，防模式增强自伤。"""
+        hits = code_traces.scan_file(Path(code_traces.__file__), verbose=False)
+        assert hits == [], f"工具自身文件应豁免，实际命中: {hits}"
+
 
 # ── check-code-traces：补强模式能检出历史痕迹 ──────────────
 
@@ -340,6 +346,17 @@ class TestDocChapterDetection:
         for line in flagged:
             assert _doc_hit(doc_traces, line) is not None, f"章节编号暗号未检出: {line}"
 
+    def test_chapter_codes_chinese_flagged(self, doc_traces):
+        """中文数字章节编号（第X章 / 裸X章式）指代报告具体章节须检出。"""
+        flagged = [
+            "三章渲染成本分档",
+            "第五章估值分位",
+            "第二章合并",
+            "第四章摘要引用",
+        ]
+        for line in flagged:
+            assert _doc_hit(doc_traces, line) is not None, f"中文数字章节暗号未检出: {line}"
+
     def test_chapter_count_exempted(self, doc_traces):
         legit = [
             "共 19 章",
@@ -353,6 +370,19 @@ class TestDocChapterDetection:
         ]
         for line in legit:
             assert _doc_hit(doc_traces, line) is None, f"章节计数表述被误伤: {line}"
+
+    def test_chapter_count_chinese_exempted(self, doc_traces):
+        """中文数字计数表述（共X章 / 减至X章 / 一章三区块式计数）应豁免。"""
+        legit = [
+            "共 二十 章",
+            "总数 二十一章 减至 十九章",
+            "减至 十九章",
+            "「十九章」",
+            "一章三区块",
+            "一章两区块",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"中文数字章节计数表述被误伤: {line}"
 
     def test_non_patterns_clean(self, doc_traces):
         legit = [
@@ -389,6 +419,19 @@ class TestDocRoundDetection:
         for line in flagged:
             assert _doc_hit(doc_traces, line) is not None, f"迭代轮次暗号未检出: {line}"
 
+    def test_round_codes_chinese_flagged(self, doc_traces):
+        """中文数字迭代轮次（第 X 轮式——X 为中文数字三及以上；及"轮 X"式）指代
+        开发迭代历史须检出；唯第一轮/第二轮为运行时序数（LLM 圆桌会两轮辩论等），
+        不纳入。"""
+        flagged = [
+            "第三轮落地",
+            "第 三 轮验收标准",
+            "轮三 落地",
+            "对应轮四/轮五",
+        ]
+        for line in flagged:
+            assert _doc_hit(doc_traces, line) is not None, f"中文数字轮次暗号未检出: {line}"
+
     def test_round_count_exempted(self, doc_traces):
         legit = [
             "共 12 轮",
@@ -410,6 +453,19 @@ class TestDocRoundDetection:
         for line in legit:
             assert _doc_hit(doc_traces, line) is None, f"轮次运行时表述被误伤: {line}"
 
+    def test_round_runtime_chinese_exempted(self, doc_traces):
+        """中文数字运行时序数/计数表述应豁免：LLM 圆桌会两轮辩论、第一轮/第二轮
+        增量抓取等为正常行为，非开发迭代痕迹。"""
+        legit = [
+            "第一轮增量获取",
+            "第二轮互相反驳聚焦调仓",
+            "圆桌会两轮辩论",
+            "共 二十 轮迭代实施",
+            "一轮行情",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"中文数字轮次运行时表述被误伤: {line}"
+
     def test_round_non_patterns_clean(self, doc_traces):
         legit = [
             "一轮行情",
@@ -420,6 +476,16 @@ class TestDocRoundDetection:
         ]
         for line in legit:
             assert _doc_hit(doc_traces, line) is None, f"合法表述被误伤: {line}"
+
+    def test_physical_merge_flagged(self, doc_traces):
+        """章节/模块合并历史痕迹（类似迁移，合并写法见下方 flagged 用例）须检出。"""
+        flagged = [
+            "物理合并「基金风格分析」+「因子暴露分析」",
+            "已物理合并为单模块",
+            "两页签已物理合并为统一渲染模块",
+        ]
+        for line in flagged:
+            assert _doc_hit(doc_traces, line) is not None, f"物理合并痕迹未检出: {line}"
 
 
 # ── check-code-traces：章节编号暗号检测（CHAPTER） ─────────
@@ -445,6 +511,17 @@ class TestCodeChapterDetection:
         for line in flagged:
             assert _code_hit(code_traces, line) is not None, f"章节编号暗号未检出: {line}"
 
+    def test_chapter_codes_chinese_flagged(self, code_traces):
+        """中文数字章节编号（第X章 / 裸X章式）指代报告具体章节须检出。"""
+        flagged = [
+            "三章渲染成本分档",
+            "第五章估值分位",
+            "第二章合并",
+            "第四章摘要引用",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"中文数字章节暗号未检出: {line}"
+
     def test_chapter_count_exempted(self, code_traces):
         legit = [
             "共 19 章",
@@ -458,6 +535,19 @@ class TestCodeChapterDetection:
         ]
         for line in legit:
             assert _code_hit(code_traces, line) is None, f"章节计数表述被误伤: {line}"
+
+    def test_chapter_count_chinese_exempted(self, code_traces):
+        """中文数字计数表述（共X章 / 减至X章 / 一章三区块式计数）应豁免。"""
+        legit = [
+            "共 二十 章",
+            "总数 二十一章 减至 十九章",
+            "减至 十九章",
+            "「十九章」",
+            "一章三区块",
+            "一章两区块",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"中文数字章节计数表述被误伤: {line}"
 
     def test_non_patterns_clean(self, code_traces):
         legit = [
@@ -495,6 +585,19 @@ class TestCodeRoundDetection:
         for line in flagged:
             assert _code_hit(code_traces, line) is not None, f"迭代轮次暗号未检出: {line}"
 
+    def test_round_codes_chinese_flagged(self, code_traces):
+        """中文数字迭代轮次（第 X 轮式——X 为中文数字三及以上；及"轮 X"式）指代
+        开发迭代历史须检出；唯第一轮/第二轮为运行时序数（LLM 圆桌会两轮辩论等），
+        不纳入。"""
+        flagged = [
+            "第三轮落地",
+            "第 三 轮验收标准",
+            "轮三 落地",
+            "对应轮四/轮五",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"中文数字轮次暗号未检出: {line}"
+
     def test_round_count_exempted(self, code_traces):
         legit = [
             "共 12 轮",
@@ -515,6 +618,19 @@ class TestCodeRoundDetection:
         for line in legit:
             assert _code_hit(code_traces, line) is None, f"轮次运行时表述被误伤: {line}"
 
+    def test_round_runtime_chinese_exempted(self, code_traces):
+        """中文数字运行时序数/计数表述应豁免：LLM 圆桌会两轮辩论、第一轮/第二轮
+        增量抓取等为正常行为，非开发迭代痕迹。"""
+        legit = [
+            "第一轮增量获取",
+            "第二轮互相反驳聚焦调仓",
+            "圆桌会两轮辩论",
+            "共 二十 轮迭代实施",
+            "一轮行情",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"中文数字轮次运行时表述被误伤: {line}"
+
     def test_round_non_patterns_clean(self, code_traces):
         legit = [
             "一轮行情",
@@ -525,6 +641,16 @@ class TestCodeRoundDetection:
         ]
         for line in legit:
             assert _code_hit(code_traces, line) is None, f"合法表述被误伤: {line}"
+
+    def test_physical_merge_flagged(self, code_traces):
+        """章节/模块合并历史痕迹（类似迁移，合并写法见下方 flagged 用例）须检出。"""
+        flagged = [
+            "物理合并「基金风格分析」+「因子暴露分析」",
+            "已物理合并为单模块",
+            "两页签已物理合并为统一渲染模块",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"物理合并痕迹未检出: {line}"
 
 
 # ── 注释提取：多行 docstring 状态不泄漏 ─────────────────────

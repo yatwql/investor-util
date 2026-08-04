@@ -14,12 +14,50 @@ from src.python.report.progress import ProgressReporter, Timer
 logger = setup_logger()
 
 
+def _build_flow_data(
+    enable_cost_lots: bool,
+    transactions: list | None,
+    dividends: list | None,
+    holdings: list,
+    details: list,
+) -> dict | None:
+    """组装成本流水数据（C19 fund_flow_data）。
+
+    仅当开关开启时计算（成本分档 + XIRR + 分红累计）；开关关闭时返回
+    None（汇总/市值/分类页签保持既有输出）。市价取自身份验证后的行情明细。
+
+    Args:
+        enable_cost_lots: 成本流水子模块开关
+        transactions: 交易流水记录（无则 None）
+        dividends: 分红流水记录（无则 None）
+        holdings: 当前持仓
+        details: 市值核算明细（提供品种代码 → 当前市价）
+
+    Returns:
+        fund_flow_data dict（无流水时 available=False），或 None（开关关闭）
+    """
+    if not enable_cost_lots:
+        return None
+    if not transactions and not dividends:
+        # 无流水页签：仍返回 available=False 契约，供渲染层写「未录入流水」占位
+        from src.python.analysis.cost_flow import build_fund_flow_data
+
+        return build_fund_flow_data([], [], holdings, {}, end_date=None)
+    from src.python.analysis.cost_flow import build_fund_flow_data
+
+    current_prices = {d.code: d.price for d in details if getattr(d, "price", None)}
+    return build_fund_flow_data(transactions or [], dividends or [], holdings, current_prices)
+
+
 def resolve_market_data(
     holdings: list,
     details: list | None,
     modules: dict[str, Any],
     ws2: Any,
     prog: ProgressReporter,
+    enable_cost_lots: bool = False,
+    transactions: list | None = None,
+    dividends: list | None = None,
 ) -> dict[str, Any]:
     """行情市值页写入，返回核心数据字典。"""
     mvs = modules.get("write_market_value_sheet")
@@ -34,6 +72,7 @@ def resolve_market_data(
             "details": details or [],
             "categories": {},
             "update_status": (0, 0, True),
+            "fund_flow_data": None,
         }
         prog.add_error("行情市值模块缺失，跳过 Sheet 2")
     elif details is not None:
@@ -45,8 +84,10 @@ def resolve_market_data(
             "today_profit": sum(d.today_profit for d in details),
             "details": details,
         }
+        fund_flow_data = _build_flow_data(enable_cost_lots, transactions, dividends, holdings, details)
+        data["fund_flow_data"] = fund_flow_data
         with Timer(get_report_sheet_name("market_value")):
-            mvs(ws2, holdings, details=details)
+            mvs(ws2, holdings, details=details, fund_flow_data=fund_flow_data)
     else:
         with Timer("行情数据获取 (" + get_report_sheet_name("market_value") + ")"):
             prog.info("正在获取行情数据（首次耗时较长，后续使用缓存）...")
@@ -56,13 +97,15 @@ def resolve_market_data(
             total_cost = sum(d.cost for d in details)
             total_profit = sum(d.profit for d in details)
             today_profit = sum(d.today_profit for d in details)
-            mvs(ws2, holdings, details=details)
+            fund_flow_data = _build_flow_data(enable_cost_lots, transactions, dividends, holdings, details)
+            mvs(ws2, holdings, details=details, fund_flow_data=fund_flow_data)
             data = {
                 "total_mv": total_mv,
                 "total_cost": total_cost,
                 "total_profit": total_profit,
                 "today_profit": today_profit,
                 "details": details,
+                "fund_flow_data": fund_flow_data,
             }
         prog.ok("行情数据获取完成")
 

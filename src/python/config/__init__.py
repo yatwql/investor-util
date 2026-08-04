@@ -69,6 +69,7 @@ from src.python.config._core import (
     is_enable_action,
     is_enable_data_quality,
     is_enable_candidate_compare,
+    is_enable_cost_lots,
     get_comparison_candidates,
     set_config,
     del_config,
@@ -133,6 +134,7 @@ __all__ = [
     "is_enable_action",
     "is_enable_data_quality",
     "is_enable_candidate_compare",
+    "is_enable_cost_lots",
     "get_comparison_candidates",
     # LLM 配置
     "get_llm_settings_path",

@@ -555,6 +555,8 @@ def generate_report(
     force_llm: bool = False,
     output_dir: str | None = None,
     warm_cache: bool = False,
+    transactions: list | None = None,
+    dividends: list | None = None,
 ) -> ReportResult:
     """生成投资分析报告。
 
@@ -564,6 +566,10 @@ def generate_report(
 
     Args:
         fetch_history: 是否获取组合历史走势数据（as-if 模拟），仅 both/full 有效
+        transactions: 交易流水记录（「交易流水」页签，无则 None）。
+            成本流水子模块（report_submodules.cost_lots）开启时用于成本分档 + XIRR
+        dividends: 分红流水记录（「分红流水」页签，无则 None）。
+            成本流水子模块开启时用于分红累计 + XIRR
     """
     result = ReportResult()
 
@@ -574,7 +580,7 @@ def generate_report(
 
     if report_type == "basic":
         # basic 路径：仅生成 Excel，不调 prepare_report_data / capture_snapshot / fetch_history_data
-        from src.python.config import is_enable_data_quality
+        from src.python.config import is_enable_cost_lots, is_enable_data_quality
         from src.python.core.perf import PerfCollector
         from src.python.core.registry import get_report_section_order
         from src.python.report._report_generation import _collect_health_checks, _spawn_health_checks
@@ -597,6 +603,10 @@ def generate_report(
                 progress=reporter,
                 # 数据质量仪表盘子模块开关（basic 无行情数据，品种覆盖区块显示降级占位）
                 enable_data_quality=is_enable_data_quality(config),
+                # 成本流水子模块开关 + 交易/分红流水（汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计）
+                enable_cost_lots=is_enable_cost_lots(config),
+                transactions=transactions,
+                dividends=dividends,
             )
             perf.stop()
             result.excel_ok = True
@@ -621,6 +631,8 @@ def generate_report(
             reporter,
             fetch_history=fetch_history,
             output_dir=output_dir,
+            transactions=transactions,
+            dividends=dividends,
         )
 
     if report_type == "full":
@@ -633,6 +645,8 @@ def generate_report(
             fetch_history=fetch_history,
             force_llm=force_llm,
             output_dir=output_dir,
+            transactions=transactions,
+            dividends=dividends,
         )
 
     result.report_generated = True

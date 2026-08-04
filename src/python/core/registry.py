@@ -526,7 +526,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "fund_deep_analysis",
         "data_flag": "concentration_data",
     },
-    # ── 风格与因子分析（物理合并「基金风格分析」+「因子暴露分析」，一章三区块） ──
+    # ── 风格与因子分析（「基金风格表 + 风格因子回归」两区块 + 行业 Beta 子表） ──
     # 区块一：基金风格表（渲染期派生）· 区块二：风格因子回归（C19 style_factor_data 子键）
     # · 区块三：行业 Beta 子表（C19 style_factor_data.industry_beta，report_submodules.industry_beta 开关默认关）
     {
@@ -550,8 +550,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "health_check", "name": "持仓体检报告", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
     {"key": "penetration_deep", "name": "穿透深度分析", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
-    # 组合历史走势与回撤：物理合并「组合历史走势」+「历史回撤分析」，
-    # 一章分「走势表 + 回撤矩阵」两区块 + 危机区间标注（2015/2018/2020/2022）
+    # 组合历史走势与回撤：一章分「走势表 + 回撤矩阵」两区块 + 危机区间标注（2015/2018/2020/2022）
     {
         "key": "portfolio_history_drawdown",
         "name": "组合历史走势与回撤",

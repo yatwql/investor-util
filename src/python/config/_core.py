@@ -422,6 +422,28 @@ def is_enable_candidate_compare(config: dict | None = None) -> bool:
     return bool(val)
 
 
+def is_enable_cost_lots(config: dict | None = None) -> bool:
+    """成本流水子模块是否启用（成本分档 + XIRR + 分红累计渲染）。
+
+    读取 `report_submodules.cost_lots`，默认关（向后兼容，既有
+    「投资分析汇总」/「市值核算明细表」/「持仓分类表」输出不变）。
+    持仓 Excel 含「交易流水」「分红流水」页签时才建议开启。
+
+    Args:
+        config: 完整配置字典，为 None 时读取全局配置
+    """
+    if config is None:
+        config = get_config()
+    submodules = config.get("report_submodules")
+    if not isinstance(submodules, dict):
+        return False
+    val = submodules.get("cost_lots")
+    if val is None:
+        logger.debug("config.json 缺少 report_submodules.cost_lots，使用默认值 false")
+        return False
+    return bool(val)
+
+
 def get_comparison_candidates(config: dict | None = None) -> list[str]:
     """候选基金比较子表候选基金代码列表。
 

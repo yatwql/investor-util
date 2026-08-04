@@ -188,14 +188,14 @@ def _show_llm_config_status_cli() -> None:
     logger.info("─" * 40)
 
 
-def _cli_read_holdings(config: dict) -> list | None:
-    """CLI 模式读取持仓——跳过文件选择交互，通过 config 配置定位文件。
+def _cli_resolve_holdings_file(config: dict) -> str | None:
+    """CLI 模式定位持仓文件路径——跳过文件选择交互，通过 config 配置定位。
 
     Args:
         config: 配置字典（需含 holdings_dir 和 holdings_filename）
 
     Returns:
-        持仓列表，文件不存在或格式异常时返回 None
+        持仓文件路径；文件不存在或目录内无 xlsx 时返回 None
     """
     import logging
 
@@ -212,7 +212,7 @@ def _cli_read_holdings(config: dict) -> list | None:
         )
         return None
 
-    from src.python.core.reader import list_xlsx_files, read_holdings
+    from src.python.core.reader import list_xlsx_files
 
     # 如果 holdings_filename 实际是一个目录，自动选第一个 xlsx 文件
     if os.path.isdir(filepath):
@@ -223,6 +223,28 @@ def _cli_read_holdings(config: dict) -> list | None:
         if len(xlsx_files) > 1:
             logger.warning("持仓目录 %s 中有多个 .xlsx 文件，自动选择第一个: %s", filepath, xlsx_files[0])
         filepath = xlsx_files[0]
+
+    return filepath
+
+
+def _cli_read_holdings(config: dict) -> list | None:
+    """CLI 模式读取持仓（主表）——跳过文件选择交互，通过 config 配置定位文件。
+
+    Args:
+        config: 配置字典（需含 holdings_dir 和 holdings_filename）
+
+    Returns:
+        持仓列表，文件不存在或格式异常时返回 None
+    """
+    import logging
+
+    logger = logging.getLogger("invest")
+
+    filepath = _cli_resolve_holdings_file(config)
+    if filepath is None:
+        return None
+
+    from src.python.core.reader import read_holdings
 
     holdings = read_holdings(filepath)
     if not holdings:
@@ -236,6 +258,44 @@ def _cli_read_holdings(config: dict) -> list | None:
     return holdings
 
 
+def _cli_read_holdings_with_flows(config: dict) -> "tuple[list, list, list] | None":
+    """CLI 模式读取持仓完整数据（主表 + 可选交易/分红流水页签）。
+
+    Args:
+        config: 配置字典（需含 holdings_dir 和 holdings_filename）
+
+    Returns:
+        (holdings, transactions, dividends) 三元组；文件不存在或格式异常时返回 None。
+        无流水页签时 transactions/dividends 为空列表。
+    """
+    import logging
+
+    logger = logging.getLogger("invest")
+
+    filepath = _cli_resolve_holdings_file(config)
+    if filepath is None:
+        return None
+
+    from src.python.core.reader import read_holdings_with_flows
+
+    parsed = read_holdings_with_flows(filepath)
+    if not parsed.holdings:
+        logger.error(
+            "持仓文件为空或格式异常: %s —— 请确保持仓文件包含「名称, 代码, 持仓份额, 每份成本」四列",
+            filepath,
+        )
+        return None
+
+    logger.info(
+        "成功读取持仓文件: %s（共 %d 条记录，交易流水 %d 条，分红流水 %d 条）",
+        filepath,
+        len(parsed.holdings),
+        len(parsed.transactions),
+        len(parsed.dividends),
+    )
+    return parsed.holdings, parsed.transactions, parsed.dividends
+
+
 def _handle_report(args: argparse.Namespace, config: dict) -> int:
     """处理 report 子命令——委托 orchestrator 共享层。
 
@@ -244,9 +304,10 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
     from src.python.report.cli_progress import CliProgressReporter
     from src.python.report.orchestrator import generate_report
 
-    holdings = _cli_read_holdings(config)
-    if holdings is None:
+    parsed = _cli_read_holdings_with_flows(config)
+    if parsed is None:
         return _EXIT_SEVERE
+    holdings, transactions, dividends = parsed
 
     reporter = CliProgressReporter(verbose=args.verbose)
 
@@ -259,6 +320,8 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
         force_llm=args.force_llm,
         output_dir=args.output,
         warm_cache=args.warm,
+        transactions=transactions,
+        dividends=dividends,
     )
 
     reporter.print_timing_summary()

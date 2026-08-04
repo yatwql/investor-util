@@ -188,6 +188,7 @@ class TestWriteSummarySheet(unittest.TestCase):
         categories=None, update_status=None,
         a_indices: dict[str, dict[str, Any]] | None = None,
         us_indices: dict[str, dict[str, Any]] | None = None,
+        fund_flow_data: dict | None = None,
     ):
         """调用 write_summary_sheet 并返回 mock 字典。
 
@@ -223,6 +224,7 @@ class TestWriteSummarySheet(unittest.TestCase):
                 ws, total_mv, total_cost, total_profit, today_profit,
                 categories=categories, update_status=update_status,
                 a_indices=a_indices, us_indices=us_indices,
+                fund_flow_data=fund_flow_data,
             )
 
             return {
@@ -502,7 +504,44 @@ class TestWriteSummarySheet(unittest.TestCase):
         self._assert_pairs_contain(pairs, "本日收益率", 500.0 / 9500.0)
 
     # ════════════════════════════════════════════════════════
-    #  市场指数 — A 股
+    #  资金加权收益率 (XIRR) 行 — 成本流水子模块
+
+    def test_xirr_row_written_when_flow_enabled(self):
+        """开关开启且有 XIRR 数值时，盈亏汇总末尾追加「资金加权收益率 (XIRR)」行。"""
+        fund_flow = {"available": True, "xirr": {"rate": 0.1234, "ok": True, "message": ""}}
+        mocks = self._call_summary_sheet(
+            self.ws, self.mv, self.cost, self.profit, self.today,
+            categories=self.categories,
+            fund_flow_data=fund_flow,
+        )
+        pairs = self._data_pairs(mocks["mock_data"])
+        self._assert_pairs_contain(pairs, "资金加权收益率 (XIRR)", 0.1234)
+
+    def test_xirr_row_placeholder_when_no_rate(self):
+        """开关开启但无可用现金流（xirr.rate=None）时写占位文本「未录入流水/无法计算」。"""
+        fund_flow = {"available": False, "xirr": {"rate": None, "ok": False, "message": "no flows"}}
+        mocks = self._call_summary_sheet(
+            self.ws, self.mv, self.cost, self.profit, self.today,
+            categories=self.categories,
+            fund_flow_data=fund_flow,
+        )
+        pairs = self._data_pairs(mocks["mock_data"])
+        self._assert_pairs_contain(pairs, "资金加权收益率 (XIRR)", "未录入流水/无法计算")
+
+    def test_no_xirr_row_when_flow_disabled(self):
+        """开关关闭（fund_flow_data=None）时盈亏汇总不含 XIRR 行，保持既有输出。"""
+        mocks = self._call_summary_sheet(
+            self.ws, self.mv, self.cost, self.profit, self.today,
+            categories=self.categories,
+            fund_flow_data=None,
+        )
+        pairs = self._data_pairs(mocks["mock_data"])
+        keys = [k for k, _ in pairs]
+        self.assertNotIn("资金加权收益率 (XIRR)", keys)
+        # 既有 6 行盈亏汇总仍在
+        self._assert_pairs_contain(pairs, "总市值 (元)", 150000.0)
+        self._assert_pairs_contain(pairs, "本日收益率", 5000.0 / 145000.0)
+
     # ════════════════════════════════════════════════════════
 
     def test_a_indices_today_values(self):

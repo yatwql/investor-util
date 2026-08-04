@@ -149,6 +149,9 @@ def generate_excel_report(
     pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
     history_data: dict | None = None,  # 组合历史走势数据（含基准指数）
     debate_info: dict | None = None,
+    enable_cost_lots: bool = False,  # 子模块：成本流水（成本分档 + XIRR + 分红累计，report_submodules.cost_lots）
+    transactions: list | None = None,  # 交易流水记录（「交易流水」页签，无则 None）
+    dividends: list | None = None,  # 分红流水记录（「分红流水」页签，无则 None）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -176,6 +179,10 @@ def generate_excel_report(
         pipeline_data: 组合历史走势环比对比数据（含 diff 等），注入 summary 页签生成 δ 列对比摘要
         history_data: 组合历史走势数据（含基准指数），来自 PortfolioHistoryCalculator。
                       未提供或 status=unavailable 时页签显示占位文本。
+        enable_cost_lots: 子模块 — 成本流水（成本分档 + XIRR + 分红累计）。
+            默认 False（向后兼容，「投资分析汇总」/「市值核算明细表」/「持仓分类表」保持既有输出）
+        transactions: 交易流水记录（「交易流水」页签），成本分档/FIFO 批次与 XIRR 现金流用
+        dividends: 分红流水记录（「分红流水」页签），分红累计与 XIRR 现金流用
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
@@ -211,11 +218,22 @@ def generate_excel_report(
     )
 
     # ── 行情市值 + 指数 ──
-    data = resolve_market_data(holdings, details, modules, sheets["market_value"], prog)
+    # 成本流水子模块：开关开启时由 resolve_market_data 组装 C19 fund_flow_data
+    # （成本分档 + XIRR + 分红累计，基于交易/分红流水 + 行情明细价格）
+    data = resolve_market_data(
+        holdings,
+        details,
+        modules,
+        sheets["market_value"],
+        prog,
+        enable_cost_lots=enable_cost_lots,
+        transactions=transactions,
+        dividends=dividends,
+    )
     a_idx, us_idx = resolve_indices(a_indices, us_indices, modules, prog)
 
     # ── 各页签写入 ──
-    pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
+    pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog, enable_cost_lots=enable_cost_lots)
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
     # 风格与因子分析：C19 数据在编排层注入 pipeline_data（style_factor_data 主键），
     # 此处透传页签写入（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）

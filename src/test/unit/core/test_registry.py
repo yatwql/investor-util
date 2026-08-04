@@ -299,7 +299,7 @@ class TestReportSectionDefault:
 
     def test_style_factor_registered_as_fund_deep_analysis(self):
         """style_factor 应注册为 fund_deep_analysis 模块（data_flag=style_factor_data，
-        物理合并「基金风格分析」+「因子暴露分析」，一章三区块，序号 9）。"""
+        一章三区块：基金风格表 + 风格因子回归 + 行业 Beta，序号 9）。"""
         sf = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "style_factor"]
         assert len(sf) == 1, "缺少 style_factor 模块条目"
         sec = sf[0]
