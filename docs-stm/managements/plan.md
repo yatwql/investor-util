@@ -1,5 +1,5 @@
 # 个人投资分析报告生成小助手 — 实现计划
-> 文档版本：0.10.3-dev
+> 文档版本：0.10.3
 > **编号源**：`plan-next = 25`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-24，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
@@ -20,7 +20,7 @@
 
 ### P0 — 发布门禁
 
-- **全链回归与发布门禁**（迭代计划轮 21）：`test_runner.py --mode verify,regression` 全量 + 3 check 脚本 + 版本号一致 + 数据快照刷新 + registry.number 连续编号复核 + 数据契约增删复核 + 打 tag。P1/P2/P3 全部达标后触发。
+- ✅ **全链回归与发布门禁**（迭代计划轮 21）：`test_runner.py --mode verify,regression` 3169 全过 + 3 check 脚本 `--ci` 全 [OK] + 版本号全链一致（v0.10.3）+ 数据快照刷新（test-coverage 4916 / folders 统计）+ registry.number 连续编号复核 + 数据契约增删复核。**v0.10.3 已发布**（2026-08-05）。
 
 ### 推荐实施顺序
 
