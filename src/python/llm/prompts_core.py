@@ -232,7 +232,7 @@ def _build_profit_attribution_block(holdings_details: list[dict] | None) -> str:
     """构建收益归因段落（TOP 5 品种按贡献排序）。
 
     复用 `analysis.return_attribution.compute_return_attribution` 的单一计算实现
-    （与 20 章行动建议归因子块表格共享，避免重复实现），此处仅做提示词段落格式化。
+    （与 19 章行动建议归因子块表格共享，避免重复实现），此处仅做提示词段落格式化。
     """
     from src.python.analysis.return_attribution import compute_return_attribution
 

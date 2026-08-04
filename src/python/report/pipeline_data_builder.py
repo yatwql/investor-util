@@ -31,13 +31,13 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "risk_metrics",
     "portfolio_daily_returns",
     "factor_exposure",
-    "correlation_data",
+    "position_relationship_data",
     "evolution_data",
     # 品种覆盖诊断：数据质量仪表盘品种覆盖区块数据源
     "position_status",
     # 可信度摘要：数据质量仪表盘可信度区块数据源（新鲜度 + 单日跳变）
     "data_freshness",
-    # 行动建议单一数据源：20 章行动板块 + 14 章行动摘要（单源计算两处呈现）
+    # 行动建议单一数据源：19 章行动板块 + 13 章行动摘要（单源计算两处呈现）
     "action_data",
 }
 
@@ -74,7 +74,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "risk_metrics": dict,
     "portfolio_daily_returns": list,
     "factor_exposure": (dict, type(None)),
-    "correlation_data": (dict, type(None)),
+    "position_relationship_data": (dict, type(None)),
     "evolution_data": (dict, type(None)),
     "position_status": (dict, type(None)),
     "data_freshness": (dict, type(None)),

@@ -149,14 +149,14 @@
 - **目标**：将原「持仓重合度矩阵」（`fund_overlap`）与「持仓相关性矩阵」（`correlation_analysis`）物理合并为「持仓关系矩阵」（`position_relationship`），一章内分上下两个矩阵区块。
 - **实施内容**：合并两个渲染模块 → 统一模块 `position_relationship_sheet.py`；`registry.py` 注册 `position_relationship`（删除 `fund_overlap`/`correlation_analysis` 两个旧注册）；`_REPORT_SHEET_NAMES` 中文名改为「持仓关系矩阵」；config `report_section_order` 中被合并旧 key 变为未知标识（`_validation.py` 仅告警，配置文档注明可清理）。**C19 契约增删**：删除附录 H 中 `fund_overlap`/`correlation_analysis` 旧契约，新建 `position_relationship_data` 契约（类型/版本/写入消费模块先定义后使用）。
 - **量化验收标准**：
-  - [ ] 既有报告测试**全部回归通过**（合并不破坏其余章节）；
-  - [ ] 新增测试 **≥6 个**（上下区块渲染 / 重合度矩阵 / 相关性矩阵 / 开关沿用 / 旧 key 不再生成 / 无品种边界），全部通过；
-  - [ ] **合并断言**：旧「持仓重合度矩阵」「持仓相关性矩阵」独立 sheet 不再生成（回归 diff），同章分上下区块渲染；
-  - [ ] **测试迁移**：原 `fund_overlap`/`correlation_analysis` 测试随模块合并迁移至 `position_relationship` 测试（原断言保留并适配新模块）；
-  - [ ] **C19 契约断言**：附录 H 已删 `fund_overlap`/`correlation_analysis` 契约、新增 `position_relationship_data`（无旧契约残留，集成测试不因 KeyError 失败）；
-  - [ ] **向后兼容**：开关默认关时合并章不改变既有输出；章节序号由 registry.number 重排保证连续；
-  - [ ] 覆盖率对新增模块 **≥85%**；
-  - [ ] §2 通用标准全部满足。
+  - [x] 既有报告测试**全部回归通过**（合并不破坏其余章节）；
+  - [x] 新增测试 **≥6 个**（上下区块渲染 / 重合度矩阵 / 相关性矩阵 / 开关沿用 / 旧 key 不再生成 / 无品种边界），全部通过；
+  - [x] **合并断言**：旧「持仓重合度矩阵」「持仓相关性矩阵」独立 sheet 不再生成（回归 diff），同章分上下区块渲染；
+  - [x] **测试迁移**：原 `fund_overlap`/`correlation_analysis` 测试随模块合并迁移至 `position_relationship` 测试（原断言保留并适配新模块）；
+  - [x] **C19 契约断言**：附录 H 已删 `fund_overlap`/`correlation_analysis` 契约、新增 `position_relationship_data`（无旧契约残留，集成测试不因 KeyError 失败）；
+  - [x] **向后兼容**：开关默认关时合并章不改变既有输出；章节序号由 registry.number 重排保证连续；
+  - [x] 覆盖率对新增模块 **≥85%**；
+  - [x] §2 通用标准全部满足。
 
 ### 阶段 C 历史增强（轮 9~11，改造 15 组合历史走势与回撤 / 16 组合演进）
 

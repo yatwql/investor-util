@@ -183,9 +183,9 @@
 
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
-| `enable_fund_deep_analysis` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓重合度矩阵、#8 持仓集中度监控、#9 基金风格分析、#10 因子暴露分析、#11 持仓相关性矩阵 | 基金深度分析章节组 |
-| `enable_news` | `true` | `config.json` | #12 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
-| `enable_history` | `true` | `config.json` | #17 组合历史走势、#18 历史回撤分析 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
+| `enable_fund_deep_analysis` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓关系矩阵、#8 持仓集中度监控、#9 基金风格分析、#10 因子暴露分析 | 基金深度分析章节组 |
+| `enable_news` | `true` | `config.json` | #11 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
+| `enable_history` | `true` | `config.json` | #16 组合历史走势、#17 历史回撤分析 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
 | `enable_portfolio_evolution` | `true` | `config.json` | #19 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
 | `enable_action` | `false` | `config.json` | #20 行动建议 | 行动建议章节组（再平衡信号/交易纪律/调仓建议/收益归因，纯算法） |
 | `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #13 全球政经局势、#14 智囊团深度复盘、#15 持仓体检报告、#16 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
@@ -383,22 +383,21 @@
 | 4 | `penetration` | 资产穿透TOP10 | 始终显示 |
 | 5 | `fund_performance` | 基金业绩分析 | 始终显示 |
 | 6 | `fund_manager` | 基金经理变更监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 7 | `fund_overlap` | 持仓重合度矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 7 | `position_relationship` | 持仓关系矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章两区块：重合度 + 相关性） |
 | 8 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
 | 9 | `fund_style` | 基金风格分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
 | 10 | `factor_exposure` | 因子暴露分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 11 | `correlation_analysis` | 持仓相关性矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 12 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
-| 13 | `global_macro` | 全球政经局势 | LLM |
-| 14 | `expert_review` | 智囊团深度复盘 | LLM |
-| 15 | `health_check` | 持仓体检报告 | LLM |
-| 16 | `penetration_deep` | 穿透深度分析 | LLM |
-| 17 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 18 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 19 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 20 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认关**；再平衡信号/交易纪律/调仓建议/收益归因） |
-| 21 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
-| 22 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 11 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
+| 12 | `global_macro` | 全球政经局势 | LLM |
+| 13 | `expert_review` | 智囊团深度复盘 | LLM |
+| 14 | `health_check` | 持仓体检报告 | LLM |
+| 15 | `penetration_deep` | 穿透深度分析 | LLM |
+| 16 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
+| 17 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
+| 18 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
+| 19 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认关**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 20 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
+| 21 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 
@@ -408,7 +407,7 @@
 {
   "report_section_order": {
     "fund_manager": 1,
-    "fund_overlap": 2,
+    "position_relationship": 2,
     "fund_concentration": 3,
     "fund_style": 4,
     "summary": 5
@@ -416,7 +415,7 @@
 }
 ```
 
-> 效果：基金经理/重合度/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
+> 效果：基金经理/持仓关系矩阵/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
 > 空对象 `{}` 或缺失此字段时使用上述 21 项默认顺序。
 

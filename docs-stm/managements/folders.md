@@ -197,17 +197,16 @@ investor-util/
 │   │   │   ├── fund_concentration_sheet.py # 集中度 Excel 页签
 │   │   │   ├── fund_manager_analysis.py # 基金经理分析
 │   │   │   ├── fund_manager_sheet.py #   基金经理 Excel 页签
-│   │   │   ├── fund_overlap.py       #   基金持仓重叠分析
-│   │   │   ├── fund_overlap_sheet.py #   重叠分析 Excel 页签
+│   │   │   ├── fund_overlap.py       #   基金持仓重叠分析（重合度计算引擎）
 │   │   │   ├── fund_style_base.py       #   基金风格基础（常量/快照/PECity阈值）
 │   │   │   ├── fund_style_classify.py   #   基金风格分类计算（push2→Tencent→兜底降级）
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
 │   │   │   ├── factor_exposure_sheet.py #  因子暴露 Excel 页签（β/t/显著性/风格归属）
-│   │   │   ├── correlation_sheet.py  #   持仓相关性矩阵 Excel 页签（热力格/配对明细）
 │   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
 │   │   │   ├── action_sheet.py       #   行动建议 Excel 页签（再平衡信号/交易纪律/调仓建议/收益归因）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
+│   │   │   ├── position_relationship_sheet.py # 持仓关系矩阵 Excel 页签（一章两区块：重合度 + 相关性）
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
 │   │   │   ├── _snapshot.py          #   快照与历史数据（持仓快照/环比差异/组合历史走势）
@@ -469,8 +468,8 @@ investor-util/
 │       │   │   ├── test_fund_overlap.py           #   基金重叠分析测试
 │       │   │   ├── test_fund_performance.py       #   基金业绩测试
 │       │   │   ├── test_fund_style_analysis.py    #   基金风格测试
-│       │   │   ├── test_correlation_html.py       #   持仓相关性章节 HTML 呈现
-│       │   │   ├── test_correlation_sheet.py      #   持仓相关性矩阵 Excel 页签呈现
+│       │   │   ├── test_correlation_html.py       #   持仓关系矩阵章节（相关性/重合度区块）HTML 呈现
+│       │   │   ├── test_correlation_sheet.py      #   持仓关系矩阵页签（一章两区块）Excel 呈现
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
 │       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现
 │       │   │   ├── test_action_html.py            #   行动建议章节 + 14 章「行动摘要」HTML 呈现（单源计算断言）

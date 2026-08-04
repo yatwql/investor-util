@@ -160,11 +160,10 @@ from src.python.core.registry import (
 | `penetration` | 资产穿透TOP10 | 始终显示 |
 | `fund_performance` | 基金业绩分析 | 始终显示 |
 | `fund_manager` | 基金经理变更监控 | 基金深度分析 |
-| `fund_overlap` | 持仓重合度矩阵 | 基金深度分析 |
+| `position_relationship` | 持仓关系矩阵 | 基金深度分析（一章两区块：重合度 + 相关性） |
 | `fund_concentration` | 持仓集中度监控 | 基金深度分析 |
 | `fund_style` | 基金风格分析 | 基金深度分析 |
 | `factor_exposure` | 因子暴露分析 | 基金深度分析 |
-| `correlation_analysis` | 持仓相关性矩阵 | 基金深度分析 |
 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻 |
 | `global_macro` | 全球政经局势 | LLM |
 | `expert_review` | 智囊团深度复盘 | LLM |
@@ -179,7 +178,7 @@ from src.python.core.registry import (
 
 > LLM 模块（`global_macro`/`expert_review`/`health_check`/`penetration_deep`/`news_correlation`）的页签标题统一通过 `get_llm_module_name(settings_suffix)` 获取；`llm_usage` 的序号和名称也在 registry 中注册，内容（Token/费用数据）由程序动态计算。
 
-完整 22 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
+完整 21 模块默认序号列表见 [配置指南→report_section_order](how-to-config.md#report_section_order-报告序号配置)，用户可通过该字段自定义排序。
 
 ### 计算模块查询
 

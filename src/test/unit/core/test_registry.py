@@ -247,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 22
+        assert len(_REPORT_SECTION_DEFAULT) == 21
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -292,7 +292,7 @@ class TestReportSectionDefault:
         assert _REPORT_SECTION_DEFAULT[-1]["key"] == "llm_usage"
 
     def test_data_source_status_before_llm_usage(self):
-        """data_source_status 应在 llm_usage 之前（序号 21 vs 22）。"""
+        """data_source_status 应在 llm_usage 之前（序号 20 vs 21）。"""
         keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         assert "data_source_status" in keys
         assert keys.index("data_source_status") < keys.index("llm_usage")
@@ -314,23 +314,40 @@ class TestReportSectionDefault:
         sec = evo[0]
         assert sec["type"] == "evolution"
         assert sec["data_flag"] == "evolution_data"
-        assert sec["number"] == 19
+        assert sec["number"] == 18
 
     def test_action_registered_as_action_type(self):
         """action 应注册为 action 类型（独立顶层开关 enable_action 控制，默认关，
-        data_flag=None，序号 20 紧跟 portfolio_evolution）。"""
+        data_flag=None，序号 19 紧跟 portfolio_evolution）。"""
         act = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "action"]
         assert len(act) == 1, "缺少 action 模块条目"
         sec = act[0]
         assert sec["type"] == "action"
         assert sec["data_flag"] is None
-        assert sec["number"] == 20
+        assert sec["number"] == 19
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""
         keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         duplicates = {k for k in keys if keys.count(k) > 1}
         assert not duplicates, f"重复的 key: {duplicates}"
+
+    def test_old_relationship_sections_removed(self):
+        """持仓关系矩阵合并后：旧章节 key 与旧 data_flag 不再注册，position_relationship 以序号 7 注册。"""
+        keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
+        assert "fund_overlap" not in keys, "旧重合度章节 key 不应再注册"
+        assert "correlation_analysis" not in keys, "旧相关性章节 key 不应再注册"
+        pr = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "position_relationship"]
+        assert len(pr) == 1, "缺少 position_relationship 模块条目"
+        sec = pr[0]
+        assert sec["name"] == "持仓关系矩阵"
+        assert sec["number"] == 7
+        assert sec["type"] == "fund_deep_analysis"
+        assert sec["data_flag"] == "position_relationship_data"
+        # 旧 data_flag（overlap_data / correlation_data）不应再出现
+        flags = [s.get("data_flag") for s in _REPORT_SECTION_DEFAULT]
+        assert "overlap_data" not in flags, "旧重合度 data_flag 不应再出现"
+        assert "correlation_data" not in flags, "旧相关性 data_flag 不应再出现"
 
 
 class TestGetReportSectionKeys:
@@ -396,7 +413,7 @@ class TestGetReportSectionOrder:
         # 但注意 market_value 默认序号是 2，与 summary 重复
         keys_after = [s["key"] for s in order[2:]]
         assert "market_value" in keys_after
-        assert "fund_overlap" in keys_after
+        assert "position_relationship" in keys_after
 
     def test_llm_usage_always_last(self):
         """llm_usage 即使被配置也强制最后。"""

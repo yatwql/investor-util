@@ -94,7 +94,7 @@ def _compute_section_visibility(
     enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     factor_exposure: dict | None = None,  # data 层：因子暴露 C19 dict（None=无数据，章节隐藏）
-    correlation_data: dict | None = None,  # data 层：持仓相关性 C19 dict（None=无数据，章节隐藏）
+    position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 C19 dict（相关性区块数据源）
     evolution_data: dict | None = None,  # data 层：组合演进 C19 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
     """计算报告模块序号 + 可见性字典 + 闭包函数。
@@ -118,7 +118,6 @@ def _compute_section_visibility(
     # data 层：各模块数据就绪状态
     data_flags: dict[str, bool] = {
         "manager_data": manager_analysis is not None,
-        "overlap_data": overlap_matrix is not None,
         "concentration_data": concentration_analysis is not None,
         "style_data": style_analysis is not None,
         "news_data_available": include_news,  # ← data 层（菜单类型+数据状态）
@@ -126,8 +125,9 @@ def _compute_section_visibility(
         # factor_exposure 非 None（含 available=False 降级占位）→ 章节可见，
         # 模板依据 available/status 在"完整内容/数据不足/数据源暂不可用"间切换（§1.4.5）
         "factor_exposure_data": factor_exposure is not None,
-        # correlation_data 同上：非 None（含降级占位）→ 章节可见
-        "correlation_data": correlation_data is not None,
+        # 持仓关系矩阵 = 重合度区块（render 时计算）∪ 相关性区块（C19 数据源）：
+        # 任一区块有数据即章节可见，区块各自独立降级（§1.4.5）
+        "position_relationship_data": overlap_matrix is not None or position_relationship_data is not None,
         # evolution_data 同上：始终由编排层计算注入（非 None）→ 章节可见，
         # available=False 时模板写占位文本（快照不足，§1.4.5）
         "evolution_data": evolution_data is not None,
@@ -286,13 +286,13 @@ def _render_template(
     enable_interactive_charts: bool = False,
     factor_exposure: dict | None = None,
     factor_names: dict | None = None,
-    correlation_data: dict | None = None,
+    position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
-    data_quality_enabled: bool = False,  # 子模块：18 章数据质量仪表盘开关
+    data_quality_enabled: bool = False,  # 子模块：20 章数据质量仪表盘开关
     position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status
     data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness
-    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（20 章行动板块 + 14 章行动摘要）
+    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（19 章行动板块 + 13 章行动摘要）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.report.chart_data_builder import build_evolution_chart_data
@@ -357,7 +357,7 @@ def _render_template(
         enable_interactive_charts=enable_interactive_charts,
         factor_exposure=factor_exposure,
         factor_names=factor_names or {},
-        correlation_data=correlation_data,
+        position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
         evolution_chart_data=build_evolution_chart_data(evolution_data),
         drawdown_min_span=drawdown_min_span,
@@ -392,16 +392,16 @@ def write_html_report(
     enable_news: bool = True,
     enable_history: bool = True,
     enable_portfolio_evolution: bool = True,
-    enable_action: bool = False,  # 行动建议独立章（20 章，enable_action 默认关）
-    enable_data_quality: bool = False,  # 子模块：18 章数据质量仪表盘（report_submodules.data_quality）
-    position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status（18 章品种覆盖区块）
-    data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness（18 章可信度区块 + 头部摘要行）
-    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（20 章行动板块 + 14 章行动摘要）
+    enable_action: bool = False,  # 行动建议独立章（19 章，enable_action 默认关）
+    enable_data_quality: bool = False,  # 子模块：20 章数据质量仪表盘（report_submodules.data_quality）
+    position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status（20 章品种覆盖区块）
+    data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness（20 章可信度区块 + 头部摘要行）
+    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（19 章行动板块 + 13 章行动摘要）
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
     factor_exposure: dict | None = None,
-    correlation_data: dict | None = None,
+    position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
 ) -> str:
@@ -549,7 +549,7 @@ def write_html_report(
         enable_action=enable_action,
         enable_llm=enable_llm,  # enable_llm is the board param for LLM
         factor_exposure=factor_exposure,
-        correlation_data=correlation_data,
+        position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
     )
 
@@ -613,7 +613,7 @@ def write_html_report(
         style_analysis=style_analysis,
         factor_exposure=factor_exposure,
         factor_names=_factor_names,
-        correlation_data=correlation_data,
+        position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
         drawdown_min_span=drawdown_min_span,
         llm_enabled_flag=llm_enabled_flag,

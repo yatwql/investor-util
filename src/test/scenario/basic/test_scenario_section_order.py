@@ -4,7 +4,7 @@
   - 默认顺序完整性（len(_REPORT_SECTION_DEFAULT) 个模块，summary 开头/llm_usage 结尾）
   - 序号 1~N 连续递增
   - get_report_section_keys 完备性
-  - 6 种可见性类型计数正确（always=6, history=2, fund_deep_analysis=6, news=1, llm=5, evolution=1）
+  - 6 种可见性类型计数正确（always=6, history=2, fund_deep_analysis=5, news=1, llm=5, evolution=1）
   - 基金深度分析 data_flag 各不相同
   - 空配置与无配置行为一致
 
@@ -83,17 +83,16 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(sec["key"], "portfolio_evolution")
         self.assertEqual(sec["data_flag"], "evolution_data")
 
-    def test_default_fund_deep_analysis_type_has_6_sections(self):
-        """基金深度分析类型模块共 6 个（含因子暴露、持仓相关性）。"""
+    def test_default_fund_deep_analysis_type_has_5_sections(self):
+        """基金深度分析类型模块共 5 个（含因子暴露、持仓关系矩阵）。"""
         fund_deep_analysis = [s for s in self._default if s["type"] == "fund_deep_analysis"]
-        self.assertEqual(len(fund_deep_analysis), 6)
+        self.assertEqual(len(fund_deep_analysis), 5)
         keys = [s["key"] for s in fund_deep_analysis]
         self.assertIn("fund_manager", keys)
-        self.assertIn("fund_overlap", keys)
+        self.assertIn("position_relationship", keys)
         self.assertIn("fund_concentration", keys)
         self.assertIn("fund_style", keys)
         self.assertIn("factor_exposure", keys)
-        self.assertIn("correlation_analysis", keys)
 
     def test_default_news_type_has_1_section(self):
         """news 类型模块共 1 个（新闻）。"""
@@ -133,7 +132,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         )
         self.assertEqual(type_counts["always"], 6)
         self.assertEqual(type_counts["history"], 2)
-        self.assertEqual(type_counts["fund_deep_analysis"], 6)
+        self.assertEqual(type_counts["fund_deep_analysis"], 5)
         self.assertEqual(type_counts["news"], 1)
         self.assertEqual(type_counts["llm"], 5)
         self.assertEqual(type_counts["evolution"], 1)

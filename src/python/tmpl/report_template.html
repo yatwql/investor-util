@@ -1363,16 +1363,24 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 7: 持仓重合度矩阵                              -->
+    <!--  MODULE 7: 持仓关系矩阵（重合度 + 相关性 一章两区块）     -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("fund_overlap") %}
+    {% if section_visible("position_relationship") %}
     {% set _fund_names = overlap_matrix.get("fund_names", {}) %}
     {% set _funds = overlap_matrix.get("funds", []) %}
     {% set _matrix = overlap_matrix.get("matrix", []) %}
     {% set _pairs = overlap_matrix.get("pairs", []) %}
-    <div class="section" id="sec-fund_overlap" style="order: {{ section_numbers['fund_overlap'] }};">
-        <div class="section-title">{{ section_numbers['fund_overlap'] }}、持仓重合度矩阵</div>
+    {% set _corr_data = position_relationship_data or {} %}
+    {% set _corr_codes = _corr_data.get("codes", []) %}
+    {% set _corr_names = _corr_data.get("names", {}) %}
+    {% set _corr_matrix = _corr_data.get("matrix", []) %}
+    {% set _corr_pvals = _corr_data.get("p_values", []) %}
+    {% set _corr_pairs = _corr_data.get("pairs", []) %}
+    <div class="section" id="sec-position_relationship" style="order: {{ section_numbers['position_relationship'] }};">
+        <div class="section-title">{{ section_numbers['position_relationship'] }}、持仓关系矩阵</div>
         <div class="section-content">
+            <!-- 区块一：持仓重合度矩阵 -->
+            <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">一、持仓重合度矩阵</div>
             {% if _funds and _pairs %}
             <div class="summary-tag" style="margin-bottom: 8px;">
                 📊 <strong>{{ _funds | length }}</strong> 只基金，共 <strong>{{ _pairs | length }}</strong> 对组合
@@ -1464,6 +1472,141 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
             {% else %}
             <div class="empty-section">📭 暂无重合度数据（需要至少 2 只基金持仓方可计算持仓重合度矩阵）</div>
+            {% endif %}
+            <!-- 区块二：持仓相关性矩阵 -->
+            <br>
+            <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">二、持仓相关性矩阵</div>
+            {% if position_relationship_data and position_relationship_data.get("available") and _corr_codes %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                📊 <strong>{{ _corr_codes | length }}</strong> 个品种，最近 <strong>{{ position_relationship_data["window"] }}</strong> 个交易日重叠样本（有效 {{ position_relationship_data["sample_count"] }} 期）
+            </div>
+            {% if _corr_pairs %}
+            {% set _corr_top = _corr_pairs[0] %}
+            <div class="notice-banner" style="margin-bottom: 12px;">
+                🔔 相关度最高：<strong>{{ _corr_top.name_a }}({{ _corr_top.code_a }})</strong> × <strong>{{ _corr_top.name_b }}({{ _corr_top.code_b }})</strong>
+                — r={{ "%.2f"|format(_corr_top.pearson) }}，p={{ "%.4f"|format(_corr_top.p_value) }}{% if _corr_top.significant %}（显著）{% else %}（不显著）{% endif %}
+            </div>
+            {% endif %}
+
+            <!-- 矩阵表（下三角；红=正相关 / 蓝=负相关 / 白=不显著 / 灰=N/A） -->
+            <div style="overflow-x: auto;">
+            <table class="heatmap-matrix">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        {% for c in _corr_codes %}
+                        <th style="font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _corr_names.get(c, c) }}">{{ _corr_names.get(c, c) }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(_corr_codes | length) %}
+                    <tr>
+                        <td style="font-weight: bold; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}">{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}</td>
+                        <td style="font-size: 11px; color: #888;">({{ _corr_codes[i] }})</td>
+                        {% for j in range(_corr_codes | length) %}
+                        {% if j == i %}
+                        <td style="background-color: #f5f5f5; color: #bbb;" title="自相关">1.00</td>
+                        {% elif j < i %}
+                        {% set _corr_r = _corr_matrix[i][j] %}
+                        {% if _corr_r is none %}
+                        <td style="background-color: #eeeeee; color: var(--text-faint);" title="重叠样本不足，未计算">N/A</td>
+                        {% else %}
+                        {% set _corr_p = _corr_pvals[i][j] %}
+                        {% if _corr_p is not none and _corr_p >= 0.05 %}
+                        <td style="background-color: #ffffff; color: var(--text-faint);" title="p={{ "%.4f"|format(_corr_p) }}，不显著">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% elif _corr_r >= 0.5 %}
+                        <td style="background-color: #C00000; color: white; font-weight: bold;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">强正</td>
+                        {% elif _corr_r >= 0.3 %}
+                        <td style="background-color: #FF7F7F; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% elif _corr_r > 0 %}
+                        <td style="background-color: #FFE0E0; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% elif _corr_r <= -0.5 %}
+                        <td style="background-color: #1F4E79; color: white; font-weight: bold;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">强负</td>
+                        {% elif _corr_r <= -0.3 %}
+                        <td style="background-color: #8DB4E2; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% else %}
+                        <td style="background-color: #E0ECF7; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% endif %}
+                        {% endif %}
+                        {% else %}
+                        <td></td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+
+            <!-- 图例 -->
+            <div class="penetration-notes" style="margin-top: 8px;">
+                <div>
+                    图例：<span style="display:inline-block; width:16px; height:12px; background:#C00000; margin-right:3px; vertical-align:middle;"></span> 强正相关(r≥0.5)
+                    <span style="display:inline-block; width:16px; height:12px; background:#FF7F7F; margin:0 3px 0 10px; vertical-align:middle;"></span> 正相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#FFE0E0; margin:0 3px 0 10px; vertical-align:middle;"></span> 弱正相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#1F4E79; margin:0 3px 0 10px; vertical-align:middle;"></span> 强负相关(r≤-0.5)
+                    <span style="display:inline-block; width:16px; height:12px; background:#8DB4E2; margin:0 3px 0 10px; vertical-align:middle;"></span> 负相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#E0ECF7; margin:0 3px 0 10px; vertical-align:middle;"></span> 弱负相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#ffffff; border:1px solid #ccc; margin:0 3px 0 10px; vertical-align:middle;"></span> 不显著(p≥0.05)
+                    <span style="display:inline-block; width:16px; height:12px; background:#eeeeee; margin:0 3px 0 10px; vertical-align:middle;"></span> 数据不足
+                </div>
+            </div>
+
+            <!-- 配对明细 -->
+            {% if _corr_pairs %}
+            <br>
+            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">配对明细（按 |r| 降序）</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>品种A</th>
+                        <th>品种B</th>
+                        <th>相关系数 r</th>
+                        <th>p 值</th>
+                        <th>样本数</th>
+                        <th>显著性</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in _corr_pairs %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="text-left">{{ p.name_a }}({{ p.code_a }})</td>
+                        <td class="text-left">{{ p.name_b }}({{ p.code_b }})</td>
+                        <td style="color: {% if p.pearson >= 0.5 %}#C00000{% elif p.pearson > 0 %}#E65C00{% elif p.pearson <= -0.5 %}#1F4E79{% else %}#2E75B6{% endif %}; font-weight: 600;">
+                            {{ "%.2f"|format(p.pearson) }}
+                        </td>
+                        <td>{{ "%.4f"|format(p.p_value) }}</td>
+                        <td>{{ p.samples }}</td>
+                        <td>{% if p.significant %}✅ 显著{% else %}— 不显著{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if position_relationship_data.get("insufficient_codes") %}
+            <div class="penetration-notes">
+                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ position_relationship_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ position_relationship_data["insufficient_codes"] | join("、") }}</div>
+            </div>
+            {% endif %}
+            <div class="penetration-notes">
+                <div>* 相关系数 r = 两品种日收益率的 Pearson 相关系数（窗口内重叠样本）；显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
+                <div>* 下三角矩阵：数值为行品种 × 列品种 的相关性；r&gt;0 同向波动（伪分散风险），r&lt;0 反向对冲</div>
+            </div>
+            {% elif position_relationship_data %}
+            {% if position_relationship_data.get("status") == "source_failed" %}
+            <div class="empty-section">📭 持仓相关性数据源暂不可用，请稍后重试</div>
+            {% else %}
+            <div class="empty-section">📭 持仓相关性数据不足（有效样本 {{ position_relationship_data.get("sample_count", 0) }} 期，低于阈值 {{ position_relationship_data.get("window", 60) }}），暂不计算</div>
+            {% endif %}
+            {% else %}
+            <div class="empty-section">📭 持仓相关性数据不足（需要至少 2 只重叠样本品种方可计算持仓相关性矩阵）</div>
             {% endif %}
         </div>
         {{ render_back_to_top() }}
@@ -1677,152 +1820,6 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
     {% endif %}
 
-    {% if section_visible("correlation_analysis") %}
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  MODULE 11: 持仓相关性矩阵                              -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    {% set _corr_codes = correlation_data.get("codes", []) %}
-    {% set _corr_names = correlation_data.get("names", {}) %}
-    {% set _corr_matrix = correlation_data.get("matrix", []) %}
-    {% set _corr_pvals = correlation_data.get("p_values", []) %}
-    {% set _corr_pairs = correlation_data.get("pairs", []) %}
-    <div class="section" id="sec-correlation_analysis" style="order: {{ section_numbers['correlation_analysis'] }};">
-        <div class="section-title">{{ section_numbers['correlation_analysis'] }}、持仓相关性矩阵</div>
-        <div class="section-content">
-            {% if correlation_data and correlation_data.get("available") and _corr_codes %}
-            <div class="summary-tag" style="margin-bottom: 8px;">
-                📊 <strong>{{ _corr_codes | length }}</strong> 个品种，最近 <strong>{{ correlation_data["window"] }}</strong> 个交易日重叠样本（有效 {{ correlation_data["sample_count"] }} 期）
-            </div>
-            {% if _corr_pairs %}
-            {% set _corr_top = _corr_pairs[0] %}
-            <div class="notice-banner" style="margin-bottom: 12px;">
-                🔔 相关度最高：<strong>{{ _corr_top.name_a }}({{ _corr_top.code_a }})</strong> × <strong>{{ _corr_top.name_b }}({{ _corr_top.code_b }})</strong>
-                — r={{ "%.2f"|format(_corr_top.pearson) }}，p={{ "%.4f"|format(_corr_top.p_value) }}{% if _corr_top.significant %}（显著）{% else %}（不显著）{% endif %}
-            </div>
-            {% endif %}
-
-            <!-- 矩阵表（下三角；红=正相关 / 蓝=负相关 / 白=不显著 / 灰=N/A） -->
-            <div style="overflow-x: auto;">
-            <table class="heatmap-matrix">
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th></th>
-                        {% for c in _corr_codes %}
-                        <th style="font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
-                            title="{{ _corr_names.get(c, c) }}">{{ _corr_names.get(c, c) }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for i in range(_corr_codes | length) %}
-                    <tr>
-                        <td style="font-weight: bold; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
-                            title="{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}">{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}</td>
-                        <td style="font-size: 11px; color: #888;">({{ _corr_codes[i] }})</td>
-                        {% for j in range(_corr_codes | length) %}
-                        {% if j == i %}
-                        <td style="background-color: #f5f5f5; color: #bbb;" title="自相关">1.00</td>
-                        {% elif j < i %}
-                        {% set _corr_r = _corr_matrix[i][j] %}
-                        {% if _corr_r is none %}
-                        <td style="background-color: #eeeeee; color: var(--text-faint);" title="重叠样本不足，未计算">N/A</td>
-                        {% else %}
-                        {% set _corr_p = _corr_pvals[i][j] %}
-                        {% if _corr_p is not none and _corr_p >= 0.05 %}
-                        <td style="background-color: #ffffff; color: var(--text-faint);" title="p={{ "%.4f"|format(_corr_p) }}，不显著">{{ "%.2f"|format(_corr_r) }}</td>
-                        {% elif _corr_r >= 0.5 %}
-                        <td style="background-color: #C00000; color: white; font-weight: bold;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">强正</td>
-                        {% elif _corr_r >= 0.3 %}
-                        <td style="background-color: #FF7F7F; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
-                        {% elif _corr_r > 0 %}
-                        <td style="background-color: #FFE0E0; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
-                        {% elif _corr_r <= -0.5 %}
-                        <td style="background-color: #1F4E79; color: white; font-weight: bold;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">强负</td>
-                        {% elif _corr_r <= -0.3 %}
-                        <td style="background-color: #8DB4E2; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
-                        {% else %}
-                        <td style="background-color: #E0ECF7; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
-                        {% endif %}
-                        {% endif %}
-                        {% else %}
-                        <td></td>
-                        {% endif %}
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
-
-            <!-- 图例 -->
-            <div class="penetration-notes" style="margin-top: 8px;">
-                <div>
-                    图例：<span style="display:inline-block; width:16px; height:12px; background:#C00000; margin-right:3px; vertical-align:middle;"></span> 强正相关(r≥0.5)
-                    <span style="display:inline-block; width:16px; height:12px; background:#FF7F7F; margin:0 3px 0 10px; vertical-align:middle;"></span> 正相关
-                    <span style="display:inline-block; width:16px; height:12px; background:#FFE0E0; margin:0 3px 0 10px; vertical-align:middle;"></span> 弱正相关
-                    <span style="display:inline-block; width:16px; height:12px; background:#1F4E79; margin:0 3px 0 10px; vertical-align:middle;"></span> 强负相关(r≤-0.5)
-                    <span style="display:inline-block; width:16px; height:12px; background:#8DB4E2; margin:0 3px 0 10px; vertical-align:middle;"></span> 负相关
-                    <span style="display:inline-block; width:16px; height:12px; background:#E0ECF7; margin:0 3px 0 10px; vertical-align:middle;"></span> 弱负相关
-                    <span style="display:inline-block; width:16px; height:12px; background:#ffffff; border:1px solid #ccc; margin:0 3px 0 10px; vertical-align:middle;"></span> 不显著(p≥0.05)
-                    <span style="display:inline-block; width:16px; height:12px; background:#eeeeee; margin:0 3px 0 10px; vertical-align:middle;"></span> 数据不足
-                </div>
-            </div>
-
-            <!-- 配对明细 -->
-            {% if _corr_pairs %}
-            <br>
-            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">配对明细（按 |r| 降序）</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>序号</th>
-                        <th>品种A</th>
-                        <th>品种B</th>
-                        <th>相关系数 r</th>
-                        <th>p 值</th>
-                        <th>样本数</th>
-                        <th>显著性</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for p in _corr_pairs %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td class="text-left">{{ p.name_a }}({{ p.code_a }})</td>
-                        <td class="text-left">{{ p.name_b }}({{ p.code_b }})</td>
-                        <td style="color: {% if p.pearson >= 0.5 %}#C00000{% elif p.pearson > 0 %}#E65C00{% elif p.pearson <= -0.5 %}#1F4E79{% else %}#2E75B6{% endif %}; font-weight: 600;">
-                            {{ "%.2f"|format(p.pearson) }}
-                        </td>
-                        <td>{{ "%.4f"|format(p.p_value) }}</td>
-                        <td>{{ p.samples }}</td>
-                        <td>{% if p.significant %}✅ 显著{% else %}— 不显著{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-
-            {% if correlation_data.get("insufficient_codes") %}
-            <div class="penetration-notes">
-                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ correlation_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ correlation_data["insufficient_codes"] | join("、") }}</div>
-            </div>
-            {% endif %}
-            <div class="penetration-notes">
-                <div>* 相关系数 r = 两品种日收益率的 Pearson 相关系数（窗口内重叠样本）；显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
-                <div>* 下三角矩阵：数值为行品种 × 列品种 的相关性；r&gt;0 同向波动（伪分散风险），r&lt;0 反向对冲</div>
-            </div>
-            {% elif correlation_data %}
-            {% if correlation_data.get("status") == "source_failed" %}
-            <div class="empty-section">📭 持仓相关性数据源暂不可用，请稍后重试</div>
-            {% else %}
-            <div class="empty-section">📭 持仓相关性数据不足（有效样本 {{ correlation_data.get("sample_count", 0) }} 期，低于阈值 {{ correlation_data.get("window", 60) }}），暂不计算</div>
-            {% endif %}
-            {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
 
     {% if section_visible("news_correlation") %}
     <!-- ═══════════════════════════════════════════════════════ -->
@@ -2017,7 +2014,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
         {% endif %}
 
-        <!-- 行动摘要子块：引用 20 章行动建议结果（单源计算、两处呈现，C14/C19） -->
+        <!-- 行动摘要子块：引用 19 章行动建议结果（单源计算、两处呈现，C14/C19） -->
         {% if section_visible("action") and action_data and action_data.available %}
         <div class="section-content" style="margin-top: 12px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;">
             <div style="font-weight: bold; font-size: 14px; color: #2E75B6; margin-bottom: 6px;">

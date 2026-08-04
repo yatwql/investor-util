@@ -1,15 +1,15 @@
-"""持仓相关性矩阵章节 HTML 呈现测试。
+"""持仓关系矩阵章节·相关性区块 HTML 呈现测试。
 
 覆盖：
   - available=True → 汇总卡 + 相关度最高提示 + 热力矩阵 + 配对明细 + 说明
   - 强正/强负/不显著/N/A 单元格样式分支
   - 重叠样本不足品种提示行
   - available=False（数据不足 / 数据源故障）→ 降级占位
-  - correlation_data=None → 章节整体隐藏（html_writer 数据门控）
+  - 相关性数据 None → 相关性区块渲染占位（章节由重合度区块驱动可见）
 
-注意：模板在 correlation 章节内部直接调用 correlation_data.get()，
-生产路径由 html_writer 保证 correlation_data 非 None 时才渲染该章节，
-因此 None 场景测试通过「章节不可见」验证（而非渲染占位）。
+注意：模板在持仓关系矩阵章节内部直接调用 position_relationship_data.get()，
+生产路径由 html_writer 保证重合度或相关性任一区块有数据时该章节才可见，
+因此 None 场景通过「相关性区块占位」验证（重合度区块驱动章节可见）。
 """
 
 from __future__ import annotations
@@ -26,26 +26,28 @@ from src.test.unit.report.test_html_report_structure import (
     _render_template,
 )
 
-_CORR_SECTION = {"key": "correlation_analysis", "name": "持仓相关性矩阵", "number": 11}
+_PR_SECTION = {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7}
 
 
-def _order_with_correlation() -> list[dict]:
-    """默认清单追加 correlation_analysis 章节。"""
-    return [dict(sec) for sec in _REPORT_SECTION_DEFAULT] + [dict(_CORR_SECTION)]
+def _order_with_relationship() -> list[dict]:
+    """默认清单中将 position_relationship 置为可见（其余隐藏）。"""
+    return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
 
 
 def _render_correlation(correlation_data) -> "BeautifulSoup":
-    """渲染 correlation_analysis 可见、其余隐藏的模板。"""
-    order = _order_with_correlation()
+    """渲染 position_relationship 可见、其余隐藏的模板。"""
+    order = _order_with_relationship()
     numbers = {sec["key"]: sec["number"] for sec in order}
-    sv_dict = {sec["key"]: (sec["key"] == "correlation_analysis") for sec in order}
+    sv_dict = {sec["key"]: (sec["key"] == "position_relationship") for sec in order}
     data = _build_minimal_render_data(order, numbers, sv_dict)
-    data["correlation_data"] = correlation_data
+    data["position_relationship_data"] = correlation_data
+    # 章节可见需重合度或相关性任一区块有数据：此处以相关性区块驱动（overlap 置空）
+    data["overlap_matrix"] = {"fund_names": {}, "funds": [], "matrix": [], "pairs": []}
     return _render_template(data)
 
 
 def _correlation_data(**extra) -> dict:
-    """构造 C19 契约 correlation_data mock（2 品种，强负相关）。"""
+    """构造持仓关系矩阵·相关性区块 C19 契约 mock（2 品种，强负相关）。"""
     d = {
         "available": True,
         "status": "ok",
@@ -75,10 +77,10 @@ def _correlation_data(**extra) -> dict:
 
 
 class TestHtmlCorrelationSection(unittest.TestCase):
-    """持仓相关性章节 HTML 呈现测试。"""
+    """持仓关系矩阵章节·相关性区块 HTML 呈现测试。"""
 
     def _section(self, correlation_data):
-        return _render_correlation(correlation_data).find(id="sec-correlation_analysis")
+        return _render_correlation(correlation_data).find(id="sec-position_relationship")
 
     def test_full_rendering_when_available(self):
         """available=True → 汇总卡 + 相关度最高 + 热力矩阵 + 配对明细 + 说明。"""
@@ -162,12 +164,77 @@ class TestHtmlCorrelationSection(unittest.TestCase):
         section = self._section(data)
         self.assertIn("数据源暂不可用", section.get_text())
 
-    def test_correlation_none_section_hidden(self):
-        """correlation_data=None → 章节整体不渲染（html_writer 数据门控）。"""
-        order = _order_with_correlation()
+    def test_correlation_none_placeholder(self):
+        """相关性数据 None → 相关性区块渲染占位（重合度区块驱动章节可见）。"""
+        section = self._section(None)
+        text = section.get_text()
+        self.assertIn("持仓相关性数据不足", text)
+        self.assertNotIn("配对明细", text)
+
+
+def _overlap_result(**extra) -> dict:
+    """构造持仓关系矩阵·重合度区块结构（2 只基金，部分重合 50%）。"""
+    d = {
+        "fund_names": {"a": "基金A", "b": "基金B"},
+        "funds": ["a", "b"],
+        "matrix": [
+            [1.0, 0.5],
+            [0.5, 1.0],
+        ],
+        "pairs": [
+            {
+                "fund_a": "a",
+                "fund_b": "b",
+                "name_a": "基金A",
+                "name_b": "基金B",
+                "code_a": "a",
+                "code_b": "b",
+                "common_count": 2,
+                "jaccard": 0.5,
+                "common_stocks": [
+                    {"name": "贵州茅台", "code": "600519"},
+                    {"name": "五粮液", "code": "000858"},
+                ],
+            }
+        ],
+    }
+    d.update(extra)
+    return d
+
+
+class TestHtmlMergedRelationshipSection(unittest.TestCase):
+    """持仓关系矩阵章节·一章两区块（重合度 + 相关性）HTML 呈现测试。"""
+
+    def _render_merged(self, overlap_matrix, correlation_data) -> "BeautifulSoup":
+        order = _order_with_relationship()
         numbers = {sec["key"]: sec["number"] for sec in order}
-        sv_dict = {sec["key"]: False for sec in order}
+        sv_dict = {sec["key"]: (sec["key"] == "position_relationship") for sec in order}
         data = _build_minimal_render_data(order, numbers, sv_dict)
-        data["correlation_data"] = None
-        soup = _render_template(data)
-        self.assertIsNone(soup.find(id="sec-correlation_analysis"))
+        data["overlap_matrix"] = overlap_matrix
+        data["position_relationship_data"] = correlation_data
+        return _render_template(data).find(id="sec-position_relationship")
+
+    def test_both_blocks_render_in_merged_section(self):
+        """重合度 + 相关性同时提供 → 同一章节内两个子区块依次呈现。"""
+        section = self._render_merged(_overlap_result(), _correlation_data())
+        text = section.get_text()
+        self.assertIn("一、持仓重合度矩阵", text)
+        self.assertIn("二、持仓相关性矩阵", text)
+        # 重合度区块内容
+        self.assertIn("基金A", text)
+        self.assertIn("基金B", text)
+        self.assertIn("50.00%", text)  # Jaccard 0.5
+        # 相关性区块内容
+        self.assertIn("资产A", text)
+        self.assertIn("-0.87", text)
+        self.assertIn("配对明细", text)
+
+    def test_overlap_only_section_visible_correlation_placeholder(self):
+        """仅重合度数据 → 章节可见，相关性区块写占位（相关性配对表不出现）。"""
+        section = self._render_merged(_overlap_result(), None)
+        text = section.get_text()
+        self.assertIn("一、持仓重合度矩阵", text)
+        self.assertIn("基金A", text)
+        self.assertIn("持仓相关性数据不足", text)
+        # 相关性配对表表头（品种A/相关系数 r）不应出现；重合度区块自身的配对明细合法保留
+        self.assertNotIn("相关系数 r", text)

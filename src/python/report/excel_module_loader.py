@@ -121,14 +121,19 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
 
     try:
         from src.python.report.fund_overlap import compute_overlap_matrix
-        from src.python.report.fund_overlap_sheet import write_overlap_matrix_sheet
 
         modules["compute_overlap_matrix"] = compute_overlap_matrix
-        modules["write_overlap_matrix_sheet"] = write_overlap_matrix_sheet
     except ImportError:
         modules["compute_overlap_matrix"] = lambda _fh, _mv=None: {}
-        modules["write_overlap_matrix_sheet"] = None
-        prog.add_error("持仓重合度矩阵模块缺失 (fund_overlap)")
+        prog.add_error("持仓重合度计算模块缺失 (fund_overlap)")
+
+    try:
+        from src.python.report.position_relationship_sheet import write_position_relationship_sheet
+
+        modules["write_position_relationship_sheet"] = write_position_relationship_sheet
+    except ImportError:
+        modules["write_position_relationship_sheet"] = None
+        prog.add_error("持仓关系矩阵模块缺失 (position_relationship)")
 
     try:
         from src.python.report.fund_concentration import compute_concentration
@@ -159,13 +164,5 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
     except ImportError:
         modules["write_factor_exposure_sheet"] = None
         prog.add_error("因子暴露分析模块缺失 (factor_exposure)")
-
-    try:
-        from src.python.report.correlation_sheet import write_correlation_sheet
-
-        modules["write_correlation_sheet"] = write_correlation_sheet
-    except ImportError:
-        modules["write_correlation_sheet"] = None
-        prog.add_error("持仓相关性矩阵模块缺失 (correlation)")
 
     return modules

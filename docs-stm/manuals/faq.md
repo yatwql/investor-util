@@ -200,7 +200,7 @@ A: 编辑 `data/config/config.json` 的 `report_section_order` 字段，格式�
 {
   "report_section_order": {
     "fund_manager": 1,
-    "fund_overlap": 2,
+    "position_relationship": 2,
     "summary": 5
   }
 }
@@ -212,7 +212,7 @@ A: 编辑 `data/config/config.json` 的 `report_section_order` 字段，格式�
 
 A: 菜单 P 提供交互式配置界面，可独立控制报告中的三个章节组是否显示：
 
-- **基金深度分析**（基金经理变更监控/持仓重合度矩阵/持仓集中度监控/基金风格分析/因子暴露分析）—— 对应 `enable_fund_deep_analysis`
+- **基金深度分析**（基金经理变更监控/持仓关系矩阵/持仓集中度监控/基金风格分析/因子暴露分析）—— 对应 `enable_fund_deep_analysis`
 - **市场新闻**（财经新闻热点与持仓关联分析）—— 对应 `enable_news`
 - **历史走势**（组合历史走势/回撤分析）—— 对应 `enable_history`
 

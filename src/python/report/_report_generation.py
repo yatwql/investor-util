@@ -270,7 +270,7 @@ def _generate_full_html_report(
     result,
     metrics: dict | None = None,
     factor_exposure: dict | None = None,
-    correlation_data: dict | None = None,
+    position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     enable_portfolio_evolution: bool = True,
     enable_action: bool = False,
@@ -286,19 +286,19 @@ def _generate_full_html_report(
             用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
         factor_exposure: 因子暴露分析 C19 契约 dict，
             基金深度分析关闭或数据不足时为 None/available=False。
-        correlation_data: 持仓相关性矩阵 C19 契约 dict，
+        position_relationship_data: 持仓关系矩阵 C19 契约 dict（相关性区块数据源），
             基金深度分析关闭或数据不足时为 None/available=False。
         evolution_data: 组合演进 C19 契约 dict（多快照趋势聚合），
             数据不足时 available=False（模板写占位）。
         enable_portfolio_evolution: board 层 — 组合演进章节是否开启。
-        enable_data_quality: 子模块 — 18 章数据质量仪表盘（默认关，保持旧样式）。
+        enable_data_quality: 子模块 — 20 章数据质量仪表盘（默认关，保持旧样式）。
         position_status: 品种覆盖诊断 C19 `position_status` 契约 dict，
-            18 章品种覆盖区块数据源（开关关闭时忽略）。
+            20 章品种覆盖区块数据源（开关关闭时忽略）。
         data_freshness: 可信度摘要 C19 `data_freshness` 契约 dict，
-            18 章可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
+            20 章可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
         enable_action: board 层 — 行动建议章节是否开启（默认关）。
         action_data: 行动建议单一数据源 C19 `action_data` 契约 dict，
-            20 章行动板块 + 14 章行动摘要数据源（开关关闭时忽略）。
+            19 章行动板块 + 13 章行动摘要数据源（开关关闭时忽略）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -338,7 +338,7 @@ def _generate_full_html_report(
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
             factor_exposure=factor_exposure,
-            correlation_data=correlation_data,
+            position_relationship_data=position_relationship_data,
             evolution_data=evolution_data,
             enable_data_quality=enable_data_quality,
             position_status=position_status,
@@ -495,7 +495,7 @@ def _generate_report_both(
             trading_day=get_last_trading_day(),
             prev_trading_day=get_prev_trading_day(),
         ),
-        # 行动建议单一数据源（C19 action_data）：20 章行动板块 + 14 章行动摘要共享。
+        # 行动建议单一数据源（C19 action_data）：19 章行动板块 + 13 章行动摘要共享。
         # 传递完整估值字段（含 profit_rate/cost/profit），交易纪律（止盈/止损）
         # 依赖收益率数据。profit_rate 契约为百分比（小数 ×100，同 orchestrator 组装口径），
         # 纪律引擎以百分数阈值（如 +20%）比较，此处统一换算避免单位不一致。
@@ -716,11 +716,11 @@ def _generate_report_full(
     # ── 2. 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
-    # 因子暴露 / 持仓相关性 / 品种覆盖诊断：prep 中已组装（C19 契约），
+    # 因子暴露 / 持仓关系矩阵 / 品种覆盖诊断：prep 中已组装（C19 契约），
     # 注入 pipeline_data 供 HTML/Excel 消费；capture_snapshot 在降级路径可能返回 None，需判空
     if pipeline_data is not None:
         pipeline_data["factor_exposure"] = prep.get("factor_exposure")
-        pipeline_data["correlation_data"] = prep.get("correlation_data")
+        pipeline_data["position_relationship_data"] = prep.get("position_relationship_data")
         pipeline_data["position_status"] = prep.get("position_status")
         pipeline_data["data_freshness"] = prep.get("data_freshness")
         pipeline_data["action_data"] = prep.get("action_data")
@@ -798,7 +798,7 @@ def _generate_report_full(
         result,
         _metrics,
         prep.get("factor_exposure"),
-        prep.get("correlation_data"),
+        prep.get("position_relationship_data"),
         (pipeline_data or {}).get("evolution_data"),
         _enable_portfolio_evolution,
         _enable_action,

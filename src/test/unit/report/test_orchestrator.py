@@ -122,7 +122,7 @@ class TestPrepareReportData:
                 "src.python.report.orchestrator.compute_factor_exposure_data",
                 return_value={"available": False, "status": "insufficient"},
             ),
-            # 持仓相关性编排同样含真实网络拉取（持仓历史 K 线），必须 mock
+            # 持仓关系矩阵·相关性编排同样含真实网络拉取（持仓历史 K 线），必须 mock
             patch(
                 "src.python.report.orchestrator.compute_correlation_data",
                 return_value={"available": False, "status": "insufficient"},
@@ -146,7 +146,7 @@ class TestPrepareReportData:
             "news_top_count",
             "risk_metrics",
             "factor_exposure",
-            "correlation_data",
+            "position_relationship_data",
             # 品种覆盖诊断：品种级数据状态标注契约
             "position_status",
             # 可信度摘要：新鲜度分类 + 单日跳变检测契约

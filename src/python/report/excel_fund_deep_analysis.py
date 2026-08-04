@@ -51,15 +51,15 @@ def write_fund_deep_analysis_sheets(
     modules: dict[str, Any],
     prog: ProgressReporter,
     factor_exposure: dict[str, Any] | None = None,
-    correlation_data: dict[str, Any] | None = None,
+    position_relationship_data: dict[str, Any] | None = None,
 ) -> None:
     """写入基金深度分析页签。
 
     Args:
         factor_exposure: 因子暴露 C19 契约 dict，来自 pipeline_data；
             未提供或 available=False 时页签写入占位（§1.4.5 降级治理）。
-        correlation_data: 持仓相关性 C19 契约 dict，来自 pipeline_data；
-            未提供或 available=False 时页签写入占位（§1.4.5 降级治理）。
+        position_relationship_data: 持仓关系矩阵 C19 契约 dict（相关性区块数据源），
+            来自 pipeline_data；未提供或 available=False 时相关性区块写入占位（§1.4.5 降级治理）。
     """
     if not enable_fund_deep_analysis:
         return
@@ -85,11 +85,11 @@ def write_fund_deep_analysis_sheets(
                 logger.warning("基金经理变更监控页签写入失败: %s", e)
                 prog.add_error("基金经理变更监控页签写入失败")
 
-    # ── 持仓重合度矩阵 ──
+    # ── 持仓关系矩阵（一章两区块：持仓重合度 + 持仓相关性） ──
     compute_overlap = modules.get("compute_overlap_matrix")
-    write_overlap = modules.get("write_overlap_matrix_sheet")
-    ws_overlap = sheets.get("fund_overlap")
-    if ws_overlap is not None and compute_overlap is not None and write_overlap is not None:
+    write_pr = modules.get("write_position_relationship_sheet")
+    ws_pr = sheets.get("position_relationship")
+    if ws_pr is not None and compute_overlap is not None and write_pr is not None:
         prog.info("正在计算持仓重合度矩阵...")
         overlap_result = None
         fund_names: dict[str, str] = {}
@@ -122,11 +122,16 @@ def write_fund_deep_analysis_sheets(
             prog.add_error("持仓重合度矩阵数据获取失败")
 
         try:
-            write_overlap(ws_overlap, overlap_result or {}, fund_names=fund_names)
-            prog.ok("持仓重合度矩阵页签写入完成")
+            write_pr(
+                ws_pr,
+                overlap_result,
+                fund_names=fund_names,
+                correlation_data=position_relationship_data,
+            )
+            prog.ok("持仓关系矩阵页签写入完成")
         except Exception as e:
-            logger.warning("持仓重合度矩阵页签写入失败: %s", e)
-            prog.add_error("持仓重合度矩阵页签写入失败")
+            logger.warning("持仓关系矩阵页签写入失败: %s", e)
+            prog.add_error("持仓关系矩阵页签写入失败")
 
     # ── 持仓集中度监控 ──
     compute_conc = modules.get("compute_concentration")
@@ -203,15 +208,3 @@ def write_fund_deep_analysis_sheets(
         except Exception as e:
             logger.warning("因子暴露分析页签写入失败: %s", e)
             prog.add_error("因子暴露分析页签写入失败")
-
-    # ── 持仓相关性矩阵（数据已在编排层组装，见 pipeline_data["correlation_data"]） ──
-    write_corr = modules.get("write_correlation_sheet")
-    ws_corr = sheets.get("correlation_analysis")
-    if ws_corr is not None and write_corr is not None:
-        prog.info("正在写入持仓相关性矩阵页签...")
-        try:
-            write_corr(ws_corr, correlation_data)
-            prog.ok("持仓相关性矩阵页签写入完成")
-        except Exception as e:
-            logger.warning("持仓相关性矩阵页签写入失败: %s", e)
-            prog.add_error("持仓相关性矩阵页签写入失败")

@@ -41,7 +41,7 @@ _ALL_KEYS_DEFAULT = [
     "penetration",
     "fund_performance",
     "fund_manager",
-    "fund_overlap",
+    "position_relationship",
     "fund_concentration",
     "fund_style",
     "news_correlation",
@@ -55,7 +55,7 @@ _ALL_KEYS_DEFAULT = [
 ]
 
 _ALWAYS_KEYS = {"summary", "market_value", "category", "penetration", "fund_performance"}
-_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "fund_overlap", "fund_concentration", "fund_style"}
+_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_relationship", "fund_concentration", "fund_style"}
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
 _HISTORY_KEYS = {"portfolio_history", "drawdown_analysis"}
@@ -67,7 +67,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "penetration", "name": "资产穿透TOP10", "number": 4},
     {"key": "fund_performance", "name": "基金业绩分析", "number": 5},
     {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
-    {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7},
+    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
     {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
     {"key": "fund_style", "name": "基金风格分析", "number": 9},
     {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
@@ -125,6 +125,8 @@ def _build_minimal_render_data(
         "has_llm_analysis": False,
         "manager_analysis": None,
         "overlap_matrix": None,
+        # 持仓关系矩阵：相关性区块 C19 契约（空 dict 触发模板内 .get() 默认值降级）
+        "position_relationship_data": {},
         "concentration_analysis": None,
         "style_analysis": None,
         "llm_enabled": True,
@@ -400,7 +402,7 @@ class TestHtmlCustomOrder(unittest.TestCase):
             {"key": "penetration", "name": "资产穿透TOP10", "number": 5},
             # 基金深度分析保持默认
             {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
-            {"key": "fund_overlap", "name": "持仓重合度矩阵", "number": 7},
+            {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
             {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
             {"key": "fund_style", "name": "基金风格分析", "number": 9},
             # news 保持默认

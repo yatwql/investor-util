@@ -53,6 +53,15 @@
 - **测试**：新增 `src/test/unit/analysis/test_return_attribution.py`（14 例：TOP5 排序/正负分列 3 / 固定 fixture 精度 <0.01% / pos_neg_total 覆盖全部持仓 / 空/零盈亏保护 / 缺省 profit / C19 契约 / 浮点值保留 / 摘要三态 / 不可归因透传 / 提示词段落逐字节一致复用断言 ×2）；`test_action_advisor.py` 更新归因零盈亏保护断言 + 新增有盈有亏填充断言；`test_action_sheet.py`/`test_action_html.py` 归因 fixture 改浮点契约 + 渲染格式/净额摘要断言。`return_attribution.py` 覆盖率 97%（≥85%）。测试用例总数 4,623 → 4,639。
 - **向后兼容**：`enable_action` 默认关；开关开启且有盈亏时 20 章归因子块由「待生成」占位升级为真实表格 + 净额摘要，报告结构不变。
 
+### 持仓关系矩阵合并（7 章，轮8「一章两区块」物理合并）
+
+- **章节合并**：原 7 章「持仓重合度矩阵」与 11 章「持仓相关性矩阵」物理合并为 7 章「持仓关系矩阵」——同一章节内**上区块 持仓重合度矩阵**（Jaccard 系数/共同持仓明细）+ **下区块 持仓相关性矩阵**（Pearson r/显著性/下三角热力格），章节可见性 = 重合度或相关性任一区块有数据。
+- **统一渲染模块**：新增 `src/python/report/position_relationship_sheet.py`（`write_position_relationship_sheet(ws, overlap_result=None, correlation_data=None)`，内部分 `_write_overlap_block`/`_write_correlation_block` 两区块，任一区块缺失写降级占位）；删除 `fund_overlap_sheet.py`、`correlation_sheet.py` 两个旧页签模块。`fund_overlap.py::compute_overlap_matrix` 重合度计算引擎保留（缓存前缀 `fund_overlap_` 不变）。
+- **章节编号重排（22 → 21 模块）**：`core/registry.py` `_REPORT_SECTION_DEFAULT` 收敛为 21 项，`position_relationship`（number=7、data_flag=`position_relationship_data`）替换原 `fund_overlap`/`correlation_analysis` 两个条目，其后各章序号整体 -1（`expert_review` 14→13、`action` 20→19、`data_source_status` 21→20、`llm_usage` 22→21）。章节序号引用全量同步（trade_discipline/return_attribution/action_advisor/data_freshness/holding_status/prompts_core/data_quality_sheet/action_sheet/pipeline_data_builder/orchestrator/excel_generator/html_writer/_report_generation/report_template.html/action_section.html）。
+- **C19 契约收敛**：`position_relationship_data`（`available/status/window/sample_count/codes/names/matrix/p_values/pairs/insufficient_codes/note`，11 键）替代 `correlation_data` 在 `pipeline_data_builder.py` 注册/合并，编排层 both/full 路径统一注入；技术文档 data_flag 表、缓存表、C19 契约表同步。
+- **模板合并**：`report_template.html` MODULE 7 一章两区块——区块一读 `overlap_matrix`（`_fund_names/_funds/_matrix/_pairs`），区块二读 `position_relationship_data`（None 守卫 `{% set _corr_data = position_relationship_data or {} %}`）；Excel `create_sheets` 经 `board_flags` 同一可见性口径自动产出 7 章页签。
+- **测试**：`test_registry.py` 新增 `test_old_relationship_sections_removed`（断言旧键移除、position_relationship 注册、21 模块）；`test_correlation_sheet.py` 新增 `TestExcelMergedRelationshipSheet`（4 例：一章两区块同页/仅相关度占位/仅重合度占位/Jaccard 百分比）；`test_correlation_html.py` 新增 `TestHtmlMergedRelationshipSection`（2 例：合并章节双区块/仅重合度时相关性区块占位）；`test_excel_report_structure.py`/`test_html_report_structure_edge.py`/`test_orchestrator.py`/`test_html_writer.py` 页签数/契约键同步。
+
 ### 任务编号冲突消解（rf-205~213 重编号为 rf-209~217）
 
 - **背景**：行动建议 20 章（轮4~6）开发期间，上游分支（任务编号保障机制）同时合并了已修复条目 rf-204~208（含 fact_checker 数值校验/门禁补强/版本一致性回归）。rebase 落盘后「已提交侧已用 rf-205~208」与「本侧开发用的 rf-205~213」重叠，编号源与已修复表交叉冲突。

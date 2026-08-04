@@ -2,7 +2,7 @@
 
 测试目标：
   - fund_manager_sheet：manager_data 为空 → 写占位
-  - fund_overlap_sheet：基金数 < 2 → 写占位（STATUS_MESSAGES）
+  - position_relationship_sheet：重合度区块基金数 < 2 → 写占位（STATUS_MESSAGES）
   - fund_concentration_sheet：concentration_data 为空 → 写占位
   - fund_style_sheet：style_data 为空 → 写占位
 
@@ -47,27 +47,27 @@ class TestFundManagerSheetEmpty(unittest.TestCase):
         )
 
 
-class TestFundOverlapSheetEmpty(unittest.TestCase):
-    """fund_overlap_sheet 空/不足数据占位"""
+class TestOverlapBlockEmpty(unittest.TestCase):
+    """持仓关系矩阵·重合度区块 空/不足数据占位"""
 
     def setUp(self):
         self.wb = openpyxl.Workbook()
         self.ws = self.wb.active
 
     def test_single_fund_writes_placeholder(self):
-        """只有 1 只基金 → 写占位。"""
-        from src.python.report.fund_overlap_sheet import write_overlap_matrix_sheet
+        """只有 1 只基金 → 重合度区块写占位。"""
+        from src.python.report.position_relationship_sheet import write_position_relationship_sheet
         overlap_result = {"funds": ["110011"], "matrix": [], "pairs": []}
-        write_overlap_matrix_sheet(self.ws, overlap_result)
+        write_position_relationship_sheet(self.ws, overlap_result)
         placeholder = self.ws.cell(row=3, column=1).value
         self.assertIsNotNone(placeholder)
         self.assertIn("无法计算", str(placeholder))
 
     def test_no_funds_writes_placeholder(self):
-        """0 只基金 → 写占位。"""
-        from src.python.report.fund_overlap_sheet import write_overlap_matrix_sheet
+        """0 只基金 → 重合度区块写占位。"""
+        from src.python.report.position_relationship_sheet import write_position_relationship_sheet
         overlap_result = {"funds": [], "matrix": [], "pairs": []}
-        write_overlap_matrix_sheet(self.ws, overlap_result)
+        write_position_relationship_sheet(self.ws, overlap_result)
         placeholder = self.ws.cell(row=3, column=1).value
         self.assertEqual(placeholder, STATUS_MESSAGES["overlap_unavailable"])
 

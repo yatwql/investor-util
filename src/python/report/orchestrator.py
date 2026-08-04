@@ -110,7 +110,9 @@ def prepare_report_data(
     # 因子暴露分析：基金深度分析关闭时为 None（章节隐藏），
     # 开启时计算 C19 dict（数据不足/故障时 available=False，不阻塞主报告）
     factor_exposure = compute_factor_exposure_data(holdings, config, reporter)
-    # 持仓相关性矩阵：同因子暴露，基金深度分析关闭时为 None（章节隐藏）
+    # 持仓关系矩阵（相关性区块）：同因子暴露，基金深度分析关闭时为 None（章节隐藏）。
+    # C19 契约 position_relationship_data——持仓关系矩阵一章两区块（重合度+相关性），
+    # 相关性矩阵由编排层注入 pipeline_data；重合度区块为渲染期派生（§8.3）。
     correlation_data = compute_correlation_data(holdings, config, reporter)
     # 品种覆盖诊断：逐品种标注数据状态，C19 position_status 契约
     coverage_status = build_coverage_summary(holdings, details)
@@ -123,7 +125,7 @@ def prepare_report_data(
     )
 
     # 行动建议单一数据源：再平衡信号等纯算法产出，C19 action_data 契约
-    # （单源计算，20 章行动板块与 14 章行动摘要共享同一对象）
+    # （单源计算，19 章行动板块与 13 章行动摘要共享同一对象）
     holdings_details = [
         {
             "name": d.name,
@@ -170,13 +172,13 @@ def prepare_report_data(
         "risk_metrics": {},
         # 因子暴露分析（C19 契约；基金深度分析关闭时为 None）
         "factor_exposure": factor_exposure,
-        # 持仓相关性矩阵（C19 契约；基金深度分析关闭时为 None）
-        "correlation_data": correlation_data,
+        # 持仓关系矩阵（C19 契约 position_relationship_data——相关性区块；基金深度分析关闭时为 None）
+        "position_relationship_data": correlation_data,
         # 品种覆盖诊断（C19 契约 position_status；品种级数据状态标注）
         "position_status": coverage_status,
         # 可信度摘要（C19 契约 data_freshness；新鲜度分类 + 单日跳变检测）
         "data_freshness": freshness_summary,
-        # 行动建议单一数据源（C19 契约 action_data；20 章行动板块 + 14 章行动摘要）
+        # 行动建议单一数据源（C19 契约 action_data；19 章行动板块 + 13 章行动摘要）
         "action_data": action_data,
     }
 
@@ -342,7 +344,7 @@ def compute_correlation_data(
     config: dict,
     reporter: ProgressReporter,
 ) -> dict | None:
-    """编排持仓相关性矩阵并返回 C19 契约 dict。
+    """编排持仓相关性矩阵并返回 C19 契约 dict（持仓关系矩阵相关性区块）。
 
     流程：并行拉取各品种历史 K 线（days=90）→ 转日收益 → 纯计算相关矩阵。
 
@@ -470,7 +472,7 @@ def generate_report(
                 output_dir=output,
                 section_order=sec_order,
                 progress=reporter,
-                # 18 章数据质量仪表盘子模块开关（basic 无行情数据，品种覆盖区块显示降级占位）
+                # 20 章数据质量仪表盘子模块开关（basic 无行情数据，品种覆盖区块显示降级占位）
                 enable_data_quality=is_enable_data_quality(config),
             )
             perf.stop()

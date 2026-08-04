@@ -596,10 +596,10 @@ def is_enable_portfolio_evolution(config: dict | None = None) -> bool:
 
 
 def is_enable_action(config: dict | None = None) -> bool:
-    """行动建议独立章（20 章，决策行动）是否启用。缺失时返回 False（默认关）。
+    """行动建议独立章（19 章，决策行动）是否启用。缺失时返回 False（默认关）。
 
     行动建议章是新增能力，默认关闭——不开时报告维持现状（无此章），
-    开启才出现第 20 章行动板块与 14 章行动摘要。
+    开启才出现第 19 章行动板块与 13 章行动摘要。
     """
     if config is None:
         config = get_config()
@@ -633,9 +633,9 @@ def is_enable_history(config: dict | None = None) -> bool:
 
 
 def is_enable_data_quality(config: dict | None = None) -> bool:
-    """数据质量仪表盘子模块（18 章改造）是否启用。
+    """数据质量仪表盘子模块（20 章改造）是否启用。
 
-    读取 `report_submodules.data_quality`，默认关（向后兼容，既有 18 章
+    读取 `report_submodules.data_quality`，默认关（向后兼容，既有 20 章
     「数据源可用性矩阵」输出不变）。
 
     Args:
