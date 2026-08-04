@@ -45,7 +45,7 @@ _DEFAULT_CONFIG = {
     "report_submodules": {
         "data_quality": False,  # 「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖）
         "industry_beta": False,  # 「风格与因子分析」→ 行业 Beta 子表（穿透行业暴露占比 + 行业指数 β）
-        "candidate_compare": False,  # 5章「基金业绩分析」→ 候选基金比较子表（候选来自 comparison_candidates）
+        "candidate_compare": False,  # 「基金业绩分析」→ 候选基金比较子表（候选来自 comparison_candidates）
     },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,

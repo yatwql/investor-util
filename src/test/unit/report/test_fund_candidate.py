@@ -80,7 +80,7 @@ class TestBuildCandidateCompareData(unittest.TestCase):
     @patch("src.python.report.fund_candidate.is_enable_candidate_compare")
     @patch("src.python.report.fund_candidate.get_comparison_candidates")
     def test_switch_off_returns_none(self, mock_get, mock_enable):
-        """行为断言：开关默认关时 5 章不渲染比较子表（build 返回 None）。"""
+        """行为断言：开关默认关时「基金业绩分析」章不渲染比较子表（build 返回 None）。"""
         mock_enable.return_value = False
         result = fc.build_candidate_compare_data([], config={})
         self.assertIsNone(result)

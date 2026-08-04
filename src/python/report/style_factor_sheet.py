@@ -248,7 +248,7 @@ def _write_industry_beta_block(
     编排层 C19 `style_factor_data.industry_beta` 子键：
       - None（开关 report_submodules.industry_beta 关闭）→ 区块不渲染；
       - available=False（push2 行业分类 / 指数 K 线不足）→ 标题 + "数据不足"占位，
-        Beta 子表不渲染，不阻塞 9 章其余内容（§1.4.5）。
+        Beta 子表不渲染，不阻塞该章其余内容（§1.4.5）。
     """
     if industry_beta is None:
         logger.info("风格与因子分析·行业 Beta：开关关闭，区块不渲染")

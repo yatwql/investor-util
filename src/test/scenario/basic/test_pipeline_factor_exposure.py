@@ -145,10 +145,10 @@ class TestComputeFactorExposureData:
 
 
 class TestPipelineInjection:
-    """_generate_report_full 将 prep.factor_exposure 注入 pipeline_data（C19 写入阶段）。"""
+    """_generate_report_full 将 prep.style_factor_data 注入 pipeline_data（C19 写入阶段）。"""
 
-    def test_full_report_injects_factor_exposure_into_pipeline(self, tmp_path):
-        """full 路径 capture_snapshot 后，pipeline_data["factor_exposure"] 从 prep 注入，HTML/Excel 消费。"""
+    def test_full_report_injects_style_factor_data_into_pipeline(self, tmp_path):
+        """full 路径 capture_snapshot 后，pipeline_data["style_factor_data"] 从 prep 注入，HTML/Excel 消费。"""
         from src.python.report.orchestrator import generate_report
 
         mock_reporter = MagicMock()

@@ -1,4 +1,4 @@
-"""收益归因计算与适配层单元测试（20 章归因子块 + 14 章提示词段落共用计算）。
+"""收益归因计算与适配层单元测试（「行动建议」章归因子块 + 「智囊团深度复盘」章提示词段落共用计算）。
 
 测试目标（轮 7 验收口径）：
   - 共享纯计算 `compute_return_attribution`：TOP5 按 |profit| 排序、正负分列、
@@ -112,7 +112,7 @@ class TestComputeReturnAttribution:
 
 
 class TestBuildReturnAttribution:
-    """20 章适配层：C19 契约 + 净额合计摘要文案。"""
+    """「行动建议」章适配层：C19 契约 + 净额合计摘要文案。"""
 
     def test_contract_c19_compliant(self):
         """输出 C19 `attribution` 契约键（available/盈利来源/亏损来源/summary）。"""

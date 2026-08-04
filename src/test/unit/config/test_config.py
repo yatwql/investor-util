@@ -1096,7 +1096,7 @@ class TestGetComparisonCandidates(unittest.TestCase):
 
 
 class TestIsEnableAction(unittest.TestCase):
-    """is_enable_action 访问器测试（行动建议独立章 20 章开关，默认关）。"""
+    """is_enable_action 访问器测试（行动建议独立章开关，默认关）。"""
 
     def test_default_false_when_missing(self):
         """config 缺失 enable_action → 返回 False（默认关，向后兼容）。"""

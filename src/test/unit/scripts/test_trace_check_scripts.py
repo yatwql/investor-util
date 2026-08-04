@@ -7,6 +7,9 @@
   - 文档「工具说明」元描述行豁免
   - 测试文件回归场景元描述豁免（仅 src/test/：旧实现/修复前/回归场景/rf-xxx 批次修复）
   - 版本号/任务编号等既有模式仍工作
+  - 章节编号暗号（"N 章"/"第 N 章"指代报告具体章节）检出，计数表述（共 N 章等）豁免
+  - 迭代轮次暗号（"第 N 轮"/"轮N"指代开发迭代轮次）检出，计数/运行时表述（共 N 轮/
+    轮询/轮动等）豁免
 
 测试通过脚本 import 方式直接复用 PATTERNS / EXCLUDE_LINE / 各扫描函数，
 不运行真实 CLI（避免扫描全仓、受控制台 GBK 编码影响）。
@@ -54,10 +57,19 @@ pytestmark = [
 
 
 def _code_hit(mod, line: str) -> str | None:
-    """返回 check-code-traces 命中的 desc；未命中返回 None。"""
+    """返回 check-code-traces 命中的 desc；未命中返回 None。
+
+    对 CHAPTER（章节编号）模式先应用 _is_chapter_excluded 计数/序数豁免，
+    对 ROUND（迭代轮次）模式先应用 _is_round_excluded 计数/运行时豁免，
+    与 scan_file 行为一致（"共 19 章"/"共 12 轮"等计数表述不误报）。
+    """
     if mod._is_excluded(line):
         return None
     for pat, cat, desc in mod.PATTERNS:
+        if cat == "CHAPTER" and mod._is_chapter_excluded(line):
+            continue
+        if cat == "ROUND" and mod._is_round_excluded(line):
+            continue
         if __import__("re").search(pat, line):
             return desc
     return None
@@ -325,6 +337,108 @@ class TestDocChapterDetection:
         ]
         for line in legit:
             assert _doc_hit(doc_traces, line) is None, f"合法表述被误伤: {line}"
+
+
+# ── check-code-traces：章节编号暗号检测（CHAPTER） ─────────
+
+
+class TestCodeChapterDetection:
+    """代码注释用数字章节号（"N 章"/"第 N 章"）指代报告具体章节须检出（语义命名
+    纪律：章节合并/重排后数字即失效，须改用语义章节名「X」章）；章节数量/序数
+    表述（共 N 章 / N 章基线 / 减至 N 章 / 出现第 N 章 / N→M 章 / 引号内"N 章"）
+    是合法计数，豁免（与 check-doc-traces 的 CHAPTER 检测行为一致）。"""
+
+    def test_chapter_codes_flagged(self, code_traces):
+        flagged = [
+            "改造 5 章",
+            "合并 9 章",
+            "9章加X",
+            "第 5 章加估值分位",
+            "输出到 20 章行动建议",
+            "14 章摘要引用",
+            "1/2/3 章渲染",
+            "4 章估值分位",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"章节编号暗号未检出: {line}"
+
+    def test_chapter_count_exempted(self, code_traces):
+        legit = [
+            "共 19 章",
+            "目标 19 章",
+            "合并后 18 章基线",
+            "总数 21 章减至 19 章",
+            "减至 19 章",
+            "20→19 章",
+            "「19 章」",
+            "开启才出现第 19 章",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"章节计数表述被误伤: {line}"
+
+    def test_non_patterns_clean(self, code_traces):
+        legit = [
+            "一章三区块",
+            "4.2 章节归并对照表",
+            "19 个章节",
+            "章节",
+            "21 轮每轮量化验收",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"合法表述被误伤: {line}"
+
+
+# ── check-code-traces：迭代轮次暗号检测（ROUND） ────────────
+
+
+class TestCodeRoundDetection:
+    """代码注释用"第 N 轮"/"轮N"指代开发迭代轮次须检出（语义命名纪律：
+    迭代轮次是开发痕迹，代码注释须改用语义描述）；轮次数量/运行时表述
+    （共 N 轮 / N 轮每轮 / 轮询 / 轮动 / 第 N 轮循环）是合法计数或业务/
+    运行时概念，豁免（与 CHAPTER 检测的计数豁免行为一致）。"""
+
+    def test_round_codes_flagged(self, code_traces):
+        flagged = [
+            "第 4 轮",
+            "第4轮",
+            "12 轮迭代",
+            "轮5 落地",
+            "轮13 验收标准",
+            "对应轮6/轮7",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"迭代轮次暗号未检出: {line}"
+
+    def test_round_count_exempted(self, code_traces):
+        legit = [
+            "共 12 轮",
+            "目标 8 轮",
+            "21 轮每轮量化验收",
+            "计划分 5 轮推进",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"轮次计数表述被误伤: {line}"
+
+    def test_round_runtime_exempted(self, code_traces):
+        legit = [
+            "轮询超时重试",
+            "第 3 轮循环",
+            "行业轮动判断",
+            "轮换到下一品种",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"轮次运行时表述被误伤: {line}"
+
+    def test_round_non_patterns_clean(self, code_traces):
+        legit = [
+            "一轮行情",
+            "每轮循环",
+            "本轮上涨",
+            "首轮筛选",
+            "两个回合",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"合法表述被误伤: {line}"
 
 
 # ── 注释提取：多行 docstring 状态不泄漏 ─────────────────────

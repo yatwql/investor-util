@@ -27,6 +27,13 @@
 - **测试**：新增 `src/test/unit/report/test_fund_candidate.py`（23 例：候选校验/截断/开关门控/全维度行/单候选失败降级/CLI 合并/缺期间非法值/风格与重合度失败降级/现有持仓收集），`test_html_writer.py` 新增 `TestCandidateCompareTemplate`（7 例，从真实模板配平截取候选区块渲染，断言开关关无子表、开启 11 列正确、失败占位、超限/无效脚注），`test_config.py`/`test_config_validation.py` 新增候选配置访问器与校验测试。fund_candidate 覆盖率 99%。
 - **文档同步**：plan.md（plan-21 轮13 已完成）、plan-investment-iteration.md（轮13 验收签字）、how-to-config.md（开关 + 候选列表说明）、reports-instruction.md（基金业绩分析比较子表说明）、folders.md 目录树补 `fund_candidate.py`/`test_fund_candidate.py`。
 
+#### 语义命名与章节/轮次引用清理（语义命名审计，2026-08-04）
+
+- **章节编号暗号全面清理**（rf-218/rf-219）：源码与测试注释、docstring、fixture 中 `N 章`/`第 N 章`/`报告第 N 页` 一律改为纯语义章节名；`test_excel_report_structure.py`/`test_action_html.py` fixture 编号对齐当前 registry（style_factor=9、action=17、expert_review=12、global_macro=11、data_source_status=18、llm_usage=19），页签计数断言同步（全部启用 17 个、always+基金深度 10 个）。
+- **check-code-traces 增强——章节编号检测（CHAPTER）**：镜像 check-doc-traces 的 CHAPTER 模式（`N 章`/`第 N 章` 指代报告章节须改用语义名）+ 计数/序数豁免（共 N 章、减至 N 章、N→M 章、「N 章」、出现第 N 章），退出码归入任务编号类（exit 2）。
+- **check-code-traces 增强——迭代轮次检测（ROUND）**（rf-220）：新增 ROUND 模式检出 `第 N 轮`/`N 轮`/`轮N` 迭代轮次痕迹，计数/运行时表述豁免（共 N 轮、计划分 N 轮、N 轮每轮、轮询、轮动/轮换、第 N 轮循环）；测试层残留轮次引用（`test_html_writer.py` 候选比较 docstring）改为语义描述；退出码归入任务编号类（exit 2）。
+- **测试**：`test_trace_check_scripts.py` 新增 `TestCodeChapterDetection`（镜像 doc 版本）与 `TestCodeRoundDetection`（轮次暗号检出 / 计数豁免 / 运行时豁免 / 合法表述不误伤），60 例全过；全仓 check-code-traces `--ci` 干净。
+
 ## [0.10.2] - 2026-08-04
 
 ### 配置家族模块化重构（config 包）

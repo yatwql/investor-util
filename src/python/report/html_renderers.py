@@ -250,7 +250,7 @@ def _render_fund_performance_section(
 
     Returns:
         (perf_data, candidate_data) — 第二项为候选基金比较数据
-        （开关 `report_submodules.candidate_compare` 关闭时返回 None，5 章不渲染比较子表）
+        （开关 `report_submodules.candidate_compare` 关闭时返回 None，不渲染比较子表）
     """
     prog.info("正在获取基金业绩排名...")
     perf_data = _build_perf_data(holdings, details, progress=prog)

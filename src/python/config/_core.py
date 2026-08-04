@@ -402,10 +402,10 @@ def is_enable_data_quality(config: dict | None = None) -> bool:
 
 
 def is_enable_candidate_compare(config: dict | None = None) -> bool:
-    """5 章候选基金比较子表是否启用。
+    """候选基金比较子表是否启用。
 
     读取 `report_submodules.candidate_compare`，默认关（向后兼容，既有
-    5 章「基金业绩分析」输出不变）。
+    「基金业绩分析」章输出不变）。
 
     Args:
         config: 完整配置字典，为 None 时读取全局配置

@@ -1,7 +1,7 @@
-"""候选基金比较增强模块 — 5 章「基金业绩分析」候选比较子表。
+"""候选基金比较增强模块 —「基金业绩分析」章候选比较子表。
 
 候选基金横向比较（收益 / 同类排名 / 评级 / 最大回撤 / 风格 / 与现有持仓重合度）。
-开关 `report_submodules.candidate_compare`（**默认关**，向后兼容既有 5 章输出），
+开关 `report_submodules.candidate_compare`（**默认关**，向后兼容既有输出），
 候选基金代码来自 config `comparison_candidates`（6 位基金代码列表，≤10 只）。
 
 数据降级：
@@ -241,10 +241,10 @@ def build_candidate_compare_data(
     config: dict | None = None,
     cli_codes: list[str] | None = None,
 ) -> dict[str, Any] | None:
-    """构建候选基金比较数据（5 章比较子表渲染源）。
+    """构建候选基金比较数据（「基金业绩分析」章比较子表渲染源）。
 
     Returns:
-        None — 开关 `report_submodules.candidate_compare` 关闭（5 章不渲染比较子表）；
+        None — 开关 `report_submodules.candidate_compare` 关闭（不渲染比较子表）；
         {"available": False, "reason": ..., "rows": []} — 开关开但无有效候选；
         {"available": True, "exceed_limit", "invalid", "rows": [...]} — 正常。
     """
