@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.4-dev
-> **编号源**：`rf-next = 226`（新增问题取此编号，完成后更新为 +1；已用最大 rf-225，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 227`（新增问题取此编号，完成后更新为 +1；已用最大 rf-226，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -13,7 +13,7 @@
 | # | 问题 | 修复方向 |
 |---|------|----------|
 | **rf-113** | plan-1 **Iter 7 全链路浏览器人工验证 6 项全程未实测**（设计文档验收标准 2/3/4/6 标 ⏳）：① 6 图 Chrome/Edge 90+ 真实渲染+交互（Firefox 90+/Safari 14+ 抽验，R17）② 打印 2x DPI 快照 + 浅色强制 + 不跨页 ③ 离线验证（删除/改名 chart.min.js → `typeof Chart` 守卫应跳过、无 JS 报错、回退 Canvas/表格）④ 微信内置浏览器链接 + file:// 两种打开方式实测（R22）⑤ 移动端 375px 图表不溢出（A4）⑥ 禁用 Canvas 后 6 图区域显示 fallback 文本而非空白（A1） | **载体已备齐（2026-08-03）**：①③⑤ 用 `src/static/test-chart.html` 调试页自检（TD8 rf-112 载体；本次修复 rf-159 回归——注入列表补 `chart-common.js`，否则 0/6 全跳过）；②④⑥ 用完整报告（菜单 L/B，`enable_interactive_charts` 默认开）。**勾选清单**：`docs-stm/archive/v0.9.x/chartjs-upgrade/iter7-verification-checklist.md`（已更新至 7 JS 资产 + chart-common.js 依赖说明 + 回撤图数据 span≥60 交易日才渲染的说明），用户另机手工勾选完成后回填 changelog、本表移至已修复 |
-| **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器 |
+| **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器。**2026-08-05 决策：先完成 rf-113 人工验证（确认 Chart.js 真机渲染可靠）后再执行删除** |
 
 > 已关闭项（决策已定，archive 可查）：rf-117 A6 键盘可达性（不做 MVP）、rf-118 相关性矩阵 Heatmap（已用 HTML 表格渲染）、rf-120 S5 CSP（不做）、rf-121 报告体积（R21 接受自包含代价）
 
@@ -47,6 +47,7 @@
 
 | # | 位置 | 问题 |
 |---|------|------|
+| **rf-226** | `src/python/llm/fact_checker/_numerical.py` | `_evaluate_percent_value` 策略 1（明确主体判定）对「组合级收益 + 个股级收益同句段」误配：`test_llm_hallucination.py::test_correct_output_all_pass` 文本「组合累计收益约10.0%，招商银行(600036)上涨8.0%，贵州茅台(600519)上涨15.0%」被误检——整句定位主体「招商银行」后，把组合收益 10.0% 错当个股收益率，报「10.0% 与 600036 实际 8.2% 偏差超容差」（正确应路由 10.0% 到组合总收益率 9.73%、8.0% 到招商银行 8.2%、15.0% 到茅台 15.0%）。**HEAD 基线已复现，非本次死代码删除引入**（`git stash` 验证：删除前同样失败） |
 
 ---
 
