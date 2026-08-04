@@ -79,12 +79,15 @@ def _doc_hit(mod, line: str) -> str | None:
     """返回 check-doc-traces 命中的 desc；未命中返回 None。
 
     对 CHAPTER（章节编号）模式先应用 _is_chapter_excluded 计数/序数豁免，
-    与 scan_file 行为一致（"共 19 章"等计数表述不误报）。
+    对 ROUND（迭代轮次）模式先应用 _is_round_excluded 计数/运行时豁免，
+    与 scan_file 行为一致（"共 19 章"/"共 12 轮"等计数表述不误报）。
     """
     if mod._is_excluded(line):
         return None
     for pat, cat, desc in mod._DOC_PATTERNS:
         if cat == "CHAPTER" and mod._is_chapter_excluded(line):
+            continue
+        if cat == "ROUND" and mod._is_round_excluded(line):
             continue
         if __import__("re").search(pat, line):
             return desc
@@ -146,6 +149,17 @@ class TestCodeTraceDetection:
     def test_replaced_old(self, code_traces):
         assert _code_hit(code_traces, "替代了旧方案") is not None
 
+    def test_original_contract_migration_flagged(self, code_traces):
+        """契约改名叙述（历史主键名变迁）须检出，当前只描述 style_factor_data。"""
+        flagged = [
+            "原 factor_exposure 契约迁移为主键",
+            "原 factor_exposure 迁移为 style_factor_data 主键",
+            "原 factor_exposure C19 dict 迁移为 style_factor_data 主键",
+            "原 contract_a 改称 contract_b",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"契约改名叙述未检出: {line}"
+
     # ── 合法运行时/当前状态描述不应误伤 ──
 
     def test_runtime_descriptions_not_flagged(self, code_traces):
@@ -157,6 +171,7 @@ class TestCodeTraceDetection:
             "此前已配置",
             "之前缓存过",
             "回退到默认配置",
+            "原始数据迁移至新库是运行时功能",
         ]
         for line in legit:
             assert _code_hit(code_traces, line) is None, f"合法描述被误伤: {line}"
@@ -246,6 +261,17 @@ class TestDocTraceDetection:
     def test_considered_alternative(self, doc_traces):
         assert _doc_hit(doc_traces, "曾考虑过A方案") is not None
 
+    def test_original_contract_migration_flagged(self, doc_traces):
+        """文档正文契约改名叙述（历史主键名变迁）须检出。"""
+        flagged = [
+            "原 factor_exposure 契约迁移为主键",
+            "原 factor_exposure 迁移为 style_factor_data 主键",
+            "原 factor_exposure C19 dict 迁移为 style_factor_data 主键",
+            "原 contract_a 改称 contract_b",
+        ]
+        for line in flagged:
+            assert _doc_hit(doc_traces, line) is not None, f"契约改名叙述未检出: {line}"
+
     # ── 合法当前状态/工具说明应豁免 ──
 
     def test_runtime_descriptions_not_flagged(self, doc_traces):
@@ -255,6 +281,7 @@ class TestDocTraceDetection:
             "回测使用历史序列",
             "此前已配置",
             "之前缓存过",
+            "原始数据迁移至新库是运行时功能",
         ]
         for line in legit:
             assert _doc_hit(doc_traces, line) is None, f"合法描述被误伤: {line}"
@@ -339,6 +366,62 @@ class TestDocChapterDetection:
             assert _doc_hit(doc_traces, line) is None, f"合法表述被误伤: {line}"
 
 
+# ── check-doc-traces：迭代轮次暗号检测（ROUND） ────────────
+
+
+class TestDocRoundDetection:
+    """正文用数字轮次（"第 N 轮"/"经 N 轮"/"N 轮"/"轮 N"）指代开发迭代历史须检出
+    （迭代轮次是开发痕迹，正文须改用语义描述）；轮次数量/运行时表述（共 N 轮 /
+    N 轮每轮 / 计划分 N 轮 / 轮询 / 轮动 / 第 N 轮循环）是合法计数或业务/运行时
+    概念，豁免。changelog/plan/review-findings 与 docs-stm/plan/ 不查本条
+    （ROUND 不进 _CHAPTER_PATTERNS，trace-exempt 文档仅章节编号扫描）。"""
+
+    def test_round_codes_flagged(self, doc_traces):
+        flagged = [
+            "第 14 轮",
+            "第4轮",
+            "经 8 轮",
+            "轮 8",
+            "12 轮迭代",
+            "轮13 验收标准",
+            "对应轮4/轮5",
+        ]
+        for line in flagged:
+            assert _doc_hit(doc_traces, line) is not None, f"迭代轮次暗号未检出: {line}"
+
+    def test_round_count_exempted(self, doc_traces):
+        legit = [
+            "共 12 轮",
+            "目标 8 轮",
+            "21 轮每轮量化验收",
+            "计划分 5 轮推进",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"轮次计数表述被误伤: {line}"
+
+    def test_round_runtime_exempted(self, doc_traces):
+        legit = [
+            "轮询超时重试",
+            "第 3 轮循环",
+            "行业轮动判断",
+            "轮换到下一品种",
+            "板块轮涨轮跌",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"轮次运行时表述被误伤: {line}"
+
+    def test_round_non_patterns_clean(self, doc_traces):
+        legit = [
+            "一轮行情",
+            "每轮循环",
+            "本轮上涨",
+            "首轮筛选",
+            "两个回合",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"合法表述被误伤: {line}"
+
+
 # ── check-code-traces：章节编号暗号检测（CHAPTER） ─────────
 
 
@@ -401,8 +484,11 @@ class TestCodeRoundDetection:
         flagged = [
             "第 4 轮",
             "第4轮",
+            "第 12 轮",
             "12 轮迭代",
+            "经 8 轮",
             "轮5 落地",
+            "轮 4 落地",
             "轮13 验收标准",
             "对应轮6/轮7",
         ]

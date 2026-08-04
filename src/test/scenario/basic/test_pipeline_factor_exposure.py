@@ -211,7 +211,7 @@ class TestPipelineInjection:
             )
 
         assert result.report_generated is True
-        # Excel 收到含 style_factor_data 的 pipeline_data（原 factor_exposure 契约迁移为主键）
+        # Excel 收到含 style_factor_data 的 pipeline_data
         excel_kw = mock_excel.call_args.kwargs
         assert excel_kw["pipeline_data"]["style_factor_data"]["available"] is True
         # HTML 收到 style_factor_data kwarg

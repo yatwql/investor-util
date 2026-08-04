@@ -326,7 +326,7 @@ def _generate_full_html_report(
     Args:
         metrics: compute_all_metrics() 返回值（14 项全量，仅 full 路径）；
             用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
-        style_factor_data: 风格与因子分析 C19 契约 dict（原 factor_exposure 迁移为主键，
+        style_factor_data: 风格与因子分析 C19 契约 dict（style_factor_data 主键，
             内嵌 industry_beta 子键），基金深度分析关闭或数据不足时为 None/available=False。
         position_relationship_data: 持仓关系矩阵 C19 契约 dict（相关性区块数据源），
             基金深度分析关闭或数据不足时为 None/available=False。

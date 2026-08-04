@@ -3,7 +3,7 @@
 
 检查面向读者的仓库文档是否残留历史痕迹，保证正文只反映最新状态。
 
-两条核心规则：
+四条核心规则：
   1. 文档正文内容不得带有历史痕迹和历史变更（版本号标记、来源叙述、
      原/旧实现、迁移/重命名、任务编号引用、迭代标记等），只描述
      "当前是什么/做什么"。changelog.md / plan.md / review-findings.md
@@ -19,6 +19,13 @@
      plan.md / review-findings.md 与 docs-stm/plan/ 目录——它们虽是
      历史/计划记录（豁免版本号等历史痕迹），但数字章节暗号同样影响
      可读性，仅对它们应用本条章节编号检查。
+  4. 迭代轮次引用：任何面向读者文档的正文不得用数字轮次（"第 N 轮" /
+     "经 N 轮" / "N 轮" / "轮 N"）指代开发迭代历史，须改为语义描述。
+     轮次数量/运行时表述（共 N 轮 / 计划分 N 轮 / N 轮每轮 / 轮询 /
+     轮动/轮换/轮番/轮涨/轮跌 / 第 N 轮循环）是合法计数或业务/运行时
+     概念，豁免。该检查**不适用于** changelog.md / plan.md /
+     review-findings.md 与 docs-stm/plan/——它们作为历史/计划记录，
+     "轮 N"是正式记录载体（changelog 记"轮 N 落地"、迭代计划按轮排期）。
 
 受检范围：
   - 项目根 README.md
@@ -53,7 +60,7 @@
 
 退出码：
   0 — 全部通过（无可疑痕迹）
-  1 — 发现高置信度痕迹（HIGH/ARCHIVE/CODE/CHAPTER），应修复后再提交
+  1 — 发现高置信度痕迹（HIGH/ARCHIVE/CODE/CHAPTER/ROUND），应修复后再提交
   2 — 仅 LOW 级别痕迹，建议人工复核
 """
 
@@ -96,6 +103,7 @@ SKIP_DIRS = {"archive", "plan", "tmp"}
 #   CODE      — 任务编号引用（rf-N / plan-N / R-N），历史记录标识
 #   HIGH      — 高置信度历史痕迹（来源叙述/历史实现/变更节点/迭代/版本号）
 #   CHAPTER   — 章节编号引用（"N 章"/"第 N 章"指代报告具体章节，须用语义章节名）
+#   ROUND     — 迭代轮次引用（"第 N 轮"/"N 轮"/"轮 N"指代开发迭代历史，须用语义描述）
 #   LOW       — 需人工判断的变更/过渡/待办描述（可能是当前能力也可能是痕迹）
 
 
@@ -148,6 +156,11 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         (r"(?:合并|迁移|提取)自\s*[`\w._-]+", "HIGH", "来源叙述（合并自/迁移自/提取自）"),
         (r"已迁移", "HIGH", "迁移痕迹（已迁移）"),
         (r"原(?:逻辑|实现|方案|代码|写法|做法|设计)", "HIGH", "原逻辑/原实现（历史实现叙述）"),
+        (
+            r"原\s*[`A-Za-z_][A-Za-z0-9_.]*(?:\s*C19\s+)?(?:\s*(?:契约|dict|数据|结构|结果))?\s*(?:迁移|改称|并入)",
+            "HIGH",
+            "原X迁移/改称（历史契约/命名变更叙述）",
+        ),
         (r"旧\s*[`\w._-]+\s*(?:逻辑|实现|方案|要求|做法|方式|判定|分类)", "HIGH", "旧XX逻辑/要求（历史实现叙述）"),
         (r"(?:旧设计|旧架构|历史遗留)", "HIGH", "旧设计/历史遗留（历史迭代叙述）"),
         (r"未升级版|旧版|老版", "HIGH", "旧版/未升级版（版本对比痕迹）"),
@@ -199,6 +212,16 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         #  豁免。负向前瞻 (?!节) 排除"章节"一词；[1-9]\d? 限 1~99，不匹配
         #  中文数字"一章"、小节号"4.2"（数字后非"章"）。
         (r"第?\s*[1-9]\d?\s*章(?!节)", "CHAPTER", "章节编号引用（N 章/第 N 章，须用语义章节名）"),
+        # ── ROUND：迭代轮次引用（用"第 N 轮"/"N 轮"/"轮 N"指代开发迭代历史） ──
+        #  "第 14 轮" / "经 8 轮" / "轮 8" 是开发迭代痕迹（计划分轮实施，
+        #  changelog 记"轮 N 落地"），面向读者文档正文不应记录迭代轮次，
+        #  须改用语义描述。轮次数量/序数表述（共 N 轮、计划分 N 轮、N 轮
+        #  每轮、轮询、轮动/轮换/轮番/轮涨/轮跌、第 N 轮循环）是合法计数
+        #  或业务/运行时概念，由 _round_excludes() 豁免；`[1-9]\d?` 限
+        #  1~99，不匹配中文数字"一轮"（一轮行情是业务表述，非迭代轮次）。
+        (r"第\s*[1-9]\d?\s*轮", "ROUND", "迭代轮次引用（第 N 轮，属开发迭代痕迹）"),
+        (r"[1-9]\d?\s*轮", "ROUND", "迭代轮次引用（N 轮，属开发迭代痕迹）"),
+        (r"轮\s*[1-9]\d?\b", "ROUND", "迭代轮次引用（轮 N，属开发迭代痕迹）"),
         # ── LOW：需人工判断的变更/过渡/待办描述（可能是当前能力也可能是痕迹） ──
         (r"重构[为成到]", "LOW", "重构为/重构到（变更描述，需判断）"),
         (r"已废弃|已弃用", "LOW", "废弃/弃用标注（当前指引或历史，需判断）"),
@@ -290,10 +313,32 @@ def _chapter_excludes() -> list[re.Pattern]:
     ]
 
 
+def _round_excludes() -> list[re.Pattern]:
+    """迭代轮次计数/运行时表述豁免（"N 轮"为数量或业务/运行时概念，非迭代痕迹）。
+
+    与 _chapter_excludes() 同理——这些是合法表述，命中的行跳过 ROUND 分类检查
+    （不影响其他痕迹检查）：
+      - 共/目标/计划/预计/规划 N 轮       —— 轮次总数
+      - N 轮 每轮 …                       —— 每轮计数（如"21 轮每轮量化验收"）
+      - 轮询                               —— 轮询是运行时技术概念（轮询超时/循环轮询）
+      - 轮动/轮换/轮番/轮涨/轮跌           —— 行业轮动等投资业务术语
+      - 第 N 轮 + 循环/遍历/扫描/筛选      —— 运行时处理轮次（第 N 轮循环）
+    """
+    return [
+        re.compile(r"(?:共|总共|合计|总数|目标|设定|预计|规划)\s*[1-9]\d?\s*轮"),
+        re.compile(r"计划(?:分|为|约|共)?\s*[1-9]\d?\s*轮"),
+        re.compile(r"[1-9]\d?\s*轮\s*每轮"),
+        re.compile(r"轮询"),
+        re.compile(r"轮动|轮换|轮番|轮涨|轮跌"),
+        re.compile(r"第\s*[1-9]\d?\s*轮\s*(?:循环|遍历|扫描|筛选)"),
+    ]
+
+
 # 模块级缓存（模式列表固定，避免逐行重复构建）
 _DOC_PATTERNS = _doc_patterns()
 _COMPILED_EXCLUDE = _exclude_lines()
 _COMPILED_CHAPTER_EXCLUDE = _chapter_excludes()
+_COMPILED_ROUND_EXCLUDE = _round_excludes()
 # 章节编号模式子集（用于 trace-exempt 文档的仅章节扫描）
 _CHAPTER_PATTERNS = [(p, c, d) for p, c, d in _DOC_PATTERNS if c == "CHAPTER"]
 
@@ -308,6 +353,11 @@ def _is_chapter_excluded(line: str) -> bool:
     return any(p.search(line) for p in _COMPILED_CHAPTER_EXCLUDE)
 
 
+def _is_round_excluded(line: str) -> bool:
+    """检查该行是否命中迭代轮次计数/运行时表述豁免（"N 轮"为数量而非迭代痕迹）。"""
+    return any(p.search(line) for p in _COMPILED_ROUND_EXCLUDE)
+
+
 def scan_file(fpath: Path, verbose: bool, chapter_only: bool = False) -> list[tuple[int, str, str, str]]:
     """扫描单个文档，返回 [(行号, 分类, 模式说明, 行内容), ...]
 
@@ -316,7 +366,8 @@ def scan_file(fpath: Path, verbose: bool, chapter_only: bool = False) -> list[tu
 
     chapter_only=True：仅应用 CHAPTER 章节编号模式（用于 changelog/plan/
     review-findings 与 docs-stm/plan/ 等 trace-exempt 文档——它们是历史/计划
-    记录，版本号等历史痕迹合法，但数字章节暗号仍影响可读性需检查）。
+    记录，版本号等历史痕迹合法，但数字章节暗号仍影响可读性需检查；迭代轮次
+    "轮 N"是这些记录文档的正式载体，ROUND 不纳入 trace-exempt 扫描）。
     """
     hits: list[tuple[int, str, str, str]] = []
     try:
@@ -352,6 +403,8 @@ def scan_file(fpath: Path, verbose: bool, chapter_only: bool = False) -> list[tu
         for pat, cat, desc in patterns:
             if cat == "CHAPTER" and _is_chapter_excluded(stripped):
                 continue  # 计数/序数表述豁免，不影响其他模式
+            if cat == "ROUND" and _is_round_excluded(stripped):
+                continue  # 轮次计数/运行时表述豁免，不影响其他模式
             if re.search(pat, stripped):
                 hits.append((lineno, cat, desc, stripped[:120]))
                 break  # 每行仅报告首个匹配
@@ -428,7 +481,7 @@ def main() -> int:
         for lineno, cat, desc, text in hits:
             total_hits += 1
             summary[cat] = summary.get(cat, 0) + 1
-            is_high = cat in ("HIGH", "ARCHIVE", "CODE", "CHAPTER")
+            is_high = cat in ("HIGH", "ARCHIVE", "CODE", "CHAPTER", "ROUND")
             if is_high:
                 high_count += 1
             else:
@@ -459,7 +512,7 @@ def main() -> int:
     cat_stats = ", ".join(f"{k}={v}" for k, v in sorted(summary.items()))
     print(f"[!] 发现 {total_hits} 处可疑痕迹（{cat_stats}）")
     if high_count > 0:
-        print(f"    {high_count} 处高置信度（HIGH/ARCHIVE/CODE/CHAPTER），应从文档中移除")
+        print(f"    {high_count} 处高置信度（HIGH/ARCHIVE/CODE/CHAPTER/ROUND），应从文档中移除")
         return 1
     print(f"[!] 仅 {low_count} 处 LOW 级别痕迹（需人工判断），建议复核")
     return 2

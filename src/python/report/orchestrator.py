@@ -109,8 +109,8 @@ def prepare_report_data(
 
     # 因子暴露分析：基金深度分析关闭时为 None（章节隐藏），
     # 开启时计算 C19 dict（数据不足/故障时 available=False，不阻塞主报告）。
-    # 轮 12 合并：原 factor_exposure C19 dict 迁移为 style_factor_data 主键
-    # （保留全部子键，不重复定义），内嵌 industry_beta 子键（行业 Beta 子表）。
+    # 风格与因子合并：style_factor_data C19 dict 主键（保留全部子键，不重复定义），
+    # 内嵌 industry_beta 子键（行业 Beta 子表）。
     factor_exposure = compute_factor_exposure_data(holdings, config, reporter)
     if factor_exposure is not None:
         # 行业 Beta 子表：report_submodules.industry_beta 开关关闭时返回 None（区块隐藏）；
@@ -176,8 +176,8 @@ def prepare_report_data(
         "news_top_count": int(config.get("news_top_count", 100)),
         # 组合风险指标（年化波动率/最大回撤/夏普比率等，需 history_data 计算后填充）
         "risk_metrics": {},
-        # 风格与因子分析（C19 契约 style_factor_data；原 factor_exposure 契约迁移为主键，
-        # 内嵌 industry_beta 子键；基金深度分析关闭时为 None）
+        # 风格与因子分析（C19 契约 style_factor_data，内嵌 industry_beta 子键；
+        # 基金深度分析关闭时为 None）
         "style_factor_data": factor_exposure,
         # 持仓关系矩阵（C19 契约 position_relationship_data——相关性区块；基金深度分析关闭时为 None）
         "position_relationship_data": correlation_data,
@@ -431,16 +431,11 @@ def compute_industry_beta_data(
             return unavailable_result("insufficient")
 
         # ── 4. 有暴露且映射行业的指数 K 线（并行） ──
-        mapped_industries = sorted(
-            i for i in exposure_result["exposure"] if i in INDUSTRY_INDEX_MAP
-        )
+        mapped_industries = sorted(i for i in exposure_result["exposure"] if i in INDUSTRY_INDEX_MAP)
         industry_klines: dict[str, list[dict]] = {}
         if mapped_industries:
             with ThreadPoolExecutor(max_workers=4, thread_name_prefix="orch_ind_idx") as _pool:
-                _futs = {
-                    _pool.submit(fetch_index_history, INDUSTRY_INDEX_MAP[i], _days): i
-                    for i in mapped_industries
-                }
+                _futs = {_pool.submit(fetch_index_history, INDUSTRY_INDEX_MAP[i], _days): i for i in mapped_industries}
                 for _fut in _futs:
                     i = _futs[_fut]
                     try:
@@ -458,12 +453,8 @@ def compute_industry_beta_data(
 
         # ── 6. 合并暴露占比 + 指数代码 + 无映射行业 ──
         result["exposure"] = exposure_result["exposure"]
-        result["index_codes"] = {
-            i: INDUSTRY_INDEX_MAP[i] for i in result["betas"] if i in INDUSTRY_INDEX_MAP
-        }
-        result["unmapped_industries"] = sorted(
-            i for i in exposure_result["exposure"] if i not in INDUSTRY_INDEX_MAP
-        )
+        result["index_codes"] = {i: INDUSTRY_INDEX_MAP[i] for i in result["betas"] if i in INDUSTRY_INDEX_MAP}
+        result["unmapped_industries"] = sorted(i for i in exposure_result["exposure"] if i not in INDUSTRY_INDEX_MAP)
         reporter.ok("行业 Beta 子表计算完成")
         return result
     except Exception:

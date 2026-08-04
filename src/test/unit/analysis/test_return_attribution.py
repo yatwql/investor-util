@@ -1,6 +1,6 @@
 """收益归因计算与适配层单元测试（「行动建议」章归因子块 + 「智囊团深度复盘」章提示词段落共用计算）。
 
-测试目标（轮 7 验收口径）：
+测试目标（「行动建议」章收益归因子块验收口径）：
   - 共享纯计算 `compute_return_attribution`：TOP5 按 |profit| 排序、正负分列、
     贡献占比精度（固定 fixture <0.01%）、空/零盈亏保护、pos/neg 合计覆盖全部持仓
   - 渲染适配层 `build_return_attribution`：C19 `attribution` 契约、净额合计摘要

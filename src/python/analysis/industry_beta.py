@@ -5,7 +5,7 @@
 
 - 无数据获取、无报告依赖，纯 pandas/numpy（C8：日志走 logging，不用 print）。
 - Beta 复用 ``factor_exposure.compute_factor_exposure`` 的单因子调用，
-  不重复实现 OLS（轮 12「复用 OLS 回归机制，无重复实现」约束）。
+  不重复实现 OLS（「复用 OLS 回归机制，无重复实现」约束）。
 - 行业分类判定复用 ``core/code_utils.py``（C1）；指数 K 线由编排层
   （report/orchestrator.py）走 Chain + session_cache（C4/C6），本模块不联网。
 - push2 行业分类不可用 / 指数 K 线不足 → available=False，绝不硬算

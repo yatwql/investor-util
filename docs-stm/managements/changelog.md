@@ -27,12 +27,22 @@
 - **测试**：新增 `src/test/unit/report/test_fund_candidate.py`（23 例：候选校验/截断/开关门控/全维度行/单候选失败降级/CLI 合并/缺期间非法值/风格与重合度失败降级/现有持仓收集），`test_html_writer.py` 新增 `TestCandidateCompareTemplate`（7 例，从真实模板配平截取候选区块渲染，断言开关关无子表、开启 11 列正确、失败占位、超限/无效脚注），`test_config.py`/`test_config_validation.py` 新增候选配置访问器与校验测试。fund_candidate 覆盖率 99%。
 - **文档同步**：plan.md（plan-21 轮13 已完成）、plan-investment-iteration.md（轮13 验收签字）、how-to-config.md（开关 + 候选列表说明）、reports-instruction.md（基金业绩分析比较子表说明）、folders.md 目录树补 `fund_candidate.py`/`test_fund_candidate.py`。
 
+#### 成本流水：持仓文件格式扩展 + 资金加权收益与成本分档（plan-22 轮14/轮15，`fund_flow_data` 契约）
+
+- **持仓文件格式扩展（轮14）**：持仓 Excel 可选新增「交易流水」「分红流水」页签，不破坏既有固定 4 列格式（名称/代码/持仓份额/每份成本）。`core/models.py` 新增 `TradeRecord`（日期/代码/操作/份额/价格/费用，费用可选缺省 0）与 `DividendRecord`（日期/代码/每份分红）；`core/reader.py` 新增 `read_flow_sheets()` / `read_holdings_with_flows()` 与 `_parse_trade_sheet()` / `_parse_dividend_sheet()`（表头不匹配整体跳过 + 行级无效容忍：日期/操作/数值无效仅跳过该行并告警；`parse_workbook` 主体零改动，向后兼容）。`test_reader.py` 新增 `TestParseFlowSheets`（20 例：交易/分红解析、表头不匹配、无效行容忍、费用可选、操作归一化、多账户、向后兼容字段相等），共 80 例、覆盖率 93%。
+- **资金加权收益（XIRR，轮15）**：新增 `src/python/analysis/cost_flow.py`（纯计算层，禁止导入 report/）——`solve_xirr()`（Newton-Raphson + 二分兜底，自然日年化 `t=days/365`，扫描区间 -99.99%~+1600%）、`build_xirr_cashflows()`（投资者视角现金流：买入为负 / 卖出与分红到账为正 / 期末市值为正，分红按登记日份额纳入时点效应，份额未知回退当前持仓）；固定 fixture 解析解年化误差 0.0000%（定投与整笔两类 10% 年化案例）。
+- **成本分档 + 分红累计（轮15）**：`build_cost_lots()`（交易流水按代码 FIFO 合并成本批次，批次成本 = 价格 + 费用均摊）、`compute_cost_tiers()`（相对当前市价分低成本/高成本档 + 无市价品种单列，`high_cost_ratio` 支持「是否追高加仓」判断）、`compute_dividend_totals()`（按代码汇总分红金额）。
+- **C19 契约预定义（轮15）**：`build_fund_flow_data()` 输出 `fund_flow_data` 契约（available/xirr/cost_tiers/dividends）；pipeline_data 注册与「投资分析汇总」「市值核算明细表」「持仓分类表」三章渲染属轮16。
+- **测试**：新增 `src/test/unit/analysis/test_cost_flow.py`（24 例：XIRR 精度 / guess 无关性 / 空值与同日退化、FIFO 批次、成本分档边界、分红累计，pytestmark unit/unit_analysis），覆盖率 94%。
+
 #### 语义命名与章节/轮次引用清理（语义命名审计，2026-08-04）
 
 - **章节编号暗号全面清理**（rf-218/rf-219）：源码与测试注释、docstring、fixture 中 `N 章`/`第 N 章`/`报告第 N 页` 一律改为纯语义章节名；`test_excel_report_structure.py`/`test_action_html.py` fixture 编号对齐当前 registry（style_factor=9、action=17、expert_review=12、global_macro=11、data_source_status=18、llm_usage=19），页签计数断言同步（全部启用 17 个、always+基金深度 10 个）。
 - **check-code-traces 增强——章节编号检测（CHAPTER）**：镜像 check-doc-traces 的 CHAPTER 模式（`N 章`/`第 N 章` 指代报告章节须改用语义名）+ 计数/序数豁免（共 N 章、减至 N 章、N→M 章、「N 章」、出现第 N 章），退出码归入任务编号类（exit 2）。
 - **check-code-traces 增强——迭代轮次检测（ROUND）**（rf-220）：新增 ROUND 模式检出 `第 N 轮`/`N 轮`/`轮N` 迭代轮次痕迹，计数/运行时表述豁免（共 N 轮、计划分 N 轮、N 轮每轮、轮询、轮动/轮换、第 N 轮循环）；测试层残留轮次引用（`test_html_writer.py` 候选比较 docstring）改为语义描述；退出码归入任务编号类（exit 2）。
-- **测试**：`test_trace_check_scripts.py` 新增 `TestCodeChapterDetection`（镜像 doc 版本）与 `TestCodeRoundDetection`（轮次暗号检出 / 计数豁免 / 运行时豁免 / 合法表述不误伤），60 例全过；全仓 check-code-traces `--ci` 干净。
+- **check-doc-traces 增强——迭代轮次检测（ROUND，空格分隔形式）**（rf-221）：check-doc-traces 镜像 ROUND 模式（`第 N 轮`/`经 N 轮`/`N 轮`/`轮 N`，含空格分隔）+ 计数/运行时豁免（共 N 轮、计划分 N 轮、N 轮每轮、轮询、轮动/轮换/轮番/轮涨/轮跌、第 N 轮循环），ROUND 不进 trace-exempt 文档扫描（changelog/plan/review-findings + docs-stm/plan/ 仅章节编号检查，`轮 N` 是其正式记录载体）；check-code-traces ROUND 放宽 `轮N` → `轮\s*N`（空格分隔）；清理 4 处空格分隔旧注释（industry_beta / excel_fund_deep_analysis / orchestrator / test_return_attribution）改为语义描述；`test_trace_check_scripts.py` 新增 `TestDocRoundDetection` 4 例。
+- **契约改名叙述清理 + 两脚本补「原 X 迁移」模式**（rf-222）：注释残留「原 factor_exposure 契约迁移为主键」等历史契约改名叙述（7 处 src 注释 + 1 处 scenario 测试）——现有模式只覆盖「原+固定名词 / 迁移自 / 迁移到新X」，漏检「原+标识符+迁移为/为主键」形状；8 处全部改为纯语义描述（style_factor_data 主键）；check-code-traces 与 check-doc-traces 同步新增 HIGH 模式「原 X…迁移/改称/并入」（ASCII 标识符 + 契约/dict/C19 限定词，「原始数据迁移」等中文后续不误伤）；`test_trace_check_scripts.py` 新增代码/文档各 1 例契约改名叙述检出测试；全仓两检查脚本 `--ci` 干净。
+- **测试**：`test_trace_check_scripts.py` 新增 `TestCodeChapterDetection`（镜像 doc 版本）、`TestCodeRoundDetection`（轮次暗号检出 / 计数豁免 / 运行时豁免 / 合法表述不误伤）与契约改名叙述检出（代码/文档各 1 例），66 例全过；全仓 check-code-traces / check-doc-traces `--ci` 干净。
 
 ## [0.10.2] - 2026-08-04
 

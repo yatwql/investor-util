@@ -30,7 +30,7 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "data_degradation",
     "risk_metrics",
     "portfolio_daily_returns",
-    # 风格与因子分析（C19 契约；原 factor_exposure 契约迁移为主键，内嵌 industry_beta 子键）
+    # 风格与因子分析（C19 契约 style_factor_data，内嵌 industry_beta 子键）
     "style_factor_data",
     "position_relationship_data",
     "evolution_data",
