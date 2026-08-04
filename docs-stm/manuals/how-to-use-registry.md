@@ -148,7 +148,7 @@ from src.python.core.registry import (
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
 - `get_report_section_number("fund_manager")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
-- `get_report_section_keys()` → 全部 20 个模块键名（见下表）
+- `get_report_section_keys()` → 全部 19 个模块键名（见下表）
 
 全部键名及对应中文标题：
 
@@ -162,8 +162,7 @@ from src.python.core.registry import (
 | `fund_manager` | 基金经理变更监控 | 基金深度分析 |
 | `position_relationship` | 持仓关系矩阵 | 基金深度分析（一章两区块：重合度 + 相关性） |
 | `fund_concentration` | 持仓集中度监控 | 基金深度分析 |
-| `fund_style` | 基金风格分析 | 基金深度分析 |
-| `factor_exposure` | 因子暴露分析 | 基金深度分析 |
+| `style_factor` | 风格与因子分析 | 基金深度分析（一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） |
 | `news_correlation` | 财经新闻热点与持仓关联分析 | 新闻 |
 | `global_macro` | 全球政经局势 | LLM |
 | `expert_review` | 智囊团深度复盘 | LLM |

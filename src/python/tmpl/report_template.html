@@ -166,6 +166,7 @@
 
         .section { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
         .section-title { background: #2E75B6; color: #fff; padding: 12px 20px; font-size: 16px; font-weight: 600; }
+        .block-title { font-size: 14px; font-weight: 600; margin: 14px 0 6px; padding-left: 8px; border-left: 3px solid #2E75B6; }
         .experimental-badge { background: var(--experimental-badge-bg); color: var(--experimental-badge-text); font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: normal; margin-left: 10px; vertical-align: middle; }
         .debate-block { margin: 12px 0; padding: 14px 16px; border-radius: 6px; }
         .debate-block .debate-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
@@ -1694,13 +1695,17 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  基金风格分析                                         -->
+    <!--  风格与因子分析（一章三区块：风格表 + 因子回归 + 行业 Beta） -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("fund_style") %}
+    {% if section_visible("style_factor") %}
     {% set style_results = style_analysis["results"] %}
-    <div class="section" id="sec-fund_style" style="order: {{ section_numbers['fund_style'] }};">
-        <div class="section-title">{{ section_numbers['fund_style'] }}、基金风格分析</div>
+    {% set sf_data = style_factor_data %}
+    {% set ind_beta = sf_data.get("industry_beta") if sf_data else none %}
+    <div class="section" id="sec-style_factor" style="order: {{ section_numbers['style_factor'] }};">
+        <div class="section-title">{{ section_numbers['style_factor'] }}、风格与因子分析</div>
         <div class="section-content">
+            <!-- 区块一：基金风格表 -->
+            <div class="block-title">一、基金风格表</div>
             {% if style_results %}
             {% set drifted = style_results | selectattr("drift_level", "in", ["轻度", "中度", "严重"]) | list %}
             {% if drifted %}
@@ -1741,23 +1746,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% else %}
             <div class="empty-section">📭 暂无基金风格分析数据（未检测到基金持仓或 API 返回为空）</div>
             {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
 
-    {% if section_visible("factor_exposure") %}
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  因子暴露分析                                        -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section" id="sec-factor_exposure" style="order: {{ section_numbers['factor_exposure'] }};">
-        <div class="section-title">{{ section_numbers['factor_exposure'] }}、因子暴露分析</div>
-        <div class="section-content">
-            {% if factor_exposure and factor_exposure.get("available") %}
+            <!-- 区块二：风格因子回归 -->
+            <div class="block-title">二、风格因子回归</div>
+            {% if sf_data and sf_data.get("available") %}
             <div class="summary-tag" style="margin-bottom: 8px;">
-                基于最近 <strong>{{ factor_exposure["window"] }}</strong> 个交易日 OLS 回归（有效样本 {{ factor_exposure["sample_count"] }} 期）
-                {% if factor_exposure.get("stale_factors") %}
-                <span style="color:var(--warn-text);"> · 已剔除停更因子：{{ factor_exposure["stale_factors"] | join("、") }}</span>
+                基于最近 <strong>{{ sf_data["window"] }}</strong> 个交易日 OLS 回归（有效样本 {{ sf_data["sample_count"] }} 期）
+                {% if sf_data.get("stale_factors") %}
+                <span style="color:var(--warn-text);"> · 已剔除停更因子：{{ sf_data["stale_factors"] | join("、") }}</span>
                 {% endif %}
             </div>
             <table>
@@ -1768,14 +1764,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </thead>
                 <tbody>
                     {% for f in ["value", "growth", "quality"] %}
-                    {% if f in factor_exposure["betas"] %}
-                    {% set _alloc = factor_exposure["style_allocation"].get(f, 0) %}
+                    {% if f in sf_data["betas"] %}
+                    {% set _alloc = sf_data["style_allocation"].get(f, 0) %}
                     {% set _bar_w = (_alloc * 100) | round(1) %}
                     <tr>
                         <td>{{ factor_names.get(f, f) }}</td>
-                        <td>{{ factor_exposure["betas"][f] }}</td>
-                        <td>{{ factor_exposure["t_stats"].get(f, "--") }}</td>
-                        <td>{% if factor_exposure["significant"].get(f) %}✅ 显著{% else %}—{% endif %}</td>
+                        <td>{{ sf_data["betas"][f] }}</td>
+                        <td>{{ sf_data["t_stats"].get(f, "--") }}</td>
+                        <td>{% if sf_data["significant"].get(f) %}✅ 显著{% else %}—{% endif %}</td>
                         <td>
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <div style="flex:1; background:var(--progress-track); border-radius:4px; height:14px;">
@@ -1789,15 +1785,15 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     {% endfor %}
                 </tbody>
             </table>
-            {% if factor_exposure.get("factor_correlations") %}
+            {% if sf_data.get("factor_correlations") %}
             <div class="penetration-notes">
-                <div>* 因子间相关性：{% for pair, v in factor_exposure["factor_correlations"].items() %}{{ pair }}={{ v }}　{% endfor %}</div>
-                {% if factor_exposure.get("correlation_note") %}
-                <div style="color:var(--warn-text);">* {{ factor_exposure["correlation_note"] }}</div>
+                <div>* 因子间相关性：{% for pair, v in sf_data["factor_correlations"].items() %}{{ pair }}={{ v }}　{% endfor %}</div>
+                {% if sf_data.get("correlation_note") %}
+                <div style="color:var(--warn-text);">* {{ sf_data["correlation_note"] }}</div>
                 {% endif %}
             </div>
             {% endif %}
-            {% if factor_exposure.get("baseline_betas") %}
+            {% if sf_data.get("baseline_betas") %}
             <div class="summary-tag" style="margin: 10px 0 4px;">基准对照（沪深300 同窗口回归）</div>
             <table>
                 <thead>
@@ -1805,12 +1801,12 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </thead>
                 <tbody>
                     {% for f in ["value", "growth", "quality"] %}
-                    {% if f in factor_exposure["betas"] and f in factor_exposure["baseline_betas"] %}
-                    {% set _rel = factor_exposure["betas"][f] - factor_exposure["baseline_betas"][f] %}
+                    {% if f in sf_data["betas"] and f in sf_data["baseline_betas"] %}
+                    {% set _rel = sf_data["betas"][f] - sf_data["baseline_betas"][f] %}
                     <tr>
                         <td>{{ factor_names.get(f, f) }}</td>
-                        <td>{{ factor_exposure["betas"][f] }}</td>
-                        <td>{{ factor_exposure["baseline_betas"][f] }}</td>
+                        <td>{{ sf_data["betas"][f] }}</td>
+                        <td>{{ sf_data["baseline_betas"][f] }}</td>
                         <td class="{% if _rel > 0.1 %}red-text{% elif _rel < -0.1 %}green-text{% endif %}">{{ _rel | round(3) }}</td>
                     </tr>
                     {% endif %}
@@ -1819,15 +1815,58 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </table>
             {% endif %}
             <div class="penetration-notes">
-                <div>* 因子暴露 = 组合日收益对因子指数日收益的 OLS 回归系数 β（窗口 {{ factor_exposure["window"] }} 期）</div>
-                <div>* α（截距）={{ factor_exposure.get("alpha", 0) }}；t 值显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
+                <div>* 因子暴露 = 组合日收益对因子指数日收益的 OLS 回归系数 β（窗口 {{ sf_data["window"] }} 期）</div>
+                <div>* α（截距）={{ sf_data.get("alpha", 0) }}；t 值显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
                 <div>* 风格归属占比 = |β| 归一化；基准对照用于判断组合相对市场风格的偏离</div>
             </div>
-            {% elif factor_exposure %}
-            {% if factor_exposure.get("status") == "source_failed" %}
+            {% elif sf_data %}
+            {% if sf_data.get("status") == "source_failed" %}
             <div class="empty-section">📭 因子数据源暂不可用，请稍后重试</div>
             {% else %}
-            <div class="empty-section">📭 因子暴露数据不足（有效样本 {{ factor_exposure.get("sample_count", 0) }} 期，低于阈值 36），暂不计算</div>
+            <div class="empty-section">📭 因子暴露数据不足（有效样本 {{ sf_data.get("sample_count", 0) }} 期，低于阈值 36），暂不计算</div>
+            {% endif %}
+            {% else %}
+            <div class="empty-section">📭 因子暴露数据暂不可用</div>
+            {% endif %}
+
+            <!-- 区块三：行业 Beta 子表（开关关闭时 ind_beta 为 none → 不渲染） -->
+            {% if ind_beta %}
+            <div class="block-title">三、行业 Beta（组合对各行业指数敏感性）</div>
+            {% if ind_beta.get("available") %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>行业</th><th>暴露占比</th><th>指数代码</th><th>β</th><th>t 值</th><th>显著（95%）</th><th>相关性 r</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ind in ind_beta["betas"].keys() %}
+                    <tr>
+                        <td>{{ ind }}</td>
+                        <td>{{ "{:.2%}".format(ind_beta["exposure"].get(ind, 0)) }}</td>
+                        <td>{{ ind_beta["index_codes"].get(ind, "--") }}</td>
+                        <td>{{ ind_beta["betas"][ind] }}</td>
+                        <td>{{ ind_beta["t_stats"].get(ind, "--") }}</td>
+                        <td>{% if ind_beta["significant"].get(ind) %}✅ 显著{% else %}—{% endif %}</td>
+                        <td>{{ ind_beta["correlations"].get(ind, "--") }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% for ind in ind_beta.get("unmapped_industries", []) %}
+                    <tr>
+                        <td>{{ ind }}</td>
+                        <td>{{ "{:.2%}".format(ind_beta["exposure"].get(ind, 0)) }}</td>
+                        <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 行业暴露占比按持仓市值加权；行业指数为中证行业指数（近似代理）</div>
+                <div>* β = 组合日收益对行业指数日收益的一元 OLS 系数（复用因子回归机制）；显著列为 95% 双尾 t 检验</div>
+                <div>* 仅参与暴露占比、无指数映射的行业（—）不参与 Beta 回归</div>
+            </div>
+            {% else %}
+            <div class="empty-section">📭 行业 Beta 数据不足（行业分类或指数 K 线缺失），子表不渲染</div>
             {% endif %}
             {% endif %}
         </div>

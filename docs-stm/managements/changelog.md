@@ -8,7 +8,15 @@
 
 ### 开发中（未发布）
 
-- （待定）
+#### 风格与因子分析合并章 + 行业 Beta 子表（plan-21 轮12，章节数 20→19）
+
+- **物理合并**：合并原「基金风格分析」（`fund_style_sheet.py`）+「因子暴露分析」（`factor_exposure_sheet.py`）→ 统一渲染模块 `src/python/report/style_factor_sheet.py`，章节 sheet key 统一为 `style_factor`，一章三区块渲染：区块一基金风格表（8 列）+ 区块二风格因子回归（5 列 + 基准对照）+ 区块三行业 Beta 子表（7 列，`industry_beta=None` 隐藏 / `available=False` 占位）；删除旧两个渲染模块，`core/registry.py` `_REPORT_SECTION_DEFAULT` 的 `fund_style`/`factor_exposure` 合并为 `style_factor`（number 9），registry.number 连续编号重新整理 20→19，`data_source_status`=18、`llm_usage`=19。
+- **行业 Beta 子表**：新增 `src/python/analysis/industry_beta.py`，`compute_industry_beta_analysis()` 复用 `factor_exposure.py::compute_factor_exposure` 单因子 OLS（不重复实现），行业穿透分类复用 `batch_fetch_industry_data`（`industry_` 前缀缓存，C1 复用 `core/code_utils.py` 判定）；`INDUSTRY_INDEX_MAP` 映射 12 个中证行业指数（银行=sh000986、证券=sz399975、白酒/食品饮料=sz399997、半导体/电子=sz399995、有色/贵金属=sz399996、煤炭=sz399998、医药=sz399989、钢铁=sz399994、房地产=sh000980、能源=sh000928、环保=sz399973、保险=sz399983）；指数 K 线复用 `history_index` 通道（Chain + session_cache，C4/C6）；开关 `report_submodules.industry_beta` **默认关**。
+- **C19 契约增删**：`pipeline_data_builder.py` 删除 `factor_exposure` 旧注册，新增 `style_factor_data` 主键（13 键：available/summary/style_table/factor_regressions/benchmark/industry_beta 等）+ 内嵌 `industry_beta` 子键（7 键：available/exposure/index_codes/betas/t_stats/significant/correlations/unmapped_industries）；`orchestrator.py` 新增 `compute_industry_beta_data()` 并在 full/both 路径注入 `style_factor_data`（含 `industry_beta` 组装）；附录 H 契约类型/版本/写入消费模块同步预定义。
+- **双层可见性**：board 层 `enable_fund_deep_analysis` + data 层 `style_factor_data`；可见性 = `style_factor_data is not None or style_analysis is not None`，旧 `factor_exposure_data` 数据 flag 一并迁移。
+- **HTML/Excel 同步**：`report_template.html` 合并 section 号 9（区块标题 `.block-title` CSS + 行业 Beta 区块渲染分支）、`excel_generator.py`/`excel_fund_deep_analysis.py`/`excel_module_loader.py`/`html_writer.py`/`_report_generation.py` 同步 `style_factor`/`style_factor_data` 接线。
+- **测试**：新增 `src/test/unit/analysis/test_industry_beta.py`（11 例：行业暴露占比 / Beta 回归 / 显著性 / 数据不足 / 开关关隐藏 / push2 行业分类降级占位 / 固定 fixture 解析解误差 <0.01）、`src/test/unit/report/test_style_factor_sheet.py`（合并章三区块渲染 / 行业 Beta 三态 / 可见性）；旧 `fund_style`/`factor_exposure` 测试迁移适配；`test_orchestrator.py`/`test_html_report_structure*.py`/`test_registry.py`/`test_config*.py`/`test_scenario_section_order.py` 同步（键 `factor_exposure`→`style_factor_data`、19 章、7 种可见性类型）。新增模块覆盖率：industry_beta 94% / style_factor_sheet 97%。
+- **文档同步**：technical.md（模块数 20→19、data_flag 表、§4.8 一章三区块、附录 H 契约）、requirements.md（§6.3/6.4 章节合并重编号）、全部用户手册（how-to-menu / how-to-config / how-to-use-registry / reports-instruction / faq / datasource）、test-coverage.md（模式计数 + 功能域 + unit 子分组）、folders.md 目录树。
 
 ## [0.10.2] - 2026-08-04
 

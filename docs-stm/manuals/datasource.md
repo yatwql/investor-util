@@ -51,7 +51,8 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 
 - **A 股指数** → `history_index` 通道：腾讯财经 → 新浪财经（备用）
 - **美股指数** → `history_index_us` 通道：新浪财经（`gb_*` 前缀） → 腾讯财经（备用，因腾讯 K-line API 不支持 `gb_*` 代码）
-- **因子暴露分析**（`analysis/factor_exposure.py`）复用 `history_index` 通道，并行拉取 CSI 风格因子指数 K 线（价值=sh000919、成长=sh000925、质量=sh000930）与基准指数（沪深300 sh000300）做 OLS 回归。因子指数不注册到 `_A_INDICES`（避免污染实时指数循环 fetch_indices），无专属缓存前缀，随 `history_index_` 统一按 TTL 管理
+- **风格与因子分析·因子回归**（`analysis/factor_exposure.py`，写入 `style_factor_data` 契约）复用 `history_index` 通道，并行拉取 CSI 风格因子指数 K 线（价值=sh000919、成长=sh000925、质量=sh000930）与基准指数（沪深300 sh000300）做 OLS 回归。因子指数不注册到 `_A_INDICES`（避免污染实时指数循环 fetch_indices），无专属缓存前缀，随 `history_index_` 统一按 TTL 管理
+- **风格与因子分析·行业 Beta 子表**（`analysis/industry_beta.py`，内嵌于 `style_factor_data.industry_beta`，开关 `report_submodules.industry_beta` 默认关）复用 `history_index` 通道拉取中证行业指数 K 线（`INDUSTRY_INDEX_MAP`：银行=sh000986、证券=sz399975、白酒/食品饮料=sz399997、半导体/电子=sz399995、有色/贵金属=sz399996、煤炭=sz399998、医药=sz399989、钢铁=sz399994、房地产=sh000980、能源=sh000928、环保=sz399973、保险=sz399983）做单因子 OLS（复用 `compute_factor_exposure`，不重复实现）；行业分类复用 `batch_fetch_industry_data`（`industry_` 前缀缓存）
 
 ### 实时行情
 

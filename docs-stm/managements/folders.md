@@ -108,6 +108,7 @@ investor-util/
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
 │   │   │   ├── drawdown_events.py             #   回撤事件识别（新高/回撤起止/幅度）
 │   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
+│   │   │   ├── industry_beta.py               #   行业 Beta 分析（纯计算：暴露占比 + 逐行业一元 OLS，复用 factor_exposure）
 │   │   │   ├── correlation.py                 #   持仓相关性矩阵（Pearson 相关/显著性/下三角矩阵）
 │   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → C19 crisis_annotation_data）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
@@ -204,8 +205,7 @@ investor-util/
 │   │   │   ├── fund_style_base.py       #   基金风格基础（常量/快照/PECity阈值）
 │   │   │   ├── fund_style_classify.py   #   基金风格分类计算（push2→Tencent→兜底降级）
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
-│   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
-│   │   │   ├── factor_exposure_sheet.py #  因子暴露 Excel 页签（β/t/显著性/风格归属）
+│   │   │   ├── style_factor_sheet.py  #   风格与因子分析 Excel 页签（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
 │   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
 │   │   │   ├── action_sheet.py       #   行动建议 Excel 页签（再平衡信号/交易纪律/调仓建议/收益归因）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
@@ -324,6 +324,7 @@ investor-util/
 │       │   │   ├── test_drawdown_events.py    #   回撤事件识别
 │       │   │   ├── test_drawdown_events_edge.py #  回撤事件识别边缘场景
 │       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
+│       │   │   ├── test_industry_beta.py      #   行业 Beta 分析（暴露占比/已知答案回归/数据不足降级/契约）
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
 │       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口）
 │       │   │   ├── test_crisis_annotation.py   #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复耗时/重叠）
@@ -477,6 +478,7 @@ investor-util/
 │       │   │   ├── test_fund_overlap.py           #   基金重叠分析测试
 │       │   │   ├── test_fund_performance.py       #   基金业绩测试
 │       │   │   ├── test_fund_style_analysis.py    #   基金风格测试
+│       │   │   ├── test_style_factor_sheet.py     #   风格与因子分析页签呈现（一章三区块：风格表+因子回归+行业 Beta）
 │       │   │   ├── test_correlation_html.py       #   持仓关系矩阵章节（相关性/重合度区块）HTML 呈现
 │       │   │   ├── test_correlation_sheet.py      #   持仓关系矩阵页签（一章两区块）Excel 呈现
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）

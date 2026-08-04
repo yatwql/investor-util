@@ -145,7 +145,7 @@ class TestPrepareReportData:
             "output_dir",
             "news_top_count",
             "risk_metrics",
-            "factor_exposure",
+            "style_factor_data",
             "position_relationship_data",
             # 品种覆盖诊断：品种级数据状态标注契约
             "position_status",

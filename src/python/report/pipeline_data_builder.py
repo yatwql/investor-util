@@ -30,7 +30,8 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "data_degradation",
     "risk_metrics",
     "portfolio_daily_returns",
-    "factor_exposure",
+    # 风格与因子分析（C19 契约；原 factor_exposure 契约迁移为主键，内嵌 industry_beta 子键）
+    "style_factor_data",
     "position_relationship_data",
     "evolution_data",
     # 品种覆盖诊断：数据质量仪表盘品种覆盖区块数据源
@@ -73,7 +74,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "data_degradation": list,
     "risk_metrics": dict,
     "portfolio_daily_returns": list,
-    "factor_exposure": (dict, type(None)),
+    "style_factor_data": (dict, type(None)),
     "position_relationship_data": (dict, type(None)),
     "evolution_data": (dict, type(None)),
     "position_status": (dict, type(None)),

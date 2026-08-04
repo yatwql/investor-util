@@ -44,6 +44,7 @@ _DEFAULT_CONFIG = {
     # 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
     "report_submodules": {
         "data_quality": False,  # 「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖）
+        "industry_beta": False,  # 「风格与因子分析」→ 行业 Beta 子表（穿透行业暴露占比 + 行业指数 β）
     },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,

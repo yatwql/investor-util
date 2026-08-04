@@ -43,7 +43,7 @@ _ALL_KEYS_DEFAULT = [
     "fund_manager",
     "position_relationship",
     "fund_concentration",
-    "fund_style",
+    "style_factor",
     "news_correlation",
     "global_macro",
     "expert_review",
@@ -54,7 +54,7 @@ _ALL_KEYS_DEFAULT = [
 ]
 
 _ALWAYS_KEYS = {"summary", "market_value", "category", "penetration", "fund_performance"}
-_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_relationship", "fund_concentration", "fund_style"}
+_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_relationship", "fund_concentration", "style_factor"}
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
 _HISTORY_KEYS = {"portfolio_history_drawdown"}
@@ -68,7 +68,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
     {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
     {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
-    {"key": "fund_style", "name": "基金风格分析", "number": 9},
+    {"key": "style_factor", "name": "风格与因子分析", "number": 9},
     {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
     {"key": "global_macro", "name": "全球政经局势", "number": 11},
     {"key": "expert_review", "name": "智囊团深度复盘", "number": 12},
@@ -402,7 +402,7 @@ class TestHtmlCustomOrder(unittest.TestCase):
             {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
             {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
             {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
-            {"key": "fund_style", "name": "基金风格分析", "number": 9},
+            {"key": "style_factor", "name": "风格与因子分析", "number": 9},
             # news 保持默认
             {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
             # llm 保持默认

@@ -83,16 +83,17 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(sec["key"], "portfolio_evolution")
         self.assertEqual(sec["data_flag"], "evolution_data")
 
-    def test_default_fund_deep_analysis_type_has_5_sections(self):
-        """基金深度分析类型模块共 5 个（含因子暴露、持仓关系矩阵）。"""
+    def test_default_fund_deep_analysis_type_has_4_sections(self):
+        """基金深度分析类型模块共 4 个（风格与因子分析为合并章，替代原 fund_style/factor_exposure 两章）。"""
         fund_deep_analysis = [s for s in self._default if s["type"] == "fund_deep_analysis"]
-        self.assertEqual(len(fund_deep_analysis), 5)
+        self.assertEqual(len(fund_deep_analysis), 4)
         keys = [s["key"] for s in fund_deep_analysis]
         self.assertIn("fund_manager", keys)
         self.assertIn("position_relationship", keys)
         self.assertIn("fund_concentration", keys)
-        self.assertIn("fund_style", keys)
-        self.assertIn("factor_exposure", keys)
+        self.assertIn("style_factor", keys)
+        self.assertNotIn("fund_style", keys)
+        self.assertNotIn("factor_exposure", keys)
 
     def test_default_news_type_has_1_section(self):
         """news 类型模块共 1 个（新闻）。"""
@@ -132,7 +133,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         )
         self.assertEqual(type_counts["always"], 6)
         self.assertEqual(type_counts["history"], 1)
-        self.assertEqual(type_counts["fund_deep_analysis"], 5)
+        self.assertEqual(type_counts["fund_deep_analysis"], 4)
         self.assertEqual(type_counts["news"], 1)
         self.assertEqual(type_counts["llm"], 5)
         self.assertEqual(type_counts["evolution"], 1)

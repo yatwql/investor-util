@@ -93,7 +93,7 @@ def _compute_section_visibility(
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
     enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
-    factor_exposure: dict | None = None,  # data 层：因子暴露 C19 dict（None=无数据，章节隐藏）
+    style_factor_data: dict | None = None,  # data 层：风格与因子 C19 dict（None=无数据，章节隐藏）
     position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 C19 dict（相关性区块数据源）
     evolution_data: dict | None = None,  # data 层：组合演进 C19 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
@@ -122,9 +122,9 @@ def _compute_section_visibility(
         "style_data": style_analysis is not None,
         "news_data_available": include_news,  # ← data 层（菜单类型+数据状态）
         "llm_data_available": llm_enabled_flag,  # ← data 层（LLM 生成成功？）
-        # factor_exposure 非 None（含 available=False 降级占位）→ 章节可见，
+        # 风格与因子合并章可见性：风格表（渲染期派生）或因子数据（C19）任一就绪即可见；
         # 模板依据 available/status 在"完整内容/数据不足/数据源暂不可用"间切换（§1.4.5）
-        "factor_exposure_data": factor_exposure is not None,
+        "style_factor_data": style_factor_data is not None or style_analysis is not None,
         # 持仓关系矩阵 = 重合度区块（render 时计算）∪ 相关性区块（C19 数据源）：
         # 任一区块有数据即章节可见，区块各自独立降级（§1.4.5）
         "position_relationship_data": overlap_matrix is not None or position_relationship_data is not None,
@@ -284,8 +284,9 @@ def _render_template(
     data_source_matrix: dict,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
-    factor_exposure: dict | None = None,
+    style_factor_data: dict | None = None,
     factor_names: dict | None = None,
+    industry_beta: dict | None = None,
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
@@ -358,8 +359,9 @@ def _render_template(
         data_unavailable=bool(total_mv == 0 and total_cost > 0),
         chart_datasets=chart_datasets,
         enable_interactive_charts=enable_interactive_charts,
-        factor_exposure=factor_exposure,
+        style_factor_data=style_factor_data,
         factor_names=factor_names or {},
+        industry_beta=industry_beta,
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
         evolution_chart_data=build_evolution_chart_data(evolution_data),
@@ -406,7 +408,7 @@ def write_html_report(
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
-    factor_exposure: dict | None = None,
+    style_factor_data: dict | None = None,
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
@@ -557,7 +559,7 @@ def write_html_report(
         enable_portfolio_evolution=enable_portfolio_evolution,
         enable_action=enable_action,
         enable_llm=enable_llm,  # enable_llm is the board param for LLM
-        factor_exposure=factor_exposure,
+        style_factor_data=style_factor_data,
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
     )
@@ -586,7 +588,7 @@ def write_html_report(
 
     # 因子中文名映射（单一数据源：analysis 层常量，经 context 传递，C14 合规）
     _factor_names: dict = {}
-    if factor_exposure:
+    if style_factor_data:
         try:
             from src.python.analysis.factor_exposure import FACTOR_NAMES
 
@@ -620,8 +622,9 @@ def write_html_report(
         overlap_matrix=overlap_matrix,
         concentration_analysis=concentration_analysis,
         style_analysis=style_analysis,
-        factor_exposure=factor_exposure,
+        style_factor_data=style_factor_data,
         factor_names=_factor_names,
+        industry_beta=(style_factor_data or {}).get("industry_beta"),
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
         drawdown_min_span=drawdown_min_span,

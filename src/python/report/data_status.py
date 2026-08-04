@@ -82,6 +82,7 @@ STATUS_MESSAGES: dict[str, str] = {
     "concentration_unavailable": "持仓集中度数据暂不可用",
     "style_unavailable": "基金风格数据暂不可用",
     "factor_exposure_unavailable": "因子暴露数据暂不可用",
+    "industry_beta_unavailable": "行业 Beta 数据不足（行业分类或指数 K 线缺失），子表不渲染",
     "correlation_unavailable": "持仓相关性数据暂不可用",
     "evolution_unavailable": "组合演进数据暂不可用（快照不足，趋势待积累）",
     "whatif_unavailable": "调仓对比数据暂不可用（基准或目标持仓为空）",

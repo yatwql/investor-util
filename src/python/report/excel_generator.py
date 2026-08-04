@@ -217,7 +217,8 @@ def generate_excel_report(
     # ── 各页签写入 ──
     pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog)
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
-    # 因子暴露：C19 数据在编排层注入 pipeline_data，此处透传页签写入
+    # 风格与因子分析：C19 数据在编排层注入 pipeline_data（原 factor_exposure 迁移为主键），
+    # 此处透传页签写入（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
     write_fund_deep_analysis_sheets(
         sheets,
         holdings,
@@ -225,7 +226,7 @@ def generate_excel_report(
         data,
         modules,
         prog,
-        factor_exposure=(pipeline_data or {}).get("factor_exposure"),
+        style_factor_data=(pipeline_data or {}).get("style_factor_data"),
         position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
     )
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）

@@ -308,7 +308,7 @@ def _generate_full_html_report(
     debate_info: dict | None,
     result,
     metrics: dict | None = None,
-    factor_exposure: dict | None = None,
+    style_factor_data: dict | None = None,
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     enable_portfolio_evolution: bool = True,
@@ -326,8 +326,8 @@ def _generate_full_html_report(
     Args:
         metrics: compute_all_metrics() 返回值（14 项全量，仅 full 路径）；
             用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
-        factor_exposure: 因子暴露分析 C19 契约 dict，
-            基金深度分析关闭或数据不足时为 None/available=False。
+        style_factor_data: 风格与因子分析 C19 契约 dict（原 factor_exposure 迁移为主键，
+            内嵌 industry_beta 子键），基金深度分析关闭或数据不足时为 None/available=False。
         position_relationship_data: 持仓关系矩阵 C19 契约 dict（相关性区块数据源），
             基金深度分析关闭或数据不足时为 None/available=False。
         evolution_data: 组合演进 C19 契约 dict（多快照趋势聚合），
@@ -379,7 +379,7 @@ def _generate_full_html_report(
             debate_info=debate_info,
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
-            factor_exposure=factor_exposure,
+            style_factor_data=style_factor_data,
             position_relationship_data=position_relationship_data,
             evolution_data=evolution_data,
             enable_data_quality=enable_data_quality,
@@ -781,10 +781,10 @@ def _generate_report_full(
     # ── 2. 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
-    # 因子暴露 / 持仓关系矩阵 / 品种覆盖诊断：prep 中已组装（C19 契约），
+    # 风格与因子 / 持仓关系矩阵 / 品种覆盖诊断：prep 中已组装（C19 契约），
     # 注入 pipeline_data 供 HTML/Excel 消费；capture_snapshot 在降级路径可能返回 None，需判空
     if pipeline_data is not None:
-        pipeline_data["factor_exposure"] = prep.get("factor_exposure")
+        pipeline_data["style_factor_data"] = prep.get("style_factor_data")
         pipeline_data["position_relationship_data"] = prep.get("position_relationship_data")
         pipeline_data["position_status"] = prep.get("position_status")
         pipeline_data["data_freshness"] = prep.get("data_freshness")
@@ -865,7 +865,7 @@ def _generate_report_full(
         debate_info,
         result,
         _metrics,
-        prep.get("factor_exposure"),
+        prep.get("style_factor_data"),
         prep.get("position_relationship_data"),
         (pipeline_data or {}).get("evolution_data"),
         _enable_portfolio_evolution,

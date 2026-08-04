@@ -4,7 +4,7 @@
   1. compute_factor_exposure_data 返回完整 C19 契约（available=True，全部 13 键）
   2. 全部因子指数拉取失败 → available=False + status="source_failed"（§1.4.5 ②），不抛异常
   3. 持仓历史为空 → available=False + status="insufficient"（§1.4.5 ①）
-  4. _generate_report_full 将 prep.factor_exposure 注入 pipeline_data（HTML/Excel 消费）
+  4. _generate_report_full 将 prep.style_factor_data 注入 pipeline_data（HTML/Excel 消费）
 
 约束：
   - 所有外部 API 均为 mock（持仓历史 K 线 / 因子指数 K 线）
@@ -200,7 +200,7 @@ class TestPipelineInjection:
                 "output_dir": str(tmp_path / "reports"),
                 "news_top_count": 100,
                 "risk_metrics": {},
-                "factor_exposure": fe_data,
+                "style_factor_data": fe_data,
             }
 
             result = generate_report(
@@ -211,9 +211,9 @@ class TestPipelineInjection:
             )
 
         assert result.report_generated is True
-        # Excel 收到含 factor_exposure 的 pipeline_data
+        # Excel 收到含 style_factor_data 的 pipeline_data（原 factor_exposure 契约迁移为主键）
         excel_kw = mock_excel.call_args.kwargs
-        assert excel_kw["pipeline_data"]["factor_exposure"]["available"] is True
-        # HTML 收到 factor_exposure kwarg
+        assert excel_kw["pipeline_data"]["style_factor_data"]["available"] is True
+        # HTML 收到 style_factor_data kwarg
         html_kw = mock_html.call_args.kwargs
-        assert html_kw["factor_exposure"]["betas"]["value"] == 0.8
+        assert html_kw["style_factor_data"]["betas"]["value"] == 0.8

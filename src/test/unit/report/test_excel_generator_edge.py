@@ -164,11 +164,11 @@ class TestMessageConsistency(unittest.TestCase):
         """基金深度分析 STATUS_MESSAGES key 完整且被 sheet 模块引用。"""
         from src.python.report.fund_manager_sheet import write_fund_manager_sheet
         from src.python.report.fund_concentration_sheet import write_concentration_sheet
-        from src.python.report.fund_style_sheet import write_style_sheet
+        from src.python.report.style_factor_sheet import write_style_factor_sheet
 
         self.assertTrue(callable(write_fund_manager_sheet))
         self.assertTrue(callable(write_concentration_sheet))
-        self.assertTrue(callable(write_style_sheet))
+        self.assertTrue(callable(write_style_factor_sheet))
 
         for key in ("manager_unavailable", "overlap_unavailable",
                     "concentration_unavailable", "style_unavailable"):
