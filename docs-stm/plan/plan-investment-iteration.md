@@ -362,6 +362,6 @@
 ## 5. 与 plan.md 衔接
 
 - 本实施计划对应 `plan-investment-features.md` §4 章节归并方案，是**实施层**文档，不在 plan.md 展开细节。
-- **立项**：评审通过后，各阶段在 plan.md 分配 `plan-N` 编号（当前 `plan-next = 17`，从 plan-17 起分配），每阶段一个计划项，链接本文档对应轮次区间。
+- **立项**：各实施阶段已在 plan.md 分配 `plan-17`~`plan-24`（每阶段一个计划项，按优先级 P1/P2/P3 分类），链接本文档对应轮次区间。任务编号仅作计划表锚点，不进入实现层。
 - plan.md 当前 P3 待办（plan-8 Web UI / plan-10 日志可视化）与本计划**独立**；本计划全部为 CLI/TUI/报告层功能，不依赖 plan-8 落地（轮 19 HTML 分组为报告自带，非 Web）。
 - 实施时按本文档 21 轮推进，每轮回填 changelog、自审 review-findings；完成归档至 `docs-stm/archive/v0.x.x/`（与版本发布同步）。

@@ -237,6 +237,6 @@
 
 ## 6. 与 plan.md 衔接
 
-- 本文档为**设计层**，实施层见 [`plan-investment-iteration.md`](./plan-investment-iteration.md)（20 轮，每轮量化验收）。
-- **立项**：评审通过后，各实施阶段在 plan.md 分配 `plan-N` 编号（当前 `plan-next = 17`，从 plan-17 起分配），每阶段一个计划项，链接实施计划对应轮次区间。
+- 本文档为**设计层**，实施层见 [`plan-investment-iteration.md`](./plan-investment-iteration.md)（21 轮，每轮量化验收）。
+- **立项**：各实施阶段已在 plan.md 分配 `plan-17`~`plan-24`（每阶段一个计划项，按优先级 P1/P2/P3 分类），链接本文档对应功能与实施计划轮次区间。任务编号仅作计划表锚点，不进入实现层。
 - 与 plan-8（Web UI）/ plan-10（日志可视化）**独立**：本设计全部为 CLI/TUI/报告层功能，不依赖 plan-8 落地（HTML 分组为报告自带，非 Web）。数据质量可复用 `datasource_health.jsonl` 与 `perf_history.jsonl` 做可信度摘要，与 plan-10（看运行日志）互补。
