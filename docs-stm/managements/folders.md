@@ -1,5 +1,5 @@
 # 目录结构
-> 文档版本：0.10.4-dev
+> 文档版本：0.10.4
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -7,12 +7,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 225 | 55,697 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| 主程序代码 | Python | 225 | 55,744 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 4 | 3,756 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 16 | 5,581 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **245** | **65,034** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **275** | **78,856** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,009 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **源代码合计** | — | **245** | **65,081** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **276** | **79,223** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,038 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |

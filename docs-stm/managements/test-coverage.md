@@ -1,5 +1,5 @@
 # 测试覆盖统计
-> 文档版本：0.10.4-dev
+> 文档版本：0.10.4
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
@@ -9,22 +9,22 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **4691** | ~30s |
-| `standard` | **4062** | ~30s |
+| `unit` | **4720** | ~30s |
+| `standard` | **4091** | ~30s |
 | `scenario` | **232** | **~6min** |
 | `regression` | **232** | **~6min** |
 | `dev-verify` | **1694** | **~1min** |
-| `verify` | **2996** | **~1min** |
+| `verify` | **3025** | **~1min** |
 | `integration` | **272** | **~50s** |
 | `edge` | 566 | ~15s |
 | `data` | 69 | ~10s |
-| `all` | **5009** | **~10min** |
+| `all` | **5038** | **~10min** |
 | `smoke` | 26 | ~2s |
 | `report` | **1475** | ~15s |
 | `all_no_unit` | 318 | **~7min** |
 | `scenario_extreme` | **9** | **~1min 45s** |
 
-> 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 5009 项（2026-08-05 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
+> 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 5038 项（2026-08-05 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
 
 ### 功能域对应测试源
 
@@ -36,8 +36,8 @@
 | **数据获取调度** | `fetcher/`(price, index, fund, industry, chain, history_diff) | `unit/fetcher/test_fetcher*.py` + `test_fund*.py` + `test_chain*.py` + `test_fetcher_api_edge.py` | 271 |
 | **新闻处理** | `providers/`(\*_news.py, news_aggregator, news_correlator, news_keywords, news_sources) | `unit/news/test_{akshare,cls,eastmoney,sina,wallstreetcn}_news.py` + `test_news_{aggregator,correlator,keywords,sources}.py` | 190 |
 | **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_fund_deep_analysis, excel_llm_usage, html, chart_data_builder, category, penetration, fund_performance, fund_candidate, market_value, summary, summary_llm_usage, news_correlation, qdii_timezone, fund_concentration, fund_manager, style_factor_sheet, portfolio_history, portfolio_history_drawdown_sheet, history_snapshot, position_relationship_sheet, evolution_sheet, action_sheet, data_quality_sheet, whatif_operations, whatif_sheet, whatif_writer) | `unit/report/` 共 67 文件含 test_html_writer、test_html_template、test_html_report_structure（导航结构：章节锚点/目录折叠/五组分组导航）、test_correlation_sheet、test_correlation_html、test_drawdown_html_excel（组合历史走势与回撤章：走势表 + 回撤矩阵 + 危机区间标注）、test_tail_risk_wiring（尾部风险接线：pipeline 注入 + Excel 五行 + HTML 卡）、test_style_factor_sheet（风格与因子分析章：基金风格表 + 风格因子回归 + 行业 Beta 子表）、test_fund_candidate（基金业绩分析章候选基金比较子表：候选校验/截断/开关门控/比较维度/重合度复用）、test_valuation_temperature_wiring（估值分位+市场温度报告层接线：穿透估值列 + 汇总温度行）、test_whatif_operations、test_whatif_sheet、test_whatif_html、test_whatif_writer、test_evolution_sheet、test_evolution_html、test_action_sheet、test_action_html、test_data_quality_sheet、test_chart_data_builder、test_theme_js 等 | 1475 |
-| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content, cost_tracker, fallback) | `unit/llm/`(含 API 路由/熔断/重试/降级/骨架/prompts/generators/辩论/cache 等) | 739 |
-| **配置管理** | `config/`, `core/constants.py` | `unit/config/test_config*.py` | 265 |
+| **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content, cost_tracker, fallback) | `unit/llm/`(含 API 路由/熔断/重试/降级/骨架/prompts/generators/辩论/cache 等) | 741 |
+| **配置管理** | `config/`, `core/constants.py` | `unit/config/test_config*.py` | 292 |
 | **核心基础设施** | `core/`(cache, models, reader, registry, http_client, market_hours, metrics, code_utils, filesystem)、`provider_registry.py`、`tui/handlers_*.py` | `unit/core/` 全部 + `unit/cache/` + `unit/handlers/`（含 `*_edge.py`） | 631 |
 | **分析计算** | `analysis/`(liquidity, rebalance, fx_exposure, bond_yield, alignment_correction, drawdown_warning, drawdown_events, factor_exposure, industry_beta, correlation, crisis_annotation, tail_risk, portfolio_evolution, snapshot_diff, action_advisor, trade_discipline, rebalance_advisor, return_attribution, cost_flow, whatif, whatif_backtest, valuation_percentile, market_temperature) | `unit/analysis/test_{liquidity,rebalance,bond_yield,fx_exposure,alignment_correction,drawdown_warning,drawdown_events,factor_exposure,industry_beta}*.py` + `test_correlation.py` + `test_correlation_edge.py` + `test_crisis_annotation.py` + `test_tail_risk.py` + `test_tail_risk_edge.py` + `test_portfolio_evolution.py` + `test_snapshot_diff.py` + `test_snapshot_diff_edge.py` + `test_action_advisor.py` + `test_trade_discipline.py` + `test_rebalance_advisor.py` + `test_return_attribution.py` + `test_cost_flow.py`（成本流水：XIRR/成本分档/分红累计） + `test_valuation_percentile.py`/`test_valuation_percentile_edge.py`（价格分位代理：收盘价提取/解析解/三档刻度）+ `test_market_temperature.py`/`test_market_temperature_edge.py`（三因子合成温度计）+ `test_whatif.py` + `test_whatif_backtest.py` + `test_whatif_backtest_edge.py` | 580 |
 | **TUI 交互** | `tui/tui*.py`, `tui/handlers*.py`, `tui/tui_keys.py` | `unit/ui/test_{tui,tui_handlers,tui_menu,log_sanitize}.py` + `test_tui_edge.py` | 164 |
@@ -72,13 +72,13 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 11 子组合计 | **4691** |
+| `unit`（父标记） | 11 子组合计 | **4720** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等，含 push2 估值字段 PE/PB 提取） | 199 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 271 |
-| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪/降级回退） | 739 |
+| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪/降级回退） | 741 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 190 |
 | ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、基金深度分析模块、风格与因子分析章（风格表 + 因子回归 + 行业 Beta 子表）、基金业绩分析章候选基金比较子表（candidate_compare 默认关）、数据降级/占位/可用性矩阵、调仓 What-if/组合演进/行动建议双端呈现、数据质量仪表盘、尾部风险接线、估值分位+市场温度接线、HTML 分组导航折叠、Chart.js 图表数据构建/裁剪、暗色模式 theme.js） | 1475 |
-| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验、enable_action 等板层开关、candidate_compare 访问器/comparison_candidates 校验、成本流水 cost_lots 开关访问器） | 265 |
+| ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验、enable_action 等板层开关、candidate_compare 访问器/comparison_candidates 校验、成本流水 cost_lots 开关访问器） | 292 |
 | ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/熔断/持仓追踪器/批处理调度/命令处理器） | 631 |
 | ├─ `unit_analysis` | 分析计算（流动性/再平衡/汇率/口径修正/回撤预警/回撤事件/因子暴露/行业 Beta/相关性矩阵/危机区间标注/尾部风险统计/组合演进/快照差异摘要/行动建议/交易纪律/调仓建议可行化层/收益归因/成本流水（XIRR/成本分档/分红累计）/估值分位（价格分位代理）/市场温度（三因子合成）/调仓 What-if 时序回测） | 580 |
 | ├─ `unit_cli` | CLI 命令行模式（参数解析/路由/退出码/日志/whatif 子命令） | 56 |

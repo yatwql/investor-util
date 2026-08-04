@@ -1,5 +1,5 @@
 # 个人投资分析报告生成小助手 — 实现计划
-> 文档版本：0.10.4-dev
+> 文档版本：0.10.4
 > **编号源**：`plan-next = 25`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-24，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
@@ -20,11 +20,12 @@
 
 ### P0 — 发布门禁
 
+- ✅ **全链回归与发布门禁**（迭代计划轮 21）：`test_runner.py --mode verify,regression` 3256 全过 + 3 check 脚本 `--ci` 全 [OK] + 版本号全链一致（v0.10.4）+ 数据快照刷新（test-coverage 5038 / folders 统计）+ registry.number 连续编号复核 + 数据契约增删复核。**v0.10.4 已发布**（2026-08-05）。
 - ✅ **全链回归与发布门禁**（迭代计划轮 21）：`test_runner.py --mode verify,regression` 3169 全过 + 3 check 脚本 `--ci` 全 [OK] + 版本号全链一致（v0.10.3）+ 数据快照刷新（test-coverage 4916 / folders 统计）+ registry.number 连续编号复核 + 数据契约增删复核。**v0.10.3 已发布**（2026-08-05）。
 
 ### 推荐实施顺序
 
-> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑧ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列；plan-8/plan-10 已归 P4 实验功能，不列入当前实施序列。**标记 ✅ 的为已完成项**（P1 轮 1~11 + 阶段 D 轮 12~13 + 阶段 E 轮 14~16 + 阶段 F 轮 17~18，changelog v0.10.1/v0.10.3/v0.10.4-dev），保留在表中供追溯；待办序列自 ⑧ 起。
+> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑧ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列；plan-8/plan-10 已归 P4 实验功能，不列入当前实施序列。**标记 ✅ 的为已完成项**（P1 轮 1~11 + 阶段 D 轮 12~13 + 阶段 E 轮 14~16 + 阶段 F 轮 17~18，changelog v0.10.1/v0.10.3/v0.10.4），保留在表中供追溯；待办序列自 ⑧ 起。
 
 | 次序 | 计划项 | 归类 | 工作量 | 推荐理由 |
 |:--:|:--|:--:|:--:|:--|
