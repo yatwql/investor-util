@@ -2168,6 +2168,56 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     </div>
                 </div>
             </div>
+            <!-- 尾部风险统计（VaR95/99、最大单日跌幅、连续下跌、恢复天数；样本不足写占位，C20 附说明） -->
+            {% set _tail_ok = tail_risk_data and tail_risk_data.available %}
+            <div class="summary-grid" style="margin-top:16px;">
+                {% if _tail_ok %}
+                <div class="summary-card">
+                    <h3>VaR(95)</h3>
+                    <div class="value" style="color:var(--profit);">{{ tail_risk_data.var95 | change }}</div>
+                    <div class="meta">单日最大可能损失（95% 置信）</div>
+                </div>
+                <div class="summary-card">
+                    <h3>VaR(99)</h3>
+                    <div class="value" style="color:var(--profit);">{{ tail_risk_data.var99 | change }}</div>
+                    <div class="meta">单日最大可能损失（99% 置信）</div>
+                </div>
+                <div class="summary-card">
+                    <h3>最大单日跌幅</h3>
+                    <div class="value" style="color:var(--profit);">{{ tail_risk_data.max_single_day_drop | change }}</div>
+                    {% if tail_risk_data.max_single_day_drop_date %}
+                    <div class="meta">{{ tail_risk_data.max_single_day_drop_date }}</div>
+                    {% endif %}
+                </div>
+                <div class="summary-card">
+                    <h3>最长连续下跌</h3>
+                    <div class="value">{{ tail_risk_data.consecutive_down_days }} 天</div>
+                    {% if tail_risk_data.consecutive_down_start %}
+                    <div class="meta">{{ tail_risk_data.consecutive_down_start }} → {{ tail_risk_data.consecutive_down_end }}</div>
+                    {% endif %}
+                </div>
+                <div class="summary-card">
+                    <h3>最大跌幅后恢复</h3>
+                    {% if tail_risk_data.recovery_state == "unrecovered" %}
+                    <div class="value" style="color:var(--profit);">未恢复</div>
+                    <div class="meta">数据窗口内未回到跌幅前水平</div>
+                    {% elif tail_risk_data.recovery_state == "none" %}
+                    <div class="value">—</div>
+                    <div class="meta">窗口内无下跌日</div>
+                    {% else %}
+                    <div class="value">{{ tail_risk_data.recovery_days_after_drop }} 天</div>
+                    <div class="meta">自最大单日跌幅日收复</div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="summary-card">
+                    <h3>尾部风险统计</h3>
+                    <div class="value" style="font-size:16px;">样本不足</div>
+                    <div class="meta">有效交易日不足，尾部指标暂不可用</div>
+                </div>
+                {% endif %}
+            </div>
+            <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">说明：尾部风险基于历史日收益序列（历史模拟法 VaR）；恢复天数指自最大单日跌幅日收复跌幅前水平所需交易日</div>
             {% if enable_interactive_charts %}
             {# 量化指标 Radar：3 张摘要卡片 + 雷达图增强（三级降级，同改造前） #}
             <div class="chart-box" style="height:320px;margin-top:16px;">

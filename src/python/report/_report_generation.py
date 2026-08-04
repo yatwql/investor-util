@@ -187,6 +187,12 @@ def _prepare_full_risk_metrics(
 
         pipeline_data["crisis_annotation_data"] = build_crisis_annotation(history_data)
 
+        # 尾部风险统计（C19 tail_risk_data）：复用历史日收益序列计算 VaR/最大单日跌幅/
+        # 连续下跌/恢复天数；样本不足时 available=False（§1.4.5 数据降级）
+        from src.python.analysis.tail_risk import compute_tail_risk
+
+        pipeline_data["tail_risk_data"] = compute_tail_risk((history_data or {}).get("bars"))
+
     # 从 history_data 提取风险指标，注入 prep 和 pipeline_data
     if history_data and history_data.get("status") not in ("unavailable",):
         _risk = {
@@ -286,6 +292,7 @@ def _generate_full_html_report(
     data_freshness: dict | None = None,
     action_data: dict | None = None,
     crisis_annotation_data: dict | None = None,
+    tail_risk_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -353,6 +360,7 @@ def _generate_full_html_report(
             data_freshness=data_freshness,
             action_data=action_data,
             crisis_annotation_data=crisis_annotation_data,
+            tail_risk_data=tail_risk_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -549,6 +557,13 @@ def _generate_report_both(
     if pipeline_data is not None:
         pipeline_data["crisis_annotation_data"] = crisis_annotation_data
 
+    # 尾部风险统计（C19 tail_risk_data）：复用历史日收益序列，样本不足时 available=False
+    from src.python.analysis.tail_risk import compute_tail_risk
+
+    tail_risk_data = compute_tail_risk((history_data or {}).get("bars"))
+    if pipeline_data is not None:
+        pipeline_data["tail_risk_data"] = tail_risk_data
+
     # ── 4. HTML 报告 ──
     _news_label = "含新闻" if _enable_news else "无新闻"
     reporter.info(f"正在生成 HTML 报告（{_news_label}）...")
@@ -582,6 +597,7 @@ def _generate_report_both(
             data_freshness=(pipeline_data or {}).get("data_freshness"),
             action_data=(pipeline_data or {}).get("action_data"),
             crisis_annotation_data=crisis_annotation_data,
+            tail_risk_data=tail_risk_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -824,6 +840,7 @@ def _generate_report_full(
         (pipeline_data or {}).get("data_freshness"),
         (pipeline_data or {}).get("action_data"),
         (pipeline_data or {}).get("crisis_annotation_data"),
+        (pipeline_data or {}).get("tail_risk_data"),
     )
 
     # ── 7. Excel 报告 ──

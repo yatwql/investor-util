@@ -169,7 +169,7 @@ from src.python.core.registry import (
 | `expert_review` | 智囊团深度复盘 | LLM |
 | `health_check` | 持仓体检报告 | LLM |
 | `penetration_deep` | 穿透深度分析 | LLM |
-| `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
+| `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（一章多区块：走势表 + 回撤矩阵 + 危机区间标注 + 尾部风险统计） |
 | `portfolio_evolution` | 组合演进 | 独立开关（`enable_portfolio_evolution`，数据不可用时占位） |
 | `action` | 行动建议 | 独立顶层开关（`enable_action`，默认关；再平衡信号/交易纪律/调仓建议/收益归因） |
 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |

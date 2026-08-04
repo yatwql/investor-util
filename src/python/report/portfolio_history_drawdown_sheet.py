@@ -65,8 +65,9 @@ def _write_trend_block(
     row: int,
     history_data: dict,
     ncols: int,
+    tail_risk: dict[str, Any] | None = None,
 ) -> int:
-    """写入一、走势表区块（净值时间线 + 指标汇总），返回下一行起始行号。"""
+    """写入一、走势表区块（净值时间线 + 指标汇总 + 尾部风险），返回下一行起始行号。"""
     write_title_row(ws, row, "一、走势表", ncols=ncols)
     row += 1
 
@@ -127,7 +128,48 @@ def _write_trend_block(
             flist.append(bm_fmt if bm_key else None)
         row = write_data_row(ws, row, values, formats=flist)
 
+    # ── 尾部风险指标行（组合独有，无基准对照列；样本不足写占位） ──
+    row = _write_tail_risk_rows(ws, row, tail_risk, n_bm)
+
     row += 1
+    return row
+
+
+def _write_tail_risk_rows(
+    ws: Worksheet,
+    row: int,
+    tail_risk: dict[str, Any] | None,
+    n_bm: int,
+) -> int:
+    """追加尾部风险指标行（VaR / 最大单日跌幅 / 连续下跌 / 恢复天数），返回下一行行号。
+
+    仅当 tail_risk 可用（available=True）时写实值；数据不足（§1.4.5）时写占位说明。
+    """
+    if not tail_risk or not tail_risk.get("available"):
+        values: list[Any] = ["尾部风险统计", "样本不足，指标不可用"] + [None] * n_bm
+        flist: list[str | None] = [None] * (2 + n_bm)
+        return write_data_row(ws, row, values, formats=flist)
+
+    recovery_days = tail_risk.get("recovery_days_after_drop")
+    recovery_state = tail_risk.get("recovery_state")
+    if recovery_state == "unrecovered":
+        recovery_cell: Any = "未恢复"
+    elif recovery_state == "none":
+        recovery_cell = "--"
+    else:
+        recovery_cell = recovery_days
+
+    rows: list[tuple[str, Any, str | None]] = [
+        ("VaR(95)", round(tail_risk.get("var95", 0) / 100, 4), FMT_PERCENT),
+        ("VaR(99)", round(tail_risk.get("var99", 0) / 100, 4), FMT_PERCENT),
+        ("最大单日跌幅(%)", round(tail_risk.get("max_single_day_drop", 0) / 100, 4), FMT_PERCENT),
+        ("最长连续下跌(天)", tail_risk.get("consecutive_down_days"), None),
+        ("最大单日跌幅后恢复(天)", recovery_cell, None),
+    ]
+    for name, value, fmt in rows:
+        values = [name, value] + [None] * n_bm
+        flist = [None, fmt] + [None] * n_bm
+        row = write_data_row(ws, row, values, formats=flist)
     return row
 
 
@@ -225,8 +267,9 @@ def write_portfolio_history_drawdown_sheet(
     ws: Worksheet,
     history_data: dict | None = None,
     crisis_annotation: dict[str, Any] | None = None,
+    tail_risk: dict[str, Any] | None = None,
 ) -> None:
-    """写入组合历史走势与回撤页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注）。
+    """写入组合历史走势与回撤页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注 + 尾部风险）。
 
     Args:
         ws: openpyxl Worksheet 对象。
@@ -234,6 +277,8 @@ def write_portfolio_history_drawdown_sheet(
             None、status=unavailable 或 bars 为空时整页写占位。
         crisis_annotation: `crisis_annotation_data` C19 契约 dict（危机区间标注）；
             None 时危机区块写"数据不可用"占位。
+        tail_risk: `tail_risk_data` C19 契约 dict（尾部风险统计）；
+            None 或 available=False 时尾部指标行写占位。
     """
     _name = get_report_sheet_name("portfolio_history_drawdown")
     ncols = _compute_ncols(history_data)
@@ -246,7 +291,7 @@ def write_portfolio_history_drawdown_sheet(
         return
 
     row = 2
-    row = _write_trend_block(ws, row, history_data, ncols)
+    row = _write_trend_block(ws, row, history_data, ncols, tail_risk)
     row = _write_drawdown_block(ws, row, history_data, ncols)
     row = _write_crisis_block(ws, row, crisis_annotation, ncols)
 

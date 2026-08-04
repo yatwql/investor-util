@@ -28,14 +28,17 @@ def _write_history_sheets(
     sheets: dict[str, Any],
     history_data: dict | None,
     crisis_annotation: dict[str, Any] | None = None,
+    tail_risk: dict[str, Any] | None = None,
 ) -> None:
-    """写入组合历史走势与回撤合并页签（一章两区块 + 危机区间标注）。
+    """写入组合历史走势与回撤合并页签（一章两区块 + 危机区间标注 + 尾部风险）。
 
     Args:
         sheets: 页签字典，读取 `portfolio_history_drawdown` 键。
         history_data: `history_data` C19 契约 dict；不可用时整页写占位。
         crisis_annotation: `crisis_annotation_data` C19 契约 dict（危机区间标注）；
             None 时危机区块写占位。
+        tail_risk: `tail_risk_data` C19 契约 dict（尾部风险统计）；
+            None 时尾部指标行写占位。
     """
     ws = sheets.get("portfolio_history_drawdown")
     if ws is None:
@@ -46,7 +49,7 @@ def _write_history_sheets(
 
     from src.python.report.portfolio_history_drawdown_sheet import write_portfolio_history_drawdown_sheet
 
-    write_portfolio_history_drawdown_sheet(ws, effective, crisis_annotation)
+    write_portfolio_history_drawdown_sheet(ws, effective, crisis_annotation, tail_risk)
 
 
 def _write_data_source_matrix_sheet(ws, prog) -> None:
@@ -246,6 +249,7 @@ def generate_excel_report(
                     sheets,
                     history_data,
                     (pipeline_data or {}).get("crisis_annotation_data"),
+                    (pipeline_data or {}).get("tail_risk_data"),
                 )
             except Exception:
                 logger.debug("[excel] 组合历史走势与回撤页签写入失败（非关键）", exc_info=True)

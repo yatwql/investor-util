@@ -8,12 +8,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 218 | 52,066 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 4 | 3,539 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 主程序代码 | Python | 219 | 52,342 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 4 | 3,589 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 16 | 5,064 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **238** | **60,669** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **260** | **73,609** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,670 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **源代码合计** | — | **239** | **60,995** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **263** | **74,359** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,705 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
@@ -119,6 +119,7 @@ investor-util/
 │   │   │   ├── return_attribution.py          #   收益归因（TOP5 品种贡献占比/正负分列/净额合计 → C19 attribution，提示词段落与20章表格共用）
 │   │   │   ├── scenario.py                    #   情景分析（Beta 推导 → 6 种市场情景预期变动）
 │   │   │   ├── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
+│   │   │   ├── tail_risk.py                   #   尾部风险统计（历史模拟法 VaR95/99 + 最大单日跌幅 + 连续下跌 + 恢复天数 → C19 tail_risk_data）
 │   │   │   ├── trade_discipline.py            #   交易纪律引擎（止盈/止损/回撤触发检测，复用 _silence 静默机制）
 │   │   │   ├── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比）
 │   │   │   └── whatif_backtest.py             #   调仓 What-if 时序回测（纯计算：生效日折算/序列对齐/5 指标）
@@ -325,6 +326,8 @@ investor-util/
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
 │       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口）
 │       │   │   ├── test_crisis_annotation.py   #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复耗时/重叠）
+│       │   │   ├── test_tail_risk.py           #   尾部风险统计（VaR95/99 固定 fixture 精度 + 最大单日跌幅 + 连续下跌 + 恢复三态）
+│       │   │   ├── test_tail_risk_edge.py      #   尾部风险边缘场景（0/负/NaN 跳过、量级、样本边界、持平序列）
 │       │   │   ├── test_portfolio_evolution.py #  组合演进聚合计算（多快照趋势/HHI/TOP 变迁）
 │       │   │   ├── test_whatif.py             #   调仓 What-if 计算（变动识别/成本权重/HHI/降级）
 │       │   │   ├── test_whatif_backtest.py    #   调仓 What-if 时序回测（天数折算/序列对齐/5 指标/降级）
@@ -482,6 +485,7 @@ investor-util/
 │       │   │   ├── test_whatif_operations.py      #   调仓 What-if 操作共享层测试
 │       │   │   ├── test_whatif_writer.py          #   调仓 What-if 报告输出（固定名+日期归档+清理）
 │       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
+│       │   │   ├── test_tail_risk_wiring.py       #   尾部风险统计接线（pipeline 注入 + Excel 五行 + HTML 卡 + C20 说明）
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试
