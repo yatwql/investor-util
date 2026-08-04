@@ -107,7 +107,7 @@ investor-util/
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
 │   │   │   ├── drawdown_events.py             #   回撤事件识别（新高/回撤起止/幅度）
-│   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
+│   │   │   ├── factor_exposure.py             #   风格因子回归（MVP 3 因子：价值/成长/质量，OLS 回归）
 │   │   │   ├── industry_beta.py               #   行业 Beta 分析（纯计算：暴露占比 + 逐行业一元 OLS，复用 factor_exposure）
 │   │   │   ├── correlation.py                 #   持仓相关性矩阵（Pearson 相关/显著性/下三角矩阵）
 │   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → crisis_annotation_data）
@@ -326,7 +326,7 @@ investor-util/
 │       │   │   ├── test_drawdown_warning.py   #   回撤历史分位预警
 │       │   │   ├── test_drawdown_events.py    #   回撤事件识别
 │       │   │   ├── test_drawdown_events_edge.py #  回撤事件识别边缘场景
-│       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
+│       │   │   ├── test_factor_exposure.py    #   风格因子回归（OLS 回归/样本下限/停更剔除）
 │       │   │   ├── test_industry_beta.py      #   行业 Beta 分析（暴露占比/已知答案回归/数据不足降级/契约）
 │       │   │   ├── test_market_temperature.py #   市场温度纯计算层（三因子合成/刻度映射/免责声明/数据不足）
 │       │   │   ├── test_market_temperature_edge.py # 市场温度边缘场景（样本边界/恒平序列/极端波动）
@@ -562,7 +562,7 @@ investor-util/
 │       │   │   ├── test_scenario_penetration_mixed.py   #   穿透分析混合场景
 │       │   │   ├── test_scenario_penetration_edge.py    #   穿透分析边缘场景
 │       │   │   ├── test_scenario_special_securities.py # 特殊证券场景测试
-│       │   │   └── test_pipeline_factor_exposure.py     #   因子暴露管线场景测试
+│       │   │   └── test_pipeline_factor_exposure.py     #   风格因子回归管线场景测试
 │       │   ├── datetime/            #   日期时间场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   └── test_datetime_scenarios.py #   日期时间场景测试
@@ -628,7 +628,7 @@ investor-util/
 │   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
 │   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
 │   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
-│   ├── probe-csi-factor-indices.py  #   CSI 风格指数可用性探测（因子暴露分析前置决策闸门）
+│   ├── probe-csi-factor-indices.py  #   CSI 风格指数可用性探测（风格因子回归前置决策闸门）
 │   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
 │   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
 ├── docs-stm/                         # 项目文档
