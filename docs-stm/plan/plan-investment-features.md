@@ -51,7 +51,9 @@
 | `data_quality` | 数据质量仪表盘 | 18 数据源可用性矩阵 | 监控 |
 | `holding_diagnosis` | 品种覆盖诊断 | 并入 `data_quality` | 监控 |
 
-> **合并章代码标识符**：章节 sheet key 统一为语义名——`style_factor`（风格与因子分析，合并原 `fund_style` + `factor_exposure`）；实现层（模块 `style_factor_sheet.py`、函数、变量、注释）一律用该语义名，禁止沿用旧 key 或以任何任务代号命名。
+> **合并章代码标识符**：三个合并章 sheet key 统一为语义名——`position_relationship`（持仓关系矩阵，合并原 `fund_overlap` + `correlation_analysis`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并原 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并原 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key 或以任何任务代号命名。
+>
+> **registry.number 重排**：实现时 `registry._REPORT_SECTION_DEFAULT` 的 `number` 需整体重排为 1~19（删除三个被合并的旧 sheet 注册 + 插入新 `action` 章，保持其余相对顺序）；被合并的旧 key（`fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure`）在用户 config `report_section_order` 中会变为未知标识——`config/_validation.py` 仅对未知 key 告警不报错，但需在配置文档注明「旧章节 key 已随合并失效，可清理」。章节序号全部以本表为准（合并后 1~19 连续编号）。
 
 ### 2.1 买入与选基
 
@@ -179,15 +181,15 @@
 | 3 持仓分类表 | 资金流水成本分档、分红现金流累计 | 加成本分档/分红子列 | `report_submodules.cost_lots`（默认关） |
 | 4 资产穿透TOP10 | 估值分位 | 加估值分位列 | `report_submodules.valuation_percentile` |
 | 5 基金业绩分析 | 候选基金比较模式 | 增强模式（候选来自 config/CLI，≤10） | `report_submodules.candidate_compare`（默认关） |
-| 7 持仓关系矩阵 | **合并原「持仓重合度矩阵」+「持仓相关性矩阵」** | 两矩阵并入一章，分上下两个矩阵区块 | 随 `enable_fund_deep_analysis` |
+| 7 持仓关系矩阵 | **合并原「持仓重合度矩阵」+「持仓相关性矩阵」**（章节 sheet key 统一为 `position_relationship`） | 两矩阵并入一章，分上下两个矩阵区块 | 随 `enable_fund_deep_analysis` |
 | 9 风格与因子分析 | **合并原「基金风格分析」+「因子暴露分析」**（章节 sheet key 统一为 `style_factor`）+ 行业 Beta 子表 | 风格+因子并区块 + 行业 Beta 子表 | `report_submodules.industry_beta` |
 | 12 智囊团深度复盘 | **引用行动建议章（与 17 章共享）** | 复盘板块 + 「行动摘要」子块（指向 17 章） | `enable_action` |
-| 15 组合历史走势与回撤 | **合并原「组合历史走势」+「历史回撤分析」** + 危机区间标注、尾部风险 | 走势表 + 回撤矩阵区块 + 标注层 + 指标列 | `report_submodules.tail_risk` |
+| 15 组合历史走势与回撤 | **合并原「组合历史走势」+「历史回撤分析」**（章节 sheet key 统一为 `portfolio_history_drawdown`）+ 危机区间标注、尾部风险 | 走势表 + 回撤矩阵区块 + 标注层 + 指标列 | `report_submodules.tail_risk` |
 | 16 组合演进 | 快照差异 | 顶部加差异摘要 | `report_submodules.snapshot_diff` |
 | 17 行动建议 | **再平衡信号、交易纪律、调仓建议、收益归因（决策行动）** | **新增独立顶层章节**（`always` 类型，`enable_action` 默认关） | `enable_action` |
 | 18 数据源可用性矩阵 | 数据质量 + 品种覆盖诊断 | 改造为「源健康 + 品种覆盖 + 可信度」三区块 | `report_submodules.data_quality` |
 
-> 未列章节（6/8/10/11/13/14/19）不改造，保持现状（序号已按合并后重排）。调仓成本模拟归入独立 what-if 报告（非 19 章）。
+> 未列章节（6/8/10/11/13/14/19）不改造，保持现状（序号已按合并后重排）。调仓成本模拟归入独立 what-if 报告（非 19 章）。19 章为「LLM API 用量」（`llm_usage`），功能不变，仅序号顺延为末章。
 >
 > **章节合并（-3）**：①「持仓重合度矩阵」（原 7）与「持仓相关性矩阵」（原 11）同属"持仓关系"维度，两矩阵并一章分上下区块，开关沿用 `enable_fund_deep_analysis`；②「组合历史走势」（原 17）与「历史回撤分析」（原 18）**数据同源**（共享同一 `history_data`：净值 bars + 基准对比 + 回撤事件），回撤是净值走势的衍生指标，并一章分「走势表 + 回撤矩阵」两个区块，且两页签原有的指标区（累计收益/最大回撤/波动率/起止日）重复，合并同时消除冗余；③「基金风格分析」（原 9）与「因子暴露分析」（原 10）**语义同源**——因子暴露分析按 value/growth/quality 三风格因子对基准做回归，列头即"风格因子"，与基金风格分析是一体两面，并一章分「基金风格表 + 风格因子回归」两个区块。合并后章节序号整体重排为 19 章。
 >
