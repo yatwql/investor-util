@@ -1,9 +1,9 @@
-"""基金业绩分析模块 — 报告第 5 页。
+"""基金业绩分析模块。
 
 调天天基金 API 获取每只基金在同类中的排名和区间收益率，
 按排名百分位打标签（优秀/良好/稳定/偏差/较差），生成结构化 Sheet。
 
-评级逻辑（P2：5 级评级 + 类型差异化阈值）：
+评级逻辑（5 级评级 + 类型差异化阈值）：
   1. 同类排名百分位 → 基础评级（默认 10%/30%/50%/75% 四道阈值）
   2. 类型差异化：债券型/QDII 使用宽松阈值(15%/35%/55%/80%)，指数型使用严格阈值(10%/25%/45%/70%)
   3. 超额收益评分（Data_performanceEvaluation）→ 调整评级
@@ -31,6 +31,7 @@ from src.python.report.data_status import (
     DataStatusItem,
     get_tracker,
 )
+from src.python.report.fund_candidate import build_candidate_compare_data
 from src.python.report.excel_writer import (
     _write_data_status_foot,
     auto_width,
@@ -45,10 +46,23 @@ from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, RED
 
 logger = logging.getLogger("invest")
 
-# 模块级降级阈值控制器（单例工厂共享，T0-01-A 统一管理）
+# 模块级降级阈值控制器（单例工厂共享，统一管理）
 _tracker = get_tracker()
 
 _NCOLS = 11
+_CANDIDATE_HEADERS = [
+    "候选基金",
+    "代码",
+    "评级",
+    "近1月",
+    "近3月",
+    "近6月",
+    "近1年",
+    "同类排名",
+    "最大回撤",
+    "风格",
+    "与持仓重合",
+]
 _HEADERS = [
     "基金",
     "代码",
@@ -63,7 +77,7 @@ _HEADERS = [
     "同类排名",
 ]
 
-# 基础业绩评价 -> 标签 + 描述（P2：5 级评级，新增"较差"）
+# 基础业绩评价 -> 标签 + 描述（5 级评级，新增"较差"）
 _RATING_COMMENT: dict[str, str] = {
     "优秀": "优秀 持续跑赢基准，超额收益显著",
     "良好": "良好 稳定跑赢基准，组合管理得当",
@@ -433,6 +447,12 @@ def write_fund_performance_sheet(
     # 数据源状态
     data_status = build_perf_data_status(adjusted_ratings, len(fund_holdings_sorted))
     _write_data_status_foot(ws, data_status, start_row=row)
+
+    # 候选基金比较子表（report_submodules.candidate_compare 默认关；关闭时 build 返回 None）
+    candidate_data = build_candidate_compare_data(holdings)
+    if candidate_data is not None and candidate_data.get("available"):
+        row = _write_candidate_compare_block(ws, row + 1, candidate_data)
+
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)
 
@@ -445,6 +465,85 @@ def write_fund_performance_sheet(
             len(adjusted_ratings),
             len(fund_holdings_sorted),
         )
+
+
+def _write_candidate_compare_block(ws, row: int, candidate_data: dict[str, Any]) -> int:
+    """写入候选基金比较子表（主业绩表下方子区块）。
+
+    Args:
+        ws: 目标工作表
+        row: 起始行（数据源状态脚注之后）
+        candidate_data: build_candidate_compare_data 返回的候选比较数据
+
+    Returns:
+        下一可用行号
+    """
+    row = write_title_row(ws, row, "候选基金比较（候选来自 config.comparison_candidates）", _NCOLS)
+    row = write_header_row(ws, row, _CANDIDATE_HEADERS)
+    fmt = _candidate_num_formats()
+    for c in candidate_data.get("rows", []):
+        if not c.get("available"):
+            write_data_row(
+                ws,
+                row,
+                [c.get("name", c["code"]), c["code"], "获取失败", "--", "--", "--", "--", "--", "--", "--", "--"],
+                fmt,
+            )
+            row += 1
+            continue
+        overlap = "--"
+        if c.get("overlap_name") and c.get("overlap_jaccard_raw") is not None:
+            overlap = f"{c['overlap_jaccard']}（{c['overlap_name']}）"
+        write_data_row(
+            ws,
+            row,
+            [
+                c.get("name", c["code"]),
+                c["code"],
+                c.get("rating", "--"),
+                c.get("syl_近1月_raw"),
+                c.get("syl_近3月_raw"),
+                c.get("syl_近6月_raw"),
+                c.get("syl_近1年_raw"),
+                c.get("rank_text", "--"),
+                c.get("max_drawdown_raw"),
+                c.get("style", "--"),
+                overlap,
+            ],
+            fmt,
+        )
+        row += 1
+    if candidate_data.get("exceed_limit"):
+        write_data_row(ws, row, ["候选基金超过 10 只，仅比较前 10 只", "", "", "", "", "", "", "", "", "", ""], fmt)
+        row += 1
+    if candidate_data.get("invalid"):
+        write_data_row(
+            ws,
+            row,
+            [f"无效候选代码（忽略）: {'、'.join(candidate_data['invalid'])}", "", "", "", "", "", "", "", "", "", ""],
+            fmt,
+        )
+        row += 1
+    return row
+
+
+def _candidate_num_formats() -> list[str | None]:
+    """候选比较子表每列的 Excel 数字格式。"""
+    from src.python.report.styles import FMT_PERCENT
+
+    return [
+        None,  # 1  候选基金（文本）
+        None,  # 2  代码（文本）
+        None,  # 3  评级（文本）
+        FMT_PERCENT,  # 4  近1月
+        FMT_PERCENT,  # 5  近3月
+        FMT_PERCENT,  # 6  近6月
+        FMT_PERCENT,  # 7  近1年
+        None,  # 8  同类排名（文本）
+        FMT_PERCENT,  # 9  最大回撤
+        None,  # 10 风格（文本）
+        None,  # 11 与持仓重合（文本）
+    ]
 
 
 def _write_empty_row(ws, row: int, fund: Holding) -> None:

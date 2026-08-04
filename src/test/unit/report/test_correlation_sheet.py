@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 def _correlation_data(**extra) -> dict:
-    """构造持仓关系矩阵·相关性区块 C19 契约 mock（2 品种，强负相关）。"""
+    """构造持仓关系矩阵·相关性区块数据契约 mock（2 品种，强负相关）。"""
     d = {
         "available": True,
         "status": "ok",

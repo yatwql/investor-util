@@ -1033,8 +1033,98 @@ class TestIsEnableDataQuality(unittest.TestCase):
         self.assertFalse(cfg.is_enable_data_quality({"report_submodules": {"data_quality": False, "tail_risk": True}}))
 
 
+class TestIsEnableCandidateCompare(unittest.TestCase):
+    """候选基金比较子模块开关（report_submodules.candidate_compare）。"""
+
+    def test_default_false_when_missing(self):
+        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
+        self.assertFalse(cfg.is_enable_candidate_compare({}))
+        self.assertFalse(cfg.is_enable_candidate_compare({"enable_fund_deep_analysis": True}))
+
+    def test_false_when_submodules_not_dict(self):
+        """report_submodules 非 dict → 关闭。"""
+        self.assertFalse(cfg.is_enable_candidate_compare({"report_submodules": "not-a-dict"}))
+        self.assertFalse(cfg.is_enable_candidate_compare({"report_submodules": None}))
+
+    def test_false_when_disabled(self):
+        """report_submodules.candidate_compare=false → 关闭。"""
+        self.assertFalse(cfg.is_enable_candidate_compare({"report_submodules": {"candidate_compare": False}}))
+
+    def test_true_when_enabled(self):
+        """report_submodules.candidate_compare=true → 开启。"""
+        self.assertTrue(cfg.is_enable_candidate_compare({"report_submodules": {"candidate_compare": True}}))
+
+    def test_independent_from_other_submodules(self):
+        """candidate_compare 开关独立于同容器其他键。"""
+        self.assertTrue(
+            cfg.is_enable_candidate_compare({"report_submodules": {"candidate_compare": True, "data_quality": False}})
+        )
+
+
+class TestIsEnableCostLots(unittest.TestCase):
+    """成本流水子模块开关（report_submodules.cost_lots，默认关）。"""
+
+    def test_default_false_when_missing(self):
+        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
+        self.assertFalse(cfg.is_enable_cost_lots({}))
+        self.assertFalse(cfg.is_enable_cost_lots({"enable_fund_deep_analysis": True}))
+
+    def test_false_when_submodules_not_dict(self):
+        """report_submodules 非 dict → 关闭。"""
+        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": "not-a-dict"}))
+        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": None}))
+
+    def test_false_when_disabled(self):
+        """report_submodules.cost_lots=false → 关闭。"""
+        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": False}}))
+
+    def test_true_when_enabled(self):
+        """report_submodules.cost_lots=true → 开启。"""
+        self.assertTrue(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True}}))
+
+    def test_independent_from_other_submodules(self):
+        """cost_lots 开关独立于同容器其他键。"""
+        self.assertTrue(
+            cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True, "candidate_compare": False}})
+        )
+
+
+class TestGetComparisonCandidates(unittest.TestCase):
+    """get_comparison_candidates 候选代码列表访问器。"""
+
+    def test_missing_returns_empty(self):
+        """config 缺失 comparison_candidates → 空列表。"""
+        self.assertEqual(cfg.get_comparison_candidates({}), [])
+
+    def test_non_list_returns_empty(self):
+        """comparison_candidates 非列表 → 空列表（安全降级）。"""
+        self.assertEqual(cfg.get_comparison_candidates({"comparison_candidates": "000001"}), [])
+        self.assertEqual(cfg.get_comparison_candidates({"comparison_candidates": None}), [])
+
+    def test_strings_normalized(self):
+        """字符串项剥空白返回。"""
+        self.assertEqual(
+            cfg.get_comparison_candidates({"comparison_candidates": [" 000001 ", "110022"]}),
+            ["000001", "110022"],
+        )
+
+    def test_numeric_normalized_to_six_digit(self):
+        """数值项归一化为 6 位代码（如 110022 → '110022'、1 → '000001'）。"""
+        self.assertEqual(
+            cfg.get_comparison_candidates({"comparison_candidates": [110022, 1]}),
+            ["110022", "000001"],
+        )
+
+    def test_invalid_items_skipped(self):
+        """非法项忽略。"""
+        self.assertEqual(
+            cfg.get_comparison_candidates({"comparison_candidates": ["000001", {"code": "x"}]}),
+            ["000001"],
+        )
+
+
 class TestIsEnableAction(unittest.TestCase):
-    """is_enable_action 访问器测试（行动建议独立章 20 章开关，默认关）。"""
+    """is_enable_action 访问器测试（行动建议独立章开关，默认关）。"""
 
     def test_default_false_when_missing(self):
         """config 缺失 enable_action → 返回 False（默认关，向后兼容）。"""

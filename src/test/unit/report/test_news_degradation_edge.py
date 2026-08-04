@@ -1,4 +1,4 @@
-"""D-7b: 新闻全源/部分失败占位 + source_status — 边缘测试。
+"""新闻全源/部分失败占位 + source_status — 边缘测试。
 
 测试目标：
   - write_news_sheet: news_data=[] + source_status 全失败 → _write_placeholder

@@ -6,7 +6,7 @@
   - consecutive_down_days：最长连续下跌天数及区间
   - recovery_days_after_drop：最大单日跌幅后收复跌幅所需交易日
 
-- 无数据获取、无报告依赖，纯标准库（C8：日志走 logging，不用 print）。
+- 无数据获取、无报告依赖，纯标准库（日志走 logging，不用 print）。
 - 复用历史日收益序列（与 report/portfolio_history._compute_daily_returns 同口径：
   日收益 = (curr - prev) / prev，小数单位，如 0.01 = 1%），不额外拉长 lookback。
 - 样本不足（< MIN_SAMPLE 个日收益）判数据不足（§1.4.5），available=False，

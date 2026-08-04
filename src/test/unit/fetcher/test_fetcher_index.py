@@ -302,7 +302,7 @@ class TestFetchIndexHistory(unittest.TestCase):
     覆盖场景：
       - 空代码 → None
       - 正常返回 → 走 chain 获取、写入会话缓存
-      - 会话缓存命中 → 不调 chain（C4 约束）
+      - 会话缓存命中 → 不调 chain（会话级复用）
       - Chain 全链路失败 → 空列表
       - Chain 异常 → 空列表
       - days 参数钳制到 [5, 3650]
@@ -345,7 +345,7 @@ class TestFetchIndexHistory(unittest.TestCase):
     @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
     def test_session_cache_hit_skips_chain(self, mock_fetch, mock_get_reg):
-        """会话缓存命中 → 不调 chain（C4 约束）。"""
+        """会话缓存命中 → 不调 chain（会话级复用）。"""
         cached = [self._SAMPLE_KLINE_1, self._SAMPLE_KLINE_2]
         mock_reg = MagicMock()
         mock_reg.session_cache_get.return_value = cached

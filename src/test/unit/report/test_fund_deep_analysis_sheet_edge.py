@@ -1,10 +1,10 @@
-"""基金深度分析 Excel 写入模块空数据占位边缘测试（D-7a）。
+"""基金深度分析 Excel 写入模块空数据占位边缘测试。
 
 测试目标：
   - fund_manager_sheet：manager_data 为空 → 写占位
   - position_relationship_sheet：重合度区块基金数 < 2 → 写占位（STATUS_MESSAGES）
   - fund_concentration_sheet：concentration_data 为空 → 写占位
-  - fund_style_sheet：style_data 为空 → 写占位
+  - style_factor_sheet：风格表 style_data 为空 → 写占位（合并章区块一）
 
 运行：
   pytest src/test/unit/report/test_fund_deep_analysis_sheet_edge.py -v
@@ -89,19 +89,20 @@ class TestFundConcentrationSheetEmpty(unittest.TestCase):
 
 
 class TestFundStyleSheetEmpty(unittest.TestCase):
-    """fund_style_sheet 空数据占位"""
+    """style_factor_sheet 风格表空数据占位（合并章区块一）"""
 
     def setUp(self):
         self.wb = openpyxl.Workbook()
         self.ws = self.wb.active
 
-    def test_empty_data_writes_placeholder(self):
-        """style_data=[] → 第4行含占位文本。"""
-        from src.python.report.fund_style_sheet import write_style_sheet
-        write_style_sheet(self.ws, [])
-        placeholder = self.ws.cell(row=4, column=1).value
-        self.assertIsNotNone(placeholder)
-        self.assertEqual(placeholder, STATUS_MESSAGES["style_unavailable"])
+    def test_empty_style_data_writes_placeholder(self):
+        """style_data=[] → 风格表区块写占位，因子区块正常。"""
+        from src.python.report.style_factor_sheet import write_style_factor_sheet
+        write_style_factor_sheet(self.ws, style_data=[], factor_exposure=None)
+        flat = [str(c.value) for row in self.ws.iter_rows() for c in row if c.value is not None]
+        self.assertIn(STATUS_MESSAGES["style_unavailable"], flat)
+        # 因子区块独立降级：占位文本同时存在（一章三区块互不影响）
+        self.assertIn(STATUS_MESSAGES["factor_exposure_unavailable"], flat)
 
 
 if __name__ == "__main__":

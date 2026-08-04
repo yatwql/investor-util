@@ -6,7 +6,7 @@
 把「触发建议」转成「能照做的方案」：每条建议输出
 代码 / 名称 / 操作 / 份额（A 股取整一手 100 股）/ 金额 / 预估费用 / 调仓后现金余额。
 
-C1 合规：份额取整的证券类型判定复用 core/code_utils.py
+份额取整的证券类型判定复用 core/code_utils.py（代码类型判定中心化）
 （is_a_share_code / is_exchange_fund_code / is_otc_fund_by_name），
 本模块不自建证券类型判定逻辑。
 
@@ -62,7 +62,7 @@ _SELL_OPERATIONS = frozenset(_PRIORITY)
 
 
 def _round_to_lot(raw_shares: float, code: str, name: str) -> int:
-    """份额取整到一手（C1 合规：证券类型判定复用 core/code_utils.py）。
+    """份额取整到一手（证券类型判定复用 core/code_utils.py）。
 
     A 股与场内基金/ETF 按一手 100 份向下取整；场外基金与港股按整数份取整
     （一手股数随标的不同，取整到整数份）。
@@ -210,7 +210,7 @@ def build_rebalance_advice(
     fee_table: dict[str, float] | None = None,
     available_cash: float = 0.0,
 ) -> list[dict[str, Any]]:
-    """构建调仓建议清单（C19 契约 `rebalance_advice`）。
+    """构建调仓建议清单（数据契约 `rebalance_advice`）。
 
     Args:
         rebalance_signals: 再平衡信号（单品占比超警戒线）

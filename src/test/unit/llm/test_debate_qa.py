@@ -104,7 +104,7 @@ class TestDebateQaConcentration(unittest.TestCase):
         self.assertIn("45.0%", result)
         self.assertIn("40% 行业集中度预警线", result)
 
-    # ── test 5: 要求回答引导（对齐需求 R-LLM-DB-QA-CONCENTRATION-03） ──
+ # ── test 5: 要求回答引导（对齐需求 R-LLM-DB-QA-） ──
 
     def test_requires_answer_instead_of_disclaimer(self):
         """QA 块要求回答（量化评估/基准对比/调仓建议），不再含"无需回答"免责声明。"""

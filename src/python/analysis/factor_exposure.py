@@ -3,10 +3,10 @@
 职责：接收（组合日收益序列 + 因子收益序列 + 基准收益序列）→ OLS 回归
       → 输出风格暴露 β / t 显著性 / 风格归属占比 / 基准对照。
 
-- 无数据获取、无报告依赖，纯 pandas/numpy（C8：日志走 logging，不用 print）。
+- 无数据获取、无报告依赖，纯 pandas/numpy（日志走 logging，不用 print）。
 - 因子代理指数代码与新鲜度常量在本模块定义，供编排层（report/orchestrator.py）引用。
 - 数据不足/因子停更 → available=false，绝不硬算（§1.4.5 数据降级治理）。
-- C1：因子指数不注册 _A_INDICES（避免污染实时指数行情循环 fetch_indices），
+- 代码类型判定：因子指数不注册 _A_INDICES（避免污染实时指数行情循环 fetch_indices），
   此处以模块内常量集合定义。
 """
 
@@ -60,7 +60,7 @@ MIN_FACTORS: int = 2
 
 
 def unavailable_result(status: str, sample_count: int = 0, stale_factors: list[str] | None = None) -> dict:
-    """返回不可用结果（C19 契约，available=False）。
+    """返回不可用结果（数据契约，available=False）。
 
     Args:
         status: "insufficient"（数据不足）或 "source_failed"（数据源故障）。
@@ -68,7 +68,7 @@ def unavailable_result(status: str, sample_count: int = 0, stale_factors: list[s
         stale_factors: 本次剔除的停更/不可用因子。
 
     Returns:
-        含全部 C19 键的空结果字典。
+        含全部数据契约键的空结果字典。
     """
     return {
         "available": False,
@@ -335,7 +335,7 @@ def compute_factor_exposure(
         min_samples: 有效样本下限，低于此判数据不足（available=false）。
 
     Returns:
-        C19 契约 dict：
+        数据契约 dict：
         {"available", "status", "betas", "t_stats", "significant",
          "style_allocation", "baseline_betas", "factor_correlations",
          "correlation_note", "alpha", "window", "sample_count", "stale_factors"}

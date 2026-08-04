@@ -3,7 +3,7 @@
 职责：
   1. 接收来自各数据准备阶段的结构化数据
   2. 合并到统一的 pipeline_data 字典
-  3. 执行类型断言（C19 契约）
+  3. 执行类型断言（数据契约）
   4. 为下游（LLM prompt / Excel 摘要）提供稳定的入口
 
 A 通道（pipeline_data）流向：
@@ -12,7 +12,7 @@ A 通道（pipeline_data）流向：
 B 通道（prep）流向：
   prepare_report_data() → pipeline_data_builder.build_prep() → LLM / Excel
 
-C19 约束：所有键必须先在 data-channels-schema.md 中注册。
+数据契约 约束：所有键必须先在 data-channels-schema.md 中注册。
 """
 
 from __future__ import annotations
@@ -30,7 +30,8 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "data_degradation",
     "risk_metrics",
     "portfolio_daily_returns",
-    "factor_exposure",
+    # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键）
+    "style_factor_data",
     "position_relationship_data",
     "evolution_data",
     # 品种覆盖诊断：数据质量仪表盘品种覆盖区块数据源
@@ -39,6 +40,9 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "data_freshness",
     # 行动建议单一数据源：行动板块 + 智囊团深度复盘行动摘要（单源计算两处呈现）
     "action_data",
+    # 成本流水：成本分档 + XIRR + 分红累计（report_submodules.cost_lots，
+    # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
+    "fund_flow_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -64,6 +68,9 @@ _PREP_KNOWN_KEYS: set[str] = {
     "data_freshness",
     # 行动建议单一数据源：由 prepare_report_data 组装（单源计算两处呈现）
     "action_data",
+    # 成本流水：成本分档 + XIRR + 分红累计（report_submodules.cost_lots，
+    # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
+    "fund_flow_data",
 }
 
 # ── 类型映射（用于自动类型断言） ──
@@ -73,12 +80,13 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "data_degradation": list,
     "risk_metrics": dict,
     "portfolio_daily_returns": list,
-    "factor_exposure": (dict, type(None)),
+    "style_factor_data": (dict, type(None)),
     "position_relationship_data": (dict, type(None)),
     "evolution_data": (dict, type(None)),
     "position_status": (dict, type(None)),
     "data_freshness": (dict, type(None)),
     "action_data": (dict, type(None)),
+    "fund_flow_data": (dict, type(None)),
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
@@ -99,6 +107,7 @@ _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "position_status": dict,
     "data_freshness": dict,
     "action_data": dict,
+    "fund_flow_data": dict,
 }
 
 

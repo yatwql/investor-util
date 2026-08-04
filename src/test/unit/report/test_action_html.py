@@ -1,17 +1,17 @@
-"""行动建议章节（20 章）与 14 章「行动摘要」HTML 呈现测试。
+"""行动建议章节与「智囊团深度复盘」章行动摘要的 HTML 呈现测试。
 
 覆盖：
-  - enable_action 开 + available=True → 20 章行动板块完整渲染（①再平衡信号 + ②交易纪律
+  - enable_action 开 + available=True → 行动板块完整渲染（①再平衡信号 + ②交易纪律
     + ③调仓建议 + ④收益归因 + 行动摘要行）
   - 再平衡信号表格内容正确（代码/名称/占比/警戒线/建议动作）
   - 无再平衡信号 → 「组合内无品种超警戒线」占位
   - available=False → 「无持仓数据，行动建议无法生成」占位（§1.4.5 降级）
-  - 14 章智囊团深度复盘「行动摘要」子块：enable_action 开 + 数据可用时出现，
-    关闭时 14 章与现状一致（无子块）
-  - 单源计算断言：20 章与 14 章共享同一 action_data 对象（summary/信号数一致，
-    两处呈现同一数据源，无重复计算）
+  - 「智囊团深度复盘」章行动摘要子块：enable_action 开 + 数据可用时出现，
+    关闭时该章与现状一致（无子块）
+  - 单源计算断言：「行动建议」与「智囊团深度复盘」共享同一 action_data 对象
+    （summary/信号数一致，两处呈现同一数据源，无重复计算）
 
-数据源为 C19 `action_data` 契约（analysis/action_advisor.build_action_data 组装、
+数据源为 `action_data` 契约（analysis/action_advisor.build_action_data 组装、
 orchestrator 注入 pipeline_data）——与 Excel 端 write_action_sheet 共享同一对象。
 """
 
@@ -28,12 +28,12 @@ from src.test.unit.report.test_html_report_structure import (
     _render_template,
 )
 
-# 行动建议章节（type=action，enable_action 默认关）与智囊团深度复盘章节（14 章宿主）
-_ACTION_SECTION = {"key": "action", "name": "行动建议", "number": 20, "type": "action"}
-_EXPERT_REVIEW_SECTION = {"key": "expert_review", "name": "智囊团深度复盘", "number": 14, "type": "llm"}
+# 行动建议章节（type=action，enable_action 默认关）与智囊团深度复盘章节（行动摘要宿主）
+_ACTION_SECTION = {"key": "action", "name": "行动建议", "number": 17, "type": "action"}
+_EXPERT_REVIEW_SECTION = {"key": "expert_review", "name": "智囊团深度复盘", "number": 12, "type": "llm"}
 # global_macro 是 LLM 章节组的守卫章节（expert_review/health_check/penetration_deep
 # 嵌套于其 section_visible 守卫内），测试需一并纳入以渲染 expert_review
-_GLOBAL_MACRO_SECTION = {"key": "global_macro", "name": "全球政经局势", "number": 13, "type": "llm"}
+_GLOBAL_MACRO_SECTION = {"key": "global_macro", "name": "全球政经局势", "number": 11, "type": "llm"}
 
 
 def _order_with_action() -> list[dict]:
@@ -65,7 +65,7 @@ def _render(action_data, action_enabled: bool = True) -> "BeautifulSoup":
 
 
 def _action_data(**extra) -> dict:
-    """构造 C19 契约 action_data mock（含 1 条再平衡信号）。"""
+    """构造数据契约 action_data mock（含 1 条再平衡信号）。"""
     d = {
         "available": True,
         "summary": "再平衡建议 1 条：组合内存在超警戒线品种，建议减持。",
@@ -81,13 +81,13 @@ def _action_data(**extra) -> dict:
 
 
 class TestHtmlActionSection(unittest.TestCase):
-    """行动建议章节（20 章）HTML 呈现测试。"""
+    """行动建议章节 HTML 呈现测试。"""
 
     def _section(self, action_data, action_enabled: bool = True):
         return _render(action_data, action_enabled=action_enabled).find(id="sec-action")
 
     def test_full_rendering_when_enabled(self):
-        """enable_action 开 + available=True → 20 章完整行动板块。"""
+        """enable_action 开 + available=True → 完整行动板块。"""
         section = self._section(_action_data())
         self.assertIsNotNone(section, "enable_action 开启时应有 #sec-action 章节")
         text = section.get_text()
@@ -166,44 +166,44 @@ class TestHtmlActionSection(unittest.TestCase):
         self.assertNotIn("① 再平衡信号", text)
 
     def test_hidden_when_action_disabled(self):
-        """enable_action 关 → 20 章整体不渲染。"""
+        """enable_action 关 → 行动建议章节整体不渲染。"""
         section = self._section(_action_data(), action_enabled=False)
         self.assertIsNone(section, "enable_action 关闭时不应有 #sec-action 章节")
 
 
 class TestHtmlActionSummaryInExpertReview(unittest.TestCase):
-    """14 章智囊团深度复盘「行动摘要」子块测试。"""
+    """「智囊团深度复盘」章行动摘要子块测试。"""
 
     def _expert_section(self, action_data, action_enabled: bool = True):
         return _render(action_data, action_enabled=action_enabled).find(id="sec-expert_review")
 
     def test_summary_subblock_when_enabled(self):
-        """enable_action 开 + 数据可用 → 14 章出现「行动摘要」子块（引用 20 章）。"""
+        """enable_action 开 + 数据可用 → 该章出现「行动摘要」子块（引用行动建议章）。"""
         section = self._expert_section(_action_data())
         text = section.get_text()
         self.assertIn("行动摘要", text)
-        self.assertIn("第 20 章", text)  # 引用 20 章序号（本清单 action=20）
+        self.assertIn("第 17 章", text)  # 引用行动建议章序号（本清单 action=17）
         self.assertIn("再平衡建议 1 条", text)
 
     def test_summary_subblock_hidden_when_disabled(self):
-        """enable_action 关 → 14 章无「行动摘要」子块（与现状一致）。"""
+        """enable_action 关 → 该章无「行动摘要」子块（与现状一致）。"""
         section = self._expert_section(_action_data(), action_enabled=False)
         text = section.get_text()
         self.assertNotIn("行动摘要", text)
         self.assertNotIn("再平衡建议", text)
 
     def test_summary_subblock_hidden_when_unavailable(self):
-        """available=False → 14 章不显示行动摘要（数据不可用，与现状一致）。"""
+        """available=False → 该章不显示行动摘要（数据不可用，与现状一致）。"""
         section = self._expert_section(_action_data(available=False))
         text = section.get_text()
         self.assertNotIn("行动摘要", text)
 
 
 class TestActionSingleSource(unittest.TestCase):
-    """单源计算断言 — 20 章与 14 章共享同一 action_data 对象（无重复计算）。"""
+    """单源计算断言 — 「行动建议」与「智囊团深度复盘」共享同一 action_data 对象（无重复计算）。"""
 
     def test_single_source_same_summary(self):
-        """20 章与 14 章渲染同一 summary 文本（同一数据源，两处呈现）。"""
+        """「行动建议」与「智囊团深度复盘」渲染同一 summary 文本（同一数据源，两处呈现）。"""
         action_data = _action_data()  # 单个对象实例，注入模板 context
         soup = _render(action_data)
         action_sec = soup.find(id="sec-action").get_text()
@@ -214,11 +214,11 @@ class TestActionSingleSource(unittest.TestCase):
         self.assertEqual(
             action_sec.count("再平衡建议 1 条"),
             1,
-            "20 章仅展示一次行动摘要行（来自单一 action_data）",
+            "「行动建议」仅展示一次行动摘要行（来自单一 action_data）",
         )
 
     def test_single_source_consistent_signal_count(self):
-        """信号数一致：20 章信号表行数与摘要文案一致（单一计算对象）。"""
+        """信号数一致：「行动建议」信号表行数与摘要文案一致（单一计算对象）。"""
         action_data = _action_data()
         soup = _render(action_data)
         action_sec = soup.find(id="sec-action")

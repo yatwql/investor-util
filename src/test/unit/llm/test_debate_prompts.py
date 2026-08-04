@@ -1,6 +1,6 @@
 """LLM 辩论模式提示词模块单元测试 — System Prompt 模板和 Prompt 构建函数。
 
-覆盖 I-02 提示词内容验证：
+覆盖 提示词内容验证：
   - _SYSTEM_DEBATE_PRO 正面关键词
   - _SYSTEM_DEBATE_CON 四个风险维度
   - _SYSTEM_DEBATE_SYNTHESIS 白脸/黑脸占位符
@@ -61,7 +61,7 @@ class TestDebateSystemPrompts(unittest.TestCase):
     def test_system_debate_conditional_scenario_exists(self):
         """_SYSTEM_DEBATE_CONDITIONAL_SCENARIO 模板存在且包含 {name}/{desc} 占位符。
 
-        条件推理情景模板（I-04 模式 2）用于在提示词中注入预设上/下行情景。
+ 条件推理情景模板（模式 2）用于在提示词中注入预设上/下行情景。
         该常量未在 prompts_core.py 中定义时跳过测试。
         """
         try:

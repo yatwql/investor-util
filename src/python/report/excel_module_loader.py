@@ -148,21 +148,13 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
 
     try:
         from src.python.report.fund_style_report import analyze_style_for_all_funds
-        from src.python.report.fund_style_sheet import write_style_sheet
+        from src.python.report.style_factor_sheet import write_style_factor_sheet
 
         modules["analyze_style_for_all_funds"] = analyze_style_for_all_funds
-        modules["write_style_sheet"] = write_style_sheet
+        modules["write_style_factor_sheet"] = write_style_factor_sheet
     except ImportError:
         modules["analyze_style_for_all_funds"] = lambda _fh: {"results": []}
-        modules["write_style_sheet"] = None
-        prog.add_error("基金风格分析模块缺失 (fund_style)")
-
-    try:
-        from src.python.report.factor_exposure_sheet import write_factor_exposure_sheet
-
-        modules["write_factor_exposure_sheet"] = write_factor_exposure_sheet
-    except ImportError:
-        modules["write_factor_exposure_sheet"] = None
-        prog.add_error("因子暴露分析模块缺失 (factor_exposure)")
+        modules["write_style_factor_sheet"] = None
+        prog.add_error("风格与因子分析模块缺失 (style_factor)")
 
     return modules

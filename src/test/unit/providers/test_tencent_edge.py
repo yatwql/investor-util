@@ -1,6 +1,6 @@
 """Tencent 指数 K 线边缘场景测试。
 
-必须放在 *_edge.py 文件中（C12 约束）。
+必须放在 *_edge.py 文件中（边缘测试文件隔离）。
 """
 
 from __future__ import annotations

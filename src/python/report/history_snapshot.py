@@ -1,6 +1,6 @@
 """持仓快照持久化：保存/加载/列表/清理。
 
-C3 约束：所有文件写入使用 tempfile.mkstemp + os.replace 确保原子性。
+所有文件写入使用 tempfile.mkstemp + os.replace 确保原子性。
 竞争条件防护：快照文件名使用时间戳（snapshot_{timestamp}.json）。
 
 用法：
@@ -105,7 +105,7 @@ def _snapshot_from_dict(d: dict[str, Any]) -> SnapshotData:
 def save(snapshot: SnapshotData) -> str:
     """将 SnapshotData 保存为快照 JSON 文件。
 
-    使用 tempfile.mkstemp + os.replace 确保原子写入（C3 约束）。
+    使用 tempfile.mkstemp + os.replace 确保原子写入。
     文件名格式：snapshot_{timestamp}.json（timestamp = ISO 格式）。
 
     Args:
@@ -126,7 +126,7 @@ def save(snapshot: SnapshotData) -> str:
     data = _snapshot_to_dict(snapshot)
     content = json.dumps(data, ensure_ascii=False, indent=2)
 
-    # C3 约束：tempfile.mkstemp + os.replace
+    # 原子写入：tempfile.mkstemp + os.replace
     fd, tmp_path = tempfile.mkstemp(
         suffix=".json",
         prefix=".snapshot_tmp_",

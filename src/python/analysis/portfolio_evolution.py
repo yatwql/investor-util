@@ -1,7 +1,7 @@
 """组合演进分析 — 多快照趋势聚合。
 
 聚合 `data/history/snapshots/` 下已持久化的多期持仓快照，输出组合
-演进趋势数据（C19 契约 `evolution_data`），供 HTML「组合演进」章节
+演进趋势数据（数据契约 `evolution_data`），供 HTML「组合演进」章节
 与 Excel 页签消费。
 
 可派生指标（快照字段内计算，无新数据源依赖）：
@@ -105,7 +105,7 @@ def build_evolution_data(
     min_snapshots: int = _DEFAULT_MIN_SNAPSHOTS,
     top_n: int = _DEFAULT_TOP_N,
 ) -> dict[str, Any]:
-    """构建组合演进 C19 契约 dict。
+    """构建组合演进数据契约 dict。
 
     从快照目录加载全部快照 → 按日期去重 → 派生各趋势序列。
 

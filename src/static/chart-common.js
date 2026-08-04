@@ -5,10 +5,10 @@
  *   lineOptions(yLabel)      — 折线图通用配置（净值/回撤/组合演进趋势共用）
  *   doughnutOptions(percent) — 环形图通用配置（图例右侧；percent=true 时 tooltip 显示百分比）
  *
- * 主题色统一取自 window.ChartTheme（chart-config.js，A3 色盲安全 palette），
+ * 主题色统一取自 window.ChartTheme（chart-config.js，色盲安全 palette），
  * 避免 Python/JS 调色板漂移与各页复制配置。
- * 缺 ChartPrint/ChartExport 引擎时静默跳过登记（O1 隔离，单页不加载也安全）。
- * ES5 保守语法（R17/R22）。
+ * 缺 ChartPrint/ChartExport 引擎时静默跳过登记（隔离，单页不加载也安全）。
+ * ES5 保守语法。
  */
 (function () {
   'use strict';

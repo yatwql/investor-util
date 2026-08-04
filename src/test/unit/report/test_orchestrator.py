@@ -145,13 +145,13 @@ class TestPrepareReportData:
             "output_dir",
             "news_top_count",
             "risk_metrics",
-            "factor_exposure",
+            "style_factor_data",
             "position_relationship_data",
             # 品种覆盖诊断：品种级数据状态标注契约
             "position_status",
             # 可信度摘要：新鲜度分类 + 单日跳变检测契约
             "data_freshness",
-            # 行动建议单一数据源：20 章行动板块 + 14 章行动摘要共享（C19 契约）
+            # 行动建议单一数据源：「行动建议」章行动板块 + 「智囊团深度复盘」章行动摘要共享（数据契约）
             "action_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
@@ -216,7 +216,7 @@ class TestGenerateReport:
         assert result.holdings_ok is True
         assert result.report_generated is True
         assert result.exit_code == 0
-        # 验证 generate_excel_report 被正确调用（数据质量仪表盘子模块默认关）
+        # 验证 generate_excel_report 被正确调用（数据质量仪表盘/成本流式子模块默认关）
         mock_gen.assert_called_once_with(
             mock_holdings,
             include_news=False,
@@ -224,6 +224,9 @@ class TestGenerateReport:
             section_order=[{"key": "overview"}],
             progress=mock_reporter,
             enable_data_quality=False,
+            enable_cost_lots=False,
+            transactions=None,
+            dividends=None,
         )
         # 验证不调用数据准备/快照/历史等函数
         with pytest.raises(AssertionError):

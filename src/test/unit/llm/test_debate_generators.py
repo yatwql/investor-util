@@ -1,6 +1,6 @@
 """LLM 辩论模式生成模块单元测试 — generate_debate_procon 流程与幻觉过滤。
 
-覆盖 I-03 辩论模式生成逻辑：
+覆盖 辩论模式生成逻辑：
   - generate_debate_procon 正常/异常流程（pro → con → synthesis 三步）
   - system_prompt/user_prompt 覆盖参数正确传递
   - _filter_hallucinated_codes 虚构代码过滤行为

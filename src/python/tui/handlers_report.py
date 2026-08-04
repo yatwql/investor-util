@@ -72,14 +72,17 @@ def _run_generate(
     """
     reporter = TuiProgressReporter()
     config = get_config_cache() or {}
-    holdings = prepare_holdings()
-    if not holdings:
+    prepared = prepare_holdings()
+    if not prepared:
         return None
+    holdings, transactions, dividends = prepared
     kwargs: dict = {
         "holdings": holdings,
         "config": config,
         "reporter": reporter,
         "report_type": report_type,
+        "transactions": transactions,
+        "dividends": dividends,
     }
     if fetch_history is not None:
         kwargs["fetch_history"] = fetch_history

@@ -14,7 +14,7 @@ class _PhaseTimeoutState:
     """phase_timeout 的可变状态容器，避免模块级 global 变量。
 
     通过包装为对象属性访问而非 module-level global 关键字，
-    满足 C14 约束。提供 reset() 方法供测试隔离使用。
+    满足 渲染数据经context传递 约束。提供 reset() 方法供测试隔离使用。
     """
 
     def __init__(self) -> None:

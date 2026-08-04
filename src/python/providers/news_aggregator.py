@@ -74,7 +74,7 @@ def _save_news_cache(cache_key: str, result: list[dict]) -> None:
     _nset(cache_key, result)
 
 
-# ── 上次获取的各源状态（用于 D-7b 空态占位） ──────────────────
+# ── 上次获取的各源状态（用于 空态占位） ──────────────────
 
 _last_src_results: dict[str, tuple[int, str]] = {}
 _src_results_lock = threading.Lock()

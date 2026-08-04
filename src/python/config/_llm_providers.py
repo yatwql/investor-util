@@ -198,9 +198,9 @@ def _parse_providers_list(raw_config: dict) -> list[dict] | None:
         if entry.get("credentials_ref"):
             entry_dict["credentials_ref"] = entry["credentials_ref"]
         else:
-            # C18 合规：强制使用 credentials_ref
+            # 凭据分离：强制使用 credentials_ref
             logger.warning(
-                "provider '%s' 内嵌 api_key 违反 C18 凭据分离约束，"
+                "provider '%s' 内嵌 api_key 违反 凭据分离 凭据分离约束，"
                 "将在运行时自动迁入凭据字典。请将 api_key 迁移到 "
                 "llm_key.json 并使用 credentials_ref 引用",
                 name,
@@ -277,7 +277,7 @@ def _inject_provider_chain_data(config: dict) -> dict:
                         ref,
                     )
 
-        # ── 内联 api_key 自动注入凭据字典（C18 凭据分离） ──
+        # ── 内联 api_key 自动注入凭据字典（凭据分离） ──
         provider_list = config.get("_provider_list")
         if provider_list:
             for entry in provider_list:

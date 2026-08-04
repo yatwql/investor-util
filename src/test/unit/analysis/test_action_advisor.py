@@ -1,7 +1,7 @@
-"""行动建议单一数据源单元测试（20 章「行动建议」计算层）。
+"""行动建议单一数据源单元测试（「行动建议」计算层）。
 
 测试目标：
-  - build_action_data 输出 C19 `action_data` 契约（available/子块/摘要）
+  - build_action_data 输出 `action_data` 契约（available/子块/摘要）
   - 再平衡信号：单品超限触发、全部合规为空、无持仓不可用
   - 交易纪律：收益率超止盈/止损线时信号流入 discipline_signals
   - 调仓建议/收益归因：后续轮次填充（当前为空骨架）
@@ -177,7 +177,7 @@ class TestBuildActionData:
         assert data["rebalance_signals"] == []
 
     def test_single_source_no_global_state(self):
-        """重复调用返回独立对象（不共享模块级状态，C14 合规）。"""
+        """重复调用返回独立对象（不共享模块级状态）。"""
         a = build_action_data(_concentrated_holdings(), 10000.0)
         b = build_action_data(_concentrated_holdings(), 10000.0)
         assert a is not b

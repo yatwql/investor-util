@@ -166,6 +166,7 @@
 
         .section { background: var(--surface); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; overflow-x: auto; }
         .section-title { background: #2E75B6; color: #fff; padding: 12px 20px; font-size: 16px; font-weight: 600; }
+        .block-title { font-size: 14px; font-weight: 600; margin: 14px 0 6px; padding-left: 8px; border-left: 3px solid #2E75B6; }
         .experimental-badge { background: var(--experimental-badge-bg); color: var(--experimental-badge-text); font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: normal; margin-left: 10px; vertical-align: middle; }
         .debate-block { margin: 12px 0; padding: 14px 16px; border-radius: 6px; }
         .debate-block .debate-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
@@ -836,10 +837,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 {% endif %}
 
 {% if enable_interactive_charts %}
-{# Chart.js 交互图表（R21 本地 bundle：相对路径，离线自包含） #}
-{# chart_datasets 数据经 context 传递（C14 合规，不写 _ENV.globals） #}
+{# Chart.js 交互图表（本地 bundle：相对路径，离线自包含） #}
+{# chart_datasets 数据经 context 传递（不写 _ENV.globals） #}
 <script type="application/json" id="chart-data">{{ chart_datasets | tojson }}</script>
-{# P3（R21 本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-export → chart-common → chart-init） #}
+{# （本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-export → chart-common → chart-init） #}
 <script defer src="chart.min.js"></script>
 <script defer src="chart-print.js"></script>
 <script defer src="chart-config.js"></script>
@@ -847,7 +848,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 <script defer src="chart-common.js"></script>
 <script defer src="chart-init.js"></script>
 {% endif %}
-{# 左侧目录 TOC（独立于图表开关，始终加载；R21 本地 bundle） #}
+{# 左侧目录 TOC（独立于图表开关，始终加载；本地 bundle） #}
 <script defer src="toc.js"></script>
 {# 主题切换（暗色模式（主题切换），独立于图表开关，始终加载） #}
 <script defer src="theme.js"></script>
@@ -984,6 +985,12 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     <h3>本日收益率</h3>
                     <div class="value" style="color: {{ today_profit_rate | profit_color }}">{{ today_profit_rate | pct }}</div>
                 </div>
+                {% if flow_display and flow_display.xirr_rate is not none %}
+                <div class="summary-card">
+                    <h3>资金加权收益率 (XIRR)</h3>
+                    <div class="value" style="color: {{ flow_display.xirr_rate | profit_color }}">{{ flow_display.xirr_rate | pct }}</div>
+                </div>
+                {% endif %}
             </div>
 
             <br>
@@ -1045,6 +1052,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <th>账户</th><th>名称</th><th>代码</th><th>最新价</th><th>净值日期</th>
                         <th>昨日价</th><th>取价方式</th><th>溢价率</th><th>份额</th><th>市值</th>
                         <th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>取价渠道</th>
+                        {% if flow_display %}<th>资金加权成本</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -1070,6 +1078,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ d.profit_rate | profit_color }}">{{ d.profit_rate | pct }}</td>
                             <td class="text-right" style="color: {{ d.today_profit | profit_color }}">{{ d.today_profit | money }}</td>
                             <td>{{ d.source }}</td>
+                            {% if flow_display %}
+                            {% set wac = flow_display.cost_map.get(d.code) %}
+                            <td class="text-right">{% if wac is not none %}{{ wac | price }}{% else %}--{% endif %}</td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                         {% set acc_tot = account_totals.get(acc_name, {}) %}
@@ -1083,6 +1095,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ acc_tot.get("profit_rate", 0) | profit_color }}">{{ acc_tot.get("profit_rate", 0) | pct }}</td>
                             <td class="text-right" style="color: {{ acc_tot.get("today_profit", 0) | profit_color }}">{{ acc_tot.get("today_profit", 0) | money }}</td>
                             <td></td>
+                            {% if flow_display %}<td></td>{% endif %}
                         </tr>
                         {% set grand_mv.v = grand_mv.v + acc_tot.get("market_value", 0) %}
                         {% set grand_cost.v = grand_cost.v + acc_tot.get("cost", 0) %}
@@ -1100,6 +1113,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td class="text-right" style="color: {{ (g_rate / 100) | profit_color }}">{{ g_rate | change }}</td>
                         <td class="text-right" style="color: {{ grand_today.v | profit_color }}">{{ grand_today.v | money }}</td>
                         <td></td>
+                        {% if flow_display %}<td></td>{% endif %}
                     </tr>
                 </tbody>
             </table>
@@ -1118,6 +1132,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     <tr>
                         <th>资产属性</th><th>投资分类</th><th>名称</th><th>代码</th>
                         <th>市值</th><th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>年均股息率</th>
+                        {% if flow_display %}<th>成本分档</th><th>分红累计</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -1138,6 +1153,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ item["profit_rate"] | profit_color }}">{{ item["profit_rate"] | pct }}</td>
                             <td class="text-right" style="color: {{ item["today_profit"] | profit_color }}">{{ item["today_profit"] | money }}</td>
                             <td>{{ item.get("yield_text", "--") }}</td>
+                            {% if flow_display %}
+                            <td>{{ flow_display.tier_map.get(item["code"], "--") }}</td>
+                            <td class="text-right">{{ flow_display.div_map.get(item["code"], 0.0) | money }}</td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                         <tr class="subtotal-row">
@@ -1149,6 +1168,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ group["sub_rate"] | profit_color }}">{{ group["sub_rate"] | pct }}</td>
                             <td class="text-right" style="color: {{ group["sub_today"] | profit_color }}">{{ group["sub_today"] | money }}</td>
                             <td></td>
+                            {% if flow_display %}<td></td><td></td>{% endif %}
                         </tr>
                         </tr>
                         {% set cat_grand_mv.v = cat_grand_mv.v + group["sub_mv"] %}
@@ -1165,6 +1185,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td class="text-right" style="color: {{ (cat_g_rate / 100) | profit_color }}">{{ cat_g_rate | change }}</td>
                         <td class="text-right" style="color: {{ cat_grand_today.v | profit_color }}">{{ cat_grand_today.v | money }}</td>
                         <td></td>
+                        {% if flow_display %}<td></td><td></td>{% endif %}
                     </tr>
                 </tbody>
             </table>
@@ -1315,6 +1336,50 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
         {% else %}
         <div class="empty-note">未检测到基金持仓</div>
+        {% endif %}
+        {% if candidate_data and candidate_data.get("available") %}
+        <div class="block-title">候选基金比较（候选来自 config.comparison_candidates）</div>
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>候选基金</th><th>代码</th><th>评级</th><th>近1月</th><th>近3月</th><th>近6月</th><th>近1年</th>
+                        <th>同类排名</th><th>最大回撤</th><th>风格</th><th>与持仓重合</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in candidate_data["rows"] %}
+                    {% if c.get("available") %}
+                    <tr>
+                        <td class="text-left">{{ c["name"] }}</td>
+                        <td>{{ c["code"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{{ c["rating"] }}</td>
+                        <td class="{% if c.get('syl_近1月_raw') is number %}{% if c['syl_近1月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近1月"] }}</td>
+                        <td class="{% if c.get('syl_近3月_raw') is number %}{% if c['syl_近3月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近3月"] }}</td>
+                        <td class="{% if c.get('syl_近6月_raw') is number %}{% if c['syl_近6月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近6月"] }}</td>
+                        <td class="{% if c.get('syl_近1年_raw') is number %}{% if c['syl_近1年_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近1年"] }}</td>
+                        <td>{{ c["rank_text"] }}</td>
+                        <td class="{% if c.get('max_drawdown_raw') is number and c['max_drawdown_raw'] < 0 %}loss{% endif %}">{{ c["max_drawdown"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{{ c["style"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{% if c.get("overlap_name") %}{{ c["overlap_jaccard"] }}（{{ c["overlap_name"] }}）{% else %}{{ c["overlap_jaccard"] }}{% endif %}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="text-left">{{ c.get("name", c["code"]) }}</td>
+                        <td>{{ c["code"] }}</td>
+                        <td colspan="9" class="text-left" style="font-size: 12px; color: #b0413e;">数据获取失败（排名接口不可用），该候选跳过</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if candidate_data.get("exceed_limit") %}
+        <div class="penetration-notes"><div>* 候选基金超过 10 只，仅比较前 10 只（超出部分忽略）。</div></div>
+        {% endif %}
+        {% if candidate_data.get("invalid") %}
+        <div class="penetration-notes"><div>* 无效候选代码（忽略）: {{ candidate_data["invalid"] | join('、') }}。</div></div>
+        {% endif %}
         {% endif %}
         <div class="penetration-notes">
             <div>* 业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿)；超额收益评分≥80上调一级、&lt;40下调一级</div>
@@ -1694,13 +1759,17 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% endif %}
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  基金风格分析                                         -->
+    <!--  风格与因子分析（一章三区块：风格表 + 因子回归 + 行业 Beta） -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("fund_style") %}
+    {% if section_visible("style_factor") %}
     {% set style_results = style_analysis["results"] %}
-    <div class="section" id="sec-fund_style" style="order: {{ section_numbers['fund_style'] }};">
-        <div class="section-title">{{ section_numbers['fund_style'] }}、基金风格分析</div>
+    {% set sf_data = style_factor_data %}
+    {% set ind_beta = sf_data.get("industry_beta") if sf_data else none %}
+    <div class="section" id="sec-style_factor" style="order: {{ section_numbers['style_factor'] }};">
+        <div class="section-title">{{ section_numbers['style_factor'] }}、风格与因子分析</div>
         <div class="section-content">
+            <!-- 区块一：基金风格表 -->
+            <div class="block-title">一、基金风格表</div>
             {% if style_results %}
             {% set drifted = style_results | selectattr("drift_level", "in", ["轻度", "中度", "严重"]) | list %}
             {% if drifted %}
@@ -1741,23 +1810,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% else %}
             <div class="empty-section">📭 暂无基金风格分析数据（未检测到基金持仓或 API 返回为空）</div>
             {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
 
-    {% if section_visible("factor_exposure") %}
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  因子暴露分析                                        -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section" id="sec-factor_exposure" style="order: {{ section_numbers['factor_exposure'] }};">
-        <div class="section-title">{{ section_numbers['factor_exposure'] }}、因子暴露分析</div>
-        <div class="section-content">
-            {% if factor_exposure and factor_exposure.get("available") %}
+            <!-- 区块二：风格因子回归 -->
+            <div class="block-title">二、风格因子回归</div>
+            {% if sf_data and sf_data.get("available") %}
             <div class="summary-tag" style="margin-bottom: 8px;">
-                基于最近 <strong>{{ factor_exposure["window"] }}</strong> 个交易日 OLS 回归（有效样本 {{ factor_exposure["sample_count"] }} 期）
-                {% if factor_exposure.get("stale_factors") %}
-                <span style="color:var(--warn-text);"> · 已剔除停更因子：{{ factor_exposure["stale_factors"] | join("、") }}</span>
+                基于最近 <strong>{{ sf_data["window"] }}</strong> 个交易日 OLS 回归（有效样本 {{ sf_data["sample_count"] }} 期）
+                {% if sf_data.get("stale_factors") %}
+                <span style="color:var(--warn-text);"> · 已剔除停更因子：{{ sf_data["stale_factors"] | join("、") }}</span>
                 {% endif %}
             </div>
             <table>
@@ -1768,14 +1828,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </thead>
                 <tbody>
                     {% for f in ["value", "growth", "quality"] %}
-                    {% if f in factor_exposure["betas"] %}
-                    {% set _alloc = factor_exposure["style_allocation"].get(f, 0) %}
+                    {% if f in sf_data["betas"] %}
+                    {% set _alloc = sf_data["style_allocation"].get(f, 0) %}
                     {% set _bar_w = (_alloc * 100) | round(1) %}
                     <tr>
                         <td>{{ factor_names.get(f, f) }}</td>
-                        <td>{{ factor_exposure["betas"][f] }}</td>
-                        <td>{{ factor_exposure["t_stats"].get(f, "--") }}</td>
-                        <td>{% if factor_exposure["significant"].get(f) %}✅ 显著{% else %}—{% endif %}</td>
+                        <td>{{ sf_data["betas"][f] }}</td>
+                        <td>{{ sf_data["t_stats"].get(f, "--") }}</td>
+                        <td>{% if sf_data["significant"].get(f) %}✅ 显著{% else %}—{% endif %}</td>
                         <td>
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <div style="flex:1; background:var(--progress-track); border-radius:4px; height:14px;">
@@ -1789,15 +1849,15 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     {% endfor %}
                 </tbody>
             </table>
-            {% if factor_exposure.get("factor_correlations") %}
+            {% if sf_data.get("factor_correlations") %}
             <div class="penetration-notes">
-                <div>* 因子间相关性：{% for pair, v in factor_exposure["factor_correlations"].items() %}{{ pair }}={{ v }}　{% endfor %}</div>
-                {% if factor_exposure.get("correlation_note") %}
-                <div style="color:var(--warn-text);">* {{ factor_exposure["correlation_note"] }}</div>
+                <div>* 因子间相关性：{% for pair, v in sf_data["factor_correlations"].items() %}{{ pair }}={{ v }}　{% endfor %}</div>
+                {% if sf_data.get("correlation_note") %}
+                <div style="color:var(--warn-text);">* {{ sf_data["correlation_note"] }}</div>
                 {% endif %}
             </div>
             {% endif %}
-            {% if factor_exposure.get("baseline_betas") %}
+            {% if sf_data.get("baseline_betas") %}
             <div class="summary-tag" style="margin: 10px 0 4px;">基准对照（沪深300 同窗口回归）</div>
             <table>
                 <thead>
@@ -1805,12 +1865,12 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </thead>
                 <tbody>
                     {% for f in ["value", "growth", "quality"] %}
-                    {% if f in factor_exposure["betas"] and f in factor_exposure["baseline_betas"] %}
-                    {% set _rel = factor_exposure["betas"][f] - factor_exposure["baseline_betas"][f] %}
+                    {% if f in sf_data["betas"] and f in sf_data["baseline_betas"] %}
+                    {% set _rel = sf_data["betas"][f] - sf_data["baseline_betas"][f] %}
                     <tr>
                         <td>{{ factor_names.get(f, f) }}</td>
-                        <td>{{ factor_exposure["betas"][f] }}</td>
-                        <td>{{ factor_exposure["baseline_betas"][f] }}</td>
+                        <td>{{ sf_data["betas"][f] }}</td>
+                        <td>{{ sf_data["baseline_betas"][f] }}</td>
                         <td class="{% if _rel > 0.1 %}red-text{% elif _rel < -0.1 %}green-text{% endif %}">{{ _rel | round(3) }}</td>
                     </tr>
                     {% endif %}
@@ -1819,15 +1879,58 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </table>
             {% endif %}
             <div class="penetration-notes">
-                <div>* 因子暴露 = 组合日收益对因子指数日收益的 OLS 回归系数 β（窗口 {{ factor_exposure["window"] }} 期）</div>
-                <div>* α（截距）={{ factor_exposure.get("alpha", 0) }}；t 值显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
+                <div>* 因子暴露 = 组合日收益对因子指数日收益的 OLS 回归系数 β（窗口 {{ sf_data["window"] }} 期）</div>
+                <div>* α（截距）={{ sf_data.get("alpha", 0) }}；t 值显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
                 <div>* 风格归属占比 = |β| 归一化；基准对照用于判断组合相对市场风格的偏离</div>
             </div>
-            {% elif factor_exposure %}
-            {% if factor_exposure.get("status") == "source_failed" %}
+            {% elif sf_data %}
+            {% if sf_data.get("status") == "source_failed" %}
             <div class="empty-section">📭 因子数据源暂不可用，请稍后重试</div>
             {% else %}
-            <div class="empty-section">📭 因子暴露数据不足（有效样本 {{ factor_exposure.get("sample_count", 0) }} 期，低于阈值 36），暂不计算</div>
+            <div class="empty-section">📭 因子暴露数据不足（有效样本 {{ sf_data.get("sample_count", 0) }} 期，低于阈值 36），暂不计算</div>
+            {% endif %}
+            {% else %}
+            <div class="empty-section">📭 因子暴露数据暂不可用</div>
+            {% endif %}
+
+            <!-- 区块三：行业 Beta 子表（开关关闭时 ind_beta 为 none → 不渲染） -->
+            {% if ind_beta %}
+            <div class="block-title">三、行业 Beta（组合对各行业指数敏感性）</div>
+            {% if ind_beta.get("available") %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>行业</th><th>暴露占比</th><th>指数代码</th><th>β</th><th>t 值</th><th>显著（95%）</th><th>相关性 r</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ind in ind_beta["betas"].keys() %}
+                    <tr>
+                        <td>{{ ind }}</td>
+                        <td>{{ "{:.2%}".format(ind_beta["exposure"].get(ind, 0)) }}</td>
+                        <td>{{ ind_beta["index_codes"].get(ind, "--") }}</td>
+                        <td>{{ ind_beta["betas"][ind] }}</td>
+                        <td>{{ ind_beta["t_stats"].get(ind, "--") }}</td>
+                        <td>{% if ind_beta["significant"].get(ind) %}✅ 显著{% else %}—{% endif %}</td>
+                        <td>{{ ind_beta["correlations"].get(ind, "--") }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% for ind in ind_beta.get("unmapped_industries", []) %}
+                    <tr>
+                        <td>{{ ind }}</td>
+                        <td>{{ "{:.2%}".format(ind_beta["exposure"].get(ind, 0)) }}</td>
+                        <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 行业暴露占比按持仓市值加权；行业指数为中证行业指数（近似代理）</div>
+                <div>* β = 组合日收益对行业指数日收益的一元 OLS 系数（复用因子回归机制）；显著列为 95% 双尾 t 检验</div>
+                <div>* 仅参与暴露占比、无指数映射的行业（—）不参与 Beta 回归</div>
+            </div>
+            {% else %}
+            <div class="empty-section">📭 行业 Beta 数据不足（行业分类或指数 K 线缺失），子表不渲染</div>
             {% endif %}
             {% endif %}
         </div>
@@ -2029,7 +2132,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
         {% endif %}
 
-        <!-- 行动摘要子块：引用行动建议结果（单源计算、两处呈现，C14/C19） -->
+        <!-- 行动摘要子块：引用行动建议结果（单源计算、两处呈现，渲染数据经context传递/数据契约） -->
         {% if section_visible("action") and action_data and action_data.available %}
         <div class="section-content" style="margin-top: 12px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;">
             <div style="font-weight: bold; font-size: 14px; color: #2E75B6; margin-bottom: 6px;">
@@ -2109,7 +2212,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% if section_visible("portfolio_history_drawdown") %}
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!--  组合历史走势与回撤（一章两区块：走势表 + 回撤矩阵）        -->
-    <!--  危机区间标注：净值曲线分段着色（2015/2018/2020/2022，C20 图下说明） -->
+    <!--  危机区间标注：净值曲线分段着色（2015/2018/2020/2022，图下说明） -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <div class="section" id="sec-portfolio_history_drawdown" style="order: {{ section_numbers['portfolio_history_drawdown'] }};">
         <div class="section-title">
@@ -2168,7 +2271,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     </div>
                 </div>
             </div>
-            <!-- 尾部风险统计（VaR95/99、最大单日跌幅、连续下跌、恢复天数；样本不足写占位，C20 附说明） -->
+            <!-- 尾部风险统计（VaR95/99、最大单日跌幅、连续下跌、恢复天数；样本不足写占位，图下说明） -->
             {% set _tail_ok = tail_risk_data and tail_risk_data.available %}
             <div class="summary-grid" style="margin-top:16px;">
                 {% if _tail_ok %}
@@ -2273,7 +2376,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% elif history_data.bars %}
             <div class="empty-section" style="margin-top:16px;">📭 历史回撤数据不足（有效交易日不足 {{ drawdown_min_span }} 天），暂不计算回撤事件</div>
             {% endif %}
-            <!-- ── 三、危机区间标注表（区间统计：区间回撤/恢复天数，C20 图下说明） ── -->
+            <!-- ── 三、危机区间标注表（区间统计：区间回撤/恢复天数，图下说明） ── -->
             {% if _crisis_ok %}
             <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">危机区间标注（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整）</div>
             {% if _crisis_in_range %}

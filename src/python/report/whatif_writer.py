@@ -8,7 +8,7 @@
 报告按主报告归档惯例输出到 output_dir（与主报告分离）：
   - 最新版固定名 `调仓模拟.xlsx` / `调仓模拟.html`（每次覆盖为最新对比）
   - 归档版 `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx` / `.html`（日期子目录）
-并复制 Chart.js 前端资产到同目录（离线自包含，R21 约束）；
+并复制 Chart.js 前端资产到同目录（离线自包含，约束）；
 超过 180 天的归档目录自动清理。
 """
 
@@ -37,7 +37,7 @@ def write_whatif_excel(whatif_data: dict[str, Any], output_dir: str = "reports")
     归档格式对齐主报告：`调仓模拟.xlsx`（最新版，覆盖）+ `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx`（归档版）。
 
     Args:
-        whatif_data: C19 契约 dict
+        whatif_data: 数据契约 dict
         output_dir: 输出目录
 
     Returns:
@@ -77,9 +77,9 @@ def write_whatif_excel(whatif_data: dict[str, Any], output_dir: str = "reports")
 
 
 def _trim_whatif_chart_data(whatif_data: dict[str, Any] | None) -> dict[str, Any] | None:
-    """What-if 图表数据专用裁剪（避免整包 tojson，R9 数据最小化）。
+    """What-if 图表数据专用裁剪（避免整包 tojson，数据最小化）。
 
-    whatif_data（C19 契约）含 summary/changes/stats/base/candidate 等表格字段，
+    whatif_data（数据契约）含 summary/changes/stats/base/candidate 等表格字段，
     双环图只需 categories（图表 JS 读取 whatif.categories）。保留 available 便于
     JS 侧可用性判断；数据不足（None/available=False）返回 None（模板不输出数据段）。
     """
@@ -89,7 +89,7 @@ def _trim_whatif_chart_data(whatif_data: dict[str, Any] | None) -> dict[str, Any
 
 
 def _trim_whatif_backtest_chart_data(whatif_data: dict[str, Any] | None) -> dict[str, Any] | None:
-    """时序回测图表数据专用裁剪（R9 数据最小化）。
+    """时序回测图表数据专用裁剪（数据最小化）。
 
     只透传 series 字段（labels/base/candidate/base_drawdown/candidate_drawdown），
     避免把 metrics/reason 等表格字段整包 tojson 到前端。回测缺失/不可用时返回 None。
@@ -117,7 +117,7 @@ def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
     """渲染 whatif_template.html，返回完整 HTML 字符串。
 
     Args:
-        whatif_data: C19 契约 dict
+        whatif_data: 数据契约 dict
         now_str: 展示用时间字符串
 
     Returns:
@@ -139,7 +139,7 @@ def write_whatif_html(whatif_data: dict[str, Any], output_dir: str = "reports") 
     归档格式对齐主报告：`调仓模拟.html`（最新版，覆盖）+ `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.html`（归档版）。
 
     Args:
-        whatif_data: C19 契约 dict
+        whatif_data: 数据契约 dict
         output_dir: 输出目录
 
     Returns:
@@ -174,7 +174,7 @@ def write_whatif_report(
     """同时输出 Excel + HTML 调仓模拟报告。
 
     Args:
-        whatif_data: C19 契约 dict
+        whatif_data: 数据契约 dict
         output_dir: 输出目录
         reporter: 进度输出（CliProgressReporter），None 时静默
 

@@ -90,11 +90,11 @@ def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -
 
 
 def _inject_evolution_data(pipeline_data: dict | None) -> dict:
-    """计算组合演进数据并注入 pipeline_data（C19 `evolution_data` 键）。
+    """计算组合演进数据并注入 pipeline_data（`evolution_data` 键）。
 
     聚合 `data/history/snapshots/` 多期快照，供 HTML「组合演进」章节与
     Excel 页签消费。计算失败或数据不足时注入 available=False 的降级 dict，
-    展示层写占位文本（§1.4.5），不阻断报告生成（R11 隔离）。
+ 展示层写占位文本（§1.4.5），不阻断报告生成（隔离）。
 
     Args:
         pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
@@ -115,12 +115,12 @@ def _inject_evolution_data(pipeline_data: dict | None) -> dict:
 
 
 def _inject_snapshot_diff_data(pipeline_data: dict | None) -> dict:
-    """计算快照差异摘要并注入 pipeline_data（C19 `snapshot_diff_data` 键）。
+    """计算快照差异摘要并注入 pipeline_data（`snapshot_diff_data` 键）。
 
     对比 `data/history/snapshots/` 去重后最近两次快照，输出组合演进章顶部
     「自上次快照变化摘要」（新增/移除品种 + 集中度 HHI 变化 + 超警戒线品种）。
     有效快照 < 2 期时返回 available=False 的降级 dict，展示层写占位
-    （§1.4.5），不阻断报告生成（R11 隔离）。
+ （§1.4.5），不阻断报告生成（隔离）。
 
     Args:
         pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
@@ -206,14 +206,14 @@ def _prepare_full_risk_metrics(
     history_data = fetch_history_data(holdings, config, reporter, fetch=fetch_history)
     perf.stop()
 
-    # 危机区间标注（C19 crisis_annotation_data）：基于既有 bars 重叠裁剪，
+    # 危机区间标注（crisis_annotation_data）：基于既有 bars 重叠裁剪，
     # 复用历史数据不拉长 lookback（以 history.lookback_days 为准）
     if pipeline_data is not None:
         from src.python.analysis.crisis_annotation import build_crisis_annotation
 
         pipeline_data["crisis_annotation_data"] = build_crisis_annotation(history_data)
 
-        # 尾部风险统计（C19 tail_risk_data）：复用历史日收益序列计算 VaR/最大单日跌幅/
+        # 尾部风险统计（tail_risk_data）：复用历史日收益序列计算 VaR/最大单日跌幅/
         # 连续下跌/恢复天数；样本不足时 available=False（§1.4.5 数据降级）
         from src.python.analysis.tail_risk import compute_tail_risk
 
@@ -308,7 +308,7 @@ def _generate_full_html_report(
     debate_info: dict | None,
     result,
     metrics: dict | None = None,
-    factor_exposure: dict | None = None,
+    style_factor_data: dict | None = None,
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     enable_portfolio_evolution: bool = True,
@@ -320,27 +320,31 @@ def _generate_full_html_report(
     crisis_annotation_data: dict | None = None,
     tail_risk_data: dict | None = None,
     snapshot_diff_data: dict | None = None,
+    fund_flow_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
     Args:
         metrics: compute_all_metrics() 返回值（14 项全量，仅 full 路径）；
             用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
-        factor_exposure: 因子暴露分析 C19 契约 dict，
+        style_factor_data: 风格与因子分析数据契约 dict（style_factor_data 主键，
+            内嵌 industry_beta 子键），基金深度分析关闭或数据不足时为 None/available=False。
+        position_relationship_data: 持仓关系矩阵数据契约 dict（相关性区块数据源），
             基金深度分析关闭或数据不足时为 None/available=False。
-        position_relationship_data: 持仓关系矩阵 C19 契约 dict（相关性区块数据源），
-            基金深度分析关闭或数据不足时为 None/available=False。
-        evolution_data: 组合演进 C19 契约 dict（多快照趋势聚合），
+        evolution_data: 组合演进数据契约 dict（多快照趋势聚合），
             数据不足时 available=False（模板写占位）。
         enable_portfolio_evolution: board 层 — 组合演进章节是否开启。
         enable_data_quality: 子模块 — 数据质量仪表盘（默认关，保持旧样式）。
-        position_status: 品种覆盖诊断 C19 `position_status` 契约 dict，
+        position_status: 品种覆盖诊断 `position_status` 契约 dict，
             品种覆盖区块数据源（开关关闭时忽略）。
-        data_freshness: 可信度摘要 C19 `data_freshness` 契约 dict，
+        data_freshness: 可信度摘要 `data_freshness` 契约 dict，
             可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
         enable_action: board 层 — 行动建议章节是否开启（默认关）。
-        action_data: 行动建议单一数据源 C19 `action_data` 契约 dict，
+        action_data: 行动建议单一数据源 `action_data` 契约 dict，
             行动建议板块 + 智囊团深度复盘行动摘要数据源（开关关闭时忽略）。
+        fund_flow_data: 成本流水数据 dict
+            （汇总 XIRR / 持仓分类成本分档与分红 / 市值核算资金加权成本渲染数据源，
+            开关关闭或传入 None 时模板保持既有输出）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -379,7 +383,7 @@ def _generate_full_html_report(
             debate_info=debate_info,
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
-            factor_exposure=factor_exposure,
+            style_factor_data=style_factor_data,
             position_relationship_data=position_relationship_data,
             evolution_data=evolution_data,
             enable_data_quality=enable_data_quality,
@@ -389,6 +393,7 @@ def _generate_full_html_report(
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=snapshot_diff_data,
+            fund_flow_data=fund_flow_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -423,6 +428,9 @@ def _generate_full_excel_report(
     enable_portfolio_evolution: bool = True,
     enable_action: bool = False,
     enable_data_quality: bool = False,
+    enable_cost_lots: bool = False,
+    transactions: list | None = None,
+    dividends: list | None = None,
 ) -> bool:
     """full 路径的 Excel 报告生成，返回是否成功。"""
     from src.python.report.excel_generator import generate_excel_report
@@ -453,6 +461,9 @@ def _generate_full_excel_report(
             enable_llm=enable_llm,
             debate_info=debate_info,
             enable_data_quality=enable_data_quality,
+            enable_cost_lots=enable_cost_lots,
+            transactions=transactions,
+            dividends=dividends,
         )
         reporter.ok("Excel 报告已生成")
         return True
@@ -472,6 +483,8 @@ def _generate_report_both(
     reporter: ProgressReporter,
     fetch_history: bool = False,
     output_dir: str | None = None,
+    transactions: list | None = None,
+    dividends: list | None = None,
 ) -> "ReportResult":
     """both 报告路径：生成 HTML + Excel，不含 LLM 分析章节。
 
@@ -480,6 +493,7 @@ def _generate_report_both(
     """
     from src.python.config import (
         is_enable_action,
+        is_enable_cost_lots,
         is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
@@ -507,6 +521,7 @@ def _generate_report_both(
     _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
     _enable_action = is_enable_action(config)
     _enable_data_quality = is_enable_data_quality(config)
+    _enable_cost_lots = is_enable_cost_lots(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
@@ -520,14 +535,14 @@ def _generate_report_both(
     # ── 2. 快照对比（始终执行） ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, details, config, reporter)
-    # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
+    # 2b. 组合演进数据（聚合多期快照，evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
         pipeline_data = _inject_evolution_data(pipeline_data)
-        # 2b1. 快照差异摘要（C19 snapshot_diff_data）：组合演进章顶部变化摘要，
+        # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
         pipeline_data = _inject_snapshot_diff_data(pipeline_data)
     # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
-    #    （C19 position_status + data_freshness）
+    #    （position_status + data_freshness）
     from src.python.analysis.action_advisor import build_action_data
     from src.python.core.data_freshness import build_freshness_summary
     from src.python.core.holding_status import build_coverage_summary
@@ -543,7 +558,7 @@ def _generate_report_both(
             trading_day=get_last_trading_day(),
             prev_trading_day=get_prev_trading_day(),
         ),
-        # 行动建议单一数据源（C19 action_data）：行动建议板块 + 智囊团深度复盘行动摘要共享。
+        # 行动建议单一数据源（action_data）：行动建议板块 + 智囊团深度复盘行动摘要共享。
         # 传递完整估值字段（含 profit_rate/cost/profit），交易纪律（止盈/止损）
         # 依赖收益率数据。profit_rate 契约为百分比（小数 ×100，同 orchestrator 组装口径），
         # 纪律引擎以百分数阈值（如 +20%）比较，此处统一换算避免单位不一致。
@@ -581,14 +596,14 @@ def _generate_report_both(
         history_data = None
         reporter.info("[章节配置] 历史走势已关闭，跳过")
 
-    # 危机区间标注（C19 crisis_annotation_data）：基于既有 bars 重叠裁剪，不拉长 lookback
+    # 危机区间标注（crisis_annotation_data）：基于既有 bars 重叠裁剪，不拉长 lookback
     from src.python.analysis.crisis_annotation import build_crisis_annotation
 
     crisis_annotation_data = build_crisis_annotation(history_data)
     if pipeline_data is not None:
         pipeline_data["crisis_annotation_data"] = crisis_annotation_data
 
-    # 尾部风险统计（C19 tail_risk_data）：复用历史日收益序列，样本不足时 available=False
+    # 尾部风险统计（tail_risk_data）：复用历史日收益序列，样本不足时 available=False
     from src.python.analysis.tail_risk import compute_tail_risk
 
     tail_risk_data = compute_tail_risk((history_data or {}).get("bars"))
@@ -605,6 +620,11 @@ def _generate_report_both(
             details=details,
             enable_interactive=_enable_interactive_charts,
         )
+        # 成本流水数据（fund_flow_data）：复用 excel_market_data 组装逻辑，
+        # 开关关闭返回 None（HTML 模板保持既有输出）。
+        from src.python.report.excel_market_data import _build_flow_data
+
+        fund_flow_data = _build_flow_data(_enable_cost_lots, transactions, dividends, holdings, details)
         path = write_html_report(
             holdings,
             output_dir=output,
@@ -630,6 +650,7 @@ def _generate_report_both(
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
+            fund_flow_data=fund_flow_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -660,6 +681,9 @@ def _generate_report_both(
             enable_action=_enable_action,
             enable_llm=False,
             enable_data_quality=_enable_data_quality,
+            enable_cost_lots=_enable_cost_lots,
+            transactions=transactions,
+            dividends=dividends,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True
@@ -689,7 +713,7 @@ def _build_chart_datasets_for_report(
     """构建 Chart.js 数据集（Flag 关闭或数据缺失时返回 None/空 dict）。
 
     - Flag 关闭 → None（模板不渲染 Chart.js，回退旧 Canvas）
-    - Flag 开启 → build_chart_datasets()（内部对单图失败独立 try/except，R11）
+ - Flag 开启 → build_chart_datasets（内部对单图失败独立 try/except，）
 
     metrics_* 功能开关（Flag）：收集雷达子开关值传给预处理器，
     关闭的指标在 radar 数据集输出 "N/A"。注：metrics_risk_contribution
@@ -719,7 +743,7 @@ def _build_chart_datasets_for_report(
             metric_flags=metric_flags,
         )
     except Exception:
-        # 预处理器顶层兜底（R11）：任何异常 → 返回空 dict（报告仍有表格/占位）
+ # 预处理器顶层兜底：任何异常 → 返回空 dict（报告仍有表格/占位）
         logger.warning("[chart] 数据集构建失败，图表整体跳过（报告仍正常）", exc_info=True)
         return {}
 
@@ -734,6 +758,8 @@ def _generate_report_full(
     fetch_history: bool = False,
     force_llm: bool = False,
     output_dir: str | None = None,
+    transactions: list | None = None,
+    dividends: list | None = None,
 ) -> "ReportResult":
     """full 报告路径：生成 HTML + Excel + LLM 分析章节。
 
@@ -743,6 +769,7 @@ def _generate_report_full(
     """
     from src.python.config import (
         is_enable_action,
+        is_enable_cost_lots,
         is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
@@ -770,6 +797,7 @@ def _generate_report_full(
     _enable_action = is_enable_action(config)
     _enable_llm = is_enable_llm(config)
     _enable_data_quality = is_enable_data_quality(config)
+    _enable_cost_lots = is_enable_cost_lots(config)
     sec_order = get_report_section_order(config)
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
@@ -781,19 +809,19 @@ def _generate_report_full(
     # ── 2. 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
-    # 因子暴露 / 持仓关系矩阵 / 品种覆盖诊断：prep 中已组装（C19 契约），
+    # 风格与因子 / 持仓关系矩阵 / 品种覆盖诊断：prep 中已组装（数据契约），
     # 注入 pipeline_data 供 HTML/Excel 消费；capture_snapshot 在降级路径可能返回 None，需判空
     if pipeline_data is not None:
-        pipeline_data["factor_exposure"] = prep.get("factor_exposure")
+        pipeline_data["style_factor_data"] = prep.get("style_factor_data")
         pipeline_data["position_relationship_data"] = prep.get("position_relationship_data")
         pipeline_data["position_status"] = prep.get("position_status")
         pipeline_data["data_freshness"] = prep.get("data_freshness")
         pipeline_data["action_data"] = prep.get("action_data")
     _validate_pipeline_snapshot(pipeline_data)
-    # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
+    # 2b. 组合演进数据（聚合多期快照，evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
         pipeline_data = _inject_evolution_data(pipeline_data)
-        # 2b1. 快照差异摘要（C19 snapshot_diff_data）：组合演进章顶部变化摘要，
+        # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
         pipeline_data = _inject_snapshot_diff_data(pipeline_data)
     perf.stop()
@@ -847,6 +875,11 @@ def _generate_report_full(
     perf.stop()
 
     # ── 6. HTML 报告 ──
+    # 成本流水数据（fund_flow_data）：复用 excel_market_data 组装逻辑，
+    # 开关关闭返回 None（HTML 模板保持既有输出）。
+    from src.python.report.excel_market_data import _build_flow_data
+
+    fund_flow_data = _build_flow_data(_enable_cost_lots, transactions, dividends, holdings, prep["details"])
     result.html_ok = _generate_full_html_report(
         holdings,
         prep,
@@ -865,7 +898,7 @@ def _generate_report_full(
         debate_info,
         result,
         _metrics,
-        prep.get("factor_exposure"),
+        prep.get("style_factor_data"),
         prep.get("position_relationship_data"),
         (pipeline_data or {}).get("evolution_data"),
         _enable_portfolio_evolution,
@@ -877,6 +910,7 @@ def _generate_report_full(
         (pipeline_data or {}).get("crisis_annotation_data"),
         (pipeline_data or {}).get("tail_risk_data"),
         (pipeline_data or {}).get("snapshot_diff_data"),
+        fund_flow_data,
     )
 
     # ── 7. Excel 报告 ──
@@ -901,6 +935,9 @@ def _generate_report_full(
         _enable_portfolio_evolution,
         _enable_action,
         _enable_data_quality,
+        _enable_cost_lots,
+        transactions,
+        dividends,
     )
 
     result.news_ok = news_ok

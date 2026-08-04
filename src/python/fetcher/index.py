@@ -206,12 +206,12 @@ def _index_history_cache_key(code: str) -> str:
 
 
 def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
-    """获取指数历史日线（走 history_index chain，C6 约束）。
+    """获取指数历史日线（走 history_index chain，不绕过 chain 层）。
 
     通过 history_index chain 路由，复用 tencent/sina 的 K 线能力，
     跳过 is_a_share_code 类型检查。
 
-    C4 约束：同次会话同一代码命中 DataSourceRegistry.session_cache。
+    同次会话同一代码命中 DataSourceRegistry.session_cache（会话级复用）。
 
     Args:
         code: 指数代码，如 "sh000300" / "gb_inx"
@@ -227,7 +227,7 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
 
     from src.python.fetcher.chain import fetch_with_incremental_fallback
 
-    # 先查会话缓存（C4 约束）
+    # 先查会话缓存（会话级复用）
     from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     reg = get_registry()

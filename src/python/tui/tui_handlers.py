@@ -16,7 +16,7 @@ from datetime import datetime
 
 from src.python.llm.pricing import CURRENCY_SYMBOLS
 from src.python.core.logger import setup_logger
-from src.python.core.reader import get_xlsx_info, list_xlsx_files, read_holdings
+from src.python.core.reader import get_xlsx_info, list_xlsx_files, read_holdings, read_holdings_with_flows
 from src.python.report.progress import TuiProgressReporter
 from src.python.tui.tui_menu import MENU_ITEMS, get_config_cache, press_any_key, refresh_config
 
@@ -102,15 +102,20 @@ def print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
 # ── 持仓准备 / 收尾 ────────────────────────────────────────
 
 
-def prepare_holdings() -> list | None:
-    """选择持仓文件并读取持仓记录。失败时返回 None。"""
+def prepare_holdings() -> "tuple[list, list, list] | None":
+    """选择持仓文件并读取持仓记录（含可选交易/分红流水页签）。失败时返回 None。
+
+    Returns:
+        (holdings, transactions, dividends) 三元组；无流水页签时流水列表为空。
+    """
     refresh_config()
     filepath = select_holdings_file()
     if not filepath:
         return None
     try:
         print("  [..] 正在读取持仓数据...")
-        holdings = read_holdings(filepath)
+        parsed = read_holdings_with_flows(filepath)
+        holdings = parsed.holdings
         if not holdings:
             print("  [ERR] 未读取到有效的持仓数据")
             print("     请检查持仓文件中是否有数据，列名是否正确")
@@ -118,8 +123,10 @@ def prepare_holdings() -> list | None:
             press_any_key()
             return None
         print(f"  [OK] 成功读取 {len(holdings)} 条持仓记录")
+        if parsed.transactions or parsed.dividends:
+            print(f"     含交易流水 {len(parsed.transactions)} 条，分红流水 {len(parsed.dividends)} 条")
         check_and_warm_for_new_assets(holdings)
-        return holdings
+        return holdings, parsed.transactions, parsed.dividends
     except Exception as e:
         print_error_with_hint(e, "读取持仓失败")
         press_any_key()

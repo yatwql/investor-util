@@ -6,7 +6,7 @@
 （智囊团深度复盘 LLM 提示词段落）与行动建议归因子块（表格）两处复用，避免重复实现
 （归因计算唯一实现，段落/表格均为同一数据的两处格式化呈现）。
 
-C19 契约 `action_data["attribution"]`（`build_return_attribution` 输出）：
+数据契约 `action_data["attribution"]`（`build_return_attribution` 输出）：
   {
     "available": bool,           # 有持仓且 Σ|profit|>0
     "盈利来源": list[dict],       # TOP5 盈利品种（name/code/profit/contribution_pp）
@@ -83,7 +83,7 @@ def compute_return_attribution(
 def build_return_attribution(
     holdings_details: list[dict[str, Any]] | None,
 ) -> dict[str, Any] | None:
-    """行动建议收益归因子块（渲染适配层，C19 `attribution` 契约）。
+    """行动建议收益归因子块（渲染适配层，`attribution` 契约）。
 
     复用 `compute_return_attribution` 计算结果，适配为报告层可读的表格数据——
     盈利来源 / 亏损来源分列、净额合计（summary）在报告层可见（渲染适配层为新代码，

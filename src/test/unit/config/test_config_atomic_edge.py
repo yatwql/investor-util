@@ -277,11 +277,11 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
                          "api_key 首尾空格应被去除")
 
     def test_api_key_whitespace_in_settings_only(self):
-        """仅 llm_settings.json 含 api_key → 因无 llm_key.json 返回 None（C18 合规）。"""
+        """仅 llm_settings.json 含 api_key → 因无 llm_key.json 返回 None（凭据分离）。"""
         import src.python.config as cfg
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
 
-        # llm_settings.json 含 api_key 且无 llm_key.json → 返回 None（C18 合规）
+        # llm_settings.json 含 api_key 且无 llm_key.json → 返回 None（凭据分离）
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "\t sk-ant-from-settings \n", "temperature": 0.7}, f)
 
@@ -291,7 +291,7 @@ class TestConfigEnvEdgeY5(unittest.TestCase):
             cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
-        # C18 约束：无 llm_key.json 且无 llm_providers.json → 返回 None
+        # 凭据分离：无 llm_key.json 且无 llm_providers.json → 返回 None
         self.assertIsNone(result)
 
     # ── 缺失嵌套键 ──

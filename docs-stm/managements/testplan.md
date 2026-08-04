@@ -1,5 +1,5 @@
 # 个人投资分析报告生成小助手 — 质量控制与测试标准
-> 文档版本：0.10.2
+> 文档版本：0.10.3
 
 ---
 
@@ -33,22 +33,22 @@
 | `cache/` 子包 | 过期判断、读写、清理 | 原子写入、损坏恢复、TTL 边界（0s/1s/过期1s）、前缀匹配、并发 access、gzip 透明解压 |
 | `providers/*.py` | mock HTTP + 异常 | 200 正常 / 空数据 / 超时 / 429 / 503 / JSON 格式错误 / HTML 而非 JSON / 空响应 / 字段缺失 / 编码异常 |
 | `llm/` 包 | 全路径覆盖 | API 路由、Provider 回退、截断检测+自动重试、空内容安抚重试、熔断器、缓存命中/未命中、Extended Thinking 注入/降级、thinking 耗尽自动重试（关闭 thinking 同 provider 重试一次，仍失败才切换）、指纹确定性 |
-| `llm/` — 辩论模式 | 6 文件专项覆盖 | `test_debate_generators.py`（三段生成流程 pro→con→synthesis 控制）、`test_debate_prompts.py`（提示词模板/合成提示/集中度问答块）、`test_debate_token_budget.py`（Token 预算守卫 1×/2× 阈值）、`test_debate_edge.py`（C12 合规边缘场景 11 项）、`test_debate_conditional.py`（条件推理场景注入）、`test_debate_qa.py`（集中度问答阈值触发） |
+| `llm/` — 辩论模式 | 6 文件专项覆盖 | `test_debate_generators.py`（三段生成流程 pro→con→synthesis 控制）、`test_debate_prompts.py`（提示词模板/合成提示/集中度问答块）、`test_debate_token_budget.py`（Token 预算守卫 1×/2× 阈值）、`test_debate_edge.py`（边缘测试文件隔离 合规边缘场景 11 项）、`test_debate_conditional.py`（条件推理场景注入）、`test_debate_qa.py`（集中度问答阈值触发） |
 | `report/*.py` | 正常 + 空数据 + 边界 | 单条持仓、最大 100 条持仓、零成本/零市值、全亏损、全盈利、混合账户 |
 | `core/market_hours.py` | 所有时段边界 | 开盘/收盘/午休/周末/节假日/UTC 时区、config 覆盖、API 掉线回退 |
 | `core/provider_registry.py` | 100% 熔断/缓存/策略 | Provider 注册/熔断（默认 3 次→冷却 300s→自动恢复，批量 API 如 eastmoney_industry 为 6 次→120s）、会话缓存 get/set/contains/clear/淘汰、策略选择(交易时段/熔断/QDII豁免)、链式熔断检测、并发安全、审计报告、phase_timeout 嵌套保护 |
 | `tui/handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
 | `tui/tui_menu.py` | 所有 17 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航 |
-| `analysis/correlation.py` | Pearson 相关矩阵计算+降级 | 已知答案（r=±1/缩放不变）、不显著配对、下三角布局、配对 |r| 降序、数据不足/单品种/无有效收益降级、名称回退、C19 契约键、NaN/Inf/None 过滤、重复日期去重、日期缺口对齐、极大幅值钳位、多品种大矩阵 |
+| `analysis/correlation.py` | Pearson 相关矩阵计算+降级 | 已知答案（r=±1/缩放不变）、不显著配对、下三角布局、配对 |r| 降序、数据不足/单品种/无有效收益降级、名称回退、数据契约键、NaN/Inf/None 过滤、重复日期去重、日期缺口对齐、极大幅值钳位、多品种大矩阵 |
 | `report/correlation_sheet.py` | 相关性页签 Excel 呈现 | 矩阵/配对/说明三区齐全、下三角+对角+上三角空、N/A 格、available=False/None 占位、配对 |r| 降序 |
 | `report/report_template.html`（correlation 模块） | 相关性章节 HTML 呈现 | 汇总卡+相关度最高+热力矩阵+配对明细、单元格样式分支（强正/强负/不显著/N/A）、不足品种提示、available=False 降级占位、correlation_data=None 章节隐藏 |
 | `analysis/portfolio_evolution.py` | 多快照趋势聚合计算 | 多账户合并、快照缺市值回退成本权重、HHI 计算、TOP 持仓变迁、快照数不足 available=False、历史快照容错跳过 |
-| `report/evolution_sheet.py` + `report_template.html`（evolution 模块） | 组合演进双端呈现 | 汇总/总市值/HHI/TOP/账户流/说明顺序、多账户流表、单账户无流表、HHI 无效期记 "-"、available=False 占位、evolution_data=None 章节隐藏、enable_portfolio_evolution=False 章节隐藏（board 层）、3 图各带 .chart-caption（C20） |
+| `report/evolution_sheet.py` + `report_template.html`（evolution 模块） | 组合演进双端呈现 | 汇总/总市值/HHI/TOP/账户流/说明顺序、多账户流表、单账户无流表、HHI 无效期记 "-"、available=False 占位、evolution_data=None 章节隐藏、enable_portfolio_evolution=False 章节隐藏（board 层）、3 图各带 .chart-caption（图下说明） |
 | `analysis/whatif.py` | 双持仓成本口径 diff 计算 | 新增/清仓/加仓/减仓/不变识别、份额容差(<1e-3)、成本权重+HHI、汇总 delta+箭头、分类配置（_CATEGORY_ORDER 排序）、多账户合并、两侧空降级、单侧空=全清仓仍可算 |
 | `analysis/whatif_backtest.py` | 生效日时序回测纯计算 | 生效日→请求天数折算/钳位/坏格式/未来日期、并集+LOCF+锚点对齐、归一化/收益率/回撤序列数值、5 指标对比、数据不足/两侧空/不可对齐 available=False、status 降级传播 |
 | `report/whatif_operations.py` | whatif 共享层编排 | build_whatif_data→校验→写报告；未指定生效日不调用回测且无 backtest 键；指定生效日合并进 data；回测异常→ok=True 且 available=False；返回 None 不加键 |
 | `report/whatif_sheet.py` | 调仓 What-if Excel 页签呈现 | 摘要(文件对比+变动统计+汇总+箭头)、分类配置权重%、变动明细行底色（新增绿/清仓红/加仓黄/减仓蓝/不变灰）、时序回测页签（指标表+净值/回撤序列+占位）、available=False/None 占位 |
-| `report/whatif_writer.py` + `whatif_template.html` | 调仓 What-if 独立 HTML 页 | ①~⑦ 段齐全（未指定生效日④时序回测隐藏）、双环形图+回测 2 折线图各带 .chart-caption（C20）+#whatif-chart-data/#whatif-backtest-chart-data JSON（R9 最小化）、行动作行 class + badge、箭头类、available=False 占位 |
+| `report/whatif_writer.py` + `whatif_template.html` | 调仓 What-if 独立 HTML 页 | ①~⑦ 段齐全（未指定生效日④时序回测隐藏）、双环形图+回测 2 折线图各带 .chart-caption（图下说明）+#whatif-chart-data/#whatif-backtest-chart-data JSON（R9 最小化）、行动作行 class + badge、箭头类、available=False 占位 |
 | `cli/cli.py`（whatif 子命令） | whatif argparse + 处理器 | --candidate 必填、--base 可选、--effective-date 解析并透传、_handle_whatif 委托（显式 base/config 默认/读取失败/目标失败/不可用数据不写报告）、main 透传 |
 
 ### 1.2 数据边界 Edge Case 强制清单（通用规范）
@@ -88,7 +88,7 @@
 | `scenario/basic/test_scenario_operational_behavior.py` | S29-S33 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 |
 | `scenario/basic/test_scenario_penetration_basic.py` / `_advanced.py` / `_mixed.py` / `_edge.py` | SP1-SP10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
 | `scenario/basic/test_scenario_section_order.py` | — | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
-| `scenario/basic/test_pipeline_smoke.py` / `test_pipeline_metrics_injection.py` / `test_pipeline_factor_exposure.py` | — | 管线冒烟/指标注入/因子暴露管线（C19 契约 + 全失败 source_failed + 空持仓 insufficient） |
+| `scenario/basic/test_pipeline_smoke.py` / `test_pipeline_metrics_injection.py` / `test_pipeline_factor_exposure.py` | — | 管线冒烟/指标注入/因子暴露管线（数据契约 + 全失败 source_failed + 空持仓 insufficient） |
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
 | `scenario/llm/test_llm_hallucination.py` | `scenario_llm` | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
 

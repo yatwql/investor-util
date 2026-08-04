@@ -4,10 +4,10 @@
 「数据质量仪表盘」标题展示三个区块：
 
   区块 A 源健康   — 数据源可用性矩阵（现状保留，来自 DegradationTracker 聚合）
-  区块 B 品种覆盖 — 逐品种数据状态清单（C19 `position_status` 契约，
+  区块 B 品种覆盖 — 逐品种数据状态清单（`position_status` 契约，
                      由品种覆盖诊断组装）
   区块 C 可信度   — 逐品种数据新鲜度分类 + 单日 ±20% 异常跳变检测
-                     （C19 `data_freshness` 契约，由数据新鲜度诊断组装）
+                     （`data_freshness` 契约，由数据新鲜度诊断组装）
 
 开关关闭时，该章保持旧「数据源可用性矩阵」样式（向后兼容，见
 `excel_generator` 的开关分支）。本模块仅在开关开启时被调用。
@@ -39,7 +39,7 @@ def build_coverage_block(position_status: dict | None) -> dict:
     """规范化品种覆盖区块数据，供 Excel/HTML 渲染。
 
     Args:
-        position_status: C19 `position_status` 契约 dict（build_coverage_summary
+        position_status: `position_status` 契约 dict（build_coverage_summary
             输出），为 None 或 available=False 表示品种覆盖数据不可用。
 
     Returns:
@@ -71,8 +71,8 @@ def write_data_quality_sheet(
     Args:
         ws: openpyxl worksheet
         matrix: build_data_source_matrix() 输出的源健康矩阵行列表
-        position_status: C19 `position_status` 契约 dict，None 表示无行情数据
-        data_freshness: C19 `data_freshness` 契约 dict（新鲜度 + 单日跳变），
+        position_status: `position_status` 契约 dict，None 表示无行情数据
+        data_freshness: `data_freshness` 契约 dict（新鲜度 + 单日跳变），
             None 表示可信度数据不可用
 
     Returns:

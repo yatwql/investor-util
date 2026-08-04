@@ -4,8 +4,8 @@
   - available=True → ①对比文件 + ②汇总指标 + ③资产配置对比图 + ⑤分类对比 +
     ⑥持仓变动明细 + ⑦说明 六段齐全（未指定生效日时④时序回测隐藏）
   - 指定生效日 → ④时序回测出现：指标卡 + 2 张线图 canvas + 2 条 .chart-caption
-    （C20）+ #whatif-backtest-chart-data JSON（R9 数据最小化）
-  - 双环形图 canvas + 2 条 .chart-caption（C20）+ #whatif-chart-data JSON
+    （图下说明）+ #whatif-backtest-chart-data JSON（数据最小化）
+  - 双环形图 canvas + 2 条 .chart-caption（图下说明）+ #whatif-chart-data JSON
   - 变动明细行 class 与 action-badge 渲染
   - 箭头方向类（arrow-up/down/flat）
   - available=False → 降级占位「调仓对比数据暂不可用」
@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 def _whatif_data(**extra) -> dict:
-    """构造 C19 契约 whatif_data mock（含全部变动类型）。"""
+    """构造数据契约 whatif_data mock（含全部变动类型）。"""
     d = {
         "available": True,
         "status": "ok",
@@ -159,7 +159,7 @@ class TestWhatifHtmlPage(unittest.TestCase):
         self.assertNotIn("④ 时序回测", text, "未指定生效日时④时序回测不应出现")
 
     def test_backtest_section_rendered(self):
-        """指定生效日 + 回测可用 → ④时序回测出现：指标卡 + 2 线图 + 2 caption + R9 负载。"""
+        """指定生效日 + 回测可用 → ④时序回测出现：指标卡 + 2 线图 + 2 caption + 数据最小化负载。"""
         import json
 
         bt = {
@@ -201,8 +201,8 @@ class TestWhatifHtmlPage(unittest.TestCase):
         self.assertIn('id="chart_whatif_bt_nav"', text)
         self.assertIn('id="chart_whatif_bt_dd"', text)
         self.assertIn("2.50%", text, "pct 值应拼 % 号")
-        self.assertEqual(text.count('class="chart-caption"'), 4, "双环图 + 2 线图各带 caption（C20）")
-        # 回测图表 JSON 负载可解析且只含 series 字段（R9 数据最小化）
+        self.assertEqual(text.count('class="chart-caption"'), 4, "双环图 + 2 线图各带 caption（图下说明）")
+        # 回测图表 JSON 负载可解析且只含 series 字段（数据最小化）
         m = 'id="whatif-backtest-chart-data">'
         start = text.index(m) + len(m)
         end = text.index("</script>", start)
@@ -249,13 +249,13 @@ class TestWhatifHtmlPage(unittest.TestCase):
         self.assertIn("24,000.00", text)  # 目标总成本（money 过滤器）
 
     def test_charts_and_captions_c20(self):
-        """双环形图 canvas + 2 条 .chart-caption（C20）+ #whatif-chart-data JSON。"""
+        """双环形图 canvas + 2 条 .chart-caption（图下说明）+ #whatif-chart-data JSON。"""
         import json
 
         text = self._render(_whatif_data())
         self.assertIn('id="chart_whatif_base"', text)
         self.assertIn('id="chart_whatif_candidate"', text)
-        self.assertEqual(text.count('class="chart-caption"'), 2, "每张图必须有 .chart-caption（C20）")
+        self.assertEqual(text.count('class="chart-caption"'), 2, "每张图必须有 .chart-caption（图下说明）")
         # 图表 JSON 数据注入可解析（Python 侧裁剪后的专用负载：只含图表消费字段）
         m = 'id="whatif-chart-data">'
         start = text.index(m) + len(m)

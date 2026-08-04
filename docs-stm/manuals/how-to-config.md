@@ -19,7 +19,8 @@
   "enable_portfolio_evolution": true,  // 组合演进
   "enable_action": false,     // 行动建议（默认关）
   // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": false},  // 数据质量仪表盘默认关
+  "report_submodules": {"data_quality": false, "candidate_compare": false},  // 数据质量仪表盘 / 基金业绩分析候选基金比较 默认关
+  "comparison_candidates": [],  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合 candidate_compare）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -86,7 +87,7 @@
     "equity_fixed_income": {}
   },
 
-  // ── I2. 交易纪律配置 ──
+  // ── 交易纪律配置 ──
   "discipline": {
     "take_profit_pct": 20.0,
     "stop_loss_pct": -15.0,
@@ -169,6 +170,8 @@
 | `enable_portfolio_evolution` | `true` | 组合演进章节可见性，关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
 | `enable_action` | `false` | 行动建议章节可见性，**默认关闭**，开启后显示 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。智囊团深度复盘同步显示「行动摘要」子块 | 菜单 `P` |
 | `report_submodules.data_quality` | `false` | 数据质量仪表盘子模块开关，**默认关闭**。开启后报告展示数据质量仪表盘区块（数据覆盖/时效性/降级状态） | 手动编辑 |
+| `report_submodules.candidate_compare` | `false` | 「基金业绩分析」章候选基金比较子表开关，**默认关闭**。开启后报告在该章主业绩表下方展示候选基金横向比较表（候选来自 `comparison_candidates`，比较维度：收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度） | 手动编辑 |
+| `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
 
 ---
 
@@ -186,7 +189,7 @@
 
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
-| `enable_fund_deep_analysis` | `true` | `config.json` | 基金经理变更监控、持仓关系矩阵、持仓集中度监控、基金风格分析、因子暴露分析 | 基金深度分析章节组 |
+| `enable_fund_deep_analysis` | `true` | `config.json` | 基金经理变更监控、持仓关系矩阵、持仓集中度监控、风格与因子分析 | 基金深度分析章节组 |
 | `enable_news` | `true` | `config.json` | 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
 | `enable_history` | `true` | `config.json` | 组合历史走势与回撤 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
 | `enable_portfolio_evolution` | `true` | `config.json` | 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
@@ -376,7 +379,7 @@
 | 键 | 模块标识 | 报告模块的唯一标识，见下方列表 |
 | 值 | 正整数 | 显示序号（1~99），决定该模块在报告中的视觉位置 |
 
-**20 个模块标识及默认顺序：**
+**19 个模块标识及默认顺序：**
 
 | 默认序号 | 模块标识 | 显示名称 | 类型 |
 |:--------:|:---------|:---------|:-----|
@@ -388,18 +391,17 @@
 | 6 | `fund_manager` | 基金经理变更监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
 | 7 | `position_relationship` | 持仓关系矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章两区块：重合度 + 相关性） |
 | 8 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 9 | `fund_style` | 基金风格分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 10 | `factor_exposure` | 因子暴露分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 11 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
-| 12 | `global_macro` | 全球政经局势 | LLM |
-| 13 | `expert_review` | 智囊团深度复盘 | LLM |
-| 14 | `health_check` | 持仓体检报告 | LLM |
-| 15 | `penetration_deep` | 穿透深度分析 | LLM |
-| 16 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
-| 17 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 18 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认关**；再平衡信号/交易纪律/调仓建议/收益归因） |
-| 19 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
-| 20 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 9 | `style_factor` | 风格与因子分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） |
+| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
+| 11 | `global_macro` | 全球政经局势 | LLM |
+| 12 | `expert_review` | 智囊团深度复盘 | LLM |
+| 13 | `health_check` | 持仓体检报告 | LLM |
+| 14 | `penetration_deep` | 穿透深度分析 | LLM |
+| 15 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
+| 16 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
+| 17 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认关**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 18 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
+| 19 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 

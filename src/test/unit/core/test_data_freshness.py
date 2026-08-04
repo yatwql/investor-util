@@ -3,7 +3,7 @@
 覆盖：
   - classify_freshness — 单品种新鲜度分类（实时/缓存/过期/降级）
   - detect_price_jumps — 单日 ±20% 异常跳变检测（含阈值边界 / 非交易日不误报）
-  - build_freshness_summary — 可信度摘要 C19 契约（abnormal_count / summary / 跳变标注）
+  - build_freshness_summary — 可信度摘要数据契约（abnormal_count / summary / 跳变标注）
 
 运行：
   python -m pytest src/test/unit/core/test_data_freshness.py -v
@@ -160,7 +160,7 @@ class TestDetectPriceJumps(unittest.TestCase):
 
 
 class TestBuildFreshnessSummary(unittest.TestCase):
-    """可信度摘要 C19 契约。"""
+    """可信度摘要数据契约。"""
 
     def test_abnormal_count_includes_jump_and_stale(self):
         """异常品种计数 = 跳变 + 过期/降级品种。"""

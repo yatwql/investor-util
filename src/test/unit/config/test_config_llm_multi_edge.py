@@ -1,4 +1,4 @@
-"""LLM 多 Provider 配置解析边缘场景测试 — R1。
+"""LLM 多 Provider 配置解析边缘场景测试 — 。
 
 测试目标：
   - 非法 provider 类型 → WARNING + 跳过

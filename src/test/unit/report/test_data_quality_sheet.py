@@ -1,4 +1,4 @@
-"""数据质量仪表盘页签写入单元测试（18 章改造：源健康 + 品种覆盖 + 可信度）。
+"""数据质量仪表盘页签写入单元测试（「数据源可用性矩阵」升级：源健康 + 品种覆盖 + 可信度）。
 
 测试目标：
   - build_coverage_block 规范化品种覆盖区块（有数据 / 无数据 / 降级）
@@ -62,7 +62,7 @@ def _coverage_item(code: str, name: str, status: str) -> dict:
 
 
 def _coverage_status(items: list[dict]) -> dict:
-    """构造 position_status C19 契约 dict。"""
+    """构造 position_status数据契约 dict。"""
     abnormal = [i for i in items if i["status"] != "ok"]
     return {
         "available": True,
@@ -89,7 +89,7 @@ def _freshness_item(code: str, name: str, freshness: str, change_pct: float = 0.
 
 
 def _freshness_status(items: list[dict]) -> dict:
-    """构造 data_freshness C19 契约 dict。"""
+    """构造 data_freshness数据契约 dict。"""
     abnormal = [i for i in items if i["freshness"] in ("stale", "degraded") or i["jump"]]
     return {
         "available": True,
@@ -108,7 +108,9 @@ class TestBuildCoverageBlock(unittest.TestCase):
     def test_has_data_with_abnormal(self):
         """有 items 且含异常 → has_data=True，abnormal_count 正确。"""
         block = build_coverage_block(
-            _coverage_status([_coverage_item("600900", "长江电力", "ok"), _coverage_item("99999", "坏码", "nav_missing")])
+            _coverage_status(
+                [_coverage_item("600900", "长江电力", "ok"), _coverage_item("99999", "坏码", "nav_missing")]
+            )
         )
         self.assertTrue(block["has_data"])
         self.assertEqual(block["abnormal_count"], 1)
@@ -135,13 +137,17 @@ class TestWriteDataQualitySheet(unittest.TestCase):
 
     def test_title_is_dashboard(self):
         """页签标题为「数据质量仪表盘」。"""
-        write_data_quality_sheet(self.ws, [_matrix_row("行情数据")], _coverage_status([_coverage_item("600900", "长江电力", "ok")]))
+        write_data_quality_sheet(
+            self.ws, [_matrix_row("行情数据")], _coverage_status([_coverage_item("600900", "长江电力", "ok")])
+        )
         self.assertIn("数据质量仪表盘", str(self.ws.cell(row=1, column=1).value))
 
     def test_source_health_block_kept(self):
         """源健康区块保留矩阵数据源行与列头。"""
         write_data_quality_sheet(self.ws, [_matrix_row("行情数据", "degraded", "1 降级")], None)
-        cells = [str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)]
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)
+        ]
         joined = "|".join(cells)
         self.assertIn("源健康", joined)
         self.assertIn("行情数据", joined)
@@ -154,7 +160,9 @@ class TestWriteDataQualitySheet(unittest.TestCase):
             [_matrix_row("行情数据")],
             _coverage_status([_coverage_item("600900", "长江电力", "nav_missing")]),
         )
-        cells = [str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)]
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)
+        ]
         joined = "|".join(cells)
         self.assertIn("品种覆盖", joined)
         self.assertIn("600900", joined)
@@ -164,7 +172,9 @@ class TestWriteDataQualitySheet(unittest.TestCase):
     def test_coverage_placeholder_when_no_data(self):
         """position_status=None → 品种覆盖区块写占位文本。"""
         write_data_quality_sheet(self.ws, [_matrix_row("行情数据")], None)
-        cells = [str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)]
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)
+        ]
         self.assertIn(_COVERAGE_PLACEHOLDER, "|".join(cells))
 
     def test_abnormal_rows_highlighted(self):
@@ -172,9 +182,13 @@ class TestWriteDataQualitySheet(unittest.TestCase):
         write_data_quality_sheet(
             self.ws,
             [_matrix_row("行情数据")],
-            _coverage_status([_coverage_item("110011", "易方达", "ok"), _coverage_item("88888", "退市股", "possibly_delisted")]),
+            _coverage_status(
+                [_coverage_item("110011", "易方达", "ok"), _coverage_item("88888", "退市股", "possibly_delisted")]
+            ),
         )
-        cells = [str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)]
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)
+        ]
         joined = "|".join(cells)
         self.assertIn("可能退市", joined)
         self.assertIn("88888", joined)
@@ -197,7 +211,9 @@ class TestWriteDataQualitySheet(unittest.TestCase):
             _coverage_status([_coverage_item("600900", "长江电力", "ok")]),
             _freshness_status([_freshness_item("600900", "长江电力", "fresh", 0.5)]),
         )
-        cells = [str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)]
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)
+        ]
         joined = "|".join(cells)
         self.assertIn("可信度", joined)
         self.assertIn("新鲜度", joined)
@@ -211,7 +227,9 @@ class TestWriteDataQualitySheet(unittest.TestCase):
             _coverage_status([_coverage_item("005827", "易方达", "ok")]),
             _freshness_status([_freshness_item("005827", "易方达", "fresh", 25.0, jump=True)]),
         )
-        cells = [str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)]
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)
+        ]
         joined = "|".join(cells)
         self.assertIn("疑似数据错误", joined)
         self.assertIn("+25.00%", joined)
@@ -229,7 +247,7 @@ class TestWriteDataQualitySheet(unittest.TestCase):
 
 
 class TestLegacySourceMatrixStyle(unittest.TestCase):
-    """旧样式回归测试 — 开关关闭时 18 章保持「数据源可用性矩阵」。"""
+    """旧样式回归测试 — 开关关闭时「数据源可用性矩阵」保持原样。"""
 
     def setUp(self):
         self.wb = openpyxl.Workbook()
@@ -245,7 +263,9 @@ class TestLegacySourceMatrixStyle(unittest.TestCase):
             return_value=[_matrix_row("行情数据", "degraded", "1 降级")],
         ):
             _write_data_source_matrix_sheet(self.ws, SilentProgressReporter())
-        cells = [str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)]
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 6)
+        ]
         joined = "|".join(cells)
         self.assertIn("数据源可用性矩阵", joined)
         self.assertIn("行情数据", joined)

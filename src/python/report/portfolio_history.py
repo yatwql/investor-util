@@ -7,10 +7,10 @@
   4. 计算回撤、波动率、收益率
   5. 数据质量校验（_validate_bars）— 见 _history_quality.py
 
-C1 约束：代码类型判定使用 code_utils 组合逻辑。
-C4 约束：会话内重复请求先查 session_cache。
-C5 约束：HTTP 请求通过 make_http_client()（由 provider 层保证）。
-C6 约束：走 fetch_with_incremental_fallback，不绕过 chain 层。
+代码类型判定使用 code_utils 组合逻辑。
+会话内重复请求先查 session_cache（会话级复用）。
+HTTP 请求通过 make_http_client()（由 provider 层保证）。
+走 fetch_with_incremental_fallback，不绕过 chain 层。
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ class PortfolioHistoryCalculator:
         """初始化组合历史走势计算器。
 
         Args:
-            session_cache: 会话级请求缓存（C4 约束），同一次会话内相同请求免 HTTP。
+            session_cache: 会话级请求缓存，同一次会话内相同请求免 HTTP。
             coverage_threshold: 有效区间覆盖比例阈值。
                 起止日要求 ≥此比例×总持仓有数据，否则截断。
                 默认 0.8（80%），取值范围 (0, 1]。
@@ -505,7 +505,7 @@ class PortfolioHistoryCalculator:
 
     def _get_stock_history(self, code: str, days: int = 30) -> list[dict]:
         """获取股票/ETF 历史 K 线数据。"""
-        # C4 约束：会话内重复请求免 HTTP
+        # 会话内重复请求免 HTTP（会话级复用）
         cache_key = f"history_stock_{code}"
         if cache_key in self._session_cache:
             return self._session_cache[cache_key]

@@ -115,7 +115,7 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.config._config_defaults._CONFIG_FILE",
         str(tmp_path / "data/config/config.json"),
     )
-    # C13: _CACHE_DIR 存在于 cache/ 子包中
+    # 测试敏感路径隔离: _CACHE_DIR 存在于 cache/ 子包中
     monkeypatch.setattr(
         "src.python.cache._paths._CACHE_DIR",
         str(tmp_path / "data/cache"),
@@ -202,7 +202,7 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "llm_settings_file",
         str(tmp_path / "data/config/llm_settings.json"),
     )
-    # C13: llm_key.json / llm_providers.json 路径同样 seed 到默认配置。
+    # 测试敏感路径隔离: llm_key.json / llm_providers.json 路径同样 seed 到默认配置。
     # _get_llm_key_path()/_get_llm_providers_path() 优先读 config["llm_key_file"]
     # / config["llm_providers_file"]（来自 _DEFAULT_CONFIG），仅靠 patch
     # _LLM_KEY_FILE_DEFAULT 会被默认配置里的真实路径绕过 —— 必须同步 seed，
@@ -286,7 +286,7 @@ def _auto_reset_llm_module_failure():
       write_llm_sheets() 读取 LLM_MODULE_FAILURE 判断模块是否被禁用（见
       llm_content.py write_llm_sheets），若某测试设置
       LLM_MODULE_FAILURE[key]=FAIL_REASON_DISABLED 后未清理，同一 worker
-      上后续 test_content_none 等测试的页签被跳过不写入，A2 占位符断言失败。
+ 上后续 test_content_none 等测试的页签被跳过不写入，占位符断言失败。
     """
     from src.python.llm.prompts import LLM_MODULE_FAILURE
 

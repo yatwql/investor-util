@@ -44,6 +44,9 @@ _DEFAULT_CONFIG = {
     # 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
     "report_submodules": {
         "data_quality": False,  # 「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖）
+        "industry_beta": False,  # 「风格与因子分析」→ 行业 Beta 子表（穿透行业暴露占比 + 行业指数 β）
+        "candidate_compare": False,  # 「基金业绩分析」→ 候选基金比较子表（候选来自 comparison_candidates）
+        "cost_lots": False,  # 成本流水：持仓 Excel 含交易/分红流水时，汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计
     },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
@@ -77,6 +80,7 @@ _DEFAULT_CONFIG = {
     "user_fund_benchmarks": {},
     # 竞争语境对比指数池（默认沪深300+中证500+中证全债）
     "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
+    "comparison_candidates": [],  # 候选基金比较子表候选（6 位基金代码列表，≤10；与 report_submodules.candidate_compare 配合）
     # ── G. 持仓快照 ──
     "history": {
         "fetch_mode": "auto",  # 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
@@ -101,7 +105,7 @@ _DEFAULT_CONFIG = {
         "target_allocation": {},  # 目标配置 Schema（空=不启用目标配置检查）
         "equity_fixed_income": {},  # 权益/固收超大类目标配置（空=不启用）
     },
-    # ── I2. 交易纪律配置 ──
+    # ── 交易纪律配置 ──
     "discipline": {
         "take_profit_pct": 20.0,  # 止盈线：单品种收益率 ≥ 此值 → 建议部分止盈
         "stop_loss_pct": -15.0,  # 止损线：单品种收益率 ≤ 此值 → 建议止损/减仓
@@ -193,6 +197,8 @@ def _build_template_from_defaults() -> str:
         f'  "user_fund_benchmarks": {json.dumps(d["user_fund_benchmarks"])},',
         "  // 竞争语境对比指数池（默认沪深300+中证500+中证全债）",
         f'  "comparison_indices": {json.dumps(d["comparison_indices"], ensure_ascii=False)},',
+        "  // 候选基金比较子表候选（6 位基金代码列表，≤10；与 report_submodules.candidate_compare 配合）",
+        f'  "comparison_candidates": {json.dumps(d["comparison_candidates"])},',
         "",
         # ── G ──
         "  // ── G. 组合历史走势与持仓快照 ──",
@@ -223,8 +229,8 @@ def _build_template_from_defaults() -> str:
         f'    "equity_fixed_income": {json.dumps(d["rebalance"]["equity_fixed_income"])}  // 权益/固收超大类目标配置（空=不启用）',
         "  },",
         "",
-        # ── I2 ──
-        "  // ── I2. 交易纪律配置 ──",
+        # ── 交易纪律配置 ──
+        "  // ── 交易纪律配置 ──",
         '  "discipline": {',
         f'    "take_profit_pct": {d["discipline"]["take_profit_pct"]},  // 止盈线：单品种收益率 ≥ 此值 → 建议部分止盈',
         f'    "stop_loss_pct": {d["discipline"]["stop_loss_pct"]},  // 止损线：单品种收益率 ≤ 此值 → 建议止损/减仓',

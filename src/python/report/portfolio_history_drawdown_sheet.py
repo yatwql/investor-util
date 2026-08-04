@@ -1,6 +1,6 @@
 """组合历史走势与回撤 Excel 写入模块 — 走势表 + 回撤矩阵合一页签（一章两区块）。
 
-物理合并原「组合历史走势」+「历史回撤分析」两个页签：
+「组合历史走势与回撤」一章分「走势表 + 回撤矩阵」两区块：
   一、走势表（upper）—— 净值时间线 + 基准归一化 + 指标汇总（组合 vs 基准对比矩阵，仅一份）
   二、回撤矩阵（lower）—— 独立回撤事件明细（含恢复耗时）
   三、危机区间标注 —— 2015/2018/2020/2022 静态日期表 + 区间统计（区间回撤/恢复天数）
@@ -35,7 +35,7 @@ _DD_NCOLS = 8
 # 危机区间表列数
 _CRISIS_NCOLS = 6
 
-# 危机标注说明行（C20：区间数据出 → 说明出）
+# 危机标注说明行（图下说明：区间数据出 → 说明出）
 _CRISIS_NOTE = (
     "说明：阴影/高亮区间为历史上 A 股主要危机时段（2015 股灾 / 2018 贸易摩擦 / "
     "2020 疫情冲击 / 2022 市场调整）；区间与报告数据窗口重叠时统计区间最大回撤与恢复耗时"
@@ -54,7 +54,7 @@ def _compute_ncols(history_data: dict | None) -> int:
 
 
 def _apply_italic(ws: Worksheet, row: int, ncols: int) -> None:
-    """将指定行整行字体置为斜体（说明/注释行，C20 图下说明）。"""
+    """将指定行整行字体置为斜体（说明/注释行，图下说明）。"""
     for col in range(1, ncols + 1):
         cell = ws.cell(row=row, column=col)
         cell.font = Font(italic=True)
@@ -273,11 +273,11 @@ def write_portfolio_history_drawdown_sheet(
 
     Args:
         ws: openpyxl Worksheet 对象。
-        history_data: `history_data` C19 契约 dict（bars / 指标 / drawdown_events / benchmarks）。
+        history_data: `history_data` 数据契约 dict（bars / 指标 / drawdown_events / benchmarks）。
             None、status=unavailable 或 bars 为空时整页写占位。
-        crisis_annotation: `crisis_annotation_data` C19 契约 dict（危机区间标注）；
+        crisis_annotation: `crisis_annotation_data` 数据契约 dict（危机区间标注）；
             None 时危机区块写"数据不可用"占位。
-        tail_risk: `tail_risk_data` C19 契约 dict（尾部风险统计）；
+        tail_risk: `tail_risk_data` 数据契约 dict（尾部风险统计）；
             None 或 available=False 时尾部指标行写占位。
     """
     _name = get_report_sheet_name("portfolio_history_drawdown")

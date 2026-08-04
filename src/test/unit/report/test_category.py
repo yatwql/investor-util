@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from src.python.core.models import Holding
 from src.python.report import category as cat
@@ -105,6 +106,133 @@ class TestWriteCategorySheet(unittest.TestCase):
             cat.write_category_sheet(self.ws, [], [])
         except Exception as e:
             self.fail(f"write_category_sheet with empty holdings raised: {e}")
+
+
+class TestWriteCategoryFlowSubcolumns(unittest.TestCase):
+    """持仓分类表成本流水子列（成本分档 / 分红累计）渲染测试。
+
+    开关 `report_submodules.cost_lots` 对应 fund_flow_data 是否传入：
+    None → 保持既有 10 列；非 None → 追加「成本分档」「分红累计」子列。
+    """
+
+    def setUp(self):
+        import openpyxl
+
+        self.wb = openpyxl.Workbook()
+        self.ws = self.wb.active
+
+    def _call(self, holdings, details, fund_flow_data=None):
+        # mock 分红 API 加载（避免真实网络请求，测试隔离）
+        with patch("src.python.report.category._load_dividend_data", return_value=({}, True)):
+            cat.write_category_sheet(self.ws, holdings, details, fund_flow_data=fund_flow_data)
+
+    def _headers(self):
+        return [self.ws.cell(row=2, column=c).value for c in range(1, 13)]
+
+    def _find_total_row(self):
+        for r in range(1, self.ws.max_row + 1):
+            if self.ws.cell(row=r, column=1).value == "总计":
+                return r
+        return None
+
+    @staticmethod
+    def _flow(low_shares=0.0, high_shares=0.0, div=0.0):
+        return {
+            "available": True,
+            "cost_tiers": {
+                "per_code": {
+                    "600900": {
+                        "low": {"shares": low_shares, "cost": low_shares * 9.0},
+                        "high": {"shares": high_shares, "cost": high_shares * 11.0},
+                        "unpriced": {"shares": 0.0, "cost": 0.0},
+                    }
+                }
+            },
+            "dividends": {"per_code": {"600900": div}},
+        }
+
+    def test_flow_subcolumns_header_when_enabled(self):
+        """开关开启（fund_flow_data 非 None）时，表头追加「成本分档」「分红累计」列。"""
+        h = Holding("证券", "长江电力", "600900", 100, 10.0)
+        details = [
+            DetailRow(code="600900", account="证券", name="长江电力",
+                      market_value=1500, cost=1000, profit=500, profit_rate=0.5)
+        ]
+        self._call([h], details, self._flow(low_shares=100, div=120.0))
+        headers = self._headers()
+        self.assertIn("成本分档", headers)
+        self.assertIn("分红累计", headers)
+        self.assertEqual(headers.index("成本分档") + 1, 11)
+        self.assertEqual(headers.index("分红累计") + 1, 12)
+
+    def test_flow_tier_low_and_div_value(self):
+        """开关开启时数据行含「低成本」分档标签与分红累计数值。"""
+        h = Holding("证券", "长江电力", "600900", 100, 10.0)
+        details = [
+            DetailRow(code="600900", account="证券", name="长江电力",
+                      market_value=1500, cost=1000, profit=500, profit_rate=0.5)
+        ]
+        self._call([h], details, self._flow(low_shares=100, div=120.0))
+        # 数据行 = 表头下一行（row 3）：列 11 = 成本分档, 列 12 = 分红累计
+        self.assertEqual(self.ws.cell(row=3, column=11).value, "低成本")
+        self.assertEqual(self.ws.cell(row=3, column=12).value, 120.0)
+
+    def test_flow_tier_high_label(self):
+        """持仓批次成本价高于市价时渲染「高成本」档标签。"""
+        h = Holding("证券", "长江电力", "600900", 100, 10.0)
+        details = [
+            DetailRow(code="600900", account="证券", name="长江电力",
+                      market_value=900, cost=1000, profit=-100, profit_rate=-0.1)
+        ]
+        self._call([h], details, self._flow(high_shares=100, div=0.0))
+        self.assertEqual(self.ws.cell(row=3, column=11).value, "高成本")
+
+    def test_flow_tier_mixed_label(self):
+        """持仓批次横跨低/高两档时渲染「混合」档标签。"""
+        h = Holding("证券", "长江电力", "600900", 100, 10.0)
+        details = [
+            DetailRow(code="600900", account="证券", name="长江电力",
+                      market_value=1000, cost=1000, profit=0, profit_rate=0.0)
+        ]
+        self._call([h], details, self._flow(low_shares=50, high_shares=50, div=0.0))
+        self.assertEqual(self.ws.cell(row=3, column=11).value, "混合")
+
+    def test_flow_total_row_dividend_sum(self):
+        """开关开启时，分红累计在小计/总计行汇总（跨持仓累加）。"""
+        flow = {
+            "available": True,
+            "cost_tiers": {
+                "per_code": {
+                    "600900": {"low": {"shares": 100, "cost": 900}, "high": {"shares": 0, "cost": 0}, "unpriced": {"shares": 0, "cost": 0}},
+                    "600519": {"low": {"shares": 10, "cost": 15000}, "high": {"shares": 0, "cost": 0}, "unpriced": {"shares": 0, "cost": 0}},
+                }
+            },
+            "dividends": {"per_code": {"600900": 120.0, "600519": 30.0}},
+        }
+        h1 = Holding("证券", "长江电力", "600900", 100, 10.0)
+        h2 = Holding("证券", "贵州茅台", "600519", 10, 1500.0)
+        details = [
+            DetailRow(code="600900", account="证券", name="长江电力", market_value=1500, cost=1000, profit=500, profit_rate=0.5),
+            DetailRow(code="600519", account="证券", name="贵州茅台", market_value=20000, cost=15000, profit=5000, profit_rate=0.33),
+        ]
+        self._call([h1, h2], details, flow)
+        total_row = self._find_total_row()
+        self.assertIsNotNone(total_row)
+        self.assertEqual(self.ws.cell(row=total_row, column=12).value, 150.0)
+
+    def test_no_flow_subcolumns_when_disabled(self):
+        """开关关闭（fund_flow_data=None）时保持既有 10 列输出，无成本流水子列。"""
+        h = Holding("证券", "长江电力", "600900", 100, 10.0)
+        details = [
+            DetailRow(code="600900", account="证券", name="长江电力",
+                      market_value=1500, cost=1000, profit=500, profit_rate=0.5)
+        ]
+        self._call([h], details, None)
+        headers = self._headers()
+        self.assertNotIn("成本分档", headers)
+        self.assertNotIn("分红累计", headers)
+        # 既有表头 10 列保持不变（前 10 列与改造前一致）
+        self.assertEqual(headers[:10][-1], "年均股息率")
 
 
 @pytest.mark.data

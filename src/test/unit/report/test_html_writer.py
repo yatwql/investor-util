@@ -191,6 +191,375 @@ class TestNewsLlmMetaTemplate(unittest.TestCase):
 
 
 # ============================================================
+#  候选基金比较子表 —「基金业绩分析」章模板区块
+# ============================================================
+
+
+class TestCandidateCompareTemplate(unittest.TestCase):
+    """验证候选基金比较子表在真实模板中的渲染结果。
+
+    行为断言（对应「基金业绩分析」章候选基金比较增强验收标准）：
+      - 开关默认关（candidate_data 为空/不可用）→「基金业绩分析」章无比较子表
+      - 开关开启且 available → 正确渲染 11 列比较表
+      - 单候选获取失败 → 该行显示"数据获取失败"占位
+      - 候选 >10 / 存在无效代码 → 渲染提示行
+    """
+
+    def setUp(self):
+        from jinja2 import Environment
+
+        self.env = Environment()
+        tmpl_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "..",
+            "python",
+            "tmpl",
+            "report_template.html",
+        )
+        self.tmpl_path = os.path.normpath(tmpl_path)
+
+    def _extract_candidate_block(self) -> str:
+        """从真实模板中提取候选基金比较区块（按 if/endif 配平截取）。"""
+        with open(self.tmpl_path, encoding="utf-8") as f:
+            html = f.read()
+        start_marker = '{% if candidate_data and candidate_data.get("available") %}'
+        start = html.find(start_marker)
+        self.assertNotEqual(start, -1, "模板中未找到候选基金比较区块起点")
+        depth = 0
+        pos = start
+        while True:
+            nxt_if = html.find("{% if", pos)
+            nxt_endif = html.find("{% endif %}", pos)
+            self.assertNotEqual(nxt_endif, -1, "模板中候选基金比较区块未闭合")
+            if nxt_if != -1 and nxt_if < nxt_endif:
+                depth += 1
+                pos = nxt_if + len("{% if")
+            else:
+                depth -= 1
+                pos = nxt_endif + len("{% endif %}")
+                if depth == 0:
+                    return html[start:pos]
+
+    def _render_candidate_block(self, candidate_data: dict | None) -> str:
+        """渲染真实模板的候选比较区块。"""
+        tpl = self.env.from_string(self._extract_candidate_block())
+        return tpl.render(candidate_data=candidate_data or {})
+
+    def test_switch_off_no_candidate_block(self):
+        """开关默认关（candidate_data=None/不可用）→ 无比较子表。"""
+        for data in (None, {"available": False, "reason": "no_valid_candidate", "rows": []}):
+            html = self._render_candidate_block(data)
+            self.assertEqual(html.strip(), "", f"candidate_data={data!r} 不应渲染比较子表")
+
+    def test_available_renders_table_headers(self):
+        """开启且 available → 渲染 11 列比较表。"""
+        candidate_data = {
+            "available": True,
+            "exceed_limit": False,
+            "invalid": [],
+            "rows": [self._sample_row()],
+        }
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("候选基金比较", html)
+        for header in (
+            "候选基金",
+            "代码",
+            "评级",
+            "近1月",
+            "近3月",
+            "近6月",
+            "近1年",
+            "同类排名",
+            "最大回撤",
+            "风格",
+            "与持仓重合",
+        ):
+            self.assertIn(f"<th>{header}</th>", html)
+
+    def test_available_renders_row_values(self):
+        """候选行各维度数值正确渲染（收益/排名/回撤/风格/重合度）。"""
+        candidate_data = {
+            "available": True,
+            "exceed_limit": False,
+            "invalid": [],
+            "rows": [self._sample_row()],
+        }
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("候选基金A", html)
+        self.assertIn("000001", html)
+        self.assertIn("优秀", html)
+        self.assertIn("1.23%", html)
+        self.assertIn("159/358", html)
+        self.assertIn("-18.50%", html)
+        self.assertIn("大盘成长", html)
+        self.assertIn("50.00%（现有基金X）", html)
+
+    def test_failed_row_shows_placeholder(self):
+        """单候选获取失败 → 显示'数据获取失败'占位行。"""
+        row = self._sample_row()
+        row["available"] = False
+        row["reason"] = "rank_unavailable"
+        candidate_data = {"available": True, "exceed_limit": False, "invalid": [], "rows": [row]}
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("数据获取失败", html)
+
+    def test_exceed_limit_footnote_rendered(self):
+        """候选 >10 只截断 → 渲染超限提示。"""
+        candidate_data = {
+            "available": True,
+            "exceed_limit": True,
+            "invalid": [],
+            "rows": [self._sample_row()],
+        }
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("候选基金超过 10 只", html)
+
+    def test_invalid_codes_footnote_rendered(self):
+        """存在无效候选代码 → 渲染忽略提示。"""
+        candidate_data = {
+            "available": True,
+            "exceed_limit": False,
+            "invalid": ["abc123", "123"],
+            "rows": [self._sample_row()],
+        }
+        html = self._render_candidate_block(candidate_data)
+        self.assertIn("无效候选代码（忽略）", html)
+        self.assertIn("abc123、123", html)
+
+    def test_candidate_block_present_in_template(self):
+        """模板确实包含候选基金比较区块（结构性自检）。"""
+        block = self._extract_candidate_block()
+        self.assertIn("候选基金比较", block)
+        self.assertIn("comparison_candidates", block)
+
+    @staticmethod
+    def _sample_row() -> dict:
+        """构造一个 available 候选行样例。"""
+        return {
+            "code": "000001",
+            "name": "候选基金A",
+            "rating": "优秀",
+            "syl_近1月": "1.23%",
+            "syl_近1月_raw": 0.0123,
+            "syl_近3月": "5.67%",
+            "syl_近3月_raw": 0.0567,
+            "syl_近6月": "11.01%",
+            "syl_近6月_raw": 0.1101,
+            "syl_近1年": "-2.01%",
+            "syl_近1年_raw": -0.0201,
+            "rank_text": "159/358",
+            "max_drawdown": "-18.50%",
+            "max_drawdown_raw": -0.185,
+            "style": "大盘成长",
+            "overlap_name": "现有基金X",
+            "overlap_jaccard": "50.00%",
+            "overlap_jaccard_raw": 0.5,
+            "available": True,
+            "reason": "",
+        }
+
+
+# ============================================================
+#  Template rendering — 成本流水（fund_flow_data）三处渲染
+# ============================================================
+
+
+class TestFundFlowTemplate(unittest.TestCase):
+    """验证成本流水数据在真实模板三处的渲染结果。
+
+    行为断言（对应「成本流水」HTML 渲染补齐验收标准）：
+      - 开关关闭（flow_display=None）→ 汇总无 XIRR 卡、市值无加权成本列、分类无分档/分红列
+      - 开关开启且数据可用 → XIRR 用 pct、加权成本用 price、分档/分红用文本/金额正确渲染
+      - 数据缺失时占位（加权成本 "--"、分档 "--"、分红 0.00）
+    """
+
+    def setUp(self):
+        from jinja2 import Environment
+
+        from src.python.report.html_jinja_env import (
+            _jinja_money,
+            _jinja_pct,
+            _jinja_price,
+            _jinja_profit_color,
+        )
+
+        self.env = Environment(autoescape=True)
+        self.env.filters.update(
+            {
+                "money": _jinja_money,
+                "pct": _jinja_pct,
+                "price": _jinja_price,
+                "profit_color": _jinja_profit_color,
+            }
+        )
+        tmpl_path = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "python", "tmpl", "report_template.html")
+        )
+        with open(tmpl_path, encoding="utf-8") as f:
+            self.html = f.read()
+
+    def _extract_balanced_from(self, start: int) -> str:
+        """按 if/endif 配平从 start 起截取一段（含起点标记本身）。"""
+        depth = 0
+        pos = start
+        while True:
+            nxt_if = self.html.find("{% if", pos)
+            nxt_endif = self.html.find("{% endif %}", pos)
+            self.assertNotEqual(nxt_endif, -1, "模板中该区块未闭合（if/endif 不配平）")
+            if nxt_if != -1 and nxt_if < nxt_endif:
+                depth += 1
+                pos = nxt_if + len("{% if")
+            else:
+                depth -= 1
+                pos = nxt_endif + len("{% endif %}")
+                if depth == 0:
+                    return self.html[start:pos]
+
+    def _extract_balanced(self, start_marker: str) -> str:
+        """按 if/endif 配平从 start_marker 起截取一段（含 marker 本身）。"""
+        start = self.html.find(start_marker)
+        self.assertNotEqual(start, -1, f"模板中未找到起点: {start_marker}")
+        return self._extract_balanced_from(start)
+
+    def _extract_flow_block(self, inner_marker: str) -> str:
+        """定位含 inner_marker 的最近前驱 {% if flow_display %} 块并配平截取。"""
+        inner = self.html.find(inner_marker)
+        self.assertNotEqual(inner, -1, f"模板中未找到内容: {inner_marker}")
+        if_start = self.html.rfind("{% if flow_display %}", 0, inner)
+        self.assertNotEqual(if_start, -1, "未找到前驱 {% if flow_display %}")
+        return self._extract_balanced_from(if_start)
+
+    def _render(self, fragment: str, flow_display, **extra) -> str:
+        return self.env.from_string(fragment).render(flow_display=flow_display, **extra)
+
+    # ── 1. 盈亏汇总 XIRR 卡 ──
+    def test_summary_xirr_card_hidden_when_disabled(self):
+        """开关关闭（flow_display=None/无 xirr_rate）→ 盈亏汇总无 XIRR 卡。"""
+        frag = self._extract_balanced("{% if flow_display and flow_display.xirr_rate is not none %}")
+        for data in (None, {}, {"xirr_rate": None}):
+            self.assertEqual(self._render(frag, data).strip(), "", f"flow_display={data!r} 不应渲染 XIRR 卡")
+
+    def test_summary_xirr_card_rendered_when_available(self):
+        """xirr_rate 可用 → 渲染「资金加权收益率 (XIRR)」卡，值经 pct 过滤器（×100）。"""
+        frag = self._extract_balanced("{% if flow_display and flow_display.xirr_rate is not none %}")
+        html = self._render(frag, {"xirr_rate": 0.1035})
+        self.assertIn("资金加权收益率 (XIRR)", html)
+        self.assertIn("10.35%", html)
+
+    # ── 2. 市值核算明细表 资金加权成本列 ──
+    def test_market_value_wac_header_hidden_when_disabled(self):
+        """开关关闭 → 市值核算表无「资金加权成本」表头列。"""
+        frag = self._extract_balanced("{% if flow_display %}<th>资金加权成本</th>")
+        self.assertEqual(self._render(frag, None).strip(), "")
+        self.assertEqual(self._render(frag, {}).strip(), "")
+
+    def test_market_value_wac_header_rendered_when_enabled(self):
+        """开关开启 → 市值核算表追加「资金加权成本」表头列。"""
+        frag = self._extract_balanced("{% if flow_display %}<th>资金加权成本</th>")
+        html = self._render(frag, {"cost_map": {}})
+        self.assertIn("<th>资金加权成本</th>", html)
+
+    def test_market_value_wac_cell_value(self):
+        """加权成本可用 → 明细行按 price 过滤器渲染；缺码时占位 "--"。"""
+        frag = self._extract_flow_block("{% set wac = flow_display.cost_map.get(d.code) %}")
+        html = self._render(frag, {"cost_map": {"600900": 52.5}}, d={"code": "600900"})
+        self.assertIn("52.500", html)
+        html_missing = self._render(frag, {"cost_map": {}}, d={"code": "600900"})
+        self.assertIn("--", html_missing)
+
+    # ── 3. 持仓分类表 成本分档/分红累计列 ──
+    def test_category_flow_headers_hidden_when_disabled(self):
+        """开关关闭 → 分类表无「成本分档」「分红累计」表头列。"""
+        frag = self._extract_balanced("{% if flow_display %}<th>成本分档</th><th>分红累计</th>")
+        self.assertEqual(self._render(frag, None).strip(), "")
+        self.assertEqual(self._render(frag, {}).strip(), "")
+
+    def test_category_flow_headers_rendered_when_enabled(self):
+        """开关开启 → 分类表追加「成本分档」「分红累计」表头列。"""
+        frag = self._extract_balanced("{% if flow_display %}<th>成本分档</th><th>分红累计</th>")
+        html = self._render(frag, {"tier_map": {}})
+        self.assertIn("<th>成本分档</th>", html)
+        self.assertIn("<th>分红累计</th>", html)
+
+    def test_category_flow_cell_values(self):
+        """分档标签 + 分红累计金额正确渲染；缺码时占位 "--"/0.00。"""
+        frag = self._extract_flow_block('flow_display.tier_map.get(item["code"]')
+        flow = {"tier_map": {"600900": "低成本"}, "div_map": {"600900": 120.5}}
+        html = self._render(frag, flow, item={"code": "600900"})
+        self.assertIn("低成本", html)
+        self.assertIn("120.50", html)
+        html_missing = self._render(frag, {"tier_map": {}, "div_map": {}}, item={"code": "600900"})
+        self.assertIn("--", html_missing)
+        self.assertIn("0.00", html_missing)
+
+    def test_fund_flow_blocks_present_in_template(self):
+        """模板确实包含成本流水三处条件渲染（结构性自检）。"""
+        self.assertIn("{% if flow_display and flow_display.xirr_rate is not none %}", self.html)
+        self.assertIn("<th>资金加权成本</th>", self.html)
+        self.assertIn("<th>成本分档</th>", self.html)
+        self.assertIn("<th>分红累计</th>", self.html)
+
+
+class TestBuildFlowDisplay(unittest.TestCase):
+    """验证 html_writer._build_flow_display 的展示映射组装。
+
+    行为断言：
+      - 开关关闭/无数据（None）→ 返回 None（模板不渲染成本流水列）
+      - 完整契约 → cost_map 复用加权成本、tier_map 复用分档标签、div_map/div_total 正确
+      - 契约键缺失 → 降级为空映射（cost_map/tier_map/div_map 空 dict，div_total 0.0）
+    """
+
+    def test_none_input_returns_none(self):
+        """None（开关关闭）→ 返回 None。"""
+        from src.python.report.html_writer import _build_flow_display
+
+        self.assertIsNone(_build_flow_display(None))
+        self.assertIsNone(_build_flow_display({}))
+
+    def test_full_contract_maps_values(self):
+        """完整契约 → 加权成本/分档标签/分红映射正确组装。"""
+        from src.python.report.html_writer import _build_flow_display
+
+        contract = {
+            "available": True,
+            "xirr": {"rate": 0.1035},
+            "cost_tiers": {
+                "per_code": {
+                    "600900": {
+                        "low": {"shares": 100.0, "cost": 5000.0},
+                        "high": {"shares": 0.0, "cost": 0.0},
+                        "unpriced": {"shares": 0.0, "cost": 0.0},
+                    }
+                }
+            },
+            "dividends": {"per_code": {"600900": 120.5}, "total": 120.5},
+        }
+        display = _build_flow_display(contract)
+        self.assertIsNotNone(display)
+        self.assertIs(display["available"], True)
+        self.assertAlmostEqual(display["xirr_rate"], 0.1035)
+        self.assertAlmostEqual(display["cost_map"]["600900"], 50.0)  # 5000/100
+        self.assertEqual(display["tier_map"]["600900"], "低成本")
+        self.assertAlmostEqual(display["div_map"]["600900"], 120.5)
+        self.assertAlmostEqual(display["div_total"], 120.5)
+
+    def test_partial_contract_degrades(self):
+        """契约键缺失 → cost_map/tier_map/div_map 空 dict、div_total 0.0、xirr_rate None。"""
+        from src.python.report.html_writer import _build_flow_display
+
+        display = _build_flow_display({"available": False})
+        self.assertIsNotNone(display)
+        self.assertIs(display["available"], False)
+        self.assertIsNone(display["xirr_rate"])
+        self.assertEqual(display["cost_map"], {})
+        self.assertEqual(display["tier_map"], {})
+        self.assertEqual(display["div_map"], {})
+        self.assertEqual(display["div_total"], 0.0)
+
+
+# ============================================================
 #  write_html_report — news_llm_meta 参数透传
 # ============================================================
 
@@ -956,7 +1325,7 @@ if __name__ == "__main__":
 
 
 # ============================================================
-#  C-P2: 报告序号可配置 → 模板渲染测试
+#  报告序号可配置 → 模板渲染测试
 # ============================================================
 
 
@@ -1129,7 +1498,7 @@ class TestComputeSectionVisibilityEvolution(unittest.TestCase):
             enable_history=True,
             enable_portfolio_evolution=enable_portfolio_evolution,
             enable_llm=False,
-            factor_exposure=None,
+            style_factor_data=None,
             position_relationship_data=None,
             evolution_data=evolution_data,
         )

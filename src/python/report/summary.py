@@ -1,4 +1,4 @@
-"""汇总模块 — 报告第 1 页。
+"""投资分析汇总模块。
 
 显示当前日期、持仓概况（分类统计+价格更新状态）、盈亏汇总、市场指数。"""
 
@@ -39,7 +39,7 @@ _INDEX_DOWN_FONT = Font(size=10, bold=True, color="009900")  # 跌→绿
 # 单元格对齐
 _CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
 
-# 模块级降级阈值控制器（单例工厂共享，T0-01-A 统一管理）
+# 模块级降级阈值控制器（单例工厂共享，统一管理）
 _tracker = get_tracker()
 
 _NCOLS = 8
@@ -163,8 +163,15 @@ def _write_profit_summary(
     total_cost: float,
     total_profit: float,
     today_profit: float,
+    fund_flow_data: dict | None = None,
 ) -> int:
-    """写入盈亏汇总（数值以原始小数/金额写入，由 Excel 数字格式控制显示）。"""
+    """写入盈亏汇总（数值以原始小数/金额写入，由 Excel 数字格式控制显示）。
+
+    Args:
+        fund_flow_data: 成本流水数据契约。非 None 时在汇总末尾追加
+            「资金加权收益率 (XIRR)」行（无可用现金流时写占位文本）；
+            None 时保持既有输出（report_submodules.cost_lots 关闭）。
+    """
     # 检测行情数据是否全部不可用 — 有持仓成本但市值全零
     _data_unavailable = total_mv == 0 and total_cost > 0
     if _data_unavailable:
@@ -201,6 +208,18 @@ def _write_profit_summary(
         ws.cell(row=row, column=2).number_format = fmt
         if "盈亏" in label and isinstance(val, (int, float)) or "收益率" in label and isinstance(val, (int, float)):
             ws.cell(row=row, column=2).font = profit_font(val)
+        row += 1
+
+    # 资金加权收益率 (XIRR)：成本流水子模块开启时展示（无可用现金流写占位）
+    if fund_flow_data is not None:
+        xirr = fund_flow_data.get("xirr")
+        if xirr and xirr.get("rate") is not None:
+            rate = xirr["rate"]
+            write_data_row(ws, row, ["资金加权收益率 (XIRR)", rate])
+            ws.cell(row=row, column=2).number_format = FMT_PERCENT
+            ws.cell(row=row, column=2).font = profit_font(rate)
+        else:
+            write_data_row(ws, row, ["资金加权收益率 (XIRR)", "未录入流水/无法计算"])
         row += 1
 
     row = _write_blanks(ws, row)
@@ -337,6 +356,7 @@ def write_summary_sheet(
     update_status: tuple[int, int, bool] | None = None,
     a_indices: dict[str, dict[str, Any]] | None = None,
     us_indices: dict[str, dict[str, Any]] | None = None,
+    fund_flow_data: dict | None = None,
 ) -> None:
     """写入投资分析汇总。
 
@@ -350,13 +370,15 @@ def write_summary_sheet(
         update_status: (已更新数, 总数, 是否全部更新)，来自 price_update_status()
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
+        fund_flow_data: 成本流水数据契约（非 None 时盈亏汇总追加 XIRR 行；
+            None 时保持既有输出，report_submodules.cost_lots 关闭）
     """
     row = write_title_row(ws, 1, get_report_sheet_name("summary"), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
 
     row = _write_basic_info(ws, row)
     row = _write_holdings_overview(ws, row, categories, update_status)
-    row = _write_profit_summary(ws, row, total_mv, total_cost, total_profit, today_profit)
+    row = _write_profit_summary(ws, row, total_mv, total_cost, total_profit, today_profit, fund_flow_data)
     row = _write_blanks(ws, row)
 
     # ── 市场指数 ──

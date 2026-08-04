@@ -2,7 +2,7 @@
 
 覆盖：
   - available=True → 汇总提示 + ①总市值趋势 + ②HHI 趋势 + ③TOP 持仓占比变迁 + 说明
-  - enable_interactive_charts=True → 3 张 Chart.js 画布 + 3 条 .chart-caption（C20）
+  - enable_interactive_charts=True → 3 张 Chart.js 画布 + 3 条 .chart-caption（图下说明）
   - 多账户 → ④账户配置流表
   - available=False（快照不足）→ 降级占位「组合演进数据不足」
   - evolution_data=None → 章节整体隐藏（html_writer 数据门控）
@@ -50,7 +50,7 @@ def _render_evolution(evolution_data, interactive: bool = False) -> "BeautifulSo
 
 
 def _evolution_data(**extra) -> dict:
-    """构造 C19 契约 evolution_data mock（3 观察日，双账户，TOP3）。"""
+    """构造数据契约 evolution_data mock（3 观察日，双账户，TOP3）。"""
     d = {
         "available": True,
         "snapshot_count": 5,
@@ -99,13 +99,13 @@ class TestHtmlEvolutionSection(unittest.TestCase):
         self.assertIn("快照格式限制", text)
 
     def test_interactive_charts_and_captions(self):
-        """enable_interactive_charts=True → 3 张画布 + 3 条图下说明（C20）。"""
+        """enable_interactive_charts=True → 3 张画布 + 3 条图下说明（图下说明）。"""
         section = self._section(_evolution_data(), interactive=True)
         self.assertEqual(len(section.select("canvas")), 3)
         for cid in ("chart_evolution_total", "chart_evolution_hhi", "chart_evolution_top"):
             self.assertIsNotNone(section.find(id=cid), f"缺画布 {cid}")
         captions = section.select(".chart-caption")
-        self.assertEqual(len(captions), 3, "每张图表必须有 .chart-caption（C20）")
+        self.assertEqual(len(captions), 3, "每张图表必须有 .chart-caption（图下说明）")
         joined = " ".join(c.get_text() for c in captions)
         self.assertIn("总市值与总盈亏", joined)
         self.assertIn("HHI", joined)

@@ -155,7 +155,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
 
 
 # ============================================================
-#  write_html_report — data_status 渲染（D-6 新增）
+#  write_html_report — data_status 渲染
 # ============================================================
 
 
@@ -215,11 +215,11 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
                     return_value=({"top10": [], "summary": {}, "industry_success": False}, False, True),
                 )
             )
-            # 基金业绩子函数 mock
+            # 基金业绩子函数 mock（第二项为候选比较数据，开关关闭时为 None）
             stack.enter_context(
                 patch(
                     "src.python.report.html_writer._render_fund_performance_section",
-                    return_value=([], True),
+                    return_value=([], None),
                 )
             )
             # data_status mock — industry 失败
@@ -275,11 +275,11 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
                     return_value=({"top10": [], "summary": {}, "industry_success": True}, True, True),
                 )
             )
-            # 基金业绩子函数 — profit_success=False
+            # 基金业绩子函数 — profit_success=False（第二项为候选比较数据，开关关闭时为 None）
             stack.enter_context(
                 patch(
                     "src.python.report.html_writer._render_fund_performance_section",
-                    return_value=([], False),
+                    return_value=([], None),
                 )
             )
             stack.enter_context(
@@ -337,7 +337,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
             stack.enter_context(
                 patch(
                     "src.python.report.html_writer._render_fund_performance_section",
-                    return_value=([], True),
+                    return_value=([], None),
                 )
             )
             # 穿透 data_status 抛异常 → 被辅助函数捕获，结果为 {}
@@ -375,7 +375,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
 
 
 # ============================================================
-#  基金深度分析模块空态占位（D-7a）
+#  基金深度分析模块空态占位
 # ============================================================
 
 
@@ -432,7 +432,7 @@ class TestWriteHtmlReportFundDeepAnalysisEmpty(unittest.TestCase):
         stack.enter_context(
             patch(
                 "src.python.report.html_writer._render_fund_performance_section",
-                return_value=([], True),
+                return_value=([], None),
             )
         )
         # 4 个基金深度分析模块返回空数据
@@ -483,7 +483,7 @@ class TestWriteHtmlReportFundDeepAnalysisEmpty(unittest.TestCase):
         self.assertTrue(svis.get("fund_manager"), "基金经理 section 应可见")
         self.assertTrue(svis.get("position_relationship"), "持仓关系 section 应可见")
         self.assertTrue(svis.get("fund_concentration"), "集中度 section 应可见")
-        self.assertTrue(svis.get("fund_style"), "风格分析 section 应可见")
+        self.assertTrue(svis.get("style_factor"), "风格与因子 section 应可见（合并章）")
 
     def test_fund_deep_analysis_empty_data_passed_to_template(self):
         """空数据时 manager_analysis / overlap_matrix / concentration_analysis / style_analysis

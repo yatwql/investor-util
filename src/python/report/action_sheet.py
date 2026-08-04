@@ -6,7 +6,7 @@
   3. 调仓建议   — 可行化调仓清单（analysis/rebalance_advisor 计算，份额取整/费用/现金）
   4. 收益归因   — 品种收益贡献占比（TOP5 正负分列 + 净额合计摘要）
 
-数据源为 C19 `action_data` 契约（`analysis/action_advisor.build_action_data` 组装、
+数据源为 `action_data` 契约（`analysis/action_advisor.build_action_data` 组装、
 orchestrator 注入 pipeline_data）。子块为空时写「暂无」占位——收益归因无可归因
 数据（Σ|profit|=0 / 无持仓）时写「待生成」占位，报告结构保持稳定。
 
@@ -83,7 +83,7 @@ def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> Non
 
     Args:
         ws: openpyxl Worksheet 对象
-        action_data: C19 `action_data` 契约 dict；None 或 available=False 时写占位。
+        action_data: `action_data` 契约 dict；None 或 available=False 时写占位。
     """
     _name = get_report_sheet_name("action")
     _ncols = 5

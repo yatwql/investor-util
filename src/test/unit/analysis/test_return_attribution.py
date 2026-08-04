@@ -1,9 +1,9 @@
-"""收益归因计算与适配层单元测试（20 章归因子块 + 14 章提示词段落共用计算）。
+"""收益归因计算与适配层单元测试（「行动建议」章归因子块 + 「智囊团深度复盘」章提示词段落共用计算）。
 
-测试目标（轮 7 验收口径）：
+测试目标（「行动建议」章收益归因子块验收口径）：
   - 共享纯计算 `compute_return_attribution`：TOP5 按 |profit| 排序、正负分列、
     贡献占比精度（固定 fixture <0.01%）、空/零盈亏保护、pos/neg 合计覆盖全部持仓
-  - 渲染适配层 `build_return_attribution`：C19 `attribution` 契约、净额合计摘要
+  - 渲染适配层 `build_return_attribution`：`attribution` 契约、净额合计摘要
     （混合/全盈/全亏三类文案）、不可归因时透传 None
   - 复用断言：`llm/prompts_core._build_profit_attribution_block` 与共享计算
     输出逐字节一致（段落与表格同一数据的两处格式化，避免重复实现）
@@ -112,10 +112,10 @@ class TestComputeReturnAttribution:
 
 
 class TestBuildReturnAttribution:
-    """20 章适配层：C19 契约 + 净额合计摘要文案。"""
+    """「行动建议」章适配层：数据契约 + 净额合计摘要文案。"""
 
     def test_contract_c19_compliant(self):
-        """输出 C19 `attribution` 契约键（available/盈利来源/亏损来源/summary）。"""
+        """输出 `attribution` 契约键（available/盈利来源/亏损来源/summary）。"""
         data = build_return_attribution(_mixed_holdings())
         assert data is not None
         assert set(data.keys()) == {"available", "盈利来源", "亏损来源", "summary"}

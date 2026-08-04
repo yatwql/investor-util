@@ -1,12 +1,12 @@
 """Chart.js 数据预处理器单元测试 — chart_data_builder.py。
 
 覆盖交互图表模块的验收标准：
-  - 6 图固定键契约（§4.11 O2）：portfolio_line / drawdown / category_doughnut /
+  - 6 图固定键契约（§4.11 ）：portfolio_line / drawdown / category_doughnut /
     industry_bar / penetration_bar / radar
   - 输出 schema（§4.12）：{"labels", "datasets", "degraded"}
-  - R11：单图脏数据隔离——一个图失败仅跳过该图
-  - R12：radar 三级降级独立构建
-  - R9：数据最小化——资产构成只传市值，不含份额/成本
+  - 单图脏数据隔离——一个图失败仅跳过该图
+  - radar 三级降级独立构建
+  - 数据最小化——资产构成只传市值，不含份额/成本
   - 空值语义：键缺失→占位；空数组→无数据；degraded→虚线
 
 运行：
@@ -95,7 +95,7 @@ def _gen_bars(n: int, start: str = "2024-01-01") -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  固定键契约（§4.11 O2）
+# 固定键契约（§4.11 ）
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -111,7 +111,7 @@ class TestKeysContract:
         assert set(DATASET_KEYS) == set(ds.keys())
 
     def test_key_contract_matches_constant(self) -> None:
-        """固定键顺序与 DATASET_KEYS 常量一致（§4.11 O2 契约）。"""
+        """固定键顺序与 DATASET_KEYS 常量一致（§4.11 契约）。"""
         assert list(DATASET_KEYS) == [
             "portfolio_line",
             "drawdown",
@@ -192,7 +192,7 @@ class TestPortfolioLineAndDrawdown:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  P1 服务端下采样
+# 服务端下采样
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -258,7 +258,7 @@ class TestDownsampling:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  资产构成 Doughnut（R9 数据最小化）
+# 资产构成 Doughnut（数据最小化）
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -271,7 +271,7 @@ class TestCategoryDoughnut:
         assert chart["datasets"][0]["data"] == [10000.0, 5000.0, 2000.0]
 
     def test_r9_privacy_no_cost_shares(self) -> None:
-        """R9：只传市值，不含份额/成本等敏感字段。"""
+        """只传市值，不含份额/成本等敏感字段。"""
         ds = build_chart_datasets(history_data=None, details=_details())
         import json
 
@@ -280,7 +280,7 @@ class TestCategoryDoughnut:
         assert "shares" not in raw.lower()
 
     def test_colors_delegated_to_js_theme(self) -> None:
-        """A3（§4.8）：扇区颜色不在 Python 侧硬编码，由 JS ChartTheme.doughnutColors 提供。
+        """（§4.8）：扇区颜色不在 Python 侧硬编码，由 JS ChartTheme.doughnutColors 提供。
 
         避免 Python/JS 调色板漂移；色盲安全 palette 单一来源在 chart-config.js。
         """
@@ -422,7 +422,7 @@ class TestIndustryAndPenetration:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  量化指标 Radar（R12 三级降级）
+# 量化指标 Radar（三级降级）
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -477,7 +477,7 @@ class TestRadar:
         assert chart["datasets"][0]["data"][-1] == "N/A"
 
     def test_radar_independent_of_history(self) -> None:
-        """R12：history unavailable 但 all_metrics 有值时 radar 仍渲染。"""
+        """history unavailable 但 all_metrics 有值时 radar 仍渲染。"""
         ds = build_chart_datasets(
             history_data=_history_unavailable(),
             all_metrics=self._ALL_METRICS,
@@ -577,7 +577,7 @@ class TestRadar:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  R11 单图脏数据隔离
+# 单图脏数据隔离
 # ═══════════════════════════════════════════════════════════════
 
 

@@ -13,7 +13,7 @@
     的约定一致：回撤是持续状态而非一次性事件，在峰值恢复前持续提示风险更合理
   - 数据守卫：缺 profit_rate / 总市值 0 / 空持仓 → 安全跳过，不报错
 
-产出信号字段（C19 `discipline_signals` 契约）：
+产出信号字段（`discipline_signals` 契约）：
   code / name / rule / value / status_label / triggered / distance_pct / action
 """
 
@@ -91,7 +91,7 @@ def _build_signal(
         action: 建议动作（部分止盈 / 止损减仓 / 减仓控回撤）
 
     Returns:
-        纪律信号 dict（C19 `discipline_signals` 契约字段）。
+        纪律信号 dict（`discipline_signals` 契约字段）。
     """
     sign = "+" if value >= 0 else ""
     if distance_pct > 0:

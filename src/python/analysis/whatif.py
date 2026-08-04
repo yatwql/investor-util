@@ -1,7 +1,7 @@
 """调仓 What-if 模拟 — 双持仓对比计算。
 
 对两份持仓（基准 base / 目标 candidate）做**成本口径**截面比较，
-输出 C19 契约 `whatif_data`，供 Excel 调仓模拟报告与 HTML 双栏对比页消费。
+输出数据契约 `whatif_data`，供 Excel 调仓模拟报告与 HTML 双栏对比页消费。
 
 设计边界（对应 technical.md §4.13 调仓 What-if 模拟 — 设计边界）：
   - **成本口径**：candidate 持仓没有市场历史，无法取实时市值/净值，
@@ -114,7 +114,7 @@ def build_whatif_data(
     base_file: str = "",
     candidate_file: str = "",
 ) -> dict[str, Any]:
-    """构建调仓 What-if 对比 C19 契约 dict。
+    """构建调仓 What-if 对比数据契约 dict。
 
     Args:
         base:      基准持仓（调仓前）

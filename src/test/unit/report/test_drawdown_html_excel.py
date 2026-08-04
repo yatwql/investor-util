@@ -10,7 +10,7 @@ HTML：
   - 有效交易日不足（drawdown_available=False）显示数据不足提示
   - history_data 缺失显示数据不可用占位
   - 未恢复事件的恢复耗时显示占位符
-  - crisis_annotation_data 有 in_range 区间时渲染危机表 + C20 图下说明
+  - crisis_annotation_data 有 in_range 区间时渲染危机表 + 图下说明
 
 Excel：
   - write_portfolio_history_drawdown_sheet 一章两区块 + 危机区间标注
@@ -187,14 +187,14 @@ class TestHtmlDrawdownSection(unittest.TestCase):
         self.assertNotIn("回撤明细", section.get_text())
 
     def test_crisis_table_rendered_when_in_range(self):
-        """危机区间有 in_range → 渲染危机表 + C20 图下说明。"""
+        """危机区间有 in_range → 渲染危机表 + 图下说明。"""
         section = self._section(_history([]), _crisis(in_range=True))
         text = section.get_text()
         self.assertIn("危机区间标注", text)
         self.assertIn("2022 市场调整", text)
         self.assertIn("25.00%", text)  # 区间最大回撤
         self.assertIn("60 天", text)  # 恢复耗时
-        # C20：净值图说明跟随危机数据
+        # 净值图说明跟随危机数据
         self.assertIn("阴影区间为 2015/2018/2020/2022", text)
 
     def test_crisis_caption_hidden_when_no_overlap(self):
@@ -204,7 +204,7 @@ class TestHtmlDrawdownSection(unittest.TestCase):
         self.assertIn("危机区间标注", text)  # 区块头仍显示
         self.assertIn("报告数据窗口内无历史危机区间", text)  # 无重叠占位
         self.assertNotIn("2022 市场调整", text)  # 无区间行
-        self.assertNotIn("阴影区间为 2015/2018/2020/2022", text)  # C20 净值图说明不跟随
+        self.assertNotIn("阴影区间为 2015/2018/2020/2022", text)  # 净值图说明不跟随
 
     def test_crisis_table_hidden_when_data_unavailable(self):
         """crisis_annotation_data 缺失 → 不渲染危机表。"""

@@ -11,7 +11,7 @@
     管指标计算层面的异常（除零/空数据/置信度不足），per-indicator 粒度。
     不关心底层是哪个数据源——只关心指标算不算得出来。
 
-C20 联动（Feature Flag ↔ Circuit Breaker）：
+熔断与功能开关联动（Feature Flag ↔ Circuit Breaker）：
   - Feature Flag 关闭期间不计断路失败次数
   - Feature Flag 打开时自动重置断路器状态
   - Feature Flag 变更事件记录到 DegradationTracker
@@ -148,7 +148,7 @@ class IndicatorBreaker:
     def _check_feature_flag(self, indicator_name: str) -> bool:
         """检查 Feature Flag 状态，联动断路器。
 
-        C20 联动：
+        熔断与功能开关联动：
           - Feature Flag 关闭期间不计断路失败次数
           - Feature Flag 打开时自动重置断路器状态
           - Feature Flag 变更事件记录到 DegradationTracker
@@ -170,19 +170,19 @@ class IndicatorBreaker:
             return True  # 没有对应 Feature Flag 的指标默认可用
 
         if not is_feature_enabled(flag_name):
-            # C20(a): Feature Flag 关闭期间不计断路失败次数
+            # a: Feature Flag 关闭期间不计断路失败次数
             st = self._state.get(indicator_name)
             if st and st.get("is_broken", False):
                 # 若已经断路，但 FF 关闭，自动解除断路（不计为失败）
                 self._state.pop(indicator_name, None)
                 self._save_state()
-                # C20(c): 记录到 DegradationTracker
+                # c: 记录到 DegradationTracker
                 self._log_ff_event(indicator_name, flag_name, False)
 
             # 从 FEATURE_FLAGS 检查是否发生了状态变化
             return False
 
-        # C20(b): Feature Flag 从 false 切换到 true 时，重置断路器
+        # b: Feature Flag 从 false 切换到 true 时，重置断路器
         # 从元数据检查：之前的状态是 false
         last_ff_state = FEATURE_FLAGS.get(flag_name, True)
         if last_ff_state:  # 当前是 true
@@ -191,14 +191,14 @@ class IndicatorBreaker:
                 # 之前 FF 关闭过，现在打开了 → 清空历史失败
                 self._state.pop(indicator_name, None)
                 self._save_state()
-                # C20(c): 记录到 DegradationTracker
+                # c: 记录到 DegradationTracker
                 self._log_ff_event(indicator_name, flag_name, True)
 
         return True
 
     @staticmethod
     def _log_ff_event(indicator_name: str, flag_name: str, now_enabled: bool) -> None:
-        """C20(c): Feature Flag 变更事件记录到 DegradationTracker。"""
+        """c: Feature Flag 变更事件记录到 DegradationTracker。"""
         try:
             from src.python.report.data_status import get_tracker
 
@@ -210,7 +210,7 @@ class IndicatorBreaker:
                 failure_type="unreachable",
             )
             logger.info(
-                "[breaker] C20 %s: Feature Flag %s → %s",
+                "[breaker] 图下说明 %s: Feature Flag %s → %s",
                 indicator_name,
                 flag_name,
                 "启用" if now_enabled else "关闭",
@@ -232,7 +232,7 @@ class IndicatorBreaker:
     def record_failure(self, indicator_name: str, context: str = "") -> None:
         """记录一次指标计算失败，达到阈值时触发断路。
 
-        feature_flag 关闭时不计失败次数（C20-a）。
+        feature_flag 关闭时不计失败次数。
         """
         # 先检查 Feature Flag
         from src.python.config.features import is_feature_enabled
@@ -248,7 +248,7 @@ class IndicatorBreaker:
         }
         flag_name = flag_map.get(indicator_name)
         if flag_name and not is_feature_enabled(flag_name):
-            # C20(a): FF 关闭，不计失败
+            # a: FF 关闭，不计失败
             logger.debug("[breaker] %s FF 关闭（%s），不计失败", indicator_name, flag_name)
             return
 

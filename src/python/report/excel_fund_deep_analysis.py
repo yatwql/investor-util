@@ -50,15 +50,16 @@ def write_fund_deep_analysis_sheets(
     data: dict[str, Any],
     modules: dict[str, Any],
     prog: ProgressReporter,
-    factor_exposure: dict[str, Any] | None = None,
+    style_factor_data: dict[str, Any] | None = None,
     position_relationship_data: dict[str, Any] | None = None,
 ) -> None:
     """写入基金深度分析页签。
 
     Args:
-        factor_exposure: 因子暴露 C19 契约 dict，来自 pipeline_data；
-            未提供或 available=False 时页签写入占位（§1.4.5 降级治理）。
-        position_relationship_data: 持仓关系矩阵 C19 契约 dict（相关性区块数据源），
+        style_factor_data: 风格与因子分析数据契约 dict，来自 pipeline_data
+            （style_factor_data 主键，内嵌 industry_beta 子键）；
+            未提供或 available=False 时因子回归区块写入占位（§1.4.5 降级治理）。
+        position_relationship_data: 持仓关系矩阵数据契约 dict（相关性区块数据源），
             来自 pipeline_data；未提供或 available=False 时相关性区块写入占位（§1.4.5 降级治理）。
     """
     if not enable_fund_deep_analysis:
@@ -161,41 +162,33 @@ def write_fund_deep_analysis_sheets(
             logger.warning("持仓集中度监控页签写入失败: %s", e)
             prog.add_error("持仓集中度监控页签写入失败")
 
-    # ── 基金风格分析 ──
+    # ── 风格与因子分析（一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） ──
+    # style_factor_data 来自编排层 pipeline_data（style_factor_data 主键，
+    # 内嵌 industry_beta 子键）；风格表 results 为渲染期派生（不进数据契约）。
+    # 三区块独立降级（§1.4.5）：风格表空/因子空/行业 Beta 关均不影响其余区块。
     analyze_style = modules.get("analyze_style_for_all_funds")
-    write_style = modules.get("write_style_sheet")
-    ws_style = sheets.get("fund_style")
-    if ws_style is not None and analyze_style is not None and write_style is not None:
-        prog.info("正在分析基金风格漂移...")
+    write_sf = modules.get("write_style_factor_sheet")
+    ws_sf = sheets.get("style_factor")
+    if ws_sf is not None and write_sf is not None:
+        prog.info("正在写入风格与因子分析页签...")
         style_result = None
-        try:
-            _, style_fund_holdings = _process_fund_deep_analysis_module(holdings, analyze_style, prog)
-            if style_fund_holdings:
-                style_result = analyze_style(style_fund_holdings)
-                if style_result.get("results"):
-                    prog.ok("基金风格分析计算完成")
+        if analyze_style is not None:
+            try:
+                _, sf_fund_holdings = _process_fund_deep_analysis_module(holdings, analyze_style, prog)
+                if sf_fund_holdings:
+                    style_result = analyze_style(sf_fund_holdings)
+                    if (style_result or {}).get("results"):
+                        prog.ok("基金风格分析计算完成")
+                    else:
+                        logger.info("基金风格分析：无结果")
                 else:
-                    logger.info("基金风格分析：无结果")
-            else:
-                logger.info("基金风格分析：无基金持仓数据")
-        except Exception as e:
-            logger.warning("基金风格分析数据获取/计算失败: %s", e)
-            prog.add_error("基金风格分析数据获取失败")
+                    logger.info("基金风格分析：无基金持仓数据")
+            except Exception as e:
+                logger.warning("基金风格分析数据获取/计算失败: %s", e)
+                prog.add_error("基金风格分析数据获取失败")
 
-        try:
-            write_style(ws_style, (style_result or {}).get("results", []))
-            prog.ok("基金风格分析页签写入完成")
-        except Exception as e:
-            logger.warning("基金风格分析页签写入失败: %s", e)
-            prog.add_error("基金风格分析页签写入失败")
-
-    # ── 因子暴露分析（数据已在编排层组装，见 pipeline_data["factor_exposure"]） ──
-    write_fe = modules.get("write_factor_exposure_sheet")
-    ws_fe = sheets.get("factor_exposure")
-    if ws_fe is not None and write_fe is not None:
-        prog.info("正在写入因子暴露分析页签...")
         _factor_names = None
-        if factor_exposure:
+        if style_factor_data:
             try:
                 from src.python.analysis.factor_exposure import FACTOR_NAMES
 
@@ -203,8 +196,14 @@ def write_fund_deep_analysis_sheets(
             except Exception:
                 _factor_names = None
         try:
-            write_fe(ws_fe, factor_exposure, _factor_names)
-            prog.ok("因子暴露分析页签写入完成")
+            write_sf(
+                ws_sf,
+                style_data=(style_result or {}).get("results", []),
+                factor_exposure=style_factor_data,
+                factor_names=_factor_names,
+                industry_beta=(style_factor_data or {}).get("industry_beta"),
+            )
+            prog.ok("风格与因子分析页签写入完成")
         except Exception as e:
-            logger.warning("因子暴露分析页签写入失败: %s", e)
-            prog.add_error("因子暴露分析页签写入失败")
+            logger.warning("风格与因子分析页签写入失败: %s", e)
+            prog.add_error("风格与因子分析页签写入失败")

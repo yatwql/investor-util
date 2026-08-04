@@ -1,4 +1,4 @@
-"""辩论模式 Token 预算守卫测试 — I-09。
+"""辩论模式 Token 预算守卫测试 — 。
 
 运行：
   cd D:/codebase/zoo/investor-util

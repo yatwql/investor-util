@@ -6,7 +6,7 @@
     - 空配置
     - 部分指数失败（其他成功）
     - 全部失败
-    - C6 约束：走 fetch_index_history
+    - 走 fetch_index_history
 """
 
 from __future__ import annotations

@@ -2,13 +2,13 @@
 
 策略类型：
   - priority（默认）：按 priority 字段升序，同 priority 保持原序
-  - weighted（R5）：按 weight 权重随机排序
-  - cost_first（R9）：按模型定价升序
-  - fallback_only（R3）：与 priority 同，语义表示为失败回退场景
+ - weighted：按 weight 权重随机排序
+ - cost_first：按模型定价升序
+ - fallback_only：与 priority 同，语义表示为失败回退场景
 
 后置步骤：
   - _apply_module_preferred()：模块偏好 provider 排首
-  - _apply_proxy_preferred()（R4）：有代理时 proxy_preferred 排首
+ - _apply_proxy_preferred：有代理时 proxy_preferred 排首
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def resolve_provider_chain(
     # step 2: 模块偏好注入
     chain = _apply_module_preferred(chain, module_key, preferred or {})
 
-    # step 3: 代理偏好注入（R4 扩展点）
+ # step 3: 代理偏好注入（扩展点）
     chain = _apply_proxy_preferred(chain)
 
     return chain

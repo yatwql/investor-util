@@ -1,9 +1,9 @@
 """首次运行引导模块测试。
 
 测试策略：
-  - is_first_run / mark_wizard_shown — 配置标记键读写（C13 隔离下用 tmp config）
+  - is_first_run / mark_wizard_shown — 配置标记键读写（测试隔离下用 tmp config）
   - _detect_startup_state — 持仓目录 / LLM 凭据 / 降级三态检测
-  - _write_llm_key_flat — 原子写 flat llm_key.json（C3 + C18，llm_key 路径被
+  - _write_llm_key_flat — 原子写 flat llm_key.json（原子写 + 凭据分离，llm_key 路径被
     _isolate_sensitive_paths 重定向到 tmp_path）
   - _is_non_interactive — CI / NON_INTERACTIVE / force 跳过
   - show_startup_wizard_if_needed — 非首次/非交互静默、交互引导打印、标记已读

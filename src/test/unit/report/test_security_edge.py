@@ -283,18 +283,23 @@ class TestTempFileRaceY6(unittest.TestCase):
     """临时文件安全 — mkstemp 原子写入。"""
 
     def test_mkstemp_used_for_config(self):
-        """set_config 原子写防半写（委托 _atomic_write，内含 mkstemp + os.replace）。"""
+        """set_config 原子写防半写（经 _persist_config_patch 委托 _atomic_write，内含 mkstemp + os.replace）。
+
+        set_config → _persist_config_patch（校验 JSON 合法性 + 原子落盘）→ _atomic_write（mkstemp + os.replace）。
+        """
         from src.python.config import set_config
-        from src.python.config._core import _atomic_write
+        from src.python.config._core import _atomic_write, _persist_config_patch
         import inspect
 
         # 原子写实现（_atomic_write）必须使用 mkstemp + os.replace 防半写
         source_atomic = inspect.getsource(_atomic_write)
         self.assertIn("mkstemp", source_atomic)
         self.assertIn("os.replace", source_atomic)
-        # set_config 必须委托 _atomic_write（而非直接写文件）
+        # set_config 必须经 _persist_config_patch 委托原子写（而非直接写文件）
         source_set = inspect.getsource(set_config)
-        self.assertIn("_atomic_write", source_set)
+        self.assertIn("_persist_config_patch", source_set)
+        source_patch = inspect.getsource(_persist_config_patch)
+        self.assertIn("_atomic_write", source_patch)
 
     def test_mkstemp_used_for_cache(self):
         """cache.set 使用 mkstemp 防半写。"""

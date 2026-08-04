@@ -5,9 +5,9 @@
  *   - beforeprint → 每张图 toBase64Image 快照为 <img>（2x 分辨率），隐藏 canvas
  *   - afterprint → 移除 <img>，恢复 canvas 交互
  *   - 必须在 chart-init.js 之前加载（chart-init.js 初始化时立即 register）
- *   - ES5 保守语法（R17/R22）：var / function / 无箭头函数
+ * - ES5 保守语法：var / function / 无箭头函数
  *
- * 独立成文件：保持 chart-init.js 纯净（≤300 行，§4.11 O4），打印与初始化分离。
+ * 独立成文件：保持 chart-init.js 纯净（≤300 行，§4.11 ），打印与初始化分离。
  */
 (function () {
   'use strict';

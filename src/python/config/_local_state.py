@@ -11,7 +11,7 @@
     _privacy_notice_shown）到本地状态，并从 config.json 删除，保证升级后 config.json 干净
 
 架构约束：
-  - C3：写入复用 `config._core._atomic_write` 原子写
+  - 写入复用 `config._core._atomic_write` 原子写
 """
 
 from __future__ import annotations

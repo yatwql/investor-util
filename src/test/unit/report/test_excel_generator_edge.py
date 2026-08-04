@@ -1,4 +1,4 @@
-"""全局降级冒烟测试 — 所有外部 API 失败时的报告生成稳定性（D-8）。
+"""全局降级冒烟测试 — 所有外部 API 失败时的报告生成稳定性。
 
 测试目标：
   - 全局降级：mock 所有外部数据源失败 → 报告生成不崩溃
@@ -124,7 +124,7 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
 
 
 # ============================================================
-#  Excel vs HTML 消息一致性（D-8 核心）
+#  Excel vs HTML 消息一致性（全局降级核心）
 # ============================================================
 
 
@@ -164,11 +164,11 @@ class TestMessageConsistency(unittest.TestCase):
         """基金深度分析 STATUS_MESSAGES key 完整且被 sheet 模块引用。"""
         from src.python.report.fund_manager_sheet import write_fund_manager_sheet
         from src.python.report.fund_concentration_sheet import write_concentration_sheet
-        from src.python.report.fund_style_sheet import write_style_sheet
+        from src.python.report.style_factor_sheet import write_style_factor_sheet
 
         self.assertTrue(callable(write_fund_manager_sheet))
         self.assertTrue(callable(write_concentration_sheet))
-        self.assertTrue(callable(write_style_sheet))
+        self.assertTrue(callable(write_style_factor_sheet))
 
         for key in ("manager_unavailable", "overlap_unavailable",
                     "concentration_unavailable", "style_unavailable"):

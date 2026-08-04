@@ -1,5 +1,5 @@
 # 目录结构
-> 文档版本：0.10.2
+> 文档版本：0.10.3
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -7,12 +7,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 221 | 52,726 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 4 | 3,605 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
-| 辅助脚本 | Python | 16 | 5,064 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **241** | **61,395** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **265** | **74,738** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,720 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| 主程序代码 | Python | 223 | 54,739 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 4 | 3,708 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 辅助脚本 | Python | 16 | 5,581 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
+| **源代码合计** | — | **243** | **64,028** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **270** | **77,912** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,916 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
@@ -102,25 +102,26 @@ investor-util/
 │   │   │   ├── _fee_estimation.py             #   组合综合费率估算
 │   │   │   ├── _math_utils.py                 #   数学工具函数（Beta/t-分布）
 │   │   │   ├── _silence.py                    #   再平衡静默期管理
-│   │   │   ├── action_advisor.py              #   行动建议（再平衡信号+交易纪律+调仓建议+收益归因 → C19 action_data）
+│   │   │   ├── action_advisor.py              #   行动建议（再平衡信号+交易纪律+调仓建议+收益归因 → action_data）
 │   │   │   ├── alignment_correction.py        #   口径修正因子计算（估值偏差校准）
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
 │   │   │   ├── drawdown_events.py             #   回撤事件识别（新高/回撤起止/幅度）
 │   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
+│   │   │   ├── industry_beta.py               #   行业 Beta 分析（纯计算：暴露占比 + 逐行业一元 OLS，复用 factor_exposure）
 │   │   │   ├── correlation.py                 #   持仓相关性矩阵（Pearson 相关/显著性/下三角矩阵）
-│   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → C19 crisis_annotation_data）
+│   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → crisis_annotation_data）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
-│   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → C19 evolution_data）
+│   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → evolution_data）
 │   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
-│   │   │   ├── rebalance_advisor.py           #   调仓建议可行化层（份额取整一手/费用估算/现金缓冲/优先级 → C19 rebalance_advice）
-│   │   │   ├── return_attribution.py          #   收益归因（TOP5 品种贡献占比/正负分列/净额合计 → C19 attribution，提示词段落与行动建议章表格共用）
+│   │   │   ├── rebalance_advisor.py           #   调仓建议可行化层（份额取整一手/费用估算/现金缓冲/优先级 → rebalance_advice）
+│   │   │   ├── return_attribution.py          #   收益归因（TOP5 品种贡献占比/正负分列/净额合计 → attribution，提示词段落与行动建议章表格共用）
 │   │   │   ├── scenario.py                    #   情景分析（Beta 推导 → 6 种市场情景预期变动）
 │   │   │   ├── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
-│   │   │   ├── snapshot_diff.py               #   快照差异摘要（去重后最近两快照对比：新增/移除 + HHI 变化 + 超限项 → C19 snapshot_diff_data）
-│   │   │   ├── tail_risk.py                   #   尾部风险统计（历史模拟法 VaR95/99 + 最大单日跌幅 + 连续下跌 + 恢复天数 → C19 tail_risk_data）
+│   │   │   ├── snapshot_diff.py               #   快照差异摘要（去重后最近两快照对比：新增/移除 + HHI 变化 + 超限项 → snapshot_diff_data）
+│   │   │   ├── tail_risk.py                   #   尾部风险统计（历史模拟法 VaR95/99 + 最大单日跌幅 + 连续下跌 + 恢复天数 → tail_risk_data）
 │   │   │   ├── trade_discipline.py            #   交易纪律引擎（止盈/止损/回撤触发检测，复用 _silence 静默机制）
 │   │   │   ├── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比）
 │   │   │   └── whatif_backtest.py             #   调仓 What-if 时序回测（纯计算：生效日折算/序列对齐/5 指标）
@@ -196,6 +197,7 @@ investor-util/
 │   │   │   ├── category.py           #   持仓分类（股票/基金/债券/QDII 等）
 │   │   │   ├── chart_data_builder.py #   Chart.js 6 图数据集预处理器
 │   │   │   ├── fund_performance.py   #   基金业绩分析（排名/回撤/超额收益）
+│   │   │   ├── fund_candidate.py     #   候选基金比较（基金业绩分析章候选比较子表数据构建，candidate_compare 默认关）
 │   │   │   ├── fund_concentration.py #   基金持仓集中度分析
 │   │   │   ├── fund_concentration_sheet.py # 集中度 Excel 页签
 │   │   │   ├── fund_manager_analysis.py # 基金经理分析
@@ -204,8 +206,7 @@ investor-util/
 │   │   │   ├── fund_style_base.py       #   基金风格基础（常量/快照/PECity阈值）
 │   │   │   ├── fund_style_classify.py   #   基金风格分类计算（push2→Tencent→兜底降级）
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
-│   │   │   ├── fund_style_sheet.py   #   风格分析 Excel 页签
-│   │   │   ├── factor_exposure_sheet.py #  因子暴露 Excel 页签（β/t/显著性/风格归属）
+│   │   │   ├── style_factor_sheet.py  #   风格与因子分析 Excel 页签（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
 │   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
 │   │   │   ├── action_sheet.py       #   行动建议 Excel 页签（再平衡信号/交易纪律/调仓建议/收益归因）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
@@ -255,8 +256,8 @@ investor-util/
 │   │   │   ├── logger.py             #   日志模块（文件+控制台，自动轮转）
 │   │   │   ├── market_hours.py       #   交易时段判断（A股/港股/QDII）
 │   │   │   ├── models.py             #   数据模型（持仓/行情/基金/新闻）
-│   │   │   ├── holding_status.py     #   品种级数据状态标注（品种覆盖诊断，C19 position_status）
-│   │   │   ├── data_freshness.py     #   数据可信度诊断（新鲜度分类 + 单日跳变检测，C19 data_freshness）
+│   │   │   ├── holding_status.py     #   品种级数据状态标注（品种覆盖诊断，position_status）
+│   │   │   ├── data_freshness.py     #   数据可信度诊断（新鲜度分类 + 单日跳变检测，data_freshness）
 │   │   │   ├── perf.py               #   性能收集（PerfCollector 计时 + 数据源健康检查持久化）
 │   │   │   ├── provider_registry.py  #   数据源注册中心（熔断器/会话缓存）
 │   │   │   ├── reader.py             #   持仓 xlsx 文件读取
@@ -324,6 +325,7 @@ investor-util/
 │       │   │   ├── test_drawdown_events.py    #   回撤事件识别
 │       │   │   ├── test_drawdown_events_edge.py #  回撤事件识别边缘场景
 │       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
+│       │   │   ├── test_industry_beta.py      #   行业 Beta 分析（暴露占比/已知答案回归/数据不足降级/契约）
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
 │       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口）
 │       │   │   ├── test_crisis_annotation.py   #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复耗时/重叠）
@@ -466,17 +468,20 @@ investor-util/
 │       │   │   ├── test_excel_format_edge.py      #   Excel 格式边缘场景
 │       │   │   ├── test_excel_generator.py        #   Excel 生成测试
 │       │   │   ├── test_excel_generator_edge.py   #   Excel 生成边缘场景
+│       │   │   ├── test_excel_market_data.py      #   成本流水 fund_flow_data 组装 + 注入测试
 │       │   │   ├── test_excel_report_structure.py #   Excel 报告结构测试
 │       │   │   ├── test_excel_roundtrip.py        #   Excel 写入读取回环测试
 │       │   │   ├── test_excel_writer.py           #   Excel 写入器测试
 │       │   │   ├── test_feature_interactive.py    #   交互图表 Feature Flag 管线测试
 │       │   │   ├── test_fund_deep_analysis_sheet_edge.py # 基金深度分析页签边缘场景
+│       │   │   ├── test_fund_candidate.py         #   候选基金比较测试（基金业绩分析章候选比较子表）
 │       │   │   ├── test_fund_concentration.py     #   基金集中度测试
 │       │   │   ├── test_fund_manager_analysis.py  #   基金经理分析测试
 │       │   │   ├── test_fund_manager_sheet.py     #   基金经理页签测试
 │       │   │   ├── test_fund_overlap.py           #   基金重叠分析测试
 │       │   │   ├── test_fund_performance.py       #   基金业绩测试
 │       │   │   ├── test_fund_style_analysis.py    #   基金风格测试
+│       │   │   ├── test_style_factor_sheet.py     #   风格与因子分析页签呈现（一章三区块：风格表+因子回归+行业 Beta）
 │       │   │   ├── test_correlation_html.py       #   持仓关系矩阵章节（相关性/重合度区块）HTML 呈现
 │       │   │   ├── test_correlation_sheet.py      #   持仓关系矩阵页签（一章两区块）Excel 呈现
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
@@ -488,7 +493,7 @@ investor-util/
 │       │   │   ├── test_whatif_operations.py      #   调仓 What-if 操作共享层测试
 │       │   │   ├── test_whatif_writer.py          #   调仓 What-if 报告输出（固定名+日期归档+清理）
 │       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
-│       │   │   ├── test_tail_risk_wiring.py       #   尾部风险统计接线（pipeline 注入 + Excel 五行 + HTML 卡 + C20 说明）
+│       │   │   ├── test_tail_risk_wiring.py       #   尾部风险统计接线（pipeline 注入 + Excel 五行 + HTML 卡 + 图下说明）
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试

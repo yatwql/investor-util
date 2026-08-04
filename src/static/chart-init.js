@@ -2,11 +2,11 @@
  *
  * 核心 6 图读取模板内联 chart-data（chart_datasets）；组合演进 3 图
  * 读取独立内联数据段 #evolution-chart-data（evolution_data 契约 dict）。
- * O1 隔离：每图独立 try/catch，单图失败仅 console.warn。
+ * 隔离：每图独立 try/catch，单图失败仅 console.warn。
  * 守卫：Chart 引擎（chart.min.js）或 ChartCommon（chart-common.js）缺失
- * （R21）→ 全部跳过；canvas 不存在（模块隐藏）→ 跳过该图。
- * ES5 保守语法（R17/R22）。打印快照降级见 chart-print.js。
- * 键名契约（§4.11 O2）：portfolio_line / drawdown / category_doughnut /
+ * → 全部跳过；canvas 不存在（模块隐藏）→ 跳过该图。
+ * ES5 保守语法。打印快照降级见 chart-print.js。
+ * 键名契约（§4.11 ）：portfolio_line / drawdown / category_doughnut /
  * industry_bar / penetration_bar / radar；evolution_total / evolution_hhi /
  * evolution_top（组合演进扩展）。
  */
@@ -47,7 +47,7 @@
     return common.doughnutOptions(percent);
   }
 
-  /* ── 危机区间着色插件（净值图 C20：2015/2018/2020/2022 阴影带）──
+  /* ── 危机区间着色插件（净值图图下说明：2015/2018/2020/2022 阴影带）──
    * 数据来自 portfolio_line 数据集的可选 crisis 字段（chart_data_builder
    * Python 侧计算起止索引）。beforeDatasetsDraw 在数据集之下绘制半透明带。 */
   function buildCrisisBandPlugin(crisis) {
@@ -74,7 +74,7 @@
     };
   }
 
-  /* ── 单图初始化函数（O1：每个独立 try/catch）────────── */
+ /* ── 单图初始化函数（每个独立 try/catch）────────── */
 
   function initPortfolioChart() {
     var ds = chartData['portfolio_line'];
@@ -368,7 +368,7 @@
     }), 'evolution_top');
   }
 
-  /* ── 注册初始化函数（O1：每个独立 try/catch）────────── */
+ /* ── 注册初始化函数（每个独立 try/catch）────────── */
   var inits = {
     portfolio_line: initPortfolioChart,
     drawdown: initDrawdownChart,

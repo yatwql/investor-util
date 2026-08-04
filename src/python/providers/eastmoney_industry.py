@@ -47,7 +47,7 @@ _MAX_RETRIES = 1
 _FIELDS = "f57,f58,f127,f128,f129,f198,f9,f20,f23"
 
 
-# 会话级内存缓存 — 委托 DataSourceRegistry session_cache（C4 约束, domain="industry"）
+# 会话级内存缓存 — 委托 DataSourceRegistry session_cache（domain="industry"）
 
 
 def _secid(code: str) -> str:
@@ -134,7 +134,7 @@ def _extract_industry(inner: dict, key: str) -> str:
 def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     """获取一只证券的行业分类和概念板块归属。
 
-    会话级内存复用（C4）：同一代码在同一会话内仅首次发起 HTTP 请求，
+    会话级内存复用：同一代码在同一会话内仅首次发起 HTTP 请求，
     后续调用直接返回缓存结果，避免重复网络/文件 I/O。
 
     Args:
