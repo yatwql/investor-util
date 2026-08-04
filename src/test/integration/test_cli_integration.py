@@ -49,7 +49,10 @@ class TestCliIntegration:
         test_config = {"output_dir": "/custom/path"}
 
         with (
-            patch("src.python.cli._cli_read_holdings", return_value=mock_holdings),
+            patch(
+                "src.python.cli.cli._cli_read_holdings_with_flows",
+                return_value=(mock_holdings, [], []),
+            ),
             patch("src.python.report.orchestrator.generate_report") as mock_gen,
         ):
             from src.python.cli.cli import _handle_report
@@ -72,7 +75,7 @@ class TestCliIntegration:
                         "holdings_filename": "test.xlsx"}
 
         with (
-            patch("src.python.cli._cli_read_holdings") as mock_read,
+            patch("src.python.cli.cli._cli_read_holdings") as mock_read,
             patch("src.python.cache.operations.update_basic_cache", return_value=mock_result),
         ):
             _handle_cache_update("basic", test_config, MagicMock())
@@ -102,7 +105,10 @@ class TestCliIntegration:
         mock_result.exit_code = 0
 
         with (
-            patch("src.python.cli._cli_read_holdings", return_value=mock_holdings),
+            patch(
+                "src.python.cli.cli._cli_read_holdings_with_flows",
+                return_value=(mock_holdings, [], []),
+            ),
             patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
         ):
             from src.python.cli.cli import _handle_report
