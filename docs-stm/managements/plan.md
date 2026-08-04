@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：投资功能优化 + 章节归并（目标 19 章）。**P1 阶段（轮 1~11）已完成**：行动建议独立章（轮 4 新增）、持仓关系矩阵合并（轮 8）、组合历史与回撤合并（轮 9）。**阶段 D 轮 12~13 已完成**：合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」（`style_factor` 一章三区块，章节数 20→19）；基金业绩分析章候选基金比较增强（`candidate_compare` 默认关）。详细设计与实施轮次见 [`plan-investment-features.md`](../plan/plan-investment-features.md)（设计层，含 §4 章节归并方案与 §4.4 架构合规自查表）与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md)（实施层，21 轮每轮量化验收）。本文档仅收录**任务摘要**，按优先级分类。
+**当前迭代**：投资功能优化 + 章节归并（目标 19 章）。**P1 阶段（轮 1~11）已完成**：行动建议独立章（轮 4 新增）、持仓关系矩阵合并（轮 8）、组合历史与回撤合并（轮 9）。**阶段 D 轮 12~13 已完成**：合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」（`style_factor` 一章三区块，章节数 20→19）；基金业绩分析章候选基金比较增强（`candidate_compare` 默认关）。**阶段 E 轮 14~16 已完成（plan-22 成本流水）**：持仓 Excel 可选「交易流水」「分红流水」页签 + XIRR 资金加权收益 + 成本分档，渲染到「投资分析汇总」/「市值核算明细表」/「持仓分类表」三页签（`fund_flow_data` 契约，`cost_lots` 默认关）。详细设计与实施轮次见 [`plan-investment-features.md`](../plan/plan-investment-features.md)（设计层，含 §4 章节归并方案与 §4.4 架构合规自查表）与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md)（实施层，21 轮每轮量化验收）。本文档仅收录**任务摘要**，按优先级分类。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -24,7 +24,7 @@
 
 ### 推荐实施顺序
 
-> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑧ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列；plan-8/plan-10 已归 P4 实验功能，不列入当前实施序列。**标记 ✅ 的为已完成项**（P1 轮 1~11 + 阶段 D 轮 12~13，changelog v0.10.1/v0.10.3），保留在表中供追溯；待办序列自 ⑥ 起。
+> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑧ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列；plan-8/plan-10 已归 P4 实验功能，不列入当前实施序列。**标记 ✅ 的为已完成项**（P1 轮 1~11 + 阶段 D 轮 12~13 + 阶段 E 轮 14~16，changelog v0.10.1/v0.10.3），保留在表中供追溯；待办序列自 ⑦ 起。
 
 | 次序 | 计划项 | 归类 | 工作量 | 推荐理由 |
 |:--:|:--|:--:|:--:|:--|
@@ -33,7 +33,7 @@
 | ③ | ✅ **plan-19** 持仓关系矩阵合并 | P1 | 轮8 | 物理合并流程模板，确立 C19 契约增删范式 |
 | ④ | ✅ **plan-20** 历史增强 | P1 | 轮9~11 | 合并组合历史+回撤 + 危机标注 + 尾部风险 |
 | ⑤ | ✅ **plan-21** 风格与选基 | P2 | 轮12~13 | 风格与因子合并 + 行业 Beta（20→19 章）+ 候选基金比较增强（`candidate_compare` 默认关），changelog v0.10.3 |
-| ⑥ | **plan-22** 成本流水 | P2 | 轮14~16 | 依赖持仓文件格式扩展，输入→计算→渲染 |
+| ⑥ | ✅ **plan-22** 成本流水 | P2 | 轮14~16 | 依赖持仓文件格式扩展，输入→计算→渲染 |
 | ⑦ | **plan-23** 估值与温度 | P3 | 轮17~18 | 免费代理信号，合规敏感，放最后 |
 | ⑧ | **plan-24** 导航与收尾 | P3 | 轮19~20 | 分组导航 + 文档快照，收尾性质 |
 
@@ -57,15 +57,15 @@
 
 物理合并「组合历史走势」+「历史回撤分析」→「组合历史走势与回撤」（`portfolio_history_drawdown`，走势表+回撤矩阵区块）+ 危机区间标注 + 尾部风险（VaR）；「组合演进」章快照差异摘要。**对应轮 9~11**（已通过）。
 
-### P2 — 下一阶段就绪
+### P2 — 已完成（轮 12~16）
 
 #### ✅ `plan-21` 风格与选基（[`plan-investment-iteration.md` 阶段D](./plan-investment-iteration.md)）— **推荐⑤ · 已完成**
 
 物理合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」（`style_factor`，一章三区块：风格表 + 因子回归 + 行业 Beta 子表）——**轮 12 已完成**（章节数 20→19，registry.number 重新编号，C19 契约 `style_factor_data` 删旧建新，dev-verify 1568 passed + 3 check 全 [OK]）；基金业绩分析章候选基金比较增强模式（`candidate_compare` 默认关）——**轮 13 已完成**（核心模块 `report/fund_candidate.py`，Excel/HTML 双渲染，新增测试 23 个，覆盖率 99%，dev-verify 1568 passed）。
 
-#### `plan-22` 成本流水（[`plan-investment-iteration.md` 阶段E](./plan-investment-iteration.md)）— **推荐⑥**
+#### ✅ `plan-22` 成本流水（[`plan-investment-iteration.md` 阶段E](./plan-investment-iteration.md)）— **推荐⑥ · 已完成**
 
-持仓 Excel 新增**可选**「交易流水」「分红流水」页签（不破坏既有 4 列）+ 资金加权收益（XIRR）+ 成本分档；「投资分析汇总」/「市值核算明细表」/「持仓分类表」章渲染。**对应轮 14~16**。
+持仓 Excel 新增**可选**「交易流水」「分红流水」页签（不破坏既有 4 列）+ 资金加权收益（XIRR）+ 成本分档；「投资分析汇总」/「市值核算明细表」/「持仓分类表」章渲染。**对应轮 14~16，已完成**——轮 14 持仓文件格式扩展（`TradeRecord`/`DividendRecord` + `read_flow_sheets()`/`read_holdings_with_flows()`，20 例解析测试、覆盖率 93%）；轮 15 XIRR 资金加权收益 + 成本分档（`analysis/cost_flow.py` 纯计算层，24 例、覆盖率 94%）；轮 16 三页签渲染（`report_submodules.cost_lots` 默认关 + `fund_flow_data` C19 契约 + CLI/TUI 接线，新增测试 32 个、受影响套件 267 passed，dev-verify 1638 passed）。
 
 ### P3 — 预期实施
 
