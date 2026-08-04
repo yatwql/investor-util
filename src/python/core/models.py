@@ -13,6 +13,8 @@ class Holding:
         code:       证券代码（字符串，保持原始格式，如 "600900"）
         shares:     持有份额 / 股数
         cost_price: 每份成本价
+        data_status: 本地可判定的品种数据状态（如 "bad_code_format"），
+            空字符串表示格式正常、待行情数据进一步标注（品种级覆盖诊断）。
     """
 
     account: str
@@ -20,3 +22,4 @@ class Holding:
     code: str
     shares: float
     cost_price: float
+    data_status: str = ""

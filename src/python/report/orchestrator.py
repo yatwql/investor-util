@@ -71,8 +71,15 @@ def prepare_report_data(
     """
     from concurrent.futures import ThreadPoolExecutor
 
+    from src.python.core.data_freshness import build_freshness_summary
+    from src.python.core.holding_status import build_coverage_summary
     from src.python.fetcher.index import fetch_indices, fetch_us_indices
-    from src.python.report.market_value import _generate_details, classify_holdings
+    from src.python.report.market_value import (
+        _generate_details,
+        classify_holdings,
+        get_last_trading_day,
+        get_prev_trading_day,
+    )
     from src.python.report.penetration import compute_penetration_top10
 
     today_str = datetime.now().strftime("%Y-%m-%d")
@@ -104,6 +111,15 @@ def prepare_report_data(
     factor_exposure = compute_factor_exposure_data(holdings, config, reporter)
     # 持仓相关性矩阵：同因子暴露，基金深度分析关闭时为 None（章节隐藏）
     correlation_data = compute_correlation_data(holdings, config, reporter)
+    # 品种覆盖诊断：逐品种标注数据状态，C19 position_status 契约
+    coverage_status = build_coverage_summary(holdings, details)
+    # 可信度摘要：逐品种新鲜度分类 + 单日 ±20% 跳变检测，C19 data_freshness 契约
+    freshness_summary = build_freshness_summary(
+        holdings,
+        details,
+        trading_day=get_last_trading_day(),
+        prev_trading_day=get_prev_trading_day(),
+    )
 
     holdings_details = [
         {
@@ -147,6 +163,10 @@ def prepare_report_data(
         "factor_exposure": factor_exposure,
         # 持仓相关性矩阵（C19 契约；基金深度分析关闭时为 None）
         "correlation_data": correlation_data,
+        # 品种覆盖诊断（C19 契约 position_status；品种级数据状态标注）
+        "position_status": coverage_status,
+        # 可信度摘要（C19 契约 data_freshness；新鲜度分类 + 单日跳变检测）
+        "data_freshness": freshness_summary,
     }
 
 
@@ -418,6 +438,7 @@ def generate_report(
 
     if report_type == "basic":
         # basic 路径：仅生成 Excel，不调 prepare_report_data / capture_snapshot / fetch_history_data
+        from src.python.config import is_enable_data_quality
         from src.python.core.perf import PerfCollector
         from src.python.core.registry import get_report_section_order
         from src.python.report._report_generation import _collect_health_checks, _spawn_health_checks
@@ -438,6 +459,8 @@ def generate_report(
                 output_dir=output,
                 section_order=sec_order,
                 progress=reporter,
+                # 18 章数据质量仪表盘子模块开关（basic 无行情数据，品种覆盖区块显示降级占位）
+                enable_data_quality=is_enable_data_quality(config),
             )
             perf.stop()
             result.excel_ok = True

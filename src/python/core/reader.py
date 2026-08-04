@@ -7,6 +7,7 @@ import zipfile
 import openpyxl
 from openpyxl.utils.exceptions import InvalidFileException
 
+from src.python.core import holding_status
 from src.python.core.models import Holding
 
 logger = logging.getLogger("invest")
@@ -153,6 +154,13 @@ def _parse_workbook(wb) -> list[Holding]:
                     code=code,
                     shares=shares,
                     cost_price=cost_price,
+                    # 本地可判定的品种状态：代码格式异常在解析期即标注，
+                    # 其余状态（净值缺失/可能退市/名称不匹配）需行情数据，后续标注
+                    data_status=(
+                        "bad_code_format"
+                        if holding_status.classify_code_format(code) != holding_status.STATUS_OK
+                        else ""
+                    ),
                 )
                 holdings.append(holding)
                 sheet_holdings += 1

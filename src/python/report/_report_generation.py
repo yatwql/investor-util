@@ -273,6 +273,9 @@ def _generate_full_html_report(
     correlation_data: dict | None = None,
     evolution_data: dict | None = None,
     enable_portfolio_evolution: bool = True,
+    enable_data_quality: bool = False,
+    position_status: dict | None = None,
+    data_freshness: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -286,6 +289,11 @@ def _generate_full_html_report(
         evolution_data: 组合演进 C19 契约 dict（多快照趋势聚合），
             数据不足时 available=False（模板写占位）。
         enable_portfolio_evolution: board 层 — 组合演进章节是否开启。
+        enable_data_quality: 子模块 — 18 章数据质量仪表盘（默认关，保持旧样式）。
+        position_status: 品种覆盖诊断 C19 `position_status` 契约 dict，
+            18 章品种覆盖区块数据源（开关关闭时忽略）。
+        data_freshness: 可信度摘要 C19 `data_freshness` 契约 dict，
+            18 章可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -326,6 +334,9 @@ def _generate_full_html_report(
             factor_exposure=factor_exposure,
             correlation_data=correlation_data,
             evolution_data=evolution_data,
+            enable_data_quality=enable_data_quality,
+            position_status=position_status,
+            data_freshness=data_freshness,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -358,6 +369,7 @@ def _generate_full_excel_report(
     debate_info: dict | None,
     result,
     enable_portfolio_evolution: bool = True,
+    enable_data_quality: bool = False,
 ) -> bool:
     """full 路径的 Excel 报告生成，返回是否成功。"""
     from src.python.report.excel_generator import generate_excel_report
@@ -386,6 +398,7 @@ def _generate_full_excel_report(
             enable_portfolio_evolution=enable_portfolio_evolution,
             enable_llm=enable_llm,
             debate_info=debate_info,
+            enable_data_quality=enable_data_quality,
         )
         reporter.ok("Excel 报告已生成")
         return True
@@ -412,6 +425,7 @@ def _generate_report_both(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import (
+        is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_news,
@@ -436,6 +450,7 @@ def _generate_report_both(
     _enable_news = is_enable_news(config)
     _enable_history = is_enable_history(config)
     _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
+    _enable_data_quality = is_enable_data_quality(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
@@ -452,6 +467,23 @@ def _generate_report_both(
     # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
         pipeline_data = _inject_evolution_data(pipeline_data)
+    # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
+    #    （C19 position_status + data_freshness）
+    from src.python.core.data_freshness import build_freshness_summary
+    from src.python.core.holding_status import build_coverage_summary
+    from src.python.report.market_value import get_last_trading_day, get_prev_trading_day
+    from src.python.report.pipeline_data_builder import merge_pipeline_data
+
+    pipeline_data = merge_pipeline_data(
+        pipeline_data,
+        position_status=build_coverage_summary(holdings, details),
+        data_freshness=build_freshness_summary(
+            holdings,
+            details,
+            trading_day=get_last_trading_day(),
+            prev_trading_day=get_prev_trading_day(),
+        ),
+    )
     perf.stop()
     # [checkpoint] pipeline_data 类型断言
     if pipeline_data is not None:
@@ -496,6 +528,9 @@ def _generate_report_both(
             chart_datasets=chart_datasets,
             enable_interactive_charts=_enable_interactive_charts,
             evolution_data=(pipeline_data or {}).get("evolution_data"),
+            enable_data_quality=_enable_data_quality,
+            position_status=(pipeline_data or {}).get("position_status"),
+            data_freshness=(pipeline_data or {}).get("data_freshness"),
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -524,6 +559,7 @@ def _generate_report_both(
             enable_history=_enable_history,
             enable_portfolio_evolution=_enable_portfolio_evolution,
             enable_llm=False,
+            enable_data_quality=_enable_data_quality,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True
@@ -606,6 +642,7 @@ def _generate_report_full(
           → write_html_report() → generate_excel_report()
     """
     from src.python.config import (
+        is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_llm,
@@ -630,6 +667,7 @@ def _generate_report_full(
     _enable_history = is_enable_history(config)
     _enable_portfolio_evolution = is_enable_portfolio_evolution(config)
     _enable_llm = is_enable_llm(config)
+    _enable_data_quality = is_enable_data_quality(config)
     sec_order = get_report_section_order(config)
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
@@ -641,11 +679,13 @@ def _generate_report_full(
     # ── 2. 快照对比 ──
     perf.start("快照对比")
     pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
-    # 因子暴露 / 持仓相关性：prep 中已组装（C19 契约），注入 pipeline_data 供 HTML/Excel 消费；
-    # capture_snapshot 在降级路径可能返回 None，需判空
+    # 因子暴露 / 持仓相关性 / 品种覆盖诊断：prep 中已组装（C19 契约），
+    # 注入 pipeline_data 供 HTML/Excel 消费；capture_snapshot 在降级路径可能返回 None，需判空
     if pipeline_data is not None:
         pipeline_data["factor_exposure"] = prep.get("factor_exposure")
         pipeline_data["correlation_data"] = prep.get("correlation_data")
+        pipeline_data["position_status"] = prep.get("position_status")
+        pipeline_data["data_freshness"] = prep.get("data_freshness")
     _validate_pipeline_snapshot(pipeline_data)
     # 2b. 组合演进数据（聚合多期快照，C19 evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
@@ -723,6 +763,9 @@ def _generate_report_full(
         prep.get("correlation_data"),
         (pipeline_data or {}).get("evolution_data"),
         _enable_portfolio_evolution,
+        _enable_data_quality,
+        (pipeline_data or {}).get("position_status"),
+        (pipeline_data or {}).get("data_freshness"),
     )
 
     # ── 7. Excel 报告 ──
@@ -745,6 +788,7 @@ def _generate_report_full(
         debate_info,
         result,
         _enable_portfolio_evolution,
+        _enable_data_quality,
     )
 
     result.news_ok = news_ok

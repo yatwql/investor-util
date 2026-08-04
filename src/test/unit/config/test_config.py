@@ -975,3 +975,34 @@ class TestIsEnablePortfolioEvolution(unittest.TestCase):
         self.assertFalse(
             cfg.is_enable_portfolio_evolution({"enable_fund_deep_analysis": True, "enable_portfolio_evolution": False})
         )
+
+
+class TestIsEnableDataQuality(unittest.TestCase):
+    """数据质量仪表盘子模块开关（report_submodules.data_quality）。"""
+
+    def test_default_false_when_missing(self):
+        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
+        self.assertFalse(cfg.is_enable_data_quality({}))
+        self.assertFalse(cfg.is_enable_data_quality({"enable_fund_deep_analysis": True}))
+
+    def test_false_when_submodules_not_dict(self):
+        """report_submodules 非 dict → 关闭。"""
+        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": "not-a-dict"}))
+        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": None}))
+
+    def test_false_when_disabled(self):
+        """report_submodules.data_quality=false → 关闭。"""
+        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": {"data_quality": False}}))
+
+    def test_true_when_enabled(self):
+        """report_submodules.data_quality=true → 开启。"""
+        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": {"data_quality": True}}))
+
+    def test_independent_from_other_submodules(self):
+        """data_quality 开关独立于同容器其他键。"""
+        self.assertTrue(
+            cfg.is_enable_data_quality({"report_submodules": {"data_quality": True, "industry_beta": False}})
+        )
+        self.assertFalse(
+            cfg.is_enable_data_quality({"report_submodules": {"data_quality": False, "tail_risk": True}})
+        )

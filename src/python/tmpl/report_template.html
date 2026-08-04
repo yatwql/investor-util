@@ -871,6 +871,12 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <div class="report-header" id="report-top">
         <h1>个人投资分析报告</h1>
         <div class="subtitle">统计时间: {{ now }} | 所属交易日: {{ trading_day }}</div>
+        {% if data_quality_enabled and data_freshness and data_freshness.available and data_freshness.abnormal_count > 0 %}
+        <div class="data-status" style="margin-top:10px;">
+            <span class="src-matrix-failed">&#9888; {{ data_freshness.summary }}</span>
+            <span style="margin-left:8px;color:#888;">含净值滞后/行情缺失/疑似跳变，详见第 {{ section_numbers["data_source_status"] }} 章</span>
+        </div>
+        {% endif %}
     </div>
 
 
@@ -2447,6 +2453,77 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% else %}
             <div class="data-status" style="margin-top:0;">
                 <div class="data-status-ok" style="border-left-color:#27ae60;padding-left:8px;">所有数据源运行正常</div>
+            </div>
+            {% endif %}
+            {% if data_quality_enabled %}
+            <!-- 品种覆盖区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">品种覆盖（逐品种数据状态）</div>
+                {% if position_status and position_status.available and position_status.items %}
+                <table>
+                    <tr>
+                        <th>代码</th>
+                        <th>名称</th>
+                        <th>账户</th>
+                        <th>状态</th>
+                        <th>原因</th>
+                    </tr>
+                    {% for item in position_status.items %}
+                    <tr>
+                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.name }}</td>
+                        <td style="text-align:left;">{{ item.account }}</td>
+                        <td>
+                            {% if item.status == "ok" %}
+                            <span class="src-matrix-ok">&#10003; {{ item.status_label }}</span>
+                            {% else %}
+                            <span class="src-matrix-failed">{{ item.status_label }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:left;">{{ item.reason }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="data-status-info">&#8505; 未获取行情数据，品种覆盖无法判定</div>
+                {% endif %}
+            </div>
+            <!-- 可信度区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">可信度（数据新鲜度 + 单日跳变）</div>
+                {% if data_freshness and data_freshness.available and data_freshness.items %}
+                <table>
+                    <tr>
+                        <th>代码</th>
+                        <th>名称</th>
+                        <th>账户</th>
+                        <th>新鲜度</th>
+                        <th>单日变化 / 跳变</th>
+                    </tr>
+                    {% for item in data_freshness.items %}
+                    <tr>
+                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.name }}</td>
+                        <td style="text-align:left;">{{ item.account }}</td>
+                        <td>
+                            {% if item.jump %}
+                            <span class="src-matrix-failed">&#9888; {{ item.freshness_label }}</span>
+                            {% elif item.freshness in ("stale", "degraded") %}
+                            <span class="src-matrix-failed">{{ item.freshness_label }}</span>
+                            {% else %}
+                            <span class="src-matrix-ok">&#10003; {{ item.freshness_label }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:left;">
+                            {% if item.jump_label %}<span class="src-matrix-failed">{{ item.jump_label }}</span>
+                            {% else %}{{ "%.2f"|format(item.change_pct) }}%{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="data-status-info">&#8505; 未获取可信度数据，新鲜度/跳变无法判定</div>
+                {% endif %}
             </div>
             {% endif %}
         </div>

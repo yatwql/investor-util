@@ -40,6 +40,10 @@ _DEFAULT_CONFIG = {
     "enable_news": True,  # 市场新闻（#12）
     "enable_history": True,  # 组合历史走势+回撤（#17~18）
     "enable_portfolio_evolution": True,  # 组合演进（#19）
+    # 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
+    "report_submodules": {
+        "data_quality": False,  # 18 章「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖）
+    },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -152,6 +156,8 @@ def _build_template_from_defaults() -> str:
         f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻（#12）',
         f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤（#17~18）',
         f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进（#19）',
+        "  // 报告子模块开关（新增能力默认关闭，避免既有报告突然\"变胖\"）",
+        f'  "report_submodules": {json.dumps(d["report_submodules"], ensure_ascii=False)},  // 数据质量仪表盘（18 章）默认关',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",

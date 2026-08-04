@@ -287,6 +287,9 @@ def _render_template(
     correlation_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
+    data_quality_enabled: bool = False,  # 子模块：18 章数据质量仪表盘开关
+    position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status
+    data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.report.chart_data_builder import build_evolution_chart_data
@@ -355,6 +358,9 @@ def _render_template(
         evolution_data=evolution_data,
         evolution_chart_data=build_evolution_chart_data(evolution_data),
         drawdown_min_span=drawdown_min_span,
+        data_quality_enabled=data_quality_enabled,
+        position_status=position_status,
+        data_freshness=data_freshness,
     )
 
 
@@ -382,6 +388,9 @@ def write_html_report(
     enable_news: bool = True,
     enable_history: bool = True,
     enable_portfolio_evolution: bool = True,
+    enable_data_quality: bool = False,  # 子模块：18 章数据质量仪表盘（report_submodules.data_quality）
+    position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status（18 章品种覆盖区块）
+    data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness（18 章可信度区块 + 头部摘要行）
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
@@ -625,6 +634,9 @@ def write_html_report(
         data_source_matrix=data_source_matrix,
         chart_datasets=chart_datasets,
         enable_interactive_charts=enable_interactive_charts,
+        data_quality_enabled=enable_data_quality,
+        position_status=position_status,
+        data_freshness=data_freshness,
     )
 
     if enable_interactive_charts:

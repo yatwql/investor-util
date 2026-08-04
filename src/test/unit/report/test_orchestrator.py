@@ -147,6 +147,10 @@ class TestPrepareReportData:
             "risk_metrics",
             "factor_exposure",
             "correlation_data",
+            # 品种覆盖诊断：品种级数据状态标注契约
+            "position_status",
+            # 可信度摘要：新鲜度分类 + 单日跳变检测契约
+            "data_freshness",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 
@@ -210,13 +214,14 @@ class TestGenerateReport:
         assert result.holdings_ok is True
         assert result.report_generated is True
         assert result.exit_code == 0
-        # 验证 generate_excel_report 被正确调用
+        # 验证 generate_excel_report 被正确调用（数据质量仪表盘子模块默认关）
         mock_gen.assert_called_once_with(
             mock_holdings,
             include_news=False,
             output_dir="reports",
             section_order=[{"key": "overview"}],
             progress=mock_reporter,
+            enable_data_quality=False,
         )
         # 验证不调用数据准备/快照/历史等函数
         with pytest.raises(AssertionError):
@@ -294,6 +299,16 @@ class TestGenerateReport:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
+            # 品种覆盖诊断：mock_detail 无真实价格字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.holding_status.build_coverage_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            # 可信度摘要：同样依赖真实价格/净值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
         ):
             mock_cap.return_value = {"diff": {}}
             mock_hist.return_value = {"dates": [], "status": "available"}
@@ -339,6 +354,11 @@ class TestGenerateReport:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
+            # 可信度摘要：MagicMock detail 无真实价格/净值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
         ):
             result = generate_report(
                 holdings=mock_holdings,
@@ -368,6 +388,11 @@ class TestGenerateReport:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=True),
             patch("src.python.config.is_enable_history", return_value=True),
+            # 可信度摘要：MagicMock detail 无真实价格/净值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
             # 使用 wrapt 确保 prepare_report_data 不被调用
         ):
             result = generate_report(
@@ -398,6 +423,11 @@ class TestGenerateReport:
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
             patch("src.python.config.is_enable_news", return_value=False),
             patch("src.python.config.is_enable_history", return_value=False),
+            # 可信度摘要：MagicMock detail 无真实价格/净值字段，须 mock（防 MagicMock 比较崩溃）
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
         ):
             result = generate_report(
                 holdings=mock_holdings,
