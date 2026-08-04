@@ -20,7 +20,7 @@
 
 ### P0 — 发布门禁
 
-- **全链回归与发布门禁**（迭代计划轮 21）：`test_runner.py --mode verify,regression` 全量 + 3 check 脚本 + 版本号一致 + 数据快照刷新 + registry.number 连续编号复核 + C19 契约增删复核 + 打 tag。P1/P2/P3 全部达标后触发。
+- **全链回归与发布门禁**（迭代计划轮 21）：`test_runner.py --mode verify,regression` 全量 + 3 check 脚本 + 版本号一致 + 数据快照刷新 + registry.number 连续编号复核 + 数据契约增删复核 + 打 tag。P1/P2/P3 全部达标后触发。
 
 ### 推荐实施顺序
 
@@ -30,7 +30,7 @@
 |:--:|:--|:--:|:--:|:--|
 | ① | ✅ **plan-17** 数据质量仪表盘 | P1 | 轮1~3 | 地基先行，「数据源可用性矩阵」章改造为后续可信度基础 |
 | ② | ✅ **plan-18** 行动建议章 | P1 | 轮4~7 | 决策价值最高，纯算法 always 类型全报告可见 |
-| ③ | ✅ **plan-19** 持仓关系矩阵合并 | P1 | 轮8 | 物理合并流程模板，确立 C19 契约增删范式 |
+| ③ | ✅ **plan-19** 持仓关系矩阵合并 | P1 | 轮8 | 物理合并流程模板，确立数据契约增删范式 |
 | ④ | ✅ **plan-20** 历史增强 | P1 | 轮9~11 | 合并组合历史+回撤 + 危机标注 + 尾部风险 |
 | ⑤ | ✅ **plan-21** 风格与选基 | P2 | 轮12~13 | 风格与因子合并 + 行业 Beta（20→19 章）+ 候选基金比较增强（`candidate_compare` 默认关），changelog v0.10.3 |
 | ⑥ | ✅ **plan-22** 成本流水 | P2 | 轮14~16 | 依赖持仓文件格式扩展，输入→计算→渲染 |
@@ -51,7 +51,7 @@
 
 #### ✅ `plan-19` 持仓关系矩阵合并（[`plan-investment-iteration.md` 阶段B′](./plan-investment-iteration.md)）— **推荐③ · 已完成**
 
-物理合并「持仓重合度矩阵」+「持仓相关性矩阵」→「持仓关系矩阵」（sheet key `position_relationship`），一章分上下矩阵区块；删除旧 sheet 注册 + C19 契约增删 + registry.number 重排。**对应轮 8**（已通过）。
+物理合并「持仓重合度矩阵」+「持仓相关性矩阵」→「持仓关系矩阵」（sheet key `position_relationship`），一章分上下矩阵区块；删除旧 sheet 注册 + 数据契约增删 + registry.number 重排。**对应轮 8**（已通过）。
 
 #### ✅ `plan-20` 历史增强（[`plan-investment-iteration.md` 阶段C](./plan-investment-iteration.md)）— **推荐④ · 已完成**
 
@@ -61,7 +61,7 @@
 
 #### ✅ `plan-21` 风格与选基（[`plan-investment-iteration.md` 阶段D](./plan-investment-iteration.md)）— **推荐⑤ · 已完成**
 
-物理合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」（`style_factor`，一章三区块：风格表 + 因子回归 + 行业 Beta 子表）——**轮 12 已完成**（章节数 20→19，registry.number 重新编号，C19 契约 `style_factor_data` 删旧建新，dev-verify 1568 passed + 3 check 全 [OK]）；基金业绩分析章候选基金比较增强模式（`candidate_compare` 默认关）——**轮 13 已完成**（核心模块 `report/fund_candidate.py`，Excel/HTML 双渲染，新增测试 23 个，覆盖率 99%，dev-verify 1568 passed）。
+物理合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」（`style_factor`，一章三区块：风格表 + 因子回归 + 行业 Beta 子表）——**轮 12 已完成**（章节数 20→19，registry.number 重新编号，数据契约 `style_factor_data` 删旧建新，dev-verify 1568 passed + 3 check 全 [OK]）；基金业绩分析章候选基金比较增强模式（`candidate_compare` 默认关）——**轮 13 已完成**（核心模块 `report/fund_candidate.py`，Excel/HTML 双渲染，新增测试 23 个，覆盖率 99%，dev-verify 1568 passed）。
 
 #### ✅ `plan-22` 成本流水（[`plan-investment-iteration.md` 阶段E](./plan-investment-iteration.md)）— **推荐⑥ · 已完成**
 
@@ -75,7 +75,7 @@
 
 #### `plan-24` 导航与收尾（[`plan-investment-iteration.md` 阶段G](./plan-investment-iteration.md)）— **推荐⑧**
 
-HTML 按「基础/基金深度/风险/历史/LLM」分组导航折叠（新增图表 C20 图下说明）；管理文档版本头/数据快照/用户手册同步。**对应轮 19~20**。
+HTML 按「基础/基金深度/风险/历史/LLM」分组导航折叠（新增图表 图下说明）；管理文档版本头/数据快照/用户手册同步。**对应轮 19~20**。
 
 ### P4 — 实验功能
 
@@ -89,7 +89,7 @@ HTML 按「基础/基金深度/风险/历史/LLM」分组导航折叠（新增�
 
 Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做多用户/LLM 在线修改/实时日志流。**运维与安全成本最高，单人工具需谨慎，选做。**
 
-> 详细评估与实施拆分见 [`plan-web-ui-implementation.md`](../plan/plan-web-ui-implementation.md)（收益/风险/架构约束 C1-C20 符合性/`src/python/web/` 模块拆分/安全设计/API/测试/实施阶段）。
+> 详细评估与实施拆分见 [`plan-web-ui-implementation.md`](../plan/plan-web-ui-implementation.md)（收益/风险/架构约束符合性/`src/python/web/` 模块拆分/安全设计/API/测试/实施阶段）。
 
 | 阶段 | 工作量 |
 |------|:------:|

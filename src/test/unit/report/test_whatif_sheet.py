@@ -20,7 +20,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 def _whatif_data(**extra) -> dict:
-    """构造 C19 契约 whatif_data mock（新增/清仓/加仓/减仓/不变 各 1 条）。"""
+    """构造数据契约 whatif_data mock（新增/清仓/加仓/减仓/不变 各 1 条）。"""
     d = {
         "available": True,
         "status": "ok",
@@ -288,7 +288,7 @@ class TestWhatifExcelSheets(unittest.TestCase):
 
 
 def _bt_data(**extra) -> dict:
-    """构造含可用 backtest 键的 C19 契约（Excel 呈现用，数值无需自洽）。"""
+    """构造含可用 backtest 键的数据契约（Excel 呈现用，数值无需自洽）。"""
     d = _whatif_data(
         backtest={
             "available": True,

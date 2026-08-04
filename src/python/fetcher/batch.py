@@ -421,7 +421,7 @@ class RateLimiter:
         if interval <= 0:
             return
 
-        # O-4: per-provider 锁，不同 provider 不互相阻塞
+ # per-provider 锁，不同 provider 不互相阻塞
         if provider not in self._locks:
             self._locks[provider] = threading.Lock()
 

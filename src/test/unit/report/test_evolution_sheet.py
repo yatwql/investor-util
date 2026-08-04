@@ -19,7 +19,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 def _evolution_data(**extra) -> dict:
-    """构造 C19 契约 evolution_data mock（3 观察日，双账户，TOP3）。"""
+    """构造数据契约 evolution_data mock（3 观察日，双账户，TOP3）。"""
     d = {
         "available": True,
         "snapshot_count": 5,

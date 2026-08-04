@@ -6,10 +6,10 @@
     Layer 3 — scripts/perf_view.py（历史趋势可视化）
 
 设计约束遵从（详见 technical.md §8）：
-    C3  — 原子写入：tempfile.mkstemp + os.replace
-    C8  — 统一日志：logging.getLogger("invest")
-    C14 — PerfCollector 为普通局部对象，非模块级单例
-    C16 — 路径从 PROJECT_ROOT 绝对化
+    缓存原子写入  — 原子写入：tempfile.mkstemp + os.replace
+    日志统一  — 统一日志：logging.getLogger("invest")
+    PerfCollector 为普通局部对象，非模块级单例
+    路径从 PROJECT_ROOT 绝对化
 
 数据收集策略：
     - 每次 generate_report() 自动收集各阶段耗时
@@ -34,7 +34,7 @@ from src.python.core.constants import APP_VERSION, PROJECT_ROOT
 logger = logging.getLogger("invest")
 
 # ── 持久化路径 ──────────────────────────────────────────
-# module-level 变量，测试时可通过 setattr 重定向（C13 隔离模式）
+# module-level 变量，测试时可通过 setattr 重定向（测试隔离模式）
 _PERF_HISTORY_DIR = os.path.join(PROJECT_ROOT, "data", "state")
 _PERF_HISTORY_FILE = os.path.join(_PERF_HISTORY_DIR, "perf_history.jsonl")
 
@@ -95,7 +95,7 @@ class PerfCollector:
         perf.save()  # 持久化到 perf_history.jsonl
 
     设计原则:
-    - 非单例、非模块级全局（遵循 C14）
+    - 非单例、非模块级全局
     - 所有时间基于 time.perf_counter()
     - start/stop 成对调用；嵌套时自动关闭前一个并记录警告
     """
@@ -163,20 +163,20 @@ class PerfCollector:
         )
 
     def save(self) -> None:
-        """将本次运行耗时追加到 perf_history.jsonl（遵循 C3 原子写入）。"""
+        """将本次运行耗时追加到 perf_history.jsonl（遵循原子写入）。"""
         line = json.dumps(self.snapshot().to_json(), ensure_ascii=False) + "\n"
         _append_jsonl_atomic(_PERF_HISTORY_FILE, line)
         logger.info("[perf] 耗时已记录到 %s", _PERF_HISTORY_FILE)
 
 
-# ── 原子写入工具（C3 约束） ────────────────────────────
+# ── 原子写入工具 ────────────────────────────
 
 
 def _append_jsonl_atomic(path: str, line: str) -> None:
     """向 JSONL 文件原子追加一行。
 
     策略：读全部现有内容 → 追加新行 → tempfile.mkstemp + os.replace 写回。
-    遵循 C3：直接覆写会因断电/崩溃产生半写损坏文件。
+    遵循原子写入：直接覆写会因断电/崩溃产生半写损坏文件。
     """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     existing = ""

@@ -3,9 +3,9 @@
 覆盖：
   - enable_interactive_charts Flag 默认开启（features.py 注册）
   - _build_chart_datasets_for_report：Flag 关闭 → None；开启 → 数据集 dict
-  - R11 顶层兜底：build_chart_datasets 异常 → 返回空 dict（报告仍正常）
-  - _copy_js_assets：Chart.js 本地 bundle 全部 JS 文件随报告复制（R21）
-  - TD8 调试页 test-chart.html 引擎注入列表与报告模板一致（浏览器人工验证前置载体）
+  - 顶层兜底：build_chart_datasets 异常 → 返回空 dict（报告仍正常）
+  - _copy_js_assets：Chart.js 本地 bundle 全部 JS 文件随报告复制
+  - 调试页 test-chart.html 引擎注入列表与报告模板一致（浏览器人工验证前置载体）
 
 运行：
   cd /lzcapp/document/working/codebase/investor-util
@@ -68,7 +68,7 @@ class TestBuildChartDatasetsForReport:
         assert "portfolio_line" in result
 
     def test_top_level_fallback_returns_empty_dict(self) -> None:
-        """R11 顶层兜底：build_chart_datasets 抛异常 → 返回空 dict（报告仍正常）。"""
+        """顶层兜底：build_chart_datasets 抛异常 → 返回空 dict（报告仍正常）。"""
         # 函数内为 `from ...chart_data_builder import build_chart_datasets`，
         # 需 patch 源模块属性才会被函数内 import 取到。
         with patch(
@@ -81,7 +81,7 @@ class TestBuildChartDatasetsForReport:
 
 class TestCopyJsAssets:
     def test_copies_all_js_files(self, tmp_path) -> None:
-        """Chart.js 本地 bundle 全部 JS 文件随报告复制到输出目录（R21）。"""
+        """Chart.js 本地 bundle 全部 JS 文件随报告复制到输出目录。"""
         _copy_js_assets(str(tmp_path))
         for fname in (
             "chart.min.js",
@@ -97,7 +97,7 @@ class TestCopyJsAssets:
 
 
 class TestDebugPageAssets:
-    """TD8 调试页 test-chart.html 引擎注入列表与报告模板一致（浏览器人工验证前置载体）。"""
+    """调试页 test-chart.html 引擎注入列表与报告模板一致（浏览器人工验证前置载体）。"""
 
     def test_injection_list_contains_chart_common_before_init(self) -> None:
         """注入列表必须含 chart-common.js 且先于 chart-init.js（回归防护）。

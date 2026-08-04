@@ -1,7 +1,7 @@
 """因子暴露分析管线场景测试。
 
 覆盖：
-  1. compute_factor_exposure_data 返回完整 C19 契约（available=True，全部 13 键）
+  1. compute_factor_exposure_data 返回完整数据契约（available=True，全部 13 键）
   2. 全部因子指数拉取失败 → available=False + status="source_failed"（§1.4.5 ②），不抛异常
   3. 持仓历史为空 → available=False + status="insufficient"（§1.4.5 ①）
   4. _generate_report_full 将 prep.style_factor_data 注入 pipeline_data（HTML/Excel 消费）
@@ -29,7 +29,7 @@ _SAMPLE_HOLDINGS = [
     Holding(account="证券", name="贵州茅台", code="600519", shares=50, cost_price=200.0),
 ]
 
-_C19_KEYS = {
+_CONTRACT_KEYS = {
     "available",
     "status",
     "betas",
@@ -64,7 +64,7 @@ class TestComputeFactorExposureData:
     """编排层 compute_factor_exposure_data 场景验证。"""
 
     def test_c19_contract_available(self):
-        """持仓历史 + 因子/基准 K 线齐备 → 返回全部 C19 键且 available=True。"""
+        """持仓历史 + 因子/基准 K 线齐备 → 返回全部数据契约键且 available=True。"""
         hold_bars = _klines(n=90, base=100.0)
         factor_bars = _klines(n=90, base=100.0, step=0.4)
 
@@ -85,7 +85,7 @@ class TestComputeFactorExposureData:
             )
 
         assert isinstance(result, dict)
-        assert set(result.keys()) == _C19_KEYS, f"C19 键集不匹配: {_C19_KEYS - set(result.keys())}"
+        assert set(result.keys()) == _CONTRACT_KEYS, f"数据契约键集不匹配: {_CONTRACT_KEYS - set(result.keys())}"
         assert result["available"] is True
         assert result["status"] == "ok"
         assert set(result["betas"].keys()) == {"value", "growth", "quality"}
@@ -145,7 +145,7 @@ class TestComputeFactorExposureData:
 
 
 class TestPipelineInjection:
-    """_generate_report_full 将 prep.style_factor_data 注入 pipeline_data（C19 写入阶段）。"""
+    """_generate_report_full 将 prep.style_factor_data 注入 pipeline_data（数据契约 写入阶段）。"""
 
     def test_full_report_injects_style_factor_data_into_pipeline(self, tmp_path):
         """full 路径 capture_snapshot 后，pipeline_data["style_factor_data"] 从 prep 注入，HTML/Excel 消费。"""

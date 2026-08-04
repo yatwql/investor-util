@@ -7,7 +7,7 @@
 返回值为小数（如 0.017404 代表 1.7404%），可直接用于夏普比率等计算。
 返回值可能为 None（数据源不可用且无手动配置）。
 
-C6 约束：走独立 fetcher，不绕过 chain 层。
+走独立 fetcher，不绕过 chain 层。
 """
 
 from __future__ import annotations

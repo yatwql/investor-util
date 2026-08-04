@@ -5,7 +5,7 @@
                        duration_days, recovery_days, recovered}
   - recovery_times：{start_date, end_date, days}（trough → recovery 恢复耗时）
 
-- 无数据获取、无报告依赖，纯标准库（C8：日志走 logging，不用 print）。
+- 无数据获取、无报告依赖，纯标准库（日志走 logging，不用 print）。
 - 算法：跟踪 running peak；跌破前峰进入回撤（水下），回升至前峰恢复；
   连续未恢复区间合并为一个事件（一次水下，一个事件）。
 - 过滤：drawdown 深度 < min_depth_pct 的事件剔除；超出 max_events 只保留最深的。

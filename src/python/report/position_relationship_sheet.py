@@ -317,7 +317,7 @@ def write_position_relationship_sheet(
         ws: openpyxl Worksheet 对象
         overlap_result: compute_overlap_matrix() 的返回结果；None 或基金数 < 2 时重合度区块写占位。
         fund_names: {fund_code: fund_name} 覆盖默认名称显示（重合度区块）。
-        correlation_data: C19 `position_relationship_data` 契约 dict（相关性区块数据源）；
+        correlation_data: `position_relationship_data` 契约 dict（相关性区块数据源）；
             None 或 available=False 时相关性区块写占位。
     """
     _name = get_report_sheet_name("position_relationship")

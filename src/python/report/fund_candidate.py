@@ -11,7 +11,7 @@
   - 候选超过 10 只 → 截断前 10，`exceed_limit=True`，渲染层提示。
 
 与现有持仓重合度复用 `fund_overlap.compute_overlap_matrix`（Jaccard 系数，
-不重复实现）；风格判定复用 `fund_style_classify.classify_fund_style`（C1 复用）。
+不重复实现）；风格判定复用 `fund_style_classify.classify_fund_style`（复用中心化分类）。
 """
 
 from __future__ import annotations

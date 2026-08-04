@@ -67,7 +67,7 @@ def prepare_report_data(
 
     使用内部 ThreadPoolExecutor。
     注意：config 参数传入后必须只读使用，不得 mutate。调用方持有的 dict 引用
-    指向相同的配置对象，写入会导致跨模块状态污染（C14 约束）。
+    指向相同的配置对象，写入会导致跨模块状态污染。
     """
     from concurrent.futures import ThreadPoolExecutor
 
@@ -108,8 +108,8 @@ def prepare_report_data(
     penetrated_assets = (pen_result or {}).get("top10", [])
 
     # 因子暴露分析：基金深度分析关闭时为 None（章节隐藏），
-    # 开启时计算 C19 dict（数据不足/故障时 available=False，不阻塞主报告）。
-    # 风格与因子合并：style_factor_data C19 dict 主键（保留全部子键，不重复定义），
+    # 开启时计算 dict（数据不足/故障时 available=False，不阻塞主报告）。
+    # 风格与因子合并：style_factor_data dict 主键（保留全部子键，不重复定义），
     # 内嵌 industry_beta 子键（行业 Beta 子表）。
     factor_exposure = compute_factor_exposure_data(holdings, config, reporter)
     if factor_exposure is not None:
@@ -117,12 +117,12 @@ def prepare_report_data(
         # 开启但数据不足时 available=False（标题 + 占位，不阻塞本页签其余区块）
         factor_exposure["industry_beta"] = compute_industry_beta_data(holdings, details, config, reporter)
     # 持仓关系矩阵（相关性区块）：同因子暴露，基金深度分析关闭时为 None（章节隐藏）。
-    # C19 契约 position_relationship_data——持仓关系矩阵一章两区块（重合度+相关性），
+    # 数据契约 position_relationship_data——持仓关系矩阵一章两区块（重合度+相关性），
     # 相关性矩阵由编排层注入 pipeline_data；重合度区块为渲染期派生（§8.3）。
     correlation_data = compute_correlation_data(holdings, config, reporter)
-    # 品种覆盖诊断：逐品种标注数据状态，C19 position_status 契约
+    # 品种覆盖诊断：逐品种标注数据状态，position_status数据契约
     coverage_status = build_coverage_summary(holdings, details)
-    # 可信度摘要：逐品种新鲜度分类 + 单日 ±20% 跳变检测，C19 data_freshness 契约
+    # 可信度摘要：逐品种新鲜度分类 + 单日 ±20% 跳变检测，data_freshness数据契约
     freshness_summary = build_freshness_summary(
         holdings,
         details,
@@ -130,7 +130,7 @@ def prepare_report_data(
         prev_trading_day=get_prev_trading_day(),
     )
 
-    # 行动建议单一数据源：再平衡信号等纯算法产出，C19 action_data 契约
+    # 行动建议单一数据源：再平衡信号等纯算法产出，action_data数据契约
     # （单源计算，行动建议板块与智囊团深度复盘行动摘要共享同一对象）
     holdings_details = [
         {
@@ -157,7 +157,7 @@ def prepare_report_data(
         for d in details
     ]
 
-    # 行动建议：组装 C19 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）
+    # 行动建议：组装 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）
     action_data = build_action_data(holdings_details, total_mv)
 
     return {
@@ -176,16 +176,16 @@ def prepare_report_data(
         "news_top_count": int(config.get("news_top_count", 100)),
         # 组合风险指标（年化波动率/最大回撤/夏普比率等，需 history_data 计算后填充）
         "risk_metrics": {},
-        # 风格与因子分析（C19 契约 style_factor_data，内嵌 industry_beta 子键；
+        # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键；
         # 基金深度分析关闭时为 None）
         "style_factor_data": factor_exposure,
-        # 持仓关系矩阵（C19 契约 position_relationship_data——相关性区块；基金深度分析关闭时为 None）
+        # 持仓关系矩阵（数据契约 position_relationship_data——相关性区块；基金深度分析关闭时为 None）
         "position_relationship_data": correlation_data,
-        # 品种覆盖诊断（C19 契约 position_status；品种级数据状态标注）
+        # 品种覆盖诊断（数据契约 position_status；品种级数据状态标注）
         "position_status": coverage_status,
-        # 可信度摘要（C19 契约 data_freshness；新鲜度分类 + 单日跳变检测）
+        # 可信度摘要（数据契约 data_freshness；新鲜度分类 + 单日跳变检测）
         "data_freshness": freshness_summary,
-        # 行动建议单一数据源（C19 契约 action_data；行动建议板块 + 智囊团深度复盘行动摘要）
+        # 行动建议单一数据源（数据契约 action_data；行动建议板块 + 智囊团深度复盘行动摘要）
         "action_data": action_data,
     }
 
@@ -239,18 +239,18 @@ def compute_factor_exposure_data(
     config: dict,
     reporter: ProgressReporter,
 ) -> dict | None:
-    """编排因子暴露分析并返回 C19 契约 dict。
+    """编排因子暴露分析并返回数据契约 dict。
 
     流程：拉取组合 as-if 日收益（days=90）+ 因子指数 K 线 + 沪深300 基准
-          → 新鲜度剔除 → 对齐 → 纯计算 OLS → C19 dict。
+          → 新鲜度剔除 → 对齐 → 纯计算 OLS → dict。
 
     Args:
         holdings: 持仓列表（Holding 对象，含 code/name/shares）
-        config: 完整配置（只读，C14 约束）
+        config: 完整配置（只读）
         reporter: 进度上报
 
     Returns:
-        C19 契约 dict；基金深度分析关闭时返回 None（章节隐藏）。
+        数据契约 dict；基金深度分析关闭时返回 None（章节隐藏）。
         数据不足/故障时 available=False（章节显示降级占位，不阻塞主报告，§1.4.5）。
     """
     from src.python.config import is_enable_fund_deep_analysis
@@ -352,20 +352,20 @@ def compute_industry_beta_data(
     config: dict,
     reporter: ProgressReporter,
 ) -> dict | None:
-    """编排行业 Beta 子表数据（C19 `style_factor_data.industry_beta` 子键）。
+    """编排行业 Beta 子表数据（`style_factor_data.industry_beta` 子键）。
 
     流程：A 股持仓行业分类（push2）→ 按市值加权行业暴露占比
-          → 各行业指数 K 线（Chain + session_cache，C4/C6）→ 组合 as-if 日收益
+          → 各行业指数 K 线（Chain + session_cache，会话级API复用/Provider Chain 必经）→ 组合 as-if 日收益
           → 纯计算逐行业一元 OLS（复用 factor_exposure 机制）。
 
     Args:
         holdings: 持仓列表（Holding 对象，含 code/name/shares）
         details: market_value 计算的 DetailRow 列表（含 code/market_value）
-        config: 完整配置（只读，C14 约束）
+        config: 完整配置（只读）
         reporter: 进度上报
 
     Returns:
-        C19 子契约 dict（含 available/status/exposure/betas/...）；
+        数据子契约 dict（含 available/status/exposure/betas/...）；
         report_submodules.industry_beta 关闭时返回 None（区块隐藏，不渲染）；
         push2 行业分类 / 指数 K 线不足时 available=False（标题 + 占位，§1.4.5）。
     """
@@ -467,17 +467,17 @@ def compute_correlation_data(
     config: dict,
     reporter: ProgressReporter,
 ) -> dict | None:
-    """编排持仓相关性矩阵并返回 C19 契约 dict（持仓关系矩阵相关性区块）。
+    """编排持仓相关性矩阵并返回数据契约 dict（持仓关系矩阵相关性区块）。
 
     流程：并行拉取各品种历史 K 线（days=90）→ 转日收益 → 纯计算相关矩阵。
 
     Args:
         holdings: 持仓列表（Holding 对象，含 code/name/shares）
-        config: 完整配置（只读，C14 约束）
+        config: 完整配置（只读）
         reporter: 进度上报
 
     Returns:
-        C19 契约 dict；基金深度分析关闭时返回 None（章节隐藏）。
+        数据契约 dict；基金深度分析关闭时返回 None（章节隐藏）。
         数据不足/故障时 available=False（章节显示降级占位，不阻塞主报告，§1.4.5）。
     """
     from src.python.config import is_enable_fund_deep_analysis

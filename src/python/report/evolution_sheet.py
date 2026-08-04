@@ -46,8 +46,8 @@ def write_evolution_sheet(
 
     Args:
         ws: openpyxl Worksheet 对象
-        evolution_data: C19 契约 dict；None 或 available=False 时写入占位。
-        snapshot_diff_data: 快照差异摘要 C19 契约 dict（页签顶部「自上次快照变化摘要」）；
+        evolution_data: 数据契约 dict；None 或 available=False 时写入占位。
+        snapshot_diff_data: 快照差异摘要数据契约 dict（页签顶部「自上次快照变化摘要」）；
             未提供或 available=False 时写入占位/提示文本。
     """
     _name = get_report_sheet_name("portfolio_evolution")
@@ -76,7 +76,7 @@ def write_evolution_sheet(
         + [""] * (_ncols - 1),
     )
 
-    # ── 1.5 自上次快照变化摘要（C19 snapshot_diff_data） ──
+    # ── 1.5 自上次快照变化摘要（snapshot_diff_data） ──
     row += 1
     row = write_title_row(ws, row, "自上次快照变化摘要", ncols=_ncols)
     diff = snapshot_diff_data or {}

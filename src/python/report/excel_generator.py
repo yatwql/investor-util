@@ -34,10 +34,10 @@ def _write_portfolio_history_drawdown_sheet(
 
     Args:
         sheets: 页签字典，读取 `portfolio_history_drawdown` 键。
-        history_data: `history_data` C19 契约 dict；不可用时整页写占位。
-        crisis_annotation: `crisis_annotation_data` C19 契约 dict（危机区间标注）；
+        history_data: `history_data` 数据契约 dict；不可用时整页写占位。
+        crisis_annotation: `crisis_annotation_data` 数据契约 dict（危机区间标注）；
             None 时危机区块写占位。
-        tail_risk: `tail_risk_data` C19 契约 dict（尾部风险统计）；
+        tail_risk: `tail_risk_data` 数据契约 dict（尾部风险统计）；
             None 时尾部指标行写占位。
     """
     ws = sheets.get("portfolio_history_drawdown")
@@ -218,7 +218,7 @@ def generate_excel_report(
     )
 
     # ── 行情市值 + 指数 ──
-    # 成本流水子模块：开关开启时由 resolve_market_data 组装 C19 fund_flow_data
+    # 成本流水子模块：开关开启时由 resolve_market_data 组装 fund_flow_data
     # （成本分档 + XIRR + 分红累计，基于交易/分红流水 + 行情明细价格）
     data = resolve_market_data(
         holdings,
@@ -235,7 +235,7 @@ def generate_excel_report(
     # ── 各页签写入 ──
     pen_result = write_content_sheets(sheets, holdings, data, a_idx, us_idx, modules, prog, enable_cost_lots=enable_cost_lots)
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
-    # 风格与因子分析：C19 数据在编排层注入 pipeline_data（style_factor_data 主键），
+    # 风格与因子分析：数据契约 数据在编排层注入 pipeline_data（style_factor_data 主键），
     # 此处透传页签写入（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
     write_fund_deep_analysis_sheets(
         sheets,
@@ -273,7 +273,7 @@ def generate_excel_report(
             except Exception:
                 logger.debug("[excel] 组合历史走势与回撤页签写入失败（非关键）", exc_info=True)
 
-    # ── 组合演进页签（多快照趋势，C19 evolution_data） ──
+    # ── 组合演进页签（多快照趋势，evolution_data） ──
     ws_evo = sheets.get("portfolio_evolution")
     if ws_evo is not None:
         prog.info("正在写入组合演进页签...")
@@ -288,7 +288,7 @@ def generate_excel_report(
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
 
-    # ── 行动建议页签（行动板块，C19 action_data） ──
+    # ── 行动建议页签（行动板块，action_data） ──
     ws_action = sheets.get("action")
     if ws_action is not None:
         prog.info("正在写入行动建议页签...")

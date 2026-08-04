@@ -270,7 +270,7 @@ class TestHtmlTocStatic(unittest.TestCase):
         self.assertIn('<script defer src="toc.js"></script>', self.tmpl)
 
     def test_smooth_scroll_reduced_motion_guarded(self):
-        """平滑滚动应置于 prefers-reduced-motion: no-preference 内（A6 可达性）。"""
+        """平滑滚动应置于 prefers-reduced-motion: no-preference 内（可达性）。"""
         match = re.search(
             r"@media\s*\(prefers-reduced-motion:\s*no-preference\)\s*\{(.*?)\}",
             self.tmpl,

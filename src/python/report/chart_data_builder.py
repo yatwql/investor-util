@@ -2,11 +2,11 @@
 
 该模块在 Python 侧完成 6 张图表的数据格式转换，使 JS 端（chart-init.js）
 只需渲染已格式化数据。数据经 template context 传递（`chart_datasets`），
-**不写 `_ENV.globals`**（C14 合规，不新增 Schema — C19 豁免）。
+**不写 `_ENV.globals`**（渲染数据经 context 传递，不新增 Schema）。
 
-契约（§4.11 O2/§4.12）：6 固定键 portfolio_line/drawdown/category_doughnut/
+契约（§4.11 /§4.12）：6 固定键 portfolio_line/drawdown/category_doughnut/
 industry_bar/penetration_bar/radar；空 labels/datasets → "无数据"；degraded → 虚线；
-行数预算 ≤400 行（O4）。
+行数预算 ≤400 行。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from src.python.report.downsample import downsample_bars
 
 logger = logging.getLogger("invest")
 
-# ── 固定键契约（§4.11 O2）────────────────────────────────
+# ── 固定键契约（§4.11 ）────────────────────────────────
 DATASET_KEYS = (
     "portfolio_line",
     "drawdown",
@@ -29,9 +29,9 @@ DATASET_KEYS = (
     "radar",
 )
 
-# ── 组合演进图表专用键（裁剪自 evolution_data C19 契约）────────
+# ── 组合演进图表专用键（裁剪自 evolution_data数据契约）────────
 # 图表（chart-init.js initEvolution*）只消费以下字段；total_cost/holding_counts/
-# account_flows/reason 等表格字段不序列化（R9 数据最小化）。
+# account_flows/reason 等表格字段不序列化（数据最小化）。
 EVOLUTION_CHART_KEYS = (
     "periods",
     "total_value",
@@ -42,7 +42,7 @@ EVOLUTION_CHART_KEYS = (
 
 # ── 资产构成 Doughnut 键序（与 category.py _PROP_ORDER 一致）─
 # 扇区颜色不在 Python 侧硬编码——由 chart-config.js ChartTheme.doughnutColors
-# 统一提供（A3 色盲安全 palette，§4.8），避免 Python/JS 调色板漂移。
+# 统一提供（色盲安全 palette，§4.8），避免 Python/JS 调色板漂移。
 _CATEGORY_ORDER = ("股票", "基金", "债券", "现金", "其他")
 
 # ── 雷达轴 → metrics_* 功能开关（Feature Flag）映射 ──────
@@ -74,12 +74,12 @@ def build_chart_datasets(
     all_metrics: dict | None = None,
     metric_flags: dict | None = None,
 ) -> dict:
-    """构建 6 张图的数据集，返回 dict → template context（C14 合规）。
+    """构建 6 张图的数据集，返回 dict → template context（渲染数据经 context 传递）。
 
     关键数据源：risk_metrics（5 基本字段，full）/ all_metrics（14 项全量，full）/
     metric_flags（metrics_* 功能开关，关闭 → "N/A"）；both 路径传入 None 时，radar 从
     history_data 提取 3 个基本轴兜底。
-    ⚠ R11：每个 dataset 独立 try/except——单图脏数据失败仅跳过该图，不影响整份报告。
+    ⚠ 每个 dataset 独立 try/except——单图脏数据失败仅跳过该图，不影响整份报告。
     """
     datasets: dict[str, Any] = {}
 
@@ -87,32 +87,32 @@ def build_chart_datasets(
     if history_data and history_data.get("status") != "unavailable":
         try:
             datasets["portfolio_line"] = _build_portfolio_line_dataset(history_data)
-        except Exception as e:  # R11：捕获一切异常，单图失败仅跳过该图
+        except Exception as e: # 捕获一切异常，单图失败仅跳过该图
             logger.warning("[chart] portfolio_line 构建失败，跳过该图: %s", e)
         try:
             datasets["drawdown"] = _build_drawdown_dataset(history_data)
-        except Exception as e:  # R11：捕获一切异常，单图失败仅跳过该图
+        except Exception as e: # 捕获一切异常，单图失败仅跳过该图
             logger.warning("[chart] drawdown 构建失败，跳过该图: %s", e)
 
     # category_doughnut + industry_bar + penetration_bar
     try:
         datasets["category_doughnut"] = _build_category_doughnut_dataset(details, cat_data)
-    except Exception as e:  # R11：捕获一切异常，单图失败仅跳过该图
+    except Exception as e: # 捕获一切异常，单图失败仅跳过该图
         logger.warning("[chart] category_doughnut 构建失败，跳过该图: %s", e)
     try:
         datasets["industry_bar"] = _build_industry_bar_dataset(penetration)
-    except Exception as e:  # R11：捕获一切异常，单图失败仅跳过该图
+    except Exception as e: # 捕获一切异常，单图失败仅跳过该图
         logger.warning("[chart] industry_bar 构建失败，跳过该图: %s", e)
     try:
         datasets["penetration_bar"] = _build_penetration_bar_dataset(penetration)
-    except Exception as e:  # R11：捕获一切异常，单图失败仅跳过该图
+    except Exception as e: # 捕获一切异常，单图失败仅跳过该图
         logger.warning("[chart] penetration_bar 构建失败，跳过该图: %s", e)
 
-    # ⚠ R12：radar 放在所有条件之外，仅依赖 all_metrics / risk_metrics / history_data
+    # ⚠ radar 放在所有条件之外，仅依赖 all_metrics / risk_metrics / history_data
     # 三源独立判断——history_data 不可用但 all_metrics 有值时，radar 仍应渲染。
     try:
         datasets["radar"] = _build_radar_dataset(history_data, all_metrics, risk_metrics, metric_flags)
-    except Exception as e:  # R11：radar 失败 → 空占位，不影响其他图
+    except Exception as e: # radar 失败 → 空占位，不影响其他图
         logger.warning("[chart] radar 构建失败，跳过该图: %s", e)
         datasets["radar"] = _empty_dataset()
 
@@ -120,9 +120,9 @@ def build_chart_datasets(
 
 
 def build_evolution_chart_data(evolution_data: dict | None) -> dict | None:
-    """组合演进图表数据专用裁剪（避免整包 tojson，R9 数据最小化）。
+    """组合演进图表数据专用裁剪（避免整包 tojson，数据最小化）。
 
-    evolution_data（C19 契约）为完整趋势 dict（含 total_cost/holding_counts/
+    evolution_data（数据契约）为完整趋势 dict（含 total_cost/holding_counts/
     account_flows/reason 等表格字段），图表（chart-init.js initEvolution*）只需
     periods/total_value/total_pnl/hhi/top_holdings，且 top_holdings 每项仅保留
     name/code/weights。此处裁剪后序列化到模板 #evolution-chart-data。
@@ -152,7 +152,7 @@ def _empty_dataset() -> dict:
 
 
 def _build_portfolio_line_dataset(history_data: dict) -> dict:
-    """净值趋势 Line：主曲线 + 基准线（P1 服务端下采样）+ 危机区间带。"""
+    """净值趋势 Line：主曲线 + 基准线（服务端下采样）+ 危机区间带。"""
     bars = downsample_bars(history_data.get("bars") or [])
     status = history_data.get("status")
     labels = [b["date"] for b in bars]
@@ -177,7 +177,7 @@ def _build_portfolio_line_dataset(history_data: dict) -> dict:
 
 
 def _compute_crisis_bands(labels: list[str]) -> list[dict[str, Any]]:
-    """计算危机区间在 x 轴 labels 中的起止索引带（危机分段着色，C20 图下说明）。
+    """计算危机区间在 x 轴 labels 中的起止索引带（危机分段着色，图下说明）。
 
     仅保留与数据窗口（labels）重叠的区间；无重叠返回空列表（说明不出）。
     labels 为 ISO 日期（YYYY-MM-DD）升序，字符串比较即日期序。
@@ -283,8 +283,8 @@ def _build_category_doughnut_dataset(details: list | None, cat_data: list | None
     - cat_data（持仓分类表数据，_categorize_holding 权威分类，优先）
       → 按 property 聚合 sub_mv，保证饼图与表格完全一致（DetailRow 无 property 字段）。
     - details（市值明细兜底）→ 按 property 属性聚合 market_value，无则 _infer_property。
-    数据最小化（R9 S4）：只传市值，不含份额/成本等敏感字段。
-    扇区颜色由 JS 端 ChartTheme.doughnutColors 提供（A3 色盲安全 palette，§4.8）。
+    数据最小化（S4）：只传市值，不含份额/成本等敏感字段。
+    扇区颜色由 JS 端 ChartTheme.doughnutColors 提供（色盲安全 palette，§4.8）。
     """
     total_by_prop: dict[str, float] = {}
     if cat_data is not None:
@@ -389,14 +389,14 @@ def _build_radar_dataset(
     risk_metrics: dict | None,
     metric_flags: dict | None = None,
 ) -> dict:
-    """量化指标 Radar — 三级降级优先级（R12）：
+    """量化指标 Radar — 三级降级优先级：
 
     1. all_metrics（14 项全量，仅 full 路径）
     2. risk_metrics（5 基本字段，仅 full 路径）
     3. history_data 内部提取（annualized_volatility / max_drawdown_pct / total_return_pct，
        双路径均有——确保 both 路径也能显示 3 个基本轴）
 
-    数据最小化（R9）：只传指标数值，不含内部明细。
+    数据最小化：只传指标数值，不含内部明细。
     Flag 过滤（metrics_* 功能开关）：metrics_* 关闭 → 该轴值转为 "N/A"（非 0）。
     降级标注：risk_metrics / history_data 兜底时 datasets[0]["note"]="仅限基础指标"。
     """

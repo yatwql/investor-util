@@ -39,7 +39,7 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
     Endpoint: money.finance.sina.com.cn/getKLineData
     Sina K 线 API 返回 JSON 格式。
 
-    ✅ C5：使用 make_http_client()。
+    ✅ 使用 make_http_client()。
     Provider 函数保持纯数据获取，不碰缓存层。
 
     Args:
@@ -87,7 +87,7 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
     """获取指数历史 K 线数据（备用链路）。
 
     与 fetch_kline() 的区别：
-      - 入口通过 code_utils.is_index_code() 校验（C1 约束）
+      - 入口通过 code_utils.is_index_code() 校验（代码类型判定）
       - 不检查 is_a_share_code/is_exchange_fund_code
       - 不调用 _add_prefix（指数代码直接透传）
       - 复用 _parse_kline_json() 解析逻辑

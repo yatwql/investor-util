@@ -26,7 +26,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 def _sample_data() -> dict:
-    """构造最小 C19 契约 whatif_data（页签/模板被 mock，仅需可用性标记）。"""
+    """构造最小数据契约 whatif_data（页签/模板被 mock，仅需可用性标记）。"""
     return {"available": True, "status": "ok"}
 
 
@@ -119,7 +119,7 @@ class TestWriteWhatifExcelSheets:
 
 
 def _full_bt_data() -> dict:
-    """构造含可用 backtest 的完整 C19 契约。"""
+    """构造含可用 backtest 的完整数据契约。"""
     return {
         "available": True,
         "backtest": {
@@ -140,7 +140,7 @@ def _full_bt_data() -> dict:
 
 
 class TestTrimBacktestChartData:
-    """_trim_whatif_backtest_chart_data R9 数据最小化。"""
+    """_trim_whatif_backtest_chart_data 数据最小化。"""
 
     def test_trim_payload_only_series_fields(self) -> None:
         """只透传 available/effective_date/series，不携带 metrics/reason。"""

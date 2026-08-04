@@ -258,10 +258,10 @@ class TestAsifReturns:
 
 
 class TestUnavailableResult:
-    """不可用结果工厂（C19 契约）。"""
+    """不可用结果工厂（数据契约）。"""
 
     def test_contract_keys_present(self):
-        """unavailable_result 返回全部 C19 键，available=False。"""
+        """unavailable_result 返回全部数据契约键，available=False。"""
         r = unavailable_result("insufficient", sample_count=5, stale_factors=["growth"])
         expected = {
             "available",

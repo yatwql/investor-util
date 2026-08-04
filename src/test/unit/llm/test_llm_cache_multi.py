@@ -1,4 +1,4 @@
-"""LLM Multi-Provider — 缓存适配（R11）。
+"""LLM Multi-Provider — 缓存适配。
 
 测试 provider-aware cache key 构建、乐观预检、按实际 provider 落盘。
 

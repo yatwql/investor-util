@@ -3,7 +3,7 @@
 职责：
   1. 接收来自各数据准备阶段的结构化数据
   2. 合并到统一的 pipeline_data 字典
-  3. 执行类型断言（C19 契约）
+  3. 执行类型断言（数据契约）
   4. 为下游（LLM prompt / Excel 摘要）提供稳定的入口
 
 A 通道（pipeline_data）流向：
@@ -12,7 +12,7 @@ A 通道（pipeline_data）流向：
 B 通道（prep）流向：
   prepare_report_data() → pipeline_data_builder.build_prep() → LLM / Excel
 
-C19 约束：所有键必须先在 data-channels-schema.md 中注册。
+数据契约 约束：所有键必须先在 data-channels-schema.md 中注册。
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "data_degradation",
     "risk_metrics",
     "portfolio_daily_returns",
-    # 风格与因子分析（C19 契约 style_factor_data，内嵌 industry_beta 子键）
+    # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键）
     "style_factor_data",
     "position_relationship_data",
     "evolution_data",

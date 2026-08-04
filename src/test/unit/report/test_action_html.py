@@ -11,7 +11,7 @@
   - 单源计算断言：「行动建议」与「智囊团深度复盘」共享同一 action_data 对象
     （summary/信号数一致，两处呈现同一数据源，无重复计算）
 
-数据源为 C19 `action_data` 契约（analysis/action_advisor.build_action_data 组装、
+数据源为 `action_data` 契约（analysis/action_advisor.build_action_data 组装、
 orchestrator 注入 pipeline_data）——与 Excel 端 write_action_sheet 共享同一对象。
 """
 
@@ -65,7 +65,7 @@ def _render(action_data, action_enabled: bool = True) -> "BeautifulSoup":
 
 
 def _action_data(**extra) -> dict:
-    """构造 C19 契约 action_data mock（含 1 条再平衡信号）。"""
+    """构造数据契约 action_data mock（含 1 条再平衡信号）。"""
     d = {
         "available": True,
         "summary": "再平衡建议 1 条：组合内存在超警戒线品种，建议减持。",

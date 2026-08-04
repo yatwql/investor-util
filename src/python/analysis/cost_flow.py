@@ -12,7 +12,7 @@
      低成本/高成本档（支持分档止盈与「是否追高加仓」判断）；无市价品种单列。
   3. 分红累计：按代码汇总分红金额（每份分红×登记日份额，份额未知回退当前持仓）。
 
-C19 契约 `fund_flow_data`（pipeline_data 键，`build_fund_flow_data` 输出）：
+数据契约 `fund_flow_data`（pipeline_data 键，`build_fund_flow_data` 输出）：
   {
     "available": bool,      # 任一子数据可用
     "xirr": {"rate": float, "cashflow_count": int, "end_date": str} | None,
@@ -400,7 +400,7 @@ def compute_dividend_totals(
 
 
 # ─────────────────────────────────────────────────────────────
-#  C19 契约组装
+#  数据契约组装
 # ─────────────────────────────────────────────────────────────
 
 
@@ -411,7 +411,7 @@ def build_fund_flow_data(
     current_prices: dict[str, float] | None,
     end_date: _dt.date | None = None,
 ) -> dict[str, Any]:
-    """组装 C19 契约 `fund_flow_data`（渲染层消费的完整数据结构）。
+    """组装数据契约 `fund_flow_data`（渲染层消费的完整数据结构）。
 
     Args:
         transactions: 交易流水记录

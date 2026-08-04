@@ -167,7 +167,7 @@ def _write_account_groupings(
 ) -> tuple[float, float, float, float, int]:
     """按账户分组写入明细行和小计，返回汇总数据及最终行号。
 
-    fund_flow_data 非 None 时明细行追加「资金加权成本」列（C19 契约）。
+    fund_flow_data 非 None 时明细行追加「资金加权成本」列（数据契约）。
 
     Returns:
         (grand_mv, grand_cost, grand_profit, grand_today, final_row)
@@ -241,7 +241,7 @@ def write_market_value_sheet(
         holdings: 持仓列表
         today_str: 日期字符串（YYYY-MM-DD），默认当天
         details: 预计算明细行（必须传入，由编排器预计算）
-        fund_flow_data: 成本流水 C19 契约（非 None 时追加「资金加权成本」列；
+        fund_flow_data: 成本流水数据契约（非 None 时追加「资金加权成本」列；
             None 时保持既有 15 列输出，向后兼容）
 
     Returns:

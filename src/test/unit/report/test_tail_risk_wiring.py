@@ -1,9 +1,9 @@
-"""尾部风险统计（tail_risk_data C19 契约）全接线测试 — 注入 + Excel + HTML。
+"""尾部风险统计（tail_risk_data数据契约）全接线测试 — 注入 + Excel + HTML。
 
 覆盖：
   - _prepare_full_risk_metrics 将 tail_risk_data 注入 pipeline_data（充足 / 不足）
   - Excel：write_portfolio_history_drawdown_sheet 尾部指标行（可用 / 占位）
-  - HTML：合并章尾部风险卡（可用 / 样本不足 / 未恢复 / C20 说明）
+  - HTML：合并章尾部风险卡（可用 / 样本不足 / 未恢复 / 图下说明）
 """
 
 from __future__ import annotations
@@ -301,7 +301,7 @@ class TestHtmlTailRiskCards:
         assert "样本不足" in text
 
     def test_caption_note_present(self):
-        """C20：尾部风险卡下方附说明（历史模拟法 VaR）。"""
+        """尾部风险卡下方附说明（历史模拟法 VaR）。"""
         tail_risk = {
             "available": True,
             "sample_size": 21,

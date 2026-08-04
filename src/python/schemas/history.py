@@ -7,7 +7,7 @@
 - DiffSummary：  新旧快照的差异摘要（组合级 + 持仓级）
 - HistoryBar：   单日价格/净值数据点（历史走势曲线基础单元）
 
-遵循 C3 约束：快照文件使用 tempfile.mkstemp + os.replace 写入。
+遵循原子写入约束：快照文件使用 tempfile.mkstemp + os.replace 写入。
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ class SnapshotData:
     """一次完整的快照数据。
 
     包含所有账户的持仓数据 + 组合级汇总 + 可选 LLM 摘要。
-    Fingerprint 用于 R3 指纹去重——无实际变化时跳过差异段落生成。
+ Fingerprint 用于 指纹去重——无实际变化时跳过差异段落生成。
 
     Attributes:
         accounts:     所有账户的快照列表
@@ -63,7 +63,7 @@ class SnapshotData:
         total_pnl_pct:组合总盈亏率
         timestamp:    快照时间（ISO 格式字符串，如 "2026-07-12T14:30:00"）
         fingerprint:  内容指纹（SHA256），用于去重
-        llm_summary:  LLM 生成的快照评语（可选，由 R3 LLM 流程写入）
+ llm_summary: LLM 生成的快照评语（可选，由 LLM 流程写入）
     """
 
     accounts: tuple[AccountSnapshot, ...]

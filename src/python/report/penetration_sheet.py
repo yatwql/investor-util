@@ -35,7 +35,7 @@ from src.python.report.styles import FMT_MONEY, FMT_PERCENT
 
 logger = logging.getLogger("invest")
 
-# 模块级降级阈值控制器（单例工厂共享，T0-01-A 统一管理）
+# 模块级降级阈值控制器（单例工厂共享，统一管理）
 _tracker = get_tracker()
 
 _NCOLS = 10

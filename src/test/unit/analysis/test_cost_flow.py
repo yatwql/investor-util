@@ -8,7 +8,7 @@
   - `build_cost_lots`：单笔买入 / 多笔买入 FIFO / 卖出扣减 / 无买入不可用
   - `compute_cost_tiers`：相对市价低/高/未分档划分、组合级合计与追高占比
   - `compute_dividend_totals`：按代码汇总、无持仓份额回退跳过
-  - `build_fund_flow_data`：C19 契约形状（available 与子数据联动）
+  - `build_fund_flow_data`：数据契约形状（available 与子数据联动）
 
 运行：
   python -m pytest src/test/unit/analysis/test_cost_flow.py -v
@@ -309,7 +309,7 @@ def test_dividend_totals_unavailable_empty():
 
 
 # ─────────────────────────────────────────────────────────────
-#  build_fund_flow_data（C19 契约）
+#  build_fund_flow_data（数据契约）
 # ─────────────────────────────────────────────────────────────
 
 

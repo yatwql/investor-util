@@ -1,6 +1,6 @@
 /* 主题切换：HTML 报告深/浅色模式（主题切换）。
  *
- * 纯原生 JS，离线自包含（R21），无外部依赖。与主报告、What-if 独立页共用。
+ * 纯原生 JS，离线自包含，无外部依赖。与主报告、What-if 独立页共用。
  * 功能：
  *   1. 右上角浮动按钮切换深/浅色（根元素 data-theme="dark"），偏好持久化到 localStorage
  *   2. 切换后重读 CSS 变量更新 window.ChartTheme，遍历已创建图表刷新
@@ -12,7 +12,7 @@
  * 降级：localStorage 不可用（file:// 隐私模式）仅本次会话生效；window.Chart 缺失
  * 时跳过图表重绘，页面配色仍由 CSS 变量正常切换。
  *
- * ES5 保守语法（R17/R22）：var / function，无箭头函数。
+ * ES5 保守语法：var / function，无箭头函数。
  */
 (function () {
     'use strict';

@@ -26,7 +26,7 @@ def write_content_sheets(
     Args:
         enable_cost_lots: 成本流水子模块开关。关闭时 fund_flow_data 不传
             （汇总/分类两章保持既有输出）；开启时透传 data["fund_flow_data"]
-            （C19 契约：成本分档 + XIRR + 分红累计，无流水时 available=False）。
+            （数据契约：成本分档 + XIRR + 分红累计，无流水时 available=False）。
     """
     fund_flow_data = data.get("fund_flow_data") if enable_cost_lots else None
 

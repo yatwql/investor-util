@@ -7,7 +7,7 @@
   4. 配对明细按 |r| 降序
   5. 数据不足分支：重叠样本 <60 / 单品种 → available=False，status="insufficient"
   6. 名称回退：names_by_code 缺失时回退 code 本身
-  7. C19 契约键完整性（含 unavailable_result 工厂）
+  7. 数据契约键完整性（含 unavailable_result 工厂）
   8. 常数序列 → (0.0, 1.0) 不显著（绝不硬算）
 
 运行：
@@ -32,7 +32,7 @@ from src.python.analysis.correlation import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
-_C19_KEYS = {
+_CONTRACT_KEYS = {
     "available",
     "status",
     "window",
@@ -233,18 +233,18 @@ class TestNameFallback:
         assert pair["name_a"] == "BBB" and pair["name_b"] == "AAA"
 
 
-class TestC19Contract:
-    """C19 契约键完整性。"""
+class TestContract:
+    """数据契约键完整性。"""
 
     def test_result_has_all_c19_keys(self):
         x = _sin(80)
         y = [-v for v in x]
         res = compute_correlation_matrix({"a": _returns(x), "b": _returns(y)})
-        assert set(res.keys()) >= _C19_KEYS
+        assert set(res.keys()) >= _CONTRACT_KEYS
 
     def test_unavailable_result_has_all_c19_keys(self):
         res = unavailable_result("insufficient", sample_count=10, insufficient_codes=["a"])
-        assert set(res.keys()) >= _C19_KEYS
+        assert set(res.keys()) >= _CONTRACT_KEYS
         assert res["available"] is False
         assert res["status"] == "insufficient"
         assert res["sample_count"] == 10

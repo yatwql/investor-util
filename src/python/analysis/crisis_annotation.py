@@ -1,4 +1,4 @@
-"""危机区间标注 — 纯计算层（C19 契约数据源）。
+"""危机区间标注 — 纯计算层（数据契约数据源）。
 
 职责：基于组合净值时间线（history_data.bars），对预设历史危机区间
 （2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整）做区间标注：
@@ -56,7 +56,7 @@ CRISIS_INTERVALS: list[dict[str, str]] = [
 
 
 def build_crisis_annotation(history_data: dict | None) -> dict[str, Any]:
-    """构建危机区间标注契约（C19 `crisis_annotation_data`）。
+    """构建危机区间标注契约（`crisis_annotation_data`）。
 
     Args:
         history_data: 组合历史走势契约 dict（含 bars / data_start / data_end）。

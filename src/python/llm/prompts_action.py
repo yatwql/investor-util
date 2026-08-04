@@ -536,7 +536,7 @@ def _build_debate_synthesis_prompt(
         except Exception:
             logger.warning("[debate] 综合阶段条件推理情景追加失败，已跳过")
 
-    # ── 集中度问答（对齐需求 R-LLM-DB-QA-CONCENTRATION-03） ────
+ # ── 集中度问答（对齐需求 R-LLM-DB-QA-） ────
     if enable_qa_concentration:
         try:
             from src.python.config._core import get_llm_config

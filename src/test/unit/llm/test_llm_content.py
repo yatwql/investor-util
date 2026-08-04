@@ -143,7 +143,7 @@ class TestWriteContentSheet(unittest.TestCase):
         self.assertTrue(cell.alignment.wrap_text)
 
     def test_multi_paragraphs(self):
-        """三个段落 → A2/A4/A6 各一段（A3/A5 空行间距），A7 无内容。"""
+        """三个段落 → 各一段（空行间距），无内容。"""
         content = "<p>第一段</p>\n\n<p>第二段</p>\n\n<p>第三段</p>"
         ws = self._write_and_get_sheet(content=content)
 
@@ -155,7 +155,7 @@ class TestWriteContentSheet(unittest.TestCase):
         self.assertIsNone(ws.cell(row=5, column=1).value)
 
     def test_content_none_placeholder(self):
-        """content=None → A2 写入占位符。"""
+        """content=None → 写入占位符。"""
         ws = self._write_and_get_sheet(content=None)
         cell = ws.cell(row=2, column=1)
         self.assertIn("LLM API Key", str(cell.value))
@@ -373,12 +373,12 @@ class TestWriteLlmSheets(unittest.TestCase):
 
 
 class TestLlmModuleFailureReset(unittest.TestCase):
-    """回归（P2 flaky）：LLM_MODULE_FAILURE 跨测试残留导致 write_llm_sheets 跳写。
+    """回归（flaky）：LLM_MODULE_FAILURE 跨测试残留导致 write_llm_sheets 跳写。
 
     问题场景（xdist 并发）：
       write_llm_sheets() 读取模块级全局 LLM_MODULE_FAILURE 判断模块是否被禁用。
       若测试 A 设置 LLM_MODULE_FAILURE[key]=FAIL_REASON_DISABLED 后未清理，
-      同一 worker 上后续 test_content_none 等测试的页签被跳过不写入，A2
+      同一 worker 上后续 test_content_none 等测试的页签被跳过不写入，
       占位符断言失败。修复方式为 conftest.py 新增 _auto_reset_llm_module_failure
       autouse fixture，本用例验证该 fixture 能清除已污染的状态。
     """
@@ -704,7 +704,7 @@ class TestWriteContentSheetFactCheck(unittest.TestCase):
             "\n⚠ [智囊团深度复盘]持仓占比 25% 与真实值 20% 不符</p>"
         )
         ws = self._write(html)
-        # 摘要在 A6 起（段落一 A2、段落二 A4）
+        # 摘要在 起（段落一 、段落二 ）
         self.assertEqual(ws.cell(row=2, column=1).value, "段落一")
         self.assertEqual(ws.cell(row=4, column=1).value, "段落二")
         # footer 只在末尾一次，正文各单元格不含 footer 文本

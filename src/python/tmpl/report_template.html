@@ -837,10 +837,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 {% endif %}
 
 {% if enable_interactive_charts %}
-{# Chart.js 交互图表（R21 本地 bundle：相对路径，离线自包含） #}
-{# chart_datasets 数据经 context 传递（C14 合规，不写 _ENV.globals） #}
+{# Chart.js 交互图表（本地 bundle：相对路径，离线自包含） #}
+{# chart_datasets 数据经 context 传递（不写 _ENV.globals） #}
 <script type="application/json" id="chart-data">{{ chart_datasets | tojson }}</script>
-{# P3（R21 本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-export → chart-common → chart-init） #}
+{# （本地 bundle）：defer 非阻塞 + 保证执行顺序（chart.min → chart-print → chart-config → chart-export → chart-common → chart-init） #}
 <script defer src="chart.min.js"></script>
 <script defer src="chart-print.js"></script>
 <script defer src="chart-config.js"></script>
@@ -848,7 +848,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 <script defer src="chart-common.js"></script>
 <script defer src="chart-init.js"></script>
 {% endif %}
-{# 左侧目录 TOC（独立于图表开关，始终加载；R21 本地 bundle） #}
+{# 左侧目录 TOC（独立于图表开关，始终加载；本地 bundle） #}
 <script defer src="toc.js"></script>
 {# 主题切换（暗色模式（主题切换），独立于图表开关，始终加载） #}
 <script defer src="theme.js"></script>
@@ -2132,7 +2132,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
         {% endif %}
 
-        <!-- 行动摘要子块：引用行动建议结果（单源计算、两处呈现，C14/C19） -->
+        <!-- 行动摘要子块：引用行动建议结果（单源计算、两处呈现，渲染数据经context传递/数据契约） -->
         {% if section_visible("action") and action_data and action_data.available %}
         <div class="section-content" style="margin-top: 12px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;">
             <div style="font-weight: bold; font-size: 14px; color: #2E75B6; margin-bottom: 6px;">
@@ -2212,7 +2212,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% if section_visible("portfolio_history_drawdown") %}
     <!-- ═══════════════════════════════════════════════════════════ -->
     <!--  组合历史走势与回撤（一章两区块：走势表 + 回撤矩阵）        -->
-    <!--  危机区间标注：净值曲线分段着色（2015/2018/2020/2022，C20 图下说明） -->
+    <!--  危机区间标注：净值曲线分段着色（2015/2018/2020/2022，图下说明） -->
     <!-- ═══════════════════════════════════════════════════════════ -->
     <div class="section" id="sec-portfolio_history_drawdown" style="order: {{ section_numbers['portfolio_history_drawdown'] }};">
         <div class="section-title">
@@ -2271,7 +2271,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     </div>
                 </div>
             </div>
-            <!-- 尾部风险统计（VaR95/99、最大单日跌幅、连续下跌、恢复天数；样本不足写占位，C20 附说明） -->
+            <!-- 尾部风险统计（VaR95/99、最大单日跌幅、连续下跌、恢复天数；样本不足写占位，图下说明） -->
             {% set _tail_ok = tail_risk_data and tail_risk_data.available %}
             <div class="summary-grid" style="margin-top:16px;">
                 {% if _tail_ok %}
@@ -2376,7 +2376,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% elif history_data.bars %}
             <div class="empty-section" style="margin-top:16px;">📭 历史回撤数据不足（有效交易日不足 {{ drawdown_min_span }} 天），暂不计算回撤事件</div>
             {% endif %}
-            <!-- ── 三、危机区间标注表（区间统计：区间回撤/恢复天数，C20 图下说明） ── -->
+            <!-- ── 三、危机区间标注表（区间统计：区间回撤/恢复天数，图下说明） ── -->
             {% if _crisis_ok %}
             <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">危机区间标注（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整）</div>
             {% if _crisis_in_range %}

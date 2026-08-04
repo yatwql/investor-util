@@ -1,4 +1,4 @@
-"""LLM 多 Provider 配置解析单元测试 — R1。
+"""LLM 多 Provider 配置解析单元测试 — 。
 
 测试目标：
   - _load_llm_providers()：读取 llm_providers.json，返回 dict 或 None
@@ -214,7 +214,7 @@ class TestParseProvidersList(unittest.TestCase):
         }
         result = _parse_providers_list(raw)
         self.assertIsNotNone(result)
-        # C18 约束：内联 api_key 被迁入 _inline_api_key 并设置 credentials_ref
+        # 凭据分离：内联 api_key 被迁入 _inline_api_key 并设置 credentials_ref
         self.assertEqual(result[0]["_inline_api_key"], "sk-test-key")
         self.assertEqual(result[0]["credentials_ref"], "_inline_p1")
 
@@ -294,7 +294,7 @@ class TestValidateProviderEntry(unittest.TestCase):
         self.assertEqual(warnings, [])
 
 
-# ── R2: _inject_provider_chain_data 测试 ─────────────────────
+# ── _inject_provider_chain_data 测试 ─────────────────────
 
 
 class TestInjectProviderChainData(unittest.TestCase):

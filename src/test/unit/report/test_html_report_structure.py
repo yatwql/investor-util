@@ -123,7 +123,7 @@ def _build_minimal_render_data(
         "has_llm_analysis": False,
         "manager_analysis": None,
         "overlap_matrix": None,
-        # 持仓关系矩阵：相关性区块 C19 契约（空 dict 触发模板内 .get() 默认值降级）
+        # 持仓关系矩阵：相关性区块数据契约（空 dict 触发模板内 .get() 默认值降级）
         "position_relationship_data": {},
         "concentration_analysis": None,
         "style_analysis": None,
@@ -804,7 +804,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNone(section.find(id="chart_radar"))
 
     def test_all_chart_canvases_have_a11y_attrs(self) -> None:
-        """6 个 Chart.js canvas 均含 A1 可访问性属性（§4.8 A1）。
+        """6 个 Chart.js canvas 均含可访问性属性（§4.8）。
 
         模板 6 处 canvas 补 aria-label + role="img" + 内嵌 fallback 文本：
         屏幕阅读器读出图表含义，降级环境（Canvas/JS 不可用）读 fallback
@@ -1111,7 +1111,7 @@ class TestHtmlTocSidebar(unittest.TestCase):
         self.assertEqual(btn.get("aria-label"), "展开目录")
 
     def test_toc_js_loaded(self):
-        """模板引用 toc.js（R21 本地 bundle 加载）。"""
+        """模板引用 toc.js（本地 bundle 加载）。"""
         self.assertIn("toc.js", str(self.soup), "模板应加载 toc.js")
 
     def test_toc_links_follow_section_order(self):

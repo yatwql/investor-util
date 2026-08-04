@@ -39,7 +39,7 @@ _INDEX_DOWN_FONT = Font(size=10, bold=True, color="009900")  # 跌→绿
 # 单元格对齐
 _CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
 
-# 模块级降级阈值控制器（单例工厂共享，T0-01-A 统一管理）
+# 模块级降级阈值控制器（单例工厂共享，统一管理）
 _tracker = get_tracker()
 
 _NCOLS = 8
@@ -168,7 +168,7 @@ def _write_profit_summary(
     """写入盈亏汇总（数值以原始小数/金额写入，由 Excel 数字格式控制显示）。
 
     Args:
-        fund_flow_data: 成本流水 C19 契约。非 None 时在汇总末尾追加
+        fund_flow_data: 成本流水数据契约。非 None 时在汇总末尾追加
             「资金加权收益率 (XIRR)」行（无可用现金流时写占位文本）；
             None 时保持既有输出（report_submodules.cost_lots 关闭）。
     """
@@ -370,7 +370,7 @@ def write_summary_sheet(
         update_status: (已更新数, 总数, 是否全部更新)，来自 price_update_status()
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
-        fund_flow_data: 成本流水 C19 契约（非 None 时盈亏汇总追加 XIRR 行；
+        fund_flow_data: 成本流水数据契约（非 None 时盈亏汇总追加 XIRR 行；
             None 时保持既有输出，report_submodules.cost_lots 关闭）
     """
     row = write_title_row(ws, 1, get_report_sheet_name("summary"), _NCOLS)

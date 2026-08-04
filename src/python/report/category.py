@@ -219,7 +219,7 @@ def _write_category_group(
 ) -> tuple[int, float, float, float, float, float]:
     """写入一个分类分组的明细行和小计。
 
-    fund_flow_data 非 None 时追加「成本分档」「分红累计」子列（C19 契约）。
+    fund_flow_data 非 None 时追加「成本分档」「分红累计」子列（数据契约）。
 
     Returns:
         (next_row, mv, cost, profit, today, div_sum)
@@ -282,7 +282,7 @@ def write_category_sheet(
         ws: 目标工作表
         holdings: 原始持仓列表
         details: 市值核算明细行列表
-        fund_flow_data: 成本流水 C19 契约（非 None 时追加「成本分档」「分红累计」
+        fund_flow_data: 成本流水数据契约（非 None 时追加「成本分档」「分红累计」
             子列；None 时保持既有 10 列输出，向后兼容）
     """
     has_flow = fund_flow_data is not None

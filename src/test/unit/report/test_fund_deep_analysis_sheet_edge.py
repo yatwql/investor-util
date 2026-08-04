@@ -1,4 +1,4 @@
-"""基金深度分析 Excel 写入模块空数据占位边缘测试（D-7a）。
+"""基金深度分析 Excel 写入模块空数据占位边缘测试。
 
 测试目标：
   - fund_manager_sheet：manager_data 为空 → 写占位

@@ -23,7 +23,7 @@ def fetch_fund_nav_history(code: str) -> list[dict]:
     从 pingzhongdata/{code}.js 中提取 Data_netWorthTrend（单位净值）
     和 Data_ACWorthTrend（累计净值）。
 
-    ✅ C5：使用 make_http_client()（通过 tiantian_base 转发）。
+    ✅ 使用 make_http_client()（通过 tiantian_base 转发）。
     Provider 函数保持纯数据获取，不碰缓存层。
 
     Args:

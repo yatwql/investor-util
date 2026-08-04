@@ -155,7 +155,7 @@ class TestRenderPenetrationSection(unittest.TestCase):
 
 
 # ============================================================
-#  write_html_report — data_status 渲染（D-6 新增）
+#  write_html_report — data_status 渲染
 # ============================================================
 
 
@@ -375,7 +375,7 @@ class TestWriteHtmlReportDataStatus(unittest.TestCase):
 
 
 # ============================================================
-#  基金深度分析模块空态占位（D-7a）
+#  基金深度分析模块空态占位
 # ============================================================
 
 

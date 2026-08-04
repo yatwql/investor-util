@@ -73,7 +73,7 @@ def write_whatif_summary_sheet(ws: Worksheet, whatif_data: dict[str, Any] | None
 
     Args:
         ws: openpyxl Worksheet 对象
-        whatif_data: C19 契约 dict；None 或 available=False 时写占位。
+        whatif_data: 数据契约 dict；None 或 available=False 时写占位。
     """
     _ncols = 8
     write_title_row(ws, 1, "调仓 What-if 模拟", ncols=_ncols)
@@ -255,7 +255,7 @@ def write_whatif_backtest_sheet(ws: Worksheet, whatif_data: dict[str, Any] | Non
 
     Args:
         ws: openpyxl Worksheet 对象
-        whatif_data: C19 契约 dict（含可选 backtest 键）
+        whatif_data: 数据契约 dict（含可选 backtest 键）
     """
     _ncols = 6
     write_title_row(ws, 1, "时序回测（指定生效日后行情推演）", ncols=_ncols)

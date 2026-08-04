@@ -47,7 +47,7 @@
   .badge.offline { background: #CC0000; }
   .note { font-size: 12px; color: #888; text-align: center; margin-top: 4px; }
   @media print {
-    /* 打印验证：浅色主题（R16 强制） + 防跨页 */
+ /* 打印验证：浅色主题（强制） + 防跨页 */
     :root { --chart-text: #000; --chart-grid: rgba(0,0,0,0.12); --chart-bg: #fff; }
     .chart-box { break-inside: avoid; }
     .chart-export-btn { display: none; }
@@ -100,7 +100,7 @@
 </div>
 
 <script>
-/* 调试页引导脚本（ES5，R17/R22）：按 ?s= 场景填充 chart-data 并注入引擎 script。
+/* 调试页引导脚本（ES5，）：按 ?s= 场景填充 chart-data 并注入引擎 script。
  * 注入顺序与报告模板一致：chart.min.js → chart-print.js → chart-config.js →
  * chart-export.js → chart-common.js → chart-init.js（chart-common.js 为 chart-init.js
  * 的必需依赖，提供 window.ChartCommon）。
@@ -132,7 +132,7 @@
     }
   }
 
-  /* ── 模拟 chart_datasets（§4.12 契约，键名对应 §4.11 O2）── */
+ /* ── 模拟 chart_datasets（§4.12 契约，键名对应 §4.11 ）── */
   var DATES = ['2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24', '2026-07-25',
                '2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31'];
   var NAV = [100.00, 101.20, 99.85, 100.65, 102.10, 101.55, 103.40, 104.05, 103.20];
@@ -169,7 +169,7 @@
         datasets: [{ label: '量化指标', data: [1.2, 0.9, 0.58, 0.35, 0.92, 0.18], borderColor: 'var(--chart-primary)', degraded: false }]
       }
     },
-    /* 降级场景：净值/回撤 degraded（虚线）+ radar 3 轴兜底 + note（§6.6/R12） */
+ /* 降级场景：净值/回撤 degraded（虚线）+ radar 3 轴兜底 + note（§6.6/） */
     degraded: {
       portfolio_line: {
         labels: DATES,

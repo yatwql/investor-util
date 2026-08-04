@@ -1,12 +1,12 @@
-"""行动建议单一数据源 —「行动建议」章节的计算层（C14/C19 单源计算）。
+"""行动建议单一数据源 —「行动建议」章节的计算层（渲染数据经context传递/数据契约 单源计算）。
 
 决策闭环的核心产出（再平衡信号 + 交易纪律 + 调仓建议 + 收益归因）均为
 纯算法功能，与 LLM 无关。本模块是「行动建议」与智囊团深度复盘「行动摘要」
 共享的唯一计算入口——计算结果经 orchestrator 组装进 pipeline_data
-（C19 契约 `action_data`），两处渲染均从模板 context 取，
-不写模块级全局变量（C14 合规，单源计算两处呈现）。
+（数据契约 `action_data`），两处渲染均从模板 context 取，
+不写模块级全局变量（单源计算两处呈现）。
 
-C19 契约 `action_data`：
+数据契约 `action_data`：
   {
     "available": bool,           # 持仓明细可用
     "rebalance_signals": list,   # 再平衡信号（单品超限，复用 simple_rebalance）
@@ -74,7 +74,7 @@ def build_action_data(
     discipline_config: dict[str, Any] | None = None,
     portfolio_peak_mv: float | None = None,
 ) -> dict[str, Any]:
-    """构建行动建议单一数据源（C19 契约 `action_data`）。
+    """构建行动建议单一数据源（数据契约 `action_data`）。
 
     Args:
         holdings_details: 持仓明细列表（含 market_value/name/code/profit/profit_rate 等）
@@ -83,7 +83,7 @@ def build_action_data(
         portfolio_peak_mv: 组合历史峰值市值（None 时纪律引擎跳过回撤纪律）
 
     Returns:
-        C19 契约 dict（结构见模块 docstring）。available 表示持仓明细可用；
+        数据契约 dict（结构见模块 docstring）。available 表示持仓明细可用；
         再平衡/纪律/调仓建议/收益归因子块均已填充；Σ|profit|=0 时归因返回 None
         （渲染层写「待生成」占位）。
     """

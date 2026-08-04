@@ -224,10 +224,10 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
     Endpoint: web.ifzq.gtimg.cn/appstock/app/fqkline/get
     Tencent K 线 API 返回 JSON 格式，支持前复权（qfq）。
 
-    参数约定（C6 约束）：
+    参数约定：
       - Provider 函数保持纯数据获取，不碰缓存层
       - 缓存合并由 chain 层的 fetch_with_incremental_fallback() 管理
-      - ✅ C5：所有 HTTP 请求使用 make_http_client()
+      - ✅ 所有 HTTP 请求使用 make_http_client()
 
     Args:
         code: 6 位证券代码（如 "600900"）
@@ -321,7 +321,7 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
     """获取指数历史 K 线数据（前复权）。
 
     与 fetch_kline() 的区别：
-      - 入口通过 code_utils.is_index_code() 校验（C1 约束）
+      - 入口通过 code_utils.is_index_code() 校验（代码类型判定）
       - 不检查 is_a_share_code/is_exchange_fund_code
       - 代码直接透传 API，不调用 _add_prefix（指数代码已含交易所前缀）
       - 复用 _parse_kline_response() 解析逻辑

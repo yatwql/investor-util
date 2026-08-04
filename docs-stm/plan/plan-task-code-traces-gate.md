@@ -9,7 +9,7 @@ CLAUDE.md 语义命名纪律规定：代码标识符（函数/变量/类名）�
 用户要求增强：标识符 + 注释都不能含任务编号（例：`b_series`、`G系列`、`F4`、`B6`、`plan-18`、`rf-185`）。
 
 **误报面已实证（全部通过 grep/AST 全仓扫描验证）**：
-- `C1~C20`（架构约束）、`P1`（优先级）、`S-P1~P4`（场景 ID）、`Y1/Y3`（edge 类后缀）、`A3/O1/R17/S2/TD8`（JS 注释约束引用）、`f9/f20/f57`（东财 API 字段码）、`f1~f4`（concurrent.futures Future 变量）、`b1/b2`（按钮）、`h1/t1/f1/x0/p50`（测试脚手架短局部）——**均合法**，不得误伤
+- `代码类型判定中心化~图下说明`（架构约束）、`P1`（优先级）、`S-P1~P4`（场景 ID）、`Y1/Y3`（edge 类后缀）、`A3/O1/R17/S2/TD8`（JS 注释约束引用）、`f9/f20/f57`（东财 API 字段码）、`f1~f4`（concurrent.futures Future 变量）、`b1/b2`（按钮）、`h1/t1/f1/x0/p50`（测试脚手架短局部）——**均合法**，不得误伤
 - `[A-Za-z]系列` 在 src 全仓 **0 命中**；大写裸 `[A-Z]\d{1,3}` 独立标识符 **0 命中**（所有独立字母+数字标识符全是小写）；单字母 `_series` 无命中（现有 `drawdown_series`/`holding_series` 是多字母词+series，合法）
 
 ## 设计
@@ -22,7 +22,7 @@ CLAUDE.md 语义命名纪律规定：代码标识符（函数/变量/类名）�
 |------|------|
 | `(?<![A-Za-z])[A-Za-z]_series\b` | 单字母+`_series`（如 `b_series`）；负向 lookbehind 排除 `drawdown_series` |
 | `[A-Za-z]系列` | 任务批次系列别名（如 `G系列`）；`全系列/中证指数系列` 前缀为 CJK 不匹配 |
-| `\b[BFG][0-9]{1,2}\b` | 任务族字母+数字（如 `F4`、`B6`），仅大写族字母，区别于合法 `C20`/`P1`/`S-P1`；族字母抽为可配置 `TASK_FAMILY_LETTERS` frozenset（默认 B/F/G，新增族一行扩展） |
+| `\b[BFG][0-9]{1,2}\b` | 任务族字母+数字（如 `F4`、`B6`），仅大写族字母，区别于合法 `图下说明`/`P1`/`S-P1`；族字母抽为可配置 `TASK_FAMILY_LETTERS` frozenset（默认 B/F/G，新增族一行扩展） |
 
 ### 2. 标识符侧：新增扫描维度（类别 `IDENT`，等同 CODE 退出码 2）
 
@@ -45,7 +45,7 @@ CLAUDE.md 语义命名纪律规定：代码标识符（函数/变量/类名）�
 
 ### 3. 明确不捕获（文档写明局限）
 - 小写裸字母+数字短局部名（`h1/t1/f1/x0/p50`）——与 Future 变量/API 字段码/测试脚手架结构同形，无法区分，误报风暴
-- 注释中**非族字母**大写代号（`C20`/`P1`/`S-P1`/`A3`/`R17`）——合法交叉引用
+- 注释中**非族字母**大写代号（`图下说明`/`P1`/`S-P1`/`A3`/`R17`）——合法交叉引用
 - 小写族字母+数字在注释中（`f9/f20/f57` API 字段）——故族字母规则限大写
 
 ## 修改文件
@@ -56,7 +56,7 @@ CLAUDE.md 语义命名纪律规定：代码标识符（函数/变量/类名）�
    - docstring 更新（新增 IDENT 维度 + 退出码语义）
 
 2. **`src/test/unit/scripts/test_trace_check_scripts.py`**（沿用 `unit_scripts` marker）
-   - 注释模式正/负用例：`b_series 说明`/`G系列`/`F4 方案` 命中；`drawdown_series`/`全系列`/`C20 约束`/`f9=市盈率` 不命中
+   - 注释模式正/负用例：`b_series 说明`/`G系列`/`F4 方案` 命中；`drawdown_series`/`全系列`/`图下说明 约束`/`f9=市盈率` 不命中
    - 新增 `_ident_hit()` 辅助 + 标识符用例：`F4=1`/`b_series=1`/`G系列=1`/`def rf_205_hack()` 命中；`f1=1`/`drawdown_series=[]`/`h1=1`/`p50=1` 不命中
    - `_iter_identifiers` 对 Python 代码片段的提取断言
 
@@ -72,7 +72,7 @@ CLAUDE.md 语义命名纪律规定：代码标识符（函数/变量/类名）�
 1. `python scripts/check-code-traces.py --ci` → 对现有代码 **0 命中**（新增模式零误报）
 2. `python -m pytest src/test/unit/scripts/test_trace_check_scripts.py -v --tb=short` → 全过（新增+既有用例）
 3. `python scripts/test_runner.py --mode dev-verify` + `check-task-numbering.py --ci` + `check-doc-traces.py --ci` → P0 门禁全绿
-4. 手工冒烟：临时构造含 `F4`/`b_series`/`rf_205_fix` 的代码片段确认被检出、含 `C20`/`h1`/`drawdown_series` 的不被检出
+4. 手工冒烟：临时构造含 `F4`/`b_series`/`rf_205_fix` 的代码片段确认被检出、含 `图下说明`/`h1`/`drawdown_series` 的不被检出
 
 ## 收尾
 - 本计划文件（`.claude/plans/`）用毕后迁移到 `docs-stm/plan/`（CLAUDE.md 违规补救要求）

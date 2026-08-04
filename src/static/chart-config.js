@@ -2,11 +2,11 @@
  *
  * 职责：
  *   - 统一定义配色（CSS 变量驱动，与模板暗色模式兼容）
- *   - 关闭入场动画（P2：报告是静态分析工具，无需动画，hover tooltip 不受影响）
- *   - 限制 devicePixelRatio（P4/R22：低配机 + 高分屏优化，防止 4K 屏 canvas 像素爆炸）
- *   - ES5 保守语法（R17/R22：兼容微信 X5 / 老旧 Chromium，不使用 const/let/箭头函数）
+ * - 关闭入场动画（报告是静态分析工具，无需动画，hover tooltip 不受影响）
+ * - 限制 devicePixelRatio（低配机 + 高分屏优化，防止 4K 屏 canvas 像素爆炸）
+ * - ES5 保守语法（兼容微信 X5 / 老旧 Chromium，不使用 const/let/箭头函数）
  *
- * 行数预算：≤150 行（§4.11 O4）。本文件应保持纯净：不初始化任何图表。
+ * 行数预算：≤150 行（§4.11 ）。本文件应保持纯净：不初始化任何图表。
  */
 (function () {
   if (typeof Chart === 'undefined') {
@@ -14,11 +14,11 @@
     return;
   }
 
-  /* ── P2 动画关闭 ─────────────────────────────────────── */
+ /* ── 动画关闭 ─────────────────────────────────────── */
   Chart.defaults.animation = false;
   Chart.defaults.transitions.active.animation.duration = 0;
 
-  /* ── P4 DPR 限制（R22）───────────────────────────────── */
+ /* ── DPR 限制───────────────────────────────── */
   // Chart.js v4 默认 DPR 上限 1.0（不再自动放大），显式设 1.5 在高分屏
   // 清晰度与低配机性能之间取平衡：折线/柱状对这种分辨率差异视觉无感。
   Chart.defaults.devicePixelRatio = 1.5;
@@ -49,7 +49,7 @@
     grid: cssVar('--chart-grid', 'rgba(128,128,128,0.15)'),
     text: cssVar('--chart-text', '#333333'),
     benchmarkColors: ['#CC0000', '#E68A00', '#2E7D32'],
-    // A3 色盲安全 palette（§4.8）：蓝/橙/绿/紫/灰，避开纯红绿对比。
+ // 色盲安全 palette（§4.8）：蓝/橙/绿/紫/灰，避开纯红绿对比。
     // 资产构成 Doughnut（股票/基金/债券/现金/其他）等分色图统一使用。
     doughnutColors: ['#2E75B6', '#E68A00', '#2E7D32', '#8E44AD', '#7B8A9E'],
     // 柱状图区分配色（蓝/橙）：资产穿透 TOP10 章节的行业分布柱状图用蓝、

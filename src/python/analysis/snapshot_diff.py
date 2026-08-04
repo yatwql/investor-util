@@ -1,6 +1,6 @@
 """快照差异摘要 — 组合演进章顶部「自上次快照变化摘要」。
 
-对比去重后的最近两次快照，输出 C19 契约 `snapshot_diff_data`：
+对比去重后的最近两次快照，输出数据契约 `snapshot_diff_data`：
   - 新增/移除品种（复用 `fetcher/history_diff.HistoryDiff` 引擎，action=新增/清仓）
   - 集中度 HHI 变化（本期 - 上期；市值口径优先，市值为 0 回退成本口径，
     与 `analysis/portfolio_evolution` 的权重口径一致）
@@ -39,7 +39,7 @@ def build_snapshot_diff(
     threshold_pct: float = _DEFAULT_THRESHOLD_PCT,
     min_snapshots: int = _DEFAULT_MIN_SNAPSHOTS,
 ) -> dict[str, Any]:
-    """构建快照差异摘要 C19 契约 dict。
+    """构建快照差异摘要数据契约 dict。
 
     从快照目录加载全部快照 → 按日期去重 → 取最近两次对比。
 

@@ -9,10 +9,10 @@
   - show_startup_wizard_if_needed(non_interactive=False) — 交互式引导
 
 架构约束：
-  - C3：写入 llm_key.json 使用 `config._core._atomic_write` 原子写入
-  - C8：运行时诊断走 logging；交互式引导 print 属 C8 豁免（提示类输出）
-  - C16：持仓目录使用配置层已绝对化的 holdings_dir，不依赖 CWD
-  - C18：凭据写入 llm_key.json（合法凭据位置），不写入 llm_providers.json
+  - 写入 llm_key.json 使用 `config._core._atomic_write` 原子写入
+  - 运行时诊断走 logging；交互式引导 print 属日志豁免（提示类输出）
+  - 持仓目录使用配置层已绝对化的 holdings_dir，不依赖 CWD
+  - 凭据写入 llm_key.json（合法凭据位置），不写入 llm_providers.json
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ def _detect_startup_state(config: dict) -> dict:
 
 
 def _list_holding_files(config: dict) -> list[str]:
-    """列出持仓目录下的 xlsx 文件（holdings_dir 由配置层绝对化，C16）。"""
+    """列出持仓目录下的 xlsx 文件（holdings_dir 由配置层绝对化）。"""
     from src.python.core.reader import list_xlsx_files
 
     return list_xlsx_files(config.get("holdings_dir", "") or "")

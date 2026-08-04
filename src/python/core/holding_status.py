@@ -17,7 +17,7 @@
 
 消费方：
   `report/orchestrator.prepare_report_data()` 组装为 `position_status`
-  C19 契约注入 pipeline_data，供「数据质量仪表盘」品种覆盖区块渲染。
+  数据契约注入 pipeline_data，供「数据质量仪表盘」品种覆盖区块渲染。
 """
 
 from __future__ import annotations
@@ -251,7 +251,7 @@ def annotate_position_status(holdings: list, details: list | None = None) -> lis
 
 
 def build_coverage_summary(holdings: list, details: list | None = None) -> dict:
-    """构建品种覆盖诊断 C19 契约（`position_status` 键结构）。
+    """构建品种覆盖诊断数据契约（`position_status` 键结构）。
 
     Args:
         holdings: Holding 列表

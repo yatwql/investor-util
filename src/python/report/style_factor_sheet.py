@@ -6,7 +6,7 @@
   一、基金风格表 —— 基金名称/当前风格/漂移等级等（数据不足写占位）
   二、风格因子回归 —— 价值/成长/质量 3 因子 OLS 暴露 + 基准对照（数据不足写占位）
   三、行业 Beta 子表 —— 穿透行业暴露占比 + 各行业指数 β/相关性
-      （由编排层 C19 `style_factor_data.industry_beta` 提供；None/available=False 时该区块不渲染）
+      （由编排层 `style_factor_data.industry_beta` 提供；None/available=False 时该区块不渲染）
 
 任一区块数据不足时该区块独立降级（§1.4.5），互不影响；
 三区块均无数据时整页写占位。
@@ -245,7 +245,7 @@ def _write_industry_beta_block(
 ) -> int:
     """写入三、行业 Beta 子表区块，返回下一行起始行号。
 
-    编排层 C19 `style_factor_data.industry_beta` 子键：
+    编排层 `style_factor_data.industry_beta` 子键：
       - None（开关 report_submodules.industry_beta 关闭）→ 区块不渲染；
       - available=False（push2 行业分类 / 指数 K 线不足）→ 标题 + "数据不足"占位，
         Beta 子表不渲染，不阻塞该章其余内容（§1.4.5）。
@@ -331,11 +331,11 @@ def write_style_factor_sheet(
 
     Args:
         ws: openpyxl Worksheet 对象
-        style_data: analyze_style_for_all_funds 的 results 列表（渲染期派生，不进 C19）。
-        factor_exposure: C19 `style_factor_data` dict（因子回归区块数据源）；
+        style_data: analyze_style_for_all_funds 的 results 列表（渲染期派生，不进数据契约）。
+        factor_exposure: `style_factor_data` dict（因子回归区块数据源）；
             None 或 available=False 时因子回归区块写占位。
         factor_names: 因子 key → 中文名映射（缺省回退 key 本身）。
-        industry_beta: C19 `style_factor_data.industry_beta` 子键（行业 Beta 区块数据源）；
+        industry_beta: `style_factor_data.industry_beta` 子键（行业 Beta 区块数据源）；
             None 或 available=False 时该区块不渲染（开关关/数据不可用）。
     """
     _name = get_report_sheet_name("style_factor")

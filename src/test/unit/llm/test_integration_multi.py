@@ -1,4 +1,4 @@
-"""LLM Multi-Provider — R12 集成验证 + 清理验证。
+"""LLM Multi-Provider — 集成验证 + 清理验证。
 
 运行：
   cd D:/codebase/zoo/investor-util

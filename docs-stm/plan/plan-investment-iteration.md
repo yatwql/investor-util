@@ -45,7 +45,7 @@
 - **[覆盖率]** 涉及模块整体覆盖率 ≥80%；**新增/改造模块 ≥85%**。
 - **[向后兼容]** 旧持仓文件（无流水页签）、旧 config 解析与改造前**完全一致**（回归断言）；既有章节输出不因新子模块开关默认关而改变；`enable_action` 默认关时报告为合并后 18 章基线（无行动建议章）。
 - **[回填]** 每轮完成：`docs-stm/managements/changelog.md` 记一轮；自审问题入 `review-findings.md`（修复后即归档）。
-- **[架构]** 每轮对照 features.md §4.4 架构合规自查表逐条自检 C1~C20（尤其 C3 原子写、C8 日志统一、C11/C12/C13/C14 测试规范、C16 路径绝对化、C18 凭据隔离）；物理合并轮必须同步 C19 契约增删（附录 H）；新增图表必须 C20 图下说明；管线共享层 `report/orchestrator.py` 不因 Web 无关改动而破坏。
+- **[架构]** 每轮对照 features.md §4.4 架构合规自查表逐条自检 代码类型判定中心化~图下说明（尤其 缓存原子写、日志统一、测试标记/边缘文件隔离/敏感路径隔离/单例重置测试规范、路径绝对化、凭据隔离）；物理合并轮必须同步数据契约增删（附录 H）；新增图表必须 图下说明；管线共享层 `report/orchestrator.py` 不因 Web 无关改动而破坏。
 
 ---
 
@@ -95,13 +95,13 @@
 #### 轮 4：新增「行动建议」章框架 +「智囊团深度复盘」章行动摘要
 
 - **目标**：新增 `always` 类型独立顶层章节「行动建议」章框架（再平衡信号 + 交易纪律 + 调仓建议 + 收益归因）；「智囊团深度复盘」章加「行动摘要」子块（引用「行动建议」章）。
-- **实施内容**：`registry.py` 注册 `action` 章节（`_REPORT_SHEET_NAMES` 加 `"action": "行动建议"` + `_REPORT_SECTION_DEFAULT` 序号 20）+ 顶层开关 `enable_action`（默认关）；行动板块渲染框架；「行动建议」章与「智囊团深度复盘」章共享同一计算结果——**计算结果经 orchestrator 组装进 pipeline_data（C14/C19 契约），两处渲染均从模板 context 取，不写模块级全局变量**（C14 自查表）。（单源计算、两处呈现）
+- **实施内容**：`registry.py` 注册 `action` 章节（`_REPORT_SHEET_NAMES` 加 `"action": "行动建议"` + `_REPORT_SECTION_DEFAULT` 序号 20）+ 顶层开关 `enable_action`（默认关）；行动板块渲染框架；「行动建议」章与「智囊团深度复盘」章共享同一计算结果——**计算结果经 orchestrator 组装进 pipeline_data（渲染数据经context传递/数据契约），两处渲染均从模板 context 取，不写模块级全局变量**（渲染数据经context传递 自查表）。（单源计算、两处呈现）
 - **量化验收标准**：
   - [x] 既有报告测试**全部回归通过**（新增章节不破坏现状）；
   - [x] 新增结构测试 **≥5 个**（「行动建议」章渲染 /「智囊团深度复盘」章摘要 / 开关默认关 / 章节注册与序号 / 单源计算断言），全部通过；
   - [x] **行为断言**：`enable_action` 关时报告无「行动建议」章、「智囊团深度复盘」章与现状一致；开时「行动建议」章显示完整行动板块、「智囊团深度复盘」章显示摘要（diff 断言）；
   - [x] **单源计算断言**：「行动建议」章与「智囊团深度复盘」章行动数据为同一对象引用（无重复计算，测试断言同一实例）；
-  - [x] **C14/C19 合规**：行动数据经 `pipeline_data`（C19 契约 `action_data`，附录 H 定义）传递，「行动建议」/「智囊团深度复盘」章渲染均从模板 context 取，无模块级全局变量共享（代码检查断言）；
+  - [x] **单源计算两处呈现合规**：行动数据经 `pipeline_data`（数据契约 `action_data`，附录 H 定义）传递，「行动建议」/「智囊团深度复盘」章渲染均从模板 context 取，无模块级全局变量共享（代码检查断言）；
   - [x] 覆盖率对新增模块 **≥85%**；
   - [x] §2 通用标准全部满足。
 
@@ -119,10 +119,10 @@
 #### 轮 6：调仓建议清单（含可行化层）
 
 - **目标**：「行动建议」章输出「调仓建议清单」——每条含代码/名称/操作/份额（取整到一手）/金额/预估费用/调仓后现金余额。
-- **实施内容**：可行化层模块——份额取整（A 股一手 100 股、基金取整）、现金缓冲约束、税费估算（本地静态费率表：佣金/印花税/赎回费）、优先级排序。份额取整用 `core/code_utils.py` 判定 A 股/基金（C1 自查表）。
+- **实施内容**：可行化层模块——份额取整（A 股一手 100 股、基金取整）、现金缓冲约束、税费估算（本地静态费率表：佣金/印花税/赎回费）、优先级排序。份额取整用 `core/code_utils.py` 判定 A 股/基金（代码类型判定中心化 自查表）。
 - **量化验收标准**：
   - [x] 新增测试 **≥12 个**（份额取整一手 / 现金负值防护 / 费用计算 / 优先级 / 多品种 / 边界），全部通过；
-  - [x] **C1 合规**：份额取整判定复用 `core/code_utils.py`（无自行实现判定逻辑，代码检查断言）；
+  - [x] **代码类型判定合规**：份额取整判定复用 `core/code_utils.py`（无自行实现判定逻辑，代码检查断言）；
   - [x] **行为断言**：构造持仓，建议"X 份可一手成交、调仓后现金 ≥0、费用计算正确"，逐条断言；
   - [x] 计算精度：费用估算与费率表**固定 fixture**（含小数手续费）误差 <0.01 元（自动化断言，非手工核对）；
   - [x] 覆盖率对新增模块 **≥85%**；
@@ -138,7 +138,7 @@
   - [x] **行为断言**：构造 5 只品种（3 盈 2 亏），正确输出盈利来源/亏损来源/净额；Σ|profit|=0 时返回空段落（不报错）；
   - [x] **复用断言**：归因计算直接复用 `_build_profit_attribution_block` 逻辑，无重复实现（共享纯计算 `compute_return_attribution` 供提示词段落与「行动建议」章表格复用，段落输出逐字节一致断言）；
   - [x] **渲染适配断言**：提示词段落（`_build_profit_attribution_block` 输出）正确转为「行动建议」章可读表格/清单——盈利来源/亏损来源分列、净额合计在报告层可见（适配层为新代码，非纯复用）；
-  - [x] **C19 合规**：归因结果经 `action_data` 契约（附录 H）注入 pipeline_data，「行动建议」/「智囊团深度复盘」章渲染从模板 context 取，不写模块级全局变量；
+  - [x] **数据契约合规**：归因结果经 `action_data` 契约（附录 H）注入 pipeline_data，「行动建议」/「智囊团深度复盘」章渲染从模板 context 取，不写模块级全局变量；
   - [x] 覆盖率对新增/改造模块 **≥85%**（`return_attribution.py` 实测 97%）；
   - [x] §2 通用标准全部满足。
 
@@ -149,13 +149,13 @@
 #### 轮 8：持仓关系矩阵物理合并
 
 - **目标**：将原「持仓重合度矩阵」（`fund_overlap`）与「持仓相关性矩阵」（`correlation_analysis`）物理合并为「持仓关系矩阵」（`position_relationship`），一章内分上下两个矩阵区块。
-- **实施内容**：合并两个渲染模块 → 统一模块 `position_relationship_sheet.py`；`registry.py` 注册 `position_relationship`（删除 `fund_overlap`/`correlation_analysis` 两个旧注册）；`_REPORT_SHEET_NAMES` 中文名改为「持仓关系矩阵」；config `report_section_order` 中被合并旧 key 变为未知标识（`_validation.py` 仅告警，配置文档注明可清理）。**C19 契约增删**：删除附录 H 中 `fund_overlap`/`correlation_analysis` 旧契约，新建 `position_relationship_data` 契约（类型/版本/写入消费模块先定义后使用）。
+- **实施内容**：合并两个渲染模块 → 统一模块 `position_relationship_sheet.py`；`registry.py` 注册 `position_relationship`（删除 `fund_overlap`/`correlation_analysis` 两个旧注册）；`_REPORT_SHEET_NAMES` 中文名改为「持仓关系矩阵」；config `report_section_order` 中被合并旧 key 变为未知标识（`_validation.py` 仅告警，配置文档注明可清理）。**数据契约增删**：删除附录 H 中 `fund_overlap`/`correlation_analysis` 旧契约，新建 `position_relationship_data` 契约（类型/版本/写入消费模块先定义后使用）。
 - **量化验收标准**：
   - [x] 既有报告测试**全部回归通过**（合并不破坏其余章节）；
   - [x] 新增测试 **≥6 个**（上下区块渲染 / 重合度矩阵 / 相关性矩阵 / 开关沿用 / 旧 key 不再生成 / 无品种边界），全部通过；
   - [x] **合并断言**：旧「持仓重合度矩阵」「持仓相关性矩阵」独立 sheet 不再生成（回归 diff），同章分上下区块渲染；
   - [x] **测试迁移**：原 `fund_overlap`/`correlation_analysis` 测试随模块合并迁移至 `position_relationship` 测试（原断言保留并适配新模块）；
-  - [x] **C19 契约断言**：附录 H 已删 `fund_overlap`/`correlation_analysis` 契约、新增 `position_relationship_data`（无旧契约残留，集成测试不因 KeyError 失败）；
+  - [x] **数据契约断言**：附录 H 已删 `fund_overlap`/`correlation_analysis` 契约、新增 `position_relationship_data`（无旧契约残留，集成测试不因 KeyError 失败）；
   - [x] **向后兼容**：开关默认关时合并章不改变既有输出；章节序号由 registry.number 重排保证连续；
   - [x] 覆盖率对新增模块 **≥85%**；
   - [x] §2 通用标准全部满足。
@@ -165,14 +165,14 @@
 #### 轮 9：组合历史+回撤物理合并 + 危机区间标注（「组合历史走势与回撤」章）
 
 - **目标**：先物理合并「组合历史走势」（`portfolio_history`）+「历史回撤分析」（`drawdown_analysis`）为「组合历史走势与回撤」（`portfolio_history_drawdown`，分「走势表 + 回撤矩阵」两区块），再在净值曲线加危机区间分段着色（2015/2018/2020/2022）+ 区间统计（区间回撤/恢复天数）。
-- **实施内容**：合并两个渲染模块 → 统一模块 `portfolio_history_drawdown_sheet.py`；`registry.py` 注册 `portfolio_history_drawdown`（删除 `portfolio_history`/`drawdown_analysis` 两个旧注册）；`_REPORT_SHEET_NAMES` 中文名改为「组合历史走势与回撤」；危机日期静态表 + 标注层；复用既有历史数据管道，不额外拉长 lookback（以 `history.lookback_days` 为准）。**C19 契约增删**：删除附录 H 中 `portfolio_history`/`drawdown_analysis` 旧契约（`history_data` 契约保留供合并章复用），新建危机区间标注契约；危机标注净值图**必须 C20 图下说明**（自查表）。
+- **实施内容**：合并两个渲染模块 → 统一模块 `portfolio_history_drawdown_sheet.py`；`registry.py` 注册 `portfolio_history_drawdown`（删除 `portfolio_history`/`drawdown_analysis` 两个旧注册）；`_REPORT_SHEET_NAMES` 中文名改为「组合历史走势与回撤」；危机日期静态表 + 标注层；复用既有历史数据管道，不额外拉长 lookback（以 `history.lookback_days` 为准）。**数据契约增删**：删除附录 H 中 `portfolio_history`/`drawdown_analysis` 旧契约（`history_data` 契约保留供合并章复用），新建危机区间标注契约；危机标注净值图**必须 图下说明**（自查表）。
 - **量化验收标准**：
   - [x] 既有报告测试**全部回归通过**（合并不破坏其余章节）；
   - [x] 新增测试 **≥8 个**（合并后两区块渲染 / 区间标注 / 区间回撤 / 恢复天数 / 数据不足占位 / 无历史区间），全部通过；
   - [x] **合并断言**：旧「组合历史走势」「历史回撤分析」独立 sheet 不再生成（回归 diff），同章分「走势表 + 回撤矩阵」两区块渲染；指标区（累计收益/最大回撤/波动率/起止日）不重复；
   - [x] **测试迁移**：原 `portfolio_history`/`drawdown_analysis` 测试随模块合并迁移至 `portfolio_history_drawdown` 测试（原断言保留并适配新模块）；
   - [x] **行为断言**：构造含 2018/2020 区间数据，正确标注并统计；无历史区间显式"无历史数据"；
-  - [x] **C20 合规**：危机标注净值图渲染分支跟随 `.chart-caption`（有区间数据→说明出，无→说明不出）；
+  - [x] **图下说明合规**：危机标注净值图渲染分支跟随 `.chart-caption`（有区间数据→说明出，无→说明不出）；
   - [x] 复用既有历史数据，不新增 lookback 拉长（无新增网络请求类型断言）；
   - [x] 覆盖率对新增模块 **≥85%**；
   - [x] §2 通用标准全部满足。
@@ -185,7 +185,7 @@
   - [x] 新增测试 **≥8 个**（VaR95/99 / VaR 参数 / 最大单日跌幅 / 连续下跌 / 恢复天数 / 样本不足），全部通过（模块 15 + edge 10 + 接线 10 = 35 个）；
   - [x] **计算精度**：**固定 fixture** 构造已知收益序列，VaR(95) 与解析解误差 <0.01%（自动化断言，非手工核对）；
   - [x] **行为断言**：构造含大单日跌幅序列，正确输出 max 单日跌与恢复天数；
-  - [x] **C12 合规**：VaR 极端值/样本不足边界测试标 `@pytest.mark.edge` 放 `*_edge.py`（conftest 自动校验）；
+  - [x] **边缘测试文件隔离合规**：VaR 极端值/样本不足边界测试标 `@pytest.mark.edge` 放 `*_edge.py`（conftest 自动校验）；
   - [x] 覆盖率对新增模块 **≥85%**（实测 96%）；
   - [x] §2 通用标准全部满足。
 
@@ -205,25 +205,25 @@
 #### 轮 12：合并「风格与因子分析」章 + 行业 Beta 子表
 
 - **目标**：合并原「基金风格分析」+「因子暴露分析」为「风格与因子分析」（分「基金风格表 + 风格因子回归」两区块），并加「行业 Beta」子表——穿透行业暴露占比 + 各行业指数 Beta/相关性。
-- **实施内容**：合并「风格与因子分析」章两个渲染模块（`fund_style_sheet.py` + `factor_exposure_sheet.py` → 统一模块 `style_factor_sheet.py`，章节 sheet key 统一为 `style_factor`，渲染分「基金风格表 + 风格因子回归」两区块）；行业 Beta 子表（穿透行业分类 push2 + 行业指数历史 K 线腾讯/新浪），复用「风格与因子分析」章 OLS 回归机制。**C19 契约增删**：删除附录 H 中 `fund_style`/`factor_exposure` 旧契约，新建 `style_factor_data` 契约；行业分类判定复用 `core/code_utils.py`（C1）；指数 K 线走 Chain + session_cache（C4/C6）。
+- **实施内容**：合并「风格与因子分析」章两个渲染模块（`fund_style_sheet.py` + `factor_exposure_sheet.py` → 统一模块 `style_factor_sheet.py`，章节 sheet key 统一为 `style_factor`，渲染分「基金风格表 + 风格因子回归」两区块）；行业 Beta 子表（穿透行业分类 push2 + 行业指数历史 K 线腾讯/新浪），复用「风格与因子分析」章 OLS 回归机制。**数据契约增删**：删除附录 H 中 `fund_style`/`factor_exposure` 旧契约，新建 `style_factor_data` 契约；行业分类判定复用 `core/code_utils.py`（代码类型判定中心化）；指数 K 线走 Chain + session_cache（会话缓存 + Chain 路由）。
 - **量化验收标准**：
   - [x] 新增测试 **≥10 个**（合并后两区块渲染 / 行业暴露占比 / Beta 回归 / 显著性 / 数据不足 / 开关关隐藏 / **push2 行业分类降级**），全部通过；
   - [x] **计算精度**：**固定 fixture** 构造已知收益序列，行业 Beta 与解析解误差 <0.01（自动化断言，非手工核对）；
   - [x] **数据源降级**：push2 行业分类不可用时，行业暴露占比显示"数据不足"占位，Beta 子表不渲染，不阻塞「风格与因子分析」章其余内容；
   - [x] **合并断言**：合并后旧「基金风格分析」「因子暴露分析」独立 sheet 不再生成（回归 diff），两区块同章渲染；复用 OLS 回归机制，无重复实现；
   - [x] **测试迁移**：原 `fund_style`/`factor_exposure` 的测试文件随模块合并迁移至 `style_factor` 测试（原断言保留并适配新模块），不丢失既有覆盖；
-  - [x] **C19 契约断言**：附录 H 已删 `fund_style`/`factor_exposure` 契约、新增 `style_factor_data`（无旧契约残留）；`factor_exposure` 契约迁移为 `style_factor` 子键而非重复定义；
-  - [x] **C1/C4/C6 合规**：行业分类判定复用 `core/code_utils.py`；指数 K 线走 Chain + session_cache（同一会话无重复请求断言）；
+  - [x] **数据契约断言**：附录 H 已删 `fund_style`/`factor_exposure` 契约、新增 `style_factor_data`（无旧契约残留）；`factor_exposure` 契约迁移为 `style_factor` 子键而非重复定义；
+  - [x] **代码类型判定/会话复用/Chain 路由合规**：行业分类判定复用 `core/code_utils.py`；指数 K 线走 Chain + session_cache（同一会话无重复请求断言）；
   - [x] 覆盖率对新增模块 **≥85%**（industry_beta 94% / style_factor_sheet 97%）；
   - [x] §2 通用标准全部满足。
 
-> ✅ **轮 12 验收签字（2026-08-04）**：物理合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」（`style_factor` 一章三区块：风格表 + 因子回归 + 行业 Beta 子表），registry.number 重新编号 20→19；C19 契约删旧建新（`style_factor_data` 主键 + `industry_beta` 子键）；行业 Beta 复用「风格与因子分析」章 OLS 机制；dev-verify 1568 passed / 0 failed，3 个 check 脚本全 [OK]。
+> ✅ **轮 12 验收签字（2026-08-04）**：物理合并「基金风格分析」+「因子暴露分析」→「风格与因子分析」（`style_factor` 一章三区块：风格表 + 因子回归 + 行业 Beta 子表），registry.number 重新编号 20→19；数据契约删旧建新（`style_factor_data` 主键 + `industry_beta` 子键）；行业 Beta 复用「风格与因子分析」章 OLS 机制；dev-verify 1568 passed / 0 failed，3 个 check 脚本全 [OK]。
 
 #### 轮 13：候选基金比较增强模式（基金业绩分析章）
 
 - **目标**：「基金业绩分析」章加「候选比较」子模式——候选基金横向比较表（收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度）。
   - 注：无规模/费率数据源，比较维度不含规模/费率（数据源可行性已验证）。
-- **实施内容**：候选来自 config `comparison_candidates` 或 CLI 参数（≤10，去重/非法剔除/超限截断）；开关 `report_submodules.candidate_compare` **默认关**；核心模块 `report/fund_candidate.py`，Excel/HTML 双渲染；重合度复用 `compute_overlap_matrix`（C1 复用），风格复用 `classify_fund_style`。
+- **实施内容**：候选来自 config `comparison_candidates` 或 CLI 参数（≤10，去重/非法剔除/超限截断）；开关 `report_submodules.candidate_compare` **默认关**；核心模块 `report/fund_candidate.py`，Excel/HTML 双渲染；重合度复用 `compute_overlap_matrix`（复用中心化分类），风格复用 `classify_fund_style`。
 - **量化验收标准**：
   - [x] 新增测试 **≥8 个**（候选表渲染 / 比较维度 / 开关默认关 / 无效候选容错 / 超 10 限制），全部通过；
   - [x] **行为断言**：开关默认关时基金业绩分析章无比较子表；开启并给候选后正确渲染比较表；
@@ -271,7 +271,7 @@
   - [x] 覆盖率对改造模块 **≥85%**；
   - [x] §2 通用标准全部满足。
 
-> ✅ **轮 16 验收签字（2026-08-04）**：开关 `report_submodules.cost_lots`（默认关，`is_enable_cost_lots` 访问器，镜像 candidate_compare 模式）贯穿 CLI/TUI→`generate_report(transactions=…, dividends=…)`→`excel_market_data.resolve_market_data` 组装 `fund_flow_data`（C19 契约：available/xirr/cost_tiers/dividends，pipeline_data_builder 注册 + technical.md 附录 H）；三页签渲染——「持仓分类表」加「成本分档」「分红累计」子列（category.py）、「市值核算明细表」加可选「资金加权成本」列（market_value_sheet.py）、「投资分析汇总」加「资金加权收益率 (XIRR)」汇总行（summary.py，无流水写占位）；新增测试 32 个（summary 3 + category 6 + market_value_sheet 8 + config 5 + cli 5 + excel_market_data 5，远超 ≥8），受影响套件 267 passed；全仓 check-code-traces / check-doc-traces `--ci` 干净。
+> ✅ **轮 16 验收签字（2026-08-04）**：开关 `report_submodules.cost_lots`（默认关，`is_enable_cost_lots` 访问器，镜像 candidate_compare 模式）贯穿 CLI/TUI→`generate_report(transactions=…, dividends=…)`→`excel_market_data.resolve_market_data` 组装 `fund_flow_data`（数据契约：available/xirr/cost_tiers/dividends，pipeline_data_builder 注册 + technical.md 附录 H）；三页签渲染——「持仓分类表」加「成本分档」「分红累计」子列（category.py）、「市值核算明细表」加可选「资金加权成本」列（market_value_sheet.py）、「投资分析汇总」加「资金加权收益率 (XIRR)」汇总行（summary.py，无流水写占位）；新增测试 32 个（summary 3 + category 6 + market_value_sheet 8 + config 5 + cli 5 + excel_market_data 5，远超 ≥8），受影响套件 267 passed；全仓 check-code-traces / check-doc-traces `--ci` 干净。
 >
 > ✅ **轮 16 补遗——HTML 渲染补齐（2026-08-04）**：`html_writer.py` 新增 `_build_flow_display()`（复用 `_weighted_avg_cost`/`_tier_label` 组装展示映射，避免双实现）并把 `fund_flow_data` 透传模板（两条报告路径复用 `excel_market_data._build_flow_data` 组装）；`report_template.html` 三处条件渲染——盈亏汇总「资金加权收益率 (XIRR)」卡、市值核算「资金加权成本」列、持仓分类「成本分档」+「分红累计」子列（`flow_display` 不可用时整块不输出）；新增 `TestFundFlowTemplate` 9 例 + `TestBuildFlowDisplay` 3 例，test_html_writer 74 passed；修复 `test_orchestrator.py::test_generate_report_basic` 断言参数透传；全仓 check-code-traces / check-doc-traces `--ci` 干净。
 
@@ -280,9 +280,9 @@
 #### 轮 17：估值分位（「资产穿透TOP10」章）
 
 - **目标**：「资产穿透TOP10」章加「估值分位」列——当前 PE/PB（push2 扩展字段）+ 3~5 年价格分位代理，显式标注"价格分位代理，非真实历史估值分位"。
-- **实施内容**：估值分位模块——push2 当前值 + 历史 K 线价格分位计算（腾讯/新浪）。push2 扩展字段与 K 线均走 Chain + session_cache（C4/C6 自查表，同会话不重复请求）。
+- **实施内容**：估值分位模块——push2 当前值 + 历史 K 线价格分位计算（腾讯/新浪）。push2 扩展字段与 K 线均走 Chain + session_cache（会话复用/Chain 路由自查表，同会话不重复请求）。**复用既有 push2 请求通道**（`providers/eastmoney_industry.py::make_push2_request`，行业分类在用），不重复实现（复用纪律）。
 - **量化验收标准**：
-  - [ ] 新增测试 **≥8 个**（PE/PB 获取 / 价格分位 / 代理标注 / 数据不足 / 开关关隐藏 / **push2 不可用时降级**），全部通过；
+  - [ ] 新增测试 **≥8 个**（PE/PB 获取 / 价格分位 / 代理标注 / 数据不足 / 开关关隐藏 / **push2 不可用时降级** / **复用既有 push2 请求通道断言**），全部通过；
   - [ ] **计算精度**：**固定 fixture** 构造已知 3 年 K 线，价格分位与解析解误差 <0.5%（自动化断言，非手工核对）；
   - [ ] **行为断言**：低估/合理/高估三档刻度正确映射，代理标注"价格分位代理，非真实历史估值分位"显式出现；
   - [ ] **数据源降级**：push2 扩展字段不可用时，估值分位列显示"数据不足"占位，不阻塞「资产穿透TOP10」章其余内容（复用既有降级链路）；
@@ -292,7 +292,7 @@
 #### 轮 18：市场温度刻度（「投资分析汇总」章）
 
 - **目标**：「投资分析汇总」章加「市场温度」刻度行——价格分位 + 均线偏离 + 波动率三因子合成，输出"温度计"（低估/合理/高估）而非仓位指令。
-- **实施内容**：市场温度模块（指数历史 K 线，腾讯/新浪）+ 免责声明；复用轮 17 价格分位机制（**依赖轮 17**，见 §4.1 轮次依赖）。指数 K 线走 Chain + session_cache（C4/C6 自查表），腾讯不可用自动切新浪（复用既有降级链）。
+- **实施内容**：市场温度模块（指数历史 K 线，腾讯/新浪）+ 免责声明；复用轮 17 价格分位机制（**依赖轮 17**，见 §4.1 轮次依赖）。指数 K 线走 Chain + session_cache（会话复用/Chain 路由自查表），腾讯不可用自动切新浪（复用既有降级链）。**双开关叠加说明**：「投资分析汇总」章已有成本流水 XIRR 汇总行（`cost_lots`，默认关，轮 16），本温度刻度行（`market_temperature`，默认关）与其**同章不同行、开关独立互不影响**——开启其一不改变另一行渲染，需在测试中断言两开关各自独立生效。
 - **量化验收标准**：
   - [ ] 新增测试 **≥8 个**（温度计算 / 三因子合成 / 刻度映射 / 免责声明 / 数据不足占位 / **K 线源降级** / 开关默认关隐藏），全部通过；
   - [ ] **计算精度**：**固定 fixture** 构造已知指数 K 线，温度值与解析解误差 <0.5%（自动化断言，非手工核对）；
@@ -306,11 +306,11 @@
 #### 轮 19：HTML 分组标签与导航折叠
 
 - **目标**：HTML 报告按「基础/基金深度/风险/历史/LLM」分组导航折叠；Excel 沿用 `report_section_order` 自定义排序。
-- **实施内容**：HTML 模板分组导航 + 折叠交互；适配合并后的章节结构（「持仓关系矩阵」「组合历史走势与回撤」「风格与因子分析」为合并章，行动建议章在 `enable_action` 开启时纳入导航）；**新增图表全部 C20 图下说明**（危机标注/尾部风险/温度计等，自查表）。
+- **实施内容**：HTML 模板分组导航 + 折叠交互；适配合并后的章节结构（「持仓关系矩阵」「组合历史走势与回撤」「风格与因子分析」为合并章，行动建议章在 `enable_action` 开启时纳入导航）；**新增图表全部 图下说明**（危机标注/尾部风险/温度计等，自查表）。
 - **量化验收标准**：
   - [ ] 新增测试 **≥4 个**（分组渲染 / 折叠交互 / 移动端不溢出 / 键盘可达），全部通过；
   - [ ] **行为断言**：章节分组正确（含合并后持仓关系矩阵、组合历史走势与回撤、风格与因子分析；`enable_action` 开时含行动建议章）、导航可达、折叠展开正常；
-  - [ ] **C20 合规**：全部新增图表渲染分支跟随 `.chart-caption` 图下说明（有数据→说明出，无→说明不出，DOM 断言）；
+  - [ ] **图下说明合规**：全部新增图表渲染分支跟随 `.chart-caption` 图下说明（有数据→说明出，无→说明不出，DOM 断言）；
   - [ ] 章节内容不因分组/折叠改变渲染（回归断言）；
   - [ ] §2 通用标准全部满足。
 
@@ -329,13 +329,13 @@
 #### 轮 21：全链回归与发布门禁
 
 - **目标**：全量验证 + 手动验证清单 + 发布准备。
-- **实施内容**：`test_runner.py --mode verify,regression` 全量；手动验证清单（真机构造持仓全流程）；review-findings 清理；版本号一致复核；registry.number 连续编号复核；**C7 约束正文与 registry 注释更新为「19 章」**；**附录 H C19 契约增删复核**。
+- **实施内容**：`test_runner.py --mode verify,regression` 全量；手动验证清单（真机构造持仓全流程）；review-findings 清理；版本号一致复核；registry.number 连续编号复核；**报告序号不可硬编码 约束正文与 registry 注释复核确认为「19 模块」**；**附录 H 数据契约增删复核**。
 - **量化验收标准**：
   - [ ] `test_runner.py --mode verify,regression` **全部通过**（含全部新 marker）；
   - [ ] 3 个 `check-*.py --ci` 全部通过；
   - [ ] **registry.number 复核**：合并后 1~19 连续编号无重复/无跳号（脚本断言），无 `fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure` 旧注册残留；
-  - [ ] **C7 正文复核**：`technical.md` §8 C7 约束与 registry 注释「21 个模块」已更新为「19 章」；
-  - [ ] **C19 契约复核**：附录 H 无 `fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure` 旧契约残留；`position_relationship_data`/`style_factor_data`/`action_data`/`data_quality_data` 新契约均已定义类型/版本/写入消费模块；
+  - [ ] **报告序号不可硬编码 正文复核**：`technical.md` §8 报告序号不可硬编码 约束与 registry 注释均确认一致为「19 模块」（registry.number 连续编号 1~19）；
+  - [ ] **数据契约复核**：附录 H 无 `fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure` 旧契约残留；`position_relationship_data`/`style_factor_data`/`action_data`/`data_quality_data` 新契约均已定义类型/版本/写入消费模块；
   - [ ] **手动验证清单**（真机构造持仓 → 全报告生成 → 新子模块逐项核对 → 预览/下载）逐项勾选无遗留；
   - [ ] review-findings 无 CRITICAL/HIGH 遗留（MEDIUM 以下可记录）；
   - [ ] 数据快照与版本号一致（check-version-consistency 全 [OK]）；
@@ -365,6 +365,7 @@
 | 轮 12/13 | 平行 | 复用既有「风格与因子分析」章回归与行情链，互不依赖（轮 12 含风格与因子合并） |
 | 轮 14 → 轮 15 → 轮 16 | 输入→计算→渲染 | 轮 14 流水页签解析是 15/16 前置；轮 16 渲染依赖 15 的 XIRR/分档计算 |
 | 轮 17 → 轮 18 | 机制复用 | 轮 18 复用轮 17 价格分位机制（指数 K 线），不得自行重写 |
+| 轮 19 → 轮 20 → 轮 21 | 结构→快照→发布 | 轮 19 分组导航结构稳定是轮 20 文档快照/手册的前置（新增章节归属依赖分组映射）；轮 20 数据快照与版本一致是轮 21 发布门禁的前置 |
 
 **章节互不冲突说明**：行动建议是独立顶层章节（「行动建议」章，`enable_action`），与「持仓分类表」章成本分档（`cost_lots`）、「资产穿透TOP10」章估值（`valuation_percentile`）、「组合历史走势与回撤」章尾部风险（`tail_risk`）等子模块分布在**不同章节**，开关独立互不影响。
 

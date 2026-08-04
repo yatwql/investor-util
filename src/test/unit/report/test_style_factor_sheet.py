@@ -50,7 +50,7 @@ def _style_results() -> list[dict]:
 
 
 def _factor_exposure(**extra) -> dict:
-    """C19 style_factor_data dict（因子回归区块 mock）。"""
+    """style_factor_data dict（因子回归区块 mock）。"""
     d = {
         "available": True,
         "status": "ok",
@@ -74,7 +74,7 @@ _FACTOR_NAMES = {"value": "价值", "growth": "成长", "quality": "质量"}
 
 
 def _industry_beta(**extra) -> dict:
-    """C19 style_factor_data.industry_beta 子键 mock。"""
+    """style_factor_data.industry_beta 子键 mock。"""
     d = {
         "available": True,
         "status": "ok",

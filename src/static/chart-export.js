@@ -5,7 +5,7 @@
  *     注入"导出PNG"按钮
  *   - 点击按钮 → chart.toBase64Image()（2x 分辨率）→ <a download> 下载 PNG
  *   - 必须在 chart-init.js 之前加载（chart-init.js 创建图表后立即 register）
- *   - ES5 保守语法（R17/R22）：var / function / 无箭头函数
+ * - ES5 保守语法：var / function / 无箭头函数
  *
  * 按钮位置：存在 .chart-title 时追加到标题栏右侧；否则以绝对定位浮于
  * .chart-box 右上角（图表区固定高度，普通流式追加会溢出）。

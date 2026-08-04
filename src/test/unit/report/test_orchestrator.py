@@ -151,7 +151,7 @@ class TestPrepareReportData:
             "position_status",
             # 可信度摘要：新鲜度分类 + 单日跳变检测契约
             "data_freshness",
-            # 行动建议单一数据源：「行动建议」章行动板块 + 「智囊团深度复盘」章行动摘要共享（C19 契约）
+            # 行动建议单一数据源：「行动建议」章行动板块 + 「智囊团深度复盘」章行动摘要共享（数据契约）
             "action_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"

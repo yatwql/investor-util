@@ -14,7 +14,7 @@
 
 消费方：
   `report/orchestrator.prepare_report_data()` 组装为 `data_freshness`
-  C19 契约注入 pipeline_data，供「数据质量仪表盘」可信度区块与
+  数据契约注入 pipeline_data，供「数据质量仪表盘」可信度区块与
   报告头部数据异常摘要行渲染。
 """
 
@@ -192,7 +192,7 @@ def build_freshness_summary(
     trading_day: str = "",
     prev_trading_day: str = "",
 ) -> dict:
-    """构建可信度摘要 C19 契约（`data_freshness` 键结构）。
+    """构建可信度摘要数据契约（`data_freshness` 键结构）。
 
     逐品种标注新鲜度分类与单日跳变事件，聚合异常计数供报告头部
     数据异常摘要行与可信度区块消费。

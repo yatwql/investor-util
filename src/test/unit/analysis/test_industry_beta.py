@@ -206,7 +206,7 @@ class TestIndustryBetaDegradation:
 
 
 class TestIndustryBetaContract:
-    """C19 子契约结构。"""
+    """数据子契约结构。"""
 
     def test_unavailable_keys_present(self):
         """unavailable_result 返回全部键，available=False。"""

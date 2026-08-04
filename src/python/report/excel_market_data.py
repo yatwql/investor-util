@@ -21,7 +21,7 @@ def _build_flow_data(
     holdings: list,
     details: list,
 ) -> dict | None:
-    """组装成本流水数据（C19 fund_flow_data）。
+    """组装成本流水数据（fund_flow_data）。
 
     仅当开关开启时计算（成本分档 + XIRR + 分红累计）；开关关闭时返回
     None（汇总/市值/分类页签保持既有输出）。市价取自身份验证后的行情明细。

@@ -1,6 +1,6 @@
 /* 左侧目录 TOC：展开/收起 + 滚动高亮当前章节。
  *
- * 纯原生 JS，离线自包含（R21），无外部依赖。
+ * 纯原生 JS，离线自包含，无外部依赖。
  * 功能：
  *   1. 折叠/展开左侧目录栏（body.toc-collapsed），偏好持久化到 localStorage
  *   2. 点击目录项平滑滚动到对应章节（CSS scroll-behavior: smooth）

@@ -62,7 +62,7 @@ def _coverage_item(code: str, name: str, status: str) -> dict:
 
 
 def _coverage_status(items: list[dict]) -> dict:
-    """构造 position_status C19 契约 dict。"""
+    """构造 position_status数据契约 dict。"""
     abnormal = [i for i in items if i["status"] != "ok"]
     return {
         "available": True,
@@ -89,7 +89,7 @@ def _freshness_item(code: str, name: str, freshness: str, change_pct: float = 0.
 
 
 def _freshness_status(items: list[dict]) -> dict:
-    """构造 data_freshness C19 契约 dict。"""
+    """构造 data_freshness数据契约 dict。"""
     abnormal = [i for i in items if i["freshness"] in ("stale", "degraded") or i["jump"]]
     return {
         "available": True,

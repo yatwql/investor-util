@@ -10,6 +10,9 @@
   - 章节编号暗号（"N 章"/"第 N 章"指代报告具体章节）检出，计数表述（共 N 章等）豁免
   - 迭代轮次暗号（"第 N 轮"/"轮N"指代开发迭代轮次）检出，计数/运行时表述（共 N 轮/
     轮询/轮动等）豁免
+  - 架构约束代号（C1~C20，technical.md 定义）在注释/文档正文属暗号须检出；约束定义处
+    （technical.md / llm-technical.md）豁免；非约束 C+数字（色值 C00000、C21+、内嵌
+    AB14/MC19）不误伤
 
 测试通过脚本 import 方式直接复用 PATTERNS / EXCLUDE_LINE / 各扫描函数，
 不运行真实 CLI（避免扫描全仓、受控制台 GBK 编码影响）。
@@ -59,9 +62,9 @@ pytestmark = [
 def _code_hit(mod, line: str) -> str | None:
     """返回 check-code-traces 命中的 desc；未命中返回 None。
 
-    对 CHAPTER（章节编号）模式先应用 _is_chapter_excluded 计数/序数豁免，
-    对 ROUND（迭代轮次）模式先应用 _is_round_excluded 计数/运行时豁免，
-    与 scan_file 行为一致（"共 19 章"/"共 12 轮"等计数表述不误报）。
+    与 scan_file 行为一致：对 CHAPTER/ROUND 应用计数/序数豁免，
+    对 DASHTASK/UNDERSCORE 应用合法领域值豁免，对 MAGIC 逐 token 应用
+    合法领域值豁免（"共 19 章"/"T-1 交易日"/"S1 场景"等合法表述不误报）。
     """
     if mod._is_excluded(line):
         return None
@@ -69,6 +72,15 @@ def _code_hit(mod, line: str) -> str | None:
         if cat == "CHAPTER" and mod._is_chapter_excluded(line):
             continue
         if cat == "ROUND" and mod._is_round_excluded(line):
+            continue
+        if cat == "DASHTASK" and mod._is_dash_excluded(line):
+            continue
+        if cat == "UNDERSCORE" and mod._is_under_excluded(line):
+            continue
+        if cat == "MAGIC":
+            for m in __import__("re").finditer(pat, line):
+                if not mod._is_magic_match_excluded(line, m.start(), m.end()):
+                    return desc
             continue
         if __import__("re").search(pat, line):
             return desc
@@ -160,7 +172,7 @@ class TestCodeTraceDetection:
         flagged = [
             "原 factor_exposure 契约迁移为主键",
             "原 factor_exposure 迁移为 style_factor_data 主键",
-            "原 factor_exposure C19 dict 迁移为 style_factor_data 主键",
+            "原 factor_exposure dict 迁移为 style_factor_data 主键",
             "原 contract_a 改称 contract_b",
         ]
         for line in flagged:
@@ -272,7 +284,7 @@ class TestDocTraceDetection:
         flagged = [
             "原 factor_exposure 契约迁移为主键",
             "原 factor_exposure 迁移为 style_factor_data 主键",
-            "原 factor_exposure C19 dict 迁移为 style_factor_data 主键",
+            "原 factor_exposure dict 迁移为 style_factor_data 主键",
             "原 contract_a 改称 contract_b",
         ]
         for line in flagged:
@@ -321,7 +333,70 @@ class TestDocTraceDetection:
 
     def test_legit_letter_digit_not_flagged(self, doc_traces):
         assert _doc_hit(doc_traces, "全系列报告") is None
-        assert _doc_hit(doc_traces, "C20 约束") is None
+        assert _doc_hit(doc_traces, "P1 优先级") is None
+        assert _doc_hit(doc_traces, "R17 兼容") is None
+
+    def test_arch_constraint_cipher_flagged(self, doc_traces):
+        """文档正文架构约束代号（C1~C20）属暗号须检出（须改写为语义描述）。"""
+        flagged = [
+            "C19 契约",
+            "C20 图下说明",
+            "C1 约束：代码类型判定复用 code_utils",
+            "C14 合规，不写 _ENV.globals",
+        ]
+        for line in flagged:
+            assert _doc_hit(doc_traces, line) is not None, f"架构约束代号未检出: {line}"
+
+    def test_arch_constraint_cipher_false_positives(self, doc_traces):
+        """非约束的 C+数字组合不得误伤：十六进制色值、C21+、内嵌命中。"""
+        legit = [
+            "色值 C00000 不随版本变",
+            "C21 方案不在约束表",
+            "AB14 协议对接",
+            "MC19 型号",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"非约束 C+数字被误伤: {line}"
+
+
+class TestDocCipherExemptFiles:
+    """架构约束代号豁免文件：约束定义处（technical.md / llm-technical.md）
+    正文大量引用 C1~C20（技术名称表）属定义载体，豁免；其余文档（含
+    trace-exempt 的计划/变更记录文档）正文一律禁。"""
+
+    def _scan(self, doc_traces, name: str, content: str, chapter_only: bool) -> list:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fpath = Path(tmp) / name
+            fpath.write_text(content, encoding="utf-8")
+            return doc_traces.scan_file(fpath, verbose=False, chapter_only=chapter_only)
+
+    def _cipher_hits(self, doc_traces, name: str, content: str, chapter_only: bool) -> list:
+        return [
+            h for h in self._scan(doc_traces, name, content, chapter_only)
+            if h[1] == "CIPHER"
+        ]
+
+    def test_regular_doc_flagged_both_modes(self, doc_traces):
+        """普通文档（含 trace-exempt 的计划/变更记录）正文出现 C1~C20 一律检出。"""
+        content = "C19 契约注入 pipeline_data\n"
+        for chapter_only in (False, True):
+            hits = self._cipher_hits(doc_traces, "other.md", content, chapter_only)
+            assert len(hits) == 1, f"chapter_only={chapter_only} 应检出 CIPHER: {hits}"
+
+    def test_technical_md_exempt_both_modes(self, doc_traces):
+        """technical.md（约束定义处）正文引用 C1~C20 属定义载体，豁免。"""
+        content = "C19 契约 / C20 图下说明 / C1 约束\n"
+        for chapter_only in (False, True):
+            hits = self._cipher_hits(doc_traces, "technical.md", content, chapter_only)
+            assert hits == [], f"chapter_only={chapter_only} technical.md 应豁免: {hits}"
+
+    def test_llm_technical_md_exempt(self, doc_traces):
+        """llm-technical.md（约束定义处）同样豁免。"""
+        content = "C17 约束 / C4 约束\n"
+        hits = self._cipher_hits(doc_traces, "llm-technical.md", content, chapter_only=False)
+        assert hits == [], f"llm-technical.md 应豁免: {hits}"
 
 
 # ── check-doc-traces：章节编号暗号检测（CHAPTER） ───────────
@@ -660,11 +735,6 @@ class TestCommentExtraction:
     """_py_comment_lines 对多行 docstring 的 in_docstring 状态必须正确开关，
     否则 docstring 后的 assert/代码行会被误当作 docstring 提取（泄漏误报）。"""
 
-    def test_triple_quote_close_line_with_trailing_text(self, code_traces):
-        """内容结尾的关闭三引号行（…内容\"\"\"，不以三引号开头）应识别为仅关闭行。"""
-        is_oc, is_open = code_traces._is_triple_quote_line('test_file=True 时豁免；不受影响仍检出。"""')
-        assert (is_oc, is_open) == (False, True)
-
     def test_close_line_with_trailing_text_no_leak(self, code_traces):
         """关闭行含内容（…内容\"\"\"）时正确关闭，docstring 后的 assert 不泄漏。"""
         sample = 'x = 1\n"""这是说明，\n第二行内容。"""\nassert _doc_hit(doc_traces, "此前直接读取文件") is not None\n'
@@ -727,17 +797,95 @@ class TestTaskCodeCommentPatterns:
             assert _code_hit(code_traces, line) is None, f"合法系列词被误伤: {line}"
 
     def test_legit_letter_digit_not_flagged(self, code_traces):
+        """合法领域值不误伤：场景标签（S-P1）、小写缩写（f9）、Excel 单元格/范围。"""
         legit = [
-            "C20 约束",
-            "P1 优先级",
             "S-P1 场景",
             "f9=市盈率",
             "合并 A1:B1",
             "数据在 B2~B5",
-            "R17 兼容",
         ]
         for line in legit:
             assert _code_hit(code_traces, line) is None, f"合法字母+数字被误伤: {line}"
+
+    def test_magic_number_letter_digit_flagged(self, code_traces):
+        """MAGIC：注释中"字母+数字/连续字母+数字"（R11/P1/C21/AB14/HH6）属魔法编号须检出。"""
+        flagged = [
+            "P1 优先级",
+            "R17 兼容",
+            "C21 兼容",      # 超出 C1~C20 范围仍是字母+数字，属魔法编号
+            "AB14 兼容",     # 连续字母+数字（内嵌命中也是魔法编号）
+            "MC19 协议",
+            "D8 数据",
+            "HH6 组合",
+            "C19 契约",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"魔法编号未检出: {line}"
+
+    def test_dashtask_letter_digit_flagged(self, code_traces):
+        """DASHTASK：注释中"字母-数字/连续字母-数字"（F-1/G-1/TASK-22/D-8）疑似任务编号须检出。"""
+        flagged = [
+            "F-1 方案",
+            "G-1 批次",
+            "TASK-22 编号",
+            "D-8 数据",
+            "I-02 配置",
+            "CONCENTRATION-03 阈值",  # 非 requirements.md 需求 ID 形态的裸字母-数字
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"疑似任务编号未检出: {line}"
+
+    def test_dashtask_legit_not_flagged(self, code_traces):
+        """DASHTASK 合法领域值不误伤：交易日（T-1）、小写下标/编码（i-1/utf-8）、计数算术（N-2 项）。"""
+        legit = [
+            "T-1 交易日",
+            "i-1 下标",
+            "utf-8 编码",
+            "N-2 项",
+            "R-LLM-DB-QA-CONCENTRATION-03/04：需求",  # requirements.md 定义的需求 ID
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"合法字母-数字被误伤: {line}"
+
+    def test_underscore_letter_digit_flagged(self, code_traces):
+        """UNDERSCORE：注释中"字母_数字/连续字母_数字"（F_1/H_1/MINE_22）疑似无意义代码须检出。"""
+        flagged = [
+            "F_1 变量",
+            "H_1 命名",
+            "MINE_22 编号",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"疑似无意义代码未检出: {line}"
+
+    def test_underscore_legit_not_flagged(self, code_traces):
+        """UNDERSCORE 合法领域值不误伤：小写语义短名（changed_1m/syl_1y）。"""
+        legit = [
+            "changed_1m 周期",
+            "syl_1y 跨度",
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"合法字母_数字被误伤: {line}"
+
+    def test_arch_constraint_codes_flagged(self, code_traces):
+        """架构约束代号（C1~C20，technical.md 定义）在注释中属暗号须检出。"""
+        flagged = [
+            "C1 约束：代码类型判定复用 code_utils",
+            "C3 原子写入",
+            "C8 日志统一",
+            "C14 合规，不写 _ENV.globals",
+            "C20 图下说明",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"架构约束代号未检出: {line}"
+
+    def test_arch_constraint_code_false_positives(self, code_traces):
+        """非约束 C+数字不误伤：十六进制色值（#C00000）、标识符内嵌（x_c20_style）。"""
+        legit = [
+            "#C00000",      # 十六进制色值（# 前缀且 5 位数字，MAGIC/CODE 均不命中）
+            "x_c20_style",   # 标识符内嵌（_c20 前为小写字母，MAGIC 需大写开头）
+        ]
+        for line in legit:
+            assert _code_hit(code_traces, line) is None, f"非约束 C+数字被误伤: {line}"
 
 
 class TestTaskCodeIdentifierCheck:

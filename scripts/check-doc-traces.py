@@ -26,6 +26,11 @@
      概念，豁免。该检查**不适用于** changelog.md / plan.md /
      review-findings.md 与 docs-stm/plan/——它们作为历史/计划记录，
      "轮 N"是正式记录载体（changelog 记"轮 N 落地"、迭代计划按轮排期）。
+  5. 架构约束代号（C1~C20）：任何文档正文不得以代号引用架构约束（如
+     "C19 契约""C20 图下说明"），须用语义描述（数据契约/图下说明等）。
+     约束定义处（technical.md / llm-technical.md，CIPHER_EXEMPT_FILES）
+     正文大量引用 C1~C20 属定义载体，豁免；其余文档（含 changelog.md /
+     plan.md / review-findings.md 与 docs-stm/plan/）一律禁。
 
 受检范围：
   - 项目根 README.md
@@ -60,7 +65,7 @@
 
 退出码：
   0 — 全部通过（无可疑痕迹）
-  1 — 发现高置信度痕迹（HIGH/ARCHIVE/CODE/CHAPTER/ROUND），应修复后再提交
+  1 — 发现高置信度痕迹（HIGH/ARCHIVE/CODE/CIPHER/CHAPTER/ROUND），应修复后再提交
   2 — 仅 LOW 级别痕迹，建议人工复核
 """
 
@@ -81,6 +86,9 @@ DOC_DIRS = [
 SKIP_FILES = {"changelog.md", "review-findings.md", "plan.md"}
 # 不扫描目录：archive（归档本身）/ plan（中间计划）/ tmp（运行时临时）
 SKIP_DIRS = {"archive", "plan", "tmp"}
+# 架构约束代号（C1~C20）豁免文件：约束定义处正文大量引用 C1~C20（技术名称表），
+# 属定义载体而非"暗号残留"，允许使用代号。其余文档正文一律不得出现约束代号。
+CIPHER_EXEMPT_FILES = {"technical.md", "llm-technical.md"}
 # ── 本工具自身豁免（结构性 + 文档化） ──
 # 本脚本只扫描 .md（见 _iter_docs），不扫描 .py，故自身天然豁免——这是
 # "结构性豁免"（扫描范围不含自身文件类型）。docstring 与 _doc_patterns()
@@ -101,6 +109,8 @@ SKIP_DIRS = {"archive", "plan", "tmp"}
 # 分类说明：
 #   ARCHIVE   — 归档文件/目录引用，面向读者文档不应指向已归档内容
 #   CODE      — 任务编号引用（rf-N / plan-N / R-N），历史记录标识
+#   CIPHER    — 架构约束代号（C1~C20，technical.md 定义）——约束定义处
+#               （technical.md/llm-technical.md）豁免，其余文档正文须用语义描述
 #   HIGH      — 高置信度历史痕迹（来源叙述/历史实现/变更节点/迭代/版本号）
 #   CHAPTER   — 章节编号引用（"N 章"/"第 N 章"指代报告具体章节，须用语义章节名）
 #   ROUND     — 迭代轮次引用（"第 N 轮"/"N 轮"/"轮 N"指代开发迭代历史，须用语义描述）
@@ -146,6 +156,12 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         (r"\bR-\d+(?!-?[A-Z])", "CODE", "任务编号引用（R-N）"),
         (r"[A-Za-z]系列", "CODE", "任务批次系列别名（如 B系列/F系列/G系列）"),
         (r"(?<![A-Za-z])[A-Za-z]_series\b", "CODE", "任务批次系列别名英文形式（如 b_series）"),
+        # ── CIPHER：架构约束代号（C1~C20）──
+        #  约束定义处（technical.md/llm-technical.md，CIPHER_EXEMPT_FILES）豁免；
+        #  其余文档正文出现 C1~C20 属"暗号"，须改写为语义描述（原子写入/会话缓存/
+        #  数据契约/图下说明等）。C+1~20 两位精确匹配，避免误伤十六进制色值
+        #  （C00000）、C21+ 等；前限非 ASCII 字母/数字，避免 AB14/MC19 内嵌命中。
+        (r"(?<![A-Za-z0-9])C(?:[1-9]|1[0-9]|20)\b", "CIPHER", "架构约束代号（C1~C20，须用语义描述替代，如原子写入/会话缓存/数据契约）"),
         # ── HIGH：来源叙述 / 历史实现 / 变更节点 / 迭代 / 版本号 ──
         (
             r"(?:自|从|由)\s*[`\w./_-]+\.(?:py|js|html|md)\s*(?:提取|拆分|迁移|合并|复用|分离)",
@@ -157,7 +173,7 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         (r"已迁移", "HIGH", "迁移痕迹（已迁移）"),
         (r"原(?:逻辑|实现|方案|代码|写法|做法|设计)", "HIGH", "原逻辑/原实现（历史实现叙述）"),
         (
-            r"原\s*[`A-Za-z_][A-Za-z0-9_.]*(?:\s*C19\s+)?(?:\s*(?:契约|dict|数据|结构|结果))?\s*(?:迁移|改称|并入)",
+            r"原\s*[`A-Za-z_][A-Za-z0-9_.]*(?:\s*(?:契约|dict|数据|结构|结果))?\s*(?:迁移|改称|并入)",
             "HIGH",
             "原X迁移/改称（历史契约/命名变更叙述）",
         ),
@@ -367,6 +383,9 @@ _COMPILED_CHAPTER_EXCLUDE = _chapter_excludes()
 _COMPILED_ROUND_EXCLUDE = _round_excludes()
 # 章节编号模式子集（用于 trace-exempt 文档的仅章节扫描）
 _CHAPTER_PATTERNS = [(p, c, d) for p, c, d in _DOC_PATTERNS if c == "CHAPTER"]
+# 架构约束代号模式子集（独立于 trace-exempt 逻辑：除约束定义处豁免外，
+# 所有文档正文（含 plan.md/changelog.md 等历史/计划记录）均不得出现 C1~C20）
+_CIPHER_PATTERNS = [(p, c, d) for p, c, d in _DOC_PATTERNS if c == "CIPHER"]
 
 
 def _is_excluded(line: str) -> bool:
@@ -394,6 +413,9 @@ def scan_file(fpath: Path, verbose: bool, chapter_only: bool = False) -> list[tu
     review-findings 与 docs-stm/plan/ 等 trace-exempt 文档——它们是历史/计划
     记录，版本号等历史痕迹合法，但数字章节暗号仍影响可读性需检查；迭代轮次
     "轮 N"是这些记录文档的正式载体，ROUND 不纳入 trace-exempt 扫描）。
+    架构约束代号（CIPHER）独立于 chapter_only：除约束定义处（technical.md /
+    llm-technical.md）豁免外，所有文档正文（含 trace-exempt 记录文档）均不得
+    出现 C1~C20——约束代号属"暗号"，与历史痕迹/章节暗号不同层，处处禁。
     """
     hits: list[tuple[int, str, str, str]] = []
     try:
@@ -401,7 +423,14 @@ def scan_file(fpath: Path, verbose: bool, chapter_only: bool = False) -> list[tu
     except (OSError, UnicodeDecodeError):
         return hits
 
-    patterns = _CHAPTER_PATTERNS if chapter_only else _DOC_PATTERNS
+    if chapter_only:
+        patterns = list(_CHAPTER_PATTERNS)
+        if fpath.name not in CIPHER_EXEMPT_FILES:
+            patterns += _CIPHER_PATTERNS
+    else:
+        patterns = _DOC_PATTERNS
+        if fpath.name in CIPHER_EXEMPT_FILES:
+            patterns = [p for p in _DOC_PATTERNS if p[1] != "CIPHER"]
     in_code_block = False
     for lineno, line in enumerate(text.splitlines(), 1):
         stripped = line.strip()
@@ -507,7 +536,7 @@ def main() -> int:
         for lineno, cat, desc, text in hits:
             total_hits += 1
             summary[cat] = summary.get(cat, 0) + 1
-            is_high = cat in ("HIGH", "ARCHIVE", "CODE", "CHAPTER", "ROUND")
+            is_high = cat in ("HIGH", "ARCHIVE", "CODE", "CIPHER", "CHAPTER", "ROUND")
             if is_high:
                 high_count += 1
             else:

@@ -87,7 +87,7 @@
     "equity_fixed_income": {}
   },
 
-  // ── I2. 交易纪律配置 ──
+  // ── 交易纪律配置 ──
   "discipline": {
     "take_profit_pct": 20.0,
     "stop_loss_pct": -15.0,

@@ -1,4 +1,4 @@
-"""Provider 策略引擎单元测试 — R3（Priority）+ R4（Proxy）+ R5（Weighted）+ R9（Cost First）。
+"""Provider 策略引擎单元测试 — （Priority）+ （Proxy）+ （Weighted）+ （Cost First）。
 
 标记：unit_llm
 
@@ -32,12 +32,12 @@ def _make_providers(names_priorities: list[tuple[str, int]]) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════════
-# R3: Priority 策略
+# Priority 策略
 # ═══════════════════════════════════════════════════════════════
 
 
 class TestPriorityStrategy(unittest.TestCase):
-    """R3 — Priority 排序测试。"""
+    """— Priority 排序测试。"""
 
     def test_priority_sort(self):
         """priority 1/2/3 升序排列。"""
@@ -103,12 +103,12 @@ class TestPriorityStrategy(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# R4: Proxy Preferred
+# Proxy Preferred
 # ═══════════════════════════════════════════════════════════════
 
 
 class TestProxyPreferredStrategy(unittest.TestCase):
-    """R4 — 代理偏好测试。"""
+    """— 代理偏好测试。"""
 
     def setUp(self):
         self.providers = _make_providers([("normal", 1), ("proxied", 2)])
@@ -143,12 +143,12 @@ class TestProxyPreferredStrategy(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# R5: Weighted 策略
+# Weighted 策略
 # ═══════════════════════════════════════════════════════════════
 
 
 class TestWeightedStrategy(unittest.TestCase):
-    """R5 — Weighted 排序测试。"""
+    """— Weighted 排序测试。"""
 
     def _make_weighted(self, names_weights: list[tuple[str, int]]) -> list[dict]:
         providers = _make_providers([(n, 1) for n, _w in names_weights])
@@ -195,7 +195,7 @@ class TestWeightedStrategy(unittest.TestCase):
 
 
 class TestCostFirstStrategy(unittest.TestCase):
-    """R9 — Cost First 策略测试。"""
+    """— Cost First 策略测试。"""
 
     def _make_providers(self, names_models: list[tuple[str, str]]) -> list[dict]:
         """生成简易 provider 列表，name + model。"""

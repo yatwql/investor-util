@@ -1,6 +1,6 @@
 """LLM Multi-Provider — 异常链处理 + 安抚重试。
 
-覆盖 R7 场景：
+覆盖 场景：
   1. 空内容安抚重试后成功
   2. 空内容安抚耗尽 → 回退下一 provider
   3. 安抚+回退组合验证 provider_name
@@ -318,7 +318,7 @@ class TestChainFailureTracking(unittest.TestCase):
 
 
 class TestModulePreferredRouting(unittest.TestCase):
-    """R10 — 每模块 Provider 路由端到端验证。"""
+    """— 每模块 Provider 路由端到端验证。"""
 
     @patch("src.python.llm.api.call_single_provider")
     def test_module_preferred_full_chain(self, mock_call: MagicMock) -> None:

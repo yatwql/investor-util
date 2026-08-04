@@ -3,11 +3,11 @@
 职责：接收（行业市值聚合 + 组合日收益序列 + 各行业指数日收益序列）
       → 输出行业暴露占比 + 逐行业一元 OLS Beta / t 显著性 / 相关性。
 
-- 无数据获取、无报告依赖，纯 pandas/numpy（C8：日志走 logging，不用 print）。
+- 无数据获取、无报告依赖，纯 pandas/numpy（日志走 logging，不用 print）。
 - Beta 复用 ``factor_exposure.compute_factor_exposure`` 的单因子调用，
   不重复实现 OLS（「复用 OLS 回归机制，无重复实现」约束）。
-- 行业分类判定复用 ``core/code_utils.py``（C1）；指数 K 线由编排层
-  （report/orchestrator.py）走 Chain + session_cache（C4/C6），本模块不联网。
+- 行业分类判定复用 ``core/code_utils.py``（代码类型判定中心化）；指数 K 线由编排层
+  （report/orchestrator.py）走 Chain + session_cache（会话缓存 + Chain 路由），本模块不联网。
 - push2 行业分类不可用 / 指数 K 线不足 → available=False，绝不硬算
   （§1.4.5 数据降级治理）。
 
@@ -67,7 +67,7 @@ def industry_index_for(industry: str) -> str | None:
 
 
 def unavailable_result(status: str, sample_count: int = 0) -> dict:
-    """返回不可用结果（C19 子契约，available=False）。
+    """返回不可用结果（数据子契约，available=False）。
 
     Args:
         status: "insufficient"（数据不足）或 "source_failed"（数据源故障）。
@@ -139,7 +139,7 @@ def compute_industry_beta_analysis(
         min_samples: 有效样本下限，低于此判数据不足（available=false）。
 
     Returns:
-        C19 子契约 dict：
+        数据子契约 dict：
         {"available", "status", "exposure", "betas", "alphas", "t_stats",
          "significant", "correlations", "unmapped_industries",
          "window", "sample_count"}

@@ -102,7 +102,7 @@ investor-util/
 │   │   │   ├── _fee_estimation.py             #   组合综合费率估算
 │   │   │   ├── _math_utils.py                 #   数学工具函数（Beta/t-分布）
 │   │   │   ├── _silence.py                    #   再平衡静默期管理
-│   │   │   ├── action_advisor.py              #   行动建议（再平衡信号+交易纪律+调仓建议+收益归因 → C19 action_data）
+│   │   │   ├── action_advisor.py              #   行动建议（再平衡信号+交易纪律+调仓建议+收益归因 → action_data）
 │   │   │   ├── alignment_correction.py        #   口径修正因子计算（估值偏差校准）
 │   │   │   ├── circuit_breaker_wrapper.py     #   指标级断路包装器
 │   │   │   ├── drawdown_warning.py            #   回撤历史分位预警
@@ -110,18 +110,18 @@ investor-util/
 │   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
 │   │   │   ├── industry_beta.py               #   行业 Beta 分析（纯计算：暴露占比 + 逐行业一元 OLS，复用 factor_exposure）
 │   │   │   ├── correlation.py                 #   持仓相关性矩阵（Pearson 相关/显著性/下三角矩阵）
-│   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → C19 crisis_annotation_data）
+│   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → crisis_annotation_data）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
-│   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → C19 evolution_data）
+│   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → evolution_data）
 │   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
-│   │   │   ├── rebalance_advisor.py           #   调仓建议可行化层（份额取整一手/费用估算/现金缓冲/优先级 → C19 rebalance_advice）
-│   │   │   ├── return_attribution.py          #   收益归因（TOP5 品种贡献占比/正负分列/净额合计 → C19 attribution，提示词段落与行动建议章表格共用）
+│   │   │   ├── rebalance_advisor.py           #   调仓建议可行化层（份额取整一手/费用估算/现金缓冲/优先级 → rebalance_advice）
+│   │   │   ├── return_attribution.py          #   收益归因（TOP5 品种贡献占比/正负分列/净额合计 → attribution，提示词段落与行动建议章表格共用）
 │   │   │   ├── scenario.py                    #   情景分析（Beta 推导 → 6 种市场情景预期变动）
 │   │   │   ├── simple_rebalance.py            #   极简再平衡（单品种超15%警戒线）
-│   │   │   ├── snapshot_diff.py               #   快照差异摘要（去重后最近两快照对比：新增/移除 + HHI 变化 + 超限项 → C19 snapshot_diff_data）
-│   │   │   ├── tail_risk.py                   #   尾部风险统计（历史模拟法 VaR95/99 + 最大单日跌幅 + 连续下跌 + 恢复天数 → C19 tail_risk_data）
+│   │   │   ├── snapshot_diff.py               #   快照差异摘要（去重后最近两快照对比：新增/移除 + HHI 变化 + 超限项 → snapshot_diff_data）
+│   │   │   ├── tail_risk.py                   #   尾部风险统计（历史模拟法 VaR95/99 + 最大单日跌幅 + 连续下跌 + 恢复天数 → tail_risk_data）
 │   │   │   ├── trade_discipline.py            #   交易纪律引擎（止盈/止损/回撤触发检测，复用 _silence 静默机制）
 │   │   │   ├── whatif.py                      #   调仓 What-if 模拟（双持仓成本口径对比）
 │   │   │   └── whatif_backtest.py             #   调仓 What-if 时序回测（纯计算：生效日折算/序列对齐/5 指标）
@@ -256,8 +256,8 @@ investor-util/
 │   │   │   ├── logger.py             #   日志模块（文件+控制台，自动轮转）
 │   │   │   ├── market_hours.py       #   交易时段判断（A股/港股/QDII）
 │   │   │   ├── models.py             #   数据模型（持仓/行情/基金/新闻）
-│   │   │   ├── holding_status.py     #   品种级数据状态标注（品种覆盖诊断，C19 position_status）
-│   │   │   ├── data_freshness.py     #   数据可信度诊断（新鲜度分类 + 单日跳变检测，C19 data_freshness）
+│   │   │   ├── holding_status.py     #   品种级数据状态标注（品种覆盖诊断，position_status）
+│   │   │   ├── data_freshness.py     #   数据可信度诊断（新鲜度分类 + 单日跳变检测，data_freshness）
 │   │   │   ├── perf.py               #   性能收集（PerfCollector 计时 + 数据源健康检查持久化）
 │   │   │   ├── provider_registry.py  #   数据源注册中心（熔断器/会话缓存）
 │   │   │   ├── reader.py             #   持仓 xlsx 文件读取
@@ -493,7 +493,7 @@ investor-util/
 │       │   │   ├── test_whatif_operations.py      #   调仓 What-if 操作共享层测试
 │       │   │   ├── test_whatif_writer.py          #   调仓 What-if 报告输出（固定名+日期归档+清理）
 │       │   │   ├── test_drawdown_html_excel.py    #   回撤明细 HTML/Excel 呈现
-│       │   │   ├── test_tail_risk_wiring.py       #   尾部风险统计接线（pipeline 注入 + Excel 五行 + HTML 卡 + C20 说明）
+│       │   │   ├── test_tail_risk_wiring.py       #   尾部风险统计接线（pipeline 注入 + Excel 五行 + HTML 卡 + 图下说明）
 │       │   │   ├── test_html_builders.py          #   HTML 构建器测试
 │       │   │   ├── test_html_builders_edge.py     #   HTML 构建器边缘场景
 │       │   │   ├── test_html_report_structure.py  #   HTML 报告结构测试

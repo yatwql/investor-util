@@ -246,7 +246,7 @@ class TestFetchIndexKline(unittest.TestCase):
 
     @patch("src.python.providers.sina.make_http_client")
     def test_is_index_code_called_for_c1(self, mock_factory):
-        """C1 约束：函数通过 code_utils.is_index_code 校验传入代码。"""
+        """函数通过 code_utils.is_index_code 校验传入代码（代码类型判定）。"""
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client

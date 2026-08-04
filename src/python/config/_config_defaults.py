@@ -105,7 +105,7 @@ _DEFAULT_CONFIG = {
         "target_allocation": {},  # 目标配置 Schema（空=不启用目标配置检查）
         "equity_fixed_income": {},  # 权益/固收超大类目标配置（空=不启用）
     },
-    # ── I2. 交易纪律配置 ──
+    # ── 交易纪律配置 ──
     "discipline": {
         "take_profit_pct": 20.0,  # 止盈线：单品种收益率 ≥ 此值 → 建议部分止盈
         "stop_loss_pct": -15.0,  # 止损线：单品种收益率 ≤ 此值 → 建议止损/减仓
@@ -229,8 +229,8 @@ def _build_template_from_defaults() -> str:
         f'    "equity_fixed_income": {json.dumps(d["rebalance"]["equity_fixed_income"])}  // 权益/固收超大类目标配置（空=不启用）',
         "  },",
         "",
-        # ── I2 ──
-        "  // ── I2. 交易纪律配置 ──",
+        # ── 交易纪律配置 ──
+        "  // ── 交易纪律配置 ──",
         '  "discipline": {',
         f'    "take_profit_pct": {d["discipline"]["take_profit_pct"]},  // 止盈线：单品种收益率 ≥ 此值 → 建议部分止盈',
         f'    "stop_loss_pct": {d["discipline"]["stop_loss_pct"]},  // 止损线：单品种收益率 ≤ 此值 → 建议止损/减仓',

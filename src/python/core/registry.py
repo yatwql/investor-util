@@ -527,8 +527,8 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "data_flag": "concentration_data",
     },
     # ── 风格与因子分析（「基金风格表 + 风格因子回归」两区块 + 行业 Beta 子表） ──
-    # 区块一：基金风格表（渲染期派生）· 区块二：风格因子回归（C19 style_factor_data 子键）
-    # · 区块三：行业 Beta 子表（C19 style_factor_data.industry_beta，report_submodules.industry_beta 开关默认关）
+    # 区块一：基金风格表（渲染期派生）· 区块二：风格因子回归（style_factor_data 子键）
+    # · 区块三：行业 Beta 子表（style_factor_data.industry_beta，report_submodules.industry_beta 开关默认关）
     {
         "key": "style_factor",
         "name": "风格与因子分析",

@@ -14,6 +14,15 @@ PowerShell（# 与 <# #>）、Windows 批处理（REM / ::）。
 （changelog.md / review-findings.md）中。标识符/注释中也不得出现
 任务编号（plan-N / rf-N）或系列代号（B 系列/F 系列、b_series、F4 等）。
 
+除历史痕迹外，注释/标识符中也不得出现三类暗号组合（无语义魔法编号 /
+疑似任务编号 / 疑似无意义代码，统称"语义命名暗号"）：
+  - 字母+数字（MAGIC）   ：C19 / D8 / HH6 / R11 / P1 —— 须用语义名替代
+  - 字母-数字（DASHTASK）：F-1 / G-1 / TASK-22 / D-8 —— 疑似任务编号
+  - 字母_数字（UNDERSCORE）：F_1 / H_1 / MINE_22 —— 疑似无意义代码
+合法领域值（TOP10 前 N 名、T2/T3/T4 数据层级、T-1 交易日、A1:B1 Excel
+单元格、F401 等 lint 码、VaR95/MD5、UTF-8、Sonnet-4 模型名等）由
+_magic_excludes() / _dash_excludes() / _under_excludes() 行豁免。
+
 两类扫描：
   - 注释痕迹扫描：PATTERNS 匹配注释/文档串行
   - 标识符扫描：IDENTIFIER_PATTERNS 匹配代码中的完整标识符 token
@@ -27,11 +36,15 @@ PowerShell（# 与 <# #>）、Windows 批处理（REM / ::）。
 退出码：
   0 — 全部通过（无可疑痕迹）
   1 — 发现高置信度痕迹（HIGH/ORIGIN/VERSION）
-  2 — 发现任务编号/章节编号引用（CODE/IDENT/CHAPTER/ROUND），应从注释/标识符中移除
+  2 — 发现任务编号/章节编号/架构约束代号/语义命名暗号引用
+      （CODE/IDENT/CHAPTER/ROUND/MAGIC/DASHTASK/UNDERSCORE），应从注释/标识符中移除
       （CHAPTER：注释中用数字章节号"N 章"/"第 N 章"指代报告具体章节，
       章节合并/重排后数字即失效，须改用语义章节名「X」章；
       ROUND：注释中用"第 N 轮"/"经 N 轮"/"N 轮"/"轮 N"指代开发迭代
-      轮次，属迭代痕迹，须改用语义描述）
+      轮次，属迭代痕迹，须改用语义描述；
+      MAGIC/DASHTASK/UNDERSCORE：注释中"字母+数字/字母-数字/字母_数字"
+      组合（如 R11/F-1/F_1）属无语义魔法编号/疑似任务编号/疑似无意义
+      代码，须改用语义名）
   3 — 仅 LOW 级别痕迹，建议人工复核
 """
 
@@ -39,8 +52,10 @@ from __future__ import annotations
 
 import argparse
 import ast
+import io
 import re
 import sys
+import tokenize
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -161,7 +176,7 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"合并自\s*[`\w._\-()]+", "HIGH", "合并自XX（合并来源叙述）"),
     (r"原(?:逻辑|实现|方案|代码|写法|做法|设计)", "HIGH", "原逻辑/原实现（历史实现叙述）"),
     (
-        r"原\s*[`A-Za-z_][A-Za-z0-9_.]*(?:\s*C19\s+)?(?:\s*(?:契约|dict|数据|结构|结果))?\s*(?:迁移|改称|并入)",
+        r"原\s*[`A-Za-z_][A-Za-z0-9_.]*(?:\s*(?:契约|dict|数据|结构|结果))?\s*(?:迁移|改称|并入)",
         "HIGH",
         "原X迁移/改称（历史契约/命名变更叙述）",
     ),
@@ -171,16 +186,43 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"(?:已更名|已重命名|改名为|重命名为|重新命名)", "HIGH", "重命名痕迹（X 已更名/改名为 Y 是历史变更记录）"),
     (r"(?:旧设计|旧架构|历史遗留)", "HIGH", "旧设计/历史遗留（历史迭代叙述）"),
     #
-    # ═══ CODE：任务/编号引用 ═══
+    # ═══ CODE：任务/编号/约束代号引用 ═══
     #   代码注释中不应出现管理任务的编号（形如 编号前缀-数字）或系列代号。
-    #   注：大写裸字母+数字（如 C20/P1/S-P1/A3/R17）多为约束/优先级/场景/需求
-    #   的合法交叉引用，且单字母+数字与 Excel 单元格（A1/B2/F4）结构性冲突，
-    #   故注释侧不捕获裸"族字母+数字"——F4/B6 作为**标识符**由 IDENTIFIER_PATTERNS
-    #   捕获（见下）。注释侧仅捕获无歧义的系列代号形状（_series/系列）。
+    #   架构约束代号（C1~C20，technical.md 定义）属"暗号"——注释应直接描述当前
+    #   行为（如"原子写入""会话缓存""数据契约""图下说明"），不得以代号引用架构
+    #   约束表格；约束定义处（technical.md / llm-technical.md）允许使用代号，由
+    #   check-doc-traces.py 豁免（代码侧无此场景）。其余裸"族字母+数字"（如
+    #   P1/S-P1/A3/R17 优先级/场景/需求引用）仍为合法交叉引用，且单字母+数字
+    #   与 Excel 单元格（A1/B2/F4）结构性冲突，故注释侧不捕获 C1~C20 之外的裸
+    #   "族字母+数字"——F4/B6 作为**标识符**由 IDENTIFIER_PATTERNS 捕获（见下）。
+    #   注释侧仅捕获无歧义的系列代号形状（_series/系列）与 C1~C20 约束代号。
     #
     (r"(?:rf|plan|R)-\d+", "CODE", "任务编号引用（如 rf-117、R-086）"),
     (r"(?<![A-Za-z])[A-Za-z]_series\b", "CODE", "任务批次系列别名英文形式（如 b_series）"),
     (r"[A-Za-z]系列", "CODE", "任务批次系列别名（如 B系列/F系列/G系列）"),
+    #  架构约束代号（C1~C20）：C+1~20 两位精确匹配，避免误伤十六进制色值
+    #  （C00000）、C21+ 等；前限非 ASCII 字母/数字，避免 AB14/MC19 内嵌命中。
+    (r"(?<![A-Za-z0-9])C(?:[1-9]|1[0-9]|20)\b", "CODE", "架构约束代号（C1~C20，须用语义描述替代，如原子写入/会话缓存/数据契约）"),
+    #
+    # ═══ MAGIC：字母+数字 魔法编号 ═══
+    #  注释中裸"大写字母(+小写)+数字"组合（R11/P1/I2/D8/HH6）属无语义魔法编号
+    #  ——既非当前代码的结构说明，也非合法领域值，须用语义名替代（如用"单图
+    #  隔离"替代 R11、"5 级评级阈值"替代 P2）。合法领域值经 _magic_excludes()
+    #  行豁免（TOP10 前 N 名、F401/E402 等 lint 码、VaR95/MD5 风险与算法名、
+    #  T2/T3/T4 数据层级值、A1:B1 Excel 单元格、Q3 季度、DeepSeek V4 模型名、
+    #  Jinja2/ES5 技术名）。前限排除 ASCII 字母/数字（避免内嵌 AB14/MC19 命中）
+    #  与井号（#C00000 十六进制色值）；后限排除字母数字，避免尾部粘连误伤。
+    (r"(?<![A-Za-z0-9#])[A-Z][A-Za-z]*[0-9]{1,3}(?![A-Za-z0-9])", "MAGIC", "字母+数字魔法编号（如 R11/P1/D8/HH6，须用语义名替代）"),
+    # ═══ DASHTASK：字母-数字 疑似任务编号 ═══
+    #  注释中"字母-数字"组合（F-1/G-1/TASK-22/D-8/I-02）疑似任务/需求编号，
+    #  属历史痕迹。合法值经 _dash_excludes() 行豁免：交易日语义（T-1/T-2）、
+    #  小写前缀的数学下标/编码/模型名（i-1/idx-1/utf-8/sonnet-4/claude-3）、
+    #  UTF-8/UTC-8 编码时区、N-2 计数（N 减 2 项）。
+    (r"(?<![A-Za-z0-9])[A-Za-z]{1,}-[0-9]{1,3}(?![0-9])", "DASHTASK", "字母-数字组合（如 F-1/TASK-22/D-8，疑似任务编号）"),
+    # ═══ UNDERSCORE：字母_数字 疑似无意义代码 ═══
+    #  注释中"字母_数字"组合（F_1/H_1/MINE_22）疑似无意义代码标识。小写前缀
+    #  （changed_1m/syl_1y 等语义短名）经 _under_excludes() 豁免。
+    (r"(?<![A-Za-z0-9])[A-Za-z]{1,}_[0-9]{1,3}(?![0-9])", "UNDERSCORE", "字母_数字组合（如 F_1/MINE_22，疑似无意义代码标识）"),
     #
     # ═══ CHAPTER：章节编号暗号（用数字章节号指代报告具体章节） ═══
     #  "N 章" / "第 N 章"（N=1~99）指代报告具体章节时，章节合并/重排后数字
@@ -263,12 +305,16 @@ PATTERNS: list[tuple[str, str, str]] = [
 # ═══ IDENT：标识符任务代号（语义命名纪律） ═══
 # 匹配**完整标识符 token**——变量/函数/类名不得使用任务编号或系列代号。
 # 捕获形状（全仓实证 0 误报）：
-#   - 大写裸字母+数字（F4、B6）——无语义的大写常量名（小写 f1/h1/t1 为短局部，合法）
+#   - 短大写字母+数字（F4、B6、HH6、AB14、TASK22）——无语义的大写常量名
+#     （小写 f1/h1/t1 为短局部，合法；长 CamelCase 测试类名 TestDegradationSignal1
+#     为语义变体号，合法，由 `^[A-Z]{1,4}[0-9]{1,3}$` 限定长度排除）
+#   - 大写字母开头 + _数字（F_1、MINE_22）——无意义代码标识
 #   - 单字母 + _series（b_series）——多字母词+series（drawdown_series）合法
 #   - 单字母 + 系列（G系列）——Python 3 允许 unicode 标识符
 #   - 嵌入 rf/plan + 数字（rf_205_fix、plan18_hack）——任务编号混入语义名
 IDENTIFIER_PATTERNS: list[tuple[str, str, str]] = [
-    (r"^[A-Z][0-9]{1,3}$", "IDENT", "大写裸字母+数字独立标识符（如 F4、B6），无语义"),
+    (r"^[A-Z]{1,4}[0-9]{1,3}$", "IDENT", "短大写字母+数字独立标识符（如 F4、HH6、TASK22），无语义"),
+    (r"^[A-Z][A-Za-z]*_[0-9]+$", "IDENT", "大写字母+_数字标识符（如 F_1、MINE_22），无意义"),
     (r"^[A-Za-z]_series$", "IDENT", "单字母+_series 标识符（如 b_series）"),
     (r"^[A-Za-z]系列$", "IDENT", "单字母+系列 标识符（如 G系列）"),
     (r"rf[_-]?\d+", "IDENT", "任务编号嵌入标识符（如 rf_205_fix）"),
@@ -344,12 +390,23 @@ EXCLUDE_LINE: list[str] = [
     r"XXX\[",
     r"jQueryXXX",
     # ── 工具自身说明（元描述豁免） ──
-    #  描述"检查/检出哪些历史痕迹、来源叙述、原旧实现、迁移/重构"的规则说明行，
-    #  而非代码实际残留历史痕迹（如本工具及其测试的描述性注释）。与
-    #  check-doc-traces.py 的"工具说明行豁免"保持一致——命中
-    #  "检查/检出/扫描 + 痕迹/来源/原旧/迁移/重构 + 类别名词"组合才豁免，
-    #  防止补强后的时序模式误伤工具自身的元描述。
-    r"(?:检查|检测|判定|扫描|检出|识别|不得带|不得包含|不得出现|不应记录|禁止出现).{0,16}(?:历史痕迹|来源叙述|原旧实现|迁移重命名|变更痕迹|迭代标记|版本号标记|归档引用|任务编号|历史实现|旧逻辑|迁移痕迹|重构前|替代旧)",
+    #  描述"检查/检出哪些历史痕迹、来源叙述、原旧实现、迁移/重构、系列/约束/
+    #  魔法编号暗号"的规则说明行，而非代码实际残留历史痕迹（如本工具及其测试
+    #  的描述性注释）。与 check-doc-traces.py 的"工具说明行豁免"保持一致——
+    #  命中"检查/检出/扫描 + 痕迹/来源/旧逻辑 + 类别名词"组合才豁免，防止补强
+    #  后的时序模式误伤工具自身的元描述。双向匹配（"检出…暗号"与"暗号…须检出"
+    #  两种语序），并覆盖 C1~C20 等约束范围记号（技术名称表）。
+    r"(?:检查|检测|判定|扫描|检出|识别|不得带|不得包含|不得出现|不应记录|禁止出现).{0,16}(?:历史痕迹|来源叙述|原旧实现|迁移重命名|变更痕迹|迭代标记|版本号标记|归档引用|任务编号|历史实现|旧逻辑|迁移痕迹|重构前|替代旧|系列代号|约束代号|架构约束|暗号|魔法编号|字母\+数字|疑似任务|无意义)",
+    r"(?:历史痕迹|来源叙述|原旧实现|迁移重命名|变更痕迹|迭代标记|版本号标记|归档引用|任务编号|历史实现|旧逻辑|迁移痕迹|重构前|替代旧|系列代号|约束代号|架构约束|暗号|魔法编号|字母\+数字|疑似任务|无意义|定义载体|定义处|C[0-9]+~\s*C[0-9]+).{0,16}(?:须检出|应检出|一律检出|须改写|需改写|豁免|不误伤)",
+    # ── 检查规则自身的边界描述（元描述豁免） ──
+    #  本工具的测试（test_trace_check_scripts.py）须用"非约束 C+数字""不得误伤/
+    #  不误伤""十六进制色值（C0 非 1~20）""超出 C1~C20 范围"等字面量描述豁免边界
+    #  （验证哪些 C+数字组合不应被检出），属规则元描述而非源码残留暗号。与上方
+    #  "工具说明行豁免"同理，命中即整行豁免。
+    r"非约束.{0,16}(?:C\+?数字|色值)",
+    r"(?:十六进制|色值).{0,16}C\d+",
+    r"不误伤|不得误伤",
+    r"超出\s*C\d+~\s*C\d+\s*范围",
 ]
 
 # ── 测试回归场景元描述豁免（仅 src/test/ 文件生效） ──────────
@@ -441,26 +498,104 @@ def _is_round_excluded(line: str) -> bool:
     return any(p.search(line) for p in _COMPILED_ROUND_EXCLUDE)
 
 
-def _is_triple_quote_line(stripped: str) -> tuple[bool, bool]:
-    """判断该行是否为三引号行。
+def _magic_excludes() -> list[re.Pattern]:
+    """字母+数字魔法编号的合法领域值豁免（"大写字母(+小写)+数字"为运行时语义值）。
 
-    Returns:
-        (is_open_close, is_open_only)
-        is_open_close — 同一行内打开又关闭（如 \\"\\"\\"brief doc\\"\\"\\"）
-        is_open_only  — 仅打开（或仅关闭）没有在同一行闭合
+    与 _chapter_excludes() / _round_excludes() 同理——这些是合法领域/技术表述，
+    命中的 token 跳过 MAGIC 分类检查（不影响其他痕迹检查）：
+      - TOP\\d+            —— 前 N 名（TOP10/TOP3…），业务语义
+      - MD5/SHA\\d+/AES\\d+ —— 哈希/加密算法名
+      - VaR\\d+            —— 尾部风险指标（VaR95/VaR99）
+      - Jinja2/ES5/ES6/Win32/UTF-\\d —— 技术栈名
+      - [A-Z]{1,3}\\d{3}\\b —— linter/静态检查码（F401/E402/PERF203/F811…）
+      - [Qq][1-4]\\b        —— 季度（2026-07（Q3））
+      - DeepSeek V\\d       —— 模型版本（DeepSeek V4）
+      - 单元格/合并/列 + 字母数字，或 A1:B1/B2~B5 范围 —— Excel 单元格引用
+      - [Ss]\\d{1,2}\\b      —— 场景标记（S1~S33，conftest 官方活分类法）
+      - S-P\\d+              —— 穿透场景标签（S-P1~S-P10，测试文件内组织编号）
+      - [Tt][1-9]\\d?\\b     —— 场景标记（T1~T21）与统计分位（T95）等语义值（不含 T0 阈值暗号）
+      - [Yy]\\d\\b / [Zz]\\d\\b —— 边缘测试组标签（Y1~Y6/Z1，文件内组织编号）
+      - 微信\\s*X\\d+         —— 微信浏览器内核（X5）
+      - ETF\\d+/主动\\d+/基金\\d+ —— 测试数据标签（基金简称）
     """
-    if stripped.startswith('"""') or stripped.startswith("'''"):
-        # 检查该行是否在开头三引号之后又出现了结尾三引号
-        rest = stripped[3:]
-        close_quote = '"""' if stripped.startswith('"""') else "'''"
-        if close_quote in rest:
-            return (True, False)  # 同一行内开+关
-        return (False, True)  # 仅打开（三引号开头但未同行闭合）
-    # 仅关闭：docstring 内容最后一行为 …内容\"\"\"（不以三引号开头但以三引号结尾）。
-    # 若不识别该行，in_docstring 状态会泄漏到后续所有代码行（误当作 docstring 提取）。
-    if stripped.endswith('"""') or stripped.endswith("'''"):
-        return (False, True)  # 仅关闭
-    return (False, False)
+    return [
+        re.compile(r"TOP\d+"),
+        re.compile(r"\b(?:MD5|SHA\d+|AES\d*|DES\d*)\b"),
+        re.compile(r"VaR\d+"),
+        re.compile(r"Jinja2|ES5|ES6|Win32|UTF-\d"),
+        re.compile(r"[A-Z]{1,3}\d{3}\b"),
+        re.compile(r"[Qq][1-4]\b"),
+        re.compile(r"DeepSeek\s*V\d"),
+        re.compile(r"(?:单元格|合并|列)\s*[A-Z]\s*[0-9](?:\s*[:~]\s*[A-Z]\s*[0-9])?|[A-Z][0-9]\s*[:~]\s*[A-Z][0-9]"),
+        re.compile(r"\b[Ss]\d{1,2}\b"),
+        re.compile(r"S\s*-\s*P\d+"),
+        re.compile(r"\b[Tt][1-9]\d?\b"),
+        re.compile(r"\b[Yy]\d\b"),
+        re.compile(r"\b[Zz]\d\b"),
+        re.compile(r"微信\s*X\d+"),
+        re.compile(r"(?:ETF|主动|基金)\d+"),
+    ]
+
+
+def _dash_excludes() -> list[re.Pattern]:
+    """字母-数字组合的合法领域值豁免（"字母-数字"为运行时时序/下标/编码/模型名）。
+
+    命中的行跳过 DASHTASK 分类检查（不影响其他痕迹检查）：
+      - [Tt]-\\d+           —— 交易日语义（T-1/T-2，QDII 净值日期滞后）
+      - [a-z]+-\\d+         —— 小写前缀：数学下标/编码/模型名（i-1/idx-1/utf-8/sonnet-4）
+      - UTF-\\d|UTC-\\d      —— 编码/时区（UTF-8/UTC-5）
+      - 模型名-\\d          —— AI 模型名（Sonnet-4/Claude-3/GPT-4…）
+      - N-\\d+(?:项|个|条)   —— 计数算术（应有 N-2 项）
+      - R-\\S+-\\d+          —— 需求编号交叉引用（R-LLM-DB-QA-CONCENTRATION-03/04，
+        requirements.md 表格定义的需求 ID，非任务编号；单字母 R-086 仍由 CODE 检出）
+    """
+    return [
+        re.compile(r"[Tt]\s*-\s*\d+"),
+        re.compile(r"[a-z]{1,}\s*-\s*\d+"),
+        re.compile(r"UTF-\d|UTC-\d"),
+        re.compile(r"(?:sonnet|claude|opus|haiku|gpt|deepseek|mistral|llama|qwen|gemini)\s*-\s*[\w.]+", re.IGNORECASE),
+        re.compile(r"N\s*-\s*\d+\s*(?:项|个|条)"),
+        re.compile(r"R-[A-Za-z0-9_./-]+-\d+(?:/\d+)?"),
+    ]
+
+
+def _under_excludes() -> list[re.Pattern]:
+    """字母_数字组合的合法领域值豁免（小写前缀为语义短名）。
+
+    命中的行跳过 UNDERSCORE 分类检查（不影响其他痕迹检查）：
+      - [a-z]+_\\d+ —— 小写语义短名（changed_1m/syl_1y/cell_3/holdings_200）
+    """
+    return [
+        re.compile(r"[a-z]{1,}\s*_\s*\d+"),
+    ]
+
+
+_COMPILED_MAGIC_EXCLUDE = [re.compile(p) for p in _magic_excludes()]
+_COMPILED_DASH_EXCLUDE = [re.compile(p) for p in _dash_excludes()]
+_COMPILED_UNDER_EXCLUDE = [re.compile(p) for p in _under_excludes()]
+
+
+def _is_magic_match_excluded(line: str, start: int, end: int) -> bool:
+    """判断 MAGIC 匹配 token（line[start:end]）是否被合法领域值豁免覆盖。
+
+    逐豁免模式检查其命中区间是否与 token 区间重叠——同一行内既有合法场景
+    标记（S1）又有暗号代号（R11）时，只豁免合法的 token，暗号仍会被检出。
+    """
+    for p in _COMPILED_MAGIC_EXCLUDE:
+        for m in p.finditer(line):
+            if m.start() < end and m.end() > start:
+                return True
+    return False
+
+
+def _is_dash_excluded(line: str) -> bool:
+    """检查该行是否命中字母-数字合法领域值豁免（T-1 交易日等为合法值）。"""
+    return any(p.search(line) for p in _COMPILED_DASH_EXCLUDE)
+
+
+def _is_under_excluded(line: str) -> bool:
+    """检查该行是否命中字母_数字合法领域值豁免（小写语义短名）。"""
+    return any(p.search(line) for p in _COMPILED_UNDER_EXCLUDE)
 
 
 def _is_excluded(line: str, test_file: bool = False) -> bool:
@@ -501,6 +636,20 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
                 continue  # 章节计数/序数表述豁免，不影响其他模式
             if cat == "ROUND" and _is_round_excluded(ctext):
                 continue  # 轮次计数/运行时表述豁免，不影响其他模式
+            if cat == "DASHTASK" and _is_dash_excluded(ctext):
+                continue  # 字母-数字合法领域值豁免（T-1 交易日等），不影响其他模式
+            if cat == "UNDERSCORE" and _is_under_excluded(ctext):
+                continue  # 字母_数字合法领域值豁免（小写语义短名），不影响其他模式
+            if cat == "MAGIC":
+                # 逐 token 豁免：同一行内合法场景标记（S1）与暗号代号（R11）并存时，
+                # 仅豁免合法的 token，暗号仍会被检出（避免整行豁免掩盖暗号）。
+                for m in re.finditer(pat, ctext):
+                    if not _is_magic_match_excluded(ctext, m.start(), m.end()):
+                        hits.append((lineno, cat, desc, ctext[:120]))
+                        break  # 该行存在未豁免的 MAGIC 命中
+                else:
+                    continue  # 该行全部 MAGIC 命中均被合法领域值豁免，不影响其他模式
+                break  # 已命中该行，不再检查后续模式
             if re.search(pat, ctext):
                 hits.append((lineno, cat, desc, ctext[:120]))
                 break  # first match only per line
@@ -640,29 +789,49 @@ def _shell_comment_lines(suffix: str, text: str) -> Iterator[tuple[int, str]]:
 
 
 def _py_comment_lines(text: str) -> Iterator[tuple[int, str]]:
-    """Python：`#` 行注释（含行内）+ 三引号 docstring（含单行/多行状态跟踪）。"""
-    in_docstring = False
-    for lineno, raw in enumerate(text.split("\n"), 1):
-        stripped = raw.strip()
-        if not stripped:
-            continue
+    """Python：`#` 行注释（含行内）+ 真正的 docstring。
 
-        # 检测三引号开关，切换 docstring 状态
-        is_oc, is_open = _is_triple_quote_line(stripped)
-        if is_open:
-            in_docstring = not in_docstring
-            yield lineno, stripped  # 开关行本身参与匹配
-        elif is_oc:
-            yield lineno, stripped  # 单行 docstring（同行开闭）
-        elif in_docstring:
-            yield lineno, stripped
-        elif stripped.startswith("#"):
-            yield lineno, stripped
-        else:
-            # 行内注释：提取由空白引导的 # 之后的注释文本（跳过字符串内 #）
-            m = re.search(r"[ \t]#", stripped)
-            if m:
-                yield lineno, stripped[m.start() + 1 :]
+    用 tokenize 提取注释 token、用 AST 判定模块/类/函数 docstring 的行范围，
+    避免行级三引号启发式把代码字符串（如 ``text = \"\"\"…\"\"\"``）的收尾行
+    或裸 ``\"\"\"`` 关闭行误判为 docstring 开关，导致状态泄漏到后续代码行。
+    """
+    src_lines = text.split("\n")
+
+    # AST 定位真正的 docstring 行范围：模块/类/函数体的首个字符串表达式语句
+    doc_lines: set[int] = set()
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        tree = None
+    if tree is not None:
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                body = getattr(node, "body", None)
+                if body and isinstance(body[0], ast.Expr):
+                    val = body[0].value
+                    if isinstance(val, ast.Constant) and isinstance(val.value, str):
+                        start = body[0].lineno
+                        end = body[0].end_lineno or start
+                        doc_lines.update(range(start, end + 1))
+
+    # tokenize 提取注释 token（# 行注释/行内注释）与 docstring 字符串 token
+    try:
+        tokens = tokenize.generate_tokens(io.StringIO(text).readline)
+    except (tokenize.TokenError, IndentationError):
+        return
+
+    yielded: set[int] = set()
+    for tok in tokens:
+        if tok.type == tokenize.COMMENT:
+            if tok.start[0] not in yielded:
+                yielded.add(tok.start[0])
+                yield tok.start[0], tok.string.strip()
+        elif tok.type == tokenize.STRING and tok.start[0] in doc_lines:
+            start, end = tok.start[0], tok.end[0]
+            for ln in range(start, end + 1):
+                if ln not in yielded and ln - 1 < len(src_lines):
+                    yielded.add(ln)
+                    yield ln, src_lines[ln - 1].strip()
 
 
 def _js_comment_lines(text: str) -> Iterator[tuple[int, str]]:
@@ -776,7 +945,7 @@ def main() -> None:
                 is_high = cat in ("HIGH", "ORIGIN", "VERSION")
                 if is_high:
                     high_count += 1
-                elif cat in ("CODE", "IDENT", "CHAPTER", "ROUND"):
+                elif cat in ("CODE", "IDENT", "CHAPTER", "ROUND", "MAGIC", "DASHTASK", "UNDERSCORE"):
                     code_count += 1
                 else:
                     low_count += 1

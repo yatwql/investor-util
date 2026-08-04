@@ -3,7 +3,7 @@
 职责：接收各品种日收益序列 → 按日期对齐 → 逐对 Pearson 相关 + 双侧 p 值
       → 输出 N×N 下三角相关矩阵 + 配对明细（识别"伪分散"）。
 
-- 无数据获取、无报告依赖，纯标准库 math（C8：日志走 logging，不用 print）。
+- 无数据获取、无报告依赖，纯标准库 math（日志走 logging，不用 print）。
 - 显著性用 _math_utils._t_cdf 手算（scipy/statsmodels 均未安装）。
 - 品种历史数据不足窗口 → 对应格为 None（灰色 N/A），绝不硬算（§1.4.5 数据降级治理）。
 - 数据不足（<MIN_HOLDINGS 或无可配对样本）→ available=false，status="insufficient"。
@@ -66,7 +66,7 @@ def unavailable_result(
     sample_count: int = 0,
     insufficient_codes: list[str] | None = None,
 ) -> dict:
-    """返回不可用结果（C19 契约，available=False）。
+    """返回不可用结果（数据契约，available=False）。
 
     Args:
         status: "insufficient"（数据不足）或 "source_failed"（数据源故障）。
@@ -74,7 +74,7 @@ def unavailable_result(
         insufficient_codes: 历史数据不足计算窗口的品种代码列表。
 
     Returns:
-        含全部 C19 键的空结果字典。
+        含全部数据契约键的空结果字典。
     """
     return {
         "available": False,
@@ -139,7 +139,7 @@ def compute_correlation_matrix(
     window: int = DEFAULT_WINDOW,
     min_samples: int = MIN_SAMPLES,
 ) -> dict:
-    """计算各品种收益率两两相关矩阵（C19 契约）。
+    """计算各品种收益率两两相关矩阵（数据契约）。
 
     Args:
         returns_by_code: {code: [{"date": str, "return": float}, ...]}，日收益升序。
@@ -148,7 +148,7 @@ def compute_correlation_matrix(
         min_samples: 对齐后有效样本下限，低于此判数据不足（格为 None）。
 
     Returns:
-        C19 契约 dict：
+        数据契约 dict：
         {"available", "status", "window", "sample_count", "codes", "names",
          "matrix", "p_values", "pairs", "insufficient_codes", "note"}
 

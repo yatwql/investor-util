@@ -8,7 +8,7 @@
   - available=False（无持仓数据）→ 整页占位
   - action_data=None → 整页占位（§1.4.5 降级）
 
-数据源为 C19 `action_data` 契约（analysis/action_advisor.build_action_data 组装、
+数据源为 `action_data` 契约（analysis/action_advisor.build_action_data 组装、
 orchestrator 注入 pipeline_data）——与 HTML 端 partials/action_section.html 共享同一对象。
 """
 
@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 def _action_data(**extra) -> dict:
-    """构造 C19 契约 action_data mock（含 1 条再平衡信号 + 收益归因）。"""
+    """构造数据契约 action_data mock（含 1 条再平衡信号 + 收益归因）。"""
     d = {
         "available": True,
         "summary": "再平衡建议 1 条：组合内存在超警戒线品种，建议减持。",

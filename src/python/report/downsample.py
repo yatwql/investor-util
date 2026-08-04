@@ -1,6 +1,6 @@
-"""P1 服务端下采样（§4.9）— 将日频净值 bars 聚合为周/月频。
+"""服务端下采样（§4.9）— 将日频净值 bars 聚合为周/月频。
 
-chart_data_builder 调用本模块，避免其超过行数预算（≤400 行，§4.11 O4）。
+chart_data_builder 调用本模块，避免其超过行数预算（≤400 行，§4.11 ）。
 下采样仅作用于 Chart.js 数据集，不改动 history_data.bars 原值。
 
 契约（§4.9 验收标准）：
@@ -49,7 +49,7 @@ def month_key(date_str: str) -> str:
 
 
 def downsample_bars(bars: list) -> list:
-    """P1 服务端下采样（§4.9 验收标准）。
+    """服务端下采样（§4.9 验收标准）。
 
     - len(bars) ≤ 500 → 保留日频原样
     - len(bars) > 500 → 周聚合（取每周最后一条）

@@ -1,4 +1,4 @@
-"""chart_data_builder.py 边缘场景测试（C12：edge 用例必须放 *_edge.py 文件）。
+"""chart_data_builder.py 边缘场景测试（edge 用例必须放 *_edge.py 文件）。
 
 覆盖行业分布图表验收：品种无行业归属 → 归入"其他"分类。
 其他极端值/异常输入场景：
@@ -54,7 +54,7 @@ def test_sector_none_and_blank_classified_as_other() -> None:
 
 
 def test_negative_and_none_mv_do_not_crash() -> None:
-    """mv 为 None / 负值时不抛异常，防御性归零聚合（R11 单图隔离）。"""
+    """mv 为 None / 负值时不抛异常，防御性归零聚合（单图隔离）。"""
     top10 = [
         {"rank": 1, "name": "标的A", "sector": "白酒", "mv": 1000.0},
         {"rank": 2, "name": "标的B", "sector": "白酒", "mv": None},
@@ -76,7 +76,7 @@ def test_empty_top10_returns_empty_dataset() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  量化指标 Radar 边缘场景（C12）
+#  量化指标 Radar 边缘场景
 # ═══════════════════════════════════════════════════════════════
 
 

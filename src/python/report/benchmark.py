@@ -6,7 +6,7 @@
   3. 返回原始数据字典（fetch_benchmarks）
   4. 归一化到 100 基点，与组合走势对齐（normalize_benchmarks）
 
-C6 约束：数据获取走 fetch_index_history → history_index chain → Provider，不绕过。
+数据获取走 fetch_index_history → history_index chain → Provider，不绕过。
 """
 
 from __future__ import annotations

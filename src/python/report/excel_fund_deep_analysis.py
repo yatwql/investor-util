@@ -56,10 +56,10 @@ def write_fund_deep_analysis_sheets(
     """写入基金深度分析页签。
 
     Args:
-        style_factor_data: 风格与因子分析 C19 契约 dict，来自 pipeline_data
+        style_factor_data: 风格与因子分析数据契约 dict，来自 pipeline_data
             （style_factor_data 主键，内嵌 industry_beta 子键）；
             未提供或 available=False 时因子回归区块写入占位（§1.4.5 降级治理）。
-        position_relationship_data: 持仓关系矩阵 C19 契约 dict（相关性区块数据源），
+        position_relationship_data: 持仓关系矩阵数据契约 dict（相关性区块数据源），
             来自 pipeline_data；未提供或 available=False 时相关性区块写入占位（§1.4.5 降级治理）。
     """
     if not enable_fund_deep_analysis:
@@ -164,7 +164,7 @@ def write_fund_deep_analysis_sheets(
 
     # ── 风格与因子分析（一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） ──
     # style_factor_data 来自编排层 pipeline_data（style_factor_data 主键，
-    # 内嵌 industry_beta 子键）；风格表 results 为渲染期派生（不进 C19）。
+    # 内嵌 industry_beta 子键）；风格表 results 为渲染期派生（不进数据契约）。
     # 三区块独立降级（§1.4.5）：风格表空/因子空/行业 Beta 关均不影响其余区块。
     analyze_style = modules.get("analyze_style_for_all_funds")
     write_sf = modules.get("write_style_factor_sheet")

@@ -93,9 +93,9 @@ def _compute_section_visibility(
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
     enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
-    style_factor_data: dict | None = None,  # data 层：风格与因子 C19 dict（None=无数据，章节隐藏）
-    position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 C19 dict（相关性区块数据源）
-    evolution_data: dict | None = None,  # data 层：组合演进 C19 dict（None=无数据，章节隐藏）
+    style_factor_data: dict | None = None,  # data 层：风格与因子 dict（None=无数据，章节隐藏）
+    position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 dict（相关性区块数据源）
+    evolution_data: dict | None = None,  # data 层：组合演进 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
     """计算报告模块序号 + 可见性字典 + 闭包函数。
 
@@ -103,7 +103,7 @@ def _compute_section_visibility(
       board 层：用户配置的章节开关（enable_xxx）
       data 层：各子模块返回的数据可用状态
 
-    返回的闭包遵守 C14 约束（不写入 _ENV.globals）。
+    返回的闭包不写入 _ENV.globals。
     """
     # board 层：内联 dict（与 Excel 端结构一致）
     board_flags: dict[str, bool] = {
@@ -122,10 +122,10 @@ def _compute_section_visibility(
         "style_data": style_analysis is not None,
         "news_data_available": include_news,  # ← data 层（菜单类型+数据状态）
         "llm_data_available": llm_enabled_flag,  # ← data 层（LLM 生成成功？）
-        # 风格与因子合并章可见性：风格表（渲染期派生）或因子数据（C19）任一就绪即可见；
+        # 风格与因子合并章可见性：风格表（渲染期派生）或因子数据（数据契约）任一就绪即可见；
         # 模板依据 available/status 在"完整内容/数据不足/数据源暂不可用"间切换（§1.4.5）
         "style_factor_data": style_factor_data is not None or style_analysis is not None,
-        # 持仓关系矩阵 = 重合度区块（render 时计算）∪ 相关性区块（C19 数据源）：
+        # 持仓关系矩阵 = 重合度区块（render 时计算）∪ 相关性区块（数据契约 数据源）：
         # 任一区块有数据即章节可见，区块各自独立降级（§1.4.5）
         "position_relationship_data": overlap_matrix is not None or position_relationship_data is not None,
         # evolution_data 同上：始终由编排层计算注入（非 None）→ 章节可见，
@@ -153,7 +153,7 @@ def _compute_section_visibility(
     ordered_visible = other_secs + llm_sec
     visible_numbers = {sec["key"]: idx for idx, sec in enumerate(ordered_visible, start=1)}
 
-    # 创建渲染期 section_visible 闭包（不写入 _ENV.globals，遵守 C14 约束）
+    # 创建渲染期 section_visible 闭包（不写入 _ENV.globals）
     _sv_fn = lambda key, _d=section_visible_dict: bool(_d.get(key, False))
     return visible_numbers, section_visible_dict, _sv_fn
 
@@ -322,12 +322,12 @@ def _render_template(
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
     data_quality_enabled: bool = False,  # 子模块：数据质量仪表盘开关
-    position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status
-    data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness
-    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（行动板块 + 智囊团深度复盘行动摘要）
-    crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（合并章）
-    tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（合并章指标卡）
-    snapshot_diff_data: dict | None = None,  # 快照差异摘要 C19 snapshot_diff_data（组合演进章顶部）
+    position_status: dict | None = None,  # 品种覆盖诊断 position_status
+    data_freshness: dict | None = None,  # 可信度摘要 data_freshness
+    action_data: dict | None = None,  # 行动建议单一数据源 action_data（行动板块 + 智囊团深度复盘行动摘要）
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data（合并章）
+    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（合并章指标卡）
+    snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部）
     fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
@@ -436,9 +436,9 @@ def write_html_report(
     enable_portfolio_evolution: bool = True,
     enable_action: bool = False,  # 行动建议独立章（enable_action 默认关）
     enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
-    position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status（品种覆盖区块）
-    data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness（可信度区块 + 头部摘要行）
-    action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（行动板块 + 智囊团深度复盘行动摘要）
+    position_status: dict | None = None,  # 品种覆盖诊断 position_status（品种覆盖区块）
+    data_freshness: dict | None = None,  # 可信度摘要 data_freshness（可信度区块 + 头部摘要行）
+    action_data: dict | None = None,  # 行动建议单一数据源 action_data（行动板块 + 智囊团深度复盘行动摘要）
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
@@ -446,9 +446,9 @@ def write_html_report(
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
-    crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（合并章）
-    tail_risk_data: dict | None = None,  # 尾部风险统计 C19 tail_risk_data（合并章指标卡）
-    snapshot_diff_data: dict | None = None,  # 快照差异摘要 C19 snapshot_diff_data（组合演进章顶部变化摘要）
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data（合并章）
+    tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（合并章指标卡）
+    snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部变化摘要）
     fund_flow_data: dict | None = None,  # 成本流水数据 fund_flow_data（三页签 HTML 渲染数据源，None=开关关闭）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
@@ -468,7 +468,7 @@ def write_html_report(
             None 时历史章节显示占位文本。
         a_indices: 可选预获取 A 股指数数据，传入时跳过 HTTP 请求。
         us_indices: 可选预获取美股指数数据，传入时跳过 HTTP 请求。
-        chart_datasets: Chart.js 数据集（chart_data_builder 输出），经 context 传递（C14 合规）。
+        chart_datasets: Chart.js 数据集（chart_data_builder 输出），经 context 传递。
             默认 None → 图表章节回退旧 Canvas 渲染。
         enable_interactive_charts: Chart.js 交互图表总开关（Feature Flag）。
             默认 False → 模板不加载 chart.min.js / canvas 容器。
@@ -501,7 +501,7 @@ def write_html_report(
     # ── 5b) Chart.js 数据集补齐：category_doughnut / industry_bar / penetration_bar ──
     # 这三张图的数据源（cat_data / penetration）只在 write_html_report 内计算，
     # 调用侧传入的 chart_datasets 拿不到它们，导致图表误显示"暂不可用"。
-    # 此处用权威数据重建并覆盖，保证图表与表格同源（R11：单图失败仅跳过该图）。
+    # 此处用权威数据重建并覆盖，保证图表与表格同源（单图失败仅跳过该图）。
     if enable_interactive_charts and chart_datasets is not None:
         from src.python.report.chart_data_builder import (
             _build_category_doughnut_dataset,
@@ -621,7 +621,7 @@ def write_html_report(
 
     data_source_matrix = build_data_source_matrix()
 
-    # 因子中文名映射（单一数据源：analysis 层常量，经 context 传递，C14 合规）
+    # 因子中文名映射（单一数据源：analysis 层常量，经 context 传递）
     _factor_names: dict = {}
     if style_factor_data:
         try:
@@ -709,7 +709,7 @@ def write_html_report(
 
 
 def _copy_js_assets(output_dir: str) -> None:
-    """将 src/static/ 下 Chart.js 前端 JS 资产复制到报告输出目录（R21 本地 bundle）。
+    """将 src/static/ 下 Chart.js 前端 JS 资产复制到报告输出目录（本地 bundle）。
 
     模板以相对路径引用（chart.min.js / chart-print.js / chart-config.js /
     chart-export.js / chart-common.js / chart-init.js / toc.js / theme.js），

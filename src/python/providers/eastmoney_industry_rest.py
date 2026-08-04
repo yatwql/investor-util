@@ -33,7 +33,7 @@ _HEADERS = {
     "Referer": "https://quote.eastmoney.com/",
 }
 
-# 会话级内存缓存 — 委托 DataSourceRegistry session_cache（C4 约束, domain="industry_rest"）
+# 会话级内存缓存 — 委托 DataSourceRegistry session_cache（domain="industry_rest"）
 
 
 def _quote_prefix(code: str) -> str:
@@ -62,7 +62,7 @@ def _extract_quotedata(html: str) -> dict | None:
 def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     """通过行情页 REST API 获取一只证券的行业分类。
 
-    会话级内存复用（C4）：同一代码在同一会话内仅首次发起 HTTP 请求，
+    会话级内存复用：同一代码在同一会话内仅首次发起 HTTP 请求，
     后续调用直接返回缓存结果。
 
     当 push2 不可用时作为 fallback 使用。
