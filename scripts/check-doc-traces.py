@@ -12,14 +12,23 @@
      归档文件（docs-stm/archive/ 下的目录或 archived_*.md）。
      例外：folders.md 的目录树（│ ├ └ 行）可引用 archive 目录及其
      文件名——目录树记录项目结构，archive/ 条目是结构的一部分。
+  3. 章节编号引用：任何面向读者文档的正文不得用数字章节号（"N 章" /
+     "第 N 章"）指代报告具体章节，须用语义章节名（「X」章），用户才能
+     看懂。章节数量/序数表述（共 N 章 / N 章基线 / 减至 N 章 / 出现
+     第 N 章等）是合法计数，豁免。该检查**同样适用于** changelog.md /
+     plan.md / review-findings.md 与 docs-stm/plan/ 目录——它们虽是
+     历史/计划记录（豁免版本号等历史痕迹），但数字章节暗号同样影响
+     可读性，仅对它们应用本条章节编号检查。
 
 受检范围：
   - 项目根 README.md
   - docs-stm/managements/（排除 changelog.md / review-findings.md / plan.md）
   - docs-stm/manuals/
+  - 章节编号检查另覆盖 changelog.md / review-findings.md / plan.md 与
+    docs-stm/plan/（仅章节编号模式，不检查其他历史痕迹）
 
 豁免范围（历史/计划记录性质，允许历史痕迹与归档引用）：
-  - docs-stm/plan/ 中间计划文档
+  - docs-stm/plan/ 中间计划文档（历史痕迹豁免，章节编号不豁免）
   - docs-stm/archive/ 归档文档
   - docs-stm/tmp/ 运行时临时产物
 
@@ -44,7 +53,7 @@
 
 退出码：
   0 — 全部通过（无可疑痕迹）
-  1 — 发现高置信度痕迹（HIGH/ARCHIVE/CODE），应修复后再提交
+  1 — 发现高置信度痕迹（HIGH/ARCHIVE/CODE/CHAPTER），应修复后再提交
   2 — 仅 LOW 级别痕迹，建议人工复核
 """
 
@@ -86,6 +95,7 @@ SKIP_DIRS = {"archive", "plan", "tmp"}
 #   ARCHIVE   — 归档文件/目录引用，面向读者文档不应指向已归档内容
 #   CODE      — 任务编号引用（rf-N / plan-N / R-N），历史记录标识
 #   HIGH      — 高置信度历史痕迹（来源叙述/历史实现/变更节点/迭代/版本号）
+#   CHAPTER   — 章节编号引用（"N 章"/"第 N 章"指代报告具体章节，须用语义章节名）
 #   LOW       — 需人工判断的变更/过渡/待办描述（可能是当前能力也可能是痕迹）
 
 
@@ -101,7 +111,11 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         (r"归档文件\s*[:：]?\s*[`]?archive/", "ARCHIVE", "归档路径说明"),
         #  无显式 archive/ 前缀的归档引用（已/可/应 归档至 某目录），如
         #  "已归档至 archive/"、"归档至 docs-stm/archive/"——须含"归档"动词 + 归档目标
-        (r"归档\s*(?:至|到|于|在|入|完成|处理)\s*[`]?(?:docs-stm/|\.\./)?archive", "ARCHIVE", "归档引用（归档至 archive/ 等）"),
+        (
+            r"归档\s*(?:至|到|于|在|入|完成|处理)\s*[`]?(?:docs-stm/|\.\./)?archive",
+            "ARCHIVE",
+            "归档引用（归档至 archive/ 等）",
+        ),
         #  明确指向归档文件的叙述（"归档文件：archived_x.md" / "归档于 archived_*"）
         (r"(?:归档文件|归档于|归档到|归档至)\s*[:：]?\s*[`]?archived_", "ARCHIVE", "归档文件引用（归档至 archived_*）"),
         #  完成态归档动作（"已归档至 X" / "归档完成"），指向历史归档行为。
@@ -113,7 +127,11 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         #  视线会落在空格字符上导致排除失败，故让 lookahead 自身也能跳过空白。
         #  排除的运行时产物目标：reports?/（报告输出目录）、报告输出目录（中文写法）、
         #  `?\d{8}`?（纯数字日期目录）、`?YYYYMMDD（日期模板）、日期子目录。
-        (r"归档\s*(?:至|到|于|在|完成|处理)\s*(?!(?:\s*)(?:reports?/|报告输出目录|`?\d{8}`?|`?YYYYMMDD|日期子目录))", "ARCHIVE", "归档引用（归档至某处/归档完成）"),
+        (
+            r"归档\s*(?:至|到|于|在|完成|处理)\s*(?!(?:\s*)(?:reports?/|报告输出目录|`?\d{8}`?|`?YYYYMMDD|日期子目录))",
+            "ARCHIVE",
+            "归档引用（归档至某处/归档完成）",
+        ),
         # ── CODE：任务编号引用 ──
         (r"\brf-\d+", "CODE", "任务编号引用（rf-N）"),
         (r"\bplan-\d+", "CODE", "任务编号引用（plan-N）"),
@@ -149,8 +167,16 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         #  "之前/此前/以前/曾经/原始/历史/旧逻辑/重构前/替代旧"等高频文档
         #  历史叙述词。仅时间词不足判历史（"之前缓存过"是运行时描述），
         #  故需后接动作/状态动词或"逻辑/实现/方案"等名词。
-        (r"(?:之前|此前|以前|先前)\s*(?:是|为|直接|就|采用|使用|用|读取|实现|判断|属于|放在|在)", "HIGH", "此前/之前是（历史状态叙述）"),
-        (r"(?:之前|此前|以前|先前)(?:的)?(?:逻辑|实现|方案|做法|判定|版本|代码|判断)", "HIGH", "此前的逻辑/实现（历史实现叙述）"),
+        (
+            r"(?:之前|此前|以前|先前)\s*(?:是|为|直接|就|采用|使用|用|读取|实现|判断|属于|放在|在)",
+            "HIGH",
+            "此前/之前是（历史状态叙述）",
+        ),
+        (
+            r"(?:之前|此前|以前|先前)(?:的)?(?:逻辑|实现|方案|做法|判定|版本|代码|判断)",
+            "HIGH",
+            "此前的逻辑/实现（历史实现叙述）",
+        ),
         (r"曾经的?[^\s。，;]{0,6}(?:实现|逻辑|方案|做法|版本|代码)", "HIGH", "曾经的实现/逻辑（历史实现叙述）"),
         (r"曾考虑[过]?", "HIGH", "曾考虑（历史决策/备选方案叙述）"),
         (r"原始(?:版本|实现|方案|逻辑)", "HIGH", "原始版本/实现（历史状态叙述）"),
@@ -158,10 +184,21 @@ def _doc_patterns() -> list[tuple[str, str, str]]:
         (r"(?:之前|此前|以前|旧|原|历史)(?:的)?版本\s*(?:为|号|是|中)", "HIGH", "旧/历史版本号（版本对比痕迹）"),
         (r"由\s*旧(?:文件|版本|逻辑|方案|实现)", "HIGH", "由旧XX（历史来源/改造叙述）"),
         (r"由旧[^\s。，;]{0,8}(?:改造|改来|升级而来|改写)", "HIGH", "由旧XX改造/改来（历史变更叙述）"),
-        (r"(?:迁移|移到|移至|搬到|转入)\s*(?:到|至)?\s*新(?:模块|文件|目录|位置|路径|函数|类)", "HIGH", "迁移/移到新位置（迁移痕迹）"),
+        (
+            r"(?:迁移|移到|移至|搬到|转入)\s*(?:到|至)?\s*新(?:模块|文件|目录|位置|路径|函数|类)",
+            "HIGH",
+            "迁移/移到新位置（迁移痕迹）",
+        ),
         (r"重构\s*前", "HIGH", "重构前（重构历史叙述）"),
         (r"旧(?:逻辑|实现|方案|代码|写法|做法|设计|版本)", "HIGH", "旧逻辑/旧实现（历史实现叙述）"),
         (r"替代(?:了|掉|原有|旧的)?旧|替换旧", "HIGH", "替代旧/替换旧（历史变更叙述）"),
+        # ── CHAPTER：章节编号引用（用数字章节号指代报告具体章节） ──
+        #  "N 章" / "第 N 章"（N=1~99）指代报告具体章节时用户无法识别，须改
+        #  用语义章节名（「X」章）。章节数量/序数表述（共 N 章、N 章基线、
+        #  减至 N 章、出现第 N 章、N→M 章、引号内"N 章"）由 _chapter_excludes()
+        #  豁免。负向前瞻 (?!节) 排除"章节"一词；[1-9]\d? 限 1~99，不匹配
+        #  中文数字"一章"、小节号"4.2"（数字后非"章"）。
+        (r"第?\s*[1-9]\d?\s*章(?!节)", "CHAPTER", "章节编号引用（N 章/第 N 章，须用语义章节名）"),
         # ── LOW：需人工判断的变更/过渡/待办描述（可能是当前能力也可能是痕迹） ──
         (r"重构[为成到]", "LOW", "重构为/重构到（变更描述，需判断）"),
         (r"已废弃|已弃用", "LOW", "废弃/弃用标注（当前指引或历史，需判断）"),
@@ -220,7 +257,9 @@ def _exclude_lines() -> list[re.Pattern]:
         # 工具说明行豁免：描述"检查哪些历史痕迹/来源叙述/原旧实现"的元描述，
         # 而非文档实际含历史痕迹（如 scripts-reference.md 的检查规则说明）。
         # 命中"检查/检测/扫描 + 痕迹/来源/原旧/迁移/重命名/迭代 + 描述"组合才豁免。
-        re.compile(r"(?:检查|检测|判定|扫描|检出|识别|不得带|不得包含|不得出现|不应记录|禁止出现).{0,12}(?:历史痕迹|来源叙述|原旧实现|迁移重命名|变更痕迹|迭代标记|版本号标记|归档引用|任务编号)"),
+        re.compile(
+            r"(?:检查|检测|判定|扫描|检出|识别|不得带|不得包含|不得出现|不应记录|禁止出现).{0,12}(?:历史痕迹|来源叙述|原旧实现|迁移重命名|变更痕迹|迭代标记|版本号标记|归档引用|任务编号)"
+        ),
         # ── 补强模式的误报排除（当前状态/运行时语义，非历史痕迹） ──
         re.compile(r"历史数据|历史(?:序列|区间|值|曲线|走势|数据点|K线|回撤)"),  # 运行时历史序列/指标
         re.compile(r"当前版本"),  # 当前版本是运行时状态描述
@@ -229,9 +268,34 @@ def _exclude_lines() -> list[re.Pattern]:
     ]
 
 
+def _chapter_excludes() -> list[re.Pattern]:
+    """章节数量/序数表述豁免（"N 章"为计数/基线/第 N 个章节，非具体章节引用）。
+
+    这些是合法计数表述，命中的行跳过 CHAPTER 分类检查（不影响其他痕迹检查）：
+      - 共/目标/总数/合计/合并后 N 章        —— 章节总数
+      - N 章 总数/内容/正文/结构/基线/篇幅/布局/表格 —— N 章的结构性指代
+      - 减至/降至/精简至/重排为/缩至 N 章    —— 章节数缩减
+      - N→M 章 / N 至 M 章                   —— 章节数过渡
+      - 「N 章」                             —— 引号内计数
+      - 出现/新增/开启才出现 第 N 章          —— 序数（出现第 N 个章节）
+    """
+    return [
+        re.compile(r"(?:共|总共|合计|目标|总数|章节数|合并后)\s*[1-9]\d?\s*章"),
+        re.compile(r"[1-9]\d?\s*章\s*(?:总数|内容|正文|结构|基线|篇幅|布局|表格)"),
+        re.compile(r"(?:减至|降至|精简至|重排(?:为|成)?|缩至)\s*[1-9]\d?\s*章"),
+        re.compile(r"[1-9]\d?\s*章\s*总数减至\s*[1-9]\d?"),
+        re.compile(r"[1-9]\d?\s*(?:→|至)\s*[1-9]\d?\s*章"),
+        re.compile(r"「[1-9]\d?\s*章」"),
+        re.compile(r"(?:出现|新增|开启才出现|才出现)\s*第\s*[1-9]\d?\s*章"),
+    ]
+
+
 # 模块级缓存（模式列表固定，避免逐行重复构建）
 _DOC_PATTERNS = _doc_patterns()
 _COMPILED_EXCLUDE = _exclude_lines()
+_COMPILED_CHAPTER_EXCLUDE = _chapter_excludes()
+# 章节编号模式子集（用于 trace-exempt 文档的仅章节扫描）
+_CHAPTER_PATTERNS = [(p, c, d) for p, c, d in _DOC_PATTERNS if c == "CHAPTER"]
 
 
 def _is_excluded(line: str) -> bool:
@@ -239,11 +303,20 @@ def _is_excluded(line: str) -> bool:
     return any(p.search(line) for p in _COMPILED_EXCLUDE)
 
 
-def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
+def _is_chapter_excluded(line: str) -> bool:
+    """检查该行是否命中章节计数/序数豁免（"N 章"为数量而非具体章节引用）。"""
+    return any(p.search(line) for p in _COMPILED_CHAPTER_EXCLUDE)
+
+
+def scan_file(fpath: Path, verbose: bool, chapter_only: bool = False) -> list[tuple[int, str, str, str]]:
     """扫描单个文档，返回 [(行号, 分类, 模式说明, 行内容), ...]
 
     Markdown 围栏代码块（``` 包裹）内是命令/配置示例，非文档叙述，
     不参与历史痕迹匹配（避免 `git tag v0.9.9`、`APP_VERSION` 示例误报）。
+
+    chapter_only=True：仅应用 CHAPTER 章节编号模式（用于 changelog/plan/
+    review-findings 与 docs-stm/plan/ 等 trace-exempt 文档——它们是历史/计划
+    记录，版本号等历史痕迹合法，但数字章节暗号仍影响可读性需检查）。
     """
     hits: list[tuple[int, str, str, str]] = []
     try:
@@ -251,6 +324,7 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
     except (OSError, UnicodeDecodeError):
         return hits
 
+    patterns = _CHAPTER_PATTERNS if chapter_only else _DOC_PATTERNS
     in_code_block = False
     for lineno, line in enumerate(text.splitlines(), 1):
         stripped = line.strip()
@@ -266,11 +340,18 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
             if verbose:
                 print(f"    (codeblock) L{lineno}: {stripped[:60]}")
             continue
-        if _is_excluded(stripped):
+        if not chapter_only and _is_excluded(stripped):
             if verbose:
                 print(f"    (excluded) L{lineno}: {stripped[:80]}")
             continue
-        for pat, cat, desc in _DOC_PATTERNS:
+        if _is_chapter_excluded(stripped):
+            if verbose and chapter_only:
+                print(f"    (ch-excluded) L{lineno}: {stripped[:80]}")
+            if chapter_only:
+                continue
+        for pat, cat, desc in patterns:
+            if cat == "CHAPTER" and _is_chapter_excluded(stripped):
+                continue  # 计数/序数表述豁免，不影响其他模式
             if re.search(pat, stripped):
                 hits.append((lineno, cat, desc, stripped[:120]))
                 break  # 每行仅报告首个匹配
@@ -278,9 +359,29 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
     return hits
 
 
-def _iter_docs() -> list[Path]:
-    """收集受检文档（README + managements/manuals 中未被豁免的 .md）。"""
+def _iter_docs(trace_exempt: bool = False) -> list[Path]:
+    """收集受检文档。
+
+    trace_exempt=False（默认）：常规文档——README + managements/manuals 中
+    未被豁免的 .md（历史痕迹全量检查）。
+
+    trace_exempt=True：仅章节编号检查的文档——changelog.md / plan.md /
+    review-findings.md（SKIP_FILES）+ docs-stm/plan/ 目录。它们虽是历史/计划
+    记录（版本号等历史痕迹豁免），但数字章节暗号影响可读性，需单独检查。
+    不包含 archive/ 与 tmp/（归档/临时产物，历史痕迹与章节编号均不检查）。
+    """
     docs: list[Path] = []
+    if trace_exempt:
+        for doc_dir in DOC_DIRS:
+            if not doc_dir.exists():
+                continue
+            for fpath in sorted(doc_dir.rglob("*.md")):
+                if fpath.name in SKIP_FILES:
+                    docs.append(fpath)
+        plan_dir = REPO_ROOT / "docs-stm" / "plan"
+        if plan_dir.exists():
+            docs.extend(sorted(plan_dir.rglob("*.md")))
+        return docs
     if README_PATH.exists():
         docs.append(README_PATH)
     for doc_dir in DOC_DIRS:
@@ -315,10 +416,11 @@ def main() -> int:
     low_count = 0
     summary: dict[str, int] = {}
 
-    for doc in _iter_docs():
-        hits = scan_file(doc, args.verbose)
+    def report_doc(doc: Path, hits: list[tuple[int, str, str, str]]) -> None:
+        """报告单个文档的命中（非 local，作为闭包读取/修改外层统计）。"""
+        nonlocal total_hits, high_count, low_count
         if not hits:
-            continue
+            return
         rel = doc.relative_to(REPO_ROOT)
         if not args.ci:
             print(f"\n  {rel}")
@@ -326,7 +428,7 @@ def main() -> int:
         for lineno, cat, desc, text in hits:
             total_hits += 1
             summary[cat] = summary.get(cat, 0) + 1
-            is_high = cat in ("HIGH", "ARCHIVE", "CODE")
+            is_high = cat in ("HIGH", "ARCHIVE", "CODE", "CHAPTER")
             if is_high:
                 high_count += 1
             else:
@@ -340,6 +442,15 @@ def main() -> int:
                 if args.verbose:
                     print(f"           {text}")
 
+    # 常规文档：历史痕迹 + 章节编号全量检查
+    for doc in _iter_docs(trace_exempt=False):
+        report_doc(doc, scan_file(doc, args.verbose, chapter_only=False))
+
+    # trace-exempt 文档（changelog/plan/review-findings + plan 目录）：
+    # 仅章节编号检查（版本号等历史痕迹合法，不检查）
+    for doc in _iter_docs(trace_exempt=True):
+        report_doc(doc, scan_file(doc, args.verbose, chapter_only=True))
+
     print()
     if total_hits == 0:
         print("[OK] 未发现历史变更痕迹，文档干净")
@@ -348,7 +459,7 @@ def main() -> int:
     cat_stats = ", ".join(f"{k}={v}" for k, v in sorted(summary.items()))
     print(f"[!] 发现 {total_hits} 处可疑痕迹（{cat_stats}）")
     if high_count > 0:
-        print(f"    {high_count} 处高置信度（HIGH/ARCHIVE/CODE），应从文档中移除")
+        print(f"    {high_count} 处高置信度（HIGH/ARCHIVE/CODE/CHAPTER），应从文档中移除")
         return 1
     print(f"[!] 仅 {low_count} 处 LOW 级别痕迹（需人工判断），建议复核")
     return 2

@@ -64,10 +64,16 @@ def _code_hit(mod, line: str) -> str | None:
 
 
 def _doc_hit(mod, line: str) -> str | None:
-    """返回 check-doc-traces 命中的 desc；未命中返回 None。"""
+    """返回 check-doc-traces 命中的 desc；未命中返回 None。
+
+    对 CHAPTER（章节编号）模式先应用 _is_chapter_excluded 计数/序数豁免，
+    与 scan_file 行为一致（"共 19 章"等计数表述不误报）。
+    """
     if mod._is_excluded(line):
         return None
     for pat, cat, desc in mod._DOC_PATTERNS:
+        if cat == "CHAPTER" and mod._is_chapter_excluded(line):
+            continue
         if __import__("re").search(pat, line):
             return desc
     return None
@@ -271,6 +277,54 @@ class TestDocTraceDetection:
     def test_legit_letter_digit_not_flagged(self, doc_traces):
         assert _doc_hit(doc_traces, "全系列报告") is None
         assert _doc_hit(doc_traces, "C20 约束") is None
+
+
+# ── check-doc-traces：章节编号暗号检测（CHAPTER） ───────────
+
+
+class TestDocChapterDetection:
+    """正文用数字章节号（"N 章"/"第 N 章"）指代报告具体章节须检出（可读性暗号，
+    须改用语义章节名「X」章）；章节数量/序数表述（共 N 章 / N 章基线 / 减至
+    N 章 / 出现第 N 章 / N→M 章 / 引号内"N 章"）是合法计数，豁免。"""
+
+    def test_chapter_codes_flagged(self, doc_traces):
+        flagged = [
+            "改造 5 章",
+            "合并 9 章",
+            "9章加X",
+            "第 5 章加估值分位",
+            "输出到 20 章行动建议",
+            "14 章摘要引用",
+            "1/2/3 章渲染",
+            "4 章估值分位",
+        ]
+        for line in flagged:
+            assert _doc_hit(doc_traces, line) is not None, f"章节编号暗号未检出: {line}"
+
+    def test_chapter_count_exempted(self, doc_traces):
+        legit = [
+            "共 19 章",
+            "目标 19 章",
+            "合并后 18 章基线",
+            "总数 21 章减至 19 章",
+            "减至 19 章",
+            "20→19 章",
+            "「19 章」",
+            "开启才出现第 19 章",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"章节计数表述被误伤: {line}"
+
+    def test_non_patterns_clean(self, doc_traces):
+        legit = [
+            "一章三区块",
+            "4.2 章节归并对照表",
+            "19 个章节",
+            "章节",
+            "21 轮每轮量化验收",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"合法表述被误伤: {line}"
 
 
 # ── 注释提取：多行 docstring 状态不泄漏 ─────────────────────
