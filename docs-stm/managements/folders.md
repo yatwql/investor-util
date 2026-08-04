@@ -345,6 +345,7 @@ investor-util/
 │       │   │   └── test_whatif_backtest_edge.py #  时序回测边缘场景（未来日期/单 bar/首值 0/极端涨跌）
 │       │   ├── config/              #   配置单元测试
 │       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_anonymizer.py        #   持仓匿名化模块测试（4 模式/回退/配置读写）
 │       │   │   ├── test_config.py            #   配置管理核心测试
 │       │   │   ├── test_config_atomic.py     #   配置原子操作测试
 │       │   │   ├── test_config_atomic_edge.py #   配置原子操作边缘场景

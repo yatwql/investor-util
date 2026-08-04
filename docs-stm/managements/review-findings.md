@@ -45,9 +45,7 @@
 
 ### P3 — 测试覆盖缺口（建议补齐）
 
-| # | 位置 | 问题 |
-|---|------|------|
-| **rf-226** | `src/python/llm/fact_checker/_numerical.py` | `_evaluate_percent_value` 策略 1（明确主体判定）对「组合级收益 + 个股级收益同句段」误配：`test_llm_hallucination.py::test_correct_output_all_pass` 文本「组合累计收益约10.0%，招商银行(600036)上涨8.0%，贵州茅台(600519)上涨15.0%」被误检——整句定位主体「招商银行」后，把组合收益 10.0% 错当个股收益率，报「10.0% 与 600036 实际 8.2% 偏差超容差」（正确应路由 10.0% 到组合总收益率 9.73%、8.0% 到招商银行 8.2%、15.0% 到茅台 15.0%）。**HEAD 基线已复现，非本次死代码删除引入**（`git stash` 验证：删除前同样失败） |
+> 全部补齐（2026-08-05）：rf-226 fact_checker 组合级收益误配修复 + config/anonymizer.py 补测试（99% 覆盖）。
 
 ---
 
@@ -57,6 +55,7 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| **rf-226** | `_evaluate_percent_value` 对「组合级收益 + 个股级收益同句段」误配：组合累计收益 10.0% 被整句主体定位误路由到数值最近的个股（招商银行 8.2%），报假阳性（HEAD 基线已复现） | 新增组合级语境检测 `_is_portfolio_level_context`（`_PORTFOLIO_KEYWORDS` 词表，match 前 15 字符窗口），在主体定位前判定组合级收益并归到组合总收益率 | changelog v0.10.4 |
 | **rf-223** | 批量暗号替换脚本（/tmp/clean_ciphers.py，本次会话一次性工具）`[ \t]{2,}` 折叠整行空白，破坏 9 个 Python 文件前导缩进（report 4 个 + test 5 个，IndentationError） | 按 HEAD 逐行映射恢复前导空白（行数 1:1 已验），全仓 git diff 范围内 `compile()` 通过 | changelog v0.10.3 |
 | **rf-224** | 批量暗号替换脚本误处理：截断需求 ID `R-LLM-DB-QA-CONCENTRATION-03/04`（test_debate_prompts.py）、删除 `I2.` 段头序号（_config_defaults.py / how-to-config.md）、产生空头 `── ──` | 需求 ID 恢复完整并纳入 DASHTASK 豁免（requirements.md 表格定义的合法需求交叉引用，非任务编号）；交易纪律段头改纯语义「交易纪律配置」（`I2` 属配置索引暗号，两处同步） | changelog v0.10.3 |
 | **rf-225** | 语义清理将模块级 `_C19_KEYS` 重命名为 `__KEYS`，双下划线在类内触发 Python 名称混淆（NameError：`test_correlation.py` 2 例 + `test_pipeline_factor_exposure.py` 1 例） | 改语义名 `_CONTRACT_KEYS`（单下划线 + 语义名，符合命名纪律），3 处引用同步；P0 门禁 dev-verify 复跑 1649 全过 | changelog v0.10.3 |

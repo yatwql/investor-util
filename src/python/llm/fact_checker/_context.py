@@ -14,6 +14,7 @@ from src.python.llm.fact_checker._constants import (
     _DAILY_TIME_KEYWORDS,
     _DRAWDOWN_KEYWORDS,
     _HYPOTHETICAL_KEYWORDS,
+    _PORTFOLIO_KEYWORDS,
     _POSITION_WEIGHT_KEYWORDS,
     _PROFIT_KEYWORDS,
     _SUGGESTION_KEYWORDS,
@@ -100,6 +101,17 @@ def _is_benchmark_relative_context(sentence: str, match_start: int) -> bool:
     """
     nearby = sentence[max(0, match_start - 20) : match_start + 10]
     return any(kw in nearby for kw in _BENCHMARK_RELATIVE_KEYWORDS)
+
+
+def _is_portfolio_level_context(sentence: str, match_start: int) -> bool:
+    """判断百分比数值是否在组合级收益语境中（如"组合累计收益约10.0%"）。
+
+    组合级收益数值应归到组合总收益率而非某个个股。用 match 前 15 字符内
+    是否出现组合级关键词判定（"组合累计""总收益""整体收益"等），避免同句
+    含多个持仓代码时组合收益数值被误路由到数值最近的个股。
+    """
+    nearby = sentence[max(0, match_start - 15) : match_start]
+    return any(kw in nearby for kw in _PORTFOLIO_KEYWORDS)
 
 
 def _is_contribution_sentence(sentence: str) -> bool:

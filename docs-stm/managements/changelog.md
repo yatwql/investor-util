@@ -8,6 +8,13 @@
 
 ### 开发中（未发布）
 
+#### 技术债收尾（LLM 死代码删除 + fact_checker 组合级收益误配 + 匿名化模块补测试）
+
+- **LLM 死代码删除**：删除 `llm/_call_claude.py`/`_call_gemini.py`/`_call_openai.py`/`_thinking.py` 四个孤儿模块（外部零引用，LLM 调用统一走 `_api_claude`/`_api_openai`/`_api_gemini` 活动路径），净删 378 行，`llm/__init__.py` 导出同步清理。
+- **fact_checker 组合级收益误配修复**：`_evaluate_percent_value` 对「组合累计收益10%，招商银行上涨8%，贵州茅台上涨15%」同句段，组合收益数值被整句主体定位误路由到数值最近的个股（招商银行 8.2%），报假阳性。新增组合级语境检测 `_is_portfolio_level_context`（`_PORTFOLIO_KEYWORDS` 词表，match 前 15 字符窗口），在主体定位前判定组合级收益并归到组合总收益率。新增 2 例专项回归（`test_portfolio_level_plus_stock_level_same_sentence` 组合级路由通过 / `test_portfolio_level_mismatch_attributed_to_portfolio` 组合级错误归因到组合总收益率而非个股）；`test_fact_checker.py` 95 例、`test_llm_hallucination.py` 17 例全过。
+- **匿名化模块补测试**：`config/anonymizer.py` 原 0% 覆盖 → 新增 `src/test/unit/config/test_anonymizer.py` 33 例、覆盖率 99%。覆盖 4 种模式（off/code_display/full_anonymous/summary）× 持仓列表与明细字典、未知模式回退 off、`get/set_anonymization_mode` 配置读写（含无效模式抛 ValueError）、`_num_to_label`/`_blur_value`/`_categorize_*` 辅助函数、`code_utils` 导入失败前缀回退。唯一未覆盖为 `_blur_shares` 中不可达的 `<100` 防御分支（`round(x/100)*100` 值域仅 {0} ∪ [100,∞)，无法命中）。
+- **门禁**：P0 dev-verify 1694 passed + 3 check（code-traces/doc-traces/task-numbering）全 [OK]。
+
 #### 重构期历史兼容负担清理（移除旧配置键迁移 / import 再导出 / LLM 内嵌凭据自动改写）
 
 - **配置键迁移移除**：`_core.get_config()` 不再做 `history.analysis`→`history.fetch_mode` 惰性迁移（旧键直接忽略，回落到默认 `fetch_mode=auto`）；`config/_local_state.py` 移除 `_migrate_legacy_keys` 旧键搬移（`_startup_wizard_shown`/`_privacy_notice_shown` 只在本机 `local_state.json` 读写，不做 config.json 迁移）；`anonymizer.py` 移除匿名化模式废弃别名映射（未知模式回退 `off`）。
