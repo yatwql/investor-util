@@ -24,7 +24,7 @@ logger = setup_logger()
 # ── 组合历史走势与回撤页签写入（合并章：走势表 + 回撤矩阵 + 危机区间标注） ──────
 
 
-def _write_history_sheets(
+def _write_portfolio_history_drawdown_sheet(
     sheets: dict[str, Any],
     history_data: dict | None,
     crisis_annotation: dict[str, Any] | None = None,
@@ -245,7 +245,7 @@ def generate_excel_report(
         if ws_hd is not None:
             prog.info("正在写入组合历史走势与回撤页签...")
             try:
-                _write_history_sheets(
+                _write_portfolio_history_drawdown_sheet(
                     sheets,
                     history_data,
                     (pipeline_data or {}).get("crisis_annotation_data"),

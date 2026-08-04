@@ -227,7 +227,7 @@ def _validate_enable_boards(config: dict, issues: int) -> int:
     """验证章节可见性配置（enable_fund_deep_analysis / enable_news / enable_history /
     enable_portfolio_evolution / enable_action）。
 
-    enable_action（行动建议独立章 17）默认关，缺失视为 False（沿用默认值），
+    enable_action（行动建议独立章）默认关，缺失视为 False（沿用默认值），
     类型校验逻辑与其余 enable_xxx 一致。
     """
     for key in (
