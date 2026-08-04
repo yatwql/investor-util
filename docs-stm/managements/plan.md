@@ -25,7 +25,7 @@
 
 ### 推荐实施顺序
 
-> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑨ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列。
+> 结合架构约束、收益/风险与最新依赖状态重排的推荐实施次序。①~⑧ 为推荐先后；括号内为计划项优先级归类。详细设计与每轮验收见 [`plan-investment-features.md`](../plan/plan-investment-features.md) §5 与 [`plan-investment-iteration.md`](../plan/plan-investment-iteration.md) 阶段地图。plan-4 已放弃，不列入实施序列；plan-8/plan-10 已归 P4 实验功能，不列入当前实施序列。
 
 | 次序 | 计划项 | 归类 | 工作量 | 推荐理由 |
 |:--:|:--|:--:|:--:|:--|
@@ -37,8 +37,6 @@
 | ⑥ | **plan-22** 成本流水 | P2 | 轮14~16 | 依赖持仓文件格式扩展，输入→计算→渲染 |
 | ⑦ | **plan-23** 估值与温度 | P3 | 轮17~18 | 免费代理信号，合规敏感，放最后 |
 | ⑧ | **plan-24** 导航与收尾 | P3 | 轮19~20 | 分组导航 + 文档快照，收尾性质 |
-| ⑨ | **plan-10** 日志可视化 | P3 | 1d | 独立低风险 |
-| ⑩ | **plan-8** 轻量 Web UI | P3 | 5-6d | 运维+安全成本最高，单人工具需谨慎，建议最后 |
 
 ### P1 — 当前待办
 
@@ -80,13 +78,17 @@
 
 HTML 按「基础/基金深度/风险/历史/LLM」分组导航折叠（新增图表 C20 图下说明）；管理文档版本头/数据快照/用户手册同步。**对应轮 19~20**。
 
-#### `plan-10` 日志可视化（[`plan-web-ui.md §3`](../plan/plan-web-ui.md#3-日志可视化)）— **推荐⑨**
+### P4 — 实验功能
+
+> 实验性功能，缺省关闭，需通过配置项或 features.json 显式启用。启用不影响现有功能稳定性。**当前实验项**：日志可视化、轻量 Web UI（独立于本迭代，选做，无排期）。
+
+#### `plan-10` 日志可视化（[`plan-web-ui.md §3`](../plan/plan-web-ui.md#3-日志可视化)）
 
 结构化日志查看（`--view-logs` 命令 + 报告尾部数据源状态表）。**预估：1d**
 
-#### `plan-8` 轻量 Web UI（[`plan-web-ui.md §1`](../plan/plan-web-ui.md#1-轻量-web-ui)）— **推荐⑩**
+#### `plan-8` 轻量 Web UI（[`plan-web-ui.md §1`](../plan/plan-web-ui.md#1-轻量-web-ui)）
 
-Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做多用户/LLM 在线修改/实时日志流。**运维与安全成本最高，单人工具需谨慎，建议作为 P3 最后项。**
+Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做多用户/LLM 在线修改/实时日志流。**运维与安全成本最高，单人工具需谨慎，选做。**
 
 > 详细评估与实施拆分见 [`plan-web-ui-implementation.md`](../plan/plan-web-ui-implementation.md)（收益/风险/架构约束 C1-C20 符合性/`src/python/web/` 模块拆分/安全设计/API/测试/实施阶段）。
 
@@ -95,10 +97,6 @@ Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做�
 | MVP 核心 | 3d |
 | 功能补齐 | 1.5d |
 | 体验打磨 | 1d |
-
-### P4 — 实验功能
-
-> 实验性功能，缺省关闭，需通过配置项或 features.json 显式启用。启用不影响现有功能稳定性。当前无排期项。
 
 ---
 
