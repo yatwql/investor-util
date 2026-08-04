@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.python.analysis.crisis_annotation import CRISIS_INTERVALS
 from src.python.report.downsample import downsample_bars
 
 logger = logging.getLogger("invest")
@@ -151,7 +152,7 @@ def _empty_dataset() -> dict:
 
 
 def _build_portfolio_line_dataset(history_data: dict) -> dict:
-    """净值趋势 Line：主曲线 + 基准线（P1 服务端下采样）。"""
+    """净值趋势 Line：主曲线 + 基准线（P1 服务端下采样）+ 危机区间带。"""
     bars = downsample_bars(history_data.get("bars") or [])
     status = history_data.get("status")
     labels = [b["date"] for b in bars]
@@ -171,7 +172,31 @@ def _build_portfolio_line_dataset(history_data: dict) -> dict:
         "labels": labels,
         "datasets": [dataset],
         "benchmarks": _build_benchmark_datasets(history_data.get("benchmarks") or []),
+        "crisis": _compute_crisis_bands(labels),
     }
+
+
+def _compute_crisis_bands(labels: list[str]) -> list[dict[str, Any]]:
+    """计算危机区间在 x 轴 labels 中的起止索引带（危机分段着色，C20 图下说明）。
+
+    仅保留与数据窗口（labels）重叠的区间；无重叠返回空列表（说明不出）。
+    labels 为 ISO 日期（YYYY-MM-DD）升序，字符串比较即日期序。
+    """
+    bands: list[dict[str, Any]] = []
+    for raw in CRISIS_INTERVALS:
+        start_i = None
+        end_i = None
+        for i, label in enumerate(labels):
+            d = str(label)
+            if start_i is None and d >= raw["start"]:
+                start_i = i
+            if d <= raw["end"]:
+                end_i = i
+        if start_i is not None and end_i is not None and start_i <= end_i:
+            bands.append(
+                {"startIndex": start_i, "endIndex": end_i, "label": raw["name"]}
+            )
+    return bands
 
 
 def _build_benchmark_datasets(benchmarks: list) -> list:

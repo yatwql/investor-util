@@ -8,12 +8,12 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 217 | 51,672 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
-| HTML 报告模板 | HTML | 4 | 3,547 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 主程序代码 | Python | 218 | 52,066 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| HTML 报告模板 | HTML | 4 | 3,539 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 16 | 5,064 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **237** | **60,283** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **259** | **72,959** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,639 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **源代码合计** | — | **238** | **60,669** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **260** | **73,609** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,670 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
 | **用户文档** | Markdown | **13** | — | 含 README.md |
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
@@ -109,6 +109,7 @@ investor-util/
 │   │   │   ├── drawdown_events.py             #   回撤事件识别（新高/回撤起止/幅度）
 │   │   │   ├── factor_exposure.py             #   因子暴露分析（MVP 3 因子：价值/成长/质量，OLS 回归）
 │   │   │   ├── correlation.py                 #   持仓相关性矩阵（Pearson 相关/显著性/下三角矩阵）
+│   │   │   ├── crisis_annotation.py           #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复 → C19 crisis_annotation_data）
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
@@ -206,6 +207,7 @@ investor-util/
 │   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
 │   │   │   ├── action_sheet.py       #   行动建议 Excel 页签（再平衡信号/交易纪律/调仓建议/收益归因）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
+│   │   │   ├── portfolio_history_drawdown_sheet.py # 组合历史走势与回撤 Excel 页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注）
 │   │   │   ├── position_relationship_sheet.py # 持仓关系矩阵 Excel 页签（一章两区块：重合度 + 相关性）
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
@@ -322,6 +324,7 @@ investor-util/
 │       │   │   ├── test_factor_exposure.py    #   因子暴露分析（OLS 回归/样本下限/停更剔除）
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
 │       │   │   ├── test_correlation_edge.py   #   相关性矩阵边缘场景（NaN/Inf/日期缺口）
+│       │   │   ├── test_crisis_annotation.py   #   危机区间标注（2015/2018/2020/2022 静态表 + 区间回撤/恢复耗时/重叠）
 │       │   │   ├── test_portfolio_evolution.py #  组合演进聚合计算（多快照趋势/HHI/TOP 变迁）
 │       │   │   ├── test_whatif.py             #   调仓 What-if 计算（变动识别/成本权重/HHI/降级）
 │       │   │   ├── test_whatif_backtest.py    #   调仓 What-if 时序回测（天数折算/序列对齐/5 指标/降级）

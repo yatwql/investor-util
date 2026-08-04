@@ -13,11 +13,11 @@
   "llm_providers_file": "data/config/llm_providers.json",
 
   // ── B. 报告章节可见性 ──
-  "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露+相关性（#6~11）
-  "enable_news": true,      // 市场新闻（#12）
-  "enable_history": true,   // 组合历史走势+回撤（#17~18）
-  "enable_portfolio_evolution": true,  // 组合演进（#19）
-  "enable_action": false,     // 行动建议（#20，默认关）
+  "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露+相关性（#6~10）
+  "enable_news": true,      // 市场新闻（#11）
+  "enable_history": true,   // 组合历史走势与回撤（#16）
+  "enable_portfolio_evolution": true,  // 组合演进（#17）
+  "enable_action": false,     // 行动建议（#18，默认关）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
@@ -61,7 +61,7 @@
   // ── G. 组合历史走势与持仓快照 ──
   "history": {
     "fetch_mode": "auto",  // 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
-    "lookback_days": 90,  // 历史走势取数窗口（K 线条数/交易日），需≥60（回撤分析最少交易日）才计算回撤分析，上限 365
+    "lookback_days": 90,  // 历史走势取数窗口（K 线条数/交易日），需≥60（回撤矩阵最少交易日）才计算回撤矩阵，上限 365
     "snapshot_retention_days": 60,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,
@@ -136,13 +136,13 @@
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
 | `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/W/C/F/O/1/2/3/4/P/I/A/S/R/X），启动后光标自动定位 | 手动编辑 |
-| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（21 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
+| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（20 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `comparison_indices` | `{"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}` | 竞争语境对比指数池。智囊团深度复盘中对比组合 vs 多指数的今日涨跌幅、区间累计收益和指标（夏普/波动率/最大回撤）。格式 `{指数代码: 显示名称}`。禁用时设为空对象 `{}` | 手动编辑 |
 | `risk_free_rate` | `null` | 无风险利率手动配置（null=自动从国债收益率获取，填小数如0.0174或百分比如1.74）。程序默认通过 akshare `bond_zh_us_rate` 获取中国 10Y 国债收益率 | 手动编辑 |
 | `history.fetch_mode` | `"auto"` | 组合历史走势获取模式：`"off"`=关闭、`"prompt"`=报告后询问、`"auto"`=自动获取（默认） | 手动编辑 |
-| `history.lookback_days` | `90` | 组合历史走势取数窗口（K 线条数/交易日）。需 ≥60（回撤分析所需最少交易日）才计算回撤分析，上限 365（K 线源最多返回条数）。股票/ETF 按此取 K 线条数，OTC 基金全量净值截取最近 N 条 | 手动编辑 |
+| `history.lookback_days` | `90` | 组合历史走势取数窗口（K 线条数/交易日）。需 ≥60（回撤矩阵所需最少交易日）才计算回撤矩阵，上限 365（K 线源最多返回条数）。股票/ETF 按此取 K 线条数，OTC 基金全量净值截取最近 N 条 | 手动编辑 |
 | `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
 | `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（0~1）。有效区间起算日和截止日均要求 ≥此比例×总持仓 有数据，否则向前/向后递延截断。提高该值可增加起算日市值真实性，但会缩短有效区间 | 手动编辑 |
@@ -161,11 +161,11 @@
 | `discipline.silence_days` | `30` | 交易纪律信号静默期天数。同一品种触发纪律后 N 天内不再重复告警 | 手动编辑 |
 | `redemption_limits` | `{}` | 场外基金单日赎回上限，格式 `{基金代码: 金额}`。配置后程序可计算场外品种全量赎回所需天数。未配置品种标记"需手动确认赎回上限" | 手动编辑 |
 | `anonymization.mode` | `"off"` | 匿名化模式：`off`（关闭，显示真实名称代码）/ `code_display`（名称→"品种X"，保留代码和盈亏）/ `full_anonymous`（名称→"品种X"，代码→"000XXX"，盈亏→±XX%）/ `summary`（仅大类汇总） | 菜单 `A` |
-| `enable_fund_deep_analysis` | `true` | 基金深度分析章节可见性（模块 #6~#11），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
-| `enable_news` | `true` | 市场新闻章节可见性（模块 #12），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
-| `enable_history` | `true` | 历史走势章节可见性（模块 #17~#18），关闭后对应章节完全隐藏。持仓快照不受影响，始终自动执行 | 菜单 `P` |
-| `enable_portfolio_evolution` | `true` | 组合演进章节可见性（模块 #19），关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
-| `enable_action` | `false` | 行动建议章节可见性（模块 #20），**默认关闭**，开启后显示 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。14 章智囊团深度复盘同步显示「行动摘要」子块 | 菜单 `P` |
+| `enable_fund_deep_analysis` | `true` | 基金深度分析章节可见性（模块 #6~#10），关闭后对应章节完全隐藏，不产生序号空缺 | 菜单 `P` |
+| `enable_news` | `true` | 市场新闻章节可见性（模块 #11），关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
+| `enable_history` | `true` | 历史走势章节可见性（模块 #16 组合历史走势与回撤，一章两区块：走势表 + 回撤矩阵 + 危机区间标注），关闭后对应章节完全隐藏。持仓快照不受影响，始终自动执行 | 菜单 `P` |
+| `enable_portfolio_evolution` | `true` | 组合演进章节可见性（模块 #17），关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
+| `enable_action` | `false` | 行动建议章节可见性（模块 #18），**默认关闭**，开启后显示 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。14 章智囊团深度复盘同步显示「行动摘要」子块 | 菜单 `P` |
 
 ---
 
@@ -185,10 +185,10 @@
 |:-----|:------:|:---------|:---------|:-----|
 | `enable_fund_deep_analysis` | `true` | `config.json` | #6 基金经理变更监控、#7 持仓关系矩阵、#8 持仓集中度监控、#9 基金风格分析、#10 因子暴露分析 | 基金深度分析章节组 |
 | `enable_news` | `true` | `config.json` | #11 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
-| `enable_history` | `true` | `config.json` | #16 组合历史走势、#17 历史回撤分析 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
-| `enable_portfolio_evolution` | `true` | `config.json` | #19 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
-| `enable_action` | `false` | `config.json` | #20 行动建议 | 行动建议章节组（再平衡信号/交易纪律/调仓建议/收益归因，纯算法） |
-| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #13 全球政经局势、#14 智囊团深度复盘、#15 持仓体检报告、#16 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
+| `enable_history` | `true` | `config.json` | #16 组合历史走势与回撤 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
+| `enable_portfolio_evolution` | `true` | `config.json` | #17 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
+| `enable_action` | `false` | `config.json` | #18 行动建议 | 行动建议章节组（再平衡信号/交易纪律/调仓建议/收益归因，纯算法） |
+| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | #12 全球政经局势、#13 智囊团深度复盘、#14 持仓体检报告、#15 穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
 
@@ -392,12 +392,11 @@
 | 13 | `expert_review` | 智囊团深度复盘 | LLM |
 | 14 | `health_check` | 持仓体检报告 | LLM |
 | 15 | `penetration_deep` | 穿透深度分析 | LLM |
-| 16 | `portfolio_history` | 组合历史走势 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 17 | `drawdown_analysis` | 历史回撤分析 | 历史走势（enable_history 控制；数据不可用时占位） |
-| 18 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 19 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认关**；再平衡信号/交易纪律/调仓建议/收益归因） |
-| 20 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
-| 21 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 16 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
+| 17 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
+| 18 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认关**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 19 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
+| 20 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 
@@ -417,21 +416,20 @@
 
 > 效果：基金经理/持仓关系矩阵/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
-> 空对象 `{}` 或缺失此字段时使用上述 21 项默认顺序。
+> 空对象 `{}` 或缺失此字段时使用上述 20 项默认顺序。
 
-**实用示例** — 将组合历史走势提到前面，关注回撤风险：
+**实用示例** — 将组合历史走势与回撤提到前面，关注回撤风险：
 
 ```json
 {
   "report_section_order": {
-    "portfolio_history": 1,
-    "drawdown_analysis": 2,
-    "summary": 3
+    "portfolio_history_drawdown": 1,
+    "summary": 2
   }
 }
 ```
 
-> 效果：组合历史走势排在第 1 位，回撤分析在第 2 位，投资分析汇总在第 3 位，其余模块保持默认顺序。适合关注历史表现的用户。
+> 效果：组合历史走势与回撤（走势表 + 回撤矩阵 + 危机区间标注）排在第 1 位，投资分析汇总排在第 2 位，其余模块保持默认顺序。适合关注历史表现的用户。
 
 ---
 ### F. 业绩基准与无风险利率
@@ -475,7 +473,7 @@
 
 | 模式 | 说明 |
 |:----|:------|
-| `"off"` | 关闭。不获取历史走势数据，报告中的"组合历史走势"和"回撤分析"章节显示占位文本 |
+| `"off"` | 关闭。不获取历史走势数据，报告中的"组合历史走势与回撤"章节显示占位文本 |
 | `"prompt"` | 报告生成后询问用户是否需要获取历史走势数据（耗时约 15s） |
 | `"auto"` | 自动获取，不询问用户（默认） |
 
@@ -489,7 +487,7 @@
 - **股票/ETF**：向 K 线源请求最近 `lookback_days` 根日 K（腾讯/新浪，上限 365 根）
 - **OTC 基金**：净值源全量返回后按最近 `lookback_days` 条截取
 
-**与回撤分析的关系**：回撤分析需要 ≥60 个交易日（`MIN_SPAN`）才能计算独立回撤事件与最大回撤。若取数窗口低于 60，回撤分析章节将显示"有效交易日不足 60 天，暂不计算回撤事件"占位文本。默认 `90` 确保取数窗口超过门槛；配置值低于 60 或超过 365 时，配置校验会告警提示。
+**与回撤矩阵的关系**：回撤矩阵需要 ≥60 个交易日（`MIN_SPAN`）才能计算独立回撤事件与最大回撤。若取数窗口低于 60，回撤矩阵将显示"有效交易日不足 60 天，暂不计算回撤事件"占位文本。默认 `90` 确保取数窗口超过门槛；配置值低于 60 或超过 365 时，配置校验会告警提示。
 
 #### 持仓快照（快照对比）
 

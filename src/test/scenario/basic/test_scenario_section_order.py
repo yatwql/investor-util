@@ -4,7 +4,7 @@
   - 默认顺序完整性（len(_REPORT_SECTION_DEFAULT) 个模块，summary 开头/llm_usage 结尾）
   - 序号 1~N 连续递增
   - get_report_section_keys 完备性
-  - 6 种可见性类型计数正确（always=6, history=2, fund_deep_analysis=5, news=1, llm=5, evolution=1）
+  - 6 种可见性类型计数正确（always=6, history=1（合并章）, fund_deep_analysis=5, news=1, llm=5, evolution=1）
   - 基金深度分析 data_flag 各不相同
   - 空配置与无配置行为一致
 
@@ -131,7 +131,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
             {"always", "history", "fund_deep_analysis", "news", "llm", "evolution", "action"},
         )
         self.assertEqual(type_counts["always"], 6)
-        self.assertEqual(type_counts["history"], 2)
+        self.assertEqual(type_counts["history"], 1)
         self.assertEqual(type_counts["fund_deep_analysis"], 5)
         self.assertEqual(type_counts["news"], 1)
         self.assertEqual(type_counts["llm"], 5)

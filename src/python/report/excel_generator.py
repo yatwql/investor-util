@@ -21,184 +21,32 @@ from src.python.report.progress import ProgressReporter, SilentProgressReporter,
 logger = setup_logger()
 
 
-# ── 组合历史走势 + 回撤分析页签写入 ──────────────────────
-
-
-def _write_portfolio_history_sheet(ws, history_data: dict) -> None:
-    """写入组合历史走势页签（含基准指数归一化列）。"""
-    from src.python.report.excel_writer import (
-        _write_placeholder,
-        auto_width,
-        freeze_header,
-        write_data_row,
-        write_header_row,
-        write_title_row,
-    )
-    from src.python.report.styles import FMT_MONEY, FMT_PERCENT
-
-    if history_data is None:
-        _write_placeholder(ws, "组合历史走势数据暂不可用（配置或网络原因）", max_cols=5)
-        auto_width(ws)
-        return
-
-    bars = history_data.get("bars", [])
-    if not bars:
-        _write_placeholder(ws, "组合历史走势数据暂不可用（配置或网络原因）", max_cols=5)
-        auto_width(ws)
-        return
-
-    benchmarks = history_data.get("benchmarks", [])
-    first_value = bars[0]["total_value"] if bars and bars[0].get("total_value") else 0
-    n_bm = len(benchmarks)
-    ncols = 4 + n_bm  # 日期 + 市值 + 收益(%) + 归一化(%) + N 基准
-
-    headers = ["日期", "组合市值", "组合收益(%)", "组合归一化(%)"]
-    for bm in benchmarks:
-        headers.append(bm.get("name", bm.get("code", "基准")))
-
-    row = write_title_row(ws, 1, "组合历史走势", ncols)
-    row = write_header_row(ws, row, headers)
-
-    for i, bar in enumerate(bars):
-        tv = bar.get("total_value", 0)
-        cum_return = (tv - first_value) / first_value if first_value > 0 else 0
-        norm_value = tv / first_value * 100 if first_value > 0 else 0
-
-        values = [bar.get("date", ""), tv, cum_return, round(norm_value, 2)]
-        for bm in benchmarks:
-            bm_bars = bm.get("bars", [])
-            bm_value = bm_bars[i].get("value") if i < len(bm_bars) else None
-            values.append(bm_value)
-
-        fmts: list[str | None] = [None, FMT_MONEY, FMT_PERCENT, "0.00"]
-        for _ in range(n_bm):
-            fmts.append("0.00")
-        row = write_data_row(ws, row, values, formats=fmts)
-
-    # ── 指标汇总区 ──
-    row += 1
-    row = write_title_row(ws, row, "指标汇总", ncols)
-
-    pd = history_data
-    summary_items: list[tuple[str, Any, str | None]] = [
-        ("累计收益率(%)", round(pd.get("total_return_pct", 0) / 100, 4), FMT_PERCENT),
-        ("累计收益(元)", pd.get("total_return", 0), FMT_MONEY),
-        ("最大回撤(%)", round(pd.get("max_drawdown_pct", 0) / 100, 4), FMT_PERCENT),
-        ("年化波动率", pd.get("annualized_volatility", 0), FMT_PERCENT),
-        ("起算日", pd.get("data_start", ""), None),
-        ("终止日", pd.get("data_end", ""), None),
-    ]
-    for label, val, fmt in summary_items:
-        cells = [label, val] + [None] * (ncols - 2)
-        fmts_line: list[str | None] = [None, fmt] + [None] * (ncols - 2)
-        row = write_data_row(ws, row, cells, formats=fmts_line)
-
-    freeze_header(ws, row=2)
-    auto_width(ws, min_width=10, max_width=28)
-
-
-def _write_drawdown_analysis_sheet(ws, history_data: dict) -> None:
-    """写入历史回撤分析页签（组合 vs 基准对比矩阵）。"""
-    from src.python.report.excel_writer import (
-        _write_placeholder,
-        auto_width,
-        freeze_header,
-        write_data_row,
-        write_header_row,
-        write_title_row,
-    )
-    from src.python.report.styles import FMT_PERCENT
-
-    if history_data is None:
-        _write_placeholder(ws, "历史回撤分析数据暂不可用（配置或网络原因）", max_cols=5)
-        auto_width(ws)
-        return
-
-    benchmarks = history_data.get("benchmarks", [])
-    n_bm = len(benchmarks)
-    ncols = 2 + n_bm
-
-    headers = ["指标", "组合"]
-    for bm in benchmarks:
-        headers.append(bm.get("name", bm.get("code", "基准")))
-
-    row = write_title_row(ws, 1, "历史回撤分析", ncols)
-    row = write_header_row(ws, row, headers)
-
-    pd = history_data
-    pct_fmt = FMT_PERCENT
-    none_fmt: str | None = None
-
-    metrics: list[tuple[str, Any, str | None, str, str | None]] = [
-        ("累计收益率(%)", round(pd.get("total_return_pct", 0) / 100, 4), pct_fmt, "total_return_pct", pct_fmt),
-        ("最大回撤(%)", round(pd.get("max_drawdown_pct", 0) / 100, 4), pct_fmt, "max_drawdown_pct", pct_fmt),
-        ("年化波动率", pd.get("annualized_volatility", 0), pct_fmt, None, None),
-        ("起算日", pd.get("data_start", ""), none_fmt, "data_start", none_fmt),
-        ("终止日", pd.get("data_end", ""), none_fmt, "data_end", none_fmt),
-    ]
-
-    for metric_name, portfolio_val, portfolio_fmt, bm_key, bm_fmt in metrics:
-        values = [metric_name, portfolio_val]
-        for bm in benchmarks:
-            if bm_key and bm.get(bm_key) is not None:
-                raw = bm[bm_key]
-                bm_val = round(raw / 100, 4) if bm_fmt == pct_fmt else raw
-            else:
-                bm_val = None
-            values.append(bm_val)
-
-        flist: list[str | None] = [none_fmt, portfolio_fmt]
-        for _ in range(n_bm):
-            flist.append(bm_fmt if bm_key else none_fmt)
-        row = write_data_row(ws, row, values, formats=flist)
-
-    # ── 回撤明细表（独立回撤事件 + 恢复耗时） ──
-    dd_events = pd.get("drawdown_events") or []
-    dd_ncols = 8
-    ncols_eff = max(ncols, dd_ncols)
-    row += 1
-    row = write_title_row(ws, row, "回撤明细", ncols_eff)
-    dd_headers = ["序号", "起峰日", "最深日", "恢复日", "最大回撤(%)", "持续天数", "恢复耗时(天)", "当前状态"]
-    dd_headers += [""] * (ncols_eff - dd_ncols)
-    row = write_header_row(ws, row, dd_headers)
-    if not dd_events:
-        row = write_data_row(ws, row, ["未检测到显著回撤事件（或历史数据不足）"] + [None] * (ncols_eff - 1))
-    else:
-        for idx, e in enumerate(dd_events, start=1):
-            cells: list[Any] = [
-                idx,
-                e.get("peak_date", ""),
-                e.get("trough_date", ""),
-                e.get("recovery_date") or "未恢复",
-                round(e.get("drawdown_pct", 0.0) / 100, 4),
-                e.get("duration_days", 0),
-                e.get("recovery_days") if e.get("recovery_days") is not None else "--",
-                "已恢复" if e.get("recovered") else "未恢复",
-            ]
-            cells += [None] * (ncols_eff - dd_ncols)
-            dd_fmts: list[str | None] = [None] * 4 + [pct_fmt] + [None] * 3
-            dd_fmts += [None] * (ncols_eff - dd_ncols)
-            row = write_data_row(ws, row, cells, formats=dd_fmts)
-
-    freeze_header(ws, row=2)
-    auto_width(ws, min_width=10, max_width=28)
+# ── 组合历史走势与回撤页签写入（合并章：走势表 + 回撤矩阵 + 危机区间标注） ──────
 
 
 def _write_history_sheets(
     sheets: dict[str, Any],
     history_data: dict | None,
+    crisis_annotation: dict[str, Any] | None = None,
 ) -> None:
-    """写入组合历史走势和回撤分析页签（含基准指数列）。"""
-    ws_ph = sheets.get("portfolio_history")
-    ws_dd = sheets.get("drawdown_analysis")
+    """写入组合历史走势与回撤合并页签（一章两区块 + 危机区间标注）。
+
+    Args:
+        sheets: 页签字典，读取 `portfolio_history_drawdown` 键。
+        history_data: `history_data` C19 契约 dict；不可用时整页写占位。
+        crisis_annotation: `crisis_annotation_data` C19 契约 dict（危机区间标注）；
+            None 时危机区块写占位。
+    """
+    ws = sheets.get("portfolio_history_drawdown")
+    if ws is None:
+        return
 
     data_ok = history_data and history_data.get("status") != "unavailable" and history_data.get("bars")
     effective = history_data if data_ok else None
 
-    if ws_ph is not None:
-        _write_portfolio_history_sheet(ws_ph, effective)
-    if ws_dd is not None:
-        _write_drawdown_analysis_sheet(ws_dd, effective)
+    from src.python.report.portfolio_history_drawdown_sheet import write_portfolio_history_drawdown_sheet
+
+    write_portfolio_history_drawdown_sheet(ws, effective, crisis_annotation)
 
 
 def _write_data_source_matrix_sheet(ws, prog) -> None:
@@ -388,16 +236,19 @@ def generate_excel_report(
         sheets, include_llm, llm_content, prog, section_order=order, debate_mode_label=_debate_mode_label
     )
 
-    # ── 组合历史走势 + 回撤分析页签（历史走势数据） ──
+    # ── 组合历史走势与回撤页签（合并章：走势表 + 回撤矩阵 + 危机区间标注） ──
     if enable_history:
-        ws_ph = sheets.get("portfolio_history")
-        ws_dd = sheets.get("drawdown_analysis")
-        if ws_ph is not None or ws_dd is not None:
-            prog.info("正在写入组合历史走势页签...")
+        ws_hd = sheets.get("portfolio_history_drawdown")
+        if ws_hd is not None:
+            prog.info("正在写入组合历史走势与回撤页签...")
             try:
-                _write_history_sheets(sheets, history_data)
+                _write_history_sheets(
+                    sheets,
+                    history_data,
+                    (pipeline_data or {}).get("crisis_annotation_data"),
+                )
             except Exception:
-                logger.debug("[excel] 组合历史走势页签写入失败（非关键）", exc_info=True)
+                logger.debug("[excel] 组合历史走势与回撤页签写入失败（非关键）", exc_info=True)
 
     # ── 组合演进页签（多快照趋势，C19 evolution_data） ──
     ws_evo = sheets.get("portfolio_evolution")

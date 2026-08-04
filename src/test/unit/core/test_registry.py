@@ -247,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 21
+        assert len(_REPORT_SECTION_DEFAULT) == 20
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -314,17 +314,17 @@ class TestReportSectionDefault:
         sec = evo[0]
         assert sec["type"] == "evolution"
         assert sec["data_flag"] == "evolution_data"
-        assert sec["number"] == 18
+        assert sec["number"] == 17
 
     def test_action_registered_as_action_type(self):
         """action 应注册为 action 类型（独立顶层开关 enable_action 控制，默认关，
-        data_flag=None，序号 19 紧跟 portfolio_evolution）。"""
+        data_flag=None，序号 18 紧跟 portfolio_evolution）。"""
         act = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "action"]
         assert len(act) == 1, "缺少 action 模块条目"
         sec = act[0]
         assert sec["type"] == "action"
         assert sec["data_flag"] is None
-        assert sec["number"] == 19
+        assert sec["number"] == 18
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""

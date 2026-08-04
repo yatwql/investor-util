@@ -120,6 +120,17 @@
 - **P0/P2 门禁描述**：CLAUDE.md 提交前（P0）/发布前（P2）门禁追加 `check-task-numbering.py --ci`，与 `check-code-traces.py` 同构。
 - **测试**：新增 `src/test/unit/scripts/test_task_numbering_hook_scripts.py`（14 例，hook 目标判定/放行/拦截/OSError 兜底/双注入方式 + 安装脚本幂等/合并/卸载；全部用 tmp_path 假文件隔离，不触碰真实编号文档）。
 
+### 组合历史走势与回撤合并 + 危机区间标注（16 章，轮9 物理合并）
+
+- **章节合并**：原 16 章「组合历史走势」与 17 章「历史回撤分析」物理合并为 16 章「组合历史走势与回撤」（`portfolio_history_drawdown`）——同一章节分**走势表**（as-if 净值曲线 + 指标汇总矩阵：累计收益/最大回撤/年化波动率/起止日，仅一份，组合 vs 基准对比）+ **回撤矩阵**（独立水下事件明细：起峰日/最深日/恢复日/最大回撤/持续天数/恢复耗时/当前状态）两区块。
+- **危机区间标注（新区块）**：新增 `src/python/analysis/crisis_annotation.py`（`build_crisis_annotation(history_data)`，纯标准库、analysis 层隔离），基于 `history_data.bars` 对预设历史危机区间（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整，`CRISIS_INTERVALS` 静态历史事实表，不随持仓变化、不拉长 lookback、零新增网络请求）做窗口重叠裁剪与区间统计——`in_range`（是否与报告数据窗口重叠）/`interval_drawdown_pct`（区间最大回撤，正数 %）/`trough_date`（最深日）/`recovery_days`（恢复耗时，未恢复 None）/`recovered`；无重叠时显式写「报告数据窗口内无历史危机区间」占位。输出 C19 契约 `crisis_annotation_data`，both 路径在 `report/_report_generation.py` 以 `build_crisis_annotation(history_data)` 注入 pipeline_data。
+- **统一渲染模块**：新增 `src/python/report/portfolio_history_drawdown_sheet.py`（`write_portfolio_history_drawdown_sheet(ws, history_data=None, crisis_annotation=None)`，内部分 `_write_trend_block`/`_write_drawdown_block`/`_write_crisis_block` 三区块，任一区块缺数据写降级占位）；删除 `excel_generator.py` 旧 `_write_portfolio_history_sheet`/`_write_drawdown_analysis_sheet` 两个独立写入函数，合并为 `_write_history_sheets` 统一写入。`portfolio_history.py` 计算引擎与 `test_portfolio_history.py` 保留（轮8 持仓关系合并先例）。
+- **HTML 合并 + 危机着色（C20）**：`report_template.html` 原 16/17 两模块物理合并为 `sec-portfolio_history_drawdown` 单章节；净值折线图新增危机区间阴影带（Chart.js 侧 `chart_data_builder.py::_compute_crisis_bands` 计算起止索引 → `chart-init.js::buildCrisisBandPlugin` beforeDatasetsDraw 半透明红色带；Canvas 降级路径 `drawSimpleChart` 同款 `crisisBands` 支持）；危机标注净值图**必须 C20 图下说明**（`.chart-caption` 跟随是否有 in_range 区间数据——有→「阴影区间为 2015/2018/2020/2022 主要危机时段」，无→普通文案）。
+- **章节编号重排（21 → 20 模块）**：`core/registry.py` `_REPORT_SECTION_DEFAULT` 收敛为 20 项，`portfolio_history_drawdown`（number=16、data_flag=None、type=`history`）替换原 `portfolio_history`/`drawdown_analysis` 两个条目，其后各章序号整体 -1（`portfolio_evolution` 18→17、`action` 19→18、`data_source_status` 20→19、`llm_usage` 21→20）。`_REPORT_SHEET_NAMES` 中文名注册「组合历史走势与回撤」；章节序号引用全量同步（html_writer/excel_generator/orchestrator/_report_generation/chart_data_builder/report_template.html 等）。
+- **C19 契约增删**：附录 H 删除旧 `portfolio_history`/`drawdown_analysis` 独立契约（`history_data` 契约保留供合并章复用，消费方更新为合并章），新建 `crisis_annotation_data` 契约（8 键，见 technical.md 附录 H）。
+- **测试**：新增 `src/test/unit/analysis/test_crisis_annotation.py`（19 例：数据不可用占位 3 / 2018+2020 区间行为断言 4 / 未恢复 2 / data_end 覆盖与恢复扫描 2 / 无 bar/非正值/非法日期防御 3 / 静态表 1 / 窗口解析与重叠 4，`crisis_annotation.py` 覆盖率 94%）；新增/迁移 `src/test/unit/report/test_drawdown_html_excel.py`（16 例：合并章两区块渲染 / 回撤明细表 / 未恢复占位 / 数据不足占位 / 危机表渲染 / 无重叠占位 / C20 图下说明跟随 / Excel 合并章三区块 + 危机表，`portfolio_history_drawdown_sheet.py` 覆盖率 87%，均 ≥85%）；迁移 `test_excel_report_structure.py`（18 页签）/`test_html_report_structure.py`（16 链接）/`test_excel_generator.py`（8 页签默认顺序 + 旧独立 sheet 不再生成回归断言）/`test_registry.py`（20 模块）/`test_scenario_section_order.py`（history 类型计数 2→1）。轮9 验收「新增测试 ≥8 个、合并断言、行为断言、C20 合规」全部满足。
+- **向后兼容**：章节物理合并后，`history_data` 契约与 `enable_history` 开关语义不变（board 层可见性不变）；危机标注仅在 `crisis_annotation_data.available` 且存在 in_range 区间时渲染，数据不可用/无重叠时落占位，既有历史报告结构稳定。
+
 ---
 
 ## 归档

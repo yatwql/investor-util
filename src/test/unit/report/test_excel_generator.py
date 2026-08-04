@@ -21,8 +21,8 @@ from collections import namedtuple
 
 from src.python.report.progress import SilentProgressReporter
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -30,20 +30,44 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 # ═══════════════════════════════════════════════════════════
 
 
-DetailRow = namedtuple("DetailRow", [
-    "market_value", "cost", "profit", "today_profit",
-    "code", "name", "change_pct", "price_type", "nav_date",
-    "profit_rate", "price",
-])
+DetailRow = namedtuple(
+    "DetailRow",
+    [
+        "market_value",
+        "cost",
+        "profit",
+        "today_profit",
+        "code",
+        "name",
+        "change_pct",
+        "price_type",
+        "nav_date",
+        "profit_rate",
+        "price",
+    ],
+)
 
 
-def _make_detail(mv: float = 1000, cost: float = 800, profit: float = 200,
-                 today_profit: float = 50, code: str = "600900",
-                 name: str = "长江电力") -> DetailRow:
+def _make_detail(
+    mv: float = 1000,
+    cost: float = 800,
+    profit: float = 200,
+    today_profit: float = 50,
+    code: str = "600900",
+    name: str = "长江电力",
+) -> DetailRow:
     return DetailRow(
-        market_value=mv, cost=cost, profit=profit, today_profit=today_profit,
-        code=code, name=name, change_pct=1.5, price_type="tencent",
-        nav_date="", profit_rate=25.0, price=28.5,
+        market_value=mv,
+        cost=cost,
+        profit=profit,
+        today_profit=today_profit,
+        code=code,
+        name=name,
+        change_pct=1.5,
+        price_type="tencent",
+        nav_date="",
+        profit_rate=25.0,
+        price=28.5,
     )
 
 
@@ -57,10 +81,15 @@ class _SheetMocks:
 
     def __init__(self) -> None:
         self.write_summary = MagicMock()
-        self.write_market_value = MagicMock(return_value=(
-            10000.0, 8000.0, 2000.0, 500.0,
-            [_make_detail()],
-        ))
+        self.write_market_value = MagicMock(
+            return_value=(
+                10000.0,
+                8000.0,
+                2000.0,
+                500.0,
+                [_make_detail()],
+            )
+        )
         self.classify_holdings = MagicMock(return_value={})
         self.get_last_trading_day = MagicMock(return_value="2026-07-01")
         self.price_update_status = MagicMock(return_value=(1, 0, True))
@@ -128,12 +157,15 @@ class TestGenerateExcelReport(unittest.TestCase):
     def test_basic_generation(self) -> None:
         """基本路径：所有模块正常，外部传入明细+指数。"""
         from src.python.report.excel_generator import generate_excel_report
+
         details = [_make_detail()]
         a_idx = {"sh000001": {"name": "上证指数", "price": 3120, "change_pct": 0.5}}
 
         generate_excel_report(
-            self.holdings, details=details,
-            a_indices=a_idx, us_indices={},
+            self.holdings,
+            details=details,
+            a_indices=a_idx,
+            us_indices={},
             progress=self.progress,
         )
 
@@ -156,10 +188,10 @@ class TestGenerateExcelReport(unittest.TestCase):
         from src.python.report.excel_generator import generate_excel_report
 
         with patch("src.python.report.news_correlation.write_news_sheet") as mock_news:
-            with patch("src.python.report.news_correlation.build_news_data",
-                       return_value=([], {})):
+            with patch("src.python.report.news_correlation.build_news_data", return_value=([], {})):
                 generate_excel_report(
-                    self.holdings, include_news=True,
+                    self.holdings,
+                    include_news=True,
                     progress=self.progress,
                 )
 
@@ -168,15 +200,18 @@ class TestGenerateExcelReport(unittest.TestCase):
     def test_with_news_external_data(self) -> None:
         """include_news + 外部新闻数据 → 复用。"""
         from src.python.report.excel_generator import generate_excel_report
+
         news_data = [{"title": "新闻1", "intro": "简介", "matched_keywords": ["test"]}]
         news_llm_meta = {"llm_enabled": False}
 
         with patch("src.python.report.news_correlation.write_news_sheet") as mock_news:
             generate_excel_report(
-                    self.holdings, include_news=True,
-                    news_data=news_data, news_llm_meta=news_llm_meta,
-                    progress=self.progress,
-                )
+                self.holdings,
+                include_news=True,
+                news_data=news_data,
+                news_llm_meta=news_llm_meta,
+                progress=self.progress,
+            )
 
         self.assertEqual(len(self.progress.get_errors()), 0)
 
@@ -185,14 +220,15 @@ class TestGenerateExcelReport(unittest.TestCase):
     def test_with_llm(self) -> None:
         """enable_llm=True → LLM 内容写入。"""
         from src.python.report.excel_generator import generate_excel_report
+
         llm_content = ("<p>宏</p>", "<p>策略</p>", "<p>体检</p>", "<p>穿透</p>")
 
         with patch("src.python.report.llm_content.write_llm_sheets") as mock_llm:
             mock_llm.return_value = ("<p>宏</p>", "<p>策略</p>", "<p>体检</p>", "<p>穿透</p>")
-            with patch("src.python.llm.session.get_session_usage",
-                       return_value={"call_count": 0, "per_module": {}}):
+            with patch("src.python.llm.session.get_session_usage", return_value={"call_count": 0, "per_module": {}}):
                 generate_excel_report(
-                    self.holdings, include_llm=True,
+                    self.holdings,
+                    include_llm=True,
                     llm_content=llm_content,
                     progress=self.progress,
                 )
@@ -203,39 +239,56 @@ class TestGenerateExcelReport(unittest.TestCase):
     def test_with_llm_and_session_usage(self) -> None:
         """include_llm + 有会话统计 → 写入用量页签 + 汇总页追加。"""
         from src.python.report.excel_generator import generate_excel_report
+
         llm_content = ("<p>宏</p>", "<p>策略</p>", "<p>体检</p>", "<p>穿透</p>")
         session_usage = {
             "call_count": 2,
-            "input_tokens": 1000, "output_tokens": 500,
-            "cache_hit_tokens": 200, "models": ["deepseek-v4-flash"],
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "cache_hit_tokens": 200,
+            "models": ["deepseek-v4-flash"],
             "per_module": {
-                "global_macro": {"input_tokens": 500, "output_tokens": 200,
-                                 "model": "deepseek-v4-flash", "cached": False,
-                                 "thinking": False, "endpoint": "", "cache_hit_tokens": 0,
-                                 "cost": 0.0},
-                "expert_review": {"input_tokens": 500, "output_tokens": 300,
-                                  "model": "deepseek-v4-flash", "cached": False,
-                                  "thinking": True, "endpoint": "", "cache_hit_tokens": 0,
-                                  "cost": 0.0},
+                "global_macro": {
+                    "input_tokens": 500,
+                    "output_tokens": 200,
+                    "model": "deepseek-v4-flash",
+                    "cached": False,
+                    "thinking": False,
+                    "endpoint": "",
+                    "cache_hit_tokens": 0,
+                    "cost": 0.0,
+                },
+                "expert_review": {
+                    "input_tokens": 500,
+                    "output_tokens": 300,
+                    "model": "deepseek-v4-flash",
+                    "cached": False,
+                    "thinking": True,
+                    "endpoint": "",
+                    "cache_hit_tokens": 0,
+                    "cost": 0.0,
+                },
             },
         }
 
         with patch("src.python.report.llm_content.write_llm_sheets") as mock_llm:
             mock_llm.return_value = ("<p>宏</p>", "<p>策略</p>", "<p>体检</p>", "<p>穿透</p>")
-            with patch("src.python.llm.session.get_session_usage",
-                       return_value=session_usage):
+            with patch("src.python.llm.session.get_session_usage", return_value=session_usage):
                 with patch("src.python.llm.session.format_session_usage") as mock_fmt:
                     mock_fmt.return_value = {
-                        "has_usage": True, "call_count": 2,
-                        "total_tokens": 1500, "cost_display": "¥0.002",
+                        "has_usage": True,
+                        "call_count": 2,
+                        "total_tokens": 1500,
+                        "cost_display": "¥0.002",
                         "per_module": session_usage["per_module"],
                     }
                     with patch("src.python.report.summary.write_llm_usage_sheet"):
-                            generate_excel_report(
-                                self.holdings, include_llm=True,
-                                llm_content=llm_content,
-                                progress=self.progress,
-                            )
+                        generate_excel_report(
+                            self.holdings,
+                            include_llm=True,
+                            llm_content=llm_content,
+                            progress=self.progress,
+                        )
 
         mock_llm.assert_called_once()
 
@@ -248,12 +301,14 @@ class TestGenerateExcelReport(unittest.TestCase):
 
         with patch("src.python.report.summary.write_summary_sheet", None):
             generate_excel_report(
-                self.holdings, progress=self.progress,
+                self.holdings,
+                progress=self.progress,
             )
 
         errors = self.progress.get_errors()
-        self.assertTrue(any("summary" in e.lower() or "汇总" in e for e in errors),
-                        f"预期 summary 错误，得到: {errors}")
+        self.assertTrue(
+            any("summary" in e.lower() or "汇总" in e for e in errors), f"预期 summary 错误，得到: {errors}"
+        )
 
     def test_market_value_module_missing(self) -> None:
         """行情市值模块缺失 → add_error + 后续模块继续。"""
@@ -261,12 +316,15 @@ class TestGenerateExcelReport(unittest.TestCase):
 
         with patch("src.python.report.market_value_sheet.write_market_value_sheet", None):
             generate_excel_report(
-                self.holdings, progress=self.progress,
+                self.holdings,
+                progress=self.progress,
             )
 
         errors = self.progress.get_errors()
-        self.assertTrue(any("market_value_sheet" in e.lower() or "行情市值" in e for e in errors),
-                        f"预期 market_value 错误，得到: {errors}")
+        self.assertTrue(
+            any("market_value_sheet" in e.lower() or "行情市值" in e for e in errors),
+            f"预期 market_value 错误，得到: {errors}",
+        )
 
     # ── 页签写入异常隔离 ──
 
@@ -279,16 +337,15 @@ class TestGenerateExcelReport(unittest.TestCase):
         # 替换 summary 的 mock 为会抛异常的版本
         with patch("src.python.report.summary.write_summary_sheet", broken_sheet):
             generate_excel_report(
-                self.holdings, progress=self.progress,
+                self.holdings,
+                progress=self.progress,
             )
 
         errors = self.progress.get_errors()
-        self.assertTrue(any("生成失败" in e for e in errors),
-                        f"预期 sheet 写入错误记录，得到: {errors}")
+        self.assertTrue(any("生成失败" in e for e in errors), f"预期 sheet 写入错误记录，得到: {errors}")
         # 确认不暴露原始异常堆栈
         for e in errors:
-            self.assertNotIn("ValueError", e,
-                             f"错误信息不应包含原始异常类型: {e}")
+            self.assertNotIn("ValueError", e, f"错误信息不应包含原始异常类型: {e}")
 
     def test_sheet_exception_others_still_called(self):
         """某页签失败 → 其他页签仍被调用（业务语义验证）。"""
@@ -301,21 +358,30 @@ class TestGenerateExcelReport(unittest.TestCase):
             mocks.write_summary.side_effect = ValueError("写入失败")
             # 同时让穿透模块成功返回有效数据
             mocks.compute_penetration.return_value = {
-                "top10": [{"rank": 1, "name": "茅台", "mv": 10000.0, "ratio_pct": 50.0,
-                           "sources": [], "codes": ["600519"]}],
-                "summary": {"total_mv": 20000.0, "total_funds": 0, "total_stocks": 1,
-                            "fund_breakdown": "", "merged_count": 1, "top10_coverage_pct": "50.0%",
-                            "unknown_mv": 0, "failed_funds": 0},
+                "top10": [
+                    {"rank": 1, "name": "茅台", "mv": 10000.0, "ratio_pct": 50.0, "sources": [], "codes": ["600519"]}
+                ],
+                "summary": {
+                    "total_mv": 20000.0,
+                    "total_funds": 0,
+                    "total_stocks": 1,
+                    "fund_breakdown": "",
+                    "merged_count": 1,
+                    "top10_coverage_pct": "50.0%",
+                    "unknown_mv": 0,
+                    "failed_funds": 0,
+                },
             }
             details = [_make_detail()]
             generate_excel_report(
-                self.holdings, details=details,
-                a_indices={}, us_indices={},
+                self.holdings,
+                details=details,
+                a_indices={},
+                us_indices={},
                 progress=self.progress,
             )
             errors = self.progress.get_errors()
-            self.assertTrue(any("生成失败" in e for e in errors),
-                            f"预期 summary 写入错误，得到: {errors}")
+            self.assertTrue(any("生成失败" in e for e in errors), f"预期 summary 写入错误，得到: {errors}")
             # 业务语义：穿透模块仍应被调用
             mocks.compute_penetration.assert_called_once()
             mocks.write_penetration.assert_called_once()
@@ -346,8 +412,10 @@ class TestGenerateExcelReport(unittest.TestCase):
         details = [_make_detail()]
 
         generate_excel_report(
-            self.holdings, details=details,
-            a_indices={}, us_indices={},
+            self.holdings,
+            details=details,
+            a_indices={},
+            us_indices={},
             progress=self.progress,
         )
 
@@ -381,16 +449,16 @@ class TestProgressReporterCallSheet(unittest.TestCase):
 
     def test_call_sheet_exception(self) -> None:
         """fn 抛出异常 → 返回 False + add_error（友好提示，不暴露堆栈）。"""
+
         def _broken(*a, **kw):
             raise RuntimeError("写入失败")
+
         result = self.prog.call_sheet("损坏模块", _broken)
         self.assertFalse(result)
         errors = self.prog.get_errors()
-        self.assertTrue(any("生成失败" in e for e in errors),
-                        f"预期友好错误提示，得到: {errors}")
+        self.assertTrue(any("生成失败" in e for e in errors), f"预期友好错误提示，得到: {errors}")
         for e in errors:
-            self.assertNotIn("RuntimeError", e,
-                             f"错误信息不应包含原始异常类型: {e}")
+            self.assertNotIn("RuntimeError", e, f"错误信息不应包含原始异常类型: {e}")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -411,56 +479,68 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
             "penetration_deep": "穿透深度分析",
         }
 
-    def _run(self, raw_session: dict, formatted: dict,
-             module_failure: dict | None = None) -> MagicMock:
+    def _run(self, raw_session: dict, formatted: dict, module_failure: dict | None = None) -> MagicMock:
         """执行 build_llm_usage_sheet 并返回 write_llm_usage_sheet 的 mock。"""
         if module_failure is None:
             module_failure = {}
         from contextlib import ExitStack
+
         with ExitStack() as stack:
-            mock_write = stack.enter_context(
-                patch("src.python.report.summary.write_llm_usage_sheet"))
-            stack.enter_context(
-                patch("src.python.llm.get_session_usage", return_value=raw_session))
-            stack.enter_context(
-                patch("src.python.llm.format_session_usage", return_value=formatted))
-            stack.enter_context(
-                patch("src.python.llm.prompts.LLM_MODULE_FAILURE", module_failure))
-            stack.enter_context(
-                patch("src.python.core.registry.get_llm_module_names",
-                      return_value=self._name_map))
+            mock_write = stack.enter_context(patch("src.python.report.summary.write_llm_usage_sheet"))
+            stack.enter_context(patch("src.python.llm.get_session_usage", return_value=raw_session))
+            stack.enter_context(patch("src.python.llm.format_session_usage", return_value=formatted))
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", module_failure))
+            stack.enter_context(patch("src.python.core.registry.get_llm_module_names", return_value=self._name_map))
             from src.python.report.excel_llm_usage import build_llm_usage_sheet
+
             build_llm_usage_sheet(self.wb, self.prog)
         return mock_write
 
     def test_cache_hit_all_modules(self):
         """全部模块缓存命中 → 各模块状态均为 'cached'、标签为 '缓存'。"""
         formatted = {
-            "has_usage": True, "call_count": 0,
+            "has_usage": True,
+            "call_count": 0,
             "per_module": {
                 "global_macro": {
-                    "model": "deepseek-v4-flash", "cached": True,
-                    "input_tokens": 0, "output_tokens": 0,
-                    "cache_hit_tokens": 500, "cost": 0.0,
-                    "thinking": False, "endpoint": "",
+                    "model": "deepseek-v4-flash",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 500,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
                 },
                 "expert_review": {
-                    "model": "claude-sonnet-4", "cached": True,
-                    "input_tokens": 0, "output_tokens": 0,
-                    "cache_hit_tokens": 1200, "cost": 0.0,
-                    "thinking": True, "endpoint": "",
+                    "model": "claude-sonnet-4",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 1200,
+                    "cost": 0.0,
+                    "thinking": True,
+                    "endpoint": "",
                 },
                 "health_check": {
-                    "model": "gpt-4o", "cached": True,
-                    "input_tokens": 0, "output_tokens": 0,
-                    "cache_hit_tokens": 800, "cost": 0.0,
-                    "thinking": False, "endpoint": "",
+                    "model": "gpt-4o",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 800,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
                 },
                 "penetration_deep": {
-                    "model": "deepseek-v4-flash", "cached": True,
-                    "input_tokens": 0, "output_tokens": 0,
-                    "cache_hit_tokens": 600, "cost": 0.0,
-                    "thinking": False, "endpoint": "",
+                    "model": "deepseek-v4-flash",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 600,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
                 },
             },
         }
@@ -479,19 +559,28 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
     def test_mixed_cache_and_success(self):
         """混合缓存和真实调用 → 各自正确的状态。"""
         formatted = {
-            "has_usage": True, "call_count": 2,
+            "has_usage": True,
+            "call_count": 2,
             "per_module": {
                 "global_macro": {
-                    "model": "deepseek-v4-flash", "cached": True,
-                    "input_tokens": 0, "output_tokens": 0,
-                    "cache_hit_tokens": 500, "cost": 0.0,
-                    "thinking": False, "endpoint": "",
+                    "model": "deepseek-v4-flash",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 500,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
                 },
                 "expert_review": {
-                    "model": "claude-sonnet-4", "cached": False,
-                    "input_tokens": 1500, "output_tokens": 800,
-                    "cache_hit_tokens": 0, "cost": 0.005,
-                    "thinking": True, "endpoint": "https://api.test.com",
+                    "model": "claude-sonnet-4",
+                    "cached": False,
+                    "input_tokens": 1500,
+                    "output_tokens": 800,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.005,
+                    "thinking": True,
+                    "endpoint": "https://api.test.com",
                 },
             },
         }
@@ -513,9 +602,11 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
     def test_disabled_module(self):
         """禁用模块 → excel_module_info 含已禁用状态。"""
         from src.python.llm import FAIL_REASON_DISABLED
+
         formatted = {"has_usage": True, "per_module": {}}
         mock_write = self._run(
-            {}, formatted,
+            {},
+            formatted,
             module_failure={"global_macro": FAIL_REASON_DISABLED},
         )
         mock_write.assert_called_once()
@@ -530,9 +621,11 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
     def test_failed_module(self):
         """失败模块 → excel_module_info 含失败描述。"""
         from src.python.llm import FAIL_REASON_API_ERROR
+
         formatted = {"has_usage": True, "per_module": {}}
         mock_write = self._run(
-            {}, formatted,
+            {},
+            formatted,
             module_failure={"health_check": FAIL_REASON_API_ERROR},
         )
         mock_write.assert_called_once()
@@ -546,19 +639,25 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
     def test_disabled_overrides_per_module(self):
         """禁用标记优先于 per_module 数据（即使有缓存数据也不显示）。"""
         from src.python.llm import FAIL_REASON_DISABLED
+
         formatted = {
             "has_usage": True,
             "per_module": {
                 "global_macro": {
-                    "model": "deepseek-v4-flash", "cached": True,
-                    "input_tokens": 0, "output_tokens": 0,
-                    "cache_hit_tokens": 500, "cost": 0.0,
-                    "thinking": False, "endpoint": "",
+                    "model": "deepseek-v4-flash",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 500,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
                 },
             },
         }
         mock_write = self._run(
-            {}, formatted,
+            {},
+            formatted,
             module_failure={"global_macro": FAIL_REASON_DISABLED},
         )
         excel_module_info = mock_write.call_args[0][2]
@@ -590,10 +689,14 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
         raw_session = {
             "per_module": {
                 "global_macro": {
-                    "model": "deepseek-v4-flash", "cached": True,
-                    "input_tokens": 0, "output_tokens": 0,
-                    "cache_hit_tokens": 500, "cost": 0.0,
-                    "thinking": False, "endpoint": "",
+                    "model": "deepseek-v4-flash",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 500,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
                 },
             },
         }
@@ -612,24 +715,34 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
         from src.python.llm import FAIL_REASON_DISABLED, FAIL_REASON_TIMEOUT
 
         formatted = {
-            "has_usage": True, "call_count": 1,
+            "has_usage": True,
+            "call_count": 1,
             "per_module": {
                 "global_macro": {
-                    "model": "deepseek-v4-flash", "cached": False,
-                    "input_tokens": 500, "output_tokens": 300,
-                    "cache_hit_tokens": 0, "cost": 0.002,
-                    "thinking": False, "endpoint": "",
+                    "model": "deepseek-v4-flash",
+                    "cached": False,
+                    "input_tokens": 500,
+                    "output_tokens": 300,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.002,
+                    "thinking": False,
+                    "endpoint": "",
                 },
                 "expert_review": {
-                    "model": "claude-sonnet-4", "cached": True,
-                    "input_tokens": 0, "output_tokens": 0,
-                    "cache_hit_tokens": 1000, "cost": 0.0,
-                    "thinking": True, "endpoint": "",
+                    "model": "claude-sonnet-4",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 1000,
+                    "cost": 0.0,
+                    "thinking": True,
+                    "endpoint": "",
                 },
             },
         }
         mock_write = self._run(
-            {}, formatted,
+            {},
+            formatted,
             module_failure={
                 "health_check": FAIL_REASON_DISABLED,
                 "penetration_deep": FAIL_REASON_TIMEOUT,
@@ -651,20 +764,19 @@ class TestBuildLlmUsageSheet(unittest.TestCase):
         self.assertEqual(len(excel_module_info), 4)
 
 
-
-
 class TestCreateSheets(unittest.TestCase):
     """create_sheets 页签创建与标题设置测试。"""
 
     _CUSTOM_ORDER = [
         {"key": "fund_performance", "name": "基金业绩分析", "number": 1, "type": "always"},
-        {"key": "summary",           "name": "投资分析汇总",   "number": 2, "type": "always"},
-        {"key": "market_value",      "name": "市值核算明细表", "number": 3, "type": "always"},
+        {"key": "summary", "name": "投资分析汇总", "number": 2, "type": "always"},
+        {"key": "market_value", "name": "市值核算明细表", "number": 3, "type": "always"},
     ]
 
     def _make_wb(self):
         """创建一个空 Workbook。"""
         from openpyxl import Workbook
+
         wb = Workbook()
         # 删除默认 Sheet
         wb.remove(wb.active)
@@ -674,32 +786,38 @@ class TestCreateSheets(unittest.TestCase):
         """默认 section_order → 标题使用连续重新编号（非注册序号）。"""
         from src.python.core.registry import _REPORT_SECTION_DEFAULT
         from src.python.report.excel_sheet_factory import create_sheets
+
         wb = self._make_wb()
-        # always(6) + history(2) + evolution(1) = 9 个页签，连续编号 1-9（组合演进为独立 evolution 类型）
-        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
-        self.assertEqual(len(sheets), 9)
+        # always(6) + history(1，合并章) + evolution(1) = 8 个页签，连续编号 1-8（组合演进为独立 evolution 类型）
+        sheets = create_sheets(
+            wb, _REPORT_SECTION_DEFAULT, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False
+        )
+        self.assertEqual(len(sheets), 8)
         expected_titles = {
-            "summary":          "1.投资分析汇总",
-            "market_value":     "2.市值核算明细表",
-            "category":         "3.持仓分类表",
-            "penetration":      "4.资产穿透TOP10",
+            "summary": "1.投资分析汇总",
+            "market_value": "2.市值核算明细表",
+            "category": "3.持仓分类表",
+            "penetration": "4.资产穿透TOP10",
             "fund_performance": "5.基金业绩分析",
-            "portfolio_history":"6.组合历史走势",
-            "drawdown_analysis":"7.历史回撤分析",
-            "portfolio_evolution":"8.组合演进",
-            "data_source_status":"9.数据源可用性矩阵",
+            "portfolio_history_drawdown": "6.组合历史走势与回撤",
+            "portfolio_evolution": "7.组合演进",
+            "data_source_status": "8.数据源可用性矩阵",
         }
         for key, title in expected_titles.items():
             self.assertIn(key, sheets, f"{key} should be created")
             self.assertEqual(sheets[key].title, title, f"{key} title mismatch")
+        # 回归：旧「组合历史走势」「历史回撤分析」独立 sheet 不再生成（已物理合并）
+        self.assertNotIn("portfolio_history", sheets)
+        self.assertNotIn("drawdown_analysis", sheets)
 
     def test_custom_order_uses_custom_titles(self):
         """自定义 section_order → 标题使用配置序号。"""
         from src.python.report.excel_sheet_factory import create_sheets
+
         wb = self._make_wb()
-        sheets = create_sheets(wb, self._CUSTOM_ORDER,
-                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
+        sheets = create_sheets(
+            wb, self._CUSTOM_ORDER, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False
+        )
         self.assertEqual(len(sheets), 3)
         self.assertEqual(sheets["fund_performance"].title, "1.基金业绩分析")
         self.assertEqual(sheets["summary"].title, "2.投资分析汇总")
@@ -709,14 +827,20 @@ class TestCreateSheets(unittest.TestCase):
         """可见性过滤 → 只创建匹配 type 的页签。"""
         from src.python.core.registry import _REPORT_SECTION_DEFAULT
         from src.python.report.excel_sheet_factory import create_sheets
+
         wb = self._make_wb()
         # board 层启用 news + data 层 news 可用 → 新闻版块页签应出现
-        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_fund_deep_analysis=False, enable_news=True, enable_llm=False,
-                                data_availability={"news_data_available": True})
+        sheets = create_sheets(
+            wb,
+            _REPORT_SECTION_DEFAULT,
+            enable_fund_deep_analysis=False,
+            enable_news=True,
+            enable_llm=False,
+            data_availability={"news_data_available": True},
+        )
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
-        # always(6) + history(2) + evolution(1) + news(1) = 10
-        self.assertEqual(len(sheets), 10)
+        # always(6) + history(1，合并章) + evolution(1) + news(1) = 9
+        self.assertEqual(len(sheets), 9)
         for key in news_keys:
             self.assertIn(key, sheets)
 
@@ -724,12 +848,18 @@ class TestCreateSheets(unittest.TestCase):
         """enable_portfolio_evolution=False → 组合演进页签不创建。"""
         from src.python.core.registry import _REPORT_SECTION_DEFAULT
         from src.python.report.excel_sheet_factory import create_sheets
+
         wb = self._make_wb()
-        # always(6) + history(2) = 8（evolution 关闭，无组合演进页签）
-        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False,
-                                enable_portfolio_evolution=False)
-        self.assertEqual(len(sheets), 8)
+        # always(6) + history(1，合并章) = 7（evolution 关闭，无组合演进页签）
+        sheets = create_sheets(
+            wb,
+            _REPORT_SECTION_DEFAULT,
+            enable_fund_deep_analysis=False,
+            enable_news=False,
+            enable_llm=False,
+            enable_portfolio_evolution=False,
+        )
+        self.assertEqual(len(sheets), 7)
         self.assertNotIn("portfolio_evolution", sheets)
         # 其他 always 页签不受影响
         self.assertIn("summary", sheets)
@@ -739,10 +869,12 @@ class TestCreateSheets(unittest.TestCase):
         """enable_portfolio_evolution=True（默认）→ 组合演进页签创建。"""
         from src.python.core.registry import _REPORT_SECTION_DEFAULT
         from src.python.report.excel_sheet_factory import create_sheets
+
         wb = self._make_wb()
-        sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
-                                enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
-        self.assertEqual(len(sheets), 9)
+        sheets = create_sheets(
+            wb, _REPORT_SECTION_DEFAULT, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False
+        )
+        self.assertEqual(len(sheets), 8)
         self.assertIn("portfolio_evolution", sheets)
 
 

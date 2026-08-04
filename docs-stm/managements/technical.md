@@ -259,7 +259,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.4 报告配置化
 
-**决策**：报告 21 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
+**决策**：报告 20 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
 **两层可见性模型**：
 
@@ -1239,7 +1239,7 @@ for sec in section_order:
 
 ### 4.6 报告序号可配置
 
-报告 21 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
+报告 20 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
 #### 注册表结构
 
@@ -1255,7 +1255,7 @@ for sec in section_order:
 }
 ```
 
-21 个模块分布：`always`×6、`基金深度分析`×5、`news`×1、`llm`×5、`history`×2、`evolution`×1、`action`×1。
+20 个模块分布：`always`×6、`基金深度分析`×5、`news`×1、`llm`×5、`history`×1、`evolution`×1、`action`×1。
 
 #### 合并规则流程
 
@@ -1265,7 +1265,7 @@ get_report_section_order(config)
     ▼
 ┌────────────────────────┐
 │ config 中有             │
-│ report_section_order?  │── NO ──→ 返回完整 21 项默认顺序
+│ report_section_order?  │── NO ──→ 返回完整 20 项默认顺序
 └───────────┬────────────┘
            YES
             │
@@ -1283,7 +1283,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（21 项，key/number/type/data_flag）
+返回 result（20 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -1467,7 +1467,7 @@ get_combined_timeseries()
 
 **HTML 渲染**：`enable_interactive_charts` 开启时由 Chart.js 渲染交互图表（净值/回撤曲线、资产构成环形图、行业分布、穿透 TOP10、量化雷达图）；关闭时回退 `drawSimpleChart()`（Canvas 2D API 原生渲染，无 Chart.js 依赖），组合 as-if 曲线（实线）+ 基准指数（虚线，颜色循环），右侧图例显示。
 
-**Excel 渲染**：`portfolio_history` 页签每基准一列（归一化值），`drawdown_analysis` 页签对比指标矩阵。
+**Excel 渲染**：合并章 `portfolio_history_drawdown` 页签分「走势表 + 回撤矩阵」两区块——走势表每基准一列（归一化值）+ 指标汇总矩阵（累计收益/最大回撤/年化波动率/起止日，仅一份），回撤矩阵为独立回撤事件明细（含恢复耗时），危机区间标注为 2015/2018/2020/2022 静态日期表 + 区间统计。旧 `portfolio_history`/`drawdown_analysis` 两个独立页签已物理合并删除。
 
 #### 持仓快照存储与清理（history_snapshot.py）
 
@@ -2459,7 +2459,7 @@ core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号不可硬编码** — 报告 21 个模块的序号和显示名称必须通过 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
+| **C7** | **报告序号不可硬编码** — 报告 20 个模块的序号和显示名称必须通过 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 pipeline_data Schema 定义文档中预定义类型、版本号、写入/消费模块后，才能在代码中使用该键（详见附录 H） | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
@@ -2713,6 +2713,7 @@ investor-util/
 | position_status | dict | 是 | 已实现 | prepare_report_data |
 | data_freshness | dict | 是 | 已实现 | prepare_report_data |
 | action_data | dict | 是 | 已实现 | prepare_report_data |
+| crisis_annotation_data | dict | 是 | 已实现 | prepare_report_data |
 
 > `factor_exposure`（因子暴露分析，C19 契约，13 键）：`{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/factor_exposure.py` 计算、`report/orchestrator.py` 组装。C7 注册见 §4.6（type=`fund_deep_analysis`、data_flag=`factor_exposure_data`），计算方案/架构约束/降级分支见 §4.8 因子暴露分析。
 
@@ -2720,7 +2721,9 @@ investor-util/
 
 > `evolution_data`（组合演进，C19 契约，多快照趋势聚合）：`{"available": bool, "snapshot_count": int, "min_snapshots": int, "periods": list[str], "total_value": list[float], "total_cost": list[float], "total_pnl": list[float], "holding_counts": list[int], "account_flows": {account: list[float]}, "hhi": list[float\|None], "top_holdings": list[dict], "reason": str}`。`top_holdings` 每项含 code/name/weights（各期占比 %）/present_count（出现期数）；历史快照 `market_value=0.0` 时权重回退成本口径。由 `analysis/portfolio_evolution.py` 计算、`report/orchestrator.py` 注入（C7 注册 type=`evolution`、data_flag=`evolution_data`，见 §4.12），有效快照 < MIN_SNAPSHOTS=3 时 `available=false` 落 §1.4.5 降级。
 
-> `history_data`（组合历史走势 + 回撤，C19 契约）：`{"bars": list[dict], "max_drawdown": float, "max_drawdown_pct": float, "drawdown_events": list[dict], "recovery_times": list[dict], "drawdown_available": bool, "annualized_volatility": float, "total_return": float, "daily_returns": list[float], "warnings": list[str], "benchmarks": list[dict], "successful_holdings": list}`。`drawdown_events`（独立回撤事件）含 peak_date/trough_date/recovery_date/drawdown_pct/duration_days/recovery_days/recovered；`recovery_times`（恢复耗时明细）含 start_date/end_date/days。由 `report/portfolio_history.py` 组装（C7 注册 type=`history`），`drawdown_available` 表示有效交易日 ≥ MIN_SPAN 才渲染回撤明细，否则落 §1.4.5 降级。
+> `history_data`（组合历史走势 + 回撤，C19 契约，供合并章复用）：`{"bars": list[dict], "max_drawdown": float, "max_drawdown_pct": float, "drawdown_events": list[dict], "recovery_times": list[dict], "drawdown_available": bool, "annualized_volatility": float, "total_return": float, "daily_returns": list[float], "warnings": list[str], "benchmarks": list[dict], "successful_holdings": list}`。`drawdown_events`（独立回撤事件）含 peak_date/trough_date/recovery_date/drawdown_pct/duration_days/recovery_days/recovered；`recovery_times`（恢复耗时明细）含 start_date/end_date/days。由 `report/portfolio_history.py` 组装（C7 注册 type=`history`），`drawdown_available` 表示有效交易日 ≥ MIN_SPAN 才渲染回撤明细，否则落 §1.4.5 降级。消费方为合并章「组合历史走势与回撤」（`portfolio_history_drawdown`，一章两区块，Excel 见 `report/portfolio_history_drawdown_sheet.py`、HTML 见模板 `report_template.html`），旧 `portfolio_history`/`drawdown_analysis` 两个独立契约已随物理合并删除，由本契约 + 下方 `crisis_annotation_data` 覆盖。
+
+> `crisis_annotation_data`（危机区间标注，C19 契约，8 键）：`{"available": bool, "intervals": list[dict]}`。`intervals` 每项含 name/start/end/desc/in_range/interval_drawdown_pct/trough_date/recovery_days/recovered——基于 `history_data.bars` 对预设历史危机区间（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整，`analysis/crisis_annotation.py::CRISIS_INTERVALS` 静态历史事实表，不随持仓变化、不拉长 lookback、无新增网络请求）做窗口重叠裁剪与区间统计：`in_range` 表示与报告数据窗口重叠；`interval_drawdown_pct` 为区间内 running-peak 最大回撤（正数 %，窗口内无 bar 时为 None）；`trough_date` 为区间最深日；`recovery_days` 为最深日→首个回到峰值的恢复耗时（数据窗口内未恢复为 None）；`recovered` 为是否已恢复。由 `analysis/crisis_annotation.py::build_crisis_annotation(history_data)` 计算（纯标准库、analysis 层隔离，无 report/llm 依赖），both 路径在 `report/_report_generation.py` 以 `build_crisis_annotation(history_data)` 注入 pipeline_data，Chart.js 净值图阴影带（`chart_data_builder.py` 计算起止索引 → `chart-init.js::buildCrisisBandPlugin`）与 HTML 危机表/Excel 危机区块消费。危机标注净值图必须 C20 图下说明（`.chart-caption` 跟随是否有 in_range 区间数据）。
 
 > `position_status`（品种覆盖诊断，C19 契约）：`{"available": bool, "items": list[dict], "abnormal_count": int, "summary": str}`。`items` 每项含 code/name/account/status/status_label/reason；status 取值 `ok`/`nav_missing`/`possibly_delisted`/`bad_code_format`/`name_mismatch`（本地信号=代码格式+名称比对，数据信号=行情/净值可用性，见 `core/holding_status.py`）。由 `core/holding_status.py::build_coverage_summary` 计算、`report/orchestrator.py::prepare_report_data` 组装，both 路径在 `_report_generation.py` 直接以 `build_coverage_summary` 注入。消费方：数据质量仪表盘（`report_submodules.data_quality`，20 章「品种覆盖」区块，Excel 见 `report/data_quality_sheet.py`、HTML 见模板 `report_template.html`）；basic 路径无行情数据时 available=False，品种覆盖区块落降级占位。
 

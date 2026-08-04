@@ -369,8 +369,7 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "fund_concentration": "持仓集中度监控",
     "fund_style": "基金风格分析",
     "factor_exposure": "因子暴露分析",
-    "portfolio_history": "组合历史走势",
-    "drawdown_analysis": "历史回撤分析",
+    "portfolio_history_drawdown": "组合历史走势与回撤",
     "portfolio_evolution": "组合演进",
     "action": "行动建议",
 }
@@ -551,15 +550,22 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "health_check", "name": "持仓体检报告", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
     {"key": "penetration_deep", "name": "穿透深度分析", "number": 15, "type": "llm", "data_flag": "llm_data_available"},
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
-    {"key": "portfolio_history", "name": "组合历史走势", "number": 16, "type": "history", "data_flag": None},
-    {"key": "drawdown_analysis", "name": "历史回撤分析", "number": 17, "type": "history", "data_flag": None},
+    # 组合历史走势与回撤：物理合并「组合历史走势」+「历史回撤分析」，
+    # 一章分「走势表 + 回撤矩阵」两区块 + 危机区间标注（2015/2018/2020/2022）
+    {
+        "key": "portfolio_history_drawdown",
+        "name": "组合历史走势与回撤",
+        "number": 16,
+        "type": "history",
+        "data_flag": None,
+    },
     # ── evolution 类型（独立开关 enable_portfolio_evolution 控制） ──
     # 组合演进：聚合本地多期快照，data_flag 控制章节可见性，
     # available=False 时模板/页签写占位（与持仓关系矩阵的降级模式一致）
     {
         "key": "portfolio_evolution",
         "name": "组合演进",
-        "number": 18,
+        "number": 17,
         "type": "evolution",
         "data_flag": "evolution_data",
     },
@@ -568,14 +574,14 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {
         "key": "action",
         "name": "行动建议",
-        "number": 19,
+        "number": 18,
         "type": "action",
         "data_flag": None,
     },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 20, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 19, "type": "always", "data_flag": None},
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 21, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 20, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 
@@ -583,7 +589,7 @@ def get_report_section_keys() -> set[str]:
     """返回所有有效的报告模块标识集合，供 config 校验使用。
 
     Returns:
-        {"summary", "market_value", "category", ..., "drawdown_analysis"}
+        {"summary", "market_value", "category", ..., "portfolio_history_drawdown"}
     """
     return {sec["key"] for sec in _REPORT_SECTION_DEFAULT}
 
@@ -612,7 +618,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 
     处理逻辑：
-      1. 无配置或配置为空 → 返回完整 21 项默认顺序（与当前硬编码一致）
+      1. 无配置或配置为空 → 返回完整 20 项默认顺序（与当前硬编码一致）
       2. 用户配置的模块使用配置序号，其余保持默认序号
       3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
       4. llm_usage 始终固定在最后一位
@@ -622,7 +628,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
                 为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
 
     Returns:
-        [{key, name, number, type, data_flag}, ...] 共 21 项
+        [{key, name, number, type, data_flag}, ...] 共 20 项
     """
     if config is None:
         return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]

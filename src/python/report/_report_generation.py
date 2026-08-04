@@ -180,6 +180,13 @@ def _prepare_full_risk_metrics(
     history_data = fetch_history_data(holdings, config, reporter, fetch=fetch_history)
     perf.stop()
 
+    # 危机区间标注（C19 crisis_annotation_data）：基于既有 bars 重叠裁剪，
+    # 复用历史数据不拉长 lookback（以 history.lookback_days 为准）
+    if pipeline_data is not None:
+        from src.python.analysis.crisis_annotation import build_crisis_annotation
+
+        pipeline_data["crisis_annotation_data"] = build_crisis_annotation(history_data)
+
     # 从 history_data 提取风险指标，注入 prep 和 pipeline_data
     if history_data and history_data.get("status") not in ("unavailable",):
         _risk = {
@@ -278,6 +285,7 @@ def _generate_full_html_report(
     position_status: dict | None = None,
     data_freshness: dict | None = None,
     action_data: dict | None = None,
+    crisis_annotation_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -344,6 +352,7 @@ def _generate_full_html_report(
             position_status=position_status,
             data_freshness=data_freshness,
             action_data=action_data,
+            crisis_annotation_data=crisis_annotation_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -533,6 +542,13 @@ def _generate_report_both(
         history_data = None
         reporter.info("[章节配置] 历史走势已关闭，跳过")
 
+    # 危机区间标注（C19 crisis_annotation_data）：基于既有 bars 重叠裁剪，不拉长 lookback
+    from src.python.analysis.crisis_annotation import build_crisis_annotation
+
+    crisis_annotation_data = build_crisis_annotation(history_data)
+    if pipeline_data is not None:
+        pipeline_data["crisis_annotation_data"] = crisis_annotation_data
+
     # ── 4. HTML 报告 ──
     _news_label = "含新闻" if _enable_news else "无新闻"
     reporter.info(f"正在生成 HTML 报告（{_news_label}）...")
@@ -565,6 +581,7 @@ def _generate_report_both(
             position_status=(pipeline_data or {}).get("position_status"),
             data_freshness=(pipeline_data or {}).get("data_freshness"),
             action_data=(pipeline_data or {}).get("action_data"),
+            crisis_annotation_data=crisis_annotation_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -806,6 +823,7 @@ def _generate_report_full(
         (pipeline_data or {}).get("position_status"),
         (pipeline_data or {}).get("data_freshness"),
         (pipeline_data or {}).get("action_data"),
+        (pipeline_data or {}).get("crisis_annotation_data"),
     )
 
     # ── 7. Excel 报告 ──

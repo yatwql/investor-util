@@ -293,6 +293,7 @@ def _render_template(
     position_status: dict | None = None,  # 品种覆盖诊断 C19 position_status
     data_freshness: dict | None = None,  # 可信度摘要 C19 data_freshness
     action_data: dict | None = None,  # 行动建议单一数据源 C19 action_data（19 章行动板块 + 13 章行动摘要）
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（15 章合并章）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.report.chart_data_builder import build_evolution_chart_data
@@ -365,6 +366,7 @@ def _render_template(
         position_status=position_status,
         data_freshness=data_freshness,
         action_data=action_data,
+        crisis_annotation_data=crisis_annotation_data,
     )
 
 
@@ -404,6 +406,7 @@ def write_html_report(
     position_relationship_data: dict | None = None,
     evolution_data: dict | None = None,
     drawdown_min_span: int = DRAW_DOWN_MIN_SPAN,
+    crisis_annotation_data: dict | None = None,  # 危机区间标注 C19 crisis_annotation_data（15 章合并章）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -645,6 +648,7 @@ def write_html_report(
         position_status=position_status,
         data_freshness=data_freshness,
         action_data=action_data,
+        crisis_annotation_data=crisis_annotation_data,
     )
 
     if enable_interactive_charts:

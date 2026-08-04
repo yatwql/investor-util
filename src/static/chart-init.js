@@ -47,6 +47,33 @@
     return common.doughnutOptions(percent);
   }
 
+  /* ── 危机区间着色插件（净值图 C20：2015/2018/2020/2022 阴影带）──
+   * 数据来自 portfolio_line 数据集的可选 crisis 字段（chart_data_builder
+   * Python 侧计算起止索引）。beforeDatasetsDraw 在数据集之下绘制半透明带。 */
+  function buildCrisisBandPlugin(crisis) {
+    return {
+      id: 'crisisBands',
+      beforeDatasetsDraw: function (chart, args, opts) {
+        if (!crisis || !crisis.length) return;
+        var area = chart.chartArea;
+        if (!area) return;
+        var xScale = chart.scales && chart.scales.x;
+        if (!xScale) return;
+        var ctx = chart.ctx;
+        ctx.save();
+        for (var bi = 0; bi < crisis.length; bi++) {
+          var band = crisis[bi];
+          var x0 = xScale.getPixelForValue(band.startIndex);
+          var x1 = xScale.getPixelForValue(band.endIndex);
+          if (x0 === undefined || x1 === undefined || x1 <= x0) continue;
+          ctx.fillStyle = 'rgba(231,76,60,0.07)';
+          ctx.fillRect(x0, area.top, x1 - x0, area.bottom - area.top);
+        }
+        ctx.restore();
+      }
+    };
+  }
+
   /* ── 单图初始化函数（O1：每个独立 try/catch）────────── */
 
   function initPortfolioChart() {
@@ -86,7 +113,8 @@
     trackChart(new Chart(el, {
       type: 'line',
       data: { labels: ds.labels, datasets: datasets },
-      options: lineOptions('净值')
+      options: lineOptions('净值'),
+      plugins: [buildCrisisBandPlugin(ds.crisis)]
     }), 'portfolio_line');
   }
 

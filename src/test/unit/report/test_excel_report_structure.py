@@ -38,11 +38,10 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "expert_review",      "name": "智囊团深度复盘",                   "number": 13, "type": "llm"},
     {"key": "health_check",       "name": "持仓体检报告",                     "number": 14, "type": "llm"},
     {"key": "penetration_deep",   "name": "穿透深度分析",                     "number": 15, "type": "llm"},
-    {"key": "portfolio_history",  "name": "组合历史走势",                     "number": 16, "type": "history"},
-    {"key": "drawdown_analysis",  "name": "历史回撤分析",                     "number": 17, "type": "history"},
-    # 注：portfolio_evolution(18) / action(19) 为注册表扩展模块，此精简版省略
-    {"key": "data_source_status", "name": "数据源可用性矩阵",                 "number": 20, "type": "always"},
-    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 21, "type": "llm"},
+    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤",       "number": 16, "type": "history"},
+    # 注：portfolio_evolution(17) / action(18) 为注册表扩展模块，此精简版省略
+    {"key": "data_source_status", "name": "数据源可用性矩阵",                 "number": 19, "type": "always"},
+    {"key": "llm_usage",          "name": "LLM API 用量",                    "number": 20, "type": "llm"},
 ]
 
 
@@ -90,7 +89,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         self.assertEqual(wb.sheetnames, [sheets[k].title for k in expected_order])
 
     def test_sheet_order_all_types_enabled(self):
-        """全部类型启用 → 19 个页签按默认顺序排列。"""
+        """全部类型启用 → 18 个页签按默认顺序排列。"""
         from src.python.report.excel_sheet_factory import create_sheets
         wb = self._make_wb()
         sheets = create_sheets(wb, _REPORT_SECTION_DEFAULT,
@@ -99,7 +98,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         self.assertEqual(list(sheets.keys()), expected_keys,
                          "全部启用时页签顺序应与默认注册表一致")
-        self.assertEqual(len(sheets), 19)
+        self.assertEqual(len(sheets), 18)
 
     def test_sheet_order_visibility_filtering(self):
         """可见性过滤 → 只创建匹配 type 的页签且顺序保持。"""
