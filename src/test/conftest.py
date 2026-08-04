@@ -179,6 +179,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.config._llm_providers._LLM_PROVIDERS_FILE_DEFAULT",
         str(tmp_path / "data/config/llm_providers.json"),
     )
+    # features.json 功能开关覆写文件隔离（save_feature_overrides 写入）
+    monkeypatch.setattr(
+        "src.python.config.features._FEATURES_FILE",
+        str(tmp_path / "data/config/features.json"),
+    )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(
         "src.python.core.constants.HISTORY_SNAPSHOT_DIR",
