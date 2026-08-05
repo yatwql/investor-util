@@ -54,7 +54,7 @@ pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。
 .venv/bin/python scripts/test_runner.py --mode unit         # 全量单元测试
 .venv/bin/python scripts/test_runner.py --mode scenario     # 业务场景测试
 .venv/bin/python scripts/test_runner.py --mode edge         # 边缘/异常场景
-.venv/bin/python scripts/test_runner.py --mode smoke        # 冒烟测试（~2s）
+.venv/bin/python scripts/test_runner.py --mode smoke        # 冒烟测试（快速验证核心通路）
 .venv/bin/python scripts/test_runner.py --mode data         # 数据正确性验证
 
 # 多模式组合
@@ -76,7 +76,7 @@ pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。
 
 #### `--mode` 与 pytest `-m` 对照
 
-| `--mode` | 等效 `-m` 表达式 | 典型耗时 |
+| `--mode` | 等效 `-m` 表达式 | Linux 开发机参考耗时 |
 |:---------|:-----------------|:--------:|
 | `regression` | `scenario` | ~17s |
 | `smoke` | `smoke` | ~2s |
@@ -93,7 +93,7 @@ pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。
 | `report` | `unit_report` | ~11s |
 | `scenario_extreme` | `scenario_extreme` | ~2s |
 
-> 注：典型耗时按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。**耗时与硬件/操作系统/并行度强相关**，不同 OS 或慢机器上可能数倍于此，仅作相对量级参考；完整说明及不同环境下的耗时对照见 `test-coverage.md`（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。
+> 注：**Linux 开发机参考耗时**按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，仅作相对量级参考；完整说明及不同环境下的耗时对照见 [`test-coverage.md`](../managements/test-coverage.md)（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。若需本机实测，运行 `python scripts/test_runner.py --mode bench --update-docs` 自动采集回填。
 
 ---
 

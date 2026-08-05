@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
-> 文档版本：0.10.8-dev
-> **编号源**：`rf-next = 234`（新增问题取此编号，完成后更新为 +1；已用最大 rf-233，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.10.8
+> **编号源**：`rf-next = 239`（新增问题取此编号，完成后更新为 +1；已用最大 rf-238，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -21,20 +21,28 @@
 
 | # | 文件 | 行数 | 状态 | 拆分建议 |
 |---|------|------|------|----------|
-| **rf-75** | `core/registry.py` | 653 | 维持现状（中央注册表被 56 文件引用，数据表内聚） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责（不拆） |
+| **rf-75** | `core/registry.py` | 665 | 维持现状（中央注册表被 56 文件引用，数据表内聚） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责（不拆） |
 | **rf-78** | `fetcher/batch.py` | 564 | 维持现状（BatchDispatcher 本身内聚，复核确认不拆） | BatchDispatcher 本身内聚，可维持现状（不拆） |
-| **rf-79** | `core/code_utils.py` | 537 | 维持现状（500-800 区间内聚文件） | 可考虑将 `estimate_market_cap_by_prefix()` 等非核心判定函数移出（不拆） |
-| **rf-80** | `report/data_status.py` | 534 | 维持现状（DegradationTracker 单类，内部职责内聚） | DegradationTracker 单类偏大（不拆） |
-| **rf-81** | `report/html_renderers.py` | 521 | 维持现状（render 函数属同一渲染域，拆分收益有限） | 所有 HTML render 函数揉合一体（不拆） |
+| **rf-79** | `core/code_utils.py` | 542 | 维持现状（500-800 区间内聚文件） | 可考虑将 `estimate_market_cap_by_prefix()` 等非核心判定函数移出（不拆） |
+| **rf-80** | `report/data_status.py` | 536 | 维持现状（DegradationTracker 单类，内部职责内聚） | DegradationTracker 单类偏大（不拆） |
+| **rf-81** | `report/html_renderers.py` | 526 | 维持现状（render 函数属同一渲染域，拆分收益有限） | 所有 HTML render 函数揉合一体（不拆） |
 | **rf-85** | `fetcher/fund.py` | 401 | 未超限（<500，维持现状） | 排名/持仓/基准三职责可拆分为子模块 |
-| **rf-86** | `cache/operations.py` | 472 | 未超限（<500，维持现状） | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
-| **rf-89** | `report/excel_generator.py` | 477 | 未超限（<500，维持现状） | Excel 编排器 |
+| **rf-86** | `cache/operations.py` | 635 | 500-800 可选优化区间（2026-08-05 实测 635，较登记值 472 增长 163，跨过 500 线，关注后续增长） | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
+| **rf-89** | `report/excel_generator.py` | 423 | 未超限（<500，维持现状；2026-08-05 实测 423，较登记值 477 下降，重构后缩减） | Excel 编排器 |
 
 ---
 
 ## 已修复（摘要）
 
 > v0.10.7 发布时已修复项（rf-217/rf-229/rf-233）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
+
+| # | 文件 | 修复摘要 |
+|---|------|----------|
+| **rf-234** | `report/_report_generation.py`（1018→686） | facade 聚合门面拆分：后台健康检查→`_report_health.py`、轻量行情/注入/校验→`_report_helpers.py`、全量指标装配→`_full_risk_metrics.py`、图表数据集→`_chart_dataset_factory.py`；门面保留 both/full 双路径编排并 re-export 全部符号 |
+| **rf-235** | `report/html_writer.py`（934→660） | facade 聚合门面拆分：章节可见性/目录导航→`html_writer_nav.py`、数据契约展示映射→`html_writer_display.py`、JS 资产复制→`html_writer_assets.py`；门面保留 `write_html_report`/`_render_template` 并 re-export 符号 |
+| **rf-236** | `analysis/metrics.py`（880→225） | facade 聚合门面拆分：收益类指标→`metrics_returns.py`、风险类指标→`metrics_risk.py`；门面保留 `compute_all_metrics` 聚合入口 + `__all__` + 常量并 re-export 符号 |
+| **rf-237** | `report/orchestrator.py`（822→442） | facade 聚合门面拆分：风格因子/行业 Beta 计算族→`_report_factor_metrics.py`（持仓K线路由 + 因子回归 + 行业Beta）、市场温度/持仓相关性→`_report_aux_metrics.py`；门面保留 `generate_report`/`prepare_report_data`/`compute_valuation_data`（patch 依赖门面命名空间）并 re-export 符号 |
+| **rf-238** | `llm/generators_orchestrator.py`（808→698） | facade 聚合门面拆分：新闻关联责任单元（模块级结果缓存/闭包/安全直调）→`_llm_news_correlation.py`；门面保留缓存预检（`_compute_module_cache_info`/`_precheck_*`）/worker 分发（`_dispatch_llm_workers`/`_build_module_fns`）/主编排入口（`generate_all_llm`），re-export 子模块符号，mock patch 接线零改动 |
 
 ## 归档
 

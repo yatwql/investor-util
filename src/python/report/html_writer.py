@@ -2,14 +2,22 @@
 
 调用现有的计算模块获取所有分析数据，通过 Jinja2 模板
 渲染为完整的单页 HTML 报告，支持最新版和归档版双重输出。
+
+本文件为聚合门面：
+  - 章节可见性/目录导航    → `html_writer_nav.py`
+  - 数据契约展示映射        → `html_writer_display.py`
+  - Chart.js JS 资产复制    → `html_writer_assets.py`
+  - 14 渲染函数 + LLM 模块  → `html_renderers.py`
+  - 模板环境/过滤器          → `html_jinja_env.py`
+  - 报告落盘                → `html_save.py`
+门面保留核心生成函数 `write_html_report()` 与模板渲染 `_render_template()`，
+并 re-export 子模块符号。
 """
 
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
-from typing import Any
 
 from src.python.cache import get_cache_hit_rate
 from src.python.core.constants import APP_VERSION
@@ -24,6 +32,21 @@ from src.python.report.penetration_sheet import build_penetration_data_status
 from src.python.report.progress import ProgressReporter, SilentProgressReporter
 from src.python.report.summary import build_index_data_status
 
+# ── 子模块 re-export ────────────────────────────────────
+from src.python.report.html_writer_assets import _copy_js_assets  # noqa: F401
+from src.python.report.html_writer_display import (  # noqa: F401
+    _attach_valuation_to_penetration,
+    _build_flow_display,
+    _build_temperature_display,
+)
+from src.python.report.html_writer_nav import (  # noqa: F401
+    _LLM_SUPPORTED_SECTIONS,
+    _NAV_GROUP_LABELS,
+    _SECTION_NAV_GROUP_MAP,
+    _build_section_nav_groups,
+    _compute_section_visibility,
+)
+
 logger = logging.getLogger("invest")
 
 # ═══════════════════════════════════════════════════════════════
@@ -32,12 +55,15 @@ logger = logging.getLogger("invest")
 #
 #   _ENV + 过滤器                  → html_jinja_env.py
 #   14 渲染函数 + LLM 模块信息    → html_renderers.py
+#   章节可见性/目录导航           → html_writer_nav.py
+#   数据契约展示映射              → html_writer_display.py
+#   Chart.js JS 资产复制          → html_writer_assets.py
 #   _save_html_report              → html_save.py
 #   辅助函数                      _safe_build_data_status, _time_strings,
-#                                  _compute_section_visibility,
-#                                  _build_data_status_sections
+#                                  _build_data_status_sections,
+#                                  _build_history_data_status
+#   模板渲染函数                  _render_template()
 #   核心生成函数                  write_html_report()
-#   桥接 import（子渲染器 + 读写器）
 #
 # ═══════════════════════════════════════════════════════════════
 
@@ -76,165 +102,6 @@ def _time_strings() -> tuple[str, str, str]:
         datetime.now().strftime("%Y-%m-%d"),
         get_last_trading_day(),
     )
-
-
-def _compute_section_visibility(
-    order: list[dict],
-    manager_analysis: dict | None,
-    overlap_matrix: dict | None,
-    concentration_analysis: dict | None,
-    style_analysis: dict | None,
-    include_news: bool,
-    llm_enabled_flag: bool,
-    # ↓↓↓ board 层新增参数 ↓↓↓
-    enable_news: bool = True,  # board 层：市场新闻是否开启（配置驱动，不是 include_news！）
-    enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
-    enable_history: bool = True,  # board 层：历史走势章节是否开启
-    enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
-    enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
-    enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
-    style_factor_data: dict | None = None,  # data 层：风格与因子 dict（None=无数据，章节隐藏）
-    position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 dict（相关性区块数据源）
-    evolution_data: dict | None = None,  # data 层：组合演进 dict（None=无数据，章节隐藏）
-) -> tuple[dict[str, int], dict[str, bool], Any]:
-    """计算报告模块序号 + 可见性字典 + 闭包函数。
-
-    两层可见性模型：
-      board 层：用户配置的章节开关（enable_xxx）
-      data 层：各子模块返回的数据可用状态
-
-    返回的闭包不写入 _ENV.globals。
-    """
-    # board 层：内联 dict（与 Excel 端结构一致）
-    board_flags: dict[str, bool] = {
-        "always": True,
-        "fund_deep_analysis": enable_fund_deep_analysis,
-        "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
-        "history": enable_history,
-        "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
-        "action": enable_action,  # ← board 层：行动建议（默认关）
-        "llm": enable_llm,  # ← board 层
-    }
-    # data 层：各模块数据就绪状态
-    data_flags: dict[str, bool] = {
-        "manager_data": manager_analysis is not None,
-        "concentration_data": concentration_analysis is not None,
-        "style_data": style_analysis is not None,
-        "news_data_available": include_news,  # ← data 层（菜单类型+数据状态）
-        "llm_data_available": llm_enabled_flag,  # ← data 层（LLM 生成成功？）
-        # 风格与因子章可见性：风格表（渲染期派生）或因子数据（数据契约）任一就绪即可见；
-        # 模板依据 available/status 在"完整内容/数据不足/数据源暂不可用"间切换（§1.4.5）
-        "style_factor_data": style_factor_data is not None or style_analysis is not None,
-        # 持仓关系矩阵 = 重合度区块（render 时计算）∪ 相关性区块（数据契约 数据源）：
-        # 任一区块有数据即章节可见，区块各自独立降级（§1.4.5）
-        "position_relationship_data": overlap_matrix is not None or position_relationship_data is not None,
-        # evolution_data 同上：始终由编排层计算注入（非 None）→ 章节可见，
-        # available=False 时模板写占位文本（快照不足，§1.4.5）
-        "evolution_data": evolution_data is not None,
-    }
-
-    # 两层合并：section_visible = board_ok AND data_ok
-    section_visible_dict: dict[str, bool] = {}
-    for sec in order:
-        board_ok = board_flags.get(sec.get("type", ""), True)
-        if not board_ok:
-            section_visible_dict[sec["key"]] = False
-            continue
-        flag_name = sec.get("data_flag")
-        if not flag_name:
-            section_visible_dict[sec["key"]] = True
-        else:
-            section_visible_dict[sec["key"]] = data_flags.get(flag_name, False)
-
-    # 连续重新编号：基于可见模块分配连续序号，llm_usage 强制末位
-    visible_list = [sec for sec in order if section_visible_dict.get(sec["key"], False)]
-    llm_sec = [s for s in visible_list if s["key"] == "llm_usage"]
-    other_secs = [s for s in visible_list if s["key"] != "llm_usage"]
-    ordered_visible = other_secs + llm_sec
-    visible_numbers = {sec["key"]: idx for idx, sec in enumerate(ordered_visible, start=1)}
-
-    # 创建渲染期 section_visible 闭包（不写入 _ENV.globals）
-    _sv_fn = lambda key, _d=section_visible_dict: bool(_d.get(key, False))
-    return visible_numbers, section_visible_dict, _sv_fn
-
-
-# ── HTML 目录分组导航（「基础/基金深度/风险/历史/LLM」五组，导航折叠收尾） ──
-
-# 分组展示顺序（组名, 组 key），空组不渲染
-_NAV_GROUP_LABELS: list[tuple[str, str]] = [
-    ("基础", "basic"),
-    ("基金深度", "fund_deep"),
-    ("风险", "risk"),
-    ("历史", "history"),
-    ("LLM", "llm"),
-]
-
-# 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础」组）
-_SECTION_NAV_GROUP_MAP: dict[str, str] = {
-    # 基础：汇总/明细/分类/穿透/数据源可用性
-    "summary": "basic",
-    "market_value": "basic",
-    "category": "basic",
-    "penetration": "basic",
-    "data_source_status": "basic",
-    # 基金深度：基金业绩 + 基金深度分析系列章节
-    "fund_performance": "fund_deep",
-    "fund_manager": "fund_deep",
-    "position_relationship": "fund_deep",
-    "fund_concentration": "fund_deep",
-    "style_factor": "fund_deep",
-    # 风险：行动建议（再平衡信号/交易纪律/调仓建议/收益归因）
-    "action": "risk",
-    # 历史：组合历史走势与回撤 + 组合演进
-    "portfolio_history_drawdown": "history",
-    "portfolio_evolution": "history",
-    # LLM：新闻关联 + LLM 文本分析系列 + API 用量
-    "news_correlation": "llm",
-    "global_macro": "llm",
-    "expert_review": "llm",
-    "health_check": "llm",
-    "penetration_deep": "llm",
-    "llm_usage": "llm",
-}
-
-# LLM 支持章节：与「LLM」导航组同源派生（新闻关联 + LLM 文本分析系列 + API 用量），
-# 单一数据源防漂移；目录/横向导航据此橙色加粗 + 🧠 图标标记。
-_LLM_SUPPORTED_SECTIONS: frozenset[str] = frozenset(
-    key for key, group in _SECTION_NAV_GROUP_MAP.items() if group == "llm"
-)
-
-
-def _build_section_nav_groups(
-    order: list[dict],
-    section_visible,
-    section_numbers: dict,
-) -> list[dict]:
-    """按「基础/基金深度/风险/历史/LLM」五组构建 HTML 目录分组导航数据。
-
-    仅收录当前可见章节；组序固定为五组顺序，组内按报告序号升序。
-    返回 [{key, name, sections: [{key, number, name, llm_supported}, ...]}, ...]；
-    llm_supported 标记该章节是否有 LLM 支持（与 LLM 导航组同源），模板据此加橙色/图标；
-    空组（无可见章节）保留在返回列表中，模板端跳过渲染（无 `<details>`）。
-    """
-    groups: dict[str, list[dict]] = {gk: [] for _, gk in _NAV_GROUP_LABELS}
-    for sec in order:
-        key = sec.get("key", "")
-        if not section_visible(key):
-            continue
-        group_key = _SECTION_NAV_GROUP_MAP.get(key, "basic")
-        groups.setdefault(group_key, []).append(
-            {
-                "key": key,
-                "number": section_numbers.get(key, 0),
-                "name": sec.get("name", key),
-                "llm_supported": key in _LLM_SUPPORTED_SECTIONS,
-            }
-        )
-    result: list[dict] = []
-    for label, group_key in _NAV_GROUP_LABELS:
-        sections = sorted(groups.get(group_key, []), key=lambda s: s["number"])
-        result.append({"key": group_key, "name": label, "sections": sections})
-    return result
 
 
 def _build_data_status_sections(
@@ -309,107 +176,6 @@ def _build_history_data_status(history_data: dict | None) -> DataStatus:
                 message=STATUS_MESSAGES.get(key, w),
             )
     return data_status_history
-
-
-def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
-    """将成本流水数据（fund_flow_data）转成 HTML 模板友好展示映射（per-code 展示值）。
-
-    复用 market_value_sheet._weighted_avg_cost / category._tier_label 计算逻辑，
-    避免双实现。无数据或开关关闭时返回 None（模板不渲染成本流水列）。
-
-    Args:
-        fund_flow_data: 成本流水数据（None = 开关关闭）
-
-    Returns:
-        含 xirr_rate/cost_map/tier_map/div_map/div_total 的展示 dict，或 None
-    """
-    if not fund_flow_data:
-        return None
-    from src.python.report.category import _tier_label
-    from src.python.report.market_value_sheet import _weighted_avg_cost
-
-    cost_tiers = (fund_flow_data.get("cost_tiers") or {}).get("per_code", {})
-    dividends = (fund_flow_data.get("dividends") or {}).get("per_code", {})
-    xirr = fund_flow_data.get("xirr") or {}
-    return {
-        "available": bool(fund_flow_data.get("available")),
-        "xirr_rate": xirr.get("rate"),
-        "cost_map": {code: _weighted_avg_cost(buckets) for code, buckets in cost_tiers.items()},
-        "tier_map": {code: _tier_label(buckets) for code, buckets in cost_tiers.items()},
-        "div_map": dict(dividends),
-        "div_total": float((fund_flow_data.get("dividends") or {}).get("total", 0.0) or 0.0),
-    }
-
-
-def _build_temperature_display(market_temperature_data: dict | None) -> dict | None:
-    """将市场温度数据契约（market_temperature_data）转成 HTML 模板友好展示映射。
-
-    Args:
-        market_temperature_data: 市场温度数据契约（None = 开关关闭）。
-
-    Returns:
-        含 available/score/tier/components/index_name/disclaimer 的展示 dict，或 None。
-    """
-    from src.python.analysis.market_temperature import TEMPERATURE_DISCLAIMER
-
-    if not market_temperature_data:
-        return None
-    if not market_temperature_data.get("available"):
-        return {
-            "available": False,
-            "score": None,
-            "tier": None,
-            "components": None,
-            "index_name": market_temperature_data.get("index_name") or "沪深300",
-            "disclaimer": market_temperature_data.get("disclaimer") or TEMPERATURE_DISCLAIMER,
-        }
-    pct = market_temperature_data.get("price_percentile")
-    dev = market_temperature_data.get("ma_deviation")
-    vol = market_temperature_data.get("volatility")
-    components = None
-    if all(v is not None for v in (pct, dev, vol)):
-        # 分位为 0~100，均线偏离/波动率为小数比例（0.032=3.2%），转百分数展示
-        components = {
-            "price_percentile": f"{pct:.1f}%",
-            "ma_deviation": f"{dev * 100:+.1f}%",
-            "volatility": f"{vol * 100:.1f}%",
-        }
-    return {
-        "available": True,
-        "score": market_temperature_data.get("score"),
-        "tier": market_temperature_data.get("tier") or "合理",
-        "components": components,
-        "index_name": market_temperature_data.get("index_name") or "沪深300",
-        "disclaimer": market_temperature_data.get("disclaimer") or TEMPERATURE_DISCLAIMER,
-    }
-
-
-def _attach_valuation_to_penetration(
-    penetration: dict | None,
-    valuation_data: dict | None,
-) -> dict | None:
-    """为穿透 TOP10 数据附加估值分位文本（返回新 dict，不修改原对象）。
-
-    Args:
-        penetration: 穿透 TOP10 数据（含 top10/summary）。
-        valuation_data: 估值分位数据契约；None 时原样返回（不附加列）。
-
-    Returns:
-        新 penetration dict（每个 top10 条目增加 valuation_text 字段），
-        或原 penetration（valuation_data 为 None）。
-    """
-    if not valuation_data or not penetration:
-        return penetration
-    from src.python.report.penetration_sheet import _get_valuation_text
-
-    display = dict(penetration)
-    top10 = []
-    for entry in display.get("top10", []):
-        e = dict(entry)
-        e["valuation_text"] = _get_valuation_text(valuation_data, entry.get("codes", []))
-        top10.append(e)
-    display["top10"] = top10
-    return display
 
 
 def _render_template(
@@ -872,46 +638,6 @@ def write_html_report(
         _copy_js_assets(output_dir)
 
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
-
-
-# ── Chart.js JS 资产复制（src/static/ → 输出目录）───────────────
-
-
-def _copy_js_assets(output_dir: str) -> None:
-    """将 src/static/ 下 Chart.js 前端 JS 资产复制到报告输出目录（本地 bundle）。
-
-    模板以相对路径引用（chart.min.js / chart-print.js / chart-config.js /
-    chart-export.js / chart-common.js / chart-init.js / toc.js / theme.js），
-    报告完全离线自包含。文件缺失时仅告警，不阻断报告生成（防御性）。
-
-    Args:
-        output_dir: 报告输出目录（与 HTML 同目录）
-    """
-    import shutil
-
-    from src.python.core.constants import PROJECT_ROOT
-
-    _JS_ASSETS = (
-        "chart.min.js",
-        "chart-print.js",
-        "chart-config.js",
-        "chart-export.js",
-        "chart-common.js",
-        "chart-init.js",
-        "toc.js",
-        "theme.js",
-    )
-    src_dir = os.path.join(PROJECT_ROOT, "src", "static")
-    os.makedirs(output_dir, exist_ok=True)
-    for fname in _JS_ASSETS:
-        src = os.path.join(src_dir, fname)
-        if not os.path.exists(src):
-            logger.warning("[chart] JS 资产缺失（跳过复制）: %s", src)
-            continue
-        try:
-            shutil.copy2(src, os.path.join(output_dir, fname))
-        except OSError as e:
-            logger.warning("[chart] JS 资产复制失败: %s", e)
 
 
 # ── 桥接 import：外部子模块 ─────────────────────────────────
