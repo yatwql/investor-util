@@ -87,6 +87,34 @@ def _get_rating_thresholds(fund_type_hint: str = "") -> list[float]:
     return _RATING_THRESHOLDS.get(fund_type_hint, _RATING_THRESHOLDS["default"])
 
 
+def _fund_type_hint_from_name(name: str | None) -> str:
+    """根据基金名称推导评级阈值类型键（default/bond/index/qdii）。
+
+    与穿透分类（report/penetration.classify_penetration）的判定优先级一致：
+    先 QDII（含隐式海外），再债券型，再指数/ETF/联接，其余走主动权益默认阈值。
+
+    Returns:
+        阈值类型键：``"qdii"`` / ``"bond"`` / ``"index"`` / ``""``（默认）
+    """
+    if not name:
+        return ""
+    from src.python.core.code_utils import (
+        is_bond_related_by_name,
+        is_etf_by_name,
+        is_index_fund_by_name,
+        is_index_link_by_name,
+        is_qdii_extended,
+    )
+
+    if is_qdii_extended(name):
+        return "qdii"
+    if is_bond_related_by_name(name):
+        return "bond"
+    if is_index_fund_by_name(name) or is_index_link_by_name(name) or is_etf_by_name(name):
+        return "index"
+    return ""
+
+
 def _pct_to_rating(pct: float, thresholds: list[float] | None = None) -> str:
     """将 0~1 百分位值转为 5 级评级。
 
@@ -226,7 +254,10 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
         code: 6 位基金代码
 
     Returns:
-        {"code", "name", "rankings", "rating", "perf_evaluation"} 或 None
+        {"code", "name", "type", "rankings", "rating", "perf_evaluation",
+        "risk_analysis"} 或 None
+        其中 ``type`` 为评级阈值类型键（``qdii``/``bond``/``index``/``""``），
+        由基金名称推导，决定 ``rating`` 采用的差异化阈值。
     """
     text = _request_pingzhong_data(code)
     if text is None:
@@ -237,12 +268,15 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     if name_match:
         name = name_match.group(1)
 
+    # 类型差异化阈值：按名称推导 QDII/债券/指数，接线至评级计算
+    fund_type_hint = _fund_type_hint_from_name(name)
+
     rankings = _parse_syl_returns(text)
     rank_entry = _parse_rank_entry(text)
     if rank_entry.get("rank") != "--" or rank_entry.get("percentile") != "--":
         rankings["同类排名"] = rank_entry
 
-    rating = _calc_rating_from_entry(rank_entry)
+    rating = _calc_rating_from_entry(rank_entry, fund_type_hint)
     perf_eval = _parse_perf_evaluation(text)
     risk_data = _parse_risk_analysis(text)
 
@@ -258,7 +292,7 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     return {
         "code": code.strip(),
         "name": name,
-        "type": "",
+        "type": fund_type_hint,
         "rankings": rankings,
         "rating": rating,
         "perf_evaluation": perf_eval,

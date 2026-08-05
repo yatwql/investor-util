@@ -14,6 +14,15 @@
 - **测试**：新增统一熔断网关 12 项、指标熔断持久化路径 3 项、菜单 [1] 扩展缓存刷新 19 项（新闻/基金经理/风格扩展 helper + 并行编排 + update_basic_cache 两分支接线 + 显示三行输出）。
 - **门禁**：check-code-traces / check-doc-traces / check-task-numbering `--ci` 全 [OK]；提交前跑 dev-verify 全量验证。
 
+### 基金业绩评级类型差异化阈值接线
+
+- **动机**：`tiantian_ranking` 已定义四组类型差异化评级阈值（默认/债券/指数/QDII）与类型提示参数，但 `fetch_fund_rankings` 调用评级计算时未传类型，导致债券型/QDII 的宽松阈值与指数型的严格阈值**从未生效**，所有基金均按主动权益默认阈值评级。
+- **接线**：新增 `_fund_type_hint_from_name(name)`——按基金名称推导阈值类型键（优先级：QDII/隐式海外 → 债券型 → 指数/ETF/联接 → 默认，与穿透分类 `classify_penetration` 一致）；`fetch_fund_rankings` 从 JS `fS_name` 提取名称后推导类型，透传至 `_calc_rating_from_entry`，并在返回结构 `type` 字段回填类型键（此前恒为 `""`）。调用链（fetcher 包装、报告、缓存刷新、候选比较）零签名变更。
+- **行为影响**：债券型/QDII 在 10~15% 百分位区间由「良好」升至「优秀」，指数型在 25~30% 区间由「良好」降为「稳定」，评级与「类型」列展示的基金分类口径一致。
+- **文档**：`requirements.md` §6.4.5 基金业绩分析补充类型差异化评级阈值表。
+- **测试**：`test_tiantian.py` 新增类型推导 9 项 + `fetch_fund_rankings` 接线 6 项（mock `_request_pingzhong_data`，覆盖债券/指数/QDII/主动权益四类阈值生效与无排名数据回退）。
+- **门禁**：check-code-traces / check-doc-traces / check-task-numbering `--ci` 全 [OK]；提交前跑 dev-verify 全量验证。
+
 ---
 
 ## [0.10.6] - 2026-08-05
