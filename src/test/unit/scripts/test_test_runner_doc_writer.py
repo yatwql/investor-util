@@ -14,6 +14,7 @@ _duration_mode_cells / _env_value 等函数，不运行真实 CLI、不触发任
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -377,3 +378,18 @@ class TestDocFileAndArgs:
         args = runner_script.parse_args()
         assert args.update_docs is False
         assert args.machine_info is False
+
+    def test_display_path_cross_drive_fallback(self, runner_script):
+        # rf-232 回归：Windows 跨盘符 relpath 抛 ValueError → 降级返回绝对路径
+        # 不崩溃；POSIX 无盘符概念，正常返回相对路径（断言平台无关）。
+        start = runner_script._PROJECT_ROOT
+        if os.name == "nt":
+            drive = os.path.splitdrive(start)[0]
+            other = "C:" if drive.upper() != "C:" else "D:"
+            target = os.path.join(other + os.sep, "unittest", "test-coverage.md")
+            shown = runner_script._display_path(target, start)
+            assert os.path.isabs(shown)
+            assert shown == os.path.abspath(target)
+        else:
+            target = "/unittest/test-coverage.md"
+            assert runner_script._display_path(target, start) == os.path.relpath(target, start)

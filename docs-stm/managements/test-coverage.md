@@ -37,44 +37,44 @@
 #### 采集环境属性
 
 <!-- env-table:start -->
-| 环境属性 | dragonball（2026-08-05 实测） | 旧慢笔记本（早期标注） |
-|:---------|:---------------------------|:----------------------|
-| 操作系统 | Linux | 未知 |
-| 系统版本 | 6.18.25-x64v3-xanmod1 | 未知 |
-| 架构 | x86_64 | 未知 |
-| 主机名 | dragonball | 未知 |
-| CPU 型号 | 13th Gen Intel(R) Core(TM) i5-13500H | 未知 |
-| 物理核数 | 12 | 未知 |
-| 逻辑线程 | 16 | 未知 |
-| 内存 | 46.8 GiB | 未知 |
-| 磁盘类型 | NVMe SSD | 未知 |
-| 文件系统 | btrfs | 未知 |
-| Python 版本 | 3.13.5 | 未知 |
-| 并行级别 | medium | 未知 |
-| worker 数 | 8 | 未知 |
-| 采集日期 | 2026-08-05 | — |
+| 环境属性 | dragonball（2026-08-05 实测） | 旧慢笔记本（早期标注） | stallman-NB1（2026-08-05 实测） |
+|:---------|:---------------------------|:----------------------|:---|
+| 操作系统 | Linux | 未知 | Windows |
+| 系统版本 | 6.18.25-x64v3-xanmod1 | 未知 | 11 |
+| 架构 | x86_64 | 未知 | AMD64 |
+| 主机名 | dragonball | 未知 | stallman-NB1 |
+| CPU 型号 | 13th Gen Intel(R) Core(TM) i5-13500H | 未知 | Intel64 Family 6 Model 142 Stepping 10, GenuineIntel |
+| 物理核数 | 12 | 未知 | 8 |
+| 逻辑线程 | 16 | 未知 | 8 |
+| 内存 | 46.8 GiB | 未知 | 7.9 GiB |
+| 磁盘类型 | NVMe SSD | 未知 | 未知 |
+| 文件系统 | btrfs | 未知 | 未知 |
+| Python 版本 | 3.13.5 | 未知 | 3.13.0 |
+| 并行级别 | medium | 未知 | medium |
+| worker 数 | 8 | 未知 | 4 |
+| 采集日期 | 2026-08-05 | — | 2026-08-05 |
 <!-- env-table:end -->
 
 #### 各模式耗时对照
 
 <!-- duration-table:start -->
-| `--mode` | dragonball（2026-08-05 实测） | 旧慢笔记本（早期标注，约值） |
-|:---------|:---------------------------:|:---------------------------:|
-| `unit` | ~15s | ~30s |
-| `standard` | ~16s | ~30s |
-| `scenario` | ~18s | ~6min |
-| `regression` | ~17s | ~6min |
-| `verify,regression` | ~30s（verify+regression 顺序之和） | ~7min |
-| `dev-verify` | ~20s | ~2.5min |
-| `verify` | ~10s | ~1min |
-| `integration` | ~14s | ~50s |
-| `edge` | ~13s | ~15s |
-| `data` | ~2s | ~10s |
-| `all` | **~21s** | ~10min |
-| `smoke` | ~2s | ~15s |
-| `report` | ~11s | ~15s |
-| `all_no_unit` | ~10s | ~7min |
-| `scenario_extreme` | ~2s | ~1min |
+| `--mode` | dragonball（2026-08-05 实测） | 旧慢笔记本（早期标注，约值） | stallman-NB1（2026-08-05 实测） |
+|:---------|:---------------------------:|:---------------------------:|:---:|
+| `unit` | ~15s | ~30s | ~4min |
+| `standard` | ~16s | ~30s | ~3min |
+| `scenario` | ~18s | ~6min | ~3min |
+| `regression` | ~17s | ~6min | ~5min |
+| `verify,regression` | ~30s（verify+regression 顺序之和） | ~7min | ~6min（verify+regression 顺序之和） |
+| `dev-verify` | ~20s | ~2.5min | ~1min |
+| `verify` | ~10s | ~1min | ~1min |
+| `integration` | ~14s | ~50s | ~3min |
+| `edge` | ~13s | ~15s | ~40s |
+| `data` | ~2s | ~10s | ~19s |
+| `all` | **~21s** | ~10min | ~5min |
+| `smoke` | ~2s | ~15s | ~14s |
+| `report` | ~11s | ~15s | ~3min |
+| `all_no_unit` | ~10s | ~7min | ~2min |
+| `scenario_extreme` | ~2s | ~1min | ~19s |
 <!-- duration-table:end -->
 
 > 两环境差距因模式而异：全量/场景等含 IO 与网络 mock 密集的模式约 **20~30 倍**（如 `all` ~21s vs ~10min、`scenario_extreme` ~2s vs ~1min），纯内存小模式（`smoke`/`data`/`report`）约 2~8 倍。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。当前开发机 worker=8（medium=50% 核数），旧机器并行度未知。

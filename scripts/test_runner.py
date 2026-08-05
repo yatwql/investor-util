@@ -906,6 +906,16 @@ def _update_test_coverage_doc(
     return doc_text
 
 
+def _display_path(path: str, start: str) -> str:
+    """返回相对 start 的展示路径；Windows 跨盘符时 relpath 抛 ValueError，
+    降级返回绝对路径，避免仅用于打印的路径换算崩溃（测试重定向文档路径到
+    其他驱动器时会触发）。"""
+    try:
+        return os.path.relpath(path, start)
+    except ValueError:
+        return os.path.abspath(path)
+
+
 def _update_test_coverage_doc_file(machine_info: dict, results: list[dict]) -> None:
     """将本机环境与实测耗时写入 test-coverage.md（仅内容变化时落盘）。
 
@@ -922,11 +932,11 @@ def _update_test_coverage_doc_file(machine_info: dict, results: list[dict]) -> N
         print(f"  [ERR] 未更新环境耗时对照：{exc}")
         return
     if updated == original:
-        print(f"  [..] {os.path.relpath(_DOC_COVERAGE_PATH, _PROJECT_ROOT)} 内容未变化，跳过写入")
+        print(f"  [..] {_display_path(_DOC_COVERAGE_PATH, _PROJECT_ROOT)} 内容未变化，跳过写入")
         return
     with open(_DOC_COVERAGE_PATH, "w", encoding="utf-8") as f:
         f.write(updated)
-    print(f"  [OK] 已更新 {os.path.relpath(_DOC_COVERAGE_PATH, _PROJECT_ROOT)}（环境耗时对照）")
+    print(f"  [OK] 已更新 {_display_path(_DOC_COVERAGE_PATH, _PROJECT_ROOT)}（环境耗时对照）")
 
 
 def _build_pytest_args(
