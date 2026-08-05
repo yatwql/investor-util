@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.9-dev
-> **编号源**：`rf-next = 239`（新增问题取此编号，完成后更新为 +1；已用最大 rf-238，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 240`（新增问题取此编号，完成后更新为 +1；已用最大 rf-239，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -43,6 +43,7 @@
 | **rf-236** | `analysis/metrics.py`（880→225） | facade 聚合门面拆分：收益类指标→`metrics_returns.py`、风险类指标→`metrics_risk.py`；门面保留 `compute_all_metrics` 聚合入口 + `__all__` + 常量并 re-export 符号 |
 | **rf-237** | `report/orchestrator.py`（822→442） | facade 聚合门面拆分：风格因子/行业 Beta 计算族→`_report_factor_metrics.py`（持仓K线路由 + 因子回归 + 行业Beta）、市场温度/持仓相关性→`_report_aux_metrics.py`；门面保留 `generate_report`/`prepare_report_data`/`compute_valuation_data`（patch 依赖门面命名空间）并 re-export 符号 |
 | **rf-238** | `llm/generators_orchestrator.py`（808→698） | facade 聚合门面拆分：新闻关联责任单元（模块级结果缓存/闭包/安全直调）→`_llm_news_correlation.py`；门面保留缓存预检（`_compute_module_cache_info`/`_precheck_*`）/worker 分发（`_dispatch_llm_workers`/`_build_module_fns`）/主编排入口（`generate_all_llm`），re-export 子模块符号，mock patch 接线零改动 |
+| **rf-239** | `llm/fact_checker/_utils.py` + `_context.py` + `_constants.py` | 事实校验两处误修正：① `_locate_subject_code` 名称分支起点距离平局（建设银行/工商银行距 171.23% anchor 均 8）误路由，把 601939 正确 171.23% 改写为 601398 的 70.2% → 改最近边距离与代码分支一致；② 止损警戒阈值「回调20%的警戒区域」被当收益率误修正为 -11.8% → `_is_trim_target_context` 增警戒词宽窗口检测。新增 6 个回归测试，修复前均失败，修复后 fact_checker 单文件 109 通过 |
 
 ## 归档
 

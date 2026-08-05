@@ -19,6 +19,7 @@ from src.python.llm.fact_checker._constants import (
     _PROFIT_KEYWORDS,
     _SUGGESTION_KEYWORDS,
     _TRIM_TARGET_KEYWORDS,
+    _WARNING_THRESHOLD_KEYWORDS,
     _WEIGHT_KEYWORDS,
     _WIN_RATE_KEYWORDS,
 )
@@ -114,7 +115,13 @@ def _is_trim_target_context(sentence: str, match_start: int) -> bool:
     避免同句首部的真实收益率被连带跳过。
     """
     nearby = sentence[max(0, match_start - 15) : match_start + 5]
-    return any(kw in nearby for kw in _TRIM_TARGET_KEYWORDS)
+    if any(kw in nearby for kw in _TRIM_TARGET_KEYWORDS):
+        return True
+    # 风险警戒阈值（"已接近回调20%的警戒区域"）：警戒词修饰风控阈值而非收益率，
+    # 数值与"警戒"间可能间隔数词，用更宽窗口检测。警戒词不修饰真实收益率描述，
+    # 宽窗口安全，不会跳过合法收益率校验。
+    _wide = sentence[max(0, match_start - 25) : match_start + 8]
+    return any(kw in _wide for kw in _WARNING_THRESHOLD_KEYWORDS)
 
 
 def _is_portfolio_level_context(sentence: str, match_start: int) -> bool:

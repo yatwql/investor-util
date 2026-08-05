@@ -1317,6 +1317,99 @@ class TestTrimTargetContext:
         assert "实际收益率" in corrections[0][3]
 
 
+# ── 名称指代主体定位：最近边距离（修复平局误路由） ──
+
+
+class TestNameSubjectNearestEdge:
+    """名称指代主体定位按最近边距离（与代码分支一致）。
+
+    真实报告「止盈纪律」句：建设银行收益率+171.23%、工商银行+70.18%、长江电力+56.83%。
+    171.23 指代建设银行（601939）：名称分支以最近边距离
+    min(abs(idx-anchor), abs(idx+len(name)-anchor)) 定位——建设银行(idx=0,len=4,anchor=8)
+    最近边 4，优于工商银行(idx=16)最近边 8，路由到 601939 与 171.23% 实际一致，不产生修正。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_llm,
+        pytest.mark.llm,
+    ]
+
+    @pytest.fixture
+    def real_holdings(self) -> list[dict]:
+        """真实组合子集：工商银行在建设银行前（与持仓 xlsx 顺序一致）。"""
+        return [
+            {"name": "长江电力", "code": "600900", "market_value": 22140.0, "cost": 14120.0, "profit_rate": 56.83},
+            {"name": "工商银行", "code": "601398", "market_value": 15000.0, "cost": 8814.0, "profit_rate": 70.18},
+            {"name": "建设银行", "code": "601939", "market_value": 19800.0, "cost": 7300.0, "profit_rate": 171.23},
+        ]
+
+    def test_adjacent_names_tie_not_miscorrected(self, real_holdings):
+        """止盈纪律句：建设银行+171.23% 保持原值，不产生修正。"""
+        text = "止盈纪律缺失。建设银行收益率+171.23%、工商银行+70.18%、长江电力+56.83%，这些品种累积丰厚浮盈。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"171.23%（601939 正确收益率）不应被误修正: {corrections}"
+
+    def test_three_real_rates_all_pass(self, real_holdings):
+        """三个真实收益率均正确路由到各自品种，全部通过。"""
+        text = "建设银行收益率+171.23%、工商银行收益率+70.18%、长江电力收益率+56.83%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"正确收益率均不应被误修正: {corrections}"
+
+    def test_run_fact_check_no_correction(self, real_holdings):
+        """run_fact_check 整链路：止盈纪律句 171.23% 保持原值。"""
+        html = "<p>止盈纪律缺失。建设银行收益率+171.23%、工商银行+70.18%、长江电力+56.83%。</p>"
+        corr, summ = run_fact_check(html, real_holdings, "智囊团深度复盘")
+        assert "171.23%" in corr
+        assert "已修正明细" not in summ
+
+
+# ── 风险警戒阈值（非收益率）不被误修正 ──
+
+
+class TestWarningThresholdContext:
+    """风险警戒阈值（"回调20%的警戒区域"）不属于收益率，不产生修正。
+
+    真实报告：易方达国证自由现金流ETF（159222）设立止损线：当前亏损-11.80%，
+    已接近回调20%的警戒区域。"回调20%的警戒区域"是止损警戒阈值，不是对收益率
+    20% 的声称；实际收益率 -11.80% 已同句另述且与 159222 一致，全文不产生数值修正。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_llm,
+        pytest.mark.llm,
+    ]
+
+    @pytest.fixture
+    def cashflow_holdings(self) -> list[dict]:
+        """易方达国证自由现金流 ETF（159222），真实收益率 -11.8%。"""
+        return [
+            {"name": "易方达国证自由现金流 ETF", "code": "159222",
+             "market_value": 14976.4, "cost": 16980.0, "profit_rate": -11.8},
+        ]
+
+    def test_warning_threshold_not_corrected(self, cashflow_holdings):
+        """「已接近回调20%的警戒区域」→ 警戒阈值，20% 保持原值。"""
+        text = "易方达国证自由现金流ETF（159222）设立止损线：当前亏损-11.80%，已接近回调20%的警戒区域。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, cashflow_holdings)
+        assert corrections == [], f"警戒阈值 20% 不应被误修正: {corrections}"
+
+    def test_run_fact_check_warning_threshold_not_rewritten(self, cashflow_holdings):
+        """run_fact_check 整链路：警戒阈值保持原值，实际收益率 -11.8% 保留。"""
+        html = "<p>易方达国证自由现金流ETF（159222）设立止损线：当前亏损-11.80%，已接近回调20%的警戒区域。</p>"
+        corr, summ = run_fact_check(html, cashflow_holdings, "智囊团深度复盘")
+        assert "回调20%的警戒区域" in corr
+        assert "-11.80%" in corr
+        assert "已修正明细" not in summ
+
+    def test_actual_loss_still_checked(self, cashflow_holdings):
+        """同句的真实亏损声明 -11.80% 与 159222 一致，不产生修正。"""
+        text = "该品种当前亏损-11.80%，已接近回调20%的警戒区域。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, cashflow_holdings)
+        assert corrections == [], f"-11.80% 与 159222 实际一致，不应修正: {corrections}"
+
+
 # ── 自动修正只替换判定处一次 ──
 
 
