@@ -7,8 +7,7 @@ edge 场景：
   - 返回值总数始终与 _REPORT_SECTION_DEFAULT 一致的不变性
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/core/test_registry_edge.py -v
+  pytest src/test/unit/core/test_registry_edge.py -v
 """
 
 from __future__ import annotations

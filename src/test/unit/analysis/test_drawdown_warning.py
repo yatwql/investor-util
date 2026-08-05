@@ -55,7 +55,7 @@ class TestRollingMaxDrawdown:
         # i=4: [-0.02, -0.05, -0.04] → min = -0.05
         assert result[4] == -0.05
 
-    def test_window_1(self):
+    def test_single_day_window(self):
         """窗口=1 → 每个值自身为最大值回撤（最负值即自身）。"""
         series = [-0.01, -0.05, -0.02]
         result = rolling_max_drawdown(series, 1)

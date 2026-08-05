@@ -3,8 +3,7 @@
 标记：unit_llm
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/llm/test_strategy.py -v
+  pytest src/test/unit/llm/test_strategy.py -v
 """
 
 from __future__ import annotations

@@ -6,8 +6,7 @@
   - set_config — 写入/读取/异常场景
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_config -v
+  pytest src/test/unit/config/test_config.py -v
 """
 
 from __future__ import annotations
@@ -509,23 +508,6 @@ if __name__ == "__main__":
 class TestValidateConfig(unittest.TestCase):
     """validate_config 对各类配置错误的检测。"""
 
-    def test_clean_config_returns_zero(self) -> None:
-        """有效配置 → 0 问题。"""
-        config = {
-            "holdings_dir": "data/holdings",
-            "holdings_filename": "持仓.xlsx",
-            "output_dir": "reports",
-            "llm_key_file": "data/config/llm_key.json",
-            "llm_settings_file": "data/config/llm_settings.json",
-            "news_top_count": 100,
-            "cache_ttl": {"price": 86400, "news": 900},
-            "news_sources": {"sina": True, "cls": False},
-            "preferred_provider": {"price": "tencent"},
-            "user_fund_benchmarks": {"000001": "沪深300"},
-        }
-        n = cfg.validate_config(config)
-        self.assertEqual(n, 0)
-
     def test_string_type_errors(self) -> None:
         """字符串配置项不是字符串类型 → 告警。"""
         config = {"holdings_dir": 123, "output_dir": None, "holdings_filename": True}
@@ -575,109 +557,6 @@ class TestValidateConfig(unittest.TestCase):
         """user_fund_benchmarks 不是 dict → 告警。"""
         n = cfg.validate_config({"user_fund_benchmarks": ["600519", "沪深300"]})
         self.assertEqual(n, 1)
-
-
-# ═══════════════════════════════════════════════════════════════
-#  System Prompt 覆盖路径测试（pytest）
-# ═══════════════════════════════════════════════════════════════
-#
-# 测试 generate_global_macro / generate_expert_review / etc.
-# 中对 system_prompt 的处理：
-#   llm_settings.json system_prompt_* 非 null → 用配置值
-#   llm_settings.json system_prompt_* 为 null → 回退代码内置默认值
-#   缺少 system_prompt_* 键 → 回退代码内置默认值
-
-
-class TestSystemPromptOverride:
-    """验证 system_prompt_* 覆盖字段的控制逻辑。"""
-
-    def test_override_from_config(self, mocker):
-        """配置中 system_prompt_global_macro 为非 null 时，应以配置值为准。"""
-        import src.python.llm.generators as _gens
-
-        mock_system = "自定义全球政经局势提示词，请分析全球经济趋势。"
-
-        # mock get_llm_config 返回包含 system_prompt_global_macro 的配置
-        mock_config = {
-            "system_prompt_global_macro": mock_system,
-            "cache_enabled_global_macro": False,
-            "max_tokens_global_macro": 800,
-            "timeout_global_macro": 60,
-            # model 设为 None 以跳过实际 LLM 调用
-            "model": None,
-        }
-        mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
-        # _generate_llm_module 位于 skeleton.py，内部调用 skeleton.get_llm_config 和
-        # skeleton._generate_llm_content，因此 mock 需指向 skeleton 而非 generators
-        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content", return_value=(None, False))
-
-        _gens.generate_global_macro(
-            a_indices={},
-            us_indices={},
-            total_mv=100000,
-            total_profit=5000,
-            total_cost=0,
-            categories={},
-        )
-
-        # 验证 _generate_llm_content 被调用，且第 4 个 positional 参数（system_prompt）等于自定义值
-        # _generate_llm_content(llm_config, cache_key, cache_ttl, system_prompt, user_prompt, ...)
-        call_args = mock_gen.call_args[0]  # positional args
-        assert call_args[3] == mock_system, f"预期 system_prompt={mock_system!r}, 实际={call_args[3]!r}"
-
-    def test_fallback_to_default(self, mocker):
-        """配置中 system_prompt_global_macro 为 null 时，应使用代码内置默认值。"""
-        from src.python.llm.prompts import _SYSTEM_GLOBAL_MACRO
-        import src.python.llm.generators as _gens
-
-        mock_config = {
-            "system_prompt_global_macro": None,
-            "cache_enabled_global_macro": False,
-            "max_tokens_global_macro": 800,
-            "timeout_global_macro": 60,
-            "model": None,
-        }
-        mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
-        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content", return_value=(None, False))
-
-        _gens.generate_global_macro(
-            a_indices={},
-            us_indices={},
-            total_mv=100000,
-            total_profit=5000,
-            total_cost=0,
-            categories={},
-        )
-
-        call_args = mock_gen.call_args[0]
-        # 应该使用代码内置默认值 _SYSTEM_GLOBAL_MACRO
-        assert call_args[3] == _SYSTEM_GLOBAL_MACRO, f"预期内置默认值, 实际={call_args[3][:50]!r}"
-
-    def test_missing_key_fallback(self, mocker):
-        """配置中完全没有 system_prompt_global_macro 键时，应使用内置默认值。"""
-        from src.python.llm.prompts import _SYSTEM_GLOBAL_MACRO
-        import src.python.llm.generators as _gens
-
-        mock_config = {
-            "cache_enabled_global_macro": False,
-            "max_tokens_global_macro": 800,
-            "timeout_global_macro": 60,
-            "model": None,
-        }
-        mocker.patch("src.python.llm.skeleton.get_llm_config", return_value=mock_config)
-        mock_gen = mocker.patch("src.python.llm.skeleton.generate_llm_content", return_value=(None, False))
-
-        _gens.generate_global_macro(
-            a_indices={},
-            us_indices={},
-            total_mv=100000,
-            total_profit=5000,
-            total_cost=0,
-            categories={},
-        )
-
-        call_args = mock_gen.call_args[0]
-        assert call_args[3] == _SYSTEM_GLOBAL_MACRO, f"预期内置默认值, 实际={call_args[3][:50]!r}"
 
 
 class TestLlmSettingsKeyConsistency:

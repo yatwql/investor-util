@@ -5,8 +5,7 @@
   - 各种类型的参数绑定
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_models -v
+  pytest src/test/unit/core/test_models.py -v
 """
 
 from __future__ import annotations

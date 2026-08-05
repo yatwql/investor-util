@@ -6,8 +6,7 @@
   - fetch_news — HTTP 请求、错误处理、空数据
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_sina_news.py -v
+  pytest src/test/unit/news/test_sina_news.py -v
 """
 
 from __future__ import annotations
@@ -38,6 +37,14 @@ class TestTsToStr(unittest.TestCase):
         """Unix 纪元 → 1970-01-01 08:00。"""
         result = ts_to_str(0)
         self.assertEqual(result, "1970-01-01 08:00")
+
+    def test_negative_timestamp(self):
+        """负数时间戳 → 始终返回字符串（各平台行为不同）。"""
+        import sys as _sys
+        result = ts_to_str(-1)
+        self.assertIsInstance(result, str)
+        if _sys.platform == "win32":
+            self.assertEqual(result, "1970-01-01 07:59")
 
 
 class TestParseNewsItem(unittest.TestCase):

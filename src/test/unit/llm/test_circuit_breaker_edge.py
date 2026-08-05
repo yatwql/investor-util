@@ -6,8 +6,7 @@ edge 场景：
   - 多个 endpoint 处于不同熔断状态
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/llm/test_circuit_breaker_edge.py -v
+  pytest src/test/unit/llm/test_circuit_breaker_edge.py -v
 """
 
 from __future__ import annotations

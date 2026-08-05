@@ -106,7 +106,7 @@ class TestLotRounding:
         assert advice[0]["shares"] == 1234
 
     def test_otc_bond_fund_bare_bond_keyword_integer_shares(self):
-        """名称含"债券"（无细分词）的 00 前缀场外基金 → 取整整数份（回归：000311 债券A）。"""
+        """名称含"债券"（无细分词）的 00 前缀场外基金 → 取整整数份。"""
         holdings = [_holding("景顺长城景颐双利债券A", "000311", 1234.5, 1.2)]
         signals = [_discipline("000311", "景顺长城景颐双利债券A", "止损/减仓")]
         advice = build_rebalance_advice([], signals, holdings, total_mv=1481.4, fee_table=_FEE_FIXTURE)
@@ -191,7 +191,7 @@ class TestFeeEstimation:
         assert otc - etf == pytest.approx(50.0, abs=0.005)  # 赎回费 10000×0.005
 
     def test_bond_fund_redemption_not_stamp_duty(self):
-        """00 前缀债券型基金（名称含"债券"无细分词）计收赎回费而非印花税（回归：000311）。"""
+        """00 前缀债券型基金（名称含"债券"无细分词）计收赎回费而非印花税。"""
         assert estimate_fee("卖出减仓", 10000.0, "000311", "景顺长城景颐双利债券A", _FEE_FIXTURE) == pytest.approx(
             55.0, abs=0.005
         )  # 佣金 5 + 赎回费 50

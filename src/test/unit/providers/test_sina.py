@@ -5,8 +5,7 @@
   - fetch_us_indices — HTTP 请求、错误处理
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_sina.py -v
+  pytest src/test/unit/providers/test_sina.py -v
 """
 
 from __future__ import annotations

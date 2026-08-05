@@ -1,8 +1,7 @@
 """LLM Multi-Provider — 异常边缘场景。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/llm/test_llm_api_multi_edge.py -v
+  pytest src/test/unit/llm/test_llm_api_multi_edge.py -v
 """
 
 from __future__ import annotations

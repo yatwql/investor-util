@@ -1,7 +1,6 @@
 """Excel 数字格式测试 — 金额/百分比/份额格式验证。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/report/test_excel_format_edge.py -v
 """
 

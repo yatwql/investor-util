@@ -1,11 +1,10 @@
-"""Y2: 数据质量纵深边缘场景测试。
+"""数据质量纵深边缘场景测试。
 
 覆盖停牌无交易/新基金空持仓/穿透数据重复/多层嵌套 FOF/ETF 超多持仓/
 负价格净值/极低流动性/债券违约/同基金多层份额/跨市场停牌时差共 15 项测试。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/report/test_data_quality_edge.py -v
+  pytest src/test/unit/report/test_data_quality_edge.py -v
 """
 
 from __future__ import annotations
@@ -51,10 +50,10 @@ def _make_detail_row(code: str, market_value: float = 1000.0,
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-1: 停牌无交易
+# 停牌无交易
 # ═══════════════════════════════════════════════════════════
 
-class TestSuspendedStockY2(unittest.TestCase):
+class TestSuspendedStock(unittest.TestCase):
     """停牌股票：行情无更新，today_profit = 0。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")
@@ -100,10 +99,10 @@ class TestSuspendedStockY2(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-2: 新基金空持仓
+# 新基金空持仓
 # ═══════════════════════════════════════════════════════════
 
-class TestNewFundEmptyHoldingsY2(unittest.TestCase):
+class TestNewFundEmptyHoldings(unittest.TestCase):
     """新成立基金尚无持仓数据 → 穿透不崩溃。"""
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch", return_value={"019999": None})
@@ -150,10 +149,10 @@ class TestNewFundEmptyHoldingsY2(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-3: 穿透数据重复
+# 穿透数据重复
 # ═══════════════════════════════════════════════════════════
 
-class TestPenetrationDataDeduplicationY2(unittest.TestCase):
+class TestPenetrationDataDeduplication(unittest.TestCase):
     """穿透数据重复条目处理。"""
 
     def test_same_code_in_fund_and_direct(self):
@@ -201,10 +200,10 @@ class TestPenetrationDataDeduplicationY2(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-4: 多层嵌套 FOF
+# 多层嵌套 FOF
 # ═══════════════════════════════════════════════════════════
 
-class TestNestedFOFY2(unittest.TestCase):
+class TestNestedFOF(unittest.TestCase):
     """FOF 持有 FOF → 仅处理第一层，不递归崩溃。"""
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
@@ -238,10 +237,10 @@ class TestNestedFOFY2(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-5: ETF 超多持仓
+# ETF 超多持仓
 # ═══════════════════════════════════════════════════════════
 
-class TestETFSuperManyHoldingsY2(unittest.TestCase):
+class TestETFSuperManyHoldings(unittest.TestCase):
     """ETF 持仓 200+ 只 → 穿透不崩溃，TOP10 正确。"""
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
@@ -287,10 +286,10 @@ class TestETFSuperManyHoldingsY2(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-6: 负价格净值
+# 负价格净值
 # ═══════════════════════════════════════════════════════════
 
-class TestNegativePriceNavY2(unittest.TestCase):
+class TestNegativePriceNav(unittest.TestCase):
     """负价格/净值场景。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")
@@ -337,10 +336,10 @@ class TestNegativePriceNavY2(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-7: 极低流动性
+# 极低流动性
 # ═══════════════════════════════════════════════════════════
 
-class TestLowLiquidityY2(unittest.TestCase):
+class TestLowLiquidity(unittest.TestCase):
     """极低流动性资产。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")
@@ -370,10 +369,10 @@ class TestLowLiquidityY2(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-8: 债券违约
+# 债券违约
 # ═══════════════════════════════════════════════════════════
 
-class TestBondDefaultY2(unittest.TestCase):
+class TestBondDefault(unittest.TestCase):
     """债券违约场景。"""
 
     @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
@@ -415,10 +414,10 @@ class TestBondDefaultY2(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-9: 同基金多层份额
+# 同基金多层份额
 # ═══════════════════════════════════════════════════════════
 
-class TestSameFundMultiShareY2(unittest.TestCase):
+class TestSameFundMultiShare(unittest.TestCase):
     """同一基金多份额（A/C 类）分类正确。"""
 
     def test_a_c_share_classification(self):
@@ -460,10 +459,10 @@ class TestSameFundMultiShareY2(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y2-10: 跨市场停牌时差
+# 跨市场停牌时差
 # ═══════════════════════════════════════════════════════════
 
-class TestCrossMarketSuspensionY2(unittest.TestCase):
+class TestCrossMarketSuspension(unittest.TestCase):
     """港股通/A 股跨市场停牌时差。"""
 
     @patch("src.python.report.market_value.get_last_trading_day")

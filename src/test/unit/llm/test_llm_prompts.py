@@ -7,8 +7,7 @@
   - _build_news_correlation_summary — 新闻摘要格式和内容
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test.unit.llm.test_llm_prompts -v
+  pytest src/test/unit/llm/test_llm_prompts.py -v
 """
 
 from __future__ import annotations
@@ -80,6 +79,24 @@ class TestBuildGlobalMacroPrompt(unittest.TestCase):
         """sector_flow=None 时不应包含资金流向内容。"""
         r = _build_global_macro_prompt({}, {}, 0, 0, 0, {})
         self.assertNotIn("行业资金流向", r)
+
+    def test_us_index_and_thousand_separator(self) -> None:
+        """美股指数嵌入 + 市值千分位格式化。"""
+        a_indices = {
+            "000001": {"name": "上证指数", "price": 3200, "change_pct": 0.5},
+        }
+        us_indices = {
+            "dji": {"name": "道琼斯", "price": 40000, "change_pct": -0.2},
+        }
+        r = _build_global_macro_prompt(a_indices, us_indices, 1_000_000, 50_000, 0, {})
+        self.assertIn("上证指数", r)
+        self.assertIn("道琼斯", r)
+        self.assertIn("1,000,000", r)
+
+    def test_empty_data_contains_market_value_label(self) -> None:
+        """空数据时仍包含总市值标签。"""
+        r = _build_global_macro_prompt({}, {}, 0, 0, 0, {})
+        self.assertIn("总市值", r)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -161,6 +178,22 @@ class TestBuildReviewPrompt(unittest.TestCase):
         self.assertIn("净值", _SYSTEM_EXPERT_REVIEW)
         self.assertIn("QDII", _SYSTEM_EXPERT_REVIEW)
         self.assertIn("滞后", _SYSTEM_EXPERT_REVIEW)
+
+    def test_overview_and_detail_blocks(self) -> None:
+        """持仓概况 + 千分位市值 + 持仓明细。"""
+        r = _build_expert_review_prompt(100_000, 80_000, 20_000, 1_000, 5, {})
+        self.assertIn("持仓概况", r)
+        self.assertIn("100,000", r)
+        self.assertIn("5只", r)
+        details = [
+            {"code": "600900", "market_value": 50_000, "profit": 5_000,
+             "profit_rate": 10.0, "source_api": "tencent", "name": "长江电力",
+             "change_pct": 0.5},
+        ]
+        r2 = _build_expert_review_prompt(100_000, 80_000, 20_000, 1_000, 5, {},
+                                 holdings_details=details)
+        self.assertIn("持仓明细", r2)
+        self.assertIn("600900", r2)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -244,3 +277,10 @@ class TestBuildNewsSummary(unittest.TestCase):
         # 最多 30 条
         count = result.count("标题:")
         self.assertLessEqual(count, 30)
+
+    def test_long_title_truncated(self) -> None:
+        """超长标题截断，避免摘要过长。"""
+        long_title = "长" * 200
+        news = [{"title": long_title, "intro": "简介", "matched_keywords": []}]
+        result = _build_news_correlation_summary(news)
+        self.assertTrue(len(result) < 500)

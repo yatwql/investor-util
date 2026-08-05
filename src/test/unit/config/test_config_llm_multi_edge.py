@@ -5,8 +5,7 @@
   - JSON 解析异常 → 返回 None（不抛异常）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/config/test_config_llm_multi_edge.py -v
+  pytest src/test/unit/config/test_config_llm_multi_edge.py -v
 """
 
 from __future__ import annotations

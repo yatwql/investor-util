@@ -3,7 +3,6 @@
 测试可独立辅助函数。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/handlers/test_handlers_report.py -v
 """
 

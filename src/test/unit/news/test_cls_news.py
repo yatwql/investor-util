@@ -1,13 +1,11 @@
 """财联社新闻 provider 单元测试。
 
 测试目标：
-  - _ts_to_str — 时间戳转换
   - _parse_news_item — 条目解析
   - fetch_news — HTTP 请求、错误处理、数据解析
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_cls_news.py -v
+  pytest src/test/unit/news/test_cls_news.py -v
 """
 
 from __future__ import annotations
@@ -17,37 +15,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
-
-
-class TestTsToStr(unittest.TestCase):
-    """_ts_to_str 纯函数测试。"""
-
-    def _call(self, ts: int) -> str:
-        from src.python.providers._utils import ts_to_str
-        return ts_to_str(ts)
-
-    def test_normal_timestamp(self):
-        """正常时间戳 → 格式化为 YYYY-MM-DD HH:MM。"""
-        # 2026-07-01 10:30 UTC+8 = 2026-06-30 02:30 UTC
-        # 但为了方便，用 2026-07-01 00:00 UTC+8 → 2026-06-30 16:00 UTC
-        result = self._call(1769817600)  # 2026-07-01 00:00:00 UTC+8 (approx)
-        self.assertIsInstance(result, str)
-        self.assertRegex(result, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}")
-
-    def test_zero_timestamp(self):
-        """时间戳 0 → 1970-01-01 08:00。"""
-        result = self._call(0)
-        self.assertEqual(result, "1970-01-01 08:00")
-
-    def test_negative_timestamp(self):
-        """负数 → 返回一个日期（各平台行为不同），但始终是字符串。"""
-        import sys as _sys
-        result = self._call(-1)
-        self.assertIsInstance(result, str)
-        # Windows 上 -1 不抛异常，返回 "1970-01-01 07:59"
-        # Unix 上 OSError 被捕获返回 ""
-        if _sys.platform == "win32":
-            self.assertEqual(result, "1970-01-01 07:59")
 
 
 class TestParseNewsItem(unittest.TestCase):

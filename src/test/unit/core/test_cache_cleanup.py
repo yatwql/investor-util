@@ -7,8 +7,7 @@
   - get_cache_age — 缓存文件年龄查询
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/core/test_cache_cleanup.py -v
+  pytest src/test/unit/core/test_cache_cleanup.py -v
 """
 
 from __future__ import annotations

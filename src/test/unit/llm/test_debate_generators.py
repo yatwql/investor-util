@@ -6,7 +6,6 @@
   - _filter_hallucinated_codes 虚构代码过滤行为
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/llm/test_debate_generators.py -v
 """
 

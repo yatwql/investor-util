@@ -4,7 +4,6 @@
 全程 mock 文件系统与计算/输出函数，避免真实文件读写与报告产物残留。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/handlers/test_handlers_whatif.py -v
 """
 
@@ -17,7 +16,7 @@ import pytest
 
 from src.python.report.whatif_operations import WhatifRunResult
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
 
 class TestSelectCandidateFile(unittest.TestCase):

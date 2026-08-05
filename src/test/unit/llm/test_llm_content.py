@@ -6,8 +6,7 @@
   - write_llm_sheets — 多页签写入 + 禁用模块处理
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_llm_content -v
+  pytest src/test/unit/llm/test_llm_content.py -v
 """
 
 from __future__ import annotations
@@ -373,14 +372,13 @@ class TestWriteLlmSheets(unittest.TestCase):
 
 
 class TestLlmModuleFailureReset(unittest.TestCase):
-    """回归（flaky）：LLM_MODULE_FAILURE 跨测试残留导致 write_llm_sheets 跳写。
+    """LLM_MODULE_FAILURE 跨测试残留由 conftest autouse fixture 自动清理。
 
-    问题场景（xdist 并发）：
-      write_llm_sheets() 读取模块级全局 LLM_MODULE_FAILURE 判断模块是否被禁用。
-      若测试 A 设置 LLM_MODULE_FAILURE[key]=FAIL_REASON_DISABLED 后未清理，
-      同一 worker 上后续 test_content_none 等测试的页签被跳过不写入，
-      占位符断言失败。修复方式为 conftest.py 新增 _auto_reset_llm_module_failure
-      autouse fixture，本用例验证该 fixture 能清除已污染的状态。
+    write_llm_sheets() 读取模块级全局 LLM_MODULE_FAILURE 判断模块是否被禁用。
+    若某测试设置 LLM_MODULE_FAILURE[key]=FAIL_REASON_DISABLED 后未清理，
+    后续测试的页签会被跳过不写入，占位符断言失败。
+    conftest.py 的 _auto_reset_llm_module_failure autouse fixture 负责清除
+    已污染的状态，本用例验证该清理逻辑。
     """
 
     def test_autouse_fixture_clears_polluted_state(self):

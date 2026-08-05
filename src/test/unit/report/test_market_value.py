@@ -12,8 +12,7 @@
   - 溢价率/场外基金 today_profit 等业务场景
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_market_value -v
+  pytest src/test/unit/report/test_market_value.py -v
 """
 
 from __future__ import annotations
@@ -963,7 +962,7 @@ class TestGenerateDetails(unittest.TestCase):
         details = mv._generate_details([h], "2026-06-26")
         self.assertEqual(details[0].account, "证券账户")
 
-    # ── 回归测试：场外基金本日盈亏（issue #1）────────────
+    # ── 场外基金本日盈亏 ────────────
     @patch("src.python.report.market_value.fetch_market_data")
     @patch("src.python.report.market_value.get_last_trading_day")
     def test_eastmoney_nav_t_minus_1_today_profit_zero(self, mock_ltd, mock_fetch):

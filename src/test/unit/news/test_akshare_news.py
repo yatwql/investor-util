@@ -9,8 +9,7 @@
 因此用 sys.modules mock 而非模块属性 patch。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_akshare_news.py -v
+  pytest src/test/unit/news/test_akshare_news.py -v
 """
 
 from __future__ import annotations

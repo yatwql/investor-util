@@ -1,7 +1,6 @@
 """HTML 模板打印样式 & 条件分支测试。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/report/test_html_template.py -v
 """
 

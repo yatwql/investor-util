@@ -9,8 +9,7 @@
   - profit_font 着色逻辑
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_summary -v
+  pytest src/test/unit/report/test_summary.py -v
 """
 
 from __future__ import annotations

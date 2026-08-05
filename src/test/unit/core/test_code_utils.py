@@ -1,7 +1,7 @@
 """code_utils 指数代码判定函数单元测试。
 
 覆盖：is_index_code / is_us_index_code / get_index_exchange_prefix /
-      is_otc_fund_by_name（00 重叠区场外基金辅助判定）。
+      is_otc_fund_by_name / is_a_share_code（00 重叠区场外基金辅助判定与 A 股代码判定）。
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ import pytest
 
 from src.python.core.code_utils import (
     get_index_exchange_prefix,
+    is_a_share_code,
     is_index_code,
     is_otc_fund_by_name,
     is_us_index_code,
@@ -135,3 +136,52 @@ class TestIsOtcFundByName:
         """名称或代码缺失 → 非场外基金（防御性，不抛异常）。"""
         assert is_otc_fund_by_name("", "000311") is False
         assert is_otc_fund_by_name("景顺长城景颐双利债券A", "") is False
+
+
+class TestIsAShareCode:
+    """is_a_share_code A 股代码判定测试。"""
+
+    def test_normal_sh(self) -> None:
+        """sh 前缀 A 股代码 → True。"""
+        assert is_a_share_code("sh600000") is True
+
+    def test_normal_sz(self) -> None:
+        """sz 前缀 A 股代码 → True。"""
+        assert is_a_share_code("sz000001") is True
+
+    def test_normal_bj(self) -> None:
+        """bj 前缀 A 股代码 → True。"""
+        assert is_a_share_code("bj830001") is True
+
+    def test_raw_six_digit(self) -> None:
+        """纯 6 位数字 → True。"""
+        assert is_a_share_code("600900") is True
+
+    def test_us_stock(self) -> None:
+        """美股字母代码 → False。"""
+        assert is_a_share_code("AAPL") is False
+
+    def test_us_stock_numeric(self) -> None:
+        """美股数字代码（无前缀非 6 位）→ False。"""
+        assert is_a_share_code("BRK.B") is False
+
+    def test_hk_stock(self) -> None:
+        """港股 5 位 → False。"""
+        assert is_a_share_code("00700") is False
+
+    def test_empty(self) -> None:
+        """空字符串 → False。"""
+        assert is_a_share_code("") is False
+
+    def test_whitespace(self) -> None:
+        """空格 → False。"""
+        assert is_a_share_code("  ") is False
+
+    def test_prefix_is_a_share(self) -> None:
+        """带 sh/sz/bj 前缀的 6 位码 → True。"""
+        for prefix in ("sh", "sz", "bj"):
+            assert is_a_share_code(f"{prefix}600000") is True
+
+    def test_prefix_not_a_share(self) -> None:
+        """带 sh/sz/bj 前缀但非 6 位 → False。"""
+        assert is_a_share_code("sh60000") is False

@@ -10,8 +10,7 @@
   7. as-if 组合收益口径（小数收益、前值>0、LOCF）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/analysis/test_style_factor_regression.py -v
+  pytest src/test/unit/analysis/test_style_factor_regression.py -v
 """
 
 from __future__ import annotations

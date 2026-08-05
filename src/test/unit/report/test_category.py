@@ -7,8 +7,7 @@
   - 三维度分类聚合一致 — 资产属性/投资分类/账户小计之和 = 总计
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_category -v
+  pytest src/test/unit/report/test_category.py -v
 """
 
 from __future__ import annotations

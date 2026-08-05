@@ -7,8 +7,7 @@
   - 以上三种占位文本互不相同、无歧义
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_llm_placeholder -v
+  pytest src/test/unit/llm/test_llm_placeholder.py -v
 """
 
 from __future__ import annotations

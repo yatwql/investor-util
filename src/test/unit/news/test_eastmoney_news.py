@@ -5,8 +5,7 @@
   - fetch_news — HTTP 请求、错误处理、空数据
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_eastmoney_news.py -v
+  pytest src/test/unit/news/test_eastmoney_news.py -v
 """
 
 from __future__ import annotations

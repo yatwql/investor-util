@@ -6,7 +6,6 @@
   - 菜单调度 execute_item 捕获异常并用友好提示替代
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/ui/test_tui_edge.py -v
 """
 

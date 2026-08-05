@@ -6,8 +6,7 @@
   - build_llm_fingerprint — 指纹构建（含 full_penetration 模式）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_fingerprint.py -v
+  pytest src/test/unit/llm/test_fingerprint.py -v
 """
 
 from __future__ import annotations

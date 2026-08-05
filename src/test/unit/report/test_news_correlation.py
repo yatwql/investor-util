@@ -6,8 +6,7 @@
   - LLM 增强路径 — 配置开启时调用 enhance_news_correlation
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_news_correlation -v
+  pytest src/test/unit/report/test_news_correlation.py -v
 """
 
 from __future__ import annotations

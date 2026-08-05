@@ -119,7 +119,7 @@ class TestFetchIndexKlineEdge(unittest.TestCase):
 
     @patch("src.python.providers.tencent.make_http_client")
     def test_days_clamped_to_2000(self, mock_factory):
-        """回归：请求 days=3650 时钳位到 2000（实测 API 上限），避免超限响应。"""
+        """请求 days=3650 时钳位到 2000（API 上限），避免超限响应。"""
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client

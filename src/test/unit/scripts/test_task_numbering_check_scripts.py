@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]  # D:/codebase/zoo/investor-util
+_REPO_ROOT = Path(__file__).resolve().parents[4]  # 仓库根目录（src/test/unit/scripts 向上 4 级）
 _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 
 

@@ -3,7 +3,7 @@
 必须使用 @pytest.mark.edge 标记，存放于 *_edge.py 文件。
 
 覆盖：
-  - NaN/Inf/None 收益值过滤（NaN 曾产生虚假 r=1.0、p=0.0 显著相关，回归防护）
+  - NaN/Inf/None 收益值过滤（避免虚假 r=1.0、p=0.0 显著相关）
   - _is_valid_return 判定边界
   - 恰好达到/低于 MIN_SAMPLES 边界
   - 重复日期去重对齐

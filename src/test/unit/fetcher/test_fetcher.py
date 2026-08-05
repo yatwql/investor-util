@@ -8,8 +8,7 @@
   - fetch_us_indices — mock API 失败降级
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_fetcher -v
+  pytest src/test/unit/fetcher/test_fetcher.py -v
 """
 
 from __future__ import annotations

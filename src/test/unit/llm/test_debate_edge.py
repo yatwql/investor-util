@@ -1,7 +1,6 @@
 """辩论模式边缘场景测试 — 边缘场景用例必须与普通测试文件分离。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/llm/test_debate_edge.py -v
 """
 

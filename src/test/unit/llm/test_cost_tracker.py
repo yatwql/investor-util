@@ -1,8 +1,7 @@
 """LLM Token 成本追踪模块单元测试。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/unit/test_cost_tracker.py -v
+  pytest src/test/unit/llm/test_cost_tracker.py -v
 """
 
 from __future__ import annotations

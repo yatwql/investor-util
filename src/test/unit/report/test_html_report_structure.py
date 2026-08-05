@@ -10,7 +10,6 @@
 边缘/异常测试见 test_html_report_structure_edge.py。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/report/test_html_report_structure.py -v
 """
 

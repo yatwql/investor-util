@@ -8,8 +8,7 @@
   - write_penetration_sheet (mock) — 合并/排序/TOP10 逻辑
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_penetration -v
+  pytest src/test/unit/report/test_penetration.py -v
 """
 
 from __future__ import annotations
@@ -511,7 +510,7 @@ class TestPenetrationEdgeCases(unittest.TestCase):
         fund_types = [pene.QDII, pene.ETF, pene.INDEX_LINK, pene.BOND_FUND, pene.ACTIVE_EQUITY]
         funds = [h for ft in fund_types for h in classified[ft]]
         stocks = classified[pene.STOCK]
-        self.assertEqual(len(funds), 0)  # "浦发转债" 回归 IGNORE
+        self.assertEqual(len(funds), 0)  # "浦发转债" 归入 IGNORE
         self.assertEqual(len(stocks), 0)
         self.assertEqual(len(classified[pene.IGNORE]), 2)
 

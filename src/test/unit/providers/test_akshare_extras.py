@@ -8,8 +8,7 @@
   - _compute_dividend_fingerprint — 指纹稳定性
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_akshare_extras -v
+  pytest src/test/unit/providers/test_akshare_extras.py -v
 """
 
 from __future__ import annotations

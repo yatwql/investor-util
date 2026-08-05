@@ -1,4 +1,4 @@
-"""测试 handlers_config 和 operations 辅助函数。"""
+"""测试 handlers_config 的 LLM 设置读写辅助函数。"""
 
 from __future__ import annotations
 
@@ -86,80 +86,3 @@ class TestWriteLlmSettings:
         mock_replace.assert_called_once()
         mock_json_dump.assert_called_once()
         mock_get_llm.assert_called_once()
-
-
-class TestRefreshOneFundCache:
-    """_refresh_one_fund_cache 单基金缓存刷新（operations 版）。"""
-
-    def _make_fund(self, code="000001", name="测试基金"):
-        f = MagicMock()
-        f.code = code
-        f.name = name
-        return f
-
-    @patch("src.python.fetcher.fund.fetch_fund_benchmark")
-    @patch("src.python.fetcher.fund.fetch_fund_holdings")
-    @patch("src.python.fetcher.fund.fetch_fund_rankings")
-    def test_all_ok(self, mock_perf, mock_hold, mock_bm):
-        """全部数据获取成功。"""
-        from src.python.cache.operations import _refresh_one_fund_cache
-
-        mock_perf.return_value = {"rank": 1}
-        mock_hold.return_value = {"holdings": [{"name": "茅台", "code": "600519"}]}
-        mock_bm.return_value = "沪深300"
-
-        result = _refresh_one_fund_cache(self._make_fund())
-        assert result[0] == "fund"
-        assert result[1] == "000001"
-        assert result[3] is True  # perf_ok
-        assert result[4] is True  # hold_ok
-        assert result[6] is True  # bm_ok
-
-    @patch("src.python.fetcher.fund.fetch_fund_benchmark", return_value="--")
-    @patch("src.python.fetcher.fund.fetch_fund_holdings", return_value=None)
-    @patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None)
-    def test_all_fail(self, mock_perf, mock_hold, mock_bm):
-        """全部数据获取失败。"""
-        from src.python.cache.operations import _refresh_one_fund_cache
-
-        result = _refresh_one_fund_cache(self._make_fund())
-        assert result[3] is False  # perf_ok
-        assert result[4] is False  # hold_ok
-        assert result[6] is False  # bm_ok
-
-    @patch("src.python.fetcher.fund.fetch_fund_benchmark", return_value="--")
-    @patch("src.python.fetcher.fund.fetch_fund_holdings", return_value=None)
-    @patch("src.python.fetcher.fund.fetch_fund_rankings", side_effect=Exception("API err"))
-    def test_rankings_raises(self, mock_perf, mock_hold, mock_bm):
-        """排名 API 抛出异常时向上传播（函数未捕获该异常）。"""
-        from src.python.cache.operations import _refresh_one_fund_cache
-
-        with pytest.raises(Exception, match="API err"):
-            _refresh_one_fund_cache(self._make_fund())
-
-
-class TestFilterMenuLlmModules:
-    """菜单层隐藏辩论三模块（注册表条目保留）。"""
-
-    def test_filter_hides_legacy_debate_modules(self):
-        """过滤后仅剩 5 个标准模块，不含 debate_pro/con/synthesis。"""
-        from src.python.core.registry import get_llm_module_names
-        from src.python.tui.tui_menu import filter_menu_llm_modules
-
-        filtered = filter_menu_llm_modules(get_llm_module_names())
-        assert set(filtered.keys()) == {
-            "global_macro",
-            "expert_review",
-            "news_correlation",
-            "health_check",
-            "penetration_deep",
-        }
-
-    def test_registry_keeps_legacy_debate_modules(self):
-        """注册表仍保留辩论三模块（缓存 TTL/前缀清理依赖），未被删除。"""
-        from src.python.core.registry import get_llm_module_names
-
-        names = get_llm_module_names()
-        assert "debate_pro" in names
-        assert "debate_con" in names
-        assert "debate_synthesis" in names

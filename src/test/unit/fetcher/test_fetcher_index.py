@@ -6,8 +6,7 @@
   - fetch_us_indices — 美股指数获取（新浪主链路 + 腾讯备用链路 + 缓存降级）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_fetcher_index.py -v
+  pytest src/test/unit/fetcher/test_fetcher_index.py -v
 """
 
 from __future__ import annotations

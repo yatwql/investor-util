@@ -8,8 +8,7 @@
   - ES5 保守语法（兼容微信 X5：var/function，无箭头函数）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/report/test_theme_js.py -v
+  pytest src/test/unit/report/test_theme_js.py -v
 """
 
 from __future__ import annotations

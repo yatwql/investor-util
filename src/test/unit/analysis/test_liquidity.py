@@ -1,8 +1,7 @@
 """流动性分析模块单元测试 — 正常场景。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/unit/test_liquidity.py -v
+  pytest src/test/unit/analysis/test_liquidity.py -v
 """
 
 from __future__ import annotations

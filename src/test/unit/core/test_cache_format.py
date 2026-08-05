@@ -7,8 +7,7 @@
   - gzip 与清理/前缀删除的交互
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/core/test_cache_format.py -v
+  pytest src/test/unit/core/test_cache_format.py -v
 """
 
 from __future__ import annotations

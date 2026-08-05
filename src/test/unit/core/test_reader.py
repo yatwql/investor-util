@@ -7,8 +7,7 @@
   - _safe_str / _safe_float / _match_header — 辅助函数
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_reader -v
+  pytest src/test/unit/core/test_reader.py -v
 """
 
 from __future__ import annotations

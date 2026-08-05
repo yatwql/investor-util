@@ -45,8 +45,8 @@ def sample_holdings() -> list[dict]:
 def holdings_with_rates() -> list[dict]:
     """含 profit_rate（百分单位，orchestrator 已 ×100）与 change_pct（单日涨跌）的持仓。
 
-    用于回归：百分单位契约（1.9% 是旧小数误读，应修正为 187.1%）与
-    单日涨跌语境按 change_pct 校验（今日下跌 3.41% 不再被误修正为收益率）。
+    用于百分单位契约与单日涨跌语境校验：数值须按百分单位比较，
+    单日涨跌语境按 change_pct 校验（不当作收益率修正）。
     """
     return [
         {"name": "建设银行", "code": "601939", "market_value": 287120.0, "cost": 100000.0,
@@ -60,8 +60,8 @@ def holdings_with_rates() -> list[dict]:
 def portfolio_mixed_holdings() -> list[dict]:
     """组合级+个股级收益同句场景的持仓：组合总收益率≈9.9%，招商银行 8.0%，茅台 15.0%。
 
-    回归：组合累计收益与个股涨跌同句时，组合收益归组合总收益率、
-    个股收益归各自代码（原误路由到数值最近个股）。
+    组合累计收益与个股涨跌同句时，组合收益归组合总收益率、
+    个股收益归各自代码。
     """
     return [
         {"name": "工商银行", "code": "601398", "market_value": 200000.0, "cost": 185000.0, "profit_rate": 8.11},
@@ -184,10 +184,9 @@ class TestCheckNumericalConsistency:
         assert corrections == []
 
     def test_portfolio_level_plus_stock_level_same_sentence(self, portfolio_mixed_holdings):
-        """组合级收益与个股级收益同句：组合收益归组合、个股收益归各自代码（回归）。
+        """组合级收益与个股级收益同句：组合收益归组合、个股收益归各自代码。
 
-        修复前：组合累计收益 10.0% 被整句主体定位误路由到数值最近的个股（招商银行 8.0%），
-        报「10.0% 与 600036 实际 8.0% 偏差超容差」假阳性。
+        组合累计收益 10.0% 归组合总收益率，不因邻近个股数值而产生假阳性。
         """
         text = "组合累计收益约10.0%，招商银行(600036)上涨8.0%，贵州茅台(600519)上涨15.0%"
         issues, checked, passed, corrections = check_numerical_consistency(text, portfolio_mixed_holdings)
@@ -197,7 +196,7 @@ class TestCheckNumericalConsistency:
         assert corrections == []
 
     def test_portfolio_level_mismatch_attributed_to_portfolio(self, portfolio_mixed_holdings):
-        """组合级收益数值错误时归因到组合总收益率而非个股（回归路由）。"""
+        """组合级收益数值错误时归因到组合总收益率而非个股。"""
         text = "组合累计收益约20.0%，招商银行(600036)上涨8.0%，贵州茅台(600519)上涨15.0%"
         issues, checked, passed, corrections = check_numerical_consistency(text, portfolio_mixed_holdings)
         assert checked == 3
@@ -628,10 +627,10 @@ class TestCheckRankingCorrectness:
         assert passed == 0
         assert len(issues) == 1
 
-    # ── 第N大 / 前N大 / 主要持仓 声称（回归） ──────────────
+    # ── 第N大 / 前N大 / 主要持仓 声称 ──────────────
 
     def test_second_largest_correct_pass(self, sample_holdings):
-        """声称"第二大持仓"且名次正确（600036 实际第2）→ 通过（回归）。"""
+        """声称"第二大持仓"且名次正确（600036 实际第2）→ 通过。"""
         text = "招商银行（600036）是组合第二大持仓。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert checked == 1
@@ -650,7 +649,7 @@ class TestCheckRankingCorrectness:
         assert "600036" in issues[0]  # 实际第二大是招商银行
 
     def test_third_largest_correct_pass(self, sample_holdings):
-        """声称"第三大持仓"且名次正确（300750 实际第3）→ 通过（回归）。"""
+        """声称"第三大持仓"且名次正确（300750 实际第3）→ 通过。"""
         text = "宁德时代（300750）是组合第三大持仓。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert checked == 1
@@ -669,7 +668,7 @@ class TestCheckRankingCorrectness:
         assert "300750" in issues[0]  # 实际第三大是宁德时代
 
     def test_top3_non_first_rank_pass(self, sample_holdings):
-        """声称"前三大持仓"且品种在 top3 内但非第一（600036 实际第2）→ 通过（回归）。"""
+        """声称"前三大持仓"且品种在 top3 内但非第一（600036 实际第2）→ 通过。"""
         text = "招商银行（600036）属于组合前三大持仓。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert checked == 1
@@ -687,7 +686,7 @@ class TestCheckRankingCorrectness:
         assert "前3大持仓" in issues[0]
 
     def test_major_holding_vague_claim_skipped(self, sample_holdings):
-        """ "主要持仓"是模糊声称（不断言精确名次）→ 不校验不告警（回归）。"""
+        """ "主要持仓"是模糊声称（不断言精确名次）→ 不校验不告警。"""
         text = "招商银行（600036）是组合主要持仓。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert issues == []
@@ -702,7 +701,7 @@ class TestCheckRankingCorrectness:
         assert len(issues) == 1
         assert "持仓品种不足" in issues[0]
 
-    # ── 表格句就近归因（回归：核心误报场景） ────────────────
+    # ── 表格句就近归因 ────────────────
 
     @pytest.fixture
     def table_holdings(self) -> list[dict]:
@@ -751,7 +750,7 @@ class TestCheckRankingCorrectness:
     # ── 非持仓排名语境不误判 ──────────────────────────────
 
     def test_max_single_loss_item_not_flagged(self, sample_holdings):
-        """ "最大单项亏损品种" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
+        """ "最大单项亏损品种" 是非持仓排名语境 → 不误判为排名声称。"""
         text = "561910 是组合最大单项亏损品种，需关注回撤风险。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert issues == []
@@ -759,7 +758,7 @@ class TestCheckRankingCorrectness:
         assert passed == 0
 
     def test_contributed_main_profit_not_flagged(self, sample_holdings):
-        """ "贡献了主要利润" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
+        """ "贡献了主要利润" 是非持仓排名语境 → 不误判为排名声称。"""
         text = "601939 本季度贡献了主要利润，表现突出。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert issues == []
@@ -767,7 +766,7 @@ class TestCheckRankingCorrectness:
         assert passed == 0
 
     def test_max_loss_source_not_flagged(self, sample_holdings):
-        """ "最大亏损来源" 是非持仓排名语境 → 不误判为排名声称（回归）。"""
+        """ "最大亏损来源" 是非持仓排名语境 → 不误判为排名声称。"""
         text = "600900 是组合最大亏损来源，拖累整体表现。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert issues == []
@@ -775,7 +774,7 @@ class TestCheckRankingCorrectness:
         assert passed == 0
 
     def test_max_feature_not_flagged(self, sample_holdings):
-        """排名词 + 非持仓名词（特点/风险）→ 不误判为排名声称（回归）。"""
+        """排名词 + 非持仓名词（特点/风险）→ 不误判为排名声称。"""
         text = "600900 最大特点是高股息，适合防守配置。"
         issues, checked, passed = check_ranking_correctness(text, sample_holdings)
         assert issues == []
@@ -875,7 +874,7 @@ class TestRunFactCheck:
     # ── 缓存命中跳过排名校验 ──────────────────────────────
 
     def test_skip_ranking_check_skips_stale_rank_claim(self, sample_holdings):
-        """缓存命中内容含过期排名声称：skip_ranking_check=True → 不报排名误报（回归）。
+        """缓存命中内容含过期排名声称：skip_ranking_check=True → 不报排名误报。
 
         600036 是实际第 2 大持仓，声称其为最大持仓在默认校验下会告警；
         但缓存内容基于生成时价格快照，当前排名可能已翻转 → 缓存命中场景应跳过排名校验。
@@ -962,15 +961,14 @@ class TestRunFactCheck:
         assert "5.0%→30.3%" in joined
 
 
-# ── 回归：百分单位契约 + 单日涨跌语境 + 表格行归因（rf-159 批次修复） ──
+# ── 百分单位契约 + 单日涨跌语境 + 表格行归因 ──
 
 
-class TestRegressionProfitRateUnitAndDailyChange:
-    """回归：profit_rate 百分单位契约 + 单日涨跌语境按 change_pct 校验。
+class TestProfitRateUnitAndDailyChange:
+    """profit_rate 百分单位契约 + 单日涨跌语境按 change_pct 校验。
 
-    真实报告曾把小数 profit_rate（1.8712=187.12%）当百分数使用，导致
-    建设银行"今日下跌3.41%"被误修正为 1.9%（3.41 与 1.9 的偏差仅 1.5pp 在
-    容差内）。修复后 orchestrator 源头 ×100、单日涨跌语境按 change_pct 校验。
+    profit_rate 为百分单位（187.12 表示 187.12%），数值校验须按百分单位比较；
+    单日涨跌语境按 change_pct 校验，不得把 3.41% 当作收益率修正。
     """
 
     def test_profit_rate_percent_unit_matches(self, holdings_with_rates):
@@ -982,10 +980,10 @@ class TestRegressionProfitRateUnitAndDailyChange:
         assert issues == []
         assert corrections == []
 
-    def test_profit_rate_decimal_legacy_corrected(self, holdings_with_rates):
-        """百分单位：旧小数误读 1.9%（≈1.8712 被当百分数）→ 修正为 187.1%。
+    def test_profit_rate_decimal_value_corrected(self, holdings_with_rates):
+        """百分单位：数值 1.9%（与 187.12 偏差超容差）→ 修正为 187.1%。
 
-        回归断言 1.9 → 187.1（而非旧实现把 3.41/4.43 修正成 1.9）。
+        百分单位契约下 1.9 与 187.12 偏差超容差，应修正为 187.1。
         """
         text = "建设银行（601939）持仓收益率为 1.9%。"
         issues, checked, passed, corrections = check_numerical_consistency(text, holdings_with_rates)
@@ -999,7 +997,7 @@ class TestRegressionProfitRateUnitAndDailyChange:
     def test_daily_change_matching_change_pct_not_corrected(self, holdings_with_rates):
         """单日涨跌语境：今日下跌 3.41% 与 601939 change_pct=-3.41 一致 → 不修正。
 
-        回归场景：建设银行"今日下跌3.41%"曾被误修正为 1.9%（误当收益率）。
+        单日涨跌按 change_pct 校验，不当作收益率修正。
         """
         text = "建设银行（601939）今日下跌3.41%，表现弱于大盘。"
         issues, checked, passed, corrections = check_numerical_consistency(text, holdings_with_rates)
@@ -1035,13 +1033,13 @@ class TestRegressionProfitRateUnitAndDailyChange:
         assert "已修正明细" not in summ
 
 
-class TestRegressionTableRowRankAttribution:
-    """回归：表格行内排名声称归因到品种名列，而非行内后出现的比较对象。
+class TestTableRowRankAttribution:
+    """表格行内排名声称归因到品种名列，而非行内后出现的比较对象。
 
-    真实报告 LLM 调仓表行："...|| 🔴 高 | 040046 华安纳斯达克100ETF联接A |
+    LLM 调仓表行："...|| 🔴 高 | 040046 华安纳斯达克100ETF联接A |
     减仓1/3 | 当前占比11.3%为第一重仓，与016055高度同质；...||"。
-    "第一重仓"声称指向品种名列 040046，但行内同单元格的比较对象 016055
-    离声称词更近。旧实现"整句最近"误归因到 016055 → 误报"016055 为最大持仓"。
+    "第一重仓"声称指向品种名列 040046，行内同单元格的比较对象 016055
+    虽离声称词更近，仍应归因到品种名列。
     """
     # 用真实句段：|| 触发 _ROW_SEP_PATTERN 表格分支，行段内 040046 在声称词前
     TABLE_ROW = (
@@ -1063,7 +1061,7 @@ class TestRegressionTableRowRankAttribution:
         issues, checked, passed = check_ranking_correctness(self.TABLE_ROW, self._make_holdings())
         assert checked == 1
         assert passed == 1
-        assert issues == []  # 旧实现会误报"016055 为最大持仓"
+        assert issues == []  # 归因到品种名列，无误报"016055 为最大持仓"
 
     def test_wrong_claim_references_subject_code(self):
         """声称主体不在第一时，告警引用品种名列（声称主体），而非比较对象。"""
@@ -1083,11 +1081,11 @@ class TestRegressionTableRowRankAttribution:
         assert "040046" in issues[0] and issues[0].startswith("声称 040046")
 
 
-# ── 回归：非收益率语境不被误修正 + 亏损品种符号保留（rf-205） ──
+# ── 非收益率语境不被误修正 + 亏损品种符号保留 ──
 
 
-class TestRegressionFalseCorrectionContexts:
-    """回归：胜率/权重/相对指数差等非收益率百分比不误判为收益率；
+class TestFalseCorrectionContexts:
+    """胜率/权重/相对指数差等非收益率百分比不误判为收益率；
     亏损品种修正时保留负号。
 
     胜率/评分权重/相对指数差均非收益率，不得与持仓收益率比较；
@@ -1105,7 +1103,7 @@ class TestRegressionFalseCorrectionContexts:
         """真实组合子集：各品种 profit_rate 为百分单位（含正负），含市值/成本。
 
         market_value = cost × (1 + profit_rate/100)，组合整体盈利，
-        确保数值校验不会因组合 profit_rate<0.01 被整体跳过（复现真实报告场景）。
+        确保数值校验不会因组合 profit_rate<0.01 被整体跳过。
         """
         return [
             {"name": "长江电力", "code": "600900", "market_value": 160.62, "cost": 100.0, "profit_rate": 60.62},
@@ -1167,16 +1165,16 @@ class TestRegressionFalseCorrectionContexts:
         assert "已修正明细" not in summ
 
 
-# ── 回归：句中明确主体优先于全局最近邻（漏检） ──
+# ── 句中明确主体优先于全局最近邻 ──
 
 
-class TestRegressionExplicitSubjectBeatsGlobalNearest:
-    """回归：句中明确指代某品种（代码/名称）时，按该品种实际收益率校验，
-    不得落入全局最近邻——否则句中已写明确主体、数值却接近无关品种时漏检。
+class TestExplicitSubjectBeatsGlobalNearest:
+    """句中明确指代某品种（代码/名称）时，按该品种实际收益率校验，
+    不落入全局最近邻——否则句中已写明确主体、数值却接近无关品种时漏检。
 
-    复现场景：601939 实际 1.87%、240012 实际 2.24%（两品种差 0.37 < 2×容差），
-    「建设银行收益率 3.2%」：3.2 与 240012 差 0.96≤容差（旧实现按全局最近邻误判
-    通过），但与句中主体 601939 差 1.33>容差 → 应修正为 601939 的 1.9%。
+    场景：601939 实际 1.87%、240012 实际 2.24%（两品种差 0.37 < 2×容差），
+    「建设银行收益率 3.2%」：3.2 与 240012 差 0.96≤容差（全局最近邻判定通过），
+    但与句中主体 601939 差 1.33>容差 → 应修正为 601939 的 1.9%。
     """
 
     pytestmark = [
@@ -1187,7 +1185,7 @@ class TestRegressionExplicitSubjectBeatsGlobalNearest:
 
     @staticmethod
     def _close_pair_holdings() -> list[dict]:
-        """两品种收益率差 0.37（<2×容差），能复现"接近无关品种"的漏检场景。"""
+        """两品种收益率差 0.37（<2×容差），用于"接近无关品种"的场景。"""
         return [
             {"name": "建设银行", "code": "601939", "market_value": 101.87, "cost": 100.0, "profit_rate": 1.87},
             {"name": "华宝增强债券A", "code": "240012", "market_value": 102.24, "cost": 100.0, "profit_rate": 2.24},
@@ -1222,7 +1220,7 @@ class TestRegressionExplicitSubjectBeatsGlobalNearest:
         assert corrections == [], f"主体数值本就接近实际，不应修正: {corrections}"
 
     def test_no_subject_falls_back_to_global_nearest(self):
-        """句中无任何持仓主体 → 保留全局最近邻行为（历史语义不变）。"""
+        """句中无任何持仓主体 → 按全局最近邻判定。"""
         holdings = self._close_pair_holdings()
         # 组合收益率 (101.87+102.24-200)/200*100 = 2.055；2.2 与组合差 0.145≤容差 → 通过
         text = "组合当前收益率为 2.2%。"

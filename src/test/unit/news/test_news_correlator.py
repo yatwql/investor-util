@@ -4,8 +4,7 @@
   - correlate_news_with_holdings — 关键词匹配、排序、去重
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_news_correlator -v
+  pytest src/test/unit/news/test_news_correlator.py -v
 """
 
 from __future__ import annotations

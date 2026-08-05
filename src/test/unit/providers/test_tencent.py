@@ -12,8 +12,7 @@
 需要至少 35 个 ~ 分隔字段。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_tencent.py -v
+  pytest src/test/unit/providers/test_tencent.py -v
 """
 
 from __future__ import annotations

@@ -316,7 +316,7 @@ class TestCategoryDoughnut:
         assert chart["datasets"][0]["data"] == [10000.0, 5000.0, 2000.0]
 
     def test_category_doughnut_prefers_cat_data(self) -> None:
-        """回归：传入 cat_data（持仓分类表权威数据）时，饼图优先取 cat_data。
+        """传入 cat_data（持仓分类表权威数据）时，饼图优先取 cat_data。
 
         cat_data 与持仓分类表同源（_categorize_holding），避免 details 兜底
         分类偏差导致饼图与表格不一致。

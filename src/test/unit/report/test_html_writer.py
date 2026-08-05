@@ -5,8 +5,7 @@
   - 模板渲染使用独立 list 变量（不因 .values() 缺失崩溃）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_html_writer -v
+  pytest src/test/unit/report/test_html_writer.py -v
 """
 
 from __future__ import annotations
@@ -711,7 +710,7 @@ class TestWriteHtmlReportNewsLlmMeta(unittest.TestCase):
 class TestWriteHtmlReportChartMerge(unittest.TestCase):
     """write_html_report 内补齐 category_doughnut / industry_bar / penetration_bar。
 
-    回归场景：调用侧 `_build_chart_datasets_for_report` 拿不到 cat_data / penetration，
+    场景：调用侧 `_build_chart_datasets_for_report` 拿不到 cat_data / penetration，
     传入的 chart_datasets 缺这三张图 → 模板误显示"暂不可用"。merge 逻辑用
     write_html_report 内计算的权威数据重建并覆盖，保证图表与表格同源。
     """
@@ -800,7 +799,7 @@ class TestWriteHtmlReportChartMerge(unittest.TestCase):
         return kwargs
 
     def test_chart_merge_fills_category_doughnut(self):
-        """回归：分类饼图由 cat_data 补齐，不再显示 100% 其他/暂不可用。"""
+        """分类饼图由 cat_data 补齐，不显示 100% 其他/暂不可用。"""
         chart_datasets = {"portfolio_line": {}, "drawdown": {}, "radar": {}}
         kwargs = self._call_write_html_report(chart_datasets=chart_datasets, enable_interactive_charts=True)
         merged = kwargs["chart_datasets"]
@@ -811,7 +810,7 @@ class TestWriteHtmlReportChartMerge(unittest.TestCase):
         self.assertIn("radar", merged)
 
     def test_chart_merge_fills_penetration_charts(self):
-        """回归：行业分布 + 穿透 TOP10 图由 penetration 补齐，不再误报"暂不可用"。"""
+        """行业分布 + 穿透 TOP10 图由 penetration 补齐，不误报"暂不可用"。"""
         chart_datasets = {"portfolio_line": {}, "drawdown": {}, "radar": {}}
         kwargs = self._call_write_html_report(chart_datasets=chart_datasets, enable_interactive_charts=True)
         merged = kwargs["chart_datasets"]
@@ -819,10 +818,10 @@ class TestWriteHtmlReportChartMerge(unittest.TestCase):
         self.assertEqual(merged["penetration_bar"]["labels"], ["贵州茅台", "宁德时代"])
 
     def test_chart_merge_partial_penetration_still_renders(self):
-        """回归：12 只基金中 1 只无法获取穿透数据 → 图表仍渲染（非全量失败）。
+        """12 只基金中 1 只无法获取穿透数据 → 图表仍渲染（非全量失败）。
 
-        用户报告场景：top10 有数据，summary 有 failed_funds（部分失败），
-        但章节开头误显示"行业数据暂不可用/穿透数据暂不可用"。
+        场景：top10 有数据，summary 有 failed_funds（部分失败），
+        章节开头不得显示"行业数据暂不可用/穿透数据暂不可用"。
         """
         chart_datasets = {"portfolio_line": {}, "drawdown": {}, "radar": {}}
         kwargs = self._call_write_html_report(chart_datasets=chart_datasets, enable_interactive_charts=True)

@@ -9,8 +9,7 @@
   - 不同 endpoint 独立熔断
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_circuit_breaker_recovery -v
+  pytest src/test/unit/llm/test_circuit_breaker_recovery.py -v
 """
 
 from __future__ import annotations

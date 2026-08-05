@@ -9,7 +9,6 @@
   - _build_qa_concentration_block 集中度反问逻辑
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/llm/test_debate_prompts.py -v
 """
 
@@ -258,7 +257,7 @@ class TestBuildQaConcentrationBlock(unittest.TestCase):
 class TestDebateQaConcentrationConfig(unittest.TestCase):
     """集中度问答的合成阶段（synthesis）与阈值配置读取。
 
-    对齐需求 R-LLM-DB-QA-CONCENTRATION-03/04：
+    集中度问答引导需求：
       - 综合权衡 prompt 在 qa 开启时追加集中度问答引导段（要求回答版）
       - synthesis 阶段 threshold 从 llm_settings 读取，而非硬编码 0.20
       - system prompt 在 qa 开启时追加集中度问答章节输出要求

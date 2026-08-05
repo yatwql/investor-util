@@ -4,8 +4,7 @@
   - build_holding_keywords — 持仓/穿透关键词提取逻辑
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_news_keywords -v
+  pytest src/test/unit/news/test_news_keywords.py -v
 """
 
 from __future__ import annotations

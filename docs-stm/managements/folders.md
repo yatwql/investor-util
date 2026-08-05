@@ -330,6 +330,8 @@ investor-util/
 │       │   │   ├── test_industry_beta.py      #   行业 Beta 分析（暴露占比/已知答案回归/数据不足降级/契约）
 │       │   │   ├── test_market_temperature.py #   市场温度纯计算层（三因子合成/刻度映射/免责声明/数据不足）
 │       │   │   ├── test_market_temperature_edge.py # 市场温度边缘场景（样本边界/恒平序列/极端波动）
+│       │   │   ├── test_metrics.py            #   量化指标计算测试
+│       │   │   ├── test_metrics_edge.py       #   量化指标边缘场景
 │       │   │   ├── test_valuation_percentile.py #  估值分位纯计算层（收盘价提取/分位解析解/三档刻度）
 │       │   │   ├── test_valuation_percentile_edge.py # 估值分位边缘场景（样本边界/恒平/极端值）
 │       │   │   ├── test_correlation.py        #   持仓相关性矩阵计算（已知答案/矩阵布局/降级）
@@ -368,8 +370,6 @@ investor-util/
 │       │   │   ├── test_http_client.py      #   HTTP 客户端测试
 │       │   │   ├── test_market_hours.py     #   交易时段判断测试
 │       │   │   ├── test_market_hours_edge.py #   交易时段边缘场景
-│       │   │   ├── test_metrics.py          #   量化指标计算测试
-│       │   │   ├── test_metrics_edge.py     #   量化指标边缘场景
 │       │   │   ├── test_models.py           #   数据模型测试
 │       │   │   ├── test_phase_timeout.py    #   阶段超时测试
 │       │   │   ├── test_provider_registry.py #   数据源注册中心测试
@@ -413,26 +413,25 @@ investor-util/
 │       │   │   ├── test_fact_checker.py       #   事实校验器测试
 │       │   │   ├── test_fingerprint.py        #   缓存指纹测试
 │       │   │   ├── test_generators.py         #   全局提示词生成测试
-│       │   │   ├── test_integration_multi.py  #   多 Provider 集成测试
+│       │   │   ├── test_llm_chain_strategies.py  #   链路调度器全策略端到端
 │       │   │   ├── test_llm_analysis.py       #   LLM 分析测试
 │       │   │   ├── test_llm_api.py            #   LLM API 主入口测试
 │       │   │   ├── test_llm_api_base.py       #   LLM API 基类测试
-│       │   │   ├── test_llm_api_base_calls.py #   LLM API 基类调用测试
 │       │   │   ├── test_llm_api_base_edge.py  #   API 基类边缘场景
 │       │   │   ├── test_llm_api_edge.py       #   API 边缘场景
 │       │   │   ├── test_llm_api_multi.py      #   多 Provider API 测试
 │       │   │   ├── test_llm_api_multi_edge.py #   多 Provider 边缘场景
 │       │   │   ├── test_llm_content.py        #   LLM 内容写入测试
 │       │   │   ├── test_llm_fallback.py       #   LLM 降级回退策略
-│       │   │   ├── test_llm_generators.py     #   LLM generators 测试
+│       │   │   ├── test_generate_all_llm.py     #   generate_all_llm 编排入口
 │       │   │   ├── test_llm_placeholder.py    #   LLM 占位内容测试
 │       │   │   ├── test_llm_placeholder_distinction_edge.py # 占位区分边缘场景
 │       │   │   ├── test_llm_prompts.py        #   LLM 提示词测试
-│       │   │   ├── test_llm_session.py        #   LLM 会话测试
 │       │   │   ├── test_llm_utils.py          #   LLM 工具函数测试
 │       │   │   ├── test_llm_prompt_builders.py     #   提示词构建器测试
 │       │   │   ├── test_prompts_core.py       #   提示词核心测试
 │       │   │   ├── test_llm_session_usage.py       #   会话用量管理测试
+│       │   │   ├── test_log_sanitize.py        #   日志清洗测试
 │       │   │   ├── test_skeleton.py           #   内容骨架生成测试
 │       │   │   └── test_strategy.py           #   策略引擎测试
 │       │   ├── news/                #   新闻单元测试
@@ -451,6 +450,7 @@ investor-util/
 │       │   │   ├── test_akshare_extras.py     #   akshare 封装测试
 │       │   │   ├── test_eastmoney.py          #   东方财富 API 测试
 │       │   │   ├── test_eastmoney_industry.py #   东方财富行业分类测试
+│       │   │   ├── test_eastmoney_industry_rest.py #   东方财富行业 REST 接口测试
 │       │   │   ├── test_sina.py               #   新浪财经 API 测试
 │       │   │   ├── test_sina_edge.py          #   新浪财经边缘场景
 │       │   │   ├── test_tencent.py            #   腾讯财经 API 测试
@@ -537,8 +537,7 @@ investor-util/
 │       │   │   └── test_cli_edge.py          #   CLI 边缘场景测试
 │       │   ├── ui/                  #   UI 单元测试
 │       │   │   ├── __init__.py      #       子包标记
-│       │   │   ├── test_log_sanitize.py     #   日志清洗测试
-│       │   │   ├── test_tui.py              #   TUI 交互测试
+│       │   │   ├── test_tui_keys.py              #   TUI 键盘输入测试
 │       │   │   ├── test_tui_edge.py         #   TUI 边缘场景
 │       │   │   ├── test_tui_handlers.py     #   TUI 事件处理测试
 │       │   │   └── test_tui_menu.py         #   TUI 菜单测试

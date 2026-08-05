@@ -6,8 +6,7 @@ edge 场景：
   - 午休判断时区一致性（UTC/EST/任意）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/core/test_market_hours_edge.py -v
+  pytest src/test/unit/core/test_market_hours_edge.py -v
 """
 
 from __future__ import annotations

@@ -3,8 +3,7 @@
 测试 provider-aware cache key 构建、乐观预检、按实际 provider 落盘。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/llm/test_llm_cache_multi.py -v
+  pytest src/test/unit/llm/test_llm_cache_multi.py -v
 """
 
 from __future__ import annotations

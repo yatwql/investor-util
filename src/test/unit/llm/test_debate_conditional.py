@@ -6,7 +6,6 @@
   - 单情景
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/llm/test_debate_conditional.py -v
 """
 
