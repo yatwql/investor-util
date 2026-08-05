@@ -180,7 +180,7 @@ def prepare_report_data(
         "holdings_details": holdings_details,
         "today_str": today_str,
         "output_dir": config.get("output_dir", "reports"),
-        "news_top_count": int(config.get("news_top_count", 100)),
+        "news_top_count": int(config.get("news_top_count", 300)),
         # 组合风险指标（年化波动率/最大回撤/夏普比率等，需 history_data 计算后填充）
         "risk_metrics": {},
         # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键；

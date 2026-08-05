@@ -119,7 +119,7 @@ def show_config() -> None:
     print(f"  持仓目录: {config.get('holdings_dir', '未设置')}")
     print(f"  持仓文件: {config.get('holdings_filename', '未设置')}")
     print(f"  输出目录: {config.get('output_dir', 'reports')}")
-    print(f"  新闻抓取上限: {config.get('news_top_count', '100')} 条")
+    print(f"  新闻抓取上限: {config.get('news_top_count', '300')} 条")
     if os.path.exists(holdings_path):
         print("  状态: [OK] 文件就绪")
     else:

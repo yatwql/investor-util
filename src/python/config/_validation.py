@@ -144,10 +144,10 @@ def _validate_news_top_count(config: dict, issues: int) -> int:
     try:
         n_int = int(ntc)
         if n_int <= 0:
-            logger.warning("config.json news_top_count = %r 不是正数，将使用默认值 100", ntc)
+            logger.warning("config.json news_top_count = %r 不是正数，将使用默认值 300", ntc)
             issues += 1
     except (ValueError, TypeError):
-        logger.warning("config.json news_top_count = %r 不是有效整数，将使用默认值 100", ntc)
+        logger.warning("config.json news_top_count = %r 不是有效整数，将使用默认值 300", ntc)
         issues += 1
     return issues
 

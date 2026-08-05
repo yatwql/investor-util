@@ -36,7 +36,6 @@ __all__ = [
     "get_all_breaker_status",
     "get_provider_breaker_status",
     "get_llm_endpoint_status",
-    "BREAKER_CONFIG_LLM",
     "BREAKER_CONFIG_DATA_SOURCE",
 ]
 
@@ -59,13 +58,6 @@ class BreakerConfig:
     cooldown_seconds: int | float
     backoff_levels: tuple[int | float, ...] = field(default_factory=tuple)
 
-
-BREAKER_CONFIG_LLM = BreakerConfig(
-    max_failures=3,
-    cooldown_seconds=60,
-    backoff_levels=(60, 300, 900, 3600),
-)
-"""LLM 端点熔断器预设：3 次/60s 基础冷却，指数退避至 3600s。"""
 
 BREAKER_CONFIG_DATA_SOURCE = BreakerConfig(
     max_failures=3,

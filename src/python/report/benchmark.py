@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
@@ -43,6 +44,7 @@ def normalize_benchmarks(
             ],
             "total_return_pct": float,    # 区间累计收益率（%）
             "max_drawdown_pct": float,    # 区间最大回撤（%）
+            "annualized_volatility": float,  # 区间年化波动率（%）
             "data_start": str,            # 指数起效起始日
             "data_end": str,              # 指数结束日
             "status": str,                # "ok" | "degraded"
@@ -151,6 +153,15 @@ def normalize_benchmarks(
             if dd_pct > max_dd_pct:
                 max_dd_pct = dd_pct
 
+        # 计算年化波动率（%）：日收益率标准差 × sqrt(252) × 100（与组合走势同一口径）
+        daily_ret = [(values[i] - values[i - 1]) / values[i - 1] for i in range(1, len(values)) if values[i - 1] > 0]
+        if len(daily_ret) >= 2:
+            _mean = sum(daily_ret) / len(daily_ret)
+            _var = sum((r - _mean) ** 2 for r in daily_ret) / (len(daily_ret) - 1)
+            annualized_vol_pct = math.sqrt(_var) * math.sqrt(252) * 100
+        else:
+            annualized_vol_pct = 0.0
+
         results.append(
             {
                 "code": code,
@@ -158,6 +169,7 @@ def normalize_benchmarks(
                 "bars": normalized,
                 "total_return_pct": total_return_pct,
                 "max_drawdown_pct": round(-max_dd_pct, 2),
+                "annualized_volatility": round(annualized_vol_pct, 2),
                 "data_start": normalized[0]["date"],
                 "data_end": normalized[-1]["date"],
                 "status": "ok",

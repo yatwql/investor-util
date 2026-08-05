@@ -533,7 +533,7 @@ def _generate_report_both(
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
-    news_top_count = int(config.get("news_top_count", 100))
+    news_top_count = int(config.get("news_top_count", 300))
 
     # ── 1. 行情获取（轻量级，无指数/穿透/分类） ──
     perf.start("行情获取")
