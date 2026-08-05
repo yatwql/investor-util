@@ -144,9 +144,11 @@ python -m src.python.cli cache --stats
 | 文档 | 说明 |
 |:-----|:------|
 | [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块（含 LLM）检查清单 |
-| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试模式、新增测试指南 |
+| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试模式、跨机器耗时采集与环境耗时对照、新增测试指南 |
 | [辅助脚本参考](docs-stm/manuals/scripts-reference.md) | scripts/ 目录全部工具脚本用法速查 |
 | [性能历史趋势查看](scripts/perf_view.py) | 查看每次报告生成的各阶段耗时记录（`python scripts/perf_view.py`） |
+
+> **跨机器测试耗时采集**：测试耗时随硬件/操作系统/并行度变化，跨机器复现采集可运行 `python scripts/test_runner.py --mode bench --update-docs`（隐含 `--machine-info`）——顺序运行全部对照模式并采集本机 14 项环境属性，自动将实测耗时写入 `test-coverage.md` 的「环境耗时对照」两张表（按主机名匹配列：同机覆盖刷新、新机器追加列；`--update-docs` 默认永不写文档，需显式传入）。详见[如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md)。
 
 ### 任务编号自动保障（开发协作）
 
