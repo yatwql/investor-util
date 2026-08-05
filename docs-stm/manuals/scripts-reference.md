@@ -62,11 +62,14 @@ python scripts/test_runner.py --mode scenario,edge
 # 跨机器耗时采集（输出机器环境属性 + 各模式实测耗时表格，供耗时对照更新）
 python scripts/test_runner.py --mode bench --machine-info
 
+# 跨机器耗时采集 + 自动更新 test-coverage.md 环境耗时对照（含机器信息采集）
+python scripts/test_runner.py --mode bench --update-docs
+
 # 带行覆盖率
 python scripts/test_runner.py --mode unit --coverage
 ```
 
-> `--mode bench` 是「环境耗时对照」所需 14 个模式（不含 `live`）的聚合别名，按对照表顺序运行；配合 `--machine-info` 输出机器硬件信息（OS/架构/主机名/CPU 型号/物理核/线程/内存/磁盘类型/文件系统/Python/并行度/日期）与环境属性表 + 各模式实测耗时表，可直接并入 `test-coverage.md` 的环境耗时对照（「采集环境属性」+「各模式耗时对照」两张表）。
+> `--mode bench` 是「环境耗时对照」所需 14 个模式（不含 `live`）的聚合别名，按对照表顺序运行；配合 `--machine-info` 输出机器硬件信息（OS/架构/主机名/CPU 型号/物理核/线程/内存/磁盘类型/文件系统/Python/并行度/日期）与环境属性表 + 各模式实测耗时表，可直接并入 `test-coverage.md` 的环境耗时对照（「采集环境属性」+「各模式耗时对照」两张表）。追加 `--update-docs` 则自动将本机环境属性与实测耗时写入 `test-coverage.md` 的两张表（按主机名匹配/新增列，同机覆盖历史实测），不再需要手工粘贴。
 
 > **`test_runner.py` 不支持 `--` 透传**（如 `-- --lf`）。如需 `--lf` 绕过它直接调 pytest，用 `-m` 复现目标模式的标记表达式。各 `--mode` 对应的 `-m` 表达式见下文"标记表达式对照"或直接查看 `MODES` 字典。
 

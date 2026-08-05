@@ -186,9 +186,9 @@ class TestEnvTable:
             "parallel_workers": "8", "date": "2026-08-05",
         }
         text = runner_script._render_env_table(info)
-        for label in ("操作系统", "架构", "主机名", "CPU 型号", "物理核数", "逻辑线程",
-                      "内存", "磁盘类型", "文件系统", "Python 版本", "并行级别",
-                      "worker 数", "采集日期"):
+        for label in ("操作系统", "系统版本", "架构", "主机名", "CPU 型号", "物理核数",
+                      "逻辑线程", "内存", "磁盘类型", "文件系统", "Python 版本",
+                      "并行级别", "worker 数", "采集日期"):
             assert f"| {label} |" in text
         assert "46.8 GiB" in text
 

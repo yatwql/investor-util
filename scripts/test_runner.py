@@ -8,6 +8,7 @@
   python scripts/test_runner.py --mode scenario,edge     # 多模式组合
   python scripts/test_runner.py --coverage               # 全量 + 覆盖率报告
   python scripts/test_runner.py --mode bench --machine-info  # 跨机器耗时采集（环境 + 各模式实测表格）
+  python scripts/test_runner.py --mode bench --update-docs   # 采集并自动回填环境耗时对照表
   python scripts/test_runner.py --help                   # 本帮助
 """
 
@@ -23,6 +24,7 @@ import subprocess
 import sys
 import time as _time
 from datetime import datetime
+from typing import Callable
 
 # Windows GBK 控制台兜底：子进程捕获输出经 errors="replace" 处理后可能含 U+FFFD
 # 替换字符，直接 print 会触发 UnicodeEncodeError 使 runner 中途崩溃（丢 Phase B）
@@ -168,6 +170,7 @@ _HELP_TEXT = """测试驱动脚本 — 统一运行 pytest 并输出结构化 HT
   python scripts/test_runner.py --mode scenario,edge     # 多模式组合
   python scripts/test_runner.py --coverage               # 全量 + 覆盖率报告
   python scripts/test_runner.py --mode bench --machine-info  # 跨机器耗时采集（环境 + 各模式实测表格）
+  python scripts/test_runner.py --mode bench --update-docs   # 采集并自动回填环境耗时对照表
   python scripts/test_runner.py --help                   # 本帮助
 
 模式说明:
@@ -185,6 +188,7 @@ _HELP_TEXT += """\
   --no-timeout      禁用超时，等待测试自然结束
   --phased          分阶段运行（对配置了 phases 的模式有效，前序失败跳过后续阶段）
   --machine-info    输出机器硬件信息 + 各模式实测耗时 markdown 表格（供耗时对照更新）
+  --update-docs     自动更新 test-coverage.md 环境耗时对照表（隐含 --machine-info）
   --help            显示本帮助信息
 
 输出目录结构:
@@ -230,8 +234,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="输出机器硬件信息 + 各模式实测耗时 markdown 表格（供 test-coverage.md 环境耗时对照更新）",
     )
+    parser.add_argument(
+        "--update-docs",
+        action="store_true",
+        help="自动更新 docs-stm/managements/test-coverage.md 环境耗时对照（隐含 --machine-info）",
+    )
     parser.add_argument("--help", action="store_true", help="显示帮助")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.update_docs:
+        args.machine_info = True
+    return args
 
 
 # ── 目录管理 ─────────────────────────────────────────────────
@@ -603,23 +615,53 @@ def _format_machine_info(info: dict) -> str:
     )
 
 
+# 环境属性表行标签（14 行，与 test-coverage.md「采集环境属性」表结构一致；
+# 操作系统/系统版本分列，供渲染与文档写入共用单一事实源）。
+_ENV_ATTR_LABELS: tuple[str, ...] = (
+    "操作系统", "系统版本", "架构", "主机名", "CPU 型号", "物理核数", "逻辑线程",
+    "内存", "磁盘类型", "文件系统", "Python 版本", "并行级别", "worker 数", "采集日期",
+)
+
+
+def _env_value(label: str, info: dict) -> str | None:
+    """按属性名取环境值（缺失以"未知"占位）；未知属性返回 None 表示不更新该行。"""
+    if label == "操作系统":
+        return info.get("os") or "未知"
+    if label == "系统版本":
+        return info.get("os_release") or "未知"
+    if label == "架构":
+        return info.get("arch") or "未知"
+    if label == "主机名":
+        return info.get("hostname") or "未知"
+    if label == "CPU 型号":
+        return info.get("cpu_model") or "未知"
+    if label == "物理核数":
+        cores = info.get("cpu_physical_cores")
+        return str(cores) if cores is not None else "未知"
+    if label == "逻辑线程":
+        threads = info.get("cpu_threads")
+        return str(threads) if threads is not None else "未知"
+    if label == "内存":
+        mem = info.get("mem_gib")
+        return f"{mem:.1f} GiB" if isinstance(mem, (int, float)) else "未知"
+    if label == "磁盘类型":
+        return info.get("disk_type") or "未知"
+    if label == "文件系统":
+        return info.get("fs_type") or "未知"
+    if label == "Python 版本":
+        return info.get("python_version") or "未知"
+    if label == "并行级别":
+        return str(info.get("parallel_level") or "未知")
+    if label == "worker 数":
+        return str(info.get("parallel_workers") or "未知")
+    if label == "采集日期":
+        return info.get("date") or "未知"
+    return None
+
+
 def _render_env_table(info: dict) -> str:
-    """渲染机器环境属性 markdown 表格（与采集字段一一对应）。"""
-    rows = [
-        ("操作系统", f"{info.get('os') or '未知'} {info.get('os_release') or ''}".strip() or "未知"),
-        ("架构", info.get("arch") or "未知"),
-        ("主机名", info.get("hostname") or "未知"),
-        ("CPU 型号", info.get("cpu_model") or "未知"),
-        ("物理核数", str(info.get("cpu_physical_cores")) if info.get("cpu_physical_cores") is not None else "未知"),
-        ("逻辑线程", str(info.get("cpu_threads")) if info.get("cpu_threads") is not None else "未知"),
-        ("内存", f"{info['mem_gib']:.1f} GiB" if isinstance(info.get("mem_gib"), (int, float)) else "未知"),
-        ("磁盘类型", info.get("disk_type") or "未知"),
-        ("文件系统", info.get("fs_type") or "未知"),
-        ("Python 版本", info.get("python_version") or "未知"),
-        ("并行级别", str(info.get("parallel_level") or "未知")),
-        ("worker 数", str(info.get("parallel_workers") or "未知")),
-        ("采集日期", info.get("date") or "未知"),
-    ]
+    """渲染机器环境属性 markdown 表格（14 行，与文档「采集环境属性」表结构一致）。"""
+    rows = [(label, _env_value(label, info)) for label in _ENV_ATTR_LABELS]
     lines = [
         "| 环境属性 | 值 |",
         "|:---------|:---|",
@@ -631,6 +673,35 @@ def _render_env_table(info: dict) -> str:
 def _approx_sec(seconds: float) -> int:
     """耗时取整为约值（下限 1 秒），用于表格"~Ns"展示。"""
     return max(1, round(seconds))
+
+
+def _format_approx_duration(seconds: float) -> str:
+    """耗时约值文本：≥60s 显示 ~{M}min，否则 ~{N}s（对齐文档旧列风格）。"""
+    secs = _approx_sec(seconds)
+    if secs >= 60:
+        return f"~{round(secs / 60)}min"
+    return f"~{secs}s"
+
+
+def _duration_mode_cells(results: list[dict]) -> dict[str, str]:
+    """按模式名聚合实测耗时单元格文本（未实测/超时模式缺席）。
+
+    组合行 verify,regression 为 verify 与 regression 顺序耗时之和。
+    """
+    by_mode = {r.get("mode", ""): r for r in results if not r.get("timed_out")}
+    cells: dict[str, str] = {}
+    for mode in _MODE_TABLE_ORDER:
+        res = by_mode.get(mode)
+        if res is None:
+            continue
+        cells[mode] = _format_approx_duration(res.get("duration", 0.0) or 0.0)
+        if mode == "regression" and "verify" in by_mode:
+            v = by_mode["verify"]
+            dur2 = (res.get("duration", 0.0) or 0.0) + (v.get("duration", 0.0) or 0.0)
+            cells["verify,regression"] = (
+                f"{_format_approx_duration(dur2)}（verify+regression 顺序之和）"
+            )
+    return cells
 
 
 def _render_duration_table(results: list[dict]) -> str:
@@ -676,6 +747,186 @@ def _print_machine_report(machine_info: dict | None, results: list[dict]) -> Non
     timed_out_modes = [r.get("mode", "") for r in results if r.get("timed_out")]
     if timed_out_modes:
         print(f"> 超时未纳入耗时表：{', '.join(timed_out_modes)}")
+
+
+# ── 环境耗时对照文档自动更新 ─────────────────────────────────
+# 两张表用 HTML 注释标记定位（渲染不可见，供脚本增改表结构）。
+
+_DOC_ENV_TABLE_MARKERS = ("<!-- env-table:start -->", "<!-- env-table:end -->")
+_DOC_DURATION_TABLE_MARKERS = ("<!-- duration-table:start -->", "<!-- duration-table:end -->")
+_DOC_COVERAGE_PATH = os.path.join(_PROJECT_ROOT, "docs-stm", "managements", "test-coverage.md")
+
+
+def _find_machine_column(header_row: list[str], hostname: str) -> int | None:
+    """在表头 token 网格中查找含 `{hostname}（` 的列序号（第 1 列为序号 1）。
+
+    header_row 为按 `|` 拆分后的 token 列表（行首/行尾 token 为空串）。
+    旧慢笔记本等非本机列因主机名不匹配而天然豁免。
+    """
+    marker = hostname + "（"
+    for idx in range(1, len(header_row) - 1):
+        if marker in header_row[idx].strip():
+            return idx
+    return None
+
+
+def _new_separator_cell(last_sep: str) -> str:
+    """由既有数据列分隔标记推断新增列对齐样式（居中 :---: 或左对齐 :---）。"""
+    return ":---:" if last_sep.rstrip().endswith(":") else ":---"
+
+
+def _update_machine_table(
+    table_lines: list[str],
+    header_cell: str,
+    row_value: Callable[[str], str | None],
+) -> list[str]:
+    """更新或新增当前主机名列（其余单元格字节原样保留）。
+
+    Args:
+        table_lines: 两 marker 之间的表格行（含表头/分隔行/数据行）
+        header_cell: 主机名列表头文本 `{hostname}（{date} 实测）`
+        row_value: 数据行第一列 label → 该主机列值；返回 None 保留原值不更新
+
+    Returns:
+        更新后的表格行列表
+
+    Raises:
+        ValueError: 区域首行不是表格行
+    """
+    if not table_lines or not table_lines[0].lstrip().startswith("|"):
+        raise ValueError("表区域首行不是 `|` 开头的表格行")
+    grid = [line.split("|") for line in table_lines]
+
+    hostname = header_cell.split("（", 1)[0]
+    col = _find_machine_column(grid[0], hostname)
+    new_col = col is None
+    if new_col:
+        col = len(grid[0]) - 1  # 行尾空 token 前插入新列
+
+    if new_col:
+        grid[0].insert(col, f" {header_cell} ")  # 新列：插入以保留行尾空 token
+    else:
+        grid[0][col] = f" {header_cell} "  # 更新（含日期刷新）
+
+    if new_col and len(grid) >= 2:  # 分隔行：新增列补对齐标记
+        grid[1].insert(col, _new_separator_cell(grid[1][-2]))
+
+    for tokens in grid[2:]:  # 数据行：按行 label 取值
+        label = tokens[1].strip()
+        value = row_value(label)
+        if new_col:
+            tokens.insert(col, f" {value} " if value is not None else " ")
+        elif value is not None:
+            tokens[col] = f" {value} "  # 缺失（None）→ 保留原单元格
+
+    return ["|".join(tokens) for tokens in grid]
+
+
+def _table_region_pattern(markers: tuple[str, str]) -> re.Pattern:
+    """构建表区域正则（起始标记 → 表格 → 结束标记，跨行）。"""
+    start_marker, end_marker = markers
+    return re.compile(
+        re.escape(start_marker) + r"\n(.*?)\n" + re.escape(end_marker),
+        re.DOTALL,
+    )
+
+
+def _extract_table_region(doc_text: str, markers: tuple[str, str]) -> list[str]:
+    """抽取两 marker 之间的表格行（不含 marker 行与空行）。
+
+    Raises:
+        ValueError: marker 缺失或区域不是表格
+    """
+    m = _table_region_pattern(markers).search(doc_text)
+    if not m:
+        raise ValueError(f"文档缺少成对的表区域标记 {markers[0]} … {markers[1]}")
+    lines = [ln for ln in m.group(1).splitlines() if ln.strip()]
+    if not lines or not lines[0].lstrip().startswith("|"):
+        raise ValueError(f"标记 {markers[0]} 与 {markers[1]} 之间未找到表格")
+    # 全行校验：任一非表格行（如夹入说明文字）或分隔行缺失都判结构异常，
+    # 防止后续 token 网格编辑把数据行误当分隔行而静默破坏表格。
+    if any(not ln.lstrip().startswith("|") for ln in lines):
+        raise ValueError(f"标记 {markers[0]} 与 {markers[1]} 之间夹有非表格行")
+    if len(lines) < 2 or "---" not in lines[1]:
+        raise ValueError(f"标记 {markers[0]} 与 {markers[1]} 之间的表格缺少分隔行")
+    return lines
+
+
+def _replace_table_region(
+    doc_text: str, markers: tuple[str, str], updated_lines: list[str]
+) -> str:
+    """以更新后的表格行替换 marker 之间的表区域。
+
+    Raises:
+        ValueError: marker 未配对匹配（防御性，正常不会触发）
+    """
+    block = markers[0] + "\n" + "\n".join(updated_lines) + "\n" + markers[1]
+    # 用可调用替换避免 re 把块内容当模板解析（单元格含反斜杠会触发 re.error）。
+    new_text, count = _table_region_pattern(markers).subn(
+        lambda _match: block, doc_text, count=1
+    )
+    if count != 1:
+        raise ValueError(f"表区域标记 {markers[0]} 与 {markers[1]} 未匹配")
+    return new_text
+
+
+def _update_test_coverage_doc(
+    doc_text: str, machine_info: dict, results: list[dict]
+) -> str:
+    """更新 test-coverage.md 两张「环境耗时对照」表（纯函数，不落盘）。
+
+    Args:
+        doc_text: test-coverage.md 全文
+        machine_info: _collect_machine_info 结果
+        results: 各模式运行结果列表
+
+    Returns:
+        更新后的全文；marker 缺失/结构异常时抛 ValueError，绝不擅自改写
+
+    Raises:
+        ValueError: 表区域标记缺失或表格结构异常
+    """
+    hostname = machine_info.get("hostname") or "未知主机"
+    date = machine_info.get("date") or ""
+    header_cell = f"{hostname}（{date} 实测）"
+
+    env_lines = _extract_table_region(doc_text, _DOC_ENV_TABLE_MARKERS)
+    env_updated = _update_machine_table(
+        env_lines, header_cell, lambda label: _env_value(label, machine_info)
+    )
+    doc_text = _replace_table_region(doc_text, _DOC_ENV_TABLE_MARKERS, env_updated)
+
+    duration_cells = _duration_mode_cells(results)
+    dur_lines = _extract_table_region(doc_text, _DOC_DURATION_TABLE_MARKERS)
+    dur_updated = _update_machine_table(
+        dur_lines, header_cell, lambda label: duration_cells.get(label.strip("`"))
+    )
+    doc_text = _replace_table_region(doc_text, _DOC_DURATION_TABLE_MARKERS, dur_updated)
+
+    return doc_text
+
+
+def _update_test_coverage_doc_file(machine_info: dict, results: list[dict]) -> None:
+    """将本机环境与实测耗时写入 test-coverage.md（仅内容变化时落盘）。
+
+    文档缺标记/结构异常时打印 [ERR] 并返回，绝不破坏既有文档。
+    """
+    if not os.path.exists(_DOC_COVERAGE_PATH):
+        print(f"  [ERR] 未找到 {_DOC_COVERAGE_PATH}，无法更新环境耗时对照")
+        return
+    with open(_DOC_COVERAGE_PATH, encoding="utf-8") as f:
+        original = f.read()
+    try:
+        updated = _update_test_coverage_doc(original, machine_info, results)
+    except Exception as exc:  # 结构异常一律降级 [ERR]，绝不破坏既有文档
+        print(f"  [ERR] 未更新环境耗时对照：{exc}")
+        return
+    if updated == original:
+        print(f"  [..] {os.path.relpath(_DOC_COVERAGE_PATH, _PROJECT_ROOT)} 内容未变化，跳过写入")
+        return
+    with open(_DOC_COVERAGE_PATH, "w", encoding="utf-8") as f:
+        f.write(updated)
+    print(f"  [OK] 已更新 {os.path.relpath(_DOC_COVERAGE_PATH, _PROJECT_ROOT)}（环境耗时对照）")
 
 
 def _build_pytest_args(
@@ -1164,6 +1415,8 @@ def main() -> None:
         print(f"  [..] 超时: 统一设为 {args.timeout}s")
     if args.phased:
         print("  [..] 分阶段: 已开启（前序阶段失败则跳过后续）")
+    if args.update_docs:
+        print("  [..] 文档更新: 开启（结束后自动回填 test-coverage.md 环境耗时对照）")
 
     # 机器信息采集（--machine-info 时启用）
     machine_info: dict | None = None
@@ -1193,6 +1446,9 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\n  [!] 手动中断，输出已完成模式的结果")
         _print_machine_report(machine_info, results)
+        if args.update_docs and machine_info is not None and results:
+            print("\n  [..] 更新已完成模式的耗时对照")
+            _update_test_coverage_doc_file(machine_info, results)
         sys.exit(130)
 
     # 生成汇总页
@@ -1227,6 +1483,10 @@ def main() -> None:
 
     # 机器环境 + 耗时表格输出（--machine-info 时启用）
     _print_machine_report(machine_info, results)
+
+    # 自动更新环境耗时对照文档（--update-docs 时启用）
+    if args.update_docs and machine_info is not None:
+        _update_test_coverage_doc_file(machine_info, results)
 
     sys.exit(overall)
 

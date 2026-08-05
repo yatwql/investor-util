@@ -7,17 +7,17 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 222 | 55,247 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
+| 主程序代码 | Python | 222 | 55,265 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 4 | 3,761 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
-| 辅助脚本 | Python | 16 | 5,581 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **242** | **64,589** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **283** | **79,122** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,998 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **13** | **5,636** | 含 README.md（179 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 12 | 5,457 | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **107** | **42,038** | 含 CLAUDE.md（72 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 9 | 7,244 | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 99 | 34,094 | 各版本 changelog/plan/review-findings 等（95 md 34,094 行 + 3 py 446 行 + 1 txt 12 行） |
+| 辅助脚本 | Python | 16 | 6,167 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
+| **源代码合计** | — | **242** | **65,193** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **284** | **79,621** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,028 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **用户文档** | Markdown | **13** | **5,671** | 含 README.md（179 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 12 | 5,492 | 配置/faq/快速上手/CLI 等 |
+| **项目文档** | Markdown | **107** | **41,940** | 含 CLAUDE.md（72 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 9 | 7,085 | 变更日志/目录树/测试计划/技术设计等 |
+| ├ archive/ | 版本归档 | 99 | 34,155 | 各版本 changelog/plan/review-findings 等（95 md 34,155 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 2 | 628 | 当前迭代中的设计方案（plan-web-ui.md + plan-web-ui-implementation.md） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -530,7 +530,8 @@ investor-util/
 │       │   │   ├── test_task_numbering_check_scripts.py # 任务编号一致性检查脚本测试
 │       │   │   ├── test_task_numbering_hook_scripts.py # 任务编号自动保障 hook 脚本测试
 │       │   │   ├── test_trace_check_scripts.py  #   check-code/doc-traces 工具自身豁免+时序模式检出/豁免回归
-│       │   │   └── test_test_runner_machine_info.py  #  test_runner 机器信息采集/bench 别名/耗时表格渲染测试
+│       │   │   ├── test_test_runner_machine_info.py  #  test_runner 机器信息采集/bench 别名/耗时表格渲染测试
+│       │   │   └── test_test_runner_doc_writer.py  #   test_runner 环境耗时对照文档自动更新（标记定位/列增改/round-trip）
 │       │   ├── startup/              #   首次运行引导单元测试
 │       │   │   ├── __init__.py       #       子包标记
 │       │   │   └── test_startup_wizard.py  #   首次运行引导向导测试
