@@ -25,19 +25,50 @@ import pytest
 
 _KNOWN_MARKERS: set[str] = {
     # scenario 分支
-    "scenario", "scenario_basic", "scenario_resilience", "scenario_llm", "scenario_datetime",
-    "scenario_stock", "scenario_fund", "scenario_mixed_accounts", "scenario_new_holdings",
-    "scenario_cache_hit", "scenario_bond", "scenario_network_down", "scenario_single_holding",
-    "scenario_zero_cost", "scenario_extreme", "scenario_perf", "scenario_security",
+    "scenario",
+    "scenario_basic",
+    "scenario_resilience",
+    "scenario_llm",
+    "scenario_datetime",
+    "scenario_stock",
+    "scenario_fund",
+    "scenario_mixed_accounts",
+    "scenario_new_holdings",
+    "scenario_cache_hit",
+    "scenario_bond",
+    "scenario_network_down",
+    "scenario_single_holding",
+    "scenario_zero_cost",
+    "scenario_extreme",
+    "scenario_perf",
+    "scenario_security",
     # unit 分支
-    "unit", "unit_providers", "unit_fetcher", "unit_llm", "unit_news", "unit_report",
-    "unit_config", "unit_config_edge", "unit_core", "unit_cli", "unit_ui", "unit_analysis",
+    "unit",
+    "unit_providers",
+    "unit_fetcher",
+    "unit_llm",
+    "unit_news",
+    "unit_report",
+    "unit_config",
+    "unit_config_edge",
+    "unit_core",
+    "unit_cli",
+    "unit_ui",
+    "unit_analysis",
     "unit_scripts",
     # 跨领域标记
-    "llm", "edge", "smoke", "data", "integration",
+    "llm",
+    "edge",
+    "smoke",
+    "data",
+    "integration",
     # integration 分支
-    "integration_contract", "integration_isolation", "integration_news_pipeline",
-    "integration_cache", "integration_tui", "integration_cli",
+    "integration_contract",
+    "integration_isolation",
+    "integration_news_pipeline",
+    "integration_cache",
+    "integration_tui",
+    "integration_cli",
     # 真实网络验证套件（opt-in，默认跳过，不入门禁）
     "live",
 }
@@ -89,7 +120,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration_cache: 跨模块缓存一致性验证")
     config.addinivalue_line("markers", "integration_tui: TUI → Handler 路由集成测试")
     config.addinivalue_line("markers", "integration_cli: CLI 命令行模式集成测试")
-    config.addinivalue_line("markers", "live: 真实网络验证套件（opt-in，默认跳过，仅 `-m live` 或 `--run-live` 运行；不入门禁）")
+    config.addinivalue_line(
+        "markers", "live: 真实网络验证套件（opt-in，默认跳过，仅 `-m live` 或 `--run-live` 运行；不入门禁）"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -154,6 +187,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.analysis.rebalance._SILENCE_FILE",
         str(tmp_path / "data/state/rebalance_silence.json"),
     )
+    # 极简再平衡信号模块（行动章）静默期文件隔离（与 rebalance.py 共用同文件）
+    monkeypatch.setattr(
+        "src.python.analysis.simple_rebalance._SILENCE_FILE",
+        str(tmp_path / "data/state/rebalance_silence.json"),
+    )
     # 交易纪律静默期文件隔离（独立于再平衡静默文件，避免信号互相抑制）
     monkeypatch.setattr(
         "src.python.analysis.trade_discipline._SILENCE_FILE",
@@ -163,6 +201,15 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "src.python.config._local_state._LOCAL_STATE_FILE",
         str(tmp_path / "data/state/local_state.json"),
+    )
+    # 指标熔断器持久化文件隔离（data/state/ 运行时状态目录 + 旧 data/cache/ 路径）
+    monkeypatch.setattr(
+        "src.python.analysis.circuit_breaker_wrapper._METRICS_BREAKER_FILE",
+        str(tmp_path / "data/state/metrics_breaker.json"),
+    )
+    monkeypatch.setattr(
+        "src.python.analysis.circuit_breaker_wrapper._LEGACY_METRICS_BREAKER_FILE",
+        str(tmp_path / "data/cache/metrics_breaker.json"),
     )
     # perf_history.jsonl 性能历史文件隔离
     monkeypatch.setattr(
@@ -235,7 +282,21 @@ def _auto_reset_provider_registry():
     依赖 provider_registry.get_registry().reset() 而非重新创建实例。
     """
     from src.python.core.provider_registry import get_registry
+
     get_registry().reset()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_indicator_breaker():
+    """自动重置指标熔断器单例，防止测试间状态污染。
+
+    每个测试执行前销毁 IndicatorBreaker 实例并清空其状态文件，
+    避免某测试记录的断路状态泄漏到后续测试（尤其网关聚合测试）。
+    依赖 reset_indicator_breaker() 销毁当前实例，下次 get_indicator_breaker() 重建。
+    """
+    from src.python.analysis.circuit_breaker_wrapper import reset_indicator_breaker
+
+    reset_indicator_breaker()
 
 
 def pytest_addoption(parser):
@@ -275,6 +336,7 @@ def _auto_reset_feature_flags():
     或在测试体内调用 set_feature_enabled()，reset fixture 保证不污染下游。
     """
     from src.python.config.features import reset_feature_flags
+
     reset_feature_flags()
 
 
@@ -286,6 +348,7 @@ def _reset_degradation_tracker():
     依赖 reset_tracker() 销毁当前实例，下次 get_tracker() 重新创建。
     """
     from src.python.report.data_status import reset_tracker
+
     reset_tracker()
 
 
@@ -314,11 +377,11 @@ def _auto_reset_cost_tracker():
 def _auto_reset_llm_module_failure():
     """自动重置 LLM_MODULE_FAILURE 全局字典，防止测试间状态污染。
 
-    问题场景（xdist 并发）：
-      write_llm_sheets() 读取 LLM_MODULE_FAILURE 判断模块是否被禁用（见
-      llm_content.py write_llm_sheets），若某测试设置
-      LLM_MODULE_FAILURE[key]=FAIL_REASON_DISABLED 后未清理，同一 worker
- 上后续 test_content_none 等测试的页签被跳过不写入，占位符断言失败。
+       问题场景（xdist 并发）：
+         write_llm_sheets() 读取 LLM_MODULE_FAILURE 判断模块是否被禁用（见
+         llm_content.py write_llm_sheets），若某测试设置
+         LLM_MODULE_FAILURE[key]=FAIL_REASON_DISABLED 后未清理，同一 worker
+    上后续 test_content_none 等测试的页签被跳过不写入，占位符断言失败。
     """
     from src.python.llm.prompts import LLM_MODULE_FAILURE
 
@@ -373,15 +436,13 @@ def _block_external_network(monkeypatch, request):
 
     def _raise(*args, **kwargs):
         raise RuntimeError(
-            "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，"
-            "请 mock 对应的数据源/LLM API 调用。"
+            "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，请 mock 对应的数据源/LLM API 调用。"
         )
 
     class _BlockedSocket(_socket.socket):  # type: ignore[misc]
         def __init__(self, *args, **kwargs):
             raise RuntimeError(
-                "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，"
-                "请 mock 对应的数据源/LLM API 调用。"
+                "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，请 mock 对应的数据源/LLM API 调用。"
             )
 
     monkeypatch.setattr(_socket, "socket", _BlockedSocket)

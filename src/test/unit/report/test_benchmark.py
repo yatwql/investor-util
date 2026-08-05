@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import math
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -21,10 +22,8 @@ from src.python.report.benchmark import fetch_benchmarks, normalize_benchmarks
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 _SAMPLE_BARS = [
-    {"date": "2026-07-01", "close": 4000.0, "open": 3980.0,
-     "high": 4010.0, "low": 3970.0, "volume": 1000000},
-    {"date": "2026-07-02", "close": 4020.0, "open": 4000.0,
-     "high": 4030.0, "low": 3990.0, "volume": 1200000},
+    {"date": "2026-07-01", "close": 4000.0, "open": 3980.0, "high": 4010.0, "low": 3970.0, "volume": 1000000},
+    {"date": "2026-07-02", "close": 4020.0, "open": 4000.0, "high": 4030.0, "low": 3990.0, "volume": 1200000},
 ]
 
 
@@ -57,6 +56,7 @@ class TestFetchBenchmarks(unittest.TestCase):
     @patch("src.python.report.benchmark.fetch_index_history")
     def test_partial_failure(self, mock_fetch):
         """部分指数失败 → 返回成功获取的。"""
+
         def _side_effect(code, days):
             if code == "sh000300":
                 return _SAMPLE_BARS
@@ -96,6 +96,7 @@ class TestFetchBenchmarks(unittest.TestCase):
     @patch("src.python.report.benchmark.fetch_index_history")
     def test_exception_handling(self, mock_fetch):
         """fetch_index_history 抛出异常 → 跳过该指数，不影响其他。"""
+
         def _side_effect(code, days):
             if code == "sh000300":
                 raise RuntimeError("API error")
@@ -243,12 +244,10 @@ class TestNormalizeBenchmarks(unittest.TestCase):
         self.assertEqual(len(result), 2)
         # 沪深300: normalized as before
         bm1_result = [r for r in result if r["code"] == "sh000300"][0]
-        self.assertEqual([b["value"] for b in bm1_result["bars"]],
-                         [100.0, 101.0, 102.0, 101.0, 103.0])
+        self.assertEqual([b["value"] for b in bm1_result["bars"]], [100.0, 101.0, 102.0, 101.0, 103.0])
         # 标普500: 1000→100, 1010→101, ...
         bm2_result = [r for r in result if r["code"] == "gb_inx"][0]
-        self.assertEqual([b["value"] for b in bm2_result["bars"]],
-                         [100.0, 101.0, 102.0, 103.0, 104.0])
+        self.assertEqual([b["value"] for b in bm2_result["bars"]], [100.0, 101.0, 102.0, 103.0, 104.0])
         self.assertEqual(bm2_result["total_return_pct"], 4.0)
 
     def test_empty_portfolio_bars(self):
@@ -277,8 +276,8 @@ class TestNormalizeBenchmarks(unittest.TestCase):
         """含有 NaN/0/None close 的 bars 被过滤，剩余正常数据参与归一化。"""
         bars = [
             {"date": "2026-01-05", "close": 100.0},
-            {"date": "2026-01-06", "close": 0},        # 无效
-            {"date": "2026-01-07", "close": None},      # 无效
+            {"date": "2026-01-06", "close": 0},  # 无效
+            {"date": "2026-01-07", "close": None},  # 无效
             {"date": "2026-01-08", "close": 101.0},
             {"date": "2026-01-09", "close": 102.0},
         ]
@@ -291,3 +290,34 @@ class TestNormalizeBenchmarks(unittest.TestCase):
         #   1/5: 100, 1/6: LOCF→100, 1/7: LOCF→100, 1/8: 101, 1/9: 102
         expected = [100.0, 100.0, 100.0, 101.0, 102.0]
         self.assertEqual([b["value"] for b in bm["bars"]], expected)
+
+    def test_annualized_volatility_key_computed(self):
+        """基准归一化结果包含年化波动率键，且等于日收益标准差×sqrt(252)×100。"""
+        result = normalize_benchmarks(_PORTFOLIO_BARS, self._raw(_BM_BARS_SAME))
+        bm = result[0]
+        self.assertIn("annualized_volatility", bm)
+        # 基于归一化 values 复算期望值（与实现同口径）
+        values = [b["value"] for b in bm["bars"]]
+        rets = [(values[i] - values[i - 1]) / values[i - 1] for i in range(1, len(values))]
+        mean = sum(rets) / len(rets)
+        var = sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)
+        expected = math.sqrt(var) * math.sqrt(252) * 100
+        self.assertAlmostEqual(bm["annualized_volatility"], expected, places=2)
+
+    def test_annualized_volatility_constant_returns_zero(self):
+        """日收益率恒定（无波动）→ 年化波动率为 0。"""
+        bars = [
+            {"date": "2026-01-05", "close": 100.0},
+            {"date": "2026-01-06", "close": 110.0},
+            {"date": "2026-01-07", "close": 121.0},
+            {"date": "2026-01-08", "close": 133.1},
+            {"date": "2026-01-09", "close": 146.41},
+        ]
+        result = normalize_benchmarks(_PORTFOLIO_BARS, self._raw(bars))
+        self.assertAlmostEqual(result[0]["annualized_volatility"], 0.0, places=5)
+
+    def test_annualized_volatility_insufficient_data_zero(self):
+        """不足 2 个交易日（无法计算波动）→ 年化波动率为 0。"""
+        bars = [{"date": "2026-01-05", "close": 100.0}]
+        result = normalize_benchmarks(_PORTFOLIO_BARS, self._raw(bars))
+        self.assertEqual(result[0]["annualized_volatility"], 0.0)

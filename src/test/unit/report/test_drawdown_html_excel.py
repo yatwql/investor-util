@@ -288,6 +288,13 @@ class TestExcelDrawdownSheet(unittest.TestCase):
         flat = [v for row in self._all_text(ws) for v in row]
         self.assertTrue(any("未检测到显著回撤事件" in v for v in flat), "空事件应写入占位行")
 
+    def test_drawdown_block_insufficient_data_placeholder(self):
+        """drawdown_available=False（有效交易日不足）→ 回撤矩阵写数据不足占位，而非空事件占位。"""
+        ws = self._write(_history([], available=False))
+        flat = [v for row in self._all_text(ws) for v in row]
+        self.assertTrue(any("历史数据不足" in v for v in flat), "数据不足应写入占位行")
+        self.assertFalse(any("未检测到显著回撤事件" in v for v in flat), "数据不足时不应写空事件占位")
+
     def test_history_none_placeholder(self):
         """history_data=None → 整页占位。"""
         ws = self._write(None)

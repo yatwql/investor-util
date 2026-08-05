@@ -49,6 +49,15 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     # 市场温度：价格分位+均线偏离+波动率三因子合成温度计（report_submodules.market_temperature，
     # 由编排层 compute_market_temperature_data 组装；开关关闭时为 None）
     "market_temperature_data",
+    # 宏观事件标注：危机/政策事件叠加到走势图的标注数据（report_submodules.crisis_annotation，
+    # 由编排层 compute_crisis_annotation_data 组装；无事件时为 None）
+    "crisis_annotation_data",
+    # 尾部风险：极端行情风险提示数据（report_submodules.tail_risk，
+    # 由编排层 compute_tail_risk_data 组装；开关关闭时为 None）
+    "tail_risk_data",
+    # 快照差异：当前持仓快照与上次快照的差异数据（report_submodules.snapshot_diff，
+    # 由编排层 compute_snapshot_diff_data 组装；无差异时为 None）
+    "snapshot_diff_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -101,6 +110,9 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "fund_flow_data": (dict, type(None)),
     "valuation_data": (dict, type(None)),
     "market_temperature_data": (dict, type(None)),
+    "crisis_annotation_data": (dict, type(None)),
+    "tail_risk_data": (dict, type(None)),
+    "snapshot_diff_data": (dict, type(None)),
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {

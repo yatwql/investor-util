@@ -33,8 +33,15 @@ _FEE_FIXTURE = {
 # ── 辅助构造 ──────────────────────────────────────────────
 
 
-def _holding(name: str, code: str, shares: float, price: float) -> dict:
-    """构造 holdings_details 单行（市值 = 份额 × 价格）。"""
+def _holding(
+    name: str,
+    code: str,
+    shares: float,
+    price: float,
+    channel: str = "",
+    account: str = "",
+) -> dict:
+    """构造 holdings_details 单行（市值 = 份额 × 价格；channel 为场内/场外渠道上下文）。"""
     return {
         "name": name,
         "code": code,
@@ -47,6 +54,8 @@ def _holding(name: str, code: str, shares: float, price: float) -> dict:
         "change_pct": 0.0,
         "nav_date": "2026-08-04",
         "source_api": "test",
+        "channel": channel,
+        "account": account,
     }
 
 
@@ -120,6 +129,87 @@ class TestLotRounding:
         advice = build_rebalance_advice([], signals, holdings, total_mv=200200.0, fee_table=_FEE_FIXTURE)
         assert len(advice) == 1
         assert advice[0]["shares"] == 500
+
+
+# ── 渠道上下文（场内/场外）──────────────────────────────
+
+
+class TestChannelAware:
+    """渠道上下文：持仓明细携带场内/场外渠道，按渠道计算份额取整与费用。
+
+    回归背景：场外持有基金（LOF/开放式指数基金，如 161725 招商中证白酒指数A、
+    110022 易方达消费行业）的 16/11 开头代码会命中场内基金前缀判定，被误当
+    场内处理（100 份取整 + 仅计佣金）；实际场外赎回需整数份取整 + 计收赎回费。
+    channel 字段由报告层按账户关键词判定填充，此层按渠道消费。
+    """
+
+    def test_otc_channel_lof_integer_shares(self):
+        """场外渠道持有 LOF（161725）止损 → 整数份取整（1234），非 100 份取整。"""
+        holdings = [_holding("招商中证白酒指数A", "161725", 1234.5, 1.2, channel="场外")]
+        signals = [_discipline("161725", "招商中证白酒指数A", "止损/减仓")]
+        advice = build_rebalance_advice([], signals, holdings, total_mv=1481.4, fee_table=_FEE_FIXTURE)
+        assert len(advice) == 1
+        assert advice[0]["shares"] == 1234
+
+    def test_otc_channel_open_fund_integer_shares(self):
+        """场外渠道持有开放式基金（110022）止损 → 整数份取整（1234），非 100 份取整。"""
+        holdings = [_holding("易方达消费行业", "110022", 1234.5, 1.2, channel="场外")]
+        signals = [_discipline("110022", "易方达消费行业", "止损/减仓")]
+        advice = build_rebalance_advice([], signals, holdings, total_mv=1481.4, fee_table=_FEE_FIXTURE)
+        assert len(advice) == 1
+        assert advice[0]["shares"] == 1234
+
+    def test_otc_channel_charges_redemption_fee(self):
+        """场外渠道卖出 → 费用含赎回费（金额×0.5%），非仅佣金。"""
+        holdings = [_holding("易方达消费行业", "110022", 1234, 1.2, channel="场外")]
+        signals = [_discipline("110022", "易方达消费行业", "止损/减仓")]
+        advice = build_rebalance_advice([], signals, holdings, total_mv=1480.8, fee_table=_FEE_FIXTURE)
+        assert len(advice) == 1
+        # 佣金 max(1480.8×0.00025,5)=5 + 赎回费 1480.8×0.005=7.404 → 12.4
+        assert advice[0]["fee"] == pytest.approx(12.4, abs=0.005)
+
+    def test_exchange_channel_etf_unchanged(self):
+        """场内渠道持有 ETF（510300）止盈 → 仍 100 份取整 + 仅佣金。"""
+        holdings = [_holding("沪深300ETF", "510300", 1050, 4.0, channel="场内")]
+        signals = [_discipline("510300", "沪深300ETF", "止盈")]
+        advice = build_rebalance_advice([], signals, holdings, total_mv=4200.0, fee_table=_FEE_FIXTURE)
+        assert len(advice) == 1
+        assert advice[0]["shares"] == 300  # 350 → 100 份取整
+        assert advice[0]["fee"] == pytest.approx(5.0, abs=0.005)  # 仅佣金
+
+    def test_a_share_channel_still_stamp_duty(self):
+        """场内渠道持有 A 股（600000）→ 100 份取整 + 费用含印花税（渠道不覆盖 A 股印花税）。"""
+        holdings = [_holding("浦发银行", "600000", 1350, 10.0, channel="场内")]
+        signals = [_discipline("600000", "浦发银行", "止盈")]
+        advice = build_rebalance_advice([], signals, holdings, total_mv=13500.0, fee_table=_FEE_FIXTURE)
+        assert len(advice) == 1
+        assert advice[0]["shares"] == 400
+        # 佣金 5 + 印花税 4000×0.0005=2 → 7.0
+        assert advice[0]["fee"] == pytest.approx(7.0, abs=0.005)
+
+    def test_explicit_channel_overrides_account(self):
+        """显式 channel="场外" 优先于 account 关键词（证券账户持有场外份额场景）。"""
+        holdings = [_holding("招商中证白酒指数A", "161725", 1234.5, 1.2, channel="场外", account="证券账户")]
+        signals = [_discipline("161725", "招商中证白酒指数A", "止损/减仓")]
+        advice = build_rebalance_advice([], signals, holdings, total_mv=1481.4, fee_table=_FEE_FIXTURE)
+        assert len(advice) == 1
+        assert advice[0]["shares"] == 1234
+
+    def test_account_fallback_when_no_channel(self):
+        """无 channel 但 account 为场外关键词（天天基金）→ 按场外渠道处理。"""
+        holdings = [_holding("招商中证白酒指数A", "161725", 1234.5, 1.2, account="天天基金")]
+        signals = [_discipline("161725", "招商中证白酒指数A", "止损/减仓")]
+        advice = build_rebalance_advice([], signals, holdings, total_mv=1481.4, fee_table=_FEE_FIXTURE)
+        assert len(advice) == 1
+        assert advice[0]["shares"] == 1234
+
+    def test_no_channel_falls_back_to_code_detection(self):
+        """无 channel 无 account → 回退证券类型判定（161725 16 开头命中场内前缀 → 100 份取整）。"""
+        holdings = [_holding("招商中证白酒指数A", "161725", 1234.5, 1.2)]
+        signals = [_discipline("161725", "招商中证白酒指数A", "止损/减仓")]
+        advice = build_rebalance_advice([], signals, holdings, total_mv=1481.4, fee_table=_FEE_FIXTURE)
+        assert len(advice) == 1
+        assert advice[0]["shares"] == 1200  # 1234 → 100 份取整（向后兼容既有行为）
 
 
 # ── 操作生成 ──────────────────────────────────────────────
@@ -204,6 +294,18 @@ class TestFeeEstimation:
         """未知操作（如买入）拒绝估算，避免静默按卖出口径计费。"""
         with pytest.raises(ValueError):
             estimate_fee("买入", 10000.0, "600000", "浦发银行", _FEE_FIXTURE)
+
+    def test_fee_channel_otc_charges_redemption(self):
+        """channel="场外" → 计收赎回费（覆盖 16/11 开头代码的前缀误判）。"""
+        assert estimate_fee(
+            "卖出减仓", 10000.0, "161725", "招商中证白酒指数A", _FEE_FIXTURE, channel="场外"
+        ) == pytest.approx(55.0, abs=0.005)  # 佣金 5 + 赎回费 50
+
+    def test_fee_no_channel_otc_code_unchanged(self):
+        """无 channel → 161725 按代码判定（16 开头场内前缀）→ 仅佣金（向后兼容）。"""
+        assert estimate_fee("卖出减仓", 10000.0, "161725", "招商中证白酒指数A", _FEE_FIXTURE) == pytest.approx(
+            5.0, abs=0.005
+        )
 
 
 # ── 现金缓冲 ──────────────────────────────────────────────

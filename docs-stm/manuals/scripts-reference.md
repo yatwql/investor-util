@@ -15,6 +15,7 @@
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
 | `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
+| `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
@@ -221,6 +222,24 @@ python scripts/check-task-numbering.py --ci       # CI 模式（只输出错误�
 - **dev-verify preflight**：`test_runner.py --mode dev-verify` 自动运行编号校验，失败即中止
 - **Claude Code hook**：编辑 `plan.md`/`review-findings.md` 后自动校验（`scripts/check-task-numbering-hook.py`），实时拦截冲突
 - **git pre-commit**：提交涉及编号文档时自动校验（`.githooks/pre-commit`），绕过流程也拦截
+
+---
+
+### `check-semantic-index.py` — 语义命名索引正反向一致性检查
+
+校验技术设计文档（`technical.md`）「功能语义命名表」章节（`<!-- semantic-index:start/end -->` 标记区间）与代码的**正面一致性**，与 `check-code-traces.py` 的负面禁止互补：
+
+1. **正向**：`_config_defaults.py` 中 `report_submodules` 字典每个键（运行时配置开关）必须已登记在「功能语义命名表」中（防新增开关绕过登记）
+2. **反向**：表中每个语义 slug 在 `src/python/` 下至少一处非注释代码引用（防僵尸条目——功能删除后表行残留）
+3. **合并章**：表下「合并章代码标识符」注声明的 sheet key 必须存在于 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表
+
+```bash
+python scripts/check-semantic-index.py       # 检查全部
+python scripts/check-semantic-index.py -v    # 详细输出（打印每项解析结果）
+python scripts/check-semantic-index.py --ci  # CI 模式（只输出错误，退出码 2）
+```
+
+**自动保障**：已纳入 CLAUDE.md 提交前（P0）/发布前（P2）门禁，与 `check-task-numbering.py --ci` 同构。语义命名纪律见技术设计文档「架构设计约束」章节的「约束外参照」。
 
 ---
 

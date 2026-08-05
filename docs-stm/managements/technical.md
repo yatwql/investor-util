@@ -1,5 +1,5 @@
 # 个人投资分析报告生成小助手 — 技术设计
-> 文档版本：0.10.6
+> 文档版本：0.10.7
 
 ## 目录
 
@@ -325,7 +325,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
                            Provider Chain 结构
  ┌──────────────────────────────────────────────────────────────────┐
  │  price_stock:   腾讯财经 (qt.gtimg.cn)  →  新浪财经 (hq.sinajs.cn)│
- │  price_fund_otc: 东方财富净值 API（直达，无备用）                   │
+ │  price_fund_otc: api.fund.eastmoney.com → fundf10（回退）           │
  │  price:         腾讯财经 → 东方财富（行情策略链：开盘状态判断）      │
  │  history_stock:  腾讯财经 K 线          →  新浪财经 K 线          │
  │  history_index:  腾讯财经 K 线          →  新浪财经 K 线          │
@@ -427,6 +427,8 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 ### 2.2 三层熔断架构
 
+> **术语约定（熔断体系双维命名）**：本项目熔断体系分两维描述——**熔断器组件**（数据源熔断器 `core/provider_registry.py` / 指标熔断器 `analysis/circuit_breaker_wrapper.py::IndicatorBreaker` / LLM 端点熔断器 `llm/circuit_breaker.py`，即 datasource-reliability.md §4.1「三级熔断体系」）+ **DataSourceRegistry 流程层**（本节三层：熔断预检 / Provider 级 / 冷却试探恢复）。本节聚焦 DataSourceRegistry 内部流程层；指标/LLM 熔断器参数见下方对比表及各自模块说明。
+
 由 `DataSourceRegistry` 单例（`src/python/core/provider_registry.py`）统一管理，采用**双锁设计**（`_provider_lock` + `_cache_lock`）使熔断操作和会话缓存互不阻塞。
 
 ```
@@ -476,20 +478,20 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 #### 熔断参数对比
 
-| 维度 | 单股票 API | 批量 API（eastmoney_industry） | LLM 熔断器 |
-|:-----|:----------|:-----------------------------|:----------|
-| 实现位置 | `core/provider_registry.py` | `core/provider_registry.py` | `llm/circuit_breaker.py` |
-| 熔断阈值 | 连续 3 次传输级失败 | 连续 6 次传输级失败 | 连续 3 次 |
-| 冷却时长 | 指数退避 60s→300s→900s→3600s | 120s | 60s |
-| 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 |
-| 恢复条件 | 试探成功 → record_success | 试探成功 → record_success | 半开成功 → 关闭熔断 |
-| 持久化 | `data/state/circuit_breaker.json` | `data/state/circuit_breaker.json` | 会话级（无持久化） |
+| 维度 | 单股票 API | 批量 API（eastmoney_industry） | LLM 熔断器 | 指标熔断器（IndicatorBreaker） |
+|:-----|:----------|:-----------------------------|:----------|:------------------------------|
+| 实现位置 | `core/provider_registry.py` | `core/provider_registry.py` | `llm/circuit_breaker.py` | `analysis/circuit_breaker_wrapper.py` |
+| 熔断阈值 | 连续 3 次传输级失败 | 连续 6 次传输级失败 | 连续 3 次 | 单指标连续 3 次异常（除零/空数据/置信度不足） |
+| 冷却时长 | 指数退避 60s→300s→900s→3600s | 120s | 60s | 24h（静默，不阻塞其他指标） |
+| 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 | 冷却期满后自动复位重试 |
+| 恢复条件 | 试探成功 → record_success | 试探成功 → record_success | 半开成功 → 关闭熔断 | record_success → 复位计数 |
+| 持久化 | `data/state/circuit_breaker.json` | `data/state/circuit_breaker.json` | 会话级（无持久化） | `data/state/metrics_breaker.json` |
 
 **指数退避**：单股票 API 熔断器冷却时间采用指数退避策略（60s→300s→900s→3600s），每次连续失败冷却时长按退避等级递增，成功恢复后重置为基础值。
 
 **跨会话持久化**：熔断器状态持久化到 `data/state/circuit_breaker.json`，与 `data/cache/` 隔离，避免缓存清理误删。会话重启后恢复熔断记忆。
 
-**双熔断器统一网关**：`core/provider_registry.py` 和 `core/circuit_breaker.py` 通过统一的熔断网关管理。Provider 级熔断（HTTP 传输层）管"某个数据源能不能调用"；数据模块级熔断（业务层）管"某类数据是否跳过"。两熔断器状态同步。
+**统一熔断网关**：`core/circuit_breaker.py` 的 `CircuitBreakerGateway` 聚合 Provider 级熔断（`provider_registry.py`，HTTP 传输层，管"某个数据源能不能调用"）、LLM 端点熔断（`llm/circuit_breaker.py`）和指标熔断器（`analysis/circuit_breaker_wrapper.py`，业务层，管"某类数据是否跳过"）三者的状态查询与管理，`gateway.summary()` / `get_all_breaker_status()` 统一返回三类状态报告，单入口消除运维复杂度。
 
 #### Chain 自动注册
 
@@ -925,12 +927,16 @@ _write_atomic(fd, tmp_path, final_path)
    │ 指数    │     │ 基金持仓  │     │ 日线     │
    │ LLM 全  │     │ 行业分类  │     │ 历史基金  │
    │ 球宏观  │     │ 新闻聚合  │     │ 净值     │
-   │ LLM 智  │     │ 盈利预测  │     │ 集中度   │
-   │ 囊团    │     │ 资金流向  │     │ 快照     │
-   │ LLM 体  │     │ 基金经理  │     │ 风格快照 │
-   │ 检报告  │     │ 基金风格  │     └──────────┘
-   │ LLM 穿  │     │ 分红数据  │     （不被菜单
-   │ 透分析  │     │ 业绩基准  │     命令误删）
+   │ LLM 智  │     │ 新闻二次  │     │ 集中度   │
+   │ 囊团    │     │ 关联     │     │ 快照     │
+   │ LLM 体  │     │ 盈利预测  │     │ 风格快照 │
+   │ 检报告  │     │ 资金流向  │     │ 追踪     │
+   │ LLM 穿  │     │ 基金经理  │     │ 日历     │
+   │ 透分析  │     │ 基金风格  │     └──────────┘
+   │ LLM 辩  │     │ 分红数据  │     （不被菜单
+   │ 论三段  │     │ 业绩基准  │     命令误删）
+   │         │     │ 无风险利  │
+   │         │     │ 率       │
    └─────────┘     └──────────┘
    菜单 [2] 触发    菜单 [1] 触发
 ```
@@ -1242,11 +1248,10 @@ for sec in section_order:
 | `concentration_data` | `concentration_analysis is not None` | `fund_deep_analysis` | 持仓集中度监控 |
 | `style_factor_data` | `style_factor_data is not None or style_analysis is not None` | `fund_deep_analysis` | 风格与因子分析（风格表 + 因子回归 + 行业 Beta 一章三区块） |
 | `evolution_data` | `evolution_data is not None` | `evolution` | 组合演进（多快照趋势） |
-| `action_data` | `action_data is not None` | `action` | 行动建议（单源计算两处呈现） |
 | `news_data_available` | `include_news` flag（新闻数据可用） | `news` | 新闻关联分析 |
 | `llm_data_available` | `llm_enabled_flag`（LLM 生成成功） | `llm` | LLM 全部 5 模块 |
 
-`always` 类型模块（summary / market_value / category / penetration / fund_performance / data_source_status）无 data_flag，始终显示。`evolution` 类型模块（`portfolio_evolution` 组合演进）由独立开关 `enable_portfolio_evolution` 控制，带 `evolution_data` 标志——聚合数据存在（`evolution_data is not None`）才渲染章节，`available=False` 时章节内写占位文本（与持仓关系矩阵·相关性区块降级模式一致）。`action` 类型模块（`action` 行动建议）由独立顶层开关 `enable_action`（默认关）控制，带 `action_data` 标志——计算数据存在（`action_data is not None`）才渲染章节，`available=False` 时章节内写占位文本（无持仓数据降级）。
+`always` 类型模块（summary / market_value / category / penetration / fund_performance / data_source_status）无 data_flag，始终显示。`evolution` 类型模块（`portfolio_evolution` 组合演进）由独立开关 `enable_portfolio_evolution` 控制，带 `evolution_data` 标志——聚合数据存在（`evolution_data is not None`）才渲染章节，`available=False` 时章节内写占位文本（与持仓关系矩阵·相关性区块降级模式一致）。`action` 类型模块（`action` 行动建议）由独立顶层开关 `enable_action`（默认关）控制，`data_flag` 为 `None`（纯算法计算，basic/both/full 均可见，无数据可用性判定）——开关关闭或无持仓数据时不渲染章节，落 §1.4.5 降级占位。
 
 ### 4.6 报告序号可配置
 
@@ -1444,6 +1449,7 @@ annualized_vol = std(daily_returns, ddof=1) × √252
   }
 }
 ```
+> 上例为**配置示例**（含自定义 `gb_inx`），非默认值；默认 `benchmark_indices` 仅含 `{"sh000300": "沪深300"}` 单条。
 
 **技术流程**：
 
@@ -1478,7 +1484,7 @@ get_combined_timeseries()
 
 **HTML 渲染**：`enable_interactive_charts` 开启时由 Chart.js 渲染交互图表（净值/回撤曲线、资产构成环形图、行业分布、穿透 TOP10、量化雷达图）；关闭时回退 `drawSimpleChart()`（Canvas 2D API 原生渲染，无 Chart.js 依赖），组合 as-if 曲线（实线）+ 基准指数（虚线，颜色循环），右侧图例显示。
 
-**Excel 渲染**：`portfolio_history_drawdown`（组合历史走势与回撤）页签分「走势表 + 回撤矩阵」两区块——走势表每基准一列（归一化值）+ 指标汇总矩阵（累计收益/最大回撤/年化波动率/起止日，仅一份），回撤矩阵为独立回撤事件明细（含恢复耗时），危机区间标注为 2015/2018/2020/2022 静态日期表 + 区间统计，尾部风险统计为 VaR(95/99)/最大单日跌幅/最长连续下跌/最大跌幅后恢复五行（百分比按 FMT_PERCENT 存小数，样本不足写「样本不足」占位）。
+**Excel 渲染**：`portfolio_history_drawdown`（组合历史走势与回撤）页签分「走势表 + 回撤矩阵 + 危机区间标注」三区块——走势表每基准一列（归一化值）+ 指标汇总矩阵（累计收益/最大回撤/年化波动率/起止日，仅一份），回撤矩阵为独立回撤事件明细（含恢复耗时）+ 尾部风险统计（VaR(95/99)/最大单日跌幅/最长连续下跌/最大跌幅后恢复五行，百分比按 FMT_PERCENT 存小数，样本不足写「样本不足」占位），危机区间标注为 2015/2018/2020/2022 静态日期表 + 区间统计。
 
 #### 持仓快照存储与清理（history_snapshot.py）
 
@@ -1933,7 +1939,7 @@ _dedup_by_title(items)
 | 信号 | 默认阈值 | 说明 |
 |:-----|:---------|:------|
 | 连续失败计数 | T2: 2 次 / T3: 2 次 / T4: 1 次 | 累计失败次数达阈值后触发降级 |
-| 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 14 天 | 距上次成功获取的天数超阈值后触发降级 |
+| 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 7 天 | 距上次成功获取的天数超阈值后触发降级 |
 
 可配置于 `config.json` 的 `degradation` 字段。支持跨会话持久化到 `data/state/.degradation_state.json`。
 
@@ -2113,7 +2119,7 @@ LLM 集成层提供 5 个分析模块，通过 `llm_settings.json` 的 `enabled_
 |:-----|:-----|:---------|:---------|:--------|
 | 全球政经局势 | `global_macro` | A 股/美股指数+持仓汇总 → 宏观判断 | preload | 24h |
 | 智囊团深度复盘 | `expert_review` | 持仓明细+穿透 → 专业分析师多视角辩论 | preload | 2h |
-| 组合体检报告 | `health_check` | 持仓明细（排除行情波动）→ 5 维健康度评分 | preload | 24h |
+| 持仓体检报告 | `health_check` | 持仓明细（排除行情波动）→ 5 维健康度评分 | preload | 24h |
 | 穿透深度分析 | `penetration_deep` | 穿透 TOP10 → 行业/品种/国家集中度分析 | preload | 24h |
 | 新闻二次关联 | `news_correlation` | 逐条新闻 → LLM 深度关联评分（批量模式） | refresh | 1h |
 
@@ -2222,7 +2228,7 @@ class DataModuleDef:
     cache_groups: tuple      # 分组
 ```
 
-当前注册 **29 个数据模块**：
+当前注册 **28 个数据模块**：
 
 | 分类 | 数量 | 模块 |
 |:-----|:----:|:-----|
@@ -2233,10 +2239,12 @@ class DataModuleDef:
 | LLM 分析（preload/refresh） | 5 | global_macro、expert_review、news_correlation、health_check、penetration_deep |
 | 辩论缓存（preload，实验） | 3 | llm_debate_pro、llm_debate_con、llm_debate_synthesis |
 | 补充数据（refresh） | 3 | profit_forecast、sector_flow、dividend |
-| 基金深度分析（refresh/无分组） | 5 | fund_manager、position_relationship、fund_concentration、fund_style_snapshot、**extended** |
+| 基金深度分析（refresh/无分组） | 4 | fund_manager、fund_concentration、fund_style_snapshot、**extended** |
 | 无风险利率（refresh） | 1 | **bond_yield** |
 | 精确键名（refresh/无分组） | 3 | benchmark、tracking、calendar |
 | 历史走势（无分组） | 3 | history_stock、history_fund_otc、history_index |
+
+> 注：`position_relationship`（持仓关系矩阵）为报告章节（#7，运行时从 fund_hold 推导），**非**缓存数据模块，故不计入上表。
 
 #### 计算模块注册表（`_COMPUTATION_REGISTRY`）
 
@@ -2400,10 +2408,11 @@ make_http_client(timeout=10.0) → httpx.Client
 
 ### 6.7 功能语义命名表
 
-> **纪律**：英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。语义名即代码名——任务代号不进入实现层（禁止用任何任务编号/F 系列/`plan-N`/`rf-N` 命名），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表（`plan.md`/`review-findings.md`）链接锚点。新增功能**先定语义名再设计**。该纪律由 `scripts/check-code-traces.py --ci` 强制（IDENT/CODE，退出码 2）。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（如 `C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。
+> **纪律**：英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。语义名即代码名——任务代号不进入实现层（禁止用任何任务编号/F 系列/`plan-N`/`rf-N` 命名），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表（`plan.md`/`review-findings.md`）链接锚点。新增功能**先定语义名再设计**。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE，退出码 2）+ `scripts/check-semantic-index.py --ci`（正面校验本表与代码正反向一致），并已纳入「架构设计约束」章节的约束外参照（见该章节开头）。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（如 `C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。
 >
 > 以下为当前已实现功能/合并章的语义命名索引（活索引）。各轮功能设计文档中的原始语义命名表为历史快照，仅以此表为唯一现状基准。
 
+<!-- semantic-index:start -->
 | 语义 slug | 中文名（文档/UI） | 归入章节 | 决策链环节 | config 开关 |
 |:--|:--|:--|:--|:--|
 | `candidate_compare` | 候选基金比较 | 基金业绩分析 | 买入/选基 | `report_submodules.candidate_compare`（默认关） |
@@ -2412,17 +2421,19 @@ make_http_client(timeout=10.0) → httpx.Client
 | `rebalance_advice` | 调仓建议 | 行动建议 | 调仓 | `enable_action`（默认关） |
 | `trade_discipline` | 交易纪律 | 行动建议 | 调仓 | `enable_action`（默认关） |
 | `return_attribution` | 收益归因 | 行动建议 | 调仓 | `enable_action`（默认关） |
-| `fund_flow` | 资金流水与资金加权收益 | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 + 输入扩展 | 成本/现金流 | 随持仓文件流水页签（可选输入，无独立开关） |
-| `dividend_flow` | 分红现金流 | 并入 `fund_flow` | 成本/现金流 | 随 `fund_flow`（本地分红流水） |
+| `fund_flow` | 资金流水与资金加权收益 | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 + 输入扩展 | 成本/现金流 | `report_submodules.cost_lots`（默认关，随持仓文件流水页签触发） |
+| `cost_lots` | 成本流水（成本分档 + XIRR + 分红累计） | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 | 成本/现金流 | `report_submodules.cost_lots`（默认关） |
 | `industry_beta` | 行业 Beta 暴露 | 风格与因子分析 | 风险/暴露 | `report_submodules.industry_beta`（默认关） |
-| `crisis_annotation` | 危机区间标注 | 组合历史走势与回撤 | 风险/暴露 | `report_submodules.tail_risk`（默认关） |
-| `tail_risk` | 尾部风险 | 组合历史走势与回撤 | 风险/暴露 | `report_submodules.tail_risk`（默认关） |
+| `crisis_annotation` | 危机区间标注 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
+| `tail_risk` | 尾部风险 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
 | `snapshot_diff` | 快照差异 | 组合演进 | 监控 | 随 `enable_portfolio_evolution` |
 | `data_quality` | 数据质量仪表盘 | 数据源可用性矩阵 | 监控 | `report_submodules.data_quality`（默认关） |
-| `holding_diagnosis` | 品种覆盖诊断 | 并入 `data_quality` | 监控 | 随 `data_quality` |
+
+> **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 
 > **合并章代码标识符**：三个合并章 sheet key 统一为语义名——`position_relationship`（持仓关系矩阵，合并 `fund_overlap` + `correlation_analysis`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号命名。
->
+<!-- semantic-index:end -->
+
 > **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~19（被合并的 key 已删除、`action` 章已插入，保持其余相对顺序）；被合并的 key（`fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure`）在用户 config `report_section_order` 中已失效，可清理（`config/_validation.py` 对未知 key 仅告警不报错）。
 
 [↑ 回到顶部](#目录)
@@ -2500,6 +2511,8 @@ core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 本节定义系统架构层面的**设计约束**。所有新增或修改的代码必须遵守，违反即视为架构违规。
 约束按职责域分组，每个约束包含：设计目的（为何存在）、违反后果（不遵守的影响）、适用范围（哪些模块/场景受约束）。
+
+> **约束外参照（语义命名纪律）**：除上表 C1~C20 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
 
 ### 8.1 数据获取层约束
 
@@ -2625,7 +2638,7 @@ investor-util/
 | 用途 | 链路方案 | Provider 文件 |
 |:-----|:---------|:-------------|
 | 场内 A 股/ETF 实时价 | 腾讯财经 → 新浪财经（双链路 fallback） | `tencent.py` / `sina.py` |
-| 场外基金净值 | 东方财富（直达，无备用） | `eastmoney.py` |
+| 场外基金净值 | 东方财富 `api.fund.eastmoney.com`（主）→ 天天基金 `fundf10.eastmoney.com`（Provider 内回退） | `eastmoney.py` |
 | 基金业绩排名 | 天天基金 JS 变量解析（直达） | `tiantian_ranking.py` |
 | 基金持仓数据 | 天天基金 HTML 解析（直达） | `tiantian_holdings.py` |
 | A 股指数 | 腾讯财经 → 新浪财经（双链路 fallback） | `tencent.py` / `sina.py` |
@@ -2634,9 +2647,13 @@ investor-util/
 | 行业分类/概念板块 | 东方财富 push2（主）→ quotedata 回退 | `eastmoney_industry.py` / `eastmoney_industry_rest.py` |
 | 机构盈利预测 | akshare 全量获取（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
 | 行业资金流向 | akshare 今日排名（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
-| 股票历史分红 | akshare 逐股获取（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
+| 股票历史分红 | akshare 无参全量拉取后按代码过滤（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
 | 基金经理数据 | 天天基金 HTML 解析（主）→ 档案页回退 | `fetcher/fund_manager.py` |
 | 无风险利率（Rf） | akshare `bond_zh_us_rate`（Sina 国债收益率）→ 手动配置兜底 | `fetcher/bond_yield.py` |
+| 个股/ETF 历史 K 线 | 腾讯财经 K 线 → 新浪财经 K 线（双链路 fallback） | `fetcher/chain.py`（`tencent.py` / `sina.py`） |
+| 场外基金历史净值 | 天天基金 `pingzhongdata` → 东方财富净值分页 | `fetcher/chain.py` |
+| 指数历史 K 线（A 股指数） | 腾讯财经 K 线 → 新浪财经 K 线 | `fetcher/index.py` |
+| 指数历史 K 线（美股指数） | 新浪财经 K 线 → 腾讯财经 K 线 | `fetcher/index.py` |
 
 新闻数据处理模块：`news_aggregator.py`（聚合去重）、`news_correlator.py`（关联分析）、`news_keywords.py`（关键词提取）、`news_sources.py`（源元数据定义），均位于 `providers/` 下。
 
@@ -2675,7 +2692,7 @@ investor-util/
 | 键名 | 文件名模式 | TTL | 盘中特殊 | 指纹 | 分组 |
 |:-----|:----------|:---:|:--------:|:----|:-----|
 | `fund_manager` | `fund_manager_{code}.json` + `fund_manager_snapshot.json` | 24h | — | — | refresh |
-| `fund_overlap` | 实时计算（推导自 `fund_hold_{code}.json`） | 7 天 | — | — | refresh |
+| —（持仓重合度） | 运行时推导（复用 `fund_hold_{code}.json`，无独立缓存） | — | — | — | — |
 | `fund_concentration` | `fund_concentration_snapshot.json` | 月级快照 | — | — | 无分组 |
 | `fund_style_snapshot` | `fund_style_snapshot.json` | 月级快照 | — | — | 无分组 |
 | `extended` | `extended_{code}.json` | 24h | — | — | refresh |
@@ -2704,7 +2721,7 @@ investor-util/
 |:-----|:------|:---------|:------------|:------------|
 | T2 | 数据不可用 | ⚠ | 2 次 | 3 天 |
 | T3 | 数据部分可用 | ℹ | 2 次 | 14 天 |
-| T4 | 数据临时不可用 | ℹ | 1 次 | 14 天 |
+| T4 | 数据临时不可用 | ℹ | 1 次 | 7 天 |
 
 降级配置位于 `config.json` 的 `degradation` 字段，支持 per-source 覆盖。
 
@@ -2806,7 +2823,7 @@ investor-util/
 
 > `fund_flow_data`（成本流水，C19 契约，开关 `report_submodules.cost_lots` 默认关）：`{"available": bool, "xirr": dict\|None, "cost_tiers": dict\|None, "dividends": dict\|None}`。`xirr` 含 `{"rate": float\|None, "ok": bool, "message": str}`（资金加权收益率，Newton-Raphson + bisection 回退，natural-day 年化 `t=days/365`，投资者视角现金流）；`cost_tiers` 含 `{"available": bool, "per_code": {code: {"low"/"high"/"unpriced": {"shares", "cost"}}}}`（成本分档，批次成本价 ≤ 市价 → 低成本档、> 市价 → 高成本档、无市价单列未分档，由 `analysis/cost_flow.compute_cost_tiers` 计算）；`dividends` 含 `{"available": bool, "per_code": {code: 分红累计金额}}`（分红现金流累计）。由 `analysis/cost_flow.py::build_fund_flow_data(transactions, dividends, holdings, current_prices)` 计算（纯计算层，不依赖 report/），在 Excel 渲染层 `report/excel_market_data.py::_build_flow_data` 基于交易/分红流水组装（开关关闭或流水为空 → None，汇总/市值/分类页签保持既有输出）。消费方（Excel 汇总/市值/分类页签，开关开启时）：「投资分析汇总」盈亏汇总末尾追加「资金加权收益率 (XIRR)」行（无可用现金流写「未录入流水/无法计算」占位）、「市值核算明细表」追加「资金加权成本」列（批次成本价按份额加权，`report/market_value_sheet.py::_weighted_avg_cost`）、「持仓分类表」追加「成本分档」「分红累计」子列（`report/category.py::_tier_label` + `div_sum` 小计/总计）。数据入口：持仓 Excel 可选「交易流水」「分红流水」页签（`core/reader.py::read_holdings_with_flows`，不破坏既有 4 列），经 `report/orchestrator.generate_report(transactions=..., dividends=...)` 贯穿。
 
-> `action_data`（行动建议，C19 契约，单源计算两处呈现）：`{"available": bool, "summary": str, "rebalance_signals": list[dict], "discipline_signals": list[dict], "rebalance_advice": list[dict], "attribution": dict\|None}`。`rebalance_signals` 每项含 code/name/weight/threshold/action（超警戒线品种再平衡信号）；`discipline_signals` 每项含 code/name/rule/value/status_label/triggered/distance_pct/action（止盈/止损/回撤触发信号，输出「触发 + 距触发幅度 + 建议动作」，由 `analysis/trade_discipline.py::compute_discipline_signals` 计算，复用 `analysis/_silence.py` 静默期机制）；`rebalance_advice` 每项含 code/name/operation/shares/amount/fee/cash_after（可执行调仓建议清单，由 `analysis/rebalance_advisor.py::build_rebalance_advice` 可行化层计算——把再平衡/纪律触发信号转成订单，份额取整一手（A 股/场内基金 100 份，场外基金整数份，复用 `core/code_utils.py` 判定，C1 合规）、费用估算（本地静态费率表：佣金/印花税仅 A 股/赎回费仅场外基金）、现金缓冲防负值、按优先级 止损 > 部分止盈 > 卖出减仓 排序）；`attribution` 为收益归因结果 `{"available": bool, "盈利来源": list[dict], "亏损来源": list[dict], "summary": str}`——TOP5 品种按贡献占比（pp，非收益率）排序、正负分列 + 净额合计摘要，每项含 name/code/profit/contribution_pp（全精度浮点，渲染层格式化展示 +pp / +,），由 `analysis/return_attribution.py::build_return_attribution` 适配（复用共享纯计算 `compute_return_attribution`，与智囊团深度复盘提示词段落 `llm/prompts_core._build_profit_attribution_block` 同一数据两处呈现，零新增外部依赖）；无盈亏（Σ|profit|==0）或无持仓时 attribution=None，渲染层写「待生成」占位。由 `analysis/action_advisor.py::build_action_data` 计算（纯计算层，不依赖 report/），`report/orchestrator.py::prepare_report_data` 组装（full 路径 holdings_details 含 shares/price 供可行化层计算卖出份额），both 路径在 `_report_generation.py` 直接以 `build_action_data` 注入。消费方（同一对象两处呈现，C14/C19）：行动建议（HTML `partials/action_section.html`，Excel `report/action_sheet.py`）+ 智囊团深度复盘「行动摘要」子块；无持仓数据或开关关闭时 available=False / 不渲染，落 §1.4.5 降级占位。C7 注册：`action` 注册于 `_REPORT_SECTION_DEFAULT`（type=`action`、data_flag=`action_data`、number=17），独立顶层开关 `enable_action`（默认关）控制 board 层可见性，序号/名称可配置，不硬编码。
+> `action_data`（行动建议，C19 契约，单源计算两处呈现）：`{"available": bool, "summary": str, "rebalance_signals": list[dict], "discipline_signals": list[dict], "rebalance_advice": list[dict], "attribution": dict\|None}`。`rebalance_signals` 每项含 code/name/weight/threshold/action（超警戒线品种再平衡信号）；`discipline_signals` 每项含 code/name/rule/value/status_label/triggered/distance_pct/action（止盈/止损/回撤触发信号，输出「触发 + 距触发幅度 + 建议动作」，由 `analysis/trade_discipline.py::compute_discipline_signals` 计算，复用 `analysis/_silence.py` 静默期机制）；`rebalance_advice` 每项含 code/name/operation/shares/amount/fee/cash_after（可执行调仓建议清单，由 `analysis/rebalance_advisor.py::build_rebalance_advice` 可行化层计算——把再平衡/纪律触发信号转成订单，份额取整一手（A 股/场内基金 100 份，场外基金整数份，复用 `core/code_utils.py` 判定，并按持仓渠道 channel 优先——场外渠道强制整数份、覆盖 16/11 开头代码被场内前缀误判的场外持有场景，C1 合规）、费用估算（本地静态费率表：佣金/印花税仅 A 股/赎回费仅场外基金，场外渠道优先计收赎回费）、现金缓冲防负值、按优先级 止损 > 部分止盈 > 卖出减仓 排序）；`attribution` 为收益归因结果 `{"available": bool, "盈利来源": list[dict], "亏损来源": list[dict], "summary": str}`——TOP5 品种按贡献占比（pp，非收益率）排序、正负分列 + 净额合计摘要，每项含 name/code/profit/contribution_pp（全精度浮点，渲染层格式化展示 +pp / +,），由 `analysis/return_attribution.py::build_return_attribution` 适配（复用共享纯计算 `compute_return_attribution`，与智囊团深度复盘提示词段落 `llm/prompts_core._build_profit_attribution_block` 同一数据两处呈现，零新增外部依赖）；无盈亏（Σ|profit|==0）或无持仓时 attribution=None，渲染层写「待生成」占位。由 `analysis/action_advisor.py::build_action_data` 计算（纯计算层，不依赖 report/），`report/orchestrator.py::prepare_report_data` 组装（full 路径 holdings_details 含 shares/price/channel——渠道上下文，按账户关键词 `is_offsite_fund` 判定场外/场内——供可行化层计算卖出份额与费用），both 路径在 `_report_generation.py` 直接以 `build_action_data` 注入。消费方（同一对象两处呈现，C14/C19）：行动建议（HTML `partials/action_section.html`，Excel `report/action_sheet.py`）+ 智囊团深度复盘「行动摘要」子块；无持仓数据或开关关闭时 available=False / 不渲染，落 §1.4.5 降级占位。C7 注册：`action` 注册于 `_REPORT_SECTION_DEFAULT`（type=`action`、data_flag=`None`、number=17），独立顶层开关 `enable_action`（默认关）控制 board 层可见性，序号/名称可配置，不硬编码。
 
 ### 附录 I：配置文件矩阵
 
@@ -2820,7 +2837,7 @@ investor-util/
 | `llm_settings.json`（非敏感 LLM 设置） | `_llm_settings_defaults._DEFAULT_LLM_SETTINGS`（全局 2 项 + 5 模块块 + 辩论 + 事实校验 + 计价） | `_llm_settings_defaults._get_default_llm_settings_template()`（逐行手拼，与 dict 深等，见一致性测试） | `_llm_settings.get_llm_config()`：合并 settings+key+providers 三文件，联合 mtime/size 失效；`_merge_llm_defaults()` 运行时按 `_DEFAULT_LLM_SETTINGS` 补齐缺失键 | `_ensure_llm_settings_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑；`_ensure_llm_settings_file` 仅首次创建） | `llm/pricing.py`（计价覆盖）、`llm/generators.py`、`llm/generators_orchestrator.py`、`llm/prompts_action.py`、`llm/skeleton.py`、`report/news_correlation.py`、`cli/cli.py`、`tui/tui_menu.py` + `tui/handlers_config.py`、`config/_validation.py` |
 | `llm_key.json`（敏感凭据） | 无（**C18 凭据分离**，代码默认值禁止内置 api_key） | 无模板 | `_llm_providers._load_llm_key_credentials()`（多凭据块字典；单凭据 flat 自动升级为 `_default`）；`get_llm_config()` 内联读取并合并覆盖同名字段（provider/endpoint 合法性告警） | 不自动创建；缺失时 `get_llm_config()` 回退判断 providers 链模式，两者皆无则 LLM 不可用（`generators_orchestrator` 降级占位） | `startup_wizard._write_llm_key_flat()`（首次引导交互式写入，C3 原子写） | `get_llm_config()` 合并主体；`_load_llm_key_credentials()` → providers 链 `credentials_ref` 凭据注入 |
 | `llm_providers.json`（多 Provider 链） | `_llm_providers_defaults._DEFAULT_LLM_PROVIDERS`（strategy=priority + 2 条示例链） | `_llm_providers_defaults._get_default_llm_providers_template()` | `_llm_providers._load_llm_providers()`（原始 JSON，根非 object/解析失败返回 None）；`get_llm_config()` 链模式（无 llm_key.json 时直接注入链数据）；`_inject_provider_chain_data()` 注入多链路由结果 | `_core._ensure_llm_providers_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑 / init 自动创建） | `get_llm_config()`（链模式无 key 依赖）；`startup_wizard.py`（就绪检查：key 存在 或 providers 有链）；`_inject_provider_chain_data` |
-| `features.json`（Feature Flag 覆写） | `features._FEATURE_FLAGS_DEFAULT`（29 项默认值：LLM 5 + 辩论 3 + 基金深度 4 + 新闻 5 + 量化指标 7 + 历史 2 + 功能 3） | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；未知键仍加载、非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态） |
+| `features.json`（Feature Flag 覆写） | `features._FEATURE_FLAGS_DEFAULT`（27 项默认值：LLM 5 + 辩论 3 + 基金深度 2 + 新闻 5 + 量化指标 7 + 历史 2 + 功能 3） | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；未知键仍加载、非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态） |
 
 #### I.1.1 解析职责归属（协调者 vs 委托）
 

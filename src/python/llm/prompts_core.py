@@ -303,10 +303,15 @@ def _build_concept_sector_block(penetrated_assets: list[dict] | None) -> str:
 
 
 def _build_rebalance_block(holdings_details: list[dict] | None, total_mv: float) -> str:
-    """构建再平衡建议段落。"""
+    """构建再平衡建议段落。
+
+    静默期不适用：LLM 智囊团深度复盘为一次性分析提示，需看到当前全部
+    超限信号；且不得读写共享静默期文件（避免与「行动建议」章节相互抑制，
+    造成同一报告内再平衡信号不一致）。静默期是用户侧重复建议的 UX 护栏。
+    """
     from src.python.analysis.simple_rebalance import compute_simple_rebalance_signals
 
-    signals = compute_simple_rebalance_signals(holdings_details, total_mv)
+    signals = compute_simple_rebalance_signals(holdings_details, total_mv, silence_days=0)
     if not signals:
         return ""
 

@@ -1,5 +1,5 @@
 # 个人投资分析报告生成小助手 — 需求文档
-> 文档版本：0.10.6
+> 文档版本：0.10.7
 
 ---
 
@@ -168,7 +168,7 @@
 | R-BRK-03 | API 正常返回空数据（非传输级异常）不计入熔断计数器 |
 | R-BRK-04 | LLM API 端点应有独立的熔断器（连续 3 次失败熔断 60 秒） |
 | R-BRK-05 | 同一次会话中跨模块的同一 API 调用结果应共享会话级内存缓存（上限 2000 条/domain） |
-| R-BRK-06 | 熔断冷却时间应采用指数退避策略（60s→300s→900s→3600s），每次失败翻倍递增，成功恢复后重置 |
+| R-BRK-06 | 熔断冷却时间应采用指数退避策略（60s→300s→900s→3600s），每次熔断冷却按退避级别递增一档（非严格翻倍、非按失败计数），成功恢复后重置 |
 | R-BRK-07 | 熔断器状态应跨会话持久化到 `data/state/circuit_breaker.json`，与缓存文件隔离，确保会话重启后熔断记忆恢复 |
 | R-BRK-08 | Provider 级熔断器和数据模块级熔断器应通过统一的网关（`core/circuit_breaker.py` + `core/provider_registry.py`）管理，消除双熔断器状态不一致
 
@@ -247,7 +247,7 @@
 | 13 | 持仓体检报告 | L | LLM | 五维度量化评分 |
 | 14 | 穿透深度分析 | L | LLM | 行业集中度+国别暴露 |
 | 15 | 组合历史走势与回撤 | B/L | 历史 | 一章两区块：走势表（as-if 市值曲线+累计收益率+最大回撤+年化波动率+基准对比）+ 回撤矩阵（回撤面积图+独立回撤事件明细）+ 危机区间标注（2015/2018/2020/2022） |
-| 16 | 组合演进 | E/B/L | 基础报表 | 多快照趋势追踪：总市值/总盈亏/HHI/TOP 持仓占比变迁，快照不足时占位 |
+| 16 | 组合演进 | E/B/L | 演进 | 多快照趋势追踪：总市值/总盈亏/HHI/TOP 持仓占比变迁，快照不足时占位 |
 | 17 | 行动建议 | E/B/L | 行动建议（enable_action 控制，**默认关**） | 再平衡信号/交易纪律/调仓建议/收益归因 |
 | 18 | 数据源可用性矩阵 | E/B/L | 基础报表 | 各数据源实时可用性状态汇总 |
 | 19 | LLM API 用量 | L | LLM | 当前会话的 LLM API 用量汇总（强制末位） |
@@ -331,12 +331,21 @@
 | 3 | 类型 | 场内ETF/场外主动型/场外指数/场外QDII/场外债券 |
 | 4 | 近3月 | 近3月收益率 |
 | 5 | 近6月 | 近6月收益率 |
-| 6 | 近12月 | 近12月收益率 |
+| 6 | 近1年 | 近1年收益率 |
 | 7 | 持仓累计盈亏(¥) | 市值 - 成本 |
 | 8 | 持仓收益率 | 盈亏 / 成本 |
 | 9 | 业绩基准 | 比较基准名称 |
 | 10 | 业绩评价 | 优秀/良好/稳定/偏差/较差 |
 | 11 | 同类排名 | 格式"排名/总数" |
+
+> **业绩评价评级阈值（类型差异化）**：5 级评级由同类百分位/排名计算，阈值随基金类型差异化（债券型/QDII 放宽、指数/ETF/联接收紧、主动权益/股票走默认），类型由基金名称按「QDII → 债券 → 指数/ETF/联接 → 主动权益」优先级判定，与穿透分类一致。
+
+| 类型 | 优秀 | 良好 | 稳定 | 偏差 | 较差 |
+|------|------|------|------|------|------|
+| 主动权益/股票（默认） | ≤10% | ≤30% | ≤50% | ≤75% | >75% |
+| 债券型 | ≤15% | ≤35% | ≤55% | ≤80% | >80% |
+| QDII/海外 | ≤15% | ≤35% | ≤55% | ≤80% | >80% |
+| 指数/ETF/联接 | ≤10% | ≤25% | ≤45% | ≤70% | >70% |
 
 > 可选**候选基金比较子表**（`report_submodules.candidate_compare` **默认关**）：候选来自 `comparison_candidates`（6 位基金代码 ≤10 只），横向比较 11 列——候选基金、代码、评级、近1月/近3月/近6月/近1年、同类排名、最大回撤、风格、与持仓重合（Jaccard 系数 + 对应基金名）。单候选获取失败该行"数据获取失败"占位；开关关闭时不渲染，主表输出保持不变。
 
@@ -770,7 +779,7 @@ LLM 五维度量化评分，每项满分 100：
 | R-LLM-GM-01 | 基于 A 股指数 + 美股指数 + 持仓总市值/盈亏 + 品种分类 + 行业资金流向生成分析 |
 | R-LLM-GM-02 | 输出 500 字以内，覆盖主要经济体政策走向、地缘风险、对持仓潜在影响 |
 | R-LLM-GM-03 | 缓存有效期 24 小时，指数或持仓汇总变化时自动失效 |
-| R-LLM-GM-04 | 支持精简模式（output_brief，200 字以内） |
+| R-LLM-GM-04 | 支持精简模式（output_brief，≤300 字、通常 200 字左右） |
 
 ### 7.3 智囊团深度复盘
 
@@ -1019,16 +1028,18 @@ LLM 五维度量化评分，每项满分 100：
 | `enable_news` | bool | true | ✅ P | 市场新闻启停 |
 | `enable_history` | bool | true | ✅ P | 历史走势启停 |
 | `enable_portfolio_evolution` | bool | true | ✅ P | 组合演进启停 |
-| `enable_action` | bool | false | ✅ P | 行动建议启停（默认关；再平衡信号/交易纪律/调仓建议/收益归因） |
+| `enable_action` | bool | false | —（仅 config.json） | 行动建议启停（默认关；再平衡信号/交易纪律/调仓建议/收益归因） |
 | `market_hour_aware` | list | `["price","index"]` | — | 交易时段短 TTL 的数据类型 |
 | `market_hour_ttl` | int | 30 | — | 交易时段缓存有效期（秒） |
-| `market_hours` | dict | `{start:"09:30",end:"15:00"}` | — | 交易时段配置 |
+| `market_hours` | dict | `{start:"09:30",end:"15:00",official_source:true}` | — | 交易时段配置（official_source=true 以官方行情源判定开市/收盘；false 不使用官方源，返回 None 走 fallback） |
 | `degradation` | dict | T2/T3/T4 默认 | — | T2（基金业绩/行业分类等, stale_days=3）/ T3（资金流向/基金持仓等, stale_days=14）/ T4（穿透数据, stale_days=14），每层含 unreachable_threshold / empty_data_threshold / stale_days 三参数 |
 | `history.fetch_mode` | str | "auto" | — | 历史走势获取模式（off/prompt/auto） |
 | `history.snapshot_retention_days` | int | 60 | — | 快照保留天数 |
 | `history.snapshot_max_count` | int | 365 | — | 快照最大数量 |
 | `history.coverage_threshold` | float | 0.8 | — | 有效区间覆盖阈值 |
 | `history.benchmark_indices` | dict | {"sh000300":"沪深300"} | — | 基准指数配置，组合历史走势对比 |
+| `history.lookback_days` | int | 90 | — | 历史走势取数窗口（K 线条数/交易日），需 ≥ 60（MIN_SPAN）才能计算回撤分析 |
+| `report_submodules` | dict | 6 项默认关 | — | 报告子模块开关：`data_quality`（数据质量仪表盘）/ `industry_beta`（行业 Beta 子表）/ `candidate_compare`（候选基金比较）/ `cost_lots`（成本流水）/ `valuation_percentile`（估值分位）/ `market_temperature`（市场温度），均默认关 |
 | `comparison_indices` | dict | {"sh000300":"沪深300","sh000905":"中证500","sh000012":"中证全债"} | — | 竞争语境对比指数池，支持多指数对比 |
 | `rebalance.threshold` | float | 0.15 | — | 单品种权重超限阈值（15%），超限触发再平衡建议 |
 | `rebalance.deviation_threshold` | float | 0.05 | — | 大类/品种配置偏离阈值（5%），权益/固收偏离超限时触发调整建议 |
@@ -1083,7 +1094,7 @@ LLM 五维度量化评分，每项满分 100：
 | `max_tokens_{key}` | int | 最大输出 Token |
 | `timeout_{key}` | int | API 超时秒数 |
 | `cache_enabled_{key}` | bool | 是否缓存 LLM 结果 |
-| `output_brief_{key}` | bool | 精简模式（≤200~300 字，news_correlation 不支持） |
+| `output_brief_{key}` | bool | 精简模式（≤300 字、通常 200 字左右，news_correlation 不支持） |
 | `thinking_enabled_{key}` | bool | Extended Thinking 开关 |
 | `thinking_budget_{key}` | int | Claude Thinking 预算 |
 | `reasoning_effort_{key}` | str | DeepSeek 推理深度 |
@@ -1139,13 +1150,13 @@ LLM 五维度量化评分，每项满分 100：
 
 ### 11.5 features.json（功能开关注册表）
 
-独立配置文件，提供 29 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
+独立配置文件，提供 27 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
 
 | 开关名 | 类型 | 默认值 | 说明 |
 |:-------|:----:|:------:|:-----|
 | `llm_global_macro` / `llm_expert_review` / `llm_health_check` / `llm_penetration_deep` / `llm_news_correlation` | bool | true（llm_news_correlation 为保留字段） | LLM 各模块独立启停开关（llm_news_correlation 的实际启停由 llm_settings.json 的 enabled_llm.news_correlation 控制，默认 false） |
 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | bool | false（全部默认关闭） | 辩论模式三增强通路独立启停：正反辩论/条件推理/集中度问答 |
-| `fund_deep_analysis_fund_manager` / `fund_deep_analysis_fund_overlap` / `fund_deep_analysis_fund_concentration` / `fund_deep_analysis_fund_style` | bool | true | 基金深度分析模块启停 |
+| `fund_deep_analysis_fund_manager` / `fund_deep_analysis_fund_concentration` | bool | true | 基金深度分析模块启停（经理变更/集中度监控） |
 | `news_sina` / `news_eastmoney` / `news_cls` / `news_wallstreetcn` / `news_akshare` | bool | true（cls 默认关闭） | 各新闻源启停 |
 | `history_portfolio` / `history_benchmark` | bool | true | 历史走势与基准指数开关 |
 | `metrics_sharpe` / `metrics_calmar` / `metrics_hhi` / `metrics_winrate` / `metrics_turnover` / `metrics_risk_contribution` / `metrics_beta` | bool | true | 量化指标独立启停（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |

@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.10.6
+> 文档版本：0.10.7
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -1076,11 +1076,11 @@ reload_pricing() → 合并 llm_settings.json → pricing
 | 简化模式 | `llm_settings.json` | `output_brief_expert_review` |
 | 缓存 TTL | `config.json` | `cache_ttl.llm_global_macro` |
 | Provider 文件路径 | `config.json` | `llm_providers_file`, `llm_key_file`, `llm_settings_file` |
-| 模型定价 | `llm_settings.json` → `pricing` | `pricing.currency`, `pricing.claude-sonnet-4-20250514.input` |
+| 模型定价 | `llm_settings.json` → `pricing` | `pricing.currency`, `pricing.claude-sonnet-4-6.input` |
 
 ### 12.2 注册表键名派生
 
-在 `core/registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`），自动派生 `llm_settings.json` 的所有合法键名：
+在 `core/registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`，外加 3 个辩论模块 `debate_pro`/`debate_con`/`debate_synthesis`），自动派生 `llm_settings.json` 的所有合法键名：
 
 ```
 已知 LLM Settings 键名（每个模块 9 个）：
@@ -1108,6 +1108,8 @@ reload_pricing() → 合并 llm_settings.json → pricing
 ```
 
 所有键名由 `get_known_llm_settings_keys()` 统一校验。新增 LLM 模块只需在 registry.py 注册表中添加一行 `DataModuleDef`，无需修改 config 校验逻辑。
+
+> **辩论模块派生**：3 个辩论模块（`debate_pro`/`debate_con`/`debate_synthesis`，`settings_suffix` 同规则）同样按每模块 9 键派生（如 `model_debate_pro`、`system_prompt_debate_con`），使 `enabled_llm` 合法子键共 **8** 个（5 标准 + 3 辩论）。辩论开关实际由 `features.json` 的实验性 Flag（`llm_debate_procon`/`llm_debate_conditional`/`llm_debate_qa_concentration`）控制，`enabled_llm` 辩论子键仅属校验层合法键，不在菜单 [S] 展示（由 `tui_menu.LLM_MENU_HIDDEN_KEYS` 隐藏），注册表保留以维持缓存 TTL/前缀清理。
 
 ### 12.3 LLM 模块配置合并（get_llm_config）
 

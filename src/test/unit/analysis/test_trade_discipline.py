@@ -262,6 +262,25 @@ class TestSilencePeriod:
             )
             assert len(signals) == 1
 
+    def test_persist_silence_false_skips_file_io(self, tmp_path):
+        """persist_silence=False（管线中间占位构建）→ 不读写静默文件、信号不被抑制。
+
+        中间占位构建不得抢占静默状态：既不能写状态文件（避免最终构建的单品信号
+        被占位构建写入的静默误抑制），也不依赖既有状态过滤（保证占位与最终构建
+        口径一致，最终构建为唯一静默写入方）。
+        """
+        silence_file = str(tmp_path / "discipline_silence.json")
+        cfg = {"silence_days": 30}
+        signals = compute_discipline_signals(
+            _holdings(25.0),
+            1000.0,
+            discipline_config=cfg,
+            silence_file=silence_file,
+            persist_silence=False,
+        )
+        assert len(signals) == 1
+        assert not os.path.exists(silence_file)  # 未写静默文件
+
 
 # ── 多品种与守卫 ─────────────────────────────────────────
 

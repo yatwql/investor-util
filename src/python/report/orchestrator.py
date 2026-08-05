@@ -71,6 +71,7 @@ def prepare_report_data(
     """
     from concurrent.futures import ThreadPoolExecutor
 
+    from src.python.core.code_utils import is_offsite_fund
     from src.python.core.data_freshness import build_freshness_summary
     from src.python.core.holding_status import build_coverage_summary
     from src.python.analysis.action_advisor import build_action_data
@@ -160,12 +161,19 @@ def prepare_report_data(
             # shares/price 供调仓建议可行化层计算可执行卖出份额与金额
             "shares": d.shares,
             "price": d.price,
+            # 渠道上下文（场内/场外）：按账户关键词判定（is_offsite_fund），
+            # 供调仓建议可行化层按渠道计算份额取整与费用（场外整数份+赎回费）；
+            # getattr 兼容缺 account 的 detail 对象（测试 fixture 简化版）
+            "channel": "场外" if is_offsite_fund(getattr(d, "account", "")) else "场内",
         }
         for d in details
     ]
 
-    # 行动建议：组装 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）
-    action_data = build_action_data(holdings_details, total_mv)
+    # 行动建议：组装 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）。
+    # 此处为「中间占位构建」：组合历史峰值市值需等历史走势就绪（report 层
+    # full 路径在 _prepare_full_risk_metrics 后重建），persist_silence=False
+    # 使占位构建不读写纪律静默文件，保证最终构建为唯一静默写入方。
+    action_data = build_action_data(holdings_details, total_mv, persist_silence=False)
 
     return {
         "details": details,
@@ -180,7 +188,7 @@ def prepare_report_data(
         "holdings_details": holdings_details,
         "today_str": today_str,
         "output_dir": config.get("output_dir", "reports"),
-        "news_top_count": int(config.get("news_top_count", 100)),
+        "news_top_count": int(config.get("news_top_count", 300)),
         # 组合风险指标（年化波动率/最大回撤/夏普比率等，需 history_data 计算后填充）
         "risk_metrics": {},
         # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键；

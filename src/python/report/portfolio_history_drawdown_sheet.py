@@ -110,7 +110,7 @@ def _write_trend_block(
         ("累计收益率(%)", round(pd.get("total_return_pct", 0) / 100, 4), FMT_PERCENT, "total_return_pct", FMT_PERCENT),
         ("累计收益(元)", pd.get("total_return", 0), FMT_MONEY, None, None),
         ("最大回撤(%)", round(pd.get("max_drawdown_pct", 0) / 100, 4), FMT_PERCENT, "max_drawdown_pct", FMT_PERCENT),
-        ("年化波动率", pd.get("annualized_volatility", 0), FMT_PERCENT, None, None),
+        ("年化波动率", pd.get("annualized_volatility", 0), FMT_PERCENT, "annualized_volatility", FMT_PERCENT),
         ("起算日", pd.get("data_start", ""), None, "data_start", None),
         ("终止日", pd.get("data_end", ""), None, "data_end", None),
     ]
@@ -184,12 +184,15 @@ def _write_drawdown_block(
     row += 1
 
     dd_events = history_data.get("drawdown_events") or []
+    dd_available = bool(history_data.get("drawdown_available"))
     ncols_eff = max(ncols, _DD_NCOLS)
     dd_headers = ["序号", "起峰日", "最深日", "恢复日", "最大回撤(%)", "持续天数", "恢复耗时(天)", "当前状态"]
     dd_headers += [""] * (ncols_eff - _DD_NCOLS)
     row = write_header_row(ws, row, dd_headers)
-    if not dd_events:
-        row = write_data_row(ws, row, ["未检测到显著回撤事件（或历史数据不足）"] + [None] * (ncols_eff - 1))
+    if not dd_available:
+        row = write_data_row(ws, row, ["历史数据不足（回撤计算样本不足），无法计算回撤事件"] + [None] * (ncols_eff - 1))
+    elif not dd_events:
+        row = write_data_row(ws, row, ["未检测到显著回撤事件"] + [None] * (ncols_eff - 1))
     else:
         for idx, e in enumerate(dd_events, start=1):
             cells: list[Any] = [

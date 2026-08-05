@@ -1,13 +1,15 @@
-"""统一的断路器网关层 — 聚合 Provider 和 LLM 熔断状态查询与管理。
+"""统一的断路器网关层 — 聚合 Provider / LLM / 指标熔断状态查询与管理。
 
 提供统一的熔断状态查询入口、监控接口、配置预设。
-Provider 熔断（provider_registry.py DataSourceRegistry）和
-LLM 熔断（llm/circuit_breaker.py 模块级）共享同一查询入口。
+Provider 熔断（provider_registry.py DataSourceRegistry）、
+LLM 熔断（llm/circuit_breaker.py 模块级）和
+指标熔断（analysis/circuit_breaker_wrapper.py::IndicatorBreaker）
+共享同一查询入口。
 
 用法:
     from src.python.core.circuit_breaker import gateway
 
-    # 获取统一状态报告
+    # 获取统一状态报告（provider + llm + indicator）
     status = gateway.summary()
 
     # 获取 DataSource 熔断器实例
@@ -16,8 +18,12 @@ LLM 熔断（llm/circuit_breaker.py 模块级）共享同一查询入口。
     # 查询 LLM 熔断端点状态
     llm_status = gateway.get("llm")
 
+    # 查询指标熔断器状态
+    indicator_status = gateway.get("indicator")
+
 包装函数:
-    get_all_breaker_status() / get_provider_breaker_status() / get_llm_endpoint_status()
+    get_all_breaker_status() / get_provider_breaker_status() /
+    get_llm_endpoint_status() / get_indicator_breaker_status()
     委派给网关。
 """
 
@@ -36,7 +42,7 @@ __all__ = [
     "get_all_breaker_status",
     "get_provider_breaker_status",
     "get_llm_endpoint_status",
-    "BREAKER_CONFIG_LLM",
+    "get_indicator_breaker_status",
     "BREAKER_CONFIG_DATA_SOURCE",
 ]
 
@@ -60,13 +66,6 @@ class BreakerConfig:
     backoff_levels: tuple[int | float, ...] = field(default_factory=tuple)
 
 
-BREAKER_CONFIG_LLM = BreakerConfig(
-    max_failures=3,
-    cooldown_seconds=60,
-    backoff_levels=(60, 300, 900, 3600),
-)
-"""LLM 端点熔断器预设：3 次/60s 基础冷却，指数退避至 3600s。"""
-
 BREAKER_CONFIG_DATA_SOURCE = BreakerConfig(
     max_failures=3,
     cooldown_seconds=300,
@@ -83,8 +82,9 @@ BREAKER_CONFIG_DATA_SOURCE = BreakerConfig(
 class CircuitBreakerGateway:
     """统一熔断器网关。
 
-    聚合 Provider（DataSourceRegistry）和 LLM（llm/circuit_breaker）两种熔断器的
-    状态查询和管理接口，消除双熔断器运维复杂度。
+    聚合 Provider（DataSourceRegistry）、LLM（llm/circuit_breaker）和
+    指标熔断器（analysis/circuit_breaker_wrapper.py::IndicatorBreaker）的
+    状态查询和管理接口，消除三熔断器运维复杂度。
 
     用法:
         >>> from src.python.core.circuit_breaker import gateway
@@ -98,10 +98,12 @@ class CircuitBreakerGateway:
         Args:
             name: "data_source" 返回 DataSourceRegistry 单例，
                   "llm" 返回当前 LLM 端点熔断状态字典，
+                  "indicator" 返回指标熔断器实例，
                   其他名称返回 None。
 
         Returns:
             DataSourceRegistry 实例（data_source 时）,
+            IndicatorBreaker 实例（indicator 时）,
             状态字典（llm 时）,
             或 None（未知名称）
         """
@@ -111,6 +113,10 @@ class CircuitBreakerGateway:
             return get_registry()
         if name == "llm":
             return self._get_llm_status()
+        if name == "indicator":
+            from src.python.analysis.circuit_breaker_wrapper import get_indicator_breaker
+
+            return get_indicator_breaker()
         logger.debug("CircuitBreakerGateway.get: 未知熔断器类型 '%s'", name)
         return None
 
@@ -140,11 +146,21 @@ class CircuitBreakerGateway:
                         "recovery_secs": float,
                     }, ...
                 },
+                "indicator": {  # 指标熔断状态
+                    indicator_name: {
+                        "indicator": str,
+                        "circuit_broken": bool,
+                        "consecutive_failures": int,
+                        "cooldown_remaining": float,
+                        "last_context": str,
+                    }, ...
+                },
             }
         """
         return {
             "provider": self._get_provider_status(),
             "llm": self._get_llm_status(),
+            "indicator": self._get_indicator_status(),
         }
 
     @staticmethod
@@ -183,6 +199,16 @@ class CircuitBreakerGateway:
             }
         return status
 
+    @staticmethod
+    def _get_indicator_status() -> dict[str, dict[str, Any]]:
+        """返回所有指标断路器的熔断状态报告。
+
+        委派给 analysis/circuit_breaker_wrapper.py::IndicatorBreaker.summary()。
+        """
+        from src.python.analysis.circuit_breaker_wrapper import get_indicator_breaker
+
+        return get_indicator_breaker().summary()
+
 
 # ── 模块级单例 ─────────────────────────────────────────
 
@@ -217,12 +243,23 @@ def get_llm_endpoint_status() -> dict[str, dict[str, Any]]:
     return gateway._get_llm_status()
 
 
+def get_indicator_breaker_status() -> dict[str, dict[str, Any]]:
+    """返回所有指标断路器的熔断状态报告。
+
+    委派给 gateway._get_indicator_status()。
+
+    Returns:
+        {indicator_name: {indicator, circuit_broken, consecutive_failures, ...}, ...}
+    """
+    return gateway._get_indicator_status()
+
+
 def get_all_breaker_status() -> dict[str, dict[str, Any]]:
-    """返回所有断路器状态（Provider + LLM）。
+    """返回所有断路器状态（Provider + LLM + 指标）。
 
     委派给 gateway.summary()。
 
     Returns:
-        {"provider": {...}, "llm": {...}}
+        {"provider": {...}, "llm": {...}, "indicator": {...}}
     """
     return gateway.summary()

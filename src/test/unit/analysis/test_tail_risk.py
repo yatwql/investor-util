@@ -280,3 +280,41 @@ class TestDataSufficiency:
             "warnings",
         ):
             assert key in result, f"契约应包含字段 {key}"
+
+
+class TestDailyReturnsCaliberUnified:
+    """日收益率口径统一回归测试。
+
+    tail_risk 与走势表（portfolio_history）必须共享同一口径——
+    metrics.compute_daily_returns 为统一源：prev 与 curr 市值均 > 0 才计入，
+    缺失/占位/清仓（curr ≤ 0）跳过，避免伪 -100% 单日。
+    """
+
+    def _bars_with_gap(self) -> list[dict]:
+        """含 0 值中段缺口的 bars（0 前后收益应被跳过）。"""
+        return [
+            {"date": "2026-01-01", "total_value": 100.0},
+            {"date": "2026-01-02", "total_value": 101.0},
+            {"date": "2026-01-03", "total_value": 0.0},
+            {"date": "2026-01-04", "total_value": 102.0},
+            {"date": "2026-01-05", "total_value": 104.0},
+        ]
+
+    def test_shared_source_skips_nonpositive_curr(self):
+        """metrics.compute_daily_returns 跳过 curr≤0 的伪 -100%（缺口不产生收益）。"""
+        from src.python.analysis.metrics import compute_daily_returns
+
+        returns = compute_daily_returns(self._bars_with_gap())
+        # 100→101 计入；101→0 跳过；0→102 跳过（prev≤0）；102→104 计入
+        assert returns == pytest.approx([0.01, (104 - 102) / 102])
+        assert -1.0 not in returns  # 无伪 -100% 单日
+
+    def test_caliber_unified_with_trend_table(self):
+        """同一 bars → tail_risk 与走势表 _compute_daily_returns 产出完全一致序列。"""
+        from src.python.analysis.metrics import compute_daily_returns
+        from src.python.report.portfolio_history import PortfolioHistoryCalculator
+
+        bars = self._bars_with_gap()
+        shared = compute_daily_returns(bars)
+        trend = PortfolioHistoryCalculator._compute_daily_returns(bars)
+        assert shared == trend

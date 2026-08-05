@@ -45,11 +45,9 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "llm_debate_procon": False,
     "llm_debate_conditional": False,
     "llm_debate_qa_concentration": False,
-    # ── 基金深度分析模块（4 项） ──
+    # ── 基金深度分析模块（2 项） ──
     "fund_deep_analysis_fund_manager": True,
-    "fund_deep_analysis_fund_overlap": True,
     "fund_deep_analysis_fund_concentration": True,
-    "fund_deep_analysis_fund_style": True,
     # ── 新闻源（5 项） ──
     "news_sina": True,
     "news_eastmoney": True,

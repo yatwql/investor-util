@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
-> 文档版本：0.10.6
-> **编号源**：`rf-next = 233`（新增问题取此编号，完成后更新为 +1；已用最大 rf-232，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.10.7
+> **编号源**：`rf-next = 234`（新增问题取此编号，完成后更新为 +1；已用最大 rf-233，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -14,14 +14,6 @@
 |---|------|----------|
 | **rf-113** | plan-1 **Iter 7 全链路浏览器人工验证 6 项全程未实测**（设计文档验收标准 2/3/4/6 标 ⏳）：① 6 图 Chrome/Edge 90+ 真实渲染+交互（Firefox 90+/Safari 14+ 抽验，R17）② 打印 2x DPI 快照 + 浅色强制 + 不跨页 ③ 离线验证（删除/改名 chart.min.js → `typeof Chart` 守卫应跳过、无 JS 报错、回退 Canvas/表格）④ 微信内置浏览器链接 + file:// 两种打开方式实测（R22）⑤ 移动端 375px 图表不溢出（A4）⑥ 禁用 Canvas 后 6 图区域显示 fallback 文本而非空白（A1） | **载体已备齐（2026-08-03）**：①③⑤ 用 `src/static/test-chart.html` 调试页自检（TD8 rf-112 载体；本次修复 rf-159 回归——注入列表补 `chart-common.js`，否则 0/6 全跳过）；②④⑥ 用完整报告（菜单 L/B，`enable_interactive_charts` 默认开）。**勾选清单**：`docs-stm/archive/v0.9.x/chartjs-upgrade/iter7-verification-checklist.md`（已更新至 7 JS 资产 + chart-common.js 依赖说明 + 回撤图数据 span≥60 交易日才渲染的说明），用户另机手工勾选完成后回填 changelog、本表移至已修复 |
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器。**2026-08-05 决策：先完成 rf-113 人工验证（确认 Chart.js 真机渲染可靠）后再执行删除** |
-
-> 已关闭项（决策已定，archive 可查）：rf-117 A6 键盘可达性（不做 MVP）、rf-118 相关性矩阵 Heatmap（已用 HTML 表格渲染）、rf-120 S5 CSP（不做）、rf-121 报告体积（R21 接受自包含代价）
-
-#### P2D — 调仓建议可行化层数据模型限制（待后续增强接入）
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-217** | 调仓建议可行化层（审查发现）：1 前缀场外持有基金（LOF/开放式指数基金，如 `161725 招商中证白酒指数A`、`110022 易方达消费行业`）无法区分场内/场外持仓渠道，当前默认按场内基金处理（100 份取整 + 仅计佣金）；场外持有会漏计赎回费且份额取整过粗 | 需持仓明细携带场内/场外渠道上下文（属后续增强，不在当前契约内）；当前默认场内口径已在模块 docstring 与 changelog 文档化，费用为估算性质 |
 
 #### P2A — 文件过长（>500 行，可选优化；**>800 行为硬上限必须拆分**）
 
@@ -38,23 +30,17 @@
 | **rf-86** | `cache/operations.py` | 472 | 未超限（<500，维持现状） | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
 | **rf-89** | `report/excel_generator.py` | 477 | 未超限（<500，维持现状） | Excel 编排器 |
 
-#### P2B — 文档与实现不符（低优先级，增量改进）
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-229** | §6.7 功能语义命名表目前是「记录性活索引」而非自动约束——`check-code-traces.py` 只做负面禁止（禁任务代号/魔法编号，`IDENTIFIER_PATTERNS` + CODE），**不校验正面一致性**：① 新增 `report_submodules.*` 开关键可绕过表不登记（预演审计实证：代码现有 6 键 `candidate_compare/cost_lots/data_quality/industry_beta/market_temperature/valuation_percentile`，其中 **`cost_lots` 不在表中**，表内成本流水由 `fund_flow`/`dividend_flow` 覆盖——键与表已存在漂移）；② 表中 slug 若功能已删除可残留僵尸条目；③ 合并章 sheet key（`position_relationship`/`portfolio_history_drawdown`/`style_factor`）是否真实存在于 `registry._REPORT_SECTION_DEFAULT` 无人校验 | **增强方向（待讨论定稿）**：新增 `scripts/check-semantic-index.py` 做双向校验并入门禁——正向：代码中 `report_submodules.<key>` 均须在 §6.7 表中登记（表外键报错，或先补表/列豁免）；反向：表中每个 slug 在 `src/python` 中确实存在（防僵尸条目）；合并章 key 校验须在 registry 中存在。**实施前先跑「键覆盖审计」**确定表外键清单与豁免策略（`cost_lots` 需决定补表或豁免）。待讨论：校验脚本独立 or 并入 check-code-traces.py；门禁级别（P0/P2）；表解析的稳定性 |
-
 ---
 
 ## 已修复（摘要）
 
-> v0.10.6 发布时已修复项（rf-227/rf-228/rf-230/rf-231/rf-232）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。当前无未归档已修复项。
+> v0.10.7 发布时已修复项（rf-217/rf-229/rf-233）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 
 ## 归档
 
 ### 归档档案
 
-- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.6（2026-08-04 ~ 2026-08-05，rf-204~rf-232）
+- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.7（2026-08-04 ~ 2026-08-05，rf-204~rf-233）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
 - [`archived_review-findings.0.7.x.md`](../archive/v0.7.x/archived_review-findings.0.7.x.md) 

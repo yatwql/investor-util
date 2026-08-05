@@ -33,7 +33,7 @@ MENU_ITEMS: list[MenuItem] = [
     ("2", "更新行情类缓存（含价格/指数等）", None, False),
     ("3", "清理过期缓存文件", None, False),
     ("4", "查看缓存/状态统计", None, False),
-    ("P", "配置报告可选章节（基金分析/市场新闻/历史走势/组合演进）", None, False),
+    ("P", "配置报告可选章节（基金深度分析/市场新闻/组合历史走势+回撤/组合演进）", None, False),
     ("I", "管理对比指数池（自定义基准指数）", None, False),
     ("A", "配置持仓匿名化（代码/名称脱敏）", None, False),
     ("S", "配置LLM分析章节", None, False),
@@ -119,7 +119,7 @@ def show_config() -> None:
     print(f"  持仓目录: {config.get('holdings_dir', '未设置')}")
     print(f"  持仓文件: {config.get('holdings_filename', '未设置')}")
     print(f"  输出目录: {config.get('output_dir', 'reports')}")
-    print(f"  新闻抓取上限: {config.get('news_top_count', '100')} 条")
+    print(f"  新闻抓取上限: {config.get('news_top_count', '300')} 条")
     if os.path.exists(holdings_path):
         print("  状态: [OK] 文件就绪")
     else:

@@ -115,7 +115,7 @@ def _generate_report_both(
     _enable_history = is_enable_history(config)
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
-    news_top_count = int(config.get("news_top_count", 100))
+    news_top_count = int(config.get("news_top_count", 300))
 
     # ── 1. 行情获取 ──
     perf.start("行情获取")

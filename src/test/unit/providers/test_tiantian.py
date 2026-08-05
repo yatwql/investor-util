@@ -12,6 +12,7 @@ from src.python.providers.tiantian_holdings import (
 )
 from src.python.providers.tiantian_ranking import (
     _calc_rating_from_entry,
+    _fund_type_hint_from_name,
     _get_rating_thresholds,
     _KNOWN_RATING_TYPES,
     _parse_perf_evaluation,
@@ -20,10 +21,22 @@ from src.python.providers.tiantian_ranking import (
     _parse_syl_returns,
     _pct_to_rating,
     _RATING_THRESHOLDS,
+    fetch_fund_rankings,
 )
+from unittest.mock import patch
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
+
+def _build_pingzhong_js(name: str, rank: int = 14, total: int = 100) -> str:
+    """构造最小 pingzhongdata JS：含基金名、同类排名（rank/total）与百分位。"""
+    return (
+        f'var fS_name = "{name}";\n'
+        f'var Data_rateInSimilarType = [{{"y": {rank}, "sc": {total}}}];\n'
+        f"var Data_rateInSimilarPersent = [[1, {rank}.0]];\n"
+        'var syl_1y = "2.1";\n'
+    )
 
 
 class TestFindHoldingsTable(unittest.TestCase):
@@ -230,7 +243,7 @@ class TestParseSylReturns(unittest.TestCase):
         self.assertEqual(result, {})
 
     def test_handles_numeric_value(self):
-        js = 'var syl_1y = 2.5;'
+        js = "var syl_1y = 2.5;"
         result = _parse_syl_returns(js)
         self.assertAlmostEqual(result["近1月"]["return"], 2.5)
 
@@ -321,36 +334,52 @@ class TestCalcRatingFromEntry(unittest.TestCase):
         """百分位与排名矛盾时，以排名/总数为准。"""
         # 百分位=3.33(top 3.3%)→优秀，但排名=4823/4985(bottom 3.3%)→较差
         self.assertEqual(
-            _calc_rating_from_entry({
-                "percentile": "3.33", "rank": "4823", "total": "4985",
-            }),
+            _calc_rating_from_entry(
+                {
+                    "percentile": "3.33",
+                    "rank": "4823",
+                    "total": "4985",
+                }
+            ),
             "较差",
         )
 
     def test_rank_outranks_percentile_good_rank(self):
         """排名好于百分位时，以排名为准。"""
         self.assertEqual(
-            _calc_rating_from_entry({
-                "percentile": "60.0", "rank": "10", "total": "100",
-            }),
+            _calc_rating_from_entry(
+                {
+                    "percentile": "60.0",
+                    "rank": "10",
+                    "total": "100",
+                }
+            ),
             "优秀",
         )
 
     def test_no_conflict_both_good(self):
         """百分位和排名一致时，返回一致的评级。"""
         self.assertEqual(
-            _calc_rating_from_entry({
-                "percentile": "5.0", "rank": "10", "total": "100",
-            }),
+            _calc_rating_from_entry(
+                {
+                    "percentile": "5.0",
+                    "rank": "10",
+                    "total": "100",
+                }
+            ),
             "优秀",
         )
 
     def test_no_conflict_both_poor(self):
         """百分位和排名都差时，返回较差。"""
         self.assertEqual(
-            _calc_rating_from_entry({
-                "percentile": "60.0", "rank": "80", "total": "100",
-            }),
+            _calc_rating_from_entry(
+                {
+                    "percentile": "60.0",
+                    "rank": "80",
+                    "total": "100",
+                }
+            ),
             "较差",
         )
 
@@ -416,6 +445,99 @@ class TestCalcRatingFromEntry(unittest.TestCase):
         )
 
 
+class TestFundTypeHintFromName(unittest.TestCase):
+    """_fund_type_hint_from_name — 名称 → 评级阈值类型键。"""
+
+    def test_qdii_explicit(self):
+        """名称含 QDII → qdii。"""
+        self.assertEqual(_fund_type_hint_from_name("南方原油(QDII)"), "qdii")
+
+    def test_qdii_implicit_oversea(self):
+        """隐式海外（纳斯达克）→ qdii。"""
+        self.assertEqual(_fund_type_hint_from_name("广发纳斯达克100指数A"), "qdii")
+
+    def test_bond(self):
+        """债券型 → bond。"""
+        self.assertEqual(_fund_type_hint_from_name("招商产业债券A"), "bond")
+
+    def test_index_link(self):
+        """指数联接 → index。"""
+        self.assertEqual(_fund_type_hint_from_name("易方达上证50ETF联接A"), "index")
+
+    def test_etf(self):
+        """纯 ETF → index。"""
+        self.assertEqual(_fund_type_hint_from_name("华夏上证50ETF"), "index")
+
+    def test_otc_index_fund(self):
+        """场外指数基金（含中证关键词）→ index。"""
+        self.assertEqual(_fund_type_hint_from_name("天弘中证500指数A"), "index")
+
+    def test_active_equity_default(self):
+        """主动权益 → 默认（空串）。"""
+        self.assertEqual(_fund_type_hint_from_name("华夏成长混合A"), "")
+
+    def test_empty_name(self):
+        """空名 → 默认（空串）。"""
+        self.assertEqual(_fund_type_hint_from_name(""), "")
+
+    def test_none_name(self):
+        """None → 默认（空串）。"""
+        self.assertEqual(_fund_type_hint_from_name(None), "")
+
+
+class TestFetchFundRankingsTypeAwareRating(unittest.TestCase):
+    """fetch_fund_rankings 接线：按名称推导类型差异化阈值计算评级。"""
+
+    @patch("src.python.providers.tiantian_ranking._request_pingzhong_data")
+    def test_bond_name_uses_looser_threshold(self, mock_req):
+        """债券型 14%：默认阈值下为良好，债券宽松阈值下为优秀。"""
+        mock_req.return_value = _build_pingzhong_js("招商产业债券A", rank=14)
+        result = fetch_fund_rankings("110003")
+        self.assertEqual(result["type"], "bond")
+        self.assertEqual(result["rating"], "优秀")
+
+    @patch("src.python.providers.tiantian_ranking._request_pingzhong_data")
+    def test_index_name_uses_stricter_threshold(self, mock_req):
+        """指数型 27%：默认阈值下为良好，指数严格阈值下为稳定。"""
+        mock_req.return_value = _build_pingzhong_js("华泰柏瑞沪深300ETF联接A", rank=27)
+        result = fetch_fund_rankings("000961")
+        self.assertEqual(result["type"], "index")
+        self.assertEqual(result["rating"], "稳定")
+
+    @patch("src.python.providers.tiantian_ranking._request_pingzhong_data")
+    def test_qdii_name_uses_looser_threshold(self, mock_req):
+        """QDII 14%：宽松阈值下为优秀。"""
+        mock_req.return_value = _build_pingzhong_js("广发纳斯达克100指数A", rank=14)
+        result = fetch_fund_rankings("270042")
+        self.assertEqual(result["type"], "qdii")
+        self.assertEqual(result["rating"], "优秀")
+
+    @patch("src.python.providers.tiantian_ranking._request_pingzhong_data")
+    def test_active_equity_uses_default_threshold(self, mock_req):
+        """主动权益 14%：默认阈值下为良好。"""
+        mock_req.return_value = _build_pingzhong_js("华夏成长混合A", rank=14)
+        result = fetch_fund_rankings("000001")
+        self.assertEqual(result["type"], "")
+        self.assertEqual(result["rating"], "良好")
+
+    @patch("src.python.providers.tiantian_ranking._request_pingzhong_data")
+    def test_name_and_type_in_result(self, mock_req):
+        """返回结构包含 name 与 type 字段。"""
+        mock_req.return_value = _build_pingzhong_js("南方原油(QDII)", rank=14)
+        result = fetch_fund_rankings("501018")
+        self.assertEqual(result["name"], "南方原油(QDII)")
+        self.assertEqual(result["type"], "qdii")
+
+    @patch("src.python.providers.tiantian_ranking._request_pingzhong_data")
+    def test_no_rank_data_rating_empty(self, mock_req):
+        """无排名/百分位数据 → 评级为空，但类型键仍按名称推导。"""
+        js = 'var fS_name = "招商产业债券A";\nvar syl_1y = "2.1";\n'
+        mock_req.return_value = js
+        result = fetch_fund_rankings("110003")
+        self.assertEqual(result["type"], "bond")
+        self.assertEqual(result["rating"], "")
+
+
 class TestParsePerfEvaluation(unittest.TestCase):
     """_parse_perf_evaluation — 解析业绩评价 JSON 变量。"""
 
@@ -431,7 +553,7 @@ class TestParsePerfEvaluation(unittest.TestCase):
         self.assertIsNone(_parse_perf_evaluation(js))
 
     def test_invalid_json_returns_none(self):
-        js = 'var Data_performanceEvaluation = {broken};'
+        js = "var Data_performanceEvaluation = {broken};"
         self.assertIsNone(_parse_perf_evaluation(js))
 
 
@@ -462,7 +584,7 @@ class TestParseRiskAnalysis(unittest.TestCase):
 
     def test_invalid_json(self):
         """无效 JSON → None。"""
-        js = 'var Data_riskAnalysis = {broken};'
+        js = "var Data_riskAnalysis = {broken};"
         self.assertIsNone(_parse_risk_analysis(js))
 
     def test_empty_result(self):

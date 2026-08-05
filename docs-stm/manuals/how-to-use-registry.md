@@ -61,7 +61,7 @@ class DataModuleDef:
 | **LLM 模块（preload/refresh）** | 全球政经局势、智囊团复盘、体检报告、穿透分析、财经新闻热点与持仓关联分析 | `llm_global_macro` ~ `llm_news_correlation` | 1h~24h | 带 `settings_suffix` |
 | **辩论模式（preload）** | 辩论白脸、辩论黑脸、辩论综合 | `llm_debate_pro`, `llm_debate_con`, `llm_debate_synthesis` | 24h | 实验功能三段独立缓存键（复用 expert_review 指纹）。**仅缓存管理用途**：注册表条目保留供 TTL/前缀清理使用，菜单 [S] 已隐藏，实际启停由 Feature Flag `llm_debate_procon`（正反辩论）控制 |
 | **补充数据（refresh）** | 盈利预测、资金流向、分红、无风险利率 | `profit_forecast`, `sector_flow`, `dividend`, `bond_yield` | 15min~30d | 主动刷新触发；`bond_yield` 为精确键名 `bond_yield_rf` |
-| **基金深度分析（refresh）** | 基金经理、持仓重合度、基金风格扩展数据 | `fund_manager`, `fund_overlap`, `extended` | 24h~7d | 基金深度分析模块，主动刷新触发 |
+| **基金深度分析（refresh）** | 基金经理、基金风格扩展数据 | `fund_manager`, `extended` | 24h | 基金深度分析模块，主动刷新触发 |
 | **基金深度分析（无分组）** | 集中度历史快照、风格快照 | `fund_concentration`, `fund_style_snapshot` | 30d | 精确键名，不被清除操作命中 |
 | **历史走势类（无分组）** | 历史股票日线、历史基金净值、指数历史日线 | `history_stock`, `history_fund_otc`, `history_index` | 1w~1M | 无分组保护，不被菜单缓存命令误删，通过 `portfolio_history.py` 内部路由自动管理 |
 | **精确键名（含 refresh）** | 基金业绩基准、持仓跟踪、交易日历 | `benchmark`, `tracking`, `calendar` | 2w~1M | `benchmark` 归入 `refresh` 组，`tracking`/`calendar` 无分组 |
@@ -191,7 +191,7 @@ from src.python.core.registry import (
 - `get_computation_registry()` — 遍历所有计算/分析模块（量化指标、流动性分析、外汇敞口、情景分析、组合校准、用户画像、事实校验器），用于运行时发现和文档生成
 - `get_computation_module("analytics_metrics")` → 按 module_key 查找单个计算模块定义
 
-当前注册的计算模块见 §计算模块注册表。
+当前注册的计算模块见下文「计算模块注册表」章节。
 
 ---
 
@@ -307,7 +307,7 @@ class ComputModuleDef:
 
 | module_key | 名称 | 依赖 | 状态 |
 |:-----------|:-----|:-----|:----:|
-| `analytics_metrics` | 量化指标 | bond_yield, history | ✅ implemented |
+| `analytics_metrics` | 量化指标计算 | bond_yield, history | ✅ implemented |
 | `analytics_liquidity` | 流动性分析 | — | ✅ implemented |
 | `analytics_fx_exposure` | 外汇敞口分析 | — | ✅ implemented |
 | `analytics_scenario` | 情景分析 | history | ✅ implemented |
@@ -327,8 +327,7 @@ class ComputModuleDef:
 - 缓存前缀/精确键名映射 → `get_prefix_type_map()` / `get_exact_type_map()`
 - LLM settings 键名 → `get_known_llm_settings_keys()`
 - LLM 模块名称 → `get_llm_module_names()`
-- 报表页签标题 → `create_sheets()` 内联连续重新编号, `get_report_sheet_name()`
-- Excel 生成器标签 → `get_report_sheet_name()` / `get_report_section_order()`
+> 报表页签标题与顺序由**独立的 `_REPORT_SECTION_DEFAULT` 注册表**驱动（见上文「报表排序与页签名称」），`get_report_sheet_name()` / `get_report_section_order()` 均读该注册表，**不**随 `_MODULE_REGISTRY` 自动派生。
 
 ---
 

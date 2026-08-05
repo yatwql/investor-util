@@ -2,8 +2,8 @@
 
 > 归档时间：2026-08-05
 > 原始文件：`docs-stm/managements/review-findings.md`
-> 涵盖版本：v0.10.1 ~ v0.10.6（2026-08-04 ~ 2026-08-05；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）
-> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-232）摘要行 + 修复方案 + 变更记录
+> 涵盖版本：v0.10.1 ~ v0.10.7（2026-08-04 ~ 2026-08-05；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）
+> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-233）摘要行 + 修复方案 + 变更记录
 
 ---
 
@@ -46,6 +46,14 @@
 | rf-215 | 调仓建议代码审查 LOW：`estimate_fee` 的 `operation` 参数未被使用，未来买入调用会静默按卖出口径计费 | 增加卖出方向守卫（未知操作抛 ValueError），杜绝静默误计费，参数保留供后续买卖方向区分 | `changelog.md` 轮6 |
 | rf-216 | 调仓建议代码审查 LOW：持仓名称缺失（None）时 `is_otc_fund_by_name` 抛 TypeError 中断整条清单 | `_round_to_lot`/`estimate_fee` 名称归一化为空串后参与判定，防御性降级（00 前缀按 A 股口径） | `changelog.md` 轮6 |
 
+### v0.10.7（2026-08-05）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-233 | `test_circuit_breaker_wrapper.py` 的 `test_default_path_under_state_dir` 用硬编码正斜杠子串 `data/state/metrics_breaker.json` 对实际路径做 `in` 匹配——Linux 下 `tmp_path` 为正斜杠路径恰好命中，Windows 下为反斜杠路径断言落空（Windows dev-verify 单点失败） | 断言前将实际路径分隔符统一规范化为 `/`（`path.replace(os.sep, "/")`）再匹配，正向/负向两条断言同时修正；源码（`os.path.join`）与 conftest 隔离（`tmp_path / ...`）本就 OS 感知，无需改动。test_circuit_breaker_wrapper.py 10 项全通过 | `changelog.md` v0.10.7 |
+| rf-229 | 语义命名索引「功能语义命名表」仅为记录性活索引、无正面校验——新增 `report_submodules.*` 开关键可绕过登记、功能删除后表行可残留僵尸条目（预演审计实证：`cost_lots` 未登记、`dividend_flow`/`holding_diagnosis` 为僵尸条目）、合并章 sheet key 无人核实 | 新增 `scripts/check-semantic-index.py` 正面校验（正向 `report_submodules` 键登记 / 反向僵尸条目 / 合并章 sheet key 存在性，tokenize 剔除注释，退出码 0/2）；表存量修正（`cost_lots` 补登记、僵尸条目移除、表体包裹 `<!-- semantic-index:start/end -->` 标记）；纪律升级为架构设计约束的「约束外参照」并接入 P0/P2 门禁 | `changelog.md` v0.10.7 |
+| rf-217 | 调仓建议可行化层（`analysis/rebalance_advisor`）仅凭代码前缀 + 名称关键词判定证券类型，场外持有基金（LOF/开放式指数基金，如 `161725 招商中证白酒指数A`、`110022 易方达消费行业`）的 16/11 开头代码命中场内基金前缀被误当场内处理（100 份取整 + 仅计佣金），漏计赎回费且份额取整过粗 | `holdings_details` 契约新增 `channel` 字段（报告层按账户关键词 `is_offsite_fund` 判定填充），`_round_to_lot`/`estimate_fee` 按渠道计算（场外整数份 + 赎回费；非场外回退既有证券类型判定）；显式 `channel` 优先、无渠道回退代码判定保持向后兼容 | `changelog.md` v0.10.7 |
+
 ### v0.10.6（2026-08-05）
 
 | # | 问题 | 修复方案 | 变更记录 |
@@ -63,5 +71,5 @@
 
 ## 归档说明
 
-- 本归档涵盖 v0.10.1 ~ v0.10.6 已发布版本的自审修复记录（rf-204~rf-232）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-217 场外渠道限制、rf-229 语义命名表增强）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
+- 本归档涵盖 v0.10.1 ~ v0.10.7 已发布版本的自审修复记录（rf-204~rf-233）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
 - 已关闭项（rf-117/118/120/121 决策已定，不做）与未修复待办项不在此列。

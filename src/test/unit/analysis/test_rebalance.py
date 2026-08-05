@@ -31,6 +31,125 @@ from src.python.analysis.rebalance import (
     resolve_rebalance_config,
 )
 
+from src.python.analysis.simple_rebalance import compute_simple_rebalance_signals
+
+
+# ── 极简再平衡信号（配置化阈值 + 静默期） ─────────────────────
+
+
+def _mk_holding(code: str, market_value: float, name: str = "") -> dict:
+    """构造极简再平衡信号所需的持仓行。"""
+    return {"code": code, "name": name or code, "market_value": market_value}
+
+
+class TestSimpleRebalanceConfigThreshold:
+    """compute_simple_rebalance_signals 配置化阈值。"""
+
+    def test_explicit_threshold_lower_triggers_more(self):
+        """显式收紧阈值 → 更多品种触发（10% 阈值下 12% 品种触发）。"""
+        # 600001 占 12%、600002 占 8%：默认 15% 均合规，10% 阈值下 600001 触发
+        holdings = [
+            _mk_holding("600001", 1200.0),
+            _mk_holding("600002", 800.0),
+        ]
+        signals = compute_simple_rebalance_signals(holdings, 10000.0, threshold=0.10)
+        assert [s["code"] for s in signals] == ["600001"]
+
+    def _single_overweight(self, code: str, mv: float, n_compliant: int = 7) -> list[dict]:
+        """构造「1 只超重 + N 只合规」持仓集，总市值 10000。"""
+        holdings = [_mk_holding(code, mv)]
+        holdings.extend(_mk_holding(f"6000{n:02d}", 1000.0) for n in range(2, 2 + n_compliant))
+        return holdings
+
+    def test_explicit_threshold_higher_suppresses(self):
+        """显式放宽阈值 → 原触发品种不再触发（25% 阈值下 20% 品种合规）。"""
+        # 600001 占 20%（超 15%），其余各 10%（合规）：25% 阈值下全部合规
+        holdings = self._single_overweight("600001", 2000.0)
+        signals = compute_simple_rebalance_signals(holdings, 10000.0, threshold=0.25)
+        assert signals == []
+
+    def test_threshold_value_in_signal(self):
+        """信号携带实际生效的 threshold 值（显式 0.12）。"""
+        # 600001 占 20%（超 15%），其余各 10%：12% 阈值下 600001 触发
+        holdings = self._single_overweight("600001", 2000.0)
+        signals = compute_simple_rebalance_signals(holdings, 10000.0, threshold=0.12)
+        assert signals[0]["threshold"] == 0.12
+        assert {s["code"] for s in signals} == {"600001"}
+
+    def test_default_threshold_still_15(self, monkeypatch):
+        """未显式传阈值 → 默认 15%（0.15），20% 触发。"""
+        holdings = self._single_overweight("600001", 2000.0)
+        signals = compute_simple_rebalance_signals(holdings, 10000.0)
+        assert signals[0]["threshold"] == 0.15
+        assert {s["code"] for s in signals} == {"600001"}
+
+    def test_default_uses_config_silence(self, tmp_path):
+        """未显式传静默期 → 默认读配置（30 天），静默期内品种被过滤。"""
+        f = str(tmp_path / "rebalance_silence.json")
+        _save_silence_state({"600001": datetime.date.today().isoformat()}, f)
+        holdings = self._single_overweight("600001", 2000.0)
+        signals = compute_simple_rebalance_signals(holdings, 10000.0, silence_file=f)
+        assert signals == []
+
+
+class TestSimpleRebalanceSilence:
+    """compute_simple_rebalance_signals 静默期过滤。"""
+
+    def _single_overweight(self, code: str, mv: float, n_compliant: int = 7) -> list[dict]:
+        """构造「1 只超重 + N 只合规」持仓集，总市值 10000。"""
+        holdings = [_mk_holding(code, mv)]
+        holdings.extend(_mk_holding(f"6000{n:02d}", 1000.0) for n in range(2, 2 + n_compliant))
+        return holdings
+
+    def test_signal_suppressed_within_silence(self, tmp_path):
+        """静默期内品种被过滤（今天触发）。"""
+        f = str(tmp_path / "rebalance_silence.json")
+        _save_silence_state({"600001": datetime.date.today().isoformat()}, f)
+        # 600001 占 30%（超 15% 触发），其余各 10%（合规）
+        holdings = self._single_overweight("600001", 3000.0)
+        signals = compute_simple_rebalance_signals(holdings, 10000.0, silence_days=30, silence_file=f)
+        assert signals == []
+
+    def test_signal_passes_after_silence(self, tmp_path):
+        """静默期到期后品种重新触发。"""
+        past = datetime.date.today() - datetime.timedelta(days=31)
+        f = str(tmp_path / "rebalance_silence.json")
+        _save_silence_state({"600001": past.isoformat()}, f)
+        holdings = self._single_overweight("600001", 3000.0)
+        signals = compute_simple_rebalance_signals(holdings, 10000.0, silence_days=30, silence_file=f)
+        assert {s["code"] for s in signals} == {"600001"}
+
+    def test_silence_zero_disables(self, tmp_path):
+        """silence_days=0 → 不过滤、不写文件。"""
+        f = str(tmp_path / "rebalance_silence.json")
+        _save_silence_state({"600001": datetime.date.today().isoformat()}, f)
+        holdings = self._single_overweight("600001", 3000.0)
+        signals = compute_simple_rebalance_signals(holdings, 10000.0, silence_days=0, silence_file=f)
+        assert {s["code"] for s in signals} == {"600001"}
+
+    def test_silence_writes_state(self, tmp_path):
+        """触发信号写入静默状态（下次同品种被抑制）。"""
+        f = str(tmp_path / "rebalance_silence.json")
+        holdings = self._single_overweight("600001", 3000.0)
+        compute_simple_rebalance_signals(holdings, 10000.0, silence_days=30, silence_file=f)
+        state = _load_silence_state(f)
+        # 触发品种写入静默状态（600001 占 30% 超 15%）
+        assert "600001" in state
+
+    def test_silence_carries_summary_passthrough(self, tmp_path):
+        """汇总信号不受静默期影响（未触发单品时汇总直接返回）。"""
+        f = str(tmp_path / "rebalance_silence.json")
+        # 5 只各占 22%：超过 _MAX_DETAILED=3 → 汇总；默认 15% 阈值
+        holdings = [_mk_holding(f"60000{n}", 1100.0) for n in range(1, 6)]
+        signals = compute_simple_rebalance_signals(holdings, 5000.0, silence_days=30, silence_file=f)
+        assert signals == [
+            {
+                "summary": True,
+                "count": 5,
+                "message": "您的组合集中度较高，有 5 个品种超过 15% 警戒线，建议整体考虑适度分散",
+            }
+        ]
+
 
 # ── classify_holding 测试 ─────────────────────────────────────
 
@@ -215,10 +334,7 @@ class TestComputeRebalanceSignals:
 
     def test_multiple_overflow_summary(self):
         """超过 3 个品种触发时聚合为一条汇总建议。"""
-        holdings = [
-            {"name": f"品种{i}", "code": f"60000{i}", "market_value": 250}
-            for i in range(5)
-        ]
+        holdings = [{"name": f"品种{i}", "code": f"60000{i}", "market_value": 250} for i in range(5)]
         # total = 1250, 每品种 250/1250 = 20%, 全部超 15%
         config = {"threshold": 0.15}
         result = compute_rebalance_signals(holdings, 1250, config)
@@ -313,10 +429,12 @@ class TestResolveRebalanceConfig:
 
     def test_explicit_values_override_preset(self):
         """显式指定的值优先于预设。"""
-        result = resolve_rebalance_config({
-            "profile": "conservative",
-            "threshold": 0.12,  # 覆盖 conservative 的 0.10
-        })
+        result = resolve_rebalance_config(
+            {
+                "profile": "conservative",
+                "threshold": 0.12,  # 覆盖 conservative 的 0.10
+            }
+        )
         assert result["threshold"] == 0.12
         # deviation_threshold 未显式指定 → 使用 preset
         assert result["deviation_threshold"] == _REBALANCE_PROFILES["conservative"]["deviation_threshold"]
@@ -328,10 +446,12 @@ class TestResolveRebalanceConfig:
         assert result["deviation_threshold"] == _REBALANCE_PROFILES["moderate"]["deviation_threshold"]
 
     def test_target_allocation_preserved(self):
-        result = resolve_rebalance_config({
-            "profile": "aggressive",
-            "target_allocation": {"equity": {"min": 20, "max": 80}},
-        })
+        result = resolve_rebalance_config(
+            {
+                "profile": "aggressive",
+                "target_allocation": {"equity": {"min": 20, "max": 80}},
+            }
+        )
         assert "equity" in result["target_allocation"]
 
 
@@ -535,12 +655,12 @@ class TestEquityFixedIncomeDeviation:
     def test_mixed_holdings_correct_aggregation(self):
         """混合持仓正确汇总权益和固收大类。"""
         holdings = [
-            {"name": "A股", "code": "600001", "market_value": 4000},        # equity
-            {"name": "XX混合A", "code": "001234", "market_value": 1000},    # fund_equity
-            {"name": "标普QDII", "code": "513100", "market_value": 1000},   # qdii
-            {"name": "XX纯债债券A", "code": "008123", "market_value": 2000},# fixed_income
-            {"name": "XX货币A", "code": "000001", "market_value": 1000},    # money_market
-            {"name": "XX转债", "code": "123456", "market_value": 1000},     # alternative
+            {"name": "A股", "code": "600001", "market_value": 4000},  # equity
+            {"name": "XX混合A", "code": "001234", "market_value": 1000},  # fund_equity
+            {"name": "标普QDII", "code": "513100", "market_value": 1000},  # qdii
+            {"name": "XX纯债债券A", "code": "008123", "market_value": 2000},  # fixed_income
+            {"name": "XX货币A", "code": "000001", "market_value": 1000},  # money_market
+            {"name": "XX转债", "code": "123456", "market_value": 1000},  # alternative
         ]
         total = 10000
         # equity 聚合 = 4000+1000+1000 = 6000 → 60%
@@ -556,10 +676,10 @@ class TestEquityFixedIncomeDeviation:
     def test_mixed_aggregation_detects_deviation(self):
         """混合持仓正确检测权益/固收偏离。"""
         holdings = [
-            {"name": "A股", "code": "600001", "market_value": 5000},        # equity
-            {"name": "XX混合A", "code": "001234", "market_value": 2000},    # fund_equity
-            {"name": "XX纯债债券A", "code": "008123", "market_value": 2000},# fixed_income
-            {"name": "XX货币A", "code": "000001", "market_value": 1000},    # money_market
+            {"name": "A股", "code": "600001", "market_value": 5000},  # equity
+            {"name": "XX混合A", "code": "001234", "market_value": 2000},  # fund_equity
+            {"name": "XX纯债债券A", "code": "008123", "market_value": 2000},  # fixed_income
+            {"name": "XX货币A", "code": "000001", "market_value": 1000},  # money_market
         ]
         total = 10000
         # equity 聚合 = 5000+2000 = 7000 → 70%

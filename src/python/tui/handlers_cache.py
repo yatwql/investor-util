@@ -71,11 +71,15 @@ def _print_cache_refresh_report(result) -> None:
     from src.python.cache.operations import _sector_flow_hint
 
     funds_count = result.total_funds
+    holdings_count = result.holdings_count
     perf_ok = result.perf_ok
     hold_ok = result.hold_ok
     bm_ok = result.bm_ok
     pf_ok = result.pf_ok
     sf_ok = result.sf_ok
+    news_ok = result.news_ok
+    manager_ok = result.manager_ok
+    ext_ok = result.ext_ok
 
     print()
     print(f"  {'=' * 40}")
@@ -105,6 +109,18 @@ def _print_cache_refresh_report(result) -> None:
         print(f"  {GREEN}[OK]{RESET} sector_flow.json               ({sf_ok} 个行业)")
     elif funds_count:
         print(f"  {YELLOW}[!]{RESET} sector_flow.json               {_sector_flow_hint()}")
+    if news_ok:
+        print(f"  {GREEN}[OK]{RESET} news_{{md5}}.json               ({news_ok} 条)")
+    elif holdings_count:
+        print(f"  {YELLOW}[!]{RESET} news_{{md5}}.json               新闻获取失败")
+    if manager_ok:
+        print(f"  {GREEN}[OK]{RESET} fund_manager_{{code}}.json       ({manager_ok}/{funds_count} 只基金)")
+    elif funds_count:
+        print(f"  {YELLOW}[!]{RESET} fund_manager_{{code}}.json       基金经理获取失败")
+    if ext_ok:
+        print(f"  {GREEN}[OK]{RESET} 风格扩展（registry 会话缓存）     ({ext_ok} 只证券)")
+    elif holdings_count:
+        print(f"  {YELLOW}[!]{RESET} 风格扩展（registry 会话缓存）     获取失败")
 
 
 def _print_position_result(result) -> None:

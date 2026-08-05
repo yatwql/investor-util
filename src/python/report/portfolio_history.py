@@ -34,6 +34,7 @@ from src.python.analysis.drawdown_events import (
     compute_recovery_times,
     extract_drawdown_events,
 )
+from src.python.analysis.metrics import compute_daily_returns
 from src.python.fetcher.chain import fetch_with_incremental_fallback
 from src.python.report._history_quality import _diagnose_return, _validate_bars
 from src.python.report.benchmark import fetch_benchmarks, normalize_benchmarks
@@ -176,7 +177,7 @@ class PortfolioHistoryCalculator:
                 "annualized_volatility": float,
                 "total_return": float,
                 "total_return_pct": float,
-                "daily_returns": [float, ...],  # 日收益率序列（百分比）
+                "daily_returns": [float, ...],  # 日收益率序列（小数，非百分比）
                 "status": "ok" | "degraded" | "unavailable",
                 "warnings": [str, ...],
                 "benchmarks": [{code, name, bars, total_return_pct,
@@ -438,7 +439,11 @@ class PortfolioHistoryCalculator:
 
     @staticmethod
     def _compute_daily_returns(bars: list[dict]) -> list[float]:
-        """计算日收益率序列。
+        """计算日收益率序列（口径统一源 analysis/metrics.compute_daily_returns）。
+
+        口径：日收益 = (curr - prev) / prev，小数形式（非百分比）；prev 与 curr
+        市值均 > 0 才计入（缺失/占位/清仓跳过，避免伪 -100% 单日）。与
+        analysis/tail_risk 同口径。
 
         Args:
             bars: 走势数据列表（含 total_value）
@@ -446,13 +451,7 @@ class PortfolioHistoryCalculator:
         Returns:
             日收益率列表（小数形式，非百分比）
         """
-        daily_returns: list[float] = []
-        for i in range(1, len(bars)):
-            prev = bars[i - 1]["total_value"]
-            curr = bars[i]["total_value"]
-            if prev > 0:
-                daily_returns.append((curr - prev) / prev)
-        return daily_returns
+        return compute_daily_returns(bars)
 
     @staticmethod
     def _compute_total_return(bars: list[dict]) -> tuple[float, float]:

@@ -485,6 +485,33 @@ def _generate_full_excel_report(
 # ── _generate_report_both（生成 HTML+Excel，不含 LLM）──
 
 
+def _both_action_holdings_details(details: list) -> list[dict]:
+    """both 路径持仓明细 → 行动建议消费的字段子集（数据契约同 orchestrator 组装）。
+
+    交易纪律依赖收益率数据（profit_rate），统一换算为百分数（小数 ×100）；
+    shares/price 供调仓建议可行化层计算可执行卖出份额与金额；
+    channel 为场内/场外渠道上下文（按账户关键词判定），供可行化层按渠道
+    计算份额取整与费用（场外整数份 + 赎回费）。
+    """
+    from src.python.core.code_utils import is_offsite_fund
+
+    return [
+        {
+            "name": d.name,
+            "code": d.code,
+            "market_value": d.market_value,
+            "cost": d.cost,
+            "profit": d.profit,
+            "profit_rate": (d.profit_rate * 100) if d.profit_rate is not None else None,
+            "shares": d.shares,
+            "price": d.price,
+            # getattr 兼容缺 account 的 detail 对象（测试 fixture 简化版）
+            "channel": "场外" if is_offsite_fund(getattr(d, "account", "")) else "场内",
+        }
+        for d in details
+    ]
+
+
 def _generate_report_both(
     holdings: list,
     config: dict,
@@ -533,7 +560,7 @@ def _generate_report_both(
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
-    news_top_count = int(config.get("news_top_count", 100))
+    news_top_count = int(config.get("news_top_count", 300))
 
     # ── 1. 行情获取（轻量级，无指数/穿透/分类） ──
     perf.start("行情获取")
@@ -576,30 +603,12 @@ def _generate_report_both(
             trading_day=get_last_trading_day(),
             prev_trading_day=get_prev_trading_day(),
         ),
-        # 行动建议单一数据源（action_data）：行动建议板块 + 智囊团深度复盘行动摘要共享。
-        # 传递完整估值字段（含 profit_rate/cost/profit），交易纪律（止盈/止损）
-        # 依赖收益率数据。profit_rate 契约为百分比（小数 ×100，同 orchestrator 组装口径），
-        # 纪律引擎以百分数阈值（如 +20%）比较，此处统一换算避免单位不一致。
-        action_data=build_action_data(
-            [
-                {
-                    "name": d.name,
-                    "code": d.code,
-                    "market_value": d.market_value,
-                    "cost": d.cost,
-                    "profit": d.profit,
-                    "profit_rate": (d.profit_rate * 100) if d.profit_rate is not None else None,
-                    "shares": d.shares,
-                    "price": d.price,
-                }
-                for d in details
-            ],
-            sum(d.market_value for d in details),
-        ),
         # 估值分位 + 市场温度（数据契约）：both 路径此处组装，开关关闭时为 None
         valuation_data=valuation_data,
         market_temperature_data=market_temperature_data,
     )
+    # 行动建议单一数据源（action_data）在「3. 历史走势」之后统一注入
+    # （组合回撤纪律需组合历史峰值市值，见 tail_risk_data 注入点）。
     perf.stop()
     # [checkpoint] pipeline_data 类型断言
     if pipeline_data is not None:
@@ -630,6 +639,20 @@ def _generate_report_both(
     tail_risk_data = compute_tail_risk((history_data or {}).get("bars"))
     if pipeline_data is not None:
         pipeline_data["tail_risk_data"] = tail_risk_data
+
+    # 行动建议单一数据源（action_data）：行动建议板块 + 智囊团深度复盘行动摘要共享。
+    # 此处为 both 路径唯一构建（历史已就绪）：组合回撤纪律以组合历史峰值市值
+    # 为基准，峰值自 history_data.bars 计算；历史走势关闭时峰值取 None，
+    # 回撤纪律按「峰值未知」处理（组合级回撤不激活），其余纪律不受影响。
+    from src.python.analysis.action_advisor import build_action_data
+    from src.python.analysis.metrics import compute_portfolio_peak_mv
+
+    if pipeline_data is not None:
+        pipeline_data["action_data"] = build_action_data(
+            _both_action_holdings_details(details),
+            sum(d.market_value for d in details),
+            portfolio_peak_mv=compute_portfolio_peak_mv((history_data or {}).get("bars")),
+        )
 
     # ── 4. HTML 报告 ──
     _news_label = "含新闻" if _enable_news else "无新闻"
@@ -865,6 +888,24 @@ def _generate_report_full(
         prep,
         pipeline_data,
     )
+
+    # 3.5 行动建议回填（历史走势就绪后注入组合历史峰值市值，激活回撤纪律）。
+    # prepare_report_data 的 action_data 为「中间占位构建」（persist_silence=False，
+    # 不读写静默文件）：彼时历史时序未就绪、峰值未知。此处用 history_data.bars
+    # 计算组合历史峰值并重建 action_data（默认 persist_silence=True），作为管线
+    # 中纪律静默的唯一写入方——同时保证单品信号不被占位构建抢占静默而误抑制。
+    from src.python.analysis.action_advisor import build_action_data
+    from src.python.analysis.metrics import compute_portfolio_peak_mv
+
+    _peak_mv = compute_portfolio_peak_mv((history_data or {}).get("bars"))
+    _action_data = build_action_data(
+        prep.get("holdings_details") or [],
+        prep.get("total_mv", 0),
+        portfolio_peak_mv=_peak_mv,
+    )
+    prep["action_data"] = _action_data
+    if pipeline_data is not None:
+        pipeline_data["action_data"] = _action_data
 
     # ── 4. 行业资金流向 ──
     reporter.info("正在获取行业资金流向...")
