@@ -331,6 +331,11 @@
         }
         .toc-list a:hover { background: var(--source-tag-bg); }
         .toc-list a.active { background: var(--source-tag-bg); border-left-color: #2E75B6; color: var(--source-tag-text); font-weight: 600; }
+        /* LLM 支持章节：目录/横向导航橙色加粗 + 🧠 图标（LLM 导航组章节；active 态保持橙色，特异性高于 .toc-list a.active） */
+        .toc-list a.toc-llm { color: var(--orange-text); font-weight: 600; }
+        .toc-list a.toc-llm.active { color: var(--orange-text); border-left-color: var(--orange-text); }
+        .section-nav a.toc-llm { color: var(--orange-text); font-weight: 600; }
+        .toc-llm-icon { margin-left: 4px; vertical-align: middle; }
         /* 分组折叠：按「基础/基金深度/风险/历史/LLM」五组（<details>/<summary> 原生折叠，键盘可达） */
         .toc-group { border-bottom: 1px solid var(--toc-border); }
         .toc-group:last-child { border-bottom: none; }
@@ -887,7 +892,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <details class="toc-group" data-group="{{ group.key }}" open>
                     <summary class="toc-group-title">{{ group.name }}<span class="toc-group-count">{{ group.sections | length }}</span></summary>
                     {% for sec in group.sections %}
-                    <a href="#sec-{{ sec['key'] }}">{{ sec.number }}、{{ sec.name }}</a>
+                    <a href="#sec-{{ sec['key'] }}"{% if sec['llm_supported'] %} class="toc-llm"{% endif %}>{{ sec.number }}、{{ sec.name }}{% if sec['llm_supported'] %}<span class="toc-llm-icon" aria-hidden="true">🧠</span>{% endif %}</a>
                     {% endfor %}
                 </details>
                 {% endif %}
@@ -923,7 +928,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <nav class="section-nav">
         {% for sec in section_order %}
         {% if section_visible(sec["key"]) %}
-        <a href="#sec-{{ sec['key'] }}">{{ section_numbers[sec["key"]] }}、{{ sec["name"] }}</a>
+        <a href="#sec-{{ sec['key'] }}"{% if sec["key"] in llm_supported_sections %} class="toc-llm"{% endif %}>{{ section_numbers[sec["key"]] }}、{{ sec["name"] }}{% if sec["key"] in llm_supported_sections %}<span class="toc-llm-icon" aria-hidden="true">🧠</span>{% endif %}</a>
         {% endif %}
         {% endfor %}
     </nav>
