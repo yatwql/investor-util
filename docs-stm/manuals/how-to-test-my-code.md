@@ -22,58 +22,58 @@ pip install pytest-cov coverage
 
 ```bash
 # 查看所有可用选项
-python scripts/test_runner.py --help
+.venv/bin/python scripts/test_runner.py --help
 
 # ===== ① 日常常用（快速反馈，提交前验证） =====
 
 # 提交前快速验证（~20s，P0 门禁）
-python scripts/test_runner.py --mode dev-verify
+.venv/bin/python scripts/test_runner.py --mode dev-verify
 
 # 冒烟测试（~2s 快速验证核心通路）
-python scripts/test_runner.py --mode smoke
+.venv/bin/python scripts/test_runner.py --mode smoke
 
 # 仅运行业务场景测试
-python scripts/test_runner.py --mode scenario
+.venv/bin/python scripts/test_runner.py --mode scenario
 
 # 集成测试（含场景 + 模块间契约/缓存/TUI 路由）
-python scripts/test_runner.py --mode integration
+.venv/bin/python scripts/test_runner.py --mode integration
 
 # 全量单元测试（含 edge/data）
-python scripts/test_runner.py --mode unit
+.venv/bin/python scripts/test_runner.py --mode unit
 
 # 常规单元测试（排除 edge/data）
-python scripts/test_runner.py --mode standard
+.venv/bin/python scripts/test_runner.py --mode standard
 
 # ===== ② 专项验证（定向覆盖） =====
 
 # 仅运行边缘/异常场景测试
-python scripts/test_runner.py --mode edge
+.venv/bin/python scripts/test_runner.py --mode edge
 
 # 极限场景（超多持仓/极端值/高精度）
-python scripts/test_runner.py --mode scenario_extreme
+.venv/bin/python scripts/test_runner.py --mode scenario_extreme
 
 # 数据正确性验证（~2s）
-python scripts/test_runner.py --mode data
+.venv/bin/python scripts/test_runner.py --mode data
 
 # 真实网络验证（opt-in，不入门禁，仅排查数据源连通性时手工运行）
-python scripts/test_runner.py --mode live
+.venv/bin/python scripts/test_runner.py --mode live
 
 # 运行全量 + 行覆盖率报告
-python scripts/test_runner.py --coverage
+.venv/bin/python scripts/test_runner.py --coverage
 
 # ===== ③ 全量/CI 门禁（耗时较长） =====
 
 # 开发期快速验证（5 个 unit 子模块并行 + 基础场景，~20s）
-python scripts/test_runner.py --mode dev-verify
+.venv/bin/python scripts/test_runner.py --mode dev-verify
 
 # 合入验证 — PR 前检查（~10s）
-python scripts/test_runner.py --mode verify
+.venv/bin/python scripts/test_runner.py --mode verify
 
 # 全量测试（~30s，--mode verify,regression 覆盖单元+场景）
-python scripts/test_runner.py --mode verify,regression
+.venv/bin/python scripts/test_runner.py --mode verify,regression
 
 # 全量测试（排除单元测试，~10s 快速全场景覆盖）
-python scripts/test_runner.py --mode all_no_unit
+.venv/bin/python scripts/test_runner.py --mode all_no_unit
 ```
 
 ## 🔁 只重跑上次失败的测试（`--lf`）
@@ -82,15 +82,15 @@ python scripts/test_runner.py --mode all_no_unit
 
 ```bash
 # 只重跑上次 pytest 运行中失败的测试（跳过已通过的）
-pytest src/test/ --lf
+.venv/bin/python -m pytest src/test/ --lf
 
 # 先收集匹配 marker 的用例，再从其中只重跑上次失败的
-pytest src/test/ -m "unit_providers" --lf
+.venv/bin/python -m pytest src/test/ -m "unit_providers" --lf
 ```
 
 **与 `test_runner.py` 的配合**：
 
-`test_runner.py` 使用 `argparse` 管理参数，**不支持** `--` 透传（例如 `python scripts/test_runner.py --mode all -- --lf` 会报错）。如需 `--lf`，绕过它直接调 pytest，用 `-m` 参数复现目标模式的标记表达式：
+`test_runner.py` 使用 `argparse` 管理参数，**不支持** `--` 透传（例如 `.venv/bin/python scripts/test_runner.py --mode all -- --lf` 会报错）。如需 `--lf`，绕过它直接调 pytest，用 `-m` 参数复现目标模式的标记表达式：
 
 ```bash
 # 先找到目标模式对应的 marker 表达式
@@ -100,9 +100,9 @@ pytest src/test/ -m "unit_providers" --lf
 #   verify     → "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts"
 
 # 然后用 pytest -m + --lf 组合运行
-pytest src/test/ -m "scenario" --lf                  # 等价 --mode regression 的失败重跑
-pytest src/test/ -m "unit_providers" --lf            # 等价 --mode unit 下 unit_providers 的失败重跑
-pytest src/test/ -m "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts" --lf  # 等价 --mode verify
+.venv/bin/python -m pytest src/test/ -m "scenario" --lf                  # 等价 --mode regression 的失败重跑
+.venv/bin/python -m pytest src/test/ -m "unit_providers" --lf            # 等价 --mode unit 下 unit_providers 的失败重跑
+.venv/bin/python -m pytest src/test/ -m "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts" --lf  # 等价 --mode verify
 ```
 
 > 各 `--mode` 对应的 `-m` 表达式见下文「模式与覆盖范围说明」章节，或直接查看 `scripts/test_runner.py` 中 `MODES` 字典的 `marker` 字段。
@@ -113,15 +113,15 @@ pytest src/test/ -m "unit_core or unit_providers or unit_fetcher or unit_config 
 
 ```
 # 1. 跑全量 → 发现 N 个失败
-pytest src/test/ -m "edge"
+.venv/bin/python -m pytest src/test/ -m "edge"
 
 # 2. 修复代码
 
 # 3. 仅重跑失败的 N 个（5 秒而非 5 分钟）
-pytest src/test/ -m "edge" --lf
+.venv/bin/python -m pytest src/test/ -m "edge" --lf
 
 # 4. 全部通过后，再用无 --lf 的全量确认没有回归
-pytest src/test/ -m "edge"
+.venv/bin/python -m pytest src/test/ -m "edge"
 ```
 
 > ⚠ **注意**：
@@ -131,7 +131,7 @@ pytest src/test/ -m "edge"
 
 ## 测试模式详解
 
-测试框架围绕两个概念组织：**pytest 标记（marker）** 是测试用例的固有属性（标注"这是什么测试"）；**`--mode`** 是 `scripts/test_runner.py` 脚本对标记的预定义组合（定义"应该运行哪些测试"）。每个 mode 对应一个或多个标记表达式，脚本解析后传给 `pytest -m` 执行。
+测试框架围绕两个概念组织：**pytest 标记（marker）** 是测试用例的固有属性（标注"这是什么测试"）；**`--mode`** 是 `scripts/test_runner.py` 脚本对标记的预定义组合（定义"应该运行哪些测试"）。每个 mode 对应一个或多个标记表达式，脚本解析后传给 `.venv/bin/python -m pytest -m` 执行。
 
 ### 回归测试级别
 
@@ -183,7 +183,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 ### 模式与覆盖范围说明
 
-每种 `--mode` 对应一组 pytest 标记表达式，由 `scripts/test_runner.py` 转换为 `pytest -m "<表达式>"` 执行。各模式的覆盖范围存在包含与被包含关系，理解这种关系有助于缩小验证范围以快速反馈：
+每种 `--mode` 对应一组 pytest 标记表达式，由 `scripts/test_runner.py` 转换为 `.venv/bin/python -m pytest -m "<表达式>"` 执行。各模式的覆盖范围存在包含与被包含关系，理解这种关系有助于缩小验证范围以快速反馈：
 
 #### 🔷 单元测试系列（`unit` / `standard`）
 
@@ -222,12 +222,12 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **内容**：覆盖行情（A 股/ETF/场外基金/中美指数）、新闻源（东方财富/财联社/新浪/华尔街见闻）、基金（历史净值/排名/基准）、akshare 交易日历共 14 项。
 - **断言原则**：只校验返回「结构」（字段存在、类型、非空），**不校验具体数值**，容忍真实行情波动（休市、涨跌、数据源改字段）。
 - **不含 LLM 真实调用**（防费用）——LLM 连通性由运行时数据源健康检查覆盖。
-- 触发方式：`python scripts/test_runner.py --mode live` 或 `pytest --run-live -m live`。
+- 触发方式：`.venv/bin/python scripts/test_runner.py --mode live` 或 `.venv/bin/python -m pytest --run-live -m live`。
 
 #### 🔷 全量（`all`）
 
 - **`--mode verify,regression`** 组合模式，等价于分别运行 verify（单元） + regression（场景）。约 30s，作为发布门禁。
-- **`--mode all`** 不设任何标记过滤（`pytest src/test/`），运行全量测试。需要全覆盖时手动调用。
+- **`--mode all`** 不设任何标记过滤（`.venv/bin/python -m pytest src/test/`），运行全量测试。需要全覆盖时手动调用。
 - **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。
 
 #### 🔷 多模式组合
@@ -236,10 +236,10 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 ```bash
 # 同时运行场景测试和边缘测试
-python scripts/test_runner.py --mode scenario,edge
+.venv/bin/python scripts/test_runner.py --mode scenario,edge
 ```
 
-脚本按 MODES 字典定义的 order 顺序依次执行各模式，结果汇总到同一份 HTML 报告中。适用于 CI 流水线中按阶段逐步收紧的场景。精确实时计数请运行 `pytest src/test/ --collect-only -q`。
+脚本按 MODES 字典定义的 order 顺序依次执行各模式，结果汇总到同一份 HTML 报告中。适用于 CI 流水线中按阶段逐步收紧的场景。精确实时计数请运行 `.venv/bin/python -m pytest src/test/ --collect-only -q`。
 
 #### 🔷 跨机器耗时采集与环境耗时对照（`bench` + `--machine-info` / `--update-docs`）
 
@@ -247,10 +247,10 @@ python scripts/test_runner.py --mode scenario,edge
 
 ```bash
 # 仅采集：顺序运行 14 个对照表模式（不含 live），打印环境属性表 + 各模式实测耗时表
-python scripts/test_runner.py --mode bench --machine-info
+.venv/bin/python scripts/test_runner.py --mode bench --machine-info
 
 # 采集并自动更新 test-coverage.md「环境耗时对照」两张表
-python scripts/test_runner.py --mode bench --update-docs   # 隐含 --machine-info
+.venv/bin/python scripts/test_runner.py --mode bench --update-docs   # 隐含 --machine-info
 ```
 
 - **`--mode bench`** 是 14 个对照表模式的聚合别名（`_MODE_TABLE_ORDER` 除 `live` 外全部），按对照表顺序运行；结果去重保序，非 bench 模式原样透传。
@@ -304,32 +304,32 @@ test-reports/latest/
 
 ```bash
 # 自动查找 test-reports/latest/ 下的报告
-python scripts/extract-test-failures.py
+.venv/bin/python scripts/extract-test-failures.py
 
 # 指定报告路径
-python scripts/extract-test-failures.py test-reports/latest/all/report.html
+.venv/bin/python scripts/extract-test-failures.py test-reports/latest/all/report.html
 
 # 仅输出汇总统计（不打印日志）
-python scripts/extract-test-failures.py --summary
+.venv/bin/python scripts/extract-test-failures.py --summary
 
 # 输出 JSON 格式（便于管道处理）
-python scripts/extract-test-failures.py --json
+.venv/bin/python scripts/extract-test-failures.py --json
 ```
 
 **典型工作流**：
 
 ```
 # 1. 跑全量测试
-python scripts/test_runner.py --mode verify,regression
+.venv/bin/python scripts/test_runner.py --mode verify,regression
 
 # 2. 快速查看哪些用例失败
-python scripts/extract-test-failures.py --summary
+.venv/bin/python scripts/extract-test-failures.py --summary
 
 # 3. 查看失败详情（含错误堆栈最后 500 字符）
-python scripts/extract-test-failures.py
+.venv/bin/python scripts/extract-test-failures.py
 
 # 4. 修复后，只重跑之前失败的用例
-pytest src/test/ -m "<对应标记>" --lf
+.venv/bin/python -m pytest src/test/ -m "<对应标记>" --lf
 ```
 
 > 脚本自动定位 `test-reports/latest/all/report.html` 等常用路径，无需每次指定路径。
@@ -361,7 +361,7 @@ pytest src/test/ -m "<对应标记>" --lf
 
 ## 标记选择运行速查
 
-以 `pytest -m "<表达式>"` 形式快速选取特定标记组合，适合开发调试中定向验证。
+以 `.venv/bin/python -m pytest -m "<表达式>"` 形式快速选取特定标记组合，适合开发调试中定向验证。
 
 ### 场景标记
 
@@ -387,7 +387,7 @@ pytest src/test/ -m "<对应标记>" --lf
 
 ### 单元子模块标记
 
-以 `pytest -m "<表达式>"` 快速选取单元子模块。
+以 `.venv/bin/python -m pytest -m "<表达式>"` 快速选取单元子模块。
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
@@ -408,7 +408,7 @@ pytest src/test/ -m "<对应标记>" --lf
 
 ### 横切标记
 
-以 `pytest -m "<表达式>"` 快速选取横切标记。
+以 `.venv/bin/python -m pytest -m "<表达式>"` 快速选取横切标记。
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
@@ -438,31 +438,31 @@ pytest src/test/ -m "<对应标记>" --lf
 
 ```bash
 # 查看指定标记下有哪些测试（不执行）
-pytest src/test/ -m "edge" --collect-only
+.venv/bin/python -m pytest src/test/ -m "edge" --collect-only
 
 # 运行单个测试文件
-pytest src/test/unit/report/test_category.py -v
+.venv/bin/python -m pytest src/test/unit/report/test_category.py -v
 
 # 运行单个测试类
-pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency -v
+.venv/bin/python -m pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency -v
 
 # 冒烟测试（~2s 验证核心通路）
-pytest src/test/ -m "smoke" -v
+.venv/bin/python -m pytest src/test/ -m "smoke" -v
 
 # 冒烟 + 边缘测试
-pytest src/test/ -m "smoke or edge" -v
+.venv/bin/python -m pytest src/test/ -m "smoke or edge" -v
 
 # 除 LLM 外的全部测试
-pytest src/test/ -m "not llm" -v
+.venv/bin/python -m pytest src/test/ -m "not llm" -v
 
 # 仅 LLM 场景（S11-S20）
-pytest src/test/ -m "scenario_llm" -v
+.venv/bin/python -m pytest src/test/ -m "scenario_llm" -v
 
 # 基础业务链路 + 日期/时间场景
-pytest src/test/ -m "scenario_basic or scenario_datetime" -v
+.venv/bin/python -m pytest src/test/ -m "scenario_basic or scenario_datetime" -v
 
 # 输出 HTML 报告
-pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
+.venv/bin/python -m pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
 ```
 
 ## 测试文件规范
@@ -472,7 +472,7 @@ pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
 - **方法**：`test_<场景>`
 - **单文件上限**：≤ 800 行 / ≤ 80 测试项 / ≤ 15 方法每类
 - **标记规则**：单元测试用 `pytestmark` 模块级列表（`[pytest.mark.unit, pytest.mark.<子组>]`），场景测试用类级 `@pytest.mark.scenario + @pytest.mark.<子组>`，edge 测试在 `pytestmark` 中追加 `pytest.mark.edge`
-- 新增文件后运行 `python scripts/check-test-markers.py` 验证标记合规性
+- 新增文件后运行 `.venv/bin/python scripts/check-test-markers.py` 验证标记合规性
 
 ## 新增测试指南
 
@@ -498,8 +498,7 @@ pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
 
 ### 命名规范
 
-```python
-# 测试类名 — 模块/场景名 + 测试维度
+```python # 测试类名 — 模块/场景名 + 测试维度
 class TestCacheEdgeCases:          # 模块 + 测试类型
 class TestGetTtlMarketAware:       # 函数名 + 场景
 class TestScenarioS21:             # 新业务场景递增
@@ -521,10 +520,10 @@ def test_qdii_nav_date_delayed_t2(self):
 ### 新增后必须执行的验证
 
 ```bash
-pytest src/test/                                   # 全量通过
-pytest --co                                         # 无 patch 残留污染
-pytest src/test/unit/core/test_registry.py --co -v      # 新文件隔离（示例）
-python scripts/check-test-markers.py                # 标记合规性检查（AST 静态扫描）
+.venv/bin/python -m pytest src/test/                                   # 全量通过
+.venv/bin/python -m pytest --co                                         # 无 patch 残留污染
+.venv/bin/python -m pytest src/test/unit/core/test_registry.py --co -v      # 新文件隔离（示例）
+.venv/bin/python scripts/check-test-markers.py                # 标记合规性检查（AST 静态扫描）
 ```
 
 ### 文件膨胀阈值
@@ -541,7 +540,7 @@ python scripts/check-test-markers.py                # 标记合规性检查（AS
 ### 运行问题
 
 **Q: 运行报错 `no tests collected`？**
-A: 确认使用了正确的 marker 名：`pytest src/test/ -m "edge" --collect-only` 可预览匹配的测试。
+A: 确认使用了正确的 marker 名：`.venv/bin/python -m pytest src/test/ -m "edge" --collect-only` 可预览匹配的测试。
 
 **Q: 报告中文乱码？**
 A: 确保操作系统编码为 UTF-8。Windows PowerShell：`chcp 65001`；Linux/Mac 默认即可。
@@ -549,7 +548,7 @@ A: 确保操作系统编码为 UTF-8。Windows PowerShell：`chcp 65001`；Linux
 ### LLM 相关
 
 **Q: 需要跳过 LLM 测试？**
-A: 使用 `--mode edge` 仅跑边缘用例，或 `python scripts/test_runner.py --mode scenario` 仅跑业务场景（不含 LLM 场景）。若要排除全部 LLM 相关（单元 + 场景），使用 `pytest src/test/ -m "not llm"`。注意 `--mode unit` **包含** `unit_llm`（均为 mock，无需 API key），不跳过 LLM。
+A: 使用 `--mode edge` 仅跑边缘用例，或 `.venv/bin/python scripts/test_runner.py --mode scenario` 仅跑业务场景（不含 LLM 场景）。若要排除全部 LLM 相关（单元 + 场景），使用 `.venv/bin/python -m pytest src/test/ -m "not llm"`。注意 `--mode unit` **包含** `unit_llm`（均为 mock，无需 API key），不跳过 LLM。
 
 ### 标记问题
 
@@ -560,4 +559,4 @@ A: `unit/conftest.py` 的验证模式要求每个单元测试文件必须包含 
 A: 在 `src/test/conftest.py` 的 `pytest_configure` 中注册新标记，然后在测试类前加 `@pytest.mark.<新标记>`。单元测试使用模块级 `pytestmark` 列表，而非类级装饰器。
 
 **Q: 如何验证新增文件的标记是否正确？**
-A: 运行 `python scripts/check-test-markers.py`，脚本会静态扫描所有 `test_*.py` 文件，检查标记完整性、是否有拼写错误、`_edge.py` 是否漏标 `edge` 等。
+A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫描所有 `test_*.py` 文件，检查标记完整性、是否有拼写错误、`_edge.py` 是否漏标 `edge` 等。

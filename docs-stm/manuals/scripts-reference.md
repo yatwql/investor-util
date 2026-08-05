@@ -19,7 +19,7 @@
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
-| `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`pytest --collect-only` 快照，供 test-coverage.md 更新） |
+| `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`.venv/bin/python -m pytest --collect-only` 快照，供 test-coverage.md 更新） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（发布前必跑） |
 | `perf_report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf_view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
@@ -39,35 +39,35 @@ pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。
 
 ```bash
 # 查看所有可用 mode
-python scripts/test_runner.py --help
+.venv/bin/python scripts/test_runner.py --help
 
 # 日常提交前门禁（P0）
-python scripts/test_runner.py --mode dev-verify
+.venv/bin/python scripts/test_runner.py --mode dev-verify
 
 # 合入门禁（P1）
-python scripts/test_runner.py --mode verify
+.venv/bin/python scripts/test_runner.py --mode verify
 
 # 发布门禁（P2）
-python scripts/test_runner.py --mode verify,regression
+.venv/bin/python scripts/test_runner.py --mode verify,regression
 
 # 常用快捷模式
-python scripts/test_runner.py --mode unit         # 全量单元测试
-python scripts/test_runner.py --mode scenario     # 业务场景测试
-python scripts/test_runner.py --mode edge         # 边缘/异常场景
-python scripts/test_runner.py --mode smoke        # 冒烟测试（~2s）
-python scripts/test_runner.py --mode data         # 数据正确性验证
+.venv/bin/python scripts/test_runner.py --mode unit         # 全量单元测试
+.venv/bin/python scripts/test_runner.py --mode scenario     # 业务场景测试
+.venv/bin/python scripts/test_runner.py --mode edge         # 边缘/异常场景
+.venv/bin/python scripts/test_runner.py --mode smoke        # 冒烟测试（~2s）
+.venv/bin/python scripts/test_runner.py --mode data         # 数据正确性验证
 
 # 多模式组合
-python scripts/test_runner.py --mode scenario,edge
+.venv/bin/python scripts/test_runner.py --mode scenario,edge
 
 # 跨机器耗时采集（输出机器环境属性 + 各模式实测耗时表格，供耗时对照更新）
-python scripts/test_runner.py --mode bench --machine-info
+.venv/bin/python scripts/test_runner.py --mode bench --machine-info
 
 # 跨机器耗时采集 + 自动更新 test-coverage.md 环境耗时对照（含机器信息采集）
-python scripts/test_runner.py --mode bench --update-docs
+.venv/bin/python scripts/test_runner.py --mode bench --update-docs
 
 # 带行覆盖率
-python scripts/test_runner.py --mode unit --coverage
+.venv/bin/python scripts/test_runner.py --mode unit --coverage
 ```
 
 > `--mode bench` 是「环境耗时对照」所需 14 个模式（不含 `live`）的聚合别名，按对照表顺序运行；配合 `--machine-info` 输出机器硬件信息（OS/架构/主机名/CPU 型号/物理核/线程/内存/磁盘类型/文件系统/Python/并行度/日期）与环境属性表 + 各模式实测耗时表，可直接并入 `test-coverage.md` 的环境耗时对照（「采集环境属性」+「各模式耗时对照」两张表）。追加 `--update-docs` 则自动将本机环境属性与实测耗时写入 `test-coverage.md` 的两张表（按主机名匹配/新增列，同机覆盖历史实测），不再需要手工粘贴。
@@ -103,27 +103,27 @@ python scripts/test_runner.py --mode unit --coverage
 
 ```bash
 # 自动查找 test-reports/latest/ 下最新报告
-python scripts/extract-test-failures.py
+.venv/bin/python scripts/extract-test-failures.py
 
 # 指定报告路径
-python scripts/extract-test-failures.py test-reports/latest/all/report.html
+.venv/bin/python scripts/extract-test-failures.py test-reports/latest/all/report.html
 
 # 仅输出汇总统计（不打印日志）
-python scripts/extract-test-failures.py --summary
+.venv/bin/python scripts/extract-test-failures.py --summary
 
 # 输出 JSON 格式（便于管道处理）
-python scripts/extract-test-failures.py --json
+.venv/bin/python scripts/extract-test-failures.py --json
 ```
 
 **典型工作流**：
 
 ```bash
-python scripts/test_runner.py --mode verify,regression     # ① 跑全量验证
-python scripts/extract-test-failures.py --summary           # ② 看哪些失败
-python scripts/extract-test-failures.py                     # ③ 看详细错误
+.venv/bin/python scripts/test_runner.py --mode verify,regression     # ① 跑全量验证
+.venv/bin/python scripts/extract-test-failures.py --summary           # ② 看哪些失败
+.venv/bin/python scripts/extract-test-failures.py                     # ③ 看详细错误
 # 修复代码后只重跑失败用例：
-python -m pytest <test_file>::<test_name> -v --tb=short     # ④ 单用例验证
-python scripts/test_runner.py --mode verify,regression     # ⑤ 发布确认
+.venv/bin/python -m pytest <test_file>::<test_name> -v --tb=short     # ④ 单用例验证
+.venv/bin/python scripts/test_runner.py --mode verify,regression     # ⑤ 发布确认
 ```
 
 ---
@@ -134,13 +134,13 @@ python scripts/test_runner.py --mode verify,regression     # ⑤ 发布确认
 
 ```bash
 # 检查全部
-python scripts/check-code-traces.py
+.venv/bin/python scripts/check-code-traces.py
 
 # 详细输出（含排除行信息）
-python scripts/check-code-traces.py -v
+.venv/bin/python scripts/check-code-traces.py -v
 
 # CI 模式（仅输出 文件名:行号，非零退出码）
-python scripts/check-code-traces.py --ci
+.venv/bin/python scripts/check-code-traces.py --ci
 ```
 
 **退出码含义**：
@@ -171,13 +171,13 @@ python scripts/check-code-traces.py --ci
 
 ```bash
 # 检查全部
-python scripts/check-doc-traces.py
+.venv/bin/python scripts/check-doc-traces.py
 
 # 详细输出（含豁免行信息）
-python scripts/check-doc-traces.py -v
+.venv/bin/python scripts/check-doc-traces.py -v
 
 # CI 模式（仅输出 文件名:行号，非零退出码）
-python scripts/check-doc-traces.py --ci
+.venv/bin/python scripts/check-doc-traces.py --ci
 ```
 
 **退出码含义**：
@@ -198,7 +198,7 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 - `_edge.py` 是否漏标 `edge`，或非 `_edge.py` 文件是否误标 `edge`
 
 ```bash
-python scripts/check-test-markers.py
+.venv/bin/python scripts/check-test-markers.py
 ```
 
 无报错输出即合规。新增/修改测试文件后必须运行此脚本。
@@ -212,9 +212,9 @@ python scripts/check-test-markers.py
 新增任务时，编号取管理文档头部 `plan-next` / `rf-next` 当前值，用后将其递增更新；若标记遗漏递增或初值写小，本脚本会扫描当前文档 + 全部历史归档并报错提示修正值。
 
 ```bash
-python scripts/check-task-numbering.py            # 检查全部（plan + rf）
-python scripts/check-task-numbering.py --kind rf  # 仅检查 rf
-python scripts/check-task-numbering.py --ci       # CI 模式（只输出错误）
+.venv/bin/python scripts/check-task-numbering.py            # 检查全部（plan + rf）
+.venv/bin/python scripts/check-task-numbering.py --kind rf  # 仅检查 rf
+.venv/bin/python scripts/check-task-numbering.py --ci       # CI 模式（只输出错误）
 ```
 
 **自动保障机制**（三层，跨机器同步策略见各条目）：
@@ -234,9 +234,9 @@ python scripts/check-task-numbering.py --ci       # CI 模式（只输出错误�
 3. **合并章**：表下「合并章代码标识符」注声明的 sheet key 必须存在于 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表
 
 ```bash
-python scripts/check-semantic-index.py       # 检查全部
-python scripts/check-semantic-index.py -v    # 详细输出（打印每项解析结果）
-python scripts/check-semantic-index.py --ci  # CI 模式（只输出错误，退出码 2）
+.venv/bin/python scripts/check-semantic-index.py       # 检查全部
+.venv/bin/python scripts/check-semantic-index.py -v    # 详细输出（打印每项解析结果）
+.venv/bin/python scripts/check-semantic-index.py --ci  # CI 模式（只输出错误，退出码 2）
 ```
 
 **自动保障**：已纳入 CLAUDE.md 提交前（P0）/发布前（P2）门禁，与 `check-task-numbering.py --ci` 同构。语义命名纪律见技术设计文档「架构设计约束」章节的「约束外参照」。
@@ -254,8 +254,8 @@ Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验�
 `.claude/settings.json` 被 `.gitignore` 排除、不随仓库同步。本脚本将 `check-task-numbering-hook.py` 的 PostToolUse 钩子写入该文件，跨机器 clone 后运行一次即完成接线。
 
 ```bash
-python scripts/install-claude-hook.py             # 安装（幂等，保留已有配置）
-python scripts/install-claude-hook.py --uninstall # 卸载
+.venv/bin/python scripts/install-claude-hook.py             # 安装（幂等，保留已有配置）
+.venv/bin/python scripts/install-claude-hook.py --uninstall # 卸载
 ```
 
 ---
@@ -266,19 +266,19 @@ python scripts/install-claude-hook.py --uninstall # 卸载
 
 ```bash
 # 完整采样（调用 LLM API 对 10 组数据生成分析）
-python scripts/llm_hallucination_sampler.py
+.venv/bin/python scripts/llm_hallucination_sampler.py
 
 # 仅测试特定模块（默认 expert_review）
-python scripts/llm_hallucination_sampler.py --module health_check
+.venv/bin/python scripts/llm_hallucination_sampler.py --module health_check
 
 # 仅测试特定数据集（1-indexed）
-python scripts/llm_hallucination_sampler.py --dataset 1,3,5
+.venv/bin/python scripts/llm_hallucination_sampler.py --dataset 1,3,5
 
 # 跳过 API 调用，只构建 prompt 验证结构
-python scripts/llm_hallucination_sampler.py --dry-run
+.venv/bin/python scripts/llm_hallucination_sampler.py --dry-run
 
 # 跳过缓存强制重新生成
-python scripts/llm_hallucination_sampler.py --force
+.venv/bin/python scripts/llm_hallucination_sampler.py --force
 ```
 
 **输出**：
@@ -293,13 +293,13 @@ python scripts/llm_hallucination_sampler.py --force
 
 ```bash
 # 分析全部锚点，输出建议
-python scripts/calibrate-dedup-threshold.py
+.venv/bin/python scripts/calibrate-dedup-threshold.py
 
 # 仅看汇总统计（不展开详细列表）
-python scripts/calibrate-dedup-threshold.py --summary
+.venv/bin/python scripts/calibrate-dedup-threshold.py --summary
 
 # 指定锚点文件
-python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.jsonl
+.venv/bin/python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.jsonl
 ```
 
 **校准时机**：建议锚点文件积累 **100 条以上**（约 5~10 次报告运行）后校准一次。脚本只分析不自动修改阈值，是否需要调整由开发者判断。
@@ -322,10 +322,10 @@ python scripts/calibrate-dedup-threshold.py --file data/cache/dedup_anchors.json
 
 ### `collect-test-coverage.py` — 测试覆盖计数收集
 
-只做 `pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），按 `test_runner.py` MODES 的 marker 表达式本地归类计数，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs-stm/managements/test-coverage.md` 快照更新使用。
+只做 `.venv/bin/python -m pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），按 `test_runner.py` MODES 的 marker 表达式本地归类计数，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs-stm/managements/test-coverage.md` 快照更新使用。
 
 ```bash
-python scripts/collect-test-coverage.py
+.venv/bin/python scripts/collect-test-coverage.py
 ```
 
 **说明**：
@@ -348,7 +348,7 @@ python scripts/collect-test-coverage.py
 
 ```bash
 # 无参数运行，逐项检查并报 [OK]/[ERR]
-python scripts/check-version-consistency.py
+.venv/bin/python scripts/check-version-consistency.py
 ```
 
 全部 `[OK]` 方可提交。如有 `[ERR]`，按提示逐个同步，然后重跑直到全部通过。
@@ -369,7 +369,7 @@ python scripts/check-version-consistency.py
 生成 20+ 品种 + 3 年模拟持仓，运行 basic/both 报告生成管线，测量各阶段耗时。
 
 ```bash
-python scripts/perf_report.py
+.venv/bin/python scripts/perf_report.py
 ```
 
 **输出**：`docs-stm/tmp/better-investment-performance-test-report.md`
@@ -384,16 +384,16 @@ python scripts/perf_report.py
 
 ```bash
 # 输出全部历史趋势到 stdout
-python scripts/perf_view.py
+.venv/bin/python scripts/perf_view.py
 
 # 仅看 full 类型报告的性能趋势
-python scripts/perf_view.py --report-type full
+.venv/bin/python scripts/perf_view.py --report-type full
 
 # 仅看最近 30 条记录
-python scripts/perf_view.py --last 30
+.venv/bin/python scripts/perf_view.py --last 30
 
 # 同时写入 docs-stm/tmp/perf_trend.md
-python scripts/perf_view.py --save
+.venv/bin/python scripts/perf_view.py --save
 ```
 
 **输出列说明**：
@@ -414,7 +414,7 @@ python scripts/perf_view.py --save
 当 Gemini API 代理（如 `http://10.22.207.29:10037`）出现连通性问题时，逐项检测网络层、代理层和 API 层的健康状况。
 
 ```bash
-python scripts/diagnose_gemini_proxy.py
+.venv/bin/python scripts/diagnose_gemini_proxy.py
 ```
 
 **检测项目**：
@@ -455,7 +455,7 @@ python scripts/diagnose_gemini_proxy.py
 
 ```bash
 # 运行数据源健康检查
-python -m src.python.cli check-sources
+.venv/bin/python -m src.python.cli check-sources
 ```
 
 **输出示例**：
