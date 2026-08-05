@@ -117,7 +117,7 @@ def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> Non
             f"{s.get('threshold', 0) * 100:.0f}%",
             s.get("action", ""),
         ],
-        placeholder="组合内无品种超警戒线",
+        placeholder="组合分散度良好，无品种超警戒线",
     )
 
     # 子块 2：交易纪律（框架，后续轮次填充）
@@ -154,6 +154,7 @@ def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> Non
             s.get("fee", ""),
             s.get("cash_after", ""),
         ],
+        placeholder="无再平衡/纪律触发信号，暂无调仓建议",
     )
 
     # 子块 4：收益归因（TOP5 贡献占比，正负分列 + 净额合计）

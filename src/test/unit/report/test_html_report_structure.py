@@ -1145,9 +1145,9 @@ class TestHtmlTocSidebar(unittest.TestCase):
         self.assertIn("toc.js", str(self.soup), "模板应加载 toc.js")
 
     def test_toc_links_follow_grouped_order(self):
-        """目录项按「基础/基金深度/风险/历史/LLM」分组顺序，组内按报告序号升序。"""
+        """目录项按「基础信息/基金深度分析/行动建议/历史/LLM」分组顺序，组内按报告序号升序。"""
         links = self.soup.select("#toc-sidebar a[href^='#sec-']")
-        # 预期分组顺序（测试常量）：基础 → 基金深度 → 历史 → LLM（风险组空，跳过）
+        # 预期分组顺序（测试常量）：基础信息 → 基金深度分析 → 历史 → LLM（行动建议组空，跳过）
         expected_keys = [
             "summary",
             "market_value",
@@ -1264,7 +1264,7 @@ class TestSummaryDateTimeValueStyles(unittest.TestCase):
 
 
 class TestHtmlTocGroupedNav(unittest.TestCase):
-    """目录分组导航测试 — 「基础/基金深度/风险/历史/LLM」五组折叠。
+    """目录分组导航测试 — 「基础信息/基金深度分析/行动建议/历史/LLM」五组折叠。
 
     覆盖导航收尾验收：分组渲染 / 折叠交互 / 移动端不溢出 / 键盘可达。
     左侧目录（toc-sidebar）按五组折叠；窄屏横向 section-nav 保持扁平兜底。
@@ -1284,7 +1284,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
     def test_four_nonempty_group_details_rendered(self):
         """目录按五组渲染 <details class='toc-group'>，非空组默认 open（展开）。"""
         details = self.soup.select("#toc-sidebar details.toc-group")
-        # 测试常量下：基础/基金深度/历史/LLM 四组有章节，风险组空跳过
+        # 测试常量下：基础信息/基金深度分析/历史/LLM 四组有章节，行动建议组空跳过
         self.assertEqual(len(details), 4, f"应有 4 个非空分组，实际 {len(details)}")
         for d in details:
             self.assertIsNotNone(d.get("open"), "非空分组应默认展开（open 属性）")
@@ -1301,7 +1301,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
         self.assertEqual(
             _group_keys("basic"),
             ["summary", "market_value", "category", "penetration"],
-            "「基础」组应含 4 个基础章节",
+            "「基础信息」组应含 4 个基础章节",
         )
         self.assertEqual(
             _group_keys("fund_deep"),
@@ -1312,7 +1312,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 "fund_concentration",
                 "style_factor",
             ],
-            "「基金深度」组应含基金业绩 + 基金深度分析四章（含持仓关系矩阵/风格与因子分析）",
+            "「基金深度分析」组应含基金业绩 + 基金深度分析四章（含持仓关系矩阵/风格与因子分析）",
         )
         self.assertEqual(
             _group_keys("history"),
@@ -1358,7 +1358,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
         self.assertEqual(
             by_key["basic"],
             ["summary", "market_value", "category", "penetration", "data_source_status"],
-            "「基础」组应含数据源可用性矩阵",
+            "「基础信息」组应含数据源可用性矩阵",
         )
         self.assertEqual(
             by_key["fund_deep"],
@@ -1370,7 +1370,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 "style_factor",
             ],
         )
-        self.assertEqual(by_key["risk"], ["action"], "「风险」组应含行动建议章")
+        self.assertEqual(by_key["action"], ["action"], "「行动建议」组应含行动建议章")
         self.assertEqual(
             by_key["history"],
             ["portfolio_history_drawdown", "portfolio_evolution"],
@@ -1400,23 +1400,23 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             self.assertIsNotNone(d.get("open"), "渲染侧默认 open 保证全量可见")
 
     def test_empty_group_skipped(self):
-        """无可见章节的分组不渲染 <details>（测试常量下风险组空 → 跳过）。"""
+        """无可见章节的分组不渲染 <details>（测试常量下行动建议组空 → 跳过）。"""
         self.assertIsNone(
-            self.soup.select_one("#toc-sidebar details.toc-group[data-group='risk']"),
-            "风险组无可见章节时不应渲染 <details>",
+            self.soup.select_one("#toc-sidebar details.toc-group[data-group='action']"),
+            "行动建议组无可见章节时不应渲染 <details>",
         )
 
-    def test_action_visible_adds_risk_group(self):
-        """enable_action 开启（action 可见）时，「风险」组出现且含行动建议章。"""
+    def test_action_visible_adds_action_group(self):
+        """enable_action 开启（action 可见）时，「行动建议」组出现且含行动建议章。"""
         order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
         order.append({"key": "action", "name": "行动建议", "number": 17})
         numbers = {sec["key"]: sec["number"] for sec in order}
         sv_dict = {sec["key"]: True for sec in order}
         soup = _render_template(_build_minimal_render_data(order, numbers, sv_dict))
-        risk = soup.select_one("#toc-sidebar details.toc-group[data-group='risk']")
-        self.assertIsNotNone(risk, "enable_action 开启时「风险」组应渲染")
-        keys = [a.get("href", "").replace("#sec-", "") for a in risk.select("a[href^='#sec-']")]
-        self.assertEqual(keys, ["action"], "「风险」组应含行动建议章")
+        action = soup.select_one("#toc-sidebar details.toc-group[data-group='action']")
+        self.assertIsNotNone(action, "enable_action 开启时「行动建议」组应渲染")
+        keys = [a.get("href", "").replace("#sec-", "") for a in action.select("a[href^='#sec-']")]
+        self.assertEqual(keys, ["action"], "「行动建议」组应含行动建议章")
 
     # ── 键盘可达 ──────────────────────────────────────────────
 

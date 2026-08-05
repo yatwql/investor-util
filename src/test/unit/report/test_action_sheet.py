@@ -108,12 +108,13 @@ class TestExcelActionSheet(unittest.TestCase):
         self.assertIn("1994.0", flat)  # 调仓后现金
 
     def test_empty_sub_blocks_placeholder(self):
-        """无再平衡信号/纪律/调仓 → 各子块写占位文本。"""
+        """无再平衡信号/纪律/调仓 → 各子块写占位文本（说明组合分散/无触发原因）。"""
         data = _action_data(rebalance_signals=[], discipline_signals=[], rebalance_advice=[], summary="")
         ws = self._write(data)
         flat = self._flat(ws)
-        self.assertIn("组合内无品种超警戒线", flat)
+        self.assertIn("组合分散度良好，无品种超警戒线", flat)
         self.assertIn("暂无触发", flat)
+        self.assertIn("无再平衡/纪律触发信号，暂无调仓建议", flat)
 
     def test_attribution_unavailable_placeholder(self):
         """收益归因 available=False / None → 「待生成」占位。"""
