@@ -191,9 +191,11 @@
 
 ### 4.1 三级熔断体系
 
+> **维度说明**：本表为**熔断器组件**维度（数据源/指标/LLM 三只熔断器）；technical.md §2.2「三层熔断架构」描述 **DataSourceRegistry 流程层**维度（熔断预检 / Provider 级 / 冷却试探恢复），二者互补，术语不冲突。
+
 | 熔断层 | 阈值 | 冷却期 | 退避策略 | 持久化 |
 |:-------|:----:|:------:|:---------|:-------|
-| **数据源熔断器**（DataSourceRegistry） | 连续 3 次失败（行业 6 次） | 300s（行业 120s） | 指数退避 60s→300s→900s→3600s | `data/state/circuit_breaker.json` |
+| **数据源熔断器**（DataSourceRegistry） | 连续 3 次失败（行业 6 次） | 复位值 300s（行业 120s），首次熔断实际冷却按退避首档 60s | 指数退避 60s→300s→900s→3600s（每次熔断升一档） | `data/state/circuit_breaker.json` |
 | **指标熔断器**（IndicatorBreaker） | 连续 3 次失败 | 86400s（24h） | — | `data/cache/metrics_breaker.json` |
 | **LLM 端点熔断器** | 连续 3 次失败 | 60s | — | 仅内存 |
 

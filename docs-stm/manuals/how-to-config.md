@@ -664,7 +664,7 @@
 ---
 ### M. 功能开关（features.json）
 
-`data/config/features.json` 提供 29 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
+`data/config/features.json` 提供 27 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
 
 ```json
 {

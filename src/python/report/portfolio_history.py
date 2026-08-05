@@ -176,7 +176,7 @@ class PortfolioHistoryCalculator:
                 "annualized_volatility": float,
                 "total_return": float,
                 "total_return_pct": float,
-                "daily_returns": [float, ...],  # 日收益率序列（百分比）
+                "daily_returns": [float, ...],  # 日收益率序列（小数，非百分比）
                 "status": "ok" | "degraded" | "unavailable",
                 "warnings": [str, ...],
                 "benchmarks": [{code, name, bars, total_return_pct,
