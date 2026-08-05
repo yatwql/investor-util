@@ -899,7 +899,9 @@ def _update_test_coverage_doc(
     duration_cells = _duration_mode_cells(results)
     dur_lines = _extract_table_region(doc_text, _DOC_DURATION_TABLE_MARKERS)
     dur_updated = _update_machine_table(
-        dur_lines, header_cell, lambda label: duration_cells.get(label.strip("`"))
+        dur_lines, header_cell,
+        # 数据更新时间行按本机采集日期填充；其余行按模式实测耗时（未测留空）
+        lambda label: date if label == "数据更新时间" else duration_cells.get(label.strip("`")),
     )
     doc_text = _replace_table_region(doc_text, _DOC_DURATION_TABLE_MARKERS, dur_updated)
 

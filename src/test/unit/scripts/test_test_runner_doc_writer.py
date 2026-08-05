@@ -89,12 +89,17 @@ def _env_table(col2: str = "旧值", header: str = "dragonball（2026-08-04 实�
 def _duration_table(col2: str | dict[str, str] = "旧值",
                     header: str = "dragonball（2026-08-04 实测）",
                     col3: str = "~30s") -> list[str]:
-    """构造各模式耗时对照表（col2 可传 per-mode dict 便于断言部分保留）。"""
+    """构造各模式耗时对照表（col2 可传 per-mode dict 便于断言部分保留）。
+
+    末行「数据更新时间」为各设备耗时实测日期（col2 dict 用 `数据更新时间` 键）。
+    """
     lines = [f"| `--mode` | {header} | 旧慢笔记本（早期标注，约值） |"]
     lines.append("|:---------|:---------------------------:|:---------------------------:|")
     for mode in _DURATION_MODES:
         c2 = col2.get(mode, "旧值") if isinstance(col2, dict) else col2
         lines.append(f"| `{mode}` | {c2} | {col3} |")
+    c2_time = col2.get("数据更新时间", "旧值") if isinstance(col2, dict) else col2
+    lines.append(f"| 数据更新时间 | {c2_time} | {col3} |")
     return lines
 
 
@@ -222,6 +227,8 @@ class TestDurationTableUpdate:
         assert "| `verify,regression` | ~28s（verify+regression 顺序之和） | ~30s |" in updated
         # 未实测模式保留原值
         assert "| `standard` | 旧值 | ~30s |" in updated
+        # 数据更新时间行：同机列更新为采集日期，历史列保留
+        assert "| 数据更新时间 | 2026-08-05 | ~30s |" in updated
 
     def test_duration_append_new_machine_column_blank_unmeasured(self, runner_script):
         doc = _sample_doc(
@@ -235,6 +242,15 @@ class TestDurationTableUpdate:
         assert "| `standard` | 旧值 | ~30s | |" in updated
         # 新增列分隔标记：耗时表居中
         assert "|:---------|:---------------------------:|:---------------------------:|:---:|" in updated
+        # 数据更新时间行：新列同样填入采集日期
+        assert "| 数据更新时间 | 旧值 | ~30s | 2026-08-05 |" in updated
+
+    def test_duration_update_time_row_matches_machine_date(self, runner_script):
+        # 数据更新时间行随采集日期联动（换日期再跑 → 同机列日期刷新）
+        doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
+        info = dict(_MACHINE_INFO, date="2026-08-06")
+        updated = runner_script._update_test_coverage_doc(doc, info, [_res("unit", 15.2)])
+        assert "| 数据更新时间 | 2026-08-06 | ~30s |" in updated
 
     def test_duration_combined_row_and_format(self, runner_script):
         assert runner_script._approx_sec(0.4) == 1
