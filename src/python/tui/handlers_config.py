@@ -403,7 +403,7 @@ def _cmd_config_report_boards() -> None:
             print(f"  {GREEN}[OK]{RESET} 市场新闻已{'禁用' if news else '启用'}")
         elif choice == "3":
             set_config("enable_history", not history)
-            print(f"  {GREEN}[OK]{RESET} 组合历史走势已{'禁用' if history else '启用'}")
+            print(f"  {GREEN}[OK]{RESET} 组合历史走势+回撤已{'禁用' if history else '启用'}")
         elif choice == "4":
             set_config("enable_portfolio_evolution", not portfolio_evolution)
             print(f"  {GREEN}[OK]{RESET} 组合演进已{'禁用' if portfolio_evolution else '启用'}")
