@@ -34,14 +34,13 @@
 
 #### P2B — 文档与实现不符（低优先级，增量改进）
 
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-229** | §6.7 功能语义命名表目前是「记录性活索引」而非自动约束——`check-code-traces.py` 只做负面禁止（禁任务代号/魔法编号，`IDENTIFIER_PATTERNS` + CODE），**不校验正面一致性**：① 新增 `report_submodules.*` 开关键可绕过表不登记（预演审计实证：代码现有 6 键 `candidate_compare/cost_lots/data_quality/industry_beta/market_temperature/valuation_percentile`，其中 **`cost_lots` 不在表中**，表内成本流水由 `fund_flow`/`dividend_flow` 覆盖——键与表已存在漂移）；② 表中 slug 若功能已删除可残留僵尸条目；③ 合并章 sheet key（`position_relationship`/`portfolio_history_drawdown`/`style_factor`）是否真实存在于 `registry._REPORT_SECTION_DEFAULT` 无人校验 | **增强方向（待讨论定稿）**：新增 `scripts/check-semantic-index.py` 做双向校验并入门禁——正向：代码中 `report_submodules.<key>` 均须在 §6.7 表中登记（表外键报错，或先补表/列豁免）；反向：表中每个 slug 在 `src/python` 中确实存在（防僵尸条目）；合并章 key 校验须在 registry 中存在。**实施前先跑「键覆盖审计」**确定表外键清单与豁免策略（`cost_lots` 需决定补表或豁免）。待讨论：校验脚本独立 or 并入 check-code-traces.py；门禁级别（P0/P2）；表解析的稳定性 |
+> 当前无待处理项——rf-229（语义命名索引双向校验）已修复，详见 [已修复（摘要）](#已修复摘要)。
 
 ---
 
 ## 已修复（摘要）
 
+- **rf-229** 语义命名索引双向校验：新增 `scripts/check-semantic-index.py` 正面校验「功能语义命名表」与代码一致（正向 `report_submodules` 键登记 / 反向僵尸条目 / 合并章 sheet key 存在性）；表存量修正（`cost_lots` 补登记、僵尸条目移除）；纪律升级为架构设计约束的「约束外参照」并接入 P0/P2 门禁。详见 changelog [0.10.7-dev]。
 - **rf-217** 调仓建议可行化层区分场内/场外渠道：`holdings_details` 契约新增 `channel` 字段（报告层按账户关键词 `is_offsite_fund` 判定填充），`rebalance_advisor` 按渠道计算份额取整与费用（场外整数份 + 赎回费，覆盖 161725/110022 等 16/11 开头代码被场内前缀误判的场外持有场景）；显式 channel 优先、无渠道回退既有证券类型判定。详见 changelog [0.10.7-dev]。
 
 > v0.10.6 发布时已修复项（rf-227/rf-228/rf-230/rf-231/rf-232）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。

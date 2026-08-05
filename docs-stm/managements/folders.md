@@ -9,9 +9,9 @@
 > |---|---|---|---|---|
 | 主程序代码 | Python | 222 | 55,265 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 4 | 3,761 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
-| 辅助脚本 | Python | 16 | 6,188 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **242** | **65,214** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **284** | **79,653** | `src/test/` 所有 `.py` 文件 |
+| 辅助脚本 | Python | 17 | 6,468 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验） |
+| **源代码合计** | — | **243** | **65,494** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **285** | **79,950** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **5,030 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **13** | **5,689** | 含 README.md（179 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 12 | 5,510 | 配置/faq/快速上手/CLI 等 |
@@ -525,14 +525,15 @@ investor-util/
 │       │   │   ├── test_orchestrator.py           #   报告编排器单元测试
 │       │   │   ├── test_summary.py                #   摘要生成测试
 │       │   │   └── test_valuation_temperature_wiring.py # 估值分位+市场温度报告层接线测试
-│       │   ├── scripts/              #   工程脚本单元测试（历史痕迹/版本一致性/任务编号检查工具自检）
+│       │   ├── scripts/              #   工程脚本单元测试（历史痕迹/版本一致性/任务编号/语义命名索引检查工具自检）
 │       │   │   ├── __init__.py       #       子包标记
 │       │   │   ├── test_check_version_consistency.py #   版本号一致性检查脚本测试
 │       │   │   ├── test_task_numbering_check_scripts.py # 任务编号一致性检查脚本测试
 │       │   │   ├── test_task_numbering_hook_scripts.py # 任务编号自动保障 hook 脚本测试
 │       │   │   ├── test_trace_check_scripts.py  #   check-code/doc-traces 工具自身豁免+时序模式检出/豁免回归
 │       │   │   ├── test_test_runner_machine_info.py  #  test_runner 机器信息采集/bench 别名/耗时表格渲染测试
-│       │   │   └── test_test_runner_doc_writer.py  #   test_runner 环境耗时对照文档自动更新（标记定位/列增改/round-trip）
+│       │   │   ├── test_test_runner_doc_writer.py  #   test_runner 环境耗时对照文档自动更新（标记定位/列增改/round-trip）
+│       │   │   └── test_check_semantic_index.py  #   语义命名索引正反向校验脚本测试
 │       │   ├── startup/              #   首次运行引导单元测试
 │       │   │   ├── __init__.py       #       子包标记
 │       │   │   └── test_startup_wizard.py  #   首次运行引导向导测试
@@ -638,6 +639,7 @@ investor-util/
 │   ├── collect-test-coverage.py     #   测试覆盖计数收集（pytest --collect-only 快照，供 test-coverage.md 更新）
 │   ├── check-code-traces.py         #   代码注释历史痕迹检查
 │   ├── check-doc-traces.py          #   文档历史痕迹检查
+│   ├── check-semantic-index.py      #   功能语义命名表正反向一致性检查
 │   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
 │   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
 │   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）

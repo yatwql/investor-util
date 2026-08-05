@@ -6,6 +6,24 @@
 
 ## [0.10.7-dev] - 开发中（未发布）
 
+### 语义命名索引双向校验（check-semantic-index.py + 功能语义命名表存量修正 + 架构约束参照）
+
+- **动机**：「功能语义命名表」（技术设计文档中「代码标识符 = 文档中文描述」的唯一现状基准）此前是「记录性活索引」而非自动约束——`check-code-traces.py` 只做负面禁止（禁任务代号/魔法编号），**不校验正面一致性**：新增 `report_submodules.*` 开关键可绕过登记、功能删除后表行可残留僵尸条目、合并章 sheet key 无人核实。预演审计实证漂移：`cost_lots` 未登记（表内成本流水此前由 `fund_flow`/`dividend_flow` 覆盖）、`dividend_flow`/`holding_diagnosis` 为僵尸条目。
+- **存量修正（技术设计文档）**：表与代码对齐——`cost_lots` 补登记（`report_submodules.cost_lots`，默认关）、移除僵尸条目 `dividend_flow`/`holding_diagnosis`（并入说明注明其并入归属）、合并章 sheet key 三枚（`position_relationship`/`portfolio_history_drawdown`/`style_factor`）核实均存在于 `registry._REPORT_SECTION_DEFAULT`；表体包裹 `<!-- semantic-index:start/end -->` HTML 标记供脚本定位（与 check-version-consistency / test_runner 文档写入器同款标记习语）。
+- **新增 `check-semantic-index.py`**（独立脚本，正面校验，与 check-code-traces 负面禁止互补）：正向——`_config_defaults.py` 中 `report_submodules` 各键须在「功能语义命名表」中登记（表外键报错）；反向——表中每个语义 slug 在 `src/python` 至少一处非注释代码引用（防僵尸条目，tokenize 剔除注释）；合并章——注声明 sheet key 须在 registry 中存在。退出码 0/2，`--ci` 只输出违规。
+- **纪律升级为架构约束参照**：技术设计文档「架构设计约束」章节开头新增「约束外参照（语义命名纪律）」——除该章节编号约束外，语义命名纪律以「功能语义命名表」为唯一现状基准、由双脚本强制；表所在章节的纪律行同步指向该参照。**不新增约束编号**：语义命名纪律以「约束外参照」形式并入，避免扩充约束编号集合，从而无需波及 check-code-traces 的约束代号边界匹配与其边界测试。
+- **门禁接入**：CLAUDE.md 提交前（P0）/发布前（P2）门禁、testplan.md 回归门禁清单增补 `check-semantic-index.py --ci`；scripts-reference.md 一览表 + 详细章节、folders.md 目录树与统计同步。
+- **测试**：`test_check_semantic_index.py` 24 项（标记区间提取/表行解析/合并章 key 解析/权威源 ast/注释剔除/反向存在性/run_checks 三向/真实仓库冒烟），全部通过；新增脚本自身通过 check-code-traces --ci 自检。
+- **门禁**：check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；提交前跑 dev-verify 全量验证。
+
+### 文档内容修正（菜单 P 章节组 / enable_action 配置入口 / 场内场外识别描述 / 注册表使用说明）
+
+- **菜单 P 章节组修正**：`faq.md` 菜单 P 可配置章节组由「三个」修正为「四个」（基金深度分析/市场新闻/历史走势/组合演进），并补充「组合演进」对应 `enable_portfolio_evolution` 开关；`how-to-config.md` 同步修正——`enable_action` 无菜单入口（需手动编辑 `config.json`），菜单 P 仅配置其余 4 个章节组可见性。
+- **场内/场外识别描述修正**：`reports-instruction.md` 移除「F 开头标记场外基金」的错误描述，改为程序自动识别规则（账户渠道/名称关键词/代码前缀三要素联合判定，QDII 单独分类，识别结果以取价方式列颜色区分），与实际 `market_value.py` 分类逻辑一致。
+- **注册表使用说明修正（`how-to-use-registry.md`）**：① 注册表结构表移除已并入「持仓关系矩阵」的缓存模块 `fund_overlap`（`_MODULE_REGISTRY` 中已删除），TTL 由「24h~7d」修正为「24h」；②「无需手动维护的派生产出」误称报表页签标题/Excel 标签随 `_MODULE_REGISTRY` 自动派生——实际由独立 `_REPORT_SECTION_DEFAULT` 注册表驱动，改为说明注释；③「计算模块注册表」交叉引用去掉裸 `§` 符号，改文字指引；④ 计算模块表 `量化指标` 名称对齐代码 `量化指标计算`。**同步清理**：`how-to-config.md` 缓存 TTL 表移除同源失效行 `fund_overlap`（模块已删除）。
+- **测试**：纯文档修正，无代码变更。
+- **门禁**：check-code-traces / check-doc-traces / check-task-numbering `--ci` 全 [OK]。
+
 ### 调仓建议可行化层区分场内/场外渠道
 
 - **动机**：调仓建议可行化层（`analysis/rebalance_advisor`）此前仅凭代码前缀 + 名称关键词判定证券类型，场外持有基金（LOF/开放式指数基金，如 `161725 招商中证白酒指数A`、`110022 易方达消费行业`）的 16/11 开头代码命中场内基金前缀，被误当场内处理（100 份取整 + 仅计佣金），漏计赎回费且份额取整过粗。

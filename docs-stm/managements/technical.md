@@ -2408,10 +2408,11 @@ make_http_client(timeout=10.0) → httpx.Client
 
 ### 6.7 功能语义命名表
 
-> **纪律**：英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。语义名即代码名——任务代号不进入实现层（禁止用任何任务编号/F 系列/`plan-N`/`rf-N` 命名），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表（`plan.md`/`review-findings.md`）链接锚点。新增功能**先定语义名再设计**。该纪律由 `scripts/check-code-traces.py --ci` 强制（IDENT/CODE，退出码 2）。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（如 `C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。
+> **纪律**：英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。语义名即代码名——任务代号不进入实现层（禁止用任何任务编号/F 系列/`plan-N`/`rf-N` 命名），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表（`plan.md`/`review-findings.md`）链接锚点。新增功能**先定语义名再设计**。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE，退出码 2）+ `scripts/check-semantic-index.py --ci`（正面校验本表与代码正反向一致），并已纳入「架构设计约束」章节的约束外参照（见该章节开头）。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（如 `C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。
 >
 > 以下为当前已实现功能/合并章的语义命名索引（活索引）。各轮功能设计文档中的原始语义命名表为历史快照，仅以此表为唯一现状基准。
 
+<!-- semantic-index:start -->
 | 语义 slug | 中文名（文档/UI） | 归入章节 | 决策链环节 | config 开关 |
 |:--|:--|:--|:--|:--|
 | `candidate_compare` | 候选基金比较 | 基金业绩分析 | 买入/选基 | `report_submodules.candidate_compare`（默认关） |
@@ -2420,17 +2421,19 @@ make_http_client(timeout=10.0) → httpx.Client
 | `rebalance_advice` | 调仓建议 | 行动建议 | 调仓 | `enable_action`（默认关） |
 | `trade_discipline` | 交易纪律 | 行动建议 | 调仓 | `enable_action`（默认关） |
 | `return_attribution` | 收益归因 | 行动建议 | 调仓 | `enable_action`（默认关） |
-| `fund_flow` | 资金流水与资金加权收益 | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 + 输入扩展 | 成本/现金流 | 随持仓文件流水页签（可选输入，无独立开关） |
-| `dividend_flow` | 分红现金流 | 并入 `fund_flow` | 成本/现金流 | 随 `fund_flow`（本地分红流水） |
+| `fund_flow` | 资金流水与资金加权收益 | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 + 输入扩展 | 成本/现金流 | `report_submodules.cost_lots`（默认关，随持仓文件流水页签触发） |
+| `cost_lots` | 成本流水（成本分档 + XIRR + 分红累计） | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 | 成本/现金流 | `report_submodules.cost_lots`（默认关） |
 | `industry_beta` | 行业 Beta 暴露 | 风格与因子分析 | 风险/暴露 | `report_submodules.industry_beta`（默认关） |
 | `crisis_annotation` | 危机区间标注 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
 | `tail_risk` | 尾部风险 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
 | `snapshot_diff` | 快照差异 | 组合演进 | 监控 | 随 `enable_portfolio_evolution` |
 | `data_quality` | 数据质量仪表盘 | 数据源可用性矩阵 | 监控 | `report_submodules.data_quality`（默认关） |
-| `holding_diagnosis` | 品种覆盖诊断 | 并入 `data_quality` | 监控 | 随 `data_quality` |
+
+> **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 
 > **合并章代码标识符**：三个合并章 sheet key 统一为语义名——`position_relationship`（持仓关系矩阵，合并 `fund_overlap` + `correlation_analysis`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号命名。
->
+<!-- semantic-index:end -->
+
 > **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~19（被合并的 key 已删除、`action` 章已插入，保持其余相对顺序）；被合并的 key（`fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure`）在用户 config `report_section_order` 中已失效，可清理（`config/_validation.py` 对未知 key 仅告警不报错）。
 
 [↑ 回到顶部](#目录)
@@ -2508,6 +2511,8 @@ core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 本节定义系统架构层面的**设计约束**。所有新增或修改的代码必须遵守，违反即视为架构违规。
 约束按职责域分组，每个约束包含：设计目的（为何存在）、违反后果（不遵守的影响）、适用范围（哪些模块/场景受约束）。
+
+> **约束外参照（语义命名纪律）**：除上表 C1~C20 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
 
 ### 8.1 数据获取层约束
 
