@@ -20,6 +20,9 @@ import pytest
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
+# generate_all_llm 返回 4 个分析结果 + 4 个缓存标志（无辩论模式）
+_LLM_OUTPUT_TUPLE_LEN = 8
+
 
 class TestMetricsTableBlock:
     """量化指标表格格式化测试。"""
@@ -185,7 +188,7 @@ class TestLLMGeneratorWiring:
     @patch("src.python.llm.generators_orchestrator.generate_all_llm")
     def test_generate_all_llm_metrics_param(self, mock_gen: MagicMock):
         """generate_all_llm 接收 metrics 参数。"""
-        mock_gen.return_value = (None, None, None, None)
+        mock_gen.return_value = (None, None, None, None, False, False, False, False)
 
         from src.python.llm.generators_orchestrator import generate_all_llm
 
@@ -202,12 +205,12 @@ class TestLLMGeneratorWiring:
             metrics=metrics,
         )
         assert result is not None
-        assert len(result) == 4
+        assert len(result) == _LLM_OUTPUT_TUPLE_LEN
 
     @patch("src.python.llm.generators_orchestrator.generate_all_llm")
     def test_generate_all_llm_degradation_events_param(self, mock_gen: MagicMock):
         """generate_all_llm 接收 degradation_events 参数。"""
-        mock_gen.return_value = (None, None, None, None)
+        mock_gen.return_value = (None, None, None, None, False, False, False, False)
 
         from src.python.llm.generators_orchestrator import generate_all_llm
 
@@ -224,7 +227,7 @@ class TestLLMGeneratorWiring:
             degradation_events=events,
         )
         assert result is not None
-        assert len(result) == 4
+        assert len(result) == _LLM_OUTPUT_TUPLE_LEN
 
     def test_expert_review_generator_accepts_metrics(self):
         """generate_expert_review 接受 metrics 参数。"""

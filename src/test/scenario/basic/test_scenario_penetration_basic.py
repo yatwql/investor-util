@@ -7,7 +7,6 @@
   S-P4: 场外主动权益基金 — 主动基金穿透与来源标注
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/scenario/basic/test_scenario_penetration_basic.py -v
 """
 
@@ -505,7 +504,7 @@ class TestSP4ActiveEquity(unittest.TestCase):
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
     @patch("src.python.fetcher.industry.batch_fetch_industry_data",
            return_value={})
-    def test_active_equity_sector_医药(self, mock_ind, mock_batch):
+    def test_active_equity_sector_medical(self, mock_ind, mock_batch):
         """主动基金 → 穿透标的板块映射为"医药"。"""
         mock_batch.return_value = {
             "003095": {

@@ -13,9 +13,7 @@
   S28: 纯债/国债持仓 — 国债/企业债的面值 vs 净价
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/scenario/basic/test_scenario_special_securities.py -v
-  pytest src/test/ -m "scenario_basic" -v
 """
 
 from __future__ import annotations
@@ -82,15 +80,6 @@ class TestS22ConvertibleBond(unittest.TestCase):
         self.assertEqual(prop, "债券")
         self.assertEqual(sub, "纯债")
 
-    def test_convertible_bond_name_bond_classification(self):
-        """可转债名称含"转债" → 分类为 债券/纯债（"债"宽匹配）。"""
-        from src.python.report.category import _categorize_holding
-        h = Holding("证券", "浦发转债", "110059", shares=10, cost_price=105.0)
-        prop, sub = _categorize_holding(h)
-        # 名称含"债" → is_bond_related_by_name 或 "债" in name 命中 → 债券/纯债
-        self.assertEqual(prop, "债券")
-        self.assertEqual(sub, "纯债")
-
     def test_convertible_bond_market_value(self):
         """可转债有行情 → 市值计算正确。"""
         from src.python.report.market_value import _compute_detail_row
@@ -123,13 +112,6 @@ class TestS23PublicReits(unittest.TestCase):
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "基金")
         self.assertEqual(sub, "指数")
-
-    def test_reit_reit_in_name_classification(self):
-        """REIT 名称含 REIT → 当前按 基金/指数 分类。"""
-        from src.python.report.category import _categorize_holding
-        h = Holding("证券", "华夏中国交建REIT", "180102", shares=1000, cost_price=8.5)
-        prop, sub = _categorize_holding(h)
-        self.assertEqual((prop, sub), ("基金", "指数"))
 
     def test_reit_market_value(self):
         """REIT 有行情 → 市值正常计算。"""

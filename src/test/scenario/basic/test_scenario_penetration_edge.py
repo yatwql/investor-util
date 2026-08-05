@@ -4,7 +4,6 @@
   S-P6: 黄金 ETF 无效比例过滤 — >100% 的垃圾数据排除
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/scenario/basic/test_scenario_penetration_edge.py -v
 """
 

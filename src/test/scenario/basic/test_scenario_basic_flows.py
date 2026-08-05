@@ -1,11 +1,9 @@
-"""集成测试 — 报告生成流程端到端验证。
+"""报告生成流程端到端验证 — _generate_excel_report 全页签生成正确。
 
-测试目标：
-  - _generate_excel_report — 全页签生成正确，mock 外部数据避免真实 API 调用
+mock 外部数据避免真实 API 调用。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_integration -v
+  pytest src/test/scenario/basic/test_scenario_basic_flows.py -v
 """
 
 from __future__ import annotations
@@ -13,15 +11,11 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import MagicMock, patch
-
-import pytest
-from openpyxl import Workbook
 
 from src.python.core.models import Holding
-from src.python.report.excel_writer import create_workbook, save_workbook
 from src.python.report.excel_generator import generate_excel_report as _generate_excel_report
 
 # 基础业务场景（S1-S5）标记

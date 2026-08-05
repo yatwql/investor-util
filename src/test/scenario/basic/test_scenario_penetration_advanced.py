@@ -6,7 +6,6 @@
   S-P8: 国内指数联接基金 — 联接基金穿透验证
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/scenario/basic/test_scenario_penetration_advanced.py -v
 """
 

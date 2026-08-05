@@ -22,6 +22,9 @@ from src.python.core.models import Holding
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
+# generate_all_llm 返回 4 个分析结果 + 4 个缓存标志（无辩论模式）
+_LLM_OUTPUT_TUPLE_LEN = 8
+
 _SAMPLE_HOLDINGS = [
     Holding(account="证券", name="长江电力", code="600900", shares=100, cost_price=10.0),
     Holding(account="证券", name="贵州茅台", code="600519", shares=50, cost_price=200.0),
@@ -88,7 +91,7 @@ class TestCheckpointSmoke:
         mock_gen: MagicMock,
     ):
         """generate_all_llm 接收 history_data 参数。"""
-        mock_gen.return_value = (None, None, None, None)
+        mock_gen.return_value = (None, None, None, None, False, False, False, False)
 
         from src.python.llm.generators_orchestrator import generate_all_llm
 
@@ -104,7 +107,7 @@ class TestCheckpointSmoke:
             history_data={"annualized_volatility": 0.15, "max_drawdown_pct": -0.10},
         )
         assert result is not None
-        assert len(result) == 4
+        assert len(result) == _LLM_OUTPUT_TUPLE_LEN
 
     # ── Checkpoint 4 ─────────────────────────────────
 
