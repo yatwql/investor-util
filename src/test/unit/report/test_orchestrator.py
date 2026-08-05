@@ -193,13 +193,11 @@ class TestGenerateReport:
         mock_reporter = MagicMock()
         with (
             # 市场数据网络依赖：交易日历（akshare）+ A 股/美股指数（腾讯/新浪）
-            patch("src.python.report.market_value._get_trading_calendar",
-                  return_value=set()),
+            patch("src.python.report.market_value._get_trading_calendar", return_value=set()),
             patch("src.python.fetcher.index.fetch_indices", return_value={}),
             patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
             # 后台数据源健康检查（全量 HTTP 连通性探测）
-            patch("src.python.report._report_generation._spawn_health_checks",
-                  return_value=None),
+            patch("src.python.report._report_generation._spawn_health_checks", return_value=None),
             patch("src.python.report._report_generation._collect_health_checks"),
         ):
             result = generate_report(holdings=[], config={}, reporter=mock_reporter)
@@ -543,6 +541,136 @@ class TestGenerateReport:
         assert detail["profit"] == pytest.approx(250.0)
         assert detail["market_value"] == pytest.approx(1250.0)
 
+    def test_generate_report_both_injects_portfolio_peak_mv(self):
+        """both 路径历史走势后重建 action_data，注入组合历史峰值市值。
+
+        回归：组合回撤纪律以 history_data.bars 的峰值市值为基准——峰值在
+        「3. 历史走势」之后才可得，action_data 必须就地重建并传入
+        portfolio_peak_mv，否则回撤纪律在生产路径永不激活。
+        """
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock(code="SH600001", name="测试", shares=100, cost_price=10.0)]
+
+        mock_detail = MagicMock()
+        mock_detail.code = "SH600001"
+        mock_detail.name = "测试"
+        mock_detail.market_value = 1250.0
+        mock_detail.cost = 1000.0
+        mock_detail.profit = 250.0
+        mock_detail.profit_rate = 0.25
+        mock_detail.shares = 100
+        mock_detail.price = 12.5
+
+        captured: dict = {}
+
+        def _fake_build(holdings_details, total_mv, **kwargs):
+            captured["portfolio_peak_mv"] = kwargs.get("portfolio_peak_mv")
+            return {"available": True, "summary": "", "rebalance_signals": []}
+
+        with (
+            patch("src.python.report.market_value._generate_details", return_value=[mock_detail]),
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            # 历史走势 bars：峰值 200.0（100→200→150），回撤纪律基准应为历史峰值
+            patch(
+                "src.python.report._snapshot.fetch_history_data",
+                return_value={
+                    "status": "ok",
+                    "bars": [
+                        {"date": "2026-01-01", "total_value": 100.0},
+                        {"date": "2026-01-02", "total_value": 200.0},
+                        {"date": "2026-01-03", "total_value": 150.0},
+                    ],
+                },
+            ),
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
+            patch("src.python.core.registry.get_report_section_order"),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=True),
+            patch("src.python.config.is_enable_history", return_value=True),
+            patch(
+                "src.python.core.holding_status.build_coverage_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            patch(
+                "src.python.analysis.action_advisor.build_action_data",
+                side_effect=_fake_build,
+            ),
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config={"output_dir": "reports"},
+                reporter=mock_reporter,
+                report_type="both",
+                fetch_history=True,
+            )
+
+        assert result.report_generated is True
+        assert captured["portfolio_peak_mv"] == pytest.approx(200.0)
+
+    def test_generate_report_both_peak_none_when_history_off(self):
+        """both 路径历史走势关闭 → 峰值注入 None（组合回撤纪律按「峰值未知」不激活）。
+
+        历史走势关闭时 action_data 仍需构建（止盈/止损纪律不受影响），
+        峰值取 None 且不得报错。
+        """
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock(code="SH600001", name="测试", shares=100, cost_price=10.0)]
+
+        mock_detail = MagicMock()
+        mock_detail.code = "SH600001"
+        mock_detail.name = "测试"
+        mock_detail.market_value = 1250.0
+        mock_detail.cost = 1000.0
+        mock_detail.profit = 250.0
+        mock_detail.profit_rate = 0.25
+        mock_detail.shares = 100
+        mock_detail.price = 12.5
+
+        captured: dict = {}
+
+        def _fake_build(holdings_details, total_mv, **kwargs):
+            captured["portfolio_peak_mv"] = kwargs.get("portfolio_peak_mv")
+            return {"available": True, "summary": "", "rebalance_signals": []}
+
+        with (
+            patch("src.python.report.market_value._generate_details", return_value=[mock_detail]),
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            patch("src.python.report._snapshot.fetch_history_data"),
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
+            patch("src.python.core.registry.get_report_section_order"),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=True),
+            patch("src.python.config.is_enable_history", return_value=False),
+            patch(
+                "src.python.core.holding_status.build_coverage_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            patch(
+                "src.python.analysis.action_advisor.build_action_data",
+                side_effect=_fake_build,
+            ),
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config={"output_dir": "reports"},
+                reporter=mock_reporter,
+                report_type="both",
+                fetch_history=True,
+            )
+
+        assert result.report_generated is True
+        assert captured["portfolio_peak_mv"] is None
+
     def test_generate_report_full_calls_prepare_report_data(self):
         """full 路径调用 prepare_report_data（含指数/穿透/分类）。"""
         mock_reporter = MagicMock()
@@ -609,6 +737,102 @@ class TestGenerateReport:
         # 传入 enable_llm=True（full 路径含 LLM）
         _html_kwargs = mock_html.call_args.kwargs
         assert _html_kwargs.get("enable_llm") is True
+
+    def test_generate_report_full_injects_portfolio_peak_mv(self):
+        """full 路径历史走势后重建 action_data，注入组合历史峰值市值。
+
+        回归：prepare_report_data 的 action_data 为中间占位构建（无峰值），
+        full 路径必须在 _prepare_full_risk_metrics（history 就绪）后重建并
+        注入 portfolio_peak_mv，组合回撤纪律方能激活。
+        """
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock(code="SH600001", name="测试", shares=100, cost_price=10.0)]
+        config = {
+            "output_dir": "reports",
+            "news_top_count": 100,
+            "history": {"fetch_mode": "auto"},
+        }
+
+        captured: dict = {}
+
+        def _fake_build(holdings_details, total_mv, **kwargs):
+            captured["portfolio_peak_mv"] = kwargs.get("portfolio_peak_mv")
+            return {"available": True, "summary": "", "rebalance_signals": []}
+
+        with (
+            patch("src.python.report.orchestrator.prepare_report_data") as mock_prep,
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            # 历史走势 bars：峰值 200.0（100→200→150），回撤纪律基准应为历史峰值
+            patch(
+                "src.python.report._snapshot.fetch_history_data",
+                return_value={
+                    "status": "ok",
+                    "bars": [
+                        {"date": "2026-01-01", "total_value": 100.0},
+                        {"date": "2026-01-02", "total_value": 200.0},
+                        {"date": "2026-01-03", "total_value": 150.0},
+                    ],
+                },
+            ),
+            patch("src.python.report._llm_news._fetch_llm_and_news") as mock_llm_news,
+            patch("src.python.report.html_writer.write_html_report") as mock_html,
+            patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
+            patch("src.python.core.registry.get_report_section_order", return_value=[]),
+            patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=[]),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=True),
+            patch("src.python.config.is_enable_history", return_value=True),
+            patch("src.python.config.is_enable_llm", return_value=True),
+            patch(
+                "src.python.analysis.action_advisor.build_action_data",
+                side_effect=_fake_build,
+            ),
+        ):
+            mock_prep.return_value = {
+                "details": [],
+                "total_mv": 1250.0,
+                "total_cost": 1000.0,
+                "total_profit": 250.0,
+                "total_today_profit": 0,
+                "categories": [],
+                "a_indices": {},
+                "us_indices": {},
+                "penetrated_assets": [],
+                "holdings_details": [
+                    {
+                        "name": "测试",
+                        "code": "SH600001",
+                        "market_value": 1250.0,
+                        "cost": 1000.0,
+                        "profit": 250.0,
+                        "profit_rate": 25.0,
+                        "shares": 100,
+                        "price": 12.5,
+                    }
+                ],
+                "today_str": "2026-07-16",
+                "output_dir": "reports",
+                "news_top_count": 100,
+            }
+            mock_llm_news.return_value = (
+                (None, None, None, None),
+                [],
+                {},
+                False,
+                None,
+            )
+
+            result = generate_report(
+                holdings=mock_holdings,
+                config=config,
+                reporter=mock_reporter,
+                report_type="full",
+                fetch_history=True,
+                force_llm=False,
+            )
+
+        assert result.report_generated is True
+        assert captured["portfolio_peak_mv"] == pytest.approx(200.0)
 
     def test_generate_report_full_news_only(self):
         """full 路径仅新闻（LLM 关闭）时正常工作。"""

@@ -119,6 +119,7 @@ def compute_discipline_signals(
     discipline_config: dict[str, Any] | None = None,
     portfolio_peak_mv: float | None = None,
     silence_file: str | None = None,
+    persist_silence: bool = True,
 ) -> list[dict[str, Any]]:
     """计算交易纪律信号（止盈 / 止损 / 回撤三类）。
 
@@ -129,6 +130,10 @@ def compute_discipline_signals(
         discipline_config: discipline 配置段（None 时从全局配置读取）
         portfolio_peak_mv: 组合历史峰值市值（None 时跳过回撤纪律）
         silence_file: 静默期持久化路径（None 时使用模块默认 _SILENCE_FILE）
+        persist_silence: 是否读写静默期状态。False 用于管线「中间占位构建」
+            （历史峰值未就绪时的预备值，随后由峰值就绪后的最终构建覆盖）——
+            跳过静默过滤与静默状态写入，保证最终构建为唯一静默写入方，
+            避免同一持仓在两次构建间被静默误抑制。
 
     Returns:
         纪律信号列表；无触发或数据不充分时返回空列表。
@@ -198,8 +203,10 @@ def compute_discipline_signals(
     # ④ 静默期过滤 + 更新（与再平衡信号同构，复用 _silence.py 机制）。
     # 仅单品信号（有 code）参与静默：组合级回撤信号 code 为空，天然豁免，
     # 与再平衡对组合级信号（category/summary）的约定一致，见模块 docstring。
+    # persist_silence=False 时跳过整段（中间占位构建不读写静默文件，
+    # 避免抢占静默状态导致最终构建的单品信号被误抑制）。
     silence_days = resolved.get("silence_days", _DEFAULT_SILENCE_DAYS)
-    if silence_days > 0:
+    if silence_days > 0 and persist_silence:
         path = silence_file or _SILENCE_FILE
         signals = _silence._filter_silenced_signals(signals, silence_days, path)
         _silence._update_silence_state(signals, path)

@@ -26,6 +26,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 def _make_positive_returns(n: int = 252, mean: float = 0.001, std: float = 0.01) -> list[float]:
     """生成日收益率序列（伪随机但确定性的振荡序列）。"""
     import hashlib
+
     rng = []
     for i in range(n):
         h = hashlib.md5(f"seed_{i}".encode()).hexdigest()
@@ -36,10 +37,7 @@ def _make_positive_returns(n: int = 252, mean: float = 0.001, std: float = 0.01)
 
 def _make_holdings(profits: list[float]) -> list[dict]:
     """生成指定盈亏的持仓列表。"""
-    return [
-        {"name": f"品种{i}", "code": f"00000{i}", "profit": p}
-        for i, p in enumerate(profits)
-    ]
+    return [{"name": f"品种{i}", "code": f"00000{i}", "profit": p} for i, p in enumerate(profits)]
 
 
 class TestSharpeRatio:
@@ -304,11 +302,9 @@ class TestPortfolioBetaAnalysis:
 
         base = _make_positive_returns(252, 0.001, 0.01)
         portfolio = [b for b in base]
-        result = compute_all_metrics(portfolio,
-                                      benchmark_daily_returns=base,
-                                      rf_annual=0.02,
-                                      portfolio_weights=[1.0],
-                                      individual_vols={"A": 0.2})
+        result = compute_all_metrics(
+            portfolio, benchmark_daily_returns=base, rf_annual=0.02, portfolio_weights=[1.0], individual_vols={"A": 0.2}
+        )
         assert "beta_analysis" in result
         assert result["beta_analysis"] is not None
         assert isinstance(result["beta_analysis"], dict)
@@ -376,3 +372,40 @@ class TestCheckDataSufficiency:
         from src.python.analysis.metrics import check_data_sufficiency
 
         assert check_data_sufficiency([]) == 0
+
+
+class TestComputePortfolioPeakMv:
+    """组合历史峰值市值（回撤纪律基准）计算测试。"""
+
+    def test_peak_is_historical_max(self):
+        """bars 含中途峰值 → 返回最大值（含首日）。"""
+        from src.python.analysis.metrics import compute_portfolio_peak_mv
+
+        bars = [
+            {"date": "2026-01-01", "total_value": 100.0},
+            {"date": "2026-01-02", "total_value": 120.0},
+            {"date": "2026-01-03", "total_value": 90.0},
+            {"date": "2026-01-04", "total_value": 110.0},
+        ]
+        assert compute_portfolio_peak_mv(bars) == pytest.approx(120.0)
+
+    def test_peak_ignores_nonpositive_placeholder(self):
+        """0/负值占位（缺失/清仓）不参与峰值。"""
+        from src.python.analysis.metrics import compute_portfolio_peak_mv
+
+        bars = [
+            {"date": "2026-01-01", "total_value": 0.0},
+            {"date": "2026-01-02", "total_value": 100.0},
+            {"date": "2026-01-03", "total_value": 0.0},
+            {"date": "2026-01-04", "total_value": 80.0},
+        ]
+        assert compute_portfolio_peak_mv(bars) == pytest.approx(100.0)
+
+    def test_peak_none_on_empty_or_all_nonpositive(self):
+        """None / 空序列 / 全非正值 → None（峰值未知，回撤纪律不激活）。"""
+        from src.python.analysis.metrics import compute_portfolio_peak_mv
+
+        assert compute_portfolio_peak_mv(None) is None
+        assert compute_portfolio_peak_mv([]) is None
+        assert compute_portfolio_peak_mv([{"date": "2026-01-01", "total_value": 0.0}]) is None
+        assert compute_portfolio_peak_mv([{"date": "2026-01-01", "total_value": -5.0}]) is None

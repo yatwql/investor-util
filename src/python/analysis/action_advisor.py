@@ -73,6 +73,7 @@ def build_action_data(
     total_mv: float,
     discipline_config: dict[str, Any] | None = None,
     portfolio_peak_mv: float | None = None,
+    persist_silence: bool = True,
 ) -> dict[str, Any]:
     """构建行动建议单一数据源（数据契约 `action_data`）。
 
@@ -81,6 +82,8 @@ def build_action_data(
         total_mv: 持仓总市值
         discipline_config: 交易纪律配置段（None 时由纪律引擎读取全局配置）
         portfolio_peak_mv: 组合历史峰值市值（None 时纪律引擎跳过回撤纪律）
+        persist_silence: 纪律静默期是否读写状态。管线「中间占位构建」传 False，
+            保证峰值就绪后的最终构建为唯一静默写入方（见 trade_discipline）。
 
     Returns:
         数据契约 dict（结构见模块 docstring）。available 表示持仓明细可用；
@@ -99,6 +102,7 @@ def build_action_data(
             total_mv,
             discipline_config=discipline_config,
             portfolio_peak_mv=portfolio_peak_mv,
+            persist_silence=persist_silence,
         )
         # 调仓建议可行化清单：把再平衡/纪律触发信号转成可执行订单
         # （份额取整一手、费用估算、现金缓冲防负值、优先级排序）

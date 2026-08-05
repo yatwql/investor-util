@@ -7,7 +7,7 @@
   - recovery_days_after_drop：最大单日跌幅后收复跌幅所需交易日
 
 - 无数据获取、无报告依赖，纯标准库（日志走 logging，不用 print）。
-- 复用历史日收益序列（与 report/portfolio_history._compute_daily_returns 同口径：
+- 复用历史日收益序列（口径统一源 analysis/metrics.compute_daily_returns：
   日收益 = (curr - prev) / prev，小数单位，如 0.01 = 1%），不额外拉长 lookback。
 - 样本不足（< MIN_SAMPLE 个日收益）判数据不足（§1.4.5），available=False，
   各指标置 None，由调用方写占位符。
@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import logging
 import math
+
+from src.python.analysis.metrics import compute_daily_returns
 
 logger = logging.getLogger("invest")
 
@@ -52,7 +54,7 @@ def compute_tail_risk(bars: list[dict] | None) -> dict:
         logger.warning("尾部风险：无历史 bars，返回数据不足占位")
         return _unavailable(0)
 
-    returns = _compute_daily_returns(bars)
+    returns = compute_daily_returns(bars)
     sample_size = len(returns)
     if sample_size < MIN_SAMPLE:
         logger.warning(
@@ -104,22 +106,6 @@ def _unavailable(sample_size: int) -> dict:
         "recovery_state": None,
         "warnings": ["日收益样本不足，尾部风险指标不可用"],
     }
-
-
-def _compute_daily_returns(bars: list[dict]) -> list[float]:
-    """bars → 日收益率序列（小数，0.01 = 1%）。
-
-    与 report/portfolio_history._compute_daily_returns 同口径：prev 市值 > 0 才计入，
-    序号 i 对应 bars[i+1]（即收益在 bars[i+1]["date"] 实现）。
-    """
-    returns: list[float] = []
-    for i in range(1, len(bars)):
-        prev = float(bars[i - 1].get("total_value") or 0.0)
-        curr = float(bars[i].get("total_value") or 0.0)
-        # 首尾任一 ≤0（缺失/占位/清仓）都不构成有效收益，跳过（避免伪 -100% 单日）
-        if prev > 0 and curr > 0:
-            returns.append((curr - prev) / prev)
-    return returns
 
 
 def _compute_var(returns: list[float], level: float) -> float:

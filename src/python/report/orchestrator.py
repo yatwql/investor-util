@@ -164,8 +164,11 @@ def prepare_report_data(
         for d in details
     ]
 
-    # 行动建议：组装 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）
-    action_data = build_action_data(holdings_details, total_mv)
+    # 行动建议：组装 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）。
+    # 此处为「中间占位构建」：组合历史峰值市值需等历史走势就绪（report 层
+    # full 路径在 _prepare_full_risk_metrics 后重建），persist_silence=False
+    # 使占位构建不读写纪律静默文件，保证最终构建为唯一静默写入方。
+    action_data = build_action_data(holdings_details, total_mv, persist_silence=False)
 
     return {
         "details": details,

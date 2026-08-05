@@ -6,6 +6,14 @@
 
 ## [0.10.7-dev] - 开发中（未发布）
 
+### 再平衡信号配置化阈值 + 静默期 + 回撤纪律峰值注入 + 日收益口径统一（第四批）
+
+- **再平衡信号配置化阈值 + 静默期**：`analysis/simple_rebalance` 的再平衡阈值与静默期由硬编码改为配置化参数（`threshold`/`silence_days`/`silence_file`），与纪律层共用 `_silence.py` 静默机制；智囊团深度复盘「行动摘要」的 LLM 段**豁免静默期**（`prompts_core` 以 `silence_days=0` 调用），保证每次复盘完整呈现超限信号、不被静默窗口抑制；新增回归验证 LLM 段不写共享静默文件。
+- **回撤纪律管线注入组合历史峰值市值**：组合级回撤纪律此前在生产路径**从未激活**——`build_action_data` 的两处调用（`orchestrator.prepare_report_data`、`_report_generation` both 路径）均未传 `portfolio_peak_mv`，而峰值只能从 `history_data.bars` 计算且晚于 action_data 构建。修复：新增 `metrics.compute_portfolio_peak_mv(bars)` 计算历史峰值；both 路径将 action_data 构建移至「3. 历史走势」之后并注入峰值；full 路径在 `_prepare_full_risk_metrics` 后重建 action_data 并覆盖 prep/pipeline_data；新增 `persist_silence` 参数使 `prepare_report_data` 的中间占位构建不读写纪律静默文件，保证峰值就绪后的最终构建为管线中纪律静默的唯一写入方（单品信号不被占位构建抢占静默而误抑制）。
+- **日收益口径统一**：`metrics.compute_daily_returns` 成为 tail_risk 与组合走势表共用的单一口径源（prev 与 curr 市值均 >0 才计入，跳过缺失/占位/清仓的伪 -100% 单日）；`tail_risk` 与 `portfolio_history` 均委托之，VaR/最大单日跌幅/年化波动率与走势表日收益完全一致。
+- **测试**：新增组合峰值市值计算 4 项、`persist_silence=False` 不读写静默文件 1 项、both/full 路径峰值注入接线 3 项（含历史走势关闭时峰值取 None 的降级路径）。
+- **门禁**：dev-verify 1810 passed + check-code-traces / check-doc-traces / check-task-numbering `--ci` 全 [OK]。
+
 ### 统一熔断网关 + 指标熔断状态文件落盘位置修正 + 菜单 [1] 基础缓存刷新补齐
 
 - **统一熔断网关（三路聚合）**：`CircuitBreakerGateway` 将数据源熔断（DataSourceRegistry）、LLM 端点熔断、指标熔断（IndicatorBreaker）三路状态聚合到统一查询入口——`gateway.get("data_source"/"indicator"/"llm")`、`gateway.summary()`，并新增模块级 `get_indicator_breaker_status()`/`get_all_breaker_status()` 包装函数。`technical.md` §2.2「统一熔断网关」段落同步更新为三路聚合描述。

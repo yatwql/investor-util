@@ -10,6 +10,9 @@
 
 指标清单：
   sharpe_ratio(portfolio_daily_returns, rf_annual) → float | None
+  compute_daily_returns(bars) → list[float]
+  compute_portfolio_peak_mv(bars) → float | None
+  sharpe_ratio(portfolio_daily_returns, rf_annual) → float | None
   calmar_ratio(portfolio_daily_returns) → float | None
   annualized_return(daily_returns) → float | None
   max_drawdown_pct(daily_returns) → float | None
@@ -45,6 +48,9 @@ from src.python.analysis._math_utils import (
 logger = logging.getLogger("invest")
 
 __all__ = [
+    # 日收益率口径（统一源）
+    "compute_daily_returns",
+    "compute_portfolio_peak_mv",
     # 指标算法
     "sharpe_ratio",
     "calmar_ratio",
@@ -79,6 +85,59 @@ _MAX_DRAWDOWN_EPSILON = 0.001
 
 _RISK_FREE_RATE_DEFAULT = 0.015
 """无风险利率默认值（当传入的 rf 为 None 时使用，约 1.5%）。"""
+
+
+# ── 日收益率口径（统一源） ──────────────────────
+
+
+def compute_daily_returns(bars: list[dict[str, Any]] | None) -> list[float]:
+    """从组合时间线 bars 计算日收益率序列（口径统一源）。
+
+    统一口径（tail_risk 与走势表同口径）：日收益 = (curr - prev) / prev，
+    小数单位（0.01 = 1%）。仅当 prev 与 curr 市值均 > 0 才计入——缺失/占位/清仓
+    （curr ≤ 0）不构成有效收益，跳过以避免伪 -100% 单日污染
+    VaR/最大单日跌幅/年化波动率等指标。序号 i 对应 bars[i+1]
+    （收益在 bars[i+1]["date"] 实现）。
+
+    Args:
+        bars: [{"date": ..., "total_value": float, ...}, ...] 按日期升序。
+            None/空列表返回 []。
+
+    Returns:
+        日收益率序列（小数）。
+    """
+    returns: list[float] = []
+    if not bars:
+        return returns
+    for i in range(1, len(bars)):
+        prev = float(bars[i - 1].get("total_value") or 0.0)
+        curr = float(bars[i].get("total_value") or 0.0)
+        # 首尾任一 ≤0（缺失/占位/清仓）都不构成有效收益，跳过（避免伪 -100% 单日）
+        if prev > 0 and curr > 0:
+            returns.append((curr - prev) / prev)
+    return returns
+
+
+def compute_portfolio_peak_mv(bars: list[dict[str, Any]] | None) -> float | None:
+    """从组合时间线 bars 计算组合历史峰值市值。
+
+    回撤纪律（组合级回撤规则）以「历史峰值」为基准：峰值 = bars 中
+    total_value 的最大值（含首日）。None/空序列/无正值 → None，调用方按
+    「峰值未知」处理（组合回撤纪律不激活）。仅计 total_value > 0 的交易日，
+    与日收益率口径一致——缺失/占位/清仓（≤0）不参与峰值。
+
+    Args:
+        bars: [{"date": ..., "total_value": float, ...}, ...] 按日期升序。
+
+    Returns:
+        组合历史峰值市值（float）或 None（无有效数据）。
+    """
+    if not bars:
+        return None
+    positive = [float(b.get("total_value") or 0.0) for b in bars if float(b.get("total_value") or 0.0) > 0]
+    if not positive:
+        return None
+    return max(positive)
 
 
 # ── 数值清理（截断保护） ──────────────────────────
