@@ -19,8 +19,7 @@
 
 ## 核心数据结构
 
-```python
-@dataclass(frozen=True)
+```python @dataclass(frozen=True)
 class DataModuleDef:
     name: str                  # 中文名称（报告标题、日志、TUI 展示）
     data_type: str             # 数据类型键（用于 TTL 查找）
@@ -72,8 +71,7 @@ class DataModuleDef:
 
 ### 遍历与查询
 
-```python
-from src.python.core.registry import get_registry
+```python from src.python.core.registry import get_registry
 
 registry = get_registry()            # → tuple[DataModuleDef, ...]
 for m in registry:
@@ -82,8 +80,7 @@ for m in registry:
 
 ### 缓存相关
 
-```python
-from src.python.core.registry import (
+```python from src.python.core.registry import (
     get_cache_ttl_defaults,          # → dict[data_type → ttl]
     get_prefix_type_map,             # → dict[prefix → data_type]
     get_exact_type_map,              # → dict[exact_key → data_type]
@@ -99,8 +96,7 @@ from src.python.core.registry import (
 
 ### LLM 模块名称查询
 
-```python
-from src.python.core.registry import (
+```python from src.python.core.registry import (
     get_llm_module_name,             # suffix → 中文名称
     get_llm_module_names,            # → dict[suffix → 名称]
 )
@@ -113,8 +109,7 @@ from src.python.core.registry import (
 
 ### LLM Settings 键名查询
 
-```python
-from src.python.core.registry import (
+```python from src.python.core.registry import (
     get_known_llm_settings_keys,     # → set[str]
 )
 ```
@@ -124,8 +119,7 @@ from src.python.core.registry import (
 
 ### enabled_llm 子键查询
 
-```python
-from src.python.core.registry import (
+```python from src.python.core.registry import (
     get_known_enabled_llm_keys,      # → set[str]
 )
 ```
@@ -135,8 +129,7 @@ from src.python.core.registry import (
 
 ### 报表排序与页签名称
 
-```python
-from src.python.core.registry import (
+```python from src.python.core.registry import (
     get_report_sheet_name,           # sheet_key → 中文标题
     get_report_section_order,        # config → list[dict]（含 key/number/type/data_flag 的完整排序列表）
     get_report_section_number,       # key → 当前配置下的序号
@@ -180,8 +173,7 @@ from src.python.core.registry import (
 
 ### 计算模块查询
 
-```python
-from src.python.core.registry import (
+```python from src.python.core.registry import (
     get_computation_registry,        # → tuple[ComputModuleDef, ...]
     get_computation_module,          # module_key → ComputModuleDef | None
 )
@@ -222,8 +214,7 @@ from src.python.core.registry import (
 
 在 `_MODULE_REGISTRY` 中添加一行 `DataModuleDef`：
 
-```python
-DataModuleDef("我的中文名称", "my_data_type",
+```python DataModuleDef("我的中文名称", "my_data_type",
               cache_prefixes=("mydata_",),
               cache_ttl=CACHE_DAILY,
               cache_groups=("refresh",)),
@@ -239,8 +230,7 @@ DataModuleDef("我的中文名称", "my_data_type",
 
 除上述字段外，还需设置 `settings_suffix`：
 
-```python
-DataModuleDef("我的 LLM 分析", "llm_my_analysis",
+```python DataModuleDef("我的 LLM 分析", "llm_my_analysis",
               cache_prefixes=("llm_my_analysis_",),
               cache_ttl=7200,
               settings_suffix="my_analysis",
@@ -265,8 +255,8 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 | ④ | **注册调度入口** | `llm/generators_orchestrator.py` | 在 `_MODULE_FNS` 字典中添加新模块条目（键=settings_suffix，值=lambda 调用新函数）；在 `_compute_module_cache_info()` 中添加对应的指纹计算和 `info` 条目 |
 | ⑤ | **添加报告页签** | `report/llm_content.py` | 在 `write_llm_sheets()` 的 `_module_keys` 和 `_module_contents` 列表中添加新模块键名 |
 | ⑥ | **暴露导出接口** | `llm/__init__.py` | 将新生成函数加入 `__all__` |
-| ⑦ | **运行注册表测试** | 终端 | `pytest src/test/unit/core/test_registry.py -v` — 验证 TTL/前缀/键名完整性 |
-| ⑧ | **验证标记合规** | 终端 | `python scripts/check-test-markers.py` — 确认测试文件标记无遗漏 |
+| ⑦ | **运行注册表测试** | 终端 | `.venv/bin/python -m pytest src/test/unit/core/test_registry.py -v` — 验证 TTL/前缀/键名完整性 |
+| ⑧ | **验证标记合规** | 终端 | `.venv/bin/python scripts/check-test-markers.py` — 确认测试文件标记无遗漏 |
 
 > **LLM 模块补充步骤**：在上述 registry 清单基础上，新增 LLM 模块还需完成以下领域特定的步骤：
 
@@ -279,8 +269,7 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 
 ### 精确键名缓存（无前缀匹配）
 
-```python
-DataModuleDef("我的固定键", "fixed",
+```python DataModuleDef("我的固定键", "fixed",
               exact_cache_keys=("my_special_cache",),
               cache_ttl=CACHE_WEEKLY),
 ```
@@ -293,8 +282,7 @@ DataModuleDef("我的固定键", "fixed",
 
 除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`core/registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表。
 
-```python
-@dataclass(frozen=True)
+```python @dataclass(frozen=True)
 class ComputModuleDef:
     name: str               # 中文名称
     module_key: str          # 唯一键，如 "analytics_liquidity"
@@ -342,4 +330,4 @@ registry 的测试在 `src/test/unit/core/test_registry.py`，验证：
 - 所有 LLM 模块都有 settings_suffix
 - 缓存分组标记完整性
 
-运行：`pytest src/test/unit/core/test_registry.py -v`
+运行：`.venv/bin/python -m pytest src/test/unit/core/test_registry.py -v`

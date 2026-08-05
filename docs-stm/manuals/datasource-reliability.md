@@ -227,7 +227,7 @@
 程序内置轻量健康检查，运行后依次测试各数据源联通性并报告延迟：
 
 ```bash
-python -m src.python.cli check-sources
+.venv/bin/python -m src.python.cli check-sources
 ```
 
 ### 输出示例

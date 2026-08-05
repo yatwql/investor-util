@@ -6,7 +6,7 @@ CLI 命令行模式支持通过 Windows 任务计划程序或 Linux cron 定时�
 
 ## 1. 概述
 
-CLI 入口：`python -m src.python.cli [全局参数] <子命令> [子命令参数]`
+CLI 入口：`.venv/bin/python -m src.python.cli [全局参数] <子命令> [子命令参数]`
 
 ### 常用命令速查
 
@@ -14,15 +14,15 @@ CLI 入口：`python -m src.python.cli [全局参数] <子命令> [子命令参�
 
 | 用途 | 命令 |
 |:-----|:-----|
-| 生成基础 Excel 报告 | `python -m src.python.cli report --type basic` |
-| 生成全系列报告（不含 LLM） | `python -m src.python.cli report --type both --history auto` |
-| 生成全量完整报告 | `python -m src.python.cli report --type full --history auto` |
-| 更新全部缓存 | `python -m src.python.cli cache --update all` |
-| 更新基础类缓存 | `python -m src.python.cli cache --update basic` |
-| 更新持仓类缓存 | `python -m src.python.cli cache --update position` |
-| 清理过期缓存 | `python -m src.python.cli cache --clean` |
-| 查看缓存状态 | `python -m src.python.cli cache --stats` |
-| 查看性能历史趋势 | `python scripts/perf_view.py` |
+| 生成基础 Excel 报告 | `.venv/bin/python -m src.python.cli report --type basic` |
+| 生成全系列报告（不含 LLM） | `.venv/bin/python -m src.python.cli report --type both --history auto` |
+| 生成全量完整报告 | `.venv/bin/python -m src.python.cli report --type full --history auto` |
+| 更新全部缓存 | `.venv/bin/python -m src.python.cli cache --update all` |
+| 更新基础类缓存 | `.venv/bin/python -m src.python.cli cache --update basic` |
+| 更新持仓类缓存 | `.venv/bin/python -m src.python.cli cache --update position` |
+| 清理过期缓存 | `.venv/bin/python -m src.python.cli cache --clean` |
+| 查看缓存状态 | `.venv/bin/python -m src.python.cli cache --stats` |
+| 查看性能历史趋势 | `.venv/bin/python scripts/perf_view.py` |
 
 ### 退出码含义
 
@@ -43,10 +43,10 @@ CLI 入口：`python -m src.python.cli [全局参数] <子命令> [子命令参�
 
 ```batch
 :: 每日 16:00 生成全量报告（盘后）
-schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "python D:\path\to\investor-util\src\python\cli\cli.py report --type full --history auto" /ST 16:00 /F
+schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "D:\path\to\investor-util\.venv\Scripts\python.exe D:\path\to\investor-util\src\python\cli\cli.py report --type full --history auto" /ST 16:00 /F
 
 :: 每周一早 9:00 更新全部缓存
-schtasks /CREATE /SC WEEKLY /D MON /TN "InvestCacheUpdate" /TR "python D:\path\to\investor-util\src\python\cli\cli.py cache --update all" /ST 09:00 /F
+schtasks /CREATE /SC WEEKLY /D MON /TN "InvestCacheUpdate" /TR "D:\path\to\investor-util\.venv\Scripts\python.exe D:\path\to\investor-util\src\python\cli\cli.py cache --update all" /ST 09:00 /F
 ```
 
 ### 2.2 PowerShell 包装脚本（推荐）
@@ -67,7 +67,7 @@ $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 
 try {
     $env:PYTHONUNBUFFERED = "1"
-    $result = & python -m src.python.cli --output $OutputDir report --type $ReportType --history auto 2>&1
+    $result = & "$ProjectRoot\.venv\Scripts\python.exe" -m src.python.cli --output $OutputDir report --type $ReportType --history auto 2>&1
     $exitCode = $LASTEXITCODE
 
     "$Timestamp [exit=$exitCode] $result" | Out-File $LogFile -Append -Encoding UTF8
@@ -87,7 +87,7 @@ try {
 
 ```batch
 :: 锁文件 + 超时退避
-schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "powershell -NoProfile -Command \"if (-not (Test-Path '$env:TEMP\invest.lock')) { New-Item '$env:TEMP\invest.lock' -Force | Out-Null; try { python -m src.python.cli report --type full --history auto } finally { Remove-Item '$env:TEMP\invest.lock' -ErrorAction SilentlyContinue } }\"" /ST 16:00
+schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "powershell -NoProfile -Command \"if (-not (Test-Path '$env:TEMP\invest.lock')) { New-Item '$env:TEMP\invest.lock' -Force | Out-Null; try { D:\path\to\investor-util\.venv\Scripts\python.exe -m src.python.cli report --type full --history auto } finally { Remove-Item '$env:TEMP\invest.lock' -ErrorAction SilentlyContinue } }\"" /ST 16:00
 ```
 
 ---
@@ -101,13 +101,13 @@ schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "powershell -NoProfile -Comman
 crontab -e
 
 # 每日 16:00 生成全量报告
-0 16 * * * cd /home/user/investor-util && python -m src.python.cli report --type full --history auto >> logs/cron.log 2>&1
+0 16 * * * cd /home/user/investor-util && .venv/bin/python -m src.python.cli report --type full --history auto >> logs/cron.log 2>&1
 
 # 每周一早 9:00 更新全部缓存
-0 9 * * 1 cd /home/user/investor-util && python -m src.python.cli cache --update all >> logs/cron.log 2>&1
+0 9 * * 1 cd /home/user/investor-util && .venv/bin/python -m src.python.cli cache --update all >> logs/cron.log 2>&1
 
 # 每月 1 号清理缓存
-0 10 1 * * cd /home/user/investor-util && python -m src.python.cli cache --clean >> logs/cron.log 2>&1
+0 10 1 * * cd /home/user/investor-util && .venv/bin/python -m src.python.cli cache --clean >> logs/cron.log 2>&1
 ```
 
 ### 3.2 flock 防重入
@@ -116,7 +116,7 @@ crontab -e
 
 ```bash
 # 使用 flock 锁文件防重入
-0 16 * * * cd /home/user/investor-util && flock -n /tmp/invest.lock python -m src.python.cli report --type full --history auto >> logs/cron.log 2>&1
+0 16 * * * cd /home/user/investor-util && flock -n /tmp/invest.lock .venv/bin/python -m src.python.cli report --type full --history auto >> logs/cron.log 2>&1
 ```
 
 ---
@@ -146,11 +146,11 @@ cron/stderr 日志建议自行配置 logrotate：
 
 ```bash
 # 先更新缓存，再生成报告
-python -m src.python.cli cache --update all
-python -m src.python.cli --output ./reports report --type basic
+.venv/bin/python -m src.python.cli cache --update all
+.venv/bin/python -m src.python.cli --output ./reports report --type basic
 
 # 或者使用 --warm 在报告生成时预热
-python -m src.python.cli report --type full --warm --history auto
+.venv/bin/python -m src.python.cli report --type full --warm --history auto
 ```
 
 ### 4.3 报告输出路径
@@ -159,13 +159,13 @@ python -m src.python.cli report --type full --warm --history auto
 
 ```bash
 # 输出到默认 reports/ 目录（使用 config.json 配置）
-python -m src.python.cli report --type full --history auto
+.venv/bin/python -m src.python.cli report --type full --history auto
 
 # 输出到指定目录
-python -m src.python.cli --output D:/backup/reports report --type basic
+.venv/bin/python -m src.python.cli --output D:/backup/reports report --type basic
 
 # 输出到网络共享目录（需确保程序有写入权限）
-python -m src.python.cli --output \\NAS\invest\reports report --type basic
+.venv/bin/python -m src.python.cli --output \\NAS\invest\reports report --type basic
 ```
 
 > 输出目录不存在时程序会自动创建。定时任务中建议使用绝对路径，避免因工作目录不确定导致的路径问题。
@@ -184,7 +184,7 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 
 | 文件 | 内容 | 查看方式 |
 |:-----|:------|:---------|
-| `perf_history.jsonl` | 各阶段耗时（行情/数据准备/HTML/Excel/LLM 等），含版本号和持仓数量 | `python scripts/perf_view.py` |
+| `perf_history.jsonl` | 各阶段耗时（行情/数据准备/HTML/Excel/LLM 等），含版本号和持仓数量 | `.venv/bin/python scripts/perf_view.py` |
 | `datasource_health.jsonl` | 全量数据源 HTTP 连通性检查结果 + 延迟 | 同上命令（同文件含来源格式） |
 
 这些记录自动积累，可用于跨版本性能退化检测和异常波动排查，无需手动触发。
@@ -197,7 +197,7 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 | LLM key 缺失降级 | 1 | 如需 LLM 内容，配置 `llm_key.json` |
 | 部分数据源失败 | 1 | 检查网络，下次调度自动恢复 |
 | 持仓文件不存在 | 2 | 检查 `config.json` 中 `holdings_dir` / `holdings_filename` 配置 |
-| 配置格式错误 | 2 | 运行 `python -c "import json; json.load(open('data/config/config.json'))"` 检查 |
+| 配置格式错误 | 2 | 运行 `.venv/bin/python -c "import json; json.load(open('data/config/config.json'))"` 检查 |
 | 用户中断 | 130 | 手动终止，无需处理 |
 
 ---
@@ -220,8 +220,8 @@ tail -20 logs/cron.log
 
 ```bash
 # 快速验证
-python -m src.python.cli cache --stats
-python -m src.python.cli report --type basic
+.venv/bin/python -m src.python.cli cache --stats
+.venv/bin/python -m src.python.cli report --type basic
 ```
 
 ### 5.3 常见问题

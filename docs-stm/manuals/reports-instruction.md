@@ -247,7 +247,7 @@
 - **回测 opt-in**：不指定生效日则不产出任何回测类结论（无夏普/波动率等量化结论）；指定生效日时回测为模拟推演，请勿作为收益承诺
 - **数据可用性**：两侧均空时降级为不可用；单侧为空视为合法的「全部清仓 / 全部新增」对比
 
-> 入口：菜单 [W]（[菜单操作手册](how-to-menu.md)）或 CLI `python -m src.python.cli whatif --base ... --candidate ... [--effective-date YYYY-MM-DD]`（[快速开始](how-to-start.md)）。
+> 入口：菜单 [W]（[菜单操作手册](how-to-menu.md)）或 CLI `.venv/bin/python -m src.python.cli whatif --base ... --candidate ... [--effective-date YYYY-MM-DD]`（[快速开始](how-to-start.md)）。
 
 ---
 

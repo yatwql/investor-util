@@ -20,11 +20,11 @@
 > 方便多个项目共享或集中管理虚拟环境：
 > ```bash
 > # Windows PowerShell
-> $env:VENV_PATH = "D:\shared\venvs\investor-util"
+> $env:VENV_PATH = "D:\path\to\venvs\investor-util"
 > .\scripts\launch.ps1
 >
 > # Linux
-> VENV_PATH=/opt/venvs/investor-util ./scripts/launch.sh
+> VENV_PATH=/path/to/venvs/investor-util ./scripts/launch.sh
 > ```
 > 首次运行自动创建并链接，再次运行直接复用。
 
@@ -44,7 +44,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 4. 启动 TUI 交互模式
-python -m src.python.tui
+.venv/bin/python -m src.python.tui
 ```
 
 ## 方式三：CLI 命令行模式
@@ -53,25 +53,25 @@ CLI 模式无需 TUI 界面，通过参数驱动，适合定时任务和脚本�
 
 ```bash
 # 查看帮助
-python -m src.python.cli --help
+.venv/bin/python -m src.python.cli --help
 
 # 基础 Excel 报告
-python -m src.python.cli report --type basic
+.venv/bin/python -m src.python.cli report --type basic
 
 # 全量报告（含 LLM）
-python -m src.python.cli report --type full --history auto
+.venv/bin/python -m src.python.cli report --type full --history auto
 
 # 更新缓存
-python -m src.python.cli cache --update all
+.venv/bin/python -m src.python.cli cache --update all
 
 # 查看缓存状态
-python -m src.python.cli cache --stats
+.venv/bin/python -m src.python.cli cache --stats
 
 # 调仓 What-if 模拟（对比两份持仓，生成独立 diff 报告）
-python -m src.python.cli whatif --base data/holdings/调仓前.xlsx --candidate data/holdings/调仓后.xlsx
+.venv/bin/python -m src.python.cli whatif --base data/holdings/调仓前.xlsx --candidate data/holdings/调仓后.xlsx
 
 # 详细模式（终端显示彩色进度前缀）
-python -m src.python.cli --verbose report --type basic
+.venv/bin/python -m src.python.cli --verbose report --type basic
 ```
 
 > CLI 模式与 TUI 模式共享同一套缓存和配置文件，两种模式可交替使用。
@@ -119,29 +119,29 @@ python -m src.python.cli --verbose report --type basic
 
 ```bash
 # 生成全量报告，预热缓存，强制重新调用 LLM
-python -m src.python.cli --verbose report --type full --history auto --warm --force-llm
+.venv/bin/python -m src.python.cli --verbose report --type full --history auto --warm --force-llm
 
 # 基础 Excel 报告，输出到指定目录
-python -m src.python.cli --output D:/my_reports report --type basic
+.venv/bin/python -m src.python.cli --output D:/my_reports report --type basic
 
 # 使用自定义配置文件
-python -m src.python.cli --config D:/config/my_config.json cache --stats
+.venv/bin/python -m src.python.cli --config D:/config/my_config.json cache --stats
 
 # 调仓 What-if：基准用配置默认持仓，目标指定另一份文件
-python -m src.python.cli whatif --candidate D:/holdings/调仓方案.xlsx
+.venv/bin/python -m src.python.cli whatif --candidate D:/holdings/调仓方案.xlsx
 
 # 调仓 What-if：显式指定两份持仓
-python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx
+.venv/bin/python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx
 
 # 调仓 What-if：指定生效日，追加时序回测
-python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx --effective-date 2026-07-01
+.venv/bin/python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx --effective-date 2026-07-01
 ```
 
 **数据源健康检查**（直接通过主程序运行，无需 TUI 界面）：
 
 ```bash
 # 测试各数据源联通性并报告延迟
-python -m src.python.cli check-sources
+.venv/bin/python -m src.python.cli check-sources
 ```
 
 定时任务配置详见[定时任务配置指南](how-to-schedule.md)。
@@ -228,8 +228,8 @@ sh .githooks/install-hooks.sh          # 启用
 sh .githooks/install-hooks.sh --off   # 停用
 
 # 2. Claude Code hook：编辑 plan.md / review-findings.md 后实时校验
-python scripts/install-claude-hook.py             # 启用（幂等，保留已有配置）
-python scripts/install-claude-hook.py --uninstall # 停用
+.venv/bin/python scripts/install-claude-hook.py             # 启用（幂等，保留已有配置）
+.venv/bin/python scripts/install-claude-hook.py --uninstall # 停用
 ```
 
 三层兜底已零配置生效（`check-task-numbering.py --ci` 纳入 P0/P2 门禁；`test_runner.py --mode dev-verify` 自动 preflight），上两命令仅提供更早的实时拦截。详见 [辅助脚本参考](scripts-reference.md)。

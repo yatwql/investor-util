@@ -28,7 +28,7 @@ A: 请使用支持 UTF-8 的终端（Windows Terminal 或 VS Code 终端），�
 
 **Q: 程序启动时 PowerShell 报"无法加载文件，因为在此系统上禁止运行脚本"？**
 
-A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，再运行 `.\scripts\launch.ps1`。或使用手动方式：`.venv\Scripts\activate` + `python -m src.python.tui.tui`。
+A: 以管理员身份运行 PowerShell，先执行 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`，再运行 `.\scripts\launch.ps1`。或使用手动方式：`.venv\Scripts\activate` + `.venv/bin/python -m src.python.tui.tui`。
 
 **Q: 需要什么 Python 版本？**
 
@@ -66,16 +66,16 @@ A: 可以。项目启动脚本（`launch.ps1` / `launch.sh`）已原生支持外
 
 ```bash
 # Linux / macOS
-ln -s /data/shared/venvs/investor-util .venv
+ln -s /path/to/venvs/investor-util .venv
 
 # Windows (Git Bash / WSL)
-ln -s /d/shared/venvs/investor-util .venv
+ln -s /path/to/venvs/investor-util .venv
 
 # Windows (cmd，管理员)
-mklink /J .venv D:\shared\venvs\investor-util
+mklink /J .venv D:\path\to\venvs\investor-util
 
 # Windows (PowerShell 7+，无需管理员)
-New-Item -ItemType SymbolicLink -Path .venv -Target D:\shared\venvs\investor-util
+New-Item -ItemType SymbolicLink -Path .venv -Target D:\path\to\venvs\investor-util
 ```
 
 创建后，Python、pip、pytest、VSCode 全部自动跟随到实际目录，无需环境变量、无需 `activate`。`.gitignore` 已有 `.venv/`，不污染仓库。多个项目可指向同一个外部 `.venv` 节省磁盘空间。
@@ -88,17 +88,17 @@ New-Item -ItemType SymbolicLink -Path .venv -Target D:\shared\venvs\investor-uti
 
 ```bash
 # Windows PowerShell（一次性）
-$env:VENV_PATH = "D:\shared\venvs\investor-util"
+$env:VENV_PATH = "D:\path\to\venvs\investor-util"
 .\scripts\launch.ps1
 
 # Windows（用户环境变量，永久）
-[System.Environment]::SetEnvironmentVariable("VENV_PATH", "D:\shared\venvs\investor-util", "User")
+[System.Environment]::SetEnvironmentVariable("VENV_PATH", "D:\path\to\venvs\investor-util", "User")
 
 # Linux（一次性）
-VENV_PATH=/opt/venvs/investor-util ./scripts/launch.sh
+VENV_PATH=/path/to/venvs/investor-util ./scripts/launch.sh
 
 # Linux（~/.bashrc，永久）
-echo 'export VENV_PATH=/data/shared/venvs/investor-util' >> ~/.bashrc && source ~/.bashrc
+echo 'export VENV_PATH=/path/to/venvs/investor-util' >> ~/.bashrc && source ~/.bashrc
 ```
 
 原理（`launch.sh` 第 43~56 行 / `launch.ps1` 第 54~77 行）：
@@ -112,18 +112,18 @@ echo 'export VENV_PATH=/data/shared/venvs/investor-util' >> ~/.bashrc && source 
 
 ```bash
 # Linux（Docker / Jenkins / GitHub Actions）
-/data/shared/venvs/investor-util/bin/python scripts/test_runner.py --mode regression
-/data/shared/venvs/investor-util/bin/python -m src.python.tui.tui
+/path/to/venvs/investor-util/bin/python scripts/test_runner.py --mode regression
+/path/to/venvs/investor-util/bin/python -m src.python.tui.tui
 
 # Windows（部署脚本）
-& "D:\shared\venvs\investor-util\Scripts\python.exe" scripts\test_runner.py --mode regression
-& "D:\shared\venvs\investor-util\Scripts\python.exe" src\python\tui\tui.py
+& "D:\path\to\venvs\investor-util\Scripts\python.exe" scripts\test_runner.py --mode regression
+& "D:\path\to\venvs\investor-util\Scripts\python.exe" src\python\tui\tui.py
 ```
 
 原理：**PEP 405** 规定 Python 解释器启动时会自动读取同级目录下的 `pyvenv.cfg`，知道自己在虚拟环境中。使用 `.venv/bin/python` 直接执行等效于先 `activate` 再运行——自动使用 venv 内的 site-packages，无需任何环境变量。pip 安装也同理：
 
 ```bash
-/data/shared/venvs/investor-util/bin/pip install -r requirements.txt
+/path/to/venvs/investor-util/bin/pip install -r requirements.txt
 ```
 
 **方案对比：**
@@ -149,15 +149,15 @@ investor-util/
 
 **Q: 如何设置定时自动生成报告？**
 
-A: 项目内置 CLI 命令行模式（`python -m src.python.cli`），专为定时任务与脚本化使用场景设计：
+A: 项目内置 CLI 命令行模式（`.venv/bin/python -m src.python.cli`），专为定时任务与脚本化使用场景设计：
 
 ```bash
 # 生成基础 Excel 报告
-python -m src.python.cli report --type basic
+.venv/bin/python -m src.python.cli report --type basic
 
 # 更新基础缓存 + 生成全量报告（含 LLM）
-python -m src.python.cli cache --update basic
-python -m src.python.cli report --type full --history auto
+.venv/bin/python -m src.python.cli cache --update basic
+.venv/bin/python -m src.python.cli report --type full --history auto
 ```
 
 通过 Windows 任务计划程序 / Linux cron 调用上述命令即可实现无人值守自动生成。CLI 模式生成结果与 TUI 菜单操作一致，缓存可共享。
@@ -237,7 +237,7 @@ A: 需要备份的文件：
 
 **Q: 为什么报告或配置中显示的版本号不是最新的？**
 
-A: 版本号在 `src/python/core/constants.py` 的 `APP_VERSION` 中定义。发布新版本后，需运行 `python scripts/check-version-consistency.py` 按提示同步所有文件中的版本号（README.md、pyproject.toml、管理文档头部等），确保全局一致。遇到版本号不一致时运行上述脚本即可排查并修复。
+A: 版本号在 `src/python/core/constants.py` 的 `APP_VERSION` 中定义。发布新版本后，需运行 `.venv/bin/python scripts/check-version-consistency.py` 按提示同步所有文件中的版本号（README.md、pyproject.toml、管理文档头部等），确保全局一致。遇到版本号不一致时运行上述脚本即可排查并修复。
 
 **Q: 如何配置场外基金的赎回上限？**
 
@@ -637,7 +637,7 @@ A: `data/state/` 存放跨会话持久化的运行时状态文件，目前包含
 
 **Q: data/state/perf_history.jsonl 有何用途？如何查看？**
 
-A: 每次通过菜单 E/B/L 或 CLI 生成报告时，程序自动记录各阶段耗时（行情获取、数据准备、快照对比、历史走势、LLM+新闻、Excel 生成、HTML 生成等）到该文件。运行 `python scripts/perf_view.py` 即可查看按版本和报告类型分组的耗时趋势对比表格。可用于发现版本间性能退化。
+A: 每次通过菜单 E/B/L 或 CLI 生成报告时，程序自动记录各阶段耗时（行情获取、数据准备、快照对比、历史走势、LLM+新闻、Excel 生成、HTML 生成等）到该文件。运行 `.venv/bin/python scripts/perf_view.py` 即可查看按版本和报告类型分组的耗时趋势对比表格。可用于发现版本间性能退化。
 
 **Q: data/state/datasource_health.jsonl 有何用途？**
 

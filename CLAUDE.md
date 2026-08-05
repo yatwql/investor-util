@@ -10,12 +10,13 @@
 - **发布分支**：`master`（仅从 dev 合并，打版本标签后发布）
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
-- **测试**：`src/test/test_*.py`，执行 `pytest src/test/`
-  - **提交前门禁（P0）**：必须通过 `python scripts/test_runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 commit
-  - **合入门禁（P1）**：合并到 master 前必须通过 `python scripts/test_runner.py --mode verify`（核心模块单元测试），否则不得 merge
-  - **发布门禁（P2）**：发布版本前必须通过 `python scripts/test_runner.py --mode verify,regression`（单元+场景验证）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 release
+- **Python 环境**：所有 Python 命令一律使用项目虚拟环境解释器——Linux/macOS 用 `.venv/bin/python`，Windows 用 `.venv\Scripts\python.exe`；**禁止**裸 `python3`/`python`/`pytest`（会命中系统解释器，缺失 pandas 等依赖，报 `No module named 'pandas'`）。运行测试、脚本、CLI 均同；本文件内所有 `python ...`/`pytest ...` 示例均已按此改写。
+- **测试**：`src/test/test_*.py`，执行 `.venv/bin/python -m pytest src/test/`
+  - **提交前门禁（P0）**：必须通过 `.venv/bin/python scripts/test_runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 commit
+  - **合入门禁（P1）**：合并到 master 前必须通过 `.venv/bin/python scripts/test_runner.py --mode verify`（核心模块单元测试），否则不得 merge
+  - **发布门禁（P2）**：发布版本前必须通过 `.venv/bin/python scripts/test_runner.py --mode verify,regression`（单元+场景验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 release
   > P1/P2 的完整要求（含手动验证项）见 `testplan.md` → §4 回归测试清单 / §6.3 门禁
-- **CI 辅助检查**：`ruff format --check`（代码格式一致性），非阻塞门禁——格式问题可通过 `ruff format` 自动修复，不阻止合并/发布
+- **CI 辅助检查**：`.venv/bin/ruff format --check`（代码格式一致性），非阻塞门禁——格式问题可通过 `.venv/bin/ruff format` 自动修复，不阻止合并/发布
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退。新增功能时，**必须**同步编写测试用例覆盖。测试用例应直接验证缺陷场景的具体断言，而非仅测正常路径。
 - **测试标记强制**：所有新增/修改的测试用例（测试类或测试方法）**必须**标注对应的 pytest marker（如 `@pytest.mark.unit_providers`、`@pytest.mark.scenario_basic` 等），marker 定义见 `src/test/conftest.py` 的 `pytest_configure`。新增 marker 需同步注册到 `conftest.py` 和维护文档。
 - **边缘测试文件隔离**：edge 场景测试（`@pytest.mark.edge`）**必须**放置在 `*_edge.py` 文件中，不得与普通测试混搭在同一文件。`conftest.py` 的 `pytest_collection_modifyitems` 会在收集期自动校验此约束。
@@ -27,7 +28,7 @@
   - **LLM 调用 mock 强制**：任何触发 `generate_all_llm()` 或 `call_llm()` 的测试**必须** mock LLM API 调用（使用 `unittest.mock.patch` 或 `monkeypatch`），禁止真实调用（防费用、防 API 依赖、防测试不稳定）
   - **输入数据隔离**：管线集成测试（同上——`test_pipeline_smoke.py`、`test_pipeline_metrics_injection.py` 等）**不得**依赖真实持仓文件，必须使用 fixture 构造最小持仓（2-5 品种）或 mock 持仓数据。`data/holdings/` 的真实文件在测试中应视为只读
   - **C12 边缘文件隔离**：极端值/异常场景测试（如 `unit/analysis/test_liquidity_edge.py`、`unit/analysis/test_liquidity_otc_edge.py`）**必须**使用 `@pytest.mark.edge` 标记并放入 `*_edge.py` 文件，conftest.py 的 `pytest_collection_modifyitems` 会自动校验
-- **调试失败用例流程**：测试失败后**禁止**重新跑全量测试套件。先用 `python scripts/extract-test-failures.py` 提取失败用例名，修复后只跑该单个用例验证（`python -m pytest <test_file>::<test_name> -v --tb=short`）。仅提交/发布前才需跑完整门禁。
+- **调试失败用例流程**：测试失败后**禁止**重新跑全量测试套件。先用 `.venv/bin/python scripts/extract-test-failures.py` 提取失败用例名，修复后只跑该单个用例验证（`.venv/bin/python -m pytest <test_file>::<test_name> -v --tb=short`）。仅提交/发布前才需跑完整门禁。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
 - **任务编号规范**：
   - `plan.md` 的待办任务：`plan-{全局递增序号}`（如 `plan-1`、`plan-2`），从 1 开始单调递增，已归档或已完成的序号不回收
@@ -51,8 +52,8 @@
   4. 以上都不是，想放 `.claude/`？→ **停，不允许，重新分类**
 - **违规补救**：发现 `.claude/` 下出现本应放在 `docs-stm/` 的文件时，**必须立即迁移**，不留存待办
 - **注意**：`EnterPlanMode` 等工具自动写入 `.claude/plans/` 的行为不可控，使用后**必须手动迁移**到 `docs-stm/plan/`
-- **版本号一致**：发布版本时，先修改 `src/python/core/constants.py`（`APP_VERSION`），然后运行 `python scripts/check-version-consistency.py`，按 [ERR] 提示逐个同步其余文件，直到全部 [OK] 再提交。受检文件：`pyproject.toml`、`README.md`、管理文档 9 份（`plan.md`/`technical.md`/`requirements.md`/`testplan.md`/`review-findings.md`/`llm-technical.md`/`folders.md`/`test-coverage.md`/`changelog.md`）、`how-to-test-my-code.md`。任何版本号变更均应全局覆盖，避免遗漏。
-- **发布数据文档刷新**：发布版本前，**必须**运行 `python scripts/collect-test-coverage.py`，按实时收集结果核对/更新以下文档的数据快照（非版本号），保证统计与目录结构时效性：
+- **版本号一致**：发布版本时，先修改 `src/python/core/constants.py`（`APP_VERSION`），然后运行 `.venv/bin/python scripts/check-version-consistency.py`，按 [ERR] 提示逐个同步其余文件，直到全部 [OK] 再提交。受检文件：`pyproject.toml`、`README.md`、管理文档 9 份（`plan.md`/`technical.md`/`requirements.md`/`testplan.md`/`review-findings.md`/`llm-technical.md`/`folders.md`/`test-coverage.md`/`changelog.md`）、`how-to-test-my-code.md`。任何版本号变更均应全局覆盖，避免遗漏。
+- **发布数据文档刷新**：发布版本前，**必须**运行 `.venv/bin/python scripts/collect-test-coverage.py`，按实时收集结果核对/更新以下文档的数据快照（非版本号），保证统计与目录结构时效性：
   - `docs-stm/managements/test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数
   - `docs-stm/managements/folders.md` — 项目统计表（主程序/模板/脚本/测试代码行数、文件数、测试用例数）及目录树新增/重命名文件
   - `docs-stm/manuals/datasource.md` + `datasource-reliability.md` — 数据源清单/路由归属/可靠性描述与实际代码配置一致
