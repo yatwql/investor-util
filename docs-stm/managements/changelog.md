@@ -8,7 +8,11 @@
 
 ### 开发中（未发布）
 
-#### CLI 集成测试 patch 目标修正（rf-227）
+### changelog 主题标题层级统一（v0.10.3 起 `####` → `###`）
+
+- 修正 v0.10.3/v0.10.4/v0.10.5-dev 各版本主题标题层级漂移：开发节引入 `### 开发中（未发布）` 占位后主题误用四级 `####`，转正式节时未同步升回。现统一为三级 `###`，与 v0.10.0~0.10.2 及 v0.9 分类层级（`###`）对齐。v0.9.x 归档保持原格式不追溯。
+
+### CLI 集成测试 patch 目标修正（rf-227）
 
 - **问题**：`test_cli_integration.py` 三处 CLI 测试 patch 目标陈旧——41df26a「根文件归子包」重构后残留包级 re-export 路径 `src.python.cli._cli_read_holdings`，拦截不到 `cli.py` 模块内部同名引用。`test_cli_cache_config_respected` 因此走到真实持仓读取（`/test/holdings/test.xlsx` 不存在）→ mock 调用 0 次断言失败；另两例（`test_cli_report_config_respected`/`test_handle_report_return_exit_code`）靠 `data/holdings/` 默认持仓文件恰好存在而侥幸通过。
 - **修复**：三处 patch 目标统一修正到 `src.python.cli.cli._cli_read_holdings(_with_flows)`；report 路径两例改用 `_cli_read_holdings_with_flows` 返回 `(mock_holdings, [], [])`（与 `_handle_report` 实际调用路径一致），彻底脱离真实持仓文件依赖，测试隔离达标。
@@ -16,14 +20,14 @@
 
 ## [0.10.4] - 2026-08-05
 
-#### 技术债收尾（LLM 死代码删除 + fact_checker 组合级收益误配 + 匿名化模块补测试）
+### 技术债收尾（LLM 死代码删除 + fact_checker 组合级收益误配 + 匿名化模块补测试）
 
 - **LLM 死代码删除**：删除 `llm/_call_claude.py`/`_call_gemini.py`/`_call_openai.py`/`_thinking.py` 四个孤儿模块（外部零引用，LLM 调用统一走 `_api_claude`/`_api_openai`/`_api_gemini` 活动路径），净删 378 行，`llm/__init__.py` 导出同步清理。
 - **fact_checker 组合级收益误配修复**：`_evaluate_percent_value` 对「组合累计收益10%，招商银行上涨8%，贵州茅台上涨15%」同句段，组合收益数值被整句主体定位误路由到数值最近的个股（招商银行 8.2%），报假阳性。新增组合级语境检测 `_is_portfolio_level_context`（`_PORTFOLIO_KEYWORDS` 词表，match 前 15 字符窗口），在主体定位前判定组合级收益并归到组合总收益率。新增 2 例专项回归（`test_portfolio_level_plus_stock_level_same_sentence` 组合级路由通过 / `test_portfolio_level_mismatch_attributed_to_portfolio` 组合级错误归因到组合总收益率而非个股）；`test_fact_checker.py` 95 例、`test_llm_hallucination.py` 17 例全过。
 - **匿名化模块补测试**：`config/anonymizer.py` 原 0% 覆盖 → 新增 `src/test/unit/config/test_anonymizer.py` 33 例、覆盖率 99%。覆盖 4 种模式（off/code_display/full_anonymous/summary）× 持仓列表与明细字典、未知模式回退 off、`get/set_anonymization_mode` 配置读写（含无效模式抛 ValueError）、`_num_to_label`/`_blur_value`/`_categorize_*` 辅助函数、`code_utils` 导入失败前缀回退。唯一未覆盖为 `_blur_shares` 中不可达的 `<100` 防御分支（`round(x/100)*100` 值域仅 {0} ∪ [100,∞)，无法命中）。
 - **门禁**：P0 dev-verify 1694 passed + 3 check（code-traces/doc-traces/task-numbering）全 [OK]。
 
-#### 重构期历史兼容负担清理（移除旧配置键迁移 / import 再导出 / LLM 内嵌凭据自动改写）
+### 重构期历史兼容负担清理（移除旧配置键迁移 / import 再导出 / LLM 内嵌凭据自动改写）
 
 - **配置键迁移移除**：`_core.get_config()` 不再做 `history.analysis`→`history.fetch_mode` 惰性迁移（旧键直接忽略，回落到默认 `fetch_mode=auto`）；`config/_local_state.py` 移除 `_migrate_legacy_keys` 旧键搬移（`_startup_wizard_shown`/`_privacy_notice_shown` 只在本机 `local_state.json` 读写，不做 config.json 迁移）；`anonymizer.py` 移除匿名化模式废弃别名映射（未知模式回退 `off`）。
 - **import 再导出移除**：`config/_core.py` 不再再导出 `_llm_providers`/`_llm_settings` 符号；`report/orchestrator.py` 移除对 `_snapshot`/`_llm_news`/`_report_generation` 的 bridge 转发 import——消费方改从源模块直接导入。
@@ -33,13 +37,13 @@
 - **文档同步**：technical.md（local_state 迁移描述移除、config.json 解析职责三处去迁移、主矩阵写入方去 `_local_state`）、requirements.md（跨机器同步段去迁移）、folders.md（`_local_state.py`/`test_local_state.py` 描述去旧键迁移）、how-to-config.md（机器本地状态段去兼容迁移说明）；llm-technical.md 内联凭据运行时回退描述保持不变（合法行为）；data/config/config.json 由模板程序重新生成（同步 `enable_fund_deep_analysis` 新注释 + 补齐 `report_submodules` 5 个子键与 `comparison_candidates`）。
 - **测试**：`test_config.py` 迁移用例改断言忽略旧键回落默认；`test_local_state.py` 删 TestLegacyMigration 类；`test_config_llm_multi*.py`/`test_integration_multi.py`/`test_debate_*.py`/`test_config_validation.py` patch 目标改到 `_llm_settings`/`_llm_providers` 源模块；`test_orchestrator.py`/`test_pipeline_smoke.py` 导入改源模块；`test_cache_core.py`/`test_cache_cleanup.py` 断言 v3 缓存文件名。
 
-#### HTML 报告目录分组导航折叠 + 文档快照同步（plan-24 轮19/轮20，导航收尾）
+### HTML 报告目录分组导航折叠 + 文档快照同步（plan-24 轮19/轮20，导航收尾）
 
 - **分组导航（轮19）**：HTML 报告左侧目录按「基础/基金深度/风险/历史/LLM」五组折叠导航，原生 `<details>/<summary>`（键盘可达、无需 JS）。`html_writer.py` 新增 `_NAV_GROUP_LABELS`（五组顺序）/`_SECTION_NAV_GROUP_MAP`（19 章节→组归属）/`_build_section_nav_groups()`（仅收录可见章节、组序固定、组内按报告序号升序、空组保留由模板跳过）；`_render_template` 计算并注入 `section_groups` 到模板。`report_template.html` 目录改为分组结构（`.toc-group` details + 组标题徽标计数 `.toc-group-count`），空组不渲染；窄屏扁平 `section-nav` 保留作移动端兜底，两种导航均不依赖 JS。
 - **测试**：`test_html_report_structure.py` 新增 `TestHtmlTocGroupedNav`（11 例：五组分组渲染/组内章节正确/标题+徽标数/空组跳过/真实 registry 映射含 action·evolution·data_source_status/折叠原生交互/键盘可达/窄屏不溢出），`_render_template` helper 同步注入 `section_groups`（与生产一致）；原 TOC 顺序测试改为分组序断言。dev-verify 1694 passed + 3 check 全 [OK]。
 - **文档快照（轮20）**：folders.md 统计表（主程序 225/55,697、HTML 4/3,756、脚本 16/5,581、源代码合计 245/65,034、测试代码 275/78,856、测试用例 5,009）；test-coverage.md 模式/功能域/unit 子分组按 `collect-test-coverage.py` 实时值刷新（all 5009、unit 4691、report 1475、unit_report 1475、unit_analysis 580、unit_providers 199、edge 566 等）；how-to-config.md 补 `report_submodules.valuation_percentile`/`market_temperature` 开关行 + `report_section_order` 19 项核对（示例键 `fund_style`→`style_factor`）；reports-instruction.md HTML 目录五组折叠说明 + 「页面/章节分组」序号全面核对（19 个页签；数据源可用性矩阵 18、llm_usage 19、风格与因子 9 等）；registry.py docstring「20 项」→「19 项」；faq.md / how-to-config.md「20 项默认顺序」→「19 项」。datasource*.md 已覆盖 push2 PE/PB 扩展字段与指数 K 线通道，无需变更。
 
-#### 估值分位 + 市场温度（plan-23 轮17/轮18，`valuation_data`/`market_temperature_data` 契约）
+### 估值分位 + 市场温度（plan-23 轮17/轮18，`valuation_data`/`market_temperature_data` 契约）
 
 - **估值分位（轮17）**：新增 `src/python/analysis/valuation_percentile.py`（纯计算层）——`extract_closes()` 收盘价提取（股票 `close` 优先、场外基金回退 `nav`，过滤 None/NaN）、`price_percentile()` 价格分位（0~100，`MIN_SAMPLES=60` 样本下限）、`compute_price_percentile()` 分位+三档刻度（低估/合理/高估）契约、`DISCLAIMER`（"价格分位代理，非真实历史估值分位"）；`providers/eastmoney_industry.py` push2 扩展字段 `fetch_valuation_fields()`（PE/PB，复用既有 push2 请求通道 + 会话缓存）。「资产穿透TOP10」章追加「估值分位」列（Excel `penetration_sheet` ncols 10→11 + 表尾免责声明；HTML `report_template.html` 条件列），开关 `report_submodules.valuation_percentile` **默认关**（关闭时列隐藏、输出与改造前一致）。
 - **市场温度（轮18）**：新增 `src/python/analysis/market_temperature.py`（纯计算层）——`ma_deviation()` 均线偏离（小数比例）、`returns_volatility()` 年化波动率（√252 年化）、`temperature_score()` 三因子合成（0.5×分位 + 0.3×均线偏离分量 + 0.2×波动率分量，各分量 clamp 0~100）、`compute_temperature()` 温度契约（`MA_DEVIATION_SPAN=±20%`、`VOLATILITY_SPAN=50%` 映射区间）；**温度计只给刻度、无仓位指令**（`TEMPERATURE_DISCLAIMER` 渲染层必须展示）。「投资分析汇总」章「市场指数」后追加「市场温度」刻度行（Excel `summary._write_market_temperature`；HTML kv-table），三因子行展示转百分数（`dev/vol ×100`，分位已为 0~100）。开关 `report_submodules.market_temperature` **默认关**（与 `cost_lots` 同章不同行、开关独立互不影响）。
@@ -49,7 +53,7 @@
 
 ## [0.10.3] - 2026-08-05
 
-#### 风格与因子分析合并章 + 行业 Beta 子表（plan-21 轮12，章节数 20→19）
+### 风格与因子分析合并章 + 行业 Beta 子表（plan-21 轮12，章节数 20→19）
 
 - **物理合并**：合并原「基金风格分析」（`fund_style_sheet.py`）+「因子暴露分析」（`factor_exposure_sheet.py`）→ 统一渲染模块 `src/python/report/style_factor_sheet.py`，章节 sheet key 统一为 `style_factor`，一章三区块渲染：区块一基金风格表（8 列）+ 区块二风格因子回归（5 列 + 基准对照）+ 区块三行业 Beta 子表（7 列，`industry_beta=None` 隐藏 / `available=False` 占位）；删除旧两个渲染模块，`core/registry.py` `_REPORT_SECTION_DEFAULT` 的 `fund_style`/`factor_exposure` 合并为 `style_factor`（number 9），registry.number 连续编号重新整理 20→19，`data_source_status`=18、`llm_usage`=19。
 - **行业 Beta 子表**：新增 `src/python/analysis/industry_beta.py`，`compute_industry_beta_analysis()` 复用 `factor_exposure.py::compute_factor_exposure` 单因子 OLS（不重复实现），行业穿透分类复用 `batch_fetch_industry_data`（`industry_` 前缀缓存，代码类型判定中心化 复用 `core/code_utils.py` 判定）；`INDUSTRY_INDEX_MAP` 映射 12 个中证行业指数（银行=sh000986、证券=sz399975、白酒/食品饮料=sz399997、半导体/电子=sz399995、有色/贵金属=sz399996、煤炭=sz399998、医药=sz399989、钢铁=sz399994、房地产=sh000980、能源=sh000928、环保=sz399973、保险=sz399983）；指数 K 线复用 `history_index` 通道（Chain + session_cache，会话级API复用/Provider Chain 必经）；开关 `report_submodules.industry_beta` **默认关**。
@@ -59,7 +63,7 @@
 - **测试**：新增 `src/test/unit/analysis/test_industry_beta.py`（11 例：行业暴露占比 / Beta 回归 / 显著性 / 数据不足 / 开关关隐藏 / push2 行业分类降级占位 / 固定 fixture 解析解误差 <0.01）、`src/test/unit/report/test_style_factor_sheet.py`（合并章三区块渲染 / 行业 Beta 三态 / 可见性）；旧 `fund_style`/`factor_exposure` 测试迁移适配；`test_orchestrator.py`/`test_html_report_structure*.py`/`test_registry.py`/`test_config*.py`/`test_scenario_section_order.py` 同步（键 `factor_exposure`→`style_factor_data`、19 个章节、7 种可见性类型）。新增模块覆盖率：industry_beta 94% / style_factor_sheet 97%。
 - **文档同步**：technical.md（模块数 20→19、data_flag 表、§4.8 一章三区块、附录 H 契约）、requirements.md（§6.3/6.4 章节合并重编号）、全部用户手册（how-to-menu / how-to-config / how-to-use-registry / reports-instruction / faq / datasource）、test-coverage.md（模式计数 + 功能域 + unit 子分组）、folders.md 目录树。
 
-#### 基金业绩分析章候选基金比较增强模式（plan-21 轮13，`candidate_compare` 默认关）
+### 基金业绩分析章候选基金比较增强模式（plan-21 轮13，`candidate_compare` 默认关）
 
 - **核心模块**：新增 `src/python/report/fund_candidate.py`——`resolve_candidates()`（6 位代码校验 / 去重 / 超 10 截断 + `exceed_limit` 标记）、`build_candidate_compare_data()`（开关门控 → 无有效候选降级 → 正常）、`_build_candidate_row()`（收益近1月/3月/6月/1年 + 同类排名 + 评级 + 最大回撤 + 风格 + 与现有持仓重合度，单候选失败 `available=False` 短路不阻塞其余）。比较维度不含规模/费率（无数据源，已验证）；重合度复用 `fund_overlap.compute_overlap_matrix`（Jaccard），风格复用 `fund_style_classify.classify_fund_style`（复用中心化分类）；`risk_analysis` 最大回撤百分数数值 `/100.0` 归一化为小数与 `syl_*_raw` 口径一致（Excel FMT_PERCENT 直接可用）。
 - **配置层**：`report_submodules.candidate_compare` **默认关**（关闭时 `build_candidate_compare_data` 返回 None，基金业绩分析章输出与改造前一致）+ 顶层 `comparison_candidates`（6 位基金代码列表 ≤10）；`_core.py` 新增访问器 `is_enable_candidate_compare` / `get_comparison_candidates`（镜像既有 data_quality 模式，非 list/str/int 数值归一化容错）；`_validation.py` 新增 `_validate_comparison_candidates`（非列表 / 非法项 / >10 告警，数值项允许）。
@@ -68,7 +72,7 @@
 - **测试**：新增 `src/test/unit/report/test_fund_candidate.py`（23 例：候选校验/截断/开关门控/全维度行/单候选失败降级/CLI 合并/缺期间非法值/风格与重合度失败降级/现有持仓收集），`test_html_writer.py` 新增 `TestCandidateCompareTemplate`（7 例，从真实模板配平截取候选区块渲染，断言开关关无子表、开启 11 列正确、失败占位、超限/无效脚注），`test_config.py`/`test_config_validation.py` 新增候选配置访问器与校验测试。fund_candidate 覆盖率 99%。
 - **文档同步**：plan.md（plan-21 轮13 已完成）、plan-investment-iteration.md（轮13 验收签字）、how-to-config.md（开关 + 候选列表说明）、reports-instruction.md（基金业绩分析比较子表说明）、folders.md 目录树补 `fund_candidate.py`/`test_fund_candidate.py`。
 
-#### 成本流水：持仓文件格式扩展 + 资金加权收益与成本分档 + 三页签渲染（plan-22 轮14/轮15/轮16，`fund_flow_data` 契约）
+### 成本流水：持仓文件格式扩展 + 资金加权收益与成本分档 + 三页签渲染（plan-22 轮14/轮15/轮16，`fund_flow_data` 契约）
 
 - **持仓文件格式扩展（轮14）**：持仓 Excel 可选新增「交易流水」「分红流水」页签，不破坏既有固定 4 列格式（名称/代码/持仓份额/每份成本）。`core/models.py` 新增 `TradeRecord`（日期/代码/操作/份额/价格/费用，费用可选缺省 0）与 `DividendRecord`（日期/代码/每份分红）；`core/reader.py` 新增 `read_flow_sheets()` / `read_holdings_with_flows()` 与 `_parse_trade_sheet()` / `_parse_dividend_sheet()`（表头不匹配整体跳过 + 行级无效容忍：日期/操作/数值无效仅跳过该行并告警；`parse_workbook` 主体零改动，向后兼容）。`test_reader.py` 新增 `TestParseFlowSheets`（20 例：交易/分红解析、表头不匹配、无效行容忍、费用可选、操作归一化、多账户、向后兼容字段相等），共 80 例、覆盖率 93%。
 - **资金加权收益（XIRR，轮15）**：新增 `src/python/analysis/cost_flow.py`（纯计算层，禁止导入 report/）——`solve_xirr()`（Newton-Raphson + 二分兜底，自然日年化 `t=days/365`，扫描区间 -99.99%~+1600%）、`build_xirr_cashflows()`（投资者视角现金流：买入为负 / 卖出与分红到账为正 / 期末市值为正，分红按登记日份额纳入时点效应，份额未知回退当前持仓）；固定 fixture 解析解年化误差 0.0000%（定投与整笔两类 10% 年化案例）。
@@ -77,7 +81,7 @@
 - **三页签渲染（轮16）**：开关 `report_submodules.cost_lots`（默认关，`is_enable_cost_lots()` 访问器，镜像 candidate_compare 模式）贯穿 CLI/TUI → `generate_report(transactions=…, dividends=…)` → `excel_market_data.resolve_market_data` 组装 `fund_flow_data` 注入 data dict（`pipeline_data_builder.py` 注册 + technical.md 附录 H）——「持仓分类表」加「成本分档」「分红累计」子列（category.py）、「市值核算明细表」加可选「资金加权成本」列（market_value_sheet.py）、「投资分析汇总」加「资金加权收益率 (XIRR)」汇总行（summary.py，无流水写「未录入流水」占位）；CLI `_cli_read_holdings_with_flows()` / TUI `prepare_holdings()` 接线透传；新增测试 32 个（summary 3 + category 6 + market_value_sheet 8 + config 5 + cli 5 + excel_market_data 5，远超 ≥8），受影响套件 267 passed。
 - **测试**：新增 `src/test/unit/analysis/test_cost_flow.py`（24 例：XIRR 精度 / guess 无关性 / 空值与同日退化、FIFO 批次、成本分档边界、分红累计，pytestmark unit/unit_analysis），覆盖率 94%。
 
-#### 成本流水 HTML 渲染补齐（plan-22 轮16 补遗，`fund_flow_data` 三处 HTML 渲染）
+### 成本流水 HTML 渲染补齐（plan-22 轮16 补遗，`fund_flow_data` 三处 HTML 渲染）
 
 - **HTML 接线**：`html_writer.py` 的 `write_html_report()` / `_render_template()` 新增 `fund_flow_data` 参数，并新增 `_build_flow_display()` 将成本流水数据转为模板友好展示映射（复用 `market_value_sheet._weighted_avg_cost` 资金加权成本 + `category._tier_label` 分档标签计算逻辑，避免双实现）；`_report_generation.py` 两条路径（`_generate_report_both` / `_generate_report_full`）复用 `excel_market_data._build_flow_data` 组装成本流水数据并透传 HTML 渲染（Excel 侧仍按原路径内部组装，无重复计算）。
 - **模板三处渲染**（`report_template.html`，`flow_display` 不可用时整体不输出，与开关关闭行为一致）：
@@ -86,7 +90,7 @@
   - 「持仓分类表」追加可选「成本分档」「分红累计」子列（分档标签复用 `_tier_label`、分红累计按 `money` 金额渲染，缺码 `--`/0.00）
 - **测试**：`test_html_writer.py` 新增 `TestFundFlowTemplate`（9 例，从真实模板配平截取三处条件区块渲染，断言开关关不渲染 / 开启正确输出 / 缺码占位）+ `TestBuildFlowDisplay`（3 例，展示映射组装 / 契约键缺失降级）；修复 `test_orchestrator.py::test_generate_report_basic` 断言的 `enable_cost_lots`/`transactions`/`dividends` 参数透传（轮16 遗漏同步）。受影响套件 test_html_writer 74 passed、test_orchestrator 45 passed。
 
-#### 语义命名与章节/轮次引用清理（语义命名审计，2026-08-04）
+### 语义命名与章节/轮次引用清理（语义命名审计，2026-08-04）
 
 - **章节编号暗号全面清理**（rf-218/rf-219）：源码与测试注释、docstring、fixture 中 `N 章`/`第 N 章`/`报告第 N 页` 一律改为纯语义章节名；`test_excel_report_structure.py`/`test_action_html.py` fixture 编号对齐当前 registry（style_factor=9、action=17、expert_review=12、global_macro=11、data_source_status=18、llm_usage=19），页签计数断言同步（全部启用 17 个、always+基金深度 10 个）。
 - **check-code-traces 增强——章节编号检测（CHAPTER）**：镜像 check-doc-traces 的 CHAPTER 模式（`N 章`/`第 N 章` 指代报告章节须改用语义名）+ 计数/序数豁免（共 N 章、减至 N 章、N→M 章、「N 章」、出现第 N 章），退出码归入任务编号类（exit 2）。
@@ -96,7 +100,7 @@
 - **check-code-traces / check-doc-traces 增强——中文数字章节/轮次 + 物理合并痕迹**：两脚本 CHAPTER 新增中文数字检测——「第 X 章」式（X 为中文数字 1~20）与裸「X 章」式（X 为中文数字二~十，唯「一」为计数语义如"一章三区块"不纳入裸模式）；ROUND 新增中文数字检测——「第 X 轮」式（X 为中文数字三~十，唯「一/二」为 LLM 圆桌会两轮辩论等运行时序数不纳入）与「轮 X」式；同步补齐 `_chapter_excludes()`/`_round_excludes()` 中文数字计数豁免（共 X 章/减至 X 章/共 X 轮/计划分 X 轮等）；CHANGE/HIGH 新增「物理合并」痕迹检测（模块/章节合并历史，类似迁移）；两脚本自豁免 `_is_tool_self()`（`check-*.traces.py` 整文件跳过自身，防止新增强模式特征字面量检出自身体）；清理 6 处源码注释 + 2 处 requirements.md 物理合并叙述 + changelog 残留的中文数字章节字样为语义描述（registry / style_factor_sheet / portfolio_history_drawdown_sheet / test_registry / test_excel_generator）；`test_trace_check_scripts.py` 新增中文数字章节/轮次检出与豁免、物理合并检出、工具自身文件豁免测试，77 例全过；全仓两检查脚本 `--ci` 干净。
 - **测试**：`test_trace_check_scripts.py` 新增 `TestCodeChapterDetection`（镜像 doc 版本）、`TestCodeRoundDetection`（轮次暗号检出 / 计数豁免 / 运行时豁免 / 合法表述不误伤）与契约改名叙述检出（代码/文档各 1 例），66 例全过；全仓 check-code-traces / check-doc-traces `--ci` 干净。
 
-#### 架构约束暗号清理收尾 + check-code-traces 增强 3 类暗号匹配（task #110/#111，2026-08-04）
+### 架构约束暗号清理收尾 + check-code-traces 增强 3 类暗号匹配（task #110/#111，2026-08-04）
 
 - **check-code-traces 增强——3 类暗号模式**：新增/强化三类「字母+数字/字母-数字/字母_数字」暗号匹配（用户中断指令）：
   - **MAGIC（字母+数字/连续字母+数字，如 D8/HH6）**：注释中裸「大写字母(+小写)+数字」魔法编号须用语义名替代；`_magic_excludes()` 行豁免覆盖合法领域值——conftest 官方活分类法（S1~S33/T1~T21/Y1~Y6/Z1）、穿透场景标签（S-P1~S-P10）、TOP\d+、linter 码（F401 等）、VaR/MD5/SHA/AES、季度 Q1~Q4、DeepSeek V\d、Excel 单元格/范围（A1:B1）、微信 X5、ETF/主动/基金 基金标签；`_is_magic_match_excluded()` 逐 token 豁免（同一行合法场景标记与暗号并存时只豁免合法 token，暗号仍检出）。
@@ -108,7 +112,7 @@
 - **测试**：`test_trace_check_scripts.py` 新增 `test_magic_number_letter_digit_flagged`（8 例：P1/C21/AB14/MC19/D8/HH6 等魔法编号与约束代号检出）、`test_dashtask_letter_digit_flagged`（6 例）+ `test_dashtask_legit_not_flagged`（5 例：T-1/i-1/utf-8/N-2 项/R-LLM-DB-QA 需求 ID 豁免）、`test_underscore_letter_digit_flagged`（3 例）+ `test_underscore_legit_not_flagged`（2 例）；`_code_hit` helper 补齐 DASHTASK/UNDERSCORE/MAGIC 豁免逻辑与 scan_file 一致；删除已废弃的 `_is_triple_quote_line` 测试；88 例全过。
 - **门禁验证**：P0 门禁 `dev-verify` 1649 全过（Phase A 单元 1501 + Phase B 场景 146，含全部 analysis/report/config 相关）；`check-code-traces.py --ci`、`check-doc-traces.py --ci`、`check-task-numbering.py --ci` 三脚本全部 [OK]（exit 0）。
 
-#### 设计文档微调（plan-investment-iteration.md，task #109，2026-08-05）
+### 设计文档微调（plan-investment-iteration.md，task #109，2026-08-05）
 
 - **轮17 补复用说明**：估值分位模块实施内容与验收标准补「复用既有 push2 请求通道」（`providers/eastmoney_industry.py::make_push2_request`，行业分类在用，不重复实现），并补「复用既有 push2 请求通道断言」测试项。
 - **轮18 补双开关叠加说明**：市场温度模块实施内容补「双开关叠加说明」——「投资分析汇总」章成本流水资金加权收益（XIRR）汇总行（`cost_lots` 开关）与本温度刻度行（`market_temperature` 开关）同章不同行、开关独立互不影响，开启其一不改变另一行渲染，测试须断言两开关各自独立生效。
