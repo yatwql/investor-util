@@ -11,8 +11,8 @@
 | HTML 报告模板 | HTML | 4 | 3,761 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 16 | 5,581 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
 | **源代码合计** | — | **242** | **64,589** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **276** | **78,332** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,980 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
+| **测试代码** | Python | **282** | **78,895** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,981 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **13** | **5,636** | 含 README.md（179 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 12 | 5,457 | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **105** | **41,704** | 含 CLAUDE.md（72 行）；md 口径（managements 9 + plan 2 + archive 93 md），py/txt 不计行 |
@@ -553,6 +553,13 @@ investor-util/
 │       │   ├── test_news_pipeline.py          #   新闻聚合到报告数据构建端到端集成测试
 │       │   ├── test_report_chapter_consistency.py # 报告章节名称顺序集合契约一致性集成测试
 │       │   └── test_tui_routing.py            #   TUI 菜单路由与回调绑定集成测试
+│       ├── live/                     #   真实网络验证套件（opt-in，--mode live 才运行，不入门禁）
+│       │   ├── __init__.py           #   子包标记
+│       │   ├── conftest.py           #   live 子目录 conftest（收集 opt-in 套件）
+│       │   ├── test_live_quotes.py   #   真实行情连通性（A股/ETF/场外基金/中美指数）
+│       │   ├── test_live_news.py     #   真实新闻源连通性（东方财富/财联社/新浪/华尔街见闻）
+│       │   ├── test_live_fund.py     #   真实基金数据源（历史净值/排名/基准）
+│       │   └── test_live_calendar.py #   真实 akshare 交易日历
 │       └── scenario/                 #   场景测试（basic/datetime/llm/perf/resilience/security 六子组）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── basic/               #   基本面场景测试

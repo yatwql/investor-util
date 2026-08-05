@@ -9,7 +9,7 @@
 |:-------|:-----|:-----|
 | **Python** | >= 3.10 | f-strings / match-case / `timezone` 等语法特性要求 |
 | **依赖安装** | `pip install -r requirements.txt` | 含 httpx / openpyxl / akshare（间接依赖 pandas）|
-| **网络** | 全量测试均不需要（全 mock） | Provider 联通性由运行时回退/熔断治理，非门禁 |
+| **网络** | 全量测试均不需要（全 mock） | Provider 联通性由运行时回退/熔断治理，非门禁。另有 opt-in `live` 套件（`--mode live`）真实联网验证数据源可达性，默认排除、不入门禁 |
 | **系统时区** | 不限 | `datetime.now(timezone(hours=8))` 保证 UTC+8 一致性 |
 | **磁盘** | `data/cache/` `data/config/` `reports/` 读写权限 | 首次运行自动创建缺失目录 |
 | **aktools/pandas** | akshare 需 pandas | 部分 test_*.py 间接依赖，CI 中需预装 |

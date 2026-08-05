@@ -145,6 +145,13 @@ MODES: dict[str, dict] = {
         "order": 13,
         "parallel": False,
     },
+    "live": {
+        "marker": "live",
+        "desc": "真实网络验证套件（opt-in，仅 `--mode live` 手工运行；不入门禁）",
+        "timeout_sec": 300,
+        "order": 14,
+        "parallel": False,
+    },
 }
 
 # ── 帮助文本 ─────────────────────────────────────────────────

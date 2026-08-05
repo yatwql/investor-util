@@ -55,6 +55,9 @@ python scripts/test_runner.py --mode scenario_extreme
 # 数据正确性验证（~10s）
 python scripts/test_runner.py --mode data
 
+# 真实网络验证（opt-in，不入门禁，仅排查数据源连通性时手工运行）
+python scripts/test_runner.py --mode live
+
 # 运行全量 + 行覆盖率报告
 python scripts/test_runner.py --coverage
 
@@ -208,6 +211,17 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **`--mode data`** 仅运行标记为 `data` 的测试，覆盖数据精确性：市值=价格×份额、盈亏=市值-成本、收益率=盈亏÷成本（成本>0）、穿透 TOP10 占比归一化等。适用于修改了数值计算逻辑后的回归。
 - **`--mode smoke`** 仅运行标记为 `smoke` 的测试，从 6 个全流程关键节点各选 4 项最快基础测试：核心数据模型→入口读取→分类计算→报告输出→启动依赖→数据获取。全部为纯内存计算、无 IO、每项 <0.1s，合计 ~15s。适用于部署后冒烟或极速"通不通"检查。
 
+#### 🔷 真实网络验证（`live`，opt-in，不入门禁）
+
+- **`--mode live`** 运行真实外部网络验证套件（`src/test/live/`），用于排查「数据源是否真的可达 / API 是否漂移」时手工验证。**平时（含 dev-verify/verify/all 全量门禁）完全不运行**——由三层机制保证：
+  1. `pytest.ini` 的 `addopts = -m "not live"` 在收集期直接排除；
+  2. `conftest.py` 的 `_skip_live_unless_requested` autouse fixture 默认跳过（`-m live` 收集到也 skip）；
+  3. `_block_external_network` 阻断 fixture 对非 live 项一律拦死真实网络。
+- **内容**：覆盖行情（A 股/ETF/场外基金/中美指数）、新闻源（东方财富/财联社/新浪/华尔街见闻）、基金（历史净值/排名/基准）、akshare 交易日历共 14 项。
+- **断言原则**：只校验返回「结构」（字段存在、类型、非空），**不校验具体数值**，容忍真实行情波动（休市、涨跌、数据源改字段）。
+- **不含 LLM 真实调用**（防费用）——LLM 连通性由运行时数据源健康检查覆盖。
+- 触发方式：`python scripts/test_runner.py --mode live` 或 `pytest --run-live -m live`。
+
 #### 🔷 全量（`all`）
 
 - **`--mode verify,regression`** 组合模式，等价于分别运行 verify（单元） + regression（场景）。约 7min，作为发布门禁。
@@ -252,6 +266,8 @@ test-reports/latest/
 │   └── report.html       # 边缘场景测试
 ├── data/
 │   └── report.html       # 数据正确性验证
+├── live/
+│   └── report.html       # 真实网络验证（opt-in，--mode live 才生成）
 ├── all/
 │   └── report.html       # 全量测试
 ├── all_no_unit/
