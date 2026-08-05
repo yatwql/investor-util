@@ -12,7 +12,9 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime as _RealDatetime
 from types import SimpleNamespace
+from unittest import mock
 
 import pytest
 
@@ -47,6 +49,18 @@ def _detail(
         nav_date=nav_date,
         price_type=price_type,
     )
+
+
+class _FixedNow(_RealDatetime):
+    """固定 ``now()`` 返回值的 datetime 子类（继承真实 ``strptime``）。
+
+    用于测试「未显式传交易日时回退当天日期」的分支——只覆写 ``now()``，
+    ``strptime``/``strftime`` 等其余行为与真实 datetime 一致。
+    """
+
+    @classmethod
+    def now(cls, tz=None):
+        return cls(2026, 8, 6)
 
 
 # ═════════════════════════════════════════════════════════════
@@ -88,6 +102,11 @@ class TestClassifyFreshness(unittest.TestCase):
         """price_type 为「暂无行情」→ 降级（degraded）。"""
         d = _detail("600900", "长江电力", price_type="暂无行情")
         self.assertEqual(df.classify_freshness(d, _T, _PREV), df.FRESHNESS_DEGRADED)
+
+    def test_dict_detail_supported(self):
+        """dict 形式明细 → 新鲜度分类一致（_detail_value 兼容 dict/对象）。"""
+        d = {"code": "600900", "name": "长江电力", "price": 10.0, "nav_date": _T, "price_type": "场内收盘价(T)"}
+        self.assertEqual(df.classify_freshness(d, _T, _PREV), df.FRESHNESS_FRESH)
 
 
 # ═════════════════════════════════════════════════════════════
@@ -152,6 +171,16 @@ class TestDetectPriceJumps(unittest.TestCase):
         d = _detail("600900", "长江电力", price=11.0, yesterday_close=10.0)
         jumps = df.detect_price_jumps([d], _T, _PREV, threshold=0.10)
         self.assertEqual(len(jumps), 1)
+
+    def test_missing_code_skipped(self):
+        """明细缺 code → 跳过，不参与跳变判定。"""
+        d = _detail("", "长江电力", price=12.5, yesterday_close=10.0)
+        jumps = df.detect_price_jumps([d], _T, _PREV)
+        self.assertEqual(jumps, [])
+
+    def test_none_details_no_error(self):
+        """details 为 None → 空列表，不报错。"""
+        self.assertEqual(df.detect_price_jumps(None, _T, _PREV), [])
 
 
 # ═════════════════════════════════════════════════════════════
@@ -227,6 +256,59 @@ class TestBuildFreshnessSummary(unittest.TestCase):
         self.assertTrue(by_code["005827"]["jump"])
         self.assertIn("疑似数据错误", by_code["005827"]["jump_label"])
         self.assertEqual(summary["abnormal_count"], 1)
+
+    def test_infer_trading_day_when_missing(self):
+        """未显式传交易日 → 从明细 nav_date 推断最近交易日。"""
+        holdings = [_holding("长江电力", "600900")]
+        details = [_detail("600900", "长江电力", nav_date=_T)]
+        summary = df.build_freshness_summary(holdings, details)  # trading_day/prev 均缺省
+        self.assertTrue(summary["available"])
+        self.assertEqual(summary["items"][0]["freshness"], df.FRESHNESS_FRESH)
+
+    def test_zero_yesterday_close_change_pct_zero(self):
+        """明细存在但昨收为 0 → change_pct 记 0.0（不除零），不判跳变。"""
+        holdings = [_holding("长江电力", "600900")]
+        details = [_detail("600900", "长江电力", price=12.0, yesterday_close=0.0)]
+        summary = df.build_freshness_summary(holdings, details, _T, _PREV)
+        item = summary["items"][0]
+        self.assertEqual(item["change_pct"], 0.0)
+        self.assertFalse(item["jump"])
+
+
+# ═════════════════════════════════════════════════════════════
+#  _infer_latest_nav_date
+# ═════════════════════════════════════════════════════════════
+
+
+class TestInferLatestNavDate(unittest.TestCase):
+    """最近交易日推断（未显式传入交易日时的近似）。"""
+
+    def test_infers_max_nav_date(self):
+        """多明细 → 取最新 nav_date。"""
+        details = [
+            _detail("600900", "长江电力", nav_date="2026-08-03"),
+            _detail("600519", "贵州茅台", nav_date="2026-08-04"),
+        ]
+        self.assertEqual(df._infer_latest_nav_date(details), "2026-08-04")
+
+    def test_infers_ignores_invalid_dates(self):
+        """无效 nav_date 被忽略，不参与取最大。"""
+        details = [
+            _detail("600900", "长江电力", nav_date="非日期"),
+            _detail("600519", "贵州茅台", nav_date="2026-08-04"),
+        ]
+        self.assertEqual(df._infer_latest_nav_date(details), "2026-08-04")
+
+    def test_fallback_today_when_no_nav(self):
+        """无有效 nav_date → 回退为当天日期（now）。"""
+        details = [_detail("600900", "长江电力", nav_date=None)]
+        with mock.patch.object(df, "datetime", _FixedNow):
+            self.assertEqual(df._infer_latest_nav_date(details), "2026-08-06")
+
+    def test_empty_details_fallback_today(self):
+        """details 为空 → 回退为当天日期（now）。"""
+        with mock.patch.object(df, "datetime", _FixedNow):
+            self.assertEqual(df._infer_latest_nav_date([]), "2026-08-06")
 
 
 if __name__ == "__main__":

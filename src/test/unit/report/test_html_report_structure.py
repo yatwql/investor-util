@@ -1490,7 +1490,8 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             key = link.get("href", "").replace("#sec-", "")
             if key in _LLM_SUPPORTED_KEYS:
                 self.assertIn(
-                    "toc-llm", link.get("class", []),
+                    "toc-llm",
+                    link.get("class", []),
                     f"LLM 章节 {key} section-nav 应带 toc-llm class",
                 )
                 icon = link.select_one("span.toc-llm-icon")
@@ -1498,7 +1499,8 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 self.assertIn("🧠", icon.get_text(strip=True), f"LLM 章节 {key} 图标文本应为 🧠")
             else:
                 self.assertNotIn(
-                    "toc-llm", link.get("class", []),
+                    "toc-llm",
+                    link.get("class", []),
                     f"非 LLM 章节 {key} section-nav 不应带 toc-llm class",
                 )
                 self.assertIsNone(
@@ -1578,8 +1580,22 @@ class TestHtmlDataQualityBlocks(unittest.TestCase):
             {
                 "available": True,
                 "items": [
-                    {"code": "000001", "name": "平安银行", "account": "全部", "status": "ok", "status_label": "正常", "reason": ""},
-                    {"code": "510300", "name": "沪深300ETF", "account": "全部", "status": "stale", "status_label": "过期", "reason": "行情未更新"},
+                    {
+                        "code": "000001",
+                        "name": "平安银行",
+                        "account": "全部",
+                        "status": "ok",
+                        "status_label": "正常",
+                        "reason": "",
+                    },
+                    {
+                        "code": "510300",
+                        "name": "沪深300ETF",
+                        "account": "全部",
+                        "status": "stale",
+                        "status_label": "过期",
+                        "reason": "行情未更新",
+                    },
                 ],
             },
             None,
@@ -1599,8 +1615,26 @@ class TestHtmlDataQualityBlocks(unittest.TestCase):
                 "abnormal_count": 0,
                 "summary": "",
                 "items": [
-                    {"code": "600519", "name": "贵州茅台", "account": "全部", "freshness": "ok", "freshness_label": "新鲜", "change_pct": 0.5, "jump": False, "jump_label": None},
-                    {"code": "601318", "name": "中国平安", "account": "全部", "freshness": "stale", "freshness_label": "过期", "change_pct": 23.4, "jump": True, "jump_label": "跳变"},
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "ok",
+                        "freshness_label": "新鲜",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    },
+                    {
+                        "code": "601318",
+                        "name": "中国平安",
+                        "account": "全部",
+                        "freshness": "stale",
+                        "freshness_label": "过期",
+                        "change_pct": 23.4,
+                        "jump": True,
+                        "jump_label": "跳变",
+                    },
                 ],
             },
         )
@@ -1624,11 +1658,31 @@ class TestHtmlDataQualityBlocks(unittest.TestCase):
         soup = self._render_dq(
             {
                 "available": True,
-                "items": [{"code": "000001", "name": "平安银行", "account": "全部", "status": "ok", "status_label": "正常", "reason": ""}],
+                "items": [
+                    {
+                        "code": "000001",
+                        "name": "平安银行",
+                        "account": "全部",
+                        "status": "ok",
+                        "status_label": "正常",
+                        "reason": "",
+                    }
+                ],
             },
             {
                 "available": True,
-                "items": [{"code": "600519", "name": "贵州茅台", "account": "全部", "freshness": "ok", "freshness_label": "新鲜", "change_pct": 0.5, "jump": False, "jump_label": None}],
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "ok",
+                        "freshness_label": "新鲜",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    }
+                ],
                 "abnormal_count": 0,
                 "summary": "",
             },
@@ -1637,6 +1691,116 @@ class TestHtmlDataQualityBlocks(unittest.TestCase):
         text = soup.get_text()
         self.assertNotIn("品种覆盖（逐品种数据状态）", text)
         self.assertNotIn("可信度（数据新鲜度 + 单日跳变）", text)
+
+    def test_header_alert_shows_when_abnormal(self):
+        """数据异常时报告头部显示摘要告警行（summary + 详见第 N 章）。"""
+        soup = self._render_dq(
+            None,
+            {
+                "available": True,
+                "abnormal_count": 1,
+                "summary": "3 个品种，1 个数据异常",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "stale",
+                        "freshness_label": "过期",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    }
+                ],
+            },
+        )
+        alert = soup.select_one(".report-header .data-status")
+        self.assertIsNotNone(alert)
+        self.assertIn("3 个品种，1 个数据异常", alert.get_text())
+        self.assertIn("18", alert.get_text())  # 告警尾部引用 data_source_status 章节号
+
+    def test_header_alert_hidden_when_all_normal(self):
+        """无数据异常 → 头部不渲染摘要告警行。"""
+        soup = self._render_dq(
+            None,
+            {
+                "available": True,
+                "abnormal_count": 0,
+                "summary": "3 个品种，0 个数据异常",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "fresh",
+                        "freshness_label": "实时",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    }
+                ],
+            },
+        )
+        self.assertIsNone(soup.select_one(".report-header .data-status"))
+
+    def test_abnormal_rows_use_failed_class(self):
+        """异常品种行用 src-matrix-failed 高亮，正常行用 src-matrix-ok。"""
+        soup = self._render_dq(
+            {
+                "available": True,
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "status": "ok",
+                        "status_label": "正常",
+                        "reason": "",
+                    },
+                    {
+                        "code": "600900",
+                        "name": "长江电力",
+                        "account": "全部",
+                        "status": "name_mismatch",
+                        "status_label": "名称不匹配",
+                        "reason": "名称不一致",
+                    },
+                ],
+            },
+            {
+                "available": True,
+                "abnormal_count": 1,
+                "summary": "",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "fresh",
+                        "freshness_label": "实时",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    },
+                    {
+                        "code": "600900",
+                        "name": "长江电力",
+                        "account": "全部",
+                        "freshness": "stale",
+                        "freshness_label": "过期",
+                        "change_pct": 0.0,
+                        "jump": False,
+                        "jump_label": None,
+                    },
+                ],
+            },
+        )
+        ok_texts = " ".join(s.get_text() for s in soup.select(".src-matrix-ok"))
+        failed_texts = " ".join(s.get_text() for s in soup.select(".src-matrix-failed"))
+        self.assertIn("正常", ok_texts)
+        self.assertIn("实时", ok_texts)
+        self.assertIn("名称不匹配", failed_texts)
+        self.assertIn("过期", failed_texts)
 
 
 if __name__ == "__main__":
