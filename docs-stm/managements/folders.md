@@ -658,10 +658,7 @@ investor-util/
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
 │   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
-│   │   ├── plan-web-ui-implementation.md #   plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API）
-│   │   ├── plan-investment-features.md #   投资分析功能优化建议（需求×数据源可行性 10 轮探索）
-│   │   ├── plan-investment-iteration.md #  投资功能优化 20 轮迭代实施计划（每轮量化验收）
-│   │   └── plan-task-code-traces-gate.md # 任务编号标识符/注释门禁增强设计（check-code-traces 扩展）
+│   │   └── plan-web-ui-implementation.md #   plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
@@ -802,6 +799,13 @@ investor-util/
 │   │   │   │   └── plan-fix-deepseek-thinking-exhaustion.md # 思考耗尽修复方案
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
+│   │   ├── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
+│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~24，设计文档索引）
+│   │   │   ├── investment-features/         #   投资功能优化 + 章节归并（plan-17~24）
+│   │   │   │   ├── plan-investment-features.md  #     投资分析功能优化设计（需求×数据源×章节归并）
+│   │   │   │   └── plan-investment-iteration.md #     投资功能优化 21 轮迭代实施计划（每轮量化验收）
+│   │   │   └── task-code-traces-gate/       #   任务编号标识符/注释门禁增强设计（rf-208）
+│   │   │       └── plan-task-code-traces-gate.md #     check-code-traces 扩展（IDENT 维度 + 系列代号）
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
