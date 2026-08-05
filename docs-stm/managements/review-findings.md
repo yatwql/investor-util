@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.5-dev
-> **编号源**：`rf-next = 229`（新增问题取此编号，完成后更新为 +1；已用最大 rf-228，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 230`（新增问题取此编号，完成后更新为 +1；已用最大 rf-229，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -42,8 +42,7 @@
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
-
-### P3 — 测试覆盖缺口（建议补齐）
+| **rf-229** | §6.7 功能语义命名表目前是「记录性活索引」而非自动约束——`check-code-traces.py` 只做负面禁止（禁任务代号/魔法编号，`IDENTIFIER_PATTERNS` + CODE），**不校验正面一致性**：① 新增 `report_submodules.*` 开关键可绕过表不登记（预演审计实证：代码现有 6 键 `candidate_compare/cost_lots/data_quality/industry_beta/market_temperature/valuation_percentile`，其中 **`cost_lots` 不在表中**，表内成本流水由 `fund_flow`/`dividend_flow` 覆盖——键与表已存在漂移）；② 表中 slug 若功能已删除可残留僵尸条目；③ 合并章 sheet key（`position_relationship`/`portfolio_history_drawdown`/`style_factor`）是否真实存在于 `registry._REPORT_SECTION_DEFAULT` 无人校验 | **增强方向（待讨论定稿）**：新增 `scripts/check-semantic-index.py` 做双向校验并入门禁——正向：代码中 `report_submodules.<key>` 均须在 §6.7 表中登记（表外键报错，或先补表/列豁免）；反向：表中每个 slug 在 `src/python` 中确实存在（防僵尸条目）；合并章 key 校验须在 registry 中存在。**实施前先跑「键覆盖审计」**确定表外键清单与豁免策略（`cost_lots` 需决定补表或豁免）。待讨论：校验脚本独立 or 并入 check-code-traces.py；门禁级别（P0/P2）；表解析的稳定性 |
 
 > 全部补齐（2026-08-05）：rf-226 fact_checker 组合级收益误配修复 + config/anonymizer.py 补测试（99% 覆盖）。
 
