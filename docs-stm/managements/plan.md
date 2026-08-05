@@ -40,6 +40,8 @@ Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做�
 | 功能补齐 | 1.5d |
 | 体验打磨 | 1d |
 
+> **最新代码核查（2026-08-05）**：`src/python/web/` 尚未创建，依赖清单无 flask/fastapi/uvicorn，**无任何代码落地，仍为纯计划状态**。复用基础已确认存在——`report/orchestrator.py` 的 `prepare_report_data`（L61）与 `generate_report`（L717）接口未变，`src/python/cli/cli.py` 已具备 `report`/`cache`/`whatif`/`check-sources` 4 个子命令，Web 层可直接调用管线；架构约束符合性表（plan-web-ui-implementation.md §5）、安全设计（§6）、API 设计（§7）、测试设计（§9）、实施拆分（§10）均已备齐。工作量估算维持不变（MVP 3d + 功能补齐 1.5d + 体验打磨 1d），仍为 P4 选做、无排期。
+
 ---
 
 ## 归档

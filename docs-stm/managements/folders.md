@@ -7,10 +7,10 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 222 | 55,823 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
+| 主程序代码 | Python | 233 | 56,152 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 4 | 3,761 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 17 | 6,468 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **243** | **66,052** | 主程序 + 模板 + 脚本 |
+| **源代码合计** | — | **254** | **66,381** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **287** | **81,500** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **5,144 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **13** | **5,711** | 含 README.md（181 行）；行数为 README + manuals 之和 |
@@ -115,7 +115,9 @@ investor-util/
 │   │   │   ├── fx_exposure.py                 #   外汇敞口分析（港股/QDII 汇率风险）
 │   │   │   ├── liquidity.py                   #   流动性风险评估（场内品种变现天数计算）
 │   │   │   ├── market_temperature.py          #   市场温度（价格分位+均线偏离+波动率三因子合成温度计，无仓位指令）
-│   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等）
+│   │   │   ├── metrics.py                     #   量化指标计算（夏普/卡玛/HHI/Beta 等，聚合门面）
+│   │   │   ├── metrics_returns.py             #   收益类指标子模块（日收益率口径/数值清理/收益回撤）
+│   │   │   ├── metrics_risk.py                #   风险类指标子模块（集中度/胜率/换手/风险贡献/波动率/Beta）
 │   │   │   ├── portfolio_evolution.py         #   组合演进（多快照聚合 → evolution_data）
 │   │   │   ├── rebalance.py                   #   再平衡信号计算（品种偏离度/调整建议）
 │   │   │   ├── rebalance_advisor.py           #   调仓建议可行化层（份额取整一手/费用估算/现金缓冲/优先级 → rebalance_advice）
@@ -184,7 +186,10 @@ investor-util/
 │   │   │   ├── excel_llm_usage.py    #   Excel LLM 用量统计页签
 │   │   │   ├── excel_writer.py       #   Excel 底层写入器（openpyxl 封装）
 │   │   │   ├── _debate_utils.py      #   辩论模式检测工具函数（共享 html/excel）
-│   │   │   ├── html_writer.py        #   HTML 报告主写入器
+│   │   │   ├── html_writer.py        #   HTML 报告主写入器（聚合门面）
+│   │   │   ├── html_writer_nav.py    #   章节可见性 + 目录分组导航（board 层×data 层两层可见性）
+│   │   │   ├── html_writer_display.py #  数据契约展示映射（fund_flow/温度/估值 → 模板友好 dict）
+│   │   │   ├── html_writer_assets.py #   Chart.js JS 资产复制（src/static/ → 报告目录，离线自包含）
 │   │   │   ├── html_builders.py      #   HTML 各区块构建器
 │   │   │   ├── html_renderers.py     #   HTML 渲染管线
 │   │   │   ├── html_jinja_env.py     #   Jinja2 模板环境配置
@@ -216,10 +221,16 @@ investor-util/
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
 │   │   │   ├── _snapshot.py          #   快照与历史数据（持仓快照/环比差异/组合历史走势）
 │   │   │   ├── news_correlation.py   #   新闻与持仓关联分析报告
-│   │   │   ├── orchestrator.py       #   报告编排共享层（TUI/CLI 共用）
+│   │   │   ├── orchestrator.py       #   报告编排共享层（TUI/CLI 共用，聚合门面）
+│   │   │   ├── _report_factor_metrics.py # 风格因子/行业 Beta 计算族（持仓K线路由 + 因子回归 + 行业Beta）
+│   │   │   ├── _report_aux_metrics.py #  辅助指标编排（市场温度 + 持仓相关性矩阵）
 │   │   │   ├── _llm_news.py          #   LLM/新闻并行获取（线程池提交/收集/报告）
 │   │   │   ├── _pipeline.py          #   报告管线编排（单管线/双管线调度）
-│   │   │   ├── _report_generation.py #   报告生成实现（both/full 两种路径）
+│   │   │   ├── _report_generation.py #   报告生成实现（both/full 两种路径，聚合门面）
+│   │   │   ├── _report_health.py     #   数据源健康检查（后台并行启动/结果收集持久化）
+│   │   │   ├── _report_helpers.py    #   管线辅助函数（轻量行情/演进与快照差异注入/完整性校验/both 明细子集）
+│   │   │   ├── _full_risk_metrics.py #   full 路径全量量化指标装配（历史走势+指标+情景分析+口径修正）
+│   │   │   ├── _chart_dataset_factory.py # Chart.js 数据集构建（Flag 开关+雷达子开关收集+异常兜底）
 │   │   │   ├── privacy_notice.py     #   隐私提示模块（首次运行提示 + 报告脚注）
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
