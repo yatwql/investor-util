@@ -1,7 +1,6 @@
 """Excel 文件往返测试 — 保存的 xlsx 可重新打开。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/report/test_excel_roundtrip.py -v
 """
 

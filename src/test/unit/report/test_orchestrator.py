@@ -191,7 +191,18 @@ class TestGenerateReport:
     def test_generate_report_skeleton(self):
         """骨架模式返回 ReportResult，不抛异常。"""
         mock_reporter = MagicMock()
-        result = generate_report(holdings=[], config={}, reporter=mock_reporter)
+        with (
+            # 市场数据网络依赖：交易日历（akshare）+ A 股/美股指数（腾讯/新浪）
+            patch("src.python.report.market_value._get_trading_calendar",
+                  return_value=set()),
+            patch("src.python.fetcher.index.fetch_indices", return_value={}),
+            patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
+            # 后台数据源健康检查（全量 HTTP 连通性探测）
+            patch("src.python.report._report_generation._spawn_health_checks",
+                  return_value=None),
+            patch("src.python.report._report_generation._collect_health_checks"),
+        ):
+            result = generate_report(holdings=[], config={}, reporter=mock_reporter)
         assert isinstance(result, ReportResult)
         assert result.report_generated is True
         assert result.exit_code == 0

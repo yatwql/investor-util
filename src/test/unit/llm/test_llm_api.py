@@ -7,8 +7,7 @@
   - content_filter 空返回安抚重试
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test.unit.llm.test_llm_api -v
+  pytest src/test/unit/llm/test_llm_api.py -v
 """
 
 from __future__ import annotations

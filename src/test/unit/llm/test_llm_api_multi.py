@@ -7,8 +7,7 @@
   4. 熔断异常兼容（call_single_provider 抛异常 → 跳下一 provider）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/llm/test_llm_api_multi.py -v
+  pytest src/test/unit/llm/test_llm_api_multi.py -v
 """
 
 from __future__ import annotations

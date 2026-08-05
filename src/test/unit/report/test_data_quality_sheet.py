@@ -246,15 +246,15 @@ class TestWriteDataQualitySheet(unittest.TestCase):
         self.assertIn(_FRESHNESS_PLACEHOLDER, "|".join(cells))
 
 
-class TestLegacySourceMatrixStyle(unittest.TestCase):
-    """旧样式回归测试 — 开关关闭时「数据源可用性矩阵」保持原样。"""
+class TestSourceMatrixDefaultStyle(unittest.TestCase):
+    """开关关闭时「数据源可用性矩阵」保持默认样式（不含「品种覆盖」区块）。"""
 
     def setUp(self):
         self.wb = openpyxl.Workbook()
         self.ws = self.wb.active
 
-    def test_legacy_title_and_matrix_rows(self):
-        """旧样式标题为「数据源可用性矩阵」，矩阵行保留。"""
+    def test_default_title_and_matrix_rows(self):
+        """标题为「数据源可用性矩阵」，矩阵行保留。"""
         from src.python.report.excel_generator import _write_data_source_matrix_sheet
         from src.python.report.progress import SilentProgressReporter
 
@@ -270,5 +270,5 @@ class TestLegacySourceMatrixStyle(unittest.TestCase):
         self.assertIn("数据源可用性矩阵", joined)
         self.assertIn("行情数据", joined)
         self.assertIn("降级", joined)
-        # 旧样式不含「品种覆盖」区块（开关关闭时无新增内容）
+        # 开关关闭时不含「品种覆盖」区块
         self.assertNotIn("品种覆盖", joined)

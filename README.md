@@ -2,7 +2,7 @@
 
 读取 Excel 持仓信息，对接中国金融数据源获取实时行情，生成 **Excel / HTML** 格式的投资分析报告。
 
-> 当前版本：0.10.4
+> 当前版本：0.10.6
 
 ## 环境要求
 
@@ -55,7 +55,7 @@ python -m src.python.cli cache --stats
   - **历史走势**（1 个）：组合历史走势与回撤（一章两区块：走势表 + 回撤矩阵 + 危机区间标注）——始终可见，数据不可用时占位
   - **行动建议**（1 个）：行动建议——开启 `enable_action` 时生成（默认关；再平衡信号/交易纪律/调仓建议/收益归因）
   - **LLM 分析**（5 个）：全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析、LLM API 用量——启用 LLM 时生成
-- **HTML 报告** — 单页完整渲染（响应式 CSS、盈亏着色、财经新闻热点与持仓关联分析、6 张 Chart.js 交互图表——悬停/缩放，全部页面顺序展示）
+- **HTML 报告** — 单页完整渲染（响应式 CSS、盈亏着色、财经新闻热点与持仓关联分析、9 张 Chart.js 交互图表（主报告 6 张 + 组合演进另加 3 张）——悬停/缩放，全部页面顺序展示）
 
 ### 新闻与数据增强
 
@@ -144,11 +144,13 @@ python -m src.python.cli cache --stats
 | 文档 | 说明 |
 |:-----|:------|
 | [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块（含 LLM）检查清单 |
-| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试模式、新增测试指南 |
+| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试模式、跨机器耗时采集与环境耗时对照、新增测试指南 |
 | [辅助脚本参考](docs-stm/manuals/scripts-reference.md) | scripts/ 目录全部工具脚本用法速查 |
 | [性能历史趋势查看](scripts/perf_view.py) | 查看每次报告生成的各阶段耗时记录（`python scripts/perf_view.py`） |
 
-#### 任务编号自动保障（开发协作）
+> **跨机器测试耗时采集**：测试耗时随硬件/操作系统/并行度变化，跨机器复现采集可运行 `python scripts/test_runner.py --mode bench --update-docs`（隐含 `--machine-info`）——顺序运行全部对照模式并采集本机 14 项环境属性，自动将实测耗时写入 `test-coverage.md` 的「环境耗时对照」两张表（按主机名匹配列：同机覆盖刷新、新机器追加列；`--update-docs` 默认永不写文档，需显式传入）。详见[如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md)。
+
+### 任务编号自动保障（开发协作）
 
 项目任务编号（`plan-`/`rf-`）全局单调递增、归档不回收，由 `scripts/check-task-numbering.py` 校验，防止新增编号与历史归档冲突。三层自动保障：
 

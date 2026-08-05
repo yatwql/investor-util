@@ -197,6 +197,12 @@ _SECTION_NAV_GROUP_MAP: dict[str, str] = {
     "llm_usage": "llm",
 }
 
+# LLM 支持章节：与「LLM」导航组同源派生（新闻关联 + LLM 文本分析系列 + API 用量），
+# 单一数据源防漂移；目录/横向导航据此橙色加粗 + 🧠 图标标记。
+_LLM_SUPPORTED_SECTIONS: frozenset[str] = frozenset(
+    key for key, group in _SECTION_NAV_GROUP_MAP.items() if group == "llm"
+)
+
 
 def _build_section_nav_groups(
     order: list[dict],
@@ -206,7 +212,8 @@ def _build_section_nav_groups(
     """按「基础/基金深度/风险/历史/LLM」五组构建 HTML 目录分组导航数据。
 
     仅收录当前可见章节；组序固定为五组顺序，组内按报告序号升序。
-    返回 [{key, name, sections: [{key, number, name}, ...]}, ...]；
+    返回 [{key, name, sections: [{key, number, name, llm_supported}, ...]}, ...]；
+    llm_supported 标记该章节是否有 LLM 支持（与 LLM 导航组同源），模板据此加橙色/图标；
     空组（无可见章节）保留在返回列表中，模板端跳过渲染（无 `<details>`）。
     """
     groups: dict[str, list[dict]] = {gk: [] for _, gk in _NAV_GROUP_LABELS}
@@ -220,6 +227,7 @@ def _build_section_nav_groups(
                 "key": key,
                 "number": section_numbers.get(key, 0),
                 "name": sec.get("name", key),
+                "llm_supported": key in _LLM_SUPPORTED_SECTIONS,
             }
         )
     result: list[dict] = []
@@ -488,6 +496,7 @@ def _render_template(
     return _ENV.get_template("report_template.html").render(
         flow_display=_build_flow_display(fund_flow_data),
         section_groups=section_groups,
+        llm_supported_sections=_LLM_SUPPORTED_SECTIONS,
         valuation_enabled=valuation_enabled,
         market_temperature=market_temperature,
         now=now_str,

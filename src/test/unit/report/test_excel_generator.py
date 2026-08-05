@@ -9,8 +9,7 @@
   - _build_llm_usage_sheet 状态判定：缓存/成功/禁用/失败
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_excel_generator.py -v
+  pytest src/test/unit/report/test_excel_generator.py -v
 """
 
 from __future__ import annotations
@@ -806,7 +805,7 @@ class TestCreateSheets(unittest.TestCase):
         for key, title in expected_titles.items():
             self.assertIn(key, sheets, f"{key} should be created")
             self.assertEqual(sheets[key].title, title, f"{key} title mismatch")
-        # 回归：组合历史走势与回撤渲染为单一 sheet（走势表 + 回撤矩阵区块合一）
+        # 组合历史走势与回撤渲染为单一 sheet（走势表 + 回撤矩阵区块合一）
         self.assertNotIn("portfolio_history", sheets)
         self.assertNotIn("drawdown_analysis", sheets)
 

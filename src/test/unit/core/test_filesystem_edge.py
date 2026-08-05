@@ -1,11 +1,10 @@
-"""Y3: 文件系统纵深边缘场景测试。
+"""文件系统纵深边缘场景测试。
 
 覆盖加密 Excel/xlsm 宏/隐藏工作表/损坏 xlsx/UNC 网络路径/
 文件占用/权限变更/超长路径/缓存篡改/空字节文件共 12 项测试。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/core/test_filesystem_edge.py -v
+  pytest src/test/unit/core/test_filesystem_edge.py -v
 """
 
 from __future__ import annotations
@@ -21,10 +20,10 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_core, pytest.mark.edge]
 
 
 # ═══════════════════════════════════════════════════════════
-# Y3-1: 加密 Excel / xlsm 宏
+# 加密 Excel / xlsm 宏
 # ═══════════════════════════════════════════════════════════
 
-class TestEncryptedExcelY3(unittest.TestCase):
+class TestEncryptedExcel(unittest.TestCase):
     """加密 Excel/xlsm 文件处理。"""
 
     @patch("src.python.core.reader.openpyxl.load_workbook")
@@ -52,10 +51,10 @@ class TestEncryptedExcelY3(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y3-2: 隐藏工作表
+# 隐藏工作表
 # ═══════════════════════════════════════════════════════════
 
-class TestHiddenSheetY3(unittest.TestCase):
+class TestHiddenSheet(unittest.TestCase):
     """隐藏工作表处理。"""
 
     def setUp(self):
@@ -89,10 +88,10 @@ class TestHiddenSheetY3(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y3-3: 损坏 xlsx
+# 损坏 xlsx
 # ═══════════════════════════════════════════════════════════
 
-class TestCorruptedXlsxY3(unittest.TestCase):
+class TestCorruptedXlsx(unittest.TestCase):
     """损坏 xlsx 文件处理。"""
 
     def test_bad_zip_file_raises_value_error(self):
@@ -122,10 +121,10 @@ class TestCorruptedXlsxY3(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y3-4: UNC 网络路径
+# UNC 网络路径
 # ═══════════════════════════════════════════════════════════
 
-class TestUncPathY3(unittest.TestCase):
+class TestUncPath(unittest.TestCase):
     """UNC 网络路径处理。"""
 
     @patch("src.python.core.reader.openpyxl.load_workbook")
@@ -152,10 +151,10 @@ class TestUncPathY3(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y3-5: 文件占用
+# 文件占用
 # ═══════════════════════════════════════════════════════════
 
-class TestFileLockedY3(unittest.TestCase):
+class TestFileLocked(unittest.TestCase):
     """文件被其他进程占用。"""
 
     @patch("src.python.core.reader.openpyxl.load_workbook")
@@ -187,10 +186,10 @@ class TestFileLockedY3(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y3-6: 权限变更
+# 权限变更
 # ═══════════════════════════════════════════════════════════
 
-class TestPermissionChangedY3(unittest.TestCase):
+class TestPermissionChanged(unittest.TestCase):
     """文件/目录权限变更处理。"""
 
     def test_readonly_file(self):
@@ -220,10 +219,10 @@ class TestPermissionChangedY3(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y3-7: 超长路径
+# 超长路径
 # ═══════════════════════════════════════════════════════════
 
-class TestLongPathY3(unittest.TestCase):
+class TestLongPath(unittest.TestCase):
     """超长路径处理。"""
 
     def test_long_path_listing(self):
@@ -251,10 +250,10 @@ class TestLongPathY3(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y3-8: 缓存篡改
+# 缓存篡改
 # ═══════════════════════════════════════════════════════════
 
-class TestCacheTamperingY3(unittest.TestCase):
+class TestCacheTampering(unittest.TestCase):
     """缓存文件被篡改。"""
 
     def test_cache_file_corrupted_json(self):
@@ -307,10 +306,10 @@ class TestCacheTamperingY3(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y3-9: 空字节文件（持仓 xlsx）
+# 空字节文件（持仓 xlsx）
 # ═══════════════════════════════════════════════════════════
 
-class TestNullBytesInXlsxY3(unittest.TestCase):
+class TestNullBytesInXlsx(unittest.TestCase):
     """xlsx 文件内含空字节。"""
 
     def test_xlsx_with_null_bytes(self):

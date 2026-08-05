@@ -14,6 +14,8 @@
 | `check-doc-traces.py` | 测试 | 面向读者文档（.md）中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
 | `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
+| `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
+| `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
 | `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`pytest --collect-only` 快照，供 test-coverage.md 更新） |
@@ -51,15 +53,23 @@ python scripts/test_runner.py --mode verify,regression
 python scripts/test_runner.py --mode unit         # 全量单元测试
 python scripts/test_runner.py --mode scenario     # 业务场景测试
 python scripts/test_runner.py --mode edge         # 边缘/异常场景
-python scripts/test_runner.py --mode smoke        # 冒烟测试（~15s）
+python scripts/test_runner.py --mode smoke        # 冒烟测试（~2s）
 python scripts/test_runner.py --mode data         # 数据正确性验证
 
 # 多模式组合
 python scripts/test_runner.py --mode scenario,edge
 
+# 跨机器耗时采集（输出机器环境属性 + 各模式实测耗时表格，供耗时对照更新）
+python scripts/test_runner.py --mode bench --machine-info
+
+# 跨机器耗时采集 + 自动更新 test-coverage.md 环境耗时对照（含机器信息采集）
+python scripts/test_runner.py --mode bench --update-docs
+
 # 带行覆盖率
 python scripts/test_runner.py --mode unit --coverage
 ```
+
+> `--mode bench` 是「环境耗时对照」所需 14 个模式（不含 `live`）的聚合别名，按对照表顺序运行；配合 `--machine-info` 输出机器硬件信息（OS/架构/主机名/CPU 型号/物理核/线程/内存/磁盘类型/文件系统/Python/并行度/日期）与环境属性表 + 各模式实测耗时表，可直接并入 `test-coverage.md` 的环境耗时对照（「采集环境属性」+「各模式耗时对照」两张表）。追加 `--update-docs` 则自动将本机环境属性与实测耗时写入 `test-coverage.md` 的两张表（按主机名匹配/新增列，同机覆盖历史实测），不再需要手工粘贴。
 
 > **`test_runner.py` 不支持 `--` 透传**（如 `-- --lf`）。如需 `--lf` 绕过它直接调 pytest，用 `-m` 复现目标模式的标记表达式。各 `--mode` 对应的 `-m` 表达式见下文"标记表达式对照"或直接查看 `MODES` 字典。
 
@@ -67,20 +77,22 @@ python scripts/test_runner.py --mode unit --coverage
 
 | `--mode` | 等效 `-m` 表达式 | 典型耗时 |
 |:---------|:-----------------|:--------:|
-| `regression` | `scenario` | ~6min |
-| `smoke` | `smoke` | ~15s |
-| `unit` | `unit` | ~30s |
-| `standard` | `unit and not (edge or data)` | ~30s |
-| `edge` | `edge` | ~15s |
-| `data` | `data` | ~10s |
-| `scenario` | `scenario` | ~6min |
-| `integration` | `scenario or integration` | ~50s |
-| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis` | ~1min |
-| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data) or (scenario_basic)` | ~2.5min |
-| `all` | （无过滤，全量） | ~10min |
-| `all_no_unit` | `not unit` | ~7min |
-| `report` | `unit_report` | ~15s |
-| `scenario_extreme` | `scenario_extreme` | ~1min |
+| `regression` | `scenario` | ~17s |
+| `smoke` | `smoke` | ~2s |
+| `unit` | `unit` | ~15s |
+| `standard` | `unit and not (edge or data)` | ~16s |
+| `edge` | `edge` | ~13s |
+| `data` | `data` | ~2s |
+| `scenario` | `scenario` | ~18s |
+| `integration` | `scenario or integration` | ~14s |
+| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts` | ~10s |
+| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)` + `scenario_basic`（两阶段） | ~20s |
+| `all` | （无过滤，全量） | ~21s |
+| `all_no_unit` | `not unit` | ~10s |
+| `report` | `unit_report` | ~11s |
+| `scenario_extreme` | `scenario_extreme` | ~2s |
+
+> 注：典型耗时按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。**耗时与硬件/操作系统/并行度强相关**，不同 OS 或慢机器上可能数倍于此，仅作相对量级参考；完整说明及不同环境下的耗时对照见 `test-coverage.md`（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。
 
 ---
 
@@ -136,7 +148,7 @@ python scripts/check-code-traces.py --ci
 |:------:|:-----|:-----|
 | 0 | 全部通过 | 无需处理 |
 | 1 | HIGH/ORIGIN/VERSION 痕迹 | 必须修复后再提交 |
-| 2 | CODE（任务编号引用如 R-xxx） | 应从注释中移除 |
+| 2 | CODE/IDENT/CHAPTER/ROUND（任务编号/标识符/章节编号引用） | 应从注释/标识符中移除 |
 | 3 | 仅 TODO/CHANGE/DEPR 级别 | 建议人工复核 |
 
 ---
@@ -172,7 +184,7 @@ python scripts/check-doc-traces.py --ci
 | 退出码 | 含义 | 行动 |
 |:------:|:-----|:-----|
 | 0 | 全部通过 | 无需处理 |
-| 1 | HIGH/ARCHIVE/CODE 痕迹 | 应从文档中移除 |
+| 1 | HIGH/ARCHIVE/CODE/CIPHER/CHAPTER/ROUND 痕迹 | 应从文档中移除 |
 | 2 | 仅 LOW 级别痕迹（需人工判断的变更/过渡类描述） | 建议人工复核 |
 
 ---

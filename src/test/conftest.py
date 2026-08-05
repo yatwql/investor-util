@@ -37,7 +37,9 @@ _KNOWN_MARKERS: set[str] = {
     "llm", "edge", "smoke", "data", "integration",
     # integration 分支
     "integration_contract", "integration_isolation", "integration_news_pipeline",
-    "integration_cache", "integration_tui",
+    "integration_cache", "integration_tui", "integration_cli",
+    # 真实网络验证套件（opt-in，默认跳过，不入门禁）
+    "live",
 }
 
 # pytest 内置标记 — 这些不算"项目标记"
@@ -86,6 +88,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration_news_pipeline: 新闻流水线全链路")
     config.addinivalue_line("markers", "integration_cache: 跨模块缓存一致性验证")
     config.addinivalue_line("markers", "integration_tui: TUI → Handler 路由集成测试")
+    config.addinivalue_line("markers", "integration_cli: CLI 命令行模式集成测试")
+    config.addinivalue_line("markers", "live: 真实网络验证套件（opt-in，默认跳过，仅 `-m live` 或 `--run-live` 运行；不入门禁）")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -234,6 +238,34 @@ def _auto_reset_provider_registry():
     get_registry().reset()
 
 
+def pytest_addoption(parser):
+    """注册 `--run-live` 选项：显式允许运行 live 真实网络套件。
+
+    不设置则 live 标记的测试一律跳过（防止误入 `all` 门禁触发真实网络）。
+    """
+    parser.addoption(
+        "--run-live",
+        action="store_true",
+        default=False,
+        help="运行 @pytest.mark.live 真实网络验证套件（默认跳过，不入门禁）",
+    )
+
+
+@pytest.fixture(autouse=True)
+def _skip_live_unless_requested(request):
+    """默认跳过 live 套件，仅 `--run-live` 或 `-m live` 时运行。
+
+    机制性保证 live 测试不进入任何门禁（dev-verify/verify/all 等均不含）：
+    - `pytest -m live`：marker 过滤已收集 live 项，本 fixture 放行（显式指定）
+    - `--run-live`：显式开关，放行
+    - 其余任何方式（含 `all` 全量）收集到 live 项：一律 skip，不发起真实网络
+    """
+    if request.config.getoption("--run-live"):
+        return
+    if request.node.get_closest_marker("live") is not None:
+        pytest.skip("live 套件为 opt-in（真实网络验证），需 `--run-live` 或 `-m live` 显式运行")
+
+
 @pytest.fixture(autouse=True)
 def _auto_reset_feature_flags():
     """自动重置 FEATURE_FLAGS 为默认值，防止测试间 feature 状态泄漏。
@@ -309,6 +341,52 @@ def _mock_market_hours_api(monkeypatch):
         "src.python.core.market_hours._is_market_open_official",
         lambda _: None,
     )
+
+
+@pytest.fixture(autouse=True)
+def _block_external_network(monkeypatch, request):
+    """全局阻断测试运行时真实外部网络连接。
+
+    任何未 mock 的 socket 建连（数据源 API / LLM API / akshare 交易日历 /
+    后台数据源健康检查等）立即抛 RuntimeError 使测试失败 —— 从机制上保证
+    测试用例运行时无外部网络依赖。
+
+    已 mock HTTP 层（httpx.Client / requests / provider 函数 / _fetch_* 等）
+    的测试不创建真实 socket，不受影响；真实建连仅发生在「应 mock 却未 mock」
+    时，此时测试立即失败并提示开发者补 mock，而非静默发起外网请求。
+
+    例外：带 @pytest.mark.live 的 opt-in 真实网络套件放行（仅当 `--run-live`
+    或 `-m live` 显式运行时），允许其发起真实数据源/LLM 连通性探测。
+
+    实现要点：
+    - socket.socket 用「类」替换（ssl 模块顶层 `class SSLSocket(socket)`
+      继承它，用函数替换会破坏 ssl 模块的类继承）；实例化时抛异常。
+    - socket.create_connection / socket.getaddrinfo 用函数替换（建连入口）。
+    """
+    import socket as _socket
+
+    # opt-in 真实网络套件放行（--run-live 或 -m live 显式运行时）
+    if request.config.getoption("--run-live"):
+        return
+    if request.node.get_closest_marker("live") is not None:
+        return
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError(
+            "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，"
+            "请 mock 对应的数据源/LLM API 调用。"
+        )
+
+    class _BlockedSocket(_socket.socket):  # type: ignore[misc]
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError(
+                "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，"
+                "请 mock 对应的数据源/LLM API 调用。"
+            )
+
+    monkeypatch.setattr(_socket, "socket", _BlockedSocket)
+    monkeypatch.setattr(_socket, "create_connection", _raise)
+    monkeypatch.setattr(_socket, "getaddrinfo", _raise)
 
 
 def pytest_collection_modifyitems(config, items):

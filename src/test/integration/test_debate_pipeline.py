@@ -1,18 +1,24 @@
-"""辩论模式集成测试 — 完整管线验证。
+"""辩论模式集成测试 — generate_all_llm 返回元组契约验证。
 
-运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/integration/test_debate_pipeline.py -v
+正反辩论（procon）启用与否决定返回元组是否携带 debate_info 末位元素，
+同时覆盖 debate 全部失败时的降级路径。
 """
 
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-pytestmark = [pytest.mark.integration]
+pytestmark = [pytest.mark.integration, pytest.mark.integration_contract]
+
+# generate_all_llm 返回元组：不含 debate_info 时的长度
+_TUPLE_LEN_WITHOUT_DEBATE = 8
+# 含 debate_info 时的长度
+_TUPLE_LEN_WITH_DEBATE = 9
+# debate_info 在元组中的下标（末位）
+_DEBATE_INFO_INDEX = 8
 
 # 预检结果：所有模块"无需缓存，需要工作线程生成"
 _NONE_CACHED = {
@@ -42,18 +48,18 @@ def _make_dispatch_mock(debate_info: dict | None = None):
 
 
 class TestDebatePipelineBackwardCompat(unittest.TestCase):
-    """所有 Flag 关闭时输出 8 元组（不含 debate_info）。"""
+    """所有 Flag 关闭时输出不含 debate_info 的元组。"""
 
     @patch("src.python.llm.generators_orchestrator.get_llm_config")
     @patch("src.python.config.features.is_feature_enabled")
     @patch("src.python.llm.generators_orchestrator._precheck_all_modules")
-    def test_all_flags_off_returns_8tuple(
+    def test_all_flags_off_returns_without_debate_info(
         self,
         mock_precheck,
         mock_feature,
         mock_config,
     ):
-        """所有 Feature Flag 为 False → 返回 8 元组。"""
+        """所有 Feature Flag 为 False → 返回不含 debate_info 的元组。"""
         mock_config.return_value = {"cache_enabled_expert_review": True,
                                     "enabled_llm": {"global_macro": True,
                                                     "expert_review": True,
@@ -75,8 +81,8 @@ class TestDebatePipelineBackwardCompat(unittest.TestCase):
             categories={"股票": 1},
         )
 
-        # Flag 全关时返回 8 元组
-        self.assertEqual(len(result), 8)
+        # Flag 全关时返回不含 debate_info 的元组
+        self.assertEqual(len(result), _TUPLE_LEN_WITHOUT_DEBATE)
 
 
 class TestDebatePipelineProconEnabled(unittest.TestCase):
@@ -91,7 +97,7 @@ class TestDebatePipelineProconEnabled(unittest.TestCase):
         mock_feature,
         mock_config,
     ):
-        """正反辩论启用 → 返回 9 元组，含 debate_info。"""
+        """正反辩论启用 → 返回含 debate_info 的元组。"""
         mock_config.return_value = {"cache_enabled_expert_review": True,
                                     "enabled_llm": {"global_macro": True,
                                                     "expert_review": True,
@@ -120,9 +126,9 @@ class TestDebatePipelineProconEnabled(unittest.TestCase):
                 categories={"股票": 1},
             )
 
-        # 正反辩论启用 → 9 元组
-        self.assertEqual(len(result), 9)
-        debate_info = result[8]
+        # 正反辩论启用 → 含 debate_info 的元组
+        self.assertEqual(len(result), _TUPLE_LEN_WITH_DEBATE)
+        debate_info = result[_DEBATE_INFO_INDEX]
         self.assertIsNotNone(debate_info)
         if debate_info:
             self.assertIn("pro_text", debate_info)
@@ -168,5 +174,5 @@ class TestDebatePipelineSynthesisFallback(unittest.TestCase):
                 categories={"股票": 1},
             )
 
-            # 应返回 8 或 9 元组
-            self.assertGreaterEqual(len(result), 8)
+            # 降级路径返回不含 debate_info 的元组（或更短）
+            self.assertGreaterEqual(len(result), _TUPLE_LEN_WITHOUT_DEBATE)

@@ -318,7 +318,7 @@ class TestCalcRatingFromEntry(unittest.TestCase):
         self.assertEqual(_calc_rating_from_entry({"rank": "5", "total": "0"}), "")
 
     def test_rank_outranks_percentile_when_conflict(self):
-        """百分位与排名矛盾时，以排名/总数为准（回归：159222 bug）。"""
+        """百分位与排名矛盾时，以排名/总数为准。"""
         # 百分位=3.33(top 3.3%)→优秀，但排名=4823/4985(bottom 3.3%)→较差
         self.assertEqual(
             _calc_rating_from_entry({

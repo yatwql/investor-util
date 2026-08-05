@@ -7,8 +7,7 @@
   - Timer 上下文管理器
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_progress.py -v
+  pytest src/test/unit/report/test_progress.py -v
 """
 
 from __future__ import annotations

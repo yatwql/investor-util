@@ -8,8 +8,7 @@
   - enhance_news_correlation 逐条缓存
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test.unit.llm.test_llm_analysis -v
+  pytest src/test/unit/llm/test_llm_analysis.py -v
 """
 
 from __future__ import annotations

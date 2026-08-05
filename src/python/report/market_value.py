@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -195,12 +196,24 @@ def is_midday_break() -> bool:
 # ── 交易日历（节假日感知） ───────────────────────────────
 _TRADING_CALENDAR_CACHE_KEY = "trading_calendar"
 
+# akshare 交易日历调用串行锁：tool_trade_date_hist_sina() 内部使用
+# py_mini_racer(V8) 解密新浪接口，而 V8 初始化不是线程安全的——多线程并发首次
+# 初始化会触发 [FATAL:partition_address_space.cc(243)] Check failed:
+# !IsConfigurablePoolInitialized() 直接 abort 整个进程（try/except 无法捕获）。
+# 菜单 2 并行价格抓取 / 报告生成的并发路径可能多线程同时命中本缓存未命中分支，
+# 必须在此串行化（V8 顺序初始化是安全的）。
+_TRADING_CALENDAR_AKSHARE_LOCK = threading.Lock()
+
 
 def _get_trading_calendar() -> set[str]:
     """获取 A 股交易日历（YYYY-MM-DD 字符串集合）。
 
     通过 akshare 获取全年交易日数据并缓存。若获取失败，返回空集合，
     由调用方（get_last_trading_day）回退到简易周度判断。
+
+    线程安全：缓存未命中分支用模块级锁串行化 akshare(V8) 调用（见
+    _TRADING_CALENDAR_AKSHARE_LOCK），避免并发初始化 py_mini_racer 触发
+    进程级 FATAL 崩溃。
 
     Returns:
         交易日日期字符串集合
@@ -209,19 +222,24 @@ def _get_trading_calendar() -> set[str]:
     if cached is not None and isinstance(cached, list):
         return set(cached)
 
-    try:
-        import akshare as ak
+    with _TRADING_CALENDAR_AKSHARE_LOCK:
+        # 双重检查：等待锁期间其他线程可能已写入缓存
+        cached = cache.get(_TRADING_CALENDAR_CACHE_KEY, cache.get_ttl("calendar"))
+        if cached is not None and isinstance(cached, list):
+            return set(cached)
+        try:
+            import akshare as ak
 
-        df = ak.tool_trade_date_hist_sina()
-        dates: set[str] = set(df["trade_date"].dropna().astype(str).tolist())
-        if dates:
-            cache.set(_TRADING_CALENDAR_CACHE_KEY, sorted(dates))
-            logger.info("交易日历已更新（%d 个交易日）", len(dates))
-            return dates
-    except Exception as exc:
-        logger.warning("获取交易日历失败: %s，使用简易节假日判断回退", exc)
+            df = ak.tool_trade_date_hist_sina()
+            dates: set[str] = set(df["trade_date"].dropna().astype(str).tolist())
+            if dates:
+                cache.set(_TRADING_CALENDAR_CACHE_KEY, sorted(dates))
+                logger.info("交易日历已更新（%d 个交易日）", len(dates))
+                return dates
+        except Exception as exc:
+            logger.warning("获取交易日历失败: %s，使用简易节假日判断回退", exc)
 
-    return set()
+        return set()
 
 
 def _is_trading_day(date: datetime) -> bool:

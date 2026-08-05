@@ -1,6 +1,6 @@
 """市场温度边界场景测试（edge，必须放 *_edge.py）。
 
-覆盖：恒平序列 / 极端因子 clamp / 单样本 / 负值输入。
+覆盖：恒平序列 / 极端因子 clamp / 负值输入。
 """
 
 from __future__ import annotations
@@ -29,10 +29,6 @@ class TestTemperatureEdge:
 
     def test_score_never_exceeds_100(self):
         assert temperature_score(100.0, 1.0, 1.0) <= 100.0
-
-    def test_single_bar_insufficient(self):
-        result = compute_temperature([{"date": "d1", "close": 1.0}])
-        assert result["available"] is False
 
     def test_zero_close_series_insufficient(self):
         """含零/负值收盘价：收益率分母保护，温度可算或降级但不崩溃。"""

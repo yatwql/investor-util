@@ -7,8 +7,7 @@
   - is_qdii_extended       — QDII 识别（显式 + 隐式）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/report/test_classification_utils.py -v
+  pytest src/test/unit/report/test_classification_utils.py -v
 """
 
 from __future__ import annotations

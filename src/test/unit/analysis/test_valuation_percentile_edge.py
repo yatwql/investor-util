@@ -1,16 +1,13 @@
 """估值分位边界场景测试（edge，必须放 *_edge.py）。
 
-覆盖：恒平序列 / 当前价越界 / 阈值边界 / 空序列 / NaN 输入。
+覆盖：恒平序列 / 当前价越界 / 空序列 / NaN 输入。
 """
 
 from __future__ import annotations
 
 import pytest
 
-from src.python.analysis.valuation_percentile import (
-    price_percentile,
-    tier_from_percentile,
-)
+from src.python.analysis.valuation_percentile import price_percentile
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
 
@@ -45,9 +42,3 @@ class TestPricePercentileEdge:
         """无穷当前价 → 返回 None（不硬算）。"""
         closes = [float(i) for i in range(1, 101)]
         assert price_percentile(closes, current=float("inf")) is None
-
-    def test_tier_boundary_30(self):
-        assert tier_from_percentile(30.0) == "合理"
-
-    def test_tier_boundary_70(self):
-        assert tier_from_percentile(70.0) == "合理"

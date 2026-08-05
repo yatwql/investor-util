@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.10.4
+> 文档版本：0.10.6
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -171,7 +171,7 @@ skeleton.py:generate_llm_content()
 | `circuit_breaker.py` | 工具 | LLM 端点熔断器（连续 3 次失败 + 固定 60s 冷却） | `get_circuit_status()` |
 | `markdown.py` | 工具 | Markdown→HTML 转换 | `markdown_to_html()` |
 | `_api_claude.py` / `_api_gemini.py` / `_api_openai.py` | 私有 | 各 Provider 单次调用实现（自包含依赖，委托 api_base 重试 + Extended Thinking 注入），api.py 分派目标 | `call_claude()` / `call_gemini()` / `call_openai()` |
-| `_batch_mode.py` | 私有 | 批量模式分块执行（`_BATCH_CHUNK_SIZE=10` 每批、并行度 6） | `run_batch_mode()` |
+| `_batch_mode.py` | 私有 | 批量模式分块执行（`_BATCH_CHUNK_SIZE=10` 每批、最多 3 批并行，受 `min(3, 批数, 6)` 约束） | `run_batch_mode()` |
 
 ### 2.2 四大+一模块详情
 
@@ -1239,7 +1239,9 @@ LLM 集成层与系统其他组件的接口：
 | claude-fable-5 | 3.00 | 15.00 | 0.30 |
 | claude-haiku-4-5 | 0.25 | 1.25 | 0.025 |
 | claude-opus-4-8 | 15.00 | 75.00 | 1.50 |
+| claude-opus-4-6 | 15.00 | 75.00 | 1.50 |
 | claude-sonnet-4-6 | 3.00 | 15.00 | 0.30 |
+| claude-sonnet-4-8 | 3.00 | 15.00 | 0.30 |
 | deepseek-chat | 1.00 | 2.00 | 0.02 |
 | deepseek-v4-flash | 1.00 | 2.00 | 0.02 |
 | deepseek-v4-pro | 3.00 | 6.00 | 0.025 |
@@ -1249,6 +1251,8 @@ LLM 集成层与系统其他组件的接口：
 | gemini-3.5-flash | 0.15 | 0.60 | 0.015 |
 | gpt-4o | 2.50 | 10.00 | 2.50 |
 | gpt-4o-mini | 0.15 | 0.60 | 0.15 |
+
+> 上表为具名模型定价；`MODEL_PRICING` 另有 6 个前缀回退键（`claude-sonnet-4-`/`claude-opus-4-`/`claude-haiku-4-`/`gemini-3.5-`/`gemini-2.5-`/`gemini-2.0-`）用于 startswith 回退匹配日期戳变体，未逐行列示。
 
 费用按 `(input_tokens × 输入单价 + output_tokens × 输出单价 + cache_hit_tokens × 缓存命中单价) / 1_000_000` 计算。
 

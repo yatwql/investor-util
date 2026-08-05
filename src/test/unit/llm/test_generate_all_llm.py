@@ -1,4 +1,4 @@
-"""LLM 生成器模块单元测试。
+"""LLM 生成编排入口单元测试。
 
 测试目标：
   - generate_all_llm — force 参数透传
@@ -6,8 +6,7 @@
   - generate_all_llm 缓存预检
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test.unit.llm.test_llm_generators -v
+  pytest src/test/unit/llm/test_generate_all_llm.py -v
 """
 
 from __future__ import annotations

@@ -8,8 +8,7 @@
   - auto_width / freeze_header
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_excel_writer -v
+  pytest src/test/unit/report/test_excel_writer.py -v
 """
 
 from __future__ import annotations

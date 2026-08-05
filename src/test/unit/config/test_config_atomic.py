@@ -8,8 +8,7 @@
   - 写入内容与 JSON 格式正确
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_config_atomic -v
+  pytest src/test/unit/config/test_config_atomic.py -v
 """
 
 from __future__ import annotations

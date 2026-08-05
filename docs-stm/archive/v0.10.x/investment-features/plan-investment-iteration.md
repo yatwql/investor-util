@@ -6,7 +6,9 @@
 >
 > 前置：`plan-investment-features.md` §4 已定章节归并对照表。本文档按 §5 实施次序拆分为 21 轮。
 >
-> **进度**：阶段 A 数据质量地基 / B 决策中枢 / B′ 持仓关系合并 / C 历史增强（轮 1~11）**已完成并验收通过**（对应 P1 计划项 `plan-17`~`plan-20`，changelog v0.10.1）；阶段 D 轮 12「风格与因子合并 + 行业 Beta」**已完成并验收通过**（章节数 20→19）；轮 13「候选基金比较增强模式」**已完成并验收通过**（`candidate_compare` 默认关）；阶段 E 轮 14~16 成本流水（对应 P2 计划项 `plan-22`）**已完成并验收通过**——轮 14 流水页签解析（20 例、覆盖率 93%）、轮 15 XIRR 资金加权收益 + 成本分档（24 例、覆盖率 94%）、轮 16 三页签渲染（`fund_flow_data` 数据契约 + `cost_lots` 默认关 + CLI/TUI 接线，新增测试 32 个、267 passed，dev-verify 1638 passed）+ **HTML 渲染补齐**（轮16 补遗：`_build_flow_display` 展示映射 + 模板三处条件渲染，新增测试 12 个）；阶段 F 轮 17~18 估值与温度（对应 P3 计划项 `plan-23`）**已完成并验收通过**——轮 17 估值分位、轮 18 市场温度；阶段 G 轮 19 HTML 分组导航**已完成并验收通过**（`_build_section_nav_groups` 五组折叠 + `TestHtmlTocGroupedNav` 11 例）、轮 20 文档快照与用户手册**已完成并验收通过**（folders/test-coverage 快照、reports-instruction「页面/章节分组」序号核对、how-to-config 新开关行）；轮 21 待实施（发布门禁）。
+> **进度**：阶段 A 数据质量地基 / B 决策中枢 / B′ 持仓关系合并 / C 历史增强（轮 1~11）**已完成并验收通过**（对应 P1 计划项 `plan-17`~`plan-20`，changelog v0.10.1）；阶段 D 轮 12「风格与因子合并 + 行业 Beta」**已完成并验收通过**（章节数 20→19）；轮 13「候选基金比较增强模式」**已完成并验收通过**（`candidate_compare` 默认关）；阶段 E 轮 14~16 成本流水（对应 P2 计划项 `plan-22`）**已完成并验收通过**——轮 14 流水页签解析（20 例、覆盖率 93%）、轮 15 XIRR 资金加权收益 + 成本分档（24 例、覆盖率 94%）、轮 16 三页签渲染（`fund_flow_data` 数据契约 + `cost_lots` 默认关 + CLI/TUI 接线，新增测试 32 个、267 passed，dev-verify 1638 passed）+ **HTML 渲染补齐**（轮16 补遗：`_build_flow_display` 展示映射 + 模板三处条件渲染，新增测试 12 个）；阶段 F 轮 17~18 估值与温度（对应 P3 计划项 `plan-23`）**已完成并验收通过**——轮 17 估值分位、轮 18 市场温度；阶段 G 轮 19 HTML 分组导航**已完成并验收通过**（`_build_section_nav_groups` 五组折叠 + `TestHtmlTocGroupedNav` 11 例）、轮 20 文档快照与用户手册**已完成并验收通过**（folders/test-coverage 快照、reports-instruction「页面/章节分组」序号核对、how-to-config 新开关行）；轮 21 全链回归与发布门禁**已完成并验收通过**（**v0.10.4 已发布**（2026-08-05）：`test_runner.py --mode verify,regression` 3256 全过 + 3 check 脚本 `--ci` 全 [OK] + 版本号全链一致 + 数据快照刷新 + registry.number 连续编号复核 + 数据契约增删复核）。
+
+> **全部 21 轮已完成**（轮 1~21 验收签字齐备）。本文档随 v0.10.x 迭代收官归档至 `docs-stm/archive/v0.10.x/investment-features/`。
 
 ---
 
@@ -25,7 +27,7 @@
 | **D 风格与选基** | 12~13 | 风格与因子合并 + 行业 Beta + 候选基金比较 | 合并风格与因子章 + 改造基金业绩章 | ✅ 已完成 |
 | **E 成本流水** | 14~16 | 资金流水 + 资金加权收益 | 输入扩展 + 改造「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 | ✅ 已完成 |
 | **F 估值与温度** | 17~18 | 估值分位 + 市场温度 | 改造「资产穿透TOP10」/「投资分析汇总」章 | ✅ 已完成 |
-| **G 导航与收尾** | 19~21 | 分组标签 + 文档 + 全链回归 | 全报告 + 发布门禁 | 待实施 |
+| **G 导航与收尾** | 19~21 | 分组标签 + 文档 + 全链回归 | 全报告 + 发布门禁 | ✅ 已完成 |
 
 **迭代原则**：
 1. **每轮独立可交付**：每轮结束产物可运行、可测试、可回滚；
@@ -335,15 +337,17 @@
 - **目标**：全量验证 + 手动验证清单 + 发布准备。
 - **实施内容**：`test_runner.py --mode verify,regression` 全量；手动验证清单（真机构造持仓全流程）；review-findings 清理；版本号一致复核；registry.number 连续编号复核；**报告序号不可硬编码 约束正文与 registry 注释复核确认为「19 模块」**；**附录 H 数据契约增删复核**。
 - **量化验收标准**：
-  - [ ] `test_runner.py --mode verify,regression` **全部通过**（含全部新 marker）；
-  - [ ] 3 个 `check-*.py --ci` 全部通过；
-  - [ ] **registry.number 复核**：合并后 1~19 连续编号无重复/无跳号（脚本断言），无 `fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure` 旧注册残留；
-  - [ ] **报告序号不可硬编码 正文复核**：`technical.md` §8 报告序号不可硬编码 约束与 registry 注释均确认一致为「19 模块」（registry.number 连续编号 1~19）；
-  - [ ] **数据契约复核**：附录 H 无 `fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure` 旧契约残留；`position_relationship_data`/`style_factor_data`/`action_data`/`data_quality_data` 新契约均已定义类型/版本/写入消费模块；
-  - [ ] **手动验证清单**（真机构造持仓 → 全报告生成 → 新子模块逐项核对 → 预览/下载）逐项勾选无遗留；
-  - [ ] review-findings 无 CRITICAL/HIGH 遗留（MEDIUM 以下可记录）；
-  - [ ] 数据快照与版本号一致（check-version-consistency 全 [OK]）；
-  - [ ] §2 通用标准全部满足。
+  - [x] `test_runner.py --mode verify,regression` **全部通过**（含全部新 marker）；
+  - [x] 3 个 `check-*.py --ci` 全部通过；
+  - [x] **registry.number 复核**：合并后 1~19 连续编号无重复/无跳号（脚本断言），无 `fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure` 旧注册残留；
+  - [x] **报告序号不可硬编码 正文复核**：`technical.md` §8 报告序号不可硬编码 约束与 registry 注释均确认一致为「19 模块」（registry.number 连续编号 1~19）；
+  - [x] **数据契约复核**：附录 H 无 `fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure` 旧契约残留；`position_relationship_data`/`style_factor_data`/`action_data`/`data_quality_data` 新契约均已定义类型/版本/写入消费模块；
+  - [x] **手动验证清单**（真机构造持仓 → 全报告生成 → 新子模块逐项核对 → 预览/下载）逐项勾选无遗留；
+  - [x] review-findings 无 CRITICAL/HIGH 遗留（MEDIUM 以下可记录）；
+  - [x] 数据快照与版本号一致（check-version-consistency 全 [OK]）；
+  - [x] §2 通用标准全部满足。
+
+> ✅ **轮 21 验收签字（2026-08-05）**：全链回归与发布门禁完成——`test_runner.py --mode verify,regression` 3256 全过（verify 3024 + regression 232）+ 3 check 脚本（code/doc/task-numbering）`--ci` 全 [OK] + 版本号全链一致（v0.10.4，check-version-consistency 13 项 [OK]）+ 数据快照刷新（test-coverage 5038 / folders 统计）+ registry.number 连续编号复核 + 数据契约增删复核。**v0.10.4 已发布**（2026-08-05，git tag v0.10.4）。**21 轮全部收官**，本迭代（plan-17~24）随 v0.10.x 归档。
 
 ---
 

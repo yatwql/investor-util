@@ -1,7 +1,6 @@
 """辩论模式 Token 预算守卫测试 — 。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/llm/test_debate_token_budget.py -v
 """
 

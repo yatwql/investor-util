@@ -1,8 +1,7 @@
 """流动性分析模块测试 — 场外品种赎回天数计算。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/unit/test_liquidity_otc.py -v
+  pytest src/test/unit/analysis/test_liquidity_otc.py -v
 """
 
 from __future__ import annotations

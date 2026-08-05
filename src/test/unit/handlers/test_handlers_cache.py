@@ -1,7 +1,6 @@
 """TUI 缓存管理命令处理器单元测试。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/handlers/test_handlers_cache.py -v
 """
 
@@ -9,7 +8,7 @@ from __future__ import annotations
 
 import io
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -238,3 +237,54 @@ class TestRefreshDividendCache(unittest.TestCase):
         count = self._call([])
         self.assertEqual(count, 0)
         mock_get.assert_not_called()
+
+
+@pytest.mark.unit_core
+class TestRefreshOneFundCache(unittest.TestCase):
+    """_refresh_one_fund_cache 单基金缓存刷新（operations 版）。"""
+
+    def _make_fund(self, code="000001", name="测试基金"):
+        f = MagicMock()
+        f.code = code
+        f.name = name
+        return f
+
+    @patch("src.python.fetcher.fund.fetch_fund_benchmark")
+    @patch("src.python.fetcher.fund.fetch_fund_holdings")
+    @patch("src.python.fetcher.fund.fetch_fund_rankings")
+    def test_all_ok(self, mock_rank, mock_hold, mock_bm):
+        """全部数据获取成功。"""
+        from src.python.cache.operations import _refresh_one_fund_cache
+
+        mock_rank.return_value = {"rank": 1}
+        mock_hold.return_value = {"holdings": [{"name": "茅台", "code": "600519"}]}
+        mock_bm.return_value = "沪深300"
+
+        result = _refresh_one_fund_cache(self._make_fund())
+        self.assertEqual(result[0], "fund")
+        self.assertEqual(result[1], "000001")
+        self.assertIs(result[3], True)  # perf_ok
+        self.assertIs(result[4], True)  # hold_ok
+        self.assertIs(result[6], True)  # bm_ok
+
+    @patch("src.python.fetcher.fund.fetch_fund_benchmark", return_value="--")
+    @patch("src.python.fetcher.fund.fetch_fund_holdings", return_value=None)
+    @patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None)
+    def test_all_fail(self, mock_rank, mock_hold, mock_bm):
+        """全部数据获取失败。"""
+        from src.python.cache.operations import _refresh_one_fund_cache
+
+        result = _refresh_one_fund_cache(self._make_fund())
+        self.assertIs(result[3], False)  # perf_ok
+        self.assertIs(result[4], False)  # hold_ok
+        self.assertIs(result[6], False)  # bm_ok
+
+    @patch("src.python.fetcher.fund.fetch_fund_benchmark", return_value="--")
+    @patch("src.python.fetcher.fund.fetch_fund_holdings", return_value=None)
+    @patch("src.python.fetcher.fund.fetch_fund_rankings", side_effect=Exception("API err"))
+    def test_rankings_raises(self, mock_rank, mock_hold, mock_bm):
+        """排名 API 抛出异常时向上传播（函数未捕获该异常）。"""
+        from src.python.cache.operations import _refresh_one_fund_cache
+
+        with self.assertRaisesRegex(Exception, "API err"):
+            _refresh_one_fund_cache(self._make_fund())

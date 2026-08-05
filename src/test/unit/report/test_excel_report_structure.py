@@ -8,7 +8,6 @@
   - 列宽度设置避免内容截断
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/report/test_excel_report_structure.py -v
 """
 

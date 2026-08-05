@@ -8,8 +8,7 @@
   - record_per_module — 模块级用量记录
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/llm/test_llm_session_usage.py -v
+  pytest src/test/unit/llm/test_llm_session_usage.py -v
 """
 
 from __future__ import annotations

@@ -4,8 +4,7 @@ S17：部分模块缓存超期（过期模块重新调用，未过期命中缓�
 S17a：全部模块缓存命中，无 API 调用。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_llm_partial_cache.py
+  python -m pytest src/test/scenario/llm/test_llm_partial_cache.py
 """
 
 from __future__ import annotations
@@ -66,7 +65,7 @@ class TestS17PartialCacheExpiry(unittest.TestCase):
         self.assertEqual(by_key["penetration_deep"]["status"], "unknown")
 
     def test_session_usage_correctly_reports_mixed_cache(self):
-        """阶段性验证：format_session_usage 在混合场景下正确反映 call_count。"""
+        """format_session_usage 在混合缓存场景下正确反映 call_count。"""
         from src.python.llm import get_session_usage, format_session_usage
         from src.python.llm.session import reset_session_usage
         from src.python.llm.session import track_session_usage, record_per_module

@@ -3,8 +3,7 @@
 验证空持仓时所有 LLM 模块应正常跳过/占位，不崩溃。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_llm_empty_holdings.py -v
+  python -m pytest src/test/scenario/llm/test_llm_empty_holdings.py -v
 """
 
 from __future__ import annotations
@@ -17,6 +16,7 @@ from unittest.mock import MagicMock, patch
 from src.test.helpers import SynchronousExecutor
 
 
+@pytest.mark.llm
 @pytest.mark.scenario_llm
 @pytest.mark.scenario
 class TestEmptyHoldingsWithLlm(unittest.TestCase):
@@ -72,7 +72,7 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
         except Exception as e:
             self.fail(f"generate_all_llm 在空持仓下不应崩溃: {e}")
 
-        # 兼容 8 元组（无辩论模式）和 9 元组（辩论模式开启）
+        # 依次取各模块输出，不依赖是否含辩论模式末位元素
         macro = result[0]
         expert = result[1]
         health = result[2]

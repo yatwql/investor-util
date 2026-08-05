@@ -10,7 +10,6 @@
 边缘/异常测试见 test_html_report_structure_edge.py。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/report/test_html_report_structure.py -v
 """
 
@@ -58,6 +57,17 @@ _FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_relationship", "fund_conce
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
 _HISTORY_KEYS = {"portfolio_history_drawdown"}
+
+# LLM 支持章节（目录/导航橙色+🧠 标记）：与「LLM」导航组全部章节一致
+# （news_correlation 注册表 type 为 news，但仍属 LLM 支持章；_LLM_SUPPORTED_SECTIONS 派生一致性测试防漂移）
+_LLM_SUPPORTED_KEYS = {
+    "news_correlation",
+    "global_macro",
+    "expert_review",
+    "health_check",
+    "penetration_deep",
+    "llm_usage",
+}
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary", "name": "投资分析汇总", "number": 1},
@@ -163,7 +173,7 @@ def _build_minimal_render_data(
 def _render_template(render_data: dict) -> BeautifulSoup:
     """用 html_writer._ENV 渲染模板并返回 BeautifulSoup 对象。"""
     from src.python.report.html_jinja_env import _ENV
-    from src.python.report.html_writer import _build_section_nav_groups
+    from src.python.report.html_writer import _LLM_SUPPORTED_SECTIONS, _build_section_nav_groups
 
     # 注入 section_visible 闭包 + section_groups 分组导航（与生产代码相同的 context 变量方式，不写入 _ENV.globals）
     _sv_dict = render_data.get("section_visible_dict", {})
@@ -177,6 +187,7 @@ def _render_template(render_data: dict) -> BeautifulSoup:
         **render_data,
         section_visible=_sv_fn,
         section_groups=section_groups,
+        llm_supported_sections=_LLM_SUPPORTED_SECTIONS,
     )
     return BeautifulSoup(html, "html.parser")
 
@@ -445,11 +456,13 @@ class TestHtmlCustomOrder(unittest.TestCase):
         self.assertTrue(first_text.startswith("1"), f"第一位标题应以 1 开头，实际为 '{first_text}'")
 
     def test_nav_section_title_text_consistency(self):
-        """导航文字与 section-title 文字一致。"""
+        """导航文字与 section-title 文字一致（LLM 章节先剔除 🧠 图标）。"""
         links = self.soup.select("nav.section-nav a")
         for link in links:
             key = link.get("href", "").replace("#sec-", "")
             nav_text = link.get_text(strip=True)
+            if key in _LLM_SUPPORTED_KEYS:
+                nav_text = nav_text.replace("🧠", "", 1).strip()
             section = self.soup.find(id=f"sec-{key}")
             if section:
                 title_div = section.find("div", class_="section-title")
@@ -1097,13 +1110,20 @@ class TestHtmlTocSidebar(unittest.TestCase):
             self.assertTrue("section" in target.get("class", []), f"{href} 对应元素应带 .section 类")
 
     def test_toc_link_text_shows_number_and_name(self):
-        """目录链接文字含「编号、章节名」。"""
+        """目录链接文字含「编号、章节名」（LLM 章节尾附 🧠 图标）。"""
         for sec in self.order:
             link = self.soup.select_one(f"#toc-sidebar a[href='#sec-{sec['key']}']")
             self.assertIsNotNone(link, f"目录缺少章节 {sec['key']}")
             text = link.get_text(strip=True)
             expected = f"{sec['number']}、{sec['name']}"
-            self.assertEqual(text, expected, f"{sec['key']} 目录文案应为「{expected}」，实际「{text}」")
+            if sec["key"] in _LLM_SUPPORTED_KEYS:
+                self.assertTrue(
+                    text.startswith(expected),
+                    f"{sec['key']} 目录文案应以「{expected}」开头，实际「{text}」",
+                )
+                self.assertIn("🧠", text, f"{sec['key']} 目录文案应含 🧠 图标")
+            else:
+                self.assertEqual(text, expected, f"{sec['key']} 目录文案应为「{expected}」，实际「{text}」")
 
     # ── 折叠/展开控件 ─────────────────────────────────────────
 
@@ -1432,6 +1452,93 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             r"\.toc-sidebar[\s,]*\.toc-toggle-btn\s*\{[^}]*display:\s*none",
             "窄屏应隐藏 .toc-sidebar 与悬浮展开按钮",
         )
+
+    # ── LLM 章节标记 ──────────────────────────────────────────
+
+    def test_llm_supported_sections_constant_matches_group(self):
+        """_LLM_SUPPORTED_SECTIONS 与测试常量 _LLM_SUPPORTED_KEYS 一致（单一数据源防漂移）。"""
+        from src.python.report.html_writer import _LLM_SUPPORTED_SECTIONS
+
+        self.assertEqual(set(_LLM_SUPPORTED_SECTIONS), _LLM_SUPPORTED_KEYS)
+
+    def test_llm_toc_links_marked(self):
+        """LLM 章节目录链接带 toc-llm class + 🧠 图标（aria-hidden、文本 🧠）。"""
+        for key in _LLM_SUPPORTED_KEYS:
+            link = self.soup.select_one(f"#toc-sidebar a[href='#sec-{key}']")
+            self.assertIsNotNone(link, f"目录缺少 LLM 章节 {key}")
+            self.assertIn("toc-llm", link.get("class", []), f"LLM 章节 {key} 目录链接应带 toc-llm class")
+            icon = link.select_one("span.toc-llm-icon")
+            self.assertIsNotNone(icon, f"LLM 章节 {key} 目录链接应含 🧠 图标")
+            self.assertEqual(icon.get("aria-hidden"), "true", f"LLM 章节 {key} 图标应 aria-hidden")
+            self.assertIn("🧠", icon.get_text(strip=True), f"LLM 章节 {key} 图标文本应为 🧠")
+
+    def test_non_llm_toc_links_unmarked(self):
+        """非 LLM 章节目录链接不带 toc-llm class 与 🧠 图标。"""
+        for link in self.soup.select("#toc-sidebar a[href^='#sec-']"):
+            key = link.get("href", "").replace("#sec-", "")
+            if key in _LLM_SUPPORTED_KEYS:
+                continue
+            self.assertNotIn("toc-llm", link.get("class", []), f"非 LLM 章节 {key} 不应带 toc-llm class")
+            self.assertIsNone(
+                link.select_one("span.toc-llm-icon"),
+                f"非 LLM 章节 {key} 不应含 🧠 图标",
+            )
+
+    def test_section_nav_llm_links_marked(self):
+        """section-nav 横向导航 LLM 章节带 class+图标，非 LLM 不带。"""
+        for link in self.soup.select("nav.section-nav a"):
+            key = link.get("href", "").replace("#sec-", "")
+            if key in _LLM_SUPPORTED_KEYS:
+                self.assertIn(
+                    "toc-llm", link.get("class", []),
+                    f"LLM 章节 {key} section-nav 应带 toc-llm class",
+                )
+                icon = link.select_one("span.toc-llm-icon")
+                self.assertIsNotNone(icon, f"LLM 章节 {key} section-nav 应含 🧠 图标")
+                self.assertIn("🧠", icon.get_text(strip=True), f"LLM 章节 {key} 图标文本应为 🧠")
+            else:
+                self.assertNotIn(
+                    "toc-llm", link.get("class", []),
+                    f"非 LLM 章节 {key} section-nav 不应带 toc-llm class",
+                )
+                self.assertIsNone(
+                    link.select_one("span.toc-llm-icon"),
+                    f"非 LLM 章节 {key} section-nav 不应含 🧠 图标",
+                )
+
+    def test_section_groups_carry_llm_supported_flag(self):
+        """_build_section_nav_groups 输出 section dict 含 llm_supported 且值与集合一致。"""
+        from src.python.report.html_writer import _build_section_nav_groups
+
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        groups = _build_section_nav_groups(order, lambda key: True, numbers)
+        for group in groups:
+            for sec in group["sections"]:
+                self.assertIn("llm_supported", sec, f"section {sec['key']} 应含 llm_supported 字段")
+                self.assertEqual(
+                    sec["llm_supported"],
+                    sec["key"] in _LLM_SUPPORTED_KEYS,
+                    f"section {sec['key']} llm_supported 值不正确",
+                )
+
+    def test_toc_llm_css_rules_defined(self):
+        """模板 CSS 定义 toc-llm 相关规则（目录/横向导航/图标/active 态）。"""
+        css = self._template_css()
+        for rule in (
+            ".toc-list a.toc-llm",
+            ".toc-list a.toc-llm.active",
+            ".section-nav a.toc-llm",
+            ".toc-llm-icon",
+        ):
+            self.assertIn(rule, css, f"CSS 应包含规则「{rule}」")
+
+    def test_llm_mark_color_reuses_dual_defined_variable(self):
+        """LLM 标记复用双定义变量 --orange-text（浅/深主题均可读）。"""
+        css = self._template_css()
+        self.assertIn("--orange-text: #E65100", css, "浅色主题应定义 --orange-text: #E65100")
+        self.assertIn("--orange-text: #ff8a50", css, "深色主题应定义 --orange-text: #ff8a50")
+        self.assertIn("var(--orange-text)", css, "toc-llm 规则应引用 var(--orange-text)")
 
     def _template_css(self) -> str:
         """读取渲染后 HTML 中全部 <style> 文本。"""

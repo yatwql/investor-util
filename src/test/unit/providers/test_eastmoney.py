@@ -7,8 +7,7 @@
   - fetch_nav — 主链路/备用链路、异常处理
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_eastmoney.py -v
+  pytest src/test/unit/providers/test_eastmoney.py -v
 """
 
 from __future__ import annotations

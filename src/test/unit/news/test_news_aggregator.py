@@ -5,10 +5,10 @@
   - _compute_cache_key — 缓存键生成
   - _finalize_news_results — 排序、关联、截断
   - aggregate_news — 完整编排（mock 各源）
+  - _fetch_from_all_sources — 多源并行获取与去重
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_news_aggregator.py -v
+  python -m pytest src/test/unit/news/test_news_aggregator.py -v
 """
 
 from __future__ import annotations
@@ -240,3 +240,58 @@ class TestAggregateNews(unittest.TestCase):
             aggregate_news(["kw"], top_n=10)
 
         mock_enabled.assert_called_once()
+
+
+class TestFetchFromAllSources(unittest.TestCase):
+    """_fetch_from_all_sources 多源并行获取行为测试。"""
+
+    def test_partial_failure_does_not_drop_other_sources(self):
+        """部分源失败时不影响其他源的数据。"""
+        from src.python.providers.news_aggregator import _fetch_from_all_sources
+
+        sources = ["sina", "eastmoney", "cls"]
+
+        with patch("src.python.providers.news_aggregator._FETCH_MAP") as mock_map:
+            # sina 成功返回 2 条，eastmoney 抛出异常，cls 成功返回 1 条
+            mock_map.get.side_effect = lambda key: {
+                "sina": lambda n: [
+                    {"title": "新浪新闻A", "url": "http://sina.com/a", "ctime": "2026-07-08"},
+                    {"title": "新浪新闻B", "url": "http://sina.com/b", "ctime": "2026-07-08"},
+                ],
+                "eastmoney": lambda n: (_ for _ in ()).throw(Exception("网络异常")),
+                "cls": lambda n: [
+                    {"title": "财联社新闻C", "url": "http://cls.com/c", "ctime": "2026-07-08"},
+                ],
+            }.get(key)
+
+            all_raw, src_results = _fetch_from_all_sources(sources, per_source=10)
+
+        # 应包含成功源的数据（sina=2, cls=1）
+        self.assertEqual(len(all_raw), 3)
+
+        # 各源状态：sina=OK(2), eastmoney=失败, cls=OK(1)
+        self.assertEqual(src_results["sina"][0], 2)
+        self.assertEqual(src_results["sina"][1], "OK")
+        self.assertNotEqual(src_results["eastmoney"][1], "OK")
+        self.assertEqual(src_results["cls"][0], 1)
+        self.assertEqual(src_results["cls"][1], "OK")
+
+    def test_duplicate_url_deduplicated(self):
+        """相同 URL 的新闻只保留第一条。"""
+        from src.python.providers.news_aggregator import _fetch_from_all_sources
+
+        sources = ["sina", "eastmoney"]
+
+        with patch("src.python.providers.news_aggregator._FETCH_MAP") as mock_map:
+            # 两个源返回完全相同的新闻（相同 URL）
+            duplicate_item = {"title": "相同新闻", "url": "http://dup.com/x", "ctime": "2026-07-08"}
+            mock_map.get.side_effect = lambda key: {
+                "sina": lambda n: [dict(duplicate_item)],
+                "eastmoney": lambda n: [dict(duplicate_item)],
+            }.get(key)
+
+            all_raw, src_results = _fetch_from_all_sources(sources, per_source=10)
+
+        # 去重后只保留 1 条（先到的不一定是哪个，但数量为 1）
+        self.assertEqual(len(all_raw), 1)
+        self.assertEqual(all_raw[0]["title"], "相同新闻")

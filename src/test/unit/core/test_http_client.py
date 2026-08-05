@@ -5,8 +5,7 @@
   - make_http_client — 客户端创建、verify 参数合并
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_http_client.py -v
+  pytest src/test/unit/core/test_http_client.py -v
 """
 
 from __future__ import annotations
@@ -37,7 +36,7 @@ class TestShouldVerify(unittest.TestCase):
         self.assertTrue(_should_verify())
 
     @patch("src.python.core.http_client.os.getenv")
-    def test_explicit_1(self, mock_getenv):
+    def test_explicit_one(self, mock_getenv):
         """SSL_VERIFY=1 → True。"""
         mock_getenv.return_value = "1"
         self.assertTrue(_should_verify())

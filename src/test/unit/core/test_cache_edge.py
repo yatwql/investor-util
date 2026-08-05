@@ -5,8 +5,7 @@ edge 场景：
   - TestGzipCacheEdge: gzip 压缩边界（100KB 阈值）+ 损坏文件恢复
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/core/test_cache_edge.py -v
+  pytest src/test/unit/core/test_cache_edge.py -v
 """
 
 from __future__ import annotations
@@ -234,7 +233,7 @@ class TestGzipCacheEdge(unittest.TestCase, _CacheTestBase):
         self.assertFalse(os.path.exists(gz_path))
 
 
-# ── Y5: BOM 缓存文件 ──────────────────────────────────────────────
+# ── BOM 缓存文件 ──────────────────────────────────────────────
 
 
 @pytest.mark.edge

@@ -5,7 +5,6 @@
   S-P10: 交叉持股合并 — 同标的被多只基金持有时归一
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/scenario/basic/test_scenario_penetration_mixed.py -v
 """
 

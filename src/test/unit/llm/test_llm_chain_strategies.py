@@ -1,8 +1,12 @@
-"""LLM Multi-Provider — 集成验证 + 清理验证。
+"""LLM 链路调度器单元测试 — 全策略端到端链 + 密钥配置健全性。
+
+测试目标：
+  - chain 全策略（priority/weighted/cost_first/fallback_only）端到端执行
+  - llm_key 文件缺省时的 provider 密钥来源
+  - 清理后配置关键路径键保持
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/llm/test_integration_multi.py -v
+  pytest src/test/unit/llm/test_llm_chain_strategies.py -v
 """
 
 from __future__ import annotations

@@ -66,27 +66,6 @@ class TestSecurityBaseline:
     # ── 基线 1: 密钥文件权限 ─────────────────────────────
 
     @pytest.mark.scenario_security
-    def test_key_file_no_plaintext_in_cache(self, tmp_path):
-        """缓存文件不应包含明文 API 密钥。"""
-        # 手动构造一个缓存 JSON 文件进行安全检查
-        cache_data = {
-            "_ts": 1000.0,
-            "_data": {
-                "price": 35.5,
-                "name": "test",
-            },
-        }
-        fpath = tmp_path / "test_cache_entry.json"
-        fpath.write_text(json.dumps(cache_data, ensure_ascii=False), encoding="utf-8")
-
-        # 读取并检查是否含密钥模式
-        content = fpath.read_text(encoding="utf-8")
-        for pattern in _SAMPLE_KEY_PATTERNS:
-            match = pattern.search(content)
-            if match:
-                pytest.fail(f"缓存文件含疑似 API 密钥: {match.group()[:20]}...")
-
-    @pytest.mark.scenario_security
     @pytest.mark.skipif(sys.platform == "win32", reason="Windows 权限模型不同，此项为软检查")
     def test_key_file_permissions_unix(self):
         """Unix: 密钥文件权限应不为 world-readable。"""
@@ -110,19 +89,25 @@ class TestSecurityBaseline:
 
     @pytest.mark.scenario_security
     def test_cache_content_no_api_key(self, tmp_path):
-        """写入和读取缓存不应产生 API 密钥残留。"""
+        """缓存文件不应包含明文 API 密钥（常见密钥模式与字段名特征）。"""
         # 手动构造一个缓存 JSON 文件进行密钥扫描
-        data = {
-            "_ts": 2000.0,
+        cache_data = {
+            "_ts": 1000.0,
             "_data": {
                 "price": 35.5,
-                "change_pct": 0.01,
+                "name": "test",
             },
         }
-        fpath = tmp_path / "price_600036.json"
-        fpath.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        fpath = tmp_path / "test_cache_entry.json"
+        fpath.write_text(json.dumps(cache_data, ensure_ascii=False), encoding="utf-8")
+
+        # 正则扫描常见密钥模式
         content = fpath.read_text(encoding="utf-8")
-        assert "sk-" not in content, "缓存文件含 API key 特征字符串"
+        for pattern in _SAMPLE_KEY_PATTERNS:
+            match = pattern.search(content)
+            if match:
+                pytest.fail(f"缓存文件含疑似 API 密钥: {match.group()[:20]}...")
+        # 字段名特征检查（api_key 等）
         assert "api_key" not in content.lower(), "缓存文件含 api_key 字段"
 
     # ── 基线 3: 匿名化模式报告不含真实名称/代码 ──────────
@@ -189,7 +174,7 @@ class TestSecurityBaseline:
 
     @pytest.mark.scenario_security
     def test_html_no_path_leakage(self):
-        """HTML 报告不应包含绝对文件系统路径。"""
+        """HTML 报告不应包含绝对文件系统路径（跨平台路径形态均可检出）。"""
         # 模拟 HTML 片段
         safe_html = "<h1>投资分析报告</h1><p>组合市值: ¥1,000,000</p>"
         # 检查无路径泄露
@@ -199,9 +184,21 @@ class TestSecurityBaseline:
             if match:
                 pytest.fail(f"HTML 泄露文件路径: {match.group()}")
 
-        unsafe_html = "<p>报告生成于 D:\\codebase\\zoo\\investor-util\\reports\\report.html</p>"
-        has_leak = any(re.search(pat, unsafe_html) for pat in path_patterns)
-        assert has_leak, "路径检测模式应能识别绝对路径"
+        # 分段拼接构造含各类绝对路径的样本，验证检测器均能识别
+        # （源码中不出现完整绝对路径字面量，Windows/Linux/macOS 形态均覆盖）
+        windows_abs = "\\".join(["C:", "fake", "report.html"])  # 盘符型（Windows）
+        home_abs = "/".join(["", "home", "user", "report.html"])  # home 型（Linux/macOS）
+        tmp_abs = "/".join(["", "tmp", "report.html"])  # tmp 型（Linux/macOS）
+        user_abs = "\\".join(["", "Users", "user", "report.html"])  # Users 型（Windows）
+        unsafe_samples = [
+            f"<p>报告生成于 {windows_abs}</p>",
+            f"<p>报告生成于 {home_abs}</p>",
+            f"<p>报告生成于 {tmp_abs}</p>",
+            f"<p>报告生成于 {user_abs}</p>",
+        ]
+        for sample in unsafe_samples:
+            has_leak = any(re.search(pat, sample) for pat in path_patterns)
+            assert has_leak, f"路径检测模式应能识别绝对路径: {sample}"
         logger.info("HTML 路径泄露检测模式验证通过")
 
 

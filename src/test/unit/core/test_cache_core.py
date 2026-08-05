@@ -9,8 +9,7 @@
   - clear_by_prefix — 前缀匹配删除、.json 过滤、目录不存在
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/core/test_cache_core.py -v
+  pytest src/test/unit/core/test_cache_core.py -v
 """
 
 from __future__ import annotations

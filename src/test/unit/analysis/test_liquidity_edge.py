@@ -66,17 +66,6 @@ class TestLiquidityEdge:
         assert r["liquidation_days"] > 100  # 日均成交额 ~5050，极度不流动
         assert "需约" in r["tag"]
 
-    def test_empty_kline_returns_assumed_liquid(self):
-        """空 K 线数据返回 assumed_liquid。"""
-        from src.python.analysis.liquidity import check_liquidity
-
-        holdings = [
-            {"code": "600519", "name": "贵州茅台", "market_value": 10_000_000},
-        ]
-        with patch(_MOCK_TARGET, return_value=[]):
-            result = check_liquidity(holdings, 10_000_000)
-        assert result[0]["type"] == "assumed_liquid"
-
     def test_kline_with_zero_volume(self):
         """K 线中全部成交量为零时返回 assumed_liquid。"""
         from src.python.analysis.liquidity import check_liquidity

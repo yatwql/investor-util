@@ -1,5 +1,7 @@
 # 增强 check-code-traces.py：任务编号标识符/注释检查
 
+> **状态**：本设计对应 rf-208 门禁补强（任务编号标识符/注释纪律）**已实施完成**（v0.10.1，`scripts/check-code-traces.py` 新增 IDENT 标识符扫描维度 + 系列代号模式，`test_trace_check_scripts.py` 固化检测/豁免行为），随 v0.10.x 迭代收官归档至 `docs-stm/archive/v0.10.x/task-code-traces-gate/`。
+
 ## Context
 
 CLAUDE.md 语义命名纪律规定：代码标识符（函数/变量/类名）与注释**一律用语义名，禁止用任务代号**（`plan-N`/`rf-N`/B 系列/F 系列等）。但 `scripts/check-code-traces.py` 目前只扫描**注释/文档串**，CODE 模式仅 `(?:rf|plan|R)-\d+`：

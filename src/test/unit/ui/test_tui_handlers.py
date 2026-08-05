@@ -10,8 +10,7 @@
   - select_holdings_file 文件选择逻辑
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test.test_tui_handlers -v
+  pytest src/test/unit/ui/test_tui_handlers.py -v
 """
 
 from __future__ import annotations

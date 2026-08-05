@@ -10,9 +10,7 @@
   S33: 新股中签待上市 — 未上市 IPO 以发行价估值
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/scenario/basic/test_scenario_operational_behavior.py -v
-  pytest src/test/ -m "scenario_basic" -v
 """
 
 from __future__ import annotations

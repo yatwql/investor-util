@@ -6,8 +6,7 @@
   - _validate_provider_entry()：单条 provider 字段校验
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/config/test_config_llm_multi.py -v
+  pytest src/test/unit/config/test_config_llm_multi.py -v
 """
 
 from __future__ import annotations

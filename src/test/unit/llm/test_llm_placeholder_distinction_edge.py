@@ -1,7 +1,6 @@
 """LLM 占位文本区分测试 — 未配置/已禁用/生成失败 三种状态。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/llm/test_llm_placeholder_distinction_edge.py -v
 """
 

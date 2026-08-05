@@ -7,8 +7,7 @@ edge 场景：
   - 全部 Provider 各抛不同 HTTP 错误 → 降级到过期缓存
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/fetcher/test_chain_edge.py -v
+  pytest src/test/unit/fetcher/test_chain_edge.py -v
 """
 
 from __future__ import annotations

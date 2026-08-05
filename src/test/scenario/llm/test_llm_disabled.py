@@ -3,8 +3,7 @@
 S14：TUI 不按 L → 无 LLM 章节、无 LLM API 用量页。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_llm_disabled.py -v
+  python -m pytest src/test/scenario/llm/test_llm_disabled.py -v
 """
 
 from __future__ import annotations

@@ -3,7 +3,6 @@
 测试 _apply_llm_news_correlation 纯函数、各生成器入口的缓存预检逻辑。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/llm/test_generators.py -v
 """
 
@@ -251,3 +250,72 @@ class TestComputeModuleCacheInfo(unittest.TestCase):
                 self.assertIn("can_cache", info[key])
                 self.assertIn("key", info[key])
                 self.assertIn("ttl", info[key])
+
+
+@pytest.mark.unit_llm
+class TestSystemPromptOverride(unittest.TestCase):
+    """验证 system_prompt_* 覆盖字段的控制逻辑。"""
+
+    def _call(self):
+        """以空持仓调用 generate_global_macro，返回生成器调用实参。"""
+        from src.python.llm.generators import generate_global_macro
+
+        generate_global_macro(
+            a_indices={},
+            us_indices={},
+            total_mv=100000,
+            total_profit=5000,
+            total_cost=0,
+            categories={},
+        )
+
+    @patch("src.python.llm.skeleton.generate_llm_content", return_value=(None, False))
+    @patch("src.python.llm.skeleton.get_llm_config")
+    def test_override_from_config(self, mock_config, mock_gen):
+        """配置中 system_prompt_global_macro 为非 null 时，应以配置值为准。"""
+        mock_system = "自定义全球政经局势提示词，请分析全球经济趋势。"
+        mock_config.return_value = {
+            "system_prompt_global_macro": mock_system,
+            "cache_enabled_global_macro": False,
+            "max_tokens_global_macro": 800,
+            "timeout_global_macro": 60,
+            # model 设为 None 以跳过实际 LLM 调用
+            "model": None,
+        }
+        self._call()
+        # _generate_llm_content(llm_config, cache_key, cache_ttl, system_prompt, ...)
+        call_args = mock_gen.call_args[0]
+        self.assertEqual(call_args[3], mock_system)
+
+    @patch("src.python.llm.skeleton.generate_llm_content", return_value=(None, False))
+    @patch("src.python.llm.skeleton.get_llm_config")
+    def test_fallback_to_default(self, mock_config, mock_gen):
+        """配置中 system_prompt_global_macro 为 null 时，应使用代码内置默认值。"""
+        from src.python.llm.prompts import _SYSTEM_GLOBAL_MACRO
+
+        mock_config.return_value = {
+            "system_prompt_global_macro": None,
+            "cache_enabled_global_macro": False,
+            "max_tokens_global_macro": 800,
+            "timeout_global_macro": 60,
+            "model": None,
+        }
+        self._call()
+        call_args = mock_gen.call_args[0]
+        self.assertEqual(call_args[3], _SYSTEM_GLOBAL_MACRO)
+
+    @patch("src.python.llm.skeleton.generate_llm_content", return_value=(None, False))
+    @patch("src.python.llm.skeleton.get_llm_config")
+    def test_missing_key_fallback(self, mock_config, mock_gen):
+        """配置中完全没有 system_prompt_global_macro 键时，应使用内置默认值。"""
+        from src.python.llm.prompts import _SYSTEM_GLOBAL_MACRO
+
+        mock_config.return_value = {
+            "cache_enabled_global_macro": False,
+            "max_tokens_global_macro": 800,
+            "timeout_global_macro": 60,
+            "model": None,
+        }
+        self._call()
+        call_args = mock_gen.call_args[0]
+        self.assertEqual(call_args[3], _SYSTEM_GLOBAL_MACRO)

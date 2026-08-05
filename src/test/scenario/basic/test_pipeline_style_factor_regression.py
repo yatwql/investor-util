@@ -63,7 +63,7 @@ def _mock_reporter() -> MagicMock:
 class TestComputeFactorExposureData:
     """编排层 compute_factor_exposure_data 场景验证。"""
 
-    def test_c19_contract_available(self):
+    def test_contract_available_with_full_data(self):
         """持仓历史 + 因子/基准 K 线齐备 → 返回全部数据契约键且 available=True。"""
         hold_bars = _klines(n=90, base=100.0)
         factor_bars = _klines(n=90, base=100.0, step=0.4)

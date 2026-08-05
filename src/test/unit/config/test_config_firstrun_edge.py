@@ -1,7 +1,6 @@
 """首次运行引导测试 — 配置缺失时的引导行为。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/config/test_config_firstrun_edge.py -v
 """
 

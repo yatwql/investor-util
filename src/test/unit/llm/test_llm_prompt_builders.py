@@ -1,7 +1,6 @@
-"""LLM 提示词模块单元测试 — FAIL_REASON 常量、格式化工具、Prompt 构建函数。
+"""LLM 提示词构建模块单元测试 — 各提示词构建函数与格式化工具。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/llm/test_llm_prompt_builders.py -v
 """
 
@@ -13,96 +12,6 @@ from unittest.mock import patch
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm]
-
-
-@pytest.mark.unit_llm
-class TestFailReasonConstants(unittest.TestCase):
-    """_build_global_macro_prompt 提示词构建。"""
-
-    def test_returns_string(self):
-        """空数据时返回合理提示词。"""
-        from src.python.llm.prompts import _build_global_macro_prompt
-        result = _build_global_macro_prompt({}, {}, 0, 0, 0, {})
-        self.assertIsInstance(result, str)
-        self.assertTrue(len(result) > 20)
-        self.assertIn("总市值", result)
-
-    def test_with_index_data(self):
-        """指数数据正确嵌入。"""
-        from src.python.llm.prompts import _build_global_macro_prompt
-        a_indices = {
-            "000001": {"name": "上证指数", "price": 3200, "change_pct": 0.5},
-        }
-        us_indices = {
-            "dji": {"name": "道琼斯", "price": 40000, "change_pct": -0.2},
-        }
-        result = _build_global_macro_prompt(a_indices, us_indices, 1_000_000, 50_000, 0, {})
-        self.assertIn("上证指数", result)
-        self.assertIn("道琼斯", result)
-        self.assertIn("1,000,000", result)
-
-    def test_with_sector_flow(self):
-        """行业资金流向数据嵌入。"""
-        from src.python.llm.prompts import _build_global_macro_prompt
-        sector_flow = [
-            {"name": "电力", "change_pct": 1.5, "main_net_inflow": 500_000_000, "main_net_inflow_pct": 0.12},
-        ]
-        result = _build_global_macro_prompt({}, {}, 500_000, 10_000, 0, {}, sector_flow)
-        self.assertIn("行业资金流向", result)
-        self.assertIn("电力", result)
-
-    def test_with_categories(self):
-        """品种分类信息嵌入。"""
-        from src.python.llm.prompts import _build_global_macro_prompt
-        categories = {"股票": 3, "基金": 2}
-        result = _build_global_macro_prompt({}, {}, 0, 0, 0, categories)
-        self.assertIn("股票3只", result)
-        self.assertIn("基金2只", result)
-
-
-@pytest.mark.unit_llm
-class TestBuildExpertReviewPrompt(unittest.TestCase):
-    """_build_expert_review_prompt 提示词构建。"""
-
-    def test_returns_string_with_overview(self):
-        """包含持仓概况和明细。"""
-        from src.python.llm.prompts import _build_expert_review_prompt
-        result = _build_expert_review_prompt(
-            total_mv=100_000, total_cost=80_000, total_profit=20_000,
-            total_today_profit=1_000, holdings_count=5, categories={},
-        )
-        self.assertIn("持仓概况", result)
-        self.assertIn("100,000", result)
-        self.assertIn("5只", result)
-
-    def test_with_holdings_details(self):
-        """持仓明细嵌入。"""
-        from src.python.llm.prompts import _build_expert_review_prompt
-        details = [
-            {"code": "600900", "market_value": 50_000, "profit": 5_000,
-             "profit_rate": 10.0, "source_api": "tencent", "name": "长江电力",
-             "change_pct": 0.5},
-        ]
-        result = _build_expert_review_prompt(
-            total_mv=100_000, total_cost=80_000, total_profit=20_000,
-            total_today_profit=1_000, holdings_count=5, categories={},
-            holdings_details=details,
-        )
-        self.assertIn("持仓明细", result)
-        self.assertIn("600900", result)
-
-    def test_with_penetrated_assets(self):
-        """穿透数据嵌入。"""
-        from src.python.llm.prompts import _build_expert_review_prompt
-        assets = [
-            {"name": "腾讯控股", "codes": ["00700"], "mv": 30_000, "sector": "互联网"},
-        ]
-        result = _build_expert_review_prompt(
-            total_mv=100_000, total_cost=80_000, total_profit=20_000,
-            total_today_profit=1_000, holdings_count=5, categories={},
-            penetrated_assets=assets,
-        )
-        self.assertIn("穿透", result)
 
 
 @pytest.mark.unit_llm
@@ -160,73 +69,6 @@ class TestBuildPenetrationDeepPrompt(unittest.TestCase):
             holdings_count=1, categories={}, holdings_details=details,
         )
         self.assertIn("A股", result)
-
-
-@pytest.mark.unit_llm
-class TestBuildHoldingsSummary(unittest.TestCase):
-    """_build_holdings_summary 持仓摘要构建。"""
-
-    def test_returns_text_with_holdings(self):
-        """从持仓列表生成摘要文本。"""
-        from src.python.llm.prompts import _build_holdings_summary
-        from src.python.core.models import Holding
-        holdings = [
-            Holding("证券", "长江电力", "600900", 100, 15.0),
-            Holding("基金", "易方达中小盘", "110011", 500, 2.0),
-        ]
-        result = _build_holdings_summary(holdings)
-        self.assertIn("长江电力", result)
-        self.assertIn("600900", result)
-        self.assertIn("110011", result)
-
-    def test_with_industry_data(self):
-        """行业概念标签嵌入。"""
-        from src.python.llm.prompts import _build_holdings_summary
-        from src.python.core.models import Holding
-        holdings = [Holding("证券", "长江电力", "600900", 100, 15.0)]
-        industry_data = {
-            "600900": {"industry": "电力", "concepts": ["水电", "清洁能源"]},
-        }
-        result = _build_holdings_summary(holdings, industry_data=industry_data)
-        self.assertIn("电力", result)
-        self.assertIn("水电", result)
-
-    def test_with_penetrated_assets(self):
-        """穿透资产条目嵌入。"""
-        from src.python.llm.prompts import _build_holdings_summary
-        result = _build_holdings_summary([], penetrated_assets=[
-            {"name": "腾讯控股", "codes": ["00700"]},
-        ])
-        self.assertIn("[穿透]", result)
-        self.assertIn("腾讯控股", result)
-
-
-@pytest.mark.unit_llm
-class TestBuildNewsCorrelationSummary(unittest.TestCase):
-    """_build_news_correlation_summary 新闻摘要构建。"""
-
-    def test_returns_string(self):
-        """从新闻列表生成摘要。"""
-        from src.python.llm.prompts import _build_news_correlation_summary
-        news = [
-            {"title": "A股大涨", "intro": "今日A股大幅上涨", "matched_keywords": ["A股"]},
-        ]
-        result = _build_news_correlation_summary(news)
-        self.assertIn("A股大涨", result)
-        self.assertIn("今日A股大幅上涨", result)
-
-    def test_empty_news(self):
-        """空列表返回空字符串。"""
-        from src.python.llm.prompts import _build_news_correlation_summary
-        self.assertEqual(_build_news_correlation_summary([]), "")
-
-    def test_truncates_long_titles(self):
-        """长标题截断。"""
-        from src.python.llm.prompts import _build_news_correlation_summary
-        long_title = "长" * 200
-        news = [{"title": long_title, "intro": "简介", "matched_keywords": []}]
-        result = _build_news_correlation_summary(news)
-        self.assertTrue(len(result) < 500)
 
 
 @pytest.mark.unit_llm

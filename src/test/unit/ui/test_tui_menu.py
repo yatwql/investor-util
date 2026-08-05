@@ -8,8 +8,7 @@
   - _show_llm_config_status 格式
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_tui_menu -v
+  pytest src/test/unit/ui/test_tui_menu.py -v
 """
 
 from __future__ import annotations
@@ -119,20 +118,20 @@ class TestIndexByKey(unittest.TestCase):
 class TestPrintFunctions(unittest.TestCase):
     """打印函数不崩溃测试。"""
 
-    def testprint_sep_default(self) -> None:
+    def test_print_sep_default(self) -> None:
         """默认分隔线。"""
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             print_sep()
             output = mock_out.getvalue()
             self.assertIn("=", output)
 
-    def testprint_sep_custom(self) -> None:
+    def test_print_sep_custom(self) -> None:
         """自定义字符和宽度。"""
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             print_sep(char="-", width=10)
             self.assertIn("----------", mock_out.getvalue())
 
-    def testprint_header(self) -> None:
+    def test_print_header(self) -> None:
         """标题头包含系统名称。"""
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             print_header()
@@ -151,6 +150,36 @@ class TestConfigCache(unittest.TestCase):
     def test_get_config_cache_default(self) -> None:
         """未初始化时返回 None。"""
         self.assertIsNone(get_config_cache())
+
+
+class TestFilterMenuLlmModules(unittest.TestCase):
+    """菜单层隐藏辩论三模块（注册表条目保留）。"""
+
+    def test_filter_hides_legacy_debate_modules(self):
+        """过滤后仅剩标准模块，不含辩论三模块。"""
+        from src.python.core.registry import get_llm_module_names
+        from src.python.tui.tui_menu import filter_menu_llm_modules
+
+        filtered = filter_menu_llm_modules(get_llm_module_names())
+        self.assertEqual(
+            set(filtered.keys()),
+            {
+                "global_macro",
+                "expert_review",
+                "news_correlation",
+                "health_check",
+                "penetration_deep",
+            },
+        )
+
+    def test_registry_keeps_legacy_debate_modules(self):
+        """注册表仍保留辩论三模块（缓存 TTL/前缀清理依赖），未被删除。"""
+        from src.python.core.registry import get_llm_module_names
+
+        names = get_llm_module_names()
+        self.assertIn("debate_pro", names)
+        self.assertIn("debate_con", names)
+        self.assertIn("debate_synthesis", names)
 
 
 if __name__ == "__main__":

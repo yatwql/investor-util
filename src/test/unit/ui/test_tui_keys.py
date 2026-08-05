@@ -7,8 +7,7 @@
   - 键名常量
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test.test_tui -v
+  pytest src/test/unit/ui/test_tui_keys.py -v
 """
 
 from __future__ import annotations

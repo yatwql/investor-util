@@ -4,13 +4,12 @@
   - 默认顺序完整性（len(_REPORT_SECTION_DEFAULT) 个模块，summary 开头/llm_usage 结尾）
   - 序号 1~N 连续递增
   - get_report_section_keys 完备性
-  - 6 种可见性类型计数正确（always=6, history=1, fund_deep_analysis=5, news=1, llm=5, evolution=1）
+  - 7 种可见性类型计数正确（always=6, history=1, fund_deep_analysis=4, news=1, llm=5, evolution=1, action=1）
   - 基金深度分析 data_flag 各不相同
   - 空配置与无配置行为一致
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/scenario/basic/test_scenario_section_order.py -v
+  pytest src/test/scenario/basic/test_scenario_section_order.py -v
 """
 
 from __future__ import annotations
@@ -64,7 +63,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         expected = {s["key"] for s in self._default}
         self.assertEqual(keys, expected)
 
-    def test_default_always_type_has_6_sections(self):
+    def test_always_type_sections_contract(self):
         """always 类型模块共 6 个（含数据源可用性矩阵），均无 data_flag。"""
         always = [s for s in self._default if s["type"] == "always"]
         self.assertEqual(len(always), 6)
@@ -74,7 +73,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         for sec in always:
             self.assertIsNone(sec["data_flag"])
 
-    def test_default_evolution_type_has_1_section(self):
+    def test_evolution_type_single_section(self):
         """evolution 类型模块共 1 个（组合演进，data_flag=evolution_data 控制可见性，
         available=False 时展示层写占位，见 technical.md §4.12）。"""
         evolution = [s for s in self._default if s["type"] == "evolution"]
@@ -83,7 +82,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(sec["key"], "portfolio_evolution")
         self.assertEqual(sec["data_flag"], "evolution_data")
 
-    def test_default_fund_deep_analysis_type_has_4_sections(self):
+    def test_fund_deep_analysis_type_contract(self):
         """基金深度分析类型模块共 4 个（含风格与因子分析一章三区块）。"""
         fund_deep_analysis = [s for s in self._default if s["type"] == "fund_deep_analysis"]
         self.assertEqual(len(fund_deep_analysis), 4)
@@ -95,14 +94,14 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertNotIn("fund_style", keys)
         self.assertNotIn("factor_exposure", keys)
 
-    def test_default_news_type_has_1_section(self):
+    def test_news_type_single_section(self):
         """news 类型模块共 1 个（新闻）。"""
         news = [s for s in self._default if s["type"] == "news"]
         self.assertEqual(len(news), 1)
         key_set = {s["key"] for s in news}
         self.assertIn("news_correlation", key_set)
 
-    def test_default_llm_type_has_5_sections(self):
+    def test_llm_type_sections_contract(self):
         """llm 类型模块共 5 个（4 分析模块 + llm_usage）。"""
         llm = [s for s in self._default if s["type"] == "llm"]
         self.assertEqual(len(llm), 5)
@@ -122,7 +121,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
             self.assertEqual(s1["key"], s2["key"])
             self.assertEqual(s1["number"], s2["number"])
 
-    def test_6_visibility_types(self):
+    def test_all_visibility_types_present(self):
         """7 种 type 都有对应模块（含组合演进专属 evolution 类型、行动建议专属 action 类型）。"""
         type_counts: dict[str, int] = {}
         for sec in self._default:

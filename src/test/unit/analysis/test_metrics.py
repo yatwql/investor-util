@@ -1,4 +1,4 @@
-"""量化指标计算模块测试 — 覆盖 8 个核心指标的正、边缘、异常路径。
+"""量化指标计算模块测试 — 覆盖 9 个核心指标的正、边缘、异常路径。
 
 测试覆盖：
   1. sharpe_ratio — 正常计算 / 不足 20 日返回 None
@@ -18,7 +18,7 @@ import math
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 # ── 测试数据 Helpers ─────────────────────────────────────
 
@@ -362,17 +362,17 @@ class TestTruncateExtremeValues:
 class TestCheckDataSufficiency:
     """数据充分性检查测试。"""
 
-    def test_sufficient_returns_2(self):
+    def test_full_year_data_high_confidence(self):
         from src.python.analysis.metrics import check_data_sufficiency
 
         assert check_data_sufficiency([0.001] * 252) == 2
 
-    def test_insufficient_returns_0(self):
+    def test_short_data_insufficient(self):
         from src.python.analysis.metrics import check_data_sufficiency
 
         assert check_data_sufficiency([0.001] * 10) == 0
 
-    def test_empty_returns_0(self):
+    def test_empty_data_insufficient(self):
         from src.python.analysis.metrics import check_data_sufficiency
 
         assert check_data_sufficiency([]) == 0

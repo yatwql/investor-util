@@ -1,11 +1,10 @@
-"""Y6: 安全纵深边缘场景测试。
+"""安全纵深边缘场景测试。
 
 覆盖 CSV 公式注入/XSS 缓存注入/符号链接/路径遍历/
 API Key 日志泄漏/JSON 原型污染/临时文件竞争共 8 项测试。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/security/ -v
+  pytest src/test/unit/report/test_security_edge.py -v
 """
 
 from __future__ import annotations
@@ -23,11 +22,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
 # ═══════════════════════════════════════════════════════════
-# Y6-1: CSV 公式注入
+# CSV 公式注入
 # ═══════════════════════════════════════════════════════════
 
 
-class TestCsvFormulaInjectionY6(unittest.TestCase):
+class TestCsvFormulaInjection(unittest.TestCase):
     """CSV 公式注入防御 — 持仓名称不以 =/+/-/@ 开头。"""
 
     def test_holding_name_starts_with_equal_sign(self):
@@ -69,11 +68,11 @@ class TestCsvFormulaInjectionY6(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y6-2: XSS 缓存注入
+# XSS 缓存注入
 # ═══════════════════════════════════════════════════════════
 
 
-class TestXssCacheInjectionY6(unittest.TestCase):
+class TestXssCacheInjection(unittest.TestCase):
     """XSS 注入防御 — 持仓名称含 HTML/JS。"""
 
     def test_holding_name_with_html_tags(self):
@@ -163,11 +162,11 @@ class TestXssCacheInjectionY6(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y6-3: 符号链接
+# 符号链接
 # ═══════════════════════════════════════════════════════════
 
 
-class TestSymlinkY6(unittest.TestCase):
+class TestSymlink(unittest.TestCase):
     """符号链接处理 — 目录遍历不走符号链接。"""
 
     def test_symlink_in_cache_dir(self):
@@ -198,11 +197,11 @@ class TestSymlinkY6(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y6-4: 路径遍历
+# 路径遍历
 # ═══════════════════════════════════════════════════════════
 
 
-class TestPathTraversalY6(unittest.TestCase):
+class TestPathTraversal(unittest.TestCase):
     """路径遍历防御。"""
 
     def test_cache_path_traversal_blocked(self):
@@ -224,11 +223,11 @@ class TestPathTraversalY6(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y6-5: API Key 日志泄漏（交叉验证已有测试）
+# API Key 日志泄漏（交叉验证已有测试）
 # ═══════════════════════════════════════════════════════════
 
 
-class TestApiKeyLogLeakY6(unittest.TestCase):
+class TestApiKeyLogLeak(unittest.TestCase):
     """API Key 不应出现在日志中。"""
 
     def test_logger_sanitizes_api_key(self):
@@ -242,11 +241,11 @@ class TestApiKeyLogLeakY6(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y6-6: JSON 原型污染
+# JSON 原型污染
 # ═══════════════════════════════════════════════════════════
 
 
-class TestJsonPrototypePollutionY6(unittest.TestCase):
+class TestJsonPrototypePollution(unittest.TestCase):
     """JSON 反序列化 — Python 原生 JSON 无原型污染风险。"""
 
     def test_json_loads_not_pollutable(self):
@@ -275,11 +274,11 @@ class TestJsonPrototypePollutionY6(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
-# Y6-7: 临时文件竞争
+# 临时文件竞争
 # ═══════════════════════════════════════════════════════════
 
 
-class TestTempFileRaceY6(unittest.TestCase):
+class TestTempFileRace(unittest.TestCase):
     """临时文件安全 — mkstemp 原子写入。"""
 
     def test_mkstemp_used_for_config(self):

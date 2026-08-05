@@ -8,8 +8,7 @@
   - fetch_market_data — 完整链路（mock chain）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_fetcher_price.py -v
+  pytest src/test/unit/fetcher/test_fetcher_price.py -v
 """
 
 from __future__ import annotations

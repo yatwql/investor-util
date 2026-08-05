@@ -8,8 +8,7 @@
   - BatchResult — unwrap 成功/失败路径
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/fetcher/test_batch.py -v --tb=short
+  pytest src/test/unit/fetcher/test_batch.py -v
 """
 
 from __future__ import annotations
@@ -668,7 +667,7 @@ class TestBatchDispatcherChainPrecheck(unittest.TestCase):
         self.assertFalse(any(r.success for r in results))
         self.assertIn("全链熔断", results[0].error or "")
 
-    def test_chain_normal_exeuctes(self):
+    def test_chain_normal_executes(self):
         """链正常 → execute 正常执行。"""
         mock_reg = self._make_mock_registry(["tiantian"], False)
 

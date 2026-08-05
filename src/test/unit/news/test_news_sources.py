@@ -6,8 +6,7 @@
   - _FETCH_MAP 元数据完整性
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_news_sources -v
+  pytest src/test/unit/news/test_news_sources.py -v
 """
 
 from __future__ import annotations

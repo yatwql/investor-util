@@ -9,8 +9,7 @@
   - is_market_open — 三层 orchestration
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_market_hours.py -v
+  pytest src/test/unit/core/test_market_hours.py -v
 """
 
 from __future__ import annotations

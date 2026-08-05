@@ -7,8 +7,7 @@
   - fetch_fund_benchmark 三层策略
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test.test_fund -v
+  pytest src/test/unit/fetcher/test_fund.py -v
 """
 
 from __future__ import annotations

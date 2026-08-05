@@ -5,8 +5,7 @@ edge 场景：
   - content_filter 安抚重试仍空 + 无回退
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/llm/test_llm_api_edge.py -v
+  pytest src/test/unit/llm/test_llm_api_edge.py -v
 """
 
 from __future__ import annotations

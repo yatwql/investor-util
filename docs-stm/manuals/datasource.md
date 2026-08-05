@@ -14,7 +14,7 @@
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业 + 概念板块归属） | 东方财富 REST 行情页（仅行业，无概念） | `industry_` | 基础类 |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `profit_forecast_` | 基础类 |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `sector_flow_` | 基础类 |
-| 股票历史分红 | akshare `stock_history_dividend()` 逐股获取 | — | `dividend_` | 基础类 |
+| 股票历史分红 | akshare `stock_history_dividend()` 无参全量拉取后按代码过滤 | — | `dividend_` | 基础类 |
 | 无风险利率（Rf） | akshare `bond_zh_us_rate`（国债收益率） | config.json 手动配置兜底 | `bond_yield_rf`¹ | 基础类 |
 | 财经新闻（5 源聚合） | 新浪 + 东方财富 + 财联社 + 华尔街见闻 + akshare 并行获取，统一聚合去重 | — | `news_` | 基础类 |
 | 股票/ETF 历史日线 | 腾讯财经 K 线接口 | 新浪财经 K 线接口 | `history_stock_` | 历史走势 |
@@ -96,12 +96,12 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 
 ### akshare 兼容性
 
-本程序依赖 **akshare**（`pyproject.toml` 锁定 `akshare==1.18.64`，兼容下限 `>= 1.16.0`）。akshare 接口更新较频繁，以下场景可能导致数据获取失败：
+本程序依赖 **akshare**（`pyproject.toml` 锁定 `akshare==1.18.64`）。akshare 接口更新较频繁，以下场景可能导致数据获取失败：
 
-- akshare 版本过低 → 接口签名变更导致报错 → 执行 `pip install --upgrade akshare`
-- akshare 版本过高 → 接口返回格式微调 → 如遇兼容问题，可先检查 `logs/app.log` 中的具体报错信息
+- akshare 版本过低 → 接口签名变更导致报错
+- akshare 版本过高 → 接口返回格式微调
 
-如遇 akshare 相关报错，先升级 akshare 至最新版：`pip install --upgrade akshare`。
+如遇 akshare 相关报错，先核对 `pyproject.toml` 锁定版本与 `logs/app.log` 中的具体报错信息，再决定是否调整版本并同步更新锁定。
 
 ### 新闻源签名鉴权
 

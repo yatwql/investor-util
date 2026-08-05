@@ -12,7 +12,6 @@
   9. 穿透市值占比归一化 — TOP10 占比总和 ≤ 100%
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/report/test_data_integrity.py -v
   pytest src/test/ -m "data" -v                # 全部数据正确性测试
 """
@@ -193,6 +192,8 @@ class TestIndexValueRange(unittest.TestCase):
         with (
             patch("src.python.fetcher.index._fetch_indices_from_tencent",
                   return_value=mock_data),
+            patch("src.python.fetcher.index._fetch_indices_from_sina",
+                  return_value={}),
             patch("src.python.fetcher.index.cache_get",
                   return_value=None),
         ):

@@ -13,7 +13,7 @@ import math
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_core, pytest.mark.edge]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
 
 
 # ═══════════════════════════════════════════════════════════════

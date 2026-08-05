@@ -9,8 +9,7 @@
   - ratio_pct 舍入后总和不超过 100%（向上舍入保护）
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_penetration_edge -v
+  pytest src/test/unit/report/test_penetration_edge.py -v
 """
 
 from __future__ import annotations

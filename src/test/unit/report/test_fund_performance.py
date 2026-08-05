@@ -10,8 +10,7 @@
       (正常 / 空基金 / 全部获取失败 / 部分失败 / 评级标色 / 评级分布)
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test_fund_performance -v
+  pytest src/test/unit/report/test_fund_performance.py -v
 """
 
 from __future__ import annotations

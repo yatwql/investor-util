@@ -3,8 +3,7 @@
 S11：4 模块混合状态 — 2 缓存 + 1 成功 + 1 失败。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_llm_mixed_cache.py
+  python -m pytest src/test/scenario/llm/test_llm_mixed_cache.py
 """
 
 from __future__ import annotations

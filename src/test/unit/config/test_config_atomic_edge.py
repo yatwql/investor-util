@@ -6,8 +6,7 @@ edge 场景：
   - 部分写入后恢复旧文件
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/config/test_config_atomic_edge.py -v
+  pytest src/test/unit/config/test_config_atomic_edge.py -v
 """
 
 from __future__ import annotations
@@ -164,12 +163,12 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
         self.assertEqual(replace_attempts[0], 1)
 
 
-# ── Y5: 配置/环境纵深 ─────────────────────────────────────────────
+# ── 配置/环境纵深 ─────────────────────────────────────────────
 
 
 @pytest.mark.edge
-class TestConfigEnvEdgeY5(unittest.TestCase):
-    """Y5 配置/环境纵深测试：BOM/CRLF/api_key 空格/缺失嵌套键/并发 init_config。"""
+class TestConfigEnvEdge(unittest.TestCase):
+    """配置/环境纵深测试：BOM/CRLF/api_key 空格/缺失嵌套键/并发 init_config。"""
 
     def setUp(self):
         self._orig_config = None

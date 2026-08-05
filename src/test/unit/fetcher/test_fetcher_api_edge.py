@@ -1,12 +1,11 @@
-"""Y1: API/网络异常纵深测试 — 共 16 项。
+"""API/网络异常纵深测试 — 共 16 项。
 
 覆盖 Provider 层 HTTP 异常（超时/断连/DNS/SSL）、Provider Chain
 Fallback（主链路失败→备链路→过期缓存降级）、LLM API 错误分类
 （可重试/不可恢复）、响应解析异常（空/截断/非 JSON/HTML 污染）。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/fetcher/test_fetcher_api_edge.py -v
+  pytest src/test/unit/fetcher/test_fetcher_api_edge.py -v
 """
 
 from __future__ import annotations
@@ -21,10 +20,10 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.edge]
 
 
 # ═══════════════════════════════════════════════════════════════
-# Y1-1 ~ Y1-4: Provider 层 HTTP 异常
+# Provider 层 HTTP 异常
 # ═══════════════════════════════════════════════════════════════
 
-class TestProviderHttpErrorsY1(unittest.TestCase):
+class TestProviderHttpErrors(unittest.TestCase):
     """Provider 各 HTTP 异常 → 返回 None，不抛出。"""
 
     @patch("src.python.providers.tencent.make_http_client")
@@ -79,10 +78,10 @@ class TestProviderHttpErrorsY1(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# Y1-5: Provider Chain 多级降级
+# Provider Chain 多级降级
 # ═══════════════════════════════════════════════════════════════
 
-class TestProviderChainFallbackY1(unittest.TestCase):
+class TestProviderChainFallback(unittest.TestCase):
     """Provider Chain 多级降级：主链→备链→过期缓存。"""
 
     @patch("src.python.fetcher.chain.cache_get", return_value=None)
@@ -153,10 +152,10 @@ class TestProviderChainFallbackY1(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# Y1-6 ~ Y1-8: 响应解析异常
+# 响应解析异常
 # ═══════════════════════════════════════════════════════════════
 
-class TestResponseParsingErrorsY1(unittest.TestCase):
+class TestResponseParsingErrors(unittest.TestCase):
     """响应体格式异常 → 返回 None。"""
 
     @patch("src.python.providers.tencent.make_http_client")
@@ -237,10 +236,10 @@ class TestResponseParsingErrorsY1(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# Y1-9 ~ Y1-12: LLM API 错误分类
+# LLM API 错误分类
 # ═══════════════════════════════════════════════════════════════
 
-class TestSslErrorsY1(unittest.TestCase):
+class TestSslErrors(unittest.TestCase):
     """SSL 证书验证失败 → 不崩溃。"""
 
     @patch("src.python.providers.tencent.make_http_client")
@@ -258,10 +257,10 @@ class TestSslErrorsY1(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# Y1-14: HTTP 客户端 — SSL_VERIFY 环境变量
+# HTTP 客户端 — SSL_VERIFY 环境变量
 # ═══════════════════════════════════════════════════════════════
 
-class TestHttpClientSslVerifyY1(unittest.TestCase):
+class TestHttpClientSslVerify(unittest.TestCase):
     """SSL_VERIFY 环境变量控制验证策略。"""
 
     @patch("src.python.core.http_client.os.getenv")

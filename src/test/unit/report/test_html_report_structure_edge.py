@@ -2,10 +2,9 @@
 
 测试目标：
   - TestHtmlCssStructure：模板 CSS 属性检查（flex-wrap、white-space、id/order 完整性）
-  - TestHtmlRegressionChecks：旧 bug 回归检查（孤立锚点、滚动条、打印样式）
+  - TestHtmlRegressionChecks：回归检查（孤立锚点、滚动条、打印样式）
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/report/test_html_report_structure_edge.py -v
 """
 
@@ -138,7 +137,7 @@ class TestHtmlCssStructure(unittest.TestCase):
 
 
 class TestHtmlRegressionChecks(unittest.TestCase):
-    """旧 bug 回归检查 — 防止同一问题再次出现。"""
+    """回归检查 — 防止同一问题再次出现。"""
 
     def setUp(self):
         with open(_TEMPLATE_PATH, "r", encoding="utf-8") as f:

@@ -1,8 +1,7 @@
 """汇率敞口分析模块单元测试。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/unit/test_fx_exposure.py -v
+  pytest src/test/unit/analysis/test_fx_exposure.py -v
 """
 
 from __future__ import annotations

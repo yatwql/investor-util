@@ -4,12 +4,12 @@
 全程 mock 文件系统与计算/输出函数，避免真实文件读写与报告产物残留。
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/handlers/test_handlers_whatif.py -v
 """
 
 from __future__ import annotations
 
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -17,7 +17,7 @@ import pytest
 
 from src.python.report.whatif_operations import WhatifRunResult
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
 
 class TestSelectCandidateFile(unittest.TestCase):
@@ -79,7 +79,9 @@ class TestSelectCandidateFile(unittest.TestCase):
         mock_input.side_effect = ["2", "/tmp/after.xlsx"]
         with patch("src.python.tui.handlers_whatif.os.path.isfile", return_value=True):
             result = _select_candidate_file("dummy_dir/base.xlsx")
-        self.assertEqual(result, "/tmp/after.xlsx")
+        # 输入路径经 os.path.abspath 归一化（Windows 下 /tmp/... → D:\\tmp\\...），
+        # 期望值同样用 abspath 构造，保证跨平台一致。
+        self.assertEqual(result, os.path.abspath("/tmp/after.xlsx"))
 
     @patch("builtins.input")
     @patch("src.python.tui.handlers_whatif.list_xlsx_files")
@@ -140,8 +142,10 @@ class TestSelectCandidateFile(unittest.TestCase):
             patch("src.python.tui.handlers_whatif.shutil.copy2") as mock_copy2,
         ):
             result = _select_candidate_file("dummy_dir/base.xlsx")
-        self.assertEqual(result, "dummy_dir/base-调仓后模板.xlsx")
-        mock_copy2.assert_called_once_with("dummy_dir/base.xlsx", "dummy_dir/base-调仓后模板.xlsx")
+        # 模板路径经 os.path.join 拼接（Windows 下用 \\），期望值同源构造保证跨平台。
+        expected = os.path.join("dummy_dir", "base-调仓后模板.xlsx")
+        self.assertEqual(result, expected)
+        mock_copy2.assert_called_once_with("dummy_dir/base.xlsx", expected)
 
     @patch("builtins.input")
     @patch("src.python.tui.handlers_whatif.list_xlsx_files")
@@ -164,7 +168,7 @@ class TestSelectCandidateFile(unittest.TestCase):
             patch("src.python.tui.handlers_whatif.shutil.copy2"),
         ):
             result = _select_candidate_file("dummy_dir/base.xlsx")
-        self.assertEqual(result, "dummy_dir/base-调仓后模板.xlsx")
+        self.assertEqual(result, os.path.join("dummy_dir", "base-调仓后模板.xlsx"))
 
     @patch("builtins.input")
     @patch("src.python.tui.handlers_whatif.list_xlsx_files")

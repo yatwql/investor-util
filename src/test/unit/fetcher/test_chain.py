@@ -5,8 +5,7 @@
   - fetch_with_fallback — 缓存命中、Provider 遍历、验证、转换、降级
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_chain.py -v
+  pytest src/test/unit/fetcher/test_chain.py -v
 """
 
 from __future__ import annotations

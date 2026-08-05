@@ -7,7 +7,6 @@
   - price_update_status 对 QDII 的 T/T-1 认可逻辑
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/unit/report/test_qdii_timezone_edge.py -v
 """
 

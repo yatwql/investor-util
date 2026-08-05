@@ -8,8 +8,7 @@ edge 场景：
   - llm_usage + 未知 key 组合场景
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/unit/config/test_config_edge.py -v
+  pytest src/test/unit/config/test_config_edge.py -v
 """
 
 from __future__ import annotations
