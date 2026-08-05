@@ -37,7 +37,7 @@ _KNOWN_MARKERS: set[str] = {
     "llm", "edge", "smoke", "data", "integration",
     # integration 分支
     "integration_contract", "integration_isolation", "integration_news_pipeline",
-    "integration_cache", "integration_tui",
+    "integration_cache", "integration_tui", "integration_cli",
 }
 
 # pytest 内置标记 — 这些不算"项目标记"
@@ -86,6 +86,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration_news_pipeline: 新闻流水线全链路")
     config.addinivalue_line("markers", "integration_cache: 跨模块缓存一致性验证")
     config.addinivalue_line("markers", "integration_tui: TUI → Handler 路由集成测试")
+    config.addinivalue_line("markers", "integration_cli: CLI 命令行模式集成测试")
 
 
 # ═══════════════════════════════════════════════════════════════

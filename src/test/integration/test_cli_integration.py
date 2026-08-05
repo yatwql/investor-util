@@ -4,11 +4,12 @@
 """
 from __future__ import annotations
 
+import logging
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-pytestmark = [pytest.mark.integration]
-
-from unittest.mock import MagicMock, patch
+pytestmark = [pytest.mark.integration, pytest.mark.integration_cli]
 
 
 class TestCliIntegration:
@@ -16,7 +17,7 @@ class TestCliIntegration:
 
     def test_cli_progress_logger(self, caplog):
         """CliProgressReporter 输出全部写入 logging。"""
-        caplog.set_level(10)
+        caplog.set_level(logging.DEBUG)
         from src.python.report.cli_progress import CliProgressReporter
 
         r = CliProgressReporter(verbose=False)
