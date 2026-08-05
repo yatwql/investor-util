@@ -1,5 +1,5 @@
 # 目录结构
-> 文档版本：0.10.7-dev
+> 文档版本：0.10.7
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -7,17 +7,17 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 222 | 55,265 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
+| 主程序代码 | Python | 222 | 55,823 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 4 | 3,761 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 17 | 6,468 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **243** | **65,494** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **285** | **79,950** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,030 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **13** | **5,689** | 含 README.md（179 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 12 | 5,510 | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **107** | **41,957** | 含 CLAUDE.md（72 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 9 | 7,102 | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 99 | 34,155 | 各版本 changelog/plan/review-findings 等（95 md 34,155 行 + 3 py 446 行 + 1 txt 12 行） |
+| **源代码合计** | — | **243** | **66,052** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **287** | **81,500** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,144 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **用户文档** | Markdown | **13** | **5,711** | 含 README.md（181 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 12 | 5,530 | 配置/faq/快速上手/CLI 等 |
+| **项目文档** | Markdown | **107** | **42,076** | 含 CLAUDE.md（72 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 9 | 7,123 | 变更日志/目录树/测试计划/技术设计等 |
+| ├ archive/ | 版本归档 | 99 | 34,253 | 各版本 changelog/plan/review-findings 等（95 md 34,253 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 2 | 628 | 当前迭代中的设计方案（plan-web-ui.md + plan-web-ui-implementation.md） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -517,6 +517,7 @@ investor-util/
 │       │   │   ├── test_news_degradation_edge.py  #   新闻降级边缘场景
 │       │   │   ├── test_penetration.py            #   穿透分析测试
 │       │   │   ├── test_penetration_edge.py       #   穿透分析边缘场景
+│       │   │   ├── test_pipeline_data_builder.py    #   管线数据上下文组装测试（crisis_annotation/tail_risk/snapshot_diff 三键注册）
 │       │   │   ├── test_pipeline_utils.py          #   管线工具函数测试
 │       │   │   ├── test_portfolio_history.py      #   组合历史走势测试
 │       │   │   ├── test_progress.py               #   进度跟踪测试
