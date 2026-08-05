@@ -61,18 +61,18 @@
 | `--mode` | dragonball（2026-08-05 实测） | 旧慢笔记本（早期标注，约值） | stallman-NB1（2026-08-05 实测） |
 |:---------|:---------------------------:|:---------------------------:|:---:|
 | `unit` | ~15s | ~30s | ~4min |
-| `standard` | ~16s | ~30s | ~3min |
+| `standard` | ~16s | ~30s | ~5min |
 | `scenario` | ~18s | ~6min | ~3min |
-| `regression` | ~17s | ~6min | ~5min |
-| `verify,regression` | ~30s（verify+regression 顺序之和） | ~7min | ~6min（verify+regression 顺序之和） |
-| `dev-verify` | ~20s | ~2.5min | ~1min |
+| `regression` | ~17s | ~6min | ~3min |
+| `verify,regression` | ~30s（verify+regression 顺序之和） | ~7min | ~5min（verify+regression 顺序之和） |
+| `dev-verify` | ~20s | ~2.5min | ~3min |
 | `verify` | ~10s | ~1min | ~1min |
 | `integration` | ~14s | ~50s | ~3min |
-| `edge` | ~13s | ~15s | ~40s |
-| `data` | ~2s | ~10s | ~19s |
+| `edge` | ~13s | ~15s | ~49s |
+| `data` | ~2s | ~10s | ~31s |
 | `all` | **~21s** | ~10min | ~5min |
-| `smoke` | ~2s | ~15s | ~14s |
-| `report` | ~11s | ~15s | ~3min |
+| `smoke` | ~2s | ~15s | ~20s |
+| `report` | ~11s | ~15s | ~4min |
 | `all_no_unit` | ~10s | ~7min | ~2min |
 | `scenario_extreme` | ~2s | ~1min | ~19s |
 <!-- duration-table:end -->
