@@ -24,61 +24,61 @@
 | `all_no_unit` | 309 | ~10s |
 | `scenario_extreme` | **9** | ~2s |
 
-> 注：典型耗时按 2026-08-05 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——早期标注（如 `all` ~10min、`scenario` ~6min）源自另一台慢笔记本环境；OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新下方两张表。
+> 注：典型耗时按 2026-08-05 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新下方两张表。
 >
 > 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 5030 项（2026-08-05 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
 
 ### 环境耗时对照
 
-测试耗时随**硬件配置、操作系统与并行度**变化显著。下表对当前开发机（实测）与早期慢笔记本（早期标注，约值）做逐模式对照，便于在不同环境下粗估耗时量级。
+测试耗时随**硬件配置、操作系统与并行度**变化显著。下表对两台已实测机器（dragonball 与 stallman-NB1，均 2026-08-05 采集）做逐模式对照，便于在不同环境下粗估耗时量级。
 
-> 跨机器采集：在新机器上运行 `python scripts/test_runner.py --mode bench --machine-info`，脚本输出「采集环境属性」表（见下）与各模式实测耗时表；追加 `--update-docs` 则自动将本机环境属性与实测耗时写入下方两张表（按主机名匹配/新增列，同机覆盖历史实测；旧机器标注列不受影响）。
+> 跨机器采集：在新机器上运行 `python scripts/test_runner.py --mode bench --machine-info`，脚本输出「采集环境属性」表（见下）与各模式实测耗时表；追加 `--update-docs` 则自动将本机环境属性与实测耗时写入下方两张表（按主机名匹配/新增列，同机覆盖历史实测）。
 
 #### 采集环境属性
 
 <!-- env-table:start -->
-| 环境属性 | dragonball（2026-08-05 实测） | 旧慢笔记本（早期标注） | stallman-NB1（2026-08-05 实测） |
-|:---------|:---------------------------|:----------------------|:---|
-| 操作系统 | Linux | 未知 | Windows |
-| 系统版本 | 6.18.25-x64v3-xanmod1 | 未知 | 11 |
-| 架构 | x86_64 | 未知 | AMD64 |
-| 主机名 | dragonball | 未知 | stallman-NB1 |
-| CPU 型号 | 13th Gen Intel(R) Core(TM) i5-13500H | 未知 | Intel64 Family 6 Model 142 Stepping 10, GenuineIntel |
-| 物理核数 | 12 | 未知 | 8 |
-| 逻辑线程 | 16 | 未知 | 8 |
-| 内存 | 46.8 GiB | 未知 | 7.9 GiB |
-| 磁盘类型 | NVMe SSD | 未知 | 未知 |
-| 文件系统 | btrfs | 未知 | 未知 |
-| Python 版本 | 3.13.5 | 未知 | 3.13.0 |
-| 并行级别 | medium | 未知 | medium |
-| worker 数 | 8 | 未知 | 4 |
-| 采集日期 | 2026-08-05 | — | 2026-08-05 |
+| 环境属性 | dragonball（2026-08-05 实测） | stallman-NB1（2026-08-05 实测） |
+|:---------|:---------------------------|:---|
+| 操作系统 | Linux | Windows |
+| 系统版本 | 6.18.25-x64v3-xanmod1 | 11 |
+| 架构 | x86_64 | AMD64 |
+| 主机名 | dragonball | stallman-NB1 |
+| CPU 型号 | 13th Gen Intel(R) Core(TM) i5-13500H | Intel64 Family 6 Model 142 Stepping 10, GenuineIntel |
+| 物理核数 | 12 | 8 |
+| 逻辑线程 | 16 | 8 |
+| 内存 | 46.8 GiB | 7.9 GiB |
+| 磁盘类型 | NVMe SSD | 未知 |
+| 文件系统 | btrfs | 未知 |
+| Python 版本 | 3.13.5 | 3.13.0 |
+| 并行级别 | medium | medium |
+| worker 数 | 8 | 4 |
+| 采集日期 | 2026-08-05 | 2026-08-05 |
 <!-- env-table:end -->
 
 #### 各模式耗时对照
 
 <!-- duration-table:start -->
-| `--mode` | dragonball（2026-08-05 实测） | 旧慢笔记本（早期标注，约值） | stallman-NB1（2026-08-05 实测） |
-|:---------|:---------------------------:|:---------------------------:|:---:|
-| `unit` | ~14s | ~30s | ~4min |
-| `standard` | ~14s | ~30s | ~5min |
-| `scenario` | ~18s | ~6min | ~3min |
-| `regression` | ~18s | ~6min | ~3min |
-| `verify,regression` | ~28s（verify+regression 顺序之和） | ~7min | ~5min（verify+regression 顺序之和） |
-| `dev-verify` | ~20s | ~2.5min | ~3min |
-| `verify` | ~10s | ~1min | ~1min |
-| `integration` | ~12s | ~50s | ~3min |
-| `edge` | ~12s | ~15s | ~49s |
-| `data` | ~2s | ~10s | ~31s |
-| `all` | **~22s** | ~10min | ~5min |
-| `smoke` | ~1s | ~15s | ~20s |
-| `report` | ~12s | ~15s | ~4min |
-| `all_no_unit` | ~10s | ~7min | ~2min |
-| `scenario_extreme` | ~2s | ~1min | ~19s |
-| 数据更新时间 | 2026-08-05 | — | 2026-08-05 |
+| `--mode` | dragonball（2026-08-05 实测） | stallman-NB1（2026-08-05 实测） |
+|:---------|:---------------------------:|:---:|
+| `unit` | ~14s | ~4min |
+| `standard` | ~14s | ~5min |
+| `scenario` | ~18s | ~3min |
+| `regression` | ~18s | ~3min |
+| `verify,regression` | ~28s（verify+regression 顺序之和） | ~5min（verify+regression 顺序之和） |
+| `dev-verify` | ~20s | ~3min |
+| `verify` | ~10s | ~1min |
+| `integration` | ~12s | ~3min |
+| `edge` | ~12s | ~49s |
+| `data` | ~2s | ~31s |
+| `all` | **~22s** | ~5min |
+| `smoke` | ~1s | ~20s |
+| `report` | ~12s | ~4min |
+| `all_no_unit` | ~10s | ~2min |
+| `scenario_extreme` | ~2s | ~19s |
+| 数据更新时间 | 2026-08-05 | 2026-08-05 |
 <!-- duration-table:end -->
 
-> 两环境差距因模式而异：全量/场景等含 IO 与网络 mock 密集的模式约 **20~30 倍**（如 `all` ~21s vs ~10min、`scenario_extreme` ~2s vs ~1min），纯内存小模式（`smoke`/`data`/`report`）约 2~8 倍。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。当前开发机 worker=8（medium=50% 核数），旧机器并行度未知。
+> 两机差距因模式而异：多数模式 dragonball 较 stallman-NB1 快约 **10~20 倍**（如 `unit` ~14s vs ~4min、`all` ~22s vs ~5min），个别模式差约 4~20 倍（`edge` ~12s vs ~49s、`smoke` ~1s vs ~20s）。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。dragonball worker=8（medium=50% 核数），stallman-NB1 worker=4。
 
 **其他环境量级参考**（估算，非实测）：
 - **并行度**：耗时近似随 worker 数线性下降——当前 worker=8 改单线程执行时各并行模式约 ×5~8（`regression`/`edge`/`data`/`smoke`/`scenario_extreme` 等本为单线程的模式除外）
