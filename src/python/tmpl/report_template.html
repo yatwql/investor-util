@@ -2669,7 +2669,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <!-- 品种覆盖区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
             <div class="data-status" style="margin-top:12px;">
                 <div class="data-status-title">品种覆盖（逐品种数据状态）</div>
-                {% if position_status and position_status.available and position_status.items %}
+                {% if position_status and position_status.available and position_status.get("items") %}
                 <table>
                     <tr>
                         <th>代码</th>
@@ -2678,7 +2678,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <th>状态</th>
                         <th>原因</th>
                     </tr>
-                    {% for item in position_status.items %}
+                    {% for item in position_status.get("items") %}
                     <tr>
                         <td style="text-align:left;">{{ item.code }}</td>
                         <td style="text-align:left;">{{ item.name }}</td>
@@ -2701,7 +2701,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <!-- 可信度区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
             <div class="data-status" style="margin-top:12px;">
                 <div class="data-status-title">可信度（数据新鲜度 + 单日跳变）</div>
-                {% if data_freshness and data_freshness.available and data_freshness.items %}
+                {% if data_freshness and data_freshness.available and data_freshness.get("items") %}
                 <table>
                     <tr>
                         <th>代码</th>
@@ -2710,7 +2710,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <th>新鲜度</th>
                         <th>单日变化 / 跳变</th>
                     </tr>
-                    {% for item in data_freshness.items %}
+                    {% for item in data_freshness.get("items") %}
                     <tr>
                         <td style="text-align:left;">{{ item.code }}</td>
                         <td style="text-align:left;">{{ item.name }}</td>

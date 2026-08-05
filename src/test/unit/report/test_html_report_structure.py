@@ -1545,5 +1545,99 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
         return "\n".join(s.get_text() for s in self.soup.select("style"))
 
 
+class TestHtmlDataQualityBlocks(unittest.TestCase):
+    """数据质量仪表盘「品种覆盖/可信度」区块渲染回归测试。
+
+    回归场景：`position_status.items` / `data_freshness.items` 若在模板中按属性访问，
+    会命中 dict 内置 `items` 方法（bound method）而非契约键 `"items"`——
+    `data_quality` 子模块开启且契约有数据时迭代 bound method 崩溃
+    （TypeError: 'builtin_function_or_method' object is not iterable）。
+    修复采用 `.get("items")`（与生产代码一致）。本类回归断言正常渲染不再崩溃且行内容正确。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+
+    def _render_dq(self, position_status, data_freshness, enabled=True):
+        render_data = _build_minimal_render_data(self.order, self.numbers, self.sv_dict)
+        # 数据质量区块嵌套于「数据源可用性矩阵」章节（registry 中 data_source_status
+        # 为 always 类型，number=18）——渲染需使其可见
+        render_data["section_visible_dict"] = {**self.sv_dict, "data_source_status": True}
+        render_data["section_numbers"] = {**self.numbers, "data_source_status": 18}
+        render_data["data_quality_enabled"] = enabled
+        render_data["position_status"] = position_status
+        render_data["data_freshness"] = data_freshness
+        return _render_template(render_data)
+
+    def test_position_status_items_rendered(self):
+        """品种覆盖区块 items 正常渲染（逐品种行输出，不崩溃）。"""
+        soup = self._render_dq(
+            {
+                "available": True,
+                "items": [
+                    {"code": "000001", "name": "平安银行", "account": "全部", "status": "ok", "status_label": "正常", "reason": ""},
+                    {"code": "510300", "name": "沪深300ETF", "account": "全部", "status": "stale", "status_label": "过期", "reason": "行情未更新"},
+                ],
+            },
+            None,
+        )
+        text = soup.get_text()
+        self.assertIn("品种覆盖（逐品种数据状态）", text)
+        self.assertIn("平安银行", text)
+        self.assertIn("沪深300ETF", text)
+        self.assertIn("过期", text)
+
+    def test_data_freshness_items_rendered(self):
+        """可信度区块 items 正常渲染（新鲜度 + 单日跳变列）。"""
+        soup = self._render_dq(
+            None,
+            {
+                "available": True,
+                "abnormal_count": 0,
+                "summary": "",
+                "items": [
+                    {"code": "600519", "name": "贵州茅台", "account": "全部", "freshness": "ok", "freshness_label": "新鲜", "change_pct": 0.5, "jump": False, "jump_label": None},
+                    {"code": "601318", "name": "中国平安", "account": "全部", "freshness": "stale", "freshness_label": "过期", "change_pct": 23.4, "jump": True, "jump_label": "跳变"},
+                ],
+            },
+        )
+        text = soup.get_text()
+        self.assertIn("可信度（数据新鲜度 + 单日跳变）", text)
+        self.assertIn("贵州茅台", text)
+        self.assertIn("中国平安", text)
+        self.assertIn("跳变", text)
+
+    def test_empty_items_shows_fallback(self):
+        """available=True 但 items 为空列表 → 显示降级占位而非崩溃。"""
+        soup = self._render_dq(
+            {"available": True, "items": []},
+            {"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+        )
+        text = soup.get_text()
+        self.assertIn("未获取行情数据，品种覆盖无法判定", text)
+
+    def test_data_quality_disabled_skips_blocks(self):
+        """data_quality_enabled=False → 两区块均不渲染。"""
+        soup = self._render_dq(
+            {
+                "available": True,
+                "items": [{"code": "000001", "name": "平安银行", "account": "全部", "status": "ok", "status_label": "正常", "reason": ""}],
+            },
+            {
+                "available": True,
+                "items": [{"code": "600519", "name": "贵州茅台", "account": "全部", "freshness": "ok", "freshness_label": "新鲜", "change_pct": 0.5, "jump": False, "jump_label": None}],
+                "abnormal_count": 0,
+                "summary": "",
+            },
+            enabled=False,
+        )
+        text = soup.get_text()
+        self.assertNotIn("品种覆盖（逐品种数据状态）", text)
+        self.assertNotIn("可信度（数据新鲜度 + 单日跳变）", text)
+
+
 if __name__ == "__main__":
     unittest.main()
