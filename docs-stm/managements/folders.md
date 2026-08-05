@@ -11,8 +11,8 @@
 | HTML 报告模板 | HTML | 4 | 3,761 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 16 | 5,581 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
 | **源代码合计** | — | **242** | **64,589** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **282** | **78,895** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **4,981 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **测试代码** | Python | **283** | **79,122** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **4,998 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **13** | **5,636** | 含 README.md（179 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 12 | 5,457 | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **107** | **42,038** | 含 CLAUDE.md（72 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |
@@ -529,7 +529,8 @@ investor-util/
 │       │   │   ├── test_check_version_consistency.py #   版本号一致性检查脚本测试
 │       │   │   ├── test_task_numbering_check_scripts.py # 任务编号一致性检查脚本测试
 │       │   │   ├── test_task_numbering_hook_scripts.py # 任务编号自动保障 hook 脚本测试
-│       │   │   └── test_trace_check_scripts.py  #   check-code/doc-traces 工具自身豁免+时序模式检出/豁免回归
+│       │   │   ├── test_trace_check_scripts.py  #   check-code/doc-traces 工具自身豁免+时序模式检出/豁免回归
+│       │   │   └── test_test_runner_machine_info.py  #  test_runner 机器信息采集/bench 别名/耗时表格渲染测试
 │       │   ├── startup/              #   首次运行引导单元测试
 │       │   │   ├── __init__.py       #       子包标记
 │       │   │   └── test_startup_wizard.py  #   首次运行引导向导测试

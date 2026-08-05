@@ -7,6 +7,7 @@
   python scripts/test_runner.py --mode edge              # 仅边缘测试
   python scripts/test_runner.py --mode scenario,edge     # 多模式组合
   python scripts/test_runner.py --coverage               # 全量 + 覆盖率报告
+  python scripts/test_runner.py --mode bench --machine-info  # 跨机器耗时采集（环境 + 各模式实测表格）
   python scripts/test_runner.py --help                   # 本帮助
 """
 
@@ -14,8 +15,10 @@ from __future__ import annotations
 
 import argparse
 import os
+import platform
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import time as _time
@@ -164,6 +167,7 @@ _HELP_TEXT = """测试驱动脚本 — 统一运行 pytest 并输出结构化 HT
   python scripts/test_runner.py --mode edge              # 仅边缘测试
   python scripts/test_runner.py --mode scenario,edge     # 多模式组合
   python scripts/test_runner.py --coverage               # 全量 + 覆盖率报告
+  python scripts/test_runner.py --mode bench --machine-info  # 跨机器耗时采集（环境 + 各模式实测表格）
   python scripts/test_runner.py --help                   # 本帮助
 
 模式说明:
@@ -180,6 +184,7 @@ _HELP_TEXT += """\
   --timeout SEC     覆盖超时时间（秒），所有模式统一使用此值
   --no-timeout      禁用超时，等待测试自然结束
   --phased          分阶段运行（对配置了 phases 的模式有效，前序失败跳过后续阶段）
+  --machine-info    输出机器硬件信息 + 各模式实测耗时 markdown 表格（供耗时对照更新）
   --help            显示本帮助信息
 
 输出目录结构:
@@ -200,7 +205,9 @@ def parse_args() -> argparse.Namespace:
     """解析命令行参数。"""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
-        "--mode", default="all", help="运行模式 (unit/scenario/integration/regression/edge/all)，逗号分隔"
+        "--mode",
+        default="all",
+        help="运行模式 (unit/scenario/integration/regression/edge/all)，逗号分隔；bench 为环境耗时对照的 14 模式聚合",
     )
     parser.add_argument("--coverage", action="store_true", help="同时生成 HTML 行覆盖率报告")
     parser.add_argument(
@@ -217,6 +224,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-timeout", action="store_true", help="禁用超时，等待测试自然结束")
     parser.add_argument(
         "--phased", action="store_true", help="分阶段运行（仅对支持分阶段的模式有效，前序失败则跳过后续）"
+    )
+    parser.add_argument(
+        "--machine-info",
+        action="store_true",
+        help="输出机器硬件信息 + 各模式实测耗时 markdown 表格（供 test-coverage.md 环境耗时对照更新）",
     )
     parser.add_argument("--help", action="store_true", help="显示帮助")
     return parser.parse_args()
@@ -362,6 +374,308 @@ def _calc_parallel_workers(level: str | bool) -> str:
     if level == "low":
         workers = max(2, workers)
     return str(workers)
+
+
+# ── 机器信息与耗时表格 ─────────────────────────────────────────
+
+
+# 「环境耗时对照」表标准顺序（对齐 docs-stm/managements/test-coverage.md），
+# 供耗时表格排序；live 为 opt-in 网络套件，不纳入对照表。
+_MODE_TABLE_ORDER: tuple[str, ...] = (
+    "unit", "standard", "scenario", "regression",
+    "dev-verify", "verify", "integration", "edge", "data",
+    "all", "smoke", "report", "all_no_unit", "scenario_extreme",
+)
+
+# bench 运行顺序：将最重的 all 置于末尾，慢机器前序轻量模式跑完可随时中断。
+_BENCH_MODES: tuple[str, ...] = tuple(m for m in _MODE_TABLE_ORDER if m != "all") + ("all",)
+
+
+def _resolve_modes(modes_to_run: list[str]) -> list[str]:
+    """展开模式列表：将 bench 别名替换为基准模式序列，按首次出现去重保序。
+
+    Args:
+        modes_to_run: 用户输入的模式列表（可含 bench）
+
+    Returns:
+        展开去重后的模式列表（仅含 MODES 键）
+    """
+    seen: set[str] = set()
+    resolved: list[str] = []
+    for mode in modes_to_run:
+        candidates = list(_BENCH_MODES) if mode == "bench" else [mode]
+        for cand in candidates:
+            if cand not in seen:
+                seen.add(cand)
+                resolved.append(cand)
+    return resolved
+
+
+def _read_cpu_model_linux() -> str | None:
+    """读 Linux /proc/cpuinfo 首个 model name；文件缺失返回 None。"""
+    try:
+        with open("/proc/cpuinfo", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.lower().startswith("model name"):
+                    return line.split(":", 1)[1].strip()
+    except OSError:
+        return None
+    return None
+
+
+def _count_physical_cores_linux() -> int | None:
+    """按 (physical id, core id) 去重统计 Linux 物理核数；缺失返回 None。"""
+    pairs: set[tuple[str, str]] = set()
+    phys = core = ""
+    try:
+        with open("/proc/cpuinfo", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                lowered = stripped.lower()
+                if lowered.startswith("physical id"):
+                    phys = stripped.split(":", 1)[1].strip()
+                elif lowered.startswith("core id"):
+                    core = stripped.split(":", 1)[1].strip()
+                    pairs.add((phys, core))
+    except OSError:
+        return None
+    return len(pairs) or None
+
+
+def _mem_gib_linux() -> float | None:
+    """读 Linux /proc/meminfo MemTotal（KB）换算 GiB；缺失返回 None。"""
+    try:
+        with open("/proc/meminfo", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.lower().startswith("memtotal"):
+                    return int(line.split()[1]) / (1024 ** 2)
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+
+def _linux_disk_info() -> tuple[str | None, str | None]:
+    """探测 Linux 根分区文件系统类型与磁盘类型。
+
+    Returns:
+        (文件系统类型, 磁盘类型)；不可用时分别为 None
+    """
+    fs_type = None
+    device = None
+    try:
+        with open("/proc/mounts", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                fields = line.split()
+                if len(fields) >= 3 and fields[1] == "/":
+                    device, fs_type = fields[0], fields[2]
+                    break
+    except OSError:
+        return None, None
+
+    disk_type = None
+    if device:
+        base = os.path.basename(device)  # 兼容 /dev/mapper/xxx
+        base = re.sub(r"[0-9]+$", "", base)  # 去掉分区尾号
+        if base.startswith("nvme"):
+            disk_type = "NVMe SSD"
+        else:
+            try:
+                with open(f"/sys/block/{base}/queue/rotational", encoding="utf-8") as f:
+                    disk_type = "HDD" if f.read().strip() == "1" else "SSD"
+            except OSError:
+                disk_type = None
+    return fs_type, disk_type
+
+
+def _sysctl_value(name: str) -> str | None:
+    """读 macOS sysctl 值；命令不可用或失败返回 None。"""
+    cmd = shutil.which("sysctl")
+    if not cmd:
+        return None
+    try:
+        proc = subprocess.run(
+            [cmd, "-n", name],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip()
+
+
+def _mem_gib_windows() -> float | None:
+    """读 Windows 全局内存状态（ctypes）换算 GiB；不可用返回 None。"""
+    import ctypes
+
+    class _MemoryStatusEx(ctypes.Structure):
+        _fields_ = [
+            ("dwLength", ctypes.c_ulong),
+            ("dwMemoryLoad", ctypes.c_ulong),
+            ("ullTotalPhys", ctypes.c_ulonglong),
+            ("ullAvailPhys", ctypes.c_ulonglong),
+            ("ullTotalPageFile", ctypes.c_ulonglong),
+            ("ullAvailPageFile", ctypes.c_ulonglong),
+            ("ullTotalVirtual", ctypes.c_ulonglong),
+            ("ullAvailVirtual", ctypes.c_ulonglong),
+            ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+        ]
+
+    try:
+        stat = _MemoryStatusEx()
+        stat.dwLength = ctypes.sizeof(_MemoryStatusEx)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+            return stat.ullTotalPhys / (1024 ** 3)
+    except Exception:
+        return None
+    return None
+
+
+def _collect_machine_info(parallel_level: str = "medium") -> dict:
+    """采集机器硬件与环境信息，供耗时对照标注。
+
+    各字段尽力采集，失败回退 None；None 在展示时以"未知"占位。
+    """
+    system = platform.system()
+    info: dict = {
+        "os": system,
+        "os_release": platform.release(),
+        "arch": platform.machine(),
+        "hostname": socket.gethostname(),
+        "cpu_model": None,
+        "cpu_physical_cores": None,
+        "cpu_threads": os.cpu_count(),
+        "mem_gib": None,
+        "disk_type": None,
+        "fs_type": None,
+        "python_version": platform.python_version(),
+        "parallel_level": parallel_level,
+        "parallel_workers": _calc_parallel_workers(parallel_level),
+        "date": datetime.now().strftime("%Y-%m-%d"),
+    }
+    if system == "Linux":
+        info["cpu_model"] = _read_cpu_model_linux()
+        info["cpu_physical_cores"] = _count_physical_cores_linux()
+        info["mem_gib"] = _mem_gib_linux()
+        info["fs_type"], info["disk_type"] = _linux_disk_info()
+    elif system == "Darwin":
+        info["cpu_model"] = _sysctl_value("machdep.cpu.brand_string") or None
+        phys = _sysctl_value("hw.physicalcpu")
+        info["cpu_physical_cores"] = int(phys) if phys and phys.isdigit() else None
+        mem = _sysctl_value("hw.memsize")
+        info["mem_gib"] = round(int(mem) / (1024 ** 3), 1) if mem and mem.isdigit() else None
+    elif system == "Windows":
+        info["cpu_model"] = platform.processor() or None
+        info["cpu_physical_cores"] = os.cpu_count()
+        info["mem_gib"] = _mem_gib_windows()
+    return info
+
+
+def _format_machine_info(info: dict) -> str:
+    """将机器信息渲染为单行 markdown 引用说明（字段缺失以"未知"占位）。"""
+    os_arch = f"{info.get('os') or '未知'} {info.get('arch') or ''}".strip()
+    cpu = info.get("cpu_model") or "未知"
+    phys = info.get("cpu_physical_cores")
+    threads = info.get("cpu_threads")
+    if phys is not None and threads is not None:
+        cpu_count = f"{phys} 核 {threads} 线程"
+    elif threads is not None:
+        cpu_count = f"逻辑 {threads} 线程"
+    else:
+        cpu_count = "未知"
+    mem = info.get("mem_gib")
+    mem_s = f"{mem:.1f} GiB" if isinstance(mem, (int, float)) else "内存未知"
+    disk = info.get("disk_type") or "磁盘未知"
+    fs = info.get("fs_type") or ""
+    disk_s = f"{disk}{' · ' + fs if fs else ''}"
+    level = info.get("parallel_level") or "medium"
+    workers = info.get("parallel_workers") or "?"
+    date_s = info.get("date") or ""
+    date_part = f" · {date_s}" if date_s else ""
+    host = info.get("hostname") or ""
+    host_part = f" · 主机 {host}" if host else ""
+    return (
+        f"> 采集环境：{os_arch} · {cpu} · {cpu_count} · {mem_s} · {disk_s} · "
+        f"Python {info.get('python_version') or '未知'} · 并行 {level}（worker={workers}）{host_part}{date_part}"
+    )
+
+
+def _render_env_table(info: dict) -> str:
+    """渲染机器环境属性 markdown 表格（与采集字段一一对应）。"""
+    rows = [
+        ("操作系统", f"{info.get('os') or '未知'} {info.get('os_release') or ''}".strip() or "未知"),
+        ("架构", info.get("arch") or "未知"),
+        ("主机名", info.get("hostname") or "未知"),
+        ("CPU 型号", info.get("cpu_model") or "未知"),
+        ("物理核数", str(info.get("cpu_physical_cores")) if info.get("cpu_physical_cores") is not None else "未知"),
+        ("逻辑线程", str(info.get("cpu_threads")) if info.get("cpu_threads") is not None else "未知"),
+        ("内存", f"{info['mem_gib']:.1f} GiB" if isinstance(info.get("mem_gib"), (int, float)) else "未知"),
+        ("磁盘类型", info.get("disk_type") or "未知"),
+        ("文件系统", info.get("fs_type") or "未知"),
+        ("Python 版本", info.get("python_version") or "未知"),
+        ("并行级别", str(info.get("parallel_level") or "未知")),
+        ("worker 数", str(info.get("parallel_workers") or "未知")),
+        ("采集日期", info.get("date") or "未知"),
+    ]
+    lines = [
+        "| 环境属性 | 值 |",
+        "|:---------|:---|",
+    ]
+    lines.extend(f"| {key} | {val} |" for key, val in rows)
+    return "\n".join(lines) + "\n"
+
+
+def _approx_sec(seconds: float) -> int:
+    """耗时取整为约值（下限 1 秒），用于表格"~Ns"展示。"""
+    return max(1, round(seconds))
+
+
+def _render_duration_table(results: list[dict]) -> str:
+    """渲染各模式实测耗时 markdown 表格（对齐「环境耗时对照」顺序）。
+
+    含 verify,regression 组合行；超时与不在对照表内的模式跳过。
+    """
+    by_mode = {r.get("mode", ""): r for r in results if not r.get("timed_out")}
+    lines = [
+        "| `--mode` | 覆盖项数 | 耗时 |",
+        "|:---------|:--------:|:--------:|",
+    ]
+    for mode in _MODE_TABLE_ORDER:
+        res = by_mode.get(mode)
+        if res is None:
+            continue
+        cnt = (
+            res.get("passed", 0) + res.get("failed", 0)
+            + res.get("skipped", 0) + res.get("errors", 0)
+        )
+        lines.append(f"| `{mode}` | {cnt} | ~{_approx_sec(res.get('duration', 0.0) or 0.0)}s |")
+        if mode == "regression" and "verify" in by_mode:
+            v = by_mode["verify"]
+            cnt2 = cnt + (
+                v.get("passed", 0) + v.get("failed", 0)
+                + v.get("skipped", 0) + v.get("errors", 0)
+            )
+            dur2 = (res.get("duration", 0.0) or 0.0) + (v.get("duration", 0.0) or 0.0)
+            lines.append(f"| `verify,regression` | {cnt2} | ~{_approx_sec(dur2)}s（verify+regression 之和） |")
+    return "\n".join(lines) + "\n"
+
+
+def _print_machine_report(machine_info: dict | None, results: list[dict]) -> None:
+    """输出机器环境属性表 + 各模式耗时表（仅 --machine-info 时启用）。"""
+    if machine_info is None:
+        return
+    print()
+    print(_format_machine_info(machine_info))
+    print()
+    print(_render_env_table(machine_info))
+    print()
+    print(_render_duration_table(results))
+    timed_out_modes = [r.get("mode", "") for r in results if r.get("timed_out")]
+    if timed_out_modes:
+        print(f"> 超时未纳入耗时表：{', '.join(timed_out_modes)}")
 
 
 def _build_pytest_args(
@@ -832,8 +1146,8 @@ def main() -> None:
         print(_HELP_TEXT)
         return
 
-    # 解析模式列表
-    modes_to_run = [m.strip() for m in args.mode.split(",")]
+    # 解析模式列表（bench 别名展开为对照表模式序列）
+    modes_to_run = _resolve_modes([m.strip() for m in args.mode.split(",")])
     invalid = [m for m in modes_to_run if m not in MODES]
     if invalid:
         print(f"  [ERR] 无效模式: {', '.join(invalid)}")
@@ -851,6 +1165,12 @@ def main() -> None:
     if args.phased:
         print("  [..] 分阶段: 已开启（前序阶段失败则跳过后续）")
 
+    # 机器信息采集（--machine-info 时启用）
+    machine_info: dict | None = None
+    if args.machine_info:
+        machine_info = _collect_machine_info(args.parallel or "medium")
+        print(_format_machine_info(machine_info))
+
     # 归档现有报告
     archive_path = archive_existing()
 
@@ -859,16 +1179,21 @@ def main() -> None:
 
     # 运行各模式
     results: list[dict] = []
-    for mode_key in modes_to_run:
-        result = run_mode(
-            mode_key,
-            coverage=args.coverage,
-            parallel_level=args.parallel,
-            timeout_override=args.timeout,
-            no_timeout=args.no_timeout,
-            phased=args.phased,
-        )
-        results.append(result)
+    try:
+        for mode_key in modes_to_run:
+            result = run_mode(
+                mode_key,
+                coverage=args.coverage,
+                parallel_level=args.parallel,
+                timeout_override=args.timeout,
+                no_timeout=args.no_timeout,
+                phased=args.phased,
+            )
+            results.append(result)
+    except KeyboardInterrupt:
+        print("\n  [!] 手动中断，输出已完成模式的结果")
+        _print_machine_report(machine_info, results)
+        sys.exit(130)
 
     # 生成汇总页
     index_html = _render_index_html(results, args.coverage, archive_path)
@@ -899,6 +1224,9 @@ def main() -> None:
         print(f"  [ERR] 存在失败的测试 — {total_passed} 通过, {total_failed} 失败")
         print("        请检查 test-reports/latest/ 中的详细报告")
     print()
+
+    # 机器环境 + 耗时表格输出（--machine-info 时启用）
+    _print_machine_report(machine_info, results)
 
     sys.exit(overall)
 

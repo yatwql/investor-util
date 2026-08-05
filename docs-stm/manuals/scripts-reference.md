@@ -53,15 +53,20 @@ python scripts/test_runner.py --mode verify,regression
 python scripts/test_runner.py --mode unit         # 全量单元测试
 python scripts/test_runner.py --mode scenario     # 业务场景测试
 python scripts/test_runner.py --mode edge         # 边缘/异常场景
-python scripts/test_runner.py --mode smoke        # 冒烟测试（~15s）
+python scripts/test_runner.py --mode smoke        # 冒烟测试（~2s）
 python scripts/test_runner.py --mode data         # 数据正确性验证
 
 # 多模式组合
 python scripts/test_runner.py --mode scenario,edge
 
+# 跨机器耗时采集（输出机器环境属性 + 各模式实测耗时表格，供耗时对照更新）
+python scripts/test_runner.py --mode bench --machine-info
+
 # 带行覆盖率
 python scripts/test_runner.py --mode unit --coverage
 ```
+
+> `--mode bench` 是「环境耗时对照」所需 14 个模式（不含 `live`）的聚合别名，按对照表顺序运行；配合 `--machine-info` 输出机器硬件信息（OS/架构/主机名/CPU 型号/物理核/线程/内存/磁盘类型/文件系统/Python/并行度/日期）与环境属性表 + 各模式实测耗时表，可直接并入 `test-coverage.md` 的环境耗时对照（「采集环境属性」+「各模式耗时对照」两张表）。
 
 > **`test_runner.py` 不支持 `--` 透传**（如 `-- --lf`）。如需 `--lf` 绕过它直接调 pytest，用 `-m` 复现目标模式的标记表达式。各 `--mode` 对应的 `-m` 表达式见下文"标记表达式对照"或直接查看 `MODES` 字典。
 
@@ -84,7 +89,7 @@ python scripts/test_runner.py --mode unit --coverage
 | `report` | `unit_report` | ~11s |
 | `scenario_extreme` | `scenario_extreme` | ~2s |
 
-> 注：典型耗时按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。**耗时与硬件/操作系统/并行度强相关**，不同 OS 或慢机器上可能数倍于此，仅作相对量级参考；完整说明及不同环境下的耗时对照见 `test-coverage.md`（顶部注 + 「环境耗时对照」表）。
+> 注：典型耗时按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。**耗时与硬件/操作系统/并行度强相关**，不同 OS 或慢机器上可能数倍于此，仅作相对量级参考；完整说明及不同环境下的耗时对照见 `test-coverage.md`（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。
 
 ---
 
