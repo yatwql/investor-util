@@ -17,7 +17,7 @@
 | ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **97** | — | 含 CLAUDE.md |
 | ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 92 | — | 各版本 changelog/plan/review-findings 等（88 md + 3 py + 1 txt） |
+| ├ archive/ | 版本归档 | 97 | — | 各版本 changelog/plan/review-findings 等（93 md + 3 py + 1 txt） |
 | ├ plan/ | 中间设计文件 | 1 | — | 当前迭代中的设计方案 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -804,8 +804,10 @@ investor-util/
 │   │   │   ├── investment-features/         #   投资功能优化 + 章节归并（plan-17~24）
 │   │   │   │   ├── plan-investment-features.md  #     投资分析功能优化设计（需求×数据源×章节归并）
 │   │   │   │   └── plan-investment-iteration.md #     投资功能优化 21 轮迭代实施计划（每轮量化验收）
-│   │   │   └── task-code-traces-gate/       #   任务编号标识符/注释门禁增强设计（rf-208）
-│   │   │       └── plan-task-code-traces-gate.md #     check-code-traces 扩展（IDENT 维度 + 系列代号）
+│   │   │   ├── task-code-traces-gate/       #   任务编号标识符/注释门禁增强设计（rf-208）
+│   │   │   │   └── plan-task-code-traces-gate.md #     check-code-traces 扩展（IDENT 维度 + 系列代号）
+│   │   │   └── toc-llm-marking/             #   目录 LLM 章节标记设计（橙色加粗 + 🧠 图标）
+│   │   │       └── plan-toc-llm-marking.md  #     TOC/横向导航 LLM 章节标记（复用 --orange-text）
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
