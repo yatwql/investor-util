@@ -88,8 +88,8 @@ if enable_history:
 
 ## Files to Modify
 
-1. `D:\codebase\zoo\investor-util\src\python\report\excel_generator.py`
-2. `D:\codebase\zoo\investor-util\src\python\handlers_report.py`
+1. `D:\path\to\investor-util\src\python\report\excel_generator.py`
+2. `D:\path\to\investor-util\src\python\handlers_report.py`
 
 No new files needed. No new external dependencies.
 

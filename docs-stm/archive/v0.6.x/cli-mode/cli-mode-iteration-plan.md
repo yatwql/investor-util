@@ -1215,7 +1215,7 @@ test_cli_verbose_ansi_auto_disable
 
 ```bash
 # 每日盘后自动生成全量报告（Windows）
-schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "python D:\codebase\zoo\investor-util\src\python\cli.py report --type full --history auto" /ST 16:00
+schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "python D:\path\to\investor-util\src\python\cli.py report --type full --history auto" /ST 16:00
 
 # 每周一更新缓存（Linux cron）
 0 9 * * 1 cd /home/user/investor-util && python -m src.python.cli cache --update all >> logs/cron.log 2>&1

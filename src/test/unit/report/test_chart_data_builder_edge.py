@@ -7,7 +7,7 @@
   - mv 为 None / 非数值 → 防御性归零，不抛异常
 
 运行：
-  cd /lzcapp/document/working/codebase/investor-util
+  cd <项目根目录>
   .venv/bin/python -m pytest src/test/unit/report/test_chart_data_builder_edge.py -v
 """
 

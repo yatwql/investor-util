@@ -6,7 +6,7 @@
 """
 import sys
 
-DOC = "D:/codebase/zoo/investor-util/docs-stm/plan/discussion-better-investment-advice.md"
+DOC = "D:/path/to/investor-util/docs-stm/plan/discussion-better-investment-advice.md"
 
 def try_text_strategies():
     """文本模式打开，多策略搜索"""

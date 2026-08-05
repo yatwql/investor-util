@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Round 1: Insert feasibility findings after section 2."""
 with open(
-    "D:/codebase/zoo/investor-util/docs-stm/plan/discussion-better-investment-advice.md",
+    "D:/path/to/investor-util/docs-stm/plan/discussion-better-investment-advice.md",
     "r", encoding="utf-8"
 ) as f:
     content = f.read()
@@ -78,7 +78,7 @@ new_block = """---\n
 if old in content:
     content = content.replace(old, new_block, 1)
     with open(
-        "D:/codebase/zoo/investor-util/docs-stm/plan/discussion-better-investment-advice.md",
+        "D:/path/to/investor-util/docs-stm/plan/discussion-better-investment-advice.md",
         "w", encoding="utf-8"
     ) as f:
         f.write(content)
