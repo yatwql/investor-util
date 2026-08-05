@@ -535,7 +535,7 @@ LLM 五维度量化评分，每项满分 100：
 
 **输出指标（危机区间标注区块）**：预设历史危机区间（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整，静态历史事实表，不随持仓变化、不拉长 lookback、零新增网络请求）与报告数据窗口重叠裁剪后统计：区间最大回撤/最深日/恢复耗时/是否已恢复；无重叠时显式写「报告数据窗口内无历史危机区间」占位。
 
-**输出指标（尾部风险统计区块）**：基于 `history_data.bars` 历史日收益序列（与走势表同口径 (curr-prev)/prev）计算尾部风险指标——VaR(95)/VaR(99)（历史模拟法，单日最大可能损失百分比）、最大单日跌幅（% + 发生日期）、最长连续下跌天数（含区间起止日期）、最大单日跌幅后恢复天数（已恢复 / 未恢复 / 无下跌日三种状态）；日收益样本 < MIN_SAMPLE=20 时 available=false，写「样本不足」占位（§1.4.5 降级）。
+**输出指标（尾部风险统计区块）**：基于 `history_data.bars` 历史日收益序列（与走势表同口径 (curr-prev)/prev）计算尾部风险指标——VaR(95)/VaR(99)（历史模拟法，单日最大可能损失百分比）、最大单日跌幅（% + 发生日期）、最长连续下跌天数（含区间起止日期）、最大单日跌幅后恢复天数（已恢复 / 未恢复 / 无下跌日三种状态）；日收益样本 < MIN_SAMPLE=20 时 available=false，写「样本不足」占位（technical.md §1.4.5 降级）。
 
 **渲染**：
 - HTML：交互净值折线图（Chart.js，含基准指数叠加 + 危机区间阴影带着色，**必须 图下说明**）+ 回撤面积图 + 指标汇总卡片 + 回撤明细表 + 危机区间表 + 尾部风险卡（VaR95/VaR99/最大单日跌幅/最长连续下跌/最大跌幅后恢复，**图下说明**注明历史模拟法）
@@ -554,7 +554,7 @@ LLM 五维度量化评分，每项满分 100：
 |:---------|:---------|
 | R-TAIL-01 | 尾部风险指标复用 `history_data.bars` 历史日收益序列计算，不额外拉长 lookback、无新增网络请求；与走势表日收益同口径 |
 | R-TAIL-02 | 输出 VaR(95/99)（历史模拟法）、最大单日跌幅、最长连续下跌、最大跌幅后恢复天数；恢复状态分已恢复/未恢复/无下跌日三态 |
-| R-TAIL-03 | 日收益样本 < MIN_SAMPLE=20 时 `tail_risk_data.available=false`、各指标 None，Excel/HTML 均写「样本不足」占位（§1.4.5 降级） |
+| R-TAIL-03 | 日收益样本 < MIN_SAMPLE=20 时 `tail_risk_data.available=false`、各指标 None，Excel/HTML 均写「样本不足」占位（technical.md §1.4.5 降级） |
 | R-TAIL-04 | 尾部风险数据注入 `tail_risk_data` 键，Excel 尾部指标行 + HTML 尾部风险卡双端消费，HTML 卡下附 图下说明（历史模拟法 VaR） |
 
 #### 6.4.16 组合演进（多快照趋势）
@@ -581,7 +581,7 @@ LLM 五维度量化评分，每项满分 100：
 | R-EVO-03 | 演进数据注入 `evolution_data` 键，Excel「组合演进」页签与 HTML「组合演进」章节双端消费 |
 | R-EVO-04 | 组合演进章节可见性由独立配置项 `enable_portfolio_evolution` 控制（默认开启），与 `enable_history`/`enable_fund_deep_analysis` 相互独立；关闭仅隐藏报告章节，不影响持仓快照自动记录 |
 
-**自上次快照变化摘要（组合演进章顶部区块）**：对比去重后最近两次快照，输出新增/移除品种（按 code 合并比对，复用 `fetcher/history_diff.HistoryDiff` 引擎）、集中度 HHI 变化（本期 - 上期，权重口径与演进一致：市值优先、市值为 0 回退成本）、超 15% 警戒线品种（阈值复用 `analysis/simple_rebalance._THRESHOLD`，按权重降序），生成一段中文变化摘要文本供双端直接渲染。数据来源复用 `data/history/snapshots/` 本地快照，零网络请求。去重后有效快照 < 2 期（无上次快照可对比）时 `available=false`，写「快照差异不足」占位（§1.4.5 降级）。由 `analysis/snapshot_diff.py::build_snapshot_diff()` 计算（纯标准库、analysis 层隔离，复用 `portfolio_evolution` 的 `_dedup_by_date`/`_compute_hhi`/`_holding_weight`），注入 `snapshot_diff_data` 键。
+**自上次快照变化摘要（组合演进章顶部区块）**：对比去重后最近两次快照，输出新增/移除品种（按 code 合并比对，复用 `fetcher/history_diff.HistoryDiff` 引擎）、集中度 HHI 变化（本期 - 上期，权重口径与演进一致：市值优先、市值为 0 回退成本）、超 15% 警戒线品种（阈值复用 `analysis/simple_rebalance._THRESHOLD`，按权重降序），生成一段中文变化摘要文本供双端直接渲染。数据来源复用 `data/history/snapshots/` 本地快照，零网络请求。去重后有效快照 < 2 期（无上次快照可对比）时 `available=false`，写「快照差异不足」占位（technical.md §1.4.5 降级）。由 `analysis/snapshot_diff.py::build_snapshot_diff()` 计算（纯标准库、analysis 层隔离，复用 `portfolio_evolution` 的 `_dedup_by_date`/`_compute_hhi`/`_holding_weight`），注入 `snapshot_diff_data` 键。
 
 **需求标识**：
 
@@ -589,7 +589,7 @@ LLM 五维度量化评分，每项满分 100：
 |:---------|:---------|
 | R-DIFF-01 | 自上次快照变化摘要基于本地快照对比，零网络请求；复用既有多快照数据（`data/history/snapshots/`），与组合演进同数据源 |
 | R-DIFF-02 | 输出新增/移除品种、集中度 HHI 变化（本期-上期，权重口径与演进一致）、超 15% 警戒线品种（按权重降序）；HHI 无可比权重时跳过 HHI 变化点 |
-| R-DIFF-03 | 去重后有效快照 < 2 期时 `snapshot_diff_data.available=false`、reason 说明，Excel/HTML 均写「快照差异不足」占位（§1.4.5 降级），不阻断报告生成 |
+| R-DIFF-03 | 去重后有效快照 < 2 期时 `snapshot_diff_data.available=false`、reason 说明，Excel/HTML 均写「快照差异不足」占位（technical.md §1.4.5 降级），不阻断报告生成 |
 | R-DIFF-04 | 快照差异摘要注入 `snapshot_diff_data` 键，Excel 组合演进页签顶部「自上次快照变化摘要」区块 + HTML 组合演进章顶部摘要卡双端消费，与演进数据同开关（`enable_portfolio_evolution`） |
 
 #### 6.4.17 行动建议
@@ -601,10 +601,10 @@ LLM 五维度量化评分，每项满分 100：
 | 1 | 行动摘要 | 行动建议概述行（引用再平衡信号条数） |
 | 2 | 再平衡信号 | 单品占比超警戒线品种清单（代码/名称/占比/警戒线/建议动作） |
 | 3 | 交易纪律 | 止盈/止损/回撤三类纪律提醒（收益率超线触发，输出触发/距触发幅度/建议动作） |
-| 4 | 调仓建议 | 可行化调仓清单（代码/名称/操作/份额/预估费用，框架，后续轮次填充） |
-| 5 | 收益归因 | 品种收益贡献占比（盈利来源/亏损来源，当前可空） |
+| 4 | 调仓建议 | 可行化调仓清单（代码/名称/操作/份额/金额/预估费用/调仓后现金） |
+| 5 | 收益归因 | 品种收益贡献占比（盈利来源/亏损来源；无盈亏或无持仓时为空） |
 
-**数据来源**：`analysis/action_advisor.build_action_data` 纯算法计算（基于持仓明细 + 总市值），零新增数据源。无持仓数据时 `available=false`，写「无持仓数据，行动建议无法生成」占位（§1.4.5 降级）。
+**数据来源**：`analysis/action_advisor.build_action_data` 纯算法计算（基于持仓明细 + 总市值），零新增数据源。无持仓数据时 `available=false`，写「无持仓数据，行动建议无法生成」占位（technical.md §1.4.5 降级）。
 
 **需求标识**：
 
@@ -613,7 +613,7 @@ LLM 五维度量化评分，每项满分 100：
 | R-ACT-01 | 行动建议由独立顶层章节承载（`action`），独立开关 `enable_action` 控制（**默认关**），basic/both/full 均可见 |
 | R-ACT-02 | 单源计算两处呈现：`action_data` 经 orchestrator 组装进 pipeline_data（数据契约），行动建议 + 智囊团深度复盘「行动摘要」子块共享同一对象（渲染数据经context传递，无模块级全局变量） |
 | R-ACT-03 | 再平衡信号基于单品占比与警戒线阈值；全部合规时信号为空但 available=True |
-| R-ACT-04 | 调仓建议/收益归因为框架子块（后续轮次填充），空时写占位文本，报告结构保持稳定 |
+| R-ACT-04 | 调仓建议/收益归因已实现，无数据时写「待生成」占位文本，报告结构保持稳定 |
 | R-ACT-05 | 开关关闭时行动建议不渲染、智囊团深度复盘与现状一致（无行动摘要子块） |
 | R-DIS-01 | 止盈纪律：单品种收益率 ≥ 止盈线（默认 +20% 可配）→ 触发「部分止盈」建议，输出「触发 + 距触发幅度 + 建议动作」结构化信号 |
 | R-DIS-02 | 止损纪律：单品种收益率 ≤ 止损线（默认 -15% 可配）→ 触发「止损/减仓」建议，输出结构同 R-DIS-01 |

@@ -93,7 +93,7 @@
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
 | `scenario/llm/test_llm_hallucination.py` | `scenario_llm` | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
 
-**业务场景规格（S0a-S0d、S1-S34、T1-T21）：**
+**业务场景规格（S0a-S0d、S1-S34、D1-D3、T1-T21）：**
 
 | 场景 | 前置场景 | 所属文件 | 前置条件 | 操作 | 验证点 |
 |:-----|:---------|:---------|:---------|:-----|:-------|
@@ -156,7 +156,7 @@
 
 单元测试按被测模块分组，通过 **父子双层 marker** 实现灵活筛选：
 
-- **父标记 `unit`** 匹配全部 12 个 `unit_*` 子标记（providers/fetcher/llm/news/report/config/config_edge/core/cli/ui/analysis/scripts），用于全量单元测试运行（`-m "unit"`）
+- **父标记 `unit`** 匹配全部 12 个已注册 `unit_*` 子标记（providers/fetcher/llm/news/report/config/config_edge/core/cli/ui/analysis/scripts，其中 `unit_config_edge` 为预留、暂无测试使用），用于全量单元测试运行（`-m "unit"`）
 - **子标记**如 `unit_providers`、`unit_fetcher`、`unit_llm` 等支持单独运行指定模块的测试（`-m "unit_providers"`）
 - 新增单元测试文件时，必须为其测试类标注子标记和父标记，缺一不可
 
@@ -458,7 +458,7 @@ def test_get_ttl_closed(self, mock_open):
 
 ### 5.7 门禁场景的自动化覆盖
 
-以下场景曾列为"需真实环境手动验证"，现全部由自动化测试覆盖（通过 mock 精确模拟条件），**不再存在人工门禁**：
+以下场景全部由自动化测试覆盖（通过 mock 精确模拟条件），不存在人工门禁：
 
 | 场景 | 自动化覆盖 | 模拟方式 |
 |:-----|:-----------|:---------|

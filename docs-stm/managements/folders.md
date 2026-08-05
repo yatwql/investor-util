@@ -7,18 +7,18 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 221 | 55,246 | `src/python/` 下所有 `.py`（不含测试，含 14 个 `__init__.py`） |
+| 主程序代码 | Python | 222 | 55,247 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 4 | 3,761 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 16 | 5,581 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **241** | **64,588** | 主程序 + 模板 + 脚本 |
+| **源代码合计** | — | **242** | **64,589** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **276** | **78,332** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **4,980 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照） |
-| **用户文档** | Markdown | **13** | — | 含 README.md |
-| ├ manuals/ | 用户手册分册 | 12 | — | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **105** | — | 含 CLAUDE.md（md 计）；managements 9 + plan 2 + archive 93 md |
-| ├ managements/ | 管理文档 | 9 | — | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 97 | — | 各版本 changelog/plan/review-findings 等（93 md + 3 py + 1 txt） |
-| ├ plan/ | 中间设计文件 | 2 | — | 当前迭代中的设计方案（plan-web-ui.md + plan-web-ui-implementation.md） |
+| **用户文档** | Markdown | **13** | **5,636** | 含 README.md（179 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 12 | 5,457 | 配置/faq/快速上手/CLI 等 |
+| **项目文档** | Markdown | **105** | **41,704** | 含 CLAUDE.md（72 行）；md 口径（managements 9 + plan 2 + archive 93 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 9 | 7,244 | 变更日志/目录树/测试计划/技术设计等 |
+| ├ archive/ | 版本归档 | 97 | 33,760 | 各版本 changelog/plan/review-findings 等（93 md 33,760 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 2 | 628 | 当前迭代中的设计方案（plan-web-ui.md + plan-web-ui-implementation.md） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -26,6 +26,7 @@
 ```
 investor-util/
 ├── src/                              # 源代码
+│   ├── __init__.py                   #   包标记（空文件）
 │   ├── python/                       # 主程序代码
 │   │   ├── __init__.py               #   包标记（空文件）
 │   │   ├── startup_wizard.py         #   首次运行引导向导（检查配置/创建模板/启动模式引导）
@@ -267,7 +268,7 @@ investor-util/
 │   │   │   ├── __main__.py           #   python -m 入口
 │   │   │   └── cli.py                #   argparse + 共享层路由（report/update/whatif 子命令）
 │   │   │
-│   │   ├── tui/                      # TUI 交互模式入口
+│   │   └── tui/                      # TUI 交互模式入口
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── __main__.py           #   python -m 入口
 │   │   │   ├── handlers_cache.py     #   缓存管理命令处理器
@@ -285,7 +286,7 @@ investor-util/
 │   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制）
 │   │   ├── chart-export.js           #   单图导出 PNG 按钮（.chart-box 注入，2x 分辨率下载）
 │   │   ├── chart-common.js           #   Chart.js 公共初始化 helper（trackChart/lineOptions/doughnutOptions，chart-init 与 What-if 页共用）
-│   │   ├── chart-init.js             #   6 张图初始化（单图异常隔离 + degraded 虚线）
+│   │   ├── chart-init.js             #   9 张图初始化（6 核心 + 3 演进；单图异常隔离 + degraded 虚线）
 │   │   ├── toc.js                    #   左侧目录 TOC（折叠/展开 + IntersectionObserver 滚动高亮，离线自包含）
 │   │   ├── theme.js                   #   主题切换（深/浅色 + localStorage 持久化 + Chart.js 重绘 + 打印浅色协调）
 │   │   ├── test-chart.html           #   独立调试页：6 图渲染/降级/离线场景自检（Chart.js 升级验证载体）
@@ -373,11 +374,11 @@ investor-util/
 │       │   │   ├── test_provider_registry.py #   数据源注册中心测试
 │       │   │   ├── test_reader.py           #   持仓文件读取测试
 │       │   │   ├── test_registry.py         #   中央注册表测试
-│       │   │   ├── test_registry_edge.py    #   注册表边缘场景
+│       │   │   └── test_registry_edge.py    #   注册表边缘场景
 │       │   ├── cache/               #   缓存单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_cache_io.py         #   缓存 IO 测试
-│       │   │   ├── test_holdings_tracker.py #   持仓快照缓存追踪器
+│       │   │   └── test_holdings_tracker.py #   持仓快照缓存追踪器
 │       │   ├── fetcher/             #   数据获取单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_fetcher_api_edge.py  #   API 获取边缘场景
@@ -536,7 +537,7 @@ investor-util/
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_cli.py               #   CLI 命令行模式单元测试
 │       │   │   └── test_cli_edge.py          #   CLI 边缘场景测试
-│       │   ├── ui/                  #   UI 单元测试
+│       │   └── ui/                  #   UI 单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_tui_keys.py              #   TUI 键盘输入测试
 │       │   │   ├── test_tui_edge.py         #   TUI 边缘场景
@@ -552,7 +553,7 @@ investor-util/
 │       │   ├── test_news_pipeline.py          #   新闻聚合到报告数据构建端到端集成测试
 │       │   ├── test_report_chapter_consistency.py # 报告章节名称顺序集合契约一致性集成测试
 │       │   └── test_tui_routing.py            #   TUI 菜单路由与回调绑定集成测试
-│       ├── scenario/                 #   场景测试（basic/datetime/llm/perf/resilience/security 六子组）
+│       └── scenario/                 #   场景测试（basic/datetime/llm/perf/resilience/security 六子组）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── basic/               #   基本面场景测试
 │       │   │   ├── __init__.py      #       子包标记
@@ -766,7 +767,7 @@ investor-util/
 │   │   │   ├── perf-benchmark/               #   性能基准体系（自动计时/回归检测/趋势工具）
 │   │   │   │   ├── perf-completion-summary.md #     性能基准体系归档摘要
 │   │   │   │   └── perf-design-and-verification.md # 性能基准体系设计方案
-│   │   │   ├── batch-parallel/             #   批量并行调度重构（BatchDispatcher + 线程池配置）
+│   │   │   └── batch-parallel/             #   批量并行调度重构（BatchDispatcher + 线程池配置）
 │   │   │   │   ├── batch-parallel-design.md #      批量并行调度技术设计
 │   │   │   │   └── batch-parallel-iteration-plan.md # 批量并行调度迭代计划
 │   │   ├── v0.9.x/                           # v0.9.x 版本归档（changelog/plan/review-findings + 设计文档）
@@ -800,7 +801,7 @@ investor-util/
 │   │   │   │   └── plan-fix-deepseek-thinking-exhaustion.md # 思考耗尽修复方案
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
-│   │   ├── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
+│   │   └── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
 │   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~24，设计文档索引）
 │   │   │   ├── investment-features/         #   投资功能优化 + 章节归并（plan-17~24）
 │   │   │   │   ├── plan-investment-features.md  #     投资分析功能优化设计（需求×数据源×章节归并）

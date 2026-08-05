@@ -117,12 +117,12 @@ LLM 配置由三个独立文件管理：
 {
   "deepseek-main": {
     "api_key": "sk-your-deepseek-key",
-    "model": "DeepSeek-V4-Flash",
+    "model": "deepseek-v4-flash",
     "endpoint": "https://api.deepseek.com/anthropic/v1/messages"
   },
   "gemini-fb": {
     "api_key": "AIzaSyYourGeminiKey",
-    "model": "gemini-3.5-flash",
+    "model": "gemini-2.5-flash",
     "endpoint": "https://generativelanguage.googleapis.com/v1beta"
   }
 }
@@ -195,9 +195,9 @@ TUI 菜单 **[S]** 查看状态时会显示多链模式详情：
 LLM Provider 状态
 状态: 已配置 | 策略: 优先级排序 | 多链服务: 2 provider
   [1] deepseek-main (claude)
-      模型: deepseek-v4-flash    优先级: 99（默认）    熔断: 正常
+      模型: deepseek-v4-flash    优先级: 10    熔断: 正常
   [2] gemini-fallback (gemini)
-      模型: gemini-2.5-flash    优先级: 99（默认）    熔断: 正常
+      模型: gemini-2.5-flash    优先级: 20    熔断: 正常
   ▶ 模块偏好: 智囊团深度复盘 → gemini-fallback / 持仓体检报告 → gemini-fallback
 ```
 
@@ -791,8 +791,8 @@ python -m src.python.tui
 | `deepseek-v4-flash` | 1.00 | 2.00 | 0.02 | ⭐ 高性价比推荐，默认模型 |
 | `deepseek-v4-pro` | 3.00 | 6.00 | 0.025 | DeepSeek 增强推理 |
 | `deepseek-chat` | 1.00 | 2.00 | 0.02 | DeepSeek V3 |
-| `gemini-3.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比 |
-| `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 轻量 |
+| `gemini-3.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 新一代（可选） |
+| `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比（代码默认） |
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
 | `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
 

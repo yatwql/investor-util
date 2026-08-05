@@ -5,7 +5,7 @@
 
 按不同的 `--mode` / pytest 标记统计当前测试覆盖规模：
 
-### 模式对应测试量
+## 模式对应测试量
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
@@ -26,7 +26,7 @@
 
 > 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 4980 项（2026-08-05 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
 
-### 功能域对应测试源
+## 功能域对应测试源
 
 按被测试的源代码模块分组，方便定位"改了某段源码该跑什么测试"：
 
@@ -44,18 +44,18 @@
 | **CLI 命令行模式** | `cli/cli.py`, `report/cli_progress.py` | `unit/cli/test_cli*.py` | 56 |
 | **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组，含 `scenario_extreme` 单列) + `integration/test_cli_integration.py` | 281 |
 
-### 场景测试分组（scenario）
+## 场景测试分组（scenario）
 
 | 标记 | 覆盖场景 | 覆盖项数 | 参考测试类 |
 |:-------|:---------|:--------:|:-----------|
-| `scenario`（父标记） | 基础业务链路（S0a-S0d、S1-S34，其中 S34 基准指数对比由单元测试覆盖）+ 日期时间（T1-T21）+ LLM 场景/韧性场景子集 | **241** | 见下 |
+| `scenario`（父标记） | 基础业务链路（S0a-S0d、S1-S33，其中基准指数对比由单元测试覆盖）+ 日期时间（T1-T21）+ LLM 场景/韧性场景子集 | **241** | 见下 |
 | ├─ `scenario_basic` | 基础业务链路（S1-S5 + S0a/S0b/S0d + S21-S33 + C-P1b + 穿透分析 + 管线冒烟/指标注入 + 因子暴露管线） | **144** | |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_scenario_basic_flows.py::TestScenarioStock` |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_scenario_basic_flows.py::TestScenarioFund` |
 | │  ├ `scenario_mixed_accounts` | S3: 混合多账户 | 1 | `test_scenario_basic_flows.py::TestScenarioMixedAccounts` |
 | │  ├ `scenario_new_holdings` | S4: 新持仓无缓存 | 1 | `test_scenario_basic_flows.py::TestScenarioNewHoldings` |
 | │  ├ `scenario_cache_hit` | S5: 缓存全命中 | 2 | `test_scenario_basic_flows.py::TestScenarioCacheHit` |
-| │  └ 文件级分组 | S0a/S0b/S0d 持仓质量(13) · S21-S28 特殊品种(27) · S29-S33 操作行为(15) · SP1-SP10 穿透分析(37) · C-P1b 报告序号(16) · 管线冒烟(4) · 指标注入(14) · 因子暴露(5) · 基础链路其余(5) | 135 | `test_scenario_holdings_quality.py` 等 9 文件 |
+| │  └ 文件级分组 | S0a/S0b/S0d 持仓质量(13) · S21-S28 特殊品种(25) · S29-S33 操作行为(15) · SP1-SP10 穿透分析(37) · C-P1b 报告序号(17) · 管线冒烟(4) · 指标注入(14) · 因子暴露(5) · 基础链路其余(5) | 135 | `test_scenario_holdings_quality.py` 等 12 文件 |
 | ├─ `scenario_resilience` | 异常容错 S6-S9 + 数据链路韧性 | **18** | |
 | │  ├ `scenario_bond` | S6: 纯债券基金组合 | 3 | `test_scenario_resilience_flows.py::TestScenarioBond` |
 | │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | `test_scenario_resilience_flows.py::TestScenarioNetworkDown` |
@@ -68,7 +68,7 @@
 | `scenario_security`（独立标记） | 安全基线测试 | **9** | `test_security.py` |
 | `scenario_extreme`（独立标记） | 极限场景 S0c/S10（超多持仓/极端份额/高精度净值/零值组合），不包含在 `scenario` 父标记中 | **9** | `test_scenario_extreme.py` |
 
-### 单元测试分组（unit）
+## 单元测试分组（unit）
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
@@ -85,7 +85,7 @@
 | ├─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 135 |
 | └─ `unit_scripts` | scripts/ 工程脚本（历史痕迹检查工具自检/豁免/补强模式/回归场景元描述豁免/多行 docstring 提取/任务编号一致性检查/3 类暗号匹配自检） | 121 |
 
-### 跨类标记
+## 跨类标记
 
 | 标记 | 覆盖范围 | 覆盖项数 |
 |:-------|:---------|:--------:|

@@ -14,6 +14,8 @@
 | `check-doc-traces.py` | 测试 | 面向读者文档（.md）中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
 | `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
+| `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
+| `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
 | `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`pytest --collect-only` 快照，供 test-coverage.md 更新） |
@@ -75,8 +77,8 @@ python scripts/test_runner.py --mode unit --coverage
 | `data` | `data` | ~10s |
 | `scenario` | `scenario` | ~6min |
 | `integration` | `scenario or integration` | ~50s |
-| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis` | ~1min |
-| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis) and not (edge or data) or (scenario_basic)` | ~2.5min |
+| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts` | ~1min |
+| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)` + `scenario_basic`（两阶段） | ~2.5min |
 | `all` | （无过滤，全量） | ~10min |
 | `all_no_unit` | `not unit` | ~7min |
 | `report` | `unit_report` | ~15s |
@@ -136,7 +138,7 @@ python scripts/check-code-traces.py --ci
 |:------:|:-----|:-----|
 | 0 | 全部通过 | 无需处理 |
 | 1 | HIGH/ORIGIN/VERSION 痕迹 | 必须修复后再提交 |
-| 2 | CODE（任务编号引用如 R-xxx） | 应从注释中移除 |
+| 2 | CODE/IDENT/CHAPTER/ROUND（任务编号/标识符/章节编号引用） | 应从注释/标识符中移除 |
 | 3 | 仅 TODO/CHANGE/DEPR 级别 | 建议人工复核 |
 
 ---
@@ -172,7 +174,7 @@ python scripts/check-doc-traces.py --ci
 | 退出码 | 含义 | 行动 |
 |:------:|:-----|:-----|
 | 0 | 全部通过 | 无需处理 |
-| 1 | HIGH/ARCHIVE/CODE 痕迹 | 应从文档中移除 |
+| 1 | HIGH/ARCHIVE/CODE/CIPHER/CHAPTER/ROUND 痕迹 | 应从文档中移除 |
 | 2 | 仅 LOW 级别痕迹（需人工判断的变更/过渡类描述） | 建议人工复核 |
 
 ---

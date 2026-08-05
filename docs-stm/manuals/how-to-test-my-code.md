@@ -150,7 +150,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 项目推荐的四道质量门禁，按开发阶段逐级收紧：
 
 - **提交前门禁（`--mode dev-verify` / P0）** — commit 前必须执行。组合 5 个 unit 子模块（unit_core/unit_providers/unit_fetcher/unit_analysis/unit_scripts，并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。约 2.5min。是编辑-验证循环中的正式屏障。
-- **全场景回归（`--mode regression`）** — commit 前可选的全场景补充验证。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S34 + T1-T21），确保端到端用户路径不被破坏。约 6min。推荐在改动了跨模块路径或数据流后补充运行。
+- **全场景回归（`--mode regression`）** — commit 前可选的全场景补充验证。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S33 + T1-T21），确保端到端用户路径不被破坏。约 6min。推荐在改动了跨模块路径或数据流后补充运行。
 - **合入验证（`--mode verify` / P1）** — 准备合并到 master 前必须执行。覆盖 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）、`unit_config`（配置管理）、`unit_news`（新闻聚合）、`unit_llm`（LLM 模块）、`unit_analysis`（分析计算：流动性/再平衡/汇率/债券收益率等）、`unit_scripts`（工程脚本：历史痕迹/版本一致性/任务编号检查）八个单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。并行执行，约 1min。场景测试已在 P0 dev-verify（基础场景）和 P2 verify,regression（全场景）中覆盖，P1 不重复。
 - **发布验证（`--mode verify,regression`）** — 发布版本（打 tag/release）前必须执行。组合单元测试 + 场景测试，覆盖全部核心通路。约 7min。
   > 注：若走常规 `dev → merge → tag master` 流程，P1 已保证 `verify` 通过，P2 的 `verify` 属冗余验证。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。如确定流程中有严格 merge 屏障且不直接发布 dev，P2 可优化为仅 `--mode regression`（~6min）。详见 [`testplan.md`](../managements/testplan.md) → §6.3 脚注。
@@ -331,14 +331,13 @@ pytest src/test/ -m "<对应标记>" --lf
 
 | 表达式 | 覆盖范围 |
 |:-------|:---------|
-| `scenario` | 全部业务场景 S0a/S0b/S0d + S1-S34 + T1-T21（S0c 属 `scenario_extreme`，不计入） |
+| `scenario` | 全部业务场景 S0a/S0b/S0d + S1-S33 + T1-T21（S0c 属 `scenario_extreme`，不计入） |
 | `scenario_basic` | 基础链路 S0a/S0b/S0d + S1-S5 + S21-S33 |
 | ├ `scenario_stock` | S1: 纯股票组合 |
 | ├ `scenario_fund` | S2: 纯基金组合 |
 | ├ `scenario_mixed_accounts` | S3: 混合多账户 |
 | ├ `scenario_new_holdings` | S4: 新持仓无缓存 |
-| ├ `scenario_cache_hit` | S5: 缓存全命中 |
-| └ `scenario_special_securities` | S21-S28: 特殊品种 |
+| └ `scenario_cache_hit` | S5: 缓存全命中 |
 | `scenario_resilience` | 异常容错场景 S6-S9 |
 | ├ `scenario_bond` | S6: 纯债券基金组合 |
 | ├ `scenario_network_down` | S7: 网络中断降级 |
@@ -392,7 +391,8 @@ pytest src/test/ -m "<对应标记>" --lf
 | ├─ `integration_isolation` | 错误隔离业务语义验证 |
 | ├─ `integration_news_pipeline` | 新闻流水线全链路 |
 | ├─ `integration_cache` | 跨模块缓存一致性验证 |
-| └─ `integration_tui` | TUI → Handler 路由集成测试 |
+| ├─ `integration_tui` | TUI → Handler 路由集成测试 |
+| └─ `integration_cli` | CLI 命令行模式集成测试 |
 
 场景标记表末尾列出了常用的标记组合表达式（如 `scenario_basic or scenario_datetime`、`scenario_cache_hit or scenario_zero_cost`），可在此基础上按需调整。
 
