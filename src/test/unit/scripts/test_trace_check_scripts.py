@@ -205,6 +205,18 @@ class TestCodeTraceDetection:
     def test_source_narrative(self, code_traces):
         assert _code_hit(code_traces, "从 utils.py 拆分而来") is not None
 
+    def test_split_out_narrative(self, code_traces):
+        """「拆出」来源归属叙述须检出（含反引号包裹模块路径）。"""
+        flagged = [
+            "自 generators_orchestrator.py 拆出",
+            "从 generators_orchestrator.py 拆出",
+            "自 `generators_orchestrator.py` 拆出（超限文件拆分重构）",
+            "由 `_report_helpers.py` 拆出",
+            "拆出自 metrics.py",
+        ]
+        for line in flagged:
+            assert _code_hit(code_traces, line) is not None, f"拆出来源叙述未检出: {line}"
+
 
 # ── 测试文件回归场景元描述豁免（仅 src/test/ 生效） ─────────
 
@@ -289,6 +301,17 @@ class TestDocTraceDetection:
         ]
         for line in flagged:
             assert _doc_hit(doc_traces, line) is not None, f"契约改名叙述未检出: {line}"
+
+    def test_split_out_narrative(self, doc_traces):
+        """「拆出」来源归属叙述须检出（含反引号包裹模块路径）。"""
+        flagged = [
+            "自 generators_orchestrator.py 拆出",
+            "自 `generators_orchestrator.py` 拆出（超限文件拆分重构）",
+            "由 `_report_helpers.py` 拆出",
+            "拆出自 metrics.py",
+        ]
+        for line in flagged:
+            assert _doc_hit(doc_traces, line) is not None, f"拆出来源叙述未检出: {line}"
 
     # ── 合法当前状态/工具说明应豁免 ──
 
