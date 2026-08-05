@@ -5,8 +5,6 @@
 
 目标：basic 模式 <60s，失败条件 >120s。
 测试中所有外部 API 和 LLM 调用均被 mock，实际耗时应远低于阈值。
-
-@pytest.mark.scenario_perf
 """
 
 from __future__ import annotations
@@ -23,6 +21,17 @@ from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 
 logger = logging.getLogger("invest")
+
+# ── 性能阈值与样本规模 ─────────────────────────────────────
+_TRADING_DAYS = 252  # 年度交易日数（日收益序列长度）
+_PORTFOLIO_SIZE = 20  # 测试持仓品种数
+_SCENARIO_CASE_COUNT = 6  # 情景分析输出场景数
+_METRICS_TIME_LIMIT_S = 10.0  # 指标计算耗时上限（秒）
+_PENETRATION_TIME_LIMIT_S = 10.0  # 穿透计算耗时上限（秒）
+_SCENARIO_TIME_LIMIT_S = 2.0  # 情景分析耗时上限（秒）
+_EXCEL_TIME_LIMIT_S = 30.0  # Excel 写入耗时上限（秒）
+_FULL_PIPELINE_TIME_LIMIT_S = 60.0  # 全量管线耗时上限（秒）
+_FULL_PIPELINE_FAIL_LIMIT_S = 120.0  # 全量管线失败阈值（秒）
 
 # ── 20 品种测试持仓 ─────────────────────────────────────────
 
@@ -93,12 +102,12 @@ class TestE2EPerformance:
         """仅指标计算阶段耗时测量。"""
         from src.python.analysis.metrics import compute_all_metrics
 
-        portfolio_returns = [0.001] * 252
-        benchmark_returns = [0.0005] * 252
+        portfolio_returns = [0.001] * _TRADING_DAYS
+        benchmark_returns = [0.0005] * _TRADING_DAYS
         start = time.perf_counter()
         result = compute_all_metrics(
             portfolio_returns,
-            portfolio_weights=[0.1] * 20,
+            portfolio_weights=[0.1] * _PORTFOLIO_SIZE,
             benchmark_daily_returns=benchmark_returns,
         )
         elapsed = time.perf_counter() - start
@@ -106,7 +115,7 @@ class TestE2EPerformance:
         logger.info("指标计算耗时: %.3fs", elapsed)
         assert result is not None
         assert "beta_analysis" in result
-        assert elapsed < 10.0, f"指标计算耗时 {elapsed:.2f}s > 10s 阈值"
+        assert elapsed < _METRICS_TIME_LIMIT_S, f"指标计算耗时 {elapsed:.2f}s > {_METRICS_TIME_LIMIT_S}s 阈值"
 
     @pytest.mark.scenario_perf
     def test_penetration_time(self, twenty_holdings, mock_all_apis):
@@ -126,7 +135,7 @@ class TestE2EPerformance:
 
         logger.info("穿透计算耗时: %.3fs", elapsed)
         assert result is not None
-        assert elapsed < 10.0, f"穿透计算耗时 {elapsed:.2f}s > 10s 阈值"
+        assert elapsed < _PENETRATION_TIME_LIMIT_S, f"穿透计算耗时 {elapsed:.2f}s > {_PENETRATION_TIME_LIMIT_S}s 阈值"
 
     @pytest.mark.scenario_perf
     def test_scenario_analysis_time(self, twenty_holdings, mock_all_apis):
@@ -145,8 +154,8 @@ class TestE2EPerformance:
 
         logger.info("情景分析耗时: %.3fs", elapsed)
         assert result is not None
-        assert len(result["scenarios"]) == 6
-        assert elapsed < 2.0, f"情景分析耗时 {elapsed:.2f}s > 2s 阈值"
+        assert len(result["scenarios"]) == _SCENARIO_CASE_COUNT
+        assert elapsed < _SCENARIO_TIME_LIMIT_S, f"情景分析耗时 {elapsed:.2f}s > {_SCENARIO_TIME_LIMIT_S}s 阈值"
 
     @pytest.mark.scenario_perf
     def test_excel_report_time(self, twenty_holdings, mock_all_apis, tmp_path):
@@ -180,7 +189,7 @@ class TestE2EPerformance:
         logger.info("Excel 报告写入耗时: %.3fs", elapsed)
         assert result_path is not None
         assert os.path.exists(result_path)
-        assert elapsed < 30.0, f"Excel 写入耗时 {elapsed:.2f}s > 30s 阈值"
+        assert elapsed < _EXCEL_TIME_LIMIT_S, f"Excel 写入耗时 {elapsed:.2f}s > {_EXCEL_TIME_LIMIT_S}s 阈值"
 
     @pytest.mark.scenario_perf
     def test_full_pipeline_time(self, twenty_holdings, mock_all_apis, tmp_path):
@@ -192,8 +201,8 @@ class TestE2EPerformance:
         )
         from src.python.report.penetration import compute_penetration_top10
 
-        portfolio_returns = [0.001] * 252
-        benchmark_returns = [0.0005] * 252
+        portfolio_returns = [0.001] * _TRADING_DAYS
+        benchmark_returns = [0.0005] * _TRADING_DAYS
         details = [
             DetailRow(
                 name=h.name, code=h.code, market_value=h.shares * h.cost_price,
@@ -206,7 +215,7 @@ class TestE2EPerformance:
 
         metrics = compute_all_metrics(
             portfolio_returns,
-            portfolio_weights=[0.1] * 20,
+            portfolio_weights=[0.1] * _PORTFOLIO_SIZE,
             benchmark_daily_returns=benchmark_returns,
         )
         penetration = compute_penetration_top10(twenty_holdings, details)
@@ -223,7 +232,9 @@ class TestE2EPerformance:
 
         elapsed = time.perf_counter() - start
         logger.info("全量管线耗时: %.3fs", elapsed)
-        assert elapsed < 60.0, f"全量管线耗时 {elapsed:.2f}s > 60s 阈值（失败条件 120s）"
+        assert elapsed < _FULL_PIPELINE_TIME_LIMIT_S, (
+            f"全量管线耗时 {elapsed:.2f}s > {_FULL_PIPELINE_TIME_LIMIT_S}s 阈值（失败条件 {_FULL_PIPELINE_FAIL_LIMIT_S}s）"
+        )
         assert metrics is not None
         assert penetration is not None
         assert scenario is not None

@@ -6,8 +6,6 @@
   3. 熔断器持久化 → 跨会话加载
   4. 所有源不可用 → 降级报告仍可生成
   5. LLM 端点熔断 → 独立熔断器生效
-
-@pytest.mark.scenario_resilience
 """
 
 from __future__ import annotations
@@ -27,6 +25,13 @@ from src.python.core.circuit_breaker import gateway
 from src.python.core.provider_registry import get_registry
 
 logger = logging.getLogger("invest")
+
+# 熔断默认阈值：连续失败 N 次触发（与 provider_registry 默认一致）
+_PROVIDER_FAILURE_THRESHOLD = 3
+# 超过阈值并留余量的失败次数（确保各 provider 均已熔断）
+_OVER_THRESHOLD_FAILURES = 5
+# 模拟冷却期已过（熔断后 1 小时恢复试探）
+_COOLDOWN_SECONDS = 3600
 
 # ── 辅助函数 ─────────────────────────────────────────────────
 
@@ -54,9 +59,9 @@ class TestChainResilience:
         registry = get_registry()
         _reset_llm_circuit_breaker()
 
-        # 对 eastmoney 和 tencent 各模拟 3 次失败
+        # 对 eastmoney 和 tencent 各模拟达到阈值的失败次数
         for provider in ("eastmoney", "tencent"):
-            for _ in range(3):
+            for _ in range(_PROVIDER_FAILURE_THRESHOLD):
                 registry.record_failure(provider)
 
         status = gateway.summary()
@@ -74,13 +79,13 @@ class TestChainResilience:
         registry = get_registry()
         _reset_llm_circuit_breaker()
 
-        # 3 次失败触发熔断
-        for _ in range(3):
+        # 达到阈值次数触发熔断
+        for _ in range(_PROVIDER_FAILURE_THRESHOLD):
             registry.record_failure("eastmoney")
         assert registry.is_circuit_broken("eastmoney"), "熔断应已触发"
 
         # 模拟冷却期结束：将 last_failure_time 设到过去
-        registry._providers["eastmoney"].last_failure_time = time.time() - 3600
+        registry._providers["eastmoney"].last_failure_time = time.time() - _COOLDOWN_SECONDS
 
         # 试探请求（记录成功）
         registry.record_success("eastmoney")
@@ -92,14 +97,16 @@ class TestChainResilience:
         registry = get_registry()
         _reset_llm_circuit_breaker()
 
-        # 模拟 2 次失败（不触发熔断，仅记录）
-        for _ in range(2):
+        # 模拟阈值以下的失败次数（不触发熔断，仅记录）
+        for _ in range(_PROVIDER_FAILURE_THRESHOLD - 1):
             registry.record_failure("eastmoney")
 
         # 验证状态已记录在熔断器内部
         state = registry._providers.get("eastmoney")
         failures = state.consecutive_failures if state else 0
-        assert failures >= 2, f"持久化前应有 >=2 次失败，实际 {failures}"
+        assert failures >= _PROVIDER_FAILURE_THRESHOLD - 1, (
+            f"持久化前应有 {_PROVIDER_FAILURE_THRESHOLD - 1} 次失败，实际 {failures}"
+        )
 
     @pytest.mark.scenario_resilience
     def test_all_sources_unreachable(self):
@@ -107,9 +114,9 @@ class TestChainResilience:
         registry = get_registry()
         _reset_llm_circuit_breaker()
 
-        # 熔断所有已知 provider
+        # 熔断所有已知 provider（超过阈值并留余量）
         for provider in ("eastmoney", "tencent", "sina"):
-            for _ in range(5):
+            for _ in range(_OVER_THRESHOLD_FAILURES):
                 registry.record_failure(provider)
 
         # 验证所有已熔断

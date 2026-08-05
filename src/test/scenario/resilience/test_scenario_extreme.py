@@ -5,7 +5,6 @@
   S10: 极端值（极大/极小持仓份额）— 数值溢出处理
 
 运行：
-  cd D:/codebase/zoo/investor-util
   pytest src/test/scenario/resilience/test_scenario_extreme.py -v
   pytest src/test/ -m "scenario_extreme" -v
 """
@@ -19,6 +18,10 @@ from unittest.mock import patch
 import pytest
 
 from src.python.core.models import Holding
+
+# S0c 超多持仓场景的持仓量（200+ 与 500+ 极限验证）
+_LARGE_HOLDINGS_COUNT = 201
+_EXTREME_HOLDINGS_COUNT = 500
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -80,11 +83,11 @@ class TestS0cLargeHoldings(unittest.TestCase):
         holdings = [
             self._make_holding("证券", f"批量股票{i:03d}", f"600{i:04d}",
                                100, 10.0)
-            for i in range(201)
+            for i in range(_LARGE_HOLDINGS_COUNT)
         ]
         details = _generate_details(holdings, "2026-07-03")
 
-        self.assertEqual(len(details), 201)
+        self.assertEqual(len(details), _LARGE_HOLDINGS_COUNT)
         for d in details:
             self.assertGreater(d.market_value, 0)
             self.assertEqual(d.source_api, "tencent")
@@ -96,7 +99,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
         holdings = [
             self._make_holding("证券", f"批量{i:03d}", f"600{i:04d}",
                                100, 10.0)
-            for i in range(201)
+            for i in range(_LARGE_HOLDINGS_COUNT)
         ]
 
         total_mv = 0.0
@@ -111,7 +114,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
         from src.python.report.market_value import _compute_detail_row
 
         holdings = []
-        # 证券账户 50 条（仍超 100 条目验证阈值）
+        # 证券账户 50 条
         holdings.extend([
             self._make_holding("证券", f"ZQ{i:03d}", f"600{i:04d}",
                                100, 10.0)
@@ -149,11 +152,11 @@ class TestS0cLargeHoldings(unittest.TestCase):
         holdings = [
             self._make_holding("证券", f"批量{i:04d}", f"600{i%9000+1000:04d}",
                                100, 10.0)
-            for i in range(500)
+            for i in range(_EXTREME_HOLDINGS_COUNT)
         ]
         details = _generate_details(holdings, "2026-07-03")
 
-        self.assertEqual(len(details), 500)
+        self.assertEqual(len(details), _EXTREME_HOLDINGS_COUNT)
         total_mv = sum(d.market_value for d in details)
         self.assertAlmostEqual(total_mv, 500 * 1000.0)
 

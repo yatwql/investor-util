@@ -5,8 +5,7 @@
 下的数据获取行为正确性。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m pytest src/test/test_datetime_scenarios.py -v
+  pytest src/test/scenario/datetime/test_datetime_scenarios.py -v
 """
 
 from __future__ import annotations

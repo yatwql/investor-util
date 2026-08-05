@@ -1,15 +1,13 @@
-"""业务场景集成测试 S6~S10。
+"""业务场景集成测试 S6~S9（S10 极端值见 test_scenario_extreme.py）。
 
 测试目标：
   - S6: 纯债券基金组合 → 穿透 TOP10 无股权覆盖或极小
   - S7: 网络中断 → 降级使用过期缓存
   - S8: 单账户单持仓 → 正确生成单行报告
   - S9: 零成本持仓（cost_price=0）→ 盈亏/收益率正确处理
-  - S10: 极端值（极大持仓份额）→ 数值溢出处理
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  python -m unittest src.test.test_integration_scenarios -v
+  pytest src/test/scenario/resilience/test_scenario_resilience_flows.py -v
 """
 
 from __future__ import annotations
