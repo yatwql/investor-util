@@ -354,7 +354,7 @@ def _remove_comparison_index(config: dict, indices: dict[str, str]) -> None:
 
 
 def _cmd_config_report_boards() -> None:
-    """配置报告可选章节（基金分析 / 市场新闻 / 历史走势 / 组合演进）。"""
+    """配置报告可选章节（基金深度分析 / 市场新闻 / 组合历史走势+回撤 / 组合演进）。"""
     from src.python.config import (
         get_config,
         is_enable_fund_deep_analysis,
