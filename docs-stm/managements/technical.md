@@ -2055,7 +2055,7 @@ tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互�
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包按调用层次分为四层，共 32 个子模块（含 fact_checker/ 子包 9 模块 / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
+`src/python/llm/` 包按调用层次分为四层，共 33 个子模块（含 fact_checker/ 子包 9 模块 / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
 
 ```
 入口层         generators_orchestrator.py    4+1 模块并行编排
@@ -2068,6 +2068,7 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
                   │
 共享层         generators.py         4 个单例生成函数
                generators_news.py   新闻 LLM 批量关联分析
+               _llm_news_correlation.py  新闻关联闭包/结果缓存/安全直调
                prompts.py           System/User Prompt 构建
                fingerprint.py       缓存指纹计算
                session.py           会话用量追踪

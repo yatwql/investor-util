@@ -29,7 +29,6 @@
 | **rf-85** | `fetcher/fund.py` | 401 | 未超限（<500，维持现状） | 排名/持仓/基准三职责可拆分为子模块 |
 | **rf-86** | `cache/operations.py` | 635 | 500-800 可选优化区间（2026-08-05 实测 635，较登记值 472 增长 163，跨过 500 线，关注后续增长） | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
 | **rf-89** | `report/excel_generator.py` | 423 | 未超限（<500，维持现状；2026-08-05 实测 423，较登记值 477 下降，重构后缩减） | Excel 编排器 |
-| **rf-238** | `llm/generators_orchestrator.py` | 808 | **超限（>800 硬上限，必须拆分）** | LLM 模块分发/并行 worker/新闻关联 3 职责，可拆出新闻关联闭包与 worker 调度 |
 
 ---
 
@@ -43,6 +42,7 @@
 | **rf-235** | `report/html_writer.py`（934→660） | facade 聚合门面拆分：章节可见性/目录导航→`html_writer_nav.py`、数据契约展示映射→`html_writer_display.py`、JS 资产复制→`html_writer_assets.py`；门面保留 `write_html_report`/`_render_template` 并 re-export 符号 |
 | **rf-236** | `analysis/metrics.py`（880→225） | facade 聚合门面拆分：收益类指标→`metrics_returns.py`、风险类指标→`metrics_risk.py`；门面保留 `compute_all_metrics` 聚合入口 + `__all__` + 常量并 re-export 符号 |
 | **rf-237** | `report/orchestrator.py`（822→442） | facade 聚合门面拆分：风格因子/行业 Beta 计算族→`_report_factor_metrics.py`（持仓K线路由 + 因子回归 + 行业Beta）、市场温度/持仓相关性→`_report_aux_metrics.py`；门面保留 `generate_report`/`prepare_report_data`/`compute_valuation_data`（patch 依赖门面命名空间）并 re-export 符号 |
+| **rf-238** | `llm/generators_orchestrator.py`（808→698） | facade 聚合门面拆分：新闻关联责任单元（模块级结果缓存/闭包/安全直调）→`_llm_news_correlation.py`；门面保留缓存预检（`_compute_module_cache_info`/`_precheck_*`）/worker 分发（`_dispatch_llm_workers`/`_build_module_fns`）/主编排入口（`generate_all_llm`），re-export 子模块符号，mock patch 接线零改动 |
 
 ## 归档
 
