@@ -3,8 +3,7 @@
 S13：2 模块有 Thinking + 2 模块无 Thinking。
 
 运行：
-  cd D:/codebase/zoo/investor-util
-  pytest src/test/scenario/llm/test_llm_extended_thinking.py
+  python -m pytest src/test/scenario/llm/test_llm_extended_thinking.py
 """
 
 from __future__ import annotations
