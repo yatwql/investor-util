@@ -1,6 +1,12 @@
-"""报告生成实现 — both/full 两种路径的 HTML+Excel 生成逻辑。
+"""报告生成实现 — both/full 两种路径的 HTML+Excel 生成逻辑（聚合门面）。
 
-包含报告生成管线各工序实现。
+包含报告生成管线各工序实现。本文件为聚合门面（超限文件拆分重构后）：
+  - 后台健康检查          → `_report_health.py`
+  - 轻量行情/数据注入/校验 → `_report_helpers.py`
+  - 全量量化指标装配       → `_full_risk_metrics.py`
+  - Chart.js 数据集构建    → `_chart_dataset_factory.py`
+门面保留 both/full 双路径生成编排（`_generate_report_*`）并 re-export
+子模块符号，保持 `from _report_generation import ...` 引用不变。
 """
 
 from __future__ import annotations
@@ -9,282 +15,20 @@ import logging
 
 from src.python.report.progress import ProgressReporter
 
+# ── 子模块 re-export（超限文件拆分重构）──────────────────
+from src.python.report._chart_dataset_factory import _build_chart_datasets_for_report  # noqa: F401
+from src.python.report._full_risk_metrics import _prepare_full_risk_metrics  # noqa: F401
+from src.python.report._report_health import _collect_health_checks, _spawn_health_checks  # noqa: F401
+from src.python.report._report_helpers import (  # noqa: F401
+    _both_action_holdings_details,
+    _compute_details,
+    _inject_evolution_data,
+    _inject_snapshot_diff_data,
+    _validate_pipeline_snapshot,
+    _validate_prep_completeness,
+)
+
 logger = __import__("logging").getLogger("invest")
-
-
-# ── 健康检查（后台并行）──
-
-
-def _spawn_health_checks(holdings: list) -> object | None:
-    """在后台启动数据源健康检查，返回 Future 或 None。
-
-    检查结果与主管线并行执行，不阻塞报告生成。
-    在管线末尾调用 _collect_health_checks() 收集结果。
-    """
-    try:
-        from concurrent.futures import ThreadPoolExecutor
-
-        from src.python.core.check_sources import run_health_checks
-
-        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="orch_health")
-        fut = pool.submit(run_health_checks)
-        # 不让 pool 在函数退出时 shutdown — 让 Future 独立运行
-        return fut
-    except Exception:
-        logger.info("[health] 启动健康检查失败（非关键，不影响报告生成）", exc_info=True)
-        return None
-
-
-def _collect_health_checks(
-    health_future: object | None,
-    report_type: str,
-    holdings: list,
-) -> None:
-    """收集数据源健康检查结果并持久化。
-
-    必须在管线末尾调用（所有主要阶段完成后）。
-    """
-    if health_future is None:
-        return
-    try:
-        results = health_future.result(timeout=30)
-        if not results:
-            return
-        from src.python.core.perf import save_health_check_snapshot
-
-        save_health_check_snapshot(results, report_type=report_type, holdings_count=len(holdings))
-
-        # 将结果注入 DegradationTracker，供 data_source_matrix 使用
-        from src.python.report.data_status import get_tracker
-
-        tracker = get_tracker()
-        for r in results:
-            source_key = f"health_{r['name']}"
-            tracker.record(
-                source_key=source_key,
-                tier="T4",
-                success=r["ok"],
-                failure_type="unreachable" if not r["ok"] else "",
-            )
-    except Exception:
-        logger.info("[health] 收集健康检查结果失败（非关键）", exc_info=True)
-
-
-# ── 轻量级行情获取（无指数/穿透/分类）──
-
-
-def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -> list:
-    """轻量级行情获取，供 both 路径使用。
-
-    仅获取行情明细，不获取指数/穿透/分类数据（与 _cmd_generate_both 语义对齐）。
-    """
-    from src.python.report.market_value import _generate_details
-
-    reporter.info("正在获取行情数据...")
-    details = _generate_details(holdings)
-    reporter.ok(f"行情数据获取完成，共 {len(details)} 条")
-    return details
-
-
-# ── 组合演进数据（多快照趋势聚合）──
-
-
-def _inject_evolution_data(pipeline_data: dict | None) -> dict:
-    """计算组合演进数据并注入 pipeline_data（`evolution_data` 键）。
-
-       聚合 `data/history/snapshots/` 多期快照，供 HTML「组合演进」章节与
-       Excel 页签消费。计算失败或数据不足时注入 available=False 的降级 dict，
-    展示层写占位文本（§1.4.5），不阻断报告生成（隔离）。
-
-       Args:
-           pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
-
-       Returns:
-           注入 evolution_data 后的 pipeline_data（None 时新建字典）
-    """
-    if pipeline_data is None:
-        pipeline_data = {}
-    try:
-        from src.python.analysis.portfolio_evolution import build_evolution_data
-
-        pipeline_data["evolution_data"] = build_evolution_data()
-    except Exception:
-        logger.warning("[evolution] 组合演进数据构建失败（非关键）", exc_info=True)
-        pipeline_data["evolution_data"] = {"available": False, "reason": "组合演进数据构建失败"}
-    return pipeline_data
-
-
-def _inject_snapshot_diff_data(pipeline_data: dict | None) -> dict:
-    """计算快照差异摘要并注入 pipeline_data（`snapshot_diff_data` 键）。
-
-       对比 `data/history/snapshots/` 去重后最近两次快照，输出组合演进章顶部
-       「自上次快照变化摘要」（新增/移除品种 + 集中度 HHI 变化 + 超警戒线品种）。
-       有效快照 < 2 期时返回 available=False 的降级 dict，展示层写占位
-    （§1.4.5），不阻断报告生成（隔离）。
-
-       Args:
-           pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
-
-       Returns:
-           注入 snapshot_diff_data 后的 pipeline_data（None 时新建字典）
-    """
-    if pipeline_data is None:
-        pipeline_data = {}
-    try:
-        from src.python.analysis.snapshot_diff import build_snapshot_diff
-
-        pipeline_data["snapshot_diff_data"] = build_snapshot_diff()
-    except Exception:
-        logger.warning("[snapshot_diff] 快照差异摘要构建失败（非关键）", exc_info=True)
-        pipeline_data["snapshot_diff_data"] = {"available": False, "reason": "快照差异摘要构建失败"}
-    return pipeline_data
-
-
-# ── 校验函数 ──
-
-
-def _validate_prep_completeness(prep: dict) -> None:
-    """校验 prepare_report_data 返回数据的完整性。"""
-    assert isinstance(prep, dict), "prepare_report_data 返回类型异常"
-    for _ck in (
-        "total_mv",
-        "total_cost",
-        "total_profit",
-        "total_today_profit",
-        "categories",
-        "a_indices",
-        "holdings_details",
-        "today_str",
-        "output_dir",
-        "news_top_count",
-        "risk_metrics",
-    ):
-        if _ck not in prep:
-            logger.warning("[checkpoint] prep 缺失必选键: %s", _ck)
-        elif not isinstance(prep.get(_ck), (int, float, dict, list, str, type(None))):
-            logger.warning("[checkpoint] prep.%s 类型异常: %s", _ck, type(prep.get(_ck)).__name__)
-
-
-def _validate_pipeline_snapshot(pipeline_data: dict | None) -> None:
-    """校验 capture_snapshot 返回数据的完整性。"""
-    if pipeline_data is not None:
-        assert isinstance(pipeline_data, dict), "capture_snapshot pipeline_data 类型异常"
-        _diff = pipeline_data.get("diff")
-        if _diff is not None:
-            if not isinstance(_diff, dict):
-                logger.warning("[checkpoint] pipeline_data.diff 类型异常: %s", type(_diff).__name__)
-
-
-# ── 全量量化指标（历史走势 + 风险指标 + 情景分析 + 口径修正）──
-
-
-def _prepare_full_risk_metrics(
-    holdings: list,
-    config: dict,
-    reporter: ProgressReporter,
-    perf: object,
-    fetch_history: bool,
-    enable_history: bool,
-    prep: dict,
-    pipeline_data: dict | None,
-) -> tuple[dict | None, dict | None]:
-    """历史走势获取 + 全量量化指标 + 情景分析 + 口径修正。
-
-    返回 (history_data, metrics)，就地注入 prep 和 pipeline_data 的 risk_metrics。
-    enable_history 为 False 或数据不可用时返回 (None, None)。
-    """
-    from src.python.analysis.alignment_correction import compute_alignment_factors
-    from src.python.analysis.metrics import compute_all_metrics
-    from src.python.analysis.scenario import scenario_analysis
-    from src.python.report._snapshot import fetch_history_data
-
-    if not enable_history:
-        reporter.info("[章节配置] 历史走势已关闭，跳过")
-        return None, None
-
-    perf.start("历史走势")
-    history_data = fetch_history_data(holdings, config, reporter, fetch=fetch_history)
-    perf.stop()
-
-    # 危机区间标注（crisis_annotation_data）：基于既有 bars 重叠裁剪，
-    # 复用历史数据不拉长 lookback（以 history.lookback_days 为准）
-    if pipeline_data is not None:
-        from src.python.analysis.crisis_annotation import build_crisis_annotation
-
-        pipeline_data["crisis_annotation_data"] = build_crisis_annotation(history_data)
-
-        # 尾部风险统计（tail_risk_data）：复用历史日收益序列计算 VaR/最大单日跌幅/
-        # 连续下跌/恢复天数；样本不足时 available=False（§1.4.5 数据降级）
-        from src.python.analysis.tail_risk import compute_tail_risk
-
-        pipeline_data["tail_risk_data"] = compute_tail_risk((history_data or {}).get("bars"))
-
-    # 从 history_data 提取风险指标，注入 prep 和 pipeline_data
-    if history_data and history_data.get("status") not in ("unavailable",):
-        _risk = {
-            "annualized_volatility": history_data.get("annualized_volatility", 0),
-            "max_drawdown_pct": history_data.get("max_drawdown_pct", 0),
-            "total_return_pct": history_data.get("total_return_pct", 0),
-            "data_start": history_data.get("data_start", ""),
-            "data_end": history_data.get("data_end", ""),
-        }
-        prep["risk_metrics"] = _risk
-        if pipeline_data is not None:
-            pipeline_data["risk_metrics"] = _risk
-            pipeline_data["portfolio_daily_returns"] = history_data.get("daily_returns_portfolio", [])
-
-    # [checkpoint] risk_metrics 完整性校验
-    _injected = prep.get("risk_metrics", {})
-    if not _injected.get("annualized_volatility") and _injected.get("annualized_volatility") != 0:
-        logger.warning("[checkpoint] prep.risk_metrics 缺 annualized_volatility")
-
-    # ── 全量量化指标 + 情景分析 + 口径修正 ──
-    _daily_returns = history_data.get("daily_returns_portfolio", []) if history_data else None
-    if _daily_returns:
-        _holdings_details = prep.get("holdings_details", [])
-        _total_mv = prep.get("total_mv", 0)
-
-        _portfolio_weights = [
-            h["market_value"] / _total_mv for h in _holdings_details if _total_mv > 0 and h.get("market_value", 0) > 0
-        ] or None
-
-        _metrics = compute_all_metrics(
-            portfolio_daily_returns=_daily_returns,
-            portfolio_weights=_portfolio_weights,
-            benchmark_daily_returns=None,
-            holdings_details=_holdings_details,
-            rf_annual=0.02,
-        )
-
-        _mdd_pct = history_data.get("max_drawdown_pct", 0)
-        _metrics["annualized_volatility"] = history_data.get("annualized_volatility")
-        _metrics["max_drawdown"] = -(_mdd_pct / 100) if _mdd_pct else None
-
-        _alignment = compute_alignment_factors(
-            holdings_details=_holdings_details,
-            total_mv=_total_mv,
-            portfolio_daily_returns=_daily_returns,
-        )
-        if _alignment.get("has_any_data"):
-            _metrics["alignment_summary"] = _alignment.get("summary_text", "")
-
-        _beta_analysis = _metrics.get("beta_analysis")
-        _beta_val = _metrics.get("portfolio_beta")
-        if isinstance(_beta_analysis, dict) and _beta_val is not None:
-            _scenario = scenario_analysis(
-                portfolio_value=_total_mv,
-                beta=_beta_val,
-                beta_ci_lower=_beta_analysis.get("ci_lower"),
-                beta_ci_upper=_beta_analysis.get("ci_upper"),
-                beta_se=_beta_analysis.get("std_error"),
-                portfolio_volatility=history_data.get("annualized_volatility"),
-            )
-            if _scenario.get("has_data") and _scenario.get("scenarios"):
-                _metrics["scenario_analysis"] = _scenario
-    else:
-        _metrics = None
-
-    return history_data, _metrics
 
 
 # ── _generate_full_html_report ─────────────────────────
@@ -483,33 +227,6 @@ def _generate_full_excel_report(
 
 
 # ── _generate_report_both（生成 HTML+Excel，不含 LLM）──
-
-
-def _both_action_holdings_details(details: list) -> list[dict]:
-    """both 路径持仓明细 → 行动建议消费的字段子集（数据契约同 orchestrator 组装）。
-
-    交易纪律依赖收益率数据（profit_rate），统一换算为百分数（小数 ×100）；
-    shares/price 供调仓建议可行化层计算可执行卖出份额与金额；
-    channel 为场内/场外渠道上下文（按账户关键词判定），供可行化层按渠道
-    计算份额取整与费用（场外整数份 + 赎回费）。
-    """
-    from src.python.core.code_utils import is_offsite_fund
-
-    return [
-        {
-            "name": d.name,
-            "code": d.code,
-            "market_value": d.market_value,
-            "cost": d.cost,
-            "profit": d.profit,
-            "profit_rate": (d.profit_rate * 100) if d.profit_rate is not None else None,
-            "shares": d.shares,
-            "price": d.price,
-            # getattr 兼容缺 account 的 detail 对象（测试 fixture 简化版）
-            "channel": "场外" if is_offsite_fund(getattr(d, "account", "")) else "场内",
-        }
-        for d in details
-    ]
 
 
 def _generate_report_both(
@@ -745,55 +462,6 @@ def _generate_report_both(
     perf.save()
     _collect_health_checks(_health_fut, "both", holdings)
     return result
-
-
-# ── Chart.js 数据集构建辅助 ───────────────────────────────
-
-
-def _build_chart_datasets_for_report(
-    *,
-    history_data: dict | None,
-    details: list | None = None,
-    risk_metrics: dict | None = None,
-    all_metrics: dict | None = None,
-    enable_interactive: bool = True,
-) -> dict | None:
-    """构建 Chart.js 数据集（Flag 关闭或数据缺失时返回 None/空 dict）。
-
-       - Flag 关闭 → None（模板不渲染 Chart.js，回退旧 Canvas）
-    - Flag 开启 → build_chart_datasets（内部对单图失败独立 try/except，）
-
-       metrics_* 功能开关（Flag）：收集雷达子开关值传给预处理器，
-       关闭的指标在 radar 数据集输出 "N/A"。注：metrics_risk_contribution
-       是指标级熔断开关（circuit_breaker_wrapper 消费），非雷达轴，不在此收集。
-    """
-    if not enable_interactive:
-        return None
-    try:
-        from src.python.config.features import is_feature_enabled
-        from src.python.report.chart_data_builder import build_chart_datasets
-
-        _metric_flag_names = (
-            "metrics_sharpe",
-            "metrics_calmar",
-            "metrics_hhi",
-            "metrics_winrate",
-            "metrics_turnover",
-            "metrics_beta",
-        )
-        metric_flags = {n: is_feature_enabled(n) for n in _metric_flag_names}
-
-        return build_chart_datasets(
-            history_data=history_data,
-            details=details,
-            risk_metrics=risk_metrics,
-            all_metrics=all_metrics,
-            metric_flags=metric_flags,
-        )
-    except Exception:
-        # 预处理器顶层兜底：任何异常 → 返回空 dict（报告仍有表格/占位）
-        logger.warning("[chart] 数据集构建失败，图表整体跳过（报告仍正常）", exc_info=True)
-        return {}
 
 
 # ── _generate_report_full（HTML+Excel+LLM）──
