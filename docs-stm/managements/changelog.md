@@ -8,6 +8,13 @@
 
 ### 开发中（未发布）
 
+### 测试模式耗时标注更新（换机实测 + 机型依赖说明）
+
+- **动机**：测试环境从旧慢笔记本换到当前开发机（Linux 8 核，pytest-xdist worker=8）后，各测试模式实际耗时大幅下降（如 `all` ~10min → ~21s、`scenario` ~6min → ~18s、`scenario_extreme` ~1min 45s → ~2s），test-coverage.md「典型耗时」列与 test_runner.py 模式描述中的时间标注已严重过时。
+- **实测**：2026-08-05 顺序运行除 `live`（opt-in 运维套件，不入门禁）外全部 14 个模式记录 pytest 总耗时——unit ~15s / standard ~16s / scenario ~18s / regression ~17s / dev-verify ~20s / verify ~10s / integration ~14s / edge ~13s / data ~2s / all ~21s / all_no_unit ~10s / smoke ~2s / report ~11s / scenario_extreme ~2s。
+- **更新**：`scripts/test_runner.py` MODES 描述 4 处时间估算（dev-verify ~2.5min→~20s、scenario_basic 阶段 ~100s→~10s、smoke ~15s→~2s 且项数 24→26、scenario_extreme ~1min→~2s）并标注「8 核并行实测」；`test-coverage.md` 模式表「典型耗时」列全部刷新为实测值，并加注说明**耗时与硬件/并行度强相关**（早期标注源自慢笔记本环境，仅作相对量级参考）。
+- **门禁**：各模式实测全部通过；改动仅涉及描述字符串与文档，不影响测试逻辑。
+
 ## [0.10.5] - 2026-08-05
 
 ### plan.md 已完成事项整体归档至 archived_plan.0.10.x.md

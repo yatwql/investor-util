@@ -9,21 +9,23 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **4672** | ~30s |
-| `standard` | **4065** | ~30s |
-| `scenario` | **241** | **~6min** |
-| `regression` | **241** | **~6min** |
-| `dev-verify` | **1706** | **~1min** |
-| `verify` | **3016** | **~1min** |
-| `integration` | **281** | **~50s** |
-| `edge` | 540 | ~15s |
-| `data` | 69 | ~10s |
-| `all` | **4981** | **~10min** |
+| `unit` | **4672** | ~15s |
+| `standard` | **4065** | ~16s |
+| `scenario` | **241** | ~18s |
+| `regression` | **241** | ~17s |
+| `dev-verify` | **1706** | ~20s |
+| `verify` | **3016** | ~10s |
+| `integration` | **281** | ~14s |
+| `edge` | 540 | ~13s |
+| `data` | 69 | ~2s |
+| `all` | **4981** | **~21s** |
 | `smoke` | 26 | ~2s |
-| `report` | **1465** | ~15s |
-| `all_no_unit` | 309 | **~7min** |
-| `scenario_extreme` | **9** | **~1min 45s** |
+| `report` | **1465** | ~11s |
+| `all_no_unit` | 309 | ~10s |
+| `scenario_extreme` | **9** | ~2s |
 
+> 注：典型耗时按 2026-08-05 当前开发机实测（Linux 8 核，pytest-xdist worker=8）。**耗时与硬件/并行度强相关**——早期标注（如 `all` ~10min、`scenario` ~6min）源自另一台慢笔记本环境；在慢机器上各模式耗时可能数倍于此，仅作相对量级参考。
+>
 > 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 4981 项（2026-08-05 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
 
 ## 功能域对应测试源
