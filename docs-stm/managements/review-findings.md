@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.7-dev
-> **编号源**：`rf-next = 233`（新增问题取此编号，完成后更新为 +1；已用最大 rf-232，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 234`（新增问题取此编号，完成后更新为 +1；已用最大 rf-233，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -40,6 +40,7 @@
 
 ## 已修复（摘要）
 
+- **rf-233** 跨平台测试可移植性：`test_default_path_under_state_dir` 硬编码正斜杠子串做路径 `in` 匹配，Windows 反斜杠路径断言落空（Windows dev-verify 单点失败）。修复：断言前将实际路径分隔符统一规范化为 `/` 再匹配（源码/conftest 本就 OS 感知）。详见 changelog [0.10.7-dev]。
 - **rf-229** 语义命名索引双向校验：新增 `scripts/check-semantic-index.py` 正面校验「功能语义命名表」与代码一致（正向 `report_submodules` 键登记 / 反向僵尸条目 / 合并章 sheet key 存在性）；表存量修正（`cost_lots` 补登记、僵尸条目移除）；纪律升级为架构设计约束的「约束外参照」并接入 P0/P2 门禁。详见 changelog [0.10.7-dev]。
 - **rf-217** 调仓建议可行化层区分场内/场外渠道：`holdings_details` 契约新增 `channel` 字段（报告层按账户关键词 `is_offsite_fund` 判定填充），`rebalance_advisor` 按渠道计算份额取整与费用（场外整数份 + 赎回费，覆盖 161725/110022 等 16/11 开头代码被场内前缀误判的场外持有场景）；显式 channel 优先、无渠道回退既有证券类型判定。详见 changelog [0.10.7-dev]。
 

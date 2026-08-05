@@ -6,6 +6,13 @@
 
 ## [0.10.7-dev] - 开发中（未发布）
 
+### 测试可移植性修复：指标熔断持久化路径断言兼容 Windows 路径分隔符
+
+- **动机**：`test_circuit_breaker_wrapper.py` 的 `test_default_path_under_state_dir` 用硬编码正斜杠子串 `data/state/metrics_breaker.json` 对实际路径做 `in` 匹配——Linux 下 `tmp_path` 为正斜杠路径恰好命中，Windows 下为反斜杠路径断言落空，导致 Windows 平台 dev-verify 单点失败。
+- **修复**：断言前将实际路径分隔符统一规范化为 `/`（`path.replace(os.sep, "/")`）再匹配，正向/负向两条断言同时修正；源码（`os.path.join`）与 conftest 隔离（`tmp_path / ...`）本就 OS 感知，无需改动。
+- **测试**：`test_circuit_breaker_wrapper.py` 10 项全通过；额外以 Windows 反斜杠路径字面量模拟验证规范化逻辑通过。
+- **门禁**：check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；提交前跑 dev-verify 全量验证。
+
 ### 语义命名索引双向校验（check-semantic-index.py + 功能语义命名表存量修正 + 架构约束参照）
 
 - **动机**：「功能语义命名表」（技术设计文档中「代码标识符 = 文档中文描述」的唯一现状基准）此前是「记录性活索引」而非自动约束——`check-code-traces.py` 只做负面禁止（禁任务代号/魔法编号），**不校验正面一致性**：新增 `report_submodules.*` 开关键可绕过登记、功能删除后表行可残留僵尸条目、合并章 sheet key 无人核实。预演审计实证漂移：`cost_lots` 未登记（表内成本流水此前由 `fund_flow`/`dividend_flow` 覆盖）、`dividend_flow`/`holding_diagnosis` 为僵尸条目。
