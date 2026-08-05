@@ -42,6 +42,9 @@ def apply_numerical_corrections(
         # 在 HTML 文本中查找 wrong_val%（带可选空格）
         # lookbehind 确保不会替换数字的一部分
         pattern = re.compile(r"(?<!\d)" + re.escape(wrong_val) + r"\s*%")
-        result = pattern.sub(correct_val + "%", result)
+        # count=1：check 阶段按数值全局去重，每个 wrong_val 在 corrections 中唯一，
+        # 只替换判定处一次，避免误伤 HTML 中同值异义的其他出现处
+        # （如"止盈约30%"与"收益率30%"并存时只修被判为错误的收益率处）。
+        result = pattern.sub(correct_val + "%", result, count=1)
 
     return result

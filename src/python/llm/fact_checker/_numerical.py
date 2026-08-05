@@ -25,6 +25,7 @@ from src.python.llm.fact_checker._context import (
     _is_hypothetical_context,
     _is_portfolio_level_context,
     _is_position_weight_context,
+    _is_trim_target_context,
     _is_weight_context,
     _is_win_rate_context,
 )
@@ -61,6 +62,7 @@ def _evaluate_percent_value(
     is_win_rate: bool = False,
     is_weight: bool = False,
     is_benchmark_relative: bool = False,
+    is_trim_target: bool = False,
 ) -> tuple[str | None, tuple[str, str, str, str] | None]:
     """评估单个百分比数值。
 
@@ -85,15 +87,23 @@ def _evaluate_percent_value(
         is_win_rate: 是否为胜率语境（盈利品种占比，非收益率）。
         is_weight: 是否为评分权重语境（维度权数，非收益率）。
         is_benchmark_relative: 是否为相对基准跑输/跑赢语境（指数差，非收益率）。
+        is_trim_target: 是否为止盈/减仓目标比例语境（调仓目标，非收益率）。
 
     Returns:
         (issue_str_or_None, correction_or_None)
         correction = (wrong_value_str, correct_value_str, context_sentence, reason)
         reason 为修正语义（如"601939实际收益率187.1%"），供修正明细展示。
     """
-    # 环比/同比变化率、胜率、评分权重、相对基准跑输/跑赢 → 数值均非收益率，不可比较。
-    # 均用近邻窗口检测（数值紧邻对应语境词），避免同句其他真实收益率被连带跳过。
-    if is_change_rate or is_win_rate or is_weight or is_benchmark_relative:
+    # 环比/同比变化率、胜率、评分权重、相对基准跑输/跑赢、止盈/减仓目标比例
+    # → 数值均非收益率，不可比较。均用近邻窗口检测（数值紧邻对应语境词），
+    # 避免同句其他真实收益率被连带跳过。
+    if (
+        is_change_rate
+        or is_win_rate
+        or is_weight
+        or is_benchmark_relative
+        or is_trim_target
+    ):
         return None, None
 
     # 单日/当日涨跌语境 → 数值为单日行情涨跌而非收益率。
@@ -326,10 +336,11 @@ def check_numerical_consistency(
                 # 带符号收益率（修正输出保留盈亏方向）
                 stock_rates=stock_rates,
                 profit_rate_signed=values["total_profit_rate"],
-                # 非收益率语境（胜率/评分权重/相对基准跑输跑赢）
+                # 非收益率语境（胜率/评分权重/相对基准跑输跑赢/止盈减仓目标比例）
                 is_win_rate=_is_win_rate_context(sentence, match.start()),
                 is_weight=_is_weight_context(sentence, match.start()),
                 is_benchmark_relative=_is_benchmark_relative_context(sentence, match.start()),
+                is_trim_target=_is_trim_target_context(sentence, match.start()),
             )
             if issue is None:
                 passed += 1

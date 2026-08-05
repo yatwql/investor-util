@@ -1237,3 +1237,118 @@ class TestExplicitSubjectBeatsGlobalNearest:
         text = "永赢科技智选C（022365）收益率为 2.4%。"
         issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
         assert not any("022365" in c[3] for c in corrections), f"无数据主体不应被修正: {corrections}"
+
+
+# ── 止盈/减仓目标比例不被误修正 ──
+
+
+class TestTrimTargetContext:
+    """止盈/减仓/止损等调仓目标比例（非收益率）不被误修正。
+
+    调仓建议中"建议止盈约30%持仓""减仓约20%该持仓"等数值是相对当前持仓的
+    目标调仓比例，与收益率（相对成本）维度不同。句子常含"利润/盈利/收益"
+    等词触发收益语境，本识别将此类比例归为目标调仓比例、与收益率区分，
+    避免与品种收益率混淆。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_llm,
+        pytest.mark.llm,
+    ]
+
+    @pytest.fixture
+    def real_holdings(self) -> list[dict]:
+        """真实组合子集：601398/601939/600900 收益率与真实持仓一致（百分单位）。"""
+        return [
+            {"name": "长江电力", "code": "600900", "market_value": 22140.0, "cost": 14120.0, "profit_rate": 56.83},
+            {"name": "工商银行", "code": "601398", "market_value": 15000.0, "cost": 8814.0, "profit_rate": 70.18},
+            {"name": "建设银行", "code": "601939", "market_value": 19800.0, "cost": 7300.0, "profit_rate": 171.23},
+        ]
+
+    def test_trim_target_range_not_corrected(self, real_holdings):
+        """真实报告复现：止盈约30-40%/20-30%不误修正。
+
+        原缺陷触发句：整段无句号合成一句，含"利润"触发收益语境，
+        30%/40% 被当收益率修正为最近邻 601398 的 70.2%。
+        """
+        text = (
+            "锁定银行板块部分利润：建设银行（+171.23%）建议止盈约30-40%持仓，"
+            "工商银行（+70.18%）止盈约20-30%。"
+        )
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"止盈目标比例不应被修正: {corrections}"
+
+    def test_trim_target_single_expression(self, real_holdings):
+        """单句「建议止盈约30%持仓」→ 目标比例，不修正。"""
+        text = "建议止盈约30%持仓。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"止盈目标比例不应被修正: {corrections}"
+
+    def test_reduce_position_expression(self, real_holdings):
+        """「建议减仓约20%该持仓」→ 目标比例，不修正。"""
+        text = "建议减仓约20%该持仓。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"减仓目标比例不应被修正: {corrections}"
+
+    def test_trim_synonym_expressions(self, real_holdings):
+        """「加仓/止损/清仓」等同类调仓动作词后的比例 → 不修正。"""
+        text = "建议加仓至40%、止损线设为10%、分批止盈约15%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"调仓目标比例不应被修正: {corrections}"
+
+    def test_run_fact_check_trim_not_rewritten(self, real_holdings):
+        """run_fact_check 整链路：止盈比例不被自动修正，摘要无修正明细。"""
+        html = (
+            "<p>锁定银行板块部分利润：建设银行（+171.23%）建议止盈约30-40%持仓，"
+            "工商银行（+70.18%）止盈约20-30%。</p>"
+        )
+        corr, summ = run_fact_check(html, real_holdings, "智囊团深度复盘")
+        assert "30-40%" in corr  # 内容不被篡改
+        assert "20-30%" in corr
+        assert "已修正明细" not in summ
+
+    def test_real_profit_rate_still_checked(self, real_holdings):
+        """真实收益率仍正常校验（修复不过度）：组合累计收益率 5.0% 仍被修正。"""
+        text = "组合累计收益率为 5.0%。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert len(corrections) == 1
+        assert corrections[0][0] == "5.0"
+        assert "实际收益率" in corrections[0][3]
+
+
+# ── 自动修正只替换判定处一次 ──
+
+
+class TestApplyCorrectionSingleReplace:
+    """数值自动修正只替换判定处一次，不连带替换同值异义的其他出现处。
+
+    apply_numerical_corrections 用 re.sub 全局替换，一处修正会误伤 HTML 中
+    同数值的其他语义出现处（如"止盈约30%"与"收益率30%"并存时，只应修被
+    判定为错误的收益率处）。count=1 限制为只替换一处。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_llm,
+        pytest.mark.llm,
+    ]
+
+    def test_same_value_multiple_contexts_replaces_only_once(self):
+        """HTML 中同值出现在两个语境 → 只替换一处，另一处保留。"""
+        from src.python.llm.fact_checker._corrections import apply_numerical_corrections
+
+        html = "<p>止盈约30%持仓，收益率30%。</p>"
+        out = apply_numerical_corrections(
+            html,
+            [("30", "70.2", "止盈约30%持仓，收益率30%。", "601398实际收益率70.2%")],
+        )
+        assert out.count("70.2%") == 1  # 只替换一处
+        assert out.count("30%") == 1  # 另一处同值数字保留
+
+    def test_no_corrections_returns_original(self):
+        """无修正列表 → 原样返回。"""
+        from src.python.llm.fact_checker._corrections import apply_numerical_corrections
+
+        html = "<p>止盈约30%持仓。</p>"
+        assert apply_numerical_corrections(html, []) == html

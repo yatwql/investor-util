@@ -18,6 +18,7 @@ from src.python.llm.fact_checker._constants import (
     _POSITION_WEIGHT_KEYWORDS,
     _PROFIT_KEYWORDS,
     _SUGGESTION_KEYWORDS,
+    _TRIM_TARGET_KEYWORDS,
     _WEIGHT_KEYWORDS,
     _WIN_RATE_KEYWORDS,
 )
@@ -101,6 +102,19 @@ def _is_benchmark_relative_context(sentence: str, match_start: int) -> bool:
     """
     nearby = sentence[max(0, match_start - 20) : match_start + 10]
     return any(kw in nearby for kw in _BENCHMARK_RELATIVE_KEYWORDS)
+
+
+def _is_trim_target_context(sentence: str, match_start: int) -> bool:
+    """判断百分比数值是否为止盈/减仓等调仓目标比例（如"建议止盈约30%"）。
+
+    调仓建议中的止盈/减仓/止损比例是相对当前持仓的目标调仓比例，
+    与收益率（相对成本）维度不同，直接与收益率比较会被误修正为
+    某品种收益率。用 match 前 15 字符内是否出现调仓动作词判定——
+    目标比例数值通常紧邻"止盈/减仓"等词（如"止盈约30%"、"-40%"），
+    避免同句首部的真实收益率被连带跳过。
+    """
+    nearby = sentence[max(0, match_start - 15) : match_start + 5]
+    return any(kw in nearby for kw in _TRIM_TARGET_KEYWORDS)
 
 
 def _is_portfolio_level_context(sentence: str, match_start: int) -> bool:

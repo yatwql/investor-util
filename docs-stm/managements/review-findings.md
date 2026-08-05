@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.6-dev
-> **编号源**：`rf-next = 230`（新增问题取此编号，完成后更新为 +1；已用最大 rf-229，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 231`（新增问题取此编号，完成后更新为 +1；已用最大 rf-230，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -52,6 +52,7 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| **rf-230** | 事实校验自动修正将 LLM 调仓建议的止盈/减仓目标比例（「建议止盈约30-40%持仓」「止盈约20-30%」）误当作收益率，修正为最近邻品种收益率（601398 实际 70.2%）——报告原文被篡改为「止盈约30-70.2%」「止盈约20-70.2%」，建议语义失真。根因：① 语境识别缺失——`_REBALANCE_TARGET_KEYWORDS` 仅覆盖「降至/减仓至」等"至"字式，漏掉「止盈约/减仓约」等"约"字式；句子含「利润/盈利」触发收益语境后，比例值走全局最近邻被误修正；② `apply_numerical_corrections` 用 `re.sub` 无 `count` 限制，一处修正连带替换 HTML 中所有同值出现处 | ① `fact_checker/_constants.py` 新增 `_TRIM_TARGET_KEYWORDS`（止盈/减仓/加仓/止损/清仓/调仓等）+ `_context.py` 新增 `_is_trim_target_context`（match 前 15 字符邻近窗口）+ `_numerical.py` `_evaluate_percent_value` 开头拦截（与胜率/权重等非收益率语境同级）；② `_corrections.py` 的 `re.sub` 加 `count=1` 只替换判定处。新增回归测试 `TestTrimTargetContext`（真实复现句 30-40%/20-30% 不误修正 + 真实收益率仍校验）+ `TestApplyCorrectionSingleReplace`（同值异义只替换一处） | changelog v0.10.6-dev |
 | **rf-228** | TUI 菜单「2」更新行情缓存时进程崩溃 `[FATAL:partition_address_space.cc(243)] Check failed: !IsConfigurablePoolInitialized()`。根因：菜单 2 的并行价格抓取（ThreadPoolExecutor 4 workers）中，每个价格的新鲜度校验 `_price_cache_fresh` → `get_last_trading_day()` → `_get_trading_calendar()` → `akshare.tool_trade_date_hist_sina()`，akshare 内部用 `py_mini_racer`(V8) 解密新浪接口且每次调用都重新初始化 V8；多线程并发首次初始化 V8 触发 partition_address_space FATAL，**直接 abort 整个进程**（try/except 无法捕获）。已在 tmp 探针脚本复现（4 线程并发 → EXIT 3 崩溃；加锁串行化 → 全成功） | `_get_trading_calendar()` 缓存未命中分支用模块级锁 `_TRADING_CALENDAR_AKSHARE_LOCK` 串行化 + 双重检查（避免锁等待后重复拉取）。V8 顺序初始化安全。新增回归测试 `TestTradingCalendarConcurrency`：4 线程并发调用 `_get_trading_calendar()` 注入 fake akshare，断言回调最大并发深度 = 1。**连带优化**：测试文件 `test_market_value.py` 多个测试类裸调用 `is_market_open`（东方财富 push2 API 真实 HTTP）与 `_is_trading_day`（akshare 交易日历）致单用例 2~6s，统一补 setUp mock 隔离网络 | changelog v0.10.5 |
 | **rf-227** | `test_cli_integration.py` 三处 CLI 测试 patch 目标陈旧（41df26a 根文件归子包重构后残留包级 re-export 路径 `src.python.cli._cli_read_holdings`，拦截不到 `cli.py` 内部调用）：`test_cli_cache_config_respected` 直接读取真实持仓文件失败（`/test/holdings/test.xlsx` 不存在 → mock 被调用 0 次断言失败），另两例靠默认持仓文件恰好存在而侥幸通过 | 三处 patch 目标统一修正到 `src.python.cli.cli._cli_read_holdings(_with_flows)`；report 路径两例改用 `_cli_read_holdings_with_flows` 返回 `(mock_holdings, [], [])`（与 `_handle_report` 实际调用一致），彻底脱离真实持仓文件依赖。全量 all 5026 passed、CLI 单测 56 passed | changelog v0.10.5 |
 
