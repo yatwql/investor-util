@@ -544,10 +544,14 @@ investor-util/
 │       │   │   └── test_tui_menu.py         #   TUI 菜单测试
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       │   ├── __init__.py           #   子包标记
-│       │   ├── test_debate_pipeline.py    #   辩论多轮对话管线集成测试
-│       │   ├── test_cli_integration.py    #   CLI 命令行模式集成测试
-│       │   ├── test_integration_coverage.py # 集成测试覆盖率校验
-│       │   └── test_news_pipeline_edge.py   # 新闻管线边缘场景集成测试
+│       │   ├── test_cache_consistency.py      #   缓存前缀契约跨模块共享集成测试
+│       │   ├── test_cli_integration.py        #   CLI 命令行模式集成测试
+│       │   ├── test_debate_pipeline.py        #   辩论多轮对话管线集成测试
+│       │   ├── test_error_isolation.py        #   单模块异常下其余生成链仍可产出集成测试
+│       │   ├── test_module_contract.py        #   模块间输入/输出数据契约集成测试
+│       │   ├── test_news_pipeline.py          #   新闻聚合到报告数据构建端到端集成测试
+│       │   ├── test_report_chapter_consistency.py # 报告章节名称顺序集合契约一致性集成测试
+│       │   └── test_tui_routing.py            #   TUI 菜单路由与回调绑定集成测试
 │       ├── scenario/                 #   场景测试（basic/datetime/llm/perf/resilience/security 六子组）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── basic/               #   基本面场景测试
@@ -567,20 +571,17 @@ investor-util/
 │       │   ├── datetime/            #   日期时间场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   └── test_datetime_scenarios.py #   日期时间场景测试
-│       │   ├── llm/                 #   LLM 场景测试（12 测试文件）
+│       │   ├── llm/                 #   LLM 场景测试（9 测试文件）
 │       │   │   ├── __init__.py      #       子包标记
-│       │   │   ├── test_llm_mixed_cache.py      #   混合缓存+真实调用
-│       │   │   ├── test_llm_all_fail.py         #   全部失败（5 种原因）
+│       │   │   ├── test_llm_disabled.py          #   LLM 不启用
+│       │   │   ├── test_llm_disabled_cache.py    #   禁用+缓存混合
+│       │   │   ├── test_llm_empty_holdings.py    #   空持仓/全缓存
 │       │   │   ├── test_llm_extended_thinking.py #   Extended Thinking 混合
-│       │   │   ├── test_llm_disabled.py         #   LLM 不启用
-│       │   │   ├── test_llm_disabled_cache.py   #   禁用+缓存混合
-│       │   │   ├── test_llm_network_error.py    #   断网下 LLM 降级
-│       │   │   ├── test_llm_partial_cache.py    #   部分缓存超期
-│       │   │   ├── test_llm_empty_holdings.py   #   空持仓/全缓存
-│       │   │   ├── test_llm_output_consistency.py #  输出格式一致性
-│       │   │   ├── test_llm_non_trading_day.py  #   非交易日 LLM 行为
-│       │   │   ├── test_llm_multi_account.py    #   多账户多轮交互
-│       │   │   └── test_llm_hallucination.py    #   LLM 幻觉率采样场景测试
+│       │   │   ├── test_llm_hallucination.py     #   LLM 幻觉率采样场景测试
+│       │   │   ├── test_llm_mixed_cache.py       #   混合缓存+真实调用
+│       │   │   ├── test_llm_module_info.py       #   LLM 模块信息输出契约测试
+│       │   │   ├── test_llm_network_error.py     #   断网下 LLM 降级
+│       │   │   └── test_llm_partial_cache.py     #   部分缓存超期
 │       │   ├── perf/                #   性能场景测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   └── test_e2e_perf.py #   端到端性能场景测试

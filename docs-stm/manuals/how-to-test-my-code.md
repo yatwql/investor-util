@@ -452,7 +452,7 @@ pytest src/test/ -m "edge" -v --html=test-reports/latest/edge/report.html
 | **特殊品种场景** | `test_scenario_special_securities.py` | S21-S28 |
 | **操作行为场景** | `test_scenario_operational_behavior.py` | S29-S33 |
 | **报告序号场景** | `scenario/basic/test_scenario_section_order.py` | 序号合规性 |
-| **LLM 场景测试** | `test_llm_mixed_cache.py` / `test_llm_all_fail.py` / `test_llm_extended_thinking.py` / `test_llm_disabled.py` / `test_llm_disabled_cache.py` / `test_llm_network_error.py` / `test_llm_partial_cache.py` / `test_llm_empty_holdings.py` / `test_llm_output_consistency.py` / `test_llm_non_trading_day.py` / `test_llm_multi_account.py` | S11-S20 |
+| **LLM 场景测试** | `scenario/llm/` 下 9 个文件：`test_llm_mixed_cache.py` / `test_llm_module_info.py` / `test_llm_extended_thinking.py` / `test_llm_disabled.py` / `test_llm_disabled_cache.py` / `test_llm_network_error.py` / `test_llm_partial_cache.py` / `test_llm_empty_holdings.py` / `test_llm_hallucination.py` | S11-S20 |
 | **日期/时间场景** | `test_datetime_scenarios.py` | T1-T21 |
 | **辩论模式场景** | `integration/test_debate_pipeline.py` | 端到端管线 |
 | **辩论模式单元测试** | `unit/llm/test_debate_*.py` | generators/prompts/edge/token_budget/conditional/qa |
