@@ -196,13 +196,6 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         cache_groups=("refresh",),
     ),
     DataModuleDef(
-        "持仓重合度",
-        "fund_overlap",
-        cache_prefixes=("fund_overlap_",),
-        cache_ttl=CACHE_WEEKLY,
-        cache_groups=("refresh",),
-    ),
-    DataModuleDef(
         "基金集中度历史",
         "fund_concentration",
         exact_cache_keys=("fund_concentration_snapshot",),
