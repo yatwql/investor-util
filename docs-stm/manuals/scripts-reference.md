@@ -69,20 +69,22 @@ python scripts/test_runner.py --mode unit --coverage
 
 | `--mode` | 等效 `-m` 表达式 | 典型耗时 |
 |:---------|:-----------------|:--------:|
-| `regression` | `scenario` | ~6min |
-| `smoke` | `smoke` | ~15s |
-| `unit` | `unit` | ~30s |
-| `standard` | `unit and not (edge or data)` | ~30s |
-| `edge` | `edge` | ~15s |
-| `data` | `data` | ~10s |
-| `scenario` | `scenario` | ~6min |
-| `integration` | `scenario or integration` | ~50s |
-| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts` | ~1min |
-| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)` + `scenario_basic`（两阶段） | ~2.5min |
-| `all` | （无过滤，全量） | ~10min |
-| `all_no_unit` | `not unit` | ~7min |
-| `report` | `unit_report` | ~15s |
-| `scenario_extreme` | `scenario_extreme` | ~1min |
+| `regression` | `scenario` | ~17s |
+| `smoke` | `smoke` | ~2s |
+| `unit` | `unit` | ~15s |
+| `standard` | `unit and not (edge or data)` | ~16s |
+| `edge` | `edge` | ~13s |
+| `data` | `data` | ~2s |
+| `scenario` | `scenario` | ~18s |
+| `integration` | `scenario or integration` | ~14s |
+| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts` | ~10s |
+| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)` + `scenario_basic`（两阶段） | ~20s |
+| `all` | （无过滤，全量） | ~21s |
+| `all_no_unit` | `not unit` | ~10s |
+| `report` | `unit_report` | ~11s |
+| `scenario_extreme` | `scenario_extreme` | ~2s |
+
+> 注：典型耗时按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。**耗时与硬件/并行度强相关**，慢机器上可能数倍于此，仅作相对量级参考；完整说明见 `test-coverage.md` 顶部注。
 
 ---
 
