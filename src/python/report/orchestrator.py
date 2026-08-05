@@ -1,12 +1,11 @@
 """报告编排共享层 — TUI 和 CLI 共用。
 
-本文件为聚合门面（超限文件拆分重构后）：
+本文件为聚合门面：
   - 风格因子/行业 Beta 计算族 → `_report_factor_metrics.py`
   - 市场温度/持仓相关性       → `_report_aux_metrics.py`
 门面保留主编排入口（`generate_report`）、完整数据准备（`prepare_report_data`）、
 估值分位编排（`compute_valuation_data`/`_fetch_valuation_for_code`，其内部
-依赖门面命名空间解析被 mock patch 的辅助函数）并 re-export 子模块符号，
-保持 `from orchestrator import ...` 引用不变。
+依赖门面命名空间解析被 mock patch 的辅助函数）并 re-export 子模块符号。
 """
 
 from __future__ import annotations
@@ -16,7 +15,7 @@ from datetime import datetime
 
 from src.python.report.progress import ProgressReporter
 
-# ── 子模块 re-export（超限文件拆分重构）──────────────────
+# ── 子模块 re-export ────────────────────────────────────
 from src.python.report._report_aux_metrics import (  # noqa: F401
     compute_correlation_data,
     compute_market_temperature_data,

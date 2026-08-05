@@ -1,10 +1,10 @@
 """HTML 报告章节可见性 + 目录分组导航子模块。
 
-自 `html_writer.py` 拆出（超限文件拆分重构），承载报告章节的两层可见性
-计算（board 层开关 × data 层数据就绪）与「基础/基金深度/风险/历史/LLM」
-五组目录折叠导航构建。纯函数 + 模块常量，无外部副作用。
+承载报告章节的两层可见性计算（board 层开关 × data 层数据就绪）与
+「基础/基金深度/风险/历史/LLM」五组目录折叠导航构建。纯函数 + 模块常量，
+无外部副作用。
 
-被 `html_writer.py`（门面）re-export，保持 `from html_writer import ...` 引用不变。
+由 `html_writer.py`（聚合门面）re-export 对外提供。
 """
 
 from __future__ import annotations

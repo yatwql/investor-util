@@ -1,9 +1,9 @@
 """HTML 报告前端 JS 资产复制子模块。
 
-自 `html_writer.py` 拆出（超限文件拆分重构），承载 Chart.js 前端静态资产
-（src/static/ → 报告输出目录）的复制逻辑，报告完全离线自包含。
+承载 Chart.js 前端静态资产（src/static/ → 报告输出目录）的复制逻辑，
+报告完全离线自包含。
 
-被 `html_writer.py`（门面）re-export，保持 `from html_writer import ...` 引用不变。
+由 `html_writer.py`（聚合门面）re-export 对外提供。
 """
 
 from __future__ import annotations

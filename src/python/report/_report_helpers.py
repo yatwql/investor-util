@@ -1,14 +1,12 @@
 """报告管线辅助函数子模块 — 轻量行情 / 数据注入 / 完整性校验。
 
-自 `_report_generation.py` 拆出（超限文件拆分重构），承载管线各阶段的
-辅助实现：
+承载管线各阶段的辅助实现：
   - 轻量级行情获取（both 路径，无指数/穿透/分类）
   - 组合演进 / 快照差异数据注入（pipeline_data 键）
   - 校验函数（prepare_report_data / capture_snapshot 完整性断言）
   - both 路径持仓明细 → 行动建议消费字段子集
 
-被 `_report_generation.py`（门面）re-export，保持
-`from _report_generation import ...` 引用不变。
+由 `_report_generation.py`（聚合门面）re-export 对外提供。
 """
 
 from __future__ import annotations

@@ -1,10 +1,9 @@
 """HTML 报告展示映射子模块 — 数据契约 → 模板友好展示 dict。
 
-自 `html_writer.py` 拆出（超限文件拆分重构），承载把数据契约
-（fund_flow_data / market_temperature_data / valuation_data）转换为
-HTML 模板直接消费的展示映射函数。纯函数，无外部副作用。
+承载把数据契约（fund_flow_data / market_temperature_data / valuation_data）
+转换为 HTML 模板直接消费的展示映射函数。纯函数，无外部副作用。
 
-被 `html_writer.py`（门面）re-export，保持 `from html_writer import ...` 引用不变。
+由 `html_writer.py`（聚合门面）re-export 对外提供。
 """
 
 from __future__ import annotations

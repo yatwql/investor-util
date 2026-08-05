@@ -3,7 +3,7 @@
 调用现有的计算模块获取所有分析数据，通过 Jinja2 模板
 渲染为完整的单页 HTML 报告，支持最新版和归档版双重输出。
 
-本文件为聚合门面（超限文件拆分重构后）：
+本文件为聚合门面：
   - 章节可见性/目录导航    → `html_writer_nav.py`
   - 数据契约展示映射        → `html_writer_display.py`
   - Chart.js JS 资产复制    → `html_writer_assets.py`
@@ -11,7 +11,7 @@
   - 模板环境/过滤器          → `html_jinja_env.py`
   - 报告落盘                → `html_save.py`
 门面保留核心生成函数 `write_html_report()` 与模板渲染 `_render_template()`，
-并 re-export 子模块符号，保持 `from html_writer import ...` 引用不变。
+并 re-export 子模块符号。
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from src.python.report.penetration_sheet import build_penetration_data_status
 from src.python.report.progress import ProgressReporter, SilentProgressReporter
 from src.python.report.summary import build_index_data_status
 
-# ── 子模块 re-export（超限文件拆分重构）──────────────────
+# ── 子模块 re-export ────────────────────────────────────
 from src.python.report.html_writer_assets import _copy_js_assets  # noqa: F401
 from src.python.report.html_writer_display import (  # noqa: F401
     _attach_valuation_to_penetration,

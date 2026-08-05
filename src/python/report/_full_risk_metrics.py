@@ -1,11 +1,10 @@
 """报告管线全量量化指标子模块 — 历史走势 + 指标 + 情景分析 + 口径修正。
 
-自 `_report_generation.py` 拆出（超限文件拆分重构），承载 full 路径的风险指标
-装配流程：历史走势获取 → 危机区间标注 / 尾部风险注入 → 全量指标计算 →
-情景分析 → 口径修正，返回 (history_data, metrics) 并就地注入 prep/pipeline_data。
+承载 full 路径的风险指标装配流程：历史走势获取 → 危机区间标注 / 尾部风险注入
+→ 全量指标计算 → 情景分析 → 口径修正，返回 (history_data, metrics)
+并就地注入 prep/pipeline_data。
 
-被 `_report_generation.py`（门面）re-export，保持
-`from _report_generation import ...` 引用不变。
+由 `_report_generation.py`（聚合门面）re-export 对外提供。
 """
 
 from __future__ import annotations

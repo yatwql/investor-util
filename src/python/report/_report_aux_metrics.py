@@ -1,11 +1,9 @@
 """报告编排辅助指标子模块 — 市场温度 + 持仓相关性矩阵。
 
-自 `orchestrator.py` 拆出（超限文件拆分重构），承载数据准备族中的
-辅助指标编排：市场温度（三因子温度计）数据契约装配、
+承载数据准备族中的辅助指标编排：市场温度（三因子温度计）数据契约装配、
 持仓相关性矩阵（持仓关系矩阵相关性区块）数据契约装配。
 
-被 `orchestrator.py`（门面）re-export，保持
-`from orchestrator import ...` 引用不变。
+由 `orchestrator.py`（聚合门面）re-export 对外提供。
 """
 
 from __future__ import annotations

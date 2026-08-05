@@ -1,11 +1,10 @@
 """Chart.js 数据集构建辅助子模块。
 
-自 `_report_generation.py` 拆出（超限文件拆分重构），承载 Chart.js 交互图表的
-数据集构建入口：Feature Flag 总开关判定 + 雷达图指标子开关收集 +
-调用 `chart_data_builder.build_chart_datasets` + 顶层异常兜底。
+承载 Chart.js 交互图表的数据集构建入口：Feature Flag 总开关判定 +
+雷达图指标子开关收集 + 调用 `chart_data_builder.build_chart_datasets` +
+顶层异常兜底。
 
-被 `_report_generation.py`（门面）re-export，保持
-`from _report_generation import ...` 引用不变。
+由 `_report_generation.py`（聚合门面）re-export 对外提供。
 """
 
 from __future__ import annotations

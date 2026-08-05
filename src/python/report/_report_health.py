@@ -1,10 +1,8 @@
 """报告管线后台健康检查子模块。
 
-自 `_report_generation.py` 拆出（超限文件拆分重构），承载数据源健康检查的
-后台并行启动与结果收集持久化（与主管线并行，不阻塞报告生成）。
+承载数据源健康检查的后台并行启动与结果收集持久化（与主管线并行，不阻塞报告生成）。
 
-被 `_report_generation.py`（门面）re-export，保持
-`from _report_generation import ...` 引用不变。
+由 `_report_generation.py`（聚合门面）re-export 对外提供。
 """
 
 from __future__ import annotations

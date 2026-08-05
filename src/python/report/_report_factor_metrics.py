@@ -1,11 +1,9 @@
 """报告编排风格因子计算子模块 — 持仓 K 线路由 + 风格因子回归 + 行业 Beta。
 
-自 `orchestrator.py` 拆出（超限文件拆分重构），承载数据准备族中与
-风格因子 / 行业 Beta 相关的编排实现：持仓历史 K 线按代码类型路由、
-风格因子回归数据契约装配、行业 Beta 子表数据契约装配。
+承载数据准备族中与风格因子 / 行业 Beta 相关的编排实现：持仓历史 K 线按代码
+类型路由、风格因子回归数据契约装配、行业 Beta 子表数据契约装配。
 
-被 `orchestrator.py`（门面）re-export，保持
-`from orchestrator import ...` 引用不变。
+由 `orchestrator.py`（聚合门面）re-export 对外提供。
 """
 
 from __future__ import annotations
