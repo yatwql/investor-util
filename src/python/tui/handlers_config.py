@@ -354,7 +354,7 @@ def _remove_comparison_index(config: dict, indices: dict[str, str]) -> None:
 
 
 def _cmd_config_report_boards() -> None:
-    """配置报告可选章节（基金深度分析 / 市场新闻 / 组合历史走势+回撤 / 组合演进 / 行动建议）。"""
+    """配置报告可选章节（基金深度分析 / 市场新闻 / 组合历史走势+回撤 / 组合演进 / 行动建议 / 报告增强子模块）。"""
     from src.python.config import (
         get_config,
         is_enable_action,
@@ -386,12 +386,13 @@ def _cmd_config_report_boards() -> None:
         print(f"  │ 4. 组合演进          [{e_status}]{' ' * 8}│")
         print(f"  │ 5. 行动建议          [{a_status}]{' ' * 8}│")
         print("  │                                   │")
-        print("  │ 6. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
+        print("  │ 6. 报告增强子模块（数据质量/行业Beta/候选比较/成本流水/估值分位/市场温度）│")
+        print("  │ 7. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
         print(f"  └{'─' * 42}┘")
         print()
         try:
-            choice = input("  输入编号切换 (0-6): ").strip()
+            choice = input("  输入编号切换 (0-7): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -415,11 +416,90 @@ def _cmd_config_report_boards() -> None:
             set_config("enable_action", not action)
             print(f"  {GREEN}[OK]{RESET} 行动建议已{'禁用' if action else '启用'}")
         elif choice == "6":
+            _cmd_config_report_submodules()
+        elif choice == "7":
             print(f"  {YELLOW}[!]{RESET} LLM 分析章节配置请使用菜单 [S]")
         else:
             print(f"  {YELLOW}[!]{RESET} 无效编号")
 
     refresh_config()
+    press_any_key()
+
+
+def _cmd_config_report_submodules() -> None:
+    """配置报告增强子模块（数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度）。
+
+    6 项增强子模块独立启停，实时保存到 config.json 的 `report_submodules`（默认全关）。
+    开启后对应章节按需增强区块（数据源可用性矩阵 / 风格与因子分析 / 基金业绩分析 /
+    资产穿透TOP10 / 投资分析汇总），不改变既有章节输出。
+    """
+    from src.python.config import (
+        get_config,
+        is_enable_candidate_compare,
+        is_enable_cost_lots,
+        is_enable_data_quality,
+        is_enable_industry_beta,
+        is_enable_market_temperature,
+        is_enable_valuation_percentile,
+        set_config,
+    )
+
+    # 子模块定义：(配置键, 显示名, 说明)
+    SUBMODULES: list[tuple[str, str, str]] = [
+        ("data_quality", "数据质量仪表盘", "数据源可用性矩阵增强（覆盖/时效/降级状态）"),
+        ("industry_beta", "行业Beta子表", "风格与因子分析：行业暴露 + 回归敏感性"),
+        ("candidate_compare", "候选基金比较子表", "基金业绩分析：候选基金横向比较"),
+        ("cost_lots", "成本流水", "成本分档 + XIRR + 分红累计"),
+        ("valuation_percentile", "估值分位", "资产穿透TOP10 估值分位列"),
+        ("market_temperature", "市场温度", "投资分析汇总 市场温度刻度行"),
+    ]
+    accessors = {
+        "data_quality": is_enable_data_quality,
+        "industry_beta": is_enable_industry_beta,
+        "candidate_compare": is_enable_candidate_compare,
+        "cost_lots": is_enable_cost_lots,
+        "valuation_percentile": is_enable_valuation_percentile,
+        "market_temperature": is_enable_market_temperature,
+    }
+
+    while True:
+        config = get_config()
+        print()
+        print("  ┌── 配置报告增强子模块 ───────────────────┐")
+        items: list[tuple[int, str, bool]] = []
+        for i, (key, label, _desc) in enumerate(SUBMODULES, 1):
+            status = accessors[key](config)
+            status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
+            items.append((i, key, status))
+            print(f"  │ {i}. {label:<14s} [{status_str}]{' ' * 4}│")
+        print(f"  │ 0. 返回上一级{' ' * 25}│")
+        print(f"  └{'─' * 42}┘")
+        print()
+        try:
+            choice = input("  输入编号切换 (0-6): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        if choice == "0":
+            break
+
+        try:
+            idx = int(choice)
+            matched = [it for it in items if it[0] == idx]
+            if not matched:
+                print(f"  {YELLOW}[!]{RESET} 无效编号")
+                continue
+            _, key, curr = matched[0]
+            submodules = dict(config.get("report_submodules") or {})
+            submodules[key] = not curr
+            set_config("report_submodules", submodules)
+            label = next(lb for k, lb, _ in SUBMODULES if k == key)
+            print(f"  {GREEN}[OK]{RESET} {label} 已{'开启' if not curr else '关闭'}")
+            refresh_config()
+        except (ValueError, TypeError):
+            print(f"  {YELLOW}[!]{RESET} 请输入有效编号")
+
     press_any_key()
 
 

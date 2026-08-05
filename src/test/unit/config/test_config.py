@@ -956,6 +956,37 @@ class TestIsEnableCostLots(unittest.TestCase):
         )
 
 
+class TestIsEnableIndustryBeta(unittest.TestCase):
+    """行业 Beta 子模块开关（report_submodules.industry_beta）。"""
+
+    def test_default_false_when_missing(self):
+        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
+        self.assertFalse(cfg.is_enable_industry_beta({}))
+        self.assertFalse(cfg.is_enable_industry_beta({"enable_fund_deep_analysis": True}))
+
+    def test_false_when_submodules_not_dict(self):
+        """report_submodules 非 dict → 关闭。"""
+        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": "not-a-dict"}))
+        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": None}))
+
+    def test_false_when_disabled(self):
+        """report_submodules.industry_beta=false → 关闭。"""
+        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": False}}))
+
+    def test_true_when_enabled(self):
+        """report_submodules.industry_beta=true → 开启。"""
+        self.assertTrue(cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": True}}))
+
+    def test_independent_from_other_submodules(self):
+        """industry_beta 开关独立于同容器其他键。"""
+        self.assertTrue(
+            cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": True, "data_quality": False}})
+        )
+        self.assertFalse(
+            cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": False, "market_temperature": True}})
+        )
+
+
 class TestGetComparisonCandidates(unittest.TestCase):
     """get_comparison_candidates 候选代码列表访问器。"""
 

@@ -86,3 +86,85 @@ class TestWriteLlmSettings:
         mock_replace.assert_called_once()
         mock_json_dump.assert_called_once()
         mock_get_llm.assert_called_once()
+
+
+# 报告增强子模块全关的基准配置（与 config.json 默认一致）
+_SUB_BASE_CONFIG = {
+    "report_submodules": {
+        "data_quality": False,
+        "industry_beta": False,
+        "candidate_compare": False,
+        "cost_lots": False,
+        "valuation_percentile": False,
+        "market_temperature": False,
+    }
+}
+
+
+class TestConfigReportSubmodules:
+    """_cmd_config_report_submodules: 报告增强子模块开关切换（mock 输入与配置读写）。"""
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["1", "0"])
+    @patch("src.python.config.set_config")
+    @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
+    def test_toggle_data_quality_on(
+        self, mock_get, mock_set, mock_input, mock_refresh, mock_press
+    ):
+        """输入 1 → 开启数据质量仪表盘，整体写回 report_submodules。"""
+        from src.python.tui.handlers_config import _cmd_config_report_submodules
+
+        _cmd_config_report_submodules()
+
+        expected = dict(_SUB_BASE_CONFIG["report_submodules"])
+        expected["data_quality"] = True
+        mock_set.assert_called_once_with("report_submodules", expected)
+        mock_press.assert_called_once()
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["2", "0"])
+    @patch("src.python.config.set_config")
+    @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
+    def test_toggle_industry_beta_on(
+        self, mock_get, mock_set, mock_input, mock_refresh, mock_press
+    ):
+        """输入 2 → 开启行业Beta子表，其余子模块保持关闭。"""
+        from src.python.tui.handlers_config import _cmd_config_report_submodules
+
+        _cmd_config_report_submodules()
+
+        expected = dict(_SUB_BASE_CONFIG["report_submodules"])
+        expected["industry_beta"] = True
+        mock_set.assert_called_once_with("report_submodules", expected)
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["9", "0"])
+    @patch("src.python.config.set_config")
+    @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
+    def test_invalid_number_then_return(
+        self, mock_get, mock_set, mock_input, mock_refresh, mock_press
+    ):
+        """无效编号不写配置，随后 0 正常返回。"""
+        from src.python.tui.handlers_config import _cmd_config_report_submodules
+
+        _cmd_config_report_submodules()
+
+        mock_set.assert_not_called()
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["0"])
+    @patch("src.python.config.set_config")
+    @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
+    def test_zero_returns_without_change(
+        self, mock_get, mock_set, mock_input, mock_refresh, mock_press
+    ):
+        """直接 0 返回，不触发任何写配置。"""
+        from src.python.tui.handlers_config import _cmd_config_report_submodules
+
+        _cmd_config_report_submodules()
+
+        mock_set.assert_not_called()

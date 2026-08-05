@@ -456,6 +456,26 @@ def is_enable_market_temperature(config: dict | None = None) -> bool:
     return bool(val)
 
 
+def is_enable_industry_beta(config: dict | None = None) -> bool:
+    """行业 Beta 子模块开关（「风格与因子分析」章行业 Beta 子表）。
+
+    读取 `report_submodules.industry_beta`，默认关（未开启时该章既有输出不变）。
+
+    Args:
+        config: 完整配置字典，为 None 时读取全局配置
+    """
+    if config is None:
+        config = get_config()
+    submodules = config.get("report_submodules")
+    if not isinstance(submodules, dict):
+        return False
+    val = submodules.get("industry_beta")
+    if val is None:
+        logger.debug("config.json 缺少 report_submodules.industry_beta，使用默认值 false")
+        return False
+    return bool(val)
+
+
 def get_comparison_candidates(config: dict | None = None) -> list[str]:
     """候选基金比较子表候选基金代码列表。
 
