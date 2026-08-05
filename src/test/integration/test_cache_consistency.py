@@ -87,6 +87,8 @@ class TestCrossModuleCacheConsistency(unittest.TestCase):
         with (
             patch("src.python.fetcher.index._fetch_indices_from_tencent",
                   return_value=mock_data),
+            patch("src.python.fetcher.index._fetch_indices_from_sina",
+                  return_value={}),
             patch("src.python.fetcher.index.cache_get",
                   return_value=None),
         ):

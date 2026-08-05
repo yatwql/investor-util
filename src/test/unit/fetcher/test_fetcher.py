@@ -150,13 +150,15 @@ class TestFetchUsIndices(unittest.TestCase):
 class TestFetchFundBenchmark(unittest.TestCase):
     """基金业绩基准测试（依赖内置基准库）。"""
 
-    def test_builtin_benchmark_exists(self):
-        """内置基准库中有该基金 → 返回基准名称。"""
-        result = fetch_fund_benchmark("000961")
+    @patch("src.python.fetcher.fund._fetch_benchmark_from_api", return_value=None)
+    def test_builtin_benchmark_exists(self, mock_api):
+        """内置基准库中有该基金 → 返回基准名称（API 层 mock 掉，走内置库）。"""
+        result = fetch_fund_benchmark("561910")
         self.assertIsInstance(result, str)
         self.assertNotEqual(result, "")
 
-    def test_unknown_code_returns_default(self):
+    @patch("src.python.fetcher.fund._fetch_benchmark_from_api", return_value=None)
+    def test_unknown_code_returns_default(self, mock_api):
         """未知代码 → 返回 "--"。"""
         result = fetch_fund_benchmark("999999")
         self.assertIsInstance(result, str)

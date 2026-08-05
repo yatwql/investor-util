@@ -312,6 +312,43 @@ def _mock_market_hours_api(monkeypatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def _block_external_network(monkeypatch):
+    """全局阻断测试运行时真实外部网络连接。
+
+    任何未 mock 的 socket 建连（数据源 API / LLM API / akshare 交易日历 /
+    后台数据源健康检查等）立即抛 RuntimeError 使测试失败 —— 从机制上保证
+    测试用例运行时无外部网络依赖。
+
+    已 mock HTTP 层（httpx.Client / requests / provider 函数 / _fetch_* 等）
+    的测试不创建真实 socket，不受影响；真实建连仅发生在「应 mock 却未 mock」
+    时，此时测试立即失败并提示开发者补 mock，而非静默发起外网请求。
+
+    实现要点：
+    - socket.socket 用「类」替换（ssl 模块顶层 `class SSLSocket(socket)`
+      继承它，用函数替换会破坏 ssl 模块的类继承）；实例化时抛异常。
+    - socket.create_connection / socket.getaddrinfo 用函数替换（建连入口）。
+    """
+    import socket as _socket
+
+    def _raise(*args, **kwargs):
+        raise RuntimeError(
+            "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，"
+            "请 mock 对应的数据源/LLM API 调用。"
+        )
+
+    class _BlockedSocket(_socket.socket):  # type: ignore[misc]
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError(
+                "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，"
+                "请 mock 对应的数据源/LLM API 调用。"
+            )
+
+    monkeypatch.setattr(_socket, "socket", _BlockedSocket)
+    monkeypatch.setattr(_socket, "create_connection", _raise)
+    monkeypatch.setattr(_socket, "getaddrinfo", _raise)
+
+
 def pytest_collection_modifyitems(config, items):
     """收集期校验 edge 标记与文件名的匹配约束。
 
