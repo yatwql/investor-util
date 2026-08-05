@@ -241,6 +241,24 @@ python scripts/test_runner.py --mode scenario,edge
 
 脚本按 MODES 字典定义的 order 顺序依次执行各模式，结果汇总到同一份 HTML 报告中。适用于 CI 流水线中按阶段逐步收紧的场景。精确实时计数请运行 `pytest src/test/ --collect-only -q`。
 
+#### 🔷 跨机器耗时采集与环境耗时对照（`bench` + `--machine-info` / `--update-docs`）
+
+耗时与**硬件配置、操作系统与并行度**强相关。跨机器复现耗时并回填对照表：
+
+```bash
+# 仅采集：顺序运行 14 个对照表模式（不含 live），打印环境属性表 + 各模式实测耗时表
+python scripts/test_runner.py --mode bench --machine-info
+
+# 采集并自动更新 test-coverage.md「环境耗时对照」两张表
+python scripts/test_runner.py --mode bench --update-docs   # 隐含 --machine-info
+```
+
+- **`--mode bench`** 是 14 个对照表模式的聚合别名（`_MODE_TABLE_ORDER` 除 `live` 外全部），按对照表顺序运行；结果去重保序，非 bench 模式原样透传。
+- **`--machine-info`** 采集 14 项环境属性（操作系统/系统版本/架构/主机名/CPU 型号/物理核数/逻辑线程/内存/磁盘类型/文件系统/Python 版本/并行级别/worker 数/采集日期，跨平台容错）并输出两张 Markdown 表格。
+- **`--update-docs`** 在跑完后**自动写入** `test-coverage.md` 的两张表（按主机名匹配列：同机覆盖刷新日期、新机器追加列；历史参考列不受影响）。默认**永不写文档**，仅在显式传入该标志时更新；内容未变化则跳过写入（幂等）。
+- 中断保护：bench 中途 `Ctrl+C` 先打印已采集部分并回填已完成模式，慢机器不丢数据。
+- 典型耗时与对照说明见 `test-coverage.md` 顶部注 + 「环境耗时对照」表。
+
 ## 查看报告
 
 每次运行后，测试报告输出到（每个子目录对应一个 `--mode` 名称）：
