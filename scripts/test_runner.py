@@ -74,17 +74,17 @@ MODES: dict[str, dict] = {
         "parallel": False,
     },
     "dev-verify": {
-        "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景，~20s，12 核 16 线程并行实测）",
+        "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景；耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）",
         "order": 5,
         "preflight": [[sys.executable, "scripts/check-task-numbering.py", "--ci"]],
         "phases": [
             {
                 "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)",
                 "desc": "核心模块单元测试",
-                "timeout_sec": 120,
+                "timeout_sec": 300,
                 "parallel": True,
             },
-            {"marker": "scenario_basic", "desc": "基础业务场景（145 项，~10s，12 核 16 线程并行实测）", "timeout_sec": 300, "parallel": True},
+            {"marker": "scenario_basic", "desc": "基础业务场景（耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）", "timeout_sec": 300, "parallel": True},
         ],
     },
     "verify": {
@@ -131,7 +131,7 @@ MODES: dict[str, dict] = {
     },
     "smoke": {
         "marker": "smoke",
-        "desc": "冒烟测试（26 项，~2s 快速验证核心通路）",
+        "desc": "冒烟测试（快速验证核心通路；耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）",
         "timeout_sec": 60,
         "order": 11,
         "parallel": False,
@@ -139,13 +139,13 @@ MODES: dict[str, dict] = {
     "report": {
         "marker": "unit_report",
         "desc": "仅报告模块测试（开发期快速验证报告变更）",
-        "timeout_sec": 300,
+        "timeout_sec": 600,
         "order": 12,
         "parallel": True,
     },
     "scenario_extreme": {
         "marker": "scenario_extreme",
-        "desc": "极限场景测试（S0c 超多持仓 + S10 极端值，~2s，12 核 16 线程并行实测，手工触发）",
+        "desc": "极限场景测试（S0c 超多持仓 + S10 极端值，手工触发；耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）",
         "timeout_sec": 600,
         "order": 13,
         "parallel": False,

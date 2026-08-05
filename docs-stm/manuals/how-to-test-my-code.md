@@ -26,10 +26,10 @@ pip install pytest-cov coverage
 
 # ===== ① 日常常用（快速反馈，提交前验证） =====
 
-# 提交前快速验证（~20s，P0 门禁）
+# 提交前快速验证（P0 门禁；耗时因机器而异，参考 test-coverage.md）
 .venv/bin/python scripts/test_runner.py --mode dev-verify
 
-# 冒烟测试（~2s 快速验证核心通路）
+# 冒烟测试（快速验证核心通路）
 .venv/bin/python scripts/test_runner.py --mode smoke
 
 # 仅运行业务场景测试
@@ -52,7 +52,7 @@ pip install pytest-cov coverage
 # 极限场景（超多持仓/极端值/高精度）
 .venv/bin/python scripts/test_runner.py --mode scenario_extreme
 
-# 数据正确性验证（~2s）
+# 数据正确性验证
 .venv/bin/python scripts/test_runner.py --mode data
 
 # 真实网络验证（opt-in，不入门禁，仅排查数据源连通性时手工运行）
@@ -63,16 +63,16 @@ pip install pytest-cov coverage
 
 # ===== ③ 全量/CI 门禁（耗时较长） =====
 
-# 开发期快速验证（5 个 unit 子模块并行 + 基础场景，~20s）
+# 开发期快速验证（5 个 unit 子模块并行 + 基础场景）
 .venv/bin/python scripts/test_runner.py --mode dev-verify
 
-# 合入验证 — PR 前检查（~10s）
+# 合入验证 — PR 前检查
 .venv/bin/python scripts/test_runner.py --mode verify
 
-# 全量测试（~30s，--mode verify,regression 覆盖单元+场景）
+# 全量测试（--mode verify,regression 覆盖单元+场景）
 .venv/bin/python scripts/test_runner.py --mode verify,regression
 
-# 全量测试（排除单元测试，~10s 快速全场景覆盖）
+# 全量测试（排除单元测试，快速全场景覆盖）
 .venv/bin/python scripts/test_runner.py --mode all_no_unit
 ```
 
@@ -139,26 +139,26 @@ pip install pytest-cov coverage
 
 | 级别 | 定义 | 阻断点 | 对应的流水线阶段 |
 |:-----|:-----|:-------|:----------------|
-| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `dev-verify`（~20s） |
-| **P1** | 阻塞合入 master | 不得 merge | ② `verify`（~10s） |
-| **P2** | 阻塞发布 | 不得 release | ③ `verify,regression`（~30s） |
+| **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `dev-verify` |
+| **P1** | 阻塞合入 master | 不得 merge | ② `verify` |
+| **P2** | 阻塞发布 | 不得 release | ③ `verify,regression` |
 | **P3** | 建议修复 | 不阻断 | — |
 
 P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 问题允许提交但不允许合入主分支。P2 允许合入主分支但不应发布版本。P3 属于已知缺陷或待优化项，可带缺陷发布。
 
 > 注意：P0-P3 是**问题影响力分级**，regression/verify/all 是**测试范围分级**，两者通过门禁阶段关联但不一一对应。例如 P0 问题恰好在 regression 模式中被检出，但 regression 模式并非仅包含"P0 级别"的测试用例——它覆盖全量业务场景，其中任何一项失败都可能导致 P0 阻断。
 
-> **耗时说明**：本文档 `~Ns` 耗时按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——早期标注（如 ~2.5min/~7min）源自另一台慢笔记本环境，不同 OS 或慢机器上可能数倍于此，仅作相对量级参考；完整说明及不同环境下的耗时对照见 `test-coverage.md`（顶部注 + 「环境耗时对照」表）。
+> **耗时说明**：测试耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，因此本文档不标注具体秒数。各模式耗时对照见 [`test-coverage.md`](../managements/test-coverage.md)（「环境耗时对照」表，按机器分列实测）——需预估耗时先在表中定位本机环境列。若本机未在表中，可运行 `python scripts/test_runner.py --mode bench --update-docs` 自动采集回填。
 
 ### 三级验证流水线
 
 项目推荐的四道质量门禁，按开发阶段逐级收紧：
 
-- **提交前门禁（`--mode dev-verify` / P0）** — commit 前必须执行。组合 5 个 unit 子模块（unit_core/unit_providers/unit_fetcher/unit_analysis/unit_scripts，并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。约 20s。是编辑-验证循环中的正式屏障。
-- **全场景回归（`--mode regression`）** — commit 前可选的全场景补充验证。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S33 + T1-T21），确保端到端用户路径不被破坏。约 17s。推荐在改动了跨模块路径或数据流后补充运行。
-- **合入验证（`--mode verify` / P1）** — 准备合并到 master 前必须执行。覆盖 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）、`unit_config`（配置管理）、`unit_news`（新闻聚合）、`unit_llm`（LLM 模块）、`unit_analysis`（分析计算：流动性/再平衡/汇率/债券收益率等）、`unit_scripts`（工程脚本：历史痕迹/版本一致性/任务编号检查）八个单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。并行执行，约 10s。场景测试已在 P0 dev-verify（基础场景）和 P2 verify,regression（全场景）中覆盖，P1 不重复。
-- **发布验证（`--mode verify,regression`）** — 发布版本（打 tag/release）前必须执行。组合单元测试 + 场景测试，覆盖全部核心通路。约 30s。
-  > 注：若走常规 `dev → merge → tag master` 流程，P1 已保证 `verify` 通过，P2 的 `verify` 属冗余验证。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。如确定流程中有严格 merge 屏障且不直接发布 dev，P2 可优化为仅 `--mode regression`（~17s）。详见 [`testplan.md`](../managements/testplan.md) → §6.3 脚注。
+- **提交前门禁（`--mode dev-verify` / P0）** — commit 前必须执行。组合 5 个 unit 子模块（unit_core/unit_providers/unit_fetcher/unit_analysis/unit_scripts，并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。是编辑-验证循环中的正式屏障。
+- **全场景回归（`--mode regression`）** — commit 前可选的全场景补充验证。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S33 + T1-T21），确保端到端用户路径不被破坏。推荐在改动了跨模块路径或数据流后补充运行。
+- **合入验证（`--mode verify` / P1）** — 准备合并到 master 前必须执行。覆盖 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）、`unit_config`（配置管理）、`unit_news`（新闻聚合）、`unit_llm`（LLM 模块）、`unit_analysis`（分析计算：流动性/再平衡/汇率/债券收益率等）、`unit_scripts`（工程脚本：历史痕迹/版本一致性/任务编号检查）八个单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。并行执行。场景测试已在 P0 dev-verify（基础场景）和 P2 verify,regression（全场景）中覆盖，P1 不重复。
+- **发布验证（`--mode verify,regression`）** — 发布版本（打 tag/release）前必须执行。组合单元测试 + 场景测试，覆盖全部核心通路。
+  > 注：若走常规 `dev → merge → tag master` 流程，P1 已保证 `verify` 通过，P2 的 `verify` 属冗余验证。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。如确定流程中有严格 merge 屏障且不直接发布 dev，P2 可优化为仅 `--mode regression`。详见 [`testplan.md`](../managements/testplan.md) → §6.3 脚注。
 
 
 > `regression` 与 `scenario` 底层使用相同的标记表达式（`-m "scenario"`），前者是语义别名——强调"提交前快速回归"的用途定位；后者是分类名——强调"业务场景测试"的数据性质。两者可互相替代，但建议按使用场合选用对应名称以增强代码意图可读性。
@@ -166,20 +166,20 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 **推荐工作流：**
 
 ```
-编码 → --mode dev-verify(~20s) → commit → 多次积累 → merge → P1 --mode verify(~10s) → release前 → P2 --mode verify,regression(~30s)
+编码 → --mode dev-verify → commit → 多次积累 → merge → P1 --mode verify → release前 → P2 --mode verify,regression
           ↑                                    ↗
     改完代码随时跑                      若改跨模块调用
-      提交前必过P0门禁                  先跑 --mode integration(~14s)
+      提交前必过P0门禁                  先跑 --mode integration
 ```
 
 在一次典型开发周期中：
-1. **提交前门禁验证**：修改代码后运行 `--mode dev-verify`（~20s）确认核心单元+基础场景通过（P0 强制）
-2. **全场景补充验证**：若改动了跨模块路径/数据流，再跑 `--mode regression`（~17s）确保全场景正常
-3. 如果改了跨模块调用关系（缓存、新闻流水线、TUI 路由等），再跑 `--mode integration`（~14s）确认接口契约和全链路正常
-4. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify`（~10s）确认整条管道通畅
+1. **提交前门禁验证**：修改代码后运行 `--mode dev-verify` 确认核心单元+基础场景通过（P0 强制）
+2. **全场景补充验证**：若改动了跨模块路径/数据流，再跑 `--mode regression` 确保全场景正常
+3. 如果改了跨模块调用关系（缓存、新闻流水线、TUI 路由等），再跑 `--mode integration` 确认接口契约和全链路正常
+4. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify` 确认整条管道通畅
 5. 通过后 commit，积累多次提交后准备合并到 master
-6. 合并前 CI 自动跑 `--mode verify` 作为合入门禁（~10s）
-7. 发布版本前 CI 自动跑 `--mode verify,regression`（~30s）全量验证
+6. 合并前 CI 自动跑 `--mode verify` 作为合入门禁
+7. 发布版本前 CI 自动跑 `--mode verify,regression` 全量验证
 
 ### 模式与覆盖范围说明
 
@@ -211,7 +211,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 - **`--mode edge`** 仅运行标记为 `edge` 的测试，覆盖各种异常和边界情况：零值、空数据集、并发竞态、Unicode、时区安全、文件系统边界、API 网络异常等。适用于修改了函数内部错误处理逻辑后的针对性验证。
 - **`--mode data`** 仅运行标记为 `data` 的测试，覆盖数据精确性：市值=价格×份额、盈亏=市值-成本、收益率=盈亏÷成本（成本>0）、穿透 TOP10 占比归一化等。适用于修改了数值计算逻辑后的回归。
-- **`--mode smoke`** 仅运行标记为 `smoke` 的测试，从 6 个全流程关键节点各选 4 项最快基础测试：核心数据模型→入口读取→分类计算→报告输出→启动依赖→数据获取。全部为纯内存计算、无 IO、每项 <0.1s，合计 ~2s。适用于部署后冒烟或极速"通不通"检查。
+- **`--mode smoke`** 仅运行标记为 `smoke` 的测试，从 6 个全流程关键节点各选 4 项最快基础测试：核心数据模型→入口读取→分类计算→报告输出→启动依赖→数据获取。全部为纯内存计算、无 IO、每项 <0.1s（速度参考见 `test-coverage.md`）。适用于部署后冒烟或极速"通不通"检查。
 
 #### 🔷 真实网络验证（`live`，opt-in，不入门禁）
 
@@ -446,7 +446,7 @@ test-reports/latest/
 # 运行单个测试类
 .venv/bin/python -m pytest src/test/unit/report/test_category.py::TestCategoryAggregationConsistency -v
 
-# 冒烟测试（~2s 验证核心通路）
+# 冒烟测试（快速验证核心通路）
 .venv/bin/python -m pytest src/test/ -m "smoke" -v
 
 # 冒烟 + 边缘测试
