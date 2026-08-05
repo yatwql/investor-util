@@ -84,7 +84,7 @@ python scripts/test_runner.py --mode unit --coverage
 | `report` | `unit_report` | ~11s |
 | `scenario_extreme` | `scenario_extreme` | ~2s |
 
-> 注：典型耗时按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。**耗时与硬件/操作系统/并行度强相关**，不同 OS 或慢机器上可能数倍于此，仅作相对量级参考；完整说明见 `test-coverage.md` 顶部注。
+> 注：典型耗时按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。**耗时与硬件/操作系统/并行度强相关**，不同 OS 或慢机器上可能数倍于此，仅作相对量级参考；完整说明及不同环境下的耗时对照见 `test-coverage.md`（顶部注 + 「环境耗时对照」表）。
 
 ---
 

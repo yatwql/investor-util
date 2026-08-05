@@ -28,6 +28,36 @@
 >
 > 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 4981 项（2026-08-05 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
 
+### 环境耗时对照
+
+测试耗时随**硬件配置、操作系统与并行度**变化显著。下表对当前开发机（实测）与早期慢笔记本（早期标注，约值）做逐模式对照，便于在不同环境下粗估耗时量级：
+
+| `--mode` | 当前开发机（2026-08-05 实测） | 旧慢笔记本（早期标注，约值） |
+|:---------|:---------------------------:|:---------------------------:|
+| `unit` | ~15s | ~30s |
+| `standard` | ~16s | ~30s |
+| `scenario` | ~18s | ~6min |
+| `regression` | ~17s | ~6min |
+| `verify,regression` | ~30s（verify+regression 顺序之和） | ~7min |
+| `dev-verify` | ~20s | ~2.5min |
+| `verify` | ~10s | ~1min |
+| `integration` | ~14s | ~50s |
+| `edge` | ~13s | ~15s |
+| `data` | ~2s | ~10s |
+| `all` | **~21s** | ~10min |
+| `smoke` | ~2s | ~15s |
+| `report` | ~11s | ~15s |
+| `all_no_unit` | ~10s | ~7min |
+| `scenario_extreme` | ~2s | ~1min |
+
+> 两环境差距因模式而异：全量/场景等含 IO 与网络 mock 密集的模式约 **20~30 倍**（如 `all` ~21s vs ~10min、`scenario_extreme` ~2s vs ~1min），纯内存小模式（`smoke`/`data`/`report`）约 2~8 倍。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。当前开发机 worker=8（medium=50% 核数），旧机器并行度未知。
+
+**其他环境量级参考**（估算，非实测）：
+- **并行度**：耗时近似随 worker 数线性下降——当前 worker=8 改单线程执行时各并行模式约 ×5~8（`regression`/`edge`/`data`/`smoke`/`scenario_extreme` 等本为单线程的模式除外）
+- **CPU 代差**：相同核数下较旧 CPU 慢约 1.5~3×
+- **操作系统**：Windows 相对 Linux 慢约 1.5~3×（调度器/文件系统/进程创建开销/电源管理差异）
+- **磁盘**：机械盘相对 NVMe SSD 慢约 2~4×（测试收集期密集读写 pyc/缓存/log 小文件）
+
 ## 功能域对应测试源
 
 按被测试的源代码模块分组，方便定位"改了某段源码该跑什么测试"：
