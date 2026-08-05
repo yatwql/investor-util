@@ -133,7 +133,6 @@ investor-util/
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── api.py                #   LLM API 主入口（自动路由 provider）
 │   │   │   ├── api_base.py           #   LLM API 基类（请求/重试/流式）
-│   │   │   ├── _thinking.py          #   Extended Thinking 配置
 │   │   │   ├── circuit_breaker.py    #   熔断器（连续失败/冷却恢复）
 │   │   │   ├── cost_tracker.py       #   Token 成本跟踪与预算管理（会话级 Token 守卫）
 │   │   │   ├── fact_checker/         # LLM 事实锚定校验器（数值/品种/排名一致性校验）
@@ -153,11 +152,8 @@ investor-util/
 │   │   │   ├── generators_news.py    #   新闻分析提示词生成
 │   │   │   ├── generators_orchestrator.py # LLM 多轮对话编排
 │   │   │   ├── _api_claude.py         #   Claude API 调用实现
-│   │   │   ├── _call_claude.py        #   Claude API 单 Provider 调用
 │   │   │   ├── _api_gemini.py         #   Gemini API 调用实现
-│   │   │   ├── _call_gemini.py        #   Gemini API 单 Provider 调用
 │   │   │   ├── _api_openai.py         #   OpenAI API 调用实现
-│   │   │   ├── _call_openai.py        #   OpenAI API 单 Provider 调用
 │   │   │   ├── _hallucination_filter.py #   LLM 幻觉过滤
 │   │   │   ├── markdown.py           #   LLM 输出 Markdown 解析/格式化
 │   │   │   ├── pricing.py            #   Token 计费与用量统计

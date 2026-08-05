@@ -9,7 +9,7 @@
 |:-------|:-----|:-----|
 | **Python** | >= 3.10 | f-strings / match-case / `timezone` 等语法特性要求 |
 | **依赖安装** | `pip install -r requirements.txt` | 含 httpx / openpyxl / akshare（间接依赖 pandas）|
-| **网络** | 全量 UT 不需要（全 mock） | 手动回归需要（§4 P1 Provider 联通性）|
+| **网络** | 全量测试均不需要（全 mock） | Provider 联通性由运行时回退/熔断治理，非门禁 |
 | **系统时区** | 不限 | `datetime.now(timezone(hours=8))` 保证 UTC+8 一致性 |
 | **磁盘** | `data/cache/` `data/config/` `reports/` 读写权限 | 首次运行自动创建缺失目录 |
 | **aktools/pandas** | akshare 需 pandas | 部分 test_*.py 间接依赖，CI 中需预装 |
@@ -114,7 +114,7 @@
 | **S11: LLM 混合缓存+真实调用** | — | `test_llm_mixed_cache.py` | 4 模块（假设 news_correlation 关闭）：2 缓存 + 1 成功 + 1 失败 | 菜单 L × 2（部分缓存 TTL 内） | HTML 表各模块状态正确（蓝"缓存"、绿"成功"、红"失败"）；Excel 明细行颜色/费用/Thinking 正确；Summary 模块列表正确 |
 | **S12: LLM 全部失败（5 种原因）** | — | `test_llm_module_info.py` | API Key 无效 / 网络断开 / 超时 / 熔断 / 配置缺失 | 菜单 L | 各模块分别显示 NOT_CONFIGURED / API_ERROR / NETWORK_ERROR / TIMEOUT / CIRCUIT_OPEN，颜色均为灰色/红色 |
 | **S13: Extended Thinking 混合** | — | `test_llm_extended_thinking.py` | 2 模块启用 Thinking（global_macro + expert_review），2 模块未启用 | 菜单 L | Thinking 列 ✓ 仅出现在启用模块行，Excel/HTML/Summary 三种输出一致 |
-| **S14: LLM 不启用** | — | `test_llm_disabled.py` | TUI 不按 L，直接生成报告 | 菜单 E / B 等（无 L） | 核心报告完整生成；无 LLM API 用量页签（Excel 无页签 21、HTML 无第 21 节）；LLM 分析章节整体不出现 |
+| **S14: LLM 不启用** | — | `test_llm_disabled.py` | TUI 不按 L，直接生成报告 | 菜单 E / B 等（无 L） | 核心报告完整生成；无 LLM API 用量页签（Excel 无页签 19、HTML 无第 19 节）；LLM 分析章节整体不出现 |
 | **S15: 禁用+缓存混合** | — | `test_llm_disabled_cache.py` | 1 模块 llm_settings 中 enable=false、1 模块缓存命中、1 模块成功 | 菜单 L | 禁用模块显示"已禁用"（灰色），禁用优先于缓存或 per_module 数据 |
 | **S16: 断网下 LLM 降级** | — | `test_llm_network_error.py` | 网络断开 + 持仓缓存存在 | 菜单 L | 所有 LLM 模块降级为 NETWORK_ERROR 占位文本，不阻塞报告生成 |
 | **S17: LLM 部分缓存超期** | — | `test_llm_partial_cache.py` | 2 模块缓存 TTL 内 + 2 模块缓存已过期 | 菜单 L | 过期模块重新调用 API（显示 Token 和费用），未过期模块显示缓存状态 |
@@ -156,7 +156,7 @@
 
 单元测试按被测模块分组，通过 **父子双层 marker** 实现灵活筛选：
 
-- **父标记 `unit`** 匹配全部 10 个子组，用于全量单元测试运行（`-m "unit"`）
+- **父标记 `unit`** 匹配全部 12 个 `unit_*` 子标记（providers/fetcher/llm/news/report/config/config_edge/core/cli/ui/analysis/scripts），用于全量单元测试运行（`-m "unit"`）
 - **子标记**如 `unit_providers`、`unit_fetcher`、`unit_llm` 等支持单独运行指定模块的测试（`-m "unit_providers"`）
 - 新增单元测试文件时，必须为其测试类标注子标记和父标记，缺一不可
 
@@ -184,7 +184,7 @@
 | **多模块缓存一致性**：price 刷新后，market_value / fund_performance 使用同一缓存源 | ✅ | `test_cache_consistency.py` |
 | **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ✅ | `test_tui_routing.py` |
 | **辩论管线集成**：orchestrator 辩论路由 _debate_wrapper → _debate_info_container → 8/9 元组返回 → HTML/Excel 渲染 | ✅ | `test_debate_pipeline.py` |
-| **API 联通性验证**：手动运行确认腾讯/东方财富/天天基金 API 实际可调通 | ✅ | 每次迭代人工执行 |
+| **Provider 降级链路**：断网/超时/异常响应 → 回退/熔断/降级占位（真实联通性由运行时治理，非门禁） | ✅ | `test_scenario_resilience_flows.py`（S7）/ T15/T16 / provider edge |
 
 ### 1.6 异常场景全覆盖
 
@@ -298,10 +298,10 @@
 
 | 验证项 | 方法 | 现有测试 |
 |:-------|:-----|:--------:|
-| 市值 = 最新价 × 份额 | 抽样 3-5 条持仓手动计算比对 | ✅ |
-| 盈亏 = 市值 - 成本 | 同上 | ✅ |
-| 分账户小计 = 该账户持仓合计数 | 逐账户比对 | ✅ |
-| 总计 = 各账户小计之和 | 比对总计行 | ✅ |
+| 市值 = 最新价 × 份额 | `test_market_value_sheet.py`（市值/成本/盈亏列计算断言） | ✅ |
+| 盈亏 = 市值 - 成本 | `test_market_value_sheet.py`（盈亏列计算 + 着色断言） | ✅ |
+| 分账户小计 = 该账户持仓合计数 | `test_category.py`（账户小计聚合一致性） | ✅ |
+| 总计 = 各账户小计之和 | `test_category.py`（三维度聚合一致：账户小计之和 = 总计） | ✅ |
 | 穿透 TOP10 合并逻辑 | 构造两个基金持相同股票 + 直接持有 | ✅ |
 | 本日盈亏计算 | 给定时价、昨收、份额 | ✅ |
 | 收益率 = 盈亏 / 成本（成本 > 0） | 验证边界值 cost=0 | ✅ |
@@ -325,7 +325,7 @@
 | **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
 | **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | ✅ |
 | **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | ✅ | `test_tui_edge.py` |
-| **Excel 页签结构** | 页签编号排序（1.~20.，LLM API 用量强制末位）、冻结首行、列宽自适应 | ✅ |
+| **Excel 页签结构** | 页签编号排序（1.~19.，LLM API 用量强制末位）、冻结首行、列宽自适应 | ✅ |
 | **Excel 盈亏着色** | 正数绿/红色（RGB 正绿/红），覆盖所有盈亏列（本日盈亏/持仓盈亏/收益率） | ✅ |
 | **Excel LLM 状态颜色** | 蓝底=缓存、绿底=成功、红底=失败、灰底=禁用+各色图标 | ✅ |
 | **Excel 取价方式标识** | 蓝色字体标注（实时价/收盘价/官方净值） | ✅ |
@@ -347,26 +347,26 @@
 ## 4. 回归测试清单
 
 每次代码变更后按优先级执行。**§1.5 集成测试**的自动化用例是回归套件的一部分，写入 `src/test/`，由 `pytest` 统一执行；
-**§4 回归清单**则额外覆盖自动化无法验证的手动和环境检查项。
+**§4 回归清单**全部为自动化门禁，每项均对应 `src/test/` 中的自动化测试（见备注列），由 `test_runner.py` 各 `--mode` 统一执行。
 
 三级自动化验证流水线的定义、工作流和统计数据见 `how-to-test-my-code.md` → § 测试模式详解，门禁等级定义见同文档 → 回归测试级别。
 
-| 优先级 | 回归范围 | 触发条件 | 备注 |
+| 优先级 | 回归范围 | 触发条件 | 备注（自动化覆盖） |
 |:------:|:---------|:---------|:-----|
 | **P0** | `python scripts/test_runner.py --mode dev-verify` 通过（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量） | **任何代码变更** | 提交前极速验证 |
 | **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） | 验证缺陷场景的断言 |
 | **P0** | 测试隔离验证：`pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
-| **P1** | 手动菜单 E/B/L 各一次，检查报告完整性 | config / report / html / llm 变更 | Excel 页签完整、不崩溃 |
-| **P1** | 手动检查 Excel 报告视觉质量 | 颜色/格式/样式相关变更 | 盈亏着色、评级色、LLM 状态色、冻结首行 |
-| **P1** | 手动检查 HTML 报告浏览器渲染 | html_writer / template 变更 | 中文不乱码、章节锚点、LLM 条件消失/出现 |
-| **P1** | 手动运行菜单 [1][2][3][4] | cache / handlers / registry 变更 | 缓存刷新/清理/统计不崩溃 |
-| **P1** | Provider 链路手动联通性 | providers / fetcher 变更 | 腾讯/东方财富/天天基金 API 实际可调通 |
-| **P2** | 断网环境下运行（自动降级） | 网络/超时/重试相关变更 | 所有缓存的场景降级正确 |
-| **P2** | 清理缓存后全新运行 | provider / fetcher / cache 变更 | 无缓存路径完整可走通 |
-| **P2** | 旧缓存格式兼容性验证 | cache.py / models.py 变更 | 用旧格式缓存测试当前版本读取 |
-| **P2** | 跨缓存池污染验证 | 缓存 Key/TTL 策略变更 | price TTL 变化不污染 rank/hold TTL |
-| **P3** | 非 UTC+8 时区运行 | 日期/时间/时区相关变更 | `datetime.now(timezone(hours=8))` 一致 |
-| **P3** | 长假期前后跨日运行 | TTL / market_hours 变更 | 长假后首个交易日恢复正常 |
+| **P1** | 报告生成完整性（菜单 E/B/L 全链路） | config / report / html / llm 变更 | `scenario_basic` 管线冒烟/指标注入 + 场景测试（Excel 页签完整、不崩溃） |
+| **P1** | Excel 报告视觉质量 | 颜色/格式/样式相关变更 | `test_excel_writer.py` / `test_summary.py`（盈亏着色、评级色、LLM 状态色、冻结首行） |
+| **P1** | HTML 报告渲染结构 | html_writer / template 变更 | `test_html_report_structure.py`（中文不乱码、章节锚点、LLM 条件消失/出现） |
+| **P1** | 缓存刷新/清理/统计（菜单 [1][2][3][4]） | cache / handlers / registry 变更 | `test_handlers_cache.py` / `test_tui_handlers.py`（刷新/清理/统计不崩溃） |
+| **P1** | Provider 降级链路 | providers / fetcher 变更 | 熔断/回退/断网降级测试（S7/T15/T16 + provider edge 用例）；实际联通性由运行时 Provider Chain 回退 + 熔断治理，非门禁 |
+| **P2** | 断网环境下自动降级 | 网络/超时/重试相关变更 | `test_scenario_resilience_flows.py::TestScenarioNetworkDown`（S7）+ T15/T16 |
+| **P2** | 清理缓存后全新运行 | provider / fetcher / cache 变更 | `test_scenario_basic_flows.py::TestScenarioNewHoldings`（S4） |
+| **P2** | 旧缓存格式兼容性验证 | cache.py / models.py 变更 | `test_cache_format.py`（gz→JSON 回退、透明读取） |
+| **P2** | 跨缓存池污染验证 | 缓存 Key/TTL 策略变更 | `test_cache_cleanup.py`（多前缀独立 TTL + `TestClearByGroup` 按组精确清理） |
+| **P3** | 非 UTC+8 时区运行 | 日期/时间/时区相关变更 | `test_datetime_scenarios.py`（时区边界，`datetime.now(timezone(hours=8))` 一致） |
+| **P3** | 长假期前后跨日运行 | TTL / market_hours 变更 | `test_datetime_scenarios.py`（T17-T21 长假/跨年/跨日） |
 
 ## 5. 测试数据与 Mock 策略
 
@@ -456,17 +456,17 @@ def test_get_ttl_closed(self, mock_open):
 | **天天基金 JS** | 模拟 `var data = { ... }` 格式的 JavaScript 变量 | 模拟 pingzhongdata 响应 |
 | **新闻** | `{"title": "...", "content": "..."}` 列表 | 模拟各新闻源返回 |
 
-### 5.7 不应 Mock 的场景
+### 5.7 门禁场景的自动化覆盖
 
-以下场景需要手动运行真实代码（不可 mock）验证：
+以下场景曾列为"需真实环境手动验证"，现全部由自动化测试覆盖（通过 mock 精确模拟条件），**不再存在人工门禁**：
 
-| 场景 | 执行频率 | 说明 |
-|:-----|:---------|:-----|
-| 腾讯/东方财富/天天基金 API 联通性 | 每次迭代至少一次 | mock 无法验证 API 实际可调通 |
-| Excel 报告视觉检查 | config/report 变更时 | 颜色/格式/冻结首行等自动化难验证 |
-| HTML 报告浏览器渲染 | html_writer/template 变更时 | 中文乱码、章节锚点、响应式布局 |
-| 断网降级 | 网络相关变更时 | 真实断网 vs mock 超时的行为差异 |
-| 旧缓存格式兼容 | cache.py 变更时 | 真实旧缓存文件 vs mock 行为差异 |
+| 场景 | 自动化覆盖 | 模拟方式 |
+|:-----|:-----------|:---------|
+| Provider API 联通性 | 熔断/回退/断网降级用例（S7/T15/T16 + provider edge） | mock httpx 响应模拟异常/超时；实际联通性由运行时 Provider Chain 回退 + 熔断治理，非门禁 |
+| Excel 报告视觉检查 | `test_excel_writer.py` / `test_summary.py` | 断言单元格样式（着色/评级色/冻结首行） |
+| HTML 报告浏览器渲染 | `test_html_report_structure.py` | 断言渲染结构（中文/锚点/LLM 条件/响应式） |
+| 断网降级 | `test_scenario_resilience_flows.py::TestScenarioNetworkDown`（S7）+ T15/T16 | mock 网络异常 → 断言降级占位/过期缓存读取 |
+| 旧缓存格式兼容 | `test_cache_format.py` | 构造旧格式 JSON/gzip → 断言当前版本透明读取 |
 
 ### 5.8 测试隔离要求
 
@@ -501,18 +501,18 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
-10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + 手动菜单 E/B/L + Excel/HTML 视觉检查 + Provider 联通性
-11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ 断网降级/旧缓存兼容/跨池污染确认
+9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
+10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + §4 中 P1 级各自动化回归项全部通过（报告完整性 / Excel 视觉 / HTML 渲染 / 缓存刷新 / Provider 降级）
+11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
-### 6.4 人工验证
+### 6.4 补充自动化门禁
 
-12. **异常场景不崩溃**：对 §1.6 异常场景清单中的 🔴/🟡 状态项，人工确认至少不导致程序崩溃
-13. **报告文件视觉检查**：Excel 和 HTML 输出文件无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）
-14. **TUI 菜单功能正常**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[X]）响应正确，无崩溃
-15. **whatif CLI 手动验证**：`python -m src.python.cli whatif --base 调仓前.xlsx --candidate 调仓后.xlsx [--effective-date 2026-07-01]` 生成 `调仓模拟.xlsx/.html`（最新版固定名，历史归档至日期子目录）；缺省 --base 用 config 持仓；--candidate 缺失报参数错误；指定 --effective-date 时输出时序回测（见第 16 项）；HTML 双环图正常渲染、Excel 变动行底色正确
-16. **whatif 生效日时序回测验证**：① 指定 `--effective-date 2026-07-01`（过去日期）→ Excel 出现第 4 页签「时序回测」、HTML 出现④时序回测区（指标卡 + 2 张折线图 + 图下说明）；② 不指定生效日 → 维持现状（3 页签，无回测区，不联网）；③ 未来生效日（如 `--effective-date 2099-01-01`）或格式错误 → 回测降级占位、主报告正常生成；④ 断网/缓存为空时回测不可用 → 报告仍生成（回测区隐藏/占位）
+12. **异常场景全覆盖**：§1.6 异常场景清单全部 ✅（每项异常场景均有对应自动化用例，edge/resilience 标记），不允许存在仅靠人工确认的 🔴/🟡 项
+13. **报告文件视觉结构**：Excel 和 HTML 输出无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）→ `test_excel_writer.py` / `test_summary.py` / `test_html_report_structure.py`
+14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[X]）响应正确、无崩溃 → `test_tui_menu.py`（17 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
+15. **whatif CLI**：`--candidate` 必填、`--base` 可选、缺失报参数错误、`--effective-date` 解析，生成/归档行为 → `test_cli.py::test_whatif_*` + `test_whatif_operations.py` / `test_whatif_sheet.py` / `test_whatif_html.py` / `test_whatif_writer.py`
+16. **whatif 生效日时序回测**：① 过去生效日→出「时序回测」页签/区 → `test_effective_date_merges_backtest` + `test_backtest_sheet_full` + `test_backtest_section_rendered`；② 缺省→维持现状（无回测）→ `test_no_effective_date_no_backtest_call` + `test_full_rendering_sections_without_backtest`；③ 未来/非法日期→降级占位、主报告正常 → `test_compute_backtest_days_invalid_format` / `test_compute_backtest_days_future_or_today_none` + `test_effective_date_exception_degrades` + `test_backtest_sheet_unavailable_reason_placeholder`；④ 断网/空缓存→回测不可用但报告仍生成 → `test_unavailable_returns_reason` / `test_unavailable_without_reason_falls_back` + `test_effective_date_bt_none_no_key`
 
 ---
 
