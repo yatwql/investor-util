@@ -71,6 +71,7 @@ def prepare_report_data(
     """
     from concurrent.futures import ThreadPoolExecutor
 
+    from src.python.core.code_utils import is_offsite_fund
     from src.python.core.data_freshness import build_freshness_summary
     from src.python.core.holding_status import build_coverage_summary
     from src.python.analysis.action_advisor import build_action_data
@@ -160,6 +161,10 @@ def prepare_report_data(
             # shares/price 供调仓建议可行化层计算可执行卖出份额与金额
             "shares": d.shares,
             "price": d.price,
+            # 渠道上下文（场内/场外）：按账户关键词判定（is_offsite_fund），
+            # 供调仓建议可行化层按渠道计算份额取整与费用（场外整数份+赎回费）；
+            # getattr 兼容缺 account 的 detail 对象（测试 fixture 简化版）
+            "channel": "场外" if is_offsite_fund(getattr(d, "account", "")) else "场内",
         }
         for d in details
     ]

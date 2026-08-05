@@ -106,6 +106,7 @@ class TestPrepareReportData:
         mock_detail.yesterday_close = 11.0
         mock_detail.nav_date = "2026-07-16"
         mock_detail.source_api = "mock"
+        mock_detail.account = "证券账户"  # 非场外账户关键词 → 渠道为场内
 
         mock_category = MagicMock()
 
@@ -162,6 +163,48 @@ class TestPrepareReportData:
         assert result["total_cost"] == 1000.0
         assert result["total_profit"] == 200.0
         assert mock_reporter.info.call_count >= 3
+
+    def test_prepare_report_data_channel_from_account(self):
+        """holdings_details 契约携带渠道上下文：账户关键词决定场内/场外。
+
+        回归：调仓建议可行化层按渠道计算份额取整与费用，场外账户（如天天基金）
+        持有的 16/11 开头基金不得按场内 100 份取整 + 仅佣金处理。
+        """
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock(code="161725", name="招商中证白酒指数A", shares=1000, cost_price=1.0)]
+
+        mock_detail = MagicMock()
+        mock_detail.code = "161725"
+        mock_detail.name = "招商中证白酒指数A"
+        mock_detail.market_value = 1200.0
+        mock_detail.cost = 1000.0
+        mock_detail.profit = 200.0
+        mock_detail.profit_rate = 0.2
+        mock_detail.today_profit = 0.0
+        mock_detail.price = 1.2
+        mock_detail.yesterday_close = 1.1
+        mock_detail.nav_date = "2026-08-04"
+        mock_detail.source_api = "mock"
+        mock_detail.account = "天天基金"  # 场外账户关键词 → 渠道为场外
+
+        with (
+            patch("src.python.report.market_value._generate_details", return_value=[mock_detail]),
+            patch("src.python.report.market_value.classify_holdings", return_value=[]),
+            patch("src.python.fetcher.index.fetch_indices", return_value={}),
+            patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
+            patch("src.python.report.penetration.compute_penetration_top10", return_value={"top10": []}),
+            patch(
+                "src.python.report.orchestrator.compute_factor_exposure_data",
+                return_value={"available": False, "status": "insufficient"},
+            ),
+            patch(
+                "src.python.report.orchestrator.compute_correlation_data",
+                return_value={"available": False, "status": "insufficient"},
+            ),
+        ):
+            result = prepare_report_data(mock_holdings, mock_reporter, config={})
+
+        assert result["holdings_details"][0]["channel"] == "场外"
 
     def test_prepare_report_data_empty_holdings(self):
         """空持仓不抛出异常，返回正确结构。"""
@@ -540,6 +583,65 @@ class TestGenerateReport:
         assert detail["profit_rate"] == pytest.approx(25.0)
         assert detail["profit"] == pytest.approx(250.0)
         assert detail["market_value"] == pytest.approx(1250.0)
+
+    def test_generate_report_both_passes_channel_context(self):
+        """both 路径持仓明细携带渠道上下文（账户关键词 → 场内/场外）。
+
+        回归：可行化层按 channel 区分场外基金（整数份 + 赎回费）与场内品种
+        （100 份取整 + 仅佣金），字段缺失会退回代码前缀判定而误判 LOF/开放式基金。
+        """
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock(code="161725", name="招商中证白酒指数A", shares=100, cost_price=1.0)]
+
+        mock_detail = MagicMock()
+        mock_detail.code = "161725"
+        mock_detail.name = "招商中证白酒指数A"
+        mock_detail.market_value = 1250.0
+        mock_detail.cost = 1000.0
+        mock_detail.profit = 250.0
+        mock_detail.profit_rate = 0.25
+        mock_detail.shares = 100
+        mock_detail.price = 12.5
+        mock_detail.account = "天天基金"  # 场外账户关键词 → 渠道为场外
+
+        captured: dict = {}
+
+        def _fake_build(holdings_details, total_mv, **kwargs):
+            captured["holdings_details"] = holdings_details
+            return {"available": True, "summary": "", "rebalance_signals": []}
+
+        with (
+            patch("src.python.report.market_value._generate_details", return_value=[mock_detail]),
+            patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+            patch("src.python.report._snapshot.fetch_history_data"),
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
+            patch("src.python.core.registry.get_report_section_order", return_value=[]),
+            patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
+            patch("src.python.config.is_enable_news", return_value=True),
+            patch("src.python.config.is_enable_history", return_value=True),
+            patch(
+                "src.python.core.holding_status.build_coverage_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            patch(
+                "src.python.core.data_freshness.build_freshness_summary",
+                return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+            ),
+            patch(
+                "src.python.analysis.action_advisor.build_action_data",
+                side_effect=_fake_build,
+            ),
+        ):
+            result = generate_report(
+                holdings=mock_holdings,
+                config={"output_dir": "reports", "history": {"fetch_mode": "auto"}},
+                reporter=mock_reporter,
+                report_type="both",
+            )
+
+        assert result.report_generated is True
+        assert captured["holdings_details"][0]["channel"] == "场外"
 
     def test_generate_report_both_injects_portfolio_peak_mv(self):
         """both 路径历史走势后重建 action_data，注入组合历史峰值市值。

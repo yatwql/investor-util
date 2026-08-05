@@ -6,6 +6,15 @@
 把「触发建议」转成「能照做的方案」：每条建议输出
 代码 / 名称 / 操作 / 份额（A 股取整一手 100 股）/ 金额 / 预估费用 / 调仓后现金余额。
 
+渠道上下文：持仓明细可携带 channel（"场外"/"场内"），由报告层按账户关键词
+判定填充（如"基金账户/支付宝"判为场外渠道）。本层消费渠道时：
+  - channel="场外" → 场外基金处理（整数份取整 + 计收赎回费），覆盖 16/11 开头
+    代码命中场内前缀而被误判的场外持有场景（LOF/开放式指数基金）
+  - 非场外 → 回退证券类型判定（A 股印花税 / 场内基金仅佣金 / 100 份取整），
+    避免用单一渠道覆盖 A 股印花税等差异化费率
+  显式 channel 优先，其次按 account 关键词判定（is_offsite_fund），
+  两者皆无时保持既有代码/名称判定（向后兼容）。
+
 份额取整的证券类型判定复用 core/code_utils.py（代码类型判定中心化）
 （is_a_share_code / is_exchange_fund_code / is_otc_fund_by_name），
 本模块不自建证券类型判定逻辑。
@@ -31,6 +40,7 @@ from typing import Any
 from src.python.core.code_utils import (
     is_a_share_code,
     is_exchange_fund_code,
+    is_offsite_fund,
     is_otc_fund_by_name,
 )
 
@@ -61,16 +71,43 @@ _PRIORITY: dict[str, int] = {
 _SELL_OPERATIONS = frozenset(_PRIORITY)
 
 
-def _round_to_lot(raw_shares: float, code: str, name: str) -> int:
+def _channel_of_holding(holding: dict[str, Any]) -> str:
+    """持仓明细 → 渠道（"场外" / 空串）。
+
+    显式 channel 字段优先（报告层契约已按账户判定填充）；兼容直接携带
+    account 的调用（按场外账户关键词判定）；两者皆无返回空串，由取整/
+    费用估算回退证券类型判定（向后兼容）。
+
+    返回值语义："场外" = 按场外基金处理（整数份取整 + 赎回费）；非场外
+    仍需区分 A 股（印花税）与场内基金（仅佣金），故此处不返回"场内"。
+
+    Args:
+        holding: 持仓明细单行（含可选 channel/account）
+
+    Returns:
+        "场外" 表示场外渠道，空串表示无渠道上下文。
+    """
+    ch = (holding.get("channel") or "").strip()
+    if ch == "场外":
+        return "场外"
+    account = (holding.get("account") or "").strip()
+    if account and is_offsite_fund(account):
+        return "场外"
+    return ""
+
+
+def _round_to_lot(raw_shares: float, code: str, name: str, channel: str = "") -> int:
     """份额取整到一手（证券类型判定复用 core/code_utils.py）。
 
     A 股与场内基金/ETF 按一手 100 份向下取整；场外基金与港股按整数份取整
-    （一手股数随标的不同，取整到整数份）。
+    （一手股数随标的不同，取整到整数份）。channel="场外" 时强制按整数份
+    取整，覆盖 16/11 开头代码命中场内前缀的场外持有场景。
 
     Args:
         raw_shares: 未取整的目标卖出份额
         code: 证券代码
         name: 证券名称（场外基金判定需要）
+        channel: 渠道上下文（"场外" 强制整数份取整；空串回退证券类型判定）
 
     Returns:
         取整后的可执行份额；不足一手时为 0。
@@ -79,12 +116,12 @@ def _round_to_lot(raw_shares: float, code: str, name: str) -> int:
     raw = int(raw_shares)
     if raw <= 0:
         return 0
+    if channel == "场外":
+        return raw
     # 场外基金判定优先：00 代码与深市主板区间重叠，需先经名称关键词排除
     if is_otc_fund_by_name(name, code):
         return raw
-    if is_a_share_code(code):
-        return (raw // 100) * 100
-    if is_exchange_fund_code(code):
+    if is_a_share_code(code) or is_exchange_fund_code(code):
         return (raw // 100) * 100
     return raw
 
@@ -95,6 +132,7 @@ def estimate_fee(
     code: str,
     name: str = "",
     fee_table: dict[str, float] | None = None,
+    channel: str = "",
 ) -> float:
     """估算调仓交易费用（佣金 + 印花税/赎回费，本地静态费率表）。
 
@@ -104,6 +142,8 @@ def estimate_fee(
         code: 证券代码
         name: 证券名称（场外基金判定需要）
         fee_table: 费率表覆盖（测试用固定 fixture；None 用默认静态费率）
+        channel: 渠道上下文（"场外" 计收赎回费，覆盖 16/11 开头代码的前缀误判；
+            空串回退证券类型判定）
 
     Returns:
         预估费用（元，两位小数）。印花税仅 A 股卖出计收、赎回费仅场外基金卖出计收，
@@ -115,8 +155,11 @@ def estimate_fee(
     fees = {**_DEFAULT_FEE_TABLE, **(fee_table or {})}
     commission = max(amount * fees["commission_rate"], fees["min_commission"])
     total = commission
+    # 场外渠道优先：覆盖 16/11 开头代码命中场内前缀的场外持有场景（如 161725/110022）
+    if channel == "场外":
+        total += amount * fees["redemption_rate"]
     # 场外基金判定优先：00 代码与深市主板区间重叠，需先经名称关键词排除
-    if is_otc_fund_by_name(name, code):
+    elif is_otc_fund_by_name(name, code):
         total += amount * fees["redemption_rate"]
     elif is_a_share_code(code):
         total += amount * fees["stamp_duty_rate"]
@@ -154,6 +197,7 @@ def _candidate_from_rebalance(
         "operation": "卖出减仓",
         "raw_shares": excess_mv / price,
         "price": price,
+        "channel": _channel_of_holding(holding),
     }
 
 
@@ -191,6 +235,7 @@ def _candidate_from_discipline(
         "operation": operation,
         "raw_shares": shares * ratio,
         "price": price,
+        "channel": _channel_of_holding(holding),
     }
 
 
@@ -215,7 +260,8 @@ def build_rebalance_advice(
     Args:
         rebalance_signals: 再平衡信号（单品占比超警戒线）
         discipline_signals: 交易纪律触发信号（止盈/止损）
-        holdings_details: 持仓明细（含 shares/price/market_value/name/code）
+        holdings_details: 持仓明细（含 shares/price/market_value/name/code；
+            可选 channel 为场内/场外渠道上下文，由报告层按账户判定填充）
         total_mv: 持仓总市值
         fee_table: 费率表覆盖（None 用默认静态费率）
         available_cash: 调仓前可用现金（默认 0）
@@ -247,11 +293,13 @@ def build_rebalance_advice(
     advice: list[dict[str, Any]] = []
     cash = available_cash
     for cand in ordered:
-        shares = _round_to_lot(cand["raw_shares"], cand["code"], cand["name"])
+        shares = _round_to_lot(cand["raw_shares"], cand["code"], cand["name"], cand.get("channel", ""))
         if shares <= 0:
             continue
         amount = round(shares * cand["price"], 2)
-        fee = estimate_fee(cand["operation"], amount, cand["code"], cand["name"], fee_table)
+        fee = estimate_fee(
+            cand["operation"], amount, cand["code"], cand["name"], fee_table, channel=cand.get("channel", "")
+        )
         cash_after = cash + amount - fee
         if cash_after < 0:
             # 现金负值防护：执行后现金为负的订单剔除，避免透支调仓

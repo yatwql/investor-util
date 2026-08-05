@@ -489,8 +489,12 @@ def _both_action_holdings_details(details: list) -> list[dict]:
     """both 路径持仓明细 → 行动建议消费的字段子集（数据契约同 orchestrator 组装）。
 
     交易纪律依赖收益率数据（profit_rate），统一换算为百分数（小数 ×100）；
-    shares/price 供调仓建议可行化层计算可执行卖出份额与金额。
+    shares/price 供调仓建议可行化层计算可执行卖出份额与金额；
+    channel 为场内/场外渠道上下文（按账户关键词判定），供可行化层按渠道
+    计算份额取整与费用（场外整数份 + 赎回费）。
     """
+    from src.python.core.code_utils import is_offsite_fund
+
     return [
         {
             "name": d.name,
@@ -501,6 +505,8 @@ def _both_action_holdings_details(details: list) -> list[dict]:
             "profit_rate": (d.profit_rate * 100) if d.profit_rate is not None else None,
             "shares": d.shares,
             "price": d.price,
+            # getattr 兼容缺 account 的 detail 对象（测试 fixture 简化版）
+            "channel": "场外" if is_offsite_fund(getattr(d, "account", "")) else "场内",
         }
         for d in details
     ]

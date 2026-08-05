@@ -6,6 +6,14 @@
 
 ## [0.10.7-dev] - 开发中（未发布）
 
+### 调仓建议可行化层区分场内/场外渠道
+
+- **动机**：调仓建议可行化层（`analysis/rebalance_advisor`）此前仅凭代码前缀 + 名称关键词判定证券类型，场外持有基金（LOF/开放式指数基金，如 `161725 招商中证白酒指数A`、`110022 易方达消费行业`）的 16/11 开头代码命中场内基金前缀，被误当场内处理（100 份取整 + 仅计佣金），漏计赎回费且份额取整过粗。
+- **持仓明细携带渠道上下文**：`holdings_details` 契约（`orchestrator.prepare_report_data` 与 `_report_generation` both 路径 `_both_action_holdings_details`）新增 `channel` 字段，按账户关键词 `is_offsite_fund(account)` 判定填充（`"场外"`/`"场内"`）；`getattr` 兼容缺 `account` 的 detail 对象（测试 fixture 简化版）。
+- **可行化层按渠道消费**：`_round_to_lot`/`estimate_fee` 新增 `channel` 参数——`channel="场外"` 强制整数份取整 + 计收赎回费；非场外回退既有证券类型判定（A 股印花税 / 场内基金仅佣金 / 100 份取整），避免用单一渠道覆盖 A 股印花税等差异化费率。显式 `channel` 优先，其次按 `account` 关键词判定，两者皆无保持向后兼容。候选构造（再平衡/纪律）携带渠道到可行化层。
+- **测试**：`test_rebalance_advisor.py` 新增渠道感知 10 项（场外 LOF/开放式基金整数份 + 赎回费、场内 ETF 100 份 + 仅佣金、A 股渠道仍计印花税、显式 channel 优先于 account、账户关键词回退、无渠道回退代码判定）；`test_orchestrator.py` 新增契约 channel 字段 2 项（场内/场外账户各一）+ both 路径 channel 接线 1 项。
+- **门禁**：dev-verify 1820 passed + check-code-traces / check-doc-traces / check-task-numbering `--ci` 全 [OK]。
+
 ### 再平衡信号配置化阈值 + 静默期 + 回撤纪律峰值注入 + 日收益口径统一（第四批）
 
 - **再平衡信号配置化阈值 + 静默期**：`analysis/simple_rebalance` 的再平衡阈值与静默期由硬编码改为配置化参数（`threshold`/`silence_days`/`silence_file`），与纪律层共用 `_silence.py` 静默机制；智囊团深度复盘「行动摘要」的 LLM 段**豁免静默期**（`prompts_core` 以 `silence_days=0` 调用），保证每次复盘完整呈现超限信号、不被静默窗口抑制；新增回归验证 LLM 段不写共享静默文件。
