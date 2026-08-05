@@ -506,7 +506,7 @@ def _magic_excludes() -> list[re.Pattern]:
       - TOP\\d+            —— 前 N 名（TOP10/TOP3…），业务语义
       - MD5/SHA\\d+/AES\\d+ —— 哈希/加密算法名
       - VaR\\d+            —— 尾部风险指标（VaR95/VaR99）
-      - Jinja2/ES5/ES6/Win32/UTF-\\d —— 技术栈名
+      - Jinja2/ES5/ES6/V8/Win32/UTF-\\d —— 技术栈名（V8 为 JS 引擎）
       - [A-Z]{1,3}\\d{3}\\b —— linter/静态检查码（F401/E402/PERF203/F811…）
       - [Qq][1-4]\\b        —— 季度（2026-07（Q3））
       - DeepSeek V\\d       —— 模型版本（DeepSeek V4）
@@ -522,7 +522,7 @@ def _magic_excludes() -> list[re.Pattern]:
         re.compile(r"TOP\d+"),
         re.compile(r"\b(?:MD5|SHA\d+|AES\d*|DES\d*)\b"),
         re.compile(r"VaR\d+"),
-        re.compile(r"Jinja2|ES5|ES6|Win32|UTF-\d"),
+        re.compile(r"Jinja2|ES5|ES6|V8|Win32|UTF-\d"),
         re.compile(r"[A-Z]{1,3}\d{3}\b"),
         re.compile(r"[Qq][1-4]\b"),
         re.compile(r"DeepSeek\s*V\d"),

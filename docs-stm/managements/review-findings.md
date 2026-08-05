@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.5-dev
-> **编号源**：`rf-next = 228`（新增问题取此编号，完成后更新为 +1；已用最大 rf-227，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 229`（新增问题取此编号，完成后更新为 +1；已用最大 rf-228，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -55,6 +55,7 @@
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
+| **rf-228** | TUI 菜单「2」更新行情缓存时进程崩溃 `[FATAL:partition_address_space.cc(243)] Check failed: !IsConfigurablePoolInitialized()`。根因：菜单 2 的并行价格抓取（ThreadPoolExecutor 4 workers）中，每个价格的新鲜度校验 `_price_cache_fresh` → `get_last_trading_day()` → `_get_trading_calendar()` → `akshare.tool_trade_date_hist_sina()`，akshare 内部用 `py_mini_racer`(V8) 解密新浪接口且每次调用都重新初始化 V8；多线程并发首次初始化 V8 触发 partition_address_space FATAL，**直接 abort 整个进程**（try/except 无法捕获）。已在 tmp 探针脚本复现（4 线程并发 → EXIT 3 崩溃；加锁串行化 → 全成功） | `_get_trading_calendar()` 缓存未命中分支用模块级锁 `_TRADING_CALENDAR_AKSHARE_LOCK` 串行化 + 双重检查（避免锁等待后重复拉取）。V8 顺序初始化安全。新增回归测试 `TestTradingCalendarConcurrency`：4 线程并发调用 `_get_trading_calendar()` 注入 fake akshare，断言回调最大并发深度 = 1。**连带优化**：测试文件 `test_market_value.py` 多个测试类裸调用 `is_market_open`（东方财富 push2 API 真实 HTTP）与 `_is_trading_day`（akshare 交易日历）致单用例 2~6s，统一补 setUp mock 隔离网络 | changelog v0.10.5-dev |
 | **rf-227** | `test_cli_integration.py` 三处 CLI 测试 patch 目标陈旧（41df26a 根文件归子包重构后残留包级 re-export 路径 `src.python.cli._cli_read_holdings`，拦截不到 `cli.py` 内部调用）：`test_cli_cache_config_respected` 直接读取真实持仓文件失败（`/test/holdings/test.xlsx` 不存在 → mock 被调用 0 次断言失败），另两例靠默认持仓文件恰好存在而侥幸通过 | 三处 patch 目标统一修正到 `src.python.cli.cli._cli_read_holdings(_with_flows)`；report 路径两例改用 `_cli_read_holdings_with_flows` 返回 `(mock_holdings, [], [])`（与 `_handle_report` 实际调用一致），彻底脱离真实持仓文件依赖。全量 all 5026 passed、CLI 单测 56 passed | changelog v0.10.5-dev |
 | **rf-226** | `_evaluate_percent_value` 对「组合级收益 + 个股级收益同句段」误配：组合累计收益 10.0% 被整句主体定位误路由到数值最近的个股（招商银行 8.2%），报假阳性（HEAD 基线已复现） | 新增组合级语境检测 `_is_portfolio_level_context`（`_PORTFOLIO_KEYWORDS` 词表，match 前 15 字符窗口），在主体定位前判定组合级收益并归到组合总收益率 | changelog v0.10.4 |
 | **rf-223** | 批量暗号替换脚本（/tmp/clean_ciphers.py，本次会话一次性工具）`[ \t]{2,}` 折叠整行空白，破坏 9 个 Python 文件前导缩进（report 4 个 + test 5 个，IndentationError） | 按 HEAD 逐行映射恢复前导空白（行数 1:1 已验），全仓 git diff 范围内 `compile()` 通过 | changelog v0.10.3 |

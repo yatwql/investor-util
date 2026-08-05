@@ -251,7 +251,26 @@ class TestClassifyHoldings(unittest.TestCase):
 
 
 class TestPriceUpdateStatus(unittest.TestCase):
-    """测试 price_update_status 价格更新状态检测。"""
+    """测试 price_update_status 价格更新状态检测。
+
+    注意：类级 setUp 统一 mock 市场状态与交易日历，避免真实网络请求。
+    price_update_status 内部会调用 is_market_open/is_midday_break（东方财富
+    push2 API，真实 HTTP）与 get_prev_trading_day→_is_trading_day（akshare
+    交易日历，V8 解密 + 真实 HTTP）。这些外部依赖与"价格更新状态判断"断言无关，
+    必须在测试中隔离，否则每个用例耗时 2~6s 且依赖网络。
+    方法级 @patch 与 setUp 的 patch 叠加时，方法级 mock 优先（后进入栈）。
+    """
+
+    def setUp(self) -> None:
+        self._patch_open = patch("src.python.report.market_value.is_market_open", return_value=False)
+        self._patch_midday = patch("src.python.report.market_value.is_midday_break", return_value=False)
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_open.start()
+        self._patch_midday.start()
+        self._patch_td.start()
+        self.addCleanup(self._patch_open.stop)
+        self.addCleanup(self._patch_midday.stop)
+        self.addCleanup(self._patch_td.stop)
 
     def _row(self, source_api: str, nav_date: str, name: str = "") -> mv.DetailRow:
         return mv.DetailRow(
@@ -480,6 +499,16 @@ def _mock_calendar() -> set[str]:
     }
 
 
+def _mock_is_trading_day(date) -> bool:
+    """mock _is_trading_day：用 _mock_calendar 迷你日历判定，保留节假日语义。
+
+    原实现会经 _get_trading_calendar() → akshare(V8) 真实网络。此辅助函数
+    用固定迷你日历替代，使 T-N 计数（_count_trading_days_back）行为与原
+    真实 akshare 日历一致（含 2026-06-19 端午排除），同时零网络依赖。
+    """
+    return date.strftime("%Y-%m-%d") in _mock_calendar()
+
+
 class TestGetLastTradingDay(unittest.TestCase):
     """测试 get_last_trading_day 最近交易日计算（mock datetime.now + 交易日历）。"""
 
@@ -668,6 +697,106 @@ class TestGetPrevTradingDay(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════
+#  交易日历并发串行化（回归：并发初始化 V8 崩溃）
+# ═══════════════════════════════════════════════════════════
+
+
+class _FakeSeries:
+    """极简 pandas.Series 替代：仅支撑 dropna().astype(str).tolist() 链式调用。"""
+
+    def __init__(self, values):
+        self._values = values
+
+    def dropna(self):
+        return self
+
+    def astype(self, _dtype):
+        return self
+
+    def tolist(self):
+        return list(self._values)
+
+
+class _FakeCalendarDf:
+    """极简 DataFrame 替代：仅支撑 df["trade_date"] 取值。"""
+
+    def __init__(self, trade_dates):
+        self._trade_dates = trade_dates
+
+    def __getitem__(self, key):
+        if key == "trade_date":
+            return _FakeSeries(self._trade_dates)
+        raise KeyError(key)
+
+
+class TestTradingCalendarConcurrency(unittest.TestCase):
+    """回归测试：并发调用交易日历会串行化 akshare(V8) 调用。
+
+    缺陷场景：菜单 2「更新行情类缓存」的并行价格抓取（ThreadPoolExecutor
+    4 workers）中，每个价格的新鲜度校验都会调用 get_last_trading_day() →
+    _get_trading_calendar()。akshare 的 tool_trade_date_hist_sina() 内部用
+    py_mini_racer(V8) 解密，多线程并发首次初始化会触发
+    [FATAL:partition_address_space.cc(243)] Check failed:
+    !IsConfigurablePoolInitialized() 直接 abort 进程（try/except 无法捕获）。
+
+    修复：_get_trading_calendar() 缓存未命中分支用模块级锁串行化。
+    本测试直接验证该串行化不变量：并发调用下 akshare 回调最大并发深度为 1。
+    """
+
+    def test_concurrent_calls_serialize_akshare(self):
+        import sys
+        import threading
+        import types
+
+        from src.python.cache import clear as cache_clear
+
+        # 缓存隔离：确保所有线程都走到 akshare 未命中分支
+        cache_clear(mv._TRADING_CALENDAR_CACHE_KEY)
+
+        # ── 注入 fake akshare：统计 tool_trade_date_hist_sina 回调并发深度 ──
+        depth = {"active": 0, "max_active": 0}
+        counter_lock = threading.Lock()
+
+        def fake_tool_trade_date_hist_sina():
+            with counter_lock:
+                depth["active"] += 1
+                depth["max_active"] = max(depth["max_active"], depth["active"])
+            # 锁外持有，构造并发窗口：无串行化时多线程能观察到 max_active > 1
+            try:
+                return _FakeCalendarDf(["2026-08-03", "2026-08-04", "2026-08-05"])
+            finally:
+                with counter_lock:
+                    depth["active"] -= 1
+
+        fake_akshare = types.ModuleType("akshare")
+        fake_akshare.tool_trade_date_hist_sina = fake_tool_trade_date_hist_sina
+
+        results: list = []
+        errors: list = []
+
+        def worker():
+            try:
+                results.append(mv._get_trading_calendar())
+            except Exception as exc:
+                errors.append(exc)
+
+        with patch.dict(sys.modules, {"akshare": fake_akshare}):
+            threads = [threading.Thread(target=worker) for _ in range(4)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(results), 4)
+        expected = {"2026-08-03", "2026-08-04", "2026-08-05"}
+        for r in results:
+            self.assertEqual(r, expected)
+        # 核心断言：akshare(V8) 回调被串行化，最大并发深度为 1
+        self.assertEqual(depth["max_active"], 1)
+
+
+# ═══════════════════════════════════════════════════════════
 #  _determine_price_type
 # ═══════════════════════════════════════════════════════════
 
@@ -681,6 +810,11 @@ class TestDeterminePriceType(unittest.TestCase):
     def setUp(self):
         self.td = "2026-06-26"   # Friday
         self.prev = "2026-06-25"  # Thursday
+        # _count_trading_days_back → _is_trading_day → akshare 交易日历（真实网络）。
+        # 用例 mock 了 is_market_open/get_prev_trading_day，但漏 _is_trading_day。
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td.start()
+        self.addCleanup(self._patch_td.stop)
 
     # ── Tencent ───────────────────────────────────────────
 
@@ -800,6 +934,12 @@ class TestGenerateDetails(unittest.TestCase):
             "price_date": "2026-06-26",
             "source_api": "tencent", "source": "腾讯财经",
         }
+        # _generate_details → _determine_price_type → _count_trading_days_back
+        # → _is_trading_day → akshare 交易日历（真实网络）。用例已 mock
+        # get_last_trading_day/is_market_open 等，但漏 _is_trading_day，统一隔离。
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td.start()
+        self.addCleanup(self._patch_td.stop)
         self.eastmoney_mock_data = {
             "name": "中欧医疗健康混合", "code": "003095",
             "price": 1.5, "yesterday_close": 1.48,
@@ -1033,6 +1173,19 @@ class TestPremiumRate(unittest.TestCase):
       - 溢价率列始终为字符串类型
     """
 
+    def setUp(self) -> None:
+        # _compute_detail_row → _determine_price_type → _is_trading_day（akshare
+        # 网络）+ is_market_open/is_midday_break（东方财富 push2 HTTP）。统一隔离。
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_open = patch("src.python.report.market_value.is_market_open", return_value=False)
+        self._patch_midday = patch("src.python.report.market_value.is_midday_break", return_value=False)
+        self._patch_td.start()
+        self._patch_open.start()
+        self._patch_midday.start()
+        self.addCleanup(self._patch_td.stop)
+        self.addCleanup(self._patch_open.stop)
+        self.addCleanup(self._patch_midday.stop)
+
     def test_premium_placeholder_in_detail_row(self):
         """不在交易时段或不是 tencent 源 → premium=--。"""
         from src.python.report.market_value import (
@@ -1115,8 +1268,15 @@ class TestTodayProfitOffMarket(unittest.TestCase):
             return_value="2026-06-26",
         )
         self._ld_patcher.start()
+        # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
+        self._td_patcher = unittest.mock.patch(
+            "src.python.report.market_value._is_trading_day",
+            side_effect=_mock_is_trading_day,
+        )
+        self._td_patcher.start()
 
     def tearDown(self):
+        self._td_patcher.stop()
         self._ld_patcher.stop()
 
     def test_off_market_nav_not_t_day(self):
@@ -1190,6 +1350,12 @@ class TestTodayProfitOffMarket(unittest.TestCase):
 
 class TestPremiumPlaceholder(unittest.TestCase):
     """溢价率始终为占位符 '--'。"""
+
+    def setUp(self) -> None:
+        # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td.start()
+        self.addCleanup(self._patch_td.stop)
 
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
@@ -1265,6 +1431,12 @@ class TestPremiumPlaceholder(unittest.TestCase):
 class TestTodayProfitEastMoneyNonTDay(unittest.TestCase):
     """场外基金非 T 日 → today_profit = 0。"""
 
+    def setUp(self) -> None:
+        # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td.start()
+        self.addCleanup(self._patch_td.stop)
+
     def _make_market_data(self, nav_date: str, source_api: str = "eastmoney") -> dict:
         return {
             "price": 2.5, "yesterday_close": 2.4,
@@ -1307,6 +1479,19 @@ class TestTodayProfitEastMoneyNonTDay(unittest.TestCase):
 
 class TestTodayProfitTencentAlways(unittest.TestCase):
     """Tencent 场内资产始终计算 today_profit。"""
+
+    def setUp(self) -> None:
+        # _compute_detail_row → _determine_price_type → _is_trading_day（akshare 网络）
+        # + is_market_open/is_midday_break（东方财富 push2 HTTP）。统一隔离。
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_open = patch("src.python.report.market_value.is_market_open", return_value=False)
+        self._patch_midday = patch("src.python.report.market_value.is_midday_break", return_value=False)
+        self._patch_td.start()
+        self._patch_open.start()
+        self._patch_midday.start()
+        self.addCleanup(self._patch_td.stop)
+        self.addCleanup(self._patch_open.stop)
+        self.addCleanup(self._patch_midday.stop)
 
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
@@ -1357,6 +1542,12 @@ class TestTodayProfitTencentAlways(unittest.TestCase):
 class TestTodayProfitEdgeCases(unittest.TestCase):
     """today_profit 边界场景。"""
 
+    def setUp(self) -> None:
+        # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td.start()
+        self.addCleanup(self._patch_td.stop)
+
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
     def test_no_price_data(self, mock_open, mock_td):
@@ -1394,6 +1585,12 @@ class TestTodayProfitEdgeCases(unittest.TestCase):
 class TestPremiumInWriteSheet(unittest.TestCase):
     """验证 premium 在写入页签时的列值。"""
 
+    def setUp(self) -> None:
+        # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td.start()
+        self.addCleanup(self._patch_td.stop)
+
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
     def test_premium_in_excel_row(self, mock_open, mock_td):
@@ -1411,6 +1608,15 @@ class TestPremiumInWriteSheet(unittest.TestCase):
 
 class TestCurrencyConversion(unittest.TestCase):
     """多币种转换正确 — 美元/港币份额处理。"""
+
+    def setUp(self) -> None:
+        # _compute_detail_row → _determine_price_type → _count_trading_days_back
+        # → _is_trading_day → akshare 交易日历（真实网络）。这些用例已 mock
+        # get_last_trading_day/is_market_open，但漏 _is_trading_day，补上以
+        # 隔离 akshare 网络调用。
+        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td.start()
+        self.addCleanup(self._patch_td.stop)
 
     @patch("src.python.report.market_value.get_last_trading_day")
     @patch("src.python.report.market_value.is_market_open", return_value=False)
