@@ -7,7 +7,7 @@
   - smoke / data / integration（详见各 marker 说明）
 
 用法：
-  cd D:/codebase/zoo/investor-util
+  cd <项目根目录>
   pytest src/test/ -m "smoke"                                    # 仅冒烟
   pytest src/test/ -m "not llm"                                  # 排除 LLM
   pytest src/test/ -m "scenario"                                 # 全部场景

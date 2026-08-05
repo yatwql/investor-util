@@ -9,7 +9,7 @@
   - 下采样不改变原 bars 列表内容
 
 运行：
-  cd /lzcapp/document/working/codebase/investor-util
+  cd <项目根目录>
   .venv/bin/python -m pytest src/test/unit/report/test_downsample.py -v
 """
 

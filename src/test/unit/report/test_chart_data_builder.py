@@ -10,7 +10,7 @@
   - 空值语义：键缺失→占位；空数组→无数据；degraded→虚线
 
 运行：
-  cd /lzcapp/document/working/codebase/investor-util
+  cd <项目根目录>
   .venv/bin/python -m pytest src/test/unit/report/test_chart_data_builder.py -v
 """
 

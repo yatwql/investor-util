@@ -8,7 +8,7 @@
   - 调试页 test-chart.html 引擎注入列表与报告模板一致（浏览器人工验证前置载体）
 
 运行：
-  cd /lzcapp/document/working/codebase/investor-util
+  cd <项目根目录>
   .venv/bin/python -m pytest src/test/unit/report/test_feature_interactive.py -v
 """
 
