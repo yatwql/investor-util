@@ -61,18 +61,18 @@
 | `--mode` | dragonball（2026-08-05 实测） | stallman-NB1（2026-08-05 实测） |
 |:---------|:---------------------------:|:---:|
 | `unit` | ~14s | ~4min |
-| `standard` | ~14s | ~5min |
+| `standard` | ~11s | ~5min |
 | `scenario` | ~18s | ~3min |
-| `regression` | ~18s | ~3min |
-| `verify,regression` | ~28s（verify+regression 顺序之和） | ~5min（verify+regression 顺序之和） |
-| `dev-verify` | ~20s | ~3min |
+| `regression` | ~17s | ~3min |
+| `verify,regression` | ~27s（verify+regression 顺序之和） | ~5min（verify+regression 顺序之和） |
+| `dev-verify` | ~21s | ~3min |
 | `verify` | ~10s | ~1min |
 | `integration` | ~12s | ~3min |
-| `edge` | ~12s | ~49s |
+| `edge` | ~13s | ~49s |
 | `data` | ~2s | ~31s |
-| `all` | **~22s** | ~5min |
-| `smoke` | ~1s | ~20s |
-| `report` | ~12s | ~4min |
+| `all` | ~22s | ~5min |
+| `smoke` | ~2s | ~20s |
+| `report` | ~13s | ~4min |
 | `all_no_unit` | ~10s | ~2min |
 | `scenario_extreme` | ~2s | ~19s |
 | 数据更新时间 | 2026-08-05 | 2026-08-05 |
