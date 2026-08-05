@@ -1,5 +1,5 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
-> 文档版本：0.10.6-dev
+> 文档版本：0.10.6
 > **编号源**：`rf-next = 233`（新增问题取此编号，完成后更新为 +1；已用最大 rf-232，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
@@ -48,24 +48,13 @@
 
 ## 已修复（摘要）
 
-> 已归档历史修复记录见 [归档档案](#归档档案)。以下仅保留近期未归档条目。
-
-| # | 问题 | 修复方案 | 变更记录 |
-|---|------|----------|----------|
-| **rf-232** | `test_runner.py::_update_test_coverage_doc_file` 打印路径用 `os.path.relpath(_DOC_COVERAGE_PATH, _PROJECT_ROOT)`，Windows 下两路径跨盘符（测试将 `_DOC_COVERAGE_PATH` monkeypatch 到 C: 临时目录，项目在 D:）时 relpath 抛 `ValueError: path is on mount 'C:', start on mount 'D:'`，`unit` 模式 1 failed（`test_update_doc_file_writes_only_when_changed`）。已用单用例复现，traceback 落 929 行 print | 新增 `_display_path(path, start)`：relpath 抛 ValueError 时降级返回绝对路径；替换 925/929 两处 relpath；新增回归测试 `test_display_path_cross_drive_fallback`（Windows 断言降级绝对路径，POSIX 断言正常相对路径，平台无关）。test_test_runner_doc_writer.py 23 passed | changelog v0.10.6-dev |
-| **rf-231** | `test_handlers_whatif.py::TestSelectCandidateFile` 三处断言硬编码 POSIX 风格路径，Windows 下 dev-verify 失败：① `test_only_base_choose_copy_template`/`test_only_base_invalid_choice_then_copy_template` 期望 `dummy_dir/base-调仓后模板.xlsx`（正斜杠），而 `_copy_base_as_template` 用 `os.path.join` 拼接（Windows `\`）；② `test_only_base_manual_input_valid` 期望返回 `/tmp/after.xlsx`，但 `_manual_input_path` 对输入做 `os.path.abspath`（Windows `D:\tmp\after.xlsx`） | 断言改平台无关：模板路径用 `os.path.join("dummy_dir", "base-调仓后模板.xlsx")`，手动输入返回用 `os.path.abspath("/tmp/after.xlsx")`；测试文件补 `import os`。test_handlers_whatif.py 16 passed | changelog v0.10.6-dev |
-| **rf-230** | 事实校验自动修正将 LLM 调仓建议的止盈/减仓目标比例（「建议止盈约30-40%持仓」「止盈约20-30%」）误当作收益率，修正为最近邻品种收益率（601398 实际 70.2%）——报告原文被篡改为「止盈约30-70.2%」「止盈约20-70.2%」，建议语义失真。根因：① 语境识别缺失——`_REBALANCE_TARGET_KEYWORDS` 仅覆盖「降至/减仓至」等"至"字式，漏掉「止盈约/减仓约」等"约"字式；句子含「利润/盈利」触发收益语境后，比例值走全局最近邻被误修正；② `apply_numerical_corrections` 用 `re.sub` 无 `count` 限制，一处修正连带替换 HTML 中所有同值出现处 | ① `fact_checker/_constants.py` 新增 `_TRIM_TARGET_KEYWORDS`（止盈/减仓/加仓/止损/清仓/调仓等）+ `_context.py` 新增 `_is_trim_target_context`（match 前 15 字符邻近窗口）+ `_numerical.py` `_evaluate_percent_value` 开头拦截（与胜率/权重等非收益率语境同级）；② `_corrections.py` 的 `re.sub` 加 `count=1` 只替换判定处。新增回归测试 `TestTrimTargetContext`（真实复现句 30-40%/20-30% 不误修正 + 真实收益率仍校验）+ `TestApplyCorrectionSingleReplace`（同值异义只替换一处） | changelog v0.10.6-dev |
-| **rf-228** | TUI 菜单「2」更新行情缓存时进程崩溃 `[FATAL:partition_address_space.cc(243)] Check failed: !IsConfigurablePoolInitialized()`。根因：菜单 2 的并行价格抓取（ThreadPoolExecutor 4 workers）中，每个价格的新鲜度校验 `_price_cache_fresh` → `get_last_trading_day()` → `_get_trading_calendar()` → `akshare.tool_trade_date_hist_sina()`，akshare 内部用 `py_mini_racer`(V8) 解密新浪接口且每次调用都重新初始化 V8；多线程并发首次初始化 V8 触发 partition_address_space FATAL，**直接 abort 整个进程**（try/except 无法捕获）。已在 tmp 探针脚本复现（4 线程并发 → EXIT 3 崩溃；加锁串行化 → 全成功） | `_get_trading_calendar()` 缓存未命中分支用模块级锁 `_TRADING_CALENDAR_AKSHARE_LOCK` 串行化 + 双重检查（避免锁等待后重复拉取）。V8 顺序初始化安全。新增回归测试 `TestTradingCalendarConcurrency`：4 线程并发调用 `_get_trading_calendar()` 注入 fake akshare，断言回调最大并发深度 = 1。**连带优化**：测试文件 `test_market_value.py` 多个测试类裸调用 `is_market_open`（东方财富 push2 API 真实 HTTP）与 `_is_trading_day`（akshare 交易日历）致单用例 2~6s，统一补 setUp mock 隔离网络 | changelog v0.10.5 |
-| **rf-227** | `test_cli_integration.py` 三处 CLI 测试 patch 目标陈旧（41df26a 根文件归子包重构后残留包级 re-export 路径 `src.python.cli._cli_read_holdings`，拦截不到 `cli.py` 内部调用）：`test_cli_cache_config_respected` 直接读取真实持仓文件失败（`/test/holdings/test.xlsx` 不存在 → mock 被调用 0 次断言失败），另两例靠默认持仓文件恰好存在而侥幸通过 | 三处 patch 目标统一修正到 `src.python.cli.cli._cli_read_holdings(_with_flows)`；report 路径两例改用 `_cli_read_holdings_with_flows` 返回 `(mock_holdings, [], [])`（与 `_handle_report` 实际调用一致），彻底脱离真实持仓文件依赖。全量 all 5026 passed、CLI 单测 56 passed | changelog v0.10.5 |
-
-
----
+> v0.10.6 发布时已修复项（rf-227/rf-228/rf-230/rf-231/rf-232）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。当前无未归档已修复项。
 
 ## 归档
 
 ### 归档档案
 
-- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.4（2026-08-04 ~ 2026-08-05，rf-204~rf-226）
+- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.6（2026-08-04 ~ 2026-08-05，rf-204~rf-232）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
 - [`archived_review-findings.0.7.x.md`](../archive/v0.7.x/archived_review-findings.0.7.x.md) 
