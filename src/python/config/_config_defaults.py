@@ -40,7 +40,7 @@ _DEFAULT_CONFIG = {
     "enable_news": True,  # 市场新闻
     "enable_history": True,  # 组合历史走势+回撤
     "enable_portfolio_evolution": True,  # 组合演进
-    "enable_action": False,  # 行动建议独立章（再平衡信号+交易纪律+调仓建议+收益归因，默认关）
+    "enable_action": True,  # 行动建议独立章（再平衡信号+交易纪律+调仓建议+收益归因，默认开，菜单 P 可切换）
     # 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
     "report_submodules": {
         "data_quality": False,  # 「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖）
@@ -170,7 +170,7 @@ def _build_template_from_defaults() -> str:
         f'  "enable_news": {json.dumps(d["enable_news"])},  // 市场新闻',
         f'  "enable_history": {json.dumps(d["enable_history"])},  // 组合历史走势+回撤',
         f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进',
-        f'  "enable_action": {json.dumps(d["enable_action"])},  // 行动建议独立章（决策行动，默认关）',
+        f'  "enable_action": {json.dumps(d["enable_action"])},  // 行动建议独立章（决策行动，默认开，菜单 P 可切换）',
         '  // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）',
         f'  "report_submodules": {json.dumps(d["report_submodules"], ensure_ascii=False)},  // 数据质量仪表盘默认关',
         "",

@@ -17,7 +17,7 @@
   "enable_news": true,      // 市场新闻
   "enable_history": true,   // 组合历史走势与回撤
   "enable_portfolio_evolution": true,  // 组合演进
-  "enable_action": false,     // 行动建议（默认关）
+  "enable_action": true,     // 行动建议（默认开，可在菜单 P 关闭）
   // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
   "report_submodules": {"data_quality": false, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度 默认关
   "comparison_candidates": [],  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合 candidate_compare）
@@ -168,7 +168,7 @@
 | `enable_news` | `true` | 市场新闻章节可见性，关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
 | `enable_history` | `true` | 历史走势章节可见性（组合历史走势与回撤，一章两区块：走势表 + 回撤矩阵 + 危机区间标注），关闭后对应章节完全隐藏。持仓快照不受影响，始终自动执行 | 菜单 `P` |
 | `enable_portfolio_evolution` | `true` | 组合演进章节可见性，关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
-| `enable_action` | `false` | 行动建议章节可见性，**默认关闭**，开启后显示 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。智囊团深度复盘同步显示「行动摘要」子块 | 手动编辑 |
+| `enable_action` | `true` | 行动建议章节可见性，**默认开启**，关闭后隐藏 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。智囊团深度复盘同步隐藏「行动摘要」子块 | 菜单 `P` |
 | `report_submodules.data_quality` | `false` | 数据质量仪表盘子模块开关，**默认关闭**。开启后报告展示数据质量仪表盘区块（数据覆盖/时效性/降级状态） | 手动编辑 |
 | `report_submodules.candidate_compare` | `false` | 「基金业绩分析」章候选基金比较子表开关，**默认关闭**。开启后报告在该章主业绩表下方展示候选基金横向比较表（候选来自 `comparison_candidates`，比较维度：收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度） | 手动编辑 |
 | `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
@@ -189,7 +189,7 @@
 
 `enable_fund_deep_analysis`、`enable_news`、`enable_history`、`enable_portfolio_evolution`、`enable_action` 五个配置项控制报告按章节组显示或隐藏对应的章节。LLM 分析章节的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个章节组后，该组涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
 
-通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换基金深度分析/市场新闻/历史走势/组合演进 4 个章节组的可见性（`enable_action` 无菜单入口，需手动编辑 `config.json`）。
+通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换基金深度分析/市场新闻/历史走势/组合演进/行动建议 5 个章节组的可见性。
 
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
@@ -197,7 +197,7 @@
 | `enable_news` | `true` | `config.json` | 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
 | `enable_history` | `true` | `config.json` | 组合历史走势与回撤 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
 | `enable_portfolio_evolution` | `true` | `config.json` | 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
-| `enable_action` | `false` | `config.json` | 行动建议 | 行动建议章节组（再平衡信号/交易纪律/调仓建议/收益归因，纯算法） |
+| `enable_action` | `true` | `config.json` | 行动建议 | 行动建议章节组（再平衡信号/交易纪律/调仓建议/收益归因，纯算法） |
 | `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | 全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
@@ -402,7 +402,7 @@
 | 14 | `penetration_deep` | 穿透深度分析 | LLM |
 | 15 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
 | 16 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 17 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认关**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 17 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
 | 18 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
 | 19 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 

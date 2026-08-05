@@ -354,9 +354,10 @@ def _remove_comparison_index(config: dict, indices: dict[str, str]) -> None:
 
 
 def _cmd_config_report_boards() -> None:
-    """配置报告可选章节（基金深度分析 / 市场新闻 / 组合历史走势+回撤 / 组合演进）。"""
+    """配置报告可选章节（基金深度分析 / 市场新闻 / 组合历史走势+回撤 / 组合演进 / 行动建议）。"""
     from src.python.config import (
         get_config,
+        is_enable_action,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_news,
@@ -370,6 +371,7 @@ def _cmd_config_report_boards() -> None:
         news = is_enable_news(config)
         history = is_enable_history(config)
         portfolio_evolution = is_enable_portfolio_evolution(config)
+        action = is_enable_action(config)
 
         print()
         print("  ┌── 配置报告可选章节 ────────────────────┐")
@@ -377,17 +379,19 @@ def _cmd_config_report_boards() -> None:
         n_status = f"{GREEN}启用{RESET}" if news else f"{RED}禁用{RESET}"
         h_status = f"{GREEN}启用{RESET}" if history else f"{RED}禁用{RESET}"
         e_status = f"{GREEN}启用{RESET}" if portfolio_evolution else f"{RED}禁用{RESET}"
+        a_status = f"{GREEN}启用{RESET}" if action else f"{RED}禁用{RESET}"
         print(f"  │ 1. 基金深度分析      [{fund_status}]{' ' * 8}│")
         print(f"  │ 2. 市场新闻          [{n_status}]{' ' * 8}│")
         print(f"  │ 3. 组合历史走势+回撤  [{h_status}]{' ' * 8}│")
         print(f"  │ 4. 组合演进          [{e_status}]{' ' * 8}│")
+        print(f"  │ 5. 行动建议          [{a_status}]{' ' * 8}│")
         print("  │                                   │")
-        print("  │ 5. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
+        print("  │ 6. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
         print(f"  └{'─' * 42}┘")
         print()
         try:
-            choice = input("  输入编号切换 (0-5): ").strip()
+            choice = input("  输入编号切换 (0-6): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
@@ -408,6 +412,9 @@ def _cmd_config_report_boards() -> None:
             set_config("enable_portfolio_evolution", not portfolio_evolution)
             print(f"  {GREEN}[OK]{RESET} 组合演进已{'禁用' if portfolio_evolution else '启用'}")
         elif choice == "5":
+            set_config("enable_action", not action)
+            print(f"  {GREEN}[OK]{RESET} 行动建议已{'禁用' if action else '启用'}")
+        elif choice == "6":
             print(f"  {YELLOW}[!]{RESET} LLM 分析章节配置请使用菜单 [S]")
         else:
             print(f"  {YELLOW}[!]{RESET} 无效编号")

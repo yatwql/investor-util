@@ -228,7 +228,7 @@ def _validate_enable_boards(config: dict, issues: int) -> int:
     """验证章节可见性配置（enable_fund_deep_analysis / enable_news / enable_history /
     enable_portfolio_evolution / enable_action）。
 
-    enable_action（行动建议独立章）默认关，缺失视为 False（沿用默认值），
+    enable_action（行动建议独立章）默认开，缺失视为 True（沿用默认值），
     类型校验逻辑与其余 enable_xxx 一致。
     """
     for key in (
@@ -240,7 +240,7 @@ def _validate_enable_boards(config: dict, issues: int) -> int:
     ):
         val = config.get(key)
         if val is None:
-            continue  # 缺失视为默认值（启用类默认 True，enable_action 默认 False）
+            continue  # 缺失视为默认值（各章节可见性开关默认 True）
         if not isinstance(val, bool):
             logger.warning("config.json %s = %r 不是布尔值，将使用默认值", key, val)
             issues += 1

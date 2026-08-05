@@ -364,7 +364,7 @@ def write_html_report(
     enable_news: bool = True,
     enable_history: bool = True,
     enable_portfolio_evolution: bool = True,
-    enable_action: bool = False,  # 行动建议独立章（enable_action 默认关）
+    enable_action: bool = False,  # 行动建议独立章（enable_action config 默认开）
     enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
     position_status: dict | None = None,  # 品种覆盖诊断 position_status（品种覆盖区块）
     data_freshness: dict | None = None,  # 可信度摘要 data_freshness（可信度区块 + 头部摘要行）

@@ -142,7 +142,7 @@ def generate_excel_report(
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
-    enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
+    enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
     enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,

@@ -71,7 +71,7 @@ def _compute_section_visibility(
     enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
-    enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
+    enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     style_factor_data: dict | None = None,  # data 层：风格与因子 dict（None=无数据，章节隐藏）
     position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 dict（相关性区块数据源）
@@ -92,7 +92,7 @@ def _compute_section_visibility(
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
-        "action": enable_action,  # ← board 层：行动建议（默认关）
+        "action": enable_action,  # ← board 层：行动建议（config 默认开）
         "llm": enable_llm,  # ← board 层
     }
     # data 层：各模块数据就绪状态

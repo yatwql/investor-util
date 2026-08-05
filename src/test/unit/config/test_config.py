@@ -991,12 +991,16 @@ class TestGetComparisonCandidates(unittest.TestCase):
 
 
 class TestIsEnableAction(unittest.TestCase):
-    """is_enable_action 访问器测试（行动建议独立章开关，默认关）。"""
+    """is_enable_action 访问器测试（行动建议独立章开关，默认开）。"""
 
-    def test_default_false_when_missing(self):
-        """config 缺失 enable_action → 返回 False（默认关，向后兼容）。"""
-        self.assertFalse(cfg.is_enable_action({}))
-        self.assertFalse(cfg.is_enable_action({"enable_fund_deep_analysis": True}))
+    def test_default_true_when_missing(self):
+        """config 缺失 enable_action → 返回 True（默认开）。"""
+        self.assertTrue(cfg.is_enable_action({}))
+        self.assertTrue(cfg.is_enable_action({"enable_fund_deep_analysis": True}))
+
+    def test_default_config_says_enabled(self):
+        """默认配置模板 enable_action=True（默认开启的事实来源）。"""
+        self.assertTrue(cfg._config_defaults._DEFAULT_CONFIG["enable_action"])
 
     def test_false_when_disabled(self):
         """显式 false → 返回 False。"""
@@ -1008,5 +1012,5 @@ class TestIsEnableAction(unittest.TestCase):
 
     def test_independent_from_portfolio_evolution(self):
         """行动建议开关独立于组合演进开关。"""
-        self.assertFalse(cfg.is_enable_action({"enable_portfolio_evolution": True}))
+        self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": True}))
         self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": False, "enable_action": True}))
