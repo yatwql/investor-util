@@ -164,6 +164,15 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.config._local_state._LOCAL_STATE_FILE",
         str(tmp_path / "data/state/local_state.json"),
     )
+    # 指标熔断器持久化文件隔离（data/state/ 运行时状态目录 + 旧 data/cache/ 路径）
+    monkeypatch.setattr(
+        "src.python.analysis.circuit_breaker_wrapper._METRICS_BREAKER_FILE",
+        str(tmp_path / "data/state/metrics_breaker.json"),
+    )
+    monkeypatch.setattr(
+        "src.python.analysis.circuit_breaker_wrapper._LEGACY_METRICS_BREAKER_FILE",
+        str(tmp_path / "data/cache/metrics_breaker.json"),
+    )
     # perf_history.jsonl 性能历史文件隔离
     monkeypatch.setattr(
         "src.python.core.perf._PERF_HISTORY_FILE",
@@ -236,6 +245,18 @@ def _auto_reset_provider_registry():
     """
     from src.python.core.provider_registry import get_registry
     get_registry().reset()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_indicator_breaker():
+    """自动重置指标熔断器单例，防止测试间状态污染。
+
+    每个测试执行前销毁 IndicatorBreaker 实例并清空其状态文件，
+    避免某测试记录的断路状态泄漏到后续测试（尤其网关聚合测试）。
+    依赖 reset_indicator_breaker() 销毁当前实例，下次 get_indicator_breaker() 重建。
+    """
+    from src.python.analysis.circuit_breaker_wrapper import reset_indicator_breaker
+    reset_indicator_breaker()
 
 
 def pytest_addoption(parser):

@@ -196,7 +196,7 @@
 | 熔断层 | 阈值 | 冷却期 | 退避策略 | 持久化 |
 |:-------|:----:|:------:|:---------|:-------|
 | **数据源熔断器**（DataSourceRegistry） | 连续 3 次失败（行业 6 次） | 复位值 300s（行业 120s），首次熔断实际冷却按退避首档 60s | 指数退避 60s→300s→900s→3600s（每次熔断升一档） | `data/state/circuit_breaker.json` |
-| **指标熔断器**（IndicatorBreaker） | 连续 3 次失败 | 86400s（24h） | — | `data/cache/metrics_breaker.json` |
+| **指标熔断器**（IndicatorBreaker） | 连续 3 次失败 | 86400s（24h） | — | `data/state/metrics_breaker.json` |
 | **LLM 端点熔断器** | 连续 3 次失败 | 60s | — | 仅内存 |
 
 ### 4.2 Provider Chain 降级路径

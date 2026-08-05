@@ -485,13 +485,13 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 | 冷却时长 | 指数退避 60s→300s→900s→3600s | 120s | 60s | 24h（静默，不阻塞其他指标） |
 | 试探次数 | 冷却期满放行一次 | 冷却期满放行一次 | 半开状态放行一次 | 冷却期满后自动复位重试 |
 | 恢复条件 | 试探成功 → record_success | 试探成功 → record_success | 半开成功 → 关闭熔断 | record_success → 复位计数 |
-| 持久化 | `data/state/circuit_breaker.json` | `data/state/circuit_breaker.json` | 会话级（无持久化） | `data/cache/metrics_breaker.json` |
+| 持久化 | `data/state/circuit_breaker.json` | `data/state/circuit_breaker.json` | 会话级（无持久化） | `data/state/metrics_breaker.json` |
 
 **指数退避**：单股票 API 熔断器冷却时间采用指数退避策略（60s→300s→900s→3600s），每次连续失败冷却时长按退避等级递增，成功恢复后重置为基础值。
 
 **跨会话持久化**：熔断器状态持久化到 `data/state/circuit_breaker.json`，与 `data/cache/` 隔离，避免缓存清理误删。会话重启后恢复熔断记忆。
 
-**双熔断器统一网关**：`core/provider_registry.py` 和 `core/circuit_breaker.py` 通过统一的熔断网关管理。Provider 级熔断（HTTP 传输层）管"某个数据源能不能调用"；数据模块级熔断（业务层）管"某类数据是否跳过"。两熔断器状态同步。
+**统一熔断网关**：`core/circuit_breaker.py` 的 `CircuitBreakerGateway` 聚合 Provider 级熔断（`provider_registry.py`，HTTP 传输层，管"某个数据源能不能调用"）、LLM 端点熔断（`llm/circuit_breaker.py`）和指标熔断器（`analysis/circuit_breaker_wrapper.py`，业务层，管"某类数据是否跳过"）三者的状态查询与管理，`gateway.summary()` / `get_all_breaker_status()` 统一返回三类状态报告，单入口消除运维复杂度。
 
 #### Chain 自动注册
 

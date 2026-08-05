@@ -23,6 +23,7 @@ class CacheUpdateResult:
     """基础缓存更新结果。"""
 
     total_funds: int = 0
+    holdings_count: int = 0
     perf_ok: int = 0
     hold_ok: int = 0
     bm_ok: int = 0
@@ -30,11 +31,22 @@ class CacheUpdateResult:
     sf_ok: int = 0
     ind_ok: int = 0
     div_ok: int = 0
+    # 扩展缓存刷新：新闻 / 基金经理 / 风格扩展
+    news_ok: int = 0
+    manager_ok: int = 0
+    ext_ok: int = 0
     errors: list[str] = field(default_factory=list)
 
     @property
     def exit_code(self) -> int:
-        if self.total_funds == 0 and self.pf_ok == 0 and self.sf_ok == 0:
+        if (
+            self.total_funds == 0
+            and self.pf_ok == 0
+            and self.sf_ok == 0
+            and self.news_ok == 0
+            and self.manager_ok == 0
+            and self.ext_ok == 0
+        ):
             return 2
         if self.errors:
             return 1
@@ -236,15 +248,147 @@ def _refresh_common_caches(
 
 
 # ═══════════════════════════════════════════════════════════════
-# update_basic_cache（基金 + 公共缓存）
+# 扩展缓存（新闻 / 基金经理 / 风格扩展）
+# ═══════════════════════════════════════════════════════════════
+
+
+def _get_news_top_count() -> int:
+    """读取新闻最大返回条数配置（默认 300）。"""
+    from src.python.config import get_config
+
+    try:
+        value = get_config().get("news_top_count", 300)
+        return int(value) if value else 300
+    except Exception:
+        return 300
+
+
+def _refresh_news_cache(holdings: list) -> int:
+    """刷新财经新闻缓存：持仓关键词 → 聚合新闻（写入 news_ 前缀缓存）。
+
+    与报告生成共用 build_holding_keywords + _expand_industry_keywords 管线，
+    保证缓存键一致、后续报告生成命中缓存。
+
+    Returns:
+        成功关联的新闻条数；无持仓或关键词为空时返回 0。
+    """
+    from src.python.fetcher.news import aggregate_news, build_holding_keywords
+    from src.python.report.news_correlation import _expand_industry_keywords
+
+    if not holdings:
+        return 0
+    keywords = build_holding_keywords(holdings, penetrated_assets=None)
+    if not keywords:
+        return 0
+    keywords, _industry_data, lightweight_kw = _expand_industry_keywords(holdings, None, keywords)
+    top_n = _get_news_top_count()
+    per_source = max(500, top_n * 2)
+    news_items = aggregate_news(
+        keywords,
+        top_n=top_n,
+        per_source=per_source,
+        lightweight_keywords=lightweight_kw,
+    )
+    return len(news_items) if news_items else 0
+
+
+def _refresh_fund_manager_cache(funds: list) -> int:
+    """刷新基金经理缓存：逐基金 fetch_fund_manager（写入 fund_manager_{code} 前缀缓存）。
+
+    Returns:
+        成功获取基金经理的基金数。
+    """
+    from src.python.fetcher.fund_manager import fetch_fund_manager
+
+    ok = 0
+    for f in funds:
+        try:
+            if fetch_fund_manager(f.code):
+                ok += 1
+        except Exception:
+            logger.debug("基金经理刷新异常 [%s]: %s", getattr(f, "code", "?"), getattr(f, "name", ""))
+    return ok
+
+
+def _refresh_extended_cache(holdings: list) -> int:
+    """刷新风格扩展数据：A 股股票扩展数据预取到 registry session_cache。
+
+    Returns:
+        需预取的 A 股去重代码数（预取本身为填充 session_cache 的尽力而为操作）。
+    """
+    from src.python.core.code_utils import is_a_share_code
+    from src.python.core.provider_registry import get_registry
+    from src.python.report.fund_style_classify import _prefetch_extended_data
+
+    a_share_codes = [h.code.strip() for h in holdings if h.code and h.code.strip() and is_a_share_code(h.code.strip())]
+    unique = list(dict.fromkeys(a_share_codes))
+    if not unique:
+        return 0
+    holdings_dicts = [{"code": h.code, "name": h.name} for h in holdings]
+    _prefetch_extended_data(holdings_dicts, get_registry())
+    return len(unique)
+
+
+def _refresh_extended_caches(
+    holdings: list,
+    funds: list,
+    result: CacheUpdateResult,
+    reporter,
+) -> None:
+    """刷新扩展缓存：新闻 / 基金经理 / 风格扩展，并行执行。
+
+    Args:
+        holdings: 持仓列表（新闻/风格扩展数据源）
+        funds: 基金子集（基金经理数据源；无基金时跳过）
+        result: 结果对象，写入 news_ok/manager_ok/ext_ok
+        reporter: 进度报告接口
+    """
+    pool = _get_pool()
+    futs: list[tuple] = []
+    if holdings:
+        futs.append((pool.submit(_refresh_news_cache, holdings), "news"))
+    if funds:
+        futs.append((pool.submit(_refresh_fund_manager_cache, funds), "manager"))
+    if holdings:
+        futs.append((pool.submit(_refresh_extended_cache, holdings), "ext"))
+
+    for fut, tag in futs:
+        try:
+            count = fut.result()
+            if tag == "news":
+                result.news_ok = count
+                if count:
+                    reporter.ok(f"新闻 ({count} 条)")
+                else:
+                    reporter.warn("新闻 获取失败")
+            elif tag == "manager":
+                result.manager_ok = count
+                if count:
+                    reporter.ok(f"基金经理 ({count} 只基金)")
+                else:
+                    reporter.warn("基金经理 获取失败")
+            elif tag == "ext":
+                result.ext_ok = count
+                if count:
+                    reporter.ok(f"风格扩展 ({count} 只证券)")
+                else:
+                    reporter.warn("风格扩展 获取失败")
+        except Exception as e:
+            logger.debug("%s 扩展缓存刷新异常: %s", tag, e)
+            result.errors.append(f"扩展缓存刷新异常: {e}")
+            reporter.warn(f"{tag} 刷新异常")
+
+
+# ═══════════════════════════════════════════════════════════════
+# update_basic_cache（基金 + 公共缓存 + 扩展缓存）
 # ═══════════════════════════════════════════════════════════════
 
 
 def update_basic_cache(holdings: list, reporter) -> CacheUpdateResult:
-    """更新基础类缓存（基金业绩+持仓+基准 + 公共缓存）。
+    """更新基础类缓存（基金业绩+持仓+基准 + 公共缓存 + 扩展缓存）。
 
     内部管理线程池，operations 池唯一存在。
-    基金刷新 + 公共缓存并行获取。
+    基金刷新 + 公共缓存并行获取；随后并行刷新扩展缓存（新闻/基金经理/风格扩展）。
 
     Args:
         holdings: 持仓列表
@@ -256,6 +400,7 @@ def update_basic_cache(holdings: list, reporter) -> CacheUpdateResult:
     from src.python.cache import clear_by_group
 
     result = CacheUpdateResult()
+    result.holdings_count = len(holdings)
 
     # 先清旧缓存（匹配 TUI 语义）
     clear_by_group("refresh")
@@ -268,17 +413,21 @@ def update_basic_cache(holdings: list, reporter) -> CacheUpdateResult:
     pool = _get_pool()
 
     if not funds:
-        # 无基金：仅刷新公共缓存
+        # 无基金：刷新公共缓存 + 扩展缓存（新闻/风格扩展，跳过基金经理）
         result.pf_ok, result.sf_ok, result.ind_ok, result.div_ok = _refresh_common_caches(holdings, reporter)
+        _refresh_extended_caches(holdings, [], result, reporter)
         return result
 
-    # 有基金：所有任务并行提交
+    # 有基金：基金 + 公共缓存并行提交，随后刷新扩展缓存
     reporter.info("正在并行获取全部缓存数据...")
     all_futures: dict = {}
     for f in funds:
         all_futures[pool.submit(_refresh_one_fund_cache, f)] = ("fund", f)
-    all_futures[pool.submit(_refresh_profit_forecast_cache)] = ("other", None)
-    all_futures[pool.submit(_refresh_sector_flow_cache)] = ("other", None)
+    all_futures[pool.submit(_refresh_profit_forecast_cache)] = ("profit_forecast", None)
+    all_futures[pool.submit(_refresh_sector_flow_cache)] = ("sector_flow", None)
+    if holdings:
+        all_futures[pool.submit(_refresh_industry_cache, holdings)] = ("industry", None)
+        all_futures[pool.submit(_refresh_dividend_cache, holdings)] = ("dividend", None)
 
     for future in as_completed(all_futures):
         tag, _ = all_futures[future]
@@ -296,22 +445,36 @@ def update_basic_cache(holdings: list, reporter) -> CacheUpdateResult:
                     f"{name} ({code}) — 业绩={'OK' if p_ok else '失败'} | "
                     f"持仓={h_cnt}条 | 基准={'OK' if b_ok else '未找到'}"
                 )
-            elif res[0] == "profit_forecast":
+            elif tag == "profit_forecast":
                 result.pf_ok = res[1]
                 if result.pf_ok:
                     reporter.ok(f"盈利预测 ({result.pf_ok} 只股票)")
                 else:
                     reporter.warn("盈利预测 获取失败")
-            elif res[0] == "sector_flow":
+            elif tag == "sector_flow":
                 result.sf_ok = res[1]
                 if result.sf_ok:
                     reporter.ok(f"行业资金流向 ({result.sf_ok} 个行业)")
                 else:
                     reporter.warn(f"行业资金流向 {_sector_flow_hint()}")
+            elif tag == "industry":
+                result.ind_ok = res
+                if result.ind_ok:
+                    reporter.ok(f"行业分类 ({result.ind_ok} 只证券)")
+                else:
+                    reporter.warn("行业分类 获取失败")
+            elif tag == "dividend":
+                result.div_ok = res
+                if result.div_ok:
+                    reporter.ok(f"分红数据 ({result.div_ok} 只股票)")
+                else:
+                    reporter.warn("分红数据 获取失败")
         except Exception as e:
             logger.debug("缓存刷新 Future 异常: %s", e)
             result.errors.append(f"缓存刷新异常: {e}")
             reporter.warn("基金刷新异常" if tag == "fund" else "其他缓存刷新异常")
+
+    _refresh_extended_caches(holdings, funds, result, reporter)
 
     return result
 

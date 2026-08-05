@@ -362,6 +362,7 @@ investor-util/
 │       │   │   ├── test_cache_cleanup.py    #   缓存清理与统计测试
 │       │   │   ├── test_cache_format.py     #   缓存格式测试
 │       │   │   ├── test_cache_edge.py       #   缓存边缘场景测试
+│       │   │   ├── test_circuit_breaker_gateway.py #   统一熔断网关（Provider/LLM/指标三路聚合）
 │       │   │   ├── test_code_utils.py       #   证券代码工具测试
 │       │   │   ├── test_filesystem_edge.py  #   文件系统边缘场景
 │       │   │   ├── test_holding_status.py   #   品种级数据状态标注测试（品种覆盖诊断）
