@@ -6,6 +6,23 @@
 
 ## [0.10.11-dev] - 开发中（未发布）
 
+### README 核心亮点总览重写（2026-08-06）
+
+- **标题区简介重写**：从一句话简介升级为有感染力的总览——「把持仓 Excel 变成决策级投资洞察」，点明本地投资分析引擎、对接中国金融数据源、穿透组合底层资产、融合量化指标/基金评级/LLM 智囊团深度复盘、产出图表丰富的 HTML 报告与专业的 Excel 报告。
+- **新增「✨ 核心亮点」总览表**（5 行）：① **三种交互渠道**（TUI 全键盘菜单 / CLI 定时无人值守 / Web 浏览器即开即用，同一引擎报告一致）；② **图表丰富的 HTML 报告**（单页自包含、响应式、9 张 Chart.js 交互图、深/浅色主题）；③ **专业的 Excel 报告**（最多 19 条件页签分七组）；④ **LLM 智囊团**（多 Provider 链式分发 + 缓存省费）；⑤ **调仓 What-if 模拟**。
+- **启动方式统一引导句**：「同一套引擎，三种交互渠道——按你的场景选一个即可，报告结果完全一致」。
+- **folders.md 同步**：用户文档统计行数 5,843→5,855（README 191→203 行）、目录树 README 描述标注「三渠道交互 + 核心亮点总览」。
+
+---
+
+### 数据源健康检查整体耗时预算修复（rf-263）（2026-08-06）
+
+- **`core/check_sources.py` `run_health_checks`（rf-263 修复）**：`max_timeout` 原为**死参数**——`ThreadPoolExecutor` + `as_completed` 主流程等待全部线程完成，慢速/挂起数据源会拖住整个健康检查（Web 健康接口需在前端 15s abort 前返回，超时则 504）。改为 daemon 线程 + 整体耗时预算：`deadline = perf_counter() + max_timeout`，逐线程 `join(timeout=剩余预算)`，预算耗尽即返回已收集的部分结果，未完成项标记「超时（预算 Ns）」；持锁原子追加 + 竞态兜底（同 name 保留真实结果弃超时占位）。
+- **`src/test/unit/core/test_check_sources.py`（新增）**：回归用例覆盖——预算内完成全部返回 / 慢源超时未完成项标记超时 / 竞态兜底（迟到真实结果覆盖超时占位）。
+- **门禁**：dev-verify passed + check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
+
+---
+
 ### 功能开关文档补全 + HTML 自包含文档强调（2026-08-06）
 
 - **`how-to-config.md` §M 功能开关表补全（rf-262 修复）**：原表只以通配符摘要列出分组（`llm_*`/`fund_deep_analysis_*`/`news_*`/`metrics_*`），未列具体 key，且 `fund_deep_analysis_*` 计数误写 4 项（实际 2 项）。已补全为**逐项列出全部 27 个开关**（key / 默认值 / 说明），与代码 `features.py::_FEATURE_FLAGS_DEFAULT` 一致。

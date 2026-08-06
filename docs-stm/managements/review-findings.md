@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.11-dev
-> **编号源**：`rf-next = 263`（新增问题取此编号，完成后更新为 +1；已用最大 rf-262，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 264`（新增问题取此编号，完成后更新为 +1；已用最大 rf-263，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -58,6 +58,7 @@
 | rf-259 | HTML 报告非自包含：报告 HTML 外链 8 个 Chart.js 资产，下载/移动（Web 下载到其他目录、单发移动端）后 JS 找不到 → 资产穿透 TOP10 等图表空白（无头 Chrome 实测 canvas 停默认 500×320，仅 HTML 与 JS 同目录才渲染；用户 `reports/` 正常、Web 下载后空白） | `html_writer_assets.py` 新增 `_inline_js_assets`（内嵌保存前读取 8 个资产 → 移除 head 外链标签 → 按 bundle 依赖序追加行内 `<script>` 到 `</body>` 前，复刻 defer 时序），`html_writer.py`/`whatif_writer.py` 保存前调用 → 报告 HTML 单文件完全自包含；`_copy_js_assets` 保留兜底；新增 `TestInlineJsAssets` 6 用例（unit_report 标记） | `changelog.md` [0.10.11-dev] |
 | rf-260 | Web 状态区缺系统信息：TUI 状态面板显示程序版本号/LLM 是否开启（含 endpoint、熔断、模型路由）/本机 IP，Web 模式仅 TUI 有，页面运行状态区无对应展示（用户要求 Web 与 TUI 对齐） | `web/handlers.py` 新增 `_build_system_info`（版本 `APP_VERSION` + 本机 IP `_get_machine_ip` + LLM 状态：flat 单 provider 展示 provider/model/endpoint 简化主机名/熔断/模型路由，credentials_ref 多链展示策略/provider 清单/模块偏好，未配置显示「未配置」，读取异常兜底）；`index.html` 状态区新增「系统信息」卡片（status-grid 改三列）；`style.css` 补 `.status-grid-3` 等样式；新增 `TestSystemInfo` 7 用例（unit_web 标记） | `changelog.md` [0.10.11-dev] |
 | rf-262 | `how-to-config.md` §M 功能开关表未列全 27 项 Feature Flag：`llm_*`/`fund_deep_analysis_*`/`news_*`/`metrics_*` 只写通配符未列具体 key；`fund_deep_analysis_*` 计数误写 4 项（实际 2 项）与总数 27 自相矛盾；结尾指引「完整清单以 features.json 注释为准」错误（features.json 唯一不支持注释） | §M 表格补全为逐项列出全部 27 个 key（含默认值+说明，与 `features.py::_FEATURE_FLAGS_DEFAULT` 一致）；修正 `fund_deep_analysis` 计数；删除错误指引改指向源码；faq.md 报告理解新增「HTML 单文件自包含」重点问答 + 修正故障排查过时说法 | `changelog.md` [0.10.11-dev] |
+| rf-263 | `run_health_checks` 的 `max_timeout` 是**死参数**：原实现用 `ThreadPoolExecutor` + `as_completed`，线程并行执行、主流程等待全部完成，`max_timeout` 从未真正限制整体耗时——慢速/挂起的数据源会拖住整个健康检查（Web 健康接口需在前端 15s abort 前返回，若超时会 504） | 改为 daemon 线程 + 整体耗时预算：`deadline = perf_counter() + max_timeout`，逐线程 `join(timeout=剩余预算)`，预算耗尽即返回已收集的部分结果，未完成项标记「超时（预算 Ns）」；持锁原子追加 + 竞态兜底（同 name 保留真实结果弃超时占位）；`max_timeout` 成为真正的整体耗时上限；新增 `src/test/unit/core/test_check_sources.py` 回归用例 | `changelog.md` [0.10.11-dev] |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 
