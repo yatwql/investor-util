@@ -1,9 +1,9 @@
 # 自我审查问题记录归档 — v0.10.x
 
-> 归档时间：2026-08-05
+> 归档时间：2026-08-06
 > 原始文件：`docs-stm/managements/review-findings.md`
-> 涵盖版本：v0.10.1 ~ v0.10.7（2026-08-04 ~ 2026-08-05；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）
-> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-233）摘要行 + 修复方案 + 变更记录
+> 涵盖版本：v0.10.1 ~ v0.10.8（2026-08-04 ~ 2026-08-06；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）
+> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-247）摘要行 + 修复方案 + 变更记录
 
 ---
 
@@ -69,7 +69,31 @@
 | rf-228 | TUI 菜单「2」更新行情缓存时进程崩溃 `[FATAL:partition_address_space.cc(243)] Check failed: !IsConfigurablePoolInitialized()`。根因：菜单 2 的并行价格抓取（ThreadPoolExecutor 4 workers）中，每个价格的新鲜度校验 `_price_cache_fresh` → `get_last_trading_day()` → `_get_trading_calendar()` → `akshare.tool_trade_date_hist_sina()`，akshare 内部用 `py_mini_racer`(V8) 解密新浪接口且每次调用都重新初始化 V8；多线程并发首次初始化 V8 触发 partition_address_space FATAL，**直接 abort 整个进程**（try/except 无法捕获）。已在 tmp 探针脚本复现（4 线程并发 → EXIT 3 崩溃；加锁串行化 → 全成功） | `_get_trading_calendar()` 缓存未命中分支用模块级锁 `_TRADING_CALENDAR_AKSHARE_LOCK` 串行化 + 双重检查（避免锁等待后重复拉取）。V8 顺序初始化安全。新增回归测试 `TestTradingCalendarConcurrency`：4 线程并发调用 `_get_trading_calendar()` 注入 fake akshare，断言回调最大并发深度 = 1。**连带优化**：测试文件 `test_market_value.py` 多个测试类裸调用 `is_market_open`（东方财富 push2 API 真实 HTTP）与 `_is_trading_day`（akshare 交易日历）致单用例 2~6s，统一补 setUp mock 隔离网络 | `changelog.md` v0.10.5 |
 | rf-227 | `test_cli_integration.py` 三处 CLI 测试 patch 目标陈旧（41df26a 根文件归子包重构后残留包级 re-export 路径 `src.python.cli._cli_read_holdings`，拦截不到 `cli.py` 内部调用）：`test_cli_cache_config_respected` 直接读取真实持仓文件失败（`/test/holdings/test.xlsx` 不存在 → mock 被调用 0 次断言失败），另两例靠默认持仓文件恰好存在而侥幸通过 | 三处 patch 目标统一修正到 `src.python.cli.cli._cli_read_holdings(_with_flows)`；report 路径两例改用 `_cli_read_holdings_with_flows` 返回 `(mock_holdings, [], [])`（与 `_handle_report` 实际调用一致），彻底脱离真实持仓文件依赖。全量 all 5026 passed、CLI 单测 56 passed | `changelog.md` v0.10.5 |
 
+### v0.10.9（2026-08-06）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-239 | 事实校验两处误修正：`_locate_subject_code` 名称分支起点距离平局（建设银行/工商银行距 anchor 均 8）误路由把 601939 正确 171.23% 改写为 601398 的 70.2%；止损警戒阈值「回调20%的警戒区域」被当收益率误修正为 -11.8% | 名称分支改用最近边距离 `min(abs(idx-anchor), abs(idx+len(name)-anchor))`；`_is_trim_target_context` 增警戒词宽窗口检测。新增 6 个回归测试，修复前均失败，修复后 fact_checker 单文件 109 通过 | `changelog.md` v0.10.9 |
+| rf-240 | 测试污染真实快照目录：`test_corrupt_snapshot_file_skipped` 用 `from src.python.core.constants import HISTORY_SNAPSHOT_DIR` 在 import 时拷贝旧值，绕过 conftest 隔离，把损坏文件写入真实 `data/history/snapshots/` | 改用 `import src.python.core.constants as core_constants` 模块属性访问，使隔离生效；edge 测试 6 passed，真实快照目录无新增残留 | `changelog.md` v0.10.9 |
+| rf-241 | 数据质量仪表盘「品种覆盖/可信度」区块渲染崩溃：`position_status.items`/`data_freshness.items` 在 Jinja2 命中 dict 内置 `items` 方法（bound method）而非契约键 → `TypeError: 'builtin_function_or_method' object is not iterable` | guard 与循环改用 `.get("items")`（与生产代码一致），空 items 正确显示降级占位；新增 `TestHtmlDataQualityBlocks` 4 用例，修复前 `_render_template` 抛 TypeError | `changelog.md` v0.10.9 |
+| rf-242 | 报告生成骨架测试污染真实 reports 目录：`test_generate_report_skeleton` 用 `config={}` 真实调用，`output_dir` fallback 到相对路径 `"reports"` → 解析到真实 reports 目录，空持仓跨整天累积 37 个残留文件 | 传入 `output_dir=tempfile.TemporaryDirectory()` 隔离；conftest 新增 `_isolate_report_output_dir` autouse 防线把真实落盘入口透明重定向到 tmp；回归测试恢复 `config={}` 真实调用并以 `reports/` 文件快照断言无新增作永久守护 | `changelog.md` v0.10.9 |
+| rf-243 | Excel 正文标题序号未跟随 `report_section_order` 配置：页签栏 tab 名用可见连续序号（行动建议=10），正文标题用注册表默认序号（行动建议=17），两者不一致 | create_sheets 创建页签时就地标记 `visible_number`；registry 新增 `get_report_section_number_from_order`；7 个深度页签写入函数新增 `section_order` 参数并透传。**后经 rf-244 设计调整收敛**：正文标题统一为纯中文名，同步机制全部撤除 | `changelog.md` v0.10.9 |
+| rf-244 | 设计调整（rf-243 方案收敛）：序号只在 Excel 页签栏与 HTML 章节标题出现，Excel 正文标题统一为纯中文名 | 撤除 rf-243 正文标题序号同步机制（`get_report_section_number_from_order`/`visible_number` 标记/`section_order` 透传），正文不依赖序号，调整配置/隐藏章节不错位；test_correlation_sheet 正文标题断言同步更新 | `changelog.md` v0.10.9 |
+| rf-245 | 历史走势关闭时仅剩误导性「尾部风险：无历史 bars」警告：`fetch_history=False` 静默跳过，用户无法判断是配置关闭所致 | ① fetch 关闭时 `reporter.warn`+`logger.warning` 醒目提示「组合历史走势获取已跳过（history off）」及占位后果；② CLI `--history` 默认改为跟随 `config.history.fetch_mode`（默认 auto），未显式传参时由 `generate_report` 回退到配置层 | `changelog.md` v0.10.9 |
+| rf-246 | cli.ps1 文件头注释声称 "UTF-8 with BOM" 实际无 BOM，Windows PowerShell 5.1 对无 BOM 的 UTF-8 中文按 ANSI/GBK 误读注释解析崩溃（跨机器复现） | 补回 BOM（`EF BB BF`，UTF-8+CRLF），PowerShell Parser 验证通过；CLAUDE.md 技术要点新增编码/BOM 约束、新增 `.editorconfig`（`[*.ps1] charset = utf-8-bom`）供跨机器自动遵守 | `changelog.md` v0.10.9 |
+| rf-247 | 报告子模块三个提示/缺省缺口：① `candidate_compare` 开启但无候选配置时静默跳过；② `cost_lots` 开启但无流水时 HTML 盈亏汇总区静默消失；③ `data_quality` 缺省 `false` | ① HTML 模板外层守卫改 `{% if candidate_data %}` + `available` 分支渲染「未配置候选基金」占位、Excel 新增 `_write_candidate_unavailable_block`；② 补「成本流水子模块已开启，但未录入交易/分红流水…」empty-note 提示；③ `data_quality` 缺省 `false`→`true` + `is_enable_data_quality` 兜底改缺省 true | `changelog.md` v0.10.9 |
+
+### v0.10.8（2026-08-06）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-234 | `report/_report_generation.py`（1018）超过 800 行硬性上限 | facade 聚合门面拆分：后台健康检查→`_report_health.py`、轻量行情/注入/校验→`_report_helpers.py`、全量指标装配→`_full_risk_metrics.py`、图表数据集→`_chart_dataset_factory.py`；门面保留 both/full 双路径编排并 re-export 全部符号（拆分后 686 行），mock patch 接线零改动 | `changelog.md` v0.10.8 |
+| rf-235 | `report/html_writer.py`（934）超过 800 行硬性上限 | facade 聚合门面拆分：章节可见性/目录导航→`html_writer_nav.py`、数据契约展示映射→`html_writer_display.py`、JS 资产复制→`html_writer_assets.py`；门面保留 `write_html_report`/`_render_template` 并 re-export 符号（拆分后 660 行） | `changelog.md` v0.10.8 |
+| rf-236 | `analysis/metrics.py`（880）超过 800 行硬性上限 | facade 聚合门面拆分：收益类指标→`metrics_returns.py`、风险类指标→`metrics_risk.py`；门面保留 `compute_all_metrics` 聚合入口 + `__all__` + 常量并 re-export 符号（拆分后 225 行），子模块维持 analysis 层单向依赖约束 | `changelog.md` v0.10.8 |
+| rf-237 | `report/orchestrator.py`（822）超过 800 行硬性上限 | facade 聚合门面拆分：风格因子/行业 Beta 计算族→`_report_factor_metrics.py`、市场温度/持仓相关性→`_report_aux_metrics.py`；门面保留 `generate_report`/`prepare_report_data`/`compute_valuation_data`/`_fetch_valuation_for_code` 并 re-export 符号（拆分后 442 行），mock patch 接线零改动 | `changelog.md` v0.10.8 |
+| rf-238 | `llm/generators_orchestrator.py`（808）超过 800 行硬性上限 | facade 聚合门面拆分：新闻关联责任单元（模块级结果缓存/闭包/安全直调）→`_llm_news_correlation.py`；门面保留缓存预检/worker 分发/主编排入口并 re-export 符号（拆分后 698 行），mock patch 接线零改动 | `changelog.md` v0.10.8 |
+
 ## 归档说明
 
-- 本归档涵盖 v0.10.1 ~ v0.10.7 已发布版本的自审修复记录（rf-204~rf-233）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
+- 本归档涵盖 v0.10.1 ~ v0.10.8 已发布版本的自审修复记录（rf-204~rf-247）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
 - 已关闭项（rf-117/118/120/121 决策已定，不做）与未修复待办项不在此列。
