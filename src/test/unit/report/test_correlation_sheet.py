@@ -230,10 +230,10 @@ class TestExcelMergedRelationshipSheet(unittest.TestCase):
         return [str(c.value) if c.value is not None else "" for row in ws.iter_rows() for c in row]
 
     def test_both_blocks_render_in_one_sheet(self):
-        """重合度 + 相关性同时提供 → 一章两区块同页呈现（章节标题带序号 7）。"""
+        """重合度 + 相关性同时提供 → 一章两区块同页呈现（正文标题纯中文名，序号仅在页签栏）。"""
         ws = self._write(_overlap_result(), _correlation_data())
         flat = self._flat(ws)
-        self.assertTrue(any("7. 持仓关系矩阵" in v for v in flat), f"应含章节标题（序号 7），实际: {flat[:3]}")
+        self.assertTrue(any("持仓关系矩阵" in v for v in flat), f"应含章节标题，实际: {flat[:3]}")
         self.assertTrue(any("一、持仓重合度矩阵" in v for v in flat), "应含重合度区块标题")
         self.assertTrue(any("二、持仓相关性矩阵" in v for v in flat), "应含相关性区块标题")
         self.assertTrue(any("基金A" in v for v in flat), "重合度区块应含基金名")

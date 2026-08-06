@@ -19,7 +19,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number_from_order, get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -41,7 +41,6 @@ def write_evolution_sheet(
     ws: Worksheet,
     evolution_data: dict[str, Any] | None,
     snapshot_diff_data: dict[str, Any] | None = None,
-    section_order: list[dict] | None = None,
 ) -> None:
     """写入组合演进页签。
 
@@ -50,14 +49,10 @@ def write_evolution_sheet(
         evolution_data: 数据契约 dict；None 或 available=False 时写入占位。
         snapshot_diff_data: 快照差异摘要数据契约 dict（页签顶部「自上次快照变化摘要」）；
             未提供或 available=False 时写入占位/提示文本。
-        section_order: 已解析的报告模块顺序列表，用于正文标题序号跟随配置；
-            None 时使用注册表默认序号。
     """
     _name = get_report_sheet_name("portfolio_evolution")
     _ncols = 8
-    write_title_row(
-        ws, 1, f"{get_report_section_number_from_order('portfolio_evolution', section_order)}. {_name}", ncols=_ncols
-    )
+    write_title_row(ws, 1, _name, ncols=_ncols)
 
     if not evolution_data or not evolution_data.get("available"):
         _write_placeholder(ws, STATUS_MESSAGES["evolution_unavailable"], row=3, max_cols=_ncols)

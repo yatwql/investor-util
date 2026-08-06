@@ -29,7 +29,6 @@ def _write_portfolio_history_drawdown_sheet(
     history_data: dict | None,
     crisis_annotation: dict[str, Any] | None = None,
     tail_risk: dict[str, Any] | None = None,
-    section_order: list[dict] | None = None,
 ) -> None:
     """写入组合历史走势与回撤页签（一章两区块 + 危机区间标注 + 尾部风险）。
 
@@ -40,8 +39,6 @@ def _write_portfolio_history_drawdown_sheet(
             None 时危机区块写占位。
         tail_risk: `tail_risk_data` 数据契约 dict（尾部风险统计）；
             None 时尾部指标行写占位。
-        section_order: 已解析的报告模块顺序列表，使正文标题序号跟随配置；
-            None 时使用注册表默认序号。
     """
     ws = sheets.get("portfolio_history_drawdown")
     if ws is None:
@@ -52,7 +49,7 @@ def _write_portfolio_history_drawdown_sheet(
 
     from src.python.report.portfolio_history_drawdown_sheet import write_portfolio_history_drawdown_sheet
 
-    write_portfolio_history_drawdown_sheet(ws, effective, crisis_annotation, tail_risk, section_order=section_order)
+    write_portfolio_history_drawdown_sheet(ws, effective, crisis_annotation, tail_risk)
 
 
 def _write_data_source_matrix_sheet(ws, prog) -> None:
@@ -271,7 +268,6 @@ def generate_excel_report(
         prog,
         style_factor_data=(pipeline_data or {}).get("style_factor_data"),
         position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
-        section_order=order,
     )
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）
     from src.python.report._debate_utils import detect_debate_mode
@@ -295,7 +291,6 @@ def generate_excel_report(
                     history_data,
                     (pipeline_data or {}).get("crisis_annotation_data"),
                     (pipeline_data or {}).get("tail_risk_data"),
-                    section_order=order,
                 )
             except Exception:
                 logger.debug("[excel] 组合历史走势与回撤页签写入失败（非关键）", exc_info=True)
@@ -311,7 +306,6 @@ def generate_excel_report(
                 ws_evo,
                 (pipeline_data or {}).get("evolution_data"),
                 snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
-                section_order=order,
             )
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
@@ -323,7 +317,7 @@ def generate_excel_report(
         try:
             from src.python.report.action_sheet import write_action_sheet
 
-            write_action_sheet(ws_action, (pipeline_data or {}).get("action_data"), section_order=order)
+            write_action_sheet(ws_action, (pipeline_data or {}).get("action_data"))
         except Exception:
             logger.debug("[excel] 行动建议页签写入失败（非关键）", exc_info=True)
 

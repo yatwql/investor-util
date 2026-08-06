@@ -85,8 +85,6 @@ def create_sheets(
         visible_count += 1
         ws = wb.create_sheet()
         ws.title = f"{visible_count}.{sec['name']}"
-        # 就地标记可见连续序号，供正文标题写入函数对齐页签栏 tab 名序号
-        sec["visible_number"] = visible_count
         sheets[sec["key"]] = ws
 
     # llm_usage 始终在最后

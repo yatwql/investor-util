@@ -19,7 +19,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number_from_order, get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -83,20 +83,15 @@ def _flag_label(is_first: bool, alert_level: str) -> str:
 def write_concentration_sheet(
     ws: Worksheet,
     concentration_data: list[dict[str, Any]],
-    section_order: list[dict] | None = None,
 ) -> None:
     """写入持仓集中度监控页签。
 
     Args:
         ws: openpyxl Worksheet 对象
         concentration_data: compute_concentration() 的返回结果
-        section_order: 已解析的报告模块顺序列表，用于正文标题序号跟随配置；
-            None 时使用注册表默认序号。
     """
     _name = get_report_sheet_name("fund_concentration")
-    write_title_row(
-        ws, 1, f"{get_report_section_number_from_order('fund_concentration', section_order)}. {_name}", ncols=_NCOLS
-    )
+    write_title_row(ws, 1, _name, ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 
     if not concentration_data:

@@ -20,7 +20,7 @@ from typing import Any
 from openpyxl.styles import Font, PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number_from_order, get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -310,7 +310,6 @@ def write_position_relationship_sheet(
     overlap_result: dict[str, Any] | None = None,
     fund_names: dict[str, str] | None = None,
     correlation_data: dict[str, Any] | None = None,
-    section_order: list[dict] | None = None,
 ) -> None:
     """写入持仓关系矩阵页签（一章两区块：持仓重合度 + 持仓相关性）。
 
@@ -320,14 +319,10 @@ def write_position_relationship_sheet(
         fund_names: {fund_code: fund_name} 覆盖默认名称显示（重合度区块）。
         correlation_data: `position_relationship_data` 契约 dict（相关性区块数据源）；
             None 或 available=False 时相关性区块写占位。
-        section_order: 已解析的报告模块顺序列表，用于正文标题序号跟随配置；
-            None 时使用注册表默认序号。
     """
     _name = get_report_sheet_name("position_relationship")
     ncols = _compute_ncols(overlap_result, correlation_data)
-    write_title_row(
-        ws, 1, f"{get_report_section_number_from_order('position_relationship', section_order)}. {_name}", ncols=ncols
-    )
+    write_title_row(ws, 1, _name, ncols=ncols)
 
     row = 2
     row = _write_overlap_block(ws, row, overlap_result, fund_names, ncols)
