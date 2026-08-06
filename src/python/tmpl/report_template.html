@@ -1014,12 +1014,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
                 {% if flow_display and flow_display.xirr_rate is not none %}
                 <div class="summary-card">
-                    <h3>资金加权收益率 (XIRR)</h3>
+                    <h3>资金加权收益率 (XIRR{% if flow_display.approximate %}，近似{% endif %})</h3>
                     <div class="value" style="color: {{ flow_display.xirr_rate | profit_color }}">{{ flow_display.xirr_rate | pct }}</div>
                 </div>
                 {% endif %}
             </div>
-            {% if flow_display and not flow_display.available %}
+            {% if flow_display and flow_display.approximate %}
+            <div class="empty-note">成本流水为可选进阶增强：当前未录入交易/分红流水，已用持仓快照近似计算成本分档（每份成本 vs 市价）{% if flow_display.xirr_rate is none %}。未配置建仓日期（config.json → holdings_start_date），近似年化暂未计算{% endif %}。如需精确的资金加权收益率 (XIRR)、分批成本分档、分红累计，请在持仓 Excel 补充「交易流水」「分红流水」页签后重新生成</div>
+            {% elif flow_display and not flow_display.available %}
             <div class="empty-note">成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算。如需启用，请在持仓 Excel 中补充「交易流水」「分红流水」页签后重新生成</div>
             {% endif %}
 

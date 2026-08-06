@@ -1055,6 +1055,7 @@ LLM 五维度量化评分，每项满分 100：
 | `history.benchmark_indices` | dict | {"sh000300":"沪深300"} | — | 基准指数配置，组合历史走势对比 |
 | `history.lookback_days` | int | 90 | — | 历史走势取数窗口（K 线条数/交易日），需 ≥ 60（MIN_SPAN）才能计算回撤分析 |
 | `report_submodules` | dict | `data_quality` 默认开，其余 5 项默认关 | — | 报告子模块开关：`data_quality`（数据质量仪表盘，长期可信核心默认开）/ `industry_beta`（行业 Beta 子表）/ `candidate_compare`（候选基金比较）/ `cost_lots`（成本流水）/ `valuation_percentile`（估值分位）/ `market_temperature`（市场温度），后 5 项默认关 |
+| `holdings_start_date` | str | `""` | — | 组合建仓日期（YYYY-MM-DD，可选）。持仓 Excel 未录入交易/分红流水时，成本流水子模块按「建仓日一次性买入」近似年化（`build_approximate_fund_flow_data`）；空=不计算近似年化，仅成本分档近似（每份成本 vs 市价） |
 | `comparison_indices` | dict | {"sh000300":"沪深300","sh000905":"中证500","sh000012":"中证全债"} | — | 竞争语境对比指数池，支持多指数对比 |
 | `rebalance.threshold` | float | 0.15 | — | 单品种权重超限阈值（15%），超限触发再平衡建议 |
 | `rebalance.deviation_threshold` | float | 0.05 | — | 大类/品种配置偏离阈值（5%），权益/固收偏离超限时触发调整建议 |

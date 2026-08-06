@@ -20,6 +20,11 @@
     "dividends": {"available": bool, "per_code": {code: 金额}, "total": float},
   }
   渲染层消费该契约，分档/累计列与 XIRR 汇总行均在此取数。
+
+  快照近似模式（无流水页签时由 `build_approximate_fund_flow_data` 输出）额外带
+  `"approximate": true` 键——渲染层据此写「可选进阶增强」说明，替代「必须录入
+  流水」的压力文案；真实流水模式无此键（消费方统一用 `.get("approximate")` 判空，
+  缺省按 False 处理）。
 """
 
 from __future__ import annotations
@@ -40,6 +45,7 @@ __all__ = [
     "compute_cost_tiers",
     "compute_dividend_totals",
     "build_fund_flow_data",
+    "build_approximate_fund_flow_data",
 ]
 
 # 迭代求解参数（XIRR 收敛）
@@ -446,3 +452,47 @@ def build_fund_flow_data(
         "cost_tiers": tiers,
         "dividends": div_totals,
     }
+
+
+def build_approximate_fund_flow_data(
+    holdings: list[Holding],
+    current_prices: dict[str, float] | None,
+    start_date: _dt.date | None = None,
+    end_date: _dt.date | None = None,
+) -> dict[str, Any]:
+    """从持仓快照合成近似成本流水数据（零流水输入出价值）。
+
+    单笔建仓假设：每个品种视为建仓日一次性买入当前持仓份额（价格 = 每份成本），
+    据此合成交易流水 → 复用 build_fund_flow_data 产出成本分档（单档判断：
+    低成本/高成本，相对市价）与近似年化收益（一次性投入的内部收益率）。
+    分红累计不可由快照推导，保持 available=False（说明文案中已交代）。
+
+    Args:
+        holdings: 当前持仓（份额 + 每份成本）
+        current_prices: 代码 → 当前市价
+        start_date: 可选组合建仓日；None 时买入日取期末日 → XIRR 因同日
+            现金流无解而返回 None（仅产出成本分档）
+        end_date: 期末估值日（缺省取今日）
+
+    Returns:
+        fund_flow_data 契约，且带 approximate=True（渲染层据此写
+        「可选进阶增强」说明，替代「必须录入流水」的压力文案）。
+    """
+    end = end_date or _dt.date.today()
+    synthetic: list[TradeRecord] = []
+    for h in holdings:
+        if h.shares <= 0 or h.cost_price <= 0:
+            continue
+        synthetic.append(
+            TradeRecord(
+                date=start_date or end,
+                code=h.code,
+                action="buy",
+                shares=h.shares,
+                price=h.cost_price,
+                fee=0.0,
+            )
+        )
+    data = build_fund_flow_data(synthetic, [], holdings, current_prices, end_date=end)
+    data["approximate"] = True
+    return data

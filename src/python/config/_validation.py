@@ -575,6 +575,31 @@ def _validate_discipline_config(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_holdings_start_date(config: dict, issues: int) -> int:
+    """验证 holdings_start_date 配置（组合建仓日期，YYYY-MM-DD，可选）。
+
+    空字符串/缺失视为未配置（近似年化不计算）；非空且格式非法时告警。
+    该日期仅用于成本流水子模块的快照近似（单笔建仓假设）。
+    """
+    raw = config.get("holdings_start_date")
+    if raw is None:
+        return issues
+    if not isinstance(raw, str):
+        logger.warning("config.json holdings_start_date = %r 应为字符串（YYYY-MM-DD），将忽略", raw)
+        return issues + 1
+    text = raw.strip()
+    if not text:
+        return issues  # 空字符串 = 未配置，正常
+    from datetime import date
+
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        logger.warning("config.json holdings_start_date = %r 不是有效日期（应为 YYYY-MM-DD），将忽略", text)
+        issues += 1
+    return issues
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 配置校验入口
 # ═══════════════════════════════════════════════════════════════════
@@ -610,6 +635,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_comparison_candidates(config, issues)
     issues = _validate_rebalance_config(config, issues)
     issues = _validate_discipline_config(config, issues)
+    issues = _validate_holdings_start_date(config, issues)
     issues = _validate_enable_llm(issues)
     if issues:
         logger.warning("config.json 共检测到 %d 个配置问题，请检查上述警告项", issues)

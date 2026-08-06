@@ -557,6 +557,48 @@ class TestWriteSummarySheet(unittest.TestCase):
             "应写入含「未录入交易/分红流水」与「无法计算」的说明单元格",
         )
 
+    def test_xirr_row_approximate_label_when_rate(self):
+        """快照近似（approximate=True）且 XIRR 可用 → 标签加注「，近似」。"""
+        fund_flow = {"available": True, "approximate": True, "xirr": {"rate": 0.09}}
+        mocks = self._call_summary_sheet(
+            self.ws, self.mv, self.cost, self.profit, self.today,
+            categories=self.categories,
+            fund_flow_data=fund_flow,
+        )
+        pairs = self._data_pairs(mocks["mock_data"])
+        self._assert_pairs_contain(pairs, "资金加权收益率 (XIRR，近似)", 0.09)
+
+    def test_xirr_row_placeholder_approximate_no_rate(self):
+        """快照近似未配置建仓日期（approximate=True，xirr=None）→ 占位「未配置建仓日期/无法计算」。"""
+        fund_flow = {"available": True, "approximate": True, "xirr": None}
+        mocks = self._call_summary_sheet(
+            self.ws, self.mv, self.cost, self.profit, self.today,
+            categories=self.categories,
+            fund_flow_data=fund_flow,
+        )
+        pairs = self._data_pairs(mocks["mock_data"])
+        self._assert_pairs_contain(pairs, "资金加权收益率 (XIRR)", "未配置建仓日期/无法计算")
+
+    def test_flow_approximate_note_written(self):
+        """快照近似（approximate=True）→ 写「可选进阶增强」说明（非压力文案）。"""
+        fund_flow = {
+            "available": True,
+            "approximate": True,
+            "xirr": {"rate": 0.09, "ok": True, "message": ""},
+            "cost_tiers": {"available": True, "per_code": {}},
+            "dividends": {"available": False, "per_code": {}},
+        }
+        mocks = self._call_summary_sheet(
+            self.ws, self.mv, self.cost, self.profit, self.today,
+            categories=self.categories,
+            fund_flow_data=fund_flow,
+        )
+        values = [c.kwargs.get("value") for c in self.ws.cell.call_args_list]
+        self.assertTrue(
+            any(isinstance(v, str) and "成本流水为可选进阶增强" in v and "已用持仓快照近似计算" in v for v in values),
+            "应写入含「可选进阶增强」与「快照近似」的说明单元格",
+        )
+
     def test_no_xirr_row_when_flow_disabled(self):
         """开关关闭（fund_flow_data=None）时盈亏汇总不含 XIRR 行，保持既有输出。"""
         mocks = self._call_summary_sheet(

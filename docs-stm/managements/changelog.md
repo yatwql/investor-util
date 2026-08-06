@@ -6,6 +6,19 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 成本流水快照近似 + 文案重定位：零流水也能出价值（2026-08-07）
+
+定位：用户维持最少量的输入，其余由应用来做——持仓 Excel 只维护 4 列快照即可，成本流水从「可选进阶增强」而非「必备手工输入」。
+
+- **`analysis/cost_flow.py` 新增 `build_approximate_fund_flow_data`**：无交易/分红流水时，将持仓快照合成为「建仓日一次性买入」（日期取可选建仓日期，未配置则当日，XIRR 同日流水不可解 → 返回 None），复用 `build_fund_flow_data` 走单档成本分档（每份成本 vs 市价）。输出契约新增 `"approximate": true` 键（真实流水模式无此键，消费方 `.get("approximate")` → falsy 即 False），`__all__` 同步导出。
+- **新增可选配置 `holdings_start_date`**（顶层，YYYY-MM-DD，默认空）：组合建仓日期，用于近似年化基准。`config/_config_defaults.py` 模板 + 注释、`config/_validation.py` 新增 `_validate_holdings_start_date`（空/缺失合法，非法格式告警不阻断）。
+- **`report/excel_market_data.py` `_build_flow_data` 重写**：开关开启且既无交易也无分红 → 调用 `build_approximate_fund_flow_data`（新增 `_resolve_holdings_start_date` 读配置解析建仓日期，非法/缺失返回 None）；有流水仍走原 `build_fund_flow_data` 精确路径。
+- **文案重定位（Excel + HTML 对齐）**：快照近似模式在「投资分析汇总」页签与 HTML 报告标注「资金加权收益率 (XIRR，近似)」，并写说明——「成本流水为可选进阶增强：当前未录入交易/分红流水，已用持仓快照近似计算成本分档（每份成本 vs 市价）」，未配置建仓日期时追加「请配置 config.json → holdings_start_date」提示；「已开启但无流水」旧占位文案降级为近似模式下的兜底分支。
+- **测试**：`test_cost_flow.py` 新增 3 例（有建仓日期 → 近似 IRR ≈ 市值/成本−1 + 分档桶 + 分红不可用；无建仓日期 → XIRR None；空持仓 → available=False 但 approximate=True）；`test_excel_market_data.py` 重写无流水契约用例（断言近似入参 `(holdings, {}, start_date=None)`）+ 新增 `TestResolveHoldingsStartDate` 3 例；`test_summary.py`/`test_html_writer.py` 新增近似标签/说明/占位文案用例。
+- **门禁**：dev-verify + 4 checks `--ci` 全 [OK]。
+
+---
+
 ### 成本流水「已开启但无流水」说明补齐（Excel 对齐 HTML）（2026-08-07）
 
 - **`report/summary.py` `_write_profit_summary`**：当成本流水子模块开启（`fund_flow_data` 非 None）但无可流水数据（`available=False`）时，在「资金加权收益率 (XIRR)」行下追加合并警告说明行——「成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算。如需启用，请在持仓 Excel 中补充「交易流水」「分红流水」页签后重新生成」，复用既有「行情不可用」警告样式（黄底红字），解释原因 + 修复指引。

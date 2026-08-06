@@ -172,8 +172,10 @@ def _write_profit_summary(
 
     Args:
         fund_flow_data: 成本流水数据契约。非 None 时在汇总末尾追加
-            「资金加权收益率 (XIRR)」行（无可用现金流时写占位文本）；
-            None 时保持既有输出（report_submodules.cost_lots 关闭）。
+            「资金加权收益率 (XIRR)」行（无可用现金流时写占位文本）：
+            真实流水模式按契约渲染；快照近似模式（approximate=True）追加
+            「可选进阶增强」说明行；None 时保持既有输出
+            （report_submodules.cost_lots 关闭）。
     """
     # 检测行情数据是否全部不可用 — 有持仓成本但市值全零
     _data_unavailable = total_mv == 0 and total_cost > 0
@@ -215,20 +217,44 @@ def _write_profit_summary(
 
     # 资金加权收益率 (XIRR)：成本流水子模块开启时展示（无可用现金流写占位）
     if fund_flow_data is not None:
+        approximate = bool(fund_flow_data.get("approximate"))
         xirr = fund_flow_data.get("xirr")
         if xirr and xirr.get("rate") is not None:
             rate = xirr["rate"]
-            write_data_row(ws, row, ["资金加权收益率 (XIRR)", rate])
+            label = "资金加权收益率 (XIRR，近似)" if approximate else "资金加权收益率 (XIRR)"
+            write_data_row(ws, row, [label, rate])
             ws.cell(row=row, column=2).number_format = FMT_PERCENT
             ws.cell(row=row, column=2).font = profit_font(rate)
         else:
-            write_data_row(ws, row, ["资金加权收益率 (XIRR)", "未录入流水/无法计算"])
+            placeholder = "未配置建仓日期/无法计算" if approximate else "未录入流水/无法计算"
+            write_data_row(ws, row, ["资金加权收益率 (XIRR)", placeholder])
         row += 1
 
-        # 已开启但无可用流水：合并警告行说明原因 + 修复指引（对齐 HTML 空态说明）
-        if not fund_flow_data.get("available"):
-            _FLOW_FILL = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
-            _FLOW_FONT = Font(size=10, bold=True, color="CC0000")
+        _FLOW_FILL = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
+        _FLOW_FONT = Font(size=10, bold=True, color="CC0000")
+        if approximate:
+            # 快照近似：说明数据来源（单笔建仓假设）+ 可选进阶增强（对齐 HTML 近似说明）
+            if xirr and xirr.get("rate") is not None:
+                note_text = (
+                    "⚙ 成本流水为可选进阶增强：当前未录入交易/分红流水，已用持仓快照近似计算"
+                    "成本分档（每份成本 vs 市价）与年化收益（假设建仓日一次性买入）。"
+                    "如需精确的资金加权收益率 (XIRR)、分批成本分档、分红累计，"
+                    "请在持仓 Excel 补充「交易流水」「分红流水」后重新生成。"
+                )
+            else:
+                note_text = (
+                    "⚙ 成本流水为可选进阶增强：当前未录入交易/分红流水，已用持仓快照近似计算"
+                    "成本分档（每份成本 vs 市价）。未配置建仓日期（config.json → holdings_start_date），"
+                    "近似年化暂未计算。如需精确的资金加权收益率 (XIRR)、分批成本分档、分红累计，"
+                    "请在持仓 Excel 补充「交易流水」「分红流水」后重新生成。"
+                )
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=_NCOLS)
+            _note_cell = ws.cell(row=row, column=1, value=note_text)
+            _note_cell.font = _FLOW_FONT
+            _note_cell.fill = _FLOW_FILL
+            row += 1
+        elif not fund_flow_data.get("available"):
+            # 已开启但无可用流水（真实流水模式兜底）：合并警告行说明原因 + 修复指引
             ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=_NCOLS)
             _note_cell = ws.cell(
                 row=row,

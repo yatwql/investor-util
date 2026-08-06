@@ -19,7 +19,8 @@ def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
         fund_flow_data: 成本流水数据（None = 开关关闭）
 
     Returns:
-        含 xirr_rate/cost_map/tier_map/div_map/div_total 的展示 dict，或 None
+        含 xirr_rate/cost_map/tier_map/div_map/div_total/approximate 的展示
+        dict，或 None
     """
     if not fund_flow_data:
         return None
@@ -31,6 +32,7 @@ def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
     xirr = fund_flow_data.get("xirr") or {}
     return {
         "available": bool(fund_flow_data.get("available")),
+        "approximate": bool(fund_flow_data.get("approximate")),
         "xirr_rate": xirr.get("rate"),
         "cost_map": {code: _weighted_avg_cost(buckets) for code, buckets in cost_tiers.items()},
         "tier_map": {code: _tier_label(buckets) for code, buckets in cost_tiers.items()},

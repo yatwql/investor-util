@@ -2743,8 +2743,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `rebalance_advice` | 调仓建议 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `trade_discipline` | 交易纪律 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `return_attribution` | 收益归因 | 行动建议 | 调仓 | `enable_action`（默认开） |
-| `fund_flow` | 资金流水与资金加权收益 | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 + 输入扩展 | 成本/现金流 | `report_submodules.cost_lots`（默认关，随持仓文件流水页签触发） |
-| `cost_lots` | 成本流水（成本分档 + XIRR + 分红累计） | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 | 成本/现金流 | `report_submodules.cost_lots`（默认关） |
+| `fund_flow` | 资金流水与资金加权收益 | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 + 输入扩展 | 成本/现金流 | `report_submodules.cost_lots`（默认关；有交易/分红流水走精确计算，无流水触发快照近似，可选 `holdings_start_date` 开近似年化） |
+| `cost_lots` | 成本流水（成本分档 + XIRR + 分红累计） | 「投资分析汇总」/「市值核算明细表」/「持仓分类表」章 | 成本/现金流 | `report_submodules.cost_lots`（默认关；无流水时由 `build_approximate_fund_flow_data` 快照近似兜底） |
+| `holdings_start_date` | 组合建仓日期（可选，近似年化基准） | 输入扩展 | 成本/现金流 | 顶层配置键 `holdings_start_date`（YYYY-MM-DD，默认空=不计算近似年化，仅成本分档近似） |
 | `industry_beta` | 行业 Beta 暴露 | 风格与因子分析 | 风险/暴露 | `report_submodules.industry_beta`（默认关） |
 | `crisis_annotation` | 危机区间标注 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
 | `tail_risk` | 尾部风险 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
