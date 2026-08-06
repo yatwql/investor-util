@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.9-dev
-> **编号源**：`rf-next = 246`（新增问题取此编号，完成后更新为 +1；已用最大 rf-245，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 247`（新增问题取此编号，完成后更新为 +1；已用最大 rf-246，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -50,6 +50,7 @@
 | **rf-243** | `core/registry.py` + `report/excel_sheet_factory.py` + `report/excel_generator.py` + `report/excel_fund_deep_analysis.py` + 7 个深度分析页签写入模块 | Excel 正文标题序号未跟随 `report_section_order` 配置：页签栏 tab 名用 create_sheets 可见连续序号（行动建议=10/组合演进=13/数据源可用性矩阵=14），正文标题用注册表默认序号（行动建议=17/组合演进=16），两者不一致。首次修复：create_sheets 创建页签时就地标记 `visible_number`；registry 新增 `get_report_section_number_from_order`；7 个深度页签写入函数新增 `section_order` 参数并透传配置后 order。**后经 rf-244 设计调整收敛**：正文标题统一为纯中文名，上述同步机制全部撤除 |
 | **rf-244** | `core/registry.py` + `report/excel_sheet_factory.py` + 7 个深度分析页签写入模块 + `report/excel_generator.py` + `report/excel_fund_deep_analysis.py` | 设计调整（rf-243 方案收敛）：序号只在 Excel 页签栏与 HTML 章节标题出现，Excel 正文标题统一为纯中文名（与基础页签/数据源可用性矩阵一致）。撤除 rf-243 的正文标题序号同步机制（registry `get_report_section_number_from_order`、create_sheets `visible_number` 标记、7 页签写入函数 `section_order` 参数及 excel_generator/excel_fund_deep_analysis 透传），正文不依赖序号，调整配置/隐藏章节不错位。test_correlation_sheet 正文标题断言同步更新为纯中文名 |
 | **rf-245** | `report/_snapshot.py` + `report/orchestrator.py` + `cli/cli.py` | 历史走势关闭时仅剩误导性「尾部风险：无历史 bars」警告：`fetch_history=False` 静默跳过，用户无法判断是配置关闭所致。修复：① fetch 关闭时 `reporter.warn`+`logger.warning` 醒目提示「组合历史走势获取已跳过（history off）」及占位后果；② CLI `--history` 默认改为跟随 `config.history.fetch_mode`（默认 auto），未显式传参时由 `generate_report` 回退到配置层，不再硬编码 off |
+| **rf-246** | `scripts/cli.ps1` + `CLAUDE.md` + `.editorconfig` + `docs-stm/managements/folders.md` | cli.ps1 文件头注释声称 "UTF-8 with BOM" 实际**无 BOM**，Windows PowerShell 5.1 对无 BOM 的 UTF-8 中文按 ANSI/GBK 误读中文注释，解析崩溃（"字符串缺少终止符" / "语句块或类型定义中缺少右}"），跨机器复现。修复：补回 BOM（`EF BB BF`，UTF-8+CRLF），PowerShell Parser 验证通过；CLAUDE.md 技术要点新增「编码/BOM（Windows 脚本）」约束、新增 `.editorconfig`（`[*.ps1] charset = utf-8-bom`）供支持 EditorConfig 的编辑器**跨机器自动遵守**、folders.md 目录树登记 `.editorconfig` |
 
 ## 归档
 
