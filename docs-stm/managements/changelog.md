@@ -6,6 +6,15 @@
 
 ## [0.10.10-dev] - 开发中（未发布）
 
+### rf-113 Iter 7 浏览器人工验证进度更新（2026-08-06 另机 Windows）
+
+- **① 6 图渲染 + 交互 — ✅ 通过**：ok/degraded 场景 6/6 图渲染 + 全部图 tooltip 可用（含净值/回撤折线、雷达——rf-249 修复后悬停任意处即显示）；empty 场景 4/6 渲染 + tooltip（资产构成/雷达空数据占位，符合 §4.12 空值语义）；offline 场景引擎缺失守卫生效（R21）。Chrome + Firefox 实测，Edge 未测（同 Chromium 内核，S2 升级时补验）。
+- **② 打印降级 — ✅ 2.1~2.3 通过**：打印预览图表 2x DPI 清晰（文字/刻度/数据线锐利）、浅色主题强制（文字黑/背景白，不浪费墨水）、单图不跨页（`break-inside: avoid`）。2.4（afterprint 恢复交互）待补验。
+- **③ 离线验证 — 3.2~3.4 通过**：删除 chart.min.js → `typeof Chart` 守卫静默跳过、无 JS 报错；现代浏览器不渲染 `<canvas>` fallback 文本，图表区域空白，真实报告回退明细表格（rf-249 修正断言）。3.1（断网 6 图正常渲染）待补验。
+- **待补验**：② 2.4 afterprint、③ 3.1 断网渲染、④ 微信内置浏览器、⑤ 375px 移动端、⑥ 禁用 Canvas fallback。
+- **验证期间修复**：rf-248（动态脚本顺序）、rf-249（折线/雷达 tooltip 触发）、rf-250（自检 `Chart.getChart` 判定）、rf-251（空数据图显式守卫）。
+- **门禁**：dev-verify passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
+
 ### chart-init.js 空数据图显式守卫（rf-251）
 
 - **缺陷**：6 个核心图 init 守卫 `!ds.labels` / `!ds.datasets` 不拦截空数组（空数组 truthy）。empty 场景（`labels:[]` + `datasets:[]`）下 `ds.datasets[0]` 为 undefined，访问 `.data` 抛 TypeError，**依赖外层 try/catch 降级**（图不渲染、console 出现 `[chart] 初始化失败` warn 噪声），而非显式空数据跳过。
