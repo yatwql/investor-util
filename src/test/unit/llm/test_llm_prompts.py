@@ -228,11 +228,12 @@ class TestBuildHoldingsSummary(unittest.TestCase):
         """industry_data 中包含行业和概念 → 显示到摘要中。"""
         industry_data = {
             "600900": {"industry": "电力", "concepts": ["核电", "水电"]},
-            "600519": {"industry": "白酒Ⅱ", "concepts": ["白酒", "超级品牌"]},
+            # 生产链路经 fetcher 网关已剥离申万层级后缀（白酒Ⅱ → 白酒）
+            "600519": {"industry": "白酒", "concepts": ["白酒", "超级品牌"]},
         }
         result = _build_holdings_summary(self.holdings, industry_data=industry_data)
         self.assertIn("电力", result)
-        self.assertIn("白酒Ⅱ", result)
+        self.assertIn("白酒", result)
         self.assertIn("核电", result)
 
     def test_empty(self) -> None:

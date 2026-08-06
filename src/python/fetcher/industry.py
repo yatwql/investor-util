@@ -8,6 +8,7 @@ Provider Chain（可配置）：
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from src.python.cache import get_ttl
@@ -17,6 +18,10 @@ from src.python.providers import eastmoney_industry, eastmoney_industry_rest
 from src.python.providers.eastmoney_industry import make_push2_request as _make_push2_request
 
 logger = logging.getLogger("invest")
+
+# 申万行业层级后缀：行业名末尾的 Ⅰ/Ⅱ/Ⅲ/Ⅳ（如「银行Ⅱ」「白酒Ⅱ」）是申万分层命名标记
+# （层级与上级/同名行业区分），对零售报告是纯展示噪音。统一在网关剥离，消费方见干净名。
+_HIERARCHY_SUFFIX_RE = re.compile(r"[ⅠⅡⅢⅣ]+$")
 
 
 _INDUSTRY_CACHE_PREFIX = "industry_"
@@ -31,13 +36,31 @@ _BATCH_RETRY_DELAY = 0.8
 _BATCH_RETRY_JITTER = 0.4
 
 
+def strip_hierarchy_suffix(name: str) -> str:
+    """剥离行业名末尾的申万层级后缀（Ⅰ/Ⅱ/Ⅲ/Ⅳ）。
+
+    东方财富 f127 / bk_name 返回申万行业名带层级标记（如「银行Ⅱ」「白酒Ⅱ」——
+    申万用 Ⅰ/Ⅱ/Ⅲ 区分同级同名行业与上级层级）。对零售报告读者，该后缀是纯
+    层级噪音，展示时统一剥离（「银行Ⅱ」→「银行」）；无后缀或空串原样返回。
+
+    Args:
+        name: 原始行业名（如 "银行Ⅱ"）
+
+    Returns:
+        剥离层级后缀后的行业名（如 "银行"）
+    """
+    if not name:
+        return name
+    return _HIERARCHY_SUFFIX_RE.sub("", name)
+
+
 def _industry_transform(raw: dict, _source: str) -> dict | None:
-    """东方财富行业原始数据 → 统一行业格式。"""
+    """东方财富行业原始数据 → 统一行业格式（行业名剥离申万层级后缀）。"""
     if not raw:
         return None
     return {
         "code": raw.get("code", ""),
-        "industry": raw.get("industry", ""),
+        "industry": strip_hierarchy_suffix(raw.get("industry", "") or ""),
         "industry_id": raw.get("industry_id", ""),
         "concepts": raw.get("concepts", []),
         "concept_ids": raw.get("concept_ids", []),
@@ -71,6 +94,8 @@ def fetch_industry_data(code: str) -> dict | None:
         transform=_industry_transform,
     )
     if result is not None:
+        # 热缓存命中的旧值可能未经 transform（历史缓存含申万层级后缀），出口统一归一化
+        result["industry"] = strip_hierarchy_suffix(result.get("industry") or "")
         _t.record(_src_key, "T3", success=True)
     else:
         _t.record(_src_key, "T3", success=False, failure_type="unreachable")
@@ -161,6 +186,8 @@ def batch_fetch_industry_data(codes: list[str], max_workers: int = 8) -> dict[st
     result_map: dict[str, dict] = {}
     for code, r in zip(a_codes, results):
         if r.success and r.result:
+            # 缓存命中路径绕过 fetch_industry_data 出口归一化，组装时兜底剥离层级后缀
+            r.result["industry"] = strip_hierarchy_suffix(r.result.get("industry") or "")
             result_map[code] = r.result
 
     dispatcher.shutdown()

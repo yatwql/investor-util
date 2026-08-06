@@ -6,6 +6,15 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 行业名剥离申万层级后缀：银行Ⅱ → 银行（2026-08-07）
+
+- **`fetcher/industry.py` 新增 `strip_hierarchy_suffix`**：剥离行业名末尾的申万层级后缀（Ⅰ/Ⅱ/Ⅲ/Ⅳ，如「银行Ⅱ」「白酒Ⅱ」）。两类 provider（push2 f127 / 行情页 bk_name）均返回带后缀的申万原始名，统一在网关剥离，所有消费方（资产穿透TOP10 板块列 / 风格与因子分析 行业Beta / 基金风格分类 / LLM 关联标签 / TUI 单票查询）一致性受益；provider 层保持原始值（上游契约不变）。
+- **三处归一化兜底**：`_industry_transform`（统一格式契约，缓存写入即干净）+ `fetch_industry_data` 出口（覆盖单查热缓存旧值）+ `batch_fetch_industry_data` 组装（覆盖批量热缓存旧值，缓存命中路径绕过 transform）。
+- **测试**：`test_fetcher_industry.py` 新增 transform 剥离（银行Ⅱ/白酒Ⅱ/国有大型银行Ⅱ）、`strip_hierarchy_suffix` 纯函数、单查热缓存出口剥离、批量组装剥离共 7 例；`test_llm_prompts.py` 夹具与断言 `白酒Ⅱ → 白酒`（生产链路经网关已归一化）。provider 层 `test_eastmoney_industry_rest.py` 保持原始断言不动。
+- **门禁**：dev-verify + 4 checks `--ci` 全 [OK]。
+
+---
+
 ### 成本流水快照近似 + 文案重定位：零流水也能出价值（2026-08-07）
 
 定位：用户维持最少量的输入，其余由应用来做——持仓 Excel 只维护 4 列快照即可，成本流水从「可选进阶增强」而非「必备手工输入」。

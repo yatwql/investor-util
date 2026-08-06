@@ -59,6 +59,35 @@ class TestIndustryTransform(unittest.TestCase):
         self.assertEqual(result["industry"], "")
         self.assertEqual(result["concepts"], [])
 
+    def test_strips_hierarchy_suffix(self):
+        """申万层级后缀（银行Ⅱ/白酒Ⅱ/国有大型银行Ⅱ）→ 剥离为干净名。"""
+        for raw_name, expected in [("银行Ⅱ", "银行"), ("白酒Ⅱ", "白酒"), ("国有大型银行Ⅱ", "国有大型银行")]:
+            result = self._call({"code": "000001", "industry": raw_name})
+            self.assertEqual(result["industry"], expected, f"{raw_name} → {expected}")
+
+    def test_keeps_plain_name(self):
+        """无层级后缀的行业名（电力）→ 原样保留。"""
+        result = self._call({"code": "600900", "industry": "电力"})
+        self.assertEqual(result["industry"], "电力")
+
+
+class TestStripHierarchySuffix(unittest.TestCase):
+    """strip_hierarchy_suffix 纯函数测试。"""
+
+    def test_strips_trailing_roman(self):
+        """末尾 Ⅰ/Ⅱ/Ⅲ/Ⅳ → 剥离。"""
+        from src.python.fetcher.industry import strip_hierarchy_suffix
+        self.assertEqual(strip_hierarchy_suffix("银行Ⅱ"), "银行")
+        self.assertEqual(strip_hierarchy_suffix("白酒Ⅱ"), "白酒")
+        self.assertEqual(strip_hierarchy_suffix("光学光电子Ⅲ"), "光学光电子")
+
+    def test_no_suffix_unchanged(self):
+        """无后缀 → 原样。"""
+        from src.python.fetcher.industry import strip_hierarchy_suffix
+        self.assertEqual(strip_hierarchy_suffix("电力"), "电力")
+        self.assertEqual(strip_hierarchy_suffix(""), "")
+        self.assertIsNone(strip_hierarchy_suffix(None))
+
 
 class TestFetchIndustryData(unittest.TestCase):
     """fetch_industry_data 测试。"""
@@ -91,6 +120,14 @@ class TestFetchIndustryData(unittest.TestCase):
         # 第三个位置参数是 cache_key
         self.assertIn("industry_600900", args)
 
+    @patch("src.python.fetcher.industry.fetch_with_fallback")
+    def test_cached_raw_suffix_stripped(self, mock_fallback):
+        """热缓存命中旧值（未经 transform 含层级后缀）→ 出口归一化剥离。"""
+        mock_fallback.return_value = {"code": "000001", "industry": "银行Ⅱ", "concepts": []}
+        from src.python.fetcher.industry import fetch_industry_data
+        result = fetch_industry_data("000001")
+        self.assertEqual(result["industry"], "银行")
+
 
 class TestBatchFetchIndustryData(unittest.TestCase):
     """batch_fetch_industry_data 测试。"""
@@ -116,6 +153,17 @@ class TestBatchFetchIndustryData(unittest.TestCase):
         result = batch_fetch_industry_data(["000001", "600900"])
         self.assertEqual(len(result), 2)
         self.assertIn("000001", result)
+
+    @patch("src.python.fetcher.industry.fetch_industry_data")
+    def test_batch_strips_suffix_from_industry(self, mock_fetch):
+        """批量组装兜底剥离层级后缀（覆盖缓存命中原始值路径）。"""
+        def side_effect(code, **kwargs):
+            return {"code": code, "industry": "银行Ⅱ"}
+        mock_fetch.side_effect = side_effect
+
+        from src.python.fetcher.industry import batch_fetch_industry_data
+        result = batch_fetch_industry_data(["000001"])
+        self.assertEqual(result["000001"]["industry"], "银行")
 
     @patch("src.python.fetcher.industry.fetch_industry_data", return_value=None)
     def test_batch_partial_failure(self, mock_fetch):
