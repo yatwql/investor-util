@@ -109,9 +109,13 @@ def _build_artifacts(params: dict, state) -> list[dict]:
     """按 report_type 计算产物清单（路径相对 output_dir，供前端渲染按钮）。
 
     basic → 仅 Excel；both/full → HTML + Excel（对齐 CLI --type 语义）。
+    严重失败（exit_code 2）或执行失败（failed）时无可用产物，返回空。
     """
     report_type = params.get("report_type", "basic")
     if not state.output_dir:
+        return []
+    # 严重失败/执行失败：报告未生成，产物按钮无意义（点击只会 404）
+    if state.status == "failed" or state.exit_code == _EXIT_SEVERE:
         return []
     artifacts = []
     if report_type in ("both", "full"):
@@ -149,10 +153,24 @@ def _is_same_origin() -> bool:
 def _handle_index():
     from flask import render_template
 
+    from src.python.config import get_config
     from src.python.core.constants import APP_VERSION
 
+    # 表单默认参数在页面加载时取一次 get_config()（页面刷新即重取，
+    # 避免页面参数与 run 出队时配置快照时刻不一致）。
+    # 历史走势默认跟随配置 fetch_mode（off→关闭；auto/prompt→开启）。
+    config = get_config()
+    fetch_mode = (config.get("history", {}) or {}).get("fetch_mode") or "auto"
+    history_checked = bool(config.get("enable_history", True)) and fetch_mode != "off"
+    # 表单说明文案（模板里嵌在复选框 label 括号中，不再重复「历史走势」前缀）
+    config_note = "跟随配置开启" if history_checked else "当前配置关闭"
     # 静态资源带版本查询串 ?v={APP_VERSION}（防浏览器缓存旧 JS/CSS 导致功能异常）
-    return render_template("index.html", app_version=APP_VERSION)
+    return render_template(
+        "index.html",
+        app_version=APP_VERSION,
+        history_checked=history_checked,
+        config_note=config_note,
+    )
 
 
 def _handle_upload():
@@ -266,8 +284,11 @@ def _handle_serve_report(filename: str):
 def _handle_health():
     from src.python.core.check_sources import run_health_checks
 
+    # 默认走 60s 缓存（防轮询/频繁刷页触发真实探测）；?fresh=1 强制重测
+    # （健康页「重新检测」按钮用，用户主动动作不计入缓存污染）
+    fresh = request.args.get("fresh") == "1"
     now = time.time()
-    if _health_cache["data"] is not None and now - _health_cache["ts"] < 60:
+    if not fresh and _health_cache["data"] is not None and now - _health_cache["ts"] < 60:
         return _ok(_health_cache["data"])
     results = run_health_checks(max_timeout=8.0)
     _health_cache["ts"] = now

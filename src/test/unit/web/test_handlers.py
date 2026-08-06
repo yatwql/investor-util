@@ -21,7 +21,7 @@ from src.python.config import _config_defaults
 from src.python.config._core import invalidate_config_cache
 from src.python.report.orchestrator import ReportResult
 from src.python.web.app import create_app
-from src.python.web.handlers import _run_generation
+from src.python.web.handlers import _build_artifacts, _health_cache, _run_generation
 from src.python.web.runs import RunManager, RunState
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_web]
@@ -258,3 +258,110 @@ class TestRunGeneration:
         code = _run_generation(state, {"file_id": "gone", "report_type": "basic"})
         assert code == 2
         assert state.errors == ["上传文件已过期，请重新上传"]
+
+
+class TestIndexConfigBackfill:
+    """索引页按 get_config() 回填表单默认（历史走势/强制 LLM 复选框）。"""
+
+    def test_index_renders_form_and_status_sections(self, app_client):
+        resp = app_client.get("/")
+        assert resp.status_code == 200
+        html = resp.data.decode("utf-8")
+        # 生成区新增控件
+        assert 'id="history-fetch"' in html
+        assert 'id="force-llm"' in html
+        # 状态区：健康 + 历史
+        assert 'id="health-list"' in html
+        assert 'id="history-list"' in html
+
+    def test_history_checkbox_follows_config_default(self, app_client):
+        """默认 fetch_mode=auto → 历史走势复选框勾选 + 配置说明。"""
+        resp = app_client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'name="fetch_history" checked' in html
+        assert "跟随配置开启" in html
+
+    def test_history_checkbox_off_when_config_fetch_mode_off(self, tmp_path, monkeypatch):
+        """配置 history.fetch_mode=off → 复选框不勾选。"""
+        monkeypatch.setitem(_config_defaults._DEFAULT_CONFIG, "output_dir", str(tmp_path))
+        monkeypatch.setitem(_config_defaults._DEFAULT_CONFIG["history"], "fetch_mode", "off")
+        invalidate_config_cache()
+        rm = RunManager(executor=_fake_executor(tmp_path))
+        app = create_app(rm)
+        app.config["TESTING"] = True
+        html = app.test_client().get("/").data.decode("utf-8")
+        assert 'name="fetch_history"' in html  # 控件存在
+        assert 'name="fetch_history" checked' not in html  # 未勾选
+        assert "当前配置关闭" in html
+
+
+class TestHealthEndpoint:
+    """/api/health 缓存 + fresh 强制重测。"""
+
+    def test_cached_and_fresh(self, app_client):
+        _health_cache["ts"] = 0.0
+        _health_cache["data"] = None
+        calls = {"n": 0}
+
+        def fake_health(max_timeout=15.0):
+            calls["n"] += 1
+            return [{"name": "x", "label": "测试源", "ok": True, "latency_ms": 1.0, "message": "ok"}]
+
+        with patch("src.python.core.check_sources.run_health_checks", side_effect=fake_health):
+            r1 = app_client.get("/api/health")
+            assert r1.status_code == 200
+            assert r1.get_json()["data"][0]["ok"] is True
+            # 60s 缓存内：不触发真实探测
+            app_client.get("/api/health")
+            assert calls["n"] == 1
+            # fresh=1 强制重测
+            app_client.get("/api/health?fresh=1")
+            assert calls["n"] == 2
+
+
+class TestArtifactsExitCode:
+    """产物清单按 exit_code/状态裁剪（错误处理完善）。"""
+
+    def test_severe_no_artifacts(self):
+        state = RunState("r", {"report_type": "both"})
+        state.output_dir = "/tmp"
+        state.exit_code = 2
+        assert _build_artifacts(state.params, state) == []
+
+    def test_failed_no_artifacts(self):
+        state = RunState("r", {"report_type": "both"})
+        state.output_dir = "/tmp"
+        state.status = "failed"
+        assert _build_artifacts(state.params, state) == []
+
+    def test_partial_keeps_artifacts(self):
+        """exit_code 1（部分失败）：产物仍可用。"""
+        state = RunState("r", {"report_type": "both"})
+        state.output_dir = "/tmp"
+        state.exit_code = 1
+        assert [a["kind"] for a in _build_artifacts(state.params, state)] == ["html", "xlsx"]
+
+    def test_success_basic_only_xlsx(self):
+        state = RunState("r", {"report_type": "basic"})
+        state.output_dir = "/tmp"
+        state.exit_code = 0
+        assert [a["kind"] for a in _build_artifacts(state.params, state)] == ["xlsx"]
+
+
+class TestCreateRunBoolParams:
+    """阶段 2 表单显式提交布尔参数（历史走势/强制 LLM）。"""
+
+    def test_fetch_history_bool_accepted(self, app_client):
+        resp = app_client.post("/api/upload", data={"file": (BytesIO(_make_holdings_xlsx()), "持仓.xlsx")})
+        file_id = resp.get_json()["data"]["file_id"]
+        for value in (True, False):
+            resp = app_client.post(
+                "/api/runs", json={"file_id": file_id, "report_type": "basic", "fetch_history": value}
+            )
+            assert resp.status_code == 202, resp.get_json()
+
+    def test_force_llm_bool_accepted(self, app_client):
+        resp = app_client.post("/api/upload", data={"file": (BytesIO(_make_holdings_xlsx()), "持仓.xlsx")})
+        file_id = resp.get_json()["data"]["file_id"]
+        resp = app_client.post("/api/runs", json={"file_id": file_id, "report_type": "basic", "force_llm": True})
+        assert resp.status_code == 202, resp.get_json()

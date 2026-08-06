@@ -39,6 +39,16 @@
             <option value="full">全量含 LLM（约 5 分钟）</option>
           </select>
         </div>
+        <div class="field-check" role="group" aria-label="生成选项">
+          <label for="history-fetch" class="check-label">
+            <input type="checkbox" id="history-fetch" name="fetch_history" {% if history_checked %}checked{% endif %}>
+            <span>获取历史走势数据（{{ config_note }}，仅 both/full 有效）</span>
+          </label>
+          <label for="force-llm" class="check-label">
+            <input type="checkbox" id="force-llm" name="force_llm">
+            <span>强制重新生成 LLM 内容（跳过缓存）</span>
+          </label>
+        </div>
         <button type="submit" id="generate-btn" class="btn btn-primary" disabled>生成报告</button>
       </form>
       <p id="generate-error" class="status-text status-error" role="alert" aria-live="polite"></p>
@@ -50,6 +60,7 @@
       <div class="progress-track">
         <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="生成进度"></div>
       </div>
+      <p id="progress-phase" class="progress-phase" aria-live="polite">准备中...</p>
       <ol id="progress-events" class="progress-events" aria-live="polite"></ol>
     </section>
 
@@ -58,6 +69,27 @@
       <h2 id="result-heading">生成结果</h2>
       <div id="result-actions" class="result-actions"></div>
       <div id="result-errors" class="result-errors" role="alert" aria-live="polite"></div>
+      <div id="result-footer" class="result-footer"></div>
+    </section>
+
+    <!-- ⑤ 状态区：数据源健康 + 历史运行记录 -->
+    <section class="card" aria-labelledby="status-heading">
+      <h2 id="status-heading">运行状态</h2>
+      <div class="status-grid">
+        <div class="status-card">
+          <h3>数据源健康</h3>
+          <div id="health-list" class="health-list" aria-live="polite">
+            <p class="status-text status-busy">正在检测...</p>
+          </div>
+          <button type="button" id="health-refresh" class="btn btn-secondary btn-sm">重新检测</button>
+        </div>
+        <div class="status-card">
+          <h3>历史运行记录</h3>
+          <div id="history-list" class="history-list" aria-live="polite">
+            <p class="status-text status-busy">加载中...</p>
+          </div>
+        </div>
+      </div>
     </section>
 
   </main>

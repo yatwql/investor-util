@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.10-dev
-> **编号源**：`rf-next = 254`（新增问题取此编号，完成后更新为 +1；已用最大 rf-253，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 255`（新增问题取此编号，完成后更新为 +1；已用最大 rf-254，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -42,6 +42,7 @@
 | rf-251 | chart-init.js 6 个核心图 init 守卫 `!ds.labels`/`!ds.datasets` 不拦截空数组（空数组 truthy），empty 场景（`labels:[]`+`datasets:[]`）下 `ds.datasets[0]` 为 undefined、抛 TypeError，依赖外层 try/catch 降级（图不渲染、console warn 噪声），而非显式空数据跳过 | 6 处守卫统一补 `!ds.labels.length` + `!ds.datasets.length`，空数据优雅 return（对齐生产模板 `{% if labels %}` 空值语义 §4.12，不再依赖异常降级） | `changelog.md` [0.10.10-dev] |
 | rf-252 | Web 上传预检（`_prevalidate`）调用 `get_xlsx_info` 未兜底：普通 zip 改 `.xlsx` 扩展名伪装（PK 魔数通过）时 openpyxl 抛 `KeyError`（archive 缺 `[Content_Types].xml`），`get_xlsx_info` 仅捕获 FileNotFoundError/BadZipFile/InvalidFileException/OSError，KeyError 逃逸 → `save_upload` 抛非 UploadError → handler 未捕获 → 500（而非设计预期的 400 UPLOAD_BAD_FILE） | `_prevalidate` 包裹 `get_xlsx_info` 调用，任意异常统一转 UPLOAD_BAD_FILE（防伪装 zip 造成 500）；新增 edge 测试 `test_plain_zip_disguised_as_xlsx` 回归 | `changelog.md` [0.10.10-dev] |
 | rf-253 | `RunManager._trim_runs` 仅在 `submit` 时调用：run 由 worker 线程逐条变为 done，批量提交时多数 run 尚未完成，submit 循环结束时 trim 无法清理后续完成的 run → run 注册表超出 `_RUN_KEEP`（测试实测 25 > 20） | worker `_work_loop` 的 finally 分支补 `_trim_runs()`（持锁），run 完成即触发保留上限清理；`test_retention_trim_oldest` 调整等待语义回归 | `changelog.md` [0.10.10-dev] |
+| rf-254 | 阶段2 自审：`_build_artifacts` 对 **failed 状态与严重失败（exit_code 2）仍返回产物按钮**——报告未生成时产物文件不存在，前端点击下载/预览只会 404，属错误路径未收敛 | `_build_artifacts` 对 `status == "failed"` 或 `exit_code == 2` 返回空列表（无产物即无按钮）；`TestArtifactsExitCode` 四用例回归（severe/failed 空、partial/success 保留） | `changelog.md` [0.10.10-dev] plan-8 阶段2 |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 
