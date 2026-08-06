@@ -274,6 +274,16 @@ class TestIndexConfigBackfill:
         assert 'id="health-list"' in html
         assert 'id="history-list"' in html
 
+    def test_index_header_shows_app_name_and_version(self, app_client):
+        """首页顶部强调应用名称 + 版本号（APP_NAME 常量 + app_version）。"""
+        from src.python.core.constants import APP_NAME, APP_VERSION
+
+        resp = app_client.get("/")
+        assert resp.status_code == 200
+        html = resp.data.decode("utf-8")
+        assert f"<h1>{APP_NAME}</h1>" in html
+        assert f"v{APP_VERSION} ·" in html
+
     def test_history_checkbox_follows_config_default(self, app_client):
         """默认 fetch_mode=auto → 历史走势复选框勾选 + 配置说明。"""
         resp = app_client.get("/")

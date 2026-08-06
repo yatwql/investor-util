@@ -31,7 +31,10 @@ def _find_project_root() -> str:
 # 使用标记文件查找法（pyproject.toml / .git），不依赖目录树深度。
 PROJECT_ROOT = _find_project_root()
 
-# ── 项目版本 ──────────────────────────────────────────────
+# ── 项目名称与版本 ─────────────────────────────────────────
+
+# 应用名称（单一来源，TUI 首页 / 启动日志 / Web 首页 / HTML 报告首页 / Excel 首页统一引用）
+APP_NAME = "个人投资分析报告生成小助手"
 
 APP_VERSION = "0.10.12-dev"
 

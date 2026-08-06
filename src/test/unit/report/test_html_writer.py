@@ -1620,4 +1620,6 @@ class TestAppVersionInTemplate(unittest.TestCase):
         _, kwargs = tmpl.render.call_args
         self.assertIn("app_version", kwargs)
         self.assertIsInstance(kwargs["app_version"], str)
+        self.assertIn("app_name", kwargs)
+        self.assertIsInstance(kwargs["app_name"], str)
         self.assertGreater(len(kwargs["app_version"]), 0)

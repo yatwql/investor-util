@@ -167,6 +167,16 @@ class TestWriteBasicInfoFonts(unittest.TestCase):
         self.assertFalse(ws.cell(row=1, column=1).font.bold, "统计时间标签不应加粗")
         self.assertFalse(ws.cell(row=2, column=1).font.bold, "所属交易日标签不应加粗")
 
+    def test_generator_tool_row(self):
+        """生成工具行（第3行）：标签 + 值含应用名称与版本号。"""
+        from src.python.core.constants import APP_NAME, APP_VERSION
+
+        ws = self._render_basic_info(datetime(2026, 6, 27, 15, 30, 0))
+        self.assertEqual(ws.cell(row=3, column=1).value, "生成工具")
+        value = ws.cell(row=3, column=2).value
+        self.assertIn(APP_NAME, value)
+        self.assertIn(APP_VERSION, value)
+
 
 # ═══════════════════════════════════════════════════════════
 #  write_summary_sheet 主函数测试

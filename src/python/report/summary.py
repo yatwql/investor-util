@@ -12,6 +12,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.cache import get_cache_age_by_data_type, get_ttl
+from src.python.core.constants import APP_NAME, APP_VERSION
 from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import (
     STATUS_MESSAGES,
@@ -119,6 +120,8 @@ def _write_basic_info(ws: Worksheet, row: int, now: datetime | None = None) -> i
     row = _write_kv_row(ws, row, "所属交易日", get_last_trading_day())
     # 所属交易日值加粗+加大+蓝色
     ws.cell(row=row - 1, column=2).font = _TRADING_DAY_FONT
+    # 生成工具（强调应用名称 + 版本号，报告由本应用生成）
+    row = _write_kv_row(ws, row, "生成工具", f"{APP_NAME} v{APP_VERSION}")
     row = _write_blanks(ws, row)
     return row
 

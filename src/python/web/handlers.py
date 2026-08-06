@@ -313,7 +313,7 @@ def _handle_index():
     from flask import render_template
 
     from src.python.config import get_config
-    from src.python.core.constants import APP_VERSION
+    from src.python.core.constants import APP_NAME, APP_VERSION
 
     # 表单默认参数在页面加载时取一次 get_config()（页面刷新即重取，
     # 避免页面参数与 run 出队时配置快照时刻不一致）。
@@ -327,6 +327,7 @@ def _handle_index():
     # 状态区系统信息（版本 / 机器 IP / LLM 状态）随页面渲染，对齐 TUI 状态面板
     return render_template(
         "index.html",
+        app_name=APP_NAME,
         app_version=APP_VERSION,
         history_checked=history_checked,
         config_note=config_note,

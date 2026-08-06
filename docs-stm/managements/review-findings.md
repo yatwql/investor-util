@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.12-dev
-> **编号源**：`rf-next = 265`（新增问题取此编号，完成后更新为 +1；已用最大 rf-264，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 266`（新增问题取此编号，完成后更新为 +1；已用最大 rf-265，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -60,6 +60,7 @@
 | rf-262 | `how-to-config.md` §M 功能开关表未列全 27 项 Feature Flag：`llm_*`/`fund_deep_analysis_*`/`news_*`/`metrics_*` 只写通配符未列具体 key；`fund_deep_analysis_*` 计数误写 4 项（实际 2 项）与总数 27 自相矛盾；结尾指引「完整清单以 features.json 注释为准」错误（features.json 唯一不支持注释） | §M 表格补全为逐项列出全部 27 个 key（含默认值+说明，与 `features.py::_FEATURE_FLAGS_DEFAULT` 一致）；修正 `fund_deep_analysis` 计数；删除错误指引改指向源码；faq.md 报告理解新增「HTML 单文件自包含」重点问答 + 修正故障排查过时说法 | `changelog.md` [0.10.11] |
 | rf-263 | `run_health_checks` 的 `max_timeout` 是**死参数**：原实现用 `ThreadPoolExecutor` + `as_completed`，线程并行执行、主流程等待全部完成，`max_timeout` 从未真正限制整体耗时——慢速/挂起的数据源会拖住整个健康检查（Web 健康接口需在前端 15s abort 前返回，若超时会 504） | 改为 daemon 线程 + 整体耗时预算：`deadline = perf_counter() + max_timeout`，逐线程 `join(timeout=剩余预算)`，预算耗尽即返回已收集的部分结果，未完成项标记「超时（预算 Ns）」；持锁原子追加 + 竞态兜底（同 name 保留真实结果弃超时占位）；`max_timeout` 成为真正的整体耗时上限；新增 `src/test/unit/core/test_check_sources.py` 回归用例 | `changelog.md` [0.10.11] |
 | rf-264 | Web 首页系统信息卡缺 TUI 首页摘要对齐字段：`show_config()` 展示 持仓目录/持仓文件/输出目录/新闻抓取上限/状态（文件是否就绪）/持仓匿名化/隐私声明，Web 首页仅展示 程序版本/本机 IP/LLM（用户要求首页显示 软件版本号/状态/新闻抓取上限/LLM配置信息/模型/策略 等，参考 TUI 首页摘要） | `web/handlers.py` `_build_system_info` 增补配置摘要字段（`get_config()` 读取 holdings_dir/holdings_filename/output_dir/news_top_count、`os.path.exists` 判定 holdings_ready、features.anonymization.mode 中文映射、`get_flag("_privacy_notice_shown")`），配置读取异常按默认值兜底；`index.html` 系统信息卡片补对应行 + `style.css` `.system-status-ok/err` 状态色；`TestSystemInfo` 新增 6 用例（web 目录 89 用例全绿 + smoke 9/9） | `changelog.md` [0.10.12-dev] |
+| rf-265 | 应用名称「个人投资分析报告生成小助手」硬编码散落（TUI 首页 tui_menu.py 写死、cli.py/server.py 描述用「生成工具」）、未作为单一来源常量；各入口（TUI 首页/启动日志/Web 首页/HTML 报告首页/Excel 首页）未统一强调应用名称 + 版本号（用户要求固化到 constants.py，报告强调由本应用及版本生成） | `core/constants.py` 新增 `APP_NAME` 单一来源常量；启动日志 `log_app_boundary` 改为「应用启动 \| {APP_NAME} v{APP_VERSION} \| …」；TUI 首页 `print_header` 引用 `APP_NAME`；Web 首页 `_handle_index` 传 `app_name` + index.html 顶部 `<h1>`/副标题强调名称与版本；主报告模板 report_template.html 头部加「由 {app_name} v{app_version} 生成」+ 页脚改「由 {app_name} v{app_version} 生成 · 个人投资分析报告」；whatif 报告模板页脚同加；Excel summary 页签 `_write_basic_info` 增「生成工具」行（`APP_NAME v{APP_VERSION}`）；新增/补强测试 4 处 | `changelog.md` [0.10.12-dev] |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 

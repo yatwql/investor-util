@@ -6,6 +6,19 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 应用名称单一来源 + 各入口统一强调名称/版本（rf-265）（2026-08-06）
+
+- **`core/constants.py` 新增 `APP_NAME = "个人投资分析报告生成小助手"`**：应用名称单一来源常量（零依赖模块，任何模块可直接引用），替代 TUI 首页硬编码。
+- **应用启动日志**（`core/logger.py` `log_app_boundary`）：日志格式由「应用启动 | 版本 vX | 模式 | 主机 IP」改为「应用启动 | 个人投资分析报告生成小助手 vX | 模式 | 主机 IP」，CLI/TUI/Web 三入口启动/关闭日志统一强调名称+版本。
+- **TUI 首页**（`tui_menu.py` `print_header`）：标题头由硬编码字符串改为引用 `APP_NAME`（`个人投资分析报告生成小助手  v{APP_VERSION}` 不变）。
+- **Web 首页**（`web/handlers.py` `_handle_index` 传 `app_name` + `index.html`）：顶部 `<title>`/`<h1>` 改为应用名称，副标题前缀「v{app_version} ·」，浏览器标签页与页面头同时强调名称+版本。
+- **HTML 报告首页**（`report_template.html` + `whatif_template.html`）：主报告头部加副标题「由 {app_name} v{app_version} 生成」，页脚改为「由 {app_name} v{app_version} 生成 · 个人投资分析报告 | 生成时间」；调仓 What-if 报告页脚加同款生成声明。
+- **Excel 首页**（`report/summary.py` `_write_basic_info`）：投资分析汇总页签「统计时间/所属交易日」后新增「生成工具」行（`个人投资分析报告生成小助手 v0.10.12-dev`）。
+- **测试**：`test_summary.py` 新增 生成工具行 用例、`test_handlers.py` 新增 首页标题名称+版本 用例、`test_html_writer.py` 补 `app_name` 透传断言、`test_tui_menu.py` 补版本断言。
+- **门禁**：相关 212 用例全绿 + dev-verify + 4 checks `--ci` 全 [OK]。
+
+---
+
 ### Web 首页系统信息卡对齐 TUI 首页摘要（rf-264）（2026-08-06）
 
 - **`web/handlers.py` `_build_system_info` 增补配置摘要字段**：在既有 程序版本/本机 IP/LLM 状态 基础上，对齐 TUI `show_config()` 首页摘要——持仓目录 / 持仓文件 / 输出目录 / 新闻抓取上限（`news_top_count`）/ 状态（`os.path.exists` 判定持仓文件是否就绪）/ 持仓匿名化模式（`features.anonymization.mode` 中文映射）/ 隐私声明是否已显示（`get_flag("_privacy_notice_shown")`）。配置读取异常按默认值兜底，不阻断页面渲染。

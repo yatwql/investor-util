@@ -20,7 +20,7 @@ import logging
 from datetime import datetime
 
 from src.python.cache import get_cache_hit_rate
-from src.python.core.constants import APP_VERSION
+from src.python.core.constants import APP_NAME, APP_VERSION
 from src.python.core.models import Holding
 from src.python.core.registry import get_llm_module_names, get_report_section_order
 from src.python.analysis.drawdown_events import MIN_SPAN as DRAW_DOWN_MIN_SPAN
@@ -304,6 +304,7 @@ def _render_template(
         llm_module_info=_llm_module_info,
         llm_endpoint=llm_endpoint,
         cache_stats=get_cache_hit_rate(),
+        app_name=APP_NAME,
         app_version=APP_VERSION,
         debate_mode_label=_debate_mode_label,
         debate_info=debate_info,

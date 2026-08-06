@@ -19,6 +19,7 @@ import os
 from datetime import datetime
 from typing import Any
 
+from src.python.core.constants import APP_NAME, APP_VERSION
 from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
 from src.python.report.html_writer import _copy_js_assets, _inline_js_assets
 from src.python.report.whatif_sheet import (
@@ -128,6 +129,8 @@ def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
     return _ENV.get_template("whatif_template.html").render(
         whatif_data=whatif_data,
         now=now_str,
+        app_name=APP_NAME,
+        app_version=APP_VERSION,
         whatif_chart_data=_trim_whatif_chart_data(whatif_data),
         whatif_backtest_chart_data=_trim_whatif_backtest_chart_data(whatif_data),
     )
