@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.10-dev
-> **编号源**：`rf-next = 249`（新增问题取此编号，完成后更新为 +1；已用最大 rf-248，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 250`（新增问题取此编号，完成后更新为 +1；已用最大 rf-249，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -12,7 +12,7 @@
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
-| **rf-113** | plan-1 **Iter 7 全链路浏览器人工验证 6 项全程未实测**（设计文档验收标准 2/3/4/6 标 ⏳）：① 6 图 Chrome/Edge 90+ 真实渲染+交互（Firefox 90+/Safari 14+ 抽验，R17）② 打印 2x DPI 快照 + 浅色强制 + 不跨页 ③ 离线验证（删除/改名 chart.min.js → `typeof Chart` 守卫应跳过、无 JS 报错、回退 Canvas/表格）④ 微信内置浏览器链接 + file:// 两种打开方式实测（R22）⑤ 移动端 375px 图表不溢出（A4）⑥ 禁用 Canvas 后 6 图区域显示 fallback 文本而非空白（A1） | **载体已备齐（2026-08-03）**：①③⑤ 用 `src/static/test-chart.html` 调试页自检（TD8 rf-112 载体；本次修复 rf-159 回归——注入列表补 `chart-common.js`，否则 0/6 全跳过）；②④⑥ 用完整报告（菜单 L/B，`enable_interactive_charts` 默认开）。**勾选清单**：`docs-stm/archive/v0.9.x/chartjs-upgrade/iter7-verification-checklist.md`（已更新至 7 JS 资产 + chart-common.js 依赖说明 + 回撤图数据 span≥60 交易日才渲染的说明），用户另机手工勾选完成后回填 changelog、本表移至已修复。**验证进度（2026-08-06 另机）**：③ 的 3.2~3.4 已过（引擎缺失守卫：无 JS 报错、chart-config/chart-init 静默跳过、canvas 保留 fallback 文本）；③ 的 3.1（断网渲染）待补验 |
+| **rf-113** | plan-1 **Iter 7 全链路浏览器人工验证 6 项全程未实测**（设计文档验收标准 2/3/4/6 标 ⏳）：① 6 图 Chrome/Edge 90+ 真实渲染+交互（Firefox 90+/Safari 14+ 抽验，R17）② 打印 2x DPI 快照 + 浅色强制 + 不跨页 ③ 离线验证（删除/改名 chart.min.js → `typeof Chart` 守卫应跳过、无 JS 报错、回退 Canvas/表格）④ 微信内置浏览器链接 + file:// 两种打开方式实测（R22）⑤ 移动端 375px 图表不溢出（A4）⑥ 禁用 Canvas 后 6 图区域显示 fallback 文本而非空白（A1） | **载体已备齐（2026-08-03）**：①③⑤ 用 `src/static/test-chart.html` 调试页自检（TD8 rf-112 载体；本次修复 rf-159 回归——注入列表补 `chart-common.js`，否则 0/6 全跳过）；②④⑥ 用完整报告（菜单 L/B，`enable_interactive_charts` 默认开）。**勾选清单**：`docs-stm/archive/v0.9.x/chartjs-upgrade/iter7-verification-checklist.md`（已更新至 7 JS 资产 + chart-common.js 依赖说明 + 回撤图数据 span≥60 交易日才渲染的说明），用户另机手工勾选完成后回填 changelog、本表移至已修复。**验证进度（2026-08-06 另机）**：③ 的 3.2~3.4 已过（引擎缺失守卫：无 JS 报错、chart-config/chart-init 静默跳过；现代浏览器不渲染 `<canvas>` fallback 文本，图表区域空白，真实报告回退明细表格，见 rf-249 修正）；③ 的 3.1（断网渲染）待补验 |
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器。**2026-08-05 决策：先完成 rf-113 人工验证（确认 Chart.js 真机渲染可靠）后再执行删除** |
 
 #### P2A — 文件过长（>500 行，可选优化；**>800 行为硬上限必须拆分**）
@@ -37,6 +37,7 @@
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
 | rf-248 | test-chart.html 调试页动态注入 chart 脚本未设 `s.async=false`（注释「非 async 动态注入按序执行」实为错误认知），动态 script 默认 async=true 无序执行，chart-init.js 先于 chart.min.js/chart-common.js 执行触发守卫静默 return，全场景 0/6 图未初始化、无 tooltip（用户 2026-08-06 实测 ok/degraded/empty 三场景复现） | 注入循环补 `s.async=false` 对齐报告模板 defer 语义；生产模板（report_template/whatif_template）用静态 defer 不受影响 | `changelog.md` [0.10.10-dev] |
+| rf-249 | 折线图（净值趋势/最大回撤/演进图 + whatif 回测线图）`pointRadius:0` 且默认 `interaction.intersect:true` → 数据点命中区域≈0，悬停无法触发 tooltip；雷达图 `pointRadius:3` 命中区域小同样难触发（用户 2026-08-06 ok 场景实测：环形图+两柱状图有 tooltip、折线+雷达无）。另：test-chart.html 自检 800ms 早于脚本加载完成误报 0/6；offline 文案「canvas 保留 fallback 文本」为误解（现代浏览器不渲染 `<canvas>` fallback 文本，引擎缺失时图表区域空白，真实报告回退明细表格） | ① chart-common.js `lineOptions` 补 `interaction:{mode:'index',intersect:false}`（悬停任意处显示最近 x 点全数据集值）；② chart-init.js radar 补 `interaction:{mode:'nearest',intersect:false}`；③ test-chart.html 自检改 chart-init.js onload 触发 + 3s 兜底；④ offline 文案与 iter7 清单/review-findings 断言修正为实测行为 | `changelog.md` [0.10.10-dev] |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 

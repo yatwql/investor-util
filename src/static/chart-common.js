@@ -36,6 +36,9 @@
         tooltip: { enabled: true }
       }
     };
+    // 折线图 tooltip：pointRadius=0 时默认 intersect=true 命中区域≈0，悬停无法触发；
+    // 改 index 模式 + intersect=false，悬停图表任意处显示最近 x 点全数据集值。
+    opts.interaction = { mode: 'index', intersect: false };
     opts.scales = {
       x: { ticks: { color: theme.text }, grid: { color: theme.grid } },
       y: { ticks: { color: theme.text }, grid: { color: theme.grid } }

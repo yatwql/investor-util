@@ -64,11 +64,11 @@
 | 3.1 | 断网（或 DevTools Network → Offline）打开报告，6 图正常渲染 + 交互 | ☐ |
 | 3.2 | **模拟引擎缺失**：复制报告目录 → 删除/改名 `chart.min.js` → 打开复制版 → 页面无 JS 报错 | ✅（另机 2026-08-06） |
 | 3.3 | 引擎缺失时页面回退 Canvas / 表格（Canvas 兜底路径生效） | ✅（另机 2026-08-06，chart-config/chart-init 静默跳过） |
-| 3.4 | 引擎缺失且 Canvas 失败时显示 `<canvas>` fallback 文本（A1，指引用户看表格） | ✅（另机 2026-08-06，canvas 保留 fallback 文本） |
+| 3.4 | 引擎缺失时图表区域空白、页面无 JS 报错（现代浏览器不渲染 `<canvas>` fallback 文本，A1 仅对不支持 Canvas 的浏览器生效，属 ⑥ 场景），真实报告回退明细表格 | ✅（另机 2026-08-06，守卫静默跳过确认；原「canvas 保留 fallback 文本」断言已按实测修正，rf-249） |
 
 > **判定**：3.1 通过（离线自包含成立）；3.2~3.4 通过（防御性守卫成立）→ ③ 通过。
 > 💡 也可用 `test-chart.html?场景=离线` 先行验证守卫逻辑（`typeof Chart` 检测 → 静默跳过 → banner 显示 err）。
-> **验证进度（2026-08-06 另机）**：3.2~3.4 已实测通过——删除 chart.min.js 后 `typeof Chart === undefined` → chart-config/chart-init 静默跳过，页面无 JS 报错，canvas 保留 fallback 文本，守卫逻辑符合预期（R21）。**3.1（断网 6 图正常渲染）待补验**。
+> **验证进度（2026-08-06 另机）**：3.2~3.4 已实测——删除 chart.min.js 后 `typeof Chart === undefined` → chart-config/chart-init 静默跳过，页面无 JS 报错，守卫逻辑符合预期（R21）。**修正（2026-08-06 测试页复核）**：现代浏览器不渲染 `<canvas>` fallback 文本，引擎缺失时图表区域为空白，真实报告回退到明细表格；`<canvas>` fallback 文本仅对不支持 Canvas 的浏览器（⑥ 场景）生效，原「canvas 保留 fallback 文本」表述为误解，已按实测修正（rf-249）。**3.1（断网 6 图正常渲染）待补验**。
 
 ## ④ 微信内置浏览器实测（Iter 7 验收标准 6，R22）
 

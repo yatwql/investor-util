@@ -6,6 +6,17 @@
 
 ## [0.10.10-dev] - 开发中（未发布）
 
+### 折线图/雷达图 tooltip 触发修复 + 调试页自检时序与文案修正（rf-249）
+
+- **tooltip 缺陷**：6 图交互验证（rf-113 ①，用户 2026-08-06 另机）发现——净值趋势/最大回撤折线图 `pointRadius:0` 且 Chart.js 默认 `interaction.intersect:true`，数据点命中区域≈0，鼠标悬停无法触发 tooltip；雷达图 `pointRadius:3` 命中区域小同样难触发。环形图（切片命中区域大）与两个柱状图（整柱命中）正常。该缺陷同时影响生产报告（净值/回撤/组合演进 3 图）与 whatif 回测线图（共用 `ChartCommon.lineOptions`）。
+- **修复**：
+  - `chart-common.js` `lineOptions` 补 `interaction:{mode:'index',intersect:false}`——折线图悬停图表任意处即显示最近 x 点全数据集值（金融时序标准交互）。
+  - `chart-init.js` radar 补 `interaction:{mode:'nearest',intersect:false}`——雷达无 x 索引轴，用最近点模式。
+- **调试页自检时序**：test-chart.html banner 自检原用固定 800ms 定时器，早于脚本加载完成（chart.min.js 约 200KB）误报「0/6 图已初始化」；改为 chart-init.js（最后一个注入脚本）onload 触发 + 3s 兜底，保证自检在全部图表初始化完成后执行。
+- **offline 文案修正**：banner 原断言「canvas 保留 fallback 文本」为误解——现代浏览器（Firefox/Chrome）不渲染 `<canvas>` 内部 fallback 文本（仅不支持 Canvas 的浏览器显示），引擎缺失时图表区域实际为空白，真实报告回退到明细表格。banner 文案与 iter7 验证清单 3.4/进度注记、review-findings rf-113 注记同步修正为实测行为。
+- **验证**：待用户另机硬刷新（Ctrl+F5 清缓存）重测四场景——ok/degraded 应 6/6 初始化、全部图悬停有 tooltip；empty 应 4/6 初始化 + 资产构成/雷达占位；offline 引擎缺失文本为预期（R21）。
+- **门禁**：dev-verify passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
+
 ### test-chart.html 动态注入脚本顺序修复（rf-248）
 
 - **缺陷**：TD8 调试页 `src/static/test-chart.html` 引导脚本用动态 `createElement('script')` 注入 6 个 chart 资产，但未设 `s.async=false`。动态 script 默认 async=true **无序执行**，chart-init.js（约 13KB）可能先于 chart.min.js（约 200KB）执行，触发 chart-init.js 顶部守卫（`typeof Chart === 'undefined' || !window.ChartCommon`）静默 return，图表永不初始化——ok/degraded/empty 全场景实测均「0/6 图已初始化」、无 tooltip（用户 2026-08-06 另机复现；empty 场景仅 radar badge 走「占位」分支，其余图空白；偶发 800ms 自检时 Chart 尚未加载完成还会误报「引擎缺失」banner）。

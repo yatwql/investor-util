@@ -275,6 +275,9 @@
           legend: { display: false },
           tooltip: { enabled: true }
         },
+        // radar 无 x 轴索引，用 nearest + intersect=false：悬停图表任意处显示最近指标点 tooltip
+        //（默认 intersect=true 需精确命中 3px 数据点，鼠标很难触发）。
+        interaction: { mode: 'nearest', intersect: false },
         scales: {
           r: {
             ticks: { display: false },
