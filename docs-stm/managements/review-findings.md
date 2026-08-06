@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.10-dev
-> **编号源**：`rf-next = 248`（新增问题取此编号，完成后更新为 +1；已用最大 rf-247，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 249`（新增问题取此编号，完成后更新为 +1；已用最大 rf-248，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -33,6 +33,10 @@
 ---
 
 ## 已修复（摘要）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-248 | test-chart.html 调试页动态注入 chart 脚本未设 `s.async=false`（注释「非 async 动态注入按序执行」实为错误认知），动态 script 默认 async=true 无序执行，chart-init.js 先于 chart.min.js/chart-common.js 执行触发守卫静默 return，全场景 0/6 图未初始化、无 tooltip（用户 2026-08-06 实测 ok/degraded/empty 三场景复现） | 注入循环补 `s.async=false` 对齐报告模板 defer 语义；生产模板（report_template/whatif_template）用静态 defer 不受影响 | `changelog.md` [0.10.10-dev] |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 

@@ -233,13 +233,14 @@
     document.getElementById('radar-note').textContent = data.radar.datasets[0].note;
   }
 
-  /* ── 注入引擎 script（顺序保证：非 async 动态注入按序执行）── */
+  /* ── 注入引擎 script（s.async=false 保证按序执行，对齐报告模板 defer 语义）── */
   var scripts = ['chart.min.js', 'chart-print.js', 'chart-config.js', 'chart-export.js', 'chart-common.js', 'chart-init.js'];
   if (scenario === 'offline') { scripts.shift(); } /* 模拟 chart.min.js 缺失 */
 
   for (var si = 0; si < scripts.length; si++) {
     var s = document.createElement('script');
     s.src = scripts[si];
+    s.async = false; /* 动态 script 默认 async=true 无序执行；必须置 false，保证 chart-init.js 最后执行（其守卫依赖 Chart 与 ChartCommon 已就绪） */
     document.head.appendChild(s);
   }
 
