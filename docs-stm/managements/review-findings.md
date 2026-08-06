@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.9-dev
-> **编号源**：`rf-next = 243`（新增问题取此编号，完成后更新为 +1；已用最大 rf-242，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 244`（新增问题取此编号，完成后更新为 +1；已用最大 rf-243，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -47,6 +47,7 @@
 | **rf-240** | `src/test/unit/analysis/test_snapshot_diff_edge.py` | 测试污染真实快照目录：`test_corrupt_snapshot_file_skipped` 用 `from src.python.core.constants import HISTORY_SNAPSHOT_DIR` 在 import 时拷贝旧值，绕过 conftest `_isolate_sensitive_paths` 的 monkeypatch 隔离，把损坏文件 `snapshot_corrupt.json` 写入真实 `data/history/snapshots/`，导致每次报告刷「文件损坏」WARNING。修复：改用 `import src.python.core.constants as core_constants` 模块属性访问，使隔离生效。回归验证：edge 测试 6 passed，真实快照目录无新增残留 |
 | **rf-241** | `src/python/tmpl/report_template.html` | 数据质量仪表盘「品种覆盖/可信度」区块渲染崩溃：`position_status.items` / `data_freshness.items` 在 Jinja2 中命中 dict 内置 `items` 方法（bound method）而非契约键 `"items"`，`data_quality` 子模块开启且契约有数据时 `{% for item in ... %}` 迭代 bound method → `TypeError: 'builtin_function_or_method' object is not iterable`（另一台电脑菜单 L 生成报告实测崩溃）。修复：guard 与循环改用 `.get("items")`（与生产代码 data_freshness.get("items") 一致），空 items 正确显示降级占位。回归：新增 `TestHtmlDataQualityBlocks` 4 用例（品种覆盖渲染/可信度渲染/空 items 占位/关闭跳过），修复前 `_render_template` 抛 TypeError |
 | **rf-242** | `src/test/unit/report/test_orchestrator.py` + `src/test/conftest.py` | 测试污染真实 reports 目录：`test_generate_report_skeleton` 用 `config={}` 真实调用 `generate_report`（report_type 默认 basic），未 patch 写盘函数，`output = config.get("output_dir", "reports")` fallback 到相对路径 `"reports"` → 解析到真实 reports 目录，空持仓每次生成一个空页签 Excel 归档（basic 路径仅写 Excel 不写 HTML，无 HTML 版）。跨整天累积 37 个残留文件。修复一：传入 `output_dir=tempfile.TemporaryDirectory()` 隔离输出。加固二：conftest 新增 `_isolate_report_output_dir` autouse 防线——Excel/HTML 两真实落盘入口收到解析后等于真实 `reports/` 的输出即重定向到 tmp；回归测试恢复 `config={}` 真实调用并以 `reports/` 文件快照断言无新增，作永久回归守护。回归验证：重跑该文件 + report 模式全量 + dev-verify，reports 零新增 |
+| **rf-243** | `core/registry.py` + `report/excel_sheet_factory.py` + `report/excel_generator.py` + `report/excel_fund_deep_analysis.py` + 7 个深度分析页签写入模块 | Excel 正文标题序号未跟随 `report_section_order` 配置：页签栏 tab 名用 create_sheets 可见连续序号（行动建议=10/组合演进=13/数据源可用性矩阵=14），正文标题用注册表默认序号（行动建议=17/组合演进=16），两者不一致。修复：create_sheets 创建页签时就地标记 `visible_number`；registry 新增 `get_report_section_number_from_order`（按「可见连续序号→配置序号→注册表默认」取值）；7 个深度页签写入函数新增 `section_order` 参数，excel_generator/excel_fund_deep_analysis 透传配置后 order，正文标题与页签栏序号现完全一致。数据源可用性矩阵及基础页签正文无序号为既有设计，不改变 |
 
 ## 归档
 

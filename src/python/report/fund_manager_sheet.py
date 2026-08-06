@@ -12,7 +12,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_section_number_from_order, get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -62,15 +62,20 @@ def _change_label(changed: bool, is_first: bool) -> str:
 def write_fund_manager_sheet(
     ws: Worksheet,
     manager_data: list[dict[str, Any]],
+    section_order: list[dict] | None = None,
 ) -> None:
     """写入基金经理变更监控页签。
 
     Args:
         ws: openpyxl Worksheet 对象
         manager_data: detect_manager_changes() 的返回结果
+        section_order: 已解析的报告模块顺序列表，用于正文标题序号跟随配置；
+            None 时使用注册表默认序号。
     """
     _name = get_report_sheet_name("fund_manager")
-    write_title_row(ws, 1, f"{get_report_section_number('fund_manager')}. {_name}", ncols=_NCOLS)
+    write_title_row(
+        ws, 1, f"{get_report_section_number_from_order('fund_manager', section_order)}. {_name}", ncols=_NCOLS
+    )
     write_header_row(ws, 2, _HEADERS)
 
     if not manager_data:

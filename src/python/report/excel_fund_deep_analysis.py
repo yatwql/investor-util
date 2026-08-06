@@ -52,6 +52,7 @@ def write_fund_deep_analysis_sheets(
     prog: ProgressReporter,
     style_factor_data: dict[str, Any] | None = None,
     position_relationship_data: dict[str, Any] | None = None,
+    section_order: list[dict] | None = None,
 ) -> None:
     """写入基金深度分析页签。
 
@@ -61,6 +62,8 @@ def write_fund_deep_analysis_sheets(
             未提供或 available=False 时因子回归区块写入占位（§1.4.5 降级治理）。
         position_relationship_data: 持仓关系矩阵数据契约 dict（相关性区块数据源），
             来自 pipeline_data；未提供或 available=False 时相关性区块写入占位（§1.4.5 降级治理）。
+        section_order: 已解析的报告模块顺序列表，透传给各页签写入函数，
+            使正文标题序号跟随配置；None 时各函数使用注册表默认序号。
     """
     if not enable_fund_deep_analysis:
         return
@@ -80,7 +83,7 @@ def write_fund_deep_analysis_sheets(
         write_fund_mgr = modules.get("write_fund_manager_sheet")
         if write_fund_mgr:
             try:
-                write_fund_mgr(ws_mgr, manager_data or [])
+                write_fund_mgr(ws_mgr, manager_data or [], section_order=section_order)
                 prog.ok("基金经理变更监控页签写入完成")
             except Exception as e:
                 logger.warning("基金经理变更监控页签写入失败: %s", e)
@@ -128,6 +131,7 @@ def write_fund_deep_analysis_sheets(
                 overlap_result,
                 fund_names=fund_names,
                 correlation_data=position_relationship_data,
+                section_order=section_order,
             )
             prog.ok("持仓关系矩阵页签写入完成")
         except Exception as e:
@@ -156,7 +160,7 @@ def write_fund_deep_analysis_sheets(
             prog.add_error("持仓集中度数据获取失败")
 
         try:
-            write_conc(ws_conc, conc_data or [])
+            write_conc(ws_conc, conc_data or [], section_order=section_order)
             prog.ok("持仓集中度监控页签写入完成")
         except Exception as e:
             logger.warning("持仓集中度监控页签写入失败: %s", e)
@@ -202,6 +206,7 @@ def write_fund_deep_analysis_sheets(
                 factor_exposure=style_factor_data,
                 factor_names=_factor_names,
                 industry_beta=(style_factor_data or {}).get("industry_beta"),
+                section_order=section_order,
             )
             prog.ok("风格与因子分析页签写入完成")
         except Exception as e:

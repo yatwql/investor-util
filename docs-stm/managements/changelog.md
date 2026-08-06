@@ -6,6 +6,13 @@
 
 ## [0.10.9-dev] - 开发中（未发布）
 
+### Excel 正文标题序号跟随报告章节顺序配置（rf-243）
+
+- **缺陷**：`report_section_order` 配置生效后，Excel 页签栏 tab 名按 create_sheets 可见连续序号重编号（行动建议=10、组合演进=13、数据源可用性矩阵=14），但 7 个深度分析页签（行动建议/组合演进/基金经理变更/持仓集中度/持仓关系矩阵/风格与因子/组合历史走势回撤）正文标题仍用注册表默认序号（行动建议=17、组合演进=16），与页签栏不一致。
+- **修复**：create_sheets 创建页签时就地标记 `visible_number`（与 tab 名同源）；registry 新增 `get_report_section_number_from_order`，正文标题按「可见连续序号 → 配置序号 → 注册表默认」取值；7 个页签写入函数新增 `section_order` 参数，excel_generator / excel_fund_deep_analysis 透传配置后 order。正文标题与页签栏序号现完全一致。
+- **说明**：数据源可用性矩阵及投资组合概要/市值/分类/穿透/基金业绩等基础页签正文标题本就不带序号（`get_report_sheet_name` 纯中文名），为既有设计，本次不改变。
+- **测试**：端到端验证全开启（19 页签）/ LLM 关闭（14 页签，即用户实测场景）两场景 tab 与正文序号全一致；191 受影响单测 + dev-verify 1864 passed；4 项 trace `--ci` 全 [OK]。
+
 ### 报告页签显示顺序配置（行动建议提前至第 10 位）
 
 - **配置**：`config.json` 的 `report_section_order` 由 `{}`（使用注册表默认）改为**完整配置 18 项**——`action`（行动建议）置于序号 10，原 10-16 依次顺延（`news_correlation`=11、`global_macro`=12、`expert_review`=13、`health_check`=14、`penetration_deep`=15、`portfolio_history_drawdown`=16、`portfolio_evolution`=17），`data_source_status`=18，`llm_usage` 强制末位。注册表默认值（行动建议=17）未改，清空该字段即恢复默认。

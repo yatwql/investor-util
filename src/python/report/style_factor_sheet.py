@@ -20,7 +20,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_section_number_from_order, get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -326,6 +326,7 @@ def write_style_factor_sheet(
     factor_exposure: dict[str, Any] | None = None,
     factor_names: dict | None = None,
     industry_beta: dict[str, Any] | None = None,
+    section_order: list[dict] | None = None,
 ) -> None:
     """写入风格与因子分析页签（一章三区块：风格表 + 因子回归 + 行业 Beta）。
 
@@ -337,10 +338,14 @@ def write_style_factor_sheet(
         factor_names: 因子 key → 中文名映射（缺省回退 key 本身）。
         industry_beta: `style_factor_data.industry_beta` 子键（行业 Beta 区块数据源）；
             None 或 available=False 时该区块不渲染（开关关/数据不可用）。
+        section_order: 已解析的报告模块顺序列表，用于正文标题序号跟随配置；
+            None 时使用注册表默认序号。
     """
     _name = get_report_sheet_name("style_factor")
     ncols = _compute_ncols(style_data, factor_exposure, industry_beta)
-    write_title_row(ws, 1, f"{get_report_section_number('style_factor')}. {_name}", ncols=ncols)
+    write_title_row(
+        ws, 1, f"{get_report_section_number_from_order('style_factor', section_order)}. {_name}", ncols=ncols
+    )
 
     row = 2
     row = _write_style_block(ws, row, style_data, ncols)

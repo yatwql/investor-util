@@ -21,7 +21,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_section_number_from_order, get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
     write_data_row,
@@ -78,16 +78,22 @@ def _write_sub_block(
     return row
 
 
-def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> None:
+def write_action_sheet(
+    ws: Worksheet,
+    action_data: dict[str, Any] | None,
+    section_order: list[dict] | None = None,
+) -> None:
     """写入行动建议页签。
 
     Args:
         ws: openpyxl Worksheet 对象
         action_data: `action_data` 契约 dict；None 或 available=False 时写占位。
+        section_order: 已解析的报告模块顺序列表（来自 get_report_section_order(config)），
+            用于正文标题序号跟随配置；None 时使用注册表默认序号。
     """
     _name = get_report_sheet_name("action")
     _ncols = 5
-    write_title_row(ws, 1, f"{get_report_section_number('action')}. {_name}", ncols=_ncols)
+    write_title_row(ws, 1, f"{get_report_section_number_from_order('action', section_order)}. {_name}", ncols=_ncols)
     row = 2
 
     if not action_data or not action_data.get("available"):

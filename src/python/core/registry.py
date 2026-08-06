@@ -606,6 +606,29 @@ def get_report_section_number(key: str, config: dict | None = None) -> int:
     return 0
 
 
+def get_report_section_number_from_order(key: str, section_order: list[dict] | None = None) -> int:
+    """根据模块键名返回指定 section_order 列表中的序号。
+
+    供报表层写入函数在已有解析后的 section_order 时直接取序号，
+    避免二次读取 config。优先返回 create_sheets 标记的可见连续序号
+    （visible_number，与页签栏 tab 名序号一致）；未标记时回退配置序号
+    （number）；section_order 为 None 或未找到时回退
+    get_report_section_number（注册表默认序号）。
+
+    Args:
+        key: 模块键名，如 "action"
+        section_order: 已解析的报告模块顺序列表（get_report_section_order 返回值，
+            create_sheets 会就地附加 visible_number 字段）
+
+    Returns:
+        序号整数，未找到时回退默认序号
+    """
+    for sec in section_order or []:
+        if sec["key"] == key:
+            return sec.get("visible_number", sec["number"])
+    return get_report_section_number(key)
+
+
 def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 

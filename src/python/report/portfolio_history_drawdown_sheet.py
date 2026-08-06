@@ -17,7 +17,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_section_number_from_order, get_report_sheet_name
 from src.python.report.excel_writer import (
     _write_placeholder,
     auto_width,
@@ -271,6 +271,7 @@ def write_portfolio_history_drawdown_sheet(
     history_data: dict | None = None,
     crisis_annotation: dict[str, Any] | None = None,
     tail_risk: dict[str, Any] | None = None,
+    section_order: list[dict] | None = None,
 ) -> None:
     """写入组合历史走势与回撤页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注 + 尾部风险）。
 
@@ -282,10 +283,17 @@ def write_portfolio_history_drawdown_sheet(
             None 时危机区块写"数据不可用"占位。
         tail_risk: `tail_risk_data` 数据契约 dict（尾部风险统计）；
             None 或 available=False 时尾部指标行写占位。
+        section_order: 已解析的报告模块顺序列表，用于正文标题序号跟随配置；
+            None 时使用注册表默认序号。
     """
     _name = get_report_sheet_name("portfolio_history_drawdown")
     ncols = _compute_ncols(history_data)
-    write_title_row(ws, 1, f"{get_report_section_number('portfolio_history_drawdown')}. {_name}", ncols=ncols)
+    write_title_row(
+        ws,
+        1,
+        f"{get_report_section_number_from_order('portfolio_history_drawdown', section_order)}. {_name}",
+        ncols=ncols,
+    )
 
     if not _data_ok(history_data):
         _write_placeholder(ws, "组合历史走势与回撤数据暂不可用（配置或网络原因）", max_cols=ncols)
