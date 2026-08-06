@@ -291,6 +291,21 @@ investor-util/
 │   │   │   ├── tui_handlers.py       #   键盘/事件处理
 │   │   │   ├── tui_keys.py           #   终端键盘输入封装
 │   │   │   └── tui_menu.py           #   菜单系统
+│   │   │
+│   │   └── web/                      # 轻量 Web 模式入口（浏览器内上传/生成/预览/下载）
+│   │   │   ├── __init__.py           #   子包标记，re-export main/create_app
+│   │   │   ├── __main__.py           #   python -m 入口
+│   │   │   ├── server.py             #   服务主入口（sys.path 注入 + 端口检测 + app.run）
+│   │   │   ├── app.py                #   Flask 应用工厂（错误处理/请求日志/注入 run_manager）
+│   │   │   ├── handlers.py           #   路由 handler（页面/上传/生成/轮询/预览/下载/历史/健康）
+│   │   │   ├── upload.py             #   上传安全（uuid 重命名/扩展名白名单/魔数校验/原子落盘/TTL）
+│   │   │   ├── progress.py           #   Web 进度报告器（事件写入 run 状态缓冲）
+│   │   │   ├── runs.py               #   RunManager 单 worker 串行队列 + run 状态/事件注册表
+│   │   │   ├── templates/            #   Jinja2 模板
+│   │   │   │   └── index.html        #   单页 Web UI（上传/格式选择/进度/结果区）
+│   │   │   └── static/               #   Web UI 静态资产（main.js/style.css）
+│   │   │       ├── main.js           #   前端逻辑（上传/提交/轮询/渲染，原生 ES6，无 innerHTML）
+│   │   │       └── style.css         #   样式（CSS 变量/浅色主题/响应式 480px 断点）
 │   │
 │   ├── static/                       # 前端静态资产（本地 bundle + 调试页）
 │   │   ├── chart.min.js              #   Chart.js v4.4.3 UMD（本地 bundle，205KB，离线自包含）
@@ -312,7 +327,7 @@ investor-util/
 │       │   └── hallucination/        #   幻觉测试数据集
 │       │       ├── __init__.py       #       子包标记
 │       │       └── datasets.py       #       幻觉评估标准持仓数据
-│       ├── unit/                     #   单元测试（14 子目录）
+│       ├── unit/                     #   单元测试（15 子目录）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── conftest.py           #   单元测试 conftest
 │       │   ├── analysis/             #   分析计算单元测试
@@ -560,6 +575,13 @@ investor-util/
 │       │   │   ├── test_tui_edge.py         #   TUI 边缘场景
 │       │   │   ├── test_tui_handlers.py     #   TUI 事件处理测试
 │       │   │   └── test_tui_menu.py         #   TUI 菜单测试
+│       │   └── web/                  #   Web 模式单元测试
+│       │   │   ├── __init__.py      #       包标记（空文件）
+│       │   │   ├── test_upload.py   #       上传安全模块（校验/生命周期/清理）
+│       │   │   ├── test_upload_edge.py #    上传安全边缘（zip-bomb/伪装/路径穿越变体）
+│       │   │   ├── test_progress.py #       Web 进度报告器（事件缓冲/seq/增量）
+│       │   │   ├── test_runs.py     #       RunManager（状态机/队列/保留/单例重置）
+│       │   │   └── test_handlers.py #       Flask 路由 handler（全链路/错误信封/穿越拒绝）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── test_cache_consistency.py      #   缓存前缀契约跨模块共享集成测试

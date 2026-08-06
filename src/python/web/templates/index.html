@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>投资分析报告生成</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ app_version }}">
+</head>
+<body>
+  <header class="app-header">
+    <h1>投资分析报告</h1>
+    <p class="subtitle">上传持仓 Excel，选择报告格式，浏览器内生成并预览</p>
+  </header>
+
+  <main class="app-main">
+
+    <!-- ① 上传区 -->
+    <section class="card" aria-labelledby="upload-heading">
+      <h2 id="upload-heading">① 上传持仓</h2>
+      <div class="upload-zone">
+        <label for="file-input" class="upload-label">
+          <span class="upload-icon" aria-hidden="true">⬆</span>
+          <span>选择或拖拽 .xlsx 文件到此处</span>
+        </label>
+        <input type="file" id="file-input" accept=".xlsx" hidden>
+        <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- ② 生成区 -->
+    <section class="card" aria-labelledby="generate-heading">
+      <h2 id="generate-heading">② 生成报告</h2>
+      <form id="generate-form" class="generate-form">
+        <div class="field-row">
+          <label for="report-type">报告格式</label>
+          <select id="report-type" name="report_type">
+            <option value="basic">仅 Excel（约 1 分钟）</option>
+            <option value="both">HTML + Excel（约 2 分钟）</option>
+            <option value="full">全量含 LLM（约 5 分钟）</option>
+          </select>
+        </div>
+        <button type="submit" id="generate-btn" class="btn btn-primary" disabled>生成报告</button>
+      </form>
+      <p id="generate-error" class="status-text status-error" role="alert" aria-live="polite"></p>
+    </section>
+
+    <!-- ③ 进度区 -->
+    <section class="card" id="progress-section" aria-labelledby="progress-heading" hidden>
+      <h2 id="progress-heading">生成进度</h2>
+      <div class="progress-track">
+        <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="生成进度"></div>
+      </div>
+      <ol id="progress-events" class="progress-events" aria-live="polite"></ol>
+    </section>
+
+    <!-- ④ 结果区 -->
+    <section class="card" id="result-section" aria-labelledby="result-heading" hidden>
+      <h2 id="result-heading">生成结果</h2>
+      <div id="result-actions" class="result-actions"></div>
+      <div id="result-errors" class="result-errors" role="alert" aria-live="polite"></div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>本地工具 · 数据来自公开行情源，仅供参考，不构成投资建议</p>
+  </footer>
+
+  <script src="/static/main.js?v={{ app_version }}"></script>
+</body>
+</html>

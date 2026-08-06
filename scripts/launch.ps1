@@ -8,6 +8,18 @@ Set-Location $projectRoot
 Write-Host "正在启动投资分析系统 ..."
 Write-Host "项目目录: $projectRoot"
 
+# 0. 解析入口参数（默认 TUI；web 入口启动轻量 Web 服务，参数透传 --host/--port/--config）
+$entry = "tui"
+$entryArgs = @($args)
+if ($args.Count -gt 0 -and ($args[0] -eq "web" -or $args[0] -eq "tui")) {
+    $entry = $args[0]
+    if ($args.Count -gt 1) {
+        $entryArgs = @($args[1..($args.Count - 1)])
+    } else {
+        $entryArgs = @()
+    }
+}
+
 # 1. 检查 Python 是否安装
 $pythonCmd = $null
 try {
@@ -136,9 +148,19 @@ New-Item -ItemType Directory -Force -Path "docs-stm\tmp" | Out-Null
 New-Item -ItemType Directory -Force -Path "logs" | Out-Null
 
 # 6. 启动主程序
-Write-Host "正在启动主程序 ..."
-try {
-    & $pythonCmd src\python\tui\tui.py
-} catch {
-    Write-Host "错误: 程序运行失败: $_" -ForegroundColor Red
+if ($entry -eq "web") {
+    Write-Host "正在启动 Web 服务（http://127.0.0.1:8000，Ctrl+C 退出）..." -ForegroundColor Cyan
+    Write-Host "(提示: 局域网访问用 launch.ps1 web --host 0.0.0.0)" -ForegroundColor DarkGray
+    try {
+        & $pythonCmd src\python\web\server.py @entryArgs
+    } catch {
+        Write-Host "错误: 程序运行失败: $_" -ForegroundColor Red
+    }
+} else {
+    Write-Host "正在启动主程序 ..."
+    try {
+        & $pythonCmd src\python\tui\tui.py
+    } catch {
+        Write-Host "错误: 程序运行失败: $_" -ForegroundColor Red
+    }
 }

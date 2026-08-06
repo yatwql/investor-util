@@ -40,7 +40,7 @@ Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做�
 | 功能补齐 | 1.5d |
 | 体验打磨 | 1d |
 
-> **最新代码核查（2026-08-06）**：`src/python/web/` 尚未创建，依赖清单无 flask/fastapi/uvicorn，**无任何代码落地，仍为纯计划状态**。复用基础已确认存在——`report/orchestrator.py` 的 `prepare_report_data` 与 `generate_report(holdings, config, reporter, report_type, fetch_history, force_llm, output_dir, ...)` 接口签名未变，`src/python/cli/cli.py` 已具备 `report`/`cache`/`whatif`/`check-sources` 4 个子命令，Web 层可直接调用管线；架构约束符合性表（plan-web-ui-implementation.md §5）、安全设计（§6）、API 设计（§7）、测试设计（§9）、实施拆分（§10）均已备齐。工作量估算维持不变（MVP 3d + 功能补齐 1.5d + 体验打磨 1d），仍为 P4 选做、无排期。
+> **实施进度（2026-08-06）**：阶段1（MVP 核心）**已落地**——`src/python/web/` 全量创建（server/app/handlers/upload/progress/runs + templates/static），依赖接入 `flask==3.1.2`（pyproject + requirements.txt），`launch.sh`/`launch.ps1` 增 `web` 入口参数；上传→生成→轮询→预览/下载全链路贯通（复用 `generate_report` 管线，零改动 report/ 层），上传安全（§6.1：uuid 重命名/扩展名白名单/PK 魔数/10MB/行数上限/原子落盘/TTL）与预览防穿越（§6.2）就位；`unit_web` marker 注册 + 5 个测试文件（upload/upload_edge/progress/runs/handlers，54 用例）全绿，P0 门禁通过。阶段2（功能补齐）/阶段3（体验打磨）待做——详见 [`plan-web-ui-implementation.md`](../plan/plan-web-ui-implementation.md) §10。复用基础已确认存在——`report/orchestrator.py` 的 `prepare_report_data` 与 `generate_report(holdings, config, reporter, report_type, fetch_history, force_llm, output_dir, ...)` 接口签名未变，Web 层直接调用管线。工作量估算：阶段1 实际完成，阶段2 1.5d + 阶段3 1d，仍为 P4 选做、无排期。
 
 ---
 

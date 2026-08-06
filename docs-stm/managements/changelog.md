@@ -6,6 +6,17 @@
 
 ## [0.10.10-dev] - 开发中（未发布）
 
+### plan-8 阶段1：轻量 Web UI 骨架 + 上传→生成→预览全链路（2026-08-06）
+
+- **依赖接入**：`flask==3.1.2`（pyproject.toml + requirements.txt，锁 werkzeug 3.1.8 / itsdangerous 2.2.0 / click 8.4.2 / blinker 1.9.0）；`scripts/launch.sh` / `launch.ps1`（BOM 保留）增 `web` 入口参数，`launch.sh web` / `launch.ps1 web` 启动 Web 服务，其余参数透传。
+- **`src/python/web/` 骨架**：`server.py`（sys.path 注入 + 端口占用检测 + app.run）、`app.py`（Flask 工厂：统一 JSON 错误处理 / request_id 访问日志 / 注入 run_manager）、`handlers.py`（页面/上传/生成/轮询/预览/下载/历史/健康路由）、`upload.py`（上传安全）、`progress.py`（WebProgressReporter 事件缓冲）、`runs.py`（RunManager 单 worker 串行队列 + run 状态/事件注册表）、`templates/index.html` + `static/main.js`/`style.css`（单页 UI，原生 ES6 无 innerHTML）。
+- **全链路贯通**：上传持仓 Excel（`POST /api/upload`）→ 提交生成任务（`POST /api/runs`，单 worker 串行防产物覆盖）→ 轮询进度（`GET /api/runs/{id}/events` 增量）→ 预览/下载产物（`GET /api/reports/<file>`）。管线复用 `generate_report` 零改动（reporter 注入 WebProgressReporter，output_dir 快照在出队时取）。
+- **上传安全（§6.1）**：uuid 重命名丢弃原始文件名（防路径穿越/中文）、`.xlsx` 扩展名白名单 `.lower()`、10MB 上限（Flask MAX_CONTENT_LENGTH 兜底）、PK zip 魔数校验、行数上限 5000、mkstemp + os.replace 原子落盘、TTL 1h + 启动清理；伪装 zip 预检兜底转 UPLOAD_BAD_FILE（新增测试暴露的真实缺陷）。
+- **预览防穿越（§6.2）**：扩展名白名单 + `send_from_directory` 内置 `..` 净化。
+- **`unit_web` marker + 测试**：conftest 注册 marker / 隔离 `_UPLOAD_DIR`+`_file_registry` / autouse 重置 RunManager 单例，unit/conftest `_DIR_TO_MARKER` 映射，test_runner dev-verify/verify 纳入；5 个测试文件 54 用例（upload/upload_edge/progress/runs/handlers，含 zip-bomb/伪装/路径穿越变体 edge 场景）。
+- **验证**：web 目录 54 用例全绿；dev-verify 1905 passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 通过。阶段2（功能补齐）/阶段3（体验打磨）待做。
+- **门禁**：dev-verify passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
+
 ### rf-113 Iter 7 浏览器人工验证进度更新（2026-08-06 另机 Windows）
 
 - **① 6 图渲染 + 交互 — ✅ 通过**：ok/degraded 场景 6/6 图渲染 + 全部图 tooltip 可用（含净值/回撤折线、雷达——rf-249 修复后悬停任意处即显示）；empty 场景 4/6 渲染 + tooltip（资产构成/雷达空数据占位，符合 §4.12 空值语义）；offline 场景引擎缺失守卫生效（R21）。Chrome + Firefox 实测，Edge 未测（同 Chromium 内核，S2 升级时补验）。

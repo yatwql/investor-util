@@ -56,6 +56,7 @@ _KNOWN_MARKERS: set[str] = {
     "unit_ui",
     "unit_analysis",
     "unit_scripts",
+    "unit_web",
     # 跨领域标记
     "llm",
     "edge",
@@ -109,6 +110,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit_ui: TUI/UI 交互单元测试")
     config.addinivalue_line("markers", "unit_analysis: 分析计算模块单元测试（流动性/再平衡/汇率/无风险利率）")
     config.addinivalue_line("markers", "unit_scripts: scripts/ 工程脚本单元测试（历史痕迹检查/版本一致性等）")
+    config.addinivalue_line("markers", "unit_web: Web 入口（src/python/web/）单元测试")
     config.addinivalue_line("markers", "llm: LLM 相关测试（全部 mock，无需 API key）")
     config.addinivalue_line("markers", "edge: 边缘/异常场景测试 — 必须放在 *_edge.py 文件中，不得与普通测试混搭")
     config.addinivalue_line("markers", "smoke: 冒烟测试（快速验证核心功能）")
@@ -235,6 +237,16 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.config.features._FEATURES_FILE",
         str(tmp_path / "data/config/features.json"),
     )
+    # Web 上传临时目录隔离（data/holdings/uploads/ —— 上传文件落盘/清理的靶目录）
+    monkeypatch.setattr(
+        "src.python.web.upload._UPLOAD_DIR",
+        str(tmp_path / "data/holdings/uploads"),
+    )
+    # Web 上传 file_id 注册表隔离（防跨测试 TTL/残留串扰）
+    monkeypatch.setattr(
+        "src.python.web.upload._file_registry",
+        {},
+    )
     # data/history/ 快照目录隔离
     monkeypatch.setattr(
         "src.python.core.constants.HISTORY_SNAPSHOT_DIR",
@@ -345,6 +357,18 @@ def _auto_reset_provider_registry():
     from src.python.core.provider_registry import get_registry
 
     get_registry().reset()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_run_manager():
+    """自动重置 RunManager 单例，防止测试间状态污染。
+
+    每个测试执行前销毁 web.runs 模块级单例，下次 get_run_manager() 重建。
+    与 _auto_reset_provider_registry / _reset_degradation_tracker 同模式。
+    """
+    from src.python.web.runs import reset_run_manager
+
+    reset_run_manager()
 
 
 @pytest.fixture(autouse=True)

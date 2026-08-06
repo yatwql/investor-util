@@ -1,0 +1,304 @@
+/* style.css — Web UI 样式（设计-quality 原则：中文 UI、浅色、响应式、可访问性）。
+ *
+ * 阶段 1 提供基础可用样式；阶段 3 打磨视觉（design-quality 完整落地）。
+ */
+
+:root {
+  --color-bg: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-border: #d9dce1;
+  --color-text: #1f2328;
+  --color-text-secondary: #57606a;
+  --color-primary: #1f6fb2;
+  --color-primary-hover: #185a92;
+  --color-ok: #1a7f37;
+  --color-warn: #9a6700;
+  --color-error: #cf222e;
+  --color-focus: #0969da;
+  --radius: 10px;
+  --space-card: 24px;
+  --font-stack: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-stack);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-header {
+  padding: 32px var(--space-card) 8px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+.app-main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px var(--space-card) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px var(--space-card);
+  box-shadow: 0 1px 3px rgba(31, 35, 40, 0.04);
+}
+
+.card h2 {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+  color: var(--color-text);
+}
+
+/* ── 上传区 ── */
+.upload-zone {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: 28px 16px;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.upload-zone.drag-over {
+  border-color: var(--color-primary);
+  background: #f0f6ff;
+}
+
+.upload-label {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+.upload-icon {
+  font-size: 1.5rem;
+  color: var(--color-primary);
+}
+
+.status-text {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+  min-height: 1.2em;
+}
+
+.status-ok {
+  color: var(--color-ok);
+}
+
+.status-busy {
+  color: var(--color-text-secondary);
+}
+
+.status-error {
+  color: var(--color-error);
+}
+
+/* ── 生成区 ── */
+.generate-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-row label {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+select:focus,
+.btn:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+/* ── 按钮 ── */
+.btn {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 9px 18px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border-color: var(--color-border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-primary);
+}
+
+/* ── 进度区 ── */
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #e7e9ec;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--color-primary);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.progress-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+
+.progress-events li {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  align-items: baseline;
+}
+
+.event-icon {
+  flex: none;
+  width: 1.1em;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.event-ok .event-icon {
+  color: var(--color-ok);
+}
+
+.event-warn .event-icon {
+  color: var(--color-warn);
+}
+
+.event-error .event-icon {
+  color: var(--color-error);
+}
+
+/* ── 结果区 ── */
+.result-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.result-errors-heading {
+  margin: 14px 0 4px;
+  font-weight: 600;
+  color: var(--color-warn);
+}
+
+.result-errors ul {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ── 页脚 ── */
+.app-footer {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 var(--space-card) 32px;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+/* ── 响应式（375px 移动端不溢出）── */
+@media (max-width: 480px) {
+  .app-header,
+  .app-main,
+  .app-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .generate-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* 减少动效偏好：关闭过渡动画 */
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar,
+  .upload-zone,
+  .btn {
+    transition: none;
+  }
+}
