@@ -24,7 +24,7 @@
 
 > 实验性功能，缺省关闭，需通过配置项或 features.json 显式启用。启用不影响现有功能稳定性。**当前实验项**：日志可视化、轻量 Web UI（独立于本迭代，选做，无排期）。
 
-#### `plan-10` 日志可视化（[`plan-web-ui.md §3`](../plan/plan-web-ui.md#3-日志可视化)）
+#### `plan-10` 日志可视化（[`plan-web-ui.md §2`](../plan/plan-web-ui.md#2-日志可视化)）
 
 结构化日志查看（`--view-logs` 命令 + 报告尾部数据源状态表）。**预估：1d**
 
@@ -40,7 +40,7 @@ Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做�
 | 功能补齐 | 1.5d |
 | 体验打磨 | 1d |
 
-> **最新代码核查（2026-08-05）**：`src/python/web/` 尚未创建，依赖清单无 flask/fastapi/uvicorn，**无任何代码落地，仍为纯计划状态**。复用基础已确认存在——`report/orchestrator.py` 的 `prepare_report_data`（L61）与 `generate_report`（L717）接口未变，`src/python/cli/cli.py` 已具备 `report`/`cache`/`whatif`/`check-sources` 4 个子命令，Web 层可直接调用管线；架构约束符合性表（plan-web-ui-implementation.md §5）、安全设计（§6）、API 设计（§7）、测试设计（§9）、实施拆分（§10）均已备齐。工作量估算维持不变（MVP 3d + 功能补齐 1.5d + 体验打磨 1d），仍为 P4 选做、无排期。
+> **最新代码核查（2026-08-06）**：`src/python/web/` 尚未创建，依赖清单无 flask/fastapi/uvicorn，**无任何代码落地，仍为纯计划状态**。复用基础已确认存在——`report/orchestrator.py` 的 `prepare_report_data` 与 `generate_report(holdings, config, reporter, report_type, fetch_history, force_llm, output_dir, ...)` 接口签名未变，`src/python/cli/cli.py` 已具备 `report`/`cache`/`whatif`/`check-sources` 4 个子命令，Web 层可直接调用管线；架构约束符合性表（plan-web-ui-implementation.md §5）、安全设计（§6）、API 设计（§7）、测试设计（§9）、实施拆分（§10）均已备齐。工作量估算维持不变（MVP 3d + 功能补齐 1.5d + 体验打磨 1d），仍为 P4 选做、无排期。
 
 ---
 

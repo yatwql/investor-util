@@ -15,10 +15,10 @@
 | **测试用例** | — | — | **5,196 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **13** | **5,757** | 含 README.md（181 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 12 | 5,576 | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **107** | **42,279** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |
+| **项目文档** | Markdown | **107** | **42,160** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 9 | 7,135 | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 99 | 34,442 | 各版本 changelog/plan/review-findings 等（95 md 34,442 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 2 | 628 | 当前迭代中的设计方案（plan-web-ui.md + plan-web-ui-implementation.md） |
+| ├ plan/ | 中间设计文件 | 2 | 509 | 当前迭代中的设计方案（plan-web-ui.md + plan-web-ui-implementation.md） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -686,7 +686,7 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
-│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
+│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（plan-8 轻量 Web UI / plan-10 日志可视化，未完成项）
 │   │   └── plan-web-ui-implementation.md #   plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
