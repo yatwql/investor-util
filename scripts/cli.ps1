@@ -1,7 +1,8 @@
 ﻿# scripts/cli.ps1 - 投资分析 CLI 命令行模式 (Windows)
 # Encoding: UTF-8 with BOM (PowerShell requires BOM for Chinese chars)
 #
-# 无参数调用时默认生成报告（report 子命令，--type both，Excel+HTML 不含 LLM）；
+# 无参数调用时默认生成报告（report 子命令，--type both，Excel+HTML 不含 LLM，
+# 组合历史走势按配置 history.fetch_mode 默认 auto 自动获取）；
 # 传入参数时原样透传给 CLI，等价于 .venv\Scripts\python.exe -m src.python.cli <args>。
 #
 # 用法:

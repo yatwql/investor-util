@@ -52,7 +52,7 @@ class TestArgparse:
         args = _build_parser().parse_args(["report"])
         assert args.command == "report"
         assert args.type == "basic"
-        assert args.history == "off"
+        assert args.history is None  # 未显式传 --history → 由配置层 history.fetch_mode 决定
         assert args.force_llm is False
         assert args.warm is False
 

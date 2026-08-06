@@ -338,7 +338,7 @@ def generate_report(
     config: dict,
     reporter: ProgressReporter,
     report_type: str = "basic",
-    fetch_history: bool = False,
+    fetch_history: bool | None = None,
     force_llm: bool = False,
     output_dir: str | None = None,
     warm_cache: bool = False,
@@ -352,13 +352,20 @@ def generate_report(
     full:  HTML+Excel+LLM
 
     Args:
-        fetch_history: 是否获取组合历史走势数据（as-if 模拟），仅 both/full 有效
+        fetch_history: 是否获取组合历史走势数据（as-if 模拟），仅 both/full 有效。
+            None 表示未显式指定，按 `config.history.fetch_mode` 决定
+            （默认 auto，即获取）
         transactions: 交易流水记录（「交易流水」页签，无则 None）。
             成本流水子模块（report_submodules.cost_lots）开启时用于成本分档 + XIRR
         dividends: 分红流水记录（「分红流水」页签，无则 None）。
             成本流水子模块开启时用于分红累计 + XIRR
     """
     result = ReportResult()
+    if fetch_history is None:
+        # 未显式传参 → 跟随 config.json 的 history.fetch_mode（off/auto/prompt）。
+        # auto/prompt 均视为获取（prompt 为 TUI 交互询问，非交互场景按获取处理）。
+        _fetch_mode = (config.get("history", {}) or {}).get("fetch_mode") or "auto"
+        fetch_history = _fetch_mode != "off"
 
     # 实验性功能状态日志（红色高亮）
     from src.python.config.features import log_experimental_features

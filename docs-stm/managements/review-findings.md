@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.9-dev
-> **编号源**：`rf-next = 245`（新增问题取此编号，完成后更新为 +1；已用最大 rf-244，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 246`（新增问题取此编号，完成后更新为 +1；已用最大 rf-245，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -49,6 +49,7 @@
 | **rf-242** | `src/test/unit/report/test_orchestrator.py` + `src/test/conftest.py` | 测试污染真实 reports 目录：`test_generate_report_skeleton` 用 `config={}` 真实调用 `generate_report`（report_type 默认 basic），未 patch 写盘函数，`output = config.get("output_dir", "reports")` fallback 到相对路径 `"reports"` → 解析到真实 reports 目录，空持仓每次生成一个空页签 Excel 归档（basic 路径仅写 Excel 不写 HTML，无 HTML 版）。跨整天累积 37 个残留文件。修复一：传入 `output_dir=tempfile.TemporaryDirectory()` 隔离输出。加固二：conftest 新增 `_isolate_report_output_dir` autouse 防线——Excel/HTML 两真实落盘入口收到解析后等于真实 `reports/` 的输出即重定向到 tmp；回归测试恢复 `config={}` 真实调用并以 `reports/` 文件快照断言无新增，作永久回归守护。回归验证：重跑该文件 + report 模式全量 + dev-verify，reports 零新增 |
 | **rf-243** | `core/registry.py` + `report/excel_sheet_factory.py` + `report/excel_generator.py` + `report/excel_fund_deep_analysis.py` + 7 个深度分析页签写入模块 | Excel 正文标题序号未跟随 `report_section_order` 配置：页签栏 tab 名用 create_sheets 可见连续序号（行动建议=10/组合演进=13/数据源可用性矩阵=14），正文标题用注册表默认序号（行动建议=17/组合演进=16），两者不一致。首次修复：create_sheets 创建页签时就地标记 `visible_number`；registry 新增 `get_report_section_number_from_order`；7 个深度页签写入函数新增 `section_order` 参数并透传配置后 order。**后经 rf-244 设计调整收敛**：正文标题统一为纯中文名，上述同步机制全部撤除 |
 | **rf-244** | `core/registry.py` + `report/excel_sheet_factory.py` + 7 个深度分析页签写入模块 + `report/excel_generator.py` + `report/excel_fund_deep_analysis.py` | 设计调整（rf-243 方案收敛）：序号只在 Excel 页签栏与 HTML 章节标题出现，Excel 正文标题统一为纯中文名（与基础页签/数据源可用性矩阵一致）。撤除 rf-243 的正文标题序号同步机制（registry `get_report_section_number_from_order`、create_sheets `visible_number` 标记、7 页签写入函数 `section_order` 参数及 excel_generator/excel_fund_deep_analysis 透传），正文不依赖序号，调整配置/隐藏章节不错位。test_correlation_sheet 正文标题断言同步更新为纯中文名 |
+| **rf-245** | `report/_snapshot.py` + `report/orchestrator.py` + `cli/cli.py` | 历史走势关闭时仅剩误导性「尾部风险：无历史 bars」警告：`fetch_history=False` 静默跳过，用户无法判断是配置关闭所致。修复：① fetch 关闭时 `reporter.warn`+`logger.warning` 醒目提示「组合历史走势获取已跳过（history off）」及占位后果；② CLI `--history` 默认改为跟随 `config.history.fetch_mode`（默认 auto），未显式传参时由 `generate_report` 回退到配置层，不再硬编码 off |
 
 ## 归档
 
