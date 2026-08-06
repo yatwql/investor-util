@@ -18,8 +18,8 @@
   "enable_history": true,   // 组合历史走势与回撤
   "enable_portfolio_evolution": true,  // 组合演进
   "enable_action": true,     // 行动建议（默认开，可在菜单 P 关闭）
-  // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": false, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度 默认关
+  // 报告子模块开关（数据质量仪表盘为长期可信核心默认开启；其余新增能力默认关闭，避免既有报告突然"变胖"）
+  "report_submodules": {"data_quality": true, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘默认开，其余默认关
   "comparison_candidates": [],  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合 candidate_compare）
 
   // ── C. 数据源与提供商 ──
@@ -169,7 +169,7 @@
 | `enable_history` | `true` | 历史走势章节可见性（组合历史走势与回撤，一章两区块：走势表 + 回撤矩阵 + 危机区间标注），关闭后对应章节完全隐藏。持仓快照不受影响，始终自动执行 | 菜单 `P` |
 | `enable_portfolio_evolution` | `true` | 组合演进章节可见性，关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
 | `enable_action` | `true` | 行动建议章节可见性，**默认开启**，关闭后隐藏 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。智囊团深度复盘同步隐藏「行动摘要」子块 | 菜单 `P` |
-| `report_submodules.data_quality` | `false` | 数据质量仪表盘子模块开关，**默认关闭**。开启后报告展示数据质量仪表盘区块（数据覆盖/时效性/降级状态） | 菜单 P → 6 |
+| `report_submodules.data_quality` | `true` | 数据质量仪表盘子模块开关，**默认开启**（长期可信核心）。开启后报告展示数据质量仪表盘区块（数据覆盖/时效性/降级状态） | 菜单 P → 6 |
 | `report_submodules.candidate_compare` | `false` | 「基金业绩分析」章候选基金比较子表开关，**默认关闭**。开启后报告在该章主业绩表下方展示候选基金横向比较表（候选来自 `comparison_candidates`，比较维度：收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度） | 菜单 P → 6 |
 | `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
 | `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 菜单 P → 6 |

@@ -12,7 +12,7 @@
 | 辅助脚本 | Python | 17 | 6,468 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验） |
 | **源代码合计** | — | **255** | **66,418** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **287** | **81,523** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,146 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **测试用例** | — | — | **5,196 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **13** | **5,698** | 含 README.md（181 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 12 | 5,517 | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **107** | **42,132** | 含 CLAUDE.md（73 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |

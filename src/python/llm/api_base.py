@@ -337,7 +337,17 @@ def _extract_content(data: dict) -> str | None:
                 "（建议增大对应 max_tokens 配置或降低 reasoning_effort）"
             )
         else:
-            logger.warning("LLM API 返回空内容（可能被内容过滤机制拦截）")
+            # 记录响应结构供诊断：空 content 不必然等于"内容被过滤"——DeepSeek 强制推理
+            # 模型在并发/异常下可能返回 HTTP 200 但 content 为空（区别于思考耗尽的
+            # stop_reason=max_tokens）。带 stop_reason / block 类型 / usage 打日志，
+            # 下次可直接定位根因，不再武断归因。
+            _block_types = [b.get("type") for b in content_field if isinstance(b, dict)]
+            logger.warning(
+                "LLM API 返回空 content（stop_reason=%r，block types=%s，usage=%r）",
+                data.get("stop_reason"),
+                _block_types,
+                data.get("usage"),
+            )
         return None
 
     return None

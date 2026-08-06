@@ -429,7 +429,7 @@ def _cmd_config_report_boards() -> None:
 def _cmd_config_report_submodules() -> None:
     """配置报告增强子模块（数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度）。
 
-    6 项增强子模块独立启停，实时保存到 config.json 的 `report_submodules`（默认全关）。
+    6 项增强子模块独立启停，实时保存到 config.json 的 `report_submodules`（数据质量仪表盘默认开，其余默认关）。
     开启后对应章节按需增强区块（数据源可用性矩阵 / 风格与因子分析 / 基金业绩分析 /
     资产穿透TOP10 / 投资分析汇总），不改变既有章节输出。
     """

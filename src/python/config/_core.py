@@ -353,8 +353,8 @@ def is_enable_history(config: dict | None = None) -> bool:
 def is_enable_data_quality(config: dict | None = None) -> bool:
     """数据质量仪表盘子模块是否启用。
 
-    读取 `report_submodules.data_quality`，默认关（未开启时既有
-    「数据源可用性矩阵」输出不变）。
+    读取 `report_submodules.data_quality`，默认开（数据质量仪表盘为长期可信核心，
+    与 `enable_action` 缺省开启口径一致；显式关闭时「数据源可用性矩阵」保持既有输出）。
 
     Args:
         config: 完整配置字典，为 None 时读取全局配置
@@ -363,11 +363,11 @@ def is_enable_data_quality(config: dict | None = None) -> bool:
         config = get_config()
     submodules = config.get("report_submodules")
     if not isinstance(submodules, dict):
-        return False
+        return True
     val = submodules.get("data_quality")
     if val is None:
-        logger.debug("config.json 缺少 report_submodules.data_quality，使用默认值 false")
-        return False
+        logger.debug("config.json 缺少 report_submodules.data_quality，使用默认值 true")
+        return True
     return bool(val)
 
 

@@ -971,6 +971,63 @@ class TestRankDataReasonableRange(unittest.TestCase):
 
 
 # ============================================================
+#  候选基金无有效候选占位（开关开启但 comparison_candidates 未配置）
+# ============================================================
+
+class TestWriteCandidateUnavailableBlock(unittest.TestCase):
+    """_write_candidate_unavailable_block: 无有效候选时写出标题 + 占位提示。"""
+
+    @patch("src.python.report.fund_performance.write_title_row")
+    @patch("src.python.report.fund_performance._write_placeholder")
+    def test_no_valid_candidate_writes_placeholder(
+        self, mock_placeholder, mock_title
+    ):
+        """available=False（无有效候选）→ 写标题 + 「未配置候选基金」占位。"""
+        mock_title.return_value = 2
+        mock_placeholder.return_value = 3
+        ws = MagicMock()
+        candidate_data = {
+            "available": False,
+            "reason": "no_valid_candidate",
+            "exceed_limit": False,
+            "invalid": [],
+            "rows": [],
+        }
+
+        fp._write_candidate_unavailable_block(ws, 2, candidate_data)
+
+        mock_title.assert_called_once_with(
+            ws, 2, "候选基金比较（候选来自 config.comparison_candidates）", 11
+        )
+        self.assertEqual(mock_placeholder.call_count, 1)
+        args = mock_placeholder.call_args[0]
+        self.assertIn("未配置候选基金", args[1])
+        self.assertIn("comparison_candidates", args[1])
+
+    @patch("src.python.report.fund_performance.write_title_row")
+    @patch("src.python.report.fund_performance._write_placeholder")
+    def test_placeholder_lists_invalid_codes(
+        self, mock_placeholder, mock_title
+    ):
+        """存在非法候选代码 → 占位文本中列出被忽略代码。"""
+        mock_title.return_value = 2
+        mock_placeholder.return_value = 3
+        ws = MagicMock()
+        candidate_data = {
+            "available": False,
+            "reason": "no_valid_candidate",
+            "exceed_limit": False,
+            "invalid": ["abc123"],
+            "rows": [],
+        }
+
+        fp._write_candidate_unavailable_block(ws, 2, candidate_data)
+
+        args = mock_placeholder.call_args[0]
+        self.assertIn("abc123", args[1])
+
+
+# ============================================================
 #  Entry
 # ============================================================
 

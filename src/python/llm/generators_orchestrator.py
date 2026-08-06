@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from typing import Any
@@ -365,10 +366,33 @@ def _dispatch_llm_workers(
     results_dict: dict[str, dict] = {}
     _label_map: dict[str, str] = get_llm_module_names()
 
+    # ── thinking 并发限制：开启 Extended Thinking 的模块（health_check / expert_review
+    #    ）并发涌向 DeepSeek 时偶发返回空 content（HTTP 200 + 空响应）。用信号量限制
+    #    thinking 请求同时最多 llm_max_thinking_concurrency 个（默认 1），从源头降低
+    #    偶发概率；非 thinking 模块不受限，保持原有并发。 ──
+    try:
+        _thinking_limit = max(1, int((llm_config or {}).get("llm_max_thinking_concurrency", 1)))
+    except (TypeError, ValueError):
+        _thinking_limit = 1
+    _thinking_sem = threading.BoundedSemaphore(_thinking_limit)
+
+    def _is_thinking_module(label: str) -> bool:
+        return bool((llm_config or {}).get(f"thinking_enabled_{label}", False))
+
     def _make_runner(label: str, fn: Callable) -> Callable:
-        """创建闭包：持 httpx.Client（HTTP/2 + 连接池）运行 fn(c, llm_config)。"""
+        """创建闭包：持 httpx.Client（HTTP/2 + 连接池）运行 fn(c, llm_config)。
+
+        thinking 模块（thinking_enabled_{label}=true）受信号量约束，同一时刻最多
+        llm_max_thinking_concurrency 个并发请求；非 thinking 模块直接运行。
+        """
 
         def _run() -> tuple[str | None, bool]:
+            if _is_thinking_module(label):
+                with _thinking_sem:
+                    return _execute(label, fn)
+            return _execute(label, fn)
+
+        def _execute(label: str, fn: Callable) -> tuple[str | None, bool]:
             logger.info("正在生成：%s...", _label_map.get(label, label))
             try:
                 c = make_http_client(timeout=LLM_TIMEOUT, **_LLM_CLIENT_SETTINGS)

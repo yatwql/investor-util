@@ -1018,6 +1018,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
                 {% endif %}
             </div>
+            {% if flow_display and not flow_display.available %}
+            <div class="empty-note">成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算</div>
+            {% endif %}
 
             <br>
 
@@ -1390,7 +1393,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {% else %}
         <div class="empty-note">未检测到基金持仓</div>
         {% endif %}
-        {% if candidate_data and candidate_data.get("available") %}
+        {% if candidate_data %}
+        {% if candidate_data.get("available") %}
         <div class="block-title">候选基金比较（候选来自 config.comparison_candidates）</div>
         <div class="section-content" style="padding: 0;">
             <table>
@@ -1432,6 +1436,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {% endif %}
         {% if candidate_data.get("invalid") %}
         <div class="penetration-notes"><div>* 无效候选代码（忽略）: {{ candidate_data["invalid"] | join('、') }}。</div></div>
+        {% endif %}
+        {% else %}
+        <!-- 候选基金比较开关已开启但无有效候选（config.comparison_candidates 未配置或代码非法） -->
+        <div class="block-title">候选基金比较（候选来自 config.comparison_candidates）</div>
+        <div class="empty-section">📭 未配置候选基金（config.comparison_candidates 为空），无法输出候选基金比较。请在 config.json 中配置 comparison_candidates 后重新生成报告。{% if candidate_data.get("invalid") %}（无效候选代码已忽略：{{ candidate_data["invalid"] | join('、') }}）{% endif %}</div>
         {% endif %}
         {% endif %}
         <div class="penetration-notes">

@@ -294,6 +294,7 @@ def get_known_llm_settings_keys() -> set[str]:
         "enabled_llm",
         "pricing",
         "llm_max_concurrency",
+        "llm_max_thinking_concurrency",
         "news_correlation_top_n",
         "debate",
         "fact_check",

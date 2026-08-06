@@ -4,16 +4,17 @@
   // ═══════════════════════════════════════════
   "max_retries": 2,
   "llm_max_concurrency": 3,
+  "llm_max_thinking_concurrency": 1,  // Extended Thinking 模块并发的最大请求数（信号量上限，默认 1，防止多 thinking 模块并发偶发空响应）
 
   // ═══════════════════════════════════════════
   // 模块开关 — 控制各 LLM 分析功能的启用/停用
   // ═══════════════════════════════════════════
   "enabled_llm": {
-    "global_macro": true,
-    "expert_review": true,
-    "health_check": true,
-    "penetration_deep": true,
-    "news_correlation": false
+      "global_macro": true,
+      "expert_review": true,
+      "health_check": true,
+      "penetration_deep": true,
+      "news_correlation": true
   },
 
   // ═══════════════════════════════════════════

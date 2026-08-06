@@ -32,7 +32,7 @@
 | `core/reader.py` | 标准格式 + 7 种异常 | 空文件、缺列、多工作表、全空行、数值类型转换失败、zip 损坏、临时文件（~$前缀自动跳过） |
 | `cache/` 子包 | 过期判断、读写、清理 | 原子写入、损坏恢复、TTL 边界（0s/1s/过期1s）、前缀匹配、并发 access、gzip 透明解压 |
 | `providers/*.py` | mock HTTP + 异常 | 200 正常 / 空数据 / 超时 / 429 / 503 / JSON 格式错误 / HTML 而非 JSON / 空响应 / 字段缺失 / 编码异常 |
-| `llm/` 包 | 全路径覆盖 | API 路由、Provider 回退、截断检测+自动重试、空内容安抚重试、熔断器、缓存命中/未命中、Extended Thinking 注入/降级、thinking 耗尽自动重试（关闭 thinking 同 provider 重试一次，仍失败才切换）、指纹确定性 |
+| `llm/` 包 | 全路径覆盖 | API 路由、Provider 回退、截断检测+自动重试、空内容安抚重试、熔断器、缓存命中/未命中、Extended Thinking 注入/降级、thinking 耗尽自动重试（关闭 thinking 同 provider 重试一次，仍失败才切换）、thinking 并发信号量（`llm_max_thinking_concurrency` 串行化，`TestThinkingConcurrencyLimit`）、指纹确定性 |
 | `llm/` — 辩论模式 | 6 文件专项覆盖 | `test_debate_generators.py`（三段生成流程 pro→con→synthesis 控制）、`test_debate_prompts.py`（提示词模板/合成提示/集中度问答块）、`test_debate_token_budget.py`（Token 预算守卫 1×/2× 阈值）、`test_debate_edge.py`（边缘测试文件隔离 合规边缘场景 11 项）、`test_debate_conditional.py`（条件推理场景注入）、`test_debate_qa.py`（集中度问答阈值触发） |
 | `report/*.py` | 正常 + 空数据 + 边界 | 单条持仓、最大 100 条持仓、零成本/零市值、全亏损、全盈利、混合账户 |
 | `core/market_hours.py` | 所有时段边界 | 开盘/收盘/午休/周末/节假日/UTC 时区、config 覆盖、API 掉线回退 |

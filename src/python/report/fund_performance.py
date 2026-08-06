@@ -34,6 +34,7 @@ from src.python.report.data_status import (
 from src.python.report.fund_candidate import build_candidate_compare_data
 from src.python.report.excel_writer import (
     _write_data_status_foot,
+    _write_placeholder,
     auto_width,
     freeze_header,
     write_data_row,
@@ -450,8 +451,13 @@ def write_fund_performance_sheet(
 
     # 候选基金比较子表（report_submodules.candidate_compare 默认关；关闭时 build 返回 None）
     candidate_data = build_candidate_compare_data(holdings)
-    if candidate_data is not None and candidate_data.get("available"):
-        row = _write_candidate_compare_block(ws, row + 1, candidate_data)
+    if candidate_data is not None:
+        if candidate_data.get("available"):
+            row = _write_candidate_compare_block(ws, row + 1, candidate_data)
+        else:
+            # 开关已开启但无有效候选（comparison_candidates 未配置或代码非法）：
+            # 写出标题 + 占位提示，避免静默消失（§1.4.5 数据降级治理）
+            _write_candidate_unavailable_block(ws, row + 1, candidate_data)
 
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)
@@ -465,6 +471,30 @@ def write_fund_performance_sheet(
             len(adjusted_ratings),
             len(fund_holdings_sorted),
         )
+
+
+def _write_candidate_unavailable_block(ws, row: int, candidate_data: dict[str, Any]) -> int:
+    """写入候选基金比较「无有效候选」占位区块（开关开启但 comparison_candidates 未配置）。
+
+    Args:
+        ws: 目标工作表
+        row: 起始行（数据源状态脚注之后）
+        candidate_data: build_candidate_compare_data 返回的候选比较数据（available=False）
+
+    Returns:
+        下一可用行号
+    """
+    row = write_title_row(ws, row, "候选基金比较（候选来自 config.comparison_candidates）", _NCOLS)
+    _invalid = candidate_data.get("invalid") or []
+    _suffix = f"（无效候选代码已忽略：{'、'.join(_invalid)}）" if _invalid else ""
+    row = _write_placeholder(
+        ws,
+        f"未配置候选基金（config.comparison_candidates 为空），无法输出候选基金比较。"
+        f"请在 config.json 中配置 comparison_candidates 后重新生成报告。{_suffix}",
+        row=row,
+        max_cols=_NCOLS,
+    )
+    return row
 
 
 def _write_candidate_compare_block(ws, row: int, candidate_data: dict[str, Any]) -> int:

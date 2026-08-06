@@ -1039,7 +1039,7 @@ LLM 五维度量化评分，每项满分 100：
 | `history.coverage_threshold` | float | 0.8 | — | 有效区间覆盖阈值 |
 | `history.benchmark_indices` | dict | {"sh000300":"沪深300"} | — | 基准指数配置，组合历史走势对比 |
 | `history.lookback_days` | int | 90 | — | 历史走势取数窗口（K 线条数/交易日），需 ≥ 60（MIN_SPAN）才能计算回撤分析 |
-| `report_submodules` | dict | 6 项默认关 | — | 报告子模块开关：`data_quality`（数据质量仪表盘）/ `industry_beta`（行业 Beta 子表）/ `candidate_compare`（候选基金比较）/ `cost_lots`（成本流水）/ `valuation_percentile`（估值分位）/ `market_temperature`（市场温度），均默认关 |
+| `report_submodules` | dict | `data_quality` 默认开，其余 5 项默认关 | — | 报告子模块开关：`data_quality`（数据质量仪表盘，长期可信核心默认开）/ `industry_beta`（行业 Beta 子表）/ `candidate_compare`（候选基金比较）/ `cost_lots`（成本流水）/ `valuation_percentile`（估值分位）/ `market_temperature`（市场温度），后 5 项默认关 |
 | `comparison_indices` | dict | {"sh000300":"沪深300","sh000905":"中证500","sh000012":"中证全债"} | — | 竞争语境对比指数池，支持多指数对比 |
 | `rebalance.threshold` | float | 0.15 | — | 单品种权重超限阈值（15%），超限触发再平衡建议 |
 | `rebalance.deviation_threshold` | float | 0.05 | — | 大类/品种配置偏离阈值（5%），权益/固收偏离超限时触发调整建议 |
@@ -1081,6 +1081,7 @@ LLM 五维度量化评分，每项满分 100：
 |:---|:----:|:------:|:-----|
 | `max_retries` | int | 2 | 429/503 最大重试次数 |
 | `llm_max_concurrency` | int | 3 | LLM 并发生成最大线程数 |
+| `llm_max_thinking_concurrency` | int | 1 | Extended Thinking 模块并发信号量上限（防止多 thinking 模块并发偶发空响应） |
 | `enabled_llm` | dict | 全局开启 | 各模块独立启停 |
 | `pricing` | dict | — | 模型定价表覆盖 + 货币设置 |
 

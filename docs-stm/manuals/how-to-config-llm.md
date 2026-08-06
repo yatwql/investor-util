@@ -285,10 +285,11 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 > 以下为 `llm_settings.json` 的全部配置项。`{module}` 占位符替换为具体的模块后缀（global_macro / expert_review / health_check / penetration_deep / news_correlation）。
 
-配置分为**全局配置**和**模块级配置**两类。全局配置共有 7 项：
+配置分为**全局配置**和**模块级配置**两类。全局配置共有 8 项：
 
 - `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
 - `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
+- `llm_max_thinking_concurrency`（int，默认 `1`）：开启 Extended Thinking 的模块（health_check / expert_review 等 `thinking_enabled_{module}=true`）并发的最大请求数。多 thinking 模块同时涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），此信号量将 thinking 请求串行化（同时最多 N 个，默认 1），非 thinking 模块不受此限。设大可提升 thinking 并发速度，但可能提高偶发空响应概率，建议保持默认 1
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
@@ -374,6 +375,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   // ═══════════════════════════════════════════
   "max_retries": 2,
   "llm_max_concurrency": 3,
+  "llm_max_thinking_concurrency": 1,  // Extended Thinking 模块并发信号量上限（默认 1）
 
   // ═══════════════════════════════════════════
   // 模块开关 — 控制各 LLM 分析功能的启用/停用

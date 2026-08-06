@@ -88,10 +88,10 @@ class TestWriteLlmSettings:
         mock_get_llm.assert_called_once()
 
 
-# 报告增强子模块全关的基准配置（与 config.json 默认一致）
+# 报告增强子模块基准配置（与 config.json 默认一致：数据质量仪表盘默认开，其余默认关）
 _SUB_BASE_CONFIG = {
     "report_submodules": {
-        "data_quality": False,
+        "data_quality": True,
         "industry_beta": False,
         "candidate_compare": False,
         "cost_lots": False,
@@ -109,16 +109,16 @@ class TestConfigReportSubmodules:
     @patch("src.python.tui.handlers_config.input", side_effect=["1", "0"])
     @patch("src.python.config.set_config")
     @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
-    def test_toggle_data_quality_on(
+    def test_toggle_data_quality_off(
         self, mock_get, mock_set, mock_input, mock_refresh, mock_press
     ):
-        """输入 1 → 开启数据质量仪表盘，整体写回 report_submodules。"""
+        """输入 1 → 关闭数据质量仪表盘（默认开启），整体写回 report_submodules。"""
         from src.python.tui.handlers_config import _cmd_config_report_submodules
 
         _cmd_config_report_submodules()
 
         expected = dict(_SUB_BASE_CONFIG["report_submodules"])
-        expected["data_quality"] = True
+        expected["data_quality"] = False
         mock_set.assert_called_once_with("report_submodules", expected)
         mock_press.assert_called_once()
 

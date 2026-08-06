@@ -872,17 +872,21 @@ class TestIsEnablePortfolioEvolution(unittest.TestCase):
 
 
 class TestIsEnableDataQuality(unittest.TestCase):
-    """数据质量仪表盘子模块开关（report_submodules.data_quality）。"""
+    """数据质量仪表盘子模块开关（report_submodules.data_quality，默认开）。"""
 
-    def test_default_false_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
-        self.assertFalse(cfg.is_enable_data_quality({}))
-        self.assertFalse(cfg.is_enable_data_quality({"enable_fund_deep_analysis": True}))
+    def test_default_true_when_missing(self):
+        """config 缺失或 report_submodules 缺失 → 默认开启（长期可信核心）。"""
+        self.assertTrue(cfg.is_enable_data_quality({}))
+        self.assertTrue(cfg.is_enable_data_quality({"enable_fund_deep_analysis": True}))
 
-    def test_false_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 关闭。"""
-        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": "not-a-dict"}))
-        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": None}))
+    def test_true_when_submodules_not_dict(self):
+        """report_submodules 非 dict → 默认开启。"""
+        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": "not-a-dict"}))
+        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": None}))
+
+    def test_default_config_says_enabled(self):
+        """默认配置模板 report_submodules.data_quality=True（默认开启的事实来源）。"""
+        self.assertTrue(cfg._config_defaults._DEFAULT_CONFIG["report_submodules"]["data_quality"])
 
     def test_false_when_disabled(self):
         """report_submodules.data_quality=false → 关闭。"""

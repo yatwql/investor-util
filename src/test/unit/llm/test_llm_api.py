@@ -244,22 +244,37 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
     @patch("src.python.llm._api_claude.call_llm_with_retry")
     @patch("src.python.llm._api_claude._get_last_thinking_exhausted")
     @patch("src.python.llm._api_claude.clear_last_thinking_exhausted")
-    def test_thinking_exhausted_flag_false_no_retry(
+    def test_deepseek_empty_content_retries_with_disabled(
         self, mock_clear: MagicMock, mock_get: MagicMock, mock_retry: MagicMock
     ) -> None:
-        """flag False（非思考耗尽空内容）→ 不重试，行为与现状一致。"""
-        mock_get.return_value = False
-        mock_retry.return_value = (None, None)
+        """DeepSeek 偶发空 content（非思考耗尽）→ 关闭 thinking 重试一次。
+
+        强制推理模型端点在多模块并发下偶发返回 HTTP 200 但 content 为空
+        （stop_reason 非 max_tokens，flag False）。安全网覆盖两类场景：思考
+        耗尽（flag True）与偶发空 content（flag False）均触发关闭 thinking
+        重试；仅前者重试时会漏掉后者场景，直接切 provider（gemini 不支持
+        thinking → 模块整章降级占位）。对强制推理模型均触发安全网，重试
+        payload 显式 disabled。
+        """
+        mock_get.return_value = False  # 非思考耗尽（偶发空 content）
+        mock_retry.side_effect = [(None, None), ("recovered", {"output_tokens": 5})]
         cfg = {"thinking_enabled_global_macro": True}
         result, usage = call_claude(
             **self.base_kw,
             model="DeepSeek-V4-Flash",
             config_field="max_tokens_global_macro",
             llm_config=cfg,
+            temperature=0.3,
         )
-        self.assertIsNone(result)
-        self.assertEqual(mock_retry.call_count, 1)
-        mock_clear.assert_not_called()
+        self.assertEqual(result, "recovered")
+        self.assertEqual(mock_retry.call_count, 2)
+        second_payload = mock_retry.call_args_list[1][1]["payload"]
+        # DeepSeek 兼容端点思考默认开启：重试必须显式 disabled，并移除互斥参数
+        self.assertEqual(second_payload.get("thinking", {}).get("type"), "disabled")
+        self.assertNotIn("output_config", second_payload)
+        self.assertNotIn("reasoning_effort", second_payload)
+        self.assertEqual(second_payload.get("temperature"), 0.3)
+        mock_clear.assert_called_once()
 
     @patch("src.python.llm._api_claude.call_llm_with_retry")
     @patch("src.python.llm._api_claude._get_last_thinking_exhausted")
@@ -271,6 +286,30 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         mock_get.return_value = True
         mock_retry.return_value = (None, None)
         cfg = {"thinking_enabled_global_macro": False}
+        result, usage = call_claude(
+            **self.base_kw,
+            model="claude-sonnet-4-20250514",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+        )
+        self.assertIsNone(result)
+        self.assertEqual(mock_retry.call_count, 1)
+        mock_clear.assert_not_called()
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    @patch("src.python.llm._api_claude._get_last_thinking_exhausted")
+    @patch("src.python.llm._api_claude.clear_last_thinking_exhausted")
+    def test_non_effort_empty_content_no_retry(
+        self, mock_clear: MagicMock, mock_get: MagicMock, mock_retry: MagicMock
+    ) -> None:
+        """非 effort 模型空 content（flag False）→ 不重试（保持原行为，不误触）。
+
+        安全网扩展仅针对强制推理模型（DeepSeek）的偶发空响应；原生 Claude 等
+        非 effort 模型未开 thinking 时空 content 仍直接切 provider，不重试。
+        """
+        mock_get.return_value = False  # 非思考耗尽空 content
+        mock_retry.return_value = (None, None)
+        cfg = {"thinking_enabled_global_macro": True}
         result, usage = call_claude(
             **self.base_kw,
             model="claude-sonnet-4-20250514",

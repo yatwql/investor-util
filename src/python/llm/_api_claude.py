@@ -97,19 +97,29 @@ def call_claude(
             model_name=model,
         )
 
-    # ── 思考耗尽安全网：DeepSeek 等强制推理模型在 max_tokens（thinking+正文共享预算）
-    #    被思考占满时响应仅含 thinking block、无正文，直接切 provider 会丢模块内容。
-    #    此处关闭 thinking 同 provider 重试一次，保证有正文产出。 ──
+    # ── 空响应安全网：DeepSeek 等强制推理模型在以下场景返回无正文时，
+    #    关闭 thinking 同 provider 重试一次，保证有正文产出，避免直接切 provider 丢模块内容。
+    #    A. 思考耗尽：max_tokens（thinking+正文共享预算）被思考占满，响应仅含 thinking
+    #       block、无正文（stop_reason=max_tokens）
+    #    B. 偶发空 content：DeepSeek 端点在多模块并发下偶发返回 HTTP 200 但 content
+    #       为空（stop_reason 非 max_tokens），直接切 provider 会丢模块整章（gemini
+    #       不支持 thinking → 模块整章降级占位）。对强制推理模型同样触发重试兜底。 ──
     thinking_was_enabled = "thinking" in payload
     call_result = _do_call(payload)
     # 触发条件放宽到 DeepSeek 强制推理模型：即使 thinking_enabled=false（payload 无
     # thinking 参数），DeepSeek 兼容端点也会落入默认思考模式（effort=high）并占满
     # max_tokens 耗尽，同样需要安全网兜底。非 effort 模型仍需显式开启 thinking 才重试。
     _is_forced_reasoning = bool(model) and _is_effort_model(model)
-    if call_result[0] is None and _get_last_thinking_exhausted() and (thinking_was_enabled or _is_forced_reasoning):
-        logger.warning(
-            "Extended Thinking 思考部分耗尽 max_tokens 预算（无正文），关闭 thinking 重试一次，避免模块整体失败"
-        )
+    _thinking_exhausted = _get_last_thinking_exhausted()
+    if call_result[0] is None and (_is_forced_reasoning or (_thinking_exhausted and thinking_was_enabled)):
+        if _thinking_exhausted:
+            logger.warning(
+                "Extended Thinking 思考部分耗尽 max_tokens 预算（无正文），关闭 thinking 重试一次，避免模块整体失败"
+            )
+        else:
+            logger.warning(
+                "LLM 返回空 content（非思考耗尽，疑似服务端偶发空响应），关闭 thinking 重试一次，避免模块整体失败"
+            )
         # 构建全新 payload，避免污染首次请求记录
         retry_payload = dict(payload)
         if _is_forced_reasoning:
