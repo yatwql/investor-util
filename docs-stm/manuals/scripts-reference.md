@@ -448,11 +448,11 @@ Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验�
 
 ### `cli.sh` / `cli.ps1` — CLI 命令行包装
 
-CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行。**无参数调用时默认生成报告**（`report --type basic`，仅 Excel）；传入参数时原样透传给 CLI。
+CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行。**无参数调用时默认生成报告**（`report --type both`，Excel+HTML 双格式，不含 LLM——全部页签有数据）；传入参数时原样透传给 CLI。
 
 ```bash
 # Linux/macOS
-./scripts/cli.sh                        # 无参数 -> 默认生成报告
+./scripts/cli.sh                        # 无参数 -> 默认生成报告（both，Excel+HTML）
 ./scripts/cli.sh report --type full     # 生成全量报告（含 LLM）
 ./scripts/cli.sh cache --stats          # 查看缓存状态
 ./scripts/cli.sh --help                 # 查看 CLI 帮助
@@ -460,7 +460,7 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 
 ```powershell
 # Windows PowerShell
-.\scripts\cli.ps1                        # 无参数 -> 默认生成报告
+.\scripts\cli.ps1                        # 无参数 -> 默认生成报告（both，Excel+HTML）
 .\scripts\cli.ps1 report --type full     # 生成全量报告（含 LLM）
 .\scripts\cli.ps1 cache --stats          # 查看缓存状态
 .\scripts\cli.ps1 --help                 # 查看 CLI 帮助
@@ -469,9 +469,11 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 与直接调用 Python 模块**完全等效**（二选一即可）：
 
 ```bash
-.venv/bin/python -m src.python.cli report                 # Linux/macOS 直调
-.venv\Scripts\python.exe -m src.python.cli report         # Windows 直调
+.venv/bin/python -m src.python.cli report --type both      # Linux/macOS 直调
+.venv\Scripts\python.exe -m src.python.cli report --type both   # Windows 直调
 ```
+
+> 注意：包装脚本的「无参数默认 both」与 CLI 本身的 `--type` 默认值（basic，仅 Excel）不同——直接直调 `python -m src.python.cli report`（不带 `--type`）仍走 basic 轻量模式（只生成核心页签，新闻/历史/LLM 等页签为降级占位）。包装脚本无参数时自动补 `report --type both`，确保拿到完整非 LLM 报告。
 
 包装脚本相比直调的好处：自动切换到项目根目录、自动定位虚拟环境解释器（避免误用系统 python 缺失 pandas 等依赖）、无参数时自动补 `report` 子命令。CLI 完整参数说明见 [快速开始](how-to-start.md) 的「CLI 命令行模式」一节。
 

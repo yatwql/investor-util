@@ -640,8 +640,8 @@ investor-util/
 ├── pytest.ini                       # pytest 全局配置
 ├── reason.bat                       # Reasonix AI code editor 启动（`reasonix code`）
 ├── scripts/                          # 启动脚本 + 测试工具
-│   ├── cli.ps1                      #   Windows PowerShell CLI 命令行包装（无参数默认生成报告）
-│   ├── cli.sh                       #   Linux/macOS CLI 命令行包装（无参数默认生成报告）
+│   ├── cli.ps1                      #   Windows PowerShell CLI 命令行包装（无参数默认生成报告 --type both）
+│   ├── cli.sh                       #   Linux/macOS CLI 命令行包装（无参数默认生成报告 --type both）
 │   ├── launch.ps1                   #   Windows PowerShell 启动脚本
 │   ├── launch.sh                    #   Linux/macOS 启动脚本
 │   ├── test_runner.py               #   测试驱动（pytest 模式封装）

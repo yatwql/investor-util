@@ -1,11 +1,11 @@
 # scripts/cli.ps1 - 投资分析 CLI 命令行模式 (Windows)
 # Encoding: UTF-8 with BOM (PowerShell requires BOM for Chinese chars)
 #
-# 无参数调用时默认生成报告（report 子命令，--type basic，仅 Excel）；
+# 无参数调用时默认生成报告（report 子命令，--type both，Excel+HTML 不含 LLM）；
 # 传入参数时原样透传给 CLI，等价于 .venv\Scripts\python.exe -m src.python.cli <args>。
 #
 # 用法:
-#   .\scripts\cli.ps1                        # 无参数 -> 默认生成报告
+#   .\scripts\cli.ps1                        # 无参数 -> 默认生成报告（both）
 #   .\scripts\cli.ps1 report --type full     # 生成全量报告（含 LLM）
 #   .\scripts\cli.ps1 cache --stats          # 查看缓存状态
 #   .\scripts\cli.ps1 --help                 # 查看 CLI 帮助
@@ -29,9 +29,9 @@ New-Item -ItemType Directory -Force -Path "data\config" | Out-Null
 New-Item -ItemType Directory -Force -Path "docs-stm\tmp" | Out-Null
 New-Item -ItemType Directory -Force -Path "logs" | Out-Null
 
-# 4. 无参数 -> 默认生成报告；否则原样透传
+# 4. 无参数 -> 默认生成报告（both，Excel+HTML 不含 LLM）；否则原样透传
 if ($args.Count -eq 0) {
-    & $pythonBin -m src.python.cli report
+    & $pythonBin -m src.python.cli report --type both
 } else {
     & $pythonBin -m src.python.cli @args
 }

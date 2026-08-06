@@ -74,23 +74,25 @@ CLI 模式无需 TUI 界面，通过参数驱动，适合定时任务和脚本�
 .venv/bin/python -m src.python.cli --verbose report --type basic
 ```
 
-> **便捷入口**：除直调 Python 模块外，也可用包装脚本 `scripts/cli.sh`（Linux/macOS）或 `scripts/cli.ps1`（Windows PowerShell）——**无参数调用时默认生成报告**，传入参数时原样透传给 CLI，与上表直调方式完全等效：
+> **便捷入口**：除直调 Python 模块外，也可用包装脚本 `scripts/cli.sh`（Linux/macOS）或 `scripts/cli.ps1`（Windows PowerShell）——**无参数调用时默认生成报告**（`report --type both`，Excel+HTML 双格式、不含 LLM、全部页签有数据），传入参数时原样透传给 CLI：
 >
 > ```bash
 > # Linux/macOS
-> ./scripts/cli.sh                        # 无参数 -> 默认生成报告
+> ./scripts/cli.sh                        # 无参数 -> 默认生成报告（both，Excel+HTML）
 > ./scripts/cli.sh report --type full     # 生成全量报告（含 LLM）
 > ./scripts/cli.sh cache --stats          # 查看缓存状态
 > ```
 >
 > ```powershell
 > # Windows PowerShell
-> .\scripts\cli.ps1                        # 无参数 -> 默认生成报告
+> .\scripts\cli.ps1                        # 无参数 -> 默认生成报告（both，Excel+HTML）
 > .\scripts\cli.ps1 report --type full     # 生成全量报告（含 LLM）
 > .\scripts\cli.ps1 cache --stats          # 查看缓存状态
 > ```
 >
 > 包装脚本自动定位项目虚拟环境解释器（`.venv/bin/python` / `.venv\Scripts\python.exe`）并切换到项目根目录；完整参数同下方「CLI 命令参考」，脚本速查见 [辅助脚本参考](scripts-reference.md)。
+>
+> **关于报告类型**：`basic`（CLI 默认，约 1 分钟）只生成核心 Excel 页签（汇总/市值/分类/穿透/基金业绩），新闻、历史、LLM 相关页签为降级占位；`both`（包装脚本无参数默认，约 2 分钟）生成 Excel+HTML 双格式且含新闻/基金深度/演进等全部非 LLM 页签；`full`（约 5 分钟）在 both 基础上再含 LLM 全球政经/智囊团等章节。若想让组合历史走势页签有数据，`both`/`full` 时加 `--history auto`。
 >
 > CLI 模式与 TUI 模式共享同一套缓存和配置文件，两种模式可交替使用。
 
