@@ -148,20 +148,23 @@ _LLM_STATUS_HIDDEN_SUFFIXES: frozenset[str] = frozenset({"debate_pro", "debate_c
 
 
 def _build_system_info() -> dict:
-    """组装页面状态信息：程序版本号 / 机器 IP / LLM 配置状态。
+    """组装页面状态信息：版本号 / 机器 IP / 持仓与输出摘要 / LLM 配置状态。
 
-    复现 TUI 状态面板（``tui_menu._show_llm_config_status`` /
-    ``_show_multi_chain_status``）的信息面：
+    对齐 TUI 首页摘要（``tui_menu.show_config`` / ``_show_privacy_and_security_status``
+    / ``_show_llm_config_status`` / ``_show_multi_chain_status``）的信息面：
+    - 持仓目录 / 持仓文件 / 输出目录 / 新闻抓取上限 / 状态（文件是否就绪）；
+    - 持仓匿名化模式（features.anonymization.mode 中文映射）/ 隐私声明是否已显示；
     - flat 单 provider：provider / model / endpoint（简化主机名）/ 熔断 / 模型路由；
     - credentials_ref 多链：策略 / 各 provider（名称/后端/模型/优先级/熔断）/ 模块偏好；
     - 未配置：configured=False（页面按未配置展示）。
 
-    LLM 配置读取失败按未配置兜底，不阻断页面渲染。
+    配置读取失败按默认值兜底，不阻断页面渲染。
 
     Returns:
-        dict，含 app_version / machine_ip / llm（结构化状态）
+        dict，含 app_version / machine_ip / holdings 摘要字段 / llm（结构化状态）
     """
-    from src.python.config import get_llm_config
+    from src.python.config import get_config, get_llm_config
+    from src.python.config._local_state import get_flag
     from src.python.core.constants import APP_VERSION
     from src.python.core.logger import _get_machine_ip
     from src.python.core.registry import get_llm_module_names
@@ -172,6 +175,30 @@ def _build_system_info() -> dict:
         "machine_ip": _get_machine_ip(),
         "llm": {"configured": False},
     }
+
+    # ── 持仓 / 输出 / 新闻 / 匿名化 / 隐私（对齐 TUI 首页摘要） ──
+    try:
+        config = get_config()
+    except Exception:
+        logger.warning("读取配置失败，页面摘要按默认值展示", exc_info=True)
+        config = {}
+    if not isinstance(config, dict):
+        config = {}
+    holdings_dir = config.get("holdings_dir") or ""
+    holdings_filename = config.get("holdings_filename") or ""
+    info["holdings_dir"] = holdings_dir or "未设置"
+    info["holdings_filename"] = holdings_filename or "未设置"
+    info["output_dir"] = config.get("output_dir") or "reports"
+    info["news_top_count"] = config.get("news_top_count", 300)
+    info["holdings_ready"] = bool(
+        holdings_dir and holdings_filename and os.path.exists(os.path.join(holdings_dir, holdings_filename))
+    )
+    anon_labels = {"off": "关闭", "code_display": "代码显示", "full_anonymous": "完全匿名", "summary": "汇总"}
+    anon_mode = (config.get("features") or {}).get("anonymization") or {}
+    anon_mode = anon_mode.get("mode", "off") if isinstance(anon_mode, dict) else "off"
+    info["anonymization"] = anon_labels.get(anon_mode, anon_mode)
+    info["privacy_shown"] = bool(get_flag("_privacy_notice_shown"))
+
     try:
         llm_config = get_llm_config()
     except Exception:

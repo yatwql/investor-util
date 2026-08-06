@@ -6,6 +6,14 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### Web 首页系统信息卡对齐 TUI 首页摘要（rf-264）（2026-08-06）
+
+- **`web/handlers.py` `_build_system_info` 增补配置摘要字段**：在既有 程序版本/本机 IP/LLM 状态 基础上，对齐 TUI `show_config()` 首页摘要——持仓目录 / 持仓文件 / 输出目录 / 新闻抓取上限（`news_top_count`）/ 状态（`os.path.exists` 判定持仓文件是否就绪）/ 持仓匿名化模式（`features.anonymization.mode` 中文映射）/ 隐私声明是否已显示（`get_flag("_privacy_notice_shown")`）。配置读取异常按默认值兜底，不阻断页面渲染。
+- **`web/templates/index.html` 系统信息卡片补对应行**：新增 持仓目录 / 持仓文件 / 输出目录 / 新闻抓取上限 / 状态（文件就绪绿 / 未找到红，语义色对齐 TUI `[OK]`/`[!!]`）/ 持仓匿名化 / 隐私声明 行，LLM 状态行保留原有 flat/multi/未配置 分支。
+- **`web/static/style.css` 补 `.system-status-ok` / `.system-status-err`** 状态色样式。
+- **`src/test/unit/web/test_handlers.py` `TestSystemInfo` 新增 6 用例**（unit_web 标记，web 目录 89 用例）：配置摘要默认兜底 / 字段齐全且文件就绪 / 文件缺失未就绪 / `get_config` 异常兜底 / 索引页渲染摘要（就绪 + 缺失两态）。
+- **门禁**：web 目录 89/89 passed + smoke-web 9/9 + dev-verify + 4 checks `--ci` 全 [OK]。
+
 ---
 
 ## [0.10.11] - 2026-08-06

@@ -430,6 +430,17 @@ select:focus,
   font-weight: 600;
 }
 
+/* 持仓文件就绪状态（对齐 TUI [OK] / [!!] 语义色） */
+.system-status-ok {
+  color: var(--color-ok);
+  font-weight: 600;
+}
+
+.system-status-err {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
 .system-llm-hint {
   display: block;
   color: var(--color-text-secondary);

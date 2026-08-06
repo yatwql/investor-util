@@ -368,10 +368,10 @@ class TestCreateRunBoolParams:
 
 
 class TestSystemInfo:
-    """状态区系统信息组装（_build_system_info：版本 / IP / LLM 状态，对齐 TUI）。
+    """状态区系统信息组装（_build_system_info：版本 / IP / 持仓摘要 / LLM 状态，对齐 TUI）。
 
-    覆盖：默认未配置 / flat 单 provider / credentials_ref 多链 / 读配置异常兜底 /
-    索引页渲染（未配置时显示「未配置」）。
+    覆盖：默认未配置 / 持仓摘要字段（含文件就绪判定）/ flat 单 provider /
+    credentials_ref 多链 / 读配置异常兜底 / 索引页渲染（未配置时显示「未配置」）。
     """
 
     @staticmethod
@@ -385,12 +385,83 @@ class TestSystemInfo:
         monkeypatch.setattr("src.python.core.logger._get_machine_ip", lambda: "192.168.1.100")
         return config
 
+    @staticmethod
+    def _patch_config(monkeypatch, config=None, privacy_shown=False):
+        """替换配置摘要数据源：get_config / 本地状态标志 / 机器 IP。"""
+        monkeypatch.setattr("src.python.config.get_config", lambda: config or {})
+        monkeypatch.setattr("src.python.config._local_state.get_flag", lambda key: privacy_shown)
+        monkeypatch.setattr("src.python.core.logger._get_machine_ip", lambda: "192.168.1.100")
+        return config
+
     def test_default_no_llm_config(self, monkeypatch):
         """未配置（get_llm_config 返回 None）：configured=False，版本/IP 正常。"""
         self._patch_llm(monkeypatch, config=None)
         info = _build_system_info()
         assert info["app_version"]
         assert info["machine_ip"] == "192.168.1.100"
+        assert info["llm"] == {"configured": False}
+
+    def test_config_summary_defaults(self, monkeypatch):
+        """配置为空 dict：持仓目录/文件未设置、输出默认 reports、新闻 300、状态未就绪、匿名化关闭。"""
+        self._patch_llm(monkeypatch, config=None)
+        self._patch_config(monkeypatch, config={})
+        info = _build_system_info()
+        assert info["holdings_dir"] == "未设置"
+        assert info["holdings_filename"] == "未设置"
+        assert info["output_dir"] == "reports"
+        assert info["news_top_count"] == 300
+        assert info["holdings_ready"] is False
+        assert info["anonymization"] == "关闭"
+        assert info["privacy_shown"] is False
+
+    def test_config_summary_fields_and_ready(self, monkeypatch, tmp_path):
+        """持仓文件就绪：目录/文件名/输出/新闻/匿名化/隐私齐全，状态为就绪。"""
+        holdings_file = tmp_path / "持仓.xlsx"
+        holdings_file.touch()
+        self._patch_llm(monkeypatch, config=None)
+        self._patch_config(
+            monkeypatch,
+            config={
+                "holdings_dir": str(tmp_path),
+                "holdings_filename": "持仓.xlsx",
+                "output_dir": str(tmp_path / "reports"),
+                "news_top_count": 200,
+                "features": {"anonymization": {"mode": "full_anonymous"}},
+            },
+            privacy_shown=True,
+        )
+        info = _build_system_info()
+        assert info["holdings_dir"] == str(tmp_path)
+        assert info["holdings_filename"] == "持仓.xlsx"
+        assert info["output_dir"] == str(tmp_path / "reports")
+        assert info["news_top_count"] == 200
+        assert info["holdings_ready"] is True
+        assert info["anonymization"] == "完全匿名"
+        assert info["privacy_shown"] is True
+
+    def test_config_summary_file_missing(self, monkeypatch, tmp_path):
+        """持仓文件不存在：holdings_ready=False（状态「未找到」）。"""
+        self._patch_llm(monkeypatch, config=None)
+        self._patch_config(
+            monkeypatch,
+            config={"holdings_dir": str(tmp_path), "holdings_filename": "不存在的.xlsx"},
+        )
+        info = _build_system_info()
+        assert info["holdings_ready"] is False
+
+    def test_get_config_raises_falls_back_defaults(self, monkeypatch):
+        """get_config 抛异常 → 摘要按默认值兜底，不阻断页面渲染。"""
+        self._patch_llm(monkeypatch, config=None)
+        self._patch_config(monkeypatch, config=None)
+
+        def _boom():
+            raise RuntimeError("config read failed")
+
+        monkeypatch.setattr("src.python.config.get_config", _boom)
+        info = _build_system_info()
+        assert info["holdings_dir"] == "未设置"
+        assert info["news_top_count"] == 300
+        assert info["holdings_ready"] is False
         assert info["llm"] == {"configured": False}
 
     def test_default_llm_key_missing(self, monkeypatch):
@@ -516,3 +587,43 @@ class TestSystemInfo:
         assert 'id="system-llm"' in html
         assert "未配置" in html
         assert 'id="system-llm-detail"' not in html
+
+    def test_index_renders_config_summary(self, app_client, tmp_path, monkeypatch):
+        """索引页渲染持仓摘要：目录/文件/输出/新闻上限/状态（就绪）/匿名化/隐私。"""
+        holdings_file = tmp_path / "持仓.xlsx"
+        holdings_file.touch()
+        self._patch_config(
+            monkeypatch,
+            config={
+                "holdings_dir": str(tmp_path),
+                "holdings_filename": "持仓.xlsx",
+                "output_dir": str(tmp_path / "reports"),
+                "news_top_count": 150,
+                "features": {"anonymization": {"mode": "code_display"}},
+            },
+            privacy_shown=False,
+        )
+        resp = app_client.get("/")
+        assert resp.status_code == 200
+        html = resp.data.decode("utf-8")
+        assert 'id="system-holdings-dir"' in html and str(tmp_path) in html
+        assert 'id="system-holdings-file"' in html and "持仓.xlsx" in html
+        assert 'id="system-output-dir"' in html
+        assert 'id="system-news-top"' in html and "150 条" in html
+        assert 'id="system-anonymization"' in html and "代码显示" in html
+        assert 'id="system-privacy"' in html and "待首次报告生成时显示" in html
+        # 文件就绪 → 绿色状态文案
+        assert '<span class="system-status-ok">文件就绪</span>' in html
+
+    def test_index_renders_config_summary_file_missing(self, app_client, tmp_path, monkeypatch):
+        """持仓文件不存在 → 状态显示「文件未找到」（红色）。"""
+        self._patch_config(
+            monkeypatch,
+            config={"holdings_dir": str(tmp_path), "holdings_filename": "缺失.xlsx"},
+            privacy_shown=True,
+        )
+        resp = app_client.get("/")
+        assert resp.status_code == 200
+        html = resp.data.decode("utf-8")
+        assert '<span class="system-status-err">文件未找到</span>' in html
+        assert 'id="system-privacy"' in html and "已显示" in html

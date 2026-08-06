@@ -89,6 +89,42 @@
               <dd id="system-ip">{{ system_info.machine_ip }}</dd>
             </div>
             <div class="system-row">
+              <dt>持仓目录</dt>
+              <dd id="system-holdings-dir">{{ system_info.holdings_dir }}</dd>
+            </div>
+            <div class="system-row">
+              <dt>持仓文件</dt>
+              <dd id="system-holdings-file">{{ system_info.holdings_filename }}</dd>
+            </div>
+            <div class="system-row">
+              <dt>输出目录</dt>
+              <dd id="system-output-dir">{{ system_info.output_dir }}</dd>
+            </div>
+            <div class="system-row">
+              <dt>新闻抓取上限</dt>
+              <dd id="system-news-top">{{ system_info.news_top_count }} 条</dd>
+            </div>
+            <div class="system-row">
+              <dt>状态</dt>
+              <dd>
+                {% if system_info.holdings_ready %}
+                <span class="system-status-ok">文件就绪</span>
+                {% else %}
+                <span class="system-status-err">文件未找到</span>
+                {% endif %}
+              </dd>
+            </div>
+            <div class="system-row">
+              <dt>持仓匿名化</dt>
+              <dd id="system-anonymization">{{ system_info.anonymization }}</dd>
+            </div>
+            <div class="system-row">
+              <dt>隐私声明</dt>
+              <dd id="system-privacy">
+                {% if system_info.privacy_shown %}已显示{% else %}待首次报告生成时显示{% endif %}
+              </dd>
+            </div>
+            <div class="system-row">
               <dt>LLM</dt>
               <dd id="system-llm">
                 {% if not system_info.llm.configured %}
