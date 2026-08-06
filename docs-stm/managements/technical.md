@@ -8,6 +8,10 @@
   - [1.2 核心数据流](#12-核心数据流)
   - [1.3 模块职责总览](#13-模块职责总览)
   - [1.4 概要设计 — 核心架构决策](#14-概要设计--核心架构决策)
+  - [1.5 交互渠道体系（CLI / TUI / Web）](#15-交互渠道体系cli--tui--web)
+  - [1.6 TUI 渠道详细设计（主要渠道）](#16-tui-渠道详细设计主要渠道)
+  - [1.7 CLI 渠道详细设计](#17-cli-渠道详细设计)
+  - [1.8 Web 渠道详细设计](#18-web-渠道详细设计)
 - [2. 数据获取层详细设计](#2-数据获取层详细设计)
   - [2.1 Provider Chain 路由与 fallback](#21-provider-chain-路由与-fallback)
   - [2.2 三层熔断架构](#22-三层熔断架构)
@@ -137,7 +141,7 @@
 | 持仓读取 | `core/reader.py` | xlsx 解析 |
 | 配置管理 | `config/` | 三文件分层配置 |
 
-**分层差异**：TUI 的 `tui/handlers_report.py` / `tui/handlers_cache.py` 是极薄包装层（仅保留交互逻辑如文件选择、结果格式化），CLI 通过 argparse 直接调用共享层，不经过 handlers_*；Web 通过 `web/handlers.py` API 路由与 `web/runs.py` 单 worker 串行队列调用共享层，进度经 `web/progress.py` 的 WebProgressReporter 事件缓冲输出。三种入口共用同一套业务逻辑。
+**分层差异**：TUI 的 `tui/handlers_report.py` / `tui/handlers_cache.py` 是极薄包装层（仅保留交互逻辑如文件选择、结果格式化），CLI 通过 argparse 直接调用共享层，不经过 handlers_*；Web 通过 `web/handlers.py` API 路由与 `web/runs.py` 单 worker 串行队列调用共享层，进度经 `web/progress.py` 的 WebProgressReporter 事件缓冲输出。三种入口共用同一套业务逻辑——三渠道的**体系化视角**（渠道定位/统一架构模式/差异对照/并发与产物治理）见 [§1.5](#15-交互渠道体系cli--tui--web)，各渠道实现细节分别见 [§1.6 TUI](#16-tui-渠道详细设计主要渠道)（主要渠道）/ [§1.7 CLI](#17-cli-渠道详细设计) / [§1.8 Web](#18-web-渠道详细设计)。
 
 **贯穿层**：`config/` · `core/registry.py` · `core/provider_registry.py` · `core/code_utils.py` · `core/market_hours.py` · `core/perf.py`
 
@@ -318,6 +322,317 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 
 ---
 
+### 1.5 交互渠道体系（CLI / TUI / Web）
+
+系统提供 **CLI / TUI / Web 三种交互渠道**，共用同一套业务管线。三渠道不是三套独立实现，而是同一共享层的三种**薄入口外壳**——差异仅停留在「交互范式、参数传递、进度传输、并发模型、产物治理」五个维度，业务逻辑（数据获取 → 缓存 → 报告编排 → 双管线生成）零重复。
+
+#### 1.5.1 渠道定位
+
+| 渠道 | 交互范式 | 典型场景 | 入口文件 | 进程模型 |
+|:-----|:---------|:---------|:---------|:---------|
+| TUI | 交互菜单（终端） | 桌面终端内菜单导航、逐项配置后生成 | `tui/tui.py` | 前台进程，菜单循环 + handler 同步执行 |
+| CLI | 命令行参数（脚本/定时） | 定时任务（cron）、脚本化批量生成、what-if 调仓 | `cli/cli.py` | 前台进程，解析参数单次执行后退出 |
+| Web | 浏览器界面（HTTP） | 浏览器内上传持仓 → 选格式 → 生成 → 预览/下载 | `web/server.py` | 常驻服务进程，单 worker 串行队列 + 后台 worker 线程 |
+
+> 三渠道的入口文件/用户交互层/业务逻辑层/进度报告器对照见 [§1.1](#11-系统分层) 的三入口表。
+
+#### 1.5.2 统一架构模式
+
+三渠道遵循同一「**薄入口 + 共享管线 + 进度抽象 + 配置快照**」模式：
+
+- **薄入口**：渠道层只保留交互外壳（菜单 / argparse / HTTP 路由），不承载业务逻辑。TUI 的 `tui/handlers_*`、CLI 的 argparse 直调、Web 的 API 路由均委托共享层（`report/orchestrator.py` + `cache/operations.py`）。
+- **共享管线**：`generate_report()`（报告编排器，§4.2）为同步函数，通过可注入的 `ProgressReporter` 接口输出阶段消息，与终端/浏览器完全解耦——三渠道注入各自的 reporter 子类即可，**管线代码零改动**。
+- **进度抽象**：`report/progress.py` 定义 `ProgressReporter` 基类（info/ok/warn/error/add_error/timer），三渠道各实现子类：`TuiProgressReporter`（菜单区刷新）、`CliProgressReporter`（logging + verbose stderr）、`WebProgressReporter`（事件缓冲 → 浏览器轮询）。
+- **配置快照**：生成任务执行时取一次 `get_config()` 快照，run 期间不受外部配置修改影响（Web 侧在任务**出队时**取快照，见 §1.8.5）。
+
+#### 1.5.3 渠道差异对照
+
+| 维度 | TUI | CLI | Web |
+|:-----|:----|:----|:----|
+| 参数传递 | 菜单交互逐步选择 | argparse 参数 + `--type basic/both/full` | 前端表单提交（报告格式下拉 + 获取历史走势/强制 LLM 复选） |
+| 进度传输 | 终端区实时刷新 | stdout/stderr 文本 | 事件缓冲 seq 增量轮询（`/api/runs/{id}/events`） |
+| 并发模型 | 单线程同步 | 单线程同步 | 单 worker 串行队列（HTTP 线程提交、worker 线程执行） |
+| 产物输出 | `output_dir` 最新版 + `YYYYMMDD/` 归档 | 同左 | 同左；产物定位基于 run 快照 output_dir，`/api/reports` 预览/下载 |
+| 启动防护 | 无 | 无 | 端口占用检测（bind 探测）+ output_dir 写锁检测（§1.8.2） |
+| 生命周期 | 会话式，退出即结束 | 单次执行退出 | 常驻服务（Ctrl+C 退出，daemon worker 丢弃进行中任务） |
+
+#### 1.5.4 并发与产物治理
+
+三渠道均可能向同一 `output_dir` 写报告产物（最新版固定文件名 + 日期归档），**并发写入会互相覆盖最新版**。治理分三层：
+
+| 层 | 机制 | 适用范围 |
+|:---|:-----|:---------|
+| 进程内 | Web 单 worker 串行队列（同一时刻仅执行一个生成任务） | Web 进程内多请求 |
+| 进程间 | `output_dir` 写锁检测（启动时原子抢占锁文件，被占用则警告） | Web 与 TUI/CLI 并行、或多开 Web 实例 |
+| 存储 | 缓存层原子写入（`os.replace`）+ 报告归档按 `YYYYMMDD` 分目录 | 全部渠道 |
+
+> 设计原则：并发治理以「**警告优先、不阻塞**」为度——「同一 `output_dir` 仅一个入口运行」属文档约定，冲突时提示用户自行决策，而非强制互斥。
+
+[↑ 回到顶部](#目录)
+
+---
+
+### 1.6 TUI 渠道详细设计（主要渠道）
+
+TUI（Text User Interface）是系统**主要交互渠道**：桌面终端内的**交互菜单**形态，用户通过方向键/快捷键逐项导航、配置后生成报告。TUI 承担了最完整的交互面——报告生成、配置管理、缓存管理、调仓模拟、LLM 模块配置全部有对应菜单项，是功能覆盖度最高的渠道。设计遵循「薄入口 + 共享管线」：`tui/handlers_*` 仅保留交互外壳（文件选择、参数询问、结果格式化），业务全部委托共享层。
+
+#### 1.6.1 模块划分
+
+| 模块 | 职责 | 关键内容 |
+|:-----|:-----|:---------|
+| `tui/tui.py` | 主入口/主循环 | sys.path 注入、init_config、_bind_callbacks、启动清理/隐私提示/首次引导、方向键导航循环、LLM 会话统计 |
+| `tui/tui_menu.py` | 菜单定义与渲染 | MENU_ITEMS 列表、render_menu/print_header/show_config、index_by_key、press_any_key/exit_app |
+| `tui/tui_keys.py` | 键盘封装 | 跨平台（Windows msvcrt / Linux tty+termios+select），标准化键名 KEY_UP/DOWN/ENTER/CTRL_C |
+| `tui/handlers_report.py` | 报告生成外壳 | `_run_generate` 骨架、`_prompt_history`/`_prompt_force_llm` 交互询问、E/B/L 三命令 |
+| `tui/handlers_config.py` | 配置管理外壳 | 目录/文件名/输出目录/章节/指数池/匿名化/LLM 模块/刷新等 8 项配置命令 |
+| `tui/handlers_cache.py` | 缓存管理外壳 | 更新基础/持仓缓存、清理过期、查看统计 4 项命令 |
+| `tui/handlers_whatif.py` | 调仓模拟外壳 | What-if 对话流程，委托 `report/whatif_operations.py`（§4.13） |
+| `report/progress.py` | 进度报告 | TuiProgressReporter（`[..]`/`[OK]`/`[!]`/`[ERR]` 前缀 + 耗时排行） |
+
+#### 1.6.2 主循环与键盘导航
+
+`tui/tui.py:main()` 主循环——每轮迭代**重绘**完整界面并等待一个按键：
+
+```text
+while True:
+    print_header()    # 标题 + 首次使用指引
+    show_config()     # 持仓/输出目录/新闻上限/LLM 状态
+    render_menu(sel)  # 带选择指示器的菜单（> 标记当前项）
+    key = get_key()   # 跨平台读键
+```
+
+按键路由（`tui_keys.py` 标准化键名）：
+
+| 按键 | 行为 |
+|:-----|:-----|
+| ↑ / ↓ | `sel` 在 MENU_ITEMS 上循环移动（`(sel ± 1) % len`） |
+| Enter | `execute_item(sel)` 执行当前选中项 |
+| 字母/数字（A-Z/0-9） | `index_by_key(key.upper())` 直达并执行对应快捷键菜单项 |
+| Ctrl+C | `exit_app()` 退出 |
+
+键盘封装跨平台：Windows 用 `msvcrt`（方向键 `\xe0` 前缀 + 第二字节映射 H/P），Linux/macOS 用 `tty.setraw` + `termios` + `select` 读 ESC 序列（`\x1b[A`/`\x1b[B` 方向键，ESC 后续字节 `_ESC_TIMEOUT=0.15`s 超时窗口）。所有读键路径统一返回标准化键名，菜单层不感知平台差异；非交互 stdin（非 tty）返回 `KEY_UNKNOWN`，保证管道/重定向环境不阻塞。
+
+#### 1.6.3 菜单体系
+
+`tui/tui_menu.py:MENU_ITEMS` —— 每项 `(快捷键, 显示标签, 回调, 是否退出)`，回调由 `_bind_callbacks()` 在**运行时**从 handlers 模块填入（定义时不直接 import，避免启动即加载全部处理器）。当前 17 项按功能域分组：
+
+| 分组 | 快捷键 | 功能 |
+|:-----|:------|:-----|
+| 报告生成 | `[E]` | 生成基础版 Excel 分析报告（basic） |
+| | `[B]` | 生成标准报告 Excel+HTML，不含 LLM（both） |
+| | `[L]` | 生成完整报告 Excel+HTML 含 LLM（full，默认菜单项） |
+| | `[W]` | 调仓 What-if 模拟（对比两份持仓） |
+| 配置管理 | `[C]`/`[F]`/`[O]` | 持仓目录 / 持仓文件名 / 报告输出目录 |
+| | `[P]` | 报告可选章节开关 |
+| | `[I]` | 对比指数池管理 |
+| | `[A]` | 持仓匿名化模式 |
+| | `[S]` | LLM 分析章节配置 |
+| | `[R]` | 刷新配置 |
+| 缓存管理 | `[1]`/`[2]` | 更新基础类 / 行情类缓存 |
+| | `[3]`/`[4]` | 清理过期缓存 / 查看缓存统计 |
+| 退出 | `[X]` | 退出程序 |
+
+菜单渲染层与状态面板：`print_header`（标题 + 首次运行指引：缺持仓文件/缺 LLM 配置提示）、`show_config`（持仓路径、输出目录、新闻抓取上限、文件就绪状态 `[OK]`/`[!!]`、匿名化状态、隐私声明、LLM 配置状态单链/多链两视图）。LLM 状态面板支持多 Provider 链式模式（策略、各 provider 后端/模型/优先级/熔断状态、模块级偏好）。
+
+#### 1.6.4 报告生成流程
+
+`handlers_report.py` —— 三条生成命令（E/B/L）共用 `_run_generate(report_type, fetch_history, force_llm)` 骨架：
+
+1. **持仓准备**：`prepare_holdings()` → `select_holdings_file()`（交互式文件选择）→ `read_holdings_with_flows()`（主表 + 交易/分红流水）→ `check_and_warm_for_new_assets()`（新资产缓存预热）。
+2. **交互询问**（TUI 专属，CLI/Web 用参数/表单表达）：
+   - `_prompt_history()`：按 `history.fetch_mode` 三态决策——`off` 直接跳过、`auto` 直接获取、`prompt` 询问「是否获取组合历史走势数据（as-if 模拟）？(y/N)」。
+   - `_prompt_force_llm()`：询问「是否强制重新生成 LLM 内容（跳过缓存）？(y/N)」。
+3. **委托共享层**：`orchestrator.generate_report(holdings, config, reporter, report_type, ...)`（§4.2）——reporter 注入 `TuiProgressReporter`，管线代码零改动。
+4. **收尾**：`finish_report()` → `print_error_summary()`（非致命错误汇总）+ `print_timing_summary()`（耗时排行）+ `press_any_key()`（等待返回菜单）。
+
+#### 1.6.5 TuiProgressReporter 进度输出
+
+`report/progress.py:TuiProgressReporter`（`ProgressReporter` 基类子类，§1.5.2）：
+
+- **前缀语义**：`[..]`（进行中，CYAN）/ `[OK]`（成功，GREEN）/ `[!]`（告警，YELLOW）/ `[ERR]`（错误，RED）——四态前缀与 UI 输出前缀约定一致。
+- **call_sheet 页签粒度**：`info("正在生成X...")` → 执行 → `ok("X生成完成")`，页签级进度可视。
+- **耗时排行**：`print_timing_summary()` 汇总各模块耗时（合并同名 label），画 `┌──48──┐` 边框 + `█░` 百分比条形图，输出「模块耗时排行（总计 N.Ns）」。
+- **错误收集**：`add_error` 收集非致命错误，`print_error_summary` 汇总输出（「不影响已有结果」），输出后清空。
+
+#### 1.6.6 启动流程
+
+`tui/tui.py:main()` 启动序列：
+
+1. **配置初始化**：`init_config()` → `_bind_callbacks()` 运行时注入菜单回调。
+2. **过期缓存清理**：`cleanup_expired()` 静默后台执行（仅日志记录清理数量，失败仅告警）。
+3. **隐私提示**：`show_privacy_notice_if_needed()` 首次运行显示隐私声明。
+4. **首次运行引导**：`show_startup_wizard_if_needed()` 检测缺失资源并交互式提示。
+5. **缺省菜单定位**：读 `config.default_menu_key`（默认 `"L"` 完整报告）→ `index_by_key()` 定位初始选中项，未命中回退 0。
+6. **主循环**：进入 1.6.2 的导航循环；退出时 `atexit` 注册 `_print_session_usage_on_exit()` 打印本次会话 LLM 累计用量（模型、分模块调用、tokens、缓存命中、累计费用）。
+
+[↑ 回到顶部](#目录)
+
+---
+
+### 1.7 CLI 渠道详细设计
+
+CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定时任务（cron/计划任务）、批量生成、what-if 调仓、数据源健康检查。`cli/cli.py` 为 argparse 主入口，单次执行后退出，退出码供外部脚本判定成败。与 TUI 差异在**无交互**——持仓通过 config 定位而非文件选择器，进度默认写日志（`--verbose` 才输出到 stderr）。
+
+#### 1.7.1 退出码约定
+
+| 退出码 | 含义 |
+|:------|:-----|
+| 0 | 成功 |
+| 1 | 部分失败（非致命错误，如个别数据源失败、LLM 部分模块失败） |
+| 2 | 严重错误（持仓缺失、参数错误、未处理异常） |
+
+#### 1.7.2 argparse 结构
+
+`_build_parser()`：`prog="investor-util"`，全局参数 + 4 个子命令。
+
+- **全局参数**：`--config`（备用配置文件路径）、`--output`（报告输出目录，覆盖 config 的 output_dir）、`--verbose`（进度同步到 stderr，默认仅写 logs/app.log）、`--non-interactive`（跳过首次运行交互式引导，定时任务/脚本使用）、`--version`。
+- **`report`**：`--type basic/both/full`（默认 basic）、`--history auto/off`（未指定回退配置层 `history.fetch_mode`，仅 both/full 有效）、`--force-llm`、`--warm`（预热新资产缓存）。
+- **`cache`**：互斥组 `--update basic/position/all` / `--clean` / `--stats`。
+- **`whatif`**：`--candidate`（目标持仓，必填）、`--base`（基准持仓，缺省用 config 持仓）、`--effective-date`（调仓生效日，opt-in 联网取历史做时序回测）。
+- **`check-sources`**：数据源健康检查，**无需 config**（main() 中特殊前置分派）。
+
+#### 1.7.3 主流程
+
+`main()`：`setup_logger` → `_build_parser` → `parse_args` → `check-sources` 特殊处理（不 init_config）→ `init_config` + `get_config` → `startup_wizard(non_interactive)`（非交互/CI 环境自动跳过，不阻塞命令）→ 按 `args.command` 分派 `_handle_report` / `_handle_cache` / `_handle_whatif`。
+
+**持仓定位差异**：CLI 不经过 TUI 文件选择器——`_cli_resolve_holdings_file()` 通过 config 的 `holdings_dir + holdings_filename` 直接定位；若该路径为目录则自动选第一个 `.xlsx`（多个时告警）。`_cli_read_holdings()` / `_cli_read_holdings_with_flows()` 分别读主表与「主表+流水」，与 TUI 读取路径对齐。
+
+#### 1.7.4 子命令处理器
+
+- **`_handle_report`**：`CliProgressReporter(verbose)` 注入 `generate_report`（§4.2）；`--output` 覆盖 `output_dir`，`--warm` 传 `warm_cache`，`--history` 为 None 时回退配置层解析；返回 `result.exit_code`。
+- **`_handle_cache`**：三分支——`--clean` 委托 `cleanup_cache`；`--stats` 委托 `get_cache_stats` + 打印 LLM 配置状态；`--update` 委托 `update_basic_cache`/`update_position_cache`（§3.6），`--update all` 采用**最大努力模式**（basic 失败仍继续 position，退出码取两者 max）。
+- **`_handle_whatif`**：解析 `--base`/`--candidate` 两份持仓 → `run_whatif_simulation()`（§4.13）→ 结果 `ok` 判定，失败返回 2；`--effective-date` 触发时序回测扩展。
+- **`_handle_check_sources`**：`run_check_sources()`（内部 `sys.exit`）。
+
+#### 1.7.5 CliProgressReporter
+
+`report/cli_progress.py:CliProgressReporter`（`ProgressReporter` 子类）：默认进度写入 `invest` logger（`logs/app.log`），`--verbose` 时同步打印到 stderr——**静默为默认**，适合定时任务不污染 stdout；`print_timing_summary` 复用耗时汇总能力（与 TUI 同构，输出走日志/verbose）。
+
+[↑ 回到顶部](#目录)
+
+---
+
+### 1.8 Web 渠道详细设计
+
+Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel → 选择报告格式 → 生成 → 预览/下载」全流程**。设计定位「薄入口 + 共享管线零改动」，仅在 Web 层实现 HTTP 通道、上传安全、后台任务与进度缓冲四类差异化逻辑。
+
+#### 1.8.1 模块划分
+
+| 模块 | 职责 | 关键内容 |
+|:-----|:-----|:---------|
+| `web/server.py` | 启动入口 | sys.path 注入、参数解析、端口检测、output_dir 写锁检测、init_config、app.run |
+| `web/app.py` | Flask 应用工厂 | 统一 JSON 错误处理、request_id 访问日志、注入 run_manager |
+| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康；`_run_generation` 复刻 CLI 报告流程 |
+| `web/upload.py` | 上传安全 | 服务端 uuid 重命名、扩展名白名单、大小上限、PK 魔数、原子落盘、TTL 清理 |
+| `web/runs.py` | 运行管理 | RunManager 单 worker 串行队列 + run 状态/事件注册表（Lock 保护） |
+| `web/progress.py` | 进度报告 | WebProgressReporter（ProgressReporter 子类 → RunState 事件缓冲） |
+| `web/templates/` + `static/` | 前端单页 | 原生 ES6 无框架、上传表单/进度事件/状态区/历史记录 |
+
+#### 1.8.2 启动流程与启动防护
+
+`web/server.py` 启动序列（`launch.sh web` / `python -m src.python.web` / 直接执行均兼容）：
+
+1. **sys.path 注入**：直接执行 `python src/python/web/server.py` 时确保项目根在 `sys.path`（`_project_root` 三级目录上溯）。
+2. **参数解析**：`--host`（默认 127.0.0.1 仅本机；局域网显式用 0.0.0.0）、`--port`（默认 8000）、`--config`（备用配置文件路径）。
+3. **配置初始化**：`init_config(config_path)`，缺失自动生成默认配置。
+4. **端口占用检测**：`socket` bind 探测（立即释放）——端口被占用则报错退出（返回码 2），避免服务静默失败/多实例混用产物。
+5. **output_dir 写锁检测**：`ensure_output_dir_lock(output_dir)`——原子抢占 `.investor_output.lock`（`os.open` `O_CREAT|O_EXCL` 防多进程抢占竞态，内容记录 entry/pid）；锁已被其他入口持有则记录警告「该输出目录可能正被其他入口占用，产物可能互相覆盖」；**仅告警不阻塞启动**（产物竞态交由用户决策）；抢占成功则持有至进程退出 `finally` 释放。锁文件为点文件，不参与 `YYYYMMDD` 归档扫描与历史枚举。
+6. **应用构建**：`create_app(run_manager)` → 注册路由 → 清理残留上传 → `app.run(host, port, threaded=True)` 常驻。
+
+#### 1.8.3 Flask 应用工厂与统一错误处理
+
+`web/app.py:create_app(run_manager)`：
+
+- 支持注入 `run_manager`（默认全局单例；测试传内存 fake 免 patch 全局），注入时绑定默认执行器 `_run_generation`。
+- `MAX_CONTENT_LENGTH` = 10MB 兜底；`app.json.ensure_ascii = False` 中文 JSON 不转义。
+- **统一错误信封**：成功 `{"ok": true, "data": ...}`；错误 `{"ok": false, "error_code", "error": 中文文案}`——`error_code` 为机器可判定短标识（`UPLOAD_*` / `FILE_EXPIRED` / `SERVER_ERROR` / `NOT_FOUND` 等），前端按 code 分支动作，不解析中文。500 记录 error 日志但**不回显绝对路径/内部细节**；413 中文上传超限提示；404 中文接口不存在提示。
+- **request_id 访问日志**：`before_request` 生成 8 位 uuid 注入 `g.request_id`；`after_request` 记一行 `method/path/status/耗时`——**不记录**上传文件名、持仓内容、绝对路径全文（日志隐私边界）；关闭 werkzeug 默认访问日志统一走 invest logger（防双通道噪音）。
+
+#### 1.8.4 路由全景
+
+| 方法 | 路由 | 处理 | 说明 |
+|:-----|:-----|:-----|:-----|
+| GET | `/` | index | 单页 UI |
+| POST | `/api/upload` | 上传持仓 | 校验 → 落盘 → 预检 → file_id |
+| POST | `/api/runs` | 创建生成任务 | 单 worker 队列；队列满 429 |
+| GET | `/api/runs` | 运行列表 | 最近 run（时间倒序，limit 10） |
+| GET | `/api/runs/history` | 历史记录 | `core.perf.load_history()` perf 快照（5s 短缓存） |
+| GET | `/api/runs/{id}` | run 详情 | 状态快照（不含事件） |
+| GET | `/api/runs/{id}/events?after=N` | 增量事件 | seq 单调递增，`seq > after` 增量轮询 |
+| GET | `/api/reports/<path>` | 产物预览/下载 | `send_from_directory`（内置 `..` 净化）+ 扩展名白名单 |
+| GET | `/api/health` | 数据源健康 | 60s 结果缓存；`?fresh=1` 强制重测 |
+
+#### 1.8.5 RunManager 单 worker 串行队列
+
+`web/runs.py` —— 管线为同步阻塞，Web 层用**单 worker 串行队列**消除进程内并发产物覆盖竞态：
+
+- **队列**：`submit(params)` → 生成 run_id（`secrets.token_urlsafe(8)` 不可预测）→ 入队 → worker 串行出队执行。队列容量 `_QUEUE_LIMIT=3`（含运行中），超出返回 None（前端 429「已有任务在跑，排队或稍后再试」）。
+- **快照语义**：每个 run 在**出队执行时**取一次 `get_config()` 快照（参数 file_id/report_type/fetch_history/force_llm + output_dir），run 期间不受外部配置修改影响；产物定位基于 run 快照而非实时 config（外部改 output_dir 时指向不错目录）。
+- **状态机**：`queued → running → done/failed`；worker `try/except` 兜底——异常转 failed + error 日志（不崩溃服务、不静默挂起）；`exit_code` 对齐 CLI（0/1/2），前端按 exit_code 映射成功/部分失败/严重。
+- **内存权衡**：run 状态/事件为**内存态**（MVP），服务重启即丢进行中 run；历史记录页数据源 = `core.perf.load_history()`（管线自动落盘的 perf 快照）。
+- **内存上限**：run 记录保留 `_RUN_KEEP=20`（worker 完成时 trim 最旧）；事件缓冲每 run `_EVENT_LIMIT=500`（滚动丢弃最旧）。
+- **线程安全**：注册表/队列/worker 状态均 `threading.Lock` 保护；事件读取做快照避免遍历中变更。模块单例 `get_run_manager()` + `reset_run_manager()`（测试隔离）。
+
+#### 1.8.6 上传安全
+
+`web/upload.py` 上传链路：
+
+- **文件名净化**：弃用 `secure_filename`（剥离中文，不符合中文持仓文件名常态），改**服务端 uuid 重命名**为 `data/holdings/uploads/{uuid}.xlsx`——丢弃原始文件名，内容即身份，天然防路径穿越/中文问题。
+- **扩展名白名单**：仅 `.xlsx`（`.lower()` 归一化后校验；拒绝 .xls/.xlsm/宏文件，openpyxl 不支持 xls）。
+- **大小上限**：10MB（读流计数超限即拒 + Flask `MAX_CONTENT_LENGTH` 兜底）。
+- **内容校验**：读前 4 字节校验 PK zip 魔数（`PK\x03\x04`）防改扩展名伪装（伪装 zip 预检兜底转 `UPLOAD_BAD_FILE` 400）；zip-bomb 由大小上限兜底。
+- **原子落盘**：`tempfile.mkstemp` 到 `_UPLOAD_DIR` + `os.replace` 原子写。
+- **内容预检**：立即内容预检（行数上限 5000 + 空持仓/无有效账户即拒），避免「上传成功、生成失败」的坏体验；预检通过才注册 file_id。
+- **file_id 生命周期**：`secrets.token_urlsafe(16)`；内存映射 `file_id → path`，TTL 1h；生成任务结束立即删除（discard_file）；未消费文件下次上传时惰性清理过期项；服务启动时清理全部残留。
+
+#### 1.8.7 WebProgressReporter 事件缓冲
+
+`web/progress.py` —— 与 `ProgressReporter` 基类接口同构（管线零改动，只注入 reporter 子类）：
+
+- `info/ok/warn/error` → `RunState.push_event(level, msg)` 写入 run 事件缓冲，前端轮询增量读取；不 print（日志统一约束）。
+- 事件 `seq` 用**单调递增整数**（非时间戳），保证轮询增量与测试确定性；`/api/runs/{id}/events?after=N` 返回 `seq > N` 增量事件。
+- `call_sheet(label, fn)` 对齐 TuiProgressReporter 语义：info「正在生成X...」/ ok「X生成完成」/ error「X生成失败」，使前端进度事件可观察页签粒度。
+- `add_error` 同步进事件缓冲 + run 错误列表 + logger（非致命错误收集，映射 exit_code=1 部分失败）。
+
+#### 1.8.8 前端单页与进度可视化
+
+`web/templates/index.html` + `web/static/main.js` / `style.css`（原生 ES6 无框架、无 `innerHTML`）：
+
+- **配置回填**：页面加载取一次 `get_config()`，报告格式/历史走势（`history.fetch_mode`）/强制 LLM 默认值跟随配置。
+- **进度事件**：事件按 seq 编号渲染，进度条显示「当前阶段（第 N 步）：消息」，完成置 100%；轮询节流（防刷接口）。
+- **状态区**：健康卡片（`/api/health` 60s 缓存 + 「重新检测」`?fresh=1` 强制重测）+ 历史运行记录卡片（最近 10 条，5s 短缓存）。
+- **结果映射**：按 exit_code 映射展示（0 成功 / 1 部分失败黄色告警 + 通用建议 / 2 严重红色 + 提示看日志）；failed/exit_code=2 隐藏无效产物按钮；失败提供「重新生成」（上传文件已消费，引导重新上传）。
+- **静态服务分离**：web 只服务自身 `static/`；报告资产（chart.min.js 等）经 `/api/reports` 从 output_dir 提供。`main.js`/`style.css` 带 `?v={APP_VERSION}` 版本查询串防浏览器缓存旧 JS。
+
+#### 1.8.9 安全防护矩阵
+
+| 威胁 | 防护 |
+|:-----|:-----|
+| 路径穿越（预览/下载） | `send_from_directory` 内置 `..` 净化 + 扩展名白名单 |
+| 伪装 xlsx（改扩展名） | PK zip 魔数校验 + 预检兜底转 400 |
+| 超大文件 / zip-bomb | 10MB 上限（读流计数 + `MAX_CONTENT_LENGTH` 兜底） |
+| 路径穿越（上传文件名） | 服务端 uuid 重命名，丢弃原始文件名 |
+| 恶意/损坏文件 | 内容预检（行数上限 5000 + 空持仓拒绝） |
+| 拒绝服务 | 单 worker 队列 + 队列满 429；健康检查 60s 缓存；前端轮询节流 |
+| 日志隐私 | 访问日志不记录文件名/持仓内容/绝对路径 |
+| 局域网暴露 | 默认仅 127.0.0.1；全零监听时启动警告（无内建认证） |
+
+#### 1.8.10 与 TUI/CLI 的差异要点
+
+| 差异 | TUI/CLI | Web |
+|:-----|:--------|:-----|
+| 业务逻辑 | `report/orchestrator.py` + `cache/operations.py` | 同左（复用，管线零改动） |
+| 进度 | 终端输出 | 事件缓冲 + 浏览器轮询 |
+| 并发 | 单线程同步 | 单 worker 串行队列（HTTP 线程 + worker 线程） |
+| 参数默认 | 菜单选择 / argparse | 表单回填 config 快照 |
+| 产物定位 | 直接写 output_dir | run 快照 output_dir + `/api/reports` 服务 |
+| 启动防护 | 无 | 端口检测 + output_dir 写锁 |
+| 生命周期 | 会话 / 单次 | 常驻服务 |
+
+[↑ 回到顶部](#目录)
+
+---
+
 ## 2. 数据获取层详细设计
 
 ### 2.1 Provider Chain 路由与 fallback
@@ -432,7 +747,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 ### 2.2 三层熔断架构
 
-> **术语约定（熔断体系双维命名）**：本项目熔断体系分两维描述——**熔断器组件**（数据源熔断器 `core/provider_registry.py` / 指标熔断器 `analysis/circuit_breaker_wrapper.py::IndicatorBreaker` / LLM 端点熔断器 `llm/circuit_breaker.py`，即 datasource-reliability.md §4.1「三级熔断体系」）+ **DataSourceRegistry 流程层**（本节三层：熔断预检 / Provider 级 / 冷却试探恢复）。本节聚焦 DataSourceRegistry 内部流程层；指标/LLM 熔断器参数见下方对比表及各自模块说明。
+> **术语约定（熔断体系双维命名）**：本项目熔断体系分两维描述——**熔断器组件**（数据源熔断器 `core/provider_registry.py` / 指标熔断器 `analysis/circuit_breaker_wrapper.py::IndicatorBreaker` / LLM 端点熔断器 `llm/circuit_breaker.py`，三者构成「三级熔断体系」）+ **DataSourceRegistry 流程层**（本节三层：熔断预检 / Provider 级 / 冷却试探恢复）。本节聚焦 DataSourceRegistry 内部流程层；指标/LLM 熔断器参数见下方对比表及各自模块说明。
 
 由 `DataSourceRegistry` 单例（`src/python/core/provider_registry.py`）统一管理，采用**双锁设计**（`_provider_lock` + `_cache_lock`）使熔断操作和会话缓存互不阻塞。
 
@@ -1646,7 +1961,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 
 **候选因子代理指数（probe 判定依据，`scripts/probe-csi-factor-indices.py` 内置候选表）**：
 
-| 因子 | 中证指数代码 | 说明 | probe 实测（2026-08-01，Tencent 主链路，365 天窗口） |
+| 因子 | 中证指数代码 | 说明 | 数据可用性（365 天窗口探测，Tencent 主链路） |
 |:----|:-----------:|:-----|:-----|
 | 大盘价值 | 000919（300 价值） | 沪深 300 中价值因子得分最高 | ✅ 365 条，新鲜 |
 | 大盘成长 | 000920（300 成长） | 沪深 300 中成长因子得分最高 | ❌ **停更**（自 2023-02-17 无数据，距今 >120 天）→ 成长因子采用 500 成长代理 |
@@ -2416,7 +2731,7 @@ make_http_client(timeout=10.0) → httpx.Client
 
 > **纪律**：英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。语义名即代码名——任务代号不进入实现层（禁止用任何任务编号/F 系列/`plan-N`/`rf-N` 命名），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表（`plan.md`/`review-findings.md`）链接锚点。新增功能**先定语义名再设计**。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE，退出码 2）+ `scripts/check-semantic-index.py --ci`（正面校验本表与代码正反向一致），并已纳入「架构设计约束」章节的约束外参照（见该章节开头）。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（如 `C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。
 >
-> 以下为当前已实现功能/合并章的语义命名索引（活索引）。各轮功能设计文档中的原始语义命名表为历史快照，仅以此表为唯一现状基准。
+> 以下为当前已实现功能/合并章的语义命名索引（活索引），以本表为唯一现状基准。
 
 <!-- semantic-index:start -->
 | 语义 slug | 中文名（文档/UI） | 归入章节 | 决策链环节 | config 开关 |
@@ -2509,7 +2824,7 @@ config/ → core/registry.py
 core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
 
 web/ (Web 服务层，薄入口)
-  → web/server.py (启动入口，端口探测，init_config)
+  → web/server.py (启动入口：端口探测 + output_dir 写锁检测 + init_config)
   → web/app.py (Flask 工厂 → web/handlers.py 注册路由)
   → web/runs.py (RunManager 单 worker 串行队列，模块单例)
   → web/upload.py (上传校验/原子落盘/TTL 清理 → core/reader.py 预检)
@@ -2552,7 +2867,7 @@ web/ (Web 服务层，薄入口)
 | **C7** | **报告序号不可硬编码** — 报告 19 个模块的序号和显示名称必须通过 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
-| **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在 pipeline_data Schema 定义文档中预定义类型、版本号、写入/消费模块后，才能在代码中使用该键（详见附录 H） | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
+| **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在附录 H（pipeline_data Schema 定义）中预定义类型、可选性、写入/消费模块后，才能在代码中使用该键 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
 | **C20** | **HTML 图表图下说明强制** — HTML 报告中每张图表下方必须渲染图下说明（`.chart-caption`），明确标注该图表是什么、用途是什么；说明必须跟随对应图表 canvas 的渲染分支一同出现（图表有数据 → 说明出现，图表空数据 → 说明不出现） | 图表无说明时用户无法快速理解该图的含义与用途，可读性下降；屏幕阅读器等无障碍场景无法获得图表意图 | 代码评审不通过；图下说明缺失或与图表渲染分支不一致 | 模板 `report_template.html`（所有 chart canvas 渲染处，含净值/回撤/资产构成/行业分布/穿透 TOP10/量化指标 radar 共 6 处）、`chart-*` 前端图表模块 |
 
 ### 8.4 LLM 集成层约束
@@ -2639,7 +2954,7 @@ investor-util/
 │   │   │   ├── handlers.py     #   API 处理（上传/运行/进度/产物）
 │   │   │   ├── progress.py     #   WebProgressReporter 事件缓冲
 │   │   │   ├── runs.py         #   RunManager 单 worker 串行队列
-│   │   │   ├── server.py       #   启动入口（--host/--port/--config）
+│   │   │   ├── server.py       #   启动入口（--host/--port/--config、端口 + output_dir 写锁检测）
 │   │   │   ├── upload.py       #   上传校验、原子落盘、TTL 清理
 │   │   │   ├── static/         #   前端资产（main.js / style.css）
 │   │   │   └── templates/      #   页面模板（index.html）
@@ -2791,39 +3106,38 @@ investor-util/
 
 > 基本原则：任何数据获取失败均不得阻止报告生成（文件系统写失败除外）。降级状态下生成的报告必须在页脚注明降级摘要。
 
-### 附录 H：pipeline_data Schema 定义（已实现全量）
+### 附录 H：pipeline_data Schema 定义
 
-> 完整定义和维护责任见 pipeline_data Schema 定义文档。
-> 此处仅列出当前阶段已确认的键名和类型。
+> 下表列出 `pipeline_data` 全部键；各键的完整结构契约、计算链路与消费方见下方逐键说明及对应模块章节。
 
-| 键名 | 类型 | Optional | 状态 | 写入阶段 |
-|:-----|:----|:---------|:------|:--------|
-| market_data | dict | 否 | 已实现 | prepare_report_data |
-| index_data | dict | 是 | 已实现 | prepare_report_data |
-| fund_data | dict | 是 | 已实现 | prepare_report_data |
-| penetration_data | dict | 是 | 已实现 | prepare_report_data |
-| news_data | list | 是 | 已实现 | fetch_news |
-| llm_data | dict | 是 | 已实现 | generate_all_llm |
-| history_data | dict | 是 | 已实现 | fetch_history_data |
-| risk_metrics | dict | 是 | 已实现 | prepare_report_data |
-| data_degradation | list[dict] | 是 | 已实现 | capture_snapshot |
-| llm_status | str | 是 | 已实现 | generate_all_llm |
-| rebalance_signals | list[dict] | 是 | 已实现 | prepare_report_data |
-| liquidity_warnings | list[dict] | 是 | 已实现 | capture_snapshot |
-| fx_exposure | dict | 是 | 已实现 | fx_exposure (analysis/) |
-| scenario_analysis | dict | 是 | 已实现 | prepare_report_data |
-| style_factor_data | dict | 是 | 已实现 | prepare_report_data |
-| position_relationship_data | dict | 是 | 已实现 | prepare_report_data |
-| evolution_data | dict | 是 | 已实现 | prepare_report_data |
-| position_status | dict | 是 | 已实现 | prepare_report_data |
-| data_freshness | dict | 是 | 已实现 | prepare_report_data |
-| action_data | dict | 是 | 已实现 | prepare_report_data |
-| crisis_annotation_data | dict | 是 | 已实现 | prepare_report_data |
-| tail_risk_data | dict | 是 | 已实现 | prepare_report_data |
-| snapshot_diff_data | dict | 是 | 已实现 | prepare_report_data |
-| fund_flow_data | dict | 是 | 已实现 | prepare_report_data |
-| valuation_data | dict | 是 | 已实现 | prepare_report_data |
-| market_temperature_data | dict | 是 | 已实现 | prepare_report_data |
+| 键名 | 类型 | Optional | 写入阶段 |
+|:-----|:----|:---------|:--------|
+| market_data | dict | 否 | prepare_report_data |
+| index_data | dict | 是 | prepare_report_data |
+| fund_data | dict | 是 | prepare_report_data |
+| penetration_data | dict | 是 | prepare_report_data |
+| news_data | list | 是 | fetch_news |
+| llm_data | dict | 是 | generate_all_llm |
+| history_data | dict | 是 | fetch_history_data |
+| risk_metrics | dict | 是 | prepare_report_data |
+| data_degradation | list[dict] | 是 | capture_snapshot |
+| llm_status | str | 是 | generate_all_llm |
+| rebalance_signals | list[dict] | 是 | prepare_report_data |
+| liquidity_warnings | list[dict] | 是 | capture_snapshot |
+| fx_exposure | dict | 是 | fx_exposure (analysis/) |
+| scenario_analysis | dict | 是 | prepare_report_data |
+| style_factor_data | dict | 是 | prepare_report_data |
+| position_relationship_data | dict | 是 | prepare_report_data |
+| evolution_data | dict | 是 | prepare_report_data |
+| position_status | dict | 是 | prepare_report_data |
+| data_freshness | dict | 是 | prepare_report_data |
+| action_data | dict | 是 | prepare_report_data |
+| crisis_annotation_data | dict | 是 | prepare_report_data |
+| tail_risk_data | dict | 是 | prepare_report_data |
+| snapshot_diff_data | dict | 是 | prepare_report_data |
+| fund_flow_data | dict | 是 | prepare_report_data |
+| valuation_data | dict | 是 | prepare_report_data |
+| market_temperature_data | dict | 是 | prepare_report_data |
 
 > `valuation_data`（估值分位，C19 契约，3 键 + 内嵌 `by_code` 子键）：`{"available": bool, "status": str, "by_code": {code: {"pe": float\|None, "pb": float\|None, "price_percentile": float\|None, "tier": str\|None, "sample_count": int, "percentile_available": bool}}}`。当前 PE/PB 由 `providers/eastmoney_industry.py::fetch_valuation_fields`（东财 push2 扩展字段，复用既有请求通道 + 会话缓存）；`price_percentile` 为历史 K 线价格分位代理（0~100，`analysis/valuation_percentile.py`，MIN_SAMPLES=60），非真实历史估值分位（盈利增长未纳入，渲染层必须展示 `DISCLAIMER`"价格分位代理，非真实历史估值分位"）。由 `report/orchestrator.py::compute_valuation_data` 计算（开关 `report_submodules.valuation_percentile` 默认关；关闭 → None → 「资产穿透TOP10」估值列隐藏；PE/PB 与 K 线皆不可得 → available=False 落 §1.4.5 占位）。消费方：穿透 TOP10 Excel `penetration_sheet` 估值分位列（ncols 10→11 + 表尾免责）与 HTML `report_template.html` 条件列（`valuation_enabled`）。
 

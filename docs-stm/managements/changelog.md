@@ -57,6 +57,23 @@
 - **验证期间修复**：rf-248（动态脚本顺序）、rf-249（折线/雷达 tooltip 触发）、rf-250（自检 `Chart.getChart` 判定）、rf-251（空数据图显式守卫）。
 - **门禁**：dev-verify passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
 
+### Web 服务启动 output_dir 写锁检测（rf-256）
+
+- **缺陷**：`web/server.py` 仅做端口占用检测（bind 探测），未做设计文档（`docs-stm/archive/v0.10.x/web-ui/plan-web-ui-implementation.md` 单 worker 串行队列一节）规定的 `output_dir` 锁文件检测——多进程共享同一输出目录（多开 web、或 web 与 TUI/CLI 并行）会互相覆盖最新版产物，启动时不提示，用户难以察觉产物被其他入口覆盖。
+- **修复**：`web/server.py` 启动时对 `output_dir` 做写锁检测——原子抢占锁文件 `.investor_output.lock`（`os.open` `O_CREAT|O_EXCL` 防多进程抢占竞态；内容记录 entry/pid 便于排查），锁已被其他入口持有则记录警告「该输出目录可能正被其他入口占用，产物可能互相覆盖」，抢占成功则持有至进程退出时 finally 释放。锁文件为点文件，不参与 `YYYYMMDD` 归档扫描与历史枚举（`_cleanup_old_archives` 仅处理 8 位数字目录）。占用仅告警、不阻塞启动（产物竞态交由用户决策）。
+- **验证**：新增 `src/test/unit/web/test_server.py` 11 用例（锁路径定位 / 存在性判断 / O_EXCL 原子排他 / 释放与缺失 noop / 目录不可写兜底 / 被占用告警且不阻塞启动）全绿；web 目录 75 用例全绿；dev-verify passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
+- **门禁**：dev-verify passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
+
+### technical.md 三渠道体系梳理 + 渠道详细设计（TUI / CLI / Web）
+
+- **背景**：plan-8 三阶段后系统已具备 TUI/CLI/Web 三个交互渠道，technical.md 仅以「三入口」表格平铺各渠道入口/交互层/进度报告器对照，缺体系化视角（渠道定位、统一架构模式、差异维度、并发与产物治理），且各渠道实现（TUI 主循环/菜单/键盘、CLI argparse/退出码、Web 启动流程/上传安全/单 worker 队列/事件缓冲）分散在 §1.1/§1.3/§4/§7 而无集中详述。
+- **§1.5 交互渠道体系（CLI / TUI / Web）**：新增体系化章节——① 渠道定位（交互范式/典型场景/进程模型三渠道对照）；② 统一架构模式（薄入口 + 共享管线 + 进度抽象 + 配置快照）；③ 渠道差异对照（参数传递/进度传输/并发模型/产物输出/启动防护/生命周期六维度）；④ 并发与产物治理三层（进程内单 worker 队列 / 进程间 output_dir 写锁 / 存储层原子写 + 归档分目录，警告优先不阻塞）。
+- **§1.6 TUI 渠道详细设计（主要渠道）**：聚拢既有丰富材料重新组织为独立章节（TUI 是主要渠道，篇幅最深，位于渠道序位首位）——模块划分（tui.py / tui_menu / tui_keys / handlers_report / handlers_config / handlers_cache / handlers_whatif / TuiProgressReporter）/ 主循环与键盘导航（重绘循环 + 方向键/快捷键/Ctrl+C 路由，跨平台键盘封装）/ 菜单体系（17 项四分组表 + 状态面板）/ 报告生成流程（_run_generate 骨架 + _prompt_history/_prompt_force_llm 交互询问 + 委托 orchestrator）/ TuiProgressReporter（四态前缀 + call_sheet + 耗时排行框）/ 启动流程（init_config → _bind_callbacks → 清理/隐私提示/首次引导 → default_menu_key 默认「L」→ 退出 LLM 会话统计）。
+- **§1.7 CLI 渠道详细设计**：新增——退出码约定（0/1/2）/ argparse 结构（全局参数 + report/cache/whatif/check-sources 子命令）/ 主流程（check-sources 前置免 config、持仓 config 定位差异）/ 子命令处理器（report 委托 generate_report、cache 三分支含 --update all 最大努力模式、whatif 委托 run_whatif_simulation）/ CliProgressReporter（默认日志、--verbose 同步 stderr）。
+- **§1.8 Web 渠道详细设计**（原 §1.6 重编号）：模块划分 / 启动流程与启动防护（端口检测 + output_dir 写锁检测）/ Flask 工厂与统一错误信封 / 路由全景表 / RunManager 单 worker 串行队列（快照语义、状态机、内存上限、线程安全）/ 上传安全链路 / WebProgressReporter 事件缓冲 / 前端单页与进度可视化 / 安全防护矩阵 / 与 TUI/CLI 差异要点。
+- **同步修订**：目录 TOC 补 §1.5/§1.6/§1.7/§1.8 锚点；§1.1 分层差异段落交叉引用 §1.6（TUI 主要渠道）/§1.7/§1.8；§1.5 内引用随重编号更新（§1.6.5→§1.8.5、§1.6.2→§1.8.2）；§7 web 依赖块 server.py 行补写锁检测；附录 A server.py 条目补启动防护说明。
+- **门禁**：check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 一致。
+
 ### chart-init.js 空数据图显式守卫（rf-251）
 
 - **缺陷**：6 个核心图 init 守卫 `!ds.labels` / `!ds.datasets` 不拦截空数组（空数组 truthy）。empty 场景（`labels:[]` + `datasets:[]`）下 `ds.datasets[0]` 为 undefined，访问 `.data` 抛 TypeError，**依赖外层 try/catch 降级**（图不渲染、console 出现 `[chart] 初始化失败` warn 噪声），而非显式空数据跳过。
