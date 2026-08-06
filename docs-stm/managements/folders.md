@@ -581,7 +581,8 @@ investor-util/
 │       │   │   ├── test_upload_edge.py #    上传安全边缘（zip-bomb/伪装/路径穿越变体）
 │       │   │   ├── test_progress.py #       Web 进度报告器（事件缓冲/seq/增量）
 │       │   │   ├── test_runs.py     #       RunManager（状态机/队列/保留/单例重置）
-│       │   │   └── test_handlers.py #       Flask 路由 handler（全链路/错误信封/穿越拒绝）
+│       │   │   ├── test_handlers.py #       Flask 路由 handler（全链路/错误信封/穿越拒绝）
+│       │   │   └── test_server.py   #       启动防护（output_dir 写锁检测/端口占用）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── test_cache_consistency.py      #   缓存前缀契约跨模块共享集成测试
