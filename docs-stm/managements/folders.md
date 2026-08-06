@@ -9,7 +9,7 @@
 > |---|---|---|---|---|
 | 主程序代码 | Python | 234 | 56,189 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
 | HTML 报告模板 | HTML | 4 | 3,761 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
-| 辅助脚本 | Python | 17 | 6,468 | `scripts/`（启动脚本、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验） |
+| 辅助脚本 | Python | 17 | 6,468 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验） |
 | **源代码合计** | — | **255** | **66,418** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **287** | **81,523** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **5,146 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
@@ -640,6 +640,8 @@ investor-util/
 ├── pytest.ini                       # pytest 全局配置
 ├── reason.bat                       # Reasonix AI code editor 启动（`reasonix code`）
 ├── scripts/                          # 启动脚本 + 测试工具
+│   ├── cli.ps1                      #   Windows PowerShell CLI 命令行包装（无参数默认生成报告）
+│   ├── cli.sh                       #   Linux/macOS CLI 命令行包装（无参数默认生成报告）
 │   ├── launch.ps1                   #   Windows PowerShell 启动脚本
 │   ├── launch.sh                    #   Linux/macOS 启动脚本
 │   ├── test_runner.py               #   测试驱动（pytest 模式封装）

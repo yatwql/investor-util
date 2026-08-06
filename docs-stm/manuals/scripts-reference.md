@@ -26,6 +26,7 @@
 | `diagnose_gemini_proxy.py` | 诊断 | Gemini API 代理连通性诊断 |
 | `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（风格因子回归前置决策闸门） |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本 |
+| `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
 | `whatif` | 诊断 | cli.py 子命令：调仓 What-if 模拟（对比两份持仓生成独立 diff 报告，见 [快速开始](how-to-start.md)） |
 
@@ -444,6 +445,35 @@ Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验�
 ```
 
 两者均负责：激活虚拟环境（如存在）、设置 `PYTHONPATH`、启动主程序 TUI。
+
+### `cli.sh` / `cli.ps1` — CLI 命令行包装
+
+CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行。**无参数调用时默认生成报告**（`report --type basic`，仅 Excel）；传入参数时原样透传给 CLI。
+
+```bash
+# Linux/macOS
+./scripts/cli.sh                        # 无参数 -> 默认生成报告
+./scripts/cli.sh report --type full     # 生成全量报告（含 LLM）
+./scripts/cli.sh cache --stats          # 查看缓存状态
+./scripts/cli.sh --help                 # 查看 CLI 帮助
+```
+
+```powershell
+# Windows PowerShell
+.\scripts\cli.ps1                        # 无参数 -> 默认生成报告
+.\scripts\cli.ps1 report --type full     # 生成全量报告（含 LLM）
+.\scripts\cli.ps1 cache --stats          # 查看缓存状态
+.\scripts\cli.ps1 --help                 # 查看 CLI 帮助
+```
+
+与直接调用 Python 模块**完全等效**（二选一即可）：
+
+```bash
+.venv/bin/python -m src.python.cli report                 # Linux/macOS 直调
+.venv\Scripts\python.exe -m src.python.cli report         # Windows 直调
+```
+
+包装脚本相比直调的好处：自动切换到项目根目录、自动定位虚拟环境解释器（避免误用系统 python 缺失 pandas 等依赖）、无参数时自动补 `report` 子命令。CLI 完整参数说明见 [快速开始](how-to-start.md) 的「CLI 命令行模式」一节。
 
 ---
 
