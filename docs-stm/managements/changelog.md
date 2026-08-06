@@ -6,6 +6,14 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 用户文档：说明报告 as-if 与独立 What-if 的区别（2026-08-07）
+
+- **`faq.md`**：新增 Q&A「报告里的 as-if 和单独做的 What-if 有什么不同？」——两者定位（as-if 是组合历史走势的计算口径 / What-if 是两份持仓对比的独立功能）、唯一联系（What-if 时序回测复用 as-if 口径）、一句话总结，交叉链接 `reports-instruction.md` 对应章节。
+- **`reports-instruction.md`**：`组合历史走势与回撤 → as-if 模拟` 小节末尾补「与调仓 What-if 的关系」说明——as-if 非独立功能，被 What-if 时序回测复用为底层算法，不指定生效日时 What-if 不涉及 as-if；并链接到 FAQ 新条目。
+- **门禁**：dev-verify + 4 checks `--ci` 全 [OK]。
+
+---
+
 ### 行业名剥离申万层级后缀：银行Ⅱ → 银行（2026-08-07）
 
 - **`fetcher/industry.py` 新增 `strip_hierarchy_suffix`**：剥离行业名末尾的申万层级后缀（Ⅰ/Ⅱ/Ⅲ/Ⅳ，如「银行Ⅱ」「白酒Ⅱ」）。两类 provider（push2 f127 / 行情页 bk_name）均返回带后缀的申万原始名，统一在网关剥离，所有消费方（资产穿透TOP10 板块列 / 风格与因子分析 行业Beta / 基金风格分类 / LLM 关联标签 / TUI 单票查询）一致性受益；provider 层保持原始值（上游契约不变）。
