@@ -63,7 +63,28 @@
 
   // ── E. 行为调优 ──
   "default_menu_key": "L",
-  "report_section_order": {},
+  // 报告章节显示顺序（report_section_order：完整配置 18 项，按序号升序排列；llm_usage 自动置末位）
+  // 本仓库配置为「行动建议=10」，其余依次顺延（原 10-16 各 +1）；清空为 {} 即恢复注册表默认顺序（行动建议=17）
+  "report_section_order": {
+    "summary": 1,
+    "market_value": 2,
+    "category": 3,
+    "penetration": 4,
+    "fund_performance": 5,
+    "fund_manager": 6,
+    "position_relationship": 7,
+    "fund_concentration": 8,
+    "style_factor": 9,
+    "action": 10,
+    "news_correlation": 11,
+    "global_macro": 12,
+    "expert_review": 13,
+    "health_check": 14,
+    "penetration_deep": 15,
+    "portfolio_history_drawdown": 16,
+    "portfolio_evolution": 17,
+    "data_source_status": 18
+  },
   "degradation": {
     "t2": {
       "unreachable_threshold": 2,

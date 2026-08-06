@@ -425,6 +425,8 @@
 > 效果：基金经理/持仓关系矩阵/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
 > 空对象 `{}` 或缺失此字段时使用上述 19 项默认顺序。
+>
+> **本仓库配置**：`config.json` 的 `report_section_order` 已配置完整 18 项，将 `action`（行动建议）置于序号 10，其余模块依次顺延（`news_correlation`=11、`global_macro`=12、`expert_review`=13、`health_check`=14、`penetration_deep`=15、`portfolio_history_drawdown`=16、`portfolio_evolution`=17、`data_source_status`=18），与上表默认顺序仅差异在「行动建议提前至第 10 位」。清空为 `{}` 即恢复上表默认顺序（行动建议=17）。
 
 **实用示例** — 将组合历史走势与回撤提到前面，关注回撤风险：
 
