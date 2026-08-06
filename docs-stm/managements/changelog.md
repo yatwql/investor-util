@@ -4,7 +4,7 @@
 
 ---
 
-## [0.10.10-dev] - 开发中（未发布）
+## [0.10.10] - 2026-08-06
 
 ### 六文档核对与 Web 模式文档补全（2026-08-06）
 
@@ -73,6 +73,14 @@
 - **§1.8 Web 渠道详细设计**（原 §1.6 重编号）：模块划分 / 启动流程与启动防护（端口检测 + output_dir 写锁检测）/ Flask 工厂与统一错误信封 / 路由全景表 / RunManager 单 worker 串行队列（快照语义、状态机、内存上限、线程安全）/ 上传安全链路 / WebProgressReporter 事件缓冲 / 前端单页与进度可视化 / 安全防护矩阵 / 与 TUI/CLI 差异要点。
 - **同步修订**：目录 TOC 补 §1.5/§1.6/§1.7/§1.8 锚点；§1.1 分层差异段落交叉引用 §1.6（TUI 主要渠道）/§1.7/§1.8；§1.5 内引用随重编号更新（§1.6.5→§1.8.5、§1.6.2→§1.8.2）；§7 web 依赖块 server.py 行补写锁检测；附录 A server.py 条目补启动防护说明。
 - **门禁**：check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 一致。
+
+### 技术设计文档自完备修正（technical.md / llm-technical.md）
+
+- **technical.md 数据降级体系**：删除对用户文档（datasource-reliability.md §4.1）的引用，改为自包含「三级熔断体系」完整说明——技术设计文档不引用用户文档、整体自行完备（约束原文要求）。
+- **technical.md 数据可用性措辞**：去实测日期痕迹与「历史快照」措辞，改为「365 天窗口探测，Tencent 主链路」等反映最新状态的中性描述。
+- **technical.md 附录 H**：去「已实现全量」标题与「已实现」状态列、清理悬空 Schema 文档引用；架构设计约束表中 pipeline_data Schema 定义条目改指向附录 H。
+- **llm-technical.md**：提示词示例时间「2026-07-14 14:30」改为占位符「YYYY-MM-DD HH:MM」——示例反映模板而非快照时间。
+- **门禁**：check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
 
 ### chart-init.js 空数据图显式守卫（rf-251）
 

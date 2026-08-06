@@ -164,6 +164,7 @@ def main() -> None:
         "unit_analysis": "分析计算",
         "unit_cli": "CLI 命令行",
         "unit_ui": "TUI 交互",
+        "unit_web": "Web 服务",
     }
     print("\n### 功能域（unit 子标记聚合）")
     for s, label in domain_map.items():

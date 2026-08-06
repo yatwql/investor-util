@@ -1,5 +1,5 @@
 # 测试覆盖统计
-> 文档版本：0.10.10-dev
+> 文档版本：0.10.10
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
 
@@ -9,16 +9,16 @@
 
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **4887** | ~15s |
-| `standard` | **4279** | ~16s |
+| `unit` | **4964** | ~15s |
+| `standard` | **4343** | ~16s |
 | `scenario` | **241** | ~18s |
 | `regression` | **241** | ~17s |
-| `dev-verify` | **1864** | ~20s |
-| `verify` | **3201** | ~10s |
+| `dev-verify` | **1928** | ~20s |
+| `verify` | **3278** | ~10s |
 | `integration` | **281** | ~14s |
-| `edge` | 541 | ~13s |
+| `edge` | 554 | ~13s |
 | `data` | 69 | ~2s |
-| `all` | **5196** | **~21s** |
+| `all` | **5273** | **~21s** |
 | `smoke` | 26 | ~2s |
 | `report` | **1495** | ~11s |
 | `all_no_unit` | 309 | ~10s |
@@ -26,7 +26,7 @@
 
 > 注：典型耗时按 2026-08-05 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新下方两张表。
 >
-> 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 5196 项（2026-08-06 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
+> 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 5273 项（2026-08-06 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
 
 ### 环境耗时对照
 
@@ -102,6 +102,7 @@
 | **分析计算** | `analysis/`(liquidity, rebalance, fx_exposure, bond_yield, alignment_correction, drawdown_warning, drawdown_events, factor_exposure, industry_beta, correlation, crisis_annotation, tail_risk, portfolio_evolution, snapshot_diff, action_advisor, trade_discipline, rebalance_advisor, return_attribution, cost_flow, whatif, whatif_backtest, valuation_percentile, market_temperature, metrics) | `unit/analysis/test_{liquidity,rebalance,bond_yield,fx_exposure,alignment_correction,drawdown_warning,drawdown_events,factor_exposure,industry_beta}*.py` + `test_correlation.py` + `test_correlation_edge.py` + `test_crisis_annotation.py` + `test_tail_risk.py` + `test_tail_risk_edge.py` + `test_portfolio_evolution.py` + `test_snapshot_diff.py` + `test_snapshot_diff_edge.py` + `test_action_advisor.py` + `test_trade_discipline.py` + `test_rebalance_advisor.py` + `test_return_attribution.py` + `test_cost_flow.py`（成本流水：XIRR/成本分档/分红累计） + `test_valuation_percentile.py`/`test_valuation_percentile_edge.py`（价格分位代理：收盘价提取/解析解/三档刻度）+ `test_market_temperature.py`/`test_market_temperature_edge.py`（三因子合成温度计）+ `test_metrics.py`/`test_metrics_edge.py`（量化指标：夏普/卡玛/集中度/胜率/换手/风险贡献/波动率/组合 Beta）+ `test_whatif.py` + `test_whatif_backtest.py` + `test_whatif_backtest_edge.py` | 696 |
 | **TUI 交互** | `tui/tui*.py`, `tui/handlers*.py`, `tui/tui_keys.py` | `unit/ui/test_{tui_keys,tui_handlers,tui_menu}.py` + `test_tui_edge.py` + `unit/startup/test_startup_wizard.py`（unit_ui 标记） | 135 |
 | **CLI 命令行模式** | `cli/cli.py`, `report/cli_progress.py` | `unit/cli/test_cli*.py` | 56 |
+| **Web 服务** | `web/`(server, app, handlers, upload, progress, runs) | `unit/web/test_{upload,upload_edge,progress,runs,handlers,server}.py`（启动防护 output_dir 写锁/端口占用、上传安全、进度事件缓冲、RunManager 运行管理、Flask 路由全链路） | 75 |
 | **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组，含 `scenario_extreme` 单列) + `integration/test_cli_integration.py` | 281 |
 
 ## 场景测试分组（scenario）
@@ -132,7 +133,7 @@
 
 | 标记 | 覆盖模块 | 覆盖项数 |
 |:-------|:---------|:--------:|
-| `unit`（父标记） | 11 子组合计 | **4887** |
+| `unit`（父标记） | 12 子组合计 | **4964** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等，含 push2 估值字段 PE/PB 提取 + 行业数据 REST 接口） | 226 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 248 |
 | ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪/降级回退） | 748 |
@@ -143,7 +144,8 @@
 | ├─ `unit_analysis` | 分析计算（流动性/再平衡/汇率/口径修正/回撤预警/回撤事件/因子暴露/行业 Beta/相关性矩阵/危机区间标注/尾部风险统计/组合演进/快照差异摘要/行动建议/交易纪律/调仓建议可行化层/收益归因/成本流水（XIRR/成本分档/分红累计）/估值分位（价格分位代理）/市场温度（三因子合成）/量化指标（夏普/卡玛/集中度/胜率/换手/风险贡献/波动率/组合 Beta）/调仓 What-if 时序回测） | 696 |
 | ├─ `unit_cli` | CLI 命令行模式（参数解析/路由/退出码/日志/whatif 子命令） | 56 |
 | ├─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示） | 135 |
-| └─ `unit_scripts` | scripts/ 工程脚本（历史痕迹检查工具自检/豁免/补强模式/回归场景元描述豁免/多行 docstring 提取/任务编号一致性检查/语义命名索引双向校验/3 类暗号匹配自检/机器信息采集与耗时表格渲染/环境耗时对照文档自动更新） | 188 |
+| ├─ `unit_scripts` | scripts/ 工程脚本（历史痕迹检查工具自检/豁免/补强模式/回归场景元描述豁免/多行 docstring 提取/任务编号一致性检查/语义命名索引双向校验/3 类暗号匹配自检/机器信息采集与耗时表格渲染/环境耗时对照文档自动更新） | 190 |
+| └─ `unit_web` | Web 服务（启动防护 output_dir 写锁/端口占用、上传安全、进度事件缓冲、RunManager 运行管理、Flask 路由全链路） | 75 |
 
 ## 跨类标记
 
@@ -151,7 +153,7 @@
 |:-------|:---------|:--------:|
 | `llm` | 全部 LLM 相关（带 `llm` 跨类标记），**全部为 mock 测试，无需真实 API key** | **603** |
 | `smoke` | 关键节点冒烟覆盖，共 26 项 | **26** |
-| `edge` | 异常/边界场景（含熔断冷却探针） | **541** |
+| `edge` | 异常/边界场景（含熔断冷却探针） | **554** |
 | `data` | 数据正确性验证 | **69** |
 
 详细方法名和验证点见 `pytest src/test/ -m "smoke" -v` 输出。
