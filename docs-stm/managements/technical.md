@@ -119,14 +119,15 @@
   └───────────────────────────────────────────────────────────────────┘
 ```
 
-**双入口：TUI 与 CLI**
+**三入口：TUI、CLI 与 Web**
 
 | 入口 | 通道 | 入口文件 | 用户交互层 | 业务逻辑层 | 进度报告 |
 |:-----|:-----|:---------|:----------|:----------|:---------|
 | TUI | 交互菜单 | `tui/tui.py` | `tui/tui_menu.py` + `tui/handlers_*.py` | `report/orchestrator.py` + `cache/operations.py` | `TuiProgressReporter` |
 | CLI | 命令行参数 | `cli/cli.py` | argparse（不经过 tui/handlers_*） | `report/orchestrator.py` + `cache/operations.py` | `CliProgressReporter` |
+| Web | 浏览器界面 | `web/server.py` | `web/handlers.py` + `web/upload.py` + `web/progress.py` + `web/runs.py` | `report/orchestrator.py` + `cache/operations.py` | `WebProgressReporter` |
 
-**共享模块**（TUI/CLI 均直接使用）：
+**共享模块**（三种入口均直接使用）：
 
 | 共享层 | 位置 | 用途 |
 |:-------|:-----|:------|
@@ -136,7 +137,7 @@
 | 持仓读取 | `core/reader.py` | xlsx 解析 |
 | 配置管理 | `config/` | 三文件分层配置 |
 
-**分层差异**：TUI 的 `tui/handlers_report.py` / `tui/handlers_cache.py` 是极薄包装层（仅保留交互逻辑如文件选择、结果格式化），CLI 通过 argparse 直接调用共享层，不经过 handlers_*。保证两次实现共用同一套业务逻辑。
+**分层差异**：TUI 的 `tui/handlers_report.py` / `tui/handlers_cache.py` 是极薄包装层（仅保留交互逻辑如文件选择、结果格式化），CLI 通过 argparse 直接调用共享层，不经过 handlers_*；Web 通过 `web/handlers.py` API 路由与 `web/runs.py` 单 worker 串行队列调用共享层，进度经 `web/progress.py` 的 WebProgressReporter 事件缓冲输出。三种入口共用同一套业务逻辑。
 
 **贯穿层**：`config/` · `core/registry.py` · `core/provider_registry.py` · `core/code_utils.py` · `core/market_hours.py` · `core/perf.py`
 
@@ -144,7 +145,7 @@
 - 每一层只能依赖其下层和贯穿层，禁止反向依赖
 - 数据获取层通过 Provider Chain 解耦数据源，新增数据源无需修改调用方
 - 缓存层作为数据获取层和报告层之间的缓冲，提供 TTL、指纹和分组管理
-- 报告编排层统筹数据准备和双管线生成，消除 TUI 与 CLI 间的逻辑重复
+- 报告编排层统筹数据准备和双管线生成，消除 TUI、CLI 与 Web 间的逻辑重复
 - 贯穿层提供全局共享的基础设施（配置、注册表、熔断器、代码类型判定）
 
 ### 1.2 核心数据流
@@ -195,6 +196,8 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | `both` | B | 轻量行情 + 快照 + 历史走势（条件） | HTML + Excel | ❌ |
 | `full` | L | 完整行情 + 穿透 + 快照 + 历史走势 + 资金流向 | HTML + Excel | ✅ |
 
+> 三种报告类型同样可由 CLI `--type basic/both/full` 与 Web 报告格式下拉（基础/标准/完整）触发，Web 侧可选「获取历史走势」「强制 LLM」两个选项。
+
 ### 1.3 模块职责总览
 
 | 层次 | 模块 | 职责 | 文件 |
@@ -204,6 +207,8 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **用户交互** | Handler 命令 | TUI 命令 → 委托编排层或共享层 | `tui/handlers_*.py` |
 | **用户交互** | 进度报告 | ProgressReporter 解耦进度输出 | `report/progress.py` |
 | **用户交互** | CLI 进度报告 | CliProgressReporter（logging 输出 / verbose stderr） | `report/cli_progress.py` |
+| **用户交互** | Web 服务层 | Flask 工厂/路由、单 worker 串行队列、上传安全、报告格式与选项选择 | `web/server.py` / `web/app.py` / `web/handlers.py` / `web/upload.py` / `web/runs.py` |
+| **用户交互** | Web 进度报告 | WebProgressReporter（事件缓冲、进度查询） | `web/progress.py` |
 | **输入** | 持仓读取 | xlsx 解析、列校验、多账户 | `core/reader.py` |
 | **配置** | 配置管理层 | 三文件分层配置 | `config/` |
 | **注册** | 中央注册表 | 数据模块 + 报告模块注册 | `core/registry.py` |
@@ -2502,6 +2507,15 @@ tui/handlers_*.py (TUI 命令)
 
 config/ → core/registry.py
 core/code_utils.py → 各 fetcher/report/llm 模块（跨层依赖，无环）
+
+web/ (Web 服务层，薄入口)
+  → web/server.py (启动入口，端口探测，init_config)
+  → web/app.py (Flask 工厂 → web/handlers.py 注册路由)
+  → web/runs.py (RunManager 单 worker 串行队列，模块单例)
+  → web/upload.py (上传校验/原子落盘/TTL 清理 → core/reader.py 预检)
+  → web/progress.py (WebProgressReporter → report/progress.py 基类)
+  → report/orchestrator.py + cache/operations.py (报告与缓存共享层)
+  → config/ / core/registry.py (配置与注册)
 ```
 
 [↑ 回到顶部](#目录)
@@ -2618,6 +2632,17 @@ investor-util/
 │   │       ├── tui_handlers.py  #   键盘/事件处理
 │   │       ├── tui_keys.py      #   键盘输入封装
 │   │       └── tui_menu.py      #   菜单交互
+│   │   ├── web/                # Web 浏览器模式入口
+│   │   │   ├── __init__.py     #   子包标记
+│   │   │   ├── __main__.py     #   python -m 入口
+│   │   │   ├── app.py          #   Flask 应用工厂 + 路由注册
+│   │   │   ├── handlers.py     #   API 处理（上传/运行/进度/产物）
+│   │   │   ├── progress.py     #   WebProgressReporter 事件缓冲
+│   │   │   ├── runs.py         #   RunManager 单 worker 串行队列
+│   │   │   ├── server.py       #   启动入口（--host/--port/--config）
+│   │   │   ├── upload.py       #   上传校验、原子落盘、TTL 清理
+│   │   │   ├── static/         #   前端资产（main.js / style.css）
+│   │   │   └── templates/      #   页面模板（index.html）
 │   ├── static/                   # 前端静态资产（Chart.js 本地 bundle + 图表初始化/导出/打印 + TOC）
 │   └── test/                    # 测试（按标记分组）
 │       ├── conftest.py          # pytest 配置 + 分层标记注册
