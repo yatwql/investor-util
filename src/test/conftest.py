@@ -274,6 +274,67 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     # 应直接从 PROJECT_ROOT 读取真实文件，而非依赖隔离路径的副本。
 
 
+# 项目真实 reports 目录（默认配置 output_dir 指向这里；测试防线的重定向基准）
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_REAL_REPORTS_DIR = os.path.abspath(os.path.join(_PROJECT_ROOT, "reports"))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_report_output_dir(tmp_path, monkeypatch):
+    """报告输出目录兜底防线：指向项目真实 reports/ 的输出一律重定向到临时目录。
+
+    敏感路径隔离（_isolate_sensitive_paths）不覆盖 output_dir/reports，依赖各
+    测试自行 setup；测试若漏传输出目录（如 generate_report 在 config 缺
+    output_dir 时 fallback 到相对路径 "reports"），会真实写入项目 reports/
+    目录（累积空页签残留）。本 fixture 在两个真实落盘入口把指向项目真实
+    reports/ 的输出透明重定向到 tmp_path/reports：
+
+      - Excel：excel_writer.save_workbook —— excel_module_loader 在运行时
+        `from excel_writer import save_workbook`，取到的是被 patch 后的模块
+        属性，故 excel_generator 报告链路天然覆盖。
+      - HTML：html_save._save_html_report 与 html_writer._save_html_report
+        两处一起 patch —— html_writer 模块 import 时已拷贝引用，需补 patch
+        调用方名字；函数内动态查模块全局，patch 模块属性必生效。
+
+    显式指向临时目录的测试不受影响；测试自身 patch 写盘函数（mock）会覆盖
+    本包装。判定仅基于"解析后是否等于项目真实 reports 目录"。
+    """
+    redirect_to = str(tmp_path / "reports")
+
+    def _redirect(output_dir):
+        if not output_dir:
+            return redirect_to
+        try:
+            abspath = os.path.abspath(output_dir)
+        except (TypeError, ValueError):
+            return output_dir
+        if abspath == _REAL_REPORTS_DIR:
+            return redirect_to
+        return output_dir
+
+    # Excel 落盘入口
+    import src.python.report.excel_writer as _ew
+
+    _orig_save_workbook = _ew.save_workbook
+
+    def _wrapped_save_workbook(wb, output_dir="reports", *args, **kwargs):
+        return _orig_save_workbook(wb, output_dir=_redirect(output_dir), *args, **kwargs)
+
+    monkeypatch.setattr(_ew, "save_workbook", _wrapped_save_workbook)
+
+    # HTML 落盘入口（定义方 + html_writer 调用方拷贝名）
+    import src.python.report.html_save as _hs
+    import src.python.report.html_writer as _hw
+
+    _orig_save_html = _hs._save_html_report
+
+    def _wrapped_save_html(html, output_dir, *args, **kwargs):
+        return _orig_save_html(html, _redirect(output_dir), *args, **kwargs)
+
+    monkeypatch.setattr(_hs, "_save_html_report", _wrapped_save_html)
+    monkeypatch.setattr(_hw, "_save_html_report", _wrapped_save_html)
+
+
 @pytest.fixture(autouse=True)
 def _auto_reset_provider_registry():
     """自动重置 DataSourceRegistry 单例，防止测试间状态污染。

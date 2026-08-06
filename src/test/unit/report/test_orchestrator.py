@@ -5,7 +5,7 @@ prepare_report_data mock 测试 + capture_snapshot。
 
 from __future__ import annotations
 
-import tempfile
+import os
 
 import pytest
 
@@ -21,6 +21,23 @@ from src.python.report.orchestrator import (
     generate_report,
     prepare_report_data,
 )
+
+
+def _real_reports_dir() -> str:
+    """项目真实 reports 目录（与 conftest 防线基准一致）。"""
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "reports"))
+
+
+def _snapshot_reports() -> frozenset:
+    """返回项目 reports/ 下所有文件相对路径（用于断言防线生效）。"""
+    root = _real_reports_dir()
+    if not os.path.isdir(root):
+        return frozenset()
+    result = set()
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for f in filenames:
+            result.add(os.path.relpath(os.path.join(dirpath, f), root))
+    return frozenset(result)
 
 
 class TestReportResult:
@@ -234,22 +251,32 @@ class TestGenerateReport:
     """generate_report 骨架测试。"""
 
     def test_generate_report_skeleton(self):
-        """骨架模式返回 ReportResult，不抛异常（输出隔离到临时目录）。"""
+        """骨架模式返回 ReportResult，不抛异常（输出隔离由 conftest 防线兜底）。
+
+        report_type 默认 basic（仅生成 Excel 不写 HTML），config 缺 output_dir
+        时输出回退到相对路径 "reports"，解析为项目真实 reports/ 目录；空持仓
+        会生成空页签 Excel 归档并覆盖根目录最新版，累积残留。conftest.
+        _isolate_report_output_dir 兜底把指向项目真实 reports/ 的输出重定向到
+        临时目录，此处用运行前后文件快照断言真实 reports/ 无新增，作永久回归
+        守护。
+        """
         mock_reporter = MagicMock()
-        with tempfile.TemporaryDirectory() as tmp:
-            with (
-                # 市场数据网络依赖：交易日历（akshare）+ A 股/美股指数（腾讯/新浪）
-                patch("src.python.report.market_value._get_trading_calendar", return_value=set()),
-                patch("src.python.fetcher.index.fetch_indices", return_value={}),
-                patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
-                # 后台数据源健康检查（全量 HTTP 连通性探测）
-                patch("src.python.report._report_generation._spawn_health_checks", return_value=None),
-                patch("src.python.report._report_generation._collect_health_checks"),
-            ):
-                result = generate_report(holdings=[], config={}, reporter=mock_reporter, output_dir=tmp)
+        before = _snapshot_reports()
+        with (
+            # 市场数据网络依赖：交易日历（akshare）+ A 股/美股指数（腾讯/新浪）
+            patch("src.python.report.market_value._get_trading_calendar", return_value=set()),
+            patch("src.python.fetcher.index.fetch_indices", return_value={}),
+            patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
+            # 后台数据源健康检查（全量 HTTP 连通性探测）
+            patch("src.python.report._report_generation._spawn_health_checks", return_value=None),
+            patch("src.python.report._report_generation._collect_health_checks"),
+        ):
+            result = generate_report(holdings=[], config={}, reporter=mock_reporter)
         assert isinstance(result, ReportResult)
         assert result.report_generated is True
         assert result.exit_code == 0
+        after = _snapshot_reports()
+        assert before == after, "报告输出未重定向，真实 reports/ 目录被测试污染"
 
     def test_generate_report_basic(self):
         """basic 路径直接调用 excel_generator.generate_excel_report 生成 Excel 报告。"""
