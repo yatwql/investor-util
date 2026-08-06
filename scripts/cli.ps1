@@ -1,4 +1,4 @@
-# scripts/cli.ps1 - 投资分析 CLI 命令行模式 (Windows)
+﻿# scripts/cli.ps1 - 投资分析 CLI 命令行模式 (Windows)
 # Encoding: UTF-8 with BOM (PowerShell requires BOM for Chinese chars)
 #
 # 无参数调用时默认生成报告（report 子命令，--type both，Excel+HTML 不含 LLM）；

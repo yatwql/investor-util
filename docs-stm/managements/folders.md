@@ -845,6 +845,7 @@ investor-util/
 ├── README.md                         # 用户文档总入口
 ├── pyproject.toml                    # Python 项目元数据
 ├── requirements.txt                  # Python 依赖清单
+├── .editorconfig                     # 编辑器编码规则（*.ps1 强制 UTF-8 BOM+CRLF）
 └── .gitignore                        # Git 忽略规则
 ```
 

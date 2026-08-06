@@ -1,0 +1,14 @@
+# EditorConfig — 项目编码规则（随仓库走，跨机器生效）
+# 支持 EditorConfig 的编辑器（VS Code、Vim、IntelliJ 等）保存文件时自动套用。
+root = true
+
+# 默认 UTF-8（无 BOM），全部文本文件统一
+[*]
+charset = utf-8
+
+# Windows PowerShell 脚本必须 UTF-8 with BOM + CRLF：
+# 无 BOM 时 Windows PowerShell 5.1 按 ANSI/GBK 误读 UTF-8 中文注释，
+# 导致解析崩溃（"字符串缺少终止符"）。编辑后必须保持 BOM+CRLF 不变。
+[*.ps1]
+charset = utf-8-bom
+end_of_line = crlf
