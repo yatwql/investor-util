@@ -258,7 +258,7 @@
       banner.textContent = '引擎缺失（typeof Chart === undefined）→ chart-config / chart-init 静默跳过，页面无 JS 报错；现代浏览器不渲染 canvas 内部 fallback 文本，图表区域空白（真实报告回退到明细表格）。✅ 守卫逻辑符合预期（R21）。';
       return;
     }
-    /* 统计 canvas 是否被 Chart.js 接管（canvas._chart 内部句柄） */
+    /* 统计 canvas 是否被 Chart.js 接管（Chart.getChart 官方 API；v4 canvas 无 _chart 属性，用 _chartjs 管理事件监听） */
     var initCount = 0;
     for (var ki = 0; ki < KEYS.length; ki++) {
       var key = KEYS[ki];
@@ -267,7 +267,7 @@
       var ds = data[key];
       var expect = ds && ds.labels && ds.labels.length ? 'ok' : 'empty';
       if (scenario === 'degraded' && key === 'radar') { expect = 'degraded'; }
-      if (canvas && canvas._chart) {
+      if (canvas && Chart.getChart(canvas)) {
         initCount++;
         badge.textContent = expect === 'degraded' ? '降级' : 'ok';
         badge.className = 'badge ' + (expect === 'degraded' ? 'degraded' : 'ok');

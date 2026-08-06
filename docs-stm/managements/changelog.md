@@ -6,6 +6,13 @@
 
 ## [0.10.10-dev] - 开发中（未发布）
 
+### test-chart.html 自检图接管判定修正（rf-250）
+
+- **缺陷**：调试页自检用 `canvas._chart` 判定图是否被 Chart.js 接管——Chart.js v4 该内部句柄已不存在（canvas 上挂的是 `_chartjs`，用于管理事件监听器；`_chart` 是数据集/图表元素内部引用），判定恒为假。rf-249 修复后 ok/degraded 场景图真实渲染、tooltip 可用（用户 2026-08-06 实测），但自检仍误报「0/6 图已初始化」。
+- **修复**：自检判定改用官方 API `Chart.getChart(canvas)`——v4 构造内部亦用 `Chart.getChart(canvas)` 查询已有图表（`constructor` 中 `o = Dn(n)`），与 chart-print.js / chart-export.js 收集图表用同一 API，口径一致。
+- **验证**：待用户重测四场景 banner 应正确显示实际初始化数（ok/degraded=6/6，empty=4/6，offline=引擎缺失文本）。
+- **门禁**：dev-verify passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
+
 ### 折线图/雷达图 tooltip 触发修复 + 调试页自检时序与文案修正（rf-249）
 
 - **tooltip 缺陷**：6 图交互验证（rf-113 ①，用户 2026-08-06 另机）发现——净值趋势/最大回撤折线图 `pointRadius:0` 且 Chart.js 默认 `interaction.intersect:true`，数据点命中区域≈0，鼠标悬停无法触发 tooltip；雷达图 `pointRadius:3` 命中区域小同样难触发。环形图（切片命中区域大）与两个柱状图（整柱命中）正常。该缺陷同时影响生产报告（净值/回撤/组合演进 3 图）与 whatif 回测线图（共用 `ChartCommon.lineOptions`）。

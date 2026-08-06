@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
 > 文档版本：0.10.10-dev
-> **编号源**：`rf-next = 250`（新增问题取此编号，完成后更新为 +1；已用最大 rf-249，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 251`（新增问题取此编号，完成后更新为 +1；已用最大 rf-250，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -38,6 +38,7 @@
 |---|------|----------|----------|
 | rf-248 | test-chart.html 调试页动态注入 chart 脚本未设 `s.async=false`（注释「非 async 动态注入按序执行」实为错误认知），动态 script 默认 async=true 无序执行，chart-init.js 先于 chart.min.js/chart-common.js 执行触发守卫静默 return，全场景 0/6 图未初始化、无 tooltip（用户 2026-08-06 实测 ok/degraded/empty 三场景复现） | 注入循环补 `s.async=false` 对齐报告模板 defer 语义；生产模板（report_template/whatif_template）用静态 defer 不受影响 | `changelog.md` [0.10.10-dev] |
 | rf-249 | 折线图（净值趋势/最大回撤/演进图 + whatif 回测线图）`pointRadius:0` 且默认 `interaction.intersect:true` → 数据点命中区域≈0，悬停无法触发 tooltip；雷达图 `pointRadius:3` 命中区域小同样难触发（用户 2026-08-06 ok 场景实测：环形图+两柱状图有 tooltip、折线+雷达无）。另：test-chart.html 自检 800ms 早于脚本加载完成误报 0/6；offline 文案「canvas 保留 fallback 文本」为误解（现代浏览器不渲染 `<canvas>` fallback 文本，引擎缺失时图表区域空白，真实报告回退明细表格） | ① chart-common.js `lineOptions` 补 `interaction:{mode:'index',intersect:false}`（悬停任意处显示最近 x 点全数据集值）；② chart-init.js radar 补 `interaction:{mode:'nearest',intersect:false}`；③ test-chart.html 自检改 chart-init.js onload 触发 + 3s 兜底；④ offline 文案与 iter7 清单/review-findings 断言修正为实测行为 | `changelog.md` [0.10.10-dev] |
+| rf-250 | test-chart.html 自检用 `canvas._chart` 判定图是否被 Chart.js 接管——v4 该内部句柄不存在（canvas 上挂 `_chartjs` 管理事件监听，`_chart` 是数据集/元素内部引用），判定恒为假；rf-249 修复后图真实渲染、tooltip 可用，但自检仍误报「0/6 图已初始化」（用户 2026-08-06 ok/degraded 场景实测） | 自检判定改官方 API `Chart.getChart(canvas)`（v4 构造内部亦用 `Chart.getChart(canvas)` 查已有图表，与 chart-print/chart-export 用同一 API） | `changelog.md` [0.10.10-dev] |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 
