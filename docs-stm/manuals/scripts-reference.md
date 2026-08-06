@@ -25,7 +25,7 @@
 | `perf_view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
 | `diagnose_gemini_proxy.py` | 诊断 | Gemini API 代理连通性诊断 |
 | `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（风格因子回归前置决策闸门） |
-| `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本 |
+| `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本（无参数启动 TUI；`web` 子命令启动 Web 浏览器模式，见下文「启动脚本」） |
 | `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
 | `whatif` | 诊断 | cli.py 子命令：调仓 What-if 模拟（对比两份持仓生成独立 diff 报告，见 [快速开始](how-to-start.md)） |
@@ -445,6 +445,21 @@ Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验�
 ```
 
 两者均负责：激活虚拟环境（如存在）、设置 `PYTHONPATH`、启动主程序 TUI。
+
+### `launch.sh web` / `launch.ps1 web` — Web 浏览器模式
+
+```bash
+./scripts/launch.sh web                       # Linux/macOS，默认监听 http://127.0.0.1:8000
+./scripts/launch.sh web --port 8080           # 换端口
+./scripts/launch.sh web --host 0.0.0.0        # 局域网访问（绑定非回环地址需自行评估暴露风险）
+```
+
+```powershell
+.\scripts\launch.ps1 web                      # Windows，默认监听 http://127.0.0.1:8000
+.\scripts\launch.ps1 web --port 8080
+```
+
+`web` 子命令启动轻量 Web 服务（`src/python/web/server.py`），浏览器打开提示地址即可上传持仓、选择报告格式（基础/标准/完整）、实时查看生成进度并预览/下载产物；亦支持 `--config <path>` 指定备用配置文件（详见[快速开始](how-to-start.md)方式四）。同一时间仅执行一个报告生成任务（单 worker 串行队列），新任务自动排队。
 
 ### `cli.sh` / `cli.ps1` — CLI 命令行包装
 

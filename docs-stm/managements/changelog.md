@@ -6,6 +6,17 @@
 
 ## [0.10.10-dev] - 开发中（未发布）
 
+### 六文档核对与 Web 模式文档补全（2026-08-06）
+
+- **六文档核对结论**：how-to-start.md（方式四）/ README.md（功能特性）/ faq.md（Web 问答）已在 plan-8 阶段3 就绪；llm-technical.md 经核对**无需改动**——Web 复用 `report/orchestrator.py` → `llm/` 包，对 LLM 层零改动，与 CLI 一致不入该文档。
+- **requirements.md**：§1.1 目标补三种入口（TUI/CLI/Web）共用同一套管线；§1.2 流程图后加入口共用说明（TUI E/B/L ↔ CLI `--type` ↔ Web 报告格式下拉）；§2 新增 R-ENV-04（`launch.sh/ps1 web` 启动 Web 模式）；§3 改「用户交互」+ 新增 3.4 Web 浏览器模式（R-WEB-01~07：启动/上传/格式与选项/进度事件/产物预览下载/单 worker 串行队列/生命周期管理）。
+- **technical.md**：§1.1「双入口：TUI 与 CLI」改「三入口」，三入口对照表加 Web 行，共享模块/分层差异/关键分层原则文案同步（"消除 TUI、CLI 与 Web 间的逻辑重复"）；§1.2 报告类型表补 CLI/Web 触发说明；§1.3 模块职责总览加 Web 服务层 + Web 进度报告两行；§7 模块间依赖补 web/ 薄入口依赖块；附录 A 目录结构补 `src/python/web/` 全量条目。
+- **how-to-test-my-code.md**：`unit_web` 标记补全——verify/dev-verify 的 `-m` 表达式（三处）加 `or unit_web`、「12 个子组」改「13 个子组」、dev-verify/verify 模块计数（5→6、8→9）、marker 参照表加 `unit_web` 行。
+- **scripts-reference.md**：启动脚本一览表 `launch.sh/ps1` 行补 `web` 子命令说明；「启动脚本」章节新增 `launch.sh web / launch.ps1 web` 小节（默认 127.0.0.1:8000、--host/--port/--config、单 worker 串行队列说明）。
+- **README.md**：启动方式新增「Web 浏览器模式」小节（`launch.sh web` / `launch.ps1 web`）。
+- **技术债务登记（review-findings.md rf-256~258）**：rf-256 `output_dir` 锁文件检测未实现（设计规定 server 启动时检测输出目录占用并警告，实现仅端口探测）；rf-257 Web 浏览器真机人工验收未做（冒烟为脚本化 HTTP 验证 9/9 过，缺 Chrome/Edge 真机走查含 375px）；rf-258 Web 前端 main.js 无自动化测试、冒烟脚本未沉淀。rf-next 256→259。
+- **门禁**：dev-verify 1917 passed + check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 一致。
+
 ### plan-8 阶段1：轻量 Web UI 骨架 + 上传→生成→预览全链路（2026-08-06）
 
 - **依赖接入**：`flask==3.1.2`（pyproject.toml + requirements.txt，锁 werkzeug 3.1.8 / itsdangerous 2.2.0 / click 8.4.2 / blinker 1.9.0）；`scripts/launch.sh` / `launch.ps1`（BOM 保留）增 `web` 入口参数，`launch.sh web` / `launch.ps1 web` 启动 Web 服务，其余参数透传。

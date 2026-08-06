@@ -18,6 +18,15 @@
 ./scripts/launch.sh     # Linux
 ```
 
+### Web 浏览器模式
+
+```bash
+./scripts/launch.sh web   # Linux/macOS，默认 http://127.0.0.1:8000
+.\scripts\launch.ps1 web  # Windows
+```
+
+浏览器上传持仓 Excel → 选择报告格式 → 实时查看生成进度 → 预览 HTML / 下载 Excel，无需终端交互（详见[快速开始](docs-stm/manuals/how-to-start.md)方式四）。
+
 ### CLI 命令行模式（定时任务驱动）
 
 ```bash
