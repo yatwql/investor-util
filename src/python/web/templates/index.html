@@ -22,7 +22,8 @@
           <span class="upload-icon" aria-hidden="true">⬆</span>
           <span>选择或拖拽 .xlsx 文件到此处</span>
         </label>
-        <input type="file" id="file-input" accept=".xlsx" hidden>
+        <!-- 视觉隐藏但保留可聚焦（键盘可达，对齐 a11y 要求） -->
+        <input type="file" id="file-input" accept=".xlsx" class="sr-only">
         <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
       </div>
     </section>

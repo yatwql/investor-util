@@ -26,6 +26,17 @@
 - **错误处理完善**：结果按 `exit_code` 映射展示（0 成功 / 1 部分失败黄色告警 + 通用建议 / 2 严重红色 + 提示看日志）；严重/执行失败时隐藏无效产物按钮（见 rf-254）；失败提供「重新生成」按钮（上传文件已消费，引导重新上传）；提交时 `FILE_EXPIRED` 自动重置流程提示重新上传。
 - **验证**：web 目录 64 用例全绿（新增索引回填/健康缓存 fresh/产物裁剪/布尔参数 10 用例）；dev-verify 1915 passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 通过。阶段3（体验打磨 + 文档）待做。
 
+### plan-8 阶段3：样式打磨 + 加载态/轮询节流 + 响应式 + 用户文档（2026-08-06）
+
+- **样式打磨（design-quality）**：上传区拖拽高亮（drag-over 抬起 + 聚焦态）、进度条渐变（主色→强调色）、卡片悬浮阴影层级、状态区双栏网格（数据源健康/历史记录，≤480px 单栏）、结果徽章语义着色（成功绿/部分黄/失败红）、`prefers-reduced-motion` 减动效适配。
+- **加载态与轮询节流**：提交后生成按钮禁用 + 文案切换（正在提交...→生成中...）；上传/轮询/结果请求全部 `AbortSignal.timeout` 兜底；`visibilitychange` 页面不可见时暂停轮询、恢复可见立即同步（省请求）。
+- **响应式（375px 移动端）**：表单纵向堆叠、按钮全宽、状态区单列、健康行 meta 截断不溢出。
+- **a11y**：文件输入从 `hidden` 改为 `sr-only` 视觉隐藏但保留可聚焦（键盘可达）；进度条 `role="progressbar"` + aria-valuenow；aria-live 播报。
+- **用户文档**：how-to-start.md 新增「方式四：Web 浏览器模式」（启动命令 / --host --port --config 参数 / 局域网访问无内建认证警示 / 使用要点）；faq.md 故障排查补 Web 模式 5 问（端口冲突/无法访问/进度卡住/文件过期/产物 404）；README.md 功能特性补 Web 模式提点。
+- **归档**：`plan-web-ui.md` + `plan-web-ui-implementation.md` 归档至 `docs-stm/archive/v0.10.x/web-ui/`（三阶段全部完成），plan.md / folders.md 引用同步更新。
+- **工具修复（rf-255）**：`check-doc-traces.py` 裸版本号模式把 Web 文档正文 IP 地址误判为版本号（`127.0.0.1:8000`→子串 `0.0.1`、`0.0.0.0`→`0.0.0`，5 处误报）——`_line_exempt()` 增加 IPv4（含端口）整行豁免，双用例回归。
+- **验证**：web 目录 64 用例全绿；dev-verify 1917 passed（新增 2 个工具回归用例）；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 通过。plan-8 三阶段全部完成。
+
 ### rf-113 Iter 7 浏览器人工验证进度更新（2026-08-06 另机 Windows）
 
 - **① 6 图渲染 + 交互 — ✅ 通过**：ok/degraded 场景 6/6 图渲染 + 全部图 tooltip 可用（含净值/回撤折线、雷达——rf-249 修复后悬停任意处即显示）；empty 场景 4/6 渲染 + tooltip（资产构成/雷达空数据占位，符合 §4.12 空值语义）；offline 场景引擎缺失守卫生效（R21）。Chrome + Firefox 实测，Edge 未测（同 Chromium 内核，S2 升级时补验）。

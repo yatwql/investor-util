@@ -15,10 +15,10 @@
 | **测试用例** | — | — | **5,196 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **13** | **5,757** | 含 README.md（181 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 12 | 5,576 | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **107** | **42,160** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |
+| **项目文档** | Markdown | **107** | **42,160** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 0 + archive 97 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 9 | 7,135 | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 99 | 34,442 | 各版本 changelog/plan/review-findings 等（95 md 34,442 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 2 | 509 | 当前迭代中的设计方案（plan-web-ui.md + plan-web-ui-implementation.md） |
+| ├ archive/ | 版本归档 | 101 | 34,951 | 各版本 changelog/plan/review-findings 等（97 md 34,951 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代中的设计方案（暂无，Web UI 设计文档随版本归档存放） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -707,9 +707,6 @@ investor-util/
 │   │   ├── technical.md              #     技术设计文档
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
-│   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
-│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（plan-8 轻量 Web UI / plan-10 日志可视化，未完成项）
-│   │   └── plan-web-ui-implementation.md #   plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
@@ -859,8 +856,11 @@ investor-util/
 │   │   │   │   └── plan-investment-iteration.md #     投资功能优化 21 轮迭代实施计划（每轮量化验收）
 │   │   │   ├── task-code-traces-gate/       #   任务编号标识符/注释门禁增强设计（rf-208）
 │   │   │   │   └── plan-task-code-traces-gate.md #     check-code-traces 扩展（IDENT 维度 + 系列代号）
-│   │   │   └── toc-llm-marking/             #   目录 LLM 章节标记设计（橙色加粗 + 🧠 图标）
-│   │   │       └── plan-toc-llm-marking.md  #     TOC/横向导航 LLM 章节标记（复用 --orange-text）
+│   │   │   ├── toc-llm-marking/             #   目录 LLM 章节标记设计（橙色加粗 + 🧠 图标）
+│   │   │   │   └── plan-toc-llm-marking.md  #     TOC/横向导航 LLM 章节标记（复用 --orange-text）
+│   │   │   └── web-ui/                      #   轻量 Web UI 实施归档（plan-8 三阶段完成）
+│   │   │       ├── plan-web-ui.md              #     轻量 Web UI 计划（plan-8 轻量 Web UI / plan-10 日志可视化）
+│   │   │       └── plan-web-ui-implementation.md #  plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

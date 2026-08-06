@@ -79,6 +79,15 @@
     // 状态区：数据源健康 + 历史运行记录（服务端各有短缓存，非频繁轮询）
     loadHealth(false);
     loadHistory();
+
+    // 轮询节流：页面不可见时暂停轮询，恢复可见立即同步一次（省流量/省请求）
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        stopPolling();
+      } else if (state.runId && els.progressSection && !els.progressSection.hidden) {
+        startPolling();
+      }
+    });
   }
 
   /* ── 响应信封解析 ──
@@ -145,6 +154,7 @@
       return;
     }
     els.generateBtn.disabled = true;
+    els.generateBtn.textContent = '正在提交...';
     els.generateError.textContent = '';
 
     var body = {
@@ -165,11 +175,13 @@
       .then(function (data) {
         state.runId = data.run_id;
         state.lastSeq = 0;
+        els.generateBtn.textContent = '生成中...';
         showProgress();
         startPolling();
       })
       .catch(function (err) {
         els.generateBtn.disabled = false;
+        els.generateBtn.textContent = '生成报告';
         if (err.errorCode === 'FILE_EXPIRED') {
           // 上传文件已过期/服务重启：重置流程引导重新上传
           resetFlow(err.message);
@@ -369,6 +381,7 @@
     els.generateError.textContent = '';
     // 文件已消费/失效，重新生成需重新上传（按钮禁用直至新上传）
     els.generateBtn.disabled = true;
+    els.generateBtn.textContent = '生成报告';
     els.fileInput.value = '';
     if (message) {
       setStatus(els.uploadStatus, message, 'busy');

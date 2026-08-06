@@ -14,6 +14,8 @@
 - [`plan-investment-features.md`](investment-features/plan-investment-features.md) — plan-17~24 投资分析功能优化设计（需求 × 数据源可行性 × 章节归并，§4 章节归并方案 + §4.4 架构合规自查表 + §5 实施次序）
 - [`plan-investment-iteration.md`](investment-features/plan-investment-iteration.md) — plan-17~24 迭代实施计划（21 轮 / 8 阶段，每轮量化验收 + 验收签字）
 - [`plan-task-code-traces-gate.md`](task-code-traces-gate/plan-task-code-traces-gate.md) — rf-208 任务编号标识符/注释门禁增强设计（check-code-traces.py 扩展 IDENT 维度 + 系列代号模式）
+- [`plan-web-ui.md`](web-ui/plan-web-ui.md) — plan-8 轻量 Web UI / plan-10 日志可视化计划（2026-08-06 三阶段完成后由 `docs-stm/plan/` 归档）
+- [`plan-web-ui-implementation.md`](web-ui/plan-web-ui-implementation.md) — plan-8 Web UI 实施拆分设计（评估/风险/约束符合性/模块拆分/安全/API/测试/阶段，2026-08-06 归档）
 
 ## v0.10.x 已完成项
 
@@ -94,5 +96,5 @@ HTML 报告左侧目录按「基础/基金深度/风险/历史/LLM」五组折�
 
 - plan-17~24 三组设计/实施文档 2026-08-05 由 `docs-stm/plan/` 移入本目录：plan-17~24 设计层 + 实施层 → `investment-features/`（`plan-investment-features.md` 设计 + `plan-investment-iteration.md` 21 轮实施，同属「投资功能优化 + 章节归并」主题，目录语义与内容相关）；rf-208 门禁增强设计 → `task-code-traces-gate/`。
 - **二次合并**：`docs-stm/managements/plan.md` 中 v0.10.x 已完成事项记录（P0 发布门禁两条、推荐实施顺序 ①~⑧ 表格、P1~P3 已完成项详细段落）整体迁入本文件「v0.10.x 已完成项」章节，原相对链接改指本目录内 `investment-features/` 兄弟路径。plan.md 仅保留未完成项与归档引用。
-- `docs-stm/plan/` 仅保留未完成项（plan-8 轻量 Web UI / plan-10 日志可视化，P4 实验功能）设计文档：`plan-web-ui.md` + `plan-web-ui-implementation.md`。
+- `docs-stm/plan/` 原保留未完成项（plan-8 轻量 Web UI / plan-10 日志可视化，P4 实验功能）设计文档：`plan-web-ui.md` + `plan-web-ui-implementation.md`。**plan-8 已于 2026-08-06 三阶段全部实施完成**，两份设计文档归档至 `docs-stm/archive/v0.10.x/web-ui/`（见本文件「v0.10.x 设计文档」索引）；plan.md 引用同步改指归档路径，`docs-stm/plan/` 当前为空目录。
 - 版本号：本归档涵盖已发布版本 v0.10.0 ~ v0.10.4（当前开发版本 v0.10.5-dev，归档时点为 2026-08-05），归档目录按版本段命名 v0.10.x。

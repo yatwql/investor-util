@@ -342,6 +342,30 @@ class TestDocTraceDetection:
         assert doc_traces._is_excluded("> 文档版本：0.9.10-dev") is True
         assert doc_traces._is_excluded("## 文档版本：v0.9.10") is True
 
+    def test_ip_address_exempted(self, doc_traces):
+        """IP 地址/端口（运行时访问语义）应豁免，防裸版本号模式误匹配。
+
+        回归场景：Web UI 文档正文含回环地址/全网监听地址，其内嵌的零开段
+        （形如点分十进制）被裸版本号（无 v 前缀）模式误判为版本号。
+        """
+        legit = [
+            "浏览器访问 http://127.0.0.1:8000",
+            "默认仅监听本机回环地址 127.0.0.1",
+            "监听地址 0.0.0.0",
+            "127.0.0.1:8080 已占用",
+        ]
+        for line in legit:
+            assert _doc_hit(doc_traces, line) is None, f"IP 地址被误伤: {line}"
+
+    def test_bare_version_still_flagged(self, doc_traces):
+        """裸版本号（无 v 前缀、零开头的点分数字）仍应检出——IP 豁免只针对 IP 地址形态，不削弱版本号检测。"""
+        flagged = [
+            "该功能在 0.9.10 引入",
+            "版本 0.10.2 起支持",
+        ]
+        for line in flagged:
+            assert _doc_hit(doc_traces, line) is not None, f"裸版本号未被检出: {line}"
+
     # ── 既有模式仍工作 ──
 
     def test_archive_reference(self, doc_traces):
@@ -396,10 +420,7 @@ class TestDocCipherExemptFiles:
             return doc_traces.scan_file(fpath, verbose=False, chapter_only=chapter_only)
 
     def _cipher_hits(self, doc_traces, name: str, content: str, chapter_only: bool) -> list:
-        return [
-            h for h in self._scan(doc_traces, name, content, chapter_only)
-            if h[1] == "CIPHER"
-        ]
+        return [h for h in self._scan(doc_traces, name, content, chapter_only) if h[1] == "CIPHER"]
 
     def test_regular_doc_flagged_both_modes(self, doc_traces):
         """普通文档（含 trace-exempt 的计划/变更记录）正文出现 C1~C20 一律检出。"""
@@ -835,8 +856,8 @@ class TestTaskCodeCommentPatterns:
         flagged = [
             "P1 优先级",
             "R17 兼容",
-            "C21 兼容",      # 超出 C1~C20 范围仍是字母+数字，属魔法编号
-            "AB14 兼容",     # 连续字母+数字（内嵌命中也是魔法编号）
+            "C21 兼容",  # 超出 C1~C20 范围仍是字母+数字，属魔法编号
+            "AB14 兼容",  # 连续字母+数字（内嵌命中也是魔法编号）
             "MC19 协议",
             "D8 数据",
             "HH6 组合",
@@ -904,8 +925,8 @@ class TestTaskCodeCommentPatterns:
     def test_arch_constraint_code_false_positives(self, code_traces):
         """非约束 C+数字不误伤：十六进制色值（#C00000）、标识符内嵌（x_c20_style）。"""
         legit = [
-            "#C00000",      # 十六进制色值（# 前缀且 5 位数字，MAGIC/CODE 均不命中）
-            "x_c20_style",   # 标识符内嵌（_c20 前为小写字母，MAGIC 需大写开头）
+            "#C00000",  # 十六进制色值（# 前缀且 5 位数字，MAGIC/CODE 均不命中）
+            "x_c20_style",  # 标识符内嵌（_c20 前为小写字母，MAGIC 需大写开头）
         ]
         for line in legit:
             assert _code_hit(code_traces, line) is None, f"非约束 C+数字被误伤: {line}"
