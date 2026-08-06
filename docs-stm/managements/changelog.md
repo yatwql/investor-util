@@ -6,14 +6,23 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 应用更名「投资复盘助手」（2026-08-07）
+
+- **`core/constants.py` `APP_NAME` 值由「个人投资分析报告生成小助手」改为「投资复盘助手」**：单一来源常量，一处修改即全链生效（TUI 首页 / 启动日志 / Web 首页 / HTML 报告 / Excel 报告 / What-if 报告 / cli/server 帮助描述 / test_runner 报告页脚）。
+- **程序内散落旧名全部改为引用 `APP_NAME` 常量**：`cli.py`/`server.py` argparse description、`scripts/test_runner.py` 报告页脚（补 sys.path 注入 + `from src.python.core.constants import APP_NAME`）、`test_tui_menu.py` 断言（`assertIn(APP_NAME, …)` 替代硬编码字符串）。
+- **文档全局替换**：README / CLAUDE.md / plan / testplan / requirements / technical / review-findings 标题与正文（R-TUI-01、rf-265 行）中的旧名统一改为「投资复盘助手」；`pyproject.toml` description 同步更新。
+- **说明**：报告输出文件名（`个人投资分析报告.xlsx/html`）是报告产品名，不属于应用名，**不随更名变动**。
+
+---
+
 ### 应用名称单一来源 + 各入口统一强调名称/版本（rf-265）（2026-08-06）
 
-- **`core/constants.py` 新增 `APP_NAME = "个人投资分析报告生成小助手"`**：应用名称单一来源常量（零依赖模块，任何模块可直接引用），替代 TUI 首页硬编码。
-- **应用启动日志**（`core/logger.py` `log_app_boundary`）：日志格式由「应用启动 | 版本 vX | 模式 | 主机 IP」改为「应用启动 | 个人投资分析报告生成小助手 vX | 模式 | 主机 IP」，CLI/TUI/Web 三入口启动/关闭日志统一强调名称+版本。
-- **TUI 首页**（`tui_menu.py` `print_header`）：标题头由硬编码字符串改为引用 `APP_NAME`（`个人投资分析报告生成小助手  v{APP_VERSION}` 不变）。
+- **`core/constants.py` 新增 `APP_NAME = "投资复盘助手"`**：应用名称单一来源常量（零依赖模块，任何模块可直接引用），替代 TUI 首页硬编码。
+- **应用启动日志**（`core/logger.py` `log_app_boundary`）：日志格式由「应用启动 | 版本 vX | 模式 | 主机 IP」改为「应用启动 | 投资复盘助手 vX | 模式 | 主机 IP」，CLI/TUI/Web 三入口启动/关闭日志统一强调名称+版本。
+- **TUI 首页**（`tui_menu.py` `print_header`）：标题头由硬编码字符串改为引用 `APP_NAME`（`投资复盘助手  v{APP_VERSION}` 不变）。
 - **Web 首页**（`web/handlers.py` `_handle_index` 传 `app_name` + `index.html`）：顶部 `<title>`/`<h1>` 改为应用名称，副标题前缀「v{app_version} ·」，浏览器标签页与页面头同时强调名称+版本。
 - **HTML 报告首页**（`report_template.html` + `whatif_template.html`）：主报告头部加副标题「由 {app_name} v{app_version} 生成」，页脚改为「由 {app_name} v{app_version} 生成 · 个人投资分析报告 | 生成时间」；调仓 What-if 报告页脚加同款生成声明。
-- **Excel 首页**（`report/summary.py` `_write_basic_info`）：投资分析汇总页签「统计时间/所属交易日」后新增「生成工具」行（`个人投资分析报告生成小助手 v0.10.12-dev`）。
+- **Excel 首页**（`report/summary.py` `_write_basic_info`）：投资分析汇总页签「统计时间/所属交易日」后新增「生成工具」行（`投资复盘助手 v0.10.12-dev`）。
 - **测试**：`test_summary.py` 新增 生成工具行 用例、`test_handlers.py` 新增 首页标题名称+版本 用例、`test_html_writer.py` 补 `app_name` 透传断言、`test_tui_menu.py` 补版本断言。
 - **门禁**：相关 212 用例全绿 + dev-verify + 4 checks `--ci` 全 [OK]。
 

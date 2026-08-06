@@ -30,6 +30,8 @@ _project_root = os.path.dirname(os.path.dirname(os.path.dirname(_src_dir)))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+from src.python.core.constants import APP_NAME
+
 logger = logging.getLogger("invest")
 
 # output_dir 写锁文件名（点文件：不参与 YYYYMMDD 归档扫描与历史枚举）
@@ -121,7 +123,7 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(
         prog="investor-util-web",
-        description="个人投资分析报告生成工具 — 轻量 Web 模式",
+        description=f"{APP_NAME} — 轻量 Web 模式",
         epilog="示例: python -m src.python.web --host 127.0.0.1 --port 8000",
     )
     parser.add_argument("--host", default="127.0.0.1", help="监听地址（默认 127.0.0.1；局域网访问显式用 0.0.0.0）")

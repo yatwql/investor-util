@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "investor-util"
 version = "0.10.12-dev"
-description = "个人投资者辅助工具：读取持仓 Excel，生成 Excel/HTML 投资分析报告"
+description = "投资复盘助手：读取持仓 Excel，生成 Excel/HTML 投资分析报告（含行情、穿透、基金业绩、财经新闻热点关联分析与 LLM 深度复盘）"
 requires-python = ">=3.11"
 dependencies = [
     "openpyxl==3.1.5",

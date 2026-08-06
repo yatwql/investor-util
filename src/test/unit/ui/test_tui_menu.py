@@ -133,11 +133,11 @@ class TestPrintFunctions(unittest.TestCase):
 
     def test_print_header(self) -> None:
         """标题头包含系统名称 + 版本号。"""
-        from src.python.core.constants import APP_VERSION
+        from src.python.core.constants import APP_NAME, APP_VERSION
 
         with patch("sys.stdout", new_callable=StringIO) as mock_out:
             print_header()
-            self.assertIn("个人投资分析报告生成小助手", mock_out.getvalue())
+            self.assertIn(APP_NAME, mock_out.getvalue())
             self.assertIn(f"v{APP_VERSION}", mock_out.getvalue())
 
 
