@@ -537,6 +537,26 @@ class TestWriteSummarySheet(unittest.TestCase):
         pairs = self._data_pairs(mocks["mock_data"])
         self._assert_pairs_contain(pairs, "资金加权收益率 (XIRR)", "未录入流水/无法计算")
 
+    def test_flow_unavailable_note_written(self):
+        """开关开启但无可用流水（available=False）时，XIRR 行下写合并警告说明行。"""
+        fund_flow = {
+            "available": False,
+            "xirr": {"rate": None, "ok": False, "message": "no flows"},
+            "cost_tiers": {"available": False, "per_code": {}},
+            "dividends": {"available": False, "per_code": {}},
+        }
+        mocks = self._call_summary_sheet(
+            self.ws, self.mv, self.cost, self.profit, self.today,
+            categories=self.categories,
+            fund_flow_data=fund_flow,
+        )
+        # 说明行走 ws.cell(value=...) 而非 write_data_row，故从 ws.cell 调用提取 value 断言
+        values = [c.kwargs.get("value") for c in self.ws.cell.call_args_list]
+        self.assertTrue(
+            any(isinstance(v, str) and "未录入交易/分红流水" in v and "无法计算" in v for v in values),
+            "应写入含「未录入交易/分红流水」与「无法计算」的说明单元格",
+        )
+
     def test_no_xirr_row_when_flow_disabled(self):
         """开关关闭（fund_flow_data=None）时盈亏汇总不含 XIRR 行，保持既有输出。"""
         mocks = self._call_summary_sheet(

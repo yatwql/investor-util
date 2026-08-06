@@ -6,6 +6,15 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 成本流水「已开启但无流水」说明补齐（Excel 对齐 HTML）（2026-08-07）
+
+- **`report/summary.py` `_write_profit_summary`**：当成本流水子模块开启（`fund_flow_data` 非 None）但无可流水数据（`available=False`）时，在「资金加权收益率 (XIRR)」行下追加合并警告说明行——「成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算。如需启用，请在持仓 Excel 中补充「交易流水」「分红流水」页签后重新生成」，复用既有「行情不可用」警告样式（黄底红字），解释原因 + 修复指引。
+- **`report_template.html`**：既有空态说明末尾追加同款修复指引，HTML/Excel 措辞对齐。
+- **测试**：`test_summary.py` 新增 `test_flow_unavailable_note_written`（经 `ws.cell` value 参数断言说明文案）。
+- **门禁**：dev-verify 1947 + 4 checks `--ci` 全 [OK]。
+
+---
+
 ### 应用更名补漏：启动横幅 + 模块 docstring 统一应用名（2026-08-07）
 
 - **启动脚本横幅**：`launch.sh` / `launch.ps1` 的「正在启动投资分析系统 …」改为「正在启动投资复盘助手 …」。shell 无法直接 import `constants.py`，按允许硬编码 + 注释注明与 `APP_NAME` 同步维护；`launch.ps1` 保持 UTF-8 with BOM + LF（git 历史即 BOM+LF，非本变更引入）。

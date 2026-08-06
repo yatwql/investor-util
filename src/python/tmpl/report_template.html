@@ -1020,7 +1020,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 {% endif %}
             </div>
             {% if flow_display and not flow_display.available %}
-            <div class="empty-note">成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算</div>
+            <div class="empty-note">成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算。如需启用，请在持仓 Excel 中补充「交易流水」「分红流水」页签后重新生成</div>
             {% endif %}
 
             <br>

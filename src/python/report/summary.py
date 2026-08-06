@@ -225,6 +225,20 @@ def _write_profit_summary(
             write_data_row(ws, row, ["资金加权收益率 (XIRR)", "未录入流水/无法计算"])
         row += 1
 
+        # 已开启但无可用流水：合并警告行说明原因 + 修复指引（对齐 HTML 空态说明）
+        if not fund_flow_data.get("available"):
+            _FLOW_FILL = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
+            _FLOW_FONT = Font(size=10, bold=True, color="CC0000")
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=_NCOLS)
+            _note_cell = ws.cell(
+                row=row,
+                column=1,
+                value="⚠ 成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算。如需启用，请在持仓 Excel 中补充「交易流水」「分红流水」页签后重新生成。",
+            )
+            _note_cell.font = _FLOW_FONT
+            _note_cell.fill = _FLOW_FILL
+            row += 1
+
     row = _write_blanks(ws, row)
     return row
 
