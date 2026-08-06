@@ -127,6 +127,20 @@ class TestBuildCoverageBlock(unittest.TestCase):
         block = build_coverage_block({"available": False, "items": [], "abnormal_count": 0, "summary": ""})
         self.assertFalse(block["has_data"])
 
+    def test_all_normal_zero_abnormal(self):
+        """全部正常 → has_data=True，abnormal_count=0。"""
+        block = build_coverage_block(_coverage_status([_coverage_item("600900", "长江电力", "ok")]))
+        self.assertTrue(block["has_data"])
+        self.assertEqual(block["abnormal_count"], 0)
+        self.assertEqual(len(block["items"]), 1)
+
+    def test_missing_items_key_tolerated(self):
+        """契约 available=True 但缺 items 键 → 容错为空列表（不抛异常）。"""
+        block = build_coverage_block({"available": True, "abnormal_count": 0, "summary": ""})
+        self.assertTrue(block["has_data"])
+        self.assertEqual(block["items"], [])
+        self.assertEqual(block["abnormal_count"], 0)
+
 
 class TestWriteDataQualitySheet(unittest.TestCase):
     """write_data_quality_sheet Excel 写入测试。"""

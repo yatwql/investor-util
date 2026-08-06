@@ -19,7 +19,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -52,7 +52,7 @@ def write_evolution_sheet(
     """
     _name = get_report_sheet_name("portfolio_evolution")
     _ncols = 8
-    write_title_row(ws, 1, f"{get_report_section_number('portfolio_evolution')}. {_name}", ncols=_ncols)
+    write_title_row(ws, 1, _name, ncols=_ncols)
 
     if not evolution_data or not evolution_data.get("available"):
         _write_placeholder(ws, STATUS_MESSAGES["evolution_unavailable"], row=3, max_cols=_ncols)

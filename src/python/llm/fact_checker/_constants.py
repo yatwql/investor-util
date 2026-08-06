@@ -141,6 +141,12 @@ _TRIM_TARGET_KEYWORDS: frozenset[str] = frozenset(
     ]
 )
 
+# 风险警戒阈值上下文——数值为风控警戒水平（如"已接近回调20%的警戒区域"），
+# 非收益率。警戒词只修饰阈值/警戒线/警戒位，不会出现在真实收益率描述中；
+# 因数值与"警戒"间可能间隔数词（"回调20%的警戒区域"），用更宽窗口单独检测
+# （见 _context._is_trim_target_context）。与"止盈约/减仓约"同属调仓/风控目标比例族。
+_WARNING_THRESHOLD_KEYWORDS: frozenset[str] = frozenset(["警戒"])
+
 # 假设/情景上下文——数值为假设场景而非实际收益率
 _HYPOTHETICAL_KEYWORDS = frozenset(
     [

@@ -19,7 +19,7 @@ import os
 import pytest
 
 from src.python.analysis.snapshot_diff import build_snapshot_diff
-from src.python.core.constants import HISTORY_SNAPSHOT_DIR
+import src.python.core.constants as core_constants
 from src.python.report.history_snapshot import save
 from src.python.schemas.history import AccountSnapshot, SnapshotData, SnapshotHolding
 
@@ -116,8 +116,8 @@ def test_zero_threshold_flags_all_holdings():
 
 def test_corrupt_snapshot_file_skipped():
     """目录含损坏 JSON 文件 → 自动跳过，仅统计有效快照。"""
-    os.makedirs(HISTORY_SNAPSHOT_DIR, exist_ok=True)
-    with open(os.path.join(HISTORY_SNAPSHOT_DIR, "snapshot_corrupt.json"), "w", encoding="utf-8") as f:
+    os.makedirs(core_constants.HISTORY_SNAPSHOT_DIR, exist_ok=True)
+    with open(os.path.join(core_constants.HISTORY_SNAPSHOT_DIR, "snapshot_corrupt.json"), "w", encoding="utf-8") as f:
         f.write("{ not valid json ")
     _save("20260701T090000", [_holding("A", "A基金", 5000, 4000)])
     data = build_snapshot_diff()

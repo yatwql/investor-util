@@ -156,6 +156,15 @@ def fetch_history_data(
         history_data 字典，获取失败或不可用时返回 None。
     """
     if not fetch:
+        # 醒目警示：history 关闭时不得静默跳过，否则下游只剩误导性的
+        # "尾部风险：无历史 bars" 占位警告，用户无法判断原因
+        logger.warning(
+            "组合历史走势获取已跳过（history off）：历史走势/回撤、尾部风险、累计收益率等章节将显示“数据不可用”占位"
+        )
+        reporter.warn(
+            "组合历史走势获取已跳过（history off）：历史走势/回撤章节与尾部风险指标将显示“数据不可用”占位；"
+            "如需完整历史分析请开启 history（CLI 使用 --history auto）"
+        )
         return None
 
     reporter.info("正在获取组合历史走势数据（as-if 模拟）...")

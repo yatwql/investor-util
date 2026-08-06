@@ -17,9 +17,9 @@
   "enable_news": true,      // 市场新闻
   "enable_history": true,   // 组合历史走势与回撤
   "enable_portfolio_evolution": true,  // 组合演进
-  "enable_action": false,     // 行动建议（默认关）
-  // 报告子模块开关（新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": false, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度 默认关
+  "enable_action": true,     // 行动建议（默认开，可在菜单 P 关闭）
+  // 报告子模块开关（数据质量仪表盘为长期可信核心默认开启；其余新增能力默认关闭，避免既有报告突然"变胖"）
+  "report_submodules": {"data_quality": true, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘默认开，其余默认关
   "comparison_candidates": [],  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合 candidate_compare）
 
   // ── C. 数据源与提供商 ──
@@ -168,14 +168,14 @@
 | `enable_news` | `true` | 市场新闻章节可见性，关闭后对应章节完全隐藏。与 `news_sources` 区别：前者控制章节在报告中的显示/隐藏，后者控制数据源启停 | 菜单 `P` |
 | `enable_history` | `true` | 历史走势章节可见性（组合历史走势与回撤，一章两区块：走势表 + 回撤矩阵 + 危机区间标注），关闭后对应章节完全隐藏。持仓快照不受影响，始终自动执行 | 菜单 `P` |
 | `enable_portfolio_evolution` | `true` | 组合演进章节可见性，关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
-| `enable_action` | `false` | 行动建议章节可见性，**默认关闭**，开启后显示 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。智囊团深度复盘同步显示「行动摘要」子块 | 手动编辑 |
-| `report_submodules.data_quality` | `false` | 数据质量仪表盘子模块开关，**默认关闭**。开启后报告展示数据质量仪表盘区块（数据覆盖/时效性/降级状态） | 手动编辑 |
-| `report_submodules.candidate_compare` | `false` | 「基金业绩分析」章候选基金比较子表开关，**默认关闭**。开启后报告在该章主业绩表下方展示候选基金横向比较表（候选来自 `comparison_candidates`，比较维度：收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度） | 手动编辑 |
+| `enable_action` | `true` | 行动建议章节可见性，**默认开启**，关闭后隐藏 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。智囊团深度复盘同步隐藏「行动摘要」子块 | 菜单 `P` |
+| `report_submodules.data_quality` | `true` | 数据质量仪表盘子模块开关，**默认开启**（长期可信核心）。开启后报告展示数据质量仪表盘区块（数据覆盖/时效性/降级状态） | 菜单 P → 6 |
+| `report_submodules.candidate_compare` | `false` | 「基金业绩分析」章候选基金比较子表开关，**默认关闭**。开启后报告在该章主业绩表下方展示候选基金横向比较表（候选来自 `comparison_candidates`，比较维度：收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度） | 菜单 P → 6 |
 | `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
-| `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 手动编辑 |
-| `report_submodules.market_temperature` | `false` | 「投资分析汇总」章市场温度刻度行开关，**默认关闭**。开启后该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明） | 手动编辑 |
-| `report_submodules.industry_beta` | `false` | 「风格与因子分析」章行业 Beta 子表开关，**默认关闭**。开启后该章展示行业 Beta 子表（组合对中证行业指数的回归敏感性：行业暴露占比 + β/t 值/显著性/相关性） | 手动编辑 |
-| `report_submodules.cost_lots` | `false` | 成本流水开关，**默认关闭**。持仓 Excel 含交易/分红流水时，开启后汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计 | 手动编辑 |
+| `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 菜单 P → 6 |
+| `report_submodules.market_temperature` | `false` | 「投资分析汇总」章市场温度刻度行开关，**默认关闭**。开启后该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明） | 菜单 P → 6 |
+| `report_submodules.industry_beta` | `false` | 「风格与因子分析」章行业 Beta 子表开关，**默认关闭**。开启后该章展示行业 Beta 子表（组合对中证行业指数的回归敏感性：行业暴露占比 + β/t 值/显著性/相关性） | 菜单 P → 6 |
+| `report_submodules.cost_lots` | `false` | 成本流水开关，**默认关闭**。持仓 Excel 含交易/分红流水时，开启后汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计 | 菜单 P → 6 |
 
 ---
 
@@ -189,7 +189,7 @@
 
 `enable_fund_deep_analysis`、`enable_news`、`enable_history`、`enable_portfolio_evolution`、`enable_action` 五个配置项控制报告按章节组显示或隐藏对应的章节。LLM 分析章节的可见性由 `llm_settings.json` 的 `enabled_llm` 字典控制。关闭某个章节组后，该组涉及的所有章节完全隐藏，不留下序号空缺，剩余章节按顺序重新编号。
 
-通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换基金深度分析/市场新闻/历史走势/组合演进 4 个章节组的可见性（`enable_action` 无菜单入口，需手动编辑 `config.json`）。
+通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换基金深度分析/市场新闻/历史走势/组合演进/行动建议 5 个章节组的可见性。
 
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
@@ -197,7 +197,7 @@
 | `enable_news` | `true` | `config.json` | 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
 | `enable_history` | `true` | `config.json` | 组合历史走势与回撤 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
 | `enable_portfolio_evolution` | `true` | `config.json` | 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
-| `enable_action` | `false` | `config.json` | 行动建议 | 行动建议章节组（再平衡信号/交易纪律/调仓建议/收益归因，纯算法） |
+| `enable_action` | `true` | `config.json` | 行动建议 | 行动建议章节组（再平衡信号/交易纪律/调仓建议/收益归因，纯算法） |
 | `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | 全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
@@ -402,7 +402,7 @@
 | 14 | `penetration_deep` | 穿透深度分析 | LLM |
 | 15 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
 | 16 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 17 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认关**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 17 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
 | 18 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
 | 19 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
@@ -425,6 +425,8 @@
 > 效果：基金经理/持仓关系矩阵/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
 > 空对象 `{}` 或缺失此字段时使用上述 19 项默认顺序。
+>
+> **本仓库配置**：`config.json` 的 `report_section_order` 已配置完整 18 项，将 `action`（行动建议）置于序号 10，其余模块依次顺延（`news_correlation`=11、`global_macro`=12、`expert_review`=13、`health_check`=14、`penetration_deep`=15、`portfolio_history_drawdown`=16、`portfolio_evolution`=17、`data_source_status`=18），与上表默认顺序仅差异在「行动建议提前至第 10 位」。清空为 `{}` 即恢复上表默认顺序（行动建议=17）。
 
 **实用示例** — 将组合历史走势与回撤提到前面，关注回撤风险：
 

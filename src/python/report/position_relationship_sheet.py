@@ -20,7 +20,7 @@ from typing import Any
 from openpyxl.styles import Font, PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -322,7 +322,7 @@ def write_position_relationship_sheet(
     """
     _name = get_report_sheet_name("position_relationship")
     ncols = _compute_ncols(overlap_result, correlation_data)
-    write_title_row(ws, 1, f"{get_report_section_number('position_relationship')}. {_name}", ncols=ncols)
+    write_title_row(ws, 1, _name, ncols=ncols)
 
     row = 2
     row = _write_overlap_block(ws, row, overlap_result, fund_names, ncols)

@@ -120,7 +120,12 @@ def _locate_subject_code(
         idx = sentence.find(name)
         if idx == -1:
             continue
-        dist = abs(idx - anchor)
+        # 最近边距离（与上方代码分支一致）：名称与数值相邻时（如"建设银行收益率
+        # +171.23%"）若只按起点距离 abs(idx-anchor)，名称起点距数值可能与其相邻
+        # 另一名称（如"工商银行"）平局，先迭代者胜出导致误路由（把 601939 的
+        # 171.23% 误判为 601398 的 70.2%）。改用最近边距离 min(abs(idx-anchor),
+        # abs(idx+len(name)-anchor))，紧邻数值的名称唯一胜出。
+        dist = min(abs(idx - anchor), abs(idx + len(name) - anchor))
         if best_dist is None or dist < best_dist:
             best_dist = dist
             best = code

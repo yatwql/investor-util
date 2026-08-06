@@ -1,6 +1,6 @@
 # 个人投资分析报告生成小助手 - 自我审查问题记录
-> 文档版本：0.10.8
-> **编号源**：`rf-next = 239`（新增问题取此编号，完成后更新为 +1；已用最大 rf-238，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.10.9
+> **编号源**：`rf-next = 248`（新增问题取此编号，完成后更新为 +1；已用最大 rf-247，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -34,21 +34,13 @@
 
 ## 已修复（摘要）
 
-> v0.10.7 发布时已修复项（rf-217/rf-229/rf-233）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
-
-| # | 文件 | 修复摘要 |
-|---|------|----------|
-| **rf-234** | `report/_report_generation.py`（1018→686） | facade 聚合门面拆分：后台健康检查→`_report_health.py`、轻量行情/注入/校验→`_report_helpers.py`、全量指标装配→`_full_risk_metrics.py`、图表数据集→`_chart_dataset_factory.py`；门面保留 both/full 双路径编排并 re-export 全部符号 |
-| **rf-235** | `report/html_writer.py`（934→660） | facade 聚合门面拆分：章节可见性/目录导航→`html_writer_nav.py`、数据契约展示映射→`html_writer_display.py`、JS 资产复制→`html_writer_assets.py`；门面保留 `write_html_report`/`_render_template` 并 re-export 符号 |
-| **rf-236** | `analysis/metrics.py`（880→225） | facade 聚合门面拆分：收益类指标→`metrics_returns.py`、风险类指标→`metrics_risk.py`；门面保留 `compute_all_metrics` 聚合入口 + `__all__` + 常量并 re-export 符号 |
-| **rf-237** | `report/orchestrator.py`（822→442） | facade 聚合门面拆分：风格因子/行业 Beta 计算族→`_report_factor_metrics.py`（持仓K线路由 + 因子回归 + 行业Beta）、市场温度/持仓相关性→`_report_aux_metrics.py`；门面保留 `generate_report`/`prepare_report_data`/`compute_valuation_data`（patch 依赖门面命名空间）并 re-export 符号 |
-| **rf-238** | `llm/generators_orchestrator.py`（808→698） | facade 聚合门面拆分：新闻关联责任单元（模块级结果缓存/闭包/安全直调）→`_llm_news_correlation.py`；门面保留缓存预检（`_compute_module_cache_info`/`_precheck_*`）/worker 分发（`_dispatch_llm_workers`/`_build_module_fns`）/主编排入口（`generate_all_llm`），re-export 子模块符号，mock patch 接线零改动 |
+> v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 
 ## 归档
 
 ### 归档档案
 
-- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.7（2026-08-04 ~ 2026-08-05，rf-204~rf-233）
+- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.8（2026-08-04 ~ 2026-08-06，rf-204~rf-247）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
 - [`archived_review-findings.0.7.x.md`](../archive/v0.7.x/archived_review-findings.0.7.x.md) 

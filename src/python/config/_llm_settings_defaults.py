@@ -15,6 +15,7 @@ from typing import Any
 _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     "max_retries": 2,
     "llm_max_concurrency": 3,
+    "llm_max_thinking_concurrency": 1,
     "enabled_llm": {
         "global_macro": True,
         "expert_review": True,
@@ -151,6 +152,7 @@ def _get_default_llm_settings_template() -> str:
     _section("全局设置")
     lines.append(f'  "max_retries": {d["max_retries"]},')
     lines.append(f'  "llm_max_concurrency": {d["llm_max_concurrency"]},')
+    lines.append(f'  "llm_max_thinking_concurrency": {d["llm_max_thinking_concurrency"]},')
 
     # ── 模块开关 ──
     _section("模块开关 — 控制各 LLM 分析功能的启用/停用")

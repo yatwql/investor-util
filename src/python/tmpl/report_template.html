@@ -336,7 +336,7 @@
         .toc-list a.toc-llm.active { color: var(--orange-text); border-left-color: var(--orange-text); }
         .section-nav a.toc-llm { color: var(--orange-text); font-weight: 600; }
         .toc-llm-icon { margin-left: 4px; vertical-align: middle; }
-        /* 分组折叠：按「基础/基金深度/风险/历史/LLM」五组（<details>/<summary> 原生折叠，键盘可达） */
+        /* 分组折叠：按「基础信息/基金深度分析/行动建议/历史/LLM」五组（<details>/<summary> 原生折叠，键盘可达） */
         .toc-group { border-bottom: 1px solid var(--toc-border); }
         .toc-group:last-child { border-bottom: none; }
         .toc-group-title {
@@ -1018,6 +1018,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
                 {% endif %}
             </div>
+            {% if flow_display and not flow_display.available %}
+            <div class="empty-note">成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算</div>
+            {% endif %}
 
             <br>
 
@@ -1390,7 +1393,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {% else %}
         <div class="empty-note">未检测到基金持仓</div>
         {% endif %}
-        {% if candidate_data and candidate_data.get("available") %}
+        {% if candidate_data %}
+        {% if candidate_data.get("available") %}
         <div class="block-title">候选基金比较（候选来自 config.comparison_candidates）</div>
         <div class="section-content" style="padding: 0;">
             <table>
@@ -1432,6 +1436,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {% endif %}
         {% if candidate_data.get("invalid") %}
         <div class="penetration-notes"><div>* 无效候选代码（忽略）: {{ candidate_data["invalid"] | join('、') }}。</div></div>
+        {% endif %}
+        {% else %}
+        <!-- 候选基金比较开关已开启但无有效候选（config.comparison_candidates 未配置或代码非法） -->
+        <div class="block-title">候选基金比较（候选来自 config.comparison_candidates）</div>
+        <div class="empty-section">📭 未配置候选基金（config.comparison_candidates 为空），无法输出候选基金比较。请在 config.json 中配置 comparison_candidates 后重新生成报告。{% if candidate_data.get("invalid") %}（无效候选代码已忽略：{{ candidate_data["invalid"] | join('、') }}）{% endif %}</div>
         {% endif %}
         {% endif %}
         <div class="penetration-notes">
@@ -2669,7 +2678,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <!-- 品种覆盖区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
             <div class="data-status" style="margin-top:12px;">
                 <div class="data-status-title">品种覆盖（逐品种数据状态）</div>
-                {% if position_status and position_status.available and position_status.items %}
+                {% if position_status and position_status.available and position_status.get("items") %}
                 <table>
                     <tr>
                         <th>代码</th>
@@ -2678,7 +2687,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <th>状态</th>
                         <th>原因</th>
                     </tr>
-                    {% for item in position_status.items %}
+                    {% for item in position_status.get("items") %}
                     <tr>
                         <td style="text-align:left;">{{ item.code }}</td>
                         <td style="text-align:left;">{{ item.name }}</td>
@@ -2701,7 +2710,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <!-- 可信度区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
             <div class="data-status" style="margin-top:12px;">
                 <div class="data-status-title">可信度（数据新鲜度 + 单日跳变）</div>
-                {% if data_freshness and data_freshness.available and data_freshness.items %}
+                {% if data_freshness and data_freshness.available and data_freshness.get("items") %}
                 <table>
                     <tr>
                         <th>代码</th>
@@ -2710,7 +2719,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <th>新鲜度</th>
                         <th>单日变化 / 跳变</th>
                     </tr>
-                    {% for item in data_freshness.items %}
+                    {% for item in data_freshness.get("items") %}
                     <tr>
                         <td style="text-align:left;">{{ item.code }}</td>
                         <td style="text-align:left;">{{ item.name }}</td>

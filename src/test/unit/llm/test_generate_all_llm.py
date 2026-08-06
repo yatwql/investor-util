@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import threading
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -438,3 +440,67 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
             "global_macro", "test-model", cached=True,
             thinking=False, endpoint="https://test.endpoint",
         )
+
+
+class TestThinkingConcurrencyLimit(unittest.TestCase):
+    """_dispatch_llm_workers — thinking 模块并发信号量限制。
+
+    health_check / expert_review 等开启 Extended Thinking 的模块并发涌向
+    DeepSeek 时偶发返回空 content（HTTP 200 + 空响应），整章降级占位。
+    约束：thinking 请求（thinking_enabled_{label}=true）受 BoundedSemaphore
+    限制，同时最多 llm_max_thinking_concurrency 个（默认 1）；非 thinking
+    模块不受限。
+    """
+
+    def test_thinking_modules_serialized_under_limit(self) -> None:
+        """两个 thinking 模块 → 信号量串行（时间不重叠）；非 thinking 不受限并发。"""
+        from src.python.llm.generators_orchestrator import _dispatch_llm_workers
+
+        _lock = threading.Lock()
+        _tracking = {"active": 0, "max_active": 0, "thinking_enter": []}
+
+        def _make_tracked_fn(name: str, is_thinking: bool):
+            def _fn(_client, _cfg):
+                with _lock:
+                    _tracking["active"] += 1
+                    _tracking["max_active"] = max(_tracking["max_active"], _tracking["active"])
+                    if is_thinking:
+                        _tracking["thinking_enter"].append(time.monotonic())
+                time.sleep(0.05)
+                with _lock:
+                    _tracking["active"] -= 1
+                return f"<p>{name}</p>", False
+
+            return _fn
+
+        fns = {
+            "health_check": _make_tracked_fn("health", True),
+            "expert_review": _make_tracked_fn("expert", True),
+            "global_macro": _make_tracked_fn("macro", False),
+        }
+        needs = {"health_check": True, "expert_review": True, "global_macro": True}
+        llm_config = {
+            "llm_max_concurrency": 3,
+            "llm_max_thinking_concurrency": 1,
+            "thinking_enabled_health_check": True,
+            "thinking_enabled_expert_review": True,
+            "thinking_enabled_global_macro": False,
+        }
+
+        with (
+            patch("src.python.llm.generators_orchestrator._build_module_fns", return_value=fns),
+            patch("src.python.llm.generators_orchestrator._build_competitive_context_block", return_value=""),
+            patch("src.python.llm.generators_orchestrator.make_http_client", return_value=MagicMock()),
+        ):
+            result = _dispatch_llm_workers(
+                needs, llm_config, False, {}, {}, 0, 0, 0, 0, 0, {}, None, None, None
+            )
+
+        # 三个模块全部完成
+        self.assertEqual(len(result), 3)
+        # thinking 两个模块进入时间不重叠（信号量串行，间隔 ≥ sleep 时长）
+        self.assertEqual(len(_tracking["thinking_enter"]), 2)
+        gap = abs(_tracking["thinking_enter"][0] - _tracking["thinking_enter"][1])
+        self.assertGreaterEqual(gap, 0.04, "thinking 模块应串行执行（并发限制未生效）")
+        # 总并发不超 llm_max_concurrency
+        self.assertLessEqual(_tracking["max_active"], 3)

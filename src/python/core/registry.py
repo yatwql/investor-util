@@ -294,6 +294,7 @@ def get_known_llm_settings_keys() -> set[str]:
         "enabled_llm",
         "pricing",
         "llm_max_concurrency",
+        "llm_max_thinking_concurrency",
         "news_correlation_top_n",
         "debate",
         "fact_check",
@@ -561,7 +562,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "evolution",
         "data_flag": "evolution_data",
     },
-    # ── action 类型（独立顶层开关 enable_action 控制，默认关） ──
+    # ── action 类型（独立顶层开关 enable_action 控制，默认开，菜单 P 可切换） ──
     # 行动建议：再平衡信号 + 交易纪律 + 调仓建议 + 收益归因（纯算法，basic/both/full 均可见）
     {
         "key": "action",

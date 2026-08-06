@@ -71,3 +71,4 @@
 
 - **缓存**：`data/cache/` JSON 文件，`src/python/cache.py` 统一管理，按前缀匹配 TTL
 - **LLM**：`src/python/llm/` 支持 `provider: "claude"`（含 DeepSeek Anthropic 兼容端点）和 `"openai"`
+- **编码/BOM（Windows 脚本）**：`scripts/*.ps1` 必须为 **UTF-8 with BOM + CRLF**（文件头 `EF BB BF`）。无 BOM 时 Windows PowerShell 5.1 按 ANSI/GBK 误读 UTF-8 中文注释，导致解析崩溃（"字符串缺少终止符"等）。**编辑含中文的 `.ps1` 后必须保持 BOM+CRLF 不变**，保存时确认编辑器编码为 UTF-8 且保留 BOM（规则已由 `.editorconfig` 声明，支持 EditorConfig 的编辑器会自动遵守）。必要时用 PowerShell 解析器验证：`[System.Management.Automation.Language.Parser]::ParseFile(<file>, [ref]$t, [ref]$e)` 无 errors。其余文本文件（源码/文档/CLAUDE.md）为 UTF-8 无 BOM。

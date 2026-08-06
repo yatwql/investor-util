@@ -57,8 +57,9 @@ def _build_parser() -> argparse.ArgumentParser:
     report_p.add_argument(
         "--history",
         choices=["auto", "off"],
-        default="off",
-        help="获取组合历史走势数据: auto=获取, off=跳过（默认; 仅 --type both/full 时有效）",
+        default=None,
+        help="获取组合历史走势数据: auto=获取, off=跳过（未指定时按配置 history.fetch_mode，默认 auto；"
+        "仅 --type both/full 时有效）",
     )
     report_p.add_argument("--force-llm", action="store_true", help="强制重新生成 LLM 内容（跳过缓存）")
     report_p.add_argument("--warm", action="store_true", help="预热新资产缓存（冷启动时使用）")
@@ -316,7 +317,8 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
         config=config,
         reporter=reporter,
         report_type=args.type,
-        fetch_history=(args.history == "auto"),
+        # None（未显式传 --history）→ generate_report 回退到配置层 history.fetch_mode 解析
+        fetch_history=args.history,
         force_llm=args.force_llm,
         output_dir=args.output,
         warm_cache=args.warm,

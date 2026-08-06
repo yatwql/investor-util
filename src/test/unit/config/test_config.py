@@ -872,17 +872,21 @@ class TestIsEnablePortfolioEvolution(unittest.TestCase):
 
 
 class TestIsEnableDataQuality(unittest.TestCase):
-    """数据质量仪表盘子模块开关（report_submodules.data_quality）。"""
+    """数据质量仪表盘子模块开关（report_submodules.data_quality，默认开）。"""
 
-    def test_default_false_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
-        self.assertFalse(cfg.is_enable_data_quality({}))
-        self.assertFalse(cfg.is_enable_data_quality({"enable_fund_deep_analysis": True}))
+    def test_default_true_when_missing(self):
+        """config 缺失或 report_submodules 缺失 → 默认开启（长期可信核心）。"""
+        self.assertTrue(cfg.is_enable_data_quality({}))
+        self.assertTrue(cfg.is_enable_data_quality({"enable_fund_deep_analysis": True}))
 
-    def test_false_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 关闭。"""
-        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": "not-a-dict"}))
-        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": None}))
+    def test_true_when_submodules_not_dict(self):
+        """report_submodules 非 dict → 默认开启。"""
+        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": "not-a-dict"}))
+        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": None}))
+
+    def test_default_config_says_enabled(self):
+        """默认配置模板 report_submodules.data_quality=True（默认开启的事实来源）。"""
+        self.assertTrue(cfg._config_defaults._DEFAULT_CONFIG["report_submodules"]["data_quality"])
 
     def test_false_when_disabled(self):
         """report_submodules.data_quality=false → 关闭。"""
@@ -956,6 +960,37 @@ class TestIsEnableCostLots(unittest.TestCase):
         )
 
 
+class TestIsEnableIndustryBeta(unittest.TestCase):
+    """行业 Beta 子模块开关（report_submodules.industry_beta）。"""
+
+    def test_default_false_when_missing(self):
+        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
+        self.assertFalse(cfg.is_enable_industry_beta({}))
+        self.assertFalse(cfg.is_enable_industry_beta({"enable_fund_deep_analysis": True}))
+
+    def test_false_when_submodules_not_dict(self):
+        """report_submodules 非 dict → 关闭。"""
+        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": "not-a-dict"}))
+        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": None}))
+
+    def test_false_when_disabled(self):
+        """report_submodules.industry_beta=false → 关闭。"""
+        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": False}}))
+
+    def test_true_when_enabled(self):
+        """report_submodules.industry_beta=true → 开启。"""
+        self.assertTrue(cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": True}}))
+
+    def test_independent_from_other_submodules(self):
+        """industry_beta 开关独立于同容器其他键。"""
+        self.assertTrue(
+            cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": True, "data_quality": False}})
+        )
+        self.assertFalse(
+            cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": False, "market_temperature": True}})
+        )
+
+
 class TestGetComparisonCandidates(unittest.TestCase):
     """get_comparison_candidates 候选代码列表访问器。"""
 
@@ -991,12 +1026,16 @@ class TestGetComparisonCandidates(unittest.TestCase):
 
 
 class TestIsEnableAction(unittest.TestCase):
-    """is_enable_action 访问器测试（行动建议独立章开关，默认关）。"""
+    """is_enable_action 访问器测试（行动建议独立章开关，默认开）。"""
 
-    def test_default_false_when_missing(self):
-        """config 缺失 enable_action → 返回 False（默认关，向后兼容）。"""
-        self.assertFalse(cfg.is_enable_action({}))
-        self.assertFalse(cfg.is_enable_action({"enable_fund_deep_analysis": True}))
+    def test_default_true_when_missing(self):
+        """config 缺失 enable_action → 返回 True（默认开）。"""
+        self.assertTrue(cfg.is_enable_action({}))
+        self.assertTrue(cfg.is_enable_action({"enable_fund_deep_analysis": True}))
+
+    def test_default_config_says_enabled(self):
+        """默认配置模板 enable_action=True（默认开启的事实来源）。"""
+        self.assertTrue(cfg._config_defaults._DEFAULT_CONFIG["enable_action"])
 
     def test_false_when_disabled(self):
         """显式 false → 返回 False。"""
@@ -1008,5 +1047,5 @@ class TestIsEnableAction(unittest.TestCase):
 
     def test_independent_from_portfolio_evolution(self):
         """行动建议开关独立于组合演进开关。"""
-        self.assertFalse(cfg.is_enable_action({"enable_portfolio_evolution": True}))
+        self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": True}))
         self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": False, "enable_action": True}))

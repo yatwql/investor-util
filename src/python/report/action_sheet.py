@@ -21,7 +21,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
     write_data_row,
@@ -78,7 +78,10 @@ def _write_sub_block(
     return row
 
 
-def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> None:
+def write_action_sheet(
+    ws: Worksheet,
+    action_data: dict[str, Any] | None,
+) -> None:
     """写入行动建议页签。
 
     Args:
@@ -87,7 +90,7 @@ def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> Non
     """
     _name = get_report_sheet_name("action")
     _ncols = 5
-    write_title_row(ws, 1, f"{get_report_section_number('action')}. {_name}", ncols=_ncols)
+    write_title_row(ws, 1, _name, ncols=_ncols)
     row = 2
 
     if not action_data or not action_data.get("available"):
@@ -117,7 +120,7 @@ def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> Non
             f"{s.get('threshold', 0) * 100:.0f}%",
             s.get("action", ""),
         ],
-        placeholder="组合内无品种超警戒线",
+        placeholder="组合分散度良好，无品种超警戒线",
     )
 
     # 子块 2：交易纪律（框架，后续轮次填充）
@@ -154,6 +157,7 @@ def write_action_sheet(ws: Worksheet, action_data: dict[str, Any] | None) -> Non
             s.get("fee", ""),
             s.get("cash_after", ""),
         ],
+        placeholder="无再平衡/纪律触发信号，暂无调仓建议",
     )
 
     # 子块 4：收益归因（TOP5 贡献占比，正负分列 + 净额合计）

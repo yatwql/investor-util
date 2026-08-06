@@ -61,6 +61,12 @@ class TestClassifyCodeFormat(unittest.TestCase):
         self.assertEqual(hs.classify_code_format("sh600900"), hs.STATUS_OK)
         self.assertEqual(hs.classify_code_format("sz000001"), hs.STATUS_OK)
 
+    def test_uppercase_prefix_stripped(self):
+        """大写 SH/SZ/BJ 前缀 → 小写归一后仍合法。"""
+        self.assertEqual(hs.classify_code_format("SH600900"), hs.STATUS_OK)
+        self.assertEqual(hs.classify_code_format("SZ000001"), hs.STATUS_OK)
+        self.assertEqual(hs.classify_code_format("BJ430047"), hs.STATUS_OK)
+
     def test_float_artifact_normalized(self):
         """Excel 浮点假象（"600900.0"）→ 归一为合法。"""
         self.assertEqual(hs.classify_code_format("600900.0"), hs.STATUS_OK)
@@ -116,6 +122,11 @@ class TestNamesMatch(unittest.TestCase):
         """任一侧名称为空 → 不判不匹配。"""
         self.assertTrue(hs.names_match("", "贵州茅台"))
         self.assertTrue(hs.names_match("贵州茅台", ""))
+
+    def test_single_char_not_substring_match(self):
+        """单字符简称 → 不判子串匹配（仅 ≥2 字符短名放宽）。"""
+        self.assertFalse(hs.names_match("茅", "贵州茅台"))
+        self.assertFalse(hs.names_match("贵", "贵州茅台"))
 
     def test_normalize_strips_case(self):
         """normalize_name 去空白并转小写。"""
@@ -199,6 +210,31 @@ class TestAnnotatePositionStatus(unittest.TestCase):
         self.assertEqual(items[1]["account"], "支付宝")
         self.assertEqual(items[1]["status"], hs.STATUS_NAV_MISSING)
 
+    def test_dict_detail_supported(self):
+        """dict 形式行情明细 → 状态标注一致（_detail_value 兼容 dict/对象）。"""
+        holdings = [_holding("长江电力", "600900")]
+        details = [{"code": "600900", "name": "长江电力", "price": 25.0, "price_type": "场内收盘价(T)"}]
+        items = hs.annotate_position_status(holdings, details)
+        self.assertEqual(items[0]["status"], hs.STATUS_OK)
+
+    def test_stock_no_quote_type_delisted(self):
+        """股票 price_type 为「暂无行情」→ 可能退市（非基金）。"""
+        holdings = [_holding("某退市股", "600999")]
+        details = [SimpleNamespace(code="600999", name="某退市股", price=10.0, price_type="暂无行情")]
+        items = hs.annotate_position_status(holdings, details)
+        self.assertEqual(items[0]["status"], hs.STATUS_POSSIBLY_DELISTED)
+        self.assertIn("退市", items[0]["reason"])
+
+    def test_duplicate_code_keeps_first_detail(self):
+        """同代码多条明细 → 取第一条（setdefault 语义），不被后续覆盖。"""
+        holdings = [_holding("长江电力", "600900")]
+        details = [
+            _detail("600900", "长江电力", 25.0),
+            _detail("600900", "名称不匹配的假数据", 25.0),
+        ]
+        items = hs.annotate_position_status(holdings, details)
+        self.assertEqual(items[0]["status"], hs.STATUS_OK)  # 若取第二条会判名称不匹配
+
     def test_behavioral_mixed_five(self):
         """行为断言：5 品种（1 格式错码、1 净值缺失）→ 状态清单准确标注全部异常。"""
         holdings = [
@@ -279,7 +315,7 @@ class TestReaderStatusAnnotation(unittest.TestCase):
 
             def iter_rows(self, min_row=1, max_row=None, values_only=False):
                 if min_row == 1 and not values_only:
-                    return iter([[ _Cell(v) for v in header]])
+                    return iter([[_Cell(v) for v in header]])
                 return iter(data)
 
         class _Wb:
@@ -309,7 +345,7 @@ class TestReaderStatusAnnotation(unittest.TestCase):
 
             def iter_rows(self, min_row=1, max_row=None, values_only=False):
                 if min_row == 1 and not values_only:
-                    return iter([[ _Cell(v) for v in header]])
+                    return iter([[_Cell(v) for v in header]])
                 return iter(data)
 
         class _Wb:

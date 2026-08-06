@@ -28,7 +28,7 @@ from src.test.unit.report.test_html_report_structure import (
     _render_template,
 )
 
-# 行动建议章节（type=action，enable_action 默认关）与智囊团深度复盘章节（行动摘要宿主）
+# 行动建议章节（type=action，enable_action 默认开）与智囊团深度复盘章节（行动摘要宿主）
 _ACTION_SECTION = {"key": "action", "name": "行动建议", "number": 17, "type": "action"}
 _EXPERT_REVIEW_SECTION = {"key": "expert_review", "name": "智囊团深度复盘", "number": 12, "type": "llm"}
 # global_macro 是 LLM 章节组的守卫章节（expert_review/health_check/penetration_deep

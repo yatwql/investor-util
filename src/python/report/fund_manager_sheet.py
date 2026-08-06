@@ -12,7 +12,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -70,7 +70,7 @@ def write_fund_manager_sheet(
         manager_data: detect_manager_changes() 的返回结果
     """
     _name = get_report_sheet_name("fund_manager")
-    write_title_row(ws, 1, f"{get_report_section_number('fund_manager')}. {_name}", ncols=_NCOLS)
+    write_title_row(ws, 1, _name, ncols=_NCOLS)
     write_header_row(ws, 2, _HEADERS)
 
     if not manager_data:

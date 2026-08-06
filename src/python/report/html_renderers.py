@@ -257,6 +257,10 @@ def _render_fund_performance_section(
     candidate_data = build_candidate_compare_data(holdings)
     if candidate_data is not None and candidate_data.get("available"):
         prog.ok("候选基金比较数据构建完成")
+    elif candidate_data is not None:
+        # 开关已开启但无有效候选（comparison_candidates 未配置或代码非法）：
+        # 报告渲染提示块，控制台同步给出原因（§1.4.5 数据降级治理）
+        prog.warn("候选基金比较：未配置候选基金（config.comparison_candidates 为空），无法输出比较子表")
     return perf_data, candidate_data
 
 

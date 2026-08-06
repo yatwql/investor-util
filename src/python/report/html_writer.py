@@ -256,7 +256,7 @@ def _render_template(
     valuation_enabled = valuation_data is not None
     penetration_display = _attach_valuation_to_penetration(penetration, valuation_data)
     market_temperature = _build_temperature_display(market_temperature_data)
-    # 目录分组导航：按「基础/基金深度/风险/历史/LLM」五组折叠（_sv_fn 闭包过滤不可见章节）
+    # 目录分组导航：按「基础信息/基金深度分析/行动建议/历史/LLM」五组折叠（_sv_fn 闭包过滤不可见章节）
     section_groups = _build_section_nav_groups(order, _sv_fn, section_numbers)
 
     return _ENV.get_template("report_template.html").render(
@@ -364,7 +364,7 @@ def write_html_report(
     enable_news: bool = True,
     enable_history: bool = True,
     enable_portfolio_evolution: bool = True,
-    enable_action: bool = False,  # 行动建议独立章（enable_action 默认关）
+    enable_action: bool = False,  # 行动建议独立章（enable_action config 默认开）
     enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
     position_status: dict | None = None,  # 品种覆盖诊断 position_status（品种覆盖区块）
     data_freshness: dict | None = None,  # 可信度摘要 data_freshness（可信度区块 + 头部摘要行）

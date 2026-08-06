@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.10.8
+> 文档版本：0.10.9
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -434,7 +434,7 @@ _LLM_CLIENT_SETTINGS = {
 
 每个工作线程创建**独立**的 `httpx.Client` 实例（`_make_runner` 闭包），避免全局共享连接池的线程安全问题。`h2` 包不可用时自动降级到 HTTP/1.1。
 
-`max_workers=llm_config.llm_max_concurrency`（config 默认 3）控制并行调用数。
+`max_workers=llm_config.llm_max_concurrency`（config 默认 3）控制并行调用数。开启 Extended Thinking 的模块（`thinking_enabled_{suffix}=true`）受独立信号量 `llm_max_thinking_concurrency`（默认 1）串行化约束——多 thinking 模块并发涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），该信号量从源头降低并发（thinking 请求同时最多 N 个），非 thinking 模块不受此限。
 
 ### 4.3 缓存预检查优化
 
@@ -1109,6 +1109,7 @@ reload_pricing() → 合并 llm_settings.json → pricing
   enabled_llm
   pricing
   llm_max_concurrency
+  llm_max_thinking_concurrency
   news_correlation_top_n
   debate
   fact_check

@@ -1145,9 +1145,9 @@ class TestHtmlTocSidebar(unittest.TestCase):
         self.assertIn("toc.js", str(self.soup), "模板应加载 toc.js")
 
     def test_toc_links_follow_grouped_order(self):
-        """目录项按「基础/基金深度/风险/历史/LLM」分组顺序，组内按报告序号升序。"""
+        """目录项按「基础信息/基金深度分析/行动建议/历史/LLM」分组顺序，组内按报告序号升序。"""
         links = self.soup.select("#toc-sidebar a[href^='#sec-']")
-        # 预期分组顺序（测试常量）：基础 → 基金深度 → 历史 → LLM（风险组空，跳过）
+        # 预期分组顺序（测试常量）：基础信息 → 基金深度分析 → 历史 → LLM（行动建议组空，跳过）
         expected_keys = [
             "summary",
             "market_value",
@@ -1264,7 +1264,7 @@ class TestSummaryDateTimeValueStyles(unittest.TestCase):
 
 
 class TestHtmlTocGroupedNav(unittest.TestCase):
-    """目录分组导航测试 — 「基础/基金深度/风险/历史/LLM」五组折叠。
+    """目录分组导航测试 — 「基础信息/基金深度分析/行动建议/历史/LLM」五组折叠。
 
     覆盖导航收尾验收：分组渲染 / 折叠交互 / 移动端不溢出 / 键盘可达。
     左侧目录（toc-sidebar）按五组折叠；窄屏横向 section-nav 保持扁平兜底。
@@ -1284,7 +1284,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
     def test_four_nonempty_group_details_rendered(self):
         """目录按五组渲染 <details class='toc-group'>，非空组默认 open（展开）。"""
         details = self.soup.select("#toc-sidebar details.toc-group")
-        # 测试常量下：基础/基金深度/历史/LLM 四组有章节，风险组空跳过
+        # 测试常量下：基础信息/基金深度分析/历史/LLM 四组有章节，行动建议组空跳过
         self.assertEqual(len(details), 4, f"应有 4 个非空分组，实际 {len(details)}")
         for d in details:
             self.assertIsNotNone(d.get("open"), "非空分组应默认展开（open 属性）")
@@ -1301,7 +1301,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
         self.assertEqual(
             _group_keys("basic"),
             ["summary", "market_value", "category", "penetration"],
-            "「基础」组应含 4 个基础章节",
+            "「基础信息」组应含 4 个基础章节",
         )
         self.assertEqual(
             _group_keys("fund_deep"),
@@ -1312,7 +1312,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 "fund_concentration",
                 "style_factor",
             ],
-            "「基金深度」组应含基金业绩 + 基金深度分析四章（含持仓关系矩阵/风格与因子分析）",
+            "「基金深度分析」组应含基金业绩 + 基金深度分析四章（含持仓关系矩阵/风格与因子分析）",
         )
         self.assertEqual(
             _group_keys("history"),
@@ -1358,7 +1358,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
         self.assertEqual(
             by_key["basic"],
             ["summary", "market_value", "category", "penetration", "data_source_status"],
-            "「基础」组应含数据源可用性矩阵",
+            "「基础信息」组应含数据源可用性矩阵",
         )
         self.assertEqual(
             by_key["fund_deep"],
@@ -1370,7 +1370,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 "style_factor",
             ],
         )
-        self.assertEqual(by_key["risk"], ["action"], "「风险」组应含行动建议章")
+        self.assertEqual(by_key["action"], ["action"], "「行动建议」组应含行动建议章")
         self.assertEqual(
             by_key["history"],
             ["portfolio_history_drawdown", "portfolio_evolution"],
@@ -1400,23 +1400,23 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             self.assertIsNotNone(d.get("open"), "渲染侧默认 open 保证全量可见")
 
     def test_empty_group_skipped(self):
-        """无可见章节的分组不渲染 <details>（测试常量下风险组空 → 跳过）。"""
+        """无可见章节的分组不渲染 <details>（测试常量下行动建议组空 → 跳过）。"""
         self.assertIsNone(
-            self.soup.select_one("#toc-sidebar details.toc-group[data-group='risk']"),
-            "风险组无可见章节时不应渲染 <details>",
+            self.soup.select_one("#toc-sidebar details.toc-group[data-group='action']"),
+            "行动建议组无可见章节时不应渲染 <details>",
         )
 
-    def test_action_visible_adds_risk_group(self):
-        """enable_action 开启（action 可见）时，「风险」组出现且含行动建议章。"""
+    def test_action_visible_adds_action_group(self):
+        """enable_action 开启（action 可见）时，「行动建议」组出现且含行动建议章。"""
         order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
         order.append({"key": "action", "name": "行动建议", "number": 17})
         numbers = {sec["key"]: sec["number"] for sec in order}
         sv_dict = {sec["key"]: True for sec in order}
         soup = _render_template(_build_minimal_render_data(order, numbers, sv_dict))
-        risk = soup.select_one("#toc-sidebar details.toc-group[data-group='risk']")
-        self.assertIsNotNone(risk, "enable_action 开启时「风险」组应渲染")
-        keys = [a.get("href", "").replace("#sec-", "") for a in risk.select("a[href^='#sec-']")]
-        self.assertEqual(keys, ["action"], "「风险」组应含行动建议章")
+        action = soup.select_one("#toc-sidebar details.toc-group[data-group='action']")
+        self.assertIsNotNone(action, "enable_action 开启时「行动建议」组应渲染")
+        keys = [a.get("href", "").replace("#sec-", "") for a in action.select("a[href^='#sec-']")]
+        self.assertEqual(keys, ["action"], "「行动建议」组应含行动建议章")
 
     # ── 键盘可达 ──────────────────────────────────────────────
 
@@ -1490,7 +1490,8 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             key = link.get("href", "").replace("#sec-", "")
             if key in _LLM_SUPPORTED_KEYS:
                 self.assertIn(
-                    "toc-llm", link.get("class", []),
+                    "toc-llm",
+                    link.get("class", []),
                     f"LLM 章节 {key} section-nav 应带 toc-llm class",
                 )
                 icon = link.select_one("span.toc-llm-icon")
@@ -1498,7 +1499,8 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 self.assertIn("🧠", icon.get_text(strip=True), f"LLM 章节 {key} 图标文本应为 🧠")
             else:
                 self.assertNotIn(
-                    "toc-llm", link.get("class", []),
+                    "toc-llm",
+                    link.get("class", []),
                     f"非 LLM 章节 {key} section-nav 不应带 toc-llm class",
                 )
                 self.assertIsNone(
@@ -1543,6 +1545,262 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
     def _template_css(self) -> str:
         """读取渲染后 HTML 中全部 <style> 文本。"""
         return "\n".join(s.get_text() for s in self.soup.select("style"))
+
+
+class TestHtmlDataQualityBlocks(unittest.TestCase):
+    """数据质量仪表盘「品种覆盖/可信度」区块渲染回归测试。
+
+    回归场景：`position_status.items` / `data_freshness.items` 若在模板中按属性访问，
+    会命中 dict 内置 `items` 方法（bound method）而非契约键 `"items"`——
+    `data_quality` 子模块开启且契约有数据时迭代 bound method 崩溃
+    （TypeError: 'builtin_function_or_method' object is not iterable）。
+    修复采用 `.get("items")`（与生产代码一致）。本类回归断言正常渲染不再崩溃且行内容正确。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+
+    def _render_dq(self, position_status, data_freshness, enabled=True):
+        render_data = _build_minimal_render_data(self.order, self.numbers, self.sv_dict)
+        # 数据质量区块嵌套于「数据源可用性矩阵」章节（registry 中 data_source_status
+        # 为 always 类型，number=18）——渲染需使其可见
+        render_data["section_visible_dict"] = {**self.sv_dict, "data_source_status": True}
+        render_data["section_numbers"] = {**self.numbers, "data_source_status": 18}
+        render_data["data_quality_enabled"] = enabled
+        render_data["position_status"] = position_status
+        render_data["data_freshness"] = data_freshness
+        return _render_template(render_data)
+
+    def test_position_status_items_rendered(self):
+        """品种覆盖区块 items 正常渲染（逐品种行输出，不崩溃）。"""
+        soup = self._render_dq(
+            {
+                "available": True,
+                "items": [
+                    {
+                        "code": "000001",
+                        "name": "平安银行",
+                        "account": "全部",
+                        "status": "ok",
+                        "status_label": "正常",
+                        "reason": "",
+                    },
+                    {
+                        "code": "510300",
+                        "name": "沪深300ETF",
+                        "account": "全部",
+                        "status": "stale",
+                        "status_label": "过期",
+                        "reason": "行情未更新",
+                    },
+                ],
+            },
+            None,
+        )
+        text = soup.get_text()
+        self.assertIn("品种覆盖（逐品种数据状态）", text)
+        self.assertIn("平安银行", text)
+        self.assertIn("沪深300ETF", text)
+        self.assertIn("过期", text)
+
+    def test_data_freshness_items_rendered(self):
+        """可信度区块 items 正常渲染（新鲜度 + 单日跳变列）。"""
+        soup = self._render_dq(
+            None,
+            {
+                "available": True,
+                "abnormal_count": 0,
+                "summary": "",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "ok",
+                        "freshness_label": "新鲜",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    },
+                    {
+                        "code": "601318",
+                        "name": "中国平安",
+                        "account": "全部",
+                        "freshness": "stale",
+                        "freshness_label": "过期",
+                        "change_pct": 23.4,
+                        "jump": True,
+                        "jump_label": "跳变",
+                    },
+                ],
+            },
+        )
+        text = soup.get_text()
+        self.assertIn("可信度（数据新鲜度 + 单日跳变）", text)
+        self.assertIn("贵州茅台", text)
+        self.assertIn("中国平安", text)
+        self.assertIn("跳变", text)
+
+    def test_empty_items_shows_fallback(self):
+        """available=True 但 items 为空列表 → 显示降级占位而非崩溃。"""
+        soup = self._render_dq(
+            {"available": True, "items": []},
+            {"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+        )
+        text = soup.get_text()
+        self.assertIn("未获取行情数据，品种覆盖无法判定", text)
+
+    def test_data_quality_disabled_skips_blocks(self):
+        """data_quality_enabled=False → 两区块均不渲染。"""
+        soup = self._render_dq(
+            {
+                "available": True,
+                "items": [
+                    {
+                        "code": "000001",
+                        "name": "平安银行",
+                        "account": "全部",
+                        "status": "ok",
+                        "status_label": "正常",
+                        "reason": "",
+                    }
+                ],
+            },
+            {
+                "available": True,
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "ok",
+                        "freshness_label": "新鲜",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    }
+                ],
+                "abnormal_count": 0,
+                "summary": "",
+            },
+            enabled=False,
+        )
+        text = soup.get_text()
+        self.assertNotIn("品种覆盖（逐品种数据状态）", text)
+        self.assertNotIn("可信度（数据新鲜度 + 单日跳变）", text)
+
+    def test_header_alert_shows_when_abnormal(self):
+        """数据异常时报告头部显示摘要告警行（summary + 详见第 N 章）。"""
+        soup = self._render_dq(
+            None,
+            {
+                "available": True,
+                "abnormal_count": 1,
+                "summary": "3 个品种，1 个数据异常",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "stale",
+                        "freshness_label": "过期",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    }
+                ],
+            },
+        )
+        alert = soup.select_one(".report-header .data-status")
+        self.assertIsNotNone(alert)
+        self.assertIn("3 个品种，1 个数据异常", alert.get_text())
+        self.assertIn("18", alert.get_text())  # 告警尾部引用 data_source_status 章节号
+
+    def test_header_alert_hidden_when_all_normal(self):
+        """无数据异常 → 头部不渲染摘要告警行。"""
+        soup = self._render_dq(
+            None,
+            {
+                "available": True,
+                "abnormal_count": 0,
+                "summary": "3 个品种，0 个数据异常",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "fresh",
+                        "freshness_label": "实时",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    }
+                ],
+            },
+        )
+        self.assertIsNone(soup.select_one(".report-header .data-status"))
+
+    def test_abnormal_rows_use_failed_class(self):
+        """异常品种行用 src-matrix-failed 高亮，正常行用 src-matrix-ok。"""
+        soup = self._render_dq(
+            {
+                "available": True,
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "status": "ok",
+                        "status_label": "正常",
+                        "reason": "",
+                    },
+                    {
+                        "code": "600900",
+                        "name": "长江电力",
+                        "account": "全部",
+                        "status": "name_mismatch",
+                        "status_label": "名称不匹配",
+                        "reason": "名称不一致",
+                    },
+                ],
+            },
+            {
+                "available": True,
+                "abnormal_count": 1,
+                "summary": "",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "fresh",
+                        "freshness_label": "实时",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    },
+                    {
+                        "code": "600900",
+                        "name": "长江电力",
+                        "account": "全部",
+                        "freshness": "stale",
+                        "freshness_label": "过期",
+                        "change_pct": 0.0,
+                        "jump": False,
+                        "jump_label": None,
+                    },
+                ],
+            },
+        )
+        ok_texts = " ".join(s.get_text() for s in soup.select(".src-matrix-ok"))
+        failed_texts = " ".join(s.get_text() for s in soup.select(".src-matrix-failed"))
+        self.assertIn("正常", ok_texts)
+        self.assertIn("实时", ok_texts)
+        self.assertIn("名称不匹配", failed_texts)
+        self.assertIn("过期", failed_texts)
 
 
 if __name__ == "__main__":

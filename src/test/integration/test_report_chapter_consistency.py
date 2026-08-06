@@ -156,7 +156,7 @@ class TestReportChapterConsistency(unittest.TestCase):
             include_news=True,
             llm_enabled_flag=True,
             enable_fund_deep_analysis=True,
-            enable_action=True,  # 行动建议默认关，全开场景显式开启
+            enable_action=True,  # 行动建议默认开，全开场景显式开启
             style_factor_data={},
             position_relationship_data={},
             evolution_data={},

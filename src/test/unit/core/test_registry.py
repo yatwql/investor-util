@@ -89,8 +89,8 @@ class TestRegistryCompleteness:
         assert "output_brief_global_macro" in keys
         # news_correlation 不应有 output_brief
         assert "output_brief_news_correlation" not in keys
-        # 确认总键数
-        assert len(keys) == 86, f"预期 86 个 LLM settings 键，实际 {len(keys)}"
+        # 确认总键数（87 = 既有 86 + llm_max_thinking_concurrency 全局 thinking 并发键）
+        assert len(keys) == 87, f"预期 87 个 LLM settings 键，实际 {len(keys)}"
 
     def test_each_llm_module_has_model_key(self):
         """每个 LLM 模块必须有 model_{suffix} 键。"""
@@ -273,7 +273,7 @@ class TestReportSectionDefault:
     def test_non_always_type_has_data_flag(self):
         """非 always/history/action 类型必须有 data_flag。
 
-        action 类型（行动建议）由独立顶层开关 enable_action 控制（默认关），
+        action 类型（行动建议）由独立顶层开关 enable_action 控制（默认开，菜单 P 可切换），
         数据可视为纯算法产出，无 data_flag 依赖（data_flag=None），
         available=False 时展示层写占位（§1.4.5 数据降级治理）。
         """
@@ -322,7 +322,7 @@ class TestReportSectionDefault:
         assert sec["number"] == 16
 
     def test_action_registered_as_action_type(self):
-        """action 应注册为 action 类型（独立顶层开关 enable_action 控制，默认关，
+        """action 应注册为 action 类型（独立顶层开关 enable_action 控制，默认开，
         data_flag=None，序号 17 紧跟 portfolio_evolution）。"""
         act = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "action"]
         assert len(act) == 1, "缺少 action 模块条目"

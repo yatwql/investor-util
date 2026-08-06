@@ -17,7 +17,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.excel_writer import (
     _write_placeholder,
     auto_width,
@@ -285,7 +285,7 @@ def write_portfolio_history_drawdown_sheet(
     """
     _name = get_report_sheet_name("portfolio_history_drawdown")
     ncols = _compute_ncols(history_data)
-    write_title_row(ws, 1, f"{get_report_section_number('portfolio_history_drawdown')}. {_name}", ncols=ncols)
+    write_title_row(ws, 1, _name, ncols=ncols)
 
     if not _data_ok(history_data):
         _write_placeholder(ws, "组合历史走势与回撤数据暂不可用（配置或网络原因）", max_cols=ncols)

@@ -20,7 +20,7 @@ from typing import Any
 from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
-from src.python.core.registry import get_report_section_number, get_report_sheet_name
+from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
     _write_placeholder,
@@ -340,7 +340,7 @@ def write_style_factor_sheet(
     """
     _name = get_report_sheet_name("style_factor")
     ncols = _compute_ncols(style_data, factor_exposure, industry_beta)
-    write_title_row(ws, 1, f"{get_report_section_number('style_factor')}. {_name}", ncols=ncols)
+    write_title_row(ws, 1, _name, ncols=ncols)
 
     row = 2
     row = _write_style_block(ws, row, style_data, ncols)

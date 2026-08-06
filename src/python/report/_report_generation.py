@@ -84,7 +84,7 @@ def _generate_full_html_report(
             品种覆盖区块数据源（开关关闭时忽略）。
         data_freshness: 可信度摘要 `data_freshness` 契约 dict，
             可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
-        enable_action: board 层 — 行动建议章节是否开启（默认关）。
+        enable_action: board 层 — 行动建议章节是否开启（config 默认开）。
         action_data: 行动建议单一数据源 `action_data` 契约 dict，
             行动建议板块 + 智囊团深度复盘行动摘要数据源（开关关闭时忽略）。
         fund_flow_data: 成本流水数据 dict

@@ -223,7 +223,7 @@ class TestCandidateCompareTemplate(unittest.TestCase):
         """从真实模板中提取候选基金比较区块（按 if/endif 配平截取）。"""
         with open(self.tmpl_path, encoding="utf-8") as f:
             html = f.read()
-        start_marker = '{% if candidate_data and candidate_data.get("available") %}'
+        start_marker = "{% if candidate_data %}"
         start = html.find(start_marker)
         self.assertNotEqual(start, -1, "模板中未找到候选基金比较区块起点")
         depth = 0
@@ -247,10 +247,24 @@ class TestCandidateCompareTemplate(unittest.TestCase):
         return tpl.render(candidate_data=candidate_data or {})
 
     def test_switch_off_no_candidate_block(self):
-        """开关默认关（candidate_data=None/不可用）→ 无比较子表。"""
-        for data in (None, {"available": False, "reason": "no_valid_candidate", "rows": []}):
-            html = self._render_candidate_block(data)
-            self.assertEqual(html.strip(), "", f"candidate_data={data!r} 不应渲染比较子表")
+        """开关默认关（candidate_data=None）→ 无比较子表、无提示。"""
+        html = self._render_candidate_block(None)
+        self.assertEqual(html.strip(), "", "candidate_data=None 不应渲染候选区块")
+
+    def test_switch_on_no_valid_candidate_shows_notice(self):
+        """开关开启但无有效候选（available=False）→ 渲染「未配置候选基金」提示。"""
+        data = {"available": False, "reason": "no_valid_candidate", "invalid": [], "rows": []}
+        html = self._render_candidate_block(data)
+        self.assertIn("候选基金比较", html)
+        self.assertIn("未配置候选基金", html)
+        self.assertIn("comparison_candidates", html)
+
+    def test_notice_lists_invalid_codes(self):
+        """无有效候选且存在非法代码 → 提示中列出被忽略代码。"""
+        data = {"available": False, "reason": "no_valid_candidate", "invalid": ["abc123"], "rows": []}
+        html = self._render_candidate_block(data)
+        self.assertIn("未配置候选基金", html)
+        self.assertIn("abc123", html)
 
     def test_available_renders_table_headers(self):
         """开启且 available → 渲染 11 列比较表。"""
@@ -499,6 +513,24 @@ class TestFundFlowTemplate(unittest.TestCase):
         self.assertIn("<th>资金加权成本</th>", self.html)
         self.assertIn("<th>成本分档</th>", self.html)
         self.assertIn("<th>分红累计</th>", self.html)
+
+    # ── 4. 开关开启但无流水 → 未录入流水提示 ──
+    def test_flow_available_false_shows_note(self):
+        """开关开启但无流水（available=False）→ 渲染「未录入流水」提示。"""
+        frag = self._extract_balanced(
+            '{% if flow_display and not flow_display.available %}'
+        )
+        flow = {"available": False, "xirr_rate": None, "cost_map": {}, "tier_map": {}, "div_map": {}}
+        html = self._render(frag, flow)
+        self.assertIn("成本流水子模块已开启", html)
+        self.assertIn("未录入交易/分红流水", html)
+
+    def test_flow_none_no_note(self):
+        """开关关闭（flow_display=None）→ 不渲染「未录入流水」提示。"""
+        frag = self._extract_balanced(
+            '{% if flow_display and not flow_display.available %}'
+        )
+        self.assertEqual(self._render(frag, None).strip(), "")
 
 
 class TestBuildFlowDisplay(unittest.TestCase):

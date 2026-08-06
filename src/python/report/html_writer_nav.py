@@ -1,7 +1,7 @@
 """HTML 报告章节可见性 + 目录分组导航子模块。
 
 承载报告章节的两层可见性计算（board 层开关 × data 层数据就绪）与
-「基础/基金深度/风险/历史/LLM」五组目录折叠导航构建。纯函数 + 模块常量，
+「基础信息/基金深度分析/行动建议/历史/LLM」五组目录折叠导航构建。纯函数 + 模块常量，
 无外部副作用。
 
 由 `html_writer.py`（聚合门面）re-export 对外提供。
@@ -12,33 +12,33 @@ from __future__ import annotations
 from typing import Any
 
 
-# ── HTML 目录分组导航（「基础/基金深度/风险/历史/LLM」五组，导航折叠收尾） ──
+# ── HTML 目录分组导航（「基础信息/基金深度分析/行动建议/历史/LLM」五组，导航折叠收尾） ──
 
 # 分组展示顺序（组名, 组 key），空组不渲染
 _NAV_GROUP_LABELS: list[tuple[str, str]] = [
-    ("基础", "basic"),
-    ("基金深度", "fund_deep"),
-    ("风险", "risk"),
+    ("基础信息", "basic"),
+    ("基金深度分析", "fund_deep"),
+    ("行动建议", "action"),
     ("历史", "history"),
     ("LLM", "llm"),
 ]
 
-# 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础」组）
+# 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础信息」组）
 _SECTION_NAV_GROUP_MAP: dict[str, str] = {
-    # 基础：汇总/明细/分类/穿透/数据源可用性
+    # 基础信息：汇总/明细/分类/穿透/数据源可用性
     "summary": "basic",
     "market_value": "basic",
     "category": "basic",
     "penetration": "basic",
     "data_source_status": "basic",
-    # 基金深度：基金业绩 + 基金深度分析系列章节
+    # 基金深度分析：基金业绩 + 基金深度分析系列章节
     "fund_performance": "fund_deep",
     "fund_manager": "fund_deep",
     "position_relationship": "fund_deep",
     "fund_concentration": "fund_deep",
     "style_factor": "fund_deep",
-    # 风险：行动建议（再平衡信号/交易纪律/调仓建议/收益归因）
-    "action": "risk",
+    # 行动建议：再平衡信号/交易纪律/调仓建议/收益归因（决策建议，非风险章节）
+    "action": "action",
     # 历史：组合历史走势与回撤 + 组合演进
     "portfolio_history_drawdown": "history",
     "portfolio_evolution": "history",
@@ -71,7 +71,7 @@ def _compute_section_visibility(
     enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
-    enable_action: bool = False,  # board 层：行动建议章节是否开启（默认关）
+    enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     style_factor_data: dict | None = None,  # data 层：风格与因子 dict（None=无数据，章节隐藏）
     position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 dict（相关性区块数据源）
@@ -92,7 +92,7 @@ def _compute_section_visibility(
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
-        "action": enable_action,  # ← board 层：行动建议（默认关）
+        "action": enable_action,  # ← board 层：行动建议（config 默认开）
         "llm": enable_llm,  # ← board 层
     }
     # data 层：各模块数据就绪状态
@@ -143,7 +143,7 @@ def _build_section_nav_groups(
     section_visible,
     section_numbers: dict,
 ) -> list[dict]:
-    """按「基础/基金深度/风险/历史/LLM」五组构建 HTML 目录分组导航数据。
+    """按「基础信息/基金深度分析/行动建议/历史/LLM」五组构建 HTML 目录分组导航数据。
 
     仅收录当前可见章节；组序固定为五组顺序，组内按报告序号升序。
     返回 [{key, name, sections: [{key, number, name, llm_supported}, ...]}, ...]；

@@ -314,17 +314,17 @@ def is_enable_portfolio_evolution(config: dict | None = None) -> bool:
 
 
 def is_enable_action(config: dict | None = None) -> bool:
-    """行动建议独立章（决策行动）是否启用。缺失时返回 False（默认关）。
+    """行动建议独立章（决策行动）是否启用。缺失时返回 True（默认开启）。
 
-    行动建议章是新增能力，默认关闭——不开时报告维持现状（无此章），
-    开启才出现行动板块与智囊团深度复盘行动摘要。
+    行动建议章（再平衡信号/交易纪律/调仓建议/收益归因）默认开启，
+    可在 TUI 菜单 `P` 关闭；关闭时不渲染章节且智囊团深度复盘隐藏行动摘要。
     """
     if config is None:
         config = get_config()
     val = config.get("enable_action")
     if val is None:
-        logger.debug("config.json 缺少 enable_action，使用默认值 false")
-        return False
+        logger.debug("config.json 缺少 enable_action，使用默认值 true")
+        return True
     return bool(val)
 
 
@@ -353,8 +353,8 @@ def is_enable_history(config: dict | None = None) -> bool:
 def is_enable_data_quality(config: dict | None = None) -> bool:
     """数据质量仪表盘子模块是否启用。
 
-    读取 `report_submodules.data_quality`，默认关（未开启时既有
-    「数据源可用性矩阵」输出不变）。
+    读取 `report_submodules.data_quality`，默认开（数据质量仪表盘为长期可信核心，
+    与 `enable_action` 缺省开启口径一致；显式关闭时「数据源可用性矩阵」保持既有输出）。
 
     Args:
         config: 完整配置字典，为 None 时读取全局配置
@@ -363,11 +363,11 @@ def is_enable_data_quality(config: dict | None = None) -> bool:
         config = get_config()
     submodules = config.get("report_submodules")
     if not isinstance(submodules, dict):
-        return False
+        return True
     val = submodules.get("data_quality")
     if val is None:
-        logger.debug("config.json 缺少 report_submodules.data_quality，使用默认值 false")
-        return False
+        logger.debug("config.json 缺少 report_submodules.data_quality，使用默认值 true")
+        return True
     return bool(val)
 
 
@@ -452,6 +452,26 @@ def is_enable_market_temperature(config: dict | None = None) -> bool:
     val = submodules.get("market_temperature")
     if val is None:
         logger.debug("config.json 缺少 report_submodules.market_temperature，使用默认值 false")
+        return False
+    return bool(val)
+
+
+def is_enable_industry_beta(config: dict | None = None) -> bool:
+    """行业 Beta 子模块开关（「风格与因子分析」章行业 Beta 子表）。
+
+    读取 `report_submodules.industry_beta`，默认关（未开启时该章既有输出不变）。
+
+    Args:
+        config: 完整配置字典，为 None 时读取全局配置
+    """
+    if config is None:
+        config = get_config()
+    submodules = config.get("report_submodules")
+    if not isinstance(submodules, dict):
+        return False
+    val = submodules.get("industry_beta")
+    if val is None:
+        logger.debug("config.json 缺少 report_submodules.industry_beta，使用默认值 false")
         return False
     return bool(val)
 

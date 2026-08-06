@@ -148,7 +148,7 @@ class TestExtractContentEdge(unittest.TestCase):
         self.assertNotIn("内容过滤", log_text, "不得误报为内容被过滤")
 
     def test_thinking_only_end_turn_returns_none(self) -> None:
-        """仅 thinking + stop_reason=end_turn → None（内容为空，可能被过滤）。"""
+        """仅 thinking + stop_reason=end_turn → None，日志带响应结构诊断（非武断归因）。"""
         from src.python.llm.api_base import _extract_content
 
         data = {
@@ -158,7 +158,28 @@ class TestExtractContentEdge(unittest.TestCase):
         with self.assertLogs("invest", level="WARNING") as cm:
             result = _extract_content(data)
         self.assertIsNone(result)
-        self.assertIn("空内容", "\n".join(cm.output))
+        log_text = "\n".join(cm.output)
+        # 日志须记录响应结构（stop_reason + block 类型）供定位，不再武断归因"内容被过滤"
+        self.assertIn("空 content", log_text)
+        self.assertIn("end_turn", log_text)
+        self.assertIn("thinking", log_text)
+        self.assertNotIn("内容过滤", log_text)
+
+    def test_empty_content_list_logs_diagnostics(self) -> None:
+        """content 空列表 + 无 stop_reason → None，日志含 block types / usage 诊断字段。"""
+        from src.python.llm.api_base import _extract_content
+
+        data = {
+            "content": [],
+            "usage": {"input_tokens": 100, "output_tokens": 0},
+        }
+        with self.assertLogs("invest", level="WARNING") as cm:
+            result = _extract_content(data)
+        self.assertIsNone(result)
+        log_text = "\n".join(cm.output)
+        self.assertIn("stop_reason", log_text)
+        self.assertIn("block types", log_text)
+        self.assertIn("usage", log_text)
 
     def test_thinking_plus_text_returns_text(self) -> None:
         """thinking + text 并存 → 正常返回 text（不回归）。"""

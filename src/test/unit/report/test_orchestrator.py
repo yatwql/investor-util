@@ -5,6 +5,8 @@ prepare_report_data mock 测试 + capture_snapshot。
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
@@ -19,6 +21,23 @@ from src.python.report.orchestrator import (
     generate_report,
     prepare_report_data,
 )
+
+
+def _real_reports_dir() -> str:
+    """项目真实 reports 目录（与 conftest 防线基准一致）。"""
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "reports"))
+
+
+def _snapshot_reports() -> frozenset:
+    """返回项目 reports/ 下所有文件相对路径（用于断言防线生效）。"""
+    root = _real_reports_dir()
+    if not os.path.isdir(root):
+        return frozenset()
+    result = set()
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for f in filenames:
+            result.add(os.path.relpath(os.path.join(dirpath, f), root))
+    return frozenset(result)
 
 
 class TestReportResult:
@@ -232,8 +251,17 @@ class TestGenerateReport:
     """generate_report 骨架测试。"""
 
     def test_generate_report_skeleton(self):
-        """骨架模式返回 ReportResult，不抛异常。"""
+        """骨架模式返回 ReportResult，不抛异常（输出隔离由 conftest 防线兜底）。
+
+        report_type 默认 basic（仅生成 Excel 不写 HTML），config 缺 output_dir
+        时输出回退到相对路径 "reports"，解析为项目真实 reports/ 目录；空持仓
+        会生成空页签 Excel 归档并覆盖根目录最新版，累积残留。conftest.
+        _isolate_report_output_dir 兜底把指向项目真实 reports/ 的输出重定向到
+        临时目录，此处用运行前后文件快照断言真实 reports/ 无新增，作永久回归
+        守护。
+        """
         mock_reporter = MagicMock()
+        before = _snapshot_reports()
         with (
             # 市场数据网络依赖：交易日历（akshare）+ A 股/美股指数（腾讯/新浪）
             patch("src.python.report.market_value._get_trading_calendar", return_value=set()),
@@ -247,6 +275,8 @@ class TestGenerateReport:
         assert isinstance(result, ReportResult)
         assert result.report_generated is True
         assert result.exit_code == 0
+        after = _snapshot_reports()
+        assert before == after, "报告输出未重定向，真实 reports/ 目录被测试污染"
 
     def test_generate_report_basic(self):
         """basic 路径直接调用 excel_generator.generate_excel_report 生成 Excel 报告。"""
@@ -440,6 +470,54 @@ class TestGenerateReport:
         assert result.report_generated is True
         # history 关闭时 fetch_history_data 不应被调用（即使 fetch_history=True）
         mock_hist.assert_not_called()
+
+    def test_generate_report_both_fetch_history_follows_config(self):
+        """both 路径未显式传 fetch_history 时按 config.history.fetch_mode 决定。
+
+        回归守护：CLI 未传 --history 时默认值不得硬编码，须回退到 config.json
+        的 history.fetch_mode（off → 不获取；auto/缺失 → 获取），验证
+        fetch_history_data 收到的 fetch 参数来自配置层。
+        """
+        mock_reporter = MagicMock()
+        mock_holdings = [MagicMock()]
+
+        def _run(config: dict) -> bool:
+            with (
+                patch("src.python.report.market_value._generate_details", return_value=[MagicMock()]),
+                patch("src.python.report._snapshot.capture_snapshot", return_value={}),
+                patch("src.python.report._snapshot.fetch_history_data") as mock_hist,
+                patch("src.python.report.html_writer.write_html_report"),
+                patch("src.python.report.excel_generator.generate_excel_report"),
+                patch("src.python.core.registry.get_report_section_order"),
+                patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),
+                patch("src.python.config.is_enable_news", return_value=False),
+                patch("src.python.config.is_enable_history", return_value=True),
+                # 可信度摘要：MagicMock detail 无真实价格/净值字段，须 mock
+                patch(
+                    "src.python.core.data_freshness.build_freshness_summary",
+                    return_value={"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+                ),
+                # 行动建议单一数据源：MagicMock detail 无真实市值字段，须 mock
+                patch(
+                    "src.python.analysis.action_advisor.build_action_data",
+                    return_value={"available": True, "summary": "", "rebalance_signals": []},
+                ),
+            ):
+                result = generate_report(
+                    holdings=mock_holdings,
+                    config=config,
+                    reporter=mock_reporter,
+                    report_type="both",
+                    fetch_history=None,
+                )
+            assert result.report_generated is True
+            mock_hist.assert_called_once()
+            return mock_hist.call_args.kwargs["fetch"]
+
+        assert _run({"output_dir": "reports", "history": {"fetch_mode": "off"}}) is False
+        assert _run({"output_dir": "reports", "history": {"fetch_mode": "auto"}}) is True
+        # fetch_mode 缺失 → 默认 auto（获取）
+        assert _run({"output_dir": "reports"}) is True
 
     def test_generate_report_both_no_prepare_report_data(self):
         """both 路径不应调用 prepare_report_data（无指数/穿透/分类）。"""
@@ -1674,7 +1752,11 @@ class TestFetchHistoryData:
         )
 
     def test_fetch_history_data_fetch_false(self):
-        """fetch=False 直接返回 None。"""
+        """fetch=False 返回 None 并醒目提示 history 已关闭（回归守护）。
+
+        防回退：history 关闭时必须通过 reporter.warn + logger 明确警示，
+        不得静默跳过——否则下游只剩误导性的"尾部风险：无历史 bars"占位警告。
+        """
         mock_reporter = MagicMock()
 
         result = fetch_history_data(
@@ -1685,6 +1767,11 @@ class TestFetchHistoryData:
         )
 
         assert result is None
+        mock_reporter.warn.assert_called_once()
+        # 警示文案须点明 history 关闭与后果，避免与"无历史 bars"混淆
+        warn_msg = mock_reporter.warn.call_args.args[0]
+        assert "history off" in warn_msg
+        assert "数据不可用" in warn_msg
 
     def test_fetch_history_data_unavailable(self):
         """status=unavailable 时返回数据但 reporter.warn 被调用。"""
