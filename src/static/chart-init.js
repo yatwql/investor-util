@@ -79,7 +79,7 @@
   function initPortfolioChart() {
     var ds = chartData['portfolio_line'];
     var el = document.getElementById('chart_portfolio_line');
-    if (!ds || !ds.labels || !ds.datasets || !el) {
+    if (!ds || !ds.labels || !ds.labels.length || !ds.datasets || !ds.datasets.length || !el) {
       return;
     }
     var datasets = ds.datasets.map(function (d) {
@@ -121,7 +121,7 @@
   function initDrawdownChart() {
     var ds = chartData['drawdown'];
     var el = document.getElementById('chart_drawdown');
-    if (!ds || !ds.labels || !ds.datasets || !el) {
+    if (!ds || !ds.labels || !ds.labels.length || !ds.datasets || !ds.datasets.length || !el) {
       return;
     }
     var datasets = ds.datasets.map(function (d) {
@@ -161,7 +161,7 @@
   function initCategoryDoughnut() {
     var ds = chartData['category_doughnut'];
     var el = document.getElementById('chart_category_doughnut');
-    if (!ds || !ds.labels || !ds.datasets || !el) {
+    if (!ds || !ds.labels || !ds.labels.length || !ds.datasets || !ds.datasets.length || !el) {
       return;
     }
     var d = ds.datasets[0];
@@ -181,7 +181,7 @@
   function initIndustryBar() {
     var ds = chartData['industry_bar'];
     var el = document.getElementById('chart_industry_bar');
-    if (!ds || !ds.labels || !ds.datasets || !el) {
+    if (!ds || !ds.labels || !ds.labels.length || !ds.datasets || !ds.datasets.length || !el) {
       return;
     }
     var d = ds.datasets[0];
@@ -215,7 +215,7 @@
   function initPenetrationBar() {
     var ds = chartData['penetration_bar'];
     var el = document.getElementById('chart_penetration_bar');
-    if (!ds || !ds.labels || !ds.datasets || !el) {
+    if (!ds || !ds.labels || !ds.labels.length || !ds.datasets || !ds.datasets.length || !el) {
       return;
     }
     var d = ds.datasets[0];
@@ -249,7 +249,7 @@
   function initRadarChart() {
     var ds = chartData['radar'];
     var el = document.getElementById('chart_radar');
-    if (!ds || !ds.labels || !ds.datasets || !el) {
+    if (!ds || !ds.labels || !ds.labels.length || !ds.datasets || !ds.datasets.length || !el) {
       return;
     }
     var d = ds.datasets[0];

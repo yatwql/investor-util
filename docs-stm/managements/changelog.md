@@ -6,6 +6,13 @@
 
 ## [0.10.10-dev] - 开发中（未发布）
 
+### chart-init.js 空数据图显式守卫（rf-251）
+
+- **缺陷**：6 个核心图 init 守卫 `!ds.labels` / `!ds.datasets` 不拦截空数组（空数组 truthy）。empty 场景（`labels:[]` + `datasets:[]`）下 `ds.datasets[0]` 为 undefined，访问 `.data` 抛 TypeError，**依赖外层 try/catch 降级**（图不渲染、console 出现 `[chart] 初始化失败` warn 噪声），而非显式空数据跳过。
+- **修复**：6 处守卫统一补 `!ds.labels.length` + `!ds.datasets.length`，空数据优雅 return，对齐生产模板 `{% if labels %}` 空值语义（§4.12），不再依赖异常降级。
+- **验证**：JS 语法校验通过；empty 场景资产构成/雷达空数据图不初始化、badge 占位行为不变。
+- **门禁**：dev-verify passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]。
+
 ### test-chart.html 自检图接管判定修正（rf-250）
 
 - **缺陷**：调试页自检用 `canvas._chart` 判定图是否被 Chart.js 接管——Chart.js v4 该内部句柄已不存在（canvas 上挂的是 `_chartjs`，用于管理事件监听器；`_chart` 是数据集/图表元素内部引用），判定恒为假。rf-249 修复后 ok/degraded 场景图真实渲染、tooltip 可用（用户 2026-08-06 实测），但自检仍误报「0/6 图已初始化」。
