@@ -1,5 +1,5 @@
 # 目录结构
-> 文档版本：0.10.11-dev
+> 文档版本：0.10.11
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -7,7 +7,7 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 242 | 57,894 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 16 个 `__init__.py`，含 `web/` 服务层） |
+| 主程序代码 | Python | 242 | 57,894 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
 | HTML 报告模板 | HTML | 4 | 3,770 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 辅助脚本 | Python | 18 | 6,790 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
 | **源代码合计** | — | **264** | **68,454** | 主程序 + 模板 + 脚本 |
@@ -390,6 +390,7 @@ investor-util/
 │       │   │   ├── test_cache_format.py     #   缓存格式测试
 │       │   │   ├── test_cache_edge.py       #   缓存边缘场景测试
 │       │   │   ├── test_circuit_breaker_gateway.py #   统一熔断网关（Provider/LLM/指标三路聚合）
+│       │   │   ├── test_check_sources.py    #   数据源健康检查（整体耗时预算/慢源超时/竞态兜底）
 │       │   │   ├── test_code_utils.py       #   证券代码工具测试
 │       │   │   ├── test_filesystem_edge.py  #   文件系统边缘场景
 │       │   │   ├── test_holding_status.py   #   品种级数据状态标注测试（品种覆盖诊断）
