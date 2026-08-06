@@ -6,6 +6,33 @@
 
 ## [0.10.11-dev] - 开发中（未发布）
 
+### 功能开关文档补全 + HTML 自包含文档强调（2026-08-06）
+
+- **`how-to-config.md` §M 功能开关表补全（rf-262 修复）**：原表只以通配符摘要列出分组（`llm_*`/`fund_deep_analysis_*`/`news_*`/`metrics_*`），未列具体 key，且 `fund_deep_analysis_*` 计数误写 4 项（实际 2 项）。已补全为**逐项列出全部 27 个开关**（key / 默认值 / 说明），与代码 `features.py::_FEATURE_FLAGS_DEFAULT` 一致。
+- **修正错误指引**：原「完整清单以 `data/config/features.json` 文件中的注释为准」——features.json 是唯一不支持注释的配置文件，指引错误。改为明确指向代码默认值 `features.py`，并强调该文件仅存覆写子集。
+- **`faq.md` 报告理解新增问答（HTML 单文件自包含强调）**：明确默认自包含（8 个 JS 资产内嵌）、关闭 `enable_interactive_charts` 后的例外（不自包含、须与 JS 同目录）、以及给用户的明确结论；同步修正故障排查中过时说法「报告不含 JavaScript，纯 CSS 渲染」。
+- **门禁**：check-doc-traces / check-task-numbering `--ci` 全 [OK]。
+
+---
+
+### Web 状态区系统信息展示（版本 / 本机 IP / LLM 状态）（2026-08-06）
+
+- **`web/handlers.py` `_build_system_info`（新增）**：rf-260 修复——Web 页面缺 TUI 状态面板信息面（程序版本号 / 是否开启 LLM / endpoint / 熔断 / 模型路由 / 本机 IP）。组装 `app_version`（`APP_VERSION`）+ `machine_ip`（`_get_machine_ip`）+ `llm` 结构化状态：flat 单 provider 模式展示 provider / model / endpoint（`_simplify_endpoint` 取主机名）/ 熔断（`get_circuit_status`）/ 模型路由（隐藏辩论三模块，模块级 `model_{sfx}` 覆盖展示）；credentials_ref 多链模式展示策略（priority 等）与 provider 清单（名称/后端/模型/优先级/熔断，model/endpoint 经 credentials_ref 解析到 `_llm_credentials`）及模块偏好；未配置或读取异常（try/except 兜底）→ `configured=False`，页面显示「未配置」，不阻断渲染。
+- **`web/templates/index.html` / `web/static/style.css`**：状态区 grid 由两列改三列（`.status-grid-3`），新增「系统信息」卡片（程序版本 `#system-version` / 本机 IP `#system-ip` / LLM 状态 `#system-llm`），配置时展开 `#system-llm-detail`（multi 列 provider、flat 列熔断+模型路由）；补 `.system-list`/`.system-row`/`.system-llm-on/off`/`.system-llm-detail` 等样式，375px 响应式折叠为单列。
+- **验证**：`TestSystemInfo` 7 用例（unit_web 标记：默认未配置 / flat 缺 api_key 兜底 / flat 详情与模块覆盖 / 多链凭据解析与偏好 / 读配置异常兜底 / 索引页渲染未配置态）全绿；`test_handlers.py` 全文件 31 用例通过。
+- **门禁**：dev-verify passed（1938 passed, 0 failed）+ check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 一致。
+
+---
+
+### HTML 报告单文件自包含（2026-08-06）
+
+- **`html_writer_assets.py` `_inline_js_assets`（新增）**：rf-259 修复——报告 HTML 下载/移动后图表失效。报告模板以相对路径外链 8 个 Chart.js 本地 bundle 资产（chart.min.js/chart-print.js/chart-config.js/chart-export.js/chart-common.js/chart-init.js/toc.js/theme.js），`_copy_js_assets` 仅复制到输出目录，HTML 移到其他目录（Web 下载到本地、单发移动端浏览）后 JS 找不到 → 资产穿透 TOP10 等图表空白。`_inline_js_assets` 在内嵌保存前读取资产内容，将 head 区外链标签移除并按 bundle 依赖顺序追加为行内 `<script>` 到 `</body>` 前——复刻 defer 外链时序（DOM 解析完后、DOMContentLoaded 事件前按序执行），保证 chart-init.js 能取到已解析的 canvas/chart-data、toc.js/theme.js/whatif 初始化等内部注册 DOMContentLoaded 的脚本仍触发；报告 HTML 单文件完全自包含。
+- **`html_writer.py` / `whatif_writer.py`**：`enable_interactive_charts` 开启时保存前调用 `_inline_js_assets(html)`；`_copy_js_assets` 保留作兜底（资产缺失/读取失败/含 `</script` 序列时该资产外链标签保留原位，松散文件仍可加载）。
+- **验证**：`TestInlineJsAssets` 6 用例（unit_report 标记：全部外链替换+追加到 body 前、defer 时序位置、bundle 依赖序 common→init、非 bundle 外链保留、缺失/含 `</script` 跳过）全绿；无头 Chrome 差分实测——内嵌版在无 JS 目录 canvas `width=1048`（Chart.js 实例化，图表渲染），外链版停默认 `500×320`（空白），修复前两者像素一致、修复后内嵌版彩色像素 347682→398536（ratio 1.15）。
+- **门禁**：dev-verify passed + check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 一致。
+
+---
+
 ### Web 冒烟脚本沉淀（2026-08-06）
 
 - **`scripts/smoke-web.py`（新增）**：rf-258 修复——将 Web 模式验收的临时冒烟脚本沉淀为可复跑脚本。前端零 node 工具链约束下不引入 Playwright，改为 Flask `test_client` 进程内 HTTP 全链路验证（不占端口、不发真实网络），覆盖 9/9 断言：页面渲染 / 健康检查 / 上传校验（合法 xlsx→file_id、伪装坏文件→400）/ 运行 202 / 进度事件 / 完成态 / 产物下载 / 历史记录 / 产物目录隔离。管线（fake executor）、健康探测（`run_health_checks` mock）、历史记录（`load_history` mock）全 mock；output_dir 与上传目录临时目录隔离。独立运行 `.venv/bin/python scripts/smoke-web.py`，全部通过退出码 0，失败退出码 2。

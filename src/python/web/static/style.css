@@ -387,6 +387,62 @@ select:focus,
   font-size: 0.85rem;
 }
 
+/* ── 系统信息卡片（版本 / IP / LLM 状态，三列状态区） ── */
+.status-grid-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.system-list {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.system-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.system-row:last-child {
+  border-bottom: none;
+}
+
+.system-row dt {
+  color: var(--color-text-secondary);
+  min-width: 3.2em;
+  flex-shrink: 0;
+}
+
+.system-row dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+.system-llm-on {
+  color: var(--color-ok);
+  font-weight: 600;
+}
+
+.system-llm-off {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+.system-llm-hint {
+  display: block;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.system-llm-detail {
+  margin-top: 6px;
+  border-top: 1px dashed var(--color-border);
+  padding-top: 6px;
+}
+
 .health-row {
   display: flex;
   align-items: baseline;
@@ -518,7 +574,8 @@ select:focus,
     text-align: center;
   }
 
-  .status-grid {
+  .status-grid,
+  .status-grid-3 {
     grid-template-columns: 1fr;
   }
 

@@ -33,7 +33,7 @@ from src.python.report.progress import ProgressReporter, SilentProgressReporter
 from src.python.report.summary import build_index_data_status
 
 # ── 子模块 re-export ────────────────────────────────────
-from src.python.report.html_writer_assets import _copy_js_assets  # noqa: F401
+from src.python.report.html_writer_assets import _copy_js_assets, _inline_js_assets  # noqa: F401
 from src.python.report.html_writer_display import (  # noqa: F401
     _attach_valuation_to_penetration,
     _build_flow_display,
@@ -636,6 +636,9 @@ def write_html_report(
 
     if enable_interactive_charts:
         _copy_js_assets(output_dir)
+        # 内嵌 Chart.js 资产 → HTML 单文件自包含（下载/移动/单发移动端浏览
+        # 不再依赖同目录松散 JS；_copy_js_assets 仍保留以兼容既有产物布局）
+        html = _inline_js_assets(html)
 
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
 

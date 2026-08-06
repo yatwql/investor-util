@@ -192,45 +192,78 @@ def run_health_checks(max_timeout: float = 15.0) -> list[dict]:
     """执行全量数据源健康检查，返回结构化结果列表。
 
     Args:
-        max_timeout: HTTP 超时秒数（自动检查时可用较短值如 8s）
+        max_timeout: 整体耗时预算秒数。超过预算即返回已收集的部分结果，
+            未完成项标记为"超时"——防止自动检查被慢速/挂起的数据源拖住
+            （如 Web 健康接口需在前端 15s abort 前返回，传较短预算 8~12s）。
 
     Returns:
         列表，每项含：name / label / ok / latency_ms / message
     """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import threading
 
     results: list[dict] = []
+    results_lock = threading.Lock()
 
-    def _run_check(name: str, label: str, check_fn: Callable) -> dict:
-        symbol, elapsed, msg = check_fn()
-        return {
-            "name": name,
-            "label": label,
-            "ok": symbol == _OK,
-            "latency_ms": round(elapsed, 1),
-            "message": msg,
-        }
+    def _run_check(name: str, label: str, check_fn: Callable) -> None:
+        try:
+            symbol, elapsed, msg = check_fn()
+            item = {
+                "name": name,
+                "label": label,
+                "ok": symbol == _OK,
+                "latency_ms": round(elapsed, 1),
+                "message": msg,
+            }
+        except Exception as e:
+            item = {
+                "name": name,
+                "label": label,
+                "ok": False,
+                "latency_ms": 0.0,
+                "message": str(e)[:60],
+            }
+        with results_lock:
+            results.append(item)
 
-    with ThreadPoolExecutor(max_workers=min(len(_checks), 8)) as pool:
-        fut_to_name = {pool.submit(_run_check, name, label, fn): name for name, label, fn in _checks}
-        for fut in as_completed(fut_to_name):
-            try:
-                results.append(fut.result())
-            except Exception as e:
-                name = fut_to_name[fut]
+    threads = []
+    for name, label, fn in _checks:
+        # daemon=True：预算超时后主流程可立即返回，挂起线程在后台收尾不阻塞进程退出
+        t = threading.Thread(target=_run_check, args=(name, label, fn), daemon=True)
+        t.start()
+        threads.append(t)
+
+    # 等待全部完成，但受 max_timeout 整体预算约束（预算耗尽即返回部分结果）
+    deadline = time.perf_counter() + max_timeout
+    for t in threads:
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            break
+        t.join(timeout=max(0.0, remaining))
+
+    # 预算内未完成的检查项标记为超时（持锁原子判空，避免与迟到的真实结果重复）
+    with results_lock:
+        done = {r["name"] for r in results}
+        for name, label, _fn in _checks:
+            if name not in done:
                 results.append(
                     {
                         "name": name,
-                        "label": "",
+                        "label": label,
                         "ok": False,
                         "latency_ms": 0.0,
-                        "message": str(e)[:60],
+                        "message": f"超时（预算 {max_timeout:g}s）",
                     }
                 )
 
+    # 预算边界竞态兜底：同 name 保留真实结果，弃"超时"占位
+    by_name: dict[str, dict] = {}
+    for r in results:
+        cur = by_name.get(r["name"])
+        if cur is None or (cur["message"].startswith("超时") and not r["message"].startswith("超时")):
+            by_name[r["name"]] = r
+
     # 按 name 排序保证输出稳定
-    results.sort(key=lambda r: r["name"])
-    return results
+    return sorted(by_name.values(), key=lambda r: r["name"])
 
 
 def run_check_sources() -> None:

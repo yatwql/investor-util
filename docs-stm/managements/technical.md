@@ -522,7 +522,7 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 |:-----|:-----|:---------|
 | `web/server.py` | 启动入口 | sys.path 注入、参数解析、端口检测、output_dir 写锁检测、init_config、app.run |
 | `web/app.py` | Flask 应用工厂 | 统一 JSON 错误处理、request_id 访问日志、注入 run_manager |
-| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康；`_run_generation` 复刻 CLI 报告流程 |
+| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 组装状态区系统信息（版本/本机 IP/LLM 状态，对齐 TUI） |
 | `web/upload.py` | 上传安全 | 服务端 uuid 重命名、扩展名白名单、大小上限、PK 魔数、原子落盘、TTL 清理 |
 | `web/runs.py` | 运行管理 | RunManager 单 worker 串行队列 + run 状态/事件注册表（Lock 保护） |
 | `web/progress.py` | 进度报告 | WebProgressReporter（ProgressReporter 子类 → RunState 事件缓冲） |
@@ -1493,6 +1493,7 @@ verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使�
 | 模板 | `tmpl/report_template.html` | Jinja2 模板 + 宏 |
 | 环境 | `html_jinja_env.py` | Jinja2 环境初始化、过滤器注册 |
 | 保存 | `html_save.py` | HTML 文件写入 |
+| JS 资产 | `html_writer_assets.py` | `_copy_js_assets` 复制 Chart.js bundle 到输出目录；`_inline_js_assets` 保存前内嵌为行内脚本（单文件自包含） |
 
 **渲染期通信**（C14 约束）：所有渲染期数据（`section_visible_dict` 等）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict 作为跨函数通信渠道。单次会话中不变的数据（如 `_ENV` 过滤器注册）不受此限。
 
@@ -2330,7 +2331,7 @@ analysis/whatif_backtest.py      # 纯计算（不联网、不 import report/）
 report/portfolio_history.py      # as-if 时序引擎：close×shares 综合走势（days 已透传到持仓历史链路）
 report/whatif_operations.py      # 共享层编排：build_whatif_data → build_whatif_backtest（联网取历史）→ 写报告
 report/whatif_sheet.py           # Excel 3 页签 + 条件第 4 页签「时序回测」（指定生效日时）
-report/whatif_writer.py          # 编排双产物：调仓模拟.xlsx / .html（最新版固定名 + 日期目录归档版）+ Chart.js 资产复制
+report/whatif_writer.py          # 编排双产物：调仓模拟.xlsx / .html（最新版固定名 + 日期目录归档版）+ Chart.js 资产复制/内嵌（单文件自包含）
 cli/cli.py                       # whatif 子命令：--candidate 必填、--base 可选（缺省用 config 持仓）、--effective-date 可选（只传参）
 tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互提示（_prompt_effective_date，只传参、不校验）
 ```
@@ -2357,7 +2358,7 @@ tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互�
 
 **打印协调**：暗色下 `@media print` 的 CSS 覆盖只影响非 canvas 部分，canvas 像素仍暗色。`theme.js` 用**捕获阶段**监听 `beforeprint`（`addEventListener('beforeprint', fn, true)`——捕获先于 chart-print.js 的冒泡阶段快照执行）：若暗色，先移除 `data-theme` + 重读变量 + 遍历图表 `update()`（同步渲染浅色像素）→ chart-print.js 快照抓到浅色；`afterprint` 捕获阶段恢复暗色 + 重绘（`restoreAfterPrint` 标志记录状态）。`@media print` 同时隐藏 `.theme-toggle-btn`。
 
-**JS 资产**：`html_writer.py::_JS_ASSETS` 增加 `theme.js`（第 8 个本地 bundle），whatif 复用同一复制函数；两模板均在 `toc.js` 之后以 `defer` 加载（DOMContentLoaded 前执行，无 FOUC）。
+**JS 资产**：`html_writer.py::_JS_ASSETS` 增加 `theme.js`（第 8 个本地 bundle），whatif 复用同一复制函数；两模板均在 `toc.js` 之后以 `defer` 加载（DOMContentLoaded 前执行，无 FOUC）。**单文件自包含**：`html_writer_assets.py::_inline_js_assets` 在保存前把 8 个资产内容内嵌——移除 head 区 `<script defer src="X.js">` 外链标签，按 bundle 依赖顺序追加为行内 `<script>` 到 `</body>` 前（复刻 defer 时序：DOM 解析完后、DOMContentLoaded 前按序执行，chart-init 能取到已解析 canvas/chart-data、toc.js/theme.js 内部 DOMContentLoaded 监听仍触发），报告 HTML 单文件完全自包含（Web 下载到其他目录/单发移动端浏览不依赖同目录松散 JS）；`_copy_js_assets` 保留作兜底（资产缺失/读取失败/含 `</script` 序列时该资产外链标签保留原位，松散文件仍可加载）。
 
 **架构约束遵从**：
 

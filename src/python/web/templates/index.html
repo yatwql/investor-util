@@ -73,10 +73,64 @@
       <div id="result-footer" class="result-footer"></div>
     </section>
 
-    <!-- ⑤ 状态区：数据源健康 + 历史运行记录 -->
+    <!-- ⑤ 状态区：系统信息 + 数据源健康 + 历史运行记录 -->
     <section class="card" aria-labelledby="status-heading">
       <h2 id="status-heading">运行状态</h2>
-      <div class="status-grid">
+      <div class="status-grid status-grid-3">
+        <div class="status-card">
+          <h3>系统信息</h3>
+          <dl class="system-list">
+            <div class="system-row">
+              <dt>程序版本</dt>
+              <dd id="system-version">{{ system_info.app_version }}</dd>
+            </div>
+            <div class="system-row">
+              <dt>本机 IP</dt>
+              <dd id="system-ip">{{ system_info.machine_ip }}</dd>
+            </div>
+            <div class="system-row">
+              <dt>LLM</dt>
+              <dd id="system-llm">
+                {% if not system_info.llm.configured %}
+                <span class="system-llm-off">未配置</span>
+                <span class="system-llm-hint">配置 llm_key.json 或 llm_providers.json 后生效</span>
+                {% elif system_info.llm.mode == "multi" %}
+                <span class="system-llm-on">已配置</span>
+                <span class="system-llm-hint">策略：{{ system_info.llm.strategy }} · {{ system_info.llm.providers|length }} 个 provider</span>
+                {% else %}
+                <span class="system-llm-on">已配置</span>
+                <span class="system-llm-hint">provider={{ system_info.llm.provider }} · model={{ system_info.llm.model }} · endpoint={{ system_info.llm.endpoint_display }}</span>
+                {% endif %}
+              </dd>
+            </div>
+          </dl>
+          {% if system_info.llm.configured %}
+          <div id="system-llm-detail" class="system-llm-detail">
+            {% if system_info.llm.mode == "multi" %}
+            {% for p in system_info.llm.providers %}
+            <div class="health-row">
+              <span class="health-name">{{ p.name }}（{{ p.backend }}）</span>
+              <span class="health-status">{{ p.circuit }}</span>
+              <span class="health-meta">模型 {{ p.model }} · 优先级 {{ p.priority }}</span>
+            </div>
+            {% endfor %}
+            {% if system_info.llm.preferred %}
+            <p class="system-llm-hint">模块偏好：{{ system_info.llm.preferred|join(" / ") }}</p>
+            {% endif %}
+            {% else %}
+            {% if system_info.llm.circuit != "—" %}
+            <div class="health-row">
+              <span class="health-name">熔断状态</span>
+              <span class="health-status">{{ system_info.llm.circuit }}</span>
+            </div>
+            {% endif %}
+            {% if system_info.llm.route %}
+            <p class="system-llm-hint">模型路由：{{ system_info.llm.route|join(" / ") }}</p>
+            {% endif %}
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
         <div class="status-card">
           <h3>数据源健康</h3>
           <div id="health-list" class="health-list" aria-live="polite">

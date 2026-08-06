@@ -21,7 +21,7 @@ from src.python.config import _config_defaults
 from src.python.config._core import invalidate_config_cache
 from src.python.report.orchestrator import ReportResult
 from src.python.web.app import create_app
-from src.python.web.handlers import _build_artifacts, _health_cache, _run_generation
+from src.python.web.handlers import _build_artifacts, _build_system_info, _health_cache, _run_generation
 from src.python.web.runs import RunManager, RunState
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_web]
@@ -365,3 +365,154 @@ class TestCreateRunBoolParams:
         file_id = resp.get_json()["data"]["file_id"]
         resp = app_client.post("/api/runs", json={"file_id": file_id, "report_type": "basic", "force_llm": True})
         assert resp.status_code == 202, resp.get_json()
+
+
+class TestSystemInfo:
+    """状态区系统信息组装（_build_system_info：版本 / IP / LLM 状态，对齐 TUI）。
+
+    覆盖：默认未配置 / flat 单 provider / credentials_ref 多链 / 读配置异常兜底 /
+    索引页渲染（未配置时显示「未配置」）。
+    """
+
+    @staticmethod
+    def _patch_llm(monkeypatch, config=None, module_names=None, circuit="正常"):
+        monkeypatch.setattr("src.python.config.get_llm_config", lambda: config)
+        monkeypatch.setattr(
+            "src.python.core.registry.get_llm_module_names",
+            lambda: module_names or {},
+        )
+        monkeypatch.setattr("src.python.llm.circuit_breaker.get_circuit_status", lambda ep: circuit)
+        monkeypatch.setattr("src.python.core.logger._get_machine_ip", lambda: "192.168.1.100")
+        return config
+
+    def test_default_no_llm_config(self, monkeypatch):
+        """未配置（get_llm_config 返回 None）：configured=False，版本/IP 正常。"""
+        self._patch_llm(monkeypatch, config=None)
+        info = _build_system_info()
+        assert info["app_version"]
+        assert info["machine_ip"] == "192.168.1.100"
+        assert info["llm"] == {"configured": False}
+
+    def test_default_llm_key_missing(self, monkeypatch):
+        """flat 模式但缺 api_key/provider：按未配置兜底。"""
+        self._patch_llm(monkeypatch, config={"model": "claude-sonnet-4-6"})
+        info = _build_system_info()
+        assert info["llm"] == {"configured": False}
+
+    def test_flat_mode_details(self, monkeypatch):
+        """flat 单 provider：provider/model/endpoint（简化主机名）/熔断/模型路由。"""
+        self._patch_llm(
+            monkeypatch,
+            config={
+                "api_key": "sk-test",
+                "provider": "claude",
+                "model": "claude-sonnet-4-6",
+                "endpoint": "https://api.anthropic.com/v1/messages",
+            },
+            module_names={
+                "global_macro": "全球政经局势",
+                "expert_review": "智囊团深度复盘",
+                "debate_pro": "正反辩论",
+                "debate_con": "正反辩论反方",
+                "debate_synthesis": "辩论总结",
+            },
+        )
+        info = _build_system_info()
+        llm = info["llm"]
+        assert llm["configured"] is True
+        assert llm["mode"] == "flat"
+        assert llm["provider"] == "claude"
+        assert llm["model"] == "claude-sonnet-4-6"
+        assert llm["endpoint_display"] == "api.anthropic.com"
+        assert llm["circuit"] == "正常"
+        # 模型路由：隐藏后缀（辩论三模块）不展示；未配置的模块级 model 回退到全局 model
+        assert "全球政经局势=claude-sonnet-4-6" in llm["route"]
+        assert "智囊团深度复盘=claude-sonnet-4-6" in llm["route"]
+        assert not any("正反辩论" in r for r in llm["route"])
+
+    def test_flat_mode_module_model_override(self, monkeypatch):
+        """模块级 model_{sfx} 覆盖全局 model（路由展示各模块实际模型）。"""
+        self._patch_llm(
+            monkeypatch,
+            config={
+                "api_key": "sk-test",
+                "provider": "claude",
+                "model": "claude-sonnet-4-6",
+                "endpoint": "默认",
+                "model_expert_review": "claude-opus-4-8",
+            },
+            module_names={"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘"},
+        )
+        info = _build_system_info()
+        llm = info["llm"]
+        # endpoint == "默认" → 熔断状态不查询（"—"）
+        assert llm["endpoint_display"] == "默认"
+        assert llm["circuit"] == "—"
+        assert "全球政经局势=claude-sonnet-4-6" in llm["route"]
+        assert "智囊团深度复盘=claude-opus-4-8" in llm["route"]
+
+    def test_multi_chain_mode(self, monkeypatch):
+        """credentials_ref 多链：策略 / provider 清单（含凭据引用解析）/ 模块偏好。"""
+        self._patch_llm(
+            monkeypatch,
+            config={
+                "_strategy": "priority",
+                "_provider_list": [
+                    {
+                        "name": "主链",
+                        "provider": "claude",
+                        "model": "claude-sonnet-4-6",
+                        "endpoint": "https://api.anthropic.com/v1/messages",
+                        "priority": 1,
+                    },
+                    {"name": "备链", "provider": "openai", "credentials_ref": "ref-openai", "priority": 2},
+                ],
+                "_llm_credentials": {
+                    "ref-openai": {"model": "gpt-4o", "endpoint": "https://api.openai.com/v1"},
+                },
+                "_preferred_providers": {"global_macro": "主链", "expert_review": "备链"},
+            },
+            module_names={"global_macro": "全球政经局势", "expert_review": "智囊团深度复盘"},
+        )
+        info = _build_system_info()
+        llm = info["llm"]
+        assert llm["configured"] is True
+        assert llm["mode"] == "multi"
+        assert llm["strategy"] == "优先级排序"
+        assert len(llm["providers"]) == 2
+        # 主链：直接来自 provider_list
+        assert llm["providers"][0]["name"] == "主链"
+        assert llm["providers"][0]["backend"] == "claude"
+        assert llm["providers"][0]["endpoint_display"] == "api.anthropic.com"
+        assert llm["providers"][0]["priority"] == "1"
+        # 备链：model/endpoint 从 credentials_ref 解析
+        assert llm["providers"][1]["name"] == "备链"
+        assert llm["providers"][1]["model"] == "gpt-4o"
+        assert llm["providers"][1]["endpoint_display"] == "api.openai.com"
+        assert llm["providers"][1]["priority"] == "2"
+        assert llm["providers"][1]["circuit"] == "正常"
+        # 模块偏好：模块语义名 → provider 名
+        assert llm["preferred"] == ["全球政经局势 → 主链", "智囊团深度复盘 → 备链"]
+
+    def test_get_llm_config_raises_falls_back_unconfigured(self, monkeypatch):
+        """读取 LLM 配置抛异常 → 按未配置兜底，不阻断页面渲染。"""
+        self._patch_llm(monkeypatch, config=None)
+
+        def _boom():
+            raise RuntimeError("config read failed")
+
+        monkeypatch.setattr("src.python.config.get_llm_config", _boom)
+        info = _build_system_info()
+        assert info["llm"] == {"configured": False}
+        assert info["machine_ip"] == "192.168.1.100"
+
+    def test_index_renders_system_info_unconfigured(self, app_client):
+        """索引页未配置时：版本/IP 渲染 + LLM 显示「未配置」+ 不显示详情区。"""
+        resp = app_client.get("/")
+        assert resp.status_code == 200
+        html = resp.data.decode("utf-8")
+        assert 'id="system-version"' in html
+        assert 'id="system-ip"' in html
+        assert 'id="system-llm"' in html
+        assert "未配置" in html
+        assert 'id="system-llm-detail"' not in html

@@ -124,6 +124,138 @@ def _build_artifacts(params: dict, state) -> list[dict]:
     return artifacts
 
 
+# ── 系统信息组装（版本 / 机器 IP / LLM 状态，对齐 TUI 状态面板）────────
+
+
+def _simplify_endpoint(endpoint: str) -> str:
+    """简化 endpoint 显示（取 URL 主机名），非 URL 原样返回。
+
+    对齐 TUI ``tui_menu._show_llm_config_status`` 的 endpoint 展示
+    （``endpoint.split('/')[2]`` 取主机名），避免页面显示过长 URL。
+    """
+    if not endpoint or endpoint == "默认":
+        return endpoint or "默认"
+    if "//" in endpoint:
+        parts = endpoint.split("/")
+        if len(parts) > 2:
+            return parts[2]
+    return endpoint
+
+
+# 状态面板隐藏的 LLM 模块后缀（对齐 tui_menu.LLM_MENU_HIDDEN_KEYS：辩论三模块
+# 在注册表保留供缓存 TTL 依赖，但不在状态面板展示，避免误导为可开关模块）。
+_LLM_STATUS_HIDDEN_SUFFIXES: frozenset[str] = frozenset({"debate_pro", "debate_con", "debate_synthesis"})
+
+
+def _build_system_info() -> dict:
+    """组装页面状态信息：程序版本号 / 机器 IP / LLM 配置状态。
+
+    复现 TUI 状态面板（``tui_menu._show_llm_config_status`` /
+    ``_show_multi_chain_status``）的信息面：
+    - flat 单 provider：provider / model / endpoint（简化主机名）/ 熔断 / 模型路由；
+    - credentials_ref 多链：策略 / 各 provider（名称/后端/模型/优先级/熔断）/ 模块偏好；
+    - 未配置：configured=False（页面按未配置展示）。
+
+    LLM 配置读取失败按未配置兜底，不阻断页面渲染。
+
+    Returns:
+        dict，含 app_version / machine_ip / llm（结构化状态）
+    """
+    from src.python.config import get_llm_config
+    from src.python.core.constants import APP_VERSION
+    from src.python.core.logger import _get_machine_ip
+    from src.python.core.registry import get_llm_module_names
+    from src.python.llm.circuit_breaker import get_circuit_status
+
+    info = {
+        "app_version": APP_VERSION,
+        "machine_ip": _get_machine_ip(),
+        "llm": {"configured": False},
+    }
+    try:
+        llm_config = get_llm_config()
+    except Exception:
+        logger.warning("读取 LLM 配置失败，页面按未配置展示", exc_info=True)
+        llm_config = None
+    if llm_config is None:
+        return info
+
+    provider_list = llm_config.get("_provider_list") or []
+
+    # ── credentials_ref 多链模式 ──
+    if provider_list and not llm_config.get("api_key"):
+        strategy_labels = {
+            "priority": "优先级排序",
+            "weighted": "加权随机",
+            "cost_first": "价格最低优先",
+            "fallback_only": "仅 Fallback",
+        }
+        strategy_raw = llm_config.get("_strategy", "priority")
+        all_creds = llm_config.get("_llm_credentials", {}) or {}
+        providers = []
+        for entry in provider_list:
+            name = entry.get("name", "?")
+            backend = entry.get("provider", "?")
+            model = entry.get("model", "")
+            endpoint = entry.get("endpoint") or ""
+            creds_ref = entry.get("credentials_ref")
+            if creds_ref and (not model or not endpoint):
+                ref_creds = all_creds.get(creds_ref, {})
+                if isinstance(ref_creds, dict):
+                    if not model:
+                        model = ref_creds.get("model", "")
+                    if not endpoint:
+                        endpoint = ref_creds.get("endpoint", "") or ""
+            raw_priority = entry.get("priority")
+            providers.append(
+                {
+                    "name": name,
+                    "backend": backend,
+                    "model": model or "默认",
+                    "endpoint": endpoint,
+                    "endpoint_display": _simplify_endpoint(endpoint),
+                    "priority": str(raw_priority) if raw_priority is not None else "99（默认）",
+                    "circuit": get_circuit_status(endpoint) if endpoint else "—",
+                }
+            )
+        preferred = []
+        for mk, pname in (llm_config.get("_preferred_providers", {}) or {}).items():
+            preferred.append(f"{get_llm_module_names().get(mk, mk)} → {pname}")
+        info["llm"] = {
+            "configured": True,
+            "mode": "multi",
+            "strategy": strategy_labels.get(strategy_raw, strategy_raw),
+            "providers": providers,
+            "preferred": preferred,
+        }
+        return info
+
+    # ── 传统 flat 模式：单 provider ──
+    if not llm_config.get("api_key") or not llm_config.get("provider"):
+        return info
+
+    provider = llm_config["provider"]
+    model = llm_config.get("model") or "默认"
+    endpoint = llm_config.get("endpoint") or "默认"
+    circuit = get_circuit_status(endpoint) if endpoint and endpoint != "默认" else "—"
+    route = []
+    for sfx, name in get_llm_module_names().items():
+        if sfx in _LLM_STATUS_HIDDEN_SUFFIXES:
+            continue
+        route.append(f"{name}={llm_config.get(f'model_{sfx}') or model}")
+    info["llm"] = {
+        "configured": True,
+        "mode": "flat",
+        "provider": provider,
+        "model": model,
+        "endpoint": endpoint,
+        "endpoint_display": _simplify_endpoint(endpoint),
+        "circuit": circuit,
+        "route": route,
+    }
+    return info
+
+
 # ── 同源校验（轻量，副作用操作用）────────────────────
 
 
@@ -165,11 +297,13 @@ def _handle_index():
     # 表单说明文案（模板里嵌在复选框 label 括号中，不再重复「历史走势」前缀）
     config_note = "跟随配置开启" if history_checked else "当前配置关闭"
     # 静态资源带版本查询串 ?v={APP_VERSION}（防浏览器缓存旧 JS/CSS 导致功能异常）
+    # 状态区系统信息（版本 / 机器 IP / LLM 状态）随页面渲染，对齐 TUI 状态面板
     return render_template(
         "index.html",
         app_version=APP_VERSION,
         history_checked=history_checked,
         config_note=config_note,
+        system_info=_build_system_info(),
     )
 
 
@@ -290,7 +424,10 @@ def _handle_health():
     now = time.time()
     if not fresh and _health_cache["data"] is not None and now - _health_cache["ts"] < 60:
         return _ok(_health_cache["data"])
-    results = run_health_checks(max_timeout=8.0)
+    # 整体预算必须低于前端 /api/health 的 15s abort（留余量）。
+    # 12s 覆盖正常网络下的全量检查（实测 ~10s），仅切断真正挂起的检查项，
+    # 未完成项由 run_health_checks 标记"超时"返回，避免整接口超时被前端判失败。
+    results = run_health_checks(max_timeout=12.0)
     _health_cache["ts"] = now
     _health_cache["data"] = results
     return _ok(results)
