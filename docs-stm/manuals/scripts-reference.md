@@ -20,6 +20,7 @@
 | `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
 | `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`.venv/bin/python -m pytest --collect-only` 快照，供 test-coverage.md 更新） |
+| `smoke-web.py` | 测试 | Web 模式 HTTP 冒烟脚本（test_client 进程内 9 项全链路断言，可独立运行） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（发布前必跑） |
 | `perf_report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf_view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
@@ -126,6 +127,22 @@ pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。
 .venv/bin/python -m pytest <test_file>::<test_name> -v --tb=short     # ④ 单用例验证
 .venv/bin/python scripts/test_runner.py --mode verify,regression     # ⑤ 发布确认
 ```
+
+---
+
+### `smoke-web.py` — Web 模式 HTTP 冒烟脚本
+
+Web 模式全链路可复跑冒烟验证（上传→生成→进度→产物，Flask `test_client` 进程内走 HTTP 契约，不占端口、不发真实网络）。管线（fake executor）、健康探测、历史记录均 mock，`output_dir` 与上传目录临时隔离，不触碰真实数据。
+
+```bash
+# 全量 9 项断言（页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离）
+.venv/bin/python scripts/smoke-web.py
+
+# 仅打印失败项
+.venv/bin/python scripts/smoke-web.py --quiet
+```
+
+退出码：0 = 全部通过；2 = 存在失败项。同款断言已由 `src/test/unit/web/test_smoke_web.py`（`unit_web` 标记）纳入 `dev-verify`/`verify` 门禁，本脚本用于手动快速复跑。
 
 ---
 

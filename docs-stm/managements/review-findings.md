@@ -37,7 +37,6 @@
 | # | 问题 | 修复方向 |
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复 |
-| **rf-258** | Web 前端 main.js（状态机/轮询节流/按钮态）无自动化测试，仅后端 Python 单测覆盖（`src/test/unit/web/`，unit_web 标记 64 用例）；冒烟脚本为临时脚本已删除，未沉淀为可复跑脚本 | 视需要引入 E2E（Playwright）或沉淀 `scripts/smoke-web.py` 到 test_runner 模式；单人工具优先级低，可延后 |
 
 ---
 
@@ -54,6 +53,7 @@
 | rf-254 | 阶段2 自审：`_build_artifacts` 对 **failed 状态与严重失败（exit_code 2）仍返回产物按钮**——报告未生成时产物文件不存在，前端点击下载/预览只会 404，属错误路径未收敛 | `_build_artifacts` 对 `status == "failed"` 或 `exit_code == 2` 返回空列表（无产物即无按钮）；`TestArtifactsExitCode` 四用例回归（severe/failed 空、partial/success 保留） | `changelog.md` [0.10.10-dev] plan-8 阶段2 |
 | rf-255 | 阶段3 自审：`check-doc-traces.py` 裸版本号模式（`0.x.x`，无 v 前缀）把 Web 用户文档正文的 **IP 地址** 误判为版本号——`127.0.0.1:8000` 命中子串 `0.0.1`、`--host 0.0.0.0` 命中子串 `0.0.0`，5 处 Web 文档（how-to-start 方式四 / faq Web 问答）被误报，检查无法通过 | `_line_exempt()` 增加 IPv4 地址（含端口）整行豁免模式 `\b(?:\d{1,3}\.){3}\d{1,3}\b(?::\d{1,5})?`（与既有「当前状态/运行时语义」豁免同性质，仅豁免 IPv4 形态，不削弱裸版本号检出）；`test_ip_address_exempted` + `test_bare_version_still_flagged` 双用例回归 | `changelog.md` [0.10.10-dev] plan-8 阶段3 |
 | rf-256 | `output_dir` 锁文件检测未实现：设计文档（`docs-stm/archive/v0.10.x/web-ui/plan-web-ui-implementation.md` 单 worker 串行队列一节）规定「server 启动时检测 `output_dir` 锁文件有占用则警告」，防止多进程共享输出目录互相覆盖产物（web 与 TUI/CLI 并行、或不同端口双 web 实例）；实现仅做端口占用检测（bind 探测），未做输出目录占用检测 | `web/server.py` 启动时对 output_dir 原子抢占写锁 `.investor_output.lock`（`O_CREAT|O_EXCL` 防多进程竞态），锁已被其他入口持有则警告「该输出目录可能正被其他入口占用，产物可能互相覆盖」，持有至进程退出 finally 释放；新增 `src/test/unit/web/test_server.py` 11 用例回归 | `changelog.md` [0.10.10-dev] |
+| rf-258 | Web 前端 main.js（状态机/轮询节流/按钮态）无自动化测试，仅后端 Python 单测覆盖（`src/test/unit/web/`，unit_web 标记 64 用例）；冒烟脚本为临时脚本已删除，未沉淀为可复跑脚本 | 前端零 node 工具链约束 → 不引入 Playwright，沉淀 `scripts/smoke-web.py` 可复跑冒烟脚本（Flask test_client 进程内 HTTP 全链路 9/9 断言：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离；管线/健康/历史全 mock，output_dir 与上传目录临时隔离）；新增 `src/test/unit/web/test_smoke_web.py` 载体（unit_web 标记，自动纳入 dev-verify/verify 门禁）；脚本可独立运行 `.venv/bin/python scripts/smoke-web.py` | `changelog.md` [0.10.11-dev] |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 

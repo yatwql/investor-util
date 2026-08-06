@@ -9,10 +9,10 @@
 > |---|---|---|---|---|
 | 主程序代码 | Python | 242 | 57,634 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
 | HTML 报告模板 | HTML | 4 | 3,770 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
-| 辅助脚本 | Python | 17 | 6,485 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **263** | **67,889** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **294** | **83,629** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,273 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| 辅助脚本 | Python | 18 | 6,788 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
+| **源代码合计** | — | **264** | **68,192** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **295** | **83,673** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,274 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **13** | **5,843** | 含 README.md（191 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 12 | 5,652 | 配置/faq/快速上手/CLI 等 |
 | **项目文档** | Markdown | **107** | **42,698** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 0 + archive 97 md），py/txt 不计行 |
@@ -582,7 +582,8 @@ investor-util/
 │       │   │   ├── test_progress.py #       Web 进度报告器（事件缓冲/seq/增量）
 │       │   │   ├── test_runs.py     #       RunManager（状态机/队列/保留/单例重置）
 │       │   │   ├── test_handlers.py #       Flask 路由 handler（全链路/错误信封/穿越拒绝）
-│       │   │   └── test_server.py   #       启动防护（output_dir 写锁检测/端口占用）
+│       │   │   ├── test_server.py   #       启动防护（output_dir 写锁检测/端口占用）
+│       │   │   └── test_smoke_web.py #      Web 冒烟脚本载体（test_client 9 项全链路断言）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── test_cache_consistency.py      #   缓存前缀契约跨模块共享集成测试
@@ -683,7 +684,8 @@ investor-util/
 │   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
 │   ├── probe-csi-factor-indices.py  #   CSI 风格指数可用性探测（风格因子回归前置决策闸门）
 │   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
-│   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
+│   ├── extract-test-failures.py      #   pytest-html 报告失败用例提取
+│   └── smoke-web.py                 #   Web 模式 HTTP 冒烟脚本（test_client 9 项全链路验证，可独立运行）
 ├── docs-stm/                         # 项目文档
 │   ├── manuals/                      #   用户手册分册
 │   │   ├── datasource.md             #     数据源一览

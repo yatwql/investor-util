@@ -6,6 +6,12 @@
 
 ## [0.10.11-dev] - 开发中（未发布）
 
+### Web 冒烟脚本沉淀（2026-08-06）
+
+- **`scripts/smoke-web.py`（新增）**：rf-258 修复——将 Web 模式验收的临时冒烟脚本沉淀为可复跑脚本。前端零 node 工具链约束下不引入 Playwright，改为 Flask `test_client` 进程内 HTTP 全链路验证（不占端口、不发真实网络），覆盖 9/9 断言：页面渲染 / 健康检查 / 上传校验（合法 xlsx→file_id、伪装坏文件→400）/ 运行 202 / 进度事件 / 完成态 / 产物下载 / 历史记录 / 产物目录隔离。管线（fake executor）、健康探测（`run_health_checks` mock）、历史记录（`load_history` mock）全 mock；output_dir 与上传目录临时目录隔离。独立运行 `.venv/bin/python scripts/smoke-web.py`，全部通过退出码 0，失败退出码 2。
+- **`src/test/unit/web/test_smoke_web.py`（新增）**：pytest 载体（`unit` + `unit_web` 标记），importlib 加载脚本调 `run_smoke()` 断言 9 项全通过；`unit_web` 标记使本用例自动纳入 test_runner `dev-verify`/`verify` 门禁（无需改 MODES 字典）。
+- **门禁**：dev-verify passed + check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 一致。
+
 ---
 
 ## [0.10.10] - 2026-08-06
