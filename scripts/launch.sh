@@ -2,7 +2,8 @@
 # scripts/launch.sh - 投资分析 TUI 启动脚本 (Linux)
 # Encoding: UTF-8 (no BOM)
 
-echo "正在启动投资分析系统 ..."
+# 应用名称（与 src/python/core/constants.py 的 APP_NAME 保持一致；shell 无法直接 import，此处同步维护）
+echo "正在启动投资复盘助手 ..."
 
 # 0. 解析入口参数（默认 TUI；web 入口启动轻量 Web 服务，参数透传 --host/--port/--config）
 ENTRY="tui"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""投资分析系统 — TUI 主入口。"""
+"""投资复盘助手 — TUI 主入口。"""
 
 from __future__ import annotations
 

@@ -6,6 +6,15 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 应用更名补漏：启动横幅 + 模块 docstring 统一应用名（2026-08-07）
+
+- **启动脚本横幅**：`launch.sh` / `launch.ps1` 的「正在启动投资分析系统 …」改为「正在启动投资复盘助手 …」。shell 无法直接 import `constants.py`，按允许硬编码 + 注释注明与 `APP_NAME` 同步维护；`launch.ps1` 保持 UTF-8 with BOM + LF（git 历史即 BOM+LF，非本变更引入）。
+- **模块 docstring**：`tui/tui.py` 模块 docstring「投资分析系统 — TUI 主入口」改为「投资复盘助手 — TUI 主入口」。
+- **全量排查**：src/ 与 scripts/ 中「投资分析系统 / 小助手 / 投资分析报告生成工具」等近似应用名硬编码均已清除；剩余「个人投资」均为持仓文件名（`个人投资持仓信息.xlsx`）或「个人投资者」通用表述，非应用名。
+- **门禁**：dev-verify 1947 + 4 checks `--ci` 全 [OK]。
+
+---
+
 ### 应用更名「投资复盘助手」（2026-08-07）
 
 - **`core/constants.py` `APP_NAME` 值由「个人投资分析报告生成小助手」改为「投资复盘助手」**：单一来源常量，一处修改即全链生效（TUI 首页 / 启动日志 / Web 首页 / HTML 报告 / Excel 报告 / What-if 报告 / cli/server 帮助描述 / test_runner 报告页脚）。

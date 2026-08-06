@@ -5,7 +5,8 @@
 $projectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $projectRoot
 
-Write-Host "正在启动投资分析系统 ..."
+# 应用名称（与 src/python/core/constants.py 的 APP_NAME 保持一致；shell 无法直接 import，此处同步维护）
+Write-Host "正在启动投资复盘助手 ..."
 Write-Host "项目目录: $projectRoot"
 
 # 0. 解析入口参数（默认 TUI；web 入口启动轻量 Web 服务，参数透传 --host/--port/--config）
