@@ -580,7 +580,7 @@ class TestSystemInfo:
                 "holdings_filename": "持仓.xlsx",
                 "output_dir": str(tmp_path / "reports"),
                 "news_top_count": 200,
-                "features": {"anonymization": {"mode": "full_anonymous"}},
+                "anonymization": {"mode": "full_anonymous"},
             },
             privacy_shown=True,
         )
@@ -753,7 +753,7 @@ class TestSystemInfo:
                 "holdings_filename": "持仓.xlsx",
                 "output_dir": str(tmp_path / "reports"),
                 "news_top_count": 150,
-                "features": {"anonymization": {"mode": "code_display"}},
+                "anonymization": {"mode": "code_display"},
             },
             privacy_shown=False,
         )

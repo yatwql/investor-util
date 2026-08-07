@@ -55,15 +55,17 @@ Web 上传持仓跑 full/both 会污染共享快照目录（rf-261）。方案�
 
 #### `plan-26` Web 配置编辑：完整镜像 TUI 可编辑配置全集（[`web-config-edit.md`](../plan/web-config-edit.md)）
 
-Web 模式支持修改与 TUI **完全一致**的配置项全集。已确认决策（用户拍板，勿推翻）：① 先写设计文档 ② 完整镜像 TUI ③ 写前 `.bak` 备份。**设计已定稿**（2026-08-07，设计文档位于 `docs-stm/plan/web-config-edit.md`，待实现）：
+Web 模式支持修改与 TUI **完全一致**的配置项全集。已确认决策（用户拍板，勿推翻）：① 先写设计文档 ② 完整镜像 TUI ③ 写前 `.bak` 备份。**设计已定稿**（2026-08-07，设计文档位于 `docs-stm/plan/web-config-edit.md`）：
 
 - **7 组全集**：自由文本路径（holdings_dir / holdings_filename / output_dir）、报告章节开关 5 项、增强子模块开关 6 项、匿名化枚举（off/code_display/full_anonymous/summary）、对比指数池（增/删/重置默认）、LLM 分析章节开关 5 项（enabled_llm，隐藏三模块不展示）、辩论实验功能开关 3 项（features.json）。
 - **后端**：新模块 `web/config_edit.py`——`config_edit_whitelist` 白名单（点分键→类型/枚举→目标文件→写入原语）+ `GET/POST /api/config/edit`（POST 复用 `_is_same_origin()` 守卫）；写共享配置前 `config_backup_file` 单槽 `.bak`（mkstemp + `os.replace` 原子写）。
 - **写入语义（逐条等价 TUI）**：config.json→`set_config`（嵌套 dict 读合并整块写；匿名化走 `set_anonymization_mode`）；llm_settings.json→共享 `write_llm_settings`（自 tui 抽取，TUI 改委托）；features.json→`save_feature_overrides`。
 - **一致性修正**：两个状态面板（tui_menu / web handlers）匿名化读路径改顶层 `anonymization.mode`（原误读不存在的 `features.anonymization.mode`，恒显示关闭）。
 - **前端**：index.html 新增「配置编辑」card（7 组控件）+ main.js 即改即存 + error_code 分支，选项与 TUI 完全一致。
-- **语义命名**：`config_edit` / `config_edit_whitelist` / `config_backup`。**登记时机**：实现完成时（check-semantic-index 反向校验约束，设计阶段不提前登记）。
-- **预估**：2d（对齐 plan-25）。状态：**设计定稿待实现**。
+- **语义命名**：`config_edit` / `config_edit_whitelist` / `config_backup`（technical.md 语义表已随实现登记，反向校验通过）。
+- **预估**：2d（对齐 plan-25）。
+
+> **实施进度（2026-08-07）**：六阶段全量完成——①共享层抽取 `write_llm_settings`（`config/_llm_settings.py` 公开原语，TUI 改委托，行为零变化）；②后端核心 `web/config_edit.py`（白名单 + 面板读取 + 应用编辑 + 备份）+ `handlers.py` 路由 `GET/POST /api/config/edit` 与同源守卫；③匿名化读路径修正（tui_menu `_show_privacy_and_security_status` + web `_build_system_info` 读顶层 `anonymization.mode`）；④前端配置面板（index.html 「③ 配置编辑」card + main.js 即改即存 + error_code 分支 + style.css 样式）；⑤测试补齐（`test_config_edit.py` 35 用例 + `test_config_edit_edge.py` 42 用例 + `smoke-web.py` 扩展至 11 项断言）；⑥文档与门禁——changelog/how-to-config/faq/folders 同步 + technical.md 语义表登记 3 行。附带修复：smoke-web `_DEFAULT_CONFIG` 顺序污染（finally 还原，config 测试在 web 后运行 7 失败 → 恢复 282 全绿）。**已实现**。
 
 #### `plan-27` 前端资产统一归入 `src/static/`：Web UI 与报告模板（基础设施重构）
 

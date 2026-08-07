@@ -3,7 +3,7 @@
 
 沉淀自 Web 模式验收的临时 HTTP 冒烟脚本（原脚本为一次性脚本，未入库）。
 本脚本以 Flask test_client 在进程内走 HTTP 链路（不占真实端口、不发真实
-网络），覆盖 10 项断言：
+网络），覆盖 11 项断言：
 
   1. 页面渲染      GET /                    → 200 + HTML 含 main.js 引用与关键元素
   2. 健康检查      GET /api/health          → 200 + ok 信封（探测源 mock）
@@ -17,16 +17,19 @@
   9. 产物目录隔离  run 的 output_dir 落在临时目录，非项目真实 reports/
  10. 正式-用存量   POST /api/runs            → 无 file_id 提交 202 + run_id；
                                               带 file_id / 非法 mode → 400 BAD_PARAM
+ 11. 配置编辑      GET /api/config/edit      → 200 + 7 组可编辑面；
+                                              合法保存 enable_news → 200；
+                                              非法键 → 400 BAD_PARAM
 
 隔离（对齐测试隔离纪律）：
   - 管线 mock：注入 fake executor（写产物 + 推送事件 + 返回 0）
-  - 配置重定向：output_dir → 临时目录
+  - 配置重定向：output_dir → 临时目录；config.json → 临时目录（写配置不污染真实配置）
   - 上传目录重定向：upload._UPLOAD_DIR → 临时目录
   - 健康/历史 mock：run_health_checks / load_history 返回罐头数据
   - 服务进程内（test_client），不建真实 socket
 
 用法：
-  .venv/bin/python scripts/smoke-web.py          # 全量 10 项
+  .venv/bin/python scripts/smoke-web.py          # 全量 11 项
   .venv/bin/python scripts/smoke-web.py --quiet  # 仅打印失败项
 
 退出码：0 全部通过；2 存在失败项。
@@ -110,6 +113,10 @@ def _build_client(tmp_root: Path):
     _config_defaults._DEFAULT_CONFIG["holdings_dir"] = str(holdings_dir)
     _config_defaults._DEFAULT_CONFIG["holdings_filename"] = "测试持仓.xlsx"
     (holdings_dir / "测试持仓.xlsx").write_bytes(_make_holdings_xlsx())
+    # 配置编辑冒烟需写 config.json：重定向到临时目录（防污染真实 data/config/）
+    config_dir = tmp_root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    _config_defaults._CONFIG_FILE = str(config_dir / "config.json")
     invalidate_config_cache()
 
     rm = RunManager(executor=_fake_executor(str(output_dir)))
@@ -313,13 +320,66 @@ def _check_output_dir_isolated(client, results, run_id: str, output_dir: Path):
     )
 
 
+def _check_config_edit(client, results) -> None:
+    """配置编辑冒烟：GET 面板全量面 → 合法保存 200 → 非法键 400。
+
+    配置编辑会写共享 config.json，_build_client 已将其重定向到临时目录，
+    本检查不会污染真实 data/config/。
+    """
+
+    # ① GET 面板：7 组全量可编辑面
+    resp_get = client.get("/api/config/edit")
+    body_get = resp_get.get_json() or {}
+    data = body_get.get("data") or {}
+    ok = resp_get.status_code == 200 and body_get.get("ok") is True
+    ok = ok and set(data) >= {
+        "paths",
+        "sections",
+        "submodules",
+        "anonymization",
+        "comparison_indices",
+        "comparison_indices_defaults",
+        "llm",
+    }
+
+    # ② 合法保存：enable_news → 200 + key/value 回显
+    resp_save = client.post("/api/config/edit", json={"key": "enable_news", "value": False})
+    body_save = resp_save.get_json() or {}
+    ok = ok and resp_save.status_code == 200 and body_save.get("ok") is True
+    ok = ok and (body_save.get("data") or {}).get("key") == "enable_news"
+    ok = ok and (body_save.get("data") or {}).get("value") is False
+
+    # ③ 非法键 → 400 BAD_PARAM
+    resp_bad = client.post("/api/config/edit", json={"key": "no_such_key", "value": True})
+    bad_body = resp_bad.get_json() or {}
+    ok = ok and resp_bad.status_code == 400 and bad_body.get("error_code") == "BAD_PARAM"
+
+    results.append(
+        {
+            _RESULT_NAME: "配置编辑",
+            _RESULT_OK: ok,
+            _RESULT_DETAIL: (
+                f"GET -> {resp_get.status_code}, "
+                f"保存 enable_news -> {resp_save.status_code}, "
+                f"非法键 -> {resp_bad.status_code}"
+            ),
+        }
+    )
+
+
 def run_smoke() -> list[dict]:
-    """执行全部 10 项冒烟检查，返回 [{name, ok, detail}]。"""
+    """执行全部 11 项冒烟检查，返回 [{name, ok, detail}]。"""
+    from src.python.config import _config_defaults
+    from src.python.config._core import invalidate_config_cache
     from src.python.web import upload
 
-    # 保存并重定向上传目录 / 文件注册表（finally 还原，防污染其他调用方）
+    # 保存并重定向上传目录 / 文件注册表 / config.json 路径 / _DEFAULT_CONFIG 覆盖
+    # （finally 统一还原，防残留污染其他调用方/后续测试——_DEFAULT_CONFIG 若残留，
+    # 后续 config 测试会读到非默认配置，产生顺序依赖失败）
     saved_upload_dir = upload._UPLOAD_DIR
     saved_registry = upload._file_registry
+    saved_config_file = _config_defaults._CONFIG_FILE
+    saved_defaults = dict(_config_defaults._DEFAULT_CONFIG)
 
     results: list[dict] = []
     with tempfile.TemporaryDirectory(prefix="smoke-web-") as tmp:
@@ -343,9 +403,14 @@ def run_smoke() -> list[dict]:
             _check_report_download(client, results)
             _check_history(client, results)
             _check_formal_use_existing(client, results)
+            _check_config_edit(client, results)
         finally:
             upload._UPLOAD_DIR = saved_upload_dir
             upload._file_registry = saved_registry
+            _config_defaults._CONFIG_FILE = saved_config_file
+            _config_defaults._DEFAULT_CONFIG.clear()
+            _config_defaults._DEFAULT_CONFIG.update(saved_defaults)
+            invalidate_config_cache()
     return results
 
 

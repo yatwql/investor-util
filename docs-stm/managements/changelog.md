@@ -6,6 +6,18 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### Web 配置编辑：完整镜像 TUI 可编辑配置全集（plan-26 实现）（2026-08-07）
+
+- **新模块 `web/config_edit.py`**：`config_edit_whitelist` 白名单（点分键→类型/枚举→目标文件→写入原语，唯一事实来源）+ `apply_config_edit`/`get_config_edit_surface` + `config_backup_file` 写前单槽 `.bak` 备份（mkstemp + `os.replace` 原子写，复用 `holdings_update._atomic_copy`）。
+- **路由**：`GET/POST /api/config/edit`——GET 返回面板全量 7 组可编辑面；POST 复用 `_is_same_origin()` 同源守卫（失败 403），校验失败 400 BAD_PARAM，写共享配置异常 500 CONFIG_WRITE_FAILED。
+- **7 组可编辑全集（与 TUI 完全一致）**：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、辩论实验功能开关 3（features.json）。
+- **写入分派逐条等价 TUI**：config.json 顶层标量→`set_config`；嵌套 dict（report_submodules/comparison_indices）读合并整块写；anonymization.mode→`set_anonymization_mode`；enabled_llm.*→共享 `write_llm_settings`（自 `tui/handlers_config.py` 抽取，TUI 改委托，行为零变化）；llm_debate_*→`save_feature_overrides`。
+- **一致性修正**：两个状态面板（TUI 隐私安全状态 + Web 系统信息）匿名化读路径由不存在的 `features.anonymization.mode` 修正为顶层 `anonymization.mode`（此前恒显示「关闭」）。
+- **前端**：`index.html` 新增「③ 配置编辑」card（7 组控件，选项与 TUI 完全一致）+ `main.js` 即改即存（改即写、失败回滚、error_code 驱动提示）+ `style.css` 配置面板样式。
+- **测试**：`test_config_edit.py` 35 用例（白名单完备/隐藏 LLM 键拒绝/面板读取/标量写/嵌套 dict 写/llm_settings 写/features 写/校验守卫/备份）+ `test_config_edit_edge.py` 42 用例（极端输入 edge 隔离）+ `smoke-web.py` 扩展至 11 项断言（配置面板加载 + 保存成功 + 非法键 400）。
+- **顺带修复**：`smoke-web.py` `_build_client` 污染 `_DEFAULT_CONFIG`（holdings_dir/holdings_filename/output_dir）导致 config 测试顺序失败——`run_smoke` finally 统一还原 `_DEFAULT_CONFIG`/`_CONFIG_FILE`，web+config 同进程 282 测试全绿。
+- **验证**：web+config+handlers 同进程 282 passed；语义表登记 `config_edit`/`config_edit_whitelist`/`config_backup`（反向校验通过）。
+
 ### 前端资产统一归入 src/static/：Web UI 与报告模板（plan-27）（2026-08-07）
 
 - **Web UI 前端**（`index.html`/`main.js`/`style.css`）自 `src/python/web/{templates,static}/` 归入 `src/static/web/`；`app.py` 的 Flask `template_folder`/`static_folder` 改为 `PROJECT_ROOT` 派生指向新目录，`/static/main.js` URL 与 `render_template("index.html")` 契约不变。

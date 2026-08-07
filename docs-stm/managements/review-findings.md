@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.12-dev
-> **编号源**：`rf-next = 267`（新增问题取此编号，完成后更新为 +1；已用最大 rf-266，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 268`（新增问题取此编号，完成后更新为 +1；已用最大 rf-267，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -61,6 +61,7 @@
 | rf-264 | Web 首页系统信息卡缺 TUI 首页摘要对齐字段：`show_config()` 展示 持仓目录/持仓文件/输出目录/新闻抓取上限/状态（文件是否就绪）/持仓匿名化/隐私声明，Web 首页仅展示 程序版本/本机 IP/LLM（用户要求首页显示 软件版本号/状态/新闻抓取上限/LLM配置信息/模型/策略 等，参考 TUI 首页摘要） | `web/handlers.py` `_build_system_info` 增补配置摘要字段（`get_config()` 读取 holdings_dir/holdings_filename/output_dir/news_top_count、`os.path.exists` 判定 holdings_ready、features.anonymization.mode 中文映射、`get_flag("_privacy_notice_shown")`），配置读取异常按默认值兜底；`index.html` 系统信息卡片补对应行 + `style.css` `.system-status-ok/err` 状态色；`TestSystemInfo` 新增 6 用例（web 目录 89 用例全绿 + smoke 9/9） | `changelog.md` [0.10.12-dev] |
 | rf-265 | 应用名称「投资复盘助手」硬编码散落（TUI 首页 tui_menu.py 写死、cli.py/server.py 描述用「生成工具」）、未作为单一来源常量；各入口（TUI 首页/启动日志/Web 首页/HTML 报告首页/Excel 首页）未统一强调应用名称 + 版本号（用户要求固化到 constants.py，报告强调由本应用及版本生成） | `core/constants.py` 新增 `APP_NAME` 单一来源常量；启动日志 `log_app_boundary` 改为「应用启动 \| {APP_NAME} v{APP_VERSION} \| …」；TUI 首页 `print_header` 引用 `APP_NAME`；Web 首页 `_handle_index` 传 `app_name` + index.html 顶部 `<h1>`/副标题强调名称与版本；主报告模板 report_template.html 头部加「由 {app_name} v{app_version} 生成」+ 页脚改「由 {app_name} v{app_version} 生成 · 个人投资分析报告」；whatif 报告模板页脚同加；Excel summary 页签 `_write_basic_info` 增「生成工具」行（`APP_NAME v{APP_VERSION}`）；新增/补强测试 4 处 | `changelog.md` [0.10.12-dev] |
 | rf-266 | `src/static/README.md` 资产说明仍仅覆盖图表 bundle（Chart.js 文件清单 + 升级指引），未涵盖 plan-27 归入的 `web/`（Web UI 前端）与 `tmpl/`（报告模板）——目录语义扩大为三类资产后文档说明滞后 | `src/static/README.md` 重写为三类资产总览（图表 bundle 报告生成时复制 / web 前端 Flask `template_folder`+`static_folder` 加载 / 报告模板 `report/html_jinja_env` 加载），原图表文件清单/版本/升级/安全保留为子节 | `changelog.md` [0.10.12-dev] plan-27 |
+| rf-267 | `smoke-web.py` `_build_client` 直接改写 `_config_defaults._DEFAULT_CONFIG`（holdings_dir/holdings_filename/output_dir）且运行后不还原，污染模块级默认值——web 套件先跑后，后续 config 测试读到被改写的默认值，致 7 个 config 用例顺序失败（test_corrupted_json/empty_file/missing_file/partial_config_merge/init_creates_default/init_template_writes_relative/set_preserves_other_keys） | `run_smoke` finally 统一还原 `_DEFAULT_CONFIG` 快照 + `_CONFIG_FILE` + `invalidate_config_cache()`；web+config 同进程 282 测试全绿（修复前 7 失败），config 单独 102 passed | `changelog.md` [0.10.12-dev] plan-26 |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 

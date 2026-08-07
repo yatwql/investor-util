@@ -1,9 +1,9 @@
 """测试：scripts/smoke-web.py 可复跑 Web 冒烟脚本。
 
 对齐「沉淀 Web 冒烟脚本」修复方向：以 pytest 为载体调用脚本的
-``run_smoke()``，验证 10 项 HTTP 全链路断言全部通过（含正式-用存量模式冒烟）。
-脚本自身走 Flask test_client（进程内、不占端口、不发真实网络），
-管线/健康/历史均 mock，无真实 LLM/行情/历史文件依赖。
+``run_smoke()``，验证 11 项 HTTP 全链路断言全部通过（含正式-用存量模式、
+配置编辑冒烟）。脚本自身走 Flask test_client（进程内、不占端口、不发真实
+网络），管线/健康/历史均 mock，无真实 LLM/行情/历史文件依赖。
 
 隔离：
   - 脚本内部将 output_dir / 上传目录重定向到临时目录并 try/finally 还原
@@ -35,10 +35,10 @@ def _load_script():
 
 
 def test_smoke_web_run_smoke_all_pass():
-    """run_smoke() 10 项断言全部通过。"""
+    """run_smoke() 11 项断言全部通过。"""
     mod = _load_script()
     results = mod.run_smoke()
 
-    assert len(results) == 10
+    assert len(results) == 11
     failed = [r for r in results if not r["ok"]]
     assert failed == [], f"Web 冒烟存在失败项: {failed}"

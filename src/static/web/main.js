@@ -54,11 +54,15 @@
     els.formalWarning = $('formal-warning');
     els.formalHint = $('formal-hint');
     els.confirmOverwrite = $('confirm-overwrite');
+    els.configPanel = $('config-panel');
 
     els.fileInput.addEventListener('change', onFileSelected);
     els.generateForm.addEventListener('submit', onSubmit);
     $('health-refresh').addEventListener('click', function () {
       loadHealth(true);
+    });
+    $('config-reload').addEventListener('click', function () {
+      loadConfigEdit();
     });
 
     // 生成用途/输入来源模式切换：正式模式展开区 + 警示条 + 按钮态联动
@@ -99,6 +103,9 @@
     // 状态区：数据源健康 + 历史运行记录（服务端各有短缓存，非频繁轮询）
     loadHealth(false);
     loadHistory();
+
+    // 配置编辑面板（与 TUI 菜单一致）
+    loadConfigEdit();
 
     // 轮询节流：页面不可见时暂停轮询，恢复可见立即同步一次（省流量/省请求）
     document.addEventListener('visibilitychange', function () {
@@ -626,6 +633,514 @@
       d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
       ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
     );
+  }
+
+  /* ── 配置编辑（与 TUI 菜单一致，即改即存）──
+   * GET /api/config/edit 载入全量可编辑面 → 按 7 组分块渲染。
+   * 保存语义即改即存（与 TUI「改一项存一项」一致）：checkbox/radio 改动即
+   * POST /api/config/edit；自由文本路径经各自「保存」按钮提交；对比指数池经
+   * 添加/删除/重置动作提交。提交期间该控件禁用，成功回读该项最新值，失败
+   * 恢复为改动前值并显示错误。
+   * error_code 驱动分支（中文文案直显服务端，不前端硬编码映射）：
+   *   BAD_PARAM(400) → 该分组错误区直显服务端中文；
+   *   BAD_PARAM(403) → 面板顶部警示同源失败；
+   *   CONFIG_WRITE_FAILED(500) → 分组错误区提示查看日志。
+   * XSS 纪律：全部 textContent/DOM API 渲染，禁止 innerHTML。
+   */
+  var configState = { surface: null };
+
+  // 控件中文标签（对齐 TUI 菜单 / 注册表中文名）
+  var CONFIG_LABELS = {
+    paths: { holdings_dir: '持仓目录', holdings_filename: '持仓文件名', output_dir: '输出目录' },
+    sections: {
+      enable_fund_deep_analysis: '基金深度分析',
+      enable_news: '市场新闻',
+      enable_history: '组合历史走势+回撤',
+      enable_portfolio_evolution: '组合演进',
+      enable_action: '行动建议'
+    },
+    submodules: {
+      data_quality: '数据质量仪表盘',
+      industry_beta: '行业Beta子表',
+      candidate_compare: '候选基金比较子表',
+      cost_lots: '成本流水',
+      valuation_percentile: '估值分位',
+      market_temperature: '市场温度'
+    },
+    llm: {
+      global_macro: '全球政经局势',
+      expert_review: '智囊团深度复盘',
+      health_check: '持仓体检报告',
+      penetration_deep: '穿透深度分析',
+      news_correlation: '财经新闻热点与持仓关联分析'
+    },
+    debate: {
+      llm_debate_procon: '辩论-正反辩论',
+      llm_debate_conditional: '辩论-条件推理',
+      llm_debate_qa_concentration: '辩论-集中度问答'
+    }
+  };
+
+  // 持仓匿名化枚举中文描述（对齐 config/anonymizer.ANONYMIZATION_MODE_DESCRIPTIONS）
+  var ANON_LABELS = {
+    off: '关闭 — 显示真实持仓名称和代码',
+    code_display: '代码显示 — 名称替换为\'品种X\'，保留代码和盈亏',
+    full_anonymous: '完全匿名 — 名称\'品种X\'，代码\'000XXX\'，盈亏±XX%',
+    summary: '汇总模式 — 仅显示大类汇总，不展示单条持仓'
+  };
+
+  function loadConfigEdit() {
+    els.configPanel.textContent = '';
+    var busy = document.createElement('p');
+    busy.className = 'status-text status-busy';
+    busy.textContent = '正在加载配置...';
+    els.configPanel.appendChild(busy);
+    fetch('/api/config/edit', { signal: AbortSignal.timeout(10000) })
+      .then(handleResponse)
+      .then(renderConfigEdit)
+      .catch(function () {
+        els.configPanel.textContent = '';
+        var p = document.createElement('p');
+        p.className = 'status-text status-error';
+        p.textContent = '配置加载失败，请稍后重试';
+        els.configPanel.appendChild(p);
+      });
+  }
+
+  function renderConfigEdit(surface) {
+    configState.surface = surface;
+    els.configPanel.textContent = '';
+    // 面板顶部警示区（同源失败 403 专用）
+    var panelErr = document.createElement('p');
+    panelErr.id = 'config-panel-error';
+    panelErr.className = 'status-text status-error';
+    panelErr.setAttribute('role', 'alert');
+    panelErr.hidden = true;
+    els.configPanel.appendChild(panelErr);
+
+    els.configPanel.appendChild(renderPathsGroup(surface.paths));
+    els.configPanel.appendChild(
+      renderBoolGroup('sections', '报告章节', surface.sections, {})
+    );
+    els.configPanel.appendChild(
+      renderBoolGroup('submodules', '报告增强子模块', surface.submodules, { prefix: 'report_submodules.' })
+    );
+    els.configPanel.appendChild(renderAnonGroup(surface.anonymization));
+    els.configPanel.appendChild(renderIndicesGroup(surface));
+    els.configPanel.appendChild(
+      renderBoolGroup('llm', 'LLM 分析章节', surface.llm.enabled_llm, {
+        prefix: 'enabled_llm.',
+        note: '辩论三模块（白脸/黑脸/综合）不在菜单展示，输出由下方「辩论实验功能」三个开关控制'
+      })
+    );
+    els.configPanel.appendChild(
+      renderBoolGroup('debate', '辩论实验功能（⚗ 实验性，默认关闭）', surface.llm.debate, {
+        experimental: true
+      })
+    );
+  }
+
+  function renderPathsGroup(paths) {
+    var group = document.createElement('div');
+    group.className = 'config-group';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', '路径与文件');
+    var heading = document.createElement('h3');
+    heading.className = 'config-group-title';
+    heading.textContent = '路径与文件';
+    group.appendChild(heading);
+
+    Object.keys(paths).forEach(function (key) {
+      var row = document.createElement('div');
+      row.className = 'config-path-row';
+      var label = document.createElement('label');
+      label.className = 'config-path-label';
+      label.textContent = (CONFIG_LABELS.paths[key] || key) + '：';
+      label.htmlFor = 'config-input-' + key;
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'config-input-' + key;
+      input.value = paths[key] || '';
+      input.spellcheck = false;
+      input.autocomplete = 'off';
+      var saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'btn btn-secondary btn-sm config-save';
+      saveBtn.textContent = '保存';
+      saveBtn.addEventListener('click', onPathSave);
+      var status = document.createElement('span');
+      status.className = 'config-row-status';
+      status.setAttribute('role', 'status');
+      row.appendChild(label);
+      row.appendChild(input);
+      row.appendChild(saveBtn);
+      row.appendChild(status);
+      group.appendChild(row);
+    });
+
+    group.appendChild(makeGroupErrorEl());
+    return group;
+  }
+
+  function renderBoolGroup(groupKey, title, items, opts) {
+    var groupId = 'config-group-' + groupKey;
+    var group = document.createElement('div');
+    group.className = 'config-group';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-labelledby', groupId);
+    var heading = document.createElement('h3');
+    heading.id = groupId;
+    heading.className = 'config-group-title';
+    heading.textContent = title;
+    group.appendChild(heading);
+
+    Object.keys(items).forEach(function (key) {
+      var fullKey = opts && opts.prefix ? opts.prefix + key : key;
+      var label = (CONFIG_LABELS[groupKey] && CONFIG_LABELS[groupKey][key]) || key;
+      if (opts && opts.experimental) {
+        label = '⚗ ' + label;
+      }
+      var row = document.createElement('label');
+      row.className = 'check-label config-row';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!items[key];
+      cb.dataset.configKey = fullKey;
+      cb.addEventListener('change', onConfigToggle);
+      row.appendChild(cb);
+      var span = document.createElement('span');
+      span.textContent = label;
+      row.appendChild(span);
+      group.appendChild(row);
+    });
+
+    if (opts && opts.note) {
+      var note = document.createElement('p');
+      note.className = 'config-note-sub';
+      note.textContent = opts.note;
+      group.appendChild(note);
+    }
+
+    group.appendChild(makeGroupErrorEl());
+    return group;
+  }
+
+  function renderAnonGroup(anon) {
+    var group = document.createElement('div');
+    group.className = 'config-group';
+    group.setAttribute('role', 'radiogroup');
+    group.setAttribute('aria-label', '持仓匿名化');
+    var heading = document.createElement('h3');
+    heading.className = 'config-group-title';
+    heading.textContent = '持仓匿名化';
+    group.appendChild(heading);
+
+    (anon.options || []).forEach(function (mode) {
+      var row = document.createElement('label');
+      row.className = 'radio-label config-row';
+      var radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'config-anonymization';
+      radio.value = mode;
+      radio.checked = mode === anon.mode;
+      radio.dataset.configKey = 'anonymization.mode';
+      radio.addEventListener('change', onConfigRadioChange);
+      row.appendChild(radio);
+      var span = document.createElement('span');
+      span.textContent = ANON_LABELS[mode] || mode;
+      row.appendChild(span);
+      group.appendChild(row);
+    });
+
+    group.appendChild(makeGroupErrorEl());
+    return group;
+  }
+
+  function renderIndicesGroup(surface) {
+    var group = document.createElement('div');
+    group.className = 'config-group';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', '对比指数池');
+    var heading = document.createElement('h3');
+    heading.className = 'config-group-title';
+    heading.textContent = '对比指数池';
+    group.appendChild(heading);
+
+    var listWrap = document.createElement('div');
+    listWrap.className = 'config-indices-list';
+    renderIndicesList(listWrap, surface.comparison_indices);
+    group.appendChild(listWrap);
+
+    var addRow = document.createElement('div');
+    addRow.className = 'config-indices-add';
+    var codeInput = document.createElement('input');
+    codeInput.type = 'text';
+    codeInput.id = 'config-index-code';
+    codeInput.placeholder = '指数代码（如 sh000905）';
+    codeInput.autocomplete = 'off';
+    codeInput.spellcheck = false;
+    var nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.id = 'config-index-name';
+    nameInput.placeholder = '指数名称（如 中证500）';
+    nameInput.autocomplete = 'off';
+    nameInput.spellcheck = false;
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn btn-secondary btn-sm';
+    addBtn.textContent = '添加';
+    addBtn.addEventListener('click', onIndexAdd);
+    addRow.appendChild(codeInput);
+    addRow.appendChild(nameInput);
+    addRow.appendChild(addBtn);
+    group.appendChild(addRow);
+
+    var resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'btn btn-secondary btn-sm config-index-reset';
+    resetBtn.textContent = '重置为默认预设';
+    resetBtn.addEventListener('click', onIndexReset);
+    group.appendChild(resetBtn);
+
+    group.appendChild(makeGroupErrorEl());
+    return group;
+  }
+
+  function renderIndicesList(wrap, indices) {
+    wrap.textContent = '';
+    var entries = Object.keys(indices || {});
+    if (!entries.length) {
+      var empty = document.createElement('p');
+      empty.className = 'config-note-sub';
+      empty.textContent = '空池（仅显示沪深300）';
+      wrap.appendChild(empty);
+      return;
+    }
+    entries.forEach(function (code) {
+      var row = document.createElement('div');
+      row.className = 'config-index-row';
+      var name = document.createElement('span');
+      name.className = 'config-index-name';
+      name.textContent = code + ' (' + indices[code] + ')';
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'btn btn-secondary btn-sm config-index-del';
+      delBtn.textContent = '删除';
+      delBtn.addEventListener('click', onIndexRemove);
+      row.appendChild(name);
+      row.appendChild(delBtn);
+      wrap.appendChild(row);
+    });
+  }
+
+  /* ── 即改即存：提交 POST /api/config/edit ── */
+  function postConfigEdit(body) {
+    return fetch('/api/config/edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000)
+    })
+      .then(handleResponse)
+      .then(function (data) {
+        // 成功即清除面板顶部同源警示，避免残留误导
+        var panelErr = document.getElementById('config-panel-error');
+        if (panelErr) {
+          panelErr.hidden = true;
+          panelErr.textContent = '';
+        }
+        return data;
+      });
+  }
+
+  function onConfigToggle(e) {
+    var cb = e.target;
+    var key = cb.dataset.configKey;
+    var prev = !cb.checked; // change 后 checked 已是新值，取反得改动前值
+    var group = cb.closest('.config-group');
+    cb.disabled = true;
+    clearGroupError(group);
+    postConfigEdit({ key: key, value: cb.checked })
+      .catch(function (err) {
+        cb.checked = prev; // 失败恢复为改动前值
+        showGroupError(group, err);
+      })
+      .then(function () {
+        cb.disabled = false;
+      });
+  }
+
+  function onConfigRadioChange(e) {
+    var radio = e.target;
+    if (!radio.checked) {
+      return; // 仅处理选中变化
+    }
+    var prev = configState.surface.anonymization.mode;
+    var group = radio.closest('.config-group');
+    var radios = group.querySelectorAll('input[type="radio"]');
+    radios.forEach(function (r) {
+      r.disabled = true;
+    });
+    clearGroupError(group);
+    postConfigEdit({ key: 'anonymization.mode', value: radio.value })
+      .then(function () {
+        configState.surface.anonymization.mode = radio.value;
+      })
+      .catch(function (err) {
+        var target = group.querySelector('input[value="' + prev + '"]');
+        if (target) {
+          target.checked = true;
+        }
+        showGroupError(group, err);
+      })
+      .then(function () {
+        radios.forEach(function (r) {
+          r.disabled = false;
+        });
+      });
+  }
+
+  function onPathSave(e) {
+    var btn = e.target;
+    var row = btn.closest('.config-path-row');
+    var input = row.querySelector('input[type="text"]');
+    var key = input.id.replace('config-input-', '');
+    var prev = input.value;
+    var group = btn.closest('.config-group');
+    var status = row.querySelector('.config-row-status');
+    btn.disabled = true;
+    status.textContent = '';
+    status.className = 'config-row-status';
+    clearGroupError(group);
+    postConfigEdit({ key: key, value: input.value })
+      .then(function (data) {
+        input.value = data.value;
+        status.textContent = data.backup ? '已保存（已备份）' : '已保存';
+        status.className = 'config-row-status status-ok';
+      })
+      .catch(function (err) {
+        input.value = prev; // 失败恢复为改动前值
+        showGroupError(group, err);
+      })
+      .then(function () {
+        btn.disabled = false;
+      });
+  }
+
+  function onIndexAdd(e) {
+    var btn = e.target;
+    var group = btn.closest('.config-group');
+    var codeInput = document.getElementById('config-index-code');
+    var nameInput = document.getElementById('config-index-name');
+    var code = codeInput.value.trim();
+    var name = nameInput.value.trim();
+    if (!code || !name) {
+      showGroupError(group, { message: '指数代码与名称均不能为空' });
+      return;
+    }
+    btn.disabled = true;
+    clearGroupError(group);
+    postConfigEdit({ key: 'comparison_indices', action: 'add', code: code, name: name })
+      .then(function (data) {
+        configState.surface.comparison_indices = data.value;
+        codeInput.value = '';
+        nameInput.value = '';
+        var listWrap = group.querySelector('.config-indices-list');
+        renderIndicesList(listWrap, data.value);
+      })
+      .catch(function (err) {
+        showGroupError(group, err);
+      })
+      .then(function () {
+        btn.disabled = false;
+      });
+  }
+
+  function onIndexRemove(e) {
+    var btn = e.target;
+    var group = btn.closest('.config-group');
+    var row = btn.closest('.config-index-row');
+    var code = row.querySelector('.config-index-name').textContent.split(' (')[0];
+    btn.disabled = true;
+    clearGroupError(group);
+    postConfigEdit({ key: 'comparison_indices', action: 'remove', code: code })
+      .then(function (data) {
+        configState.surface.comparison_indices = data.value;
+        var listWrap = group.querySelector('.config-indices-list');
+        renderIndicesList(listWrap, data.value);
+      })
+      .catch(function (err) {
+        showGroupError(group, err);
+      })
+      .then(function () {
+        btn.disabled = false;
+      });
+  }
+
+  function onIndexReset(e) {
+    var btn = e.target;
+    var group = btn.closest('.config-group');
+    var defaults = (configState.surface && configState.surface.comparison_indices_defaults) || {};
+    var names = Object.keys(defaults)
+      .map(function (c) {
+        return c + ' (' + defaults[c] + ')';
+      })
+      .join('，');
+    var confirmMsg = '确定重置对比指数池为默认预设？' + (names ? '（' + names + '）' : '');
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+    btn.disabled = true;
+    clearGroupError(group);
+    postConfigEdit({ key: 'comparison_indices', action: 'reset' })
+      .then(function (data) {
+        configState.surface.comparison_indices = data.value;
+        var listWrap = group.querySelector('.config-indices-list');
+        renderIndicesList(listWrap, data.value);
+      })
+      .catch(function (err) {
+        showGroupError(group, err);
+      })
+      .then(function () {
+        btn.disabled = false;
+      });
+  }
+
+  /* ── 分组错误区辅助 ── */
+  function makeGroupErrorEl() {
+    var el = document.createElement('p');
+    el.className = 'status-text config-error';
+    el.setAttribute('role', 'alert');
+    el.hidden = true;
+    return el;
+  }
+
+  function clearGroupError(group) {
+    var err = group.querySelector('.config-error');
+    if (err) {
+      err.hidden = true;
+      err.textContent = '';
+    }
+  }
+
+  function showGroupError(group, err) {
+    if (err.errorCode === 'BAD_PARAM' && err.httpStatus === 403) {
+      // 同源失败 → 面板顶部警示，提示刷新
+      var panelErr = document.getElementById('config-panel-error');
+      if (panelErr) {
+        panelErr.textContent = '同源校验失败，请刷新页面重试';
+        panelErr.hidden = false;
+      }
+      return;
+    }
+    var msg = err.message || '配置修改失败';
+    var errEl = group.querySelector('.config-error');
+    if (!errEl) {
+      errEl = makeGroupErrorEl();
+      group.appendChild(errEl);
+    }
+    errEl.textContent = msg;
+    errEl.hidden = false;
   }
 
   document.addEventListener('DOMContentLoaded', init);

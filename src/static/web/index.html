@@ -88,9 +88,19 @@
       <p id="generate-error" class="status-text status-error" role="alert" aria-live="polite"></p>
     </section>
 
-    <!-- ③ 进度区 -->
+    <!-- ③ 配置编辑（与 TUI 菜单一致，即改即存） -->
+    <section class="card" aria-labelledby="config-heading">
+      <h2 id="config-heading">③ 配置编辑（与 TUI 菜单一致）</h2>
+      <p class="config-note">配置修改立即写入共享配置文件（config.json / llm_settings.json / features.json），写前自动备份 .bak；TUI / CLI 下次读取即生效</p>
+      <div id="config-panel" aria-live="polite"></div>
+      <div class="config-actions">
+        <button type="button" id="config-reload" class="btn btn-secondary btn-sm">重新加载</button>
+      </div>
+    </section>
+
+    <!-- ④ 进度区 -->
     <section class="card" id="progress-section" aria-labelledby="progress-heading" hidden>
-      <h2 id="progress-heading">生成进度</h2>
+      <h2 id="progress-heading">④ 生成进度</h2>
       <div class="progress-track">
         <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="生成进度"></div>
       </div>
@@ -98,17 +108,17 @@
       <ol id="progress-events" class="progress-events" aria-live="polite"></ol>
     </section>
 
-    <!-- ④ 结果区 -->
+    <!-- ⑤ 结果区 -->
     <section class="card" id="result-section" aria-labelledby="result-heading" hidden>
-      <h2 id="result-heading">生成结果</h2>
+      <h2 id="result-heading">⑤ 生成结果</h2>
       <div id="result-actions" class="result-actions"></div>
       <div id="result-errors" class="result-errors" role="alert" aria-live="polite"></div>
       <div id="result-footer" class="result-footer"></div>
     </section>
 
-    <!-- ⑤ 状态区：系统信息 + 数据源健康 + 历史运行记录 -->
+    <!-- ⑥ 状态区：系统信息 + 数据源健康 + 历史运行记录 -->
     <section class="card" aria-labelledby="status-heading">
-      <h2 id="status-heading">运行状态</h2>
+      <h2 id="status-heading">⑥ 运行状态</h2>
       <div class="status-grid status-grid-3">
         <div class="status-card">
           <h3>系统信息</h3>

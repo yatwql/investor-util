@@ -210,7 +210,7 @@ def _build_system_info() -> dict:
     对齐 TUI 首页摘要（``tui_menu.show_config`` / ``_show_privacy_and_security_status``
     / ``_show_llm_config_status`` / ``_show_multi_chain_status``）的信息面：
     - 持仓目录 / 持仓文件 / 输出目录 / 新闻抓取上限 / 状态（文件是否就绪）；
-    - 持仓匿名化模式（features.anonymization.mode 中文映射）/ 隐私声明是否已显示；
+    - 持仓匿名化模式（顶层 anonymization.mode 中文映射）/ 隐私声明是否已显示；
     - flat 单 provider：provider / model / endpoint（简化主机名）/ 熔断 / 模型路由；
     - credentials_ref 多链：策略 / 各 provider（名称/后端/模型/优先级/熔断）/ 模块偏好；
     - 未配置：configured=False（页面按未配置展示）。
@@ -222,6 +222,7 @@ def _build_system_info() -> dict:
     """
     from src.python.config import get_config, get_llm_config
     from src.python.config._local_state import get_flag
+    from src.python.config.anonymizer import get_anonymization_mode
     from src.python.core.constants import APP_VERSION
     from src.python.core.logger import _get_machine_ip
     from src.python.core.registry import get_llm_module_names
@@ -253,8 +254,11 @@ def _build_system_info() -> dict:
     # 正式文件 mtime（正式-用存量「读取当前正式持仓」提示用；未就绪为 None）
     info["holdings_mtime"] = os.path.getmtime(holdings_path) if holdings_ready else None
     anon_labels = {"off": "关闭", "code_display": "代码显示", "full_anonymous": "完全匿名", "summary": "汇总"}
-    anon_mode = (config.get("features") or {}).get("anonymization") or {}
-    anon_mode = anon_mode.get("mode", "off") if isinstance(anon_mode, dict) else "off"
+    try:
+        anon_mode = get_anonymization_mode()
+    except Exception:
+        logger.warning("读取匿名化模式失败，按关闭展示", exc_info=True)
+        anon_mode = "off"
     info["anonymization"] = anon_labels.get(anon_mode, anon_mode)
     info["privacy_shown"] = bool(get_flag("_privacy_notice_shown"))
 
@@ -502,6 +506,31 @@ def _handle_run_history():
     return _ok(records)
 
 
+def _handle_config_edit():
+    """配置编辑：GET 返回可编辑面，POST 应用单次编辑（副作用，同源守卫）。
+
+    POST 校验失败（未知键/类型/枚举/action 非法）→ 400 BAD_PARAM；
+    写共享配置异常 → 500 CONFIG_WRITE_FAILED（详情记日志，前端不泄露内部细节）。
+    """
+    from src.python.web.config_edit import ConfigEditError, apply_config_edit, get_config_edit_surface
+
+    if request.method == "POST":
+        if not _is_same_origin():
+            return _err("BAD_PARAM", "同源校验失败，拒绝提交"), 403
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return _err("BAD_PARAM", "请求体格式不合法"), 400
+        try:
+            data = apply_config_edit(payload)
+        except ConfigEditError as e:
+            return _err("BAD_PARAM", str(e)), 400
+        except Exception:
+            logger.exception("[config-edit] 配置写入失败")
+            return _err("CONFIG_WRITE_FAILED", "配置写入失败（详情请查看日志）"), 500
+        return _ok(data)
+    return _ok(get_config_edit_surface())
+
+
 def _handle_serve_report(filename: str):
     """预览/下载产物（route ``<path:filename>`` → 参数名 filename）。
 
@@ -565,3 +594,5 @@ def create_handlers(app, run_manager) -> None:
 
     app.add_url_rule("/api/reports/<path:filename>", "serve_report", _handle_serve_report, methods=["GET"])
     app.add_url_rule("/api/health", "health", _handle_health, methods=["GET"])
+
+    app.add_url_rule("/api/config/edit", "config_edit", _handle_config_edit, methods=["GET", "POST"])

@@ -7,18 +7,18 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 242 | 57,894 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
+| 主程序代码 | Python | 244 | 58,803 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
 | HTML 报告模板 | HTML | 4 | 3,770 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
-| 辅助脚本 | Python | 18 | 6,790 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
-| **源代码合计** | — | **264** | **68,454** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **296** | **84,024** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,291 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **13** | **5,855** | 含 README.md（203 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 12 | 5,652 | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **109** | **43,546** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 1 + archive 98 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 9 | 7,639 | 变更日志/目录树/测试计划/技术设计等 |
+| 辅助脚本 | Python | 18 | 6,938 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
+| **源代码合计** | — | **266** | **69,511** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **304** | **85,969** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,445 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **用户文档** | Markdown | **13** | **5,976** | 含 README.md（203 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 12 | 5,773 | 配置/faq/快速上手/CLI 等 |
+| **项目文档** | Markdown | **109** | **43,813** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 1 + archive 98 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 9 | 7,904 | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 102 | 35,352 | 各版本 changelog/plan/review-findings 等（98 md 35,352 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 1 | 481 | 当前迭代中的设计方案（web-config-edit 设计定稿待实现） |
+| ├ plan/ | 中间设计文件 | 1 | 483 | 当前迭代中的设计方案（web-config-edit 设计定稿已实现） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -290,6 +290,7 @@ investor-util/
 │   │   │   ├── __main__.py           #   python -m 入口
 │   │   │   ├── server.py             #   服务主入口（sys.path 注入 + 端口检测 + app.run）
 │   │   │   ├── app.py                #   Flask 应用工厂（错误处理/请求日志/注入 run_manager）
+│   │   │   ├── config_edit.py        #   Web 配置编辑（白名单 config_edit_whitelist + 面板读取 + 应用编辑 + 写前 .bak 备份）
 │   │   │   ├── handlers.py           #   路由 handler（页面/上传/生成/轮询/预览/下载/历史/健康；_build_system_info 状态区系统信息）
 │   │   │   ├── upload.py             #   上传安全（uuid 重命名/扩展名白名单/魔数校验/原子落盘/TTL）
 │   │   │   ├── holdings_update.py    #   正式持仓更新（旧文件备份 .bak + 原子提升上传文件为正式文件）
@@ -582,8 +583,10 @@ investor-util/
 │       │   │   ├── test_progress.py #       Web 进度报告器（事件缓冲/seq/增量）
 │       │   │   ├── test_runs.py     #       RunManager（状态机/队列/保留/单例重置）
 │       │   │   ├── test_handlers.py #       Flask 路由 handler（全链路/错误信封/穿越拒绝/系统信息组装）
+│       │   │   ├── test_config_edit.py #    Web 配置编辑（白名单完备/写分派/校验守卫/备份）
+│       │   │   ├── test_config_edit_edge.py # Web 配置编辑极端输入（edge，*_edge.py 隔离）
 │       │   │   ├── test_server.py   #       启动防护（output_dir 写锁检测/端口占用）
-│       │   │   └── test_smoke_web.py #      Web 冒烟脚本载体（test_client 9 项全链路断言）
+│       │   │   └── test_smoke_web.py #      Web 冒烟脚本载体（test_client 11 项全链路断言）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── test_cache_consistency.py      #   缓存前缀契约跨模块共享集成测试
@@ -867,7 +870,7 @@ investor-util/
 │   │   │   └── web-holdings-input-modes/    #   Web 持仓输入模式实施归档（plan-25 完成）
 │   │   │       └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计定稿
 │   ├── plan/                          #   中间设计文件
-│   │   └── web-config-edit.md           #     Web 配置编辑设计定稿（plan-26，完整镜像 TUI 可编辑配置全集，待实现）
+│   │   └── web-config-edit.md           #     Web 配置编辑设计定稿（plan-26，完整镜像 TUI 可编辑配置全集，已实现）
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
