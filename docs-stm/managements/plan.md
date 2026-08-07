@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.10.12-dev
-> **编号源**：`plan-next = 26`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-25，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 28`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-27，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -52,6 +52,28 @@ Web 上传持仓跑 full/both 会污染共享快照目录（rf-261）。方案�
 **实现要点**：`capture_snapshot` 增试算/正式判定（web 默认试算 → namespace="web"）；`history_snapshot` 的 save/load_latest/load_all/prune 支持 namespace 子目录；`portfolio_evolution`/`_snapshot` 读主目录；web `_handle_create_run` 增模式参数（trial/formal + use-existing），前端表单增模式选择；测试覆盖两种模式快照归属；用户文档（how-to-start Web 模式 + how-to-config）。**预估：2d**。
 
 > **实施进度（2026-08-07）**：**六阶段全部落地**——① 存储层 `history_snapshot` namespace 子目录（save/load_latest/load_all/list_all/prune + 白名单校验）；② 消费层 `capture_snapshot`/`build_evolution_data`/`build_snapshot_diff` + 两个 `_inject_*` 透传 `snapshot_namespace`；③ 编排层 `generate_report` + `_report_generation` 双路径透传；④ web 入口 `holdings_update.py`（单槽 `.bak` 备份 + 原子提升）+ `_handle_create_run` mode/use_existing 解析与组合校验（正式+用存量禁止 file_id→400）+ `_web_input_mode_snapshot_domain` 模式→快照域映射；⑤ 前端生成用途/输入来源单选 + 覆盖警示 + 确认勾选（index.html/main.js/style.css），resetFlow 区分正式-用存量；⑥ 文档与门禁——语义表登记 `snapshot_namespace`/`web_input_mode`/`use_existing`/`holdings_update`，folders/三手册/changelog 同步，`_pipeline.py` 标注遗留不承载活代码。smoke-web.py 10 断言全通过，dev-verify 1970 + 4 checks --ci 全 [OK]。**已实现**（P4 选做、无排期，仍列为实验功能）。设计文档已归档至 [`archive/v0.10.x/web-holdings-input-modes/`](../archive/v0.10.x/web-holdings-input-modes/plan-web-holdings-input-modes.md)。
+
+#### `plan-26` Web 配置编辑：完整镜像 TUI 可编辑配置全集（[`web-config-edit.md`](../plan/web-config-edit.md)）
+
+Web 模式支持修改与 TUI **完全一致**的配置项全集。已确认决策（用户拍板，勿推翻）：① 先写设计文档 ② 完整镜像 TUI ③ 写前 `.bak` 备份。**设计已定稿**（2026-08-07，设计文档位于 `docs-stm/plan/web-config-edit.md`，待实现）：
+
+- **7 组全集**：自由文本路径（holdings_dir / holdings_filename / output_dir）、报告章节开关 5 项、增强子模块开关 6 项、匿名化枚举（off/code_display/full_anonymous/summary）、对比指数池（增/删/重置默认）、LLM 分析章节开关 5 项（enabled_llm，隐藏三模块不展示）、辩论实验功能开关 3 项（features.json）。
+- **后端**：新模块 `web/config_edit.py`——`config_edit_whitelist` 白名单（点分键→类型/枚举→目标文件→写入原语）+ `GET/POST /api/config/edit`（POST 复用 `_is_same_origin()` 守卫）；写共享配置前 `config_backup_file` 单槽 `.bak`（mkstemp + `os.replace` 原子写）。
+- **写入语义（逐条等价 TUI）**：config.json→`set_config`（嵌套 dict 读合并整块写；匿名化走 `set_anonymization_mode`）；llm_settings.json→共享 `write_llm_settings`（自 tui 抽取，TUI 改委托）；features.json→`save_feature_overrides`。
+- **一致性修正**：两个状态面板（tui_menu / web handlers）匿名化读路径改顶层 `anonymization.mode`（原误读不存在的 `features.anonymization.mode`，恒显示关闭）。
+- **前端**：index.html 新增「配置编辑」card（7 组控件）+ main.js 即改即存 + error_code 分支，选项与 TUI 完全一致。
+- **语义命名**：`config_edit` / `config_edit_whitelist` / `config_backup`。**登记时机**：实现完成时（check-semantic-index 反向校验约束，设计阶段不提前登记）。
+- **预估**：2d（对齐 plan-25）。状态：**设计定稿待实现**。
+
+#### `plan-27` 前端资产统一归入 `src/static/`：Web UI 与报告模板（基础设施重构）
+
+将分散在 Python 包内的非 Python 前端资产统一归入 `src/static/`（报告图表 bundle 已有目录），`src/python/` 仅保留纯 Python 代码：
+
+- **Web UI 前端**（`index.html`/`main.js`/`style.css`）：`src/python/web/{templates,static}/` → `src/static/web/`；`app.py` 的 Flask `template_folder`/`static_folder` 改为 `PROJECT_ROOT` 派生，`/static/main.js` 与 `render_template("index.html")` 契约不变。
+- **报告 Jinja 模板**（`report_template.html`/`whatif_template.html`/`partials/`）：`src/python/tmpl/` → `src/static/tmpl/`；`html_jinja_env.py` `_TEMPLATE_DIR` 改用 `PROJECT_ROOT` 派生（单加载点）。
+- **净效果**：`src/static/` = 报告图表 bundle + Web UI 前端 + 报告模板三合一；5 个按路径读模板的测试路径同步。
+
+> **实施进度（2026-08-07）**：代码归入 + 加载点改造（app.py / html_jinja_env）+ 5 测试路径同步完成；`smoke-web.py` 10/10 + report/web/llm 单测 2395 passed；folders 目录树/统计表同步，changelog 登记；`src/static/README.md` 资产说明滞后登记 rf-267。**已实现**（基础设施重构，随 P4 实验功能批次，无独立排期）。
 
 ---
 

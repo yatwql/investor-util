@@ -15,15 +15,20 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from uuid import uuid4
 
 from flask import Flask, g, request
 
+from src.python.core.constants import PROJECT_ROOT
 from src.python.web.handlers import _err, _run_generation, create_handlers
 from src.python.web.upload import _MAX_BYTES
 
 logger = logging.getLogger("invest")
+
+# Web UI 前端目录：Jinja 模板 + 静态资产统一归 src/static/web/（与报告模板同属前端资源）
+_WEB_FRONTEND_DIR = os.path.join(PROJECT_ROOT, "src", "static", "web")
 
 
 def create_app(run_manager=None) -> Flask:
@@ -41,7 +46,7 @@ def create_app(run_manager=None) -> Flask:
     if run_manager.executor is None:
         run_manager.executor = _run_generation
 
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder=_WEB_FRONTEND_DIR, static_folder=_WEB_FRONTEND_DIR)
     app.config["MAX_CONTENT_LENGTH"] = _MAX_BYTES
     # 中文 JSON 不转义（对齐仓库中文文案惯例）
     app.json.ensure_ascii = False

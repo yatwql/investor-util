@@ -236,6 +236,14 @@ A: 需要备份的文件：
 
 缓存文件（`data/cache/`）无需备份，程序会自动重新生成。建议将上述文件定期复制到安全位置。迁移到新电脑时复制整个项目目录即可。
 
+**Q: 在 Web 页面改了配置，会影响 TUI / CLI 吗？**
+
+A: 会。Web「配置编辑」面板与 TUI 修改的是**同一份共享配置文件**（`config.json` / `llm_settings.json` / `features.json`），可编辑项与 TUI 主菜单完全一致。修改立即写入，TUI / CLI 下次读取即生效（缓存按文件修改时间自动失效）。注意避免 Web 与 TUI 同时修改配置（跨进程并发读-改-写可能互相覆盖），写前程序会自动备份 `.bak`。
+
+**Q: Web 改配置改错了怎么办？**
+
+A: Web 每次写共享配置前会自动备份为 `{文件}.bak`（如 `config.json.bak`，单槽轮转，仅保留最近一份）。手动把 `.bak` 改回原文件名即可还原上次写入前的配置，然后重新生成/刷新。
+
 **Q: 为什么报告或配置中显示的版本号不是最新的？**
 
 A: 版本号在 `src/python/core/constants.py` 的 `APP_VERSION` 中定义。发布新版本后，需运行 `.venv/bin/python scripts/check-version-consistency.py` 按提示同步所有文件中的版本号（README.md、pyproject.toml、管理文档头部等），确保全局一致。遇到版本号不一致时运行上述脚本即可排查并修复。

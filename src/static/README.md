@@ -1,8 +1,16 @@
-# src/static/ — 前端静态资产
+# src/static/ — 前端资产
 
-Chart.js 交互式图表的前端资产（引擎 + 自有 JS + 独立调试页）统一存放于此目录。
-报告生成时由 `html_writer.py` 通过 `shutil.copy2` 复制到报告输出目录（与 HTML 同目录），
-模板以**相对路径**引用，报告完全离线自包含（R21 纯本地 bundle 决策）。
+非 Python 前端资产统一存放于此目录（plan-27 后分三类）：
+
+1. **报告图表 bundle**（`chart*.js` / `toc.js` / `theme.js` / `test-chart.html`）：报告生成时由 `report/html_writer_assets.py` 复制到报告输出目录（与 HTML 同目录），模板以**相对路径**引用，报告完全离线自包含（R21 纯本地 bundle 决策）。
+2. **Web UI 前端**（`web/`）：轻量 Web 模式单页 UI 的 Jinja 模板 + 静态资产。`web/app.py` 的 Flask `template_folder` / `static_folder` 指向 `src/static/web/`，URL 前缀 `/static/`、`render_template("index.html")` 契约与归入前一致。
+3. **报告 Jinja 模板**（`tmpl/`）：HTML 报告主模板、调仓 What-if 独立页与章节级 partial，由 `report/html_jinja_env.py` 的 `FileSystemLoader` 加载（单加载点）。
+
+---
+
+# 报告图表 bundle
+
+Chart.js 交互式图表的前端资产（引擎 + 自有 JS + 独立调试页）。报告生成时复制到输出目录，模板以相对路径引用。
 
 ## 文件清单
 

@@ -6,6 +6,28 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 前端资产统一归入 src/static/：Web UI 与报告模板（plan-27）（2026-08-07）
+
+- **Web UI 前端**（`index.html`/`main.js`/`style.css`）自 `src/python/web/{templates,static}/` 归入 `src/static/web/`；`app.py` 的 Flask `template_folder`/`static_folder` 改为 `PROJECT_ROOT` 派生指向新目录，`/static/main.js` URL 与 `render_template("index.html")` 契约不变。
+- **报告 Jinja 模板**（`report_template.html`/`whatif_template.html`/`partials/`）自 `src/python/tmpl/` 归入 `src/static/tmpl/`；`html_jinja_env.py` 的 `_TEMPLATE_DIR` 改用 `PROJECT_ROOT` 派生（单加载点，whatif 走同一 `_ENV` 零改动）。
+- **净效果**：`src/static/` 成为非 Python 前端资产唯一归属（报告图表 bundle + Web UI 前端 + 报告模板三合一）；`src/python/` 仅保留纯 Python 代码。
+- **测试同步**：5 个按路径读模板的测试（test_html_writer / test_html_template / test_html_report_structure / test_html_report_structure_edge / test_llm_placeholder_distinction_edge）路径改为 `src/static/tmpl/`。
+- **验证**：`smoke-web.py` 10/10（Flask 新位置服务模板 + `/static/main.js`）；report/web/llm 全量单测 2395 passed。
+- **配套**：`folders.md` 目录树与统计表同步（web/ 目录树移除 templates/static，src/static/ 新增 web/tmpl 子树）；plan-26 配置编辑设计文档改动清单已按新路径更新（前端位置无关、契约不变）；`src/static/README.md` 资产说明滞后登记 rf-267。
+
+---
+
+### Web 配置编辑：完整镜像 TUI 可编辑配置全集（设计定稿）（2026-08-07）
+
+- **本条目为设计文档登记**（`docs-stm/plan/web-config-edit.md`，plan-26），实现前不产生运行时代码变更。
+- **范围**：Web 模式支持修改与 TUI **完全一致**的配置项全集——7 组：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档（off/code_display/full_anonymous/summary）、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、辩论实验功能开关 3（features.json）。
+- **关键决策**：新模块 `web/config_edit.py`——`config_edit_whitelist` 白名单（点分键→类型/枚举→目标文件→写入原语）+ `GET/POST /api/config/edit`（POST 复用 `_is_same_origin()` 同源守卫）；写共享配置前 `config_backup_file` 单槽 `.bak` 备份（mkstemp + `os.replace` 原子写）；写入分派逐条等价 TUI（config.json→`set_config`，嵌套 dict 读合并整块写，匿名化走 `set_anonymization_mode`；llm_settings.json→自 tui 抽取共享 `write_llm_settings`；features.json→`save_feature_overrides`）。
+- **一致性修正（随功能实现）**：状态面板匿名化读路径由不存在的 `features.anonymization.mode` 修正为顶层 `anonymization.mode`（tui_menu 状态面板 + web `_build_system_info`），此前面板恒显示「关闭」。
+- **前端**：index.html 新增「配置编辑」card（7 组控件）+ main.js 即改即存 + error_code 分支，选项与 TUI 完全一致。
+- **状态**：设计定稿待实现；预估 2d；语义表 `config_edit`/`config_edit_whitelist`/`config_backup` 于实现完成时登记（check-semantic-index 反向校验约束）。
+
+---
+
 ### Web 生成用途双模式：临时试算隔离 / 正式更新共享（2026-08-07）
 
 - **Web 新增「生成用途」选择**：提交前可选「临时试算」（默认）或「正式更新」。

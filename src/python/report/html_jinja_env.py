@@ -8,10 +8,12 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 from src.python.core.code_utils import is_qdii_extended
+from src.python.core.constants import PROJECT_ROOT
 
 # ── 路径 & Jinja2 环境 ─────────────────────────────────────
 
-_TEMPLATE_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "tmpl"))
+# 报告 Jinja 模板统一归 src/static/tmpl/（与前端资产同目录，src/python 仅保留 Python 代码）
+_TEMPLATE_DIR = os.path.normpath(os.path.join(PROJECT_ROOT, "src", "static", "tmpl"))
 _ENV = Environment(loader=FileSystemLoader(_TEMPLATE_DIR), autoescape=True)
 
 

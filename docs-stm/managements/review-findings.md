@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.12-dev
-> **编号源**：`rf-next = 266`（新增问题取此编号，完成后更新为 +1；已用最大 rf-265，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 267`（新增问题取此编号，完成后更新为 +1；已用最大 rf-266，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -38,7 +38,6 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复 |
 | **rf-261** | Web 上传持仓跑 full/both 会**污染共享快照目录** `data/history/snapshots/`：上传文件本身已隔离（`web/upload.py` uuid 落盘 `data/holdings/uploads/` + TTL/用完即删），但 full/both 生成时 `capture_snapshot`（`report/_snapshot.py`）基于**本次上传的临时持仓**调 `save()` 持久化快照到**三渠道共享**目录 → TUI/CLI 后续报告的「快照差异/组合演进」会拿 web 测试持仓的历史快照参与对比（`portfolio_evolution` 读 `load_latest`）。`data/cache/`（行情缓存）与 `data/state/`（熔断/降级/性能历史）共享属**架构刻意**（数据降级治理体系全局一致），非缺口；basic 路径明确不落快照（`orchestrator.py` 注释） | **方案已确认（2026-08-07 探讨收敛）**：`data/cache`/`data/state` 保持共享不动（按证券代码/机器键控，非持仓身份数据，隔离反而破坏缓存复用与数据降级治理——伪需求）。按**使用意图**分两模式：① **临时试算（web 默认）**：上传保持 uuid 临时态，快照写入独立子目录 `data/history/snapshots/web/`（`history_snapshot.save/load` 增 namespace 子目录支持），TUI/CLI 读主目录自然排除 web 试算快照，组合演进/快照差异不受污染；② **正式更新（共享，显式选择）**：两种输入——上传覆盖 `data/holdings/{holdings_filename}`（先备份旧文件），或**不上传直接用存量持仓文件**（web 成为完整报告生成入口，符合"最少输入"定位）；快照入共享主目录，演进/对比真实生效。实现要点：`capture_snapshot` 增试算/正式判定（web 默认试算），`history_snapshot` 支持 namespace 子目录，web `_handle_create_run` 增模式参数（trial/formal + use-existing）。**待实现（登记 plan-25）** |
-
 ---
 
 ## 已修复（摘要）
@@ -61,6 +60,7 @@
 | rf-263 | `run_health_checks` 的 `max_timeout` 是**死参数**：原实现用 `ThreadPoolExecutor` + `as_completed`，线程并行执行、主流程等待全部完成，`max_timeout` 从未真正限制整体耗时——慢速/挂起的数据源会拖住整个健康检查（Web 健康接口需在前端 15s abort 前返回，若超时会 504） | 改为 daemon 线程 + 整体耗时预算：`deadline = perf_counter() + max_timeout`，逐线程 `join(timeout=剩余预算)`，预算耗尽即返回已收集的部分结果，未完成项标记「超时（预算 Ns）」；持锁原子追加 + 竞态兜底（同 name 保留真实结果弃超时占位）；`max_timeout` 成为真正的整体耗时上限；新增 `src/test/unit/core/test_check_sources.py` 回归用例 | `changelog.md` [0.10.11] |
 | rf-264 | Web 首页系统信息卡缺 TUI 首页摘要对齐字段：`show_config()` 展示 持仓目录/持仓文件/输出目录/新闻抓取上限/状态（文件是否就绪）/持仓匿名化/隐私声明，Web 首页仅展示 程序版本/本机 IP/LLM（用户要求首页显示 软件版本号/状态/新闻抓取上限/LLM配置信息/模型/策略 等，参考 TUI 首页摘要） | `web/handlers.py` `_build_system_info` 增补配置摘要字段（`get_config()` 读取 holdings_dir/holdings_filename/output_dir/news_top_count、`os.path.exists` 判定 holdings_ready、features.anonymization.mode 中文映射、`get_flag("_privacy_notice_shown")`），配置读取异常按默认值兜底；`index.html` 系统信息卡片补对应行 + `style.css` `.system-status-ok/err` 状态色；`TestSystemInfo` 新增 6 用例（web 目录 89 用例全绿 + smoke 9/9） | `changelog.md` [0.10.12-dev] |
 | rf-265 | 应用名称「投资复盘助手」硬编码散落（TUI 首页 tui_menu.py 写死、cli.py/server.py 描述用「生成工具」）、未作为单一来源常量；各入口（TUI 首页/启动日志/Web 首页/HTML 报告首页/Excel 首页）未统一强调应用名称 + 版本号（用户要求固化到 constants.py，报告强调由本应用及版本生成） | `core/constants.py` 新增 `APP_NAME` 单一来源常量；启动日志 `log_app_boundary` 改为「应用启动 \| {APP_NAME} v{APP_VERSION} \| …」；TUI 首页 `print_header` 引用 `APP_NAME`；Web 首页 `_handle_index` 传 `app_name` + index.html 顶部 `<h1>`/副标题强调名称与版本；主报告模板 report_template.html 头部加「由 {app_name} v{app_version} 生成」+ 页脚改「由 {app_name} v{app_version} 生成 · 个人投资分析报告」；whatif 报告模板页脚同加；Excel summary 页签 `_write_basic_info` 增「生成工具」行（`APP_NAME v{APP_VERSION}`）；新增/补强测试 4 处 | `changelog.md` [0.10.12-dev] |
+| rf-266 | `src/static/README.md` 资产说明仍仅覆盖图表 bundle（Chart.js 文件清单 + 升级指引），未涵盖 plan-27 归入的 `web/`（Web UI 前端）与 `tmpl/`（报告模板）——目录语义扩大为三类资产后文档说明滞后 | `src/static/README.md` 重写为三类资产总览（图表 bundle 报告生成时复制 / web 前端 Flask `template_folder`+`static_folder` 加载 / 报告模板 `report/html_jinja_env` 加载），原图表文件清单/版本/升级/安全保留为子节 | `changelog.md` [0.10.12-dev] plan-27 |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 

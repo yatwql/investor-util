@@ -29,7 +29,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 # ── 常量 ──────────────────────────────────────────────────────
 
 _TEMPLATE_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "python", "tmpl", "report_template.html"),
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html"),
 )
 
 # 默认注册表 key（按默认顺序，与 registry.py 对齐）

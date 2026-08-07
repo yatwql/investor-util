@@ -213,7 +213,7 @@ class TestCandidateCompareTemplate(unittest.TestCase):
             "..",
             "..",
             "..",
-            "python",
+            "static",
             "tmpl",
             "report_template.html",
         )
@@ -408,7 +408,7 @@ class TestFundFlowTemplate(unittest.TestCase):
             }
         )
         tmpl_path = os.path.normpath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "..", "python", "tmpl", "report_template.html")
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html")
         )
         with open(tmpl_path, encoding="utf-8") as f:
             self.html = f.read()
