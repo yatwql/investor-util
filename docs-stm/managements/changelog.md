@@ -48,6 +48,13 @@
 - **保留**：`_build_scenario_entry` 的 `vol_*`/CI 结构化输出字段（由 `beta_se`/`beta_ci` 驱动，语义为「Beta 估计不确定性传播」，与已删的 `portfolio_volatility` 是不同概念；未来渲染层可直接消费）。
 - **验证**：test_scenario_analysis.py + test_e2e_perf.py 共 32 用例全绿；无 `portfolio_volatility`/`annual_volatility` 残留引用；ruff format 干净。rf-271 完成，rf-next 保持 273。
 
+### 关闭日志流竞态修复：`_ClosedStreamSilentHandler`（rf-273 完成）（2026-08-07）
+
+- **背景**：全量测试（mode all，5433 用例）进程退出阶段出现 `--- Logging error ---` 噪声。根因——`tui.py` 模块级 `atexit.register(log_app_boundary, "关闭", "TUI模式")` 在任何导入 tui 模块的测试进程退出时触发，此时 pytest 已关闭 sys.stderr，console `StreamHandler`（默认绑 stderr）emit 抛 `ValueError: I/O operation on closed file`，logging 默认 `handleError` 打印 `--- Logging error ---` + traceback。无害（测试全绿）但污染每次全量测试输出。
+- **修复**：`core/logger.py` 新增 `_ClosedStreamSilentHandler`（`logging.StreamHandler` 子类，覆盖 `handleError`——仅当异常为 `ValueError/OSError` 且含 "closed file"（退出竞态）时静默降级，其余日志错误照常由父类报告）；`setup_logger` 控制台 handler 换用该类。
+- **回归测试**：新增 `src/test/unit/core/test_logger.py` 4 用例（unit_core 标记）——关闭流 emit 不打印 error / handleError 对 closed file 静默不委托父类 / 对其他错误照常委托 / setup_logger 控制台 handler 类型断言。
+- **验证**：全量 mode all **5437 passed, 0 failed**（新增 4 用例），`--- Logging error ---` 消失；dev-verify 2009 passed；ruff format/lint 干净；4 check 脚本 `--ci` [OK]。rf-273 完成，rf-next 递增为 274。
+
 ---
 
 ## [0.10.12] - 2026-08-07

@@ -55,6 +55,22 @@ class _ColoredFormatter(logging.Formatter):
         return super().format(record)
 
 
+class _ClosedStreamSilentHandler(logging.StreamHandler):
+    """控制台 Handler — 对「流已关闭」写失败静默降级。
+
+    进程退出阶段（模块级 atexit 注册的关闭日志）可能发生在宿主/测试
+    框架关闭 sys.stderr 之后，此时 emit 抛 ``ValueError: I/O operation
+    on closed file``，logging 默认经 handleError 打印 ``--- Logging error ---``
+    噪声。本类仅对该退出竞态静默，其余日志错误照常由父类报告。
+    """
+
+    def handleError(self, record: logging.LogRecord) -> None:
+        exc_value = sys.exc_info()[1]
+        if isinstance(exc_value, (ValueError, OSError)) and "closed file" in str(exc_value):
+            return  # 流已关闭属退出竞态，静默降级
+        super().handleError(record)
+
+
 def setup_logger(name: str = "invest") -> logging.Logger:
     """
     初始化并返回 logger。
@@ -81,7 +97,9 @@ def setup_logger(name: str = "invest") -> logging.Logger:
     formatter = logging.Formatter(_LOG_FORMAT)
 
     # ---- 控制台 Handler（彩色输出） ----
-    console_handler = logging.StreamHandler()
+    # 用 _ClosedStreamSilentHandler：进程退出阶段（atexit）流可能已关闭，
+    # 对 "closed file" 静默降级，避免 `--- Logging error ---` 噪声。
+    console_handler = _ClosedStreamSilentHandler()
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(_ColoredFormatter(_LOG_FORMAT))
     logger.addHandler(console_handler)
