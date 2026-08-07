@@ -6,8 +6,8 @@
   - 汇率情景：基于外汇敞口的人民币 ±5% 波动影响
 
 置信区间传播：
-  - Beta CI → 情景回撤 CI
-  - 年化波动率 CI → 夏普比率 CI
+  - Beta CI → 情景回撤 CI（beta_ci_lower/upper 与 beta_se 驱动）
+  - 夏普比率 CI（Lo(2002) 常数近似，不消费年化波动率）
   - 过宽时标注"预测可靠性有限"
 
 严格保持与 report/ 层无依赖（analysis 层约束）。
@@ -121,20 +121,19 @@ def scenario_analysis(
     beta_ci_lower: float | None = None,
     beta_ci_upper: float | None = None,
     beta_se: float | None = None,
-    portfolio_volatility: float | None = None,  # noqa: ARG001  # 预留：组合年化波动率区间输出（±1σ/±2σ）待实现，调用方已传值
 ) -> dict[str, Any]:
     """基于 Beta 计算六种市场情景下的组合预期变动。
 
     线性推导 E(Rp) = β × Rm。
-    含置信区间（Beta CI → 预期变动 CI）和 ±1σ/±2σ 波动率区间（当 portfolio_volatility 可用时）。
+    含置信区间（Beta CI → 预期变动 CI）和 ±1σ/±2σ 不确定带
+    （由 Beta 标准误 beta_se 驱动，见 _build_scenario_entry）。
 
     Args:
         portfolio_value: 组合总市值（元）
         beta: 组合 Beta 点估计值，为 None 时情景列显示"--"
         beta_ci_lower: Beta 95% CI 下限，为 None 时不输出 CI
         beta_ci_upper: Beta 95% CI 上限
-        beta_se: Beta 标准误，为 None 时不输出 ±1σ/±2σ
-        portfolio_volatility: 组合年化波动率，为 None 时不输出波动率区间
+        beta_se: Beta 标准误，为 None 时不输出 ±1σ/±2σ 不确定带
 
     Returns:
         {
@@ -330,18 +329,16 @@ def fx_scenario_analysis(
 
 def sharpe_ci_propagation(
     sharpe_ratio: float | None,
-    annual_volatility: float | None,  # noqa: ARG001  # 预留：当前 SE 用 Lo(2002) 常数近似，未消费此参数；保留以支持未来波动率修正
     years_of_data: float,
     n_observations: int = _TRADING_DAYS,
 ) -> dict[str, Any]:
-    """从年化波动率传播夏普比率的置信区间。
+    """计算夏普比率的置信区间。
 
     夏普比率的标准误近似：SE(SR) ≈ sqrt(1 + 0.5 * SR²) / sqrt(N)
     其中 N 为观测年数折算的独立观测数。
 
     Args:
         sharpe_ratio: 夏普比率值，None 时不计算
-        annual_volatility: 年化波动率，用于辅助判断
         years_of_data: 数据覆盖年数
         n_observations: 日收益率观测数
 

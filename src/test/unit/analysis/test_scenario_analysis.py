@@ -182,7 +182,7 @@ class TestSharpeCI:
 
     def test_normal_sharpe_returns_ci(self):
         from src.python.analysis.scenario import sharpe_ci_propagation
-        result = sharpe_ci_propagation(0.80, 0.15, 3.0)
+        result = sharpe_ci_propagation(0.80, 3.0)
         assert result["has_data"] is True
         assert result["ci_lower"] < result["sharpe_ratio"]
         assert result["ci_upper"] > result["sharpe_ratio"]
@@ -190,23 +190,23 @@ class TestSharpeCI:
     def test_high_sharpe_wider_ci(self):
         """夏普比率越高，CI 越宽（Lo 近似）。"""
         from src.python.analysis.scenario import sharpe_ci_propagation
-        r1 = sharpe_ci_propagation(0.50, 0.15, 3.0)
-        r2 = sharpe_ci_propagation(2.00, 0.15, 3.0)
+        r1 = sharpe_ci_propagation(0.50, 3.0)
+        r2 = sharpe_ci_propagation(2.00, 3.0)
         assert r2["ci_width"] > r1["ci_width"]
 
     def test_more_data_narrower_ci(self):
         """更多观测数据 → CI 更窄。"""
         from src.python.analysis.scenario import sharpe_ci_propagation
-        r1 = sharpe_ci_propagation(0.80, 0.15, 1.0, n_observations=63)
-        r2 = sharpe_ci_propagation(0.80, 0.15, 3.0, n_observations=756)
+        r1 = sharpe_ci_propagation(0.80, 1.0, n_observations=63)
+        r2 = sharpe_ci_propagation(0.80, 3.0, n_observations=756)
         assert r2["ci_width"] < r1["ci_width"]
 
     def test_none_sharpe_returns_no_data(self):
         from src.python.analysis.scenario import sharpe_ci_propagation
-        result = sharpe_ci_propagation(None, 0.15, 3.0)
+        result = sharpe_ci_propagation(None, 3.0)
         assert result["has_data"] is False
 
     def test_short_history_warning(self):
         from src.python.analysis.scenario import sharpe_ci_propagation
-        result = sharpe_ci_propagation(0.50, 0.15, 0.5)
+        result = sharpe_ci_propagation(0.50, 0.5)
         assert result["warning"] is not None

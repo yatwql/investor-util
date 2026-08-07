@@ -40,6 +40,14 @@
 - **新增 F841 连带清理**：`handlers_report._cmd_generate_both` 未用局部 `reporter`、`test_market_value_sheet` 未用局部 `result`、`test_handlers_report` 7 处未用 `reporter`。
 - **门禁**：P0 dev-verify **2005 passed**；4 个 check 脚本 `--ci` [OK]；ruff format 本轮改动 7 文件全绿。rf-272 完成（43 处全数处置），rf-next 保持 273。
 
+### scenario 死参数删除：portfolio_volatility / annual_volatility（rf-271 完成）（2026-08-07）
+
+- **背景**：rf-271 登记时按「死参数预留」处置（保留 + `# noqa: ARG001`）。本次深入评估发现三层问题——① 两参数确实从未消费（`scenario_analysis().portfolio_volatility` docstring 承诺 ±1σ/±2σ 波动率区间但函数体不引用，2 处调用点已传 `annualized_volatility` 被吞；`sharpe_ci_propagation().annual_volatility` 被 Lo(2002) 常数近似公式绕过）；② 死的不止参数——`_build_scenario_entry` 计算的 `vol_1sigma/vol_2sigma` 4 字段与 `ci_lower/ci_upper` 4 字段**全仓零消费**，`scenario_analysis` 输出唯一消费方 `prompts_tables._build_scenario_block` 只读点估计 `expected_change_pct`；③ `sharpe_ci_propagation` 无生产调用（仅测试 + `analysis/__init__.py` 导出）。
+- **设计意图核对**：归档 P4-03 承诺「在 LLM prompt 表述 *若市场下跌 20%，组合预计回撤 -16% 至 -24%（95% 置信区间）*」——该 CI 区间从未进入任何 prompt/报告输出，属**半实现**；波动率区间功能连计算都未落地（参数被吞）。用户从未见过 CI/波动率区间输出。
+- **处置（方向 2：删除）**：`scenario_analysis` 删 `portfolio_volatility`（同步 `_full_risk_metrics.py`/`_pipeline.py` 2 调用点）；`sharpe_ci_propagation` 删 `annual_volatility`（签名变 `(sharpe_ratio, years_of_data, n_observations)`，同步 test_scenario_analysis.py 7 处位置传参 + test_e2e_perf.py 关键字传参）；docstring 与模块 docstring 诚实化（「年化波动率 CI → 夏普 CI」修正为「Lo 常数近似，不消费年化波动率」）。
+- **保留**：`_build_scenario_entry` 的 `vol_*`/CI 结构化输出字段（由 `beta_se`/`beta_ci` 驱动，语义为「Beta 估计不确定性传播」，与已删的 `portfolio_volatility` 是不同概念；未来渲染层可直接消费）。
+- **验证**：test_scenario_analysis.py + test_e2e_perf.py 共 32 用例全绿；无 `portfolio_volatility`/`annual_volatility` 残留引用；ruff format 干净。rf-271 完成，rf-next 保持 273。
+
 ---
 
 ## [0.10.12] - 2026-08-07
