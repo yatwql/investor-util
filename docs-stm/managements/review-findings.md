@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.13-dev
-> **编号源**：`rf-next = 274`（新增问题取此编号，完成后更新为 +1；已用最大 rf-273，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 276`（新增问题取此编号，完成后更新为 +1；已用最大 rf-275，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -36,7 +36,7 @@
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
-| **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复 |
+| **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
 ## 已解决问题（变更详情见 changelog.md 对应条目）
 
@@ -69,6 +69,8 @@
 | rf-272 | 全仓 **43 处 ARG001 未用函数参数**全数处置：① 删参 21 处（含 40+ 调用点/测试同步）② 契约保留 7 处加 `# noqa: ARG001`（sina_kline start_from、is_enable_llm config、_compute_ncols 3×、check_liquidity total_mv）③ 独立项 3 项不纳入本轮（见下） | `changelog.md` [0.10.13-dev] |
 | rf-271 | `analysis/scenario.py` 两个死参数——① `scenario_analysis()` 的 `portfolio_volatility`（docstring 承诺 ±1σ/±2σ 波动率区间但从未消费，调用方已传 `annualized_volatility` 被吞）；② `sharpe_ci_propagation()` 的 `annual_volatility`（Lo(2002) 常数近似不消费）。**深入评估（2026-08-07）**：死的不止参数——`vol_*`/`ci_*` 输出字段全仓零消费（LLM 唯一消费方 `_build_scenario_block` 只读点估计），`sharpe_ci_propagation` 无生产调用；设计承诺（P4-03）的 CI 区间从未进入 prompt。**处置（方向 2：删除）**：删 2 参数 + 2 生产调用点（_full_risk_metrics/_pipeline）+ 8 处测试调用点（7 处单元位置传参 + e2e_perf 关键字传参）+ docstring/模块 docstring 诚实化（修正「年化波动率 CI → 夏普 CI」为实际「Lo 常数近似」）；`vol_*`/CI 输出字段保留为结构化输出。 | `changelog.md` [0.10.13-dev] |
 | rf-273 | 全量测试（mode all）进程退出阶段出现 `--- Logging error ---` 噪声：`tui.py` 模块级 `atexit.register(log_app_boundary, "关闭", ...)` 在 pytest 关闭 sys.stderr 后执行，console `StreamHandler` emit 抛 `ValueError: I/O operation on closed file`，logging 默认 `handleError` 打印噪声（无害但污染输出）。**修复**：`core/logger.py` 新增 `_ClosedStreamSilentHandler`（`StreamHandler` 子类，`handleError` 仅对 "closed file" 竞态静默降级，其余日志错误照常报告），`setup_logger` 控制台 handler 换用；新增 `test_logger.py` 4 用例回归。 | `changelog.md` [0.10.13-dev] |
+| rf-274 | Web 前端静态资产 404（阻断级）：Flask 未显式指定 `static_url_path` 时按 `static_folder` basename 推导（`src/static/web/` → `/web/*`），index.html 引用的 `/static/main.js`、`/static/style.css` 全 404 → JS/CSS 未加载，前端整页失效（配置面板空白、健康区卡静态"正在检测"、生成按钮灰色）。plan-27 前端资产移入 `src/static/` 时引入，移动后未在真实浏览器验证。**修复**：`app.py` 显式 `static_url_path="/static"`；新增 `test_web_static_serving.py` 3 用例（静态路由固定 /static + index 全部资产 200 + main.js 可访问）回归。 | `changelog.md` [0.10.13-dev] |
+| rf-275 | main.js 旧浏览器兼容隐患（排查 rf-274 时发现）：`AbortSignal.timeout`（Chrome 103+/Safari 16+ 起才有）缺失时 `fetch(url, {signal: AbortSignal.timeout(...)})` 构造参数**同步抛 TypeError** → init 在 loadHealth 处中断，后续 loadHistory/loadConfigEdit 全部静默不执行（同 rf-274 症状但不同根因）。**修复**：main.js 顶部补 `AbortSignal.timeout` 兼容兜底（AbortController+setTimeout，无 AbortController 则退化 undefined 信号）+ init 三加载器改 `safeRun` 隔离（任一初始化异常只渲染对应面板错误，不连带中断其余）。 | `changelog.md` [0.10.13-dev] |
 
 > **独立项（rf-272 处置衍生，单列跟踪）**：`html_renderers._render_llm_content_section` 13 参渲染器上下文（删除需重构 html_writer.py 调用点，单列「签名瘦身」）；`report/_pipeline.py` 遗留重复文件（已标注不承载活代码，单列清理项）；`orchestrator.generate_report.warm_cache`（CLI `--warm` 标志去留待决策，已无实际消费路径）。
 
