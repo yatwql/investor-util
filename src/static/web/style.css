@@ -563,22 +563,11 @@ select:focus,
   white-space: nowrap;
 }
 
-.history-list ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.history-row {
+.history-summary {
   display: flex;
   align-items: baseline;
   gap: 8px;
   padding: 4px 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.history-row:last-child {
-  border-bottom: none;
 }
 
 .history-time {
@@ -587,14 +576,17 @@ select:focus,
   font-variant-numeric: tabular-nums;
 }
 
-.history-type {
+.history-status {
   flex: none;
   font-weight: 600;
-  color: var(--color-primary);
-  font-size: 0.75rem;
-  background: #eef4fb;
-  border-radius: 4px;
-  padding: 0 5px;
+}
+
+.history-status-ok {
+  color: var(--color-ok);
+}
+
+.history-status-err {
+  color: var(--color-error);
 }
 
 .history-meta {
@@ -604,13 +596,16 @@ select:focus,
   text-align: right;
 }
 
-.history-err {
-  flex: none;
-  font-size: 0.75rem;
-  color: var(--color-error);
-  border: 1px solid var(--color-error);
-  border-radius: 4px;
-  padding: 0 5px;
+/* 代理诊断提示（全数据源被拒时服务端追加） */
+.health-hint {
+  margin-top: 6px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--color-text);
+  background: rgba(240, 173, 78, 0.12);
+  border: 1px solid rgba(240, 173, 78, 0.4);
+  border-radius: 6px;
 }
 
 /* ── 配置编辑面板（与 TUI 菜单一致，即改即存）── */

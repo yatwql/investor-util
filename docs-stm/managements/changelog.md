@@ -6,12 +6,39 @@
 
 ## [0.10.13-dev] - 开发中（未发布）
 
+### 架构图布局修复（用户反馈「对齐不好的图有反作用」）（2026-08-08）
+
+- **`architecture.svg` 右列报告卡底部对齐**——Excel/HTML 报告卡高度 150→154、y 修正，底部 428 与左列 Web 渠道卡、引擎底部对齐，消除 8px 错位。
+- **`capabilities.svg`「HTML 报告」文字溢出容器**——修复「报告」两字跨出卡片右缘，文本重新排布并镜像复核（全部元素终点 < 容器右缘 980）。
+- **`llm-chain.svg` 全量审计通过**，无需修改。
+- **验证**：几何边界/对齐/重叠脚本 + cairosvg 渲染像素级文字溢出检测（docs-stm/tmp/svg-review/），确认三图无越界文字、无文本重叠。
+
+### Web 数据源健康检查：全部被拒时追加代理诊断提示（2026-08-08）
+
+- **回归背景**：另一台电脑 Web 模式全数据源 `[WinError 10061] 目标计算机积极拒绝连接` + 超时——`make_http_client` 经 `trust_env` 默认读取系统代理/HTTP(S)_PROXY，代理软件未运行即所有请求被路由到死代理。
+- **后端**：`check_sources.run_health_checks` 全部失败且多数为「连接被拒」（WinError 10061 / Errno 111）时追加 `hint` 项（`_PROXY_HINT_NAME`），提示检查系统代理或清除代理环境变量；CLI `run_check_sources` 在汇总行后单独打印该提示。
+- **前端**：`renderHealth` 渲染 `item.hint` 为整卡警示条（`.health-hint`，琥珀色描边）；健康检测按钮/接口不变。
+- **回归测试**：`test_check_sources.py` 新增 `TestProxyHint` 3 用例（全拒追加 / 有源正常不追加 / 仅超时不追加）。
+
+### Web 首页「历史运行记录」弱化为单行状态摘要（2026-08-08）
+
+- **卡片标题**「历史运行记录」→「最近运行」；`renderHistory` 由多行列表（类型/条数/每条明细）重写为**单行摘要**——时间 + 状态（成功/有异常，`.`history-status-ok/err）+ 耗时（`.history-meta` 右对齐）。
+- **取舍**：历史记录对单用户自用的真正价值是错误痕迹与耗时，类型/条数属装饰字段；状态区因此更紧凑，首页信息密度更聚焦。
+- **样式**：移除 `.history-row/.history-type/.history-err` 旧列表样式，新增 `.history-summary/.history-status/.history-status-ok/err`；新增 `formatDur(sec)` 秒/分/时中文耗时格式化。
+- **回归**：`/api/runs/history` 响应字段（timestamp/total_seconds/errors）与前端消费一致，web 单元测试 194 passed。
+
 ### 开发者指南整合：README 零碎 + 两份手册并入 developer-guide.md（2026-08-08）
 
 - **新增管理文档 `docs-stm/managements/developer-guide.md`**（管理文档 9→10 份，纳入版本一致性受检）——整合四来源为开发者一站式指南，7 个部分：开发环境与工作流 / 三级门禁 / 任务编号规范与自动保障 / 测试指南 / 辅助脚本速查 / 版本发布流程 / 关键纪律来源。四来源 = README「开发者参考」区零碎内容（辅助脚本速查 / 性能历史趋势查看 / 跨机器耗时采集 / 任务编号自动保障）+ `how-to-test-my-code.md`（测试指南）+ `scripts-reference.md`（脚本参考）+ CLAUDE.md 开发纪律（门禁命令 / 编号规则 / 发布四步的人话版）。
 - **锚点兼容**：保留 `#测试模式详解`、`#新增测试指南`、`#llm-幻觉率采样测试` 三锚点，testplan.md / faq.md 原有锚点引用不失效。
 - **删除两份旧手册**：`docs-stm/manuals/how-to-test-my-code.md`、`docs-stm/manuals/scripts-reference.md`（内容并入 developer-guide，旧引用点全量迁移）。
 - **引用点迁移**：README 开发者参考区精简（保留 developer-guide / registry / perf_view 三入口，删跨机器耗时 blockquote 与任务编号小节）；CLAUDE.md 管理文档清单补 developer-guide、用户文档清单删两手册；testplan.md（测试模式详解 / 新增测试指南）、faq.md（幻觉率采样）、how-to-start.md（辅助脚本参考链接）改指 developer-guide；`check-version-consistency.py` 受检登记 + `test_check_version_consistency.py` HEADER_DOCS 同步；folders.md 统计表（用户文档 14→12 文件 6,210→5,093 行、managements 9→10 文件 7,904→9,184 行）与目录树同步。
+
+### 注册表使用说明并入 developer-guide.md（2026-08-08）
+
+- **`docs-stm/manuals/how-to-use-registry.md` 内容并入 developer-guide** 新增「注册表使用（registry）」章节——核心数据结构（`DataModuleDef` / `ComputModuleDef`）、公共 API 速查（遍历 / 缓存 / LLM 名称 / settings 键 / enabled_llm 子键 / 报表排序 / 计算模块）、新增数据模块（非 LLM / LLM + 8 步检查清单 / 精确键名缓存）、计算模块注册表、无需手动维护的派生产出、测试。压缩易过时快照（注册表模块清单大表、19 键全表、消费方清单），架构背景与模块清单指向 `technical.md`「功能语义命名表」、report_section_order 键名对照指向 `how-to-config.md`。
+- **删除旧手册** `docs-stm/manuals/how-to-use-registry.md`。
+- **引用点迁移**：README 开发者参考区 registry 独立入口删除（并入 developer-guide，该区仅剩 developer-guide / perf_view 两入口）；CLAUDE.md 用户文档清单删 how-to-use-registry；folders.md 统计表（用户文档 12→11 文件 5,093→4,759 行、manuals 11→10 文件 4,897→4,564 行、managements 9,184→9,390 行）与目录树同步。
 
 ### Web 前端静态资产 404 修复 + 旧浏览器兼容兜底（rf-274 / rf-275）（2026-08-08）
 

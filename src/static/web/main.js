@@ -581,6 +581,14 @@
       return;
     }
     results.forEach(function (item) {
+      if (item.hint) {
+        // 代理诊断提示：全灭且多数连接被拒时，服务端追加一条整卡提示
+        var note = document.createElement('div');
+        note.className = 'health-hint';
+        note.textContent = item.message;
+        els.healthList.appendChild(note);
+        return;
+      }
       var row = document.createElement('div');
       row.className = 'health-row ' + (item.ok ? 'health-ok' : 'health-err');
       var name = document.createElement('span');
@@ -599,7 +607,7 @@
     });
   }
 
-  /* ── 状态区：历史运行记录 ── */
+  /* ── 状态区：最近运行（单行摘要，聚焦错误痕迹与耗时）── */
   function loadHistory() {
     fetch('/api/runs/history', {
       signal: AbortSignal.timeout(10000),
@@ -622,35 +630,29 @@
     if (!records.length) {
       var p = document.createElement('p');
       p.className = 'status-text status-busy';
-      p.textContent = '暂无历史运行记录';
+      p.textContent = '暂无运行记录';
       els.historyList.appendChild(p);
       return;
     }
-    var list = document.createElement('ul');
-    records.slice(0, 10).forEach(function (rec) {
-      var li = document.createElement('li');
-      li.className = 'history-row';
-      var when = document.createElement('span');
-      when.className = 'history-time';
-      when.textContent = formatTs(rec.timestamp);
-      var type = document.createElement('span');
-      type.className = 'history-type';
-      type.textContent = (rec.report_type || 'basic').toUpperCase();
-      var meta = document.createElement('span');
-      meta.className = 'history-meta';
-      meta.textContent = rec.holdings_count + ' 条 · ' + (rec.total_seconds || 0) + 's';
-      li.appendChild(when);
-      li.appendChild(type);
-      li.appendChild(meta);
-      if (rec.errors && rec.errors.length) {
-        var errBadge = document.createElement('span');
-        errBadge.className = 'history-err';
-        errBadge.textContent = '有异常';
-        li.appendChild(errBadge);
-      }
-      list.appendChild(li);
-    });
-    els.historyList.appendChild(list);
+    // 单行摘要：时间 + 状态（成功/有异常）+ 耗时。错误痕迹与耗时是历史记录
+    // 的真正价值，类型/条数对单用户自用属装饰字段，已弱化掉。
+    var rec = records[0];
+    var row = document.createElement('div');
+    row.className = 'history-summary';
+    var when = document.createElement('span');
+    when.className = 'history-time';
+    when.textContent = formatTs(rec.timestamp);
+    var hasErr = !!(rec.errors && rec.errors.length);
+    var status = document.createElement('span');
+    status.className = 'history-status ' + (hasErr ? 'history-status-err' : 'history-status-ok');
+    status.textContent = hasErr ? '有异常' : '成功';
+    var meta = document.createElement('span');
+    meta.className = 'history-meta';
+    meta.textContent = formatDur(rec.total_seconds);
+    row.appendChild(when);
+    row.appendChild(status);
+    row.appendChild(meta);
+    els.historyList.appendChild(row);
   }
 
   function formatTs(ts) {
@@ -668,6 +670,19 @@
       d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
       ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
     );
+  }
+
+  function formatDur(sec) {
+    var s = Math.round(Number(sec) || 0);
+    if (s < 60) {
+      return s + '秒';
+    }
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    if (m < 60) {
+      return r ? m + '分' + r + '秒' : m + '分钟';
+    }
+    return Math.floor(m / 60) + '时' + (m % 60) + '分';
   }
 
   /* ── 配置编辑（与 TUI 菜单一致，即改即存）──

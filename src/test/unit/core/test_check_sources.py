@@ -75,3 +75,41 @@ class TestRunHealthChecksBudget:
         names = [r["name"] for r in results]
         assert names.count("快源A") == 1
         assert results[0]["ok"] is True
+
+
+class TestProxyHint:
+    """全部数据源被拒时追加代理诊断提示（回归：另一台电脑 WinError 10061 全灭）。"""
+
+    def _check(self, symbol: str, msg: str):
+        return lambda: (symbol, 5.0, msg)
+
+    def test_all_refused_appends_hint(self):
+        """全部失败且多数为连接被拒（WinError 10061 / Errno 111）→ 追加 hint 项。"""
+        checks = [
+            ("源A", "行情", self._check(cs._ERR, "[WinError 10061] 由于目标计算机积极拒绝，无法连接。")),
+            ("源B", "新闻", self._check(cs._ERR, "[Errno 111] Connection refused")),
+        ]
+        with mock.patch.object(cs, "_checks", checks):
+            results = cs.run_health_checks(max_timeout=5.0)
+        hints = [r for r in results if r.get("hint")]
+        assert len(hints) == 1
+        assert "10061" in hints[0]["message"] or "代理" in hints[0]["message"]
+        assert hints[0]["ok"] is False
+
+    def test_no_hint_when_some_ok(self):
+        """只要有源正常 → 不追加 hint（避免误报）。"""
+        checks = [
+            ("源A", "行情", self._check(cs._OK, "5ms 正常")),
+            ("源B", "新闻", self._check(cs._ERR, "[WinError 10061] 拒绝")),
+        ]
+        with mock.patch.object(cs, "_checks", checks):
+            results = cs.run_health_checks(max_timeout=5.0)
+        assert not any(r.get("hint") for r in results)
+
+    def test_no_hint_on_timeout_only(self):
+        """全部超时（非连接被拒）→ 不追加 hint。"""
+        checks = [("源A", "行情", lambda: (cs._ERR, 0.0, "超时（预算 12s）"))]
+        with mock.patch.object(cs, "_checks", checks):
+            results = cs.run_health_checks(max_timeout=5.0)
+        assert not any(r.get("hint") for r in results)
+        assert results[0]["message"].startswith("超时")
