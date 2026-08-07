@@ -15,7 +15,6 @@ from src.python.config import get_llm_config
 from src.python.llm.api import call_llm
 from src.python.llm.api_base import (
     AUTO_INCREASE_FACTOR,
-    LLM_TIMEOUT,
     TRUNCATION_MARKER,
     _build_cache_hint_and_record,
     _get_last_llm_failure,

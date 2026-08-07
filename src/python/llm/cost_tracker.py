@@ -24,7 +24,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.python.llm.pricing import CURRENCY_SYMBOLS, estimate_cost
 from src.python.llm.session import format_session_usage, get_session_usage
 
 logger = logging.getLogger("invest")

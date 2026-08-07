@@ -16,7 +16,7 @@ from datetime import datetime
 
 from src.python.llm.pricing import CURRENCY_SYMBOLS
 from src.python.core.logger import setup_logger
-from src.python.core.reader import get_xlsx_info, list_xlsx_files, read_holdings, read_holdings_with_flows
+from src.python.core.reader import get_xlsx_info, list_xlsx_files, read_holdings_with_flows
 from src.python.report.progress import TuiProgressReporter
 from src.python.tui.tui_menu import MENU_ITEMS, get_config_cache, press_any_key, refresh_config
 

@@ -121,7 +121,7 @@ def scenario_analysis(
     beta_ci_lower: float | None = None,
     beta_ci_upper: float | None = None,
     beta_se: float | None = None,
-    portfolio_volatility: float | None = None,
+    portfolio_volatility: float | None = None,  # noqa: ARG001  # 预留：组合年化波动率区间输出（±1σ/±2σ）待实现，调用方已传值
 ) -> dict[str, Any]:
     """基于 Beta 计算六种市场情景下的组合预期变动。
 
@@ -330,7 +330,7 @@ def fx_scenario_analysis(
 
 def sharpe_ci_propagation(
     sharpe_ratio: float | None,
-    annual_volatility: float | None,
+    annual_volatility: float | None,  # noqa: ARG001  # 预留：当前 SE 用 Lo(2002) 常数近似，未消费此参数；保留以支持未来波动率修正
     years_of_data: float,
     n_observations: int = _TRADING_DAYS,
 ) -> dict[str, Any]:

@@ -22,6 +22,16 @@
 - **树形符号修正**：③ `tui/` 目录由 `└──` → `├──`（其后仍有 `web/` 兄弟节点）；④ `web-ui/` 目录由 `└──` → `├──`（其后仍有 `web-holdings-input-modes/`、`web-config-edit/`、`readme-svg-layout/` 兄弟节点）。保持「`├──` 后接兄弟、`└──` 为最后一项」的目录树层级符号规则。
 - **门禁**：4 个 check 脚本 `--ci` [OK]（check-doc-traces / check-task-numbering 等）。
 
+### 死代码清理：死配置 + 未用 import/变量/参数 + re-export 防护（2026-08-07）
+
+- **死配置**：`cache_ttl.fund_overlap`（`config.json`）为唯一死配置——`get_ttl()` 先查 config `cache_ttl[data_type]`，差集无对应注册表 data_type，已移除。
+- **A/B 类死代码（ruff --fix + 手动）**：清除 49+ 处未用 import/局部变量/重定义——覆盖 31 个文件（`_math_utils.py`/`alignment_correction.py`/`industry_beta.py`/`liquidity.py`/`metrics.py`/`rebalance.py`/`scenario.py`/`cache/operations.py`/`config/__init__.py`/`provider_registry.py`/`fetcher/batch.py`/`fetcher/bond_yield.py`/`llm/cost_tracker.py`/`llm/fact_checker/_numerical.py`/`llm/fallback.py`/`llm/generators.py`/`llm/prompts_core.py`/`llm/prompts_tables.py`/`llm/skeleton.py`/`providers/akshare_extras.py`/`providers/news_aggregator.py`/`providers/sina.py`/`providers/tiantian_base.py`/`report/_llm_news.py`/`report/_pipeline.py`/`report/_report_generation.py`/`report/_snapshot.py`/`report/data_quality_sheet.py`/`tui/tui_handlers.py` 等）。含 5 处被本地重定义覆盖的冗余 import（`metrics.py` 4 常量 + `provider_registry.py` 本地 sentinel/类）。
+- **D 类 re-export 防护**：`cache/__init__.py` 补 `__all__`（11 个内部符号：`_read_cache_data`/`_write_atomic`/`_CACHE_DIR`/`_cache_path` 等）；`config/__init__.py` 补 `__all__`（`get_llm_config`/`_CONFIG_PATH_OVERRIDE`）——保证 re-export API 不被静态扫描误删。
+- **re-export 误删修复（ruff --fix 连带，恢复 + `# noqa: F401`）**：`providers/tiantian_base.py` 恢复 `_safe_float`（`tiantian_nav`/`tiantian_ranking` 引用）；`analysis/rebalance.py` 恢复 `_SILENCE_FILE`/`_load_silence_state`/`_save_silence_state`（conftest monkeypatch + 测试引用）；`core/provider_registry.py` 恢复 `phase_timeout`（test_phase_timeout 引用）；`providers/sina.py` 恢复 `is_index_code`（`sina_kline` lazy import + 测试 patch）；`analysis/metrics.py` 恢复 `_t_cdf`/`_t_critical_95`（test_metrics_edge 引用）。
+- **scenario 死参数（rf-271，方案 A）**：`scenario_analysis.portfolio_volatility`/`sharpe_ci_propagation.annual_volatility` 加 `# noqa: ARG001` 标注预留意图，不破坏测试签名。
+- **遗留文件确认**：`report/_pipeline.py` 为文档标注「不再承载活代码」的遗留重复文件（编排实现在 `_report_generation.py` 聚合门面），仅删其未用 `Future` import，未做进一步改动。
+- **门禁**：P0 dev-verify **2005 passed**；4 个 check 脚本 `--ci` [OK]；ruff format 本轮改动文件全绿。登记 rf-271/rf-272 待跟进（scenario 死参数补齐评估 + 43 处 ARG001 死参数评估）。
+
 ---
 
 ## [0.10.12] - 2026-08-07

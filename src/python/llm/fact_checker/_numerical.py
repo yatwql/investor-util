@@ -11,7 +11,6 @@ from src.python.llm.fact_checker._constants import (
     _DEFAULT_TOLERANCE_PCT,
     _EXPOSURE_KEYWORDS,
     _INDEX_CODES,
-    _POSITION_WEIGHT_KEYWORDS,
     _PROFIT_KEYWORDS,
     _PROPORTION_KEYWORDS,
     _REBALANCE_TARGET_KEYWORDS,
@@ -97,13 +96,7 @@ def _evaluate_percent_value(
     # 环比/同比变化率、胜率、评分权重、相对基准跑输/跑赢、止盈/减仓目标比例
     # → 数值均非收益率，不可比较。均用近邻窗口检测（数值紧邻对应语境词），
     # 避免同句其他真实收益率被连带跳过。
-    if (
-        is_change_rate
-        or is_win_rate
-        or is_weight
-        or is_benchmark_relative
-        or is_trim_target
-    ):
+    if is_change_rate or is_win_rate or is_weight or is_benchmark_relative or is_trim_target:
         return None, None
 
     # 单日/当日涨跌语境 → 数值为单日行情涨跌而非收益率。

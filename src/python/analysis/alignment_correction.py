@@ -11,16 +11,11 @@
 
 from __future__ import annotations
 
-import math
 from typing import Any
 
 from src.python.analysis._fee_estimation import (
     _classify_fund_type,
     portfolio_fee_estimation,
-    _FUND_TYPE_RULES,
-    _DEFAULT_FEE_RATE,
-    _MIN_HOLDINGS_FOR_FEE_ESTIMATION,
-    _STOCK_FEE_RATE,
 )
 
 # ── TWR 计算常量 ────────────────────────────────
@@ -193,7 +188,6 @@ def twr_calculation(
     # 单个快照：无法计算期间收益率，回退为简单收益率
     if len(snapshots) == 1:
         s = snapshots[0]
-        value = s.get("value", 0.0)
         cash_flow = s.get("cash_flow", 0.0)
         # 简单收益率 = (期末市值 - 期初市值 - 现金流) / 期初市值
         # 但仅有一个快照时，无期初值，只能回退为 0

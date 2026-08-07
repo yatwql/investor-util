@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import logging
 
 from src.python.report.progress import ProgressReporter
 
@@ -510,7 +509,6 @@ def _generate_report_full(
         is_enable_news,
         is_enable_portfolio_evolution,
     )
-    from src.python.config.features import is_feature_enabled
     from src.python.fetcher.akshare import get_sector_fund_flow
     from src.python.core.perf import PerfCollector
     from src.python.core.registry import get_report_section_order

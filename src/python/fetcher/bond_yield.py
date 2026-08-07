@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set

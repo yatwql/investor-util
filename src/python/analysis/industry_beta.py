@@ -148,8 +148,6 @@ def compute_industry_beta_analysis(
     if not active:
         return unavailable_result("insufficient", sample_count=0)
 
-    import numpy as np
-
     betas: dict[str, float] = {}
     alphas: dict[str, float] = {}
     t_stats: dict[str, float] = {}

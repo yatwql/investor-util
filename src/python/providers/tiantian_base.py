@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 
 from src.python.core.http_client import make_http_client
-from src.python.providers._utils import safe_float as _safe_float
+from src.python.providers._utils import safe_float as _safe_float  # noqa: F401  # re-export，tiantian_nav/tiantian_ranking 引用
 
 logger = logging.getLogger("invest")
 
