@@ -16,6 +16,12 @@
 - **`folders.md` 同步**：项目统计表新增「架构图示 SVG 3/315」行；目录树 `src/static/` 分支登记 3 个 SVG；README 行数 206→212、用户文档合计 6,204→6,210。
 - **门禁**：XML 解析校验 3 个 SVG 合法 + 几何越界检查通过；P0 dev-verify 2005 passed；4 个 check 脚本 `--ci` [OK]。
 
+### folders.md 目录树历史痕迹修正（rf-270）（2026-08-07）
+
+- **过时计数修正**：① `smoke-web.py` 描述「test_client 9 项全链路验证」→ **11 项**（脚本自述「覆盖 11 项断言」+ 11 个 `_check_*` 函数，与 test_smoke_web.py 描述一致）；② `archived_plan.0.10.x.md` 描述「plan-17~25」→ **plan-17~26**（归档文件头 + plan.md 引用均为 plan-17~26）。
+- **树形符号修正**：③ `tui/` 目录由 `└──` → `├──`（其后仍有 `web/` 兄弟节点）；④ `web-ui/` 目录由 `└──` → `├──`（其后仍有 `web-holdings-input-modes/`、`web-config-edit/`、`readme-svg-layout/` 兄弟节点）。保持「`├──` 后接兄弟、`└──` 为最后一项」的目录树层级符号规则。
+- **门禁**：4 个 check 脚本 `--ci` [OK]（check-doc-traces / check-task-numbering 等）。
+
 ---
 
 ## [0.10.12] - 2026-08-07

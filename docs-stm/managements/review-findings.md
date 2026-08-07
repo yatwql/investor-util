@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.13-dev
-> **编号源**：`rf-next = 270`（新增问题取此编号，完成后更新为 +1；已用最大 rf-269，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 271`（新增问题取此编号，完成后更新为 +1；已用最大 rf-270，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -38,6 +38,7 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复 |
 | **rf-261** | Web 上传持仓跑 full/both 会**污染共享快照目录** `data/history/snapshots/`：上传文件本身已隔离（`web/upload.py` uuid 落盘 `data/holdings/uploads/` + TTL/用完即删），但 full/both 生成时 `capture_snapshot`（`report/_snapshot.py`）基于**本次上传的临时持仓**调 `save()` 持久化快照到**三渠道共享**目录 → TUI/CLI 后续报告的「快照差异/组合演进」会拿 web 测试持仓的历史快照参与对比（`portfolio_evolution` 读 `load_latest`）。`data/cache/`（行情缓存）与 `data/state/`（熔断/降级/性能历史）共享属**架构刻意**（数据降级治理体系全局一致），非缺口；basic 路径明确不落快照（`orchestrator.py` 注释） | **方案已确认（2026-08-07 探讨收敛）**：`data/cache`/`data/state` 保持共享不动（按证券代码/机器键控，非持仓身份数据，隔离反而破坏缓存复用与数据降级治理——伪需求）。按**使用意图**分两模式：① **临时试算（web 默认）**：上传保持 uuid 临时态，快照写入独立子目录 `data/history/snapshots/web/`（`history_snapshot.save/load` 增 namespace 子目录支持），TUI/CLI 读主目录自然排除 web 试算快照，组合演进/快照差异不受污染；② **正式更新（共享，显式选择）**：两种输入——上传覆盖 `data/holdings/{holdings_filename}`（先备份旧文件），或**不上传直接用存量持仓文件**（web 成为完整报告生成入口，符合"最少输入"定位）；快照入共享主目录，演进/对比真实生效。实现要点：`capture_snapshot` 增试算/正式判定（web 默认试算），`history_snapshot` 支持 namespace 子目录，web `_handle_create_run` 增模式参数（trial/formal + use-existing）。**待实现（登记 plan-25）** |
+
 ---
 
 ## 已修复（摘要）
@@ -64,6 +65,7 @@
 | rf-267 | `smoke-web.py` `_build_client` 直接改写 `_config_defaults._DEFAULT_CONFIG`（holdings_dir/holdings_filename/output_dir）且运行后不还原，污染模块级默认值——web 套件先跑后，后续 config 测试读到被改写的默认值，致 7 个 config 用例顺序失败（test_corrupted_json/empty_file/missing_file/partial_config_merge/init_creates_default/init_template_writes_relative/set_preserves_other_keys） | `run_smoke` finally 统一还原 `_DEFAULT_CONFIG` 快照 + `_CONFIG_FILE` + `invalidate_config_cache()`；web+config 同进程 282 测试全绿（修复前 7 失败），config 单独 102 passed | `changelog.md` [0.10.12-dev] plan-26 |
 | rf-268 | 三模式文档体系建立后相关文档未同步：folders.md manuals 目录树出现 `how-to-use-tui-menu.md` 重复条目（两行相同）+ 统计表滞后（manuals 仍记 12 文件/5,773 行，实际新增 web-mode/cli-mode 后为 13 文件）；README 启动方式三节未指向对应分册（TUI 节无链接、Web 节链「快速开始」方式四、CLI 节只链 §11 定时任务）；CLAUDE.md 用户文档列表顺序与 README 索引不一致（cli→web→tui） | folders.md 去重 + 统计表刷新（manuals 13/5,998，用户文档 14/6,204）；README 启动方式三节统一指向各分册 + 功能特性三模式补链接 + 用户指南表 CLI 行补「定时任务」；CLAUDE.md 列表顺序对齐 README（start → web-mode → tui-menu → cli-mode → …） | `changelog.md` [0.10.12-dev] plan-28 |
 | rf-269 | 提交 `3026ffa7`（README/CLAUDE.md 索引统一）未登记 changelog——三模式体系条目（`7bff7d75`）只覆盖了分册创建与配套文档，未覆盖后续的索引统一提交，变更日志与提交历史不同步 | 补登记独立条目「README/CLAUDE.md：三模式文档索引与列表统一」 | `changelog.md` [0.10.12-dev] plan-28 |
+| rf-270 | folders.md 目录树过时描述 + 树形符号错误：① smoke-web.py 描述「test_client 9 项」应为 11 项（脚本自述 + 11 个 `_check_*`，test_smoke_web.py 已写 11 项）；② archived_plan.0.10.x.md 描述「plan-17~25」应为 plan-17~26（归档头 + plan.md 引用同）；③ `tui/` 目录用 `└──`（后接 `web/` 兄弟）④ `web-ui/` 目录用 `└──`（后接多个兄弟） | folders.md ①② 计数修正（9→11、25→26），③④ `└──`→`├──` 符号修正 | `changelog.md` [0.10.13-dev] |
 
 > v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 

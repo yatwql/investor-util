@@ -274,7 +274,7 @@ investor-util/
 │   │   │   ├── __main__.py           #   python -m 入口
 │   │   │   └── cli.py                #   argparse + 共享层路由（report/update/whatif 子命令）
 │   │   │
-│   │   └── tui/                      # TUI 交互模式入口
+│   │   ├── tui/                      # TUI 交互模式入口
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── __main__.py           #   python -m 入口
 │   │   │   ├── handlers_cache.py     #   缓存管理命令处理器
@@ -692,7 +692,7 @@ investor-util/
 │   ├── probe-csi-factor-indices.py  #   CSI 风格指数可用性探测（风格因子回归前置决策闸门）
 │   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
 │   ├── extract-test-failures.py      #   pytest-html 报告失败用例提取
-│   └── smoke-web.py                 #   Web 模式 HTTP 冒烟脚本（test_client 9 项全链路验证，可独立运行）
+│   └── smoke-web.py                 #   Web 模式 HTTP 冒烟脚本（test_client 11 项全链路验证，可独立运行）
 ├── docs-stm/                         # 项目文档
 │   ├── manuals/                      #   用户手册分册
 │   │   ├── datasource.md             #     数据源一览
@@ -859,7 +859,7 @@ investor-util/
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   └── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
-│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~25，设计文档索引）
+│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~26，设计文档索引）
 │   │   │   ├── archived_changelog.0.10.x.md #    变更日志归档 v0.10.x
 │   │   │   ├── archived_review-findings.0.10.x.md # 自审记录归档 v0.10.x（rf-204~226）
 │   │   │   ├── investment-features/         #   投资功能优化 + 章节归并（plan-17~24）
@@ -869,7 +869,7 @@ investor-util/
 │   │   │   │   └── plan-task-code-traces-gate.md #     check-code-traces 扩展（IDENT 维度 + 系列代号）
 │   │   │   ├── toc-llm-marking/             #   目录 LLM 章节标记设计（橙色加粗 + 🧠 图标）
 │   │   │   │   └── plan-toc-llm-marking.md  #     TOC/横向导航 LLM 章节标记（复用 --orange-text）
-│   │   │   └── web-ui/                      #   轻量 Web UI 实施归档（plan-8 三阶段完成）
+│   │   │   ├── web-ui/                      #   轻量 Web UI 实施归档（plan-8 三阶段完成）
 │   │   │       ├── plan-web-ui.md              #     轻量 Web UI 计划（plan-8 轻量 Web UI / plan-10 日志可视化）
 │   │   │       └── plan-web-ui-implementation.md #  plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
 │   │   │   ├── web-holdings-input-modes/    #   Web 持仓输入模式实施归档（plan-25 完成）
