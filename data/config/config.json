@@ -14,7 +14,7 @@
   "enable_portfolio_evolution": true,  // 组合演进
   "enable_action": true,  // 行动建议独立章（再平衡信号+交易纪律+调仓建议+收益归因，默认开，菜单 P 可切换）
   // 报告子模块开关（数据质量仪表盘为长期可信核心默认开启；其余新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": true, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘默认开，其余默认关
+  "report_submodules": {"data_quality": true, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": true},  // 数据质量仪表盘默认开，其余默认关
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,

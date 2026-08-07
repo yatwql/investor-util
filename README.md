@@ -160,9 +160,9 @@
 | # | 文档 | 说明 |
 |:-:|:-----|:------|
 | 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
-| 2 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
-| 3 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
-| 4 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif 子命令、使用示例、退出码、定时任务 |
+| 2 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
+| 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif 子命令、使用示例、退出码、定时任务 |
+| 4 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
 | 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、章节可见性 |
 | 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
 | 7 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
@@ -174,7 +174,7 @@
 
 | 文档 | 说明 |
 |:-----|:------|
-| [开发者指南](docs-stm/managements/developer-guide.md) | 开发环境与工作流、三级门禁、任务编号规范、测试驱动、辅助脚本速查（含性能历史趋势查看 perf_view）、注册表使用、版本发布流程 |
+| [开发者指南](docs-stm/managements/developer-guide.md) | 开发环境与工作流、三级门禁、任务编号规范、测试驱动、辅助脚本速查、注册表使用、版本发布流程 |
 
 ## 📋 项目内部文档
 
