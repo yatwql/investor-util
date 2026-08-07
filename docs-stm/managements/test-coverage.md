@@ -10,34 +10,34 @@
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
 | `unit` | **5136** | ~15s |
-| `standard` | **4458** | ~16s |
+| `standard` | **4458** | ~15s |
 | `scenario` | **241** | ~18s |
-| `regression` | **241** | ~17s |
-| `dev-verify` | **2005** | ~20s |
-| `verify` | **3404** | ~10s |
+| `regression` | **241** | ~18s |
+| `dev-verify` | **2005** | ~21s |
+| `verify` | **3404** | ~12s |
 | `integration` | **281** | ~14s |
 | `edge` | 611 | ~13s |
 | `data` | 69 | ~2s |
-| `all` | **5445** | **~21s** |
+| `all` | **5445** | **~23s** |
 | `smoke` | 26 | ~2s |
-| `report` | **1541** | ~11s |
+| `report` | **1541** | ~14s |
 | `all_no_unit` | 309 | ~10s |
 | `scenario_extreme` | **9** | ~2s |
 
-> 注：典型耗时按 2026-08-05 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新下方两张表。
+> 注：典型耗时按 2026-08-07 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新下方两张表。
 >
 > 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 5445 项（2026-08-07 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
 
 ### 环境耗时对照
 
-测试耗时随**硬件配置、操作系统与并行度**变化显著。下表对两台已实测机器（dragonball 与 stallman-NB1，均 2026-08-05 采集）做逐模式对照，便于在不同环境下粗估耗时量级。
+测试耗时随**硬件配置、操作系统与并行度**变化显著。下表对两台已实测机器（dragonball 2026-08-07 采集、stallman-NB1 2026-08-06 采集）做逐模式对照，便于在不同环境下粗估耗时量级。
 
 > 跨机器采集：在新机器上运行 `python scripts/test_runner.py --mode bench --machine-info`，脚本输出「采集环境属性」表（见下）与各模式实测耗时表；追加 `--update-docs` 则自动将本机环境属性与实测耗时写入下方两张表（按主机名匹配/新增列，同机覆盖历史实测）。
 
 #### 采集环境属性
 
 <!-- env-table:start -->
-| 环境属性 | dragonball（2026-08-05 实测） | stallman-NB1（2026-08-06 实测） |
+| 环境属性 | dragonball（2026-08-07 实测） | stallman-NB1（2026-08-06 实测） |
 |:---------|:---------------------------|:---|
 | 操作系统 | Linux | Windows |
 | 系统版本 | 6.18.25-x64v3-xanmod1 | 11 |
@@ -52,33 +52,33 @@
 | Python 版本 | 3.13.5 | 3.13.0 |
 | 并行级别 | medium | medium |
 | worker 数 | 8 | 4 |
-| 采集日期 | 2026-08-05 | 2026-08-06 |
+| 采集日期 | 2026-08-07 | 2026-08-06 |
 <!-- env-table:end -->
 
 #### 各模式耗时对照
 
 <!-- duration-table:start -->
-| `--mode` | dragonball（2026-08-05 实测） | stallman-NB1（2026-08-06 实测） |
+| `--mode` | dragonball（2026-08-07 实测） | stallman-NB1（2026-08-06 实测） |
 |:---------|:---------------------------:|:---:|
-| `unit` | ~14s | ~4min |
-| `standard` | ~11s | ~4min |
+| `unit` | ~15s | ~4min |
+| `standard` | ~15s | ~4min |
 | `scenario` | ~18s | ~3min |
-| `regression` | ~17s | ~3min |
-| `verify,regression` | ~27s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
+| `regression` | ~18s | ~3min |
+| `verify,regression` | ~30s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
 | `dev-verify` | ~21s | ~2min |
-| `verify` | ~10s | ~46s |
-| `integration` | ~12s | ~1min |
+| `verify` | ~12s | ~46s |
+| `integration` | ~14s | ~1min |
 | `edge` | ~13s | ~32s |
 | `data` | ~2s | ~14s |
-| `all` | ~22s | ~3min |
+| `all` | ~23s | ~3min |
 | `smoke` | ~2s | ~9s |
-| `report` | ~13s | ~2min |
+| `report` | ~14s | ~2min |
 | `all_no_unit` | ~10s | ~1min |
 | `scenario_extreme` | ~2s | ~9s |
-| 数据更新时间 | 2026-08-05 | 2026-08-06 |
+| 数据更新时间 | 2026-08-07 | 2026-08-06 |
 <!-- duration-table:end -->
 
-> 两机差距因模式而异：多数模式 dragonball 较 stallman-NB1 快约 **10~20 倍**（如 `unit` ~14s vs ~4min、`all` ~22s vs ~5min），个别模式差约 4~20 倍（`edge` ~12s vs ~49s、`smoke` ~1s vs ~20s）。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。dragonball worker=8（medium=50% 核数），stallman-NB1 worker=4。
+> 两机差距因模式而异：多数模式 dragonball 较 stallman-NB1 快约 **10~20 倍**（如 `unit` ~15s vs ~4min、`all` ~23s vs ~3min），个别模式差约 4~20 倍（`edge` ~13s vs ~32s、`smoke` ~2s vs ~9s）。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。dragonball worker=8（medium=50% 核数），stallman-NB1 worker=4。
 
 **其他环境量级参考**（估算，非实测）：
 - **并行度**：耗时近似随 worker 数线性下降——当前 worker=8 改单线程执行时各并行模式约 ×5~8（`regression`/`edge`/`data`/`smoke`/`scenario_extreme` 等本为单线程的模式除外）

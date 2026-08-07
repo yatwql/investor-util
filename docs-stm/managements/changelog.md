@@ -6,6 +6,15 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 测试覆盖统计：dragonball 列耗时刷新（--update-docs 回填）（2026-08-07）
+
+- **重新采集 dragonball 列运行时长**：`test_runner.py --mode bench --update-docs` 顺序采集全部模式实测耗时并回填 `test-coverage.md` 环境耗时对照表（env 表采集日期 2026-08-05 → 08-07；duration 表 dragonball 列按新实测刷新，如 `unit` ~14s → ~15s、`all` ~22s → ~23s、`report` ~11s → ~14s）。
+- **统计计数核对**：`collect-test-coverage.py` 实时收集快照与文档一致——`all` 5445、`unit` 5136、unit 子标记（unit_report 1541 / unit_analysis 699 / unit_config 299 / unit_web 184 等）均无变化（近期无测试新增/删除）。
+- **说明文字同步**：顶部「典型耗时」注、两机采集日期表述、对比段落示例值（`unit`/`all`/`edge`/`smoke`）按 dragonball 新实测更新。
+- **门禁**：check-doc-traces `--ci` [OK]。
+
+---
+
 ### 用户文档：三模式使用指南体系（TUI/CLI/Web 各一份）（2026-08-07）
 
 - **Web 浏览器模式使用指南**（`how-to-use-web-mode.md` 新建）：从用户视角完整讲述 Web 使用——启动访问、首页 6 分区布局、上传→生成→预览/下载全流程、配置编辑面板（7 组即改即存）、运行状态区、与其他模式关系、安全注意（无内建认证）。
