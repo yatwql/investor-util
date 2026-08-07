@@ -68,7 +68,6 @@ def build_chart_datasets(
     history_data: dict | None,
     cat_data: list | None = None,
     penetration: dict | None = None,
-    perf_data: list | None = None,
     details: list | None = None,
     risk_metrics: dict | None = None,
     all_metrics: dict | None = None,
@@ -87,32 +86,32 @@ def build_chart_datasets(
     if history_data and history_data.get("status") != "unavailable":
         try:
             datasets["portfolio_line"] = _build_portfolio_line_dataset(history_data)
-        except Exception as e: # 捕获一切异常，单图失败仅跳过该图
+        except Exception as e:  # 捕获一切异常，单图失败仅跳过该图
             logger.warning("[chart] portfolio_line 构建失败，跳过该图: %s", e)
         try:
             datasets["drawdown"] = _build_drawdown_dataset(history_data)
-        except Exception as e: # 捕获一切异常，单图失败仅跳过该图
+        except Exception as e:  # 捕获一切异常，单图失败仅跳过该图
             logger.warning("[chart] drawdown 构建失败，跳过该图: %s", e)
 
     # category_doughnut + industry_bar + penetration_bar
     try:
         datasets["category_doughnut"] = _build_category_doughnut_dataset(details, cat_data)
-    except Exception as e: # 捕获一切异常，单图失败仅跳过该图
+    except Exception as e:  # 捕获一切异常，单图失败仅跳过该图
         logger.warning("[chart] category_doughnut 构建失败，跳过该图: %s", e)
     try:
         datasets["industry_bar"] = _build_industry_bar_dataset(penetration)
-    except Exception as e: # 捕获一切异常，单图失败仅跳过该图
+    except Exception as e:  # 捕获一切异常，单图失败仅跳过该图
         logger.warning("[chart] industry_bar 构建失败，跳过该图: %s", e)
     try:
         datasets["penetration_bar"] = _build_penetration_bar_dataset(penetration)
-    except Exception as e: # 捕获一切异常，单图失败仅跳过该图
+    except Exception as e:  # 捕获一切异常，单图失败仅跳过该图
         logger.warning("[chart] penetration_bar 构建失败，跳过该图: %s", e)
 
     # ⚠ radar 放在所有条件之外，仅依赖 all_metrics / risk_metrics / history_data
     # 三源独立判断——history_data 不可用但 all_metrics 有值时，radar 仍应渲染。
     try:
         datasets["radar"] = _build_radar_dataset(history_data, all_metrics, risk_metrics, metric_flags)
-    except Exception as e: # radar 失败 → 空占位，不影响其他图
+    except Exception as e:  # radar 失败 → 空占位，不影响其他图
         logger.warning("[chart] radar 构建失败，跳过该图: %s", e)
         datasets["radar"] = _empty_dataset()
 
@@ -193,9 +192,7 @@ def _compute_crisis_bands(labels: list[str]) -> list[dict[str, Any]]:
             if d <= raw["end"]:
                 end_i = i
         if start_i is not None and end_i is not None and start_i <= end_i:
-            bands.append(
-                {"startIndex": start_i, "endIndex": end_i, "label": raw["name"]}
-            )
+            bands.append({"startIndex": start_i, "endIndex": end_i, "label": raw["name"]})
     return bands
 
 

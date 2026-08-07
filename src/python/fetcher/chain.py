@@ -268,7 +268,6 @@ def fetch_with_incremental_fallback(
     chain_name: str,
     code: str,
     days: int = 30,
-    param_fn: Callable | None = None,
 ) -> list[dict]:
     """增量合并版 Fallback 路由（历史数据用）。
 
@@ -282,8 +281,6 @@ def fetch_with_incremental_fallback(
         chain_name: chain 名称（如 "history_stock"、"history_fund_otc"）
         code: 证券代码
         days: 获取天数（默认 30）
-        param_fn: 将 (code, start_from, days) 转换为 provider_fn_kwargs 的函数。
-                  None 时直接使用原始的 (code, days, start_from) 作为 kwargs。
 
     Returns:
         list[dict]: 按日期升序排列的数据列表，至少返回 days 条。

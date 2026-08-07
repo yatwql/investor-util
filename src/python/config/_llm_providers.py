@@ -104,12 +104,11 @@ def _load_llm_key_credentials() -> dict[str, dict] | None:
         return None
 
 
-def _validate_provider_entry(entry: dict, index: int) -> list[str]:
+def _validate_provider_entry(entry: dict) -> list[str]:
     """校验单个 provider 配置条目。
 
     Args:
         entry: provider dict
-        index: 在 providers 数组中的索引（用于错误消息）
 
     Returns:
         WARNING 消息列表，空列表表示完全通过
@@ -176,7 +175,7 @@ def _parse_providers_list(raw_config: dict) -> list[dict] | None:
         if not isinstance(entry, dict):
             logger.warning("LLM providers[%d] 不是字典对象，已跳过", i)
             continue
-        errs = _validate_provider_entry(entry, i)
+        errs = _validate_provider_entry(entry)
         if errs:
             for e in errs:
                 logger.warning("LLM providers[%d] 校验不通过: %s", i, e)

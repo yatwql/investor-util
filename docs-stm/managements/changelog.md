@@ -32,6 +32,14 @@
 - **遗留文件确认**：`report/_pipeline.py` 为文档标注「不再承载活代码」的遗留重复文件（编排实现在 `_report_generation.py` 聚合门面），仅删其未用 `Future` import，未做进一步改动。
 - **门禁**：P0 dev-verify **2005 passed**；4 个 check 脚本 `--ci` [OK]；ruff format 本轮改动文件全绿。登记 rf-271/rf-272 待跟进（scenario 死参数补齐评估 + 43 处 ARG001 死参数评估）。
 
+### 死代码清理（二）：ARG001 死参数全数处置（rf-272 完成）（2026-08-07）
+
+- **删参 21 处**（生产 18 函数 + 连带 40+ 调用点/测试）：`metrics_risk.portfolio_beta.trading_days`、`fetcher/industry.batch_fetch_industry_data.max_workers`、`fetcher/chain.fetch_with_incremental_fallback.param_fn`、`cost_flow.compute_cost_tiers.holdings`、`liquidity._is_exchange_traded.name`、`_history_quality._diagnose_return.sorted_dates`、`excel_fund_deep_analysis._process_fund_deep_analysis_module.process_fn/prog`、`chart_data_builder.build_chart_datasets.perf_data`、`orchestrator.compute_valuation_data.holdings`、`_report_health._spawn_health_checks.holdings`、`handlers_config._add/_remove_comparison_index.config`、`handlers_report._prompt_history.reporter`、`check_sources._check_http.name/label`（连带 `_checks` 10 个 lambda 简化）、`prompts_action._build_global_macro_prompt.holdings_details`、`market_value_sheet.write_market_value_sheet.holdings/today_str`（连带 `excel_market_data` 别名调用 2 处）、`config/_llm_providers._validate_provider_entry.index`、`_report_helpers._compute_details.config`。
+- **契约保留 7 处加 `# noqa: ARG001`**（注明保留理由）：`providers/sina_kline.py` 2×`start_from`（chain 层经 `getattr` 无条件传参契约）、`config/_llm_settings.is_enable_llm.config`（`is_enable_*` 家族统一签名 12 成员同构）、`style_factor_sheet._compute_ncols` 3×（参数声明计算覆盖的三区块，设计契约）、`liquidity.check_liquidity.total_mv`（公开 API 契约，22 处调用点传参）。
+- **独立项不纳入本轮**：`html_renderers._render_llm_content_section` 13 参渲染器上下文（删除需重构 html_writer.py 调用点，单列「签名瘦身」项）；`_pipeline.py` 遗留重复文件清理（单列重构项，现有测试引用其辅助函数）；`orchestrator.generate_report.warm_cache`（CLI `--warm` 标志已无实际消费路径，去留待决策）。
+- **新增 F841 连带清理**：`handlers_report._cmd_generate_both` 未用局部 `reporter`、`test_market_value_sheet` 未用局部 `result`、`test_handlers_report` 7 处未用 `reporter`。
+- **门禁**：P0 dev-verify **2005 passed**；4 个 check 脚本 `--ci` [OK]；ruff format 本轮改动 7 文件全绿。rf-272 完成（43 处全数处置），rf-next 保持 273。
+
 ---
 
 ## [0.10.12] - 2026-08-07

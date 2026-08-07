@@ -152,7 +152,7 @@ def prepare_report_data(
 
     # 估值分位（数据契约 valuation_data）：report_submodules.valuation_percentile
     # 开启时计算（当前 PE/PB + 价格分位代理）；关闭返回 None（「资产穿透TOP10」列隐藏）
-    valuation_data = compute_valuation_data(holdings, details, config, reporter)
+    valuation_data = compute_valuation_data(details, config, reporter)
     # 市场温度（数据契约 market_temperature_data）：report_submodules.market_temperature
     # 开启时计算（价格分位+均线偏离+波动率三因子温度计）；关闭返回 None（汇总行隐藏）
     market_temperature_data = compute_market_temperature_data(config, reporter)
@@ -234,7 +234,6 @@ def prepare_report_data(
 
 
 def compute_valuation_data(
-    holdings: list,
     details: list,
     config: dict,
     reporter: ProgressReporter,
@@ -246,7 +245,6 @@ def compute_valuation_data(
     → 三档刻度。PE/PB 与 K 线任一可得即计入该代码，两者皆不可得才剔除。
 
     Args:
-        holdings: 持仓列表（Holding 对象，含 code/name/shares）
         details: market_value 计算的 DetailRow 列表（含 code/market_value）
         config: 完整配置（只读）
         reporter: 进度上报
@@ -389,7 +387,7 @@ def generate_report(
         output = output_dir or config.get("output_dir", "reports")
 
         # 后台启动健康检查（与 Excel 生成并行）
-        _health_fut = _spawn_health_checks(holdings)
+        _health_fut = _spawn_health_checks()
 
         try:
             perf.start("Excel 生成")

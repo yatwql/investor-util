@@ -59,8 +59,6 @@ def _colored(text: str, ok: bool, warn: bool = False) -> str:
 
 
 def _check_http(
-    name: str,
-    label: str,
     url: str,
     *,
     timeout: float = 15.0,
@@ -92,14 +90,12 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
     (
         "腾讯财经",
         "行情",
-        lambda: _check_http("腾讯财经", "行情", "http://qt.gtimg.cn/q=sz000001", timeout=15),
+        lambda: _check_http("http://qt.gtimg.cn/q=sz000001", timeout=15),
     ),
     (
         "新浪财经",
         "行情",
         lambda: _check_http(
-            "新浪财经",
-            "行情",
             "http://hq.sinajs.cn/list=sh000001",
             timeout=15,
             headers={"Referer": "https://finance.sina.com.cn"},
@@ -109,8 +105,6 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         "东方财富",
         "基金净值",
         lambda: _check_http(
-            "东方财富",
-            "基金净值",
             "http://api.fund.eastmoney.com/f10/lsjz?callback=jQuery&fundCode=000001&pageIndex=1&pageSize=1",
             timeout=15,
         ),
@@ -119,8 +113,6 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         "天天基金",
         "持仓/排名",
         lambda: _check_http(
-            "天天基金",
-            "持仓/排名",
             "http://fund.eastmoney.com/pingzhongdata/000001.js",
             timeout=15,
         ),
@@ -129,8 +121,6 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         "东方财富行业",
         "行业分类",
         lambda: _check_http(
-            "东方财富行业",
-            "行业分类",
             "http://push2.eastmoney.com/api/qt/stock/get?secid=1.000001&fields=f12,f14,f137,f138",
             timeout=5,
         ),
@@ -139,8 +129,6 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         "新浪新闻",
         "财经新闻",
         lambda: _check_http(
-            "新浪新闻",
-            "财经新闻",
             "http://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=1",
             timeout=15,
         ),
@@ -149,8 +137,6 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         "东方财富新闻",
         "财经新闻",
         lambda: _check_http(
-            "东方财富新闻",
-            "财经新闻",
             "http://np-weblist.eastmoney.com/comm/web/getFastNewsList?pageSize=1",
             timeout=15,
         ),
@@ -159,8 +145,6 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         "华尔街见闻",
         "财经新闻",
         lambda: _check_http(
-            "华尔街见闻",
-            "财经新闻",
             "http://api-one.wallstcn.com/apiv1/content/lives?limit=1",
             timeout=15,
         ),
@@ -169,8 +153,6 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         "财联社",
         "财经新闻",
         lambda: _check_http(
-            "财联社",
-            "财经新闻",
             "http://www.cls.cn/v1/roll/get_roll_list?rn=1",
             timeout=15,
         ),
@@ -179,8 +161,6 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         "腾讯K线",
         "历史行情",
         lambda: _check_http(
-            "腾讯K线",
-            "历史行情",
             "http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh000001,day,,,1",
             timeout=30,
         ),

@@ -243,7 +243,7 @@ class PortfolioHistoryCalculator:
         total_return, total_return_pct = self._compute_total_return(bars)
 
         # 7) 诊断 + 质量校验
-        _diagnose_return(bars, sorted_dates, 0, fund_count_on_date, total_return_pct, len(all_series))
+        _diagnose_return(bars, 0, fund_count_on_date, total_return_pct, len(all_series))
         warnings.extend(_validate_bars(bars))
 
         # 8) 基准指数历史走势

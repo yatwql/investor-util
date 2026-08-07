@@ -39,7 +39,7 @@ _REPORT_LLM_MODULES = frozenset(
 )
 
 
-def is_enable_llm(config: dict | None = None) -> bool:
+def is_enable_llm(config: dict | None = None) -> bool:  # noqa: ARG001 — 签名契约：is_enable_* 家族统一签名（12 个成员同构）
     """LLM 分析章节是否启用。
 
     检查 llm_settings.json 中 4 个 LLM 报告模块（global_macro /

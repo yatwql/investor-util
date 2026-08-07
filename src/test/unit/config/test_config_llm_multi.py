@@ -244,7 +244,7 @@ class TestValidateProviderEntry(unittest.TestCase):
             "api_key": "sk-test-key",
             "model": "claude-sonnet-4-20250514",
         }
-        warnings = _validate_provider_entry(entry, 0)
+        warnings = _validate_provider_entry(entry)
         self.assertEqual(warnings, [])
 
     def test_valid_with_optional_fields(self):
@@ -256,31 +256,31 @@ class TestValidateProviderEntry(unittest.TestCase):
             "model": "gpt-4",
             "endpoint": "https://api.openai.com/v1",
         }
-        warnings = _validate_provider_entry(entry, 0)
+        warnings = _validate_provider_entry(entry)
         self.assertEqual(warnings, [])
 
     def test_missing_name_errors(self):
         """缺 name → WARNING。"""
         entry = {"provider": "claude", "api_key": "sk-key", "model": "m1"}
-        warnings = _validate_provider_entry(entry, 0)
+        warnings = _validate_provider_entry(entry)
         self.assertTrue(any("name" in w for w in warnings))
 
     def test_empty_name_errors(self):
         """空 name → WARNING。"""
         entry = {"name": "", "provider": "claude", "api_key": "sk-key", "model": "m1"}
-        warnings = _validate_provider_entry(entry, 0)
+        warnings = _validate_provider_entry(entry)
         self.assertTrue(any("name" in w for w in warnings))
 
     def test_missing_api_key_errors(self):
         """缺 api_key → WARNING。"""
         entry = {"name": "test", "provider": "claude", "model": "m1"}
-        warnings = _validate_provider_entry(entry, 0)
+        warnings = _validate_provider_entry(entry)
         self.assertTrue(any("api_key" in w for w in warnings))
 
     def test_missing_model_errors(self):
         """缺 model → WARNING。"""
         entry = {"name": "test", "provider": "claude", "api_key": "sk-key"}
-        warnings = _validate_provider_entry(entry, 0)
+        warnings = _validate_provider_entry(entry)
         self.assertTrue(any("model" in w for w in warnings))
 
     def test_null_endpoint_allowed(self):
@@ -289,7 +289,7 @@ class TestValidateProviderEntry(unittest.TestCase):
             "name": "test", "provider": "claude", "api_key": "sk-key",
             "model": "m1", "endpoint": None,
         }
-        warnings = _validate_provider_entry(entry, 0)
+        warnings = _validate_provider_entry(entry)
         self.assertEqual(warnings, [])
 
 

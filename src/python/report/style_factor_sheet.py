@@ -91,9 +91,9 @@ def _factor_name(factor: str, factor_names: dict | None) -> str:
 
 
 def _compute_ncols(
-    style_data: list[dict] | None,
-    factor_exposure: dict | None,
-    industry_beta: dict | None,
+    style_data: list[dict] | None,  # noqa: ARG001 — 设计契约：参数声明本计算覆盖的三区块，与另两 sheet 的 per-file 模式对称
+    factor_exposure: dict | None,  # noqa: ARG001
+    industry_beta: dict | None,  # noqa: ARG001
 ) -> int:
     """计算标题栏跨列数：取三区块所需列数的最大值。"""
     return max(_STYLE_NCOLS, _FACTOR_NCOLS, _IND_NCOLS)

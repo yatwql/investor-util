@@ -15,7 +15,7 @@ logger = logging.getLogger("invest")
 # ── 健康检查（后台并行）──
 
 
-def _spawn_health_checks(holdings: list) -> object | None:
+def _spawn_health_checks() -> object | None:
     """在后台启动数据源健康检查，返回 Future 或 None。
 
     检查结果与主管线并行执行，不阻塞报告生成。

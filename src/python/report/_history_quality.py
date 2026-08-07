@@ -45,7 +45,6 @@ def _validate_bars(bars: list[dict]) -> list[str]:
 
 def _diagnose_return(
     bars: list[dict],
-    sorted_dates: list[str],
     valid_start_idx: int,
     fund_count_on_date: dict[str, int],
     total_return_pct: float,

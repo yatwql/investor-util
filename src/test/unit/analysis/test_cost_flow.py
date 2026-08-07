@@ -255,8 +255,7 @@ def test_cost_tiers_low_high_split():
         _trade("600900", "2025-01-05", "buy", 100, 20.0),  # 低成本
         _trade("600900", "2025-02-05", "buy", 100, 40.0),  # 高成本
     ]
-    holdings = [_holding("600900", "长江电力", 200, 30.0)]
-    data = compute_cost_tiers(tx, holdings, {"600900": 30.0})
+    data = compute_cost_tiers(tx, {"600900": 30.0})
     assert data["available"] is True
     low = data["totals"]["low"]
     high = data["totals"]["high"]
@@ -270,8 +269,7 @@ def test_cost_tiers_low_high_split():
 def test_cost_tiers_no_price_unpriced():
     """无市价品种 -> 归入「未分档」，不计入追高占比。"""
     tx = [_trade("600900", "2025-01-05", "buy", 100, 20.0)]
-    holdings = [_holding("600900", "长江电力", 100, 20.0)]
-    data = compute_cost_tiers(tx, holdings, {})
+    data = compute_cost_tiers(tx, {})
     assert data["available"] is True
     assert data["totals"]["unpriced"]["shares"] == pytest.approx(100.0)
     assert data["totals"]["low"]["shares"] == pytest.approx(0.0)
@@ -280,7 +278,7 @@ def test_cost_tiers_no_price_unpriced():
 
 def test_cost_tiers_unavailable_without_lots():
     """无可分档批次 -> available=False。"""
-    data = compute_cost_tiers([], [_holding("600900", "长江电力", 100, 20.0)], {"600900": 30.0})
+    data = compute_cost_tiers([], {"600900": 30.0})
     assert data["available"] is False
 
 

@@ -97,85 +97,78 @@ class TestPromptHistory(unittest.TestCase):
         """fetch_mode=auto → True（自动获取，不询问）。"""
         from src.python.tui.handlers_report import _prompt_history
 
-        reporter = MagicMock()
         with (
             patch("src.python.tui.handlers_report.get_config_cache", return_value=self._config("auto")),
             patch("src.python.config.is_enable_history", return_value=True),
         ):
-            result = _prompt_history(reporter)
+            result = _prompt_history()
         self.assertTrue(result)
 
     def test_off_returns_false(self):
         """fetch_mode=off → False（不获取，不询问）。"""
         from src.python.tui.handlers_report import _prompt_history
 
-        reporter = MagicMock()
         with (
             patch("src.python.tui.handlers_report.get_config_cache", return_value=self._config("off")),
             patch("src.python.config.is_enable_history", return_value=True),
         ):
-            result = _prompt_history(reporter)
+            result = _prompt_history()
         self.assertFalse(result)
 
     def test_enable_history_false_returns_false(self):
         """enable_history 关闭 → False（总闸优先）。"""
         from src.python.tui.handlers_report import _prompt_history
 
-        reporter = MagicMock()
         with (
             patch("src.python.tui.handlers_report.get_config_cache", return_value=self._config("auto")),
             patch("src.python.config.is_enable_history", return_value=False),
         ):
-            result = _prompt_history(reporter)
+            result = _prompt_history()
         self.assertFalse(result)
 
     def test_prompt_yes_returns_true(self):
         """fetch_mode=prompt 且用户答 y → True。"""
         from src.python.tui.handlers_report import _prompt_history
 
-        reporter = MagicMock()
         with (
             patch("src.python.tui.handlers_report.get_config_cache", return_value=self._config("prompt")),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("builtins.input", return_value="y"),
         ):
-            result = _prompt_history(reporter)
+            result = _prompt_history()
         self.assertTrue(result)
 
     def test_prompt_no_returns_false(self):
         """fetch_mode=prompt 且用户答 n → False。"""
         from src.python.tui.handlers_report import _prompt_history
 
-        reporter = MagicMock()
         with (
             patch("src.python.tui.handlers_report.get_config_cache", return_value=self._config("prompt")),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("builtins.input", return_value="n"),
         ):
-            result = _prompt_history(reporter)
+            result = _prompt_history()
         self.assertFalse(result)
 
     def test_prompt_eof_returns_false(self):
         """fetch_mode=prompt 且 EOFError → False，不崩溃。"""
         from src.python.tui.handlers_report import _prompt_history
 
-        reporter = MagicMock()
         with (
             patch("src.python.tui.handlers_report.get_config_cache", return_value=self._config("prompt")),
             patch("src.python.config.is_enable_history", return_value=True),
             patch("builtins.input", side_effect=EOFError),
         ):
-            result = _prompt_history(reporter)
+            result = _prompt_history()
         self.assertFalse(result)
 
     def test_missing_fetch_mode_defaults_auto(self):
         """fetch_mode 缺失时默认 auto → True。"""
         from src.python.tui.handlers_report import _prompt_history
 
-        reporter = MagicMock()
         with (
             patch("src.python.tui.handlers_report.get_config_cache", return_value={}),
             patch("src.python.config.is_enable_history", return_value=True),
         ):
-            result = _prompt_history(reporter)
+            result = _prompt_history()
         self.assertTrue(result)

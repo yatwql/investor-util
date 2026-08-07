@@ -269,7 +269,7 @@ def _generate_report_both(
     result.holdings_ok = True
 
     # 后台启动健康检查（与数据获取并行）
-    _health_fut = _spawn_health_checks(holdings)
+    _health_fut = _spawn_health_checks()
 
     _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
@@ -285,7 +285,7 @@ def _generate_report_both(
 
     # ── 1. 行情获取（轻量级，无指数/穿透/分类） ──
     perf.start("行情获取")
-    details = _compute_details(holdings, config, reporter)
+    details = _compute_details(holdings, reporter)
     perf.stop()
 
     # 估值分位 + 市场温度（数据契约）：both 路径同样渲染「资产穿透TOP10」估值列
@@ -295,7 +295,7 @@ def _generate_report_both(
         compute_valuation_data,
     )
 
-    valuation_data = compute_valuation_data(holdings, details, config, reporter)
+    valuation_data = compute_valuation_data(details, config, reporter)
     market_temperature_data = compute_market_temperature_data(config, reporter)
 
     # ── 2. 快照对比（始终执行） ──
@@ -519,7 +519,7 @@ def _generate_report_full(
     perf = PerfCollector(report_type="full", holdings=holdings)
     result = ReportResult()
     result.holdings_ok = True
-    _health_fut = _spawn_health_checks(holdings)
+    _health_fut = _spawn_health_checks()
 
     _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)

@@ -87,7 +87,6 @@ def generate_global_macro(
             categories,
             sector_flow,
             competitive_context=competitive_context,
-            holdings_details=holdings_details,
         )
 
     return generate_llm_module(
