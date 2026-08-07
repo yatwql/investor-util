@@ -1076,6 +1076,206 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 
 **注意**：事实校验器对仓位占比百分比和情景假设百分比设跳过策略（`_POSITION_WEIGHT_KEYWORDS` / `_HYPOTHETICAL_KEYWORDS`），避免将百分比陈述误报为幻觉。最终幻觉率以 `docs-stm/tmp/hallucination-report.md` 为准。
 
+## 注册表使用（registry）
+
+`src/python/core/registry.py` 是本项目的**中央注册表**，统一管理所有数据模块的：中文名称（`name`）、缓存前缀（`cache_prefixes`）、缓存 TTL（`cache_ttl`）、精确缓存键（`exact_cache_keys`）、LLM Settings 后缀（`settings_suffix`）、缓存分组（`cache_groups`）。
+
+设计原则：**一处注册，全局生效**。新增数据模块只需在 `_MODULE_REGISTRY` 中添加一行 `DataModuleDef`，所有派生结构自动同步。
+
+> **架构背景**：注册表是数据获取层与报告生成层之间的契约层，详细架构说明见 [technical.md](technical.md)（缓存层 / 报告生成层章节）；当前已注册模块的功能语义清单见其「功能语义命名表」章节。
+
+### 核心数据结构
+
+```python
+@dataclass(frozen=True)
+class DataModuleDef:
+    name: str                    # 中文名称（报告标题、日志、TUI 展示）
+    data_type: str               # 数据类型键（用于 TTL 查找）
+    cache_prefixes: tuple[str, ...] = ()
+    exact_cache_keys: tuple[str, ...] = ()
+    cache_ttl: float = CACHE_DAILY
+    settings_suffix: str | None = None   # None 表示非 LLM 模块
+    cache_groups: tuple[str, ...] = ()
+```
+
+- `DataModuleDef` 是不可变的（`frozen=True`），注册后不可修改。
+- `is_llm` — 自动判断是否为 LLM 模块（`settings_suffix is not None`）。
+- `llm_settings_keys()` — 生成该模块在 `llm_settings.json` 中的所有合法键名，新增 LLM 模块后可用于配置校验。
+
+### 公共 API 速查
+
+**遍历与查询**：
+
+```python
+from src.python.core.registry import get_registry
+registry = get_registry()          # → tuple[DataModuleDef, ...]
+```
+
+**缓存相关**：
+
+```python
+from src.python.core.registry import (
+    get_cache_ttl_defaults,        # → dict[data_type → ttl]
+    get_prefix_type_map,           # → dict[prefix → data_type]
+    get_exact_type_map,            # → dict[exact_key → data_type]
+    get_registered_data_types,     # → set[data_type]
+)
+```
+
+`get_cache_ttl_defaults()` 供 `config/_config_defaults.py` 生成默认配置模板；`get_prefix_type_map()` / `get_exact_type_map()` 供 `cache/_cleanup.py` 按文件名前缀 / 精确键名清理过期缓存；`get_registered_data_types()` 用于校验与测试。
+
+**LLM 模块名称查询**：
+
+```python
+from src.python.core.registry import (
+    get_llm_module_name,           # suffix → 中文名称
+    get_llm_module_names,          # → dict[suffix → 名称]
+)
+```
+
+合法 suffix：`global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation`（另含缓存管理保留条目 `debate_pro` / `debate_con` / `debate_synthesis`，菜单层已隐藏）。
+
+**LLM Settings 键名查询**：
+
+```python
+from src.python.core.registry import get_known_llm_settings_keys   # → set[str]
+```
+
+返回 `llm_settings.json` 中所有合法配置键名，用于配置校验。
+
+**enabled_llm 子键查询**：
+
+```python
+from src.python.core.registry import get_known_enabled_llm_keys    # → set[str]
+```
+
+返回 `enabled_llm` 字典的所有合法子键（即各 LLM 模块的 `settings_suffix`），用于 `_validate_enable_llm()` 的子键拼写校验。
+
+**报表排序与页签名称**：
+
+```python
+from src.python.core.registry import (
+    get_report_sheet_name,         # sheet_key → 中文标题
+    get_report_section_order,      # config → list[dict]（含 key/number/type/data_flag 的完整排序列表）
+    get_report_section_number,     # key → 当前配置下的序号
+    get_report_section_keys,       # → list[key]
+)
+```
+
+- `get_report_sheet_name("summary")` → `"投资分析汇总"`
+- `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
+- `get_report_section_number("fund_manager")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
+- `get_report_section_keys()` → 全部 19 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
+
+**计算模块查询**：
+
+```python
+from src.python.core.registry import (
+    get_computation_registry,      # → tuple[ComputModuleDef, ...]
+    get_computation_module,        # module_key → ComputModuleDef | None
+)
+```
+
+`get_computation_registry()` 遍历所有计算/分析模块，用于运行时发现和文档生成；`get_computation_module("analytics_metrics")` 按 module_key 查找单个计算模块定义。
+
+### 新增数据模块（非 LLM）
+
+在 `_MODULE_REGISTRY` 中添加一行 `DataModuleDef`：
+
+```python
+DataModuleDef("我的中文名称", "my_data_type",
+              cache_prefixes=("mydata_",),
+              cache_ttl=CACHE_DAILY,
+              cache_groups=("refresh",)),
+```
+
+- `name` — 中文显示名；`data_type` — 内部标识键，需唯一。
+- `cache_prefixes` — 缓存文件名前缀（可多个），清理时按前缀匹配。**注意：长前缀需排在短前缀之前**，否则短前缀可能先匹配（如 `"llm_"` 会误匹配 `"llm_global_macro_"`）。实际声明时所有 LLM 模块均已使用完整长前缀，无歧义。
+- `cache_ttl` — 使用 `CACHE_DAILY` / `CACHE_WEEKLY` / `CACHE_MONTHLY` 或自定义秒数。
+- `cache_groups` — `"preload"`（换持仓需重取）或 `"refresh"`（主动刷新按钮触发）；**留空 `()` 表示不被任何组清除操作命中**（如 `tracking`、`calendar` 等安全设计）。
+
+### 新增 LLM 分析模块
+
+除上述字段外，还需设置 `settings_suffix`：
+
+```python
+DataModuleDef("我的 LLM 分析", "llm_my_analysis",
+              cache_prefixes=("llm_my_analysis_",),
+              cache_ttl=7200,
+              settings_suffix="my_analysis",
+              cache_groups=("preload",)),
+```
+
+#### 新增 LLM 模块检查清单
+
+| # | 步骤 | 操作位置 | 产出 |
+|---|------|---------|------|
+| ① | **注册模块定义** | `core/registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
+| ② | **配置 JSON 键组** | `llm_settings.json` | 新增 9~10 个 `{key}_{suffix}` 配置键（`news_correlation` 不含 `output_brief`） |
+| ③ | **实现生成函数** | `llm/generators.py` | 新增生成函数，通过 `_call_llm()` 调用 LLM |
+| ④ | **注册调度入口** | `llm/generators_orchestrator.py` | 在 `_MODULE_FNS` 字典中添加新模块条目（键=settings_suffix，值=lambda 调用新函数）；在 `_compute_module_cache_info()` 中添加对应的指纹计算和 `info` 条目 |
+| ⑤ | **添加报告页签** | `report/llm_content.py` | 在 `write_llm_sheets()` 的 `_module_keys` 和 `_module_contents` 列表中添加新模块键名 |
+| ⑥ | **暴露导出接口** | `llm/__init__.py` | 将新生成函数加入 `__all__` |
+| ⑦ | **运行注册表测试** | 终端 | `.venv/bin/python -m pytest src/test/unit/core/test_registry.py -v` — 验证 TTL/前缀/键名完整性 |
+| ⑧ | **验证标记合规** | 终端 | `.venv/bin/python scripts/check-test-markers.py` — 确认测试文件标记无遗漏 |
+
+> **LLM 模块补充步骤**：在上述 registry 清单基础上，新增 LLM 模块还需完成领域特定步骤——`llm/prompts.py` 新增 `_SYSTEM_{MODULE}` 常量与提示词构建函数；`report/html_writer.py`（HTML）+ `report/llm_content.py`（Excel）新章节双渲染；`config.json` → `cache_ttl` 添加 `llm_{module}` 条目；`llm_settings.json` 加入推荐默认值并更新 [配置指南](../manuals/how-to-config.md)。
+
+### 精确键名缓存
+
+```python
+DataModuleDef("我的固定键", "fixed",
+              exact_cache_keys=("my_special_cache",),
+              cache_ttl=CACHE_WEEKLY),
+```
+
+精确键名不会被前缀通配误匹配，适合固定文件名的缓存。
+
+### 计算模块注册表（_COMPUTATION_REGISTRY）
+
+除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`core/registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表：
+
+```python
+@dataclass(frozen=True)
+class ComputModuleDef:
+    name: str               # 中文名称
+    module_key: str         # 唯一键，如 "analytics_liquidity"
+    label: str              # 短标签（日志/提示）
+    dependencies: tuple     # 前置数据模块键名
+    description: str        # 功能说明
+```
+
+| module_key | 名称 | 依赖 | 状态 |
+|:-----------|:-----|:-----|:----:|
+| `analytics_metrics` | 量化指标计算 | bond_yield, history | ✅ implemented |
+| `analytics_liquidity` | 流动性分析 | — | ✅ implemented |
+| `analytics_fx_exposure` | 外汇敞口分析 | — | ✅ implemented |
+| `analytics_scenario` | 情景分析 | history | ✅ implemented |
+| `analytics_alignment` | 组合校准分析 | — | ✅ implemented |
+| `analytics_inferrer` | 用户画像推断 | — | ⏳ planned |
+| `analytics_fact_checker` | 事实锚定校验器 | — | ✅ implemented |
+
+新增计算模块只需在 `_COMPUTATION_REGISTRY` 中添加一行 `ComputModuleDef`，纯算法模块无需缓存注册。
+
+### 无需手动维护的派生产出
+
+新增模块时只需在 `_MODULE_REGISTRY` 添加一行 `DataModuleDef`，即可自动同步到以下位置：
+
+- 缓存 TTL 默认值 → `get_cache_ttl_defaults()`
+- 缓存前缀/精确键名映射 → `get_prefix_type_map()` / `get_exact_type_map()`
+- LLM settings 键名 → `get_known_llm_settings_keys()`
+- LLM 模块名称 → `get_llm_module_names()`
+
+> 报表页签标题与顺序由独立的 `_REPORT_SECTION_DEFAULT` 注册表驱动，`get_report_sheet_name()` / `get_report_section_order()` 均读该注册表，**不**随 `_MODULE_REGISTRY` 自动派生。
+
+### 测试
+
+registry 的测试在 `src/test/unit/core/test_registry.py`，验证 TTL 默认值完整性、前缀类型映射一致性、精确键名映射、LLM settings keys 与模块列表匹配、所有 LLM 模块都有 settings_suffix、缓存分组标记完整性。
+
+```bash
+.venv/bin/python -m pytest src/test/unit/core/test_registry.py -v
+```
+
 ## 版本发布流程
 
 发布版本时，按以下四步顺序执行：

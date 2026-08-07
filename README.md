@@ -174,8 +174,7 @@
 
 | 文档 | 说明 |
 |:-----|:------|
-| [开发者指南](docs-stm/managements/developer-guide.md) | 开发环境与工作流、三级门禁、任务编号规范、测试驱动、辅助脚本速查、版本发布流程 |
-| [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块（含 LLM）检查清单 |
+| [开发者指南](docs-stm/managements/developer-guide.md) | 开发环境与工作流、三级门禁、任务编号规范、测试驱动、辅助脚本速查、注册表使用、版本发布流程 |
 | [性能历史趋势查看](scripts/perf_view.py) | 查看每次报告生成的各阶段耗时记录（`.venv/bin/python scripts/perf_view.py`） |
 
 ## 📋 项目内部文档
