@@ -236,11 +236,17 @@ def _generate_report_both(
     output_dir: str | None = None,
     transactions: list | None = None,
     dividends: list | None = None,
+    *,
+    snapshot_namespace: str | None = None,
 ) -> "ReportResult":
     """both 报告路径：生成 HTML + Excel，不含 LLM 分析章节。
 
     流程：_compute_details() → capture_snapshot() → fetch_history_data()
           → write_html_report() → generate_excel_report()
+
+    Args:
+        snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域）。
+            快照对比/组合演进/快照差异均在本域内闭环，不污染共享时间线。
     """
     from src.python.config import (
         is_enable_action,
@@ -295,13 +301,19 @@ def _generate_report_both(
 
     # ── 2. 快照对比（始终执行） ──
     perf.start("快照对比")
-    pipeline_data = capture_snapshot(holdings, details, config, reporter)
+    pipeline_data = capture_snapshot(
+        holdings,
+        details,
+        config,
+        reporter,
+        snapshot_namespace=snapshot_namespace,
+    )
     # 2b. 组合演进数据（聚合多期快照，evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
-        pipeline_data = _inject_evolution_data(pipeline_data)
+        pipeline_data = _inject_evolution_data(pipeline_data, snapshot_namespace=snapshot_namespace)
         # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
-        pipeline_data = _inject_snapshot_diff_data(pipeline_data)
+        pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
     # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
     #    （position_status + data_freshness）
     from src.python.analysis.action_advisor import build_action_data
@@ -475,12 +487,18 @@ def _generate_report_full(
     output_dir: str | None = None,
     transactions: list | None = None,
     dividends: list | None = None,
+    *,
+    snapshot_namespace: str | None = None,
 ) -> "ReportResult":
     """full 报告路径：生成 HTML + Excel + LLM 分析章节。
 
     流程：prepare_report_data() → capture_snapshot() → _prepare_full_risk_metrics()
           → get_sector_fund_flow() → _fetch_llm_and_news()
           → write_html_report() → generate_excel_report()
+
+    Args:
+        snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域）。
+            快照对比/组合演进/快照差异均在本域内闭环，不污染共享时间线。
     """
     from src.python.config import (
         is_enable_action,
@@ -523,7 +541,13 @@ def _generate_report_full(
 
     # ── 2. 快照对比 ──
     perf.start("快照对比")
-    pipeline_data = capture_snapshot(holdings, prep["details"], config, reporter)
+    pipeline_data = capture_snapshot(
+        holdings,
+        prep["details"],
+        config,
+        reporter,
+        snapshot_namespace=snapshot_namespace,
+    )
     # 风格与因子 / 持仓关系矩阵 / 品种覆盖诊断：prep 中已组装（数据契约），
     # 注入 pipeline_data 供 HTML/Excel 消费；capture_snapshot 在降级路径可能返回 None，需判空
     if pipeline_data is not None:
@@ -538,10 +562,10 @@ def _generate_report_full(
     _validate_pipeline_snapshot(pipeline_data)
     # 2b. 组合演进数据（聚合多期快照，evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
-        pipeline_data = _inject_evolution_data(pipeline_data)
+        pipeline_data = _inject_evolution_data(pipeline_data, snapshot_namespace=snapshot_namespace)
         # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
-        pipeline_data = _inject_snapshot_diff_data(pipeline_data)
+        pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
     perf.stop()
 
     # ── 3. 历史走势 + 全量量化指标 ──

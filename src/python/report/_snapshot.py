@@ -17,6 +17,8 @@ def capture_snapshot(
     details: list,
     config: dict | None,
     reporter: ProgressReporter,
+    *,
+    snapshot_namespace: str | None = None,
     **extra,
 ) -> dict | None:
     """持仓快照创建 + 差异计算 + 保存 + 清理。
@@ -26,6 +28,8 @@ def capture_snapshot(
         details: 行情明细
         config: 配置字典
         reporter: 进度报告接口
+        snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域），
+            差异计算基于同域上一份快照、保存与清理均在域内闭环
         extra: 额外扩展字段（如 risk_metrics），透传到 pipeline_data
 
     Returns:
@@ -68,15 +72,16 @@ def capture_snapshot(
             total_pnl=sum(d.profit for d in details),
             timestamp=datetime.now().strftime("%Y%m%dT%H%M%S"),
         )
-        _old = load_latest()
+        _old = load_latest(snapshot_namespace)
         _diff = HistoryDiff.compute(_snapshot, _old)
-        save(_snapshot)
+        save(_snapshot, snapshot_namespace)
         from src.python.report.history_snapshot import prune as _prune_snapshots
 
         _history_cfg = (config or {}).get("history", {})
         _prune_snapshots(
             retention_days=_history_cfg.get("snapshot_retention_days", 60),
             max_count=_history_cfg.get("snapshot_max_count", 365),
+            namespace=snapshot_namespace,
         )
         if not _diff.is_first_check:
             pipeline_data = {

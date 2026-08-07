@@ -344,6 +344,8 @@ def generate_report(
     warm_cache: bool = False,
     transactions: list | None = None,
     dividends: list | None = None,
+    *,
+    snapshot_namespace: str | None = None,
 ) -> ReportResult:
     """生成投资分析报告。
 
@@ -359,6 +361,8 @@ def generate_report(
             成本流水子模块（report_submodules.cost_lots）开启时用于成本分档 + XIRR
         dividends: 分红流水记录（「分红流水」页签，无则 None）。
             成本流水子模块开启时用于分红累计 + XIRR
+        snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域）。
+            仅 both/full 生效；快照对比/组合演进/快照差异均在本域内闭环。
     """
     result = ReportResult()
     if fetch_history is None:
@@ -427,6 +431,7 @@ def generate_report(
             output_dir=output_dir,
             transactions=transactions,
             dividends=dividends,
+            snapshot_namespace=snapshot_namespace,
         )
 
     if report_type == "full":
@@ -441,6 +446,7 @@ def generate_report(
             output_dir=output_dir,
             transactions=transactions,
             dividends=dividends,
+            snapshot_namespace=snapshot_namespace,
         )
 
     result.report_generated = True

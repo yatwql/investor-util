@@ -1,5 +1,9 @@
 """报告生成管线 — 单管线/双管线的编排逻辑。
 
+> **遗留重复文件**：本文件不再承载活代码——both/full 双路径生成的
+> 编排实现在 `_report_generation.py`（聚合门面），`orchestrator.generate_report`
+> 实际经其执行。请勿在本文件实施管线变更（防双份漂移）；清理本文件列为独立重构项。
+
 职责范围：
   - 健康检查（_spawn/_collect）
   - both/full 报告管线（_generate_report_both / _generate_report_full）

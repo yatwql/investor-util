@@ -131,10 +131,9 @@ def show_config() -> None:
 
 def _show_privacy_and_security_status() -> None:
     """显示隐私提示和匿名化安全状态。"""
-    from src.python.config import get_config as _get_cfg
+    from src.python.config.anonymizer import get_anonymization_mode
 
-    _cfg = _get_cfg()
-    _anon_mode = _cfg.get("features", {}).get("anonymization", {}).get("mode", "off")
+    _anon_mode = get_anonymization_mode()
     _anon_labels = {"off": "关闭", "code_display": "代码显示", "full_anonymous": "完全匿名", "summary": "汇总"}
     _anon_display = _anon_labels.get(_anon_mode, _anon_mode)
 

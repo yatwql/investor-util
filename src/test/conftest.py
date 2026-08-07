@@ -286,6 +286,24 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     # 应直接从 PROJECT_ROOT 读取真实文件，而非依赖隔离路径的副本。
 
 
+@pytest.fixture
+def holdings_path_isolated(tmp_path, monkeypatch):
+    """把 holdings_dir/holdings_filename 重定向到临时目录（正式覆盖类测试专用）。
+
+    防止正式模式测试覆盖真实 data/holdings/。autouse 不可用——部分既有测试
+    断言默认 holdings_dir 路径，全量重定向会破坏它们。测试内需自行在
+    tmp_path/holdings/ 下构造正式持仓文件（文件名 = 本 fixture 的
+    holdings_filename），再用 ``monkeypatch.setitem`` 调整配置。
+    """
+    import src.python.config._config_defaults as _cfg_defaults
+    import src.python.config._core as _cfg_core
+
+    monkeypatch.setitem(_cfg_defaults._DEFAULT_CONFIG, "holdings_dir", str(tmp_path / "holdings"))
+    monkeypatch.setitem(_cfg_defaults._DEFAULT_CONFIG, "holdings_filename", "测试持仓.xlsx")
+    _cfg_core._clear_config_cache()
+    return {"holdings_dir": str(tmp_path / "holdings"), "holdings_filename": "测试持仓.xlsx"}
+
+
 # 项目真实 reports 目录（默认配置 output_dir 指向这里；测试防线的重定向基准）
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _REAL_REPORTS_DIR = os.path.abspath(os.path.join(_PROJECT_ROOT, "reports"))

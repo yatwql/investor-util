@@ -4,7 +4,98 @@
 
 ---
 
-## [0.10.12-dev] - 开发中（未发布）
+## [0.10.12] - 2026-08-07
+
+### 测试覆盖统计：dragonball 列耗时刷新（--update-docs 回填）（2026-08-07）
+
+- **重新采集 dragonball 列运行时长**：`test_runner.py --mode bench --update-docs` 顺序采集全部模式实测耗时并回填 `test-coverage.md` 环境耗时对照表（env 表采集日期 2026-08-05 → 08-07；duration 表 dragonball 列按新实测刷新，如 `unit` ~14s → ~15s、`all` ~22s → ~23s、`report` ~11s → ~14s）。
+- **统计计数核对**：`collect-test-coverage.py` 实时收集快照与文档一致——`all` 5445、`unit` 5136、unit 子标记（unit_report 1541 / unit_analysis 699 / unit_config 299 / unit_web 184 等）均无变化（近期无测试新增/删除）。
+- **说明文字同步**：顶部「典型耗时」注、两机采集日期表述、对比段落示例值（`unit`/`all`/`edge`/`smoke`）按 dragonball 新实测更新。
+- **门禁**：check-doc-traces `--ci` [OK]。
+
+---
+
+### README/CLAUDE.md：三模式文档索引与列表统一（2026-08-07）
+
+- **README 启动方式三节统一指向各自分册**：TUI 节补「TUI 菜单操作手册」链接（原只有命令、无入口）；Web 节改链「Web 浏览器模式使用指南」（原链快速开始方式四，不直达分册）；CLI 节补完整命令参考入口 + 保留 §11「定时任务」引用。
+- **README 功能特性**：TUI / CLI / Web 三模式条目统一追加对应指南链接。
+- **README 用户指南表**：CLI 行说明补「定时任务」。
+- **CLAUDE.md 用户文档列表顺序统一**：调整为与 README 索引一致（how-to-start → web-mode → tui-menu → cli-mode → config → llm-config → reports-instruction → datasource → datasource-reliability → faq → registry → test-my-code → scripts-reference）。
+- **`folders.md` 统计表同步**：README 204→206 行，用户文档 14/6,204。
+- **门禁**：check-doc-traces `--ci` [OK]。
+
+---
+
+### 用户文档：三模式使用指南体系（TUI/CLI/Web 各一份）（2026-08-07）
+
+- **Web 浏览器模式使用指南**（`how-to-use-web-mode.md` 新建）：从用户视角完整讲述 Web 使用——启动访问、首页 6 分区布局、上传→生成→预览/下载全流程、配置编辑面板（7 组即改即存）、运行状态区、与其他模式关系、安全注意（无内建认证）。
+- **CLI 命令行模式使用指南**（`how-to-use-cli-mode.md` 新建）：命令结构、全局参数、`report`/`cache`/`whatif`/`check-sources` 子命令、使用示例、常用命令速查、退出码、最佳实践（缓存预热/输出路径/网络退避/性能历史/日志轮转）。
+- **定时任务内容并入 CLI 指南**：`how-to-schedule.md` 内容合并至 `how-to-use-cli-mode.md` §11「定时任务」（Windows schtasks + PowerShell 包装 + 防重入 / Linux crontab + flock / 排障），原独立文档删除；`README`/`how-to-start`/`faq` 等引用统一改指 CLI 指南 §11。
+- **TUI 菜单文档重命名**：`how-to-menu.md` → `how-to-use-tui-menu.md`（标题改「TUI 菜单操作手册」，内容不变）；归档目录保留历史文件名（不追溯重命名）。
+- **`how-to-start.md`**：方式四（Web）新增「③ 配置编辑」要点并链接 Web 指南 §4；原「CLI 命令参考」小节替换为指向 CLI 指南的精简引用；菜单操作速览引用改指 TUI 菜单手册。
+- **`README.md`**：用户指南表改为三模式文档各占一行（Web/TUI/CLI），删除 schedule 行，CLI 启动方式补「定时任务见 CLI 指南 §11」。
+- **`technical.md` §1.8**：模块表新增 `web/config_edit.py`、路由表新增 `GET/POST /api/config/edit`、§1.8.9 安全矩阵新增「跨站写请求（配置编辑）」行、§1.8.11 新增 Web 配置编辑小节、差异表补配置编辑行——与 plan-26 实现对齐。
+- **`folders.md`**：manuals 目录树同步三模式文档（新增 web-mode/cli-mode，tui-menu 重命名，schedule 移除），统计表刷新（用户文档 14/6,202，manuals 13/5,998），并修正重复条目。
+- **门禁**：dev-verify + 4 checks `--ci` 全 [OK]。
+
+---
+
+### Web 配置编辑：完整镜像 TUI 可编辑配置全集（plan-26 实现）（2026-08-07）
+
+- **新模块 `web/config_edit.py`**：`config_edit_whitelist` 白名单（点分键→类型/枚举→目标文件→写入原语，唯一事实来源）+ `apply_config_edit`/`get_config_edit_surface` + `config_backup_file` 写前单槽 `.bak` 备份（mkstemp + `os.replace` 原子写，复用 `holdings_update._atomic_copy`）。
+- **路由**：`GET/POST /api/config/edit`——GET 返回面板全量 7 组可编辑面；POST 复用 `_is_same_origin()` 同源守卫（失败 403），校验失败 400 BAD_PARAM，写共享配置异常 500 CONFIG_WRITE_FAILED。
+- **7 组可编辑全集（与 TUI 完全一致）**：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、辩论实验功能开关 3（features.json）。
+- **写入分派逐条等价 TUI**：config.json 顶层标量→`set_config`；嵌套 dict（report_submodules/comparison_indices）读合并整块写；anonymization.mode→`set_anonymization_mode`；enabled_llm.*→共享 `write_llm_settings`（自 `tui/handlers_config.py` 抽取，TUI 改委托，行为零变化）；llm_debate_*→`save_feature_overrides`。
+- **一致性修正**：两个状态面板（TUI 隐私安全状态 + Web 系统信息）匿名化读路径由不存在的 `features.anonymization.mode` 修正为顶层 `anonymization.mode`（此前恒显示「关闭」）。
+- **前端**：`index.html` 新增「③ 配置编辑」card（7 组控件，选项与 TUI 完全一致）+ `main.js` 即改即存（改即写、失败回滚、error_code 驱动提示）+ `style.css` 配置面板样式。
+- **测试**：`test_config_edit.py` 35 用例（白名单完备/隐藏 LLM 键拒绝/面板读取/标量写/嵌套 dict 写/llm_settings 写/features 写/校验守卫/备份）+ `test_config_edit_edge.py` 42 用例（极端输入 edge 隔离）+ `smoke-web.py` 扩展至 11 项断言（配置面板加载 + 保存成功 + 非法键 400）。
+- **顺带修复**：`smoke-web.py` `_build_client` 污染 `_DEFAULT_CONFIG`（holdings_dir/holdings_filename/output_dir）导致 config 测试顺序失败——`run_smoke` finally 统一还原 `_DEFAULT_CONFIG`/`_CONFIG_FILE`，web+config 同进程 282 测试全绿。
+- **验证**：web+config+handlers 同进程 282 passed；语义表登记 `config_edit`/`config_edit_whitelist`/`config_backup`（反向校验通过）。
+
+### 前端资产统一归入 src/static/：Web UI 与报告模板（plan-27）（2026-08-07）
+
+- **Web UI 前端**（`index.html`/`main.js`/`style.css`）自 `src/python/web/{templates,static}/` 归入 `src/static/web/`；`app.py` 的 Flask `template_folder`/`static_folder` 改为 `PROJECT_ROOT` 派生指向新目录，`/static/main.js` URL 与 `render_template("index.html")` 契约不变。
+- **报告 Jinja 模板**（`report_template.html`/`whatif_template.html`/`partials/`）自 `src/python/tmpl/` 归入 `src/static/tmpl/`；`html_jinja_env.py` 的 `_TEMPLATE_DIR` 改用 `PROJECT_ROOT` 派生（单加载点，whatif 走同一 `_ENV` 零改动）。
+- **净效果**：`src/static/` 成为非 Python 前端资产唯一归属（报告图表 bundle + Web UI 前端 + 报告模板三合一）；`src/python/` 仅保留纯 Python 代码。
+- **测试同步**：5 个按路径读模板的测试（test_html_writer / test_html_template / test_html_report_structure / test_html_report_structure_edge / test_llm_placeholder_distinction_edge）路径改为 `src/static/tmpl/`。
+- **验证**：`smoke-web.py` 10/10（Flask 新位置服务模板 + `/static/main.js`）；report/web/llm 全量单测 2395 passed。
+- **配套**：`folders.md` 目录树与统计表同步（web/ 目录树移除 templates/static，src/static/ 新增 web/tmpl 子树）；plan-26 配置编辑设计文档改动清单已按新路径更新（前端位置无关、契约不变）；`src/static/README.md` 资产说明滞后登记 rf-266。
+
+---
+
+### Web 配置编辑：完整镜像 TUI 可编辑配置全集（设计定稿）（2026-08-07）
+
+- **本条目为设计文档登记**（`docs-stm/plan/web-config-edit.md`，plan-26），实现前不产生运行时代码变更。
+- **范围**：Web 模式支持修改与 TUI **完全一致**的配置项全集——7 组：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档（off/code_display/full_anonymous/summary）、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、辩论实验功能开关 3（features.json）。
+- **关键决策**：新模块 `web/config_edit.py`——`config_edit_whitelist` 白名单（点分键→类型/枚举→目标文件→写入原语）+ `GET/POST /api/config/edit`（POST 复用 `_is_same_origin()` 同源守卫）；写共享配置前 `config_backup_file` 单槽 `.bak` 备份（mkstemp + `os.replace` 原子写）；写入分派逐条等价 TUI（config.json→`set_config`，嵌套 dict 读合并整块写，匿名化走 `set_anonymization_mode`；llm_settings.json→自 tui 抽取共享 `write_llm_settings`；features.json→`save_feature_overrides`）。
+- **一致性修正（随功能实现）**：状态面板匿名化读路径由不存在的 `features.anonymization.mode` 修正为顶层 `anonymization.mode`（tui_menu 状态面板 + web `_build_system_info`），此前面板恒显示「关闭」。
+- **前端**：index.html 新增「配置编辑」card（7 组控件）+ main.js 即改即存 + error_code 分支，选项与 TUI 完全一致。
+- **状态**：设计定稿待实现；预估 2d；语义表 `config_edit`/`config_edit_whitelist`/`config_backup` 于实现完成时登记（check-semantic-index 反向校验约束）。
+
+---
+
+### Web 生成用途双模式：临时试算隔离 / 正式更新共享（2026-08-07）
+
+- **Web 新增「生成用途」选择**：提交前可选「临时试算」（默认）或「正式更新」。
+  - **临时试算**：读上传临时文件生成，不落正式持仓；历史快照写入**试算隔离域**（`data/history/snapshots/web/`），与 TUI / CLI 的正式共享时间线互不污染。
+  - **正式更新**：两个输入来源——「上传新文件覆盖」先将旧正式持仓备份为 `.bak` 再提升为正式文件；「直接用当前正式文件」无需上传，直接读取配置路径下的正式文件。两种来源快照均写入共享时间线。
+- **后端契约**：`POST /api/runs` 新增 `mode`（`trial`/`formal`，默认试算）与 `use_existing` 参数；正式+用存量组合禁止携带 `file_id`（否则 400 BAD_PARAM）。正式模式提升发生在 run 出队后、生成前——报告后续失败（LLM/网络）不影响已提交的正式文件。
+- **快照隔离命名空间**：`history_snapshot` 全部公开函数（save/load_latest/load_all/list_all/prune）与 `capture_snapshot`/`build_evolution_data`/`build_snapshot_diff`/`generate_report` 新增 `namespace`/`snapshot_namespace` 参数（默认共享主目录，`"web"` 为试算隔离域）；各域按 `history.snapshot_retention_days`/`snapshot_max_count` 独立清理。
+- **正式持仓更新模块**：新增 `web/holdings_update.py`（`backup_holdings_file` 单槽 `.bak` 备份 + `promote_upload_to_holdings` 原子提升，mkstemp + `os.replace`）。
+- **前端**：`index.html`/`main.js` 新增模式单选、输入来源单选、覆盖警示条与确认勾选；`resetFlow` 区分正式-用存量（直接重新生成）与其余模式（重新上传）；警示条 `role="alert"` 单一 live-region 语义。
+- **冒烟**：`smoke-web.py` 扩展到 10 项断言（含正式-用存量 202 全链路 + 参数组合 400 校验）。
+- **测试**：新增 namespace 存储隔离、消费层透传、输入模式分派（含正式-用存量缺文件严重退出、参数组合校验）；conftest 新增 `holdings_path_isolated` 可选隔离 fixture（正式覆盖不污染真实持仓）。
+- **门禁**：dev-verify + 4 checks `--ci` 全 [OK]。
+
+---
+
+### 数据质量仪表盘缺省开启：config.json 落盘同步（2026-08-07）
+
+- **`data/config/config.json` `report_submodules.data_quality` 由 `false` 改为 `true`**：此前默认值改 `true` 时（见下方案例 `data_quality 缺省开启` 条目）仅同步了生成模板/访问器/文档，仓库内**实际配置文件残留 `false`**——生成器新建配置虽默认开，但沿用旧配置的用户仍是关。本次将落盘配置对齐默认，并修正过期注释「数据质量仪表盘默认关」→「数据质量仪表盘默认开，其余默认关」。
+- **一致性核对**：生成模板 `_config_defaults.py`（`data_quality: True`，已正确）、访问器 `is_enable_data_quality` 兜底（缺失键默认 `true`，已正确）、`how-to-config.md`（示例 + 参数表默认 `true`，已正确）、`requirements.md`/`technical.md`/`how-to-menu.md`（均默认开，已正确）——本次仅配置落盘为唯一残留，已修复。
+- **验证**：`get_config()` 解析后 `is_enable_data_quality(cfg)` 为 `True`；dev-verify 1956 + 4 checks `--ci` 全 [OK]。
+
+---
 
 ### 用户文档：说明报告 as-if 与独立 What-if 的区别（2026-08-07）
 
@@ -70,7 +161,7 @@
 - **TUI 首页**（`tui_menu.py` `print_header`）：标题头由硬编码字符串改为引用 `APP_NAME`（`投资复盘助手  v{APP_VERSION}` 不变）。
 - **Web 首页**（`web/handlers.py` `_handle_index` 传 `app_name` + `index.html`）：顶部 `<title>`/`<h1>` 改为应用名称，副标题前缀「v{app_version} ·」，浏览器标签页与页面头同时强调名称+版本。
 - **HTML 报告首页**（`report_template.html` + `whatif_template.html`）：主报告头部加副标题「由 {app_name} v{app_version} 生成」，页脚改为「由 {app_name} v{app_version} 生成 · 个人投资分析报告 | 生成时间」；调仓 What-if 报告页脚加同款生成声明。
-- **Excel 首页**（`report/summary.py` `_write_basic_info`）：投资分析汇总页签「统计时间/所属交易日」后新增「生成工具」行（`投资复盘助手 v0.10.12-dev`）。
+- **Excel 首页**（`report/summary.py` `_write_basic_info`）：投资分析汇总页签「统计时间/所属交易日」后新增「生成工具」行（`投资复盘助手 v0.10.12`）。
 - **测试**：`test_summary.py` 新增 生成工具行 用例、`test_handlers.py` 新增 首页标题名称+版本 用例、`test_html_writer.py` 补 `app_name` 透传断言、`test_tui_menu.py` 补版本断言。
 - **门禁**：相关 212 用例全绿 + dev-verify + 4 checks `--ci` 全 [OK]。
 

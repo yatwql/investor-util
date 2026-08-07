@@ -3,11 +3,17 @@
 所有文件写入使用 tempfile.mkstemp + os.replace 确保原子性。
 竞争条件防护：快照文件名使用时间戳（snapshot_{timestamp}.json）。
 
+命名空间（namespace）：快照可按隔离域读写（如 web 试算域 `web`），
+落在 `HISTORY_SNAPSHOT_DIR/{namespace}/` 子目录；`namespace=None` 时读写
+共享主目录（默认行为，TUI/CLI 不变）。namespace 值经白名单校验
+（仅小写字母/数字/`-`/`_`，拒绝路径分隔符），防路径穿越。
+
 用法：
   >>> from src.python.schemas.history import SnapshotData, AccountSnapshot
   >>> sd = SnapshotData(...)
-  >>> path = save(sd)
-  >>> latest = load_latest()
+  >>> path = save(sd)                # 共享主目录（默认）
+  >>> path = save(sd, "web")         # web 试算隔离域
+  >>> latest = load_latest("web")    # 读 web 域最新
   >>> all_snapshots = list_all()
   >>> prune(max_count=12)
 """
@@ -17,6 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime
 from typing import Any
@@ -29,6 +36,38 @@ from src.python.core.constants import (
 from src.python.schemas.history import AccountSnapshot, SnapshotData, SnapshotHolding
 
 logger = logging.getLogger("invest")
+
+# ── 命名空间 ──────────────────────────────────────────────
+# 允许的 namespace 字符集：小写字母/数字/`-`/`_`（目录段安全，无路径分隔符）
+_NAMESPACE_RE = re.compile(r"^[a-z0-9_-]+$")
+
+
+def _namespace_dir(namespace: str | None) -> str:
+    """解析命名空间对应的快照目录。
+
+    Args:
+        namespace: 隔离域标识（None=共享主目录，如 "web"=web 试算域）。
+
+    Returns:
+        对应目录绝对路径。
+
+    Raises:
+        ValueError: namespace 含非法字符（非小写字母/数字/`-`/`_`）时。
+    """
+    if namespace is None:
+        return HISTORY_SNAPSHOT_DIR
+    _validate_namespace(namespace)
+    return os.path.join(HISTORY_SNAPSHOT_DIR, namespace)
+
+
+def _validate_namespace(namespace: str) -> None:
+    """校验 namespace 值合法性（防路径穿越）。
+
+    仅允许小写字母/数字/`-`/`_`；拒绝 `..`、`/`、`\\` 等路径分隔符。
+    """
+    if not _NAMESPACE_RE.match(namespace):
+        raise ValueError(f"非法快照命名空间 {namespace!r}：仅允许小写字母/数字/'-'/'_'")
+
 
 # ── JSON 编解码辅助 ──────────────────────────────────────────
 
@@ -102,7 +141,7 @@ def _snapshot_from_dict(d: dict[str, Any]) -> SnapshotData:
 # ── 公开 API ────────────────────────────────────────────────
 
 
-def save(snapshot: SnapshotData) -> str:
+def save(snapshot: SnapshotData, namespace: str | None = None) -> str:
     """将 SnapshotData 保存为快照 JSON 文件。
 
     使用 tempfile.mkstemp + os.replace 确保原子写入。
@@ -110,18 +149,21 @@ def save(snapshot: SnapshotData) -> str:
 
     Args:
         snapshot: 要保存的快照数据
+        namespace: 隔离域标识（None=共享主目录，如 "web"=web 试算域）
 
     Returns:
         已写入文件的绝对路径
 
     Raises:
         OSError: 目录创建或文件写入失败
+        ValueError: namespace 含非法字符时
     """
-    os.makedirs(HISTORY_SNAPSHOT_DIR, exist_ok=True)
+    snap_dir = _namespace_dir(namespace)
+    os.makedirs(snap_dir, exist_ok=True)
 
     ts = snapshot.timestamp or datetime.now().strftime("%Y%m%dT%H%M%S")
     filename = f"snapshot_{ts}.json"
-    final_path = os.path.join(HISTORY_SNAPSHOT_DIR, filename)
+    final_path = os.path.join(snap_dir, filename)
 
     data = _snapshot_to_dict(snapshot)
     content = json.dumps(data, ensure_ascii=False, indent=2)
@@ -130,7 +172,7 @@ def save(snapshot: SnapshotData) -> str:
     fd, tmp_path = tempfile.mkstemp(
         suffix=".json",
         prefix=".snapshot_tmp_",
-        dir=HISTORY_SNAPSHOT_DIR,
+        dir=snap_dir,
     )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -148,16 +190,22 @@ def save(snapshot: SnapshotData) -> str:
     return final_path
 
 
-def load_latest() -> SnapshotData | None:
+def load_latest(namespace: str | None = None) -> SnapshotData | None:
     """加载最新的快照文件（按 mtime）。
 
-    从 HISTORY_SNAPSHOT_DIR 中查找所有 snapshot_*.json 文件，
+    从快照目录中查找所有 snapshot_*.json 文件，
     返回 mtime 最大的那个的解析结果。
+
+    Args:
+        namespace: 隔离域标识（None=共享主目录，如 "web"=web 试算域）
 
     Returns:
         SnapshotData 或 None（无快照文件时）
+
+    Raises:
+        ValueError: namespace 含非法字符时
     """
-    snapshots = _list_snapshot_files()
+    snapshots = _list_snapshot_files(namespace)
     if not snapshots:
         return None
 
@@ -165,15 +213,21 @@ def load_latest() -> SnapshotData | None:
     return _load_file(latest)
 
 
-def load_all() -> list[SnapshotData]:
+def load_all(namespace: str | None = None) -> list[SnapshotData]:
     """加载全部快照（按时间戳升序），供多期趋势聚合（组合演进）。
+
+    Args:
+        namespace: 隔离域标识（None=共享主目录，如 "web"=web 试算域）
 
     Returns:
         按 timestamp 升序排列的 SnapshotData 列表（损坏文件自动跳过）。
         无快照文件时返回空列表。
+
+    Raises:
+        ValueError: namespace 含非法字符时
     """
     snapshots: list[tuple[str, float, SnapshotData]] = []
-    for path in _list_snapshot_files():
+    for path in _list_snapshot_files(namespace):
         ts = os.path.basename(path).replace("snapshot_", "").replace(".json", "")
         data = _load_file(path)
         if data is not None:
@@ -183,14 +237,20 @@ def load_all() -> list[SnapshotData]:
     return [sd for _, _, sd in snapshots]
 
 
-def list_all() -> list[dict[str, Any]]:
+def list_all(namespace: str | None = None) -> list[dict[str, Any]]:
     """列出所有快照文件的元信息（按 mtime 降序）。
+
+    Args:
+        namespace: 隔离域标识（None=共享主目录，如 "web"=web 试算域）
 
     Returns:
         每个元素包含 filename、mtime、timestamp（从文件名解析）、size 的 dict 列表。
         空列表表示无快照文件。
+
+    Raises:
+        ValueError: namespace 含非法字符时
     """
-    files = _list_snapshot_files()
+    files = _list_snapshot_files(namespace)
     entries = []
     for path in sorted(files, key=lambda p: os.path.getmtime(p), reverse=True):
         mtime = os.path.getmtime(path)
@@ -214,6 +274,7 @@ def list_all() -> list[dict[str, Any]]:
 def prune(
     retention_days: int = HISTORY_SNAPSHOT_RETENTION_DAYS,
     max_count: int = HISTORY_SNAPSHOT_MAX_COUNT,
+    namespace: str | None = None,
 ) -> int:
     """删除超出保留天数和最大数量的旧快照文件。
 
@@ -226,13 +287,17 @@ def prune(
     Args:
         retention_days: 保留天数，默认 HISTORY_SNAPSHOT_RETENTION_DAYS (60)
         max_count: 最大保留数，默认 HISTORY_SNAPSHOT_MAX_COUNT (12)
+        namespace: 隔离域标识（None=共享主目录，如 "web"=web 试算域）
 
     Returns:
         实际删除的文件数量
+
+    Raises:
+        ValueError: namespace 含非法字符时
     """
     from datetime import datetime
 
-    files = _list_snapshot_files()
+    files = _list_snapshot_files(namespace)
     if not files:
         return 0
 
@@ -275,19 +340,24 @@ def prune(
 # ── 内部辅助 ────────────────────────────────────────────────
 
 
-def _list_snapshot_files() -> list[str]:
+def _list_snapshot_files(namespace: str | None = None) -> list[str]:
     """列出快照目录中所有 snapshot_*.json 文件。
+
+    Args:
+        namespace: 隔离域标识（None=共享主目录，如 "web"=web 试算域）
 
     Returns:
         文件绝对路径列表，按文件名排序
+
+    Raises:
+        ValueError: namespace 含非法字符时
     """
-    if not os.path.isdir(HISTORY_SNAPSHOT_DIR):
+    snap_dir = _namespace_dir(namespace)
+    if not os.path.isdir(snap_dir):
         return []
     try:
         return [
-            os.path.join(HISTORY_SNAPSHOT_DIR, f)
-            for f in os.listdir(HISTORY_SNAPSHOT_DIR)
-            if f.startswith("snapshot_") and f.endswith(".json")
+            os.path.join(snap_dir, f) for f in os.listdir(snap_dir) if f.startswith("snapshot_") and f.endswith(".json")
         ]
     except OSError:
         return []

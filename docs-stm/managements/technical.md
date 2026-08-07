@@ -1,5 +1,5 @@
 # 投资复盘助手 — 技术设计
-> 文档版本：0.10.12-dev
+> 文档版本：0.10.12
 
 ## 目录
 
@@ -350,6 +350,7 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 | 维度 | TUI | CLI | Web |
 |:-----|:----|:----|:----|
 | 参数传递 | 菜单交互逐步选择 | argparse 参数 + `--type basic/both/full` | 前端表单提交（报告格式下拉 + 获取历史走势/强制 LLM 复选） |
+| 配置编辑 | 主菜单改项即写即存（写前 .bak） | 无（编辑 config.json 或走 TUI/Web） | 配置编辑面板（§1.8.11 白名单 7 组）即改即存 + 写前 .bak + 同源守卫 |
 | 进度传输 | 终端区实时刷新 | stdout/stderr 文本 | 事件缓冲 seq 增量轮询（`/api/runs/{id}/events`） |
 | 并发模型 | 单线程同步 | 单线程同步 | 单 worker 串行队列（HTTP 线程提交、worker 线程执行） |
 | 产物输出 | `output_dir` 最新版 + `YYYYMMDD/` 归档 | 同左 | 同左；产物定位基于 run 快照 output_dir，`/api/reports` 预览/下载 |
@@ -522,11 +523,12 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 |:-----|:-----|:---------|
 | `web/server.py` | 启动入口 | sys.path 注入、参数解析、端口检测、output_dir 写锁检测、init_config、app.run |
 | `web/app.py` | Flask 应用工厂 | 统一 JSON 错误处理、request_id 访问日志、注入 run_manager |
-| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 组装状态区系统信息（版本/本机 IP/LLM 状态，对齐 TUI） |
+| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康/配置编辑；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 组装状态区系统信息（版本/本机 IP/LLM 状态，对齐 TUI）；`_handle_config_edit` 同源守卫（`_is_same_origin`） |
 | `web/upload.py` | 上传安全 | 服务端 uuid 重命名、扩展名白名单、大小上限、PK 魔数、原子落盘、TTL 清理 |
+| `web/config_edit.py` | 配置编辑 | `config_edit_whitelist` 白名单（唯一事实来源）+ `apply_config_edit`/`get_config_edit_surface` + `config_backup_file` 写前 .bak 备份；写入分派逐条等价 TUI |
 | `web/runs.py` | 运行管理 | RunManager 单 worker 串行队列 + run 状态/事件注册表（Lock 保护） |
 | `web/progress.py` | 进度报告 | WebProgressReporter（ProgressReporter 子类 → RunState 事件缓冲） |
-| `web/templates/` + `static/` | 前端单页 | 原生 ES6 无框架、上传表单/进度事件/状态区/历史记录 |
+| `src/static/web/` | 前端单页 | 原生 ES6 无框架、上传表单/进度事件/状态区/历史记录/配置编辑面板 |
 
 #### 1.8.2 启动流程与启动防护
 
@@ -561,6 +563,8 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 | GET | `/api/runs/{id}/events?after=N` | 增量事件 | seq 单调递增，`seq > after` 增量轮询 |
 | GET | `/api/reports/<path>` | 产物预览/下载 | `send_from_directory`（内置 `..` 净化）+ 扩展名白名单 |
 | GET | `/api/health` | 数据源健康 | 60s 结果缓存；`?fresh=1` 强制重测 |
+| GET | `/api/config/edit` | 配置编辑面板 | 无守卫；返回 7 组可编辑面（路径/章节/子模块/匿名化/对比指数池/LLM 开关/辩论实验） |
+| POST | `/api/config/edit` | 应用配置编辑 | `_is_same_origin()` 同源守卫（失败 403）；校验失败 400 BAD_PARAM；写共享配置异常 500 CONFIG_WRITE_FAILED |
 
 #### 1.8.5 RunManager 单 worker 串行队列
 
@@ -596,10 +600,11 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 
 #### 1.8.8 前端单页与进度可视化
 
-`web/templates/index.html` + `web/static/main.js` / `style.css`（原生 ES6 无框架、无 `innerHTML`）：
+`src/static/web/index.html` + `main.js` / `style.css`（原生 ES6 无框架、无 `innerHTML`，Flask `template_folder`/`static_folder` 由 `PROJECT_ROOT` 派生指向；`/static/main.js` URL 契约不变）：
 
 - **配置回填**：页面加载取一次 `get_config()`，报告格式/历史走势（`history.fetch_mode`）/强制 LLM 默认值跟随配置。
 - **进度事件**：事件按 seq 编号渲染，进度条显示「当前阶段（第 N 步）：消息」，完成置 100%；轮询节流（防刷接口）。
+- **配置编辑面板**：`loadConfigEdit()` 拉取 `/api/config/edit` 全量可编辑面，按 7 组分块渲染；保存语义**即改即存**（与 TUI「改一项存一项」一致）——checkbox/radio 改动即 POST，自由文本路径经各自「保存」按钮提交，对比指数池经添加/删除/重置动作提交；提交期间控件禁用，成功回读该项最新值，失败恢复改动前值并显示错误。`error_code` 驱动分支（BAD_PARAM 400 / 同源 403 / CONFIG_WRITE_FAILED 500），中文文案直显服务端不前端硬编码。
 - **状态区**：健康卡片（`/api/health` 60s 缓存 + 「重新检测」`?fresh=1` 强制重测）+ 历史运行记录卡片（最近 10 条，5s 短缓存）。
 - **结果映射**：按 exit_code 映射展示（0 成功 / 1 部分失败黄色告警 + 通用建议 / 2 严重红色 + 提示看日志）；failed/exit_code=2 隐藏无效产物按钮；失败提供「重新生成」（上传文件已消费，引导重新上传）。
 - **静态服务分离**：web 只服务自身 `static/`；报告资产（chart.min.js 等）经 `/api/reports` 从 output_dir 提供。`main.js`/`style.css` 带 `?v={APP_VERSION}` 版本查询串防浏览器缓存旧 JS。
@@ -616,6 +621,7 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 | 拒绝服务 | 单 worker 队列 + 队列满 429；健康检查 60s 缓存；前端轮询节流 |
 | 日志隐私 | 访问日志不记录文件名/持仓内容/绝对路径 |
 | 局域网暴露 | 默认仅 127.0.0.1；全零监听时启动警告（无内建认证） |
+| 跨站写请求（配置编辑） | 副作用写操作复用 `_is_same_origin()`（Sec-Fetch-Site + Origin 校验），失败 403；配置编辑无 CSRF token 依赖 |
 
 #### 1.8.10 与 TUI/CLI 的差异要点
 
@@ -625,9 +631,21 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 | 进度 | 终端输出 | 事件缓冲 + 浏览器轮询 |
 | 并发 | 单线程同步 | 单 worker 串行队列（HTTP 线程 + worker 线程） |
 | 参数默认 | 菜单选择 / argparse | 表单回填 config 快照 |
+| 配置编辑 | TUI 主菜单改项即写即存 | 配置编辑面板（白名单 7 组）即改即存，写前 .bak 备份，同源守卫 |
 | 产物定位 | 直接写 output_dir | run 快照 output_dir + `/api/reports` 服务 |
 | 启动防护 | 无 | 端口检测 + output_dir 写锁 |
 | 生命周期 | 会话 / 单次 | 常驻服务 |
+
+#### 1.8.11 Web 配置编辑（完整镜像 TUI 可编辑全集）
+
+Web 配置编辑面板的职责边界：**「能改什么」由白名单唯一确定，「怎么改」逐条等价 TUI 写入路径**，不引入任何 TUI 之外的新配置项。核心实现 `web/config_edit.py`：
+
+- **白名单 `config_edit_whitelist`**（小写模块级 dict，唯一事实来源）：点分键 → `{"kind", "target", "writer"}`。`kind` 取 `str`/`bool`/`enum`/`action`；`target` 取 `config`/`llm_settings`/`features`（落盘目标文件）；`writer` 取 `scalar`/`submodule`/`anonymization`/`llm`/`features`/`comparison_indices`（写入分派器）。全集 7 组：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、辩论实验功能开关 3（features.json）。
+- **写入分派逐条等价 TUI**：config.json 顶层标量 → `set_config`（`_PATH_CONFIG_KEYS` 路径键自动反绝对化）；嵌套 dict（report_submodules / comparison_indices）→ 读合并后 `set_config` 整块写；`anonymization.mode` → `set_anonymization_mode`；`enabled_llm.*` → 共享 `write_llm_settings`（`config/_llm_settings.py` 公开原语，自 `tui/handlers_config.py` 抽取，TUI 改委托、行为零变化；保留注释 + mkstemp + `os.replace` 原子写 + `get_llm_config()` 缓存刷新）；`llm_debate_*` → `save_feature_overrides`（features.json）。
+- **类型/枚举校验**：`set_config` 不做值类型/模式验证，白名单在 Web 层自行校验——kind=str 拒绝含路径分隔符，kind=bool 仅接受 `True`/`False`（`1`/`"true"`/`0.0` 等一律 400），kind=enum 严格匹配合法枚举值（大小写/空白/非字符串拒绝），对比指数池 code 拒绝含路径分隔符（防 `../` 穿越）且 name 长度受限。校验失败统一 400 BAD_PARAM（服务端中文文案）。
+- **写前备份 `config_backup_file`**：写目标文件前单槽 `.bak` 备份（复用 `holdings_update._atomic_copy`），原文件不存在时返回 None（不备份）；仅备份一次（后续写入目标存在已有 `.bak` 不覆盖），供手动还原（`.bak` 改回原名）。
+- **同源守卫**：`_handle_config_edit` POST 复用 `_is_same_origin()`（Sec-Fetch-Site + Origin 校验，同源或非浏览器放行）——Web 无内建认证/无 CSRF token，副作用写操作以此兜底跨站写请求，失败 403。
+- **匿名化读路径一致性**：TUI 隐私安全状态（`tui_menu._show_privacy_and_security_status`）与 Web 系统信息（`_build_system_info`）读顶层 `anonymization.mode`（非不存在的 `features.anonymization.mode`），两个面板匿名化状态显示与 `set_anonymization_mode` 写入键一致。
 
 [↑ 回到顶部](#目录)
 
@@ -2751,6 +2769,13 @@ make_http_client(timeout=10.0) → httpx.Client
 | `tail_risk` | 尾部风险 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
 | `snapshot_diff` | 快照差异 | 组合演进 | 监控 | 随 `enable_portfolio_evolution` |
 | `data_quality` | 数据质量仪表盘 | 数据源可用性矩阵 | 监控 | `report_submodules.data_quality`（默认开） |
+| `snapshot_namespace` | 快照隔离命名空间（试算域 `web` / 共享主目录） | 快照存储/Web 输入 | 输入隔离 | 无（run 级参数） |
+| `web_input_mode` | Web 输入模式（试算/正式） | Web 输入 | 输入隔离 | 无（run 级参数 `mode`） |
+| `use_existing` | 直接用正式持仓文件 | Web 输入 | 输入隔离 | 无（run 级参数） |
+| `holdings_update` | 正式持仓更新（备份 + 提升） | Web 输入 | 输入隔离 | 无 |
+| `config_edit` | Web 配置编辑（覆盖 TUI 可编辑全集） | Web 配置 | 配置编辑 | 无（功能面） |
+| `config_edit_whitelist` | 可编辑配置项白名单（键→类型/枚举→目标文件→写入原语） | Web 配置 | 配置编辑 | 无（校验面） |
+| `config_backup` | 配置写前备份（`.bak` 单槽轮转） | Web 配置 | 配置编辑 | 无（安全面） |
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 

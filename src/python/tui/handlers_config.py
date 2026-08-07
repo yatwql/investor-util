@@ -8,11 +8,7 @@ from __future__ import annotations
 import json
 import os
 
-import contextlib
-import tempfile
-
 from src.python.config import set_config
-from src.python.config._json_patch import _replace_dict_block, _update_json_raw_text
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.logger import setup_logger
 from src.python.core.reader import list_xlsx_files
@@ -56,43 +52,11 @@ def _read_llm_settings() -> tuple[dict, str] | None:
 def _write_llm_settings(settings: dict, path: str) -> None:
     """写入 llm_settings.json 并刷新 LLM 配置缓存，保留文件中的注释。
 
-    仅更新 settings 中发生变化的字段对应的文本区块，注释和其他字段原样保留。
+    委托 config 层共享写入原语 write_llm_settings（自本函数抽取），行为一致。
     """
-    try:
-        with open(path, encoding="utf-8") as f:
-            raw = f.read()
-    except FileNotFoundError:
-        raw = ""
+    from src.python.config._llm_settings import write_llm_settings
 
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    if raw.strip():
-        from src.python.config import _strip_json_comments
-
-        current = json.loads(_strip_json_comments(raw))
-        updated_raw = _update_json_raw_text(raw, current, settings)
-        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(updated_raw)
-            os.replace(tmp_path, path)
-        except Exception:
-            with contextlib.suppress(OSError):
-                os.remove(tmp_path)
-            raise
-    else:
-        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(settings, f, ensure_ascii=False, indent=2)
-            os.replace(tmp_path, path)
-        except Exception:
-            with contextlib.suppress(OSError):
-                os.remove(tmp_path)
-            raise
-
-    from src.python.config import get_llm_config
-
-    get_llm_config()
+    write_llm_settings(settings, path)
 
 
 def _edit_single_config(key: str, label: str, default: str = "", *, pre_hook=None) -> None:

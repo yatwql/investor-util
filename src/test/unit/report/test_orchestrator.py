@@ -300,14 +300,14 @@ class TestGenerateReport:
         assert result.holdings_ok is True
         assert result.report_generated is True
         assert result.exit_code == 0
-        # 验证 generate_excel_report 被正确调用（数据质量仪表盘/成本流式子模块默认关）
+        # 验证 generate_excel_report 被正确调用（数据质量仪表盘默认开，成本流式子模块默认关）
         mock_gen.assert_called_once_with(
             mock_holdings,
             include_news=False,
             output_dir="reports",
             section_order=[{"key": "overview"}],
             progress=mock_reporter,
-            enable_data_quality=False,
+            enable_data_quality=True,
             enable_cost_lots=False,
             transactions=None,
             dividends=None,
@@ -1625,8 +1625,8 @@ class TestCaptureSnapshot:
                 mock_reporter,
             )
 
-        # 验证 prune 参数来自 config 而非 get_config_cache()
-        mock_prune.assert_called_once_with(retention_days=99, max_count=200)
+        # 验证 prune 参数来自 config 而非 get_config_cache()；默认 namespace=None（共享主目录）
+        mock_prune.assert_called_once_with(retention_days=99, max_count=200, namespace=None)
 
     def test_capture_snapshot_pipeline_data(self):
         """pipeline_data 含 diff/diff_trimmed/days_since_last 三个顶层 key。"""

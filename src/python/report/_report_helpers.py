@@ -37,7 +37,11 @@ def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -
 # ── 组合演进数据（多快照趋势聚合）──
 
 
-def _inject_evolution_data(pipeline_data: dict | None) -> dict:
+def _inject_evolution_data(
+    pipeline_data: dict | None,
+    *,
+    snapshot_namespace: str | None = None,
+) -> dict:
     """计算组合演进数据并注入 pipeline_data（`evolution_data` 键）。
 
        聚合 `data/history/snapshots/` 多期快照，供 HTML「组合演进」章节与
@@ -46,6 +50,7 @@ def _inject_evolution_data(pipeline_data: dict | None) -> dict:
 
        Args:
            pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
+           snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域）
 
        Returns:
            注入 evolution_data 后的 pipeline_data（None 时新建字典）
@@ -55,14 +60,18 @@ def _inject_evolution_data(pipeline_data: dict | None) -> dict:
     try:
         from src.python.analysis.portfolio_evolution import build_evolution_data
 
-        pipeline_data["evolution_data"] = build_evolution_data()
+        pipeline_data["evolution_data"] = build_evolution_data(snapshot_namespace=snapshot_namespace)
     except Exception:
         logger.warning("[evolution] 组合演进数据构建失败（非关键）", exc_info=True)
         pipeline_data["evolution_data"] = {"available": False, "reason": "组合演进数据构建失败"}
     return pipeline_data
 
 
-def _inject_snapshot_diff_data(pipeline_data: dict | None) -> dict:
+def _inject_snapshot_diff_data(
+    pipeline_data: dict | None,
+    *,
+    snapshot_namespace: str | None = None,
+) -> dict:
     """计算快照差异摘要并注入 pipeline_data（`snapshot_diff_data` 键）。
 
        对比 `data/history/snapshots/` 去重后最近两次快照，输出组合演进章顶部
@@ -72,6 +81,7 @@ def _inject_snapshot_diff_data(pipeline_data: dict | None) -> dict:
 
        Args:
            pipeline_data: capture_snapshot 返回的 A 通道数据（可能为 None）
+           snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域）
 
        Returns:
            注入 snapshot_diff_data 后的 pipeline_data（None 时新建字典）
@@ -81,7 +91,7 @@ def _inject_snapshot_diff_data(pipeline_data: dict | None) -> dict:
     try:
         from src.python.analysis.snapshot_diff import build_snapshot_diff
 
-        pipeline_data["snapshot_diff_data"] = build_snapshot_diff()
+        pipeline_data["snapshot_diff_data"] = build_snapshot_diff(snapshot_namespace=snapshot_namespace)
     except Exception:
         logger.warning("[snapshot_diff] 快照差异摘要构建失败（非关键）", exc_info=True)
         pipeline_data["snapshot_diff_data"] = {"available": False, "reason": "快照差异摘要构建失败"}

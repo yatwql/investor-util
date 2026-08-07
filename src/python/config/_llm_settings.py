@@ -218,6 +218,37 @@ def get_llm_settings_path() -> str:
     return config.get("llm_settings_file") or os.path.join(PROJECT_ROOT, "data/config/llm_settings.json")
 
 
+def write_llm_settings(settings: dict, path: str) -> None:
+    """写入 llm_settings.json 并刷新 LLM 配置缓存，保留文件中的注释。
+
+    TUI / Web 配置编辑共享的 llm_settings.json 写入原语（自 tui 抽取）。
+    仅更新 settings 中发生变化的字段对应的文本区块，注释和其他字段原样保留；
+    原子写入（mkstemp + os.replace），完成后 get_llm_config() 刷新缓存。
+
+    Args:
+        settings: 要写入的 LLM 设置字典（可只含变更字段）。
+        path: llm_settings.json 绝对路径。
+    """
+    from src.python.config._core import _atomic_write
+    from src.python.config._json_patch import _update_json_raw_text
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        raw = ""
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if raw.strip():
+        current = json.loads(_comments._strip_json_comments(raw))
+        updated_raw = _update_json_raw_text(raw, current, settings)
+        _atomic_write(path, updated_raw)
+    else:
+        _atomic_write(path, json.dumps(settings, ensure_ascii=False, indent=2))
+
+    get_llm_config()
+
+
 def invalidate_llm_config_cache() -> None:
     """使 LLM 配置缓存失效，下次 get_llm_config() 自动重读。"""
     global _llm_config_cache, _llm_config_mtime, _llm_config_size

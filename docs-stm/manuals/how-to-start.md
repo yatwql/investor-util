@@ -129,81 +129,43 @@ CLI 模式无需 TUI 界面，通过参数驱动，适合定时任务和脚本�
 | `--config PATH` | 备用配置文件路径，默认 `data/config/config.json` |
 
 > **Web 模式使用要点**：
+> - 首页「③ 配置编辑」面板与 TUI 主菜单可编辑项**完全一致**（7 组：路径/报告章节/子模块/匿名化/对比指数池/LLM 开关/辩论实验），**即改即存**写入共享配置文件（config.json / llm_settings.json / features.json）并写前自动备份 `.bak`——详见 [Web 浏览器模式使用指南](how-to-use-web-mode.md) §4。
 > - 首页底部「运行状态 → 系统信息」卡片展示程序版本、本机 IP、持仓目录/文件、输出目录、新闻抓取上限、持仓文件就绪状态（对齐 TUI 首页摘要）、持仓匿名化模式、隐私声明与 LLM 配置状态（provider/模型/策略/熔断/模型路由）。
 > - 生成任务的「历史走势」复选框默认跟随配置 `history.fetch_mode`，可在提交前按本次需求勾选/取消；「强制重新生成 LLM 内容」跳过 LLM 缓存，仅 `full` 报告生效。
 > - 同一 `output_dir` 仅保持一个入口在运行：Web / TUI / CLI 共用输出目录，同时运行会互相覆盖最新版产物。
 > - Web 模式与 TUI / CLI 共享同一套缓存与配置文件，可交替使用。
 > - Web 界面的上传/生成/进度/产物交互流程见本文「方式四」；生成报告的内容与页签解读见 [报告解读说明](reports-instruction.md)；常见问题见 [FAQ](faq.md)。
 
-### CLI 命令参考
+#### Web 生成用途：临时试算 / 正式更新
 
-**全局参数**（位于子命令之前）：
+提交生成前，在「生成用途」中选择本次任务的输入模式：
 
-| 参数 | 说明 |
-|:-----|:-----|
-| `--config PATH` | 配置文件路径，默认 `data/config/config.json` |
-| `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir` |
-| `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
-| `--non-interactive` | 跳过首次运行交互式引导（定时任务/脚本使用） |
-| `--version` | 显示版本号并退出 |
+| 生成用途 | 输入来源 | 效果 | 快照时间线 |
+|:-----|:-----|:-----|:-----|
+| **临时试算**（默认） | 上传文件 | 仅本次生成使用，不落正式持仓 | 写入**试算隔离域**，与正式快照互不污染 |
+| **正式更新** | 上传新文件 / 直接用当前正式文件 | 覆盖 `data/holdings/` 正式持仓（旧文件备份为 `.bak`）；或直接读取当前正式文件生成 | 写入**共享快照时间线** |
 
-**`report` 子命令**：
+- **临时试算**：上传 → 生成 → 预览/下载，适合快速验证。试算结果不改变任何正式文件，历史快照写入隔离的试算域，后续正式更新不受试算影响。
+- **正式更新**：会改变 `data/holdings/` 下的正式持仓文件，提交前需勾选确认。两个输入来源：
+  - **上传新文件覆盖**：旧正式文件先备份为 `.bak`，再以新文件生成报告。
+  - **直接用当前正式文件**：无需上传，直接读取现有正式持仓生成；适合正式文件已是最新时。
+- 正式更新无论哪种来源，生成成功后快照均写入**共享时间线**（与 TUI / CLI 的正式历史共用）。
 
-| 参数 | 说明 |
-|:-----|:-----|
-| `--type {basic,both,full}` | `basic`=仅 Excel 报告（约 1 分钟，默认）；`both`=Excel+HTML（不含 LLM，约 2 分钟）；`full`=全量含 LLM（约 5 分钟，需 LLM 配置） |
-| `--history {auto,off}` | 是否获取组合历史走势：`auto`=获取，`off`=跳过。未指定时按配置 `history.fetch_mode`（默认 `auto`，即获取）。仅 `--type both` / `full` 时有效 |
-| `--force-llm` | 强制重新调用 LLM API（忽略缓存），生成最新 LLM 内容 |
-| `--warm` | 报告生成前预热缓存（首次使用或新增持仓时推荐） |
+> **提示**：历史走势/快照演进基于快照时间线。试算的快照在隔离域内环比，不影响 TUI / CLI 的正式历史；正式更新才写入共享历史。
 
-**`cache` 子命令**：
+### CLI 使用指南
 
-| 参数 | 说明 |
-|:-----|:-----|
-| `--update {basic,position,all}` | `basic`=更新基础类缓存（基金业绩、行业分类、新闻等）；`position`=更新持仓类缓存（价格行情、指数）；`all`=全部更新 |
-| `--clean` | 按 TTL 删除过期缓存文件 |
-| `--stats` | 查看缓存状态统计（文件数、总大小、过期文件预览等） |
-
-**`whatif` 子命令**（调仓 What-if 模拟，独立报告）：
-
-| 参数 | 说明 |
-|:-----|:-----|
-| `--base PATH` | 基准持仓文件（调仓前）。缺省使用 `config.json` 的 `holdings_dir` + `holdings_filename` |
-| `--candidate PATH` | 目标持仓文件（调仓后/假设），**必填** |
-| `--effective-date YYYY-MM-DD` | 调仓生效日（可选）。指定后 opt-in 联网取生效日后行情，追加时序回测（区间/年化收益、波动率、夏普、最大回撤） |
-
-对比两份持仓生成独立调仓 diff 报告（Excel 3 页签 + 指定生效日时第 4 页签「时序回测」+ HTML 双栏对比页），产物输出到报告输出目录：最新版固定名 `调仓模拟.xlsx` / `调仓模拟.html`（每次覆盖为最新对比），历史归档至 `YYYYMMDD/调仓模拟-YYYYMMDD-HHMMSS.xlsx/.html` 日期子目录（超 180 天自动清理）。默认全程本地计算、零网络请求，不并入主报告管线；指定 `--effective-date` 时联网取历史做假设推演（不构成收益承诺），数据不足时回测降级不阻塞主报告。
-
-**使用示例**：
+CLI 模式的完整命令参考（全局参数 / `report` / `cache` / `whatif` / `check-sources` 子命令、使用示例、常用命令速查、退出码、最佳实践）见 [CLI 命令行模式使用指南](how-to-use-cli-mode.md)。
 
 ```bash
-# 生成全量报告，预热缓存，强制重新调用 LLM
-.venv/bin/python -m src.python.cli --verbose report --type full --history auto --warm --force-llm
+# 查看帮助
+.venv/bin/python -m src.python.cli --help
 
-# 基础 Excel 报告，输出到指定目录
-.venv/bin/python -m src.python.cli --output D:/my_reports report --type basic
-
-# 使用自定义配置文件
-.venv/bin/python -m src.python.cli --config D:/config/my_config.json cache --stats
-
-# 调仓 What-if：基准用配置默认持仓，目标指定另一份文件
-.venv/bin/python -m src.python.cli whatif --candidate D:/holdings/调仓方案.xlsx
-
-# 调仓 What-if：显式指定两份持仓
-.venv/bin/python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx
-
-# 调仓 What-if：指定生效日，追加时序回测
-.venv/bin/python -m src.python.cli whatif --base D:/holdings/当前.xlsx --candidate D:/holdings/方案B.xlsx --effective-date 2026-07-01
+# 基础 Excel 报告
+.venv/bin/python -m src.python.cli report --type basic
 ```
 
-**数据源健康检查**（直接通过主程序运行，无需 TUI 界面）：
-
-```bash
-# 测试各数据源联通性并报告延迟
-.venv/bin/python -m src.python.cli check-sources
-```
-
-定时任务配置详见[定时任务配置指南](how-to-schedule.md)。
+定时任务配置详见[CLI 命令行模式使用指南](how-to-use-cli-mode.md) §11「定时任务」。
 
 ---
 
@@ -267,7 +229,7 @@ CLI 模式无需 TUI 界面，通过参数驱动，适合定时任务和脚本�
 | 组合历史走势与回撤（走势表 + 回撤矩阵 + 危机区间标注） | — | ☆ | ☆ |
 | LLM 全模块分析 | — | — | ☆ |
 
-> ☆ 表示受章节可见性配置控制。各菜单的详细说明参见 [菜单操作手册](how-to-menu.md)。
+> ☆ 表示受章节可见性配置控制。各菜单的详细说明参见 [TUI 菜单操作手册](how-to-use-tui-menu.md)。
 >
 > **W（调仓 What-if 模拟）** 不在此表中：它对比两份持仓生成独立 diff 报告（Excel + HTML），不并入主报告管线。
 
@@ -297,7 +259,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 
 ## 下一步
 
-- [菜单操作详解](how-to-menu.md) — 各菜单完整说明
+- [TUI 菜单操作详解](how-to-use-tui-menu.md) — 各菜单完整说明
 - [配置指南](how-to-config.md) — 调整数据源、缓存、预警等参数
 - [LLM 配置指引](how-to-config-llm.md) — 接入 LLM 分析
 - [常见问题解答](faq.md) — 使用中的高频问题

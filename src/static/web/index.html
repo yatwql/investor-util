@@ -50,14 +50,57 @@
             <span>强制重新生成 LLM 内容（跳过缓存）</span>
           </label>
         </div>
+        <div class="field-block" role="radiogroup" aria-label="生成用途">
+          <span class="field-label">生成用途</span>
+          <label class="radio-label">
+            <input type="radio" name="input_mode" value="trial" checked>
+            <span>临时试算（推荐）—— 不更新正式持仓，快照隔离，安全尝试</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="input_mode" value="formal">
+            <span>正式更新 —— 覆盖 {{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}，快照共享生效</span>
+          </label>
+        </div>
+        <div id="formal-options" class="field-block" hidden>
+          <div role="radiogroup" aria-label="输入来源">
+            <span class="field-label">输入来源</span>
+            <label class="radio-label">
+              <input type="radio" name="use_existing" value="upload" checked>
+              <span>上传新文件覆盖正式持仓（需已上传）</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="use_existing" value="existing">
+              <span>直接用当前正式持仓文件（无需上传）</span>
+            </label>
+          </div>
+          <div id="formal-warning" class="formal-warning" role="alert"
+               data-holdings="{{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}">
+            将覆盖 {{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}，旧文件备份为 .bak，并写入共享快照时间线
+          </div>
+          <p id="formal-hint" class="status-text status-busy" aria-live="polite"></p>
+          <label class="check-label">
+            <input type="checkbox" id="confirm-overwrite">
+            <span>我已知晓：正式更新会覆盖/使用正式持仓文件，并写入共享快照时间线</span>
+          </label>
+        </div>
         <button type="submit" id="generate-btn" class="btn btn-primary" disabled>生成报告</button>
       </form>
       <p id="generate-error" class="status-text status-error" role="alert" aria-live="polite"></p>
     </section>
 
-    <!-- ③ 进度区 -->
+    <!-- ③ 配置编辑（与 TUI 菜单一致，即改即存） -->
+    <section class="card" aria-labelledby="config-heading">
+      <h2 id="config-heading">③ 配置编辑（与 TUI 菜单一致）</h2>
+      <p class="config-note">配置修改立即写入共享配置文件（config.json / llm_settings.json / features.json），写前自动备份 .bak；TUI / CLI 下次读取即生效</p>
+      <div id="config-panel" aria-live="polite"></div>
+      <div class="config-actions">
+        <button type="button" id="config-reload" class="btn btn-secondary btn-sm">重新加载</button>
+      </div>
+    </section>
+
+    <!-- ④ 进度区 -->
     <section class="card" id="progress-section" aria-labelledby="progress-heading" hidden>
-      <h2 id="progress-heading">生成进度</h2>
+      <h2 id="progress-heading">④ 生成进度</h2>
       <div class="progress-track">
         <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="生成进度"></div>
       </div>
@@ -65,17 +108,17 @@
       <ol id="progress-events" class="progress-events" aria-live="polite"></ol>
     </section>
 
-    <!-- ④ 结果区 -->
+    <!-- ⑤ 结果区 -->
     <section class="card" id="result-section" aria-labelledby="result-heading" hidden>
-      <h2 id="result-heading">生成结果</h2>
+      <h2 id="result-heading">⑤ 生成结果</h2>
       <div id="result-actions" class="result-actions"></div>
       <div id="result-errors" class="result-errors" role="alert" aria-live="polite"></div>
       <div id="result-footer" class="result-footer"></div>
     </section>
 
-    <!-- ⑤ 状态区：系统信息 + 数据源健康 + 历史运行记录 -->
+    <!-- ⑥ 状态区：系统信息 + 数据源健康 + 历史运行记录 -->
     <section class="card" aria-labelledby="status-heading">
-      <h2 id="status-heading">运行状态</h2>
+      <h2 id="status-heading">⑥ 运行状态</h2>
       <div class="status-grid status-grid-3">
         <div class="status-card">
           <h3>系统信息</h3>

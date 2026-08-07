@@ -51,6 +51,16 @@ def _err(error_code, message):
 # ── worker 执行体（RunManager.executor 注入点）────────────────
 
 
+def _web_input_mode_snapshot_domain(mode: str) -> str | None:
+    """生成用途（web 输入模式）→ 快照隔离域：试算→web 试算域 / 正式→共享主目录。
+
+    模式与快照隔离域映射的唯一事实来源（语义名即代码名），避免散落多处。
+    试算（trial）：快照隔离到 ``web/`` 域，不污染共享时间线；
+    正式（formal）：快照写共享主目录（返回 None = 默认共享域）。
+    """
+    return "web" if mode == "trial" else None
+
+
 def _run_generation(state, params: dict) -> int:
     """单个 run 的执行体：读持仓 → 建 reporter → generate_report → 映射退出码。
 
@@ -58,29 +68,72 @@ def _run_generation(state, params: dict) -> int:
     （run 期间不受外部配置修改影响）；产物 output_dir 基于该快照
     保存到 run 记录（产物 URL/下载基于 run 记录而非实时配置）。
     上传临时文件在 finally 中立即删除（§6.1 清理）。
+
+    输入模式分派（试算隔离 vs 正式共享）：
+      - 试算（trial，默认）：读上传临时文件，快照写 ``web/`` 隔离域
+        （``snapshot_namespace="web"``），不落正式持仓、不写共享快照。
+      - 正式（formal）+ 上传：先 ``promote_upload_to_holdings`` 提升临时文件
+        为正式持仓（备份旧文件为 .bak），读正式文件，快照写共享主目录。
+      - 正式（formal）+ 用存量（use_existing）：直接读正式持仓文件
+        （路径仅从 ``get_config()`` 派生，无目录穿越向量），快照写共享主目录。
+    正式模式的提升发生在 run 出队后、生成前——报告后续失败（LLM/网络）
+    不影响已提交的正式文件（正式模式语义，UI/文档已说明）。
     """
     from src.python.config import get_config
     from src.python.core.reader import read_holdings_with_flows
     from src.python.report.orchestrator import generate_report
 
+    from src.python.web.holdings_update import promote_upload_to_holdings
     from src.python.web.progress import WebProgressReporter
     from src.python.web.upload import discard_file, resolve_file
 
+    mode = params.get("mode", "trial")
+    use_existing = bool(params.get("use_existing", False))
     file_id = params.get("file_id")
-    path = resolve_file(file_id) if file_id else None
-    if path is None:
-        state.errors.append("上传文件已过期，请重新上传")
-        return _EXIT_SEVERE
 
     try:
-        parsed = read_holdings_with_flows(path)
+        # 每个 run 启动取一次配置快照（run 期间不受外部配置修改影响）
+        config = get_config()
+        # 输入模式 → 快照隔离域（试算→web/ 正式→共享主目录），单一来源
+        snapshot_namespace = _web_input_mode_snapshot_domain(mode)
+
+        # ── 按模式解析持仓来源与快照隔离域 ──
+        if mode == "formal":
+            holdings_dir = config.get("holdings_dir") or ""
+            holdings_name = config.get("holdings_filename") or ""
+            formal_path = os.path.join(holdings_dir, holdings_name) if holdings_dir and holdings_name else None
+            if use_existing:
+                # 正式 + 用存量：直接读正式文件（路径仅从配置派生）
+                if formal_path is None or not os.path.isfile(formal_path):
+                    shown = formal_path or "（未配置 holdings_dir/holdings_filename）"
+                    state.errors.append(f"正式持仓文件不存在：{shown}。请先在正式模式上传覆盖，或改用临时试算")
+                    return _EXIT_SEVERE
+                holdings_path = formal_path
+            else:
+                # 正式 + 上传：出队后先提升为正式文件（备份旧文件），再读正式路径
+                path = resolve_file(file_id) if file_id else None
+                if path is None:
+                    state.errors.append("上传文件已过期，请重新上传")
+                    return _EXIT_SEVERE
+                if formal_path is None:
+                    state.errors.append("未配置正式持仓文件路径（holdings_dir/holdings_filename）")
+                    return _EXIT_SEVERE
+                promote_upload_to_holdings(path, formal_path)
+                holdings_path = formal_path
+        else:
+            # 试算（默认）：读上传临时文件，快照隔离到 web/ 域
+            path = resolve_file(file_id) if file_id else None
+            if path is None:
+                state.errors.append("上传文件已过期，请重新上传")
+                return _EXIT_SEVERE
+            holdings_path = path
+
+        parsed = read_holdings_with_flows(holdings_path)
         holdings = parsed.holdings
         if not holdings:
             state.errors.append("持仓文件为空或格式异常")
             return _EXIT_SEVERE
 
-        # 每个 run 启动取一次配置快照（run 期间不受外部配置修改影响）
-        config = get_config()
         reporter = WebProgressReporter(state)
         result = generate_report(
             holdings=holdings,
@@ -93,6 +146,7 @@ def _run_generation(state, params: dict) -> int:
             output_dir=None,
             transactions=parsed.transactions,
             dividends=parsed.dividends,
+            snapshot_namespace=snapshot_namespace,
         )
         state.output_dir = config.get("output_dir", "reports")
         state.errors = list(result.errors)
@@ -102,7 +156,10 @@ def _run_generation(state, params: dict) -> int:
         state.errors.append("生成任务执行异常（详情请查看日志）")
         return _EXIT_SEVERE
     finally:
-        discard_file(file_id)
+        # 试算 / 正式-上传携带 file_id → 清理上传临时文件（正式文件本体保留；
+        # promote 为 copy，临时文件生命周期不变，仍由这里统一清理）
+        if file_id:
+            discard_file(file_id)
 
 
 def _build_artifacts(params: dict, state) -> list[dict]:
@@ -153,7 +210,7 @@ def _build_system_info() -> dict:
     对齐 TUI 首页摘要（``tui_menu.show_config`` / ``_show_privacy_and_security_status``
     / ``_show_llm_config_status`` / ``_show_multi_chain_status``）的信息面：
     - 持仓目录 / 持仓文件 / 输出目录 / 新闻抓取上限 / 状态（文件是否就绪）；
-    - 持仓匿名化模式（features.anonymization.mode 中文映射）/ 隐私声明是否已显示；
+    - 持仓匿名化模式（顶层 anonymization.mode 中文映射）/ 隐私声明是否已显示；
     - flat 单 provider：provider / model / endpoint（简化主机名）/ 熔断 / 模型路由；
     - credentials_ref 多链：策略 / 各 provider（名称/后端/模型/优先级/熔断）/ 模块偏好；
     - 未配置：configured=False（页面按未配置展示）。
@@ -165,6 +222,7 @@ def _build_system_info() -> dict:
     """
     from src.python.config import get_config, get_llm_config
     from src.python.config._local_state import get_flag
+    from src.python.config.anonymizer import get_anonymization_mode
     from src.python.core.constants import APP_VERSION
     from src.python.core.logger import _get_machine_ip
     from src.python.core.registry import get_llm_module_names
@@ -190,12 +248,17 @@ def _build_system_info() -> dict:
     info["holdings_filename"] = holdings_filename or "未设置"
     info["output_dir"] = config.get("output_dir") or "reports"
     info["news_top_count"] = config.get("news_top_count", 300)
-    info["holdings_ready"] = bool(
-        holdings_dir and holdings_filename and os.path.exists(os.path.join(holdings_dir, holdings_filename))
-    )
+    holdings_path = os.path.join(holdings_dir, holdings_filename) if holdings_dir and holdings_filename else ""
+    holdings_ready = bool(holdings_path and os.path.exists(holdings_path))
+    info["holdings_ready"] = holdings_ready
+    # 正式文件 mtime（正式-用存量「读取当前正式持仓」提示用；未就绪为 None）
+    info["holdings_mtime"] = os.path.getmtime(holdings_path) if holdings_ready else None
     anon_labels = {"off": "关闭", "code_display": "代码显示", "full_anonymous": "完全匿名", "summary": "汇总"}
-    anon_mode = (config.get("features") or {}).get("anonymization") or {}
-    anon_mode = anon_mode.get("mode", "off") if isinstance(anon_mode, dict) else "off"
+    try:
+        anon_mode = get_anonymization_mode()
+    except Exception:
+        logger.warning("读取匿名化模式失败，按关闭展示", exc_info=True)
+        anon_mode = "off"
     info["anonymization"] = anon_labels.get(anon_mode, anon_mode)
     info["privacy_shown"] = bool(get_flag("_privacy_notice_shown"))
 
@@ -356,19 +419,33 @@ def _handle_create_run(run_manager):
     report_type = payload.get("report_type", "basic")
     fetch_history = payload.get("fetch_history")
     force_llm = payload.get("force_llm", False)
+    mode = payload.get("mode", "trial")
+    use_existing = payload.get("use_existing", False)
 
     # 枚举校验（BAD_PARAM）
-    if not isinstance(file_id, str) or not file_id:
-        return _err("BAD_PARAM", "缺少 file_id"), 400
     if report_type not in ("basic", "both", "full"):
         return _err("BAD_PARAM", "报告格式不合法（basic/both/full）"), 400
     if fetch_history is not None and not isinstance(fetch_history, bool):
         return _err("BAD_PARAM", "历史走势参数不合法"), 400
     if not isinstance(force_llm, bool):
         return _err("BAD_PARAM", "强制 LLM 参数不合法"), 400
-    # file_id 存在且未过期（TTL 清理后引用 → FILE_EXPIRED）
-    if resolve_file(file_id) is None:
-        return _err("FILE_EXPIRED", "上传文件已过期，请重新上传"), 404
+    if mode not in ("trial", "formal"):
+        return _err("BAD_PARAM", "生成用途不合法（trial/formal）"), 400
+    if not isinstance(use_existing, bool):
+        return _err("BAD_PARAM", "输入来源参数不合法"), 400
+
+    # 模式 × 输入来源组合校验：
+    #   - 正式 + 用存量：无需上传（不携带 file_id），读正式持仓文件
+    #   - 其余（试算 / 正式 + 上传）：必须有合法未过期 file_id
+    if mode == "formal" and use_existing:
+        if isinstance(file_id, str) and file_id:
+            return _err("BAD_PARAM", "正式-用存量模式下无需上传文件（请勿携带 file_id）"), 400
+    else:
+        if not isinstance(file_id, str) or not file_id:
+            return _err("BAD_PARAM", "缺少 file_id"), 400
+        # file_id 存在且未过期（TTL 清理后引用 → FILE_EXPIRED）
+        if resolve_file(file_id) is None:
+            return _err("FILE_EXPIRED", "上传文件已过期，请重新上传"), 404
     # 副作用操作轻量同源校验
     if not _is_same_origin():
         return _err("BAD_PARAM", "同源校验失败，拒绝提交"), 403
@@ -379,6 +456,8 @@ def _handle_create_run(run_manager):
             "report_type": report_type,
             "fetch_history": fetch_history,
             "force_llm": force_llm,
+            "mode": mode,
+            "use_existing": use_existing,
         }
     )
     if run_id is None:
@@ -425,6 +504,31 @@ def _handle_run_history():
     _history_cache["ts"] = now
     _history_cache["data"] = records
     return _ok(records)
+
+
+def _handle_config_edit():
+    """配置编辑：GET 返回可编辑面，POST 应用单次编辑（副作用，同源守卫）。
+
+    POST 校验失败（未知键/类型/枚举/action 非法）→ 400 BAD_PARAM；
+    写共享配置异常 → 500 CONFIG_WRITE_FAILED（详情记日志，前端不泄露内部细节）。
+    """
+    from src.python.web.config_edit import ConfigEditError, apply_config_edit, get_config_edit_surface
+
+    if request.method == "POST":
+        if not _is_same_origin():
+            return _err("BAD_PARAM", "同源校验失败，拒绝提交"), 403
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return _err("BAD_PARAM", "请求体格式不合法"), 400
+        try:
+            data = apply_config_edit(payload)
+        except ConfigEditError as e:
+            return _err("BAD_PARAM", str(e)), 400
+        except Exception:
+            logger.exception("[config-edit] 配置写入失败")
+            return _err("CONFIG_WRITE_FAILED", "配置写入失败（详情请查看日志）"), 500
+        return _ok(data)
+    return _ok(get_config_edit_surface())
 
 
 def _handle_serve_report(filename: str):
@@ -490,3 +594,5 @@ def create_handlers(app, run_manager) -> None:
 
     app.add_url_rule("/api/reports/<path:filename>", "serve_report", _handle_serve_report, methods=["GET"])
     app.add_url_rule("/api/health", "health", _handle_health, methods=["GET"])
+
+    app.add_url_rule("/api/config/edit", "config_edit", _handle_config_edit, methods=["GET", "POST"])

@@ -24,7 +24,7 @@ class TestHtmlTemplatePrintStyles(unittest.TestCase):
             "..",
             "..",
             "..",
-            "python",
+            "static",
             "tmpl",
             "report_template.html",
         )

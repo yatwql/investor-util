@@ -1,5 +1,5 @@
 # 目录结构
-> 文档版本：0.10.12-dev
+> 文档版本：0.10.12
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -7,18 +7,18 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 242 | 57,894 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
-| HTML 报告模板 | HTML | 4 | 3,770 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
-| 辅助脚本 | Python | 18 | 6,790 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
-| **源代码合计** | — | **264** | **68,454** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **296** | **84,024** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,291 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **13** | **5,855** | 含 README.md（203 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 12 | 5,652 | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **107** | **42,698** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 0 + archive 97 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 9 | 7,639 | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 101 | 34,985 | 各版本 changelog/plan/review-findings 等（97 md 34,985 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代中的设计方案（暂无，Web UI 设计文档随版本归档存放） |
+| 主程序代码 | Python | 244 | 58,803 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
+| HTML 报告模板 | HTML | 4 | 3,770 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 辅助脚本 | Python | 18 | 6,938 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
+| **源代码合计** | — | **266** | **69,511** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **304** | **85,969** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,445 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **用户文档** | Markdown | **14** | **6,204** | 含 README.md（206 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 13 | 5,998 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
+| **项目文档** | Markdown | **109** | **43,813** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 1 + archive 98 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 9 | 7,904 | 变更日志/目录树/测试计划/技术设计等 |
+| ├ archive/ | 版本归档 | 102 | 35,352 | 各版本 changelog/plan/review-findings 等（98 md 35,352 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 1 | 483 | 当前迭代中的设计方案（web-config-edit 设计定稿已实现） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -248,13 +248,6 @@ investor-util/
 │   │   │   ├── whatif_operations.py  #   调仓 What-if 操作共享层（CLI/TUI 共用的业务链）
 │   │   │   └── styles.py             #   Excel 样式定义
 │   │   │
-│   │   ├── tmpl/                     # HTML 报告模板
-│   │   │   ├── report_template.html  #   Jinja2 HTML 报告主模板
-│   │   │   ├── whatif_template.html  #   调仓 What-if 独立 HTML 页（双环图+变动明细）
-│   │   │   └── partials/             #   章节级 partial（report_template.html 经 Jinja include 引入）
-│   │   │       ├── evolution_section.html  #   组合演进章节（多快照趋势，含专用图表数据段）
-│   │   │       └── action_section.html     #   行动建议章节（再平衡信号/交易纪律/调仓建议/收益归因，开关 enable_action）
-│   │   │
 │   │   ├── core/                     # 核心基础设施
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── _phase_timeout.py     #   数据获取阶段超时管理
@@ -297,17 +290,14 @@ investor-util/
 │   │   │   ├── __main__.py           #   python -m 入口
 │   │   │   ├── server.py             #   服务主入口（sys.path 注入 + 端口检测 + app.run）
 │   │   │   ├── app.py                #   Flask 应用工厂（错误处理/请求日志/注入 run_manager）
+│   │   │   ├── config_edit.py        #   Web 配置编辑（白名单 config_edit_whitelist + 面板读取 + 应用编辑 + 写前 .bak 备份）
 │   │   │   ├── handlers.py           #   路由 handler（页面/上传/生成/轮询/预览/下载/历史/健康；_build_system_info 状态区系统信息）
 │   │   │   ├── upload.py             #   上传安全（uuid 重命名/扩展名白名单/魔数校验/原子落盘/TTL）
+│   │   │   ├── holdings_update.py    #   正式持仓更新（旧文件备份 .bak + 原子提升上传文件为正式文件）
 │   │   │   ├── progress.py           #   Web 进度报告器（事件写入 run 状态缓冲）
-│   │   │   ├── runs.py               #   RunManager 单 worker 串行队列 + run 状态/事件注册表
-│   │   │   ├── templates/            #   Jinja2 模板
-│   │   │   │   └── index.html        #   单页 Web UI（上传/格式选择/进度/结果/状态区三列含系统信息）
-│   │   │   └── static/               #   Web UI 静态资产（main.js/style.css）
-│   │   │       ├── main.js           #   前端逻辑（上传/提交/轮询/渲染，原生 ES6，无 innerHTML）
-│   │   │       └── style.css         #   样式（CSS 变量/浅色主题/响应式 480px 断点/系统信息卡片）
+│   │   │   └── runs.py               #   RunManager 单 worker 串行队列 + run 状态/事件注册表
 │   │
-│   ├── static/                       # 前端静态资产（本地 bundle + 调试页）
+│   ├── static/                       # 前端资产（报告图表 bundle + Web UI 前端 + 报告模板）
 │   │   ├── chart.min.js              #   Chart.js v4.4.3 UMD（本地 bundle，205KB，离线自包含）
 │   │   ├── chart-print.js            #   打印降级（beforeprint 快照 <img> / afterprint 恢复）
 │   │   ├── chart-config.js           #   Chart.js 全局配置（主题色/动画关闭/DPR 限制）
@@ -317,7 +307,17 @@ investor-util/
 │   │   ├── toc.js                    #   左侧目录 TOC（折叠/展开 + IntersectionObserver 滚动高亮，离线自包含）
 │   │   ├── theme.js                   #   主题切换（深/浅色 + localStorage 持久化 + Chart.js 重绘 + 打印浅色协调）
 │   │   ├── test-chart.html           #   独立调试页：6 图渲染/降级/离线场景自检（Chart.js 升级验证载体）
-│   │   └── README.md                 #   资产说明 + Chart.js 版本号记录（升级指引：替换引擎后先在此页验证）
+│   │   ├── README.md                 #   资产说明 + Chart.js 版本号记录（升级指引：替换引擎后先在此页验证）
+│   │   ├── web/                      #   Web UI 前端（Jinja 模板 + 静态资产，Flask template/static 目录指向此处）
+│   │   │   ├── index.html            #   单页 Web UI 模板（上传/格式选择/进度/结果/状态区三列含系统信息）
+│   │   │   ├── main.js               #   前端逻辑（上传/提交/轮询/渲染，原生 ES6，无 innerHTML）
+│   │   │   └── style.css             #   样式（CSS 变量/浅色主题/响应式 480px 断点/系统信息卡片）
+│   │   └── tmpl/                     #   报告 Jinja 模板（report/html_jinja_env 加载）
+│   │       ├── report_template.html  #   Jinja2 HTML 报告主模板
+│   │       ├── whatif_template.html  #   调仓 What-if 独立 HTML 页（双环图+变动明细）
+│   │       └── partials/             #   章节级 partial（report_template.html 经 Jinja include 引入）
+│   │           ├── evolution_section.html  #   组合演进章节（多快照趋势，含专用图表数据段）
+│   │           └── action_section.html     #   行动建议章节（再平衡信号/交易纪律/调仓建议/收益归因，开关 enable_action）
 │   │
 │   └── test/                         # 测试套件
 │       ├── __init__.py               #   包标记（空文件）
@@ -583,8 +583,10 @@ investor-util/
 │       │   │   ├── test_progress.py #       Web 进度报告器（事件缓冲/seq/增量）
 │       │   │   ├── test_runs.py     #       RunManager（状态机/队列/保留/单例重置）
 │       │   │   ├── test_handlers.py #       Flask 路由 handler（全链路/错误信封/穿越拒绝/系统信息组装）
+│       │   │   ├── test_config_edit.py #    Web 配置编辑（白名单完备/写分派/校验守卫/备份）
+│       │   │   ├── test_config_edit_edge.py # Web 配置编辑极端输入（edge，*_edge.py 隔离）
 │       │   │   ├── test_server.py   #       启动防护（output_dir 写锁检测/端口占用）
-│       │   │   └── test_smoke_web.py #      Web 冒烟脚本载体（test_client 9 项全链路断言）
+│       │   │   └── test_smoke_web.py #      Web 冒烟脚本载体（test_client 11 项全链路断言）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── test_cache_consistency.py      #   缓存前缀契约跨模块共享集成测试
@@ -694,9 +696,10 @@ investor-util/
 │   │   ├── faq.md                    #     常见问题解答
 │   │   ├── how-to-config-llm.md      #     LLM 配置指南
 │   │   ├── how-to-config.md          #     配置说明
-│   │   ├── how-to-menu.md            #     菜单操作指南
+│   │   ├── how-to-use-tui-menu.md    #     TUI 菜单操作指南
+│   │   ├── how-to-use-web-mode.md    #     Web 浏览器模式使用指南
+│   │   ├── how-to-use-cli-mode.md    #     CLI 命令行模式使用指南
 │   │   ├── how-to-start.md           #     快速上手
-│   │   ├── how-to-schedule.md       #     定时任务配置指南
 │   │   ├── how-to-test-my-code.md    #     测试编写指南
 │   │   ├── scripts-reference.md      #     辅助脚本参考（全）
 │   │   ├── how-to-use-registry.md    #     注册表使用说明
@@ -852,7 +855,7 @@ investor-util/
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   └── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
-│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~24，设计文档索引）
+│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~25，设计文档索引）
 │   │   │   ├── archived_changelog.0.10.x.md #    变更日志归档 v0.10.x
 │   │   │   ├── archived_review-findings.0.10.x.md # 自审记录归档 v0.10.x（rf-204~226）
 │   │   │   ├── investment-features/         #   投资功能优化 + 章节归并（plan-17~24）
@@ -865,6 +868,10 @@ investor-util/
 │   │   │   └── web-ui/                      #   轻量 Web UI 实施归档（plan-8 三阶段完成）
 │   │   │       ├── plan-web-ui.md              #     轻量 Web UI 计划（plan-8 轻量 Web UI / plan-10 日志可视化）
 │   │   │       └── plan-web-ui-implementation.md #  plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
+│   │   │   └── web-holdings-input-modes/    #   Web 持仓输入模式实施归档（plan-25 完成）
+│   │   │       └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计定稿
+│   ├── plan/                          #   中间设计文件
+│   │   └── web-config-edit.md           #     Web 配置编辑设计定稿（plan-26，完整镜像 TUI 可编辑配置全集，已实现）
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
