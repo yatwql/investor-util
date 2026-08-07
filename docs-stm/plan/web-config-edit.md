@@ -129,7 +129,7 @@ app.add_url_rule(
 
 **校验规则**（`apply_config_edit` 内集中实现）：
 - 未知点分键 → 400 `BAD_PARAM`（不落盘）。
-- str 值：必须为非空 str（拒绝纯空白）；`holdings_dir`/`output_dir` 允许绝对路径，写盘时由 `set_config` 自动反绝对化（对齐 `_PATH_CONFIG_KEYS`）。
+- str 值：必须为非空 str（拒绝纯空白）；`holdings_dir`/`output_dir` 允许绝对路径，写盘时由 `set_config` 自动反绝对化（对齐 `_PATH_CONFIG_KEYS`）；`holdings_filename` 为纯文件名，**拒绝含路径分隔符**（`/`/`\`）——防止用户填「子目录/持仓.xlsx」破坏文件定位。
 - bool 值：必须为 `bool`（拒绝 `0`/`1`/`"true"` 字符串——`set_config` 不校验，这里强制）。
 - enum：必须命中选项集合（`off`/`code_display`/`full_anonymous`/`summary`），否则 400。
 - `comparison_indices`：
@@ -152,7 +152,7 @@ app.add_url_rule(
 
 当前 `_write_llm_settings(settings, path)` 位于 `src/python/tui/handlers_config.py:56`。Web 层**不得 import TUI 模块**（分层错误），设计将其抽取为 config 层共享函数：
 
-- 新增 `src/python/config/_llm_settings.py` 公开函数 `write_llm_settings(settings: dict, path: str) -> None`：保留注释（`_update_json_raw_text`）、mkstemp + `os.replace` 原子写、写完 `get_llm_config()` 刷新。
+- 在**现有** `src/python/config/_llm_settings.py` 新增公开函数 `write_llm_settings(settings: dict, path: str) -> None`（该文件已存在，含 `get_llm_settings_path`/`get_llm_config` 等，新增本函数与既有职责内聚）：保留注释（`_update_json_raw_text`）、mkstemp + `os.replace` 原子写、写完 `get_llm_config()` 刷新。
 - `src/python/tui/handlers_config.py` 的 `_write_llm_settings` 改为**委托**共享函数（或 TUI 调用点直接改调共享函数），行为零变化。
 - 测试：既有 TUI 注释保留用例迁移到 config 层测试，TUI 侧保留委托用例。
 
@@ -217,7 +217,7 @@ app.add_url_rule(
 ### 5.2 交互（`src/static/web/main.js`）
 
 - 页面加载时 `loadConfigEdit()` 调 `GET /api/config/edit`，按返回分组渲染；渲染一律 `textContent`/DOM API（XSS 防护纪律，禁止 innerHTML）。
-- 保存：每个控件改动即提交 `POST /api/config/edit`（`{key, value}` 或 `{key, action, code?, name?}`）——与 TUI「改一项存一项」的即时保存语义一致；或按分组显式「保存」按钮（实施时二选一，倾向「即改即存」以贴近 TUI）。提交期间该控件禁用，成功后回读该项最新值。
+- 保存：**即改即存**（已确认，非二选一）——每个控件改动即提交 `POST /api/config/edit`（`{key, value}` 或 `{key, action, code?, name?}`），与 TUI「改一项存一项」的即时保存语义完全一致。提交期间该控件禁用，成功后回读该项最新值；失败恢复为改动前值并显示错误。
 - 失败反馈：`error_code` 驱动——`BAD_PARAM`（400）→ 该分组错误区显示服务端中文文案；`BAD_PARAM`（403）同源失败 → 面板顶部警示「同源校验失败，请刷新页面重试」；`CONFIG_WRITE_FAILED` → 面板错误区 + 提示查看日志。中文文案一律直显服务端，不前端硬编码映射（对齐既有 error_code 约定）。
 - `comparison_indices`：添加成功后本地追加行；删除成功后移除行；重置后整组重渲染。
 - a11y：checkbox/radio 用原生 label 包裹（键盘可达）；分组 `role="group"`/`aria-labelledby`；错误区 `role="alert"` `aria-live="polite"`；375px 下分组纵向堆叠（沿用现有响应式规则）。
@@ -324,7 +324,7 @@ app.add_url_rule(
 |:--|:--|
 | `src/python/web/config_edit.py` | **新建**：`config_edit_whitelist` 白名单 + `get_config_edit_surface` + `apply_config_edit` + `config_backup_file`（语义名） |
 | `src/python/web/handlers.py` | `create_handlers` 注册 `GET/POST /api/config/edit`；新增 `_handle_config_edit`（GET/POST 分派 + POST 同源守卫）；`_build_system_info` 匿名化读路径改顶层 `get_anonymization_mode()` |
-| `src/python/config/_llm_settings.py` | **新增公开函数** `write_llm_settings(settings, path)`（自 `tui/handlers_config.py:_write_llm_settings` 抽取：注释保留 + 原子写 + `get_llm_config()` 刷新） |
+| `src/python/config/_llm_settings.py` | **在现有文件新增公开函数** `write_llm_settings(settings, path)`（自 `tui/handlers_config.py:_write_llm_settings` 抽取：注释保留 + 原子写 + `get_llm_config()` 刷新） |
 | `src/python/tui/handlers_config.py` | `_write_llm_settings` 改为委托共享 `write_llm_settings`（行为零变化） |
 | `src/python/tui/tui_menu.py` | `_show_privacy_and_security_status` 匿名化读路径改顶层（`get_anonymization_mode()`） |
 | `src/static/web/index.html`（并行重构后前端资源新位置，原 `src/python/web/templates/`） | 新增「配置编辑」card（7 组控件），编号顺延 |
@@ -353,7 +353,7 @@ app.add_url_rule(
 | `config_edit_whitelist` | 可编辑配置项白名单（键→类型/枚举→目标文件→写入原语） | Web 配置 | 配置编辑 | 无（校验面） |
 | `config_backup` | 配置写前备份（`.bak` 单槽轮转） | Web 配置 | 配置编辑 | 无（安全面） |
 
-**实现时标识符约束**（保证反向校验通过）：模块 `web/config_edit.py`、函数 `apply_config_edit`/`get_config_edit_surface` 含 `config_edit` 字面量；白名单常量/函数命名**必须含 `config_edit_whitelist` 字面量**（如模块级小写命名 `config_edit_whitelist`，作为语义标识符例外，见语义命名纪律）；备份函数命名必须含 `config_backup` 字面量（如 `config_backup_file`）。
+**实现时标识符约束**（保证反向校验通过）：`scripts/check-semantic-index.py:190` 用**大小写敏感子串匹配** `slug in _code_without_comments(text)` 且剥离注释——docstring 写 slug 无效，必须真实代码标识符含字面量。模块 `web/config_edit.py`、函数 `apply_config_edit`/`get_config_edit_surface` 含 `config_edit` 字面量；白名单定义为模块级**小写** `config_edit_whitelist = {...}`（数据字典，非 UPPER_SNAKE 常量——大写会因大小写敏感匹配不过；此小写数据名是对语义索引的反向校验要求，非普通常量风格，见语义命名纪律）；备份函数命名必须含 `config_backup` 字面量（如 `config_backup_file`）。
 
 ---
 
@@ -372,11 +372,11 @@ app.add_url_rule(
 
 ### 10.1 实施顺序（依赖驱动）
 
-1. **共享层抽取**：`config/_llm_settings.py` 新增 `write_llm_settings`；`tui/handlers_config.py` 改为委托（TUI 行为零变化，既有测试先绿）。
+1. **共享层抽取**：在现有 `config/_llm_settings.py` 新增公开函数 `write_llm_settings`；`tui/handlers_config.py` 改为委托（TUI 行为零变化，既有测试先绿）。
 2. **后端核心**：`web/config_edit.py`（白名单 + 面板读取 + 应用编辑 + 备份）→ `handlers.py` 路由注册与同源守卫 → T3/T4/T5/T7。
 3. **匿名化读路径修正**：`handlers.py:_build_system_info` 与 `tui_menu.py:_show_privacy_and_security_status` 改顶层读 → 同步 `test_handlers.py` 断言 → T8。
 4. **前端**：`index.html` + `main.js` + `style.css` 配置面板 → T6/T9（冒烟扩展）。
-5. **测试补齐**：`test_config_edit.py` + `test_config_edit_edge.py` + conftest 隔离（复用 `_isolate_sensitive_paths`，见 §12）。
+5. **测试补齐**：`test_config_edit.py` + `test_config_edit_edge.py` + conftest 隔离（复用 `_isolate_sensitive_paths`，见 §12；llm_settings.json 已由 conftest `_isolate_sensitive_paths` seed 到 tmp——T6 写 llm_settings 不污染真实文件，见附录 A）。
 6. **文档与门禁**：plan.md 条目、changelog、how-to-config、faq、folders；**实现完成后**登记 technical.md 语义表 3 行并跑全部门禁。
 
 ### 10.2 门禁（P0，提交前必须全绿）

@@ -73,7 +73,7 @@ Web 模式支持修改与 TUI **完全一致**的配置项全集。已确认决�
 - **报告 Jinja 模板**（`report_template.html`/`whatif_template.html`/`partials/`）：`src/python/tmpl/` → `src/static/tmpl/`；`html_jinja_env.py` `_TEMPLATE_DIR` 改用 `PROJECT_ROOT` 派生（单加载点）。
 - **净效果**：`src/static/` = 报告图表 bundle + Web UI 前端 + 报告模板三合一；5 个按路径读模板的测试路径同步。
 
-> **实施进度（2026-08-07）**：代码归入 + 加载点改造（app.py / html_jinja_env）+ 5 测试路径同步完成；`smoke-web.py` 10/10 + report/web/llm 单测 2395 passed；folders 目录树/统计表同步，changelog 登记；`src/static/README.md` 资产说明滞后登记 rf-266。**已实现**（基础设施重构，随 P4 实验功能批次，无独立排期）。
+> **实施进度（2026-08-07）**：代码归入 + 加载点改造（app.py / html_jinja_env）+ 5 测试路径同步完成；`smoke-web.py` 10/10 + report/web/llm 单测 2395 passed；folders 目录树/统计表同步，changelog 登记；`src/static/README.md` 资产说明滞后登记 rf-266，已修复（README 扩展为三类资产说明，rf-266 移入已修复区）。**已实现**（基础设施重构，随 P4 实验功能批次，无独立排期）。
 
 ---
 
