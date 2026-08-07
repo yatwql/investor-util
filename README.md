@@ -30,6 +30,8 @@
 ./scripts/launch.sh     # Linux
 ```
 
+全键盘菜单操作：方向键导航 + 字母快捷键。各菜单详解与报告内容对照见 [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md)。
+
 ### Web 浏览器模式
 
 ```bash
@@ -37,7 +39,7 @@
 .\scripts\launch.ps1 web  # Windows
 ```
 
-浏览器上传持仓 Excel → 选择报告格式 → 实时查看生成进度 → 预览 HTML / 下载 Excel，无需终端交互（详见[快速开始](docs-stm/manuals/how-to-start.md)方式四）。
+浏览器上传持仓 Excel → 选择报告格式 → 实时查看生成进度 → 预览 HTML / 下载 Excel，无需终端交互。完整操作流程（上传→生成→预览/下载 + 配置编辑面板）见 [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md)。
 
 ### CLI 命令行模式（定时任务驱动）
 
@@ -55,7 +57,7 @@
 .venv/bin/python -m src.python.cli cache --stats
 ```
 
-详见[CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) §11「定时任务」。
+完整命令参考（全局参数 / report / cache / whatif / check-sources / 使用示例 / 退出码 / 最佳实践）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §11「定时任务」。
 
 ---
 
@@ -63,9 +65,9 @@
 
 ### 基础报告与行情
 
-- **TUI 菜单操作** — 方向键导航 + 字母快捷键，交互友好
-- **CLI 命令行模式** — argparse 参数驱动，支持定时任务自动生成报告（Windows 任务计划程序 / Linux cron）
-- **Web 浏览器模式** — `launch.sh web` / `launch.ps1 web` 启动轻量 Web 界面：浏览器内上传持仓 Excel → 选择报告格式 → 实时查看生成进度 → 预览 HTML / 下载 Excel，无需终端交互（详见[快速开始](docs-stm/manuals/how-to-start.md)方式四）
+- **TUI 菜单操作** — 方向键导航 + 字母快捷键，交互友好（详见 [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md)）
+- **CLI 命令行模式** — argparse 参数驱动，支持定时任务自动生成报告（Windows 任务计划程序 / Linux cron）（详见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)）
+- **Web 浏览器模式** — `launch.sh web` / `launch.ps1 web` 启动轻量 Web 界面：浏览器内上传持仓 Excel → 选择报告格式 → 实时查看生成进度 → 预览 HTML / 下载 Excel，无需终端交互（详见 [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md)）
 - **多账户支持** — Excel 每页工作表为一个独立账户，自动识别
 - **实时行情获取** — 腾讯财经（场内实时价）、东方财富（场外基金净值），多数据源自动 fallback
 - **智能缓存** — API 响应按指定频率缓存，减少网络请求，支持手动刷新和缓存管理
@@ -154,7 +156,7 @@
 | 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
 | 2 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
 | 3 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
-| 4 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif 子命令、使用示例、退出码 |
+| 4 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif 子命令、使用示例、退出码、定时任务 |
 | 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、章节可见性 |
 | 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
 | 7 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
