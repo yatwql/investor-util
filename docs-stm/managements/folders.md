@@ -14,10 +14,10 @@
 | **源代码合计** | — | **266** | **69,511** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **304** | **85,969** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **5,445 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **14** | **6,210** | 含 README.md（212 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 13 | 5,998 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **109** | **44,532** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 0 + archive 100 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 9 | 7,904 | 变更日志/目录树/测试计划/技术设计等 |
+| **用户文档** | Markdown | **12** | **5,093** | 含 README.md（196 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 11 | 4,897 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
+| **项目文档** | Markdown | **112** | **45,325** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 101 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 9,184 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 105 | 36,524 | 各版本 changelog/plan/review-findings 等（101 md 36,066 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代无未完成设计方案（web-config-edit、plan-readme-svg-layout、env-benchmark-doc-update 已归档） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -705,12 +705,11 @@ investor-util/
 │   │   ├── how-to-use-web-mode.md    #     Web 浏览器模式使用指南
 │   │   ├── how-to-use-cli-mode.md    #     CLI 命令行模式使用指南
 │   │   ├── how-to-start.md           #     快速上手
-│   │   ├── how-to-test-my-code.md    #     测试编写指南
-│   │   ├── scripts-reference.md      #     辅助脚本参考（全）
 │   │   ├── how-to-use-registry.md    #     注册表使用说明
 │   │   └── reports-instruction.md    #     报告使用说明
 │   ├── managements/                  #   管理文档
 │   │   ├── changelog.md              #     变更日志
+│   │   ├── developer-guide.md        #     开发者指南（开发纪律/门禁/测试/脚本/发布）
 │   │   ├── folders.md                #     目录结构
 │   │   ├── llm-technical.md          #     LLM 技术设计
 │   │   ├── plan.md                   #     总体实现计划

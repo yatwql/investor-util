@@ -6,6 +6,13 @@
 
 ## [0.10.13-dev] - 开发中（未发布）
 
+### 开发者指南整合：README 零碎 + 两份手册并入 developer-guide.md（2026-08-08）
+
+- **新增管理文档 `docs-stm/managements/developer-guide.md`**（管理文档 9→10 份，纳入版本一致性受检）——整合四来源为开发者一站式指南，7 个部分：开发环境与工作流 / 三级门禁 / 任务编号规范与自动保障 / 测试指南 / 辅助脚本速查 / 版本发布流程 / 关键纪律来源。四来源 = README「开发者参考」区零碎内容（辅助脚本速查 / 性能历史趋势查看 / 跨机器耗时采集 / 任务编号自动保障）+ `how-to-test-my-code.md`（测试指南）+ `scripts-reference.md`（脚本参考）+ CLAUDE.md 开发纪律（门禁命令 / 编号规则 / 发布四步的人话版）。
+- **锚点兼容**：保留 `#测试模式详解`、`#新增测试指南`、`#llm-幻觉率采样测试` 三锚点，testplan.md / faq.md 原有锚点引用不失效。
+- **删除两份旧手册**：`docs-stm/manuals/how-to-test-my-code.md`、`docs-stm/manuals/scripts-reference.md`（内容并入 developer-guide，旧引用点全量迁移）。
+- **引用点迁移**：README 开发者参考区精简（保留 developer-guide / registry / perf_view 三入口，删跨机器耗时 blockquote 与任务编号小节）；CLAUDE.md 管理文档清单补 developer-guide、用户文档清单删两手册；testplan.md（测试模式详解 / 新增测试指南）、faq.md（幻觉率采样）、how-to-start.md（辅助脚本参考链接）改指 developer-guide；`check-version-consistency.py` 受检登记 + `test_check_version_consistency.py` HEADER_DOCS 同步；folders.md 统计表（用户文档 14→12 文件 6,210→5,093 行、managements 9→10 文件 7,904→9,184 行）与目录树同步。
+
 ### Web 前端静态资产 404 修复 + 旧浏览器兼容兜底（rf-274 / rf-275）（2026-08-08）
 
 - **阻断级修复：Web 前端整页失效（rf-274）**——Flask 未显式指定 `static_url_path` 时按 `static_folder` basename 推导（`src/static/web/` → `/web/*`），index.html 引用的 `/static/main.js`、`/static/style.css` 全部 404，JS/CSS 未加载 → 配置面板空白、健康区卡静态"正在检测"、生成报告按钮灰色。plan-27 前端资产移入 `src/static/` 时引入，移动后未在真实浏览器验证。
