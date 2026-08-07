@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 548" width="100%" role="img" aria-label="投资复盘助手八大功能域总览与双报告输出">
+  <title>功能能力总览图</title>
+  <defs>
+    <linearGradient id="bgGrad3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1b2d"/>
+      <stop offset="1" stop-color="#16283f"/>
+    </linearGradient>
+  </defs>
+  <style>
+    text { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif; }
+  </style>
+
+  <!-- 背景 -->
+  <rect x="0" y="0" width="1000" height="548" rx="18" fill="url(#bgGrad3)"/>
+
+  <!-- 标题区 -->
+  <text x="500" y="52" text-anchor="middle" font-size="26" font-weight="700" fill="#e8f1fb">八大功能域 · 一图总览</text>
+  <text x="500" y="80" text-anchor="middle" font-size="15" fill="#9fb6d0">从数据获取到决策洞察</text>
+
+  <!-- 8 个能力卡 2×4 网格：x=20/265/510/755，y=100/270 -->
+  <!-- 卡1 基础报告与行情 -->
+  <rect x="20" y="100" width="225" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="20" y="246" width="225" height="4" rx="2" fill="#22d3ee"/>
+  <text x="38" y="136" font-size="20">🔍</text>
+  <text x="74" y="136" font-size="16" font-weight="700" fill="#e8f1fb">基础报告与行情</text>
+  <text x="38" y="176" font-size="13" fill="#9fb6d0">多账户 · 实时行情 · 智能缓存</text>
+  <text x="38" y="200" font-size="13" fill="#9fb6d0">最多 19 条件页签 · 7 组分类</text>
+
+  <!-- 卡2 新闻与数据增强 -->
+  <rect x="265" y="100" width="225" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="265" y="246" width="225" height="4" rx="2" fill="#60a5fa"/>
+  <text x="283" y="136" font-size="20">📰</text>
+  <text x="319" y="136" font-size="16" font-weight="700" fill="#e8f1fb">新闻与数据增强</text>
+  <text x="283" y="176" font-size="13" fill="#9fb6d0">5 源并行 · 关键词关联</text>
+  <text x="283" y="200" font-size="13" fill="#9fb6d0">行业概念 · 盈利预测 · 分红</text>
+
+  <!-- 卡3 LLM 智囊团 -->
+  <rect x="510" y="100" width="225" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="510" y="246" width="225" height="4" rx="2" fill="#a78bfa"/>
+  <text x="528" y="136" font-size="20">🤖</text>
+  <text x="564" y="136" font-size="16" font-weight="700" fill="#e8f1fb">LLM 智囊团</text>
+  <text x="528" y="176" font-size="13" fill="#9fb6d0">多 Provider 链式分发</text>
+  <text x="528" y="200" font-size="13" fill="#9fb6d0">Extended Thinking · 指纹缓存</text>
+
+  <!-- 卡4 分析与风控 -->
+  <rect x="755" y="100" width="225" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="755" y="246" width="225" height="4" rx="2" fill="#fbbf24"/>
+  <text x="773" y="136" font-size="20">📈</text>
+  <text x="809" y="136" font-size="16" font-weight="700" fill="#e8f1fb">投资分析与风控</text>
+  <text x="773" y="176" font-size="13" fill="#9fb6d0">Beta CI · 情景分析</text>
+  <text x="773" y="200" font-size="13" fill="#9fb6d0">再平衡 · 流动性风险</text>
+
+  <!-- 卡5 调仓 What-if -->
+  <rect x="20" y="270" width="225" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="20" y="416" width="225" height="4" rx="2" fill="#34d399"/>
+  <text x="38" y="306" font-size="20">🔄</text>
+  <text x="74" y="306" font-size="16" font-weight="700" fill="#e8f1fb">调仓 What-if</text>
+  <text x="38" y="346" font-size="13" fill="#9fb6d0">双持仓 diff 对比</text>
+  <text x="38" y="370" font-size="13" fill="#9fb6d0">生效日时序回测</text>
+
+  <!-- 卡6 运维追踪 -->
+  <rect x="265" y="270" width="225" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="265" y="416" width="225" height="4" rx="2" fill="#f87171"/>
+  <text x="283" y="306" font-size="20">⚙️</text>
+  <text x="319" y="306" font-size="16" font-weight="700" fill="#e8f1fb">性能追踪与运维</text>
+  <text x="283" y="346" font-size="13" fill="#9fb6d0">阶段计时 · 数据源健康检查</text>
+  <text x="283" y="370" font-size="13" fill="#9fb6d0">版本间性能趋势</text>
+
+  <!-- 卡7 基金评价 -->
+  <rect x="510" y="270" width="225" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="510" y="416" width="225" height="4" rx="2" fill="#facc15"/>
+  <text x="528" y="306" font-size="20">🏆</text>
+  <text x="564" y="306" font-size="16" font-weight="700" fill="#e8f1fb">基金评价</text>
+  <text x="528" y="346" font-size="13" fill="#9fb6d0">5 级评级 · 经理变更监控</text>
+  <text x="528" y="370" font-size="13" fill="#9fb6d0">重合度矩阵 · 风格因子</text>
+
+  <!-- 卡8 隐私安全 -->
+  <rect x="755" y="270" width="225" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="755" y="416" width="225" height="4" rx="2" fill="#4ade80"/>
+  <text x="773" y="306" font-size="20">🔒</text>
+  <text x="809" y="306" font-size="16" font-weight="700" fill="#e8f1fb">隐私与安全</text>
+  <text x="773" y="346" font-size="13" fill="#9fb6d0">匿名化 4 模式</text>
+  <text x="773" y="370" font-size="13" fill="#9fb6d0">缓存审查 · 状态隔离</text>
+
+  <!-- 底部双报告条 -->
+  <rect x="20" y="450" width="960" height="60" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <text x="130" y="488" font-size="18">📗</text>
+  <text x="175" y="487" font-size="17" font-weight="700" fill="#34d399">Excel 报告</text>
+  <text x="305" y="487" font-size="14" fill="#9fb6d0">19 条件页签 · 页签专业</text>
+  <line x1="500" y1="462" x2="500" y2="498" stroke="#2e4a6e" stroke-width="2"/>
+  <text x="870" y="488" font-size="18">📈</text>
+  <text x="915" y="487" font-size="17" font-weight="700" fill="#fbbf24">HTML 报告</text>
+  <text x="690" y="487" font-size="14" fill="#9fb6d0">9 交互图表 · 单页自包含</text>
+
+  <!-- 底部说明 -->
+  <text x="500" y="536" text-anchor="middle" font-size="13" fill="#9fb6d0">同一套分析引擎 · 双管线并行输出</text>
+</svg>
