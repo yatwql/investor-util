@@ -579,7 +579,6 @@ def get_cache_stats(reporter) -> CacheStats:
     """
     from src.python.cache import (
         cleanup_expired,
-        get_cache_dir,
         get_cache_hit_rate,
     )
     from src.python.cache import (
@@ -588,7 +587,6 @@ def get_cache_stats(reporter) -> CacheStats:
     from src.python.core.constants import PROJECT_ROOT
 
     stats = CacheStats()
-    cache_dir = get_cache_dir()
     raw_stats = _get_cache_stats()
     hit_rate = get_cache_hit_rate()
 

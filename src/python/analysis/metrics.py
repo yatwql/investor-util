@@ -37,19 +37,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.python.analysis._math_utils import (
-    _beta_se,
-    _incomplete_beta_cf,
-    _incomplete_beta_series,
-    _log_beta,
-    _t_cdf,
-    _t_critical_95,
+from src.python.analysis._math_utils import (  # noqa: F401
+    _t_cdf,  # noqa: F401  # re-export，test_metrics_edge 引用
+    _t_critical_95,  # noqa: F401  # re-export，test_metrics_edge 引用
 )
 from src.python.analysis.metrics_returns import (  # noqa: F401
-    _MAX_DRAWDOWN_EPSILON,
-    _MIN_SAMPLE_DAYS,
-    _RISK_FREE_RATE_DEFAULT,
-    _TRADING_DAYS_PER_YEAR,
     annualized_return,
     calmar_ratio,
     check_data_sufficiency,

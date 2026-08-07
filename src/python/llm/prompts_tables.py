@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from src.python.analysis.fx_exposure import fx_exposure as _fx_exposure
 from src.python.core.code_utils import get_currency_by_code

@@ -15,15 +15,8 @@ from typing import Any
 
 from src.python.providers.news_correlator import correlate_news_with_holdings
 from src.python.providers.news_dedup import (
-    _ANCHOR_LOCK,
-    _ANCHOR_PATH,
-    _ANCHOR_RECORDS,
     _dedup_by_title,
-    _extract_entity_bigrams,
     _flush_anchors,
-    _make_anchor,
-    _normalize_title,
-    _record_anchor,
 )
 from src.python.providers.news_sources import (
     _FETCH_MAP,

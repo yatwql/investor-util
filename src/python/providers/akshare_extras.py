@@ -381,7 +381,6 @@ def _fetch_all_dividends(a_codes: list[str]) -> dict[str, dict]:
     一次拉取后按代码过滤。
     """
     result: dict[str, dict] = {}
-    code_set = set(a_codes)
 
     try:
         full_df = ak.stock_history_dividend()

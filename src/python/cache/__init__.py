@@ -48,6 +48,18 @@ __all__ = [
     "CACHE_DAILY",
     # ── 内部接口（_cache_lock 被市场时段等模块使用）──
     "_cache_lock",
+    # ── 内部接口（re-export，供缓存子模块 / 外部直接引用）──
+    "_read_cache_data",
+    "_write_atomic",
+    "_CACHE_DIR",
+    "_GZIP_SUFFIX",
+    "_GZIP_THRESHOLD",
+    "_cache_path",
+    "_process_cache_file",
+    "_record_cache_hit",
+    "_record_cache_miss",
+    "_clear_holdings_related_caches",
+    "_read_holdings_tracking",
 ]
 
 

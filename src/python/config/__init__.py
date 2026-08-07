@@ -105,6 +105,7 @@ __all__ = [
     "_DEFAULT_CONFIG",
     "_get_default_config_template",
     "_CONFIG_FILE",
+    "_CONFIG_PATH_OVERRIDE",
     "get_config_path",
     # llm 默认模板
     "_get_default_llm_settings_template",
@@ -143,6 +144,7 @@ __all__ = [
     "is_enable_industry_beta",
     "get_comparison_candidates",
     # LLM 配置
+    "get_llm_config",
     "get_llm_settings_path",
     "_KNOWN_LLM_SETTINGS_KEYS",
     "_llm_config_cache",

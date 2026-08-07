@@ -49,11 +49,11 @@ from src.python.core.code_utils import (
 )
 from src.python.config._core import get_config
 from src.python.analysis._silence import (
-    _SILENCE_FILE,
     _filter_silenced_signals,
-    _load_silence_state,
-    _save_silence_state,
     _update_silence_state,
+    _SILENCE_FILE,  # noqa: F401  # re-export，conftest 通过 rebalance._SILENCE_FILE 重定向
+    _load_silence_state,  # noqa: F401  # re-export，test_rebalance / test_rebalance_edge 引用
+    _save_silence_state,  # noqa: F401  # re-export，test_rebalance / test_rebalance_edge 引用
 )
 
 logger = logging.getLogger("invest")

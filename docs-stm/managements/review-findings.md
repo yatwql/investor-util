@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.13-dev
-> **编号源**：`rf-next = 271`（新增问题取此编号，完成后更新为 +1；已用最大 rf-270，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 273`（新增问题取此编号，完成后更新为 +1；已用最大 rf-272，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -39,9 +39,23 @@
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复 |
 | **rf-261** | Web 上传持仓跑 full/both 会**污染共享快照目录** `data/history/snapshots/`：上传文件本身已隔离（`web/upload.py` uuid 落盘 `data/holdings/uploads/` + TTL/用完即删），但 full/both 生成时 `capture_snapshot`（`report/_snapshot.py`）基于**本次上传的临时持仓**调 `save()` 持久化快照到**三渠道共享**目录 → TUI/CLI 后续报告的「快照差异/组合演进」会拿 web 测试持仓的历史快照参与对比（`portfolio_evolution` 读 `load_latest`）。`data/cache/`（行情缓存）与 `data/state/`（熔断/降级/性能历史）共享属**架构刻意**（数据降级治理体系全局一致），非缺口；basic 路径明确不落快照（`orchestrator.py` 注释） | **方案已确认（2026-08-07 探讨收敛）**：`data/cache`/`data/state` 保持共享不动（按证券代码/机器键控，非持仓身份数据，隔离反而破坏缓存复用与数据降级治理——伪需求）。按**使用意图**分两模式：① **临时试算（web 默认）**：上传保持 uuid 临时态，快照写入独立子目录 `data/history/snapshots/web/`（`history_snapshot.save/load` 增 namespace 子目录支持），TUI/CLI 读主目录自然排除 web 试算快照，组合演进/快照差异不受污染；② **正式更新（共享，显式选择）**：两种输入——上传覆盖 `data/holdings/{holdings_filename}`（先备份旧文件），或**不上传直接用存量持仓文件**（web 成为完整报告生成入口，符合"最少输入"定位）；快照入共享主目录，演进/对比真实生效。实现要点：`capture_snapshot` 增试算/正式判定（web 默认试算），`history_snapshot` 支持 namespace 子目录，web `_handle_create_run` 增模式参数（trial/formal + use-existing）。**待实现（登记 plan-25）** |
 
+#### P2D — scenario 死参数预留接口追踪（2026-08-07）
+
+> 死代码排查发现的功能缺失类待办，非纯死代码。参数已保留并加 `# noqa: ARG001` 标注，需后续评估是否补齐实现。
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-271** | `analysis/scenario.py` 两个**死参数**——① `scenario_analysis()` 的 `portfolio_volatility`：docstring 承诺「可用时输出 ±1σ/±2σ 波动率区间」，但函数体**完全未消费**该参数（`_build_scenario_entry` 只用 `beta_se` 算 CI）；调用点 `report/_full_risk_metrics.py:121`、`report/_pipeline.py:455` **已传入 `annualized_volatility` 值**（`history_data.get("annualized_volatility")`），但被吞掉 → 波动率区间功能实际未输出。② `sharpe_ci_propagation()` 的 `annual_volatility`：SE 用 Lo(2002) 常数近似 `sqrt(1+0.5*SR²)/sqrt(N)`，未消费年化波动率；测试 `test_scenario_analysis.py:185/193/200/206/211` 均**按位置传参** `sharpe_ci_propagation(0.80, 0.15, 3.0)`，删除会破坏签名 | **已保留 + 标注（2026-08-07，方案 A）**：两参数加 `# noqa: ARG001` 并注释预留意图，不破坏测试签名。**待跟进**：①评估是否补齐 `portfolio_volatility` → 波动率区间输出（数据已传，缺实现）；②若确认废弃可删，需同步改 5 处测试调用点 + 2 处生产调用点 |
 ---
 
-## 已修复（摘要）
+#### P2F — 死代码清理遗留：43 处 ARG001 死参数待评估（2026-08-07）
+
+> 死代码清理（2026-08-07，plan 见 changelog）仅处理 F401/F841/F811 类（未用 import/局部变量/重定义）与 D 类 re-export 补 `__all__`，**未处理 ARG001（未用函数参数）**——多数为统一回调签名/渲染器上下文/接口约定，盲删会破坏签名一致性。登记为待评估清单。
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-272** | 全仓 **43 处 ARG001 未用函数参数**（`ruff check --select ARG001 src/python/` 可复现）。按性质分三类：① **渲染器/接口签名约定**（多数——`report/html_renderers.py:453-465` 渲染器接收上下文 13 参但部分未用、`report/orchestrator.py:237/344` 分发 `warm_cache/holdings`、`report/style_factor_sheet.py:94-96`、`report/market_value_sheet.py:232-233`、`report/html_renderers.py:454-465` 等）——删除会破坏统一签名/调用方，**应保留**；② **回调/泛型参数**（`fetcher/chain.py:271 param_fn`、`excel_fund_deep_analysis.py:24-25 process_fn/prog`、`core/check_sources.py:62-63 name/label`、`config/_llm_settings.py:42 config`、`llm/prompts_action.py:47`）——为满足统一回调签名，**保留**；③ **确为未用的可选参数**（`analysis/liquidity.py:32/98 name/total_mv`、`analysis/cost_flow.py:291 holdings`、`analysis/metrics_risk.py:337 trading_days`、`providers/sina_kline.py:36/86 start_from`、`fetcher/industry.py:122 max_workers`、`report/chart_data_builder.py:71 perf_data`、`report/_history_quality.py:48 sorted_dates`、`tui/handlers_report.py:22 reporter`、`config/_llm_providers.py:107 index` 等）——需逐个评估 | **待跟进**：对③类逐个评估——确认废弃则删参（需同步核对调用方），确认预留则加 `# noqa: ARG001` 注释（对齐 rf-271 处理方案）；①②类不改（接口约定，保留签名一致性） |
+---
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|

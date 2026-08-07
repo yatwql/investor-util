@@ -31,7 +31,6 @@ from src.python.llm.prompts import (
     _SYSTEM_GLOBAL_MACRO,
     _SYSTEM_HEALTH_CHECK,
     _SYSTEM_PENETRATION_DEEP,
-    _build_competitive_context_block,
     _build_debate_synthesis_prompt,
     _build_expert_review_prompt,
     _build_global_macro_prompt,
@@ -39,7 +38,7 @@ from src.python.llm.prompts import (
     _build_penetration_deep_prompt,
 )
 from src.python.config.features import is_feature_enabled
-from src.python.llm._hallucination_filter import _filter_hallucinated_codes, _is_safe_word
+from src.python.llm._hallucination_filter import _filter_hallucinated_codes
 from src.python.llm.skeleton import generate_llm_module
 
 logger = logging.getLogger("invest")

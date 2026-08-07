@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-from concurrent.futures import Future
 from typing import Any
 
 from src.python.report.progress import ProgressReporter

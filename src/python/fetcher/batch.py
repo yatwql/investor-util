@@ -25,7 +25,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
 
 logger = logging.getLogger("invest")
@@ -421,7 +421,7 @@ class RateLimiter:
         if interval <= 0:
             return
 
- # per-provider 锁，不同 provider 不互相阻塞
+        # per-provider 锁，不同 provider 不互相阻塞
         if provider not in self._locks:
             self._locks[provider] = threading.Lock()
 

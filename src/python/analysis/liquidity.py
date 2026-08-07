@@ -35,7 +35,7 @@ def _is_exchange_traded(code: str, name: str) -> bool:
     优先排除场外基金：先检查 OTC 特征（含名称关键词 + 代码重叠区），
     确认非 OTC 后才判定为场内可交易。
     """
-    from src.python.core.code_utils import is_a_share_code, is_exchange_fund_code, is_hk_stock_code
+    from src.python.core.code_utils import is_a_share_code, is_exchange_fund_code
 
     # 场外基金（含债券基金/货基）已由 _is_otc_fund 排除，
     # 此处只做正向匹配

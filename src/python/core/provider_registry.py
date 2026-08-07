@@ -17,13 +17,11 @@ import os
 import threading
 import time
 from collections.abc import Callable
-from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from src.python.core._session_cache import NOT_FOUND, SessionCache, SessionCacheEntry
-from src.python.core._phase_timeout import _PhaseTimeoutContext, phase_timeout
+from src.python.core._phase_timeout import phase_timeout  # noqa: F401  # re-export，test_phase_timeout 通过 provider_registry 访问
 
 logger = logging.getLogger("invest")
 

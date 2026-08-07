@@ -19,7 +19,6 @@ import logging
 import math
 
 from src.python.analysis.valuation_percentile import (
-    MIN_SAMPLES,
     extract_closes,
     price_percentile,
     tier_from_percentile,
