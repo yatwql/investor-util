@@ -53,9 +53,9 @@ Web 上传持仓跑 full/both 会污染共享快照目录（rf-261）。方案�
 
 > **实施进度（2026-08-07）**：**六阶段全部落地**——① 存储层 `history_snapshot` namespace 子目录（save/load_latest/load_all/list_all/prune + 白名单校验）；② 消费层 `capture_snapshot`/`build_evolution_data`/`build_snapshot_diff` + 两个 `_inject_*` 透传 `snapshot_namespace`；③ 编排层 `generate_report` + `_report_generation` 双路径透传；④ web 入口 `holdings_update.py`（单槽 `.bak` 备份 + 原子提升）+ `_handle_create_run` mode/use_existing 解析与组合校验（正式+用存量禁止 file_id→400）+ `_web_input_mode_snapshot_domain` 模式→快照域映射；⑤ 前端生成用途/输入来源单选 + 覆盖警示 + 确认勾选（index.html/main.js/style.css），resetFlow 区分正式-用存量；⑥ 文档与门禁——语义表登记 `snapshot_namespace`/`web_input_mode`/`use_existing`/`holdings_update`，folders/三手册/changelog 同步，`_pipeline.py` 标注遗留不承载活代码。smoke-web.py 10 断言全通过，dev-verify 1970 + 4 checks --ci 全 [OK]。**已实现**（P4 选做、无排期，仍列为实验功能）。设计文档已归档至 [`archive/v0.10.x/web-holdings-input-modes/`](../archive/v0.10.x/web-holdings-input-modes/plan-web-holdings-input-modes.md)。
 
-#### `plan-26` Web 配置编辑：完整镜像 TUI 可编辑配置全集（[`web-config-edit.md`](../plan/web-config-edit.md)）
+#### `plan-26` Web 配置编辑：完整镜像 TUI 可编辑配置全集（[`web-config-edit.md`](../archive/v0.10.x/web-config-edit/web-config-edit.md)）
 
-Web 模式支持修改与 TUI **完全一致**的配置项全集。已确认决策（用户拍板，勿推翻）：① 先写设计文档 ② 完整镜像 TUI ③ 写前 `.bak` 备份。**设计已定稿**（2026-08-07，设计文档位于 `docs-stm/plan/web-config-edit.md`）：
+Web 模式支持修改与 TUI **完全一致**的配置项全集。已确认决策（用户拍板，勿推翻）：① 先写设计文档 ② 完整镜像 TUI ③ 写前 `.bak` 备份。**设计已定稿**（2026-08-07，设计文档位于 `docs-stm/archive/v0.10.x/web-config-edit/web-config-edit.md`，已归档）：
 
 - **7 组全集**：自由文本路径（holdings_dir / holdings_filename / output_dir）、报告章节开关 5 项、增强子模块开关 6 项、匿名化枚举（off/code_display/full_anonymous/summary）、对比指数池（增/删/重置默认）、LLM 分析章节开关 5 项（enabled_llm，隐藏三模块不展示）、辩论实验功能开关 3 项（features.json）。
 - **后端**：新模块 `web/config_edit.py`——`config_edit_whitelist` 白名单（点分键→类型/枚举→目标文件→写入原语）+ `GET/POST /api/config/edit`（POST 复用 `_is_same_origin()` 守卫）；写共享配置前 `config_backup_file` 单槽 `.bak`（mkstemp + `os.replace` 原子写）。
@@ -93,7 +93,7 @@ plan-8/25/26/27 实现后，用户文档从「单份菜单手册 + 定时任务�
 
 ## 归档
 
-- [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项（plan-17~plan-25，含设计文档索引：投资功能优化/章节归并 + 任务编号门禁 + Web 持仓输入模式）
+- [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项（plan-17~plan-26，含设计文档索引：投资功能优化/章节归并 + 任务编号门禁 + Web 持仓输入模式 + Web 配置编辑 + README SVG 架构图）
 - [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项（含设计文档索引）
 - [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10（含设计文档索引 + 已完成项）
 - [`archived_plan.0.7.x.md`](../archive/v0.7.x/archived_plan.0.7.x.md)

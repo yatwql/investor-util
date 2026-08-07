@@ -79,7 +79,7 @@
 
 ### Web 配置编辑：完整镜像 TUI 可编辑配置全集（设计定稿）（2026-08-07）
 
-- **本条目为设计文档登记**（`docs-stm/plan/web-config-edit.md`，plan-26），实现前不产生运行时代码变更。
+- **本条目为设计文档登记**（`docs-stm/archive/v0.10.x/web-config-edit/web-config-edit.md`，plan-26），实现前不产生运行时代码变更（已实现，设计文档已归档）。
 - **范围**：Web 模式支持修改与 TUI **完全一致**的配置项全集——7 组：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档（off/code_display/full_anonymous/summary）、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、辩论实验功能开关 3（features.json）。
 - **关键决策**：新模块 `web/config_edit.py`——`config_edit_whitelist` 白名单（点分键→类型/枚举→目标文件→写入原语）+ `GET/POST /api/config/edit`（POST 复用 `_is_same_origin()` 同源守卫）；写共享配置前 `config_backup_file` 单槽 `.bak` 备份（mkstemp + `os.replace` 原子写）；写入分派逐条等价 TUI（config.json→`set_config`，嵌套 dict 读合并整块写，匿名化走 `set_anonymization_mode`；llm_settings.json→自 tui 抽取共享 `write_llm_settings`；features.json→`save_feature_overrides`）。
 - **一致性修正（随功能实现）**：状态面板匿名化读路径由不存在的 `features.anonymization.mode` 修正为顶层 `anonymization.mode`（tui_menu 状态面板 + web `_build_system_info`），此前面板恒显示「关闭」。

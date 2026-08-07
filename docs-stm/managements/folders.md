@@ -16,10 +16,10 @@
 | **测试用例** | — | — | **5,445 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **14** | **6,210** | 含 README.md（212 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 13 | 5,998 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **110** | **43,935** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 2 + archive 98 md），py/txt 不计行 |
+| **项目文档** | Markdown | **109** | **44,532** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 0 + archive 100 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 9 | 7,904 | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 102 | 35,352 | 各版本 changelog/plan/review-findings 等（98 md 35,352 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 2 | 605 | 当前迭代中的设计方案（web-config-edit、plan-readme-svg-layout 设计定稿已实现） |
+| ├ archive/ | 版本归档 | 104 | 36,419 | 各版本 changelog/plan/review-findings 等（100 md 35,961 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代无未完成设计方案（web-config-edit、plan-readme-svg-layout 已归档） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -872,11 +872,13 @@ investor-util/
 │   │   │   └── web-ui/                      #   轻量 Web UI 实施归档（plan-8 三阶段完成）
 │   │   │       ├── plan-web-ui.md              #     轻量 Web UI 计划（plan-8 轻量 Web UI / plan-10 日志可视化）
 │   │   │       └── plan-web-ui-implementation.md #  plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
-│   │   │   └── web-holdings-input-modes/    #   Web 持仓输入模式实施归档（plan-25 完成）
-│   │   │       └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计定稿
+│   │   │   ├── web-holdings-input-modes/    #   Web 持仓输入模式实施归档（plan-25 完成）
+│   │   │   │   └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计定稿
+│   │   │   ├── web-config-edit/              #   Web 配置编辑实施归档（plan-26 完成）
+│   │   │   │   └── web-config-edit.md        #   Web 配置编辑设计定稿（完整镜像 TUI 可编辑配置全集，已实现）
+│   │   │   └── readme-svg-layout/            #   README SVG 架构图实施归档
+│   │   │       └── plan-readme-svg-layout.md #     README 嵌入 SVG 架构图 + 排版优化（设计定稿已实现）
 │   ├── plan/                          #   中间设计文件
-│   │   ├── web-config-edit.md           #     Web 配置编辑设计定稿（plan-26，完整镜像 TUI 可编辑配置全集，已实现）
-│   │   └── plan-readme-svg-layout.md    #     README 嵌入 SVG 架构图 + 排版优化（设计定稿已实现）
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
