@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 470" width="100%" role="img" aria-label="投资复盘助手架构：TUI、CLI、Web 三渠道接入同一分析引擎，输出 Excel 与 HTML 双报告">
+  <title>投资复盘助手架构图</title>
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f1b2d"/>
+      <stop offset="1" stop-color="#16283f"/>
+    </linearGradient>
+    <linearGradient id="engGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#183a5e"/>
+      <stop offset="1" stop-color="#122c4a"/>
+    </linearGradient>
+    <marker id="arrowCyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif; }
+  </style>
+
+  <!-- 背景 -->
+  <rect x="0" y="0" width="1000" height="470" rx="18" fill="url(#bgGrad)"/>
+
+  <!-- 标题区 -->
+  <text x="500" y="52" text-anchor="middle" font-size="30" font-weight="700" fill="#e8f1fb">投资复盘助手</text>
+  <text x="500" y="80" text-anchor="middle" font-size="18" fill="#9fb6d0">把持仓 Excel 变成决策级投资洞察</text>
+
+  <!-- 左列：三渠道入口 -->
+  <!-- TUI -->
+  <rect x="30" y="100" width="210" height="96" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <text x="46" y="142" font-size="26">⌨️</text>
+  <text x="86" y="138" font-size="18" font-weight="700" fill="#e8f1fb">TUI 交互模式</text>
+  <text x="86" y="162" font-size="13" fill="#9fb6d0">全键盘菜单 · 方向键+字母</text>
+
+  <!-- CLI -->
+  <rect x="30" y="216" width="210" height="96" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <text x="46" y="258" font-size="26">⚙️</text>
+  <text x="86" y="254" font-size="18" font-weight="700" fill="#e8f1fb">CLI 命令行模式</text>
+  <text x="86" y="278" font-size="13" fill="#9fb6d0">定时任务 · 无人值守</text>
+
+  <!-- Web -->
+  <rect x="30" y="332" width="210" height="96" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <text x="46" y="374" font-size="26">🌐</text>
+  <text x="86" y="370" font-size="18" font-weight="700" fill="#e8f1fb">Web 浏览器模式</text>
+  <text x="86" y="394" font-size="13" fill="#9fb6d0">上传即生成 · 实时进度</text>
+
+  <!-- 左→中 箭头 -->
+  <line x1="244" y1="148" x2="292" y2="148" stroke="#22d3ee" stroke-width="3" marker-end="url(#arrowCyan)"/>
+  <line x1="244" y1="264" x2="292" y2="264" stroke="#22d3ee" stroke-width="3" marker-end="url(#arrowCyan)"/>
+  <line x1="244" y1="380" x2="292" y2="380" stroke="#22d3ee" stroke-width="3" marker-end="url(#arrowCyan)"/>
+
+  <!-- 中间：分析引擎大卡 -->
+  <rect x="300" y="100" width="400" height="328" rx="16" fill="url(#engGrad)" stroke="#2f5d8a"/>
+  <text x="500" y="138" text-anchor="middle" font-size="24" font-weight="700" fill="#22d3ee">分析引擎</text>
+  <text x="500" y="164" text-anchor="middle" font-size="14" fill="#9fb6d0">实时行情 · 深度分析 · 智能洞察</text>
+
+  <!-- 引擎内部 6 能力标签（2列×3行） -->
+  <!-- 行1 -->
+  <rect x="318" y="184" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <circle cx="336" cy="210" r="4" fill="#22d3ee"/>
+  <text x="350" y="215" font-size="15" fill="#e8f1fb">实时行情 · 多源回退</text>
+  <rect x="506" y="184" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <circle cx="524" cy="210" r="4" fill="#60a5fa"/>
+  <text x="538" y="215" font-size="15" fill="#e8f1fb">资产穿透 TOP10</text>
+
+  <!-- 行2 -->
+  <rect x="318" y="252" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <circle cx="336" cy="278" r="4" fill="#34d399"/>
+  <text x="350" y="283" font-size="15" fill="#e8f1fb">基金业绩评级</text>
+  <rect x="506" y="252" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <circle cx="524" cy="278" r="4" fill="#a78bfa"/>
+  <text x="538" y="283" font-size="15" fill="#e8f1fb">新闻热点关联</text>
+
+  <!-- 行3 -->
+  <rect x="318" y="320" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <circle cx="336" cy="346" r="4" fill="#fbbf24"/>
+  <text x="350" y="351" font-size="15" fill="#e8f1fb">LLM 智囊团复盘</text>
+  <rect x="506" y="320" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <circle cx="524" cy="346" r="4" fill="#f87171"/>
+  <text x="538" y="351" font-size="15" fill="#e8f1fb">风险 · 情景 · 再平衡</text>
+
+  <!-- 中→右 箭头 -->
+  <line x1="704" y1="175" x2="752" y2="175" stroke="#22d3ee" stroke-width="3" marker-end="url(#arrowCyan)"/>
+  <line x1="704" y1="345" x2="752" y2="345" stroke="#22d3ee" stroke-width="3" marker-end="url(#arrowCyan)"/>
+
+  <!-- 右列：双报告输出 -->
+  <!-- Excel -->
+  <rect x="760" y="100" width="210" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <text x="865" y="138" text-anchor="middle" font-size="30">📗</text>
+  <text x="865" y="170" text-anchor="middle" font-size="19" font-weight="700" fill="#34d399">Excel 报告</text>
+  <text x="865" y="194" text-anchor="middle" font-size="13" fill="#9fb6d0">19 个条件页签</text>
+  <text x="865" y="228" text-anchor="middle" font-size="12" fill="#6b87a5">页签专业 · 结构清晰</text>
+
+  <!-- HTML -->
+  <rect x="760" y="270" width="210" height="150" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <text x="865" y="308" text-anchor="middle" font-size="30">📈</text>
+  <text x="865" y="340" text-anchor="middle" font-size="19" font-weight="700" fill="#fbbf24">HTML 报告</text>
+  <text x="865" y="364" text-anchor="middle" font-size="13" fill="#9fb6d0">9 张交互图表</text>
+  <text x="865" y="398" text-anchor="middle" font-size="12" fill="#6b87a5">单页自包含 · 深浅主题</text>
+
+  <!-- 底部横条 -->
+  <rect x="30" y="434" width="940" height="28" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <text x="500" y="452" text-anchor="middle" font-size="15" font-weight="600" fill="#22d3ee">同一套分析引擎 · 三种交互渠道 · 报告结果完全一致</text>
+</svg>

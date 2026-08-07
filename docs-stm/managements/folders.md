@@ -9,16 +9,17 @@
 > |---|---|---|---|---|
 | 主程序代码 | Python | 244 | 58,803 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
 | HTML 报告模板 | HTML | 4 | 3,770 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 18 | 6,938 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
 | **源代码合计** | — | **266** | **69,511** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **304** | **85,969** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **5,445 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **14** | **6,204** | 含 README.md（206 行）；行数为 README + manuals 之和 |
+| **用户文档** | Markdown | **14** | **6,210** | 含 README.md（212 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 13 | 5,998 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **109** | **43,813** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 1 + archive 98 md），py/txt 不计行 |
+| **项目文档** | Markdown | **110** | **43,935** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 2 + archive 98 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 9 | 7,904 | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 102 | 35,352 | 各版本 changelog/plan/review-findings 等（98 md 35,352 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 1 | 483 | 当前迭代中的设计方案（web-config-edit 设计定稿已实现） |
+| ├ plan/ | 中间设计文件 | 2 | 605 | 当前迭代中的设计方案（web-config-edit、plan-readme-svg-layout 设计定稿已实现） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -308,6 +309,9 @@ investor-util/
 │   │   ├── theme.js                   #   主题切换（深/浅色 + localStorage 持久化 + Chart.js 重绘 + 打印浅色协调）
 │   │   ├── test-chart.html           #   独立调试页：6 图渲染/降级/离线场景自检（Chart.js 升级验证载体）
 │   │   ├── README.md                 #   资产说明 + Chart.js 版本号记录（升级指引：替换引擎后先在此页验证）
+│   │   ├── architecture.svg          #   README 首屏主图：三渠道→引擎→双报告
+│   │   ├── llm-chain.svg             #   README LLM 智囊团 Provider 链式分发图
+│   │   ├── capabilities.svg          #   README 八大功能域总览图
 │   │   ├── web/                      #   Web UI 前端（Jinja 模板 + 静态资产，Flask template/static 目录指向此处）
 │   │   │   ├── index.html            #   单页 Web UI 模板（上传/格式选择/进度/结果/状态区三列含系统信息）
 │   │   │   ├── main.js               #   前端逻辑（上传/提交/轮询/渲染，原生 ES6，无 innerHTML）
@@ -871,7 +875,8 @@ investor-util/
 │   │   │   └── web-holdings-input-modes/    #   Web 持仓输入模式实施归档（plan-25 完成）
 │   │   │       └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计定稿
 │   ├── plan/                          #   中间设计文件
-│   │   └── web-config-edit.md           #     Web 配置编辑设计定稿（plan-26，完整镜像 TUI 可编辑配置全集，已实现）
+│   │   ├── web-config-edit.md           #     Web 配置编辑设计定稿（plan-26，完整镜像 TUI 可编辑配置全集，已实现）
+│   │   └── plan-readme-svg-layout.md    #     README 嵌入 SVG 架构图 + 排版优化（设计定稿已实现）
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

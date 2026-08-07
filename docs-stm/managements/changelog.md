@@ -6,6 +6,16 @@
 
 ## [0.10.13-dev] - 开发中（未发布）
 
+### README 嵌入 SVG 架构图 + 排版优化（2026-08-07）
+
+- **新增 3 张深色科技风架构图**（`src/static/`，手写 SVG，README 相对路径引用）：
+  - `architecture.svg` — 首屏主图：TUI/CLI/Web 三渠道 → 分析引擎 → Excel/HTML 双报告，底部「同一套引擎 · 三种渠道 · 结果一致」。
+  - `llm-chain.svg` — LLM 智囊团技术图：触发源 → 缓存指纹判定 → Provider Chain 链式分发（Claude/OpenAI/DeepSeek/Gemini）→ 四种分发策略 → 四类深度分析输出。
+  - `capabilities.svg` — 八大功能域总览图：基础报告/新闻增强/LLM 智囊团/分析与风控/调仓 What-if/运维追踪/基金评价/隐私安全 2×4 网格 + 双报告输出条。
+- **README 排版优化**：副标题精炼为一句话价值主张；3 张 SVG 分别嵌入首屏（架构图）、功能特性章节首（能力总览）、LLM 分析章节（Provider 链）；功能特性 8 个分组标题统一 emoji（🔍📰🤖📈🔄⚙️🏆🔒）。
+- **`folders.md` 同步**：项目统计表新增「架构图示 SVG 3/315」行；目录树 `src/static/` 分支登记 3 个 SVG；README 行数 206→212、用户文档合计 6,204→6,210。
+- **门禁**：XML 解析校验 3 个 SVG 合法 + 几何越界检查通过；P0 dev-verify 2005 passed；4 个 check 脚本 `--ci` [OK]。
+
 ---
 
 ## [0.10.12] - 2026-08-07
