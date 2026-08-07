@@ -88,9 +88,9 @@
   <text x="175" y="487" font-size="17" font-weight="700" fill="#34d399">Excel 报告</text>
   <text x="305" y="487" font-size="14" fill="#9fb6d0">19 条件页签 · 页签专业</text>
   <line x1="500" y1="462" x2="500" y2="498" stroke="#2e4a6e" stroke-width="2"/>
-  <text x="870" y="488" font-size="18">📈</text>
-  <text x="915" y="487" font-size="17" font-weight="700" fill="#fbbf24">HTML 报告</text>
-  <text x="690" y="487" font-size="14" fill="#9fb6d0">9 交互图表 · 单页自包含</text>
+  <text x="547" y="487" font-size="14" fill="#9fb6d0">9 交互图表 · 单页自包含</text>
+  <text x="745" y="487" font-size="17" font-weight="700" fill="#fbbf24">HTML 报告</text>
+  <text x="852" y="488" font-size="18">📈</text>
 
   <!-- 底部说明 -->
   <text x="500" y="536" text-anchor="middle" font-size="13" fill="#9fb6d0">同一套分析引擎 · 双管线并行输出</text>
