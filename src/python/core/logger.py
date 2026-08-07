@@ -118,12 +118,13 @@ def log_app_boundary(event: str, mode: str) -> None:
         event: "启动" 或 "关闭"
         mode: "CLI模式" 或 "TUI模式"
     """
-    from src.python.core.constants import APP_VERSION
+    from src.python.core.constants import APP_NAME, APP_VERSION
 
     ip = _get_machine_ip()
     logging.getLogger("invest").info(
-        "应用%s | 版本 v%s | %s | 主机 IP: %s",
+        "应用%s | %s v%s | %s | 主机 IP: %s",
         event,
+        APP_NAME,
         APP_VERSION,
         mode,
         ip,

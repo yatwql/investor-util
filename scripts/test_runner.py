@@ -42,6 +42,11 @@ _LATEST_DIR = os.path.join(_REPORTS_DIR, "latest")
 _ARCHIVES_DIR = os.path.join(_REPORTS_DIR, "archives")
 _SRC_DIR = os.path.join(_PROJECT_ROOT, "src", "test")
 
+# 引用 APP_NAME（应用名称单一来源常量）需将项目根加入 sys.path（独立脚本默认不在）
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+from src.python.core.constants import APP_NAME  # noqa: E402
+
 # ── 模式配置 ─────────────────────────────────────────────────
 
 MODES: dict[str, dict] = {
@@ -79,16 +84,21 @@ MODES: dict[str, dict] = {
         "preflight": [[sys.executable, "scripts/check-task-numbering.py", "--ci"]],
         "phases": [
             {
-                "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)",
+                "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web) and not (edge or data)",
                 "desc": "核心模块单元测试",
                 "timeout_sec": 300,
                 "parallel": True,
             },
-            {"marker": "scenario_basic", "desc": "基础业务场景（耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）", "timeout_sec": 300, "parallel": True},
+            {
+                "marker": "scenario_basic",
+                "desc": "基础业务场景（耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）",
+                "timeout_sec": 300,
+                "parallel": True,
+            },
         ],
     },
     "verify": {
-        "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts",
+        "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts or unit_web",
         "desc": "合入验证（核心/配置/新闻/LLM 模块单元测试，不含场景——场景由 P0+P2 覆盖）",
         "timeout_sec": 300,
         "order": 6,
@@ -394,9 +404,20 @@ def _calc_parallel_workers(level: str | bool) -> str:
 # 「环境耗时对照」表标准顺序（对齐 docs-stm/managements/test-coverage.md），
 # 供耗时表格排序；live 为 opt-in 网络套件，不纳入对照表。
 _MODE_TABLE_ORDER: tuple[str, ...] = (
-    "unit", "standard", "scenario", "regression",
-    "dev-verify", "verify", "integration", "edge", "data",
-    "all", "smoke", "report", "all_no_unit", "scenario_extreme",
+    "unit",
+    "standard",
+    "scenario",
+    "regression",
+    "dev-verify",
+    "verify",
+    "integration",
+    "edge",
+    "data",
+    "all",
+    "smoke",
+    "report",
+    "all_no_unit",
+    "scenario_extreme",
 )
 
 # bench 运行顺序：将最重的 all 置于末尾，慢机器前序轻量模式跑完可随时中断。
@@ -462,7 +483,7 @@ def _mem_gib_linux() -> float | None:
         with open("/proc/meminfo", encoding="utf-8", errors="replace") as f:
             for line in f:
                 if line.lower().startswith("memtotal"):
-                    return int(line.split()[1]) / (1024 ** 2)
+                    return int(line.split()[1]) / (1024**2)
     except (OSError, ValueError, IndexError):
         return None
     return None
@@ -509,8 +530,11 @@ def _sysctl_value(name: str) -> str | None:
     try:
         proc = subprocess.run(
             [cmd, "-n", name],
-            capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=5,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -540,7 +564,7 @@ def _mem_gib_windows() -> float | None:
         stat = _MemoryStatusEx()
         stat.dwLength = ctypes.sizeof(_MemoryStatusEx)
         if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
-            return stat.ullTotalPhys / (1024 ** 3)
+            return stat.ullTotalPhys / (1024**3)
     except Exception:
         return None
     return None
@@ -578,7 +602,7 @@ def _collect_machine_info(parallel_level: str = "medium") -> dict:
         phys = _sysctl_value("hw.physicalcpu")
         info["cpu_physical_cores"] = int(phys) if phys and phys.isdigit() else None
         mem = _sysctl_value("hw.memsize")
-        info["mem_gib"] = round(int(mem) / (1024 ** 3), 1) if mem and mem.isdigit() else None
+        info["mem_gib"] = round(int(mem) / (1024**3), 1) if mem and mem.isdigit() else None
     elif system == "Windows":
         info["cpu_model"] = platform.processor() or None
         info["cpu_physical_cores"] = os.cpu_count()
@@ -618,8 +642,20 @@ def _format_machine_info(info: dict) -> str:
 # 环境属性表行标签（14 行，与 test-coverage.md「采集环境属性」表结构一致；
 # 操作系统/系统版本分列，供渲染与文档写入共用单一事实源）。
 _ENV_ATTR_LABELS: tuple[str, ...] = (
-    "操作系统", "系统版本", "架构", "主机名", "CPU 型号", "物理核数", "逻辑线程",
-    "内存", "磁盘类型", "文件系统", "Python 版本", "并行级别", "worker 数", "采集日期",
+    "操作系统",
+    "系统版本",
+    "架构",
+    "主机名",
+    "CPU 型号",
+    "物理核数",
+    "逻辑线程",
+    "内存",
+    "磁盘类型",
+    "文件系统",
+    "Python 版本",
+    "并行级别",
+    "worker 数",
+    "采集日期",
 )
 
 
@@ -698,9 +734,7 @@ def _duration_mode_cells(results: list[dict]) -> dict[str, str]:
         if mode == "regression" and "verify" in by_mode:
             v = by_mode["verify"]
             dur2 = (res.get("duration", 0.0) or 0.0) + (v.get("duration", 0.0) or 0.0)
-            cells["verify,regression"] = (
-                f"{_format_approx_duration(dur2)}（verify+regression 顺序之和）"
-            )
+            cells["verify,regression"] = f"{_format_approx_duration(dur2)}（verify+regression 顺序之和）"
     return cells
 
 
@@ -718,17 +752,11 @@ def _render_duration_table(results: list[dict]) -> str:
         res = by_mode.get(mode)
         if res is None:
             continue
-        cnt = (
-            res.get("passed", 0) + res.get("failed", 0)
-            + res.get("skipped", 0) + res.get("errors", 0)
-        )
+        cnt = res.get("passed", 0) + res.get("failed", 0) + res.get("skipped", 0) + res.get("errors", 0)
         lines.append(f"| `{mode}` | {cnt} | ~{_approx_sec(res.get('duration', 0.0) or 0.0)}s |")
         if mode == "regression" and "verify" in by_mode:
             v = by_mode["verify"]
-            cnt2 = cnt + (
-                v.get("passed", 0) + v.get("failed", 0)
-                + v.get("skipped", 0) + v.get("errors", 0)
-            )
+            cnt2 = cnt + (v.get("passed", 0) + v.get("failed", 0) + v.get("skipped", 0) + v.get("errors", 0))
             dur2 = (res.get("duration", 0.0) or 0.0) + (v.get("duration", 0.0) or 0.0)
             lines.append(f"| `verify,regression` | {cnt2} | ~{_approx_sec(dur2)}s（verify+regression 之和） |")
     return "\n".join(lines) + "\n"
@@ -852,9 +880,7 @@ def _extract_table_region(doc_text: str, markers: tuple[str, str]) -> list[str]:
     return lines
 
 
-def _replace_table_region(
-    doc_text: str, markers: tuple[str, str], updated_lines: list[str]
-) -> str:
+def _replace_table_region(doc_text: str, markers: tuple[str, str], updated_lines: list[str]) -> str:
     """以更新后的表格行替换 marker 之间的表区域。
 
     Raises:
@@ -862,17 +888,13 @@ def _replace_table_region(
     """
     block = markers[0] + "\n" + "\n".join(updated_lines) + "\n" + markers[1]
     # 用可调用替换避免 re 把块内容当模板解析（单元格含反斜杠会触发 re.error）。
-    new_text, count = _table_region_pattern(markers).subn(
-        lambda _match: block, doc_text, count=1
-    )
+    new_text, count = _table_region_pattern(markers).subn(lambda _match: block, doc_text, count=1)
     if count != 1:
         raise ValueError(f"表区域标记 {markers[0]} 与 {markers[1]} 未匹配")
     return new_text
 
 
-def _update_test_coverage_doc(
-    doc_text: str, machine_info: dict, results: list[dict]
-) -> str:
+def _update_test_coverage_doc(doc_text: str, machine_info: dict, results: list[dict]) -> str:
     """更新 test-coverage.md 两张「环境耗时对照」表（纯函数，不落盘）。
 
     Args:
@@ -891,15 +913,14 @@ def _update_test_coverage_doc(
     header_cell = f"{hostname}（{date} 实测）"
 
     env_lines = _extract_table_region(doc_text, _DOC_ENV_TABLE_MARKERS)
-    env_updated = _update_machine_table(
-        env_lines, header_cell, lambda label: _env_value(label, machine_info)
-    )
+    env_updated = _update_machine_table(env_lines, header_cell, lambda label: _env_value(label, machine_info))
     doc_text = _replace_table_region(doc_text, _DOC_ENV_TABLE_MARKERS, env_updated)
 
     duration_cells = _duration_mode_cells(results)
     dur_lines = _extract_table_region(doc_text, _DOC_DURATION_TABLE_MARKERS)
     dur_updated = _update_machine_table(
-        dur_lines, header_cell,
+        dur_lines,
+        header_cell,
         # 数据更新时间行按本机采集日期填充；其余行按模式实测耗时（未测留空）
         lambda label: date if label == "数据更新时间" else duration_cells.get(label.strip("`")),
     )
@@ -1237,7 +1258,7 @@ def _render_index_html(results: list[dict], coverage: bool, archive_path: str | 
 {archive_note}
 
 <div class="footer">
-  Generated by test_runner.py · 个人投资分析报告生成小助手
+  Generated by test_runner.py · {APP_NAME}
 </div>
 </body>
 </html>"""

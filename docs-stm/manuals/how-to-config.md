@@ -7,6 +7,7 @@
   // ── A. 路径与文件 ──
   "holdings_dir": "data/holdings",
   "holdings_filename": "个人投资持仓信息.xlsx",
+  "holdings_start_date": "",  // 组合建仓日期（YYYY-MM-DD，可选）：未录入交易/分红流水时按「建仓日一次性买入」近似年化；空=仅成本分档近似
   "output_dir": "reports",
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
@@ -127,6 +128,7 @@
 |------|--------|------|----------|
 | `holdings_dir` | `data/holdings` | 持仓 xlsx 文件所在目录 | 菜单 `C` |
 | `holdings_filename` | `个人投资持仓信息.xlsx` | 要读取的持仓文件名 | 菜单 `F` |
+| `holdings_start_date` | `""` | 组合建仓日期（YYYY-MM-DD，可选）。持仓 Excel 未录入交易/分红流水时，成本流水子模块按「建仓日一次性买入」近似年化；空=不计算近似年化，仅成本分档近似（每份成本 vs 市价）。须配合 `report_submodules.cost_lots` 开启 | 手动编辑 |
 | `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `O` |
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
@@ -175,13 +177,13 @@
 | `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 菜单 P → 6 |
 | `report_submodules.market_temperature` | `false` | 「投资分析汇总」章市场温度刻度行开关，**默认关闭**。开启后该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明） | 菜单 P → 6 |
 | `report_submodules.industry_beta` | `false` | 「风格与因子分析」章行业 Beta 子表开关，**默认关闭**。开启后该章展示行业 Beta 子表（组合对中证行业指数的回归敏感性：行业暴露占比 + β/t 值/显著性/相关性） | 菜单 P → 6 |
-| `report_submodules.cost_lots` | `false` | 成本流水开关，**默认关闭**。持仓 Excel 含交易/分红流水时，开启后汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计 | 菜单 P → 6 |
+| `report_submodules.cost_lots` | `false` | 成本流水开关，**默认关闭**。开启后汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计：持仓 Excel 含交易/分红流水走精确计算；无流水时自动切换为快照近似（按 `holdings_start_date` 建仓日一次性买入近似年化，未配置则仅成本分档近似），XIRR 标注「近似」 | 菜单 P → 6 |
 
 ---
 
 ### A. 路径与文件
 
-路径/文件相关字段（`holdings_dir`、`holdings_filename`、`output_dir`、`llm_key_file`、`llm_settings_file`、`llm_providers_file`）见上方字段总表。
+路径/文件相关字段（`holdings_dir`、`holdings_filename`、`holdings_start_date`、`output_dir`、`llm_key_file`、`llm_settings_file`、`llm_providers_file`）见上方字段总表。
 
 ---
 
@@ -665,7 +667,7 @@
 ---
 ### M. 功能开关（features.json）
 
-`data/config/features.json` 提供 27 项功能开关的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
+`data/config/features.json` 提供 **27 项功能开关**的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
 
 ```json
 {
@@ -675,24 +677,43 @@
 ```
 
 > **文件不必须存在** — 全部使用代码默认值时无需此文件。首次在菜单 **[S]** 切换辩论模式或手动创建后自动生效。
+> **注意**：features.json 是唯一**不支持注释**的配置文件（标准 JSON，`//`/`/* */` 均不可用）。所有开关的默认值与完整说明见下表，或直接查看源码 `src/python/config/features.py` 的 `_FEATURE_FLAGS_DEFAULT`。
 
-主要开关：
+全部 27 项开关：
 
 | 开关名 | 默认值 | 说明 |
 |:-------|:------:|:-----|
-| `llm_*`（5 项） | true（features.py 全部默认 true；news_correlation 实际启停通过 llm_settings.json 的 `enabled_llm` 控制，默认 false） | LLM 各模块独立启停 |
-| `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | **false**（全部默认关闭） | 辩论模式三增强通路：正反辩论/条件推理/集中度问答。菜单 **[S]** 可交互开关 |
-| `fund_deep_analysis_*`（4 项） | true | 基金深度分析模块 |
-| `news_*`（5 项） | true（cls 默认 false） | 新闻源启停 |
-| `history_portfolio` / `history_benchmark` | true | 历史走势与基准指数开关 |
-| `metrics_*`（7 项） | true | 量化指标（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
+| `llm_global_macro` | true | LLM 全球政经局势 |
+| `llm_expert_review` | true | LLM 智囊团深度复盘 |
+| `llm_health_check` | true | LLM 持仓体检报告 |
+| `llm_penetration_deep` | true | LLM 穿透深度分析 |
+| `llm_news_correlation` | true | LLM 财经新闻与持仓关联分析（实际启停还受 `llm_settings.json` 的 `enabled_llm` 控制） |
+| `llm_debate_procon` | **false** | 辩论-正反辩论（三段式：白脸→黑脸→综合） |
+| `llm_debate_conditional` | **false** | 辩论-条件推理（情景化分析：涨/跌/震荡） |
+| `llm_debate_qa_concentration` | **false** | 辩论-集中度问答（集中度风险问答） |
+| `fund_deep_analysis_fund_manager` | true | 基金深度分析-基金经理 |
+| `fund_deep_analysis_fund_concentration` | true | 基金深度分析-基金集中度 |
+| `news_sina` | true | 新闻源-新浪财经 |
+| `news_eastmoney` | true | 新闻源-东方财富 |
+| `news_cls` | **false** | 新闻源-财联社 |
+| `news_wallstreetcn` | true | 新闻源-华尔街见闻 |
+| `news_akshare` | true | 新闻源-akshare 封装 |
+| `metrics_sharpe` | true | 量化指标-夏普比率 |
+| `metrics_calmar` | true | 量化指标-卡玛比率 |
+| `metrics_hhi` | true | 量化指标-HHI 集中度 |
+| `metrics_winrate` | true | 量化指标-胜率 |
+| `metrics_turnover` | true | 量化指标-换手率 |
+| `metrics_risk_contribution` | true | 量化指标-风险贡献 |
+| `metrics_beta` | true | 量化指标-Beta |
+| `history_portfolio` | true | 历史走势-组合净值 |
+| `history_benchmark` | true | 历史走势-基准指数 |
 | `anonymizer` | false | 匿名化功能总开关（关闭后强制 off）；具体模式通过 config.json 的 anonymization.mode 设置 |
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
-| `enable_interactive_charts` | true | 报告图表交互总开关（Chart.js 交互图，缩放/悬停）；关闭时回退到 Canvas + 表格静态渲染 |
+| `enable_interactive_charts` | true | 报告图表交互总开关（Chart.js 交互图，缩放/悬停）——**同时决定 HTML 报告是否单文件自包含**：开启时 8 个 Chart.js 资产内嵌进 HTML（下载到任意目录、单独发送到移动端浏览均正常，不依赖同目录 JS 文件）；关闭时回退到 Canvas + 表格静态渲染，HTML **不内嵌 JS**（需与 `reports/` 下的 .js 资产同目录才显示图表，移动/单发后会空白） |
 
 > **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（1-5，由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性辩论模式（6-8，由上方 `llm_debate_*` 开关控制，三项相互独立、可组合开启）。**正反辩论（`llm_debate_procon`）**开启后，智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**为分析注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议。
 
-> 以上为主要功能开关速查。完整清单（含所有子开关名、默认值及说明）以 `data/config/features.json` 文件中的注释为准，可直接查看该文件。
+> 以上 27 项为**全部**功能开关清单（默认值与代码 `features.py::_FEATURE_FLAGS_DEFAULT` 一致）。features.json 仅需列出需覆写的开关，未列出的保持默认值。
 > 该文件不包含敏感信息，可安全纳入版本控制。
 
 ---

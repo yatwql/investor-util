@@ -77,10 +77,10 @@ def print_sep(char: str = "=", width: int = 56) -> None:
 
 def print_header() -> None:
     """打印程序标题头（每次主循环迭代时重绘）。"""
-    from src.python.core.constants import APP_VERSION
+    from src.python.core.constants import APP_NAME, APP_VERSION
 
     print_sep()
-    print(f"        个人投资分析报告生成小助手  v{APP_VERSION}")
+    print(f"        {APP_NAME}  v{APP_VERSION}")
     print_sep()
 
     # 首次运行引导：检测是否缺少关键资源

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 from typing import Any
 
 from src.python.core.logger import setup_logger
@@ -12,6 +13,28 @@ from src.python.core.registry import get_report_sheet_name
 from src.python.report.progress import ProgressReporter, Timer
 
 logger = setup_logger()
+
+
+def _resolve_holdings_start_date() -> _dt.date | None:
+    """读取可选的组合建仓日期（config.json → holdings_start_date，YYYY-MM-DD）。
+
+    仅用于成本流水子模块的快照近似（单笔建仓假设的年化计算）。未配置或
+    格式无效返回 None（近似年化不计算，仅输出成本分档）。
+
+    Returns:
+        建仓日期，或 None（未配置 / 空 / 格式无效）
+    """
+    from src.python.config import get_config
+
+    raw = get_config().get("holdings_start_date") or ""
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        return _dt.date.fromisoformat(text)
+    except ValueError:
+        logger.warning("holdings_start_date 配置格式无效（应为 YYYY-MM-DD）: %r，忽略近似年化", text)
+        return None
 
 
 def _build_flow_data(
@@ -34,18 +57,19 @@ def _build_flow_data(
         details: 市值核算明细（提供品种代码 → 当前市价）
 
     Returns:
-        fund_flow_data dict（无流水时 available=False），或 None（开关关闭）
+        fund_flow_data dict（无流水时为快照近似契约 approximate=True；
+        有流水时为真实契约 approximate=False），或 None（开关关闭）
     """
     if not enable_cost_lots:
         return None
-    if not transactions and not dividends:
-        # 无流水页签：仍返回 available=False 契约，供渲染层写「未录入流水」占位
-        from src.python.analysis.cost_flow import build_fund_flow_data
-
-        return build_fund_flow_data([], [], holdings, {}, end_date=None)
-    from src.python.analysis.cost_flow import build_fund_flow_data
+    from src.python.analysis.cost_flow import build_approximate_fund_flow_data, build_fund_flow_data
 
     current_prices = {d.code: d.price for d in details if getattr(d, "price", None)}
+    if not transactions and not dividends:
+        # 无流水页签：返回快照近似契约（成本分档单档判断 + 可选近似年化），
+        # 供渲染层写「可选进阶增强」说明；开关开启但零持仓时近似也仅占位契约。
+        start_date = _resolve_holdings_start_date()
+        return build_approximate_fund_flow_data(holdings, current_prices, start_date=start_date)
     return build_fund_flow_data(transactions or [], dividends or [], holdings, current_prices)
 
 

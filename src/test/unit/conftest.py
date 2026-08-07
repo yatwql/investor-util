@@ -35,6 +35,7 @@ _DIR_TO_MARKER: dict[str, str] = {
     "providers": "unit_providers",
     "report": "unit_report",
     "ui": "unit_ui",
+    "web": "unit_web",
 }
 
 

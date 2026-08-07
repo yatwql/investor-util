@@ -221,6 +221,10 @@ class TestWriteWhatifHtml:
                 return_value="<html>调仓模拟</html>",
             ) as mock_render,
             patch("src.python.report.whatif_writer._copy_js_assets") as mock_copy,
+            patch(
+                "src.python.report.whatif_writer._inline_js_assets",
+                side_effect=lambda html: html,
+            ) as mock_inline,
             patch("src.python.report.whatif_writer._cleanup_old_archives") as mock_cleanup,
         ):
             output_dir = str(tmp_path)
@@ -235,4 +239,5 @@ class TestWriteWhatifHtml:
         assert archives[0].read_text(encoding="utf-8") == "<html>调仓模拟</html>"
         mock_render.assert_called_once()
         mock_copy.assert_called_once_with(output_dir)
+        mock_inline.assert_called_once_with("<html>调仓模拟</html>")
         mock_cleanup.assert_called_once_with(output_dir)

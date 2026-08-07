@@ -1,5 +1,5 @@
 # 目录结构
-> 文档版本：0.10.9
+> 文档版本：0.10.12-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -7,18 +7,18 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 234 | 56,419 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 14 个 `__init__.py`） |
+| 主程序代码 | Python | 242 | 57,894 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
 | HTML 报告模板 | HTML | 4 | 3,770 | `src/python/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
-| 辅助脚本 | Python | 17 | 6,468 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验） |
-| **源代码合计** | — | **255** | **66,657** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **287** | **82,491** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,196 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **13** | **5,757** | 含 README.md（181 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 12 | 5,576 | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **107** | **42,279** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 2 + archive 95 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 9 | 7,135 | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 99 | 34,442 | 各版本 changelog/plan/review-findings 等（95 md 34,442 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 2 | 628 | 当前迭代中的设计方案（plan-web-ui.md + plan-web-ui-implementation.md） |
+| 辅助脚本 | Python | 18 | 6,790 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
+| **源代码合计** | — | **264** | **68,454** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **296** | **84,024** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,291 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **用户文档** | Markdown | **13** | **5,855** | 含 README.md（203 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 12 | 5,652 | 配置/faq/快速上手/CLI 等 |
+| **项目文档** | Markdown | **107** | **42,698** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 0 + archive 97 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 9 | 7,639 | 变更日志/目录树/测试计划/技术设计等 |
+| ├ archive/ | 版本归档 | 101 | 34,985 | 各版本 changelog/plan/review-findings 等（97 md 34,985 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代中的设计方案（暂无，Web UI 设计文档随版本归档存放） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -190,7 +190,7 @@ investor-util/
 │   │   │   ├── html_writer.py        #   HTML 报告主写入器（聚合门面）
 │   │   │   ├── html_writer_nav.py    #   章节可见性 + 目录分组导航（board 层×data 层两层可见性）
 │   │   │   ├── html_writer_display.py #  数据契约展示映射（fund_flow/温度/估值 → 模板友好 dict）
-│   │   │   ├── html_writer_assets.py #   Chart.js JS 资产复制（src/static/ → 报告目录，离线自包含）
+│   │   │   ├── html_writer_assets.py #   Chart.js JS 资产复制/内嵌（复制到报告目录 + 保存前内嵌为行内脚本，单文件自包含）
 │   │   │   ├── html_builders.py      #   HTML 各区块构建器
 │   │   │   ├── html_renderers.py     #   HTML 渲染管线
 │   │   │   ├── html_jinja_env.py     #   Jinja2 模板环境配置
@@ -244,7 +244,7 @@ investor-util/
 │   │   │   ├── progress.py           #   报告生成进度跟踪
 │   │   │   ├── cli_progress.py         #   CLI 进度报告器（CliProgressReporter）
 │   │   │   ├── whatif_sheet.py       #   调仓 What-if Excel 页签（摘要/分类/变动明细）
-│   │   │   ├── whatif_writer.py      #   调仓 What-if 报告输出编排（Excel+HTML）
+│   │   │   ├── whatif_writer.py      #   调仓 What-if 报告输出编排（Excel+HTML，含 Chart.js 资产复制/内嵌）
 │   │   │   ├── whatif_operations.py  #   调仓 What-if 操作共享层（CLI/TUI 共用的业务链）
 │   │   │   └── styles.py             #   Excel 样式定义
 │   │   │
@@ -291,6 +291,21 @@ investor-util/
 │   │   │   ├── tui_handlers.py       #   键盘/事件处理
 │   │   │   ├── tui_keys.py           #   终端键盘输入封装
 │   │   │   └── tui_menu.py           #   菜单系统
+│   │   │
+│   │   └── web/                      # 轻量 Web 模式入口（浏览器内上传/生成/预览/下载）
+│   │   │   ├── __init__.py           #   子包标记，re-export main/create_app
+│   │   │   ├── __main__.py           #   python -m 入口
+│   │   │   ├── server.py             #   服务主入口（sys.path 注入 + 端口检测 + app.run）
+│   │   │   ├── app.py                #   Flask 应用工厂（错误处理/请求日志/注入 run_manager）
+│   │   │   ├── handlers.py           #   路由 handler（页面/上传/生成/轮询/预览/下载/历史/健康；_build_system_info 状态区系统信息）
+│   │   │   ├── upload.py             #   上传安全（uuid 重命名/扩展名白名单/魔数校验/原子落盘/TTL）
+│   │   │   ├── progress.py           #   Web 进度报告器（事件写入 run 状态缓冲）
+│   │   │   ├── runs.py               #   RunManager 单 worker 串行队列 + run 状态/事件注册表
+│   │   │   ├── templates/            #   Jinja2 模板
+│   │   │   │   └── index.html        #   单页 Web UI（上传/格式选择/进度/结果/状态区三列含系统信息）
+│   │   │   └── static/               #   Web UI 静态资产（main.js/style.css）
+│   │   │       ├── main.js           #   前端逻辑（上传/提交/轮询/渲染，原生 ES6，无 innerHTML）
+│   │   │       └── style.css         #   样式（CSS 变量/浅色主题/响应式 480px 断点/系统信息卡片）
 │   │
 │   ├── static/                       # 前端静态资产（本地 bundle + 调试页）
 │   │   ├── chart.min.js              #   Chart.js v4.4.3 UMD（本地 bundle，205KB，离线自包含）
@@ -312,7 +327,7 @@ investor-util/
 │       │   └── hallucination/        #   幻觉测试数据集
 │       │       ├── __init__.py       #       子包标记
 │       │       └── datasets.py       #       幻觉评估标准持仓数据
-│       ├── unit/                     #   单元测试（14 子目录）
+│       ├── unit/                     #   单元测试（15 子目录）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── conftest.py           #   单元测试 conftest
 │       │   ├── analysis/             #   分析计算单元测试
@@ -375,6 +390,7 @@ investor-util/
 │       │   │   ├── test_cache_format.py     #   缓存格式测试
 │       │   │   ├── test_cache_edge.py       #   缓存边缘场景测试
 │       │   │   ├── test_circuit_breaker_gateway.py #   统一熔断网关（Provider/LLM/指标三路聚合）
+│       │   │   ├── test_check_sources.py    #   数据源健康检查（整体耗时预算/慢源超时/竞态兜底）
 │       │   │   ├── test_code_utils.py       #   证券代码工具测试
 │       │   │   ├── test_filesystem_edge.py  #   文件系统边缘场景
 │       │   │   ├── test_holding_status.py   #   品种级数据状态标注测试（品种覆盖诊断）
@@ -491,7 +507,7 @@ investor-util/
 │       │   │   ├── test_excel_report_structure.py #   Excel 报告结构测试
 │       │   │   ├── test_excel_roundtrip.py        #   Excel 写入读取回环测试
 │       │   │   ├── test_excel_writer.py           #   Excel 写入器测试
-│       │   │   ├── test_feature_interactive.py    #   交互图表 Feature Flag 管线测试
+│       │   │   ├── test_feature_interactive.py    #   交互图表 Feature Flag + JS 资产复制/内嵌（单文件自包含）测试
 │       │   │   ├── test_fund_deep_analysis_sheet_edge.py # 基金深度分析页签边缘场景
 │       │   │   ├── test_fund_candidate.py         #   候选基金比较测试（基金业绩分析章候选比较子表）
 │       │   │   ├── test_fund_concentration.py     #   基金集中度测试
@@ -560,6 +576,15 @@ investor-util/
 │       │   │   ├── test_tui_edge.py         #   TUI 边缘场景
 │       │   │   ├── test_tui_handlers.py     #   TUI 事件处理测试
 │       │   │   └── test_tui_menu.py         #   TUI 菜单测试
+│       │   └── web/                  #   Web 模式单元测试
+│       │   │   ├── __init__.py      #       包标记（空文件）
+│       │   │   ├── test_upload.py   #       上传安全模块（校验/生命周期/清理）
+│       │   │   ├── test_upload_edge.py #    上传安全边缘（zip-bomb/伪装/路径穿越变体）
+│       │   │   ├── test_progress.py #       Web 进度报告器（事件缓冲/seq/增量）
+│       │   │   ├── test_runs.py     #       RunManager（状态机/队列/保留/单例重置）
+│       │   │   ├── test_handlers.py #       Flask 路由 handler（全链路/错误信封/穿越拒绝/系统信息组装）
+│       │   │   ├── test_server.py   #       启动防护（output_dir 写锁检测/端口占用）
+│       │   │   └── test_smoke_web.py #      Web 冒烟脚本载体（test_client 9 项全链路断言）
 │       ├── integration/              #   集成测试（契约/隔离/流水线）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── test_cache_consistency.py      #   缓存前缀契约跨模块共享集成测试
@@ -660,7 +685,8 @@ investor-util/
 │   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
 │   ├── probe-csi-factor-indices.py  #   CSI 风格指数可用性探测（风格因子回归前置决策闸门）
 │   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
-│   └── extract-test-failures.py      #   pytest-html 报告失败用例提取
+│   ├── extract-test-failures.py      #   pytest-html 报告失败用例提取
+│   └── smoke-web.py                 #   Web 模式 HTTP 冒烟脚本（test_client 9 项全链路验证，可独立运行）
 ├── docs-stm/                         # 项目文档
 │   ├── manuals/                      #   用户手册分册
 │   │   ├── datasource.md             #     数据源一览
@@ -685,9 +711,6 @@ investor-util/
 │   │   ├── technical.md              #     技术设计文档
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
-│   ├── plan/                         #   中间设计文件（当前迭代中，仅未完成项）
-│   │   ├── plan-web-ui.md              #     轻量 Web UI 计划（日志可视化 / HTML 暗色模式）
-│   │   └── plan-web-ui-implementation.md #   plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API）
 │   ├── archive/                      #   历史归档
 │   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
@@ -837,12 +860,15 @@ investor-util/
 │   │   │   │   └── plan-investment-iteration.md #     投资功能优化 21 轮迭代实施计划（每轮量化验收）
 │   │   │   ├── task-code-traces-gate/       #   任务编号标识符/注释门禁增强设计（rf-208）
 │   │   │   │   └── plan-task-code-traces-gate.md #     check-code-traces 扩展（IDENT 维度 + 系列代号）
-│   │   │   └── toc-llm-marking/             #   目录 LLM 章节标记设计（橙色加粗 + 🧠 图标）
-│   │   │       └── plan-toc-llm-marking.md  #     TOC/横向导航 LLM 章节标记（复用 --orange-text）
+│   │   │   ├── toc-llm-marking/             #   目录 LLM 章节标记设计（橙色加粗 + 🧠 图标）
+│   │   │   │   └── plan-toc-llm-marking.md  #     TOC/横向导航 LLM 章节标记（复用 --orange-text）
+│   │   │   └── web-ui/                      #   轻量 Web UI 实施归档（plan-8 三阶段完成）
+│   │   │       ├── plan-web-ui.md              #     轻量 Web UI 计划（plan-8 轻量 Web UI / plan-10 日志可视化）
+│   │   │       └── plan-web-ui-implementation.md #  plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
-├── README.md                         # 用户文档总入口
+├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
 ├── pyproject.toml                    # Python 项目元数据
 ├── requirements.txt                  # Python 依赖清单
 ├── .editorconfig                     # 编辑器编码规则（*.ps1 强制 UTF-8 BOM+CRLF）

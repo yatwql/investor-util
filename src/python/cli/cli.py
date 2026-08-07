@@ -16,7 +16,7 @@ _project_root = os.path.dirname(os.path.dirname(os.path.dirname(_src_dir)))
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from src.python.core.constants import APP_VERSION
+from src.python.core.constants import APP_NAME, APP_VERSION
 
 # ── 退出码 ───────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ def _build_parser() -> argparse.ArgumentParser:
     """构建 argparse 参数解析器。"""
     parser = argparse.ArgumentParser(
         prog="investor-util",
-        description="个人投资分析报告生成工具 — 命令行模式",
+        description=f"{APP_NAME} — 命令行模式",
         epilog="示例: python -m src.python.cli report --type full --history auto",
     )
 

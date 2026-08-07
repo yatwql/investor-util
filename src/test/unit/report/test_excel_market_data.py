@@ -13,14 +13,18 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from src.python.report.excel_market_data import _build_flow_data, resolve_market_data
+from src.python.report.excel_market_data import (
+    _build_flow_data,
+    _resolve_holdings_start_date,
+    resolve_market_data,
+)
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 class TestBuildFlowData(unittest.TestCase):
-    """_build_flow_data 开关门控与占位契约。"""
+    """_build_flow_data 开关门控与快照近似/真实流水契约。"""
 
     def test_none_when_switch_disabled(self):
         """开关关闭（enable_cost_lots=False）→ 返回 None，不调用成本流水计算。"""
@@ -29,29 +33,55 @@ class TestBuildFlowData(unittest.TestCase):
         self.assertIsNone(result)
         mock_bffd.assert_not_called()
 
-    def test_available_false_placeholder_when_no_flows(self):
-        """开关开启但无流水 → 返回 available=False 占位契约（渲染层写「未录入流水」）。"""
+    def test_approximate_contract_when_no_flows(self):
+        """开关开启但无流水 → 返回快照近似契约（approximate=True，成本分档仍可用）。"""
+        holdings = [MagicMock()]
         with patch(
-            "src.python.analysis.cost_flow.build_fund_flow_data", return_value={"available": False}
-        ) as mock_bffd:
-            result = _build_flow_data(True, None, None, [], [])
-        self.assertEqual(result, {"available": False})
-        mock_bffd.assert_called_once_with([], [], [], {}, end_date=None)
+            "src.python.analysis.cost_flow.build_approximate_fund_flow_data",
+            return_value={"available": False, "approximate": True},
+        ) as mock_bap:
+            result = _build_flow_data(True, None, None, holdings, [])
+        self.assertEqual(result, {"available": False, "approximate": True})
+        args, kwargs = mock_bap.call_args
+        self.assertEqual(args[0], holdings)  # 位置参数 0：holdings
+        self.assertEqual(args[1], {})  # 位置参数 1：current_prices（无行情明细）
+        self.assertIsNone(kwargs.get("start_date"))  # 默认未配置建仓日期
 
     def test_passes_current_prices_when_flows_present(self):
-        """开关开启且有流水 → 以行情明细构建代码→市价映射传入成本流水计算。"""
+        """开关开启且有流水 → 以行情明细构建代码→市价映射传入真实成本流水计算。"""
         holdings = [MagicMock()]
         detail = MagicMock()
         detail.code = "600519"
         detail.price = 1500.0
-        with patch(
-            "src.python.analysis.cost_flow.build_fund_flow_data", return_value={"available": True}
-        ) as mock_bffd:
+        with patch("src.python.analysis.cost_flow.build_fund_flow_data", return_value={"available": True}) as mock_bffd:
             result = _build_flow_data(True, [MagicMock()], [MagicMock()], holdings, [detail])
         self.assertEqual(result, {"available": True})
         args, _ = mock_bffd.call_args
         # 位置参数：transactions, dividends, holdings, current_prices
         self.assertEqual(args[3], {"600519": 1500.0})
+
+
+class TestResolveHoldingsStartDate(unittest.TestCase):
+    """_resolve_holdings_start_date 建仓日期解析。"""
+
+    def test_parses_valid_iso_date(self):
+        """合法 YYYY-MM-DD → 返回 date。"""
+        from datetime import date
+
+        with patch("src.python.config.get_config", return_value={"holdings_start_date": "2024-01-15"}):
+            self.assertEqual(_resolve_holdings_start_date(), date(2024, 1, 15))
+
+    def test_empty_or_missing_returns_none(self):
+        """空字符串/缺失键 → None（不计算近似年化）。"""
+        with patch("src.python.config.get_config", return_value={"holdings_start_date": ""}):
+            self.assertIsNone(_resolve_holdings_start_date())
+        with patch("src.python.config.get_config", return_value={}):
+            self.assertIsNone(_resolve_holdings_start_date())
+
+    def test_invalid_format_returns_none(self):
+        """非法日期格式 → None（仅成本分档近似，近似年化跳过）。"""
+        with patch("src.python.config.get_config", return_value={"holdings_start_date": "2024/13/45"}):
+            self.assertIsNone(_resolve_holdings_start_date())
 
 
 class TestResolveMarketDataFlow(unittest.TestCase):

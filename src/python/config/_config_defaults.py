@@ -31,6 +31,9 @@ _DEFAULT_CONFIG = {
     # 以下路径型键使用绝对路径，使配置不依赖 CWD；holdings_filename 是纯文件名，保持相对
     "holdings_dir": os.path.join(PROJECT_ROOT, "data/holdings"),
     "holdings_filename": "个人投资持仓信息.xlsx",
+    # 组合建仓日期（YYYY-MM-DD，可选）：未录入交易/分红流水时，成本流水子模块按
+    # 「建仓日一次性买入」假设近似计算年化收益；空=仅输出成本分档近似，不计算近似年化
+    "holdings_start_date": "",
     "output_dir": os.path.join(PROJECT_ROOT, "reports"),
     "llm_settings_file": os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
@@ -159,6 +162,7 @@ def _build_template_from_defaults() -> str:
         "  // ── A. 路径与文件 ──",
         f'  "holdings_dir": {json.dumps(d["holdings_dir"])},',
         f'  "holdings_filename": {json.dumps(d["holdings_filename"], ensure_ascii=False)},',
+        '  "holdings_start_date": "",  // 组合建仓日期（YYYY-MM-DD，可选）：未录入交易/分红流水时，按「建仓日一次性买入」近似年化；空=仅成本分档近似',
         f'  "output_dir": {json.dumps(d["output_dir"])},',
         f'  "llm_settings_file": {json.dumps(d["llm_settings_file"])},',
         f'  "llm_key_file": {json.dumps(d["llm_key_file"])},',

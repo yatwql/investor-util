@@ -461,6 +461,15 @@ class TestFundFlowTemplate(unittest.TestCase):
         self.assertIn("资金加权收益率 (XIRR)", html)
         self.assertIn("10.35%", html)
 
+    def test_summary_xirr_card_approximate_label(self):
+        """快照近似（approximate=True）→ XIRR 卡标签加注「，近似」；真实模式不加注。"""
+        frag = self._extract_balanced("{% if flow_display and flow_display.xirr_rate is not none %}")
+        html_approx = self._render(frag, {"xirr_rate": 0.1, "approximate": True})
+        self.assertIn("资金加权收益率 (XIRR，近似)", html_approx)
+        html_real = self._render(frag, {"xirr_rate": 0.1})
+        self.assertIn("资金加权收益率 (XIRR)", html_real)
+        self.assertNotIn("，近似", html_real)
+
     # ── 2. 市值核算明细表 资金加权成本列 ──
     def test_market_value_wac_header_hidden_when_disabled(self):
         """开关关闭 → 市值核算表无「资金加权成本」表头列。"""
@@ -514,22 +523,49 @@ class TestFundFlowTemplate(unittest.TestCase):
         self.assertIn("<th>成本分档</th>", self.html)
         self.assertIn("<th>分红累计</th>", self.html)
 
-    # ── 4. 开关开启但无流水 → 未录入流水提示 ──
-    def test_flow_available_false_shows_note(self):
-        """开关开启但无流水（available=False）→ 渲染「未录入流水」提示。"""
-        frag = self._extract_balanced(
-            '{% if flow_display and not flow_display.available %}'
-        )
+    # ── 4. 成本流水说明：快照近似（可选进阶增强）与无数据兜底 ──
+    def test_flow_approximate_shows_optional_note(self):
+        """快照近似（approximate=True）→ 渲染「可选进阶增强」说明（非压力文案）。"""
+        frag = self._extract_balanced("{% if flow_display and flow_display.approximate %}")
+        flow = {
+            "approximate": True,
+            "available": True,
+            "xirr_rate": None,
+            "cost_map": {},
+            "tier_map": {},
+            "div_map": {},
+        }
+        html = self._render(frag, flow)
+        self.assertIn("成本流水为可选进阶增强", html)
+        self.assertIn("已用持仓快照近似计算", html)
+        self.assertIn("未配置建仓日期", html)
+
+    def test_flow_approximate_with_rate_omits_start_date_hint(self):
+        """快照近似且已配置建仓日期（xirr_rate 可用）→ 说明不含「未配置建仓日期」。"""
+        frag = self._extract_balanced("{% if flow_display and flow_display.approximate %}")
+        flow = {
+            "approximate": True,
+            "available": True,
+            "xirr_rate": 0.1,
+            "cost_map": {},
+            "tier_map": {},
+            "div_map": {},
+        }
+        html = self._render(frag, flow)
+        self.assertIn("成本流水为可选进阶增强", html)
+        self.assertNotIn("未配置建仓日期", html)
+
+    def test_flow_unavailable_fallback_note(self):
+        """真实流水模式无数据（available=False，无 approximate）→ 保留原空态说明。"""
+        frag = self._extract_balanced("{% if flow_display and flow_display.approximate %}")
         flow = {"available": False, "xirr_rate": None, "cost_map": {}, "tier_map": {}, "div_map": {}}
         html = self._render(frag, flow)
         self.assertIn("成本流水子模块已开启", html)
         self.assertIn("未录入交易/分红流水", html)
 
     def test_flow_none_no_note(self):
-        """开关关闭（flow_display=None）→ 不渲染「未录入流水」提示。"""
-        frag = self._extract_balanced(
-            '{% if flow_display and not flow_display.available %}'
-        )
+        """开关关闭（flow_display=None）→ 不渲染任何成本流水说明。"""
+        frag = self._extract_balanced("{% if flow_display and flow_display.approximate %}")
         self.assertEqual(self._render(frag, None).strip(), "")
 
 
@@ -1620,4 +1656,6 @@ class TestAppVersionInTemplate(unittest.TestCase):
         _, kwargs = tmpl.render.call_args
         self.assertIn("app_version", kwargs)
         self.assertIsInstance(kwargs["app_version"], str)
+        self.assertIn("app_name", kwargs)
+        self.assertIsInstance(kwargs["app_name"], str)
         self.assertGreater(len(kwargs["app_version"]), 0)

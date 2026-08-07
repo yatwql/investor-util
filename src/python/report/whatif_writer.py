@@ -19,8 +19,9 @@ import os
 from datetime import datetime
 from typing import Any
 
+from src.python.core.constants import APP_NAME, APP_VERSION
 from src.python.report.excel_writer import _cleanup_old_archives, _ensure_reports_dir
-from src.python.report.html_writer import _copy_js_assets
+from src.python.report.html_writer import _copy_js_assets, _inline_js_assets
 from src.python.report.whatif_sheet import (
     write_whatif_backtest_sheet,
     write_whatif_category_sheet,
@@ -128,6 +129,8 @@ def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
     return _ENV.get_template("whatif_template.html").render(
         whatif_data=whatif_data,
         now=now_str,
+        app_name=APP_NAME,
+        app_version=APP_VERSION,
         whatif_chart_data=_trim_whatif_chart_data(whatif_data),
         whatif_backtest_chart_data=_trim_whatif_backtest_chart_data(whatif_data),
     )
@@ -149,6 +152,8 @@ def write_whatif_html(whatif_data: dict[str, Any], output_dir: str = "reports") 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     html = render_whatif_html(whatif_data, now_str)
     _copy_js_assets(output_dir)
+    # 内嵌 Chart.js 资产 → HTML 单文件自包含（下载/移动/单发移动端浏览）
+    html = _inline_js_assets(html)
 
     now = datetime.now()
     date_str = now.strftime("%Y%m%d")

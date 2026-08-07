@@ -9,6 +9,8 @@
   - `compute_cost_tiers`：相对市价低/高/未分档划分、组合级合计与追高占比
   - `compute_dividend_totals`：按代码汇总、无持仓份额回退跳过
   - `build_fund_flow_data`：数据契约形状（available 与子数据联动）
+  - `build_approximate_fund_flow_data`：快照近似（单笔建仓假设）— 近似年化 +
+    单档成本分档、approximate 标记、未配置建仓日期仅分档
 
 运行：
   python -m pytest src/test/unit/analysis/test_cost_flow.py -v
@@ -21,6 +23,7 @@ import datetime as _dt
 import pytest
 
 from src.python.analysis.cost_flow import (
+    build_approximate_fund_flow_data,
     build_cost_lots,
     build_fund_flow_data,
     build_xirr_cashflows,
@@ -338,3 +341,56 @@ def test_fund_flow_data_unavailable_without_flows():
     assert data["xirr"] is None
     assert data["cost_tiers"]["available"] is False
     assert data["dividends"]["available"] is False
+
+
+# ─────────────────────────────────────────────────────────────
+#  build_approximate_fund_flow_data（快照近似，单笔建仓假设）
+# ─────────────────────────────────────────────────────────────
+
+
+def test_approximate_fund_flow_data_with_start_date():
+    """配置建仓日期 → 近似年化（一次性投入 IRR）+ 单档成本分档 + approximate 标记。"""
+    holdings = [
+        _holding("600900", "长江电力", 1000, 20.0),  # 成本 20 ≤ 市价 22 → 低成本
+        _holding("600519", "贵州茅台", 10, 1500.0),  # 成本 1500 > 市价 1400 → 高成本
+    ]
+    prices = {"600900": 22.0, "600519": 1400.0}
+    data = build_approximate_fund_flow_data(
+        holdings,
+        prices,
+        start_date=_dt.date(2024, 1, 1),
+        end_date=_dt.date(2025, 1, 1),
+    )
+    assert data["approximate"] is True
+    assert data["available"] is True
+    assert data["xirr"] is not None
+    total_cost = 1000 * 20.0 + 10 * 1500.0  # 35000
+    total_mv = 1000 * 22.0 + 10 * 1400.0  # 36000
+    assert abs(data["xirr"]["rate"] - (total_mv / total_cost - 1.0)) < 0.001
+    # 单档分档：低成本/高成本各一档
+    per_code = data["cost_tiers"]["per_code"]
+    assert per_code["600900"]["low"]["shares"] == 1000
+    assert per_code["600900"]["high"]["shares"] == 0
+    assert per_code["600519"]["high"]["shares"] == 10
+    assert per_code["600519"]["low"]["shares"] == 0
+    # 分红累计不可由快照推导
+    assert data["dividends"]["available"] is False
+
+
+def test_approximate_fund_flow_data_without_start_date():
+    """未配置建仓日期 → 仅成本分档近似，近似年化（XIRR）返回 None。"""
+    holdings = [_holding("600900", "长江电力", 1000, 20.0)]
+    data = build_approximate_fund_flow_data(holdings, {"600900": 22.0})
+    assert data["approximate"] is True
+    assert data["available"] is True
+    assert data["xirr"] is None
+    per_code = data["cost_tiers"]["per_code"]
+    assert per_code["600900"]["low"]["shares"] == 1000
+
+
+def test_approximate_fund_flow_data_empty_holdings():
+    """零持仓 → available=False 占位契约，但 approximate 标记仍为 True。"""
+    data = build_approximate_fund_flow_data([], {})
+    assert data["approximate"] is True
+    assert data["available"] is False
+    assert data["cost_tiers"]["available"] is False

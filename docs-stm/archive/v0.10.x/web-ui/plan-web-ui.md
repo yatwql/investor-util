@@ -1,17 +1,12 @@
 # 轻量 Web UI + 用户体验改进
 
-> plan-12 **错误友好提示/数据源可用性矩阵**（§4）**已完成并归档**：
-> ↗ [`archive/v0.8.x/datasource-matrix/datasource-matrix.md`](../archive/v0.8.x/datasource-matrix/datasource-matrix.md)
->
-> **📦 已归档**：plan-9 **首次运行引导**（§2）已于 2026-08-03 完成（v0.9.7 发布），设计/实施文档归档至 [`archive/v0.9.x/first-run-wizard/`](../archive/v0.9.x/first-run-wizard/)（`plan-first-run-wizard.md` + `plan-first-run-wizard-implementation.md`）。
->
-> **📦 已归档**：plan-11 **HTML 暗色模式**（§4）已于 2026-08-03 实施完成（v0.9.11-dev），设计/实施见 [`archive/v0.9.x/html-dark-mode/dark-mode-implementation.md`](../archive/v0.9.x/html-dark-mode/dark-mode-implementation.md)。本文档继续跟踪未完成项 plan-8/10。
+> 本文档仅跟踪**未完成项**：plan-8 轻量 Web UI（§1）、plan-10 日志可视化（§2）。
+> 同批设计中的已归档项（正文已移除，见对应归档）：plan-9 首次运行引导 → `archive/v0.9.x/first-run-wizard/` · plan-12 数据源可用性矩阵 → `archive/v0.8.x/datasource-matrix/` · plan-11 HTML 暗色模式 → `archive/v0.9.x/html-dark-mode/`。
 
 ## 目录
 
 1. [轻量 Web UI](#1-轻量-web-ui)
-2. [日志可视化](#3-日志可视化)
-3. [HTML 暗色模式](#4-html-暗色模式)
+2. [日志可视化](#2-日志可视化)
 
 ---
 
@@ -58,7 +53,7 @@
 
 ---
 
-## 3. 日志可视化
+## 2. 日志可视化
 
 ### 概述
 
@@ -81,33 +76,4 @@
 
 两种入口：
 - **TUI 模式**：`python tui.py --view-logs` → 终端内折叠式日志查看（类似 `journalctl -n 50 -f`）
-- **数据源矩阵**：在报告末尾加一页"本次运行数据源状态"表，绿色=成功/黄色=降级/红色=失败
-
----
-
-## 4. HTML 暗色模式
-
-### 概述
-
-为 HTML 报告增加暗色模式切换按钮，通过 CSS 变量 + 少量 JS 实现。
-
-### 收益
-
-- **晚间护眼**：晚上看报告不刺眼
-- **极低成本**：纯 CSS 变量 + 一个 localStorage 开关
-- **专业感**：暗色模式在金融工具中很常见，缺失显得过时
-
-### 风险
-
-- 部分已有 CSS 样式可能需要微调（如 Canvas 图表背景色）
-- 打印时需要强制亮色模式
-
-### 工作量估算：**0.5 天**
-
-### 实现思路
-
-```css
-:root { --bg: #fff; --text: #333; }
-[data-theme="dark"] { --bg: #1a1a2e; --text: #e0e0e0; }
-```
-JS：`<button onclick="toggleTheme()">🌙</button>` + `localStorage` 持久化。
+- **报告尾部数据源状态表**：在报告末尾加一页"本次运行数据源状态"表，绿色=成功/黄色=降级/红色=失败

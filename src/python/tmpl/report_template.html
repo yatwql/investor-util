@@ -913,6 +913,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <div class="report-header" id="report-top">
         <h1>个人投资分析报告</h1>
         <div class="subtitle">统计时间: {{ now }} | 所属交易日: {{ trading_day }}</div>
+        <div class="subtitle" style="font-size:12px; margin-top:2px;">由 {{ app_name }} v{{ app_version }} 生成</div>
         {% if data_quality_enabled and data_freshness and data_freshness.available and data_freshness.abnormal_count > 0 %}
         <div class="data-status" style="margin-top:10px;">
             <span class="src-matrix-failed">&#9888; {{ data_freshness.summary }}</span>
@@ -1013,13 +1014,15 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
                 {% if flow_display and flow_display.xirr_rate is not none %}
                 <div class="summary-card">
-                    <h3>资金加权收益率 (XIRR)</h3>
+                    <h3>资金加权收益率 (XIRR{% if flow_display.approximate %}，近似{% endif %})</h3>
                     <div class="value" style="color: {{ flow_display.xirr_rate | profit_color }}">{{ flow_display.xirr_rate | pct }}</div>
                 </div>
                 {% endif %}
             </div>
-            {% if flow_display and not flow_display.available %}
-            <div class="empty-note">成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算</div>
+            {% if flow_display and flow_display.approximate %}
+            <div class="empty-note">成本流水为可选进阶增强：当前未录入交易/分红流水，已用持仓快照近似计算成本分档（每份成本 vs 市价）{% if flow_display.xirr_rate is none %}。未配置建仓日期（config.json → holdings_start_date），近似年化暂未计算{% endif %}。如需精确的资金加权收益率 (XIRR)、分批成本分档、分红累计，请在持仓 Excel 补充「交易流水」「分红流水」页签后重新生成</div>
+            {% elif flow_display and not flow_display.available %}
+            <div class="empty-note">成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算。如需启用，请在持仓 Excel 中补充「交易流水」「分红流水」页签后重新生成</div>
             {% endif %}
 
             <br>
@@ -2872,7 +2875,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <!--  FOOTER                                                -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="report-footer" style="text-align: center; padding: 14px 20px; color: var(--text-faint); font-size: 12px;">
-        个人投资分析报告 v{{ app_version }} | 生成时间: {{ now }}
+        由 {{ app_name }} v{{ app_version }} 生成 · 个人投资分析报告 | 生成时间: {{ now }}
         {%- if debate_mode_combination %}
         <br>🧪 辩论模式已启用：{{ debate_mode_combination }}
         {%- endif %}

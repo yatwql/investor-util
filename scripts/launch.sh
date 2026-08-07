@@ -2,7 +2,15 @@
 # scripts/launch.sh - 投资分析 TUI 启动脚本 (Linux)
 # Encoding: UTF-8 (no BOM)
 
-echo "正在启动投资分析系统 ..."
+# 应用名称（与 src/python/core/constants.py 的 APP_NAME 保持一致；shell 无法直接 import，此处同步维护）
+echo "正在启动投资复盘助手 ..."
+
+# 0. 解析入口参数（默认 TUI；web 入口启动轻量 Web 服务，参数透传 --host/--port/--config）
+ENTRY="tui"
+if [ "$1" = "web" ] || [ "$1" = "tui" ]; then
+    ENTRY="$1"
+    shift
+fi
 
 # 1. 检查 Python 是否安装
 PYTHON_CMD=""
@@ -122,8 +130,14 @@ mkdir -p data/holdings data/cache data/config docs-stm/tmp logs
 # 注册退出处理：TUI 退出后自动退出虚拟环境（覆盖 Ctrl+C / 正常退出 / 错误）
 trap 'deactivate 2>/dev/null; echo "虚拟环境已退出。"' EXIT
 
-echo "正在启动主程序 ..."
-$PYTHON_CMD src/python/tui/tui.py
+if [ "$ENTRY" = "web" ]; then
+    echo "正在启动 Web 服务（http://127.0.0.1:8000，Ctrl+C 退出）..."
+    echo "(提示: 局域网访问用 launch.sh web --host 0.0.0.0)"
+    $PYTHON_CMD src/python/web/server.py "$@"
+else
+    echo "正在启动主程序 ..."
+    $PYTHON_CMD src/python/tui/tui.py
+fi
 if [ $? -ne 0 ]; then
     echo "错误: 程序运行失败。" >&2
     exit 1

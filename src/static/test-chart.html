@@ -233,28 +233,33 @@
     document.getElementById('radar-note').textContent = data.radar.datasets[0].note;
   }
 
-  /* ── 注入引擎 script（顺序保证：非 async 动态注入按序执行）── */
+  /* ── 注入引擎 script（s.async=false 保证按序执行，对齐报告模板 defer 语义）── */
   var scripts = ['chart.min.js', 'chart-print.js', 'chart-config.js', 'chart-export.js', 'chart-common.js', 'chart-init.js'];
   if (scenario === 'offline') { scripts.shift(); } /* 模拟 chart.min.js 缺失 */
 
+  var lastScript = null;
   for (var si = 0; si < scripts.length; si++) {
     var s = document.createElement('script');
     s.src = scripts[si];
+    s.async = false; /* 动态 script 默认 async=true 无序执行；必须置 false，保证 chart-init.js 最后执行（其守卫依赖 Chart 与 ChartCommon 已就绪） */
     document.head.appendChild(s);
+    lastScript = s;
   }
 
-  /* ── 自检（延迟到注入脚本执行后）── */
+  /* ── 自检（chart-init.js 加载执行完成后触发；兜底 3s 防脚本加载异常）── */
   var KEYS = ['portfolio_line', 'drawdown', 'category_doughnut', 'industry_bar', 'penetration_bar', 'radar'];
-  setTimeout(function () {
+  var checked = false;
+  function runSelfCheck() {
+    if (checked) { return; }
+    checked = true;
     var banner = document.getElementById('banner');
     if (typeof Chart === 'undefined') {
       banner.className = 'err';
-      banner.textContent = '引擎缺失（typeof Chart === undefined）→ chart-config / chart-init 静默跳过，页面无 JS 报错，canvas 保留 fallback 文本。✅ 守卫逻辑符合预期（R21）。';
+      banner.textContent = '引擎缺失（typeof Chart === undefined）→ chart-config / chart-init 静默跳过，页面无 JS 报错；现代浏览器不渲染 canvas 内部 fallback 文本，图表区域空白（真实报告回退到明细表格）。✅ 守卫逻辑符合预期（R21）。';
       return;
     }
-    /* 统计 canvas 是否被 Chart.js 接管（canvas._chart 内部句柄） */
+    /* 统计 canvas 是否被 Chart.js 接管（Chart.getChart 官方 API；v4 canvas 无 _chart 属性，用 _chartjs 管理事件监听） */
     var initCount = 0;
-    var statuses = {};
     for (var ki = 0; ki < KEYS.length; ki++) {
       var key = KEYS[ki];
       var canvas = document.getElementById('chart_' + key);
@@ -262,13 +267,11 @@
       var ds = data[key];
       var expect = ds && ds.labels && ds.labels.length ? 'ok' : 'empty';
       if (scenario === 'degraded' && key === 'radar') { expect = 'degraded'; }
-      if (canvas && canvas._chart) {
+      if (canvas && Chart.getChart(canvas)) {
         initCount++;
-        statuses[key] = expect === 'empty' ? 'empty(渲染但空数据)' : 'ok';
         badge.textContent = expect === 'degraded' ? '降级' : 'ok';
         badge.className = 'badge ' + (expect === 'degraded' ? 'degraded' : 'ok');
       } else {
-        statuses[key] = expect === 'empty' ? 'empty(占位)' : '空(未初始化)';
         badge.textContent = expect === 'empty' ? '占位' : '空';
         badge.className = 'badge ' + (expect === 'empty' ? 'empty' : 'err');
       }
@@ -278,7 +281,11 @@
       (scenario === 'degraded' ? '降级图应显示虚线描边 + radar 底部"仅限基础指标"。' : '') +
       (scenario === 'empty' ? '空数据图应显示占位文本（badge 灰色）。' : '') +
       ' 悬停任意图查看 tooltip。打印预览验证 2x DPI 快照（chart-print.js）。';
-  }, 800);
+  }
+  if (lastScript) {
+    lastScript.onload = runSelfCheck;
+  }
+  setTimeout(runSelfCheck, 3000); /* 兜底：脚本加载失败/阻塞时仍给出状态 */
 })();
 </script>
 </body>
