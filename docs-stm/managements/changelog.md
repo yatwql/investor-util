@@ -6,6 +6,13 @@
 
 ## [0.10.13-dev] - 开发中（未发布）
 
+### perf_view 性能历史趋势查看并入 developer-guide.md（2026-08-08）
+
+- **README「开发者参考」区 perf_view 独立入口删除**——`scripts/perf_view.py` 用法早已完整收录于 developer-guide「诊断类脚本」章节（读取 `data/state/perf_history.jsonl`、按版本+报告类型分组、`--report-type`/`--last`/`--save` 参数、输出列说明、数据来源），删除 README 重复表格行后该区仅剩 developer-guide 单一入口。
+- **开发者指南入口描述补全**：新增「（含性能历史趋势查看 perf_view）」——入口行覆盖范围与 developer-guide 章节一致。
+- **保留**：README 功能特性区「⚙️ 性能追踪与运维」下的「趋势查看工具」产品能力条目（与自动阶段计时/数据源健康检查并列，属产品总览非开发者参考）；`how-to-use-cli-mode.md` / `faq.md` 中用户视角的 perf_view 用法（用户手册，非开发者参考）。
+- **folders.md 统计同步**：README 195→194 行，用户文档合计 4,759→4,758 行。
+
 ### 架构图布局修复（用户反馈「对齐不好的图有反作用」）（2026-08-08）
 
 - **`architecture.svg` 右列报告卡底部对齐**——Excel/HTML 报告卡高度 150→154、y 修正，底部 428 与左列 Web 渠道卡、引擎底部对齐，消除 8px 错位。
