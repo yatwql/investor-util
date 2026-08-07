@@ -298,6 +298,7 @@
 - **配置显示回填表单**：索引页加载时取一次 `get_config()`，历史走势复选框默认跟随配置 `history.fetch_mode`（off→关闭，auto/prompt→开启，`enable_history` 一并计入）；新增「强制重新生成 LLM 内容」开关。表单显式提交 `fetch_history`/`force_llm` 布尔值。
 - **进度步骤展示**：事件按步序号（seq）编号渲染，进度条上方显示「当前阶段（第 N 步）：消息」，完成置 100%。
 - **历史运行记录页**：状态区新增历史记录卡片（`/api/runs/history`，5s 短缓存），展示最近 10 条运行（时间/报告类型/持仓数/耗时/异常标记）。
+- **run 保留上限清理（rf-253）**：`_trim_runs` 原仅在 `submit` 时调用——run 由 worker 线程逐条变为 done，批量提交时多数 run 尚未完成，submit 循环结束时 trim 无法清理后续完成的 run → run 注册表超出 `_RUN_KEEP`（测试实测 25 > 20）。修复：worker `_work_loop` 的 finally 分支补 `_trim_runs()`（持锁），run 完成即触发保留上限清理；`test_retention_trim_oldest` 调整等待语义回归。
 - **数据源健康状态**：状态区新增健康卡片（`/api/health`，60s 缓存），逐源展示正常/异常 + 延迟；「重新检测」按钮用 `?fresh=1` 绕过缓存强制重测。
 - **错误处理完善**：结果按 `exit_code` 映射展示（0 成功 / 1 部分失败黄色告警 + 通用建议 / 2 严重红色 + 提示看日志）；严重/执行失败时隐藏无效产物按钮（见 rf-254）；失败提供「重新生成」按钮（上传文件已消费，引导重新上传）；提交时 `FILE_EXPIRED` 自动重置流程提示重新上传。
 - **验证**：web 目录 64 用例全绿（新增索引回填/健康缓存 fresh/产物裁剪/布尔参数 10 用例）；dev-verify 1915 passed；check-code-traces / check-doc-traces / check-task-numbering / check-semantic-index `--ci` 全 [OK]；ruff format 通过。阶段3（体验打磨 + 文档）待做。
