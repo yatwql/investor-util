@@ -6,6 +6,14 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 数据质量仪表盘缺省开启：config.json 落盘同步（2026-08-07）
+
+- **`data/config/config.json` `report_submodules.data_quality` 由 `false` 改为 `true`**：此前默认值改 `true` 时（见下方案例 `data_quality 缺省开启` 条目）仅同步了生成模板/访问器/文档，仓库内**实际配置文件残留 `false`**——生成器新建配置虽默认开，但沿用旧配置的用户仍是关。本次将落盘配置对齐默认，并修正过期注释「数据质量仪表盘默认关」→「数据质量仪表盘默认开，其余默认关」。
+- **一致性核对**：生成模板 `_config_defaults.py`（`data_quality: True`，已正确）、访问器 `is_enable_data_quality` 兜底（缺失键默认 `true`，已正确）、`how-to-config.md`（示例 + 参数表默认 `true`，已正确）、`requirements.md`/`technical.md`/`how-to-menu.md`（均默认开，已正确）——本次仅配置落盘为唯一残留，已修复。
+- **验证**：`get_config()` 解析后 `is_enable_data_quality(cfg)` 为 `True`；dev-verify 1956 + 4 checks `--ci` 全 [OK]。
+
+---
+
 ### 用户文档：说明报告 as-if 与独立 What-if 的区别（2026-08-07）
 
 - **`faq.md`**：新增 Q&A「报告里的 as-if 和单独做的 What-if 有什么不同？」——两者定位（as-if 是组合历史走势的计算口径 / What-if 是两份持仓对比的独立功能）、唯一联系（What-if 时序回测复用 as-if 口径）、一句话总结，交叉链接 `reports-instruction.md` 对应章节。
