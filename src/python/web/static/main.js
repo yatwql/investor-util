@@ -47,12 +47,32 @@
     els.resultFooter = $('result-footer');
     els.healthList = $('health-list');
     els.historyList = $('history-list');
+    // 输入模式（试算 trial / 正式 formal）相关控件
+    els.modeRadios = document.querySelectorAll('input[name="input_mode"]');
+    els.sourceRadios = document.querySelectorAll('input[name="use_existing"]');
+    els.formalOptions = $('formal-options');
+    els.formalWarning = $('formal-warning');
+    els.formalHint = $('formal-hint');
+    els.confirmOverwrite = $('confirm-overwrite');
 
     els.fileInput.addEventListener('change', onFileSelected);
     els.generateForm.addEventListener('submit', onSubmit);
     $('health-refresh').addEventListener('click', function () {
       loadHealth(true);
     });
+
+    // 生成用途/输入来源模式切换：正式模式展开区 + 警示条 + 按钮态联动
+    els.modeRadios.forEach(function (r) {
+      r.addEventListener('change', onModeChange);
+    });
+    els.sourceRadios.forEach(function (r) {
+      r.addEventListener('change', onModeChange);
+    });
+    if (els.confirmOverwrite) {
+      els.confirmOverwrite.addEventListener('change', updateGenerateBtn);
+    }
+    // 初始按默认 trial 收敛表单状态（正式展开区收起、按钮态就绪）
+    onModeChange();
 
     // 拖拽上传（拖入上传区高亮）
     var zone = document.querySelector('.upload-zone');
@@ -116,6 +136,87 @@
     el.className = 'status-text' + (kind ? ' status-' + kind : '');
   }
 
+  /* ── 输入模式（试算 trial / 正式 formal）状态机 ──
+   * 试算（默认）：读上传临时文件，快照隔离 web/ 域，不碰正式持仓。
+   * 正式：覆盖/使用正式持仓文件，快照写共享主目录；分「上传覆盖」与
+   *   「直接用存量」两种来源——用存量免上传，但正式模式均须勾选确认。
+   */
+  function currentMode() {
+    var checked = document.querySelector('input[name="input_mode"]:checked');
+    return checked ? checked.value : 'trial';
+  }
+
+  function currentSource() {
+    var checked = document.querySelector('input[name="use_existing"]:checked');
+    return checked ? checked.value : 'upload';
+  }
+
+  // 正式-用存量：无需上传，直接读正式持仓文件
+  function isFormalExisting() {
+    return currentMode() === 'formal' && currentSource() === 'existing';
+  }
+
+  function onModeChange() {
+    var formal = currentMode() === 'formal';
+    if (els.formalOptions) {
+      els.formalOptions.hidden = !formal;
+    }
+    if (!formal && els.confirmOverwrite) {
+      // 切回试算：清除正式覆盖确认勾选，避免残留状态误导后续提交
+      els.confirmOverwrite.checked = false;
+    }
+    updateWarning();
+    updateSourceHint();
+    updateGenerateBtn();
+  }
+
+  // 警示条文案按输入来源动态（用存量不覆盖文件，措辞区分）
+  function updateWarning() {
+    if (!els.formalWarning) {
+      return;
+    }
+    var path = els.formalWarning.dataset.holdings || '正式持仓文件';
+    if (isFormalExisting()) {
+      els.formalWarning.textContent =
+        '将读取当前正式持仓文件 ' + path + ' 生成报告，并写入共享快照时间线（不会覆盖文件）';
+    } else {
+      els.formalWarning.textContent =
+        '将覆盖 ' + path + '，旧文件备份为 .bak，并写入共享快照时间线';
+    }
+  }
+
+  function updateSourceHint() {
+    if (!els.formalHint) {
+      return;
+    }
+    if (currentMode() !== 'formal') {
+      setStatus(els.formalHint, '', '');
+      return;
+    }
+    if (isFormalExisting()) {
+      setStatus(els.formalHint, '无需上传，将直接读取正式持仓文件生成报告', 'ok');
+    } else {
+      setStatus(els.formalHint, '请先上传新文件，将覆盖正式持仓文件', 'busy');
+    }
+  }
+
+  // 生成按钮可用性：试算/正式-上传须先上传；正式须勾选确认；正式-用存量免上传
+  function updateGenerateBtn() {
+    if (currentMode() !== 'formal') {
+      els.generateBtn.disabled = !state.fileId;
+      return;
+    }
+    if (els.confirmOverwrite && !els.confirmOverwrite.checked) {
+      els.generateBtn.disabled = true;
+      return;
+    }
+    if (isFormalExisting()) {
+      els.generateBtn.disabled = false;
+      return;
+    }
+    els.generateBtn.disabled = !state.fileId;
+  }
+
   /* ── 上传 ── */
   function onFileSelected() {
     var file = els.fileInput.files[0];
@@ -140,17 +241,20 @@
           ? data.sheets.length + ' 个账户'
           : '1 个账户';
         setStatus(els.uploadStatus, '上传成功：' + accountText + '，共 ' + data.count + ' 条持仓，可生成报告', 'ok');
-        els.generateBtn.disabled = false;
+        updateGenerateBtn();
       })
       .catch(function (err) {
         setStatus(els.uploadStatus, err.message, 'error');
+        updateGenerateBtn();
       });
   }
 
   /* ── 触发生成 ── */
   function onSubmit(e) {
     e.preventDefault();
-    if (!state.fileId) {
+    var existing = isFormalExisting();
+    // 正式-用存量无需上传；其余模式须已上传
+    if (!existing && !state.fileId) {
       return;
     }
     els.generateBtn.disabled = true;
@@ -158,12 +262,18 @@
     els.generateError.textContent = '';
 
     var body = {
-      file_id: state.fileId,
       report_type: els.reportType.value,
       // 历史走势/强制 LLM 开关：表单显式传值（默认值已在页面加载时按配置回填）
       fetch_history: els.historyFetch.checked,
       force_llm: els.forceLlm.checked,
+      mode: currentMode(),
+      use_existing: existing,
     };
+    // 正式-用存量：直接读正式持仓文件，body 不携带 file_id
+    // （后端 formal+use_existing 校验禁止携带，携带即 BAD_PARAM）
+    if (!existing) {
+      body.file_id = state.fileId;
+    }
 
     fetch('/api/runs', {
       method: 'POST',
@@ -180,13 +290,14 @@
         startPolling();
       })
       .catch(function (err) {
-        els.generateBtn.disabled = false;
+        updateGenerateBtn();
         els.generateBtn.textContent = '生成报告';
         if (err.errorCode === 'FILE_EXPIRED') {
           // 上传文件已过期/服务重启：重置流程引导重新上传
           resetFlow(err.message);
           return;
         }
+        // HOLDINGS_MISSING 等运行期错误：文案直显服务端中文，不前端映射
         els.generateError.textContent = err.message;
       });
   }
@@ -379,14 +490,19 @@
     els.progressSection.hidden = true;
     els.resultSection.hidden = true;
     els.generateError.textContent = '';
-    // 文件已消费/失效，重新生成需重新上传（按钮禁用直至新上传）
-    els.generateBtn.disabled = true;
+    // 试算/正式-上传：上传文件已随 run 消费清理，需重新上传；
+    // 正式-用存量：无需上传，直接重新生成（提示与焦点均不指向重新上传）
+    updateGenerateBtn();
     els.generateBtn.textContent = '生成报告';
-    els.fileInput.value = '';
-    if (message) {
-      setStatus(els.uploadStatus, message, 'busy');
+    if (isFormalExisting()) {
+      setStatus(els.uploadStatus, '可直接重新生成（读取当前正式持仓文件）', 'ok');
+    } else {
+      els.fileInput.value = '';
+      if (message) {
+        setStatus(els.uploadStatus, message, 'busy');
+      }
+      els.fileInput.focus();
     }
-    els.fileInput.focus();
   }
 
   /* ── 状态区：数据源健康 ── */

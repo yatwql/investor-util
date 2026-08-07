@@ -150,6 +150,8 @@
 | `history.lookback_days` | `90` | 组合历史走势取数窗口（K 线条数/交易日）。需 ≥60（回撤矩阵所需最少交易日）才计算回撤矩阵，上限 365（K 线源最多返回条数）。股票/ETF 按此取 K 线条数，OTC 基金全量净值截取最近 N 条 | 手动编辑 |
 | `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
+
+> 以上两条同样作用于 **Web 试算快照域**（`data/history/snapshots/web/`）：Web「临时试算」的快照按相同保留天数与上限在试算域内独立清理，与共享主目录互不影响。Web 模式无新增配置键。
 | `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（0~1）。有效区间起算日和截止日均要求 ≥此比例×总持仓 有数据，否则向前/向后递延截断。提高该值可增加起算日市值真实性，但会缩短有效区间 | 手动编辑 |
 | `history.benchmark_indices` | `{"sh000300": "沪深300"}` | 基准指数配置，格式 `{指数代码: 显示名称}`。组合历史走势图上叠加显示这些指数的归一化曲线。禁用时可设为空对象 `{}` | 手动编辑 |
 | `performance_evaluation.excess_threshold_up` | `80` | 超额收益 ≥ 此值（百分点）时基金业绩评级上调一级 | 手动编辑 |

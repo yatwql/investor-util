@@ -15,6 +15,7 @@ from urllib.parse import quote
 
 import pytest
 from openpyxl import Workbook
+from unittest.mock import MagicMock, patch
 
 import src.python.web.upload as upload
 from src.python.config import _config_defaults
@@ -375,6 +376,149 @@ class TestCreateRunBoolParams:
         file_id = resp.get_json()["data"]["file_id"]
         resp = app_client.post("/api/runs", json={"file_id": file_id, "report_type": "basic", "force_llm": True})
         assert resp.status_code == 202, resp.get_json()
+
+
+class TestInputModeDispatch:
+    """输入模式分派：试算隔离 vs 正式共享。
+
+    执行体（_run_generation）直接调用 + generate_report mock；快照落盘用
+    真实 capture_snapshot 副作用验证域隔离（而非仅参数断言）。
+    正式覆盖类用例使用 `holdings_path_isolated`（conftest）避免触碰真实
+    data/holdings/。
+    """
+
+    @staticmethod
+    def _capture_side_effect(holdings, config, reporter, **kwargs):
+        """generate_report mock 副作用：用真实 capture_snapshot 落快照（验证域隔离）。"""
+        from src.python.report._snapshot import capture_snapshot
+
+        capture_snapshot(
+            holdings,
+            [],
+            config,
+            MagicMock(),
+            snapshot_namespace=kwargs.get("snapshot_namespace"),
+        )
+        return ReportResult(report_generated=True, excel_ok=True, history_ok=True)
+
+    # ── 试算默认（快照隔离 web/ 域）──
+    @patch("src.python.report.orchestrator.generate_report")
+    def test_trial_default_snapshot_web(self, mock_gen, tmp_path):
+        """试算默认：上传→run（不带 mode）→ 快照落 web/，主目录零新增，temp 清理。"""
+        import src.python.report.history_snapshot as hs
+
+        mock_gen.side_effect = self._capture_side_effect
+        result = upload.save_upload(BytesIO(_make_holdings_xlsx()), "持仓.xlsx")
+        file_id = result["file_id"]
+        params = {"file_id": file_id, "report_type": "both"}
+        state = RunState("r-trial-default", params)
+        code = _run_generation(state, params)
+
+        assert code == 0
+        # 默认 mode=trial → namespace web
+        assert mock_gen.call_args.kwargs.get("snapshot_namespace") == "web"
+        # 快照落 web/ 域，主目录零新增（试算与共享时间线互不污染）
+        assert len(hs.load_all("web")) >= 1
+        assert len(hs.load_all()) == 0
+        # temp 文件 finally 清理
+        assert upload.resolve_file(file_id) is None
+
+    # ── 正式 + 上传（提升正式文件 + 共享快照）──
+    @patch("src.python.report.orchestrator.generate_report")
+    def test_formal_upload_promotes_and_shared_snapshot(self, mock_gen, tmp_path, holdings_path_isolated):
+        """正式+上传：正式文件被覆盖、.bak 生成、快照落共享、temp 清理。"""
+        import src.python.report.history_snapshot as hs
+
+        mock_gen.side_effect = self._capture_side_effect
+        formal_path = os.path.join(holdings_path_isolated["holdings_dir"], holdings_path_isolated["holdings_filename"])
+        os.makedirs(holdings_path_isolated["holdings_dir"], exist_ok=True)
+        # 旧正式文件（任意字节即可，仅用于 .bak 断言）
+        with open(formal_path, "wb") as f:
+            f.write(b"OLD-FORMAL-CONTENT")
+
+        new_bytes = _make_holdings_xlsx()
+        result = upload.save_upload(BytesIO(new_bytes), "持仓.xlsx")
+        file_id = result["file_id"]
+        params = {"file_id": file_id, "report_type": "both", "mode": "formal"}
+        state = RunState("r-formal-upload", params)
+        code = _run_generation(state, params)
+
+        assert code == 0
+        # 正式文件被覆盖为上传内容
+        with open(formal_path, "rb") as f:
+            assert f.read() == new_bytes
+        # 旧正式文件备份为 .bak
+        with open(formal_path + ".bak", "rb") as f:
+            assert f.read() == b"OLD-FORMAL-CONTENT"
+        # 快照落共享主目录（namespace=None）
+        assert mock_gen.call_args.kwargs.get("snapshot_namespace") is None
+        assert len(hs.load_all()) >= 1
+        # temp 上传文件清理（copy 提升后仍清理）
+        assert upload.resolve_file(file_id) is None
+
+    # ── 正式 + 用存量（直接读正式文件）──
+    @patch("src.python.report.orchestrator.generate_report")
+    def test_formal_use_existing_reads_formal_file(self, mock_gen, tmp_path, holdings_path_isolated):
+        """正式+用存量（无 file_id）：读正式文件、快照共享、无需上传。"""
+        import src.python.report.history_snapshot as hs
+
+        mock_gen.side_effect = self._capture_side_effect
+        formal_dir = holdings_path_isolated["holdings_dir"]
+        formal_name = holdings_path_isolated["holdings_filename"]
+        os.makedirs(formal_dir, exist_ok=True)
+        with open(os.path.join(formal_dir, formal_name), "wb") as f:
+            f.write(_make_holdings_xlsx())
+
+        params = {"report_type": "both", "mode": "formal", "use_existing": True}
+        state = RunState("r-formal-existing", params)
+        code = _run_generation(state, params)
+
+        assert code == 0
+        assert mock_gen.call_args.kwargs.get("snapshot_namespace") is None
+        assert len(hs.load_all()) >= 1
+        # 无 file_id → 无临时文件清理需求
+        assert upload.resolve_file("") is None
+
+    def test_formal_use_existing_missing_file(self, tmp_path, holdings_path_isolated):
+        """正式+用存量但正式文件不存在 → 严重退出码 + 友好错误。"""
+        params = {"report_type": "both", "mode": "formal", "use_existing": True}
+        state = RunState("r-formal-existing-missing", params)
+        code = _run_generation(state, params)
+        assert code == 2
+        assert any("正式持仓文件不存在" in e for e in state.errors)
+
+    # ── 参数组合校验（HTTP 层）──
+    def test_trial_no_file_id_bad_param(self, app_client):
+        resp = app_client.post("/api/runs", json={"report_type": "basic", "mode": "trial"})
+        assert resp.status_code == 400
+        assert resp.get_json()["error_code"] == "BAD_PARAM"
+
+    def test_formal_use_existing_with_file_id_bad_param(self, app_client):
+        resp = app_client.post(
+            "/api/runs",
+            json={"file_id": "x", "report_type": "basic", "mode": "formal", "use_existing": True},
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error_code"] == "BAD_PARAM"
+
+    def test_invalid_mode_bad_param(self, app_client):
+        resp = app_client.post("/api/runs", json={"report_type": "basic", "mode": "weird"})
+        assert resp.status_code == 400
+        assert resp.get_json()["error_code"] == "BAD_PARAM"
+
+    def test_invalid_use_existing_bad_param(self, app_client):
+        resp = app_client.post("/api/runs", json={"report_type": "basic", "use_existing": "yes"})
+        assert resp.status_code == 400
+        assert resp.get_json()["error_code"] == "BAD_PARAM"
+
+    def test_formal_use_existing_submits_without_file_id(self, app_client):
+        """正式+用存量：body 无 file_id 放行（202 提交成功，执行期才读正式文件）。"""
+        resp = app_client.post(
+            "/api/runs",
+            json={"report_type": "basic", "mode": "formal", "use_existing": True},
+        )
+        assert resp.status_code == 202, resp.get_json()
+        assert resp.get_json()["ok"] is True
 
 
 class TestSystemInfo:

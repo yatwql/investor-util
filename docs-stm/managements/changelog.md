@@ -6,6 +6,21 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### Web 生成用途双模式：临时试算隔离 / 正式更新共享（2026-08-07）
+
+- **Web 新增「生成用途」选择**：提交前可选「临时试算」（默认）或「正式更新」。
+  - **临时试算**：读上传临时文件生成，不落正式持仓；历史快照写入**试算隔离域**（`data/history/snapshots/web/`），与 TUI / CLI 的正式共享时间线互不污染。
+  - **正式更新**：两个输入来源——「上传新文件覆盖」先将旧正式持仓备份为 `.bak` 再提升为正式文件；「直接用当前正式文件」无需上传，直接读取配置路径下的正式文件。两种来源快照均写入共享时间线。
+- **后端契约**：`POST /api/runs` 新增 `mode`（`trial`/`formal`，默认试算）与 `use_existing` 参数；正式+用存量组合禁止携带 `file_id`（否则 400 BAD_PARAM）。正式模式提升发生在 run 出队后、生成前——报告后续失败（LLM/网络）不影响已提交的正式文件。
+- **快照隔离命名空间**：`history_snapshot` 全部公开函数（save/load_latest/load_all/list_all/prune）与 `capture_snapshot`/`build_evolution_data`/`build_snapshot_diff`/`generate_report` 新增 `namespace`/`snapshot_namespace` 参数（默认共享主目录，`"web"` 为试算隔离域）；各域按 `history.snapshot_retention_days`/`snapshot_max_count` 独立清理。
+- **正式持仓更新模块**：新增 `web/holdings_update.py`（`backup_holdings_file` 单槽 `.bak` 备份 + `promote_upload_to_holdings` 原子提升，mkstemp + `os.replace`）。
+- **前端**：`index.html`/`main.js` 新增模式单选、输入来源单选、覆盖警示条与确认勾选；`resetFlow` 区分正式-用存量（直接重新生成）与其余模式（重新上传）；警示条 `role="alert"` 单一 live-region 语义。
+- **冒烟**：`smoke-web.py` 扩展到 10 项断言（含正式-用存量 202 全链路 + 参数组合 400 校验）。
+- **测试**：新增 namespace 存储隔离、消费层透传、输入模式分派（含正式-用存量缺文件严重退出、参数组合校验）；conftest 新增 `holdings_path_isolated` 可选隔离 fixture（正式覆盖不污染真实持仓）。
+- **门禁**：dev-verify + 4 checks `--ci` 全 [OK]。
+
+---
+
 ### 数据质量仪表盘缺省开启：config.json 落盘同步（2026-08-07）
 
 - **`data/config/config.json` `report_submodules.data_quality` 由 `false` 改为 `true`**：此前默认值改 `true` 时（见下方案例 `data_quality 缺省开启` 条目）仅同步了生成模板/访问器/文档，仓库内**实际配置文件残留 `false`**——生成器新建配置虽默认开，但沿用旧配置的用户仍是关。本次将落盘配置对齐默认，并修正过期注释「数据质量仪表盘默认关」→「数据质量仪表盘默认开，其余默认关」。

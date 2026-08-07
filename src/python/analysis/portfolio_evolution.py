@@ -104,6 +104,8 @@ def _format_period_label(ts: str) -> str:
 def build_evolution_data(
     min_snapshots: int = _DEFAULT_MIN_SNAPSHOTS,
     top_n: int = _DEFAULT_TOP_N,
+    *,
+    snapshot_namespace: str | None = None,
 ) -> dict[str, Any]:
     """构建组合演进数据契约 dict。
 
@@ -112,6 +114,8 @@ def build_evolution_data(
     Args:
         min_snapshots: 有效期数下限（默认 3），不足时返回 available=False
         top_n: TOP 持仓变迁展示数量上限（默认 10）
+        snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域），
+            试算报告演进在本域内闭环，不读共享时间线
 
     Returns:
         evolution_data 契约 dict：
@@ -126,7 +130,7 @@ def build_evolution_data(
     """
     from src.python.report.history_snapshot import load_all
 
-    raw = load_all()
+    raw = load_all(snapshot_namespace)
     snapshots = _dedup_by_date(raw)
     count = len(snapshots)
 

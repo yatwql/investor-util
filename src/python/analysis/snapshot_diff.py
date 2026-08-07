@@ -38,6 +38,8 @@ _DEFAULT_MIN_SNAPSHOTS = 2
 def build_snapshot_diff(
     threshold_pct: float = _DEFAULT_THRESHOLD_PCT,
     min_snapshots: int = _DEFAULT_MIN_SNAPSHOTS,
+    *,
+    snapshot_namespace: str | None = None,
 ) -> dict[str, Any]:
     """构建快照差异摘要数据契约 dict。
 
@@ -46,6 +48,8 @@ def build_snapshot_diff(
     Args:
         threshold_pct: 超警戒线阈值（%），默认 15.0（与 simple_rebalance 一致）
         min_snapshots: 有效期数下限（默认 2），不足时返回 available=False
+        snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域），
+            试算报告差异摘要在本域内闭环，不读共享时间线
 
     Returns:
         snapshot_diff_data 契约 dict：
@@ -60,7 +64,7 @@ def build_snapshot_diff(
     """
     from src.python.report.history_snapshot import load_all
 
-    raw = load_all()
+    raw = load_all(snapshot_namespace)
     snapshots = _dedup_by_date(raw)
 
     if len(snapshots) < min_snapshots:

@@ -299,6 +299,7 @@ investor-util/
 │   │   │   ├── app.py                #   Flask 应用工厂（错误处理/请求日志/注入 run_manager）
 │   │   │   ├── handlers.py           #   路由 handler（页面/上传/生成/轮询/预览/下载/历史/健康；_build_system_info 状态区系统信息）
 │   │   │   ├── upload.py             #   上传安全（uuid 重命名/扩展名白名单/魔数校验/原子落盘/TTL）
+│   │   │   ├── holdings_update.py    #   正式持仓更新（旧文件备份 .bak + 原子提升上传文件为正式文件）
 │   │   │   ├── progress.py           #   Web 进度报告器（事件写入 run 状态缓冲）
 │   │   │   ├── runs.py               #   RunManager 单 worker 串行队列 + run 状态/事件注册表
 │   │   │   ├── templates/            #   Jinja2 模板

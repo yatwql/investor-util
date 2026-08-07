@@ -2751,6 +2751,10 @@ make_http_client(timeout=10.0) → httpx.Client
 | `tail_risk` | 尾部风险 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
 | `snapshot_diff` | 快照差异 | 组合演进 | 监控 | 随 `enable_portfolio_evolution` |
 | `data_quality` | 数据质量仪表盘 | 数据源可用性矩阵 | 监控 | `report_submodules.data_quality`（默认开） |
+| `snapshot_namespace` | 快照隔离命名空间（试算域 `web` / 共享主目录） | 快照存储/Web 输入 | 输入隔离 | 无（run 级参数） |
+| `web_input_mode` | Web 输入模式（试算/正式） | Web 输入 | 输入隔离 | 无（run 级参数 `mode`） |
+| `use_existing` | 直接用正式持仓文件 | Web 输入 | 输入隔离 | 无（run 级参数） |
+| `holdings_update` | 正式持仓更新（备份 + 提升） | Web 输入 | 输入隔离 | 无 |
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 
