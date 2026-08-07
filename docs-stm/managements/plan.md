@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.10.12-dev
-> **编号源**：`plan-next = 28`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-27，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 29`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-28，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -76,6 +76,18 @@ Web 模式支持修改与 TUI **完全一致**的配置项全集。已确认决�
 - **净效果**：`src/static/` = 报告图表 bundle + Web UI 前端 + 报告模板三合一；5 个按路径读模板的测试路径同步。
 
 > **实施进度（2026-08-07）**：代码归入 + 加载点改造（app.py / html_jinja_env）+ 5 测试路径同步完成；`smoke-web.py` 10/10 + report/web/llm 单测 2395 passed；folders 目录树/统计表同步，changelog 登记；`src/static/README.md` 资产说明滞后登记 rf-266，已修复（README 扩展为三类资产说明，rf-266 移入已修复区）。**已实现**（基础设施重构，随 P4 实验功能批次，无独立排期）。
+
+#### `plan-28` 三模式使用指南体系：TUI/CLI/Web 各一份 + 文档索引统一（用户文档）
+
+plan-8/25/26/27 实现后，用户文档从「单份菜单手册 + 定时任务手册」演进为**三种模式各一份分册**——Web 模式使用指南、CLI 模式使用指南（含定时任务）、TUI 菜单手册，并统一 README / CLAUDE.md / folders 索引。
+
+- **三份模式分册**：`how-to-use-web-mode.md`（新建，Web 全流程——启动访问/首页 6 分区/上传→生成→预览下载/配置编辑面板/运行状态/安全注意）、`how-to-use-cli-mode.md`（新建，命令结构/全局参数/report·cache·whatif·check-sources 子命令/使用示例/退出码/最佳实践）、`how-to-menu.md` → `how-to-use-tui-menu.md`（重命名，标题改「TUI 菜单操作手册」）。
+- **定时任务并入 CLI 指南**：`how-to-schedule.md` 内容并入 cli-mode.md §11「定时任务」（Windows schtasks + PowerShell 包装 + 防重入 / Linux crontab + flock / 排障），原文档删除，活跃引用（README/faq/how-to-start/tui-menu）统一改指。
+- **索引统一**：README 启动方式三节 + 功能特性三模式条目 + 用户指南表指向各分册；CLAUDE.md 用户文档列表顺序与 README 索引一致；folders.md 目录树去重 + 统计表刷新（用户文档 14/6,204，manuals 13/5,998）。
+- **测试覆盖统计刷新**：`bench --update-docs` 回填 dragonball 列耗时（2026-08-07），`collect-test-coverage.py` 计数核对无变化（all 5445 / unit 5136）。
+- **预估**：无排期（纯文档配套，随 Web 功能批次）。
+
+> **实施进度（2026-08-07）**：三模式分册全部落地 + 定时任务并入 + README/CLAUDE.md/folders 索引统一 + test-coverage 耗时刷新 + changelog 登记；P0 门禁（dev-verify 2005 + 4 checks `--ci`）全 [OK]。**已实现**（纯文档任务，无运行时代码变更）。
 
 ---
 
