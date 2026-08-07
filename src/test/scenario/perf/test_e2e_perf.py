@@ -148,7 +148,6 @@ class TestE2EPerformance:
             beta=0.85,
             beta_ci_lower=0.7,
             beta_ci_upper=1.0,
-            portfolio_volatility=0.20,
         )
         elapsed = time.perf_counter() - start
 
@@ -222,11 +221,9 @@ class TestE2EPerformance:
         scenario = scenario_analysis(
             portfolio_value=1000000.0,
             beta=metrics.get("portfolio_beta"),
-            portfolio_volatility=0.20,
         )
         sharpe_ci = sharpe_ci_propagation(
             sharpe_ratio=metrics.get("sharpe_ratio"),
-            annual_volatility=0.20,
             years_of_data=1.0,
         )
 

@@ -38,15 +38,6 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复 |
 
-#### P2D — scenario 死参数预留接口追踪（2026-08-07）
-
-> 死代码排查发现的功能缺失类待办，非纯死代码。参数已保留并加 `# noqa: ARG001` 标注，需后续评估是否补齐实现。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-271** | `analysis/scenario.py` 两个**死参数**——① `scenario_analysis()` 的 `portfolio_volatility`：docstring 承诺「可用时输出 ±1σ/±2σ 波动率区间」，但函数体**完全未消费**该参数（`_build_scenario_entry` 只用 `beta_se` 算 CI）；调用点 `report/_full_risk_metrics.py:121`、`report/_pipeline.py:455` **已传入 `annualized_volatility` 值**（`history_data.get("annualized_volatility")`），但被吞掉 → 波动率区间功能实际未输出。② `sharpe_ci_propagation()` 的 `annual_volatility`：SE 用 Lo(2002) 常数近似 `sqrt(1+0.5*SR²)/sqrt(N)`，未消费年化波动率；测试 `test_scenario_analysis.py:185/193/200/206/211` 均**按位置传参** `sharpe_ci_propagation(0.80, 0.15, 3.0)`，删除会破坏签名 | **已保留 + 标注（2026-08-07，方案 A）**：两参数加 `# noqa: ARG001` 并注释预留意图，不破坏测试签名。**待跟进**：①评估是否补齐 `portfolio_volatility` → 波动率区间输出（数据已传，缺实现）；②若确认废弃可删，需同步改 5 处测试调用点 + 2 处生产调用点 |
----
-
 ## 已解决问题（变更详情见 changelog.md 对应条目）
 
 > 2026-08-07 全面核对：以下各项均已修复并在 changelog.md 相应版本段登记（rf-261 为 plan-25 实现、rf-272 为 ARG001 死参数全数处置，完成时均处于待处理段，本次核对后移入本区）。
@@ -76,6 +67,7 @@
 | rf-270 | folders.md 目录树描述过时 + 树形符号错误 → ①② 计数修正（9→11、25→26）、③④ `└──`→`├──` | `changelog.md` [0.10.13-dev] |
 | rf-261 | Web 上传跑 full/both 污染共享快照目录 `data/history/snapshots/` → **试算/正式双模式**：web 默认试算（快照入 `snapshots/web/` namespace 子目录），正式更新显式选择（上传覆盖或直接用存量） | `changelog.md` [0.10.12] plan-25 |
 | rf-272 | 全仓 **43 处 ARG001 未用函数参数**全数处置：① 删参 21 处（含 40+ 调用点/测试同步）② 契约保留 7 处加 `# noqa: ARG001`（sina_kline start_from、is_enable_llm config、_compute_ncols 3×、check_liquidity total_mv）③ 独立项 3 项不纳入本轮（见下） | `changelog.md` [0.10.13-dev] |
+| rf-271 | `analysis/scenario.py` 两个死参数——① `scenario_analysis()` 的 `portfolio_volatility`（docstring 承诺 ±1σ/±2σ 波动率区间但从未消费，调用方已传 `annualized_volatility` 被吞）；② `sharpe_ci_propagation()` 的 `annual_volatility`（Lo(2002) 常数近似不消费）。**深入评估（2026-08-07）**：死的不止参数——`vol_*`/`ci_*` 输出字段全仓零消费（LLM 唯一消费方 `_build_scenario_block` 只读点估计），`sharpe_ci_propagation` 无生产调用；设计承诺（P4-03）的 CI 区间从未进入 prompt。**处置（方向 2：删除）**：删 2 参数 + 2 生产调用点（_full_risk_metrics/_pipeline）+ 8 处测试调用点（7 处单元位置传参 + e2e_perf 关键字传参）+ docstring/模块 docstring 诚实化（修正「年化波动率 CI → 夏普 CI」为实际「Lo 常数近似」）；`vol_*`/CI 输出字段保留为结构化输出。 | `changelog.md` [0.10.13-dev] |
 
 > **独立项（rf-272 处置衍生，单列跟踪）**：`html_renderers._render_llm_content_section` 13 参渲染器上下文（删除需重构 html_writer.py 调用点，单列「签名瘦身」）；`report/_pipeline.py` 遗留重复文件（已标注不承载活代码，单列清理项）；`orchestrator.generate_report.warm_cache`（CLI `--warm` 标志去留待决策，已无实际消费路径）。
 

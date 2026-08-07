@@ -451,7 +451,6 @@ def _fetch_history_with_metrics(
             beta_ci_lower=_beta_analysis.get("ci_lower"),
             beta_ci_upper=_beta_analysis.get("ci_upper"),
             beta_se=_beta_analysis.get("std_error"),
-            portfolio_volatility=history_data.get("annualized_volatility"),
         )
         if _scenario.get("has_data") and _scenario.get("scenarios"):
             _metrics["scenario_analysis"] = _scenario
