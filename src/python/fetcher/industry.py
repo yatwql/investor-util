@@ -119,15 +119,15 @@ def fetch_industry_data_cached(code: str) -> dict | None:
     return result
 
 
-def batch_fetch_industry_data(codes: list[str], max_workers: int = 8) -> dict[str, dict]:
+def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
     """批量获取多只证券的行业分类和概念板块归属。
 
     使用 BatchDispatcher 统一并行调度，支持缓存优先、熔断预检、通用重试。
     非 A 股代码（美股/港股等）自动跳过，不调用 API。
+    并发数由配置 `industry_workers` 控制（见 get_batch_worker_count）。
 
     Args:
         codes: 6 位证券代码列表
-        max_workers: 最大并发线程数（默认 8）
 
     Returns:
         {code: {code, industry, concepts, ...}, ...}

@@ -19,7 +19,7 @@ from src.python.tui.tui_menu import get_config_cache
 logger = setup_logger()
 
 
-def _prompt_history(reporter: TuiProgressReporter) -> bool:
+def _prompt_history() -> bool:
     """TUI 专属：决定是否获取历史走势数据。
 
     读取 config.history.fetch_mode（off/prompt/auto）：
@@ -104,12 +104,11 @@ def _cmd_generate_excel() -> None:
 
 def _cmd_generate_both() -> None:
     """生成全系列包含新闻的报告（Excel+HTML，不含 LLM 分析章节）。"""
-    reporter = TuiProgressReporter()
-    _run_generate("both", fetch_history=_prompt_history(reporter))
+    _run_generate("both", fetch_history=_prompt_history())
 
 
 def _cmd_generate_full() -> None:
     """生成包含所有内容的全系列报告（Excel + HTML + 新闻 + LLM 分析章节）。"""
     reporter = TuiProgressReporter()
-    _run_generate("full", fetch_history=_prompt_history(reporter), force_llm=_prompt_force_llm(reporter))
+    _run_generate("full", fetch_history=_prompt_history(), force_llm=_prompt_force_llm(reporter))
     print_llm_session_usage()

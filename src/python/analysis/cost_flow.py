@@ -288,7 +288,6 @@ def build_cost_lots(transactions: list[TradeRecord]) -> dict[str, Any]:
 
 def compute_cost_tiers(
     transactions: list[TradeRecord],
-    holdings: list[Holding],
     current_prices: dict[str, float] | None,
 ) -> dict[str, Any]:
     """成本分档（低成本/高成本档，相对当前市价）。
@@ -299,7 +298,6 @@ def compute_cost_tiers(
 
     Args:
         transactions: 交易流水记录
-        holdings:     当前持仓（仅供档位计数完整性的参照，不参与分摊）
         current_prices: 代码 → 当前市价
 
     Returns:
@@ -443,7 +441,7 @@ def build_fund_flow_data(
                 "end_date": max(dates).isoformat(),
             }
 
-    tiers = compute_cost_tiers(transactions, holdings, current_prices)
+    tiers = compute_cost_tiers(transactions, current_prices)
     div_totals = compute_dividend_totals(dividends, holdings)
     available = xirr_data is not None or tiers["available"] or div_totals["available"]
     return {

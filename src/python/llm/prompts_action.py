@@ -44,7 +44,6 @@ def _build_global_macro_prompt(
     categories: dict,
     sector_flow: list[dict[str, Any]] | None = None,
     competitive_context: str | None = None,
-    holdings_details: list[dict] | None = None,
 ) -> str:
     """构建全球政经局势的用户提示词（紧凑格式）。
 
@@ -57,7 +56,6 @@ def _build_global_macro_prompt(
         categories: 品种分类计数
         sector_flow: 行业资金流向数据（可选），含主力净流入排名
         competitive_context: 竞争语境文本（可选），由呼叫方构建
-        holdings_details: 持仓明细（可选），用于提供 TOP3 品种排名，防止 LLM 虚构
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     idx_text = "A股:"
@@ -536,7 +534,7 @@ def _build_debate_synthesis_prompt(
         except Exception:
             logger.warning("[debate] 综合阶段条件推理情景追加失败，已跳过")
 
- # ── 集中度问答（对齐需求 R-LLM-DB-QA-） ────
+    # ── 集中度问答（对齐需求 R-LLM-DB-QA-） ────
     if enable_qa_concentration:
         try:
             from src.python.config._llm_settings import get_llm_config

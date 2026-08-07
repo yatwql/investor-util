@@ -111,7 +111,7 @@ def resolve_market_data(
         fund_flow_data = _build_flow_data(enable_cost_lots, transactions, dividends, holdings, details)
         data["fund_flow_data"] = fund_flow_data
         with Timer(get_report_sheet_name("market_value")):
-            mvs(ws2, holdings, details=details, fund_flow_data=fund_flow_data)
+            mvs(ws2, details=details, fund_flow_data=fund_flow_data)
     else:
         with Timer("行情数据获取 (" + get_report_sheet_name("market_value") + ")"):
             prog.info("正在获取行情数据（首次耗时较长，后续使用缓存）...")
@@ -122,7 +122,7 @@ def resolve_market_data(
             total_profit = sum(d.profit for d in details)
             today_profit = sum(d.today_profit for d in details)
             fund_flow_data = _build_flow_data(enable_cost_lots, transactions, dividends, holdings, details)
-            mvs(ws2, holdings, details=details, fund_flow_data=fund_flow_data)
+            mvs(ws2, details=details, fund_flow_data=fund_flow_data)
             data = {
                 "total_mv": total_mv,
                 "total_cost": total_cost,

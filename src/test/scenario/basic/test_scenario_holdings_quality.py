@@ -391,7 +391,7 @@ class TestS0dSpecialCharacters(unittest.TestCase):
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             try:
-                write_market_value_sheet(ws, [], "2026-07-03", details=details)
+                write_market_value_sheet(ws, details=details)
             except Exception as e:
                 self.fail(f"write_market_value_sheet 含特殊字符名称崩溃: {e}")
 

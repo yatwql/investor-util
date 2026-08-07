@@ -33,7 +33,7 @@ def _add_prefix(code: str) -> str:
     return get_exchange_prefix(code) + code
 
 
-def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:
+def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:  # noqa: ARG001 — 签名契约：chain 层经 getattr 无条件传 start_from=
     """获取股票/ETF 历史 K 线数据（纯获取，Tencent 备用链路）。
 
     Endpoint: money.finance.sina.com.cn/getKLineData
@@ -83,7 +83,7 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
     return _parse_kline_json(data)
 
 
-def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:
+def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:  # noqa: ARG001 — 签名契约：chain 层经 getattr 无条件传 start_from=
     """获取指数历史 K 线数据（备用链路）。
 
     与 fetch_kline() 的区别：

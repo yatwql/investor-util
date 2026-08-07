@@ -20,12 +20,8 @@ class TestExcelFundDeepAnalysis:
                 self.name = code
                 self.account = "主账户"
 
-        class _MockProgress:
-            def info(self, msg):
-                pass
-
         holdings = [_MockHolding("600519")]
-        result = _process_fund_deep_analysis_module(holdings, lambda h: h, _MockProgress())
+        result = _process_fund_deep_analysis_module(holdings)
         assert isinstance(result, tuple)
         assert len(result) == 2
 

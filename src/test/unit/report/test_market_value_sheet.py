@@ -465,7 +465,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         mock_hdr.return_value = 3
         ws = MagicMock()
         ws.title = "fixture_title"
-        result = mvs.write_market_value_sheet(ws, [], "2026-06-26", details=self.details)
+        result = mvs.write_market_value_sheet(ws, details=self.details)
         grand_mv, grand_cost, grand_profit, grand_today, details = result
         self.assertAlmostEqual(grand_mv, 1300.0)
         self.assertAlmostEqual(grand_cost, 500.0)
@@ -501,7 +501,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         mock_tl.return_value = 2
         mock_hdr.return_value = 3
         ws = MagicMock()
-        result = mvs.write_market_value_sheet(ws, [], "2026-06-26", details=[])
+        result = mvs.write_market_value_sheet(ws, details=[])
         grand_mv, grand_cost, grand_profit, grand_today, details = result
         self.assertAlmostEqual(grand_mv, 0.0)
         self.assertAlmostEqual(grand_cost, 0.0)
@@ -546,7 +546,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         mock_tl.return_value = 2
         mock_hdr.return_value = 3
         ws = MagicMock()
-        result = mvs.write_market_value_sheet(ws, [], "2026-06-26",
+        result = mvs.write_market_value_sheet(ws,
                                               details=[detail_a, detail_c, detail_b])
         self.assertEqual(mock_sub.call_count, 2)
         grand_mv = result[0]
@@ -573,7 +573,7 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         mock_hdr.return_value = 3
         ws = MagicMock()
         ws.cell.return_value = MagicMock()
-        result = mvs.write_market_value_sheet(ws, [], "2026-06-26", details=[
+        mvs.write_market_value_sheet(ws, details=[
             mvs.DetailRow(account="证券", name="电池ETF", code="561910",
                          price=0.0, shares=100.0, market_value=0.0, cost=100.0),
         ])
@@ -664,7 +664,7 @@ class TestWriteMarketValueSheetFlow(unittest.TestCase):
 
     def test_flow_weighted_cost_header_when_enabled(self):
         """开关开启时表头第 16 列为「资金加权成本」，原 15 列保持不变。"""
-        mvs.write_market_value_sheet(self.ws, [], "2026-06-26", details=[self.detail],
+        mvs.write_market_value_sheet(self.ws, details=[self.detail],
                                      fund_flow_data=self._flow())
         headers = [self.ws.cell(row=2, column=c).value for c in range(1, 17)]
         self.assertEqual(len(headers), 16)
@@ -674,7 +674,7 @@ class TestWriteMarketValueSheetFlow(unittest.TestCase):
     def test_flow_weighted_cost_value(self):
         """开关开启时数据行「资金加权成本」列 = 批次成本价按份额加权。"""
         flow = self._flow(low_shares=100.0, cost=950.0)
-        mvs.write_market_value_sheet(self.ws, [], "2026-06-26", details=[self.detail],
+        mvs.write_market_value_sheet(self.ws, details=[self.detail],
                                      fund_flow_data=flow)
         # 数据行 row 3，列 16 = 950 / 100 = 9.5
         self.assertAlmostEqual(self.ws.cell(row=3, column=16).value, 9.5)
@@ -682,13 +682,13 @@ class TestWriteMarketValueSheetFlow(unittest.TestCase):
     def test_flow_weighted_cost_none_when_no_buckets(self):
         """开关开启但代码无批次数据时，「资金加权成本」列为空。"""
         flow = {"available": True, "cost_tiers": {"per_code": {}}, "dividends": {"per_code": {}}}
-        mvs.write_market_value_sheet(self.ws, [], "2026-06-26", details=[self.detail],
+        mvs.write_market_value_sheet(self.ws, details=[self.detail],
                                      fund_flow_data=flow)
         self.assertIsNone(self.ws.cell(row=3, column=16).value)
 
     def test_no_flow_column_when_disabled(self):
         """开关关闭（fund_flow_data=None）时保持既有 15 列，无「资金加权成本」列。"""
-        mvs.write_market_value_sheet(self.ws, [], "2026-06-26", details=[self.detail],
+        mvs.write_market_value_sheet(self.ws, details=[self.detail],
                                      fund_flow_data=None)
         headers = [self.ws.cell(row=2, column=c).value for c in range(1, 16)]
         self.assertEqual(len(headers), 15)

@@ -21,7 +21,7 @@ logger = logging.getLogger("invest")
 # ── 轻量级行情获取（无指数/穿透/分类）──
 
 
-def _compute_details(holdings: list, config: dict, reporter: ProgressReporter) -> list:
+def _compute_details(holdings: list, reporter: ProgressReporter) -> list:
     """轻量级行情获取，供 both 路径使用。
 
     仅获取行情明细，不获取指数/穿透/分类数据（与 _cmd_generate_both 语义对齐）。

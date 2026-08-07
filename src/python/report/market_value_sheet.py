@@ -84,6 +84,7 @@ def _weighted_avg_cost(buckets: dict | None) -> float | None:
         return None
     return cost / shares
 
+
 _PRICE_TYPE_COL = 7
 _NAME_COL = 2
 
@@ -229,8 +230,6 @@ def _write_account_groupings(
 
 def write_market_value_sheet(
     ws: Worksheet,
-    holdings: list,
-    today_str: str = "",
     details: list[DetailRow] | None = None,
     fund_flow_data: dict | None = None,
 ) -> tuple[float, float, float, float, list[DetailRow]]:
@@ -238,8 +237,6 @@ def write_market_value_sheet(
 
     Args:
         ws: 目标工作表
-        holdings: 持仓列表
-        today_str: 日期字符串（YYYY-MM-DD），默认当天
         details: 预计算明细行（必须传入，由编排器预计算）
         fund_flow_data: 成本流水数据契约（非 None 时追加「资金加权成本」列；
             None 时保持既有 15 列输出）

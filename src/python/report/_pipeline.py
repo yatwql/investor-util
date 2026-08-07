@@ -122,7 +122,7 @@ def _generate_report_both(
 
     # ── 1. 行情获取 ──
     perf.start("行情获取")
-    details = _compute_details(holdings, config, reporter)
+    details = _compute_details(holdings, reporter)
     perf.stop()
 
     # ── 2. 快照对比 ──

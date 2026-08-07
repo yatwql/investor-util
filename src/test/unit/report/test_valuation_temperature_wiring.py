@@ -224,7 +224,7 @@ class TestComputeValuationData(unittest.TestCase):
     def test_switch_off_returns_none(self):
         from src.python.report.orchestrator import compute_valuation_data
 
-        result = compute_valuation_data([], [], {}, MagicMock())
+        result = compute_valuation_data([], {}, MagicMock())
         assert result is None
 
     def test_switch_on_contract(self):
@@ -243,7 +243,7 @@ class TestComputeValuationData(unittest.TestCase):
             "percentile_available": True,
         }
         with patch("src.python.report.orchestrator._fetch_valuation_for_code", return_value=fetched):
-            result = compute_valuation_data([], [detail], config, MagicMock())
+            result = compute_valuation_data([detail], config, MagicMock())
         assert result["available"] is True
         assert result["status"] == "ok"
         assert result["by_code"]["600001"]["pe"] == 12.3
@@ -257,7 +257,7 @@ class TestComputeValuationData(unittest.TestCase):
         detail.code = "600001"
         detail.name = "测试股票"
         with patch("src.python.report.orchestrator._fetch_valuation_for_code", return_value=None):
-            result = compute_valuation_data([], [detail], config, MagicMock())
+            result = compute_valuation_data([detail], config, MagicMock())
         assert result["available"] is False
         assert result["status"] == "source_failed"
 

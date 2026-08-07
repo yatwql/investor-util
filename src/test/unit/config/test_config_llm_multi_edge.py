@@ -35,13 +35,13 @@ class TestInvalidProviderType(unittest.TestCase):
     def test_invalid_type_warning(self):
         """非 claude/openai/gemini → WARNING。"""
         entry = {"name": "test", "provider": "deepseek", "api_key": "sk-key", "model": "deepseek-v3"}
-        warnings = _validate_provider_entry(entry, 0)
+        warnings = _validate_provider_entry(entry)
         self.assertTrue(any("provider" in w.lower() for w in warnings))
 
     def test_missing_type_warning(self):
         """缺 provider 字段 → WARNING。"""
         entry = {"name": "test", "api_key": "sk-key", "model": "m1"}
-        warnings = _validate_provider_entry(entry, 0)
+        warnings = _validate_provider_entry(entry)
         self.assertTrue(any("provider" in w.lower() for w in warnings))
 
     # ── _parse_providers_list 层 ──

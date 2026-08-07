@@ -29,16 +29,14 @@ _LOOKBACK_DAYS = 20
 _SAME_DAY_THRESHOLD = 1.0
 
 
-def _is_exchange_traded(code: str, name: str) -> bool:
+def _is_exchange_traded(code: str) -> bool:
     """判断品种是否为场内可交易（股票/ETF/场内基金）。
 
-    优先排除场外基金：先检查 OTC 特征（含名称关键词 + 代码重叠区），
-    确认非 OTC 后才判定为场内可交易。
+    场外基金（含债券基金/货基）已由 _is_otc_fund 排除，
+    此处只做正向匹配。
     """
     from src.python.core.code_utils import is_a_share_code, is_exchange_fund_code
 
-    # 场外基金（含债券基金/货基）已由 _is_otc_fund 排除，
-    # 此处只做正向匹配
     return is_a_share_code(code) or is_exchange_fund_code(code)
 
 
@@ -95,7 +93,7 @@ def _compute_avg_daily_turnover(code: str) -> float | None:
 
 def check_liquidity(
     holdings_details: list[dict[str, Any]] | None,
-    total_mv: float,
+    total_mv: float,  # noqa: ARG001 — 公开 API 契约：组合总市值（22 处调用点传参），预留权重计算
     redemption_limits: dict[str, float] | None = None,
 ) -> list[dict[str, Any]]:
     """检查持仓流动性风险。
@@ -171,7 +169,7 @@ def check_liquidity(
             continue
 
         # 场内品种 → 计算变现天数
-        if _is_exchange_traded(code, name):
+        if _is_exchange_traded(code):
             avg_turnover = _compute_avg_daily_turnover(code)
             if avg_turnover is not None and avg_turnover > 0:
                 liq_days = mv / avg_turnover

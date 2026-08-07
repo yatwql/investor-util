@@ -106,7 +106,6 @@ class TestKeysContract:
             history_data=_history_ok(),
             details=_details(),
             penetration=_penetration(),
-            perf_data=[],
         )
         assert set(DATASET_KEYS) == set(ds.keys())
 

@@ -334,7 +334,6 @@ def individual_volatility(
 def portfolio_beta(
     portfolio_returns: list[float],
     benchmark_returns: list[float],
-    trading_days: int = _TRADING_DAYS_PER_YEAR,
 ) -> float | None:
     """计算组合 Beta（协方差法）。
 
@@ -345,7 +344,6 @@ def portfolio_beta(
     Args:
         portfolio_returns: 组合日收益率序列
         benchmark_returns: 基准（沪深300）日收益率序列
-        trading_days: 年化交易日数（用于日志，不影响计算）
 
     Returns:
         Beta 值，数据不足时返回 None

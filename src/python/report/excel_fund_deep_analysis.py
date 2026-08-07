@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from src.python.core.logger import setup_logger
@@ -21,8 +20,6 @@ logger = setup_logger()
 
 def _process_fund_deep_analysis_module(
     holdings: list,
-    process_fn: Callable,
-    prog: ProgressReporter,
 ) -> tuple[list[str], dict[str, dict]]:
     """基金深度分析模块通用数据准备模板。
 
@@ -95,7 +92,7 @@ def write_fund_deep_analysis_sheets(
         overlap_result = None
         fund_names: dict[str, str] = {}
         try:
-            fund_codes, fund_holdings_map = _process_fund_deep_analysis_module(holdings, compute_overlap, prog)
+            fund_codes, fund_holdings_map = _process_fund_deep_analysis_module(holdings)
             if len(fund_codes) < 2:
                 logger.info("持仓重合度矩阵：基金数 < 2（%d），跳过", len(fund_codes))
             elif len(fund_holdings_map) >= 2:
@@ -142,7 +139,7 @@ def write_fund_deep_analysis_sheets(
         prog.info("正在计算持仓集中度...")
         conc_data = None
         try:
-            _, conc_fund_holdings = _process_fund_deep_analysis_module(holdings, compute_conc, prog)
+            _, conc_fund_holdings = _process_fund_deep_analysis_module(holdings)
             if conc_fund_holdings:
                 conc_data = compute_conc(conc_fund_holdings)
                 if conc_data:
@@ -174,7 +171,7 @@ def write_fund_deep_analysis_sheets(
         style_result = None
         if analyze_style is not None:
             try:
-                _, sf_fund_holdings = _process_fund_deep_analysis_module(holdings, analyze_style, prog)
+                _, sf_fund_holdings = _process_fund_deep_analysis_module(holdings)
                 if sf_fund_holdings:
                     style_result = analyze_style(sf_fund_holdings)
                     if (style_result or {}).get("results"):

@@ -241,9 +241,9 @@ def _cmd_config_comparison_indices() -> None:
         if choice == "0":
             break
         elif choice == "A":
-            _add_comparison_index(config, indices)
+            _add_comparison_index(indices)
         elif choice == "D":
-            _remove_comparison_index(config, indices)
+            _remove_comparison_index(indices)
         elif choice == "R":
             default_pool = _DEFAULT_CONFIG.get("comparison_indices", {})
             set_config("comparison_indices", dict(default_pool))
@@ -256,7 +256,7 @@ def _cmd_config_comparison_indices() -> None:
     press_any_key()
 
 
-def _add_comparison_index(config: dict, indices: dict[str, str]) -> None:
+def _add_comparison_index(indices: dict[str, str]) -> None:
     """添加指数到对比池。"""
     print("  请输入指数代码（如 sh000905）:")
     try:
@@ -285,7 +285,7 @@ def _add_comparison_index(config: dict, indices: dict[str, str]) -> None:
     print(f"  {GREEN}[OK]{RESET} 已添加 {code} ({name})")
 
 
-def _remove_comparison_index(config: dict, indices: dict[str, str]) -> None:
+def _remove_comparison_index(indices: dict[str, str]) -> None:
     """从对比池中删除指数。"""
     if not indices:
         print(f"  {YELLOW}[!]{RESET} 对比池为空，无指数可删除")
