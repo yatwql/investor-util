@@ -6,6 +6,14 @@
 
 ## [0.10.13-dev] - 开发中（未发布）
 
+### Web 前端静态资产 404 修复 + 旧浏览器兼容兜底（rf-274 / rf-275）（2026-08-08）
+
+- **阻断级修复：Web 前端整页失效（rf-274）**——Flask 未显式指定 `static_url_path` 时按 `static_folder` basename 推导（`src/static/web/` → `/web/*`），index.html 引用的 `/static/main.js`、`/static/style.css` 全部 404，JS/CSS 未加载 → 配置面板空白、健康区卡静态"正在检测"、生成报告按钮灰色。plan-27 前端资产移入 `src/static/` 时引入，移动后未在真实浏览器验证。
+  - **修复**：`src/python/web/app.py` 显式 `static_url_path="/static"`（静态路由固定，不随目录名推导）。
+  - **回归**：新增 `src/test/unit/web/test_web_static_serving.py` 3 用例（静态路由固定 /static + index.html 全部资产 200 + main.js 含初始化注册），修复前 `/static/*` 404 必然失败。
+- **main.js 旧浏览器兼容兜底（rf-275）**——排查 rf-274 时发现：`AbortSignal.timeout`（Chrome 103+/Safari 16+ 起才有）缺失时 `fetch` 参数构造同步抛 TypeError，init 后续加载器全部静默不执行。修复：顶部补 `AbortSignal.timeout` 兼容兜底（AbortController+setTimeout，超旧环境退化 undefined 信号）+ init 三加载器 `safeRun` 隔离（任一初始化异常只渲染对应面板错误，不连带中断其余）。
+- **验证**：node 模拟旧浏览器（无 AbortSignal.timeout）加载真实 main.js 完整走通 init；test_client 全链路 `/static/*` 200；web 单元测试 187+3 全绿。
+
 ### README 嵌入 SVG 架构图 + 排版优化（2026-08-07）
 
 - **新增 3 张深色科技风架构图**（`src/static/`，手写 SVG，README 相对路径引用）：

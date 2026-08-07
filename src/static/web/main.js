@@ -11,6 +11,24 @@
 (function () {
   'use strict';
 
+  // AbortSignal.timeout 兼容兜底（Chrome 103+/Safari 16+ 起才提供，缺失时调用
+  // 会同步抛 TypeError，fetch 参数构造失败 → 请求从未发出，上传/健康/配置面板
+  // 全部静默失效：生成按钮灰色、面板空白、状态卡在"检测中"）。
+  // 等价实现：AbortController + setTimeout；连 AbortController 都没有的超旧
+  // 环境返回 undefined（fetch 忽略 undefined signal，请求照常发出仅失去超时）。
+  if (typeof AbortSignal !== 'undefined' && !AbortSignal.timeout) {
+    AbortSignal.timeout = function (ms) {
+      var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+      if (ctrl) {
+        setTimeout(function () {
+          ctrl.abort();
+        }, ms);
+        return ctrl.signal;
+      }
+      return undefined;
+    };
+  }
+
   var POLL_INTERVAL_MS = 2000;
 
   var state = {
@@ -101,11 +119,14 @@
     });
 
     // 状态区：数据源健康 + 历史运行记录（服务端各有短缓存，非频繁轮询）
-    loadHealth(false);
-    loadHistory();
+    // 三个加载器各自隔离运行：任一初始化阶段抛同步异常（如旧浏览器缺
+    // AbortSignal.timeout 导致 fetch 参数构造抛错）不得连带中断后续加载器，
+    // 否则配置面板整块空白、生成按钮/健康/历史区全部静默失效。
+    safeRun(loadHealth, [false], els.healthList, '健康检测失败，请稍后重试');
+    safeRun(loadHistory, [], els.historyList, '历史记录加载失败');
 
     // 配置编辑面板（与 TUI 菜单一致）
-    loadConfigEdit();
+    safeRun(loadConfigEdit, [], els.configPanel, '配置加载失败，请稍后重试');
 
     // 轮询节流：页面不可见时暂停轮询，恢复可见立即同步一次（省流量/省请求）
     document.addEventListener('visibilitychange', function () {
@@ -509,6 +530,20 @@
         setStatus(els.uploadStatus, message, 'busy');
       }
       els.fileInput.focus();
+    }
+  }
+
+  /* 加载器隔离运行：捕获初始化阶段同步异常，把对应面板渲染成可见错误，
+   * 避免一个加载器抛错中断 init 其余加载器（fetch 参数构造同步抛错场景）。 */
+  function safeRun(fn, args, errEl, errText) {
+    try {
+      fn.apply(null, args || []);
+    } catch (e) {
+      errEl.textContent = '';
+      var p = document.createElement('p');
+      p.className = 'status-text status-error';
+      p.textContent = errText;
+      errEl.appendChild(p);
     }
   }
 

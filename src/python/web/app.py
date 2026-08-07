@@ -46,7 +46,15 @@ def create_app(run_manager=None) -> Flask:
     if run_manager.executor is None:
         run_manager.executor = _run_generation
 
-    app = Flask(__name__, template_folder=_WEB_FRONTEND_DIR, static_folder=_WEB_FRONTEND_DIR)
+    app = Flask(
+        __name__,
+        template_folder=_WEB_FRONTEND_DIR,
+        static_folder=_WEB_FRONTEND_DIR,
+        # 静态路由固定 /static/*：不显式指定时 Flask 按 static_folder 的 basename
+        # 推导 static_url_path（src/static/web/ → /web/*），会导致 index.html 的
+        # /static/main.js、/static/style.css 全部 404，前端 JS/CSS 完全失效。
+        static_url_path="/static",
+    )
     app.config["MAX_CONTENT_LENGTH"] = _MAX_BYTES
     # 中文 JSON 不转义（对齐仓库中文文案惯例）
     app.json.ensure_ascii = False
