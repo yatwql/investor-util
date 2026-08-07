@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.10.12-dev
-> **编号源**：`plan-next = 25`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-24，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 26`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-25，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -41,6 +41,15 @@ Flask/FastAPI + 上传页面 + 触发管线 + 结果预览/下载。MVP 不做�
 | 体验打磨 | 1d |
 
 > **实施进度（2026-08-06）**：阶段1（MVP 核心）**已落地**——`src/python/web/` 全量创建（server/app/handlers/upload/progress/runs + templates/static），依赖接入 `flask==3.1.2`（pyproject + requirements.txt），`launch.sh`/`launch.ps1` 增 `web` 入口参数；上传→生成→轮询→预览/下载全链路贯通（复用 `generate_report` 管线，零改动 report/ 层），上传安全（§6.1：uuid 重命名/扩展名白名单/PK 魔数/10MB/行数上限/原子落盘/TTL）与预览防穿越（§6.2）就位；`unit_web` marker 注册 + 5 个测试文件（upload/upload_edge/progress/runs/handlers，54 用例）全绿，P0 门禁通过。**阶段2（功能补齐）已落地**（同日）——索引页按 `get_config()` 回填表单默认（历史走势跟随配置 + 强制 LLM 开关）、进度编号步骤 + 当前阶段展示、状态区（数据源健康 `/api/health` 含 `?fresh=1` 重测 + 历史运行记录 `/api/runs/history`）、错误处理完善（exit_code 映射展示 / 严重态产物裁剪 rf-254 / FILE_EXPIRED 重置 / 重新生成按钮）；web 目录 64 用例全绿，P0 门禁通过。**阶段3（体验打磨 + 用户文档）已落地**（同日）——样式打磨（design-quality：上传区拖拽高亮/渐变进度条/卡片悬浮阴影/状态区分栏/语义色）、加载态与轮询节流（提交/生成中按钮禁用 + 文案、页面不可见暂停轮询、AbortSignal 超时）、375px 移动端响应式（表单纵向堆叠/状态区单列/`prefers-reduced-motion` 减动效）、a11y（文件输入 sr-only 键盘可达、progressbar aria、aria-live）、用户文档（how-to-start 方式四 Web 模式 + faq 端口冲突/无法访问/进度卡住/产物 404 高频问题 + README 功能提点）；web 目录 64 用例全绿，P0 门禁通过。**三阶段全部完成**，设计文档已归档至 [`archive/v0.10.x/web-ui/`](../archive/v0.10.x/web-ui/plan-web-ui-implementation.md)。复用基础已确认存在——`report/orchestrator.py` 的 `prepare_report_data` 与 `generate_report(holdings, config, reporter, report_type, fetch_history, force_llm, output_dir, ...)` 接口签名未变，Web 层直接调用管线。工作量估算：阶段1/2/3 实际完成（约 5.5d），仍为 P4 选做、无排期。
+
+#### `plan-25` Web 持仓输入模式：试算隔离 vs 正式共享（rf-261）
+
+Web 上传持仓跑 full/both 会污染共享快照目录（rf-261）。方案已确认（2026-08-07 探讨收敛），按**使用意图**分两模式，`data/cache`/`data/state` 保持共享不动：
+
+- **① 临时试算（web 默认）**：上传保持 uuid 临时态（现状），快照写入独立子目录 `data/history/snapshots/web/`（`history_snapshot.save/load` 增 namespace 子目录参数），TUI/CLI 读主目录自然排除 web 试算快照 → 组合演进/快照差异不受污染。
+- **② 正式更新（共享，显式选择）**：两种输入——上传覆盖 `data/holdings/{holdings_filename}`（先备份旧文件），或**不上传直接用存量持仓文件**（web 成为完整报告生成入口，符合"最少输入"定位）；快照入共享主目录，演进/对比真实生效。
+
+**实现要点**：`capture_snapshot` 增试算/正式判定（web 默认试算 → namespace="web"）；`history_snapshot` 的 save/load_latest/load_all/prune 支持 namespace 子目录；`portfolio_evolution`/`_snapshot` 读主目录；web `_handle_create_run` 增模式参数（trial/formal + use-existing），前端表单增模式选择；测试覆盖两种模式快照归属；用户文档（how-to-start Web 模式 + how-to-config）。**预估：2d，待实现**。
 
 ---
 
