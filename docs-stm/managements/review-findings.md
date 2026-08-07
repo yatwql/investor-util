@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.13-dev
-> **编号源**：`rf-next = 273`（新增问题取此编号，完成后更新为 +1；已用最大 rf-272，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 274`（新增问题取此编号，完成后更新为 +1；已用最大 rf-273，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -68,6 +68,7 @@
 | rf-261 | Web 上传跑 full/both 污染共享快照目录 `data/history/snapshots/` → **试算/正式双模式**：web 默认试算（快照入 `snapshots/web/` namespace 子目录），正式更新显式选择（上传覆盖或直接用存量） | `changelog.md` [0.10.12] plan-25 |
 | rf-272 | 全仓 **43 处 ARG001 未用函数参数**全数处置：① 删参 21 处（含 40+ 调用点/测试同步）② 契约保留 7 处加 `# noqa: ARG001`（sina_kline start_from、is_enable_llm config、_compute_ncols 3×、check_liquidity total_mv）③ 独立项 3 项不纳入本轮（见下） | `changelog.md` [0.10.13-dev] |
 | rf-271 | `analysis/scenario.py` 两个死参数——① `scenario_analysis()` 的 `portfolio_volatility`（docstring 承诺 ±1σ/±2σ 波动率区间但从未消费，调用方已传 `annualized_volatility` 被吞）；② `sharpe_ci_propagation()` 的 `annual_volatility`（Lo(2002) 常数近似不消费）。**深入评估（2026-08-07）**：死的不止参数——`vol_*`/`ci_*` 输出字段全仓零消费（LLM 唯一消费方 `_build_scenario_block` 只读点估计），`sharpe_ci_propagation` 无生产调用；设计承诺（P4-03）的 CI 区间从未进入 prompt。**处置（方向 2：删除）**：删 2 参数 + 2 生产调用点（_full_risk_metrics/_pipeline）+ 8 处测试调用点（7 处单元位置传参 + e2e_perf 关键字传参）+ docstring/模块 docstring 诚实化（修正「年化波动率 CI → 夏普 CI」为实际「Lo 常数近似」）；`vol_*`/CI 输出字段保留为结构化输出。 | `changelog.md` [0.10.13-dev] |
+| rf-273 | 全量测试（mode all）进程退出阶段出现 `--- Logging error ---` 噪声：`tui.py` 模块级 `atexit.register(log_app_boundary, "关闭", ...)` 在 pytest 关闭 sys.stderr 后执行，console `StreamHandler` emit 抛 `ValueError: I/O operation on closed file`，logging 默认 `handleError` 打印噪声（无害但污染输出）。**修复**：`core/logger.py` 新增 `_ClosedStreamSilentHandler`（`StreamHandler` 子类，`handleError` 仅对 "closed file" 竞态静默降级，其余日志错误照常报告），`setup_logger` 控制台 handler 换用；新增 `test_logger.py` 4 用例回归。 | `changelog.md` [0.10.13-dev] |
 
 > **独立项（rf-272 处置衍生，单列跟踪）**：`html_renderers._render_llm_content_section` 13 参渲染器上下文（删除需重构 html_writer.py 调用点，单列「签名瘦身」）；`report/_pipeline.py` 遗留重复文件（已标注不承载活代码，单列清理项）；`orchestrator.generate_report.warm_cache`（CLI `--warm` 标志去留待决策，已无实际消费路径）。
 
