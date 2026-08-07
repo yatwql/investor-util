@@ -55,7 +55,7 @@
 .venv/bin/python -m src.python.cli cache --stats
 ```
 
-详见[定时任务配置指南](docs-stm/manuals/how-to-schedule.md)。
+详见[CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) §11「定时任务」。
 
 ---
 
@@ -152,14 +152,15 @@
 | # | 文档 | 说明 |
 |:-:|:-----|:------|
 | 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
-| 2 | [菜单操作手册](docs-stm/manuals/how-to-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
-| 3 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、章节可见性 |
-| 4 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
-| 5 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
-| 6 | [数据源一览](docs-stm/manuals/datasource.md) | 数据源、缓存前缀、数据质量与常见问题 |
-| 7 | [数据源可靠性文档](docs-stm/manuals/datasource-reliability.md) | 运维视角：可靠度评级、降级策略、限流规则、已知问题 |
-| 8 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
-| 9 | [定时任务配置指南](docs-stm/manuals/how-to-schedule.md) | CLI 命令行模式 & Windows/Linux 定时任务设置 |
+| 2 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
+| 3 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
+| 4 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif 子命令、使用示例、退出码 |
+| 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、章节可见性 |
+| 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
+| 7 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
+| 8 | [数据源一览](docs-stm/manuals/datasource.md) | 数据源、缓存前缀、数据质量与常见问题 |
+| 9 | [数据源可靠性文档](docs-stm/manuals/datasource-reliability.md) | 运维视角：可靠度评级、降级策略、限流规则、已知问题 |
+| 10 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
 
 ## 🔧 开发者参考
 

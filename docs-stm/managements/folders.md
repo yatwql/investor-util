@@ -13,8 +13,8 @@
 | **源代码合计** | — | **266** | **69,511** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **304** | **85,969** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **5,445 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **13** | **5,976** | 含 README.md（203 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 12 | 5,773 | 配置/faq/快速上手/CLI 等 |
+| **用户文档** | Markdown | **14** | **6,202** | 含 README.md（204 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 13 | 5,998 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
 | **项目文档** | Markdown | **109** | **43,813** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 1 + archive 98 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 9 | 7,904 | 变更日志/目录树/测试计划/技术设计等 |
 | ├ archive/ | 版本归档 | 102 | 35,352 | 各版本 changelog/plan/review-findings 等（98 md 35,352 行 + 3 py 446 行 + 1 txt 12 行） |
@@ -696,9 +696,10 @@ investor-util/
 │   │   ├── faq.md                    #     常见问题解答
 │   │   ├── how-to-config-llm.md      #     LLM 配置指南
 │   │   ├── how-to-config.md          #     配置说明
-│   │   ├── how-to-menu.md            #     菜单操作指南
+│   │   ├── how-to-use-tui-menu.md    #     TUI 菜单操作指南
+│   │   ├── how-to-use-web-mode.md    #     Web 浏览器模式使用指南
+│   │   ├── how-to-use-cli-mode.md    #     CLI 命令行模式使用指南
 │   │   ├── how-to-start.md           #     快速上手
-│   │   ├── how-to-schedule.md       #     定时任务配置指南
 │   │   ├── how-to-test-my-code.md    #     测试编写指南
 │   │   ├── scripts-reference.md      #     辅助脚本参考（全）
 │   │   ├── how-to-use-registry.md    #     注册表使用说明

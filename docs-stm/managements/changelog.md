@@ -6,6 +6,20 @@
 
 ## [0.10.12-dev] - 开发中（未发布）
 
+### 用户文档：三模式使用指南体系（TUI/CLI/Web 各一份）（2026-08-07）
+
+- **Web 浏览器模式使用指南**（`how-to-use-web-mode.md` 新建）：从用户视角完整讲述 Web 使用——启动访问、首页 6 分区布局、上传→生成→预览/下载全流程、配置编辑面板（7 组即改即存）、运行状态区、与其他模式关系、安全注意（无内建认证）。
+- **CLI 命令行模式使用指南**（`how-to-use-cli-mode.md` 新建）：命令结构、全局参数、`report`/`cache`/`whatif`/`check-sources` 子命令、使用示例、常用命令速查、退出码、最佳实践（缓存预热/输出路径/网络退避/性能历史/日志轮转）。
+- **定时任务内容并入 CLI 指南**：`how-to-schedule.md` 内容合并至 `how-to-use-cli-mode.md` §11「定时任务」（Windows schtasks + PowerShell 包装 + 防重入 / Linux crontab + flock / 排障），原独立文档删除；`README`/`how-to-start`/`faq` 等引用统一改指 CLI 指南 §11。
+- **TUI 菜单文档重命名**：`how-to-menu.md` → `how-to-use-tui-menu.md`（标题改「TUI 菜单操作手册」，内容不变）；归档目录保留历史文件名（不追溯重命名）。
+- **`how-to-start.md`**：方式四（Web）新增「③ 配置编辑」要点并链接 Web 指南 §4；原「CLI 命令参考」小节替换为指向 CLI 指南的精简引用；菜单操作速览引用改指 TUI 菜单手册。
+- **`README.md`**：用户指南表改为三模式文档各占一行（Web/TUI/CLI），删除 schedule 行，CLI 启动方式补「定时任务见 CLI 指南 §11」。
+- **`technical.md` §1.8**：模块表新增 `web/config_edit.py`、路由表新增 `GET/POST /api/config/edit`、§1.8.9 安全矩阵新增「跨站写请求（配置编辑）」行、§1.8.11 新增 Web 配置编辑小节、差异表补配置编辑行——与 plan-26 实现对齐。
+- **`folders.md`**：manuals 目录树同步三模式文档（新增 web-mode/cli-mode，tui-menu 重命名，schedule 移除），统计表刷新（用户文档 14/6,202，manuals 13/5,998），并修正重复条目。
+- **门禁**：dev-verify + 4 checks `--ci` 全 [OK]。
+
+---
+
 ### Web 配置编辑：完整镜像 TUI 可编辑配置全集（plan-26 实现）（2026-08-07）
 
 - **新模块 `web/config_edit.py`**：`config_edit_whitelist` 白名单（点分键→类型/枚举→目标文件→写入原语，唯一事实来源）+ `apply_config_edit`/`get_config_edit_surface` + `config_backup_file` 写前单槽 `.bak` 备份（mkstemp + `os.replace` 原子写，复用 `holdings_update._atomic_copy`）。
