@@ -18,8 +18,8 @@
 | ├ manuals/ | 用户手册分册 | 13 | 5,998 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
 | **项目文档** | Markdown | **109** | **44,532** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 0 + archive 100 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 9 | 7,904 | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 104 | 36,419 | 各版本 changelog/plan/review-findings 等（100 md 35,961 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代无未完成设计方案（web-config-edit、plan-readme-svg-layout 已归档） |
+| ├ archive/ | 版本归档 | 105 | 36,524 | 各版本 changelog/plan/review-findings 等（101 md 36,066 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代无未完成设计方案（web-config-edit、plan-readme-svg-layout、env-benchmark-doc-update 已归档） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -877,8 +877,10 @@ investor-util/
 │   │   │   │   └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计定稿
 │   │   │   ├── web-config-edit/              #   Web 配置编辑实施归档（plan-26 完成）
 │   │   │   │   └── web-config-edit.md        #   Web 配置编辑设计定稿（完整镜像 TUI 可编辑配置全集，已实现）
-│   │   │   └── readme-svg-layout/            #   README SVG 架构图实施归档
-│   │   │       └── plan-readme-svg-layout.md #     README 嵌入 SVG 架构图 + 排版优化（设计定稿已实现）
+│   │   │   ├── readme-svg-layout/            #   README SVG 架构图实施归档
+│   │   │   │   └── plan-readme-svg-layout.md #     README 嵌入 SVG 架构图 + 排版优化（设计定稿已实现）
+│   │   │   └── env-benchmark-doc-update/     #   环境耗时对照文档自动更新（--update-docs 已实现）
+│   │   │       └── plan-env-benchmark-doc-update.md # test-coverage.md 环境耗时表按主机名自动回填
 │   ├── plan/                          #   中间设计文件
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
