@@ -1,6 +1,6 @@
 # 实现计划归档 — v0.10.x
 
-> 归档时间：2026-08-05（设计文档 + 完成项摘要）；2026-08-05 二次合并 plan.md 已完成事项记录；2026-08-07 追加 plan-25 Web 持仓输入模式 / plan-26 Web 配置编辑 / README SVG 架构图
+> 归档时间：2026-08-05（设计文档 + 完成项摘要）；2026-08-05 二次合并 plan.md 已完成事项记录；2026-08-07 追加 plan-25 Web 持仓输入模式 / plan-26 Web 配置编辑 / README SVG 架构图；2026-08-08 追加 env-benchmark-doc-update（--update-docs 环境耗时对照自动更新）
 > 原始文件：`docs-stm/managements/plan.md`（当前迭代部分）
 > 涵盖版本：v0.10.0 ~ v0.10.4（2026-08-03 ~ 2026-08-05）；plan-25/26 于 0.10.12-dev 实现、README SVG 于 0.10.13-dev 实现（2026-08-07）
 > 归档内容：本迭代已实现的计划项（plan-17~plan-26）设计文档 + 完成项摘要 + 推荐实施顺序 + 发布门禁记录（P0/P1/P2/P3 已完成事项记录自 plan.md 整体迁入）
@@ -19,6 +19,7 @@
 - [`plan-web-holdings-input-modes.md`](web-holdings-input-modes/plan-web-holdings-input-modes.md) — plan-25 Web 持仓输入模式（试算隔离/正式共享）实现设计（命名空间隔离 + 双模式输入，2026-08-07 完成归档）
 - [`web-config-edit.md`](web-config-edit/web-config-edit.md) — plan-26 Web 配置编辑（完整镜像 TUI 可编辑配置全集）设计定稿（白名单 + 7 组控件 + 原子写备份，2026-08-07 完成归档）
 - [`plan-readme-svg-layout.md`](readme-svg-layout/plan-readme-svg-layout.md) — README 嵌入 SVG 架构图 + 排版优化设计（3 张深色科技风图 + folders 同步，2026-08-07 完成归档）
+- [`plan-env-benchmark-doc-update.md`](env-benchmark-doc-update/plan-env-benchmark-doc-update.md) — 环境耗时对照文档自动更新设计（`--mode bench --update-docs` 自动回填 test-coverage.md 环境耗时表，2026-08-08 归档）
 
 ## v0.10.x 已完成项
 
