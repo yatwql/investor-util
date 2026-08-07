@@ -15,6 +15,17 @@
 
 ---
 
+### README/CLAUDE.md：三模式文档索引与列表统一（2026-08-07）
+
+- **README 启动方式三节统一指向各自分册**：TUI 节补「TUI 菜单操作手册」链接（原只有命令、无入口）；Web 节改链「Web 浏览器模式使用指南」（原链快速开始方式四，不直达分册）；CLI 节补完整命令参考入口 + 保留 §11「定时任务」引用。
+- **README 功能特性**：TUI / CLI / Web 三模式条目统一追加对应指南链接。
+- **README 用户指南表**：CLI 行说明补「定时任务」。
+- **CLAUDE.md 用户文档列表顺序统一**：调整为与 README 索引一致（how-to-start → web-mode → tui-menu → cli-mode → config → llm-config → reports-instruction → datasource → datasource-reliability → faq → registry → test-my-code → scripts-reference）。
+- **`folders.md` 统计表同步**：README 204→206 行，用户文档 14/6,204。
+- **门禁**：check-doc-traces `--ci` [OK]。
+
+---
+
 ### 用户文档：三模式使用指南体系（TUI/CLI/Web 各一份）（2026-08-07）
 
 - **Web 浏览器模式使用指南**（`how-to-use-web-mode.md` 新建）：从用户视角完整讲述 Web 使用——启动访问、首页 6 分区布局、上传→生成→预览/下载全流程、配置编辑面板（7 组即改即存）、运行状态区、与其他模式关系、安全注意（无内建认证）。
