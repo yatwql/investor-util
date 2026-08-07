@@ -15,10 +15,10 @@
 | **测试用例** | — | — | **5,291 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **13** | **5,855** | 含 README.md（203 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 12 | 5,652 | 配置/faq/快速上手/CLI 等 |
-| **项目文档** | Markdown | **108** | **43,065** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 1 + archive 97 md），py/txt 不计行 |
+| **项目文档** | Markdown | **108** | **43,065** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 0 + archive 98 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 9 | 7,639 | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 101 | 34,985 | 各版本 changelog/plan/review-findings 等（97 md 34,985 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 1 | 367 | 当前迭代中的设计方案（web-holdings-input-modes.md — Web 持仓输入模式试算/正式设计定稿） |
+| ├ archive/ | 版本归档 | 102 | 35,352 | 各版本 changelog/plan/review-findings 等（98 md 35,352 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代中的设计方案（暂无进行中设计，web-holdings-input-modes 定稿已完成并移入版本归档） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -853,7 +853,7 @@ investor-util/
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   └── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
-│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~24，设计文档索引）
+│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~25，设计文档索引）
 │   │   │   ├── archived_changelog.0.10.x.md #    变更日志归档 v0.10.x
 │   │   │   ├── archived_review-findings.0.10.x.md # 自审记录归档 v0.10.x（rf-204~226）
 │   │   │   ├── investment-features/         #   投资功能优化 + 章节归并（plan-17~24）
@@ -866,8 +866,9 @@ investor-util/
 │   │   │   └── web-ui/                      #   轻量 Web UI 实施归档（plan-8 三阶段完成）
 │   │   │       ├── plan-web-ui.md              #     轻量 Web UI 计划（plan-8 轻量 Web UI / plan-10 日志可视化）
 │   │   │       └── plan-web-ui-implementation.md #  plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
+│   │   │   └── web-holdings-input-modes/    #   Web 持仓输入模式实施归档（plan-25 完成）
+│   │   │       └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计定稿
 │   ├── plan/                          #   中间设计文件
-│   │   └── web-holdings-input-modes.md #     Web 持仓输入模式（试算隔离/正式共享）实现设计定稿
 │   └── tmp/                          #   临时文件（git 忽略，不展开）
 │
 ├── CLAUDE.md                         # AI 编程助手指引

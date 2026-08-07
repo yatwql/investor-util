@@ -1,9 +1,9 @@
 # 实现计划归档 — v0.10.x
 
-> 归档时间：2026-08-05（设计文档 + 完成项摘要）；2026-08-05 二次合并 plan.md 已完成事项记录
+> 归档时间：2026-08-05（设计文档 + 完成项摘要）；2026-08-05 二次合并 plan.md 已完成事项记录；2026-08-07 追加 plan-25 Web 持仓输入模式
 > 原始文件：`docs-stm/managements/plan.md`（当前迭代部分）
-> 涵盖版本：v0.10.0 ~ v0.10.4（2026-08-03 ~ 2026-08-05）
-> 归档内容：本迭代已实现的计划项（plan-17~plan-24）设计文档 + 完成项摘要 + 推荐实施顺序 + 发布门禁记录（P0/P1/P2/P3 已完成事项记录自 plan.md 整体迁入）
+> 涵盖版本：v0.10.0 ~ v0.10.4（2026-08-03 ~ 2026-08-05）；plan-25 于 0.10.12-dev 实现（2026-08-07）
+> 归档内容：本迭代已实现的计划项（plan-17~plan-25）设计文档 + 完成项摘要 + 推荐实施顺序 + 发布门禁记录（P0/P1/P2/P3 已完成事项记录自 plan.md 整体迁入）
 
 ---
 
@@ -16,6 +16,7 @@
 - [`plan-task-code-traces-gate.md`](task-code-traces-gate/plan-task-code-traces-gate.md) — rf-208 任务编号标识符/注释门禁增强设计（check-code-traces.py 扩展 IDENT 维度 + 系列代号模式）
 - [`plan-web-ui.md`](web-ui/plan-web-ui.md) — plan-8 轻量 Web UI / plan-10 日志可视化计划（2026-08-06 三阶段完成后由 `docs-stm/plan/` 归档）
 - [`plan-web-ui-implementation.md`](web-ui/plan-web-ui-implementation.md) — plan-8 Web UI 实施拆分设计（评估/风险/约束符合性/模块拆分/安全/API/测试/阶段，2026-08-06 归档）
+- [`plan-web-holdings-input-modes.md`](web-holdings-input-modes/plan-web-holdings-input-modes.md) — plan-25 Web 持仓输入模式（试算隔离/正式共享）实现设计（命名空间隔离 + 双模式输入，2026-08-07 完成归档）
 
 ## v0.10.x 已完成项
 
@@ -29,6 +30,7 @@
 | plan-22 | **成本流水** | 持仓 Excel 可选「交易流水」「分红流水」页签 + 资金加权收益（XIRR）+ 成本分档 + 分红累计；「投资分析汇总」/「市值核算明细表」/「持仓分类表」三页签渲染（`fund_flow_data` 契约，`cost_lots` 默认关）+ HTML 三处条件渲染补遗 | 轮14~16 | ✅ 已完成（v0.10.3，2026-08-05） |
 | plan-23 | **估值与温度** | 「资产穿透TOP10」章估值分位（当前 PE/PB + 价格分位代理，`valuation_percentile` 默认关）+「投资分析汇总」章市场温度（价格分位+均线偏离+波动率三因子，温度计无仓位指令，`market_temperature` 默认关）；`valuation_data`/`market_temperature_data` 契约 | 轮17~18 | ✅ 已完成（v0.10.4，2026-08-05） |
 | plan-24 | **导航与收尾** | HTML 报告左侧目录五组折叠导航（`<details>/<summary>` 分组 + 组徽标计数 + 窄屏扁平兜底）+ 文档快照与用户手册同步（folders/test-coverage 统计、reports-instruction 序号核对、how-to-config 开关行） | 轮19~20 | ✅ 已完成（v0.10.4，2026-08-05） |
+| plan-25 | **Web 持仓输入模式** | Web「生成用途」双模式：临时试算（快照隔离 `web/` 域，不污染共享时间线）/ 正式更新（上传覆盖备份 `.bak` 或用存量直接读正式文件，快照共享）；`history_snapshot` 全公开函数 + 消费/编排层 `namespace`/`snapshot_namespace` 透传；`web/holdings_update.py` 备份+原子提升；`_handle_create_run` mode/use_existing 组合校验；前端生成用途/输入来源 UI；语义表登记 `snapshot_namespace`/`web_input_mode`/`use_existing`/`holdings_update` | 6 阶段 | ✅ 已完成（0.10.12-dev，2026-08-07） |
 
 ### P0 — 发布门禁（已完成）
 
