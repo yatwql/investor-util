@@ -5,7 +5,8 @@
 本脚本以 Flask test_client 在进程内走 HTTP 链路（不占真实端口、不发真实
 网络），覆盖 11 项断言：
 
-  1. 页面渲染      GET /                    → 200 + HTML 含 main.js 引用与关键元素
+  1. 页面渲染      GET /                    → 200 + HTML 含 main.js 引用与关键元素；
+                                               引用的全部 /static/* 资产可访问（200，防 404 漂移）
   2. 健康检查      GET /api/health          → 200 + ok 信封（探测源 mock）
   3. 上传校验      POST /api/upload         → 合法 xlsx → 200 + file_id + count==1；
                                                伪装坏文件 → 400 UPLOAD_BAD_FILE
@@ -38,6 +39,7 @@
 from __future__ import annotations
 
 import io
+import re
 import sys
 import tempfile
 import time
@@ -135,13 +137,16 @@ def _check_page_render(client, results):
     ok = ok and 'name="input_mode"' in html and 'value="trial"' in html and 'value="formal"' in html
     ok = ok and 'name="use_existing"' in html and 'value="existing"' in html
     ok = ok and 'id="formal-options"' in html and 'id="confirm-overwrite"' in html and 'id="formal-warning"' in html
-    results.append(
-        {
-            _RESULT_NAME: "页面渲染",
-            _RESULT_OK: ok,
-            _RESULT_DETAIL: f"GET / -> {resp.status_code}",
-        }
-    )
+    # 静态资产可解析：index.html 引用的每个 /static/* 资源都必须返回 200。
+    # 盲区——此前仅查引用串存在（"/static/main.js" in html）不查资源可访问，
+    # static_url_path 推导漂移致全部资产 404 时整页 JS/CSS 失效、冒烟仍误报通过。
+    assets = re.findall(r'(?:src|href)="(/static/[^"?#]+)', html)
+    missing = [a for a in assets if client.get(a).status_code != 200]
+    ok = ok and bool(assets) and not missing
+    detail = f"GET / -> {resp.status_code}, 静态资产 {len(assets)} 个"
+    if missing:
+        detail += f"，404: {missing}"
+    results.append({_RESULT_NAME: "页面渲染", _RESULT_OK: ok, _RESULT_DETAIL: detail})
 
 
 def _check_health(client, results):
