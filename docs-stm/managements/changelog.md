@@ -13,7 +13,7 @@
 - **净效果**：`src/static/` 成为非 Python 前端资产唯一归属（报告图表 bundle + Web UI 前端 + 报告模板三合一）；`src/python/` 仅保留纯 Python 代码。
 - **测试同步**：5 个按路径读模板的测试（test_html_writer / test_html_template / test_html_report_structure / test_html_report_structure_edge / test_llm_placeholder_distinction_edge）路径改为 `src/static/tmpl/`。
 - **验证**：`smoke-web.py` 10/10（Flask 新位置服务模板 + `/static/main.js`）；report/web/llm 全量单测 2395 passed。
-- **配套**：`folders.md` 目录树与统计表同步（web/ 目录树移除 templates/static，src/static/ 新增 web/tmpl 子树）；plan-26 配置编辑设计文档改动清单已按新路径更新（前端位置无关、契约不变）；`src/static/README.md` 资产说明滞后登记 rf-267。
+- **配套**：`folders.md` 目录树与统计表同步（web/ 目录树移除 templates/static，src/static/ 新增 web/tmpl 子树）；plan-26 配置编辑设计文档改动清单已按新路径更新（前端位置无关、契约不变）；`src/static/README.md` 资产说明滞后登记 rf-266。
 
 ---
 
