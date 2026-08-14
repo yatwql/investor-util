@@ -39,8 +39,8 @@
   - **编号源标记**：各管理文档头部维护「编号源」标记记录**下一个可用编号**——`plan.md` → `plan-next`、`review-findings.md` → `rf-next`。新增任务时**取当前值**作为编号，完成后**递增更新标记**（+1）。标记单调递增、绝不回退，保证与历史归档（含 `docs-stm/archive/*/`）编号不冲突。若标记遗漏递增或初值异常，`scripts/check-task-numbering.py --ci` 会扫描当前文档+全部归档报错并提示修正值（已用最大+1）
 - **语义化命名**：代码标识符（函数/变量/类/模块/config 键）与文档正文一律用**语义名**，**禁止用任务代号**（`plan-N`/`rf-N`/B 系列/F 系列等）。任务代号仅存在于内部计划表（`plan.md`/`review-findings.md`）作链接锚点，不扩散到实现层。新增功能**先定语义名再设计**（语义名即代码名），已实现功能的语义命名索引见技术设计文档（`docs-stm/managements/technical.md`）「功能语义命名表」章节（活索引；各轮设计文档中的原始表为历史快照，如归档 `docs-stm/archive/v0.10.x/investment-features/plan-investment-features.md` 的原始语义命名表），保证「代码标识符 = 文档中文描述」一致。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止：注释/标识符中出现任务编号、系列代号（`b_series`/`G系列`/`F4`/`B6`）、嵌入 `rf/plan`+数字 的命名均会被检出（IDENT/CODE，退出码 2））+ `scripts/check-semantic-index.py --ci`（正面校验「功能语义命名表」与代码正反向一致），已纳入技术设计文档「架构设计约束」章节的约束外参照。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（`C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。
-- **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, llm-technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md, folders.md）
-- **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-use-web-mode.md, how-to-use-tui-menu.md, how-to-use-cli-mode.md, how-to-config.md, how-to-config-llm.md, reports-instruction.md, datasource.md, datasource-reliability.md, faq.md, how-to-use-registry.md, how-to-test-my-code.md, scripts-reference.md）
+- **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, llm-technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md, folders.md, developer-guide.md）
+- **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-use-web-mode.md, how-to-use-tui-menu.md, how-to-use-cli-mode.md, how-to-config.md, how-to-config-llm.md, reports-instruction.md, datasource.md, datasource-reliability.md, faq.md）
 - **文件归属三原则**：
   - **中间计划文件**（设计方案、迭代计划、架构决策）→ `docs-stm/plan/`
   - **运行时临时文件**（除log以外的临时输出、调试产物、缓存转储）→ `docs-stm/tmp/`
@@ -52,7 +52,7 @@
   4. 以上都不是，想放 `.claude/`？→ **停，不允许，重新分类**
 - **违规补救**：发现 `.claude/` 下出现本应放在 `docs-stm/` 的文件时，**必须立即迁移**，不留存待办
 - **注意**：`EnterPlanMode` 等工具自动写入 `.claude/plans/` 的行为不可控，使用后**必须手动迁移**到 `docs-stm/plan/`
-- **版本号一致**：发布版本时，先修改 `src/python/core/constants.py`（`APP_VERSION`），然后运行 `.venv/bin/python scripts/check-version-consistency.py`，按 [ERR] 提示逐个同步其余文件，直到全部 [OK] 再提交。受检文件：`pyproject.toml`、`README.md`、管理文档 9 份（`plan.md`/`technical.md`/`requirements.md`/`testplan.md`/`review-findings.md`/`llm-technical.md`/`folders.md`/`test-coverage.md`/`changelog.md`）、`how-to-test-my-code.md`。任何版本号变更均应全局覆盖，避免遗漏。
+- **版本号一致**：发布版本时，先修改 `src/python/core/constants.py`（`APP_VERSION`），然后运行 `.venv/bin/python scripts/check-version-consistency.py`，按 [ERR] 提示逐个同步其余文件，直到全部 [OK] 再提交。受检文件：`pyproject.toml`、`README.md`、管理文档 10 份（`plan.md`/`technical.md`/`requirements.md`/`testplan.md`/`review-findings.md`/`llm-technical.md`/`folders.md`/`test-coverage.md`/`changelog.md`/`developer-guide.md`）。任何版本号变更均应全局覆盖，避免遗漏。
 - **发布数据文档刷新**：发布版本前，**必须**运行 `.venv/bin/python scripts/collect-test-coverage.py`，按实时收集结果核对/更新以下文档的数据快照（非版本号），保证统计与目录结构时效性：
   - `docs-stm/managements/test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数
   - `docs-stm/managements/folders.md` — 项目统计表（主程序/模板/脚本/测试代码行数、文件数、测试用例数）及目录树新增/重命名文件

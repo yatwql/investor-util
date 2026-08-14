@@ -109,7 +109,7 @@ class TestDocHeaderRegistration:
         "docs-stm/managements/llm-technical.md",
         "docs-stm/managements/folders.md",
         "docs-stm/managements/test-coverage.md",
-        "docs-stm/manuals/how-to-test-my-code.md",
+        "docs-stm/managements/developer-guide.md",
     ]
 
     def test_doc_header_docs_registered_as_header(self, version_script):

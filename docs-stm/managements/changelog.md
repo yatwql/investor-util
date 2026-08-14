@@ -4,7 +4,105 @@
 
 ---
 
-## [0.10.13-dev] - 开发中（未发布）
+## [0.10.13] - 2026-08-14
+
+### perf_view 性能历史趋势查看并入 developer-guide.md（2026-08-08）
+
+- **README「开发者参考」区 perf_view 独立入口删除**——`scripts/perf_view.py` 用法早已完整收录于 developer-guide「诊断类脚本」章节（读取 `data/state/perf_history.jsonl`、按版本+报告类型分组、`--report-type`/`--last`/`--save` 参数、输出列说明、数据来源），删除 README 重复表格行后该区仅剩 developer-guide 单一入口。
+- **开发者指南入口描述补全**：新增「（含性能历史趋势查看 perf_view）」——入口行覆盖范围与 developer-guide 章节一致。
+- **保留**：README 功能特性区「⚙️ 性能追踪与运维」下的「趋势查看工具」产品能力条目（与自动阶段计时/数据源健康检查并列，属产品总览非开发者参考）；`how-to-use-cli-mode.md` / `faq.md` 中用户视角的 perf_view 用法（用户手册，非开发者参考）。
+- **folders.md 统计同步**：README 195→194 行，用户文档合计 4,759→4,758 行。
+
+### 架构图布局修复（用户反馈「对齐不好的图有反作用」）（2026-08-08）
+
+- **`architecture.svg` 右列报告卡底部对齐**——Excel/HTML 报告卡高度 150→154、y 修正，底部 428 与左列 Web 渠道卡、引擎底部对齐，消除 8px 错位。
+- **`capabilities.svg`「HTML 报告」文字溢出容器**——修复「报告」两字跨出卡片右缘，文本重新排布并镜像复核（全部元素终点 < 容器右缘 980）。
+- **`llm-chain.svg` 全量审计通过**，无需修改。
+- **验证**：几何边界/对齐/重叠脚本 + cairosvg 渲染像素级文字溢出检测（docs-stm/tmp/svg-review/），确认三图无越界文字、无文本重叠。
+
+### Web 数据源健康检查：全部被拒时追加代理诊断提示（2026-08-08）
+
+- **回归背景**：另一台电脑 Web 模式全数据源 `[WinError 10061] 目标计算机积极拒绝连接` + 超时——`make_http_client` 经 `trust_env` 默认读取系统代理/HTTP(S)_PROXY，代理软件未运行即所有请求被路由到死代理。
+- **后端**：`check_sources.run_health_checks` 全部失败且多数为「连接被拒」（WinError 10061 / Errno 111）时追加 `hint` 项（`_PROXY_HINT_NAME`），提示检查系统代理或清除代理环境变量；CLI `run_check_sources` 在汇总行后单独打印该提示。
+- **前端**：`renderHealth` 渲染 `item.hint` 为整卡警示条（`.health-hint`，琥珀色描边）；健康检测按钮/接口不变。
+- **回归测试**：`test_check_sources.py` 新增 `TestProxyHint` 3 用例（全拒追加 / 有源正常不追加 / 仅超时不追加）。
+
+### Web 首页「历史运行记录」弱化为单行状态摘要（2026-08-08）
+
+- **卡片标题**「历史运行记录」→「最近运行」；`renderHistory` 由多行列表（类型/条数/每条明细）重写为**单行摘要**——时间 + 状态（成功/有异常，`.`history-status-ok/err）+ 耗时（`.history-meta` 右对齐）。
+- **取舍**：历史记录对单用户自用的真正价值是错误痕迹与耗时，类型/条数属装饰字段；状态区因此更紧凑，首页信息密度更聚焦。
+- **样式**：移除 `.history-row/.history-type/.history-err` 旧列表样式，新增 `.history-summary/.history-status/.history-status-ok/err`；新增 `formatDur(sec)` 秒/分/时中文耗时格式化。
+- **回归**：`/api/runs/history` 响应字段（timestamp/total_seconds/errors）与前端消费一致，web 单元测试 194 passed。
+
+### 开发者指南整合：README 零碎 + 两份手册并入 developer-guide.md（2026-08-08）
+
+- **新增管理文档 `docs-stm/managements/developer-guide.md`**（管理文档 9→10 份，纳入版本一致性受检）——整合四来源为开发者一站式指南，7 个部分：开发环境与工作流 / 三级门禁 / 任务编号规范与自动保障 / 测试指南 / 辅助脚本速查 / 版本发布流程 / 关键纪律来源。四来源 = README「开发者参考」区零碎内容（辅助脚本速查 / 性能历史趋势查看 / 跨机器耗时采集 / 任务编号自动保障）+ `how-to-test-my-code.md`（测试指南）+ `scripts-reference.md`（脚本参考）+ CLAUDE.md 开发纪律（门禁命令 / 编号规则 / 发布四步的人话版）。
+- **锚点兼容**：保留 `#测试模式详解`、`#新增测试指南`、`#llm-幻觉率采样测试` 三锚点，testplan.md / faq.md 原有锚点引用不失效。
+- **删除两份旧手册**：`docs-stm/manuals/how-to-test-my-code.md`、`docs-stm/manuals/scripts-reference.md`（内容并入 developer-guide，旧引用点全量迁移）。
+- **引用点迁移**：README 开发者参考区精简（保留 developer-guide / registry / perf_view 三入口，删跨机器耗时 blockquote 与任务编号小节）；CLAUDE.md 管理文档清单补 developer-guide、用户文档清单删两手册；testplan.md（测试模式详解 / 新增测试指南）、faq.md（幻觉率采样）、how-to-start.md（辅助脚本参考链接）改指 developer-guide；`check-version-consistency.py` 受检登记 + `test_check_version_consistency.py` HEADER_DOCS 同步；folders.md 统计表（用户文档 14→12 文件 6,210→5,093 行、managements 9→10 文件 7,904→9,184 行）与目录树同步。
+
+### 注册表使用说明并入 developer-guide.md（2026-08-08）
+
+- **`docs-stm/manuals/how-to-use-registry.md` 内容并入 developer-guide** 新增「注册表使用（registry）」章节——核心数据结构（`DataModuleDef` / `ComputModuleDef`）、公共 API 速查（遍历 / 缓存 / LLM 名称 / settings 键 / enabled_llm 子键 / 报表排序 / 计算模块）、新增数据模块（非 LLM / LLM + 8 步检查清单 / 精确键名缓存）、计算模块注册表、无需手动维护的派生产出、测试。压缩易过时快照（注册表模块清单大表、19 键全表、消费方清单），架构背景与模块清单指向 `technical.md`「功能语义命名表」、report_section_order 键名对照指向 `how-to-config.md`。
+- **删除旧手册** `docs-stm/manuals/how-to-use-registry.md`。
+- **引用点迁移**：README 开发者参考区 registry 独立入口删除（并入 developer-guide，该区仅剩 developer-guide / perf_view 两入口）；CLAUDE.md 用户文档清单删 how-to-use-registry；folders.md 统计表（用户文档 12→11 文件 5,093→4,759 行、manuals 11→10 文件 4,897→4,564 行、managements 9,184→9,390 行）与目录树同步。
+
+### Web 前端静态资产 404 修复 + 旧浏览器兼容兜底（rf-274 / rf-275）（2026-08-08）
+
+- **阻断级修复：Web 前端整页失效（rf-274）**——Flask 未显式指定 `static_url_path` 时按 `static_folder` basename 推导（`src/static/web/` → `/web/*`），index.html 引用的 `/static/main.js`、`/static/style.css` 全部 404，JS/CSS 未加载 → 配置面板空白、健康区卡静态"正在检测"、生成报告按钮灰色。plan-27 前端资产移入 `src/static/` 时引入，移动后未在真实浏览器验证。
+  - **修复**：`src/python/web/app.py` 显式 `static_url_path="/static"`（静态路由固定，不随目录名推导）。
+  - **回归**：新增 `src/test/unit/web/test_web_static_serving.py` 3 用例（静态路由固定 /static + index.html 全部资产 200 + main.js 含初始化注册），修复前 `/static/*` 404 必然失败；连带补强 `scripts/smoke-web.py` 页面渲染检查——由仅查引用串存在升级为实际请求全部 `/static/*` 资产断言 200（原盲区：资产 404 时整页失效、冒烟仍误报通过）。
+- **main.js 旧浏览器兼容兜底（rf-275）**——排查 rf-274 时发现：`AbortSignal.timeout`（Chrome 103+/Safari 16+ 起才有）缺失时 `fetch` 参数构造同步抛 TypeError，init 后续加载器全部静默不执行。修复：顶部补 `AbortSignal.timeout` 兼容兜底（AbortController+setTimeout，超旧环境退化 undefined 信号）+ init 三加载器 `safeRun` 隔离（任一初始化异常只渲染对应面板错误，不连带中断其余）。
+- **验证**：node 模拟旧浏览器（无 AbortSignal.timeout）加载真实 main.js 完整走通 init；test_client 全链路 `/static/*` 200；web 单元测试 187+3 全绿。
+
+### README 嵌入 SVG 架构图 + 排版优化（2026-08-07）
+
+- **新增 3 张深色科技风架构图**（`src/static/`，手写 SVG，README 相对路径引用）：
+  - `architecture.svg` — 首屏主图：TUI/CLI/Web 三渠道 → 分析引擎 → Excel/HTML 双报告，底部「同一套引擎 · 三种渠道 · 结果一致」。
+  - `llm-chain.svg` — LLM 智囊团技术图：触发源 → 缓存指纹判定 → Provider Chain 链式分发（Claude/OpenAI/DeepSeek/Gemini）→ 四种分发策略 → 四类深度分析输出。
+  - `capabilities.svg` — 八大功能域总览图：基础报告/新闻增强/LLM 智囊团/分析与风控/调仓 What-if/运维追踪/基金评价/隐私安全 2×4 网格 + 双报告输出条。
+- **README 排版优化**：副标题精炼为一句话价值主张；3 张 SVG 分别嵌入首屏（架构图）、功能特性章节首（能力总览）、LLM 分析章节（Provider 链）；功能特性 8 个分组标题统一 emoji（🔍📰🤖📈🔄⚙️🏆🔒）。
+- **`folders.md` 同步**：项目统计表新增「架构图示 SVG 3/315」行；目录树 `src/static/` 分支登记 3 个 SVG；README 行数 206→212、用户文档合计 6,204→6,210。
+- **门禁**：XML 解析校验 3 个 SVG 合法 + 几何越界检查通过；P0 dev-verify 2005 passed；4 个 check 脚本 `--ci` [OK]。
+
+### folders.md 目录树历史痕迹修正（rf-270）（2026-08-07）
+
+- **过时计数修正**：① `smoke-web.py` 描述「test_client 9 项全链路验证」→ **11 项**（脚本自述「覆盖 11 项断言」+ 11 个 `_check_*` 函数，与 test_smoke_web.py 描述一致）；② `archived_plan.0.10.x.md` 描述「plan-17~25」→ **plan-17~26**（归档文件头 + plan.md 引用均为 plan-17~26）。
+- **树形符号修正**：③ `tui/` 目录由 `└──` → `├──`（其后仍有 `web/` 兄弟节点）；④ `web-ui/` 目录由 `└──` → `├──`（其后仍有 `web-holdings-input-modes/`、`web-config-edit/`、`readme-svg-layout/` 兄弟节点）。保持「`├──` 后接兄弟、`└──` 为最后一项」的目录树层级符号规则。
+- **门禁**：4 个 check 脚本 `--ci` [OK]（check-doc-traces / check-task-numbering 等）。
+
+### 死代码清理：死配置 + 未用 import/变量/参数 + re-export 防护（2026-08-07）
+
+- **死配置**：`cache_ttl.fund_overlap`（`config.json`）为唯一死配置——`get_ttl()` 先查 config `cache_ttl[data_type]`，差集无对应注册表 data_type，已移除。
+- **A/B 类死代码（ruff --fix + 手动）**：清除 49+ 处未用 import/局部变量/重定义——覆盖 31 个文件（`_math_utils.py`/`alignment_correction.py`/`industry_beta.py`/`liquidity.py`/`metrics.py`/`rebalance.py`/`scenario.py`/`cache/operations.py`/`config/__init__.py`/`provider_registry.py`/`fetcher/batch.py`/`fetcher/bond_yield.py`/`llm/cost_tracker.py`/`llm/fact_checker/_numerical.py`/`llm/fallback.py`/`llm/generators.py`/`llm/prompts_core.py`/`llm/prompts_tables.py`/`llm/skeleton.py`/`providers/akshare_extras.py`/`providers/news_aggregator.py`/`providers/sina.py`/`providers/tiantian_base.py`/`report/_llm_news.py`/`report/_pipeline.py`/`report/_report_generation.py`/`report/_snapshot.py`/`report/data_quality_sheet.py`/`tui/tui_handlers.py` 等）。含 5 处被本地重定义覆盖的冗余 import（`metrics.py` 4 常量 + `provider_registry.py` 本地 sentinel/类）。
+- **D 类 re-export 防护**：`cache/__init__.py` 补 `__all__`（11 个内部符号：`_read_cache_data`/`_write_atomic`/`_CACHE_DIR`/`_cache_path` 等）；`config/__init__.py` 补 `__all__`（`get_llm_config`/`_CONFIG_PATH_OVERRIDE`）——保证 re-export API 不被静态扫描误删。
+- **re-export 误删修复（ruff --fix 连带，恢复 + `# noqa: F401`）**：`providers/tiantian_base.py` 恢复 `_safe_float`（`tiantian_nav`/`tiantian_ranking` 引用）；`analysis/rebalance.py` 恢复 `_SILENCE_FILE`/`_load_silence_state`/`_save_silence_state`（conftest monkeypatch + 测试引用）；`core/provider_registry.py` 恢复 `phase_timeout`（test_phase_timeout 引用）；`providers/sina.py` 恢复 `is_index_code`（`sina_kline` lazy import + 测试 patch）；`analysis/metrics.py` 恢复 `_t_cdf`/`_t_critical_95`（test_metrics_edge 引用）。
+- **scenario 死参数（rf-271，方案 A）**：`scenario_analysis.portfolio_volatility`/`sharpe_ci_propagation.annual_volatility` 加 `# noqa: ARG001` 标注预留意图，不破坏测试签名。
+- **遗留文件确认**：`report/_pipeline.py` 为文档标注「不再承载活代码」的遗留重复文件（编排实现在 `_report_generation.py` 聚合门面），仅删其未用 `Future` import，未做进一步改动。
+- **门禁**：P0 dev-verify **2005 passed**；4 个 check 脚本 `--ci` [OK]；ruff format 本轮改动文件全绿。登记 rf-271/rf-272 待跟进（scenario 死参数补齐评估 + 43 处 ARG001 死参数评估）。
+
+### 死代码清理（二）：ARG001 死参数全数处置（rf-272 完成）（2026-08-07）
+
+- **删参 21 处**（生产 18 函数 + 连带 40+ 调用点/测试）：`metrics_risk.portfolio_beta.trading_days`、`fetcher/industry.batch_fetch_industry_data.max_workers`、`fetcher/chain.fetch_with_incremental_fallback.param_fn`、`cost_flow.compute_cost_tiers.holdings`、`liquidity._is_exchange_traded.name`、`_history_quality._diagnose_return.sorted_dates`、`excel_fund_deep_analysis._process_fund_deep_analysis_module.process_fn/prog`、`chart_data_builder.build_chart_datasets.perf_data`、`orchestrator.compute_valuation_data.holdings`、`_report_health._spawn_health_checks.holdings`、`handlers_config._add/_remove_comparison_index.config`、`handlers_report._prompt_history.reporter`、`check_sources._check_http.name/label`（连带 `_checks` 10 个 lambda 简化）、`prompts_action._build_global_macro_prompt.holdings_details`、`market_value_sheet.write_market_value_sheet.holdings/today_str`（连带 `excel_market_data` 别名调用 2 处）、`config/_llm_providers._validate_provider_entry.index`、`_report_helpers._compute_details.config`。
+- **契约保留 7 处加 `# noqa: ARG001`**（注明保留理由）：`providers/sina_kline.py` 2×`start_from`（chain 层经 `getattr` 无条件传参契约）、`config/_llm_settings.is_enable_llm.config`（`is_enable_*` 家族统一签名 12 成员同构）、`style_factor_sheet._compute_ncols` 3×（参数声明计算覆盖的三区块，设计契约）、`liquidity.check_liquidity.total_mv`（公开 API 契约，22 处调用点传参）。
+- **独立项不纳入本轮**：`html_renderers._render_llm_content_section` 13 参渲染器上下文（删除需重构 html_writer.py 调用点，单列「签名瘦身」项）；`_pipeline.py` 遗留重复文件清理（单列重构项，现有测试引用其辅助函数）；`orchestrator.generate_report.warm_cache`（CLI `--warm` 标志已无实际消费路径，去留待决策）。
+- **新增 F841 连带清理**：`handlers_report._cmd_generate_both` 未用局部 `reporter`、`test_market_value_sheet` 未用局部 `result`、`test_handlers_report` 7 处未用 `reporter`。
+- **门禁**：P0 dev-verify **2005 passed**；4 个 check 脚本 `--ci` [OK]；ruff format 本轮改动 7 文件全绿。rf-272 完成（43 处全数处置），rf-next 保持 273。
+
+### scenario 死参数删除：portfolio_volatility / annual_volatility（rf-271 完成）（2026-08-07）
+
+- **背景**：rf-271 登记时按「死参数预留」处置（保留 + `# noqa: ARG001`）。本次深入评估发现三层问题——① 两参数确实从未消费（`scenario_analysis().portfolio_volatility` docstring 承诺 ±1σ/±2σ 波动率区间但函数体不引用，2 处调用点已传 `annualized_volatility` 被吞；`sharpe_ci_propagation().annual_volatility` 被 Lo(2002) 常数近似公式绕过）；② 死的不止参数——`_build_scenario_entry` 计算的 `vol_1sigma/vol_2sigma` 4 字段与 `ci_lower/ci_upper` 4 字段**全仓零消费**，`scenario_analysis` 输出唯一消费方 `prompts_tables._build_scenario_block` 只读点估计 `expected_change_pct`；③ `sharpe_ci_propagation` 无生产调用（仅测试 + `analysis/__init__.py` 导出）。
+- **设计意图核对**：归档 P4-03 承诺「在 LLM prompt 表述 *若市场下跌 20%，组合预计回撤 -16% 至 -24%（95% 置信区间）*」——该 CI 区间从未进入任何 prompt/报告输出，属**半实现**；波动率区间功能连计算都未落地（参数被吞）。用户从未见过 CI/波动率区间输出。
+- **处置（方向 2：删除）**：`scenario_analysis` 删 `portfolio_volatility`（同步 `_full_risk_metrics.py`/`_pipeline.py` 2 调用点）；`sharpe_ci_propagation` 删 `annual_volatility`（签名变 `(sharpe_ratio, years_of_data, n_observations)`，同步 test_scenario_analysis.py 7 处位置传参 + test_e2e_perf.py 关键字传参）；docstring 与模块 docstring 诚实化（「年化波动率 CI → 夏普 CI」修正为「Lo 常数近似，不消费年化波动率」）。
+- **保留**：`_build_scenario_entry` 的 `vol_*`/CI 结构化输出字段（由 `beta_se`/`beta_ci` 驱动，语义为「Beta 估计不确定性传播」，与已删的 `portfolio_volatility` 是不同概念；未来渲染层可直接消费）。
+- **验证**：test_scenario_analysis.py + test_e2e_perf.py 共 32 用例全绿；无 `portfolio_volatility`/`annual_volatility` 残留引用；ruff format 干净。rf-271 完成，rf-next 保持 273。
+
+### 关闭日志流竞态修复：`_ClosedStreamSilentHandler`（rf-273 完成）（2026-08-07）
+
+- **背景**：全量测试（mode all，5433 用例）进程退出阶段出现 `--- Logging error ---` 噪声。根因——`tui.py` 模块级 `atexit.register(log_app_boundary, "关闭", "TUI模式")` 在任何导入 tui 模块的测试进程退出时触发，此时 pytest 已关闭 sys.stderr，console `StreamHandler`（默认绑 stderr）emit 抛 `ValueError: I/O operation on closed file`，logging 默认 `handleError` 打印 `--- Logging error ---` + traceback。无害（测试全绿）但污染每次全量测试输出。
+- **修复**：`core/logger.py` 新增 `_ClosedStreamSilentHandler`（`logging.StreamHandler` 子类，覆盖 `handleError`——仅当异常为 `ValueError/OSError` 且含 "closed file"（退出竞态）时静默降级，其余日志错误照常由父类报告）；`setup_logger` 控制台 handler 换用该类。
+- **回归测试**：新增 `src/test/unit/core/test_logger.py` 4 用例（unit_core 标记）——关闭流 emit 不打印 error / handleError 对 closed file 静默不委托父类 / 对其他错误照常委托 / setup_logger 控制台 handler 类型断言。
+- **验证**：全量 mode all **5437 passed, 0 failed**（新增 4 用例），`--- Logging error ---` 消失；dev-verify 2009 passed；ruff format/lint 干净；4 check 脚本 `--ci` [OK]。rf-273 完成，rf-next 递增为 274。
 
 ### Web 前端静态资产 404 修复 + 旧浏览器兼容兜底（rf-274 / rf-275）（2026-08-08）
 

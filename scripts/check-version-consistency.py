@@ -9,7 +9,7 @@
     testplan.md, review-findings.md, llm-technical.md,
     folders.md, test-coverage.md
                             最后更新：...（vX.Y.Z ...）
-  - docs-stm/manuals/how-to-test-my-code.md
+  - docs-stm/managements/developer-guide.md
                             最后更新：...（vX.Y.Z）
   - docs-stm/managements/changelog.md
                             ## [X.Y.Z]
@@ -82,7 +82,7 @@ add_header(REPO_ROOT / "docs-stm" / "managements" / "folders.md")
 add_header(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md")
 # changelog 无「文档版本：」头，用 [X.Y.Z] 标题行 contains 校验
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md", "[{v}]")
-add_header(REPO_ROOT / "docs-stm" / "manuals" / "how-to-test-my-code.md")
+add_header(REPO_ROOT / "docs-stm" / "managements" / "developer-guide.md")
 
 
 # ── 校验逻辑 ────────────────────────────────────────────────

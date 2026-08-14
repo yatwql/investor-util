@@ -168,6 +168,43 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
 ]
 
 
+# 代理诊断：当全部数据源同时失败且多数为「连接被拒」时，提示检查本机代理。
+# 连接被拒（TCP RST，Windows WinError 10061 / POSIX Errno 111）且 0 成功，
+# 几乎总是本机系统代理 / HTTP(S)_PROXY 指向的端口无监听（代理软件未启动）——
+# 所有请求被统一路由到死代理。该提示能自愈大多数「全部源异常」的误报。
+_PROXY_HINT_NAME = "__proxy_hint__"
+
+
+def _refused_error(msg: str) -> bool:
+    """判断错误消息是否属「连接被拒」类。"""
+    m = (msg or "").lower()
+    return "10061" in m or "refused" in m
+
+
+def _with_proxy_hint(results: list[dict]) -> list[dict]:
+    """全部失败且多数为连接被拒时，追加代理诊断提示项（返回新列表，不修改入参）。"""
+    if not results:
+        return results
+    if any(r.get("ok") for r in results):
+        return results
+    refused = sum(1 for r in results if _refused_error(r.get("message", "")))
+    if refused < max(1, len(results) // 2):
+        return results
+    return results + [
+        {
+            "name": _PROXY_HINT_NAME,
+            "label": "网络代理",
+            "ok": False,
+            "latency_ms": 0.0,
+            "message": (
+                "多个数据源同时连接被拒：疑似本机系统代理或 HTTP_PROXY/HTTPS_PROXY/"
+                "ALL_PROXY 指向的代理未运行。请检查系统代理设置或清除相关环境变量后重试"
+            ),
+            "hint": True,
+        }
+    ]
+
+
 def run_health_checks(max_timeout: float = 15.0) -> list[dict]:
     """执行全量数据源健康检查，返回结构化结果列表。
 
@@ -243,7 +280,8 @@ def run_health_checks(max_timeout: float = 15.0) -> list[dict]:
             by_name[r["name"]] = r
 
     # 按 name 排序保证输出稳定
-    return sorted(by_name.values(), key=lambda r: r["name"])
+    results = sorted(by_name.values(), key=lambda r: r["name"])
+    return _with_proxy_hint(results)
 
 
 def run_check_sources() -> None:
@@ -251,6 +289,8 @@ def run_check_sources() -> None:
     from datetime import date
 
     results = run_health_checks(max_timeout=15.0)
+    hint_items = [r for r in results if r.get("hint")]
+    results = [r for r in results if not r.get("hint")]
 
     print(f"\n数据源健康检查结果 ({date.today()})")
     print("─" * 55)
@@ -276,6 +316,8 @@ def run_check_sources() -> None:
     print("─" * 55)
     total = ok_count + warn_count + err_count
     print(f"  {total} 个数据源 — {_OK} {ok_count} / {_WARN} {warn_count} / {_ERR} {err_count}")
+    if hint_items:
+        print(f"  {_WARN} {hint_items[0]['message']}")
     print()
 
     if err_count > 0:

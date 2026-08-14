@@ -2,7 +2,9 @@
 
 **把持仓 Excel 变成决策级投资洞察。** 一个面向个人投资者的本地投资分析引擎——实时行情 · 资产穿透 · 基金评级 · LLM 智囊团深度复盘，双报告输出，让每一次投资决策都建立在数据之上。
 
-> 当前版本：0.10.13-dev
+> 当前版本：0.10.13
+
+![](src/static/architecture.svg)
 
 ![](src/static/architecture.svg)
 
@@ -160,9 +162,9 @@
 | # | 文档 | 说明 |
 |:-:|:-----|:------|
 | 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
-| 2 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
-| 3 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
-| 4 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif 子命令、使用示例、退出码、定时任务 |
+| 2 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
+| 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif 子命令、使用示例、退出码、定时任务 |
+| 4 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
 | 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、章节可见性 |
 | 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
 | 7 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
@@ -174,25 +176,7 @@
 
 | 文档 | 说明 |
 |:-----|:------|
-| [中央注册表（registry）使用说明](docs-stm/manuals/how-to-use-registry.md) | 数据模块注册、缓存 TTL、新增模块（含 LLM）检查清单 |
-| [如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md) | 本地运行测试、测试模式、跨机器耗时采集与环境耗时对照、新增测试指南 |
-| [辅助脚本参考](docs-stm/manuals/scripts-reference.md) | scripts/ 目录全部工具脚本用法速查 |
-| [性能历史趋势查看](scripts/perf_view.py) | 查看每次报告生成的各阶段耗时记录（`.venv/bin/python scripts/perf_view.py`） |
-
-> **跨机器测试耗时采集**：测试耗时随硬件/操作系统/并行度变化，跨机器复现采集可运行 `.venv/bin/python scripts/test_runner.py --mode bench --update-docs`（隐含 `--machine-info`）——顺序运行全部对照模式并采集本机 14 项环境属性，自动将实测耗时写入 `test-coverage.md` 的「环境耗时对照」两张表（按主机名匹配列：同机覆盖刷新、新机器追加列；`--update-docs` 默认永不写文档，需显式传入）。详见[如何测试我的代码](docs-stm/manuals/how-to-test-my-code.md)。
-
-### 任务编号自动保障（开发协作）
-
-项目任务编号（`plan-`/`rf-`）全局单调递增、归档不回收，由 `scripts/check-task-numbering.py` 校验，防止新增编号与历史归档冲突。三层自动保障：
-
-| 机制 | 触发 | 跨机器 |
-|:-----|:-----|:------|
-| **P0/P2 门禁** | 提交/发布前 `check-task-numbering.py --ci` | ✅ 零配置 |
-| **dev-verify preflight** | `test_runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
-| **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
-| **git pre-commit** | `git commit` 涉及编号文档时自动校验 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
-
-> `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
+| [开发者指南](docs-stm/managements/developer-guide.md) | 开发环境与工作流、三级门禁、任务编号规范、测试驱动、辅助脚本速查、注册表使用、版本发布流程 |
 
 ## 📋 项目内部文档
 

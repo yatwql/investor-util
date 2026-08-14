@@ -1,5 +1,5 @@
 # 目录结构
-> 文档版本：0.10.13-dev
+> 文档版本：0.10.13
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -7,18 +7,18 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 244 | 58,803 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
-| HTML 报告模板 | HTML | 4 | 3,770 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 主程序代码 | Python | 244 | 58,784 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
+| HTML 报告模板 | HTML | 4 | 3,774 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
-| 辅助脚本 | Python | 18 | 6,938 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
-| **源代码合计** | — | **266** | **69,511** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **304** | **85,969** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,445 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **14** | **6,210** | 含 README.md（212 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 13 | 5,998 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **109** | **44,532** | 含 CLAUDE.md（74 行）；md 口径（managements 9 + plan 0 + archive 100 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 9 | 7,904 | 变更日志/目录树/测试计划/技术设计等 |
-| ├ archive/ | 版本归档 | 105 | 36,524 | 各版本 changelog/plan/review-findings 等（101 md 36,066 行 + 3 py 446 行 + 1 txt 12 行） |
+| 辅助脚本 | Python | 18 | 6,943 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
+| **源代码合计** | — | **266** | **69,501** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **306** | **86,131** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,455 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **用户文档** | Markdown | **11** | **4,758** | 含 README.md（194 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 10 | 4,564 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
+| **项目文档** | Markdown | **112** | **45,564** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 101 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 9,423 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 105 | 36,525 | 各版本 changelog/plan/review-findings 等（101 md 36,067 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代无未完成设计方案（web-config-edit、plan-readme-svg-layout、env-benchmark-doc-update 已归档） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -400,6 +400,7 @@ investor-util/
 │       │   │   ├── test_holding_status.py   #   品种级数据状态标注测试（品种覆盖诊断）
 │       │   │   ├── test_data_freshness.py   #   数据可信度诊断测试（新鲜度 + 单日跳变）
 │       │   │   ├── test_http_client.py      #   HTTP 客户端测试
+│       │   │   ├── test_logger.py           #   日志模块测试（文件+控制台，自动轮转）
 │       │   │   ├── test_market_hours.py     #   交易时段判断测试
 │       │   │   ├── test_market_hours_edge.py #   交易时段边缘场景
 │       │   │   ├── test_models.py           #   数据模型测试
@@ -705,12 +706,10 @@ investor-util/
 │   │   ├── how-to-use-web-mode.md    #     Web 浏览器模式使用指南
 │   │   ├── how-to-use-cli-mode.md    #     CLI 命令行模式使用指南
 │   │   ├── how-to-start.md           #     快速上手
-│   │   ├── how-to-test-my-code.md    #     测试编写指南
-│   │   ├── scripts-reference.md      #     辅助脚本参考（全）
-│   │   ├── how-to-use-registry.md    #     注册表使用说明
 │   │   └── reports-instruction.md    #     报告使用说明
 │   ├── managements/                  #   管理文档
 │   │   ├── changelog.md              #     变更日志
+│   │   ├── developer-guide.md        #     开发者指南（开发纪律/门禁/测试/脚本/发布）
 │   │   ├── folders.md                #     目录结构
 │   │   ├── llm-technical.md          #     LLM 技术设计
 │   │   ├── plan.md                   #     总体实现计划
