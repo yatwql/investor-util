@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.14-dev
-> **编号源**：`rf-next = 276`（新增问题取此编号，完成后更新为 +1；已用最大 rf-275，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 277`（新增问题取此编号，完成后更新为 +1；已用最大 rf-276，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -71,6 +71,7 @@
 | rf-273 | 全量测试（mode all）进程退出阶段出现 `--- Logging error ---` 噪声：`tui.py` 模块级 `atexit.register(log_app_boundary, "关闭", ...)` 在 pytest 关闭 sys.stderr 后执行，console `StreamHandler` emit 抛 `ValueError: I/O operation on closed file`，logging 默认 `handleError` 打印噪声（无害但污染输出）。**修复**：`core/logger.py` 新增 `_ClosedStreamSilentHandler`（`StreamHandler` 子类，`handleError` 仅对 "closed file" 竞态静默降级，其余日志错误照常报告），`setup_logger` 控制台 handler 换用；新增 `test_logger.py` 4 用例回归。 | `changelog.md` [0.10.13] |
 | rf-274 | Web 前端静态资产 404（阻断级）：Flask 未显式指定 `static_url_path` 时按 `static_folder` basename 推导（`src/static/web/` → `/web/*`），index.html 引用的 `/static/main.js`、`/static/style.css` 全 404 → JS/CSS 未加载，前端整页失效（配置面板空白、健康区卡静态"正在检测"、生成按钮灰色）。plan-27 前端资产移入 `src/static/` 时引入，移动后未在真实浏览器验证。**修复**：`app.py` 显式 `static_url_path="/static"`；新增 `test_web_static_serving.py` 3 用例（静态路由固定 /static + index 全部资产 200 + main.js 可访问）回归；连带补强：`smoke-web.py` 页面渲染检查升级为实际请求全部 `/static/*` 资产断言 200（原仅查引用串存在，同类 404 会漏过冒烟）。 | `changelog.md` [0.10.13] |
 | rf-275 | main.js 旧浏览器兼容隐患（排查 rf-274 时发现）：`AbortSignal.timeout`（Chrome 103+/Safari 16+ 起才有）缺失时 `fetch(url, {signal: AbortSignal.timeout(...)})` 构造参数**同步抛 TypeError** → init 在 loadHealth 处中断，后续 loadHistory/loadConfigEdit 全部静默不执行（同 rf-274 症状但不同根因）。**修复**：main.js 顶部补 `AbortSignal.timeout` 兼容兜底（AbortController+setTimeout，无 AbortController 则退化 undefined 信号）+ init 三加载器改 `safeRun` 隔离（任一初始化异常只渲染对应面板错误，不连带中断其余）。 | `changelog.md` [0.10.13] |
+| rf-276 | v0.10.1+ 改动文档一致性全量审计（203 提交）→ 三档修复：**A 类事实错误**（README `enable_action` 默认值修正为「默认开、菜单 P 可切换」、folders.md 统计/目录树同步 6 个新测试文件、reports-instruction 浮盈/已实现盈亏文案）；**B 类用户文档缺口**（reports-instruction 补完整成本流水分析章节 + HTML TOC LLM 标记说明、how-to-use-web-mode 数据源健康代理诊断 + 产物写锁检测、datasource 行业名归一化说明、how-to-config `fetch_mode=off` 警告行为、how-to-start 持仓文件流水页签块、faq 已实现盈亏引用 XIRR/cost_lots）；**C 类管理文档**（requirements 增 R-ENV-05/R-WEB-09/§6.4.20 成本流水/增强 R-OUT-07、technical 增 §1.7.6 便捷入口包装脚本 + 语义命名表 report_section_order/generators_news、test-coverage 快照刷新至实时值） | `changelog.md` [0.10.14-dev] |
 
 > **独立项（rf-272 处置衍生，单列跟踪）**：`html_renderers._render_llm_content_section` 13 参渲染器上下文（删除需重构 html_writer.py 调用点，单列「签名瘦身」）；`report/_pipeline.py` 遗留重复文件（已标注不承载活代码，单列清理项）；`orchestrator.generate_report.warm_cache`（CLI `--warm` 标志去留待决策，已无实际消费路径）。
 

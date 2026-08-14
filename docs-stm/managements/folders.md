@@ -7,17 +7,17 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 244 | 58,784 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
+| 主程序代码 | Python | 244 | 58,970 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
 | HTML 报告模板 | HTML | 4 | 3,774 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 18 | 6,943 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本） |
-| **源代码合计** | — | **266** | **69,501** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **306** | **86,131** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,455 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **11** | **4,758** | 含 README.md（194 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 10 | 4,564 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **112** | **45,564** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 101 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 9,423 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| **源代码合计** | — | **266** | **69,687** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **306** | **86,228** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,461 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **用户文档** | Markdown | **11** | **4,793** | 含 README.md（194 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 10 | 4,599 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
+| **项目文档** | Markdown | **112** | **45,628** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 101 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 9,487 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 105 | 36,525 | 各版本 changelog/plan/review-findings 等（101 md 36,067 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代无未完成设计方案（web-config-edit、plan-readme-svg-layout、env-benchmark-doc-update 已归档） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -386,6 +386,7 @@ investor-util/
 │       │   │   ├── test_config_llm_multi.py      #   LLM 多配置测试
 │       │   │   ├── test_config_llm_multi_edge.py #   LLM 多配置边缘场景
 │       │   │   ├── test_config_validation.py     #   配置校验函数测试
+│       │   │   ├── test_llm_settings.py       #   LLM 定价/时段/时区设置解析测试（峰谷定价时段可配置）
 │       │   │   └── test_local_state.py           #   机器本地状态读写测试
 │       │   ├── core/                #   核心模块单元测试
 │       │   │   ├── __init__.py      #       子包标记
@@ -521,6 +522,9 @@ investor-util/
 │       │   │   ├── test_position_overlap.py       #   持仓重合度计算测试
 │       │   │   ├── test_fund_performance.py       #   基金业绩测试
 │       │   │   ├── test_fund_style.py             #   基金风格判定测试
+│       │   │   ├── test_history_snapshot_namespace.py      #   历史快照命名空间测试
+│       │   │   ├── test_history_snapshot_namespace_edge.py #   历史快照命名空间边缘场景
+│       │   │   ├── test_snapshot_namespace_consumers.py    #   快照命名空间消费方测试
 │       │   │   ├── test_style_factor_sheet.py     #   风格与因子分析页签呈现（一章三区块：风格表+因子回归+行业 Beta）
 │       │   │   ├── test_correlation_html.py       #   持仓关系矩阵章节（相关性/重合度区块）HTML 呈现
 │       │   │   ├── test_correlation_sheet.py      #   持仓关系矩阵页签（一章两区块）Excel 呈现
@@ -590,6 +594,8 @@ investor-util/
 │       │   │   ├── test_handlers.py #       Flask 路由 handler（全链路/错误信封/穿越拒绝/系统信息组装）
 │       │   │   ├── test_config_edit.py #    Web 配置编辑（白名单完备/写分派/校验守卫/备份）
 │       │   │   ├── test_config_edit_edge.py # Web 配置编辑极端输入（edge，*_edge.py 隔离）
+│       │   │   ├── test_holdings_update.py  #   Web 持仓更新（备份轮转/原子写提升）
+│       │   │   ├── test_holdings_update_edge.py # Web 持仓更新失败/回滚边缘场景
 │       │   │   ├── test_web_static_serving.py # Web 静态资产可访问性回归（/static/* 固定路径）
 │       │   │   ├── test_server.py   #       启动防护（output_dir 写锁检测/端口占用）
 │       │   │   └── test_smoke_web.py #      Web 冒烟脚本载体（test_client 11 项全链路断言）

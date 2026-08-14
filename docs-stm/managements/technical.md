@@ -509,6 +509,10 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 
 `report/cli_progress.py:CliProgressReporter`（`ProgressReporter` 子类）：默认进度写入 `invest` logger（`logs/app.log`），`--verbose` 时同步打印到 stderr——**静默为默认**，适合定时任务不污染 stdout；`print_timing_summary` 复用耗时汇总能力（与 TUI 同构，输出走日志/verbose）。
 
+#### 1.7.6 便捷入口包装脚本
+
+`scripts/cli.sh`（Linux/macOS，Bash）与 `scripts/cli.ps1`（Windows PowerShell）为 CLI 的**便捷入口外壳**：自动定位项目虚拟环境解释器（`.venv/bin/python` / `.venv\Scripts\python.exe`）并 `cd` 到项目根目录后执行。**无参数调用时默认注入 `report --type both`**（Excel+HTML 双格式、不含 LLM、全部页签有数据），传入参数时原样透传给 `cli/cli.py`。属纯分发层（不新增业务逻辑），供交互式使用与脚本速查；Windows 侧 `cli.ps1` 保持 UTF-8 with BOM + CRLF 编码约束（见 CLAUDE.md 编码/BOM 说明）。
+
 [↑ 回到顶部](#目录)
 
 ---
@@ -2412,7 +2416,7 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
                fingerprint.py       缓存指纹计算
                session.py           会话用量追踪
                cost_tracker.py      Token 预算管理
-               pricing.py           费用估算
+               pricing.py           费用估算（含 DeepSeek 峰谷定价）
                markdown.py          Markdown→HTML 转换
                circuit_breaker.py   LLM API 熔断器
                fact_checker/        LLM 输出伪代码/幻觉过滤（子包 9 模块，__init__ 重导出 4 公开函数）
@@ -2776,6 +2780,8 @@ make_http_client(timeout=10.0) → httpx.Client
 | `config_edit` | Web 配置编辑（覆盖 TUI 可编辑全集） | Web 配置 | 配置编辑 | 无（功能面） |
 | `config_edit_whitelist` | 可编辑配置项白名单（键→类型/枚举→目标文件→写入原语） | Web 配置 | 配置编辑 | 无（校验面） |
 | `config_backup` | 配置写前备份（`.bak` 单槽轮转） | Web 配置 | 配置编辑 | 无（安全面） |
+| `report_section_order` | 报告模块序号配置（键=模块标识，值=序号；空对象用默认 19 项顺序） | 报告编排 | 报告配置 | 顶层配置键 `report_section_order`（`get_report_section_order()` 读取，`llm_usage` 强制末位） |
+| `generators_news` | 财经新闻 LLM 关联分析（新闻热词→持仓关联二次生成） | 财经新闻热点与持仓关联分析 | LLM 生成 | 随 `enable_news` + LLM 启用 |
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 
