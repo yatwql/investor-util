@@ -135,9 +135,15 @@
 
   // ═══════════════════════════════════════════
   // 计价配置（默认使用 constants.py MODEL_PRICING，此处可覆盖）
+  // 峰谷定价时段（DeepSeek 官方方案，北京时间）：timezone 为判定时区，
+  // peak_periods 为高峰时段（"HH:MM-HH:MM" 闭区间），idle_periods 为空时
+  // 高峰之外的其余时间均按闲时价。含 "peak" 子段的模型高峰时段按 peak 价计费。
   // ═══════════════════════════════════════════
   "pricing": {
     "currency": "CNY",
+    "timezone": "Asia/Shanghai",
+    "peak_periods": ["09:00-12:00", "14:00-18:00"],
+    "idle_periods": [],
     "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.3}
   }
 }
