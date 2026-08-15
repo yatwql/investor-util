@@ -725,7 +725,6 @@ investor-util/
 │   │   ├── test-coverage.md          #     测试覆盖率统计
 │   │   └── testplan.md               #     测试计划
 │   ├── archive/                      #   历史归档
-│   │   ├── porting-to-rust-vs-java-analysis.md  #   Rust/Java 移植技术分析
 │   │   ├── v0.1.x/                            # v0.1.x 版本归档
 │   │   │   ├── archived_changelog.0.1.x.md        # 变更日志归档 v0.1.x
 │   │   │   ├── archived_plan.0.1.x.md             # 实现计划归档 v0.1.x
@@ -803,6 +802,7 @@ investor-util/
 │   │   │   ├── archived_changelog.0.7.x.md        # 变更日志归档 v0.7.x
 │   │   │   ├── archived_plan.0.7.x.md             # 实现计划归档 v0.7.x
 │   │   │   ├── archived_review-findings.0.7.x.md  # 自审记录归档 v0.7.x
+│   │   │   ├── porting-to-rust-vs-java-analysis.md # Rust/Java 移植技术分析
 │   │   │   └── better-investment-advice/           # 投资建议改进分析讨论（已归档）
 │   │   │       ├── discussion-better-investment-advice.md             # 可行性调研：6 层改进方向与实施路径
 │   │   │       ├── better-investment-task.md                          # 最小粒度工作任务分解（86 任务）
