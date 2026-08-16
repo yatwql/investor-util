@@ -166,10 +166,7 @@ def _locate_subject_code(
             # 归一化位置映射回原句的近似：减去 norm[:idx] 中别名替换带来的
             # 长度增量（core 内部含 canon 时略有偏差，仅影响多候选排序，
             # 不影响唯一简称的归因）。
-            _extra = sum(
-                (len(_c) - len(_a)) * norm[:idx].count(_c)
-                for _a, _c in _NAME_ALIAS_MAP.items()
-            )
+            _extra = sum((len(_c) - len(_a)) * norm[:idx].count(_c) for _a, _c in _NAME_ALIAS_MAP.items())
             _pos = idx - _extra
             dist = min(abs(_pos - anchor), abs(_pos + len(core) - anchor))
             if best_dist is None or dist < best_dist:

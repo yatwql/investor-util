@@ -86,6 +86,7 @@ def _tier_label(buckets: dict | None) -> str:
         return "低成本"
     return "混合"
 
+
 # ── 分类映射规则 ──────────────────────────────────────────
 
 # 分类关键词统一定义于 code_utils.py：

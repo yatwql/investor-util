@@ -103,7 +103,7 @@ def _check_header(text: str, version: str) -> bool:
     仅匹配整行 `> 文档版本：{version}`，避免正文偶然出现的版本号
     导致全文 contains 误判。
     """
-    pattern = rf'^\s*>\s*文档版本：{re.escape(version)}\s*$'
+    pattern = rf"^\s*>\s*文档版本：{re.escape(version)}\s*$"
     return bool(re.search(pattern, text, re.MULTILINE))
 
 
@@ -111,7 +111,7 @@ def _auto_fix_header(path: Path, version: str) -> bool:
     """自动修正「文档版本：」头部版本行为目标版本。"""
     text = path.read_text(encoding="utf-8")
     new_text, count = re.subn(
-        r'^\s*>\s*文档版本：.*$',
+        r"^\s*>\s*文档版本：.*$",
         lambda m: f"> 文档版本：{version}",
         text,
         count=1,

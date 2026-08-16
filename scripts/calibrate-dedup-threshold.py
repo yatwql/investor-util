@@ -287,7 +287,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--summary", action="store_true", help="仅显示汇总统计")
     parser.add_argument("--dry-run", action="store_true", default=True, help="仅分析不修改（默认）")
-    parser.add_argument("--file", default=_ANCHOR_PATH, help="锚点文件路径（默认 data/calibration/dedup_anchors.jsonl）")
+    parser.add_argument(
+        "--file", default=_ANCHOR_PATH, help="锚点文件路径（默认 data/calibration/dedup_anchors.jsonl）"
+    )
     args = parser.parse_args()
 
     records = load_anchors(args.file)

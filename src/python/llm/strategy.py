@@ -60,7 +60,7 @@ def resolve_provider_chain(
     # step 2: 模块偏好注入
     chain = _apply_module_preferred(chain, module_key, preferred or {})
 
- # step 3: 代理偏好注入（扩展点）
+    # step 3: 代理偏好注入（扩展点）
     chain = _apply_proxy_preferred(chain)
 
     return chain

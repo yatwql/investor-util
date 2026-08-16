@@ -79,9 +79,7 @@ _WEIGHT_KEYWORDS: frozenset[str] = frozenset(["权重"])
 
 # 相对基准跑输/跑赢上下文——数值为相对指数的表现差（如"跑输沪深300达1.10%"），
 # 单位是百分点而非收益率。直接与持仓收益率比较会误修正为某品种收益率。
-_BENCHMARK_RELATIVE_KEYWORDS: frozenset[str] = frozenset(
-    ["跑输", "跑赢", "落后于", "领先于"]
-)
+_BENCHMARK_RELATIVE_KEYWORDS: frozenset[str] = frozenset(["跑输", "跑赢", "落后于", "领先于"])
 
 # 品种计数/比例上下文——数值为品种计数比例而非收益率（如"80%的品种处于盈利"）
 _PROPORTION_KEYWORDS: tuple[str, ...] = (

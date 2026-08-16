@@ -66,7 +66,7 @@ def extract_marker_region(doc_text: str) -> str | None:
     start = doc_text.find(_MARKER_START)
     if start == -1:
         return None
-    body = doc_text[start + len(_MARKER_START):]
+    body = doc_text[start + len(_MARKER_START) :]
     end = body.find(_MARKER_END)
     if end == -1:
         return None
@@ -113,11 +113,7 @@ def report_submodules_keys(source: str) -> list[str]:
             if isinstance(k, ast.Constant) and k.value == "report_submodules":
                 val = node.values[i]
                 if isinstance(val, ast.Dict):
-                    return [
-                        kk.value
-                        for kk in val.keys
-                        if isinstance(kk, ast.Constant) and isinstance(kk.value, str)
-                    ]
+                    return [kk.value for kk in val.keys if isinstance(kk, ast.Constant) and isinstance(kk.value, str)]
     return []
 
 

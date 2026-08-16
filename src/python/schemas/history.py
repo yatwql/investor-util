@@ -52,18 +52,18 @@ class AccountSnapshot:
 class SnapshotData:
     """一次完整的快照数据。
 
-    包含所有账户的持仓数据 + 组合级汇总 + 可选 LLM 摘要。
- Fingerprint 用于 指纹去重——无实际变化时跳过差异段落生成。
+       包含所有账户的持仓数据 + 组合级汇总 + 可选 LLM 摘要。
+    Fingerprint 用于 指纹去重——无实际变化时跳过差异段落生成。
 
-    Attributes:
-        accounts:     所有账户的快照列表
-        total_value:  组合总市值
-        total_cost:   组合总成本
-        total_pnl:    组合总盈亏
-        total_pnl_pct:组合总盈亏率
-        timestamp:    快照时间（ISO 格式字符串，如 "2026-07-12T14:30:00"）
-        fingerprint:  内容指纹（SHA256），用于去重
- llm_summary: LLM 生成的快照评语（可选，由 LLM 流程写入）
+       Attributes:
+           accounts:     所有账户的快照列表
+           total_value:  组合总市值
+           total_cost:   组合总成本
+           total_pnl:    组合总盈亏
+           total_pnl_pct:组合总盈亏率
+           timestamp:    快照时间（ISO 格式字符串，如 "2026-07-12T14:30:00"）
+           fingerprint:  内容指纹（SHA256），用于去重
+    llm_summary: LLM 生成的快照评语（可选，由 LLM 流程写入）
     """
 
     accounts: tuple[AccountSnapshot, ...]
