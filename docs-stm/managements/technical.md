@@ -1492,7 +1492,7 @@ verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使�
 | `orch_val` | `orchestrator.py` 估值分位 | `min(6, len(pairs))` | 并行拉取 PE/PB + 价格分位 |
 | `orch_corr` | `orchestrator.py` 相关性矩阵 | `min(6, n)` | 并行拉取持仓 K 线 |
 | `orch_llm_news` | `_fetch_llm_and_news()` | 2 | 并行获取 LLM + 新闻 |
-| `orch_health` | `_pipeline.py` 数据源健康检查 | 1 | 后台并行执行数据源健康检查 |
+| `orch_health` | `_report_health.py` 数据源健康检查 | 1 | 后台并行执行数据源健康检查 |
 
 ### 4.3 Excel 管线
 

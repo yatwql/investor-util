@@ -7,13 +7,13 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 244 | 59,133 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
+| 主程序代码 | Python | 243 | 58,453 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
 | HTML 报告模板 | HTML | 4 | 3,774 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 19 | 7,022 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断） |
-| **源代码合计** | — | **267** | **69,929** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **307** | **86,536** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,474 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **源代码合计** | — | **266** | **69,249** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **307** | **86,533** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,473 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **4,793** | 含 README.md（194 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,599 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
 | **项目文档** | Markdown | **112** | **45,662** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 101 md），py/txt 不计行 |
@@ -227,7 +227,6 @@ investor-util/
 │   │   │   ├── _report_factor_metrics.py # 风格因子/行业 Beta 计算族（持仓K线路由 + 因子回归 + 行业Beta）
 │   │   │   ├── _report_aux_metrics.py #  辅助指标编排（市场温度 + 持仓相关性矩阵）
 │   │   │   ├── _llm_news.py          #   LLM/新闻并行获取（线程池提交/收集/报告）
-│   │   │   ├── _pipeline.py          #   报告管线编排（单管线/双管线调度）
 │   │   │   ├── _report_generation.py #   报告生成实现（both/full 两种路径，聚合门面）
 │   │   │   ├── _report_health.py     #   数据源健康检查（后台并行启动/结果收集持久化）
 │   │   │   ├── _report_helpers.py    #   管线辅助函数（轻量行情/演进与快照差异注入/完整性校验/both 明细子集）

@@ -38,21 +38,14 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
-### P3 — rf-272 处置衍生独立跟踪项（2026-08-16）
-
-> 全仓 ARG001 死参数处置（rf-272，v0.10.13，已归档）后遗留的独立跟踪项，自「已解决」区独立项注释移入本区单列待办。各自完成后转入「已解决」区并在 changelog.md 登记。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-282** | `html_renderers._render_llm_content_section` 渲染器上下文参数过多（当前 15 参） | 签名瘦身：删参并重构 `html_writer.py` 调用点 |
-| **rf-283** | `report/_pipeline.py` 遗留重复文件（已标注不承载活代码） | 清理项：确认无活引用后删除，防双份漂移 |
-| **rf-284** | `orchestrator.generate_report.warm_cache`（CLI `--warm` 标志去留） | 已无实际消费路径，待决策：删除 `--warm` 或保留 |
-
 ## 已解决问题（变更详情见 changelog.md 对应条目）
 
 
 | # | 摘要 | 变更记录 |
 |---|------|----------|
+| rf-282 | `html_renderers._render_llm_content_section` 渲染器上下文参数过多（15 参） | 签名瘦身至 2 参（`enable_llm`/`llm_content`），删 13 死参并重构 `html_writer.py` 调用点 | `changelog.md` [0.10.14-dev] |
+| rf-283 | `report/_pipeline.py` 遗留重复文件（已标注不承载活代码） | 确认无活引用后删除（`git rm`），测试迁移至活模块 `_llm_news.py` | `changelog.md` [0.10.14-dev] |
+| rf-284 | `orchestrator.generate_report.warm_cache`（CLI `--warm` 标志）已无实际消费路径 | 删除 `--warm` 标志 + `warm_cache` 参数（含测试引用同步清理） | `changelog.md` [0.10.14-dev] |
 
 ### 归档档案
 
