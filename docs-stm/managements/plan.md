@@ -18,11 +18,7 @@
 
 > **P0** = 必须完成才能发布 · **P1** = 当前待办 · **P2** = 下一阶段就绪 · **P3** = 预期实施，有空时安排 · **P4** = 实验功能（缺省关闭，需显式启用）
 
-**当前无 P0~P3 待办**（v0.10.x 已完成事项记录已整体归档至 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)：P0 发布门禁、推荐实施顺序 ①~⑧、P1~P3 已完成项详细段落 + P4 已随发布版本实现项 plan-8/25/26/27/28）。P4 区仅剩未实现项 `plan-10` 日志可视化。
-
 ### P4 — 实验功能
-
-> 实验性功能，缺省关闭，需通过配置项或 features.json 显式启用。启用不影响现有功能稳定性。**当前实验项**：日志可视化（`plan-10`，未实现）。已随发布版本实现的 P4 项（plan-8/25/26/27/28）详细记录已整体归档至 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)「P4 — 实验功能」章节。
 
 #### `plan-10` 日志可视化（[`plan-web-ui.md §2`](../archive/v0.10.x/web-ui/plan-web-ui.md#2-日志可视化)）
 
@@ -32,7 +28,7 @@
 
 ## 归档
 
-- [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项（plan-17~plan-28，含设计文档索引：投资功能优化/章节归并 + 任务编号门禁 + Web UI 三件套（持仓输入模式/配置编辑/前端资产归位）+ 三模式使用指南 + README SVG 架构图；P4 实验功能已完成项 plan-8/25/26/27/28 亦已并入「P4 — 实验功能」章节）
+- [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项
 - [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项（含设计文档索引）
 - [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10（含设计文档索引 + 已完成项）
 - [`archived_plan.0.7.x.md`](../archive/v0.7.x/archived_plan.0.7.x.md)
