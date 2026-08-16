@@ -3104,7 +3104,7 @@ investor-util/
 | 池名称 | 所在模块 | max_workers | 线程名前缀 | 用途 |
 |:-------|:---------|:-----------|:----------|:------|
 | `orch_prep` | `report/orchestrator.py`（`prepare_report_data`） | 2 | `orch_prep` | 并行获取 A 股/美股指数 |
-| `orch_llm_news` | `report/orchestrator.py`（`_fetch_llm_and_news`） | 2 | `orch_llm_news` | 并行获取 LLM + 新闻 |
+| `orch_llm_news` | `report/_llm_news.py`（`_fetch_llm_and_news`） | 2 | `orch_llm_news` | 并行获取 LLM + 新闻 |
 | `cache_ops` | `cache/operations.py` | 4 | `cache_ops` | 并行刷新基金/行业/公共缓存 |
 
 各线程池互不共享，职责隔离。
