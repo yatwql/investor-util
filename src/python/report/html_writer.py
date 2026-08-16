@@ -478,19 +478,6 @@ def write_html_report(
         _render_llm_content_section(
             enable_llm,
             llm_content,
-            force_llm,
-            a_indices,
-            us_indices,
-            total_mv,
-            total_cost,
-            total_profit,
-            total_today_profit,
-            holdings,
-            cat_counts,
-            penetration,
-            details,
-            sector_flow,
-            prog,
         )
     )
 
