@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.14-dev
-> **编号源**：`rf-next = 281`（新增问题取此编号，完成后更新为 +1；已用最大 rf-280，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 282`（新增问题取此编号，完成后更新为 +1；已用最大 rf-281，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -50,6 +50,7 @@
 | rf-278 | fact_checker 简称匹配漏检：「华安纳指+180.5%」（040046 实际 130.61%）因简称无法匹配全名、回退最近邻 180.5 恰命中 601939 真实值而漏检。修复：`_NAME_ALIAS_MAP` 简称归一化 + `_extract_core_name` 核心名前缀匹配 | `changelog.md` [0.10.14-dev] |
 | rf-279 | dedup 校准脚本读取路径与写入路径不一致：`calibrate-dedup-threshold.py` 默认读 `data/cache/dedup_anchors.jsonl`（7-29 旧文件），而 `news_dedup.py` 自 commit `4e95d595`（2026-07-30）起写入 `data/calibration/dedup_anchors.jsonl`，脚本从未同步 → 校准建议基于过时快照。修复：脚本默认路径改为 `data/calibration/`；基于最新 109018 条数据重校准结论——bg=2 ratio≥0.35 候选 523 条真实重复率仅约 25%，维持现阈值 | `changelog.md` [0.10.14-dev] |
 | rf-280 | dedup 锚点文件重复计数：`dedup_anchors.jsonl` append-only，同一对 (source,title) 多轮运行重复追加（实测 61.6% 为重复），使校准数字失真（cross_skip bg=0 279→13800 虚增）。修复：① `_flush_anchors` 写入层去重——新增 `_WRITTEN_ANCHOR_KEYS` 进程级集合 + `_load_written_keys` 惰性加载，跨轮只写新 key；② 校准脚本 `load_anchors` 统计层按 (source,title) 对去重，处理存量污染；③ conftest 隔离锚点路径 + 重置锚点单例。去重后校准锚点 109018→41761 | `changelog.md` [0.10.14-dev] |
+| rf-281 | extract-test-failures.py 解析 pytest-html 报告崩溃：`_find_json_blob` 手工花括号扫描器假设 JSON 引号以反斜杠转义，但 pytest-html 将引号编码为 `&#34;` 实体 → 扫描器从不进入字符串态、日志内嵌 `}` 提前截断，`json.loads` 报 `Extra data`（**全绿报告也崩溃**，依赖此工具的失败用例提取流程不可用）。修复：按 `data-jsonblob` 属性起始引号到下一裸引号整体截取（blob 内引号均为实体编码，不会裸引号提前终止）+ 统一解码实体。新增 4 例回归测试（实体引号提取/日志内嵌花括号/无 blob/缺失结束引号） | `changelog.md` [0.10.14-dev] |
 
 > **独立项（rf-272 处置衍生，单列跟踪）**：`html_renderers._render_llm_content_section` 13 参渲染器上下文（删除需重构 html_writer.py 调用点，单列「签名瘦身」）；`report/_pipeline.py` 遗留重复文件（已标注不承载活代码，单列清理项）；`orchestrator.generate_report.warm_cache`（CLI `--warm` 标志去留待决策，已无实际消费路径）。
 
