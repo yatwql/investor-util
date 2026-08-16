@@ -272,7 +272,7 @@
 |:-----|:---------|
 | 某只股票行情为 0 | ① 确认交易时间 ② 查看日志 WARNING（Provider Chain 回退） ③ 检查熔断器 `data/state/circuit_breaker.json` |
 | 基金净值未更新 | ① 确认非节假日 ② 确认当天 22:00 后 ③ 查看净值日期字段（可能为 T-1） |
-| 行业分类为空 | ① 检查 `push2.eastmoney.com` 是否可连通 ② 确认代码前缀正确（上海 `1.` / 深圳 `0.`） |
+| 行业分类为空 | ① 检查 `push2.eastmoney.com` 是否可连通 ② 确认代码前缀正确（上海 `1.` / 深圳 `0.`） ③ 频繁断连（日志含 "Server disconnected" + 熔断退避）时运行 `scripts/probe-push2.py` 定位网络拦截 vs 程序缺陷（含 curl 对照判读） |
 | akshare 数据为空 | ① `pip list \| grep akshare` 确认已安装且 ≥1.16.0 ② 尝试 `pip install --upgrade akshare` ③ 查看 `logs/app.log` 中超时/异常详情 |
 | 新闻为空 | ① 确认 `enable_news` 为 true ② 勾选的新闻源是否可用 ③ 财联社是否因签名鉴权失败 |
 
