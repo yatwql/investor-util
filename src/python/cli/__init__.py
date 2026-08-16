@@ -10,6 +10,7 @@ from src.python.cli.cli import (
     _handle_cache,
     _handle_cache_update,
     _handle_report,
+    _handle_view_logs,
     _handle_whatif,
     main,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "_handle_cache",
     "_handle_cache_update",
     "_handle_report",
+    "_handle_view_logs",
     "_handle_whatif",
     "main",
 ]

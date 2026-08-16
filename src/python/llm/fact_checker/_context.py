@@ -9,6 +9,7 @@ from __future__ import annotations
 from src.python.llm.fact_checker._constants import (
     _BENCHMARK_RELATIVE_KEYWORDS,
     _CHANGE_RATE_KEYWORDS,
+    _CONDITION_TRIGGER_KEYWORDS,
     _CONTRIBUTION_KEYWORDS,
     _DAILY_MOVE_KEYWORDS,
     _DAILY_TIME_KEYWORDS,
@@ -113,6 +114,11 @@ def _is_trim_target_context(sentence: str, match_start: int) -> bool:
     某品种收益率。用 match 前 15 字符内是否出现调仓动作词判定——
     目标比例数值通常紧邻"止盈/减仓"等词（如"止盈约30%"、"-40%"），
     避免同句首部的真实收益率被连带跳过。
+
+    额外识别条件阈值触发式（"收益率超过200%后可考虑部分止盈"）：数值前有
+    "超过/达到/突破"等触发词、数值后有止盈/减仓等调仓动作词时，数值是
+    条件触发的止盈目标阈值，非对当前收益率的陈述。双条件联合判定，避免
+    把"收益率+X%，建议止盈"的真实收益率误判为阈值（该处数值前无触发词）。
     """
     nearby = sentence[max(0, match_start - 15) : match_start + 5]
     if any(kw in nearby for kw in _TRIM_TARGET_KEYWORDS):
@@ -121,7 +127,17 @@ def _is_trim_target_context(sentence: str, match_start: int) -> bool:
     # 数值与"警戒"间可能间隔数词，用更宽窗口检测。警戒词不修饰真实收益率描述，
     # 宽窗口安全，不会跳过合法收益率校验。
     _wide = sentence[max(0, match_start - 25) : match_start + 8]
-    return any(kw in _wide for kw in _WARNING_THRESHOLD_KEYWORDS)
+    if any(kw in _wide for kw in _WARNING_THRESHOLD_KEYWORDS):
+        return True
+    # 条件阈值触发式（"超过X%后可考虑部分止盈"）——"止盈"等动作词位于数值
+    # 之后较远处（超出 [-15,+5] 邻近窗口），需触发词+后置动作词双条件联合：
+    # 仅有触发词而无动作词（如"收益率超过200%，风险很大"）仍按收益率校验。
+    _cond = sentence[max(0, match_start - 12) : match_start]
+    if any(kw in _cond for kw in _CONDITION_TRIGGER_KEYWORDS):
+        _after = sentence[match_start : match_start + 25]
+        if any(kw in _after for kw in _TRIM_TARGET_KEYWORDS):
+            return True
+    return False
 
 
 def _is_portfolio_level_context(sentence: str, match_start: int) -> bool:

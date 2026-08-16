@@ -62,7 +62,6 @@ def _build_parser() -> argparse.ArgumentParser:
         "仅 --type both/full 时有效）",
     )
     report_p.add_argument("--force-llm", action="store_true", help="强制重新生成 LLM 内容（跳过缓存）")
-    report_p.add_argument("--warm", action="store_true", help="预热新资产缓存（冷启动时使用）")
 
     # ── cache 子命令 ──
     cache_p = sub.add_parser("cache", help="缓存管理")
@@ -100,6 +99,30 @@ def _build_parser() -> argparse.ArgumentParser:
     # ── check-sources 子命令 ──
     check_p = sub.add_parser("check-sources", help="数据源健康检查（无需 config）")
     check_p.epilog = "示例:\n  check-sources    测试各数据源联通性"
+
+    # ── view-logs 子命令 ──
+    logs_p = sub.add_parser("view-logs", help="查看结构化运行日志（无需 config）")
+    logs_p.add_argument(
+        "--level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default=None,
+        help="最小级别阈值（ERROR 含 ERROR+CRITICAL；默认全部）",
+    )
+    logs_p.add_argument(
+        "--lines",
+        type=int,
+        default=5000,
+        help="读取日志末尾物理行数上限（默认 5000，防止大日志卡顿）",
+    )
+    logs_p.add_argument("--since", metavar="YYYY-MM-DD[ HH:MM:SS]", help="起始时间前缀过滤")
+    logs_p.add_argument("--until", metavar="YYYY-MM-DD[ HH:MM:SS]", help="结束时间前缀过滤（含边界）")
+    logs_p.epilog = (
+        "示例:\n"
+        "  view-logs                     查看最近日志\n"
+        "  view-logs --level ERROR      只看 ERROR+CRITICAL\n"
+        "  view-logs --since 2026-08-16 只看指定日期之后\n"
+        "  view-logs --lines 200        只读末尾 200 行"
+    )
 
     return parser
 
@@ -321,7 +344,6 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
         fetch_history=args.history,
         force_llm=args.force_llm,
         output_dir=args.output,
-        warm_cache=args.warm,
         transactions=transactions,
         dividends=dividends,
     )
@@ -456,6 +478,38 @@ def _handle_check_sources() -> int:
     return 2  # unreachable, run_check_sources calls sys.exit
 
 
+def _handle_view_logs(args: argparse.Namespace) -> int:
+    """处理 view-logs 子命令——读取结构化运行日志。
+
+    纯命令输出（print），无需 config——配置损坏时仍可查看日志诊断。
+    级别/时间过滤与尾部读取逻辑全部委托核心层 read_log()。
+    """
+    import logging
+
+    from src.python.core.log_reader import read_log
+
+    lines = max(1, args.lines)
+    try:
+        entries = read_log(limit=lines, level=args.level, since=args.since, until=args.until)
+    except (ValueError, OSError):
+        logging.getLogger("invest").exception("读取运行日志失败")
+        print("[ERR] 读取运行日志失败（详见日志）", file=sys.stderr)
+        return _EXIT_SEVERE
+
+    if not entries:
+        print("无匹配日志条目")
+        return _EXIT_SUCCESS
+
+    level_label = args.level or "全部"
+    print(f"=== 运行日志（尾部 {lines} 行，级别: {level_label}）===")
+    for entry in entries:
+        print(f"{entry.time} [{entry.level}] {entry.message}")
+        # 多行 body（traceback 等续行）缩进显示
+        for body_line in entry.body.splitlines()[1:]:
+            print(f"    {body_line}")
+    return _EXIT_SUCCESS
+
+
 # ── 主入口 ───────────────────────────────────────────────
 
 
@@ -477,6 +531,10 @@ def main() -> int:
 
     if args.command == "check-sources":
         return _handle_check_sources()
+
+    # view-logs 无需 config：配置损坏时仍可查看日志诊断
+    if args.command == "view-logs":
+        return _handle_view_logs(args)
 
     init_config(config_path=args.config)
     config = get_config()

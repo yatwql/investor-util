@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.10.14-dev
+> 文档版本：0.10.14
 
 ---
 
@@ -504,14 +504,14 @@ def test_get_ttl_closed(self, mock_open):
 
 9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + §4 中 P1 级各自动化回归项全部通过（报告完整性 / Excel 视觉 / HTML 渲染 / 缓存刷新 / Provider 降级）
-11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）
+11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`python scripts/test_runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行）
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
 ### 6.4 补充自动化门禁
 
 12. **异常场景全覆盖**：§1.6 异常场景清单全部 ✅（每项异常场景均有对应自动化用例，edge/resilience 标记），不允许存在仅靠人工确认的 🔴/🟡 项
 13. **报告文件视觉结构**：Excel 和 HTML 输出无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）→ `test_excel_writer.py` / `test_summary.py` / `test_html_report_structure.py`
-14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[X]）响应正确、无崩溃 → `test_tui_menu.py`（17 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
+14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[V]/[H]/[X]）响应正确、无崩溃 → `test_tui_menu.py`（19 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
 15. **whatif CLI**：`--candidate` 必填、`--base` 可选、缺失报参数错误、`--effective-date` 解析，生成/归档行为 → `test_cli.py::test_whatif_*` + `test_whatif_operations.py` / `test_whatif_sheet.py` / `test_whatif_html.py` / `test_whatif_writer.py`
 16. **whatif 生效日时序回测**：① 过去生效日→出「时序回测」页签/区 → `test_effective_date_merges_backtest` + `test_backtest_sheet_full` + `test_backtest_section_rendered`；② 缺省→维持现状（无回测）→ `test_no_effective_date_no_backtest_call` + `test_full_rendering_sections_without_backtest`；③ 未来/非法日期→降级占位、主报告正常 → `test_compute_backtest_days_invalid_format` / `test_compute_backtest_days_future_or_today_none` + `test_effective_date_exception_degrades` + `test_backtest_sheet_unavailable_reason_placeholder`；④ 断网/空缓存→回测不可用但报告仍生成 → `test_unavailable_returns_reason` / `test_unavailable_without_reason_falls_back` + `test_effective_date_bt_none_no_key`
 

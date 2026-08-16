@@ -28,7 +28,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SETTINGS_PATH = _REPO_ROOT / ".claude" / "settings.json"
 
 # 与 check-task-numbering-hook.py 同名的 hook 条目（match_tool + match_type + command）
-_HOOK_CMD = "python scripts/check-task-numbering-hook.py \"$__INJECTED_OBJECT__\""
+_HOOK_CMD = 'python scripts/check-task-numbering-hook.py "$__INJECTED_OBJECT__"'
 
 
 def _build_hook_block() -> dict:
@@ -93,10 +93,7 @@ def uninstall() -> int:
     remaining = [
         hook
         for hook in post
-        if not any(
-            h.get("type") == "command" and h.get("command") == _HOOK_CMD
-            for h in hook.get("hooks", [])
-        )
+        if not any(h.get("type") == "command" and h.get("command") == _HOOK_CMD for h in hook.get("hooks", []))
     ]
     existing["hooks"]["PostToolUse"] = remaining
     if not remaining:

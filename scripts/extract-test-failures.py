@@ -21,47 +21,20 @@ from typing import Any
 def _find_json_blob(html: str) -> str | None:
     """在 pytest-html 报告 HTML 中找到 data-jsonblob 属性的值。
 
-    JSON blob 可能含 HTML 转义实体（&#34; 等），需要在解析前解码。
+    JSON blob 是单一 HTML 属性值：属性起始引号到下一个裸引号之间即为
+    完整 JSON（blob 内所有 JSON 引号都被 pytest-html 转义为 HTML 实体
+    ``&#34;``，不会出现裸引号提前终止属性）。取到后统一解码实体。
     """
     idx = html.find("data-jsonblob=")
     if idx < 0:
         return None
 
     start = html.index('"', idx) + 1
-    buf: list[str] = []
-    depth = 0
-    in_str = False
-    prev_bs = False
+    end = html.find('"', start)
+    if end < 0:
+        return None
 
-    for i in range(start, len(html)):
-        ch = html[i]
-        if prev_bs:
-            buf.append(ch)
-            prev_bs = False
-            continue
-        if ch == "\\":
-            prev_bs = True
-            buf.append(ch)
-            continue
-        if ch == '"' and in_str:
-            in_str = False
-            buf.append(ch)
-            continue
-        if ch == '"' and not in_str:
-            in_str = True
-            buf.append(ch)
-            continue
-        if not in_str:
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    buf.append(ch)
-                    break
-        buf.append(ch)
-
-    raw = "".join(buf)
+    raw = html[start:end]
     raw = raw.replace("&#34;", '"').replace("&gt;", ">").replace("&lt;", "<").replace("&amp;", "&")
     return raw
 

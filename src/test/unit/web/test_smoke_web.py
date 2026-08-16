@@ -42,3 +42,39 @@ def test_smoke_web_run_smoke_all_pass():
     assert len(results) == 11
     failed = [r for r in results if not r["ok"]]
     assert failed == [], f"Web 冒烟存在失败项: {failed}"
+
+
+class _FakePollClient:
+    """模拟 run 状态机轮询客户端：按给定 status 序列依次返回。"""
+
+    def __init__(self, statuses: list[str]):
+        self._statuses = statuses
+
+    def get(self, url):
+        class _Resp:
+            @staticmethod
+            def get_json():
+                return {"data": {"status": self._statuses.pop(0)}}
+
+        return _Resp()
+
+
+def test_smoke_web_poll_run_finished_waits_for_done():
+    """_poll_run_finished 轮询至终态：queued→running→done 返回 done（不提前返回）。"""
+    mod = _load_script()
+    status = mod._poll_run_finished(_FakePollClient(["queued", "running", "done"]), "r1")
+    assert status == "done"
+
+
+def test_smoke_web_poll_run_finished_returns_failed():
+    """_poll_run_finished 到 failed 也返回终态 failed。"""
+    mod = _load_script()
+    status = mod._poll_run_finished(_FakePollClient(["queued", "failed"]), "r1")
+    assert status == "failed"
+
+
+def test_smoke_web_poll_run_finished_never_finishes_returns_last():
+    """_poll_run_finished 始终不到终态时返回最后 status（不崩溃）。"""
+    mod = _load_script()
+    status = mod._poll_run_finished(_FakePollClient(["running", "running"]), "r1", max_iters=2)
+    assert status == "running"

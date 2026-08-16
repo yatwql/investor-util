@@ -93,6 +93,10 @@ def _bind_callbacks() -> None:
         _cmd_config_report_boards,
         _cmd_refresh_config,
     )
+    from src.python.tui.handlers_log import (
+        _cmd_view_health_history,
+        _cmd_view_logs,
+    )
     from src.python.tui.handlers_report import (
         _cmd_generate_both,
         _cmd_generate_excel,
@@ -117,6 +121,8 @@ def _bind_callbacks() -> None:
         "P": _cmd_config_report_boards,
         "S": _cmd_config_llm_modules,
         "R": _cmd_refresh_config,
+        "V": _cmd_view_logs,
+        "H": _cmd_view_health_history,
     }
     for i, (key, _label, _cb, is_exit) in enumerate(MENU_ITEMS):
         MENU_ITEMS[i] = (key, _label, callbacks.get(key), is_exit)
@@ -154,7 +160,7 @@ def main() -> None:
     except Exception:
         logger.debug("首次运行引导显示失败（非关键）", exc_info=True)
 
-    # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/H/B/L/W/C/F/O/1/2/3/4/S/R/X
+    # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/B/L/W/C/F/O/1/2/3/4/P/I/A/S/R/V/H/X
     from src.python.config import get_config
 
     _default_key = get_config().get("default_menu_key", "L").upper()

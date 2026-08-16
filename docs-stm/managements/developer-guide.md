@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.10.14-dev
+> 文档版本：0.10.14
 
 ## 概述
 
@@ -649,11 +649,15 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
 | `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`--collect-only` 快照，供 test-coverage.md 更新） |
 | `smoke-web.py` | 测试 | Web 模式 HTTP 冒烟脚本（test_client 进程内全链路断言，可独立运行） |
+| `reproduce_factcheck_corrections.py` | 测试 | 事实校验自动修正复现脚本（重建持仓+缓存 → 重跑数值校验提取修正明细） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（发布前必跑） |
 | `perf_report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf_view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
 | `diagnose_gemini_proxy.py` | 诊断 | Gemini API 代理连通性诊断 |
 | `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（风格因子回归前置决策闸门） |
+| `svg_geom_check.py` | 诊断 | README SVG 架构图几何审查（文本越界/重叠/矩形对齐） |
+| `svg_pixel_check.py` | 诊断 | README SVG 架构图像素检查（检测文本越出卡片右缘） |
+| `svg_text_overflow_check.py` | 诊断 | README SVG 架构图文字色像素越界精确检测 |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本（无参数启动 TUI；`web` 子命令启动 Web 浏览器模式） |
 | `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
@@ -702,6 +706,16 @@ Web 模式全链路可复跑冒烟验证（上传→生成→进度→产物，F
 ```
 
 退出码：0 = 全部通过；2 = 存在失败项。同款断言已由 `src/test/unit/web/test_smoke_web.py`（`unit_web` 标记）纳入 `dev-verify`/`verify` 门禁，本脚本用于手动快速复跑。
+
+**`reproduce_factcheck_corrections.py` — 事实校验自动修正复现**
+
+回答「事实校验到底修正了哪些数值」的复现脚本：用 `data/holdings` 持仓 + `data/cache` 历史行情快照重建当时的 `holdings_details`，对指定 LLM 缓存内容调用 `check_numerical_consistency`，逐条打印修正三元组（错误值 → 修正值 + 原文句段）。
+
+```bash
+.venv/bin/python scripts/reproduce_factcheck_corrections.py
+```
+
+逐份检查计数/通过数/不一致数/修正数；有修正时列出每处 `错误值% → 修正值%` 与截断句段。用于排查事实校验是否误修正正确文本（如阈值/止盈目标被当收益率改写的回归复现）。
 
 **`check-code-traces.py` — 代码注释历史痕迹检查**
 
@@ -941,6 +955,23 @@ sh .githooks/install-hooks.sh --off   # 停用
 **`probe-csi-factor-indices.py` — CSI 风格指数可用性探测**
 
 CSI 风格指数可用性探测（风格因子回归前置决策闸门），决定风格因子回归是否可用。
+
+**`svg_geom_check.py` / `svg_pixel_check.py` / `svg_text_overflow_check.py` — README SVG 架构图检查三件套**
+
+README 首屏架构图（`src/static/architecture.svg` / `llm-chain.svg` / `capabilities.svg`）的渲染质量检查，改图后用于验证文本不越界/重叠。
+
+```bash
+# 几何审查：文本越界 / 文本重叠 / 矩形对齐（估算字体宽度）
+.venv/bin/python scripts/svg_geom_check.py <svg路径>
+
+# 像素检查：检测文本是否越出卡片右缘（副标题行区域找亮色像素）
+.venv/bin/python scripts/svg_pixel_check.py <png路径>
+
+# 精确检测文字色像素是否越出卡片右缘
+.venv/bin/python scripts/svg_text_overflow_check.py <png路径>
+```
+
+三个脚本均接受图片路径参数，配合 `src/static/` 下 SVG 渲染出的 PNG 使用。
 
 ### 启动脚本
 

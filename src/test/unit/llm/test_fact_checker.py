@@ -1316,6 +1316,32 @@ class TestTrimTargetContext:
         assert corrections[0][0] == "5.0"
         assert "实际收益率" in corrections[0][3]
 
+    def test_condition_threshold_over_pct_not_corrected(self, real_holdings):
+        """「收益率超过200%后可考虑部分止盈」→ 条件阈值，不误修正。
+
+        穿透深度分析原文含「收益率超过 200% 后可考虑部分止盈锁定利润」：
+        其中 200% 是止盈目标阈值，非对 600900 当前收益率的陈述。"止盈"距数值
+        较远（超出 _TRIM_TARGET_KEYWORDS 的 [-15,+5] 邻近窗口）时，该阈值
+        不做收益率修正，保持原值、无修正项。
+        """
+        text = (
+            "建设银行收益率+171.23%、长江电力+56.83%，建议继续持有以平滑组合波动，"
+            "但在收益率超过 200% 后可考虑部分止盈锁定利润。"
+        )
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert corrections == [], f"200% 是止盈目标阈值，不应被误修正: {corrections}"
+
+    def test_condition_threshold_no_action_word_still_checked(self, real_holdings):
+        """触发词后无调仓动作词 → 仍按收益率校验（不过度跳过）。
+
+        「收益率超过200%，风险很大」中 200% 无后置"止盈/减仓"等动作词，
+        仍作为收益率陈述处理（偏离真实值会告警），避免修复过度掩盖真错误。
+        """
+        text = "该组合收益率超过 200%，风险很大。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
+        assert len(corrections) == 1, f"无动作词的夸张收益率仍应被校验: {corrections}"
+        assert corrections[0][0] == "200"
+
 
 # ── 名称指代主体定位：最近边距离（修复平局误路由） ──
 
@@ -1445,3 +1471,74 @@ class TestApplyCorrectionSingleReplace:
 
         html = "<p>止盈约30%持仓。</p>"
         assert apply_numerical_corrections(html, []) == html
+
+
+# ── 持仓简称/别名归一化匹配 ──
+
+
+class TestNameAliasNormalized:
+    """句中用「机构名+指数简称」缩略指代持仓（如"华安纳指"→040046）可被归因。
+
+    辩论综合 LLM 输出以「华安纳指+180.5%」缩略指代华安纳斯达克100ETF联接
+    （040046，实际收益率 130.61%）。名称归一化（_NAME_ALIAS_MAP + 核心名
+    前缀匹配）将"华安纳指"解析回 040046 并按其真实持仓校验收益率，不回退
+    全局最近邻误命中其他代码。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_llm,
+        pytest.mark.llm,
+    ]
+
+    @staticmethod
+    def _alias_holdings() -> list[dict]:
+        """华安纳指（040046）+ 建设银行（601939），收益率与真实持仓一致。"""
+        return [
+            {
+                "name": "华安纳斯达克100ETF联接基金A",
+                "code": "040046",
+                "market_value": 41928.0,
+                "cost": 18181.5,
+                "profit_rate": 130.61,
+            },
+            {
+                "name": "建设银行",
+                "code": "601939",
+                "market_value": 20480.0,
+                "cost": 7300.0,
+                "profit_rate": 180.55,
+            },
+        ]
+
+    def test_alias_shortname_wrong_value_corrected(self):
+        """「华安纳指+180.5%」→ 归因 040046，按实际 130.61% 修正。"""
+        holdings = self._alias_holdings()
+        text = "如何处理已实现的巨额浮盈（华安纳指+180.5%、建设银行+180.55%）"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert len(corrections) == 1, f"华安纳指被写成 180.5%，应被检出修正: {corrections}"
+        assert corrections[0][0] == "180.5"
+        assert corrections[0][1] == "130.6"
+        assert "040046" in corrections[0][3]
+
+    def test_alias_shortname_right_value_passes(self):
+        """「华安纳指+130.61%」正确值 → 通过，不产生修正。"""
+        holdings = self._alias_holdings()
+        text = "华安纳指收益率+130.61%，为核心仓位。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert corrections == [], f"华安纳指正确收益率不应被修正: {corrections}"
+
+    def test_bank_shortname_not_corrected(self):
+        """「建行」等机构简称归一化匹配不误伤：句中建行真实收益率保持原值。"""
+        holdings = self._alias_holdings()
+        text = "建行收益率+180.55%，价值重估持续。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert corrections == [], f"建行(601939)正确收益率不应被修正: {corrections}"
+
+    def test_alias_run_fact_check_corrects_html(self):
+        """run_fact_check 整链路：华安纳指 180.5% 被自动修正为 130.6%。"""
+        holdings = self._alias_holdings()
+        html = "<p>本质分歧在于如何处理已实现的巨额浮盈（华安纳指+180.5%、建设银行+180.55%）。</p>"
+        corr, summ = run_fact_check(html, holdings, "智囊团深度复盘")
+        assert "华安纳指+130.6%" in corr
+        assert "建设银行+180.55%" in corr  # 建设银行正确值不被连带修改

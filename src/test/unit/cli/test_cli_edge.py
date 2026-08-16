@@ -26,8 +26,7 @@ class TestCliEdge:
             patch("src.python.report.orchestrator.generate_report") as mock_gen,
         ):
             from src.python.cli import _handle_report
-            args = MagicMock(type="basic", history="off", force_llm=False,
-                              warm=False, output=None, verbose=False)
+            args = MagicMock(type="basic", history="off", force_llm=False, output=None, verbose=False)
             _handle_report(args, {})
 
         # 验证 orchestrator.generate_report 被调用而非 input()

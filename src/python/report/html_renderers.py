@@ -450,21 +450,12 @@ def _render_news_section(
 def _render_llm_content_section(
     enable_llm: bool,
     llm_content: tuple | None,
-    force_llm: bool,
-    a_indices: dict,
-    us_indices: dict,
-    total_mv: float,
-    total_cost: float,
-    total_profit: float,
-    total_today_profit: float,
-    holdings: list[Holding],
-    cat_counts: dict[str, int],
-    penetration: dict | None,
-    details: list,
-    sector_flow: list | None,
-    prog: ProgressReporter,
 ) -> tuple[bool, str | None, str | None, str | None, str | None]:
     """LLM 智能分析内容生成。
+
+    llm_content 由 orchestrator 预生成后传入（4 元组 gm/er/hc/pd）；本函数
+    仅做解包与开关判定。enable_llm=True 时 llm_content 不应为 None，兜底
+    路径仅记录告警返回空值。
 
     Returns:
         (llm_enabled_flag, global_macro, expert_review, health_check, penetration_deep)

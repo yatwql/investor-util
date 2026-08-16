@@ -38,6 +38,8 @@ MENU_ITEMS: list[MenuItem] = [
     ("A", "配置持仓匿名化（代码/名称脱敏）", None, False),
     ("S", "配置LLM分析章节", None, False),
     ("R", "刷新配置", None, False),
+    ("V", "查看最近运行日志（可按级别筛选）", None, False),
+    ("H", "查看数据源健康历史（近期检查记录）", None, False),
     ("X", "退出", None, True),
 ]
 

@@ -1,5 +1,5 @@
 # 投资复盘助手 — 实现计划
-> 文档版本：0.10.14-dev
+> 文档版本：0.10.14
 > **编号源**：`plan-next = 29`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-28，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
@@ -18,21 +18,15 @@
 
 > **P0** = 必须完成才能发布 · **P1** = 当前待办 · **P2** = 下一阶段就绪 · **P3** = 预期实施，有空时安排 · **P4** = 实验功能（缺省关闭，需显式启用）
 
-**当前无 P0~P3 待办**（v0.10.x 已完成事项记录已整体归档至 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)：P0 发布门禁、推荐实施顺序 ①~⑧、P1~P3 已完成项详细段落 + P4 已随发布版本实现项 plan-8/25/26/27/28）。P4 区仅剩未实现项 `plan-10` 日志可视化。
-
 ### P4 — 实验功能
 
-> 实验性功能，缺省关闭，需通过配置项或 features.json 显式启用。启用不影响现有功能稳定性。**当前实验项**：日志可视化（`plan-10`，未实现）。已随发布版本实现的 P4 项（plan-8/25/26/27/28）详细记录已整体归档至 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)「P4 — 实验功能」章节。
-
-#### `plan-10` 日志可视化（[`plan-web-ui.md §2`](../archive/v0.10.x/web-ui/plan-web-ui.md#2-日志可视化)）
-
-结构化日志查看（`--view-logs` 命令 + 报告尾部数据源状态表）。**预估：1d**
+> 当前无未完成实验功能项。已完成项见归档设计/实施文档 `docs-stm/archive/v0.10.x/log-visualization/plan-log-visualization.md`（`plan-10` 日志可视化，v0.10.14-dev 实现：CLI + TUI + Web 三端 + 数据源健康历史接线）。
 
 ---
 
 ## 归档
 
-- [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项（plan-17~plan-28，含设计文档索引：投资功能优化/章节归并 + 任务编号门禁 + Web UI 三件套（持仓输入模式/配置编辑/前端资产归位）+ 三模式使用指南 + README SVG 架构图；P4 实验功能已完成项 plan-8/25/26/27/28 亦已并入「P4 — 实验功能」章节）
+- [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项
 - [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项（含设计文档索引）
 - [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10（含设计文档索引 + 已完成项）
 - [`archived_plan.0.7.x.md`](../archive/v0.7.x/archived_plan.0.7.x.md)

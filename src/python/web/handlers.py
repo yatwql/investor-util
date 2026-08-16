@@ -565,6 +565,58 @@ def _handle_health():
     return _ok(results)
 
 
+def _handle_logs():
+    """GET /api/logs — 结构化日志查看（日志可视化）。
+
+    查询参数：
+      level  — 最小级别阈值（DEBUG/INFO/WARNING/ERROR/CRITICAL，非法值 → 400）
+      lines  — 尾部读取物理行数（默认 5000，clamp [1,5000]，防大日志卡顿）
+      since/until — 时间前缀过滤（透传核心层）
+    所有解析/过滤/尾部读取逻辑委托核心层 read_log()，本 handler 仅做
+    参数校验与 JSON 渲染。
+    """
+    from src.python.core.log_reader import LOG_LEVELS, read_log
+
+    level = request.args.get("level")
+    if level is not None and level not in LOG_LEVELS:
+        return _err("BAD_PARAM", f"无效日志级别: {level}"), 400
+
+    raw_lines = request.args.get("lines", "5000")
+    try:
+        lines = int(raw_lines)
+    except (TypeError, ValueError):
+        return _err("BAD_PARAM", f"无效 lines 参数: {raw_lines}"), 400
+    lines = max(1, min(lines, 5000))
+
+    since = request.args.get("since")
+    until = request.args.get("until")
+
+    try:
+        entries = read_log(limit=lines, level=level, since=since, until=until)
+    except (ValueError, OSError):
+        logger.exception("[logs] 读取运行日志失败")
+        return _err("LOG_READ_FAILED", "读取运行日志失败（详情请查看日志）"), 500
+
+    return _ok([e.to_dict() for e in entries])
+
+
+def _handle_health_history():
+    """GET /api/health/history — 数据源健康历史摘要（最近 10 次）。
+
+    与 /api/health（实时探测）解耦：本接口只读历史快照文件（零网络探测），
+    聚合逻辑委托核心层 summarize_health_history()。
+    """
+    from src.python.core.perf import summarize_health_history
+
+    try:
+        summaries = summarize_health_history(limit=10)
+    except OSError:
+        logger.exception("[health] 读取健康历史失败")
+        return _err("HEALTH_HISTORY_READ_FAILED", "读取健康历史失败（详情请查看日志）"), 500
+
+    return _ok(summaries)
+
+
 # ── 路由注册 ─────────────────────────────────────────
 
 
@@ -594,5 +646,7 @@ def create_handlers(app, run_manager) -> None:
 
     app.add_url_rule("/api/reports/<path:filename>", "serve_report", _handle_serve_report, methods=["GET"])
     app.add_url_rule("/api/health", "health", _handle_health, methods=["GET"])
+    app.add_url_rule("/api/health/history", "health_history", _handle_health_history, methods=["GET"])
+    app.add_url_rule("/api/logs", "logs", _handle_logs, methods=["GET"])
 
     app.add_url_rule("/api/config/edit", "config_edit", _handle_config_edit, methods=["GET", "POST"])
