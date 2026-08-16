@@ -16,9 +16,9 @@
 | **测试用例** | — | — | **5,461 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **4,793** | 含 README.md（194 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,599 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **112** | **45,628** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 101 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 9,487 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 105 | 36,525 | 各版本 changelog/plan/review-findings 等（101 md 36,067 行 + 3 py 446 行 + 1 txt 12 行） |
+| **项目文档** | Markdown | **112** | **45,620** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 101 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 8,833 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 105 | 37,171 | 各版本 changelog/plan/review-findings 等（101 md 36,713 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代无未完成设计方案（web-config-edit、plan-readme-svg-layout、env-benchmark-doc-update 已归档） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -865,9 +865,9 @@ investor-util/
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   └── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
-│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~26，设计文档索引）
+│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~28，设计文档索引）
 │   │   │   ├── archived_changelog.0.10.x.md #    变更日志归档 v0.10.x
-│   │   │   ├── archived_review-findings.0.10.x.md # 自审记录归档 v0.10.x（rf-204~226）
+│   │   │   ├── archived_review-findings.0.10.x.md # 自审记录归档 v0.10.x（rf-204~275）
 │   │   │   ├── investment-features/         #   投资功能优化 + 章节归并（plan-17~24）
 │   │   │   │   ├── plan-investment-features.md  #     投资分析功能优化设计（需求×数据源×章节归并）
 │   │   │   │   └── plan-investment-iteration.md #     投资功能优化 21 轮迭代实施计划（每轮量化验收）

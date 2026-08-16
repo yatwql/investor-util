@@ -41,47 +41,21 @@
 ## 已解决问题（变更详情见 changelog.md 对应条目）
 
 > 2026-08-07 全面核对：以下各项均已修复并在 changelog.md 相应版本段登记（rf-261 为 plan-25 实现、rf-272 为 ARG001 死参数全数处置，完成时均处于待处理段，本次核对后移入本区）。
+> **2026-08-16 归档**：v0.10.10 ~ v0.10.13 已发布版本修复项（rf-248 ~ rf-275）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md` 对应版本章节。本区仅保留仍处 dev 版本（v0.10.14-dev）的已解决项。
 
 | # | 摘要 | 变更记录 |
 |---|------|----------|
-| rf-248 | test-chart.html 动态注入 chart 脚本未设 `s.async=false` → 注入循环补 `s.async=false` 对齐报告模板 defer 语义 | `changelog.md` [0.10.10-dev] |
-| rf-249 | 折线/雷达图 tooltip 悬停无法触发（`pointRadius:0` + `intersect:true`）→ `lineOptions`/radar 补 `interaction`；调试页自检时序 800ms 误报 → onload 触发；offline 文案修正 | `changelog.md` [0.10.10-dev] |
-| rf-250 | 调试页自检用 `canvas._chart` 判定接管（v4 无此句柄恒假）→ 改官方 API `Chart.getChart(canvas)` | `changelog.md` [0.10.10-dev] |
-| rf-251 | chart-init 守卫不拦截空数组致 empty 场景 TypeError → 6 处守卫补 `!ds.labels.length` + `!ds.datasets.length` 显式跳过 | `changelog.md` [0.10.10-dev] |
-| rf-252 | Web 上传预检伪装 zip 致 `KeyError` 逃逸 → `_prevalidate` 任意异常统一转 UPLOAD_BAD_FILE + edge 测试 | `changelog.md` [0.10.10-dev] |
-| rf-253 | `RunManager._trim_runs` 仅 submit 时调用致注册表超限 → worker finally 分支补 `_trim_runs()` 持锁清理 | `changelog.md` [0.10.10-dev] |
-| rf-254 | `_build_artifacts` 对 failed/严重失败仍返回产物按钮 → 空列表（无产物即无按钮）+ 四用例回归 | `changelog.md` [0.10.10-dev] plan-8 阶段2 |
-| rf-255 | `check-doc-traces.py` 裸版本号模式误判 IP → `_line_exempt()` 增 IPv4 整行豁免 + 双用例回归 | `changelog.md` [0.10.10-dev] plan-8 阶段3 |
-| rf-256 | `output_dir` 锁文件检测未实现 → server 启动原子抢占写锁 + 占用警告 + 11 用例 | `changelog.md` [0.10.10-dev] |
-| rf-258 | Web 前端无自动化测试 → 沉淀 `scripts/smoke-web.py` 可复跑脚本（test_client 全链路 9/9）+ test_smoke_web.py 载体 | `changelog.md` [0.10.11] |
-| rf-259 | HTML 报告非自包含（外链 Chart.js 下载后空白）→ `_inline_js_assets` 内嵌 8 资产，报告单文件自包含 + 6 用例 | `changelog.md` [0.10.11] |
-| rf-260 | Web 状态区缺系统信息 → `_build_system_info`（版本/IP/LLM 状态）+ 状态区卡片 + 7 用例 | `changelog.md` [0.10.11] |
-| rf-262 | `how-to-config.md` §M 功能开关表未列全 → 逐项补全 27 个 key + 计数修正 + faq 补充 | `changelog.md` [0.10.11] |
-| rf-263 | `run_health_checks` 的 `max_timeout` 死参数 → daemon 线程 + 整体耗时预算，预算耗尽返回部分结果 + 回归用例 | `changelog.md` [0.10.11] |
-| rf-264 | Web 首页系统信息卡缺 TUI 首页摘要对齐字段 → 增补配置摘要字段 + 6 用例 | `changelog.md` [0.10.12-dev] |
-| rf-265 | 应用名称硬编码散落 → `constants.py` 新增 `APP_NAME` 单一来源，TUI/Web/HTML/Excel 各入口统一强调名称与版本 + 4 处测试 | `changelog.md` [0.10.12-dev] |
-| rf-266 | `src/static/README.md` 资产说明滞后（仅图表 bundle）→ 重写为三类资产总览（图表/web/tmpl），原内容保留子节 | `changelog.md` [0.10.12-dev] plan-27 |
-| rf-267 | `smoke-web.py` 改写 `_DEFAULT_CONFIG` 不还原污染默认值 → `run_smoke` finally 统一还原 + 失效缓存；web+config 同进程 282 全绿 | `changelog.md` [0.10.12-dev] plan-26 |
-| rf-268 | 三模式文档体系建立后相关文档未同步（folders 重复/统计滞后、README 链接、CLAUDE.md 顺序）→ 去重 + 刷新 + 链接统一 | `changelog.md` [0.10.12-dev] plan-28 |
-| rf-269 | 提交 `3026ffa7`（README/CLAUDE.md 索引统一）未登记 changelog → 补登记独立条目 | `changelog.md` [0.10.12-dev] plan-28 |
-| rf-270 | folders.md 目录树描述过时 + 树形符号错误 → ①② 计数修正（9→11、25→26）、③④ `└──`→`├──` | `changelog.md` [0.10.13] |
-| rf-261 | Web 上传跑 full/both 污染共享快照目录 `data/history/snapshots/` → **试算/正式双模式**：web 默认试算（快照入 `snapshots/web/` namespace 子目录），正式更新显式选择（上传覆盖或直接用存量） | `changelog.md` [0.10.12] plan-25 |
-| rf-271 | `analysis/scenario.py` 两个死参数删除（`portfolio_volatility`/`annual_volatility`，Lo 常数近似不消费）+ docstring 诚实化，`vol_*`/CI 输出字段保留 | `changelog.md` [0.10.13] |
-| rf-272 | 全仓 43 处 ARG001 未用函数参数全数处置：删参 21（含 40+ 调用点/测试同步）+ 契约保留 7 加 `# noqa: ARG001` + 独立项 3 单列跟踪 | `changelog.md` [0.10.13] |
-| rf-273 | 全量测试进程退出 Logging error 噪声 → `core/logger.py` 新增 `_ClosedStreamSilentHandler`（closed file 静默降级，其余照常报告）+ `test_logger.py` 4 用例回归 | `changelog.md` [0.10.13] |
-| rf-274 | Web 前端静态资产 404（阻断级）→ `app.py` 显式 `static_url_path="/static"` + `test_web_static_serving.py` 3 用例 + `smoke-web.py` 资产断言升级 200 | `changelog.md` [0.10.13] |
-| rf-275 | main.js 旧浏览器兼容：`AbortSignal.timeout` 缺失同步抛 TypeError → 兼容兜底（AbortController+setTimeout）+ init 三加载器 `safeRun` 隔离 | `changelog.md` [0.10.13] |
 | rf-276 | v0.10.1+ 改动文档一致性全量审计（203 提交）→ A 类事实错误 / B 类用户文档缺口 / C 类管理文档三档修复 | `changelog.md` [0.10.14-dev] |
 
 > **独立项（rf-272 处置衍生，单列跟踪）**：`html_renderers._render_llm_content_section` 13 参渲染器上下文（删除需重构 html_writer.py 调用点，单列「签名瘦身」）；`report/_pipeline.py` 遗留重复文件（已标注不承载活代码，单列清理项）；`orchestrator.generate_report.warm_cache`（CLI `--warm` 标志去留待决策，已无实际消费路径）。
 
-> v0.10.8/v0.10.9 发布时已修复项（rf-234~rf-247）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
+> v0.10.8 ~ v0.10.13 发布时已修复项（rf-234 ~ rf-275）已整体迁入 [归档档案](#归档档案) 的 `archived_review-findings.0.10.x.md`。
 
 ## 归档
 
 ### 归档档案
 
-- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.8（2026-08-04 ~ 2026-08-06，rf-204~rf-247）
+- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14，rf-204 ~ rf-275）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
 - [`archived_review-findings.0.7.x.md`](../archive/v0.7.x/archived_review-findings.0.7.x.md) 

@@ -1,9 +1,9 @@
 # 自我审查问题记录归档 — v0.10.x
 
-> 归档时间：2026-08-06
+> 归档时间：2026-08-06；2026-08-16 二次合并 review-findings.md 已解决项（rf-248 ~ rf-275，v0.10.10 ~ v0.10.13 已发布版本）
 > 原始文件：`docs-stm/managements/review-findings.md`
-> 涵盖版本：v0.10.1 ~ v0.10.8（2026-08-04 ~ 2026-08-06；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）
-> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-247）摘要行 + 修复方案 + 变更记录
+> 涵盖版本：v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）
+> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-275）摘要行 + 修复方案 + 变更记录；仍处 dev 版本（rf-276，v0.10.14-dev）与未完成待办项保留在原文件 review-findings.md
 
 ---
 
@@ -93,7 +93,55 @@
 | rf-237 | `report/orchestrator.py`（822）超过 800 行硬性上限 | facade 聚合门面拆分：风格因子/行业 Beta 计算族→`_report_factor_metrics.py`、市场温度/持仓相关性→`_report_aux_metrics.py`；门面保留 `generate_report`/`prepare_report_data`/`compute_valuation_data`/`_fetch_valuation_for_code` 并 re-export 符号（拆分后 442 行），mock patch 接线零改动 | `changelog.md` v0.10.8 |
 | rf-238 | `llm/generators_orchestrator.py`（808）超过 800 行硬性上限 | facade 聚合门面拆分：新闻关联责任单元（模块级结果缓存/闭包/安全直调）→`_llm_news_correlation.py`；门面保留缓存预检/worker 分发/主编排入口并 re-export 符号（拆分后 698 行），mock patch 接线零改动 | `changelog.md` v0.10.8 |
 
+### v0.10.10（2026-08-06）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-248 | test-chart.html 动态注入 chart 脚本未设 `s.async=false` → 注入循环补 `s.async=false` 对齐报告模板 defer 语义 | `changelog.md` v0.10.10 |
+| rf-249 | 折线/雷达图 tooltip 悬停无法触发（`pointRadius:0` + `intersect:true`）→ `lineOptions`/radar 补 `interaction`；调试页自检时序 800ms 误报 → onload 触发；offline 文案修正 | `changelog.md` v0.10.10 |
+| rf-250 | 调试页自检用 `canvas._chart` 判定接管（v4 无此句柄恒假）→ 改官方 API `Chart.getChart(canvas)` | `changelog.md` v0.10.10 |
+| rf-251 | chart-init 守卫不拦截空数组致 empty 场景 TypeError → 6 处守卫补 `!ds.labels.length` + `!ds.datasets.length` 显式跳过 | `changelog.md` v0.10.10 |
+| rf-252 | Web 上传预检伪装 zip 致 `KeyError` 逃逸 → `_prevalidate` 任意异常统一转 UPLOAD_BAD_FILE + edge 测试 | `changelog.md` v0.10.10 |
+| rf-253 | `RunManager._trim_runs` 仅 submit 时调用致注册表超限 → worker finally 分支补 `_trim_runs()` 持锁清理 | `changelog.md` v0.10.10 |
+| rf-254 | `_build_artifacts` 对 failed/严重失败仍返回产物按钮 → 空列表（无产物即无按钮）+ 四用例回归 | `changelog.md` v0.10.10 plan-8 阶段2 |
+| rf-255 | `check-doc-traces.py` 裸版本号模式误判 IP → `_line_exempt()` 增 IPv4 整行豁免 + 双用例回归 | `changelog.md` v0.10.10 plan-8 阶段3 |
+| rf-256 | `output_dir` 锁文件检测未实现 → server 启动原子抢占写锁 + 占用警告 + 11 用例 | `changelog.md` v0.10.10 |
+
+### v0.10.11（2026-08-06）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-258 | Web 前端无自动化测试 → 沉淀 `scripts/smoke-web.py` 可复跑脚本（test_client 全链路 9/9）+ test_smoke_web.py 载体 | `changelog.md` v0.10.11 |
+| rf-259 | HTML 报告非自包含（外链 Chart.js 下载后空白）→ `_inline_js_assets` 内嵌 8 资产，报告单文件自包含 + 6 用例 | `changelog.md` v0.10.11 |
+| rf-260 | Web 状态区缺系统信息 → `_build_system_info`（版本/IP/LLM 状态）+ 状态区卡片 + 7 用例 | `changelog.md` v0.10.11 |
+| rf-262 | `how-to-config.md` §M 功能开关表未列全 → 逐项补全 27 个 key + 计数修正 + faq 补充 | `changelog.md` v0.10.11 |
+| rf-263 | `run_health_checks` 的 `max_timeout` 死参数 → daemon 线程 + 整体耗时预算，预算耗尽返回部分结果 + 回归用例 | `changelog.md` v0.10.11 |
+
+### v0.10.12（2026-08-07）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-261 | Web 上传跑 full/both 污染共享快照目录 `data/history/snapshots/` → **试算/正式双模式**：web 默认试算（快照入 `snapshots/web/` namespace 子目录），正式更新显式选择（上传覆盖或直接用存量） | `changelog.md` v0.10.12 plan-25 |
+| rf-264 | Web 首页系统信息卡缺 TUI 首页摘要对齐字段 → 增补配置摘要字段 + 6 用例 | `changelog.md` v0.10.12 |
+| rf-265 | 应用名称硬编码散落 → `constants.py` 新增 `APP_NAME` 单一来源，TUI/Web/HTML/Excel 各入口统一强调名称与版本 + 4 处测试 | `changelog.md` v0.10.12 |
+| rf-266 | `src/static/README.md` 资产说明滞后（仅图表 bundle）→ 重写为三类资产总览（图表/web/tmpl），原内容保留子节 | `changelog.md` v0.10.12 plan-27 |
+| rf-267 | `smoke-web.py` 改写 `_DEFAULT_CONFIG` 不还原污染默认值 → `run_smoke` finally 统一还原 + 失效缓存；web+config 同进程 282 全绿 | `changelog.md` v0.10.12 plan-26 |
+| rf-268 | 三模式文档体系建立后相关文档未同步（folders 重复/统计滞后、README 链接、CLAUDE.md 顺序）→ 去重 + 刷新 + 链接统一 | `changelog.md` v0.10.12 plan-28 |
+| rf-269 | 提交 `3026ffa7`（README/CLAUDE.md 索引统一）未登记 changelog → 补登记独立条目 | `changelog.md` v0.10.12 plan-28 |
+
+### v0.10.13（2026-08-14）
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-270 | folders.md 目录树描述过时 + 树形符号错误 → ①② 计数修正（9→11、25→26）、③④ `└──`→`├──` | `changelog.md` v0.10.13 |
+| rf-271 | `analysis/scenario.py` 两个死参数删除（`portfolio_volatility`/`annual_volatility`，Lo 常数近似不消费）+ docstring 诚实化，`vol_*`/CI 输出字段保留 | `changelog.md` v0.10.13 |
+| rf-272 | 全仓 43 处 ARG001 未用函数参数全数处置：删参 21（含 40+ 调用点/测试同步）+ 契约保留 7 加 `# noqa: ARG001` + 独立项 3 单列跟踪 | `changelog.md` v0.10.13 |
+| rf-273 | 全量测试进程退出 Logging error 噪声 → `core/logger.py` 新增 `_ClosedStreamSilentHandler`（closed file 静默降级，其余照常报告）+ `test_logger.py` 4 用例回归 | `changelog.md` v0.10.13 |
+| rf-274 | Web 前端静态资产 404（阻断级）→ `app.py` 显式 `static_url_path="/static"` + `test_web_static_serving.py` 3 用例 + `smoke-web.py` 资产断言升级 200 | `changelog.md` v0.10.13 |
+| rf-275 | main.js 旧浏览器兼容：`AbortSignal.timeout` 缺失同步抛 TypeError → 兼容兜底（AbortController+setTimeout）+ init 三加载器 `safeRun` 隔离 | `changelog.md` v0.10.13 |
+
 ## 归档说明
 
-- 本归档涵盖 v0.10.1 ~ v0.10.8 已发布版本的自审修复记录（rf-204~rf-247）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
+- 本归档涵盖 v0.10.1 ~ v0.10.13 已发布版本的自审修复记录（rf-204~rf-275）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-257 Web 真机验收）与仍处 dev 版本的已解决项（rf-276，v0.10.14-dev）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
+- **二次合并（2026-08-16）**：`docs-stm/managements/review-findings.md`「已解决问题」区 v0.10.10 ~ v0.10.13 已发布版本修复项（rf-248~rf-275）整体迁入本文件对应版本章节；原表仅保留 rf-276（dev）。对应 plan.md P4 已完成项（plan-8/25/26/27/28）迁入 `archived_plan.0.10.x.md`、changelog [0.10.9]~[0.10.13] 迁入 `archived_changelog.0.10.x.md`。
 - 已关闭项（rf-117/118/120/121 决策已定，不做）与未修复待办项不在此列。
