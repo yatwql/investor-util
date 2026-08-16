@@ -2,8 +2,8 @@
 
 > 归档时间：2026-08-06；2026-08-16 二次合并 review-findings.md 已解决项（rf-248 ~ rf-275，v0.10.10 ~ v0.10.13 已发布版本）
 > 原始文件：`docs-stm/managements/review-findings.md`
-> 涵盖版本：v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）
-> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-275）摘要行 + 修复方案 + 变更记录；仍处 dev 版本（rf-276，v0.10.14-dev）与未完成待办项保留在原文件 review-findings.md
+> 涵盖版本：v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14，已发布；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）+ v0.10.14-dev 批次（2026-08-16，未发布、按用户要求提前归档）
+> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-281）摘要行 + 修复方案 + 变更记录；v0.10.14-dev 已解决项（rf-276 ~ rf-281）按用户要求提前归档于 v0.10.14 章节，未完成待办项保留在原文件 review-findings.md
 
 ---
 
@@ -140,8 +140,22 @@
 | rf-274 | Web 前端静态资产 404（阻断级）→ `app.py` 显式 `static_url_path="/static"` + `test_web_static_serving.py` 3 用例 + `smoke-web.py` 资产断言升级 200 | `changelog.md` v0.10.13 |
 | rf-275 | main.js 旧浏览器兼容：`AbortSignal.timeout` 缺失同步抛 TypeError → 兼容兜底（AbortController+setTimeout）+ init 三加载器 `safeRun` 隔离 | `changelog.md` v0.10.13 |
 
+### v0.10.14（2026-08-16，dev 批次提前归档）
+
+> 用户要求：v0.10.14 仍处 dev（0.10.14-dev）时即归档本批次已解决项（rf-276 ~ rf-281），便于原文件聚焦待办。变更详情见 changelog.md [0.10.14-dev] 对应条目。
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-276 | v0.10.1+ 改动文档一致性全量审计（203 提交）→ A 类事实错误 / B 类用户文档缺口 / C 类管理文档三档问题 | A/B/C 三档全量修复：README 默认值、6 测试文件同步、reports-instruction 成本流水章节、需求/技术/测试文档补充（详见 changelog [0.10.14-dev]） | `changelog.md` [0.10.14-dev] |
+| rf-277 | fact_checker 条件阈值误修正：穿透深度分析「收益率超过 200% 后可考虑部分止盈」的 200% 是止盈目标阈值，被误判为 600900 实际收益率修正为 59.2%（把正确文本改错） | 新增 `_CONDITION_TRIGGER_KEYWORDS` 触发词 + 后置调仓动作词双条件联合判定 | `changelog.md` [0.10.14-dev] |
+| rf-278 | fact_checker 简称匹配漏检：「华安纳指+180.5%」（040046 实际 130.61%）因简称无法匹配全名、回退最近邻 180.5 恰命中 601939 真实值而漏检 | `_NAME_ALIAS_MAP` 简称归一化 + `_extract_core_name` 核心名前缀匹配 | `changelog.md` [0.10.14-dev] |
+| rf-279 | dedup 校准脚本读取路径与写入路径不一致：`calibrate-dedup-threshold.py` 默认读 `data/cache/dedup_anchors.jsonl`（7-29 旧文件），而 `news_dedup.py` 自 commit `4e95d595`（2026-07-30）起写入 `data/calibration/dedup_anchors.jsonl`，脚本从未同步 → 校准建议基于过时快照 | 脚本默认路径改为 `data/calibration/`；基于最新 109018 条数据重校准——bg=2 ratio≥0.35 候选 523 条真实重复率仅约 25%，维持现阈值 | `changelog.md` [0.10.14-dev] |
+| rf-280 | dedup 锚点文件重复计数：`dedup_anchors.jsonl` append-only，同一对 (source,title) 多轮运行重复追加（实测 61.6% 为重复），使校准数字失真（cross_skip bg=0 279→13800 虚增） | ① `_flush_anchors` 写入层去重——`_WRITTEN_ANCHOR_KEYS` 进程级集合 + `_load_written_keys` 惰性加载，跨轮只写新 key；② 校准脚本 `load_anchors` 统计层按 (source,title) 对去重，处理存量污染；③ conftest 隔离锚点路径 + 重置锚点单例。去重后校准锚点 109018→41761 | `changelog.md` [0.10.14-dev] |
+| rf-281 | extract-test-failures.py 解析 pytest-html 报告崩溃：`_find_json_blob` 手工花括号扫描器假设 JSON 引号以反斜杠转义，但 pytest-html 将引号编码为 `&#34;` 实体 → 扫描器从不进入字符串态、日志内嵌 `}` 提前截断，`json.loads` 报 `Extra data`（全绿报告也崩溃，依赖此工具的失败用例提取流程不可用） | 按 `data-jsonblob` 属性起始引号到下一裸引号整体截取（blob 内引号均为实体编码，不会裸引号提前终止）+ 统一解码实体。新增 4 例回归测试（实体引号提取/日志内嵌花括号/无 blob/缺失结束引号） | `changelog.md` [0.10.14-dev] |
+
 ## 归档说明
 
-- 本归档涵盖 v0.10.1 ~ v0.10.13 已发布版本的自审修复记录（rf-204~rf-275）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-257 Web 真机验收）与仍处 dev 版本的已解决项（rf-276，v0.10.14-dev）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
-- **二次合并（2026-08-16）**：`docs-stm/managements/review-findings.md`「已解决问题」区 v0.10.10 ~ v0.10.13 已发布版本修复项（rf-248~rf-275）整体迁入本文件对应版本章节；原表仅保留 rf-276（dev）。对应 plan.md P4 已完成项（plan-8/25/26/27/28）迁入 `archived_plan.0.10.x.md`、changelog [0.10.9]~[0.10.13] 迁入 `archived_changelog.0.10.x.md`。
+- 本归档涵盖 v0.10.1 ~ v0.10.13 已发布版本的自审修复记录（rf-204~rf-275）与 v0.10.14-dev 已解决项（rf-276~rf-281）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-257 Web 真机验收）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
+- **二次合并（2026-08-16）**：`docs-stm/managements/review-findings.md`「已解决问题」区 v0.10.10 ~ v0.10.13 已发布版本修复项（rf-248~rf-275）整体迁入本文件对应版本章节。对应 plan.md P4 已完成项（plan-8/25/26/27/28）迁入 `archived_plan.0.10.x.md`、changelog [0.10.9]~[0.10.13] 迁入 `archived_changelog.0.10.x.md`。
+- **三次合并（2026-08-16，dev 批次提前归档）**：按用户要求，仍处 0.10.14-dev 的已解决项（rf-276~rf-281）一并迁入本文件新增 v0.10.14 章节；原 review-findings.md 已解决区清空。后续新增已解决项先登记 review-findings.md，待 v0.10.14 发布后按惯例归档。
 - 已关闭项（rf-117/118/120/121 决策已定，不做）与未修复待办项不在此列。
