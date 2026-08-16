@@ -58,7 +58,10 @@ LLM 配置由三个独立文件管理：
   "temperature_expert_review": 0.3,
   "max_tokens_expert_review": 24000,
   "pricing": {
-    "currency": "CNY"
+    "currency": "CNY",
+    "timezone": "Asia/Shanghai",
+    "peak_periods": ["09:00-12:00", "14:00-18:00"],
+    "idle_periods": []
   }
 }
 ```
@@ -292,7 +295,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `llm_max_thinking_concurrency`（int，默认 `1`）：开启 Extended Thinking 的模块（health_check / expert_review 等 `thinking_enabled_{module}=true`）并发的最大请求数。多 thinking 模块同时涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），此信号量将 thinking 请求串行化（同时最多 N 个，默认 1），非 thinking 模块不受此限。设大可提升 thinking 并发速度，但可能提高偶发空响应概率，建议保持默认 1
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
-- `pricing`（dict，默认 `{currency: "CNY"}`）：模型 Token 定价表，可省略（使用代码内置定价），仅需覆盖时添加
+- `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: []}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
 - `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，null=默认 8192）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 48000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
 
@@ -506,10 +509,15 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   },
 
   // ═══════════════════════════════════════════
-  // 计价配置
+  // 计价配置（默认使用代码内置定价，此处仅需覆盖时添加）
+  // 峰谷时段（DeepSeek 官方方案，北京时间）：timezone 为判定时区，
+  // peak_periods 为高峰时段，idle_periods 为空时高峰之外的其余时间均按闲时价。
   // ═══════════════════════════════════════════
   "pricing": {
-    "currency": "CNY"
+    "currency": "CNY",
+    "timezone": "Asia/Shanghai",
+    "peak_periods": ["09:00-12:00", "14:00-18:00"],
+    "idle_periods": []
   }
 }
 ```
@@ -759,16 +767,16 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 
 ## Token 消耗参考
 
-以下费用按 **DeepSeek-V4-Flash** 定价（¥1/M 输入、¥2/M 输出）估算，各模型单价详见「完整模型定价表」。
+以下费用按 **DeepSeek-V4-Flash 闲时价**（¥1.5/M 输入、¥4.5/M 输出）估算，高峰时段约翻倍，各模型单价详见「完整模型定价表」。
 
 | 模块 | 输入 token | 输出 token | 单次费用参考 |
 |------|-----------|-----------|-------------|
-| 全球政经局势 | ~300-800 | ~300-600 | ~¥0.001-0.003 |
-| 智囊团深度复盘 | ~800-2500 | ~1500-2500 | ~¥0.005-0.02 |
-| 持仓体检报告 | ~500-1500 | ~800-1500 | ~¥0.002-0.008 |
-| 穿透深度分析 | ~500-1500 | ~800-1500 | ~¥0.002-0.008 |
-| 财经新闻关联分析（可选） | ~2000-4000 | ~600-1200 | ~¥0.003-0.01 |
-| **五者合计（菜单 L + 新闻 LLM）** | — | — | **~¥0.01-0.05/次** |
+| 全球政经局势 | ~300-800 | ~300-600 | ~¥0.002-0.004 |
+| 智囊团深度复盘 | ~800-2500 | ~1500-2500 | ~¥0.008-0.015 |
+| 持仓体检报告 | ~500-1500 | ~800-1500 | ~¥0.004-0.009 |
+| 穿透深度分析 | ~500-1500 | ~800-1500 | ~¥0.004-0.009 |
+| 财经新闻关联分析（可选） | ~2000-4000 | ~600-1200 | ~¥0.006-0.011 |
+| **五者合计（菜单 L + 新闻 LLM）** | — | — | **~¥0.02-0.05/次** |
 
 - 仅菜单 **L** 触发 LLM 调用，E / B 不会
 - LLM 结果默认缓存，缓存有效期内反复按 L 不会重复扣费
@@ -790,21 +798,27 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 | `claude-fable-5` | 3.00 | 15.00 | 0.30 | 最新 Claude 模型 |
 | `gpt-4o` | 2.50 | 10.00 | 2.50 | OpenAI 主力（缓存无折扣） |
 | `gpt-4o-mini` | 0.15 | 0.60 | 0.15 | OpenAI 轻量（缓存无折扣） |
-| `deepseek-v4-flash` | 1.00 | 2.00 | 0.02 | ⭐ 高性价比推荐，默认模型 |
-| `deepseek-v4-pro` | 3.00 | 6.00 | 0.025 | DeepSeek 增强推理 |
-| `deepseek-chat` | 1.00 | 2.00 | 0.02 | DeepSeek V3 |
+| `deepseek-v4-flash` | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | ⭐ 高性价比推荐，默认模型（峰谷定价，闲时/高峰） |
+| `deepseek-v4-pro` | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | DeepSeek 增强推理（峰谷定价，闲时/高峰） |
+| `deepseek-chat` | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | DeepSeek V3（峰谷定价，闲时/高峰） |
 | `gemini-3.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 新一代（可选） |
 | `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比（代码默认） |
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
 | `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
 
-> **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash：输入 3000 tokens × ¥1 + 输出 2000 tokens × ¥2 = ¥0.007/次。缓存命中时输入部分按 `input_cache_hit` 计费。
+> **峰谷定价（DeepSeek）**：`deepseek-v4-*` 三个模型采用 DeepSeek 官方峰谷定价（2026-08-17 起生效），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。高峰时段为**北京时间 09:00–12:00、14:00–18:00**，其余时间为闲时（闲时价 = 高峰价的一半）。时段与判定时区可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` 中覆盖；含 `"peak"` 子段的模型高峰时段按 `peak` 价计费，无 `"peak"` 的模型始终按 base 价计费。
 >
-> **覆盖方式**：在 `llm_settings.json` 中添加 `pricing` 段即可覆盖任意模型的定价，未覆盖的模型自动使用上方内置价格：
+> **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash 闲时：输入 3000 tokens × ¥1.5 + 输出 2000 tokens × ¥4.5 = ¥0.0135/次（高峰时段则 ×3、×9）。缓存命中时输入部分按 `input_cache_hit` 计费。
+>
+> **覆盖方式**：在 `llm_settings.json` 中添加 `pricing` 段即可覆盖任意模型的定价，未覆盖的模型自动使用上方内置价格；含峰谷时段的模型可一并覆盖 `peak` 子段：
 > ```json
 > "pricing": {
 >   "claude-sonnet-4-6": {"input": 3, "output": 15},
->   "my-new-model": {"input": 5, "output": 10, "input_cache_hit": 0.5}
+>   "my-new-model": {"input": 5, "output": 10, "input_cache_hit": 0.5},
+>   "deepseek-v4-flash": {
+>     "input": 1.5, "output": 4.5, "input_cache_hit": 0.05,
+>     "peak": {"input": 3.0, "output": 9.0, "input_cache_hit": 0.10}
+>   }
 > }
 > ```
 

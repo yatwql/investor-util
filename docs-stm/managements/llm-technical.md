@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.10.13
+> 文档版本：0.10.14-dev
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -1022,7 +1022,23 @@ reload_pricing() → 合并 llm_settings.json → pricing
 2. **前缀匹配**：`deepseek-v4-flash-xxx` → `deepseek-v4-flash`
 3. **回退**：均不匹配 → 返回 `"-"`（未知模型不计费）
 
-### 10.4 货币
+### 10.4 峰谷定价（DeepSeek）
+
+`MODEL_PRICING` 中含 `"peak"` 高峰价子段的模型（`deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat`）
+采用峰谷定价：高峰时段按 `peak` 子段单价计费，其余时段（闲时）按 base 单价计费。
+
+- **高峰时段**（默认）：北京时间 09:00–12:00、14:00–18:00；闲时为其余全部时间
+- **配置覆盖**：`llm_settings.json → pricing` 段的 `timezone`（IANA 时区名）、
+  `peak_periods` / `idle_periods`（`"HH:MM-HH:MM"` 闭区间列表）可调整时段与时区
+- **判定逻辑**：`peak_periods` 非空时高峰 = 这些时段、闲时 = 其余时间；`peak_periods`
+  为空且 `idle_periods` 非空时闲时 = 这些时段、高峰 = 其余时间；两者均空 → 无峰谷
+- **无 `"peak"` 的模型**不受时段影响，始终按 base 价计费
+- **计费时刻**：`estimate_cost(..., at_time=...)` 可显式传入判定时刻（naive 视为已在
+  定价时区，便于测试）；缺省取当前时间并按定价时区换算
+- **时段对象稳定性**：`reload_pricing()` 以就地替换（`[:]`）方式更新时段列表，
+  保持列表对象身份稳定，外部已持有引用不失效
+
+### 10.5 货币
 
 由 `llm_settings.json → pricing.currency` 控制（默认 `"CNY"`），决定费用显示符号（¥/$/€/£）。
 
@@ -1244,25 +1260,27 @@ LLM 集成层与系统其他组件的接口：
 
 以下为 `core/constants.py` 中 `MODEL_PRICING` 内置的定价快照（单位：元/百万 token），可通过 `llm_settings.json` 的 `pricing` 覆盖：
 
-| 模型 | 输入 | 输出 | 缓存命中 |
-|:-----|:----:|:----:|:--------:|
-| claude-fable-5 | 3.00 | 15.00 | 0.30 |
-| claude-haiku-4-5 | 0.25 | 1.25 | 0.025 |
-| claude-opus-4-8 | 15.00 | 75.00 | 1.50 |
-| claude-opus-4-6 | 15.00 | 75.00 | 1.50 |
-| claude-sonnet-4-6 | 3.00 | 15.00 | 0.30 |
-| claude-sonnet-4-8 | 3.00 | 15.00 | 0.30 |
-| deepseek-chat | 1.00 | 2.00 | 0.02 |
-| deepseek-v4-flash | 1.00 | 2.00 | 0.02 |
-| deepseek-v4-pro | 3.00 | 6.00 | 0.025 |
-| gemini-2.0-flash | 0.10 | 0.40 | 0.01 |
-| gemini-2.5-flash | 0.15 | 0.60 | 0.015 |
-| gemini-2.5-pro | 1.25 | 5.00 | 0.125 |
-| gemini-3.5-flash | 0.15 | 0.60 | 0.015 |
-| gpt-4o | 2.50 | 10.00 | 2.50 |
-| gpt-4o-mini | 0.15 | 0.60 | 0.15 |
+| 模型 | 输入 | 输出 | 缓存命中 | 说明 |
+|:-----|:----:|:----:|:--------:|:-----|
+| claude-fable-5 | 3.00 | 15.00 | 0.30 | |
+| claude-haiku-4-5 | 0.25 | 1.25 | 0.025 | |
+| claude-opus-4-8 | 15.00 | 75.00 | 1.50 | |
+| claude-opus-4-6 | 15.00 | 75.00 | 1.50 | |
+| claude-sonnet-4-6 | 3.00 | 15.00 | 0.30 | |
+| claude-sonnet-4-8 | 3.00 | 15.00 | 0.30 | |
+| deepseek-chat | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | 峰谷定价（闲时/高峰） |
+| deepseek-v4-flash | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | 峰谷定价（闲时/高峰） |
+| deepseek-v4-pro | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | 峰谷定价（闲时/高峰） |
+| gemini-2.0-flash | 0.10 | 0.40 | 0.01 | |
+| gemini-2.5-flash | 0.15 | 0.60 | 0.015 | |
+| gemini-2.5-pro | 1.25 | 5.00 | 0.125 | |
+| gemini-3.5-flash | 0.15 | 0.60 | 0.015 | |
+| gpt-4o | 2.50 | 10.00 | 2.50 | |
+| gpt-4o-mini | 0.15 | 0.60 | 0.15 | |
 
 > 上表为具名模型定价；`MODEL_PRICING` 另有 6 个前缀回退键（`claude-sonnet-4-`/`claude-opus-4-`/`claude-haiku-4-`/`gemini-3.5-`/`gemini-2.5-`/`gemini-2.0-`）用于 startswith 回退匹配日期戳变体，未逐行列示。
+>
+> 峰谷定价模型的「闲时/高峰」两列为非高峰与高峰时段单价（高峰时段为北京时间 09:00–12:00、14:00–18:00，闲时为其外全部时间）；模型条目含 `"peak"` 高峰价子段，时段可经 `pricing` 段 `peak_periods`/`idle_periods`/`timezone` 覆盖。
 
 费用按 `(input_tokens × 输入单价 + output_tokens × 输出单价 + cache_hit_tokens × 缓存命中单价) / 1_000_000` 计算。
 

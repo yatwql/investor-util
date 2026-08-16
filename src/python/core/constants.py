@@ -36,7 +36,7 @@ PROJECT_ROOT = _find_project_root()
 # 应用名称（单一来源，TUI 首页 / 启动日志 / Web 首页 / HTML 报告首页 / Excel 首页统一引用）
 APP_NAME = "投资复盘助手"
 
-APP_VERSION = "0.10.13"
+APP_VERSION = "0.10.14-dev"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
@@ -62,14 +62,18 @@ HISTORY_CHAIN_FUND_TTL = CACHE_MONTHLY
 
 # ── LLM 模型定价表（每百万 token，CNY）══ 唯一默认源 ══
 
-MODEL_PRICING: dict[str, dict[str, float]] = {
+MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
     # 单一来源：此表为唯一默认定价。pricing.py 以此为基，从 llm_settings.json
     # 的 "pricing" 段加载覆盖（若存在），运行时合并到 _PRICING_MERGED。
     # 新增模型请在此处添加，不要仅修改 llm_settings.json。
     # Per 1M token:
-    #   input: 标准输入（缓存未命中）
+    #   input: 标准输入（缓存未命中）——含 "peak" 子段的模型即闲时价（默认价）
     #   output: 输出
     #   input_cache_hit: 缓存命中输入（可选，默认等于 input 即无折扣）
+    #   peak: 高峰价子段（可选，仅 DeepSeek 峰谷定价模型有）——高峰时段按此计费，
+    #         其余时段按 base 价（input/output/input_cache_hit）。时段见下方
+    #         PRICING_PEAK_PERIODS / PRICING_IDLE_PERIODS（可经 llm_settings.json
+    #         → pricing.peak_periods / idle_periods 覆盖）。
     # 通用前缀（如 "claude-sonnet-4-"）用作 startswith() 回退匹配，
     # 覆盖所有日期戳变体（如 claude-sonnet-4-20250514），避免费用显示 "-"。
     "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
@@ -83,9 +87,26 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "claude-fable-5": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
     "gpt-4o": {"input": 2.5, "output": 10.0, "input_cache_hit": 2.5},
     "gpt-4o-mini": {"input": 0.15, "output": 0.6, "input_cache_hit": 0.15},
-    "deepseek-v4-flash": {"input": 1, "output": 2, "input_cache_hit": 0.02},
-    "deepseek-v4-pro": {"input": 3, "output": 6, "input_cache_hit": 0.025},
-    "deepseek-chat": {"input": 1, "output": 2, "input_cache_hit": 0.02},
+    # ── DeepSeek 峰谷定价（2026-08-17 起生效，元/百万 token）──
+    # base 为闲时价；peak 为高峰价（高峰时段为闲时的 2 倍）。
+    "deepseek-v4-flash": {
+        "input": 1.5,
+        "output": 4.5,
+        "input_cache_hit": 0.05,
+        "peak": {"input": 3.0, "output": 9.0, "input_cache_hit": 0.10},
+    },
+    "deepseek-v4-pro": {
+        "input": 4.5,
+        "output": 13.5,
+        "input_cache_hit": 0.15,
+        "peak": {"input": 9.0, "output": 27.0, "input_cache_hit": 0.30},
+    },
+    "deepseek-chat": {
+        "input": 1.5,
+        "output": 4.5,
+        "input_cache_hit": 0.05,
+        "peak": {"input": 3.0, "output": 9.0, "input_cache_hit": 0.10},
+    },
     # Gemini
     "gemini-3.5-flash": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
     "gemini-3.5-": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
@@ -95,3 +116,18 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "gemini-2.0-flash": {"input": 0.10, "output": 0.40, "input_cache_hit": 0.01},
     "gemini-2.0-": {"input": 0.10, "output": 0.40, "input_cache_hit": 0.01},
 }
+
+# ── LLM 峰谷定价时段（DeepSeek 官方方案，北京时间）══ 唯一默认源 ══
+# 高峰时段为 9:00–12:00、14:00–18:00；闲时为其余时间（闲时价 = MODEL_PRICING 中
+# 含 "peak" 子段模型的 base 价）。pricing.py 以此为基，可从 llm_settings.json →
+# pricing.peak_periods / idle_periods / timezone 覆盖。
+# 单位：当日 00:00 起算的分钟数（闭区间 [start, end]）。
+
+# 高峰时段（分钟）——9:00–12:00、14:00–18:00
+PRICING_PEAK_PERIODS: list[tuple[int, int]] = [(9 * 60, 12 * 60), (14 * 60, 18 * 60)]
+
+# 闲时时段（分钟）——空列表 = 高峰之外的其余时间均为闲时
+PRICING_IDLE_PERIODS: list[tuple[int, int]] = []
+
+# 峰谷时段判定所用 IANA 时区（默认北京时间）
+PRICING_TIMEZONE: str = "Asia/Shanghai"

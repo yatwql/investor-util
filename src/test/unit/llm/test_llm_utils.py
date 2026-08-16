@@ -5,9 +5,12 @@ _supports_extended_thinking、_is_effort_model、_log_token_usage、_extract_con
 from __future__ import annotations
 
 import unittest
+from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 
+from src.python.llm import pricing as _pricing_mod
 from src.python.llm.api_base import (
     _check_claude_truncation,
     _check_openai_truncation,
@@ -18,7 +21,14 @@ from src.python.llm.api_base import (
 )
 from src.python.llm.fingerprint import compute_fingerprint, get_cache_ttl_llm
 from src.python.llm.markdown import markdown_to_html
-from src.python.llm.pricing import CURRENCY_SYMBOLS, PRICING_MERGED, estimate_cost, reload_pricing
+from src.python.llm.pricing import (
+    CURRENCY_SYMBOLS,
+    PRICING_IDLE_PERIODS,
+    PRICING_MERGED,
+    PRICING_PEAK_PERIODS,
+    estimate_cost,
+    reload_pricing,
+)
 from src.python.llm.prompts import _SYSTEM_EXPERT_REVIEW, _SYSTEM_GLOBAL_MACRO
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
@@ -397,18 +407,22 @@ class TestCheckTruncation(unittest.TestCase):
 
 
 class TestPricing(unittest.TestCase):
-    """测试 LLM 费用估算和定价管理。"""
+    """测试 LLM 费用估算、峰谷定价与定价管理。"""
+
+    # 峰谷判定固定时刻（naive 视为已在定价时区）：20:00 闲时、10:00 高峰
+    _IDLE_TIME = datetime(2026, 8, 15, 20, 0)
+    _PEAK_TIME = datetime(2026, 8, 15, 10, 0)
 
     def testestimate_cost_known_model(self) -> None:
-        """已知模型应返回正确的费用估算。"""
-        cost = estimate_cost("deepseek-v4-flash", 3000, 2000)
-        # (3000/1M)*1 + (2000/1M)*2 = 0.003 + 0.004 = 0.007
-        self.assertIn("0.007", cost)
+        """已知模型闲时按 base 价（闲时价）估算。"""
+        cost = estimate_cost("deepseek-v4-flash", 3000, 2000, at_time=self._IDLE_TIME)
+        # (3000/1M)*1.5 + (2000/1M)*4.5 = 0.0045 + 0.009 = 0.0135
+        self.assertIn("0.014", cost)
 
     def testestimate_cost_cache_hit(self) -> None:
         """缓存命中应降低费用。"""
-        cost = estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=2000)
-        cost_no = estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=0)
+        cost = estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=2000, at_time=self._IDLE_TIME)
+        cost_no = estimate_cost("deepseek-v4-flash", 3000, 2000, cache_hit_input_tokens=0, at_time=self._IDLE_TIME)
         self.assertNotEqual(cost, cost_no)
 
     def testestimate_cost_unknown_model(self) -> None:
@@ -441,3 +455,86 @@ class TestPricing(unittest.TestCase):
         orig = dict(PRICING_MERGED)
         reload_pricing()
         self.assertEqual(PRICING_MERGED.get("deepseek-v4-flash"), orig.get("deepseek-v4-flash"))
+
+    def test_peak_pricing_peak_hour_higher_than_idle(self) -> None:
+        """含 peak 子段的模型高峰时段按高峰价、闲时按 base 价。"""
+        cost_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
+        cost_idle = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._IDLE_TIME)
+        # 高峰 (3+9)=12 vs 闲时 (1.5+4.5)=6
+        self.assertEqual(cost_peak, "¥12.000")
+        self.assertEqual(cost_idle, "¥6.000")
+
+    def test_peak_pricing_boundary_inclusive_end(self) -> None:
+        """高峰时段边界闭区间：12:00 属高峰（含端点），13:00 属闲时。"""
+        cost_1200 = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 15, 12, 0))
+        cost_1300 = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 15, 13, 0))
+        self.assertEqual(cost_1200, "¥12.000")
+        self.assertEqual(cost_1300, "¥6.000")
+
+    def test_peak_pricing_without_peak_entry_ignores_time(self) -> None:
+        """无 peak 子段的模型不受时段影响。"""
+        cost_peak = estimate_cost("claude-sonnet-4-6", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
+        cost_idle = estimate_cost("claude-sonnet-4-6", 1_000_000, 1_000_000, at_time=self._IDLE_TIME)
+        # 3 + 15 = 18，两个时段一致
+        self.assertEqual(cost_peak, cost_idle)
+        self.assertEqual(cost_peak, "¥18.000")
+
+    def test_peak_pricing_cache_hit_uses_peak_rate(self) -> None:
+        """缓存命中 token 在高峰时段按 peak.input_cache_hit 计费。"""
+        cost_peak = estimate_cost(
+            "deepseek-v4-flash",
+            1_000_000,
+            0,
+            cache_hit_input_tokens=1_000_000,
+            at_time=self._PEAK_TIME,
+        )
+        cost_idle = estimate_cost(
+            "deepseek-v4-flash",
+            1_000_000,
+            0,
+            cache_hit_input_tokens=1_000_000,
+            at_time=self._IDLE_TIME,
+        )
+        self.assertEqual(cost_peak, "¥0.100")
+        self.assertEqual(cost_idle, "¥0.050")
+
+    def test_peak_periods_defaults(self) -> None:
+        """默认峰谷时段应为北京时间 09:00–12:00、14:00–18:00，闲时为其外全部时间。"""
+        self.assertEqual(PRICING_PEAK_PERIODS, [(540, 720), (840, 1080)])
+        self.assertEqual(PRICING_IDLE_PERIODS, [])
+
+    def test_peak_pricing_custom_periods_from_config(self) -> None:
+        """llm_settings.json 自定义峰谷时段与模型价格后应生效。"""
+        orig_peak = list(PRICING_PEAK_PERIODS)
+        orig_idle = list(PRICING_IDLE_PERIODS)
+        orig_tz = _pricing_mod.PRICING_TIMEZONE_NAME
+        orig_flash = dict(PRICING_MERGED.get("deepseek-v4-flash", {}))
+        try:
+            custom = {
+                "pricing": {
+                    "currency": "CNY",
+                    "timezone": "Asia/Shanghai",
+                    "peak_periods": ["22:00-23:00"],
+                    "idle_periods": [],
+                    "deepseek-v4-flash": {
+                        "input": 1.0,
+                        "output": 2.0,
+                        "input_cache_hit": 0.02,
+                        "peak": {"input": 2.0, "output": 4.0, "input_cache_hit": 0.04},
+                    },
+                }
+            }
+            with patch("src.python.config.get_llm_config", return_value=custom):
+                reload_pricing()
+            self.assertEqual(PRICING_PEAK_PERIODS, [(22 * 60, 23 * 60)])
+            self.assertEqual(PRICING_IDLE_PERIODS, [])
+            # 自定义时段下：22:30 高峰、06:00 非高峰（高峰外均为闲时）
+            cost_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 15, 22, 30))
+            cost_off = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 15, 6, 0))
+            self.assertEqual(cost_peak, "¥6.000")  # (2+4)
+            self.assertEqual(cost_off, "¥3.000")  # (1+2)
+        finally:
+            PRICING_PEAK_PERIODS[:] = orig_peak
+            PRICING_IDLE_PERIODS[:] = orig_idle
+            _pricing_mod.PRICING_TIMEZONE_NAME = orig_tz
+            _pricing_mod.PRICING_MERGED["deepseek-v4-flash"] = orig_flash
