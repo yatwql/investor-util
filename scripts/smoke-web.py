@@ -197,15 +197,29 @@ def _check_run_and_poll(client, results, file_id: str) -> str | None:
     return run_id if ok else None
 
 
-def _check_progress_events(client, results, run_id: str):
-    # fake executor 立即完成，轮询至终态
+def _poll_run_finished(client, run_id: str, max_iters: int = 100) -> str | None:
+    """轮询 run 至终态（done/failed），返回最终 status；未到终态返回最后 status。
+
+    供各检查复用：fake executor 立即完成，多数情况首轮即 done。此处的关键价值
+    是「确保 run 在调用方退出前已终态」——run 由后台 worker 线程异步执行，若
+    提交后不等待终态就退出，worker 可能仍在写产物目录（如 output/），导致外层
+    TemporaryDirectory 清理时撞上并发写（OSError Directory not empty，CI 并行
+    调度下偶发复现）。
+    """
+
     status = None
-    for _ in range(100):
-        detail = client.get(f"/api/runs/{run_id}").get_json().get("data") or {}
-        status = detail.get("status")
+    for _ in range(max_iters):
+        data = (client.get(f"/api/runs/{run_id}").get_json() or {}).get("data") or {}
+        status = data.get("status")
         if status in ("done", "failed"):
             break
         time.sleep(0.01)
+    return status
+
+
+def _check_progress_events(client, results, run_id: str):
+    # fake executor 立即完成，轮询至终态
+    status = _poll_run_finished(client, run_id)
 
     ev_resp = client.get(f"/api/runs/{run_id}/events?after=0")
     ev_body = ev_resp.get_json() or {}
@@ -278,6 +292,11 @@ def _check_formal_use_existing(client, results) -> None:
     body_ok = resp_ok.get_json() or {}
     run_id = (body_ok.get("data") or {}).get("run_id")
     ok = resp_ok.status_code == 202 and body_ok.get("ok") is True and bool(run_id)
+    # run 由后台 worker 线程异步执行：轮询至终态，确保 run_smoke 退出时 worker
+    # 不再写产物目录（防 TemporaryDirectory 清理撞并发写 → Directory not empty）。
+    # 断言本身不变（仍验证 202 + run_id），此处只为消除竞态窗口。
+    if run_id:
+        _poll_run_finished(client, run_id)
 
     # ② 用存量 + 携带 file_id → 400 BAD_PARAM
     resp_bad_id = client.post(
