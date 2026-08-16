@@ -50,7 +50,6 @@ _KNOWN_MARKERS: set[str] = {
     "unit_news",
     "unit_report",
     "unit_config",
-    "unit_config_edge",
     "unit_core",
     "unit_cli",
     "unit_ui",
@@ -104,7 +103,6 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "unit_news: 新闻模块单元测试")
     config.addinivalue_line("markers", "unit_report: 报告生成单元测试")
     config.addinivalue_line("markers", "unit_config: 配置管理单元测试")
-    config.addinivalue_line("markers", "unit_config_edge: 配置管理边缘场景单元测试（必须放在 *_edge.py）")
     config.addinivalue_line("markers", "unit_core: 核心基础设施单元测试")
     config.addinivalue_line("markers", "unit_cli: CLI 命令行模式单元测试")
     config.addinivalue_line("markers", "unit_ui: TUI/UI 交互单元测试")

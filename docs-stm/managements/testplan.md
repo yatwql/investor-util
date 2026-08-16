@@ -504,7 +504,7 @@ def test_get_ttl_closed(self, mock_open):
 
 9. **P0 全通** — 不可提交代码：`python scripts/test_runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
 10. **P1 全通** — 不可合并 master：`python scripts/test_runner.py --mode verify` + §4 中 P1 级各自动化回归项全部通过（报告完整性 / Excel 视觉 / HTML 渲染 / 缓存刷新 / Provider 降级）
-11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）
+11. **P2 已执行** — 可合入但不可发布：`python scripts/test_runner.py --mode verify,regression` + `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`python scripts/test_runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行）
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
 ### 6.4 补充自动化门禁

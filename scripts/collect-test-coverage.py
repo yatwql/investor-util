@@ -100,6 +100,8 @@ def main() -> None:
         "smoke": lambda m: "smoke" in m,
         "report": lambda m: "unit_report" in m,
         "scenario_extreme": lambda m: "scenario_extreme" in m,
+        "perf": lambda m: "scenario_perf" in m,
+        "security": lambda m: "scenario_security" in m,
     }
     print("### 模式对应测试量")
     for name, sel in modes.items():

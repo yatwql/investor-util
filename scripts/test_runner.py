@@ -160,11 +160,25 @@ MODES: dict[str, dict] = {
         "order": 13,
         "parallel": False,
     },
+    "perf": {
+        "marker": "scenario_perf",
+        "desc": "端到端性能基准（scenario_perf 独立标记，手工/发布前运行；不入门禁、不进 bench）",
+        "timeout_sec": 600,
+        "order": 14,
+        "parallel": False,
+    },
+    "security": {
+        "marker": "scenario_security",
+        "desc": "安全基线测试（scenario_security 独立标记，手工/发布前运行；不入门禁、不进 bench）",
+        "timeout_sec": 600,
+        "order": 15,
+        "parallel": False,
+    },
     "live": {
         "marker": "live",
         "desc": "真实网络验证套件（opt-in，仅 `--mode live` 手工运行；不入门禁）",
         "timeout_sec": 300,
-        "order": 14,
+        "order": 16,
         "parallel": False,
     },
 }

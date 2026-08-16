@@ -28,7 +28,7 @@
 
 > 注：典型耗时按 2026-08-16 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新模式对应测试量 + 下方两张环境耗时对照表。
 >
-> 注：`模式对应测试量` 表覆盖项数为 pytest 实测执行计数（含参数化展开），由 `--mode bench --update-docs` 自动回填；功能域/场景分组/单元分组/跨类等子表为 `scripts/collect-test-coverage.py` 收集快照（仅收集不执行，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
+> 注：`模式对应测试量` 表覆盖项数为 pytest 实测执行计数（含参数化展开），由 `--mode bench --update-docs` 自动回填；功能域/场景分组/单元分组/跨类等子表为 `scripts/collect-test-coverage.py` 收集快照（仅收集不执行，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。`perf`/`security` 为定向 mode（`scenario_perf`/`scenario_security` 独立标记，手工/发布前运行）**不进 bench**，故不在本表，计数见 `collect-test-coverage.py` 输出（perf: 5 / security: 9）。
 
 ### 环境耗时对照
 

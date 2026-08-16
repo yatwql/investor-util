@@ -82,12 +82,12 @@ KNOWN_MARKERS = {
     "unit_news",
     "unit_report",
     "unit_config",
-    "unit_config_edge",
     "unit_core",
     "unit_cli",
     "unit_ui",
     "unit_analysis",
     "unit_scripts",
+    "unit_web",
     "edge",
     "smoke",
     "data",
@@ -98,6 +98,8 @@ KNOWN_MARKERS = {
     "integration_news_pipeline",
     "integration_cache",
     "integration_tui",
+    "integration_cli",
+    "live",
 }
 
 
