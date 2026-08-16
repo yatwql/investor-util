@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.14-dev
-> **编号源**：`rf-next = 280`（新增问题取此编号，完成后更新为 +1；已用最大 rf-279，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 281`（新增问题取此编号，完成后更新为 +1；已用最大 rf-280，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -49,6 +49,7 @@
 | rf-277 | fact_checker 条件阈值误修正：穿透深度分析「收益率超过 200% 后可考虑部分止盈」的 200% 是止盈目标阈值，被误判为 600900 实际收益率修正为 59.2%（把正确文本改错）。修复：新增 `_CONDITION_TRIGGER_KEYWORDS` 触发词 + 后置调仓动作词双条件联合判定 | `changelog.md` [0.10.14-dev] |
 | rf-278 | fact_checker 简称匹配漏检：「华安纳指+180.5%」（040046 实际 130.61%）因简称无法匹配全名、回退最近邻 180.5 恰命中 601939 真实值而漏检。修复：`_NAME_ALIAS_MAP` 简称归一化 + `_extract_core_name` 核心名前缀匹配 | `changelog.md` [0.10.14-dev] |
 | rf-279 | dedup 校准脚本读取路径与写入路径不一致：`calibrate-dedup-threshold.py` 默认读 `data/cache/dedup_anchors.jsonl`（7-29 旧文件），而 `news_dedup.py` 自 commit `4e95d595`（2026-07-30）起写入 `data/calibration/dedup_anchors.jsonl`，脚本从未同步 → 校准建议基于过时快照。修复：脚本默认路径改为 `data/calibration/`；基于最新 109018 条数据重校准结论——bg=2 ratio≥0.35 候选 523 条真实重复率仅约 25%，维持现阈值 | `changelog.md` [0.10.14-dev] |
+| rf-280 | dedup 锚点文件重复计数：`dedup_anchors.jsonl` append-only，同一对 (source,title) 多轮运行重复追加（实测 61.6% 为重复），使校准数字失真（cross_skip bg=0 279→13800 虚增）。修复：① `_flush_anchors` 写入层去重——新增 `_WRITTEN_ANCHOR_KEYS` 进程级集合 + `_load_written_keys` 惰性加载，跨轮只写新 key；② 校准脚本 `load_anchors` 统计层按 (source,title) 对去重，处理存量污染；③ conftest 隔离锚点路径 + 重置锚点单例。去重后校准锚点 109018→41761 | `changelog.md` [0.10.14-dev] |
 
 > **独立项（rf-272 处置衍生，单列跟踪）**：`html_renderers._render_llm_content_section` 13 参渲染器上下文（删除需重构 html_writer.py 调用点，单列「签名瘦身」）；`report/_pipeline.py` 遗留重复文件（已标注不承载活代码，单列清理项）；`orchestrator.generate_report.warm_cache`（CLI `--warm` 标志去留待决策，已无实际消费路径）。
 

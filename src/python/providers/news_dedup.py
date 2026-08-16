@@ -18,7 +18,7 @@ logger = logging.getLogger("invest")
 
 # ── 锚点采集（阈值校准用） ──────────────────────────────────────
 # 每次 _dedup_by_title 运行后，边界案例收集到此列表，
-# aggregate_news() 结束时追写至 data/cache/dedup_anchors.jsonl。
+# aggregate_news() 结束时追写至 data/calibration/dedup_anchors.jsonl。
 # 一条记录为一个 JSON 行，append-only。格式：
 #   {"ts","title_a","title_b","source_a","source_b",
 #    "ratio","bigram_overlap","decision","rule"}
@@ -30,6 +30,53 @@ _ANCHOR_PATH = os.path.join(
     "calibration",
     "dedup_anchors.jsonl",
 )
+
+# 进程级"已写锚点 key"集合 — 防止同一对 (source,title) 在多轮运行中重复追加。
+# 背景：锚点文件 append-only，同一对新闻在每次真实抓取进入候选区时都会重新记录，
+# 多轮后同一对重复数十次（实测 calibration 文件 61.6% 为重复记录），使校准报告
+# 绝对数字严重失真（如 cross_skip bg=0 从 279 虚增至 13800）。
+# 方案：首次 flush 时惰性加载现有文件 key 到内存集合，之后每次 flush 只写
+# 不在集合中的新 key、写后加入。跨会话、跨轮次均拦截重复，避免每次读全文件。
+_WRITTEN_ANCHOR_KEYS: set[str] = set()
+_WRITTEN_KEYS_LOADED = False
+_WRITTEN_KEYS_LOCK = threading.Lock()
+
+
+def _anchor_key(record: dict[str, Any]) -> str:
+    """锚点去重键：source 对 + 标题对（顺序无关）。"""
+    a = (record.get("source_a", "") or "", record.get("title_a", "") or "")
+    b = (record.get("source_b", "") or "", record.get("title_b", "") or "")
+    # 排序使 (A,B) 与 (B,A) 视为同一对，避免来源顺序不同产生重复
+    sa, ta = (a, b) if a <= b else (b, a)
+    return f"{sa[0]}|{sa[1]}|{ta[0]}|{ta[1]}"
+
+
+def _load_written_keys() -> None:
+    """惰性加载锚点文件已有 key 到 _WRITTEN_ANCHOR_KEYS（进程生命周期内一次）。
+
+    首次 flush 前调用，读一次现有文件（~110k 行/35MB，一次性成本），
+    之后所有 flush 仅内存比对。文件不存在或为空时静默返回空集合。
+    """
+    global _WRITTEN_KEYS_LOADED
+    with _WRITTEN_KEYS_LOCK:
+        if _WRITTEN_KEYS_LOADED:
+            return
+        _WRITTEN_KEYS_LOADED = True
+        if not os.path.exists(_ANCHOR_PATH):
+            return
+        try:
+            with open(_ANCHOR_PATH, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    _WRITTEN_ANCHOR_KEYS.add(_anchor_key(rec))
+        except OSError:
+            logger.warning("锚点 key 加载失败: %s", _ANCHOR_PATH)
 
 
 def _record_anchor(record: dict[str, Any]) -> None:
@@ -115,6 +162,10 @@ def _flush_anchors() -> None:
 
     一次运行产生数十条记录（~200 字节/条），文件写入发生在去重完成后，
     不影响新闻获取和报告生成的主流程。
+
+    写入前按 (source,title) 对去重：只写本次尚未写入文件的记录（查
+    _WRITTEN_ANCHOR_KEYS），写后加入集合。防止同一对新闻多轮运行重复
+    追加导致校准数字失真（见 _WRITTEN_ANCHOR_KEYS 注释）。
     """
     global _ANCHOR_RECORDS
     if not _ANCHOR_RECORDS:
@@ -122,10 +173,21 @@ def _flush_anchors() -> None:
     with _ANCHOR_LOCK:
         records = _ANCHOR_RECORDS
         _ANCHOR_RECORDS = []  # 先清空再写，防止递归写入
+    _load_written_keys()
+    new_records: list[dict[str, Any]] = []
+    with _WRITTEN_KEYS_LOCK:
+        for r in records:
+            key = _anchor_key(r)
+            if key in _WRITTEN_ANCHOR_KEYS:
+                continue
+            _WRITTEN_ANCHOR_KEYS.add(key)
+            new_records.append(r)
+    if not new_records:
+        return
     try:
         os.makedirs(os.path.dirname(_ANCHOR_PATH), exist_ok=True)
         with open(_ANCHOR_PATH, "a", encoding="utf-8") as f:
-            for r in records:
+            for r in new_records:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
     except OSError as e:
         logger.warning("锚点文件写入失败: %s", e)

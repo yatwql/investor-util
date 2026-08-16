@@ -256,6 +256,12 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.report.history_snapshot.HISTORY_SNAPSHOT_DIR",
         str(tmp_path / "data/history/snapshots"),
     )
+    # 新闻去重锚点文件隔离（data/calibration/dedup_anchors.jsonl —— _flush_anchors
+    # 追写目标；防测试运行污染真实校准数据，与 _auto_reset_anchor_state 配套）
+    monkeypatch.setattr(
+        "src.python.providers.news_dedup._ANCHOR_PATH",
+        str(tmp_path / "data/calibration/dedup_anchors.jsonl"),
+    )
     # 清空配置缓存，使下次 get_config() 使用新路径
     import src.python.config._config_defaults as _cfg_defaults
     import src.python.config._core as _cfg_core
@@ -375,6 +381,21 @@ def _auto_reset_provider_registry():
     from src.python.core.provider_registry import get_registry
 
     get_registry().reset()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_anchor_state():
+    """自动重置新闻去重锚点模块单例状态，防止测试间状态污染。
+
+    每个测试执行前清空进程级已写 key 集合、内存记录列表与惰性加载标志，
+    避免某测试记录的锚点状态泄漏到后续测试（锚点路径已由
+    _isolate_sensitive_paths 隔离到 tmp_path）。
+    """
+    from src.python.providers import news_dedup
+
+    news_dedup._WRITTEN_ANCHOR_KEYS = set()
+    news_dedup._ANCHOR_RECORDS = []
+    news_dedup._WRITTEN_KEYS_LOADED = False
 
 
 @pytest.fixture(autouse=True)

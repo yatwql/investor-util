@@ -21,7 +21,7 @@ from typing import Any
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 注意：与 src/python/providers/news_dedup.py 的 _ANCHOR_PATH 保持一致——
 # 2026-07-30 起代码写入路径为 data/calibration/dedup_anchors.jsonl
-# （commit 4e95d595，rf-65/rf-74 拆分），此处不再读 data/cache/ 旧文件。
+# （commit 4e95d595 起锚点路径拆分至校准目录），此处不再读 data/cache/ 旧文件。
 _ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "calibration", "dedup_anchors.jsonl")
 # 当前代码中的阈值常量（与 news_aggregator.py 保持一致）
 # 算法同时使用中文 bigram + 英数 token 匹配，
@@ -36,20 +36,40 @@ _CROSS_BG2_RATIO = 0.40  # bg=2 梯度补偿阈值
 
 
 def load_anchors(path: str = _ANCHOR_PATH) -> list[dict[str, Any]]:
-    """从 JSONL 文件加载锚点记录。"""
+    """从 JSONL 文件加载锚点记录。
+
+    按 (source_a, source_b, title_a, title_b) 对去重：锚点文件 append-only，
+    2026-08 前同一对新闻在多轮运行中重复追加（实测 61.6% 为重复记录），
+    直接统计会虚增绝对数字（如 cross_skip bg=0 从 279 虚增至 13800）。
+    去重后校准结论反映真实边界样本分布，而非重复计数。
+    """
     if not os.path.exists(path):
         print(f"[!] 锚点文件不存在: {path}")
         print("    请先运行一次报告生成（触发新闻获取），积累数据后再校准。")
         sys.exit(0)
     records: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str]] = set()
     with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if line:
-                try:
-                    records.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
+            if not line:
+                continue
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            key = (
+                r.get("source_a", "") or "",
+                r.get("source_b", "") or "",
+                r.get("title_a", "") or "",
+                r.get("title_b", "") or "",
+            )
+            # 顺序无关：调换源顺序的同一对视为重复
+            key_b = (key[1], key[0], key[3], key[2])
+            if key in seen or key_b in seen:
+                continue
+            seen.add(key)
+            records.append(r)
     return records
 
 

@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import os
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -300,6 +301,99 @@ class TestDedupByTitle(unittest.TestCase):
         result = _dedup_by_title(items)
         # ratio≈0.381 < 0.40 走不了梯度规则，但 _tk: 加权后 bg≥3 通过候选区
         self.assertEqual(len(result), 1)
+
+
+class TestFlushAnchorsDedup(unittest.TestCase):
+    """_flush_anchors 锚点写入去重 — 同一对 (source,title) 跨轮运行不重复追加。
+
+    背景：锚点文件 append-only，同一对新闻在每次真实抓取（_dedup_by_title
+    进入候选区）时都会重新记录，多轮运行后同一对重复数十次（实测 calibration
+    文件 61.6% 为重复记录），导致校准报告绝对数字失真（如 cross_skip bg=0
+    从 279 虚增至 13800）。本测试验证写入层按 key 去重后跨轮不重复。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_news,
+    ]
+
+    def setUp(self) -> None:
+        """隔离锚点路径 + 清空进程级已写 key 集合，避免污染真实 calibration 文件。"""
+        import tempfile
+        from unittest.mock import patch
+
+        self._tmpdir = tempfile.mkdtemp()
+        self._anchor_path = os.path.join(self._tmpdir, "anchors.jsonl")
+        from src.python.providers import news_dedup
+
+        # 隔离写入路径：patch 模块常量，确保测试不触碰真实 data/calibration/
+        self._path_patch = patch("src.python.providers.news_dedup._ANCHOR_PATH", self._anchor_path)
+        self._path_patch.start()
+        # 重置进程级已写集合与内存记录列表
+        news_dedup._WRITTEN_ANCHOR_KEYS = set()
+        news_dedup._ANCHOR_RECORDS = []
+
+    def tearDown(self) -> None:
+        """恢复 patch。"""
+        self._path_patch.stop()
+
+    def _record_cross_skip(self, title_a: str, title_b: str) -> None:
+        """记录一条 cross_skip 锚点（进入候选区但未合并的典型记录）。"""
+        from src.python.providers.news_dedup import _record_anchor
+
+        _record_anchor(
+            {
+                "source_a": "东方财富",
+                "source_b": "新浪财经",
+                "title_a": title_a,
+                "title_b": title_b,
+                "ratio": 0.312,
+                "bigram_overlap": 2,
+                "decision": False,
+                "rule": "cross_skip",
+                "ts": "",
+            }
+        )
+
+    def test_same_pair_flushed_once_across_runs(self) -> None:
+        """同一对新闻跨两次 flush 只写入一次。"""
+        from src.python.providers.news_dedup import _flush_anchors
+
+        # 第一轮：两条不同记录 + 一条与下一轮相同的记录
+        self._record_cross_skip("特朗普下令暂停空袭伊朗", "美国连续第二晚暂停袭击伊朗")
+        self._record_cross_skip("华尔街见闻", "东方财富完全不同新闻")
+        _flush_anchors()
+        lines1 = open(self._anchor_path, encoding="utf-8").readlines()
+        self.assertEqual(len(lines1), 2, f"第一轮应写 2 条: {lines1}")
+
+        # 第二轮：再次出现第一轮同对记录 → 不应重复追加
+        self._record_cross_skip("特朗普下令暂停空袭伊朗", "美国连续第二晚暂停袭击伊朗")
+        _flush_anchors()
+        lines2 = open(self._anchor_path, encoding="utf-8").readlines()
+        self.assertEqual(len(lines2), 2, f"第二轮不应重复追加，仍应 2 条: {lines2}")
+
+    def test_different_pairs_still_appended(self) -> None:
+        """不同 (source,title) 对正常追加，不被误去重。"""
+        from src.python.providers.news_dedup import _flush_anchors
+
+        self._record_cross_skip("新闻A", "新闻B")
+        _flush_anchors()
+        self._record_cross_skip("新闻C", "新闻D")
+        _flush_anchors()
+        lines = open(self._anchor_path, encoding="utf-8").readlines()
+        self.assertEqual(len(lines), 2, f"不同对应各写一条: {lines}")
+
+    def test_anchor_keys_cached_across_flush(self) -> None:
+        """进程级已写 key 集合在 flush 后更新，后续同对直接拦截（不重复读文件）。"""
+        from src.python.providers import news_dedup
+
+        # 首次 flush 后 _WRITTEN_ANCHOR_KEYS 应包含已写 key
+        self._record_cross_skip("新闻A", "新闻B")
+        news_dedup._flush_anchors()
+        self.assertGreaterEqual(
+            len(news_dedup._WRITTEN_ANCHOR_KEYS), 1,
+            "flush 后进程级 key 集合应包含已写记录",
+        )
 
 
 if __name__ == "__main__":
