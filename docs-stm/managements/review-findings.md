@@ -38,21 +38,13 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
-## 已解决问题（变更详情见 changelog.md 对应条目）
+## 已解决问题
 
-
-| # | 摘要 | 变更记录 |
-|---|------|----------|
-| rf-287 | `check-test-markers.py` 标记合规检查的 `KNOWN_MARKERS` 与 `conftest._KNOWN_MARKERS` 漂移——缺 `unit_web`/`integration_cli`/`live` 三个实际在用的标记，导致脚本误报 17 处「未注册标记」、退出码 1（非门禁脚本，漂移未被日常门禁暴露） | 按 conftest 对齐 `check-test-markers.py` 全集（补 `unit_web`/`integration_cli`/`live` 三缺），277 文件 0 违规恢复通过；同步在 conftest 与 check-test-markers 移除死注册 `unit_config_edge`（0 用例） | `changelog.md` [0.10.14-dev] |
-| rf-286 | `test_menu_key_coverage` 菜单键集断言未同步日志可视化新增键——`MENU_ITEMS` 自加 `[V]`/`[H]` 后为 19 键，断言仍为旧 17 键，`integration`/`all_no_unit`/`all` 模式必失败（integration 不在 P0 门禁内，`--mode bench` 全量跑才暴露） | `test_tui_routing.py` 期望集补 `V`/`H`（回归断言直接验证缺失键），集成/全量模式复跑通过 | `changelog.md` [0.10.14-dev] |
-| rf-285 | `smoke-web.py` 正式-用存量 run 提交后未轮询终态 → 后台 worker 线程仍写临时产物目录，`TemporaryDirectory` 清理撞并发写报 `OSError: Directory not empty`（CI 并行调度下偶发） | 抽 `_poll_run_finished(client, run_id)` 轮询 helper，正式-用存量 run 与进度事件检查统一轮询至终态（done/failed）后退出；断言语义不变，仅消除竞态窗口；回归测试新增 3 例，本地 8 次连跑稳定 | `changelog.md` [0.10.14-dev] |
-| rf-282 | `html_renderers._render_llm_content_section` 渲染器上下文参数过多（15 参） | 签名瘦身至 2 参（`enable_llm`/`llm_content`），删 13 死参并重构 `html_writer.py` 调用点 | `changelog.md` [0.10.14-dev] |
-| rf-283 | `report/_pipeline.py` 遗留重复文件（已标注不承载活代码） | 确认无活引用后删除（`git rm`），测试迁移至活模块 `_llm_news.py` | `changelog.md` [0.10.14-dev] |
-| rf-284 | `orchestrator.generate_report.warm_cache`（CLI `--warm` 标志）已无实际消费路径 | 删除 `--warm` 标志 + `warm_cache` 参数（含测试引用同步清理） | `changelog.md` [0.10.14-dev] |
+当前无未归档的已解决项——v0.10.14-dev 已解决记录（rf-282 ~ rf-287）已随四次合并迁入 [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) v0.10.14 章节（变更详情见 changelog.md [0.10.14-dev] 对应条目）。
 
 ### 归档档案
 
-- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.14-dev（2026-08-04 ~ 2026-08-16，rf-204 ~ rf-281）
+- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.14-dev（2026-08-04 ~ 2026-08-17，rf-204 ~ rf-287）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
 - [`archived_review-findings.0.7.x.md`](../archive/v0.7.x/archived_review-findings.0.7.x.md) 

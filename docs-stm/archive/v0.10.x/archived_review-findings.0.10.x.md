@@ -1,9 +1,9 @@
 # 自我审查问题记录归档 — v0.10.x
 
-> 归档时间：2026-08-06；2026-08-16 二次合并 review-findings.md 已解决项（rf-248 ~ rf-275，v0.10.10 ~ v0.10.13 已发布版本）
+> 归档时间：2026-08-06；2026-08-16 二次合并 review-findings.md 已解决项（rf-248 ~ rf-275，v0.10.10 ~ v0.10.13 已发布版本）；2026-08-17 四次合并（rf-282 ~ rf-287，v0.10.14-dev）
 > 原始文件：`docs-stm/managements/review-findings.md`
-> 涵盖版本：v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14，已发布；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）+ v0.10.14-dev 批次（2026-08-16，未发布、按用户要求提前归档）
-> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-281）摘要行 + 修复方案 + 变更记录；v0.10.14-dev 已解决项（rf-276 ~ rf-281）按用户要求提前归档于 v0.10.14 章节，未完成待办项保留在原文件 review-findings.md
+> 涵盖版本：v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14，已发布；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）+ v0.10.14-dev 批次（2026-08-16 ~ 2026-08-17，未发布、按用户要求提前归档）
+> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-287）摘要行 + 修复方案 + 变更记录；v0.10.14-dev 已解决项（rf-276 ~ rf-287）按用户要求提前归档于 v0.10.14 章节，未完成待办项保留在原文件 review-findings.md
 
 ---
 
@@ -142,7 +142,7 @@
 
 ### v0.10.14（2026-08-16，dev 批次提前归档）
 
-> 用户要求：v0.10.14 仍处 dev（0.10.14-dev）时即归档本批次已解决项（rf-276 ~ rf-281），便于原文件聚焦待办。变更详情见 changelog.md [0.10.14-dev] 对应条目。
+> 用户要求：v0.10.14 仍处 dev（0.10.14-dev）时即归档本批次已解决项（rf-276 ~ rf-287），便于原文件聚焦待办。变更详情见 changelog.md [0.10.14-dev] 对应条目。
 
 | # | 问题 | 修复方案 | 变更记录 |
 |---|------|----------|----------|
@@ -152,10 +152,17 @@
 | rf-279 | dedup 校准脚本读取路径与写入路径不一致：`calibrate-dedup-threshold.py` 默认读 `data/cache/dedup_anchors.jsonl`（7-29 旧文件），而 `news_dedup.py` 自 commit `4e95d595`（2026-07-30）起写入 `data/calibration/dedup_anchors.jsonl`，脚本从未同步 → 校准建议基于过时快照 | 脚本默认路径改为 `data/calibration/`；基于最新 109018 条数据重校准——bg=2 ratio≥0.35 候选 523 条真实重复率仅约 25%，维持现阈值 | `changelog.md` [0.10.14-dev] |
 | rf-280 | dedup 锚点文件重复计数：`dedup_anchors.jsonl` append-only，同一对 (source,title) 多轮运行重复追加（实测 61.6% 为重复），使校准数字失真（cross_skip bg=0 279→13800 虚增） | ① `_flush_anchors` 写入层去重——`_WRITTEN_ANCHOR_KEYS` 进程级集合 + `_load_written_keys` 惰性加载，跨轮只写新 key；② 校准脚本 `load_anchors` 统计层按 (source,title) 对去重，处理存量污染；③ conftest 隔离锚点路径 + 重置锚点单例。去重后校准锚点 109018→41761 | `changelog.md` [0.10.14-dev] |
 | rf-281 | extract-test-failures.py 解析 pytest-html 报告崩溃：`_find_json_blob` 手工花括号扫描器假设 JSON 引号以反斜杠转义，但 pytest-html 将引号编码为 `&#34;` 实体 → 扫描器从不进入字符串态、日志内嵌 `}` 提前截断，`json.loads` 报 `Extra data`（全绿报告也崩溃，依赖此工具的失败用例提取流程不可用） | 按 `data-jsonblob` 属性起始引号到下一裸引号整体截取（blob 内引号均为实体编码，不会裸引号提前终止）+ 统一解码实体。新增 4 例回归测试（实体引号提取/日志内嵌花括号/无 blob/缺失结束引号） | `changelog.md` [0.10.14-dev] |
+| rf-282 | `html_renderers._render_llm_content_section` 渲染器上下文参数过多（15 参） | 签名瘦身至 2 参（`enable_llm`/`llm_content`），删 13 死参并重构 `html_writer.py` 调用点 | `changelog.md` [0.10.14-dev] |
+| rf-283 | `report/_pipeline.py` 遗留重复文件（已标注不承载活代码） | 确认无活引用后删除（`git rm`），测试迁移至活模块 `_llm_news.py` | `changelog.md` [0.10.14-dev] |
+| rf-284 | `orchestrator.generate_report.warm_cache`（CLI `--warm` 标志）已无实际消费路径 | 删除 `--warm` 标志 + `warm_cache` 参数（含测试引用同步清理） | `changelog.md` [0.10.14-dev] |
+| rf-285 | `smoke-web.py` 正式-用存量 run 提交后未轮询终态 → 后台 worker 线程仍写临时产物目录，`TemporaryDirectory` 清理撞并发写报 `OSError: Directory not empty`（CI 并行调度下偶发） | 抽 `_poll_run_finished(client, run_id)` 轮询 helper，正式-用存量 run 与进度事件检查统一轮询至终态（done/failed）后退出；断言语义不变，仅消除竞态窗口；回归测试新增 3 例，本地 8 次连跑稳定 | `changelog.md` [0.10.14-dev] |
+| rf-286 | `test_menu_key_coverage` 菜单键集断言未同步日志可视化新增键——`MENU_ITEMS` 自加 `[V]`/`[H]` 后为 19 键，断言仍为旧 17 键，`integration`/`all_no_unit`/`all` 模式必失败（integration 不在 P0 门禁内，`--mode bench` 全量跑才暴露） | `test_tui_routing.py` 期望集补 `V`/`H`（回归断言直接验证缺失键），集成/全量模式复跑通过 | `changelog.md` [0.10.14-dev] |
+| rf-287 | `check-test-markers.py` 标记合规检查的 `KNOWN_MARKERS` 与 `conftest._KNOWN_MARKERS` 漂移——缺 `unit_web`/`integration_cli`/`live` 三个实际在用的标记，导致脚本误报 17 处「未注册标记」、退出码 1（非门禁脚本，漂移未被日常门禁暴露） | 按 conftest 对齐 `check-test-markers.py` 全集（补 `unit_web`/`integration_cli`/`live` 三缺），277 文件 0 违规恢复通过；同步在 conftest 与 check-test-markers 移除死注册 `unit_config_edge`（0 用例） | `changelog.md` [0.10.14-dev] |
 
 ## 归档说明
 
-- 本归档涵盖 v0.10.1 ~ v0.10.13 已发布版本的自审修复记录（rf-204~rf-275）与 v0.10.14-dev 已解决项（rf-276~rf-281）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-257 Web 真机验收）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
+- 本归档涵盖 v0.10.1 ~ v0.10.13 已发布版本的自审修复记录（rf-204~rf-275）与 v0.10.14-dev 已解决项（rf-276~rf-287）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-257 Web 真机验收）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
 - **二次合并（2026-08-16）**：`docs-stm/managements/review-findings.md`「已解决问题」区 v0.10.10 ~ v0.10.13 已发布版本修复项（rf-248~rf-275）整体迁入本文件对应版本章节。对应 plan.md P4 已完成项（plan-8/25/26/27/28）迁入 `archived_plan.0.10.x.md`、changelog [0.10.9]~[0.10.13] 迁入 `archived_changelog.0.10.x.md`。
 - **三次合并（2026-08-16，dev 批次提前归档）**：按用户要求，仍处 0.10.14-dev 的已解决项（rf-276~rf-281）一并迁入本文件新增 v0.10.14 章节；原 review-findings.md 已解决区清空。后续新增已解决项先登记 review-findings.md，待 v0.10.14 发布后按惯例归档。
+- **四次合并（2026-08-17，dev 批次提前归档）**：按用户要求，续归 v0.10.14-dev 已解决项（rf-282~rf-287）——死参数/遗留文件清理（rf-282/283/284，源自 rf-272 衍生独立项）、smoke-web 竞态修复（rf-285）、bench 菜单键集缺陷（rf-286）、测试标记体系漂移（rf-287）。原 review-findings.md 已解决区再次清空；待办项（含 rf-113/114 交互图表技术债）继续保留在原文件。
 - 已关闭项（rf-117/118/120/121 决策已定，不做）与未修复待办项不在此列。
