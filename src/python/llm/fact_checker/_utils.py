@@ -109,6 +109,55 @@ def _extract_core_name(name: str) -> str:
     return name
 
 
+# 描述性尾名匹配最小中文核心长度：LLM 缩写省略基金公司前缀后保留的
+# 「描述词+产品后缀」（如"电池主题ETF"→561910"招商中证电池主题ETF"）须含
+# ≥3 个汉字才算特异，避免"混合C""股票A"等纯产品型泛词被当作主体。
+_DESCRIPTIVE_TAIL_MIN_CJK = 3
+
+
+def _cjk_len(s: str) -> int:
+    """统计字符串中的汉字（CJK 统一表意文字）个数。"""
+    return sum(1 for ch in s if "一" <= ch <= "鿿")
+
+
+def _match_descriptive_tail(
+    sentence: str,
+    name_to_code: dict[str, str] | None,
+    anchor: int,
+) -> tuple[str, int] | None:
+    """按持仓核心名的「描述性后缀 + 产品后缀」匹配句中主体。
+
+    LLM 常省略基金公司前缀指代持仓（如"电池主题ETF"→561910"招商中证电池
+    主题ETF"），全名/别名匹配均失败时会回退全局最近邻 → 误路由到同句其他
+    品种。逐持仓取核心名后缀（≥3 汉字）拼接产品后缀（"ETF"/"股票A"/"混合C"
+    等）为完整候选，命中句中候选则按 (距锚点距离, 候选长度) 择优；产品后缀
+    将候选锚定为产品名而非泛词（"科技""指数"等），避免无谓误路由。
+
+    Returns:
+        (code, 最近边距锚点距离)；无命中返回 None。
+    """
+    best_code: str | None = None
+    best_dist: int | None = None
+    best_len = 0
+    for name, code in sorted((name_to_code or {}).items(), key=lambda kv: -len(kv[0])):
+        core = _extract_core_name(name)
+        rest = name[len(core) :]
+        if len(core) < _DESCRIPTIVE_TAIL_MIN_CJK:
+            continue
+        # 核心名后缀从最长（完整核心名）到最短（≥3 汉字）逐一尝试；同一持仓
+        # 的嵌套后缀可能命中更近位置（如"电池主题ETF"内再命中"池主题ETF"）。
+        for start in range(0, len(core) - _DESCRIPTIVE_TAIL_MIN_CJK + 1):
+            tail = core[start:]
+            if _cjk_len(tail) < _DESCRIPTIVE_TAIL_MIN_CJK:
+                continue
+            cand = tail + rest
+            for m in re.finditer(re.escape(cand), sentence):
+                dist = min(abs(m.start() - anchor), abs(m.end() - anchor))
+                if best_dist is None or dist < best_dist or (dist == best_dist and len(cand) > best_len):
+                    best_code, best_dist, best_len = code, dist, len(cand)
+    return (best_code, best_dist) if best_code is not None else None
+
+
 def _locate_subject_code(
     sentence: str,
     holding_codes: set[str],
@@ -172,4 +221,13 @@ def _locate_subject_code(
             if best_dist is None or dist < best_dist:
                 best_dist = dist
                 best = code
+    # 描述性尾名匹配（兜底）：以上均失败时，按持仓核心名的「描述性后缀 + 产品
+    # 后缀」匹配（LLM 省略基金公司前缀，如"电池主题ETF"→561910）。按距锚点
+    # 距离与已有候选统一比较，命中更近者覆盖——否则回退全局最近邻会把数值
+    # 误路由到同句另一品种，将正确数值修正为错误值。
+    _tail = _match_descriptive_tail(sentence, name_to_code, anchor)
+    if _tail is not None:
+        _code, _dist = _tail
+        if best_dist is None or _dist < best_dist:
+            best, best_dist = _code, _dist
     return best

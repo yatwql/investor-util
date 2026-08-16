@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.15-dev
-> **编号源**：`rf-next = 289`（新增问题取此编号，完成后更新为 +1；已用最大 rf-288，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 290`（新增问题取此编号，完成后更新为 +1；已用最大 rf-289，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -48,7 +48,13 @@
 
 ## 已解决问题
 
-当前无未归档的已解决项——v0.10.14 已解决记录（rf-282 ~ rf-287）已随四次合并迁入 [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) v0.10.14 章节（变更详情见 changelog.md [0.10.14] 对应条目）。
+### 已解决待归档（v0.10.15-dev）
+
+| # | 问题摘要 | 解决记录 |
+|---|----------|----------|
+| **rf-289** | 事实校验 `_locate_subject_code` 无法解析省略基金公司前缀的描述性缩写（"电池主题ETF"→561910"招商中证电池主题ETF"），回退同句最近邻误路由，把 561910 正确 -3.92% 误修正为 -36.3%（2026-08-17 报告） | `_utils.py` 新增 `_match_descriptive_tail` 描述性尾名匹配（≥3 汉字核心后缀 + 产品后缀，按距锚点距离择优），接入 `_locate_subject_code` 兜底；回归测试 `test_fact_checker.py::TestDescriptiveTailMatch` 5 项；全 LLM 单测 764 通过 + P0 门禁全绿。变更记录见 changelog.md [0.10.15-dev] 2026-08-17 条目 |
+
+v0.10.14 已解决记录（rf-282 ~ rf-287）已随四次合并迁入 [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) v0.10.14 章节（变更详情见 changelog.md [0.10.14] 对应条目）。
 
 ### 归档档案
 

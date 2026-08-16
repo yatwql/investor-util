@@ -1542,3 +1542,105 @@ class TestNameAliasNormalized:
         corr, summ = run_fact_check(html, holdings, "智囊团深度复盘")
         assert "华安纳指+130.6%" in corr
         assert "建设银行+180.55%" in corr  # 建设银行正确值不被连带修改
+
+
+# ── 描述性尾名匹配（省略基金公司前缀） ──
+
+
+class TestDescriptiveTailMatch:
+    """句中用「描述词+产品后缀」缩略指代持仓（如"电池主题ETF"→561910）可被归因。
+
+    2026-08-17 报告中 LLM 正确写出"电池主题ETF（收益率-3.92%）"（561910 实际
+    -3.92%），但 _locate_subject_code 无法解析省略基金公司前缀的缩写，回退
+    同句最近邻把 3.92 误路由到 022365（永赢科技智选混合C，实际 +36.29%），
+    自动修正为 -36.3%。正确行为：归因 561910 且 3.92 在容差内通过。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_llm,
+        pytest.mark.llm,
+    ]
+
+    @staticmethod
+    def _tail_holdings() -> list[dict]:
+        """招商中证电池主题ETF（561910）+ 永赢科技智选混合C（022365）+ 建信高端装备（011506）。"""
+        return [
+            {
+                "name": "招商中证电池主题ETF",
+                "code": "561910",
+                "market_value": 9610.0,
+                "cost": 10000.0,
+                "profit_rate": -3.92,
+            },
+            {
+                "name": "永赢科技智选混合C",
+                "code": "022365",
+                "market_value": 13629.0,
+                "cost": 10000.0,
+                "profit_rate": 36.29,
+            },
+            {
+                "name": "建信高端装备股票A",
+                "code": "011506",
+                "market_value": 16635.0,
+                "cost": 10000.0,
+                "profit_rate": 66.35,
+            },
+        ]
+
+    def test_tail_abbrev_correct_value_passes(self):
+        """报告回归：「电池主题ETF（收益率-3.92%）」真实值 → 归因 561910，不产生修正。"""
+        holdings = self._tail_holdings()
+        text = (
+            "建信高端装备股票A（收益率+66.35%）与永赢科技智选混合C（收益率+36.29%）"
+            "及电池主题ETF（收益率-3.92%）同属成长赛道"
+        )
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert corrections == [], f"电池主题ETF(561910)正确收益率 -3.92% 不应被修正: {corrections}"
+
+    def test_tail_abbrev_wrong_value_corrected(self):
+        """「电池主题ETF（收益率+5.0%）」→ 归因 561910，按实际 -3.9% 修正（保留盈亏方向）。"""
+        holdings = self._tail_holdings()
+        text = "电池主题ETF（收益率+5.0%），短期承压但估值已处低位。"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert len(corrections) == 1, f"电池主题ETF 被写成 5.0%，应被检出修正: {corrections}"
+        assert corrections[0][0] == "5.0"
+        assert corrections[0][1] == "-3.9"
+        assert "561910" in corrections[0][3]
+
+    def test_locate_tail_abbrev(self):
+        """_locate_subject_code 直测：省略品牌前缀的尾名缩写解析到正确代码。"""
+        from src.python.llm.fact_checker._utils import _locate_subject_code
+
+        holdings = self._tail_holdings()
+        name_to_code = {d["name"]: d["code"] for d in holdings}
+        codes = {d["code"] for d in holdings}
+        sent = "及电池主题ETF（收益率-3.92%）同属成长赛道"
+        anchor = sent.find("3.92")
+        assert _locate_subject_code(sent, codes, name_to_code, anchor) == "561910"
+
+    def test_locate_generic_term_not_misrouted(self):
+        """泛词（电池板块/科技赛道）不被误路由到持仓，防新误修正。"""
+        from src.python.llm.fact_checker._utils import _locate_subject_code
+
+        holdings = self._tail_holdings()
+        name_to_code = {d["name"]: d["code"] for d in holdings}
+        codes = {d["code"] for d in holdings}
+        for sent, val in (
+            ("电池板块整体承压，建议关注新能源方向（收益率+8.8%）", "8.8"),
+            ("科技赛道表现分化，但估值消化仍需时间（收益率+12.3%）", "12.3"),
+        ):
+            anchor = sent.find(val)
+            assert _locate_subject_code(sent, codes, name_to_code, anchor) is None, sent
+
+    def test_run_fact_check_keeps_correct_tail_value(self):
+        """run_fact_check 整链路：电池主题ETF 正确 -3.92% 不被改写为 -36.3%。"""
+        holdings = self._tail_holdings()
+        html = (
+            "<p>建信高端装备股票A（收益率+66.35%）与永赢科技智选混合C（收益率+36.29%）"
+            "及电池主题ETF（收益率-3.92%）同属成长赛道。</p>"
+        )
+        corr, summ = run_fact_check(html, holdings, "全球政经局势")
+        assert "电池主题ETF（收益率-3.92%）" in corr
+        assert "-36.3%" not in corr
