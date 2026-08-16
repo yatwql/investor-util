@@ -3,13 +3,13 @@
 CLI 命令行模式无需 TUI 菜单界面，通过命令行参数驱动，适合**定时任务、脚本化批量生成、服务器 / 无桌面环境**使用。本文从用户角度完整介绍 CLI 模式的命令结构、子命令参数与使用技巧。
 
 > **入口**：`.venv/bin/python -m src.python.cli [全局参数] <子命令> [子命令参数]`
-> **定时任务**：配合 Windows 任务计划程序 / Linux cron 自动运行，见本文 [§11 定时任务](#11-定时任务)。
+> **定时任务**：配合 Windows 任务计划程序 / Linux cron 自动运行，见本文 [§12 定时任务](#12-定时任务)。
 
 ---
 
 ## 1. 命令结构
 
-CLI 命令分两层：**全局参数**（位于子命令之前）+ **子命令**（`report` / `cache` / `whatif` / `check-sources`）。
+CLI 命令分两层：**全局参数**（位于子命令之前）+ **子命令**（`report` / `cache` / `whatif` / `check-sources` / `view-logs`）。
 
 ```bash
 # 查看帮助
@@ -42,7 +42,6 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | `--type {basic,both,full}` | `basic`=仅 Excel 报告（约 1 分钟，默认）；`both`=Excel+HTML（不含 LLM，约 2 分钟）；`full`=全量含 LLM（约 5 分钟，需 LLM 配置） |
 | `--history {auto,off}` | 是否获取组合历史走势：`auto`=获取，`off`=跳过。未指定时按配置 `history.fetch_mode`（默认 `auto`）。仅 `--type both` / `full` 时有效 |
 | `--force-llm` | 强制重新调用 LLM API（忽略缓存），生成最新 LLM 内容 |
-| `--warm` | 报告生成前预热缓存（首次使用或新增持仓时推荐） |
 
 ---
 
@@ -80,11 +79,37 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 
 ---
 
-## 7. 使用示例
+## 7. `view-logs` 子命令（结构化日志查看）
+
+按级别/行数/时间范围查看最近运行日志，无需生成报告，也**无需配置**（读取逻辑不依赖 config——配置损坏时仍可查日志诊断）。日志路径取自运行期 `logs/app.log`。
+
+| 参数 | 说明 |
+|:-----|:-----|
+| `--level {DEBUG,INFO,WARNING,ERROR,CRITICAL}` | 最小级别阈值，只显示该级别及以上的日志 |
+| `--lines N` | 读取末尾行数上限（默认 5000） |
+| `--since PREFIX` | 只显示时间前缀 >= 该值的记录（如 `2026-08-16 12:00`） |
+| `--until PREFIX` | 只显示时间前缀 <= 该值的记录 |
 
 ```bash
-# 生成全量报告，预热缓存，强制重新调用 LLM
-.venv/bin/python -m src.python.cli --verbose report --type full --history auto --warm --force-llm
+# 查看最近 200 行
+.venv/bin/python -m src.python.cli view-logs --lines 200
+
+# 只看 ERROR 及以上
+.venv/bin/python -m src.python.cli view-logs --level ERROR
+
+# 查看指定时间段
+.venv/bin/python -m src.python.cli view-logs --since "2026-08-16 12:00" --until "2026-08-16 13:00"
+```
+
+每条输出格式：`time [LEVEL] message`，多行正文（如 traceback）缩进展示。
+
+---
+
+## 8. 使用示例
+
+```bash
+# 生成全量报告，强制重新调用 LLM
+.venv/bin/python -m src.python.cli --verbose report --type full --history auto --force-llm
 
 # 基础 Excel 报告，输出到指定目录
 .venv/bin/python -m src.python.cli --output D:/my_reports report --type basic
@@ -107,13 +132,16 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 # 查看缓存状态
 .venv/bin/python -m src.python.cli cache --stats
 
+# 查看最近 200 行运行日志（只看 ERROR）
+.venv/bin/python -m src.python.cli view-logs --lines 200 --level ERROR
+
 # 查看性能历史趋势
 .venv/bin/python scripts/perf_view.py
 ```
 
 ---
 
-## 8. 常用命令速查
+## 9. 常用命令速查
 
 | 用途 | 命令 |
 |:-----|:-----|
@@ -126,11 +154,12 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | 清理过期缓存 | `.venv/bin/python -m src.python.cli cache --clean` |
 | 查看缓存状态 | `.venv/bin/python -m src.python.cli cache --stats` |
 | 数据源健康检查 | `.venv/bin/python -m src.python.cli check-sources` |
+| 查看最近运行日志 | `.venv/bin/python -m src.python.cli view-logs --level WARNING` |
 | 查看性能历史趋势 | `.venv/bin/python scripts/perf_view.py` |
 
 ---
 
-## 9. 退出码含义
+## 10. 退出码含义
 
 | 退出码 | 含义 | 说明 |
 |:------:|:-----|:-----|
@@ -150,22 +179,19 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 
 ---
 
-## 10. 最佳实践
+## 11. 最佳实践
 
-### 10.1 缓存预热
+### 11.1 缓存预热
 
-首次运行或新增持仓后，建议先预热缓存再生成报告：
+首次运行或新增持仓后，建议先更新缓存再生成报告：
 
 ```bash
 # 先更新缓存，再生成报告
 .venv/bin/python -m src.python.cli cache --update all
 .venv/bin/python -m src.python.cli --output ./reports report --type basic
-
-# 或者使用 --warm 在报告生成时预热
-.venv/bin/python -m src.python.cli report --type full --warm --history auto
 ```
 
-### 10.2 报告输出路径
+### 11.2 报告输出路径
 
 通过 `--output DIR` 全局参数指定报告输出目录，覆盖 `config.json` 中的 `output_dir` 配置：
 
@@ -182,7 +208,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 
 > 定时任务中建议使用绝对路径，避免因工作目录不确定导致的路径问题。
 
-### 10.3 网络退避策略
+### 11.3 网络退避策略
 
 Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自动降级使用过期缓存：
 
@@ -190,7 +216,7 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 - 数据源持续不可用 → 熔断器开启 → 使用过期缓存
 - 报告在无网络环境下降级生成（exit=1，部分数据为空）
 
-### 10.4 性能历史自动收集
+### 11.4 性能历史自动收集
 
 每次 CLI 报告生成时，系统自动记录性能数据到 `data/state/` 目录：
 
@@ -201,7 +227,7 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 
 这些记录自动积累，可用于跨版本性能退化检测和异常波动排查，无需手动触发。
 
-### 10.5 日志轮转
+### 11.5 日志轮转
 
 应用日志已自动轮转（`logs/app.log`，单文件最大 10 MB，保留 5 份备份），**无需额外配置**。
 
@@ -220,11 +246,11 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 
 ---
 
-## 11. 定时任务
+## 12. 定时任务
 
 CLI 模式配合操作系统定时任务可实现无人值守的自动报告生成（定时驱动报告 / 更新缓存），无需人工操作 TUI 菜单。定时任务中建议使用**绝对路径**（避免工作目录不确定）与 `--non-interactive`（跳过首次运行引导）。
 
-### 11.1 Windows 任务计划程序
+### 12.1 Windows 任务计划程序
 
 #### 基础配置
 
@@ -277,7 +303,7 @@ try {
 schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "powershell -NoProfile -Command \"if (-not (Test-Path '$env:TEMP\invest.lock')) { New-Item '$env:TEMP\invest.lock' -Force | Out-Null; try { D:\path\to\investor-util\.venv\Scripts\python.exe -m src.python.cli report --type full --history auto } finally { Remove-Item '$env:TEMP\invest.lock' -ErrorAction SilentlyContinue } }\"" /ST 16:00
 ```
 
-### 11.2 Linux crontab
+### 12.2 Linux crontab
 
 #### 基础配置
 
@@ -304,7 +330,7 @@ crontab -e
 0 16 * * * cd /home/user/investor-util && flock -n /tmp/invest.lock .venv/bin/python -m src.python.cli report --type full --history auto >> logs/cron.log 2>&1
 ```
 
-### 11.3 定时任务排障
+### 12.3 定时任务排障
 
 **检查日志**：
 
@@ -335,7 +361,7 @@ tail -20 logs/cron.log
 
 ---
 
-## 12. 更多参考
+## 13. 更多参考
 
 - [快速开始](how-to-start.md)「方式三」—— CLI 启动简介
 - [TUI 菜单操作手册](how-to-use-tui-menu.md) —— TUI 等效操作（各菜单详解）

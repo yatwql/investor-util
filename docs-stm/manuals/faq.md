@@ -162,7 +162,7 @@ A: 项目内置 CLI 命令行模式（`.venv/bin/python -m src.python.cli`），
 
 通过 Windows 任务计划程序 / Linux cron 调用上述命令即可实现无人值守自动生成。CLI 模式生成结果与 TUI 菜单操作一致，缓存可共享。
 
-详细配置步骤见[CLI 命令行模式使用指南](how-to-use-cli-mode.md) §11「定时任务」。
+详细配置步骤见[CLI 命令行模式使用指南](how-to-use-cli-mode.md) §12「定时任务」。
 
 ---
 

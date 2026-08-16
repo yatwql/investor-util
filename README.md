@@ -59,7 +59,7 @@
 .venv/bin/python -m src.python.cli cache --stats
 ```
 
-完整命令参考（全局参数 / report / cache / whatif / check-sources / 使用示例 / 退出码 / 最佳实践）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §11「定时任务」。
+完整命令参考（全局参数 / report / cache / whatif / check-sources / view-logs / 使用示例 / 退出码 / 最佳实践）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §12「定时任务」。
 
 ---
 
@@ -161,7 +161,7 @@
 |:-:|:-----|:------|
 | 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
 | 2 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
-| 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif 子命令、使用示例、退出码、定时任务 |
+| 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif/check-sources/view-logs 子命令、使用示例、退出码、定时任务 |
 | 4 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
 | 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、章节可见性 |
 | 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
