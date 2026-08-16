@@ -7,19 +7,19 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 243 | 58,453 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
+| 主程序代码 | Python | 245 | 58,940 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
 | HTML 报告模板 | HTML | 4 | 3,774 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 19 | 7,022 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断） |
-| **源代码合计** | — | **266** | **69,249** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **307** | **86,533** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,473 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **源代码合计** | — | **268** | **69,736** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **309** | **87,153** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,527 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **4,793** | 含 README.md（194 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,599 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **112** | **45,662** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 101 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 8,875 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 105 | 37,171 | 各版本 changelog/plan/review-findings 等（101 md 36,713 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 0 | 0 | 当前迭代无未完成设计方案（web-config-edit、plan-readme-svg-layout、env-benchmark-doc-update 已归档） |
+| **项目文档** | Markdown | **113** | **45,887** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 102 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 8,898 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 106 | 37,373 | 各版本 changelog/plan/review-findings 等（102 md 36,915 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | 当前无文件 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -259,6 +259,7 @@ investor-util/
 │   │   │   ├── constants.py          #   全局常量/版本号
 │   │   │   ├── http_client.py        #   HTTP 客户端（请求/重试/超时）
 │   │   │   ├── logger.py             #   日志模块（文件+控制台，自动轮转）
+│   │   │   ├── log_reader.py         #   结构化日志读取（read_log/tail_log/parse_log，CLI/TUI/Web 共享）
 │   │   │   ├── market_hours.py       #   交易时段判断（A股/港股/QDII）
 │   │   │   ├── models.py             #   数据模型（持仓/行情/基金/新闻）
 │   │   │   ├── holding_status.py     #   品种级数据状态标注（品种覆盖诊断，position_status）
@@ -278,6 +279,7 @@ investor-util/
 │   │   │   ├── __main__.py           #   python -m 入口
 │   │   │   ├── handlers_cache.py     #   缓存管理命令处理器
 │   │   │   ├── handlers_config.py    #   配置管理命令处理器
+│   │   │   ├── handlers_log.py       #   日志可视化命令处理器（查看日志/数据源健康历史）
 │   │   │   ├── handlers_report.py    #   报告生成命令处理器
 │   │   │   ├── handlers_whatif.py    #   调仓 What-if 模拟命令处理器（对比两份持仓生成独立报告）
 │   │   │   ├── tui.py                #   主循环入口
@@ -291,7 +293,7 @@ investor-util/
 │   │   │   ├── server.py             #   服务主入口（sys.path 注入 + 端口检测 + app.run）
 │   │   │   ├── app.py                #   Flask 应用工厂（错误处理/请求日志/注入 run_manager）
 │   │   │   ├── config_edit.py        #   Web 配置编辑（白名单 config_edit_whitelist + 面板读取 + 应用编辑 + 写前 .bak 备份）
-│   │   │   ├── handlers.py           #   路由 handler（页面/上传/生成/轮询/预览/下载/历史/健康；_build_system_info 状态区系统信息）
+│   │   │   ├── handlers.py           #   路由 handler（页面/上传/生成/轮询/预览/下载/历史/健康/日志；_build_system_info 状态区系统信息）
 │   │   │   ├── upload.py             #   上传安全（uuid 重命名/扩展名白名单/魔数校验/原子落盘/TTL）
 │   │   │   ├── holdings_update.py    #   正式持仓更新（旧文件备份 .bak + 原子提升上传文件为正式文件）
 │   │   │   ├── progress.py           #   Web 进度报告器（事件写入 run 状态缓冲）
@@ -312,9 +314,9 @@ investor-util/
 │   │   ├── llm-chain.svg             #   README LLM 智囊团 Provider 链式分发图
 │   │   ├── capabilities.svg          #   README 八大功能域总览图
 │   │   ├── web/                      #   Web UI 前端（Jinja 模板 + 静态资产，Flask template/static 目录指向此处）
-│   │   │   ├── index.html            #   单页 Web UI 模板（上传/格式选择/进度/结果/状态区三列含系统信息）
-│   │   │   ├── main.js               #   前端逻辑（上传/提交/轮询/渲染，原生 ES6，无 innerHTML）
-│   │   │   └── style.css             #   样式（CSS 变量/浅色主题/响应式 480px 断点/系统信息卡片）
+│   │   │   ├── index.html            #   单页 Web UI 模板（上传/格式选择/进度/结果/状态区三列含系统信息/日志查看卡）
+│   │   │   ├── main.js               #   前端逻辑（上传/提交/轮询/渲染/日志加载，原生 ES6，无 innerHTML）
+│   │   │   └── style.css             #   样式（CSS 变量/浅色主题/响应式 480px 断点/系统信息卡片/日志列表）
 │   │   └── tmpl/                     #   报告 Jinja 模板（report/html_jinja_env 加载）
 │   │       ├── report_template.html  #   Jinja2 HTML 报告主模板
 │   │       ├── whatif_template.html  #   调仓 What-if 独立 HTML 页（双环图+变动明细）
@@ -401,6 +403,7 @@ investor-util/
 │       │   │   ├── test_data_freshness.py   #   数据可信度诊断测试（新鲜度 + 单日跳变）
 │       │   │   ├── test_http_client.py      #   HTTP 客户端测试
 │       │   │   ├── test_logger.py           #   日志模块测试（文件+控制台，自动轮转）
+│       │   │   ├── test_log_reader.py       #   结构化日志读取测试（parse_log/tail_log/read_log）
 │       │   │   ├── test_market_hours.py     #   交易时段判断测试
 │       │   │   ├── test_market_hours_edge.py #   交易时段边缘场景
 │       │   │   ├── test_models.py           #   数据模型测试
@@ -584,7 +587,8 @@ investor-util/
 │       │   │   ├── test_tui_keys.py              #   TUI 键盘输入测试
 │       │   │   ├── test_tui_edge.py         #   TUI 边缘场景
 │       │   │   ├── test_tui_handlers.py     #   TUI 事件处理测试
-│       │   │   └── test_tui_menu.py         #   TUI 菜单测试
+│       │   │   ├── test_tui_menu.py         #   TUI 菜单测试
+│       │   │   └── test_handlers_log.py     #   日志可视化命令处理测试（查看日志/健康历史）
 │       │   └── web/                  #   Web 模式单元测试
 │       │   │   ├── __init__.py      #       包标记（空文件）
 │       │   │   ├── test_upload.py   #       上传安全模块（校验/生命周期/清理）
@@ -838,8 +842,8 @@ investor-util/
 │   │   │   ├── archived_plan.0.9.x.md         # 实现计划归档 v0.9.x（设计文档索引）
 │   │   │   ├── archived_changelog.0.9.x.md     # 变更日志归档 v0.9.x
 │   │   │   ├── archived_review-findings.0.9.x.md # 自审记录归档 v0.9.x
-│   │   │   ├── abandoned-design/               #   已放弃设计决策归档区（plan-4 业绩归因）
-│   │   │   │   └── plan-4-brinson-attribution-abandoned.md # plan-4 业绩归因（Brinson）放弃设计
+│   │   │   ├── abandoned-design/               #   已放弃设计决策归档区（业绩归因）
+│   │   │   │   └── plan-4-brinson-attribution-abandoned.md # 业绩归因（Brinson）放弃设计
 │   │   │   ├── chartjs-upgrade/               #   交互式 HTML 报告升级设计（8 迭代）
 │   │   │   │   ├── plan-chartjs-report-upgrade.md   # Chart.js 升级实施方案
 │   │   │   │   ├── plan-chartjs-risk-analysis.md    # Chart.js 升级风险/收益/架构分析
@@ -859,33 +863,35 @@ investor-util/
 │   │   │   ├── portfolio-evolution/             #   多快照趋势追踪/组合演进设计
 │   │   │   │   └── plan-portfolio-evolution.md  #     多快照趋势追踪设计
 │   │   │   ├── html-dark-mode/                  #   HTML 暗色模式实施归档
-│   │   │   │   ├── dark-mode-implementation.md  #     plan-11 暗色模式实施记录
-│   │   │   │   └── plan-11-dark-mode-plan.md    #     plan-11 暗色模式实施计划
+│   │   │   │   ├── dark-mode-implementation.md  #     暗色模式实施记录
+│   │   │   │   └── plan-11-dark-mode-plan.md    #     暗色模式实施计划
 │   │   │   ├── fix-deepseek-thinking/           #   DeepSeek thinking 思考耗尽修复设计
 │   │   │   │   └── plan-fix-deepseek-thinking-exhaustion.md # 思考耗尽修复方案
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   └── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
-│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（plan-17~28，设计文档索引）
+│   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（含设计文档索引）
 │   │   │   ├── archived_changelog.0.10.x.md #    变更日志归档 v0.10.x
-│   │   │   ├── archived_review-findings.0.10.x.md # 自审记录归档 v0.10.x（rf-204~275）
-│   │   │   ├── investment-features/         #   投资功能优化 + 章节归并（plan-17~24）
+│   │   │   ├── archived_review-findings.0.10.x.md # 自审记录归档 v0.10.x
+│   │   │   ├── investment-features/         #   投资功能优化 + 章节归并设计文档
 │   │   │   │   ├── plan-investment-features.md  #     投资分析功能优化设计（需求×数据源×章节归并）
 │   │   │   │   └── plan-investment-iteration.md #     投资功能优化 21 轮迭代实施计划（每轮量化验收）
-│   │   │   ├── task-code-traces-gate/       #   任务编号标识符/注释门禁增强设计（rf-208）
+│   │   │   ├── log-visualization/           #   日志可视化三端设计文档（CLI+TUI+Web）
+│   │   │   │   └── plan-log-visualization.md #     CLI+TUI+Web 日志查看与数据源健康历史接线设计
+│   │   │   ├── task-code-traces-gate/       #   任务编号标识符/注释门禁增强设计
 │   │   │   │   └── plan-task-code-traces-gate.md #     check-code-traces 扩展（IDENT 维度 + 系列代号）
 │   │   │   ├── toc-llm-marking/             #   目录 LLM 章节标记设计（橙色加粗 + 🧠 图标）
 │   │   │   │   └── plan-toc-llm-marking.md  #     TOC/横向导航 LLM 章节标记（复用 --orange-text）
-│   │   │   ├── web-ui/                      #   轻量 Web UI 实施归档（plan-8 三阶段完成）
-│   │   │       ├── plan-web-ui.md              #     轻量 Web UI 计划（plan-8 轻量 Web UI / plan-10 日志可视化）
-│   │   │       └── plan-web-ui-implementation.md #  plan-8 Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
-│   │   │   ├── web-holdings-input-modes/    #   Web 持仓输入模式实施归档（plan-25 完成）
-│   │   │   │   └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计定稿
-│   │   │   ├── web-config-edit/              #   Web 配置编辑实施归档（plan-26 完成）
-│   │   │   │   └── web-config-edit.md        #   Web 配置编辑设计定稿（完整镜像 TUI 可编辑配置全集，已实现）
+│   │   │   ├── web-ui/                      #   轻量 Web UI 实施归档（含日志可视化设计）
+│   │   │       ├── plan-web-ui.md              #     轻量 Web UI 计划
+│   │   │       └── plan-web-ui-implementation.md # Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
+│   │   │   ├── web-holdings-input-modes/    #   Web 持仓输入模式实施归档
+│   │   │   │   └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计
+│   │   │   ├── web-config-edit/              #   Web 配置编辑实施归档
+│   │   │   │   └── web-config-edit.md        #   Web 配置编辑设计（完整镜像 TUI 可编辑配置全集）
 │   │   │   ├── readme-svg-layout/            #   README SVG 架构图实施归档
-│   │   │   │   └── plan-readme-svg-layout.md #     README 嵌入 SVG 架构图 + 排版优化（设计定稿已实现）
-│   │   │   └── env-benchmark-doc-update/     #   环境耗时对照文档自动更新（--update-docs 已实现）
+│   │   │   │   └── plan-readme-svg-layout.md #     README 嵌入 SVG 架构图 + 排版优化设计
+│   │   │   └── env-benchmark-doc-update/     #   环境耗时对照文档自动更新
 │   │   │       └── plan-env-benchmark-doc-update.md # test-coverage.md 环境耗时表按主机名自动回填
 │   ├── plan/                          #   中间设计文件
 │   └── tmp/                          #   临时文件（git 忽略，不展开）

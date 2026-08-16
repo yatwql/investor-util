@@ -20,9 +20,11 @@ from src.python.cli import (
     _cli_read_holdings_with_flows,
     _handle_cache_update,
     _handle_report,
+    _handle_view_logs,
     _handle_whatif,
     main,
 )
+from src.python.core.log_reader import LogEntry
 from src.python.report.whatif_operations import WhatifRunResult
 
 
@@ -352,8 +354,10 @@ class TestHandleReport:
         mock_result = MagicMock()
         mock_result.exit_code = 0
         with (
-            patch("src.python.cli.cli._cli_read_holdings_with_flows",
-                  return_value=([MagicMock()], [MagicMock()], [MagicMock()])),
+            patch(
+                "src.python.cli.cli._cli_read_holdings_with_flows",
+                return_value=([MagicMock()], [MagicMock()], [MagicMock()]),
+            ),
             patch("src.python.report.cli_progress.CliProgressReporter"),
             patch("src.python.report.orchestrator.generate_report", return_value=mock_result) as mock_gen,
         ):
@@ -620,3 +624,134 @@ class TestMain:
         mock_whatif.assert_called_once()
         args = mock_whatif.call_args[0][0]
         assert args.effective_date == "2026-07-01"
+
+
+# ═══════════════════════════════════════════════════════════════
+# view-logs 子命令
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestArgparseViewLogs:
+    """view-logs 子命令参数解析。"""
+
+    def test_view_logs_subcommand(self):
+        """view-logs 默认参数。"""
+        args = _build_parser().parse_args(["view-logs"])
+        assert args.command == "view-logs"
+        assert args.level is None
+        assert args.lines == 5000
+        assert args.since is None
+        assert args.until is None
+
+    def test_view_logs_params(self):
+        """view-logs --level/--lines/--since/--until 透传。"""
+        args = _build_parser().parse_args(
+            [
+                "view-logs",
+                "--level",
+                "ERROR",
+                "--lines",
+                "200",
+                "--since",
+                "2026-08-16",
+                "--until",
+                "2026-08-16 12:00:00",
+            ]
+        )
+        assert args.level == "ERROR"
+        assert args.lines == 200
+        assert args.since == "2026-08-16"
+        assert args.until == "2026-08-16 12:00:00"
+
+    def test_view_logs_invalid_level(self):
+        """非法 --level 被 argparse 拒绝。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["view-logs", "--level", "VERBOSE"])
+        assert exc.value.code == 2
+
+
+@pytest.mark.unit
+class TestHandleViewLogs:
+    """_handle_view_logs 输出与退出码。"""
+
+    def test_output_entries(self, capsys):
+        """有日志条目时输出时间/级别/消息（续行缩进）并返回成功。"""
+        entries = [
+            LogEntry(time="2026-08-16 10:00:00,123", level="INFO", message="应用启动", body="应用启动"),
+            LogEntry(
+                time="2026-08-16 10:00:01,456",
+                level="ERROR",
+                message="读取行情失败",
+                body="读取行情失败\n  堆栈行",
+            ),
+        ]
+        with patch("src.python.core.log_reader.read_log", return_value=entries):
+            code = _handle_view_logs(MagicMock(lines=100, level=None, since=None, until=None))
+        out = capsys.readouterr().out
+        assert code == _EXIT_SUCCESS
+        assert "运行日志" in out
+        assert "2026-08-16 10:00:00,123 [INFO] 应用启动" in out
+        assert "2026-08-16 10:00:01,456 [ERROR] 读取行情失败" in out
+        assert "    堆栈行" in out
+
+    def test_no_match(self, capsys):
+        """无匹配条目时提示并返回成功。"""
+        with patch("src.python.core.log_reader.read_log", return_value=[]):
+            code = _handle_view_logs(MagicMock(lines=100, level=None, since=None, until=None))
+        assert code == _EXIT_SUCCESS
+        assert "无匹配日志条目" in capsys.readouterr().out
+
+    def test_value_error_severe(self, capsys):
+        """read_log 抛 ValueError → 返回 _EXIT_SEVERE。"""
+        with patch("src.python.core.log_reader.read_log", side_effect=ValueError("无效日志级别")):
+            code = _handle_view_logs(MagicMock(lines=100, level=None, since=None, until=None))
+        assert code == _EXIT_SEVERE
+        assert "[ERR]" in capsys.readouterr().err
+
+    def test_os_error_severe(self, capsys):
+        """read_log 抛 OSError → 返回 _EXIT_SEVERE。"""
+        with patch("src.python.core.log_reader.read_log", side_effect=OSError("IO error")):
+            code = _handle_view_logs(MagicMock(lines=100, level=None, since=None, until=None))
+        assert code == _EXIT_SEVERE
+
+    def test_lines_clamped_to_min_one(self):
+        """lines 负数/零被钳制为 1。"""
+        with patch("src.python.core.log_reader.read_log", return_value=[]) as mock_read:
+            _handle_view_logs(MagicMock(lines=-5, level=None, since=None, until=None))
+        assert mock_read.call_args.kwargs["limit"] == 1
+
+
+@pytest.mark.unit
+class TestMainViewLogs:
+    """main() view-logs 分派（config 之前）。"""
+
+    def test_dispatches_before_init_config(self):
+        """view-logs 在 init_config 之前分派，不触发配置加载。"""
+        with (
+            patch("src.python.cli.cli._handle_view_logs", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config") as mock_init,
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "view-logs", "--level", "ERROR"]):
+                code = main()
+
+        assert code == _EXIT_SUCCESS
+        mock_handle.assert_called_once()
+        mock_init.assert_not_called()
+
+    def test_passes_args_to_handler(self):
+        """main 分派将解析后的 args 传给 _handle_view_logs。"""
+        with (
+            patch("src.python.cli.cli._handle_view_logs", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "view-logs", "--lines", "300"]):
+                main()
+
+        args = mock_handle.call_args[0][0]
+        assert args.command == "view-logs"
+        assert args.lines == 300

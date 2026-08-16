@@ -226,6 +226,27 @@
       </div>
     </section>
 
+    <!-- ⑦ 日志查看：手动加载 + 级别筛选 + 原生折叠展示（大日志高 IO，不自动轮询） -->
+    <section class="card" aria-labelledby="logs-heading">
+      <h2 id="logs-heading">⑦ 日志查看</h2>
+      <div class="log-controls">
+        <label for="log-level">级别筛选</label>
+        <select id="log-level" class="log-level-select">
+          <option value="">全部</option>
+          <option value="DEBUG">DEBUG</option>
+          <option value="INFO">INFO</option>
+          <option value="WARNING">WARNING</option>
+          <option value="ERROR">ERROR</option>
+          <option value="CRITICAL">CRITICAL</option>
+        </select>
+        <button type="button" id="log-load" class="btn btn-secondary">加载日志</button>
+        <span id="log-status" class="log-status status-text"></span>
+      </div>
+      <div id="log-list" class="log-list" aria-live="polite">
+        <p class="status-text status-busy">点击「加载日志」查看最近运行日志</p>
+      </div>
+    </section>
+
   </main>
 
   <footer class="app-footer">

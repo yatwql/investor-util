@@ -65,6 +65,9 @@
     els.resultFooter = $('result-footer');
     els.healthList = $('health-list');
     els.historyList = $('history-list');
+    els.logLevel = $('log-level');
+    els.logList = $('log-list');
+    els.logStatus = $('log-status');
     // 输入模式（试算 trial / 正式 formal）相关控件
     els.modeRadios = document.querySelectorAll('input[name="input_mode"]');
     els.sourceRadios = document.querySelectorAll('input[name="use_existing"]');
@@ -82,6 +85,7 @@
     $('config-reload').addEventListener('click', function () {
       loadConfigEdit();
     });
+    $('log-load').addEventListener('click', loadLogs);
 
     // 生成用途/输入来源模式切换：正式模式展开区 + 警示条 + 按钮态联动
     els.modeRadios.forEach(function (r) {
@@ -605,6 +609,61 @@
       row.appendChild(meta);
       els.healthList.appendChild(row);
     });
+  }
+
+  /* ── ⑦ 日志查看：手动加载 + 级别筛选 + 原生折叠展示 ──
+   * 日志可能很大，仅用户点「加载日志」才请求（不自动轮询，对齐设计文档
+   * 「自动刷新高 IO → 需手动刷新」）。渲染全 textContent/DOM API，
+   * 服务端返回的日志正文（含数据源名等不可信内容）不进 innerHTML。
+   */
+  function loadLogs() {
+    var level = els.logLevel.value;
+    var params = new URLSearchParams();
+    if (level) {
+      params.append('level', level);
+    }
+    var qs = params.toString();
+    setStatus(els.logStatus, '加载中...', 'busy');
+    fetch('/api/logs' + (qs ? '?' + qs : ''), {
+      signal: AbortSignal.timeout(10000),
+    })
+      .then(handleResponse)
+      .then(function (entries) {
+        renderLogs(entries || []);
+        setStatus(els.logStatus, '共 ' + entries.length + ' 条', 'ok');
+      })
+      .catch(function (err) {
+        setStatus(els.logStatus, err.message, 'error');
+        renderLogs([]);
+      });
+  }
+
+  function renderLogs(entries) {
+    els.logList.textContent = '';
+    if (!entries.length) {
+      var p = document.createElement('p');
+      p.className = 'status-text status-busy';
+      p.textContent = '暂无匹配日志';
+      els.logList.appendChild(p);
+      return;
+    }
+    entries.forEach(function (entry) {
+      var levelCls = entry.level ? entry.level.toLowerCase() : 'info';
+      var details = document.createElement('details');
+      details.className = 'log-entry log-' + levelCls;
+      if (entry.is_decorative) {
+        details.classList.add('log-decorative');
+      }
+      var summary = document.createElement('summary');
+      summary.textContent = entry.time + ' [' + entry.level + '] ' + entry.message;
+      details.appendChild(summary);
+      var body = document.createElement('pre');
+      body.className = 'log-body';
+      body.textContent = entry.body;
+      details.appendChild(body);
+      els.logList.appendChild(details);
+    });
+    els.logList.scrollTop = 0;
   }
 
   /* ── 状态区：最近运行（单行摘要，聚焦错误痕迹与耗时）── */

@@ -257,6 +257,39 @@ def load_health_history(path: str | None = None) -> list[dict[str, Any]]:
     return records
 
 
+def summarize_health_history(limit: int = 10) -> list[dict[str, Any]]:
+    """聚合数据源健康历史为最近 limit 次运行摘要。
+
+    每条摘要包含：时间戳、报告类型、持仓数量、源总数/成功数/失败数、
+    失败源名称列表（最多前 5 个）。聚合逻辑集中在核心层，
+    供 TUI/Web 端展示「数据源健康历史」。
+
+    Args:
+        limit: 返回最近多少次运行（默认 10）
+
+    Returns:
+        按时间升序的摘要列表；无历史记录时返回 []
+    """
+    records = load_health_history()
+    recent = records[-limit:] if limit > 0 else []
+    summaries: list[dict[str, Any]] = []
+    for record in recent:
+        sources = record.get("sources") or {}
+        failed = [name for name, s in sources.items() if not s.get("ok")][:5]
+        summaries.append(
+            {
+                "timestamp": record.get("timestamp", ""),
+                "report_type": record.get("report_type", ""),
+                "holdings_count": record.get("holdings_count", 0),
+                "total": record.get("total", len(sources)),
+                "ok_count": record.get("ok_count", sum(1 for s in sources.values() if s.get("ok"))),
+                "fail_count": record.get("fail_count", sum(1 for s in sources.values() if not s.get("ok"))),
+                "failed_sources": failed,
+            }
+        )
+    return summaries
+
+
 # ── 工具函数（供 Layer 3 脚本使用） ─────────────────────
 
 

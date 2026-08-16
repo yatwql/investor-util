@@ -608,6 +608,105 @@ select:focus,
   border-radius: 6px;
 }
 
+/* ── 日志查看卡（⑦）：手动加载 + 级别筛选 + 原生折叠 ── */
+.log-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.log-controls label {
+  color: var(--color-text-secondary);
+}
+
+.log-level-select {
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.log-level-select:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.log-status {
+  font-size: 0.85rem;
+}
+
+.log-list {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: 0.82rem;
+}
+
+.log-list .status-text {
+  padding: 12px;
+  margin: 0;
+}
+
+.log-entry {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-entry summary {
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--color-text);
+  word-break: break-all;
+  display: flex;
+  gap: 6px;
+}
+
+.log-entry summary:hover {
+  background: rgba(31, 111, 178, 0.06);
+}
+
+.log-entry[open] summary {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.log-body {
+  margin: 0;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--color-text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  background: rgba(31, 35, 40, 0.03);
+}
+
+/* 日志级别语义色（对齐 TUI 级别着色） */
+.log-entry.log-error summary,
+.log-entry.log-critical summary {
+  color: var(--color-error);
+}
+
+.log-entry.log-warning summary {
+  color: var(--color-warn);
+}
+
+/* 装饰性横幅/分隔线（实验性提示等）置灰 */
+.log-decorative summary {
+  color: var(--color-text-secondary);
+}
+
 /* ── 配置编辑面板（与 TUI 菜单一致，即改即存）── */
 .config-note {
   margin: 0 0 12px;

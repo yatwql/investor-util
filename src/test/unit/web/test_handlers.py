@@ -20,6 +20,7 @@ from unittest.mock import MagicMock, patch
 import src.python.web.upload as upload
 from src.python.config import _config_defaults
 from src.python.config._core import invalidate_config_cache
+from src.python.core.log_reader import LogEntry
 from src.python.report.orchestrator import ReportResult
 from src.python.web.app import create_app
 from src.python.web.handlers import _build_artifacts, _build_system_info, _health_cache, _run_generation
@@ -781,3 +782,106 @@ class TestSystemInfo:
         html = resp.data.decode("utf-8")
         assert '<span class="system-status-err">文件未找到</span>' in html
         assert 'id="system-privacy"' in html and "已显示" in html
+
+
+class TestLogsEndpoint:
+    """/api/logs 结构化日志查看。"""
+
+    def test_logs_success(self, app_client):
+        """正常读取 → 200 + LogEntry.to_dict 列表。"""
+        entries = [
+            LogEntry(time="2026-08-16 10:00:00,123", level="INFO", message="应用启动", body="应用启动"),
+            LogEntry(
+                time="2026-08-16 10:00:01,456",
+                level="ERROR",
+                message="读取行情失败",
+                body="读取行情失败\n  堆栈行",
+            ),
+        ]
+        with patch("src.python.core.log_reader.read_log", return_value=entries):
+            resp = app_client.get("/api/logs")
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data[0] == {
+            "time": "2026-08-16 10:00:00,123",
+            "level": "INFO",
+            "message": "应用启动",
+            "body": "应用启动",
+            "is_decorative": False,
+        }
+        assert data[1]["body"] == "读取行情失败\n  堆栈行"
+
+    def test_invalid_level_400(self, app_client):
+        """非法 level → 400 BAD_PARAM。"""
+        resp = app_client.get("/api/logs?level=VERBOSE")
+        assert resp.status_code == 400
+        assert resp.get_json()["error_code"] == "BAD_PARAM"
+
+    def test_invalid_lines_400(self, app_client):
+        """非法 lines → 400 BAD_PARAM。"""
+        resp = app_client.get("/api/logs?lines=abc")
+        assert resp.status_code == 400
+        assert resp.get_json()["error_code"] == "BAD_PARAM"
+
+    def test_lines_clamped_to_5000(self, app_client):
+        """lines 超上限被钳制为 5000。"""
+        with patch("src.python.core.log_reader.read_log", return_value=[]) as mock_read:
+            resp = app_client.get("/api/logs?lines=999999")
+        assert resp.status_code == 200
+        assert mock_read.call_args.kwargs["limit"] == 5000
+
+    def test_lines_min_one(self, app_client):
+        """lines 为 0 被钳制为 1。"""
+        with patch("src.python.core.log_reader.read_log", return_value=[]) as mock_read:
+            resp = app_client.get("/api/logs?lines=0")
+        assert resp.status_code == 200
+        assert mock_read.call_args.kwargs["limit"] == 1
+
+    def test_level_filter_passthrough(self, app_client):
+        """level 参数透传核心层。"""
+        with patch("src.python.core.log_reader.read_log", return_value=[]) as mock_read:
+            app_client.get("/api/logs?level=ERROR")
+        assert mock_read.call_args.kwargs["level"] == "ERROR"
+
+    def test_read_failure_500(self, app_client):
+        """read_log 抛 OSError → 500 LOG_READ_FAILED。"""
+        with patch("src.python.core.log_reader.read_log", side_effect=OSError("IO error")):
+            resp = app_client.get("/api/logs")
+        assert resp.status_code == 500
+        assert resp.get_json()["error_code"] == "LOG_READ_FAILED"
+
+
+class TestHealthHistoryEndpoint:
+    """/api/health/history 数据源健康历史摘要。"""
+
+    def test_success(self, app_client):
+        """有历史 → 200 + 摘要列表。"""
+        summaries = [
+            {
+                "timestamp": "2026-08-16T10:00:00",
+                "report_type": "basic",
+                "holdings_count": 3,
+                "total": 10,
+                "ok_count": 8,
+                "fail_count": 2,
+                "failed_sources": ["腾讯K线"],
+            }
+        ]
+        with patch("src.python.core.perf.summarize_health_history", return_value=summaries):
+            resp = app_client.get("/api/health/history")
+        assert resp.status_code == 200
+        assert resp.get_json()["data"][0]["failed_sources"] == ["腾讯K线"]
+
+    def test_empty(self, app_client):
+        """无历史 → 200 + 空列表。"""
+        with patch("src.python.core.perf.summarize_health_history", return_value=[]):
+            resp = app_client.get("/api/health/history")
+        assert resp.status_code == 200
+        assert resp.get_json()["data"] == []
+
+    def test_read_failure_500(self, app_client):
+        """异常 → 500 HEALTH_HISTORY_READ_FAILED。"""
+        with patch("src.python.core.perf.summarize_health_history", side_effect=OSError("IO error")):
+            resp = app_client.get("/api/health/history")
+        assert resp.status_code == 500
+        assert resp.get_json()["error_code"] == "HEALTH_HISTORY_READ_FAILED"

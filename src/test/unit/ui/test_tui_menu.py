@@ -41,8 +41,8 @@ class TestMenuItems(unittest.TestCase):
             _tm.MENU_ITEMS[i] = (key, label, None, is_exit)
 
     def test_item_count(self) -> None:
-        """菜单项应为 17 个。"""
-        self.assertEqual(len(MENU_ITEMS), 17)
+        """菜单项应为 19 个。"""
+        self.assertEqual(len(MENU_ITEMS), 19)
 
     def test_whatif_item(self) -> None:
         """What-if 菜单项在报告生成组后（第 4 项，快捷键 W）。"""
@@ -62,11 +62,27 @@ class TestMenuItems(unittest.TestCase):
 
     def test_last_item_exit(self) -> None:
         """最后一项快捷键 X，is_exit=True。"""
-        key, label, cb, is_exit = MENU_ITEMS[16]
+        key, label, cb, is_exit = MENU_ITEMS[18]
         self.assertEqual(key, "X")
         self.assertIn("退出", label)
         self.assertIsNone(cb)
         self.assertTrue(is_exit)
+
+    def test_view_logs_item(self) -> None:
+        """日志查看项在退出前（快捷键 V）。"""
+        key, label, cb, is_exit = MENU_ITEMS[16]
+        self.assertEqual(key, "V")
+        self.assertIn("运行日志", label)
+        self.assertIsNone(cb)
+        self.assertFalse(is_exit)
+
+    def test_health_history_item(self) -> None:
+        """健康历史项在日志查看后（快捷键 H）。"""
+        key, label, cb, is_exit = MENU_ITEMS[17]
+        self.assertEqual(key, "H")
+        self.assertIn("健康历史", label)
+        self.assertIsNone(cb)
+        self.assertFalse(is_exit)
 
     def test_all_keys_unique(self) -> None:
         """所有快捷键不重复。"""
@@ -99,7 +115,13 @@ class TestIndexByKey(unittest.TestCase):
         self.assertEqual(index_by_key("W"), 3)
 
     def test_find_X(self) -> None:
-        self.assertEqual(index_by_key("X"), 16)
+        self.assertEqual(index_by_key("X"), 18)
+
+    def test_find_V(self) -> None:
+        self.assertEqual(index_by_key("V"), 16)
+
+    def test_find_H(self) -> None:
+        self.assertEqual(index_by_key("H"), 17)
 
     def test_find_nonexistent(self) -> None:
         self.assertIsNone(index_by_key("Z"))

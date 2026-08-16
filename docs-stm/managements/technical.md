@@ -229,7 +229,8 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **贯穿** | 代码类型判定 | 资产识别原语 | `core/code_utils.py` |
 | **贯穿** | 交易时段判断 | A 股时段、午间休市 | `core/market_hours.py` |
 | **贯穿** | HTTP 客户端 | 统一工厂 | `core/http_client.py` |
-| **贯穿** | 性能收集 | PerfCollector 三路径计时 + perf_history.jsonl 持久化 | `core/perf.py` |
+| **贯穿** | 性能收集 | PerfCollector 三路径计时 + perf_history.jsonl 持久化 + 数据源健康历史聚合 `summarize_health_history()` | `core/perf.py` |
+| **贯穿** | 日志可视化 | 结构化日志读取（parse_log/tail_log/read_log），CLI/TUI/Web 三端共享 | `core/log_reader.py` |
 
 ### 1.4 概要设计 — 核心架构决策
 
@@ -415,7 +416,7 @@ while True:
 
 #### 1.6.3 菜单体系
 
-`tui/tui_menu.py:MENU_ITEMS` —— 每项 `(快捷键, 显示标签, 回调, 是否退出)`，回调由 `_bind_callbacks()` 在**运行时**从 handlers 模块填入（定义时不直接 import，避免启动即加载全部处理器）。当前 17 项按功能域分组：
+`tui/tui_menu.py:MENU_ITEMS` —— 每项 `(快捷键, 显示标签, 回调, 是否退出)`，回调由 `_bind_callbacks()` 在**运行时**从 handlers 模块填入（定义时不直接 import，避免启动即加载全部处理器）。当前 19 项按功能域分组：
 
 | 分组 | 快捷键 | 功能 |
 |:-----|:------|:-----|
@@ -431,6 +432,8 @@ while True:
 | | `[R]` | 刷新配置 |
 | 缓存管理 | `[1]`/`[2]` | 更新基础类 / 行情类缓存 |
 | | `[3]`/`[4]` | 清理过期缓存 / 查看缓存统计 |
+| 诊断 | `[V]` | 查看最近运行日志（可按级别筛选，`handlers_log.py::_cmd_view_logs`） |
+| | `[H]` | 查看数据源健康历史（近期检查记录，`handlers_log.py::_cmd_view_health_history`） |
 | 退出 | `[X]` | 退出程序 |
 
 菜单渲染层与状态面板：`print_header`（标题 + 首次运行指引：缺持仓文件/缺 LLM 配置提示）、`show_config`（持仓路径、输出目录、新闻抓取上限、文件就绪状态 `[OK]`/`[!!]`、匿名化状态、隐私声明、LLM 配置状态单链/多链两视图）。LLM 状态面板支持多 Provider 链式模式（策略、各 provider 后端/模型/优先级/熔断状态、模块级偏好）。
@@ -484,17 +487,18 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 
 #### 1.7.2 argparse 结构
 
-`_build_parser()`：`prog="investor-util"`，全局参数 + 4 个子命令。
+`_build_parser()`：`prog="investor-util"`，全局参数 + 5 个子命令。
 
 - **全局参数**：`--config`（备用配置文件路径）、`--output`（报告输出目录，覆盖 config 的 output_dir）、`--verbose`（进度同步到 stderr，默认仅写 logs/app.log）、`--non-interactive`（跳过首次运行交互式引导，定时任务/脚本使用）、`--version`。
-- **`report`**：`--type basic/both/full`（默认 basic）、`--history auto/off`（未指定回退配置层 `history.fetch_mode`，仅 both/full 有效）、`--force-llm`、`--warm`（预热新资产缓存）。
+- **`report`**：`--type basic/both/full`（默认 basic）、`--history auto/off`（未指定回退配置层 `history.fetch_mode`，仅 both/full 有效）、`--force-llm`。
 - **`cache`**：互斥组 `--update basic/position/all` / `--clean` / `--stats`。
 - **`whatif`**：`--candidate`（目标持仓，必填）、`--base`（基准持仓，缺省用 config 持仓）、`--effective-date`（调仓生效日，opt-in 联网取历史做时序回测）。
 - **`check-sources`**：数据源健康检查，**无需 config**（main() 中特殊前置分派）。
+- **`view-logs`**：结构化运行日志查看（`core/log_reader.py::read_log`），`--level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`（最小级别阈值）、`--lines N`（默认 5000，读取末尾行数上限）、`--since/--until`（时间前缀过滤）；**无需 config**（main() 中特殊前置分派，配置损坏时仍可查日志诊断）。
 
 #### 1.7.3 主流程
 
-`main()`：`setup_logger` → `_build_parser` → `parse_args` → `check-sources` 特殊处理（不 init_config）→ `init_config` + `get_config` → `startup_wizard(non_interactive)`（非交互/CI 环境自动跳过，不阻塞命令）→ 按 `args.command` 分派 `_handle_report` / `_handle_cache` / `_handle_whatif`。
+`main()`：`setup_logger` → `_build_parser` → `parse_args` → `check-sources` / `view-logs` 特殊处理（均不 init_config）→ `init_config` + `get_config` → `startup_wizard(non_interactive)`（非交互/CI 环境自动跳过，不阻塞命令）→ 按 `args.command` 分派 `_handle_report` / `_handle_cache` / `_handle_whatif`。
 
 **持仓定位差异**：CLI 不经过 TUI 文件选择器——`_cli_resolve_holdings_file()` 通过 config 的 `holdings_dir + holdings_filename` 直接定位；若该路径为目录则自动选第一个 `.xlsx`（多个时告警）。`_cli_read_holdings()` / `_cli_read_holdings_with_flows()` 分别读主表与「主表+流水」，与 TUI 读取路径对齐。
 
@@ -504,6 +508,7 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 - **`_handle_cache`**：三分支——`--clean` 委托 `cleanup_cache`；`--stats` 委托 `get_cache_stats` + 打印 LLM 配置状态；`--update` 委托 `update_basic_cache`/`update_position_cache`（§3.6），`--update all` 采用**最大努力模式**（basic 失败仍继续 position，退出码取两者 max）。
 - **`_handle_whatif`**：解析 `--base`/`--candidate` 两份持仓 → `run_whatif_simulation()`（§4.13）→ 结果 `ok` 判定，失败返回 2；`--effective-date` 触发时序回测扩展。
 - **`_handle_check_sources`**：`run_check_sources()`（内部 `sys.exit`）。
+- **`_handle_view_logs`**：调 `core/log_reader.py::read_log(limit, level, since, until)`，输出每条 `time [LEVEL] message`（多行 body 缩进）；无匹配 → 提示并返回 0；ValueError/OSError → 记录日志 + 返回 `_EXIT_SEVERE`。**薄展示层，无解析逻辑**（解析/过滤全在 `core/log_reader.py`）。
 
 #### 1.7.5 CliProgressReporter
 
@@ -527,7 +532,7 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 |:-----|:-----|:---------|
 | `web/server.py` | 启动入口 | sys.path 注入、参数解析、端口检测、output_dir 写锁检测、init_config、app.run |
 | `web/app.py` | Flask 应用工厂 | 统一 JSON 错误处理、request_id 访问日志、注入 run_manager |
-| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康/配置编辑；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 组装状态区系统信息（版本/本机 IP/LLM 状态，对齐 TUI）；`_handle_config_edit` 同源守卫（`_is_same_origin`） |
+| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康/日志/配置编辑；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 组装状态区系统信息（版本/本机 IP/LLM 状态，对齐 TUI）；`_handle_logs`/`_handle_health_history` 薄展示（委托 `core/log_reader.py` + `core/perf.py`，无解析逻辑）；`_handle_config_edit` 同源守卫（`_is_same_origin`） |
 | `web/upload.py` | 上传安全 | 服务端 uuid 重命名、扩展名白名单、大小上限、PK 魔数、原子落盘、TTL 清理 |
 | `web/config_edit.py` | 配置编辑 | `config_edit_whitelist` 白名单（唯一事实来源）+ `apply_config_edit`/`get_config_edit_surface` + `config_backup_file` 写前 .bak 备份；写入分派逐条等价 TUI |
 | `web/runs.py` | 运行管理 | RunManager 单 worker 串行队列 + run 状态/事件注册表（Lock 保护） |
@@ -567,6 +572,8 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 | GET | `/api/runs/{id}/events?after=N` | 增量事件 | seq 单调递增，`seq > after` 增量轮询 |
 | GET | `/api/reports/<path>` | 产物预览/下载 | `send_from_directory`（内置 `..` 净化）+ 扩展名白名单 |
 | GET | `/api/health` | 数据源健康 | 60s 结果缓存；`?fresh=1` 强制重测 |
+| GET | `/api/health/history` | 数据源健康历史 | `core/perf.py::summarize_health_history()` 最近 N 次运行摘要（含 ok/total、失败源）；读取失败 500 HEALTH_HISTORY_READ_FAILED |
+| GET | `/api/logs` | 结构化日志查看 | `core/log_reader.py::read_log()`；`?level=` 校验（非法 400 BAD_PARAM）、`?lines=` clamp [1,5000]、`?since/until` 透传；读取失败 500 LOG_READ_FAILED |
 | GET | `/api/config/edit` | 配置编辑面板 | 无守卫；返回 7 组可编辑面（路径/章节/子模块/匿名化/对比指数池/LLM 开关/辩论实验） |
 | POST | `/api/config/edit` | 应用配置编辑 | `_is_same_origin()` 同源守卫（失败 403）；校验失败 400 BAD_PARAM；写共享配置异常 500 CONFIG_WRITE_FAILED |
 
@@ -610,6 +617,7 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 - **进度事件**：事件按 seq 编号渲染，进度条显示「当前阶段（第 N 步）：消息」，完成置 100%；轮询节流（防刷接口）。
 - **配置编辑面板**：`loadConfigEdit()` 拉取 `/api/config/edit` 全量可编辑面，按 7 组分块渲染；保存语义**即改即存**（与 TUI「改一项存一项」一致）——checkbox/radio 改动即 POST，自由文本路径经各自「保存」按钮提交，对比指数池经添加/删除/重置动作提交；提交期间控件禁用，成功回读该项最新值，失败恢复改动前值并显示错误。`error_code` 驱动分支（BAD_PARAM 400 / 同源 403 / CONFIG_WRITE_FAILED 500），中文文案直显服务端不前端硬编码。
 - **状态区**：健康卡片（`/api/health` 60s 缓存 + 「重新检测」`?fresh=1` 强制重测）+ 历史运行记录卡片（最近 10 条，5s 短缓存）。
+- **日志查看卡**：⑦ 日志查看（级别 `<select>` + 「加载日志」按钮）——**手动加载不自动轮询**（对齐设计文档「自动刷新高 IO → 手动刷新」）；`loadLogs()` fetch `/api/logs`，每条 `<details class="log-entry log-{level}">` 原生折叠 + `<pre class="log-body">` 展开 body；`is_decorative` 置灰；**全程 `textContent`/DOM API**（XSS 纪律，日志 body 含外部数据源名不可信）。
 - **结果映射**：按 exit_code 映射展示（0 成功 / 1 部分失败黄色告警 + 通用建议 / 2 严重红色 + 提示看日志）；failed/exit_code=2 隐藏无效产物按钮；失败提供「重新生成」（上传文件已消费，引导重新上传）。
 - **静态服务分离**：web 只服务自身 `static/`；报告资产（chart.min.js 等）经 `/api/reports` 从 output_dir 提供。`main.js`/`style.css` 带 `?v={APP_VERSION}` 版本查询串防浏览器缓存旧 JS。
 
@@ -2782,6 +2790,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `config_backup` | 配置写前备份（`.bak` 单槽轮转） | Web 配置 | 配置编辑 | 无（安全面） |
 | `report_section_order` | 报告模块序号配置（键=模块标识，值=序号；空对象用默认 19 项顺序） | 报告编排 | 报告配置 | 顶层配置键 `report_section_order`（`get_report_section_order()` 读取，`llm_usage` 强制末位） |
 | `generators_news` | 财经新闻 LLM 关联分析（新闻热词→持仓关联二次生成） | 财经新闻热点与持仓关联分析 | LLM 生成 | 随 `enable_news` + LLM 启用 |
+| `log_reader` | 日志读取（read_log/tail_log/parse_log） | 日志可视化 | 诊断 | 无（模块级） |
+| `view_logs` | 查看日志（CLI view-logs 子命令） | 日志可视化 | 诊断 | 无（子命令） |
+| `health_history` | 数据源健康历史（load_health_history/summarize_health_history） | 日志可视化 | 监控 | data/state/datasource_health.jsonl |
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 

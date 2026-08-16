@@ -20,9 +20,7 @@
 
 ### P4 — 实验功能
 
-#### `plan-10` 日志可视化（[`plan-web-ui.md §2`](../archive/v0.10.x/web-ui/plan-web-ui.md#2-日志可视化)）
-
-结构化日志查看（`--view-logs` 命令 + 报告尾部数据源状态表）。**预估：1d**
+> 当前无未完成实验功能项。已完成项见归档设计/实施文档 `docs-stm/archive/v0.10.x/log-visualization/plan-log-visualization.md`（`plan-10` 日志可视化，v0.10.14-dev 实现：CLI + TUI + Web 三端 + 数据源健康历史接线）。
 
 ---
 
