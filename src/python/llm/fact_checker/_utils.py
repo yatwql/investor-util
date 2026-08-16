@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 
+from src.python.llm.fact_checker._constants import _NAME_ALIAS_MAP
 from src.python.llm.fact_checker._patterns import _CODE_PATTERN
 
 
@@ -93,6 +94,21 @@ def _build_stock_change_map(holdings_details: list[dict] | None) -> dict[str, fl
     return result
 
 
+def _extract_core_name(name: str) -> str:
+    """提取持仓名称的核心名（首个 ASCII 字母/数字之前的汉字部分）。
+
+    如"华安纳斯达克100ETF联接基金A"→"华安纳斯达克"、"建设银行"→"建设银行"、
+    "华安黄金ETF"→"华安黄金"。简称匹配按核心名做前缀包含判断，
+    避免被"ETF联接基金A"等类型尾缀干扰。
+    """
+    if not name:
+        return ""
+    m = re.search(r"[A-Za-z0-9（(]", name)
+    if m:
+        return name[: m.start()]
+    return name
+
+
 def _locate_subject_code(
     sentence: str,
     holding_codes: set[str],
@@ -103,6 +119,10 @@ def _locate_subject_code(
 
     优先句中出现的持仓代码（取离 anchor 最近）；无代码时按持仓名称匹配
     （名称越长越具体优先，取离 anchor 最近）。
+
+    补充简称归一化匹配：LLM 常用「机构名+指数简称」缩略指代持仓
+    （如"华安纳指"→040046"华安纳斯达克100ETF联接基金A"），全名匹配失败会
+    回退全局最近邻 → 反向串位漏检（180.5 恰命中另一品种 601939 真实值）。
     """
     best: str | None = None
     best_dist: int | None = None
@@ -129,4 +149,30 @@ def _locate_subject_code(
         if best_dist is None or dist < best_dist:
             best_dist = dist
             best = code
+    # 简称归一化匹配：先将句中常用简称归一化（"纳指"→"纳斯达克"等），
+    # 再与持仓名称核心名前缀匹配。仅在句中确实出现简称（norm != sentence）
+    # 时执行，避免额外开销与误匹配。
+    norm = sentence
+    for _alias, _canon in sorted(_NAME_ALIAS_MAP.items(), key=lambda kv: -len(kv[0])):
+        norm = norm.replace(_alias, _canon)
+    if norm != sentence:
+        for name, code in sorted((name_to_code or {}).items(), key=lambda kv: -len(kv[0])):
+            core = _extract_core_name(name)
+            if len(core) < 2:
+                continue
+            idx = norm.find(core)
+            if idx == -1:
+                continue
+            # 归一化位置映射回原句的近似：减去 norm[:idx] 中别名替换带来的
+            # 长度增量（core 内部含 canon 时略有偏差，仅影响多候选排序，
+            # 不影响唯一简称的归因）。
+            _extra = sum(
+                (len(_c) - len(_a)) * norm[:idx].count(_c)
+                for _a, _c in _NAME_ALIAS_MAP.items()
+            )
+            _pos = idx - _extra
+            dist = min(abs(_pos - anchor), abs(_pos + len(core) - anchor))
+            if best_dist is None or dist < best_dist:
+                best_dist = dist
+                best = code
     return best

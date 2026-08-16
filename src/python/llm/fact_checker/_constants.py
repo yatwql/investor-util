@@ -147,6 +147,29 @@ _TRIM_TARGET_KEYWORDS: frozenset[str] = frozenset(
 # （见 _context._is_trim_target_context）。与"止盈约/减仓约"同属调仓/风控目标比例族。
 _WARNING_THRESHOLD_KEYWORDS: frozenset[str] = frozenset(["警戒"])
 
+# 条件阈值触发词——数值前出现触发词、数值后出现调仓动作词时，数值是
+# 条件触发的止盈/减仓目标阈值（如"收益率超过200%后可考虑部分止盈"），
+# 非对当前收益率的陈述。与 _TRIM_TARGET_KEYWORDS 的"约"字式（[-15,+5]
+# 邻近窗口）互补：本表覆盖"超过X%后止盈"等条件触发式，由
+# _context._is_trim_target_context 用「触发词 + 后置调仓动作词」双条件
+# 联合判定，避免把"收益率+X%，建议止盈"的真实收益率误判为阈值。
+_CONDITION_TRIGGER_KEYWORDS: frozenset[str] = frozenset(
+    [
+        "超过",
+        "达到",
+        "突破",
+        "高于",
+        "接近",
+        "升至",
+        "涨到",
+        "涨至",
+        "跌破",
+        "跌至",
+        "降至",
+        "回撤至",
+    ]
+)
+
 # 假设/情景上下文——数值为假设场景而非实际收益率
 _HYPOTHETICAL_KEYWORDS = frozenset(
     [
@@ -157,6 +180,22 @@ _HYPOTHETICAL_KEYWORDS = frozenset(
         "假如",
     ]
 )
+
+# 持仓简称/别名归一化表——LLM 常用「机构名+指数简称」缩略指代持仓
+# （如"华安纳指"→040046"华安纳斯达克100ETF联接基金A"、"建行"→601939"建设银行"），
+# fact_checker 仅知全名，按全名匹配会失败导致漏检（见 _utils._locate_subject_code）。
+# 匹配时先将句中简称归一化为规范词，再与持仓名称核心名做前缀匹配。
+# 键按长度降序替换（"纳指100"先于"纳指"），避免部分替换产生错误文本。
+_NAME_ALIAS_MAP: dict[str, str] = {
+    "纳指100": "纳斯达克100",
+    "纳指": "纳斯达克",
+    "建行": "建设银行",
+    "工行": "工商银行",
+    "招行": "招商银行",
+    "长电": "长江电力",
+    "茅台": "贵州茅台",
+    "宁德": "宁德时代",
+}
 
 # 币种/敞口上下文
 _EXPOSURE_KEYWORDS = frozenset(

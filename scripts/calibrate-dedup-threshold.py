@@ -19,7 +19,10 @@ from typing import Any
 
 # ── 项目路径 ──────────────────────────────────────────
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "cache", "dedup_anchors.jsonl")
+# 注意：与 src/python/providers/news_dedup.py 的 _ANCHOR_PATH 保持一致——
+# 2026-07-30 起代码写入路径为 data/calibration/dedup_anchors.jsonl
+# （commit 4e95d595，rf-65/rf-74 拆分），此处不再读 data/cache/ 旧文件。
+_ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "calibration", "dedup_anchors.jsonl")
 # 当前代码中的阈值常量（与 news_aggregator.py 保持一致）
 # 算法同时使用中文 bigram + 英数 token 匹配，
 # 跨源采用梯度阈值：
@@ -264,7 +267,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--summary", action="store_true", help="仅显示汇总统计")
     parser.add_argument("--dry-run", action="store_true", default=True, help="仅分析不修改（默认）")
-    parser.add_argument("--file", default=_ANCHOR_PATH, help="锚点文件路径（默认 data/cache/dedup_anchors.jsonl）")
+    parser.add_argument("--file", default=_ANCHOR_PATH, help="锚点文件路径（默认 data/calibration/dedup_anchors.jsonl）")
     args = parser.parse_args()
 
     records = load_anchors(args.file)
