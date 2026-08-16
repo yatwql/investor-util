@@ -6,8 +6,6 @@
 
 ![](src/static/architecture.svg)
 
-![](src/static/architecture.svg)
-
 ## ✨ 核心亮点
 
 | 亮点 | 说明 |
