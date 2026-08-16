@@ -782,6 +782,7 @@ def _print_machine_report(machine_info: dict | None, results: list[dict]) -> Non
 
 _DOC_ENV_TABLE_MARKERS = ("<!-- env-table:start -->", "<!-- env-table:end -->")
 _DOC_DURATION_TABLE_MARKERS = ("<!-- duration-table:start -->", "<!-- duration-table:end -->")
+_DOC_MODE_COUNT_MARKERS = ("<!-- mode-count-table:start -->", "<!-- mode-count-table:end -->")
 _DOC_COVERAGE_PATH = os.path.join(_PROJECT_ROOT, "docs-stm", "managements", "test-coverage.md")
 
 
@@ -850,6 +851,36 @@ def _update_machine_table(
     return ["|".join(tokens) for tokens in grid]
 
 
+def _update_mode_count_table(table_lines: list[str], results: list[dict]) -> list[str]:
+    """更新「模式对应测试量」表：覆盖项数=实测执行数，典型耗时=实测耗时。
+
+    未实测/超时模式保留原值；表结构与行集不做增删（模式增删走人工维护）。
+
+    Args:
+        table_lines: 两 marker 之间的表格行（含表头/分隔行/数据行）
+        results: 各模式运行结果列表
+
+    Returns:
+        更新后的表格行列表
+
+    Raises:
+        ValueError: 区域首行不是表格行
+    """
+    if not table_lines or not table_lines[0].lstrip().startswith("|"):
+        raise ValueError("表区域首行不是 `|` 开头的表格行")
+    by_mode = {r.get("mode", ""): r for r in results if not r.get("timed_out")}
+    grid = [line.split("|") for line in table_lines]
+    for tokens in grid[2:]:  # 跳过表头与分隔行
+        mode = tokens[1].strip().strip("`")
+        res = by_mode.get(mode)
+        if res is None:
+            continue
+        cnt = res.get("passed", 0) + res.get("failed", 0) + res.get("skipped", 0) + res.get("errors", 0)
+        tokens[2] = f" **{cnt}** "
+        tokens[3] = f" {_format_approx_duration(res.get('duration', 0.0) or 0.0)} "
+    return ["|".join(tokens) for tokens in grid]
+
+
 def _table_region_pattern(markers: tuple[str, str]) -> re.Pattern:
     """构建表区域正则（起始标记 → 表格 → 结束标记，跨行）。"""
     start_marker, end_marker = markers
@@ -895,7 +926,7 @@ def _replace_table_region(doc_text: str, markers: tuple[str, str], updated_lines
 
 
 def _update_test_coverage_doc(doc_text: str, machine_info: dict, results: list[dict]) -> str:
-    """更新 test-coverage.md 两张「环境耗时对照」表（纯函数，不落盘）。
+    """更新 test-coverage.md「模式对应测试量」表 + 两张「环境耗时对照」表（纯函数，不落盘）。
 
     Args:
         doc_text: test-coverage.md 全文
@@ -925,6 +956,10 @@ def _update_test_coverage_doc(doc_text: str, machine_info: dict, results: list[d
         lambda label: date if label == "数据更新时间" else duration_cells.get(label.strip("`")),
     )
     doc_text = _replace_table_region(doc_text, _DOC_DURATION_TABLE_MARKERS, dur_updated)
+
+    count_lines = _extract_table_region(doc_text, _DOC_MODE_COUNT_MARKERS)
+    count_updated = _update_mode_count_table(count_lines, results)
+    doc_text = _replace_table_region(doc_text, _DOC_MODE_COUNT_MARKERS, count_updated)
 
     return doc_text
 
@@ -959,7 +994,7 @@ def _update_test_coverage_doc_file(machine_info: dict, results: list[dict]) -> N
         return
     with open(_DOC_COVERAGE_PATH, "w", encoding="utf-8") as f:
         f.write(updated)
-    print(f"  [OK] 已更新 {_display_path(_DOC_COVERAGE_PATH, _PROJECT_ROOT)}（环境耗时对照）")
+    print(f"  [OK] 已更新 {_display_path(_DOC_COVERAGE_PATH, _PROJECT_ROOT)}（模式对应测试量 + 环境耗时对照）")
 
 
 def _build_pytest_args(

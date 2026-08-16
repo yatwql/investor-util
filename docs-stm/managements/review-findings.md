@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.14-dev
-> **编号源**：`rf-next = 286`（新增问题取此编号，完成后更新为 +1；已用最大 rf-285，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 287`（新增问题取此编号，完成后更新为 +1；已用最大 rf-286，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -43,6 +43,7 @@
 
 | # | 摘要 | 变更记录 |
 |---|------|----------|
+| rf-286 | `test_menu_key_coverage` 菜单键集断言未同步日志可视化新增键——`MENU_ITEMS` 自加 `[V]`/`[H]` 后为 19 键，断言仍为旧 17 键，`integration`/`all_no_unit`/`all` 模式必失败（integration 不在 P0 门禁内，`--mode bench` 全量跑才暴露） | `test_tui_routing.py` 期望集补 `V`/`H`（回归断言直接验证缺失键），集成/全量模式复跑通过 | `changelog.md` [0.10.14-dev] |
 | rf-285 | `smoke-web.py` 正式-用存量 run 提交后未轮询终态 → 后台 worker 线程仍写临时产物目录，`TemporaryDirectory` 清理撞并发写报 `OSError: Directory not empty`（CI 并行调度下偶发） | 抽 `_poll_run_finished(client, run_id)` 轮询 helper，正式-用存量 run 与进度事件检查统一轮询至终态（done/failed）后退出；断言语义不变，仅消除竞态窗口；回归测试新增 3 例，本地 8 次连跑稳定 | `changelog.md` [0.10.14-dev] |
 | rf-282 | `html_renderers._render_llm_content_section` 渲染器上下文参数过多（15 参） | 签名瘦身至 2 参（`enable_llm`/`llm_content`），删 13 死参并重构 `html_writer.py` 调用点 | `changelog.md` [0.10.14-dev] |
 | rf-283 | `report/_pipeline.py` 遗留重复文件（已标注不承载活代码） | 确认无活引用后删除（`git rm`），测试迁移至活模块 `_llm_news.py` | `changelog.md` [0.10.14-dev] |

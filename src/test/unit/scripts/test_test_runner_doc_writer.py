@@ -3,6 +3,7 @@
 覆盖：
   - 环境属性表：同名列原地更新/新机器列追加/OS 与系统版本分行/未知行标签保留原值
   - 耗时对照表：同名列更新/新列追加未测留空/组合行 verify,regression/部分结果保留未测行
+  - 模式对应测试量表：实测执行计数+耗时回填/未实测与超时保留原值/marker 缺失抛 ValueError
   - 标记定位：start/end marker 缺失抛 ValueError、round-trip 幂等、标记区外文本逐字节不变
   - IO 封装：仅内容变化才写盘、缺标记文件不落盘
   - parse_args：--update-docs 隐含 --machine-info
@@ -66,19 +67,42 @@ _MACHINE_INFO = {
 }
 
 _ENV_LABELS = [
-    "操作系统", "系统版本", "架构", "主机名", "CPU 型号", "物理核数", "逻辑线程",
-    "内存", "磁盘类型", "文件系统", "Python 版本", "并行级别", "worker 数", "采集日期",
+    "操作系统",
+    "系统版本",
+    "架构",
+    "主机名",
+    "CPU 型号",
+    "物理核数",
+    "逻辑线程",
+    "内存",
+    "磁盘类型",
+    "文件系统",
+    "Python 版本",
+    "并行级别",
+    "worker 数",
+    "采集日期",
 ]
 
 _DURATION_MODES = [
-    "unit", "standard", "scenario", "regression", "verify,regression",
-    "dev-verify", "verify", "integration", "edge", "data", "all",
-    "smoke", "report", "all_no_unit", "scenario_extreme",
+    "unit",
+    "standard",
+    "scenario",
+    "regression",
+    "verify,regression",
+    "dev-verify",
+    "verify",
+    "integration",
+    "edge",
+    "data",
+    "all",
+    "smoke",
+    "report",
+    "all_no_unit",
+    "scenario_extreme",
 ]
 
 
-def _env_table(col2: str = "旧值", header: str = "dragonball（2026-08-04 实测）",
-               col3: str = "未知") -> list[str]:
+def _env_table(col2: str = "旧值", header: str = "dragonball（2026-08-04 实测）", col3: str = "未知") -> list[str]:
     """构造环境属性表（14 数据行；col2 为当前机器列，col3 为历史参考列）。"""
     lines = [f"| 环境属性 | {header} | 旧慢笔记本（早期标注） |"]
     lines.append("|:---------|:---------------------------|:----------------------|")
@@ -86,9 +110,9 @@ def _env_table(col2: str = "旧值", header: str = "dragonball（2026-08-04 实�
     return lines
 
 
-def _duration_table(col2: str | dict[str, str] = "旧值",
-                    header: str = "dragonball（2026-08-04 实测）",
-                    col3: str = "~30s") -> list[str]:
+def _duration_table(
+    col2: str | dict[str, str] = "旧值", header: str = "dragonball（2026-08-04 实测）", col3: str = "~30s"
+) -> list[str]:
     """构造各模式耗时对照表（col2 可传 per-mode dict 便于断言部分保留）。
 
     末行「数据更新时间」为各设备耗时实测日期（col2 dict 用 `数据更新时间` 键）。
@@ -103,14 +127,50 @@ def _duration_table(col2: str | dict[str, str] = "旧值",
     return lines
 
 
-def _sample_doc(env_lines: list[str], dur_lines: list[str],
-                with_markers: bool = True) -> str:
-    """构造含两对标记 + 前后文案的完整文档样本。"""
+# 「模式对应测试量」表模式行（对齐文档，无 verify,regression 组合行）
+_MODE_COUNT_MODES = [
+    "unit",
+    "standard",
+    "scenario",
+    "regression",
+    "dev-verify",
+    "verify",
+    "integration",
+    "edge",
+    "data",
+    "all",
+    "smoke",
+    "report",
+    "all_no_unit",
+    "scenario_extreme",
+]
+
+
+def _mode_count_table(col2: str = "旧值", col3: str = "~30s") -> list[str]:
+    """构造「模式对应测试量」表（col2 覆盖项数、col3 典型耗时）。"""
+    lines = ["| `--mode` 值 | 覆盖项数 | 典型耗时 |"]
+    lines.append("|:------------|:--------:|:--------:|")
+    lines.extend(f"| `{mode}` | {col2} | {col3} |" for mode in _MODE_COUNT_MODES)
+    return lines
+
+
+def _sample_doc(env_lines: list[str], dur_lines: list[str], with_markers: bool = True) -> str:
+    """构造含三对标记 + 前后文案的完整文档样本（模式对应测试量 + 环境耗时对照两表）。"""
     head = [
         "# 测试覆盖统计",
         "",
         "## 说明",
         "> 注：典型耗时按当前开发机实测。",
+        "",
+        "## 模式对应测试量",
+        "",
+    ]
+    count_block = (
+        ["<!-- mode-count-table:start -->"] + _mode_count_table() + ["<!-- mode-count-table:end -->"]
+        if with_markers
+        else _mode_count_table()
+    )
+    mid1 = [
         "",
         "### 环境耗时对照",
         "",
@@ -119,15 +179,15 @@ def _sample_doc(env_lines: list[str], dur_lines: list[str],
         "#### 采集环境属性",
         "",
     ]
-    env_block = (["<!-- env-table:start -->"] + env_lines + ["<!-- env-table:end -->"]
-                 if with_markers else env_lines)
-    mid = [
+    env_block = ["<!-- env-table:start -->"] + env_lines + ["<!-- env-table:end -->"] if with_markers else env_lines
+    mid2 = [
         "",
         "#### 各模式耗时对照",
         "",
     ]
-    dur_block = (["<!-- duration-table:start -->"] + dur_lines + ["<!-- duration-table:end -->"]
-                 if with_markers else dur_lines)
+    dur_block = (
+        ["<!-- duration-table:start -->"] + dur_lines + ["<!-- duration-table:end -->"] if with_markers else dur_lines
+    )
     tail = [
         "",
         "> 两环境差距因模式而异。",
@@ -135,12 +195,20 @@ def _sample_doc(env_lines: list[str], dur_lines: list[str],
         "## 尾部内容",
         "end",
     ]
-    return "\n".join(head + env_block + mid + dur_block + tail)
+    return "\n".join(head + count_block + mid1 + env_block + mid2 + dur_block + tail)
 
 
 def _res(mode: str, duration: float = 1.0, **overrides) -> dict:
-    base = {"mode": mode, "passed": 1, "failed": 0, "skipped": 0, "errors": 0,
-            "duration": duration, "exit_code": 0, "timed_out": False}
+    base = {
+        "mode": mode,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "errors": 0,
+        "duration": duration,
+        "exit_code": 0,
+        "timed_out": False,
+    }
     base.update(overrides)
     return base
 
@@ -169,8 +237,7 @@ class TestEnvTableUpdate:
         updated = runner_script._update_test_coverage_doc(doc, _MACHINE_INFO, [])
         assert "| 操作系统 | Linux | 未知 |" in updated
         assert "| 系统版本 | 6.18.25-x64v3-xanmod1 | 未知 |" in updated
-        env_lines = runner_script._extract_table_region(
-            updated, runner_script._DOC_ENV_TABLE_MARKERS)
+        env_lines = runner_script._extract_table_region(updated, runner_script._DOC_ENV_TABLE_MARKERS)
         assert len(env_lines) == 16  # 表头 + 分隔行 + 14 数据行
         # stdout 渲染表同样 14 行（跳过表头）
         rendered = runner_script._render_env_table(_MACHINE_INFO)
@@ -186,7 +253,10 @@ class TestEnvTableUpdate:
             _duration_table(col2="旧值", header="当前开发机（2026-08-04 实测）"),
         )
         updated = runner_script._update_test_coverage_doc(doc, _MACHINE_INFO, [])
-        assert "| 环境属性 | 当前开发机（2026-08-04 实测） | 旧慢笔记本（早期标注） | dragonball（2026-08-05 实测） |" in updated
+        assert (
+            "| 环境属性 | 当前开发机（2026-08-04 实测） | 旧慢笔记本（早期标注） | dragonball（2026-08-05 实测） |"
+            in updated
+        )
         assert "| 操作系统 | 旧值 | 未知 | Linux |" in updated
         # 新增列分隔标记：环境表左对齐
         assert "|:---------|:---------------------------|:----------------------|:---|" in updated
@@ -219,8 +289,7 @@ class TestDurationTableUpdate:
 
     def test_duration_update_existing_machine_column(self, runner_script):
         doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
-        results = [_res("unit", 15.2), _res("all", 21.4),
-                   _res("verify", 10.2), _res("regression", 17.4)]
+        results = [_res("unit", 15.2), _res("all", 21.4), _res("verify", 10.2), _res("regression", 17.4)]
         updated = runner_script._update_test_coverage_doc(doc, _MACHINE_INFO, results)
         assert "| `unit` | ~15s | ~30s |" in updated
         assert "| `all` | ~21s | ~30s |" in updated
@@ -282,6 +351,43 @@ class TestDurationTableUpdate:
         assert "verify,regression" not in cells2
 
 
+# ── 模式对应测试量表 ────────────────────────────────────────
+
+
+class TestModeCountTableUpdate:
+    """模式对应测试量表：实测执行计数+耗时回填、未实测/超时保留、marker 缺失报错。"""
+
+    def test_count_update_existing_rows_with_counts_and_durations(self, runner_script):
+        doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
+        results = [
+            _res("unit", 15.2, passed=4672, skipped=3),
+            _res("all", 21.4, passed=5530),
+            _res("edge", 300.0, timed_out=True),
+        ]
+        updated = runner_script._update_test_coverage_doc(doc, _MACHINE_INFO, results)
+        # 覆盖项数=passed+failed+skipped+errors，耗时=实测约值
+        assert "| `unit` | **4675** | ~15s |" in updated
+        assert "| `all` | **5530** | ~21s |" in updated
+        # 未实测模式保留原值
+        assert "| `standard` | 旧值 | ~30s |" in updated
+        # 超时模式保留原值（不计入覆盖项数）
+        assert "| `edge` | 旧值 | ~30s |" in updated
+
+    def test_count_update_partial_results_preserve_others(self, runner_script):
+        doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
+        results = [_res("unit", 15.2, passed=4672)]
+        updated = runner_script._update_test_coverage_doc(doc, _MACHINE_INFO, results)
+        assert "| `unit` | **4672** | ~15s |" in updated
+        assert "| `scenario` | 旧值 | ~30s |" in updated
+        assert "| `all` | 旧值 | ~30s |" in updated
+
+    def test_count_table_missing_marker_raises(self, runner_script):
+        doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
+        doc = doc.replace("<!-- mode-count-table:start -->", "")
+        with pytest.raises(ValueError):
+            runner_script._update_test_coverage_doc(doc, _MACHINE_INFO, [_res("unit", 15.2)])
+
+
 # ── 标记定位与区域替换 ──────────────────────────────────────
 
 
@@ -289,8 +395,7 @@ class TestTableRegion:
     """标记定位：缺失抛 ValueError、round-trip 幂等、区外文本不变。"""
 
     def test_missing_start_marker_raises(self, runner_script):
-        doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"),
-                          with_markers=False)
+        doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"), with_markers=False)
         with pytest.raises(ValueError):
             runner_script._update_test_coverage_doc(doc, _MACHINE_INFO, [])
 
@@ -309,13 +414,16 @@ class TestTableRegion:
 
     def test_preserves_surrounding_text_byte_for_byte(self, runner_script):
         doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
-        prefix = doc.split("#### 采集环境属性")[0]
+        # 首个标记之前与末个标记之后的文本逐字节不变；标记区间的章节标题保留
+        prefix = doc.split("<!-- mode-count-table:start -->")[0]
         suffix = doc.split("<!-- duration-table:end -->")[1]
-        updated = runner_script._update_test_coverage_doc(
-            doc, _MACHINE_INFO, [_res("unit", 15.2)])
+        updated = runner_script._update_test_coverage_doc(doc, _MACHINE_INFO, [_res("unit", 15.2)])
         assert updated.startswith(prefix)
         assert updated.endswith(suffix)
         assert "## 尾部内容" in updated and updated.rstrip().endswith("end")
+        assert "### 环境耗时对照" in updated
+        assert "#### 采集环境属性" in updated
+        assert "#### 各模式耗时对照" in updated
 
     def test_prose_line_inside_region_raises(self, runner_script):
         # 标记间夹入非表格行（人工维护失误）→ 结构异常抛 ValueError，不静默破坏
@@ -377,8 +485,7 @@ class TestDocFileAndArgs:
     def test_update_doc_file_missing_markers_no_write(self, runner_script, monkeypatch, tmp_path):
         target = tmp_path / "test-coverage.md"
         monkeypatch.setattr(runner_script, "_DOC_COVERAGE_PATH", str(target))
-        doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"),
-                          with_markers=False)
+        doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"), with_markers=False)
         target.write_text(doc, encoding="utf-8")
         runner_script._update_test_coverage_doc_file(_MACHINE_INFO, [_res("unit", 15.2)])
         assert target.read_text(encoding="utf-8") == doc  # 未落盘

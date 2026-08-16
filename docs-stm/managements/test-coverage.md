@@ -1,32 +1,34 @@
 # 测试覆盖统计
 > 文档版本：0.10.14-dev
 
-> ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。精确统计请以 `scripts/test_runner.py` 的 MODES 字典为准，或运行 `pytest src/test/ --collect-only -q` 获取实时计数。
+> ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。`模式对应测试量` 表由 `--mode bench --update-docs` 自动回填本机实测；功能域/分组等子表精确统计请运行 `scripts/collect-test-coverage.py`（或 `pytest src/test/ --collect-only -q`）获取实时计数。
 
 按不同的 `--mode` / pytest 标记统计当前测试覆盖规模：
 
 ## 模式对应测试量
 
+<!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **5218** | ~15s |
-| `standard` | **4540** | ~15s |
-| `scenario` | **241** | ~18s |
-| `regression` | **241** | ~18s |
-| `dev-verify` | **2050** | ~21s |
-| `verify` | **3464** | ~12s |
-| `integration` | **281** | ~14s |
-| `edge` | 611 | ~13s |
-| `data` | 69 | ~2s |
-| `all` | **5527** | **~23s** |
-| `smoke` | 26 | ~2s |
-| `report` | **1541** | ~14s |
-| `all_no_unit` | 309 | ~10s |
-| `scenario_extreme` | **9** | ~2s |
+| `unit` | **5224** | ~15s |
+| `standard` | **4546** | ~14s |
+| `scenario` | **241** | ~17s |
+| `regression` | **241** | ~17s |
+| `dev-verify` | **2056** | ~20s |
+| `verify` | **3470** | ~10s |
+| `integration` | **281** | ~12s |
+| `edge` | **611** | ~13s |
+| `data` | **69** | ~2s |
+| `all` | **5533** | ~22s |
+| `smoke` | **26** | ~2s |
+| `report` | **1541** | ~13s |
+| `all_no_unit` | **323** | ~10s |
+| `scenario_extreme` | **9** | ~3s |
+<!-- mode-count-table:end -->
 
-> 注：典型耗时按 2026-08-07 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新下方两张表。
+> 注：典型耗时按 2026-08-16 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新模式对应测试量 + 下方两张环境耗时对照表。
 >
-> 注：以下统计为 `def test_` 函数级计数（不含参数化展开）。`all` 模式全量 5527 项（2026-08-16 实时收集快照，`scripts/collect-test-coverage.py` 生成，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
+> 注：`模式对应测试量` 表覆盖项数为 pytest 实测执行计数（含参数化展开），由 `--mode bench --update-docs` 自动回填；功能域/场景分组/单元分组/跨类等子表为 `scripts/collect-test-coverage.py` 收集快照（仅收集不执行，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。
 
 ### 环境耗时对照
 
@@ -37,7 +39,7 @@
 #### 采集环境属性
 
 <!-- env-table:start -->
-| 环境属性 | dragonball（2026-08-07 实测） | stallman-NB1（2026-08-06 实测） |
+| 环境属性 | dragonball（2026-08-16 实测） | stallman-NB1（2026-08-06 实测） |
 |:---------|:---------------------------|:---|
 | 操作系统 | Linux | Windows |
 | 系统版本 | 6.18.25-x64v3-xanmod1 | 11 |
@@ -52,30 +54,30 @@
 | Python 版本 | 3.13.5 | 3.13.0 |
 | 并行级别 | medium | medium |
 | worker 数 | 8 | 4 |
-| 采集日期 | 2026-08-07 | 2026-08-06 |
+| 采集日期 | 2026-08-16 | 2026-08-06 |
 <!-- env-table:end -->
 
 #### 各模式耗时对照
 
 <!-- duration-table:start -->
-| `--mode` | dragonball（2026-08-07 实测） | stallman-NB1（2026-08-06 实测） |
+| `--mode` | dragonball（2026-08-16 实测） | stallman-NB1（2026-08-06 实测） |
 |:---------|:---------------------------:|:---:|
 | `unit` | ~15s | ~4min |
-| `standard` | ~15s | ~4min |
-| `scenario` | ~18s | ~3min |
-| `regression` | ~18s | ~3min |
-| `verify,regression` | ~30s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
-| `dev-verify` | ~21s | ~2min |
-| `verify` | ~12s | ~46s |
-| `integration` | ~14s | ~1min |
+| `standard` | ~14s | ~4min |
+| `scenario` | ~17s | ~3min |
+| `regression` | ~17s | ~3min |
+| `verify,regression` | ~28s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
+| `dev-verify` | ~20s | ~2min |
+| `verify` | ~10s | ~46s |
+| `integration` | ~12s | ~1min |
 | `edge` | ~13s | ~32s |
 | `data` | ~2s | ~14s |
-| `all` | ~23s | ~3min |
+| `all` | ~22s | ~3min |
 | `smoke` | ~2s | ~9s |
-| `report` | ~14s | ~2min |
+| `report` | ~13s | ~2min |
 | `all_no_unit` | ~10s | ~1min |
-| `scenario_extreme` | ~2s | ~9s |
-| 数据更新时间 | 2026-08-07 | 2026-08-06 |
+| `scenario_extreme` | ~3s | ~9s |
+| 数据更新时间 | 2026-08-16 | 2026-08-06 |
 <!-- duration-table:end -->
 
 > 两机差距因模式而异：多数模式 dragonball 较 stallman-NB1 快约 **10~20 倍**（如 `unit` ~15s vs ~4min、`all` ~23s vs ~3min），个别模式差约 4~20 倍（`edge` ~13s vs ~32s、`smoke` ~2s vs ~9s）。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。dragonball worker=8（medium=50% 核数），stallman-NB1 worker=4。

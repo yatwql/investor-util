@@ -35,12 +35,11 @@ class TestTuiRouting(unittest.TestCase):
                 )
 
     def test_menu_key_coverage(self):
-        """MENU_ITEMS 包含所有标准功能键。"""
+        """MENU_ITEMS 包含所有标准功能键（含日志可视化 V/H）。"""
         from src.python.tui.tui_menu import MENU_ITEMS
 
         keys = {item[0] for item in MENU_ITEMS}
-        expected = {"E", "P", "B", "L", "W", "C", "F", "O", "I", "A",
-                    "1", "2", "3", "4", "S", "R", "X"}
+        expected = {"E", "P", "B", "L", "W", "C", "F", "O", "I", "A", "1", "2", "3", "4", "S", "R", "X", "V", "H"}
         self.assertSetEqual(keys, expected)
 
     def test_execute_item_dispatches_correct_handler(self):
@@ -52,18 +51,17 @@ class TestTuiRouting(unittest.TestCase):
         from src.python.tui.tui_menu import MENU_ITEMS
 
         # 找到非退出项
-        non_exit_idx = next(i for i, item in enumerate(MENU_ITEMS)
-                            if not item[3])
+        non_exit_idx = next(i for i, item in enumerate(MENU_ITEMS) if not item[3])
 
         cb = MENU_ITEMS[non_exit_idx][2]
         if cb is not None:
             # 仅验证回调是可调用对象，不实际调用
-            self.assertTrue(callable(cb),
-                            f"菜单项 [{MENU_ITEMS[non_exit_idx][0]}] 回调应可调用")
+            self.assertTrue(callable(cb), f"菜单项 [{MENU_ITEMS[non_exit_idx][0]}] 回调应可调用")
 
     def test_menu_sel_navigation(self):
         """菜单选择索引在上下界内。"""
         from src.python.tui.tui_menu import MENU_ITEMS
+
         sel = 0
         n = len(MENU_ITEMS)
 
@@ -82,6 +80,7 @@ class TestTuiRouting(unittest.TestCase):
         _bind_callbacks()
 
         from src.python.tui.tui_menu import MENU_ITEMS
+
         e_item = next(item for item in MENU_ITEMS if item[0] == "E")
         self.assertIsNotNone(e_item[2])
 
@@ -96,6 +95,7 @@ class TestTuiRouting(unittest.TestCase):
         _bind_callbacks()
 
         from src.python.tui.tui_menu import MENU_ITEMS
+
         l_item = next(item for item in MENU_ITEMS if item[0] == "L")
         cb_name = l_item[2].__name__ if l_item[2] else ""
         self.assertEqual(cb_name, "_cmd_generate_full")
