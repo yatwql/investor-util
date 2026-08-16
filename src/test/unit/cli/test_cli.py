@@ -54,7 +54,6 @@ class TestArgparse:
         assert args.type == "basic"
         assert args.history is None  # 未显式传 --history → 由配置层 history.fetch_mode 决定
         assert args.force_llm is False
-        assert args.warm is False
 
     def test_report_type_both(self):
         """report --type both 解析。"""
@@ -75,11 +74,6 @@ class TestArgparse:
         """report --force-llm 标志解析。"""
         args = _build_parser().parse_args(["report", "--force-llm"])
         assert args.force_llm is True
-
-    def test_report_warm(self):
-        """report --warm 标志解析。"""
-        args = _build_parser().parse_args(["report", "--warm"])
-        assert args.warm is True
 
     def test_cache_subcommands(self):
         """cache 子命令及其互斥操作。"""
@@ -368,7 +362,6 @@ class TestHandleReport:
             args.history = "auto"
             args.force_llm = False
             args.output = None
-            args.warm = False
             args.verbose = False
             code = _handle_report(args, {})
         assert code == 0
@@ -550,7 +543,7 @@ class TestMain:
             with patch.object(
                 __import__("sys"),
                 "argv",
-                ["cli.py", "report", "--type", "full", "--history", "auto", "--force-llm", "--warm"],
+                ["cli.py", "report", "--type", "full", "--history", "auto", "--force-llm"],
             ):
                 main()
 
@@ -559,7 +552,6 @@ class TestMain:
         assert args.type == "full"
         assert args.history == "auto"
         assert args.force_llm is True
-        assert args.warm is True
 
     def test_cache_param_passthrough(self):
         """cache 子命令参数正确透传给 _handle_cache。"""

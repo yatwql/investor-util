@@ -62,7 +62,6 @@ def _build_parser() -> argparse.ArgumentParser:
         "仅 --type both/full 时有效）",
     )
     report_p.add_argument("--force-llm", action="store_true", help="强制重新生成 LLM 内容（跳过缓存）")
-    report_p.add_argument("--warm", action="store_true", help="预热新资产缓存（冷启动时使用）")
 
     # ── cache 子命令 ──
     cache_p = sub.add_parser("cache", help="缓存管理")
@@ -321,7 +320,6 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
         fetch_history=args.history,
         force_llm=args.force_llm,
         output_dir=args.output,
-        warm_cache=args.warm,
         transactions=transactions,
         dividends=dividends,
     )

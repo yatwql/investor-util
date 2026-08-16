@@ -339,7 +339,6 @@ def generate_report(
     fetch_history: bool | None = None,
     force_llm: bool = False,
     output_dir: str | None = None,
-    warm_cache: bool = False,
     transactions: list | None = None,
     dividends: list | None = None,
     *,
