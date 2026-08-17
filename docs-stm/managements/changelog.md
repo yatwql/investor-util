@@ -62,6 +62,7 @@
   - `_context.py` 新增 `_is_portfolio_daily_change_context`（前 18 字符时间词 + 数值紧邻"组合"标记），`_numerical.py` 在组合级累计收益语境之后、主体定位之前跳过——组合本日收益不再回退全局最近邻
 - **回归测试**：`test_fact_checker.py` 新增 `TestSubjectAttributionMulti` 4 项（体检单代码不钉扎全句 / 智囊团短尾简称不误路由 / 组合本日收益不误修正 / 同句远距尾名不覆盖可靠主体）；`test_fact_checker.py` 全 124 用例通过。
 - **P1 合入门禁**：`--mode verify` 通过（另机执行，0 失败）。
+- **文档同步**：test-coverage.md 模式表 bench 回填（unit 5245 / standard 4567 / verify 3491 / all 5554）、功能域 LLM 智能分析 765→769、单元分组 `unit_llm` 765→769、跨类 `llm` 620→624；folders.md 统计重计（源码 70,732 / 测试 87,638 / 用例 5,554）。
 - **变更记录**：rf-291/rf-292/rf-293 已修复归档（见 review-findings.md 已解决区）。
 
 ## [0.10.14] - 2026-08-17
