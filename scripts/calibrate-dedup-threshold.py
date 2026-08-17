@@ -23,16 +23,22 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 2026-07-30 起代码写入路径为 data/calibration/dedup_anchors.jsonl
 # （commit 4e95d595 起锚点路径拆分至校准目录），此处不再读 data/cache/ 旧文件。
 _ANCHOR_PATH = os.path.join(_PROJECT_ROOT, "data", "calibration", "dedup_anchors.jsonl")
-# 当前代码中的阈值常量（与 news_aggregator.py 保持一致）
+# 当前代码中的阈值常量（与 news_dedup.py 保持一致）
 # 算法同时使用中文 bigram + 英数 token 匹配，
-# 跨源采用梯度阈值：
-#   - bg≥3: ratio≥0.30 合并（主规则）
-#   - bg=2: ratio≥0.40 合并（中高 ratio 梯度补偿）
-#   - bg≤1: 不合并（即使 ratio 较高也是虚假重叠）
-_CROSS_THRESHOLD = 0.30  # cross_threshold
+# 跨源采用梯度阈值（2026-08-17 校准收紧）：
+#   - ratio≥0.65 且专名 bg≥1 → 直接合并（改写型重复）
+#   - 0.50≤ratio<0.65 需专名 bg≥2 → 合并（防"算力服务合同"模板骨架虚高）
+#   - 候选区 bg≥3 + ratio≥0.35 → 合并（主规则）
+#   - bg=2 梯度：ratio≥0.375 且共享 bigram 含英数/数字 token → 合并
+#     （纯中文公司名共享不触发）
+#   - 方向对立（上涨vs下跌等分属两标题）且共享实体 → 不合并
+# 模板词治理：_STOP_BIGRAMS 扩财报/回购/指数/预警/地震等，提取前整体掩码
+_CROSS_THRESHOLD = 0.35  # cross_threshold（候选区入口）
 _SAME_SRC_BIGRAM = 4  # 同源 bigram 阈值
 _CROSS_BIGRAM = 3  # 跨源 bigram 阈值
-_CROSS_BG2_RATIO = 0.40  # bg=2 梯度补偿阈值
+_CROSS_BG2_RATIO = 0.375  # bg=2 梯度补偿阈值（需含英数 token）
+_CROSS_DIRECT_RATIO = 0.65  # 安全区直接合并线（需专名 bg≥1）
+_CROSS_SAFE_RATIO = 0.50  # 安全区入口（0.50~0.65 需专名 bg≥2）
 
 
 def load_anchors(path: str = _ANCHOR_PATH) -> list[dict[str, Any]]:
@@ -265,13 +271,13 @@ def _print_calibration_advice(
     print("─" * 60)
     print("当前阈值规则")
     print("─" * 60)
-    print(f"  跨源：bg≥3 + ratio≥0.30 → 合并（主规则）")
-    print(f"  跨源：bg=2 + ratio≥0.40 → 合并（梯度补偿）")
-    print(f"  跨源安全区：ratio≥0.50 → 直接合并")
-    print(f"  同源：bigram≥4 → 合并")
-    print(f"  清理模式：日期(年/月/日)、英文专名占位化")
-    print(f"  _normalize_title 过滤模式：%、万亿、前N、\\\\b(?:19|20)\\\\d{{2}}\\\\b、字母后缀年份")
-
+    print(f"  跨源：bg≥3 + ratio≥0.35 → 合并（主规则）")
+    print(f"  跨源：bg=2 + ratio≥0.375 + 含英数token → 合并（专名梯度）")
+    print(f"  跨源安全区：ratio≥0.65 且专名bg≥1 → 直接合并；0.50~0.65 需专名bg≥2")
+    print(f"  跨源方向对立（上涨vs下跌等）→ 不合并（cross_opposite）")
+    print(f"  同源：bigram≥4 → 合并（模板词已掩码，不同公司同模板不误合并）")
+    print(f"  清理模式：日期(年/月/日)、英文专名按长度分桶占位(_tk2_/_tk4_/_tk6_)、\"N级\"")
+    print(f"  _normalize_title 过滤模式：%、万亿、前N、\b(?:19|20)\d{{2}}\b、字母后缀年份；保留空格防英文粘连")
     if not dry_run:
         print()
         print("[..] --dry-run 模式，未实际修改任何设置")

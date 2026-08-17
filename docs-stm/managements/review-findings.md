@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.15-dev
-> **编号源**：`rf-next = 290`（新增问题取此编号，完成后更新为 +1；已用最大 rf-289，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 291`（新增问题取此编号，完成后更新为 +1；已用最大 rf-290，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -52,6 +52,7 @@
 
 | # | 问题摘要 | 解决记录 |
 |---|----------|----------|
+| **rf-290** | dedup 跨源误合并率高（42560 锚点分层采样 ~70-80% 误合并：不同事件共享财报/回购/指数/预警/地震模板词天然 3-6 bigram，英文统一占位符虚高 ratio，bg=2 梯度与安全区直接合并误判多） | `news_dedup.py`：`_STOP_BIGRAMS` 扩至 ~280 模板词 + 提取前整体掩码（`_mask_stop`）；英文占位符按长度分桶（`_tk2_`/`_tk4_`/`_tk6_`）；候选区门槛 0.35；bg=2 梯度 0.375 且含英数 token；安全区分级（0.65+bg≥1 直接 / 0.50-0.65 需 bg≥2）；跨源方向对立检测（cross_opposite）；`_normalize_title` 保留空格防英文粘连 + 剥离 N级；ratio 双向取 max 消除 SequenceMatcher 贪心方向偏差。回归测试 `TestDedupFalseMergeGuard` 9 例 + `TestDedupTokenGradientMerge` 3 例，锚点采样 13/13 误合并修复；校准脚本常量/规则摘要同步。变更记录见 changelog.md [0.10.15-dev] 2026-08-17 条目 |
 | **rf-289** | 事实校验 `_locate_subject_code` 无法解析省略基金公司前缀的描述性缩写（"电池主题ETF"→561910"招商中证电池主题ETF"），回退同句最近邻误路由，把 561910 正确 -3.92% 误修正为 -36.3%（2026-08-17 报告） | `_utils.py` 新增 `_match_descriptive_tail` 描述性尾名匹配（≥3 汉字核心后缀 + 产品后缀，按距锚点距离择优），接入 `_locate_subject_code` 兜底；回归测试 `test_fact_checker.py::TestDescriptiveTailMatch` 5 项；全 LLM 单测 764 通过 + P0 门禁全绿。变更记录见 changelog.md [0.10.15-dev] 2026-08-17 条目 |
 
 v0.10.14 已解决记录（rf-282 ~ rf-287）已随四次合并迁入 [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) v0.10.14 章节（变更详情见 changelog.md [0.10.14] 对应条目）。
