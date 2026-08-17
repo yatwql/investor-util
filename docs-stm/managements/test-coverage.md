@@ -21,9 +21,9 @@
 | `data` | **69** | ~2s |
 | `all` | **5550** | ~22s |
 | `smoke` | **26** | ~2s |
-| `report` | **1541** | ~18s |
-| `all_no_unit` | **309** | ~10s |
-| `scenario_extreme` | **9** | ~3s |
+| `report` | **1541** | ~14s |
+| `all_no_unit` | **309** | ~14s |
+| `scenario_extreme` | **9** | ~2s |
 <!-- mode-count-table:end -->
 
 > 注：典型耗时按 2026-08-17 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新模式对应测试量 + 下方两张环境耗时对照表。
@@ -74,9 +74,9 @@
 | `data` | ~2s | ~14s |
 | `all` | ~22s | ~3min |
 | `smoke` | ~2s | ~9s |
-| `report` | ~18s | ~2min |
-| `all_no_unit` | ~10s | ~1min |
-| `scenario_extreme` | ~3s | ~9s |
+| `report` | ~14s | ~2min |
+| `all_no_unit` | ~14s | ~1min |
+| `scenario_extreme` | ~2s | ~9s |
 | 数据更新时间 | 2026-08-17 | 2026-08-06 |
 <!-- duration-table:end -->
 

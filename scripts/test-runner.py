@@ -133,7 +133,7 @@ MODES: dict[str, dict] = {
         "parallel": True,
     },
     "all_no_unit": {
-        "marker": "not unit",
+        "marker": "not unit and not live",
         "desc": "全量测试（排除单元测试）",
         "timeout_sec": 1200,
         "order": 10,

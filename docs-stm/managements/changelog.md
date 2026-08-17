@@ -8,7 +8,13 @@
 
 ### 开发版本切换（2026-08-17）
 
-- 发布 v0.10.14 后，APP_VERSION 与全部管理文档版本头切换至 v0.10.15-dev。待办：rf-288（test-runner `all_no_unit` marker 补 `and not live`，修复后 bench `--update-docs` 回填稳定不反复）。
+- 发布 v0.10.14 后，APP_VERSION 与全部管理文档版本头切换至 v0.10.15-dev。
+
+### all_no_unit live 卷入修复 + bench 重跑（rf-288）（2026-08-17）
+
+- **修复**：`test-runner.py` MODES `all_no_unit` marker 由 `not unit` 改为 `not unit and not live`——命令行 `-m` 覆盖 pytest.ini `addopts = -m "not live"`，使 14 项 opt-in live 真实网络套件卷入 `--mode all_no_unit` / bench（323 vs 正确口径 309）。补 `and not live` 后 `--mode all_no_unit` 收集 309，与 collect-test-coverage 口径一致。
+- **验证**：`--mode all_no_unit` collect 309（不再卷 live）；bench 全量重跑（含 all 5550 全 mock 零网络访问）回填 test-coverage.md 模式对应测试量表，all_no_unit 保持 309 稳定不反复。
+- **变更记录**：rf-288 已修复归档（见 review-findings.md 已解决区）。
 
 ### scripts/ 命名统一与清理（2026-08-17）
 

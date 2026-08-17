@@ -38,14 +38,6 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
-#### P2C — test-runner all_no_unit 口径与 live 套件卷入（2026-08-17 发布自审）
-
-> 发布 v0.10.14 前刷新 test-coverage.md 时发现。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-288** | `test-runner.py` MODES `all_no_unit` 用 `-m "not unit"` 构建 pytest 参数，会**覆盖** `pytest.ini` 的 `addopts = -m "not live"`，使 opt-in 的 live 真实网络套件（14 项）卷入 `--mode all_no_unit` / bench 计数——`test-coverage.md` 模式对应测试量表 `all_no_unit` 被 bench 回填为 323（含 live），而 collect-test-coverage.py 口径（addopts 生效，排除 live）为 309，且 `all`(5533) = `unit`(5224) + `all_no_unit`(309) 数学自洽证明 309 正确 | 修复方向二选一：① `all_no_unit` marker 改为 `not unit and not live`（与 live 不入门禁语义对齐）；② 或 `_build_pytest_args` 对 marker 非空时显式追加 `and not live`（pytest.ini addopts 只覆盖命令行 `-m`，需在 MODES 表达式内补）。修复后 `--mode all_no_unit` 收集 309，bench `--update-docs` 回填与 collect 口径一致。2026-08-17 发布已按 collect 口径将表值 309 修正，待修复后 bench 回填稳定不反复 |
-
 ## 已解决问题
 
 ### 已解决待归档（v0.10.15-dev）
@@ -54,6 +46,7 @@
 |---|----------|----------|
 | **rf-290** | dedup 跨源误合并率高（42560 锚点分层采样 ~70-80% 误合并：不同事件共享财报/回购/指数/预警/地震模板词天然 3-6 bigram，英文统一占位符虚高 ratio，bg=2 梯度与安全区直接合并误判多） | `news_dedup.py`：`_STOP_BIGRAMS` 扩至 ~280 模板词 + 提取前整体掩码（`_mask_stop`）；英文占位符按长度分桶（`_tk2_`/`_tk4_`/`_tk6_`）；候选区门槛 0.35；bg=2 梯度 0.375 且含英数 token；安全区分级（0.65+bg≥1 直接 / 0.50-0.65 需 bg≥2）；跨源方向对立检测（cross_opposite）；`_normalize_title` 保留空格防英文粘连 + 剥离 N级；ratio 双向取 max 消除 SequenceMatcher 贪心方向偏差。回归测试 `TestDedupFalseMergeGuard` 9 例 + `TestDedupTokenGradientMerge` 3 例，锚点采样 13/13 误合并修复；校准脚本常量/规则摘要同步。变更记录见 changelog.md [0.10.15-dev] 2026-08-17 条目 |
 | **rf-289** | 事实校验 `_locate_subject_code` 无法解析省略基金公司前缀的描述性缩写（"电池主题ETF"→561910"招商中证电池主题ETF"），回退同句最近邻误路由，把 561910 正确 -3.92% 误修正为 -36.3%（2026-08-17 报告） | `_utils.py` 新增 `_match_descriptive_tail` 描述性尾名匹配（≥3 汉字核心后缀 + 产品后缀，按距锚点距离择优），接入 `_locate_subject_code` 兜底；回归测试 `test_fact_checker.py::TestDescriptiveTailMatch` 5 项；全 LLM 单测 764 通过 + P0 门禁全绿。变更记录见 changelog.md [0.10.15-dev] 2026-08-17 条目 |
+| **rf-288** | `test-runner.py` MODES `all_no_unit` 用 `-m "not unit"` 构建 pytest 参数会**覆盖** `pytest.ini` 的 `addopts = -m "not live"`，使 opt-in 的 live 真实网络套件（14 项）卷入 `--mode all_no_unit`/bench 计数——`test-coverage.md` 模式量表 `all_no_unit` 被 bench 回填为 323（含 live），而 collect-test-coverage.py 口径（addopts 生效）为 309，且 `all` = `unit` + `all_no_unit` 数学自洽证明 309 正确 | `scripts/test-runner.py` MODES `all_no_unit` marker 改为 `not unit and not live`，与「live 不入门禁」语义对齐；修复后 `--mode all_no_unit` 收集 309，bench `--update-docs` 回填稳定不反复（2026-08-17 全 14 模式重跑确认）。变更记录见 changelog.md [0.10.15-dev] 2026-08-17 条目 |
 
 v0.10.14 已解决记录（rf-282 ~ rf-287）已随四次合并迁入 [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) v0.10.14 章节（变更详情见 changelog.md [0.10.14] 对应条目）。
 
