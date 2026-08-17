@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 
-from src.python.llm.fact_checker._constants import _NAME_ALIAS_MAP
+from src.python.llm.fact_checker._constants import _ATTACHED_SUBJECT_MAX_DIST, _NAME_ALIAS_MAP
 from src.python.llm.fact_checker._patterns import _CODE_PATTERN
 
 
@@ -120,6 +120,18 @@ def _cjk_len(s: str) -> int:
     return sum(1 for ch in s if "一" <= ch <= "鿿")
 
 
+def _leading_token(s: str) -> str:
+    """取字符串前导的连续数字串（产品代号中的数字部分）。
+
+    如"100ETF联接基金A"→"100"、"ETF"→""、"2040三年A"→"2040"。仅取数字——
+    LLM 以「核心名+数字代号」缩写持仓时只保留指数/产品代码数字（"华安纳斯达克
+    100"），不含类型尾缀字母（"ETF"等）；若后缀以字母开头（"ETF""C""A"）则
+    无数字代号，不生成短尾候选。
+    """
+    m = re.match(r"[0-9]+", s)
+    return m.group(0) if m else ""
+
+
 def _match_descriptive_tail(
     sentence: str,
     name_to_code: dict[str, str] | None,
@@ -155,6 +167,19 @@ def _match_descriptive_tail(
                 dist = min(abs(m.start() - anchor), abs(m.end() - anchor))
                 if best_dist is None or dist < best_dist or (dist == best_dist and len(cand) > best_len):
                     best_code, best_dist, best_len = code, dist, len(cand)
+            # 短尾候选：核心名后缀 + 类型后缀的「数字/字母前缀」——LLM 常省略类型尾缀
+            # （"ETF联接基金A""(QDII)A"等）仅保留「核心名+数字代号」指代持仓（如
+            # "华安纳斯达克100"→040046"华安纳斯达克100ETF联接基金A"、"博时纳斯达克100"
+            # →016055），全名/别名/完整长尾候选均不命中 → 回退全局最近邻误路由。
+            # 取 rest 的前导字母/数字串（"100ETF联接基金A"→"100"）拼核心名后缀，
+            # 仅当前导串是 rest 真前缀（短于 rest）时生成，避免与完整候选重复。
+            _short = _leading_token(rest)
+            if _short and _short != rest:
+                cand_short = tail + _short
+                for m in re.finditer(re.escape(cand_short), sentence):
+                    dist = min(abs(m.start() - anchor), abs(m.end() - anchor))
+                    if best_dist is None or dist < best_dist or (dist == best_dist and len(cand_short) > best_len):
+                        best_code, best_dist, best_len = code, dist, len(cand_short)
     return (best_code, best_dist) if best_code is not None else None
 
 
@@ -166,41 +191,53 @@ def _locate_subject_code(
 ) -> str | None:
     """定位句中最可能指代的持仓代码。
 
-    优先句中出现的持仓代码（取离 anchor 最近）；无代码时按持仓名称匹配
-    （名称越长越具体优先，取离 anchor 最近）。
+    主体来源分四级：句中持仓代码 → 持仓全名 → 简称归一化 → 描述性尾名。
+    采用「紧邻优先 + 可靠主体兜底」：
+      - 任一来源的主体若紧贴该数值（主体边缘距数值 ≤ _ATTACHED_SUBJECT_MAX_DIST），
+        取其中最近者为其主体——同句含代码与多个名称主体时（"040046 收益率
+        +130.61%、建设银行收益率 +181.37%"）181.37 紧邻建设银行 → 归 601939，
+        不再被句内唯一代码 040046 钉扎误修正；
+      - 无紧邻主体时，若句中已有代码/全名则取其中最近者（代码钉扎优先，防远距
+        别名/尾名误覆盖；如"040046 ... +130% ... 与博时纳斯达克
+        100合计17.4%"，+130% 归最近的代码 040046 而非 17 字符外的尾名 016055）；
+      - 仅当句中既无代码也无全名时才以最近的简称/尾名候选作为主体（历史兜底）。
 
-    补充简称归一化匹配：LLM 常用「机构名+指数简称」缩略指代持仓
-    （如"华安纳指"→040046"华安纳斯达克100ETF联接基金A"），全名匹配失败会
-    回退全局最近邻 → 反向串位漏检（180.5 恰命中另一品种 601939 真实值）。
+    最近边距离（min(abs(idx-anchor), abs(idx+len(subject)-anchor))）：名称与数值
+    相邻时（如"建设银行收益率+171.23%"）若只按起点距离 abs(idx-anchor)，名称
+    起点距数值可能与其相邻另一名称（如"工商银行"）平局，先迭代者胜出导致误路由。
     """
     best: str | None = None
     best_dist: int | None = None
+    attached: str | None = None
+    attached_dist: int | None = None
+    has_reliable = False  # 句中是否存在代码或全名（可靠主体）
+
+    def _offer(code: str, dist: int, into_best: bool = True) -> None:
+        nonlocal best, best_dist, attached, attached_dist
+        if dist <= _ATTACHED_SUBJECT_MAX_DIST:
+            if attached_dist is None or dist < attached_dist:
+                attached, attached_dist = code, dist
+        if into_best and (best_dist is None or dist < best_dist):
+            best, best_dist = code, dist
+
     for cm in _CODE_PATTERN.finditer(sentence):
         code = cm.group(0)
         if code not in holding_codes:
             continue
-        dist = min(abs(cm.start() - anchor), abs(cm.end() - anchor))
-        if best_dist is None or dist < best_dist:
-            best_dist = dist
-            best = code
-    if best:
-        return best
+        has_reliable = True
+        _offer(code, min(abs(cm.start() - anchor), abs(cm.end() - anchor)))
+
     for name, code in sorted((name_to_code or {}).items(), key=lambda kv: -len(kv[0])):
         idx = sentence.find(name)
         if idx == -1:
             continue
-        # 最近边距离（与上方代码分支一致）：名称与数值相邻时（如"建设银行收益率
-        # +171.23%"）若只按起点距离 abs(idx-anchor)，名称起点距数值可能与其相邻
-        # 另一名称（如"工商银行"）平局，先迭代者胜出导致误路由（把 601939 的
-        # 171.23% 误判为 601398 的 70.2%）。改用最近边距离 min(abs(idx-anchor),
-        # abs(idx+len(name)-anchor))，紧邻数值的名称唯一胜出。
-        dist = min(abs(idx - anchor), abs(idx + len(name) - anchor))
-        if best_dist is None or dist < best_dist:
-            best_dist = dist
-            best = code
+        has_reliable = True
+        _offer(code, min(abs(idx - anchor), abs(idx + len(name) - anchor)))
+
     # 简称归一化匹配：先将句中常用简称归一化（"纳指"→"纳斯达克"等），
     # 再与持仓名称核心名前缀匹配。仅在句中确实出现简称（norm != sentence）
-    # 时执行，避免额外开销与误匹配。
+    # 时执行，避免额外开销与误匹配。句中已有代码/全名时简称仅以「紧邻」覆盖
+    # （不参与全局最近竞争），防止远距简称误路由。
     norm = sentence
     for _alias, _canon in sorted(_NAME_ALIAS_MAP.items(), key=lambda kv: -len(kv[0])):
         norm = norm.replace(_alias, _canon)
@@ -217,17 +254,16 @@ def _locate_subject_code(
             # 不影响唯一简称的归因）。
             _extra = sum((len(_c) - len(_a)) * norm[:idx].count(_c) for _a, _c in _NAME_ALIAS_MAP.items())
             _pos = idx - _extra
-            dist = min(abs(_pos - anchor), abs(_pos + len(core) - anchor))
-            if best_dist is None or dist < best_dist:
-                best_dist = dist
-                best = code
-    # 描述性尾名匹配（兜底）：以上均失败时，按持仓核心名的「描述性后缀 + 产品
-    # 后缀」匹配（LLM 省略基金公司前缀，如"电池主题ETF"→561910）。按距锚点
-    # 距离与已有候选统一比较，命中更近者覆盖——否则回退全局最近邻会把数值
-    # 误路由到同句另一品种，将正确数值修正为错误值。
+            _offer(code, min(abs(_pos - anchor), abs(_pos + len(core) - anchor)), into_best=not has_reliable)
+
+    # 描述性尾名匹配（兜底）：按持仓核心名的「描述性后缀 + 产品后缀」匹配
+    # （LLM 省略基金公司前缀，如"电池主题ETF"→561910、"华安纳斯达克100"
+    # →040046）。与简称一致：句中已有代码/全名时尾名仅以「紧邻」覆盖。
     _tail = _match_descriptive_tail(sentence, name_to_code, anchor)
     if _tail is not None:
         _code, _dist = _tail
-        if best_dist is None or _dist < best_dist:
-            best, best_dist = _code, _dist
+        _offer(_code, _dist, into_best=not has_reliable)
+
+    if attached is not None:
+        return attached
     return best

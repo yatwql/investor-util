@@ -1644,3 +1644,98 @@ class TestDescriptiveTailMatch:
         corr, summ = run_fact_check(html, holdings, "全球政经局势")
         assert "电池主题ETF（收益率-3.92%）" in corr
         assert "-36.3%" not in corr
+
+
+# ── 多主体同句就近归因：单代码钉扎 / 部分简称 / 组合当日收益 ──
+
+
+class TestSubjectAttributionMulti:
+    """同句含多个持仓主体（代码/名称/简称）时各数值就近归因，不做单一主体钉扎。
+
+    2026-08-17 报告误修正三连（智囊团深度复盘 + 持仓体检）根因均为主体育位缺陷：
+      - 体检「040046 收益率 +130.61%、建设银行收益率 +181.37%」：句内唯一代码 040046
+        钉扎全句，把建设银行主体的 181.37% 误修正为 040046 的 130.6%；
+      - 智囊团「华安纳斯达克100 +130.61%、建设银行 +181.37%」：华安纳指用部分简称
+        （缺"ETF联接基金A"类型尾缀），全名/别名/长尾均不命中 → 两个数值都误归 601939；
+      - 智囊团「今日组合 +0.21%」：组合当日收益被误路由到最近邻 561910 修正为 -2.3%。
+    """
+
+    pytestmark = [
+        pytest.mark.unit,
+        pytest.mark.unit_llm,
+        pytest.mark.llm,
+    ]
+
+    @staticmethod
+    def _holdings() -> list[dict]:
+        """2026-08-17 报告持仓子集：040046 华安纳指 +130.61%、601939 建行 +181.37%、561910 电池 -2.28%。"""
+        return [
+            {
+                "name": "华安纳斯达克100ETF联接基金A",
+                "code": "040046",
+                "market_value": 41928.0,
+                "cost": 18181.5,
+                "profit_rate": 130.61,
+            },
+            {
+                "name": "建设银行",
+                "code": "601939",
+                "market_value": 20540.0,
+                "cost": 7300.0,
+                "profit_rate": 181.37,
+            },
+            {
+                "name": "招商中证电池主题ETF",
+                "code": "561910",
+                "market_value": 9610.0,
+                "cost": 10000.0,
+                "profit_rate": -2.28,
+            },
+        ]
+
+    def test_health_check_single_code_not_pinning_all(self):
+        """体检句：代码 040046 + 建设银行名称同句 → 两个数值各自就近归因，不误修正。"""
+        holdings = self._holdings()
+        text = "异常说明：040046 收益率 +130.61%、建设银行收益率 +181.37% 较高"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert corrections == [], f"130.61% 属040046、181.37% 属建设银行，均正确不应被误修正: {corrections}"
+
+    def test_thinktank_partial_name_short_tail(self):
+        """智囊团分歧焦点句：华安纳斯达克100（部分简称）+ 建设银行 → 各自就近归因。"""
+        holdings = self._holdings()
+        text = "分歧焦点：围绕高浮盈品种（华安纳斯达克100 +130.61%、建设银行 +181.37%）的处理策略"
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert corrections == [], f"华安纳斯达克100=130.61%、建设银行=181.37% 均正确，不应被误修正: {corrections}"
+
+    def test_portfolio_daily_return_not_corrected(self):
+        """智囊团综合评估句：今日组合 +0.21% 是组合当日收益（非个股收益率）→ 不修正。"""
+        holdings = self._holdings()
+        text = (
+            "组合在进攻方向（科技/成长）和防御方向（银行/电力/债券）的配比，"
+            "导致其收益弹性有限——今日组合 +0.21% 对沪深300 +1.34% 的跑输已现端倪"
+        )
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert corrections == [], f"组合当日收益 0.21% 不应被误修正为个股收益率: {corrections}"
+
+    def test_thinktank_action_item_130_not_misrouted_to_far_tail(self):
+        """华安行动项：+130% 以上浮盈 归同句代码 040046，不被远距"博时纳斯达克100"尾名误路由。
+
+        单代码钉扎修复若简化为"纯距离最近"会让 +130% 误归距其 17 字符的博时纳斯达克100
+        （016055），把正确值改错——须保持代码对远距尾名的优先级（仅紧邻主体可覆盖）。
+        """
+        holdings = self._holdings() + [
+            {
+                "name": "博时纳斯达克100ETF联接(QDII)A",
+                "code": "016055",
+                "market_value": 20000.0,
+                "cost": 17000.0,
+                "profit_rate": 17.65,
+            },
+        ]
+        text = (
+            "华安纳斯达克100ETF联接基金A（040046）— 分批止盈，锁定盈利总额50%～60%（置信度：高）"
+            "保留核心敞口（如剩余5%仓位）以延续全球科技长期配置，但 +130% 以上浮盈必须兑现一部分；"
+            "与博时纳斯达克100合计17.4%的暴露需整体降下来"
+        )
+        issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
+        assert corrections == [], f"+130% 应归 040046（实际 130.61%）通过，不应被远距尾名误路由: {corrections}"

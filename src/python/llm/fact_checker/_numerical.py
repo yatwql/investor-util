@@ -22,6 +22,7 @@ from src.python.llm.fact_checker._context import (
     _is_daily_change_context,
     _is_drawdown_context,
     _is_hypothetical_context,
+    _is_portfolio_daily_change_context,
     _is_portfolio_level_context,
     _is_position_weight_context,
     _is_trim_target_context,
@@ -151,14 +152,27 @@ def _evaluate_percent_value(
         issue = f"收益相关数值 {value}% 与实际累计收益率 {correct_str}%（{profit_sign}）偏差超过容差（句段：{_ctx}）"
         return issue, (value_str, correct_str, sentence, f"组合实际收益率{correct_str}%")
 
-    # 定位句中明确持仓主体：优先按句中持仓代码（单个）或名称指代校验，而非全局最近邻。
-    # 否则句中已写明确主体（如"建设银行收益率 3.2%"）、数值却接近无关品种
-    # （240012 的 2.24%，差 0.96≤容差）时，全局最近邻会误判通过 → 漏检。
+    # 组合单日/当日表现语境（"今日组合 +0.21%"）→ 数值为组合当日收益，非个股收益率，
+    # 且无组合当日收益基准数据可校验 → 跳过。必须在此判定：否则回退全局最近邻会把
+    # 当日收益（如 0.21%）误修正为数值最接近的品种收益率（如 561910 的 -2.3%）。
+    if _is_portfolio_daily_change_context(sentence, anchor):
+        return None, None
+
+    # 定位句中明确持仓主体：统一按 _locate_subject_code「紧邻优先 + 代码/全名最近兜底」
+    # 归因（含代码、全名、简称、描述性尾名四来源），而非全局最近邻。同句含多个名称
+    # 主体时（如"040046 收益率 +130.61%、建设银行收益率 +181.37%"）各数值各自就近
+    # 归因，建设银行主体的 181.37% 归 601939，不被句内代码 040046 钉扎。句中无名称/
+    # 代码主体时回退全局最近邻（兜底语义）。
     codes_in_sentence = _CODE_PATTERN.findall(sentence)
     index_codes_in_sentence = [c for c in codes_in_sentence if c in _INDEX_CODES]
     holding_codes_in_sentence = [c for c in codes_in_sentence if c in holding_codes]
 
-    if len(holding_codes_in_sentence) > 1:
+    name_code = _locate_subject_code(sentence, holding_codes, name_to_code, anchor)
+    if name_code is not None and name_code in stock_rates_abs:
+        best_code = name_code
+    elif len(holding_codes_in_sentence) > 1:
+        # 句中主体无收益率数据但多代码：按收益率最近者归因（历史语义，防仅按位置
+        # 就近把数值错配到同句其他品种）。
         best_code = min(holding_codes_in_sentence, key=lambda c: abs(value - stock_rates_abs.get(c, 999)))
     elif holding_codes_in_sentence:
         best_code = holding_codes_in_sentence[0]
@@ -166,8 +180,7 @@ def _evaluate_percent_value(
         # 句中无代码但以名称指代持仓（如"建设银行收益率+1.87%"）→ 名称定位到代码，
         # 否则该收益声称无法归因到具体品种，会误修正到数值最接近的无关品种。
         # 仅当该品种确有收益率数据（在 stock_rates_abs 中）时采用，否则回退组合收益率。
-        name_code = _locate_subject_code(sentence, holding_codes, name_to_code, anchor)
-        best_code = name_code if name_code in stock_rates_abs else None
+        best_code = None
 
     closest_ref = min(ref_rates, key=lambda k: abs(value - ref_rates[k]))
 
