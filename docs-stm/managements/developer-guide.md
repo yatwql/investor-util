@@ -649,7 +649,6 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
 | `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`--collect-only` 快照，供 test-coverage.md 更新） |
 | `smoke-web.py` | 测试 | Web 模式 HTTP 冒烟脚本（test_client 进程内全链路断言，可独立运行） |
-| `reproduce_factcheck_corrections.py` | 测试 | 事实校验自动修正复现脚本（重建持仓+缓存 → 重跑数值校验提取修正明细） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（发布前必跑） |
 | `perf-report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf-view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
@@ -706,16 +705,6 @@ Web 模式全链路可复跑冒烟验证（上传→生成→进度→产物，F
 ```
 
 退出码：0 = 全部通过；2 = 存在失败项。同款断言已由 `src/test/unit/web/test_smoke_web.py`（`unit_web` 标记）纳入 `dev-verify`/`verify` 门禁，本脚本用于手动快速复跑。
-
-**`reproduce_factcheck_corrections.py` — 事实校验自动修正复现**
-
-回答「事实校验到底修正了哪些数值」的复现脚本：用 `data/holdings` 持仓 + `data/cache` 历史行情快照重建当时的 `holdings_details`，对指定 LLM 缓存内容调用 `check_numerical_consistency`，逐条打印修正三元组（错误值 → 修正值 + 原文句段）。
-
-```bash
-.venv/bin/python scripts/reproduce_factcheck_corrections.py
-```
-
-逐份检查计数/通过数/不一致数/修正数；有修正时列出每处 `错误值% → 修正值%` 与截断句段。用于排查事实校验是否误修正正确文本（如阈值/止盈目标被当收益率改写的回归复现）。
 
 **`check-code-traces.py` — 代码注释历史痕迹检查**
 
