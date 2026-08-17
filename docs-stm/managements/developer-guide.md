@@ -653,7 +653,6 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（发布前必跑） |
 | `perf-report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf-view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
-| `diagnose_gemini_proxy.py` | 诊断 | Gemini API 代理连通性诊断 |
 | `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（风格因子回归前置决策闸门） |
 | `probe-push2.py` | 诊断 | 东方财富 push2 连通性探测（区分程序缺陷与网络环境拦截，熔断降级前置排障） |
 | `check-svg-geom.py` | 诊断 | README SVG 架构图几何审查（文本越界/重叠/矩形对齐） |
@@ -934,24 +933,6 @@ sh .githooks/install-hooks.sh --off   # 停用
 | 次数 | 该阶段出现次数（条件阶段如历史走势仅在启用时出现） |
 
 **数据来源**：每次 `generate_report()` 调用时自动记录到 `data/state/perf_history.jsonl`，无需手动触发。
-
-**`diagnose_gemini_proxy.py` — Gemini API 代理诊断**
-
-当 Gemini API 代理（如 `http://10.22.207.29:10037`）出现连通性问题时，逐项检测网络层、代理层和 API 层的健康状况。
-
-```bash
-.venv/bin/python scripts/diagnose_gemini_proxy.py
-```
-
-**检测项目**：
-1. 直接 Google 连通性（`google.com`）
-2. 代理服务器连通性（`telnet` 式探测）
-3. 代理 HTTP 请求（`curl -x` 等效）
-4. Gemini API 真实调用（使用当前 `llm_key.json` 配置）
-5. DNS 解析
-6. 各环境变量（`HTTP_PROXY` / `HTTPS_PROXY` / `http_proxy` / `https_proxy`）
-
-每项显示 ✅/❌ 状态和详细错误信息，定位哪一层出了问题。
 
 **`probe-csi-factor-indices.py` — CSI 风格指数可用性探测**
 
