@@ -25,26 +25,26 @@
 
 | 门禁 | 触发点 | 命令 | 说明 |
 |:-----|:-------|:-----|:-----|
-| **P0** | 提交前 | `.venv/bin/python scripts/test_runner.py --mode dev-verify` + 4 个 check 脚本 | 阻塞提交，不得 commit |
-| **P1** | 合入 master 前 | `.venv/bin/python scripts/test_runner.py --mode verify` | 阻塞合入，不得 merge |
-| **P2** | 发布前 | `.venv/bin/python scripts/test_runner.py --mode verify,regression` + 4 个 check 脚本 | 阻塞发布，不得 release |
+| **P0** | 提交前 | `.venv/bin/python scripts/test-runner.py --mode dev-verify` + 4 个 check 脚本 | 阻塞提交，不得 commit |
+| **P1** | 合入 master 前 | `.venv/bin/python scripts/test-runner.py --mode verify` | 阻塞合入，不得 merge |
+| **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode verify,regression` + 4 个 check 脚本 | 阻塞发布，不得 release |
 
 **P0 提交前门禁**（全部通过才可 commit）：
 
 ```bash
-.venv/bin/python scripts/test_runner.py --mode dev-verify   # 核心单元 + 基础场景快速验证
+.venv/bin/python scripts/test-runner.py --mode dev-verify   # 核心单元 + 基础场景快速验证
 .venv/bin/python scripts/check-code-traces.py --ci          # 代码注释历史痕迹 + 任务编号标识符检查
 .venv/bin/python scripts/check-doc-traces.py --ci           # 文档历史痕迹检查
 .venv/bin/python scripts/check-task-numbering.py --ci       # 任务编号全局一致性检查
 .venv/bin/python scripts/check-semantic-index.py --ci       # 语义命名索引正反向校验
 ```
 
-**P1 合入门禁**：`test_runner.py --mode verify`（核心模块单元测试），否则不得 merge。
+**P1 合入门禁**：`test-runner.py --mode verify`（核心模块单元测试），否则不得 merge。
 
 **P2 发布门禁**：
 
 ```bash
-.venv/bin/python scripts/test_runner.py --mode verify,regression   # 单元 + 场景验证
+.venv/bin/python scripts/test-runner.py --mode verify,regression   # 单元 + 场景验证
 .venv/bin/python scripts/check-code-traces.py --ci
 .venv/bin/python scripts/check-doc-traces.py --ci
 .venv/bin/python scripts/check-task-numbering.py --ci
@@ -79,7 +79,7 @@
 | 机制 | 触发 | 跨机器 |
 |:-----|:-----|:------|
 | **P0/P2 门禁** | 提交/发布前 `check-task-numbering.py --ci` | ✅ 零配置 |
-| **dev-verify preflight** | `test_runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
+| **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
 | **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
 | **git pre-commit** | `git commit` 涉及编号文档时自动校验 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
 
@@ -87,7 +87,7 @@
 
 ## 测试指南
 
-测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行，使用 `scripts/test_runner.py` 统一驱动并自动输出结构化报告。各 `--mode` 的精确测试项数统计见 [test-coverage.md](test-coverage.md)。
+测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行，使用 `scripts/test-runner.py` 统一驱动并自动输出结构化报告。各 `--mode` 的精确测试项数统计见 [test-coverage.md](test-coverage.md)。
 
 ### 前置条件
 
@@ -104,58 +104,58 @@ pip install pytest-cov coverage
 
 ```bash
 # 查看所有可用选项
-.venv/bin/python scripts/test_runner.py --help
+.venv/bin/python scripts/test-runner.py --help
 
 # ===== ① 日常常用（快速反馈，提交前验证） =====
 
 # 提交前快速验证（P0 门禁；耗时因机器而异，参考 test-coverage.md）
-.venv/bin/python scripts/test_runner.py --mode dev-verify
+.venv/bin/python scripts/test-runner.py --mode dev-verify
 
 # 冒烟测试（快速验证核心通路）
-.venv/bin/python scripts/test_runner.py --mode smoke
+.venv/bin/python scripts/test-runner.py --mode smoke
 
 # 仅运行业务场景测试
-.venv/bin/python scripts/test_runner.py --mode scenario
+.venv/bin/python scripts/test-runner.py --mode scenario
 
 # 集成测试（含场景 + 模块间契约/缓存/TUI 路由）
-.venv/bin/python scripts/test_runner.py --mode integration
+.venv/bin/python scripts/test-runner.py --mode integration
 
 # 全量单元测试（含 edge/data）
-.venv/bin/python scripts/test_runner.py --mode unit
+.venv/bin/python scripts/test-runner.py --mode unit
 
 # 常规单元测试（排除 edge/data）
-.venv/bin/python scripts/test_runner.py --mode standard
+.venv/bin/python scripts/test-runner.py --mode standard
 
 # ===== ② 专项验证（定向覆盖） =====
 
 # 仅运行边缘/异常场景测试
-.venv/bin/python scripts/test_runner.py --mode edge
+.venv/bin/python scripts/test-runner.py --mode edge
 
 # 极限场景（超多持仓/极端值/高精度）
-.venv/bin/python scripts/test_runner.py --mode scenario_extreme
+.venv/bin/python scripts/test-runner.py --mode scenario_extreme
 
 # 数据正确性验证
-.venv/bin/python scripts/test_runner.py --mode data
+.venv/bin/python scripts/test-runner.py --mode data
 
 # 真实网络验证（opt-in，不入门禁，仅排查数据源连通性时手工运行）
-.venv/bin/python scripts/test_runner.py --mode live
+.venv/bin/python scripts/test-runner.py --mode live
 
 # 运行全量 + 行覆盖率报告
-.venv/bin/python scripts/test_runner.py --coverage
+.venv/bin/python scripts/test-runner.py --coverage
 
 # ===== ③ 全量/CI 门禁（耗时较长） =====
 
 # 开发期快速验证（5 个 unit 子模块并行 + 基础场景）
-.venv/bin/python scripts/test_runner.py --mode dev-verify
+.venv/bin/python scripts/test-runner.py --mode dev-verify
 
 # 合入验证 — PR 前检查
-.venv/bin/python scripts/test_runner.py --mode verify
+.venv/bin/python scripts/test-runner.py --mode verify
 
 # 全量测试（--mode verify,regression 覆盖单元+场景）
-.venv/bin/python scripts/test_runner.py --mode verify,regression
+.venv/bin/python scripts/test-runner.py --mode verify,regression
 
 # 全量测试（排除单元测试，快速全场景覆盖）
-.venv/bin/python scripts/test_runner.py --mode all_no_unit
+.venv/bin/python scripts/test-runner.py --mode all_no_unit
 ```
 
 ### 只重跑上次失败的测试（`--lf`）
@@ -170,13 +170,13 @@ pip install pytest-cov coverage
 .venv/bin/python -m pytest src/test/ -m "unit_providers" --lf
 ```
 
-**与 `test_runner.py` 的配合**：
+**与 `test-runner.py` 的配合**：
 
-`test_runner.py` 使用 `argparse` 管理参数，**不支持** `--` 透传（例如 `.venv/bin/python scripts/test_runner.py --mode all -- --lf` 会报错）。如需 `--lf`，绕过它直接调 pytest，用 `-m` 参数复现目标模式的标记表达式：
+`test-runner.py` 使用 `argparse` 管理参数，**不支持** `--` 透传（例如 `.venv/bin/python scripts/test-runner.py --mode all -- --lf` 会报错）。如需 `--lf`，绕过它直接调 pytest，用 `-m` 参数复现目标模式的标记表达式：
 
 ```bash
 # 先找到目标模式对应的 marker 表达式
-# 在 scripts/test_runner.py 的 MODES 字典中查找，例如：
+# 在 scripts/test-runner.py 的 MODES 字典中查找，例如：
 #   regression → "scenario"
 #   unit       → "unit"
 #   verify     → "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts or unit_web"
@@ -187,7 +187,7 @@ pip install pytest-cov coverage
 .venv/bin/python -m pytest src/test/ -m "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts or unit_web" --lf  # 等价 --mode verify
 ```
 
-> 各 `--mode` 对应的 `-m` 表达式见下文「模式与覆盖范围说明」章节，或直接查看 `scripts/test_runner.py` 中 `MODES` 字典的 `marker` 字段。
+> 各 `--mode` 对应的 `-m` 表达式见下文「模式与覆盖范围说明」章节，或直接查看 `scripts/test-runner.py` 中 `MODES` 字典的 `marker` 字段。
 
 **工作原理**：pytest 在每次运行后，将失败用例记录到 `.pytest_cache/lastfailed` 文件；`--lf` 读取该文件，只收集文件中的用例执行。如果上次运行全部通过，`--lf` 会提示 `no tests ran`（因为没有失败记录）。
 
@@ -209,11 +209,11 @@ pip install pytest-cov coverage
 > ⚠ **注意**：
 > - `--lf` 依赖上次运行生成的 `.pytest_cache/lastfailed` 文件。如果清理了 `.pytest_cache/` 或切换了虚拟环境，`--lf` 不会生效。此时只需先正常跑一次目标模式生成失败记录即可。
 > - 另一相关标志 `--ff`（`--failed-first`）会**先跑上次失败、再跑全部**，适合修复后确认修复 + 检查回归一步到位。
-> - `test_runner.py` 不支持 `--lf`，是因为它用 `subprocess.run` 调 pytest 且 argparse 不接收未注册的 `--` 参数。建议日常快速验证时直接使用 `pytest`，门禁检查时再用 `test_runner.py`。
+> - `test-runner.py` 不支持 `--lf`，是因为它用 `subprocess.run` 调 pytest 且 argparse 不接收未注册的 `--` 参数。建议日常快速验证时直接使用 `pytest`，门禁检查时再用 `test-runner.py`。
 
 ### 测试模式详解
 
-测试框架围绕两个概念组织：**pytest 标记（marker）** 是测试用例的固有属性（标注"这是什么测试"）；**`--mode`** 是 `scripts/test_runner.py` 脚本对标记的预定义组合（定义"应该运行哪些测试"）。每个 mode 对应一个或多个标记表达式，脚本解析后传给 `.venv/bin/python -m pytest -m` 执行。
+测试框架围绕两个概念组织：**pytest 标记（marker）** 是测试用例的固有属性（标注"这是什么测试"）；**`--mode`** 是 `scripts/test-runner.py` 脚本对标记的预定义组合（定义"应该运行哪些测试"）。每个 mode 对应一个或多个标记表达式，脚本解析后传给 `.venv/bin/python -m pytest -m` 执行。
 
 #### 回归测试级别
 
@@ -230,7 +230,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 > 注意：P0-P3 是**问题影响力分级**，regression/verify/all 是**测试范围分级**，两者通过门禁阶段关联但不一一对应。例如 P0 问题恰好在 regression 模式中被检出，但 regression 模式并非仅包含"P0 级别"的测试用例——它覆盖全量业务场景，其中任何一项失败都可能导致 P0 阻断。
 
-> **耗时说明**：测试耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，因此本文档不标注具体秒数。各模式耗时对照见 [test-coverage.md](test-coverage.md)（「环境耗时对照」表，按机器分列实测）——需预估耗时先在表中定位本机环境列。若本机未在表中，可运行 `python scripts/test_runner.py --mode bench --update-docs` 自动采集回填。
+> **耗时说明**：测试耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，因此本文档不标注具体秒数。各模式耗时对照见 [test-coverage.md](test-coverage.md)（「环境耗时对照」表，按机器分列实测）——需预估耗时先在表中定位本机环境列。若本机未在表中，可运行 `python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
 
 #### 三级验证流水线
 
@@ -264,7 +264,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 #### 模式与覆盖范围说明
 
-每种 `--mode` 对应一组 pytest 标记表达式，由 `scripts/test_runner.py` 转换为 `.venv/bin/python -m pytest -m "<表达式>"` 执行。各模式的覆盖范围存在包含与被包含关系，理解这种关系有助于缩小验证范围以快速反馈：
+每种 `--mode` 对应一组 pytest 标记表达式，由 `scripts/test-runner.py` 转换为 `.venv/bin/python -m pytest -m "<表达式>"` 执行。各模式的覆盖范围存在包含与被包含关系，理解这种关系有助于缩小验证范围以快速反馈：
 
 ##### 单元测试系列（`unit` / `standard`）
 
@@ -303,7 +303,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **内容**：覆盖行情（A 股/ETF/场外基金/中美指数）、新闻源（东方财富/财联社/新浪/华尔街见闻）、基金（历史净值/排名/基准）、akshare 交易日历共 14 项。
 - **断言原则**：只校验返回「结构」（字段存在、类型、非空），**不校验具体数值**，容忍真实行情波动（休市、涨跌、数据源改字段）。
 - **不含 LLM 真实调用**（防费用）——LLM 连通性由运行时数据源健康检查覆盖。
-- 触发方式：`.venv/bin/python scripts/test_runner.py --mode live` 或 `.venv/bin/python -m pytest --run-live -m live`。
+- 触发方式：`.venv/bin/python scripts/test-runner.py --mode live` 或 `.venv/bin/python -m pytest --run-live -m live`。
 
 ##### 全量（`all`）
 
@@ -317,7 +317,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 ```bash
 # 同时运行场景测试和边缘测试
-.venv/bin/python scripts/test_runner.py --mode scenario,edge
+.venv/bin/python scripts/test-runner.py --mode scenario,edge
 ```
 
 脚本按 MODES 字典定义的 order 顺序依次执行各模式，结果汇总到同一份 HTML 报告中。适用于 CI 流水线中按阶段逐步收紧的场景。精确实时计数请运行 `.venv/bin/python -m pytest src/test/ --collect-only -q`。
@@ -341,7 +341,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 | `report` | `unit_report` | ~11s |
 | `scenario_extreme` | `scenario_extreme` | ~2s |
 
-> 注：**Linux 开发机参考耗时**按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，仅作相对量级参考；完整说明及不同环境下的耗时对照见 [test-coverage.md](test-coverage.md)（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。若需本机实测，运行 `python scripts/test_runner.py --mode bench --update-docs` 自动采集回填。
+> 注：**Linux 开发机参考耗时**按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，仅作相对量级参考；完整说明及不同环境下的耗时对照见 [test-coverage.md](test-coverage.md)（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。若需本机实测，运行 `python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
 
 ##### 跨机器耗时采集与环境耗时对照（`bench` + `--machine-info` / `--update-docs`）
 
@@ -349,10 +349,10 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 ```bash
 # 仅采集：顺序运行 14 个对照表模式（不含 live），打印环境属性表 + 各模式实测耗时表
-.venv/bin/python scripts/test_runner.py --mode bench --machine-info
+.venv/bin/python scripts/test-runner.py --mode bench --machine-info
 
 # 采集并自动更新 test-coverage.md「环境耗时对照」两张表
-.venv/bin/python scripts/test_runner.py --mode bench --update-docs   # 隐含 --machine-info
+.venv/bin/python scripts/test-runner.py --mode bench --update-docs   # 隐含 --machine-info
 ```
 
 - **`--mode bench`** 是 14 个对照表模式的聚合别名（`_MODE_TABLE_ORDER` 除 `live` 外全部），按对照表顺序运行；结果去重保序，非 bench 模式原样透传。
@@ -402,7 +402,7 @@ test-reports/latest/
 
 ### 快速定位失败用例 — `extract-test-failures.py`
 
-运行 `test_runner.py --mode verify,regression` 等全量测试后，直接从 HTML 报告中提取失败/错误用例的详细信息，无需手动翻浏览器：
+运行 `test-runner.py --mode verify,regression` 等全量测试后，直接从 HTML 报告中提取失败/错误用例的详细信息，无需手动翻浏览器：
 
 ```bash
 # 自动查找 test-reports/latest/ 下的报告
@@ -422,7 +422,7 @@ test-reports/latest/
 
 ```
 # 1. 跑全量测试
-.venv/bin/python scripts/test_runner.py --mode verify,regression
+.venv/bin/python scripts/test-runner.py --mode verify,regression
 
 # 2. 快速查看哪些用例失败
 .venv/bin/python scripts/extract-test-failures.py --summary
@@ -617,7 +617,7 @@ A: 确认使用了正确的 marker 名：`.venv/bin/python -m pytest src/test/ -
 A: 确保操作系统编码为 UTF-8。Windows PowerShell：`chcp 65001`；Linux/Mac 默认即可。
 
 **Q: 需要跳过 LLM 测试？**
-A: 使用 `--mode edge` 仅跑边缘用例，或 `.venv/bin/python scripts/test_runner.py --mode scenario` 仅跑业务场景（不含 LLM 场景）。若要排除全部 LLM 相关（单元 + 场景），使用 `.venv/bin/python -m pytest src/test/ -m "not llm"`。注意 `--mode unit` **包含** `unit_llm`（均为 mock，无需 API key），不跳过 LLM。
+A: 使用 `--mode edge` 仅跑边缘用例，或 `.venv/bin/python scripts/test-runner.py --mode scenario` 仅跑业务场景（不含 LLM 场景）。若要排除全部 LLM 相关（单元 + 场景），使用 `.venv/bin/python -m pytest src/test/ -m "not llm"`。注意 `--mode unit` **包含** `unit_llm`（均为 mock，无需 API key），不跳过 LLM。
 
 **Q: 新增测试文件后运行报错 `missing unit_* marker`？**
 A: `unit/conftest.py` 的验证模式要求每个单元测试文件必须包含 `unit_*` 子标记。在文件顶部添加 `pytestmark = [pytest.mark.unit, pytest.mark.<子组>]`，子组名见 `conftest.py` 注册表（如 `unit_providers`、`unit_report` 等）。
@@ -636,7 +636,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 
 | 脚本 | 分类 | 一句话 |
 |:-----|:-----|:-------|
-| `test_runner.py` | 测试 | pytest 标记模式封装驱动，支持 14 种 `--mode` |
+| `test-runner.py` | 测试 | pytest 标记模式封装驱动，支持 14 种 `--mode` |
 | `extract-test-failures.py` | 测试 | 从 pytest-html 报告提取失败用例详情 |
 | `check-code-traces.py` | 测试 | 代码注释/文档字符串中历史变更痕迹检查 |
 | `check-doc-traces.py` | 测试 | 面向读者文档（.md）中历史变更痕迹检查 |
@@ -645,19 +645,20 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
-| `llm_hallucination_sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
+| `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
 | `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`--collect-only` 快照，供 test-coverage.md 更新） |
 | `smoke-web.py` | 测试 | Web 模式 HTTP 冒烟脚本（test_client 进程内全链路断言，可独立运行） |
 | `reproduce_factcheck_corrections.py` | 测试 | 事实校验自动修正复现脚本（重建持仓+缓存 → 重跑数值校验提取修正明细） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（发布前必跑） |
-| `perf_report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
-| `perf_view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
+| `perf-report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
+| `perf-view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
 | `diagnose_gemini_proxy.py` | 诊断 | Gemini API 代理连通性诊断 |
 | `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（风格因子回归前置决策闸门） |
-| `svg_geom_check.py` | 诊断 | README SVG 架构图几何审查（文本越界/重叠/矩形对齐） |
-| `svg_pixel_check.py` | 诊断 | README SVG 架构图像素检查（检测文本越出卡片右缘） |
-| `svg_text_overflow_check.py` | 诊断 | README SVG 架构图文字色像素越界精确检测 |
+| `probe-push2.py` | 诊断 | 东方财富 push2 连通性探测（区分程序缺陷与网络环境拦截，熔断降级前置排障） |
+| `check-svg-geom.py` | 诊断 | README SVG 架构图几何审查（文本越界/重叠/矩形对齐） |
+| `check-svg-pixel.py` | 诊断 | README SVG 架构图像素检查（检测文本越出卡片右缘） |
+| `check-svg-text-overflow.py` | 诊断 | README SVG 架构图文字色像素越界精确检测 |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本（无参数启动 TUI；`web` 子命令启动 Web 浏览器模式） |
 | `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
@@ -665,28 +666,28 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 
 ### 测试类
 
-**`test_runner.py` — 测试模式驱动**
+**`test-runner.py` — 测试模式驱动**
 
 pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。所有 `--mode` 的详细说明见上文「测试模式详解」章节。
 
 ```bash
 # 查看所有可用 mode
-.venv/bin/python scripts/test_runner.py --help
+.venv/bin/python scripts/test-runner.py --help
 
 # 日常提交前门禁（P0）
-.venv/bin/python scripts/test_runner.py --mode dev-verify
+.venv/bin/python scripts/test-runner.py --mode dev-verify
 
 # 合入门禁（P1）
-.venv/bin/python scripts/test_runner.py --mode verify
+.venv/bin/python scripts/test-runner.py --mode verify
 
 # 发布门禁（P2）
-.venv/bin/python scripts/test_runner.py --mode verify,regression
+.venv/bin/python scripts/test-runner.py --mode verify,regression
 
 # 跨机器耗时采集 + 自动更新 test-coverage.md 环境耗时对照（含机器信息采集）
-.venv/bin/python scripts/test_runner.py --mode bench --update-docs
+.venv/bin/python scripts/test-runner.py --mode bench --update-docs
 
 # 带行覆盖率
-.venv/bin/python scripts/test_runner.py --mode unit --coverage
+.venv/bin/python scripts/test-runner.py --mode unit --coverage
 ```
 
 **`extract-test-failures.py` — 失败用例提取**
@@ -840,7 +841,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 
 与 `install-claude-hook.py`（Claude Code hook）配套；两条 hook 均调用 `check-task-numbering-hook.py` 校验编号文档。
 
-**`llm_hallucination_sampler.py` — LLM 幻觉率采样**
+**`llm-hallucination-sampler.py` — LLM 幻觉率采样**
 
 见下文「LLM 幻觉率采样测试」章节。
 
@@ -863,7 +864,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 
 **`collect-test-coverage.py` — 测试覆盖计数收集**
 
-只做 `.venv/bin/python -m pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），按 `test_runner.py` MODES 的 marker 表达式本地归类计数，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs-stm/managements/test-coverage.md` 快照更新使用。
+只做 `.venv/bin/python -m pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），按 `test-runner.py` MODES 的 marker 表达式本地归类计数，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs-stm/managements/test-coverage.md` 快照更新使用。
 
 ```bash
 .venv/bin/python scripts/collect-test-coverage.py
@@ -872,7 +873,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 **说明**：
 - 只收集不执行——测试体不会运行，不影响测试结果，也不会触发真实数据源 / LLM 调用
 - 项数随版本迭代变化，属撰写时快照，精确计数以本脚本实时输出为准
-- 计数口径与 `test_runner.py` 的 `MODES` marker 表达式对齐（verify / dev-verify 等组合模式同样本地复现）
+- 计数口径与 `test-runner.py` 的 `MODES` marker 表达式对齐（verify / dev-verify 等组合模式同样本地复现）
 
 ### 质量类
 
@@ -893,34 +894,34 @@ sh .githooks/install-hooks.sh --off   # 停用
 
 ### 诊断类
 
-**`perf_report.py` — 端到端性能基准**
+**`perf-report.py` — 端到端性能基准**
 
 生成 20+ 品种 + 3 年模拟持仓，运行 basic/both 报告生成管线，测量各阶段耗时。
 
 ```bash
-.venv/bin/python scripts/perf_report.py
+.venv/bin/python scripts/perf-report.py
 ```
 
 **输出**：`docs-stm/tmp/better-investment-performance-test-report.md`
 
 **目标**：basic 模式总耗时 < 60s
 
-**`perf_view.py` — 性能历史趋势查看**
+**`perf-view.py` — 性能历史趋势查看**
 
 读取 `data/state/perf_history.jsonl`（由 `PerfCollector` 在每次报告生成时自动追加），按版本和报告类型分组统计，输出版本间性能趋势对比。
 
 ```bash
 # 输出全部历史趋势到 stdout
-.venv/bin/python scripts/perf_view.py
+.venv/bin/python scripts/perf-view.py
 
 # 仅看 full 类型报告的性能趋势
-.venv/bin/python scripts/perf_view.py --report-type full
+.venv/bin/python scripts/perf-view.py --report-type full
 
 # 仅看最近 30 条记录
-.venv/bin/python scripts/perf_view.py --last 30
+.venv/bin/python scripts/perf-view.py --last 30
 
 # 同时写入 docs-stm/tmp/perf_trend.md
-.venv/bin/python scripts/perf_view.py --save
+.venv/bin/python scripts/perf-view.py --save
 ```
 
 **输出列说明**：
@@ -956,19 +957,34 @@ sh .githooks/install-hooks.sh --off   # 停用
 
 CSI 风格指数可用性探测（风格因子回归前置决策闸门），决定风格因子回归是否可用。
 
-**`svg_geom_check.py` / `svg_pixel_check.py` / `svg_text_overflow_check.py` — README SVG 架构图检查三件套**
+**`probe-push2.py` — 东方财富 push2 连通性诊断**
+
+东方财富 push2 连通性探测，用于区分「程序缺陷」与「网络环境拦截」。部分电脑运行报告时 push2 频繁出现 `Server disconnected without sending a response`（服务器接受 TCP 连接但未返回响应即断开），触发熔断退避（60s→300s→900s→3600s）后降级到备用链路——用此脚本可快速定位根因，决定是否需要调整代码或加速降级。
+
+```bash
+.venv/bin/python scripts/probe-push2.py     # 默认探测 3 次
+```
+
+判读：
+- **三次全部成功** → 网络正常，之前失败为临时抖动/时段性，无需改动
+- **三次全失败、且 curl 对照也失败** → 网络/防火墙/代理拦截 push2，属环境问题（curl_cffi 指纹大概率无效，可考虑加速降级）
+- **脚本失败、curl 对照成功** → httpx/TLS 指纹被 WAF 拦截，curl_cffi 浏览器指纹方案才有价值
+
+curl 对照命令：`curl -s "https://push2.eastmoney.com/api/qt/stock/get?secid=1.000001&fields=f58"`。纯只读探测，不写缓存/熔断/降级记录，无副作用。
+
+**`check-svg-geom.py` / `check-svg-pixel.py` / `check-svg-text-overflow.py` — README SVG 架构图检查三件套**
 
 README 首屏架构图（`src/static/architecture.svg` / `llm-chain.svg` / `capabilities.svg`）的渲染质量检查，改图后用于验证文本不越界/重叠。
 
 ```bash
 # 几何审查：文本越界 / 文本重叠 / 矩形对齐（估算字体宽度）
-.venv/bin/python scripts/svg_geom_check.py <svg路径>
+.venv/bin/python scripts/check-svg-geom.py <svg路径>
 
 # 像素检查：检测文本是否越出卡片右缘（副标题行区域找亮色像素）
-.venv/bin/python scripts/svg_pixel_check.py <png路径>
+.venv/bin/python scripts/check-svg-pixel.py <png路径>
 
 # 精确检测文字色像素是否越出卡片右缘
-.venv/bin/python scripts/svg_text_overflow_check.py <png路径>
+.venv/bin/python scripts/check-svg-text-overflow.py <png路径>
 ```
 
 三个脚本均接受图片路径参数，配合 `src/static/` 下 SVG 渲染出的 PNG 使用。
@@ -1086,19 +1102,19 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 
 ```bash
 # 完整采样（调用 LLM API 对 10 组数据生成分析）
-.venv/bin/python scripts/llm_hallucination_sampler.py
+.venv/bin/python scripts/llm-hallucination-sampler.py
 
 # 仅测试特定模块（默认 expert_review）
-.venv/bin/python scripts/llm_hallucination_sampler.py --module health_check
+.venv/bin/python scripts/llm-hallucination-sampler.py --module health_check
 
 # 仅测试特定数据集（1-indexed）
-.venv/bin/python scripts/llm_hallucination_sampler.py --dataset 1,3,5
+.venv/bin/python scripts/llm-hallucination-sampler.py --dataset 1,3,5
 
 # 跳过 API 调用，只构建 prompt 验证结构
-.venv/bin/python scripts/llm_hallucination_sampler.py --dry-run
+.venv/bin/python scripts/llm-hallucination-sampler.py --dry-run
 
 # 跳过缓存强制重新生成
-.venv/bin/python scripts/llm_hallucination_sampler.py --force
+.venv/bin/python scripts/llm-hallucination-sampler.py --force
 ```
 
 **输出**：

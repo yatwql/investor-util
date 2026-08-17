@@ -5,7 +5,7 @@
 测量各阶段耗时，输出性能报告 Markdown。
 
 用法：
-  python scripts/perf_report.py
+  python scripts/perf-report.py
 
 输出：
   docs-stm/tmp/better-investment-performance-test-report.md

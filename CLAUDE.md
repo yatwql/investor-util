@@ -12,9 +12,9 @@
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **Python 环境**：所有 Python 命令一律使用项目虚拟环境解释器——Linux/macOS 用 `.venv/bin/python`，Windows 用 `.venv\Scripts\python.exe`；**禁止**裸 `python3`/`python`/`pytest`（会命中系统解释器，缺失 pandas 等依赖，报 `No module named 'pandas'`）。运行测试、脚本、CLI 均同；本文件内所有 `python ...`/`pytest ...` 示例均已按此改写。
 - **测试**：`src/test/test_*.py`，执行 `.venv/bin/python -m pytest src/test/`
-  - **提交前门禁（P0）**：必须通过 `.venv/bin/python scripts/test_runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 commit
-  - **合入门禁（P1）**：合并到 master 前必须通过 `.venv/bin/python scripts/test_runner.py --mode verify`（核心模块单元测试），否则不得 merge
-  - **发布门禁（P2）**：发布版本前必须通过 `.venv/bin/python scripts/test_runner.py --mode verify,regression`（单元+场景验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 release
+  - **提交前门禁（P0）**：必须通过 `.venv/bin/python scripts/test-runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 commit
+  - **合入门禁（P1）**：合并到 master 前必须通过 `.venv/bin/python scripts/test-runner.py --mode verify`（核心模块单元测试），否则不得 merge
+  - **发布门禁（P2）**：发布版本前必须通过 `.venv/bin/python scripts/test-runner.py --mode verify,regression`（单元+场景验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 release
   > P1/P2 的完整要求（含手动验证项）见 `testplan.md` → §4 回归测试清单 / §6.3 门禁
 - **CI 辅助检查**：`.venv/bin/ruff format --check`（代码格式一致性），非阻塞门禁——格式问题可通过 `.venv/bin/ruff format` 自动修复，不阻止合并/发布
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退。新增功能时，**必须**同步编写测试用例覆盖。测试用例应直接验证缺陷场景的具体断言，而非仅测正常路径。

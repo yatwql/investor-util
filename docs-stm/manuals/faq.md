@@ -112,11 +112,11 @@ echo 'export VENV_PATH=/path/to/venvs/investor-util' >> ~/.bashrc && source ~/.b
 
 ```bash
 # Linux（Docker / Jenkins / GitHub Actions）
-/path/to/venvs/investor-util/bin/python scripts/test_runner.py --mode regression
+/path/to/venvs/investor-util/bin/python scripts/test-runner.py --mode regression
 /path/to/venvs/investor-util/bin/python -m src.python.tui.tui
 
 # Windows（部署脚本）
-& "D:\path\to\venvs\investor-util\Scripts\python.exe" scripts\test_runner.py --mode regression
+& "D:\path\to\venvs\investor-util\Scripts\python.exe" scripts\test-runner.py --mode regression
 & "D:\path\to\venvs\investor-util\Scripts\python.exe" src\python\tui\tui.py
 ```
 
@@ -403,7 +403,7 @@ A: 可以。在 `llm_settings.json` 中设置对应模块的 `output_brief_{模�
 
 **Q: 如何评估 LLM 输出的准确性，防止幻觉？**
 
-A: 使用 `scripts/llm_hallucination_sampler.py` 对 10 组标准化持仓数据进行采样测试。脚本调用当前 prompt 配置生成 LLM 分析，通过事实校验器自动验证数值一致性、品种存在性和排名正确性，生成幻觉率报告到 `docs-stm/tmp/hallucination-report.md`。目标幻觉率 < 5%，每次 prompt 重大修改后应重新采样。详见 [`developer-guide.md`](../managements/developer-guide.md#llm-幻觉率采样测试)。
+A: 使用 `scripts/llm-hallucination-sampler.py` 对 10 组标准化持仓数据进行采样测试。脚本调用当前 prompt 配置生成 LLM 分析，通过事实校验器自动验证数值一致性、品种存在性和排名正确性，生成幻觉率报告到 `docs-stm/tmp/hallucination-report.md`。目标幻觉率 < 5%，每次 prompt 重大修改后应重新采样。详见 [`developer-guide.md`](../managements/developer-guide.md#llm-幻觉率采样测试)。
 
 **Q: 调用 LLM 大概需要多少费用？**
 
@@ -658,14 +658,14 @@ A: `data/state/` 存放跨会话持久化的运行时状态文件，目前包含
 - `.degradation_state.json` — 降级状态（各数据源上次成功获取的时间戳）
 - `circuit_breaker.json` — 熔断器状态（Provider 级熔断记忆，跨会话恢复）
 - `rebalance_silence.json` — 再平衡告警静默期
-- `perf_history.jsonl` — **每次报告生成的阶段耗时记录**（供 `scripts/perf_view.py` 做跨版本趋势分析）
+- `perf_history.jsonl` — **每次报告生成的阶段耗时记录**（供 `scripts/perf-view.py` 做跨版本趋势分析）
 - `datasource_health.jsonl` — **每次报告生成时自动执行的数据源健康检查结果**（HTTP 连通性+延迟）
 
 该目录与 `data/cache/` 隔离，**不会被菜单 `[3]`（清理过期缓存）删除**，也不会被 `cleanup_expired()` 扫描。菜单 `[4]`（查看缓存统计）会单独列出该目录的文件数量和大小。如手动删除该目录，程序会自动重建，但会丢失降级记忆（熔断从零开始）和性能历史数据。
 
 **Q: data/state/perf_history.jsonl 有何用途？如何查看？**
 
-A: 每次通过菜单 E/B/L 或 CLI 生成报告时，程序自动记录各阶段耗时（行情获取、数据准备、快照对比、历史走势、LLM+新闻、Excel 生成、HTML 生成等）到该文件。运行 `.venv/bin/python scripts/perf_view.py` 即可查看按版本和报告类型分组的耗时趋势对比表格。可用于发现版本间性能退化。
+A: 每次通过菜单 E/B/L 或 CLI 生成报告时，程序自动记录各阶段耗时（行情获取、数据准备、快照对比、历史走势、LLM+新闻、Excel 生成、HTML 生成等）到该文件。运行 `.venv/bin/python scripts/perf-view.py` 即可查看按版本和报告类型分组的耗时趋势对比表格。可用于发现版本间性能退化。
 
 **Q: data/state/datasource_health.jsonl 有何用途？**
 

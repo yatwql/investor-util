@@ -1,4 +1,4 @@
-"""测试：test_runner.py 环境耗时对照文档自动更新（--update-docs 写入器）
+"""测试：test-runner.py 环境耗时对照文档自动更新（--update-docs 写入器）
 
 覆盖：
   - 环境属性表：同名列原地更新/新机器列追加/OS 与系统版本分行/未知行标签保留原值
@@ -38,7 +38,7 @@ def _load_script(name: str):
 
 @pytest.fixture(scope="module")
 def runner_script():
-    return _load_script("test_runner.py")
+    return _load_script("test-runner.py")
 
 
 pytestmark = [
@@ -491,13 +491,13 @@ class TestDocFileAndArgs:
         assert target.read_text(encoding="utf-8") == doc  # 未落盘
 
     def test_parse_args_update_docs_implies_machine_info(self, runner_script, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["test_runner.py", "--mode", "bench", "--update-docs"])
+        monkeypatch.setattr(sys, "argv", ["test-runner.py", "--mode", "bench", "--update-docs"])
         args = runner_script.parse_args()
         assert args.update_docs is True
         assert args.machine_info is True
 
     def test_parse_args_default_no_update(self, runner_script, monkeypatch):
-        monkeypatch.setattr(sys, "argv", ["test_runner.py", "--mode", "unit"])
+        monkeypatch.setattr(sys, "argv", ["test-runner.py", "--mode", "unit"])
         args = runner_script.parse_args()
         assert args.update_docs is False
         assert args.machine_info is False

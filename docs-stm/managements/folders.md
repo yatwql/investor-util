@@ -687,7 +687,7 @@ investor-util/
 │   ├── cli.sh                       #   Linux/macOS CLI 命令行包装（无参数默认生成报告 --type both）
 │   ├── launch.ps1                   #   Windows PowerShell 启动脚本
 │   ├── launch.sh                    #   Linux/macOS 启动脚本
-│   ├── test_runner.py               #   测试驱动（pytest 模式封装）
+│   ├── test-runner.py               #   测试驱动（pytest 模式封装）
 │   ├── check-test-markers.py        #   测试标记合规检查
 │   ├── check-task-numbering.py      #   任务编号（plan-/rf-）全局一致性检查
 │   ├── check-task-numbering-hook.py #   Claude Code PostToolUse hook（编辑编号文档后自动校验）
@@ -698,17 +698,17 @@ investor-util/
 │   ├── check-code-traces.py         #   代码注释历史痕迹检查
 │   ├── check-doc-traces.py          #   文档历史痕迹检查
 │   ├── check-semantic-index.py      #   功能语义命名表正反向一致性检查
-│   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
-│   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
-│   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
+│   ├── llm-hallucination-sampler.py #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
+│   ├── perf-report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
+│   ├── perf-view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
 │   ├── probe-csi-factor-indices.py  #   CSI 风格指数可用性探测（风格因子回归前置决策闸门）
 │   ├── probe-push2.py               #   东方财富 push2 连通性诊断（区分网络拦截与程序缺陷，含 curl 对照判读）
 │   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
 │   ├── extract-test-failures.py      #   pytest-html 报告失败用例提取
 │   ├── reproduce_factcheck_corrections.py #   事实校验自动修正复现脚本（重建持仓+缓存 → 重跑数值校验提取修正明细）
-│   ├── svg_geom_check.py             #   SVG 几何审查（文本越界/重叠/矩形对齐，估算字体宽度）
-│   ├── svg_pixel_check.py            #   SVG 像素检查（检测文本越出卡片右缘）
-│   ├── svg_text_overflow_check.py    #   SVG 文字色像素越界精确检测
+│   ├── check-svg-geom.py             #   SVG 几何审查（文本越界/重叠/矩形对齐，估算字体宽度）
+│   ├── check-svg-pixel.py            #   SVG 像素检查（检测文本越出卡片右缘）
+│   ├── check-svg-text-overflow.py    #   SVG 文字色像素越界精确检测
 │   └── smoke-web.py                 #   Web 模式 HTTP 冒烟脚本（test_client 11 项全链路验证，可独立运行）
 ├── docs-stm/                         # 项目文档
 │   ├── manuals/                      #   用户手册分册

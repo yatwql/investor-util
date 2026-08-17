@@ -257,7 +257,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 .venv/bin/python scripts/install-claude-hook.py --uninstall # 停用
 ```
 
-三层兜底已零配置生效（`check-task-numbering.py --ci` 纳入 P0/P2 门禁；`test_runner.py --mode dev-verify` 自动 preflight），上两命令仅提供更早的实时拦截。详见 [开发者指南](../managements/developer-guide.md)。
+三层兜底已零配置生效（`check-task-numbering.py --ci` 纳入 P0/P2 门禁；`test-runner.py --mode dev-verify` 自动 preflight），上两命令仅提供更早的实时拦截。详见 [开发者指南](../managements/developer-guide.md)。
 
 ---
 

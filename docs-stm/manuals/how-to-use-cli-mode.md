@@ -136,7 +136,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 .venv/bin/python -m src.python.cli view-logs --lines 200 --level ERROR
 
 # 查看性能历史趋势
-.venv/bin/python scripts/perf_view.py
+.venv/bin/python scripts/perf-view.py
 ```
 
 ---
@@ -155,7 +155,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | 查看缓存状态 | `.venv/bin/python -m src.python.cli cache --stats` |
 | 数据源健康检查 | `.venv/bin/python -m src.python.cli check-sources` |
 | 查看最近运行日志 | `.venv/bin/python -m src.python.cli view-logs --level WARNING` |
-| 查看性能历史趋势 | `.venv/bin/python scripts/perf_view.py` |
+| 查看性能历史趋势 | `.venv/bin/python scripts/perf-view.py` |
 
 ---
 
@@ -222,7 +222,7 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 
 | 文件 | 内容 | 查看方式 |
 |:-----|:------|:---------|
-| `perf_history.jsonl` | 各阶段耗时（行情/数据准备/HTML/Excel/LLM 等），含版本号和持仓数量 | `.venv/bin/python scripts/perf_view.py` |
+| `perf_history.jsonl` | 各阶段耗时（行情/数据准备/HTML/Excel/LLM 等），含版本号和持仓数量 | `.venv/bin/python scripts/perf-view.py` |
 | `datasource_health.jsonl` | 全量数据源 HTTP 连通性检查结果 + 延迟 | 同上命令 |
 
 这些记录自动积累，可用于跨版本性能退化检测和异常波动排查，无需手动触发。

@@ -5,10 +5,10 @@
 输出版本间性能趋势对比 Markdown 表格。
 
 用法：
-  python scripts/perf_view.py                          # 输出到 stdout
-  python scripts/perf_view.py --save                   # 同时写入 docs-stm/tmp/perf_trend.md
-  python scripts/perf_view.py --report-type full       # 仅查看 full 类型
-  python scripts/perf_view.py --last 30                # 仅查看最近 30 条记录
+  python scripts/perf-view.py                          # 输出到 stdout
+  python scripts/perf-view.py --save                   # 同时写入 docs-stm/tmp/perf_trend.md
+  python scripts/perf-view.py --report-type full       # 仅查看 full 类型
+  python scripts/perf-view.py --last 30                # 仅查看最近 30 条记录
 """
 
 from __future__ import annotations

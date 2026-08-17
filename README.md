@@ -98,7 +98,7 @@
 - **多 Provider 链式分发** — `llm_providers.json` 支持 priority（顺序递补）/ weighted（加权随机）/ cost_first（低成本优先）/ fallback_only（仅故障降级）四种策略，任一 Provider 失败自动递补
 - **Extended Thinking** — 支持 Claude、DeepSeek（Anthropic 兼容端点）和 Gemini 2.5 的扩展思考模式，按模块独立开启
 - **每模块独立控制** — 菜单 `S` 交互切换 5 个 LLM 模块的启停，立即生效无需重启
-- **LLM 幻觉率评估** — `scripts/llm_hallucination_sampler.py` 对 10 组标准化持仓数据采样，事实校验器自动验证数值/品种/排名正确性
+- **LLM 幻觉率评估** — `scripts/llm-hallucination-sampler.py` 对 10 组标准化持仓数据采样，事实校验器自动验证数值/品种/排名正确性
 
 ![](src/static/llm-chain.svg)
 
@@ -133,7 +133,7 @@
 
 - **自动阶段计时** — 每次报告生成自动记录各阶段耗时（行情获取/数据准备/快照对比/历史走势/HTML 生成/Excel 生成/LLM+新闻），持久化到 `data/state/perf_history.jsonl`
 - **数据源健康检查** — 每次报告生成时后台并行执行全量数据源 HTTP 连通性检测，结果存入 `data/state/datasource_health.jsonl` 并实时反映在报告 #18 数据源可用性矩阵章节
-- **趋势查看工具** — `scripts/perf_view.py` 读取历史记录，输出版本间耗时对比 Markdown 表格，用于多版本间性能退化检测
+- **趋势查看工具** — `scripts/perf-view.py` 读取历史记录，输出版本间耗时对比 Markdown 表格，用于多版本间性能退化检测
 
 ### 🏆 基金评价
 
