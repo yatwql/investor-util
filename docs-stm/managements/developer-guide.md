@@ -835,7 +835,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 
 **`calibrate-dedup-threshold.py` — 新闻去重阈值校准**
 
-新闻标题去重（同源/跨源两档阈值 + 中文 bigram）在每次报告运行时自动记录"边界案例"到 `data/cache/dedup_anchors.jsonl`。积累足够锚点后，用此脚本分析当前阈值是否合理。
+新闻标题去重（同源/跨源安全区分级 + 候选区阶梯 + 方向对立防护，阈值见 `news_dedup.py` 校准常量）在每次报告运行时自动记录"边界案例"到 `data/cache/dedup_anchors.jsonl`。积累足够锚点后，用此脚本分析当前阈值是否合理。
 
 ```bash
 # 分析全部锚点，输出建议
