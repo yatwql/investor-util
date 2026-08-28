@@ -206,6 +206,32 @@ class TestDedupByTitle(unittest.TestCase):
         result = _dedup_by_title(items)
         self.assertEqual(len(result), 2)
 
+    def test_cross_source_roundup_closing_terminology_synonym_merged(self) -> None:
+        """跨源：收评/午评语义同义，收盘/午评归一为收评后同一收评簇应合并。
+
+        背景：港股每日收评，新浪用"收评"、东方财富用"收盘"，二者同义但此前
+        未被归一，导致"港股收评恒指涨0.07%…"与"8月18日港股收盘恒指涨0.07%…"
+        只共享 2 个 bigram（恒指+指涨）被漏判保留两条。校准数据发现该漏判簇。
+        归一化后 overlap=4、ratio≈0.54（≥安全区 0.50）→ 应合并。
+        """
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("港股收评：恒指涨0.07% 科指跌0.9% 芯片股走弱 生物医药板块活跃", "新浪财经"),
+            self._make_item("8月18日港股收盘：恒指涨0.07% 恒生科技指数跌0.9%", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 1)
+
+    def test_cross_source_roundup_closing_terminology_synonym_merged_v2(self) -> None:
+        """跨源：另一条收评/收盘对的归一化合并（同校验，多日样本验证）。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("港股收评：恒指涨1.21% 科指涨1.40% 黄金股集体上涨 锂矿概念活跃", "新浪财经"),
+            self._make_item("8月21日港股收盘：恒指涨1.21% 恒生科技指数涨1.4%", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 1)
+
     def test_substring_dedup(self) -> None:
         """子串包含去重：短标题(≥6字)完全出现在长标题中则合并。"""
         from src.python.providers.news_aggregator import _dedup_by_title

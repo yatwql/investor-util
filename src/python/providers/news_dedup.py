@@ -117,6 +117,13 @@ def _normalize_title(title: str) -> str:
         if title.startswith(prefix):
             title = title[len(prefix) :]
             break
+    # 同义收盘术语归一（收评/收盘/午评）：三者为同一收评簇语义（每日/午间
+    # 市场收盘汇总），只在标题开头时被上方前缀剥离，出现在标题中段（如
+    # "港股收评""港股午评"）会保留差异，导致相同收评簇共享 bigram 不足而漏判。
+    # 校准发现 cross_skip 漏判簇（"港股收评恒指涨0.07%…" vs "8月18日港股收盘
+    # 恒指涨0.07%…"）。归一为"收评"后两边带上同一 bigram 对齐，overlap 由 2 升至
+    # 4、ratio≥0.50，进入安全区合并；且仅增不减，不破坏既有合并。
+    title = title.replace("收盘", "收评").replace("午评", "收评")
     # 过滤通用数字模式，避免跨源去重时不同新闻因共享
     # "20%""25亿"等数字模式而获得虚高 SequenceMatcher 比率。
     # 日期模式（2026年/7月/8日）已在 _dedup_by_title 的 _RATIO_CLEAN 中处理，
