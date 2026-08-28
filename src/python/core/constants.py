@@ -70,10 +70,11 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
     #   input: 标准输入（缓存未命中）——含 "peak" 子段的模型即闲时价（默认价）
     #   output: 输出
     #   input_cache_hit: 缓存命中输入（可选，默认等于 input 即无折扣）
-    #   peak: 高峰价子段（可选，仅 DeepSeek 峰谷定价模型有）——高峰时段按此计费，
-    #         其余时段按 base 价（input/output/input_cache_hit）。时段见下方
-    #         PRICING_PEAK_PERIODS / PRICING_IDLE_PERIODS（可经 llm_settings.json
-    #         → pricing.peak_periods / idle_periods 覆盖）。
+    #   peak: 高峰价子段（可选，仅 DeepSeek 峰谷定价模型有）——工作日高峰时段按此
+    #         计费，其余时段按 base 价（input/output/input_cache_hit）。时段见下方
+    #         PRICING_PEAK_PERIODS / PRICING_IDLE_PERIODS；周末全天按闲时价（2026-08-23
+    #         起 DeepSeek 官方周末统一低谷价），见 PRICING_WEEKEND_ALWAYS_IDLE。
+    #         均可经 llm_settings.json → pricing 段覆盖。
     # 通用前缀（如 "claude-sonnet-4-"）用作 startswith() 回退匹配，
     # 覆盖所有日期戳变体（如 claude-sonnet-4-20250514），避免费用显示 "-"。
     "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
@@ -118,16 +119,20 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
 }
 
 # ── LLM 峰谷定价时段（DeepSeek 官方方案，北京时间）══ 唯一默认源 ══
-# 高峰时段为 9:00–12:00、14:00–18:00；闲时为其余时间（闲时价 = MODEL_PRICING 中
-# 含 "peak" 子段模型的 base 价）。pricing.py 以此为基，可从 llm_settings.json →
-# pricing.peak_periods / idle_periods / timezone 覆盖。
+# 工作日高峰时段为 9:00–12:00、14:00–18:00；闲时为其余时间（闲时价 = MODEL_PRICING
+# 中含 "peak" 子段模型的 base 价）。周末（周六/周日）全天按闲时价计费，不区分峰谷
+# （2026-08-23 起生效）。pricing.py 以此为基，可从 llm_settings.json → pricing 段
+# （peak_periods / idle_periods / timezone / weekend_always_idle）覆盖。
 # 单位：当日 00:00 起算的分钟数（闭区间 [start, end]）。
 
-# 高峰时段（分钟）——9:00–12:00、14:00–18:00
+# 高峰时段（分钟）——9:00–12:00、14:00–18:00（仅工作日生效）
 PRICING_PEAK_PERIODS: list[tuple[int, int]] = [(9 * 60, 12 * 60), (14 * 60, 18 * 60)]
 
 # 闲时时段（分钟）——空列表 = 高峰之外的其余时间均为闲时
 PRICING_IDLE_PERIODS: list[tuple[int, int]] = []
+
+# 周末全天按闲时价计费（周六/周日不再区分峰谷，2026-08-23 起 DeepSeek 官方方案）
+PRICING_WEEKEND_ALWAYS_IDLE: bool = True
 
 # 峰谷时段判定所用 IANA 时区（默认北京时间）
 PRICING_TIMEZONE: str = "Asia/Shanghai"

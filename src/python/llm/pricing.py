@@ -1,8 +1,10 @@
 """LLM 定价模块 — 模型费用估算与定价配置管理。
 
-支持峰谷定价（DeepSeek 官方方案）：含 ``peak`` 高峰价子段的模型，在高峰时段
-（默认北京时间 9:00–12:00、14:00–18:00）按高峰价计费，其余时段（闲时）按
-base 价计费。时段与时区可由 ``llm_settings.json → pricing`` 段覆盖。
+支持峰谷定价（DeepSeek 官方方案）：含 ``peak`` 高峰价子段的模型，在工作日高峰
+时段（默认北京时间 9:00–12:00、14:00–18:00）按高峰价计费，其余时段（闲时）按
+base 价计费；周末（周六/周日）全天一律按闲时价计费，不区分峰谷（2026-08-23
+起 DeepSeek 官方方案）。时段、时区与周末规则可由 ``llm_settings.json → pricing``
+段覆盖。
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from src.python.core.constants import (
     PRICING_IDLE_PERIODS as _DEFAULT_IDLE_PERIODS,
     PRICING_PEAK_PERIODS as _DEFAULT_PEAK_PERIODS,
     PRICING_TIMEZONE as _DEFAULT_TIMEZONE,
+    PRICING_WEEKEND_ALWAYS_IDLE as _DEFAULT_WEEKEND_ALWAYS_IDLE,
 )
 
 logger = logging.getLogger("invest")
@@ -27,6 +30,7 @@ __all__ = [
     "PRICING_PEAK_PERIODS",
     "PRICING_IDLE_PERIODS",
     "PRICING_TIMEZONE_NAME",
+    "PRICING_WEEKEND_ALWAYS_IDLE",
     "reload_pricing",
     "estimate_cost",
 ]
@@ -104,12 +108,18 @@ CURRENCY_SYMBOLS: dict[str, str] = {
 PRICING_PEAK_PERIODS: list[tuple[int, int]] = list(_DEFAULT_PEAK_PERIODS)
 PRICING_IDLE_PERIODS: list[tuple[int, int]] = list(_DEFAULT_IDLE_PERIODS)
 
+# 周末全天按闲时价计费（周六/周日不再区分峰谷）——默认取 constants.py，可通过
+# llm_settings.json → pricing.weekend_always_idle 覆盖
+PRICING_WEEKEND_ALWAYS_IDLE: bool = bool(_DEFAULT_WEEKEND_ALWAYS_IDLE)
+
 # 峰谷判定时区（IANA 名称）与编译后的 ZoneInfo 对象；加载失败回落本地时间
 PRICING_TIMEZONE_NAME: str = _DEFAULT_TIMEZONE
 PRICING_TZ: Any = _load_timezone(PRICING_TIMEZONE_NAME)
 
 # 非模型键：pricing 段中不作模型合并的元字段
-_NON_MODEL_PRICING_KEYS: frozenset[str] = frozenset({"currency", "timezone", "peak_periods", "idle_periods"})
+_NON_MODEL_PRICING_KEYS: frozenset[str] = frozenset(
+    {"currency", "timezone", "peak_periods", "idle_periods", "weekend_always_idle"}
+)
 
 # 延迟加载标记 — reload_pricing() 首次调用 estimate_cost() 时执行
 _PRICING_LOADED: bool = False
@@ -130,13 +140,31 @@ def _effective_minute(at_time: datetime | None) -> int:
     return at_time.hour * 60 + at_time.minute
 
 
-def _is_peak_minute(minute: int) -> bool:
-    """分钟是否属于高峰时段。
+def _is_weekend(at_time: datetime | None) -> bool:
+    """待判定时刻（定价时区）是否周末（周六/周日）。
 
-    - peak_periods 非空时，高峰 = 这些时段，闲时 = 其余时间（官方方案「其余为空闲时段」）
-    - peak_periods 为空、仅 idle_periods 非空时，闲时 = 这些时段，高峰 = 其余时间
-    - 两者均空 → 无峰谷定价，始终按 base 价
+    naive datetime 视为已在定价时区（与 _effective_minute 一致，便于测试）。
     """
+    tz = PRICING_TZ
+    if at_time is None:
+        now = datetime.now(tz) if tz else datetime.now()
+        return now.weekday() >= 5
+    if at_time.tzinfo is not None and tz is not None:
+        at_time = at_time.astimezone(tz)
+    return at_time.weekday() >= 5
+
+
+def _is_peak_minute(minute: int, weekend: bool = False) -> bool:
+    """分钟是否属于高峰时段（仅工作日；周末恒为闲时）。
+
+    高峰时段仅在工作日（周一至周五）生效：peak_periods 非空时，高峰 = 这些时段，
+    闲时 = 其余时间（官方方案「其余为空闲时段」）；peak_periods 为空、仅
+    idle_periods 非空时，闲时 = 这些时段，高峰 = 其余时间；两者均空 → 无峰谷定价，
+    始终按 base 价。PRICING_WEEKEND_ALWAYS_IDLE 为真且为周末时，无论时段一律返回
+    False（闲时价）。
+    """
+    if PRICING_WEEKEND_ALWAYS_IDLE and weekend:
+        return False
     if not PRICING_PEAK_PERIODS and not PRICING_IDLE_PERIODS:
         return False
     if PRICING_PEAK_PERIODS:
@@ -151,13 +179,16 @@ def reload_pricing() -> None:
     - "timezone" 字段（可选，默认 "Asia/Shanghai"）设定峰谷判定时区。
     - "peak_periods" / "idle_periods" 字段（可选，"HH:MM-HH:MM" 列表）设定
       高峰/闲时段，缺省沿用 constants.py 内置时段。
+    - "weekend_always_idle" 字段（可选，默认 True）设定周末（周六/周日）是否
+      全天按闲时价计费、不区分峰谷（DeepSeek 官方方案）。
     - 其余字段按模型名合并到 PRICING_MERGED（文件配置优先级高于内置默认）。
       文件中的 input_cache_hit 为可选字段，缺失时继承内置默认值（如内置也无则等于 input）。
-      含 "peak" 子段的模型支持峰谷定价：高峰时段按 peak 子段价格，其余时段按 base 价。
+      含 "peak" 子段的模型支持峰谷定价：工作日高峰时段按 peak 子段价格，
+      其余时段（含周末全天）按 base 价。
     """
     global PRICING_CURRENCY
     global PRICING_PEAK_PERIODS, PRICING_IDLE_PERIODS
-    global PRICING_TIMEZONE_NAME, PRICING_TZ
+    global PRICING_TIMEZONE_NAME, PRICING_TZ, PRICING_WEEKEND_ALWAYS_IDLE
     try:
         from src.python.config import get_llm_config
 
@@ -181,6 +212,10 @@ def reload_pricing() -> None:
                 parsed_idle = _parse_periods(file_pricing.get("idle_periods"))
                 if parsed_idle is not None:
                     PRICING_IDLE_PERIODS[:] = parsed_idle
+                # 周末全天按闲时价（可选，默认 True）
+                weekend_flag = file_pricing.get("weekend_always_idle")
+                if isinstance(weekend_flag, bool):
+                    PRICING_WEEKEND_ALWAYS_IDLE = weekend_flag
                 # 模型定价合并（含高峰价子段 peak）
                 for model, prices in file_pricing.items():
                     if model in _NON_MODEL_PRICING_KEYS or not isinstance(prices, dict):
@@ -221,7 +256,8 @@ def estimate_cost(
     未知模型返回 "-"。
     货币符号由 PRICING_CURRENCY 决定（自 llm_settings.json → pricing.currency）。
     若存在缓存命中 token，按 input_cache_hit 费率计算（通常为 input 的 10%）。
-    含 "peak" 高峰价子段的模型，在高峰时段按 peak 价计费，其余时段按 base（闲时）价。
+    含 "peak" 高峰价子段的模型，在工作日高峰时段按 peak 价计费，其余时段按
+    base（闲时）价；周末全天一律按 base（闲时）价（PRICING_WEEKEND_ALWAYS_IDLE）。
 
     Args:
         model: 模型名称
@@ -248,10 +284,10 @@ def estimate_cost(
                 break
     if not pricing:
         return "-"
-    # 峰谷定价：命中高峰时段时切换到高峰价子段
+    # 峰谷定价：工作日命中高峰时段（周末恒闲时）时切换到高峰价子段
     effective: dict[str, float | dict[str, float]] = pricing
     peak = pricing.get("peak")
-    if isinstance(peak, dict) and _is_peak_minute(_effective_minute(at_time)):
+    if isinstance(peak, dict) and _is_peak_minute(_effective_minute(at_time), _is_weekend(at_time)):
         effective = peak
     cache_miss = input_tokens - cache_hit_input_tokens
     cost = cache_miss / 1_000_000 * float(effective["input"]) + output_tokens / 1_000_000 * float(effective["output"])

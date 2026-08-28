@@ -1025,13 +1025,16 @@ reload_pricing() → 合并 llm_settings.json → pricing
 ### 10.4 峰谷定价（DeepSeek）
 
 `MODEL_PRICING` 中含 `"peak"` 高峰价子段的模型（`deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat`）
-采用峰谷定价：高峰时段按 `peak` 子段单价计费，其余时段（闲时）按 base 单价计费。
+采用峰谷定价：工作日高峰时段按 `peak` 子段单价计费，其余时段（闲时，含周末全天）按 base 单价计费。
 
-- **高峰时段**（默认）：北京时间 09:00–12:00、14:00–18:00；闲时为其余全部时间
+- **高峰时段**（默认，**仅工作日**生效）：北京时间 09:00–12:00、14:00–18:00；工作日其余时间与
+  **周末（周六/周日）全天**均为闲时（2026-08-23 起 DeepSeek 官方周末统一低谷价，闲时价 = 高峰价的一半）
 - **配置覆盖**：`llm_settings.json → pricing` 段的 `timezone`（IANA 时区名）、
-  `peak_periods` / `idle_periods`（`"HH:MM-HH:MM"` 闭区间列表）可调整时段与时区
+  `peak_periods` / `idle_periods`（`"HH:MM-HH:MM"` 闭区间列表）可调整时段与时区；
+  `weekend_always_idle`（bool，默认 `true`）设为 `false` 时周末恢复按钟点区分峰谷
 - **判定逻辑**：`peak_periods` 非空时高峰 = 这些时段、闲时 = 其余时间；`peak_periods`
-  为空且 `idle_periods` 非空时闲时 = 这些时段、高峰 = 其余时间；两者均空 → 无峰谷
+  为空且 `idle_periods` 非空时闲时 = 这些时段、高峰 = 其余时间；两者均空 → 无峰谷；
+  `weekend_always_idle` 为真且为周末时，无论时段一律按闲时价
 - **无 `"peak"` 的模型**不受时段影响，始终按 base 价计费
 - **计费时刻**：`estimate_cost(..., at_time=...)` 可显式传入判定时刻（naive 视为已在
   定价时区，便于测试）；缺省取当前时间并按定价时区换算
@@ -1280,7 +1283,7 @@ LLM 集成层与系统其他组件的接口：
 
 > 上表为具名模型定价；`MODEL_PRICING` 另有 6 个前缀回退键（`claude-sonnet-4-`/`claude-opus-4-`/`claude-haiku-4-`/`gemini-3.5-`/`gemini-2.5-`/`gemini-2.0-`）用于 startswith 回退匹配日期戳变体，未逐行列示。
 >
-> 峰谷定价模型的「闲时/高峰」两列为非高峰与高峰时段单价（高峰时段为北京时间 09:00–12:00、14:00–18:00，闲时为其外全部时间）；模型条目含 `"peak"` 高峰价子段，时段可经 `pricing` 段 `peak_periods`/`idle_periods`/`timezone` 覆盖。
+> 峰谷定价模型的「闲时/高峰」两列为非高峰与高峰时段单价（高峰时段为北京时间 09:00–12:00、14:00–18:00，**仅工作日生效**；闲时为其外全部时间，**周末全天按闲时价**）；模型条目含 `"peak"` 高峰价子段，时段可经 `pricing` 段 `peak_periods`/`idle_periods`/`timezone`/`weekend_always_idle` 覆盖。
 
 费用按 `(input_tokens × 输入单价 + output_tokens × 输出单价 + cache_hit_tokens × 缓存命中单价) / 1_000_000` 计算。
 

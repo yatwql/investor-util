@@ -407,11 +407,15 @@ class TestCheckTruncation(unittest.TestCase):
 
 
 class TestPricing(unittest.TestCase):
-    """测试 LLM 费用估算、峰谷定价与定价管理。"""
+    """测试 LLM 费用估算、峰谷定价与定价管理（含周末全天闲时规则）。"""
 
-    # 峰谷判定固定时刻（naive 视为已在定价时区）：20:00 闲时、10:00 高峰
-    _IDLE_TIME = datetime(2026, 8, 15, 20, 0)
-    _PEAK_TIME = datetime(2026, 8, 15, 10, 0)
+    # 峰谷判定固定时刻（naive 视为已在定价时区，均为工作日）：
+    #   工作日（2026-08-21 周五）10:00 高峰、20:00 闲时
+    #   周末（2026-08-15 周六）10:00/20:00 均为闲时（DeepSeek 官方周末统一低谷价）
+    _IDLE_TIME = datetime(2026, 8, 21, 20, 0)
+    _PEAK_TIME = datetime(2026, 8, 21, 10, 0)
+    _WEEKEND_PEAK_HOUR_TIME = datetime(2026, 8, 15, 10, 0)
+    _WEEKEND_IDLE_HOUR_TIME = datetime(2026, 8, 15, 20, 0)
 
     def testestimate_cost_known_model(self) -> None:
         """已知模型闲时按 base 价（闲时价）估算。"""
@@ -457,7 +461,7 @@ class TestPricing(unittest.TestCase):
         self.assertEqual(PRICING_MERGED.get("deepseek-v4-flash"), orig.get("deepseek-v4-flash"))
 
     def test_peak_pricing_peak_hour_higher_than_idle(self) -> None:
-        """含 peak 子段的模型高峰时段按高峰价、闲时按 base 价。"""
+        """工作日：含 peak 子段的模型高峰时段按高峰价、闲时按 base 价。"""
         cost_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
         cost_idle = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._IDLE_TIME)
         # 高峰 (3+9)=12 vs 闲时 (1.5+4.5)=6
@@ -465,9 +469,9 @@ class TestPricing(unittest.TestCase):
         self.assertEqual(cost_idle, "¥6.000")
 
     def test_peak_pricing_boundary_inclusive_end(self) -> None:
-        """高峰时段边界闭区间：12:00 属高峰（含端点），13:00 属闲时。"""
-        cost_1200 = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 15, 12, 0))
-        cost_1300 = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 15, 13, 0))
+        """工作日高峰时段边界闭区间：12:00 属高峰（含端点），13:00 属闲时。"""
+        cost_1200 = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 21, 12, 0))
+        cost_1300 = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 21, 13, 0))
         self.assertEqual(cost_1200, "¥12.000")
         self.assertEqual(cost_1300, "¥6.000")
 
@@ -480,7 +484,7 @@ class TestPricing(unittest.TestCase):
         self.assertEqual(cost_peak, "¥18.000")
 
     def test_peak_pricing_cache_hit_uses_peak_rate(self) -> None:
-        """缓存命中 token 在高峰时段按 peak.input_cache_hit 计费。"""
+        """工作日缓存命中 token 在高峰时段按 peak.input_cache_hit 计费。"""
         cost_peak = estimate_cost(
             "deepseek-v4-flash",
             1_000_000,
@@ -503,8 +507,51 @@ class TestPricing(unittest.TestCase):
         self.assertEqual(PRICING_PEAK_PERIODS, [(540, 720), (840, 1080)])
         self.assertEqual(PRICING_IDLE_PERIODS, [])
 
+    # ── 周末全天闲时规则（DeepSeek 官方 2026-08-23 起） ──────────────
+
+    def test_weekend_always_idle_default_on(self) -> None:
+        """默认周末全天按闲时价计费（PRICING_WEEKEND_ALWAYS_IDLE 默认 True）。"""
+        self.assertTrue(_pricing_mod.PRICING_WEEKEND_ALWAYS_IDLE)
+
+    def test_weekend_peak_hour_bills_idle_rate(self) -> None:
+        """周末高峰时段（10:00）也按闲时价计费，不区分峰谷。"""
+        cost_weekend_peak = estimate_cost(
+            "deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._WEEKEND_PEAK_HOUR_TIME
+        )
+        cost_weekend_idle = estimate_cost(
+            "deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._WEEKEND_IDLE_HOUR_TIME
+        )
+        self.assertEqual(cost_weekend_peak, "¥6.000")  # (1.5+4.5)
+        self.assertEqual(cost_weekend_idle, "¥6.000")
+        # 与工作日高峰同钟点对比：周末显著低于工作日高峰
+        cost_workday_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
+        self.assertEqual(cost_workday_peak, "¥12.000")
+
+    def test_weekend_cache_hit_bills_idle_rate(self) -> None:
+        """周末缓存命中输入按闲时 input_cache_hit（0.05）而非高峰价（0.10）计费。"""
+        cost_weekend = estimate_cost(
+            "deepseek-v4-flash",
+            1_000_000,
+            0,
+            cache_hit_input_tokens=1_000_000,
+            at_time=self._WEEKEND_PEAK_HOUR_TIME,
+        )
+        self.assertEqual(cost_weekend, "¥0.050")
+
+    def test_weekend_flag_disabled_restores_peak_on_weekend(self) -> None:
+        """weekend_always_idle=False 时周末恢复按钟点区分峰谷（配置覆盖生效）。"""
+        orig_flag = _pricing_mod.PRICING_WEEKEND_ALWAYS_IDLE
+        try:
+            with patch("src.python.config.get_llm_config", return_value={"pricing": {"weekend_always_idle": False}}):
+                reload_pricing()
+            self.assertFalse(_pricing_mod.PRICING_WEEKEND_ALWAYS_IDLE)
+            cost_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._WEEKEND_PEAK_HOUR_TIME)
+            self.assertEqual(cost_peak, "¥12.000")  # 周末高峰按高峰价
+        finally:
+            _pricing_mod.PRICING_WEEKEND_ALWAYS_IDLE = orig_flag
+
     def test_peak_pricing_custom_periods_from_config(self) -> None:
-        """llm_settings.json 自定义峰谷时段与模型价格后应生效。"""
+        """llm_settings.json 自定义峰谷时段与模型价格后应生效（工作日）。"""
         orig_peak = list(PRICING_PEAK_PERIODS)
         orig_idle = list(PRICING_IDLE_PERIODS)
         orig_tz = _pricing_mod.PRICING_TIMEZONE_NAME
@@ -528,9 +575,9 @@ class TestPricing(unittest.TestCase):
                 reload_pricing()
             self.assertEqual(PRICING_PEAK_PERIODS, [(22 * 60, 23 * 60)])
             self.assertEqual(PRICING_IDLE_PERIODS, [])
-            # 自定义时段下：22:30 高峰、06:00 非高峰（高峰外均为闲时）
-            cost_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 15, 22, 30))
-            cost_off = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 15, 6, 0))
+            # 自定义时段下（工作日 2026-08-21）：22:30 高峰、06:00 非高峰（高峰外均为闲时）
+            cost_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 21, 22, 30))
+            cost_off = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 21, 6, 0))
             self.assertEqual(cost_peak, "¥6.000")  # (2+4)
             self.assertEqual(cost_off, "¥3.000")  # (1+2)
         finally:
