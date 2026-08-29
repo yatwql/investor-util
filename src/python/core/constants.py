@@ -36,7 +36,7 @@ PROJECT_ROOT = _find_project_root()
 # 应用名称（单一来源，TUI 首页 / 启动日志 / Web 首页 / HTML 报告首页 / Excel 首页统一引用）
 APP_NAME = "投资复盘助手"
 
-APP_VERSION = "0.10.15"
+APP_VERSION = "0.10.16-dev"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
