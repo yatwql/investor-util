@@ -4,7 +4,13 @@
 
 ---
 
-## [0.10.15-dev] - 开发中（未发布）
+## [0.10.15] - 2026-08-29
+
+### 版本发布 v0.10.15（2026-08-29）
+
+- **发布流程**：P2 发布门禁通过（`test-runner --mode verify,regression` 3737 通过 0 失败 + code/doc/task-numbering/semantic-index 四检查全绿 + 发布手动验证 `--mode perf,security` 14 通过）；版本号全链一致化至 v0.10.15（constants.py / pyproject.toml / README / 10 份管理文档）；发布数据文档刷新（test-coverage.md / folders.md / datasource 文档核对）。
+- **版本标签**：`git tag v0.10.15` 已打并推送，发布可追溯。
+- **已解决项归档**：v0.10.15-dev 已解决项（rf-288 ~ rf-294）整体迁入 `docs-stm/archive/v0.10.x/archived_review-findings.0.10.x.md` v0.10.15 章节，原文件保留待办区与归档引用。
 
 ### dedup 跨源收盘术语同义归一修复（rf-294）（2026-08-28）
 

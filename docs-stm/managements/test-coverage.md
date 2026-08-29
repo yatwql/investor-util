@@ -1,5 +1,5 @@
 # 测试覆盖统计
-> 文档版本：0.10.15-dev
+> 文档版本：0.10.15
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。`模式对应测试量` 表由 `--mode bench --update-docs` 自动回填本机实测；功能域/分组等子表精确统计请运行 `scripts/collect-test-coverage.py`（或 `pytest src/test/ --collect-only -q`）获取实时计数。
 
