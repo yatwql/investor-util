@@ -206,6 +206,32 @@ class TestDedupByTitle(unittest.TestCase):
         result = _dedup_by_title(items)
         self.assertEqual(len(result), 2)
 
+    def test_cross_source_roundup_closing_terminology_synonym_merged(self) -> None:
+        """跨源：收评/午评语义同义，收盘/午评归一为收评后同一收评簇应合并。
+
+        背景：港股每日收评，新浪用"收评"、东方财富用"收盘"，二者同义但此前
+        未被归一，导致"港股收评恒指涨0.07%…"与"8月18日港股收盘恒指涨0.07%…"
+        只共享 2 个 bigram（恒指+指涨）被漏判保留两条。校准数据发现该漏判簇。
+        归一化后 overlap=4、ratio≈0.54（≥安全区 0.50）→ 应合并。
+        """
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("港股收评：恒指涨0.07% 科指跌0.9% 芯片股走弱 生物医药板块活跃", "新浪财经"),
+            self._make_item("8月18日港股收盘：恒指涨0.07% 恒生科技指数跌0.9%", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 1)
+
+    def test_cross_source_roundup_closing_terminology_synonym_merged_v2(self) -> None:
+        """跨源：另一条收评/收盘对的归一化合并（同校验，多日样本验证）。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("港股收评：恒指涨1.21% 科指涨1.40% 黄金股集体上涨 锂矿概念活跃", "新浪财经"),
+            self._make_item("8月21日港股收盘：恒指涨1.21% 恒生科技指数涨1.4%", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 1)
+
     def test_substring_dedup(self) -> None:
         """子串包含去重：短标题(≥6字)完全出现在长标题中则合并。"""
         from src.python.providers.news_aggregator import _dedup_by_title
@@ -301,6 +327,151 @@ class TestDedupByTitle(unittest.TestCase):
         result = _dedup_by_title(items)
         # ratio≈0.381 < 0.40 走不了梯度规则，但 _tk: 加权后 bg≥3 通过候选区
         self.assertEqual(len(result), 1)
+
+
+class TestDedupFalseMergeGuard(unittest.TestCase):
+    """跨源误合并防护回归测试（rf-290 校准结论，2026-08-17）。
+
+    旧规则（候选区 0.30 + 安全区 0.50 直接合并 + bg=2 梯度 0.40）实测
+    误合并率 ~70-80%：不同事件共享财报/回购/指数/预警/地震等模板词天然
+    产生 3-6 个实体 bigram，英文统一占位符虚高 ratio。以下用例全部来自
+    42560 锚点采样中的人工判定样本，必须保持两条（不合并）。
+    """
+
+    def _make_item(self, title: str, source: str = "东方财富") -> dict:
+        return {"title": title, "_source": source, "url": "http://x.com/" + title[:10]}
+
+    def test_same_company_different_events_kept(self) -> None:
+        """同名不同事件（龙虎榜 vs 控制权变更）不合并——单实体重叠不足。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("兆日科技7月29日龙虎榜数据", "新浪财经"),
+            self._make_item("兆日科技：筹划控制权变更事项 股票停牌", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_different_company_buyback_template_kept(self) -> None:
+        """不同公司回购公告（共享"累计回购A股股份"模板）不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("美的集团：累计回购A股股份金额达69.73亿元", "东方财富"),
+            self._make_item("中远海控：累计回购A股股份29116504股", "新浪财经"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_different_earthquake_kept(self) -> None:
+        """不同地震（共享"发生N级地震"模板）不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("福建三明市尤溪县发生3.5级地震，震源深度8千米", "新浪财经"),
+            self._make_item("日本熊本县发生4.4级地震", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_different_company_earnings_template_kept(self) -> None:
+        """同源不同公司业绩快报（共享"半年度净利润同比增长"模板）不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("宏发股份：2026年半年度净利润同比增长19.89%", "东方财富"),
+            self._make_item("西部矿业：2026年半年度净利润同比增长123%", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_different_target_price_rating_kept(self) -> None:
+        """不同公司目标价/评级（共享"花旗+目标价"骨架）不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("花旗上调Visa目标价", "东方财富"),
+            self._make_item("花旗：ASMPT重申“买入”评级 目标价250港元", "新浪财经"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_different_compute_contract_kept(self) -> None:
+        """不同公司算力服务合同（共享"全资子公司签订算力服务合同"骨架）不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("行云科技：全资子公司签订算力服务补充协议 合同金额增至30.53", "东方财富"),
+            self._make_item("亿田智能旗下全资子公司签订11.06亿元算力资源服务合同", "新浪财经"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_different_index_market_kept(self) -> None:
+        """不同市场指数（共享"指数上涨/下跌 N%"骨架）不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("MSCI亚太指数下跌1%", "东方财富"),
+            self._make_item("越南股指VN指数上涨1%。", "华尔街见闻"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_opposite_direction_kept(self) -> None:
+        """跨源方向对立报道（暂缓加息 vs 将加息）不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("美联储主席沃什或在本次会议暂缓加息", "新浪财经"),
+            self._make_item("城堡证券预计美联储将加息", "华尔街见闻"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_same_source_different_company_kept(self) -> None:
+        """同源不同公司回购公告（ratio 0.7+ 模板骨架）不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("美的集团：累计回购A股股份金额达69.73亿元", "东方财富"),
+            self._make_item("中远海控：累计回购A股股份29116504股", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+
+class TestDedupTokenGradientMerge(unittest.TestCase):
+    """跨源 bg=2 梯度规则（共享英数 token 专名）捕获的真重复。
+
+    旧 bg=2 梯度（ratio≥0.40 即合并）误合并率高（英伟达 Vera Rubin vs
+    英伟达投资同为 bg=2）；新规则要求共享 bigram 含英数/数字 token
+    （CPI/PPI、荣耀IPO、SpaceX 类专名），纯中文公司名共享不触发。
+    """
+
+    def _make_item(self, title: str, source: str = "东方财富") -> dict:
+        return {"title": title, "_source": source, "url": "http://x.com/" + title[:10]}
+
+    def test_english_token_shared_merged(self) -> None:
+        """共享英数 token（CPI/PPI）的同一数据报道合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("CPI同比增长2.5%PPI同比下降0.8%", "东方财富"),
+            self._make_item("统计局公布CPI和PPI数据：CPI涨2.5%PPI降0.8%", "新浪财经"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 1)
+
+    def test_pure_chinese_company_shared_kept(self) -> None:
+        """纯中文公司名共享（英伟达 2 bigram）且事件不同不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("英伟达Vera Rubin正全面加速量产", "东方财富"),
+            self._make_item("英伟达据悉将向Lancium投资至冬30亿美元", "新浪财经"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_same_event_english_entity_merged(self) -> None:
+        """共享英文专名实体（SpaceX）的同一事件合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("美股三大股指小幅高开 SpaceX盘初大跌市值蒸发2050亿美元", "华尔街见闻"),
+            self._make_item("SpaceX股价盘初重挫12%", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 1)
 
 
 class TestFlushAnchorsDedup(unittest.TestCase):

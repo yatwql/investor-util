@@ -1,4 +1,4 @@
-"""测试：test_runner.py 机器信息采集与耗时表格渲染
+"""测试：test-runner.py 机器信息采集与耗时表格渲染
 
 覆盖：
   - 机器信息采集：字段完整性、并行级别映射、Linux 采集读取在 /proc 缺失时回退 None 不崩溃
@@ -39,7 +39,7 @@ def _load_script(name: str):
 
 @pytest.fixture(scope="module")
 def runner_script():
-    return _load_script("test_runner.py")
+    return _load_script("test-runner.py")
 
 
 pytestmark = [

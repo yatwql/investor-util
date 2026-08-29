@@ -1,7 +1,7 @@
 """live 真实网络验证套件（opt-in）。
 
 用途：在需要排查「数据源是否真的可达 / API 是否漂移」时，手工运行
-`python scripts/test_runner.py --mode live`（或 `pytest -m live`）验证真实
+`python scripts/test-runner.py --mode live`（或 `pytest -m live`）验证真实
 数据源/LLM API 连通性与返回结构。
 
 设计约束（与门禁测试严格隔离）：

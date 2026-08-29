@@ -235,6 +235,7 @@ _CHANGE_RATE_KEYWORDS = frozenset(
 # 维度不同，不可直接与收益率比较。检测需同时出现时间词与涨跌动作词
 # （见 _context._is_daily_change_context），句中含持仓主体（代码/名称）时按
 # 该品种 change_pct 校验，无主体（指数/大盘）时跳过。
+# "本日"与报告摘要卡（"本日收益率"）用语一致，纳入时间词族。
 _DAILY_TIME_KEYWORDS = frozenset(
     [
         "今日",
@@ -245,6 +246,7 @@ _DAILY_TIME_KEYWORDS = frozenset(
         "昨天",
         "日内",
         "一天",
+        "本日",
     ]
 )
 _DAILY_MOVE_KEYWORDS = frozenset(
@@ -299,3 +301,10 @@ _INDEX_CODES: frozenset[str] = frozenset(
 
 # 默认容差（百分点）
 _DEFAULT_TOLERANCE_PCT = 1.0
+
+# 主体「紧邻」数值的最大边距（字符）：≤6 视为该数值的明确主体。
+# 句内主体定位（_utils._locate_subject_code）据此做两级决策——紧邻主体
+# 优先采用（同句多主体时各数值各自就近归因，不被单一代码钉扎）；无紧邻
+# 主体时保持代码/全名最近兜底（防远距别名/尾名误覆盖）。6 字符 ≈ 紧贴
+# "主体+收益率+ " 的修饰宽度。
+_ATTACHED_SUBJECT_MAX_DIST = 6

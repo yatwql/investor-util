@@ -12,7 +12,7 @@ from src.python.core.ansi_colors import RED, RESET, YELLOW
 # 日志文件路径（始终以项目根目录为基准，不受 CWD 影响）
 _LOG_BASE = os.path.join(PROJECT_ROOT, "logs")
 # 检测方式（按可靠性降序）：
-#   1. INVEST_RUNNING_TESTS 环境变量（test_runner.py 显式设置，xdist worker 继承）
+#   1. INVEST_RUNNING_TESTS 环境变量（test-runner.py 显式设置，xdist worker 继承）
 #   2. PYTEST_CURRENT_TEST 环境变量（pytest 自身设置）
 #   3. sys.modules 中已加载 pytest（xdist worker 进程，pytest 先于用户代码导入）
 #   4. sys.argv[:3] 包含 "pytest"（直接 python -m pytest）

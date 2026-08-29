@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import re
+
 from src.python.llm.fact_checker._constants import (
     _BENCHMARK_RELATIVE_KEYWORDS,
     _CHANGE_RATE_KEYWORDS,
@@ -149,6 +151,23 @@ def _is_portfolio_level_context(sentence: str, match_start: int) -> bool:
     """
     nearby = sentence[max(0, match_start - 15) : match_start]
     return any(kw in nearby for kw in _PORTFOLIO_KEYWORDS)
+
+
+def _is_portfolio_daily_change_context(sentence: str, match_start: int) -> bool:
+    """判断百分比数值是否在组合单日/当日表现语境中（如"今日组合 +0.21%"）。
+
+    组合当日收益（本日涨跌）与收益率（相对成本）维度不同，且系统不提供组合
+    当日收益基准数据 → 无法校验，跳过，避免回退全局最近邻把当日收益误修正为
+    某个品种收益率。判定：match 前 18 字符内有时间词（今日/本日等），且数值
+    紧邻"组合"标记（"今日组合 +0.21%"、"组合+0.21%"）。与组合级累计收益语境
+    （_is_portfolio_level_context，校验组合总收益率）互补：组合累计收益
+    （"今日组合累计收益30%"）由组合级语境先行校验，本检测仅兜底"组合+时间词"
+    但不含累计/总收益关键词的当日表现句。
+    """
+    if not any(kw in sentence[max(0, match_start - 18) : match_start + 5] for kw in _DAILY_TIME_KEYWORDS):
+        return False
+    nearby = sentence[max(0, match_start - 8) : match_start]
+    return re.search(r"组合\s*[+-]?\s*$", nearby) is not None
 
 
 def _is_contribution_sentence(sentence: str) -> bool:

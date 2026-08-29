@@ -2,7 +2,7 @@
 """测试覆盖计数收集脚本 — 供 test-coverage.md 快照更新。
 
 只做 pytest --collect-only（收集测试项，**不执行测试**），
-按 test_runner.py MODES 的 marker 表达式本地归类计数，
+按 test-runner.py MODES 的 marker 表达式本地归类计数，
 输出各模式/子标记的项数，供 docs-stm/managements/test-coverage.md 更新使用。
 
 用法：
@@ -59,7 +59,7 @@ def main() -> None:
     def count(sel) -> int:
         return sum(1 for _, m in collected if sel(m))
 
-    # ── 模式对应测试量（对齐 test_runner.py MODES marker 表达式）──
+    # ── 模式对应测试量（对齐 test-runner.py MODES marker 表达式）──
     modes = {
         "unit": lambda m: "unit" in m,
         "standard": lambda m: "unit" in m and "edge" not in m and "data" not in m,

@@ -280,7 +280,7 @@ def _exclude_lines() -> list[re.Pattern]:
         re.compile(r"\bP[0-3]\b"),
         re.compile(r"--mode\s+verify"),
         re.compile(r"--mode\s+regression"),
-        re.compile(r"test_runner\.py"),
+        re.compile(r"test-runner\.py"),
         re.compile(r"check-version-consistency\.py"),
         re.compile(r"check-code-traces\.py"),
         re.compile(r"git tag|git pull|打 tag"),

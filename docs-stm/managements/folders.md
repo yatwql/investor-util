@@ -1,5 +1,5 @@
 # 目录结构
-> 文档版本：0.10.14
+> 文档版本：0.10.15
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -7,17 +7,17 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 245 | 58,930 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
+| 主程序代码 | Python | 245 | 59,524 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
 | HTML 报告模板 | HTML | 4 | 3,774 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
-| 辅助脚本 | Python | 23 | 7,394 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、事实校验复现、SVG 架构图检查） |
-| **源代码合计** | — | **272** | **70,413** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **309** | **87,296** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,533 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| 辅助脚本 | Python | 21 | 7,171 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
+| **源代码合计** | — | **273** | **70,784** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **309** | **87,711** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,560 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **4,850** | 含 README.md（194 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,656 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **116** | **46,249** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 105 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 8,950 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| **项目文档** | Markdown | **116** | **46,372** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 105 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 9,067 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 109 | 37,689 | 各版本 changelog/plan/review-findings 等（105 md 37,231 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 0 | 0 | 当前无文件 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -687,7 +687,7 @@ investor-util/
 │   ├── cli.sh                       #   Linux/macOS CLI 命令行包装（无参数默认生成报告 --type both）
 │   ├── launch.ps1                   #   Windows PowerShell 启动脚本
 │   ├── launch.sh                    #   Linux/macOS 启动脚本
-│   ├── test_runner.py               #   测试驱动（pytest 模式封装）
+│   ├── test-runner.py               #   测试驱动（pytest 模式封装）
 │   ├── check-test-markers.py        #   测试标记合规检查
 │   ├── check-task-numbering.py      #   任务编号（plan-/rf-）全局一致性检查
 │   ├── check-task-numbering-hook.py #   Claude Code PostToolUse hook（编辑编号文档后自动校验）
@@ -698,17 +698,15 @@ investor-util/
 │   ├── check-code-traces.py         #   代码注释历史痕迹检查
 │   ├── check-doc-traces.py          #   文档历史痕迹检查
 │   ├── check-semantic-index.py      #   功能语义命名表正反向一致性检查
-│   ├── llm_hallucination_sampler.py  #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
-│   ├── perf_report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
-│   ├── perf_view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
+│   ├── llm-hallucination-sampler.py #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
+│   ├── perf-report.py               #   端到端性能基准测试（独立脚本，mock 外部数据源）
+│   ├── perf-view.py                 #   性能历史趋势查看（读取 perf_history.jsonl -> Markdown 对比表格）
 │   ├── probe-csi-factor-indices.py  #   CSI 风格指数可用性探测（风格因子回归前置决策闸门）
 │   ├── probe-push2.py               #   东方财富 push2 连通性诊断（区分网络拦截与程序缺陷，含 curl 对照判读）
-│   ├── diagnose_gemini_proxy.py     #   Gemini API 代理连通性诊断
 │   ├── extract-test-failures.py      #   pytest-html 报告失败用例提取
-│   ├── reproduce_factcheck_corrections.py #   事实校验自动修正复现脚本（重建持仓+缓存 → 重跑数值校验提取修正明细）
-│   ├── svg_geom_check.py             #   SVG 几何审查（文本越界/重叠/矩形对齐，估算字体宽度）
-│   ├── svg_pixel_check.py            #   SVG 像素检查（检测文本越出卡片右缘）
-│   ├── svg_text_overflow_check.py    #   SVG 文字色像素越界精确检测
+│   ├── check-svg-geom.py             #   SVG 几何审查（文本越界/重叠/矩形对齐，估算字体宽度）
+│   ├── check-svg-pixel.py            #   SVG 像素检查（检测文本越出卡片右缘）
+│   ├── check-svg-text-overflow.py    #   SVG 文字色像素越界精确检测
 │   └── smoke-web.py                 #   Web 模式 HTTP 冒烟脚本（test_client 11 项全链路验证，可独立运行）
 ├── docs-stm/                         # 项目文档
 │   ├── manuals/                      #   用户手册分册

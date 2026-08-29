@@ -97,18 +97,22 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     },
     "pricing": {
         "currency": "CNY",
-        # 峰谷定价时段（DeepSeek 官方方案，北京时间）——模型价格仍以
-        # constants.py MODEL_PRICING 为唯一默认源，此处仅配置峰谷时段/时区：
-        #   timezone      — 峰谷判定时区（IANA 名称，默认 Asia/Shanghai）
-        #   peak_periods  — 高峰时段（"HH:MM-HH:MM" 列表，闭区间）
-        #   idle_periods  — 闲时时段（空列表 = 高峰之外的其余时间均按闲时价）
-        # 含 "peak" 高峰价子段的模型（如 deepseek-v4-*）在高峰时段按 peak 价计费，
-        # 其余时段按 base 价计费；无 "peak" 的模型始终按 base 价计费。模型价格
-        # 覆盖示例（含 peak 子段）："deepseek-v4-flash": {"input": 1.5, "output": 4.5,
-        # "input_cache_hit": 0.05, "peak": {"input": 3.0, "output": 9.0, "input_cache_hit": 0.10}}
+        # 峰谷定价（DeepSeek 官方方案，北京时间，2026-08-23 起）——模型价格仍以
+        # constants.py MODEL_PRICING 为唯一默认源，此处仅配置峰谷时段/时区/周末规则：
+        #   timezone            — 峰谷判定时区（IANA 名称，默认 Asia/Shanghai）
+        #   peak_periods        — 高峰时段（"HH:MM-HH:MM" 列表，闭区间，仅工作日生效）
+        #   idle_periods        — 闲时时段（空列表 = 高峰之外的其余时间均按闲时价）
+        #   weekend_always_idle — 周末（周六/周日）全天按闲时价计费（默认 true，
+        #                          DeepSeek 官方周末统一低谷价，不区分峰谷）
+        # 含 "peak" 高峰价子段的模型（如 deepseek-v4-*）在工作日高峰时段按 peak 价
+        # 计费，其余时段（含周末全天）按 base 价计费；无 "peak" 的模型始终按 base 价。
+        # 模型价格覆盖示例（含 peak 子段）："deepseek-v4-flash": {"input": 1.5,
+        # "output": 4.5, "input_cache_hit": 0.05, "peak": {"input": 3.0, "output": 9.0,
+        # "input_cache_hit": 0.10}}
         "timezone": "Asia/Shanghai",
         "peak_periods": ["09:00-12:00", "14:00-18:00"],
         "idle_periods": [],
+        "weekend_always_idle": True,
         "claude-sonnet-4-6": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.3},
     },
 }

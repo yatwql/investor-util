@@ -119,7 +119,7 @@ class TestToolSelfExemption:
         assert code_traces._is_tool_self("check-xml-traces.py") is True
 
     def test_does_not_exempt_other_scripts(self, code_traces):
-        assert code_traces._is_tool_self("test_runner.py") is False
+        assert code_traces._is_tool_self("test-runner.py") is False
         assert code_traces._is_tool_self("check-version-consistency.py") is False
         assert code_traces._is_tool_self("chart.min.js") is False
 

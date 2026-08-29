@@ -14,7 +14,7 @@ check-code-traces.py 只做负面禁止（禁任务代号/魔法编号），本�
      文档未同步）
 
 表解析基于该表首尾的 HTML 注释标记（<!-- semantic-index:start/end -->），
-与 check-version-consistency.py / test_runner.py 文档写入器同款标记定位习语，
+与 check-version-consistency.py / test-runner.py 文档写入器同款标记定位习语，
 不依赖脆弱的表头正则。标记缺失时报错（须先在文档中补齐标记）。
 
 用法：

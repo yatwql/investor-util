@@ -1,9 +1,9 @@
 # 自我审查问题记录归档 — v0.10.x
 
-> 归档时间：2026-08-06；2026-08-16 二次合并 review-findings.md 已解决项（rf-248 ~ rf-275，v0.10.10 ~ v0.10.13 已发布版本）；2026-08-17 四次合并（rf-282 ~ rf-287，v0.10.14-dev）
+> 归档时间：2026-08-06；2026-08-16 二次合并 review-findings.md 已解决项（rf-248 ~ rf-275，v0.10.10 ~ v0.10.13 已发布版本）；2026-08-17 四次合并（rf-282 ~ rf-287，v0.10.14-dev）；2026-08-29 发布 v0.10.15 合并（rf-288 ~ rf-294）
 > 原始文件：`docs-stm/managements/review-findings.md`
-> 涵盖版本：v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14，已发布；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）+ v0.10.14-dev 批次（2026-08-16 ~ 2026-08-17，未发布、按用户要求提前归档）
-> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-287）摘要行 + 修复方案 + 变更记录；v0.10.14-dev 已解决项（rf-276 ~ rf-287）按用户要求提前归档于 v0.10.14 章节，未完成待办项保留在原文件 review-findings.md
+> 涵盖版本：v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14，已发布；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）+ v0.10.14-dev 批次（2026-08-16 ~ 2026-08-17，未发布、按用户要求提前归档）+ v0.10.15 批次（2026-08-17 ~ 2026-08-29，已发布）
+> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-294）摘要行 + 修复方案 + 变更记录；v0.10.14-dev 已解决项（rf-276 ~ rf-287）按用户要求提前归档于 v0.10.14 章节，v0.10.15 已解决项（rf-288 ~ rf-294）随发布归档于 v0.10.15 章节，未完成待办项保留在原文件 review-findings.md
 
 ---
 
@@ -159,10 +159,25 @@
 | rf-286 | `test_menu_key_coverage` 菜单键集断言未同步日志可视化新增键——`MENU_ITEMS` 自加 `[V]`/`[H]` 后为 19 键，断言仍为旧 17 键，`integration`/`all_no_unit`/`all` 模式必失败（integration 不在 P0 门禁内，`--mode bench` 全量跑才暴露） | `test_tui_routing.py` 期望集补 `V`/`H`（回归断言直接验证缺失键），集成/全量模式复跑通过 | `changelog.md` [0.10.14-dev] |
 | rf-287 | `check-test-markers.py` 标记合规检查的 `KNOWN_MARKERS` 与 `conftest._KNOWN_MARKERS` 漂移——缺 `unit_web`/`integration_cli`/`live` 三个实际在用的标记，导致脚本误报 17 处「未注册标记」、退出码 1（非门禁脚本，漂移未被日常门禁暴露） | 按 conftest 对齐 `check-test-markers.py` 全集（补 `unit_web`/`integration_cli`/`live` 三缺），277 文件 0 违规恢复通过；同步在 conftest 与 check-test-markers 移除死注册 `unit_config_edge`（0 用例） | `changelog.md` [0.10.14-dev] |
 
+### v0.10.15（2026-08-29）
+
+> 发布 v0.10.15 时整体归档已解决项（rf-288 ~ rf-294）。变更详情见 changelog.md [0.10.15] 对应条目。
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-288 | `test-runner.py` MODES `all_no_unit` 用 `-m "not unit"` 构建 pytest 参数会**覆盖** `pytest.ini` 的 `addopts = -m "not live"`，使 opt-in 的 live 真实网络套件（14 项）卷入 `--mode all_no_unit`/bench 计数 | `scripts/test-runner.py` MODES `all_no_unit` marker 改为 `not unit and not live`，与「live 不入门禁」语义对齐；修复后 `--mode all_no_unit` 收集 309，bench `--update-docs` 回填稳定不反复 | `changelog.md` [0.10.15] |
+| rf-289 | 事实校验 `_locate_subject_code` 无法解析省略基金公司前缀的描述性缩写（"电池主题ETF"→561910），回退同句最近邻误路由，把正确 -3.92% 误修正为 -36.3% | `_utils.py` 新增 `_match_descriptive_tail` 描述性尾名匹配（≥3 汉字核心后缀 + 产品后缀，按距锚点距离择优），接入 `_locate_subject_code` 兜底；回归测试 `TestDescriptiveTailMatch` 5 项 | `changelog.md` [0.10.15] |
+| rf-290 | dedup 跨源误合并率高（42560 锚点分层采样 ~70-80% 误合并：不同事件共享模板词天然 3-6 bigram，英文统一占位符虚高 ratio，bg=2 梯度与安全区直接合并误判多） | `news_dedup.py`：`_STOP_BIGRAMS` 扩至 ~280 模板词 + 提取前整体掩码；英文占位符按长度分桶；候选区门槛 0.35；bg=2 梯度 0.375 且含英数 token；安全区分级；跨源方向对立检测；`_normalize_title` 保留空格 + 剥离 N级；ratio 双向取 max。回归测试 `TestDedupFalseMergeGuard` 9 例 + `TestDedupTokenGradientMerge` 3 例 | `changelog.md` [0.10.15] |
+| rf-291 | 事实校验 `_locate_subject_code` 短尾候选未覆盖「核心名+数字代号」缩略（"华安纳斯达克100"→040046），智囊团深度复盘 130.61% 被误归同句最近邻 601939 | `_utils.py` `_leading_token` 改为仅取前导数字串（"100ETF联接基金A"→"100"）生成「核心名+数字代号」短尾候选，接入 `_match_descriptive_tail`；回归测试 `TestSubjectAttributionMulti::test_thinktank_partial_name_short_tail` | `changelog.md` [0.10.15] |
+| rf-292 | 组合单日/当日收益（"今日组合 +0.21%"）无语境保护，回退全局最近邻把当日收益误修正为数值最接近的品种收益率 | `_context.py` 新增 `_is_portfolio_daily_change_context`（前 18 字符时间词 + 紧邻"组合"标记判定），`_numerical.py` 组合级累计收益语境之后跳过；回归测试 `TestSubjectAttributionMulti::test_portfolio_daily_return_not_corrected` | `changelog.md` [0.10.15] |
+| rf-293 | 事实校验 `_evaluate_percent_value` 单代码钉扎：句中恰含 1 个持仓代码时把所有百分比钉扎到该代码，与智囊团复盘相反 | `_locate_subject_code` 重构为「紧邻优先 + 代码/全名最近兜底」统一归因（代码/全名/简称/尾名四级，紧邻优先；无紧邻时句内代码/全名最近兜底）；回归测试 `TestSubjectAttributionMulti` 4 项 | `changelog.md` [0.10.15] |
+| rf-294 | dedup 跨源收盘/午评同日收评簇漏判（“港股收评…” vs “8月18日港股收盘…”仅共享“恒指涨”2 bigram 被 cross_skip，校准 11847 条 skip 中发现 ~40 条真重复） | `news_dedup.py` `_normalize_title` 收盘术语同义归一：`收盘→收评`、`午评→收评`（只增不减，不破坏既有合并）；归一后收评簇 overlap 2→4、ratio≈0.54≥0.50 进入安全区合并。回归测试 `TestDedupByTitle::test_cross_source_roundup_closing_terminology_synonym_merged*` 2 例 | `changelog.md` [0.10.15] |
+
 ## 归档说明
 
-- 本归档涵盖 v0.10.1 ~ v0.10.13 已发布版本的自审修复记录（rf-204~rf-275）与 v0.10.14-dev 已解决项（rf-276~rf-287）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-257 Web 真机验收）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
+- 本归档涵盖 v0.10.1 ~ v0.10.13 已发布版本的自审修复记录（rf-204~rf-275）、v0.10.14-dev 已解决项（rf-276~rf-287）与 v0.10.15 已解决项（rf-288~rf-294）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-257 Web 真机验收）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
 - **二次合并（2026-08-16）**：`docs-stm/managements/review-findings.md`「已解决问题」区 v0.10.10 ~ v0.10.13 已发布版本修复项（rf-248~rf-275）整体迁入本文件对应版本章节。对应 plan.md P4 已完成项（plan-8/25/26/27/28）迁入 `archived_plan.0.10.x.md`、changelog [0.10.9]~[0.10.13] 迁入 `archived_changelog.0.10.x.md`。
 - **三次合并（2026-08-16，dev 批次提前归档）**：按用户要求，仍处 0.10.14-dev 的已解决项（rf-276~rf-281）一并迁入本文件新增 v0.10.14 章节；原 review-findings.md 已解决区清空。后续新增已解决项先登记 review-findings.md，待 v0.10.14 发布后按惯例归档。
 - **四次合并（2026-08-17，dev 批次提前归档）**：按用户要求，续归 v0.10.14-dev 已解决项（rf-282~rf-287）——死参数/遗留文件清理（rf-282/283/284，源自 rf-272 衍生独立项）、smoke-web 竞态修复（rf-285）、bench 菜单键集缺陷（rf-286）、测试标记体系漂移（rf-287）。原 review-findings.md 已解决区再次清空；待办项（含 rf-113/114 交互图表技术债）继续保留在原文件。
+- **五次合并（2026-08-29，发布归档）**：发布 v0.10.15 时，将 v0.10.15-dev 已解决项（rf-288~rf-294）整体迁入本文件新增 v0.10.15 章节——all_no_unit live 卷入修复（rf-288）、事实校验主体归因三处修复（rf-291/292/293，描述性尾名匹配 rf-289）、dedup 跨源误合并率修复（rf-290）与收盘术语同义归一（rf-294）。原 review-findings.md 已解决区清空，仅保留待办区与归档引用。
 - 已关闭项（rf-117/118/120/121 决策已定，不做）与未修复待办项不在此列。

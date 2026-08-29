@@ -1,6 +1,6 @@
 """真实行情/指数连通性验证（opt-in live 套件，不入门禁）。
 
-运行：`python scripts/test_runner.py --mode live` 或 `pytest -m live`。
+运行：`python scripts/test-runner.py --mode live` 或 `pytest -m live`。
 
 断言原则：只校验返回「结构」（字段存在、类型、非空），不校验具体数值，
 容忍真实行情波动（休市、指数涨跌、数据源改字段等）。
