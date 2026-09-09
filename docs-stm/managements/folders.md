@@ -16,10 +16,10 @@
 | **测试用例** | — | — | **5,560 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **4,850** | 含 README.md（194 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,656 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **118** | **46,773** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 3 + archive 105 md），py/txt 不计行 |
+| **项目文档** | Markdown | **119** | **46,919** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 4 + archive 105 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 10 | 9,067 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 109 | 37,689 | 各版本 changelog/plan/review-findings 等（105 md 37,231 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 3 | 401 | 决策跨期反思闭环深入分析 + 信号预消化/质量分级/结构化决策头深入分析 + augur 多智能体借鉴评估（reflection-decision-loop-analysis.md + llm-quality-signal-analysis.md + augur-borrowing-analysis.md） |
+| ├ plan/ | 中间设计文件 | 4 | 547 | 决策跨期反思闭环深入分析 + 信号预消化/质量分级/结构化决策头深入分析 + augur 多智能体借鉴评估 + OpenBB 数据层工程借鉴评估（reflection-decision-loop-analysis.md + llm-quality-signal-analysis.md + augur-borrowing-analysis.md + openbb-data-provider-analysis.md） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -902,7 +902,8 @@ investor-util/
 │   ├── plan/                          #   中间设计文件
 │   │   ├── reflection-decision-loop-analysis.md #   决策跨期反思闭环深入分析（外部 TradingAgents-astock 借鉴评估）
 │   │   ├── llm-quality-signal-analysis.md #   信号预消化/模块质量分级/结构化决策头深入分析（外部 TradingAgents-astock 借鉴评估）
-│   │   └── augur-borrowing-analysis.md #   augur 多智能体投资分析借鉴评估（决策-结算学习/确定性信号沉淀/健壮性三件套）
+│   │   ├── augur-borrowing-analysis.md #   augur 多智能体投资分析借鉴评估（决策-结算学习/确定性信号沉淀/健壮性三件套）
+│   │   └── openbb-data-provider-analysis.md #   OpenBB Platform 数据层工程借鉴评估（标准字段/Fetcher 三段适配契约 + VCR 记录-回放测试）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）

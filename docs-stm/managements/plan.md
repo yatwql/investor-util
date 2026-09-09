@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.10.16-dev
-> **编号源**：`plan-next = 36`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-35，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 39`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-38，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### P4 — 实验功能
 
-> **借用探索候选**（借鉴外部仓库 TradingAgents-astock + BruceLanLan/augur 的机制）：当前迭代已完整发布，以下为借鉴评估识别出的可借用点登记，均按 P4 实验级（缺省关闭、需显式启用）暂存，先设计评估后实施。TradingAgents 借鉴评估（2026-08-29）识别 4 条——**plan-30/31/32/33 均已深入分析**；augur 借鉴评估（2026-09-09）识别 3 条——**plan-30 合并评估 + plan-34/35 已深入分析**。分析文档见 `docs-stm/plan/`：`reflection-decision-loop-analysis.md`、`llm-quality-signal-analysis.md`、`augur-borrowing-analysis.md`。语义名为拟用名，落地前须按「先定语义名再设计」复核。已完成实验项见归档设计文档 `docs-stm/archive/v0.10.x/log-visualization/plan-log-visualization.md`（`plan-10` 日志可视化）。
+> **借用探索候选**（借鉴外部仓库 TradingAgents-astock + BruceLanLan/augur + OpenBB 的机制）：当前迭代已完整发布，以下为借鉴评估识别出的可借用点登记，均按 P4 实验级（缺省关闭、需显式启用）暂存，先设计评估后实施。TradingAgents 借鉴评估（2026-08-29）识别 4 条——**plan-30/31/32/33 均已深入分析**；augur 借鉴评估（2026-09-09）识别 3 条——**plan-30 合并评估 + plan-34/35 已深入分析**；OpenBB Platform 借鉴评估（2026-09-09）识别 3 条——**plan-36/37/38 已深入分析**。分析文档见 `docs-stm/plan/`：`reflection-decision-loop-analysis.md`、`llm-quality-signal-analysis.md`、`augur-borrowing-analysis.md`、`openbb-data-provider-analysis.md`。语义名为拟用名，落地前须按「先定语义名再设计」复核。已完成实验项见归档设计文档 `docs-stm/archive/v0.10.x/log-visualization/plan-log-visualization.md`（`plan-10` 日志可视化）。
 >
 > | # | 任务 | 优先级 | 状态 |
 > |---|------|:------:|:----:|
@@ -36,6 +36,9 @@
 > | **plan-33** | 决策头结构化 + 确定性解析兜底（借鉴 `bind_structured` schema 输出 + `agents/utils/rating.py` 词边界确定性解析）：评级/决策头先走结构化输出，落空时用确定性规则兜底解析（防"评级静默误判/污染绩效统计"这类隐患）。语义名（拟）`decision_header_parse`。 | P4 | 深入分析中（分析见 `llm-quality-signal-analysis.md`） |
 > | **plan-34** | 确定性数值信号沉淀 + live/demo 标签纪律（借鉴 augur `backtest.py` `data_source` 标签 + 排行榜默认 `live_only`）：把我方已有确定性算法评级——市场温度低估/合理/高估、估值分位 tier、尾部风险 VaR、风格因子、再平衡超限——沉淀为可回测记录并附真/合成标签，排行榜/统计默认只算真实，防合成数据冒充真实战绩；与 plan-30 决策记录可合并成一套。语义名（拟）`signal_ledger`。分析见 `augur-borrowing-analysis.md` §建议B。 | P4 | 深入分析中（本条） |
 > | **plan-35** | 健壮性三件套（借鉴 augur）：① `safe_num` 全链路数值归一（防 NaN/±inf 污染下游链）；② 数据源失败「错误即 UX」——provider 失败原因进可读 `data_error` 字段、主链路不中断；③ `doctor` 类自检命令（一次性盘点 key/连通性/缓存/路径，复用现有 `check_sources.py`）。语义名（拟）`robustness_suite`。分析见 `augur-borrowing-analysis.md` §建议C。 | P4 | 深入分析中（本条） |
+> | **plan-36** | 数据源适配契约（借鉴 OpenBB Fetcher 三段式 TET + 标准字段 schema + alias 声明式归一）：定义「数据域标准字段」一份 + 每数据源只实现「参数转译 → 抓取 → 映射到标准字段」三小函数；字段改名/换算用 alias/校验器在解析期归一，替代各 provider 手拼 dict。**只对新增数据源/加字段试点，不回改存量 provider**；不搬 OpenBB 的 Provider 注册元架构/覆盖矩阵/命令路由。语义名（拟）`provider_adapter_contract`。分析见 `openbb-data-provider-analysis.md` §建议A/B。 | P4 | 深入分析中（本条） |
+> | **plan-37** | 数据源记录-回放测试（借鉴 OpenBB pytest-recorder/vcrpy cassette）：对高价值数据源（基金净值/持仓解析）录真实响应进 git 跟踪 cassette，无 `--record` 跑即离线回放——补上「真实响应体的解析/归一路径」的回归覆盖（现有 mock 测试测不到），不违反「测试不碰真网络」隔离纪律；需评估引依赖 vs 自研轻量回放。语义名（拟）`datasource_cassette_test`。分析见 `openbb-data-provider-analysis.md` §建议C。 | P4 | 深入分析中（本条） |
+> | **plan-38** | 数据源凭据声明与就绪指引（借鉴 OpenBB `Provider(credentials=[...])` + 缺失 `"Missing credential ... Check <website>"` 可读报错）：若接入需 API key 的数据源，能声明「此源需 key」并在缺失时给可读指引与就绪提示，而非运行时裸报错。当前免费源为主，**远期/需 key 源时再启用**，可并入 `config` 层 + `check_sources.py`。语义名（拟）`datasource_credential_ready`。分析见 `openbb-data-provider-analysis.md` §建议D。 | P4 | 深入分析中（本条） |
 
 ---
 
