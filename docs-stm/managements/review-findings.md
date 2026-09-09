@@ -45,9 +45,11 @@
 | # | 问题 | 修复方向 |
 |---|------|----------|
 | **rf-295** | `_submit_llm_future`（`report/_llm_news.py:71-89`）调 `generate_all_llm` 时**未传 `degradation_events`**（metrics 等已传）→ health_check 生成时 `_build_data_quality_detail_block(None)` 恒返回「今日无降级记录，所有数据源正常。」（`prompts_tables.py:225-226`），而同一批 expert_review 经 `_build_data_degradation_block(pipeline_data)` 可能显示真实降级——health_check 第 5 维「数据质量」据此误判"全正常"，与 expert 摘要自相矛盾 | 让 `_submit_llm_future` 把 `DegradationTracker.get_log()` 经 `degradation_events` 传入 `generate_all_llm`（该参数已存在，仅调用点漏传）；或 health 侧改读 pipeline_data 降级摘要与 expert 统一口径。需回归测试断言 health_check prompt 含真实降级事件而非恒空。关联 plan-32（模块级质量分级可作该能力的最小起步验证） |
-| **rf-296** | 品种代码笔误**无自动纠正通道**（2026-09-09 实盘报告复现）：穿透深度分析建议表 row3「关注561910的负收益是否持续分化 | 收益率 -13.65%，且**161910**规模达10.2%…」中 161910 系 LLM 把实际持仓 **561910**（招商中证电池主题ETF）易位一位数字的幻觉——该错码仅出现在缓存 LLM 输出（`data/cache/llm_penetration_deep_*.json`），数据层全程只有 561910（`data/holdings/个人投资持仓信息.xlsx`、全部 cache 键）。fact_checker 的 `check_symbol_existence` 虽精确检出（⚠ `品种代码 161910 不在当前持仓中`），但代码类问题走的是**纯告警通道**：`_runner.run_fact_check` 仅对数值一致性（`apply_numerical_corrections`）做自动修正，`_symbols.py` 返回 `(issues, total_checked, passed, suggestions)` 无任何修正反馈 → 唯一候选 561910（161910 的编辑距离=1 唯一近邻）与其真实组合权重 10.2%（35516/347197）吻合也被放过，用户需手工核错 | 新增**品种代码近似纠正**（语义名：`detect_code_corrections`/`apply_code_corrections`，辅助 `_build_stock_weight_map`/`_edit_distance_le_one`）：当错码不在 持仓/穿透/指数/建议语境 有效集、且**唯一**持仓代码与其编辑距离≤1、且错码后方权重声称（"规模达/占比 X%"）与该候选真实组合权重容差内吻合时自动纠正——镜像数值修正纳入 `已修正明细` 并从 ⚠ 剔除。需回归测试断言 561910/161910 实盘场景自动纠正、唯一近邻/歧义/合法外部代码/建议语境/指数碰撞 等边界不误改。详见 changelog |
-
 ## 已解决问题
+
+### 已解决待归档（v0.10.16-dev）
+
+| rf-296 | 品种代码笔误无自动纠正通道（2026-09-09 实盘穿透深度复现 561910→161910 易位一位幻觉；唯一近邻 + 组合权重 10.2% 吻合仍仅告警） | `_corrections.py` 新增 `detect_code_corrections`/`apply_code_corrections`（辅助 `_utils._build_stock_weight_map`/`_edit_distance_le_one`）：错码非 持仓/穿透/指数/建议语境 有效集、**唯一**持仓近邻（编辑距离≤1）、后方权重声称与候选真实组合权重容差内吻合 三条件全满足才自动纠正，纳入「已修正明细」并从 ⚠ 剔除；回归测试 `TestCodeTypoAutoCorrection` 8 项（实盘纠正 + 权重不吻合/多近邻歧义/建议语境/穿透代码/指数 边界不误改） | `changelog.md` [0.10.16-dev] |
 
 ### 已解决待归档（v0.10.15-dev）
 
