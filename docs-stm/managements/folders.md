@@ -7,19 +7,19 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 245 | 59,524 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层） |
+| 主程序代码 | Python | 250 | 61,204 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层；本轮新增 `core/decision_ledger.py` 与 `report/decision_*` 决策复盘 4 模块） |
 | HTML 报告模板 | HTML | 4 | 3,774 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 21 | 7,171 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
-| **源代码合计** | — | **273** | **70,784** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **309** | **87,711** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,560 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **源代码合计** | — | **278** | **72,464** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **315** | **89,343** | `src/test/` 所有 `.py` 文件 |
+| **测试用例** | — | — | **5,677 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **4,850** | 含 README.md（194 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,656 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **119** | **46,919** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 4 + archive 105 md），py/txt 不计行 |
+| **项目文档** | Markdown | **120** | **47,204** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 5 + archive 105 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 10 | 9,067 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 109 | 37,689 | 各版本 changelog/plan/review-findings 等（105 md 37,231 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 4 | 547 | 决策跨期反思闭环深入分析 + 信号预消化/质量分级/结构化决策头深入分析 + augur 多智能体借鉴评估 + OpenBB 数据层工程借鉴评估（reflection-decision-loop-analysis.md + llm-quality-signal-analysis.md + augur-borrowing-analysis.md + openbb-data-provider-analysis.md） |
+| ├ plan/ | 中间设计文件 | 5 | 832 | 决策跨期反思闭环深入分析/实现设计 + 信号预消化/质量分级/结构化决策头深入分析 + augur 多智能体借鉴评估 + OpenBB 数据层工程借鉴评估（reflection-decision-loop-analysis.md + decision-reflection-implementation.md + llm-quality-signal-analysis.md + augur-borrowing-analysis.md + openbb-data-provider-analysis.md） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -216,6 +216,10 @@ investor-util/
 │   │   │   ├── style_factor_sheet.py  #   风格与因子分析 Excel 页签（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
 │   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
 │   │   │   ├── action_sheet.py       #   行动建议 Excel 页签（再平衡信号/交易纪律/调仓建议/收益归因）
+│   │   │   ├── decision_record.py    #   决策复盘·确定性载体登记（再平衡卖出/调仓卖出建议，仅带基线价入账，同日去重）
+│   │   │   ├── decision_llm_capture.py # 决策复盘·LLM 操作建议表结构化解析（表头识别→逐代码方向登记，同日去重）
+│   │   │   ├── decision_settlement.py #  决策复盘·结算服务（到期 pending 用真实后续行情结算，方向命中/超额 alpha）
+│   │   │   ├── decision_review_block.py # 决策复盘·「历史决策复盘」区块数据组装（available/免责声明/命中率/近期明细）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── portfolio_history_drawdown_sheet.py # 组合历史走势与回撤 Excel 页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注）
 │   │   │   ├── position_relationship_sheet.py # 持仓关系矩阵 Excel 页签（一章两区块：重合度 + 相关性）
@@ -264,6 +268,7 @@ investor-util/
 │   │   │   ├── models.py             #   数据模型（持仓/行情/基金/新闻）
 │   │   │   ├── holding_status.py     #   品种级数据状态标注（品种覆盖诊断，position_status）
 │   │   │   ├── data_freshness.py     #   数据可信度诊断（新鲜度分类 + 单日跳变检测，data_freshness）
+│   │   │   ├── decision_ledger.py    #   决策跨期反思账本（事件 JSONL 持久化/结算折叠/教训区块+缓存指纹/开关），无 report/llm 依赖
 │   │   │   ├── perf.py               #   性能收集（PerfCollector 计时 + 数据源健康检查持久化）
 │   │   │   ├── provider_registry.py  #   数据源注册中心（熔断器/会话缓存）
 │   │   │   ├── reader.py             #   持仓 xlsx 文件读取
@@ -401,6 +406,8 @@ investor-util/
 │       │   │   ├── test_filesystem_edge.py  #   文件系统边缘场景
 │       │   │   ├── test_holding_status.py   #   品种级数据状态标注测试（品种覆盖诊断）
 │       │   │   ├── test_data_freshness.py   #   数据可信度诊断测试（新鲜度 + 单日跳变）
+│       │   │   ├── test_decision_ledger.py  #   决策账本核心测试（事件持久化/结算折叠/同日去重/教训区块）
+│       │   │   ├── test_decision_ledger_edge.py # 决策账本边缘场景（空账本/损坏行/阈值边界）
 │       │   │   ├── test_http_client.py      #   HTTP 客户端测试
 │       │   │   ├── test_logger.py           #   日志模块测试（文件+控制台，自动轮转）
 │       │   │   ├── test_log_reader.py       #   结构化日志读取测试（parse_log/tail_log/read_log）
@@ -534,6 +541,10 @@ investor-util/
 │       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现
 │       │   │   ├── test_action_html.py            #   行动建议章节 + 智囊团深度复盘「行动摘要」HTML 呈现（单源计算断言）
 │       │   │   ├── test_action_sheet.py           #   行动建议 Excel 页签呈现
+│       │   │   ├── test_decision_record.py        #   决策复盘·确定性载体登记（卖出建议入账/基线价守门/同日去重）
+│       │   │   ├── test_decision_llm_capture.py   #   决策复盘·LLM 操作建议表解析登记（表头识别/逐代码方向/去重/降级）
+│       │   │   ├── test_decision_settlement.py    #   决策复盘·结算服务（到期结算/方向命中统计/需样本数/基准对齐）
+│       │   │   ├── test_decision_review_block.py  #   决策复盘·复盘区块数据组装（available/命中率/近期明细/样本守门）
 │       │   │   ├── test_whatif_html.py            #   调仓 What-if 独立 HTML 页呈现
 │       │   │   ├── test_whatif_sheet.py           #   调仓 What-if Excel 三页签呈现
 │       │   │   ├── test_whatif_operations.py      #   调仓 What-if 操作共享层测试

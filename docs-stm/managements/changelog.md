@@ -6,6 +6,21 @@
 
 ## [0.10.16-dev] - 开发中（未发布）
 
+### 决策跨期反思闭环（plan-30）（2026-09-10）
+
+- **背景**：原「对判断当次即评、事后无对账」——LLM 看多看空与确定性再平衡/行动建议无法用真实后续行情验证，判断质量无从沉淀、教训无法回灌后续分析。借鉴 TradingAgents-astock 两阶段延迟反馈 + augur「预测-真实结果结算、确定性命中率统计、立即持久化」合成一套闭环（分析见 `docs-stm/plan/reflection-decision-loop-analysis.md` + `augur-borrowing-analysis.md` §建议A）。
+- **实现设计**：`docs-stm/plan/decision-reflection-implementation.md`（分层依赖：`core/` 账本零 report/llm 依赖；`report/` 登记/结算/复盘消费 core；`llm/` 经 core 读教训回灌）。
+- **代码**（实验功能 `decision_reflection`，默认关，`features.json` 注册）：
+  - `core/decision_ledger.py`：决策账本核心——事件 JSONL 原子追加（`data/state/decision_ledger.jsonl`，无模块单例）、结算作独立追加事件（决策事件恒 `pending`）、`fold_ledger` 按 decision_id 折叠；教训区块 `lessons_block`/`lessons_cache_suffix`（md5 → 缓存指纹版本化）；`is_active()` 单源开关。
+  - `report/decision_record.py`：确定性载体登记（再平衡/调仓卖出建议，仅带基线价入账保证「入账必可结算」，同日 pending 去重）。
+  - `report/decision_llm_capture.py`：LLM 操作建议表结构化解析（表头识别 → 逐代码方向登记，同日去重）。
+  - `report/decision_settlement.py`：到期 pending 结算（真实后续行情对账，方向命中/超额 alpha，需样本数守门）。
+  - `report/decision_review_block.py` + `action_sheet.py`/`html_writer.py`/`action_section.html`：行动章内嵌「历史决策复盘」区块（HTML+Excel，5 列，命中小样本不报命中率结论）。
+  - `_report_generation.py` 两个 seam（确定性结算/登记在 LLM 拉取前；LLM 登记/复盘装配在回退后），`llm/skeleton.py` 教训注入 + `llm/generators*.py` 缓存指纹版本化——实验特性全程 try/except，故障绝不打断报告主链路。
+- **测试**：新增 6 文件 109 例（决策账本核心 30 + 边缘 16 + 记录 12 + LLM 捕获 22 + 结算 14 + 复盘区块 7）+ 既有行动双端 8 例（HTML 3 + Excel 5）扩展；决策复盘全套件含 render/excel 均通过。
+- **配套**：folders.md 目录树/统计（主程序 245→250 / 测试 309→315 / 测试用例 5,560→5,677 / 项目文档 119→120）+ test-coverage.md 计数同步。
+- **记账**：plan-30 标记完成（见 plan.md P4 表）。
+
 ### DeepSeek v4-flash 定价更新（2026-09-10 官方降价）（2026-09-09）
 
 - **背景**：DeepSeek 官方自 2026-09-10 12:00（北京时间）起对 v4-flash 系列降价（最高 60%），闲时 输入 ¥1.0/输出 ¥4.0/缓存命中 ¥0.02，高峰价翻倍 ¥2.0/¥8.0/¥0.04（元/百万 token）。本次降价**仅影响 flash 系列**，`deepseek-v4-pro` 与 `deepseek-chat` 价格不变。

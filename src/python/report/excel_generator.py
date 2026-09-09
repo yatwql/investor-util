@@ -317,7 +317,11 @@ def generate_excel_report(
         try:
             from src.python.report.action_sheet import write_action_sheet
 
-            write_action_sheet(ws_action, (pipeline_data or {}).get("action_data"))
+            write_action_sheet(
+                ws_action,
+                (pipeline_data or {}).get("action_data"),
+                decision_review_data=(pipeline_data or {}).get("decision_review_data"),
+            )
         except Exception:
             logger.debug("[excel] 行动建议页签写入失败（非关键）", exc_info=True)
 

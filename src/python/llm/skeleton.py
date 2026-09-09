@@ -38,6 +38,11 @@ _MN = get_llm_module_name
 
 logger = logging.getLogger("invest")
 
+# 教训回灌接收模块（决策跨期反思闭环，语义名 decision_reflection；v1 边界）：
+# 仅智囊团 expert_review —— 唯一按 code 出方向的 LLM 载体。扩至其他方向性模块 =
+# 往此集合加键 + 其写侧/预检指纹闭包各补同源 lessons_cache_suffix()（各 2 处）。
+_LESSON_RECEIVER_MODULES: frozenset[str] = frozenset({"expert_review"})
+
 __all__ = [
     "is_llm_module_enabled",
     "generate_llm_content",
@@ -456,6 +461,17 @@ def _run_standard_mode(
         appendix = _build_prompt_appendix(holdings_details, total_mv, total_cost, total_profit)
         if appendix:
             _user = _user + "\n\n" + appendix
+
+    # ── 教训回灌（决策跨期反思闭环）：追加历史决策复盘教训块 ──
+    # 仅对接收模块（expert_review）、非辩论自定义 prompt 变体生效；
+    # 教训现算（lessons_block），无有效样本返回 "" → 不注入；开关关闭无感。
+    if _user and user_prompt is None and module_key in _LESSON_RECEIVER_MODULES:
+        from src.python.core import decision_ledger as _dl
+
+        if _dl.is_active():
+            _lessons = _dl.lessons_block()
+            if _lessons:
+                _user = _user + "\n\n" + _lessons
 
     fingerprint = fingerprint_fn() if fingerprint_fn else ""
     cache_key = CACHE_PREFIX_LLM + f"{module_key}_{fingerprint}"

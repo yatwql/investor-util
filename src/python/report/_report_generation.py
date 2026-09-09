@@ -65,6 +65,7 @@ def _generate_full_html_report(
     fund_flow_data: dict | None = None,
     valuation_data: dict | None = None,
     market_temperature_data: dict | None = None,
+    decision_review_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -144,6 +145,7 @@ def _generate_full_html_report(
             fund_flow_data=fund_flow_data,
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
+            decision_review_data=decision_review_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -596,6 +598,44 @@ def _generate_report_full(
     if pipeline_data is not None:
         pipeline_data["action_data"] = _action_data
 
+    # ── 3.6 决策跨期反思闭环（decision_reflection 实验功能，默认关）──
+    # 顺序：先结旧（用真实后续行情结算到期 pending），再入新（登记本报告
+    # final action_data 的确定性卖出建议为 pending）。结算必须先于 LLM 拉取：
+    # 否则当次教训（含本批结算结果）在 LLM 注入前未落档，注入读不到新结算。
+    # 开关关闭 → decision_ledger.is_active() False → 全链路无感（不读不写）。
+    from src.python.core import decision_ledger
+
+    if decision_ledger.is_active():
+        try:
+            from src.python.report import decision_record, decision_settlement
+
+            _report_date = prep["today_str"]
+            # ① 结算到期 pending 决策（幂等：同 decision 只结一次；未到期/行情
+            #    不可得保持 pending；无基线的早期登记暂缓不结）。结算须先于 LLM
+            #    拉取：否则当次教训（含本批结算结果）在 LLM 注入前未落档读不到。
+            _settle = decision_settlement.settle_pending_decisions(
+                report_date=_report_date,
+            )
+            if _settle.get("settled"):
+                reporter.ok(f"决策复盘：已结算 {_settle['settled']} 条到期决策")
+            elif _settle.get("deferred") or _settle.get("skipped"):
+                reporter.info("决策复盘：无到期可结算决策")
+            # ② 登记确定性卖出建议（入账必可结算：仅带持仓基线的 code 落账；
+            #    同日重复运行由账本 pending 防重，不累积重复 pending）
+            _reg = decision_record.register_action_decisions(
+                _action_data,
+                holdings_details=prep.get("holdings_details"),
+                report_date=_report_date,
+            )
+            if _reg.get("registered"):
+                reporter.ok(f"决策复盘：登记 {_reg['registered']} 条确定性建议")
+            else:
+                logger.info("[decision_reflection] 确定性建议登记为空（无卖出信号或无基线）")
+        except Exception:
+            # 实验功能异常不阻断报告主链路（外部行情拉取等不可控因素）
+            reporter.warn("决策复盘（确定性结算/登记）执行异常，已跳过")
+            logger.exception("[decision_reflection] 确定性结算/登记 seam 异常")
+
     # ── 4. 行业资金流向 ──
     reporter.info("正在获取行业资金流向...")
     perf.start("行业资金流向")
@@ -630,6 +670,38 @@ def _generate_report_full(
         llm_content = build_fallback_llm_content(llm_content)
         if all(c is not None for c in llm_content[:4]):
             result.llm_ok = True
+
+    # ── 5b. 决策跨期反思闭环（LLM 载体登记 + 复盘区块装配）──
+    # ③ 解析 expert_review 操作建议表 → 逐 code 方向登记（完整可解析路径才执行：
+    #    _enable_llm 关 / expert_review None / 降级回退占位均无「|」数据行 →
+    #    解析自然跳过，回退内容非真实意见不登记）；
+    # ④ 复盘区块数据契约装配 → 注入 pipeline_data 供 HTML/Excel 行动章内嵌块。
+    from src.python.core import decision_ledger
+
+    if decision_ledger.is_active():
+        try:
+            from src.python.report import decision_llm_capture, decision_review_block
+
+            if _enable_llm and llm_content and len(llm_content) > 1 and llm_content[1]:
+                _llm_reg = decision_llm_capture.register_llm_decisions(
+                    llm_content[1],
+                    prep.get("holdings_details"),
+                    report_date=prep["today_str"],
+                )
+                if _llm_reg.get("registered"):
+                    reporter.ok(f"决策复盘：登记 {_llm_reg['registered']} 条 LLM 操作建议")
+                else:
+                    logger.info("[decision_reflection] LLM 操作建议登记为空（无方向建议或同日已登记）")
+            _review_block = decision_review_block.build_review_block(
+                report_date=prep["today_str"],
+            )
+            if _review_block and pipeline_data is not None:
+                pipeline_data["decision_review_data"] = _review_block
+                reporter.info("决策复盘：行动章复盘区块数据已装配")
+        except Exception:
+            # 实验功能异常不阻断报告主链路（不装配复盘区块，报告保持既有输出）
+            reporter.warn("决策复盘（LLM 登记/复盘装配）执行异常，已跳过")
+            logger.exception("[decision_reflection] LLM 登记/复盘装配 seam 异常")
     perf.stop()
 
     # ── 6. HTML 报告 ──
@@ -671,6 +743,7 @@ def _generate_report_full(
         fund_flow_data,
         (pipeline_data or {}).get("valuation_data"),
         (pipeline_data or {}).get("market_temperature_data"),
+        (pipeline_data or {}).get("decision_review_data"),
     )
 
     # ── 7. Excel 报告 ──

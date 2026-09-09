@@ -248,6 +248,7 @@ def _render_template(
     valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（穿透估值列，None=开关关闭）
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约 market_temperature_data（汇总温度行，None=开关关闭）
+    decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.report.chart_data_builder import build_evolution_chart_data
@@ -338,6 +339,7 @@ def _render_template(
         crisis_annotation_data=crisis_annotation_data,
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,
+        decision_review_data=decision_review_data,
     )
 
 
@@ -384,6 +386,7 @@ def write_html_report(
     valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（「资产穿透TOP10」估值分位列，None=开关关闭）
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约 market_temperature_data（「投资分析汇总」温度行，None=开关关闭）
+    decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -620,6 +623,7 @@ def write_html_report(
         fund_flow_data=fund_flow_data,
         valuation_data=valuation_data,
         market_temperature_data=market_temperature_data,
+        decision_review_data=decision_review_data,
     )
 
     if enable_interactive_charts:

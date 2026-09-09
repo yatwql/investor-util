@@ -81,12 +81,15 @@ def _write_sub_block(
 def write_action_sheet(
     ws: Worksheet,
     action_data: dict[str, Any] | None,
+    decision_review_data: dict[str, Any] | None = None,
 ) -> None:
     """写入行动建议页签。
 
     Args:
         ws: openpyxl Worksheet 对象
         action_data: `action_data` 契约 dict；None 或 available=False 时写占位。
+        decision_review_data: 「历史决策复盘」契约 dict（决策跨期反思闭环，
+            默认关闭）；None 时行动页签保持既有输出。
     """
     _name = get_report_sheet_name("action")
     _ncols = 5
@@ -95,6 +98,9 @@ def write_action_sheet(
 
     if not action_data or not action_data.get("available"):
         row = write_data_row(ws, row, [_PLACEHOLDER_UNAVAILABLE, "", "", "", ""])
+        if decision_review_data and decision_review_data.get("available"):
+            _row = row + 1
+            _write_review_block(ws, _row, decision_review_data, _ncols)
         auto_width(ws)
         logger.info("行动建议：无持仓数据，写入占位")
         return
@@ -183,5 +189,73 @@ def write_action_sheet(
             ws.cell(row=row, column=1, value=f"净额合计：{_summary}").font = _FONT_SUB_BLOCK
             row += 1
 
+    # 子块 5：历史决策复盘（决策跨期反思闭环，非回测）
+    if decision_review_data and decision_review_data.get("available"):
+        row += 1
+        row = _write_review_block(ws, row, decision_review_data, _ncols)
+
     auto_width(ws)
     logger.info("行动建议页签已写入")
+
+
+def _write_review_block(
+    ws: Worksheet,
+    row: int,
+    review_data: dict[str, Any],
+    ncols: int,
+) -> int:
+    """写入行动页签内的「历史决策复盘」子块。
+
+    Args:
+        review_data: `decision_review_data` 契约 dict（available=True 已保证）
+    """
+    row += 1
+    ws.cell(row=row, column=1, value="历史决策复盘（非回测，仅供反思参考）").font = _FONT_SUB_BLOCK
+    row += 1
+    disclaimer = (review_data.get("disclaimer") or "").strip()
+    if disclaimer:
+        ws.cell(row=row, column=1, value=disclaimer).font = Font(italic=True, color="808080")
+        row += 1
+
+    row = write_header_row(ws, row, ["代码", "名称", "判断方向", "结果", "区间涨跌"])
+    _outcome_label = {"hit": "兑现", "miss": "未兑现", "flat": "平盘", "gap": "缺数据"}
+    for s in review_data.get("recent_settled") or []:
+        raw = s.get("raw_return")
+        ret_text = f"{raw:+.1%}" if isinstance(raw, (int, float)) else ""
+        row = write_data_row(
+            ws,
+            row,
+            [
+                s.get("code", ""),
+                s.get("name", ""),
+                s.get("direction", ""),
+                _outcome_label.get(s.get("outcome"), s.get("outcome", "")),
+                ret_text,
+            ],
+        )
+    for p in review_data.get("recent_pending") or []:
+        row = write_data_row(
+            ws,
+            row,
+            [p.get("code", ""), p.get("name", ""), p.get("direction", ""), "待结算", ""],
+        )
+    if review_data.get("settled_count", 0) > 0:
+        if review_data.get("sample_sufficient"):
+            _acc = review_data.get("direction_accuracy")
+            _acc_text = f"{_acc:.0%}" if isinstance(_acc, (int, float)) else ""
+            _alpha = review_data.get("alpha_mean")
+            _alpha_text = f" · 超额均值 {_alpha:+.2%}" if isinstance(_alpha, (int, float)) else ""
+            row = write_data_row(ws, row, [f"方向命中 {_acc_text}{_alpha_text}", "", "", "", ""])
+        else:
+            row = write_data_row(
+                ws,
+                row,
+                [f"已结算 {review_data.get('settled_count', 0)} 条（样本不足，仅计数参考）", "", "", "", ""],
+            )
+    elif review_data.get("pending_count", 0) > 0:
+        row = write_data_row(
+            ws,
+            row,
+            [f"待结算 {review_data.get('pending_count', 0)} 条（决策满 5 个交易日后用真实行情对账）", "", "", "", ""],
+        )
+    return row

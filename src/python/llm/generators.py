@@ -38,6 +38,7 @@ from src.python.llm.prompts import (
     _build_penetration_deep_prompt,
 )
 from src.python.config.features import is_feature_enabled
+from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
 from src.python.llm._hallucination_filter import _filter_hallucinated_codes
 from src.python.llm.skeleton import generate_llm_module
 
@@ -182,7 +183,7 @@ def generate_expert_review(
     _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
 
     def _fingerprint():
-        return (
+        fp = (
             build_llm_fingerprint(
                 total_mv=total_mv,
                 total_cost=total_cost,
@@ -194,6 +195,14 @@ def generate_expert_review(
             )
             + _fp_suffix
         )
+        # 决策跨期反思闭环（decision_reflection）：追加教训指纹后缀（同源现算）。
+        # 结算落档 → 教训文本变 → 后缀变 → 读写键同变 → 缓存自然失效并带新教训重生成；
+        # 开关关闭/无有效样本 → "" → 缓存键与未注入时一致（不误伤旧缓存）。
+        # 与 generators_orchestrator 预检闭包同调 decision_ledger.lessons_cache_suffix()，
+        # 保证读写键同源（见 design §6.2）。
+        if decision_ledger.is_active():
+            fp += decision_ledger.lessons_cache_suffix()
+        return fp
 
     def _prompt():
         return _build_expert_review_prompt(

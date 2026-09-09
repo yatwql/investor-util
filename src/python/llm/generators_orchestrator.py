@@ -47,6 +47,7 @@ from src.python.llm.prompts import (
     _build_competitive_context_block,
 )
 from src.python.llm.skeleton import is_llm_module_enabled
+from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
 from src.python.core.registry import get_llm_module_name, get_llm_module_names
 
 logger = logging.getLogger("invest")
@@ -127,6 +128,11 @@ def _compute_module_cache_info(
         categories=categories,
         history_data=history_data,
     )
+    # 决策跨期反思闭环（decision_reflection）：预检指纹同样追加教训后缀，
+    # 与 generators.py expert_review 写侧闭包同调同源 → 预检键 = 读写键；
+    # 教训不变命中旧缓存，新结算 → 后缀变 → 预检 miss → 携带新教训重生成。
+    if decision_ledger.is_active():
+        fp_expert_review += decision_ledger.lessons_cache_suffix()
     fp_health_check = build_llm_fingerprint(
         total_mv=total_mv,
         total_cost=total_cost,

@@ -69,6 +69,8 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "anonymizer": False,
     "cache_daily_cleanup": True,
     "enable_interactive_charts": True,
+    # ── 决策跨期反思闭环（实验功能，默认关闭） ──
+    "decision_reflection": False,
 }
 
 # ── 实验性功能定义 ──────────────────────────────────────────
@@ -79,6 +81,10 @@ EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
     "llm_debate_procon": ("辩论-正反辩论", "三段式(白脸→黑脸→综合)"),
     "llm_debate_conditional": ("辩论-条件推理", "情景化分析(涨/跌/震荡)"),
     "llm_debate_qa_concentration": ("辩论-集中度问答", "集中度风险问答"),
+    "decision_reflection": (
+        "决策跨期反思闭环",
+        "登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词",
+    ),
 }
 
 
