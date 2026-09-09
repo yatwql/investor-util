@@ -106,9 +106,9 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
         #                          DeepSeek 官方周末统一低谷价，不区分峰谷）
         # 含 "peak" 高峰价子段的模型（如 deepseek-v4-*）在工作日高峰时段按 peak 价
         # 计费，其余时段（含周末全天）按 base 价计费；无 "peak" 的模型始终按 base 价。
-        # 模型价格覆盖示例（含 peak 子段）："deepseek-v4-flash": {"input": 1.5,
-        # "output": 4.5, "input_cache_hit": 0.05, "peak": {"input": 3.0, "output": 9.0,
-        # "input_cache_hit": 0.10}}
+        # 模型价格覆盖示例（含 peak 子段，2026-09-10 起 flash 降价后价格）：
+        # "deepseek-v4-flash": {"input": 1.0, "output": 4.0, "input_cache_hit": 0.02,
+        # "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04}}
         "timezone": "Asia/Shanghai",
         "peak_periods": ["09:00-12:00", "14:00-18:00"],
         "idle_periods": [],

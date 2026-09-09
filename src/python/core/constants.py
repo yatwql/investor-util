@@ -90,11 +90,14 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
     "gpt-4o-mini": {"input": 0.15, "output": 0.6, "input_cache_hit": 0.15},
     # ── DeepSeek 峰谷定价（2026-08-17 起生效，元/百万 token）──
     # base 为闲时价；peak 为高峰价（高峰时段为闲时的 2 倍）。
+    # deepseek-v4-flash 于 2026-09-10 12:00（北京时间）起官方降价（最高 60%）：
+    # 闲时 输入 1.0/输出 4.0/缓存命中 0.02，高峰翻倍 2.0/8.0/0.04。仅影响 flash
+    # 系列，deepseek-v4-pro 与 deepseek-chat 价格不变。
     "deepseek-v4-flash": {
-        "input": 1.5,
-        "output": 4.5,
-        "input_cache_hit": 0.05,
-        "peak": {"input": 3.0, "output": 9.0, "input_cache_hit": 0.10},
+        "input": 1.0,
+        "output": 4.0,
+        "input_cache_hit": 0.02,
+        "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04},
     },
     "deepseek-v4-pro": {
         "input": 4.5,
