@@ -1,6 +1,6 @@
 """LLM 提示词模块 — 统一导出入口。
 
-导出 prompts_core / prompts_tables / prompts_action 的公开符号。
+导出 prompts_core / prompts_tables / prompts_action / prompts_signals 的公开符号。
 外部代码使用 from src.python.llm.prompts import ... 导入。
 """
 
@@ -55,6 +55,20 @@ from src.python.llm.prompts_action import (
     _build_qa_concentration_block,
 )
 
+# ── 从 prompts_signals 导出 ───────────────────────────────
+from src.python.llm.prompts_signals import (
+    SIGNAL_BEARISH,
+    SIGNAL_BULLISH,
+    SIGNAL_NEUTRAL,
+    SIGNAL_PREFIX,
+    SIGNAL_RISK_HIGH,
+    SIGNAL_RISK_LOW,
+    SIGNAL_RISK_MEDIUM,
+    _build_sector_flow_block,
+    _build_signal_digest_block,
+    _signal_digest_cache_suffix,
+)
+
 __all__ = [
     # 常量
     "CACHE_PREFIX_LLM",
@@ -99,4 +113,15 @@ __all__ = [
     # 新闻关联分析
     "_build_holdings_summary",
     "_build_news_correlation_summary",
+    # 信号预消化（词表 + 信号块 + 缓存后缀）
+    "SIGNAL_PREFIX",
+    "SIGNAL_BULLISH",
+    "SIGNAL_BEARISH",
+    "SIGNAL_NEUTRAL",
+    "SIGNAL_RISK_HIGH",
+    "SIGNAL_RISK_MEDIUM",
+    "SIGNAL_RISK_LOW",
+    "_build_sector_flow_block",
+    "_build_signal_digest_block",
+    "_signal_digest_cache_suffix",
 ]

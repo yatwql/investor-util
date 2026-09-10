@@ -36,6 +36,7 @@ from src.python.llm.prompts import (
     _build_global_macro_prompt,
     _build_health_check_prompt,
     _build_penetration_deep_prompt,
+    _signal_digest_cache_suffix,
 )
 from src.python.config.features import is_feature_enabled
 from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
@@ -263,9 +264,10 @@ def generate_health_check(
     degradation_events: list[dict] | None = None,
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。"""
+    _enable_signal_digest = is_feature_enabled("signal_pre_digest")
 
     def _fingerprint():
-        return build_llm_fingerprint(
+        fp = build_llm_fingerprint(
             total_mv=total_mv,
             total_cost=total_cost,
             total_profit=total_profit,
@@ -274,6 +276,10 @@ def generate_health_check(
             penetrated_assets=penetrated_assets,
             categories=categories,
         )
+        # 信号预消化（signal_pre_digest）：见 generate_expert_review 同名注释，
+        # 与 generators_orchestrator 预检闭包同调同一函数保证读写键同源。
+        fp += _signal_digest_cache_suffix(pipeline_data)
+        return fp
 
     def _prompt():
         return _build_health_check_prompt(
@@ -287,6 +293,7 @@ def generate_health_check(
             holdings_details=holdings_details,
             pipeline_data=pipeline_data,
             degradation_events=degradation_events,
+            enable_signal_digest=_enable_signal_digest,
         )
 
     return generate_llm_module(

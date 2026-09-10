@@ -119,6 +119,37 @@ class TestConfigLlmModulesExperimentalFlags:
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["10", "0"])
+    @patch("src.python.config.features.save_feature_overrides")
+    @patch("src.python.config.features.set_feature_enabled")
+    @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
+    @patch("src.python.core.registry.get_llm_module_names")
+    @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
+    def test_menu_number_ten_toggles_signal_pre_digest(
+        self,
+        mock_read,
+        mock_names,
+        mock_filter,
+        mock_set_feature,
+        mock_save_overrides,
+        mock_input,
+        mock_refresh,
+        mock_press,
+    ):
+        """输入 10 → 切换第 5 个实验开关（信号预消化），持久化到 features.json。
+
+        新实验项一律**追加**到 EXPERIMENTAL_FEATURES 末尾，既有编号不位移。
+        """
+        from src.python.tui.handlers_config import _cmd_config_llm_modules
+
+        _cmd_config_llm_modules()
+
+        mock_save_overrides.assert_called_once_with({"signal_pre_digest": True})
+        mock_set_feature.assert_called_once_with("signal_pre_digest", True)
+        mock_press.assert_called_once()
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
     @patch("src.python.tui.handlers_config.input", side_effect=["6", "0"])
     @patch("src.python.config.features.save_feature_overrides")
     @patch("src.python.config.features.set_feature_enabled")

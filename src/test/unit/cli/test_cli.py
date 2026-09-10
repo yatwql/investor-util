@@ -144,6 +144,60 @@ class TestArgparse:
 
 
 # ═══════════════════════════════════════════════════════════════
+# 实验功能命令行开关
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestApplyCliExperiments:
+    """_apply_cli_experiments 行为测试。"""
+
+    def test_none_is_noop(self, monkeypatch):
+        """未传 --experiment 时不改动任何开关。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        _apply_cli_experiments(None)
+        assert feat.FEATURE_FLAGS["signal_pre_digest"] is False
+
+    def test_empty_groups_is_noop(self, monkeypatch):
+        """空列表同样不改动开关。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        _apply_cli_experiments([])
+        assert feat.FEATURE_FLAGS["signal_pre_digest"] is False
+
+    def test_enables_requested_flags(self, monkeypatch):
+        """逐项启用命令行指定的实验功能。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "decision_reflection", False)
+        _apply_cli_experiments([("signal_pre_digest",), ("decision_reflection",)])
+        assert feat.FEATURE_FLAGS["signal_pre_digest"] is True
+        assert feat.FEATURE_FLAGS["decision_reflection"] is True
+
+    def test_does_not_touch_other_flags(self, monkeypatch):
+        """未指定的实验功能保持原值（不误开）。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "llm_debate_conditional", False)
+        _apply_cli_experiments([("signal_pre_digest",)])
+        assert feat.FEATURE_FLAGS["llm_debate_conditional"] is False
+
+    def test_not_persisted(self, monkeypatch):
+        """命令行开关仅影响本次运行，不写 features.json。"""
+        from src.python.config import features as feat
+
+        called: list[dict] = []
+        monkeypatch.setattr(feat, "save_feature_overrides", lambda *a, **k: called.append({"a": a}))
+        _apply_cli_experiments([("signal_pre_digest",)])
+        assert called == []
+
+
+# ═══════════════════════════════════════════════════════════════
 # CliProgressReporter
 # ═══════════════════════════════════════════════════════════════
 

@@ -356,6 +356,23 @@ class TestApplyFeaturesWrite:
         raw = open(_FEATURES_FILE, encoding="utf-8").read()
         assert '"decision_reflection": true' in raw
 
+    def test_signal_pre_digest_flag_write_takes_effect(self, app_client):
+        """signal_pre_digest 写：features.json 含覆写，运行时开关生效。"""
+        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+
+        assert is_feature_enabled("signal_pre_digest") is False  # 默认关
+
+        resp = app_client.post(
+            "/api/config/edit",
+            json={"key": "signal_pre_digest", "value": True},
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["data"]["value"] is True
+        assert is_feature_enabled("signal_pre_digest") is True
+
+        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        assert '"signal_pre_digest": true' in raw
+
 
 # ═══════════════════════════════════════════════════════════════
 # T9 校验与守卫

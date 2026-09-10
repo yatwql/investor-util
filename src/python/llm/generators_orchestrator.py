@@ -45,6 +45,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_DISABLED,
     LLM_MODULE_FAILURE,
     _build_competitive_context_block,
+    _signal_digest_cache_suffix,
 )
 from src.python.llm.skeleton import is_llm_module_enabled
 from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
@@ -107,10 +108,12 @@ def _compute_module_cache_info(
     force: bool,
     *,
     history_data: dict | None = None,
+    pipeline_data: dict | None = None,
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
 
     history_data 风险信号 Hash 加入专家/体检/穿透指纹。
+    pipeline_data 供信号预消化块计算指纹后缀（专家/体检两份）。
     """
     fp_global_macro = compute_fingerprint(
         a_indices,
@@ -134,6 +137,20 @@ def _compute_module_cache_info(
     # 教训不变命中旧缓存，新结算 → 后缀变 → 预检 miss → 携带新教训重生成。
     if decision_ledger.is_active():
         fp_expert_review += decision_ledger.lessons_cache_suffix()
+    # 信号预消化（signal_pre_digest）：预检指纹同样追加信号块后缀，与 generators.py
+    # 写侧闭包同调同一函数（开关判定收敛在该函数内）——后缀表达式两侧逐字一致，
+    # 写侧修好任何键差时预检自动跟随；信号数值变化 → 后缀变 → 携带新信号重生成；
+    # 开关关闭 → ""（键不变、不误伤旧缓存）。
+    _signal_suffix = _signal_digest_cache_suffix(pipeline_data)
+    fp_expert_review += _signal_suffix
+    # 确定性数值信号沉淀（signal_ledger）：预检指纹同样追加同一后缀函数，与
+    # generators.py 写侧闭包同调同源；摘要文本变 → 后缀变 → 预检 miss → 带新摘要
+    # 重生成；关闭/样本不足 → ""（键不变、不误伤旧缓存）。开关判定收敛在该函数内。
+    fp_expert_review += signal_ledger.summary_cache_suffix()
+    # 结构化决策头（decision_header_parse）：预检指纹同样追加同一后缀函数，
+    # 与 generators.py 写侧闭包同调同源。开关关闭 → ""（键不变、不误伤旧缓存）；
+    # 开启 → 预检 key 与写侧 key 同步换键，避免预检误判命中而跳过重生成。
+    fp_expert_review += structured_header_cache_suffix()
     fp_health_check = build_llm_fingerprint(
         total_mv=total_mv,
         total_cost=total_cost,
@@ -144,6 +161,7 @@ def _compute_module_cache_info(
         categories=categories,
         history_data=history_data,
     )
+    fp_health_check += _signal_suffix
     fp_penetration_deep = build_llm_fingerprint(
         total_mv=total_mv,
         total_cost=total_cost,
@@ -593,6 +611,7 @@ def generate_all_llm(
         holdings_details,
         force,
         history_data=history_data,
+        pipeline_data=pipeline_data,
     )
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
