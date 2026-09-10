@@ -5,8 +5,8 @@
 
 设计约束遵从（对齐 `core/perf.py` / `core/decision_ledger.py` 先例）：
     分层约束  — 本模块属 core 层，只依赖 stdlib，禁止 import report/llm/analysis
-    原子写入  — 读全部现有内容 → 追加新行 → tempfile.mkstemp + os.replace 写回，
-                防断电/崩溃产生半写损坏档
+    原子写入  — 读全部现有内容 → 追加新行 → 落盘走 `core/atomic_write` 的
+                mkstemp + os.replace，防断电/崩溃产生半写损坏档
     无单例    — 纯函数集，不驻留模块全局状态
     日志统一  — logging.getLogger("invest")；log_tag/noun 由调用方注入，
                 保证迁移后各调用点日志文本逐字不变
@@ -15,6 +15,7 @@
     core/perf.py            → prefix=".perf_history_"      tag="perf"
     core/decision_ledger.py → prefix=".decision_ledger_"   tag="decision_ledger"
     core/signal_ledger.py   → prefix=".signal_ledger_"     tag="signal_ledger"
+    providers/news_dedup.py → prefix=".dedup_anchors_"     tag="dedup"
 """
 
 from __future__ import annotations
@@ -22,8 +23,9 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tempfile
 from typing import Any
+
+from src.python.core.atomic_write import write_text_atomic
 
 logger = logging.getLogger("invest")
 
@@ -50,9 +52,33 @@ def append_jsonl_atomic(
         持久化，不承担中断调用链的职责）；但必须把成败**如实返回**——调用方若对
         外承诺「已写入 N 条」，就得据此判定，否则写盘失败会被报成成功。
     """
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
+    return append_jsonl_atomic_many(path, [line], prefix=prefix, log_tag=log_tag, noun=noun)
+
+
+def append_jsonl_atomic_many(
+    path: str,
+    lines: list[str],
+    *,
+    prefix: str = ".jsonl_",
+    log_tag: str = "jsonl",
+    noun: str = "JSONL 文件",
+) -> bool:
+    """向 JSONL 文件**一次性**原子追加多行（`lines` 每项需自带结尾换行）。
+
+    批量入口存在的理由是成本：本原语的原子性来自「读全文 → 拼接 → 整文件
+    替换」，逐行调用等价于每行重写一次全文件（O(n²)）。调用方有多行要写时
+    必须走本函数一次性拼接，不得在循环里调 ``append_jsonl_atomic``。
+
+    Args:
+        path: 目标 JSONL 文件路径（父目录不存在时自动创建）
+        lines: 已序列化的多行内容（每项含 "\\n"）；空列表时立即返回 True
+        其余参数同 :func:`append_jsonl_atomic`
+
+    Returns:
+        是否落盘成功（语义同 :func:`append_jsonl_atomic`）。
+    """
+    if not lines:
+        return True
     existing = ""
     if os.path.isfile(path):
         try:
@@ -61,24 +87,13 @@ def append_jsonl_atomic(
         except OSError:
             logger.warning("[%s] %s不可读，将重新创建: %s", log_tag, noun, path)
 
-    content = existing + line
-    try:
-        fd, tmp_path = tempfile.mkstemp(dir=parent or ".", prefix=prefix, suffix=".tmp")
-    except OSError:
-        logger.exception("[%s] 创建临时文件失败: %s", log_tag, path)
-        return False
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-        os.replace(tmp_path, path)
-    except Exception:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
-        logger.exception("[%s] 写入%s失败: %s", log_tag, noun, path)
-        return False
-    return True
+    return write_text_atomic(
+        path,
+        existing + "".join(lines),
+        prefix=prefix,
+        log_tag=log_tag,
+        noun=noun,
+    )
 
 
 def read_jsonl(

@@ -40,9 +40,18 @@ logger = logging.getLogger("invest")
 def _atomic_write(filepath: str, content: str) -> None:
     """原子写入文件：先写临时文件再 os.replace。
 
+    **不**委托 `core/atomic_write`：本函数的契约是「失败即抛且**保留异常类型**」——
+    `init_config()` 依赖 `except PermissionError` 的 Windows 并发容忍分支，TUI 依赖
+    `PermissionError` 映射为「权限不足」提示。共享原语刻意吞掉异常只返回布尔，传不出
+    类型；两者契约相反，各自服务不同调用层，故保留本实现（C3 要求的 mkstemp +
+    os.replace 语义两者一致）。
+
     Args:
         filepath: 目标文件路径
         content: 要写入的字符串内容
+
+    Raises:
+        OSError: 临时文件创建或写入失败（含 os.replace 失败，异常类型原样透传）。
     """
     fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(filepath), suffix=".tmp")
     try:

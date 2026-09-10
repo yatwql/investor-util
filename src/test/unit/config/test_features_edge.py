@@ -5,14 +5,18 @@
 
 from __future__ import annotations
 
-import pytest
+from unittest.mock import patch
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_config, pytest.mark.edge]
+import pytest
 
 from src.python.config.features import (
     EXPERIMENTAL_FEATURES,
+    FEATURE_FLAGS,
     resolve_experiment_flags,
+    save_feature_overrides,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_config, pytest.mark.edge]
 
 
 @pytest.mark.edge
@@ -67,3 +71,22 @@ class TestResolveExperimentFlagsEdge:
         flags, unknown = resolve_experiment_flags(["bad", "bad"])
         assert flags == set()
         assert unknown == ["bad", "bad"]
+
+
+@pytest.mark.edge
+class TestSaveFeatureOverridesEdge:
+    """开关覆写落盘失败边缘场景（落盘委托 core/atomic_write）。"""
+
+    @pytest.mark.edge
+    def test_write_failure_does_not_raise_and_syncs_runtime(self):
+        """落盘失败 → 不抛出，且运行时开关仍按本次覆写同步。
+
+        落盘属尽力持久化（原语只记日志返回 False）：写不进盘不能中断调用链，
+        更不能让"本次运行已生效"的内存态回退成旧值。
+        """
+        with (
+            patch("src.python.config.features.write_json_atomic", return_value=False),
+            patch.dict(FEATURE_FLAGS, {"signal_pre_digest": True}, clear=False),
+        ):
+            save_feature_overrides({"signal_pre_digest": False}, merge=False)  # 不抛
+            assert FEATURE_FLAGS["signal_pre_digest"] is False

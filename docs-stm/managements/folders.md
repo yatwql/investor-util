@@ -266,6 +266,7 @@ investor-util/
 │   │   │   ├── _phase_timeout.py     #   数据获取阶段超时管理
 │   │   │   ├── _session_cache.py     #   会话缓存管理
 │   │   │   ├── ansi_colors.py        #   ANSI 颜色常量（终端输出着色）
+│   │   │   ├── atomic_write.py       #   原子整文件写入原语（唯一实现，mkstemp + os.replace；jsonl_store/熔断状态/持仓快照/静默期/断路状态/降级状态/功能开关覆写共用，成败如实返回布尔）
 │   │   │   ├── cassette.py           #   数据源记录-回放引擎（真实响应体离线录制/回放，经传输工厂注入，不联网）
 │   │   │   ├── check_sources.py      #   数据源健康检查命令处理器（CLI/报告共享）
 │   │   │   ├── circuit_breaker.py    #   统一断路器网关（Provider + LLM 熔断状态查询）

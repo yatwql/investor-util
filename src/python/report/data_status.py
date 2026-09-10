@@ -24,6 +24,7 @@ from typing import Any, TypedDict
 
 from src.python.cache import get_cache_dir
 from src.python.config import get_config
+from src.python.core.atomic_write import write_json_atomic
 
 logger = logging.getLogger("invest")
 
@@ -236,14 +237,18 @@ class DegradationTracker:
         now = time.time()
         if not force and self._persist_dirty and now - self._last_persist_ts < self._PERSIST_INTERVAL:
             return  # 节流：距上次写入不足间隔，跳过
-        try:
-            os.makedirs(os.path.dirname(self._persist_path), exist_ok=True)
-            with open(self._persist_path, "w", encoding="utf-8") as f:
-                json.dump(self._last_success, f, ensure_ascii=False)
-            self._last_persist_ts = now
-            self._persist_dirty = False
-        except Exception:
-            logger.debug("[degradation] 持久化状态保存失败（非关键）", exc_info=True)
+        # 原子写（mkstemp + os.replace）：本文件被高频改写，直接覆盖落盘时
+        # 并发读取方可能读到截断 JSON，解析失败即降级记忆丢失
+        if not write_json_atomic(
+            self._persist_path,
+            self._last_success,
+            indent=None,
+            log_tag="degradation",
+            noun="降级状态",
+        ):
+            return
+        self._last_persist_ts = now
+        self._persist_dirty = False
 
     # ── 公开 API ──────────────────────────────
 

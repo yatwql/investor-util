@@ -6,6 +6,16 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 原子写入收敛到唯一原语（C3，自审 rf-322）（2026-09-10）
+
+- **缺陷（自审 rf-322）**：全局架构审计发现 C3（缓存原子写入）在实现层**逐字重复了 4 份 mkstemp + os.replace 拷贝**（`core/jsonl_store.py`、`core/provider_registry.py`、`report/history_snapshot.py`、`config/features.py`），另有 **5 处写入完全无原子性**（违反 C3 字面要求）：
+  - `analysis/_silence.py::_save_silence_state`、`analysis/circuit_breaker_wrapper.py::_save_state` 与 `_migrate_legacy`、`report/data_status.py::_persist`：`open(path, "w")` 直接覆盖——中断即留截断 JSON，下次读取解析失败，静默期状态/断路状态/降级记忆**整份丢失**（断路器「失忆」后已熔断的源被立即重试）。其中 `data_status` 的降级状态文件被高频改写，并发读取方还可能读到半写内容。
+  - `providers/news_dedup.py::_flush_anchors`：`open(..., "a")` 逐行追加——中途中断留下**半行** JSONL，而读取方按行解析，该行及其后记录一并作废。
+  - 多份拷贝的实质风险与 C3 补充说明一致：改一处必漏其余，且各调用点拿不到成败（无法据此决定后续动作）。
+- **改动**：新增 `core/atomic_write.py`（`write_text_atomic` / `write_json_atomic`，mkstemp + 同目录 os.replace；Windows 下 os.replace 遭占用时回退「删目标 + rename」，与 `cache/_io.py::_write_atomic` 同一处置），上述 8 处全部迁移到该原语，`jsonl_store` 另抽出批量入口 `append_jsonl_atomic_many`（锚点文件已达数万行，逐行调用等价于每行整文件重写，O(n²)）。原语契约：**失败记日志并如实返回布尔、不向上抛**，调用方按需还原异常类型（`history_snapshot.save` 即据返回值重新抛 `OSError`，保持其「失败即抛」的对外契约）。`cache/` 子包（需 gzip 分支与文件锁）与 `config/_core.py::_atomic_write`（契约是「失败即抛且保留异常类型」，被 `init_config()` 的 Windows 并发容忍分支与 TUI 的权限提示依赖）两处**有意不合并**，理由写在原语 docstring 与 C3 约束行内。
+- **行为变更（均为修正方向）**：① 上述 5 处由「非原子覆盖」变为原子替换，写失败时旧文件原样保留；② `news_dedup` 落盘失败时**撤回**本轮登记的 `(source,title)` 已写 key（旧实现 key 留在集合里，该对新闻此后每轮都被判「已写」而永不重试，锚点**永久丢失**却只记一条 warning）；③ `circuit_breaker_wrapper._migrate_legacy` 显式以写入成败决定是否删除旧文件，删旧失败由静默的 debug 改为 warning；④ `jsonl_store`/`history_snapshot` 的 os.replace 在 Windows 占用场景获得回退路径。
+- **测试**：新增 `src/test/unit/core/test_atomic_write.py`（12 例：正常写入/目录创建/覆盖/无临时残骸、mkstemp 失败与替换失败均返回 False 且旧内容原样保留、序列化失败、Windows 占用回退）；`test_news_sources.py::TestFlushAnchorsDedup` 新增写失败回滚用例（以「锚点目录被同名文件占位」构造真实 IO 故障，已验证还原旧实现后转红——旧实现 key 未撤回）；`test_features_edge.py` 新增功能开关写失败不抛出且内存态仍同步用例。C3 相关单元测试 4080 例全绿。
+
 ### 持仓跟踪缓存读取回归 cache API（C2，自审 rf-323）（2026-09-10）
 
 - **缺陷（自审 rf-323）**：`cache/services/holdings_tracker.py::_read_holdings_tracking` **绕过 cache API 直接读缓存文件**（`_cache_path()` + `open` + `json.load` + 手取 `payload["_data"]`），违反 C2「所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 接口读写，禁止直接操作 `data/cache/` 文件系统」。逐项后果：

@@ -13,6 +13,7 @@ import threading
 from typing import Any
 
 from src.python.core.constants import PROJECT_ROOT
+from src.python.core.jsonl_store import append_jsonl_atomic_many
 
 logger = logging.getLogger("invest")
 
@@ -177,6 +178,8 @@ def _flush_anchors() -> None:
     写入前按 (source,title) 对去重：只写本次尚未写入文件的记录（查
     _WRITTEN_ANCHOR_KEYS），写后加入集合。防止同一对新闻多轮运行重复
     追加导致校准数字失真（见 _WRITTEN_ANCHOR_KEYS 注释）。
+
+    落盘走 ``core/jsonl_store.append_jsonl_atomic_many``（一次批量原子追加）。
     """
     global _ANCHOR_RECORDS
     if not _ANCHOR_RECORDS:
@@ -195,13 +198,22 @@ def _flush_anchors() -> None:
             new_records.append(r)
     if not new_records:
         return
-    try:
-        os.makedirs(os.path.dirname(_ANCHOR_PATH), exist_ok=True)
-        with open(_ANCHOR_PATH, "a", encoding="utf-8") as f:
-            for r in new_records:
-                f.write(json.dumps(r, ensure_ascii=False) + "\n")
-    except OSError as e:
-        logger.warning("锚点文件写入失败: %s", e)
+    # 一次性批量原子追加（`open(..., "a")` 逐行写在中途中断会留下半行，
+    # 而本文件的读取方要求逐行完整）。必须用批量入口：`append_jsonl_atomic`
+    # 的原子性来自「读全文 → 拼接 → 整文件替换」，逐行调用等价于每行重写一次
+    # 整个文件（锚点文件已达数万行，O(n²) 不可接受）。
+    if append_jsonl_atomic_many(
+        _ANCHOR_PATH,
+        [json.dumps(r, ensure_ascii=False) + "\n" for r in new_records],
+        prefix=".dedup_anchors_",
+        log_tag="dedup",
+        noun="锚点文件",
+    ):
+        return
+    # 写盘失败：撤回本次登记的 key，否则这些锚点会被永久判为"已写"而丢失
+    with _WRITTEN_KEYS_LOCK:
+        for r in new_records:
+            _WRITTEN_ANCHOR_KEYS.discard(_anchor_key(r))
 
 
 # ── 高频财经常见动词/形容词/副词 — 不作为实体判定依据 ──────

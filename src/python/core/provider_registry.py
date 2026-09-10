@@ -22,6 +22,7 @@ from enum import Enum
 from typing import Any
 
 from src.python.core._phase_timeout import phase_timeout  # noqa: F401  # re-export，test_phase_timeout 通过 provider_registry 访问
+from src.python.core.atomic_write import write_json_atomic
 
 logger = logging.getLogger("invest")
 
@@ -219,11 +220,13 @@ class DataSourceRegistry:
         return os.path.join(os.path.dirname(_CACHE_DIR), "state", _CIRCUIT_BREAKER_STATE_FILE)
 
     def _save_state(self) -> None:
-        """持久化当前熔断状态到 JSON 文件（原子写入）。"""
-        import contextlib
-        import json
-        import tempfile
+        """持久化当前熔断状态到 JSON 文件（原子写入，委托 core/atomic_write）。
 
+        半写的状态文件会让下次启动读不出熔断记录（断路器"失忆"，已熔断的源被
+        立即重试）。落盘委托 `core/atomic_write.write_json_atomic`（同目录临时
+        文件 + os.replace），失败由原语记日志并返回 False，本处不抛出——熔断状态
+        属尽力持久化的旁路状态，不得中断调用链。
+        """
         path = self._get_breaker_state_path()
         now = time.time()
         state: dict[str, dict] = {}
@@ -239,19 +242,10 @@ class DataSourceRegistry:
                         "cooldown_secs": ps.cooldown_secs,
                         "_saved_at": now,
                     }
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    json.dump(state, f, ensure_ascii=False, indent=2)
-                os.replace(tmp_path, path)
-            except Exception:
-                with contextlib.suppress(OSError):
-                    os.remove(tmp_path)
-                raise
-        except OSError as e:
-            logger.warning("[registry] 熔断状态持久化失败: %s", e)
+        # 落盘委托 core/atomic_write（唯一原语）。失败已在原语内记日志并返回 False；
+        # 此处**不**判定成败——熔断状态是旁路持久化，本次写盘失败不影响本次熔断判定
+        # （内存态仍生效），下次成功写入即会补齐。
+        write_json_atomic(path, state, prefix=".breaker_", log_tag="registry", noun="熔断状态")
 
     def _load_state(self) -> None:
         """从 JSON 文件加载熔断状态，超过 TTL 的条目自动清理。"""

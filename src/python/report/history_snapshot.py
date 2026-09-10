@@ -1,6 +1,6 @@
 """持仓快照持久化：保存/加载/列表/清理。
 
-所有文件写入使用 tempfile.mkstemp + os.replace 确保原子性。
+所有文件写入委托 `core/atomic_write`（mkstemp + os.replace 原子写）。
 竞争条件防护：快照文件名使用时间戳（snapshot_{timestamp}.json）。
 
 命名空间（namespace）：快照可按隔离域读写（如 web 试算域 `web`），
@@ -24,9 +24,10 @@ import json
 import logging
 import os
 import re
-import tempfile
 from datetime import datetime
 from typing import Any
+
+from src.python.core.atomic_write import write_text_atomic
 
 from src.python.core.constants import (
     HISTORY_SNAPSHOT_DIR,
@@ -144,7 +145,7 @@ def _snapshot_from_dict(d: dict[str, Any]) -> SnapshotData:
 def save(snapshot: SnapshotData, namespace: str | None = None) -> str:
     """将 SnapshotData 保存为快照 JSON 文件。
 
-    使用 tempfile.mkstemp + os.replace 确保原子写入。
+    原子写入委托 `core/atomic_write`（同目录临时文件 + os.replace）。
     文件名格式：snapshot_{timestamp}.json（timestamp = ISO 格式）。
 
     Args:
@@ -168,23 +169,18 @@ def save(snapshot: SnapshotData, namespace: str | None = None) -> str:
     data = _snapshot_to_dict(snapshot)
     content = json.dumps(data, ensure_ascii=False, indent=2)
 
-    # 原子写入：tempfile.mkstemp + os.replace
-    fd, tmp_path = tempfile.mkstemp(
-        suffix=".json",
+    # 原子写入：委托 core/atomic_write（唯一原语，mkstemp + os.replace）。
+    # 本函数的契约是**失败即抛**（见 docstring Raises），故把原语的布尔成败还原
+    # 为 OSError——原语只记日志不抛出（其调用方多为「尽力持久化」场景），此处
+    # 必须显式还原，否则写盘失败会被静默吞成"已保存"。
+    if not write_text_atomic(
+        final_path,
+        content,
         prefix=".snapshot_tmp_",
-        dir=snap_dir,
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-        os.replace(tmp_path, final_path)
-    except Exception:
-        # 清理临时文件
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+        log_tag="history_snapshot",
+        noun="快照",
+    ):
+        raise OSError(f"快照写入失败: {final_path}")
 
     logger.info("[history_snapshot] 快照已保存: %s (%d KB)", filename, len(content) // 1024)
     return final_path

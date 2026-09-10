@@ -13,14 +13,13 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import logging
 import os
-import tempfile
 import threading
 from typing import Any
 
+from src.python.core.atomic_write import write_json_atomic
 from src.python.core.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
@@ -345,20 +344,17 @@ def save_feature_overrides(overrides: dict[str, bool], merge: bool = True) -> No
     # 只保留值为 bool 的条目
     cleaned = {k: v for k, v in existing.items() if isinstance(v, bool)}
 
-    try:
-        os.makedirs(os.path.dirname(_FEATURES_FILE), exist_ok=True)
-        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(_FEATURES_FILE), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(cleaned, f, ensure_ascii=False, indent=2)
-            os.replace(tmp_path, _FEATURES_FILE)
-            logger.info("[features] 已保存 %d 项功能开关覆写", len(cleaned))
-        except Exception:
-            with contextlib.suppress(OSError):
-                os.remove(tmp_path)
-            raise
-    except OSError as e:
-        logger.warning("[features] 保存覆写失败: %s", e)
+    # 落盘委托 core/atomic_write（唯一原语，mkstemp + os.replace）。失败由原语记日志
+    # 并返回 False——开关覆写属尽力持久化：写不进盘不影响本次运行（内存态随后同步），
+    # 也不应因此中断调用链。
+    if write_json_atomic(
+        _FEATURES_FILE,
+        cleaned,
+        prefix=".features_",
+        log_tag="features",
+        noun="功能开关覆写",
+    ):
+        logger.info("[features] 已保存 %d 项功能开关覆写", len(cleaned))
 
     # 同步运行时状态
     for flag_name, enabled in cleaned.items():
