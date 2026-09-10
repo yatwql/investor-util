@@ -137,8 +137,25 @@ def pytest_configure(config):
 # ═══════════════════════════════════════════════════════════════
 
 
+@pytest.fixture(scope="session")
+def _doctor_probe_targets(tmp_path_factory):
+    """doctor 目录探针的 session 级落点：``[(标签, 目录)]``，三个可写目录。
+
+    独立于各用例的 ``tmp_path``：``_check_writable`` 会在目标目录写哨兵文件
+    （随即删除），而有用例断言 `tmp_path` 内无残留，故探针落点不能在 tmp_path 下。
+    session 级复用单个目录，pytest 按保留策略自动清理。
+    """
+    base = tmp_path_factory.mktemp("doctor_probe")
+    targets: list[tuple[str, str]] = []
+    for label, rel in (("输出目录", "reports"), ("缓存目录", "data/cache"), ("日志目录", "logs")):
+        target = base / rel
+        target.mkdir(parents=True, exist_ok=True)
+        targets.append((label, str(target)))
+    return targets
+
+
 @pytest.fixture(autouse=True)
-def _isolate_sensitive_paths(tmp_path, monkeypatch):
+def _isolate_sensitive_paths(tmp_path, monkeypatch, _doctor_probe_targets):
     """自动将 config.json 和缓存目录重定向到临时目录。
 
     防止测试运行意外修改用户的真实配置文件（data/config/config.json）、
@@ -239,6 +256,14 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "src.python.core.signal_ledger._SIGNAL_LEDGER_FILE",
         str(tmp_path / "data/state/signal_ledger.jsonl"),
+    )
+    # doctor 自检目录探针隔离：_check_writable 会**真实写盘**（写哨兵文件后删除），
+    # 三个目标不重定向则每次自检测试都瞬写用户真实的 reports/、data/cache/、logs/，
+    # 用例中途失败还会留下探针残留。目标目录取 session 级独立临时目录 —— 不落在
+    # 各用例的 tmp_path 下（有用例断言 tmp_path 内无哨兵残留，见 test_doctor）。
+    monkeypatch.setattr(
+        "src.python.core.doctor._probe_targets",
+        lambda: list(_doctor_probe_targets),
     )
     # LLM 配置文件隔离
     monkeypatch.setattr(
