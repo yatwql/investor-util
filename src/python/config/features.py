@@ -117,6 +117,63 @@ EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
     ),
 }
 
+# ── 实验功能名解析 ──────────────────────────────────────────
+# 「可开启的实验功能清单」唯一来源是 EXPERIMENTAL_FEATURES 注册表：
+# TUI 菜单 S / Web 配置面板直接遍历注册表渲染，命令行入口经下方解析函数
+# 校验取值，三者同源，新增实验开关无需改动任何入口代码。
+
+EXPERIMENT_ALL = "all"
+
+
+def _match_experiment(token: str) -> str | None:
+    """按开关名（大小写不敏感）或显示名（精确）匹配单个实验功能。
+
+    Returns:
+        命中的开关名，未匹配到返回 None
+    """
+    lowered = token.lower()
+    for flag, (display_name, _desc) in EXPERIMENTAL_FEATURES.items():
+        if flag.lower() == lowered or display_name == token:
+            return flag
+    return None
+
+
+def resolve_experiment_flags(names: list[str]) -> tuple[set[str], list[str]]:
+    """将用户输入的实验功能名解析为开关名集合（注册表驱动）。
+
+    接受三种写法（忽略首尾空白；开关名大小写不敏感）：
+      - 开关名：``signal_pre_digest``
+      - 显示名：``信号预消化``
+      - ``all``：全部实验功能
+
+    Args:
+        names: 用户输入的名称列表（空白项自动跳过）
+
+    Returns:
+        ``(命中的开关名集合, 未识别的原始名称列表)``；调用方据此决定
+        是全部启用还是报错提示可用清单。
+    """
+    resolved: set[str] = set()
+    unknown: list[str] = []
+    for raw in names:
+        token = (raw or "").strip()
+        if not token:
+            continue
+        if token.lower() == EXPERIMENT_ALL:
+            resolved.update(EXPERIMENTAL_FEATURES)
+            continue
+        hit = _match_experiment(token)
+        if hit is None:
+            unknown.append(raw)
+        else:
+            resolved.add(hit)
+    return resolved, unknown
+
+
+def describe_experiment_flags() -> str:
+    """返回实验功能清单的人类可读串（供 CLI 帮助与报错提示复用）。"""
+    return "、".join(f"{flag}（{name}）" for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items())
+
 
 def log_experimental_features() -> None:
     """如果已启用实验性功能，在日志中以红色高亮显示具体开启了什么功能。
@@ -143,10 +200,13 @@ def log_experimental_features() -> None:
 
 __all__ = [
     "EXPERIMENTAL_FEATURES",
+    "EXPERIMENT_ALL",
     "FEATURE_FLAGS",
+    "describe_experiment_flags",
     "get_feature_defaults",
     "is_feature_enabled",
     "log_experimental_features",
+    "resolve_experiment_flags",
     "set_feature_enabled",
     "load_feature_overrides",
     "save_feature_overrides",

@@ -866,12 +866,9 @@
       penetration_deep: '穿透深度分析',
       news_correlation: '财经新闻热点与持仓关联分析'
     },
-    experiments: {
-      llm_debate_procon: '辩论-正反辩论',
-      llm_debate_conditional: '辩论-条件推理',
-      llm_debate_qa_concentration: '辩论-集中度问答',
-      decision_reflection: '决策跨期反思闭环'
-    }
+    // 实验开关显示名不在此维护：服务端 surface.llm.experiment_labels 按注册表下发，
+    // 由 renderConfigEdit 回填（避免前端手写字典与 features.EXPERIMENTAL_FEATURES 漂移）
+    experiments: {}
   };
 
   // 持仓匿名化枚举中文描述（对齐 config/anonymizer.ANONYMIZATION_MODE_DESCRIPTIONS）
@@ -902,6 +899,12 @@
 
   function renderConfigEdit(surface) {
     configState.surface = surface;
+    // 实验开关显示名回填（服务端按注册表下发，新增实验项无需改前端）
+    if (surface.llm && surface.llm.experiment_labels) {
+      Object.keys(surface.llm.experiment_labels).forEach(function (flag) {
+        CONFIG_LABELS.experiments[flag] = surface.llm.experiment_labels[flag];
+      });
+    }
     els.configPanel.textContent = '';
     // 面板顶部警示区（同源失败 403 专用）
     var panelErr = document.createElement('p');

@@ -28,6 +28,24 @@ _EXIT_SEVERE = 2
 # ── argparse 解析器 ─────────────────────────────────────
 
 
+def _experiment_name(value: str) -> tuple[str, ...]:
+    """argparse type 回调 —— 校验并归一化 ``--experiment`` 取值。
+
+    取值清单取自 features.EXPERIMENTAL_FEATURES 注册表（与 TUI 菜单 S /
+    Web 配置面板同源），支持开关名、显示名与 ``all``。命中多个（``all``）
+    时返回全部开关名，调用方平铺后统一启用。
+
+    名称解析本身容忍空白项（见 resolve_experiment_flags），但命令行取值
+    为空串时属用户笔误，此处按非法取值报错，不静默忽略。
+    """
+    from src.python.config.features import describe_experiment_flags, resolve_experiment_flags
+
+    flags, unknown = resolve_experiment_flags([value])
+    if unknown or not flags:
+        raise argparse.ArgumentTypeError(f"未知实验功能 '{value}'；可选: {describe_experiment_flags()}、all")
+    return tuple(sorted(flags))
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """构建 argparse 参数解析器。"""
     parser = argparse.ArgumentParser(
@@ -41,6 +59,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", metavar="DIR", help="报告输出目录（覆盖 config.json 的 output_dir）")
     parser.add_argument("--verbose", action="store_true", help="将进度消息同步到 stderr（默认仅写入 logs/app.log）")
     parser.add_argument("--non-interactive", action="store_true", help="跳过首次运行交互式引导（定时任务/脚本使用）")
+    parser.add_argument(
+        "--experiment",
+        metavar="NAME",
+        action="append",
+        type=_experiment_name,
+        help="启用实验性功能，仅本次运行生效（不写入 features.json）。可重复指定；"
+        "NAME 取开关名或显示名，all=全部启用。",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s v{APP_VERSION}")
 
     sub = parser.add_subparsers(dest="command", required=True)
@@ -564,6 +590,25 @@ def _handle_view_logs(args: argparse.Namespace) -> int:
 # ── 主入口 ───────────────────────────────────────────────
 
 
+def _apply_cli_experiments(groups: list[tuple[str, ...]] | None) -> None:
+    """启用命令行指定的实验功能（仅当前进程运行时，不写盘）。
+
+    ``--experiment`` 已在 argparse type 回调中完成取值校验，
+    此处只负责平铺与启用。持久化开关请走 TUI 菜单 S / Web 配置面板。
+    """
+    if not groups:
+        return
+
+    import logging
+
+    from src.python.config.features import set_feature_enabled
+
+    flags = sorted({flag for group in groups for flag in group})
+    for flag in flags:
+        set_feature_enabled(flag, True)
+    logging.getLogger("invest").info("[features] 命令行启用实验功能 %d 项: %s", len(flags), "、".join(flags))
+
+
 def main() -> int:
     """CLI 主入口。
 
@@ -593,6 +638,9 @@ def main() -> int:
 
     init_config(config_path=args.config)
     config = get_config()
+
+    # 实验功能命令行开关（需在配置初始化之后：覆写加载已完成，此处为本次运行增量）
+    _apply_cli_experiments(args.experiment)
 
     # 首次运行引导（非交互/CI/脚本环境自动跳过，不阻塞命令执行）
     try:

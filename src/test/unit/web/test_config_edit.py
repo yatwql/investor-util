@@ -182,6 +182,10 @@ class TestGetSurface:
             "doctor_check",
         }
         assert all(v is False for v in data["llm"]["experiments"].values())
+        # 显示名同源下发（前端不再手写标签字典，避免与注册表漂移）
+        assert set(data["llm"]["experiment_labels"]) == set(data["llm"]["experiments"])
+        assert data["llm"]["experiment_labels"]["decision_header_parse"] == "决策头结构化"
+        assert data["llm"]["experiment_labels"]["signal_ledger"] == "确定性信号沉淀"
 
 
 # ═══════════════════════════════════════════════════════════════

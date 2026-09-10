@@ -15,6 +15,7 @@ from src.python.cli import (
     _EXIT_PARTIAL,
     _EXIT_SEVERE,
     _EXIT_SUCCESS,
+    _apply_cli_experiments,
     _build_parser,
     _cli_read_holdings,
     _cli_read_holdings_with_flows,
@@ -104,6 +105,41 @@ class TestArgparse:
         """--output 全局参数解析。"""
         args = _build_parser().parse_args(["--output", "/tmp/reports", "report"])
         assert args.output == "/tmp/reports"
+
+    def test_experiment_absent_by_default(self):
+        """未指定 --experiment 时为 None（不触碰运行时开关）。"""
+        args = _build_parser().parse_args(["report"])
+        assert args.experiment is None
+
+    def test_experiment_by_flag_name(self):
+        """--experiment 接受开关名。"""
+        args = _build_parser().parse_args(["--experiment", "signal_pre_digest", "report"])
+        assert args.experiment == [("signal_pre_digest",)]
+
+    def test_experiment_by_display_name(self):
+        """--experiment 接受中文显示名（与 TUI 菜单 S 同源）。"""
+        args = _build_parser().parse_args(["--experiment", "信号预消化", "report"])
+        assert args.experiment == [("signal_pre_digest",)]
+
+    def test_experiment_repeatable(self):
+        """--experiment 可重复指定，逐项独立解析。"""
+        args = _build_parser().parse_args(
+            ["--experiment", "signal_pre_digest", "--experiment", "decision_reflection", "report"]
+        )
+        assert args.experiment == [("signal_pre_digest",), ("decision_reflection",)]
+
+    def test_experiment_all(self):
+        """--experiment all 展开为全部实验功能。"""
+        from src.python.config.features import EXPERIMENTAL_FEATURES
+
+        args = _build_parser().parse_args(["--experiment", "all", "report"])
+        assert args.experiment == [tuple(sorted(EXPERIMENTAL_FEATURES))]
+
+    def test_experiment_unknown_rejected(self):
+        """未知名称 → argparse 报错 SystemExit(2)，不静默忽略。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--experiment", "no_such_feature", "report"])
+        assert exc.value.code == 2
 
     def test_invalid_command(self):
         """未知命令 → SystemExit(2)。"""

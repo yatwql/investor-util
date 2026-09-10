@@ -11,7 +11,13 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_cli, pytest.mark.edge]
 import os
 from unittest.mock import MagicMock, patch
 
-from src.python.cli import _EXIT_SEVERE, _EXIT_SUCCESS, _cli_read_holdings
+from src.python.cli import (
+    _EXIT_SEVERE,
+    _EXIT_SUCCESS,
+    _apply_cli_experiments,
+    _build_parser,
+    _cli_read_holdings,
+)
 
 
 class TestCliEdge:
@@ -109,3 +115,35 @@ class TestCliEdge:
         from src.python.report.cli_progress import _should_color
         # 测试环境中 stderr 被 pytest 捕获（非 TTY），应禁用颜色
         assert _should_color() is False
+
+    @pytest.mark.edge
+    def test_experiment_blank_value_rejected(self):
+        """--experiment 空串 → 视为未识别并报错，不静默忽略。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--experiment", "", "report"])
+        assert exc.value.code == 2
+
+    @pytest.mark.edge
+    def test_experiment_valid_then_invalid_rejected(self):
+        """同一参数重复指定时，任一取值非法即整体报错（不部分生效）。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--experiment", "signal_pre_digest", "--experiment", "bad", "report"])
+        assert exc.value.code == 2
+
+    @pytest.mark.edge
+    def test_experiment_all_then_name_dedup(self):
+        """all 与具体名称混用 → 解析结果去重，不产生重复启用。"""
+        from src.python.config.features import EXPERIMENTAL_FEATURES
+
+        args = _build_parser().parse_args(["--experiment", "all", "--experiment", "signal_pre_digest", "report"])
+        flags = {flag for group in args.experiment for flag in group}
+        assert flags == set(EXPERIMENTAL_FEATURES)
+
+    @pytest.mark.edge
+    def test_apply_experiments_duplicate_groups(self, monkeypatch):
+        """重复分组不报错，开关按幂等处理。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        _apply_cli_experiments([("signal_pre_digest",), ("signal_pre_digest",)])
+        assert feat.FEATURE_FLAGS["signal_pre_digest"] is True

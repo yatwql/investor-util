@@ -44,6 +44,24 @@ MENU_ITEMS: list[MenuItem] = [
     ("X", "退出", None, True),
 ]
 
+# 受功能开关约束的菜单项：{快捷键: 开关名}。
+# 开关关闭时该菜单项整体不出现（在 _apply_feature_gates 中裁剪），
+# 避免用户点进去只得到一句「功能未启用」。
+FEATURE_GATED_ITEMS: dict[str, str] = {"D": "doctor_check"}
+
+
+def _apply_feature_gates() -> None:
+    """按功能开关就地裁剪 MENU_ITEMS（切片赋值保持列表对象不变，调用方视图同步）。"""
+    from src.python.config.features import is_feature_enabled
+
+    disabled = {
+        key
+        for key, flag in FEATURE_GATED_ITEMS.items()
+        if key in {item[0] for item in MENU_ITEMS} and not is_feature_enabled(flag)
+    }
+    if disabled:
+        MENU_ITEMS[:] = [item for item in MENU_ITEMS if item[0] not in disabled]
+
 _config_cache: dict | None = None
 
 
