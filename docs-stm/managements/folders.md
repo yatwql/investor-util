@@ -239,6 +239,7 @@ investor-util/
 │   │   │   ├── _report_aux_metrics.py #  辅助指标编排（市场温度 + 持仓相关性矩阵）
 │   │   │   ├── _llm_news.py          #   LLM/新闻并行获取（线程池提交/收集/报告）
 │   │   │   ├── _report_generation.py #   报告生成实现（both/full 两种路径，聚合门面）
+│   │   │   ├── _experimental_seams.py #  管线实验挂载点（守护语义单份实现 + 按需导入被调子模块）
 │   │   │   ├── _report_health.py     #   数据源健康检查（后台并行启动/结果收集持久化）
 │   │   │   ├── _report_helpers.py    #   管线辅助函数（轻量行情/演进与快照差异注入/完整性校验/both 明细子集）
 │   │   │   ├── _full_risk_metrics.py #   full 路径全量量化指标装配（历史走势+指标+情景分析+口径修正）
@@ -574,6 +575,7 @@ investor-util/
 │       │   │   ├── test_excel_report_structure.py #   Excel 报告结构测试
 │       │   │   ├── test_excel_roundtrip.py        #   Excel 写入读取回环测试
 │       │   │   ├── test_excel_writer.py           #   Excel 写入器测试
+│       │   │   ├── test_experimental_seams.py     #   管线实验挂载点（开关关闭无感/开启生效/下游异常只告警不外抛 + 顶层导入接线守卫）
 │       │   │   ├── test_feature_interactive.py    #   交互图表 Feature Flag + JS 资产复制/内嵌（单文件自包含）测试
 │       │   │   ├── test_fund_deep_analysis_sheet_edge.py # 基金深度分析页签边缘场景
 │       │   │   ├── test_fund_candidate.py         #   候选基金比较测试（基金业绩分析章候选比较子表）
