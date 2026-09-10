@@ -114,6 +114,27 @@ _PRICE_TRANSFORMS: dict[str, Callable] = {
 }
 
 
+def _price_chain_slots() -> tuple[dict[str, tuple[str, _ProviderFunc]], dict[str, Callable]]:
+    """返回行情链路的（provider 映射, 转换映射）。
+
+    实验开关「数据源适配契约」开启时改用适配器实现同一映射（三段式 + 声明式
+    alias 归一）；关闭时使用既有手写转换函数。两者由等价性回归测试逐源锁定，
+    链路顺序/缓存键/熔断/降级均不受影响（映射内容除「东财源补 market_cap/pe
+    两个 None 键」外逐键等价，见 test_quote_adapter_parity.py）。
+    """
+    from src.python.config.features import is_feature_enabled
+    from src.python.fetcher.source_adapter import adapter_chain_slots
+    from src.python.schemas.datasource_fields import DOMAIN_QUOTE
+
+    if not is_feature_enabled("datasource_adapter"):
+        return _PRICE_PROVIDERS, _PRICE_TRANSFORMS
+    provider_map, transform_map = adapter_chain_slots(DOMAIN_QUOTE)
+    if not provider_map:  # 适配器不可用（导入失败等）→ 保守回落既有映射
+        logger.warning("[price] 适配契约无可用适配器，回落既有转换函数")
+        return _PRICE_PROVIDERS, _PRICE_TRANSFORMS
+    return provider_map, transform_map
+
+
 # ── 公开接口 ─────────────────────────────────────────────────
 
 
@@ -178,6 +199,7 @@ def _fetch_price_with_cache_refresh(
 
     _t = get_tracker()
     _src_key = f"price_{data_type}_{code}"
+    providers, transforms = _price_chain_slots()
 
     def _validate(raw: dict, provider_name: str) -> bool:
         return _validate_price_data(raw, provider_name, expected_name)
@@ -185,11 +207,11 @@ def _fetch_price_with_cache_refresh(
     diag = FailureDiagnostics()
     r = fetch_with_fallback(
         data_type=data_type,
-        provider_fn_map=_PRICE_PROVIDERS,
+        provider_fn_map=providers,
         cache_key=cache_key,
         cache_ttl=get_ttl("price", cache_key),
         fn_kwargs={"code": code},
-        transform=_PRICE_TRANSFORMS,
+        transform=transforms,
         validate=_validate,
         diagnostics=diag,
     )
@@ -208,11 +230,11 @@ def _fetch_price_with_cache_refresh(
         refresh_diag = FailureDiagnostics()
         r = fetch_with_fallback(
             data_type=data_type,
-            provider_fn_map=_PRICE_PROVIDERS,
+            provider_fn_map=providers,
             cache_key=cache_key,
             cache_ttl=get_ttl("price", cache_key),
             fn_kwargs={"code": code},
-            transform=_PRICE_TRANSFORMS,
+            transform=transforms,
             validate=_validate,
             diagnostics=refresh_diag,
         )

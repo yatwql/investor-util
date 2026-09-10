@@ -29,9 +29,10 @@ GROUP_ENV = "环境"
 GROUP_CONFIG = "配置"
 GROUP_DIRS = "目录"
 GROUP_FEATURES = "功能开关"
+GROUP_ADAPTER = "数据源适配"
 GROUP_NETWORK = "数据源"
 
-GROUP_ORDER = [GROUP_ENV, GROUP_CONFIG, GROUP_DIRS, GROUP_FEATURES, GROUP_NETWORK]
+GROUP_ORDER = [GROUP_ENV, GROUP_CONFIG, GROUP_DIRS, GROUP_FEATURES, GROUP_ADAPTER, GROUP_NETWORK]
 
 # 支持的最低 Python 版本（项目依赖的语法特性下限）
 MIN_PYTHON = (3, 10)
@@ -258,6 +259,56 @@ def _check_experimental_features() -> list[dict[str, Any]]:
     return [_item(GROUP_FEATURES, "实验功能", True, f"已启用 {len(enabled)} 项 — {detail}")]
 
 
+def _check_source_adapters() -> list[dict[str, Any]]:
+    """数据源适配契约自检（离线，不发起任何网络请求）。
+
+    报告已登记的适配器数量与其契约自检结论，并标注契约路径是否已由实验开关
+    启用——开关未启用时声明与自检仍可核验（这正是接入新数据源前要看的）。
+    """
+    try:
+        from src.python.config.features import is_feature_enabled
+        from src.python.fetcher.source_adapter import survey_adapters
+
+        reports = survey_adapters()
+        enabled = is_feature_enabled("datasource_adapter")
+    except Exception as exc:  # noqa: BLE001
+        return [_item(GROUP_ADAPTER, "适配契约", False, f"执行失败: {type(exc).__name__}: {exc}")]
+
+    if not reports:
+        return [
+            _item(
+                GROUP_ADAPTER,
+                "适配契约",
+                False,
+                "未登记任何适配器",
+                hint="检查 src/python/fetcher/ 下适配器模块是否注册（source_adapter.ADAPTER_MODULES）",
+            )
+        ]
+
+    domains = "、".join(sorted({r["domain"] for r in reports}))
+    path_state = "已启用" if enabled else "未启用（实验开关 datasource_adapter 关闭，链路走既有转换函数）"
+    bad = [r for r in reports if not r["ok"]]
+    if bad:
+        detail = "；".join(f"{r['display_name']}：{r['message']}" for r in bad)
+        return [
+            _item(
+                GROUP_ADAPTER,
+                "适配契约",
+                False,
+                f"{len(reports)} 个适配器（域：{domains}），{len(bad)} 个未通过自检 — {detail}",
+                hint="修正适配器的 aliases/defaults 声明或 transform_data 输出字段集",
+            )
+        ]
+    return [
+        _item(
+            GROUP_ADAPTER,
+            "适配契约",
+            True,
+            f"{len(reports)} 个适配器（域：{domains}）契约自检通过；契约路径{path_state}",
+        )
+    ]
+
+
 def _check_network(max_timeout: float) -> list[dict[str, Any]]:
     """复用数据源健康检查（网络不可用时不应让整次自检失败，故结果照实上报）。"""
     try:
@@ -302,6 +353,7 @@ def run_doctor_checks(*, include_network: bool = True, max_timeout: float = 8.0)
     results.extend(_check_config())
     results.extend(_check_directories())
     results.extend(_check_experimental_features())
+    results.extend(_check_source_adapters())
     if include_network:
         results.extend(_check_network(max_timeout))
 

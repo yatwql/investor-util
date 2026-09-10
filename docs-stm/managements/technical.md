@@ -17,6 +17,7 @@
   - [2.2 三层熔断架构](#22-三层熔断架构)
   - [2.3 Fetcher 调度架构](#23-fetcher-调度架构)
   - [2.4 关键机制](#24-关键机制)
+  - [2.5 数据源适配契约（实验：`datasource_adapter`，默认关）](#25-数据源适配契约实验datasource_adapter默认关)
 - [3. 缓存层详细设计](#3-缓存层详细设计)
   - [3.1 子模块结构](#31-子模块结构)
   - [3.2 核心接口与 TTL 分辨率](#32-核心接口与-ttl-分辨率)
@@ -1074,6 +1075,43 @@ fetch_index_data(code)
 | 00 代码降级触发 | `[price] [002943 广发多因子] 股票链路全部失败，降级尝试东方财富净值链路` |
 | 00 代码降级成功 | `[price] [002943 广发多因子] 降级成功——通过场外基金链路获取到净值` |
 | 汇总失败资产 | `市场行情获取：14 成功，1 失败；失败资产: ['广发多因子(002943)']` |
+
+### 2.5 数据源适配契约（实验：`datasource_adapter`，默认关）
+
+接入一个数据源要做的三件事被拆成三个可独立检验的小函数，**声明在前、代码在后**：
+
+| 契约环节 | 实现位置 | 本项目的落地方式 |
+|:---------|:---------|:-----------------|
+| 参数转译 `transform_query` | `SourceAdapter.transform_query` | 默认恒等；子类可补默认值/拼查询参数 |
+| 抓取 `extract_data` | 各子类 | **委托既有 provider 函数**，不复制任何 HTTP 与解析逻辑 |
+| 映射到标准字段 `transform_data` | `SourceAdapter` 默认实现 | 声明式 alias 归一（见下），子类可覆写 |
+
+默认映射由三样**数据**驱动，不含逐字段的手写赋值：
+
+| 声明 | 位置 | 语义 |
+|:-----|:-----|:-----|
+| 标准字段记录类 | `schemas/datasource_fields.py`（`DOMAIN_RECORDS` 登记） | 字段名与类型的唯一来源；`float` 缺失取 `0.0`、`float \| None` 取 `None`（该源不提供此字段）、`str` 取空串；数值一律经 `core.num_utils.safe_num` 归一（防 NaN/±inf 污染下游） |
+| `aliases` | 适配器类属性 | `{上游字段名: 标准字段名}`——字段改名的唯一表达处（如净值源 `nav` → `price`） |
+| `defaults` | 适配器类属性 | `{标准字段: 该源在上游未提供或取值不可用时的缺省}`；未声明则按类型注解推导。合法的 `0.0` 不被缺省覆盖 |
+
+**输出恒为全部标准字段**：同一域的不同源产出同键同构 dict，下游无需为「某源少两个键」写分支。
+源身份字段（`source`/`source_api`）由适配器强制提供，上游自报的来源不参与映射——否则「来源」会与「实际生效链路」脱钩（如东方财富回落到天天基金时自报`天天基金`）。
+
+**接入链路的方式**：`adapter_chain_slots(domain)` 把某域的适配器映射为 Provider Chain 的两个入参
+（`provider_fn_map` / `transform`），因此链路顺序、缓存键、熔断、降级全部复用
+`fetcher/chain.fetch_with_fallback`，**不新造第二条获取路径**。行情域试点见
+`fetcher/price.py::_price_chain_slots()`——开关关闭时返回既有手写映射对象本身（逐字节行为不变），
+开启时改用适配器映射。
+
+**试点范围与等价性**：仅行情域三源（腾讯/新浪/东方财富），与既有转换函数逐源等价，
+唯一有意差异是东方财富既有转换函数不含 `market_cap`/`pe` 两个键而契约恒为全字段（补 `None`）——
+下游消费方一律 `.get()` 读取，取值语义不变。等价性由 `test_quote_adapter_parity.py` 锁定。
+**存量 provider 不回改**：新数据源/新字段先走契约，既有源维持现状。
+
+**自检与体检**：`survey_adapters()` 离线核验（域登记、alias/defaults 指向真实标准字段、
+`transform_data` 对合成样本输出恰好标准字段集），自身不抛异常；`doctor` 的「数据源适配」组
+（`--offline` 可用）报告适配器数量、各域与自检结论，并标注契约路径是否已由开关启用——
+**契约未启用时声明与自检仍可核验**，这正是接入新数据源前要看的。
 
 [↑ 回到顶部](#目录)
 
@@ -3029,6 +3067,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `log_reader` | 日志读取（read_log/tail_log/parse_log） | 日志可视化 | 诊断 | 无（模块级） |
 | `view_logs` | 查看日志（CLI view-logs 子命令） | 日志可视化 | 诊断 | 无（子命令） |
 | `health_history` | 数据源健康历史（load_health_history/summarize_health_history） | 日志可视化 | 监控 | data/state/datasource_health.jsonl |
+| `source_adapter` | 数据源适配契约（`SourceAdapter` 基类 + 注册表 + 自检报告 `survey_adapters`） | 数据源适配 | 数据获取 | 实验开关 `datasource_adapter`（默认关） |
+| `quote_adapters` | 行情域适配器（腾讯/新浪/东方财富三源） | 数据源适配 | 数据获取 | 实验开关 `datasource_adapter`（默认关） |
+| `adapter_chain_slots` | 适配器映射为 Provider Chain 两槽（provider_fn_map / transform） | 数据源适配 | 数据获取 | 实验开关 `datasource_adapter`（默认关） |
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 

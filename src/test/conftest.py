@@ -394,6 +394,20 @@ def _auto_reset_provider_registry():
 
 
 @pytest.fixture(autouse=True)
+def _auto_reset_adapter_registry():
+    """自动重置数据源适配器注册表，防止测试间状态污染。
+
+    每个测试执行前先把注册表恢复为「模块导入后」的初始内容（即各适配器模块
+    注册的真实适配器），测试中临时注入的适配器不会泄漏到后续用例。
+    """
+    from src.python.fetcher import source_adapter
+
+    baseline = source_adapter.snapshot_adapters()
+    yield
+    source_adapter.restore_adapters(baseline)
+
+
+@pytest.fixture(autouse=True)
 def _auto_reset_anchor_state():
     """自动重置新闻去重锚点模块单例状态，防止测试间状态污染。
 

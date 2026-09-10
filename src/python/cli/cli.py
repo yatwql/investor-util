@@ -609,6 +609,22 @@ def _apply_cli_experiments(groups: list[tuple[str, ...]] | None) -> None:
     logging.getLogger("invest").info("[features] 命令行启用实验功能 %d 项: %s", len(flags), "、".join(flags))
 
 
+def _prepare_early_exit_experiments(groups: list[tuple[str, ...]] | None) -> None:
+    """为不初始化 config 的早返回命令应用实验开关。
+
+    ``doctor``/``check-sources``/``view-logs`` 先于 ``init_config()`` 分派
+    （配置损坏时这些命令仍须可用），故命令行开关需单独应用，否则
+    ``--experiment`` 会被静默忽略、用户据 doctor 结论误判实验功能状态。
+
+    顺序必须与 ``init_config()`` 一致：先读 features.json 覆写，再叠加命令行
+    增量——反过来会被随后的覆写值回冲。
+    """
+    from src.python.config.features import load_feature_overrides
+
+    load_feature_overrides()
+    _apply_cli_experiments(groups)
+
+
 def main() -> int:
     """CLI 主入口。
 
@@ -624,6 +640,10 @@ def main() -> int:
     args = parser.parse_args()
 
     from src.python.config import get_config, init_config
+
+    # 以下三命令不初始化 config（配置损坏时仍须可用），实验开关需单独应用
+    if args.command in ("check-sources", "view-logs", "doctor"):
+        _prepare_early_exit_experiments(args.experiment)
 
     if args.command == "check-sources":
         return _handle_check_sources()

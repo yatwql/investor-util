@@ -81,6 +81,8 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "signal_ledger": False,
     # ── 系统自检（实验功能，默认关闭） ──
     "doctor_check": False,
+    # ── 数据源适配契约（实验功能，默认关闭） ──
+    "datasource_adapter": False,
 }
 
 # ── 实验性功能定义 ──────────────────────────────────────────
@@ -114,6 +116,10 @@ EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
     "doctor_check": (
         "系统自检",
         "一键体检运行环境/配置/目录/数据源，失败项附修复建议（doctor 命令、TUI 菜单 D、Web 运行状态区）",
+    ),
+    "datasource_adapter": (
+        "数据源适配契约",
+        "三段式（参数转译→抓取→映射到标准字段）适配器 + 声明式 alias 归一，行情域试点；关闭时走既有转换函数",
     ),
 }
 

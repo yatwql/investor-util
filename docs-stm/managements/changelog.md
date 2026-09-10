@@ -19,6 +19,21 @@
 - **测试**：新增 `test_module_fingerprint.py` 32 例——注册表键集合与预检键集合一致（防新增模块只注册一半）、四种输入场景下「预检键 == 写侧键」（含 `history_data` 有无/变化、信号摘要开关、辩论增强开关两态，三模块 + 全局政经共 4 模块 × 6 场景参数化）、**风险信号进入写侧指纹**（缺陷直接守卫）、全局政经不受风险信号影响、辩论增强后缀两侧同步、信号摘要后缀只作用于摘要模块。既有 `test_debate_generators.py` 的开关变体用例补齐第二处读点打桩。`test_trace_check_scripts.py` 的约束代号边界用例随识别范围扩展同步（"范围外样例"改用紧邻的下一个新编号，确认新增约束自身被检出、而其后的编号仍不误伤）。
 - **文档**：`llm-technical.md`（§13.1 指纹依赖表补齐 `history_data` 组合风险信号摘要项与辩论增强后缀、新增模块表行、"提示词受开关影响时的缓存键纪律"改写为"唯一事实来源"）、`technical.md`（约束表新增条目、结构化表头与信号摘要两处同源表述改为指向构建函数）、`folders.md`（目录树补两个新文件）、`CLAUDE.md`（架构遵从条目的约束条数）。
 
+### 数据源适配契约（plan-36，实验功能 `datasource_adapter` 默认关）（2026-09-10）
+
+- **背景**：借鉴 OpenBB Platform 的 Fetcher 设计识别出的接入形态问题——**本项目的每个数据源都要手拼一份解析后的 dict**，「字段从哪来、缺失时取什么、这个源有没有这个字段」全散在各 provider 的解析代码里；同一个行情域，腾讯源给了市值/市盈率、新浪源没给、东方财富源连键都不产出，下游只能靠 `if key in data` / `.get()` 逐个试探。字段改名（净值源的 `nav` → 统一的 `price`）也靠手写赋值表达。分析见 `docs-stm/plan/openbb-data-provider-analysis.md` §建议A/B；实现设计见 `docs-stm/plan/datasource-adapter-contract-design.md`。
+- **三段式契约**：接入一个数据源要做的事被拆成三个可独立检验的小函数——`transform_query`（参数转译，默认恒等）/ `extract_data`（抓取，**既有源在此委托既有 provider 函数**，不复制任何 HTTP 与解析逻辑）/ `transform_data`（映射到标准字段）。三者由 `fetcher/source_adapter.py::SourceAdapter` 统一约束，`fetch_raw` / `transform_record` 把两段直接暴露成 Provider Chain 的槽位。
+- **标准字段一份 + 声明式归一**：`schemas/datasource_fields.py` 按**数据域**登记标准字段记录（行情域为首个域），字段名与类型注解即缺省语义——`float` 缺失取 `0.0`、`float | None` 取 `None`（表示该源不提供此字段）、`str` 取空串；数值一律经 `core.num_utils.safe_num` 归一，NaN/±inf 不会经此路径进下游。默认映射由三样**数据**驱动：`aliases`（上游字段名 → 标准字段名，字段改名的唯一表达处）、`defaults`（该源的缺省取值）、记录类的类型注解。**输出恒为全部标准字段**，下游不必再为「某源少两个键」写分支。
+  - **「未提供」与「不可用」同待遇**：上游缺键、NaN/±inf、不可解析的字符串，都回落到该源声明的 `defaults`（未声明则按类型注解推导）；而**合法的 `0.0` 不会被缺省值覆盖**——这是实现期发现的真语义分界，两种情形分别有测试锁定（同一不可用取值在腾讯源得 `0.0`（声明"不提供按 0 计"）、在新浪源得 `None`（声明"不提供该字段"））。
+  - **源身份字段由适配器强制提供**（`source` / `source_api` 不参与上游映射）：东方财富净值回落到天天基金时上游自报 `source: "天天基金"`，若直接透传会让报告显示「来源：天天基金」而实际生效链路是东方财富，破坏「来源 = 实际生效链路」的可信语义。
+- **接入链路不新造路径**：`adapter_chain_slots(domain)` 把某域的适配器映射成 Provider Chain 的两个入参（`provider_fn_map` / `transform`），因此链路顺序、缓存键、熔断、降级、过期缓存兜底**全部复用既有 `fetch_with_fallback`**。行情域接入点为 `fetcher/price.py::_price_chain_slots()`：开关关闭时**返回既有手写映射对象本身**（`is` 断言锁定，行为逐字节不变），开启时改用适配器映射。
+- **试点范围与等价性（本试点唯一有意差异）**：仅行情域三源（`fetcher/quote_adapters.py`：腾讯/新浪/东方财富），与既有转换函数**逐源等价**——腾讯/新浪逐键逐值相等；东方财富既有转换函数不含 `market_cap`/`pe` 两个键而契约恒为全字段（补 `None`）。已逐个消费方复核：全部用 `.get()` 读取，且无消费方遍历该 dict 的键，「键缺失」与「值为 None」对下游完全同义。差异由 `test_quote_adapter_parity.py` 显式断言（`set(适配器输出) - set(既有输出) == {"market_cap", "pe"}`），防止差异扩大成「悄悄多跑一个源出来」。**存量 provider 不回改**——新数据源/新字段先走契约，既有源维持现状。
+- **离线契约自检 + 体检**：`survey_adapters()` 核验域登记齐备、`aliases`/`defaults` 指向真实标准字段、`transform_data` 对合成样本输出**恰好**标准字段集（不多不少），自身不抛异常（异常转为该适配器的失败报告）、不发起任何网络请求。`core/doctor.py` 新增「数据源适配」组（`doctor` 子命令 `--offline` 可用），报告适配器数量/各域/自检结论，并标注契约路径是否已由开关启用——**开关关闭时声明与自检仍照常核验**，这正是接入新数据源前要看的。适配器模块按 `ADAPTER_MODULES` 惰性导入，单个模块导入失败仅告警不拖垮链路与体检。
+- **实验开关与三面上屏**：开关名 `datasource_adapter`（默认关）。无需任何渠道层改动——登记进 `features.EXPERIMENTAL_FEATURES` 后，TUI 菜单 `[S]`、Web 配置面板、CLI `--experiment` 三处由注册表自动驱动（`check-semantic-index` / 既有 CLI 用例断言 `--experiment` 取值集合 == 注册表键集合，新增开关即被覆盖）。
+- **测试**：新增 40 例——`test_source_adapter.py`（注册表/三段式/声明式归一/自检对坏 alias、缺标准字段、未登记域、自检抛异常四类问题的检出）、`test_source_adapter_edge.py`（非映射响应/空响应/全 None/上游多出未知键/NaN 与非有限值/合法零不被覆盖/别名冲突与键名撞车/缺身份声明，全部 `@edge` 且独立成文件）、`test_quote_adapter_parity.py`（逐源等价 + 链两槽选择（含开关关闭时返回既有映射对象本身）+ 端到端开关开/关结果一致）。另新增 `conftest.py` 的 `_auto_reset_adapter_registry` autouse fixture，适配器注册表在测试间自动还原。
+- **自审（rf-306）**：实现期发现 `--experiment` 对 `doctor` / `check-sources` **完全无效**——这三个命令在 `init_config()` 之前就返回（配置损坏时它们仍须可用，属有意设计），而应用命令行实验开关的调用在其后才执行，导致 `--experiment datasource_adapter doctor --offline` 仍报告「开关关闭」，用户据此判断实验功能状态会得到相反答案。已在早返回分支内改为「先读 features.json 覆写、再叠加命令行增量」（与配置初始化的顺序一致，避免被覆写值回冲），并补 4 例回归测试（含「不传开关时保持默认」对照组与「覆写先于命令行」顺序守卫），已验证去掉修复后 3 例转红。
+- **文档**：`technical.md`（新增 §2.5 数据源适配契约 + 目录 + 语义命名表三行）、`requirements.md`（新增 §5.7 契约需求 R-ADP-01~08 + 配置开关表行）、`how-to-config.md`（开关总数 33→34、新增开关说明行、实验功能面板段落补一条、配置项对照表补 `[S]` 归属）、`folders.md`（目录树补 3 个源码文件 + 3 个测试文件）、`plan.md`（本条完成态）、`review-findings.md`（rf-306 登记与解决）。
+
 ## [0.10.16] - 2026-09-10
 
 ### 版本发布 v0.10.16（2026-09-10）

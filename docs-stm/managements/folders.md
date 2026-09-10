@@ -72,7 +72,9 @@ investor-util/
 │   │   │   ├── index.py              #   指数行情获取（A股/美股，直连 API 不走 Chain）
 │   │   │   ├── industry.py           #   行业分类/概念板块数据获取
 │   │   │   ├── news.py               #   新闻数据获取封装层（聚合器+关键词转发）
-│   │   │   └── price.py              #   行情价格获取（股票/ETF）
+│   │   │   ├── price.py              #   行情价格获取（股票/ETF）
+│   │   │   ├── quote_adapters.py     #   行情域数据源适配器（腾讯/新浪/东方财富，实验开关 datasource_adapter）
+│   │   │   └── source_adapter.py     #   数据源适配契约（三段式基类 + 声明式 alias 归一 + 注册表/自检）
 │   │   │
 │   │   ├── providers/                # 数据源提供商实现
 │   │   │   ├── __init__.py           #   子包标记
@@ -175,6 +177,7 @@ investor-util/
 │   │   │
 │   │   ├── schemas/                  # 数据模型定义
 │   │   │   ├── __init__.py           #   子包标记
+│   │   │   ├── datasource_fields.py  #   数据源标准字段记录（按数据域登记，类型注解即缺省语义）
 │   │   │   └── history.py            #   历史净值/行情数据模型
 │   │   │
 │   │   ├── report/                   # 报告生成引擎
@@ -454,7 +457,10 @@ investor-util/
 │       │   │   ├── test_fetcher_industry.py #   行业分类获取测试
 │       │   │   ├── test_fetcher_price.py    #   行情价格获取测试
 │       │   │   ├── test_fund.py             #   基金数据获取测试
-│       │   │   └── test_fund_manager.py     #   基金经理数据测试
+│       │   │   ├── test_fund_manager.py     #   基金经理数据测试
+│       │   │   ├── test_quote_adapter_parity.py # 行情域适配契约等价性（与既有转换函数逐源比对 + 链两槽选择）
+│       │   │   ├── test_source_adapter.py       # 数据源适配契约（注册表/三段式/声明式归一）
+│       │   │   └── test_source_adapter_edge.py  # 适配契约边缘场景（非映射响应/不可用取值/别名冲突）
 │       │   ├── handlers/            #   命令处理器单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_handlers_cache.py  #   缓存管理命令处理测试

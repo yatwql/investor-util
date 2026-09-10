@@ -79,6 +79,7 @@ _EXPECTED_WHITELIST = {
     "decision_header_parse",
     "signal_ledger",
     "doctor_check",
+    "datasource_adapter",
 }
 
 
@@ -180,6 +181,7 @@ class TestGetSurface:
             "decision_header_parse",
             "signal_ledger",
             "doctor_check",
+            "datasource_adapter",
         }
         assert all(v is False for v in data["llm"]["experiments"].values())
         # 显示名同源下发（前端不再手写标签字典，避免与注册表漂移）

@@ -947,3 +947,70 @@ class TestMainDoctor:
         args = mock_handle.call_args[0][0]
         assert args.command == "doctor"
         assert args.timeout == 4.0
+
+
+@pytest.mark.unit
+class TestMainEarlyExitExperiments:
+    """早返回命令（doctor/check-sources）的命令行实验开关（回归：rf-306）。
+
+    这些命令在 ``init_config()`` 之前分派，命令行 ``--experiment`` 若不随早返回
+    路径一并应用，会被静默忽略——doctor 会报告「实验开关关闭」，而用户明明
+    指定了该开关，据此判断实验功能状态即得到相反答案。
+    """
+
+    @staticmethod
+    def _enabled_during_dispatch(argv: list[str], patch_target: str) -> dict[str, bool]:
+        """跑一次 main()，返回被分派函数执行瞬间各实验开关的生效值。"""
+        from src.python.config.features import EXPERIMENTAL_FEATURES, is_feature_enabled
+
+        seen: dict[str, bool] = {}
+
+        def _record(*_args, **_kwargs) -> int:
+            seen.update({flag: is_feature_enabled(flag) for flag in EXPERIMENTAL_FEATURES})
+            return _EXIT_SUCCESS
+
+        with (
+            patch(patch_target, side_effect=_record),
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", argv):
+                main()
+        return seen
+
+    @pytest.mark.parametrize(
+        ("command", "patch_target"),
+        [
+            ("doctor", "src.python.cli.cli._handle_doctor"),
+            ("check-sources", "src.python.cli.cli._handle_check_sources"),
+        ],
+    )
+    def test_experiment_flag_effective_on_early_exit_command(self, command, patch_target):
+        """--experiment 指定的开关在该命令分派前已生效。"""
+        seen = self._enabled_during_dispatch(
+            ["cli.py", "--experiment", "datasource_adapter", command],
+            patch_target,
+        )
+        assert seen["datasource_adapter"] is True
+        assert seen["doctor_check"] is False  # 未指定的开关不受影响
+
+    def test_without_experiment_flag_keeps_defaults(self):
+        """不传 --experiment → 实验开关保持默认关闭（对照组，防误判为恒真）。"""
+        seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")
+        assert not any(seen.values())
+
+    def test_features_json_overrides_loaded_before_cli_flags(self):
+        """早返回路径同样先读 features.json 覆写，再叠加命令行增量。"""
+        import json
+        import os
+
+        from src.python.config import features
+
+        os.makedirs(os.path.dirname(features._FEATURES_FILE), exist_ok=True)
+        with open(features._FEATURES_FILE, "w", encoding="utf-8") as f:
+            json.dump({"doctor_check": True}, f)
+
+        seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")
+        assert seen["doctor_check"] is True
+        assert seen["datasource_adapter"] is False
