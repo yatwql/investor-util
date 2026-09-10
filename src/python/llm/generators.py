@@ -22,6 +22,7 @@ from src.python.llm.fingerprint import get_cache_ttl_llm
 from src.python.llm.module_fingerprint import (
     ModuleFingerprintInputs,
     debate_feature_cache_suffix,
+    debate_procon_fingerprint,
     expert_review_fingerprint,
     global_macro_fingerprint,
     health_check_fingerprint,
@@ -79,12 +80,15 @@ def generate_global_macro(
         holdings_details: 持仓明细（可选），用于提供 TOP3 排名，防止 LLM 虚构最大持仓。
     """
     # 指纹构造统一走 llm/module_fingerprint.py（读写同源的唯一事实来源）
+    # competitive_context 为调用方渲染好的同一实例（既进指纹又进提示词，
+    # 见 module_fingerprint 模块 docstring），此处只透传、不重渲染。
     _global_macro_inputs = ModuleFingerprintInputs(
         a_indices=a_indices,
         us_indices=us_indices,
         total_mv=total_mv,
         total_profit=total_profit,
         categories=categories,
+        competitive_context=competitive_context or "",
     )
 
     def _fingerprint():
@@ -184,6 +188,8 @@ def generate_expert_review(
     _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
     # 指纹输入闭包与预检侧同构；后缀（辩论增强/教训/信号/决策头）统一在
     # module_fingerprint 内拼接，读写键同源由结构保证。
+    # competitive_context / metrics 是其提示词正文段（对比块 + 指标表 + 情景分析），
+    # 故一并进指纹——两者都是调用方传入的同一实例，此处只透传、不重算。
     _fingerprint_inputs = ModuleFingerprintInputs(
         total_mv=total_mv,
         total_cost=total_cost,
@@ -194,6 +200,8 @@ def generate_expert_review(
         categories=categories,
         history_data=history_data,
         pipeline_data=pipeline_data,
+        competitive_context=competitive_context or "",
+        metrics=metrics,
     )
 
     def _fingerprint():
@@ -400,7 +408,6 @@ def generate_debate_procon(
     """
     import threading as _threading
     from src.python.config._llm_settings import get_llm_config
-    from src.python.llm.fingerprint import build_llm_fingerprint
 
     # ── 辩论模式 feature 组合 ──────────────────────────
     _fp_suffix = debate_feature_cache_suffix()
@@ -428,14 +435,21 @@ def generate_debate_procon(
     )
 
     # ── 指纹计算 ────────────────────────────────────────
-    _fingerprint = build_llm_fingerprint(
-        total_mv=total_mv,
-        total_cost=total_cost,
-        total_profit=total_profit,
-        total_today_profit=total_today_profit,
-        holdings_details=holdings_details,
-        penetrated_assets=penetrated_assets,
-        categories=categories,
+    # 收敛到 module_fingerprint（此处原为项目内唯一绕开注册表的指纹自拼点）：
+    # 辩论提示词含竞争语境块与量化指标，二者必须进键，否则预检/缓存会命中按旧
+    # 指数算出的对比内容；后缀也由同一构造器拼接，不再于本函数内手拼。
+    _fingerprint = debate_procon_fingerprint(
+        ModuleFingerprintInputs(
+            total_mv=total_mv,
+            total_cost=total_cost,
+            total_profit=total_profit,
+            total_today_profit=total_today_profit,
+            holdings_details=holdings_details,
+            penetrated_assets=penetrated_assets,
+            categories=categories,
+            competitive_context=competitive_context or "",
+            metrics=metrics,
+        )
     )
 
     # ── Session 级缓存（线程安全） ──────────────────────
@@ -486,8 +500,8 @@ def generate_debate_procon(
                     _valid_codes.add(str(_c).strip())
 
     # ── Step 1: 白脸（Pro） ────────────────────────────
-    _pro_cache_key = f"llm_debate_pro_{_fingerprint}{_fp_suffix}"
-    _session_pro_key = f"debate_pro_{_fingerprint}{_fp_suffix}"
+    _pro_cache_key = f"llm_debate_pro_{_fingerprint}"
+    _session_pro_key = f"debate_pro_{_fingerprint}"
     pro_text = _check_session_cache(_session_pro_key)
 
     if pro_text is None and not force:
@@ -499,7 +513,7 @@ def generate_debate_procon(
             "expert_review",
             force=force,
             http_client=http_client,
-            fingerprint_fn=lambda: f"{_fingerprint}{_fp_suffix}_debate_pro",
+            fingerprint_fn=lambda: f"{_fingerprint}_debate_pro",
             system_prompt_default=_SYSTEM_DEBATE_PRO,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -537,8 +551,8 @@ def generate_debate_procon(
         return (None, None, None)
 
     # ── Step 2: 黑脸（Con） ────────────────────────────
-    _con_cache_key = f"llm_debate_con_{_fingerprint}{_fp_suffix}"
-    _session_con_key = f"debate_con_{_fingerprint}{_fp_suffix}"
+    _con_cache_key = f"llm_debate_con_{_fingerprint}"
+    _session_con_key = f"debate_con_{_fingerprint}"
     con_text = _check_session_cache(_session_con_key)
 
     if con_text is None and not force:
@@ -550,7 +564,7 @@ def generate_debate_procon(
             "expert_review",
             force=force,
             http_client=http_client,
-            fingerprint_fn=lambda: f"{_fingerprint}{_fp_suffix}_debate_con",
+            fingerprint_fn=lambda: f"{_fingerprint}_debate_con",
             system_prompt_default=_SYSTEM_DEBATE_CON,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -599,7 +613,7 @@ def generate_debate_procon(
     )
     _pro_digest = hashlib.sha256(pro_text[:200].encode()).hexdigest()[:8]
     _con_digest = hashlib.sha256(con_text[:200].encode()).hexdigest()[:8]
-    _syn_fingerprint = f"{_fingerprint}{_fp_suffix}_{_pro_digest}_{_con_digest}"
+    _syn_fingerprint = f"{_fingerprint}_{_pro_digest}_{_con_digest}"
     _syn_cache_key = f"llm_debate_synthesis_{_syn_fingerprint}"
     _session_syn_key = f"debate_syn_{_syn_fingerprint}"
     synthesis_text = _check_session_cache(_session_syn_key)
@@ -620,7 +634,7 @@ def generate_debate_procon(
             "expert_review",
             force=force,
             http_client=http_client,
-            fingerprint_fn=lambda: f"{_fingerprint}{_fp_suffix}_debate_syn_{_pro_digest}_{_con_digest}",
+            fingerprint_fn=lambda: f"{_fingerprint}_debate_syn_{_pro_digest}_{_con_digest}",
             system_prompt_default=_synthesis_system,
             prompt_builder=lambda: _synthesis_user,
             max_tokens_default=_max_tokens,

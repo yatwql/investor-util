@@ -19,6 +19,11 @@
   - ``ModuleFingerprintInputs`` 是两侧都持有的输入闭包；``history_data`` 的风险
     信号摘要对三模块统一参与哈希（口径一致优先于逐模块精简——多算只带来无害的
     过度失效，漏算则导致内容与键脱钩的陈旧缓存）。
+  - **覆盖以「提示词是否真的含该段」为准**：进了提示词的内容必须进指纹
+    （``competitive_context`` / ``metrics``），不进提示词的段落不并入（纯成本失效）。
+  - **一次渲染、两侧共享同一实例**：``competitive_context`` 由调用方
+    （``generate_all_llm``）渲染一次后同时交给预检侧与写侧，两边不得各自渲染
+    ——两次渲染会让「进键的文本」与「进提示词的文本」退化为靠纪律对齐。
   - 返回值为**指纹本体**（不含 ``CACHE_PREFIX_LLM + 模块名`` 前缀），缓存键由两侧
     按同一形态自行拼装。
 """
@@ -38,6 +43,7 @@ from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 __all__ = [
     "ModuleFingerprintInputs",
     "debate_feature_cache_suffix",
+    "debate_procon_fingerprint",
     "global_macro_fingerprint",
     "expert_review_fingerprint",
     "health_check_fingerprint",
@@ -65,6 +71,10 @@ class ModuleFingerprintInputs:
         pipeline_data: 管线上下文（供信号预消化后缀计算）
         a_indices: A 股指数行情（仅 global_macro 使用）
         us_indices: 美股指数行情（仅 global_macro 使用）
+        competitive_context: **已渲染**的竞争语境文本块，由调用方渲染一次后
+            与提示词共享**同一实例**（仅提示词含该段的模块使用）
+        metrics: 量化指标字典（指标表 / 情景分析 / 风格一致性的共同来源，
+            仅 expert_review 使用）
     """
 
     total_mv: float = 0.0
@@ -78,6 +88,8 @@ class ModuleFingerprintInputs:
     pipeline_data: dict | None = None
     a_indices: dict | None = None
     us_indices: dict | None = None
+    competitive_context: str = ""
+    metrics: dict | None = None
 
 
 def debate_feature_cache_suffix() -> str:
@@ -100,32 +112,45 @@ def debate_feature_cache_suffix() -> str:
 
 
 def global_macro_fingerprint(inputs: ModuleFingerprintInputs) -> str:
-    """全球政经局势：指数行情 / 总市值 / 盈亏 / 分类汇总。"""
+    """全球政经局势：指数行情 / 总市值 / 盈亏 / 分类汇总 + 竞争语境块。
+
+    竞争语境块（组合 vs 指数今日/区间对比）由其提示词直接承载，故必须进键：
+    否则「组合未动、基准指数已动」时键不变，预检命中旧键后复用按旧指数算出的
+    对比结论。该块为**已渲染文本**，与注入提示词的实例同一（见模块 docstring）。
+    """
     return compute_fingerprint(
         inputs.a_indices,
         inputs.us_indices,
         inputs.total_mv,
         inputs.total_profit,
         inputs.categories,
+        inputs.competitive_context,
     )
 
 
 def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
-    """智囊团深度复盘：基础指纹 + 辩论增强 + 四段按开关现算的后缀。
+    """智囊团深度复盘：基础指纹 + 提示词内容（竞争语境块 / 量化指标）+ 四段按开关现算的后缀。
 
     四个后缀（决策教训 / 信号预消化 / 确定性信号摘要 / 结构化决策头）各自的
     开关判定收敛在函数内部，关闭或样本不足时返回空串——键与未启用时一致，
     不误伤既有缓存。
+
+    竞争语境块与 ``metrics`` 都是其提示词的正文段（【今日对比】/【区间对比】/
+    【指标对比】/【量化指标】/情景分析），一并纳入哈希。
     """
-    _fp = build_llm_fingerprint(
-        total_mv=inputs.total_mv,
-        total_cost=inputs.total_cost,
-        total_profit=inputs.total_profit,
-        total_today_profit=inputs.total_today_profit,
-        holdings_details=inputs.holdings_details,
-        penetrated_assets=inputs.penetrated_assets,
-        categories=inputs.categories,
-        history_data=inputs.history_data,
+    _fp = compute_fingerprint(
+        build_llm_fingerprint(
+            total_mv=inputs.total_mv,
+            total_cost=inputs.total_cost,
+            total_profit=inputs.total_profit,
+            total_today_profit=inputs.total_today_profit,
+            holdings_details=inputs.holdings_details,
+            penetrated_assets=inputs.penetrated_assets,
+            categories=inputs.categories,
+            history_data=inputs.history_data,
+        ),
+        inputs.competitive_context,
+        inputs.metrics,
     )
     _fp += debate_feature_cache_suffix()
     if decision_ledger.is_active():
@@ -134,6 +159,36 @@ def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     _fp += signal_ledger.summary_cache_suffix()
     _fp += structured_header_cache_suffix()
     return _fp
+
+
+def debate_procon_fingerprint(inputs: ModuleFingerprintInputs) -> str:
+    """辩论三键（白脸 / 黑脸 / 综合）共用的基础指纹 + 辩论增强后缀。
+
+    **仅写侧使用**：辩论模式绕过标准预检（其缓存键族 ``llm_debate_*`` 与标准
+    ``llm_expert_review_*`` 不同），故不进 ``MODULE_FINGERPRINT_BUILDERS``。
+
+    输入口径以其提示词实际包含的段落为准——基础持仓 + 竞争语境块 + 量化指标 +
+    辩论增强后缀。**刻意不并入** ``history_data`` / ``pipeline_data`` 与决策教训、
+    信号摘要、结构化决策头后缀：辩论提示词不含这些段落（不传 ``history_data``、
+    不开信号预消化），并入只会让每次运行都换键 —— 白脸/黑脸/综合三次昂贵调用
+    每份报告必 miss。
+    """
+    return (
+        compute_fingerprint(
+            build_llm_fingerprint(
+                total_mv=inputs.total_mv,
+                total_cost=inputs.total_cost,
+                total_profit=inputs.total_profit,
+                total_today_profit=inputs.total_today_profit,
+                holdings_details=inputs.holdings_details,
+                penetrated_assets=inputs.penetrated_assets,
+                categories=inputs.categories,
+            ),
+            inputs.competitive_context,
+            inputs.metrics,
+        )
+        + debate_feature_cache_suffix()
+    )
 
 
 def health_check_fingerprint(inputs: ModuleFingerprintInputs) -> str:

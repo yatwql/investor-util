@@ -109,12 +109,18 @@ def _compute_module_cache_info(
     *,
     history_data: dict | None = None,
     pipeline_data: dict | None = None,
+    competitive_context: str = "",
+    metrics: dict | None = None,
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
 
     指纹一律取自 ``llm/module_fingerprint.py``（读写同源的唯一事实来源），
     本函数**不再自行拼接**模块指纹——预检键与写侧键同源由结构保证，
     而非靠两侧逐字对齐的注释纪律（历史偏差见该模块 docstring）。
+
+    ``competitive_context`` / ``metrics`` 是提示词正文段的输入（详见
+    ``llm/module_fingerprint.py``）：本函数只对**调用方已渲染好**的同一实例取
+    哈希，不自行渲染——两次渲染会让「进键的文本」与「进提示词的文本」脱钩。
     """
     _inputs = ModuleFingerprintInputs(
         total_mv=total_mv,
@@ -128,6 +134,8 @@ def _compute_module_cache_info(
         pipeline_data=pipeline_data,
         a_indices=a_indices,
         us_indices=us_indices,
+        competitive_context=competitive_context,
+        metrics=metrics,
     )
     fp_global_macro = global_macro_fingerprint(_inputs)
     fp_expert_review = expert_review_fingerprint(_inputs)
@@ -333,25 +341,20 @@ def _dispatch_llm_workers(
     comparison_indices: dict[str, str] | None = None,
     history_data: dict | None = None,
     _debate_info_container: list | None = None,
+    competitive_context: str = "",
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。
 
     Args:
         _debate_info_container: 辩论模式信息捕获容器（list[dict|None]），
             启用辩论模式时闭包写入 debate_info dict，调用方事后读取。
+        competitive_context: 由调用方（``generate_all_llm``）渲染一次的竞争语境
+            文本块，与其交给预检侧的**同一实例**——本函数不再自行渲染，
+            否则进提示词的文本可能与进指纹的文本不同（缓存键与内容脱钩）。
     """
     if not any(needs.values()):
         return {}
 
-    # ── 预计算竞争语境文本块 ──
-    _competitive_context = _build_competitive_context_block(
-        a_indices,
-        total_mv,
-        total_today_profit,
-        comparison_indices=comparison_indices,
-        history_data=history_data,
-        metrics=metrics,
-    )
     # 量化指标 + 降级事件传递
     _metrics = metrics
     _degradation_events = degradation_events
@@ -416,7 +419,7 @@ def _dispatch_llm_workers(
         sector_flow=sector_flow,
         force=force,
         pipeline_data=pipeline_data,
-        competitive_context=_competitive_context,
+        competitive_context=competitive_context,
         metrics=_metrics,
         degradation_events=_degradation_events,
         history_data=history_data,
@@ -459,7 +462,7 @@ def _dispatch_llm_workers(
                     http_client=c,
                     llm_config=lc,
                     pipeline_data=pipeline_data,
-                    competitive_context=_competitive_context,
+                    competitive_context=competitive_context,
                     metrics=_metrics,
                 )
                 pro, con, synthesis = _result
@@ -566,6 +569,19 @@ def generate_all_llm(
     if llm_config is None:
         return (None, None, None, None, False, False, False, False)
 
+    # ── 竞争语境块：此处渲染**一次**，同一实例既进指纹（经预检）又进提示词
+    #    （经 worker 分发）。两个消费点各自渲染会让「进键的文本」与「进提示词的
+    #    文本」只能靠纪律对齐——渲染器一改而键不动，预检就会命中旧键复用按旧
+    #    指数算出的对比结论。 ──
+    competitive_context = _build_competitive_context_block(
+        a_indices,
+        total_mv,
+        total_today_profit,
+        comparison_indices=comparison_indices,
+        history_data=history_data,
+        metrics=metrics,
+    )
+
     cache_info = _compute_module_cache_info(
         llm_config,
         a_indices,
@@ -581,6 +597,8 @@ def generate_all_llm(
         force,
         history_data=history_data,
         pipeline_data=pipeline_data,
+        competitive_context=competitive_context,
+        metrics=metrics,
     )
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
@@ -620,6 +638,7 @@ def generate_all_llm(
         comparison_indices=comparison_indices,
         history_data=history_data,
         _debate_info_container=_debate_info_container,
+        competitive_context=competitive_context,
     )
 
     # 合并预检结果 + 工作线程结果

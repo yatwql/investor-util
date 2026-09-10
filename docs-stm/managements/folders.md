@@ -19,7 +19,7 @@
 | **项目文档** | Markdown | **126** | **48,668** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 10 + archive 105 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 10 | 9,638 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 109 | 37,704 | 各版本 changelog/plan/review-findings 等（105 md 37,246 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 10 | 1,710 | 决策跨期反思闭环深入分析/实现设计 + 实验性功能开关上屏方案 + 信号预消化/质量分级/结构化决策头深入分析 + 信号预消化实现设计 + 决策头结构化实现设计 + 确定性信号沉淀实现设计 + 健壮性三件套实现设计 + augur 多智能体借鉴评估 + OpenBB 数据层工程借鉴评估（reflection-decision-loop-analysis.md + decision-reflection-implementation.md + experimental-features-ui-surfacing.md + llm-quality-signal-analysis.md + signal-pre-digestion-implementation.md + decision-header-parse-implementation.md + signal-ledger-implementation.md + robustness-suite-implementation.md + augur-borrowing-analysis.md + openbb-data-provider-analysis.md） |
+| ├ plan/ | 中间设计文件 | 14 | 2,172 | 决策跨期反思闭环深入分析/实现设计 + 实验性功能开关上屏方案 + 信号预消化/质量分级/结构化决策头深入分析 + 信号预消化实现设计 + 决策头结构化实现设计 + 确定性信号沉淀实现设计 + 健壮性三件套实现设计 + augur 多智能体借鉴评估 + OpenBB 数据层工程借鉴评估 + 数据源适配契约/记录-回放/凭据就绪三份实现设计 + LLM 模块指纹提示词内容覆盖设计（reflection-decision-loop-analysis.md + decision-reflection-implementation.md + experimental-features-ui-surfacing.md + llm-quality-signal-analysis.md + signal-pre-digestion-implementation.md + decision-header-parse-implementation.md + signal-ledger-implementation.md + robustness-suite-implementation.md + augur-borrowing-analysis.md + openbb-data-provider-analysis.md + datasource-adapter-contract-design.md + datasource-cassette-replay-design.md + datasource-credential-ready-design.md + llm-fingerprint-prompt-coverage-design.md） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -970,7 +970,11 @@ investor-util/
 │   │   ├── augur-borrowing-analysis.md #   augur 多智能体投资分析借鉴评估（决策-结算学习/确定性信号沉淀/健壮性三件套）
 │   │   ├── openbb-data-provider-analysis.md #   OpenBB Platform 数据层工程借鉴评估（标准字段/Fetcher 三段适配契约 + VCR 记录-回放测试）
 │   │   ├── robustness-suite-implementation.md #   健壮性三件套实现设计（数值归一防线/失败原因可读/系统自检三面上屏）
-│   │   └── signal-ledger-implementation.md #   确定性信号沉淀实现设计（分层共享原语/实时-非实时标签纪律/报告接缝）
+│   │   ├── signal-ledger-implementation.md #   确定性信号沉淀实现设计（分层共享原语/实时-非实时标签纪律/报告接缝）
+│   │   ├── datasource-adapter-contract-design.md #   数据源适配契约设计（标准字段三段适配 + 失败即错 + 适配器注册）
+│   │   ├── datasource-cassette-replay-design.md #   数据源记录-回放实现设计（真实响应体录制/离线回放/失败即错）
+│   │   ├── datasource-credential-ready-design.md #   数据源凭据声明与就绪指引设计（凭据声明表/就绪判定/上屏指引）
+│   │   └── llm-fingerprint-prompt-coverage-design.md #   LLM 模块指纹提示词内容覆盖设计（覆盖判据/一次渲染两侧共享/辩论三键口径）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
