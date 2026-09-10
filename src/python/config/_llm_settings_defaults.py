@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from src.python.core.registry import get_llm_module_names
+
 # LLM 默认设置（与模板一一对应，确保一致性）
 _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     "max_retries": 2,
@@ -119,14 +121,11 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     },
 }
 
-# 模块显示名映射（与 _DEFAULT_LLM_SETTINGS["enabled_llm"] 的键名对齐）
-_MODULE_LABELS = {
-    "global_macro": "全球政经局势",
-    "expert_review": "智囊团深度复盘",
-    "health_check": "持仓体检报告",
-    "penetration_deep": "穿透深度分析",
-    "news_correlation": "财经新闻热点与持仓关联分析",
-}
+# 模块显示名映射（键 = settings_suffix，与 _DEFAULT_LLM_SETTINGS["enabled_llm"] 对齐）。
+# 唯一事实来源为中央注册表（core.registry），此处不再自留副本：模板注释里的模块名
+# 曾是与注册表并存的第三份硬编码 —— 注册表改名或新增模块时它不会跟着动，生成的
+# 模板注释就与实际模块名静默不一致（不报错，只误导用户）。
+_MODULE_LABELS = get_llm_module_names()
 
 
 def _get_default_llm_settings_template() -> str:
@@ -182,7 +181,9 @@ def _get_default_llm_settings_template() -> str:
     _module_block("penetration_deep")
 
     # ── news_correlation ──
-    _section("财经新闻热点与持仓关联分析 — news_correlation")
+    # 该模块无 output_brief 键（llm_settings_keys 已按后缀自动排除），故不走
+    # _module_block，单独拼接并保留说明注释；标题同样取自注册表。
+    _section(f"{_MODULE_LABELS.get('news_correlation', 'news_correlation')} — news_correlation")
     lines.append("  // （注：news_correlation 不支持 output_brief 模式）")
     for key in d:
         if key.endswith("_news_correlation"):

@@ -846,6 +846,46 @@ class TestLlmSettingsTemplateConsistency:
             f"值差异: {[k for k in parsed if parsed.get(k) != _DEFAULT_LLM_SETTINGS.get(k)]}"
         )
 
+    @pytest.mark.unit_config
+    def test_module_labels_derived_from_registry(self):
+        """模块显示名取自中央注册表，不得另存副本。
+
+        历史缺陷：模板注释里的模块名是与注册表并存的第三份硬编码 —— 注册表改名
+        或新增模块时它不跟着动，生成的模板注释与实际模块名静默不一致。
+        """
+        from src.python.config import _llm_settings_defaults as d
+        from src.python.core.registry import get_llm_module_names, get_known_enabled_llm_keys
+
+        assert d._MODULE_LABELS == get_llm_module_names(), (
+            "模板模块名与注册表不一致：模板独有 "
+            f"{d._MODULE_LABELS.keys() - get_llm_module_names().keys()}，"
+            f"注册表独有 {get_llm_module_names().keys() - d._MODULE_LABELS.keys()}"
+        )
+        # enabled_llm 的每个子键都必须能在注册表里查到显示名（否则模板注释退化为裸键名）
+        missing = get_known_enabled_llm_keys() - d._MODULE_LABELS.keys()
+        assert not missing, f"enabled_llm 子键在注册表中无显示名: {sorted(missing)}"
+
+    @pytest.mark.unit_config
+    def test_template_module_titles_match_registry(self):
+        """模板中每个「<显示名> — <模块>」区块标题的显示名须与注册表一致（渲染结果层锁定）。"""
+        import re
+
+        from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS, _get_default_llm_settings_template
+        from src.python.core.registry import get_llm_module_name
+
+        template = _get_default_llm_settings_template()
+        titles = {module: label for label, module in re.findall(r"^\s*//\s*(.+?)\s+—\s+([a-z_]+)\s*$", template, re.MULTILINE)}
+        assert titles, "模板中未找到任何模块区块标题，正则或模板格式已变"
+
+        for module, label in titles.items():
+            assert label == get_llm_module_name(module), (
+                f"模板区块标题 {label!r} 与注册表 {get_llm_module_name(module)!r} 不一致（模块 {module}）"
+            )
+        # 每个 enabled_llm 子键都应有对应的配置区块
+        assert _DEFAULT_LLM_SETTINGS["enabled_llm"].keys() <= titles.keys(), (
+            f"以下模块在模板中缺少配置区块: {sorted(_DEFAULT_LLM_SETTINGS['enabled_llm'].keys() - titles.keys())}"
+        )
+
 
 class TestIsEnablePortfolioEvolution(unittest.TestCase):
     """is_enable_portfolio_evolution 访问器测试（组合演进章节开关）。"""

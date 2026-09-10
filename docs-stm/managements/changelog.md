@@ -6,6 +6,15 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### LLM 模块显示名回归中央注册表（C9，自审 rf-330）（2026-09-10）
+
+- **缺陷（自审 rf-330）**：`config/_llm_settings_defaults.py` 自留一份模块显示名映射 `_MODULE_LABELS`（5 条：global_macro / expert_review / health_check / penetration_deep / news_correlation），与 `core/registry.py::get_llm_module_names()`（8 条，多出 debate_pro / debate_con / debate_synthesis）**并存**，违反 C9「LLM 模块元信息以注册表为单一事实来源」。这份副本的两处实际后果：
+  - `_module_block()` 对未登记的模块走 `_MODULE_LABELS.get(module, module)` 回退，即**新增模块在配置模板里显示为裸键名**（如 `// debate_pro — debate_pro`）而非中文名——不报错、不告警，只是注释变成英文键。
+  - 同文件内 `news_correlation` 的显示名**写了两遍**：`_MODULE_LABELS` 里一条，模板 `_section(f"财经新闻热点与持仓关联分析 — news_correlation")` 又硬编码一次。两处相邻但无约束，改一处忘另一处即静默不一致（该模块因不支持 `output_brief` 而单独拼接，正是漏走 `_module_block()` 统一取值路径的那一个）。
+- **改动**：`_MODULE_LABELS = get_llm_module_names()`（模块级导入中央注册表），副本删除；`news_correlation` 区块标题改取 `_MODULE_LABELS.get("news_correlation", "news_correlation")`，与其他模块同一取值路径，并补注释说明该模块为何不走 `_module_block`（无 `output_brief` 键）。
+- **行为变更**：无——已验证改前改后 `_get_default_llm_settings_template()` 的**输出逐字相同**（diff 为空）：既有 5 个模块的显示名与注册表本就一致，本次仅消除副本与重复。
+- **测试**：`test_config.py::TestLlmSettingsTemplateConsistency` 新增两例：`test_module_labels_derived_from_registry`（映射须与 `get_llm_module_names()` 深度相等 + `enabled_llm` 每个子键都能查到显示名，已验证还原旧实现后转红——旧副本少 3 个 debate 模块）、`test_template_module_titles_match_registry`（从渲染出的模板里正则抽出各「显示名 — 模块」区块标题，逐个比对注册表取值，属渲染结果层锁定）。配置单元测试 100 例全绿。
+
 ### 移除新闻关联的误导性编排注册（C9，自审 rf-329）（2026-09-10）
 
 - **缺陷（自审 rf-329）**：编排层 `_dispatch_llm_workers` 内有一条 news_correlation 注册分支——仅当调用方传入 `news_data` 且 `holdings_data` 时，把 `_make_news_correlation_closure(...)` 写进 `_MODULE_FNS`。但这两个参数在**任何调用方都未传入**（`generate_all_llm` 是唯一调用方，其签名与实参均无此项），分支永不执行。连带整条「预计算」链同样是死代码：模块级变量 `_news_correlation_result`、公开读取接口 `get_news_correlation_result()`、结果回写函数 `_store_news_correlation_result()`、闭包工厂 `_make_news_correlation_closure()`，以及 `run_news_correlation_safe()` 里「若已有 orchestrator 预计算结果则直接返回」的短路——四处没有一处可达。危害不在性能而在**语义**：注册表与文档呈现出「新闻关联由编排层统一调度、结果经模块级变量复用」的图景，与真实路径（`report/news_correlation.py` 直调 `run_news_correlation_safe`）不符，正是 C9 所防的「注册与实际运行路径漂移」；后来者若照此图景扩展（例如给 `generate_all_llm` 加新闻参数以「启用」预计算），会同时把 `(list, bool, dict)` 的三元返回塞进期望 `(str|None, bool)` 二元返回的线程池，异常只在运行期暴露。
