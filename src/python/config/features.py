@@ -83,6 +83,8 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "doctor_check": False,
     # ── 数据源适配契约（实验功能，默认关闭） ──
     "datasource_adapter": False,
+    # ── 数据源凭据就绪指引（实验功能，默认关闭） ──
+    "datasource_credential_ready": False,
 }
 
 # ── 实验性功能定义 ──────────────────────────────────────────
@@ -120,6 +122,10 @@ EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
     "datasource_adapter": (
         "数据源适配契约",
         "三段式（参数转译→抓取→映射到标准字段）适配器 + 声明式 alias 归一，行情域试点；关闭时走既有转换函数",
+    ),
+    "datasource_credential_ready": (
+        "数据源凭据就绪",
+        "声明数据源所需凭据，缺失时链路跳过并给出可读指引；体检与健康检查报告就绪状态（当前全部数据源免费无需凭据）",
     ),
 }
 

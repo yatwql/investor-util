@@ -10,6 +10,24 @@
 
 - 发布 v0.10.16 后，APP_VERSION 与全部管理文档版本头切换至 v0.10.17-dev。
 
+### check-sources 超时行符号与统计口径归一（自审 rf-309）（2026-09-10）
+
+- **缺陷（自审 rf-309）**：`check_sources.run_check_sources` 的结果行**符号与统计口径不一致**——统计分支判 `"timeout" in message or "超时" in message` 两种措辞，符号分支只判 `"timeout"`。而本文件自身产生的预算超时行消息恰是 `超时（预算 15s）`（不含 `"timeout"` 子串），于是该行**被计入 `warn_count` 却渲染成 `❌`（红色错误）**：汇总行说「⚠️ 1」、行首说「❌」，同一行自相矛盾。计数是对的（退出码仍为告警级 1），**渲染是错的**，用户据此以为源故障要去排查，而实际只是本次探测超出耗时预算。在 plan-38 改造该分支（新增凭据跳过态）时发现。
+- **改动**：把措辞判定提为单一变量 `timed_out = "timeout" in msg.lower() or "超时" in msg`，统计与本轮改写的符号分支**共用同一判据**，口径归一——这类「判据复制两份」正是漂移的温床，与 rf-297（缓存指纹读写两份拼接）同属一个病根。
+- **测试**：新增 2 例——预算超时行渲染为 `_WARN`、汇总计入告警、退出码 1；真实失败（非超时措辞）仍渲染 `_ERR` 且退出码 2（防修复过度放宽）。已验证把符号分支退回旧判据后首例转红（实测行首为 ❌）。
+
+### 数据源凭据声明与就绪指引（plan-38，实验功能 `datasource_credential_ready` 默认关）（2026-09-10）
+
+- **背景**：当前数据源**全部免费无需凭据**，但 LLM 侧早已暴露同一问题模式——缺 key 时若在调用点裸报错，用户看到的是传输层异常而非「你缺什么、去哪申请」（plan-35 的 `doctor._check_llm_credentials` 即为此而写）。借鉴 OpenBB 把「此源需什么凭据」**声明在 Provider 定义里**的做法，把这套「声明 → 就绪判定 → 可读指引」补到数据源侧，使将来接入任何需 key 的源时链路能**主动跳过**它并给出指引（而非当作「不可达」反复重试、甚至计入熔断）。分析见 `docs-stm/plan/openbb-data-provider-analysis.md` §建议D；实现设计见 `docs-stm/plan/datasource-credential-ready-design.md`。
+- **声明即数据（不为演示编造假数据源）**：新增 `core/datasource_credential.py`——`CredentialSpec` 冻结 dataclass（`source_id` / `display_name` / `env_var` / `apply_url` / `note`）+ `CREDENTIAL_SPECS` 注册表 + `register_credential_spec` / `missing_credential` / `credential_hint` / `credential_readiness`。**生产注册表为空**（全部免费源是事实），机制由**注入合成声明**的单元测试证明可用。就绪判定读环境变量，**空白串（含纯空白/换行）视为缺失**——防「设了空值以为配好了」；源未声明 → 不需凭据。就绪矩阵**自身不抛异常**（体检与健康检查共用，不能因声明写错而崩）。
+- **链路主动跳过（两处，非一处）**：`fetcher/chain.py` 的 `fetch_with_fallback` 在熔断检查之后做凭据预检，缺失则 `continue` 到下一链路；**历史走势的 `_try_providers` 遍历循环同样受控**（设计原稿只写了前者——只堵主链路等于机制半应用，缺凭据的源仍会在历史链路里被反复调用并计入熔断）。语义与既有「已被熔断跳过」「未知 Provider」两处 `continue` 完全同例：**不计入熔断失败计数**（配置级问题≠源不可达），仅以可读原因进入 `FailureDiagnostics`，随降级事件上屏到数据源可用性矩阵。
+- **健康检查跳过态与就绪行**：`core/check_sources.py` 的 `_checks` 由三元组扩为 `(source_id, 显示名, 用途, 探测函数)`，`source_id` 与 provider 名对齐（新闻源带 `_news` 后缀消歧——「东方财富（净值）」与「东方财富新闻」显示名相近而 provider 名不同，按短名对齐会让凭据声明挂错源）。缺失凭据**不发起探测**，直接产出跳过项并对称使用文件中**已定义但至今未使用**的 `_SKIP` 符号 `⏭️`，消息为可读指引；跳过项计入 `skipped` 而非 `err`/`warn`，**不改变退出码**；开关开启时输出末尾追加就绪摘要行。
+- **体检分组**：`core/doctor.py` 新增 `GROUP_CREDENTIAL`「数据源凭据」组（插在「数据源适配」与「数据源」之间）——无声明报「N 个数据源均无需凭据（免费源）」，存在缺失则报失败项并附变量名修复建议（复用 plan-35 的 `_item(..., hint=...)`）。「数据源」组据此**过滤掉凭据跳过项**：凭据未探测的源已由新组专门报告，若网络组照旧渲染成 `[ERR]`，同一配置问题会被计成两次失败并误导用户去查连通性。
+- **安全口径**：凭据只从环境变量读取，**值永不落日志、永不写入报告与缓存**——日志与就绪矩阵只出现「变量名 + 是否就绪」以及申请地址。
+- **开关关闭时零行为分支**：开关关闭 / 无声明凭据时上述分支恒不触发，链路照常尝试、无跳过项、无就绪行、无凭据组，输出与未引入本机制时逐字节一致（实测 `doctor` 与 `check-sources` 分别不再输出凭据组与就绪行）。
+- **测试**：新增 50 例 / 6 文件——`test_datasource_credential.py`（声明表/空白串视为缺失/指引措辞/就绪矩阵）、`test_datasource_credential_edge.py`（`unit_core`+`edge`：空表、声明缺 `env_var`、各类空白字符、重复注册、清空回落）、`test_credential_gate.py`（`unit_fetcher`：缺凭据跳过并落到下一链路、可读原因进诊断、**断言 `record_failure` 未被调用**、补凭据后正常参与、开关关闭不预检、未声明源不跳过；历史遍历循环同上）、`test_check_sources_credential.py`（缺凭据不探测、跳过态不影响退出码、就绪摘要随声明变化）、`test_doctor_credential.py`（开关关闭不产出该组、无声明报免费源、缺失给变量名建议、就绪报通过、**就绪矩阵读取失败转失败项而非抛出**、网络组过滤跳过项）、`test_health_credential.py`（`unit_web`：`/api/health` 的 `skipped` 标记透传到前端）。既有 `test_check_sources.py` 的全部 `_checks` 桩同步改为四元组；新增 `conftest.py` autouse fixture `_auto_reset_credential_specs` 保证声明表在用例间不串味。
+- **文档**：`technical.md`（新增 §2.7 + TOC + 语义命名表三行）、`requirements.md`（新增 §5.8 需求 R-CRD-01~08 + 配置开关表行）、`how-to-config.md`（开关总数 34→35、新增开关说明行、实验功能面板段落补一条、代码分派表补键名）、`how-to-config-llm.md` / `how-to-use-cli-mode.md` / `how-to-use-tui-menu.md` / `how-to-use-web-mode.md` / `faq.md` / `test-coverage.md`（`doctor` 分组枚举由「五组」更正为「七组」——plan-36 新增适配组后这五处描述已滞后，本轮一并校正）、`folders.md`（目录树补 1 个源码文件 + 6 个测试文件）、`plan.md`（本条完成态）。
+
 ### LLM 模块缓存指纹读写同源（2026-09-10）
 
 - **缺陷（自审 rf-297）**：写侧（`generators.py` 各生成器内的指纹闭包）与预检侧（`generators_orchestrator.py::_compute_module_cache_info`）**各自拼接**同一模块的缓存指纹，仅靠两侧注释声明"须同步"。实际已双向漂移：预检侧把组合风险信号摘要（`history_data` 的最大回撤/年化波动/区间收益/状态，经 `_build_competitive_context_block` 进入智囊团复盘提示词）计入指纹而写侧未计入；写侧把辩论增强开关后缀（`_c`）计入而预检侧未计入。后果是**读写键相互错开、永不相等**——写侧照常写缓存，预检侧却恒不命中，表现为「开关与参数看似生效、每次报告仍全量派发 LLM」的静默退化：专家复盘/健康体检/穿透深挖三个模块每次都重复调用（费用与耗时随报告规模线性放大），且无异常、无告警，只能靠逐模块比对键值发现。

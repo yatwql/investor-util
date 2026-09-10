@@ -106,6 +106,27 @@ OpenBB 的做法是把「此源需什么凭据」**声明在 Provider 定义里*
 - **不新增界面**——开关三面由注册表自动上屏，效果复用 `check-sources`/`doctor`/`/api/health` 既有面。
 - **不把凭据缺失计入熔断**——配置级问题混入可用性统计会污染数据源可用性矩阵的语义。
 
+## 实施记录（落地时的取舍，2026-09-10）
+
+设计定稿后实现期做了四处增补，均属「把机制补完整」而非扩大范围：
+
+1. **预检同时覆盖历史走势链路**（设计原稿只写了 `fetch_with_fallback`）。`_try_providers` 是历史
+   走势的 provider 遍历循环，同样「能取数」；只堵主链路等于机制半应用——缺凭据的源仍会在历史
+   链路里被反复调用并计入熔断。现两处同判定，测试 `TestHistoryChainCredentialGate` 锁定。
+2. **`_checks` 的 `source_id` 用 `_news` 后缀消歧**（`sina_news` / `eastmoney_news`）。探测项里
+   存在「同一家的行情源与新闻源」以及「东方财富（净值）与东方财富新闻」，显示名相近而 provider
+   名不同；若按显示名或去掉后缀的短名对齐，凭据声明会挂到错误的源上。
+3. **`doctor._check_network` 过滤 `skipped` 行**。凭据未探测的源由新增的「数据源凭据」组专门
+   报告；若网络组照旧把它们渲染成 `[ERR]`，同一个配置问题会在体检里被计成两次失败，且误导用户
+   去查连通性。
+4. **测试文件比原计划多一个**：`test_doctor_credential.py`（原测试计划只列了 5 个文件，体检组被
+   并入 `test_doctor.py` 的隐含预期）。体检组是本次唯一新增界面，独立成文件更便于定位失败。
+
+**CLI 实测**（v0.10.17-dev）：`--experiment datasource_credential_ready check-sources` 末尾出现
+`凭据就绪：10 个数据源均无需凭据（免费源）` 且退出码 0；`doctor` 出现 `[数据源凭据]` 组并报
+`[OK] 凭据就绪 — 全部数据源均无需凭据（免费源）`；两条命令在去掉 `--experiment` 后分别不再输出
+就绪行与凭据组——开关关闭时行为与未引入本机制时一致。
+
 ## 验证
 
 1. 单元：`.venv/bin/python -m pytest src/test/unit/core/test_datasource_credential.py src/test/unit/core/test_datasource_credential_edge.py src/test/unit/fetcher/test_credential_gate.py -v --tb=short`

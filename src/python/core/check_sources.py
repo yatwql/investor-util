@@ -14,6 +14,12 @@ import sys
 import time
 from collections.abc import Callable
 
+from src.python.core.datasource_credential import (
+    credential_hint,
+    credential_readiness,
+    credential_ready_enabled,
+    missing_credential,
+)
 from src.python.core.http_client import make_http_client
 from src.python.core.logger import setup_logger
 
@@ -85,14 +91,20 @@ def _check_http(
 
 
 # ── 检查项定义 ──────────────────────────────────────────
+# 四元组 (source_id, 显示名, 用途, 探测函数)：source_id 用于凭据就绪预检
+# （见 core/datasource_credential.py），与 fetcher/chain.py 的 provider 名对齐。
+# 注意「同一厂商的行情与新闻是两个服务」：新闻侧加 _news 后缀，避免与行情
+# provider 名（sina / eastmoney）共用一条凭据声明。
 
-_checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
+_checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
     (
+        "tencent",
         "腾讯财经",
         "行情",
         lambda: _check_http("http://qt.gtimg.cn/q=sz000001", timeout=15),
     ),
     (
+        "sina",
         "新浪财经",
         "行情",
         lambda: _check_http(
@@ -102,6 +114,7 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         ),
     ),
     (
+        "eastmoney",
         "东方财富",
         "基金净值",
         lambda: _check_http(
@@ -110,6 +123,7 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         ),
     ),
     (
+        "tiantian",
         "天天基金",
         "持仓/排名",
         lambda: _check_http(
@@ -118,6 +132,7 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         ),
     ),
     (
+        "eastmoney_industry",
         "东方财富行业",
         "行业分类",
         lambda: _check_http(
@@ -126,6 +141,7 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         ),
     ),
     (
+        "sina_news",
         "新浪新闻",
         "财经新闻",
         lambda: _check_http(
@@ -134,6 +150,7 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         ),
     ),
     (
+        "eastmoney_news",
         "东方财富新闻",
         "财经新闻",
         lambda: _check_http(
@@ -142,6 +159,7 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         ),
     ),
     (
+        "wallstreetcn",
         "华尔街见闻",
         "财经新闻",
         lambda: _check_http(
@@ -150,6 +168,7 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         ),
     ),
     (
+        "cls",
         "财联社",
         "财经新闻",
         lambda: _check_http(
@@ -158,6 +177,7 @@ _checks: list[tuple[str, str, Callable[[], tuple[str, float, str]]]] = [
         ),
     ),
     (
+        "tencent",
         "腾讯K线",
         "历史行情",
         lambda: _check_http(
@@ -221,6 +241,27 @@ def run_health_checks(max_timeout: float = 15.0) -> list[dict]:
     results: list[dict] = []
     results_lock = threading.Lock()
 
+    # 凭据就绪预检（实验开关 datasource_credential_ready）：未就绪的源**不发起
+    # 探测**——探测只会拿到 401/403，与其如实报「源不可达」不如直接说明缺什么。
+    # 跳过项不计入 err/warn（配置级问题，不是源故障），故不影响退出码。
+    _gate = credential_ready_enabled()
+    pending: list[tuple[str, str, Callable]] = []
+    for source_id, name, label, fn in _checks:
+        _spec = missing_credential(source_id) if _gate else None
+        if _spec is None:
+            pending.append((name, label, fn))
+            continue
+        results.append(
+            {
+                "name": name,
+                "label": label,
+                "ok": False,
+                "skipped": True,
+                "latency_ms": 0.0,
+                "message": credential_hint(_spec),
+            }
+        )
+
     def _run_check(name: str, label: str, check_fn: Callable) -> None:
         try:
             symbol, elapsed, msg = check_fn()
@@ -243,7 +284,7 @@ def run_health_checks(max_timeout: float = 15.0) -> list[dict]:
             results.append(item)
 
     threads = []
-    for name, label, fn in _checks:
+    for name, label, fn in pending:
         # daemon=True：预算超时后主流程可立即返回，挂起线程在后台收尾不阻塞进程退出
         t = threading.Thread(target=_run_check, args=(name, label, fn), daemon=True)
         t.start()
@@ -260,7 +301,7 @@ def run_health_checks(max_timeout: float = 15.0) -> list[dict]:
     # 预算内未完成的检查项标记为超时（持锁原子判空，避免与迟到的真实结果重复）
     with results_lock:
         done = {r["name"] for r in results}
-        for name, label, _fn in _checks:
+        for name, label, _fn in pending:
             if name not in done:
                 results.append(
                     {
@@ -300,22 +341,35 @@ def run_check_sources() -> None:
     ok_count = 0
     warn_count = 0
     err_count = 0
+    skip_count = 0
 
     for r in results:
-        if r["ok"]:
+        timed_out = "timeout" in r["message"].lower() or "超时" in r["message"]
+        if r.get("skipped"):
+            # 凭据缺失 → 未发起探测。配置级问题，不计入 err/warn，不影响退出码。
+            skip_count += 1
+            symbol = _SKIP
+        elif r["ok"]:
             ok_count += 1
-        elif "timeout" in r["message"].lower() or "超时" in r["message"]:
+            symbol = _OK
+        elif timed_out:
             warn_count += 1
+            symbol = _WARN
         else:
             err_count += 1
+            symbol = _ERR
 
-        symbol = _OK if r["ok"] else (_WARN if "timeout" in r["message"].lower() else _ERR)
         elapsed_str = f"{r['latency_ms']:>7.0f}ms" if r["latency_ms"] >= 0 else "       -"
         print(f"  {symbol}  {r['name']:<12} {r['label']:<10} {elapsed_str:>8}  {r['message']}")
 
     print("─" * 55)
-    total = ok_count + warn_count + err_count
-    print(f"  {total} 个数据源 — {_OK} {ok_count} / {_WARN} {warn_count} / {_ERR} {err_count}")
+    total = ok_count + warn_count + err_count + skip_count
+    summary = f"  {total} 个数据源 — {_OK} {ok_count} / {_WARN} {warn_count} / {_ERR} {err_count}"
+    if skip_count:
+        summary += f" / {_SKIP} {skip_count}"
+    print(summary)
+    if credential_ready_enabled():
+        print(f"  {_credential_summary()}")
     if hint_items:
         print(f"  {_WARN} {hint_items[0]['message']}")
     print()
@@ -325,3 +379,12 @@ def run_check_sources() -> None:
     if warn_count > 0:
         sys.exit(1)
     sys.exit(0)
+
+
+def _credential_summary() -> str:
+    """凭据就绪摘要行（仅实验开关开启时输出）。"""
+    rows = credential_readiness()
+    if not rows:
+        return f"凭据就绪：{len(_checks)} 个数据源均无需凭据（免费源）"
+    ready = sum(1 for r in rows if r["ready"])
+    return f"凭据就绪：{len(rows)} 个数据源需凭据，{ready} 个已就绪"

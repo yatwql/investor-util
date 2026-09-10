@@ -19,6 +19,7 @@
   - [2.4 关键机制](#24-关键机制)
   - [2.5 数据源适配契约（实验：`datasource_adapter`，默认关）](#25-数据源适配契约实验datasource_adapter默认关)
   - [2.6 数据源记录-回放（测试基建，无开关）](#26-数据源记录-回放测试基建无开关)
+  - [2.7 数据源凭据就绪指引（实验：`datasource_credential_ready`，默认关）](#27-数据源凭据就绪指引实验datasource_credential_ready默认关)
 - [3. 缓存层详细设计](#3-缓存层详细设计)
   - [3.1 子模块结构](#31-子模块结构)
   - [3.2 核心接口与 TTL 分辨率](#32-核心接口与-ttl-分辨率)
@@ -1156,6 +1157,39 @@ fetch_index_data(code)
 **与 C5 的关系**：回放机制完全寄生于 C5「所有 HTTP 请求必须使用 `core/http_client.py` 工厂」。
 任何 provider 若绕过工厂自建客户端，其请求既不受回放替换，也就**不会被未命中保护**——
 回放用例会真实联网且静默通过。
+
+[↑ 回到顶部](#目录)
+
+---
+
+### 2.7 数据源凭据就绪指引（实验：`datasource_credential_ready`，默认关）
+
+把「此源需要什么凭据」**声明在数据里**，缺失时给出「缺什么 → 去哪申请」的可读指引，而不是等
+运行期拿到 HTTP 401 再当作「源不可达」反复重试（借鉴 OpenBB `Provider(credentials=[...])`；
+设计见 `docs-stm/plan/datasource-credential-ready-design.md`）。
+
+**现状如实呈现**：当前全部数据源免费无需凭据，故 `CREDENTIAL_SPECS` 生产实现为**空表**，
+开关开启后的可观察行为就是就绪矩阵报告「N 个数据源均无需凭据（免费源）」。机制由**注入合成
+凭据声明**的单元测试证明可用——不为了演示而把假数据源写进生产注册表。
+
+| 组成 | 位置 | 职责 |
+|:-----|:-----|:-----|
+| 声明与判定 | `core/datasource_credential.py` | `CredentialSpec` 冻结 dataclass + `CREDENTIAL_SPECS` 注册表（声明即数据，当前为空）；`missing_credential` 判定就绪（**空白串视为缺失**，源未声明 → `None` 即不需凭据）；`credential_hint` 可读指引；`credential_readiness` 就绪矩阵（**自身不抛异常**，供体检复用） |
+| 链路预检跳过 | `fetcher/chain.py` | `fetch_with_fallback` 的 provider 循环内、熔断检查之后；历史 chain 的 `_try_providers` 遍历循环同样受控——两处都是「能取数的路径」，只堵一处等于机制半应用 |
+| 健康检查跳过 | `core/check_sources.py` | `_checks` 由三元组扩为 `(source_id, 显示名, 用途, 探测函数)`；缺失凭据**不发起探测**，直接产出 `skipped` 项（复用既有 `_SKIP` 符号 `⏭️`），末尾追加就绪摘要行 |
+| 体检分组 | `core/doctor.py` | 新增 `GROUP_CREDENTIAL`「数据源凭据」组，插在「数据源适配」与「数据源」之间 |
+
+**跳过语义与既有两处 `continue` 同例**：缺凭据是**配置级**问题而非源不可达，因此
+**不计入熔断失败计数**；仅以可读原因进入 `FailureDiagnostics`，随降级事件上屏到数据源可用性
+矩阵。`check-sources` 中跳过项计入 `skipped` 而非 `err`/`warn`，**不改变退出码**；`doctor` 的
+「数据源」组据此过滤掉跳过项（该组只报真实探测结果），避免同一问题被两个组重复计为失败。
+
+**安全口径**：凭据只从环境变量读取，**值永不落日志、永不写入报告/缓存**——日志与就绪矩阵
+只报告**变量名 + 是否就绪**，以及申请地址。
+
+**不设凭据交互式配置向导**：无源需要凭据时该 UI 既无法验证也无法使用（YAGNI）；接入需 key 的
+源时补 `register_credential_spec(...)` 一行声明即可，四面上屏（链路/健康检查/体检/Web 健康页）
+均由既有面自动生效。
 
 [↑ 回到顶部](#目录)
 
@@ -3117,6 +3151,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `cassette` | 数据源记录-回放（真实响应体离线录制/回放引擎，`Cassette`/`cassette_replay`/`cassette_record`） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建，不控制运行时行为） |
 | `cassette_checks` | 已录制响应 → 当前解析器的绑定表（录制自检与 `cassettes --verify` 共用） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |
 | `use_transport_factory` | 传输工厂注入点（`make_http_client` 的响应来源替换，C5 唯一构造点上的挂载） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |
+| `datasource_credential_ready` | 数据源凭据就绪指引（声明 → 就绪判定 → 可读指引） | 数据源可用性矩阵 | 监控 | 实验开关 `datasource_credential_ready`（默认关） |
+| `credential_spec` | 数据源凭据声明（`CredentialSpec` 冻结 dataclass + `CREDENTIAL_SPECS` 注册表） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
+| `credential_readiness` | 凭据就绪矩阵与缺失指引（`missing_credential` / `credential_hint` / `credential_readiness`） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 

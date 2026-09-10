@@ -415,6 +415,19 @@ def _auto_reset_adapter_registry():
 
 
 @pytest.fixture(autouse=True)
+def _auto_reset_credential_specs():
+    """自动重置数据源凭据声明表，防止测试间状态污染。
+
+    声明表在生产中为空（全部免费源），测试为验证机制会注入合成声明；
+    每个测试执行前清空，避免合成声明泄漏到后续用例（尤其会影响
+    check-sources / doctor 的凭据预检分支）。
+    """
+    from src.python.core import datasource_credential
+
+    datasource_credential.reset_credential_specs()
+
+
+@pytest.fixture(autouse=True)
 def _auto_reset_anchor_state():
     """自动重置新闻去重锚点模块单例状态，防止测试间状态污染。
 

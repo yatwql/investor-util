@@ -30,9 +30,18 @@ GROUP_CONFIG = "配置"
 GROUP_DIRS = "目录"
 GROUP_FEATURES = "功能开关"
 GROUP_ADAPTER = "数据源适配"
+GROUP_CREDENTIAL = "数据源凭据"
 GROUP_NETWORK = "数据源"
 
-GROUP_ORDER = [GROUP_ENV, GROUP_CONFIG, GROUP_DIRS, GROUP_FEATURES, GROUP_ADAPTER, GROUP_NETWORK]
+GROUP_ORDER = [
+    GROUP_ENV,
+    GROUP_CONFIG,
+    GROUP_DIRS,
+    GROUP_FEATURES,
+    GROUP_ADAPTER,
+    GROUP_CREDENTIAL,
+    GROUP_NETWORK,
+]
 
 # 支持的最低 Python 版本（项目依赖的语法特性下限）
 MIN_PYTHON = (3, 10)
@@ -309,6 +318,39 @@ def _check_source_adapters() -> list[dict[str, Any]]:
     ]
 
 
+def _check_datasource_credentials() -> list[dict[str, Any]]:
+    """数据源凭据就绪自检（离线，不发起任何网络请求）。
+
+    只报告「变量名 + 是否就绪」，**不含凭据值**。开关关闭时不产出该组，
+    体检输出与未引入本机制时逐字一致。
+    """
+    try:
+        from src.python.core.datasource_credential import credential_readiness, credential_ready_enabled
+
+        if not credential_ready_enabled():
+            return []
+        rows = credential_readiness()
+    except Exception as exc:  # noqa: BLE001
+        return [_item(GROUP_CREDENTIAL, "凭据就绪", False, f"执行失败: {type(exc).__name__}: {exc}")]
+
+    if not rows:
+        return [_item(GROUP_CREDENTIAL, "凭据就绪", True, "全部数据源均无需凭据（免费源）")]
+
+    missing = [r for r in rows if not r["ready"]]
+    if missing:
+        detail = "；".join(r["display_name"] for r in missing)
+        return [
+            _item(
+                GROUP_CREDENTIAL,
+                "凭据就绪",
+                False,
+                f"{len(missing)}/{len(rows)} 个数据源缺少凭据 — {detail}",
+                hint=missing[0].get("message", ""),
+            )
+        ]
+    return [_item(GROUP_CREDENTIAL, "凭据就绪", True, f"{len(rows)} 个数据源凭据均已就绪")]
+
+
 def _check_network(max_timeout: float) -> list[dict[str, Any]]:
     """复用数据源健康检查（网络不可用时不应让整次自检失败，故结果照实上报）。"""
     try:
@@ -320,6 +362,9 @@ def _check_network(max_timeout: float) -> list[dict[str, Any]]:
 
     results: list[dict[str, Any]] = []
     for r in raw:
+        if r.get("skipped"):
+            # 凭据缺失而未探测的源由「数据源凭据」组专门报告，此处不重复计为失败
+            continue
         results.append(
             _item(
                 GROUP_NETWORK,
@@ -354,6 +399,7 @@ def run_doctor_checks(*, include_network: bool = True, max_timeout: float = 8.0)
     results.extend(_check_directories())
     results.extend(_check_experimental_features())
     results.extend(_check_source_adapters())
+    results.extend(_check_datasource_credentials())
     if include_network:
         results.extend(_check_network(max_timeout))
 

@@ -17,6 +17,7 @@ from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.config import get_config
 from src.python.core.constants import CACHE_WEEKLY
+from src.python.core.datasource_credential import credential_hint, credential_ready_enabled, missing_credential
 from src.python.core.provider_registry import TRANSPORT_FAILURE, get_registry
 
 logger = logging.getLogger("invest")
@@ -245,6 +246,17 @@ def fetch_with_fallback(
                 diagnostics.add(label, "未注册")
             continue
 
+        # 凭据就绪预检（实验开关 datasource_credential_ready）：
+        # 配置级问题（用户没配 key），**不计入熔断计数器**——混入可用性统计
+        # 会污染数据源可用性矩阵的语义；仅以可读原因进入「错误即 UX」通道。
+        # 开关关闭 / 无声明凭据 → 该分支恒不触发，行为与未引入本机制时逐字一致。
+        _spec = missing_credential(provider_name) if credential_ready_enabled() else None
+        if _spec is not None:
+            logger.info("[%s]%s %s 缺少凭据，跳过（%s）", data_type, _code_tag, label, _spec.env_var)
+            if diagnostics is not None:
+                diagnostics.add(label, credential_hint(_spec))
+            continue
+
         source_label, fetch_fn = entry
         logger.info("[%s]%s 尝试 %s (%s)", data_type, _code_tag, source_label, provider_name)
 
@@ -317,6 +329,15 @@ def _try_providers(
             logger.debug("[%s] %s 已被熔断，跳过", chain_name, provider_name)
             if diagnostics is not None:
                 diagnostics.add(provider_name, "已被熔断跳过")
+            continue
+        # 凭据就绪预检：与 fetch_with_fallback 同一判定（见彼处注释——配置级
+        # 问题不计入熔断）。历史 chain 若缺此分支，需 key 的源会在此被当作
+        # 「不可达」反复重试并累计熔断，正是本机制要消除的行为。
+        _spec = missing_credential(provider_name) if credential_ready_enabled() else None
+        if _spec is not None:
+            logger.info("[%s] %s 缺少凭据，跳过（%s）", chain_name, provider_name, _spec.env_var)
+            if diagnostics is not None:
+                diagnostics.add(provider_name, credential_hint(_spec))
             continue
         logger.info("[%s] 尝试 %s（code=%s, days=%d）", chain_name, provider_name, code, days)
         try:
