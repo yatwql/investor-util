@@ -207,7 +207,7 @@
 | `price_fund_otc` | 东方财富 JSONP | 天天基金 HTML | JSONP 解析失败 |
 | `industry` | 东方财富 push2 | REST 行情页 | push2 超时/熔断 |
 | `history_stock` | 腾讯 K 线 | 新浪 K 线 | 腾讯不可用 |
-| `history_index_us` | 新浪 K 线 | 腾讯 K 线（反转，因腾讯不支持 `gb_*`） | 新浪不可用 |
+| `history_index_us` | 新浪财经（未实现指数 K 线，探测即跳过） | 腾讯 K 线（`gb_*` 代码支持有限，实际唯一发请求的源） | 腾讯返回空 → 该链路整体取空 |
 
 链路失败时逐段采集失败原因（`fetcher/chain.py` 的 `FailureDiagnostics`），以「展示名(原因)」形式随降级事件透传到报告的**数据源可用性矩阵**降级明细，例如 `腾讯财经(连接超时)；新浪财经(返回空)`——用户可直接看出是哪个源、为什么失败，不必翻日志。未采集到可读原因时回落原有的短标识（如 `transport`、`empty`），输出与既往一致。
 

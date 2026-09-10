@@ -688,7 +688,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
  │  price:         腾讯财经 → 东方财富（行情策略链：开盘状态判断）      │
  │  history_stock:  腾讯财经 K 线          →  新浪财经 K 线          │
  │  history_index:  腾讯财经 K 线          →  新浪财经 K 线          │
- │  history_index_us: 新浪财经 K 线        →  腾讯财经 K 线          │
+ │  history_index_us: 新浪财经（无 K 线实现，跳过） → 腾讯财经 K 线   │
  │  history_fund_otc: 天天基金 pingzhongdata → 东方财富净值分页       │
  │  industry:       东方财富 push2          →  行情页 quotedata      │
  │  fund_rank:      天天基金（直达）                                   │

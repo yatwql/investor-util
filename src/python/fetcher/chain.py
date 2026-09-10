@@ -35,6 +35,9 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "history_stock": ["tencent", "sina"],
     "history_fund_otc": ["tiantian", "eastmoney"],
     "history_index": ["tencent", "sina"],
+    # 美股指数历史日线：真实提供 K 线的只有腾讯（新浪未实现 fetch_index_kline，
+    # 其新浪实时行情函数只覆盖现价）；腾讯 K 线接口对 gb_* 代码支持有限，故该链
+    # 可能整链取空——空结果按正常降级记录，不视作配置错误。
     "history_index_us": ["sina", "tencent"],
     # 无风险利率：首选 akshare（bond_zh_us_rate），配置兜底
     "bond_yield": ["akshare"],
@@ -475,7 +478,9 @@ def _call_history_provider(
         fn = getattr(mod, "fetch_fund_nav_history", None)
         if fn:
             return fn(code)
-    elif chain_name == "history_index":
+    elif chain_name in ("history_index", "history_index_us"):
+        # 两条链共用指数 K 线函数：命中 provider 有实现（腾讯）才真正发起请求，
+        # 无实现者（新浪仅有实时行情，未实现 K 线）落到末尾的统一告警。
         fn = getattr(mod, "fetch_index_kline", None)
         if fn:
             return fn(code, days=days, start_from=start_from)
@@ -487,6 +492,7 @@ def _call_history_provider(
     fn_name = {
         "history_stock": "fetch_kline",
         "history_index": "fetch_index_kline",
+        "history_index_us": "fetch_index_kline",
         "history_fund_otc": "fetch_fund_nav_history",
     }.get(chain_name, "未知函数")
     logger.warning("[history] %s 无 %s 函数", provider_name, fn_name)

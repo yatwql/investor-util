@@ -234,7 +234,7 @@
 | R-HST-04 | 检测到历史数据修正（新数据与缓存日期重叠）时应自动全量刷新 |
 | R-HST-05 | 数据获取模式由用户配置控制：off（关闭）/ prompt（询问后执行）/ auto（自动执行） |
 | R-HST-06 | 00 代码的 K 线全空时自动降级为基金净值链路 |
-| R-HST-07 | 基准指数历史数据通过 history_index（A 股）/ history_index_us（美股）chain 获取，支持增量缓存合并。美股指数（gb_ 前缀）路由至 history_index_us（新浪→腾讯），因腾讯 K-line API 不支持 gb_* 代码 |
+| R-HST-07 | 基准指数历史数据通过 history_index（A 股）/ history_index_us（美股）chain 获取，支持增量缓存合并。美股指数（gb_ 前缀）路由至 history_index_us（新浪→腾讯）；两条链共用同一指数 K 线函数，无实现的 provider 被跳过——当前新浪未实现指数 K 线、腾讯 K-line API 对 gb_* 支持有限，故该链可能整体取空（空结果按正常降级记录） |
 
 ### 5.6 指数数据获取需求
 

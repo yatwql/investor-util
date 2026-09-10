@@ -21,9 +21,8 @@ from src.python.fetcher.chain import (
     reset_provider_skip,
 )
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
-
-
 
 
 # ============================================================
@@ -84,6 +83,7 @@ class TestGetChain(unittest.TestCase):
 # ============================================================
 #  fetch_with_fallback
 # ============================================================
+
 
 class TestFetchWithFallback(unittest.TestCase):
     """Provider Chain 通用 Fallback 获取器测试。"""
@@ -238,8 +238,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def validate(raw, provider):
             return provider == "p2" or raw.get("data") is not None
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, validate=validate)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, validate=validate)
 
         self.assertEqual(result, {"data": "ok"})
 
@@ -256,8 +255,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def validate(raw, provider):
             return True
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, validate=validate)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, validate=validate)
 
         self.assertEqual(result, {"data": "good"})
         fn2.assert_not_called()
@@ -277,8 +275,7 @@ class TestFetchWithFallback(unittest.TestCase):
                 raise ValueError("validation error")
             return True
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, validate=validate)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, validate=validate)
 
         self.assertEqual(result, {"data": "ok"})
 
@@ -297,8 +294,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def transform(raw, source_label):
             return {"price": float(raw["price"]), "source": source_label}
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, transform=transform)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform=transform)
 
         self.assertEqual(result, {"price": 100.0, "source": "P1"})
 
@@ -315,11 +311,11 @@ class TestFetchWithFallback(unittest.TestCase):
 
         def t1(raw, label):
             return {"price": int(raw["price"]) * 2, "from": label}
+
         def t2(raw, label):
             return {"price": int(raw["price"]) * 3, "from": label}
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
 
         # p1 成功，使用 t1 转换
         self.assertEqual(result, {"price": 200, "from": "P1"})
@@ -333,8 +329,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn1 = MagicMock(return_value={"data": "raw"})
         provider_map = {"p1": ("P1", fn1)}
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, transform={"p_other": lambda r, l: None})
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform={"p_other": lambda r, l: None})
 
         self.assertEqual(result, {"data": "raw"})
 
@@ -350,11 +345,11 @@ class TestFetchWithFallback(unittest.TestCase):
 
         def t1(raw, label):
             raise ValueError("p1 transform failed")
+
         def t2(raw, label):
             return {"data": raw["data"], "transformed": True}
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
 
         self.assertEqual(result, {"data": "good", "transformed": True})
 
@@ -448,6 +443,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         """全部 provider 在熔断中 → True。"""
         from src.python.fetcher.chain import is_provider_chain_broken
         from src.python.core.provider_registry import get_registry
+
         mock_chain.return_value = ["p1", "p2"]
         reg = get_registry()
         reg.register_provider("p1", 2)
@@ -465,6 +461,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         """仅部分 provider 熔断 → False。"""
         from src.python.fetcher.chain import is_provider_chain_broken
         from src.python.core.provider_registry import get_registry
+
         mock_chain.return_value = ["p1", "p2"]
         reg = get_registry()
         reg.register_provider("p1", 2)
@@ -480,6 +477,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         """无 provider 熔断 → False。"""
         from src.python.fetcher.chain import is_provider_chain_broken
         from src.python.core.provider_registry import get_registry
+
         mock_chain.return_value = ["p1", "p2"]
         reg = get_registry()
         reg.register_provider("p1", 2)
@@ -490,6 +488,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
     def test_empty_chain(self, mock_chain):
         """空链 → True（无可用 provider）。"""
         from src.python.fetcher.chain import is_provider_chain_broken
+
         mock_chain.return_value = []
         self.assertTrue(is_provider_chain_broken("test"))
 
@@ -498,6 +497,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         """单 provider 链且已熔断 → True。"""
         from src.python.fetcher.chain import is_provider_chain_broken
         from src.python.core.provider_registry import get_registry
+
         mock_chain.return_value = ["p1"]
         reg = get_registry()
         reg.register_provider("p1", 2)
@@ -529,6 +529,22 @@ class TestHistoryIndexChain(unittest.TestCase):
             result = _call_history_provider("tencent", "history_index", "sh000300", 30, None)
             self.assertEqual(len(result), 1)
             mock_mod.fetch_index_kline.assert_called_once_with("sh000300", days=30, start_from=None)
+
+    def test_call_history_provider_dispatches_us_index(self):
+        """history_index_us 与 history_index 同走 fetch_index_kline。
+
+        回归：该链名此前不在 `_call_history_provider` 的任何分支里，直接落到
+        「无 未知函数 函数」告警并恒返回 []——链路看似配了 [sina, tencent]，实际
+        一个 provider 都不会被调用。
+        """
+        mock_mod = MagicMock()
+        mock_mod.fetch_index_kline = MagicMock(return_value=[{"date": "2026-07-01", "close": 5000.0}])
+
+        with patch("importlib.import_module", return_value=mock_mod):
+            result = _call_history_provider("tencent", "history_index_us", "gb_inx", 30, None)
+
+        self.assertEqual(len(result), 1)
+        mock_mod.fetch_index_kline.assert_called_once_with("gb_inx", days=30, start_from=None)
 
     def test_call_history_provider_stock_unaffected(self):
         """history_stock 仍调用 fetch_kline，不受历史指数分支影响。"""
@@ -564,10 +580,11 @@ class TestHistoryIndexChain(unittest.TestCase):
         from src.python.fetcher.chain import fetch_with_incremental_fallback
 
         # mock 所有 provider 返回空
-        with patch("src.python.fetcher.chain.cache_get") as mock_cache_get, \
-             patch("src.python.fetcher.chain.cache_set") as mock_cache_set, \
-             patch("src.python.fetcher.chain._try_providers") as mock_try:
-
+        with (
+            patch("src.python.fetcher.chain.cache_get") as mock_cache_get,
+            patch("src.python.fetcher.chain.cache_set") as mock_cache_set,
+            patch("src.python.fetcher.chain._try_providers") as mock_try,
+        ):
             mock_cache_get.return_value = []
             mock_try.return_value = []  # 全链路失败
 
