@@ -1237,6 +1237,32 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 | ⑧ | **验证标记合规** | 终端 | `.venv/bin/python scripts/check-test-markers.py` — 确认测试文件标记无遗漏 |
 
 > **LLM 模块补充步骤**：在上述 registry 清单基础上，新增 LLM 模块还需完成领域特定步骤——`llm/prompts.py` 新增 `_SYSTEM_{MODULE}` 常量与提示词构建函数；`report/html_writer.py`（HTML）+ `report/llm_content.py`（Excel）新章节双渲染；`config.json` → `cache_ttl` 添加 `llm_{module}` 条目；`llm_settings.json` 加入推荐默认值并更新 [配置指南](../manuals/how-to-config.md)。
+>
+> **纳入模块级质量分级（可选，实验功能 `module_quality_gate`）**：新模块默认不参与 `report/llm_quality.py` 的 A~F 分级（分级为只读旁路，未登记不影响任何既有功能）。若需纳入：在 `_MODULE_KEYS` 追加模块键（顺序须与 `llm_content` 四元组位置一致）、在 `_LENGTH_THRESHOLDS` 设定该模块的 `(降级下限, 参考篇幅)` 双阈值（依据真实健康输出实测字符数标定）；若其提示词规定了固定章节清单，还需在 `_REQUIRED_MARKERS` 登记标记——`test_llm_quality.py::TestRequiredMarkersMatchPrompts` 会直接比对提示词常量，标记与提示词不同步即测试失败。
+
+> **实验开关改变提示词 → 缓存指纹必须读写两侧同源**：凡实验开关**会改变提示词内容**（`signal_pre_digest` 注入信号块、`decision_header_parse` 追加决策头契约、`signal_ledger` 注入确定性信号摘要），必须在**写侧指纹闭包**（`llm/generators.py` 各 `generate_*` 的 `_fingerprint`）与 **orchestrator 预检指纹**（`llm/generators_orchestrator._compute_module_cache_info`）**无条件调用同一个后缀函数**，并把开关判定**收敛在该函数内部**——只改一侧会让预检命中旧键、跳过重生成，开关形同虚设；两侧各读一次开关则迟早漂移。后缀函数关闭时返回 `""`（键不变、不误伤既有缓存），开启时返回稳定短串（如 `"_dh"`）。**内容指纹型**后缀（如 `decision_ledger.lessons_cache_suffix`、`prompts_signals._signal_digest_cache_suffix`、`signal_ledger.summary_cache_suffix`）另取块内容 md5 作版本，使数值变化即换键。
+
+> **追加型状态文件一律走共享原语 `core/jsonl_store.py`**：`perf`（性能历史）、`decision_ledger`（决策账本）、`signal_ledger`（信号账本）三者的「读全文 → 拼接 → 写临时文件 → `os.replace`」逻辑已抽为 `append_jsonl_atomic()` / `read_jsonl()`，**新增任何 JSONL 持久化都不得再抄一份**——各自只保留自己的序列化口径（如 `decision_ledger` 的 `sort_keys=True` + `ensure_ascii=False`）与 `prefix`/日志标签，行为逐字不变由 `test_jsonl_store.py::TestDelegationPreservesBehaviour` 锁定。新增持久化文件时**必须**在 `src/test/conftest.py` 的 `_isolate_sensitive_paths` 中把路径重定向到 `tmp_path`，不得依赖测试自行清理。
+
+> **统计类输出默认只算「实时」记录**：凡把历史记录折叠成统计/排行榜/提示词摘要的功能（如 `signal_ledger.fold_signals(live_only=True)`），必须给每条记录附来源标签并可区分「可证明为实时」与其余，**默认只统计实时记录**、且**不引入新的合成数据开关**——来源判定复用既有数据质量设施（逐品种 `data_freshness` + 降级事件），未识别的取值一律保守判非实时；确需乐观缺省时（无逐品种条目可证伪）必须显式写入理由字段，不得静默。
+
+### 新增实验开关检查清单
+
+实验功能以**注册表驱动**：`config/features.py` 的 `EXPERIMENTAL_FEATURES` 是唯一事实源，一处登记即自动出现在三个面，**不得在任一渠道层另写一份开关清单**。
+
+| # | 步骤 | 操作位置 | 产出 |
+|---|------|---------|------|
+| ① | **登记注册表** | `config/features.py` → `EXPERIMENTAL_FEATURES` | 追加 `ExperimentalFeature(name=..., label=..., description=...)`；`name` 即 `features.json` 键名与 `--experiment` 取值 |
+| ② | **声明默认值** | `config/features.py` → `_FEATURE_FLAGS_DEFAULT` | 新增同名键，默认 **`False`**（实验项缺省关闭） |
+| ③ | **消费开关** | 功能实现处 | 一律经 `is_feature_enabled()` 读取；开关判定若影响提示词，须收敛在缓存后缀函数内部（见上方「缓存指纹必须读写两侧同源」） |
+| ④ | **覆盖三面** | 自动 | TUI 菜单 `S` / Web 配置面板 / CLI `--experiment` 均由注册表生成，无需改渠道代码 |
+| ⑤ | **验证** | 终端 | `.venv/bin/python -m pytest src/test/unit/config/test_features.py src/test/unit/web/test_config_edit.py -v` — 配置编辑白名单覆盖全部 TUI 可编辑键 |
+
+> **菜单项/卡片可见性由开关门控**：若实验功能有常驻入口（TUI 菜单项、Web 卡片），开关关闭时必须**就地裁剪**而非渲染后置灰——TUI 侧向 `tui/tui_menu.py::FEATURE_GATED_ITEMS` 登记 `(菜单项, 开关名)`，Web 侧由 `system_info` 透出 `*_enabled` 供前端决定是否渲染；`tui/tui_menu.py::_apply_feature_gates()` 是统一裁剪点。
+
+> **诊断类命令不得依赖 config 初始化**：`doctor` / `view-logs` / `check-sources` 三个子命令在 `main()` 中**先于 `init_config` 分派**——配置损坏正是它们要定位的场景，若先初始化配置再分派，用户会在最需要诊断能力时被配置错误挡在门外（死锁）。新增诊断类命令遵循同一模式：**先分派、后初始化**，并把「命令失败」（退出码 2）与「命令跑完但结论不佳」（退出码 1）用 `_EXIT_SUCCESS` / `_EXIT_PARTIAL` / `_EXIT_SEVERE` 常量区分开，不得写裸字面量。**诊断类命令自身永不抛异常**——任何内部异常都转成一条结果行，否则等于在最需要它的时刻失效（`core/doctor.py`）。
+
+> **新增数值解析一律委托 `core/num_utils.py`，禁止自写 `try: float(x) / except`**：`float("nan")` / `float("±inf")` **不抛异常**，该形态的兜底对它们完全无效，脏值会一路穿透到聚合、绘图与 JSON 序列化；`value or 0.0` 同样是**假兜底**（NaN 是真值，`or` 不会短路）。按语义选入口：宽容解析（含数值字符串）用 `safe_num`、类型契约敏感场景用 `strict_num`、替代 `or 0.0` 惯用法用 `finite_or`、判定谓词用 `is_finite_number`。**不改变既有失败口径**（`0.0` 还是 `None` 由调用方契约决定），只保证「返回的数值一定有限」。
 
 ### 精确键名缓存
 

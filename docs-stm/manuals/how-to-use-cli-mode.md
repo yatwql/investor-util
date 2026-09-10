@@ -9,7 +9,7 @@ CLI 命令行模式无需 TUI 菜单界面，通过命令行参数驱动，适�
 
 ## 1. 命令结构
 
-CLI 命令分两层：**全局参数**（位于子命令之前）+ **子命令**（`report` / `cache` / `whatif` / `check-sources` / `view-logs`）。
+CLI 命令分两层：**全局参数**（位于子命令之前）+ **子命令**（`report` / `cache` / `whatif` / `check-sources` / `view-logs` / `doctor`）。
 
 ```bash
 # 查看帮助
@@ -31,7 +31,32 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir`（不存在时自动创建；支持绝对 / 相对路径） |
 | `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
 | `--non-interactive` | 跳过首次运行交互式引导（定时任务 / 脚本使用） |
+| `--experiment NAME` | 启用实验性功能，**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `signal_pre_digest`）或显示名（如 `信号预消化`），`all` = 全部启用 |
 | `--version` | 显示版本号并退出 |
+
+> **`--experiment` 说明**：等价于在 TUI 菜单 **[S]** / Web 配置面板中临时勾选实验开关，但**只作用于当前这一次命令、不改动持久化配置**——CI / 定时任务可在不污染用户配置的前提下试用实验功能；反之，用户配置里已开启的实验开关不会被本参数关闭。
+>
+> ```bash
+> # 单次运行启用信号预消化
+> .venv/bin/python -m src.python.cli --experiment signal_pre_digest report --type full
+>
+> # 用显示名指定、可重复叠加
+> .venv/bin/python -m src.python.cli --experiment 决策跨期反思闭环 --experiment 模块级质量分级 report --type full
+>
+> # 单次启用决策头结构化（受控 JSON 决策头，抽取侧优先读结构化、失败回落表格解析）
+> .venv/bin/python -m src.python.cli --experiment decision_header_parse report --type full
+>
+> # 单次启用确定性信号沉淀（五类确定性评级入账，附实时/非实时标签）
+> .venv/bin/python -m src.python.cli --experiment signal_ledger report --type full
+>
+> # 单次启用系统自检上屏（TUI 菜单 [D] / Web 自检卡片；doctor 子命令本身不受开关约束）
+> .venv/bin/python -m src.python.cli --experiment doctor_check report --type full
+>
+> # 本次运行启用全部实验功能
+> .venv/bin/python -m src.python.cli --experiment all report --type full
+> ```
+>
+> 取值写错会立即报错并列出全部可选值，不会静默忽略。当前可选实验功能清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)（与 TUI 菜单 [S] 实验块同源，由 `features.EXPERIMENTAL_FEATURES` 注册表驱动）。
 
 ---
 
@@ -105,7 +130,39 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 
 ---
 
-## 8. 使用示例
+## 8. `doctor` 子命令（系统自检）
+
+一键盘点运行环境，分组报告 **环境 / 配置 / 目录 / 功能开关 / 数据源** 五类检查结果，**失败项附可执行修复建议**。适合新机部署、报告跑不起来、怀疑配置损坏时先跑一遍。
+
+```bash
+.venv/bin/python -m src.python.cli doctor
+```
+
+| 参数 | 说明 |
+|:-----|:-----|
+| `--offline` | 跳过联网检查（数据源连通性），纯本地自检、秒级返回 |
+| `--timeout SECONDS` | 单次检查的耗时预算（默认 8 秒） |
+
+```bash
+# 纯本地自检（不联网）
+.venv/bin/python -m src.python.cli doctor --offline
+
+# 放宽联网检查预算到 20 秒
+.venv/bin/python -m src.python.cli doctor --timeout 20
+```
+
+**与其它子命令的两点不同**：
+
+1. **无需配置**——自检在加载配置**之前**执行。配置损坏正是它要诊断的场景，因此不会因配置读不出来而拒绝运行。
+2. **不受实验开关约束**——`doctor` 子命令始终可用，无需 `--experiment doctor_check`。该开关只控制 TUI 菜单项与 Web 自检卡片这两个日常入口的可见性（同理：若 CLI 也被开关拦住，就会陷入「开开关要先读配置、读配置失败又要开开关」的死锁）。
+
+**退出码**：`0` = 全部检查通过；`1` = 自检跑完了但**存在失败项**（注意：这不是「命令失败」，而是一条诊断结论，脚本可用它判定环境是否可用）。
+
+> 日常也可从 TUI 菜单 **[D]** 或 Web「系统自检」卡片触发同一套检查，三端共用 `core/doctor.py`。
+
+---
+
+## 9. 使用示例
 
 ```bash
 # 生成全量报告，强制重新调用 LLM
@@ -141,7 +198,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 
 ---
 
-## 9. 常用命令速查
+## 10. 常用命令速查
 
 | 用途 | 命令 |
 |:-----|:-----|
@@ -155,11 +212,12 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | 查看缓存状态 | `.venv/bin/python -m src.python.cli cache --stats` |
 | 数据源健康检查 | `.venv/bin/python -m src.python.cli check-sources` |
 | 查看最近运行日志 | `.venv/bin/python -m src.python.cli view-logs --level WARNING` |
+| 系统自检（一键体检） | `.venv/bin/python -m src.python.cli doctor --offline` |
 | 查看性能历史趋势 | `.venv/bin/python scripts/perf-view.py` |
 
 ---
 
-## 10. 退出码含义
+## 11. 退出码含义
 
 | 退出码 | 含义 | 说明 |
 |:------:|:-----|:-----|
@@ -174,14 +232,15 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | LLM key 缺失降级 | 1 | 如需 LLM 内容，配置 `llm_key.json` |
 | 部分数据源失败 | 1 | 检查网络，下次调度自动恢复 |
 | 持仓文件不存在 | 2 | 检查 `config.json` 中 `holdings_dir` / `holdings_filename` 配置 |
-| 配置格式错误 | 2 | 运行 `.venv/bin/python -c "import json; json.load(open('data/config/config.json'))"` 检查 |
+| 配置格式错误 | 2 | 运行 `.venv/bin/python -c "import json; json.load(open('data/config/config.json'))"` 检查；或先跑 `doctor`（无需配置即可运行）定位 |
+| 自检有失败项 | 1 | `doctor` 子命令专用：命令跑完了但检查未全过，按失败项附带的修复建议处理 |
 | 用户中断 | 130 | 手动终止，无需处理 |
 
 ---
 
-## 11. 最佳实践
+## 12. 最佳实践
 
-### 11.1 缓存预热
+### 12.1 缓存预热
 
 首次运行或新增持仓后，建议先更新缓存再生成报告：
 
@@ -191,7 +250,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 .venv/bin/python -m src.python.cli --output ./reports report --type basic
 ```
 
-### 11.2 报告输出路径
+### 12.2 报告输出路径
 
 通过 `--output DIR` 全局参数指定报告输出目录，覆盖 `config.json` 中的 `output_dir` 配置：
 
@@ -208,7 +267,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 
 > 定时任务中建议使用绝对路径，避免因工作目录不确定导致的路径问题。
 
-### 11.3 网络退避策略
+### 12.3 网络退避策略
 
 Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自动降级使用过期缓存：
 
@@ -216,7 +275,7 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 - 数据源持续不可用 → 熔断器开启 → 使用过期缓存
 - 报告在无网络环境下降级生成（exit=1，部分数据为空）
 
-### 11.4 性能历史自动收集
+### 12.4 性能历史自动收集
 
 每次 CLI 报告生成时，系统自动记录性能数据到 `data/state/` 目录：
 
@@ -227,7 +286,7 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 
 这些记录自动积累，可用于跨版本性能退化检测和异常波动排查，无需手动触发。
 
-### 11.5 日志轮转
+### 12.5 日志轮转
 
 应用日志已自动轮转（`logs/app.log`，单文件最大 10 MB，保留 5 份备份），**无需额外配置**。
 
@@ -246,11 +305,11 @@ Provider Chain 已内置三次重试 + 熔断机制，网络临时故障时自�
 
 ---
 
-## 12. 定时任务
+## 13. 定时任务
 
 CLI 模式配合操作系统定时任务可实现无人值守的自动报告生成（定时驱动报告 / 更新缓存），无需人工操作 TUI 菜单。定时任务中建议使用**绝对路径**（避免工作目录不确定）与 `--non-interactive`（跳过首次运行引导）。
 
-### 12.1 Windows 任务计划程序
+### 13.1 Windows 任务计划程序
 
 #### 基础配置
 
@@ -303,7 +362,7 @@ try {
 schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "powershell -NoProfile -Command \"if (-not (Test-Path '$env:TEMP\invest.lock')) { New-Item '$env:TEMP\invest.lock' -Force | Out-Null; try { D:\path\to\investor-util\.venv\Scripts\python.exe -m src.python.cli report --type full --history auto } finally { Remove-Item '$env:TEMP\invest.lock' -ErrorAction SilentlyContinue } }\"" /ST 16:00
 ```
 
-### 12.2 Linux crontab
+### 13.2 Linux crontab
 
 #### 基础配置
 
@@ -330,7 +389,7 @@ crontab -e
 0 16 * * * cd /home/user/investor-util && flock -n /tmp/invest.lock .venv/bin/python -m src.python.cli report --type full --history auto >> logs/cron.log 2>&1
 ```
 
-### 12.3 定时任务排障
+### 13.3 定时任务排障
 
 **检查日志**：
 
@@ -361,7 +420,7 @@ tail -20 logs/cron.log
 
 ---
 
-## 13. 更多参考
+## 14. 更多参考
 
 - [快速开始](how-to-start.md)「方式三」—— CLI 启动简介
 - [TUI 菜单操作手册](how-to-use-tui-menu.md) —— TUI 等效操作（各菜单详解）

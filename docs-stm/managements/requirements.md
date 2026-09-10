@@ -139,6 +139,16 @@
 | R-DIAG-02 | TUI 主菜单提供「V 查看最近运行日志（可按级别筛选）」「H 查看数据源健康历史（近期检查记录）」两项：级别筛选、ERROR/WARNING 着色（NO_COLOR/TTY 检测自动降级无着色）、traceback 折叠为「⤷ 堆栈详情 +N 行」 |
 | R-DIAG-03 | Web 提供 `GET /api/logs` 与 `GET /api/health/history` 接口及「⑦ 日志查看」卡：级别校验（非法 400）、`lines` clamp [1,5000]、`since/until` 透传、读取失败 500；前端手动加载不自动轮询，`<details>` 原生折叠 + 级别配色，全程 `textContent`（防 XSS） |
 
+### 3.6 系统自检（诊断，实验功能 `doctor_check`）
+
+一键盘点运行环境，三端共用核心层 `core/doctor.py`，渠道层仅做薄展示。分组输出（环境/配置/目录/功能开关/数据源），**失败项附可执行修复建议**。**自检自身永不抛异常**（异常一律转为该组失败行）、**零重依赖**（不 import pandas——其缺失正是它要报告的场景）。
+
+| 需求标识 | 需求描述 |
+|:---------|:---------|
+| R-DIAG-04 | CLI 提供 `doctor` 子命令：`--offline` 跳过联网检查、`--timeout SECONDS` 限定单次检查预算；**无需 config 且在 `init_config` 之前分派**——配置损坏正是它要诊断的场景，被开关或配置初始化拦住会形成死锁；**不受 `doctor_check` 开关约束**。退出码 `0`=全部通过、`1`=命令跑完但有失败项（≠ 命令自身失败） |
+| R-DIAG-05 | TUI 主菜单提供 `[D]` 系统自检项，**受实验开关 `doctor_check` 约束**：开关关闭时该项由菜单门控就地裁剪，不出现在主菜单中 |
+| R-DIAG-06 | Web 提供 `GET /api/doctor` 接口（`network=0` 跳过联网、`timeout` 上限 15s、非法值回落默认）及运行状态区「系统自检」卡片，卡片可见性由 `system_info["doctor_enabled"]` 控制（受 `doctor_check` 开关约束）；接口在配置损坏时仍返回 200 并给出失败结果行 |
+
 ---
 
 ## 4. 持仓输入格式
@@ -1194,13 +1204,17 @@ LLM 五维度量化评分，每项满分 100：
 
 ### 11.5 features.json（功能开关注册表）
 
-独立配置文件，提供 28 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
+独立配置文件，提供 33 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
 
 | 开关名 | 类型 | 默认值 | 说明 |
 |:-------|:----:|:------:|:-----|
 | `llm_global_macro` / `llm_expert_review` / `llm_health_check` / `llm_penetration_deep` / `llm_news_correlation` | bool | true（llm_news_correlation 为保留字段） | LLM 各模块独立启停开关（llm_news_correlation 的实际启停由 llm_settings.json 的 enabled_llm.news_correlation 控制，默认 false） |
 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | bool | false（全部默认关闭） | 辩论模式三增强通路独立启停：正反辩论/条件推理/集中度问答 |
 | `decision_reflection` | bool | false（默认关闭） | 决策跨期反思闭环启停：登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词 |
+| `signal_pre_digest` | bool | false（默认关闭） | 信号预消化启停：市场温度/估值分位/尾部风险预消化为带方向标注的信号行（`信号：… 看多/看空/中性/风险高/中/低`）注入专家复盘与持仓体检提示词 |
+| `module_quality_gate` | bool | false（默认关闭） | 模块级质量分级启停：对 4 个 LLM 模块输出按完整性/篇幅评 A~F，低评级中「内容在但存在缺陷」者随内容头部注入 `【内容质量提示】` 横幅（只标注、不阻断、不重试、不写回缓存） |
+| `decision_header_parse` | bool | false（默认关闭） | 决策头结构化启停：专家复盘提示词追加一行受控 JSON 决策头（`决策头：{"decisions":[…]}`），抽取侧优先读结构化头、失败回落确定性表格解析（决策词归一，防写反方向）；关闭时提示词逐字节不变 |
+| `signal_ledger` | bool | false（默认关闭） | 确定性数值信号沉淀启停：把市场温度/估值分位/尾部风险/风格因子/再平衡超限五类确定性评级沉淀为 `data/state/signal_ledger.jsonl` 账本，每条附实时-非实时来源标签；统计与注入提示词的摘要默认只算实时记录，防非实时记录冒充真实战绩 |
 | `fund_deep_analysis_fund_manager` / `fund_deep_analysis_fund_concentration` | bool | true | 基金深度分析模块启停（经理变更/集中度监控） |
 | `news_sina` / `news_eastmoney` / `news_cls` / `news_wallstreetcn` / `news_akshare` | bool | true（cls 默认关闭） | 各新闻源启停 |
 | `history_portfolio` / `history_benchmark` | bool | true | 历史走势与基准指数开关 |
@@ -1208,6 +1222,7 @@ LLM 五维度量化评分，每项满分 100：
 | `anonymizer` | bool | false | 匿名化功能全局开关（模式选择在 config.json 的 `anonymization.mode` 中配置） |
 | `cache_daily_cleanup` | bool | true | 启动时自动清理过期缓存 |
 | `enable_interactive_charts` | bool | true | 报告 HTML 交互图表（Chart.js）；关闭时回退基础 Canvas 图表 |
+| `doctor_check` | bool | false（默认关闭） | 系统自检功能上屏：开启后 TUI 菜单显示 `[D]` 系统自检项、Web 运行状态区渲染「系统自检」卡片（`GET /api/doctor`）。**仅约束 TUI/Web 两个日常入口**——`doctor` CLI 子命令不受本开关约束（配置损坏正是它要诊断的场景，被开关拦住会形成死锁） |
 
 用法：在 `features.json` 中仅列出需覆写的开关，未列出的保持默认值。
 ```json

@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.16-dev
-> **编号源**：`rf-next = 297`（新增问题取此编号，完成后更新为 +1；已用最大 rf-296，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 305`（新增问题取此编号，完成后更新为 +1；已用最大 rf-304，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -38,18 +38,29 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
-#### P2C — LLM 数据质量口径缺陷（2026-09-04 借鉴分析发现）
-
-> health_check「数据质量」维度与 expert_review 降级摘要口径可能自相矛盾。
+#### P2D — LLM 缓存指纹同源偏差（2026-09-10 plan-31 实现期自审发现）
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
-| **rf-295** | `_submit_llm_future`（`report/_llm_news.py:71-89`）调 `generate_all_llm` 时**未传 `degradation_events`**（metrics 等已传）→ health_check 生成时 `_build_data_quality_detail_block(None)` 恒返回「今日无降级记录，所有数据源正常。」（`prompts_tables.py:225-226`），而同一批 expert_review 经 `_build_data_degradation_block(pipeline_data)` 可能显示真实降级——health_check 第 5 维「数据质量」据此误判"全正常"，与 expert 摘要自相矛盾 | 让 `_submit_llm_future` 把 `DegradationTracker.get_log()` 经 `degradation_events` 传入 `generate_all_llm`（该参数已存在，仅调用点漏传）；或 health 侧改读 pipeline_data 降级摘要与 expert 统一口径。需回归测试断言 health_check prompt 含真实降级事件而非恒空。关联 plan-32（模块级质量分级可作该能力的最小起步验证） |
+#### P2E — DeepSeek 旧模型名定价口径待确认（2026-09-10 接入 `deepseek-flash` 时自审发现）
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-303** | 接入 V4.1-Flash 正式名时核对 `MODEL_PRICING` 的 DeepSeek 条目，发现两处既有口径未经官方确认：① **`deepseek-reasoner` 无定价条目**——该模型名目前仍被 DeepSeek 端点接受，但 `estimate_cost()` 对其返回 `"-"`，费用页签显示为空；② **`deepseek-chat` 单价来源存疑**——本表按 V3（1.50/4.50/0.05）单独定价，而 DeepSeek 文档称 `deepseek-chat` 与 `deepseek-reasoner` 分别是 V4-Flash 的「非思考 / 思考模式」别名（若属实，二者应随 flash 系列走 09-10 降价后的 1.00/4.00/0.02，且 `deepseek-reasoner` 应有条目） | 以 DeepSeek 官方文档确认两个模型名的**当前语义与单价归属**后再定：若确为 v4-flash 别名，则为 `deepseek-reasoner` 增加条目并核对 `deepseek-chat` 单价（须同步 `[0.10.16-dev]` 起 flash 系列降价口径）；若 `deepseek-chat` 已固化为独立 V3 端点则维持现值并补注释说明。**改动前须先补「模型名 → 单价」断言测试**，避免误改导致费用估算偏移。低优先级：项目配置、文档示例与测试均未使用这两个模型名 |
+
+| **rf-297** | `generators_orchestrator._compute_module_cache_info` 对 expert_review / health_check / penetration_deep 三个模块构建指纹时传 `history_data=history_data`（`build_llm_fingerprint` 会把它抽取成 `_risk_signals` 并入哈希），而 `generators.py` 三个写侧 `_fingerprint()` 闭包**完全不传** `history_data`（`_risk_signals` 恒为 `{}`）→ 两侧哈希必然不同（实测 `41e560ba67fe` ≠ `259afccbd62e`）→ 预检 `cache_get(cache_info["key"])` 对这三个模块**永不命中**，每次报告都全量派发。**非正确性缺陷**（内层 `generate_llm_module` 用写侧键读写缓存，内容仍正确复用），属性能与日志噪声；但预检形同虚设，易误判为"缓存未命中率高" | 二选一对齐：① 预检侧不传 `history_data`；② 写侧闭包补传并核对 `history_data` 在两侧可取到同一对象（须确认 `build_llm_fingerprint` 的 `history_data` 语义对三个模块等价）。**必须先补两侧指纹一致的回归测试**（断言 `_compute_module_cache_info` 的 key 与写侧 `fingerprint_fn()` 拼接结果相等）再改，避免修复引入缓存永久 miss；另需评估 `_module_labels` 事实校验按 `cached` 跳过的分支不受影响。关联 plan-31（其信号后缀已按同源纪律两侧同调，未触碰本偏差） |
 ## 已解决问题
 
 ### 已解决待归档（v0.10.16-dev）
 
+| rf-295 | 持仓体检「数据质量」维度降级事件恒空（`_submit_llm_future` 未传 `degradation_events`）——报告自身数据降级披露口径自相矛盾 | `report/_llm_news.py` 在提交线程池前于主线程取一次 `DegradationTracker.get_log()` 快照随参传入 `generate_all_llm`（该参数早已存在，仅调用点漏传；主线程读取避免与工作线程并发写入交错）；回归测试 `TestSubmitLlmFutureDegradationEvents` 3 项（快照非空透传/空降级仍传空列表/不影响 metrics 等既有传参） | `changelog.md` [0.10.16-dev] |
 | rf-296 | 品种代码笔误无自动纠正通道（2026-09-09 实盘穿透深度复现 561910→161910 易位一位幻觉；唯一近邻 + 组合权重 10.2% 吻合仍仅告警） | `_corrections.py` 新增 `detect_code_corrections`/`apply_code_corrections`（辅助 `_utils._build_stock_weight_map`/`_edit_distance_le_one`）：错码非 持仓/穿透/指数/建议语境 有效集、**唯一**持仓近邻（编辑距离≤1）、后方权重声称与候选真实组合权重容差内吻合 三条件全满足才自动纠正，纳入「已修正明细」并从 ⚠ 剔除；回归测试 `TestCodeTypoAutoCorrection` 8 项（实盘纠正 + 权重不吻合/多近邻歧义/建议语境/穿透代码/指数 边界不误改） | `changelog.md` [0.10.16-dev] |
+| rf-298 | `core/signal_ledger.fold_signals` 对**显式传入**的非 dict 元素（`None`/字符串/数字）会抛异常，而 `load_signals` 对同一文件内容是容错的——同一份数据走「文件读入」与「直接传集合」两条路径行为不一致（plan-34 实现期自审发现，写边缘用例时暴露） | `fold_signals` 入口增加 `items = [s for s in raw if isinstance(s, dict)]` 过滤（与 `load_signals` 的容错口径对齐）；回归测试 `test_signal_ledger_edge.py::TestDegenerateRecords::test_fold_ignores_non_dict_entries` | `changelog.md` [0.10.16-dev] |
+| rf-299 | `fetcher/chain.py` 熔断跳过分支把**原始 provider id** 写进链路诊断（`p1(已被熔断跳过)`），而同一循环内其余分支写的是展示名（`腾讯财经(连接超时)`）——同一条降级事件因失败类型不同而时好时坏地不可读，恰好违背本项「失败原因可读」的目标（写批量 3 用例时被断言揭出） | 把 `entry = provider_fn_map.get(provider_name)` 提到熔断检查之前，熔断/未注册分支统一改用 `label`（有注册项取展示名，否则回落原始 id）；回归测试 `test_chain_diagnostics.py::TestFetchWithFallbackDiagnostics::test_circuit_broken_provider_recorded` 断言输出为 `腾讯财经(已被熔断跳过)` | `changelog.md` [0.10.16-dev] |
+| rf-300 | `cli._handle_doctor` 用裸字面量 `1 if bad_count else 0` 作退出码，未走项目既有的 `_EXIT_SUCCESS/_EXIT_PARTIAL/_EXIT_SEVERE` 常量——脚本无法区分「命令本身失败」（SEVERE=2）与「命令跑完但检查未通过」（PARTIAL=1），且魔法数字散落 | 改为 `return _EXIT_PARTIAL if bad_count else _EXIT_SUCCESS`，docstring 补记该语义区分；测试相应改为断言 `_EXIT_PARTIAL` | `changelog.md` [0.10.16-dev] |
+| rf-301 | plan-35 A1/A2 改动遗留 4 处违反代码痕迹纪律的注释/文案：`providers/_utils.py` 与 `providers/akshare_extras.py` 注释叙述历史实现（「原实现的 `float(s)`…」「原实现只拦 NaN」），`test_numeric_guard_regression.py` 出现魔法编号 `F9` 及同类历史叙述——`check-code-traces --ci` 报 HIGH×2 + MAGIC×1，阻断 P0 门禁 | 四处一并改写为陈述当前不变量的语义描述（不提历史实现、不用接口字段名的缩写代号），`check-code-traces --ci` 恢复 [OK] | `changelog.md` [0.10.16-dev] |
+| rf-304 | 接入 `deepseek-flash` 时在代码注释与测试 docstring 中书写厂商标识 `DeepSeek-V4.1-Flash` / `V4.1 Pro`，其「大写字母+数字」形态被 `check-code-traces --ci` 判为魔法编号（MAGIC×8：`core/constants.py`、`llm/api_base.py`、`test_llm_utils.py`×2、`test_llm_api.py`）；同批在 `changelog.md` 写入指向技术设计文档某章的编号式引用，被 `check-doc-traces --ci` 判为 CHAPTER×1——两项同时阻断 P0 门禁 | 代码侧 8 处改写为语义描述「新一代 Flash / 新一代 Pro」（正式模型名 `deepseek-flash` 本身已是语义名，不承载版本代号）；`changelog.md` 改称「定价快照表」（语义章节名，不带章号）。两个 checker 均恢复 [OK] | `changelog.md` [0.10.16-dev] |
+| rf-302 | plan-35 文档阶段在 `technical.md` §4.17 正文写入两处任务编号括注（「（自审记录 rf-299）」「（自审记录 rf-300）」）——技术设计文档属实现层文档，不得出现任务代号引用，`check-doc-traces --ci` 报 CODE×2 阻断 P0 门禁 | 两处括注改写为对应的语义描述（展示名一致性的目的、退出码 `PARTIAL` 与 `SEVERE` 的语义区分），任务编号引用仅保留在 `changelog.md` / `plan.md` / `review-findings.md` 三份记账文档中，`check-doc-traces --ci` 恢复 [OK] | `changelog.md` [0.10.16-dev] |
 
 ### 已解决待归档（v0.10.15-dev）
 
