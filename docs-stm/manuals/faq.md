@@ -704,10 +704,10 @@ A: 日志文件在 `logs/app.log`，DEBUG 级别的详细信息（如 LLM 发出
 
 | 修改目标 | 找到的代码行 | 改为 |
 |:---------|:-----------|:-----|
-| 控制台输出更多细节 | `console_handler.setLevel(logging.INFO)`（约 85 行） | `console_handler.setLevel(logging.DEBUG)` |
-| 文件日志减少级别 | `file_handler.setLevel(logging.DEBUG)`（约 99 行） | `file_handler.setLevel(logging.INFO)` |
+| 控制台输出更多细节 | `console_handler.setLevel(logging.INFO)`（约 103 行） | `console_handler.setLevel(logging.DEBUG)` |
+| 文件日志减少级别 | `file_handler.setLevel(logging.DEBUG)`（约 117 行） | `file_handler.setLevel(logging.INFO)` |
 
-也可全局设为某个级别：修改第 78 行 `logger.setLevel(logging.DEBUG)` 为 `logger.setLevel(logging.INFO)`，所有 handler 输出均不高于 INFO。
+也可全局设为某个级别：修改第 94 行 `logger.setLevel(logging.DEBUG)` 为 `logger.setLevel(logging.INFO)`，所有 handler 输出均不高于 INFO。
 
 **Q: 程序有没有日志轮转（log rotation）？**
 

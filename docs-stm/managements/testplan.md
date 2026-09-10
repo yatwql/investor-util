@@ -58,7 +58,8 @@
 
 | Edge Case 类型 | 示例 | 验证点 |
 |:---------------|:-----|:-------|
-| **零值边界** | 成本=0、市值=0、份额=0、收益率=NaN | 不抛出 ZeroDivisionError，输出 `0.0` 或 `--` |
+| **零值边界** | 成本=0、市值=0、份额=0 | 不抛出 ZeroDivisionError，输出 `0.0` 或 `--` |
+| **非有限数值** | 解析结果为 `float("nan")` / `float("±inf")`（上游脏值、除零派生） | **不抛异常**——`try: float(x) except` 与 `or 0.0` 对二者均**兜不住**（NaN 参与比较恒 False、`or` 不把 NaN 当假）；必须经 `core/num_utils.safe_num` 显式拦下，验证点见 `test_numeric_guard_regression.py` |
 | **极大/极小值** | 市值超 1e12、成本=0.0001、份额=1e8 | 数值不溢出，`_fmt_wan()` 正确定标 |
 | **空数据集** | 空持仓文件、空 API 响应、空缓存文件、空新闻列表 | 不崩溃，输出合理占位 |
 | **单条/极限大** | 1 条持仓 vs 1000 条持仓 | 前者不空转，后者有时间保护（不超时） |
@@ -156,11 +157,11 @@
 
 单元测试按被测模块分组，通过 **父子双层 marker** 实现灵活筛选：
 
-- **父标记 `unit`** 匹配全部 12 个已注册 `unit_*` 子标记（providers/fetcher/llm/news/report/config/config_edge/core/cli/ui/analysis/scripts，其中 `unit_config_edge` 为预留、暂无测试使用），用于全量单元测试运行（`-m "unit"`）
+- **父标记 `unit`** 匹配全部 12 个已注册 `unit_*` 子标记（providers/fetcher/llm/news/report/config/core/cli/ui/analysis/scripts/web，其中 `unit_web` 为 Web 入口层），用于全量单元测试运行（`-m "unit"`）
 - **子标记**如 `unit_providers`、`unit_fetcher`、`unit_llm` 等支持单独运行指定模块的测试（`-m "unit_providers"`）
 - 新增单元测试文件时，必须为其测试类标注子标记和父标记，缺一不可
 
-**跨类标记**（如 `llm`、`edge`、`smoke`）不依附于父子层级，可跨越单元/场景分类独立筛选。
+**跨类标记**（如 `llm`、`edge`、`smoke`、`data`、`cassette`、`live`）不依附于父子层级，可跨越单元/场景分类独立筛选。其中 `cassette` 声明用例所需的已录制真实响应（离线回放），`live` 为 opt-in 真实网络套件（默认跳过、不入门禁，仅 `--run-live` 或 `-m live` 运行）。
 
 各标记的定义、覆盖规模和典型耗时见 [`test-coverage.md`](./test-coverage.md) → 单元测试分组 / 跨类标记。
 
@@ -354,9 +355,9 @@
 
 | 优先级 | 回归范围 | 触发条件 | 备注（自动化覆盖） |
 |:------:|:---------|:---------|:-----|
-| **P0** | `python scripts/test-runner.py --mode dev-verify` 通过（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量） | **任何代码变更** | 提交前极速验证 |
+| **P0** | `.venv/bin/python scripts/test-runner.py --mode dev-verify` 通过（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量） | **任何代码变更** | 提交前极速验证 |
 | **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） | 验证缺陷场景的断言 |
-| **P0** | 测试隔离验证：`pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
+| **P0** | 测试隔离验证：`.venv/bin/python -m pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
 | **P1** | 报告生成完整性（菜单 E/B/L 全链路） | config / report / html / llm 变更 | `scenario_basic` 管线冒烟/指标注入 + 场景测试（Excel 页签完整、不崩溃） |
 | **P1** | Excel 报告视觉质量 | 颜色/格式/样式相关变更 | `test_excel_writer.py` / `test_summary.py`（盈亏着色、评级色、LLM 状态色、冻结首行） |
 | **P1** | HTML 报告渲染结构 | html_writer / template 变更 | `test_html_report_structure.py`（中文不乱码、章节锚点、LLM 条件消失/出现） |
@@ -482,7 +483,7 @@ def test_get_ttl_closed(self, mock_open):
 - 测试不写磁盘配置，`config.json` 通过 `os.environ` 或 `tempfile` 隔离
 - 网络测试全部 mock，不发起真实 HTTP 请求
 - 测试间互不依赖，每个 `setUp` 清理状态
-- 每新增 test_*.py 后运行 `pytest --co` 验证无 patch 残留污染
+- 每新增 test_*.py 后运行 `.venv/bin/python -m pytest --co` 验证无 patch 残留污染
 - 不修改全局变量/环境变量（必须修改时用 `with patch.dict(os.environ, ...)`）
 
 ---
@@ -499,9 +500,9 @@ def test_get_ttl_closed(self, mock_open):
 
 ### 6.2 自动化测试门禁
 
-4. **全量 pytest 通过**：`pytest src/test/` 全部通过（0 failed, 0 error）
-5. **无测试污染**：`pytest --co` 验证无跨文件 patch 残留冲突
-6. **测试数量不降级**：新增功能后 `pytest --collect-only | tail -1` 报告的总测试数 ≥ 变更前（有删除须在 changelog.md 中说明理由）
+4. **全量 pytest 通过**：`.venv/bin/python -m pytest src/test/` 全部通过（0 failed, 0 error）
+5. **无测试污染**：`.venv/bin/python -m pytest --co` 验证无跨文件 patch 残留冲突
+6. **测试数量不降级**：新增功能后 `.venv/bin/python -m pytest --collect-only | tail -1` 报告的总测试数 ≥ 变更前（有删除须在 changelog.md 中说明理由）
 7. **测试用例 MUST**：新增功能必有对应测试用例，Bug 修复必有对应回归用例（验证缺陷场景的具体断言，非仅正常路径）
 8. **`test-coverage.md` 场景表更新**：新场景（S/Txx）必须在场景测试分组表补充条目
 
@@ -509,16 +510,16 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **P0 全通** — 不可提交代码：`python scripts/test-runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
-10. **P1 全通** — 不可合并 master：`python scripts/test-runner.py --mode verify` + §4 中 P1 级各自动化回归项全部通过（报告完整性 / Excel 视觉 / HTML 渲染 / 缓存刷新 / Provider 降级）
-11. **P2 已执行** — 可合入但不可发布：`python scripts/test-runner.py --mode verify,regression` + `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`python scripts/test-runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行）
+9. **P0 全通** — 不可提交代码：`.venv/bin/python scripts/test-runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ Bug 回归用例 + 测试隔离验证（`.venv/bin/python -m pytest --co`）
+10. **P1 全通** — 不可合并 master：`.venv/bin/python scripts/test-runner.py --mode verify` + §4 中 P1 级各自动化回归项全部通过（报告完整性 / Excel 视觉 / HTML 渲染 / 缓存刷新 / Provider 降级）
+11. **P2 已执行** — 可合入但不可发布：`.venv/bin/python scripts/test-runner.py --mode verify,regression` + `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`.venv/bin/python scripts/test-runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行）
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
 ### 6.4 补充自动化门禁
 
 12. **异常场景全覆盖**：§1.6 异常场景清单全部 ✅（每项异常场景均有对应自动化用例，edge/resilience 标记），不允许存在仅靠人工确认的 🔴/🟡 项
 13. **报告文件视觉结构**：Excel 和 HTML 输出无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）→ `test_excel_writer.py` / `test_summary.py` / `test_html_report_structure.py`
-14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[V]/[H]/[X]）响应正确、无崩溃 → `test_tui_menu.py`（19 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
+14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[V]/[H]/[D]/[X]，其中 [D] 系统自检受 `doctor_check` 开关门控）响应正确、无崩溃 → `test_tui_menu.py`（20 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
 15. **whatif CLI**：`--candidate` 必填、`--base` 可选、缺失报参数错误、`--effective-date` 解析，生成/归档行为 → `test_cli.py::test_whatif_*` + `test_whatif_operations.py` / `test_whatif_sheet.py` / `test_whatif_html.py` / `test_whatif_writer.py`
 16. **whatif 生效日时序回测**：① 过去生效日→出「时序回测」页签/区 → `test_effective_date_merges_backtest` + `test_backtest_sheet_full` + `test_backtest_section_rendered`；② 缺省→维持现状（无回测）→ `test_no_effective_date_no_backtest_call` + `test_full_rendering_sections_without_backtest`；③ 未来/非法日期→降级占位、主报告正常 → `test_compute_backtest_days_invalid_format` / `test_compute_backtest_days_future_or_today_none` + `test_effective_date_exception_degrades` + `test_backtest_sheet_unavailable_reason_placeholder`；④ 断网/空缓存→回测不可用但报告仍生成 → `test_unavailable_returns_reason` / `test_unavailable_without_reason_falls_back` + `test_effective_date_bt_none_no_key`
 

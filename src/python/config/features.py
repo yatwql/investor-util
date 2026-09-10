@@ -89,8 +89,11 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
 
 # ── 实验性功能定义 ──────────────────────────────────────────
 # 格式: {flag_name: ("显示名", "说明")}
-# 此处列出的功能默认关闭，用户在 features.json 中手动开启后，
-# 启动时会在日志中以红色高亮提示。
+# 此处列出的功能默认关闭，用户在 features.json 中手动开启后，报告入口
+# （``report/orchestrator.generate_report``）会在日志中以红色高亮提示已启用项。
+# 本注册表同时是 TUI 菜单 [S] 试验功能面板与 Web 配置面板的渲染来源（渠道层
+# 不得另写清单）；CLI 侧经 ``--experiment <名|all>`` 增量启用（仅当前进程、
+# 不写盘，只开不关——关闭仍走 features.json / 面板）。
 EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
     "llm_debate_procon": ("辩论-正反辩论", "三段式(白脸→黑脸→综合)"),
     "llm_debate_conditional": ("辩论-条件推理", "情景化分析(涨/跌/震荡)"),
@@ -190,7 +193,9 @@ def describe_experiment_flags() -> str:
 def log_experimental_features() -> None:
     """如果已启用实验性功能，在日志中以红色高亮显示具体开启了什么功能。
 
-    在 main() 中调用（TUI/CLI 均在 ``init_config()`` 之后调用此函数）。
+    唯一调用点为报告入口 ``report/orchestrator.generate_report``（在配置初始化
+    之后），故 TUI / CLI / Web 三条入口在生成报告时均会提示——「本次报告受哪些
+    实验功能影响」正是需要看到这条信息的时刻。
     通过 ``logger.error()`` 输出以触发 ``_ColoredFormatter`` 的红色着色。
     """
     enabled = [(name, desc) for flag, (name, desc) in EXPERIMENTAL_FEATURES.items() if is_feature_enabled(flag)]

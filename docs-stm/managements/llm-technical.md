@@ -181,6 +181,7 @@ skeleton.py:generate_llm_content()
 | `markdown.py` | 工具 | Markdown→HTML 转换 | `markdown_to_html()` |
 | `_api_claude.py` / `_api_gemini.py` / `_api_openai.py` | 私有 | 各 Provider 单次调用实现（自包含依赖，委托 api_base 重试 + Extended Thinking 注入），api.py 分派目标 | `call_claude()` / `call_gemini()` / `call_openai()` |
 | `_batch_mode.py` | 私有 | 批量模式分块执行（`_BATCH_CHUNK_SIZE=10` 每批、最多 3 批并行，受 `min(3, 批数, 6)` 约束） | `run_batch_mode()` |
+| `_hallucination_filter.py` | 私有 | LLM 输出虚构品种代码过滤（辩论模式等场景）：按「行内句段」粒度删除疑似代码 token，保留 HTML/CSS 标签与金融术语白名单防误伤 | `_filter_hallucinated_codes()` |
 
 ### 2.2 四大+一模块详情
 

@@ -90,7 +90,7 @@ CLI 模式无需 TUI 界面，通过参数驱动，适合定时任务和脚本�
 > .\scripts\cli.ps1 cache --stats          # 查看缓存状态
 > ```
 >
-> 包装脚本自动定位项目虚拟环境解释器（`.venv/bin/python` / `.venv\Scripts\python.exe`）并切换到项目根目录；完整参数同下方「CLI 命令参考」，脚本速查见 [辅助脚本参考](scripts-reference.md)。
+> 包装脚本自动定位项目虚拟环境解释器（`.venv/bin/python` / `.venv\Scripts\python.exe`）并切换到项目根目录；完整参数同下方「CLI 命令参考」，脚本速查见 [开发者指南](../managements/developer-guide.md#辅助脚本速查)。
 >
 > **关于报告类型**：`basic`（CLI 默认，约 1 分钟）只生成核心 Excel 页签（汇总/市值/分类/穿透/基金业绩），新闻、历史、LLM 相关页签为降级占位；`both`（包装脚本无参数默认，约 2 分钟）生成 Excel+HTML 双格式且含新闻/基金深度/演进等全部非 LLM 页签；`full`（约 5 分钟）在 both 基础上再含 LLM 全球政经/智囊团等章节。组合历史走势默认自动获取（按配置 `history.fetch_mode`，默认 `auto`）；如需跳过可在 `both`/`full` 时加 `--history off`。
 >
@@ -129,7 +129,7 @@ CLI 模式无需 TUI 界面，通过参数驱动，适合定时任务和脚本�
 | `--config PATH` | 备用配置文件路径，默认 `data/config/config.json` |
 
 > **Web 模式使用要点**：
-> - 首页「③ 配置编辑」面板与 TUI 主菜单可编辑项**完全一致**（7 组：路径/报告章节/子模块/匿名化/对比指数池/LLM 开关/辩论实验），**即改即存**写入共享配置文件（config.json / llm_settings.json / features.json）并写前自动备份 `.bak`——详见 [Web 浏览器模式使用指南](how-to-use-web-mode.md) §4。
+> - 首页「③ 配置编辑」面板与 TUI 主菜单可编辑项**完全一致**（7 组：路径/报告章节/子模块/匿名化/对比指数池/LLM 开关/实验性功能），**即改即存**写入共享配置文件（config.json / llm_settings.json / features.json）并写前自动备份 `.bak`——详见 [Web 浏览器模式使用指南](how-to-use-web-mode.md) §4。
 > - 首页底部「运行状态 → 系统信息」卡片展示程序版本、本机 IP、持仓目录/文件、输出目录、新闻抓取上限、持仓文件就绪状态（对齐 TUI 首页摘要）、持仓匿名化模式、隐私声明与 LLM 配置状态（provider/模型/策略/熔断/模型路由）。
 > - 生成任务的「历史走势」复选框默认跟随配置 `history.fetch_mode`，可在提交前按本次需求勾选/取消；「强制重新生成 LLM 内容」跳过 LLM 缓存，仅 `full` 报告生效。
 > - 同一 `output_dir` 仅保持一个入口在运行：Web / TUI / CLI 共用输出目录，同时运行会互相覆盖最新版产物。

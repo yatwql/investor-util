@@ -164,7 +164,8 @@ def main() -> None:
     except Exception:
         logger.debug("首次运行引导显示失败（非关键）", exc_info=True)
 
-    # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/B/L/W/C/F/O/1/2/3/4/P/I/A/S/R/V/H/X
+    # 读取缺省菜单选项（config.json → default_menu_key），仅支持 E/B/L/W/C/F/O/1/2/3/4/P/I/A/S/R/V/H/D/X
+    # （D 系统自检受 doctor_check 开关门控：关闭时该项被裁剪，index_by_key 自然回落到首项）
     from src.python.config import get_config
 
     _default_key = get_config().get("default_menu_key", "L").upper()

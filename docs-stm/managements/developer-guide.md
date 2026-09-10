@@ -145,7 +145,7 @@ pip install pytest-cov coverage
 
 # ===== ③ 全量/CI 门禁（耗时较长） =====
 
-# 开发期快速验证（5 个 unit 子模块并行 + 基础场景）
+# 开发期快速验证（6 个 unit 子模块并行 + 基础场景）
 .venv/bin/python scripts/test-runner.py --mode dev-verify
 
 # 合入验证 — PR 前检查
@@ -230,7 +230,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 > 注意：P0-P3 是**问题影响力分级**，regression/verify/all 是**测试范围分级**，两者通过门禁阶段关联但不一一对应。例如 P0 问题恰好在 regression 模式中被检出，但 regression 模式并非仅包含"P0 级别"的测试用例——它覆盖全量业务场景，其中任何一项失败都可能导致 P0 阻断。
 
-> **耗时说明**：测试耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，因此本文档不标注具体秒数。各模式耗时对照见 [test-coverage.md](test-coverage.md)（「环境耗时对照」表，按机器分列实测）——需预估耗时先在表中定位本机环境列。若本机未在表中，可运行 `python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
+> **耗时说明**：测试耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，因此本文档不标注具体秒数。各模式耗时对照见 [test-coverage.md](test-coverage.md)（「环境耗时对照」表，按机器分列实测）——需预估耗时先在表中定位本机环境列。若本机未在表中，可运行 `.venv/bin/python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
 
 #### 三级验证流水线
 
@@ -268,7 +268,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 ##### 单元测试系列（`unit` / `standard`）
 
-- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（13 个子组：providers、fetcher、llm、news、report、config、config_edge、core、analysis、ui、cli、scripts、web），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
+- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（12 个子组：providers、fetcher、llm、news、report、config、core、analysis、ui、cli、scripts、web），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
 - **`--mode standard`** 在 `unit` 基础上排除 edge（异常边界）和 data（数据正确性）两个跨类标记，仅保留"常规路径"的单元测试。适用于日常开发中快速验证模块本身逻辑正确，不需要关心边界情况。
 
 ##### 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
@@ -353,7 +353,7 @@ def test_tencent_quote_parses(self):
 
 - **`--mode verify,regression`** 组合模式，等价于分别运行 verify（单元） + regression（场景）。约 30s，作为发布门禁。
 - **`--mode all`** 不设任何标记过滤（`.venv/bin/python -m pytest src/test/`），运行全量测试。需要全覆盖时手动调用。
-- **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。
+- **`--mode all_no_unit`** 排除所有单元测试与联网测试（`-m "not unit and not live"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。
 
 ##### 多模式组合
 
@@ -378,14 +378,17 @@ def test_tencent_quote_parses(self):
 | `data` | `data` | ~2s |
 | `scenario` | `scenario` | ~18s |
 | `integration` | `scenario or integration` | ~14s |
-| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts` | ~10s |
-| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)` + `scenario_basic`（两阶段） | ~20s |
+| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts or unit_web` | ~10s |
+| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web) and not (edge or data)` + `scenario_basic`（两阶段） | ~20s |
 | `all` | （无过滤，全量） | ~21s |
-| `all_no_unit` | `not unit` | ~10s |
+| `all_no_unit` | `not unit and not live` | ~10s |
 | `report` | `unit_report` | ~11s |
 | `scenario_extreme` | `scenario_extreme` | ~2s |
+| `perf` | `scenario_perf` | 见 test-coverage.md |
+| `security` | `scenario_security` | 见 test-coverage.md |
+| `live` | `live`（需 `--run-live`） | — |
 
-> 注：**Linux 开发机参考耗时**按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，仅作相对量级参考；完整说明及不同环境下的耗时对照见 [test-coverage.md](test-coverage.md)（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。若需本机实测，运行 `python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
+> 注：**Linux 开发机参考耗时**按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，仅作相对量级参考；完整说明及不同环境下的耗时对照见 [test-coverage.md](test-coverage.md)（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。若需本机实测，运行 `.venv/bin/python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
 
 ##### 跨机器耗时采集与环境耗时对照（`bench` + `--machine-info` / `--update-docs`）
 
@@ -519,7 +522,6 @@ test-reports/latest/
 | `unit_config` | 配置管理 |
 | `unit_core` | 核心基础设施（缓存/模型/注册表等） |
 | `unit_analysis` | 分析计算（流动性/再平衡/汇率/债券收益率/情景） |
-| `unit_config_edge` | 配置管理边缘场景（必须放在 `*_edge.py`） |
 | `unit_ui` | TUI 交互 |
 | `unit_cli` | CLI 命令行模式 |
 | `unit_scripts` | 工程脚本（历史痕迹/版本一致性/任务编号检查） |
@@ -680,7 +682,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 
 | 脚本 | 分类 | 一句话 |
 |:-----|:-----|:-------|
-| `test-runner.py` | 测试 | pytest 标记模式封装驱动，支持 14 种 `--mode` |
+| `test-runner.py` | 测试 | pytest 标记模式封装驱动，支持 17 种 `--mode` |
 | `extract-test-failures.py` | 测试 | 从 pytest-html 报告提取失败用例详情 |
 | `check-code-traces.py` | 测试 | 代码注释/文档字符串中历史变更痕迹检查 |
 | `check-doc-traces.py` | 测试 | 面向读者文档（.md）中历史变更痕迹检查 |
@@ -704,7 +706,10 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本（无参数启动 TUI；`web` 子命令启动 Web 浏览器模式） |
 | `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
+| `doctor` | 诊断 | cli.py 子命令：系统自检（环境/配置/目录/开关/适配/凭据/数据源七组，`--offline`/`--timeout`，不受实验开关约束） |
+| `view-logs` | 诊断 | cli.py 子命令：查看结构化运行日志（`--level`/`--lines`/`--since`/`--until`，与 TUI `[V]` 同实现） |
 | `whatif` | 诊断 | cli.py 子命令：调仓 What-if 模拟（对比两份持仓生成独立 diff 报告，见 [快速开始](../manuals/how-to-start.md)） |
+| `cassettes` | 诊断 | cli.py 子命令：数据源记录-回放维护（列表 / `--verify` 离线回放校验，见下文「CLI 子命令」） |
 
 ### 测试类
 
@@ -1061,7 +1066,7 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 .venv\Scripts\python.exe -m src.python.cli report --type both   # Windows 直调
 ```
 
-> 注意：包装脚本的「无参数默认 both」与 CLI 本身的 `--type` 默认值（basic，仅 Excel）不同——直接直调 `python -m src.python.cli report`（不带 `--type`）仍走 basic 轻量模式（只生成核心页签，新闻/历史/LLM 等页签为降级占位）。包装脚本无参数时自动补 `report --type both`，确保拿到完整非 LLM 报告。
+> 注意：包装脚本的「无参数默认 both」与 CLI 本身的 `--type` 默认值（basic，仅 Excel）不同——直接直调 `.venv/bin/python -m src.python.cli report`（不带 `--type`）仍走 basic 轻量模式（只生成核心页签，新闻/历史/LLM 等页签为降级占位）。包装脚本无参数时自动补 `report --type both`，确保拿到完整非 LLM 报告。
 
 包装脚本相比直调的好处：自动切换到项目根目录、自动定位虚拟环境解释器（避免误用系统 python 缺失 pandas 等依赖）、无参数时自动补 `report` 子命令。CLI 完整参数说明见 [快速开始](../manuals/how-to-start.md) 的「CLI 命令行模式」一节。
 
@@ -1106,6 +1111,45 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 **`--verify` 输出标记**：`[OK]` 解析正常；`[!]` 该 cassette 未登记解析器（只校验文件可读，不伪造成 OK）；`[ERR]` 解析器吃不下已录制的真实响应体——**上游格式可能已变，需重新录制**。
 
 **退出码**：0=正常（含列表模式与全部 `[OK]`/`[!]`），2=有录制的解析路径失败。
+
+**`doctor` — 系统自检**
+
+一次性盘点「跑不起来」的常见根因，分环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，失败项附可执行修复建议。与 `check-sources` 的分工：后者只测数据源联通性，前者还覆盖解释器/虚拟环境、配置可解析与关键字段、目录可读写。
+
+```bash
+# 完整自检（含数据源网络检查）
+.venv/bin/python -m src.python.cli doctor
+
+# 仅查本地环境/配置/目录，跳过网络（瞬时返回）
+.venv/bin/python -m src.python.cli doctor --offline
+
+# 收紧网络检查的整体耗时预算（秒，默认 8）
+.venv/bin/python -m src.python.cli doctor --timeout 5
+```
+
+**无需配置**：与 `view-logs` / `cassettes` 同例，在 `init_config()` **之前**分派——配置损坏正是自检要定位的场景，若被配置初始化拦住即成死锁。
+
+**不受实验开关约束**：自检由实验开关 `doctor_check` 门控，但该开关**只约束 TUI 菜单 `[D]` 与 Web 自检卡片两个日常入口**；CLI 子命令始终可用（同理，被开关拦住就失去了诊断手段）。
+
+**退出码**：0=全部通过，1=有失败项（`_EXIT_PARTIAL`）。自检有失败项不算命令本身失败——命令跑完了并给出了结论，故用 PARTIAL 而非 SEVERE。
+
+**`view-logs` — 查看结构化运行日志**
+
+按级别/时间过滤读取日志尾部，**无需配置**（配置损坏时仍可查看日志诊断）。
+
+```bash
+# 查看最近日志（默认读末尾 5000 物理行）
+.venv/bin/python -m src.python.cli view-logs
+
+# 只看 ERROR + CRITICAL
+.venv/bin/python -m src.python.cli view-logs --level ERROR
+
+# 只看指定日期之后 / 只读末尾 200 行
+.venv/bin/python -m src.python.cli view-logs --since 2026-08-16
+.venv/bin/python -m src.python.cli view-logs --lines 200
+```
+
+级别/时间过滤与尾部读取逻辑全部委托 `core/log_reader.read_log()`（与 TUI 菜单 `[V]` 同一实现）。
 
 ### LLM 幻觉率采样测试
 

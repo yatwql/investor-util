@@ -10,6 +10,12 @@
 
 - 发布 v0.10.16 后，APP_VERSION 与全部管理文档版本头切换至 v0.10.17-dev。
 
+### 测试覆盖与目录统计快照刷新（2026-09-10）
+
+- **`test-coverage.md`**：模式对应测试量与环境耗时对照由 `.venv/bin/python scripts/test-runner.py --mode bench --update-docs` **自动回填本机实测**（dragonball，2026-09-10）——`unit` ~13s、`all` ~22s、`verify,regression` ~28s 等；覆盖项数与 `scripts/collect-test-coverage.py` 实时收集结果一致（总收集 6595）。修正正文两处与表格脱节的旧值：「环境耗时对照」引言仍写 dragonball 为 08-07 采集（表格已是 09-10），差距说明引用的 `unit ~15s` / `all ~23s` 未随表格刷新。
+- **`folders.md`**：项目统计表按本机实测刷新——主程序 66,110 行、测试代码 98,343 行、测试用例 6,595 个、用户文档 5,005 行（README 201 + manuals 4,804）、项目文档 49,720 行（CLAUDE.md 74 + managements + plan + archive 105 md）、目录树补 `src/test/unit/report/test_experimental_seams.py` 条目。
+- **说明**：本轮仅刷新数据快照（非版本号），与 rf-320 的文档漂移校正同批落地。
+
 ### JSONL 原子写入与信号账本落盘结果如实上报（自审 rf-315 / rf-316）（2026-09-10）
 
 - **缺陷（自审 rf-315）**：`core/jsonl_store.py::append_jsonl_atomic` 把 `tempfile.mkstemp()` 与随后的写入 / `os.replace()` 包在**同一个 `try`** 里，而 `except` 分支要引用的 `tmp_path` 正是 `mkstemp` 的返回值——**`mkstemp` 自身抛 `OSError` 时该名字尚未绑定**，清理分支会再抛 `UnboundLocalError`，把真实错误（目录不可写等）掩盖成一条自指异常。同一函数的签名返回 `None`、失败仅记日志，**成功与失败对调用方不可区分**。
@@ -30,6 +36,23 @@
 - **改动**：提示词侧判据改为 `not data_quality_text`，与指纹侧折叠口径一致；docstring 写明「未提供」含 `None` 与**空串**两种，并说明为何必须用 `not` 而非 `is None`——若只认 `None`，空串会渲染成空段却与 `None` 共用同一指纹，即「提示词变而键不变」。
 - **测试**：`test_pipeline_metrics_injection.py` 新增参数化用例（`None` 与 `""` 渲染出**逐字相同**的提示词）与「数据质量文本与模块指纹同源」断言。
 
+### 实验挂载点导入契约与注释校正（自审 rf-319）（2026-09-10）
+
+- **缺陷（自审 rf-319）**：`report/_experimental_seams.py` 的模块 docstring 只说明「被调子模块在挂载点内按需导入」，未记录真正的分界契约——`core` 账本模块（`decision_ledger` / `signal_ledger`）是**顶层导入**（`is_active()` 开关判定本身要落在它们上，且二者只依赖 stdlib + 同层 core，不构成启动负担），report 子模块才是按需导入。读者按唯一口径理解，会把新增顶层导入当成无害、或把既有顶层导入当成违规。
+- **改动**：docstring 改为显式区分**两类导入**，按「开关关闭时是否值得付出成本」给出判据；该分界由 `test_experimental_seams` 的接线守卫逐项锁定（顶层 `src.python.*` 导入集合必须恰为两个 core 模块 + `report.progress` 接口），使文字描述与可执行断言同源。
+- **同批注释校正**：`core/doctor.py` 的目录探针注释把持久化路径误写为 `data/state`（实为 `data/cache`、`logs/`），并改写输出目录缺省值的说明为「仅当配置该键取空值（空串）时才用到」，去掉无法核实的措辞。
+
+### 管理文档与用户文档第二批漂移校正（自审 rf-320）（2026-09-10）
+
+- **缺陷（自审 rf-320）**：plan-36~38 三条数据层实验机制落地后，管理文档与用户文档仍有成片内容未随代码复核——
+  - **自检分组枚数**：`doctor` 在四处仍写作「五组 / 六组」（`technical.md` 概览表与 §4.17.3、`requirements.md` §3.6、`plan.md` 的 plan-35 完成态），实际已是**七组**（环境 / 配置 / 目录 / 功能开关 / 数据源适配 / 数据源凭据 / 数据源）。同一特性在计划表与设计文档给出相反的分组数，读者无法判断哪份为准。
+  - **LLM 子模块计数**：`technical.md` §5.1 称 `llm/` 包「共 34 个子模块」，实测 **35**（26 个顶层模块 + `fact_checker/` 子包 9 模块）；`llm-technical.md` §2.1 模块表**漏登** `_hallucination_filter.py`（该模块自辩论虚构过滤改造起就在，且被 `generators.py` 实际引用）。
+  - **测试驱动脚本口径**：`developer-guide.md` 脚本一览写「支持 14 种 `--mode`」，`scripts/test-runner.py::MODES` 实为 **17** 个键；模式对照表把 `all_no_unit` 的等效表达式写成 `not unit`（实为 `not unit and not live`，会连带把 opt-in 联网套件纳入），并漏掉 `perf` / `security` / `live` 三个定向模式。
+  - **测试统计快照**：`test-coverage.md` 的模式计数、单元子标记、功能域、跨类四张子表停在旧快照（`unit` 6274→6283、`all` 6583→6595、`unit_web` 213→215、`unit_core` 1126→1131、`unit_llm` 933→935、`llm` 跨类 736→738 等），且 `unit_web` 一处 213 与另一处 215 自相矛盾。
+  - **目录与统计**：`folders.md` 目录树缺 `src/test/unit/report/test_experimental_seams.py` 条目，统计表「主程序 / 辅助脚本 / 测试代码 / 测试用例 / 用户文档 / 项目文档」六项数据过期。
+  - **用户文档**：`how-to-start.md` 指向**并不存在**的 `scripts-reference.md`（死链）；`how-to-config.md` 的 TUI 菜单键列表漏 `D`/`P`/`I`/`A`/`S`/`R`/`V`/`H`/`F`/`X` 等且未标注门控；`how-to-use-cli-mode.md` 把 `doctor --timeout` 描述成单次请求超时（实为**整轮网络检查**的耗时预算）；`faq.md` 的日志行号引用整体偏移、美股指数基准问答与实现不符；`datasource.md` / `datasource-reliability.md` / `requirements.md` R-HST-07 仍称美股指数历史由新浪承担（新浪无 `fetch_index_kline` 实现）。
+- **改动**：逐项对照代码与实时收集结果更新上述文档。统计类数据以 `scripts/collect-test-coverage.py`（测试计数，6595）与本机实测（主程序 66,112 行 / 测试代码 98,348 行 / 项目文档 49,677 行）为准回填，避免再出现同一数字两处不一致的情况。
+
 ### 报告管线实验挂载点抽取公共守护（自审 rf-310）（2026-09-10）
 
 - **缺陷（自审 rf-310）**：实验性功能接入报告管线时，四个挂载点（决策跨期反思闭环的确定性结算/登记、决策的 LLM 注入、模块级质量分级横幅、确定性数值信号沉淀）**各自内联一份** `try/except Exception` + 告警 + 异常日志。守护判据复制即漂移——告警文案与日志标签逐处重写，改一处必漏三处（与缓存指纹「读写两份拼接」同一病根）；`report/_report_generation.py` 因这四个内联块**越过 800 行硬上限**（实测 817 行）；挂载点本身**零直接测试覆盖**——内联在管线函数中只能靠驱动整条报告管线覆盖，开关判定与数据注入此前无任何直接断言。
@@ -43,6 +66,11 @@
 - **缺陷（自审 rf-311）**：体检（`doctor`）以「写入再删除 `.doctor_write_probe`」验证输出目录/缓存目录/日志目录「存在且可写」，但探针目标在函数内直接取自配置，**无任何可替换的注入点**——测试运行体检时探针作用于用户的真实 `reports/`/`data/cache/`/`logs/`（实测真实报告目录出现 `.doctor_write_probe` 残留），违反「测试不得修改用户数据」的敏感路径隔离纪律。
 - **修复**：把探针目标提为**单一可替换来源** `_probe_targets()`（其返回值即探针实际作用的目录列表），`src/test/conftest.py` 增加 session 级 fixture 将其重定向到临时目录，隔离不依赖测试自行清理。
 - **验证**：端到端确认探针解析到 pytest 临时目录，真实 `reports/`/`data/cache/`/`logs/` 无 `.doctor_write_probe` 残留。
+
+### 注释漂移修正与文档同步（自审 rf-312 / rf-313）（2026-09-10）
+
+- **注释漂移（自审 rf-312）**：① 实验功能注册表注释把 CLI 侧描述为可用 `--experiment` / `--no-experiment` 双向覆写，而 `--no-experiment` 参数**并不存在**（CLI 只有只开不关的 `--experiment`）；② 实验功能提示函数的 docstring 称「在 main() 中调用（TUI/CLI 均在配置初始化之后调用）」，实际唯一调用点是报告入口——TUI/CLI/Web 三入口均经该点统一触发；③ TUI 缺省菜单键的合法键注释列表漏掉系统自检项（受实验开关门控），据此配置的用户无法判断其是否可用。三处均按代码现状改写，并在键列表处注明门控与裁剪后的回落行为。
+- **文档同步（自审 rf-313）**：核对全部管理文档与用户文档相对代码现状，修正成片漂移——实验开关计数（33 → 35）、TUI 试验功能面板编号（6-14 → 6-16，补登两条数据源相关实验开关）、`features.json` 键表、unit 子标记清单（`testplan.md` 与 `developer-guide.md` 两处均删除并不存在的 `unit_config_edge` 并补 `unit_web`，子组数相应由 13 改为 12）、`test-runner.py` 的模式表达式（`dev-verify`/`verify` 补回漏写的 `unit_web`，与脚本 `MODES` 定义逐字对齐）、十余处 shell 示例改回项目虚拟环境解释器、`developer-guide.md` 补登 `doctor`/`view-logs`/`cassettes` 子命令、`folders.md` 与 `test-coverage.md` 的统计快照按实时收集结果刷新。**架构设计约束表新增三条约束行**（报告管线实验挂载点集中 / 实验功能开关注册表唯一事实来源 / 凭据值不落日志与产物），双检查脚本的约束代号匹配范围与 `CLAUDE.md` 的条数说明同步放开，避免新约束代号成为检测盲区。
 
 ### DeepSeek 已停用别名定价与文档口径校正（自审 rf-303 / rf-314）（2026-09-10）
 
