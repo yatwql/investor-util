@@ -5,7 +5,7 @@ VaR、风格因子、再平衡超限）逐次沉淀为可回溯的记录，并�
 使统计口径默认只算「本次实时可得」的记录，防非实时记录冒充真实战绩
 （承接 augur `backtest.py` 的 `data_source` 标签 + 排行榜默认 live_only 纪律）。
 
-设计约束遵从（详见 docs-stm/plan/signal-ledger-implementation.md）：
+设计约束遵从（详见 docs-stm/archive/v0.10.x/augur-borrowing/signal-ledger-implementation.md）：
     分层约束  — 本模块属 core 层，只依赖 stdlib + 同层 core，禁止 import
                 report/llm/analysis 下的任何模块。因此**不含**评级词汇表
                 （低估/高估/超限等）：评级 → 方向的映射由 report 层适配器

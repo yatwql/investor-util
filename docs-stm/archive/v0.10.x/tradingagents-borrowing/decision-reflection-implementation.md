@@ -1,9 +1,9 @@
 # plan-30 决策跨期反思闭环 — 实现设计
 
 > 文档版本：0.10.16-dev
-> 关联：`docs-stm/plan/reflection-decision-loop-analysis.md`（机理深入分析）+ `docs-stm/plan/augur-borrowing-analysis.md`（augur 结算纪律）
+> 关联：[`reflection-decision-loop-analysis.md`](reflection-decision-loop-analysis.md)（机理深入分析）+ [`../augur-borrowing/augur-borrowing-analysis.md`](../augur-borrowing/augur-borrowing-analysis.md)（augur 结算纪律）
 > 语义名（落地）：`decision_reflection`（功能开关）、`decision_ledger`（账本核心）、`decision_settlement`（结算服务）
-> 状态：设计定稿，待实施
+> 状态：**已实现**（默认关闭的 P4 实验特性；TUI / Web / CLI 三面上屏见同目录 `experimental-features-ui-surfacing.md`）
 
 ---
 

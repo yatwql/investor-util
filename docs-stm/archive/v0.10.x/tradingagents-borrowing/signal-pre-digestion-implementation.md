@@ -4,6 +4,7 @@
 > 语义名（落地）：`signal_pre_digest`（功能开关）、`prompts_signals`（提示词信号层）、`signal_digest_block`（信号块）
 > 上游分析：[`llm-quality-signal-analysis.md`](llm-quality-signal-analysis.md)（§1.2 缺口定位 / §1.3 A+B 落地建议 / §5 风险）
 > 同级先例：[`decision-reflection-implementation.md`](decision-reflection-implementation.md)（实验开关 + 缓存指纹后缀同源纪律）
+> 状态：**已实现**（行业资金流向预消化为默认路径生效的真缺陷修复；`signal_pre_digest` 为默认关闭的 P4 实验特性）
 
 ---
 

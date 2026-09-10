@@ -1,7 +1,8 @@
 # 数据源记录-回放测试实施设计（借鉴 OpenBB pytest-recorder / vcrpy cassette）
 
-> 来源：`openbb-data-provider-analysis.md` §建议C（OpenBB Platform 数据层工程借鉴评估，2026-09-09）。
+> 来源：[`openbb-data-provider-analysis.md`](openbb-data-provider-analysis.md) §建议C（OpenBB Platform 数据层工程借鉴评估，2026-09-09）。
 > 级别：**测试基建（非运行时实验开关）**——本计划不引入 `features.json` 开关，理由见「为何不设开关」。
+> 状态：**已实现**（自研轻量回放引擎，已录 6 份真实响应夹具）。
 
 ## Context
 

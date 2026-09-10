@@ -4,6 +4,7 @@
 > 语义名（落地）：`decision_header_parse`（功能开关）、`decision_header`（词表与解析模块）、`decision_word`（决策词归一）、`structured_header`（结构化决策头）
 > 上游分析：[`llm-quality-signal-analysis.md`](llm-quality-signal-analysis.md)（§3.2 缺口定位 / §3.3 落地建议 / §5 风险与不做清单）
 > 同级先例：[`decision-reflection-implementation.md`](decision-reflection-implementation.md)（plan-30 决策账本 + 载体纪律）、[`signal-pre-digestion-implementation.md`](signal-pre-digestion-implementation.md)（plan-31 开关门控 + 默认路径提示词逐字节不变）
+> 状态：**已实现**（决策词归一解析为默认路径生效的真缺陷修复；`decision_header_parse` 为默认关闭的 P4 实验特性）
 
 ---
 

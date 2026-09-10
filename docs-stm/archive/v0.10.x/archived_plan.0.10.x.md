@@ -1,9 +1,9 @@
 # 实现计划归档 — v0.10.x
 
-> 归档时间：2026-08-05（设计文档 + 完成项摘要）；2026-08-05 二次合并 plan.md 已完成事项记录；2026-08-07 追加 plan-25 Web 持仓输入模式 / plan-26 Web 配置编辑 / README SVG 架构图；2026-08-08 追加 env-benchmark-doc-update（--update-docs 环境耗时对照自动更新）；2026-08-16 三次合并 plan.md 已完成事项记录（plan-8/25/26/27/28 P4 实验功能项）；2026-09-10 四次合并 plan.md 已完成事项记录（plan-29 DeepSeek 峰谷定价周末闲时）
+> 归档时间：2026-08-05（设计文档 + 完成项摘要）；2026-08-05 二次合并 plan.md 已完成事项记录；2026-08-07 追加 plan-25 Web 持仓输入模式 / plan-26 Web 配置编辑 / README SVG 架构图；2026-08-08 追加 env-benchmark-doc-update（--update-docs 环境耗时对照自动更新）；2026-08-16 三次合并 plan.md 已完成事项记录（plan-8/25/26/27/28 P4 实验功能项）；2026-09-10 四次合并 plan.md 已完成事项记录（plan-29 DeepSeek 峰谷定价周末闲时）；2026-09-11 五次归档——`docs-stm/plan/` 全部 14 份外部借鉴系列设计文档（plan-30~plan-38 + 指纹提示词覆盖）按借鉴来源分四目录迁入
 > 原始文件：`docs-stm/managements/plan.md`（当前迭代部分）
-> 涵盖版本：v0.10.0 ~ v0.10.15（2026-08-03 ~ 2026-08-29）；plan-8 于 v0.10.10 实现、plan-25/26/27/28 于 v0.10.12 实现、README SVG 于 v0.10.13 实现（2026-08-06/07）、plan-29 于 v0.10.15 实现（2026-08-28）
-> 归档内容：本迭代已实现的计划项（plan-8 + plan-17~plan-29）设计文档 + 完成项摘要 + 推荐实施顺序 + 发布门禁记录（P0/P1/P2/P3 已完成事项记录 + P4 已随发布版本实现项自 plan.md 整体迁入）
+> 涵盖版本：v0.10.0 ~ v0.10.17（2026-08-03 ~ 2026-09-10）；plan-8 于 v0.10.10 实现、plan-25/26/27/28 于 v0.10.12 实现、README SVG 于 v0.10.13 实现（2026-08-06/07）、plan-29 于 v0.10.15 实现（2026-08-28）、plan-30~plan-38 外部借鉴系列于 v0.10.16~v0.10.17 实现（2026-09-10）
+> 归档内容：本迭代已实现的计划项（plan-8 + plan-17~plan-38）设计文档 + 完成项摘要 + 推荐实施顺序 + 发布门禁记录（P0/P1/P2/P3 已完成事项记录 + P4 已随发布版本实现项自 plan.md 整体迁入）。plan-30~plan-38 的完成项摘要仍在 `plan.md` P4 表（待下次发布并入本文件）
 
 ---
 
@@ -20,6 +20,36 @@
 - [`web-config-edit.md`](web-config-edit/web-config-edit.md) — plan-26 Web 配置编辑（完整镜像 TUI 可编辑配置全集）设计定稿（白名单 + 7 组控件 + 原子写备份，2026-08-07 完成归档）
 - [`plan-readme-svg-layout.md`](readme-svg-layout/plan-readme-svg-layout.md) — README 嵌入 SVG 架构图 + 排版优化设计（3 张深色科技风图 + folders 同步，2026-08-07 完成归档）
 - [`plan-env-benchmark-doc-update.md`](env-benchmark-doc-update/plan-env-benchmark-doc-update.md) — 环境耗时对照文档自动更新设计（`--mode bench --update-docs` 自动回填 test-coverage.md 环境耗时表，2026-08-08 归档）
+
+### 外部借鉴系列（plan-30~plan-38 + 指纹提示词覆盖，2026-09-11 归档）
+
+2026-09-04 ~ 2026-09-09 对三个外部仓库做借鉴评估，识别出的可借用点全部落地后，14 份「评估分析 + 实现设计」文档按**借鉴来源**分四目录归档：
+
+**借鉴 TradingAgents-astock → `tradingagents-borrowing/`**（LLM 输入/输出质量治理 + 决策闭环）
+
+- [`reflection-decision-loop-analysis.md`](tradingagents-borrowing/reflection-decision-loop-analysis.md) — plan-30 决策跨期反思闭环机理分析（两阶段延迟反馈：先记 `pending`，同标的再现时用真实行情结算方向正确率与超额 alpha）
+- [`decision-reflection-implementation.md`](tradingagents-borrowing/decision-reflection-implementation.md) — plan-30 实现设计（`decision_reflection` 开关，`decision_ledger` 账本 + `decision_settlement` 结算）
+- [`experimental-features-ui-surfacing.md`](tradingagents-borrowing/experimental-features-ui-surfacing.md) — 实验开关上屏改为由 `features.EXPERIMENTAL_FEATURES` 注册表统一驱动（TUI 菜单 S / Web 配置面板 / CLI `--experiment` 三面同源）
+- [`llm-quality-signal-analysis.md`](tradingagents-borrowing/llm-quality-signal-analysis.md) — plan-31/32/33 三层质量治理分析（输入侧预消化 → 输出侧分级 → 决策头结构化）
+- [`signal-pre-digestion-implementation.md`](tradingagents-borrowing/signal-pre-digestion-implementation.md) — plan-31 信号预消化实现设计（`signal_pre_digest` 开关 + 行业资金流向默认路径缺陷修复）
+- [`decision-header-parse-implementation.md`](tradingagents-borrowing/decision-header-parse-implementation.md) — plan-33 决策头结构化与决策词归一解析实现设计（`decision_header_parse` 开关 + 边界纪律解析器）
+
+**借鉴 BruceLanLan/augur → `augur-borrowing/`**（决策结算纪律 + 健壮性）
+
+- [`augur-borrowing-analysis.md`](augur-borrowing/augur-borrowing-analysis.md) — augur 借鉴评估（决策-结算学习闭环 / 确定性数值信号沉淀 + live/demo 标签 / 健壮性三件套）
+- [`signal-ledger-implementation.md`](augur-borrowing/signal-ledger-implementation.md) — plan-34 确定性数值信号账本实现设计（`signal_ledger` 开关，五类评级沉淀 + 默认 `live_only`）
+- [`robustness-suite-implementation.md`](augur-borrowing/robustness-suite-implementation.md) — plan-35 健壮性三件套实现设计（数值归一防线 / 失败原因可读 / `doctor_check` 系统自检）
+
+**借鉴 OpenBB Platform → `openbb-borrowing/`**（数据层适配 + 测试基建 + 凭据声明）
+
+- [`openbb-data-provider-analysis.md`](openbb-borrowing/openbb-data-provider-analysis.md) — OpenBB 数据层工程借鉴评估（Fetcher 三段式 / 响应记录-回放 / 凭据就绪矩阵）
+- [`datasource-adapter-contract-design.md`](openbb-borrowing/datasource-adapter-contract-design.md) — plan-36 数据源适配契约实现设计（三段式 TET + 标准字段 schema + alias 声明式归一，行情域三源试点）
+- [`datasource-cassette-replay-design.md`](openbb-borrowing/datasource-cassette-replay-design.md) — plan-37 数据源记录-回放测试实现设计（自研轻量 cassette 引擎，真实响应进仓库离线回放）
+- [`datasource-credential-ready-design.md`](openbb-borrowing/datasource-credential-ready-design.md) — plan-38 数据源凭据声明与就绪指引实现设计（`datasource_credential_ready` 开关，缺凭据主动跳过并给可读指引）
+
+**自审缺陷修复 → `llm-fingerprint-prompt-coverage/`**
+
+- [`llm-fingerprint-prompt-coverage-design.md`](llm-fingerprint-prompt-coverage/llm-fingerprint-prompt-coverage-design.md) — LLM 模块缓存指纹的提示词覆盖设计（提示词实际承载的派生段进指纹 + 辩论综合键覆盖白脸/黑脸完整正文，无开关）
 
 ## v0.10.x 已完成项
 
@@ -132,4 +162,5 @@ plan-8/25/26/27 实现后用户文档从「单份菜单手册 + 定时任务手�
 - **二次合并**：`docs-stm/managements/plan.md` 中 v0.10.x 已完成事项记录（P0 发布门禁两条、推荐实施顺序 ①~⑧ 表格、P1~P3 已完成项详细段落）整体迁入本文件「v0.10.x 已完成项」章节，原相对链接改指本目录内 `investment-features/` 兄弟路径。plan.md 仅保留未完成项与归档引用。
 - `docs-stm/plan/` 原保留未完成项（plan-8 轻量 Web UI / plan-10 日志可视化，P4 实验功能）设计文档：`plan-web-ui.md` + `plan-web-ui-implementation.md`。**plan-8 已于 2026-08-06 三阶段全部实施完成**，两份设计文档归档至 `docs-stm/archive/v0.10.x/web-ui/`（见本文件「v0.10.x 设计文档」索引）；plan.md 引用同步改指归档路径，`docs-stm/plan/` 当前为空目录。
 - **三次合并（2026-08-16）**：`docs-stm/managements/plan.md` 中 v0.10.x 已随发布版本实现的 **P4 实验功能项**（plan-8/25/26/27/28）详细段落整体迁入本文件「P4 — 实验功能（已随发布版本实现）」章节。plan.md 的 P4 区仅保留未实现项 plan-10（日志可视化，未完成）与归档引用。对应 rf-248~275 已解决项同步迁入 `archived_review-findings.0.10.x.md`、changelog [0.10.9]~[0.10.13] 同步迁入 `archived_changelog.0.10.x.md`。
-- 版本号：本归档涵盖已发布版本 v0.10.0 ~ v0.10.4（当前开发版本 v0.10.5-dev，归档时点为 2026-08-05），归档目录按版本段命名 v0.10.x。三次合并后归档范围扩展为已发布 v0.10.0 ~ v0.10.13（2026-08-03 ~ 2026-08-14）。
+- **五次归档（2026-09-11）**：`docs-stm/plan/` 中外部借鉴系列全部 14 份文档按**借鉴来源**分四目录迁入本目录——`tradingagents-borrowing/`（决策跨期反思闭环 + LLM 输入/输出质量治理三层 + 实验开关上屏）、`augur-borrowing/`（决策结算纪律 + 确定性信号账本 + 健壮性三件套）、`openbb-borrowing/`（数据源适配契约 + 记录-回放测试 + 凭据就绪指引）、`llm-fingerprint-prompt-coverage/`（自审发现的缓存指纹提示词覆盖缺口）。目录语义 = 借鉴来源，与各文档头部「来源」行一致；文档间交叉引用按新相对路径改写。各文档头部状态行同步由「未立项实施 / 设计定稿待实施 / 实现中」更新为已实现态。`plan.md` 的「实现设计见」引用同步改指归档路径，`docs-stm/plan/` 再次成为空目录（等待新立项的中间计划）。
+- 版本号：本归档涵盖已发布版本 v0.10.0 ~ v0.10.4（当前开发版本 v0.10.5-dev，归档时点为 2026-08-05），归档目录按版本段命名 v0.10.x。三次合并后归档范围扩展为已发布 v0.10.0 ~ v0.10.13（2026-08-03 ~ 2026-08-14）；五次归档后扩展为已发布 v0.10.0 ~ v0.10.17（2026-08-03 ~ 2026-09-10）。

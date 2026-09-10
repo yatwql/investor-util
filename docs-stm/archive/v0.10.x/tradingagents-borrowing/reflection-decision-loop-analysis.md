@@ -2,7 +2,7 @@
 
 > 文档版本：0.10.16-dev
 > 来源：外部仓库 TradingAgents-astock 借鉴评估（2026-09-04）→ plan.md `plan-30`
-> 状态：深入分析完成（未立项实施）
+> 状态：**分析已落地**——决策跨期反思闭环（`decision_reflection`）已实现为默认关闭的 P4 实验特性，实现设计见同目录 [`decision-reflection-implementation.md`](decision-reflection-implementation.md)
 > 关联：`docs-stm/managements/plan.md` P4 · `docs-stm/tmp/TradingAgents-astock/`
 
 ---

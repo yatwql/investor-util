@@ -1,7 +1,8 @@
 # 数据源适配契约实施设计（借鉴 OpenBB Fetcher 三段式 TET + 标准字段 schema + alias 声明式归一）
 
-> 来源：`openbb-data-provider-analysis.md` §建议A/B（OpenBB Platform 数据层工程借鉴评估，2026-09-09）。
+> 来源：[`openbb-data-provider-analysis.md`](openbb-data-provider-analysis.md) §建议A/B（OpenBB Platform 数据层工程借鉴评估，2026-09-09）。
 > 级别：**P4 实验级**（缺省关闭、需显式启用），开关 `datasource_adapter`。
+> 状态：**已实现**（行情域三源试点，存量 provider 不回改）。
 
 ## Context
 

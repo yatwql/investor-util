@@ -6,6 +6,15 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 测试覆盖统计刷新 + 中间计划文档归档（2026-09-11）
+
+- **测试覆盖统计刷新**（`test-coverage.md`）：模式覆盖项数与开发机实测耗时经 `--mode bench --update-docs` 回填（unit 6338 / standard 5419 / dev-verify 2494 / verify 4320 / edge 852 / report 1752 / all 6650），功能域、单元分组、跨类三张子表按 `collect-test-coverage.py` 实时结果手更（单元组合计 6338、跨类 `llm` 753、`edge` 852），并补本轮新增的覆盖语义——提示词承载段与辩论综合键进指纹、文件写入原子原语、Provider 凭据分离校验、估值字段网关、管线数据契约键台账校验。上一节的「留待发布刷新」项至此完成。
+- **中间计划文档归档**（`docs-stm/plan/` → `docs-stm/archive/v0.10.x/`）：外部借鉴系列的 14 份文档（三个外部仓库的评估分析 + plan-30~plan-38 实现设计 + 缓存指纹提示词覆盖设计）随其迭代完成整体迁出 `docs-stm/plan/`，该目录回到空目录（等待新立项的中间计划）。
+  - 归档目录按**借鉴来源**划分，与各文档头部「来源」行一致：`tradingagents-borrowing/`（决策跨期反思闭环 + LLM 输入/输出质量治理三层 + 实验开关上屏，6 份）、`augur-borrowing/`（决策结算纪律 + 确定性信号账本 + 健壮性三件套，3 份）、`openbb-borrowing/`（数据源适配契约 + 记录-回放测试 + 凭据就绪指引，4 份）、`llm-fingerprint-prompt-coverage/`（自审发现的缓存指纹提示词覆盖缺口，1 份）。
+  - 各文档头部状态行由「未立项实施 / 设计定稿待实施 / 实现中」更新为已实现态；文档间交叉引用按新相对路径改写。
+  - 引用同步：`plan.md`（P4 表的「实现设计见」与借用探索候选段的「分析文档见」改指归档路径）、`changelog.md` 本版本各条目、三个 core 模块文档字符串（`core/decision_ledger.py`、`core/signal_ledger.py`、`core/cassette.py` 的设计约束指路）。
+  - `technical.md` 正文两处设计文档指路改为按名称引用（面向读者文档正文不得指向归档内容）；`archived_plan.0.10.x.md` 补四目录索引与五次归档说明；`folders.md` 目录树与项目统计同步。
+
 ### 管理文档与用户文档同步（架构约束判据回填 + 台账刷新）（2026-09-10）
 
 - **架构设计约束表判据回填**（`technical.md` §架构设计约束，5 行）：本次自审暴露的共性是「规则只有口号、没有可操作判据」，逐条补判据与适用范围：
@@ -242,7 +251,7 @@
 
 ### 数据源凭据声明与就绪指引（plan-38，实验功能 `datasource_credential_ready` 默认关）（2026-09-10）
 
-- **背景**：当前数据源**全部免费无需凭据**，但 LLM 侧早已暴露同一问题模式——缺 key 时若在调用点裸报错，用户看到的是传输层异常而非「你缺什么、去哪申请」（plan-35 的 `doctor._check_llm_credentials` 即为此而写）。借鉴 OpenBB 把「此源需什么凭据」**声明在 Provider 定义里**的做法，把这套「声明 → 就绪判定 → 可读指引」补到数据源侧，使将来接入任何需 key 的源时链路能**主动跳过**它并给出指引（而非当作「不可达」反复重试、甚至计入熔断）。分析见 `docs-stm/plan/openbb-data-provider-analysis.md` §建议D；实现设计见 `docs-stm/plan/datasource-credential-ready-design.md`。
+- **背景**：当前数据源**全部免费无需凭据**，但 LLM 侧早已暴露同一问题模式——缺 key 时若在调用点裸报错，用户看到的是传输层异常而非「你缺什么、去哪申请」（plan-35 的 `doctor._check_llm_credentials` 即为此而写）。借鉴 OpenBB 把「此源需什么凭据」**声明在 Provider 定义里**的做法，把这套「声明 → 就绪判定 → 可读指引」补到数据源侧，使将来接入任何需 key 的源时链路能**主动跳过**它并给出指引（而非当作「不可达」反复重试、甚至计入熔断）。分析见 `docs-stm/archive/v0.10.x/openbb-borrowing/openbb-data-provider-analysis.md` §建议D；实现设计见 `docs-stm/archive/v0.10.x/openbb-borrowing/datasource-credential-ready-design.md`。
 - **声明即数据（不为演示编造假数据源）**：新增 `core/datasource_credential.py`——`CredentialSpec` 冻结 dataclass（`source_id` / `display_name` / `env_var` / `apply_url` / `note`）+ `CREDENTIAL_SPECS` 注册表 + `register_credential_spec` / `missing_credential` / `credential_hint` / `credential_readiness`。**生产注册表为空**（全部免费源是事实），机制由**注入合成声明**的单元测试证明可用。就绪判定读环境变量，**空白串（含纯空白/换行）视为缺失**——防「设了空值以为配好了」；源未声明 → 不需凭据。就绪矩阵**自身不抛异常**（体检与健康检查共用，不能因声明写错而崩）。
 - **链路主动跳过（两处，非一处）**：`fetcher/chain.py` 的 `fetch_with_fallback` 在熔断检查之后做凭据预检，缺失则 `continue` 到下一链路；**历史走势的 `_try_providers` 遍历循环同样受控**（设计原稿只写了前者——只堵主链路等于机制半应用，缺凭据的源仍会在历史链路里被反复调用并计入熔断）。语义与既有「已被熔断跳过」「未知 Provider」两处 `continue` 完全同例：**不计入熔断失败计数**（配置级问题≠源不可达），仅以可读原因进入 `FailureDiagnostics`，随降级事件上屏到数据源可用性矩阵。
 - **健康检查跳过态与就绪行**：`core/check_sources.py` 的 `_checks` 由三元组扩为 `(source_id, 显示名, 用途, 探测函数)`，`source_id` 与 provider 名对齐（新闻源带 `_news` 后缀消歧——「东方财富（净值）」与「东方财富新闻」显示名相近而 provider 名不同，按短名对齐会让凭据声明挂错源）。缺失凭据**不发起探测**，直接产出跳过项并对称使用文件中**已定义但至今未使用**的 `_SKIP` 符号 `⏭️`，消息为可读指引；跳过项计入 `skipped` 而非 `err`/`warn`，**不改变退出码**；开关开启时输出末尾追加就绪摘要行。
@@ -285,7 +294,7 @@
 
 ### 数据源记录-回放（plan-37，无开关）（2026-09-10）
 
-- **背景**：既有数据源测试全部喂**手工构造的假响应**——那是「我以为上游长什么样」。上游字段改名、值加前后缀、换分隔符、错误页返回 HTML 这类回归在结构上测不出。借鉴 OpenBB 的 pytest-recorder/vcrpy cassette 思路，把**真实响应体**录进仓库、此后离线回放，补上「真实响应体的解析/归一路径」的回归覆盖，同时不破坏「测试不碰真网络」的隔离纪律。分析见 `docs-stm/plan/openbb-data-provider-analysis.md` §建议C；实现设计见 `docs-stm/plan/datasource-cassette-replay-design.md`。
+- **背景**：既有数据源测试全部喂**手工构造的假响应**——那是「我以为上游长什么样」。上游字段改名、值加前后缀、换分隔符、错误页返回 HTML 这类回归在结构上测不出。借鉴 OpenBB 的 pytest-recorder/vcrpy cassette 思路，把**真实响应体**录进仓库、此后离线回放，补上「真实响应体的解析/归一路径」的回归覆盖，同时不破坏「测试不碰真网络」的隔离纪律。分析见 `docs-stm/archive/v0.10.x/openbb-borrowing/openbb-data-provider-analysis.md` §建议C；实现设计见 `docs-stm/archive/v0.10.x/openbb-borrowing/datasource-cassette-replay-design.md`。
 - **自研轻量引擎（不引依赖）**：不引 vcrpy / responses / httpretty——本仓库只有 httpx 一种客户端、注入点唯一，自研约 430 行的引擎比适配第三方库的传输层钩子更可控。语义名定为 **`cassette`**（引擎模块名即语义名）。
 - **注入点即「HTTP 客户端统一」约束下的唯一构造点**：`core/http_client.py` 新增 `use_transport_factory()` / `make_transport()`——`make_http_client()` 在未显式传 `transport` 时取当前工厂产出的传输，因此全项目 provider **零改动**即被替换为回放源（这是本次唯一的生产代码改动）。工厂每次调用必须返回**新**传输实例：`httpx.Client.close()` 会连带关闭其传输，复用同一实例会让后续请求打到已关闭的传输上。未安装工厂时行为与没有本机制时逐字节相同（既有 `test_http_client.py` 用例锁定）。
 - **离线保证与「失败即错」**：回放未命中抛 `CassetteMissError`，**绝不回落真实网络**；该异常**刻意不继承 `httpx.HTTPError`**——provider 的异常处理会捕获 httpx 错误并降级到下一个源，若继承之，「夹具漏录」会被静默改写成「换个源重试」，掩盖真实问题。**录制保证**：需 `--run-live` 与 `--record-cassettes` 双显式开关；非 live 用例的真实请求已被 conftest 的 `_block_external_network` 拦死，**机制上不可能意外产生录制**。
@@ -306,7 +315,7 @@
 
 ### 数据源适配契约（plan-36，实验功能 `datasource_adapter` 默认关）（2026-09-10）
 
-- **背景**：借鉴 OpenBB Platform 的 Fetcher 设计识别出的接入形态问题——**本项目的每个数据源都要手拼一份解析后的 dict**，「字段从哪来、缺失时取什么、这个源有没有这个字段」全散在各 provider 的解析代码里；同一个行情域，腾讯源给了市值/市盈率、新浪源没给、东方财富源连键都不产出，下游只能靠 `if key in data` / `.get()` 逐个试探。字段改名（净值源的 `nav` → 统一的 `price`）也靠手写赋值表达。分析见 `docs-stm/plan/openbb-data-provider-analysis.md` §建议A/B；实现设计见 `docs-stm/plan/datasource-adapter-contract-design.md`。
+- **背景**：借鉴 OpenBB Platform 的 Fetcher 设计识别出的接入形态问题——**本项目的每个数据源都要手拼一份解析后的 dict**，「字段从哪来、缺失时取什么、这个源有没有这个字段」全散在各 provider 的解析代码里；同一个行情域，腾讯源给了市值/市盈率、新浪源没给、东方财富源连键都不产出，下游只能靠 `if key in data` / `.get()` 逐个试探。字段改名（净值源的 `nav` → 统一的 `price`）也靠手写赋值表达。分析见 `docs-stm/archive/v0.10.x/openbb-borrowing/openbb-data-provider-analysis.md` §建议A/B；实现设计见 `docs-stm/archive/v0.10.x/openbb-borrowing/datasource-adapter-contract-design.md`。
 - **三段式契约**：接入一个数据源要做的事被拆成三个可独立检验的小函数——`transform_query`（参数转译，默认恒等）/ `extract_data`（抓取，**既有源在此委托既有 provider 函数**，不复制任何 HTTP 与解析逻辑）/ `transform_data`（映射到标准字段）。三者由 `fetcher/source_adapter.py::SourceAdapter` 统一约束，`fetch_raw` / `transform_record` 把两段直接暴露成 Provider Chain 的槽位。
 - **标准字段一份 + 声明式归一**：`schemas/datasource_fields.py` 按**数据域**登记标准字段记录（行情域为首个域），字段名与类型注解即缺省语义——`float` 缺失取 `0.0`、`float | None` 取 `None`（表示该源不提供此字段）、`str` 取空串；数值一律经 `core.num_utils.safe_num` 归一，NaN/±inf 不会经此路径进下游。默认映射由三样**数据**驱动：`aliases`（上游字段名 → 标准字段名，字段改名的唯一表达处）、`defaults`（该源的缺省取值）、记录类的类型注解。**输出恒为全部标准字段**，下游不必再为「某源少两个键」写分支。
   - **「未提供」与「不可用」同待遇**：上游缺键、NaN/±inf、不可解析的字符串，都回落到该源声明的 `defaults`（未声明则按类型注解推导）；而**合法的 `0.0` 不会被缺省值覆盖**——这是实现期发现的真语义分界，两种情形分别有测试锁定（同一不可用取值在腾讯源得 `0.0`（声明"不提供按 0 计"）、在新浪源得 `None`（声明"不提供该字段"））。
@@ -339,7 +348,7 @@
 
 ### 健壮性三件套：数值归一 / 失败原因可读 / 系统自检（plan-35）（2026-09-10）
 
-- **背景**：借鉴外部 augur 的健壮性实践识别出三项独立改进——① `float("nan")` / `float("±inf")` **不抛异常**，各 provider 解析器里 `try: float(x) except` 形态的兜底对它们完全无效，脏值直入市值核算/收益序列/绘图数据；② provider 链路失败只留 `failure_type` 短标识（`tencent: transport`），用户看不懂是哪个源、为什么失败；③ 缺少一次性盘点「环境/配置/目录/数据源」的诊断入口，出问题只能逐个命令试。分析见 `docs-stm/plan/augur-borrowing-analysis.md` §建议C；实现设计见 `docs-stm/plan/robustness-suite-implementation.md`。按缺口**性质**拆 A（真缺陷，无开关）/ B（实验增强，开关门控）三条独立落地路径。
+- **背景**：借鉴外部 augur 的健壮性实践识别出三项独立改进——① `float("nan")` / `float("±inf")` **不抛异常**，各 provider 解析器里 `try: float(x) except` 形态的兜底对它们完全无效，脏值直入市值核算/收益序列/绘图数据；② provider 链路失败只留 `failure_type` 短标识（`tencent: transport`），用户看不懂是哪个源、为什么失败；③ 缺少一次性盘点「环境/配置/目录/数据源」的诊断入口，出问题只能逐个命令试。分析见 `docs-stm/archive/v0.10.x/augur-borrowing/augur-borrowing-analysis.md` §建议C；实现设计见 `docs-stm/archive/v0.10.x/augur-borrowing/robustness-suite-implementation.md`。按缺口**性质**拆 A（真缺陷，无开关）/ B（实验增强，开关门控）三条独立落地路径。
 
   **A1｜数值归一防线（无开关，默认路径生效）**——判为真缺陷，就近修。改动前是**约 10 个互不一致的私有解析器 + 4 种失败口径**，其中被依赖最广的 `providers/_utils.safe_float` 恰是 NaN/±inf 防线最弱的一个：
 
@@ -373,8 +382,8 @@
 
 ### 确定性数值信号沉淀与实时/非实时标签纪律（plan-34）（2026-09-10）
 
-- **背景**：市场温度、估值分位、尾部风险、风格因子、再平衡超限这五类评级由**确定性算法**算出，但只活在一次报告生成的内存里与当页展示中——报告落盘即散失，跨期无法回答「上期判高估，事后对不对」。同时，这些评级里既有当日实时行情算出的、也有**降级/缓存行情**算出的，二者混在一起消费时，非实时数据算出的评级会冒充真实战绩。借鉴外部 augur `backtest.py` 的 `data_source` 标签与「排行榜默认 `live_only`」纪律。分析见 `docs-stm/plan/augur-borrowing-analysis.md` §建议B。
-- **实现设计**：`docs-stm/plan/signal-ledger-implementation.md`。
+- **背景**：市场温度、估值分位、尾部风险、风格因子、再平衡超限这五类评级由**确定性算法**算出，但只活在一次报告生成的内存里与当页展示中——报告落盘即散失，跨期无法回答「上期判高估，事后对不对」。同时，这些评级里既有当日实时行情算出的、也有**降级/缓存行情**算出的，二者混在一起消费时，非实时数据算出的评级会冒充真实战绩。借鉴外部 augur `backtest.py` 的 `data_source` 标签与「排行榜默认 `live_only`」纪律。分析见 `docs-stm/archive/v0.10.x/augur-borrowing/augur-borrowing-analysis.md` §建议B。
+- **实现设计**：`docs-stm/archive/v0.10.x/augur-borrowing/signal-ledger-implementation.md`。
 
   **A｜缺陷修复：本项无**——五类评级当前的**输出**均为确定性且可复现，没有「算错」可修；仅有的处置隐患是**尚未发生的污染风险**（非实时数据混入统计），而消除该风险本身就属新增能力。**不制造一个缺陷来凑 A/B 结构**，避免把「新增功能」伪装成「修 bug」而掩盖真实变更面。
 
@@ -394,8 +403,8 @@
 
 ### 决策头结构化与决策词归一解析（plan-33）（2026-09-10）
 
-- **背景**：决策词（减仓/加仓/持有）在全仓库**只走展示、无人解析**——「操作建议」表仅存在于提示词契约中，`markdown_to_html` 又把表格降级为逐个 `<p>` 行；唯一消费方（决策账本抽取）用**子串包含**判方向。`不建议加仓` 会被判成 `+1`、`加仓或减仓` 会取靠前词判成 `-1`、`暂不减仓` 会被判成 `-1`。误判后果不是显示错一行，而是**按错误方向写入 `data/state/decision_ledger.jsonl`**，日后结算时污染命中率统计与教训回灌。分析见 `docs-stm/plan/llm-quality-signal-analysis.md` §3。
-- **实现设计**：`docs-stm/plan/decision-header-parse-implementation.md`。按缺口**性质**拆两条独立落地路径：
+- **背景**：决策词（减仓/加仓/持有）在全仓库**只走展示、无人解析**——「操作建议」表仅存在于提示词契约中，`markdown_to_html` 又把表格降级为逐个 `<p>` 行；唯一消费方（决策账本抽取）用**子串包含**判方向。`不建议加仓` 会被判成 `+1`、`加仓或减仓` 会取靠前词判成 `-1`、`暂不减仓` 会被判成 `-1`。误判后果不是显示错一行，而是**按错误方向写入 `data/state/decision_ledger.jsonl`**，日后结算时污染命中率统计与教训回灌。分析见 `docs-stm/archive/v0.10.x/tradingagents-borrowing/llm-quality-signal-analysis.md` §3。
+- **实现设计**：`docs-stm/archive/v0.10.x/tradingagents-borrowing/decision-header-parse-implementation.md`。按缺口**性质**拆两条独立落地路径：
 
   **A｜决策词归一解析器（无开关，默认路径生效）**——判为真缺陷，就近修：
 
@@ -419,7 +428,7 @@
 
 ### 模块级质量分级注入（plan-32）（2026-09-10）
 
-- **背景**：现有【数据质量降级】披露只覆盖**输入侧**（数据源可达性），**输出侧**（LLM 各模块内容本身的完整性/一致性）无任何口径——内容缺章节、被占位符顶替、篇幅显著偏薄这类"内容在但不可信"的情形，下游读者拿到的是与正常输出无异的排版。借鉴外部 `agents/quality_gate.py` 的 A~F 分级机制（**劣级不阻断、不重试**，只把「降级 C/D/F」说明注入下游）。分析见 `docs-stm/plan/llm-quality-signal-analysis.md` §2。
+- **背景**：现有【数据质量降级】披露只覆盖**输入侧**（数据源可达性），**输出侧**（LLM 各模块内容本身的完整性/一致性）无任何口径——内容缺章节、被占位符顶替、篇幅显著偏薄这类"内容在但不可信"的情形，下游读者拿到的是与正常输出无异的排版。借鉴外部 `agents/quality_gate.py` 的 A~F 分级机制（**劣级不阻断、不重试**，只把「降级 C/D/F」说明注入下游）。分析见 `docs-stm/archive/v0.10.x/tradingagents-borrowing/llm-quality-signal-analysis.md` §2。
 - **实现设计**：按缺口**性质**拆两条独立落地路径：
 
   **A｜同域缺陷修复（无开关，默认路径生效）**——`rf-295` 判为真缺陷，就近修：
@@ -449,8 +458,8 @@
 
 ### 信号预消化（plan-31）（2026-09-10）
 
-- **背景**：算法层算出的确定性结论有相当一部分只走渲染层、进不了提示词；进了的那部分又存在**裸值歧义**——行业资金流向段原先把净流出拼成「主力净流入-5,000,000」（label 固定「净流入」、数值带负号），模型读到的是自相矛盾的文本，只能靠推断符号含义；且数据源返回顺序无排名语义，截取前 5 行不构成任何「前列」含义。分析见 `docs-stm/plan/llm-quality-signal-analysis.md`。
-- **实现设计**：`docs-stm/plan/signal-pre-digestion-implementation.md`。按缺口的**性质**拆两条独立落地路径：
+- **背景**：算法层算出的确定性结论有相当一部分只走渲染层、进不了提示词；进了的那部分又存在**裸值歧义**——行业资金流向段原先把净流出拼成「主力净流入-5,000,000」（label 固定「净流入」、数值带负号），模型读到的是自相矛盾的文本，只能靠推断符号含义；且数据源返回顺序无排名语义，截取前 5 行不构成任何「前列」含义。分析见 `docs-stm/archive/v0.10.x/tradingagents-borrowing/llm-quality-signal-analysis.md`。
+- **实现设计**：`docs-stm/archive/v0.10.x/tradingagents-borrowing/signal-pre-digestion-implementation.md`。按缺口的**性质**拆两条独立落地路径：
 
   **A｜资金流方向标注与排名（无开关，默认路径修复）**——判定为真缺陷，就近修：
 
@@ -478,8 +487,8 @@
 
 ### 决策跨期反思闭环（plan-30）（2026-09-10）
 
-- **背景**：原「对判断当次即评、事后无对账」——LLM 看多看空与确定性再平衡/行动建议无法用真实后续行情验证，判断质量无从沉淀、教训无法回灌后续分析。借鉴 TradingAgents-astock 两阶段延迟反馈 + augur「预测-真实结果结算、确定性命中率统计、立即持久化」合成一套闭环（分析见 `docs-stm/plan/reflection-decision-loop-analysis.md` + `augur-borrowing-analysis.md` §建议A）。
-- **实现设计**：`docs-stm/plan/decision-reflection-implementation.md`（分层依赖：`core/` 账本零 report/llm 依赖；`report/` 登记/结算/复盘消费 core；`llm/` 经 core 读教训回灌）。
+- **背景**：原「对判断当次即评、事后无对账」——LLM 看多看空与确定性再平衡/行动建议无法用真实后续行情验证，判断质量无从沉淀、教训无法回灌后续分析。借鉴 TradingAgents-astock 两阶段延迟反馈 + augur「预测-真实结果结算、确定性命中率统计、立即持久化」合成一套闭环（分析见 `docs-stm/archive/v0.10.x/tradingagents-borrowing/reflection-decision-loop-analysis.md` + `augur-borrowing-analysis.md` §建议A）。
+- **实现设计**：`docs-stm/archive/v0.10.x/tradingagents-borrowing/decision-reflection-implementation.md`（分层依赖：`core/` 账本零 report/llm 依赖；`report/` 登记/结算/复盘消费 core；`llm/` 经 core 读教训回灌）。
 - **代码**（实验功能 `decision_reflection`，默认关，`features.json` 注册）：
   - `core/decision_ledger.py`：决策账本核心——事件 JSONL 原子追加（`data/state/decision_ledger.jsonl`，无模块单例）、结算作独立追加事件（决策事件恒 `pending`）、`fold_ledger` 按 decision_id 折叠；教训区块 `lessons_block`/`lessons_cache_suffix`（md5 → 缓存指纹版本化）；`is_active()` 单源开关。
   - `report/decision_record.py`：确定性载体登记（再平衡/调仓卖出建议，仅带基线价入账保证「入账必可结算」，同日 pending 去重）。
@@ -509,7 +518,7 @@
 
 ### LLM 输出侧借鉴评估 + 待办登记（2026-09-09）
 
-- **借鉴评估**：外部仓库 TradingAgents-astock 与 BruceLanLan/augur 的机制借鉴评估，识别 7 条可借用点登记为 P4 实验级候选（缺省关闭、需显式启用），见 `docs-stm/plan/` 三份深入分析文档 + plan.md P4「借用探索候选」表：
+- **借鉴评估**：外部仓库 TradingAgents-astock 与 BruceLanLan/augur 的机制借鉴评估，识别 7 条可借用点登记为 P4 实验级候选（缺省关闭、需显式启用），见借鉴评估分析文档（现归档于 `docs-stm/archive/v0.10.x/tradingagents-borrowing/` 与 `augur-borrowing/`）+ plan.md P4「借用探索候选」表：
   - TradingAgents-astock（2026-08-29 评估）：决策跨期反思闭环、信号预消化、模块级质量分级注入、决策头结构化+确定性解析兜底 → **plan-30/31/32/33**
   - augur（2026-09-09 评估）：确定性结算学习、live/demo 标签纪律、健壮性三件套 → **plan-30 合并评估 + plan-34/35**
 - **待办登记**：借鉴分析同步发现 2 条 LLM 输出侧质量缺陷，登记 `review-findings.md` P2C（详见该文件）——

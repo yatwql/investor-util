@@ -2,8 +2,8 @@
 
 > 文档版本：0.10.16-dev
 > 来源：外部仓库 TradingAgents-astock 借鉴评估（2026-09-04）→ plan.md `plan-31/32/33`
-> 状态：深入分析完成（未立项实施）
-> 关联：`docs-stm/managements/plan.md` P4 · `docs-stm/managements/review-findings.md` `rf-295` · plan-30 分析 `docs-stm/plan/reflection-decision-loop-analysis.md`
+> 状态：**三层建议已全部落地**——输入侧信号预消化（`signal_pre_digest`）、输出侧模块质量分级（`module_quality_gate`）、决策头结构化与确定性解析（`decision_header_parse`）；实现设计见同目录 `signal-pre-digestion-implementation.md`、`decision-header-parse-implementation.md`
+> 关联：`docs-stm/managements/plan.md` P4 · `docs-stm/managements/review-findings.md` `rf-295` · plan-30 分析 [`reflection-decision-loop-analysis.md`](reflection-decision-loop-analysis.md)
 > 三者同属一条主线：**LLM 输入/输出质量治理三层**——输入侧（喂数值前预消化）、输出侧（成稿后质量分级）、决策头（结构化产出 + 确定性解析兜底）。
 
 ---

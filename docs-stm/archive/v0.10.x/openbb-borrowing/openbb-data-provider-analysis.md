@@ -3,7 +3,7 @@
 > 文档版本：0.10.16-dev
 > 来源：外部仓库 [OpenBB-finance/OpenBB](https://github.com/OpenBB-finance/OpenBB) 借鉴评估（2026-09-09）
 > 源码位置：`docs-stm/tmp/OpenBB/`（浅层 git clone `--depth 1`，未纳入版本库）
-> 状态：深入分析完成（**未立项实施**，待纳入 `plan.md` 评估）
+> 状态：**借鉴点已全部落地**——建议A/B 落地为数据源适配契约（`datasource_adapter`）、建议C 落地为数据源记录-回放测试（`cassette`）、建议D 落地为数据源凭据声明与就绪指引（`datasource_credential_ready`）；三份实现设计见同目录 `datasource-adapter-contract-design.md`、`datasource-cassette-replay-design.md`、`datasource-credential-ready-design.md`
 > 外部版本：openbb_core 1.6.13（HEAD `3e071fc`，开源许可）
 > 技术路线前提：OpenBB 是**金融数据平台**（34 个数据源 provider 统一适配层 + REST/SDK/CLI 多端自动派生），与本项目「批量持仓复盘报告生成器」类型不同、域有重叠（同为多源行情/新闻/基金数据抓取）。其**数据层适配抽象与测试基建**可借鉴；其全量「标准模型 + provider 注册 + 覆盖矩阵」的元架构**过重、不建议照搬**（详见 §1.1、§3 低价值档）。
 

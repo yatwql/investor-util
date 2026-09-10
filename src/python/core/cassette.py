@@ -2,7 +2,7 @@
 
 测试基建，**不产生任何运行时行为分支**：cassette 只在测试进程与维护命令
 （``cassettes``）中被读写，报告管线不读取它，因此本模块不进实验开关注册表
-（详见 docs-stm/plan/datasource-cassette-replay-design.md「为何不设开关」）。
+（详见 docs-stm/archive/v0.10.x/openbb-borrowing/datasource-cassette-replay-design.md「为何不设开关」）。
 
 解决的问题：既有数据源测试全部用**手工构造的假响应**，那是「我以为上游长什么
 样」；真实响应体格式与解析器假设不一致（字段改名、加前后缀、换分隔符、返回

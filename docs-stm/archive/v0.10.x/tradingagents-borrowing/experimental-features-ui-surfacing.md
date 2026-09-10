@@ -1,5 +1,7 @@
 # 实验性功能开关上屏：决策跨期反思闭环接入 TUI 菜单 S 与 Web 配置面板
 
+> 状态：**已实现**——实验开关的上屏改为由 `features.EXPERIMENTAL_FEATURES` 注册表统一驱动（TUI 菜单 S / Web 配置面板 / CLI `--experiment` 三面同源），两处 UI 各自硬编码的实验开关列表已移除。
+
 ## Context
 
 `decision_reflection`（决策跨期反思闭环，登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词）已在上一轮实现为 P4 实验特性：默认关闭、开关存 `data/config/features.json`、报告三处接缝经 `decision_ledger.is_active()` 惰性判定。**但目前没有任何 UI 能开关它** —— 只能手工编辑 features.json。

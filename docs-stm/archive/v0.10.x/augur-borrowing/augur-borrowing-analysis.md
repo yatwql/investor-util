@@ -3,7 +3,7 @@
 > 文档版本：0.10.16-dev
 > 来源：外部仓库 [BruceLanLan/augur](https://github.com/BruceLanLan/augur) 借鉴评估（2026-09-09）
 > 源码位置：`docs-stm/tmp/augur-main/`（浅层下载，非 git clone，未纳入版本库）
-> 状态：深入分析完成（**未立项实施**，待纳入 `plan.md` 评估）
+> 状态：**借鉴点已全部落地**——建议A 与既有决策反思分析合并为决策跨期反思闭环（`decision_reflection`）、建议B 落地为确定性信号账本（`signal_ledger`）、建议C 落地为健壮性三件套（数值归一防线 / 失败原因可读 / 系统自检）；三份实现设计见同目录 `signal-ledger-implementation.md`、`robustness-suite-implementation.md` 与 `../tradingagents-borrowing/decision-reflection-implementation.md`
 > 外部版本：v10.15.0（MIT，518 star，114 源 py + 111 测试，2026-07 快照）
 > 技术路线前提：augur 的「18 位投资大师」**核心是确定性规则打分器，非 LLM**；LLM 仅在外围聊天/抽取（详见 §1）
 

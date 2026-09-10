@@ -2,9 +2,10 @@
 
 > 文档版本：0.10.16-dev
 > 语义名：`signal_ledger`（实验开关名同）
-> 来源分析：[`augur-borrowing-analysis.md`](./augur-borrowing-analysis.md) §建议 B
+> 来源分析：[`augur-borrowing-analysis.md`](augur-borrowing-analysis.md) §建议 B
 > 对应计划项：`plan-34`（P4 实验功能）
-> 结构模板：[`decision-reflection-implementation.md`](./decision-reflection-implementation.md)（`plan-30`）
+> 结构模板：[`../tradingagents-borrowing/decision-reflection-implementation.md`](../tradingagents-borrowing/decision-reflection-implementation.md)（`plan-30`）
+> 状态：**已实现**（默认关闭的 P4 实验特性）
 
 ---
 

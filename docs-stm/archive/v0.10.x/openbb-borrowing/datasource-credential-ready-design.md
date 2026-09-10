@@ -1,7 +1,8 @@
 # 数据源凭据声明与就绪指引实施设计（借鉴 OpenBB `Provider(credentials=[...])`）
 
-> 来源：`openbb-data-provider-analysis.md` §建议D（OpenBB Platform 数据层工程借鉴评估，2026-09-09）。
+> 来源：[`openbb-data-provider-analysis.md`](openbb-data-provider-analysis.md) §建议D（OpenBB Platform 数据层工程借鉴评估，2026-09-09）。
 > 级别：**P4 实验级**（缺省关闭、需显式启用），开关 `datasource_credential_ready`。
+> 状态：**已实现**（当前生产注册表为空表——全部数据源免费无需凭据是事实；机制由注入合成声明的单元测试证明）。
 
 ## Context
 
