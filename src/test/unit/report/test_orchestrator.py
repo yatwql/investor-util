@@ -1452,6 +1452,68 @@ class TestFetchLlmAndNews:
 
 @pytest.mark.unit
 @pytest.mark.unit_report
+@pytest.mark.unit
+class TestSubmitLlmFutureDegradationEvents:
+    """_submit_llm_future 数据降级事件透传回归测试。
+
+    回归场景：数据源降级事件此前未随参数送入 generate_all_llm，持仓体检
+    提示词中的【数据质量降级】详情段在生产路径恒为空，LLM 只能凭基础
+    降级块泛泛而谈。此处锁定「事件快照确实被读取并透传」。
+    """
+
+    def _prep(self) -> dict:
+        return {
+            "a_indices": {},
+            "us_indices": {},
+            "total_mv": 0.0,
+            "total_cost": 0.0,
+            "total_profit": 0.0,
+            "total_today_profit": 0.0,
+            "categories": [],
+            "penetrated_assets": [],
+            "holdings_details": [],
+        }
+
+    def _capture_submit_kwargs(self, fail_source_key: str | None) -> tuple[dict, list[dict]]:
+        """执行一次提交，返回 (submit 关键字参数, 提交时刻的降级事件日志)。"""
+        from src.python.report._llm_news import _submit_llm_future
+        from src.python.report.data_status import get_tracker
+
+        tracker = get_tracker()
+        tracker.clear_log()
+        if fail_source_key:
+            tracker.record(fail_source_key, "T2", success=False, failure_type="unreachable")
+        expected_events = tracker.get_log()
+
+        pool = MagicMock()
+        pool.submit.return_value = MagicMock(name="future")
+        with patch("src.python.llm.generate_all_llm", MagicMock()):
+            _submit_llm_future(pool, [MagicMock()], self._prep(), [], False, None, True)
+        return pool.submit.call_args.kwargs, expected_events
+
+    def test_degradation_events_forwarded(self):
+        """有降级事件时，事件列表随参数透传给 generate_all_llm。"""
+        kwargs, expected = self._capture_submit_kwargs("industry")
+        assert "degradation_events" in kwargs, "降级事件未透传，体检提示词的数据质量详情段将为空"
+        assert kwargs["degradation_events"] == expected
+        assert [e["source_key"] for e in kwargs["degradation_events"]] == ["industry"]
+
+    def test_empty_degradation_events_still_forwarded(self):
+        """无降级事件时透传空列表（而非 None），保持与数据源侧语义一致。"""
+        kwargs, expected = self._capture_submit_kwargs(None)
+        assert kwargs["degradation_events"] == []
+        assert expected == []
+
+    def test_disabled_llm_skips_submit(self):
+        """未启用 LLM 时不提交任务，也不读取降级事件。"""
+        from src.python.report._llm_news import _submit_llm_future
+
+        pool = MagicMock()
+        assert _submit_llm_future(pool, [MagicMock()], self._prep(), [], False, None, False) is None
+        pool.submit.assert_not_called()
+
+
+@pytest.mark.unit
 class TestCaptureSnapshot:
     """capture_snapshot 快照创建测试（8 用例覆盖 5 子步骤）。"""
 

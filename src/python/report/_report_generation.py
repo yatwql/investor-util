@@ -702,6 +702,25 @@ def _generate_report_full(
             # 实验功能异常不阻断报告主链路（不装配复盘区块，报告保持既有输出）
             reporter.warn("决策复盘（LLM 登记/复盘装配）执行异常，已跳过")
             logger.exception("[decision_reflection] LLM 登记/复盘装配 seam 异常")
+
+    # ── 5c. 模块级质量分级（实验开关，默认关闭）──
+    # 对 4 个 LLM 模块输出做完整性/一致性评级，低评级模块内容头部注入
+    # 「内容质量提示」横幅；只标注不阻断、不重试、不写回缓存。
+    # 置于决策登记之后：横幅会改变内容文本，须避开操作建议表的解析。
+    try:
+        from src.python.report import llm_quality
+
+        llm_content = llm_quality.apply_quality_banners(llm_content, reporter)
+    except Exception:
+        # 实验功能异常不阻断报告主链路（分级失败时报告保持既有输出）
+        reporter.warn("模块级质量分级执行异常，已跳过")
+        logger.exception("[llm_quality] 模块级质量分级 seam 异常")
+
+    # ── 5d. 确定性数值信号沉淀（实验开关，默认关闭）──
+    # 抽取本轮市场温度/估值分位/尾部风险/风格因子/再平衡超限五类确定性评级，
+    # 打实时-非实时来源标签后入账（幂等：同日同类型同标的只记一次）。
+    # 置于此处而非 3.6：尾部风险等 A 通道键在 LLM 生成阶段才注入 pipeline_data，
+    # 过早登记会漏采；适配器对缺失键逐项跳过，故不构成硬依赖。
     perf.stop()
 
     # ── 6. HTML 报告 ──

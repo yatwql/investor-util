@@ -51,11 +51,34 @@ _PLACEHOLDER_TEXT: dict[str, str] = {
 
 _MODULE_KEYS = ("global_macro", "expert_review", "health_check", "penetration_deep")
 
+# 占位文本的稳定签名 —— 上面全部模板均含该片段。内容侧识别降级占位
+# （如 LLM 输出质量分级）依赖此常量，模板改动时签名须同步。
+_PLACEHOLDER_SIGNATURE = "⚠️ 当前无法"
+
 __all__ = [
     "build_fallback_llm_content",
     "is_all_llm_failed",
+    "is_placeholder_content",
     "get_placeholder_text",
 ]
+
+
+def is_placeholder_content(html: str) -> bool:
+    """判断给定 HTML 是否为 LLM 失败后的自动降级占位文本。
+
+    仅识别 :data:`_PLACEHOLDER_TEXT` 中的模块占位模板；``get_placeholder_text``
+    的通用兜底分支（含动态模块键）只会在未知模块键时触发，4 个正式模块不会
+    走到，故不纳入签名。
+
+    Args:
+        html: 待判定的 LLM 输出 HTML
+
+    Returns:
+        True = 命中降级占位模板；空输入返回 False（空内容由调用方另行判定）
+    """
+    if not html:
+        return False
+    return _PLACEHOLDER_SIGNATURE in html
 
 
 def get_placeholder_text(module_key: str, timestamp: str | None = None) -> str:
