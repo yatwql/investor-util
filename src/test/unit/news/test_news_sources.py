@@ -16,14 +16,13 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from src.python.providers.news_sources import (
-
     _FETCH_MAP,
     _SOURCE_LABELS,
     get_source_label,
 )
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
 
 class TestSourceMetadata(unittest.TestCase):
@@ -562,7 +561,8 @@ class TestFlushAnchorsDedup(unittest.TestCase):
         self._record_cross_skip("新闻A", "新闻B")
         news_dedup._flush_anchors()
         self.assertGreaterEqual(
-            len(news_dedup._WRITTEN_ANCHOR_KEYS), 1,
+            len(news_dedup._WRITTEN_ANCHOR_KEYS),
+            1,
             "flush 后进程级 key 集合应包含已写记录",
         )
 

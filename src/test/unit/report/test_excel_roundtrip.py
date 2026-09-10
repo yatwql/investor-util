@@ -61,6 +61,7 @@ class TestWorkbookSaveRoundtrip(unittest.TestCase):
         self.assertTrue(os.path.exists(path))
 
         from openpyxl import load_workbook
+
         loaded = load_workbook(path, read_only=True)
         self.assertEqual(len(loaded.sheetnames), 4)
         for name in names:

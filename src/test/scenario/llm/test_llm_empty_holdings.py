@@ -28,19 +28,21 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._cfg_patcher = patch("src.python.llm.generators_orchestrator.get_llm_config",
-                                  return_value={"enabled_llm": {
-                                      "global_macro": True,
-                                      "expert_review": True,
-                                      "health_check": True,
-                                      "penetration_deep": True,
-                                  }})
+        cls._cfg_patcher = patch(
+            "src.python.llm.generators_orchestrator.get_llm_config",
+            return_value={
+                "enabled_llm": {
+                    "global_macro": True,
+                    "expert_review": True,
+                    "health_check": True,
+                    "penetration_deep": True,
+                }
+            },
+        )
         cls._cfg_patcher.start()
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor",
-                                   new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client",
-                                    new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
@@ -54,7 +56,11 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
     @patch("src.python.llm.generators_orchestrator.generate_global_macro")
     @patch("src.python.llm.generators_orchestrator.generate_expert_review")
     def test_empty_holdings_no_crash(
-        self, mock_expert, mock_macro, mock_health, mock_penetration,
+        self,
+        mock_expert,
+        mock_macro,
+        mock_health,
+        mock_penetration,
     ):
         """holdings_count=0 + categories={} → 不会崩溃。"""
         from src.python.llm import generate_all_llm
@@ -66,8 +72,16 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
 
         try:
             result = generate_all_llm(
-                {}, {}, 0, 0, 0, 0, 0, {},
-                holdings_details=[], penetrated_assets=[],
+                {},
+                {},
+                0,
+                0,
+                0,
+                0,
+                0,
+                {},
+                holdings_details=[],
+                penetrated_assets=[],
             )
         except Exception as e:
             self.fail(f"generate_all_llm 在空持仓下不应崩溃: {e}")
@@ -91,8 +105,7 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
         with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
             mock_gen.return_value = ("<p>宏观</p>", False)
             try:
-                result, cached = generate_global_macro({}, {}, 0, 0, 0, {},
-                                                        force=True)
+                result, cached = generate_global_macro({}, {}, 0, 0, 0, {}, force=True)
             except Exception as e:
                 self.fail(f"空持仓下 generate_global_macro 不应崩溃: {e}")
             self.assertEqual(result, "<p>宏观</p>")

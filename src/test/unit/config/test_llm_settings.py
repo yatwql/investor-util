@@ -21,12 +21,7 @@ class TestWriteLlmSettingsShared:
         """标量字段替换：保留文件内注释与未变更字段。"""
         path = tmp_path / "llm_settings.json"
         path.write_text(
-            "// 全局说明\n"
-            "{\n"
-            '  "model": "claude",\n'
-            "  // 最大输出 tokens\n"
-            '  "max_tokens": 8000\n'
-            "}\n",
+            '// 全局说明\n{\n  "model": "claude",\n  // 最大输出 tokens\n  "max_tokens": 8000\n}\n',
             encoding="utf-8",
         )
 
@@ -42,10 +37,7 @@ class TestWriteLlmSettingsShared:
         """dict 字段替换：整块重生成，其余顶层键保留。"""
         path = tmp_path / "llm_settings.json"
         path.write_text(
-            "{\n"
-            '  "model": "claude",\n'
-            '  "enabled_llm": {"global_macro": false, "news_correlation": false}\n'
-            "}\n",
+            '{\n  "model": "claude",\n  "enabled_llm": {"global_macro": false, "news_correlation": false}\n}\n',
             encoding="utf-8",
         )
 
@@ -64,9 +56,7 @@ class TestWriteLlmSettingsShared:
 
         write_llm_settings({"enabled_llm": {"news_correlation": True}}, str(path))
 
-        assert json.loads(path.read_text(encoding="utf-8")) == {
-            "enabled_llm": {"news_correlation": True}
-        }
+        assert json.loads(path.read_text(encoding="utf-8")) == {"enabled_llm": {"news_correlation": True}}
 
     def test_refreshes_llm_cache(self, tmp_path, monkeypatch):
         """写入完成后刷新 LLM 配置缓存（get_llm_config 被调用）。"""

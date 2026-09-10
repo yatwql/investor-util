@@ -23,7 +23,9 @@ class TestBuildProviderCacheKey(unittest.TestCase):
         from src.python.llm.skeleton import _build_provider_cache_key
 
         key = _build_provider_cache_key(
-            "llm_global_macro_fp123", {"provider": "claude"}, "global_macro",
+            "llm_global_macro_fp123",
+            {"provider": "claude"},
+            "global_macro",
         )
         self.assertEqual(key, "llm_global_macro_fp123")
 
@@ -65,7 +67,10 @@ class TestCachePrecheckAndWrite(unittest.TestCase):
     @patch("src.python.llm.skeleton.call_llm")
     @patch("src.python.llm.skeleton.clear_last_llm_failure")
     def test_optimistic_precheck_hit(
-        self, mock_clear: MagicMock, mock_call: MagicMock, mock_cache_get: MagicMock,
+        self,
+        mock_clear: MagicMock,
+        mock_call: MagicMock,
+        mock_cache_get: MagicMock,
     ) -> None:
         """乐观预检命中 → 不调用 call_llm。"""
         from src.python.llm.skeleton import generate_llm_content
@@ -104,8 +109,11 @@ class TestCachePrecheckAndWrite(unittest.TestCase):
     @patch("src.python.llm.skeleton.call_llm")
     @patch("src.python.llm.skeleton.clear_last_llm_failure")
     def test_cache_write_with_provider(
-        self, mock_clear: MagicMock, mock_call: MagicMock,
-        mock_cache_set: MagicMock, mock_cache_get: MagicMock,
+        self,
+        mock_clear: MagicMock,
+        mock_call: MagicMock,
+        mock_cache_set: MagicMock,
+        mock_cache_get: MagicMock,
     ) -> None:
         """call_llm 成功后按实际 provider_name 落盘。"""
         from src.python.llm.skeleton import generate_llm_content
@@ -147,8 +155,11 @@ class TestCachePrecheckAndWrite(unittest.TestCase):
     @patch("src.python.llm.skeleton.call_llm")
     @patch("src.python.llm.skeleton.clear_last_llm_failure")
     def test_legacy_cache_key_unchanged(
-        self, mock_clear: MagicMock, mock_call: MagicMock,
-        mock_cache_set: MagicMock, mock_cache_get: MagicMock,
+        self,
+        mock_clear: MagicMock,
+        mock_call: MagicMock,
+        mock_cache_set: MagicMock,
+        mock_cache_get: MagicMock,
     ) -> None:
         """无 _provider_list → cache key 不变。"""
         from src.python.llm.skeleton import generate_llm_content

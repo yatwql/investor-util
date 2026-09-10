@@ -180,7 +180,10 @@ class TestFetchFundManager(unittest.TestCase):
     @patch("src.python.fetcher.fund_manager._request_fund_html")
     @patch("src.python.fetcher.fund_manager.cache_set")
     def test_cache_miss_html_success(
-        self, mock_set: MagicMock, mock_request: MagicMock, mock_cache: MagicMock,
+        self,
+        mock_set: MagicMock,
+        mock_request: MagicMock,
+        mock_cache: MagicMock,
     ):
         """缓存未命中，HTTP 成功，解析并缓存。"""
         mock_cache.return_value = None
@@ -197,8 +200,11 @@ class TestFetchFundManager(unittest.TestCase):
     @patch("src.python.fetcher.fund_manager._parse_manager_from_archive_page")
     @patch("src.python.fetcher.fund_manager.cache_set")
     def test_html_failed_archive_fallback(
-        self, mock_set: MagicMock, mock_archive: MagicMock,
-        mock_request: MagicMock, mock_cache: MagicMock,
+        self,
+        mock_set: MagicMock,
+        mock_archive: MagicMock,
+        mock_request: MagicMock,
+        mock_cache: MagicMock,
     ):
         """主页请求失败时回退到档案页。"""
         mock_cache.return_value = None
@@ -221,7 +227,10 @@ class TestFetchFundManager(unittest.TestCase):
     @patch("src.python.fetcher.fund_manager._request_fund_html")
     @patch("src.python.fetcher.fund_manager._parse_manager_from_archive_page")
     def test_all_failed_returns_none(
-        self, mock_archive: MagicMock, mock_request: MagicMock, mock_cache: MagicMock,
+        self,
+        mock_archive: MagicMock,
+        mock_request: MagicMock,
+        mock_cache: MagicMock,
     ):
         """主页和档案页均失败时返回 None。"""
         mock_cache.return_value = None
@@ -237,8 +246,11 @@ class TestFetchFundManager(unittest.TestCase):
     @patch("src.python.fetcher.fund_manager._parse_manager_from_archive_page")
     @patch("src.python.fetcher.fund_manager.cache_set")
     def test_archive_fallback(
-        self, mock_set: MagicMock, mock_archive: MagicMock,
-        mock_request: MagicMock, mock_cache: MagicMock,
+        self,
+        mock_set: MagicMock,
+        mock_archive: MagicMock,
+        mock_request: MagicMock,
+        mock_cache: MagicMock,
     ):
         """主页 HTML 无经理信息时回退到档案页。"""
         mock_cache.return_value = None
@@ -287,6 +299,7 @@ class TestParseManagerFromArchivePage(unittest.TestCase):
         mock_ctx = MagicMock()
         mock_ctx.__enter__.return_value = mock_ctx
         import httpx
+
         mock_ctx.get.side_effect = httpx.TimeoutException("timeout", request=MagicMock())
         mock_client.return_value = mock_ctx
 

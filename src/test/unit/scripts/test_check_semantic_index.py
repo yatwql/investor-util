@@ -112,13 +112,13 @@ class TestParseMergedSheetKeys:
 class TestReportSubmodulesKeys:
     def test_parses_nested_dict(self, sem_index):
         source = (
-            '_DEFAULT_CONFIG = {\n'
+            "_DEFAULT_CONFIG = {\n"
             '    "enable_action": False,\n'
             '    "report_submodules": {\n'
             '        "data_quality": False,\n'
             '        "cost_lots": False,\n'
-            '    },\n'
-            '}\n'
+            "    },\n"
+            "}\n"
         )
         assert sem_index.report_submodules_keys(source) == ["data_quality", "cost_lots"]
 
@@ -151,11 +151,7 @@ class TestRegistrySectionKeys:
 
 class TestCodeWithoutComments:
     def test_strips_comments_keeps_strings(self, sem_index):
-        source = (
-            "# 顶部注释\n"
-            'x = 1  # 行尾注释\n'
-            'y = "rebalance_advice"  # 字符串保留\n'
-        )
+        source = '# 顶部注释\nx = 1  # 行尾注释\ny = "rebalance_advice"  # 字符串保留\n'
         stripped = sem_index._code_without_comments(source)
         assert "顶部注释" not in stripped
         assert "行尾注释" not in stripped
@@ -209,12 +205,12 @@ def _valid_doc() -> str:
 
 def _valid_defaults() -> str:
     return (
-        '_DEFAULT_CONFIG = {\n'
+        "_DEFAULT_CONFIG = {\n"
         '    "report_submodules": {\n'
         '        "candidate_compare": False,\n'
         '        "cost_lots": False,\n'
-        '    },\n'
-        '}\n'
+        "    },\n"
+        "}\n"
     )
 
 
@@ -230,25 +226,14 @@ def _valid_registry() -> str:
 class TestRunChecks:
     def test_all_pass(self, sem_index, tmp_path):
         (tmp_path / "a.py").write_text(
-            "def build_candidate_compare(): pass\n"
-            'd = {"cost_lots": False}\n'
-            'def build_position_relationship(): pass\n',
+            'def build_candidate_compare(): pass\nd = {"cost_lots": False}\ndef build_position_relationship(): pass\n',
             encoding="utf-8",
         )
-        assert (
-            sem_index.run_checks(_valid_doc(), _valid_defaults(), _valid_registry(), tmp_path)
-            == []
-        )
+        assert sem_index.run_checks(_valid_doc(), _valid_defaults(), _valid_registry(), tmp_path) == []
 
     def test_forward_finds_unregistered_key(self, sem_index, tmp_path):
         (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
-        defaults = (
-            '_DEFAULT_CONFIG = {\n'
-            '    "report_submodules": {\n'
-            '        "market_temperature": False,\n'
-            '    },\n'
-            '}\n'
-        )
+        defaults = '_DEFAULT_CONFIG = {\n    "report_submodules": {\n        "market_temperature": False,\n    },\n}\n'
         findings = sem_index.run_checks(_valid_doc(), defaults, _valid_registry(), tmp_path)
         assert any("report_submodules.market_temperature" in f for f in findings)
 
@@ -291,7 +276,5 @@ class TestRealRepoSmoke:
         doc_text = sem_index._TECHNICAL_MD.read_text(encoding="utf-8")
         defaults_source = sem_index._CONFIG_DEFAULTS.read_text(encoding="utf-8")
         registry_source = sem_index._REGISTRY_PY.read_text(encoding="utf-8")
-        findings = sem_index.run_checks(
-            doc_text, defaults_source, registry_source, sem_index._CODE_ROOT
-        )
+        findings = sem_index.run_checks(doc_text, defaults_source, registry_source, sem_index._CODE_ROOT)
         assert findings == []

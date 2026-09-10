@@ -87,7 +87,7 @@ def _check_http(
     except Exception as e:
         elapsed = (time.perf_counter() - start) * 1000
         err_msg = str(e).split("\n")[0][:60]
-        return _ERR, elapsed, f"超时" if "timeout" in str(e).lower() else err_msg
+        return _ERR, elapsed, "超时" if "timeout" in str(e).lower() else err_msg
 
 
 # ── 检查项定义 ──────────────────────────────────────────

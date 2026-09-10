@@ -34,7 +34,11 @@ class TestTierLabelSurvivesDirtyShares:
         assert _tier_label(buckets) == "高成本"
 
     def test_all_dirty_buckets_fall_back_to_placeholder(self):
-        buckets = {"low": {"shares": float("nan")}, "high": {"shares": float("inf")}, "unpriced": {"shares": float("nan")}}
+        buckets = {
+            "low": {"shares": float("nan")},
+            "high": {"shares": float("inf")},
+            "unpriced": {"shares": float("nan")},
+        }
         assert _tier_label(buckets) == "--"
 
     def test_legitimate_buckets_unchanged(self):
@@ -54,7 +58,9 @@ class TestPenetrationBarSurvivesDirtyValues:
         return dataset["datasets"][0]["data"]
 
     def test_mixed_column_keeps_legitimate_values(self):
-        values = self._values([{"name": "A", "mv": 100.0}, {"name": "B", "mv": float("nan")}, {"name": "C", "mv": 200.0}])
+        values = self._values(
+            [{"name": "A", "mv": 100.0}, {"name": "B", "mv": float("nan")}, {"name": "C", "mv": 200.0}]
+        )
         assert all(math.isfinite(v) for v in values)
         assert values == [100.0, 0.0, 200.0]
 

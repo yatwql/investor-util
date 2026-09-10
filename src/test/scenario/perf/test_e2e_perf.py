@@ -124,8 +124,12 @@ class TestE2EPerformance:
 
         details = [
             DetailRow(
-                name=h.name, code=h.code, market_value=h.shares * h.cost_price,
-                cost=h.shares * h.cost_price, profit=0.0, account=h.account,
+                name=h.name,
+                code=h.code,
+                market_value=h.shares * h.cost_price,
+                cost=h.shares * h.cost_price,
+                profit=0.0,
+                account=h.account,
             )
             for h in twenty_holdings
         ]
@@ -160,8 +164,6 @@ class TestE2EPerformance:
     def test_excel_report_time(self, twenty_holdings, mock_all_apis, tmp_path):
         """Excel 报告写入耗时测量。"""
         import os
-
-        from openpyxl import Workbook
 
         from src.python.report.excel_writer import (
             create_workbook,
@@ -204,8 +206,12 @@ class TestE2EPerformance:
         benchmark_returns = [0.0005] * _TRADING_DAYS
         details = [
             DetailRow(
-                name=h.name, code=h.code, market_value=h.shares * h.cost_price,
-                cost=h.shares * h.cost_price, profit=0.0, account=h.account,
+                name=h.name,
+                code=h.code,
+                market_value=h.shares * h.cost_price,
+                cost=h.shares * h.cost_price,
+                profit=0.0,
+                account=h.account,
             )
             for h in twenty_holdings
         ]

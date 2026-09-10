@@ -513,7 +513,6 @@ class TestContentFilterRecovery(unittest.TestCase):
         self.assertEqual(mock_call.call_count, 2)
 
         # 验证第二次调用 system_prompt 包含安抚指令
-        from src.python.llm.api import _CONTENT_FILTER_RECOVERY
 
         second_call_system = mock_call.call_args_list[1][0][1]  # system_prompt arg
         self.assertIn("注意：请确保你的回答包含实质性的分析内容", second_call_system)

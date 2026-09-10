@@ -2,6 +2,7 @@
 
 集中存放测试中可复用的 mock/helper，避免各测试文件重复定义。
 """
+
 from __future__ import annotations
 
 from concurrent.futures import Future

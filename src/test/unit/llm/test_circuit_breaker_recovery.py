@@ -14,12 +14,11 @@
 
 from __future__ import annotations
 
-import time
 import unittest
 from unittest.mock import patch
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
 
 class TestCircuitBreakerOpenClose(unittest.TestCase):
@@ -28,8 +27,10 @@ class TestCircuitBreakerOpenClose(unittest.TestCase):
     def setUp(self):
         # 每次测试前清理全局熔断状态
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         # 保存原始状态并在 tearDown 恢复
         self._orig_failures = _circuit_failures.copy()
         self._orig_open_until = _circuit_open_until.copy()
@@ -38,8 +39,10 @@ class TestCircuitBreakerOpenClose(unittest.TestCase):
 
     def tearDown(self):
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         _circuit_failures.clear()
         _circuit_failures.update(self._orig_failures)
         _circuit_open_until.clear()
@@ -48,6 +51,7 @@ class TestCircuitBreakerOpenClose(unittest.TestCase):
     def test_closed_by_default(self):
         """初始状态 → 熔断关闭。"""
         from src.python.llm.circuit_breaker import _cb_is_open
+
         self.assertFalse(_cb_is_open("https://api.test.com/v1"))
 
     def test_one_failure_does_not_open(self):
@@ -87,8 +91,10 @@ class TestCircuitBreakerRecovery(unittest.TestCase):
 
     def setUp(self):
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         self._orig_failures = _circuit_failures.copy()
         self._orig_open_until = _circuit_open_until.copy()
         _circuit_failures.clear()
@@ -96,8 +102,10 @@ class TestCircuitBreakerRecovery(unittest.TestCase):
 
     def tearDown(self):
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         _circuit_failures.clear()
         _circuit_failures.update(self._orig_failures)
         _circuit_open_until.clear()
@@ -107,7 +115,8 @@ class TestCircuitBreakerRecovery(unittest.TestCase):
     def test_recovery_after_cooldown(self, mock_time):
         """冷却期过后 → 熔断半开（_cb_is_open 返回 False）。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _cb_is_open,
+            _cb_record_failure,
+            _cb_is_open,
             _CIRCUIT_BREAKER_RECOVERY,
         )
 
@@ -129,8 +138,11 @@ class TestCircuitBreakerRecovery(unittest.TestCase):
     def test_success_resets_after_recovery(self, mock_time):
         """冷却后成功 → 熔断完全关闭，失败计数清零。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _cb_record_success, _cb_is_open,
-            _circuit_failures, _CIRCUIT_BREAKER_RECOVERY,
+            _cb_record_failure,
+            _cb_record_success,
+            _cb_is_open,
+            _circuit_failures,
+            _CIRCUIT_BREAKER_RECOVERY,
         )
 
         url = "https://api.test.com/v1"
@@ -154,7 +166,8 @@ class TestCircuitBreakerRecovery(unittest.TestCase):
     def test_failure_after_semi_open_reopens(self, mock_time):
         """半开状态下再次失败 → 重新熔断（重置冷却计时器）。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _cb_is_open,
+            _cb_record_failure,
+            _cb_is_open,
             _CIRCUIT_BREAKER_RECOVERY,
         )
 
@@ -188,8 +201,10 @@ class TestCircuitBreakerIndependentEndpoints(unittest.TestCase):
 
     def setUp(self):
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         self._orig_failures = _circuit_failures.copy()
         self._orig_open_until = _circuit_open_until.copy()
         _circuit_failures.clear()
@@ -197,8 +212,10 @@ class TestCircuitBreakerIndependentEndpoints(unittest.TestCase):
 
     def tearDown(self):
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         _circuit_failures.clear()
         _circuit_failures.update(self._orig_failures)
         _circuit_open_until.clear()
@@ -226,7 +243,9 @@ class TestCircuitBreakerIndependentEndpoints(unittest.TestCase):
     def test_success_only_resets_its_endpoint(self):
         """成功重置仅影响对应 endpoint。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _cb_record_success, _cb_is_open,
+            _cb_record_failure,
+            _cb_record_success,
+            _cb_is_open,
         )
 
         url_a = "https://api.anthropic.com/v1/messages"
@@ -251,8 +270,10 @@ class TestCircuitBreakerEdgeCases(unittest.TestCase):
 
     def setUp(self):
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         self._orig_failures = _circuit_failures.copy()
         self._orig_open_until = _circuit_open_until.copy()
         _circuit_failures.clear()
@@ -260,8 +281,10 @@ class TestCircuitBreakerEdgeCases(unittest.TestCase):
 
     def tearDown(self):
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         _circuit_failures.clear()
         _circuit_failures.update(self._orig_failures)
         _circuit_open_until.clear()
@@ -270,25 +293,29 @@ class TestCircuitBreakerEdgeCases(unittest.TestCase):
     def test_empty_url_not_open(self):
         """空 URL → 熔断器不开启。"""
         from src.python.llm.circuit_breaker import _cb_is_open
+
         self.assertFalse(_cb_is_open(""))
 
     def test_none_url_not_open(self):
         """None URL → 熔断器不开启。"""
         from src.python.llm.circuit_breaker import _cb_is_open
+
         self.assertFalse(_cb_is_open(None))
 
     def test_success_on_clean_state(self):
         """未熔断时调用 success → 无副作用。"""
         from src.python.llm.circuit_breaker import _cb_record_success, _cb_is_open
+
         _cb_record_success("https://api.test.com/v1")
         self.assertFalse(_cb_is_open("https://api.test.com/v1"))
 
     def test_failure_count_reset_on_success(self):
         """成功后失败计数清零，重新从 1 开始计数。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _cb_record_success, _cb_is_open,
+            _cb_record_failure,
+            _cb_record_success,
+            _cb_is_open,
         )
-
 
         url = "https://api.test.com/v1"
         _cb_record_failure(url)  # 1
@@ -305,23 +332,28 @@ class TestCircuitBreakerEndpoint(unittest.TestCase):
     def test_endpoint_normal(self):
         """标准 URL → 提取域名。"""
         from src.python.llm.circuit_breaker import _cb_endpoint
+
         self.assertEqual(_cb_endpoint("https://api.anthropic.com/v1/messages"), "api.anthropic.com")
 
     def test_endpoint_empty(self):
         """空 URL → unknown。"""
         from src.python.llm.circuit_breaker import _cb_endpoint
+
         self.assertEqual(_cb_endpoint(""), "unknown")
 
     def test_endpoint_invalid(self):
         """无效 URL → unknown。"""
         from src.python.llm.circuit_breaker import _cb_endpoint
+
         self.assertEqual(_cb_endpoint("not-a-url"), "unknown")
 
     def test_failure_count_increments(self):
         """连续记录失败 → 计数递增。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _circuit_failures,
+            _cb_record_failure,
+            _circuit_failures,
         )
+
         _circuit_failures.clear()
         _cb_record_failure("https://api.anthropic.com/v1/messages")
         _cb_record_failure("https://api.anthropic.com/v1/messages")
@@ -331,6 +363,7 @@ class TestCircuitBreakerEndpoint(unittest.TestCase):
     def test_unknown_endpoint_not_open(self):
         """未记录的 endpoint → 熔断关闭。"""
         from src.python.llm.circuit_breaker import _cb_is_open
+
         self.assertFalse(_cb_is_open("https://api.unknown.com/v1"))
 
 

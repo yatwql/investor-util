@@ -29,8 +29,8 @@ class TestLlmPlaceholderDistinction(unittest.TestCase):
         from src.python.llm.prompts import (
             FAIL_REASON_NOT_CONFIGURED,
             FAIL_REASON_API_ERROR,
-            FAIL_REASON_DISABLED,
         )
+
         self._placeholder = _PLACEHOLDER_BY_REASON
         self._not_configured_key = FAIL_REASON_NOT_CONFIGURED
         self._api_error_key = FAIL_REASON_API_ERROR
@@ -70,7 +70,12 @@ class TestLlmPlaceholderDistinction(unittest.TestCase):
         """模板在未配置 LLM 时显示占位提示。"""
         tmpl_path = os.path.join(
             os.path.dirname(__file__),
-            "..", "..", "..", "static", "tmpl", "report_template.html",
+            "..",
+            "..",
+            "..",
+            "static",
+            "tmpl",
+            "report_template.html",
         )
         tmpl_path = os.path.normpath(tmpl_path)
         with open(tmpl_path, encoding="utf-8") as f:

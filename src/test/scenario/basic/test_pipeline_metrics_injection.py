@@ -282,6 +282,7 @@ class TestLLMGeneratorWiring:
 
         # 只验证签名兼容性，不实际调用 LLM
         import inspect
+
         sig = inspect.signature(generate_expert_review)
         assert "metrics" in sig.parameters
 
@@ -290,5 +291,6 @@ class TestLLMGeneratorWiring:
         from src.python.llm.generators import generate_health_check
 
         import inspect
+
         sig = inspect.signature(generate_health_check)
         assert "data_quality_text" in sig.parameters

@@ -62,6 +62,7 @@ def _apply_feature_gates() -> None:
     if disabled:
         MENU_ITEMS[:] = [item for item in MENU_ITEMS if item[0] not in disabled]
 
+
 _config_cache: dict | None = None
 
 

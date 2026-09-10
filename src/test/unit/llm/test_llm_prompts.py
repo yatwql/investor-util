@@ -133,15 +133,28 @@ class TestBuildReviewPrompt(unittest.TestCase):
     def test_nav_date_label(self) -> None:
         """tencent→今涨跌幅，场外→净值日期。"""
         details = [
-            {"code": "600900", "market_value": 100000, "cost": 80000,
-             "profit": 20000, "profit_rate": 25.0, "change_pct": 1.2,
-             "nav_date": "", "source_api": "tencent"},
-            {"code": "110011", "market_value": 50000, "cost": 40000,
-             "profit": 10000, "profit_rate": 25.0, "change_pct": -0.5,
-             "nav_date": "2026-06-26", "source_api": "eastmoney"},
+            {
+                "code": "600900",
+                "market_value": 100000,
+                "cost": 80000,
+                "profit": 20000,
+                "profit_rate": 25.0,
+                "change_pct": 1.2,
+                "nav_date": "",
+                "source_api": "tencent",
+            },
+            {
+                "code": "110011",
+                "market_value": 50000,
+                "cost": 40000,
+                "profit": 10000,
+                "profit_rate": 25.0,
+                "change_pct": -0.5,
+                "nav_date": "2026-06-26",
+                "source_api": "eastmoney",
+            },
         ]
-        r = _build_expert_review_prompt(150000, 120000, 30000, 1500, 2, {},
-                                 holdings_details=details)
+        r = _build_expert_review_prompt(150000, 120000, 30000, 1500, 2, {}, holdings_details=details)
         # compact 模式省略今日涨跌幅，保留净值日期
         self.assertNotIn("今+1.20%", r)
         self.assertIn("净值:2026-06-26", r)
@@ -149,25 +162,45 @@ class TestBuildReviewPrompt(unittest.TestCase):
     def test_nav_date_empty_fallback(self) -> None:
         """compact 模式下场内品种无今日涨跌幅（减少 token）。"""
         details = [
-            {"code": "600900", "market_value": 100000, "cost": 80000,
-             "profit": 20000, "profit_rate": 25.0, "change_pct": 1.2},
+            {
+                "code": "600900",
+                "market_value": 100000,
+                "cost": 80000,
+                "profit": 20000,
+                "profit_rate": 25.0,
+                "change_pct": 1.2,
+            },
         ]
-        r = _build_expert_review_prompt(100000, 80000, 20000, 1200, 1, {},
-                                 holdings_details=details)
+        r = _build_expert_review_prompt(100000, 80000, 20000, 1200, 1, {}, holdings_details=details)
         self.assertNotIn("今+1.20%", r)
 
     def test_qdii_label(self) -> None:
         """compact 模式下 QDII 品种标注 (QDII滞后1日)，省略今日涨跌幅。"""
         details = [
-            {"code": "000041", "name": "华夏全球QDII混合", "market_value": 30000, "cost": 25000,
-             "profit": 5000, "profit_rate": 20.0, "change_pct": 0.3,
-             "nav_date": "2026-06-26", "source_api": "eastmoney"},
-            {"code": "513100", "name": "纳指ETF(QDII)", "market_value": 20000, "cost": 18000,
-             "profit": 2000, "profit_rate": 11.1, "change_pct": 1.5,
-             "nav_date": "", "source_api": "tencent"},
+            {
+                "code": "000041",
+                "name": "华夏全球QDII混合",
+                "market_value": 30000,
+                "cost": 25000,
+                "profit": 5000,
+                "profit_rate": 20.0,
+                "change_pct": 0.3,
+                "nav_date": "2026-06-26",
+                "source_api": "eastmoney",
+            },
+            {
+                "code": "513100",
+                "name": "纳指ETF(QDII)",
+                "market_value": 20000,
+                "cost": 18000,
+                "profit": 2000,
+                "profit_rate": 11.1,
+                "change_pct": 1.5,
+                "nav_date": "",
+                "source_api": "tencent",
+            },
         ]
-        r = _build_expert_review_prompt(50000, 43000, 7000, 200, 2, {},
-                                 holdings_details=details)
+        r = _build_expert_review_prompt(50000, 43000, 7000, 200, 2, {}, holdings_details=details)
         self.assertIn("净值:2026-06-26(QDII滞后1日)", r)
         # compact 模式省略今日涨跌幅
         self.assertNotIn("今+1.50%", r)
@@ -186,12 +219,17 @@ class TestBuildReviewPrompt(unittest.TestCase):
         self.assertIn("100,000", r)
         self.assertIn("5只", r)
         details = [
-            {"code": "600900", "market_value": 50_000, "profit": 5_000,
-             "profit_rate": 10.0, "source_api": "tencent", "name": "长江电力",
-             "change_pct": 0.5},
+            {
+                "code": "600900",
+                "market_value": 50_000,
+                "profit": 5_000,
+                "profit_rate": 10.0,
+                "source_api": "tencent",
+                "name": "长江电力",
+                "change_pct": 0.5,
+            },
         ]
-        r2 = _build_expert_review_prompt(100_000, 80_000, 20_000, 1_000, 5, {},
-                                 holdings_details=details)
+        r2 = _build_expert_review_prompt(100_000, 80_000, 20_000, 1_000, 5, {}, holdings_details=details)
         self.assertIn("持仓明细", r2)
         self.assertIn("600900", r2)
 
@@ -261,8 +299,7 @@ class TestBuildNewsSummary(unittest.TestCase):
 
     def test_basic(self) -> None:
         news = [
-            {"title": "能源改革新方案", "intro": "国家能源局发布电力改革方案...",
-             "matched_keywords": ["长江电力"]},
+            {"title": "能源改革新方案", "intro": "国家能源局发布电力改革方案...", "matched_keywords": ["长江电力"]},
         ]
         result = _build_news_correlation_summary(news)
         self.assertIn("能源改革", result)

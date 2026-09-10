@@ -17,13 +17,13 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from src.python.fetcher.fund import (
-
     _BUILTIN_BENCHMARKS,
     _get_benchmark_lock,
     _get_full_benchmark_table,
     fetch_fund_benchmark,
 )
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
 
 
@@ -42,8 +42,7 @@ class TestGetFullBenchmarkTable(unittest.TestCase):
     def test_merges_user_overrides(self):
         """config.json 的 user_fund_benchmarks 覆盖内置库。"""
         overrides = {"561910": "自定义基准", "999999": "新基金基准"}
-        with patch("src.python.fetcher.fund.get_config",
-                   return_value={"user_fund_benchmarks": overrides}):
+        with patch("src.python.fetcher.fund.get_config", return_value={"user_fund_benchmarks": overrides}):
             table = _get_full_benchmark_table()
         self.assertEqual(table["561910"], "自定义基准")  # 覆盖
         self.assertEqual(table["999999"], "新基金基准")  # 新增
@@ -51,8 +50,7 @@ class TestGetFullBenchmarkTable(unittest.TestCase):
 
     def test_handles_none_user_benchmarks(self):
         """user_fund_benchmarks 为 None 时不崩溃（由 or {} 兜底）。"""
-        with patch("src.python.fetcher.fund.get_config",
-                   return_value={"user_fund_benchmarks": None}):
+        with patch("src.python.fetcher.fund.get_config", return_value={"user_fund_benchmarks": None}):
             table = _get_full_benchmark_table()
         self.assertEqual(table, _BUILTIN_BENCHMARKS)
 
@@ -69,6 +67,7 @@ class TestGetBenchmarkLock(unittest.TestCase):
     def tearDown(self):
         _benchmark_locks = {}  # 清理全局状态
         import src.python.fetcher.fund as _fm
+
         _fm._benchmark_locks.clear()
 
     def test_creates_lock_on_first_access(self):
@@ -104,10 +103,11 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_factory.return_value = mock_client
 
         resp = MagicMock()
-        resp.text = self._make_html('业绩比较基准：沪深300指数收益率×80%+中证全债×20%')
+        resp.text = self._make_html("业绩比较基准：沪深300指数收益率×80%+中证全债×20%")
         mock_client.get.return_value = resp
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertIsNotNone(result)
         self.assertIn("沪深300", result)
@@ -121,10 +121,11 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_factory.return_value = mock_client
 
         resp = MagicMock()
-        resp.text = self._make_html('业绩比较基准:沪深300指数收益率')
+        resp.text = self._make_html("业绩比较基准:沪深300指数收益率")
         mock_client.get.return_value = resp
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertEqual(result, "沪深300指数收益率")
 
@@ -136,12 +137,11 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_factory.return_value = mock_client
 
         resp = MagicMock()
-        resp.text = self._make_html(
-            '<script>var data = {benchmark: "中证500指数"}; var 基准: 沪深300指数</script>'
-        )
+        resp.text = self._make_html('<script>var data = {benchmark: "中证500指数"}; var 基准: 沪深300指数</script>')
         mock_client.get.return_value = resp
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertIsNotNone(result)
 
@@ -157,6 +157,7 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_client.get.return_value = resp
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertIsNone(result)
 
@@ -164,6 +165,7 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
     def test_handles_http_error(self, mock_factory):
         """HTTP 请求异常时返回 None。"""
         import httpx as _httpx_loc
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -171,6 +173,7 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_client.get.side_effect = _httpx_loc.RequestError("timeout")
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertIsNone(result)
 
@@ -178,19 +181,21 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
     def test_tries_multiple_urls(self, mock_factory):
         """第一个 URL 失败时尝试第二个 URL。"""
         import httpx as _httpx_loc
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
 
         # 第一个 URL 超时，第二个返回有效
         resp = MagicMock()
-        resp.text = self._make_html('业绩比较基准：中证全债指数')
+        resp.text = self._make_html("业绩比较基准：中证全债指数")
         mock_client.get.side_effect = [
             _httpx_loc.RequestError("timeout"),
             resp,
         ]
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertEqual(result, "中证全债指数")
 
@@ -200,6 +205,7 @@ class TestFetchFundBenchmark(unittest.TestCase):
 
     def tearDown(self):
         import src.python.fetcher.fund as _fm
+
         _fm._benchmark_locks.clear()
 
     @patch("src.python.fetcher.fund.cache_get")
@@ -220,7 +226,10 @@ class TestFetchFundBenchmark(unittest.TestCase):
     @patch("src.python.fetcher.fund.cache_set")
     @patch("src.python.fetcher.fund._fetch_benchmark_from_api")
     def test_uses_api_result_when_cache_misses(
-        self, mock_api, mock_set, mock_get,
+        self,
+        mock_api,
+        mock_set,
+        mock_get,
     ):
         """缓存未命中且 API 成功时，基准来自 API 并写入缓存表。"""
         mock_get.return_value = None
@@ -237,7 +246,10 @@ class TestFetchFundBenchmark(unittest.TestCase):
     @patch("src.python.fetcher.fund.cache_set")
     @patch("src.python.fetcher.fund._fetch_benchmark_from_api")
     def test_falls_back_to_builtin_when_api_fails(
-        self, mock_api, mock_set, mock_get,
+        self,
+        mock_api,
+        mock_set,
+        mock_get,
     ):
         """API 失败时使用内置知识库。"""
         mock_get.return_value = None
@@ -250,7 +262,10 @@ class TestFetchFundBenchmark(unittest.TestCase):
     @patch("src.python.fetcher.fund.cache_set")
     @patch("src.python.fetcher.fund._fetch_benchmark_from_api")
     def test_returns_dash_when_all_layers_fail(
-        self, mock_api, mock_set, mock_get,
+        self,
+        mock_api,
+        mock_set,
+        mock_get,
     ):
         """全部三层失败时返回 '--'。"""
         mock_get.return_value = None
@@ -275,9 +290,7 @@ class TestFetchFundBenchmark(unittest.TestCase):
             return {"000000": "沪深300"}
 
         mock_get.side_effect = _side
-        mock_api.side_effect = lambda code: (
-            api_called.set() or "沪深300"
-        )
+        mock_api.side_effect = lambda code: api_called.set() or "沪深300"
 
         import concurrent.futures
 
@@ -415,10 +428,9 @@ class TestFetchFundHoldingsBatch(unittest.TestCase):
 
     def test_calls_fetch_fund_holdings_cached_internally(self):
         """内部使用 fetch_fund_holdings_cached（含 session_cache）。"""
-        from src.python.fetcher.fund import fetch_fund_holdings_batch, fetch_fund_holdings_cached
+        from src.python.fetcher.fund import fetch_fund_holdings_batch
 
         # Verify the batch function uses the cached variant
-        from functools import partial
         import inspect
 
         # Check that the source references fetch_fund_holdings_cached

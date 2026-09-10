@@ -3,7 +3,6 @@
 覆盖 api_base.py 的基础设施函数（常量 + 检测 + 内容提取 + 重试骨架 + 失败追踪）。
 """
 
-import json
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -419,7 +418,6 @@ class TestCallLlmWithRetry(unittest.TestCase):
     def test_retry_then_succeed(self, mock_record_success, mock_attempt, mock_cb_open) -> None:
         """失败重试后成功 → (content, usage)。"""
         from src.python.llm.api_base import call_llm_with_retry
-        from src.python.llm.api_base import _is_retry_available
 
         # 第一次 retryable, 第二次 success
         mock_attempt.side_effect = [
@@ -461,7 +459,6 @@ class TestCallLlmWithRetry(unittest.TestCase):
         mock_client = MagicMock()
 
         # Make sure max_retries is 0 so only 1 attempt
-        from src.python.llm.api_base import _is_retry_available
 
         with patch("src.python.llm.api_base._is_retry_available", return_value=False):
             result, usage = call_llm_with_retry(

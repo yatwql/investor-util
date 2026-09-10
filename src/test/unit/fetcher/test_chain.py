@@ -329,7 +329,9 @@ class TestFetchWithFallback(unittest.TestCase):
         fn1 = MagicMock(return_value={"data": "raw"})
         provider_map = {"p1": ("P1", fn1)}
 
-        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform={"p_other": lambda _r, _l: None})
+        result = fetch_with_fallback(
+            "price", provider_map, "test_key", 3600, transform={"p_other": lambda _r, _l: None}
+        )
 
         self.assertEqual(result, {"data": "raw"})
 
@@ -577,7 +579,6 @@ class TestHistoryIndexChain(unittest.TestCase):
 
     def test_double_failure_returns_empty(self):
         """history_index 全链路失败 → 空列表（不缓存空结果）。"""
-        from src.python.fetcher.chain import fetch_with_incremental_fallback
 
         # mock 所有 provider 返回空
         with (

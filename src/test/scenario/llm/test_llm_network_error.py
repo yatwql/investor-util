@@ -25,25 +25,27 @@ class TestNetworkErrorHtmlRender(unittest.TestCase):
         from src.python.report.html_renderers import _render_llm_module_info
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {
-                "global_macro": FAIL_REASON_NETWORK_ERROR,
-                "expert_review": FAIL_REASON_NETWORK_ERROR,
-                "health_check": FAIL_REASON_NETWORK_ERROR,
-                "penetration_deep": FAIL_REASON_NETWORK_ERROR,
-                "news_correlation": FAIL_REASON_NETWORK_ERROR,
-            }))
             stack.enter_context(
-                patch("src.python.llm.get_session_usage",
-                      return_value={"has_usage": False, "per_module": {}}))
+                patch(
+                    "src.python.llm.prompts.LLM_MODULE_FAILURE",
+                    {
+                        "global_macro": FAIL_REASON_NETWORK_ERROR,
+                        "expert_review": FAIL_REASON_NETWORK_ERROR,
+                        "health_check": FAIL_REASON_NETWORK_ERROR,
+                        "penetration_deep": FAIL_REASON_NETWORK_ERROR,
+                        "news_correlation": FAIL_REASON_NETWORK_ERROR,
+                    },
+                )
+            )
             stack.enter_context(
-                patch("src.python.llm.format_session_usage",
-                      return_value={"has_usage": False}))
+                patch("src.python.llm.get_session_usage", return_value={"has_usage": False, "per_module": {}})
+            )
+            stack.enter_context(patch("src.python.llm.format_session_usage", return_value={"has_usage": False}))
 
             llm_module_info, _, _, _ = _render_llm_module_info(True)
 
         by_key = {m["key"]: m for m in llm_module_info}
-        for key in ("global_macro", "expert_review", "health_check",
-                    "penetration_deep", "news_correlation"):
+        for key in ("global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"):
             with self.subTest(key=key):
                 self.assertEqual(by_key[key]["status"], "failed")
                 self.assertIn("网络连接失败", by_key[key]["status_label"])

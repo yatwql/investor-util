@@ -19,8 +19,8 @@
 from __future__ import annotations
 
 import unittest
-from datetime import date, datetime, timezone, timedelta
-from unittest.mock import MagicMock, patch
+from datetime import datetime, timezone, timedelta
+from unittest.mock import patch
 
 import pytest
 
@@ -42,6 +42,7 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
         """股票代码（6 开头）→ ('股票', 'A股')。"""
         h = Holding("证券", "贵州茅台", "600519", 100, 150.0)
         from src.python.report.category import _categorize_holding
+
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "股票")
         self.assertEqual(sub, "A股")
@@ -50,6 +51,7 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
         """ETF 名称 → ('基金', '指数')。"""
         h = Holding("证券", "沪深300ETF", "510300", 1000, 4.0)
         from src.python.report.category import _categorize_holding
+
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "基金")
         self.assertEqual(sub, "指数")
@@ -58,6 +60,7 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
         """QDII 名称 → ('基金', 'QDII')。"""
         h = Holding("证券", "易方达QDII", "003095", 100, 1.5)
         from src.python.report.category import _categorize_holding
+
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "基金")
         self.assertEqual(sub, "QDII")
@@ -66,6 +69,7 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
         """债券关键词 → ('债券', '纯债')。"""
         h = Holding("证券", "招商纯债", "003095", 1000, 1.0)
         from src.python.report.category import _categorize_holding
+
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "债券")
         self.assertEqual(sub, "纯债")
@@ -74,6 +78,7 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
         """货币关键词 → ('现金', '货币')。"""
         h = Holding("支付宝", "余额宝", "003095", 10000, 1.0)
         from src.python.report.category import _categorize_holding
+
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "现金")
         self.assertEqual(sub, "货币")
@@ -82,6 +87,7 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
         """场外基金 + 指数关键词 → ('基金', '被动')。"""
         h = Holding("支付宝", "沪深300指数", "003095", 500, 1.5)
         from src.python.report.category import _categorize_holding
+
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "基金")
         self.assertEqual(sub, "被动")
@@ -90,6 +96,7 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
         """纯场外基金 → ('基金', '主动')。"""
         h = Holding("支付宝", "易方达蓝筹精选", "005827", 500, 2.0)
         from src.python.report.category import _categorize_holding
+
         prop, sub = _categorize_holding(h)
         self.assertEqual(prop, "基金")
         self.assertEqual(sub, "主动")
@@ -110,24 +117,28 @@ class TestPenetrationIndustryRatio(unittest.TestCase):
         """股票代码 → 'stock'。"""
         h = Holding("证券", "贵州茅台", "600519", 100, 150.0)
         from src.python.report.penetration import classify_penetration
+
         self.assertEqual(classify_penetration(h), "stock")
 
     def test_classify_penetration_etf(self):
         """ETF → 'etf'。"""
         h = Holding("证券", "沪深300ETF", "510300", 1000, 4.0)
         from src.python.report.penetration import classify_penetration
+
         self.assertEqual(classify_penetration(h), "etf")
 
     def test_classify_penetration_bond_fund(self):
         """纯债关键词 → 'bond_fund'。"""
         h = Holding("证券", "招商纯债", "003095", 1000, 1.0)
         from src.python.report.penetration import classify_penetration
+
         self.assertEqual(classify_penetration(h), "bond_fund")
 
     def test_classify_penetration_index_link(self):
         """ETF联接 → 'index_link'。"""
         h = Holding("支付宝", "沪深300ETF联接", "003095", 500, 1.5)
         from src.python.report.penetration import classify_penetration
+
         self.assertEqual(classify_penetration(h), "index_link")
 
     def test_penetration_top10_ratios_sum_lte_100(self):
@@ -140,18 +151,21 @@ class TestPenetrationIndustryRatio(unittest.TestCase):
             Holding("证券", "沪深300ETF", "510300", 1000, 4.0),
         ]
         from src.python.report.market_value import DetailRow
+
         details = [
-            DetailRow("证券", "茅台", "600519", 100, 150.0, 160.0, 155.0,
-                      "2026-07-03", "tencent", 10.0, 1000.0, 0.5, "--", 1),
-            DetailRow("证券", "招商银行", "600036", 200, 30.0, 32.0, 31.0,
-                      "2026-07-03", "tencent", 2.0, 400.0, 0.3, "--", 2),
-            DetailRow("证券", "沪深300ETF", "510300", 1000, 4.0, 4.2, 4.1,
-                      "2026-07-03", "tencent", 1.0, 200.0, 0.2, "--", 3),
+            DetailRow(
+                "证券", "茅台", "600519", 100, 150.0, 160.0, 155.0, "2026-07-03", "tencent", 10.0, 1000.0, 0.5, "--", 1
+            ),
+            DetailRow(
+                "证券", "招商银行", "600036", 200, 30.0, 32.0, 31.0, "2026-07-03", "tencent", 2.0, 400.0, 0.3, "--", 2
+            ),
+            DetailRow(
+                "证券", "沪深300ETF", "510300", 1000, 4.0, 4.2, 4.1, "2026-07-03", "tencent", 1.0, 200.0, 0.2, "--", 3
+            ),
         ]
 
         with (
-            patch("src.python.fetcher.industry.batch_fetch_industry_data",
-                  return_value={}),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
             top10 = result.get("top10", [])
@@ -177,25 +191,17 @@ class TestIndexValueRange(unittest.TestCase):
         from src.python.fetcher.index import fetch_indices
 
         mock_data = {
-            "sh000001": {"name": "上证指数", "code": "sh000001",
-                         "price": 3050.5, "change_pct": 0.5},
-            "sz399001": {"name": "深证成指", "code": "sz399001",
-                         "price": 9500.0, "change_pct": -0.3},
-            "sh000300": {"name": "沪深300", "code": "sh000300",
-                         "price": 3850.0, "change_pct": 0.2},
-            "sh000688": {"name": "科创板50", "code": "sh000688",
-                         "price": 1500.0, "change_pct": 1.0},
-            "sz399006": {"name": "创业板指", "code": "sz399006",
-                         "price": 2200.0, "change_pct": -0.5},
+            "sh000001": {"name": "上证指数", "code": "sh000001", "price": 3050.5, "change_pct": 0.5},
+            "sz399001": {"name": "深证成指", "code": "sz399001", "price": 9500.0, "change_pct": -0.3},
+            "sh000300": {"name": "沪深300", "code": "sh000300", "price": 3850.0, "change_pct": 0.2},
+            "sh000688": {"name": "科创板50", "code": "sh000688", "price": 1500.0, "change_pct": 1.0},
+            "sz399006": {"name": "创业板指", "code": "sz399006", "price": 2200.0, "change_pct": -0.5},
         }
 
         with (
-            patch("src.python.fetcher.index._fetch_indices_from_tencent",
-                  return_value=mock_data),
-            patch("src.python.fetcher.index._fetch_indices_from_sina",
-                  return_value={}),
-            patch("src.python.fetcher.index.cache_get",
-                  return_value=None),
+            patch("src.python.fetcher.index._fetch_indices_from_tencent", return_value=mock_data),
+            patch("src.python.fetcher.index._fetch_indices_from_sina", return_value={}),
+            patch("src.python.fetcher.index.cache_get", return_value=None),
         ):
             result = fetch_indices()
 
@@ -215,26 +221,21 @@ class TestIndexValueRange(unittest.TestCase):
         for code in mock_data:
             c = result[code]["change_pct"]
             self.assertGreater(c, -10.0)  # 单日跌幅不超过 10%
-            self.assertLess(c, 10.0)      # 单日涨幅不超过 10%
+            self.assertLess(c, 10.0)  # 单日涨幅不超过 10%
 
     def test_us_index_value_ranges(self):
         """美股指数数量级验证（mock 数据）。"""
         from src.python.fetcher.index import fetch_us_indices
 
         mock_data = {
-            "gb_dji": {"name": "道琼斯", "code": "gb_dji",
-                       "price": 35000.0, "change_pct": 0.3},
-            "gb_ixic": {"name": "纳斯达克", "code": "gb_ixic",
-                        "price": 15000.0, "change_pct": -0.5},
-            "gb_inx": {"name": "标普500", "code": "gb_inx",
-                       "price": 5200.0, "change_pct": 0.1},
+            "gb_dji": {"name": "道琼斯", "code": "gb_dji", "price": 35000.0, "change_pct": 0.3},
+            "gb_ixic": {"name": "纳斯达克", "code": "gb_ixic", "price": 15000.0, "change_pct": -0.5},
+            "gb_inx": {"name": "标普500", "code": "gb_inx", "price": 5200.0, "change_pct": 0.1},
         }
 
         with (
-            patch("src.python.fetcher.index.sina.fetch_us_indices",
-                  return_value=mock_data),
-            patch("src.python.fetcher.index.cache_get",
-                  return_value=None),
+            patch("src.python.fetcher.index.sina.fetch_us_indices", return_value=mock_data),
+            patch("src.python.fetcher.index.cache_get", return_value=None),
         ):
             result = fetch_us_indices()
 
@@ -274,13 +275,15 @@ class TestMultiCurrencyConversion(unittest.TestCase):
 
         h = Holding("证券", "标普500ETF", "513500", 100, 2.0)
         mkt = {
-            "price": 2.5, "yesterday_close": 2.45,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "标普500ETF", "code": "513500",
+            "price": 2.5,
+            "yesterday_close": 2.45,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "标普500ETF",
+            "code": "513500",
         }
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -311,14 +314,13 @@ class TestQdiiNavConsistency(unittest.TestCase):
         from src.python.report.market_value import price_update_status, DetailRow
 
         details = [
-            DetailRow("证券", "QDII基金", "003095", 100, 1.0, 1.2, 1.15,
-                      "2026-07-01", "eastmoney", 0.0, 20.0, 0.0, "--", 1),
+            DetailRow(
+                "证券", "QDII基金", "003095", 100, 1.0, 1.2, 1.15, "2026-07-01", "eastmoney", 0.0, 20.0, 0.0, "--", 1
+            ),
         ]
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
-            patch("src.python.report.market_value.get_prev_trading_day",
-                  return_value="2026-07-02"),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_prev_trading_day", return_value="2026-07-02"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 16, 0)
@@ -326,7 +328,8 @@ class TestQdiiNavConsistency(unittest.TestCase):
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             updated, total, all_updated = price_update_status(
-                details, "2026-07-03",
+                details,
+                "2026-07-03",
             )
         self.assertEqual(updated, 0)
         self.assertFalse(all_updated)
@@ -346,41 +349,49 @@ class TestFundPerformanceReasonableness(unittest.TestCase):
     def test_format_return_positive(self):
         """正收益率 → 小数（5.23 → 0.0523，浮点近似）。"""
         from src.python.report.fund_performance import _format_return
+
         self.assertAlmostEqual(_format_return(5.23), 0.0523)
 
     def test_format_return_negative(self):
         """负收益率 → 负小数（-3.14 → -0.0314，浮点近似）。"""
         from src.python.report.fund_performance import _format_return
+
         self.assertAlmostEqual(_format_return(-3.14), -0.0314)
 
     def test_format_return_zero(self):
         """零收益率 → 0.0。"""
         from src.python.report.fund_performance import _format_return
+
         self.assertEqual(_format_return(0.0), 0.0)
 
     def test_format_return_none(self):
         """None → "--"。"""
         from src.python.report.fund_performance import _format_return
+
         self.assertEqual(_format_return(None), "--")
 
     def test_format_return_dash(self):
         """'--' → '--'。"""
         from src.python.report.fund_performance import _format_return
+
         self.assertEqual(_format_return("--"), "--")
 
     def test_format_rank_normal(self):
         """有效排名 → "排名/总数"。"""
         from src.python.report.fund_performance import _format_rank
+
         self.assertEqual(_format_rank({"rank": 5, "total": 100}), "5/100")
 
     def test_format_rank_none(self):
         """None 排名 → "--"。"""
         from src.python.report.fund_performance import _format_rank
+
         self.assertEqual(_format_rank({"rank": None, "total": 100}), "--")
 
     def test_format_rank_missing_key(self):
         """缺失键 → "--"。"""
         from src.python.report.fund_performance import _format_rank
+
         self.assertEqual(_format_rank({}), "--")
 
     def test_rating_adjustment_excess_high(self):
@@ -388,7 +399,8 @@ class TestFundPerformanceReasonableness(unittest.TestCase):
         from src.python.report.fund_performance import _adjust_rating_with_benchmark
 
         perf_eval = {
-            "categories": ["超额收益"], "data": [85.0],
+            "categories": ["超额收益"],
+            "data": [85.0],
         }
         rating = _adjust_rating_with_benchmark("稳定", perf_eval)
         self.assertEqual(rating, "良好")  # 稳定 → 良好
@@ -398,7 +410,8 @@ class TestFundPerformanceReasonableness(unittest.TestCase):
         from src.python.report.fund_performance import _adjust_rating_with_benchmark
 
         perf_eval = {
-            "categories": ["超额收益"], "data": [35.0],
+            "categories": ["超额收益"],
+            "data": [35.0],
         }
         rating = _adjust_rating_with_benchmark("稳定", perf_eval)
         self.assertEqual(rating, "偏差")  # 稳定 → 偏差
@@ -408,27 +421,30 @@ class TestFundPerformanceReasonableness(unittest.TestCase):
         from src.python.report.fund_performance import _adjust_rating_with_benchmark
 
         perf_eval = {
-            "categories": ["超额收益"], "data": [60.0],
+            "categories": ["超额收益"],
+            "data": [60.0],
         }
         rating = _adjust_rating_with_benchmark("稳定", perf_eval)
         self.assertEqual(rating, "稳定")
 
     def test_rating_adjustment_excellent_downgraded(self):
-        """"优秀" + 超额 < 40 → 下调为"良好"。"""
+        """ "优秀" + 超额 < 40 → 下调为"良好"。"""
         from src.python.report.fund_performance import _adjust_rating_with_benchmark
 
         perf_eval = {
-            "categories": ["超额收益"], "data": [20.0],
+            "categories": ["超额收益"],
+            "data": [20.0],
         }
         rating = _adjust_rating_with_benchmark("优秀", perf_eval)
         self.assertEqual(rating, "良好")  # 优秀 → 良好（下调一级）
 
     def test_rating_adjustment_poor_upgraded(self):
-        """"较差" + 超额 ≥ 80 → 上调为"偏差"。"""
+        """ "较差" + 超额 ≥ 80 → 上调为"偏差"。"""
         from src.python.report.fund_performance import _adjust_rating_with_benchmark
 
         perf_eval = {
-            "categories": ["超额收益"], "data": [95.0],
+            "categories": ["超额收益"],
+            "data": [95.0],
         }
         rating = _adjust_rating_with_benchmark("较差", perf_eval)
         self.assertEqual(rating, "偏差")  # 较差 → 偏差（上调一级）
@@ -448,6 +464,7 @@ class TestPremiumRateCalculation(unittest.TestCase):
     def test_premium_is_placeholder(self):
         """当前溢价率为占位符 "--"。"""
         from src.python.report.market_value import _FUND_PREMIUM_PLACEHOLDER
+
         self.assertEqual(_FUND_PREMIUM_PLACEHOLDER, "--")
 
     def test_compute_detail_row_premium_qdii_etf(self):
@@ -456,13 +473,15 @@ class TestPremiumRateCalculation(unittest.TestCase):
 
         h = Holding("证券", "标普500ETF", "513500", 100, 2.0)
         mkt = {
-            "price": 2.5, "yesterday_close": 2.45,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "标普500ETF", "code": "513500",
+            "price": 2.5,
+            "yesterday_close": 2.45,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "标普500ETF",
+            "code": "513500",
         }
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -477,24 +496,28 @@ class TestPremiumRateCalculation(unittest.TestCase):
     def test_premium_qdii_etf_positive(self):
         """QDII ETF + 现价 > 参考净值 → 正溢价率。"""
         from src.python.report.market_value import _compute_premium
+
         result = _compute_premium(2.50, 2.45, "标普500ETF")
         self.assertEqual(result, "+2.04%")
 
     def test_premium_qdii_etf_negative(self):
         """QDII ETF + 现价 < 参考净值 → 负溢价率。"""
         from src.python.report.market_value import _compute_premium
+
         result = _compute_premium(2.40, 2.45, "纳指ETF")
         self.assertEqual(result, "-2.04%")
 
     def test_premium_non_qdii_placeholder(self):
         """非 QDII 基金 → 返回占位符 "--"。"""
         from src.python.report.market_value import _compute_premium
+
         result = _compute_premium(10.0, 9.5, "沪深300ETF")
         self.assertEqual(result, "--")
 
     def test_premium_nav_zero_placeholder(self):
         """QDII 基金但参考净值为 0 → 返回占位符 "--"。"""
         from src.python.report.market_value import _compute_premium
+
         result = _compute_premium(10.0, 0.0, "标普500ETF")
         self.assertEqual(result, "--")
 
@@ -516,13 +539,15 @@ class TestTodayProfitOffsiteNavDate(unittest.TestCase):
 
         h = Holding("证券", "茅台", "600519", 100, 150.0)
         mkt = {
-            "price": 160.0, "yesterday_close": 155.0,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "茅台", "code": "600519",
+            "price": 160.0,
+            "yesterday_close": 155.0,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "茅台",
+            "code": "600519",
         }
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -538,15 +563,16 @@ class TestTodayProfitOffsiteNavDate(unittest.TestCase):
 
         h = Holding("证券", "测试基金", "003095", 1000, 1.5)
         mkt = {
-            "price": 1.6, "yesterday_close": 1.55,
-            "price_date": "2026-07-03", "source_api": "eastmoney",
-            "name": "测试基金", "code": "003095",
+            "price": 1.6,
+            "yesterday_close": 1.55,
+            "price_date": "2026-07-03",
+            "source_api": "eastmoney",
+            "name": "测试基金",
+            "code": "003095",
         }
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
-            patch("src.python.report.market_value._is_trading_day",
-                  return_value=True),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
+            patch("src.python.report.market_value._is_trading_day", return_value=True),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -562,15 +588,16 @@ class TestTodayProfitOffsiteNavDate(unittest.TestCase):
 
         h = Holding("证券", "测试基金", "003095", 1000, 1.5)
         mkt = {
-            "price": 1.6, "yesterday_close": 1.55,
-            "price_date": "2026-07-02", "source_api": "eastmoney",
-            "name": "测试基金", "code": "003095",
+            "price": 1.6,
+            "yesterday_close": 1.55,
+            "price_date": "2026-07-02",
+            "source_api": "eastmoney",
+            "name": "测试基金",
+            "code": "003095",
         }
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
-            patch("src.python.report.market_value._is_trading_day",
-                  return_value=True),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
+            patch("src.python.report.market_value._is_trading_day", return_value=True),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -586,15 +613,16 @@ class TestTodayProfitOffsiteNavDate(unittest.TestCase):
 
         h = Holding("证券", "测试基金", "003095", 1000, 1.5)
         mkt = {
-            "price": 1.6, "yesterday_close": 1.55,
-            "price_date": "", "source_api": "eastmoney",
-            "name": "测试基金", "code": "003095",
+            "price": 1.6,
+            "yesterday_close": 1.55,
+            "price_date": "",
+            "source_api": "eastmoney",
+            "name": "测试基金",
+            "code": "003095",
         }
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
-            patch("src.python.report.market_value._is_trading_day",
-                  return_value=True),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
+            patch("src.python.report.market_value._is_trading_day", return_value=True),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -622,13 +650,14 @@ class TestPenetrationTop10RatioNormalization(unittest.TestCase):
 
         holdings = [Holding("证券", "茅台", "600519", 100, 150.0)]
         from src.python.report.market_value import DetailRow
+
         details = [
-            DetailRow("证券", "茅台", "600519", 100, 150.0, 160.0, 155.0,
-                      "2026-07-03", "tencent", 10.0, 1000.0, 1.0, "--", 1),
+            DetailRow(
+                "证券", "茅台", "600519", 100, 150.0, 160.0, 155.0, "2026-07-03", "tencent", 10.0, 1000.0, 1.0, "--", 1
+            ),
         ]
         with (
-            patch("src.python.fetcher.industry.batch_fetch_industry_data",
-                  return_value={}),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
             self.assertIn("top10_coverage_pct", result["summary"])
@@ -642,13 +671,12 @@ class TestPenetrationTop10RatioNormalization(unittest.TestCase):
 
         holdings = [Holding("证券", "茅台", "600519", 100, 150.0)]
         from src.python.report.market_value import DetailRow
+
         details = [
-            DetailRow("证券", "茅台", "600519", 100, 150.0, 0.0, 0.0,
-                      "2026-07-03", "tencent", 0.0, 0.0, 0.0, "--", 1),
+            DetailRow("证券", "茅台", "600519", 100, 150.0, 0.0, 0.0, "2026-07-03", "tencent", 0.0, 0.0, 0.0, "--", 1),
         ]
         with (
-            patch("src.python.fetcher.industry.batch_fetch_industry_data",
-                  return_value={}),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
             top10 = result.get("top10", [])

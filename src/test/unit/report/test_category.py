@@ -19,16 +19,15 @@ from src.python.core.models import Holding
 from src.python.report import category as cat
 from src.python.report.market_value import DetailRow
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 class TestCategorizeHolding(unittest.TestCase):
     """_categorize_holding 全分支测试。"""
 
     def _h(self, name: str, code: str, account: str = "证券账户") -> Holding:
-        return Holding(account=account, name=name, code=code,
-                        shares=100, cost_price=10.0)
+        return Holding(account=account, name=name, code=code, shares=100, cost_price=10.0)
 
     @pytest.mark.smoke
     def test_qdii(self):
@@ -92,9 +91,9 @@ class TestWriteCategorySheet(unittest.TestCase):
     def test_single_holding(self):
         """单条持仓 → 分类表正确渲染。"""
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
-        details = [DetailRow(
-            code="600900", account="证券", name="长江电力",
-            market_value=2500, profit=1500, profit_rate=1.5)]
+        details = [
+            DetailRow(code="600900", account="证券", name="长江电力", market_value=2500, profit=1500, profit_rate=1.5)
+        ]
         cat.write_category_sheet(self.ws, [h], details)
         # 应该至少有一行标题 + 一行数据 + 合计行
         self.assertGreater(self.ws.max_row, 2)
@@ -154,8 +153,15 @@ class TestWriteCategoryFlowSubcolumns(unittest.TestCase):
         """开关开启（fund_flow_data 非 None）时，表头追加「成本分档」「分红累计」列。"""
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
         details = [
-            DetailRow(code="600900", account="证券", name="长江电力",
-                      market_value=1500, cost=1000, profit=500, profit_rate=0.5)
+            DetailRow(
+                code="600900",
+                account="证券",
+                name="长江电力",
+                market_value=1500,
+                cost=1000,
+                profit=500,
+                profit_rate=0.5,
+            )
         ]
         self._call([h], details, self._flow(low_shares=100, div=120.0))
         headers = self._headers()
@@ -168,8 +174,15 @@ class TestWriteCategoryFlowSubcolumns(unittest.TestCase):
         """开关开启时数据行含「低成本」分档标签与分红累计数值。"""
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
         details = [
-            DetailRow(code="600900", account="证券", name="长江电力",
-                      market_value=1500, cost=1000, profit=500, profit_rate=0.5)
+            DetailRow(
+                code="600900",
+                account="证券",
+                name="长江电力",
+                market_value=1500,
+                cost=1000,
+                profit=500,
+                profit_rate=0.5,
+            )
         ]
         self._call([h], details, self._flow(low_shares=100, div=120.0))
         # 数据行 = 表头下一行（row 3）：列 11 = 成本分档, 列 12 = 分红累计
@@ -180,8 +193,15 @@ class TestWriteCategoryFlowSubcolumns(unittest.TestCase):
         """持仓批次成本价高于市价时渲染「高成本」档标签。"""
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
         details = [
-            DetailRow(code="600900", account="证券", name="长江电力",
-                      market_value=900, cost=1000, profit=-100, profit_rate=-0.1)
+            DetailRow(
+                code="600900",
+                account="证券",
+                name="长江电力",
+                market_value=900,
+                cost=1000,
+                profit=-100,
+                profit_rate=-0.1,
+            )
         ]
         self._call([h], details, self._flow(high_shares=100, div=0.0))
         self.assertEqual(self.ws.cell(row=3, column=11).value, "高成本")
@@ -190,8 +210,9 @@ class TestWriteCategoryFlowSubcolumns(unittest.TestCase):
         """持仓批次横跨低/高两档时渲染「混合」档标签。"""
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
         details = [
-            DetailRow(code="600900", account="证券", name="长江电力",
-                      market_value=1000, cost=1000, profit=0, profit_rate=0.0)
+            DetailRow(
+                code="600900", account="证券", name="长江电力", market_value=1000, cost=1000, profit=0, profit_rate=0.0
+            )
         ]
         self._call([h], details, self._flow(low_shares=50, high_shares=50, div=0.0))
         self.assertEqual(self.ws.cell(row=3, column=11).value, "混合")
@@ -202,8 +223,16 @@ class TestWriteCategoryFlowSubcolumns(unittest.TestCase):
             "available": True,
             "cost_tiers": {
                 "per_code": {
-                    "600900": {"low": {"shares": 100, "cost": 900}, "high": {"shares": 0, "cost": 0}, "unpriced": {"shares": 0, "cost": 0}},
-                    "600519": {"low": {"shares": 10, "cost": 15000}, "high": {"shares": 0, "cost": 0}, "unpriced": {"shares": 0, "cost": 0}},
+                    "600900": {
+                        "low": {"shares": 100, "cost": 900},
+                        "high": {"shares": 0, "cost": 0},
+                        "unpriced": {"shares": 0, "cost": 0},
+                    },
+                    "600519": {
+                        "low": {"shares": 10, "cost": 15000},
+                        "high": {"shares": 0, "cost": 0},
+                        "unpriced": {"shares": 0, "cost": 0},
+                    },
                 }
             },
             "dividends": {"per_code": {"600900": 120.0, "600519": 30.0}},
@@ -211,8 +240,24 @@ class TestWriteCategoryFlowSubcolumns(unittest.TestCase):
         h1 = Holding("证券", "长江电力", "600900", 100, 10.0)
         h2 = Holding("证券", "贵州茅台", "600519", 10, 1500.0)
         details = [
-            DetailRow(code="600900", account="证券", name="长江电力", market_value=1500, cost=1000, profit=500, profit_rate=0.5),
-            DetailRow(code="600519", account="证券", name="贵州茅台", market_value=20000, cost=15000, profit=5000, profit_rate=0.33),
+            DetailRow(
+                code="600900",
+                account="证券",
+                name="长江电力",
+                market_value=1500,
+                cost=1000,
+                profit=500,
+                profit_rate=0.5,
+            ),
+            DetailRow(
+                code="600519",
+                account="证券",
+                name="贵州茅台",
+                market_value=20000,
+                cost=15000,
+                profit=5000,
+                profit_rate=0.33,
+            ),
         ]
         self._call([h1, h2], details, flow)
         total_row = self._find_total_row()
@@ -223,8 +268,15 @@ class TestWriteCategoryFlowSubcolumns(unittest.TestCase):
         """开关关闭（fund_flow_data=None）时保持既有 10 列输出，无成本流水子列。"""
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
         details = [
-            DetailRow(code="600900", account="证券", name="长江电力",
-                      market_value=1500, cost=1000, profit=500, profit_rate=0.5)
+            DetailRow(
+                code="600900",
+                account="证券",
+                name="长江电力",
+                market_value=1500,
+                cost=1000,
+                profit=500,
+                profit_rate=0.5,
+            )
         ]
         self._call([h], details, None)
         headers = self._headers()
@@ -309,10 +361,7 @@ class TestCategoryAggregationConsistency(unittest.TestCase):
         data = self._build_mock_category_result()
         for dim_name, dim_data in data.items():
             for cat_name, values in dim_data.items():
-                self.assertGreaterEqual(
-                    values["count"], 0,
-                    f"{dim_name}.{cat_name} count={values['count']} 为负"
-                )
+                self.assertGreaterEqual(values["count"], 0, f"{dim_name}.{cat_name} count={values['count']} 为负")
 
 
 class TestYieldText(unittest.TestCase):

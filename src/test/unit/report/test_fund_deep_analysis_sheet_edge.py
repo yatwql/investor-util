@@ -32,6 +32,7 @@ class TestFundManagerSheetEmpty(unittest.TestCase):
     def test_empty_manager_data_writes_placeholder(self):
         """manager_data=[] → 第4行含占位文本。"""
         from src.python.report.fund_manager_sheet import write_fund_manager_sheet
+
         write_fund_manager_sheet(self.ws, [])
         placeholder = self.ws.cell(row=4, column=1).value
         self.assertIsNotNone(placeholder)
@@ -40,6 +41,7 @@ class TestFundManagerSheetEmpty(unittest.TestCase):
     def test_empty_manager_data_status_message(self):
         """占位文本来自 STATUS_MESSAGES。"""
         from src.python.report.fund_manager_sheet import write_fund_manager_sheet
+
         write_fund_manager_sheet(self.ws, [])
         self.assertEqual(
             self.ws.cell(row=4, column=1).value,
@@ -57,6 +59,7 @@ class TestOverlapBlockEmpty(unittest.TestCase):
     def test_single_fund_writes_placeholder(self):
         """只有 1 只基金 → 重合度区块写占位。"""
         from src.python.report.position_relationship_sheet import write_position_relationship_sheet
+
         overlap_result = {"funds": ["110011"], "matrix": [], "pairs": []}
         write_position_relationship_sheet(self.ws, overlap_result)
         placeholder = self.ws.cell(row=3, column=1).value
@@ -66,6 +69,7 @@ class TestOverlapBlockEmpty(unittest.TestCase):
     def test_no_funds_writes_placeholder(self):
         """0 只基金 → 重合度区块写占位。"""
         from src.python.report.position_relationship_sheet import write_position_relationship_sheet
+
         overlap_result = {"funds": [], "matrix": [], "pairs": []}
         write_position_relationship_sheet(self.ws, overlap_result)
         placeholder = self.ws.cell(row=3, column=1).value
@@ -82,6 +86,7 @@ class TestFundConcentrationSheetEmpty(unittest.TestCase):
     def test_empty_data_writes_placeholder(self):
         """concentration_data=[] → 第4行含占位文本。"""
         from src.python.report.fund_concentration_sheet import write_concentration_sheet
+
         write_concentration_sheet(self.ws, [])
         placeholder = self.ws.cell(row=4, column=1).value
         self.assertIsNotNone(placeholder)
@@ -98,6 +103,7 @@ class TestFundStyleSheetEmpty(unittest.TestCase):
     def test_empty_style_data_writes_placeholder(self):
         """style_data=[] → 风格表区块写占位，因子区块正常。"""
         from src.python.report.style_factor_sheet import write_style_factor_sheet
+
         write_style_factor_sheet(self.ws, style_data=[], factor_exposure=None)
         flat = [str(c.value) for row in self.ws.iter_rows() for c in row if c.value is not None]
         self.assertIn(STATUS_MESSAGES["style_unavailable"], flat)

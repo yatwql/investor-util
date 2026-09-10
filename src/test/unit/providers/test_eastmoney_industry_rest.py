@@ -25,6 +25,7 @@ class TestRestQuotePrefix(unittest.TestCase):
 
     def _call(self, code: str) -> str:
         from src.python.providers.eastmoney_industry_rest import _quote_prefix
+
         return _quote_prefix(code)
 
     def test_sh_60(self):
@@ -53,15 +54,16 @@ class TestRestExtractQuotedata(unittest.TestCase):
 
     def _call(self, html: str) -> dict | None:
         from src.python.providers.eastmoney_industry_rest import _extract_quotedata
+
         return _extract_quotedata(html)
 
     def test_normal(self):
         """正常 HTML 含 quotedata → 正确解析。"""
         html = (
-            '<html><body><script>'
+            "<html><body><script>"
             'var quotedata = {"name":"test","code":"600000",'
             '"bk_name":"白酒Ⅱ","bk_id":"BK1277"};'
-            '</script></body></html>'
+            "</script></body></html>"
         )
         result = self._call(html)
         self.assertEqual(result["bk_name"], "白酒Ⅱ")
@@ -92,6 +94,7 @@ class TestRestFetchIndustryAndConcepts(unittest.TestCase):
 
     def setUp(self):
         from src.python.core.provider_registry import get_registry
+
         get_registry().session_cache_clear("industry_rest")
 
     @patch("src.python.providers.eastmoney_industry_rest.make_http_client")
@@ -103,8 +106,7 @@ class TestRestFetchIndustryAndConcepts(unittest.TestCase):
         mock_client = mock_client_factory.return_value.__enter__.return_value
         mock_resp = mock_client.get.return_value
         mock_resp.text = (
-            '<script>var quotedata = {"name":"贵州茅台","code":"600519",'
-            '"bk_name":"白酒Ⅱ","bk_id":"BK1277"};</script>'
+            '<script>var quotedata = {"name":"贵州茅台","code":"600519","bk_name":"白酒Ⅱ","bk_id":"BK1277"};</script>'
         )
 
         result = fetch_industry_and_concepts("600519")

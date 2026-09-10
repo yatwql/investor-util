@@ -27,8 +27,9 @@ def _row(price, yclose, *, shares=100, cost=10.0, source_api="tencent"):
         "source": "腾讯财经",
         "source_api": source_api,
     }
-    with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-01"), patch(
-        "src.python.report.market_value.is_market_open", return_value=False
+    with (
+        patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-01"),
+        patch("src.python.report.market_value.is_market_open", return_value=False),
     ):
         return _compute_detail_row(h, mkt)
 
@@ -75,8 +76,9 @@ class TestNanYesterdayCloseDoesNotFabricateProfit:
     def test_missing_yclose_gives_zero_today_profit(self):
         h = Holding("证券", "测试资产", "000001", 100, 10.0)
         mkt = {"price": 10.0, "price_date": "2026-07-01", "source": "腾讯财经", "source_api": "tencent"}
-        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-01"), patch(
-            "src.python.report.market_value.is_market_open", return_value=False
+        with (
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-01"),
+            patch("src.python.report.market_value.is_market_open", return_value=False),
         ):
             detail = _compute_detail_row(h, mkt)
         assert detail.today_profit == 0.0

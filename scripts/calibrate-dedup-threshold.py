@@ -14,7 +14,6 @@ import json
 import os
 import sys
 from collections import defaultdict
-from difflib import SequenceMatcher
 from typing import Any
 
 # ── 项目路径 ──────────────────────────────────────────
@@ -101,11 +100,11 @@ def report(records: list[dict[str, Any]], summary_only: bool = False, dry_run: b
     if skip_records:
         ratios = [r["ratio"] for r in skip_records]
         overlaps = [r["bigram_overlap"] for r in skip_records]
-        print(f"=== cross_skip（跨源 ≥0.30 但 bigram<3 被跳过 — 潜在漏判）===")
+        print("=== cross_skip（跨源 ≥0.30 但 bigram<3 被跳过 — 潜在漏判）===")
         print(f"  数量: {len(skip_records)}")
         print(f"  ratio 范围: {min(ratios):.3f} ~ {max(ratios):.3f}")
         print(f"  bigram 范围: {min(overlaps)} ~ {max(overlaps)}")
-        print(f"  各 bigram 分布: ", end="")
+        print("  各 bigram 分布: ", end="")
         dist = sorted(set(overlaps))
         for d in dist:
             cnt = sum(1 for o in overlaps if o == d)
@@ -127,7 +126,7 @@ def report(records: list[dict[str, Any]], summary_only: bool = False, dry_run: b
     if merge_records:
         ratios = [r["ratio"] for r in merge_records]
         overlaps = [r["bigram_overlap"] for r in merge_records]
-        print(f"=== cross_merge（跨源 ≥0.30 且 bigram≥3 已合并 — 验证样本）===")
+        print("=== cross_merge（跨源 ≥0.30 且 bigram≥3 已合并 — 验证样本）===")
         print(f"  数量: {len(merge_records)}")
         print(f"  ratio 范围: {min(ratios):.3f} ~ {max(ratios):.3f}")
         print(f"  bigram 范围: {min(overlaps)} ~ {max(overlaps)}")
@@ -149,7 +148,7 @@ def report(records: list[dict[str, Any]], summary_only: bool = False, dry_run: b
     safe_records = by_rule.get("cross_safe", [])
     if safe_records:
         ratios = [r["ratio"] for r in safe_records]
-        print(f"=== cross_safe（跨源 ≥0.50 安全区擦边 — 0.50~0.60）===")
+        print("=== cross_safe（跨源 ≥0.50 安全区擦边 — 0.50~0.60）===")
         print(f"  数量: {len(safe_records)}")
         print(f"  ratio 范围: {min(ratios):.3f} ~ {max(ratios):.3f}")
     else:
@@ -160,7 +159,7 @@ def report(records: list[dict[str, Any]], summary_only: bool = False, dry_run: b
     same_records = by_rule.get("same_src", [])
     if same_records:
         overlaps = [r["bigram_overlap"] for r in same_records]
-        print(f"=== same_src（同源 bigram 接近阈值 4 — 边界样本）===")
+        print("=== same_src（同源 bigram 接近阈值 4 — 边界样本）===")
         print(f"  数量: {len(same_records)}")
         print(f"  bigram 范围: {min(overlaps)} ~ {max(overlaps)}")
         dist = sorted(set(overlaps))
@@ -200,7 +199,7 @@ def _print_calibration_advice(
         skip_bg1 = [r for r in skip if r["bigram_overlap"] == 1]
         skip_bg2 = [r for r in skip if r["bigram_overlap"] >= 2]
         print()
-        print(f"  cross_skip 按 bigram 分档:")
+        print("  cross_skip 按 bigram 分档:")
         print(f"    bg=0: {len(skip_bg0)} 条（无实体重叠，财经虚高，安全跳过）")
         print(f"    bg=1: {len(skip_bg1)} 条（几乎无实体重叠，安全跳过）")
         print(f"    bg>=2: {len(skip_bg2)} 条（有实体重叠但未达阈值，需审查）")
@@ -210,16 +209,16 @@ def _print_calibration_advice(
         if skip_bg2_high:
             print()
             print(f"[?] bg≥2 且 ratio≥0.35 被跳过: {len(skip_bg2_high)} 条")
-            print(f"    有实体重叠但未达 bg≥3 合并条件，需审查是否应为重复")
+            print("    有实体重叠但未达 bg≥3 合并条件，需审查是否应为重复")
 
         # bg=0,1 但 ratio 很高 → 说明归一化不够，不是阈值问题
         high_skip_noise = [r for r in skip if r["bigram_overlap"] <= 1 and r["ratio"] >= 0.40]
         if high_skip_noise:
             print()
             print(f"[+] bg≤1 但 ratio≥0.40: {len(high_skip_noise)} 条")
-            print(f"    这些不是重复，是共享日期/事件名/财经关键词导致 SequenceMatcher 比率虚高")
+            print("    这些不是重复，是共享日期/事件名/财经关键词导致 SequenceMatcher 比率虚高")
             print(f"    _normalize_title 用 \\\\b(?:19|20)\\\\d{2}\\\\b 剥离孤立年份数字")
-            print(f'    可过滤共享"2026""2025"等年份导致的 ratio 虚高（如"2026年炒股"vs"2026年展会"）')
+            print('    可过滤共享"2026""2025"等年份导致的 ratio 虚高（如"2026年炒股"vs"2026年展会"）')
             if not summary_only:
                 for r in high_skip_noise[:3]:
                     print(
@@ -229,9 +228,9 @@ def _print_calibration_advice(
 
         # 绝大多数 skip 都在边界内 → 阈值合适
         if not any(r["bigram_overlap"] >= 2 and r["ratio"] >= 0.35 for r in skip):
-            print(f"[OK] cross_threshold=0.30 当前合适（无非重复漏判）")
+            print("[OK] cross_threshold=0.30 当前合适（无非重复漏判）")
     else:
-        print(f"[OK] cross_threshold=0.30: 无 skips，阈值安全")
+        print("[OK] cross_threshold=0.30: 无 skips，阈值安全")
 
     # 2. 跨源 bigram 阈值 (3)
     if merge:
@@ -241,13 +240,13 @@ def _print_calibration_advice(
             print()
             print(f"[!] 跨源 bigram=3: {len(edge_merge)} 条在边界上")
             print(f"    其中 {ratio_ok}/{len(edge_merge)} 条 ratio>=0.40")
-            print(f"    降低 bigram=3 阈值的需求不大。")
+            print("    降低 bigram=3 阈值的需求不大。")
 
         bigram_4plus = [r for r in merge if r["bigram_overlap"] >= 4]
         if bigram_4plus:
             print(f"[OK] 跨源 bigram>=4: {len(bigram_4plus)} 条已合并，阈值安全")
     else:
-        print(f"[OK] 跨源 bigram=3: 无边界样本")
+        print("[OK] 跨源 bigram=3: 无边界样本")
 
     # 3. 同源 bigram 阈值 (4)
     if same:
@@ -255,7 +254,7 @@ def _print_calibration_advice(
         if bg2:
             print()
             print(f"[!] 同源 bigram=2: {len(bg2)} 条在边界下（当前阈值 4，差距较大）")
-            print(f"    其中部分可能是不同产品/事件误判风险，建议审查后标注")
+            print("    其中部分可能是不同产品/事件误判风险，建议审查后标注")
             if not summary_only:
                 for r in bg2[:5]:
                     print(f"      [{r['source_a']}] {r['title_a'][:30]}")
@@ -271,13 +270,13 @@ def _print_calibration_advice(
     print("─" * 60)
     print("当前阈值规则")
     print("─" * 60)
-    print(f"  跨源：bg≥3 + ratio≥0.35 → 合并（主规则）")
-    print(f"  跨源：bg=2 + ratio≥0.375 + 含英数token → 合并（专名梯度）")
-    print(f"  跨源安全区：ratio≥0.65 且专名bg≥1 → 直接合并；0.50~0.65 需专名bg≥2")
-    print(f"  跨源方向对立（上涨vs下跌等）→ 不合并（cross_opposite）")
-    print(f"  同源：bigram≥4 → 合并（模板词已掩码，不同公司同模板不误合并）")
-    print(f"  清理模式：日期(年/月/日)、英文专名按长度分桶占位(_tk2_/_tk4_/_tk6_)、\"N级\"")
-    print(rf"  _normalize_title 过滤模式：%、万亿、前N、\b(?:19|20)\d{{2}}\b、字母后缀年份；保留空格防英文粘连")
+    print("  跨源：bg≥3 + ratio≥0.35 → 合并（主规则）")
+    print("  跨源：bg=2 + ratio≥0.375 + 含英数token → 合并（专名梯度）")
+    print("  跨源安全区：ratio≥0.65 且专名bg≥1 → 直接合并；0.50~0.65 需专名bg≥2")
+    print("  跨源方向对立（上涨vs下跌等）→ 不合并（cross_opposite）")
+    print("  同源：bigram≥4 → 合并（模板词已掩码，不同公司同模板不误合并）")
+    print('  清理模式：日期(年/月/日)、英文专名按长度分桶占位(_tk2_/_tk4_/_tk6_)、"N级"')
+    print(r"  _normalize_title 过滤模式：%、万亿、前N、\b(?:19|20)\d{2}\b、字母后缀年份；保留空格防英文粘连")
     if not dry_run:
         print()
         print("[..] --dry-run 模式，未实际修改任何设置")

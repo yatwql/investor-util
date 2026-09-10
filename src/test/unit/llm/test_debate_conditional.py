@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
@@ -54,11 +54,13 @@ class TestDebateConditionalMode2(unittest.TestCase):
     @patch("src.python.config._llm_settings.get_llm_config")
     def test_mode2_enabled_3_scenarios(self, mock_get_llm_config):
         """Mode 2 启用 + 3 情景 → prompt 末尾出现 3 段情景指令，含 '+20%'。"""
-        mock_get_llm_config.return_value = _mock_llm_config_with_scenarios([
-            {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
-            {"name": "下跌", "change": -0.20, "desc": "如果未来市场下跌 20%"},
-            {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"},
-        ])
+        mock_get_llm_config.return_value = _mock_llm_config_with_scenarios(
+            [
+                {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
+                {"name": "下跌", "change": -0.20, "desc": "如果未来市场下跌 20%"},
+                {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"},
+            ]
+        )
         from src.python.llm.prompts import _build_expert_review_prompt
 
         result = _build_expert_review_prompt(
@@ -106,9 +108,11 @@ class TestDebateConditionalMode2(unittest.TestCase):
     @patch("src.python.config._llm_settings.get_llm_config")
     def test_mode2_enabled_1_scenario(self, mock_get_llm_config):
         """1 情景 → prompt 末尾仅 1 段情景指令。"""
-        mock_get_llm_config.return_value = _mock_llm_config_with_scenarios([
-            {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
-        ])
+        mock_get_llm_config.return_value = _mock_llm_config_with_scenarios(
+            [
+                {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
+            ]
+        )
         from src.python.llm.prompts import _build_expert_review_prompt
 
         result = _build_expert_review_prompt(

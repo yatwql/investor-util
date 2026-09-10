@@ -18,8 +18,7 @@ _MOCK_TARGET = "src.python.fetcher.chain.fetch_with_incremental_fallback"
 def _extreme_market_value_bars() -> list[dict]:
     """极高市值品种：成交额巨大但相对持仓仍很小。"""
     return [
-        {"date": f"2026-07-{d:02d}", "open": 100.0, "close": 102.0,
-         "high": 105.0, "low": 99.0, "volume": 500_000}
+        {"date": f"2026-07-{d:02d}", "open": 100.0, "close": 102.0, "high": 105.0, "low": 99.0, "volume": 500_000}
         for d in range(1, 21)
     ]
 
@@ -27,8 +26,7 @@ def _extreme_market_value_bars() -> list[dict]:
 def _low_liquidity_bars() -> list[dict]:
     """极低流动性品种：日均成交额不到市值的 0.1%。"""
     return [
-        {"date": f"2026-07-{d:02d}", "open": 50.0, "close": 50.5,
-         "high": 51.0, "low": 49.5, "volume": 100}
+        {"date": f"2026-07-{d:02d}", "open": 50.0, "close": 50.5, "high": 51.0, "low": 49.5, "volume": 100}
         for d in range(1, 21)
     ]
 
@@ -71,8 +69,7 @@ class TestLiquidityEdge:
         from src.python.analysis.liquidity import check_liquidity
 
         zero_volume_bars = [
-            {"date": f"2026-07-{d:02d}", "open": 10.0, "close": 10.5,
-             "high": 10.8, "low": 9.9, "volume": 0}
+            {"date": f"2026-07-{d:02d}", "open": 10.0, "close": 10.5, "high": 10.8, "low": 9.9, "volume": 0}
             for d in range(1, 21)
         ]
         holdings = [

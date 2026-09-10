@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import threading
-import time
 from unittest import mock
 
 import pytest
@@ -178,6 +177,7 @@ class TestCircuitBreaker:
     def test_is_transport_failure(self):
         """校验 is_transport_failure 正确识别 sentinel。"""
         from src.python.core.provider_registry import TRANSPORT_FAILURE
+
         assert DataSourceRegistry.is_transport_failure(TRANSPORT_FAILURE) is True
         assert DataSourceRegistry.is_transport_failure(None) is False
         assert DataSourceRegistry.is_transport_failure({}) is False
@@ -257,12 +257,13 @@ class TestFetchOrCached:
         """LIVE_FETCH 策略 → 调用 fetch_fn 并写 session cache。"""
         r = _fresh_registry()
         calls = []
+
         def _fetch(code: str) -> dict:
             calls.append(code)
             return {"price": 100.0}
+
         with mock.patch("src.python.core.market_hours.is_market_open", return_value=True):
-            result = r.fetch_or_cached("600519", "a_share", _fetch,
-                                       cache_domain="price", chain=[])
+            result = r.fetch_or_cached("600519", "a_share", _fetch, cache_domain="price", chain=[])
         assert result == {"price": 100.0}
         assert calls == ["600519"]
         # session cache 应有值
@@ -279,12 +280,13 @@ class TestFetchOrCached:
                     r.record_failure(p, "timeout")
             r.session_cache_set("price", "600519", {"price": 100.0})
             calls = []
+
             def _fetch(code: str) -> dict:
                 calls.append(code)
                 return {"price": 200.0}
+
             with mock.patch("src.python.core.market_hours.is_market_open", return_value=True):
-                result = r.fetch_or_cached("600519", "a_share", _fetch,
-                                           cache_domain="price", chain=["t1", "t2"])
+                result = r.fetch_or_cached("600519", "a_share", _fetch, cache_domain="price", chain=["t1", "t2"])
         # 全链熔断 → CACHE_ONLY → 返回 session cache
         assert result == {"price": 100.0}
         assert calls == []
@@ -292,11 +294,12 @@ class TestFetchOrCached:
     def test_fetch_or_cached_live_fetch_none_does_not_cache(self):
         """LIVE_FETCH 但 fetch_fn 返回 None → 不写 session cache。"""
         r = _fresh_registry()
+
         def _fetch(code: str) -> None:
             return None
+
         with mock.patch("src.python.core.market_hours.is_market_open", return_value=True):
-            result = r.fetch_or_cached("600519", "a_share", _fetch,
-                                       cache_domain="price")
+            result = r.fetch_or_cached("600519", "a_share", _fetch, cache_domain="price")
         assert result is None
         assert r.session_cache_get("price", "600519") is NOT_FOUND
 

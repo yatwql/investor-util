@@ -35,8 +35,9 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_timeout_triggers_fallback(self, mock_chain, mock_set, mock_get):
         """Provider 超时 → 回退到下一链路。"""
-        from src.python.fetcher.chain import fetch_with_fallback, reset_provider_skip
+        from src.python.fetcher.chain import fetch_with_fallback
         import httpx
+
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None
         fn1 = MagicMock(side_effect=httpx.TimeoutException("Connection timed out"))
@@ -54,8 +55,9 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_429_triggers_fallback(self, mock_chain, mock_set, mock_get):
         """HTTP 429 限流 → 回退到下一链路。"""
-        from src.python.fetcher.chain import fetch_with_fallback, reset_provider_skip
+        from src.python.fetcher.chain import fetch_with_fallback
         import httpx
+
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None
         req = httpx.Request("GET", "https://api.test.com")
@@ -73,8 +75,9 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_503_triggers_fallback(self, mock_chain, mock_set, mock_get):
         """HTTP 503 服务不可用 → 回退到下一链路。"""
-        from src.python.fetcher.chain import fetch_with_fallback, reset_provider_skip
+        from src.python.fetcher.chain import fetch_with_fallback
         import httpx
+
         mock_chain.return_value = ["p1", "p2"]
         mock_get.return_value = None
         req = httpx.Request("GET", "https://api.test.com")
@@ -92,14 +95,16 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain._get_chain")
     def test_all_providers_http_errors_fall_to_stale(self, mock_chain, mock_set, mock_get):
         """全部 Provider 各抛不同 HTTP 错误 → 降级到过期缓存。"""
-        from src.python.fetcher.chain import fetch_with_fallback, reset_provider_skip
+        from src.python.fetcher.chain import fetch_with_fallback
         import httpx
+
         mock_chain.return_value = ["p1", "p2"]
         # 第一次 cache_get（新鲜缓存）→ None；第二次（过期降级）→ stale
         mock_get.side_effect = [None, {"stale": True, "price": 99.0}]
         req = httpx.Request("GET", "https://api.test.com")
-        fn1 = MagicMock(side_effect=httpx.HTTPStatusError("429", request=req,
-                          response=httpx.Response(429, request=req)))
+        fn1 = MagicMock(
+            side_effect=httpx.HTTPStatusError("429", request=req, response=httpx.Response(429, request=req))
+        )
         fn2 = MagicMock(side_effect=httpx.TimeoutException("timeout"))
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
@@ -126,6 +131,7 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
     def _break_provider(self, name: str, at_time: float):
         """在指定时间点模拟 provider 连续 3 次传输级失败。"""
         from src.python.core.provider_registry import get_registry
+
         with patch("src.python.core.provider_registry.time.time", return_value=at_time):
             reg = get_registry()
             reg.register_provider(name, 2)
@@ -148,11 +154,13 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
 
         with patch("src.python.core.provider_registry.time.time", return_value=1001.0):
             from src.python.fetcher.chain import fetch_with_fallback
+
             result = fetch_with_fallback("price", self.provider_map, "k1", 3600)
 
         self.assertEqual(result, {"data": "probe_ok"})
         p1_fn.assert_called_once()  # 试探请求被放行
         from src.python.core.provider_registry import get_registry
+
         self.assertFalse(get_registry().is_circuit_broken("p1"))  # 熔断已清除
 
     @patch("src.python.fetcher.chain.cache_get")
@@ -175,6 +183,7 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
             self.assertEqual(result, {"data": "fallback"})
             p1_fn.assert_called_once()
             from src.python.core.provider_registry import get_registry
+
             self.assertFalse(get_registry().is_circuit_broken("p1"))  # 未重新熔断
 
             # 第2次：p1 计数器 = 2，仍不熔断
@@ -203,6 +212,7 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
 
         with patch("src.python.core.provider_registry.time.time", return_value=950.0):
             from src.python.fetcher.chain import fetch_with_fallback
+
             result = fetch_with_fallback("price", self.provider_map, "k3", 3600)
 
         self.assertEqual(result, {"data": "fallback"})
@@ -220,6 +230,7 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         self.provider_map["p1"] = ("P1", p1_fn)
 
         from src.python.fetcher.chain import fetch_with_fallback
+
         result = fetch_with_fallback("price", self.provider_map, "k4", 3600)
 
         self.assertEqual(result, {"data": "probe_ok"})

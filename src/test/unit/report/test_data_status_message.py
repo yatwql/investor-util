@@ -29,9 +29,7 @@ class TestRecordMessage:
     """record() 的可选 message 入参与事件 detail。"""
 
     def test_message_stored_in_detail(self, tracker):
-        tracker.record(
-            "industry_000001", "T3", success=False, failure_type="unreachable", message="东方财富(连接超时)"
-        )
+        tracker.record("industry_000001", "T3", success=False, failure_type="unreachable", message="东方财富(连接超时)")
 
         events = tracker.get_log()
         assert len(events) == 1

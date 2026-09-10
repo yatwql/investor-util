@@ -51,10 +51,24 @@ def _mk_holdings() -> list[Holding]:
 def _mk_details() -> list[dict]:
     """构造最小持仓明细字典（含 market_value/cost/profit/profit_rate_pct）。"""
     return [
-        {"name": "招商银行", "code": "600036", "market_value": 216400.0, "cost": 200000.0,
-         "profit": 16400.0, "profit_rate_pct": 8.2, "account": "测试账户"},
-        {"name": "贵州茅台", "code": "600519", "market_value": 345000.0, "cost": 300000.0,
-         "profit": 45000.0, "profit_rate_pct": 15.0, "account": "测试账户"},
+        {
+            "name": "招商银行",
+            "code": "600036",
+            "market_value": 216400.0,
+            "cost": 200000.0,
+            "profit": 16400.0,
+            "profit_rate_pct": 8.2,
+            "account": "测试账户",
+        },
+        {
+            "name": "贵州茅台",
+            "code": "600519",
+            "market_value": 345000.0,
+            "cost": 300000.0,
+            "profit": 45000.0,
+            "profit_rate_pct": 15.0,
+            "account": "测试账户",
+        },
     ]
 
 
@@ -188,8 +202,15 @@ class TestAnonymizeHoldingsDetails(unittest.TestCase):
 
     def test_full_anonymous_zero_profit(self):
         """full_anonymous + profit=0 → 盈亏文本 '±0.0%'。"""
-        d = {"name": "招商银行", "code": "600036", "market_value": 216400.0, "cost": 216400.0,
-             "profit": 0, "profit_rate_pct": 0.0, "account": "测试账户"}
+        d = {
+            "name": "招商银行",
+            "code": "600036",
+            "market_value": 216400.0,
+            "cost": 216400.0,
+            "profit": 0,
+            "profit_rate_pct": 0.0,
+            "account": "测试账户",
+        }
         result = anonymize_holdings_details([d], "full_anonymous")
         self.assertEqual(result[0]["profit"], "±0.0%")
 
@@ -254,7 +275,9 @@ class TestCategorize(unittest.TestCase):
         """场外基金（00 前缀 + 名称含基金特征词）→ 基金。"""
         h = Holding(account="账户A", name="易方达蓝筹精选混合", code="005827", shares=1000, cost_price=1.0)
         self.assertEqual(_categorize_holding(h), "基金")
-        self.assertEqual(_categorize_detail({"name": "易方达蓝筹精选混合", "code": "005827", "account": "账户A"}), "基金")
+        self.assertEqual(
+            _categorize_detail({"name": "易方达蓝筹精选混合", "code": "005827", "account": "账户A"}), "基金"
+        )
 
     def test_delegates_to_central_judgment(self):
         """分类结果无条件跟随 `code_utils.is_fund_holding`（不自建前缀回退）。
@@ -270,13 +293,17 @@ class TestCategorize(unittest.TestCase):
             self.assertEqual(_categorize_holding(stock), "基金")
         with patch.object(anonymizer, "is_fund_holding", return_value=False):
             self.assertEqual(_categorize_holding(stock), "股票/其他")
-            self.assertEqual(_categorize_detail({"name": "招商银行", "code": "600036", "account": "账户A"}), "股票/其他")
+            self.assertEqual(
+                _categorize_detail({"name": "招商银行", "code": "600036", "account": "账户A"}), "股票/其他"
+            )
 
     def test_beijing_exchange_stock_not_misclassified_as_fund(self):
         """北交所（8 开头）股票 → 股票/其他（不自建前缀判断）。"""
         h = Holding(account="账户A", name="某北交所股票", code="830799", shares=1000, cost_price=10.0)
         self.assertEqual(_categorize_holding(h), "股票/其他")
-        self.assertEqual(_categorize_detail({"name": "某北交所股票", "code": "830799", "account": "账户A"}), "股票/其他")
+        self.assertEqual(
+            _categorize_detail({"name": "某北交所股票", "code": "830799", "account": "账户A"}), "股票/其他"
+        )
 
 
 class TestGetSetMode(unittest.TestCase):
@@ -330,7 +357,9 @@ class TestModeDescriptions(unittest.TestCase):
 
     def test_all_modes_described(self):
         """4 种模式均有描述。"""
-        self.assertEqual(set(ANONYMIZATION_MODE_DESCRIPTIONS.keys()), {"off", "code_display", "full_anonymous", "summary"})
+        self.assertEqual(
+            set(ANONYMIZATION_MODE_DESCRIPTIONS.keys()), {"off", "code_display", "full_anonymous", "summary"}
+        )
         for desc in ANONYMIZATION_MODE_DESCRIPTIONS.values():
             self.assertTrue(desc)
 

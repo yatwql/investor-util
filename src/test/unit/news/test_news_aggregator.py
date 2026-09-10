@@ -14,17 +14,19 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
 
 class TestGetEnabledSources(unittest.TestCase):
     """get_enabled_sources 测试。"""
 
-    @patch("src.python.providers.news_aggregator._SOURCE_LABELS",
-           {"akshare": "akshare", "eastmoney": "东方财富", "cls": "财联社"})
+    @patch(
+        "src.python.providers.news_aggregator._SOURCE_LABELS",
+        {"akshare": "akshare", "eastmoney": "东方财富", "cls": "财联社"},
+    )
     @patch("src.python.config.get_config")
     def test_all_enabled(self, mock_config):
         """全部启用 → 返回所有源。"""
@@ -32,12 +34,12 @@ class TestGetEnabledSources(unittest.TestCase):
             "news_sources": {"akshare": True, "eastmoney": True, "cls": True},
         }
         from src.python.providers.news_aggregator import get_enabled_sources
+
         result = get_enabled_sources()
         self.assertEqual(len(result), 3)
         self.assertIn("akshare", result)
 
-    @patch("src.python.providers.news_aggregator._SOURCE_LABELS",
-           {"akshare": "akshare", "eastmoney": "东方财富"})
+    @patch("src.python.providers.news_aggregator._SOURCE_LABELS", {"akshare": "akshare", "eastmoney": "东方财富"})
     @patch("src.python.config.get_config")
     def test_partial_enabled(self, mock_config):
         """部分启用 → 仅返回启用的。"""
@@ -45,16 +47,17 @@ class TestGetEnabledSources(unittest.TestCase):
             "news_sources": {"akshare": True, "eastmoney": False},
         }
         from src.python.providers.news_aggregator import get_enabled_sources
+
         result = get_enabled_sources()
         self.assertEqual(result, ["akshare"])
 
-    @patch("src.python.providers.news_aggregator._SOURCE_LABELS",
-           {"akshare": "akshare", "eastmoney": "东方财富"})
+    @patch("src.python.providers.news_aggregator._SOURCE_LABELS", {"akshare": "akshare", "eastmoney": "东方财富"})
     @patch("src.python.config.get_config")
     def test_empty_config(self, mock_config):
         """空配置 → 空列表。"""
         mock_config.return_value = {}
         from src.python.providers.news_aggregator import get_enabled_sources
+
         self.assertEqual(get_enabled_sources(), [])
 
 
@@ -63,6 +66,7 @@ class TestComputeCacheKey(unittest.TestCase):
 
     def _call(self, keywords, top_n, sources, per_source):
         from src.python.providers.news_aggregator import _compute_cache_key
+
         return _compute_cache_key(keywords, top_n, sources, per_source)
 
     def test_returns_string(self):
@@ -90,16 +94,19 @@ class TestFinalizeNewsResults(unittest.TestCase):
 
     def _call(self, all_raw, keywords, top_n):
         from src.python.providers.news_aggregator import _finalize_news_results
+
         return _finalize_news_results(all_raw, keywords, top_n)
 
-    @patch("src.python.providers.news_aggregator.correlate_news_with_holdings",
-           side_effect=lambda items, *a, **kw: items)
+    @patch(
+        "src.python.providers.news_aggregator.correlate_news_with_holdings", side_effect=lambda items, *a, **kw: items
+    )
     def test_empty_input(self, mock_corr):
         """空输入 → 空列表。"""
         self.assertEqual(self._call([], [], 10), [])
 
-    @patch("src.python.providers.news_aggregator.correlate_news_with_holdings",
-           side_effect=lambda items, *a, **kw: items)
+    @patch(
+        "src.python.providers.news_aggregator.correlate_news_with_holdings", side_effect=lambda items, *a, **kw: items
+    )
     def test_sort_by_ctime(self, mock_corr):
         """按 ctime 降序排列。"""
         items = [
@@ -109,16 +116,18 @@ class TestFinalizeNewsResults(unittest.TestCase):
         result = self._call(items, [], 10)
         self.assertEqual(result[0]["title"], "晚")
 
-    @patch("src.python.providers.news_aggregator.correlate_news_with_holdings",
-           side_effect=lambda items, *a, **kw: items)
+    @patch(
+        "src.python.providers.news_aggregator.correlate_news_with_holdings", side_effect=lambda items, *a, **kw: items
+    )
     def test_ensure_matched_keywords(self, mock_corr):
         """每个条目确保有 matched_keywords 字段。"""
         items = [{"ctime": "2026-07-01", "title": "test"}]
         result = self._call(items, [], 10)
         self.assertIn("matched_keywords", result[0])
 
-    @patch("src.python.providers.news_aggregator.correlate_news_with_holdings",
-           side_effect=lambda items, *a, **kw: items)
+    @patch(
+        "src.python.providers.news_aggregator.correlate_news_with_holdings", side_effect=lambda items, *a, **kw: items
+    )
     def test_truncate_top_n(self, mock_corr):
         """超过 top_n 条 → 截断。"""
         titles = [
@@ -143,17 +152,16 @@ class TestFinalizeNewsResults(unittest.TestCase):
             "大消费板块业绩有望改善",
             "通信行业5G建设持续推进",
         ]
-        items = [{"ctime": f"2026-07-01 {i:02d}:00", "title": titles[i]}
-                 for i in range(20)]
+        items = [{"ctime": f"2026-07-01 {i:02d}:00", "title": titles[i]} for i in range(20)]
         result = self._call(items, [], 5)
         self.assertEqual(len(result), 5)
 
-    @patch("src.python.providers.news_aggregator.correlate_news_with_holdings",
-           side_effect=lambda items, *a, **kw: items)
+    @patch(
+        "src.python.providers.news_aggregator.correlate_news_with_holdings", side_effect=lambda items, *a, **kw: items
+    )
     def test_existing_matched_keywords_preserved(self, mock_corr):
         """已有的 matched_keywords 不被覆盖。"""
-        items = [{"ctime": "2026-07-01", "title": "test",
-                  "matched_keywords": ["preserved"]}]
+        items = [{"ctime": "2026-07-01", "title": "test", "matched_keywords": ["preserved"]}]
         result = self._call(items, ["keyword"], 10)
         self.assertEqual(result[0]["matched_keywords"], ["preserved"])
 
@@ -175,11 +183,11 @@ class TestAggregateNews(unittest.TestCase):
     @patch("src.python.providers.news_aggregator._check_news_cache")
     @patch("src.python.providers.news_aggregator._fetch_from_all_sources")
     @patch("src.python.providers.news_aggregator._finalize_news_results")
-    def test_cache_hit(self, mock_finalize, mock_fetch, mock_cache_check,
-                       mock_save):
+    def test_cache_hit(self, mock_finalize, mock_fetch, mock_cache_check, mock_save):
         """缓存命中 → 不调取源。"""
         mock_cache_check.return_value = [{"title": "cached"}]
         from src.python.providers.news_aggregator import aggregate_news
+
         result = aggregate_news(["kw"], top_n=10, sources=["eastmoney"])
         self.assertEqual(len(result), 1)
         mock_fetch.assert_not_called()
@@ -188,25 +196,19 @@ class TestAggregateNews(unittest.TestCase):
     @patch("src.python.providers.news_aggregator._save_news_cache")
     @patch("src.python.providers.news_aggregator._check_news_cache")
     @patch("src.python.providers.news_aggregator._fetch_from_all_sources")
-    def test_cache_miss(self, mock_fetch, mock_cache_check, mock_save,
-                        mock_log):
+    def test_cache_miss(self, mock_fetch, mock_cache_check, mock_save, mock_log):
         """缓存未命中 → 调取源并保存缓存。"""
         mock_cache_check.return_value = None
-        mock_fetch.return_value = ([{"ctime": "2026-07-01", "title": "news"}],
-                                    {"eastmoney": (1, "OK")})
-
-        from src.python.providers.news_aggregator import (
-            _finalize_news_results,
-        )
+        mock_fetch.return_value = ([{"ctime": "2026-07-01", "title": "news"}], {"eastmoney": (1, "OK")})
 
         with patch.object(
-            __import__("src.python.providers.news_aggregator",
-                       fromlist=["correlate_news_with_holdings"]),
+            __import__("src.python.providers.news_aggregator", fromlist=["correlate_news_with_holdings"]),
             "correlate_news_with_holdings",
             side_effect=lambda items, *a, **kw: items,
         ):
             from src.python.providers.news_aggregator import aggregate_news
-            result = aggregate_news(["kw"], top_n=10, sources=["eastmoney"])
+
+            aggregate_news(["kw"], top_n=10, sources=["eastmoney"])
 
         mock_save.assert_called_once()
 
@@ -217,6 +219,7 @@ class TestAggregateNews(unittest.TestCase):
         mock_cache_check.return_value = None
         mock_fetch.return_value = ([], {})
         from src.python.providers.news_aggregator import aggregate_news
+
         result = aggregate_news(["kw"], top_n=10, sources=["eastmoney"])
         self.assertEqual(result, [])
 
@@ -226,10 +229,6 @@ class TestAggregateNews(unittest.TestCase):
         """未指定源 → 使用启用的源。"""
         mock_cache_check.return_value = None
         mock_enabled.return_value = ["eastmoney"]
-
-        from src.python.providers.news_aggregator import (
-            _fetch_from_all_sources,
-        )
 
         with patch(
             "src.python.providers.news_aggregator._fetch_from_all_sources",

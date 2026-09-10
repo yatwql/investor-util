@@ -25,6 +25,7 @@ from src.python.report.llm_quality import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
+
 def _feature_on(monkeypatch) -> None:
     from src.python.config import features as feat
 

@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -165,9 +165,11 @@ class TestComputeConcentration(unittest.TestCase):
     def test_empty_holdings(self, mock_load):
         """持仓为空 → 跳过"""
         mock_load.return_value = None
-        result = compute_concentration({
-            "110011": {"name": "基金", "holdings": []},
-        })
+        result = compute_concentration(
+            {
+                "110011": {"name": "基金", "holdings": []},
+            }
+        )
         self.assertEqual(result, [])
 
 

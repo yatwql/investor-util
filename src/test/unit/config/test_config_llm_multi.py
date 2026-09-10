@@ -47,17 +47,19 @@ class TestLoadLlmProviders(unittest.TestCase):
 
     def test_standard_format(self):
         """标准格式解析成功。"""
-        self._write_json({
-            "strategy": "priority",
-            "preferred_providers": {"news": "claude-opus"},
-            "providers": [
-                {
-                    "name": "claude-opus",
-                    "provider": "claude",
-                    "credentials_ref": "ref-test",
-                }
-            ],
-        })
+        self._write_json(
+            {
+                "strategy": "priority",
+                "preferred_providers": {"news": "claude-opus"},
+                "providers": [
+                    {
+                        "name": "claude-opus",
+                        "provider": "claude",
+                        "credentials_ref": "ref-test",
+                    }
+                ],
+            }
+        )
         with patch("src.python.config._llm_providers._get_llm_providers_path", return_value=self.providers_path):
             result = _load_llm_providers()
         self.assertIsNotNone(result)
@@ -186,9 +188,14 @@ class TestParseProvidersList(unittest.TestCase):
         raw = {
             "providers": [
                 {
-                    "name": "p1", "provider": "claude", "credentials_ref": "ref-1",
-                    "priority": 5, "weight": 3, "timeout": 120.0,
-                    "endpoint": "https://custom.endpoint", "proxy_preferred": True,
+                    "name": "p1",
+                    "provider": "claude",
+                    "credentials_ref": "ref-1",
+                    "priority": 5,
+                    "weight": 3,
+                    "timeout": 120.0,
+                    "endpoint": "https://custom.endpoint",
+                    "proxy_preferred": True,
                 },
             ]
         }
@@ -321,7 +328,10 @@ class TestValidateProviderEntry(unittest.TestCase):
     def test_null_endpoint_allowed(self):
         """endpoint 为 None 不警告。"""
         entry = {
-            "name": "test", "provider": "claude", "credentials_ref": "ref-key", "endpoint": None,
+            "name": "test",
+            "provider": "claude",
+            "credentials_ref": "ref-key",
+            "endpoint": None,
         }
         warnings = _validate_provider_entry(entry)
         self.assertEqual(warnings, [])
@@ -375,7 +385,7 @@ class TestInjectProviderChainData(unittest.TestCase):
             "strategy": "weighted",
             "providers": [
                 {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
-            ]
+            ],
         }
         result = _inject_provider_chain_data(dict(self.base_config))
         self.assertEqual(result["_strategy"], "weighted")
@@ -387,7 +397,7 @@ class TestInjectProviderChainData(unittest.TestCase):
             "strategy": "random",
             "providers": [
                 {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
-            ]
+            ],
         }
         with self.assertLogs("invest", level="WARNING") as logs:
             result = _inject_provider_chain_data(dict(self.base_config))
@@ -414,7 +424,7 @@ class TestInjectProviderChainData(unittest.TestCase):
             "preferred_providers": {"news": "p1"},
             "providers": [
                 {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
-            ]
+            ],
         }
         result = _inject_provider_chain_data(dict(self.base_config))
         self.assertEqual(result["_preferred_providers"], {"news": "p1"})
@@ -426,7 +436,7 @@ class TestInjectProviderChainData(unittest.TestCase):
             "preferred_providers": {"news": "nonexistent"},
             "providers": [
                 {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
-            ]
+            ],
         }
         with self.assertLogs("invest", level="WARNING") as logs:
             result = _inject_provider_chain_data(dict(self.base_config))
@@ -475,7 +485,7 @@ class TestInjectProviderChainData(unittest.TestCase):
             "preferred_providers": "not_a_dict",
             "providers": [
                 {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
-            ]
+            ],
         }
         with self.assertLogs("invest", level="WARNING") as logs:
             result = _inject_provider_chain_data(dict(self.base_config))

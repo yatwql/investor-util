@@ -22,6 +22,7 @@ from src.python.report.orchestrator import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
+
 def _real_reports_dir() -> str:
     """项目真实 reports 目录（与 conftest 防线基准一致）。"""
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "reports"))
@@ -954,8 +955,8 @@ class TestGenerateReport:
                 },
             ),
             patch("src.python.report._llm_news._fetch_llm_and_news") as mock_llm_news,
-            patch("src.python.report.html_writer.write_html_report") as mock_html,
-            patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order", return_value=[]),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=[]),
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),

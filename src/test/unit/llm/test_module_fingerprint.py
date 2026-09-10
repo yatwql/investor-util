@@ -69,9 +69,7 @@ _PIPELINE_DIFF = {
         "decreased": [],
     }
 }
-_PIPELINE_DIFF_CHANGED = {
-    "diff": {**_PIPELINE_DIFF["diff"], "total_value_diff": 9900.0, "total_value_diff_pct": 9.9}
-}
+_PIPELINE_DIFF_CHANGED = {"diff": {**_PIPELINE_DIFF["diff"], "total_value_diff": 9900.0, "total_value_diff_pct": 9.9}}
 
 # 竞争语境块（组合 vs 指数对比）：由指数 / 区间收益 / 指标渲染而成的**已渲染文本**
 _COMPETITIVE_BLOCK = "【今日对比】组合 +0.50% vs 沪深300 +1.05%\n相对沪深300 跑输 0.55%"
@@ -263,7 +261,9 @@ def test_precheck_key_equals_write_key(module_key: str, scenario: str):
         f"{module_key}_"
         f"{_write_fingerprint(module_key, history_data, pipeline_data, competitive_context, metrics, data_quality_text)}"
     )
-    actual = _precheck_info(history_data, pipeline_data, competitive_context, metrics, data_quality_text)[module_key]["key"]
+    actual = _precheck_info(history_data, pipeline_data, competitive_context, metrics, data_quality_text)[module_key][
+        "key"
+    ]
 
     assert actual == expected, f"{module_key} / {scenario}：预检键与写侧键不同源 → 预检永不命中"
 
@@ -506,9 +506,7 @@ def test_debate_fingerprint_covers_pipeline_blocks_in_its_prompt():
     from src.python.llm.module_fingerprint import debate_procon_fingerprint
 
     baseline = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK, pipeline_data=_PIPELINE_DEGRADED))
-    changed = debate_procon_fingerprint(
-        _debate_inputs(_COMPETITIVE_BLOCK, pipeline_data=_PIPELINE_DEGRADED_CHANGED)
-    )
+    changed = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK, pipeline_data=_PIPELINE_DEGRADED_CHANGED))
 
     assert baseline != changed, "辩论指纹未覆盖其提示词中的降级段 → 复用陈旧降级结论"
 

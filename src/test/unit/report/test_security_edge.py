@@ -13,7 +13,7 @@ import json
 import os
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from src.python.core.constants import PROJECT_ROOT
 import pytest
@@ -175,7 +175,7 @@ class TestSymlink(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # 创建普通文件而不是符号链接（Windows 兼容）
-            fpath = _cache_path.__wrapped__("test_key") if hasattr(_cache_path, "__wrapped__") else None
+            _cache_path.__wrapped__("test_key") if hasattr(_cache_path, "__wrapped__") else None
             # 简单验证：os.listdir 不因文件类型异常
             try:
                 entries = os.listdir(tmpdir)
@@ -261,7 +261,6 @@ class TestJsonPrototypePollution(unittest.TestCase):
     def test_config_json_with_proto(self):
         """config.json 含 __proto__ → 不被特殊处理。"""
         from src.python.config import get_config
-        import builtins
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = os.path.join(tmpdir, "config.json")
@@ -319,8 +318,8 @@ class TestTempFileRace(unittest.TestCase):
 
                 def write_item(i):
                     try:
-                        set(f"concurrent_key", {"value": i})
-                        r = get(f"concurrent_key", max_age_seconds=3600)
+                        set("concurrent_key", {"value": i})
+                        r = get("concurrent_key", max_age_seconds=3600)
                         return r
                     except Exception:
                         return {"__error__": str(sys.exc_info()[1])}

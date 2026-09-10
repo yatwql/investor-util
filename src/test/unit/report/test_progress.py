@@ -13,20 +13,20 @@
 from __future__ import annotations
 
 import io
-import os
 import sys
 import time as _time_module
 import unittest
-from unittest.mock import patch
 
 from src.python.report.progress import (
-
-    ProgressReporter, SilentProgressReporter, TuiProgressReporter,
-    Timer, _timing_records,
+    ProgressReporter,
+    SilentProgressReporter,
+    TuiProgressReporter,
+    Timer,
+    _timing_records,
 )
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 class TestProgressReporter(unittest.TestCase):

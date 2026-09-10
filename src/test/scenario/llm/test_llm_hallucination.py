@@ -38,12 +38,33 @@ _MAX_ALLOWED_FALSE_POSITIVES = 2
 # 数据一致性：profit = mv - cost, profit_rate = profit / cost * 100
 # 组合总成本: 600000, 总盈亏: +58400, 总收益率: 9.73%
 _STD_HOLDINGS_DETAILS = [
-    {"name": "招商银行", "code": "600036", "market_value": 216400.0, "cost": 200000.0,
-     "profit": 16400.0, "profit_rate": 8.2, "account": "测试账户"},
-    {"name": "贵州茅台", "code": "600519", "market_value": 345000.0, "cost": 300000.0,
-     "profit": 45000.0, "profit_rate": 15.0, "account": "测试账户"},
-    {"name": "易方达蓝筹", "code": "005827", "market_value": 97000.0, "cost": 100000.0,
-     "profit": -3000.0, "profit_rate": -3.0, "account": "测试账户"},
+    {
+        "name": "招商银行",
+        "code": "600036",
+        "market_value": 216400.0,
+        "cost": 200000.0,
+        "profit": 16400.0,
+        "profit_rate": 8.2,
+        "account": "测试账户",
+    },
+    {
+        "name": "贵州茅台",
+        "code": "600519",
+        "market_value": 345000.0,
+        "cost": 300000.0,
+        "profit": 45000.0,
+        "profit_rate": 15.0,
+        "account": "测试账户",
+    },
+    {
+        "name": "易方达蓝筹",
+        "code": "005827",
+        "market_value": 97000.0,
+        "cost": 100000.0,
+        "profit": -3000.0,
+        "profit_rate": -3.0,
+        "account": "测试账户",
+    },
 ]
 
 
@@ -164,9 +185,7 @@ class TestHallucinationDetection:
     def test_penetration_module_skips_rank(self):
         """穿透分析模块的排名断言应跳过（排名维度不同）。"""
         text = "最大持仓是 600900（长江电力）"
-        issues, total, passed = check_ranking_correctness(
-            text, _STD_HOLDINGS_DETAILS, is_penetration_module=True
-        )
+        issues, total, passed = check_ranking_correctness(text, _STD_HOLDINGS_DETAILS, is_penetration_module=True)
         assert len(issues) == 0, "穿透模块应跳过排名校验"
 
     # ── 集成场景 ───────────────────────────────────────────
@@ -174,9 +193,7 @@ class TestHallucinationDetection:
     def test_correct_output_all_pass(self):
         """对照用例：LLM 输出完全正确，三项检查均应通过。"""
         text = (
-            "组合累计收益约 10.0%，招商银行(600036)上涨 8.0%，"
-            "贵州茅台(600519)上涨 15.0%。"
-            "最大持仓是贵州茅台(600519)。"
+            "组合累计收益约 10.0%，招商银行(600036)上涨 8.0%，贵州茅台(600519)上涨 15.0%。最大持仓是贵州茅台(600519)。"
         )
         i1, _, p1, _ = check_numerical_consistency(text, _STD_HOLDINGS_DETAILS)
         i2, _, p2, _ = check_symbol_existence(text, _STD_HOLDINGS_DETAILS)
@@ -188,26 +205,27 @@ class TestHallucinationDetection:
         """汇总统计：记录幻觉率基线。"""
         # 场景定义: (实际正确, 检测到错误)
         scenarios = {
-            "组合收益率偏离": (False, True),     # test_wrong_profit_rate_vs_portfolio
-            "正确组合收益率": (True, True),       # test_correct_profit_rate_vs_portfolio
-            "个股收益率偏离": (False, True),       # test_wrong_stock_return
-            "正确个股收益率": (True, True),        # test_correct_stock_return
-            "归因段落跳过": (True, True),          # test_attribution_sentence_skipped
-            "指数基准跳过": (True, True),          # test_index_benchmark_skipped
-            "正确全通过": (True, True),            # test_correct_output_all_pass
+            "组合收益率偏离": (False, True),  # test_wrong_profit_rate_vs_portfolio
+            "正确组合收益率": (True, True),  # test_correct_profit_rate_vs_portfolio
+            "个股收益率偏离": (False, True),  # test_wrong_stock_return
+            "正确个股收益率": (True, True),  # test_correct_stock_return
+            "归因段落跳过": (True, True),  # test_attribution_sentence_skipped
+            "指数基准跳过": (True, True),  # test_index_benchmark_skipped
+            "正确全通过": (True, True),  # test_correct_output_all_pass
         }
-        false_positives = sum(1 for _, (correct, detected) in scenarios.items()
-                              if correct and not detected)
-        false_negatives = sum(1 for _, (correct, detected) in scenarios.items()
-                              if not correct and not detected)
+        false_positives = sum(1 for _, (correct, detected) in scenarios.items() if correct and not detected)
+        false_negatives = sum(1 for _, (correct, detected) in scenarios.items() if not correct and not detected)
         total = len(scenarios)
         correct_count = sum(1 for _, (c, d) in scenarios.items() if (c and d) or (not c and d))
         logger.info(
-            "幻觉率基线: %d/%d 场景正确, "
-            "假阳性=%d, 假阴性=%d, 准确率=%.0f%%",
-            correct_count, total, false_positives, false_negatives,
+            "幻觉率基线: %d/%d 场景正确, 假阳性=%d, 假阴性=%d, 准确率=%.0f%%",
+            correct_count,
+            total,
+            false_positives,
+            false_negatives,
             (correct_count / total * 100),
         )
         # 事实校验器应维持低假阳性（不误报）
-        assert false_positives <= _MAX_ALLOWED_FALSE_POSITIVES, \
+        assert false_positives <= _MAX_ALLOWED_FALSE_POSITIVES, (
             f"假阳性 {false_positives} > {_MAX_ALLOWED_FALSE_POSITIVES}，需调整容差"
+        )

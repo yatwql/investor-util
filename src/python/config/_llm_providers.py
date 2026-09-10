@@ -132,8 +132,7 @@ def _validate_provider_entry(entry: dict) -> list[str]:
     api_key = entry.get("api_key")
     if isinstance(api_key, str) and api_key.strip():
         warnings.append(
-            "禁止内联字段 'api_key'（凭据分离）——"
-            "请将其写入 llm_key.json 的凭据块，并在本条目用 credentials_ref 引用"
+            "禁止内联字段 'api_key'（凭据分离）——请将其写入 llm_key.json 的凭据块，并在本条目用 credentials_ref 引用"
         )
 
     # credentials_ref — 必填：凭据的唯一合法来源

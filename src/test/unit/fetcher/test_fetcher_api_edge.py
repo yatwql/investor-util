@@ -10,18 +10,19 @@ Fallback（主链路失败→备链路→过期缓存降级）、LLM API 错误�
 
 from __future__ import annotations
 
-import json
 import unittest
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.edge]
 
 
 # ═══════════════════════════════════════════════════════════════
 # Provider 层 HTTP 异常
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestProviderHttpErrors(unittest.TestCase):
     """Provider 各 HTTP 异常 → 返回 None，不抛出。"""
@@ -34,6 +35,7 @@ class TestProviderHttpErrors(unittest.TestCase):
         mock_factory.return_value.__enter__.return_value = mock_client
 
         from src.python.providers.tencent import fetch_price
+
         result = fetch_price("600900")
         self.assertIsNone(result)
 
@@ -45,6 +47,7 @@ class TestProviderHttpErrors(unittest.TestCase):
         mock_factory.return_value.__enter__.return_value = mock_client
 
         from src.python.providers.tencent import fetch_price
+
         result = fetch_price("600900")
         self.assertIsNone(result)
 
@@ -58,6 +61,7 @@ class TestProviderHttpErrors(unittest.TestCase):
         with patch("src.python.providers.eastmoney._fallback_fundf10") as mock_fallback:
             mock_fallback.return_value = {"fallback": True}
             from src.python.providers.eastmoney import fetch_nav
+
             result = fetch_nav("000001")
             self.assertEqual(result, {"fallback": True})
             mock_fallback.assert_called_once()
@@ -72,6 +76,7 @@ class TestProviderHttpErrors(unittest.TestCase):
         with patch("src.python.providers.eastmoney._fallback_fundf10") as mock_fallback:
             mock_fallback.return_value = {"fallback": True}
             from src.python.providers.eastmoney import fetch_nav
+
             result = fetch_nav("000001")
             self.assertEqual(result, {"fallback": True})
             mock_fallback.assert_called_once()
@@ -81,21 +86,34 @@ class TestProviderHttpErrors(unittest.TestCase):
 # Provider Chain 多级降级
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestProviderChainFallback(unittest.TestCase):
     """Provider Chain 多级降级：主链→备链→过期缓存。"""
 
     @patch("src.python.fetcher.chain.cache_get", return_value=None)
     @patch("src.python.fetcher.chain.cache_set")
-    @patch.dict("src.python.fetcher.price._PRICE_PROVIDERS", {
-        "tencent": ("腾讯财经", MagicMock(return_value=None)),
-        "sina": ("新浪财经", MagicMock(return_value={
-            "name": "长江电力", "code": "600900", "price": 27.0,
-            "yesterday_close": 26.5, "price_date": "2026-07-03",
-        })),
-    })
+    @patch.dict(
+        "src.python.fetcher.price._PRICE_PROVIDERS",
+        {
+            "tencent": ("腾讯财经", MagicMock(return_value=None)),
+            "sina": (
+                "新浪财经",
+                MagicMock(
+                    return_value={
+                        "name": "长江电力",
+                        "code": "600900",
+                        "price": 27.0,
+                        "yesterday_close": 26.5,
+                        "price_date": "2026-07-03",
+                    }
+                ),
+            ),
+        },
+    )
     def test_primary_fails_fallback_succeeds(self, mock_set, mock_get):
         """腾讯（主）返回 None → 新浪（备）成功。"""
         from src.python.fetcher.price import fetch_market_data
+
         result = fetch_market_data("600900", "长江电力")
         self.assertIsNotNone(result)
         self.assertEqual(result["price"], 27.0)
@@ -105,15 +123,18 @@ class TestProviderChainFallback(unittest.TestCase):
     def test_all_providers_fail_stale_cache_used(self, mock_set, mock_get):
         """全部 Provider 失败 → 降级使用过期缓存。"""
         # 模拟无有效缓存，有过期缓存
-        mock_get.side_effect = lambda key, ttl: (
-            None if ttl < 3600 else {"price": 26.0, "stale": True}
-        )
+        mock_get.side_effect = lambda key, ttl: None if ttl < 3600 else {"price": 26.0, "stale": True}
         from src.python.fetcher.price import _PRICE_PROVIDERS
-        with patch.dict(_PRICE_PROVIDERS, {
-            "tencent": ("腾讯", MagicMock(return_value=None)),
-            "sina": ("新浪", MagicMock(return_value=None)),
-        }):
+
+        with patch.dict(
+            _PRICE_PROVIDERS,
+            {
+                "tencent": ("腾讯", MagicMock(return_value=None)),
+                "sina": ("新浪", MagicMock(return_value=None)),
+            },
+        ):
             from src.python.fetcher.price import fetch_market_data
+
             result = fetch_market_data("600900", "长江电力")
             self.assertIsNotNone(result)
             self.assertTrue(result.get("stale"))
@@ -123,11 +144,16 @@ class TestProviderChainFallback(unittest.TestCase):
     def test_all_providers_fail_no_cache_returns_none(self, mock_set, mock_get):
         """全部 Provider 失败且无过期缓存 → 返回 None。"""
         from src.python.fetcher.price import _PRICE_PROVIDERS
-        with patch.dict(_PRICE_PROVIDERS, {
-            "tencent": ("腾讯", MagicMock(return_value=None)),
-            "sina": ("新浪", MagicMock(return_value=None)),
-        }):
+
+        with patch.dict(
+            _PRICE_PROVIDERS,
+            {
+                "tencent": ("腾讯", MagicMock(return_value=None)),
+                "sina": ("新浪", MagicMock(return_value=None)),
+            },
+        ):
             from src.python.fetcher.price import fetch_market_data
+
             result = fetch_market_data("600900", "长江电力")
             self.assertIsNone(result)
 
@@ -137,15 +163,28 @@ class TestProviderChainFallback(unittest.TestCase):
         """Provider 抛出异常 → 跳过该链路，尝试下一链路。"""
         mock_get.return_value = None
         from src.python.fetcher.price import _PRICE_PROVIDERS
+
         failing = MagicMock(side_effect=RuntimeError("Unexpected crash"))
-        with patch.dict(_PRICE_PROVIDERS, {
-            "tencent": ("腾讯", failing),
-            "sina": ("新浪", MagicMock(return_value={
-                "name": "长江电力", "code": "600900", "price": 27.5,
-                "yesterday_close": 27.0, "price_date": "2026-07-03",
-            })),
-        }):
+        with patch.dict(
+            _PRICE_PROVIDERS,
+            {
+                "tencent": ("腾讯", failing),
+                "sina": (
+                    "新浪",
+                    MagicMock(
+                        return_value={
+                            "name": "长江电力",
+                            "code": "600900",
+                            "price": 27.5,
+                            "yesterday_close": 27.0,
+                            "price_date": "2026-07-03",
+                        }
+                    ),
+                ),
+            },
+        ):
             from src.python.fetcher.price import fetch_market_data
+
             result = fetch_market_data("600900", "长江电力")
             self.assertIsNotNone(result)
             self.assertEqual(result["price"], 27.5)
@@ -154,6 +193,7 @@ class TestProviderChainFallback(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 # 响应解析异常
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestResponseParsingErrors(unittest.TestCase):
     """响应体格式异常 → 返回 None。"""
@@ -169,6 +209,7 @@ class TestResponseParsingErrors(unittest.TestCase):
         mock_factory.return_value.__enter__.return_value = mock_client
 
         from src.python.providers.tencent import fetch_price
+
         result = fetch_price("600900")
         self.assertIsNone(result)
 
@@ -184,6 +225,7 @@ class TestResponseParsingErrors(unittest.TestCase):
         mock_factory.return_value.__enter__.return_value = mock_client
 
         from src.python.providers.tencent import fetch_price
+
         result = fetch_price("600900")
         self.assertIsNone(result)
 
@@ -198,6 +240,7 @@ class TestResponseParsingErrors(unittest.TestCase):
 
         with patch("src.python.providers.eastmoney._fallback_fundf10", return_value=None):
             from src.python.providers.eastmoney import fetch_nav
+
             result = fetch_nav("000001")
             self.assertIsNone(result)
 
@@ -212,6 +255,7 @@ class TestResponseParsingErrors(unittest.TestCase):
 
         with patch("src.python.providers.eastmoney._fallback_fundf10", return_value=None):
             from src.python.providers.eastmoney import fetch_nav
+
             result = fetch_nav("000001")
             self.assertIsNone(result)
 
@@ -223,14 +267,17 @@ class TestResponseParsingErrors(unittest.TestCase):
         # 当 resp.text 被访问时，httpx 自动解码
         # 模拟解码不抛异常
         # Tencent 格式需要 10+ 个 ~ 字段
-        mock_resp.text = ('v_sh600900="1~test~600900~26.65~26.50~26.80~'
-                          '1000~50000~26.70~26.40~26.85~100000~'
-                          '20260703150000~1.23~0.88~26.65");')
+        mock_resp.text = (
+            'v_sh600900="1~test~600900~26.65~26.50~26.80~'
+            "1000~50000~26.70~26.40~26.85~100000~"
+            '20260703150000~1.23~0.88~26.65");'
+        )
         mock_client = MagicMock()
         mock_client.get.return_value = mock_resp
         mock_factory.return_value.__enter__.return_value = mock_client
 
         from src.python.providers.tencent import fetch_price
+
         result = fetch_price("600900")
         self.assertIsNotNone(result)
 
@@ -239,6 +286,7 @@ class TestResponseParsingErrors(unittest.TestCase):
 # LLM API 错误分类
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestSslErrors(unittest.TestCase):
     """SSL 证书验证失败 → 不崩溃。"""
 
@@ -246,12 +294,11 @@ class TestSslErrors(unittest.TestCase):
     def test_ssl_error_caught_by_request_error(self, mock_factory):
         """SSL 证书错误 → RequestError 捕获 → 返回 None。"""
         mock_client = MagicMock()
-        mock_client.get.side_effect = httpx.RequestError(
-            "SSL: CERTIFICATE_VERIFY_FAILED"
-        )
+        mock_client.get.side_effect = httpx.RequestError("SSL: CERTIFICATE_VERIFY_FAILED")
         mock_factory.return_value.__enter__.return_value = mock_client
 
         from src.python.providers.tencent import fetch_price
+
         result = fetch_price("600900")
         self.assertIsNone(result)
 
@@ -259,6 +306,7 @@ class TestSslErrors(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 # HTTP 客户端 — SSL_VERIFY 环境变量
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestHttpClientSslVerify(unittest.TestCase):
     """SSL_VERIFY 环境变量控制验证策略。"""
@@ -270,6 +318,7 @@ class TestHttpClientSslVerify(unittest.TestCase):
         # 重新加载模块级变量
         import importlib
         import src.python.core.http_client as hc
+
         importlib.reload(hc)
         self.assertFalse(hc._SSL_VERIFY)
 
@@ -279,6 +328,7 @@ class TestHttpClientSslVerify(unittest.TestCase):
         mock_getenv.return_value = "true"
         import importlib
         import src.python.core.http_client as hc
+
         importlib.reload(hc)
         self.assertTrue(hc._SSL_VERIFY)
 

@@ -186,7 +186,7 @@ class TestGenerateExcelReport(unittest.TestCase):
         """include_news=True → 新闻页签创建。"""
         from src.python.report.excel_generator import generate_excel_report
 
-        with patch("src.python.report.news_correlation.write_news_sheet") as mock_news:
+        with patch("src.python.report.news_correlation.write_news_sheet"):
             with patch("src.python.report.news_correlation.build_news_data", return_value=([], {})):
                 generate_excel_report(
                     self.holdings,
@@ -203,7 +203,7 @@ class TestGenerateExcelReport(unittest.TestCase):
         news_data = [{"title": "新闻1", "intro": "简介", "matched_keywords": ["test"]}]
         news_llm_meta = {"llm_enabled": False}
 
-        with patch("src.python.report.news_correlation.write_news_sheet") as mock_news:
+        with patch("src.python.report.news_correlation.write_news_sheet"):
             generate_excel_report(
                 self.holdings,
                 include_news=True,

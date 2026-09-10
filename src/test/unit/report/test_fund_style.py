@@ -85,17 +85,17 @@ class TestPeToStyle(unittest.TestCase):
 
     def test_value_with_industry_avg(self):
         """PE < 行业均值的 70% → 价值"""
-        self.assertEqual(_pe_to_style(10, 20), "价值")   # 10/20=0.5 < 0.7
-        self.assertEqual(_pe_to_style(13, 20), "价值")   # 13/20=0.65 < 0.7
+        self.assertEqual(_pe_to_style(10, 20), "价值")  # 10/20=0.5 < 0.7
+        self.assertEqual(_pe_to_style(13, 20), "价值")  # 13/20=0.65 < 0.7
 
     def test_growth_with_industry_avg(self):
         """PE > 行业均值的 130% → 成长"""
-        self.assertEqual(_pe_to_style(30, 20), "成长")   # 30/20=1.5 > 1.3
-        self.assertEqual(_pe_to_style(26, 20), "成长")   # 26/20=1.3
+        self.assertEqual(_pe_to_style(30, 20), "成长")  # 30/20=1.5 > 1.3
+        self.assertEqual(_pe_to_style(26, 20), "成长")  # 26/20=1.3
 
     def test_blend_with_industry_avg(self):
         """PE 在中间范围 → 混合"""
-        self.assertEqual(_pe_to_style(20, 20), "混合")   # 20/20=1.0
+        self.assertEqual(_pe_to_style(20, 20), "混合")  # 20/20=1.0
 
     def test_no_industry_avg_absolute(self):
         """无行业平均 PE → 绝对值判定"""
@@ -167,7 +167,7 @@ class TestGridDistance(unittest.TestCase):
         self.assertEqual(_grid_distance("大盘成长", "小盘价值"), 4)
 
     def test_dash_style(self):
-        """"--" → 0"""
+        """ "--" → 0"""
         self.assertEqual(_grid_distance("大盘成长", "--"), 0)
 
 
@@ -199,6 +199,7 @@ class TestGetIndustryAvgPe(unittest.TestCase):
 
     def setUp(self):
         from src.python.core.provider_registry import get_registry
+
         get_registry().session_cache_clear("extended")
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
@@ -326,6 +327,7 @@ class TestClassifyFundStyle(unittest.TestCase):
     def setUp(self):
         """每个测试前清除 registry session_cache（extended 域），避免跨测试污染。"""
         from src.python.core.provider_registry import get_registry
+
         get_registry().session_cache_clear("extended")
 
     def test_empty_holdings(self):
@@ -390,6 +392,7 @@ class TestClassifyFundStyle(unittest.TestCase):
                 "000858": {"market_cap": 5e11, "pe": 44.0},  # 高PE
             }
             return data.get(code)
+
         mock_push2.side_effect = push2_side
 
         holdings = [
@@ -411,12 +414,14 @@ class TestClassifyFundStyle(unittest.TestCase):
     def test_weighted_style(self, mock_push2, mock_fetch_ind):
         """多只持仓加权 → 按权重最大的 size 和 style 输出"""
         mock_fetch_ind.return_value = None
+
         def side_effect(code):
             if code == "600519":
-                return {"market_cap": 1000e8, "pe": 25.0}   # 大盘混合
+                return {"market_cap": 1000e8, "pe": 25.0}  # 大盘混合
             elif code == "300750":
-                return {"market_cap": 50e8, "pe": 50.0}     # 小盘成长
+                return {"market_cap": 50e8, "pe": 50.0}  # 小盘成长
             return None
+
         mock_push2.side_effect = side_effect
 
         holdings = [
@@ -503,12 +508,15 @@ class TestExtendedCacheSharing(unittest.TestCase):
     def setUp(self):
         """清除文件缓存中 extended_ 前缀的条目。"""
         from src.python.cache import clear_by_prefix
+
         clear_by_prefix("extended_")
 
     @patch("src.python.fetcher.price.fetch_market_data")
     @patch("src.python.fetcher.industry.fetch_industry_data")
     def test_push2_writes_tencent_reads(
-        self, mock_fetch_ind, mock_tencent_api,
+        self,
+        mock_fetch_ind,
+        mock_tencent_api,
     ):
         """push2 路径写入缓存 → tencent 读取缓存（不调用 tencent API）"""
         # 行业请求同源带出扩展字段（pe/pb/market_cap），写入缓存
@@ -534,7 +542,9 @@ class TestExtendedCacheSharing(unittest.TestCase):
     @patch("src.python.fetcher.price.fetch_market_data")
     @patch("src.python.fetcher.industry.fetch_industry_data")
     def test_tencent_writes_push2_reads(
-        self, mock_fetch_ind, mock_tencent_api,
+        self,
+        mock_fetch_ind,
+        mock_tencent_api,
     ):
         """tencent 写入缓存 → push2 读取缓存（不调用行业请求）"""
         mock_fetch_ind.return_value = None  # 不应被调用
@@ -557,7 +567,9 @@ class TestExtendedCacheSharing(unittest.TestCase):
     @patch("src.python.fetcher.price.fetch_market_data")
     @patch("src.python.fetcher.industry.fetch_industry_data")
     def test_different_code_no_cache_interference(
-        self, mock_fetch_ind, mock_tencent_api,
+        self,
+        mock_fetch_ind,
+        mock_tencent_api,
     ):
         """不同代码的缓存互不干扰。"""
         mock_fetch_ind.side_effect = lambda c: {

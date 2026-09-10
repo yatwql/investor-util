@@ -195,7 +195,7 @@ def get_cost_summary(for_report: bool = True) -> str:
         cost_display = formatted.get("cost_display", "¥0.0000")
         model = formatted.get("model_display", "未指定")
 
-        parts.append(f"LLM Token 成本追踪")
+        parts.append("LLM Token 成本追踪")
         parts.append(f"{'=' * 40}")
         parts.append(f"模型: {model}")
         parts.append(f"调用次数: {formatted.get('call_count', 0)}")

@@ -26,6 +26,7 @@ class TestCalcYieldText(unittest.TestCase):
 
     def setUp(self):
         from src.python.report.category import calc_yield_text
+
         self.fn = calc_yield_text
         self.d = MagicMock(spec=DetailRow)
         self.d.price = 50.0
@@ -84,9 +85,10 @@ class TestBuildCategoryDataDividend(unittest.TestCase):
         """get_dividend_data 正常 → yield_text 正确计算。"""
         from src.python.report.html_builders import _build_category_data
 
-        with patch("src.python.fetcher.akshare.get_dividend_data",
-                   return_value={"600900": {"avg_dividend": 0.85},
-                                 "601398": {"avg_dividend": 0.30}}):
+        with patch(
+            "src.python.fetcher.akshare.get_dividend_data",
+            return_value={"600900": {"avg_dividend": 0.85}, "601398": {"avg_dividend": 0.30}},
+        ):
             result, dividend_success = _build_category_data(self.holdings, list(self.detail_map.values()))
             self.assertTrue(dividend_success)
 

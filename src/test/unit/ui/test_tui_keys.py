@@ -17,7 +17,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from src.python.tui.tui_keys import (
-
     KEY_CTRL_C,
     KEY_DOWN,
     KEY_ENTER,
@@ -28,6 +27,7 @@ from src.python.tui.tui_keys import (
     _get_key_windows,
 )
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 
 
@@ -90,7 +90,6 @@ class TestGetKeyWindows(unittest.TestCase):
 
     def setUp(self) -> None:
         # 确保 msvcrt 已在 sys.modules 中，patch 才能正确拦截
-        import msvcrt  # noqa: F811
 
         self._patcher = patch("msvcrt.getch")
         self._mock_getch = self._patcher.start()
@@ -166,9 +165,6 @@ class TestGetKeyLinux(unittest.TestCase):
 
     def setUp(self) -> None:
         import termios
-        import tty
-        import select
-
 
         self._termios_error = termios.error
         self._stdin_patcher = patch("src.python.tui.tui_keys.sys.stdin")

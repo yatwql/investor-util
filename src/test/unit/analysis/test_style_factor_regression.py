@@ -21,7 +21,6 @@ import numpy as np
 import pytest
 
 from src.python.analysis.style_factor_regression import (
-    FACTOR_STALE_DAYS,
     asif_portfolio_daily_returns,
     compute_factor_exposure,
     filter_stale_factor_klines,

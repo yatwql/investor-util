@@ -47,6 +47,7 @@ def _appendix_h_keys() -> set[str]:
             keys.add(m.group(1))
     return keys
 
+
 _EXTRA_KEYS = {"crisis_annotation_data", "tail_risk_data", "snapshot_diff_data"}
 
 
@@ -137,9 +138,7 @@ class TestSchemaRegisteredInAppendixH(unittest.TestCase):
 
     def test_decision_review_data_registered(self):
         """决策复盘区块键已登记类型（dict / None）并可经 build() 注入不告警。"""
-        self.assertEqual(
-            _PIPELINE_DATA_TYPE_MAP.get("decision_review_data"), (dict, type(None))
-        )
+        self.assertEqual(_PIPELINE_DATA_TYPE_MAP.get("decision_review_data"), (dict, type(None)))
         with self.assertNoLogs("invest", level="WARNING"):
             build(decision_review_data={"rows": []})
 

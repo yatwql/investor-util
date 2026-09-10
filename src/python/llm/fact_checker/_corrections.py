@@ -19,7 +19,6 @@ from src.python.llm.fact_checker._utils import (
     _build_stock_weight_map,
     _edit_distance_le_one,
     _extract_holding_map,
-    _sentence_snippet,
     _strip_html,
 )
 

@@ -53,7 +53,7 @@ class TestFindJsonBlob:
         """
         html = (
             '<div id="data-container" data-jsonblob="{&#34;tests&#34;: {'
-            '&#34;a::t&#34;: [{ &#34;result&#34;: &#34;Failed&#34;, '
+            "&#34;a::t&#34;: [{ &#34;result&#34;: &#34;Failed&#34;, "
             '&#34;log&#34;: &#34;<pre>assert False</pre>&#34; }]}}"></div>'
         )
         blob = extract_script._find_json_blob(html)
@@ -68,7 +68,7 @@ class TestFindJsonBlob:
         """日志内嵌花括号不干扰 JSON 提取（depth 逻辑废弃后自然通过）。"""
         html = (
             '<div data-jsonblob="{&#34;tests&#34;: {&#34;t&#34;: ['
-            '{ &#34;result&#34;: &#34;Passed&#34;, '
+            "{ &#34;result&#34;: &#34;Passed&#34;, "
             '&#34;log&#34;: &#34;{a: 1} {b: 2}&#34; }]}}"></div>'
         )
         blob = extract_script._find_json_blob(html)

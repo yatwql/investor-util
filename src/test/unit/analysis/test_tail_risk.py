@@ -19,6 +19,7 @@ from src.python.analysis.tail_risk import compute_tail_risk
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
+
 def _bars_from_returns(returns: list[float], start: str = "2026-01-01", base: float = 100.0) -> list[dict]:
     """从日收益率序列（小数）生成 bars（v[i] = v[i-1] * (1 + r[i-1])）。"""
     out: list[dict] = []

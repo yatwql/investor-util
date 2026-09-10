@@ -18,7 +18,6 @@ from __future__ import annotations
 import os
 import re
 import unittest
-from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup

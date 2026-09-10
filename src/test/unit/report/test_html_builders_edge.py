@@ -26,6 +26,7 @@ class TestCalcYieldTextEdge(unittest.TestCase):
 
     def setUp(self):
         from src.python.report.category import calc_yield_text
+
         self.fn = calc_yield_text
 
     def test_price_zero(self):
@@ -87,15 +88,13 @@ class TestBuildCategoryDataDividendDegradation(unittest.TestCase):
         """get_dividend_data 抛异常 → 所有 yield_text 为 "--"。"""
         from src.python.report.html_builders import _build_category_data
 
-        with patch("src.python.fetcher.akshare.get_dividend_data",
-                   side_effect=Exception("API 失败")):
+        with patch("src.python.fetcher.akshare.get_dividend_data", side_effect=Exception("API 失败")):
             result, dividend_success = _build_category_data(self.holdings, list(self.detail_map.values()))
             self.assertFalse(dividend_success)
 
         for group in result:
             for item in group["items"]:
-                self.assertEqual(item.get("yield_text"), "--",
-                                 f"{item['name']} 的 yield_text 应为 --")
+                self.assertEqual(item.get("yield_text"), "--", f"{item['name']} 的 yield_text 应为 --")
 
 
 if __name__ == "__main__":

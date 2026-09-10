@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -22,9 +22,15 @@ class TestApplyLlmNewsCorrelation(unittest.TestCase):
 
     def _call(self, news_batch: list | None = None, llm_response: str = ""):
         from src.python.llm.generators_news import _apply_llm_news_correlation
-        batch = news_batch if news_batch is not None else [
-            {"title": "新闻A"}, {"title": "新闻B"},
-        ]
+
+        batch = (
+            news_batch
+            if news_batch is not None
+            else [
+                {"title": "新闻A"},
+                {"title": "新闻B"},
+            ]
+        )
         return _apply_llm_news_correlation(batch, llm_response)
 
     def test_empty_batch(self):
@@ -45,11 +51,7 @@ class TestApplyLlmNewsCorrelation(unittest.TestCase):
 
     def test_json_in_markdown_block(self):
         """JSON 在 Markdown 代码块内仍能解析。"""
-        response = (
-            '```json\n'
-            '[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "test"}]\n'
-            '```'
-        )
+        response = '```json\n[{"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "test"}]\n```'
         result = self._call(news_batch=[{"title": "单条新闻"}], llm_response=response)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0][0], "高")
@@ -107,10 +109,11 @@ class TestApplyLlmNewsCorrelation(unittest.TestCase):
 
     def test_all_news_high_correlation(self):
         """所有新闻高关联。"""
-        response = '[' + ','.join(
-            f'{{"idx": {i}, "relevance": "高", "sentiment": "利好", "analysis": "a{i}"}}'
-            for i in range(5)
-        ) + ']'
+        response = (
+            "["
+            + ",".join(f'{{"idx": {i}, "relevance": "高", "sentiment": "利好", "analysis": "a{i}"}}' for i in range(5))
+            + "]"
+        )
         batch = [{"title": f"N{i}"} for i in range(5)]
         result = self._call(news_batch=batch, llm_response=response)
         self.assertEqual(len(result), 5)
@@ -135,10 +138,11 @@ class TestPrecheckOneCache(unittest.TestCase):
     def test_cache_disabled(self):
         """can_cache=False → 返回 (None, False)。"""
         from src.python.llm.generators_orchestrator import _precheck_one_cache
+
         result, cached = _precheck_one_cache(
-            {"can_cache": False, "key": "test", "ttl": 3600,
-             "thinking_key": "thinking_enabled_test"},
-            {}, "test_module",
+            {"can_cache": False, "key": "test", "ttl": 3600, "thinking_key": "thinking_enabled_test"},
+            {},
+            "test_module",
         )
         self.assertIsNone(result)
         self.assertFalse(cached)
@@ -147,10 +151,11 @@ class TestPrecheckOneCache(unittest.TestCase):
     def test_cache_miss(self, mock_get):
         """缓存未命中 → 返回 (None, False)。"""
         from src.python.llm.generators_orchestrator import _precheck_one_cache
+
         result, cached = _precheck_one_cache(
-            {"can_cache": True, "key": "test", "ttl": 3600,
-             "thinking_key": "thinking_enabled_test"},
-            {}, "test_module",
+            {"can_cache": True, "key": "test", "ttl": 3600, "thinking_key": "thinking_enabled_test"},
+            {},
+            "test_module",
         )
         self.assertIsNone(result)
         self.assertFalse(cached)
@@ -162,11 +167,13 @@ class TestPrecheckAllModules(unittest.TestCase):
 
     def setUp(self):
         from src.python.llm.prompts import LLM_MODULE_FAILURE
+
         self._orig = dict(LLM_MODULE_FAILURE)
         LLM_MODULE_FAILURE.clear()
 
     def tearDown(self):
         from src.python.llm.prompts import LLM_MODULE_FAILURE
+
         LLM_MODULE_FAILURE.clear()
         LLM_MODULE_FAILURE.update(self._orig)
 
@@ -177,8 +184,12 @@ class TestPrecheckAllModules(unittest.TestCase):
         from src.python.llm.prompts import FAIL_REASON_DISABLED, LLM_MODULE_FAILURE
 
         cache_info = {
-            "global_macro": {"can_cache": True, "key": "llm_global_macro", "ttl": 86400,
-                             "thinking_key": "thinking_enabled_global_macro"},
+            "global_macro": {
+                "can_cache": True,
+                "key": "llm_global_macro",
+                "ttl": 86400,
+                "thinking_key": "thinking_enabled_global_macro",
+            },
         }
         _precheck_all_modules({}, cache_info, _force=False)
         self.assertEqual(
@@ -195,6 +206,7 @@ class TestGeneratorFunctions(unittest.TestCase):
         """generate_global_macro 有正确签名的 prompt builder。"""
         from src.python.llm.generators import generate_global_macro
         import inspect
+
         sig = inspect.signature(generate_global_macro)
         params = list(sig.parameters.keys())
         self.assertIn("a_indices", params)
@@ -205,6 +217,7 @@ class TestGeneratorFunctions(unittest.TestCase):
         """generate_expert_review 包含持仓明细和穿透参数。"""
         from src.python.llm.generators import generate_expert_review
         import inspect
+
         sig = inspect.signature(generate_expert_review)
         params = list(sig.parameters.keys())
         self.assertIn("holdings_details", params)
@@ -214,6 +227,7 @@ class TestGeneratorFunctions(unittest.TestCase):
         """generate_health_check 包含四个维度参数。"""
         from src.python.llm.generators import generate_health_check
         import inspect
+
         sig = inspect.signature(generate_health_check)
         params = list(sig.parameters.keys())
         self.assertIn("holdings_details", params)
@@ -223,6 +237,7 @@ class TestGeneratorFunctions(unittest.TestCase):
         """generate_penetration_deep_analysis 包含穿透参数。"""
         from src.python.llm.generators import generate_penetration_deep_analysis
         import inspect
+
         sig = inspect.signature(generate_penetration_deep_analysis)
         params = list(sig.parameters.keys())
         self.assertIn("penetrated_assets", params)
@@ -230,6 +245,7 @@ class TestGeneratorFunctions(unittest.TestCase):
     def test_llm_client_settings_have_http2(self):
         """默认 LLM 客户端配置包含 HTTP/2。"""
         from src.python.llm.generators_orchestrator import _LLM_CLIENT_SETTINGS
+
         self.assertTrue(_LLM_CLIENT_SETTINGS.get("http2"))
         self.assertIn("limits", _LLM_CLIENT_SETTINGS)
 
@@ -241,8 +257,20 @@ class TestComputeModuleCacheInfo(unittest.TestCase):
     def test_contains_all_module_keys(self):
         """包含所有 4 个 LLM 主模块的缓存信息。"""
         from src.python.llm.generators_orchestrator import _compute_module_cache_info
+
         info = _compute_module_cache_info(
-            {}, {}, {}, 0, 0, 0, 0, 0, {}, None, None, force=False,
+            {},
+            {},
+            {},
+            0,
+            0,
+            0,
+            0,
+            0,
+            {},
+            None,
+            None,
+            force=False,
         )
         for key in ["global_macro", "expert_review", "health_check", "penetration_deep"]:
             with self.subTest(key=key):

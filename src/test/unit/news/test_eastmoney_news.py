@@ -14,11 +14,11 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from src.python.providers.eastmoney_news import (
-
     _parse_news_item,
     fetch_news,
 )
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
 
@@ -74,10 +74,14 @@ class TestParseNewsItem(unittest.TestCase):
 
     def test_whitespace_stripped(self):
         """字段值去除前后空格。"""
-        result = _parse_news_item({
-            "title": "  标题  ", "code": "  123  ",
-            "summary": "  摘要  ", "showTime": "  2026-07-01  ",
-        })
+        result = _parse_news_item(
+            {
+                "title": "  标题  ",
+                "code": "  123  ",
+                "summary": "  摘要  ",
+                "showTime": "  2026-07-01  ",
+            }
+        )
         self.assertEqual(result["title"], "标题")
         self.assertEqual(result["intro"], "摘要")
         self.assertEqual(result["ctime"], "2026-07-01")
@@ -91,23 +95,24 @@ class TestParseNewsItem(unittest.TestCase):
 class TestFetchNews(unittest.TestCase):
     """fetch_news HTTP 集成测试。"""
 
-    def _mock_response(self, json_data: dict | None = None,
-                       status_code: int = 200):
+    def _mock_response(self, json_data: dict | None = None, status_code: int = 200):
         """创建模拟 httpx.Response。"""
         import httpx
+
         resp = MagicMock(spec=httpx.Response)
         resp.status_code = status_code
         resp.json.return_value = json_data or {}
         if status_code >= 400:
             resp.raise_for_status.side_effect = httpx.HTTPStatusError(
-                f"{status_code} error", request=MagicMock(), response=resp,
+                f"{status_code} error",
+                request=MagicMock(),
+                response=resp,
             )
         else:
             resp.raise_for_status.return_value = None
         return resp
 
-    def _setup_mock(self, mock_factory: MagicMock,
-                    mock_response: MagicMock) -> MagicMock:
+    def _setup_mock(self, mock_factory: MagicMock, mock_response: MagicMock) -> MagicMock:
         """配置 mock make_http_client 返回 mock client。"""
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
@@ -120,14 +125,16 @@ class TestFetchNews(unittest.TestCase):
     @patch("src.python.providers.eastmoney_news.make_http_client")
     def test_success(self, mock_factory):
         """正常返回 → 正确解析新闻列表。"""
-        mock_resp = self._mock_response({
-            "data": {"fastNewsList": [
-                {"title": "新闻1", "code": "c001",
-                 "summary": "摘要1", "showTime": "2026-07-01 10:00"},
-                {"title": "新闻2", "code": "c002",
-                 "summary": "摘要2", "showTime": "2026-07-01 10:01"},
-            ]},
-        })
+        mock_resp = self._mock_response(
+            {
+                "data": {
+                    "fastNewsList": [
+                        {"title": "新闻1", "code": "c001", "summary": "摘要1", "showTime": "2026-07-01 10:00"},
+                        {"title": "新闻2", "code": "c002", "summary": "摘要2", "showTime": "2026-07-01 10:01"},
+                    ]
+                },
+            }
+        )
         self._setup_mock(mock_factory, mock_resp)
 
         result = fetch_news(num=10)
@@ -164,6 +171,7 @@ class TestFetchNews(unittest.TestCase):
     def test_timeout_returns_empty_list(self, mock_factory):
         """超时异常 → 返回空列表。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -210,13 +218,17 @@ class TestFetchNews(unittest.TestCase):
     @patch("src.python.providers.eastmoney_news.make_http_client")
     def test_invalid_items_skipped(self, mock_factory):
         """列表中含无效条目 → 跳过空标题。"""
-        mock_resp = self._mock_response({
-            "data": {"fastNewsList": [
-                {"title": "有效", "code": "c001"},
-                {"title": "", "code": "c002"},
-                {"title": "   ", "code": "c003"},
-            ]},
-        })
+        mock_resp = self._mock_response(
+            {
+                "data": {
+                    "fastNewsList": [
+                        {"title": "有效", "code": "c001"},
+                        {"title": "", "code": "c002"},
+                        {"title": "   ", "code": "c003"},
+                    ]
+                },
+            }
+        )
         self._setup_mock(mock_factory, mock_resp)
 
         result = fetch_news(num=10)

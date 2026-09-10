@@ -4,6 +4,7 @@
 
 断言原则：只校验返回「结构」与非空，不校验具体日期集合。
 """
+
 from __future__ import annotations
 
 import pytest

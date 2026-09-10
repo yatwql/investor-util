@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 import pytest
 from openpyxl import Workbook
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import src.python.web.upload as upload
 from src.python.config import _config_defaults

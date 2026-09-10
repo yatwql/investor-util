@@ -14,17 +14,15 @@
 from __future__ import annotations
 
 import unittest
-from dataclasses import dataclass
 from typing import Any
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import patch
 
 from src.python.core.models import Holding
 from src.python.report import penetration as pene
 from src.python.report.market_value import DetailRow
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
-
 
 
 # ═══════════════════════════════════════════════════════════
@@ -37,8 +35,11 @@ class TestClassifyPenetration(unittest.TestCase):
 
     def _h(self, name: str, code: str = "", account: str = "证券账户") -> Holding:
         return Holding(
-            account=account, name=name, code=code,
-            shares=1.0, cost_price=1.0,
+            account=account,
+            name=name,
+            code=code,
+            shares=1.0,
+            cost_price=1.0,
         )
 
     # ── 正向分支 ──────────────────────────────────────────
@@ -192,15 +193,22 @@ class TestIsBondFund(unittest.TestCase):
 
     def test_bond_keywords(self):
         from src.python.core.code_utils import is_bond_related_by_name
+
         for name in [
-            "招商鑫福中短债A", "博时安盈短债A", "广发景明中短债A",
-            "南方利率债A", "富国信用债A", "某纯债A", "某债券A",
+            "招商鑫福中短债A",
+            "博时安盈短债A",
+            "广发景明中短债A",
+            "南方利率债A",
+            "富国信用债A",
+            "某纯债A",
+            "某债券A",
         ]:
             with self.subTest(name=name):
                 self.assertTrue(is_bond_related_by_name(name))
 
     def test_not_bond(self):
         from src.python.core.code_utils import is_bond_related_by_name
+
         self.assertFalse(is_bond_related_by_name("中欧医疗健康混合"))
         self.assertFalse(is_bond_related_by_name("华夏纳斯达克100ETF(QDII)"))
         self.assertFalse(is_bond_related_by_name("电池ETF"))
@@ -211,6 +219,7 @@ class TestIsIndexLink(unittest.TestCase):
 
     def test_link_keywords(self):
         from src.python.core.code_utils import is_index_link_by_name
+
         for name in [
             "天弘沪深300ETF联接A",
             "天弘沪深300ETF联接",
@@ -222,6 +231,7 @@ class TestIsIndexLink(unittest.TestCase):
 
     def test_not_link(self):
         from src.python.core.code_utils import is_index_link_by_name
+
         self.assertFalse(is_index_link_by_name("中欧医疗健康混合"))
         self.assertFalse(is_index_link_by_name("电池ETF"))
         self.assertFalse(is_index_link_by_name("招商鑫福中短债A"))
@@ -269,6 +279,7 @@ class TestNormalizeName(unittest.TestCase):
 
 class MockDetailRow:
     """替代 DetailRow 的简单对象，避免导入 openpyxl 依赖。"""
+
     def __init__(self, code: str, market_value: float):
         self.code = code
         self.market_value = market_value
@@ -308,9 +319,9 @@ class TestPenetrationMerge(unittest.TestCase):
         ]
         # 对应的 detail 行
         self.details = [
-            MockDetailRow("561910", 10000.0),    # 电池ETF市值 1万
-            MockDetailRow("012325", 5000.0),       # 短债市值 5000
-            MockDetailRow("600900", 10000.0),      # 长江电力市值 1万
+            MockDetailRow("561910", 10000.0),  # 电池ETF市值 1万
+            MockDetailRow("012325", 5000.0),  # 短债市值 5000
+            MockDetailRow("600900", 10000.0),  # 长江电力市值 1万
         ]
 
         # mock 电池ETF持仓：前10=宁德时代(15%)+比亚迪(10%)
@@ -327,10 +338,12 @@ class TestPenetrationMerge(unittest.TestCase):
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
     def test_basic_merge_and_sort(self, mock_batch):
         """验证相同的底层标的合并、按市值排序。"""
-        mock_batch.return_value = _mock_fund_holdings_batch({
-            "561910": self.etf_holdings,
-            "012325": self.bond_holdings,
-        })
+        mock_batch.return_value = _mock_fund_holdings_batch(
+            {
+                "561910": self.etf_holdings,
+                "012325": self.bond_holdings,
+            }
+        )
 
         # 调用写穿透的下层逻辑：直接调用 write_penetration_sheet 太重量级（需要 openpyxl）
         # 用内联方式测试 merge 阶段的逻辑
@@ -402,15 +415,16 @@ class TestPenetrationMerge(unittest.TestCase):
     def test_top10_truncation(self, mock_batch):
         """验证超过 10 个标的时只取 TOP10。"""
         # 1只基金, 15个持仓
-        holdings_15 = [{"name": f"股票{i:02d}", "code": f"600{i:03d}", "ratio": 5.0}
-                       for i in range(1, 16)]
+        holdings_15 = [{"name": f"股票{i:02d}", "code": f"600{i:03d}", "ratio": 5.0} for i in range(1, 16)]
 
-        mock_batch.return_value = _mock_fund_holdings_batch({
-            "561910": holdings_15,
-        })
+        mock_batch.return_value = _mock_fund_holdings_batch(
+            {
+                "561910": holdings_15,
+            }
+        )
 
         h = Holding("证券账户", "电池ETF", "561910", 1000, 1.0)
-        detail_map = {"561910": MockDetailRow("561910", 10000.0)}
+        {"561910": MockDetailRow("561910", 10000.0)}
         merged = {}
 
         batch_data = mock_batch.return_value
@@ -439,10 +453,12 @@ class TestPenetrationMerge(unittest.TestCase):
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
     def test_same_underlying_merged(self, mock_batch):
         """验证相同底层标的（同名）合并。"""
-        mock_batch.return_value = _mock_fund_holdings_batch({
-            "561910": [{"name": "宁德时代", "code": "300750", "ratio": 10.0}],
-            "515700": [{"name": "宁德时代", "code": "300750", "ratio": 10.0}],
-        })
+        mock_batch.return_value = _mock_fund_holdings_batch(
+            {
+                "561910": [{"name": "宁德时代", "code": "300750", "ratio": 10.0}],
+                "515700": [{"name": "宁德时代", "code": "300750", "ratio": 10.0}],
+            }
+        )
 
         holdings = [
             Holding("证券账户", "电池ETF", "561910", 1000, 1.0),
@@ -496,10 +512,14 @@ class TestPenetrationEdgeCases(unittest.TestCase):
             Holding("证券账户", "浦发转债", "110059", 10, 100.0),
             Holding("证券账户", "现金管理", "400000", 1000, 1.0),
         ]
-        details = []
         classified: dict[str, list[Holding]] = {
-            pene.QDII: [], pene.ETF: [], pene.INDEX_LINK: [],
-            pene.BOND_FUND: [], pene.ACTIVE_EQUITY: [], pene.STOCK: [], pene.IGNORE: [],
+            pene.QDII: [],
+            pene.ETF: [],
+            pene.INDEX_LINK: [],
+            pene.BOND_FUND: [],
+            pene.ACTIVE_EQUITY: [],
+            pene.STOCK: [],
+            pene.IGNORE: [],
         }
         for h in holdings:
             cat = pene.classify_penetration(h)
@@ -525,7 +545,6 @@ class TestPenetrationEdgeCases(unittest.TestCase):
             MockDetailRow("561910", 3000.0),
         ]
         detail_map = {d.code: d for d in details}
-        merged: dict = {}
         unknown_mv = 0.0
 
         # 模拟所有 fetch 返回 None
@@ -544,14 +563,18 @@ class TestPenetrationEdgeCases(unittest.TestCase):
         holdings = [
             Holding("支付宝", "某混合基金", "001234", 1000, 1.0),
         ]
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
-             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
-            mock_batch.return_value = _mock_fund_holdings_batch({
-                "001234": [
-                    {"name": "贵州茅台", "code": "600519", "ratio": 5.0},
-                    {"name": "宁德时代", "code": "300750", "ratio": 4.0},
-                ],
-            })
+        with (
+            patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch,
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        ):
+            mock_batch.return_value = _mock_fund_holdings_batch(
+                {
+                    "001234": [
+                        {"name": "贵州茅台", "code": "600519", "ratio": 5.0},
+                        {"name": "宁德时代", "code": "300750", "ratio": 4.0},
+                    ],
+                }
+            )
             details = [MockDetailRow("001234", 10000.0)]
             detail_map = {d.code: d for d in details}
             merged = {}
@@ -592,19 +615,24 @@ class TestPenetrationConcepts(unittest.TestCase):
         ]
         details = [MockDetailRow("561910", 10000.0)]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
-             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
-            mock_batch.return_value = {"561910": {
-                "code": "561910", "name": "电池ETF", "date": "2026-03-31",
-                "holdings": [
-                    {"name": "宁德时代", "code": "300750", "ratio": 15.0},
-                    {"name": "比亚迪", "code": "002594", "ratio": 10.0},
-                ],
-            }}
+        with (
+            patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch,
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        ):
+            mock_batch.return_value = {
+                "561910": {
+                    "code": "561910",
+                    "name": "电池ETF",
+                    "date": "2026-03-31",
+                    "holdings": [
+                        {"name": "宁德时代", "code": "300750", "ratio": 15.0},
+                        {"name": "比亚迪", "code": "002594", "ratio": 10.0},
+                    ],
+                }
+            }
             result = pene.compute_penetration_top10(holdings, details)
             for entry in result["top10"]:
-                self.assertIn("concepts", entry,
-                              f"TOP10 条目 {entry['name']} 缺少 concepts 字段")
+                self.assertIn("concepts", entry, f"TOP10 条目 {entry['name']} 缺少 concepts 字段")
                 # concepts 可以为空列表或字符串列表
                 self.assertIsInstance(entry["concepts"], list)
 
@@ -615,14 +643,20 @@ class TestPenetrationConcepts(unittest.TestCase):
         ]
         details = [MockDetailRow("561910", 10000.0)]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
-             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
-            mock_batch.return_value = {"561910": {
-                "code": "561910", "name": "电池ETF", "date": "2026-03-31",
-                "holdings": [
-                    {"name": "宁德时代", "code": "300750", "ratio": 15.0},
-                ],
-            }}
+        with (
+            patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch,
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        ):
+            mock_batch.return_value = {
+                "561910": {
+                    "code": "561910",
+                    "name": "电池ETF",
+                    "date": "2026-03-31",
+                    "holdings": [
+                        {"name": "宁德时代", "code": "300750", "ratio": 15.0},
+                    ],
+                }
+            }
             result = pene.compute_penetration_top10(holdings, details)
             self.assertIn("top10", result)
             first = result["top10"][0]
@@ -644,11 +678,13 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
     应保证各资产占总市值的比例之和不超过 100%。
     """
 
-    def _make_holding(self, name: str, code: str, shares: float,
-                       price: float, account: str = "证券") -> Holding:
+    def _make_holding(self, name: str, code: str, shares: float, price: float, account: str = "证券") -> Holding:
         return Holding(
-            account=account, name=name, code=code,
-            shares=shares, cost_price=price,
+            account=account,
+            name=name,
+            code=code,
+            shares=shares,
+            cost_price=price,
         )
 
     def _make_detail(self, code: str, name: str, price: float) -> DetailRow:
@@ -682,16 +718,21 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
             self._make_detail("600900", "长江电力", 28.0),
         ]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
-             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
-            mock_batch.return_value = {"510300": {
-                "code": "510300", "name": "沪深300ETF",
-                "date": "2026-03-31",
-                "holdings": [
-                    {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
-                    {"name": "宁德时代", "code": "300750", "ratio": 8.0},
-                ],
-            }}
+        with (
+            patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch,
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        ):
+            mock_batch.return_value = {
+                "510300": {
+                    "code": "510300",
+                    "name": "沪深300ETF",
+                    "date": "2026-03-31",
+                    "holdings": [
+                        {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
+                        {"name": "宁德时代", "code": "300750", "ratio": 8.0},
+                    ],
+                }
+            }
             result = pene.compute_penetration_top10(holdings, details)
 
         top10 = result.get("top10", [])
@@ -699,8 +740,7 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
             self.skipTest("穿透结果为空")
 
         total_ratio = sum(item.get("ratio_pct", 0) for item in top10)
-        self.assertLessEqual(total_ratio, 100.0 + 1e-9,
-                             f"TOP10 占比总和 {total_ratio:.2f}% > 100%")
+        self.assertLessEqual(total_ratio, 100.0 + 1e-9, f"TOP10 占比总和 {total_ratio:.2f}% > 100%")
 
     def test_single_asset_ratio(self):
         """单一资产 → 占比应为 100%。"""
@@ -711,8 +751,10 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
             self._make_detail("600900", "长江电力", 28.0),
         ]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
-             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
+        with (
+            patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch,
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        ):
             mock_batch.return_value = {"600900": None}
             result = pene.compute_penetration_top10(holdings, details)
         top10 = result.get("top10", [])
@@ -726,8 +768,7 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
             self._make_holding("长江电力", "600900", 200, 28.0),
             self._make_holding("宁德时代", "300750", 50, 250.0),
         ]
-        details = [self._make_detail(h.code, h.name, h.cost_price)
-                    for h in holdings]
+        details = [self._make_detail(h.code, h.name, h.cost_price) for h in holdings]
 
         with patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
             result = pene.compute_penetration_top10(holdings, details)
@@ -742,21 +783,25 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
         ]
         details = [self._make_detail("510300", "沪深300ETF", 4.0)]
 
-        with patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch, \
-             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}):
-            mock_batch.return_value = {"510300": {
-                "code": "510300", "name": "沪深300ETF",
-                "date": "2026-03-31",
-                "holdings": [
-                    {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
-                ],
-            }}
+        with (
+            patch("src.python.report.penetration.fetch_fund_holdings_batch") as mock_batch,
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
+        ):
+            mock_batch.return_value = {
+                "510300": {
+                    "code": "510300",
+                    "name": "沪深300ETF",
+                    "date": "2026-03-31",
+                    "holdings": [
+                        {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
+                    ],
+                }
+            }
             result = pene.compute_penetration_top10(holdings, details)
 
         top10 = result.get("top10", [])
         for item in top10:
-            self.assertGreaterEqual(item.get("ratio_pct", -1), 0,
-                                    f"{item.get('name')} 占比为负")
+            self.assertGreaterEqual(item.get("ratio_pct", -1), 0, f"{item.get('name')} 占比为负")
 
 
 class TestFundsWithUnavailableHoldings(unittest.TestCase):
@@ -771,7 +816,9 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         """持仓数据取不到的基金 → 不进入 top10，基金全值计入 unknown_mv。"""
         mock_batch.return_value = {
             "561910": {
-                "code": "561910", "name": "电池ETF", "date": "2026-03-31",
+                "code": "561910",
+                "name": "电池ETF",
+                "date": "2026-03-31",
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                     {"name": "比亚迪", "code": "002594", "ratio": 10.0},
@@ -795,8 +842,7 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         # 财通基金不应该出现在 top10 的名称中
         top10_names = [e["name"] for e in result["top10"]]
         for name in top10_names:
-            self.assertNotIn("财通", name,
-                             f"穿透 TOP10 不应包含基金名称「{name}」")
+            self.assertNotIn("财通", name, f"穿透 TOP10 不应包含基金名称「{name}」")
 
         # 宁德时代和比亚迪应为穿透结果（来自电池ETF）
         self.assertIn("宁德时代", top10_names)
@@ -807,8 +853,7 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         self.assertAlmostEqual(nd["mv"], 1500.0, places=1)
 
         # unknown_mv 包含两只财通基金的全值
-        self.assertAlmostEqual(result["summary"]["unknown_mv"],
-                               31299.59 + 31152.86, delta=0.02)
+        self.assertAlmostEqual(result["summary"]["unknown_mv"], 31299.59 + 31152.86, delta=0.02)
 
         # failed_funds 应正确计数
         self.assertEqual(result["summary"]["failed_funds"], 2)
@@ -819,7 +864,9 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         """未穿透的基金不参与总市值计算，ratio_pct 仅基于可识别资产。"""
         mock_batch.return_value = {
             "561910": {
-                "code": "561910", "name": "电池ETF", "date": "2026-03-31",
+                "code": "561910",
+                "name": "电池ETF",
+                "date": "2026-03-31",
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 50.0},
                 ],
@@ -854,7 +901,9 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         """持仓比例 >100% 的标的应被过滤（如 518880 黄金 ETF API 返回的垃圾数据）。"""
         mock_batch.return_value = {
             "518880": {
-                "code": "518880", "name": "华安黄金ETF", "date": "",
+                "code": "518880",
+                "name": "华安黄金ETF",
+                "date": "",
                 "holdings": [
                     # ratio > 100% 的垃圾数据
                     {"name": "财通成长优选混合A（001480）", "code": "001480", "ratio": 401.03},
@@ -874,8 +923,7 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         result = pene.compute_penetration_top10(holdings, details)
 
         # 过滤后无有效标的 → top10 应为空
-        self.assertEqual(len(result["top10"]), 0,
-                         "ratio 全部 >100% 的基金不应产生穿透标的")
+        self.assertEqual(len(result["top10"]), 0, "ratio 全部 >100% 的基金不应产生穿透标的")
 
         # unknown_mv 应包含 518880 的全值
         self.assertAlmostEqual(result["summary"]["unknown_mv"], 8309.70, delta=0.02)
@@ -887,7 +935,9 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         """同一基金混有无效和有效比例 → 只保留有效比例。"""
         mock_batch.return_value = {
             "518880": {
-                "code": "518880", "name": "华安黄金ETF", "date": "",
+                "code": "518880",
+                "name": "华安黄金ETF",
+                "date": "",
                 "holdings": [
                     {"name": "财通成长优选混合A（001480）", "code": "001480", "ratio": 401.03},
                     {"name": "山东黄金", "code": "600547", "ratio": 15.0},
@@ -907,8 +957,7 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
 
         # 财通基金应被过滤，只保留山东黄金和中金黄金
         top10_names = [e["name"] for e in result["top10"]]
-        self.assertNotIn("财通成长优选混合A", top10_names,
-                         "ratio>100% 的标的应被过滤")
+        self.assertNotIn("财通成长优选混合A", top10_names, "ratio>100% 的标的应被过滤")
         self.assertIn("山东黄金", top10_names)
         self.assertIn("中金黄金", top10_names)
 

@@ -248,5 +248,3 @@ def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
     dispatcher.shutdown()
     logger.info("批量行业数据就绪: %d/%d 个代码（含缓存命中）", len(result_map), len(a_codes))
     return result_map
-
-

@@ -15,25 +15,27 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
 
 from src.python.core.models import Holding
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
+def _make_holding(
+    name: str, code: str, shares: float = 100, cost_price: float = 10.0, account: str = "证券"
+) -> Holding:
+    return Holding(account=account, name=name, code=code, shares=shares, cost_price=cost_price)
 
-def _make_holding(name: str, code: str, shares: float = 100,
-                  cost_price: float = 10.0, account: str = "证券") -> Holding:
-    return Holding(account=account, name=name, code=code,
-                   shares=shares, cost_price=cost_price)
 
-
-def _make_merged_item(name: str, mv: float,
-                      codes: list[str] | None = None,
-                      funds: list[str] | None = None,
-                      sector: str = "制造业",
-                      concepts: list[str] | None = None) -> dict:
+def _make_merged_item(
+    name: str,
+    mv: float,
+    codes: list[str] | None = None,
+    funds: list[str] | None = None,
+    sector: str = "制造业",
+    concepts: list[str] | None = None,
+) -> dict:
     return {
         "name": name,
         "mv": mv,
@@ -58,9 +60,11 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
         }
         classified = {key: [] for key in ("qdii", "etf", "index_link", "bond_fund", "active_equity")}
         funds = []
-        direct_stocks = [_make_holding("贵州茅台", "600519"),
-                         _make_holding("长江电力", "600900"),
-                         _make_holding("宁德时代", "300750")]
+        direct_stocks = [
+            _make_holding("贵州茅台", "600519"),
+            _make_holding("长江电力", "600900"),
+            _make_holding("宁德时代", "300750"),
+        ]
 
         result = _build_penetration_result(
             merged=merged,
@@ -73,8 +77,7 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
         )
 
         total_ratio = sum(item["ratio_pct"] for item in result["top10"])
-        self.assertAlmostEqual(total_ratio, 100.0, delta=0.02,
-                               msg=f"ratio_pct 之和应 ≈ 100%，实际 {total_ratio}")
+        self.assertAlmostEqual(total_ratio, 100.0, delta=0.02, msg=f"ratio_pct 之和应 ≈ 100%，实际 {total_ratio}")
 
     def test_zero_total_mv_returns_zero_ratios(self):
         """总市值 = 0 → 所有 ratio_pct = 0。"""
@@ -99,8 +102,7 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
         )
 
         for item in result["top10"]:
-            self.assertEqual(item["ratio_pct"], 0.0,
-                             f"{item['name']} ratio_pct 应为 0，实际 {item['ratio_pct']}")
+            self.assertEqual(item["ratio_pct"], 0.0, f"{item['name']} ratio_pct 应为 0，实际 {item['ratio_pct']}")
 
     def test_single_asset_ratio_100(self):
         """单资产 → ratio_pct = 100%。"""
@@ -179,8 +181,7 @@ class TestPenetrationNormalizationEdgeCases(unittest.TestCase):
         )
 
         expected_coverage = (10000 + 5000 + 2000) / (10000 + 5000 + 2000) * 100
-        self.assertAlmostEqual(result["summary"]["top10_coverage_pct"],
-                               expected_coverage, delta=0.1)
+        self.assertAlmostEqual(result["summary"]["top10_coverage_pct"], expected_coverage, delta=0.1)
 
     def test_top10_coverage_zero_total(self):
         """总市值 = 0 → top10_coverage_pct = 0。"""
@@ -260,8 +261,7 @@ class TestPenetrationNormalizationEdgeCases(unittest.TestCase):
         """超过 10 项合并资产 → 只取 TOP10。"""
         from src.python.report.penetration import _build_penetration_result
 
-        merged = {f"CODE{i:04d}": _make_merged_item(f"资产{i}", (11 - i) * 1000)
-                  for i in range(1, 15)}
+        merged = {f"CODE{i:04d}": _make_merged_item(f"资产{i}", (11 - i) * 1000) for i in range(1, 15)}
         classified = {key: [] for key in ("qdii", "etf", "index_link", "bond_fund", "active_equity")}
         funds = []
         direct_stocks = []
@@ -294,13 +294,15 @@ class TestPenetrationWithFunds(unittest.TestCase):
             "300750": _make_merged_item("宁德时代", 20000, funds=["沪深300ETF"]),
             "000858": _make_merged_item("五粮液", 15000, funds=["易方达蓝筹"]),
         }
-        classified = {"qdii": [], "etf": [_make_holding("510300", "沪深300ETF")],
-                      "index_link": [], "bond_fund": [],
-                      "active_equity": [_make_holding("005827", "易方达蓝筹")]}
-        funds = [_make_holding("510300", "沪深300ETF"),
-                 _make_holding("005827", "易方达蓝筹")]
-        direct_stocks = [_make_holding("贵州茅台", "600519"),
-                         _make_holding("长江电力", "600900")]
+        classified = {
+            "qdii": [],
+            "etf": [_make_holding("510300", "沪深300ETF")],
+            "index_link": [],
+            "bond_fund": [],
+            "active_equity": [_make_holding("005827", "易方达蓝筹")],
+        }
+        funds = [_make_holding("510300", "沪深300ETF"), _make_holding("005827", "易方达蓝筹")]
+        direct_stocks = [_make_holding("贵州茅台", "600519"), _make_holding("长江电力", "600900")]
 
         result = _build_penetration_result(
             merged=merged,
@@ -355,14 +357,21 @@ class TestSectorAllocationRatio(unittest.TestCase):
         merged = {}
         for name, mv in sectors:
             merged[name] = {
-                "name": name, "mv": mv, "codes": [], "funds": ["直接持股"],
-                "sector": name, "concepts": [],
+                "name": name,
+                "mv": mv,
+                "codes": [],
+                "funds": ["直接持股"],
+                "sector": name,
+                "concepts": [],
             }
-        classified = {key: [] for key in
-                       ("qdii", "etf", "index_link", "bond_fund", "active_equity")}
+        classified = {key: [] for key in ("qdii", "etf", "index_link", "bond_fund", "active_equity")}
         return _build_penetration_result(
-            merged=merged, classified=classified, funds=[],
-            direct_stocks=[], unknown_mv=0.0, failed_count=0,
+            merged=merged,
+            classified=classified,
+            funds=[],
+            direct_stocks=[],
+            unknown_mv=0.0,
+            failed_count=0,
             failed_fund_details=[],
         )
 

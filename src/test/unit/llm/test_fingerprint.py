@@ -14,15 +14,13 @@ from __future__ import annotations
 import unittest
 
 from src.python.llm.fingerprint import (
-
     build_llm_fingerprint,
-    compute_fingerprint,
     extract_stable_holdings,
     extract_stable_penetration,
 )
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
 
 class TestExtractStableHoldings(unittest.TestCase):
@@ -39,8 +37,7 @@ class TestExtractStableHoldings(unittest.TestCase):
     def test_extracts_name_code_cost_only(self):
         """只保留 name/code/cost，忽略 price/market_value 等行情字段。"""
         details = [
-            {"name": "茅台", "code": "600519", "cost": 1000,
-             "price": 1500, "market_value": 150000, "profit": 50000},
+            {"name": "茅台", "code": "600519", "cost": 1000, "price": 1500, "market_value": 150000, "profit": 50000},
         ]
         result = extract_stable_holdings(details)
         self.assertEqual(len(result), 1)
@@ -106,11 +103,15 @@ class TestBuildLlmFingerprint(unittest.TestCase):
     def test_fingerprint_is_deterministic(self):
         """相同输入 → 相同指纹。"""
         fp1 = build_llm_fingerprint(
-            total_mv=100000, total_cost=80000, total_profit=20000,
+            total_mv=100000,
+            total_cost=80000,
+            total_profit=20000,
             holdings_details=[{"name": "A", "code": "000001", "cost": 100}],
         )
         fp2 = build_llm_fingerprint(
-            total_mv=100000, total_cost=80000, total_profit=20000,
+            total_mv=100000,
+            total_cost=80000,
+            total_profit=20000,
             holdings_details=[{"name": "A", "code": "000001", "cost": 100}],
         )
         self.assertEqual(fp1, fp2)

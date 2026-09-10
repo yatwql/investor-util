@@ -22,7 +22,6 @@ from src.python.tui.tui_menu import (
     index_by_key,
     print_header,
     print_sep,
-    _show_llm_config_status,
     get_config_cache,
 )
 import pytest

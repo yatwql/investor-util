@@ -40,28 +40,32 @@ class TestBuildDataSourceMatrixDegradedList:
     ) -> None:
         """向 DegradationTracker 注入一条 record 事件。"""
         t = get_tracker()
-        t._events.append(t._make_event(
-            source_key=source_key,
-            tier=tier,
-            success=success,
-            failure_type=failure_type,
-            degraded=degraded,
-            count=1,
-            effective_threshold=1,
-            timestamp=1000.0,
-        ))
+        t._events.append(
+            t._make_event(
+                source_key=source_key,
+                tier=tier,
+                success=success,
+                failure_type=failure_type,
+                degraded=degraded,
+                count=1,
+                effective_threshold=1,
+                timestamp=1000.0,
+            )
+        )
         # 同步更新计数器（避免 _record_unsafe 影响，直接操作 _events）
         # 注：_make_event 是私有的——我们直接构造 DegradationEvent 对象
 
     def _add_raw_event(self, **kwargs) -> None:
         """向 DegradationTracker 注入一条 DegradationEvent。"""
         from src.python.report.data_status import DegradationEvent
+
         t = get_tracker()
         ev = DegradationEvent(**kwargs)
         t._events.append(ev)
 
     def _build(self) -> list[dict[str, Any]]:
         from src.python.report.data_source_matrix import build_data_source_matrix
+
         return build_data_source_matrix()
 
     # ── 测试用例 ─────────────────────────────
@@ -180,18 +184,33 @@ class TestBuildDataSourceMatrixDegradedList:
         """同一类别多条 degraded → degraded_list 含多项。"""
         self._add_raw_event(
             source_key="price_600900",
-            tier="T2", success=False, failure_type="unreachable",
-            degraded=True, count=3, effective_threshold=2, timestamp=1000.0,
+            tier="T2",
+            success=False,
+            failure_type="unreachable",
+            degraded=True,
+            count=3,
+            effective_threshold=2,
+            timestamp=1000.0,
         )
         self._add_raw_event(
             source_key="price_600519",
-            tier="T2", success=False, failure_type="timeout",
-            degraded=True, count=4, effective_threshold=2, timestamp=1001.0,
+            tier="T2",
+            success=False,
+            failure_type="timeout",
+            degraded=True,
+            count=4,
+            effective_threshold=2,
+            timestamp=1001.0,
         )
         self._add_raw_event(
             source_key="price_000001",
-            tier="T2", success=False, failure_type="unreachable",
-            degraded=True, count=3, effective_threshold=2, timestamp=1002.0,
+            tier="T2",
+            success=False,
+            failure_type="unreachable",
+            degraded=True,
+            count=3,
+            effective_threshold=2,
+            timestamp=1002.0,
         )
         matrix = self._build()
         price_row = next(r for r in matrix if r["key"] == "price")
@@ -206,8 +225,13 @@ class TestBuildDataSourceMatrixDegradedList:
         for code in ("price_a", "price_b", "price_c"):
             self._add_raw_event(
                 source_key=code,
-                tier="T4", success=False, failure_type="unreachable",
-                degraded=False, count=1, effective_threshold=1, timestamp=1000.0,
+                tier="T4",
+                success=False,
+                failure_type="unreachable",
+                degraded=False,
+                count=1,
+                effective_threshold=1,
+                timestamp=1000.0,
             )
         matrix = self._build()
         price_row = next(r for r in matrix if r["key"] == "price")
@@ -220,6 +244,7 @@ class TestBuildDataSourceMatrixDegradedList:
     def test_no_events_returns_empty(self):
         """无任何事件 → 空列表。"""
         from src.python.report.data_status import reset_tracker
+
         reset_tracker()
         matrix = self._build()
         assert matrix == []
@@ -228,8 +253,13 @@ class TestBuildDataSourceMatrixDegradedList:
         """degraded_list 每项格式包含 failure_type 描述。"""
         self._add_raw_event(
             source_key="fund_rank_001",
-            tier="T2", success=False, failure_type="empty",
-            degraded=True, count=3, effective_threshold=2, timestamp=1000.0,
+            tier="T2",
+            success=False,
+            failure_type="empty",
+            degraded=True,
+            count=3,
+            effective_threshold=2,
+            timestamp=1000.0,
         )
         matrix = self._build()
         rank_row = next(r for r in matrix if r["key"] == "fund_rank")

@@ -12,7 +12,7 @@ import unittest
 from contextlib import ExitStack
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from src.python.llm import FAIL_REASON_API_ERROR, FAIL_REASON_DISABLED
 
@@ -36,14 +36,23 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
         }
         per_module = {
             "global_macro": {
-                "model": "deepseek-v4-flash", "cached": True,
-                "input_tokens": 0, "output_tokens": 0, "cache_hit_tokens": 500,
-                "cost": 0.0, "thinking": False, "endpoint": "",
+                "model": "deepseek-v4-flash",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 500,
+                "cost": 0.0,
+                "thinking": False,
+                "endpoint": "",
             },
             "expert_review": {
-                "model": "claude-sonnet-4", "cached": False,
-                "input_tokens": 2000, "output_tokens": 1000,
-                "cache_hit_tokens": 0, "cost": 0.008, "thinking": True,
+                "model": "claude-sonnet-4",
+                "cached": False,
+                "input_tokens": 2000,
+                "output_tokens": 1000,
+                "cache_hit_tokens": 0,
+                "cost": 0.008,
+                "thinking": True,
                 "endpoint": "",
             },
         }
@@ -76,6 +85,7 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
     def test_mixed_states_count(self):
         """_build_module_info_list：返回 5 个模块条目。"""
         from src.python.report.llm_module_info import build_llm_module_info
+
         result = build_llm_module_info({}, {})
         self.assertEqual(len(result), 5)
         keys = [m["key"] for m in result]
@@ -86,16 +96,27 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
         from src.python.report.html_renderers import _render_llm_module_info
 
         session_usage = {
-            "has_usage": True, "call_count": 1, "per_module": {
+            "has_usage": True,
+            "call_count": 1,
+            "per_module": {
                 "global_macro": {
-                    "model": "ds", "cached": True,
-                    "input_tokens": 0, "output_tokens": 0, "cache_hit_tokens": 300,
-                    "cost": 0.0, "thinking": False, "endpoint": "",
+                    "model": "ds",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "cache_hit_tokens": 300,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
                 },
                 "expert_review": {
-                    "model": "claude", "cached": False,
-                    "input_tokens": 1500, "output_tokens": 800,
-                    "cache_hit_tokens": 0, "cost": 0.005, "thinking": True,
+                    "model": "claude",
+                    "cached": False,
+                    "input_tokens": 1500,
+                    "output_tokens": 800,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.005,
+                    "thinking": True,
                     "endpoint": "",
                 },
             },
@@ -105,15 +126,11 @@ class TestS11MixedCacheAndRealCall(unittest.TestCase):
         }
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE",
-                                      module_failure))
-            stack.enter_context(
-                patch("src.python.llm.get_session_usage", return_value=session_usage))
-            stack.enter_context(
-                patch("src.python.llm.format_session_usage", return_value=session_usage))
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", module_failure))
+            stack.enter_context(patch("src.python.llm.get_session_usage", return_value=session_usage))
+            stack.enter_context(patch("src.python.llm.format_session_usage", return_value=session_usage))
 
-            llm_module_info, llm_endpoint, module_disabled, llm_session_usage = \
-                _render_llm_module_info(True)
+            llm_module_info, llm_endpoint, module_disabled, llm_session_usage = _render_llm_module_info(True)
 
         by_key = {m["key"]: m for m in llm_module_info}
         self.assertEqual(by_key["global_macro"]["status"], "cached")

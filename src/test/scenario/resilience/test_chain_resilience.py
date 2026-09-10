@@ -10,10 +10,7 @@
 
 from __future__ import annotations
 
-import json
-import os
 import time
-from unittest.mock import patch
 
 import logging
 
@@ -120,10 +117,7 @@ class TestChainResilience:
                 registry.record_failure(provider)
 
         # 验证所有已熔断
-        all_broken = all(
-            registry.is_circuit_broken(p)
-            for p in ("eastmoney", "tencent", "sina")
-        )
+        all_broken = all(registry.is_circuit_broken(p) for p in ("eastmoney", "tencent", "sina"))
         assert all_broken, "所有 provider 应均已熔断"
 
         # 验证链状态

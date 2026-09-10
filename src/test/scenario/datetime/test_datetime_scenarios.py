@@ -11,9 +11,8 @@
 from __future__ import annotations
 
 import unittest
-from contextlib import ExitStack
 from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -45,9 +44,9 @@ class TestGetTtlMarketAware:
                 self._mock_is_open = mock_is_open
                 yield
 
-    def _setup_config(self, market_hour_aware: list | None = None,
-                      cache_ttl: dict | None = None,
-                      market_hour_ttl: int = 30):
+    def _setup_config(
+        self, market_hour_aware: list | None = None, cache_ttl: dict | None = None, market_hour_ttl: int = 30
+    ):
         """构造 mock config。"""
         cfg: dict = {}
         if market_hour_aware is not None:
@@ -66,8 +65,12 @@ class TestGetTtlMarketAware:
             pytest.param(True, ["price", "index"], {"price": 86400, "index": 86400}, 30, "index", 30, id="T1-index"),
             pytest.param(True, ["price"], {"price": 86400}, 60, "price", 60, id="T1-custom-mh-ttl"),
             # T2/T4/T5: 非交易时段 — long TTL
-            pytest.param(False, ["price", "index"], {"price": 86400, "index": 86400}, 30, "price", 86400, id="T2-pre-market"),
-            pytest.param(False, ["price", "index"], {"price": 86400, "index": 86400}, 30, "index", 86400, id="T4-post-market"),
+            pytest.param(
+                False, ["price", "index"], {"price": 86400, "index": 86400}, 30, "price", 86400, id="T2-pre-market"
+            ),
+            pytest.param(
+                False, ["price", "index"], {"price": 86400, "index": 86400}, 30, "index", 86400, id="T4-post-market"
+            ),
             pytest.param(False, ["price", "index"], {"price": 86400}, 30, "price", 86400, id="T5-weekend"),
             # 非感知类型不受市场状态影响
             pytest.param(True, ["price", "index"], {"rank": 7200}, 30, "rank", 7200, id="non-aware-rank"),
@@ -122,13 +125,18 @@ class TestIsMiddayBreak(unittest.TestCase):
         """在 mock 的北京时间下调用 is_midday_break。"""
         with patch("src.python.core.market_hours.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(
-                2026, 7, 6 + weekday, hour, minute,
+                2026,
+                7,
+                6 + weekday,
+                hour,
+                minute,
                 tzinfo=timezone(timedelta(hours=8)),
             )
             mock_dt.timezone = timezone
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             from src.python.core.market_hours import is_midday_break
+
             return is_midday_break()
 
     def test_morning_session(self):
@@ -176,6 +184,7 @@ class TestClassifyHoldings:
     @staticmethod
     def _classify(holdings: list[Holding]) -> dict[str, list]:
         from src.python.report.market_value import classify_holdings
+
         return classify_holdings(holdings)
 
     @pytest.mark.parametrize(
@@ -213,10 +222,10 @@ class TestClassifyHoldings:
     def test_mixed_holdings_separated_correctly(self):
         """T11: 混合持仓（QDII + 场外 + ETF + 股票）各归各类。"""
         holdings = [
-            Holding("证券账户", "纳斯达克100QDII", "01878", 100, 1.0),   # QDII
-            Holding("支付宝", "天弘沪深300", "000961", 1000, 1.2),       # 国内场外
-            Holding("证券账户", "电池ETF", "561910", 1000, 10.0),         # 场内ETF
-            Holding("证券账户", "长江电力", "600900", 500, 28.0),        # 场内股票
+            Holding("证券账户", "纳斯达克100QDII", "01878", 100, 1.0),  # QDII
+            Holding("支付宝", "天弘沪深300", "000961", 1000, 1.2),  # 国内场外
+            Holding("证券账户", "电池ETF", "561910", 1000, 10.0),  # 场内ETF
+            Holding("证券账户", "长江电力", "600900", 500, 28.0),  # 场内股票
         ]
         cats = self._classify(holdings)
         assert len(cats["QDII"]) == 1
@@ -270,10 +279,17 @@ class TestCountTradingDaysBack(unittest.TestCase):
         # 7月：1(三) 2(四) 3(五) 6(一) 7(二) 8(三) 9(四) 10(五)
         # 6月：26(五) 29(一) 30(二)
         self._mock_calendar.return_value = {
-            "2026-06-26", "2026-06-29", "2026-06-30",
-            "2026-07-01", "2026-07-02", "2026-07-03",
-            "2026-07-06", "2026-07-07", "2026-07-08",
-            "2026-07-09", "2026-07-10",
+            "2026-06-26",
+            "2026-06-29",
+            "2026-06-30",
+            "2026-07-01",
+            "2026-07-02",
+            "2026-07-03",
+            "2026-07-06",
+            "2026-07-07",
+            "2026-07-08",
+            "2026-07-09",
+            "2026-07-10",
         }
 
     def tearDown(self):
@@ -281,6 +297,7 @@ class TestCountTradingDaysBack(unittest.TestCase):
 
     def _count(self, trading_day: str, nav_date: str) -> int | None:
         from src.python.report.market_value import _count_trading_days_back
+
         return _count_trading_days_back(trading_day, nav_date)
 
     def test_same_day_returns_none(self):

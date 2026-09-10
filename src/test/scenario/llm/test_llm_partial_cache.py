@@ -30,15 +30,23 @@ class TestS17PartialCacheExpiry(unittest.TestCase):
 
         per_module = {
             "global_macro": {
-                "model": "ds", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 1000, "cost": 0.0, "thinking": False,
+                "model": "ds",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 1000,
+                "cost": 0.0,
+                "thinking": False,
                 "endpoint": "",
             },
             "expert_review": {
-                "model": "claude", "cached": False,
-                "input_tokens": 3000, "output_tokens": 1500,
-                "cache_hit_tokens": 0, "cost": 0.015, "thinking": True,
+                "model": "claude",
+                "cached": False,
+                "input_tokens": 3000,
+                "output_tokens": 1500,
+                "cache_hit_tokens": 0,
+                "cost": 0.015,
+                "thinking": True,
                 "endpoint": "",
             },
         }
@@ -73,15 +81,10 @@ class TestS17PartialCacheExpiry(unittest.TestCase):
         reset_session_usage()
 
         # 模拟 S17: 2 模块缓存 + 1 模块成功（过期重新调用）
-        record_per_module("global_macro", "ds", inp=0, out=0, cached=True,
-                           cache_hit_tokens=1000)
-        record_per_module("health_check", "gpt4", inp=0, out=0, cached=True,
-                           cache_hit_tokens=500)
-        track_session_usage("claude",
-                             {"input_tokens": 2000, "output_tokens": 1000},
-                             "claude-sonnet-4")
-        record_per_module("expert_review", "claude-sonnet-4",
-                           inp=2000, out=1000, cached=False)
+        record_per_module("global_macro", "ds", inp=0, out=0, cached=True, cache_hit_tokens=1000)
+        record_per_module("health_check", "gpt4", inp=0, out=0, cached=True, cache_hit_tokens=500)
+        track_session_usage("claude", {"input_tokens": 2000, "output_tokens": 1000}, "claude-sonnet-4")
+        record_per_module("expert_review", "claude-sonnet-4", inp=2000, out=1000, cached=False)
 
         raw = get_session_usage()
         formatted = format_session_usage(raw)
@@ -115,33 +118,53 @@ class TestS17aFullCache(unittest.TestCase):
 
         per_module = {
             "global_macro": {
-                "model": "ds", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 500, "cost": 0.0, "thinking": False,
+                "model": "ds",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 500,
+                "cost": 0.0,
+                "thinking": False,
                 "endpoint": "",
             },
             "expert_review": {
-                "model": "claude", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 300, "cost": 0.0, "thinking": True,
+                "model": "claude",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 300,
+                "cost": 0.0,
+                "thinking": True,
                 "endpoint": "",
             },
             "health_check": {
-                "model": "gpt4", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 200, "cost": 0.0, "thinking": False,
+                "model": "gpt4",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 200,
+                "cost": 0.0,
+                "thinking": False,
                 "endpoint": "",
             },
             "penetration_deep": {
-                "model": "ds", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 400, "cost": 0.0, "thinking": False,
+                "model": "ds",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 400,
+                "cost": 0.0,
+                "thinking": False,
                 "endpoint": "",
             },
             "news_correlation": {
-                "model": "claude", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 600, "cost": 0.0, "thinking": False,
+                "model": "claude",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 600,
+                "cost": 0.0,
+                "thinking": False,
                 "endpoint": "",
             },
         }

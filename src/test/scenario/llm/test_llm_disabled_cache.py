@@ -34,9 +34,13 @@ class TestS15DisabledPriority(unittest.TestCase):
         # health_check 在 per_module 中也有数据，但应被禁用覆盖
         per_module = {
             "health_check": {
-                "model": "ds", "cached": False,
-                "input_tokens": 500, "output_tokens": 300,
-                "cache_hit_tokens": 0, "cost": 0.002, "thinking": False,
+                "model": "ds",
+                "cached": False,
+                "input_tokens": 500,
+                "output_tokens": 300,
+                "cache_hit_tokens": 0,
+                "cost": 0.002,
+                "thinking": False,
                 "endpoint": "",
             },
         }
@@ -63,9 +67,13 @@ class TestS15DisabledPriority(unittest.TestCase):
         }
         per_module = {
             "health_check": {
-                "model": "ds", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 500, "cost": 0.0, "thinking": False,
+                "model": "ds",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 500,
+                "cost": 0.0,
+                "thinking": False,
                 "endpoint": "",
             },
         }

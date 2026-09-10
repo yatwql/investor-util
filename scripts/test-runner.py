@@ -1096,8 +1096,6 @@ def run_mode(
     elif timeout_override is not None:
         timeout = timeout_override
 
-    start = _time.time()
-    timed_out = False
     try:
         # 设置测试环境标识，使子进程（含 xdist worker）正确将日志写入 test.log
         _env = os.environ.copy()
@@ -1114,8 +1112,6 @@ def run_mode(
         )
     except subprocess.TimeoutExpired:
         print(f"  [ERR] {mode_key} 测试超时（{timeout}s）")
-        timed_out = True
-        elapsed = timeout
         stats: dict = {
             "mode": mode_key,
             "desc": mode_cfg.get("desc", ""),
@@ -1129,8 +1125,6 @@ def run_mode(
         }
         stats["timed_out"] = True
         return stats
-    else:
-        elapsed = _time.time() - start
 
     # 合并 stdout + stderr
     output = (proc.stdout or "") + (proc.stderr or "")

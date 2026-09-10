@@ -237,7 +237,10 @@ def build_freshness_summary(
         jump = jump_by_code.get((h.code or "").strip())
         change_pct = (
             round(
-                (finite_or(_detail_value(detail, "price", 0.0)) - finite_or(_detail_value(detail, "yesterday_close", 0.0)))
+                (
+                    finite_or(_detail_value(detail, "price", 0.0))
+                    - finite_or(_detail_value(detail, "yesterday_close", 0.0))
+                )
                 / finite_or(_detail_value(detail, "yesterday_close", 0.0), 1.0)
                 * 100,
                 2,

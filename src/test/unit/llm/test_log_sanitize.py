@@ -23,16 +23,12 @@ from src.python.llm.api_base import _sanitize_endpoint
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
 
-
 class TestSanitizeEndpoint(unittest.TestCase):
     """_sanitize_endpoint 脱敏辅助函数测试。"""
 
     def test_normal_url_returns_host(self):
         """https://api.anthropic.com/v1/messages → api.anthropic.com。"""
-        self.assertEqual(
-            _sanitize_endpoint("https://api.anthropic.com/v1/messages"),
-            "api.anthropic.com"
-        )
+        self.assertEqual(_sanitize_endpoint("https://api.anthropic.com/v1/messages"), "api.anthropic.com")
 
     def test_empty_url(self):
         """空字符串 → unknown。"""
@@ -48,17 +44,11 @@ class TestSanitizeEndpoint(unittest.TestCase):
 
     def test_url_with_port(self):
         """含端口号的 URL → 端口保留。"""
-        self.assertEqual(
-            _sanitize_endpoint("https://api.test.com:8080/v1/chat"),
-            "api.test.com:8080"
-        )
+        self.assertEqual(_sanitize_endpoint("https://api.test.com:8080/v1/chat"), "api.test.com:8080")
 
     def test_http_url(self):
         """http URL → 域名部分。"""
-        self.assertEqual(
-            _sanitize_endpoint("http://localhost:11434/v1"),
-            "localhost:11434"
-        )
+        self.assertEqual(_sanitize_endpoint("http://localhost:11434/v1"), "localhost:11434")
 
 
 class TestApiKeyNotInLog(unittest.TestCase):
@@ -91,8 +81,7 @@ class TestApiKeyNotInLog(unittest.TestCase):
 
         log_text = self.log_capture.getvalue()
         # api_key 明文不应出现在日志中
-        self.assertNotIn(secret_key, log_text,
-                         "API Key 明文不应出现在日志中")
+        self.assertNotIn(secret_key, log_text, "API Key 明文不应出现在日志中")
 
     def test_api_key_not_logged_on_failure(self):
         """API 调用失败日志不包含 api_key。"""
@@ -106,15 +95,18 @@ class TestApiKeyNotInLog(unittest.TestCase):
                 client=MagicMock(),
                 url="https://api.test.com/v1",
                 headers={"x-api-key": secret_key},
-                payload={}, timeout=30, max_retries=1,
-                max_tokens=1000, config_field="max_tokens",
-                extract_fn=lambda d: "", check_truncation_fn=lambda d, mt: False,
+                payload={},
+                timeout=30,
+                max_retries=1,
+                max_tokens=1000,
+                config_field="max_tokens",
+                extract_fn=lambda d: "",
+                check_truncation_fn=lambda d, mt: False,
                 provider="claude",
             )
 
         log_text = self.log_capture.getvalue()
-        self.assertNotIn(secret_key, log_text,
-                         "日志不应包含 API Key")
+        self.assertNotIn(secret_key, log_text, "日志不应包含 API Key")
 
     def test_header_api_key_not_in_log(self):
         """HTTP 请求头的 API Key 不写入日志。"""
@@ -125,15 +117,18 @@ class TestApiKeyNotInLog(unittest.TestCase):
         with patch("src.python.llm._api_claude.call_llm_with_retry") as mock_retry:
             mock_retry.return_value = ("result", {"input_tokens": 10})
             call_claude(
-                system="sys", user="user", api_key=secret_key,
-                model="claude-sonnet-4", endpoint="",
-                max_tokens=100, timeout=30,
+                system="sys",
+                user="user",
+                api_key=secret_key,
+                model="claude-sonnet-4",
+                endpoint="",
+                max_tokens=100,
+                timeout=30,
                 http_client=MagicMock(),
             )
 
         log_text = self.log_capture.getvalue()
-        self.assertNotIn(secret_key, log_text,
-                         "请求头中的 API Key 不应出现在日志中")
+        self.assertNotIn(secret_key, log_text, "请求头中的 API Key 不应出现在日志中")
 
 
 class TestSanitizeEndpointInLogs(unittest.TestCase):
@@ -156,7 +151,8 @@ class TestSanitizeEndpointInLogs(unittest.TestCase):
     def test_circuit_breaker_logs_sanitized_endpoint(self):
         """熔断器日志使用域名而非完整 URL。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _CIRCUIT_BREAKER_THRESHOLD,
+            _cb_record_failure,
+            _CIRCUIT_BREAKER_THRESHOLD,
         )
 
         # 需要连续失败 _CIRCUIT_BREAKER_THRESHOLD(3) 次才触发日志
@@ -169,14 +165,16 @@ class TestSanitizeEndpointInLogs(unittest.TestCase):
     def test_config_api_key_not_in_log(self):
         """config 模块不将 api_key 写入日志。"""
         import logging
+
         cfg_logger = logging.getLogger("invest")
         cfg_logger.handlers.clear()
         cfg_logger.addHandler(self.handler)
         cfg_logger.setLevel(logging.DEBUG)
 
         from src.python.config import get_llm_config
-        import tempfile, json, os
-
+        import tempfile
+        import json
+        import os
 
         # 创建临时 llm_key.json 含 api_key
         tmp = tempfile.TemporaryDirectory()
@@ -186,15 +184,13 @@ class TestSanitizeEndpointInLogs(unittest.TestCase):
             json.dump({"provider": "claude", "api_key": secret}, f)
 
         with patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
-            with patch("src.python.config.get_llm_settings_path",
-                       return_value=os.path.join(tmp.name, "llm_settings.json")):
+            with patch(
+                "src.python.config.get_llm_settings_path", return_value=os.path.join(tmp.name, "llm_settings.json")
+            ):
                 with patch("src.python.config._core.os.path.exists") as mock_exists:
                     mock_exists.return_value = True
                     get_llm_config()
 
         log_text = self.log_capture.getvalue()
-        self.assertNotIn(secret, log_text,
-                         "API Key 不应出现在 config 模块的日志中")
+        self.assertNotIn(secret, log_text, "API Key 不应出现在 config 模块的日志中")
         tmp.cleanup()
-
-

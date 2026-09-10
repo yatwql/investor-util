@@ -1,6 +1,5 @@
 """测试 tiantian_holdings / tiantian_ranking 数据解析辅助函数。"""
 
-import json
 import unittest
 
 from src.python.providers.tiantian_holdings import (
@@ -13,14 +12,10 @@ from src.python.providers.tiantian_holdings import (
 from src.python.providers.tiantian_ranking import (
     _calc_rating_from_entry,
     _fund_type_hint_from_name,
-    _get_rating_thresholds,
-    _KNOWN_RATING_TYPES,
     _parse_perf_evaluation,
     _parse_rank_entry,
     _parse_risk_analysis,
     _parse_syl_returns,
-    _pct_to_rating,
-    _RATING_THRESHOLDS,
     fetch_fund_rankings,
 )
 from unittest.mock import patch

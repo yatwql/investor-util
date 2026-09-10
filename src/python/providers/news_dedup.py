@@ -574,9 +574,7 @@ _STOP_BIGRAMS: set[str] = {
 # 停用词掩码正则（长词优先，防重叠替换）：
 # "累计回购" → "□□"，杜绝跨词边界 bigram（计回/购股）泄漏；
 # 中文 bigram 提取时跳过含占位符的滑窗，使模板词彻底不贡献实体重叠。
-_STOP_MASK_RE = re.compile(
-    "|".join(re.escape(w) for w in sorted(_STOP_BIGRAMS, key=len, reverse=True))
-)
+_STOP_MASK_RE = re.compile("|".join(re.escape(w) for w in sorted(_STOP_BIGRAMS, key=len, reverse=True)))
 
 
 def _mask_stop(text: str) -> str:
@@ -681,10 +679,7 @@ _TOKEN_LIKE = re.compile(r"^[a-z0-9]+$|^_tk:[a-z]+$")
 
 def _has_opposite_direction(title_a: str, title_b: str) -> bool:
     """两标题是否含相反方向的词对（一正一反分属两标题）。"""
-    return any(
-        (w1 in title_a and w2 in title_b) or (w2 in title_a and w1 in title_b)
-        for w1, w2 in _OPPOSITE_PAIRS
-    )
+    return any((w1 in title_a and w2 in title_b) or (w2 in title_a and w1 in title_b) for w1, w2 in _OPPOSITE_PAIRS)
 
 
 def _dedup_by_title(
@@ -789,9 +784,7 @@ def _dedup_by_title(
                 # ④ 方向对立检测：共享实体 + 相反方向词分属两标题 → 不合并
                 #    （"美联储或暂缓加息"vs"城堡证券预计美联储将加息"）
                 if overlap >= 1 and _has_opposite_direction(norm, existing):
-                    _record_anchor(
-                        _make_anchor(item, existing_item, ratio, overlap, False, "cross_opposite")
-                    )
+                    _record_anchor(_make_anchor(item, existing_item, ratio, overlap, False, "cross_opposite"))
                 elif overlap >= 3:
                     is_dup = True
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge"))
@@ -799,11 +792,7 @@ def _dedup_by_title(
                 # ⑤ bg=2 梯度：中高 ratio + 共享英数/数字 token（专名）→ 合并
                 #    纯中文实体共享（如"英伟达"2 bigram）不代表同一事件，不触发；
                 #    CPI/PPI、荣耀IPO 等共享专名 token 的真重复靠此规则捕获。
-                elif (
-                    overlap >= 2
-                    and ratio >= _CROSS_BG2_RATIO
-                    and any(_TOKEN_LIKE.match(s) for s in (bg1 & bg2))
-                ):
+                elif overlap >= 2 and ratio >= _CROSS_BG2_RATIO and any(_TOKEN_LIKE.match(s) for s in (bg1 & bg2)):
                     is_dup = True
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge_bg2"))
                     break

@@ -13,16 +13,15 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
 
 from src.python.llm.prompts import (
-
     FAIL_REASON_NOT_CONFIGURED,
     FAIL_REASON_API_ERROR,
     FAIL_REASON_DISABLED,
     LLM_MODULE_FAILURE,
 )
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
 
@@ -53,7 +52,6 @@ class TestLlmPlaceholderTextInReport(unittest.TestCase):
     def test_excel_generator_placeholder_distinct(self):
         """excel_generator 中所有状态占位文本互不相同。"""
         # 验证 _build_llm_usage_sheet 中的 DISPLAY_REASON 映射
-        from src.python.report.excel_llm_usage import build_llm_usage_sheet as _blus
 
         # 5 种非 disabled 原因 + disabled（单独处理）= 6 种不同状态
         display_reason = {
@@ -69,8 +67,7 @@ class TestLlmPlaceholderTextInReport(unittest.TestCase):
         self.assertEqual(len(texts), 5, "非 disabled 应有 5 种占位文本")
 
         # disabled 单独验证（通过函数内专门分支）
-        self.assertEqual(len(set(display_reason.values()) | {"已禁用"}), 6,
-                         "包含 disabled 共 6 种不同占位")
+        self.assertEqual(len(set(display_reason.values()) | {"已禁用"}), 6, "包含 disabled 共 6 种不同占位")
 
     def test_llm_content_placeholder_distinct(self):
         """llm_content 中所有原因占位文本互不相同。"""
@@ -78,27 +75,26 @@ class TestLlmPlaceholderTextInReport(unittest.TestCase):
 
         # 验证占位文本映射各不相同
         texts = set(_PLACEHOLDER_BY_REASON.values())
-        self.assertEqual(len(texts), len(_PLACEHOLDER_BY_REASON),
-                         "每种原因的占位文本应互不相同")
-        self.assertGreaterEqual(len(texts), 3,
-                                "至少应有 3 种以上占位文本")
+        self.assertEqual(len(texts), len(_PLACEHOLDER_BY_REASON), "每种原因的占位文本应互不相同")
+        self.assertGreaterEqual(len(texts), 3, "至少应有 3 种以上占位文本")
 
         # 验证每个占位文本非空
         for reason, placeholder in _PLACEHOLDER_BY_REASON.items():
-            self.assertTrue(len(placeholder) > 0,
-                            f"原因 {reason} 的占位文本不应为空")
+            self.assertTrue(len(placeholder) > 0, f"原因 {reason} 的占位文本不应为空")
 
         # llm_content 不包含 FAIL_REASON_DISABLED
         # disabled 由调用方在模块级别过滤，不会传入 llm_content
         from src.python.llm.prompts import FAIL_REASON_DISABLED
-        self.assertNotIn(FAIL_REASON_DISABLED, _PLACEHOLDER_BY_REASON,
-                         "disabled 应在 llm_content 上层过滤，不进入 _PLACEHOLDER_BY_REASON")
+
+        self.assertNotIn(
+            FAIL_REASON_DISABLED,
+            _PLACEHOLDER_BY_REASON,
+            "disabled 应在 llm_content 上层过滤，不进入 _PLACEHOLDER_BY_REASON",
+        )
 
     def test_html_writer_placeholder_distinct(self):
         """html_writer 中所有状态占位文本互不相同。"""
         # 验证 html_writer 中 _build_module_info_list 的占位映射
-        from src.python.report.llm_module_info import build_llm_module_info
-
 
         display_reason = {
             "not_configured": "LLM 未配置",
@@ -109,8 +105,7 @@ class TestLlmPlaceholderTextInReport(unittest.TestCase):
         }
         texts = set(display_reason.values())
         self.assertEqual(len(texts), 5, "非 disabled 应有 5 种占位文本")
-        self.assertEqual(len(texts | {"已禁用"}), 6,
-                         "包含 disabled 共 6 种不同占位")
+        self.assertEqual(len(texts | {"已禁用"}), 6, "包含 disabled 共 6 种不同占位")
         self.assertIn("未配置", display_reason["not_configured"])
         self.assertIn("失败", display_reason["api_error"])
 

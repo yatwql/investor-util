@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
@@ -108,18 +107,17 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
     def test_power_failure_during_replace(self, mock_get_path):
         """模拟断电：os.replace 抛出异常 → 原文件完整，无临时文件残留。"""
         mock_get_path.return_value = self.config_path
-        import json
 
         # 先创建原始配置
         from src.python.config import set_config
+
         set_config("original_key", "original_value")
 
         with open(self.config_path, "r", encoding="utf-8") as f:
             original_content = f.read()
 
         # 模拟 os.replace 断电失败
-        with patch("src.python.config._core.os.replace",
-                   side_effect=OSError("Power failure simulated")):
+        with patch("src.python.config._core.os.replace", side_effect=OSError("Power failure simulated")):
             with self.assertRaises(OSError):
                 set_config("new_key", "new_value")
 
@@ -139,7 +137,8 @@ class TestConfigAtomicWriteConcurrency(unittest.TestCase):
         mock_get_path.return_value = self.config_path
         import json
 
-        from src.python.config import set_config, get_config
+        from src.python.config import set_config
+
         # 建立初始状态
         set_config("key_a", "value_a")
         set_config("key_b", "value_b")
@@ -177,6 +176,7 @@ class TestConfigEnvEdge(unittest.TestCase):
     def tearDown(self):
         if self._orig_config is not None:
             import src.python.config as cfg
+
             cfg._config_defaults._CONFIG_FILE = self._orig_config
         self.tmp.cleanup()
 
@@ -185,6 +185,7 @@ class TestConfigEnvEdge(unittest.TestCase):
     def test_bom_config_json_readable(self):
         """含 UTF-8 BOM 的 config.json → 能被 get_config() 正常解析。"""
         import src.python.config as cfg
+
         self._orig_config = cfg._config_defaults._CONFIG_FILE
         cfg._config_defaults._CONFIG_FILE = os.path.join(self.tmp.name, "config.json")
 
@@ -194,13 +195,13 @@ class TestConfigEnvEdge(unittest.TestCase):
             f.write(raw)
 
         result = cfg.get_config()
-        self.assertTrue(os.path.isabs(result["holdings_dir"]),
-                        f"holdings_dir 应为绝对路径: {result['holdings_dir']!r}")
+        self.assertTrue(os.path.isabs(result["holdings_dir"]), f"holdings_dir 应为绝对路径: {result['holdings_dir']!r}")
         self.assertEqual(result["holdings_filename"], "test.xlsx")
 
     def test_bom_llm_settings_readable(self):
         """含 UTF-8 BOM 的 llm_settings.json → 能被 get_llm_config() 正常解析。"""
         import src.python.config as cfg
+
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
         key_path = os.path.join(self.tmp.name, "llm_key.json")
 
@@ -212,8 +213,10 @@ class TestConfigEnvEdge(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
-        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
+        with (
+            patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path),
+            patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path),
+        ):
             # 清缓存
             cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
@@ -226,25 +229,21 @@ class TestConfigEnvEdge(unittest.TestCase):
     def test_crlf_llm_settings_with_comments(self):
         """CRLF 行尾 + 注释的 llm_settings.json → 正常解析。"""
         import src.python.config as cfg
+
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
         key_path = os.path.join(self.tmp.name, "llm_key.json")
 
         # CRLF 行尾 + 注释
-        settings_raw = (
-            "{\r\n"
-            '  // 温度参数\r\n'
-            '  "temperature": 0.7,\r\n'
-            '  /* 注释块 */\r\n'
-            '  "max_tokens": 2048\r\n'
-            "}\r\n"
-        )
+        settings_raw = '{\r\n  // 温度参数\r\n  "temperature": 0.7,\r\n  /* 注释块 */\r\n  "max_tokens": 2048\r\n}\r\n'
         with open(settings_path, "w", encoding="utf-8", newline="") as f:
             f.write(settings_raw)
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
-        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
+        with (
+            patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path),
+            patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path),
+        ):
             cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -257,6 +256,7 @@ class TestConfigEnvEdge(unittest.TestCase):
     def test_api_key_whitespace_stripped(self):
         """api_key 含首尾空格 → 被 strip 后再用于 API 调用。"""
         import src.python.config as cfg
+
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
         key_path = os.path.join(self.tmp.name, "llm_key.json")
 
@@ -266,27 +266,37 @@ class TestConfigEnvEdge(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "  sk-test-with-spaces  ", "provider": "claude"}, f)
 
-        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
+        with (
+            patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path),
+            patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path),
+        ):
             cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
         self.assertIsNotNone(result)
-        self.assertEqual(result["api_key"], "sk-test-with-spaces",
-                         "api_key 首尾空格应被去除")
+        self.assertEqual(result["api_key"], "sk-test-with-spaces", "api_key 首尾空格应被去除")
 
     def test_api_key_whitespace_in_settings_only(self):
         """仅 llm_settings.json 含 api_key → 因无 llm_key.json 返回 None（凭据分离）。"""
         import src.python.config as cfg
+
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
 
         # llm_settings.json 含 api_key 且无 llm_key.json → 返回 None（凭据分离）
         with open(settings_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "\t sk-ant-from-settings \n", "temperature": 0.7}, f)
 
-        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._llm_providers._get_llm_key_path", return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json")), \
-             patch("src.python.config._llm_providers._get_llm_providers_path", return_value=os.path.join(self.tmp.name, "llm_providers_not_exists.json")):
+        with (
+            patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path),
+            patch(
+                "src.python.config._llm_providers._get_llm_key_path",
+                return_value=os.path.join(self.tmp.name, "llm_key_not_exists.json"),
+            ),
+            patch(
+                "src.python.config._llm_providers._get_llm_providers_path",
+                return_value=os.path.join(self.tmp.name, "llm_providers_not_exists.json"),
+            ),
+        ):
             cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -298,6 +308,7 @@ class TestConfigEnvEdge(unittest.TestCase):
     def test_missing_pricing_still_returns_config(self):
         """llm_settings.json 缺失 pricing 段 → 运行时补默认值。"""
         import src.python.config as cfg
+
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
         key_path = os.path.join(self.tmp.name, "llm_key.json")
 
@@ -308,8 +319,10 @@ class TestConfigEnvEdge(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "openai"}, f)
 
-        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
+        with (
+            patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path),
+            patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path),
+        ):
             cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -322,6 +335,7 @@ class TestConfigEnvEdge(unittest.TestCase):
     def test_missing_system_prompt_still_works(self):
         """llm_settings.json 缺失所有 system_prompt_* → 运行时补默认 None。"""
         import src.python.config as cfg
+
         settings_path = os.path.join(self.tmp.name, "llm_settings.json")
         key_path = os.path.join(self.tmp.name, "llm_key.json")
 
@@ -330,8 +344,10 @@ class TestConfigEnvEdge(unittest.TestCase):
         with open(key_path, "w", encoding="utf-8") as f:
             json.dump({"api_key": "sk-test", "provider": "claude"}, f)
 
-        with patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path), \
-             patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path):
+        with (
+            patch("src.python.config._llm_settings.get_llm_settings_path", return_value=settings_path),
+            patch("src.python.config._llm_providers._get_llm_key_path", return_value=key_path),
+        ):
             cfg._llm_settings._llm_config_cache = None
             result = cfg.get_llm_config()
 
@@ -345,11 +361,13 @@ class TestConfigEnvEdge(unittest.TestCase):
     def test_concurrent_init_config_no_crash(self):
         """config.json 缺失时双线程同时 init_config() → 不崩溃。"""
         import src.python.config as cfg
+
         self._orig_config = cfg._config_defaults._CONFIG_FILE
         config_path = os.path.join(self.tmp.name, "config.json")
         cfg._config_defaults._CONFIG_FILE = config_path
 
         import threading
+
         errors = []
 
         def _init():
@@ -368,8 +386,9 @@ class TestConfigEnvEdge(unittest.TestCase):
         self.assertTrue(os.path.exists(config_path), "配置文件应被创建")
 
         data = cfg.get_config()
-        self.assertTrue(os.path.isabs(data.get("holdings_dir")),
-                        f"holdings_dir 应为绝对路径: {data.get('holdings_dir')!r}")
+        self.assertTrue(
+            os.path.isabs(data.get("holdings_dir")), f"holdings_dir 应为绝对路径: {data.get('holdings_dir')!r}"
+        )
 
     # ── 终端无颜色 ──
 
@@ -378,30 +397,31 @@ class TestConfigEnvEdge(unittest.TestCase):
         import src.python.tui.tui_menu as tui
 
         # 模拟非 TTY stdout + NO_COLOR
-        with patch("sys.stdout.isatty", return_value=False), \
-             patch.dict(os.environ, {"NO_COLOR": "1"}), \
-             patch("src.python.tui.tui_menu.get_llm_config",
-                   return_value={"api_key": "sk-test", "provider": "claude"}):
+        with (
+            patch("sys.stdout.isatty", return_value=False),
+            patch.dict(os.environ, {"NO_COLOR": "1"}),
+            patch("src.python.tui.tui_menu.get_llm_config", return_value={"api_key": "sk-test", "provider": "claude"}),
+        ):
             with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
                 tui._show_llm_config_status()
                 for call_args, _ in mock_stdout.write.call_args_list:
                     text = call_args[0] if isinstance(call_args[0], str) else str(call_args[0])
-                    self.assertNotIn("\033[", text,
-                                     f"NO_COLOR 下输出不应含 ANSI 转义: {text[:50]!r}")
+                    self.assertNotIn("\033[", text, f"NO_COLOR 下输出不应含 ANSI 转义: {text[:50]!r}")
 
     def test_no_color_env_unconfigured_ansi_suppressed(self):
         """NO_COLOR + 未配置 LLM → 输出不含 ANSI 转义。"""
         import src.python.tui.tui_menu as tui
 
-        with patch("sys.stdout.isatty", return_value=False), \
-             patch.dict(os.environ, {"NO_COLOR": "1"}), \
-             patch("src.python.tui.tui_menu.get_llm_config", return_value=None):
+        with (
+            patch("sys.stdout.isatty", return_value=False),
+            patch.dict(os.environ, {"NO_COLOR": "1"}),
+            patch("src.python.tui.tui_menu.get_llm_config", return_value=None),
+        ):
             with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
                 tui._show_llm_config_status()
                 for call_args, _ in mock_stdout.write.call_args_list:
                     text = call_args[0] if isinstance(call_args[0], str) else str(call_args[0])
-                    self.assertNotIn("\033[", text,
-                                     f"NO_COLOR + 未配置应无 ANSI: {text[:50]!r}")
+                    self.assertNotIn("\033[", text, f"NO_COLOR + 未配置应无 ANSI: {text[:50]!r}")
 
 
 if __name__ == "__main__":

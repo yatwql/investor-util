@@ -22,6 +22,7 @@ class TestFetchIndexKlineEdge(unittest.TestCase):
     def test_request_error_returns_empty(self, mock_factory):
         """网络异常 → 空列表。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -65,8 +66,14 @@ class TestFetchIndexKlineEdge(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.json.return_value = [
             "not a dict",
-            {"day": "2026-07-02", "open": "4000.0", "close": "4010.0",
-             "high": "4020.0", "low": "3990.0", "volume": "1000000"},
+            {
+                "day": "2026-07-02",
+                "open": "4000.0",
+                "close": "4010.0",
+                "high": "4020.0",
+                "low": "3990.0",
+                "volume": "1000000",
+            },
         ]
         mock_client.get.return_value = mock_resp
 
@@ -81,10 +88,22 @@ class TestFetchIndexKlineEdge(unittest.TestCase):
         mock_factory.return_value = mock_client
         mock_resp = MagicMock()
         mock_resp.json.return_value = [
-            {"day": "2026-07-01", "open": "3990.0", "close": "0.0",
-             "high": "4010.0", "low": "3980.0", "volume": "1000000"},
-            {"day": "2026-07-02", "open": "4000.0", "close": "0.0",
-             "high": "4020.0", "low": "3990.0", "volume": "1200000"},
+            {
+                "day": "2026-07-01",
+                "open": "3990.0",
+                "close": "0.0",
+                "high": "4010.0",
+                "low": "3980.0",
+                "volume": "1000000",
+            },
+            {
+                "day": "2026-07-02",
+                "open": "4000.0",
+                "close": "0.0",
+                "high": "4020.0",
+                "low": "3990.0",
+                "volume": "1200000",
+            },
         ]
         mock_client.get.return_value = mock_resp
 

@@ -16,7 +16,6 @@ from __future__ import annotations
 import unittest
 
 from src.python.llm.session import (
-
     _session_usage,
     _session_lock,
     get_session_usage,
@@ -26,8 +25,8 @@ from src.python.llm.session import (
     record_per_module,
 )
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
 
 def _reset_safe():
@@ -111,8 +110,15 @@ class TestGetSessionUsage(unittest.TestCase):
     def test_get_has_all_keys(self):
         """get 返回的 dict 包含所有必要键。"""
         usage = get_session_usage()
-        for key in ("input_tokens", "output_tokens", "cache_hit_tokens",
-                     "total_cost", "call_count", "per_module", "models"):
+        for key in (
+            "input_tokens",
+            "output_tokens",
+            "cache_hit_tokens",
+            "total_cost",
+            "call_count",
+            "per_module",
+            "models",
+        ):
             self.assertIn(key, usage)
 
 
@@ -139,10 +145,12 @@ class TestFormatSessionUsage(unittest.TestCase):
 
     def test_zero_calls_with_per_module_shows_usage(self):
         """call_count=0 但有 per_module → has_usage=True（全缓存场景）。"""
-        result = format_session_usage({
-            "call_count": 0,
-            "per_module": {"global_macro": {"model": "x"}},
-        })
+        result = format_session_usage(
+            {
+                "call_count": 0,
+                "per_module": {"global_macro": {"model": "x"}},
+            }
+        )
         self.assertTrue(result["has_usage"])
 
     def test_with_calls_returns_has_usage_true(self):
@@ -152,45 +160,55 @@ class TestFormatSessionUsage(unittest.TestCase):
 
     def test_total_tokens_is_sum(self):
         """total_tokens = input + output。"""
-        result = format_session_usage({
-            "call_count": 1,
-            "input_tokens": 100,
-            "output_tokens": 50,
-        })
+        result = format_session_usage(
+            {
+                "call_count": 1,
+                "input_tokens": 100,
+                "output_tokens": 50,
+            }
+        )
         self.assertEqual(result["total_tokens"], 150)
 
     def test_cache_hit_tokens_preserved(self):
         """cache_hit_tokens 原样传入。"""
-        result = format_session_usage({
-            "call_count": 1,
-            "cache_hit_tokens": 200,
-        })
+        result = format_session_usage(
+            {
+                "call_count": 1,
+                "cache_hit_tokens": 200,
+            }
+        )
         self.assertEqual(result["cache_hit_tokens"], 200)
 
     def test_cost_display_format(self):
         """cost_display 包含货币符号。"""
-        result = format_session_usage({
-            "call_count": 1,
-            "total_cost": 0.0456,
-            "currency": "CNY",
-        })
+        result = format_session_usage(
+            {
+                "call_count": 1,
+                "total_cost": 0.0456,
+                "currency": "CNY",
+            }
+        )
         self.assertIn("¥", result["cost_display"])
         self.assertIn("0.0456", result["cost_display"])
 
     def test_model_display_single(self):
         """单模型时 model_display 等于 model。"""
-        result = format_session_usage({
-            "call_count": 1,
-            "model": "claude-sonnet-4-6",
-        })
+        result = format_session_usage(
+            {
+                "call_count": 1,
+                "model": "claude-sonnet-4-6",
+            }
+        )
         self.assertEqual(result["model_display"], "claude-sonnet-4-6")
 
     def test_model_display_multiple_joined(self):
         """多模型时 model_display 用 / 连接。"""
-        result = format_session_usage({
-            "call_count": 2,
-            "models": ["claude-sonnet-4-6", "deepseek-v4-flash"],
-        })
+        result = format_session_usage(
+            {
+                "call_count": 2,
+                "models": ["claude-sonnet-4-6", "deepseek-v4-flash"],
+            }
+        )
         self.assertIn("/", result["model_display"])
 
 
@@ -207,11 +225,14 @@ class TestTrackSessionUsage(unittest.TestCase):
 
     def test_claude_provider_tokens(self):
         """claude provider 使用 input_tokens / output_tokens。"""
-        track_session_usage("claude", {
-            "input_tokens": 10,
-            "output_tokens": 20,
-            "cache_read_input_tokens": 5,
-        })
+        track_session_usage(
+            "claude",
+            {
+                "input_tokens": 10,
+                "output_tokens": 20,
+                "cache_read_input_tokens": 5,
+            },
+        )
         self.assertEqual(_session_usage["input_tokens"], 10)
         self.assertEqual(_session_usage["output_tokens"], 20)
         self.assertEqual(_session_usage["cache_hit_tokens"], 5)
@@ -219,10 +240,13 @@ class TestTrackSessionUsage(unittest.TestCase):
 
     def test_openai_provider_tokens(self):
         """openai provider 使用 prompt_tokens / completion_tokens。"""
-        track_session_usage("openai", {
-            "prompt_tokens": 30,
-            "completion_tokens": 40,
-        })
+        track_session_usage(
+            "openai",
+            {
+                "prompt_tokens": 30,
+                "completion_tokens": 40,
+            },
+        )
         self.assertEqual(_session_usage["input_tokens"], 30)
         self.assertEqual(_session_usage["output_tokens"], 40)
         self.assertEqual(_session_usage["cache_hit_tokens"], 0)
@@ -235,15 +259,13 @@ class TestTrackSessionUsage(unittest.TestCase):
 
     def test_model_name_tracked(self):
         """传入 model_name 累计到 models 列表。"""
-        track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1},
-                             model_name="claude-sonnet-4-6")
+        track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1}, model_name="claude-sonnet-4-6")
         self.assertIn("claude-sonnet-4-6", _session_usage["models"])
 
     def test_model_name_dedup(self):
         """相同 model_name 不重复添加。"""
         for _ in range(2):
-            track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1},
-                                 model_name="claude-sonnet-4-6")
+            track_session_usage("claude", {"input_tokens": 1, "output_tokens": 1}, model_name="claude-sonnet-4-6")
         self.assertEqual(len(_session_usage["models"]), 1)
 
 
@@ -255,8 +277,7 @@ class TestRecordPerModule(unittest.TestCase):
 
     def test_record_creates_entry(self):
         """首次记录创建模块条目。"""
-        record_per_module("global_macro", "claude-sonnet-4-6",
-                           inp=100, out=50, cost=0.01)
+        record_per_module("global_macro", "claude-sonnet-4-6", inp=100, out=50, cost=0.01)
         pm = _session_usage["per_module"]
         self.assertIn("global_macro", pm)
         entry = pm["global_macro"]
@@ -266,10 +287,8 @@ class TestRecordPerModule(unittest.TestCase):
 
     def test_record_accumulates(self):
         """多次记录同一模块累加 Token 和费用。"""
-        record_per_module("global_macro", "claude-sonnet-4-6",
-                           inp=100, out=50, cost=0.01)
-        record_per_module("global_macro", "claude-sonnet-4-6",
-                           inp=200, out=30, cost=0.02)
+        record_per_module("global_macro", "claude-sonnet-4-6", inp=100, out=50, cost=0.01)
+        record_per_module("global_macro", "claude-sonnet-4-6", inp=200, out=30, cost=0.02)
         entry = _session_usage["per_module"]["global_macro"]
         self.assertEqual(entry["input_tokens"], 300)
         self.assertEqual(entry["output_tokens"], 80)
@@ -297,8 +316,7 @@ class TestRecordPerModule(unittest.TestCase):
         """cache_hit_tokens 累加。"""
         record_per_module("test_mod", "m", inp=1, out=1, cache_hit_tokens=50)
         record_per_module("test_mod", "m", inp=1, out=1, cache_hit_tokens=30)
-        self.assertEqual(
-            _session_usage["per_module"]["test_mod"]["cache_hit_tokens"], 80)
+        self.assertEqual(_session_usage["per_module"]["test_mod"]["cache_hit_tokens"], 80)
 
     def test_multiple_modules_independent(self):
         """多个模块独立累计。"""

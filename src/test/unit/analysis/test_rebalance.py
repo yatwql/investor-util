@@ -9,14 +9,12 @@
 from __future__ import annotations
 
 import datetime
-import json
 
 import pytest
 
 from src.python.analysis.rebalance import (
     _categorize_holdings,
     _calc_category_weights,
-    _CATEGORY_ORDER,
     _compute_confidence,
     _REBALANCE_PROFILES,
     _filter_silenced_signals,

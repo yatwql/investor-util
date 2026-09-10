@@ -25,11 +25,9 @@ class TestUtcTimezoneConsistencyEdge(unittest.TestCase):
 
     def setUp(self):
         # 确保 config 层不干预
-        self._cfg_patcher = patch("src.python.core.market_hours._is_market_open_config",
-                                   return_value=None)
+        self._cfg_patcher = patch("src.python.core.market_hours._is_market_open_config", return_value=None)
         self._cfg_patcher.start()
-        self._official_patcher = patch("src.python.core.market_hours._is_market_open_official",
-                                        return_value=None)
+        self._official_patcher = patch("src.python.core.market_hours._is_market_open_official", return_value=None)
         self._official_patcher.start()
 
     def tearDown(self):
@@ -37,16 +35,12 @@ class TestUtcTimezoneConsistencyEdge(unittest.TestCase):
         self._cfg_patcher.stop()
 
     def _call_is_market_open_at_beijing_time(
-        self, hour: int, minute: int, weekday: int = 0,
-        system_offset: int = 8
+        self, hour: int, minute: int, weekday: int = 0, system_offset: int = 8
     ) -> bool:
         """简化的北京时间测试辅助方法。"""
         with patch("src.python.core.market_hours.datetime") as mock_dt:
             # 构造北京时间的时间对象
-            beijing_dt = datetime(
-                2026, 7, 6 + weekday, hour, minute,
-                tzinfo=timezone(timedelta(hours=8))
-            )
+            beijing_dt = datetime(2026, 7, 6 + weekday, hour, minute, tzinfo=timezone(timedelta(hours=8)))
             # 对应 UTC 时间
             utc_dt = beijing_dt.astimezone(timezone.utc)
             # 在系统时区下看到的时间
@@ -62,15 +56,13 @@ class TestUtcTimezoneConsistencyEdge(unittest.TestCase):
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
             from src.python.core.market_hours import is_market_open
+
             return is_market_open()
 
     def _call_midday_break_at_beijing_time(self, hour, minute, weekday=1, system_offset=8):
         """在指定系统时区下调用 is_midday_break() 辅助方法。"""
         with patch("src.python.core.market_hours.datetime") as mock_dt:
-            beijing_dt = datetime(
-                2026, 7, 6 + weekday, hour, minute,
-                tzinfo=timezone(timedelta(hours=8))
-            )
+            beijing_dt = datetime(2026, 7, 6 + weekday, hour, minute, tzinfo=timezone(timedelta(hours=8)))
             utc_dt = beijing_dt.astimezone(timezone.utc)
             sys_dt = utc_dt.astimezone(timezone(timedelta(hours=system_offset)))
 
@@ -83,61 +75,46 @@ class TestUtcTimezoneConsistencyEdge(unittest.TestCase):
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
             from src.python.core.market_hours import is_midday_break
+
             return is_midday_break()
 
     # ── 系统时区为 JST（UTC+9）─ 与北京同时区方向 ──
 
     def test_jst_system_at_beijing_morning(self):
         """系统 JST(UTC+9)，北京时间 10:00 周二 → True。"""
-        self.assertTrue(
-            self._call_is_market_open_at_beijing_time(10, 0, weekday=1, system_offset=9)
-        )
+        self.assertTrue(self._call_is_market_open_at_beijing_time(10, 0, weekday=1, system_offset=9))
 
     def test_jst_system_at_beijing_lunch(self):
         """系统 JST(UTC+9)，北京时间 12:00 周二 → False。"""
-        self.assertFalse(
-            self._call_is_market_open_at_beijing_time(12, 0, weekday=1, system_offset=9)
-        )
+        self.assertFalse(self._call_is_market_open_at_beijing_time(12, 0, weekday=1, system_offset=9))
 
     # ── 系统时区为 Pacific（UTC-8）─ 深度负偏移 ──
 
     def test_pacific_system_at_beijing_morning(self):
         """系统 Pacific(UTC-8)，北京时间 10:00 周二 → True。"""
-        self.assertTrue(
-            self._call_is_market_open_at_beijing_time(10, 0, weekday=1, system_offset=-8)
-        )
+        self.assertTrue(self._call_is_market_open_at_beijing_time(10, 0, weekday=1, system_offset=-8))
 
     def test_pacific_system_at_beijing_afternoon(self):
         """系统 Pacific(UTC-8)，北京时间 14:00 周二 → True。"""
-        self.assertTrue(
-            self._call_is_market_open_at_beijing_time(14, 0, weekday=1, system_offset=-8)
-        )
+        self.assertTrue(self._call_is_market_open_at_beijing_time(14, 0, weekday=1, system_offset=-8))
 
     def test_pacific_system_weekend(self):
         """系统 Pacific(UTC-8)，北京时间周六 10:00 → False。"""
-        self.assertFalse(
-            self._call_is_market_open_at_beijing_time(10, 0, weekday=5, system_offset=-8)
-        )
+        self.assertFalse(self._call_is_market_open_at_beijing_time(10, 0, weekday=5, system_offset=-8))
 
     # ── 午休判断时区一致性 ──
 
     def test_midday_break_utc_system(self):
         """UTC 系统下北京时间 12:00 → 午休。"""
-        self.assertTrue(
-            self._call_midday_break_at_beijing_time(12, 0, system_offset=0)
-        )
+        self.assertTrue(self._call_midday_break_at_beijing_time(12, 0, system_offset=0))
 
     def test_midday_break_est_system(self):
         """EST 系统下北京时间 12:00 → 午休。"""
-        self.assertTrue(
-            self._call_midday_break_at_beijing_time(12, 0, system_offset=-5)
-        )
+        self.assertTrue(self._call_midday_break_at_beijing_time(12, 0, system_offset=-5))
 
     def test_midday_break_non_break_time(self):
         """任意系统时区下北京时间 14:00 → 非午休。"""
-        self.assertFalse(
-            self._call_midday_break_at_beijing_time(14, 0, system_offset=8)
-        )
+        self.assertFalse(self._call_midday_break_at_beijing_time(14, 0, system_offset=8))
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 
 必须放在 *_edge.py 文件中（pytest_collection_modifyitems 强制约束）。
 """
+
 from __future__ import annotations
 
 import pytest
@@ -10,7 +11,6 @@ import os
 from unittest.mock import MagicMock, patch
 
 from src.python.cli import (
-    _EXIT_SEVERE,
     _EXIT_SUCCESS,
     _apply_cli_experiments,
     _build_parser,
@@ -18,6 +18,7 @@ from src.python.cli import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_cli, pytest.mark.edge]
+
 
 class TestCliEdge:
     """CLI 边缘场景测试。"""
@@ -31,6 +32,7 @@ class TestCliEdge:
             patch("src.python.report.orchestrator.generate_report") as mock_gen,
         ):
             from src.python.cli import _handle_report
+
             args = MagicMock(type="basic", history="off", force_llm=False, output=None, verbose=False)
             _handle_report(args, {})
 
@@ -86,6 +88,7 @@ class TestCliEdge:
 
         # f2 修改时间更新
         import time
+
         now = time.time()
         os.utime(str(f1), (now - 100, now - 100))
         os.utime(str(f2), (now, now))
@@ -105,6 +108,7 @@ class TestCliEdge:
         """NO_COLOR 环境变量禁用 ANSI 颜色。"""
         monkeypatch.setenv("NO_COLOR", "1")
         from src.python.report.cli_progress import _should_color
+
         assert _should_color() is False
 
     @pytest.mark.edge
@@ -112,6 +116,7 @@ class TestCliEdge:
         """stderr 非 TTY 时 ANSI 禁用。"""
         monkeypatch.delenv("NO_COLOR", raising=False)
         from src.python.report.cli_progress import _should_color
+
         # 测试环境中 stderr 被 pytest 捕获（非 TTY），应禁用颜色
         assert _should_color() is False
 

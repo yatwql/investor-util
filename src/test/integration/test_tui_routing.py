@@ -40,8 +40,26 @@ class TestTuiRouting(unittest.TestCase):
 
         keys = {item[0] for item in MENU_ITEMS}
         expected = {
-            "E", "P", "B", "L", "W", "C", "F", "O", "I", "A",
-            "1", "2", "3", "4", "S", "R", "X", "V", "H", "D",
+            "E",
+            "P",
+            "B",
+            "L",
+            "W",
+            "C",
+            "F",
+            "O",
+            "I",
+            "A",
+            "1",
+            "2",
+            "3",
+            "4",
+            "S",
+            "R",
+            "X",
+            "V",
+            "H",
+            "D",
         }
         self.assertSetEqual(keys, expected)
 

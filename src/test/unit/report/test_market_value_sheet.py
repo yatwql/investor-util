@@ -37,12 +37,22 @@ class TestDetailToRowValues(unittest.TestCase):
     def test_full_detail_row(self):
         """完整 DetailRow → 15 个字段的列表。"""
         d = mvs.DetailRow(
-            account="证券账户", name="电池ETF", code="561910",
-            price=10.5, nav_date="2026-06-26", yesterday_close=10.0,
-            price_type="场内收盘价(T)", premium="--",
-            shares=1000.0, market_value=10500.0, cost=1000.0,
-            profit=9500.0, profit_rate=9.5, today_profit=500.0,
-            source="腾讯财经", source_api="tencent",
+            account="证券账户",
+            name="电池ETF",
+            code="561910",
+            price=10.5,
+            nav_date="2026-06-26",
+            yesterday_close=10.0,
+            price_type="场内收盘价(T)",
+            premium="--",
+            shares=1000.0,
+            market_value=10500.0,
+            cost=1000.0,
+            profit=9500.0,
+            profit_rate=9.5,
+            today_profit=500.0,
+            source="腾讯财经",
+            source_api="tencent",
         )
         vals = mvs._detail_to_row_values(d)
         self.assertEqual(len(vals), 15)
@@ -89,24 +99,24 @@ class TestNumFormats(unittest.TestCase):
     def test_price_format(self):
         """第 4 个为价格格式。"""
         fmts = mvs._num_formats()
-        self.assertEqual(fmts[3], '#,##0.0000')
+        self.assertEqual(fmts[3], "#,##0.0000")
 
     def test_money_format(self):
         """市值/成本/盈亏列金额格式。"""
         fmts = mvs._num_formats()
-        self.assertEqual(fmts[9], '#,##0.00')
-        self.assertEqual(fmts[10], '#,##0.00')
-        self.assertEqual(fmts[11], '#,##0.00')
+        self.assertEqual(fmts[9], "#,##0.00")
+        self.assertEqual(fmts[10], "#,##0.00")
+        self.assertEqual(fmts[11], "#,##0.00")
 
     def test_percent_format(self):
         """收益率列百分比格式。"""
         fmts = mvs._num_formats()
-        self.assertEqual(fmts[12], '0.00%')
+        self.assertEqual(fmts[12], "0.00%")
 
     def test_shares_format(self):
         """份额列格式。"""
         fmts = mvs._num_formats()
-        self.assertEqual(fmts[8], '#,##0.00')
+        self.assertEqual(fmts[8], "#,##0.00")
 
 
 # ═══════════════════════════════════════════════════════════
@@ -155,10 +165,12 @@ class TestApplyProfitColors(unittest.TestCase):
         """非数字值（字符串）→ 不设置字体。"""
         ws = MagicMock()
         values = {"12": "亏损", "14": "盈利"}
+
         def cell_side_effect(row, column):
             cell = MagicMock()
             cell.value = values.get(str(column))
             return cell
+
         ws.cell.side_effect = cell_side_effect
         mvs._apply_profit_colors(ws, 3, 4, profit_col=12, rate_col=13, today_col=14)
         mock_pf.assert_not_called()
@@ -194,10 +206,12 @@ class TestApplyProfitColors(unittest.TestCase):
         mock_pf.side_effect = lambda v: f"font_for_{v}"
         ws = MagicMock()
         row_values = {3: 100.0, 4: -50.0, 5: 200.0}
+
         def cell_side_effect(row, column):
             cell = MagicMock()
             cell.value = row_values.get(row, 0.0)
             return cell
+
         ws.cell.side_effect = cell_side_effect
         mvs._apply_profit_colors(ws, 3, 5, profit_col=12, rate_col=13, today_col=14)
         self.assertEqual(mock_pf.call_count, 9)
@@ -313,20 +327,40 @@ class TestWriteAccountGroupings(unittest.TestCase):
 
     def setUp(self):
         self.detail_a = mvs.DetailRow(
-            account="证券账户", name="电池ETF", code="561910",
-            price=10.0, nav_date="2026-06-26", yesterday_close=9.5,
-            price_type="场内收盘价(T)", premium="--",
-            shares=100.0, market_value=1000.0, cost=100.0,
-            profit=900.0, profit_rate=9.0, today_profit=50.0,
-            source="腾讯财经", source_api="tencent",
+            account="证券账户",
+            name="电池ETF",
+            code="561910",
+            price=10.0,
+            nav_date="2026-06-26",
+            yesterday_close=9.5,
+            price_type="场内收盘价(T)",
+            premium="--",
+            shares=100.0,
+            market_value=1000.0,
+            cost=100.0,
+            profit=900.0,
+            profit_rate=9.0,
+            today_profit=50.0,
+            source="腾讯财经",
+            source_api="tencent",
         )
         self.detail_b = mvs.DetailRow(
-            account="支付宝", name="中欧医疗健康混合", code="003095",
-            price=1.5, nav_date="2026-06-25", yesterday_close=1.48,
-            price_type="官方净值(T-1)", premium="--",
-            shares=200.0, market_value=300.0, cost=400.0,
-            profit=-100.0, profit_rate=-0.25, today_profit=4.0,
-            source="东方财富", source_api="eastmoney",
+            account="支付宝",
+            name="中欧医疗健康混合",
+            code="003095",
+            price=1.5,
+            nav_date="2026-06-25",
+            yesterday_close=1.48,
+            price_type="官方净值(T-1)",
+            premium="--",
+            shares=200.0,
+            market_value=300.0,
+            cost=400.0,
+            profit=-100.0,
+            profit_rate=-0.25,
+            today_profit=4.0,
+            source="东方财富",
+            source_api="eastmoney",
         )
 
     @patch("src.python.report.market_value_sheet.write_data_row")
@@ -351,8 +385,7 @@ class TestWriteAccountGroupings(unittest.TestCase):
         mock_fmts.return_value = [""] * 15
         mock_to_row.side_effect = lambda d: [d.account, d.name]
         ws = MagicMock()
-        _, _, _, _, final_row = mvs._write_account_groupings(
-            ws, [self.detail_a, self.detail_b], 3)
+        _, _, _, _, final_row = mvs._write_account_groupings(ws, [self.detail_a, self.detail_b], 3)
         self.assertEqual(mock_sub.call_count, 2)
 
     @patch("src.python.report.market_value_sheet.write_data_row")
@@ -376,9 +409,15 @@ class TestWriteAccountGroupings(unittest.TestCase):
         mock_fmts.return_value = [""] * 15
         mock_to_row.side_effect = lambda d: [d.account, d.name]
         detail_special = mvs.DetailRow(
-            account="测💹试/账户（定投）", name="基金A", code="000001",
-            shares=100.0, market_value=1000.0, cost=500.0,
-            profit=500.0, profit_rate=1.0, today_profit=10.0,
+            account="测💹试/账户（定投）",
+            name="基金A",
+            code="000001",
+            shares=100.0,
+            market_value=1000.0,
+            cost=500.0,
+            profit=500.0,
+            profit_rate=1.0,
+            today_profit=10.0,
         )
         ws = MagicMock()
         try:
@@ -395,9 +434,15 @@ class TestWriteAccountGroupings(unittest.TestCase):
         mock_fmts.return_value = [""] * 15
         mock_to_row.side_effect = lambda d: [d.account, d.name]
         detail_cost_zero = mvs.DetailRow(
-            account="证券", name="新股", code="688001",
-            market_value=1000.0, cost=0.0, profit=1000.0,
-            shares=100.0, profit_rate=None, today_profit=0.0,
+            account="证券",
+            name="新股",
+            code="688001",
+            market_value=1000.0,
+            cost=0.0,
+            profit=1000.0,
+            shares=100.0,
+            profit_rate=None,
+            today_profit=0.0,
         )
         ws = MagicMock()
         mvs._write_account_groupings(ws, [detail_cost_zero], 3)
@@ -422,20 +467,40 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         ]
         self.details = [
             mvs.DetailRow(
-                account="证券账户", name="电池ETF", code="561910",
-                price=10.0, nav_date="2026-06-26", yesterday_close=9.5,
-                price_type="场内收盘价(T)", premium="--",
-                shares=100.0, market_value=1000.0, cost=100.0,
-                profit=900.0, profit_rate=9.0, today_profit=50.0,
-                source="腾讯财经", source_api="tencent",
+                account="证券账户",
+                name="电池ETF",
+                code="561910",
+                price=10.0,
+                nav_date="2026-06-26",
+                yesterday_close=9.5,
+                price_type="场内收盘价(T)",
+                premium="--",
+                shares=100.0,
+                market_value=1000.0,
+                cost=100.0,
+                profit=900.0,
+                profit_rate=9.0,
+                today_profit=50.0,
+                source="腾讯财经",
+                source_api="tencent",
             ),
             mvs.DetailRow(
-                account="支付宝", name="中欧医疗健康混合", code="003095",
-                price=1.5, nav_date="2026-06-25", yesterday_close=1.48,
-                price_type="官方净值(T-1)", premium="--",
-                shares=200.0, market_value=300.0, cost=400.0,
-                profit=-100.0, profit_rate=-0.25, today_profit=4.0,
-                source="东方财富", source_api="eastmoney",
+                account="支付宝",
+                name="中欧医疗健康混合",
+                code="003095",
+                price=1.5,
+                nav_date="2026-06-25",
+                yesterday_close=1.48,
+                price_type="官方净值(T-1)",
+                premium="--",
+                shares=200.0,
+                market_value=300.0,
+                cost=400.0,
+                profit=-100.0,
+                profit_rate=-0.25,
+                today_profit=4.0,
+                source="东方财富",
+                source_api="eastmoney",
             ),
         ]
 
@@ -450,16 +515,38 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.python.report.market_value_sheet.auto_width")
     @patch("src.python.report.market_value_sheet._detail_to_row_values")
     @patch("src.python.report.market_value_sheet._num_formats")
-    def test_basic_write(self, mock_fmts, mock_to_row,
-                         mock_aw, mock_freeze, mock_color,
-                         mock_pt_color, mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
+    def test_basic_write(
+        self,
+        mock_fmts,
+        mock_to_row,
+        mock_aw,
+        mock_freeze,
+        mock_color,
+        mock_pt_color,
+        mock_tl,
+        mock_hdr,
+        mock_data,
+        mock_sub,
+        mock_total,
+    ):
         """正常写入：验证汇总值正确，内部函数被调用。"""
         mock_fmts.return_value = [""] * 15
         mock_to_row.side_effect = lambda d: [
-            d.account, d.name, d.code, d.price,
-            d.nav_date, d.yesterday_close, d.price_type, d.premium,
-            d.shares, d.market_value, d.cost, d.profit,
-            d.profit_rate, d.today_profit, d.source,
+            d.account,
+            d.name,
+            d.code,
+            d.price,
+            d.nav_date,
+            d.yesterday_close,
+            d.price_type,
+            d.premium,
+            d.shares,
+            d.market_value,
+            d.cost,
+            d.profit,
+            d.profit_rate,
+            d.today_profit,
+            d.source,
         ]
         mock_tl.return_value = 2
         mock_hdr.return_value = 3
@@ -493,9 +580,20 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.python.report.market_value_sheet.auto_width")
     @patch("src.python.report.market_value_sheet._detail_to_row_values")
     @patch("src.python.report.market_value_sheet._num_formats")
-    def test_empty_holdings(self, mock_fmts, mock_to_row,
-                            mock_aw, mock_freeze, mock_color,
-                            mock_pt_color, mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
+    def test_empty_holdings(
+        self,
+        mock_fmts,
+        mock_to_row,
+        mock_aw,
+        mock_freeze,
+        mock_color,
+        mock_pt_color,
+        mock_tl,
+        mock_hdr,
+        mock_data,
+        mock_sub,
+        mock_total,
+    ):
         """空持仓 → 总市值为 0，无小计行。"""
         mock_fmts.return_value = [""] * 15
         mock_tl.return_value = 2
@@ -522,32 +620,63 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.python.report.market_value_sheet.auto_width")
     @patch("src.python.report.market_value_sheet._detail_to_row_values")
     @patch("src.python.report.market_value_sheet._num_formats")
-    def test_subtotal_per_account(self, mock_fmts, mock_to_row,
-                                   mock_aw, mock_freeze, mock_color,
-                                   mock_pt_color, mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
+    def test_subtotal_per_account(
+        self,
+        mock_fmts,
+        mock_to_row,
+        mock_aw,
+        mock_freeze,
+        mock_color,
+        mock_pt_color,
+        mock_tl,
+        mock_hdr,
+        mock_data,
+        mock_sub,
+        mock_total,
+    ):
         """多个账户 → 每个账户写入小计。"""
         detail_a = self.details[0]
         detail_b = self.details[1]
         detail_c = mvs.DetailRow(
-            account="证券账户", name="长江电力", code="600900",
-            price=25.0, nav_date="2026-06-26", yesterday_close=24.5,
-            price_type="场内收盘价(T)", premium="--",
-            shares=100.0, market_value=2500.0, cost=2000.0,
-            profit=500.0, profit_rate=0.25, today_profit=50.0,
-            source="腾讯财经", source_api="tencent",
+            account="证券账户",
+            name="长江电力",
+            code="600900",
+            price=25.0,
+            nav_date="2026-06-26",
+            yesterday_close=24.5,
+            price_type="场内收盘价(T)",
+            premium="--",
+            shares=100.0,
+            market_value=2500.0,
+            cost=2000.0,
+            profit=500.0,
+            profit_rate=0.25,
+            today_profit=50.0,
+            source="腾讯财经",
+            source_api="tencent",
         )
         mock_fmts.return_value = [""] * 15
         mock_to_row.side_effect = lambda d: [
-            d.account, d.name, d.code, d.price,
-            d.nav_date, d.yesterday_close, d.price_type, d.premium,
-            d.shares, d.market_value, d.cost, d.profit,
-            d.profit_rate, d.today_profit, d.source,
+            d.account,
+            d.name,
+            d.code,
+            d.price,
+            d.nav_date,
+            d.yesterday_close,
+            d.price_type,
+            d.premium,
+            d.shares,
+            d.market_value,
+            d.cost,
+            d.profit,
+            d.profit_rate,
+            d.today_profit,
+            d.source,
         ]
         mock_tl.return_value = 2
         mock_hdr.return_value = 3
         ws = MagicMock()
-        result = mvs.write_market_value_sheet(ws,
-                                              details=[detail_a, detail_c, detail_b])
+        result = mvs.write_market_value_sheet(ws, details=[detail_a, detail_c, detail_b])
         self.assertEqual(mock_sub.call_count, 2)
         grand_mv = result[0]
         self.assertAlmostEqual(grand_mv, 3800.0)
@@ -563,9 +692,20 @@ class TestWriteMarketValueSheet(unittest.TestCase):
     @patch("src.python.report.market_value_sheet.auto_width")
     @patch("src.python.report.market_value_sheet._detail_to_row_values")
     @patch("src.python.report.market_value_sheet._num_formats")
-    def test_all_zero_price_show_warning(self, mock_fmts, mock_to_row,
-                                          mock_aw, mock_freeze, mock_color,
-                                          mock_pt_color, mock_tl, mock_hdr, mock_data, mock_sub, mock_total):
+    def test_all_zero_price_show_warning(
+        self,
+        mock_fmts,
+        mock_to_row,
+        mock_aw,
+        mock_freeze,
+        mock_color,
+        mock_pt_color,
+        mock_tl,
+        mock_hdr,
+        mock_data,
+        mock_sub,
+        mock_total,
+    ):
         """全零行情 → 写入红色警告行 + 合并单元格。"""
         mock_fmts.return_value = [""] * 15
         mock_to_row.side_effect = lambda d: [""] * 15
@@ -573,10 +713,14 @@ class TestWriteMarketValueSheet(unittest.TestCase):
         mock_hdr.return_value = 3
         ws = MagicMock()
         ws.cell.return_value = MagicMock()
-        mvs.write_market_value_sheet(ws, details=[
-            mvs.DetailRow(account="证券", name="电池ETF", code="561910",
-                         price=0.0, shares=100.0, market_value=0.0, cost=100.0),
-        ])
+        mvs.write_market_value_sheet(
+            ws,
+            details=[
+                mvs.DetailRow(
+                    account="证券", name="电池ETF", code="561910", price=0.0, shares=100.0, market_value=0.0, cost=100.0
+                ),
+            ],
+        )
         ws.merge_cells.assert_called_once()
         call_kwargs = ws.cell.call_args
         if call_kwargs:
@@ -617,9 +761,7 @@ class TestWeightedAvgCost(unittest.TestCase):
         self.assertIsNone(mvs._weighted_avg_cost({}))
         self.assertIsNone(mvs._weighted_avg_cost({}))
         self.assertIsNone(
-            mvs._weighted_avg_cost(
-                {"low": {"shares": 0.0, "cost": 0.0}, "high": {"shares": 0.0, "cost": 0.0}}
-            )
+            mvs._weighted_avg_cost({"low": {"shares": 0.0, "cost": 0.0}, "high": {"shares": 0.0, "cost": 0.0}})
         )
 
 
@@ -639,12 +781,22 @@ class TestWriteMarketValueSheetFlow(unittest.TestCase):
         self.wb = Workbook()
         self.ws = self.wb.active
         self.detail = mvs.DetailRow(
-            account="证券账户", name="电池ETF", code="561910",
-            price=10.0, nav_date="2026-06-26", yesterday_close=9.5,
-            price_type="场内收盘价(T)", premium="--",
-            shares=100.0, market_value=1000.0, cost=100.0,
-            profit=900.0, profit_rate=9.0, today_profit=50.0,
-            source="腾讯财经", source_api="tencent",
+            account="证券账户",
+            name="电池ETF",
+            code="561910",
+            price=10.0,
+            nav_date="2026-06-26",
+            yesterday_close=9.5,
+            price_type="场内收盘价(T)",
+            premium="--",
+            shares=100.0,
+            market_value=1000.0,
+            cost=100.0,
+            profit=900.0,
+            profit_rate=9.0,
+            today_profit=50.0,
+            source="腾讯财经",
+            source_api="tencent",
         )
 
     def _flow(self, low_shares=0.0, cost=0.0):
@@ -664,8 +816,7 @@ class TestWriteMarketValueSheetFlow(unittest.TestCase):
 
     def test_flow_weighted_cost_header_when_enabled(self):
         """开关开启时表头第 16 列为「资金加权成本」，原 15 列保持不变。"""
-        mvs.write_market_value_sheet(self.ws, details=[self.detail],
-                                     fund_flow_data=self._flow())
+        mvs.write_market_value_sheet(self.ws, details=[self.detail], fund_flow_data=self._flow())
         headers = [self.ws.cell(row=2, column=c).value for c in range(1, 17)]
         self.assertEqual(len(headers), 16)
         self.assertEqual(headers[14], "取价渠道")
@@ -674,22 +825,19 @@ class TestWriteMarketValueSheetFlow(unittest.TestCase):
     def test_flow_weighted_cost_value(self):
         """开关开启时数据行「资金加权成本」列 = 批次成本价按份额加权。"""
         flow = self._flow(low_shares=100.0, cost=950.0)
-        mvs.write_market_value_sheet(self.ws, details=[self.detail],
-                                     fund_flow_data=flow)
+        mvs.write_market_value_sheet(self.ws, details=[self.detail], fund_flow_data=flow)
         # 数据行 row 3，列 16 = 950 / 100 = 9.5
         self.assertAlmostEqual(self.ws.cell(row=3, column=16).value, 9.5)
 
     def test_flow_weighted_cost_none_when_no_buckets(self):
         """开关开启但代码无批次数据时，「资金加权成本」列为空。"""
         flow = {"available": True, "cost_tiers": {"per_code": {}}, "dividends": {"per_code": {}}}
-        mvs.write_market_value_sheet(self.ws, details=[self.detail],
-                                     fund_flow_data=flow)
+        mvs.write_market_value_sheet(self.ws, details=[self.detail], fund_flow_data=flow)
         self.assertIsNone(self.ws.cell(row=3, column=16).value)
 
     def test_no_flow_column_when_disabled(self):
         """开关关闭（fund_flow_data=None）时保持既有 15 列，无「资金加权成本」列。"""
-        mvs.write_market_value_sheet(self.ws, details=[self.detail],
-                                     fund_flow_data=None)
+        mvs.write_market_value_sheet(self.ws, details=[self.detail], fund_flow_data=None)
         headers = [self.ws.cell(row=2, column=c).value for c in range(1, 16)]
         self.assertEqual(len(headers), 15)
         self.assertEqual(headers[14], "取价渠道")

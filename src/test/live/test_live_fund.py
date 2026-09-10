@@ -4,6 +4,7 @@
 
 断言原则：只校验返回「结构」（字段存在、类型、非空），不校验具体数值。
 """
+
 from __future__ import annotations
 
 import pytest
@@ -11,7 +12,7 @@ import pytest
 pytestmark = [pytest.mark.live]
 
 # 稳定存在的场外基金代码
-_FUND = "110022"   # 易方达消费行业
+_FUND = "110022"  # 易方达消费行业
 
 
 @pytest.mark.live

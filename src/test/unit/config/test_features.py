@@ -18,6 +18,7 @@ from src.python.config.features import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 
+
 @pytest.mark.unit
 class TestResolveExperimentFlags:
     """实验功能名解析测试。"""
@@ -59,9 +60,7 @@ class TestResolveExperimentFlags:
     def test_resolve_mixed_and_dedup(self):
         """多种写法混用并去重。"""
         display_name = EXPERIMENTAL_FEATURES["decision_reflection"][0]
-        flags, unknown = resolve_experiment_flags(
-            ["signal_pre_digest", "SIGNAL_PRE_DIGEST", display_name, "all"]
-        )
+        flags, unknown = resolve_experiment_flags(["signal_pre_digest", "SIGNAL_PRE_DIGEST", display_name, "all"])
         assert flags == set(EXPERIMENTAL_FEATURES)
         assert unknown == []
 

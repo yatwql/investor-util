@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
@@ -51,27 +50,23 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
             # 分类
             patch("src.python.report.html_builders._build_category_data", return_value=[]),
             # 穿透 — 数据获取
-            patch("src.python.report.penetration_sheet._load_profit_forecast_safe",
-                  return_value=({}, False)),
-            patch("src.python.report.penetration_sheet._load_dividend_data_safe",
-                  return_value=({}, False)),
+            patch("src.python.report.penetration_sheet._load_profit_forecast_safe", return_value=({}, False)),
+            patch("src.python.report.penetration_sheet._load_dividend_data_safe", return_value=({}, False)),
             # 基金持仓
             patch("src.python.fetcher.fund.fetch_fund_holdings", return_value=None),
             # 基金业绩
             patch("src.python.fetcher.fund.fetch_fund_rankings", return_value=None),
             patch("src.python.fetcher.fund.fetch_fund_benchmark", return_value="--"),
             # 基金深度分析数据
-            patch("src.python.report.fund_manager_analysis.detect_manager_changes",
-                  return_value=[]),
-            patch("src.python.report.position_overlap.compute_overlap_matrix",
-                  return_value={"funds": [], "matrix": [], "pairs": []}),
-            patch("src.python.report.fund_concentration.compute_concentration",
-                  return_value=[]),
-            patch("src.python.report.fund_style_report.analyze_style_for_all_funds",
-                  return_value={"results": []}),
+            patch("src.python.report.fund_manager_analysis.detect_manager_changes", return_value=[]),
+            patch(
+                "src.python.report.position_overlap.compute_overlap_matrix",
+                return_value={"funds": [], "matrix": [], "pairs": []},
+            ),
+            patch("src.python.report.fund_concentration.compute_concentration", return_value=[]),
+            patch("src.python.report.fund_style_report.analyze_style_for_all_funds", return_value={"results": []}),
             # 新闻
-            patch("src.python.report.news_correlation.build_news_data",
-                  return_value=([], {})),
+            patch("src.python.report.news_correlation.build_news_data", return_value=([], {})),
             # LLM（跳过）
             patch("src.python.report.llm_content.write_llm_sheets"),
         ]
@@ -170,10 +165,8 @@ class TestMessageConsistency(unittest.TestCase):
         self.assertTrue(callable(write_concentration_sheet))
         self.assertTrue(callable(write_style_factor_sheet))
 
-        for key in ("manager_unavailable", "overlap_unavailable",
-                    "concentration_unavailable", "style_unavailable"):
-            self.assertIn(key, STATUS_MESSAGES,
-                          f"STATUS_MESSAGES 应包含 {key}")
+        for key in ("manager_unavailable", "overlap_unavailable", "concentration_unavailable", "style_unavailable"):
+            self.assertIn(key, STATUS_MESSAGES, f"STATUS_MESSAGES 应包含 {key}")
 
     # ── 渲染层一致性验证 ────────────────────────────────
 
@@ -218,34 +211,26 @@ class TestMessageConsistency(unittest.TestCase):
         test_cases = [
             # T2 单项降级
             {
-                "rank": {"available": False, "tier": "T2",
-                         "message": STATUS_MESSAGES["rank_unavailable"]},
+                "rank": {"available": False, "tier": "T2", "message": STATUS_MESSAGES["rank_unavailable"]},
             },
             # T3 单项降级
             {
-                "industry": {"available": False, "tier": "T3",
-                             "message": STATUS_MESSAGES["industry_unavailable"]},
+                "industry": {"available": False, "tier": "T3", "message": STATUS_MESSAGES["industry_unavailable"]},
             },
             # T4 单项降级
             {
-                "dividend": {"available": False, "tier": "T4",
-                             "message": STATUS_MESSAGES["dividend_unavailable"]},
+                "dividend": {"available": False, "tier": "T4", "message": STATUS_MESSAGES["dividend_unavailable"]},
             },
             # 混合降级（T2 + T3 + T4）
             {
-                "index_a": {"available": False, "tier": "T2",
-                            "message": STATUS_MESSAGES["index_degraded"]},
-                "industry": {"available": False, "tier": "T3",
-                             "message": STATUS_MESSAGES["industry_unavailable"]},
-                "eps": {"available": False, "tier": "T4",
-                        "message": STATUS_MESSAGES["profit_forecast_unavailable"]},
+                "index_a": {"available": False, "tier": "T2", "message": STATUS_MESSAGES["index_degraded"]},
+                "industry": {"available": False, "tier": "T3", "message": STATUS_MESSAGES["industry_unavailable"]},
+                "eps": {"available": False, "tier": "T4", "message": STATUS_MESSAGES["profit_forecast_unavailable"]},
             },
             # 含可用项（应被过滤）
             {
-                "rank": {"available": False, "tier": "T2",
-                         "message": STATUS_MESSAGES["rank_unavailable"]},
-                "benchmark": {"available": True, "tier": "T3",
-                              "message": "基准数据正常"},
+                "rank": {"available": False, "tier": "T2", "message": STATUS_MESSAGES["rank_unavailable"]},
+                "benchmark": {"available": True, "tier": "T3", "message": "基准数据正常"},
             },
         ]
 
@@ -255,10 +240,9 @@ class TestMessageConsistency(unittest.TestCase):
                 html_lines = self._html_simulated_macro(status_dict)
 
                 self.assertEqual(
-                    excel_lines, html_lines,
-                    f"Case {idx}: Excel 和 HTML 输出不一致\n"
-                    f"  Excel: {excel_lines}\n"
-                    f"  HTML:  {html_lines}",
+                    excel_lines,
+                    html_lines,
+                    f"Case {idx}: Excel 和 HTML 输出不一致\n  Excel: {excel_lines}\n  HTML:  {html_lines}",
                 )
 
     def test_data_status_empty(self):
@@ -268,12 +252,16 @@ class TestMessageConsistency(unittest.TestCase):
         self.assertEqual(excel_lines, [])
         self.assertEqual(html_lines, [])
 
-        excel_lines = self._excel_render_status_lines({
-            "a": {"available": True, "tier": "T2", "message": "ok"},
-        })
-        html_lines = self._html_simulated_macro({
-            "a": {"available": True, "tier": "T2", "message": "ok"},
-        })
+        excel_lines = self._excel_render_status_lines(
+            {
+                "a": {"available": True, "tier": "T2", "message": "ok"},
+            }
+        )
+        html_lines = self._html_simulated_macro(
+            {
+                "a": {"available": True, "tier": "T2", "message": "ok"},
+            }
+        )
         self.assertEqual(excel_lines, [])
         self.assertEqual(html_lines, [])
 

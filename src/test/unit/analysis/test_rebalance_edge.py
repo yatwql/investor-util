@@ -254,13 +254,12 @@ class TestSilenceEdge:
         signals = [
             {"type": "single_overflow", "code": "600001", "weight": 30.0},
         ]
-        result = _filter_silenced_signals(signals, silence_days=0,
-                                           silence_file=str(tmp_path / "s.json"))
+        result = _filter_silenced_signals(signals, silence_days=0, silence_file=str(tmp_path / "s.json"))
         assert len(result) == 1
 
     def test_invalid_trigger_date_treated_as_expired(self, tmp_path):
         """静默期日期格式异常 → 视为过期，信号通过。"""
-        today = datetime.date.today()
+        datetime.date.today()
         silences = {"600001": "not-a-date"}
         f = str(tmp_path / "rebalance_silence.json")
         _save_silence_state(silences, f)
@@ -276,8 +275,7 @@ class TestSilenceEdge:
         signals = [
             {"type": "single_overflow", "name": "A", "weight": 30.0},
         ]
-        result = _filter_silenced_signals(signals, silence_days=30,
-                                           silence_file=str(tmp_path / "s.json"))
+        result = _filter_silenced_signals(signals, silence_days=30, silence_file=str(tmp_path / "s.json"))
         assert len(result) == 1
 
     def test_signal_code_without_type_not_filtered(self, tmp_path):

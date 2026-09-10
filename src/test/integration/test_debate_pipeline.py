@@ -39,11 +39,13 @@ _DISPATCH_OK = {
 
 def _make_dispatch_mock(debate_info: dict | None = None):
     """创建 _dispatch_llm_workers 的 mock，按需填充 debate_info 容器。"""
+
     def _side_effect(needs, llm_config, force, *args, **kwargs):
         container = kwargs.get("_debate_info_container")
         if container is not None and debate_info is not None:
             container[0] = debate_info
         return dict(_DISPATCH_OK)
+
     return _side_effect
 
 
@@ -60,11 +62,15 @@ class TestDebatePipelineBackwardCompat(unittest.TestCase):
         mock_config,
     ):
         """所有 Feature Flag 为 False → 返回不含 debate_info 的元组。"""
-        mock_config.return_value = {"cache_enabled_expert_review": True,
-                                    "enabled_llm": {"global_macro": True,
-                                                    "expert_review": True,
-                                                    "health_check": True,
-                                                    "penetration_deep": True}}
+        mock_config.return_value = {
+            "cache_enabled_expert_review": True,
+            "enabled_llm": {
+                "global_macro": True,
+                "expert_review": True,
+                "health_check": True,
+                "penetration_deep": True,
+            },
+        }
         mock_precheck.return_value = _NONE_CACHED
         mock_feature.return_value = False  # 所有 flag 关
 
@@ -98,11 +104,15 @@ class TestDebatePipelineProconEnabled(unittest.TestCase):
         mock_config,
     ):
         """正反辩论启用 → 返回含 debate_info 的元组。"""
-        mock_config.return_value = {"cache_enabled_expert_review": True,
-                                    "enabled_llm": {"global_macro": True,
-                                                    "expert_review": True,
-                                                    "health_check": True,
-                                                    "penetration_deep": True}}
+        mock_config.return_value = {
+            "cache_enabled_expert_review": True,
+            "enabled_llm": {
+                "global_macro": True,
+                "expert_review": True,
+                "health_check": True,
+                "penetration_deep": True,
+            },
+        }
         mock_precheck.return_value = _NONE_CACHED
 
         # 正反辩论启用状态 + 用 side_effect 模拟 dispatch 填充 debate_info 容器
@@ -149,11 +159,15 @@ class TestDebatePipelineSynthesisFallback(unittest.TestCase):
         mock_config,
     ):
         """debate 全部失败 → 降级普通 expert_review。"""
-        mock_config.return_value = {"cache_enabled_expert_review": True,
-                                    "enabled_llm": {"global_macro": True,
-                                                    "expert_review": True,
-                                                    "health_check": True,
-                                                    "penetration_deep": True}}
+        mock_config.return_value = {
+            "cache_enabled_expert_review": True,
+            "enabled_llm": {
+                "global_macro": True,
+                "expert_review": True,
+                "health_check": True,
+                "penetration_deep": True,
+            },
+        }
         mock_precheck.return_value = _NONE_CACHED
         mock_feature.return_value = True  # debate flag 开
 

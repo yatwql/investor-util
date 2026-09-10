@@ -27,6 +27,7 @@ from src.python.analysis.crisis_annotation import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
+
 def _bars(pairs: list[tuple[str, float]]) -> list[dict]:
     """从 (date, total_value) 列表生成 bars（升序）。"""
     return [{"date": d, "total_value": float(v)} for d, v in pairs]

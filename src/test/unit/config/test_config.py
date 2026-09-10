@@ -874,7 +874,9 @@ class TestLlmSettingsTemplateConsistency:
         from src.python.core.registry import get_llm_module_name
 
         template = _get_default_llm_settings_template()
-        titles = {module: label for label, module in re.findall(r"^\s*//\s*(.+?)\s+—\s+([a-z_]+)\s*$", template, re.MULTILINE)}
+        titles = {
+            module: label for label, module in re.findall(r"^\s*//\s*(.+?)\s+—\s+([a-z_]+)\s*$", template, re.MULTILINE)
+        }
         assert titles, "模板中未找到任何模块区块标题，正则或模板格式已变"
 
         for module, label in titles.items():
@@ -995,9 +997,7 @@ class TestIsEnableCostLots(unittest.TestCase):
 
     def test_independent_from_other_submodules(self):
         """cost_lots 开关独立于同容器其他键。"""
-        self.assertTrue(
-            cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True, "candidate_compare": False}})
-        )
+        self.assertTrue(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True, "candidate_compare": False}}))
 
 
 class TestIsEnableIndustryBeta(unittest.TestCase):

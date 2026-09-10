@@ -54,9 +54,19 @@ class TestMachineInfo:
     def test_machine_info_shape(self, runner_script):
         info = runner_script._collect_machine_info("medium")
         required_keys = {
-            "os", "os_release", "arch", "hostname", "cpu_model",
-            "cpu_physical_cores", "cpu_threads", "mem_gib", "disk_type",
-            "fs_type", "python_version", "parallel_level", "parallel_workers",
+            "os",
+            "os_release",
+            "arch",
+            "hostname",
+            "cpu_model",
+            "cpu_physical_cores",
+            "cpu_threads",
+            "mem_gib",
+            "disk_type",
+            "fs_type",
+            "python_version",
+            "parallel_level",
+            "parallel_workers",
             "date",
         }
         assert required_keys <= set(info)
@@ -74,9 +84,7 @@ class TestMachineInfo:
         original_open = builtins.open
 
         def fake_open(path, *args, **kwargs):
-            if isinstance(path, str) and any(
-                marker in path for marker in ("cpuinfo", "meminfo", "mounts")
-            ):
+            if isinstance(path, str) and any(marker in path for marker in ("cpuinfo", "meminfo", "mounts")):
                 raise OSError("simulated missing")
             return original_open(path, *args, **kwargs)
 
@@ -129,8 +137,16 @@ class TestDurationTable:
 
     @staticmethod
     def _res(mode, passed=1, duration=1.0, **overrides):
-        base = {"mode": mode, "passed": passed, "failed": 0, "skipped": 0,
-                "errors": 0, "duration": duration, "exit_code": 0, "timed_out": False}
+        base = {
+            "mode": mode,
+            "passed": passed,
+            "failed": 0,
+            "skipped": 0,
+            "errors": 0,
+            "duration": duration,
+            "exit_code": 0,
+            "timed_out": False,
+        }
         base.update(overrides)
         return base
 
@@ -141,8 +157,7 @@ class TestDurationTable:
 
     def test_render_duration_table_sorted_by_table_order(self, runner_script):
         text = runner_script._render_duration_table(
-            [self._res("regression", 241, 17.4), self._res("unit", 4672, 15.2),
-             self._res("scenario_extreme", 9, 2.1)]
+            [self._res("regression", 241, 17.4), self._res("unit", 4672, 15.2), self._res("scenario_extreme", 9, 2.1)]
         )
         idx_unit = text.index("`unit`")
         idx_reg = text.index("`regression`")
@@ -166,8 +181,7 @@ class TestDurationTable:
 
     def test_render_duration_table_skips_timeout_and_unknown(self, runner_script):
         text = runner_script._render_duration_table(
-            [self._res("unit", 4672, 15.2), self._res("edge", 1, 300.0, timed_out=True),
-             self._res("live", 14, 5.0)]
+            [self._res("unit", 4672, 15.2), self._res("edge", 1, 300.0, timed_out=True), self._res("live", 14, 5.0)]
         )
         assert "`edge`" not in text
         assert "`live`" not in text
@@ -179,35 +193,80 @@ class TestEnvTable:
 
     def test_render_env_table_has_all_rows(self, runner_script):
         info = {
-            "os": "Linux", "os_release": "6.1", "arch": "x86_64",
-            "hostname": "host-a", "cpu_model": "cpu-x", "cpu_physical_cores": 12,
-            "cpu_threads": 16, "mem_gib": 46.8, "disk_type": "NVMe SSD",
-            "fs_type": "btrfs", "python_version": "3.13", "parallel_level": "medium",
-            "parallel_workers": "8", "date": "2026-08-05",
+            "os": "Linux",
+            "os_release": "6.1",
+            "arch": "x86_64",
+            "hostname": "host-a",
+            "cpu_model": "cpu-x",
+            "cpu_physical_cores": 12,
+            "cpu_threads": 16,
+            "mem_gib": 46.8,
+            "disk_type": "NVMe SSD",
+            "fs_type": "btrfs",
+            "python_version": "3.13",
+            "parallel_level": "medium",
+            "parallel_workers": "8",
+            "date": "2026-08-05",
         }
         text = runner_script._render_env_table(info)
-        for label in ("操作系统", "系统版本", "架构", "主机名", "CPU 型号", "物理核数",
-                      "逻辑线程", "内存", "磁盘类型", "文件系统", "Python 版本",
-                      "并行级别", "worker 数", "采集日期"):
+        for label in (
+            "操作系统",
+            "系统版本",
+            "架构",
+            "主机名",
+            "CPU 型号",
+            "物理核数",
+            "逻辑线程",
+            "内存",
+            "磁盘类型",
+            "文件系统",
+            "Python 版本",
+            "并行级别",
+            "worker 数",
+            "采集日期",
+        ):
             assert f"| {label} |" in text
         assert "46.8 GiB" in text
 
     def test_render_env_table_unknown_fallback(self, runner_script):
-        info = {k: None for k in (
-            "os", "os_release", "arch", "hostname", "cpu_model", "cpu_physical_cores",
-            "cpu_threads", "mem_gib", "disk_type", "fs_type", "python_version",
-            "parallel_level", "parallel_workers", "date",
-        )}
+        info = {
+            k: None
+            for k in (
+                "os",
+                "os_release",
+                "arch",
+                "hostname",
+                "cpu_model",
+                "cpu_physical_cores",
+                "cpu_threads",
+                "mem_gib",
+                "disk_type",
+                "fs_type",
+                "python_version",
+                "parallel_level",
+                "parallel_workers",
+                "date",
+            )
+        }
         text = runner_script._render_env_table(info)
         assert "未知" in text
 
     def test_format_machine_info_renders_fields(self, runner_script):
         info = {
-            "os": "Linux", "arch": "x86_64", "os_release": "6.1", "hostname": "host-a",
-            "cpu_model": "cpu-x", "cpu_physical_cores": 12, "cpu_threads": 16,
-            "mem_gib": 46.8, "disk_type": "NVMe SSD", "fs_type": "btrfs",
-            "python_version": "3.13", "parallel_level": "medium",
-            "parallel_workers": "8", "date": "2026-08-05",
+            "os": "Linux",
+            "arch": "x86_64",
+            "os_release": "6.1",
+            "hostname": "host-a",
+            "cpu_model": "cpu-x",
+            "cpu_physical_cores": 12,
+            "cpu_threads": 16,
+            "mem_gib": 46.8,
+            "disk_type": "NVMe SSD",
+            "fs_type": "btrfs",
+            "python_version": "3.13",
+            "parallel_level": "medium",
+            "parallel_workers": "8",
+            "date": "2026-08-05",
         }
         line = runner_script._format_machine_info(info)
         assert "Linux x86_64" in line
@@ -218,10 +277,24 @@ class TestEnvTable:
         assert "2026-08-05" in line
 
     def test_format_machine_info_unknown_fallback(self, runner_script):
-        info = {k: None for k in (
-            "os", "os_release", "arch", "hostname", "cpu_model", "cpu_physical_cores",
-            "cpu_threads", "mem_gib", "disk_type", "fs_type", "python_version",
-            "parallel_level", "parallel_workers", "date",
-        )}
+        info = {
+            k: None
+            for k in (
+                "os",
+                "os_release",
+                "arch",
+                "hostname",
+                "cpu_model",
+                "cpu_physical_cores",
+                "cpu_threads",
+                "mem_gib",
+                "disk_type",
+                "fs_type",
+                "python_version",
+                "parallel_level",
+                "parallel_workers",
+                "date",
+            )
+        }
         line = runner_script._format_machine_info(info)
         assert "未知" in line

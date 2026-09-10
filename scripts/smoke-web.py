@@ -158,7 +158,6 @@ def _check_health(client, results):
 
 
 def _check_upload(client, results) -> str | None:
-    from src.python.web.upload import _file_registry
 
     xlsx = _make_holdings_xlsx()
     resp = client.post("/api/upload", data={"file": (io.BytesIO(xlsx), "持仓.xlsx")})

@@ -5,6 +5,7 @@
 断言原则：只校验返回「结构」（字段存在、类型、非空），不校验具体内容
 （新闻标题/正文随时间变化）。
 """
+
 from __future__ import annotations
 
 import pytest

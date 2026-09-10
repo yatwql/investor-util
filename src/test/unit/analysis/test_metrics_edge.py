@@ -193,8 +193,7 @@ class TestWinRateEdge:
         """全部持平 → win_rate=0。"""
         from src.python.analysis.metrics import win_rate
 
-        holdings = [{"name": "A", "code": "001", "profit": 0},
-                     {"name": "B", "code": "002", "profit": 0}]
+        holdings = [{"name": "A", "code": "001", "profit": 0}, {"name": "B", "code": "002", "profit": 0}]
         result = win_rate(holdings)
         assert result["win_rate"] == 0.0
         assert len(result["zero"]) == 2
@@ -584,6 +583,7 @@ class TestBetaAnalysisEdge:
         from src.python.analysis.metrics import portfolio_beta_analysis
 
         import random
+
         random.seed(42)
         base = [random.gauss(0.0, 0.015) for _ in range(100)]
         # 高噪声确保宽 CI

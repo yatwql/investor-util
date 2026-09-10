@@ -16,12 +16,14 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core, pytest.mark.edge]
 
 
 # ═══════════════════════════════════════════════════════════
 # 加密 Excel / xlsm 宏
 # ═══════════════════════════════════════════════════════════
+
 
 class TestEncryptedExcel(unittest.TestCase):
     """加密 Excel/xlsm 文件处理。"""
@@ -31,18 +33,17 @@ class TestEncryptedExcel(unittest.TestCase):
         """加密 xlsx → 抛出 ValueError。"""
         from src.python.core.reader import read_holdings
         import openpyxl
-        mock_load.side_effect = openpyxl.utils.exceptions.InvalidFileException(
-            "File contains encrypted content"
-        )
+
+        mock_load.side_effect = openpyxl.utils.exceptions.InvalidFileException("File contains encrypted content")
         with patch("src.python.core.reader.os.path.exists", return_value=True):
             with self.assertRaises(ValueError) as ctx:
                 read_holdings("encrypted.xlsx")
-        self.assertIn("encrypted", str(ctx.exception).lower()
-                      or "格式错误" in str(ctx.exception))
+        self.assertIn("encrypted", str(ctx.exception).lower() or "格式错误" in str(ctx.exception))
 
     def test_xlsm_not_listed_as_xlsx(self):
         """xlsm 文件不被 list_xlsx_files 识别（只认 .xlsx）。"""
         from src.python.core.reader import list_xlsx_files
+
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "macro.xlsm")
             with open(fpath, "w"):
@@ -55,11 +56,13 @@ class TestEncryptedExcel(unittest.TestCase):
 # 隐藏工作表
 # ═══════════════════════════════════════════════════════════
 
+
 class TestHiddenSheet(unittest.TestCase):
     """隐藏工作表处理。"""
 
     def setUp(self):
         from src.python.core import reader as rdr
+
         self.reader = rdr
 
     @patch("src.python.core.reader.openpyxl.load_workbook")
@@ -82,6 +85,7 @@ class TestHiddenSheet(unittest.TestCase):
         mock_load.return_value = mock_wb
 
         from src.python.core.reader import get_xlsx_info
+
         with patch("src.python.core.reader.os.path.exists", return_value=True):
             info = get_xlsx_info("work.xlsx")
         self.assertIn("证券账户", info["sheet_names"])
@@ -92,13 +96,14 @@ class TestHiddenSheet(unittest.TestCase):
 # 损坏 xlsx
 # ═══════════════════════════════════════════════════════════
 
+
 class TestCorruptedXlsx(unittest.TestCase):
     """损坏 xlsx 文件处理。"""
 
     def test_bad_zip_file_raises_value_error(self):
         """非 zip 格式 → ValueError。"""
         from src.python.core.reader import read_holdings
-        import zipfile
+
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "bad.xlsx")
             with open(fpath, "w") as f:
@@ -110,7 +115,7 @@ class TestCorruptedXlsx(unittest.TestCase):
     def test_truncated_xlsx_raises_value_error(self):
         """截断的 xlsx → ValueError。"""
         from src.python.core.reader import read_holdings
-        import zipfile
+
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "truncated.xlsx")
             # 写一个不完整的 zip 文件
@@ -125,6 +130,7 @@ class TestCorruptedXlsx(unittest.TestCase):
 # UNC 网络路径
 # ═══════════════════════════════════════════════════════════
 
+
 class TestUncPath(unittest.TestCase):
     """UNC 网络路径处理。"""
 
@@ -133,6 +139,7 @@ class TestUncPath(unittest.TestCase):
     def test_unc_path_read(self, mock_exists, mock_load):
         """UNC 路径 → 正常传递到 load_workbook。"""
         from src.python.core.reader import read_holdings
+
         unc_path = r"\\server\share\holdings.xlsx"
         mock_exists.return_value = True
         mock_wb = MagicMock()
@@ -146,6 +153,7 @@ class TestUncPath(unittest.TestCase):
     def test_unc_path_listing(self):
         """UNC 路径目录 → list_xlsx_files 不崩溃。"""
         from src.python.core.reader import list_xlsx_files
+
         # UNC 路径不存在时返回空列表，不崩溃
         result = list_xlsx_files(r"\\nonexistent-server\share")
         self.assertEqual(result, [])
@@ -155,6 +163,7 @@ class TestUncPath(unittest.TestCase):
 # 文件占用
 # ═══════════════════════════════════════════════════════════
 
+
 class TestFileLocked(unittest.TestCase):
     """文件被其他进程占用。"""
 
@@ -163,6 +172,7 @@ class TestFileLocked(unittest.TestCase):
     def test_locked_file_permission_error(self, mock_exists, mock_load):
         """文件被占用（PermissionError）→ 转为 ValueError。"""
         from src.python.core.reader import read_holdings
+
         mock_exists.return_value = True
         mock_load.side_effect = PermissionError("被其他程序打开")
         # 当前实现可能直接抛出 PermissionError
@@ -177,6 +187,7 @@ class TestFileLocked(unittest.TestCase):
     def test_locked_file_oserror(self, mock_exists, mock_load):
         """文件被占用（OSError）→ 不崩溃。"""
         from src.python.core.reader import read_holdings
+
         mock_exists.return_value = True
         mock_load.side_effect = OSError("文件已被其他进程占用")
         try:
@@ -190,6 +201,7 @@ class TestFileLocked(unittest.TestCase):
 # 权限变更
 # ═══════════════════════════════════════════════════════════
 
+
 class TestPermissionChanged(unittest.TestCase):
     """文件/目录权限变更处理。"""
 
@@ -197,6 +209,7 @@ class TestPermissionChanged(unittest.TestCase):
         """只读文件 → openpyxl 可读取。"""
         from src.python.core.reader import read_holdings
         import openpyxl
+
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "readonly.xlsx")
             wb = openpyxl.Workbook()
@@ -215,6 +228,7 @@ class TestPermissionChanged(unittest.TestCase):
     def test_directory_no_permission(self, mock_exists):
         """无权限访问目录 → 返回空列表。"""
         from src.python.core.reader import list_xlsx_files
+
         result = list_xlsx_files("Z:\\nonexistent")
         self.assertEqual(result, [])
 
@@ -223,12 +237,14 @@ class TestPermissionChanged(unittest.TestCase):
 # 超长路径
 # ═══════════════════════════════════════════════════════════
 
+
 class TestLongPath(unittest.TestCase):
     """超长路径处理。"""
 
     def test_long_path_listing(self):
         """超长路径 → list_xlsx_files 不崩溃返回空。"""
         from src.python.core.reader import list_xlsx_files
+
         long_path = "C:\\" + "a" * 200 + "\\" + "b" * 50
         result = list_xlsx_files(long_path)
         self.assertEqual(result, [])
@@ -238,6 +254,7 @@ class TestLongPath(unittest.TestCase):
     def test_long_path_read(self, mock_exists, mock_load):
         """超长路径 → 可传递到 load_workbook。"""
         from src.python.core.reader import read_holdings
+
         long_path = "C:\\" + "a" * 150 + "\\holdings.xlsx"
         mock_exists.return_value = True
         mock_wb = MagicMock()
@@ -254,12 +271,14 @@ class TestLongPath(unittest.TestCase):
 # 缓存篡改
 # ═══════════════════════════════════════════════════════════
 
+
 class TestCacheTampering(unittest.TestCase):
     """缓存文件被篡改。"""
 
     def test_cache_file_corrupted_json(self):
         """缓存 JSON 损坏 → 自动删除并触发重新获取。"""
         from src.python.cache import get, _cache_path
+
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("src.python.cache._paths._CACHE_DIR", tmpdir):
                 fpath = _cache_path("test_corrupted")
@@ -272,6 +291,7 @@ class TestCacheTampering(unittest.TestCase):
     def test_cache_file_null_bytes(self):
         """缓存文件含空字节 → 解析失败，自动删除。"""
         from src.python.cache import get, _cache_path
+
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("src.python.cache._paths._CACHE_DIR", tmpdir):
                 fpath = _cache_path("test_nullbytes")
@@ -284,10 +304,11 @@ class TestCacheTampering(unittest.TestCase):
     def test_cache_file_zero_bytes(self):
         """0 字节缓存文件 → 解析失败，自动删除。"""
         from src.python.cache import get, _cache_path
+
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("src.python.cache._paths._CACHE_DIR", tmpdir):
                 fpath = _cache_path("test_empty")
-                with open(fpath, "wb") as f:
+                with open(fpath, "wb"):
                     pass
                 result = get("test_empty", max_age_seconds=3600)
                 self.assertIsNone(result)
@@ -296,11 +317,12 @@ class TestCacheTampering(unittest.TestCase):
     def test_cache_file_non_utf8_content(self):
         """非 UTF-8 编码的缓存文件 → 解析失败，自动删除。"""
         from src.python.cache import get, _cache_path
+
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("src.python.cache._paths._CACHE_DIR", tmpdir):
                 fpath = _cache_path("test_binary")
                 with open(fpath, "wb") as f:
-                    f.write(b'\xff\xfe\x00\x01\x02\x03')
+                    f.write(b"\xff\xfe\x00\x01\x02\x03")
                 result = get("test_binary", max_age_seconds=3600)
                 self.assertIsNone(result)
                 self.assertFalse(os.path.exists(fpath))
@@ -310,6 +332,7 @@ class TestCacheTampering(unittest.TestCase):
 # 空字节文件（持仓 xlsx）
 # ═══════════════════════════════════════════════════════════
 
+
 class TestNullBytesInXlsx(unittest.TestCase):
     """xlsx 文件内含空字节。"""
 
@@ -317,6 +340,7 @@ class TestNullBytesInXlsx(unittest.TestCase):
         """空字节污染 xlsx → 格式错误或正常解析。"""
         from src.python.core.reader import read_holdings
         import openpyxl
+
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "nullbytes.xlsx")
             # 创建正常 xlsx 然后注入空字节
@@ -327,7 +351,7 @@ class TestNullBytesInXlsx(unittest.TestCase):
             wb.save(fpath)
             # 追加空字节（模拟文件污染）
             with open(fpath, "ab") as f:
-                f.write(b'\x00\x00')
+                f.write(b"\x00\x00")
             try:
                 holdings = read_holdings(fpath)
                 # 可能成功（空字节在末尾被忽略）或抛出异常

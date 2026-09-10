@@ -167,8 +167,9 @@ class TestDirectoryChecks:
     def test_output_dir_unwritable_is_reported(self, tmp_path):
         target = tmp_path / "out"
         target.mkdir()
-        with patch("src.python.config.get_config", return_value={"output_dir": str(target)}), patch.object(
-            doctor, "_check_writable", return_value=(False, "不可写: 权限不足")
+        with (
+            patch("src.python.config.get_config", return_value={"output_dir": str(target)}),
+            patch.object(doctor, "_check_writable", return_value=(False, "不可写: 权限不足")),
         ):
             items = [r for r in doctor._check_directories() if r["label"] == "输出目录"]
 

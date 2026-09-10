@@ -139,7 +139,9 @@ class TestCheckAndRefreshCaches:
             cleared.append("cleared")
             return ["fund_benchmarks"]
 
-        monkeypatch.setattr("src.python.cache.services.holdings_tracker._clear_holdings_related_caches", _mock_clear_related)
+        monkeypatch.setattr(
+            "src.python.cache.services.holdings_tracker._clear_holdings_related_caches", _mock_clear_related
+        )
         monkeypatch.setattr("src.python.cache.services.holdings_tracker.set", lambda k, v: None)
 
         holdings = [_MockHolding("600519"), _MockHolding("000001")]
@@ -157,7 +159,9 @@ class TestCheckAndRefreshCaches:
             lambda k: {"fingerprint": "same_fp", "codes": ["600519", "000001"]},
         )
         cleared: list[str] = []
-        monkeypatch.setattr("src.python.cache.services.holdings_tracker._clear_holdings_related_caches", lambda: cleared)
+        monkeypatch.setattr(
+            "src.python.cache.services.holdings_tracker._clear_holdings_related_caches", lambda: cleared
+        )
         monkeypatch.setattr("src.python.cache.services.holdings_tracker.set", lambda k, v: None)
 
         holdings = [_MockHolding("600519"), _MockHolding("000001")]
@@ -178,7 +182,9 @@ class TestCheckAndRefreshCaches:
             lambda k: {"fingerprint": prev_fp, "codes": ["600519"]},
         )
         cleared: list[str] = []
-        monkeypatch.setattr("src.python.cache.services.holdings_tracker._clear_holdings_related_caches", lambda: cleared)
+        monkeypatch.setattr(
+            "src.python.cache.services.holdings_tracker._clear_holdings_related_caches", lambda: cleared
+        )
         stored_data: dict = {}
         monkeypatch.setattr("src.python.cache.services.holdings_tracker.set", lambda k, v: stored_data.update(v))
 

@@ -15,8 +15,7 @@ from __future__ import annotations
 
 import time
 import unittest
-from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -75,6 +74,7 @@ class TestBatchDispatcherExecute(unittest.TestCase):
 
     def test_execute_returns_in_order(self):
         """3 个不同耗时任务 → 返回结果按输入顺序排列。"""
+
         def task(val: int, delay: float):
             time.sleep(delay)
             return val
@@ -391,7 +391,8 @@ class TestBatchDispatcherCacheCheck(unittest.TestCase):
         """strict_none=False（默认）→ None 结果保持 success=True。"""
         items = [("a", lambda: None)]
         results = self.dispatcher.execute_with_cache_check(
-            items, lambda x: None,
+            items,
+            lambda x: None,
         )
         self.assertTrue(results[0].success)
         self.assertIsNone(results[0].result)
@@ -400,7 +401,9 @@ class TestBatchDispatcherCacheCheck(unittest.TestCase):
         """strict_none=True → None 结果标记为失败。"""
         items = [("a", lambda: 42), ("b", lambda: None)]
         results = self.dispatcher.execute_with_cache_check(
-            items, lambda x: None, strict_none=True,
+            items,
+            lambda x: None,
+            strict_none=True,
         )
         self.assertTrue(results[0].success)
         self.assertEqual(results[0].result, 42)
@@ -435,7 +438,9 @@ class TestBatchDispatcherStrategyHook(unittest.TestCase):
             return "cache"
 
         results = self.dispatcher.execute_with_cache_check(
-            items, check, strategy_hook=hook,
+            items,
+            check,
+            strategy_hook=hook,
         )
         # 0 次线程池调用
         self.assertEqual(call_count, 0)
@@ -446,6 +451,7 @@ class TestBatchDispatcherStrategyHook(unittest.TestCase):
 
     def test_strategy_live_fetch(self):
         """strategy_hook 返回 'live' → 正常执行。"""
+
         def task():
             return "live_data"
 
@@ -458,7 +464,9 @@ class TestBatchDispatcherStrategyHook(unittest.TestCase):
             return "live"
 
         results = self.dispatcher.execute_with_cache_check(
-            items, check, strategy_hook=hook,
+            items,
+            check,
+            strategy_hook=hook,
         )
         self.assertTrue(results[0].success)
         self.assertEqual(results[0].result, "live_data")
@@ -481,7 +489,9 @@ class TestBatchDispatcherStrategyHook(unittest.TestCase):
             raise RuntimeError("策略判断失败")
 
         results = self.dispatcher.execute_with_cache_check(
-            items, check, strategy_hook=hook,
+            items,
+            check,
+            strategy_hook=hook,
         )
         self.assertEqual(call_count, 1)
         self.assertTrue(results[0].success)
@@ -601,6 +611,7 @@ class TestGetRateLimiterCacheClear(unittest.TestCase):
         self.assertIsNot(inst_a, inst_b)
         # 新实例应为 RateLimiter 类型
         from src.python.fetcher.batch import RateLimiter
+
         self.assertIsInstance(inst_b, RateLimiter)
 
     def test_cache_clear_after_get_returns_new_config(self):
@@ -615,6 +626,7 @@ class TestGetRateLimiterCacheClear(unittest.TestCase):
         inst_b = get_rate_limiter()
         # inst_b 的 eastmoney 不应有上次调用记录（无等待）
         import time as _time2
+
         t0 = _time2.monotonic()
         inst_b.acquire("eastmoney")
         elapsed = _time2.monotonic() - t0
@@ -658,6 +670,7 @@ class TestBatchDispatcherChainPrecheck(unittest.TestCase):
         def task():
             nonlocal call_count
             call_count += 1
+
         items = [("a", task), ("b", task)]
         results = self.dispatcher.execute_with_chain_precheck(items, "fund_rank")
 
@@ -739,6 +752,7 @@ class TestBatchDispatcherRetry(unittest.TestCase):
             def _task():
                 call_count[0] += 1
                 return f"fixed_{idx}"
+
             return _task
 
         results = [
@@ -751,6 +765,7 @@ class TestBatchDispatcherRetry(unittest.TestCase):
 
     def test_retry_preserves_successful(self):
         """成功任务不受重试影响。"""
+
         def task_factory(idx: int):
             return lambda: f"retry_{idx}"
 
@@ -769,6 +784,7 @@ class TestBatchDispatcherRetry(unittest.TestCase):
             def _task():
                 call_count[0] += 1
                 return "retried"
+
             return _task
 
         results = [

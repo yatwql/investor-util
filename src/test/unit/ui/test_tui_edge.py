@@ -30,6 +30,7 @@ class TestPrintErrorWithHint(unittest.TestCase):
 
     def _call(self, e: Exception, prefix: str = "操作失败"):
         from src.python.tui.tui_handlers import print_error_with_hint
+
         with patch("sys.stdout", self.capture):
             print_error_with_hint(e, prefix)
         return self.capture.getvalue()
@@ -42,8 +43,7 @@ class TestPrintErrorWithHint(unittest.TestCase):
     def assert_no_raw_type(self, text: str, e: Exception):
         """友好提示不暴露原始异常类型名。"""
         raw = type(e).__name__
-        self.assertNotIn(raw, text,
-                         f"友好提示不应包含原始异常类型名「{raw}」: {text}")
+        self.assertNotIn(raw, text, f"友好提示不应包含原始异常类型名「{raw}」: {text}")
 
     # ── 网络异常 ──
 
@@ -135,10 +135,14 @@ class TestExecuteItemErrorFriendly(unittest.TestCase):
 
     def _execute(self, callback):
         from src.python.tui.tui_handlers import execute_item
+
         # 修补 MENU_ITEMS 构造一个临时条目
-        with patch("src.python.tui.tui_handlers.MENU_ITEMS", [
-            (0, "test", callback, False),
-        ]):
+        with patch(
+            "src.python.tui.tui_handlers.MENU_ITEMS",
+            [
+                (0, "test", callback, False),
+            ],
+        ):
             with patch("sys.stdout", self.capture):
                 with patch("src.python.tui.tui_handlers.press_any_key"):
                     execute_item(0)
@@ -146,40 +150,50 @@ class TestExecuteItemErrorFriendly(unittest.TestCase):
 
     def test_callback_raises_generic(self):
         """回调抛出通用异常 → 友好提示不含原始异常名。"""
+
         def _bad():
             raise RuntimeError("内部错误123")
+
         out = self._execute(_bad)
         self.assertIn("操作执行异常", out)
         self.assertNotIn("RuntimeError", out)
 
     def test_callback_raises_value_error(self):
         """回调抛出 ValueError → 友好提示含数据处理异常。"""
+
         def _bad():
             raise ValueError("bad data")
+
         out = self._execute(_bad)
         self.assertIn("操作执行异常", out)
         self.assertIn("logs/app.log", out)
 
     def test_callback_raises_network_error(self):
         """回调抛出网络相关异常 → 友好提示含网络连接异常。"""
+
         def _bad():
             raise ConnectionError("timeout")
+
         out = self._execute(_bad)
         self.assertIn("操作执行异常", out)
         self.assertIn("网络连接异常", out)
 
     def test_callback_raises_permission_error(self):
         """回调抛出 PermissionError → 友好提示含权限不足。"""
+
         def _bad():
             raise PermissionError("no write")
+
         out = self._execute(_bad)
         self.assertIn("操作执行异常", out)
         self.assertIn("权限不足", out)
 
     def test_callback_keyboard_interrupt(self):
         """Ctrl+C → 不调用 print_error_with_hint，直接显示取消。"""
+
         def _cancel():
             raise KeyboardInterrupt()
+
         with patch("src.python.tui.tui_handlers.print_error_with_hint") as mock_err:
             out = self._execute(_cancel)
         self.assertIn("操作已取消", out)
@@ -188,10 +202,14 @@ class TestExecuteItemErrorFriendly(unittest.TestCase):
     def test_busy_skip(self):
         """_busy=True 时跳过执行。"""
         from src.python.tui.tui_handlers import execute_item
+
         callback = MagicMock()
-        with patch("src.python.tui.tui_handlers.MENU_ITEMS", [
-            (0, "test", callback, False),
-        ]):
+        with patch(
+            "src.python.tui.tui_handlers.MENU_ITEMS",
+            [
+                (0, "test", callback, False),
+            ],
+        ):
             with patch("src.python.tui.tui_handlers._busy", True):
                 execute_item(0)
         callback.assert_not_called()

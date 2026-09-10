@@ -22,6 +22,7 @@ from src.python.analysis.drawdown_events import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
 
+
 def _bars(values: list[float], start: str = "2026-01-01") -> list[dict]:
     """从每日净值序列生成 bars（每日 +1 天）。"""
     from datetime import date, timedelta
@@ -39,24 +40,27 @@ class TestExtractDrawdownEventsEdge:
 
     def test_zero_negative_values_skipped(self):
         """中间出现 0/负值 → 跳过，不影响其余净值处理。"""
-        bars = [{"date": "2026-01-01", "total_value": 10.0},
-                {"date": "2026-01-02", "total_value": 0.0},
-                {"date": "2026-01-03", "total_value": -5.0},
-                {"date": "2026-01-04", "total_value": 12.0}]
+        bars = [
+            {"date": "2026-01-01", "total_value": 10.0},
+            {"date": "2026-01-02", "total_value": 0.0},
+            {"date": "2026-01-03", "total_value": -5.0},
+            {"date": "2026-01-04", "total_value": 12.0},
+        ]
         # 等效 [10, 12] → 单调上涨，无事件
         assert extract_drawdown_events(bars) == []
 
     def test_all_invalid_values_no_events(self):
         """全部 total_value ≤ 0 → 无事件、不崩溃。"""
-        bars = [{"date": "2026-01-01", "total_value": 0.0},
-                {"date": "2026-01-02", "total_value": -1.0}]
+        bars = [{"date": "2026-01-01", "total_value": 0.0}, {"date": "2026-01-02", "total_value": -1.0}]
         assert extract_drawdown_events(bars) == []
 
     def test_missing_total_value_skipped(self):
         """缺失 total_value 字段 → 按 0 跳过，不崩溃。"""
-        bars = [{"date": "2026-01-01", "total_value": 100.0},
-                {"date": "2026-01-02"},
-                {"date": "2026-01-03", "total_value": 90.0}]
+        bars = [
+            {"date": "2026-01-01", "total_value": 100.0},
+            {"date": "2026-01-02"},
+            {"date": "2026-01-03", "total_value": 90.0},
+        ]
         events = extract_drawdown_events(bars)
         # 等效 [100, 90] → 单调下跌 → 1 个未恢复事件
         assert len(events) == 1
@@ -64,8 +68,7 @@ class TestExtractDrawdownEventsEdge:
 
     def test_missing_date_no_crash(self):
         """缺失/非法 date 字段 → 时长回退 0，不崩溃。"""
-        bars = [{"date": "bad-date", "total_value": 100.0},
-                {"date": "2026-01-02", "total_value": 90.0}]
+        bars = [{"date": "bad-date", "total_value": 100.0}, {"date": "2026-01-02", "total_value": 90.0}]
         events = extract_drawdown_events(bars)
         assert len(events) == 1
         assert events[0]["duration_days"] == 0
@@ -89,9 +92,11 @@ class TestExtractDrawdownEventsEdge:
 
     def test_negative_total_value_before_peak(self):
         """首日即为负值 → 该日跳过，后续正常建峰。"""
-        bars = [{"date": "2026-01-01", "total_value": -100.0},
-                {"date": "2026-01-02", "total_value": 100.0},
-                {"date": "2026-01-03", "total_value": 50.0}]
+        bars = [
+            {"date": "2026-01-01", "total_value": -100.0},
+            {"date": "2026-01-02", "total_value": 100.0},
+            {"date": "2026-01-03", "total_value": 50.0},
+        ]
         events = extract_drawdown_events(bars)
         assert len(events) == 1
         assert events[0]["peak_date"] == "2026-01-02"

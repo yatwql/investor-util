@@ -12,7 +12,6 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
 
 import openpyxl
 import pytest
@@ -30,22 +29,37 @@ class TestWriteFundManagerSheet(unittest.TestCase):
         self.ws = self.wb.active
         self.manager_data = [
             {
-                "name": "易方达中小盘混合", "code": "110011",
-                "current_manager": "张坤", "tenure_days": 5000,
-                "changed_1m": False, "changed_3m": False, "changed_6m": False,
-                "alert_level": "正常", "is_first_check": False,
+                "name": "易方达中小盘混合",
+                "code": "110011",
+                "current_manager": "张坤",
+                "tenure_days": 5000,
+                "changed_1m": False,
+                "changed_3m": False,
+                "changed_6m": False,
+                "alert_level": "正常",
+                "is_first_check": False,
             },
             {
-                "name": "某主动基金", "code": "007844",
-                "current_manager": "刘彦春", "tenure_days": 2000,
-                "changed_1m": True, "changed_3m": True, "changed_6m": True,
-                "alert_level": "紧急", "is_first_check": False,
+                "name": "某主动基金",
+                "code": "007844",
+                "current_manager": "刘彦春",
+                "tenure_days": 2000,
+                "changed_1m": True,
+                "changed_3m": True,
+                "changed_6m": True,
+                "alert_level": "紧急",
+                "is_first_check": False,
             },
             {
-                "name": "新基金", "code": "999999",
-                "current_manager": "王经理", "tenure_days": 30,
-                "changed_1m": False, "changed_3m": False, "changed_6m": False,
-                "alert_level": "首检", "is_first_check": True,
+                "name": "新基金",
+                "code": "999999",
+                "current_manager": "王经理",
+                "tenure_days": 30,
+                "changed_1m": False,
+                "changed_3m": False,
+                "changed_6m": False,
+                "alert_level": "首检",
+                "is_first_check": True,
             },
         ]
 
@@ -82,10 +96,15 @@ class TestWriteFundManagerSheet(unittest.TestCase):
         """首检行变更列显示"—"。"""
         first_check_data = [
             {
-                "name": "首检基金", "code": "999999",
-                "current_manager": "王经理", "tenure_days": 30,
-                "changed_1m": False, "changed_3m": False, "changed_6m": False,
-                "alert_level": "首检", "is_first_check": True,
+                "name": "首检基金",
+                "code": "999999",
+                "current_manager": "王经理",
+                "tenure_days": 30,
+                "changed_1m": False,
+                "changed_3m": False,
+                "changed_6m": False,
+                "alert_level": "首检",
+                "is_first_check": True,
             },
         ]
         write_fund_manager_sheet(self.ws, first_check_data)

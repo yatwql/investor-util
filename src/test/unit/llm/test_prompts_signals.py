@@ -184,7 +184,14 @@ class TestSignalDigestBlock:
         from src.python.llm.prompts_signals import _build_signal_digest_block
 
         text = _build_signal_digest_block(
-            {"tail_risk_data": {"available": True, "var95": 3.5, "max_single_day_drop": -4.2, "consecutive_down_days": 3}}
+            {
+                "tail_risk_data": {
+                    "available": True,
+                    "var95": 3.5,
+                    "max_single_day_drop": -4.2,
+                    "consecutive_down_days": 3,
+                }
+            }
         )
 
         assert "尾部风险 风险高" in text

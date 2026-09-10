@@ -33,18 +33,23 @@ class ScenarioTestBase(unittest.TestCase):
         self._price_patcher = patch("src.python.fetcher.price.fetch_market_data")
         self._mock_price = self._price_patcher.start()
         self._mock_price.return_value = {
-            "price": 10.0, "yesterday_close": 9.8,
-            "price_date": "2026-06-26", "source": "腾讯财经",
+            "price": 10.0,
+            "yesterday_close": 9.8,
+            "price_date": "2026-06-26",
+            "source": "腾讯财经",
             "source_api": "tencent",
         }
 
         self._fund_patcher = patch("src.python.report.penetration.fetch_fund_holdings_batch")
         self._mock_fund = self._fund_patcher.start()
-        self._mock_fund.return_value = {"510300": {
-            "code": "510300", "name": "沪深300ETF",
-            "date": "2026-03-31",
-            "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
-        }}
+        self._mock_fund.return_value = {
+            "510300": {
+                "code": "510300",
+                "name": "沪深300ETF",
+                "date": "2026-03-31",
+                "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
+            }
+        }
 
         # LLM 相关 mock
         self._llm_config_patcher = patch(
@@ -58,11 +63,13 @@ class ScenarioTestBase(unittest.TestCase):
         self._fund_patcher.stop()
         self._llm_config_patcher.stop()
 
-    def _make_holding(self, account: str, name: str, code: str,
-                       shares: float, cost_price: float) -> Holding:
+    def _make_holding(self, account: str, name: str, code: str, shares: float, cost_price: float) -> Holding:
         return Holding(
-            account=account, name=name, code=code,
-            shares=shares, cost_price=cost_price,
+            account=account,
+            name=name,
+            code=code,
+            shares=shares,
+            cost_price=cost_price,
         )
 
 
@@ -90,12 +97,14 @@ class TestScenarioBond(ScenarioTestBase):
         for h in self.holdings:
             if "ETF" in h.name:
                 # ETF 标记的债券基金按规则归为 etf
-                self.assertEqual(classify_penetration(h), "etf",
-                                 f"{h.name} 应为 etf")
+                self.assertEqual(classify_penetration(h), "etf", f"{h.name} 应为 etf")
             else:
                 # 场外债券基金 → bond_fund
-                self.assertEqual(classify_penetration(h), "bond_fund",
-                                 f"{h.name} 应分类为 bond_fund，实际为 {classify_penetration(h)}")
+                self.assertEqual(
+                    classify_penetration(h),
+                    "bond_fund",
+                    f"{h.name} 应分类为 bond_fund，实际为 {classify_penetration(h)}",
+                )
 
     def test_penetration_top10_contains_no_or_few_stocks(self):
         """纯债券穿透 → TOP10 无直接股权, 或无穿透数据。"""
@@ -135,8 +144,10 @@ class TestScenarioBond(ScenarioTestBase):
         from src.python.report.penetration import _build_penetration_result
 
         classified = {
-            "qdii": [], "etf": [],
-            "index_link": [], "bond_fund": self.holdings,
+            "qdii": [],
+            "etf": [],
+            "index_link": [],
+            "bond_fund": self.holdings,
             "active_equity": [],
         }
 
@@ -150,8 +161,7 @@ class TestScenarioBond(ScenarioTestBase):
             failed_fund_details=[],
         )
 
-        self.assertIn("债券", result["summary"]["fund_breakdown"],
-                      "fund_breakdown 应包含债券标记")
+        self.assertIn("债券", result["summary"]["fund_breakdown"], "fund_breakdown 应包含债券标记")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -181,11 +191,8 @@ class TestScenarioNetworkDown(ScenarioTestBase):
             # 第二次 cache_get（过期缓存降级）→ stale data
             mock_cache_get.side_effect = [None, {"stale": True, "price": 10.5}]
 
-            with patch("src.python.fetcher.chain._get_chain",
-                       return_value=["tencent", "eastmoney"]):
-                result = fetch_with_fallback(
-                    "price", provider_map, "test_600900", 3600
-                )
+            with patch("src.python.fetcher.chain._get_chain", return_value=["tencent", "eastmoney"]):
+                result = fetch_with_fallback("price", provider_map, "test_600900", 3600)
 
         # 降级使用过期缓存
         self.assertEqual(result, {"stale": True, "price": 10.5})
@@ -199,11 +206,8 @@ class TestScenarioNetworkDown(ScenarioTestBase):
         }
 
         with patch("src.python.fetcher.chain.cache_get", return_value=None):
-            with patch("src.python.fetcher.chain._get_chain",
-                       return_value=["tencent"]):
-                result = fetch_with_fallback(
-                    "price", provider_map, "test_600900", 3600
-                )
+            with patch("src.python.fetcher.chain._get_chain", return_value=["tencent"]):
+                result = fetch_with_fallback("price", provider_map, "test_600900", 3600)
 
         self.assertIsNone(result)
 
@@ -213,8 +217,11 @@ class TestScenarioNetworkDown(ScenarioTestBase):
 
         # 模拟行情数据获取失败（返回空/缺字段的行情）
         mkt = {
-            "price": 0.0, "yesterday_close": 0.0,
-            "price_date": "", "source": "--", "source_api": "",
+            "price": 0.0,
+            "yesterday_close": 0.0,
+            "price_date": "",
+            "source": "--",
+            "source_api": "",
         }
         detail = _compute_detail_row(self.holding, mkt)
 
@@ -243,9 +250,11 @@ class TestScenarioSingleHolding(ScenarioTestBase):
         from src.python.report.market_value import _compute_detail_row
 
         mkt = {
-            "price": 29.0, "yesterday_close": 28.5,
+            "price": 29.0,
+            "yesterday_close": 28.5,
             "price_date": "2026-06-26",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(self.holding, mkt)
 
@@ -256,15 +265,15 @@ class TestScenarioSingleHolding(ScenarioTestBase):
 
     def test_single_holding_generates_excel(self):
         """单持仓 → 可生成 Excel 报告。"""
-        import tempfile
         from src.python.report.excel_generator import generate_excel_report
 
         tmp = tempfile.TemporaryDirectory()
         try:
-            with patch("src.python.fetcher.index.fetch_indices", return_value={}), \
-                 patch("src.python.fetcher.index.fetch_us_indices", return_value={}), \
-                 patch("src.python.report.fund_performance.write_fund_performance_sheet"):
-
+            with (
+                patch("src.python.fetcher.index.fetch_indices", return_value={}),
+                patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
+                patch("src.python.report.fund_performance.write_fund_performance_sheet"),
+            ):
                 generate_excel_report(
                     [self.holding],
                     output_dir=tmp.name,
@@ -283,9 +292,11 @@ class TestScenarioSingleHolding(ScenarioTestBase):
         from src.python.report.market_value import _compute_detail_row
 
         mkt = {
-            "price": 29.0, "yesterday_close": 28.5,
+            "price": 29.0,
+            "yesterday_close": 28.5,
             "price_date": "2026-06-26",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(self.holding, mkt)
 
@@ -308,9 +319,11 @@ class TestScenarioZeroCost(ScenarioTestBase):
 
         h = Holding("证券", "赠送股票", "600000", 100, 0.0)
         mkt = {
-            "price": 50.0, "yesterday_close": 49.0,
+            "price": 50.0,
+            "yesterday_close": 49.0,
             "price_date": "2026-06-26",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
 
@@ -327,9 +340,11 @@ class TestScenarioZeroCost(ScenarioTestBase):
 
         h = Holding("支付宝", "赠送基金", "005827", 500, 0.0)
         mkt = {
-            "price": 2.0, "yesterday_close": 1.9,
+            "price": 2.0,
+            "yesterday_close": 1.9,
             "price_date": "2026-06-30",
-            "source": "天天基金", "source_api": "eastmoney",
+            "source": "天天基金",
+            "source_api": "eastmoney",
         }
         detail = _compute_detail_row(h, mkt)
 
@@ -347,9 +362,11 @@ class TestScenarioZeroCost(ScenarioTestBase):
 
         h = Holding("证券", "测试零成本", "600000", 100, 0.0)
         mkt = {
-            "price": 10.0, "yesterday_close": 9.5,
+            "price": 10.0,
+            "yesterday_close": 9.5,
             "price_date": "2026-06-30",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         values = _detail_to_row_values(detail)
@@ -365,9 +382,11 @@ class TestScenarioZeroCost(ScenarioTestBase):
 
         h = Holding("证券", "负值零成本", "600000", 100, 0.0)
         mkt = {
-            "price": -5.0, "yesterday_close": -4.0,
+            "price": -5.0,
+            "yesterday_close": -4.0,
             "price_date": "2026-06-26",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
 
@@ -377,6 +396,7 @@ class TestScenarioZeroCost(ScenarioTestBase):
         # profit = -500 - 0 = -500
         self.assertEqual(detail.profit, -500.0)
         self.assertIsNone(detail.profit_rate)
+
 
 if __name__ == "__main__":
     unittest.main()

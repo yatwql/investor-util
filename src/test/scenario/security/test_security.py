@@ -17,7 +17,6 @@ import logging
 import os
 import re
 import sys
-from unittest.mock import patch
 
 import pytest
 
@@ -35,7 +34,7 @@ logger = logging.getLogger("invest")
 
 _SAMPLE_API_KEY = "sk-test-secret-key-12345abcdef"
 _SAMPLE_KEY_PATTERNS = [
-    re.compile(r"sk-[a-zA-Z0-9]{20,}"),       # OpenAI / Claude
+    re.compile(r"sk-[a-zA-Z0-9]{20,}"),  # OpenAI / Claude
     re.compile(r"api[_-]?key[\s\"':=]+[a-zA-Z0-9_\-]{10,}", re.IGNORECASE),
 ]
 
@@ -48,12 +47,33 @@ _SAMPLE_HOLDINGS = [
 ]
 
 _SAMPLE_DETAILS = [
-    {"name": "招商银行", "code": "600036", "market_value": 175000.0, "cost": 175000.0,
-     "profit": 10000.0, "profit_rate_pct": 6.0, "account": "测试账户"},
-    {"name": "贵州茅台", "code": "600519", "market_value": 360000.0, "cost": 360000.0,
-     "profit": 50000.0, "profit_rate_pct": 16.0, "account": "测试账户"},
-    {"name": "易方达蓝筹", "code": "005827", "market_value": 25000.0, "cost": 25000.0,
-     "profit": -3000.0, "profit_rate_pct": -10.0, "account": "测试账户"},
+    {
+        "name": "招商银行",
+        "code": "600036",
+        "market_value": 175000.0,
+        "cost": 175000.0,
+        "profit": 10000.0,
+        "profit_rate_pct": 6.0,
+        "account": "测试账户",
+    },
+    {
+        "name": "贵州茅台",
+        "code": "600519",
+        "market_value": 360000.0,
+        "cost": 360000.0,
+        "profit": 50000.0,
+        "profit_rate_pct": 16.0,
+        "account": "测试账户",
+    },
+    {
+        "name": "易方达蓝筹",
+        "code": "005827",
+        "market_value": 25000.0,
+        "cost": 25000.0,
+        "profit": -3000.0,
+        "profit_rate_pct": -10.0,
+        "account": "测试账户",
+    },
 ]
 
 
@@ -218,10 +238,12 @@ def _mask_api_key(text: str, visible_chars: int = 4) -> str:
         脱敏后的文本
     """
     pattern = re.compile(r"(sk-)[a-zA-Z0-9_-]+")
+
     def _replacer(m: re.Match) -> str:
         prefix = m.group(1)
         full_key = m.group(0)
         if len(full_key) > visible_chars + len(prefix):
             return f"{prefix}***{full_key[-visible_chars:]}"
         return full_key
+
     return pattern.sub(_replacer, text)

@@ -53,10 +53,7 @@ class TestHeaderCheck:
 
     def test_old_header_rejected_even_if_body_mentions_target(self, version_script):
         """回归断言：头部为旧版本号、正文出现目标版本号时，header 校验必须判定不一致。"""
-        text = (
-            "> 文档版本：0.9.13-dev\n\n"
-            "| rf-114 | 待 v0.10.0 稳定 2 个版本后删除旧渲染器 |\n"
-        )
+        text = "> 文档版本：0.9.13-dev\n\n| rf-114 | 待 v0.10.0 稳定 2 个版本后删除旧渲染器 |\n"
         # 全文 contains 方案：因正文出现目标版本号而误判通过。
         assert version_script._check_contains(text, ("{v}",), "0.10.0") is True
         # 新方案按头部行精确匹配：头部未同步则判定不一致。

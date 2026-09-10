@@ -49,8 +49,7 @@ class TestBondYieldFetcher:
             "美国GDP同比增长",
         ]
         data = [
-            ["2026-07-17", 1.2645, 1.4466, 1.7404, 2.2425, 0.4759, None,
-             4.18, 4.28, 4.55, 5.06, 0.37, None],
+            ["2026-07-17", 1.2645, 1.4466, 1.7404, 2.2425, 0.4759, None, 4.18, 4.28, 4.55, 5.06, 0.37, None],
         ]
         return pd.DataFrame(data, columns=columns)
 

@@ -18,6 +18,7 @@ from src.python.providers.wallstreetcn_news import (
     fetch_news,
 )
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
 
@@ -27,14 +28,17 @@ class TestParseNewsItem(unittest.TestCase):
     def test_normal_item(self):
         """正常条目 → 正确解析所有字段。"""
         item = {
-            "title": "新闻标题", "content_text": "正文内容",
-            "display_time": "1782873000", "uri": "/live/12345",
+            "title": "新闻标题",
+            "content_text": "正文内容",
+            "display_time": "1782873000",
+            "uri": "/live/12345",
         }
         result = _parse_news_item(item)
         self.assertEqual(result["title"], "新闻标题")
         self.assertEqual(result["intro"], "正文内容")
         self.assertEqual(
-            result["url"], "https://wallstreetcn.com/live/12345",
+            result["url"],
+            "https://wallstreetcn.com/live/12345",
         )
         self.assertEqual(result["ctime"], "2026-07-01 10:30")
         self.assertEqual(result["media_name"], "华尔街见闻")
@@ -43,7 +47,9 @@ class TestParseNewsItem(unittest.TestCase):
         """缺少 title → 使用 content_text 前 40 字。"""
         content = "测试正文" * 20  # 80 chars
         item = {
-            "content_text": content, "display_time": "0", "uri": "/live/1",
+            "content_text": content,
+            "display_time": "0",
+            "uri": "/live/1",
         }
         result = _parse_news_item(item)
         self.assertEqual(result["title"], ("测试正文" * 10) + "…")
@@ -51,7 +57,9 @@ class TestParseNewsItem(unittest.TestCase):
     def test_short_content_no_ellipsis(self):
         """content_text 不超过 40 字 → 不加 …。"""
         item = {
-            "content_text": "短内容", "display_time": "0", "uri": "/live/1",
+            "content_text": "短内容",
+            "display_time": "0",
+            "uri": "/live/1",
         }
         result = _parse_news_item(item)
         self.assertEqual(result["title"], "短内容")
@@ -65,7 +73,8 @@ class TestParseNewsItem(unittest.TestCase):
     def test_html_tags_stripped_from_intro(self):
         """intro 剥离 HTML 标签。"""
         item = {
-            "title": "标题", "content_text": "<p>正文<b>强调</b></p>",
+            "title": "标题",
+            "content_text": "<p>正文<b>强调</b></p>",
             "display_time": "0",
         }
         result = _parse_news_item(item)
@@ -75,7 +84,9 @@ class TestParseNewsItem(unittest.TestCase):
         """intro 超过 300 字 → 截断加 …。"""
         long_text = "内容" * 200  # 400 chars
         item = {
-            "title": "标题", "content_text": long_text, "display_time": "0",
+            "title": "标题",
+            "content_text": long_text,
+            "display_time": "0",
         }
         result = _parse_news_item(item)
         self.assertLessEqual(len(result["intro"]), 301)  # 300 + "…"
@@ -84,7 +95,9 @@ class TestParseNewsItem(unittest.TestCase):
     def test_uri_relative_becomes_absolute(self):
         """相对路径 uri → 拼接完整 URL。"""
         item = {
-            "title": "标题", "uri": "/live/abc", "display_time": "0",
+            "title": "标题",
+            "uri": "/live/abc",
+            "display_time": "0",
         }
         result = _parse_news_item(item)
         self.assertEqual(result["url"], "https://wallstreetcn.com/live/abc")
@@ -92,7 +105,8 @@ class TestParseNewsItem(unittest.TestCase):
     def test_uri_absolute_kept_as_is(self):
         """绝对路径 uri → 保持原样。"""
         item = {
-            "title": "标题", "uri": "https://example.com/page",
+            "title": "标题",
+            "uri": "https://example.com/page",
             "display_time": "0",
         }
         result = _parse_news_item(item)
@@ -134,14 +148,14 @@ class TestFetchNews(unittest.TestCase):
     def _mock_response(self, json_data: dict | None = None):
         """创建模拟 httpx.Response（200 OK）。"""
         import httpx
+
         resp = MagicMock(spec=httpx.Response)
         resp.status_code = 200
         resp.json.return_value = json_data or {}
         resp.raise_for_status.return_value = None
         return resp
 
-    def _setup_mock(self, mock_factory: MagicMock,
-                    mock_response: MagicMock) -> MagicMock:
+    def _setup_mock(self, mock_factory: MagicMock, mock_response: MagicMock) -> MagicMock:
         """配置 mock make_http_client。"""
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
@@ -154,14 +168,16 @@ class TestFetchNews(unittest.TestCase):
     @patch("src.python.providers.wallstreetcn_news.make_http_client")
     def test_success(self, mock_factory):
         """正常返回 → 正确解析新闻列表。"""
-        mock_resp = self._mock_response({
-            "data": {"items": [
-                {"title": "新闻1", "content_text": "内容1",
-                 "display_time": "1782873000", "uri": "/live/1"},
-                {"title": "新闻2", "content_text": "内容2",
-                 "display_time": "1782873060", "uri": "/live/2"},
-            ]},
-        })
+        mock_resp = self._mock_response(
+            {
+                "data": {
+                    "items": [
+                        {"title": "新闻1", "content_text": "内容1", "display_time": "1782873000", "uri": "/live/1"},
+                        {"title": "新闻2", "content_text": "内容2", "display_time": "1782873060", "uri": "/live/2"},
+                    ]
+                },
+            }
+        )
         self._setup_mock(mock_factory, mock_resp)
 
         result = fetch_news(num=10)
@@ -198,6 +214,7 @@ class TestFetchNews(unittest.TestCase):
     def test_timeout_returns_empty(self, mock_factory):
         """超时 → 空列表。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -258,13 +275,16 @@ class TestFetchNews(unittest.TestCase):
     @patch("src.python.providers.wallstreetcn_news.make_http_client")
     def test_invalid_items_skipped(self, mock_factory):
         """列表中含无效条目 → 跳过（无标题且无内容）。"""
-        mock_resp = self._mock_response({
-            "data": {"items": [
-                {"title": "有效", "content_text": "内容",
-                 "display_time": "0"},
-                {},
-            ]},
-        })
+        mock_resp = self._mock_response(
+            {
+                "data": {
+                    "items": [
+                        {"title": "有效", "content_text": "内容", "display_time": "0"},
+                        {},
+                    ]
+                },
+            }
+        )
         self._setup_mock(mock_factory, mock_resp)
         result = fetch_news(num=10)
         self.assertEqual(len(result), 1)

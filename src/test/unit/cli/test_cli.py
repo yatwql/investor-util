@@ -10,7 +10,7 @@ import sys
 
 import pytest
 
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 from src.python.cli import (
     _EXIT_PARTIAL,
