@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -23,6 +22,7 @@ from src.python.llm.module_fingerprint import (
     ModuleFingerprintInputs,
     debate_feature_cache_suffix,
     debate_procon_fingerprint,
+    debate_synthesis_fingerprint,
     expert_review_fingerprint,
     global_macro_fingerprint,
     health_check_fingerprint,
@@ -444,19 +444,19 @@ def generate_debate_procon(
     # 收敛到 module_fingerprint（此处原为项目内唯一绕开注册表的指纹自拼点）：
     # 辩论提示词含竞争语境块与量化指标，二者必须进键，否则预检/缓存会命中按旧
     # 指数算出的对比内容；后缀也由同一构造器拼接，不再于本函数内手拼。
-    _fingerprint = debate_procon_fingerprint(
-        ModuleFingerprintInputs(
-            total_mv=total_mv,
-            total_cost=total_cost,
-            total_profit=total_profit,
-            total_today_profit=total_today_profit,
-            holdings_details=holdings_details,
-            penetrated_assets=penetrated_assets,
-            categories=categories,
-            competitive_context=competitive_context or "",
-            metrics=metrics,
-        )
+    _fp_inputs = ModuleFingerprintInputs(
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
+        categories=categories,
+        pipeline_data=pipeline_data,
+        competitive_context=competitive_context or "",
+        metrics=metrics,
     )
+    _fingerprint = debate_procon_fingerprint(_fp_inputs)
 
     # ── Session 级缓存（线程安全） ──────────────────────
     _cache_lock = _threading.Lock()
@@ -617,9 +617,10 @@ def generate_debate_procon(
         holdings_details=holdings_details,
         total_mv=total_mv,
     )
-    _pro_digest = hashlib.sha256(pro_text[:200].encode()).hexdigest()[:8]
-    _con_digest = hashlib.sha256(con_text[:200].encode()).hexdigest()[:8]
-    _syn_fingerprint = f"{_fingerprint}_{_pro_digest}_{_con_digest}"
+    # 综合指纹取「辩论基础指纹 + 综合提示词全文」而非 pro/con 前 200 字符摘要：
+    # 摘要口径会漏掉 200 字符之后的正文差异，也漏掉仅 config 变化（情景名/描述、
+    # 集中度阈值）的情形——两者都让提示词变了而键不动，命中旧综合结论。
+    _syn_fingerprint = debate_synthesis_fingerprint(_fp_inputs, _synthesis_user)
     _syn_cache_key = f"llm_debate_synthesis_{_syn_fingerprint}"
     _session_syn_key = f"debate_syn_{_syn_fingerprint}"
     synthesis_text = _check_session_cache(_session_syn_key)
@@ -640,7 +641,7 @@ def generate_debate_procon(
             "expert_review",
             force=force,
             http_client=http_client,
-            fingerprint_fn=lambda: f"{_fingerprint}_debate_syn_{_pro_digest}_{_con_digest}",
+            fingerprint_fn=lambda: f"{_syn_fingerprint}_debate_syn",
             system_prompt_default=_synthesis_system,
             prompt_builder=lambda: _synthesis_user,
             max_tokens_default=_max_tokens,

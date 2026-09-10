@@ -6,6 +6,18 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 指纹补齐提示词承载段与综合键全文口径（自审 rf-331）（2026-09-10）
+
+- **缺陷（自审 rf-331）**：指纹覆盖纪律要求「一次渲染、两侧共享；进了提示词的必须进指纹」。核查发现两处**键与提示词内容脱钩**，且都不报错、只表现为静默的陈旧结论：
+  - **提示词承载段缺席指纹**：`pipeline_data` 派生的【环比变化】（`_build_difpipeline_data_block`）与【数据质量降级】（`_build_data_degradation_block`）两段**直接进入** `expert_review` / `health_check` / 辩论白脸红脸的提示词正文，却完全不参与指纹——持仓未动而数据源故障或恢复（降级事件集变化）、当日两份报告的环比基数不同（`diff` 内容变化）时键不变，预检命中旧键，报告继续陈述「某数据源不可用」或复用按旧环比算出的结论。
+  - **辩论综合键的摘要口径**：综合步的 `fingerprint_fn` 只把白脸/黑脸正文**前 200 字符**的 sha256 摘要拼进键（`f"{_fingerprint}_{_pro_digest}_{_con_digest}"`）——正文差异落在 200 字符之后时键不动；且键里只有开关位字母后缀，提示词中的条件推理**情景名/描述**与集中度问答**阈值**均来自 `config`，仅改配置而不动开关时键同样不动。两种情况都命中按旧正文/旧配置生成的综合结论。
+- **改动**：
+  - `module_fingerprint.py` 新增 `_pipeline_block_cache_suffix(pipeline_data)`——与既有的 `_signal_digest_cache_suffix` 同法，调用**提示词侧同一构建器**取文本再哈希，故「进键的文本」与「进提示词的文本」由同一段代码产出、不靠纪律对齐；两段皆空时返回 `""`（键与未注入时一致，不误伤既有缓存）。`expert_review_fingerprint` / `health_check_fingerprint` / `debate_procon_fingerprint` 三个构造器各拼接该后缀（辩论白脸红脸复用 `_build_expert_review_prompt`，两段随其进入提示词）。
+  - 新增 `debate_synthesis_fingerprint(inputs, synthesis_prompt)` = `compute_fingerprint(debate_procon_fingerprint(inputs), synthesis_prompt)`：综合提示词本就是白脸/黑脸全文 + 情景段 + 集中度段的函数，键直接取该渲染结果，无需逐项枚举入哈希来源、也就不会漏项。
+  - `generators.py` 的 `generate_debate_procon` 改为构造**一次** `_fp_inputs` 供三段复用（并把 `pipeline_data` 注入该输入闭包），综合键改用新构造器；删除 `hashlib` 依赖与前 200 字符摘要拼接。
+- **行为变更**：键形态变化，升级后首份报告的三处相关缓存（`expert_review` / `health_check` / 辩论三键）为一次性未命中重算，其后恢复正常命中。正常路径的报告内容无变化；变化只发生在「此前会命中陈旧结论」的场景。
+- **测试**：`test_module_fingerprint.py` 新增 7 例——`test_degradation_block_is_in_prompt_for_covered_modules`（前提校验：该块确实进了提示词，否则下述用例无的放矢）、`test_degradation_block_enters_fingerprint` / `test_diff_block_enters_fingerprint`（两模块参数化：事件集或环比内容变化必须换键，且与「无 pipeline_data」的基线不同）、`test_pipeline_blocks_ignored_without_block_in_prompt`（`global_macro` / `penetration_deep` 提示词不含该两段，指纹不得随之变化——反向防纯成本失效）、`test_pipeline_block_enters_precheck_key_not_only_write_side`（预检侧同样换键且与写侧逐字符同源）、`test_debate_fingerprint_covers_pipeline_blocks_in_its_prompt`、`test_debate_synthesis_fingerprint_covers_full_procon_text`（用例前提显式断言两段正文前 200 字符完全相同）、`test_debate_synthesis_fingerprint_covers_config_driven_prompt_text`（仅改情景描述、开关位不变也必须换键）；`test_debate_generators.py` 新增 `test_synthesis_fingerprint_covers_full_procon_text`——走**生产路径**（`generate_debate_procon` 三段 mock 后取第三段的 `fingerprint_fn`）而非直接调用指纹函数。共 10 例已用 `git stash` 还原旧实现验证转红。
+
 ### pipeline_data 键台账回归三方一致（C19，自审 rf-328）（2026-09-10）
 
 - **缺陷（自审 rf-328）**：C19 要求 pipeline_data 的键必须先在附录 H（`technical.md` 的 Schema 台账）登记类型与写入/消费模块后才能使用。实际存在**三方漂移**——代码 `_PIPELINE_DATA_KNOWN_KEYS`、类型断言表 `_PIPELINE_DATA_TYPE_MAP`、附录 H 台账各说各话：

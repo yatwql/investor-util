@@ -785,13 +785,16 @@ penetrated_assets ──→ extract_stable_penetration()
 | `competitive_context` | `global_macro` / `expert_review` / 辩论三键 | `prompts_core._build_competitive_context_block()` | 竞争语境块（【今日对比】/【区间对比】），由 A 股/美股指数、对比指数配置、区间收益与量化指标渲染而成 |
 | `metrics` | `expert_review` / 辩论三键 | 提示词正文（【量化指标】/ 情景分析 / 风格一致性） | 量化指标字典 |
 | `data_quality_text` | `health_check` | `prompts_tables._build_data_quality_detail_block()` | 数据质量详细状态块（【数据质量详细状态】：连接失败 / 数据为空 / 触发降级计数），由 `degradation_events`（本进程内的降级事件日志）渲染而成 |
+| `pipeline_data` 派生的【环比变化】【数据质量降级】两段 | `expert_review` / `health_check` / 辩论三键 | `prompts_core._build_difpipeline_data_block()` / `_build_data_degradation_block()` | 由 `_pipeline_block_cache_suffix()` 调用**提示词侧同一构建器**取文本再哈希——「进键的文本」与「进提示词的文本」同源 |
 
 **两个结构性保证**：
 
 1. **覆盖以提示词为准，而非以「是否与持仓相关」为准**：每段只进「提示词确实含该段」的模块——`competitive_context` / `metrics` 不进 `health_check` / `penetration_deep`（其提示词不含这两段），`data_quality_text` 只进 `health_check`（仅它的提示词含数据质量段）。反向的 `history_data`/信号后缀也遵循同一判据：进提示词的进键，没进的不进键。
 2. **一次渲染、两侧共享同一实例**：`competitive_context` 与 `data_quality_text` 均由 `generate_all_llm()` 渲染**一次**，同一字符串实例同时交给预检侧（`_compute_module_cache_info`）与写侧（各生成函数）——两侧**不得各自渲染**。哈希「已渲染文本」而非哈希其输入 dict，使得「提示词内容变 ⇒ 键必变」由构造保证：将来改动渲染函数（增删字段、调整格式）不可能悄悄让键与提示词脱钩。若两侧各渲染一份，该保证就退化为靠纪律对齐的两次渲染一致性。
 
-**辩论三键（`debate_procon_fingerprint`）**：辩论模式绕过标准预检，其键族 `llm_debate_*` 与标准键不同，故**仅写侧**使用、不进 `MODULE_FINGERPRINT_BUILDERS`。其输入口径同样以辩论提示词实际包含的段落为准——含基础持仓 + 竞争语境块 + 量化指标 + 辩论增强后缀，**刻意不并入** `history_data` / `pipeline_data` 与教训/信号摘要/结构化决策头后缀（辩论提示词不含这些段落，并入只会让白脸/黑脸/综合三次昂贵调用每份报告必 miss）。
+**辩论三键（`debate_procon_fingerprint` / `debate_synthesis_fingerprint`）**：辩论模式绕过标准预检，其键族 `llm_debate_*` 与标准键不同，故**仅写侧**使用、不进 `MODULE_FINGERPRINT_BUILDERS`。其输入口径同样以辩论提示词实际包含的段落为准——含基础持仓 + 竞争语境块 + 量化指标 + 辩论增强后缀 + `pipeline_data` 派生的【环比变化】【数据质量降级】两段（白脸/黑脸复用 `_build_expert_review_prompt`，这两段随其进入提示词），**刻意不并入** `history_data` 与教训/信号摘要/结构化决策头后缀（辩论提示词不含这些段落，并入只会让白脸/黑脸/综合三次昂贵调用每份报告必 miss）。
+
+**辩论综合键（`debate_synthesis_fingerprint`）**：取「辩论基础指纹 + **综合提示词全文**」。综合提示词 = 白脸/黑脸**全文** + 条件推理情景段（`debate.conditional.scenarios` 驱动）+ 集中度问答段（`debate.qa_concentration.threshold` 驱动），由 `_build_debate_synthesis_prompt()` 一次性渲染。既然提示词就是这三者的函数，键直接取该渲染结果，无需逐项枚举入哈希的来源、也就不会漏项。此前本键另起一套：截取 pro/con **前 200 字符**摘要 + 开关位字母后缀，两处后果——正文差异落在 200 字符之后时键不动，仅改 config（情景名/描述、集中度阈值）而开关位不变时键同样不动；两种情形都命中按旧正文/旧配置生成的综合结论且不报错。
 
 **数据质量段的成本口径**：该段曾按「纳入后数据源抖动期间事件集持续变化会让该模块反复未命中（TTL 24h 下的重算成本）」的理由不纳入指纹；核查显示三点前提均不成立——① 事件集是**本进程内**的降级日志（`DegradationTracker._events` 只存内存、不落盘），该块因而是**本次运行的数据源画像**而非「一日累计」；② 该块已是聚合结果（仅失败源与计数，无时间戳/消息/`detail`）；③ 本模块指纹本就含 `total_today_profit`，交易日内持仓一有盈亏变化即换键，24h TTL 从不是真实驻留期。故纳入的边际额外失效接近零，而收益是消除一类**静默的错误结论**：源恢复后重出报告不再复用故障期间缓存的健康判断（详见 `review-findings.md` 已解决区）。
 
@@ -1253,8 +1256,8 @@ LLM 集成层与系统其他组件的接口：
 | LLM 模块 | 依赖数据源 | 缓存指纹依赖 |
 |:---------|:----------|:------------|
 | `global_macro` | A股指数 + 美股指数 + 总市值+总盈亏 + 分类 + (可选)行业资金流向 | 指数收盘价 + 持仓汇总 + 竞争语境块（`competitive_context`） |
-| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + 组合历史走势 + 竞争语境块 + 量化指标 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要（`history_data` 的 max_drawdown_pct / annualized_volatility / total_return_pct / status）+ 竞争语境块（`competitive_context`）+ 量化指标（`metrics`）+ 辩论增强后缀（`llm_debate_conditional` / `llm_debate_qa_concentration`）+ 实验开关后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要指纹 → `_sg`） |
-| `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要 + 数据质量详细状态块（`data_quality_text`，本次运行的降级事件画像）+ 信号预消化后缀（`signal_pre_digest`） |
+| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + 组合历史走势 + 竞争语境块 + 量化指标 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要（`history_data` 的 max_drawdown_pct / annualized_volatility / total_return_pct / status）+ 竞争语境块（`competitive_context`）+ 量化指标（`metrics`）+ 辩论增强后缀（`llm_debate_conditional` / `llm_debate_qa_concentration`）+ pipeline_data 派生块后缀（【环比变化】【数据质量降级】两段）+ 实验开关后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要指纹 → `_sg`） |
+| `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要 + 数据质量详细状态块（`data_quality_text`，本次运行的降级事件画像）+ pipeline_data 派生块后缀（【环比变化】【数据质量降级】两段）+ 信号预消化后缀（`signal_pre_digest`） |
 | `penetration_deep` | 同 expert_review + 穿透 TOP10（含行业/板块） | 同上 + 穿透 mv/ratio/sector（full_penetration=True） |
 | `news_correlation` | 过滤后的新闻列表 + 持仓摘要 + 穿透资产 + 行业/概念数据 | 标题前 80 字 + 持仓指纹 |
 

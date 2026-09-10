@@ -111,6 +111,36 @@ class TestDebateProconFlow(unittest.TestCase):
             # conditional 强化版不应包含基线"禁止情景分析"的冲突断言
             self.assertNotIn("不要在综合权衡中再次插入情景分析段落", syn_prompt)
 
+    def test_synthesis_fingerprint_covers_full_procon_text(self):
+        """综合步的 fingerprint_fn 取 pro/con **全文**：仅 200 字符之后不同也换键。
+
+        生产路径验证（非直接调用指纹函数）：旧实现只把 pro/con 前 200 字符摘要
+        拼进综合缓存键，正文差异落在 200 字符之后时键不动，综合步直接复用按旧
+        正文生成的结论且不报错。
+        """
+        from src.python.llm.generators import generate_debate_procon
+
+        prefix = "开头相同。" * 60  # 300 字符 > 200，差异落在旧摘要窗口之外
+
+        def _synthesis_fingerprint(pro_text: str) -> str:
+            with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
+                mock_gen.side_effect = [
+                    (pro_text, False),
+                    ("600519 估值已偏高，需注意回调风险。", False),
+                    ("综合双方意见，建议持有但设止盈。", False),
+                ]
+                generate_debate_procon(**self.base_kwargs)
+                return mock_gen.call_args_list[2].kwargs["fingerprint_fn"]()
+
+        fp_hold = _synthesis_fingerprint(prefix + "尾部：建议持有。")
+        fp_trim = _synthesis_fingerprint(prefix + "尾部：建议减仓。")
+
+        self.assertNotEqual(
+            fp_hold,
+            fp_trim,
+            "综合缓存键仍未覆盖 pro/con 全文 → 会复用按旧正文生成的综合结论",
+        )
+
     def test_user_prompt_is_not_empty(self):
         """user_prompt 参数在每个阶段均为非空字符串。"""
         from src.python.llm.generators import generate_debate_procon

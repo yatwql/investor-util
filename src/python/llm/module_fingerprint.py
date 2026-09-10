@@ -20,7 +20,8 @@
     信号摘要对三模块统一参与哈希（口径一致优先于逐模块精简——多算只带来无害的
     过度失效，漏算则导致内容与键脱钩的陈旧缓存）。
   - **覆盖以「提示词是否真的含该段」为准**：进了提示词的内容必须进指纹
-    （``competitive_context`` / ``metrics`` / ``data_quality_text``），不进提示词的
+    （``competitive_context`` / ``metrics`` / ``data_quality_text`` /
+    ``pipeline_data`` 派生的【环比变化】【数据质量降级】两段），不进提示词的
     段落不并入（纯成本失效）。
   - **一次渲染、两侧共享同一实例**：``competitive_context`` 与
     ``data_quality_text`` 由调用方（``generate_all_llm``）渲染一次后同时交给预检侧
@@ -46,6 +47,7 @@ __all__ = [
     "ModuleFingerprintInputs",
     "debate_feature_cache_suffix",
     "debate_procon_fingerprint",
+    "debate_synthesis_fingerprint",
     "global_macro_fingerprint",
     "expert_review_fingerprint",
     "health_check_fingerprint",
@@ -117,6 +119,37 @@ def debate_feature_cache_suffix() -> str:
     return "_" + "".join(sorted(_parts)) if _parts else ""
 
 
+def _pipeline_block_cache_suffix(pipeline_data: dict | None) -> str:
+    """``pipeline_data`` 注入复盘类提示词的正文段（环比差异 / 数据质量降级）指纹后缀。
+
+    复盘与辩论提示词都会带上【环比变化】【数据质量降级】两段（构建器
+    ``_build_difpipeline_data_block`` / ``_build_data_degradation_block``），
+    但这两段此前不参与指纹——持仓未动而降级事件集变化时键不变，预检命中旧键，
+    报告继续陈述「某数据源不可用」（或漏报新故障），且不报错。
+
+    与 ``_signal_digest_cache_suffix`` 同法：调用**提示词侧同一构建器**取文本再
+    哈希，故「进键的文本」与「进提示词的文本」由同一段代码产出，不靠纪律对齐。
+    两段皆空（无环比数据、无降级事件）→ ``""``，键与未注入时一致，不误伤旧缓存。
+
+    Args:
+        pipeline_data: 报告管线数据契约。
+    """
+    # 延迟导入：prompts_core 属提示词层，模块级导入会与 llm 包初始化形成环。
+    from src.python.llm.prompts_core import (
+        _build_data_degradation_block,
+        _build_difpipeline_data_block,
+    )
+
+    _blocks = [
+        _build_difpipeline_data_block(pipeline_data),
+        _build_data_degradation_block(pipeline_data),
+    ]
+    _block = "\n".join(b for b in _blocks if b)
+    if not _block:
+        return ""
+    return "_" + compute_fingerprint(_block)
+
+
 def global_macro_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     """全球政经局势：指数行情 / 总市值 / 盈亏 / 分类汇总 + 竞争语境块。
 
@@ -135,14 +168,15 @@ def global_macro_fingerprint(inputs: ModuleFingerprintInputs) -> str:
 
 
 def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
-    """智囊团深度复盘：基础指纹 + 提示词内容（竞争语境块 / 量化指标）+ 四段按开关现算的后缀。
+    """智囊团深度复盘：基础指纹 + 提示词内容（竞争语境块 / 量化指标）+ 五段现算后缀。
 
-    四个后缀（决策教训 / 信号预消化 / 确定性信号摘要 / 结构化决策头）各自的
-    开关判定收敛在函数内部，关闭或样本不足时返回空串——键与未启用时一致，
-    不误伤既有缓存。
+    五个后缀（决策教训 / 信号预消化 / 环比与降级块 / 确定性信号摘要 / 结构化
+    决策头）各自的开关判定收敛在函数内部，关闭或样本不足时返回空串——键与未
+    启用时一致，不误伤既有缓存。
 
     竞争语境块与 ``metrics`` 都是其提示词的正文段（【今日对比】/【区间对比】/
-    【指标对比】/【量化指标】/情景分析），一并纳入哈希。
+    【指标对比】/【量化指标】/情景分析），连同 ``pipeline_data`` 派生的【环比
+    变化】【数据质量降级】两段（见 ``_pipeline_block_cache_suffix``）一并纳入哈希。
     """
     _fp = compute_fingerprint(
         build_llm_fingerprint(
@@ -162,22 +196,25 @@ def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     if decision_ledger.is_active():
         _fp += decision_ledger.lessons_cache_suffix()
     _fp += _signal_digest_cache_suffix(inputs.pipeline_data)
+    _fp += _pipeline_block_cache_suffix(inputs.pipeline_data)
     _fp += signal_ledger.summary_cache_suffix()
     _fp += structured_header_cache_suffix()
     return _fp
 
 
 def debate_procon_fingerprint(inputs: ModuleFingerprintInputs) -> str:
-    """辩论三键（白脸 / 黑脸 / 综合）共用的基础指纹 + 辩论增强后缀。
+    """辩论白脸 / 黑脸两键共用的基础指纹 + 辩论增强后缀 + 环比与降级块后缀。
 
     **仅写侧使用**：辩论模式绕过标准预检（其缓存键族 ``llm_debate_*`` 与标准
     ``llm_expert_review_*`` 不同），故不进 ``MODULE_FINGERPRINT_BUILDERS``。
 
     输入口径以其提示词实际包含的段落为准——基础持仓 + 竞争语境块 + 量化指标 +
-    辩论增强后缀。**刻意不并入** ``history_data`` / ``pipeline_data`` 与决策教训、
-    信号摘要、结构化决策头后缀：辩论提示词不含这些段落（不传 ``history_data``、
-    不开信号预消化），并入只会让每次运行都换键 —— 白脸/黑脸/综合三次昂贵调用
-    每份报告必 miss。
+    辩论增强后缀 + ``pipeline_data`` 派生的【环比变化】【数据质量降级】两段
+    （白脸/黑脸复用 ``_build_expert_review_prompt``，这两段随之进入其提示词）。
+
+    **刻意不并入** ``history_data`` 与决策教训、信号摘要、结构化决策头后缀：
+    辩论提示词不含这些段落（不传 ``history_data``、不开信号预消化与结构化决策头），
+    并入只会让每次运行都换键 —— 白脸/黑脸两次昂贵调用每份报告必 miss。
     """
     return (
         compute_fingerprint(
@@ -194,7 +231,30 @@ def debate_procon_fingerprint(inputs: ModuleFingerprintInputs) -> str:
             inputs.metrics,
         )
         + debate_feature_cache_suffix()
+        + _pipeline_block_cache_suffix(inputs.pipeline_data)
     )
+
+
+def debate_synthesis_fingerprint(inputs: ModuleFingerprintInputs, synthesis_prompt: str) -> str:
+    """辩论综合（第三段）：辩论基础指纹 + **综合提示词全文**。
+
+    **仅写侧使用**（同 ``debate_procon_fingerprint``）。
+
+    综合提示词 = 白脸/黑脸**全文** + 条件推理情景段（``debate.conditional.scenarios``
+    驱动）+ 集中度问答段（``debate.qa_concentration.threshold`` 驱动），由
+    ``_build_debate_synthesis_prompt`` 一次性渲染。既然提示词就是这三者的函数，
+    键直接取该渲染结果——无需逐项枚举入哈希的来源，也就不会漏项。
+
+    此前本键另起一套：截取 pro/con **前 200 字符**摘要再拼接。两处后果——
+    正文差异落在 200 字符之后时键不动（命中按旧正文生成的综合结论），仅改
+    config（情景名/描述、集中度阈值）而开关位不变时键同样不动。
+
+    Args:
+        inputs: 与白脸/黑脸同一份输入闭包（除 ``pipeline_data`` 外，其效果已由
+            基础指纹承载）。
+        synthesis_prompt: 已渲染的综合阶段 user prompt。
+    """
+    return compute_fingerprint(debate_procon_fingerprint(inputs), synthesis_prompt)
 
 
 def health_check_fingerprint(inputs: ModuleFingerprintInputs) -> str:
@@ -208,6 +268,9 @@ def health_check_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     成本口径：该块是**本次运行**的数据源画像（事件集只在进程内累积，不含时间戳
     等易变字段），且本模块指纹本就含 ``total_today_profit``——交易日内持仓一有
     盈亏变化即换键，故纳入本块带来的边际额外失效接近零。
+
+    同理由纳入 ``pipeline_data`` 派生的【环比变化】【数据质量降级】两段（体检
+    提示词同样承载它们，见 ``_pipeline_block_cache_suffix``）。
     """
     _fp = compute_fingerprint(
         build_llm_fingerprint(
@@ -223,6 +286,7 @@ def health_check_fingerprint(inputs: ModuleFingerprintInputs) -> str:
         inputs.data_quality_text,
     )
     _fp += _signal_digest_cache_suffix(inputs.pipeline_data)
+    _fp += _pipeline_block_cache_suffix(inputs.pipeline_data)
     return _fp
 
 

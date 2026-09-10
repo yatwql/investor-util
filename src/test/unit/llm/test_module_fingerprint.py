@@ -13,6 +13,9 @@
     源恢复后仍复述故障）；且只进「提示词确实包含该段」的模块——卫生检查/穿透
     深度的提示词不含对比块与指标，并入只是纯成本
   - 辩论三键的基础指纹同样覆盖其提示词内容，但不并入辩论提示词没有的段落
+  - 辩论综合键取「基础指纹 + 综合提示词全文」——pro/con 仅 200 字符之后不同、
+    或仅 config 情景段/集中度阈值不同，都必须换键（历史缺陷：只哈希前 200 字符
+    摘要 + 开关位字母，两种情况都静默复用陈旧综合结论）
 
 运行：
   pytest src/test/unit/llm/test_module_fingerprint.py -v
@@ -41,6 +44,34 @@ _HISTORY_CHANGED = {"annualized_volatility": 0.31, "max_drawdown_pct": -0.24, "s
 _HOLDINGS = [{"name": "示例", "code": "600519", "cost": 100.0}]
 _CATEGORIES = {"股票": 1}
 _PIPELINE_RISK = {"tail_risk_data": {"available": True, "var95": 0.5}}
+
+# pipeline_data 中【环比变化】【数据质量降级】两段的来源（提示词正文段）
+_PIPELINE_DEGRADED = {
+    "data_degradation": [
+        {"source_key": "tencent", "tier": "T2", "failure_type": "unreachable", "degraded": True, "count": 2}
+    ]
+}
+_PIPELINE_DEGRADED_CHANGED = {
+    "data_degradation": [
+        {"source_key": "eastmoney", "tier": "T1", "failure_type": "empty", "degraded": True, "count": 1}
+    ]
+}
+_PIPELINE_DIFF = {
+    "diff": {
+        "is_first_check": False,
+        "total_value_diff": 1200.0,
+        "total_value_diff_pct": 1.2,
+        "total_pnl_diff": 300.0,
+        "days_since_last_report": 3,
+        "added": [{"name": "示例", "code": "600519", "action": "新增", "shares_diff": 100.0, "value_diff": 1200.0}],
+        "removed": [],
+        "increased": [],
+        "decreased": [],
+    }
+}
+_PIPELINE_DIFF_CHANGED = {
+    "diff": {**_PIPELINE_DIFF["diff"], "total_value_diff": 9900.0, "total_value_diff_pct": 9.9}
+}
 
 # 竞争语境块（组合 vs 指数对比）：由指数 / 区间收益 / 指标渲染而成的**已渲染文本**
 _COMPETITIVE_BLOCK = "【今日对比】组合 +0.50% vs 沪深300 +1.05%\n相对沪深300 跑输 0.55%"
@@ -372,6 +403,75 @@ def test_data_quality_block_enters_precheck_key_not_only_write_side():
     assert baseline != changed, "预检侧未随数据质量块换键"
 
 
+# ── pipeline_data 派生的【环比变化】【数据质量降级】两段 ──────────
+# 复盘提示词与体检提示词都直接承载这两段（_build_expert_review_prompt /
+# _build_health_check_prompt 共用 prompts_core 的两个构建器），故二者都必须进键。
+
+_PIPELINE_BLOCK_MODULES = ("expert_review", "health_check")
+_PIPELINE_BLOCK_ABSENT_MODULES = ("global_macro", "penetration_deep")
+
+
+def test_degradation_block_is_in_prompt_for_covered_modules():
+    """前提校验：降级块确实进了这两个模块的提示词（否则下述用例是无的放矢）。"""
+    from src.python.llm.prompts import _build_data_degradation_block, _build_expert_review_prompt
+
+    block = _build_data_degradation_block(_PIPELINE_DEGRADED)
+    assert block, "降级块构建器对该输入未产出文本，用例输入需修正"
+    prompt = _build_expert_review_prompt(
+        _TOTAL_MV,
+        _TOTAL_COST,
+        _TOTAL_PROFIT,
+        _TODAY_PROFIT,
+        1,
+        dict(_CATEGORIES),
+        holdings_details=_HOLDINGS,
+        pipeline_data=_PIPELINE_DEGRADED,
+    )
+    assert block in prompt, "降级块未进入复盘提示词——指纹覆盖就失去了前提"
+
+
+@pytest.mark.parametrize("module_key", _PIPELINE_BLOCK_MODULES)
+def test_degradation_block_enters_fingerprint(module_key: str):
+    """降级事件集变化 ⇒ 指纹随之变化（否则复述故障的陈旧结论被复用）。
+
+    历史缺陷：该块只进提示词、不进指纹——持仓未动而数据源故障/恢复时键不变，
+    预检命中旧键，报告继续陈述「某数据源不可用」或漏报新故障，且不报错。
+    """
+    baseline = _write_fingerprint(module_key, pipeline_data=_PIPELINE_DEGRADED)
+    changed = _write_fingerprint(module_key, pipeline_data=_PIPELINE_DEGRADED_CHANGED)
+    empty = _write_fingerprint(module_key)
+
+    assert baseline != changed, f"{module_key}：降级事件集变化未换键 → 复用陈旧降级结论"
+    assert baseline != empty, f"{module_key}：降级块未进入指纹"
+
+
+@pytest.mark.parametrize("module_key", _PIPELINE_BLOCK_MODULES)
+def test_diff_block_enters_fingerprint(module_key: str):
+    """环比差异内容变化 ⇒ 指纹随之变化（同日两份报告的环比结论不得串用）。"""
+    baseline = _write_fingerprint(module_key, pipeline_data=_PIPELINE_DIFF)
+    changed = _write_fingerprint(module_key, pipeline_data=_PIPELINE_DIFF_CHANGED)
+
+    assert baseline != changed, f"{module_key}：环比差异变化未换键 → 复用陈旧环比结论"
+    assert baseline != _write_fingerprint(module_key), f"{module_key}：环比块未进入指纹"
+
+
+@pytest.mark.parametrize("module_key", _PIPELINE_BLOCK_ABSENT_MODULES)
+def test_pipeline_blocks_ignored_without_block_in_prompt(module_key: str):
+    """提示词不含这两段的模块，指纹不随其变化（并入即纯成本失效）。"""
+    assert _write_fingerprint(module_key, pipeline_data=_PIPELINE_DEGRADED) == _write_fingerprint(module_key)
+
+
+@pytest.mark.parametrize("module_key", _PIPELINE_BLOCK_MODULES)
+def test_pipeline_block_enters_precheck_key_not_only_write_side(module_key: str):
+    """预检侧同样随降级块换键，且与写侧逐字符同源。"""
+    baseline = _precheck_info(pipeline_data=_PIPELINE_DEGRADED)[module_key]["key"]
+    changed = _precheck_info(pipeline_data=_PIPELINE_DEGRADED_CHANGED)[module_key]["key"]
+    write_fp = _write_fingerprint(module_key, pipeline_data=_PIPELINE_DEGRADED)
+
+    assert baseline != changed, f"{module_key}：预检侧未随降级块换键"
+    assert baseline == CACHE_PREFIX_LLM + f"{module_key}_{write_fp}", f"{module_key}：两侧键不同源"
+
+
 # ═══════════════════════════════════════════════════════════════
 #  辩论三键：写侧独有（辩论模式绕过标准预检），同样覆盖其提示词内容
 # ═══════════════════════════════════════════════════════════════
@@ -401,11 +501,24 @@ def test_debate_fingerprint_covers_its_prompt_content():
     assert baseline != debate_procon_fingerprint(_debate_inputs())
 
 
-def test_debate_fingerprint_ignores_segments_absent_from_its_prompt():
-    """辩论提示词不含信号预消化段 ⇒ 指纹不得随 pipeline_data 变化。
+def test_debate_fingerprint_covers_pipeline_blocks_in_its_prompt():
+    """辩论提示词（复用复盘提示词构建器）含环比与降级两段 ⇒ 基础指纹须覆盖。"""
+    from src.python.llm.module_fingerprint import debate_procon_fingerprint
 
-    否则每次报告的 pipeline_data 摘要都不同，辩论三键（白脸/黑脸/综合各一次
-    昂贵调用）将每份报告必 miss。
+    baseline = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK, pipeline_data=_PIPELINE_DEGRADED))
+    changed = debate_procon_fingerprint(
+        _debate_inputs(_COMPETITIVE_BLOCK, pipeline_data=_PIPELINE_DEGRADED_CHANGED)
+    )
+
+    assert baseline != changed, "辩论指纹未覆盖其提示词中的降级段 → 复用陈旧降级结论"
+
+
+def test_debate_fingerprint_ignores_segments_absent_from_its_prompt():
+    """辩论提示词不含信号预消化段 ⇒ 指纹不得随该段变化。
+
+    否则每次报告的信号摘要都不同，辩论三键（白脸/黑脸/综合各一次昂贵调用）
+    将每份报告必 miss。注意区分：``pipeline_data`` 中的环比/降级两段确实在其
+    提示词内（上一个用例），只有信号预消化这类**未开启**的段落才应被排除。
     """
     from src.python.llm.module_fingerprint import debate_procon_fingerprint
 
@@ -413,6 +526,64 @@ def test_debate_fingerprint_ignores_segments_absent_from_its_prompt():
     with_signal = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK, pipeline_data=_PIPELINE_RISK))
 
     assert without == with_signal, "辩论指纹被并入其提示词没有的段落 → 三键每次必 miss"
+
+
+def test_debate_synthesis_fingerprint_covers_full_procon_text():
+    """综合指纹覆盖 pro/con **全文**：仅 200 字符之后不同也必须换键。
+
+    历史缺陷：综合键另起一套拼接，只取 pro/con 前 200 字符摘要——正文差异落在
+    200 字符之后时键不动，直接复用按旧正文生成的综合结论（且不报错）。
+    """
+    from src.python.llm.module_fingerprint import debate_synthesis_fingerprint
+    from src.python.llm.prompts import _build_debate_synthesis_prompt
+
+    _prefix = "开头相同。" * 60  # 300 字符 > 200，差异因此落在摘要窗口之外
+    pro_a = _prefix + "尾部：建议持有。"
+    pro_b = _prefix + "尾部：建议减仓。"
+    con = "黑脸观点：估值偏高。"
+
+    fp_a = debate_synthesis_fingerprint(_debate_inputs(), _build_debate_synthesis_prompt(pro_a, con))
+    fp_b = debate_synthesis_fingerprint(_debate_inputs(), _build_debate_synthesis_prompt(pro_b, con))
+
+    assert pro_a[:200] == pro_b[:200], "用例前提：两段正文前 200 字符须完全相同"
+    assert fp_a != fp_b, "综合指纹仍只看前 200 字符 → 会复用按旧正文生成的综合结论"
+
+
+def test_debate_synthesis_fingerprint_covers_config_driven_prompt_text():
+    """综合指纹覆盖 config 驱动的情景段/集中度段：仅改配置也必须换键。
+
+    历史缺陷：综合键只编码开关位（c/q 字母后缀），提示词里的情景名/描述与
+    集中度阈值来自 config——改配置不动开关时键不变，命中按旧配置生成的综合结论。
+    """
+    from unittest.mock import patch
+
+    from src.python.llm.module_fingerprint import debate_synthesis_fingerprint
+    from src.python.llm.prompts import _build_debate_synthesis_prompt
+
+    _base_cfg = {
+        "debate": {
+            "conditional": {"scenarios": [{"name": "上涨", "desc": "上证站上 3500"}]},
+            "qa_concentration": {"threshold": 0.20},
+        }
+    }
+    _changed_cfg = {
+        "debate": {
+            "conditional": {"scenarios": [{"name": "上涨", "desc": "上证站上 4000"}]},
+            "qa_concentration": {"threshold": 0.20},
+        }
+    }
+
+    def _fp(cfg: dict) -> str:
+        with patch("src.python.config._llm_settings.get_llm_config", return_value=cfg):
+            prompt = _build_debate_synthesis_prompt(
+                "白脸观点。", "黑脸观点。", enable_conditional=True, total_mv=_TOTAL_MV
+            )
+        return debate_synthesis_fingerprint(_debate_inputs(), prompt)
+
+    _base_prompt_fp = _fp(_base_cfg)
+    _changed_prompt_fp = _fp(_changed_cfg)
+
+    assert _base_prompt_fp != _changed_prompt_fp, "综合指纹未覆盖 config 驱动的情景段 → 复用旧配置结论"
 
 
 def test_debate_fingerprint_carries_debate_feature_suffix():
