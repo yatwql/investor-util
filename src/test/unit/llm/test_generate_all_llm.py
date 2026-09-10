@@ -759,3 +759,51 @@ class TestThinkingConcurrencyLimit(unittest.TestCase):
         self.assertGreaterEqual(gap, 0.04, "thinking 模块应串行执行（并发限制未生效）")
         # 总并发不超 llm_max_concurrency
         self.assertLessEqual(_tracking["max_active"], 3)
+
+
+class TestNewsCorrelationNotOrchestrated(unittest.TestCase):
+    """新闻关联不经编排层线程池（C9：模块注册须与真实运行路径一致）。
+
+    新闻关联的返回类型是 ``(list[dict], bool, dict)``（富化后的新闻列表），
+    与其余 HTML 生成模块的 ``(str, bool)`` 不同，由 `report/news_correlation.py`
+    直调 ``run_news_correlation_safe``。编排层曾另设一条「预计算 + 模块级变量
+    传递」路径（闭包包装成 JSON 字符串、结果经 ``_news_correlation_result``
+    传回），但该分支的入参 ``news_data`` / ``holdings_data`` 在任何调用方都
+    未传入，**永不执行**——注册表里有、运行时从不跑，正是 C9 要防的注册漂移。
+    """
+
+    def test_dispatch_has_no_news_correlation_params(self) -> None:
+        """分发入口不再接受新闻/持仓入参（回归：旧签名含这三个永不使用的参数）。"""
+        import inspect
+
+        from src.python.llm.generators_orchestrator import _dispatch_llm_workers
+
+        params = set(inspect.signature(_dispatch_llm_workers).parameters)
+        for dead in ("news_data", "holdings_data", "penetrated_assets_for_news"):
+            self.assertNotIn(dead, params, f"编排层不应再接受 {dead}——该注册分支无调用方")
+
+    def test_dispatch_never_returns_news_correlation(self) -> None:
+        """实跑一次分发：结果键即传入的模块键，不含注入的 news_correlation。"""
+        from src.python.llm.generators_orchestrator import _dispatch_llm_workers
+
+        keys = ("health_check", "expert_review", "global_macro", "penetration_deep")
+        fns = {key: (lambda _c, _lc, _k=key: (f"<p>{_k}</p>", False)) for key in keys}
+        needs = dict.fromkeys(keys, True)
+
+        with (
+            patch("src.python.llm.generators_orchestrator._build_module_fns", return_value=fns),
+            patch("src.python.llm.generators_orchestrator._build_competitive_context_block", return_value=""),
+            patch("src.python.llm.generators_orchestrator.make_http_client", return_value=MagicMock()),
+        ):
+            result = _dispatch_llm_workers(needs, {}, False, {}, {}, 0, 0, 0, 0, 0, {}, None, None, None)
+
+        self.assertEqual(set(result), set(keys))
+
+    def test_precompute_result_api_removed(self) -> None:
+        """不再暴露「预计算结果」读取接口（路径移除后该 API 已无来源）。"""
+        import src.python.llm as llm_pkg
+
+        self.assertFalse(
+            hasattr(llm_pkg, "get_news_correlation_result"),
+            "编排层预计算路径已移除，不应再暴露其结果读取接口",
+        )

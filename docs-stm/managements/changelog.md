@@ -6,6 +6,13 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 移除新闻关联的误导性编排注册（C9，自审 rf-329）（2026-09-10）
+
+- **缺陷（自审 rf-329）**：编排层 `_dispatch_llm_workers` 内有一条 news_correlation 注册分支——仅当调用方传入 `news_data` 且 `holdings_data` 时，把 `_make_news_correlation_closure(...)` 写进 `_MODULE_FNS`。但这两个参数在**任何调用方都未传入**（`generate_all_llm` 是唯一调用方，其签名与实参均无此项），分支永不执行。连带整条「预计算」链同样是死代码：模块级变量 `_news_correlation_result`、公开读取接口 `get_news_correlation_result()`、结果回写函数 `_store_news_correlation_result()`、闭包工厂 `_make_news_correlation_closure()`，以及 `run_news_correlation_safe()` 里「若已有 orchestrator 预计算结果则直接返回」的短路——四处没有一处可达。危害不在性能而在**语义**：注册表与文档呈现出「新闻关联由编排层统一调度、结果经模块级变量复用」的图景，与真实路径（`report/news_correlation.py` 直调 `run_news_correlation_safe`）不符，正是 C9 所防的「注册与实际运行路径漂移」；后来者若照此图景扩展（例如给 `generate_all_llm` 加新闻参数以「启用」预计算），会同时把 `(list, bool, dict)` 的三元返回塞进期望 `(str|None, bool)` 二元返回的线程池，异常只在运行期暴露。
+- **改动**：删除上述四处死代码与 `run_news_correlation_safe` 的预计算短路；`_dispatch_llm_workers` 去掉三个永不使用的参数（`news_data` / `holdings_data` / `penetrated_assets_for_news`）及注册分支；`llm/__init__.py` 与编排门面的 re-export 同步移除 `get_news_correlation_result`。`_llm_news_correlation.py` 模块 docstring 改写为说明**为何不经编排层**（返回类型二元/三元不兼容 + 实际由报告侧直调），并注明已被移除的误导路径，避免该分支再被「复原」。模块显示名/设置键不受影响，仍由 `core/registry.py::get_llm_module_name` 单一登记。
+- **行为变更**：无——被删的路径在删除前即不可达；`report/news_correlation.py` 走的 `run_news_correlation_safe` 直调入口行为不变（其内部分支减少一条恒假判断）。
+- **测试**：`test_generate_all_llm.py` 新增 `TestNewsCorrelationNotOrchestrated` 三例：`test_dispatch_has_no_news_correlation_params`（签名不得再含三个死参数，已验证还原旧实现后转红）、`test_dispatch_never_returns_news_correlation`（实跑分发，结果键即为传入模块键，无注入）、`test_precompute_result_api_removed`（`src.python.llm` 不再暴露预计算结果读取接口，已验证还原旧实现后转红）。LLM 单元测试 996 例全绿。
+
 ### 报表页签显示名注册表驱动（C7，自审 rf-326）（2026-09-10）
 
 - **缺陷（自审 rf-326）**：`report/excel_generator.py::_write_data_source_matrix_sheet` 把「数据源可用性矩阵」页签的**表内标题写成字面量**，绕开显示名注册表，违反 C7「报表页签标题由注册表驱动，禁止硬编码」。同一显示名因此存在于两处——`core/registry.py::_REPORT_SECTION_DEFAULT`（页签名，经 `excel_sheet_factory` 生成 `ws.title`）与写入层字面量——改一处不会同步另一处，且无任何测试拦截漂移。同批核对发现「数据源可用性矩阵」「LLM API 用量」两个页签**未登记**在 `_REPORT_SHEET_NAMES`（该表按表头注释只排除「已由 `get_llm_module_name()` 注册」的 LLM 模块章，此二键不属此列，属遗漏）；未登记时 `get_report_sheet_name()` 走「回退为键名」兜底返回英文键，故仅改写入层调用而不补登记，会把 `data_source_status` 这个英文键当标题写进报告——补登记是该修复成立的前提。

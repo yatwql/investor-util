@@ -1,7 +1,8 @@
 """LLM 批量编排门面 — 缓存预检查、线程池分发与 LLM 全量生成。
 
 本文件为聚合门面：
-  - 新闻关联责任单元（模块级结果缓存/闭包/安全直调） → `_llm_news_correlation.py`
+  - 新闻关联安全直调入口 → `_llm_news_correlation.py`（该模块不经本门面的线程池，
+    运行路径见其模块文档）
 门面保留缓存预检（`_compute_module_cache_info`/`_precheck_*`）、worker 分发
 （`_dispatch_llm_workers`/`_build_module_fns`）与主编排入口（`generate_all_llm`）
 ——其内部经门面命名空间解析被 mock patch 的辅助符号（`ThreadPoolExecutor`、
@@ -58,12 +59,8 @@ _MN = get_llm_module_name
 
 
 # ── 子模块 re-export ──────────────────────────────────────
-# news_correlation 责任单元（模块级结果缓存 + 闭包 + 安全直调）
-# 在 `_llm_news_correlation.py` 中实现，此处 re-export。
+# news_correlation 安全直调入口在 `_llm_news_correlation.py` 中实现，此处 re-export。
 from src.python.llm._llm_news_correlation import (  # noqa: F401
-    _make_news_correlation_closure,
-    _store_news_correlation_result,
-    get_news_correlation_result,
     run_news_correlation_safe,
 )
 
@@ -76,7 +73,6 @@ __all__ = [
     "_precheck_all_modules",
     "_dispatch_llm_workers",
     "generate_all_llm",
-    "get_news_correlation_result",
     "run_news_correlation_safe",
 ]
 
@@ -337,9 +333,6 @@ def _dispatch_llm_workers(
     sector_flow: list[dict] | None,
     pipeline_data: dict | None = None,
     *,
-    news_data: list[dict] | None = None,
-    holdings_data: list | None = None,
-    penetrated_assets_for_news: list[dict] | None = None,
     metrics: dict | None = None,
     data_quality_text: str = "",
     comparison_indices: dict[str, str] | None = None,
@@ -500,15 +493,6 @@ def _dispatch_llm_workers(
         _MODULE_FNS["expert_review"] = _debate_wrapper
         logger.info("[debate] 辩论模式已启用，expert_review 路由已替换")
 
-    # news_correlation 可选集成：仅在提供了新闻和持仓数据时注册
-    if news_data is not None and holdings_data is not None:
-        _MODULE_FNS["news_correlation"] = _make_news_correlation_closure(
-            news_data,
-            holdings_data,
-            penetrated_assets_for_news,
-            force,
-        )
-
     _max_workers = (llm_config or {}).get("llm_max_concurrency", 3)
     with ThreadPoolExecutor(max_workers=_max_workers) as executor:
         _futures: dict[Future, str] = {
@@ -523,10 +507,6 @@ def _dispatch_llm_workers(
                 logger.info("%s生成完成" if result else "%s生成失败（跳过）", _label_map.get(key, key))
             except Exception:  # noqa: PERF203
                 logger.warning("LLM 生成线程异常", exc_info=True)
-
-    # 提取 news_correlation 结果到模块级变量（委托子模块存储）
-    if "news_correlation" in results_dict:
-        _store_news_correlation_result(results_dict["news_correlation"]["result"])
 
     return results_dict
 
