@@ -259,10 +259,9 @@ class TestCategorize(unittest.TestCase):
     def test_delegates_to_central_judgment(self):
         """分类结果无条件跟随 `code_utils.is_fund_holding`（不自建前缀回退）。
 
-        旧实现除中心判定外还内联一张「代码以 0/3/6 开头即股票」的回退表与
-        `except ImportError` 兜底，两套判定并存必然漂移；现改为单一来源委托。
-        以「中心判定说基金、前缀表说股票」的代码验证分类确实听中心判定——
-        改由 mock 直接改写中心函数返回值。
+        分类只认中心判定，不另立前缀回退表——两套判定并存必然漂移，故此处
+        无内联回退。以「中心判定说基金、代码前缀暗示股票」的持仓验证分类确实
+        听中心判定：mock 直接改写中心函数返回值即可翻转结论。
         """
         from src.python.config import anonymizer
 

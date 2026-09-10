@@ -94,7 +94,7 @@ def _resolve_entry_credentials(
 
     解析顺序：credentials_ref → llm_key.json 多键凭据；entry 级字段叠加覆盖。
 
-    凭据来源边界（C18 凭据分离，见 config/_llm_providers.py）：
+    凭据来源边界（凭据分离，见 config/_llm_providers.py）：
         - `entry["api_key"]` 分支只服务**运行期内存条目**（调用方直接构造）。
           经 `_parse_providers_list()` 从 llm_providers.json 解析出的条目**永不带
           此键**——内联 api_key 在校验阶段即被拒（该条目会被整条跳过）。

@@ -762,14 +762,15 @@ class TestThinkingConcurrencyLimit(unittest.TestCase):
 
 
 class TestNewsCorrelationNotOrchestrated(unittest.TestCase):
-    """新闻关联不经编排层线程池（C9：模块注册须与真实运行路径一致）。
+    """新闻关联不经编排层线程池（模块注册须与真实运行路径一致）。
 
     新闻关联的返回类型是 ``(list[dict], bool, dict)``（富化后的新闻列表），
     与其余 HTML 生成模块的 ``(str, bool)`` 不同，由 `report/news_correlation.py`
     直调 ``run_news_correlation_safe``。编排层曾另设一条「预计算 + 模块级变量
     传递」路径（闭包包装成 JSON 字符串、结果经 ``_news_correlation_result``
     传回），但该分支的入参 ``news_data`` / ``holdings_data`` 在任何调用方都
-    未传入，**永不执行**——注册表里有、运行时从不跑，正是 C9 要防的注册漂移。
+    未传入，**永不执行**——注册表里有、运行时从不跑，正是「注册须与真实运行路径
+    一致」要防的注册漂移。
     """
 
     def test_dispatch_has_no_news_correlation_params(self) -> None:

@@ -43,7 +43,7 @@ def _atomic_write(filepath: str, content: str) -> None:
     **不**委托 `core/atomic_write`：本函数的契约是「失败即抛且**保留异常类型**」——
     `init_config()` 依赖 `except PermissionError` 的 Windows 并发容忍分支，TUI 依赖
     `PermissionError` 映射为「权限不足」提示。共享原语刻意吞掉异常只返回布尔，传不出
-    类型；两者契约相反，各自服务不同调用层，故保留本实现（C3 要求的 mkstemp +
+    类型；两者契约相反，各自服务不同调用层，故保留本实现（原子写入要求的 mkstemp +
     os.replace 语义两者一致）。
 
     Args:

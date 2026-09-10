@@ -1,6 +1,6 @@
 """原子整文件写入原语 — 同目录临时文件 + os.replace（core 层共享）。
 
-问题（C3 缓存原子写入约束）：`open(path, "w") + json.dump()` 直接覆盖落盘，
+问题（缓存原子写入约束）：`open(path, "w") + json.dump()` 直接覆盖落盘，
 进程在写入途中被中断（Ctrl-C / 断电 / OOM）时目标文件停留在半写状态——
 下次读取拿到的是截断内容，JSON 解析失败即整份持久化状态丢失。原子写入的
 语义是「要么旧内容、要么新内容，不存在中间态」：先把新内容写进**同目录**的
@@ -14,7 +14,7 @@
   - `config/_core.py::_atomic_write`：契约是「失败即抛且**保留异常类型**」——
     `init_config()` 的 `except PermissionError` Windows 并发容忍分支、TUI 把
     `PermissionError` 映射为「权限不足」提示，都依赖传得出异常类型；而本原语刻意
-    吞掉异常、只返回布尔。C3 要求的 mkstemp + os.replace 语义两者一致。
+    吞掉异常、只返回布尔。原子写入要求的 mkstemp + os.replace 语义两者一致。
 
 设计约束遵从（对齐 `core/jsonl_store.py` 先例）：
     分层约束  — 本模块属 core 层，只依赖 stdlib，禁止 import report/llm/analysis

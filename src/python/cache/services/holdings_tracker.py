@@ -51,10 +51,10 @@ def compute_holdings_codes(holdings: list) -> builtins.set[str]:
 def _read_holdings_tracking(tracking_key: str) -> dict | None:
     """读取上次存储的持仓跟踪数据（经 cache API）。
 
-    必须走 ``cache.get``（C2 缓存统一管理）：直接 open + json.load 读缓存文件会
+    必须走 ``cache.get``（缓存 API 唯一入口）：直接 open + json.load 读缓存文件会
     绕过注册表为 `holdings_tracking` 声明的 CACHE_MONTHLY（TTL 声明形同虚设）、
     缓存层的 `.json.gz` 优先读与 BOM 容错（`utf-8-sig`）、损坏文件自动清理与
-    命中率统计——其中编码异常还会因旧实现的 except 元组不含 UnicodeDecodeError
+    命中率统计——其中编码异常还会因 except 元组不含 UnicodeDecodeError
     而**直接抛出**打断主流程。超过 TTL 时返回 None，调用方按「无上轮记录」处理
     （视其代码为新增并刷新，方向上宁多刷不漏刷）。
 

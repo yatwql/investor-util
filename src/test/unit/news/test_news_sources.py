@@ -569,13 +569,13 @@ class TestFlushAnchorsDedup(unittest.TestCase):
     def test_write_failure_rolls_back_written_keys(self) -> None:
         """落盘失败 → 撤回本次登记的 key，锚点不被永久判为「已写」而丢失。
 
-        回归背景：key 在「决定要写」时即加入 `_WRITTEN_ANCHOR_KEYS`，而旧实现
-        落盘走 ``open(..., "a")`` 且失败仅记一条 warning——key 已留在集合里，
-        该对新闻此后每轮都被判「已写」而永不重试，锚点永久丢失（校准数字少计
-        却无任何异常提示）。现改批量原子写 + 失败回滚 key。
+        回归背景：key 在「决定要写」时即加入 `_WRITTEN_ANCHOR_KEYS`，若落盘只走
+        ``open(..., "a")`` 且失败仅记一条 warning，key 就留在集合里——该对新闻
+        此后每轮都被判「已写」而永不重试，锚点永久丢失（校准数字少计却无任何
+        异常提示）。正确语义是批量原子写 + 失败回滚 key。
 
-        失败以真实 IO 故障构造（锚点目录被同名普通文件占位），使旧实现同样
-        走到「记录警告」路径——断言在其下确为红，而非仅因接口改名而报错。
+        失败以真实 IO 故障构造（锚点目录被同名普通文件占位），使直接追加的写法
+        同样走到「记录警告」路径——断言在其下确为红，而非仅因接口改名而报错。
         """
         from src.python.providers import news_dedup
 

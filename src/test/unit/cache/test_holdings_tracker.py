@@ -211,15 +211,15 @@ class TestCheckAndRefreshCaches:
 
 
 # ── _read_holdings_tracking 必须经 cache API ───────────────────
-# 回归背景（C2 缓存 API 唯一入口）：该函数曾直接 open + json.load 读缓存文件
-# 并自行取 "_data"，绕过注册表声明的 TTL 与缓存层统一处理。后果是过期指纹
-# 仍被当作有效值复用——持仓变更后关联缓存永不刷新（静默失效）。
-# 注意：旧的直接读实现同样能通过「读取已存数据」类断言，故此处必须以
+# 回归背景（缓存 API 唯一入口）：绕开 cache API 直接 open + json.load 读缓存
+# 文件并自行取 "_data"，就绕过了注册表声明的 TTL 与缓存层统一处理。后果是过期
+# 指纹仍被当作有效值复用——持仓变更后关联缓存永不刷新（静默失效）。
+# 注意：直接读文件的写法同样能通过「读取已存数据」类断言，故此处必须以
 # TTL 判定为判别点，否则测试无法拦住回退。
 
 
 class TestReadHoldingsTrackingUsesCacheApi:
-    """_read_holdings_tracking() 经 cache API 读取（C2 缓存 API 唯一入口）。"""
+    """_read_holdings_tracking() 经 cache API 读取（缓存 API 唯一入口）。"""
 
     def test_returns_unwrapped_payload(self, monkeypatch):
         """经 cache.set 写入后读取 → 返回内层数据（已解包 envelope）。"""

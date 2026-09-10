@@ -77,22 +77,22 @@ def _industry_transform(raw: dict, _source: str) -> dict | None:
 
 
 def _drop_legacy_cached_payload(cache_key: str) -> None:
-    """清除不含扩展行情字段的旧版行业缓存载荷（缓存载荷 schema 迁移）。
+    """清除不含扩展行情字段的行业缓存载荷（缓存载荷 schema 迁移）。
 
-    本版起 ``_industry_transform`` 透传同一次 push2 响应带出的 pe/pb/market_cap，
-    而**旧版载荷不含这三个键**。行业缓存 TTL 为两周，``fetch_with_fallback`` 的
-    第一步就是「命中即返回」——不处理的话，旧载荷会在存活期内被当作有效命中，
+    ``_industry_transform`` 透传同一次 push2 响应带出的 pe/pb/market_cap，
+    而**缺键载荷不含这三个键**。行业缓存 TTL 为两周，``fetch_with_fallback`` 的
+    第一步就是「命中即返回」——不处理的话，缺键载荷会在存活期内被当作有效命中，
     使估值分位与基金风格的 PE 取用静默退化为「不可得」（无异常、无告警）。
 
-    判据取「键是否存在」而非值是否为 None：新载荷无论 provider 是否给出该字段都
-    会带上键（值为 None 表示该源不提供，属正常），只有旧载荷缺键。
+    判据取「键是否存在」而非值是否为 None：带键载荷无论 provider 是否给出该字段
+    都会带上键（值为 None 表示该源不提供，属正常），只有缺键载荷才清除。
 
-    清除后本次调用即自然回落到 provider 重取，此后写入的即是新载荷——每个代码至
-    多迁移一次。待旧载荷全部过期（≤ 两周）后本函数成为纯字典判定的无害空转。
+    清除后本次调用即自然回落到 provider 重取，此后写入的即是带键载荷——每个代码
+    至多清理一次。待缺键载荷全部过期（≤ 两周）后本函数成为纯字典判定的无害空转。
     """
     cached = cache_get(cache_key, get_ttl("industry", cache_key))
     if isinstance(cached, dict) and "pe" not in cached:
-        logger.info("[industry] 清除旧版缓存载荷（不含扩展行情字段），将重新获取: %s", cache_key)
+        logger.info("[industry] 清除不含扩展行情字段的缓存载荷，将重新获取: %s", cache_key)
         cache_clear(cache_key)
 
 
@@ -220,7 +220,7 @@ def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
     ]
 
     def _cache_check(cache_id: str) -> Any:
-        """缓存命中判据：先剔除旧版载荷，再按 TTL 读取（见 _drop_legacy_cached_payload）。"""
+        """缓存命中判据：先剔除缺扩展行情字段的载荷，再按 TTL 读取（见 _drop_legacy_cached_payload）。"""
         _drop_legacy_cached_payload(cache_id)
         return cache_get(cache_id, get_ttl("industry", cache_id))
 

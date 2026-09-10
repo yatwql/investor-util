@@ -201,10 +201,10 @@ class TestParseProvidersList(unittest.TestCase):
         self.assertEqual(entry["endpoint"], "https://custom.endpoint")
         self.assertTrue(entry["proxy_preferred"])
 
-    # ── C18 凭据分离：内联 api_key 一律拒绝 ──
+    # ── 凭据分离：内联 api_key 一律拒绝 ──
 
     def test_inline_api_key_rejected(self):
-        """内联 api_key 的 entry 被拒（C18：凭据只经 credentials_ref 引用）。
+        """内联 api_key 的 entry 被拒（凭据只经 credentials_ref 引用）。
 
         回归背景：llm_providers.json 受版本控制（.gitignore 白名单放行），
         内联 api_key 即「凭据随配置入库」，故校验层必须拒绝而非宽容接受。
@@ -294,7 +294,7 @@ class TestValidateProviderEntry(unittest.TestCase):
         self.assertTrue(any("name" in w for w in warnings))
 
     def test_inline_api_key_rejected(self):
-        """内联 api_key → WARNING（C18 凭据分离，禁止凭据写入版本控制中的文件）。"""
+        """内联 api_key → WARNING（凭据分离，禁止凭据写入版本控制中的文件）。"""
         entry = {"name": "test", "provider": "claude", "api_key": "sk-key"}
         warnings = _validate_provider_entry(entry)
         self.assertTrue(any("api_key" in w and "凭据分离" in w for w in warnings))

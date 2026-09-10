@@ -356,13 +356,14 @@ class TestReportSectionDefault:
 
 
 class TestReportSheetNames:
-    """页签显示名与章节注册表的一致性（C7：注册表驱动，写入层不得硬编码显示名）。"""
+    """页签显示名与章节注册表的一致性（注册表驱动，写入层不得硬编码显示名）。"""
 
     def test_sheet_names_match_section_names(self):
         """页签显示名注册表的每个键必须在章节注册表中同名同显示名。
 
-        两张注册表存在同名条目（页签标题路径 vs 序号/可见性路径），
-        此处防的是二者漂移——改了一张忘了另一张，两处显示名就会不一致。
+        两张注册表存在同名条目（页签标题路径 vs 序号/可见性路径），二者一旦
+        漂移——只更新其中一张、另一张未同步——两处显示名就会不一致，本用例即
+        为此设。
         """
         from src.python.core.registry import _REPORT_SHEET_NAMES
 
@@ -374,10 +375,10 @@ class TestReportSheetNames:
             )
 
     def test_data_source_status_name_registered(self):
-        """data_source_status 显示名由注册表提供（回归：曾硬编码在写入层）。
+        """data_source_status 显示名由注册表提供（回归：写入层不得自写字面量）。
 
-        C7：Excel「数据源可用性矩阵」页签标题曾直接写字面量，绕过显示名
-        注册表——改注册表不会改标题，两处显示名可各自漂移。
+        Excel「数据源可用性矩阵」页签标题若直接写字面量，就绕过了显示名注册表
+        ——改注册表不会改标题，两处显示名可各自漂移。
         """
         from src.python.core.registry import get_report_sheet_name
 

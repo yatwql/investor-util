@@ -125,14 +125,14 @@ def _validate_provider_entry(entry: dict) -> list[str]:
     if provider_type not in _VALID_LLM_PROVIDER_TYPES:
         warnings.append(f"provider 类型 '{provider_type}' 无效（有效值: claude/openai/gemini）")
 
-    # C18 凭据分离：api_key 只能经 llm_key.json 的 credentials_ref 引用。
+    # 凭据分离：api_key 只能经 llm_key.json 的 credentials_ref 引用。
     # 本文件（llm_providers.json）受版本控制（.gitignore 白名单放行），
-    # 内联 api_key 即「凭据随配置入库」——正是 C18 禁止的泄露形态。
+    # 内联 api_key 即「凭据随配置入库」——正是凭据分离约束禁止的泄露形态。
     # 仅在确实带了非空密钥时判定，空串/null 不产生噪音。
     api_key = entry.get("api_key")
     if isinstance(api_key, str) and api_key.strip():
         warnings.append(
-            "禁止内联字段 'api_key'（C18 凭据分离）——"
+            "禁止内联字段 'api_key'（凭据分离）——"
             "请将其写入 llm_key.json 的凭据块，并在本条目用 credentials_ref 引用"
         )
 
@@ -159,7 +159,7 @@ def _validate_provider_entry(entry: dict) -> list[str]:
 def _parse_providers_list(raw_config: dict) -> list[dict] | None:
     """解析 llm_providers.json 中的 providers 数组，校验并补齐默认值。
 
-    凭据边界（C18 凭据分离）：本函数是「配置文件 → 运行期条目」的唯一入口，
+    凭据边界（凭据分离）：本函数是「配置文件 → 运行期条目」的唯一入口，
     条目只携带 `credentials_ref`（凭据引用）与非敏感路由字段（model/endpoint/
     priority/…）；**api_key 不由此处传入**（内联 api_key 在校验阶段即被拒），
     运行期凭据由 `_inject_provider_chain_data` 注入的 `_llm_credentials` 解析。
@@ -202,7 +202,7 @@ def _parse_providers_list(raw_config: dict) -> list[dict] | None:
             "timeout": float(entry.get("timeout", 60.0)),
             "proxy_preferred": entry.get("proxy_preferred", False),
         }
-        # 凭据唯一来源：credentials_ref → llm_key.json 凭据块（C18 凭据分离）
+        # 凭据唯一来源：credentials_ref → llm_key.json 凭据块（凭据分离）
         entry_dict["credentials_ref"] = entry["credentials_ref"]
         # model 为非敏感路由覆盖（模板注释邀请按需修改）；缺省时由凭据块提供。
         # 传空串会让 _resolve_entry_credentials 的 falsy 判断回落到凭据块，故仅在

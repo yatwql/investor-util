@@ -283,9 +283,9 @@ class TestGetIndustryAvgPe(unittest.TestCase):
     def test_single_fetch_per_code(self, mock_fetch_ind, mock_push2):
         """回归：行业归属与 PE 同源于一次请求，不得为取 PE 二次请求。
 
-        背景（C4 会话缓存复用）：该函数曾先 ``fetch_industry_data`` 取行业，
-        再 ``_push2_extended`` 发一次同样参数的 push2 请求取 PE——同一代码同一轮
-        两次取数。回归表现为再次出现第二次调用。
+        背景（会话级 API 复用）：行业归属与 PE 本就是同一次 push2 响应的字段，
+        若先 ``fetch_industry_data`` 取行业、再 ``_push2_extended`` 发一次同样
+        参数的请求取 PE，同一代码同一轮就取了两次数。回归表现为第二次调用。
         """
         calls: list[str] = []
 

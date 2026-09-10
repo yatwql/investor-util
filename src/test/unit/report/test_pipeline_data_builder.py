@@ -33,7 +33,7 @@ _TECHNICAL_DOC = _REPO_ROOT / "docs-stm" / "managements" / "technical.md"
 def _appendix_h_keys() -> set[str]:
     """解析 technical.md 附录 H 的键名列表（表格第一列）。
 
-    附录 H 是 C19 的注册台账：键必须先在此登记类型与写入/消费模块，
+    附录 H 是 pipeline_data 的注册台账：键必须先在此登记类型与写入/消费模块，
     才能在代码中使用。此处解析出的集合即「已登记键」。
     """
     text = _TECHNICAL_DOC.read_text(encoding="utf-8")
@@ -113,7 +113,7 @@ class TestPipelineDataMergeExtra(unittest.TestCase):
 
 
 class TestSchemaRegisteredInAppendixH(unittest.TestCase):
-    """C19 契约：代码中在用的 pipeline_data 键必须先在附录 H 登记。
+    """数据契约：代码中在用的 pipeline_data 键必须先在附录 H 登记。
 
     背景：`decision_review_data`（决策复盘区块）曾由挂载点写入并被执行章消费，
     却未登记进 `_PIPELINE_DATA_KNOWN_KEYS`/附录 H——两处清单各自漂移即失去

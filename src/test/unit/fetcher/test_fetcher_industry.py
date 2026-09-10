@@ -130,10 +130,10 @@ class TestFetchIndustryData(unittest.TestCase):
 
 
 class TestLegacyIndustryCacheMigration(unittest.TestCase):
-    """旧版行业缓存载荷（缺扩展行情字段）迁移 — 见 `_drop_legacy_cached_payload`。
+    """缺扩展行情字段的行业缓存载荷清理 — 见 `_drop_legacy_cached_payload`。
 
-    背景：本版起行业载荷透传 pe/pb/market_cap，旧载荷不含这三个键，而缓存 TTL
-    为两周、`fetch_with_fallback` 命中即返回——不剔除旧载荷，估值分位与基金风格
+    背景：行业载荷透传 pe/pb/market_cap，缺键载荷不含这三个键，而缓存 TTL 为
+    两周、`fetch_with_fallback` 命中即返回——不剔除缺键载荷，估值分位与基金风格
     的 PE 取用会在存活期内静默退化为「不可得」。
     """
 
@@ -186,7 +186,7 @@ class TestLegacyIndustryCacheMigration(unittest.TestCase):
 
 
 class TestFetchValuationFields(unittest.TestCase):
-    """fetch_valuation_fields — 经 Provider Chain 取 PE/PB（C6 网关入口）。
+    """fetch_valuation_fields — 经 Provider Chain 取 PE/PB（唯一网关入口）。
 
     背景：报告层曾直接 import ``providers.eastmoney_industry`` 的估值取值函数，
     绕开 fetcher 网关（无链路降级/诊断）。现值取值经本网关取用，断言：

@@ -12,8 +12,8 @@ A 通道（pipeline_data）流向：
 B 通道（prep）流向：
   prepare_report_data() → pipeline_data_builder.build_prep() → LLM / Excel
 
-数据契约 约束：所有键必须先在 `technical.md` 附录 H（pipeline_data Schema 定义）中
-注册类型与写入/消费模块（C19）。
+数据契约约束：所有键必须先在 `technical.md` 附录 H（pipeline_data Schema 定义）中
+注册类型与写入/消费模块。
 """
 
 from __future__ import annotations
@@ -158,7 +158,7 @@ def _validate_keys(data: dict, known_keys: set[str], label: str) -> None:
     """
     for k in data:
         if k not in known_keys:
-            logger.warning("[pipeline_data] %s 包含未知键 '%s'，请先在 technical.md 附录 H 注册（C19）", label, k)
+            logger.warning("[pipeline_data] %s 包含未知键 '%s'，请先在 technical.md 附录 H 注册", label, k)
 
 
 def _assert_type(value: Any, expected: type | tuple[type, ...], key: str) -> None:
