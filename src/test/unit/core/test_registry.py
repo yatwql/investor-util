@@ -221,9 +221,9 @@ class TestDataModuleDef:
         m = DataModuleDef("测试LLM", "test_llm", cache_ttl=3600, settings_suffix="test_module")
         assert m.is_llm
         keys = m.llm_settings_keys()
-        assert f"model_test_module" in keys
-        assert f"temperature_test_module" in keys
-        assert f"output_brief_test_module" in keys  # 非 news_correlation 应有 output_brief
+        assert "model_test_module" in keys
+        assert "temperature_test_module" in keys
+        assert "output_brief_test_module" in keys  # 非 news_correlation 应有 output_brief
 
     def test_llm_settings_keys_news_correlation_no_output_brief(self):
         """news_correlation 模块不应有 output_brief 键。"""
@@ -353,6 +353,41 @@ class TestReportSectionDefault:
         flags = [s.get("data_flag") for s in _REPORT_SECTION_DEFAULT]
         assert "overlap_data" not in flags, "旧重合度 data_flag 不应再出现"
         assert "correlation_data" not in flags, "旧相关性 data_flag 不应再出现"
+
+
+class TestReportSheetNames:
+    """页签显示名与章节注册表的一致性（C7：注册表驱动，写入层不得硬编码显示名）。"""
+
+    def test_sheet_names_match_section_names(self):
+        """页签显示名注册表的每个键必须在章节注册表中同名同显示名。
+
+        两张注册表存在同名条目（页签标题路径 vs 序号/可见性路径），
+        此处防的是二者漂移——改了一张忘了另一张，两处显示名就会不一致。
+        """
+        from src.python.core.registry import _REPORT_SHEET_NAMES
+
+        section_names = {sec["key"]: sec["name"] for sec in _REPORT_SECTION_DEFAULT}
+        for key, name in _REPORT_SHEET_NAMES.items():
+            assert key in section_names, f"页签显示名 '{key}' 不是有效章节键"
+            assert name == section_names[key], (
+                f"'{key}' 显示名漂移：页签注册表={name!r}，章节注册表={section_names[key]!r}"
+            )
+
+    def test_data_source_status_name_registered(self):
+        """data_source_status 显示名由注册表提供（回归：曾硬编码在写入层）。
+
+        C7：Excel「数据源可用性矩阵」页签标题曾直接写字面量，绕过显示名
+        注册表——改注册表不会改标题，两处显示名可各自漂移。
+        """
+        from src.python.core.registry import get_report_sheet_name
+
+        assert get_report_sheet_name("data_source_status") == "数据源可用性矩阵"
+
+    def test_unknown_key_falls_back_to_key(self):
+        """未登记键回退为键名本身（保持既有前向兼容语义）。"""
+        from src.python.core.registry import get_report_sheet_name
+
+        assert get_report_sheet_name("not_a_section") == "not_a_section"
 
 
 class TestGetReportSectionKeys:

@@ -1413,7 +1413,11 @@ class ComputModuleDef:
 - LLM settings 键名 → `get_known_llm_settings_keys()`
 - LLM 模块名称 → `get_llm_module_names()`
 
-> 报表页签标题与顺序由独立的 `_REPORT_SECTION_DEFAULT` 注册表驱动，`get_report_sheet_name()` / `get_report_section_order()` 均读该注册表，**不**随 `_MODULE_REGISTRY` 自动派生。
+> 报表页签标题与顺序由两张**独立**注册表分别驱动，**不**随 `_MODULE_REGISTRY` 自动派生：
+> - `get_report_sheet_name(sheet_key)` → 读 `_REPORT_SHEET_NAMES`（sheet key → 中文标题映射）
+> - `get_report_section_order(config)` → 读 `_REPORT_SECTION_DEFAULT`（章顺序与分组）
+>
+> 二者职责不同：前者管「页签叫什么」，后者管「章按什么顺序排」。新增页签需在 `_REPORT_SHEET_NAMES` 登记标题；若该页签属报告章，还需在 `_REPORT_SECTION_DEFAULT` 登记顺序（`scripts/check-semantic-index.py` 校验合并章引用的 sheet key 存在于 `_REPORT_SECTION_DEFAULT`）。
 
 ### 测试
 

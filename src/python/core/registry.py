@@ -365,6 +365,8 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "portfolio_history_drawdown": "组合历史走势与回撤",
     "portfolio_evolution": "组合演进",
     "action": "行动建议",
+    "data_source_status": "数据源可用性矩阵",
+    "llm_usage": "LLM API 用量",
 }
 
 

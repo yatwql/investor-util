@@ -6,6 +6,13 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 报表页签显示名注册表驱动（C7，自审 rf-326）（2026-09-10）
+
+- **缺陷（自审 rf-326）**：`report/excel_generator.py::_write_data_source_matrix_sheet` 把「数据源可用性矩阵」页签的**表内标题写成字面量**，绕开显示名注册表，违反 C7「报表页签标题由注册表驱动，禁止硬编码」。同一显示名因此存在于两处——`core/registry.py::_REPORT_SECTION_DEFAULT`（页签名，经 `excel_sheet_factory` 生成 `ws.title`）与写入层字面量——改一处不会同步另一处，且无任何测试拦截漂移。同批核对发现「数据源可用性矩阵」「LLM API 用量」两个页签**未登记**在 `_REPORT_SHEET_NAMES`（该表按表头注释只排除「已由 `get_llm_module_name()` 注册」的 LLM 模块章，此二键不属此列，属遗漏）；未登记时 `get_report_sheet_name()` 走「回退为键名」兜底返回英文键，故仅改写入层调用而不补登记，会把 `data_source_status` 这个英文键当标题写进报告——补登记是该修复成立的前提。
+- **改动**：`_REPORT_SHEET_NAMES` 补登 `data_source_status` / `llm_usage` 中文显示名；`_write_data_source_matrix_sheet` 改取 `get_report_sheet_name("data_source_status")`。`developer-guide.md` 的注册表说明同步校正——原文称「页签标题与顺序由**独立的 `_REPORT_SECTION_DEFAULT`** 注册表驱动，`get_report_sheet_name()` / `get_report_section_order()` 均读该注册表」，与实际不符（`get_report_sheet_name` 读的是 `_REPORT_SHEET_NAMES`）；改为说明两张注册表的职责分工：「页签叫什么」由 `_REPORT_SHEET_NAMES` 管、「章按什么顺序排」由 `_REPORT_SECTION_DEFAULT` 管，新增页签的登记路径一并写明。
+- **行为变更**：无——该页签表内标题此前即与注册表登记值一致，本次仅把取值收敛到注册表（`llm_usage` 表内标题取自 `ws.title`，不受影响）。
+- **测试**：`test_registry.py` 新增 `TestReportSheetNames` 三例：`test_sheet_names_match_section_names`（遍历 `_REPORT_SHEET_NAMES`，断言每个键都在 `_REPORT_SECTION_DEFAULT` 中且显示名逐字相同——把「两张注册表漂移」变成红灯）、`test_data_source_status_name_registered`（回归：标题取注册表值而非字面量，已验证还原旧实现后转红）、`test_unknown_key_falls_back_to_key`（锁定未登记键回退为键名的既有语义）。另清理该文件三处多余的 f-string 前缀（ruff F541）。
+
 ### 估值取数回归 Provider Chain 与会话复用（C4 + C6，自审 rf-324 / rf-325 / rf-334）（2026-09-10）
 
 - **缺陷（自审 rf-324，C6）**：`report/fund_style_classify.py::_push2_extended` 直接 import `fetcher.industry.make_push2_request` 发起 push2 请求——该入口是 provider 函数的**薄透传**，不经 Provider Chain，因而没有备用源递补（`eastmoney_industry_rest`）、不经 `industry_` 文件缓存、不登记 `FailureDiagnostics` 数据源状态（provider 模块内部的熔断计数仍在，故问题被掩盖得更深），也不参与会话复用；provider 侧失败时报告层只看到一条「扩展数据获取失败」告警，数据源可用性矩阵里毫无痕迹。同批发现 `fetcher/industry.py::make_push2_request` 在本轮修复后**已无任何生产调用方**，作为「绕开 Chain 的现成入口」继续留在网关层，正是同类违规的温床——一并删除。

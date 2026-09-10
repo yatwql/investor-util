@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.python.core.logger import setup_logger
-from src.python.core.registry import get_report_section_order
+from src.python.core.registry import get_report_section_order, get_report_sheet_name
 from src.python.report.excel_fund_deep_analysis import write_fund_deep_analysis_sheets
 from src.python.report.excel_content_sheets import write_content_sheets
 from src.python.report.excel_llm_usage import write_llm_section_and_usage
@@ -77,7 +77,8 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
         matrix = build_data_source_matrix()
         if matrix:
             ncols = 5
-            row = write_title_row(ws, 1, "数据源可用性矩阵", ncols)
+            # 标题取自页签显示名注册表（与页签名同源），不硬编码字面量
+            row = write_title_row(ws, 1, get_report_sheet_name("data_source_status"), ncols)
             row = write_header_row(
                 ws,
                 row,
