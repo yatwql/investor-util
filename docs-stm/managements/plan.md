@@ -20,9 +20,7 @@
 
 ### P1 — 当前待办
 
-| # | 任务 | 优先级 | 状态 |
-|---|------|:------:|:----:|
-| **plan-29** | DeepSeek 峰谷定价适配周末全天闲时规则（2026-08-23 官方方案）：工作日高峰时段 09:00–12:00、14:00–18:00 按 peak 价，其余时间（含周末全天）按 base 闲时价。新增 `pricing.weekend_always_idle` 配置（默认 true，可关闭恢复周末按钟点区分），`constants.py`/`pricing.py`/`_llm_settings_defaults.py`/用户 `llm_settings.json` 同步更新，测试与文档同步 | P1 | 完成（2026-08-28） |
+> 无待办项。plan-29（DeepSeek 峰谷定价适配周末全天闲时）已于 v0.10.15（2026-08-28）完成并归档，完成项摘要见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)。
 
 ### P4 — 实验功能
 

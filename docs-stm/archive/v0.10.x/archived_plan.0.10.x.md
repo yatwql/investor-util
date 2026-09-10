@@ -1,9 +1,9 @@
 # 实现计划归档 — v0.10.x
 
-> 归档时间：2026-08-05（设计文档 + 完成项摘要）；2026-08-05 二次合并 plan.md 已完成事项记录；2026-08-07 追加 plan-25 Web 持仓输入模式 / plan-26 Web 配置编辑 / README SVG 架构图；2026-08-08 追加 env-benchmark-doc-update（--update-docs 环境耗时对照自动更新）；2026-08-16 三次合并 plan.md 已完成事项记录（plan-8/25/26/27/28 P4 实验功能项）
+> 归档时间：2026-08-05（设计文档 + 完成项摘要）；2026-08-05 二次合并 plan.md 已完成事项记录；2026-08-07 追加 plan-25 Web 持仓输入模式 / plan-26 Web 配置编辑 / README SVG 架构图；2026-08-08 追加 env-benchmark-doc-update（--update-docs 环境耗时对照自动更新）；2026-08-16 三次合并 plan.md 已完成事项记录（plan-8/25/26/27/28 P4 实验功能项）；2026-09-10 四次合并 plan.md 已完成事项记录（plan-29 DeepSeek 峰谷定价周末闲时）
 > 原始文件：`docs-stm/managements/plan.md`（当前迭代部分）
-> 涵盖版本：v0.10.0 ~ v0.10.13（2026-08-03 ~ 2026-08-14）；plan-8 于 v0.10.10 实现、plan-25/26/27/28 于 v0.10.12 实现、README SVG 于 v0.10.13 实现（2026-08-06/07）
-> 归档内容：本迭代已实现的计划项（plan-8 + plan-17~plan-28）设计文档 + 完成项摘要 + 推荐实施顺序 + 发布门禁记录（P0/P1/P2/P3 已完成事项记录 + P4 已随发布版本实现项自 plan.md 整体迁入）
+> 涵盖版本：v0.10.0 ~ v0.10.15（2026-08-03 ~ 2026-08-29）；plan-8 于 v0.10.10 实现、plan-25/26/27/28 于 v0.10.12 实现、README SVG 于 v0.10.13 实现（2026-08-06/07）、plan-29 于 v0.10.15 实现（2026-08-28）
+> 归档内容：本迭代已实现的计划项（plan-8 + plan-17~plan-29）设计文档 + 完成项摘要 + 推荐实施顺序 + 发布门禁记录（P0/P1/P2/P3 已完成事项记录 + P4 已随发布版本实现项自 plan.md 整体迁入）
 
 ---
 
@@ -38,6 +38,7 @@
 | plan-26 | **Web 配置编辑** | Web 修改与 TUI 完全一致的配置全集（7 组）：`web/config_edit.py` 白名单 + `GET/POST /api/config/edit` + 同源守卫 + `.bak` 备份；`write_llm_settings` 共享原语（TUI 改委托）；匿名化读路径修正；前端配置面板即改即存；测试 35+42 用例 + smoke 11 断言 | 6 阶段 | ✅ 已完成（v0.10.12，2026-08-07） |
 | plan-27 | **前端资产统一归入 src/static/** | Web UI 前端 + 报告模板归入 `src/static/`（三合一），`src/python/` 仅纯 Python；`app.py`/`html_jinja_env` 加载点改 `PROJECT_ROOT` 派生；5 个按路径读模板测试同步 | 基础设施重构 | ✅ 已完成（v0.10.12，2026-08-07） |
 | plan-28 | **三模式使用指南体系** | how-to-use-web-mode/cli-mode 新建 + tui-menu 重命名；定时任务并入 CLI 指南 §11；README/CLAUDE/folders 索引统一；test-coverage 耗时刷新 | 纯文档 | ✅ 已完成（v0.10.12，2026-08-07） |
+| plan-29 | **DeepSeek 峰谷定价周末闲时** | 按 DeepSeek 2026-08-23 官方方案适配周末（周六/周日）全天统一按闲时（低谷）价计费、不再区分峰谷：`core/constants.py` 新增 `PRICING_WEEKEND_ALWAYS_IDLE`（默认 True）+ `llm/pricing.py` 新增同名模块级变量与 `_is_weekend()` 判定并据以改写 `estimate_cost()` 峰谷分支；`pricing.weekend_always_idle` 配置（默认 true，设 false 恢复周末按钟点区分）同步 `config/_llm_settings_defaults.py` 默认模板与用户 `data/config/llm_settings.json`；`test_llm_utils.py::TestPricing` 周末闲时规则 4 例（默认开/周末高峰按闲时/周末缓存命中按闲时价/关闭恢复峰谷）+ how-to-config-llm.md、llm-technical.md §10.4 与附录 B 文档同步 | 定价适配 | ✅ 已完成（v0.10.15，2026-08-28） |
 
 ### P0 — 发布门禁（已完成）
 
