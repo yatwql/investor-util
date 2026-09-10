@@ -62,7 +62,7 @@
 .venv/bin/python -m src.python.cli --experiment module_quality_gate report --type full
 ```
 
-完整命令参考（全局参数 / report / cache / whatif / check-sources / view-logs / doctor / 使用示例 / 退出码 / 最佳实践）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §13「定时任务」。
+完整命令参考（全局参数 / report / cache / whatif / check-sources / view-logs / doctor / 使用示例 / 退出码 / 最佳实践；另有开发维护命令 `cassettes`，见开发者指南）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §13「定时任务」。
 `--experiment` 为全局参数，取值接受开关名（如 `module_quality_gate`）、显示名（如 `模块级质量分级`）或 `all`（全部启用），可重复指定。
 
 ---

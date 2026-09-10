@@ -19,6 +19,27 @@
 - **测试**：新增 `test_module_fingerprint.py` 32 例——注册表键集合与预检键集合一致（防新增模块只注册一半）、四种输入场景下「预检键 == 写侧键」（含 `history_data` 有无/变化、信号摘要开关、辩论增强开关两态，三模块 + 全局政经共 4 模块 × 6 场景参数化）、**风险信号进入写侧指纹**（缺陷直接守卫）、全局政经不受风险信号影响、辩论增强后缀两侧同步、信号摘要后缀只作用于摘要模块。既有 `test_debate_generators.py` 的开关变体用例补齐第二处读点打桩。`test_trace_check_scripts.py` 的约束代号边界用例随识别范围扩展同步（"范围外样例"改用紧邻的下一个新编号，确认新增约束自身被检出、而其后的编号仍不误伤）。
 - **文档**：`llm-technical.md`（§13.1 指纹依赖表补齐 `history_data` 组合风险信号摘要项与辩论增强后缀、新增模块表行、"提示词受开关影响时的缓存键纪律"改写为"唯一事实来源"）、`technical.md`（约束表新增条目、结构化表头与信号摘要两处同源表述改为指向构建函数）、`folders.md`（目录树补两个新文件）、`CLAUDE.md`（架构遵从条目的约束条数）。
 
+### 数据源记录-回放（plan-37，无开关）（2026-09-10）
+
+- **背景**：既有数据源测试全部喂**手工构造的假响应**——那是「我以为上游长什么样」。上游字段改名、值加前后缀、换分隔符、错误页返回 HTML 这类回归在结构上测不出。借鉴 OpenBB 的 pytest-recorder/vcrpy cassette 思路，把**真实响应体**录进仓库、此后离线回放，补上「真实响应体的解析/归一路径」的回归覆盖，同时不破坏「测试不碰真网络」的隔离纪律。分析见 `docs-stm/plan/openbb-data-provider-analysis.md` §建议C；实现设计见 `docs-stm/plan/datasource-cassette-replay-design.md`。
+- **自研轻量引擎（不引依赖）**：不引 vcrpy / responses / httpretty——本仓库只有 httpx 一种客户端、注入点唯一，自研约 430 行的引擎比适配第三方库的传输层钩子更可控。语义名定为 **`cassette`**（引擎模块名即语义名）。
+- **注入点即「HTTP 客户端统一」约束下的唯一构造点**：`core/http_client.py` 新增 `use_transport_factory()` / `make_transport()`——`make_http_client()` 在未显式传 `transport` 时取当前工厂产出的传输，因此全项目 provider **零改动**即被替换为回放源（这是本次唯一的生产代码改动）。工厂每次调用必须返回**新**传输实例：`httpx.Client.close()` 会连带关闭其传输，复用同一实例会让后续请求打到已关闭的传输上。未安装工厂时行为与没有本机制时逐字节相同（既有 `test_http_client.py` 用例锁定）。
+- **离线保证与「失败即错」**：回放未命中抛 `CassetteMissError`，**绝不回落真实网络**；该异常**刻意不继承 `httpx.HTTPError`**——provider 的异常处理会捕获 httpx 错误并降级到下一个源，若继承之，「夹具漏录」会被静默改写成「换个源重试」，掩盖真实问题。**录制保证**：需 `--run-live` 与 `--record-cassettes` 双显式开关；非 live 用例的真实请求已被 conftest 的 `_block_external_network` 拦死，**机制上不可能意外产生录制**。
+- **存储口径（实测确定，非设计臆断）**：存**解码后的响应体文本 + 字符集**（上游真实响应为 gzip + GBK/GB18030/utf-8 混用），回放时按录制字符集重新编码，并丢弃 `content-encoding`/`content-length`/`transfer-encoding`——否则 httpx 会按已解压内容再解一次（`zlib.error`）或按旧长度截断。请求键归一剥离易变查询参数（`VOLATILE_QUERY_PARAMS`：防缓存参数与 JSONP 惯用名，取值来自本仓库实际用法），只对查询参数生效、不动路径。
+- **分层**：`core/cassette.py` 只依赖 stdlib + httpx + `core.http_client`，禁止 import providers/fetcher/report/llm；「cassette 名 → 当前解析器」的绑定表放在 `fetcher/cassette_checks.py`，使 `core/` 不反向依赖 providers。
+- **已录 6 份真实响应**（`src/test/data/cassettes/`，git 跟踪，合计约 170 KB）：腾讯行情、新浪行情、腾讯 K 线、东方财富基金净值、天天基金持仓明细、天天基金季度持仓——均为**对真实端点实际录制**所得，非手工编造。
+- **维护入口**：新增 `cassettes`（列出已录制响应：来源/录制时间/交互数/大小）与 `cassettes --verify`（逐条离线回放并交给**当前解析器**解析；`[OK]`/`[!]` 未登记解析器/`[ERR]` 解析失败，有失败则退出码 2）两个子命令，与 `doctor` 同例——**无需 config、不受任何实验开关约束、不发起网络请求**。
+- **不设功能开关**：cassette 只在测试进程与维护命令中被读写，报告管线不读它，**不产生任何运行时行为分支**——一个不控制任何功能的开关纯属注册负担（理由记入设计文档与 `technical.md` §2.6）。
+- **测试**：新增 103 例——`test_cassette.py` 50 例（请求键归一/数据模型/存取/回放传输/录制会话/列出与校验，含「工厂每次返回新传输」「flush 幂等」「无流量不产空文件」「未命中在触碰网络之前失败」「未命中不是 httpx 错误」）、`test_cassette_edge.py` 45 例（畸形 URL、**版本号严格整数校验**（`1.0`/`true` 会被 Python 判为等于 1，只做等值比较会把畸形文件放行）、顶层/交互结构破坏、可选字段回退、重复键后写胜出、多 cassette 回退、非 JSON 文件忽略）、`test_cassette_replay.py` 7 例（对已录制真实响应体做**精确值断言**：价格/市值/市盈率、K 线根数与日期、基金净值与净值日期、持仓条数与前三名）、`test_http_client.py` 新增 9 例（传输工厂的安装/卸载/嵌套/异常恢复/显式 transport 优先/`make_transport` 沿用 SSL 策略）。**变异性验证**：把已录制的价格数字变异后重跑，回放用例转红；把响应体改成 HTML 错误页后 `cassettes --verify` 报 `[ERR]` 并退出码 2——确认断言测的是真实内容而非空跑。
+- **文档**：`technical.md`（新增 §2.6 数据源记录-回放 + TOC + 语义命名表三行 + 「HTTP 客户端统一」约束补充「该工厂同时是 cassette 唯一注入点，绕过工厂的请求使回放静默失效」）、`testplan.md`（§4 新增 P1 回归项「数据源真实响应体解析路径」+ §5.2 补「真实响应体回归优先用 cassette 回放」）、`developer-guide.md`（测试模式详解新增「数据源真实响应录制与回放（cassette）」小节：用例写法/录制命令/三处同步清单/离线保证/与「HTTP 客户端统一」约束的关系；CLI 子命令新增 `cassettes` 条目含输出标记与退出码）、`how-to-use-cli-mode.md`（子命令清单补 `cassettes` 并标注为开发维护命令；顺带修正文首「§12 定时任务」的过期交叉引用为 §13）、`folders.md`（目录树补 3 个源码文件 + 4 个测试文件 + `test/data/cassettes/` 6 份夹具）、`README.md`（命令参考补 `cassettes` 指引）、`plan.md`（本条完成态）。
+- **自审（rf-307）**：实现期自测 `cassettes --verify` 时发现——损坏的 cassette 已打印 `[ERR]`，进程退出码却是 0；根因是 `cli/__main__.py` 只调 `main()` 而丢弃返回值（只有 `cli.py` 作为脚本直跑时才 `sys.exit(main())`），而 `scripts/cli.sh` / `cli.ps1` / cron / CI **全部经 `python -m src.python.cli` 调用**，故本项目的退出码契约（`doctor` 的 1/2、`cassettes --verify` 的 2、`report`/`cache`/`whatif` 同理）对外一律失效。已抽出 `run_cli()` 供两条入口共用并补 6 例回归测试（详见下方 rf-307 条目）。
+
+### CLI 进程入口退出码传递修复（自审 rf-307）（2026-09-10）
+
+- **缺陷**：`python -m src.python.cli` 的退出码**恒为 0**——`cli/__main__.py` 只调 `main()` 而丢弃其返回值；`cli.py` 自身作为脚本直跑时才有 `sys.exit(main())`（含边界日志与 KeyboardInterrupt/异常处理），两条入口行为不一致。退出码是本项目命令对外契约的一部分，而 `scripts/cli.sh`、`scripts/cli.ps1`、cron、CI 全部经 `python -m src.python.cli` 调用，因此失败对外一律表现为成功：`doctor` 的「部分失败=1 / 严重=2」、`cassettes --verify` 的「解析失败=2」、`report`/`cache`/`whatif` 的非零码**都无法被脚本感知**。在 plan-37 自测中实证：损坏的 cassette 已打印 `[ERR]`，进程仍返回 0。
+- **改动**：把入口逻辑抽为 `cli.py::run_cli()`（执行 `main()` → 退出码/`KeyboardInterrupt`/异常 → `SystemExit`，并写应用边界日志），`cli.py` 直跑分支与 `__main__.py` 共用，两条入口行为归一。
+- **测试**：新增 6 例——`run_cli` 的返回码传递（含 `_EXIT_SEVERE`）、`KeyboardInterrupt`→130、未处理异常→2、退出时写边界日志，以及**以 `runpy` 把 `__main__.py` 当真实入口执行**并断言进程退出码（`TestModuleEntryPoint`）。已验证还原旧 `__main__.py` 后该用例转红（实测退出码 0 ≠ 7）。另在既有 `TestMainEarlyExitExperiments` 的参数化列表中加入 `cassettes`，锁定「早返回命令同样应用命令行实验开关」。
+
 ### 数据源适配契约（plan-36，实验功能 `datasource_adapter` 默认关）（2026-09-10）
 
 - **背景**：借鉴 OpenBB Platform 的 Fetcher 设计识别出的接入形态问题——**本项目的每个数据源都要手拼一份解析后的 dict**，「字段从哪来、缺失时取什么、这个源有没有这个字段」全散在各 provider 的解析代码里；同一个行情域，腾讯源给了市值/市盈率、新浪源没给、东方财富源连键都不产出，下游只能靠 `if key in data` / `.get()` 逐个试探。字段改名（净值源的 `nav` → 统一的 `price`）也靠手写赋值表达。分析见 `docs-stm/plan/openbb-data-provider-analysis.md` §建议A/B；实现设计见 `docs-stm/plan/datasource-adapter-contract-design.md`。

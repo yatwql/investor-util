@@ -15,9 +15,8 @@ from unittest.mock import patch
 
 from src.python.core.http_client import _should_verify, make_http_client
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
-
-
 
 
 class TestShouldVerify(unittest.TestCase):
@@ -140,3 +139,98 @@ class TestMakeHttpClient(unittest.TestCase):
         with make_http_client(timeout=30.0) as client:
             self.assertFalse(client.is_closed)
         self.assertTrue(client.is_closed)
+
+
+class TestTransportFactory:
+    """传输层注入点（use_transport_factory）—— 数据源记录-回放的接入方式。"""
+
+    def test_no_factory_means_no_transport_kwarg(self):
+        """未安装工厂：不向 httpx.Client 传 transport，行为与无本机制时一致。"""
+        from src.python.core import http_client as hc
+
+        with patch("src.python.core.http_client.httpx.Client") as mock_client_class:
+            hc.make_http_client(timeout=5.0)
+            _, kwargs = mock_client_class.call_args
+        assert "transport" not in kwargs
+
+    def test_installed_factory_supplies_transport(self):
+        """已安装工厂：其产物作为 transport 传入，其余参数不受影响。"""
+        from src.python.core import http_client as hc
+
+        marker = object()
+        with patch("src.python.core.http_client.httpx.Client") as mock_client_class:
+            with hc.use_transport_factory(lambda: marker):
+                hc.make_http_client(timeout=7.0)
+            _, kwargs = mock_client_class.call_args
+        assert kwargs["transport"] is marker
+        assert kwargs["timeout"] == 7.0
+
+    def test_factory_returning_none_leaves_default_transport(self):
+        """工厂返回 None：不传 transport（回落 httpx 默认传输）。"""
+        from src.python.core import http_client as hc
+
+        with patch("src.python.core.http_client.httpx.Client") as mock_client_class:
+            with hc.use_transport_factory(lambda: None):
+                hc.make_http_client()
+            _, kwargs = mock_client_class.call_args
+        assert "transport" not in kwargs
+
+    def test_explicit_transport_beats_factory(self):
+        """调用方显式传 transport 时以调用方为准（工厂不覆盖明确意图）。"""
+        from src.python.core import http_client as hc
+
+        explicit = object()
+        with patch("src.python.core.http_client.httpx.Client") as mock_client_class:
+            with hc.use_transport_factory(lambda: object()):
+                hc.make_http_client(transport=explicit)
+            _, kwargs = mock_client_class.call_args
+        assert kwargs["transport"] is explicit
+
+    def test_factory_restored_after_block(self):
+        """退出 with 块后工厂还原（不污染后续客户端）。"""
+        from src.python.core import http_client as hc
+
+        assert hc._TRANSPORT_FACTORY is None
+        with hc.use_transport_factory(lambda: None):
+            assert hc._TRANSPORT_FACTORY is not None
+        assert hc._TRANSPORT_FACTORY is None
+
+    def test_nested_factories_restore_to_outer(self):
+        """嵌套时内层退出还原到外层工厂，而非直接清空。"""
+        from src.python.core import http_client as hc
+
+        outer = lambda: None  # noqa: E731
+        inner = lambda: None  # noqa: E731
+        with hc.use_transport_factory(outer):
+            with hc.use_transport_factory(inner):
+                assert hc._TRANSPORT_FACTORY is inner
+            assert hc._TRANSPORT_FACTORY is outer
+
+    def test_factory_restored_after_exception(self):
+        """块内抛异常也须还原工厂（否则测试间污染后续用例）。"""
+        from src.python.core import http_client as hc
+
+        with pytest.raises(RuntimeError):
+            with hc.use_transport_factory(lambda: None):
+                raise RuntimeError("boom")
+        assert hc._TRANSPORT_FACTORY is None
+
+    def test_make_transport_honors_module_ssl_policy(self):
+        """make_transport 与 make_http_client 共用同一 SSL 策略。"""
+        from src.python.core import http_client as hc
+
+        with patch("src.python.core.http_client.httpx.HTTPTransport") as mock_transport:
+            with patch("src.python.core.http_client._SSL_VERIFY", False):
+                hc.make_transport()
+            _, kwargs = mock_transport.call_args
+        assert kwargs["verify"] is False
+
+    def test_make_transport_explicit_verify_wins(self):
+        """显式 verify 覆盖模块级策略。"""
+        from src.python.core import http_client as hc
+
+        with patch("src.python.core.http_client.httpx.HTTPTransport") as mock_transport:
+            with patch("src.python.core.http_client._SSL_VERIFY", True):
+                hc.make_transport(verify=False)
+            _, kwargs = mock_transport.call_args
+        assert kwargs["verify"] is False

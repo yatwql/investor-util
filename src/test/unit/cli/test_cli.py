@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_cli]
@@ -20,12 +23,15 @@ from src.python.cli import (
     _cli_read_holdings,
     _cli_read_holdings_with_flows,
     _handle_cache_update,
+    _handle_cassettes,
     _handle_doctor,
     _handle_report,
     _handle_view_logs,
     _handle_whatif,
     main,
+    run_cli,
 )
+from src.python.core.constants import PROJECT_ROOT
 from src.python.core.log_reader import LogEntry
 from src.python.report.whatif_operations import WhatifRunResult
 
@@ -984,6 +990,7 @@ class TestMainEarlyExitExperiments:
         [
             ("doctor", "src.python.cli.cli._handle_doctor"),
             ("check-sources", "src.python.cli.cli._handle_check_sources"),
+            ("cassettes", "src.python.cli.cli._handle_cassettes"),
         ],
     )
     def test_experiment_flag_effective_on_early_exit_command(self, command, patch_target):
@@ -1014,3 +1021,224 @@ class TestMainEarlyExitExperiments:
         seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")
         assert seen["doctor_check"] is True
         assert seen["datasource_adapter"] is False
+
+
+# ═══════════════════════════════════════════════════════════════
+# cassettes 子命令
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestArgparseCassettes:
+    """cassettes 子命令参数解析。"""
+
+    def test_defaults_to_listing(self):
+        """不带 --verify → 列表模式（不触发解析校验）。"""
+        args = _build_parser().parse_args(["cassettes"])
+        assert args.command == "cassettes"
+        assert args.verify is False
+
+    def test_verify_flag(self):
+        args = _build_parser().parse_args(["cassettes", "--verify"])
+        assert args.verify is True
+
+
+@pytest.mark.unit
+class TestHandleCassettes:
+    """_handle_cassettes 输出与退出码。"""
+
+    _OK_ENTRY = {
+        "name": "tencent_quote",
+        "path": "/x/tencent_quote.json",
+        "size_bytes": 2048,
+        "source": "腾讯行情",
+        "recorded_at": "2026-09-10T18:38:37+08:00",
+        "interactions": 1,
+    }
+    _BAD_ENTRY = {"name": "broken", "path": "/x/broken.json", "size_bytes": 3, "error": "cassette 不是合法 JSON"}
+
+    def test_empty_directory_returns_success(self, capsys):
+        """未录制任何 cassette：提示目录并正常退出（非错误）。"""
+        with patch("src.python.core.cassette.list_cassettes", return_value=[]):
+            code = _handle_cassettes(MagicMock(verify=False))
+
+        assert code == _EXIT_SUCCESS
+        assert "未找到已录制的数据源响应" in capsys.readouterr().out
+
+    def test_listing_shows_source_and_interactions(self, capsys):
+        with patch("src.python.core.cassette.list_cassettes", return_value=[self._OK_ENTRY]):
+            code = _handle_cassettes(MagicMock(verify=False))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SUCCESS
+        assert "tencent_quote" in out
+        assert "腾讯行情" in out
+        assert "交互=1" in out
+
+    def test_unreadable_cassette_marked_error(self, capsys):
+        """损坏文件如实以 [ERR] 呈现，不静默跳过（否则「已录制」是假的）。"""
+        with patch("src.python.core.cassette.list_cassettes", return_value=[self._BAD_ENTRY]):
+            code = _handle_cassettes(MagicMock(verify=False))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SUCCESS
+        assert "[ERR] broken" in out
+        assert "不是合法 JSON" in out
+
+    def test_verify_all_ok_returns_success(self, capsys):
+        verdicts = [{"name": "tencent_quote", "status": "ok", "detail": "", "interactions": 1}]
+        with patch("src.python.core.cassette.verify_cassettes", return_value=verdicts):
+            code = _handle_cassettes(MagicMock(verify=True))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SUCCESS
+        assert "[OK] tencent_quote" in out
+        assert "全部录制的解析路径正常" in out
+
+    def test_verify_any_fail_returns_severe(self, capsys):
+        """有解析失败 → _EXIT_SEVERE（回放通道坏了，须重新录制）。"""
+        verdicts = [{"name": "tencent_quote", "status": "fail", "detail": "KeyError: 'data'"}]
+        with patch("src.python.core.cassette.verify_cassettes", return_value=verdicts):
+            code = _handle_cassettes(MagicMock(verify=True))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SEVERE
+        assert "[ERR] tencent_quote" in out
+        assert "1 份录制的解析路径失败" in out
+
+    def test_verify_skipped_is_partial_marker_but_not_failure(self, capsys):
+        """未登记解析器的 cassette 记 [!] 跳过，不算失败（也不伪造成 OK）。"""
+        verdicts = [{"name": "future_source", "status": "skipped", "detail": "未登记解析器，仅校验文件可读"}]
+        with patch("src.python.core.cassette.verify_cassettes", return_value=verdicts):
+            code = _handle_cassettes(MagicMock(verify=True))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SUCCESS
+        assert "[!] future_source" in out
+        assert "[OK] future_source" not in out
+
+    def test_verify_uses_registered_parsers(self):
+        """--verify 必须带上解析器登记表，否则校验退化为「只查文件可读」。"""
+        from src.python.fetcher.cassette_checks import CASSETTE_CHECKS
+
+        with patch("src.python.core.cassette.verify_cassettes", return_value=[]) as mock_verify:
+            _handle_cassettes(MagicMock(verify=True))
+
+        assert mock_verify.call_args[0][0] is CASSETTE_CHECKS
+
+
+@pytest.mark.unit
+class TestMainCassettes:
+    """main() cassettes 分派（config 之前，只读离线维护）。"""
+
+    def test_dispatches_before_init_config(self):
+        """cassettes 不碰用户配置：损坏配置下也须可用。"""
+        with (
+            patch("src.python.cli.cli._handle_cassettes", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config") as mock_init,
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "cassettes"]):
+                code = main()
+
+        assert code == _EXIT_SUCCESS
+        mock_handle.assert_called_once()
+        mock_init.assert_not_called()
+
+    def test_passes_verify_to_handler(self):
+        with (
+            patch("src.python.cli.cli._handle_cassettes", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "cassettes", "--verify"]):
+                main()
+
+        args = mock_handle.call_args[0][0]
+        assert args.command == "cassettes"
+        assert args.verify is True
+
+
+# ═══════════════════════════════════════════════════════════════
+# 进程入口与退出码传递
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestRunCli:
+    """run_cli() 把 main() 的返回值/异常翻译为进程退出码。"""
+
+    def test_propagates_return_code(self):
+        """main() 返回的非零码必须向上抛 SystemExit（否则失败被吞成 0）。"""
+        with (
+            patch("src.python.cli.cli.main", return_value=_EXIT_SEVERE),
+            patch("src.python.core.logger.log_app_boundary"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                run_cli()
+
+        assert exc.value.code == _EXIT_SEVERE
+
+    def test_keyboard_interrupt_maps_to_130(self, caplog):
+        """Ctrl-C → 130（shell 约定），不当作崩溃。"""
+        with (
+            patch("src.python.cli.cli.main", side_effect=KeyboardInterrupt),
+            patch("src.python.core.logger.log_app_boundary"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                run_cli()
+
+        assert exc.value.code == 130
+
+    def test_unhandled_exception_maps_to_severe(self):
+        """未处理异常 → 2，且不得把 traceback 直接抛给用户。"""
+        with (
+            patch("src.python.cli.cli.main", side_effect=RuntimeError("boom")),
+            patch("src.python.core.logger.log_app_boundary"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                run_cli()
+
+        assert exc.value.code == _EXIT_SEVERE
+
+    def test_boundary_log_written_on_exit(self):
+        """退出时记录应用边界（日志可追溯本次运行）。"""
+        with (
+            patch("src.python.cli.cli.main", return_value=_EXIT_SUCCESS),
+            patch("src.python.core.logger.log_app_boundary") as mock_boundary,
+        ):
+            with pytest.raises(SystemExit):
+                run_cli()
+
+        assert mock_boundary.call_args[0][0] == "关闭"
+
+
+@pytest.mark.unit
+class TestModuleEntryPoint:
+    """``python -m src.python.cli`` 必须把退出码传给 shell。
+
+    回归：``__main__.py`` 曾只调 ``main()`` 而丢弃返回值，导致 ``scripts/cli.sh``
+    / ``scripts/cli.ps1`` / cron / CI 调用的退出码恒为 0——``doctor``（部分失败=1、
+    严重=2）与 ``cassettes --verify``（解析失败=2）的结论对外部不可见。
+    这里用 ``runpy`` 以 ``__main__`` 身份执行该入口，并预先把 ``main`` 打桩为固定
+    返回码，断言进程退出码就是它（而非恒 0）。
+    """
+
+    _PROBE = (
+        "import runpy, src.python.cli.cli as cli; "
+        "cli.main = lambda: 7; "
+        "runpy.run_module('src.python.cli', run_name='__main__')"
+    )
+
+    def test_module_entry_propagates_exit_code(self):
+        proc = subprocess.run(
+            [sys.executable, "-c", self._PROBE],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        assert proc.returncode == 7, f"退出码未传递（stdout={proc.stdout!r} stderr={proc.stderr!r})"

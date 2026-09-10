@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "name": "sina_quote",
+  "source": "sina",
+  "recorded_at": "2026-09-10T18:38:37+08:00",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://hq.sinajs.cn/list=sh600519"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "cache-control": "no-cache",
+          "content-length": "174",
+          "connection": "Keep-Alive",
+          "content-type": "application/javascript; charset=GB18030",
+          "content-encoding": "gzip"
+        },
+        "body": "var hq_str_sh600519=\"贵州茅台,1291.000,1290.880,1285.130,1294.990,1282.000,1285.000,1285.150,1890022,2428698784.000,400,1285.000,100,1284.950,200,1284.920,100,1284.880,100,1284.860,100,1285.150,100,1285.160,400,1285.200,100,1285.530,100,1285.560,2026-09-10,15:34:59,00,D|800|1028104.00\";\n",
+        "encoding": "gb18030"
+      }
+    }
+  ]
+}

@@ -362,6 +362,7 @@
 | **P1** | HTML 报告渲染结构 | html_writer / template 变更 | `test_html_report_structure.py`（中文不乱码、章节锚点、LLM 条件消失/出现） |
 | **P1** | 缓存刷新/清理/统计（菜单 [1][2][3][4]） | cache / handlers / registry 变更 | `test_handlers_cache.py` / `test_tui_handlers.py`（刷新/清理/统计不崩溃） |
 | **P1** | Provider 降级链路 | providers / fetcher 变更 | 熔断/回退/断网降级测试（S7/T15/T16 + provider edge 用例）；实际联通性由运行时 Provider Chain 回退 + 熔断治理，非门禁 |
+| **P1** | 数据源**真实响应体**解析路径（cassette 离线回放） | providers / fetcher 的解析或归一路径变更 | `test_cassette_replay.py`（对上仓库录制的真实响应体做精确值断言，离线）；人工核验入口 `cassettes --verify`（解析器吃不下已录制响应体即报 `[ERR]` 并退出码 2）。上游字段改名/加前后缀/返回 HTML 错误页这类回归**只有真实响应体测得出**，手工构造的假响应测不出 |
 | **P2** | 断网环境下自动降级 | 网络/超时/重试相关变更 | `test_scenario_resilience_flows.py::TestScenarioNetworkDown`（S7）+ T15/T16 |
 | **P2** | 清理缓存后全新运行 | provider / fetcher / cache 变更 | `test_scenario_basic_flows.py::TestScenarioNewHoldings`（S4） |
 | **P2** | 旧缓存格式兼容性验证 | cache.py / models.py 变更 | `test_cache_format.py`（gz→JSON 回退、透明读取） |
@@ -397,6 +398,12 @@ def test_fetch_price_normal(self, mock_client_cls):
 
 > 注意：provider 通过 `core/http_client.py` 创建 client（`with get_httpx_client() as client:`），
 > 应 mock `httpx.Client` 类的构造，而非直接 mock 模块函数。
+
+**真实响应体回归优先用 cassette 回放**（见 `technical.md` §2.6）。手工构造的假响应测的是
+「我以为上游长什么样」，字段改名、加前后缀、换分隔符、返回 HTML 错误页这类回归它在结构上测不出；
+对已完成记录的数据源（行情/K 线/基金净值/基金持仓），改用 `@pytest.mark.cassette("名称")` 声明所需
+夹具，运行期离线回放真实响应体、不发起网络请求。刷新夹具是显式联网动作：
+`test-runner --mode live --record-cassettes`（需 `--run-live` 同开，且仅录进 cassette 不入门禁）。
 
 ### 5.3 Mock LLM API
 

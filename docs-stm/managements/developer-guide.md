@@ -305,6 +305,50 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **不含 LLM 真实调用**（防费用）——LLM 连通性由运行时数据源健康检查覆盖。
 - 触发方式：`.venv/bin/python scripts/test-runner.py --mode live` 或 `.venv/bin/python -m pytest --run-live -m live`。
 
+##### 数据源真实响应录制与回放（cassette）
+
+**要解决的问题**：数据源单元测试全部喂**手工构造的假响应**，测的是「我以为上游长什么样」。上游字段改名、值加前后缀、换分隔符、错误页返回 HTML 这类回归，**只有真实响应体测得出**。cassette 把上游真实响应体录进仓库，此后离线回放——既有真实数据，又不碰网络，且随默认套件入门禁。
+
+| 组成 | 位置 |
+|:-----|:-----|
+| 回放引擎 | `src/python/core/cassette.py`（只依赖 stdlib + httpx + `core.http_client`） |
+| 解析器绑定表 | `src/python/fetcher/cassette_checks.py`（cassette 名 → 当前解析器调用） |
+| 已录制响应 | `src/test/data/cassettes/*.json`（git 跟踪） |
+| 回放回归用例 | `src/test/unit/providers/test_cassette_replay.py` |
+| 录制用例 | `src/test/live/test_live_cassette_record.py` |
+
+**在用例里用已录制响应**——声明所需 cassette，运行期自动离线回放，用例内的 provider 调用照常写：
+
+```python
+pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
+
+@pytest.mark.cassette("tencent_quote", source="腾讯行情")
+def test_tencent_quote_parses(self):
+    data = tencent.fetch_price("600519")     # 响应来自 cassette，不联网
+    assert data["price"] == pytest.approx(1285.13)
+```
+
+**刷新/新增录制**（显式联网动作，双开关缺一不可）：
+
+```bash
+# 录制全部登记的 cassette 并即时回放自检
+.venv/bin/python scripts/test-runner.py --mode live --record-cassettes
+
+# 只录一个
+.venv/bin/python -m pytest -m live --run-live --record-cassettes \
+    src/test/live/test_live_cassette_record.py -k tencent_quote
+```
+
+新增一个 cassette 需要三处同步：绑定表加一条解析器调用（`CASSETTE_CHECKS`）、录制用例加一个 `@pytest.mark.cassette(...)` 测试、回放回归用例加精确值断言。
+
+**离线保证与非目标**：
+
+- 回放**未命中即失败**（`CassetteMissError`），**绝不回落真实网络**——避免「以为在回放、实则在联网」。该异常刻意不继承 `httpx.HTTPError`，否则 provider 会把它当成网络错误降级到别的源，掩盖夹具缺失。
+- 非 live 用例的真实请求已被 `conftest.py` 的 `_block_external_network` 拦死，**机制上不可能意外产生录制**。
+- 录制产物进 git（每份几 KB ~ 百 KB），**不入门禁的 live 套件**；夹具刷新须走上面的显式开关。
+- 维护入口：`cassettes`（列出）/ `cassettes --verify`（离线回放 + 交当前解析器解析，失败退出码 2），见下节「CLI 子命令」。
+- 与「HTTP 客户端统一」约束的关系：回放寄生于「所有 HTTP 请求必须经 `core/http_client.py` 工厂」；绕过工厂自建客户端的 provider 不受回放替换，其用例会真实联网且静默通过。设计细节见 `technical.md` §2.6。
+
 ##### 全量（`all`）
 
 - **`--mode verify,regression`** 组合模式，等价于分别运行 verify（单元） + regression（场景）。约 30s，作为发布门禁。
@@ -1046,6 +1090,22 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 **检查覆盖范围**：腾讯财经行情、新浪财经行情、东方财富净值、天天基金持仓/排名、东方财富行业分类、新浪财经新闻、东方财富新闻、华尔街见闻、财联社、腾讯 K 线——共 **10 个端点**。
 
 **退出码**：0=全部正常，1=有告警（部分源慢），2=有失败。
+
+**`cassettes` — 数据源记录-回放维护**
+
+维护已录制的真实数据源响应（见上文「数据源真实响应录制与回放（cassette）」）。与 `doctor` 同例：**无需配置、不受任何实验开关约束、不发起网络请求**。
+
+```bash
+# 列出已录制响应（来源/录制时间/交互数/大小）
+.venv/bin/python -m src.python.cli cassettes
+
+# 逐条离线回放并交给当前解析器解析（不联网）
+.venv/bin/python -m src.python.cli cassettes --verify
+```
+
+**`--verify` 输出标记**：`[OK]` 解析正常；`[!]` 该 cassette 未登记解析器（只校验文件可读，不伪造成 OK）；`[ERR]` 解析器吃不下已录制的真实响应体——**上游格式可能已变，需重新录制**。
+
+**退出码**：0=正常（含列表模式与全部 `[OK]`/`[!]`），2=有录制的解析路径失败。
 
 ### LLM 幻觉率采样测试
 

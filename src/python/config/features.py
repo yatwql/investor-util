@@ -289,20 +289,29 @@ def load_feature_overrides() -> None:
         return
 
     valid_count = 0
+    changed = 0
     with _FEATURES_LOCK:
         for flag_name, value in overrides.items():
             if isinstance(value, bool) and flag_name in FEATURE_FLAGS:
+                changed += FEATURE_FLAGS[flag_name] != value
                 FEATURE_FLAGS[flag_name] = value
                 valid_count += 1
             elif isinstance(value, bool):
                 logger.debug("[features] 覆写未知开关 '%s'，仍加载", flag_name)
                 FEATURE_FLAGS[flag_name] = value
                 valid_count += 1
+                changed += 1
             else:
                 logger.warning("[features] 覆写 '%s' 值应为 bool，忽略", flag_name)
 
-    if valid_count:
+    if not valid_count:
+        return
+    # 只有确实改变了取值才报 INFO：本模块在导入时自动加载一次，调用方（如 CLI
+    # 早返回命令的应用开关入口）可能再显式加载一次，重复打印同一条日志是噪声。
+    if changed:
         logger.info("[features] 已加载 %d 项功能开关覆写", valid_count)
+    else:
+        logger.debug("[features] 覆写已生效（%d 项，取值无变化）", valid_count)
 
 
 def save_feature_overrides(overrides: dict[str, bool], merge: bool = True) -> None:

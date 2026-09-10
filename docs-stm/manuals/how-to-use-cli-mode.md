@@ -3,13 +3,15 @@
 CLI 命令行模式无需 TUI 菜单界面，通过命令行参数驱动，适合**定时任务、脚本化批量生成、服务器 / 无桌面环境**使用。本文从用户角度完整介绍 CLI 模式的命令结构、子命令参数与使用技巧。
 
 > **入口**：`.venv/bin/python -m src.python.cli [全局参数] <子命令> [子命令参数]`
-> **定时任务**：配合 Windows 任务计划程序 / Linux cron 自动运行，见本文 [§12 定时任务](#12-定时任务)。
+> **定时任务**：配合 Windows 任务计划程序 / Linux cron 自动运行，见本文 [§13 定时任务](#13-定时任务)。
 
 ---
 
 ## 1. 命令结构
 
-CLI 命令分两层：**全局参数**（位于子命令之前）+ **子命令**（`report` / `cache` / `whatif` / `check-sources` / `view-logs` / `doctor`）。
+CLI 命令分两层：**全局参数**（位于子命令之前）+ **子命令**（`report` / `cache` / `whatif` / `check-sources` / `view-logs` / `doctor` / `cassettes`）。
+
+> 其中 `cassettes` 是**开发维护命令**（列出/校验已录制的数据源真实响应，供离线回归使用），日常使用报告功能不需要它——详见 [开发者指南](../managements/developer-guide.md) → CLI 子命令。
 
 ```bash
 # 查看帮助

@@ -10,11 +10,13 @@ from src.python.cli.cli import (
     _EXIT_SUCCESS,
     _handle_cache,
     _handle_cache_update,
+    _handle_cassettes,
     _handle_doctor,
     _handle_report,
     _handle_view_logs,
     _handle_whatif,
     main,
+    run_cli,
 )
 
 __all__ = [
@@ -27,9 +29,11 @@ __all__ = [
     "_EXIT_SUCCESS",
     "_handle_cache",
     "_handle_cache_update",
+    "_handle_cassettes",
     "_handle_doctor",
     "_handle_report",
     "_handle_view_logs",
     "_handle_whatif",
     "main",
+    "run_cli",
 ]

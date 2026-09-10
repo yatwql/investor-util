@@ -18,6 +18,7 @@
   - [2.3 Fetcher 调度架构](#23-fetcher-调度架构)
   - [2.4 关键机制](#24-关键机制)
   - [2.5 数据源适配契约（实验：`datasource_adapter`，默认关）](#25-数据源适配契约实验datasource_adapter默认关)
+  - [2.6 数据源记录-回放（测试基建，无开关）](#26-数据源记录-回放测试基建无开关)
 - [3. 缓存层详细设计](#3-缓存层详细设计)
   - [3.1 子模块结构](#31-子模块结构)
   - [3.2 核心接口与 TTL 分辨率](#32-核心接口与-ttl-分辨率)
@@ -1112,6 +1113,49 @@ fetch_index_data(code)
 `transform_data` 对合成样本输出恰好标准字段集），自身不抛异常；`doctor` 的「数据源适配」组
 （`--offline` 可用）报告适配器数量、各域与自检结论，并标注契约路径是否已由开关启用——
 **契约未启用时声明与自检仍可核验**，这正是接入新数据源前要看的。
+
+[↑ 回到顶部](#目录)
+
+---
+
+### 2.6 数据源记录-回放（测试基建，无开关）
+
+把**上游真实响应体**录进仓库、此后离线回放，用来回归「真实响应体的解析/归一路径」——
+既有单元测试全部喂**手工构造的假响应**，那是「我以为上游长什么样」；字段改名、加前后缀、
+换分隔符、返回 HTML 错误页这类真实回归测不出来（`docs-stm/plan/datasource-cassette-replay-design.md`）。
+
+| 组成 | 位置 | 职责 |
+|:-----|:-----|:-----|
+| 回放引擎 | `core/cassette.py` | 请求键归一、cassette 存取（原子写盘）、回放/录制传输、解析校验；**只依赖 stdlib + httpx + `core.http_client`**，不 import providers/fetcher/report/llm |
+| 解析器绑定表 | `fetcher/cassette_checks.py` | cassette 名 → 当前解析器调用。绑在 fetcher 层是为了让 `core/` 不反向依赖 providers |
+| 传输注入点 | `core/http_client.py` | `use_transport_factory()` / `make_transport()`——**C5 的唯一 HTTP 构造点**即注入点 |
+| 已录制响应 | `src/test/data/cassettes/*.json` | git 跟踪的真实响应体（行情/K 线/基金净值/基金持仓） |
+
+**注入方式**：`make_http_client()` 在未显式传 `transport` 时取当前工厂产出的传输，因此
+全项目 provider **零改动**即可被替换为回放源；工厂每次调用必须返回**新**传输实例
+（`httpx.Client.close()` 会连带关闭其传输，复用同一实例会让后续请求打到已关闭的传输上）。
+未安装工厂时行为与没有本机制时逐字节相同。
+
+**离线保证**：回放未命中抛 `CassetteMissError`，**绝不回落真实网络**；该异常刻意**不继承
+`httpx.HTTPError`**——provider 的异常处理会捕获 httpx 错误并降级到下一个源，若继承之，
+「回放漏录」会被静默改写成「换个源重试」，掩盖夹具缺失。**录制保证**：需 `--run-live` 与
+`--record-cassettes` 双显式开关，非 live 用例的真实请求已被 conftest 阻断，机制上不可能产生录制。
+
+**存储口径**：存**解码后的响应体文本 + 字符集**（真实响应为 gzip + GBK/GB18030/utf-8 混用），
+回放时按录制字符集重新编码，并丢弃 `content-encoding`/`content-length`/`transfer-encoding`——
+否则 httpx 会按已解压内容再解一次（`zlib.error`）或按旧长度截断。请求键归一剥离易变查询参数
+（`VOLATILE_QUERY_PARAMS`：防缓存与 JSONP 惯用名），只对查询参数生效、不动路径。
+
+**维护入口**：`cassettes`（列出）与 `cassettes --verify`（离线回放 + 交当前解析器解析，有失败则退出码 2）
+为早返回命令，与 `doctor` 同例——**无需 config、不受任何实验开关约束**。录制刷新是显式联网动作：
+`test-runner --mode live --record-cassettes`。
+
+**不设功能开关**：cassette 只在测试进程与维护命令中被读写，报告管线不读它，不产生任何运行时
+行为分支——一个不控制任何功能的开关纯属注册负担（理由见设计文档「为何不设开关」）。
+
+**与 C5 的关系**：回放机制完全寄生于 C5「所有 HTTP 请求必须使用 `core/http_client.py` 工厂」。
+任何 provider 若绕过工厂自建客户端，其请求既不受回放替换，也就**不会被未命中保护**——
+回放用例会真实联网且静默通过。
 
 [↑ 回到顶部](#目录)
 
@@ -3070,6 +3114,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `source_adapter` | 数据源适配契约（`SourceAdapter` 基类 + 注册表 + 自检报告 `survey_adapters`） | 数据源适配 | 数据获取 | 实验开关 `datasource_adapter`（默认关） |
 | `quote_adapters` | 行情域适配器（腾讯/新浪/东方财富三源） | 数据源适配 | 数据获取 | 实验开关 `datasource_adapter`（默认关） |
 | `adapter_chain_slots` | 适配器映射为 Provider Chain 两槽（provider_fn_map / transform） | 数据源适配 | 数据获取 | 实验开关 `datasource_adapter`（默认关） |
+| `cassette` | 数据源记录-回放（真实响应体离线录制/回放引擎，`Cassette`/`cassette_replay`/`cassette_record`） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建，不控制运行时行为） |
+| `cassette_checks` | 已录制响应 → 当前解析器的绑定表（录制自检与 `cassettes --verify` 共用） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |
+| `use_transport_factory` | 传输工厂注入点（`make_http_client` 的响应来源替换，C5 唯一构造点上的挂载） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 
@@ -3171,7 +3218,7 @@ web/ (Web 服务层，薄入口)
 |:---|:-----|:---------|:---------|:---------|
 | **C1** | **代码类型判定中心化** — 所有资产代码类型判定必须使用 `core/code_utils.py` 提供的函数，禁止任何模块自行实现判定逻辑 | 系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落，"魔法判定"遍地，新增资产类型时需全局搜索替换 | 代码评审不通过；新增资产类型时遗漏大量散落判定点 | 所有涉及代码类型判定的模块（fetcher/、report/、llm/ 等） |
 | **C4** | **会话级 API 复用** — 同次会话内同一 API 返回的数据必须通过 `DataSourceRegistry.session_cache` 复用，禁止重复 HTTP 请求 | 避免同一资产在多个模块中重复请求相同 API 数据，降低 API 限频风险，提升性能 | API 调用量膨胀、触发限频、报告生成时间增长 | 所有通过 Provider 获取数据的模块 |
-| **C5** | **HTTP 客户端统一** — 所有 HTTP 请求必须使用 `core/http_client.py` 工厂方法创建客户端实例 | 统一 SSL 配置、超时策略、连接池管理；防止各模块自行构造 request 导致配置散落、连接池泄漏 | SSL 配置不一致、连接泄漏、重试策略不统一 | 所有发起 HTTP 请求的模块（providers/、llm/） |
+| **C5** | **HTTP 客户端统一** — 所有 HTTP 请求必须使用 `core/http_client.py` 工厂方法创建客户端实例 | 统一 SSL 配置、超时策略、连接池管理；防止各模块自行构造 request 导致配置散落、连接池泄漏。该工厂同时是**数据源记录-回放（cassette）的唯一注入点**（§2.6）：绕过工厂自建客户端的 provider 不受回放替换，回放用例会**真实联网并静默通过**——离线保证随之失效 | SSL 配置不一致、连接泄漏、重试策略不统一；绕过工厂的请求使 cassette 回放静默失效（测试实际联网而无人察觉） | 所有发起 HTTP 请求的模块（providers/、llm/） |
 | **C6** | **Provider Chain 必经** — 大多数数据获取必须通过 `fetch_with_fallback()` 走 Chain 路由，不得直接调用 Provider 函数 | 跳过 Chain 直接调用 Provider 会导致熔断器不被激活（故障后无冷却恢复）、fallback 链路断路（某 Provider 失败时不会自动递补）、日志审计缺失 | 熔断器失效、fallback 断路、故障记录缺失 | fetcher/ 各模块（例外：index.py 直调 Provider 的双链路 fallback 硬编码，熔断器不适用于指数场景） |
 
 ### 8.2 缓存层约束

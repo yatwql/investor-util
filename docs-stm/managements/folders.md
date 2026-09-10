@@ -67,6 +67,7 @@ investor-util/
 │   │   │   ├── batch.py              #   批量并行调度（BatchDispatcher + RateLimiter）
 │   │   │   ├── chain.py              #   Provider Chain 获取链路（主→备→过期缓存）
 │   │   │   ├── fund.py               #   基金数据获取（净值/业绩排名/持仓）
+│   │   │   ├── cassette_checks.py    #   已录制响应 → 当前解析器的绑定表（录制自检与 cassettes --verify 共用）
 │   │   │   ├── fund_manager.py       #   基金经理数据获取
 │   │   │   ├── history_diff.py       #   历史数据差分同步
 │   │   │   ├── index.py              #   指数行情获取（A股/美股，直连 API 不走 Chain）
@@ -264,6 +265,7 @@ investor-util/
 │   │   │   ├── _phase_timeout.py     #   数据获取阶段超时管理
 │   │   │   ├── _session_cache.py     #   会话缓存管理
 │   │   │   ├── ansi_colors.py        #   ANSI 颜色常量（终端输出着色）
+│   │   │   ├── cassette.py           #   数据源记录-回放引擎（真实响应体离线录制/回放，经传输工厂注入，不联网）
 │   │   │   ├── check_sources.py      #   数据源健康检查命令处理器（CLI/报告共享）
 │   │   │   ├── circuit_breaker.py    #   统一断路器网关（Provider + LLM 熔断状态查询）
 │   │   │   ├── code_utils.py         #   证券代码/类型判定工具
@@ -346,6 +348,13 @@ investor-util/
 │       ├── conftest.py               #   pytest 全局配置 + 标记注册
 │       ├── helpers.py                #   测试辅助工具
 │       ├── data/                     #   测试数据集
+│       │   ├── cassettes/            #   数据源真实响应录制（git 跟踪，离线回放；刷新需 --run-live --record-cassettes）
+│       │   │   ├── tencent_quote.json          #   腾讯行情（个股实时价）
+│       │   │   ├── sina_quote.json             #   新浪行情（备用实时价）
+│       │   │   ├── tencent_kline.json          #   腾讯 K 线（日线）
+│       │   │   ├── fund_nav.json               #   东方财富场外基金净值
+│       │   │   ├── fund_holdings.json          #   天天基金持仓明细
+│       │   │   └── fund_quarterly_holdings.json #  天天基金季度持仓
 │       │   └── hallucination/        #   幻觉测试数据集
 │       │       ├── __init__.py       #       子包标记
 │       │       └── datasets.py       #       幻觉评估标准持仓数据
@@ -425,6 +434,8 @@ investor-util/
 │       │   │   ├── test_decision_ledger.py  #   决策账本核心测试（事件持久化/结算折叠/同日去重/教训区块）
 │       │   │   ├── test_decision_ledger_edge.py # 决策账本边缘场景（空账本/损坏行/阈值边界）
 │       │   │   ├── test_doctor.py           #   系统自检测试（五组检查/永不抛异常契约/只读探测不留残留/统计与渲染）
+│       │   │   ├── test_cassette.py         #   数据源记录-回放引擎测试（请求键归一/存取/回放未命中/录制会话/校验）
+│       │   │   ├── test_cassette_edge.py    #   记录-回放边缘场景（畸形 URL/版本号类型/结构破坏/重复键/空交互）
 │       │   │   ├── test_http_client.py      #   HTTP 客户端测试
 │       │   │   ├── test_jsonl_store.py      #   JSONL 原子追加/容错读取原语测试（含 perf/decision_ledger 委托行为不变）
 │       │   │   ├── test_num_utils.py        #   数值归一原语（合法输入口径/bool 拒绝/int 原样返回/非有限值归零）
@@ -521,6 +532,7 @@ investor-util/
 │       │   ├── providers/           #   数据源提供商单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_akshare_extras.py     #   akshare 封装测试
+│       │   │   ├── test_cassette_replay.py    #   已录制真实响应体的解析回归（精确值断言，离线回放）
 │       │   │   ├── test_eastmoney.py          #   东方财富 API 测试
 │       │   │   ├── test_eastmoney_industry.py #   东方财富行业分类测试
 │       │   │   ├── test_eastmoney_industry_rest.py #   东方财富行业 REST 接口测试
@@ -667,7 +679,8 @@ investor-util/
 │       │   ├── test_live_quotes.py   #   真实行情连通性（A股/ETF/场外基金/中美指数）
 │       │   ├── test_live_news.py     #   真实新闻源连通性（东方财富/财联社/新浪/华尔街见闻）
 │       │   ├── test_live_fund.py     #   真实基金数据源（历史净值/排名/基准）
-│       │   └── test_live_calendar.py #   真实 akshare 交易日历
+│       │   ├── test_live_calendar.py #   真实 akshare 交易日历
+│       │   └── test_live_cassette_record.py # 录制真实响应进 cassette（--run-live --record-cassettes 双开关，录完即回放自检）
 │       └── scenario/                 #   场景测试（basic/datetime/llm/perf/resilience/security 六子组）
 │       │   ├── __init__.py           #   子包标记
 │       │   ├── basic/               #   基本面场景测试
