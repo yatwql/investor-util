@@ -16,7 +16,7 @@
   - **合入门禁（P1）**：合并到 master 前必须通过 `.venv/bin/python scripts/test-runner.py --mode verify`（核心模块单元测试），否则不得 merge
   - **发布门禁（P2）**：发布版本前必须通过 `.venv/bin/python scripts/test-runner.py --mode verify,regression`（单元+场景验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 release
   > P1/P2 的完整要求（含手动验证项）见 `testplan.md` → §4 回归测试清单 / §6.3 门禁
-- **CI 辅助检查**：`.venv/bin/ruff format --check`（代码格式一致性），非阻塞门禁——格式问题可通过 `.venv/bin/ruff format` 自动修复，不阻止合并/发布
+- **CI 辅助检查**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性），非阻塞门禁——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码须在提交前保持干净
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退。新增功能时，**必须**同步编写测试用例覆盖。测试用例应直接验证缺陷场景的具体断言，而非仅测正常路径。
 - **测试标记强制**：所有新增/修改的测试用例（测试类或测试方法）**必须**标注对应的 pytest marker（如 `@pytest.mark.unit_providers`、`@pytest.mark.scenario_basic` 等），marker 定义见 `src/test/conftest.py` 的 `pytest_configure`。新增 marker 需同步注册到 `conftest.py` 和维护文档。
 - **边缘测试文件隔离**：edge 场景测试（`@pytest.mark.edge`）**必须**放置在 `*_edge.py` 文件中，不得与普通测试混搭在同一文件。`conftest.py` 的 `pytest_collection_modifyitems` 会在收集期自动校验此约束。

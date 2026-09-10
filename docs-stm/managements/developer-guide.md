@@ -51,7 +51,7 @@
 .venv/bin/python scripts/check-semantic-index.py --ci
 ```
 
-**辅助（非阻塞）**：`.venv/bin/ruff format --check`（代码格式一致性）——格式问题可通过 `.venv/bin/ruff format` 自动修复，不阻止合并/发布。
+**辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
 
 > P1/P2 的完整要求（含手动验证项）见 [testplan.md](testplan.md) → 回归测试清单 / 门禁章节。
 

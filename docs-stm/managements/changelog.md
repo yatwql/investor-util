@@ -6,6 +6,16 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### ruff lint 基线收敛（全仓零告警）（2026-09-11）
+
+- **基线声明**（`pyproject.toml`）：`[tool.ruff.lint]` 显式声明 `select`（等价 ruff 默认集），不再依赖会随版本升级静默漂移的隐式默认；`extend-exclude` 增加 `docs-stm`——归档目录内的历史脚本副本自此冻结，不参与 lint / format；新增 `per-file-ignores` 记录两类**刻意豁免**（各附就地说明）：可执行入口先注入项目根到 `sys.path` 再导入项目模块、子模块 re-export 块置于模块级代码之后，二者重排都会破坏原有加载顺序（E402）；函数内延迟导入 + 引号注解规避循环依赖造成的未定义名静态误报（F821）。
+- **E402 走「改代码」而非「加豁免」**：28 个测试文件把 `pytestmark` 放在第三方导入与项目导入之间触发 E402。`pytestmark` 是模块级变量、pytest 在模块导入完成后读取，位置不影响语义，故统一移至全部导入之后——测试树因此保留 E402 全量保护，无需按目录豁免；仅 5 个入口/脚本文件按上述刻意豁免登记。
+- **自动修复**（`ruff check --fix`）：216 项——未使用导入、无占位符 f-string、单行多导入、重复定义。未使用局部变量逐项核对后清理：`test-runner` 的 `elapsed` / `timed_out` 与 `test_market_hours` 的 `actual_weekday` 属彻底死码，连同其数据来源一并移除，不留无副作用空表达式。
+- **手工收敛**：歧义变量名 `l`（E741 ×3）、`lambda` 赋值改 `def`（E731 ×2，保留默认参数绑定语义）、单行多语句（E701）、`type()` 比较改 `is`（E721）；`calibrate-dedup-threshold.py` 中 f-string 内的正则转义序列（反斜杠 d）改 raw f-string，消除 `SyntaxWarning`，输出不变。
+- **格式化**（`ruff format`）：176 个文件；归档目录 `docs-stm/` 保持冻结，不随本次改动。
+- **顺带发现的测试完整性缺陷**（`review-findings.md` rf-337）：`test_market_value` 的 `TestIsQdii` 内两条用例同名 `test_empty_string`，后者覆盖前者，致其中一条**从未执行**——重命名后用例恢复执行，全量计数 6650 → **6651**；`test_config_atomic` 的 `_config_cache = None` 只是本地重绑定、未清模块级缓存，改用 `_clear_config_cache()`；`_report_generation` 重复导入的 `build_action_data` 与 `test_generate_all_llm` 无使用的模块级 generators 导入块按死码移除。
+- **数据文档同步**：`test-coverage.md`（unit 6339 / standard 5420 / report 1753 / all 6651，其余不变）、`folders.md` 项目统计表按 ruff format 后的行数口径刷新（主程序 66,195 / 脚本 7,165 / 测试代码 102,162 / 源代码合计 77,501；项目文档 49,993 / managements 10,396；测试用例 6,651）。
+
 ### 测试覆盖统计刷新 + 中间计划文档归档（2026-09-11）
 
 - **测试覆盖统计刷新**（`test-coverage.md`）：模式覆盖项数与开发机实测耗时经 `--mode bench --update-docs` 回填（unit 6338 / standard 5419 / dev-verify 2494 / verify 4320 / edge 852 / report 1752 / all 6650），功能域、单元分组、跨类三张子表按 `collect-test-coverage.py` 实时结果手更（单元组合计 6338、跨类 `llm` 753、`edge` 852），并补本轮新增的覆盖语义——提示词承载段与辩论综合键进指纹、文件写入原子原语、Provider 凭据分离校验、估值字段网关、管线数据契约键台账校验。上一节的「留待发布刷新」项至此完成。

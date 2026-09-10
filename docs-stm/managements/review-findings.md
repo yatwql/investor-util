@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.18-dev
-> **编号源**：`rf-next = 337`（新增问题取此编号，完成后更新为 +1；已用最大 rf-336，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 338`（新增问题取此编号，完成后更新为 +1；已用最大 rf-337，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -38,17 +38,13 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
-### P3 — 工具链 lint 基线（2026-09-10 全局架构自审期发现）
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-336** | **全仓 ruff lint 基线 324 项 + 170 个文件待格式化**（`ruff check` / `ruff format --check` 现状）。逐类核对结论：**无一项是架构约束违规或运行期缺陷**——`F821` 8 项全部是「函数内延迟导入 + 引号注解」的静态误报（如 `_report_generation.py` 的 `"ReportResult"`，导入语句在函数体内以避免循环依赖）；`E402` 58 项集中于 `# noqa: F401` 的 re-export 块与刻意的延迟导入；`F401` 140 / `F541` 77 / `F841` 22 / `F811` 10（测试内重复 import）等为纯风格项。另 `scripts/calibrate-dedup-threshold.py:280` 的 f-string 内含 `\d` 产生 `SyntaxWarning`（输出正确，仅告警） | 低优先级、可批量处理：`ruff check --fix`（227 项可自动修）与 `ruff format` 收敛基线后，在 CI 中显式声明 lint 选择项。**注意**：`E402` 需逐处判断是否为刻意的延迟导入/re-export（重排会破坏循环依赖规避），不可整体 `--fix`。按项目约定 ruff 为非阻塞门禁，不阻止合并/发布 |
-
 ## 已解决问题
 
 ### 已解决待归档（v0.10.18-dev）
 
 > 全局架构约束逐条自检（C 表 24 项）发现并修复的违规项，详情见 `changelog.md` [0.10.18-dev] 对应条目。约束语义见 `technical.md` §架构设计约束。
+>
+> 末两条为同轮 lint 基线收敛过程中发现（rf-336 工具链基线、rf-337 测试完整性），非架构约束违规。
 
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
@@ -66,6 +62,8 @@
 | **rf-333** | 匿名化与图表数据构建各自维护「代码前缀是否合法」判定表，代码前缀知识散落 | 判定回归 `core/code_utils.py` 中心化函数 |
 | **rf-334** | 汇率敞口按代码逐个发起 push2 请求，同一代码在多账户重复请求 | 会话复用 + 按代码去重，单次会话内只取一次 |
 | **rf-335** | 汇率敞口「其他币种」汇总行引用未定义名，非主要币种敞口存在时崩溃 | 修正该行取值来源，补回归测试 |
+| **rf-336** | 全仓 ruff lint 基线 324 项告警 + 176 个文件待格式化，且 `select` 未显式声明——默认规则集随 ruff 版本升级静默漂移，无感知 | 收敛至零告警：`ruff check --fix` 自动修复 216 项，手工收敛歧义变量名 / `lambda` 赋值 / 单行多语句 / `type()` 比较 / `\d` 转义告警；`ruff format` 176 个文件。`pyproject.toml` 显式声明 `select`、`extend-exclude`（归档目录冻结）与 `per-file-ignores`（E402 入口 `sys.path` 注入 + 子模块 re-export 块；F821 延迟导入 + 引号注解误报） |
+| **rf-337** | lint 基线中有两项实为**缺陷而非风格**：`test_market_value` 的 `TestIsQdii` 内两条用例同名 `test_empty_string`（`is_qdii_by_name("")` 与 `is_etf_by_name("")`），后者覆盖前者致前一条**从未执行**；`test_config_atomic` 的 `_config_cache = None` 只是本地重绑定、未清模块级缓存，与注释意图不符 | 后者重命名为 `test_etf_empty_string`（用例恢复执行，全量计数 +1）；`_config_cache = None` 改用 `_clear_config_cache()`；`_report_generation`（重复导入 `build_action_data`）与 `test_generate_all_llm`（模块级 generators 导入块全无使用）按死码移除 |
 
 ### 已解决待归档（v0.10.17-dev）
 
