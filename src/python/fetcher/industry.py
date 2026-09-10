@@ -11,11 +11,12 @@ import logging
 import re
 from typing import Any
 
+from src.python.cache import clear as cache_clear
+from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.core.code_utils import is_a_share_code
 from src.python.fetcher.chain import FailureDiagnostics, fetch_with_fallback, is_provider_chain_broken
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
-from src.python.providers.eastmoney_industry import make_push2_request as _make_push2_request
 
 logger = logging.getLogger("invest")
 
@@ -55,7 +56,12 @@ def strip_hierarchy_suffix(name: str) -> str:
 
 
 def _industry_transform(raw: dict, _source: str) -> dict | None:
-    """东方财富行业原始数据 → 统一行业格式（行业名剥离申万层级后缀）。"""
+    """东方财富行业原始数据 → 统一行业格式（行业名剥离申万层级后缀）。
+
+    同时**透传**同一次 push2 响应已带出的扩展行情字段（pe/pb/market_cap）。
+    这些字段与行业分类来自同一个请求（见 ``_FIELDS``），在此丢弃会让消费方
+    只能再发一次同参数请求——即会话缓存要消除的重复取数。
+    """
     if not raw:
         return None
     return {
@@ -64,20 +70,43 @@ def _industry_transform(raw: dict, _source: str) -> dict | None:
         "industry_id": raw.get("industry_id", ""),
         "concepts": raw.get("concepts", []),
         "concept_ids": raw.get("concept_ids", []),
+        "pe": raw.get("pe"),
+        "pb": raw.get("pb"),
+        "market_cap": raw.get("market_cap"),
     }
+
+
+def _drop_legacy_cached_payload(cache_key: str) -> None:
+    """清除不含扩展行情字段的旧版行业缓存载荷（缓存载荷 schema 迁移）。
+
+    本版起 ``_industry_transform`` 透传同一次 push2 响应带出的 pe/pb/market_cap，
+    而**旧版载荷不含这三个键**。行业缓存 TTL 为两周，``fetch_with_fallback`` 的
+    第一步就是「命中即返回」——不处理的话，旧载荷会在存活期内被当作有效命中，
+    使估值分位与基金风格的 PE 取用静默退化为「不可得」（无异常、无告警）。
+
+    判据取「键是否存在」而非值是否为 None：新载荷无论 provider 是否给出该字段都
+    会带上键（值为 None 表示该源不提供，属正常），只有旧载荷缺键。
+
+    清除后本次调用即自然回落到 provider 重取，此后写入的即是新载荷——每个代码至
+    多迁移一次。待旧载荷全部过期（≤ 两周）后本函数成为纯字典判定的无害空转。
+    """
+    cached = cache_get(cache_key, get_ttl("industry", cache_key))
+    if isinstance(cached, dict) and "pe" not in cached:
+        logger.info("[industry] 清除旧版缓存载荷（不含扩展行情字段），将重新获取: %s", cache_key)
+        cache_clear(cache_key)
 
 
 def fetch_industry_data(code: str) -> dict | None:
     """获取一只证券的行业分类和概念板块归属。
 
     缓存键: industry_{code}.json
-    缓存 TTL: 7 天（可通过 cache_ttl.industry 配置）
+    缓存 TTL: 两周（可通过 cache_ttl.industry 配置）
 
     Args:
         code: 6 位证券代码
 
     Returns:
-        {code, industry, industry_id, concepts, concept_ids}
+        {code, industry, industry_id, concepts, concept_ids, pe, pb, market_cap}
         失败返回 None
     """
     from src.python.report.data_status import get_tracker
@@ -85,6 +114,7 @@ def fetch_industry_data(code: str) -> dict | None:
     _t = get_tracker()
     _src_key = f"industry_{code.strip()}"
     industry_cache_key = _INDUSTRY_CACHE_PREFIX + code.strip()
+    _drop_legacy_cached_payload(industry_cache_key)
     diag = FailureDiagnostics()
     result = fetch_with_fallback(
         "industry",
@@ -121,6 +151,25 @@ def fetch_industry_data_cached(code: str) -> dict | None:
     return result
 
 
+def fetch_valuation_fields(code: str) -> dict[str, float | None] | None:
+    """获取一只证券的当前 PE/PB（经 Provider Chain + 文件/会话缓存）。
+
+    PE 与市净率是东财 push2 响应中的扩展字段（f9/f23），与行业分类同属一次
+    请求——故经行业数据入口取用，而不是绕开 Provider Chain 直连 provider。
+    好处：享受链路熔断/降级/诊断与 7 天文件缓存，同一代码同会话不重复取数。
+
+    Args:
+        code: 6 位 A 股代码
+
+    Returns:
+        {"pe": float|None, "pb": float|None}；数据不可得返回 None。
+    """
+    data = fetch_industry_data_cached(code)
+    if data is None:
+        return None
+    return {"pe": data.get("pe"), "pb": data.get("pb")}
+
+
 def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
     """批量获取多只证券的行业分类和概念板块归属。
 
@@ -154,7 +203,6 @@ def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
 
     from functools import partial
 
-    from src.python.cache import get as cache_get
     from src.python.fetcher.batch import BatchDispatcher, get_batch_worker_count
 
     dispatcher = BatchDispatcher(
@@ -171,9 +219,14 @@ def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
         for code in a_codes
     ]
 
+    def _cache_check(cache_id: str) -> Any:
+        """缓存命中判据：先剔除旧版载荷，再按 TTL 读取（见 _drop_legacy_cached_payload）。"""
+        _drop_legacy_cached_payload(cache_id)
+        return cache_get(cache_id, get_ttl("industry", cache_id))
+
     results = dispatcher.execute_with_cache_check(
         items,
-        cache_check_fn=lambda cache_id: cache_get(cache_id, get_ttl("industry", cache_id)),
+        cache_check_fn=_cache_check,
         strict_none=True,
     )
 
@@ -197,16 +250,3 @@ def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
     return result_map
 
 
-def make_push2_request(code: str, retries: int = 3) -> dict | None:
-    """执行东方财富 push2 API 请求，返回扩展行情数据。
-
-    委托给 ``providers.eastmoney_industry.make_push2_request``。
-
-    Args:
-        code: 6 位 A 股代码
-        retries: 重试次数
-
-    Returns:
-        {"f20": market_cap, "f9": pe, "f23": pb, ...} 或 None
-    """
-    return _make_push2_request(code, retries=retries)

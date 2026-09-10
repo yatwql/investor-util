@@ -7,8 +7,9 @@
 - 价格分位 ≠ 真实历史估值分位（盈利增长未纳入），作为"贵不贵"近似信号，
   渲染层必须显式标注 ``DISCLAIMER``（"价格分位代理，非真实历史估值分位"）。
 - 样本不足（< MIN_SAMPLES）或空序列 → available=False（绝不硬算，
-  §1.4.5 数据降级治理）。PE/PB 当前值由编排层从东财 push2 扩展字段获取
-  （复用 ``providers/eastmoney_industry.make_push2_request`` 通道），本模块不联网。
+  §1.4.5 数据降级治理）。PE/PB 当前值由编排层经网关
+  ``fetcher/industry.py::fetch_valuation_fields``（Provider Chain + 缓存）取用，
+  本模块不联网。
 """
 
 from __future__ import annotations

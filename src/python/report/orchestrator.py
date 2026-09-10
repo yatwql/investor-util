@@ -311,8 +311,10 @@ def _fetch_valuation_for_code(
         单代码估值子契约 dict；PE/PB 与价格分位皆不可得返回 None。
     """
     from src.python.analysis.valuation_percentile import compute_price_percentile
-    from src.python.providers.eastmoney_industry import fetch_valuation_fields
+    from src.python.fetcher.industry import fetch_valuation_fields
 
+    # 经 fetcher 网关取数（Provider Chain 必经）：享受链路熔断/降级/诊断与缓存，
+    # 且 PE/PB 与行业分类同属一次 push2 响应，不再直连 provider 模块。
     pe_pb = fetch_valuation_fields(code)
     bars = _fetch_holding_bars(code, name, days) or []
     pct = compute_price_percentile(bars)

@@ -6,6 +6,19 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 估值取数回归 Provider Chain 与会话复用（C4 + C6，自审 rf-324 / rf-325 / rf-334）（2026-09-10）
+
+- **缺陷（自审 rf-324，C6）**：`report/fund_style_classify.py::_push2_extended` 直接 import `fetcher.industry.make_push2_request` 发起 push2 请求——该入口是 provider 函数的**薄透传**，不经 Provider Chain，因而没有备用源递补（`eastmoney_industry_rest`）、不经 `industry_` 文件缓存、不登记 `FailureDiagnostics` 数据源状态（provider 模块内部的熔断计数仍在，故问题被掩盖得更深），也不参与会话复用；provider 侧失败时报告层只看到一条「扩展数据获取失败」告警，数据源可用性矩阵里毫无痕迹。同批发现 `fetcher/industry.py::make_push2_request` 在本轮修复后**已无任何生产调用方**，作为「绕开 Chain 的现成入口」继续留在网关层，正是同类违规的温床——一并删除。
+- **缺陷（自审 rf-325，C6）**：`report/orchestrator.py::_fetch_valuation_for_code` 直接 `from src.python.providers.eastmoney_industry import fetch_valuation_fields`，**报告层直连 provider 模块**，同样绕开 Chain 与文件缓存，且与 C6「Provider Chain 必经」直接冲突。
+- **缺陷（自审 rf-334，C4）**：`_get_industry_avg_pe` 对每个代码**发两次同参数 push2 请求**——先 `fetch_industry_data` 取行业归属，再 `_push2_extended` 取 PE；而 PE（f9）本就是同一次 push2 响应里的字段（provider `_FIELDS` 已含 f9/f20/f23），第一次请求的响应里就有。C4（会话级 API 复用）要求同一会话同一 API 只取一次，此处是纯浪费（每只持仓多一次请求，直接放大限频风险）。
+- **改动**：
+  - `providers/eastmoney_industry.py::fetch_industry_and_concepts` 的返回值补 `market_cap`（f20，与既有 pe/pb 同源同请求），`fetch_valuation_fields` 从 provider 移除（避免 provider 层再提供一个「非 Chain」取值口）。
+  - `fetcher/industry.py::_industry_transform` **透传** pe/pb/market_cap（原实现在网关转换层丢弃这三个字段，迫使消费方另想办法取数）；新增 `fetch_valuation_fields(code)` 作为 PE/PB 的**网关入口**（经 `fetch_industry_data_cached` → Chain + 文件/会话缓存），`_push2_extended` 与 `_get_industry_avg_pe` 改从行业结果直接取 PE，`report/orchestrator.py` 改 import 网关入口；`fetcher/industry.py::make_push2_request` 删除。
+  - **旧缓存载荷迁移**：行业缓存 TTL 为两周，而旧载荷不含扩展行情字段，`fetch_with_fallback` 命中即返回——不处理的话旧载荷会在存活期内被当作有效命中，PE 取用静默退化为「不可得」（无异常、无告警）。新增 `_drop_legacy_cached_payload`：判据取「键是否存在」（新载荷无论 provider 是否给出都会带键，值为 None 表该源不提供），缺键即清除并回落重取；单代码至多迁移一次，旧载荷全部过期后成为无害空转。
+  - `analysis/valuation_percentile.py` 模块 docstring 的取数路径同步为网关入口（原文写「复用 providers…make_push2_request 通道」，已失真）。
+- **行为变更**：`_push2_extended` 的取数来源由「独立 push2 请求」变为「行业数据结果」，其 `extended_{code}` 全天缓存与腾讯侧降级链（`_tencent_extended`）保持不变；PE/PB 现在享受 Chain 的熔断/降级/诊断与 7 天行业文件缓存，同一代码同一轮**只请求一次**。
+- **测试**：`test_fund_style.py` 各用例改自行业结果提供 PE，`test_single_fetch_per_code` 替换原「session_cache 填充」用例——以「每个代码恰好调用一次行业入口、未二次请求」锁定 C4 回归（旧实现下即两次取数）；`test_fetcher_industry.py` 新增 `TestFetchValuationFields`（网关入口契约：投影/不可得/字段缺失/经入口取数）与 `TestLegacyIndustryCacheMigration`（旧载荷清除、新载荷不误删、转换层透传字段）；`test_eastmoney_industry.py` 原 `TestFetchValuationFields` 改为 `TestIndustryExtendedFields`（锁定一次请求带出 pe/pb/market_cap）。
+
 ### 原子写入收敛到唯一原语（C3，自审 rf-322）（2026-09-10）
 
 - **缺陷（自审 rf-322）**：全局架构审计发现 C3（缓存原子写入）在实现层**逐字重复了 4 份 mkstemp + os.replace 拷贝**（`core/jsonl_store.py`、`core/provider_registry.py`、`report/history_snapshot.py`、`config/features.py`），另有 **5 处写入完全无原子性**（违反 C3 字面要求）：

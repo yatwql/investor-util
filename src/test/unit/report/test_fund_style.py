@@ -29,12 +29,11 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from src.python.report.fund_style_base import (
-    _estimate_style_by_code,
     _get_size_from_code,
     _market_cap_to_size,
     _pe_to_style,
@@ -203,14 +202,12 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         get_registry().session_cache_clear("extended")
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
-    @patch("src.python.report.fund_style_classify._push2_extended")
-    def test_same_industry_median(self, mock_push2, mock_fetch_ind):
-        """同行业多只 → 中位数作为行业平均 PE"""
-        mock_fetch_ind.side_effect = lambda c: {"600519": {"industry": "白酒"}, "000858": {"industry": "白酒"}, "000568": {"industry": "白酒"}}.get(c)
-        mock_push2.side_effect = lambda c: {
-            "600519": {"market_cap": 2e12, "pe": 25.0},
-            "000858": {"market_cap": 5e11, "pe": 15.0},
-            "000568": {"market_cap": 3e11, "pe": 35.0},
+    def test_same_industry_median(self, mock_fetch_ind):
+        """同行业多只 → 中位数作为行业平均 PE（行业与 PE 同源于一次请求）"""
+        mock_fetch_ind.side_effect = lambda c: {
+            "600519": {"industry": "白酒", "pe": 25.0},
+            "000858": {"industry": "白酒", "pe": 15.0},
+            "000568": {"industry": "白酒", "pe": 35.0},
         }.get(c)
 
         result = _get_industry_avg_pe(["600519", "000858", "000568"])
@@ -220,14 +217,12 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         self.assertAlmostEqual(result.get("000568", 0), 25.0, places=4)
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
-    @patch("src.python.report.fund_style_classify._push2_extended")
-    def test_different_industries(self, mock_push2, mock_fetch_ind):
+    def test_different_industries(self, mock_fetch_ind):
         """不同行业 → 各自独立计算"""
-        mock_fetch_ind.side_effect = lambda c: {"600519": {"industry": "白酒"}, "300750": {"industry": "电池"}, "002594": {"industry": "电池"}}.get(c)
-        mock_push2.side_effect = lambda c: {
-            "600519": {"market_cap": 2e12, "pe": 25.0},
-            "300750": {"market_cap": 8e11, "pe": 40.0},
-            "002594": {"market_cap": 7e11, "pe": 20.0},
+        mock_fetch_ind.side_effect = lambda c: {
+            "600519": {"industry": "白酒", "pe": 25.0},
+            "300750": {"industry": "电池", "pe": 40.0},
+            "002594": {"industry": "电池", "pe": 20.0},
         }.get(c)
 
         result = _get_industry_avg_pe(["600519", "300750", "002594"])
@@ -236,29 +231,23 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         self.assertAlmostEqual(result.get("002594", 0), 30.0, places=4)
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
-    @patch("src.python.report.fund_style_classify._push2_extended")
-    def test_all_fail(self, mock_push2, mock_fetch_ind):
+    def test_all_fail(self, mock_fetch_ind):
         """全部失败 → 空字典"""
         mock_fetch_ind.return_value = None
-        mock_push2.return_value = None
 
         result = _get_industry_avg_pe(["600519", "000858"])
         self.assertEqual(result, {})
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
-    @patch("src.python.report.fund_style_classify._push2_extended")
-    def test_partial_failure(self, mock_push2, mock_fetch_ind):
+    def test_partial_failure(self, mock_fetch_ind):
         """部分失败 → 有数据的正常计算"""
-        def _industry_side(code):
-            return {"industry": "白酒"} if code == "600519" else {"industry": "电池"} if code == "300750" else None
-        mock_fetch_ind.side_effect = _industry_side
-        mock_push2.side_effect = lambda c: {
-            "600519": {"market_cap": 2e12, "pe": 25.0},
-            "300750": {"market_cap": 8e11, "pe": 30.0},
+        mock_fetch_ind.side_effect = lambda c: {
+            "600519": {"industry": "白酒", "pe": 25.0},
+            "300750": {"industry": "电池", "pe": 30.0},
         }.get(c)
 
         result = _get_industry_avg_pe(["600519", "000858", "300750"])
-        # 600519 → 白酒 PE=25; 000858 无行业→跳过; 300750 → 电池 PE=30
+        # 600519 → 白酒 PE=25; 000858 无数据→跳过; 300750 → 电池 PE=30
         self.assertIn("600519", result)
         self.assertNotIn("000858", result)
         self.assertIn("300750", result)
@@ -276,54 +265,49 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         self.assertEqual(result, {})
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
-    @patch("src.python.report.fund_style_classify._push2_extended")
-    def test_even_count_median(self, mock_push2, mock_fetch_ind):
+    def test_even_count_median(self, mock_fetch_ind):
         """偶数只股票 → 中位数取中间两数平均值"""
-        mock_fetch_ind.return_value = {"industry": "白酒"}
-        mock_push2.side_effect = lambda c: {
-            "600519": {"market_cap": 2e12, "pe": 20.0},
-            "000858": {"market_cap": 5e11, "pe": 30.0},
-            "000568": {"market_cap": 3e11, "pe": 10.0},
-            "600809": {"market_cap": 4e11, "pe": 40.0},
+        mock_fetch_ind.side_effect = lambda c: {
+            "600519": {"industry": "白酒", "pe": 20.0},
+            "000858": {"industry": "白酒", "pe": 30.0},
+            "000568": {"industry": "白酒", "pe": 10.0},
+            "600809": {"industry": "白酒", "pe": 40.0},
         }.get(c)
 
         result = _get_industry_avg_pe(["600519", "000858", "000568", "600809"])
         # 排序 PE: [10, 20, 30, 40] → 中位数 = (20+30)/2 = 25.0
         self.assertAlmostEqual(result.get("600519", 0), 25.0, places=4)
 
-    @patch("src.python.fetcher.industry.fetch_industry_data")
     @patch("src.python.report.fund_style_classify._push2_extended")
-    def test_session_cache_filled(self, mock_push2, mock_fetch_ind):
-        """验证 registry session_cache 被填充，主循环复用"""
-        mock_fetch_ind.side_effect = lambda c: {"600519": {"industry": "白酒"}, "000858": {"industry": "白酒"}}.get(c)
-        push2_data = {
-            "600519": {"market_cap": 2e12, "pe": 25.0},
-            "000858": {"market_cap": 5e11, "pe": 15.0},
-        }
+    @patch("src.python.fetcher.industry.fetch_industry_data")
+    def test_single_fetch_per_code(self, mock_fetch_ind, mock_push2):
+        """回归：行业归属与 PE 同源于一次请求，不得为取 PE 二次请求。
 
-        from src.python.core.provider_registry import get_registry
+        背景（C4 会话缓存复用）：该函数曾先 ``fetch_industry_data`` 取行业，
+        再 ``_push2_extended`` 发一次同样参数的 push2 请求取 PE——同一代码同一轮
+        两次取数。回归表现为再次出现第二次调用。
+        """
+        calls: list[str] = []
 
-        def _push2_with_memo(code):
-            val = push2_data.get(code)
-            if val is not None:
-                get_registry().session_cache_set("extended", code, val)
-            return val
+        def _fetch(code):
+            calls.append(code)
+            return {"industry": "白酒", "pe": 20.0}
 
-        mock_push2.side_effect = _push2_with_memo
+        mock_fetch_ind.side_effect = _fetch
 
-        _ = _get_industry_avg_pe(["600519", "000858"])
-        # _push2_extended 已填充 registry session_cache（通过 side_effect 模拟）
-        self.assertTrue(get_registry().session_cache_contains("extended", "600519"))
-        self.assertTrue(get_registry().session_cache_contains("extended", "000858"))
+        result = _get_industry_avg_pe(["600519", "000858"])
+
+        self.assertEqual(calls, ["600519", "000858"])  # 每个代码恰好取一次
+        mock_push2.assert_not_called()  # 未二次请求取 PE
+        self.assertAlmostEqual(result["600519"], 20.0, places=4)
+        self.assertAlmostEqual(result["000858"], 20.0, places=4)
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
-    @patch("src.python.report.fund_style_classify._push2_extended")
-    def test_negative_pe_skipped(self, mock_push2, mock_fetch_ind):
+    def test_negative_pe_skipped(self, mock_fetch_ind):
         """负 PE / 零 PE 不参与行业平均计算"""
-        mock_fetch_ind.side_effect = lambda c: {"600519": {"industry": "白酒"}, "000858": {"industry": "白酒"}}.get(c)
-        mock_push2.side_effect = lambda c: {
-            "600519": {"market_cap": 2e12, "pe": 25.0},
-            "000858": {"market_cap": 5e11, "pe": -5.0},  # 负 PE，应跳过
+        mock_fetch_ind.side_effect = lambda c: {
+            "600519": {"industry": "白酒", "pe": 25.0},
+            "000858": {"industry": "白酒", "pe": -5.0},  # 负 PE，应跳过
         }.get(c)
 
         result = _get_industry_avg_pe(["600519", "000858"])
@@ -394,7 +378,11 @@ class TestClassifyFundStyle(unittest.TestCase):
     def test_industry_avg_affects_style(self, mock_push2, mock_tencent, mock_fetch_ind):
         """行业平均 PE 影响风格判定 — 同一行业不同PE→价值/成长区分"""
         mock_tencent.return_value = None
-        mock_fetch_ind.return_value = {"industry": "白酒"}  # 全部同一行业
+        # 行业归属与 PE 同源于一次请求（全部同一行业）
+        mock_fetch_ind.side_effect = lambda c: {
+            "600519": {"industry": "白酒", "pe": 16.0},
+            "000858": {"industry": "白酒", "pe": 44.0},
+        }.get(c)
 
         def push2_side(code):
             data = {
@@ -518,18 +506,18 @@ class TestExtendedCacheSharing(unittest.TestCase):
         clear_by_prefix("extended_")
 
     @patch("src.python.fetcher.price.fetch_market_data")
-    @patch("src.python.fetcher.industry.make_push2_request")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     def test_push2_writes_tencent_reads(
-        self, mock_push2_api, mock_tencent_api,
+        self, mock_fetch_ind, mock_tencent_api,
     ):
-        """push2 写入缓存 → tencent 读取缓存（不调用 tencent API）"""
-        # push2 成功返回数据（f20=总市值, f9=PE），写入缓存
-        mock_push2_api.return_value = {"f20": 1e11, "f9": 25.0}
+        """push2 路径写入缓存 → tencent 读取缓存（不调用 tencent API）"""
+        # 行业请求同源带出扩展字段（pe/pb/market_cap），写入缓存
+        mock_fetch_ind.return_value = {"industry": "白酒", "pe": 25.0, "market_cap": 1e11}
         mock_tencent_api.return_value = None  # 不应被调用
 
         from src.python.report.fund_style_classify import _push2_extended, _tencent_extended
 
-        # 第一次调用：push2 API 被调用，写入缓存
+        # 第一次调用：经行业请求取数，写入缓存
         result1 = _push2_extended("600519")
         self.assertIsNotNone(result1)
         self.assertAlmostEqual(result1["market_cap"], 1e11)
@@ -544,12 +532,12 @@ class TestExtendedCacheSharing(unittest.TestCase):
         mock_tencent_api.assert_not_called()
 
     @patch("src.python.fetcher.price.fetch_market_data")
-    @patch("src.python.fetcher.industry.make_push2_request")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     def test_tencent_writes_push2_reads(
-        self, mock_push2_api, mock_tencent_api,
+        self, mock_fetch_ind, mock_tencent_api,
     ):
-        """tencent 写入缓存 → push2 读取缓存（不调用 push2 API）"""
-        mock_push2_api.return_value = None  # 不应被调用
+        """tencent 写入缓存 → push2 读取缓存（不调用行业请求）"""
+        mock_fetch_ind.return_value = None  # 不应被调用
         # Tencent 返回 market_cap 单位为亿，函数内部乘以 1e8 转为元
         mock_tencent_api.return_value = {"market_cap": 2000.0, "pe": 30.0}
 
@@ -560,21 +548,21 @@ class TestExtendedCacheSharing(unittest.TestCase):
         self.assertIsNotNone(result1)
         self.assertAlmostEqual(result1["market_cap"], 2e11)
 
-        # 第二次调用：push2 应命中同一缓存，不调用 push2 API
+        # 第二次调用：push2 应命中同一缓存，不取行业数据
         result2 = _push2_extended("600519")
         self.assertIsNotNone(result2)
         self.assertAlmostEqual(result2["market_cap"], 2e11)
-        mock_push2_api.assert_not_called()
+        mock_fetch_ind.assert_not_called()
 
     @patch("src.python.fetcher.price.fetch_market_data")
-    @patch("src.python.fetcher.industry.make_push2_request")
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     def test_different_code_no_cache_interference(
-        self, mock_push2_api, mock_tencent_api,
+        self, mock_fetch_ind, mock_tencent_api,
     ):
         """不同代码的缓存互不干扰。"""
-        mock_push2_api.side_effect = lambda c: {
-            "600519": {"f20": 1e11, "f9": 25.0},
-            "000858": {"f20": 5e10, "f9": 15.0},
+        mock_fetch_ind.side_effect = lambda c: {
+            "600519": {"industry": "白酒", "pe": 25.0, "market_cap": 1e11},
+            "000858": {"industry": "白酒", "pe": 15.0, "market_cap": 5e10},
         }.get(c)
 
         from src.python.report.fund_style_classify import _push2_extended
