@@ -18,8 +18,6 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
-
 from src.python import startup_wizard
 from src.python.config._llm_providers import (
     _get_llm_key_path,
@@ -36,6 +34,7 @@ from src.python.startup_wizard import (
     show_startup_wizard_if_needed,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 
 def _key_path() -> Path:
     """llm_key.json 路径（隔离环境指向 tmp_path）。"""

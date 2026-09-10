@@ -15,8 +15,6 @@ import json
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
-
 from src.python.analysis.rebalance import (
     _calc_category_weights,
     _categorize_holdings,
@@ -31,6 +29,7 @@ from src.python.analysis.rebalance import (
     resolve_rebalance_config,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
 
 # ═══════════════════════════════════════════════════════════════
 # resolve_rebalance_config — 配置解析边界

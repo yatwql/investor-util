@@ -804,7 +804,7 @@ class TestDefaultConfigTemplateConsistency:
                     f"cache_ttl 键集不一致: {parsed['cache_ttl'].keys() ^ cfg._DEFAULT_CONFIG['cache_ttl'].keys()}"
                 )
                 for k in parsed["cache_ttl"]:
-                    assert type(parsed["cache_ttl"][k]) == type(cfg._DEFAULT_CONFIG["cache_ttl"][k]), (
+                    assert type(parsed["cache_ttl"][k]) is type(cfg._DEFAULT_CONFIG["cache_ttl"][k]), (
                         f"cache_ttl.{k} 类型不匹配: {type(parsed['cache_ttl'][k])} vs {type(cfg._DEFAULT_CONFIG['cache_ttl'][k])}"
                     )
             if key in _PATH_KEYS_IN_TEMPLATE:

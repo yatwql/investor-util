@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
-
 from src.python.analysis.drawdown_warning import (
     compute_drawdown_warning,
     current_drawdown_percentile,
     rolling_max_drawdown,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 # ── rolling_max_drawdown 测试 ─────────────────────────────────
 

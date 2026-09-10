@@ -277,7 +277,7 @@ def _print_calibration_advice(
     print(f"  跨源方向对立（上涨vs下跌等）→ 不合并（cross_opposite）")
     print(f"  同源：bigram≥4 → 合并（模板词已掩码，不同公司同模板不误合并）")
     print(f"  清理模式：日期(年/月/日)、英文专名按长度分桶占位(_tk2_/_tk4_/_tk6_)、\"N级\"")
-    print(f"  _normalize_title 过滤模式：%、万亿、前N、\b(?:19|20)\d{{2}}\b、字母后缀年份；保留空格防英文粘连")
+    print(rf"  _normalize_title 过滤模式：%、万亿、前N、\b(?:19|20)\d{{2}}\b、字母后缀年份；保留空格防英文粘连")
     if not dry_run:
         print()
         print("[..] --dry-run 模式，未实际修改任何设置")

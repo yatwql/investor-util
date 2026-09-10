@@ -134,7 +134,9 @@ def _compute_section_visibility(
     visible_numbers = {sec["key"]: idx for idx, sec in enumerate(ordered_visible, start=1)}
 
     # 创建渲染期 section_visible 闭包（不写入 _ENV.globals）
-    _sv_fn = lambda key, _d=section_visible_dict: bool(_d.get(key, False))
+    def _sv_fn(key: str, _d: dict[str, bool] = section_visible_dict) -> bool:
+        return bool(_d.get(key, False))
+
     return visible_numbers, section_visible_dict, _sv_fn
 
 

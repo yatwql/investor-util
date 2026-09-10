@@ -13,14 +13,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
 from src.test.unit.report.test_html_report_structure import (
     _REPORT_SECTION_DEFAULT,
     _build_minimal_render_data,
     _render_template,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 def _bars_from_returns(returns: list[float], start: str = "2026-01-01", base: float = 100.0) -> list[dict]:
     """从日收益率序列（小数）生成 bars（v[i] = v[i-1] * (1 + r[i-1])）。"""

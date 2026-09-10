@@ -15,13 +15,12 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
-
 from src.python.analysis.drawdown_events import (
     compute_recovery_times,
     extract_drawdown_events,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
 
 def _bars(values: list[float], start: str = "2026-01-01") -> list[dict]:
     """从每日净值序列生成 bars（每日 +1 天）。"""

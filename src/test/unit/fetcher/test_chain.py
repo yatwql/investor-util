@@ -329,7 +329,7 @@ class TestFetchWithFallback(unittest.TestCase):
         fn1 = MagicMock(return_value={"data": "raw"})
         provider_map = {"p1": ("P1", fn1)}
 
-        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform={"p_other": lambda r, l: None})
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform={"p_other": lambda _r, _l: None})
 
         self.assertEqual(result, {"data": "raw"})
 

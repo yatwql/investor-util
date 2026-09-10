@@ -21,13 +21,13 @@ from unittest.mock import patch
 
 import pytest
 
-pytestmark = [pytest.mark.scenario_security]
-
 from src.python.config.anonymizer import (
     anonymize_holdings,
     anonymize_holdings_details,
 )
 from src.python.core.models import Holding
+
+pytestmark = [pytest.mark.scenario_security]
 
 logger = logging.getLogger("invest")
 

@@ -6,8 +6,6 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_cli, pytest.mark.edge]
-
 import os
 from unittest.mock import MagicMock, patch
 
@@ -19,6 +17,7 @@ from src.python.cli import (
     _cli_read_holdings,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_cli, pytest.mark.edge]
 
 class TestCliEdge:
     """CLI 边缘场景测试。"""

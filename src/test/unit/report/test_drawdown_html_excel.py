@@ -23,14 +23,13 @@ import unittest
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
 from src.test.unit.report.test_html_report_structure import (
     _REPORT_SECTION_DEFAULT,
     _build_minimal_render_data,
     _render_template,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 def _render_drawdown(history_data, crisis_annotation=None) -> "BeautifulSoup":
     """渲染 portfolio_history_drawdown 可见、其余隐藏的模板。"""

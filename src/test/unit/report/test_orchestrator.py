@@ -9,8 +9,6 @@ import os
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
 from unittest.mock import MagicMock, patch
 
 from src.python.report._llm_news import _fetch_llm_and_news, _report_llm_module_results
@@ -22,6 +20,7 @@ from src.python.report.orchestrator import (
     prepare_report_data,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 def _real_reports_dir() -> str:
     """项目真实 reports 目录（与 conftest 防线基准一致）。"""

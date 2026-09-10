@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
-
 from src.python.analysis.alignment_correction import (
     cash_stripping,
     compute_alignment_factors,
     twr_calculation,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 # ── cash_stripping 测试 ────────────────────────────────────────
 

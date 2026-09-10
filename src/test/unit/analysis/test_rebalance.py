@@ -13,8 +13,6 @@ import json
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
-
 from src.python.analysis.rebalance import (
     _categorize_holdings,
     _calc_category_weights,
@@ -33,6 +31,7 @@ from src.python.analysis.rebalance import (
 
 from src.python.analysis.simple_rebalance import compute_simple_rebalance_signals
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 # ── 极简再平衡信号（配置化阈值 + 静默期） ─────────────────────
 

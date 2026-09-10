@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
-
 from src.python.config.features import (
     EXPERIMENT_ALL,
     EXPERIMENTAL_FEATURES,
@@ -18,6 +16,7 @@ from src.python.config.features import (
     resolve_experiment_flags,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 
 @pytest.mark.unit
 class TestResolveExperimentFlags:

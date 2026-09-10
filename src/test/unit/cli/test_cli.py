@@ -10,8 +10,6 @@ import sys
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_cli]
-
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from src.python.cli import (
@@ -35,6 +33,7 @@ from src.python.core.constants import PROJECT_ROOT
 from src.python.core.log_reader import LogEntry
 from src.python.report.whatif_operations import WhatifRunResult
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_cli]
 
 # ═══════════════════════════════════════════════════════════════
 # argparse 参数解析

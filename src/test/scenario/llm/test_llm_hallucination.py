@@ -19,13 +19,13 @@ import logging
 
 import pytest
 
-pytestmark = [pytest.mark.llm, pytest.mark.scenario_llm, pytest.mark.scenario]
-
 from src.python.llm.fact_checker import (
     check_numerical_consistency,
     check_ranking_correctness,
     check_symbol_existence,
 )
+
+pytestmark = [pytest.mark.llm, pytest.mark.scenario_llm, pytest.mark.scenario]
 
 logger = logging.getLogger("invest")
 

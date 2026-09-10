@@ -45,7 +45,8 @@ class TestEncryptedExcel(unittest.TestCase):
         from src.python.core.reader import list_xlsx_files
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "macro.xlsm")
-            with open(fpath, "w"): pass
+            with open(fpath, "w"):
+                pass
             result = list_xlsx_files(tmpdir)
             self.assertEqual(len(result), 0)
 

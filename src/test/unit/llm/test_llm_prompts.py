@@ -245,9 +245,9 @@ class TestBuildHoldingsSummary(unittest.TestCase):
         H = namedtuple("Holding", ["name", "code"])
         many = [H(name=f"股票{i}", code=f"{i:06d}") for i in range(30)]
         result = _build_holdings_summary(many)
-        lines = [l for l in result.split("\n") if l.strip()]
+        lines = [line for line in result.split("\n") if line.strip()]
         # 最多 20 行持仓
-        holding_lines = [l for l in lines if "[穿透]" not in l]
+        holding_lines = [line for line in lines if "[穿透]" not in line]
         self.assertLessEqual(len(holding_lines), 20)
 
 

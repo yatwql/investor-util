@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
-
 from src.python.llm.fallback import (
     build_fallback_llm_content,
     get_placeholder_text,
     is_all_llm_failed,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
 # ── get_placeholder_text 测试 ──────────────────────────────────
 

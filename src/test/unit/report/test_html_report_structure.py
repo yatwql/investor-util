@@ -177,7 +177,10 @@ def _render_template(render_data: dict) -> BeautifulSoup:
 
     # 注入 section_visible 闭包 + section_groups 分组导航（与生产代码相同的 context 变量方式，不写入 _ENV.globals）
     _sv_dict = render_data.get("section_visible_dict", {})
-    _sv_fn = lambda key, _d=_sv_dict: bool(_d.get(key, False))
+
+    def _sv_fn(key: str, _d: dict = _sv_dict) -> bool:
+        return bool(_d.get(key, False))
+
     section_groups = _build_section_nav_groups(
         render_data.get("section_order", []),
         _sv_fn,
