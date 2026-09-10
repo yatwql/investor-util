@@ -783,10 +783,11 @@
       penetration_deep: '穿透深度分析',
       news_correlation: '财经新闻热点与持仓关联分析'
     },
-    debate: {
+    experiments: {
       llm_debate_procon: '辩论-正反辩论',
       llm_debate_conditional: '辩论-条件推理',
-      llm_debate_qa_concentration: '辩论-集中度问答'
+      llm_debate_qa_concentration: '辩论-集中度问答',
+      decision_reflection: '决策跨期反思闭环'
     }
   };
 
@@ -839,11 +840,11 @@
     els.configPanel.appendChild(
       renderBoolGroup('llm', 'LLM 分析章节', surface.llm.enabled_llm, {
         prefix: 'enabled_llm.',
-        note: '辩论三模块（白脸/黑脸/综合）不在菜单展示，输出由下方「辩论实验功能」三个开关控制'
+        note: '辩论三模块（白脸/黑脸/综合）不在菜单展示，输出由下方「实验性功能」对应开关控制'
       })
     );
     els.configPanel.appendChild(
-      renderBoolGroup('debate', '辩论实验功能（⚗ 实验性，默认关闭）', surface.llm.debate, {
+      renderBoolGroup('experiments', '实验性功能（⚗ 实验性，默认关闭）', surface.llm.experiments, {
         experimental: true
       })
     );

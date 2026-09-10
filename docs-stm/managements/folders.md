@@ -13,13 +13,13 @@
 | 辅助脚本 | Python | 21 | 7,171 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
 | **源代码合计** | — | **278** | **72,464** | 主程序 + 模板 + 脚本 |
 | **测试代码** | Python | **315** | **89,343** | `src/test/` 所有 `.py` 文件 |
-| **测试用例** | — | — | **5,677 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **测试用例** | — | — | **5,680 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **4,850** | 含 README.md（194 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,656 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **120** | **47,204** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 5 + archive 105 md），py/txt 不计行 |
+| **项目文档** | Markdown | **121** | **47,297** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 6 + archive 105 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 10 | 9,067 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 109 | 37,689 | 各版本 changelog/plan/review-findings 等（105 md 37,231 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 5 | 832 | 决策跨期反思闭环深入分析/实现设计 + 信号预消化/质量分级/结构化决策头深入分析 + augur 多智能体借鉴评估 + OpenBB 数据层工程借鉴评估（reflection-decision-loop-analysis.md + decision-reflection-implementation.md + llm-quality-signal-analysis.md + augur-borrowing-analysis.md + openbb-data-provider-analysis.md） |
+| ├ plan/ | 中间设计文件 | 6 | 925 | 决策跨期反思闭环深入分析/实现设计 + 实验性功能开关上屏方案 + 信号预消化/质量分级/结构化决策头深入分析 + augur 多智能体借鉴评估 + OpenBB 数据层工程借鉴评估（reflection-decision-loop-analysis.md + decision-reflection-implementation.md + experimental-features-ui-surfacing.md + llm-quality-signal-analysis.md + augur-borrowing-analysis.md + openbb-data-provider-analysis.md） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -912,6 +912,8 @@ investor-util/
 │   │   │       └── cross_merge_bg2_review.md #   cross_merge_bg2 30 条去重后独立 pair 分析
 │   ├── plan/                          #   中间设计文件
 │   │   ├── reflection-decision-loop-analysis.md #   决策跨期反思闭环深入分析（外部 TradingAgents-astock 借鉴评估）
+│   │   ├── decision-reflection-implementation.md #   决策跨期反思闭环实现设计（分层依赖/账本契约/报告接缝）
+│   │   ├── experimental-features-ui-surfacing.md #   实验性功能开关上屏方案（TUI 菜单 S + Web 配置面板由注册表驱动）
 │   │   ├── llm-quality-signal-analysis.md #   信号预消化/模块质量分级/结构化决策头深入分析（外部 TradingAgents-astock 借鉴评估）
 │   │   ├── augur-borrowing-analysis.md #   augur 多智能体投资分析借鉴评估（决策-结算学习/确定性信号沉淀/健壮性三件套）
 │   │   └── openbb-data-provider-analysis.md #   OpenBB Platform 数据层工程借鉴评估（标准字段/Fetcher 三段适配契约 + VCR 记录-回放测试）

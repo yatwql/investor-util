@@ -69,10 +69,11 @@ _EXPECTED_WHITELIST = {
     "enabled_llm.health_check",
     "enabled_llm.penetration_deep",
     "enabled_llm.news_correlation",
-    # 7 辩论实验功能开关（菜单 S 6~8）
+    # 7 实验性功能开关（菜单 S 实验块；清单取自 features.EXPERIMENTAL_FEATURES）
     "llm_debate_procon",
     "llm_debate_conditional",
     "llm_debate_qa_concentration",
+    "decision_reflection",
 }
 
 
@@ -154,7 +155,7 @@ class TestGetSurface:
         assert data["anonymization"]["options"] == ["off", "code_display", "full_anonymous", "summary"]
         # 对比指数池 = 默认池
         assert data["comparison_indices"] == data["comparison_indices_defaults"]
-        # LLM 开关默认开，隐藏模块列出辩论三模块，辩论实验默认关
+        # LLM 开关默认开，隐藏模块列出辩论三模块，实验性功能默认关
         assert set(data["llm"]["enabled_llm"]) == {
             "global_macro",
             "expert_review",
@@ -163,7 +164,14 @@ class TestGetSurface:
             "news_correlation",
         }
         assert data["llm"]["hidden_modules"] == ["debate_pro", "debate_con", "debate_synthesis"]
-        assert all(v is False for v in data["llm"]["debate"].values())
+        # 实验性功能面 = 注册表全集（3 辩论 + 决策跨期反思闭环），默认全关
+        assert set(data["llm"]["experiments"]) == {
+            "llm_debate_procon",
+            "llm_debate_conditional",
+            "llm_debate_qa_concentration",
+            "decision_reflection",
+        }
+        assert all(v is False for v in data["llm"]["experiments"].values())
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -302,7 +310,7 @@ class TestApplyLlmSettingsWrite:
 
 
 class TestApplyFeaturesWrite:
-    """T7：辩论实验开关写 features.json（save_feature_overrides + 运行时生效）。"""
+    """T7：实验性功能开关写 features.json（save_feature_overrides + 运行时生效）。"""
 
     def test_debate_flag_write_takes_effect(self, app_client):
         """llm_debate_conditional 写：features.json 含覆写，运行时开关生效。"""
@@ -320,6 +328,23 @@ class TestApplyFeaturesWrite:
 
         raw = open(_FEATURES_FILE, encoding="utf-8").read()
         assert '"llm_debate_conditional": true' in raw
+
+    def test_decision_reflection_flag_write_takes_effect(self, app_client):
+        """decision_reflection 写：features.json 含覆写，运行时开关生效。"""
+        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+
+        assert is_feature_enabled("decision_reflection") is False  # 默认关
+
+        resp = app_client.post(
+            "/api/config/edit",
+            json={"key": "decision_reflection", "value": True},
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["data"]["value"] is True
+        assert is_feature_enabled("decision_reflection") is True
+
+        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        assert '"decision_reflection": true' in raw
 
 
 # ═══════════════════════════════════════════════════════════════

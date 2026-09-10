@@ -1194,12 +1194,13 @@ LLM 五维度量化评分，每项满分 100：
 
 ### 11.5 features.json（功能开关注册表）
 
-独立配置文件，提供 27 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
+独立配置文件，提供 28 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
 
 | 开关名 | 类型 | 默认值 | 说明 |
 |:-------|:----:|:------:|:-----|
 | `llm_global_macro` / `llm_expert_review` / `llm_health_check` / `llm_penetration_deep` / `llm_news_correlation` | bool | true（llm_news_correlation 为保留字段） | LLM 各模块独立启停开关（llm_news_correlation 的实际启停由 llm_settings.json 的 enabled_llm.news_correlation 控制，默认 false） |
 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | bool | false（全部默认关闭） | 辩论模式三增强通路独立启停：正反辩论/条件推理/集中度问答 |
+| `decision_reflection` | bool | false（默认关闭） | 决策跨期反思闭环启停：登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词 |
 | `fund_deep_analysis_fund_manager` / `fund_deep_analysis_fund_concentration` | bool | true | 基金深度分析模块启停（经理变更/集中度监控） |
 | `news_sina` / `news_eastmoney` / `news_cls` / `news_wallstreetcn` / `news_akshare` | bool | true（cls 默认关闭） | 各新闻源启停 |
 | `history_portfolio` / `history_benchmark` | bool | true | 历史走势与基准指数开关 |

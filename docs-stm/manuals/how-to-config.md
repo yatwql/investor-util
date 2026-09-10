@@ -669,7 +669,7 @@
 ---
 ### M. 功能开关（features.json）
 
-`data/config/features.json` 提供 **27 项功能开关**的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
+`data/config/features.json` 提供 **28 项功能开关**的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
 
 ```json
 {
@@ -678,10 +678,10 @@
 }
 ```
 
-> **文件不必须存在** — 全部使用代码默认值时无需此文件。首次在菜单 **[S]** 切换辩论模式或手动创建后自动生效。
+> **文件不必须存在** — 全部使用代码默认值时无需此文件。首次在菜单 **[S]** 切换实验性功能或手动创建后自动生效。
 > **注意**：features.json 是唯一**不支持注释**的配置文件（标准 JSON，`//`/`/* */` 均不可用）。所有开关的默认值与完整说明见下表，或直接查看源码 `src/python/config/features.py` 的 `_FEATURE_FLAGS_DEFAULT`。
 
-全部 27 项开关：
+全部 28 项开关：
 
 | 开关名 | 默认值 | 说明 |
 |:-------|:------:|:-----|
@@ -693,6 +693,7 @@
 | `llm_debate_procon` | **false** | 辩论-正反辩论（三段式：白脸→黑脸→综合） |
 | `llm_debate_conditional` | **false** | 辩论-条件推理（情景化分析：涨/跌/震荡） |
 | `llm_debate_qa_concentration` | **false** | 辩论-集中度问答（集中度风险问答） |
+| `decision_reflection` | **false** | 决策跨期反思闭环（登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词；行动建议章内嵌「历史决策复盘」块） |
 | `fund_deep_analysis_fund_manager` | true | 基金深度分析-基金经理 |
 | `fund_deep_analysis_fund_concentration` | true | 基金深度分析-基金集中度 |
 | `news_sina` | true | 新闻源-新浪财经 |
@@ -713,9 +714,9 @@
 | `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
 | `enable_interactive_charts` | true | 报告图表交互总开关（Chart.js 交互图，缩放/悬停）——**同时决定 HTML 报告是否单文件自包含**：开启时 8 个 Chart.js 资产内嵌进 HTML（下载到任意目录、单独发送到移动端浏览均正常，不依赖同目录 JS 文件）；关闭时回退到 Canvas + 表格静态渲染，HTML **不内嵌 JS**（需与 `reports/` 下的 .js 资产同目录才显示图表，移动/单发后会空白） |
 
-> **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（1-5，由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性辩论模式（6-8，由上方 `llm_debate_*` 开关控制，三项相互独立、可组合开启）。**正反辩论（`llm_debate_procon`）**开启后，智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**为分析注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议。
+> **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性功能（编号紧随标准模块之后，由上方实验开关控制，各项相互独立、可组合开启；开关清单由 `features.py::EXPERIMENTAL_FEATURES` 注册表驱动，新增实验开关自动上屏）。**正反辩论（`llm_debate_procon`）**开启后，智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**为分析注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**在行动建议章内嵌「历史决策复盘」块（HTML + Excel）。
 
-> 以上 27 项为**全部**功能开关清单（默认值与代码 `features.py::_FEATURE_FLAGS_DEFAULT` 一致）。features.json 仅需列出需覆写的开关，未列出的保持默认值。
+> 以上 28 项为**全部**功能开关清单（默认值与代码 `features.py::_FEATURE_FLAGS_DEFAULT` 一致）。features.json 仅需列出需覆写的开关，未列出的保持默认值。
 > 该文件不包含敏感信息，可安全纳入版本控制。
 
 ---
@@ -767,8 +768,8 @@ Web 模式（浏览器界面）提供「配置编辑」面板，可修改的配�
 | 报告增强子模块 | `report_submodules.data_quality` / `industry_beta` / `candidate_compare` / `cost_lots` / `valuation_percentile` / `market_temperature` | `[P]` 6 |
 | 持仓匿名化 | `anonymization.mode`（off / code_display / full_anonymous / summary） | `[A]` |
 | 对比指数池 | `comparison_indices`（增 / 删 / 重置默认） | `[I]` |
-| LLM 分析章节 | `enabled_llm.global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation` | `[S]` |
-| 辩论实验功能 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | `[S]` 6~8 |
+| LLM 分析章节 | `enabled_llm.global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation` | `[S]` 标准模块 |
+| 实验性功能 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` / `decision_reflection` | `[S]` 实验块 |
 
 **写入行为**：
 - 面板修改**立即写入**共享配置文件（`config.json` / `llm_settings.json` / `features.json`），TUI / CLI 下次读取即生效（缓存按文件修改时间自动失效，无需手动刷新）。

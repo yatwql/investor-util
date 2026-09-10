@@ -73,6 +73,77 @@ class TestWriteLlmSettings:
         mock_write.assert_called_once_with(settings, path)
 
 
+# 标准 LLM 模块（菜单 S 1~5），实验性功能编号紧随其后（6~9）
+_STANDARD_LLM_MODULES = {
+    "global_macro": "全球政经局势",
+    "expert_review": "智囊团深度复盘",
+    "health_check": "持仓体检报告",
+    "penetration_deep": "穿透深度分析",
+    "news_correlation": "财经新闻热点与持仓关联分析",
+}
+
+
+class TestConfigLlmModulesExperimentalFlags:
+    """_cmd_config_llm_modules: 实验性功能开关面板（清单取自 EXPERIMENTAL_FEATURES 注册表）。"""
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["9", "0"])
+    @patch("src.python.config.features.save_feature_overrides")
+    @patch("src.python.config.features.set_feature_enabled")
+    @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
+    @patch("src.python.core.registry.get_llm_module_names")
+    @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
+    def test_menu_number_nine_toggles_decision_reflection(
+        self,
+        mock_read,
+        mock_names,
+        mock_filter,
+        mock_set_feature,
+        mock_save_overrides,
+        mock_input,
+        mock_refresh,
+        mock_press,
+    ):
+        """输入 9 → 切换第 4 个实验开关（决策跨期反思闭环），持久化到 features.json。
+
+        编号 6~8 为既有辩论开关，9 为寄存器中紧随其后的 decision_reflection。
+        """
+        from src.python.tui.handlers_config import _cmd_config_llm_modules
+
+        _cmd_config_llm_modules()
+
+        mock_save_overrides.assert_called_once_with({"decision_reflection": True})
+        mock_set_feature.assert_called_once_with("decision_reflection", True)
+        mock_press.assert_called_once()
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["6", "0"])
+    @patch("src.python.config.features.save_feature_overrides")
+    @patch("src.python.config.features.set_feature_enabled")
+    @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
+    @patch("src.python.core.registry.get_llm_module_names")
+    @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
+    def test_menu_number_six_still_toggles_first_debate_flag(
+        self,
+        mock_read,
+        mock_names,
+        mock_filter,
+        mock_set_feature,
+        mock_save_overrides,
+        mock_input,
+        mock_refresh,
+        mock_press,
+    ):
+        """输入 6 → 仍为第一个辩论开关（编号连续性未被新项打乱）。"""
+        from src.python.tui.handlers_config import _cmd_config_llm_modules
+
+        _cmd_config_llm_modules()
+
+        mock_save_overrides.assert_called_once_with({"llm_debate_procon": True})
+
+
 # 报告增强子模块基准配置（与 config.json 默认一致：数据质量仪表盘默认开，其余默认关）
 _SUB_BASE_CONFIG = {
     "report_submodules": {

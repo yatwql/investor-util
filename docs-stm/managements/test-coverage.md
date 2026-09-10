@@ -10,16 +10,16 @@
 <!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **5368** | ~13s |
-| `standard` | **4674** | ~14s |
+| `unit` | **5371** | ~13s |
+| `standard` | **4677** | ~14s |
 | `scenario` | **241** | ~17s |
 | `regression` | **241** | ~17s |
-| `dev-verify` | **2086** | ~20s |
-| `verify` | **3551** | ~10s |
+| `dev-verify` | **2089** | ~20s |
+| `verify` | **3554** | ~10s |
 | `integration` | **281** | ~12s |
 | `edge` | **627** | ~13s |
 | `data` | **69** | ~2s |
-| `all` | **5677** | ~21s |
+| `all` | **5680** | ~21s |
 | `smoke` | **26** | ~2s |
 | `report` | **1604** | ~13s |
 | `all_no_unit` | **309** | ~14s |
@@ -100,11 +100,11 @@
 | **报告生成** | `report/`(excel_generator, excel_module_loader, excel_sheet_factory, excel_market_data, excel_content_sheets, excel_news_warning, excel_fund_deep_analysis, excel_llm_usage, html, chart_data_builder, pipeline_data_builder, category, penetration, fund_performance, fund_candidate, market_value, summary, summary_llm_usage, news_correlation, qdii_timezone, fund_concentration, fund_manager, style_factor_sheet, portfolio_history, portfolio_history_drawdown_sheet, history_snapshot, position_relationship_sheet, evolution_sheet, action_sheet, data_quality_sheet, decision_record, decision_llm_capture, decision_settlement, decision_review_block, whatif_operations, whatif_sheet, whatif_writer) | `unit/report/` 共 72 文件含 test_html_writer、test_html_template、test_html_report_structure（导航结构：章节锚点/目录折叠/五组分组导航）、test_correlation_sheet、test_correlation_html、test_drawdown_html_excel（组合历史走势与回撤章：走势表 + 回撤矩阵 + 危机区间标注）、test_tail_risk_wiring（尾部风险接线：pipeline 注入 + Excel 五行 + HTML 卡）、test_style_factor_sheet（风格与因子分析章：基金风格表 + 风格因子回归 + 行业 Beta 子表）、test_fund_candidate（基金业绩分析章候选基金比较子表：候选校验/截断/开关门控/比较维度/重合度复用）、test_valuation_temperature_wiring（估值分位+市场温度报告层接线：穿透估值列 + 汇总温度行）、test_pipeline_data_builder（管线数据契约：crisis_annotation/tail_risk/snapshot_diff 三键注册）、test_whatif_operations、test_whatif_sheet、test_whatif_html、test_whatif_writer、test_evolution_sheet、test_evolution_html、test_action_sheet、test_action_html、test_decision_record（决策复盘·确定性登记）、test_decision_llm_capture（决策复盘·LLM 建议表解析登记）、test_decision_settlement（决策复盘·结算）、test_decision_review_block（决策复盘·复盘区块）、test_data_quality_sheet、test_chart_data_builder、test_theme_js 等 | 1604 |
 | **LLM 智能分析** | `llm/`(api, circuit_breaker, fingerprint, generators, markdown, pricing, prompts, session, skeleton, llm_content, cost_tracker, fallback) | `unit/llm/`(含 API 路由/熔断/重试/降级/骨架/prompts/generators/辩论/cache、DeepSeek 峰谷定价/时段/时区/周末全天闲时规则 等) | 781 |
 | **配置管理** | `config/`, `core/constants.py` | `unit/config/test_config*.py` | 299 |
-| **核心基础设施** | `core/`(cache, models, reader, registry, circuit_breaker, http_client, market_hours, code_utils, filesystem, log_reader, decision_ledger)、`provider_registry.py`、`tui/handlers_*.py` | `unit/core/` 全部（含 `test_decision_ledger.py`/`test_decision_ledger_edge.py` 决策账本、`*_edge.py`、`test_log_reader.py` 日志可视化）+ `unit/cache/` + `unit/handlers/` | 690 |
+| **核心基础设施** | `core/`(cache, models, reader, registry, circuit_breaker, http_client, market_hours, code_utils, filesystem, log_reader, decision_ledger)、`provider_registry.py`、`tui/handlers_*.py` | `unit/core/` 全部（含 `test_decision_ledger.py`/`test_decision_ledger_edge.py` 决策账本、`*_edge.py`、`test_log_reader.py` 日志可视化）+ `unit/cache/` + `unit/handlers/` | 692 |
 | **分析计算** | `analysis/`(liquidity, rebalance, fx_exposure, bond_yield, alignment_correction, drawdown_warning, drawdown_events, factor_exposure, industry_beta, correlation, crisis_annotation, tail_risk, portfolio_evolution, snapshot_diff, action_advisor, trade_discipline, rebalance_advisor, return_attribution, cost_flow, whatif, whatif_backtest, valuation_percentile, market_temperature, metrics) | `unit/analysis/test_{liquidity,rebalance,bond_yield,fx_exposure,alignment_correction,drawdown_warning,drawdown_events,factor_exposure,industry_beta}*.py` + `test_correlation.py` + `test_correlation_edge.py` + `test_crisis_annotation.py` + `test_tail_risk.py` + `test_tail_risk_edge.py` + `test_portfolio_evolution.py` + `test_snapshot_diff.py` + `test_snapshot_diff_edge.py` + `test_action_advisor.py` + `test_trade_discipline.py` + `test_rebalance_advisor.py` + `test_return_attribution.py` + `test_cost_flow.py`（成本流水：XIRR/成本分档/分红累计） + `test_valuation_percentile.py`/`test_valuation_percentile_edge.py`（价格分位代理：收盘价提取/解析解/三档刻度）+ `test_market_temperature.py`/`test_market_temperature_edge.py`（三因子合成温度计）+ `test_metrics.py`/`test_metrics_edge.py`（量化指标：夏普/卡玛/集中度/胜率/换手/风险贡献/波动率/组合 Beta）+ `test_whatif.py` + `test_whatif_backtest.py` + `test_whatif_backtest_edge.py` | 699 |
 | **TUI 交互** | `tui/tui*.py`, `tui/handlers*.py`, `tui/tui_keys.py` | `unit/ui/test_{tui_keys,tui_handlers,tui_menu}.py` + `test_handlers_log.py`（日志可视化）+ `test_tui_edge.py` + `unit/startup/test_startup_wizard.py`（unit_ui 标记） | 148 |
 | **CLI 命令行模式** | `cli/cli.py`, `report/cli_progress.py` | `unit/cli/test_cli*.py` | 65 |
-| **Web 服务** | `web/`(server, app, handlers, config_edit, upload, progress, runs) | `unit/web/test_{upload,upload_edge,progress,runs,handlers,server}.py` + `test_config_edit.py`/`test_config_edit_edge.py`（启动防护 output_dir 写锁/端口占用、上传安全、进度事件缓冲、RunManager 运行管理、Flask 路由全链路、配置编辑：白名单完备/写分派/校验守卫/写前备份/极端输入）+ `test_smoke_web.py`（11 项全链路断言）+ `test_handlers.py` 日志/健康历史端点（/api/logs + /api/health/history） | 200 |
+| **Web 服务** | `web/`(server, app, handlers, config_edit, upload, progress, runs) | `unit/web/test_{upload,upload_edge,progress,runs,handlers,server}.py` + `test_config_edit.py`/`test_config_edit_edge.py`（启动防护 output_dir 写锁/端口占用、上传安全、进度事件缓冲、RunManager 运行管理、Flask 路由全链路、配置编辑：白名单完备/写分派/校验守卫/写前备份/极端输入）+ `test_smoke_web.py`（11 项全链路断言）+ `test_handlers.py` 日志/健康历史端点（/api/logs + /api/health/history） | 201 |
 | **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组，含 `scenario_extreme` 单列) + `integration/test_cli_integration.py` | 281 |
 
 ## 场景测试分组（scenario）
@@ -138,16 +138,16 @@
 | `unit`（父标记） | 12 子组合计 | **5368** |
 | ├─ `unit_providers` | 数据源 Provider（腾讯/东方财富/天天基金等，含 push2 估值字段 PE/PB 提取 + 行业数据 REST 接口） | 226 |
 | ├─ `unit_fetcher` | 数据获取调度（价格/指数/基金/行业/API 异常/熔断预检/冷却恢复） | 254 |
-| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪/降级回退/DeepSeek 峰谷定价含时段判定/时段/时区/周末全天闲时规则设置） | 773 |
+| ├─ `unit_llm` | LLM 模块（API 路由/熔断/指纹/骨架/prompts/generators/llm_content 写入/Token 成本跟踪/降级回退/DeepSeek 峰谷定价含时段判定/时段/时区/周末全天闲时规则设置） | 781 |
 | ├─ `unit_news` | 新闻源（新浪/东方财富/财联社/华尔街见闻） | 205 |
 | ├─ `unit_report` | 报表生成（Excel/HTML 各页签写入、基金深度分析模块、风格与因子分析章（风格表 + 因子回归 + 行业 Beta 子表）、基金业绩分析章候选基金比较子表（candidate_compare 默认关）、数据降级/占位/可用性矩阵、调仓 What-if/组合演进/行动建议双端呈现、数据质量仪表盘、尾部风险接线、估值分位+市场温度接线、管线数据契约、HTML 分组导航折叠、Chart.js 图表数据构建/裁剪、暗色模式 theme.js、JS 资产内嵌单文件自包含、决策复盘（确定性/LLM 登记 + 结算 + 复盘区块）） | 1604 |
 | ├─ `unit_config` | 配置管理（config/llm_settings/llm_key；含报告序号配置校验、enable_action 等板层开关、candidate_compare 访问器/comparison_candidates 校验、成本流水 cost_lots 开关访问器） | 299 |
-| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/统一熔断网关/持仓追踪器/批处理调度/命令处理器/日志读取 read_log/tail_log/parse_log/决策账本 decision_ledger 事件持久化与结算折叠） | 690 |
+| ├─ `unit_core` | 核心基础设施（缓存/数据模型/读者/注册表/统一熔断网关/持仓追踪器/批处理调度/命令处理器/日志读取 read_log/tail_log/parse_log/决策账本 decision_ledger 事件持久化与结算折叠） | 692 |
 | ├─ `unit_analysis` | 分析计算（流动性/再平衡/汇率/口径修正/回撤预警/回撤事件/因子暴露/行业 Beta/相关性矩阵/危机区间标注/尾部风险统计/组合演进/快照差异摘要/行动建议/交易纪律/调仓建议可行化层/收益归因/成本流水（XIRR/成本分档/分红累计）/估值分位（价格分位代理）/市场温度（三因子合成）/量化指标（夏普/卡玛/集中度/胜率/换手/风险贡献/波动率/组合 Beta）/调仓 What-if 时序回测） | 699 |
 | ├─ `unit_cli` | CLI 命令行模式（参数解析/路由/退出码/日志/view-logs 子命令/whatif 子命令） | 65 |
 | ├─ `unit_ui` | TUI 交互（菜单/键盘/进度/错误提示/日志可视化查看日志与健康历史） | 148 |
 | ├─ `unit_scripts` | scripts/ 工程脚本（历史痕迹检查工具自检/豁免/补强模式/回归场景元描述豁免/多行 docstring 提取/任务编号一致性检查/语义命名索引双向校验/3 类暗号匹配自检/机器信息采集与耗时表格渲染/环境耗时对照文档自动更新/失败用例提取 data-jsonblob 回归） | 197 |
-| └─ `unit_web` | Web 服务（启动防护 output_dir 写锁/端口占用、上传安全、进度事件缓冲、RunManager 运行管理、Flask 路由全链路、日志/健康历史端点（/api/logs + /api/health/history）、Web 配置编辑（镜像 TUI 可编辑配置全集/白名单/备份/写入分派）、状态区系统信息组装（含持仓/输出/新闻上限/匿名化/隐私摘要）、首页标题应用名称+版本、Web 冒烟脚本载体） | 200 |
+| └─ `unit_web` | Web 服务（启动防护 output_dir 写锁/端口占用、上传安全、进度事件缓冲、RunManager 运行管理、Flask 路由全链路、日志/健康历史端点（/api/logs + /api/health/history）、Web 配置编辑（镜像 TUI 可编辑配置全集/白名单/备份/写入分派）、状态区系统信息组装（含持仓/输出/新闻上限/匿名化/隐私摘要）、首页标题应用名称+版本、Web 冒烟脚本载体） | 201 |
 
 ## 跨类标记
 

@@ -117,14 +117,21 @@ def _cmd_config_output_dir() -> None:
 
 
 def _cmd_config_llm_modules() -> None:
-    """配置各 LLM 报告的启用/停用（llm_settings.json + features.json 辩论开关）。
+    """配置各 LLM 报告的启用/停用（llm_settings.json + features.json 实验开关）。
 
-    标准 LLM 模块（1-5）通过 enabled_llm 控制，存储在 llm_settings.json。
-    辩论模式增强（6-8）通过 Feature Flag 控制，存储在 features.json。
+    标准 LLM 模块通过 enabled_llm 控制，存储在 llm_settings.json。
+    实验性功能（辩论模式增强、决策跨期反思闭环等）通过 Feature Flag 控制，
+    存储在 features.json；开关清单由 features.EXPERIMENTAL_FEATURES 注册表
+    驱动（显示名 + 说明 + 顺序均取自注册表），新增实验开关自动上屏。
     辩论白脸/黑脸/综合（debate_pro/con/synthesis）保留在注册表
     （缓存 TTL/前缀清理仍依赖），菜单层隐藏，不在此面板展示。
     """
-    from src.python.config.features import is_feature_enabled, save_feature_overrides, set_feature_enabled
+    from src.python.config.features import (
+        EXPERIMENTAL_FEATURES,
+        is_feature_enabled,
+        save_feature_overrides,
+        set_feature_enabled,
+    )
     from src.python.core.registry import get_llm_module_names
 
     result = _read_llm_settings()
@@ -137,12 +144,8 @@ def _cmd_config_llm_modules() -> None:
     # 实际辩论开关由下方实验性 Feature Flag（正反辩论等）控制
     module_names = filter_menu_llm_modules(get_llm_module_names())
 
-    # 辩论模式开关定义：(flag_key, 显示名, 说明)
-    DEBATE_FLAGS: list[tuple[str, str, str]] = [
-        ("llm_debate_procon", "辩论-正反辩论", "三段式(白脸→黑脸→综合)"),
-        ("llm_debate_conditional", "辩论-条件推理", "情景化分析(涨/跌/震荡)"),
-        ("llm_debate_qa_concentration", "辩论-集中度问答", "集中度风险问答"),
-    ]
+    # 实验性功能开关：(flag_key, 显示名)，清单与顺序取自注册表
+    experiment_flags = [(flag, name) for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items()]
 
     while True:
         print()
@@ -160,16 +163,16 @@ def _cmd_config_llm_modules() -> None:
         print(f"  │{'─' * 42}│")
         print(f"  │ ⚗ 实验性功能（默认关闭）{' ' * 22}│")
 
-        # ② 辩论模式开关（6-8）
-        for j, (flag, label, _desc) in enumerate(DEBATE_FLAGS, len(module_names) + 1):
+        # ② 实验性功能开关（编号紧随标准模块之后）
+        for j, (flag, label) in enumerate(experiment_flags, len(module_names) + 1):
             status = is_feature_enabled(flag)
             status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
-            items.append((j, flag, label, status, "debate"))
+            items.append((j, flag, label, status, "experiment"))
             print(f"  │ {j}. ⚗{label:<14s} [{status_str}]{' ' * 3}│")
 
         print(f"  │ 0. 返回主菜单{' ' * 27}│")
         print(f"  └{'─' * 42}┘")
-        print("  ⚗ 实验性辩论模式默认关闭，开启后智囊团深度复盘输出含辩论内容")
+        print("  ⚗ 实验性功能默认关闭，开启后按各自说明增强报告输出")
         print("     ⚠ 当前为实验阶段，输出质量可能不稳定")
         print()
         try:
