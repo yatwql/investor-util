@@ -10,6 +10,12 @@
 
 - 发布 v0.10.17 后，APP_VERSION 与全部管理文档版本头切换至 v0.10.18-dev。
 
+### 汇率敞口「其他币种」行未定义名崩溃（自审 rf-335）（2026-09-10）
+
+- **缺陷（自审 rf-335）**：`analysis/fx_exposure.py` 汇总非 CNY/HKD/USD 币种时，行内标签写作 `_CURRENCY_OTHER`——**该名字全仓未定义**（常量与标签表键均为 `CURRENCY_OTHER`，无下划线前缀），该分支一执行即抛 `NameError: name '_CURRENCY_OTHER' is not defined`，整段外汇敞口分析中断。当前 `core/code_utils.get_currency_by_code()` 只返回 CNY/HKD/USD，故**今日走不到**（潜藏缺陷）——但同文件已知币种行取的是 `_CURRENCY_LABELS.get(currency, currency)`，两行取法不一致本身就是隐患：将来（或用户自持的）代码一旦识别出新币种（JPY/SGD…），不是渲染成「其他」而是直接把报告打崩。该名由 ruff 的 F821（未定义名）静态检查暴露。
+- **改动**：`"label": _CURRENCY_OTHER` → `"label": _CURRENCY_LABELS.get(CURRENCY_OTHER, CURRENCY_OTHER)`，与已知币种行同一取法，标签表里既有的 `CURRENCY_OTHER: "其他币种"` 条目随之真正生效。
+- **测试**：`test_fx_exposure.py` 新增 `TestFxExposureOtherCurrency::test_other_currency_row_labeled`——patch `get_currency_by_code` 使一只持仓解析为 JPY（模拟新增币种），断言未知币种汇总为一行「其他」、标签为「其他币种」、占比正确、`has_foreign` 为真。已验证还原旧实现后该用例转红（实测 `NameError: name '_CURRENCY_OTHER' is not defined`）。
+
 ## [0.10.17] - 2026-09-10
 
 ### 版本发布 v0.10.17（2026-09-10）
