@@ -6,6 +6,17 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 凭据分离校验收紧为硬拒绝（C18，自审 rf-327）（2026-09-10）
+
+- **缺陷（自审 rf-327）**：`config/_llm_providers.py::_validate_provider_entry` 对「条目内联 `api_key`」的处理是**先校验必填、再告警放行**——无 `credentials_ref` 时把内联 `api_key`/`model` 当合法配置接受，仅在 `_parse_providers_list` 里记一条「建议迁移」的 WARNING 后照常进入运行期 provider 链。这与 C18 的字面要求不符：`llm_providers.json` **是版本控制内文件**（`.gitignore` 白名单放行，`git ls-files` 可证），内联 `api_key` 即「凭据随配置入库」，WARNING 级提示既拦不住误提交，也不改变已经发生的泄露。附带发现同一段逻辑的另一处**文档与实现不符**：`_llm_providers_defaults.py` 生成的模板注释邀请用户「按需修改 model / endpoint」，但 `_parse_providers_list` 在 `credentials_ref` 分支下**只透传 `credentials_ref`、丢弃 entry 级 `model`**——照模板改的 `model` 覆盖被静默忽略（`_resolve_entry_credentials` 里 entry 级优先的分支因此永收不到值），用户看到的是「改了没反应」。
+- **改动**：
+  - 校验层：内联 `api_key` **非空即拒**（不再是必填校验 + 放行），WARNING 文案直接给出迁移指引（移入 `llm_key.json` 凭据块 + 用 `credentials_ref` 引用）；`credentials_ref` 升为**必填**（唯一合法凭据来源）；`model` 由「无 ref 时必填」改为**始终可选**（凭据块可提供），仅校验类型不为非法；纯空白视同未设置，不因可选字段的空白拒收整条。
+  - 解析层：`entry_dict` 恒写 `credentials_ref`；`model` 恢复透传（非空才写，空串会让 `_resolve_entry_credentials` 的 falsy 判断跳过凭据块同名值）——模板注释承诺的「按需修改 model」至此真正生效。
+  - `llm/api.py::_resolve_entry_credentials` docstring 补「凭据来源边界」说明：`entry["api_key"]` 分支只服务运行期直接构造的内存条目，配置来源的条目永不带该键；llm_key.json 的单键 flat 格式也不走此分支（由 `get_llm_config()` 合并为顶层键走单 Provider 模式）。
+- **行为变更（需注意）**：① 内联 `api_key` 的条目由「告警后照常使用」变为**整条跳过**——若链中只剩该条，则该模块回落占位文本；② `credentials_ref` 缺失的条目同样被跳过；③ entry 级 `model` 覆盖**开始生效**（此前对 `credentials_ref` 条目无效）。已验证本仓 `data/config/llm_providers.json` 的实际条目均为 `credentials_ref` 形态、无内联 `api_key`，默认模板 `_llm_providers_defaults.py` 亦本就合规，故现有配置不受影响；旧内联配置的迁移路径见 `how-to-config-llm.md`。
+- **文档**：`llm-technical.md` §5.3 重写为「凭据分离的边界是 `api_key`，不是全部字段」——`model`/`endpoint` 属非敏感路由字段，可留在路由配置按条目覆盖，并列出「硬拒绝 + 必填 + entry 覆盖」三条规则与迁移步骤；调用链示意同步。`how-to-config-llm.md` 的「Provider 条目字段」表补 `model`/`endpoint` 两行（原表漏列 `model`，而旧实现下它还是条件必填），并加「不得内联 `api_key`」警示块。`technical.md` C18 约束行改为「`credentials_ref` 必填、内联 `api_key` 硬校验拒绝」，适用范围补 `config/_llm_providers.py`、`llm/api.py`。
+- **测试**：`test_config_llm_multi.py` 相关用例整体迁移到 `credentials_ref` 形态，并把原 `test_api_key_stripped`（断言内联字段被保留供运行期读取）替换为三例：`test_inline_api_key_rejected`（内联条目不出现在运行期列表）、`test_model_carried_as_routing_override`（entry 级 model 覆盖被透传）、`test_blank_model_not_carried`（空串不写键）；`TestValidateProviderEntry` 的「缺 api_key / 缺 model 告警」两例替换为 `test_inline_api_key_rejected` / `test_missing_credentials_ref_errors` / `test_model_optional` / `test_empty_inline_api_key_no_warning`。已验证还原旧实现后其中 5 例转红。
+
 ### LLM 模块显示名回归中央注册表（C9，自审 rf-330）（2026-09-10）
 
 - **缺陷（自审 rf-330）**：`config/_llm_settings_defaults.py` 自留一份模块显示名映射 `_MODULE_LABELS`（5 条：global_macro / expert_review / health_check / penetration_deep / news_correlation），与 `core/registry.py::get_llm_module_names()`（8 条，多出 debate_pro / debate_con / debate_synthesis）**并存**，违反 C9「LLM 模块元信息以注册表为单一事实来源」。这份副本的两处实际后果：

@@ -125,26 +125,30 @@ def _validate_provider_entry(entry: dict) -> list[str]:
     if provider_type not in _VALID_LLM_PROVIDER_TYPES:
         warnings.append(f"provider 类型 '{provider_type}' 无效（有效值: claude/openai/gemini）")
 
-    has_creds_ref = bool(entry.get("credentials_ref"))
-
-    # api_key — 无 credentials_ref 时必填
+    # C18 凭据分离：api_key 只能经 llm_key.json 的 credentials_ref 引用。
+    # 本文件（llm_providers.json）受版本控制（.gitignore 白名单放行），
+    # 内联 api_key 即「凭据随配置入库」——正是 C18 禁止的泄露形态。
+    # 仅在确实带了非空密钥时判定，空串/null 不产生噪音。
     api_key = entry.get("api_key")
-    if not has_creds_ref:
-        if not isinstance(api_key, str) or not api_key.strip():
-            warnings.append("缺少必填字段 'api_key' 或格式非法（须为非空字符串）")
+    if isinstance(api_key, str) and api_key.strip():
+        warnings.append(
+            "禁止内联字段 'api_key'（C18 凭据分离）——"
+            "请将其写入 llm_key.json 的凭据块，并在本条目用 credentials_ref 引用"
+        )
 
-    # model — 无 credentials_ref 时必填
+    # credentials_ref — 必填：凭据的唯一合法来源
+    creds_ref = entry.get("credentials_ref")
+    if not isinstance(creds_ref, str) or not creds_ref.strip():
+        warnings.append("缺少必填字段 'credentials_ref' 或格式非法（须为非空字符串，指向 llm_key.json 中的凭据块）")
+
+    # model / endpoint — 可选的非敏感路由字段（模板注释邀请按需修改），
+    # 与凭据块同名键的关系见 llm/api._resolve_entry_credentials（entry 覆盖凭据块）。
+    # 纯空白视同未设置（回落凭据块同名值），不因可选字段的空白而拒收整条——
+    # 与 endpoint 的 falsy 语义保持一致。
     model = entry.get("model")
-    if not has_creds_ref:
-        if not isinstance(model, str) or not model.strip():
-            warnings.append("缺少必填字段 'model' 或格式非法（须为非空字符串）")
+    if model is not None and not isinstance(model, str):
+        warnings.append("可选字段 'model' 类型非法（须为字符串）")
 
-    # credentials_ref 格式检查
-    if has_creds_ref:
-        if not isinstance(entry["credentials_ref"], str) or not entry["credentials_ref"].strip():
-            warnings.append("'credentials_ref' 须为非空字符串")
-
-    # optional: endpoint
     endpoint = entry.get("endpoint")
     if endpoint is not None and not isinstance(endpoint, str):
         warnings.append("可选字段 'endpoint' 类型非法（须为字符串或 null）")
@@ -154,6 +158,11 @@ def _validate_provider_entry(entry: dict) -> list[str]:
 
 def _parse_providers_list(raw_config: dict) -> list[dict] | None:
     """解析 llm_providers.json 中的 providers 数组，校验并补齐默认值。
+
+    凭据边界（C18 凭据分离）：本函数是「配置文件 → 运行期条目」的唯一入口，
+    条目只携带 `credentials_ref`（凭据引用）与非敏感路由字段（model/endpoint/
+    priority/…）；**api_key 不由此处传入**（内联 api_key 在校验阶段即被拒），
+    运行期凭据由 `_inject_provider_chain_data` 注入的 `_llm_credentials` 解析。
 
     Args:
         raw_config: _load_llm_providers() 返回的原始 dict
@@ -193,17 +202,14 @@ def _parse_providers_list(raw_config: dict) -> list[dict] | None:
             "timeout": float(entry.get("timeout", 60.0)),
             "proxy_preferred": entry.get("proxy_preferred", False),
         }
-        # 凭据来源：credentials_ref 引用或内嵌 api_key/model（运行时宽容读取）
-        if entry.get("credentials_ref"):
-            entry_dict["credentials_ref"] = entry["credentials_ref"]
-        else:
-            # 保留内嵌字段供运行时直接读取（api.py 内联回退）
-            logger.warning(
-                "provider '%s' 内嵌 api_key，建议迁移到 llm_key.json 并使用 credentials_ref 引用",
-                name,
-            )
-            entry_dict["api_key"] = entry["api_key"].strip()
-            entry_dict["model"] = entry["model"]
+        # 凭据唯一来源：credentials_ref → llm_key.json 凭据块（C18 凭据分离）
+        entry_dict["credentials_ref"] = entry["credentials_ref"]
+        # model 为非敏感路由覆盖（模板注释邀请按需修改）；缺省时由凭据块提供。
+        # 传空串会让 _resolve_entry_credentials 的 falsy 判断回落到凭据块，故仅在
+        # 非空时写入。
+        model = entry.get("model")
+        if isinstance(model, str) and model.strip():
+            entry_dict["model"] = model.strip()
         validated.append(entry_dict)
 
     if not validated:

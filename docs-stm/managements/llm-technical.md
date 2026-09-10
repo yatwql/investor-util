@@ -161,7 +161,7 @@ skeleton.py:generate_llm_content()
 | `generators_orchestrator.py` | 编排层 | 4+1 模块并行调度，缓存预检查，线程池分发 | `generate_all_llm()` |
 | `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 | 各 `generate_*()` |
 | `generators_news.py` | 生成层 | 新闻 LLM 二次关联分析（批量模式 7 函数） | `enhance_news_correlation()` |
-| `_llm_news_correlation.py` | 私有 | 新闻关联责任单元：模块级结果缓存 + 闭包 + 安全直调，由 `generators_orchestrator.py`（聚合门面）re-export 对外提供 | `run_news_correlation_safe()` / `_make_news_correlation_closure()` |
+| `_llm_news_correlation.py` | 私有 | 新闻关联安全直调入口（返回类型 `(list[dict], bool, dict)` 与其余四模块的 `(str, bool)` 不同，**不经编排层线程池**，由 `report/news_correlation.py` 直接调用），由 `generators_orchestrator.py`（聚合门面）re-export 对外提供 | `run_news_correlation_safe()` |
 | `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑）+ `raw_filter_fn` 原始输出过滤钩子（markdown_to_html 之前） | `generate_llm_module()` |
 | `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、单 Provider 分派 | `call_llm()` / `call_single_provider()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `call_llm_with_retry()` |
@@ -488,9 +488,10 @@ call_llm(system_prompt, user_prompt, llm_config, ...)
     ├─ ③ 遍历 Provider Chain（逐条尝试至成功）
     │      for entry in chain:
     │          _resolve_entry_credentials(entry, llm_config)
-    │            ├─ credentials_ref 查表 → api_key/model/endpoint
-    │            ├─ entry 级叠加覆盖
-    │            └─ 无 ref → 内联字段回退
+    │            ├─ credentials_ref 查表 → api_key（唯一凭据来源）+ model/endpoint 缺省值
+    │            ├─ entry 级路由覆盖（model/endpoint，非敏感字段）
+    │            └─ 无 ref → 内联 api_key 回退：仅服务运行期内存条目；
+    │               经配置解析的条目必有 ref（内联 api_key 在校验阶段即拒）
     │
     │          _call_provider_entry(entry, ...)
     │            ├─ "claude"  → call_claude()（_api_claude.py）
@@ -641,19 +642,21 @@ call_gemini() Extended Thinking 注入
 
 ### 5.3 credentials_ref 凭据引用
 
-**设计目的**：将敏感凭据（api_key、model、endpoint）与 Provider 路由配置分离，降低凭据泄露风险，支持凭据复用。
+**设计目的**：将**敏感凭据**（`api_key`）与 Provider 路由配置分离，降低凭据泄露风险，支持凭据复用。`model`/`endpoint` 是路由字段（非敏感），仍可留在路由配置上按条目覆盖——凭据分离的边界是 `api_key`，不是全部字段。
 
 **凭据来源**：`llm_config["_llm_credentials"]`，由 `config/_llm_providers.py` 的 `_load_llm_key_credentials()` 读取 `llm_key.json` 构建。
 
 **解析优先级**（`_resolve_entry_credentials()`）：
 
 1. **`credentials_ref` 查表**：从 `llm_config["_llm_credentials"]` 中查找对应键名的凭据块
-2. **entry 级叠加覆盖**：若 entry 本身也包含 `api_key`/`model`/`endpoint`，则覆盖凭据块中的同名字段
-3. **无 ref 回退**：无 `credentials_ref` 时，直接使用 entry 内联字段
+2. **entry 级路由覆盖**：entry 自带的 `model`/`endpoint`（非敏感路由字段）覆盖凭据块中的同名值
+3. **`api_key` 只来自凭据块**：经配置文件解析出的 entry 内联 `api_key` 不参与解析——它在 `_validate_provider_entry()` 阶段即被拒，该条目被整条跳过，根本走不到这里。函数内仍保留 `entry["api_key"]` 分支，服务于**运行期直接构造的内存条目**（调用方自行组装 dict 时不受配置校验约束）；该分支对配置来源的条目永不生效
 
 **兼容说明**：
 - **单键格式**：`llm_key.json` 为 `{"api_key": "...", "model": "..."}` 时，自动包裹为 `{"_default": {...}}`
-- **内联凭据**：`llm_providers.json` 的 entry 可直接含 `api_key`/`model`（无需 `credentials_ref`）
+- **内联凭据（本版起硬拒绝）**：`llm_providers.json` 的 entry **不得**再含 `api_key`——内联即「凭据随配置入库」，正是 C18 禁止的形态。校验器记 WARNING 并**跳过该条目**（不再是仅告警后放行）。旧配置需迁移：把 `api_key` 移入 `llm_key.json` 的凭据块，entry 改为 `"credentials_ref": "<块名>"`。
+- **`credentials_ref` 必填**：缺少或非法（非空字符串）的条目在 `_validate_provider_entry()` 阶段被拒并记 WARNING。
+- **`model` 仍可在 entry 上覆盖**：`model`/`endpoint` 属非敏感路由字段（模板注释邀请按需修改），entry 级取值优先于凭据块同名值。
 
 [↑ 回到顶部](#目录)
 

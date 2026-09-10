@@ -141,10 +141,14 @@ LLM 配置由三个独立文件管理：
 | `name` | ✅ | string | Provider 唯一标识名，用于日志和缓存键 |
 | `provider` | ✅ | string | 服务商类型：`claude` / `openai` / `gemini` |
 | `credentials_ref` | ✅ | string | 引用 `llm_key.json` 中的凭据块键名 |
+| `model` | ❌ | string | 路由字段：覆盖凭据块中的同名模型名；缺省时用凭据块的值 |
+| `endpoint` | ❌ | string | 路由字段：覆盖凭据块中的同名端点；缺省时用凭据块的值 |
 | `priority` | ❌ | int | 优先级（数值越小越优先），默认 99 |
 | `weight` | ❌ | int | 加权随机权重，仅 `weighted` 策略有效，默认 1 |
 | `timeout` | ❌ | int | 超时秒数，覆盖全局 timeout，默认 60 |
 | `proxy_preferred` | ❌ | bool | `true` 时优先使用代理直连（而非自动路由），默认 `false` |
+
+> **不得内联 `api_key`**：本文件可提交仓库（团队共享调优参数），因此**只放路由字段**——写入 `api_key` 等于把密钥随配置入库。校验器遇到非空内联 `api_key` 会记 WARNING 并**跳过整条 provider**（不是仅告警后放行）。密钥一律写在 `llm_key.json` 的凭据块里，本文件用 `credentials_ref` 引用。`model` / `endpoint` 属非敏感路由字段，可留在本文件按条目覆盖凭据块同名值。
 
 ### 切换策略
 

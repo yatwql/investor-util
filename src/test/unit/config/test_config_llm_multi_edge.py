@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 import unittest
@@ -34,13 +33,13 @@ class TestInvalidProviderType(unittest.TestCase):
 
     def test_invalid_type_warning(self):
         """非 claude/openai/gemini → WARNING。"""
-        entry = {"name": "test", "provider": "deepseek", "api_key": "sk-key", "model": "deepseek-v3"}
+        entry = {"name": "test", "provider": "deepseek", "credentials_ref": "ref-key"}
         warnings = _validate_provider_entry(entry)
         self.assertTrue(any("provider" in w.lower() for w in warnings))
 
     def test_missing_type_warning(self):
         """缺 provider 字段 → WARNING。"""
-        entry = {"name": "test", "api_key": "sk-key", "model": "m1"}
+        entry = {"name": "test", "credentials_ref": "ref-key"}
         warnings = _validate_provider_entry(entry)
         self.assertTrue(any("provider" in w.lower() for w in warnings))
 
@@ -50,8 +49,8 @@ class TestInvalidProviderType(unittest.TestCase):
         """非法类型的 entry 被跳过，合法 entry 保留。"""
         raw = {
             "providers": [
-                {"name": "valid", "provider": "claude", "api_key": "sk-1", "model": "m1"},
-                {"name": "bad", "provider": "deepseek", "api_key": "sk-2", "model": "dsv3"},
+                {"name": "valid", "provider": "claude", "credentials_ref": "ref-1"},
+                {"name": "bad", "provider": "deepseek", "credentials_ref": "ref-2"},
             ]
         }
         result = _parse_providers_list(raw)

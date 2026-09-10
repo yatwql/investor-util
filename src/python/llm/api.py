@@ -92,9 +92,17 @@ def _resolve_entry_credentials(
 ) -> tuple[str, str, str]:
     """从 provider entry 解析 api_key / model / endpoint。
 
-    优先 credentials_ref → llm_key.json 多键凭据，entry 级字段可叠加覆盖。
-    无 credentials_ref 时回退 entry 内联字段。
+    解析顺序：credentials_ref → llm_key.json 多键凭据；entry 级字段叠加覆盖。
 
+    凭据来源边界（C18 凭据分离，见 config/_llm_providers.py）：
+        - `entry["api_key"]` 分支只服务**运行期内存条目**（调用方直接构造）。
+          经 `_parse_providers_list()` 从 llm_providers.json 解析出的条目**永不带
+          此键**——内联 api_key 在校验阶段即被拒（该条目会被整条跳过）。
+        - llm_key.json 的凭据**不**流经本函数的 entry 分支：多键格式由
+          `credentials_ref` 查 `_llm_credentials`；单键 flat 格式则由
+          `get_llm_config()` 合并为 config 顶层键，走无 `_provider_list` 时的
+          单 Provider 模式（`_call_llm_legacy()`），不构造 entry。
+        - `model` / `endpoint` 是非敏感路由字段，entry 级值优先于凭据块同名值。
     Returns:
         (api_key, model, endpoint)
     """

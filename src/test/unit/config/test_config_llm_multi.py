@@ -54,8 +54,7 @@ class TestLoadLlmProviders(unittest.TestCase):
                 {
                     "name": "claude-opus",
                     "provider": "claude",
-                    "api_key": "sk-test",
-                    "model": "claude-sonnet-4-20250514",
+                    "credentials_ref": "ref-test",
                 }
             ],
         })
@@ -85,7 +84,7 @@ class TestParseProvidersList(unittest.TestCase):
         """单条 provider 正确解析。"""
         raw = {
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         result = _parse_providers_list(raw)
@@ -97,8 +96,8 @@ class TestParseProvidersList(unittest.TestCase):
         """多条 provider 正确解析并保持顺序。"""
         raw = {
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
-                {"name": "p2", "provider": "openai", "api_key": "sk-2", "model": "m2"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
+                {"name": "p2", "provider": "openai", "credentials_ref": "ref-2"},
             ]
         }
         result = _parse_providers_list(raw)
@@ -127,9 +126,9 @@ class TestParseProvidersList(unittest.TestCase):
         """缺必填字段的 entry 被跳过，其余正常保留。"""
         raw = {
             "providers": [
-                {"name": "valid", "provider": "claude", "api_key": "sk-1", "model": "m1"},
-                {"name": "bad", "provider": "claude"},  # 缺 api_key 和 model
-                {"name": "also-valid", "provider": "openai", "api_key": "sk-2", "model": "m2"},
+                {"name": "valid", "provider": "claude", "credentials_ref": "ref-1"},
+                {"name": "bad", "provider": "claude"},  # 缺 credentials_ref
+                {"name": "also-valid", "provider": "openai", "credentials_ref": "ref-2"},
             ]
         }
         result = _parse_providers_list(raw)
@@ -142,7 +141,7 @@ class TestParseProvidersList(unittest.TestCase):
         """全部 entry 校验不通过返回 None。"""
         raw = {
             "providers": [
-                {"name": "", "provider": "unknown", "api_key": "", "model": ""},
+                {"name": "", "provider": "unknown", "credentials_ref": ""},
             ]
         }
         result = _parse_providers_list(raw)
@@ -154,8 +153,8 @@ class TestParseProvidersList(unittest.TestCase):
         """同名 provider → 后者覆盖前者（二者均保留但后者在前者之后）。"""
         raw = {
             "providers": [
-                {"name": "dup", "provider": "claude", "api_key": "sk-1", "model": "m1"},
-                {"name": "dup", "provider": "openai", "api_key": "sk-2", "model": "m2"},
+                {"name": "dup", "provider": "claude", "credentials_ref": "ref-1"},
+                {"name": "dup", "provider": "openai", "credentials_ref": "ref-2"},
             ]
         }
         result = _parse_providers_list(raw)
@@ -170,7 +169,7 @@ class TestParseProvidersList(unittest.TestCase):
         """缺省字段用默认值补齐（priority=99, weight=1, timeout=60.0, endpoint=None, proxy_preferred=False）。"""
         raw = {
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         result = _parse_providers_list(raw)
@@ -187,7 +186,7 @@ class TestParseProvidersList(unittest.TestCase):
         raw = {
             "providers": [
                 {
-                    "name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1",
+                    "name": "p1", "provider": "claude", "credentials_ref": "ref-1",
                     "priority": 5, "weight": 3, "timeout": 120.0,
                     "endpoint": "https://custom.endpoint", "proxy_preferred": True,
                 },
@@ -202,20 +201,45 @@ class TestParseProvidersList(unittest.TestCase):
         self.assertEqual(entry["endpoint"], "https://custom.endpoint")
         self.assertTrue(entry["proxy_preferred"])
 
-    # ── api_key 清理 ──
+    # ── C18 凭据分离：内联 api_key 一律拒绝 ──
 
-    def test_api_key_stripped(self):
-        """api_key 两端空格被去除，内联字段保留在 entry 中（运行时直接读取）。"""
+    def test_inline_api_key_rejected(self):
+        """内联 api_key 的 entry 被拒（C18：凭据只经 credentials_ref 引用）。
+
+        回归背景：llm_providers.json 受版本控制（.gitignore 白名单放行），
+        内联 api_key 即「凭据随配置入库」，故校验层必须拒绝而非宽容接受。
+        """
         raw = {
             "providers": [
                 {"name": "p1", "provider": "claude", "api_key": "  sk-test-key  ", "model": "m1"},
             ]
         }
         result = _parse_providers_list(raw)
+        self.assertIsNone(result, "内联 api_key 的条目不得进入运行期 provider 列表")
+
+    def test_model_carried_as_routing_override(self):
+        """entry 级 model（非敏感路由字段）保留，且凭据仍只走 credentials_ref。"""
+        raw = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1", "model": "  m1  "},
+            ]
+        }
+        result = _parse_providers_list(raw)
         self.assertIsNotNone(result)
-        self.assertEqual(result[0]["api_key"], "sk-test-key")
         self.assertEqual(result[0]["model"], "m1")
-        self.assertNotIn("credentials_ref", result[0])
+        self.assertEqual(result[0]["credentials_ref"], "ref-1")
+        self.assertNotIn("api_key", result[0])
+
+    def test_blank_model_not_carried(self):
+        """空串 model 不写入 entry（否则会让凭据块的 model 被 falsy 判断跳过）。"""
+        raw = {
+            "providers": [
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1", "model": "   "},
+            ]
+        }
+        result = _parse_providers_list(raw)
+        self.assertIsNotNone(result)
+        self.assertNotIn("model", result[0])
 
     # ── 非 dict entry ──
 
@@ -223,9 +247,9 @@ class TestParseProvidersList(unittest.TestCase):
         """非 dict 的 providers 元素被跳过。"""
         raw = {
             "providers": [
-                {"name": "valid", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "valid", "provider": "claude", "credentials_ref": "ref-1"},
                 "not_a_dict",
-                {"name": "also-valid", "provider": "openai", "api_key": "sk-2", "model": "m2"},
+                {"name": "also-valid", "provider": "openai", "credentials_ref": "ref-2"},
             ]
         }
         result = _parse_providers_list(raw)
@@ -241,8 +265,7 @@ class TestValidateProviderEntry(unittest.TestCase):
         entry = {
             "name": "test-provider",
             "provider": "claude",
-            "api_key": "sk-test-key",
-            "model": "claude-sonnet-4-20250514",
+            "credentials_ref": "ref-test-key",
         }
         warnings = _validate_provider_entry(entry)
         self.assertEqual(warnings, [])
@@ -252,8 +275,7 @@ class TestValidateProviderEntry(unittest.TestCase):
         entry = {
             "name": "test-provider",
             "provider": "openai",
-            "api_key": "sk-test-key",
-            "model": "gpt-4",
+            "credentials_ref": "ref-test-key",
             "endpoint": "https://api.openai.com/v1",
         }
         warnings = _validate_provider_entry(entry)
@@ -261,33 +283,45 @@ class TestValidateProviderEntry(unittest.TestCase):
 
     def test_missing_name_errors(self):
         """缺 name → WARNING。"""
-        entry = {"provider": "claude", "api_key": "sk-key", "model": "m1"}
+        entry = {"provider": "claude", "credentials_ref": "ref-key"}
         warnings = _validate_provider_entry(entry)
         self.assertTrue(any("name" in w for w in warnings))
 
     def test_empty_name_errors(self):
         """空 name → WARNING。"""
-        entry = {"name": "", "provider": "claude", "api_key": "sk-key", "model": "m1"}
+        entry = {"name": "", "provider": "claude", "credentials_ref": "ref-key"}
         warnings = _validate_provider_entry(entry)
         self.assertTrue(any("name" in w for w in warnings))
 
-    def test_missing_api_key_errors(self):
-        """缺 api_key → WARNING。"""
-        entry = {"name": "test", "provider": "claude", "model": "m1"}
-        warnings = _validate_provider_entry(entry)
-        self.assertTrue(any("api_key" in w for w in warnings))
-
-    def test_missing_model_errors(self):
-        """缺 model → WARNING。"""
+    def test_inline_api_key_rejected(self):
+        """内联 api_key → WARNING（C18 凭据分离，禁止凭据写入版本控制中的文件）。"""
         entry = {"name": "test", "provider": "claude", "api_key": "sk-key"}
         warnings = _validate_provider_entry(entry)
-        self.assertTrue(any("model" in w for w in warnings))
+        self.assertTrue(any("api_key" in w and "凭据分离" in w for w in warnings))
+
+    def test_empty_inline_api_key_no_warning(self):
+        """api_key 为空串（未携带密钥）→ 不因「内联」而告警，只差 credentials_ref。"""
+        entry = {"name": "test", "provider": "claude", "api_key": "   "}
+        warnings = _validate_provider_entry(entry)
+        self.assertFalse(any("凭据分离" in w for w in warnings))
+        self.assertTrue(any("credentials_ref" in w for w in warnings))
+
+    def test_missing_credentials_ref_errors(self):
+        """缺 credentials_ref → WARNING（凭据的唯一合法来源）。"""
+        entry = {"name": "test", "provider": "claude", "model": "m1"}
+        warnings = _validate_provider_entry(entry)
+        self.assertTrue(any("credentials_ref" in w for w in warnings))
+
+    def test_model_optional(self):
+        """model 缺省不告警（可由 llm_key.json 凭据块提供）。"""
+        entry = {"name": "test", "provider": "claude", "credentials_ref": "ref-key"}
+        warnings = _validate_provider_entry(entry)
+        self.assertEqual(warnings, [])
 
     def test_null_endpoint_allowed(self):
         """endpoint 为 None 不警告。"""
         entry = {
-            "name": "test", "provider": "claude", "api_key": "sk-key",
-            "model": "m1", "endpoint": None,
+            "name": "test", "provider": "claude", "credentials_ref": "ref-key", "endpoint": None,
         }
         warnings = _validate_provider_entry(entry)
         self.assertEqual(warnings, [])
@@ -302,8 +336,7 @@ class TestInjectProviderChainData(unittest.TestCase):
     def setUp(self):
         self.base_config = {
             "provider": "claude",
-            "api_key": "sk-test",
-            "model": "claude-sonnet-4-20250514",
+            "credentials_ref": "ref-test",
         }
 
     # ── _provider_list ──
@@ -313,7 +346,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         """_inject_provider_chain_data → merged dict 含 _provider_list。"""
         mock_load.return_value = {
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         result = _inject_provider_chain_data(dict(self.base_config))
@@ -329,7 +362,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         """未指定 strategy → 默认 "priority"。"""
         mock_load.return_value = {
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         result = _inject_provider_chain_data(dict(self.base_config))
@@ -341,7 +374,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         mock_load.return_value = {
             "strategy": "weighted",
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         result = _inject_provider_chain_data(dict(self.base_config))
@@ -353,7 +386,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         mock_load.return_value = {
             "strategy": "random",
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         with self.assertLogs("invest", level="WARNING") as logs:
@@ -368,7 +401,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         """未指定 preferred_providers → 默认 {}。"""
         mock_load.return_value = {
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         result = _inject_provider_chain_data(dict(self.base_config))
@@ -380,7 +413,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         mock_load.return_value = {
             "preferred_providers": {"news": "p1"},
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         result = _inject_provider_chain_data(dict(self.base_config))
@@ -392,7 +425,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         mock_load.return_value = {
             "preferred_providers": {"news": "nonexistent"},
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         with self.assertLogs("invest", level="WARNING") as logs:
@@ -407,7 +440,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         """原有 provider/api_key/model/endpoint 字段在注入后保留。"""
         mock_load.return_value = {
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         original = {
@@ -441,7 +474,7 @@ class TestInjectProviderChainData(unittest.TestCase):
         mock_load.return_value = {
             "preferred_providers": "not_a_dict",
             "providers": [
-                {"name": "p1", "provider": "claude", "api_key": "sk-1", "model": "m1"},
+                {"name": "p1", "provider": "claude", "credentials_ref": "ref-1"},
             ]
         }
         with self.assertLogs("invest", level="WARNING") as logs:
