@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-import logging
 import unittest
 from unittest.mock import patch
 
@@ -257,15 +256,28 @@ class TestCategorize(unittest.TestCase):
         self.assertEqual(_categorize_holding(h), "基金")
         self.assertEqual(_categorize_detail({"name": "易方达蓝筹精选混合", "code": "005827", "account": "账户A"}), "基金")
 
-    def test_import_error_falls_back_to_prefix(self):
-        """code_utils 导入失败 → 按代码前缀粗略分类。"""
-        with patch.dict("sys.modules", {"src.python.core.code_utils": None}):
-            stock = Holding(account="账户A", name="招商银行", code="600036", shares=1000, cost_price=10.0)
+    def test_delegates_to_central_judgment(self):
+        """分类结果无条件跟随 `code_utils.is_fund_holding`（不自建前缀回退）。
+
+        旧实现除中心判定外还内联一张「代码以 0/3/6 开头即股票」的回退表与
+        `except ImportError` 兜底，两套判定并存必然漂移；现改为单一来源委托。
+        以「中心判定说基金、前缀表说股票」的代码验证分类确实听中心判定——
+        改由 mock 直接改写中心函数返回值。
+        """
+        from src.python.config import anonymizer
+
+        stock = Holding(account="账户A", name="招商银行", code="600036", shares=1000, cost_price=10.0)
+        with patch.object(anonymizer, "is_fund_holding", return_value=True):
+            self.assertEqual(_categorize_holding(stock), "基金")
+        with patch.object(anonymizer, "is_fund_holding", return_value=False):
             self.assertEqual(_categorize_holding(stock), "股票/其他")
-            fund = Holding(account="账户A", name="某指数基金", code="161725", shares=1000, cost_price=1.0)
-            self.assertEqual(_categorize_holding(fund), "基金")
             self.assertEqual(_categorize_detail({"name": "招商银行", "code": "600036", "account": "账户A"}), "股票/其他")
-            self.assertEqual(_categorize_detail({"name": "某指数基金", "code": "161725", "account": "账户A"}), "基金")
+
+    def test_beijing_exchange_stock_not_misclassified_as_fund(self):
+        """北交所（8 开头）股票 → 股票/其他（不自建前缀判断）。"""
+        h = Holding(account="账户A", name="某北交所股票", code="830799", shares=1000, cost_price=10.0)
+        self.assertEqual(_categorize_holding(h), "股票/其他")
+        self.assertEqual(_categorize_detail({"name": "某北交所股票", "code": "830799", "account": "账户A"}), "股票/其他")
 
 
 class TestGetSetMode(unittest.TestCase):

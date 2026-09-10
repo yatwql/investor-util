@@ -6,6 +6,16 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 代码类型判定回归中心化（C1，自审 rf-333）（2026-09-10）
+
+- **缺陷（自审 rf-333）**：全局架构审计（C1~C24 逐条对照）发现两处**绕过 `core/code_utils.py` 自建代码前缀判定**，违反 C1「所有资产代码类型判定必须使用 `core/code_utils.py`，禁止任何模块自行实现判定逻辑」：
+  - `report/chart_data_builder.py::_infer_property`——按 `code[:1] in ("6","0","3")` 判股票、`("5","1")` 判基金。**实际影响**：北交所（8 开头）股票全部落入「其他」资产属性，饼图与持仓分类表口径不一致（68xxxx 科创板仅因首字符恰为 6 而蒙对，语义上仍是巧合而非判定）。
+  - `config/anonymizer.py::_categorize_holding` / `_categorize_detail`——中心判定之外**并存**一张「0/3/6 开头即股票」回退表（外加 `except ImportError: pass` 兜底）。两套判定并存即会漂移，且把错误前缀知识散落到匿名化层；`except ImportError` 兜底在当前包结构下永不可达，属防御性死代码。
+  - 违规后果与 C1 表头描述一致：代码前缀知识散落多处，新增资产类型时需全局搜索替换、极易遗漏。
+- **改动**：`_infer_property` 改委托 `is_a_share_code()` / `is_exchange_fund_code()`（模块级导入，与同文件其他 `core.*` 导入一致）；`anonymizer` 两处改为模块级导入 `is_fund_holding` 并无条件委托，删除内联前缀表与 `except ImportError` 分支。判定语义单一来源化后，两处随 `code_utils` 演进自动跟进。
+- **行为变更**：`_infer_property` 对北交所代码（如 830799）由「其他」变为「股票」——属**修正**而非回归（与持仓分类表口径对齐）；其余代码分类结果不变。
+- **测试**：`test_anonymizer.py` 把失效的 `test_import_error_falls_back_to_prefix`（在原实现下已因模块级导入提前绑定而形同虚设）替换为 `test_delegates_to_central_judgment`（mock 中心函数返回值双向验证无条件委托）+ 新增 `test_beijing_exchange_stock_not_misclassified_as_fund`；`test_chart_data_builder.py` 新增 `test_infer_property_star_and_bse_boards_classified` 锁定科创板/北交所归「股票」、5 开头场内基金归「基金」。两用例均已验证还原旧实现后转红。另清理该测试文件历史遗留的未使用 `import logging`（ruff F401）。
+
 ### 死代码清理：未接线的股息率取值（自审 rf-332）（2026-09-10）
 
 - **缺陷（自审 rf-332）**：`analysis/metrics_risk.py::get_dividend_yield` 在全仓（`src/`、测试、模板、文档）**零调用点**——自早期量化指标体系引入后未接入任何报告章节、LLM 提示词或纪律判定，仅由 `analysis/metrics.py` 与 `analysis/__init__.py` 两层 `__all__` 转出，形成「看起来是公共能力、实则从不执行」的假接口。更实际的问题是它**按早期缓存键契约取数**（`dividend_{code}` / `price_{code}` + `item.get("year"/"dividend"/"cash_dividend")` 多形态猜测），保留即保留一份与现行情链路无关的取数路径——将来误接时不会报错，只会静默拿到空值。
