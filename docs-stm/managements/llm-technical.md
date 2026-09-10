@@ -173,6 +173,7 @@ skeleton.py:generate_llm_content()
 | `prompts_action.py` | 工具 | 各模块 User Prompt 构建（global_macro / expert_review / health_check / penetration_deep / debate_synthesis）+ 集中度问答块 | `_build_expert_review_prompt()` / `_build_qa_concentration_block()` |
 | `prompts_signals.py` | 工具 | 信号预消化：行业资金流向段方向标注与分方向排名（无开关，默认路径）+ 算法评级信号块（市场温度/估值分位/尾部风险 → `信号：…` 行，`signal_pre_digest` 开关，判定收敛于缓存后缀函数保证读写键同源） | `_build_sector_flow_block()` / `_build_signal_digest_block()` / `_signal_digest_cache_suffix()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `compute_fingerprint()` / `build_llm_fingerprint()` |
+| `module_fingerprint.py` | 工具 | **模块指纹的唯一事实来源（预检侧与写侧同源）**：四模块指纹构造器 + 输入闭包 + 注册表，两侧都调用同一函数，结构性消除「预检键 ≠ 写侧键」的漂移 | `MODULE_FINGERPRINT_BUILDERS` / `ModuleFingerprintInputs` / `*_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `track_session_usage()` / `get_session_usage()` |
 | `cost_tracker.py` | 工具 | Token 预算管理、输入检查、成本摘要格式化（compact/verbose） | `reset_budget()` / `get_cost_summary()` |
 | `pricing.py` | 工具 | 模型定价合并、费用估算 | `estimate_cost()` / `reload_pricing()` |
@@ -1225,12 +1226,16 @@ LLM 集成层与系统其他组件的接口：
 | LLM 模块 | 依赖数据源 | 缓存指纹依赖 |
 |:---------|:----------|:------------|
 | `global_macro` | A股指数 + 美股指数 + 总市值+总盈亏 + 分类 + (可选)行业资金流向 | 指数收盘价 + 持仓汇总 |
-| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动）+ 实验开关后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要指纹 → `_sg`） |
-| `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动） |
+| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + 组合历史走势 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要（`history_data` 的 max_drawdown_pct / annualized_volatility / total_return_pct / status）+ 辩论增强后缀（`llm_debate_conditional` / `llm_debate_qa_concentration`）+ 实验开关后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要指纹 → `_sg`） |
+| `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要 |
 | `penetration_deep` | 同 expert_review + 穿透 TOP10（含行业/板块） | 同上 + 穿透 mv/ratio/sector（full_penetration=True） |
 | `news_correlation` | 过滤后的新闻列表 + 持仓摘要 + 穿透资产 + 行业/概念数据 | 标题前 80 字 + 持仓指纹 |
 
-**提示词受开关影响时的缓存键纪律**：凡实验开关**改变提示词内容**（`signal_pre_digest` 注入信号块、`decision_header_parse` 追加决策头契约、`signal_ledger` 注入确定性信号摘要），**写侧指纹闭包**（`generators.py::_fingerprint`）与 **orchestrator 预检指纹**（`_compute_module_cache_info`）必须**无条件同调同一后缀函数**、开关判定收敛在函数内部。关闭时返回 `""`（键不变、不误伤旧缓存），开启时两侧同步换键——只改一侧会让预检命中旧键而跳过重生成，开关形同虚设。
+**模块指纹的唯一事实来源（读写同源）**：模块缓存键统一为 `CACHE_PREFIX_LLM + f"{模块}_{指纹}"`，由**预检侧**（`generators_orchestrator._compute_module_cache_info`，判断能否跳过生成）与**写侧**（`generators.py` 各生成函数的 `_fingerprint` 闭包，经 `skeleton.py` 组装同一形态的键）两侧分别拼装。四模块的指纹构造**一律**取自 `llm/module_fingerprint.py`——两侧调用同一函数、同一 `ModuleFingerprintInputs` 输入闭包，**新增影响内容的输入只需改一处**。
+
+历史教训：该纪律此前靠「两侧注释声明同调」维持，每逢新增输入都要两处手工各改一遍，漏改即产生**读写键永不同源**——预检 read 落空、每次报告全量派发，不报错、只表现为静默的性能与日志噪声（`history_data` 风险信号与辩论增强后缀各发生过一次）。故本条纪律的落实方式是**结构性收敛而非复查纪律**：任何一方若再自行拼接模块指纹即属违规。
+
+开关类后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要 → `_sg`、辩论增强 → `_c`/`_q`）**开关判定一律收敛在指纹构造器内部**：关闭时返回 `""`（键不变、不误伤旧缓存），开启时两侧同步换键——只改一侧会让预检命中旧键而跳过重生成，开关形同虚设。同源保证由 `src/test/unit/llm/test_module_fingerprint.py` 锁定（断言预检键 == 写侧键，覆盖四模块 × 多场景）。
 
 **结构化决策头（实验功能 `decision_header_parse`，默认关）**：开启时 `_build_expert_review_prompt` 在「### 操作建议」表之后追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约（`core/decision_header.build_structured_header_instruction()`，与解析器同源、由测试锁定互读）；关闭时 append 空串，提示词**逐字节不变**。该段只在标准模式 expert_review 生效，辩论模式路径不追加。解析侧归一见 `technical.md` §4.15。
 

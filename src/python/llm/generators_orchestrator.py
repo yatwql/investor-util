@@ -27,11 +27,7 @@ from src.python.llm.api_base import (
     LLM_TIMEOUT,
     _build_cache_hint_and_record,
 )
-from src.python.llm.fingerprint import (
-    build_llm_fingerprint,
-    compute_fingerprint,
-    get_cache_ttl_llm,
-)
+from src.python.llm.fingerprint import get_cache_ttl_llm
 from src.python.llm.fact_checker import run_fact_check
 from src.python.llm.generators import (
     generate_debate_procon,
@@ -40,17 +36,20 @@ from src.python.llm.generators import (
     generate_health_check,
     generate_penetration_deep_analysis,
 )
+from src.python.llm.module_fingerprint import (
+    ModuleFingerprintInputs,
+    expert_review_fingerprint,
+    global_macro_fingerprint,
+    health_check_fingerprint,
+    penetration_deep_fingerprint,
+)
 from src.python.llm.prompts import (
     CACHE_PREFIX_LLM,
     FAIL_REASON_DISABLED,
     LLM_MODULE_FAILURE,
     _build_competitive_context_block,
-    _signal_digest_cache_suffix,
 )
 from src.python.llm.skeleton import is_llm_module_enabled
-from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
-from src.python.core import signal_ledger  # 确定性信号沉淀摘要指纹后缀（同源现算）
-from src.python.core.decision_header import structured_header_cache_suffix
 from src.python.core.registry import get_llm_module_name, get_llm_module_names
 
 logger = logging.getLogger("invest")
@@ -113,17 +112,11 @@ def _compute_module_cache_info(
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
 
-    history_data 风险信号 Hash 加入专家/体检/穿透指纹。
-    pipeline_data 供信号预消化块计算指纹后缀（专家/体检两份）。
+    指纹一律取自 ``llm/module_fingerprint.py``（读写同源的唯一事实来源），
+    本函数**不再自行拼接**模块指纹——预检键与写侧键同源由结构保证，
+    而非靠两侧逐字对齐的注释纪律（历史偏差见该模块 docstring）。
     """
-    fp_global_macro = compute_fingerprint(
-        a_indices,
-        us_indices,
-        total_mv,
-        total_profit,
-        categories,
-    )
-    fp_expert_review = build_llm_fingerprint(
+    _inputs = ModuleFingerprintInputs(
         total_mv=total_mv,
         total_cost=total_cost,
         total_profit=total_profit,
@@ -132,48 +125,14 @@ def _compute_module_cache_info(
         penetrated_assets=penetrated_assets,
         categories=categories,
         history_data=history_data,
+        pipeline_data=pipeline_data,
+        a_indices=a_indices,
+        us_indices=us_indices,
     )
-    # 决策跨期反思闭环（decision_reflection）：预检指纹同样追加教训后缀，
-    # 与 generators.py expert_review 写侧闭包同调同源 → 预检键 = 读写键；
-    # 教训不变命中旧缓存，新结算 → 后缀变 → 预检 miss → 携带新教训重生成。
-    if decision_ledger.is_active():
-        fp_expert_review += decision_ledger.lessons_cache_suffix()
-    # 信号预消化（signal_pre_digest）：预检指纹同样追加信号块后缀，与 generators.py
-    # 写侧闭包同调同一函数（开关判定收敛在该函数内）——后缀表达式两侧逐字一致，
-    # 写侧修好任何键差时预检自动跟随；信号数值变化 → 后缀变 → 携带新信号重生成；
-    # 开关关闭 → ""（键不变、不误伤旧缓存）。
-    _signal_suffix = _signal_digest_cache_suffix(pipeline_data)
-    fp_expert_review += _signal_suffix
-    # 确定性数值信号沉淀（signal_ledger）：预检指纹同样追加同一后缀函数，与
-    # generators.py 写侧闭包同调同源；摘要文本变 → 后缀变 → 预检 miss → 带新摘要
-    # 重生成；关闭/样本不足 → ""（键不变、不误伤旧缓存）。开关判定收敛在该函数内。
-    fp_expert_review += signal_ledger.summary_cache_suffix()
-    # 结构化决策头（decision_header_parse）：预检指纹同样追加同一后缀函数，
-    # 与 generators.py 写侧闭包同调同源。开关关闭 → ""（键不变、不误伤旧缓存）；
-    # 开启 → 预检 key 与写侧 key 同步换键，避免预检误判命中而跳过重生成。
-    fp_expert_review += structured_header_cache_suffix()
-    fp_health_check = build_llm_fingerprint(
-        total_mv=total_mv,
-        total_cost=total_cost,
-        total_profit=total_profit,
-        total_today_profit=total_today_profit,
-        holdings_details=holdings_details,
-        penetrated_assets=penetrated_assets,
-        categories=categories,
-        history_data=history_data,
-    )
-    fp_health_check += _signal_suffix
-    fp_penetration_deep = build_llm_fingerprint(
-        total_mv=total_mv,
-        total_cost=total_cost,
-        total_profit=total_profit,
-        total_today_profit=total_today_profit,
-        holdings_details=holdings_details,
-        penetrated_assets=penetrated_assets,
-        categories=categories,
-        full_penetration=True,
-        history_data=history_data,
-    )
+    fp_global_macro = global_macro_fingerprint(_inputs)
+    fp_expert_review = expert_review_fingerprint(_inputs)
+    fp_health_check = health_check_fingerprint(_inputs)
+    fp_penetration_deep = penetration_deep_fingerprint(_inputs)
 
     force_flag = force
     info: dict[str, dict] = {
@@ -273,11 +232,16 @@ def _build_module_fns(
     competitive_context: str = "",
     metrics: dict | None = None,
     degradation_events: list[dict] | None = None,
+    history_data: dict | None = None,
 ) -> dict[str, Callable]:
     """构建 LLM 模块名称 → 生成函数闭包 的映射。
 
     模块级集中注册，新增 LLM 模块只需在此添加条目。
     每个闭包签名: (http_client, llm_config) → (result_str | None, from_cache)。
+
+    history_data 贯通到三个承接模块，使其写侧指纹与预检指纹同源（见
+    ``llm/module_fingerprint.py``）；漏传会让写侧指纹少一项风险信号摘要，
+    预检键永不命中。
     """
     return {
         "global_macro": lambda c, lc: generate_global_macro(
@@ -309,6 +273,7 @@ def _build_module_fns(
             pipeline_data=pipeline_data,
             competitive_context=competitive_context,
             metrics=metrics,
+            history_data=history_data,
         ),
         "health_check": lambda c, lc: generate_health_check(
             total_mv,
@@ -324,6 +289,7 @@ def _build_module_fns(
             llm_config=lc,
             pipeline_data=pipeline_data,
             degradation_events=degradation_events,
+            history_data=history_data,
         ),
         "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
             total_mv,
@@ -337,6 +303,7 @@ def _build_module_fns(
             force=force,
             http_client=c,
             llm_config=lc,
+            history_data=history_data,
         ),
     }
 
@@ -452,6 +419,7 @@ def _dispatch_llm_workers(
         competitive_context=_competitive_context,
         metrics=_metrics,
         degradation_events=_degradation_events,
+        history_data=history_data,
     )
 
     # ── 辩论模式路由：替换 expert_review 条目 ─────────────────

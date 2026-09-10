@@ -18,10 +18,14 @@ if TYPE_CHECKING:
 
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
-from src.python.llm.fingerprint import (
-    build_llm_fingerprint,
-    compute_fingerprint,
-    get_cache_ttl_llm,
+from src.python.llm.fingerprint import get_cache_ttl_llm
+from src.python.llm.module_fingerprint import (
+    ModuleFingerprintInputs,
+    debate_feature_cache_suffix,
+    expert_review_fingerprint,
+    global_macro_fingerprint,
+    health_check_fingerprint,
+    penetration_deep_fingerprint,
 )
 from src.python.llm.prompts import (
     _SYSTEM_DEBATE_CON,
@@ -36,11 +40,8 @@ from src.python.llm.prompts import (
     _build_global_macro_prompt,
     _build_health_check_prompt,
     _build_penetration_deep_prompt,
-    _signal_digest_cache_suffix,
 )
 from src.python.config.features import is_feature_enabled
-from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
-from src.python.core import signal_ledger  # 确定性信号沉淀摘要指纹后缀（同源现算）
 from src.python.core.decision_header import structured_header_cache_suffix
 from src.python.llm._hallucination_filter import _filter_hallucinated_codes
 from src.python.llm.skeleton import generate_llm_module
@@ -77,9 +78,17 @@ def generate_global_macro(
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），可选。
         holdings_details: 持仓明细（可选），用于提供 TOP3 排名，防止 LLM 虚构最大持仓。
     """
+    # 指纹构造统一走 llm/module_fingerprint.py（读写同源的唯一事实来源）
+    _global_macro_inputs = ModuleFingerprintInputs(
+        a_indices=a_indices,
+        us_indices=us_indices,
+        total_mv=total_mv,
+        total_profit=total_profit,
+        categories=categories,
+    )
 
     def _fingerprint():
-        return compute_fingerprint(a_indices, us_indices, total_mv, total_profit, categories)
+        return global_macro_fingerprint(_global_macro_inputs)
 
     def _prompt():
         return _build_global_macro_prompt(
@@ -109,23 +118,6 @@ def generate_global_macro(
         total_cost=total_cost,
         total_profit=total_profit,
     )
-
-
-def _build_feature_suffix() -> str:
-    """构建辩论模式组合的确定性缓存指纹后缀。
-
-    取各启用模式的代号字母排序后拼接（conditional=c, qa_concentration=q），
-    保证相同组合产生相同后缀，不同组合不会冲突。
-
-    Returns:
-        空字符串（无模式启用）或 "_cq" 等后缀（启用后）。
-    """
-    _parts = []
-    if is_feature_enabled("llm_debate_conditional"):
-        _parts.append("c")  # conditional
-    if is_feature_enabled("llm_debate_qa_concentration"):
-        _parts.append("q")  # qa_concentration
-    return "_" + "".join(sorted(_parts)) if _parts else ""
 
 
 def _compute_industry_concentration(
@@ -169,6 +161,7 @@ def generate_expert_review(
     pipeline_data: dict | None = None,
     competitive_context: str | None = None,
     metrics: dict | None = None,
+    history_data: dict | None = None,
 ) -> tuple[str | None, bool]:
     """生成智囊团深度复盘。
 
@@ -179,47 +172,32 @@ def generate_expert_review(
     Args:
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），可选。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
+        history_data: 组合历史走势数据（含风险指标），参与缓存指纹。
     """
-    _fp_suffix = _build_feature_suffix()
+    _fp_suffix = debate_feature_cache_suffix()
     _enable_conditional = "c" in _fp_suffix
     _enable_qa_concentration = "q" in _fp_suffix
     _enable_signal_digest = is_feature_enabled("signal_pre_digest")
     # 结构化决策头（decision_header_parse）：开关判定收敛在 suffix 函数内，
-    # 预检闭包同调同一函数保证读写键同源；关闭 → "" 且不追加提示词契约段。
+    # 关闭 → "" 且不追加提示词契约段；指纹侧由 module_fingerprint 同源现算。
     _structured_suffix = structured_header_cache_suffix()
     _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
+    # 指纹输入闭包与预检侧同构；后缀（辩论增强/教训/信号/决策头）统一在
+    # module_fingerprint 内拼接，读写键同源由结构保证。
+    _fingerprint_inputs = ModuleFingerprintInputs(
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
+        categories=categories,
+        history_data=history_data,
+        pipeline_data=pipeline_data,
+    )
 
     def _fingerprint():
-        fp = (
-            build_llm_fingerprint(
-                total_mv=total_mv,
-                total_cost=total_cost,
-                total_profit=total_profit,
-                total_today_profit=total_today_profit,
-                holdings_details=holdings_details,
-                penetrated_assets=penetrated_assets,
-                categories=categories,
-            )
-            + _fp_suffix
-        )
-        # 决策跨期反思闭环（decision_reflection）：追加教训指纹后缀（同源现算）。
-        # 结算落档 → 教训文本变 → 后缀变 → 读写键同变 → 缓存自然失效并带新教训重生成；
-        # 开关关闭/无有效样本 → "" → 缓存键与未注入时一致（不误伤旧缓存）。
-        # 与 generators_orchestrator 预检闭包同调 decision_ledger.lessons_cache_suffix()，
-        # 保证读写键同源（见 design §6.2）。
-        if decision_ledger.is_active():
-            fp += decision_ledger.lessons_cache_suffix()
-        # 信号预消化（signal_pre_digest）：信号块内容变 → 后缀变 → 缓存自然失效。
-        # 同样与 generators_orchestrator 预检闭包同调同一函数（开关判定收敛在函数内）。
-        fp += _signal_digest_cache_suffix(pipeline_data)
-        # 确定性数值信号沉淀（signal_ledger）：注入的统计摘要文本变（新信号落账 /
-        # 实时-非实时标签变化）→ 后缀变 → 缓存自然失效并带新摘要重生成。
-        # 与 generators_orchestrator 预检闭包同调同一函数（开关判定收敛在函数内），
-        # 关闭/样本不足 → ""（缓存键与未注入时一致，不误伤旧缓存）。
-        fp += signal_ledger.summary_cache_suffix()
-        # 结构化决策头（decision_header_parse）：契约段固定 → 固定后缀换键。
-        fp += _structured_suffix
-        return fp
+        return expert_review_fingerprint(_fingerprint_inputs)
 
     def _prompt():
         return _build_expert_review_prompt(
@@ -273,24 +251,25 @@ def generate_health_check(
     llm_config: dict | None = None,
     pipeline_data: dict | None = None,
     degradation_events: list[dict] | None = None,
+    history_data: dict | None = None,
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。"""
     _enable_signal_digest = is_feature_enabled("signal_pre_digest")
+    # 指纹输入闭包与预检侧同构（见 generate_expert_review 同名注释）。
+    _fingerprint_inputs = ModuleFingerprintInputs(
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
+        categories=categories,
+        history_data=history_data,
+        pipeline_data=pipeline_data,
+    )
 
     def _fingerprint():
-        fp = build_llm_fingerprint(
-            total_mv=total_mv,
-            total_cost=total_cost,
-            total_profit=total_profit,
-            total_today_profit=total_today_profit,
-            holdings_details=holdings_details,
-            penetrated_assets=penetrated_assets,
-            categories=categories,
-        )
-        # 信号预消化（signal_pre_digest）：见 generate_expert_review 同名注释，
-        # 与 generators_orchestrator 预检闭包同调同一函数保证读写键同源。
-        fp += _signal_digest_cache_suffix(pipeline_data)
-        return fp
+        return health_check_fingerprint(_fingerprint_inputs)
 
     def _prompt():
         return _build_health_check_prompt(
@@ -337,20 +316,24 @@ def generate_penetration_deep_analysis(
     force: bool = False,
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
+    history_data: dict | None = None,
 ) -> tuple[str | None, bool]:
     """生成穿透深度分析。"""
+    # 穿透深度分析的提示词不含信号块，指纹无后缀；风险信号摘要与其余
+    # 承接模块同口径（见 llm/module_fingerprint.py）。
+    _fingerprint_inputs = ModuleFingerprintInputs(
+        total_mv=total_mv,
+        total_cost=total_cost,
+        total_profit=total_profit,
+        total_today_profit=total_today_profit,
+        holdings_details=holdings_details,
+        penetrated_assets=penetrated_assets,
+        categories=categories,
+        history_data=history_data,
+    )
 
     def _fingerprint():
-        return build_llm_fingerprint(
-            total_mv=total_mv,
-            total_cost=total_cost,
-            total_profit=total_profit,
-            total_today_profit=total_today_profit,
-            holdings_details=holdings_details,
-            penetrated_assets=penetrated_assets,
-            categories=categories,
-            full_penetration=True,
-        )
+        return penetration_deep_fingerprint(_fingerprint_inputs)
 
     def _prompt():
         return _build_penetration_deep_prompt(
@@ -420,7 +403,7 @@ def generate_debate_procon(
     from src.python.llm.fingerprint import build_llm_fingerprint
 
     # ── 辩论模式 feature 组合 ──────────────────────────
-    _fp_suffix = _build_feature_suffix()
+    _fp_suffix = debate_feature_cache_suffix()
     _enable_conditional = "c" in _fp_suffix
     _enable_qa_concentration = "q" in _fp_suffix
     _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None

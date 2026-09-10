@@ -10,8 +10,8 @@
   - 章节编号暗号（"N 章"/"第 N 章"指代报告具体章节）检出，计数表述（共 N 章等）豁免
   - 迭代轮次暗号（"第 N 轮"/"轮N"指代开发迭代轮次）检出，计数/运行时表述（共 N 轮/
     轮询/轮动等）豁免
-  - 架构约束代号（C1~C20，technical.md 定义）在注释/文档正文属暗号须检出；约束定义处
-    （technical.md / llm-technical.md）豁免；非约束 C+数字（色值 C00000、C21+、内嵌
+  - 架构约束代号（C1~C21，technical.md 定义）在注释/文档正文属暗号须检出；约束定义处
+    （technical.md / llm-technical.md）豁免；非约束 C+数字（色值 C00000、C22+、内嵌
     AB14/MC19）不误伤
 
 测试通过脚本 import 方式直接复用 PATTERNS / EXCLUDE_LINE / 各扫描函数，
@@ -384,10 +384,11 @@ class TestDocTraceDetection:
         assert _doc_hit(doc_traces, "R17 兼容") is None
 
     def test_arch_constraint_cipher_flagged(self, doc_traces):
-        """文档正文架构约束代号（C1~C20）属暗号须检出（须改写为语义描述）。"""
+        """文档正文架构约束代号（C1~C21）属暗号须检出（须改写为语义描述）。"""
         flagged = [
             "C19 契约",
             "C20 图下说明",
+            "C21 指纹同源",
             "C1 约束：代码类型判定复用 code_utils",
             "C14 合规，不写 _ENV.globals",
         ]
@@ -395,10 +396,10 @@ class TestDocTraceDetection:
             assert _doc_hit(doc_traces, line) is not None, f"架构约束代号未检出: {line}"
 
     def test_arch_constraint_cipher_false_positives(self, doc_traces):
-        """非约束的 C+数字组合不得误伤：十六进制色值、C21+、内嵌命中。"""
+        """非约束的 C+数字组合不得误伤：十六进制色值、C22+、内嵌命中。"""
         legit = [
             "色值 C00000 不随版本变",
-            "C21 方案不在约束表",
+            "C22 方案不在约束表",
             "AB14 协议对接",
             "MC19 型号",
         ]
@@ -408,7 +409,7 @@ class TestDocTraceDetection:
 
 class TestDocCipherExemptFiles:
     """架构约束代号豁免文件：约束定义处（technical.md / llm-technical.md）
-    正文大量引用 C1~C20（技术名称表）属定义载体，豁免；其余文档（含
+    正文大量引用 C1~C21（技术名称表）属定义载体，豁免；其余文档（含
     trace-exempt 的计划/变更记录文档）正文一律禁。"""
 
     def _scan(self, doc_traces, name: str, content: str, chapter_only: bool) -> list:
@@ -423,14 +424,14 @@ class TestDocCipherExemptFiles:
         return [h for h in self._scan(doc_traces, name, content, chapter_only) if h[1] == "CIPHER"]
 
     def test_regular_doc_flagged_both_modes(self, doc_traces):
-        """普通文档（含 trace-exempt 的计划/变更记录）正文出现 C1~C20 一律检出。"""
+        """普通文档（含 trace-exempt 的计划/变更记录）正文出现 C1~C21 一律检出。"""
         content = "C19 契约注入 pipeline_data\n"
         for chapter_only in (False, True):
             hits = self._cipher_hits(doc_traces, "other.md", content, chapter_only)
             assert len(hits) == 1, f"chapter_only={chapter_only} 应检出 CIPHER: {hits}"
 
     def test_technical_md_exempt_both_modes(self, doc_traces):
-        """technical.md（约束定义处）正文引用 C1~C20 属定义载体，豁免。"""
+        """technical.md（约束定义处）正文引用 C1~C21 属定义载体，豁免。"""
         content = "C19 契约 / C20 图下说明 / C1 约束\n"
         for chapter_only in (False, True):
             hits = self._cipher_hits(doc_traces, "technical.md", content, chapter_only)
@@ -852,11 +853,11 @@ class TestTaskCodeCommentPatterns:
             assert _code_hit(code_traces, line) is None, f"合法字母+数字被误伤: {line}"
 
     def test_magic_number_letter_digit_flagged(self, code_traces):
-        """MAGIC：注释中"字母+数字/连续字母+数字"（R11/P1/C21/AB14/HH6）属魔法编号须检出。"""
+        """MAGIC：注释中"字母+数字/连续字母+数字"（R11/P1/C22/AB14/HH6）属魔法编号须检出。"""
         flagged = [
             "P1 优先级",
             "R17 兼容",
-            "C21 兼容",  # 超出 C1~C20 范围仍是字母+数字，属魔法编号
+            "C22 兼容",  # 超出 C1~C21 范围仍是字母+数字，属魔法编号
             "AB14 兼容",  # 连续字母+数字（内嵌命中也是魔法编号）
             "MC19 协议",
             "D8 数据",
@@ -911,13 +912,14 @@ class TestTaskCodeCommentPatterns:
             assert _code_hit(code_traces, line) is None, f"合法字母_数字被误伤: {line}"
 
     def test_arch_constraint_codes_flagged(self, code_traces):
-        """架构约束代号（C1~C20，technical.md 定义）在注释中属暗号须检出。"""
+        """架构约束代号（C1~C21，technical.md 定义）在注释中属暗号须检出。"""
         flagged = [
             "C1 约束：代码类型判定复用 code_utils",
             "C3 原子写入",
             "C8 日志统一",
             "C14 合规，不写 _ENV.globals",
             "C20 图下说明",
+            "C21 指纹同源",
         ]
         for line in flagged:
             assert _code_hit(code_traces, line) is not None, f"架构约束代号未检出: {line}"

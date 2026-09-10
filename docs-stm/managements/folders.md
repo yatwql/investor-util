@@ -161,6 +161,7 @@ investor-util/
 │   │   │   ├── _hallucination_filter.py #   LLM 幻觉过滤
 │   │   │   ├── _llm_news_correlation.py #  新闻关联责任单元（模块级结果缓存/闭包/安全直调，聚合门面 re-export）
 │   │   │   ├── markdown.py           #   LLM 输出 Markdown 解析/格式化
+│   │   │   ├── module_fingerprint.py #   各 LLM 模块缓存指纹唯一事实来源（预检侧与写侧同源）
 │   │   │   ├── pricing.py            #   Token 计费与用量统计
 │   │   │   ├── prompts.py            #   提示词模板库
 │   │   │   ├── prompts_action.py     #   LLM 分析模块提示词构造（全局政经/智囊团复盘/体检/穿透）
@@ -476,6 +477,7 @@ investor-util/
 │       │   │   ├── test_fingerprint.py        #   缓存指纹测试
 │       │   │   ├── test_generators.py         #   全局提示词生成测试
 │       │   │   ├── test_llm_chain_strategies.py  #   链路调度器全策略端到端
+│       │   │   ├── test_module_fingerprint.py  #   模块缓存指纹读写同源测试
 │       │   │   ├── test_llm_analysis.py       #   LLM 分析测试
 │       │   │   ├── test_llm_api.py            #   LLM API 主入口测试
 │       │   │   ├── test_llm_api_base.py       #   LLM API 基类测试

@@ -87,12 +87,13 @@ class TestDebateProconFlow(unittest.TestCase):
         )
         from src.python.llm.generators import generate_debate_procon
 
+        # 开关两处读点都要打桩：generators 用于推导 prompt 分支，
+        # module_fingerprint 用于推导缓存后缀（读写同源的唯一事实来源）。
+        _flag = lambda flag: flag == "llm_debate_conditional"  # noqa: E731
         with (
             patch("src.python.llm.generators.generate_llm_module") as mock_gen,
-            patch(
-                "src.python.llm.generators.is_feature_enabled",
-                side_effect=lambda flag: flag == "llm_debate_conditional",
-            ),
+            patch("src.python.llm.generators.is_feature_enabled", side_effect=_flag),
+            patch("src.python.llm.module_fingerprint.is_feature_enabled", side_effect=_flag),
         ):
             mock_gen.side_effect = [
                 ("600519 贵州茅台适合长期持有。", False),

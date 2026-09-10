@@ -2472,7 +2472,7 @@ report/decision_llm_capture.py   # 抽取：结构化优先 → 表格兜底
 **结构化决策头（实验开关 `decision_header_parse`，默认关）**：开启时提示词末尾追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约；抽取侧先 `parse_structured_header` 读结构化头，逐字段归一校验（`action` 必须经上述判据归一为方向，否则丢弃该条；`code` 必须 6 位数字），全批不可用 → 回落确定性表格解析。两路产物形状统一为 `{code, name, direction, magnitude, detail, …}`（结构化头的 `priority` 在解析侧即归一为 `magnitude`），`_collect_decision` 对两路走同一段登记纪律（持有剔除 / code 白名单 / 名称回填 / 同码取高）。
 
 - **载荷提取用花括号配平扫描**（字符串/转义感知），而非 `find("{")`/`rfind("}")`——后者在同一行出现两个 JSON 对象时会把跨度拉通成非法 JSON；`决策头：` 后为空行时以空串兜底，不抛 `IndexError`。
-- **缓存键同源**：开关影响提示词 → **写侧指纹**（`llm/generators.py::_fingerprint`）与**预检指纹**（`llm/generators_orchestrator.py::_compute_module_cache_info`）无条件同调 `structured_header_cache_suffix()`，开关判定收敛在函数内部。关闭返回 `""`（键不变、不误伤旧缓存）；开启两侧同步换键，避免预检命中旧键而跳过重生成使开关形同虚设。关闭时提示词**逐字节不变**。
+- **缓存键同源**：开关影响提示词 → **写侧指纹**与**预检指纹**都取自 `llm/module_fingerprint.py::expert_review_fingerprint()` 内无条件调用的 `structured_header_cache_suffix()`（开关判定收敛在函数内部）。关闭返回 `""`（键不变、不误伤旧缓存）；开启两侧同步换键，避免预检命中旧键而跳过重生成使开关形同虚设。关闭时提示词**逐字节不变**。
 
 **架构约束遵从**：
 
@@ -2518,7 +2518,7 @@ llm/skeleton.py            # 摘要注入 expert_review 提示词（开关门控
 
 **记录与幂等**：`id = {report_date}|{signal_type}|{subject}`；`append_signals` 批量读一次 → 按 id 去重（含批内重复）→ 一次原子写。同日重跑不重复入账（`registered` 归零、`skipped` 计数），次日照常入账。非有限数值（`NaN`/`±inf`）经 `_safe_number` 归一为 `None` 后才落盘，防写出非法 JSON。
 
-**摘要与缓存键同源**：`summary_block()` 在开关关闭、或实时样本不足 `MIN_SUMMARY_SAMPLE` 时返回 `""`（判定无条件执行，故「开关关闭 → 全链路无感」在注入路径同样成立）；输出逐类一行 + 非实时备注。开关影响提示词 → **写侧指纹**（`llm/generators.py::_fingerprint`）与**预检指纹**（`llm/generators_orchestrator.py::_compute_module_cache_info`）同调 `signal_ledger.summary_cache_suffix()`（无块返回 `""`，有块返回 `_sg` + 摘要 md5 前 12 位），开关判定收敛在函数内部。
+**摘要与缓存键同源**：`summary_block()` 在开关关闭、或实时样本不足 `MIN_SUMMARY_SAMPLE` 时返回 `""`（判定无条件执行，故「开关关闭 → 全链路无感」在注入路径同样成立）；输出逐类一行 + 非实时备注。开关影响提示词 → **写侧指纹**与**预检指纹**都取自 `llm/module_fingerprint.py::expert_review_fingerprint()` 内无条件调用的 `signal_ledger.summary_cache_suffix()`（无块返回 `""`，有块返回 `_sg` + 摘要 md5 前 12 位），开关判定收敛在函数内部。
 
 **报告 seam（5d）**：登记置于决策头结构化（5c）之后、`perf.stop()` 之前，而非更早的分析阶段——尾部风险等键在 LLM 生成阶段才注入 `pipeline_data`，过早登记会漏采。适配器对缺失键逐项跳过，故不构成硬依赖；登记整体包在 `try/except` 中，异常只告警不中断报告生成。
 
@@ -2995,7 +2995,7 @@ make_http_client(timeout=10.0) → httpx.Client
 
 ### 6.7 功能语义命名表
 
-> **纪律**：英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。语义名即代码名——任务代号不进入实现层（禁止用任何任务编号/F 系列/`plan-N`/`rf-N` 命名），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表（`plan.md`/`review-findings.md`）链接锚点。新增功能**先定语义名再设计**。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE，退出码 2）+ `scripts/check-semantic-index.py --ci`（正面校验本表与代码正反向一致），并已纳入「架构设计约束」章节的约束外参照（见该章节开头）。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（如 `C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。
+> **纪律**：英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。语义名即代码名——任务代号不进入实现层（禁止用任何任务编号/F 系列/`plan-N`/`rf-N` 命名），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表（`plan.md`/`review-findings.md`）链接锚点。新增功能**先定语义名再设计**。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE，退出码 2）+ `scripts/check-semantic-index.py --ci`（正面校验本表与代码正反向一致），并已纳入「架构设计约束」章节的约束外参照（见该章节开头）。注：小写短局部名（`h1/t1/f1`）与 Excel 单元格（`A1:B1`）等结构性记号属合法豁免。
 >
 > 以下为当前已实现功能/合并章的语义命名索引（活索引），以本表为唯一现状基准。
 
@@ -3025,6 +3025,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `config_backup` | 配置写前备份（`.bak` 单槽轮转） | Web 配置 | 配置编辑 | 无（安全面） |
 | `report_section_order` | 报告模块序号配置（键=模块标识，值=序号；空对象用默认 19 项顺序） | 报告编排 | 报告配置 | 顶层配置键 `report_section_order`（`get_report_section_order()` 读取，`llm_usage` 强制末位） |
 | `generators_news` | 财经新闻 LLM 关联分析（新闻热词→持仓关联二次生成） | 财经新闻热点与持仓关联分析 | LLM 生成 | 随 `enable_news` + LLM 启用 |
+| `module_fingerprint` | LLM 模块缓存指纹唯一事实来源（预检侧与写侧同源） | LLM 生成 | LLM 生成 | 无（模块级） |
 | `log_reader` | 日志读取（read_log/tail_log/parse_log） | 日志可视化 | 诊断 | 无（模块级） |
 | `view_logs` | 查看日志（CLI view-logs 子命令） | 日志可视化 | 诊断 | 无（子命令） |
 | `health_history` | 数据源健康历史（load_health_history/summarize_health_history） | 日志可视化 | 监控 | data/state/datasource_health.jsonl |
@@ -3121,7 +3122,7 @@ web/ (Web 服务层，薄入口)
 本节定义系统架构层面的**设计约束**。所有新增或修改的代码必须遵守，违反即视为架构违规。
 约束按职责域分组，每个约束包含：设计目的（为何存在）、违反后果（不遵守的影响）、适用范围（哪些模块/场景受约束）。
 
-> **约束外参照（语义命名纪律）**：除上表 C1~C20 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
+> **约束外参照（语义命名纪律）**：除上表 C1~C21 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
 
 ### 8.1 数据获取层约束
 
@@ -3156,6 +3157,7 @@ web/ (Web 服务层，薄入口)
 | **C9** | **LLM 模块注册** — 新增 LLM 分析模块时，必须在 `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `core/registry.py` 的 `DataModuleDef` 注册表中同时注册（详见 `llm-technical.md` §12） | 仅在 orchestrator 注册会导致缓存/TTL/统计遗漏；仅在 registry 注册会导致编排调度遗漏 | LLM 调度遗漏、缓存 TTL 未定义、用量统计缺失 | llm/ 包 + core/registry.py |
 | **C17** | **Multi-LLM Provider Chain** — 所有 LLM API 调用必须通过 Provider Chain（`strategy.py` + `api.py`）路由，`call_llm()` 返回 `(result, usage, provider_name)` 三元组，provider_name 记录实际使用的 Provider 条目名（详见 `llm-technical.md` §5.2） | 手动切换 Provider 导致配置散落、失败无法递补、Provider 名称不可追踪 | API 调用不经过 Chain → 无法自动递补、Provider 名称缺失 → 缓存键冲突、用量统计不准确 | llm/api.py、llm/skeleton.py、llm/strategy.py |
 | **C18** | **credentials_ref 凭据分离** — API 凭据（api_key/model/endpoint）必须通过 `llm_key.json` 的 `credentials_ref` 引用，禁止在 `llm_providers.json` 中直接存储敏感凭据（详见 `llm-technical.md` §5.3） | 凭据与路由配置混存导致凭据泄露风险；凭据变更时需同时修改两份配置 | 凭据泄露风险、凭据变更需多处修改、凭据复用困难 | data/config/llm_providers.json、data/config/llm_key.json、config/_core.py、llm/api.py |
+| **C21** | **LLM 模块缓存指纹唯一事实来源** — 各 LLM 模块的缓存指纹（写侧与预检侧共用的那一个哈希）必须由 `llm/module_fingerprint.py` 的 `MODULE_FINGERPRINT_BUILDERS` 统一构造，写侧（`generators.py` 各生成器）与预检侧（`generators_orchestrator.py::_compute_module_cache_info`）只允许调用同一构建函数，禁止任一环节自行拼接指纹片段（详见 `llm-technical.md` §13.1） | 指纹决定缓存键，缓存键必须读写同源。两侧各自拼接时，任一侧新增一个影响提示词的入参/开关后缀而未同步另一侧，两侧计算结果即永久不等——写侧照常写入，预检侧却永不命中，表现为「开关/参数看似生效但每次仍全量调用 LLM」的静默性能退化与日志噪声，且因无异常而极难察觉 | 预检缓存恒不命中 → 每次报告重复调用 LLM（费用与耗时翻倍）、日志噪声；反向漂移则命中过期键导致提示词开关形同虚设 | llm/module_fingerprint.py（唯一构造点）、llm/generators.py、llm/generators_orchestrator.py |
 
 ### 8.5 基础设施约束
 

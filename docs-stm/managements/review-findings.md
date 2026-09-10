@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.17-dev
-> **编号源**：`rf-next = 305`（新增问题取此编号，完成后更新为 +1；已用最大 rf-304，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 306`（新增问题取此编号，完成后更新为 +1；已用最大 rf-305，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -38,18 +38,24 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
-#### P2D — LLM 缓存指纹同源偏差（2026-09-10 plan-31 实现期自审发现）
+#### P2D — LLM 缓存指纹同源与覆盖问题（2026-09-10 plan-31 实现期自审发现）
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
+| **rf-305** | LLM 模块缓存指纹**覆盖不足（欠敏感）**——与「读写不同源」属不同类别：`competitive_context`（`_build_competitive_context_block` 生成的业绩基准与竞品对比块）与 `metrics`（量化指标）**参与提示词构造，却不进入任何模块指纹**。当持仓未变、但基准指数或竞品行情变动使对比块内容变化时，指纹不变 → 预检命中旧键 → 运行期直接复用旧内容，**提示词与缓存键脱钩**。两侧一致缺失（写侧与预检侧同缺 `competitive_context`/`metrics`），因此不产生恒 miss，而是**恒命中过期内容**，用户感知弱 | 先量化再决定：纳入 `ModuleFingerprintInputs` 可消除陈旧内容，但会提高未命中率（基准/指标微变即换键 → LLM 重算成本上升），须用真实持仓测量命中率与费用变化后取舍。**改动前须先补覆盖性断言测试**（对比块内容变化 → 指纹随之变化）。低优先级：内容陈旧度受报告生成节奏限制 |
 #### P2E — DeepSeek 旧模型名定价口径待确认（2026-09-10 接入 `deepseek-flash` 时自审发现）
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
 | **rf-303** | 接入 V4.1-Flash 正式名时核对 `MODEL_PRICING` 的 DeepSeek 条目，发现两处既有口径未经官方确认：① **`deepseek-reasoner` 无定价条目**——该模型名目前仍被 DeepSeek 端点接受，但 `estimate_cost()` 对其返回 `"-"`，费用页签显示为空；② **`deepseek-chat` 单价来源存疑**——本表按 V3（1.50/4.50/0.05）单独定价，而 DeepSeek 文档称 `deepseek-chat` 与 `deepseek-reasoner` 分别是 V4-Flash 的「非思考 / 思考模式」别名（若属实，二者应随 flash 系列走 09-10 降价后的 1.00/4.00/0.02，且 `deepseek-reasoner` 应有条目） | 以 DeepSeek 官方文档确认两个模型名的**当前语义与单价归属**后再定：若确为 v4-flash 别名，则为 `deepseek-reasoner` 增加条目并核对 `deepseek-chat` 单价（须同步 `[0.10.16]` 起 flash 系列降价口径）；若 `deepseek-chat` 已固化为独立 V3 端点则维持现值并补注释说明。**改动前须先补「模型名 → 单价」断言测试**，避免误改导致费用估算偏移。低优先级：项目配置、文档示例与测试均未使用这两个模型名 |
 
-| **rf-297** | `generators_orchestrator._compute_module_cache_info` 对 expert_review / health_check / penetration_deep 三个模块构建指纹时传 `history_data=history_data`（`build_llm_fingerprint` 会把它抽取成 `_risk_signals` 并入哈希），而 `generators.py` 三个写侧 `_fingerprint()` 闭包**完全不传** `history_data`（`_risk_signals` 恒为 `{}`）→ 两侧哈希必然不同（实测 `41e560ba67fe` ≠ `259afccbd62e`）→ 预检 `cache_get(cache_info["key"])` 对这三个模块**永不命中**，每次报告都全量派发。**非正确性缺陷**（内层 `generate_llm_module` 用写侧键读写缓存，内容仍正确复用），属性能与日志噪声；但预检形同虚设，易误判为"缓存未命中率高" | 二选一对齐：① 预检侧不传 `history_data`；② 写侧闭包补传并核对 `history_data` 在两侧可取到同一对象（须确认 `build_llm_fingerprint` 的 `history_data` 语义对三个模块等价）。**必须先补两侧指纹一致的回归测试**（断言 `_compute_module_cache_info` 的 key 与写侧 `fingerprint_fn()` 拼接结果相等）再改，避免修复引入缓存永久 miss；另需评估 `_module_labels` 事实校验按 `cached` 跳过的分支不受影响。关联 plan-31（其信号后缀已按同源纪律两侧同调，未触碰本偏差） |
 ## 已解决问题
+
+### 已解决待归档（v0.10.17-dev）
+
+| # | 问题摘要 | 解决方式 |
+|---|----------|----------|
+| **rf-297** | 预检侧与写侧各自拼接同一模块的缓存指纹，已双向漂移（预检侧计入组合风险信号而写侧未计入；写侧计入辩论增强后缀而预检侧未计入）→ 三个模块的读写键永不相等，预检恒不命中、每次报告全量派发 LLM | 抽取 `llm/module_fingerprint.py` 作为模块缓存指纹的**唯一事实来源**，写侧与预检侧改为调用同一构建函数（后缀判定收敛进函数内部），`history_data` 两侧一致计入；该同源要求同时写入技术设计文档的架构设计约束表。变更详情见 changelog.md [0.10.17-dev] 对应条目 |
 
 ### 已解决待归档（v0.10.16-dev）
 
