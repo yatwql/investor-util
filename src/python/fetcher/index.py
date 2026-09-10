@@ -235,7 +235,7 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     if cached is not NOT_FOUND:
         return cached
 
-    # 美股指数使用独立 chain（新浪优先，腾讯备用；腾讯 K-line 不支持 gb_* 代码）
+    # 美股指数使用独立 chain（新浪优先，腾讯备用；腾讯 K-line 对 gb_* 支持有限）
     from src.python.core.code_utils import is_us_index_code
 
     chain_name = "history_index_us" if is_us_index_code(code) else "history_index"

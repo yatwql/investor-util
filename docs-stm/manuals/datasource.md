@@ -9,7 +9,7 @@
 | A 股指数行情 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` | `index_` | 持仓类 |
 | 美股指数行情 | 新浪财经 `hq.sinajs.cn`（gb_* 前缀） | 腾讯财经 `qt.gtimg.cn` | `index_` | 持仓类 |
 | 基金业绩排名 | 天天基金 `fund.eastmoney.com`（`pingzhongdata/{code}.js` JS 变量解析） | — | `fund_perf_` | 基础类 |
-| 基金持仓数据 | 天天基金 `fundf10.eastmoney.com`（HTML 解析） | — | `fund_hold_` | 基础类 |
+| 基金持仓数据 | 天天基金 `fund.eastmoney.com/{code}.html`（HTML 解析） | 天天基金 `fundf10.eastmoney.com`（季报 API `FundArchivesDatas.aspx`，回溯 4 个季度） | `fund_hold_` | 基础类 |
 | 基金经理数据 | 天天基金 `fund.eastmoney.com/{code}.html`（HTML 解析，与基金业绩排名同源） | 天天基金 `fundf10.eastmoney.com/jjjl_{code}.html`（档案页） | `fund_manager_` | 基础类 |
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业 + 概念板块归属） | 东方财富 REST 行情页（仅行业，无概念） | `industry_` | 基础类 |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `profit_forecast_` | 基础类 |
@@ -51,7 +51,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 由 `fetcher/index.py` 通过 Provider Chain 获取（`fetch_with_incremental_fallback`）：
 
 - **A 股指数** → `history_index` 通道：腾讯财经 → 新浪财经（备用）
-- **美股指数** → `history_index_us` 通道：新浪财经 → 腾讯财经。两者共用指数 K 线函数，但新浪只实现指数实时行情、未实现 K 线（探测到即跳过），实际发起请求的只有腾讯；而腾讯 K 线接口对 `gb_*` 代码支持有限，因此该通道可能整链取空——空结果按正常降级记录（成因与现状见 `datasource-reliability.md` §4.2）
+- **美股指数** → `history_index_us` 通道：新浪财经 → 腾讯财经。两者共用指数 K 线函数（`fetch_index_kline`），新浪侧实现位于 `providers/sina_kline.py`，但其 `getKLineData` 端点对全部代码返回 404/空，实际取数通常由腾讯完成；而腾讯 K 线接口对 `gb_*` 代码支持有限，因此该通道可能整链取空——空结果按正常降级记录（成因与现状见 `datasource-reliability.md` §4.2）
 - **风格与因子分析·风格因子回归**（`analysis/style_factor_regression.py`，写入 `style_factor_data` 契约）复用 `history_index` 通道，并行拉取 CSI 风格因子指数 K 线（价值=sh000919、成长=sh000925、质量=sh000930）与基准指数（沪深300 sh000300）做 OLS 回归。因子指数不注册到 `_A_INDICES`（避免污染实时指数循环 fetch_indices），无专属缓存前缀，随 `history_index_` 统一按 TTL 管理
 - **风格与因子分析·行业 Beta 子表**（`analysis/industry_beta.py`，内嵌于 `style_factor_data.industry_beta`，开关 `report_submodules.industry_beta` 默认关）复用 `history_index` 通道拉取中证行业指数 K 线（`INDUSTRY_INDEX_MAP`：银行=sh000986、证券=sz399975、白酒/食品饮料=sz399997、半导体/电子=sz399995、有色/贵金属=sz399996、煤炭=sz399998、医药=sz399989、钢铁=sz399994、房地产=sh000980、能源=sh000928、环保=sz399973、保险=sz399983）做单因子 OLS（复用 `compute_factor_exposure`，不重复实现）；行业分类复用 `batch_fetch_industry_data`（`industry_` 前缀缓存）
 
@@ -78,7 +78,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 | 机构盈利预测 | 不定期更新 | 基于券商研报汇总，时效性取决于研报发布时间 |
 | 行业资金流向 | 交易日实时 | akshare 今日排名，非交易日或盘前为空 |
 | 无风险利率 | 每日更新 | akshare 获取中国 10Y 国债收益率，config 可手动覆盖 |
-| 股票/ETF 历史日线 | 交易日更新 | 包含前复权数据，含涨跌幅、成交量、换手率 |
+| 股票/ETF 历史日线 | 交易日更新 | 包含前复权数据，含开高低收与成交量（涨跌幅由相邻交易日收盘价推得；换手率另由组合两期持仓计算，取自行情 K 线之外） |
 
 ---
 
@@ -93,7 +93,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 | 新闻为空 | 网络异常、选中的新闻源全量不可用 | 自动跳过该源，其他源正常采集 |
 | 行业资金流向为空 | 非交易日、数据源休息 | 显示占位，不影响其他数据模块 |
 
-> 所有数据请求均经过 Provider Chain 处理：首次重试（最多 3 次）→ 熔断（持续失败时开启）→ 降级使用过期缓存（如有）。日志中 WARNING 级别的消息对应数据降级事件，属正常行为。
+> 所有数据请求均经过 Provider Chain 处理：单个 provider 失败即切换链上下一个源 → 连续失败达阈值（3 次，行业链 6 次）后熔断该源 → 全部源不可用时降级使用过期缓存（如有）。日志中 WARNING 级别的消息对应数据降级事件，属正常行为。
 
 ### akshare 兼容性
 
