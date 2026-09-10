@@ -1,5 +1,5 @@
 # 测试覆盖统计
-> 文档版本：0.10.16-dev
+> 文档版本：0.10.16
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。`模式对应测试量` 表由 `--mode bench --update-docs` 自动回填本机实测；功能域/分组等子表精确统计请运行 `scripts/collect-test-coverage.py`（或 `pytest src/test/ --collect-only -q`）获取实时计数。
 
@@ -10,23 +10,23 @@
 <!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **5778** | ~15s |
-| `standard` | **4950** | ~14s |
-| `scenario` | **241** | ~17s |
+| `unit` | **5954** | ~15s |
+| `standard` | **5107** | ~15s |
+| `scenario` | **241** | ~18s |
 | `regression` | **241** | ~17s |
-| `dev-verify` | **2217** | ~22s |
-| `verify` | **3850** | ~9s |
-| `integration` | **281** | ~12s |
-| `edge` | **761** | ~13s |
+| `dev-verify` | **2328** | ~23s |
+| `verify` | **3979** | ~10s |
+| `integration` | **281** | ~13s |
+| `edge` | **780** | ~13s |
 | `data` | **69** | ~2s |
-| `all` | **6087** | ~21s |
+| `all` | **6263** | ~21s |
 | `smoke` | **26** | ~2s |
-| `report` | **1700** | ~12s |
+| `report` | **1730** | ~12s |
 | `all_no_unit` | **309** | ~14s |
 | `scenario_extreme` | **9** | ~2s |
 <!-- mode-count-table:end -->
 
-> 注：典型耗时按 2026-08-17 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新模式对应测试量 + 下方两张环境耗时对照表。
+> 注：典型耗时按 2026-09-10 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新模式对应测试量 + 下方两张环境耗时对照表。
 >
 > 注：`模式对应测试量` 表覆盖项数为 pytest 实测执行计数（含参数化展开），由 `--mode bench --update-docs` 自动回填；功能域/场景分组/单元分组/跨类等子表为 `scripts/collect-test-coverage.py` 收集快照（仅收集不执行，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。`perf`/`security` 为定向 mode（`scenario_perf`/`scenario_security` 独立标记，手工/发布前运行）**不进 bench**，故不在本表，计数见 `collect-test-coverage.py` 输出（perf: 5 / security: 9）。
 
@@ -63,13 +63,13 @@
 | `--mode` | dragonball（2026-09-10 实测） | stallman-NB1（2026-08-06 实测） |
 |:---------|:---------------------------:|:---:|
 | `unit` | ~15s | ~4min |
-| `standard` | ~14s | ~4min |
-| `scenario` | ~17s | ~3min |
+| `standard` | ~15s | ~4min |
+| `scenario` | ~18s | ~3min |
 | `regression` | ~17s | ~3min |
-| `verify,regression` | ~26s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
-| `dev-verify` | ~22s | ~2min |
-| `verify` | ~9s | ~46s |
-| `integration` | ~12s | ~1min |
+| `verify,regression` | ~27s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
+| `dev-verify` | ~23s | ~2min |
+| `verify` | ~10s | ~46s |
+| `integration` | ~13s | ~1min |
 | `edge` | ~13s | ~32s |
 | `data` | ~2s | ~14s |
 | `all` | ~21s | ~3min |

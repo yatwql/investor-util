@@ -4,7 +4,13 @@
 
 ---
 
-## [0.10.16-dev] - 开发中（未发布）
+## [0.10.16] - 2026-09-10
+
+### 版本发布 v0.10.16（2026-09-10）
+
+- **发布流程**：P2 发布门禁通过（`test-runner --mode verify,regression` 4219 通过 0 失败 + code/doc/task-numbering/semantic-index 四检查全绿 + 发布手动验证 `--mode perf,security` 14 通过）；版本号全链一致化至 v0.10.16（constants.py / pyproject.toml / README / 10 份管理文档）；发布数据文档刷新（`--mode bench --update-docs` 回填模式对应测试量与 dragonball 环境耗时对照；folders.md 测试代码 336 文件 94,305 行、测试用例 6,263；datasource-reliability.md 补记链路失败原因可读与 `doctor` 自检的分工）。
+- **版本标签**：`git tag v0.10.16` 已打并推送，发布可追溯。
+- **已解决项归档**：v0.10.16-dev 已解决项（rf-295 ~ rf-304；rf-297 与 rf-303 仍待办）整体迁入 `docs-stm/archive/v0.10.x/archived_review-findings.0.10.x.md` v0.10.16 章节，原文件保留待办区与归档引用。
 
 ### DeepSeek V4.1-Flash 正式模型名接入（`deepseek-flash`）（2026-09-10）
 

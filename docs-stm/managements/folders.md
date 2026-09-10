@@ -1,5 +1,5 @@
 # 目录结构
-> 文档版本：0.10.16-dev
+> 文档版本：0.10.16
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -12,7 +12,7 @@
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 21 | 7,171 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
 | **源代码合计** | — | **286** | **75,381** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **336** | **94,304** | `src/test/` 所有 `.py` 文件 |
+| **测试代码** | Python | **336** | **94,305** | `src/test/` 所有 `.py` 文件 |
 | **测试用例** | — | — | **6,263 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **4,991** | 含 README.md（201 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,790 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
