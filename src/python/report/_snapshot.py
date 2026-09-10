@@ -29,7 +29,7 @@ def capture_snapshot(
         reporter: 进度报告接口
         snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域），
             差异计算基于同域上一份快照、保存与清理均在域内闭环
-        extra: 额外扩展字段（如 risk_metrics），透传到 pipeline_data
+        extra: 额外扩展字段（调用方 kwargs），透传到 pipeline_data
 
     Returns:
         pipeline_data 字典（含 diff），首次运行或异常时返回 None。
@@ -133,7 +133,7 @@ def capture_snapshot(
                 },
                 "data_degradation": _get_degradation_tracker().get_log(),
             }
-            # 透传额外扩展字段（risk_metrics / portfolio_daily_returns）
+            # 透传额外扩展字段（调用方 kwargs，如测试注入 risk_metrics）
             if extra:
                 pipeline_data.update(extra)
         reporter.ok("环比对比数据准备完成")

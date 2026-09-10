@@ -3597,6 +3597,12 @@ investor-util/
 | fund_flow_data | dict | 是 | prepare_report_data |
 | valuation_data | dict | 是 | prepare_report_data |
 | market_temperature_data | dict | 是 | prepare_report_data |
+| diff | dict | 是 | capture_snapshot |
+| decision_review_data | dict | 是 | record_llm_decisions_and_review_block |
+
+> `diff`（环比对比差异，C19 契约，9 键）：`{"is_first_check": bool, "total_value_diff": float, "total_value_diff_pct": float, "total_pnl_diff": float, "days_since_last_report": int, "added": list[dict], "removed": list[dict], "increased": list[dict], "decreased": list[dict]}`。四组明细每项含 `name`/`code`/`action`/`shares_diff`/`value_diff`（新增/清仓/加仓/减仓）。由 `capture_snapshot()`（`report/_snapshot.py`）基于**同快照域**上一份快照用 `fetcher/history_diff.HistoryDiff` 计算；首次运行（`is_first_check`）或异常时整个 `pipeline_data` 为 None（键缺席，下游按 `.get()` 判空）。校验入口 `report/pipeline_data_builder.py::build(diff=...)`（`_validate_diff` 子键深层类型校验）。消费方：汇总 Excel 环比 δ 列（`report/excel_generator.py`）、行动章环比上下文（`report/_report_helpers.py`）、LLM 环比差异段落（`llm/prompts_core.py`）。
+
+> `decision_review_data`（决策复盘区块，C19 契约，实验功能「决策跨期反思闭环」开启时才有）：行动章内嵌复盘表数据，由 `report/decision_review_block.py::build_review_block(report_date=...)` 从决策账本（`core/decision_ledger`）装配，在 `report/_experimental_seams.py::record_llm_decisions_and_review_block` 注入（开关关闭或区块为空 → 键缺席，两条输出路径保持既有输出）。消费方：HTML `partials/action_section.html` 与 Excel `report/action_sheet.py`（均按 `.get()` 消费，键缺席即不渲染）。类型校验：`report/pipeline_data_builder.py::_PIPELINE_DATA_TYPE_MAP`。
 
 > `valuation_data`（估值分位，C19 契约，3 键 + 内嵌 `by_code` 子键）：`{"available": bool, "status": str, "by_code": {code: {"pe": float\|None, "pb": float\|None, "price_percentile": float\|None, "tier": str\|None, "sample_count": int, "percentile_available": bool}}}`。当前 PE/PB 由 `fetcher/industry.py::fetch_valuation_fields`（网关入口；东财 push2 扩展字段 f9/f23 与行业分类同属一次请求，经 Provider Chain + 文件/会话缓存取用，报告层不得直连 provider）；`price_percentile` 为历史 K 线价格分位代理（0~100，`analysis/valuation_percentile.py`，MIN_SAMPLES=60），非真实历史估值分位（盈利增长未纳入，渲染层必须展示 `DISCLAIMER`"价格分位代理，非真实历史估值分位"）。由 `report/orchestrator.py::compute_valuation_data` 计算（开关 `report_submodules.valuation_percentile` 默认关；关闭 → None → 「资产穿透TOP10」估值列隐藏；PE/PB 与 K 线皆不可得 → available=False 落 §1.4.5 占位）。消费方：穿透 TOP10 Excel `penetration_sheet` 估值分位列（ncols 10→11 + 表尾免责）与 HTML `report_template.html` 条件列（`valuation_enabled`）。
 

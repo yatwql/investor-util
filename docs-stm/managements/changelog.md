@@ -6,6 +6,17 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### pipeline_data 键台账回归三方一致（C19，自审 rf-328）（2026-09-10）
+
+- **缺陷（自审 rf-328）**：C19 要求 pipeline_data 的键必须先在附录 H（`technical.md` 的 Schema 台账）登记类型与写入/消费模块后才能使用。实际存在**三方漂移**——代码 `_PIPELINE_DATA_KNOWN_KEYS`、类型断言表 `_PIPELINE_DATA_TYPE_MAP`、附录 H 台账各说各话：
+  - `diff`（环比对比差异，9 键）**在两个代码清单里长期存在且被汇总 Excel δ 列、行动章环比上下文、LLM 环比提示词三处消费，却从未登记进附录 H**——台账漏登在用键，C19 的「先登记后使用」对它是空文；且因无台账可对照，其 9 键结构在文档里无处可查。
+  - `decision_review_data`（决策复盘区块）**反向漏登**：`report/_experimental_seams.py::record_llm_decisions_and_review_block` 往 pipeline_data 里写它，行动章（HTML 模板 + `action_sheet.py`）读它，但代码两份清单与附录 H **三处都没有**——写路径每次命中「包含未知键」告警，类型断言表也无从校验。
+  - `portfolio_daily_returns`（组合日收益率）是**死键**：登记在代码两份清单里，但全仓无任何消费者（`history_data.daily_returns_portfolio` 由 `_full_risk_metrics` 直接读取，无需再投射为顶层键），且同样不在附录 H。
+  - 附带：`pipeline_data_builder.py` 模块 docstring 与 `_validate_keys` 的告警文案都把登记处指向 `data-channels-schema.md`——该文件**只存在于 `docs-stm/archive/v0.7.x/`**，照着提示去登记的开发者找不到文件。
+- **改动**：`portfolio_daily_returns` 从 `_PIPELINE_DATA_KNOWN_KEYS`、`_PIPELINE_DATA_TYPE_MAP` 及写入侧 `_full_risk_metrics` 的注入语句中删除（死键清理，`history_data` 的消费路径不变）；`decision_review_data`（`dict | None`）补登进两份代码清单；附录 H 补 `diff`、`decision_review_data` 两行（含 9 键结构、写入/消费模块、降级语义），使「代码用键 ⊆ 台账登记键」成立；两处 `data-channels-schema.md` 指针改为 `technical.md` 附录 H。
+- **行为变更**：① 实验功能「决策跨期反思闭环」开启时，写 `decision_review_data` 不再产生「未知键」WARNING（此前每轮报告固定刷一条噪音告警）；② `pipeline_data` 中不再出现永无消费者的 `portfolio_daily_returns`（`_snapshot.py`/`_full_risk_metrics.py` 的 `extra` 透传机制本身保留，其 docstring 由「如 risk_metrics」改为中性的「调用方 kwargs」以免继续暗示该键的存在）。报告输出无变化。
+- **测试**：`test_pipeline_data_builder.py` 新增 `TestSchemaRegisteredInAppendixH` 四例——`test_known_keys_documented_in_appendix_h` 与 `test_type_map_keys_documented_in_appendix_h` 从 `technical.md` 现场解析附录 H 表格键名，锁定「代码用键 ⊆ 台账登记键」（解析结果为空即视为台账标题/格式变更而失败，防台账被改格式后校验静默失效）；`test_decision_review_data_registered`（类型登记 + `build()` 注入无告警，用 `assertNoLogs`）与 `test_portfolio_daily_returns_is_not_a_pipeline_key`（死键不得复活）。四例均已验证还原旧实现后转红。
+
 ### 凭据分离校验收紧为硬拒绝（C18，自审 rf-327）（2026-09-10）
 
 - **缺陷（自审 rf-327）**：`config/_llm_providers.py::_validate_provider_entry` 对「条目内联 `api_key`」的处理是**先校验必填、再告警放行**——无 `credentials_ref` 时把内联 `api_key`/`model` 当合法配置接受，仅在 `_parse_providers_list` 里记一条「建议迁移」的 WARNING 后照常进入运行期 provider 链。这与 C18 的字面要求不符：`llm_providers.json` **是版本控制内文件**（`.gitignore` 白名单放行，`git ls-files` 可证），内联 `api_key` 即「凭据随配置入库」，WARNING 级提示既拦不住误提交，也不改变已经发生的泄露。附带发现同一段逻辑的另一处**文档与实现不符**：`_llm_providers_defaults.py` 生成的模板注释邀请用户「按需修改 model / endpoint」，但 `_parse_providers_list` 在 `credentials_ref` 分支下**只透传 `credentials_ref`、丢弃 entry 级 `model`**——照模板改的 `model` 覆盖被静默忽略（`_resolve_entry_credentials` 里 entry 级优先的分支因此永收不到值），用户看到的是「改了没反应」。

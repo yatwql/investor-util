@@ -11,17 +11,41 @@
 
 from __future__ import annotations
 
+import re
 import unittest
+from pathlib import Path
 
 import pytest
 
 from src.python.report.pipeline_data_builder import (
     _PIPELINE_DATA_KNOWN_KEYS,
+    _PIPELINE_DATA_TYPE_MAP,
     build,
     merge_pipeline_data,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]  # 仓库根目录（src/test/unit/report 向上 4 级）
+_TECHNICAL_DOC = _REPO_ROOT / "docs-stm" / "managements" / "technical.md"
+
+
+def _appendix_h_keys() -> set[str]:
+    """解析 technical.md 附录 H 的键名列表（表格第一列）。
+
+    附录 H 是 C19 的注册台账：键必须先在此登记类型与写入/消费模块，
+    才能在代码中使用。此处解析出的集合即「已登记键」。
+    """
+    text = _TECHNICAL_DOC.read_text(encoding="utf-8")
+    section = text.split("### 附录 H：pipeline_data Schema 定义", 1)[1]
+    # 截到下一个同级/更高级标题（附录 I 或任一 ### 标题）
+    section = re.split(r"\n#{2,3} ", section, maxsplit=1)[0]
+    keys: set[str] = set()
+    for line in section.splitlines():
+        m = re.match(r"^\|\s*([A-Za-z_][A-Za-z0-9_]*)\s*\|", line)
+        if m:
+            keys.add(m.group(1))
+    return keys
 
 _EXTRA_KEYS = {"crisis_annotation_data", "tail_risk_data", "snapshot_diff_data"}
 
@@ -86,6 +110,47 @@ class TestPipelineDataMergeExtra(unittest.TestCase):
         self.assertIsNotNone(merged)
         self.assertIn("crisis_annotation_data", merged)
         self.assertIn("tail_risk_data", merged)
+
+
+class TestSchemaRegisteredInAppendixH(unittest.TestCase):
+    """C19 契约：代码中在用的 pipeline_data 键必须先在附录 H 登记。
+
+    背景：`decision_review_data`（决策复盘区块）曾由挂载点写入并被执行章消费，
+    却未登记进 `_PIPELINE_DATA_KNOWN_KEYS`/附录 H——两处清单各自漂移即失去
+    「先定义类型再使用」的守门作用；`portfolio_daily_returns` 则是反向问题
+    （登记了类型却在全仓库无任何消费者，属死键，已随本次整改移除）。
+    本用例锁定「代码用键 ⊆ 附录 H 登记键」的单向不变式。
+    """
+
+    def test_known_keys_documented_in_appendix_h(self):
+        """_PIPELINE_DATA_KNOWN_KEYS 全量键均在附录 H 表格中登记。"""
+        documented = _appendix_h_keys()
+        self.assertTrue(documented, "附录 H 解析为空——标题或表格格式可能已变更")
+        undocumented = sorted(_PIPELINE_DATA_KNOWN_KEYS - documented)
+        self.assertEqual(undocumented, [], f"以下键未在附录 H 登记（C19）：{undocumented}")
+
+    def test_type_map_keys_documented_in_appendix_h(self):
+        """类型断言表中的键均在附录 H 登记（类型断言不能脱离 schema 台账）。"""
+        documented = _appendix_h_keys()
+        undocumented = sorted(set(_PIPELINE_DATA_TYPE_MAP) - documented)
+        self.assertEqual(undocumented, [], f"以下键未在附录 H 登记（C19）：{undocumented}")
+
+    def test_decision_review_data_registered(self):
+        """决策复盘区块键已登记类型（dict / None）并可经 build() 注入不告警。"""
+        self.assertEqual(
+            _PIPELINE_DATA_TYPE_MAP.get("decision_review_data"), (dict, type(None))
+        )
+        with self.assertNoLogs("invest", level="WARNING"):
+            build(decision_review_data={"rows": []})
+
+    def test_portfolio_daily_returns_is_not_a_pipeline_key(self):
+        """死键回归：portfolio_daily_returns 无消费者，不得再登记为契约键。
+
+        `history_data.daily_returns_portfolio` 由 `_full_risk_metrics` 直接读取，
+        无需（也不应）额外投射为 pipeline_data 顶层键。
+        """
+        self.assertNotIn("portfolio_daily_returns", _PIPELINE_DATA_KNOWN_KEYS)
+        self.assertNotIn("portfolio_daily_returns", _PIPELINE_DATA_TYPE_MAP)
 
 
 if __name__ == "__main__":

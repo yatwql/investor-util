@@ -12,7 +12,8 @@ A 通道（pipeline_data）流向：
 B 通道（prep）流向：
   prepare_report_data() → pipeline_data_builder.build_prep() → LLM / Excel
 
-数据契约 约束：所有键必须先在 data-channels-schema.md 中注册。
+数据契约 约束：所有键必须先在 `technical.md` 附录 H（pipeline_data Schema 定义）中
+注册类型与写入/消费模块（C19）。
 """
 
 from __future__ import annotations
@@ -29,7 +30,6 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "diff",
     "data_degradation",
     "risk_metrics",
-    "portfolio_daily_returns",
     # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键）
     "style_factor_data",
     "position_relationship_data",
@@ -58,6 +58,10 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     # 快照差异：当前持仓快照与上次快照的差异数据（report_submodules.snapshot_diff，
     # 由编排层 compute_snapshot_diff_data 组装；无差异时为 None）
     "snapshot_diff_data",
+    # 决策复盘区块：行动章内嵌复盘表数据（决策跨期反思闭环开启时由
+    # report/_experimental_seams.record_llm_decisions_and_review_block 注入；
+    # 实验功能关闭或区块为空时键缺席，两条输出路径保持既有输出）
+    "decision_review_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -100,7 +104,6 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "diff": (dict, type(None)),
     "data_degradation": list,
     "risk_metrics": dict,
-    "portfolio_daily_returns": list,
     "style_factor_data": (dict, type(None)),
     "position_relationship_data": (dict, type(None)),
     "evolution_data": (dict, type(None)),
@@ -113,6 +116,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "crisis_annotation_data": (dict, type(None)),
     "tail_risk_data": (dict, type(None)),
     "snapshot_diff_data": (dict, type(None)),
+    "decision_review_data": (dict, type(None)),
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
@@ -154,7 +158,7 @@ def _validate_keys(data: dict, known_keys: set[str], label: str) -> None:
     """
     for k in data:
         if k not in known_keys:
-            logger.warning("[pipeline_data] %s 包含未知键 '%s'，请先在 data-channels-schema.md 注册", label, k)
+            logger.warning("[pipeline_data] %s 包含未知键 '%s'，请先在 technical.md 附录 H 注册（C19）", label, k)
 
 
 def _assert_type(value: Any, expected: type | tuple[type, ...], key: str) -> None:
