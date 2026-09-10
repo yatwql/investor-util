@@ -206,6 +206,11 @@ class TestSupportsExtendedThinking(unittest.TestCase):
     def test_deepseek_chat_supported(self) -> None:
         self.assertTrue(_supports_extended_thinking("deepseek-chat"))
 
+    def test_deepseek_flash_supported(self) -> None:
+        """新一代 Flash 正式模型名 deepseek-flash 支持 Extended Thinking。"""
+        self.assertTrue(_supports_extended_thinking("deepseek-flash"))
+        self.assertTrue(_supports_extended_thinking("DeepSeek-Flash"))
+
     def test_deepseek_v3_not_supported(self) -> None:
         self.assertFalse(_supports_extended_thinking("deepseek-v3"))
 
@@ -232,6 +237,15 @@ class TestIsEffortModel(unittest.TestCase):
 
     def test_deepseek_chat_is_effort(self) -> None:
         self.assertTrue(_is_effort_model("deepseek-chat"))
+
+    def test_deepseek_flash_is_effort(self) -> None:
+        """deepseek-flash 属 effort 族。
+
+        该判定同时决定「未开启 thinking 时显式注入 disabled」的安全网是否生效——
+        漏登记会让请求落入 DeepSeek 默认思考模式占满 max_tokens 而无正文。
+        """
+        self.assertTrue(_is_effort_model("deepseek-flash"))
+        self.assertTrue(_is_effort_model("DeepSeek-Flash"))
 
     def test_empty_is_not_effort(self) -> None:
         self.assertFalse(_is_effort_model(""))
@@ -442,9 +456,36 @@ class TestPricing(unittest.TestCase):
         cost = estimate_cost("claude-sonnet-4-6-20250514", 1000, 500)
         self.assertNotEqual(cost, "-")
 
+    def testestimate_cost_v41_flash_by_official_name(self) -> None:
+        """新一代 Flash 正式模型名按 flash 系列价计费，不得回落为未知模型（"-"）。"""
+        cost_idle = estimate_cost("deepseek-flash", 1_000_000, 1_000_000, at_time=self._IDLE_TIME)
+        cost_peak = estimate_cost("deepseek-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
+        # 闲时 (1+4)=5、高峰 (2+8)=10
+        self.assertEqual(cost_idle, "¥5.000")
+        self.assertEqual(cost_peak, "¥10.000")
+
+    def test_v41_flash_name_billed_same_as_flash_aliases(self) -> None:
+        """deepseek-flash 与它接管的别名 deepseek-v4-flash / vision-exp 同价。"""
+        for alias in ("deepseek-v4-flash", "deepseek-v4-flash-vision-exp"):
+            self.assertEqual(
+                estimate_cost("deepseek-flash", 3000, 2000, cache_hit_input_tokens=2000, at_time=self._IDLE_TIME),
+                estimate_cost(alias, 3000, 2000, cache_hit_input_tokens=2000, at_time=self._IDLE_TIME),
+            )
+
+    def test_v41_flash_cache_hit_follows_peak_valley(self) -> None:
+        """deepseek-flash 缓存命中同样走峰谷价（闲时 0.02 / 高峰 0.04）。"""
+        cost_peak = estimate_cost(
+            "deepseek-flash", 1_000_000, 0, cache_hit_input_tokens=1_000_000, at_time=self._PEAK_TIME
+        )
+        cost_idle = estimate_cost(
+            "deepseek-flash", 1_000_000, 0, cache_hit_input_tokens=1_000_000, at_time=self._IDLE_TIME
+        )
+        self.assertEqual(cost_peak, "¥0.040")
+        self.assertEqual(cost_idle, "¥0.020")
+
     def test_pricing_merged_has_defaults(self) -> None:
         """PRICING_MERGED 应包含所有内置模型。"""
-        for model in ("deepseek-v4-flash", "claude-sonnet-4-6", "gpt-4o"):
+        for model in ("deepseek-flash", "deepseek-v4-flash", "claude-sonnet-4-6", "gpt-4o"):
             self.assertIn(model, PRICING_MERGED)
 
     def test_currency_symbols(self) -> None:

@@ -375,6 +375,23 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         self.assertNotIn("output_config", _payload)
         self.assertNotIn("reasoning_effort", _payload)
 
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    def test_deepseek_flash_thinking_disabled_injected_when_not_enabled(self, mock_retry: MagicMock) -> None:
+        """新一代 Flash 正式名 deepseek-flash 同样命中显式 disabled 安全网。
+
+        该模型名不在 effort 族内时，未开 thinking 的请求不注入 disabled，会落入
+        DeepSeek 默认思考模式占满 max_tokens——本用例锁定该防线对新模型名生效。
+        """
+        cfg = {"thinking_enabled_global_macro": False}
+        call_claude(
+            **self.base_kw,
+            model="deepseek-flash",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertEqual(_payload.get("thinking", {}).get("type"), "disabled")
+
     def test_thinking_exhausted_flag_thread_local_isolation(self) -> None:
         """并发线程 _extract_content 不清除本线程思考耗尽标志（thread-local 隔离）。
 
@@ -472,6 +489,7 @@ class TestProviderFallback(unittest.TestCase):
         content, usage, _ = call_llm("sys", "user", config)
         self.assertIsNone(content)
         self.assertEqual(mock_call.call_count, 1)
+
 
 # ═══════════════════════════════════════════════════════════════
 #  LLM content_filter 空返回安抚重试测试
