@@ -323,7 +323,6 @@ def _generate_report_both(
         pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
     # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
     #    （position_status + data_freshness）
-    from src.python.analysis.action_advisor import build_action_data
     from src.python.core.data_freshness import build_freshness_summary
     from src.python.core.holding_status import build_coverage_summary
     from src.python.report.market_value import get_last_trading_day, get_prev_trading_day

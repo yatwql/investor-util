@@ -18,15 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.python.llm import (
-    generate_all_llm,
-)
-from src.python.llm.generators import (
-    generate_expert_review,
-    generate_global_macro,
-    generate_health_check,
-    generate_penetration_deep_analysis,
-)
+from src.python.llm import generate_all_llm
 from src.test.helpers import SynchronousExecutor
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]

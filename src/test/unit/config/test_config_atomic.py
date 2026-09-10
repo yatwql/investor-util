@@ -172,9 +172,11 @@ class TestConfigAtomicWriteFailure(unittest.TestCase):
         # mkstemp 返回一个不存在的 fd → 后续写入失败
         mock_mkstemp.return_value = (999, os.path.join(self.tmp.name, "bad.tmp"))
 
-        from src.python.config import set_config, _config_cache
+        from src.python.config import _clear_config_cache, set_config
 
-        _config_cache = None
+        # 断言的是「写入失败后临时文件被清理」，缓存放行与否不影响该路径；
+        # 先清缓存以避免上一次测试的缓存命中短路掉本次写入失败。
+        _clear_config_cache()
         with self.assertRaises(Exception):
             set_config("partial", "data")
 

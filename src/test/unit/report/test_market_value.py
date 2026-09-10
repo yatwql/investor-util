@@ -28,8 +28,6 @@ from src.python.core.models import Holding
 from src.python.report import market_value as mv
 from src.python.report.styles import BLUE_FONT
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
 
 # ── 市值明细计算与行情更新状态辅助导入 ────────────
 from src.python.report.market_value import (
@@ -41,7 +39,7 @@ from src.python.report.market_value_sheet import (
     _detail_to_row_values,
 )
 
-
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 # ═══════════════════════════════════════════════════════════
 #  is_qdii_by_name（委派 code_utils）
@@ -86,7 +84,7 @@ class TestIsQdii(unittest.TestCase):
         from src.python.core.code_utils import is_etf_by_name
         self.assertFalse(is_etf_by_name("长江电力"))
 
-    def test_empty_string(self):
+    def test_etf_empty_string(self):
         """空字符串 → False。"""
         from src.python.core.code_utils import is_etf_by_name
         self.assertFalse(is_etf_by_name(""))
