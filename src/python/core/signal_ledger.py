@@ -254,6 +254,11 @@ def append_signals(
     避免逐条追加减写放大。
 
     空输入或全部命中幂等 → 不触碰账本文件（返回空列表）。
+
+    **落盘失败同样返回空列表**（写盘异常已由 :mod:`core.jsonl_store` 记日志）。
+    本函数对外承诺的是「实际入账条数」，调用方据此上报「登记 N 条」；若失败仍
+    返回去重后的 ``fresh``，磁盘满/无写权限时会报出绿色成功而账本零新增，且下次
+    运行因读不到这些 id 而重复登记——静默失败 + 跨期沉淀失效。
     """
     incoming = [s for s in signals if isinstance(s, dict) and s.get("id")]
     if not incoming:
@@ -271,8 +276,9 @@ def append_signals(
     if not fresh:
         return []
     payload = "".join(json.dumps(s, ensure_ascii=False, sort_keys=True) + "\n" for s in fresh)
-    append_jsonl_atomic(target, payload, prefix=".signal_ledger_", log_tag="signal_ledger", noun="账本")
-    return fresh
+    written = append_jsonl_atomic(target, payload, prefix=".signal_ledger_", log_tag="signal_ledger", noun="账本")
+    # 写盘失败 → 未入账，不返回乐观结果（详见 docstring）
+    return fresh if written else []
 
 
 def append_signal(**kwargs: Any) -> dict[str, Any] | None:

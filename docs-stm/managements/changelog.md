@@ -10,6 +10,13 @@
 
 - 发布 v0.10.16 后，APP_VERSION 与全部管理文档版本头切换至 v0.10.17-dev。
 
+### JSONL 原子写入与信号账本落盘结果如实上报（自审 rf-315 / rf-316）（2026-09-10）
+
+- **缺陷（自审 rf-315）**：`core/jsonl_store.py::append_jsonl_atomic` 把 `tempfile.mkstemp()` 与随后的写入 / `os.replace()` 包在**同一个 `try`** 里，而 `except` 分支要引用的 `tmp_path` 正是 `mkstemp` 的返回值——**`mkstemp` 自身抛 `OSError` 时该名字尚未绑定**，清理分支会再抛 `UnboundLocalError`，把真实错误（目录不可写等）掩盖成一条自指异常。同一函数的签名返回 `None`、失败仅记日志，**成功与失败对调用方不可区分**。
+- **缺陷（自审 rf-316）**：`core/signal_ledger.py::append_signals` 因此**在落盘失败时仍返回去重后的 `fresh`**——调用方据此统计「本次入账 N 条」并渲染绿色成功行，而账本零新增（磁盘满 / 无写权限时静默失效）。确定性信号账本是报告结论的事实来源，账本内容与统计口径不一致会让「统计只算实时记录」的纪律失真。
+- **改动**：`mkstemp` 拆为独立 `try` 并返回 `False`；写入 / 替换段保留原清理逻辑（删临时文件 + 记异常日志 + 返回 `False`）；函数签名 `-> None` 改为 `-> bool` 并在 docstring 增加 `Returns:` 说明「失败只记日志不抛出，但**成功 / 失败必须如实上报**」。`append_signals` 收下该布尔结果，**失败时返回空列表**（docstring 写明），使调用方计数与账本实际内容同源。
+- **测试**：`test_jsonl_store.py` 新增 3 例（成功返回 `True`；替换失败返回 `False` 且**原文件内容不变**；创建临时文件失败返回 `False` 而非抛 `UnboundLocalError`——已验证还原旧实现后此例转红）；`test_signal_ledger.py` 新增 2 例（写盘失败时入账数为 0、单条登记失败时返回 `None`）。
+
 ### 数据质量详情「未提供」判据两侧归一（自审 rf-318）（2026-09-10）
 
 - **缺陷（自审 rf-318）**：`llm/prompts_action.py` 判断数据质量详情「未提供」用 `is None`，而模块指纹侧（`ModuleFingerprintInputs.data_quality_text` 的 `data_quality_text or ""`）把空串一并折叠成「无」——**同一实例在两个消费点被判成不同状态**：传空串时指纹侧按「无数据质量段」哈希，提示词侧却认为「已提供」并渲染出一个空段。当前调用方（`generate_all_llm()` 一次渲染、两侧共享同一实例）恰好只传非空串或 `None`，缺陷不显现；但该函数是公开入口，判据分叉属结构性隐患（rf-308 建立「一次渲染两侧共享」纪律时遗留的口径不一致）。

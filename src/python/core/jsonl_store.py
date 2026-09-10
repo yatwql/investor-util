@@ -35,7 +35,7 @@ def append_jsonl_atomic(
     prefix: str = ".jsonl_",
     log_tag: str = "jsonl",
     noun: str = "JSONL 文件",
-) -> None:
+) -> bool:
     """向 JSONL 文件原子追加一行（`line` 需自带结尾换行）。
 
     Args:
@@ -44,6 +44,11 @@ def append_jsonl_atomic(
         prefix: 临时文件名前缀（各调用点保留原值，便于故障定位）
         log_tag: 日志标签（如 "perf"）
         noun: 日志中对该文件的称谓（如 "历史文件" / "账本"）
+
+    Returns:
+        是否落盘成功。写盘异常已在内部记日志并**不向上抛出**（本原语只负责尽力
+        持久化，不承担中断调用链的职责）；但必须把成败**如实返回**——调用方若对
+        外承诺「已写入 N 条」，就得据此判定，否则写盘失败会被报成成功。
     """
     parent = os.path.dirname(path)
     if parent:
@@ -57,7 +62,11 @@ def append_jsonl_atomic(
             logger.warning("[%s] %s不可读，将重新创建: %s", log_tag, noun, path)
 
     content = existing + line
-    fd, tmp_path = tempfile.mkstemp(dir=parent or ".", prefix=prefix, suffix=".tmp")
+    try:
+        fd, tmp_path = tempfile.mkstemp(dir=parent or ".", prefix=prefix, suffix=".tmp")
+    except OSError:
+        logger.exception("[%s] 创建临时文件失败: %s", log_tag, path)
+        return False
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
@@ -68,6 +77,8 @@ def append_jsonl_atomic(
         except OSError:
             pass
         logger.exception("[%s] 写入%s失败: %s", log_tag, noun, path)
+        return False
+    return True
 
 
 def read_jsonl(
