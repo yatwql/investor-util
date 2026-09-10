@@ -29,12 +29,12 @@ import hashlib
 import json
 import logging
 import os
-import tempfile
 import uuid
 from datetime import datetime
 from typing import Any, Iterable
 
 from src.python.core.constants import PROJECT_ROOT
+from src.python.core.jsonl_store import append_jsonl_atomic, read_jsonl
 
 logger = logging.getLogger("invest")
 
@@ -88,59 +88,19 @@ def is_active() -> bool:
 
 
 def _append_event_atomic(event: dict[str, Any], path: str | None = None) -> None:
-    """向事件账本原子追加一行 JSON。
+    """向事件账本原子追加一行 JSON（原语见 `core/jsonl_store.py`）。
 
     策略：读全部现有内容 → 追加新行 → tempfile.mkstemp + os.replace 写回，
     防断电/崩溃产生半写损坏档。
     """
     target = path or _DECISION_LEDGER_FILE
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    existing = ""
-    if os.path.isfile(target):
-        try:
-            with open(target, "r", encoding="utf-8") as f:
-                existing = f.read()
-        except OSError:
-            logger.warning("[decision_ledger] 账本不可读，将重新创建: %s", target)
-
     line = json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n"
-    content = existing + line
-    fd, tmp_path = tempfile.mkstemp(
-        dir=os.path.dirname(target),
-        prefix=".decision_ledger_",
-        suffix=".tmp",
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-        os.replace(tmp_path, target)
-    except Exception:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
-        logger.exception("[decision_ledger] 写入账本失败: %s", target)
+    append_jsonl_atomic(target, line, prefix=".decision_ledger_", log_tag="decision_ledger", noun="账本")
 
 
 def load_events(path: str | None = None) -> list[dict[str, Any]]:
     """读取全量事件（按写入顺序）。损坏行跳过并告警，不中断后续行。"""
-    target = path or _DECISION_LEDGER_FILE
-    if not os.path.isfile(target):
-        return []
-    records: list[dict[str, Any]] = []
-    try:
-        with open(target, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    records.append(json.loads(line))
-                except json.JSONDecodeError:
-                    logger.warning("[decision_ledger] 忽略损坏行: %s", line[:80])
-    except OSError:
-        logger.warning("[decision_ledger] 账本读取失败: %s", target)
-    return records
+    return read_jsonl(path or _DECISION_LEDGER_FILE, log_tag="decision_ledger", noun="账本")
 
 
 # ── 事件构建与登记 ──────────────────────────────────────

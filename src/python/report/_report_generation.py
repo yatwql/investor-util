@@ -721,6 +721,24 @@ def _generate_report_full(
     # 打实时-非实时来源标签后入账（幂等：同日同类型同标的只记一次）。
     # 置于此处而非 3.6：尾部风险等 A 通道键在 LLM 生成阶段才注入 pipeline_data，
     # 过早登记会漏采；适配器对缺失键逐项跳过，故不构成硬依赖。
+    from src.python.core import signal_ledger
+
+    if signal_ledger.is_active():
+        try:
+            from src.python.report import signal_record
+
+            _sig = signal_record.register_deterministic_signals(
+                pipeline_data,
+                report_date=prep["today_str"],
+            )
+            if _sig.get("registered"):
+                reporter.ok(f"确定性信号沉淀：登记 {_sig['registered']} 条确定性评级")
+            else:
+                logger.info("[signal_ledger] 确定性信号登记为空（无可登记评级或同日已登记）")
+        except Exception:
+            # 实验功能异常不阻断报告主链路
+            reporter.warn("确定性信号沉淀执行异常，已跳过")
+            logger.exception("[signal_ledger] 确定性信号登记 seam 异常")
     perf.stop()
 
     # ── 6. HTML 报告 ──

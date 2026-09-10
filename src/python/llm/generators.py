@@ -40,6 +40,7 @@ from src.python.llm.prompts import (
 )
 from src.python.config.features import is_feature_enabled
 from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
+from src.python.core import signal_ledger  # 确定性信号沉淀摘要指纹后缀（同源现算）
 from src.python.core.decision_header import structured_header_cache_suffix
 from src.python.llm._hallucination_filter import _filter_hallucinated_codes
 from src.python.llm.skeleton import generate_llm_module
@@ -208,6 +209,16 @@ def generate_expert_review(
         # 保证读写键同源（见 design §6.2）。
         if decision_ledger.is_active():
             fp += decision_ledger.lessons_cache_suffix()
+        # 信号预消化（signal_pre_digest）：信号块内容变 → 后缀变 → 缓存自然失效。
+        # 同样与 generators_orchestrator 预检闭包同调同一函数（开关判定收敛在函数内）。
+        fp += _signal_digest_cache_suffix(pipeline_data)
+        # 确定性数值信号沉淀（signal_ledger）：注入的统计摘要文本变（新信号落账 /
+        # 实时-非实时标签变化）→ 后缀变 → 缓存自然失效并带新摘要重生成。
+        # 与 generators_orchestrator 预检闭包同调同一函数（开关判定收敛在函数内），
+        # 关闭/样本不足 → ""（缓存键与未注入时一致，不误伤旧缓存）。
+        fp += signal_ledger.summary_cache_suffix()
+        # 结构化决策头（decision_header_parse）：契约段固定 → 固定后缀换键。
+        fp += _structured_suffix
         return fp
 
     def _prompt():

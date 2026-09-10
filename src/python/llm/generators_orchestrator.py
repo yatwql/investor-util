@@ -49,6 +49,7 @@ from src.python.llm.prompts import (
 )
 from src.python.llm.skeleton import is_llm_module_enabled
 from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
+from src.python.core import signal_ledger  # 确定性信号沉淀摘要指纹后缀（同源现算）
 from src.python.core.decision_header import structured_header_cache_suffix
 from src.python.core.registry import get_llm_module_name, get_llm_module_names
 

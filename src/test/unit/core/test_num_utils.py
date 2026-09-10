@@ -142,3 +142,17 @@ class TestIsFiniteNumber:
         """避免调用方误写 ``if value``（0 是合法数值却为假）。"""
         assert is_finite_number(0) is True
 
+
+@pytest.mark.unit
+@pytest.mark.unit_core
+class TestSignalLedgerParity:
+    """``strict_num`` 必须与既有 ``signal_ledger._safe_number`` 口径逐字一致。"""
+
+    @pytest.mark.parametrize(
+        "value",
+        [None, True, False, "12", "abc", 0, 3, 3.5, float("nan"), float("inf"), float("-inf"), [1]],
+    )
+    def test_same_result_as_ledger_helper(self, value):
+        from src.python.core.signal_ledger import _safe_number
+
+        assert strict_num(value) == _safe_number(value)
