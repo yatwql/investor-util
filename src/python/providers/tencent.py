@@ -18,6 +18,7 @@ from src.python.core.code_utils import (
     is_index_code,
 )
 from src.python.core.http_client import make_http_client
+from src.python.core.num_utils import safe_num
 
 logger = logging.getLogger("invest")
 
@@ -120,11 +121,8 @@ def _parse_response(text: str) -> dict[str, Any] | None:
 
 
 def _parse_float(s: str) -> float:
-    """安全解析浮点数，失败返回 0.0。"""
-    try:
-        v = float(s)
-    except (ValueError, TypeError):
-        return 0.0
+    """安全解析浮点数，失败或非正数返回 0.0。"""
+    v = float(safe_num(s, default=0.0))  # type: ignore[arg-type]
     return v if v > 0 else 0.0
 
 
@@ -364,7 +362,4 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
 
 def _parse_float_field(s: str) -> float:
     """安全解析浮点数字段，失败返回 0.0。"""
-    try:
-        return float(s) if s else 0.0
-    except (ValueError, TypeError):
-        return 0.0
+    return float(safe_num(s, default=0.0))  # type: ignore[arg-type]

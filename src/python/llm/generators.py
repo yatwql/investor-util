@@ -36,8 +36,12 @@ from src.python.llm.prompts import (
     _build_global_macro_prompt,
     _build_health_check_prompt,
     _build_penetration_deep_prompt,
+    _signal_digest_cache_suffix,
 )
 from src.python.config.features import is_feature_enabled
+from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
+from src.python.core import signal_ledger  # 确定性信号沉淀摘要指纹后缀（同源现算）
+from src.python.core.decision_header import structured_header_cache_suffix
 from src.python.llm._hallucination_filter import _filter_hallucinated_codes
 from src.python.llm.skeleton import generate_llm_module
 
@@ -179,10 +183,14 @@ def generate_expert_review(
     _fp_suffix = _build_feature_suffix()
     _enable_conditional = "c" in _fp_suffix
     _enable_qa_concentration = "q" in _fp_suffix
+    _enable_signal_digest = is_feature_enabled("signal_pre_digest")
+    # 结构化决策头（decision_header_parse）：开关判定收敛在 suffix 函数内，
+    # 预检闭包同调同一函数保证读写键同源；关闭 → "" 且不追加提示词契约段。
+    _structured_suffix = structured_header_cache_suffix()
     _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
 
     def _fingerprint():
-        return (
+        fp = (
             build_llm_fingerprint(
                 total_mv=total_mv,
                 total_cost=total_cost,
@@ -194,6 +202,24 @@ def generate_expert_review(
             )
             + _fp_suffix
         )
+        # 决策跨期反思闭环（decision_reflection）：追加教训指纹后缀（同源现算）。
+        # 结算落档 → 教训文本变 → 后缀变 → 读写键同变 → 缓存自然失效并带新教训重生成；
+        # 开关关闭/无有效样本 → "" → 缓存键与未注入时一致（不误伤旧缓存）。
+        # 与 generators_orchestrator 预检闭包同调 decision_ledger.lessons_cache_suffix()，
+        # 保证读写键同源（见 design §6.2）。
+        if decision_ledger.is_active():
+            fp += decision_ledger.lessons_cache_suffix()
+        # 信号预消化（signal_pre_digest）：信号块内容变 → 后缀变 → 缓存自然失效。
+        # 同样与 generators_orchestrator 预检闭包同调同一函数（开关判定收敛在函数内）。
+        fp += _signal_digest_cache_suffix(pipeline_data)
+        # 确定性数值信号沉淀（signal_ledger）：注入的统计摘要文本变（新信号落账 /
+        # 实时-非实时标签变化）→ 后缀变 → 缓存自然失效并带新摘要重生成。
+        # 与 generators_orchestrator 预检闭包同调同一函数（开关判定收敛在函数内），
+        # 关闭/样本不足 → ""（缓存键与未注入时一致，不误伤旧缓存）。
+        fp += signal_ledger.summary_cache_suffix()
+        # 结构化决策头（decision_header_parse）：契约段固定 → 固定后缀换键。
+        fp += _structured_suffix
+        return fp
 
     def _prompt():
         return _build_expert_review_prompt(
@@ -211,6 +237,8 @@ def generate_expert_review(
             enable_conditional=_enable_conditional,
             enable_qa_concentration=_enable_qa_concentration,
             industry_concentration=_industry_conc,
+            enable_signal_digest=_enable_signal_digest,
+            enable_structured_header=bool(_structured_suffix),
         )
 
     return generate_llm_module(
@@ -247,9 +275,10 @@ def generate_health_check(
     degradation_events: list[dict] | None = None,
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。"""
+    _enable_signal_digest = is_feature_enabled("signal_pre_digest")
 
     def _fingerprint():
-        return build_llm_fingerprint(
+        fp = build_llm_fingerprint(
             total_mv=total_mv,
             total_cost=total_cost,
             total_profit=total_profit,
@@ -258,6 +287,10 @@ def generate_health_check(
             penetrated_assets=penetrated_assets,
             categories=categories,
         )
+        # 信号预消化（signal_pre_digest）：见 generate_expert_review 同名注释，
+        # 与 generators_orchestrator 预检闭包同调同一函数保证读写键同源。
+        fp += _signal_digest_cache_suffix(pipeline_data)
+        return fp
 
     def _prompt():
         return _build_health_check_prompt(
@@ -271,6 +304,7 @@ def generate_health_check(
             holdings_details=holdings_details,
             pipeline_data=pipeline_data,
             degradation_events=degradation_events,
+            enable_signal_digest=_enable_signal_digest,
         )
 
     return generate_llm_module(

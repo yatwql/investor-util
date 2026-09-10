@@ -27,6 +27,7 @@ from src.python.analysis.rebalance import (
     classify_holding,
 )
 from src.python.core.models import Holding
+from src.python.core.num_utils import finite_or
 
 logger = logging.getLogger("invest")
 
@@ -56,14 +57,14 @@ def _merge_holdings(holdings: list[Holding]) -> dict[str, dict[str, Any]]:
         总成本为 0 时 weight 统一为 0。
     """
     merged: dict[str, dict[str, Any]] = {}
-    total_cost = sum((h.shares or 0.0) * (h.cost_price or 0.0) for h in holdings)
+    total_cost = sum(finite_or(h.shares) * finite_or(h.cost_price) for h in holdings)
 
     for h in holdings:
         code = (h.code or "").strip()
         if not code:
             continue
-        shares = h.shares or 0.0
-        cost_price = h.cost_price or 0.0
+        shares = finite_or(h.shares)
+        cost_price = finite_or(h.cost_price)
         cost = shares * cost_price
         entry = merged.get(code)
         if entry is None:

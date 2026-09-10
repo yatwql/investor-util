@@ -35,11 +35,14 @@ class TestTuiRouting(unittest.TestCase):
                 )
 
     def test_menu_key_coverage(self):
-        """MENU_ITEMS 包含所有标准功能键（含日志可视化 V/H）。"""
+        """MENU_ITEMS 包含所有标准功能键（含日志可视化 V/H、系统自检 D）。"""
         from src.python.tui.tui_menu import MENU_ITEMS
 
         keys = {item[0] for item in MENU_ITEMS}
-        expected = {"E", "P", "B", "L", "W", "C", "F", "O", "I", "A", "1", "2", "3", "4", "S", "R", "X", "V", "H"}
+        expected = {
+            "E", "P", "B", "L", "W", "C", "F", "O", "I", "A",
+            "1", "2", "3", "4", "S", "R", "X", "V", "H", "D",
+        }
         self.assertSetEqual(keys, expected)
 
     def test_execute_item_dispatches_correct_handler(self):

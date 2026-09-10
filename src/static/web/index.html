@@ -223,6 +223,15 @@
             <p class="status-text status-busy">加载中...</p>
           </div>
         </div>
+        {% if system_info.doctor_enabled %}
+        <div class="status-card">
+          <h3>系统自检 <span class="tag tag-experiment" title="实验功能 doctor_check">⚗ 实验性</span></h3>
+          <div id="doctor-list" class="health-list doctor-list" aria-live="polite">
+            <p class="status-text status-busy">点击下方按钮开始自检</p>
+          </div>
+          <button type="button" id="doctor-run" class="btn btn-secondary btn-sm">开始自检（含数据源联网检查）</button>
+        </div>
+        {% endif %}
       </div>
     </section>
 

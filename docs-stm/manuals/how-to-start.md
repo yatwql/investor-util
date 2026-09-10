@@ -155,7 +155,7 @@ CLI 模式无需 TUI 界面，通过参数驱动，适合定时任务和脚本�
 
 ### CLI 使用指南
 
-CLI 模式的完整命令参考（全局参数 / `report` / `cache` / `whatif` / `check-sources` / `view-logs` 子命令、使用示例、常用命令速查、退出码、最佳实践）见 [CLI 命令行模式使用指南](how-to-use-cli-mode.md)。
+CLI 模式的完整命令参考（全局参数 / `report` / `cache` / `whatif` / `check-sources` / `view-logs` / `doctor` 子命令、使用示例、常用命令速查、退出码、最佳实践）见 [CLI 命令行模式使用指南](how-to-use-cli-mode.md)。
 
 ```bash
 # 查看帮助
@@ -165,7 +165,7 @@ CLI 模式的完整命令参考（全局参数 / `report` / `cache` / `whatif` /
 .venv/bin/python -m src.python.cli report --type basic
 ```
 
-定时任务配置详见[CLI 命令行模式使用指南](how-to-use-cli-mode.md) §12「定时任务」。
+定时任务配置详见[CLI 命令行模式使用指南](how-to-use-cli-mode.md) §13「定时任务」。
 
 ---
 

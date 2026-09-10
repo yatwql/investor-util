@@ -13,7 +13,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import math
 import threading as _threading
 import time as _time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
@@ -22,6 +21,7 @@ from typing import Any
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.core.code_utils import is_a_share_code
+from src.python.core.num_utils import safe_num
 
 logger = logging.getLogger("invest")
 
@@ -471,13 +471,10 @@ def get_dividend_data(codes: list[str]) -> dict[str, dict]:
 
 
 def _safe_float(val: Any) -> float | None:
-    """安全转 float，None/NaN/花式入参 → None。"""
-    if val is None:
-        return None
-    try:
-        v = float(val)
-        if isinstance(v, float) and math.isnan(v):
-            return None
-        return v
-    except (ValueError, TypeError):
-        return None
+    """安全转 float，None/NaN/±inf/花式入参 → None。
+
+    归一收敛于 :func:`core.num_utils.safe_num`，由它统一拦下 NaN/±inf/花式入参，
+    本层不再各自判空。
+    """
+    v = safe_num(val, default=None)
+    return float(v) if v is not None else None

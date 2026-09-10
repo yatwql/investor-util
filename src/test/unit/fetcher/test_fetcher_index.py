@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
 
@@ -328,7 +328,7 @@ class TestFetchIndexHistory(unittest.TestCase):
         result = fetch_index_history("sh000300")
 
         self.assertEqual(result, expected)
-        mock_fetch.assert_called_once_with("history_index", "sh000300", 365)
+        mock_fetch.assert_called_once_with("history_index", "sh000300", 365, diagnostics=ANY)
         mock_reg.session_cache_set.assert_called_once_with(
             "history_index", "sh000300", expected, source="api")
 
@@ -406,7 +406,7 @@ class TestFetchIndexHistory(unittest.TestCase):
         from src.python.fetcher.index import fetch_index_history
         fetch_index_history("sh000300", days=1)
 
-        mock_fetch.assert_called_once_with("history_index", "sh000300", 5)
+        mock_fetch.assert_called_once_with("history_index", "sh000300", 5, diagnostics=ANY)
 
     @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
@@ -421,7 +421,7 @@ class TestFetchIndexHistory(unittest.TestCase):
         from src.python.fetcher.index import fetch_index_history
         fetch_index_history("sh000300", days=5000)
 
-        mock_fetch.assert_called_once_with("history_index", "sh000300", 3650)
+        mock_fetch.assert_called_once_with("history_index", "sh000300", 3650, diagnostics=ANY)
 
     @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
@@ -437,4 +437,4 @@ class TestFetchIndexHistory(unittest.TestCase):
         result = fetch_index_history("gb_inx", days=200)
 
         self.assertEqual(len(result), 1)
-        mock_fetch.assert_called_once_with("history_index_us", "gb_inx", 200)
+        mock_fetch.assert_called_once_with("history_index_us", "gb_inx", 200, diagnostics=ANY)

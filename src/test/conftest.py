@@ -221,6 +221,18 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.core.perf._HEALTH_CHECK_FILE",
         str(tmp_path / "data/state/datasource_health.jsonl"),
     )
+    # decision_ledger.jsonl 决策跨期反思账本文件隔离（无单例，
+    # 路径隔离即状态隔离——lessons_block/lessons_cache_suffix 按需读档现算）
+    monkeypatch.setattr(
+        "src.python.core.decision_ledger._DECISION_LEDGER_FILE",
+        str(tmp_path / "data/state/decision_ledger.jsonl"),
+    )
+    # signal_ledger.jsonl 确定性数值信号账本文件隔离（同为无单例纯函数集，
+    # 路径隔离即状态隔离——fold_signals/summary_block 按需读档现算）
+    monkeypatch.setattr(
+        "src.python.core.signal_ledger._SIGNAL_LEDGER_FILE",
+        str(tmp_path / "data/state/signal_ledger.jsonl"),
+    )
     # LLM 配置文件隔离
     monkeypatch.setattr(
         "src.python.config._llm_providers._LLM_KEY_FILE_DEFAULT",

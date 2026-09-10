@@ -1,9 +1,9 @@
 # 自我审查问题记录归档 — v0.10.x
 
-> 归档时间：2026-08-06；2026-08-16 二次合并 review-findings.md 已解决项（rf-248 ~ rf-275，v0.10.10 ~ v0.10.13 已发布版本）；2026-08-17 四次合并（rf-282 ~ rf-287，v0.10.14-dev）；2026-08-29 发布 v0.10.15 合并（rf-288 ~ rf-294）
+> 归档时间：2026-08-06；2026-08-16 二次合并 review-findings.md 已解决项（rf-248 ~ rf-275，v0.10.10 ~ v0.10.13 已发布版本）；2026-08-17 四次合并（rf-282 ~ rf-287，v0.10.14-dev）；2026-08-29 发布 v0.10.15 合并（rf-288 ~ rf-294）；2026-09-10 发布 v0.10.16 合并（rf-295 ~ rf-304）
 > 原始文件：`docs-stm/managements/review-findings.md`
-> 涵盖版本：v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14，已发布；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）+ v0.10.14-dev 批次（2026-08-16 ~ 2026-08-17，未发布、按用户要求提前归档）+ v0.10.15 批次（2026-08-17 ~ 2026-08-29，已发布）
-> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-294）摘要行 + 修复方案 + 变更记录；v0.10.14-dev 已解决项（rf-276 ~ rf-287）按用户要求提前归档于 v0.10.14 章节，v0.10.15 已解决项（rf-288 ~ rf-294）随发布归档于 v0.10.15 章节，未完成待办项保留在原文件 review-findings.md
+> 涵盖版本：v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14，已发布；v0.10.0 无独立 changelog 段，已发布记录自 v0.10.1 起）+ v0.10.14-dev 批次（2026-08-16 ~ 2026-08-17，未发布、按用户要求提前归档）+ v0.10.15 批次（2026-08-17 ~ 2026-08-29，已发布）+ v0.10.16 批次（2026-08-29 ~ 2026-09-10，已发布）
+> 归档内容：本迭代已修复的 rf 记录（rf-204 ~ rf-304）摘要行 + 修复方案 + 变更记录；v0.10.14-dev 已解决项（rf-276 ~ rf-287）按用户要求提前归档于 v0.10.14 章节，v0.10.15 已解决项（rf-288 ~ rf-294）随发布归档于 v0.10.15 章节，v0.10.16 已解决项（rf-295 ~ rf-304）随发布归档于 v0.10.16 章节，未完成待办项保留在原文件 review-findings.md
 
 ---
 
@@ -173,6 +173,21 @@
 | rf-293 | 事实校验 `_evaluate_percent_value` 单代码钉扎：句中恰含 1 个持仓代码时把所有百分比钉扎到该代码，与智囊团复盘相反 | `_locate_subject_code` 重构为「紧邻优先 + 代码/全名最近兜底」统一归因（代码/全名/简称/尾名四级，紧邻优先；无紧邻时句内代码/全名最近兜底）；回归测试 `TestSubjectAttributionMulti` 4 项 | `changelog.md` [0.10.15] |
 | rf-294 | dedup 跨源收盘/午评同日收评簇漏判（“港股收评…” vs “8月18日港股收盘…”仅共享“恒指涨”2 bigram 被 cross_skip，校准 11847 条 skip 中发现 ~40 条真重复） | `news_dedup.py` `_normalize_title` 收盘术语同义归一：`收盘→收评`、`午评→收评`（只增不减，不破坏既有合并）；归一后收评簇 overlap 2→4、ratio≈0.54≥0.50 进入安全区合并。回归测试 `TestDedupByTitle::test_cross_source_roundup_closing_terminology_synonym_merged*` 2 例 | `changelog.md` [0.10.15] |
 
+### v0.10.16（2026-09-10）
+
+> 发布 v0.10.16 时整体归档已解决项（rf-295 ~ rf-304；rf-297 与 rf-303 仍在待办区）。变更详情见 changelog.md [0.10.16] 对应条目。
+
+| # | 问题 | 修复方案 | 变更记录 |
+|---|------|----------|----------|
+| rf-295 | 持仓体检「数据质量」维度降级事件恒空（`_submit_llm_future` 未传 `degradation_events`）——报告自身数据降级披露口径自相矛盾 | `report/_llm_news.py` 在提交线程池前于主线程取一次 `DegradationTracker.get_log()` 快照随参传入 `generate_all_llm`（该参数早已存在，仅调用点漏传；主线程读取避免与工作线程并发写入交错）；回归测试 `TestSubmitLlmFutureDegradationEvents` 3 项（快照非空透传/空降级仍传空列表/不影响 metrics 等既有传参） | `changelog.md` [0.10.16] |
+| rf-296 | 品种代码笔误无自动纠正通道（2026-09-09 实盘穿透深度复现 561910→161910 易位一位幻觉；唯一近邻 + 组合权重 10.2% 吻合仍仅告警） | `_corrections.py` 新增 `detect_code_corrections`/`apply_code_corrections`（辅助 `_utils._build_stock_weight_map`/`_edit_distance_le_one`）：错码非 持仓/穿透/指数/建议语境 有效集、**唯一**持仓近邻（编辑距离≤1）、后方权重声称与候选真实组合权重容差内吻合 三条件全满足才自动纠正，纳入「已修正明细」并从 ⚠ 剔除；回归测试 `TestCodeTypoAutoCorrection` 8 项（实盘纠正 + 权重不吻合/多近邻歧义/建议语境/穿透代码/指数 边界不误改） | `changelog.md` [0.10.16] |
+| rf-298 | `core/signal_ledger.fold_signals` 对**显式传入**的非 dict 元素（`None`/字符串/数字）会抛异常，而 `load_signals` 对同一文件内容是容错的——同一份数据走「文件读入」与「直接传集合」两条路径行为不一致（plan-34 实现期自审发现，写边缘用例时暴露） | `fold_signals` 入口增加 `items = [s for s in raw if isinstance(s, dict)]` 过滤（与 `load_signals` 的容错口径对齐）；回归测试 `test_signal_ledger_edge.py::TestDegenerateRecords::test_fold_ignores_non_dict_entries` | `changelog.md` [0.10.16] |
+| rf-299 | `fetcher/chain.py` 熔断跳过分支把**原始 provider id** 写进链路诊断（`p1(已被熔断跳过)`），而同一循环内其余分支写的是展示名（`腾讯财经(连接超时)`）——同一条降级事件因失败类型不同而时好时坏地不可读，恰好违背本项「失败原因可读」的目标（写批量 3 用例时被断言揭出） | 把 `entry = provider_fn_map.get(provider_name)` 提到熔断检查之前，熔断/未注册分支统一改用 `label`（有注册项取展示名，否则回落原始 id）；回归测试 `test_chain_diagnostics.py::TestFetchWithFallbackDiagnostics::test_circuit_broken_provider_recorded` 断言输出为 `腾讯财经(已被熔断跳过)` | `changelog.md` [0.10.16] |
+| rf-300 | `cli._handle_doctor` 用裸字面量 `1 if bad_count else 0` 作退出码，未走项目既有的 `_EXIT_SUCCESS/_EXIT_PARTIAL/_EXIT_SEVERE` 常量——脚本无法区分「命令本身失败」（SEVERE=2）与「命令跑完但检查未通过」（PARTIAL=1），且魔法数字散落 | 改为 `return _EXIT_PARTIAL if bad_count else _EXIT_SUCCESS`，docstring 补记该语义区分；测试相应改为断言 `_EXIT_PARTIAL` | `changelog.md` [0.10.16] |
+| rf-301 | plan-35 A1/A2 改动遗留 4 处违反代码痕迹纪律的注释/文案：`providers/_utils.py` 与 `providers/akshare_extras.py` 注释叙述历史实现（「原实现的 `float(s)`…」「原实现只拦 NaN」），`test_numeric_guard_regression.py` 出现魔法编号 `F9` 及同类历史叙述——`check-code-traces --ci` 报 HIGH×2 + MAGIC×1，阻断 P0 门禁 | 四处一并改写为陈述当前不变量的语义描述（不提历史实现、不用接口字段名的缩写代号），`check-code-traces --ci` 恢复 [OK] | `changelog.md` [0.10.16] |
+| rf-302 | plan-35 文档阶段在 `technical.md` §4.17 正文写入两处任务编号括注（「（自审记录 rf-299）」「（自审记录 rf-300）」）——技术设计文档属实现层文档，不得出现任务代号引用，`check-doc-traces --ci` 报 CODE×2 阻断 P0 门禁 | 两处括注改写为对应的语义描述（展示名一致性的目的、退出码 `PARTIAL` 与 `SEVERE` 的语义区分），任务编号引用仅保留在 `changelog.md` / `plan.md` / `review-findings.md` 三份记账文档中，`check-doc-traces --ci` 恢复 [OK] | `changelog.md` [0.10.16] |
+| rf-304 | 接入 `deepseek-flash` 时在代码注释与测试 docstring 中书写厂商标识 `DeepSeek-V4.1-Flash` / `V4.1 Pro`，其「大写字母+数字」形态被 `check-code-traces --ci` 判为魔法编号（MAGIC×8：`core/constants.py`、`llm/api_base.py`、`test_llm_utils.py`×2、`test_llm_api.py`）；同批在 `changelog.md` 写入指向技术设计文档某章的编号式引用，被 `check-doc-traces --ci` 判为 CHAPTER×1——两项同时阻断 P0 门禁 | 代码侧 8 处改写为语义描述「新一代 Flash / 新一代 Pro」（正式模型名 `deepseek-flash` 本身已是语义名，不承载版本代号）；`changelog.md` 改称「定价快照表」（语义章节名，不带章号）。两个 checker 均恢复 [OK] | `changelog.md` [0.10.16] |
+
 ## 归档说明
 
 - 本归档涵盖 v0.10.1 ~ v0.10.13 已发布版本的自审修复记录（rf-204~rf-275）、v0.10.14-dev 已解决项（rf-276~rf-287）与 v0.10.15 已解决项（rf-288~rf-294）；当前待处理项（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-257 Web 真机验收）保留在 `docs-stm/managements/review-findings.md`，不随版本归档。
@@ -180,4 +195,5 @@
 - **三次合并（2026-08-16，dev 批次提前归档）**：按用户要求，仍处 0.10.14-dev 的已解决项（rf-276~rf-281）一并迁入本文件新增 v0.10.14 章节；原 review-findings.md 已解决区清空。后续新增已解决项先登记 review-findings.md，待 v0.10.14 发布后按惯例归档。
 - **四次合并（2026-08-17，dev 批次提前归档）**：按用户要求，续归 v0.10.14-dev 已解决项（rf-282~rf-287）——死参数/遗留文件清理（rf-282/283/284，源自 rf-272 衍生独立项）、smoke-web 竞态修复（rf-285）、bench 菜单键集缺陷（rf-286）、测试标记体系漂移（rf-287）。原 review-findings.md 已解决区再次清空；待办项（含 rf-113/114 交互图表技术债）继续保留在原文件。
 - **五次合并（2026-08-29，发布归档）**：发布 v0.10.15 时，将 v0.10.15-dev 已解决项（rf-288~rf-294）整体迁入本文件新增 v0.10.15 章节——all_no_unit live 卷入修复（rf-288）、事实校验主体归因三处修复（rf-291/292/293，描述性尾名匹配 rf-289）、dedup 跨源误合并率修复（rf-290）与收盘术语同义归一（rf-294）。原 review-findings.md 已解决区清空，仅保留待办区与归档引用。
+- **六次合并（2026-09-10，发布归档）**：发布 v0.10.16 时，将 v0.10.16-dev 已解决项（rf-295 ~ rf-304）整体迁入本文件新增 v0.10.16 章节——持仓体检降级事件漏传修复（rf-295）、品种代码笔误自动纠正（rf-296）、信号账本 `fold_signals` 容错口径不一致（rf-298）、链路熔断分支展示名不一致（rf-299）、`doctor` 退出码常量（rf-300）、代码/文档痕迹纪律四处整改（rf-301/302/304）。原 review-findings.md 已解决区清空，仅保留待办区与归档引用。
 - 已关闭项（rf-117/118/120/121 决策已定，不做）与未修复待办项不在此列。

@@ -1,7 +1,7 @@
 """fact_checker 子包 — run_fact_check 统一入口。
 
 依次执行数值一致性、品种存在性、排名正确性三项检查，
-当 auto_correct=True 时自动修正错误数值。
+当 auto_correct=True 时自动修正错误数值与唯一可辨的品种代码笔误。
 """
 
 from __future__ import annotations
@@ -9,7 +9,11 @@ from __future__ import annotations
 import logging
 
 from src.python.llm.fact_checker._constants import _DEFAULT_TOLERANCE_PCT
-from src.python.llm.fact_checker._corrections import apply_numerical_corrections
+from src.python.llm.fact_checker._corrections import (
+    apply_code_corrections,
+    apply_numerical_corrections,
+    detect_code_corrections,
+)
 from src.python.llm.fact_checker._numerical import check_numerical_consistency
 from src.python.llm.fact_checker._ranking import check_ranking_correctness
 from src.python.llm.fact_checker._symbols import check_symbol_existence
@@ -128,24 +132,46 @@ def run_fact_check(
     total_checks += rank_checked
     total_passed += rank_passed
 
-    # ── 自动修正 ──
+    # ── 自动修正（数值 + 品种代码笔误）──
+    # 代码笔误纠正通道：品种存在性告警（sym_issues）基础上，当错码非
+    # 持仓/穿透/指数/建议语境、且唯一持仓近邻（编辑距离≤1）、且其后
+    # 权重声称与候选真实权重容差内吻合时才自动纠正（见 _corrections.detect_code_corrections）。
+    code_corrections: list[tuple[str, str, str, str]] = []
+    if auto_correct and sym_issues:
+        code_corrections = detect_code_corrections(text, holdings_details, extra_valid_codes)
+
+    _auto_part = ""
     corrected_html = html_content
     correction_lines = ""
-    if auto_correct and all_corrections:
-        corrected_html = apply_numerical_corrections(html_content, all_corrections)
+    if auto_correct and (all_corrections or code_corrections):
+        if all_corrections:
+            corrected_html = apply_numerical_corrections(corrected_html, all_corrections)
+        if code_corrections:
+            corrected_html = apply_code_corrections(corrected_html, code_corrections)
         # 修正明细：日志记录 + HTML 摘要灰色行（供用户直接查看具体修正了什么）。
-        # 4 元组 correction 带语义 reason（如"601939实际收益率187.1%"），
-        # 展示"修正的是哪个数字、其语义"，而非仅截断句段。
+        # 数值 4 元组 correction 带语义 reason（如"601939实际收益率187.1%"），
+        # 代码 4 元组 reason 带候选权重语义（如"561910（招商中证电池主题ETF）
+        # 实际权重10.2%…"），展示"修正的是哪个数字/代码、其语义"而非仅截断句段。
         _parts = []
         for cx in all_corrections:
             w, c, s = cx[0], cx[1], cx[2]
             reason = cx[3] if len(cx) >= 4 and cx[3] else _sentence_snippet(s)
             _parts.append(f"{w}%→{c}%（{reason}）")
+        for bc, gc, _s, code_reason in code_corrections:
+            _parts.append(f"{bc}→{gc}（{code_reason}）")
         _corr_detail = "; ".join(_parts)
+        _num_n = len(all_corrections)
+        _code_n = len(code_corrections)
+        if _num_n and _code_n:
+            _auto_part = f"{_num_n} 处数值、{_code_n} 处代码"
+        elif _code_n:
+            _auto_part = f"{_code_n} 处代码"
+        else:
+            _auto_part = f"{_num_n} 处数值"
         logger.info(
-            "[%s] 事实校验自动修正 %d 处数值: %s",
+            "[%s] 事实校验自动修正 %s: %s",
             module_label or "LLM",
-            len(all_corrections),
+            _auto_part,
             _corr_detail,
         )
         correction_lines = f'\n<span style="color:#888;font-size:11px">已修正明细: {_corr_detail}</span>'
@@ -173,13 +199,16 @@ def run_fact_check(
 
     # 存在不一致 — 黄色告警摘要（若已修正则标注修正条数，已修正项不重复列出）
     corrected_values = {c[0] for c in all_corrections} if auto_correct else set()
+    corrected_codes = {c[0] for c in code_corrections} if auto_correct else set()
     detail_lines: list[str] = []
     for issue in all_issues:
-        # 跳过已自动修正的数值的告警（用户在内容中已看不到该值，列出徒增困惑）
+        # 跳过已自动修正的数值/代码的告警（用户在内容中已看不到该值/码，列出徒增困惑）
         if any(cv in issue for cv in corrected_values):
             continue
+        if any(cc in issue for cc in corrected_codes):
+            continue
         detail_lines.append(f"⚠ {tag}{issue}")
-    auto_msg = f"（自动修正 {len(all_corrections)} 处数值）" if auto_correct and all_corrections else ""
+    auto_msg = f"（自动修正 {_auto_part}）" if auto_correct and (all_corrections or code_corrections) else ""
     if detail_lines:
         summary = f"{tag}事实校验：{total_passed}/{total_checks} 项通过，{len(detail_lines)} 项提示{auto_msg}\n"
         summary += "\n".join(detail_lines)

@@ -104,11 +104,13 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
         #   idle_periods        — 闲时时段（空列表 = 高峰之外的其余时间均按闲时价）
         #   weekend_always_idle — 周末（周六/周日）全天按闲时价计费（默认 true，
         #                          DeepSeek 官方周末统一低谷价，不区分峰谷）
-        # 含 "peak" 高峰价子段的模型（如 deepseek-v4-*）在工作日高峰时段按 peak 价
-        # 计费，其余时段（含周末全天）按 base 价计费；无 "peak" 的模型始终按 base 价。
-        # 模型价格覆盖示例（含 peak 子段）："deepseek-v4-flash": {"input": 1.5,
-        # "output": 4.5, "input_cache_hit": 0.05, "peak": {"input": 3.0, "output": 9.0,
-        # "input_cache_hit": 0.10}}
+        # 含 "peak" 高峰价子段的模型（如 deepseek-flash / deepseek-v4-*）在工作日高峰
+        # 时段按 peak 价计费，其余时段（含周末全天）按 base 价计费；无 "peak" 的模型
+        # 始终按 base 价。
+        # 模型价格覆盖示例（含 peak 子段，2026-09-10 12:00 起 flash 系列降价后价格，
+        # 正式模型名 deepseek-flash，单位元/百万 token）：
+        # "deepseek-flash": {"input": 1.0, "output": 4.0, "input_cache_hit": 0.02,
+        # "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04}}
         "timezone": "Asia/Shanghai",
         "peak_periods": ["09:00-12:00", "14:00-18:00"],
         "idle_periods": [],

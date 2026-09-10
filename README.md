@@ -2,7 +2,7 @@
 
 **把持仓 Excel 变成决策级投资洞察。** 一个面向个人投资者的本地投资分析引擎——实时行情 · 资产穿透 · 基金评级 · LLM 智囊团深度复盘，双报告输出，让每一次投资决策都建立在数据之上。
 
-> 当前版本：0.10.15
+> 当前版本：0.10.16
 
 ![](src/static/architecture.svg)
 
@@ -57,9 +57,13 @@
 
 # 查看缓存状态
 .venv/bin/python -m src.python.cli cache --stats
+
+# 单次运行启用实验功能（仅本次生效，不写入 features.json）
+.venv/bin/python -m src.python.cli --experiment module_quality_gate report --type full
 ```
 
-完整命令参考（全局参数 / report / cache / whatif / check-sources / view-logs / 使用示例 / 退出码 / 最佳实践）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §12「定时任务」。
+完整命令参考（全局参数 / report / cache / whatif / check-sources / view-logs / doctor / 使用示例 / 退出码 / 最佳实践）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §13「定时任务」。
+`--experiment` 为全局参数，取值接受开关名（如 `module_quality_gate`）、显示名（如 `模块级质量分级`）或 `all`（全部启用），可重复指定。
 
 ---
 
@@ -98,6 +102,9 @@
 - **多 Provider 链式分发** — `llm_providers.json` 支持 priority（顺序递补）/ weighted（加权随机）/ cost_first（低成本优先）/ fallback_only（仅故障降级）四种策略，任一 Provider 失败自动递补
 - **Extended Thinking** — 支持 Claude、DeepSeek（Anthropic 兼容端点）和 Gemini 2.5 的扩展思考模式，按模块独立开启
 - **每模块独立控制** — 菜单 `S` 交互切换 5 个 LLM 模块的启停，立即生效无需重启
+- **模块级质量分级**（⚗ 实验，默认关，`module_quality_gate`）— 对 4 个 LLM 生成模块输出按**完整性 + 篇幅**评 A~F 级；评到 C/D/F 且「内容在但存在缺陷」（缺提示词规定的固定章节、篇幅显著偏薄）者，章节头部自动追加 `【内容质量提示】` 横幅提示降级参考。**只标注、不阻断、不重试、不写回缓存**（内容缺失/占位符本身已有醒目提示，不叠加）。三个入口均可开启：TUI 菜单 **[S]** 实验块 / Web 配置面板「实验性功能」/ CLI `--experiment module_quality_gate`
+- **决策头结构化**（⚗ 实验，默认关，`decision_header_parse`）— 专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读结构化头、失败回落确定性表格解析。两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），「不建议加仓」「加仓或减仓」不再被判成相反方向写入决策账本；关闭时提示词逐字节不变、不扰动缓存。三个入口均可开启：TUI 菜单 **[S]** 实验块 / Web 配置面板「实验性功能」/ CLI `--experiment decision_header_parse`
+- **确定性信号沉淀**（⚗ 实验，默认关，`signal_ledger`）— 把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类**确定性算法评级**沉淀为 `data/state/signal_ledger.jsonl` 账本，每条附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施：逐品种新鲜度 + 数据源降级事件，非实时即降级行情算出）。统计与注入智囊团复盘的摘要**默认只算实时记录**，防降级数据冒充真实战绩；同日重跑不重复入账。三个入口均可开启：TUI 菜单 **[S]** 实验块 / Web 配置面板「实验性功能」/ CLI `--experiment signal_ledger`
 - **LLM 幻觉率评估** — `scripts/llm-hallucination-sampler.py` 对 10 组标准化持仓数据采样，事实校验器自动验证数值/品种/排名正确性
 
 ![](src/static/llm-chain.svg)
@@ -161,7 +168,7 @@
 |:-:|:-----|:------|
 | 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
 | 2 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
-| 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、report/cache/whatif/check-sources/view-logs 子命令、使用示例、退出码、定时任务 |
+| 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、全局参数（含 `--experiment` 实验开关）、report/cache/whatif/check-sources/view-logs/doctor 子命令、使用示例、退出码、定时任务 |
 | 4 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
 | 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、章节可见性 |
 | 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |

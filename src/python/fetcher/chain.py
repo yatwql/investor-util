@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any, cast
 
 from src.python.cache import clear as cache_clear
@@ -93,6 +94,41 @@ _ProviderFunc = Callable[..., dict[str, Any] | None]
 
 # ── 通用带缓存的 Fallback 调用 ──────────────────────────────
 
+# 失败原因短句截断长度（诊断可读性优先，不追求完整 traceback）
+_REASON_MAX_LEN = 60
+
+
+def _brief_reason(text: str) -> str:
+    """把异常信息压成一行短原因（诊断展示用）。"""
+    flat = " ".join(str(text).split())
+    return flat if len(flat) <= _REASON_MAX_LEN else flat[: _REASON_MAX_LEN - 1] + "…"
+
+
+@dataclass
+class FailureDiagnostics:
+    """单次链路调用的失败原因收集器（「错误即 UX」）。
+
+    链路失败时，调用方拿到的只有 ``None``／``[]``，失败原因此前只存在于
+    logger 输出里、用户可见面见不到。本对象把「哪个 provider、为什么失败」
+    沉淀为可读短句，供调用方写入降级事件、由报告的数据源可用性矩阵上屏。
+
+    可选出参：不传时链路零采集、零开销（保持既有行为逐字不变）。
+    """
+
+    attempts: list[tuple[str, str]] = field(default_factory=list)
+
+    def add(self, provider: str, reason: str) -> None:
+        """记录一次 provider 失败（provider 为展示名，reason 为可读短句）。"""
+        self.attempts.append((provider, reason))
+
+    @property
+    def has_failure(self) -> bool:
+        return bool(self.attempts)
+
+    def summary(self) -> str:
+        """人类可读的失败原因汇总，如 ``腾讯财经(连接超时)；新浪财经(返回空)``。"""
+        return "；".join(f"{name}({reason})" for name, reason in self.attempts)
+
 
 def _try_provider_fetch(
     data_type: str,
@@ -104,8 +140,13 @@ def _try_provider_fetch(
     transform: Callable[[dict[str, Any], str], dict[str, Any] | None]
     | dict[str, Callable[[dict[str, Any], str], dict[str, Any] | None]]
     | None,
-) -> dict[str, Any] | None:
-    """尝试调用单个 provider 的 fetch 函数，返回转换后的结果或 None。"""
+) -> tuple[dict[str, Any] | None, str]:
+    """尝试调用单个 provider 的 fetch 函数。
+
+    Returns:
+        ``(结果, 失败原因)``。成功时原因为空串；失败时结果为 ``None`` 或
+        ``TRANSPORT_FAILURE``，原因是一行可读短句（供诊断上屏，不再只进日志）。
+    """
     _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
     try:
         raw = fetch_fn(**kwargs)
@@ -113,23 +154,26 @@ def _try_provider_fetch(
         err_str = str(e)
         if "429" in err_str or "Too Many Requests" in err_str or "rate" in err_str.lower():
             logger.warning("[%s]%s %s API 限速(429): %s", data_type, _code_tag, provider_name, err_str)
+            reason = "API 限速(429)"
         else:
             logger.warning("[%s]%s %s 调用异常: %s", data_type, _code_tag, provider_name, err_str)
-        return cast("dict[str, Any] | None", TRANSPORT_FAILURE)  # 传输级异常 → 应计入熔断
+            reason = _brief_reason(f"{type(e).__name__}: {err_str}")
+        # 传输级异常 → 应计入熔断
+        return cast("dict[str, Any] | None", TRANSPORT_FAILURE), reason
 
     if raw is None:
         logger.info("[%s]%s %s 返回空，尝试下一链路", data_type, _code_tag, provider_name)
-        return None
+        return None, "返回空"
 
     # 数据验证
     if validate:
         try:
             if not validate(raw, provider_name):
                 logger.info("[%s]%s %s 数据验证未通过，尝试下一链路", data_type, _code_tag, provider_name)
-                return None
+                return None, "数据校验未通过"
         except Exception as e:
             logger.warning("[%s]%s %s 数据验证异常: %s", data_type, _code_tag, provider_name, e)
-            return None
+            return None, _brief_reason(f"数据校验异常: {e}")
 
     # 应用数据转换
     try:
@@ -142,11 +186,11 @@ def _try_provider_fetch(
             result = raw
     except Exception as e:
         logger.warning("[%s] %s 数据转换失败: %s", data_type, provider_name, e)
-        return None
+        return None, _brief_reason(f"数据转换失败: {e}")
 
     if result is not None:
         logger.info("[%s]%s %s 成功", data_type, _code_tag, provider_name)
-    return result
+    return result, ""
 
 
 def fetch_with_fallback(
@@ -159,6 +203,7 @@ def fetch_with_fallback(
     | dict[str, Callable[[dict[str, Any], str], dict[str, Any] | None]]
     | None = None,
     validate: Callable[[dict[str, Any], str], bool] | None = None,
+    diagnostics: FailureDiagnostics | None = None,
 ) -> dict[str, Any] | None:
     """通用 Fallback 获取器。
 
@@ -166,6 +211,10 @@ def fetch_with_fallback(
     第一个成功的返回结果，全部失败返回 None。
 
     熔断逻辑委托 DataSourceRegistry 统一管理。
+
+    Args:
+        diagnostics: 可选的失败原因收集器。传入时逐 provider 记录可读失败原因，
+            供调用方写入降级事件（「错误即 UX」）；不传则零采集、零开销。
     """
     chain = _get_chain(data_type)
 
@@ -179,14 +228,21 @@ def fetch_with_fallback(
     _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
     reg = get_registry()
     for provider_name in chain:
+        entry = provider_fn_map.get(provider_name)
+        # 展示名优先（用户看得懂「腾讯财经」而非 "tencent"）
+        label = entry[0] if entry else provider_name
+
         # 熔断检查（含自动冷却恢复）
         if reg.is_circuit_broken(provider_name):
             logger.debug("[%s]%s %s 已被熔断，跳过", data_type, _code_tag, provider_name)
+            if diagnostics is not None:
+                diagnostics.add(label, "已被熔断跳过")
             continue
 
-        entry = provider_fn_map.get(provider_name)
         if not entry:
             logger.warning("[%s]%s 未知 Provider '%s'，跳过", data_type, _code_tag, provider_name)
+            if diagnostics is not None:
+                diagnostics.add(label, "未注册")
             continue
 
         source_label, fetch_fn = entry
@@ -194,18 +250,26 @@ def fetch_with_fallback(
 
         if fetch_fn is None:
             logger.warning("[%s] %s 没有注册的 fetch 函数", data_type, provider_name)
+            if diagnostics is not None:
+                diagnostics.add(source_label or provider_name, "无 fetch 函数")
             continue
 
-        result = _try_provider_fetch(data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform)
+        result, reason = _try_provider_fetch(
+            data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform
+        )
         if result is not None and result is not TRANSPORT_FAILURE:
             # 成功 → 恢复熔断计数器
             reg.record_success(provider_name)
             cache_set(cache_key, result)
             return result
 
+        if diagnostics is not None:
+            diagnostics.add(source_label or provider_name, reason or "无结果")
+
         if result is TRANSPORT_FAILURE:
             # 传输级异常（超时/断连/DNS/5xx）→ 累计连续失败计数
-            reg.record_failure(provider_name, f"{data_type}:transport")
+            # 原因带上可读短句，让 DataSourceRegistry.last_failure_context 首次有实义
+            reg.record_failure(provider_name, f"{data_type}: {reason}")
             if reg.is_circuit_broken(provider_name):
                 logger.warning("[%s]%s %s 连续失败，本会话后续请求跳过", data_type, _code_tag, provider_name)
         # else: 代码级空结果（API 不识别该代码）→ 不计入熔断计数器
@@ -232,6 +296,7 @@ def _try_providers(
     code: str,
     days: int,
     start_from: str | None,
+    diagnostics: FailureDiagnostics | None = None,
 ) -> list[dict]:
     """遍历 providers 获取数据，返回第一个非空结果。
 
@@ -242,6 +307,7 @@ def _try_providers(
         code: 证券代码
         days: 获取天数
         start_from: 起始日期，None 时获取完整 days 条数据
+        diagnostics: 可选的失败原因收集器（不传则零采集）
 
     Returns:
         list[dict] 或 []（全部链路失败时）
@@ -249,17 +315,24 @@ def _try_providers(
     for provider_name in providers:
         if registry.is_circuit_broken(provider_name):
             logger.debug("[%s] %s 已被熔断，跳过", chain_name, provider_name)
+            if diagnostics is not None:
+                diagnostics.add(provider_name, "已被熔断跳过")
             continue
         logger.info("[%s] 尝试 %s（code=%s, days=%d）", chain_name, provider_name, code, days)
         try:
             data = _call_history_provider(provider_name, chain_name, code, days, start_from)
             if not data:
                 logger.info("[%s] %s 返回空数据（无此品种历史数据），尝试下一链路", chain_name, provider_name)
+                if diagnostics is not None:
+                    diagnostics.add(provider_name, "返回空")
                 continue
             registry.record_success(provider_name)
             return data
-        except Exception:
-            registry.record_failure(provider_name, f"{chain_name}:transport")
+        except Exception as e:
+            reason = _brief_reason(f"{type(e).__name__}: {e}")
+            registry.record_failure(provider_name, f"{chain_name}: {reason}")
+            if diagnostics is not None:
+                diagnostics.add(provider_name, reason)
             continue
     return []
 
@@ -268,6 +341,7 @@ def fetch_with_incremental_fallback(
     chain_name: str,
     code: str,
     days: int = 30,
+    diagnostics: FailureDiagnostics | None = None,
 ) -> list[dict]:
     """增量合并版 Fallback 路由（历史数据用）。
 
@@ -281,6 +355,7 @@ def fetch_with_incremental_fallback(
         chain_name: chain 名称（如 "history_stock"、"history_fund_otc"）
         code: 证券代码
         days: 获取天数（默认 30）
+        diagnostics: 可选的失败原因收集器（不传则零采集）
 
     Returns:
         list[dict]: 按日期升序排列的数据列表，至少返回 days 条。
@@ -294,7 +369,7 @@ def fetch_with_incremental_fallback(
     providers = _get_chain(chain_name)
 
     # 第一轮：增量获取（从 last_cached_date 开始）
-    new_data = _try_providers(providers, registry, chain_name, code, days, last_cached_date)
+    new_data = _try_providers(providers, registry, chain_name, code, days, last_cached_date, diagnostics)
 
     if new_data:
         # 判断 provider 是否实际支持增量获取。
@@ -318,7 +393,7 @@ def fetch_with_incremental_fallback(
             # 自动全量刷新：删旧缓存，不带 start_from 重新获取完整历史
             logger.info("[%s] 检测到历史修正 → 自动全量刷新", chain_name)
             cache_clear(cache_key)
-            full_data = _try_providers(providers, registry, chain_name, code, days, None)
+            full_data = _try_providers(providers, registry, chain_name, code, days, None, diagnostics)
             if full_data:
                 cache_set(cache_key, full_data)
                 return full_data[-days:]

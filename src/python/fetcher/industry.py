@@ -13,7 +13,7 @@ from typing import Any
 
 from src.python.cache import get_ttl
 from src.python.core.code_utils import is_a_share_code
-from src.python.fetcher.chain import fetch_with_fallback, is_provider_chain_broken
+from src.python.fetcher.chain import FailureDiagnostics, fetch_with_fallback, is_provider_chain_broken
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
 from src.python.providers.eastmoney_industry import make_push2_request as _make_push2_request
 
@@ -85,6 +85,7 @@ def fetch_industry_data(code: str) -> dict | None:
     _t = get_tracker()
     _src_key = f"industry_{code.strip()}"
     industry_cache_key = _INDUSTRY_CACHE_PREFIX + code.strip()
+    diag = FailureDiagnostics()
     result = fetch_with_fallback(
         "industry",
         _INDUSTRY_PROVIDERS,
@@ -92,13 +93,14 @@ def fetch_industry_data(code: str) -> dict | None:
         get_ttl("industry", industry_cache_key),
         fn_kwargs={"code": code.strip()},
         transform=_industry_transform,
+        diagnostics=diag,
     )
     if result is not None:
         # 热缓存命中的旧值可能未经 transform（历史缓存含申万层级后缀），出口统一归一化
         result["industry"] = strip_hierarchy_suffix(result.get("industry") or "")
         _t.record(_src_key, "T3", success=True)
     else:
-        _t.record(_src_key, "T3", success=False, failure_type="unreachable")
+        _t.record(_src_key, "T3", success=False, failure_type="unreachable", message=diag.summary())
     return result
 
 

@@ -80,6 +80,48 @@ def _build_stock_rate_map(holdings_details: list[dict] | None) -> dict[str, floa
     return result
 
 
+def _build_stock_weight_map(holdings_details: list[dict] | None) -> dict[str, float]:
+    """构建 {code: 组合权重%} 映射（市值占比）。
+
+    用于品种代码近似纠正的佐证：LLM 笔误代码（如 161910）后紧跟的
+    "规模达 X%"/"占比 X%"，与真实持仓代码（561910）的组合权重比对，
+    容差内吻合才自动纠正，避免把合法引用的非持仓代码误改。
+    市值缺失/为 0 的品种不纳入（无法计算占比，佐证不可用）。
+    """
+    result: dict[str, float] = {}
+    mv_by_code: dict[str, float] = {}
+    for d in holdings_details or []:
+        code = d.get("code", "") or ""
+        mv = d.get("market_value", 0) or 0
+        if code and mv:
+            mv_by_code[code] = float(mv)
+    total = sum(mv_by_code.values())
+    if not total:
+        return result
+    for code, mv in mv_by_code.items():
+        result[code] = mv / total * 100
+    return result
+
+
+def _edit_distance_le_one(a: str, b: str) -> bool:
+    """判断两串编辑距离是否 ≤1（6 位代码场景：同长即 ≤1 次替换）。
+
+    用于品种代码近似纠正：LLM 常把持仓代码写错/易位一位数字
+    （如 561910→161910）。仅需判 ≤1，做长度预检 + 逐位差异计数即可，
+    不引入完整 Levenshtein。完全相同（diffs==0）亦返回 True，
+    调用方已先排除有效集成员，无需在此剔除。
+    """
+    if len(a) != len(b):
+        return False
+    diffs = 0
+    for ca, cb in zip(a, b):
+        if ca != cb:
+            diffs += 1
+            if diffs > 1:
+                return False
+    return True
+
+
 def _build_stock_change_map(holdings_details: list[dict] | None) -> dict[str, float]:
     """构建 {code: change_pct} 映射（单日涨跌幅度，百分单位）。
 

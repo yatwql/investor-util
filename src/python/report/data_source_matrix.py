@@ -37,6 +37,17 @@ def _match_category(source_key: str) -> str | None:
     return None
 
 
+def _failure_entry(source_key: str, event: dict[str, Any]) -> str:
+    """把降级事件渲染成 ``数据源: 原因`` 的可读条目。
+
+    优先用事件携带的人类可读原因（``detail.message``，由链路诊断传入），
+    无原因时回落到失败类型短标识，保证既有输出逐字不变。
+    """
+    detail = event.get("detail") or {}
+    reason = detail.get("message") or event.get("failure_type", "unknown")
+    return f"{source_key}: {reason}"
+
+
 def build_data_source_matrix() -> list[dict[str, Any]]:
     """构建数据源可用性矩阵。
 
@@ -70,8 +81,8 @@ def build_data_source_matrix() -> list[dict[str, Any]]:
             "ok": 0,
             "degraded": 0,
             "failed": 0,
-            "sample_failures": [],  # 失败项（含 source_key + failure_type）
-            "degraded_list": [],  # 降级项列表（含 source_key + failure_type）
+            "sample_failures": [],  # 失败项（source_key + 可读原因）
+            "degraded_list": [],  # 降级项列表（source_key + 可读原因）
         }
 
     unmatched: list[str] = []
@@ -88,10 +99,10 @@ def build_data_source_matrix() -> list[dict[str, Any]]:
             cd["ok"] += 1
         elif ev["degraded"]:
             cd["degraded"] += 1
-            cd["degraded_list"].append(f"{src_key}: {ev.get('failure_type', 'unknown')}")
+            cd["degraded_list"].append(_failure_entry(src_key, ev))
         else:
             cd["failed"] += 1
-            cd["sample_failures"].append(f"{src_key}: {ev.get('failure_type', 'unknown')}")
+            cd["sample_failures"].append(_failure_entry(src_key, ev))
 
     # 4) 计算综合状态并生成输出行
     matrix: list[dict[str, Any]] = []

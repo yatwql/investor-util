@@ -15,10 +15,12 @@ from src.python.cli import (
     _EXIT_PARTIAL,
     _EXIT_SEVERE,
     _EXIT_SUCCESS,
+    _apply_cli_experiments,
     _build_parser,
     _cli_read_holdings,
     _cli_read_holdings_with_flows,
     _handle_cache_update,
+    _handle_doctor,
     _handle_report,
     _handle_view_logs,
     _handle_whatif,
@@ -104,6 +106,41 @@ class TestArgparse:
         args = _build_parser().parse_args(["--output", "/tmp/reports", "report"])
         assert args.output == "/tmp/reports"
 
+    def test_experiment_absent_by_default(self):
+        """未指定 --experiment 时为 None（不触碰运行时开关）。"""
+        args = _build_parser().parse_args(["report"])
+        assert args.experiment is None
+
+    def test_experiment_by_flag_name(self):
+        """--experiment 接受开关名。"""
+        args = _build_parser().parse_args(["--experiment", "signal_pre_digest", "report"])
+        assert args.experiment == [("signal_pre_digest",)]
+
+    def test_experiment_by_display_name(self):
+        """--experiment 接受中文显示名（与 TUI 菜单 S 同源）。"""
+        args = _build_parser().parse_args(["--experiment", "信号预消化", "report"])
+        assert args.experiment == [("signal_pre_digest",)]
+
+    def test_experiment_repeatable(self):
+        """--experiment 可重复指定，逐项独立解析。"""
+        args = _build_parser().parse_args(
+            ["--experiment", "signal_pre_digest", "--experiment", "decision_reflection", "report"]
+        )
+        assert args.experiment == [("signal_pre_digest",), ("decision_reflection",)]
+
+    def test_experiment_all(self):
+        """--experiment all 展开为全部实验功能。"""
+        from src.python.config.features import EXPERIMENTAL_FEATURES
+
+        args = _build_parser().parse_args(["--experiment", "all", "report"])
+        assert args.experiment == [tuple(sorted(EXPERIMENTAL_FEATURES))]
+
+    def test_experiment_unknown_rejected(self):
+        """未知名称 → argparse 报错 SystemExit(2)，不静默忽略。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--experiment", "no_such_feature", "report"])
+        assert exc.value.code == 2
+
     def test_invalid_command(self):
         """未知命令 → SystemExit(2)。"""
         with pytest.raises(SystemExit) as exc:
@@ -140,6 +177,60 @@ class TestArgparse:
 
         args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx"])
         assert args.effective_date is None
+
+
+# ═══════════════════════════════════════════════════════════════
+# 实验功能命令行开关
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestApplyCliExperiments:
+    """_apply_cli_experiments 行为测试。"""
+
+    def test_none_is_noop(self, monkeypatch):
+        """未传 --experiment 时不改动任何开关。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        _apply_cli_experiments(None)
+        assert feat.FEATURE_FLAGS["signal_pre_digest"] is False
+
+    def test_empty_groups_is_noop(self, monkeypatch):
+        """空列表同样不改动开关。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        _apply_cli_experiments([])
+        assert feat.FEATURE_FLAGS["signal_pre_digest"] is False
+
+    def test_enables_requested_flags(self, monkeypatch):
+        """逐项启用命令行指定的实验功能。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "decision_reflection", False)
+        _apply_cli_experiments([("signal_pre_digest",), ("decision_reflection",)])
+        assert feat.FEATURE_FLAGS["signal_pre_digest"] is True
+        assert feat.FEATURE_FLAGS["decision_reflection"] is True
+
+    def test_does_not_touch_other_flags(self, monkeypatch):
+        """未指定的实验功能保持原值（不误开）。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "llm_debate_conditional", False)
+        _apply_cli_experiments([("signal_pre_digest",)])
+        assert feat.FEATURE_FLAGS["llm_debate_conditional"] is False
+
+    def test_not_persisted(self, monkeypatch):
+        """命令行开关仅影响本次运行，不写 features.json。"""
+        from src.python.config import features as feat
+
+        called: list[dict] = []
+        monkeypatch.setattr(feat, "save_feature_overrides", lambda *a, **k: called.append({"a": a}))
+        _apply_cli_experiments([("signal_pre_digest",)])
+        assert called == []
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -755,3 +846,104 @@ class TestMainViewLogs:
         args = mock_handle.call_args[0][0]
         assert args.command == "view-logs"
         assert args.lines == 300
+
+
+# ═══════════════════════════════════════════════════════════════
+# doctor 子命令
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestArgparseDoctor:
+    """doctor 子命令参数解析。"""
+
+    def test_doctor_defaults(self):
+        """doctor 默认联网 + 8s 超时。"""
+        args = _build_parser().parse_args(["doctor"])
+        assert args.command == "doctor"
+        assert args.offline is False
+        assert args.timeout == 8.0
+
+    def test_doctor_params(self):
+        """--offline / --timeout 透传。"""
+        args = _build_parser().parse_args(["doctor", "--offline", "--timeout", "3.5"])
+        assert args.offline is True
+        assert args.timeout == 3.5
+
+
+@pytest.mark.unit
+class TestHandleDoctor:
+    """_handle_doctor 输出与退出码。"""
+
+    _OK = [{"group": "环境", "label": "Python 版本", "ok": True, "message": "3.12", "hint": ""}]
+    _BAD = [{"group": "目录", "label": "输出目录", "ok": False, "message": "不可写", "hint": "chmod +w"}]
+
+    def test_all_ok_returns_success(self, capsys):
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._OK):
+            code = _handle_doctor(MagicMock(offline=False, timeout=8.0))
+
+        assert code == _EXIT_SUCCESS
+        assert "Python 版本" in capsys.readouterr().out
+
+    def test_any_bad_returns_partial(self, capsys):
+        """有失败项 → _EXIT_PARTIAL（命令跑完了，只是结论不佳；非 SEVERE）。"""
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._BAD):
+            code = _handle_doctor(MagicMock(offline=False, timeout=8.0))
+
+        assert code == _EXIT_PARTIAL
+        assert "chmod +w" in capsys.readouterr().out
+
+    def test_offline_skips_network(self):
+        """--offline 不触发联网检查。"""
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._OK) as mock_run:
+            _handle_doctor(MagicMock(offline=True, timeout=8.0))
+
+        assert mock_run.call_args.kwargs["include_network"] is False
+
+    def test_timeout_passthrough(self):
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._OK) as mock_run:
+            _handle_doctor(MagicMock(offline=False, timeout=2.5))
+
+        assert mock_run.call_args.kwargs["max_timeout"] == 2.5
+
+    def test_no_color_env_plain_output(self, capsys, monkeypatch):
+        """NO_COLOR 下输出不含 ANSI 转义（管道/日志场景）。"""
+        monkeypatch.setenv("NO_COLOR", "1")
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._OK):
+            _handle_doctor(MagicMock(offline=False, timeout=8.0))
+
+        assert "\033[" not in capsys.readouterr().out
+
+
+@pytest.mark.unit
+class TestMainDoctor:
+    """main() doctor 分派（config 之前，与 view-logs 同理）。"""
+
+    def test_dispatches_before_init_config(self):
+        """配置损坏正是 doctor 要诊断的场景，故不得先 init_config。"""
+        with (
+            patch("src.python.cli.cli._handle_doctor", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config") as mock_init,
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "doctor", "--offline"]):
+                code = main()
+
+        assert code == _EXIT_SUCCESS
+        mock_handle.assert_called_once()
+        mock_init.assert_not_called()
+
+    def test_passes_args_to_handler(self):
+        with (
+            patch("src.python.cli.cli._handle_doctor", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "doctor", "--timeout", "4"]):
+                main()
+
+        args = mock_handle.call_args[0][0]
+        assert args.command == "doctor"
+        assert args.timeout == 4.0

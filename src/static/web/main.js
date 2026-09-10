@@ -65,6 +65,9 @@
     els.resultFooter = $('result-footer');
     els.healthList = $('health-list');
     els.historyList = $('history-list');
+    // 系统自检卡片（实验功能 doctor_check 关闭时不存在于 DOM）
+    els.doctorList = $('doctor-list');
+    els.doctorRun = $('doctor-run');
     els.logLevel = $('log-level');
     els.logList = $('log-list');
     els.logStatus = $('log-status');
@@ -82,6 +85,11 @@
     $('health-refresh').addEventListener('click', function () {
       loadHealth(true);
     });
+    if (els.doctorRun) {
+      els.doctorRun.addEventListener('click', function () {
+        loadDoctor();
+      });
+    }
     $('config-reload').addEventListener('click', function () {
       loadConfigEdit();
     });
@@ -611,6 +619,81 @@
     });
   }
 
+  /* ── 状态区：系统自检（实验功能 doctor_check，卡片不存在时整段跳过） ── */
+  function loadDoctor() {
+    if (!els.doctorList) return;
+    els.doctorList.textContent = '';
+    var busy = document.createElement('p');
+    busy.className = 'status-text status-busy';
+    busy.textContent = '自检中（含数据源联网检查，最多约 12 秒）...';
+    els.doctorList.appendChild(busy);
+    els.doctorRun.disabled = true;
+
+    fetch('/api/doctor', { signal: AbortSignal.timeout(15000) })
+      .then(handleResponse)
+      .then(function (data) {
+        renderDoctor(data || {});
+      })
+      .catch(function () {
+        els.doctorList.textContent = '';
+        var p = document.createElement('p');
+        p.className = 'status-text status-error';
+        p.textContent = '系统自检失败，请稍后重试';
+        els.doctorList.appendChild(p);
+      })
+      .finally(function () {
+        els.doctorRun.disabled = false;
+      });
+  }
+
+  function renderDoctor(data) {
+    els.doctorList.textContent = '';
+    var results = data.results || [];
+    if (!results.length) {
+      var p = document.createElement('p');
+      p.className = 'status-text status-busy';
+      p.textContent = '无自检结果';
+      els.doctorList.appendChild(p);
+      return;
+    }
+    var currentGroup = null;
+    results.forEach(function (item) {
+      if (item.group !== currentGroup) {
+        currentGroup = item.group;
+        var head = document.createElement('div');
+        head.className = 'doctor-group';
+        head.textContent = currentGroup;
+        els.doctorList.appendChild(head);
+      }
+      var row = document.createElement('div');
+      row.className = 'health-row ' + (item.ok ? 'health-ok' : 'health-err');
+      var name = document.createElement('span');
+      name.className = 'health-name';
+      name.textContent = item.label;
+      var status = document.createElement('span');
+      status.className = 'health-status';
+      status.textContent = item.ok ? '正常' : '异常';
+      var meta = document.createElement('span');
+      meta.className = 'health-meta';
+      meta.textContent = item.message;
+      row.appendChild(name);
+      row.appendChild(status);
+      row.appendChild(meta);
+      els.doctorList.appendChild(row);
+      // 失败项附修复建议——自检的价值一半在「告诉用户下一步做什么」
+      if (!item.ok && item.hint) {
+        var hint = document.createElement('div');
+        hint.className = 'doctor-hint';
+        hint.textContent = '→ ' + item.hint;
+        els.doctorList.appendChild(hint);
+      }
+    });
+    var summary = document.createElement('p');
+    summary.className = 'status-text ' + (data.bad_count ? 'status-error' : 'status-ok');
+    summary.textContent = '共 ' + results.length + ' 项 — 通过 ' + data.ok_count + ' / 未通过 ' + data.bad_count;
+    els.doctorList.appendChild(summary);
+  }
+
   /* ── ⑦ 日志查看：手动加载 + 级别筛选 + 原生折叠展示 ──
    * 日志可能很大，仅用户点「加载日志」才请求（不自动轮询，对齐设计文档
    * 「自动刷新高 IO → 需手动刷新」）。渲染全 textContent/DOM API，
@@ -783,11 +866,9 @@
       penetration_deep: '穿透深度分析',
       news_correlation: '财经新闻热点与持仓关联分析'
     },
-    debate: {
-      llm_debate_procon: '辩论-正反辩论',
-      llm_debate_conditional: '辩论-条件推理',
-      llm_debate_qa_concentration: '辩论-集中度问答'
-    }
+    // 实验开关显示名不在此维护：服务端 surface.llm.experiment_labels 按注册表下发，
+    // 由 renderConfigEdit 回填（避免前端手写字典与 features.EXPERIMENTAL_FEATURES 漂移）
+    experiments: {}
   };
 
   // 持仓匿名化枚举中文描述（对齐 config/anonymizer.ANONYMIZATION_MODE_DESCRIPTIONS）
@@ -818,6 +899,12 @@
 
   function renderConfigEdit(surface) {
     configState.surface = surface;
+    // 实验开关显示名回填（服务端按注册表下发，新增实验项无需改前端）
+    if (surface.llm && surface.llm.experiment_labels) {
+      Object.keys(surface.llm.experiment_labels).forEach(function (flag) {
+        CONFIG_LABELS.experiments[flag] = surface.llm.experiment_labels[flag];
+      });
+    }
     els.configPanel.textContent = '';
     // 面板顶部警示区（同源失败 403 专用）
     var panelErr = document.createElement('p');
@@ -839,11 +926,11 @@
     els.configPanel.appendChild(
       renderBoolGroup('llm', 'LLM 分析章节', surface.llm.enabled_llm, {
         prefix: 'enabled_llm.',
-        note: '辩论三模块（白脸/黑脸/综合）不在菜单展示，输出由下方「辩论实验功能」三个开关控制'
+        note: '辩论三模块（白脸/黑脸/综合）不在菜单展示，输出由下方「实验性功能」对应开关控制'
       })
     );
     els.configPanel.appendChild(
-      renderBoolGroup('debate', '辩论实验功能（⚗ 实验性，默认关闭）', surface.llm.debate, {
+      renderBoolGroup('experiments', '实验性功能（⚗ 实验性，默认关闭）', surface.llm.experiments, {
         experimental: true
       })
     );

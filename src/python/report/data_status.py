@@ -49,9 +49,10 @@ class DegradationEvent:
     每次 record() 或 record_aggregated() 调用产生一个事件，
     供 get_log() 汇总为 LLM 可消费的结构化列表。
 
-    detail 字段为可选字典，用于承载 record_aggregated() 的聚合信息
-    （failed_count / total_count / ratio / severity / message）。
-    纯 record() 调用不设 detail。
+    detail 字段为可选字典，用于承载聚合信息
+    （record_aggregated()：failed_count / total_count / ratio / severity / message）
+    或纯 record() 调用的失败原因（``{"message": ...}``）。
+    两者都不提供时保持 ``None``。
     """
 
     source_key: str
@@ -254,6 +255,7 @@ class DegradationTracker:
         failure_type: str = "unreachable",
         cache_age_hours: float | None = None,
         cache_ttl_hours: float | None = None,
+        message: str | None = None,
     ) -> tuple[bool, int, int]:
         """记录一次数据获取结果，判断是否应降级。
 
@@ -265,6 +267,8 @@ class DegradationTracker:
                           或 ``"empty"``（数据为空）
             cache_age_hours: 缓存数据年龄（小时），用于信号2
             cache_ttl_hours: 缓存标准 TTL（小时），用于自适应调节
+            message: 人类可读的失败原因（如 ``"腾讯财经(连接超时)"``）。
+                     仅作诊断展示，不参与降级判定；不传时行为与既往完全一致。
 
         Returns:
             (是否降级, 当前最大失败计数, 最低有效阈值)
@@ -284,6 +288,7 @@ class DegradationTracker:
                 failure_type,
                 cache_age_hours,
                 cache_ttl_hours,
+                message,
             )
 
     def reset(self, source_key: str) -> None:
@@ -303,7 +308,8 @@ class DegradationTracker:
 
         Returns:
             事件字典列表，每条含 source_key / tier / success / failure_type /
-            degraded / count / effective_threshold / timestamp。
+            degraded / count / effective_threshold / timestamp / detail。
+            ``detail`` 为可选的失败原因或聚合信息字典，无附加信息时为 ``None``。
             按 record() 调用顺序排列。
         """
         with self._lock:
@@ -411,6 +417,7 @@ class DegradationTracker:
         failure_type: str,
         cache_age_hours: float | None,
         cache_ttl_hours: float | None,
+        message: str | None = None,
     ) -> tuple[bool, int, int]:
         # 成功 → 全部归零 + 更新持久化时间戳（带写节流）
         if success:
@@ -467,6 +474,7 @@ class DegradationTracker:
                 count=max_count,
                 effective_threshold=min_eff,
                 timestamp=time.time(),
+                detail={"message": message} if message else None,
             )
         )
         return degraded, max_count, min_eff

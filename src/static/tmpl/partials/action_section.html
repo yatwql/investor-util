@@ -146,6 +146,58 @@
             <div>* 交易纪律：止盈/止损线按成本收益率触发（可配置）；回撤纪律需组合历史峰值数据</div>
             <div>* 调仓建议：份额已按一手取整（A 股/场内基金 100 份），费用为本地静态费率估算，金额与现金按建议执行顺序累计；收益归因为后续增强能力，报告结构保持稳定</div>
         </div>
+
+        <!-- ⑤ 历史决策复盘（决策跨期反思闭环，默认关闭） -->
+        {% set _rev = decision_review_data or {} %}
+        {% if _rev.get("available") %}
+        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">⑤ 历史决策复盘（非回测，仅供反思参考）</div>
+        <div style="font-size:13px;color:var(--text-muted);margin: 2px 0 8px;">{{ _rev.get("disclaimer", "") }}</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>代码</th><th>名称</th><th>判断方向</th>
+                    <th>结果</th><th>区间涨跌</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in (_rev.get("recent_settled") or []) %}
+                <tr>
+                    <td>{{ s.get("code", "") }}</td>
+                    <td class="text-left">{{ s.get("name", "") }}</td>
+                    <td class="text-left">{{ s.get("direction", "") }}</td>
+                    <td>
+                        {% if s.get("outcome") == "hit" %}兑现
+                        {% elif s.get("outcome") == "miss" %}未兑现
+                        {% elif s.get("outcome") == "flat" %}平盘
+                        {% else %}缺数据{% endif %}
+                    </td>
+                    <td style="text-align:right;">
+                        {% if s.get("raw_return") is not none %}{{ "{:+.1%}".format(s.get("raw_return")) }}{% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% for p in (_rev.get("recent_pending") or []) %}
+                <tr>
+                    <td>{{ p.get("code", "") }}</td>
+                    <td class="text-left">{{ p.get("name", "") }}</td>
+                    <td class="text-left">{{ p.get("direction", "") }}</td>
+                    <td>待结算</td>
+                    <td>-</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if _rev.get("settled_count", 0) > 0 and _rev.get("sample_sufficient") %}
+        <div class="summary-tag" style="margin-top: 8px;">
+            方向命中 {{ "{:.0%}".format(_rev.get("direction_accuracy") or 0) }}
+            {% if _rev.get("alpha_mean") is not none %} · 超额均值 {{ "{:+.2%}".format(_rev.get("alpha_mean")) }}{% endif %}
+        </div>
+        {% elif _rev.get("settled_count", 0) > 0 %}
+        <div class="summary-tag" style="margin-top: 8px;">已结算 {{ _rev.get("settled_count", 0) }} 条（样本不足，仅计数参考）</div>
+        {% elif _rev.get("pending_count", 0) > 0 %}
+        <div class="summary-tag" style="margin-top: 8px;">待结算 {{ _rev.get("pending_count", 0) }} 条（决策满 5 个交易日后用真实行情对账）</div>
+        {% endif %}
+        {% endif %}
     </div>
     {% else %}
     <div class="section-content">

@@ -42,17 +42,17 @@ def _action_data(**extra) -> dict:
     return d
 
 
-class TestExcelActionSheet(unittest.TestCase):
-    """行动建议页签 Excel 呈现测试。"""
+class _ExcelSheetAssertHelpers:
+    """Excel 呈现测试共享断言助手（写页签 / 取全部文本 / 展平）。"""
 
-    def _write(self, action_data) -> "object":
+    def _write(self, action_data, decision_review_data=None) -> "object":
         from openpyxl import Workbook
 
         from src.python.report.action_sheet import write_action_sheet
 
         wb = Workbook()
         ws = wb.active
-        write_action_sheet(ws, action_data)
+        write_action_sheet(ws, action_data, decision_review_data=decision_review_data)
         return ws
 
     def _all_text(self, ws) -> list[list[str]]:
@@ -60,6 +60,10 @@ class TestExcelActionSheet(unittest.TestCase):
 
     def _flat(self, ws) -> list[str]:
         return [v for row in self._all_text(ws) for v in row]
+
+
+class TestExcelActionSheet(_ExcelSheetAssertHelpers, unittest.TestCase):
+    """行动建议页签 Excel 呈现测试。"""
 
     def test_full_rendering_when_available(self):
         """available=True → 标题 + 行动摘要 + 四个子块齐全。"""
@@ -149,6 +153,90 @@ class TestExcelActionSheet(unittest.TestCase):
         ws = self._write(None)
         flat = self._flat(ws)
         self.assertIn("无持仓数据，行动建议无法生成", flat)
+
+
+class TestExcelDecisionReviewBlock(_ExcelSheetAssertHelpers, unittest.TestCase):
+    """行动页签内嵌「历史决策复盘」子块（decision_review_data）Excel 呈现测试。"""
+
+    @staticmethod
+    def _review_data(**extra) -> dict:
+        """构造 decision_review_data 契约 mock（1 条 settled + 1 条 pending）。"""
+        d = {
+            "available": True,
+            "disclaimer": "本复盘基于历史判断与真实行情的滞后对账，仅供反思参考，不构成任何投资建议。",
+            "pending_count": 1,
+            "settled_count": 1,
+            "sample_sufficient": False,
+            "direction_accuracy": None,
+            "alpha_mean": None,
+            "recent_pending": [
+                {"code": "600519", "name": "贵州茅台", "direction": "看空（减仓/卖出建议）", "detail": "止盈线 +20%"},
+            ],
+            "recent_settled": [
+                {
+                    "code": "159915",
+                    "name": "创业板ETF",
+                    "direction": "看多（加仓建议）",
+                    "outcome": "miss",
+                    "raw_return": -0.03,
+                    "settle_date": "2026-09-08",
+                    "horizon_bars": 7,
+                },
+            ],
+        }
+        d.update(extra)
+        return d
+
+    @staticmethod
+    def _contains(flat: list[str], text: str) -> bool:
+        """单元格整体或单元格内含 text 均算命中（Excel 单元格常为长文案）。"""
+        return any(text in v for v in flat)
+
+    def test_no_review_block_without_data(self):
+        """decision_review_data 缺省（None）→ 页签无⑤复盘子块（既有输出不变）。"""
+        flat = self._flat(self._write(_action_data()))
+        self.assertNotIn("历史决策复盘", flat)
+        self.assertNotIn("待结算", flat)
+
+    def test_settled_and_pending_rows(self):
+        """复盘子块渲染 settled（结果列+区间涨跌）与 pending（待结算）行。"""
+        flat = self._flat(self._write(_action_data(), self._review_data()))
+        self.assertTrue(self._contains(flat, "历史决策复盘"), "应含复盘子块标题")
+        self.assertTrue(self._contains(flat, "仅供反思参考"), "应含免责声明")
+        self.assertIn("159915", flat)
+        self.assertIn("未兑现", flat)  # outcome=miss
+        self.assertIn("-3.0%", flat)  # raw_return -0.03 → -3.0%
+        self.assertIn("600519", flat)
+        self.assertIn("待结算", flat)
+        # settled_count>0 且样本不足 → 计数提示行（不给命中率结论）
+        self.assertTrue(self._contains(flat, "已结算 1 条"))
+        self.assertFalse(self._contains(flat, "方向命中"))
+
+    def test_accuracy_summary_when_sample_sufficient(self):
+        """样本充足 → 命中率 + 超额均值摘要行。"""
+        data = self._review_data(
+            settled_count=21,
+            sample_sufficient=True,
+            direction_accuracy=0.6,
+            alpha_mean=0.012,
+        )
+        flat = self._flat(self._write(_action_data(), data))
+        self.assertTrue(self._contains(flat, "方向命中 60%"))
+        self.assertTrue(self._contains(flat, "超额均值 +1.20%"))
+
+    def test_pending_only_summary(self):
+        """仅 pending（无 settled）→ 待结算计数提示行。"""
+        data = self._review_data(settled_count=0, recent_settled=[])
+        flat = self._flat(self._write(_action_data(), data))
+        self.assertTrue(self._contains(flat, "待结算 1 条"))
+
+    def test_review_block_in_unavailable_action(self):
+        """action 数据不可用（available=False）→ 复盘子块仍渲染（历史账本独立于当日行动）。"""
+        ws = self._write(_action_data(available=False), self._review_data())
+        flat = self._flat(ws)
+        self.assertIn("无持仓数据，行动建议无法生成", flat)
+        self.assertTrue(self._contains(flat, "历史决策复盘"))
+        self.assertIn("待结算", flat)
 
 
 if __name__ == "__main__":

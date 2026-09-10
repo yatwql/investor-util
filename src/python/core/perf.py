@@ -23,13 +23,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
 from src.python.core.constants import APP_VERSION, PROJECT_ROOT
+from src.python.core.jsonl_store import append_jsonl_atomic
 
 logger = logging.getLogger("invest")
 
@@ -173,36 +173,12 @@ class PerfCollector:
 
 
 def _append_jsonl_atomic(path: str, line: str) -> None:
-    """向 JSONL 文件原子追加一行。
+    """向 JSONL 文件原子追加一行（原语见 `core/jsonl_store.py`）。
 
     策略：读全部现有内容 → 追加新行 → tempfile.mkstemp + os.replace 写回。
     遵循原子写入：直接覆写会因断电/崩溃产生半写损坏文件。
     """
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    existing = ""
-    if os.path.isfile(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                existing = f.read()
-        except OSError:
-            logger.warning("[perf] 历史文件不可读，将重新创建: %s", path)
-
-    content = existing + line
-    fd, tmp_path = tempfile.mkstemp(
-        dir=os.path.dirname(path),
-        prefix=".perf_history_",
-        suffix=".tmp",
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-        os.replace(tmp_path, path)
-    except Exception:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
-        logger.exception("[perf] 写入历史文件失败: %s", path)
+    append_jsonl_atomic(path, line, prefix=".perf_history_", log_tag="perf", noun="历史文件")
 
 
 # ── 数据源健康检查持久化 ──────────────────────────────

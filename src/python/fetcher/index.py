@@ -225,7 +225,7 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     if not code:
         return None
 
-    from src.python.fetcher.chain import fetch_with_incremental_fallback
+    from src.python.fetcher.chain import FailureDiagnostics, fetch_with_incremental_fallback
 
     # 先查会话缓存（会话级复用）
     from src.python.core.provider_registry import NOT_FOUND, get_registry
@@ -240,11 +240,13 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
 
     chain_name = "history_index_us" if is_us_index_code(code) else "history_index"
     days = min(max(days, 5), 3650)
+    diag = FailureDiagnostics()
     try:
-        result = fetch_with_incremental_fallback(chain_name, code, days)
-    except Exception:
+        result = fetch_with_incremental_fallback(chain_name, code, days, diagnostics=diag)
+    except Exception as exc:
         logger.warning("[index] 指数历史日线获取异常: %s", code, exc_info=True)
         result = []
+        diag.add(chain_name, f"{type(exc).__name__}")
 
     # 记录降级事件
     from src.python.report.data_status import get_tracker
@@ -254,7 +256,7 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     if result:
         _t.record(_src_key, "T2", success=True)
     else:
-        _t.record(_src_key, "T2", success=False, failure_type="unreachable")
+        _t.record(_src_key, "T2", success=False, failure_type="unreachable", message=diag.summary())
 
     # 写入会话缓存（即使为空也缓存，避免重复请求）
     reg.session_cache_set("history_index", code, result, source="api")

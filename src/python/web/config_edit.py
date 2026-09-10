@@ -10,7 +10,8 @@
   config.json 顶层标量 → ``set_config``；嵌套 dict（report_submodules /
   comparison_indices）读合并后整块写；anonymization → ``set_anonymization_mode``；
   llm_settings.json → ``write_llm_settings``（自 tui 抽取的共享原语）；
-  features.json → ``save_feature_overrides``。
+  features.json → ``save_feature_overrides``（实验性功能开关，清单由
+  ``features.EXPERIMENTAL_FEATURES`` 注册表驱动，与 TUI 菜单 S 同源）。
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ import json
 import logging
 import os
 
+from src.python.config.features import EXPERIMENTAL_FEATURES
 from src.python.web.holdings_update import _atomic_copy
 
 logger = logging.getLogger("invest")
@@ -45,12 +47,9 @@ _SUBMODULE_KEYS = (
     "market_temperature",
 )
 
-# LLM 分析章节可编辑开关（菜单 S 1~5；辩论三模块为隐藏项，不在白名单）
+# LLM 分析章节可编辑开关（菜单 S 标准模块；辩论三模块为隐藏项，不在白名单）
 _LLM_SURFACE_KEYS = ("global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation")
 _LLM_HIDDEN_MODULES = ("debate_pro", "debate_con", "debate_synthesis")
-
-# 辩论实验功能开关（菜单 S 6~8，features.json）
-_DEBATE_FLAG_KEYS = ("llm_debate_procon", "llm_debate_conditional", "llm_debate_qa_concentration")
 
 
 class ConfigEditError(ValueError):
@@ -100,10 +99,8 @@ config_edit_whitelist = {
     "enabled_llm.health_check": {"kind": "bool", "target": "llm_settings", "writer": "llm"},
     "enabled_llm.penetration_deep": {"kind": "bool", "target": "llm_settings", "writer": "llm"},
     "enabled_llm.news_correlation": {"kind": "bool", "target": "llm_settings", "writer": "llm"},
-    # ── 7 辩论实验功能开关（features.json）──
-    "llm_debate_procon": {"kind": "bool", "target": "features", "writer": "features"},
-    "llm_debate_conditional": {"kind": "bool", "target": "features", "writer": "features"},
-    "llm_debate_qa_concentration": {"kind": "bool", "target": "features", "writer": "features"},
+    # ── 7 实验性功能开关（features.json；清单取自 features.EXPERIMENTAL_FEATURES 注册表）──
+    **{flag: {"kind": "bool", "target": "features", "writer": "features"} for flag in EXPERIMENTAL_FEATURES},
 }
 
 
@@ -294,7 +291,7 @@ def get_config_edit_surface() -> dict:
 
     数据来源：config.json（get_config + 章节/子模块访问器）、
     llm_settings.json（enabled_llm 直接读源文件，缺失键默认开，对齐 TUI）、
-    features.json（辩论实验开关经运行时覆写读取）。
+    features.json（实验性功能开关经运行时覆写读取）。
     """
     from src.python.config import (
         get_config,
@@ -352,7 +349,7 @@ def get_config_edit_surface() -> dict:
         except (OSError, json.JSONDecodeError) as e:
             logger.warning("读取 llm_settings.json 失败，LLM 开关按默认展示: %s", e)
     surface_enabled = {k: bool(enabled_map.get(k, True)) for k in _LLM_SURFACE_KEYS}
-    debate = {flag: is_feature_enabled(flag) for flag in _DEBATE_FLAG_KEYS}
+    experiments = {flag: is_feature_enabled(flag) for flag in EXPERIMENTAL_FEATURES}
 
     return {
         "paths": paths,
@@ -364,6 +361,9 @@ def get_config_edit_surface() -> dict:
         "llm": {
             "enabled_llm": surface_enabled,
             "hidden_modules": list(_LLM_HIDDEN_MODULES),
-            "debate": debate,
+            "experiments": experiments,
+            # 实验开关显示名同样取自注册表，供前端直接渲染（避免前端另维护一份
+            # 手写标签字典而与注册表漂移）。
+            "experiment_labels": {flag: name for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items()},
         },
     }

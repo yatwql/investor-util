@@ -1,5 +1,5 @@
 # 投资复盘助手 — 技术设计
-> 文档版本：0.10.15
+> 文档版本：0.10.16
 
 ## 目录
 
@@ -231,6 +231,8 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **贯穿** | HTTP 客户端 | 统一工厂 | `core/http_client.py` |
 | **贯穿** | 性能收集 | PerfCollector 三路径计时 + perf_history.jsonl 持久化 + 数据源健康历史聚合 `summarize_health_history()` | `core/perf.py` |
 | **贯穿** | 日志可视化 | 结构化日志读取（parse_log/tail_log/read_log），CLI/TUI/Web 三端共享 | `core/log_reader.py` |
+| **贯穿** | 系统自检 | 运行环境/配置/目录/功能开关/数据源一次性盘点（实验功能 `doctor_check`），CLI/TUI/Web 三端共享；自身永不抛异常、零重依赖 | `core/doctor.py` |
+| **贯穿** | 数值归一 | 非有限值（NaN/±inf）防线收敛点：`safe_num` / `strict_num` / `finite_or` / `is_finite_number`；纯 stdlib、零项目内依赖，providers/analysis/report 任一侧可安全导入 | `core/num_utils.py` |
 
 ### 1.4 概要设计 — 核心架构决策
 
@@ -434,6 +436,7 @@ while True:
 | | `[3]`/`[4]` | 清理过期缓存 / 查看缓存统计 |
 | 诊断 | `[V]` | 查看最近运行日志（可按级别筛选，`handlers_log.py::_cmd_view_logs`） |
 | | `[H]` | 查看数据源健康历史（近期检查记录，`handlers_log.py::_cmd_view_health_history`） |
+| | `[D]` | 系统自检（环境/配置/目录/数据源一键体检，`handlers_log.py::_cmd_run_doctor`）；**受实验开关 `doctor_check` 约束**——开关关闭时该菜单项由 `tui_menu._apply_feature_gates()` 就地裁剪，不出现在菜单中 |
 | 退出 | `[X]` | 退出程序 |
 
 菜单渲染层与状态面板：`print_header`（标题 + 首次运行指引：缺持仓文件/缺 LLM 配置提示）、`show_config`（持仓路径、输出目录、新闻抓取上限、文件就绪状态 `[OK]`/`[!!]`、匿名化状态、隐私声明、LLM 配置状态单链/多链两视图）。LLM 状态面板支持多 Provider 链式模式（策略、各 provider 后端/模型/优先级/熔断状态、模块级偏好）。
@@ -489,16 +492,17 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 
 `_build_parser()`：`prog="investor-util"`，全局参数 + 5 个子命令。
 
-- **全局参数**：`--config`（备用配置文件路径）、`--output`（报告输出目录，覆盖 config 的 output_dir）、`--verbose`（进度同步到 stderr，默认仅写 logs/app.log）、`--non-interactive`（跳过首次运行交互式引导，定时任务/脚本使用）、`--version`。
+- **全局参数**：`--config`（备用配置文件路径）、`--output`（报告输出目录，覆盖 config 的 output_dir）、`--verbose`（进度同步到 stderr，默认仅写 logs/app.log）、`--non-interactive`（跳过首次运行交互式引导，定时任务/脚本使用）、`--experiment NAME`（可重复；启用实验性功能且**仅本次运行生效、不写盘**。NAME 取开关名或显示名，`all` = 全部启用。取值经 `_experiment_name` argparse type 回调即时校验：空串/未知名即报错，可选值由 `features.describe_experiment_flags()` 生成）、`--version`。
 - **`report`**：`--type basic/both/full`（默认 basic）、`--history auto/off`（未指定回退配置层 `history.fetch_mode`，仅 both/full 有效）、`--force-llm`。
 - **`cache`**：互斥组 `--update basic/position/all` / `--clean` / `--stats`。
 - **`whatif`**：`--candidate`（目标持仓，必填）、`--base`（基准持仓，缺省用 config 持仓）、`--effective-date`（调仓生效日，opt-in 联网取历史做时序回测）。
 - **`check-sources`**：数据源健康检查，**无需 config**（main() 中特殊前置分派）。
 - **`view-logs`**：结构化运行日志查看（`core/log_reader.py::read_log`），`--level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`（最小级别阈值）、`--lines N`（默认 5000，读取末尾行数上限）、`--since/--until`（时间前缀过滤）；**无需 config**（main() 中特殊前置分派，配置损坏时仍可查日志诊断）。
+- **`doctor`**：系统自检（`core/doctor.py`，§4.17.3），`--offline`（跳过数据源联网检查）、`--timeout SECONDS`（默认 8.0，联网检查总预算）；**无需 config 且不受 `doctor_check` 开关约束**（main() 中特殊前置分派——配置损坏正是它要诊断的场景，若被开关拦住即成死锁）。
 
 #### 1.7.3 主流程
 
-`main()`：`setup_logger` → `_build_parser` → `parse_args` → `check-sources` / `view-logs` 特殊处理（均不 init_config）→ `init_config` + `get_config` → `startup_wizard(non_interactive)`（非交互/CI 环境自动跳过，不阻塞命令）→ 按 `args.command` 分派 `_handle_report` / `_handle_cache` / `_handle_whatif`。
+`main()`：`setup_logger` → `_build_parser` → `parse_args` → `check-sources` / `view-logs` / `doctor` 特殊处理（均不 init_config）→ `init_config` + `get_config` → `_apply_cli_experiments(args.experiment)`（实验功能命令行开关，须在配置初始化**之后**——覆写加载已完成，此处只做本次运行的增量 `set_feature_enabled`，绝不 `save_feature_overrides` 写盘）→ `startup_wizard(non_interactive)`（非交互/CI 环境自动跳过，不阻塞命令）→ 按 `args.command` 分派 `_handle_report` / `_handle_cache` / `_handle_whatif`。
 
 **持仓定位差异**：CLI 不经过 TUI 文件选择器——`_cli_resolve_holdings_file()` 通过 config 的 `holdings_dir + holdings_filename` 直接定位；若该路径为目录则自动选第一个 `.xlsx`（多个时告警）。`_cli_read_holdings()` / `_cli_read_holdings_with_flows()` 分别读主表与「主表+流水」，与 TUI 读取路径对齐。
 
@@ -509,6 +513,7 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 - **`_handle_whatif`**：解析 `--base`/`--candidate` 两份持仓 → `run_whatif_simulation()`（§4.13）→ 结果 `ok` 判定，失败返回 2；`--effective-date` 触发时序回测扩展。
 - **`_handle_check_sources`**：`run_check_sources()`（内部 `sys.exit`）。
 - **`_handle_view_logs`**：调 `core/log_reader.py::read_log(limit, level, since, until)`，输出每条 `time [LEVEL] message`（多行 body 缩进）；无匹配 → 提示并返回 0；ValueError/OSError → 记录日志 + 返回 `_EXIT_SEVERE`。**薄展示层，无解析逻辑**（解析/过滤全在 `core/log_reader.py`）。
+- **`_handle_doctor`**：调 `core/doctor.py::run_doctor_checks(include_network=not offline, max_timeout=timeout)` → `format_doctor_report(results, use_color=_use_ansi_color())` → 按 `summarize_doctor_results()` 返回 `_EXIT_SUCCESS`（全通过）/ `_EXIT_PARTIAL`（有失败项）。`_use_ansi_color()` 遵循 `NO_COLOR` + `isatty` + UTF-8 三项判据，终端不支持颜色时自动降级为纯文本（§4.17.3）。
 
 #### 1.7.5 CliProgressReporter
 
@@ -532,7 +537,7 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 |:-----|:-----|:---------|
 | `web/server.py` | 启动入口 | sys.path 注入、参数解析、端口检测、output_dir 写锁检测、init_config、app.run |
 | `web/app.py` | Flask 应用工厂 | 统一 JSON 错误处理、request_id 访问日志、注入 run_manager |
-| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康/日志/配置编辑；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 组装状态区系统信息（版本/本机 IP/LLM 状态，对齐 TUI）；`_handle_logs`/`_handle_health_history` 薄展示（委托 `core/log_reader.py` + `core/perf.py`，无解析逻辑）；`_handle_config_edit` 同源守卫（`_is_same_origin`） |
+| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康/日志/配置编辑；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 组装状态区系统信息（版本/本机 IP/LLM 状态/自检卡片可见性，对齐 TUI）；`_handle_logs`/`_handle_health_history` 薄展示（委托 `core/log_reader.py` + `core/perf.py`，无解析逻辑）；`_handle_doctor` 薄展示（委托 `core/doctor.py`）；`_handle_config_edit` 同源守卫（`_is_same_origin`） |
 | `web/upload.py` | 上传安全 | 服务端 uuid 重命名、扩展名白名单、大小上限、PK 魔数、原子落盘、TTL 清理 |
 | `web/config_edit.py` | 配置编辑 | `config_edit_whitelist` 白名单（唯一事实来源）+ `apply_config_edit`/`get_config_edit_surface` + `config_backup_file` 写前 .bak 备份；写入分派逐条等价 TUI |
 | `web/runs.py` | 运行管理 | RunManager 单 worker 串行队列 + run 状态/事件注册表（Lock 保护） |
@@ -574,7 +579,8 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 | GET | `/api/health` | 数据源健康 | 60s 结果缓存；`?fresh=1` 强制重测 |
 | GET | `/api/health/history` | 数据源健康历史 | `core/perf.py::summarize_health_history()` 最近 N 次运行摘要（含 ok/total、失败源）；读取失败 500 HEALTH_HISTORY_READ_FAILED |
 | GET | `/api/logs` | 结构化日志查看 | `core/log_reader.py::read_log()`；`?level=` 校验（非法 400 BAD_PARAM）、`?lines=` clamp [1,5000]、`?since/until` 透传；读取失败 500 LOG_READ_FAILED |
-| GET | `/api/config/edit` | 配置编辑面板 | 无守卫；返回 7 组可编辑面（路径/章节/子模块/匿名化/对比指数池/LLM 开关/辩论实验） |
+| GET | `/api/doctor` | 系统自检（实验功能 `doctor_check`） | `core/doctor.py::run_doctor_checks()`，返回 `{results, ok_count, bad_count}`；`?network=0` 跳过联网检查、`?timeout=` clamp 上限 15s（非法值回落 12s 默认）；不与其它的健康缓存共享（预算不同） |
+| GET | `/api/config/edit` | 配置编辑面板 | 无守卫；返回 7 组可编辑面（路径/章节/子模块/匿名化/对比指数池/LLM 开关/实验性功能） |
 | POST | `/api/config/edit` | 应用配置编辑 | `_is_same_origin()` 同源守卫（失败 403）；校验失败 400 BAD_PARAM；写共享配置异常 500 CONFIG_WRITE_FAILED |
 
 #### 1.8.5 RunManager 单 worker 串行队列
@@ -652,8 +658,8 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 
 Web 配置编辑面板的职责边界：**「能改什么」由白名单唯一确定，「怎么改」逐条等价 TUI 写入路径**，不引入任何 TUI 之外的新配置项。核心实现 `web/config_edit.py`：
 
-- **白名单 `config_edit_whitelist`**（小写模块级 dict，唯一事实来源）：点分键 → `{"kind", "target", "writer"}`。`kind` 取 `str`/`bool`/`enum`/`action`；`target` 取 `config`/`llm_settings`/`features`（落盘目标文件）；`writer` 取 `scalar`/`submodule`/`anonymization`/`llm`/`features`/`comparison_indices`（写入分派器）。全集 7 组：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、辩论实验功能开关 3（features.json）。
-- **写入分派逐条等价 TUI**：config.json 顶层标量 → `set_config`（`_PATH_CONFIG_KEYS` 路径键自动反绝对化）；嵌套 dict（report_submodules / comparison_indices）→ 读合并后 `set_config` 整块写；`anonymization.mode` → `set_anonymization_mode`；`enabled_llm.*` → 共享 `write_llm_settings`（`config/_llm_settings.py` 公开原语，自 `tui/handlers_config.py` 抽取，TUI 改委托、行为零变化；保留注释 + mkstemp + `os.replace` 原子写 + `get_llm_config()` 缓存刷新）；`llm_debate_*` → `save_feature_overrides`（features.json）。
+- **白名单 `config_edit_whitelist`**（小写模块级 dict，唯一事实来源）：点分键 → `{"kind", "target", "writer"}`。`kind` 取 `str`/`bool`/`enum`/`action`；`target` 取 `config`/`llm_settings`/`features`（落盘目标文件）；`writer` 取 `scalar`/`submodule`/`anonymization`/`llm`/`features`/`comparison_indices`（写入分派器）。全集 7 组：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、实验性功能开关 7（features.json；清单由 `features.EXPERIMENTAL_FEATURES` 注册表驱动，与 TUI 菜单 S 同源，面板显示名亦由注册表下发 `experiment_labels`）。
+- **写入分派逐条等价 TUI**：config.json 顶层标量 → `set_config`（`_PATH_CONFIG_KEYS` 路径键自动反绝对化）；嵌套 dict（report_submodules / comparison_indices）→ 读合并后 `set_config` 整块写；`anonymization.mode` → `set_anonymization_mode`；`enabled_llm.*` → 共享 `write_llm_settings`（`config/_llm_settings.py` 公开原语，自 `tui/handlers_config.py` 抽取，TUI 改委托、行为零变化；保留注释 + mkstemp + `os.replace` 原子写 + `get_llm_config()` 缓存刷新）；实验性功能开关 → `save_feature_overrides`（features.json）。
 - **类型/枚举校验**：`set_config` 不做值类型/模式验证，白名单在 Web 层自行校验——kind=str 拒绝含路径分隔符，kind=bool 仅接受 `True`/`False`（`1`/`"true"`/`0.0` 等一律 400），kind=enum 严格匹配合法枚举值（大小写/空白/非字符串拒绝），对比指数池 code 拒绝含路径分隔符（防 `../` 穿越）且 name 长度受限。校验失败统一 400 BAD_PARAM（服务端中文文案）。
 - **写前备份 `config_backup_file`**：写目标文件前单槽 `.bak` 备份（复用 `holdings_update._atomic_copy`），原文件不存在时返回 None（不备份）；仅备份一次（后续写入目标存在已有 `.bak` 不覆盖），供手动还原（`.bak` 改回原名）。
 - **同源守卫**：`_handle_config_edit` POST 复用 `_is_same_origin()`（Sec-Fetch-Site + Origin 校验，同源或非浏览器放行）——Web 无内建认证/无 CSRF token，副作用写操作以此兜底跨站写请求，失败 403。
@@ -2328,6 +2334,25 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
     跨会话持久化
 ```
 
+#### LLM 输出侧质量分级（`report/llm_quality.py`，实验功能 `module_quality_gate` 默认关）
+
+上节的降级治理面向**数据源侧（输入）**；本模块把同一「降级披露」思路扩展到 **LLM 输出侧**——回答「这段模型输出能不能信」。借鉴外部 `quality_gate` 的 A~F 分级，但**只标注不阻断**：劣级不重试、不改生成流程、不影响缓存读写。
+
+| 评级 | 触发条件（自上而下首个命中者胜出） |
+|:----:|:-----------------------------------|
+| F | 剥离 HTML 标签后正文为空 |
+| D | 命中降级占位（`llm/fallback.py::is_placeholder_content`）/ 截断标记（`TRUNCATION_MARKER`），或正文短于该模块下限 |
+| C | 缺失该模块提示词要求的必需章节标记 |
+| B | 结构与必需章节齐备，但正文短于该模块参考篇幅 |
+| A | 结构与篇幅均达标 |
+
+- **上屏策略**：A/B 视为健康输出，**零噪音**；C/D（「内容在但存在缺陷」）在模块 HTML 字符串**头部拼接**一条 `【内容质量提示】` 内联样式横幅（含评级 + 具体原因 + 「仅供降级参考」提示），并向 reporter 汇总告警一次。内容缺失型（F 空内容 / D 占位与截断）已有各自的醒目提示（占位文本写明「当前无法生成」、空内容由模板兜底），**不叠加横幅**，避免同一件事说两遍。
+- **载体复用**：横幅直接拼进模块 HTML 字符串，与既有的截断标记、缓存命中行、事实校验摘要同一套载体——不新增 `pipeline_data` 契约键（附录 H 无需变更）、不扩展报告生成函数的参数表，HTML（`{{ global_macro | safe }}` 等）与 Excel（`_write_content_sheet` 按块标签分段 + `_strip_html` 渲染）**两条输出路径同时生效**。
+- **横幅前缀刻意避开 `⚠ `**：Excel 侧按行首 `⚠ ` 识别事实校验告警块（`_FACT_CHECK_FAIL_RE` 无 MULTILINE 的 `^⚠ `），故横幅以 `【内容质量提示】` 起首，避免被误判为校验告警行着色。
+- **只读分级**：判定依据全部来自内容本身（正文长度、必需章节标记、占位签名），无额外数据依赖；读的是缓存**之后**的内容，**不写回缓存**（缓存始终保持 LLM 原始输出）。
+- **阈值与标记的维护纪律**：各模块长度双阈值 (降级下限, 参考篇幅) 按 `data/cache/` 真实健康输出实测标定（取实测篇幅约 25%~40% / 60%~65%，只拦截「明显残缺」而非「写得比其他模块短」）；必需章节标记只收录「提示词明文规定固定章节清单」的模块（持仓体检 7 项 / 穿透深度 5 项），纯散文模块（全球政经）与结构随辩论模式变化的模块（智囊团复盘）只做长度分级。标记与提示词章节规定**须同步**——由 `test_module_markers_match_prompts` 直接比对 `prompts_core` 的 System Prompt 常量，改提示词而标记未跟随即报错，防分级静默误判。
+- **接线**：`report/_report_generation.py` 第 5c 步（决策登记之后、`perf.stop()` 之前——横幅会改变内容文本，须避开操作建议表的解析），整体 try/except，分级异常只告警不打断报告主链路。
+
 ### 4.12 组合演进（多快照趋势）
 
 聚合 `data/history/snapshots/snapshot_{timestamp}.json` 多期快照，输出组合市值/HHI/TOP 持仓占比的趋势数据（`analysis/portfolio_evolution.py` / `report/orchestrator.py` 组装），供 Excel「组合演进」页签与 HTML「组合演进」章节消费（3 张 Chart.js 图：总市值与总盈亏 / HHI / TOP 持仓占比变迁）。
@@ -2416,6 +2441,197 @@ tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互�
 | **C20** (HTML 图表图下说明强制) | 主题不改变图表 DOM 结构与图下说明（`.chart-caption`）渲染分支 |
 | **§1.4.5** (数据降级治理) | `window.Chart` 缺失时 `theme.js` 守卫跳过图表重绘（仅切换页面 CSS 变量），不崩溃；离线降级（drawSimpleChart 回退渲染）不受影响 |
 
+### 4.15 决策头结构化与决策词归一解析
+
+决策词（减仓/加仓/持有）此前只存在于提示词契约与展示层，唯一消费方是决策账本的抽取模块，且以**子串包含**判方向——`不建议加仓` 会被判成 `+1`、`加仓或减仓` 会取靠前词判成 `-1`。误判后果不是显示错一行，而是**按相反方向写入 `data/state/decision_ledger.jsonl`**，日后用真实行情结算时污染命中率统计。本项把决策词从「展示文本」升格为「可解析数据」。
+
+**分层（`core/` 为共享层，两个消费方向都无环）**：
+
+```
+core/decision_header.py          # 词表 + 归一解析 + 结构化头解析 + 缓存后缀；零项目内业务依赖
+    ↑ 单向依赖（仅取 core.decision_ledger 的方向常量作单一事实来源）
+llm/prompts_action.py            # 提示词契约段（开关门控）  ← llm/ 不得依赖 report/
+report/decision_llm_capture.py   # 抽取：结构化优先 → 表格兜底
+```
+
+方向常量复用 `core.decision_ledger` 的 `DIRECTION_LONG/SHORT/FLAT`，不另立一套 int 常量。
+
+**归一判据（`parse_decision_word`）**：
+
+| 判据 | 说明 |
+|:-----|:-----|
+| 标签优先于裸词 | 先对整格做精确匹配（剥离 emoji/符号/空白后），命中即返回；未命中才降级全文扫描 |
+| 长词优先 | 词表按长度降序，避免短词劫持 |
+| 否定前缀守卫 | 命中词**左侧**同子句内出现 `NEGATION_PREFIXES`（不建议/不宜/暂不/暂缓/无需/不必/不用/不再/不要/不应/避免/防止/切勿/切忌/切莫）或单字 `不/勿` → 判未命中。仅看左侧：右侧限定语（`建议加仓不必追高`）不构成否定 |
+| 复合词左边界 | 命中词紧邻左字符若属 `COMPOUND_PREFIX_CHARS`（`加减增`）→ 判为复合词片段而跳过（`加减仓位`/`增减持`）。中文无词间空格，无法照搬 `\b`，故取**窄字符集**：只有这三字能与其后的 `仓/持` 组成方向二义的复合短语；不收 `持/买/卖/清/观/止/建`，否则误杀「坚持持有」「逢低买入」等正常表述（已编码为回归矩阵） |
+| 二义不猜 | 扫描命中多个不同方向 → 返回 None（不做「取第一个」的静默选择） |
+| 默认值 = None | 判不出即 None 且**不登记**。不落「持有」或任何方向默认值 |
+
+词表分**规范词**（减仓/加仓/持有，提示词契约固定三值）与**扩展词**（清仓·减持·卖出·止损 / 增持·买入·建仓 / 观望），只收语义单向词——`止盈`（可能部分落袋也可能清仓）、`调仓`（方向不明）**不入词表**：宁可判不出，不可判错。
+
+**结构化决策头（实验开关 `decision_header_parse`，默认关）**：开启时提示词末尾追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约；抽取侧先 `parse_structured_header` 读结构化头，逐字段归一校验（`action` 必须经上述判据归一为方向，否则丢弃该条；`code` 必须 6 位数字），全批不可用 → 回落确定性表格解析。两路产物形状统一为 `{code, name, direction, magnitude, detail, …}`（结构化头的 `priority` 在解析侧即归一为 `magnitude`），`_collect_decision` 对两路走同一段登记纪律（持有剔除 / code 白名单 / 名称回填 / 同码取高）。
+
+- **载荷提取用花括号配平扫描**（字符串/转义感知），而非 `find("{")`/`rfind("}")`——后者在同一行出现两个 JSON 对象时会把跨度拉通成非法 JSON；`决策头：` 后为空行时以空串兜底，不抛 `IndexError`。
+- **缓存键同源**：开关影响提示词 → **写侧指纹**（`llm/generators.py::_fingerprint`）与**预检指纹**（`llm/generators_orchestrator.py::_compute_module_cache_info`）无条件同调 `structured_header_cache_suffix()`，开关判定收敛在函数内部。关闭返回 `""`（键不变、不误伤旧缓存）；开启两侧同步换键，避免预检命中旧键而跳过重生成使开关形同虚设。关闭时提示词**逐字节不变**。
+
+**架构约束遵从**：
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| 分层 / 无环依赖 | `core/decision_header.py` 零项目内业务依赖；`report/`、`llm/` 单向依赖 `core/`，解析器不 import `report/` |
+| 不引入新依赖 | 纯标准库（`re` / `json`）；明确不引入 pydantic/langchain/SDK |
+| 实验项默认关 | 缺省 `False`；关闭时提示词逐字节不变、缓存不扰动 |
+| 无静默默认值 | 判不出返回 None 且不登记（拒绝「失败丢默认值填充」） |
+| 持久化隔离 | 不新增持久化文件（账本路径沿用既有 conftest 隔离） |
+
+[↑ 回到顶部](#目录)
+
+### 4.16 确定性数值信号沉淀与实时/非实时标签纪律
+
+市场温度、估值分位、尾部风险、风格因子、再平衡超限这五类评级由确定性算法算出，此前只活在一次报告生成的内存里与当页展示中——报告落盘即散失，跨期无法回答「上期判高估，事后对不对」。本项把这五类评级沉淀为追加型账本 `data/state/signal_ledger.jsonl`，并给每条记录附**实时/非实时**来源标签，统计与提示词摘要**默认只算实时记录**（借鉴 augur `backtest.py` 的 `data_source` 标签与排行榜默认 `live_only` 纪律），防非实时数据算出的评级冒充真实战绩。
+
+**分层（`core/` 为共享层，两个消费方向都无环）**：
+
+```
+core/jsonl_store.py        # 原子追加 + 容错读取原语（零项目内依赖）
+    ↑ 委托（各自保持 prefix/日志标签，行为逐字不变）
+core/perf.py               # 性能历史
+core/decision_ledger.py    # 决策账本（序列化口径：键排序 + ensure_ascii=False）
+core/signal_ledger.py      # 信号账本：登记/幂等/折叠/摘要；不 import analysis
+    ↑ 单向依赖（仅借 core.decision_ledger 的方向常量作单一事实来源）
+report/signal_record.py    # 适配器：五类评级 → 记录（唯一持有 analysis 词表映射的一侧）
+llm/skeleton.py            # 摘要注入 expert_review 提示词（开关门控）
+```
+
+评级→方向词表映射（`低估/便宜 → +1`、`高估/超限 → -1` 等）与尾部风险分档阈值落在 `report/signal_record.py`：`core/` 不得依赖 `analysis/`，故语义映射不下沉到账本层，账本只存通用整数方向。
+
+**实时/非实时判据（`signal_record` 侧）**：
+
+| 信号 | 判定依据 | 说明 |
+|:-----|:---------|:-----|
+| 持仓级（估值分位、再平衡超限） | 该 code 的 `data_freshness` 条目 | `fresh` → 实时；非 fresh 或未识别取值 → 非实时并回显原始新鲜度文案 |
+| 指数级（市场温度、风格因子） | 降级事件 `source_key` 以 `index_history_` 开头 | 命中即本次降级 → 非实时 |
+| 组合级（尾部风险） | 降级事件 `source_key` 以 `price_` / `fund_` 开头 | 命中即本次降级 → 非实时 |
+| 组合级/指数级无逐品种新鲜度 | 乐观缺省「实时」并注明理由 | 无逐品种条目可证伪时取实时，理由字段显式记录，不静默 |
+
+「非实时」不引入新的合成数据开关，直接复用既有数据质量设施（逐品种 `data_freshness` + 降级事件），避免另立一套与既有降级治理并行的标签体系。仅可证明为实时才算实时：未识别的新鲜度取值一律判非实时（除 `FRESHNESS_FRESH` 外全部保守处理），文案取自 `core.data_freshness.FRESHNESS_LABELS`，不另写一份。
+
+**记录与幂等**：`id = {report_date}|{signal_type}|{subject}`；`append_signals` 批量读一次 → 按 id 去重（含批内重复）→ 一次原子写。同日重跑不重复入账（`registered` 归零、`skipped` 计数），次日照常入账。非有限数值（`NaN`/`±inf`）经 `_safe_number` 归一为 `None` 后才落盘，防写出非法 JSON。
+
+**摘要与缓存键同源**：`summary_block()` 在开关关闭、或实时样本不足 `MIN_SUMMARY_SAMPLE` 时返回 `""`（判定无条件执行，故「开关关闭 → 全链路无感」在注入路径同样成立）；输出逐类一行 + 非实时备注。开关影响提示词 → **写侧指纹**（`llm/generators.py::_fingerprint`）与**预检指纹**（`llm/generators_orchestrator.py::_compute_module_cache_info`）同调 `signal_ledger.summary_cache_suffix()`（无块返回 `""`，有块返回 `_sg` + 摘要 md5 前 12 位），开关判定收敛在函数内部。
+
+**报告 seam（5d）**：登记置于决策头结构化（5c）之后、`perf.stop()` 之前，而非更早的分析阶段——尾部风险等键在 LLM 生成阶段才注入 `pipeline_data`，过早登记会漏采。适配器对缺失键逐项跳过，故不构成硬依赖；登记整体包在 `try/except` 中，异常只告警不中断报告生成。
+
+**架构约束遵从**：
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| 分层 / 无环依赖 | `core/signal_ledger.py` 不 import `analysis/`；词表映射在 `report/` 适配器；`llm/` 单向依赖 `core/` |
+| 不重复实现（DRY） | 原子追加原语抽为 `core/jsonl_store.py`，`perf`/`decision_ledger`/`signal_ledger` 三处共用，不新增第三份拷贝 |
+| 实验项默认关 | 缺省 `False`；关闭时提示词逐字节不变、不写账本、摘要返回空 |
+| 无静默默认值 | 判不出来源即非实时（保守）；无逐品种条目时乐观取实时但**显式记录理由**；非有限数值归一为 `None` 而非写出 |
+| 持久化隔离 | 账本路径 `data/state/signal_ledger.jsonl` 已纳入测试隔离（conftest 重定向到 tmp） |
+| 不引入新依赖 | 纯标准库（`json` / `hashlib` / `math`） |
+
+[↑ 回到顶部](#目录)
+
+---
+
+### 4.17 健壮性三件套（数值归一防线 / 失败原因可读 / 系统自检）
+
+借鉴 augur 的健壮性实践识别出三项独立改进，按「A 真缺陷修复（无开关，默认路径生效）+ B 实验增强（开关门控、默认关）」拆分：**A1 数值归一防线**、**A2 失败原因可读** 属缺陷修复，**B1 系统自检** 是实验功能 `doctor_check`。三者互不依赖，各自独立生效。
+
+#### 4.17.1 A1 数值归一防线（无开关）
+
+**缺陷**：`float("nan")` / `float("±inf")` **不抛异常**，故各 provider 解析器里 `try: float(x) / except (TypeError, ValueError)` 形态的兜底对它们完全无效——脏值经 `fetcher/` 一路穿透到市值核算、收益序列与绘图数据，且在比较运算中表现得像正常数值（`nan > 0` 为假、`inf > 0` 为真），下游只能靠逐处判空补救。
+
+改动前的实际形态是**约 10 个互不一致的私有解析器 + 4 种失败口径**：有的返 `0.0`、有的返 `None`、有的抛异常；且被依赖最广的 `providers/_utils.safe_float`（基金净值/排名链路）恰是 NaN/±inf 防线最弱的一个。另有一类更隐蔽的漏点——形如 `value or 0.0` 的「空值兜底」对 **NaN 完全失效**（`nan or 0.0` 求值为 `nan`，因 NaN 是 truthy），脏值借此绕过判空直入聚合。
+
+**修复**共三层，合法输入的返回**逐字不变**（仅脏值路径改变）：
+
+**① 新建归一原语 `core/num_utils.py`**（`core/` 层，无跨层依赖）：
+
+| 函数 | 语义 |
+|:-----|:-----|
+| `safe_num(value, *, default=None)` | **宽容**归一：数值字符串先尝试解析（对接 JSON/网页脏字段），失败或非有限 → `default`；**`int` 原样返回**（不强行转 `float`，避免整数份额/ID 被改写）；拒绝 `bool` |
+| `strict_num(value, *, default=None)` | **严格**归一：只接受有限 `int`/`float`，字符串一律视为非数值（对接账本落盘等类型契约敏感场景） |
+| `finite_or(value, fallback=0.0)` | `value or fallback` 的 NaN 安全替代，始终返回 `float`，便于直接参与算术 |
+| `is_finite_number(value)` | 判定谓词（等同 `strict_num(value) is not None`，但读起来不会误写成 `if not value`——`0` 是合法数值却为假） |
+
+**② 收敛既有私有实现**（约 10 处，全部改为委托原语）：
+
+| 模块 | 归一函数 | 兜底语义（保持不变） |
+|:-----|:---------|:---------------------|
+| `providers/_utils.py` | `safe_float` | 失败 → `0.0`（命中面最广：基金净值/排名链路） |
+| `providers/tencent.py` | `_parse_float` / `_parse_float_field` | 失败 → `0.0`（保留负数钳零的既有口径） |
+| `providers/sina_kline.py` | `_parse_sina_kline_float` | 失败 → `0.0` |
+| `providers/akshare_extras.py` | `_safe_float` | 失败 → `None` |
+| `providers/eastmoney_industry.py` | `_extract_number` | 失败 → `None`（并拒绝 `bool`） |
+| `core/reader.py` | `_safe_float` | 追加**有限性检查**——脏行不再当合法值进入持仓读取 |
+| `core/signal_ledger.py` | `_safe_number` | 委托 `strict_num`，账本数值不外泄非有限值 |
+
+**③ 消除 `or 0.0` 空防线**：`report/` / `analysis/` / `core/` 下 28 处真 bug 站点改用 `finite_or(...)`（`market_value` / `market_value_sheet` / `category` / `chart_data_builder` / `decision_record` / `decision_llm_capture` / `html_writer_display` / `portfolio_evolution` / `snapshot_diff` / `whatif` / `data_freshness` 等），NaN 不再渗透进市值、盈亏、涨幅与档位判定。
+
+**明确不做**：**不统一各层的 dirty 默认值语义**（`0.0` vs `None` 是各调用方既有的契约，强行统一会改变合法输入路径的行为）。本次只保证「非有限值一定被拦下」，默认值口径维持原状。
+
+回归锁定：`core/test_num_utils.py` + `test_num_utils_edge.py`（原语契约）、`providers/test_numeric_guard_regression.py`（provider 层双向不变量）、`report/test_numeric_guard_regression.py` + `_edge.py`（报告层「单个 NaN 不污染整列合计与档位判定」）。
+
+#### 4.17.2 A2 失败原因可读（无开关）
+
+**缺陷**：provider 链路失败此前只把 `failure_type` 短标识（`transport` / `empty` / `invalid`）写进降级事件，用户在「数据源可用性矩阵」里看到的是 `tencent: transport`——既不知道是哪个源的展示名，也不知道具体为什么失败。
+
+**修复**：新增 `fetcher/chain.FailureDiagnostics`（采集「展示名(原因)」条目，`summary()` 渲染为 `腾讯财经(连接超时)；新浪财经(返回空)`，单条原因按 `_REASON_MAX_LEN` 截断），由 `fetcher/{price,fund,industry,index}.py` 在调用链路时构造并随 `DegradationEvent.detail.message` 透传；`report/data_source_matrix._failure_entry()` 渲染时**优先取该人类可读原因**，无原因时回落原 `failure_type` 短标识。
+
+**向后兼容**：`DegradationTracker.record()` / `_record_unsafe()` 新增 `message` 参数默认 `None` → `detail` 保持 `None` → 矩阵输出与改动前**逐字相同**，由显式测试锁定。复用既有 `detail` 字典而非新增字段，与聚合路径（`record_aggregated()` 亦把 `message` 放在 `detail` 内）形状一致，`get_log()` 无需改动。
+
+**展示名一致性**：熔断跳过与未注册两条分支原先写原始 provider id，与其它分支的展示名不一致；现统一把 `entry = provider_fn_map.get(provider_name)` 提到熔断检查之前，取 `label = entry[0] if entry else provider_name`，使同一条降级事件不因失败类型不同而时好时坏地不可读。
+
+#### 4.17.3 B1 系统自检（实验功能 `doctor_check`，默认关）
+
+`core/doctor.py` 一次性盘点运行环境，输出分组结果（`环境` / `配置` / `目录` / `功能开关` / `数据源`），**失败项附可执行修复建议**（`hint`）。
+
+**两条不可让步的设计约束**：
+
+1. **自检自身永不抛异常**——任何检查项的异常都转成该组的失败结果行。配置损坏正是它最需要诊断的场景，此处抛 traceback 等于在最需要用它的时刻失效。
+2. **零重依赖**——不 import `reader.py`（pandas）；持仓文件检查用 `os.listdir`。pandas 缺失/损坏本身就是它要报告的一类失败。
+
+| 检查项 | 判据 | 失败提示 |
+|:-------|:-----|:---------|
+| Python 版本 | `>= MIN_PYTHON (3, 10)` | 升级解释器 |
+| 虚拟环境 | `sys.prefix != sys.base_prefix` | 改用 `.venv/bin/python` |
+| 项目根 / 配置加载 | 惰性 `init_config()` / `get_config()` | 定位损坏的配置文件 |
+| LLM 凭据 | `get_llm_config()`（兼容多链 `_provider_list` 与扁平 `provider`/`api_key`） | 配置 llm_key.json / llm_providers.json |
+| 目录可写性 | 写探测哨兵文件后**立即删除**（不留残留） | 权限/路径修正 |
+| 持仓 / 输出 / 缓存 / 日志目录 | 存在性 + 可写性 | 建目录或改 `config.json` |
+| 功能开关清单 | `is_feature_enabled` 逐项（信息性，不改结论） | — |
+| 数据源连通性 | 复用 `core/check_sources.run_health_checks`（可按 `include_network=False` 跳过） | 网络/代理排查 |
+
+**三面上屏**（注册表驱动，与其它实验项同源）：
+
+| 面 | 入口 | 是否受开关约束 |
+|:---|:-----|:---------------|
+| CLI | `doctor` 子命令（`--offline` 跳过联网、`--timeout` 预算秒数） | **否**（见下） |
+| TUI | 菜单 `[D]` 系统自检（`tui_menu.FEATURE_GATED_ITEMS` 门控） | 是 |
+| Web | 运行状态区「系统自检」卡片 + `GET /api/doctor`（`network=0` / `timeout`，上限 15s） | 是（`system_info["doctor_enabled"]` 控制卡片渲染） |
+
+CLI 实验开关仍由 `--experiment doctor_check` 统一控制（与所有实验项一致，无需另开门路）。
+
+**`doctor` 子命令不受开关约束**（有意为之）：它与 `view-logs` 同样在 `init_config` **之前**分派——配置损坏正是它要诊断的场景，若因开关未开而拒绝执行，用户就陷入「开开关要先读配置、读配置失败又要开开关」的死锁。开关只约束 TUI `[D]` 与 Web 卡片这两个「日常会看见」的入口。
+
+**退出码语义**：`_EXIT_SUCCESS`=全部通过、`_EXIT_PARTIAL`=命令跑完但有失败项（**不是** `_EXIT_SEVERE`——命令本身没失败，只是结论不佳），供 CI/脚本判定环境是否可用——脚本据以区分「命令本身失败」与「命令跑完但检查未通过」。
+
+**架构约束遵从**：
+
+| 约束 | 适配方式 |
+|:-----|:---------|
+| 分层 / 无环依赖 | `core/doctor.py` 只依赖 `core/` + 惰性函数内 import `config`（与 `market_hours` / `decision_header` / `signal_ledger` 同款），不触及 `report/` / `analysis/` |
+| 不重复实现（DRY） | 约 10 个分散的私有解析器收敛到本项新建的 `core/num_utils.py` 单一实现；网络检查复用既有 `check_sources.run_health_checks`，不另写探测 |
+| 无静默默认值 | 每个检查项都带 `message`；失败项额外带 `hint`；开关清单逐项回显 |
+| 向后兼容 | A1 合法输入行为不变、A2 `message=None` 时矩阵输出逐字不变，均有显式测试 |
+| 实验项默认关 | `doctor_check` 缺省 `False`；关闭时 TUI 无 `[D]` 项、Web 不渲染该卡片 |
+| 三面同源 | 注册表 `EXPERIMENTAL_FEATURES` 一处新增即自动出现在 TUI 菜单 / Web 配置面板 / CLI `--experiment` |
+| 只读诊断 | 写探测哨兵文件后立即删除；自检不改任何配置或缓存 |
+
 [↑ 回到顶部](#目录)
 
 ---
@@ -2424,7 +2640,7 @@ tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互�
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包按调用层次分为四层，共 33 个子模块（含 fact_checker/ 子包 9 模块 / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action 3 文件中）：
+`src/python/llm/` 包按调用层次分为四层，共 34 个子模块（含 fact_checker/ 子包 9 模块 / fallback.py；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action/signals 4 文件中）：
 
 ```
 入口层         generators_orchestrator.py    4+1 模块并行编排
@@ -2439,6 +2655,7 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
                generators_news.py   新闻 LLM 批量关联分析
                _llm_news_correlation.py  新闻关联闭包/结果缓存/安全直调
                prompts.py           System/User Prompt 构建
+               prompts_signals.py   信号预消化（带方向标注的信号行，实验开关）
                fingerprint.py       缓存指纹计算
                session.py           会话用量追踪
                cost_tracker.py      Token 预算管理
@@ -3239,7 +3456,7 @@ investor-util/
 | `llm_settings.json`（非敏感 LLM 设置） | `_llm_settings_defaults._DEFAULT_LLM_SETTINGS`（全局 2 项 + 5 模块块 + 辩论 + 事实校验 + 计价） | `_llm_settings_defaults._get_default_llm_settings_template()`（逐行手拼，与 dict 深等，见一致性测试） | `_llm_settings.get_llm_config()`：合并 settings+key+providers 三文件，联合 mtime/size 失效；`_merge_llm_defaults()` 运行时按 `_DEFAULT_LLM_SETTINGS` 补齐缺失键 | `_ensure_llm_settings_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑；`_ensure_llm_settings_file` 仅首次创建） | `llm/pricing.py`（计价覆盖）、`llm/generators.py`、`llm/generators_orchestrator.py`、`llm/prompts_action.py`、`llm/skeleton.py`、`report/news_correlation.py`、`cli/cli.py`、`tui/tui_menu.py` + `tui/handlers_config.py`、`config/_validation.py` |
 | `llm_key.json`（敏感凭据） | 无（**C18 凭据分离**，代码默认值禁止内置 api_key） | 无模板 | `_llm_providers._load_llm_key_credentials()`（多凭据块字典；单凭据 flat 自动升级为 `_default`）；`get_llm_config()` 内联读取并合并覆盖同名字段（provider/endpoint 合法性告警） | 不自动创建；缺失时 `get_llm_config()` 回退判断 providers 链模式，两者皆无则 LLM 不可用（`generators_orchestrator` 降级占位） | `startup_wizard._write_llm_key_flat()`（首次引导交互式写入，C3 原子写） | `get_llm_config()` 合并主体；`_load_llm_key_credentials()` → providers 链 `credentials_ref` 凭据注入 |
 | `llm_providers.json`（多 Provider 链） | `_llm_providers_defaults._DEFAULT_LLM_PROVIDERS`（strategy=priority + 2 条示例链） | `_llm_providers_defaults._get_default_llm_providers_template()` | `_llm_providers._load_llm_providers()`（原始 JSON，根非 object/解析失败返回 None）；`get_llm_config()` 链模式（无 llm_key.json 时直接注入链数据）；`_inject_provider_chain_data()` 注入多链路由结果 | `_core._ensure_llm_providers_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑 / init 自动创建） | `get_llm_config()`（链模式无 key 依赖）；`startup_wizard.py`（就绪检查：key 存在 或 providers 有链）；`_inject_provider_chain_data` |
-| `features.json`（Feature Flag 覆写） | `features._FEATURE_FLAGS_DEFAULT`（27 项默认值：LLM 5 + 辩论 3 + 基金深度 2 + 新闻 5 + 量化指标 7 + 历史 2 + 功能 3） | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；未知键仍加载、非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态） |
+| `features.json`（Feature Flag 覆写） | `features._FEATURE_FLAGS_DEFAULT`（33 项默认值：LLM 5 + 辩论 3 + 基金深度 2 + 新闻 5 + 量化指标 7 + 历史 2 + 功能 3 + 决策反思 1 + 信号预消化 1 + 模块质量分级 1 + 决策头结构化 1 + 确定性信号沉淀 1 + 系统自检 1）；实验开关清单见 `features.EXPERIMENTAL_FEATURES` 注册表（9 项，含显示名 + 说明，驱动 TUI 菜单 S 与 Web 配置面板）；命令行一次性开关见 `features.resolve_experiment_flags` / `describe_experiment_flags`（`--experiment` 的解析与可选值来源，与注册表同源） | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；未知键仍加载、非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化）+ Web `web/config_edit.py`（配置面板写入，白名单由注册表生成） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`core/decision_ledger.py`（决策跨期反思闭环）、`llm/prompts_signals.py`（信号预消化，开关判定收敛于缓存后缀函数）、`report/llm_quality.py`（模块质量分级，§4.11）、`core/decision_header.py`（决策头结构化缓存后缀，§4.15）、`core/signal_ledger.py`（确定性信号沉淀，开关判定收敛于摘要函数，§4.16）、`core/doctor.py`（系统自检功能清单上屏，§4.17.3）、`web/handlers.py`（自检卡片可见性，§4.17.3）、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态）、`tui/tui_menu.py`（菜单项门控）、`web/config_edit.py`（面板状态） |
 
 #### I.1.1 解析职责归属（协调者 vs 委托）
 

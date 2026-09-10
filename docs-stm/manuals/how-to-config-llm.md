@@ -232,7 +232,7 @@ LLM Provider 状态
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
-- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性辩论模式（6-8，由 `features.json` 的 `llm_debate_*` Feature Flag 控制，见下方 `debate` 配置段）。三个辩论开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议
+- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性功能（编号紧随标准模块之后，由 `features.json` 的 Feature Flag 控制，见下方 `debate` 配置段）。实验开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**登记决策并用真实行情结算命中率，再将教训回灌专家复盘提示词（行动建议章内嵌「历史决策复盘」块）；**信号预消化（`signal_pre_digest`）**把市场温度档位/持仓估值分位分布/尾部风险幅度预消化为 `信号：{指标} {结论}（{依据}）` 的方向行，置于智囊团复盘与持仓体检提示词的结论位置，降低模型读裸数值自行推断方向的误判率；**模块级质量分级（`module_quality_gate`）**对 4 个 LLM 模块输出按完整性与篇幅评 A~F，低评级中「内容在但存在缺陷」者（缺必需章节/篇幅明显偏短）在模块内容头部注入 `【内容质量提示】` 横幅（评级 + 具体原因 + 降级参考提示），**只标注、不阻断生成、不触发重试、不写回缓存**——A/B 级健康输出零噪音，内容缺失型（空内容/降级占位）已有各自醒目提示故不叠加横幅；**决策头结构化（`decision_header_parse`）**在专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读结构化头、失败回落确定性表格解析——两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），防「不建议加仓」「加仓或减仓」这类表述被判成相反方向写入决策账本；**关闭时该段不追加**，提示词与缓存指纹逐字节不变；**确定性信号沉淀（`signal_ledger`）**把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类确定性算法评级沉淀为账本 `data/state/signal_ledger.jsonl`，每条记录附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施：逐品种行情新鲜度 + 数据源降级事件，非实时即本次由降级/缓存行情算出），并把摘要注入智囊团复盘提示词——**统计与摘要默认只算实时记录**，防止降级数据算出的评级冒充真实战绩；关闭时账本不写盘、提示词与缓存指纹逐字节不变；**系统自检（`doctor_check`）**开启 TUI 菜单 `[D]` 与 Web「系统自检」卡片，一键盘点环境/配置/目录/功能开关/数据源五组，其中「配置」组会校验本文件的 LLM 凭据是否可读——**自检只读、自身永不抛异常**，且 CLI 的 `doctor` 子命令不受本开关约束。以上开关均可用 CLI 全局参数 `--experiment` 单次启用（不写盘）
 - 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
 - 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
 
@@ -298,7 +298,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: [], weekend_always_idle: true}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）、`weekend_always_idle`（周末全天闲时开关，默认 `true`）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
-- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，null=默认 8192）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 48000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**通过 Feature Flag 控制启停，非配置直接启用**
+- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，null=默认 8192）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 48000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**本段仅控制辩论行为的参数，启停由 Feature Flag（`llm_debate_*`）决定，非配置直接启用**；决策跨期反思闭环（`decision_reflection`）同样由 Feature Flag 启停，无独立配置段
 
 ### 模块级配置
 
@@ -555,7 +555,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 > **Claude**（provider: `"claude"`）：模型 ≥ `claude-sonnet-4` 时生效，用 `thinking.budget_tokens` 控制思考 token 预算。
 >
-> **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"low"` / `"medium"` / `"high"` / `"max"`）。
+> **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"low"` / `"medium"` / `"high"` / `"max"`）。
 >
 > **Gemini**（provider: `"gemini"`）：模型 `gemini-2.5-*` 时生效，用 `generationConfig.thinkingConfig.thinkingBudget` 控制思考 token 预算。
 
@@ -680,7 +680,8 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 ```
 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
-- 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-chat`（V3，功能受限）
+- 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-flash`（DeepSeek-V4.1-Flash 正式模型名，2026-09-10 发布，与前者同价）、`deepseek-chat`（V3，功能受限）
+- **注意**：`deepseek-v4-pro` 于 2026-09-14 12:00（北京时间）下线，在此之前请求自动路由到 V4.1-Flash 并按 V4.1-Flash 单价计费；`deepseek-v4-flash` 与 `deepseek-v4-flash-vision-exp` 底层模型同样由 V4.1-Flash 接管，价格不变。费用估算以 `core/constants.py` 的 `MODEL_PRICING` 为准
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
 
@@ -770,16 +771,16 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 
 ## Token 消耗参考
 
-以下费用按 **DeepSeek-V4-Flash 闲时价**（¥1.5/M 输入、¥4.5/M 输出）估算，工作日高峰时段约翻倍、周末全天按闲时价，各模型单价详见「完整模型定价表」。
+以下费用按 **DeepSeek-V4-Flash 闲时价**（¥1.0/M 输入、¥4.0/M 输出，2026-09-10 官方降价后）估算，工作日高峰时段约翻倍、周末全天按闲时价，各模型单价详见「完整模型定价表」。
 
 | 模块 | 输入 token | 输出 token | 单次费用参考 |
 |------|-----------|-----------|-------------|
-| 全球政经局势 | ~300-800 | ~300-600 | ~¥0.002-0.004 |
-| 智囊团深度复盘 | ~800-2500 | ~1500-2500 | ~¥0.008-0.015 |
-| 持仓体检报告 | ~500-1500 | ~800-1500 | ~¥0.004-0.009 |
-| 穿透深度分析 | ~500-1500 | ~800-1500 | ~¥0.004-0.009 |
-| 财经新闻关联分析（可选） | ~2000-4000 | ~600-1200 | ~¥0.006-0.011 |
-| **五者合计（菜单 L + 新闻 LLM）** | — | — | **~¥0.02-0.05/次** |
+| 全球政经局势 | ~300-800 | ~300-600 | ~¥0.002-0.003 |
+| 智囊团深度复盘 | ~800-2500 | ~1500-2500 | ~¥0.007-0.013 |
+| 持仓体检报告 | ~500-1500 | ~800-1500 | ~¥0.004-0.008 |
+| 穿透深度分析 | ~500-1500 | ~800-1500 | ~¥0.004-0.008 |
+| 财经新闻关联分析（可选） | ~2000-4000 | ~600-1200 | ~¥0.004-0.009 |
+| **五者合计（菜单 L + 新闻 LLM）** | — | — | **~¥0.02-0.04/次** |
 
 - 仅菜单 **L** 触发 LLM 调用，E / B 不会
 - LLM 结果默认缓存，缓存有效期内反复按 L 不会重复扣费
@@ -801,7 +802,7 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 | `claude-fable-5` | 3.00 | 15.00 | 0.30 | 最新 Claude 模型 |
 | `gpt-4o` | 2.50 | 10.00 | 2.50 | OpenAI 主力（缓存无折扣） |
 | `gpt-4o-mini` | 0.15 | 0.60 | 0.15 | OpenAI 轻量（缓存无折扣） |
-| `deepseek-v4-flash` | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | ⭐ 高性价比推荐，默认模型（峰谷定价，闲时/高峰） |
+| `deepseek-v4-flash` | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | ⭐ 高性价比推荐，默认模型（峰谷定价，闲时/高峰；2026-09-10 降价） |
 | `deepseek-v4-pro` | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | DeepSeek 增强推理（峰谷定价，闲时/高峰） |
 | `deepseek-chat` | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | DeepSeek V3（峰谷定价，闲时/高峰） |
 | `gemini-3.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 新一代（可选） |
@@ -809,9 +810,9 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
 | `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
 
-> **峰谷定价（DeepSeek）**：`deepseek-v4-*` 三个模型采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在工作日（周一至周五）生效**，为**北京时间 09:00–12:00、14:00–18:00**；工作日其余时间为闲时、**周末（周六/周日）全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` 中覆盖；含 `"peak"` 子段的模型工作日高峰时段按 `peak` 价计费，其余时段（含周末全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
+> **峰谷定价（DeepSeek）**：`deepseek-v4-*` 三个模型采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 v4-flash 降价），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在工作日（周一至周五）生效**，为**北京时间 09:00–12:00、14:00–18:00**；工作日其余时间为闲时、**周末（周六/周日）全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` 中覆盖；含 `"peak"` 子段的模型工作日高峰时段按 `peak` 价计费，其余时段（含周末全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
 >
-> **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash 工作日闲时/周末：输入 3000 tokens × ¥1.5 + 输出 2000 tokens × ¥4.5 = ¥0.0135/次（工作日高峰时段则 ×3、×9）。缓存命中时输入部分按 `input_cache_hit` 计费。
+> **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash 工作日闲时/周末：输入 3000 tokens × ¥1.0 + 输出 2000 tokens × ¥4.0 = ¥0.011/次（工作日高峰时段则 ×2、×8）。缓存命中时输入部分按 `input_cache_hit` 计费。
 >
 > **覆盖方式**：在 `llm_settings.json` 中添加 `pricing` 段即可覆盖任意模型的定价，未覆盖的模型自动使用上方内置价格；含峰谷时段的模型可一并覆盖 `peak` 子段：
 > ```json
@@ -819,8 +820,8 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 >   "claude-sonnet-4-6": {"input": 3, "output": 15},
 >   "my-new-model": {"input": 5, "output": 10, "input_cache_hit": 0.5},
 >   "deepseek-v4-flash": {
->     "input": 1.5, "output": 4.5, "input_cache_hit": 0.05,
->     "peak": {"input": 3.0, "output": 9.0, "input_cache_hit": 0.10}
+>     "input": 1.0, "output": 4.0, "input_cache_hit": 0.02,
+>     "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04}
 >   },
 >   "weekend_always_idle": false
 > }

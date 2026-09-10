@@ -14,7 +14,7 @@ from typing import Any
 
 from src.python.cache import get_ttl
 from src.python.core.code_utils import is_a_share_code, is_exchange_fund_code, is_otc_code_overlap, is_otc_fund_by_name
-from src.python.fetcher.chain import fetch_with_fallback
+from src.python.fetcher.chain import FailureDiagnostics, fetch_with_fallback
 from src.python.providers import eastmoney, tencent
 from src.python.providers import sina as sina_provider
 
@@ -182,6 +182,7 @@ def _fetch_price_with_cache_refresh(
     def _validate(raw: dict, provider_name: str) -> bool:
         return _validate_price_data(raw, provider_name, expected_name)
 
+    diag = FailureDiagnostics()
     r = fetch_with_fallback(
         data_type=data_type,
         provider_fn_map=_PRICE_PROVIDERS,
@@ -190,11 +191,12 @@ def _fetch_price_with_cache_refresh(
         fn_kwargs={"code": code},
         transform=_PRICE_TRANSFORMS,
         validate=_validate,
+        diagnostics=diag,
     )
     if r is not None:
         _t.record(_src_key, "T2", success=True)
     else:
-        _t.record(_src_key, "T2", success=False, failure_type="unreachable")
+        _t.record(_src_key, "T2", success=False, failure_type="unreachable", message=diag.summary())
 
     if r is not None and not _price_cache_fresh(r):
         from src.python.cache import clear as _cache_clear
@@ -203,6 +205,7 @@ def _fetch_price_with_cache_refresh(
         _td = _gtd()
         logger.debug("价格缓存来自 %s（交易日 %s），跨日残留，强制刷新", r.get("price_date", "?"), _td)
         _cache_clear(cache_key)
+        refresh_diag = FailureDiagnostics()
         r = fetch_with_fallback(
             data_type=data_type,
             provider_fn_map=_PRICE_PROVIDERS,
@@ -211,11 +214,18 @@ def _fetch_price_with_cache_refresh(
             fn_kwargs={"code": code},
             transform=_PRICE_TRANSFORMS,
             validate=_validate,
+            diagnostics=refresh_diag,
         )
         if r is not None:
             _t.record(f"{_src_key}_refresh", "T2", success=True)
         else:
-            _t.record(f"{_src_key}_refresh", "T2", success=False, failure_type="unreachable")
+            _t.record(
+                f"{_src_key}_refresh",
+                "T2",
+                success=False,
+                failure_type="unreachable",
+                message=refresh_diag.summary(),
+            )
     return r
 
 

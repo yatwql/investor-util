@@ -23,6 +23,7 @@ from src.python.core.code_utils import (
     is_qdii_extended,
 )
 from src.python.core.models import Holding
+from src.python.core.num_utils import finite_or
 from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES, DataStatus, DataStatusItem
 from src.python.report.excel_writer import (
@@ -73,9 +74,9 @@ def _tier_label(buckets: dict | None) -> str:
     """
     if not isinstance(buckets, dict):
         return "--"
-    low = float(buckets.get("low", {}).get("shares", 0.0) or 0.0)
-    high = float(buckets.get("high", {}).get("shares", 0.0) or 0.0)
-    unpriced = float(buckets.get("unpriced", {}).get("shares", 0.0) or 0.0)
+    low = finite_or(buckets.get("low", {}).get("shares", 0.0))
+    high = finite_or(buckets.get("high", {}).get("shares", 0.0))
+    unpriced = finite_or(buckets.get("unpriced", {}).get("shares", 0.0))
     if unpriced > 0 and low == 0 and high == 0:
         return "未分档"
     if low == 0 and high == 0:

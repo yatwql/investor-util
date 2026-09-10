@@ -206,6 +206,11 @@ class TestSupportsExtendedThinking(unittest.TestCase):
     def test_deepseek_chat_supported(self) -> None:
         self.assertTrue(_supports_extended_thinking("deepseek-chat"))
 
+    def test_deepseek_flash_supported(self) -> None:
+        """新一代 Flash 正式模型名 deepseek-flash 支持 Extended Thinking。"""
+        self.assertTrue(_supports_extended_thinking("deepseek-flash"))
+        self.assertTrue(_supports_extended_thinking("DeepSeek-Flash"))
+
     def test_deepseek_v3_not_supported(self) -> None:
         self.assertFalse(_supports_extended_thinking("deepseek-v3"))
 
@@ -232,6 +237,15 @@ class TestIsEffortModel(unittest.TestCase):
 
     def test_deepseek_chat_is_effort(self) -> None:
         self.assertTrue(_is_effort_model("deepseek-chat"))
+
+    def test_deepseek_flash_is_effort(self) -> None:
+        """deepseek-flash 属 effort 族。
+
+        该判定同时决定「未开启 thinking 时显式注入 disabled」的安全网是否生效——
+        漏登记会让请求落入 DeepSeek 默认思考模式占满 max_tokens 而无正文。
+        """
+        self.assertTrue(_is_effort_model("deepseek-flash"))
+        self.assertTrue(_is_effort_model("DeepSeek-Flash"))
 
     def test_empty_is_not_effort(self) -> None:
         self.assertFalse(_is_effort_model(""))
@@ -420,8 +434,8 @@ class TestPricing(unittest.TestCase):
     def testestimate_cost_known_model(self) -> None:
         """已知模型闲时按 base 价（闲时价）估算。"""
         cost = estimate_cost("deepseek-v4-flash", 3000, 2000, at_time=self._IDLE_TIME)
-        # (3000/1M)*1.5 + (2000/1M)*4.5 = 0.0045 + 0.009 = 0.0135
-        self.assertIn("0.014", cost)
+        # (3000/1M)*1.0 + (2000/1M)*4.0 = 0.003 + 0.008 = 0.011（2026-09-10 降价后）
+        self.assertIn("0.011", cost)
 
     def testestimate_cost_cache_hit(self) -> None:
         """缓存命中应降低费用。"""
@@ -442,9 +456,36 @@ class TestPricing(unittest.TestCase):
         cost = estimate_cost("claude-sonnet-4-6-20250514", 1000, 500)
         self.assertNotEqual(cost, "-")
 
+    def testestimate_cost_v41_flash_by_official_name(self) -> None:
+        """新一代 Flash 正式模型名按 flash 系列价计费，不得回落为未知模型（"-"）。"""
+        cost_idle = estimate_cost("deepseek-flash", 1_000_000, 1_000_000, at_time=self._IDLE_TIME)
+        cost_peak = estimate_cost("deepseek-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
+        # 闲时 (1+4)=5、高峰 (2+8)=10
+        self.assertEqual(cost_idle, "¥5.000")
+        self.assertEqual(cost_peak, "¥10.000")
+
+    def test_v41_flash_name_billed_same_as_flash_aliases(self) -> None:
+        """deepseek-flash 与它接管的别名 deepseek-v4-flash / vision-exp 同价。"""
+        for alias in ("deepseek-v4-flash", "deepseek-v4-flash-vision-exp"):
+            self.assertEqual(
+                estimate_cost("deepseek-flash", 3000, 2000, cache_hit_input_tokens=2000, at_time=self._IDLE_TIME),
+                estimate_cost(alias, 3000, 2000, cache_hit_input_tokens=2000, at_time=self._IDLE_TIME),
+            )
+
+    def test_v41_flash_cache_hit_follows_peak_valley(self) -> None:
+        """deepseek-flash 缓存命中同样走峰谷价（闲时 0.02 / 高峰 0.04）。"""
+        cost_peak = estimate_cost(
+            "deepseek-flash", 1_000_000, 0, cache_hit_input_tokens=1_000_000, at_time=self._PEAK_TIME
+        )
+        cost_idle = estimate_cost(
+            "deepseek-flash", 1_000_000, 0, cache_hit_input_tokens=1_000_000, at_time=self._IDLE_TIME
+        )
+        self.assertEqual(cost_peak, "¥0.040")
+        self.assertEqual(cost_idle, "¥0.020")
+
     def test_pricing_merged_has_defaults(self) -> None:
         """PRICING_MERGED 应包含所有内置模型。"""
-        for model in ("deepseek-v4-flash", "claude-sonnet-4-6", "gpt-4o"):
+        for model in ("deepseek-flash", "deepseek-v4-flash", "claude-sonnet-4-6", "gpt-4o"):
             self.assertIn(model, PRICING_MERGED)
 
     def test_currency_symbols(self) -> None:
@@ -464,16 +505,16 @@ class TestPricing(unittest.TestCase):
         """工作日：含 peak 子段的模型高峰时段按高峰价、闲时按 base 价。"""
         cost_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
         cost_idle = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._IDLE_TIME)
-        # 高峰 (3+9)=12 vs 闲时 (1.5+4.5)=6
-        self.assertEqual(cost_peak, "¥12.000")
-        self.assertEqual(cost_idle, "¥6.000")
+        # 高峰 (2+8)=10 vs 闲时 (1+4)=5（2026-09-10 降价后）
+        self.assertEqual(cost_peak, "¥10.000")
+        self.assertEqual(cost_idle, "¥5.000")
 
     def test_peak_pricing_boundary_inclusive_end(self) -> None:
         """工作日高峰时段边界闭区间：12:00 属高峰（含端点），13:00 属闲时。"""
         cost_1200 = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 21, 12, 0))
         cost_1300 = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=datetime(2026, 8, 21, 13, 0))
-        self.assertEqual(cost_1200, "¥12.000")
-        self.assertEqual(cost_1300, "¥6.000")
+        self.assertEqual(cost_1200, "¥10.000")
+        self.assertEqual(cost_1300, "¥5.000")
 
     def test_peak_pricing_without_peak_entry_ignores_time(self) -> None:
         """无 peak 子段的模型不受时段影响。"""
@@ -499,8 +540,8 @@ class TestPricing(unittest.TestCase):
             cache_hit_input_tokens=1_000_000,
             at_time=self._IDLE_TIME,
         )
-        self.assertEqual(cost_peak, "¥0.100")
-        self.assertEqual(cost_idle, "¥0.050")
+        self.assertEqual(cost_peak, "¥0.040")
+        self.assertEqual(cost_idle, "¥0.020")
 
     def test_peak_periods_defaults(self) -> None:
         """默认峰谷时段应为北京时间 09:00–12:00、14:00–18:00，闲时为其外全部时间。"""
@@ -521,14 +562,14 @@ class TestPricing(unittest.TestCase):
         cost_weekend_idle = estimate_cost(
             "deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._WEEKEND_IDLE_HOUR_TIME
         )
-        self.assertEqual(cost_weekend_peak, "¥6.000")  # (1.5+4.5)
-        self.assertEqual(cost_weekend_idle, "¥6.000")
+        self.assertEqual(cost_weekend_peak, "¥5.000")  # (1+4)
+        self.assertEqual(cost_weekend_idle, "¥5.000")
         # 与工作日高峰同钟点对比：周末显著低于工作日高峰
         cost_workday_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
-        self.assertEqual(cost_workday_peak, "¥12.000")
+        self.assertEqual(cost_workday_peak, "¥10.000")
 
     def test_weekend_cache_hit_bills_idle_rate(self) -> None:
-        """周末缓存命中输入按闲时 input_cache_hit（0.05）而非高峰价（0.10）计费。"""
+        """周末缓存命中输入按闲时 input_cache_hit（0.02）而非高峰价（0.04）计费。"""
         cost_weekend = estimate_cost(
             "deepseek-v4-flash",
             1_000_000,
@@ -536,7 +577,7 @@ class TestPricing(unittest.TestCase):
             cache_hit_input_tokens=1_000_000,
             at_time=self._WEEKEND_PEAK_HOUR_TIME,
         )
-        self.assertEqual(cost_weekend, "¥0.050")
+        self.assertEqual(cost_weekend, "¥0.020")
 
     def test_weekend_flag_disabled_restores_peak_on_weekend(self) -> None:
         """weekend_always_idle=False 时周末恢复按钟点区分峰谷（配置覆盖生效）。"""
@@ -546,7 +587,7 @@ class TestPricing(unittest.TestCase):
                 reload_pricing()
             self.assertFalse(_pricing_mod.PRICING_WEEKEND_ALWAYS_IDLE)
             cost_peak = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._WEEKEND_PEAK_HOUR_TIME)
-            self.assertEqual(cost_peak, "¥12.000")  # 周末高峰按高峰价
+            self.assertEqual(cost_peak, "¥10.000")  # 周末高峰按高峰价
         finally:
             _pricing_mod.PRICING_WEEKEND_ALWAYS_IDLE = orig_flag
 

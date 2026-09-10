@@ -1,7 +1,10 @@
-"""TUI 日志/健康历史查看命令处理器。
+"""TUI 运行状态诊断命令处理器。
 
-菜单 [V] 查看最近运行日志（可按级别筛选）、[H] 查看数据源健康历史。
-所有解析/聚合逻辑委托核心层（core/log_reader.py、core/perf.py），
+菜单 [V] 查看最近运行日志（可按级别筛选）、[H] 查看数据源健康历史、
+[D] 系统自检（实验功能 doctor_check，未启用时该菜单项不出现）。
+三者同属只读诊断面，故归于一模块。
+
+所有解析/聚合逻辑委托核心层（core/log_reader.py、core/perf.py、core/doctor.py），
 本模块仅保留 TUI 外壳（级别提示、彩色渲染、traceback 折叠、翻页等待）。
 """
 
@@ -104,4 +107,41 @@ def _cmd_view_health_history() -> None:
         print(f"  {ts}  {status}{ok_count}/{total} 正常{RESET}{extra}  |  失败 {fail_count}")
         if summary["failed_sources"]:
             print(f"      失败源: {', '.join(summary['failed_sources'])}")
+    press_any_key()
+
+
+# ── 系统自检（实验功能 doctor_check）────────────────────────
+
+# TUI 内网络检查的整体耗时预算（短于 CLI——交互场景不能让用户干等）
+_DOCTOR_NETWORK_TIMEOUT = 6.0
+
+
+def _cmd_run_doctor() -> None:
+    """系统自检（环境/配置/目录/功能开关/数据源），失败项附修复建议。
+
+    交互场景下先问是否联网——离线自检瞬时返回，联网自检受预算约束。
+    """
+    from src.python.core.doctor import format_doctor_report, run_doctor_checks, summarize_doctor_results
+
+    raw = input("  是否包含数据源网络检查？(y=联网 / 空回车=仅本地): ").strip().lower()
+    include_network = raw in ("y", "yes", "是")
+
+    scope = f"（含数据源联网检查，最多约 {_DOCTOR_NETWORK_TIMEOUT:g}s）" if include_network else "（仅本地）"
+    print(f"  {YELLOW}[..]{RESET} 正在自检{scope}...")
+    try:
+        results = run_doctor_checks(include_network=include_network, max_timeout=_DOCTOR_NETWORK_TIMEOUT)
+    except Exception:
+        logger.exception("系统自检执行失败")
+        print(f"  {RED}[ERR]{RESET} 系统自检执行失败（详见日志）")
+        press_any_key()
+        return
+
+    print()
+    print(format_doctor_report(results))
+
+    _ok_count, bad_count = summarize_doctor_results(results)
+    if bad_count:
+        print(f"  {RED}[!]{RESET} 有 {bad_count} 项未通过——按上方 → 建议逐项处理")
+    else:
+        print(f"  {GREEN}[OK]{RESET} 全部通过")
     press_any_key()

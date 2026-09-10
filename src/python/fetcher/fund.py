@@ -21,7 +21,7 @@ from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.config import get_config
 from src.python.core.constants import PROJECT_ROOT
-from src.python.fetcher.chain import fetch_with_fallback
+from src.python.fetcher.chain import FailureDiagnostics, fetch_with_fallback
 from src.python.core.http_client import make_http_client
 from src.python.providers.tiantian_holdings import fetch_fund_holdings
 from src.python.providers.tiantian_ranking import fetch_fund_rankings
@@ -53,17 +53,19 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     _t = get_tracker()
     _src_key = f"fund_rank_{code}"
     rank_cache_key = _FUND_PERF_CACHE_PREFIX + code
+    diag = FailureDiagnostics()
     result = fetch_with_fallback(
         "fund_rank",
         _FUND_RANK_PROVIDERS,
         rank_cache_key,
         get_ttl("rank", rank_cache_key),
         fn_kwargs={"code": code},
+        diagnostics=diag,
     )
     if result is not None:
         _t.record(_src_key, "T2", success=True)
     else:
-        _t.record(_src_key, "T2", success=False, failure_type="unreachable")
+        _t.record(_src_key, "T2", success=False, failure_type="unreachable", message=diag.summary())
     return result
 
 
@@ -89,17 +91,19 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
     _t = get_tracker()
     _src_key = f"fund_hold_{code}"
     hold_cache_key = _FUND_HOLD_CACHE_PREFIX + code
+    diag = FailureDiagnostics()
     result = fetch_with_fallback(
         "fund_hold",
         _FUND_HOLD_PROVIDERS,
         hold_cache_key,
         get_ttl("hold", hold_cache_key),
         fn_kwargs={"code": code},
+        diagnostics=diag,
     )
     if result is not None:
         _t.record(_src_key, "T2", success=True)
     else:
-        _t.record(_src_key, "T2", success=False, failure_type="unreachable")
+        _t.record(_src_key, "T2", success=False, failure_type="unreachable", message=diag.summary())
     return result
 
 

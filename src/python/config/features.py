@@ -69,6 +69,18 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "anonymizer": False,
     "cache_daily_cleanup": True,
     "enable_interactive_charts": True,
+    # ── 决策跨期反思闭环（实验功能，默认关闭） ──
+    "decision_reflection": False,
+    # ── 信号预消化（实验功能，默认关闭） ──
+    "signal_pre_digest": False,
+    # ── 模块级质量分级（实验功能，默认关闭） ──
+    "module_quality_gate": False,
+    # ── 决策头结构化（实验功能，默认关闭） ──
+    "decision_header_parse": False,
+    # ── 确定性数值信号沉淀（实验功能，默认关闭） ──
+    "signal_ledger": False,
+    # ── 系统自检（实验功能，默认关闭） ──
+    "doctor_check": False,
 }
 
 # ── 实验性功能定义 ──────────────────────────────────────────
@@ -79,7 +91,88 @@ EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
     "llm_debate_procon": ("辩论-正反辩论", "三段式(白脸→黑脸→综合)"),
     "llm_debate_conditional": ("辩论-条件推理", "情景化分析(涨/跌/震荡)"),
     "llm_debate_qa_concentration": ("辩论-集中度问答", "集中度风险问答"),
+    "decision_reflection": (
+        "决策跨期反思闭环",
+        "登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词",
+    ),
+    "signal_pre_digest": (
+        "信号预消化",
+        "市场温度/估值分位/尾部风险预消化为带方向标注的信号行注入复盘与体检提示词",
+    ),
+    "module_quality_gate": (
+        "模块级质量分级",
+        "按完整性/一致性给各 LLM 模块输出评 A~F 级，低评级随内容头部标注质量提示（不阻断不重试）",
+    ),
+    "decision_header_parse": (
+        "决策头结构化",
+        "提示词追加受控 JSON 决策头，抽取优先读结构化、失败回落确定性表格解析（决策词归一，防写反方向）",
+    ),
+    "signal_ledger": (
+        "确定性信号沉淀",
+        "确定性算法评级（温度/估值/尾部风险/风格/再平衡超限）沉淀为带实时-非实时标签的账本，统计默认只算实时",
+    ),
+    "doctor_check": (
+        "系统自检",
+        "一键体检运行环境/配置/目录/数据源，失败项附修复建议（doctor 命令、TUI 菜单 D、Web 运行状态区）",
+    ),
 }
+
+# ── 实验功能名解析 ──────────────────────────────────────────
+# 「可开启的实验功能清单」唯一来源是 EXPERIMENTAL_FEATURES 注册表：
+# TUI 菜单 S / Web 配置面板直接遍历注册表渲染，命令行入口经下方解析函数
+# 校验取值，三者同源，新增实验开关无需改动任何入口代码。
+
+EXPERIMENT_ALL = "all"
+
+
+def _match_experiment(token: str) -> str | None:
+    """按开关名（大小写不敏感）或显示名（精确）匹配单个实验功能。
+
+    Returns:
+        命中的开关名，未匹配到返回 None
+    """
+    lowered = token.lower()
+    for flag, (display_name, _desc) in EXPERIMENTAL_FEATURES.items():
+        if flag.lower() == lowered or display_name == token:
+            return flag
+    return None
+
+
+def resolve_experiment_flags(names: list[str]) -> tuple[set[str], list[str]]:
+    """将用户输入的实验功能名解析为开关名集合（注册表驱动）。
+
+    接受三种写法（忽略首尾空白；开关名大小写不敏感）：
+      - 开关名：``signal_pre_digest``
+      - 显示名：``信号预消化``
+      - ``all``：全部实验功能
+
+    Args:
+        names: 用户输入的名称列表（空白项自动跳过）
+
+    Returns:
+        ``(命中的开关名集合, 未识别的原始名称列表)``；调用方据此决定
+        是全部启用还是报错提示可用清单。
+    """
+    resolved: set[str] = set()
+    unknown: list[str] = []
+    for raw in names:
+        token = (raw or "").strip()
+        if not token:
+            continue
+        if token.lower() == EXPERIMENT_ALL:
+            resolved.update(EXPERIMENTAL_FEATURES)
+            continue
+        hit = _match_experiment(token)
+        if hit is None:
+            unknown.append(raw)
+        else:
+            resolved.add(hit)
+    return resolved, unknown
+
+
+def describe_experiment_flags() -> str:
+    """返回实验功能清单的人类可读串（供 CLI 帮助与报错提示复用）。"""
+    return "、".join(f"{flag}（{name}）" for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items())
 
 
 def log_experimental_features() -> None:
@@ -107,10 +200,13 @@ def log_experimental_features() -> None:
 
 __all__ = [
     "EXPERIMENTAL_FEATURES",
+    "EXPERIMENT_ALL",
     "FEATURE_FLAGS",
+    "describe_experiment_flags",
     "get_feature_defaults",
     "is_feature_enabled",
     "log_experimental_features",
+    "resolve_experiment_flags",
     "set_feature_enabled",
     "load_feature_overrides",
     "save_feature_overrides",

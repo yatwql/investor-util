@@ -28,6 +28,24 @@ _EXIT_SEVERE = 2
 # ── argparse 解析器 ─────────────────────────────────────
 
 
+def _experiment_name(value: str) -> tuple[str, ...]:
+    """argparse type 回调 —— 校验并归一化 ``--experiment`` 取值。
+
+    取值清单取自 features.EXPERIMENTAL_FEATURES 注册表（与 TUI 菜单 S /
+    Web 配置面板同源），支持开关名、显示名与 ``all``。命中多个（``all``）
+    时返回全部开关名，调用方平铺后统一启用。
+
+    名称解析本身容忍空白项（见 resolve_experiment_flags），但命令行取值
+    为空串时属用户笔误，此处按非法取值报错，不静默忽略。
+    """
+    from src.python.config.features import describe_experiment_flags, resolve_experiment_flags
+
+    flags, unknown = resolve_experiment_flags([value])
+    if unknown or not flags:
+        raise argparse.ArgumentTypeError(f"未知实验功能 '{value}'；可选: {describe_experiment_flags()}、all")
+    return tuple(sorted(flags))
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """构建 argparse 参数解析器。"""
     parser = argparse.ArgumentParser(
@@ -41,6 +59,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", metavar="DIR", help="报告输出目录（覆盖 config.json 的 output_dir）")
     parser.add_argument("--verbose", action="store_true", help="将进度消息同步到 stderr（默认仅写入 logs/app.log）")
     parser.add_argument("--non-interactive", action="store_true", help="跳过首次运行交互式引导（定时任务/脚本使用）")
+    parser.add_argument(
+        "--experiment",
+        metavar="NAME",
+        action="append",
+        type=_experiment_name,
+        help="启用实验性功能，仅本次运行生效（不写入 features.json）。可重复指定；"
+        "NAME 取开关名或显示名，all=全部启用。",
+    )
     parser.add_argument("--version", action="version", version=f"%(prog)s v{APP_VERSION}")
 
     sub = parser.add_subparsers(dest="command", required=True)
@@ -122,6 +148,26 @@ def _build_parser() -> argparse.ArgumentParser:
         "  view-logs --level ERROR      只看 ERROR+CRITICAL\n"
         "  view-logs --since 2026-08-16 只看指定日期之后\n"
         "  view-logs --lines 200        只读末尾 200 行"
+    )
+
+    # ── doctor 子命令（实验功能 doctor_check）──
+    doctor_p = sub.add_parser("doctor", help="系统自检：环境/配置/目录/数据源一键体检（无需 config）")
+    doctor_p.add_argument(
+        "--offline",
+        action="store_true",
+        help="跳过数据源网络检查（仅查本地环境/配置/目录，瞬时返回）",
+    )
+    doctor_p.add_argument(
+        "--timeout",
+        type=float,
+        default=8.0,
+        help="网络检查整体耗时预算秒数（默认 8，防止慢速数据源拖住自检）",
+    )
+    doctor_p.epilog = (
+        "示例:\n"
+        "  doctor              完整自检（含数据源联通性）\n"
+        "  doctor --offline    仅本地自检，不联网\n"
+        "  doctor --timeout 15 放宽网络检查耗时预算"
     )
 
     return parser
@@ -478,6 +524,37 @@ def _handle_check_sources() -> int:
     return 2  # unreachable, run_check_sources calls sys.exit
 
 
+def _use_ansi_color() -> bool:
+    """终端是否支持 ANSI 着色（无 TTY / 设了 NO_COLOR / 非 UTF-8 编码时降级）。"""
+    if os.environ.get("NO_COLOR"):
+        return False
+    if not sys.stdout.isatty():
+        return False
+    return bool(sys.stdout.encoding and sys.stdout.encoding.upper() in ("UTF-8", "UTF8"))
+
+
+def _handle_doctor(args: argparse.Namespace) -> int:
+    """处理 doctor 子命令——系统自检。
+
+    纯只读诊断，不需要 config 初始化：配置损坏正是自检要定位的场景之一。
+
+    Returns:
+        int 退出码（_EXIT_SUCCESS=全部通过, _EXIT_PARTIAL=有失败项）。
+        自检失败不是命令本身失败——命令跑完了并给出了结论，故用 PARTIAL 而非 SEVERE。
+    """
+    from src.python.core.doctor import (
+        format_doctor_report,
+        run_doctor_checks,
+        summarize_doctor_results,
+    )
+
+    results = run_doctor_checks(include_network=not args.offline, max_timeout=args.timeout)
+    print(format_doctor_report(results, use_color=_use_ansi_color()))
+
+    _ok_count, bad_count = summarize_doctor_results(results)
+    return _EXIT_PARTIAL if bad_count else _EXIT_SUCCESS
+
+
 def _handle_view_logs(args: argparse.Namespace) -> int:
     """处理 view-logs 子命令——读取结构化运行日志。
 
@@ -513,6 +590,25 @@ def _handle_view_logs(args: argparse.Namespace) -> int:
 # ── 主入口 ───────────────────────────────────────────────
 
 
+def _apply_cli_experiments(groups: list[tuple[str, ...]] | None) -> None:
+    """启用命令行指定的实验功能（仅当前进程运行时，不写盘）。
+
+    ``--experiment`` 已在 argparse type 回调中完成取值校验，
+    此处只负责平铺与启用。持久化开关请走 TUI 菜单 S / Web 配置面板。
+    """
+    if not groups:
+        return
+
+    import logging
+
+    from src.python.config.features import set_feature_enabled
+
+    flags = sorted({flag for group in groups for flag in group})
+    for flag in flags:
+        set_feature_enabled(flag, True)
+    logging.getLogger("invest").info("[features] 命令行启用实验功能 %d 项: %s", len(flags), "、".join(flags))
+
+
 def main() -> int:
     """CLI 主入口。
 
@@ -536,8 +632,15 @@ def main() -> int:
     if args.command == "view-logs":
         return _handle_view_logs(args)
 
+    # doctor 同样无需 config：配置损坏正是它要定位的场景，此时不能因配置读不出而拒绝自检
+    if args.command == "doctor":
+        return _handle_doctor(args)
+
     init_config(config_path=args.config)
     config = get_config()
+
+    # 实验功能命令行开关（需在配置初始化之后：覆写加载已完成，此处为本次运行增量）
+    _apply_cli_experiments(args.experiment)
 
     # 首次运行引导（非交互/CI/脚本环境自动跳过，不阻塞命令执行）
     try:

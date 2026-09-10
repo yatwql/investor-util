@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.10.15
+> 文档版本：0.10.16
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -88,7 +88,7 @@
               │ prompts_core.py  │          │ fingerprint.py     │
               │ prompts_tables.py│          │ 缓存指纹计算       │
               │ prompts_action.py│          │ 稳定性字段提取      │
-              │                │          │ 风险信号摘要        │
+              │prompts_signals.py│          │ 风险信号摘要        │
               └──────────────────┘          └────────────────────┘
               ┌──────────────────┐              ┌────────────────────┐
               │ session.py       │              │ pricing.py         │
@@ -154,7 +154,7 @@ skeleton.py:generate_llm_content()
 
 ### 2.1 子模块总览
 
-说明：`prompts.py` 为统一导出入口，将 `prompts_core.py` / `prompts_tables.py` / `prompts_action.py` 的公开符号汇总导出。
+说明：`prompts.py` 为统一导出入口，将 `prompts_core.py` / `prompts_tables.py` / `prompts_action.py` / `prompts_signals.py` 的公开符号汇总导出。
 
 | 模块 | 分类 | 职责 | 入口函数 |
 |:-----|:-----|:------|:---------|
@@ -167,10 +167,11 @@ skeleton.py:generate_llm_content()
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `call_llm_with_retry()` |
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
 | `fact_checker/`（子包 9 模块，`__init__.py` 重导出 4 公开函数） | 基础设施 | LLM 输出事实锚定校验（数值一致性/品种存在性/排名正确性）+ 自动修正 | `run_fact_check()` |
-| `fallback.py` | 基础设施 | 全模块失败时的降级占位模板 | `get_fallback_content()` |
+| `fallback.py` | 基础设施 | 全模块失败时的降级占位模板；占位识别（`is_placeholder_content()` 按模板共有的稳定签名 `⚠️ 当前无法` 判定，供 `report/llm_quality.py` 等内容侧消费——签名常量与模板同文件，改模板即改签名） | `get_fallback_content()` / `get_placeholder_text()` / `is_placeholder_content()` |
 | `prompts_core.py` | 工具 | System Prompt 常量 + 上下文构建块（数据降级/收益归因/竞争语境/再平衡/概念板块/管线差异） | `_SYSTEM_*` 常量 + `_build_system_debate_synthesis()` |
 | `prompts_tables.py` | 工具 | 持仓/穿透/指标/情景/数据质量/汇率等数据块格式化为 Markdown | `_format_holdings_block()` / `_build_holdings_summary()` |
 | `prompts_action.py` | 工具 | 各模块 User Prompt 构建（global_macro / expert_review / health_check / penetration_deep / debate_synthesis）+ 集中度问答块 | `_build_expert_review_prompt()` / `_build_qa_concentration_block()` |
+| `prompts_signals.py` | 工具 | 信号预消化：行业资金流向段方向标注与分方向排名（无开关，默认路径）+ 算法评级信号块（市场温度/估值分位/尾部风险 → `信号：…` 行，`signal_pre_digest` 开关，判定收敛于缓存后缀函数保证读写键同源） | `_build_sector_flow_block()` / `_build_signal_digest_block()` / `_signal_digest_cache_suffix()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `compute_fingerprint()` / `build_llm_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `track_session_usage()` / `get_session_usage()` |
 | `cost_tracker.py` | 工具 | Token 预算管理、输入检查、成本摘要格式化（compact/verbose） | `reset_budget()` / `get_cost_summary()` |
@@ -457,6 +458,10 @@ if not any(needs.values()):
 **history_data 暴露**：`generate_all_llm()` 接收 `history_data` 参数，包含组合历史日收益率序列、基准指数日收益率序列等时间序列数据。该数据在 prompt 中以紧凑图表形式注入，使 LLM 能感知组合的历史波动特征和相对大盘表现，增强智囊团深度复盘和持仓体检报告中的趋势分析能力。
 
 首次运行（`is_first_check=True`）时输出"暂无历史对比数据"标记。
+
+**degradation_events 暴露**：`generate_all_llm()` 接收 `degradation_events` 参数，供 `health_check` 的第 5 维「数据质量」引用【数据质量降级】事件；传 `None`/空列表时该维度的降级详情段恒返回「今日无降级记录，所有数据源正常。」。调用点 `report/_llm_news.py::_submit_llm_future` 在**主线程**提交线程池前取一次 `DegradationTracker.get_log()` 快照随参传入（数据获取阶段已结束，此处读取即定稿；主线程读取避免与工作线程并发写入交错）——**不可改在 `generate_all_llm` 内部自行取**，那会让 LLM 层反向依赖 `report/` 的降级追踪器，且与 `expert_review` 经 `_build_data_degradation_block(pipeline_data)` 的口径分叉。health_check 缓存指纹不含提示词内容，故该修复在下次缓存未命中时自然生效，无需改缓存键。
+
+> **LLM 输出侧质量分级不属本层**：`report/llm_quality.py`（实验功能 `module_quality_gate`）消费本层输出后逐模块评级并注入横幅，位于 `report/` 而非 `llm/`——`llm/` 不得反向依赖 `report/`（`report/llm_content.py` 已依赖 `llm/`）。设计见 `technical.md` §4.11。
 
 [↑ 回到顶部](#目录)
 
@@ -1019,12 +1024,12 @@ reload_pricing() → 合并 llm_settings.json → pricing
 `estimate_cost()` 匹配模型定价的优先级：
 
 1. **精确匹配**：模型全名小写 → 同名字典
-2. **前缀匹配**：`deepseek-v4-flash-xxx` → `deepseek-v4-flash`
+2. **前缀匹配**：`deepseek-flash-xxx` → `deepseek-flash`
 3. **回退**：均不匹配 → 返回 `"-"`（未知模型不计费）
 
 ### 10.4 峰谷定价（DeepSeek）
 
-`MODEL_PRICING` 中含 `"peak"` 高峰价子段的模型（`deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat`）
+`MODEL_PRICING` 中含 `"peak"` 高峰价子段的模型（`deepseek-flash` / `deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat`）
 采用峰谷定价：工作日高峰时段按 `peak` 子段单价计费，其余时段（闲时，含周末全天）按 base 单价计费。
 
 - **高峰时段**（默认，**仅工作日**生效）：北京时间 09:00–12:00、14:00–18:00；工作日其余时间与
@@ -1220,10 +1225,16 @@ LLM 集成层与系统其他组件的接口：
 | LLM 模块 | 依赖数据源 | 缓存指纹依赖 |
 |:---------|:----------|:------------|
 | `global_macro` | A股指数 + 美股指数 + 总市值+总盈亏 + 分类 + (可选)行业资金流向 | 指数收盘价 + 持仓汇总 |
-| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动） |
+| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动）+ 实验开关后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要指纹 → `_sg`） |
 | `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动） |
 | `penetration_deep` | 同 expert_review + 穿透 TOP10（含行业/板块） | 同上 + 穿透 mv/ratio/sector（full_penetration=True） |
 | `news_correlation` | 过滤后的新闻列表 + 持仓摘要 + 穿透资产 + 行业/概念数据 | 标题前 80 字 + 持仓指纹 |
+
+**提示词受开关影响时的缓存键纪律**：凡实验开关**改变提示词内容**（`signal_pre_digest` 注入信号块、`decision_header_parse` 追加决策头契约、`signal_ledger` 注入确定性信号摘要），**写侧指纹闭包**（`generators.py::_fingerprint`）与 **orchestrator 预检指纹**（`_compute_module_cache_info`）必须**无条件同调同一后缀函数**、开关判定收敛在函数内部。关闭时返回 `""`（键不变、不误伤旧缓存），开启时两侧同步换键——只改一侧会让预检命中旧键而跳过重生成，开关形同虚设。
+
+**结构化决策头（实验功能 `decision_header_parse`，默认关）**：开启时 `_build_expert_review_prompt` 在「### 操作建议」表之后追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约（`core/decision_header.build_structured_header_instruction()`，与解析器同源、由测试锁定互读）；关闭时 append 空串，提示词**逐字节不变**。该段只在标准模式 expert_review 生效，辩论模式路径不追加。解析侧归一见 `technical.md` §4.15。
+
+**账本上下文注入（`skeleton.py::_LEDGER_CONTEXT_MODULES`）**：标准模式 `expert_review` 的 user prompt 首轮组装时，按开关追加两类**跨期账本上下文**——决策教训（`decision_ledger.lessons_block()`）与确定性信号摘要（`signal_ledger.summary_block()`）。两者各自做开关与样本门槛判断（关闭或无内容返回空串，注入逐字节无变化），故开关关闭时提示词不受影响；两处注入点与两处指纹后缀一一对应，见上表 `expert_review` 行。摘要**只统计实时来源记录**（非实时记录不参与），防止降级行情算出的评级污染跨期判断——纪律说明见 `technical.md` §4.16。
 
 ### 13.2 失败影响范围
 
@@ -1272,8 +1283,9 @@ LLM 集成层与系统其他组件的接口：
 | claude-sonnet-4-6 | 3.00 | 15.00 | 0.30 | |
 | claude-sonnet-4-8 | 3.00 | 15.00 | 0.30 | |
 | deepseek-chat | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | 峰谷定价（闲时/高峰） |
-| deepseek-v4-flash | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | 峰谷定价（闲时/高峰） |
-| deepseek-v4-pro | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | 峰谷定价（闲时/高峰） |
+| deepseek-flash | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；DeepSeek-V4.1-Flash 正式模型名（2026-09-10 发布） |
+| deepseek-v4-flash | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；别名，端点仍接受、底层由 V4.1-Flash 接管并按同价计费 |
+| deepseek-v4-pro | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | 峰谷定价（闲时/高峰）；2026-09-14 12:00 起下线，之前请求路由到 V4.1-Flash 并按其单价计费 |
 | gemini-2.0-flash | 0.10 | 0.40 | 0.01 | |
 | gemini-2.5-flash | 0.15 | 0.60 | 0.015 | |
 | gemini-2.5-pro | 1.25 | 5.00 | 0.125 | |

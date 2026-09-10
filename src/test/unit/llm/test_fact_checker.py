@@ -18,6 +18,10 @@ from src.python.llm.fact_checker import (
     check_symbol_existence,
     run_fact_check,
 )
+from src.python.llm.fact_checker._corrections import (
+    apply_code_corrections,
+    detect_code_corrections,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -49,10 +53,22 @@ def holdings_with_rates() -> list[dict]:
     单日涨跌语境按 change_pct 校验（不当作收益率修正）。
     """
     return [
-        {"name": "建设银行", "code": "601939", "market_value": 287120.0, "cost": 100000.0,
-         "profit_rate": 187.12, "change_pct": -3.41},
-        {"name": "贵州茅台", "code": "600519", "market_value": 2000000.0, "cost": 1500000.0,
-         "profit_rate": 33.33, "change_pct": 1.25},
+        {
+            "name": "建设银行",
+            "code": "601939",
+            "market_value": 287120.0,
+            "cost": 100000.0,
+            "profit_rate": 187.12,
+            "change_pct": -3.41,
+        },
+        {
+            "name": "贵州茅台",
+            "code": "600519",
+            "market_value": 2000000.0,
+            "cost": 1500000.0,
+            "profit_rate": 33.33,
+            "change_pct": 1.25,
+        },
     ]
 
 
@@ -1041,6 +1057,7 @@ class TestTableRowRankAttribution:
     "第一重仓"声称指向品种名列 040046，行内同单元格的比较对象 016055
     虽离声称词更近，仍应归因到品种名列。
     """
+
     # 用真实句段：|| 触发 _ROW_SEP_PATTERN 表格分支，行段内 040046 在声称词前
     TABLE_ROW = (
         ":--------:|------|| 🔴 高 | 040046 华安纳斯达克100ETF联接A | "
@@ -1050,10 +1067,8 @@ class TestTableRowRankAttribution:
 
     def _make_holdings(self) -> list[dict]:
         return [
-            {"name": "华安纳斯达克100ETF联接A", "code": "040046",
-             "market_value": 50000.0, "cost": 40000.0},
-            {"name": "博时纳斯达克100ETF联接A", "code": "016055",
-             "market_value": 30000.0, "cost": 25000.0},
+            {"name": "华安纳斯达克100ETF联接A", "code": "040046", "market_value": 50000.0, "cost": 40000.0},
+            {"name": "博时纳斯达克100ETF联接A", "code": "016055", "market_value": 30000.0, "cost": 25000.0},
         ]
 
     def test_claimed_to_prior_cell_code(self):
@@ -1066,10 +1081,8 @@ class TestTableRowRankAttribution:
     def test_wrong_claim_references_subject_code(self):
         """声称主体不在第一时，告警引用品种名列（声称主体），而非比较对象。"""
         holdings = [
-            {"name": "华安纳斯达克100ETF联接A", "code": "040046",
-             "market_value": 30000.0, "cost": 25000.0},
-            {"name": "博时纳斯达克100ETF联接A", "code": "016055",
-             "market_value": 50000.0, "cost": 40000.0},
+            {"name": "华安纳斯达克100ETF联接A", "code": "040046", "market_value": 30000.0, "cost": 25000.0},
+            {"name": "博时纳斯达克100ETF联接A", "code": "016055", "market_value": 50000.0, "cost": 40000.0},
         ]
         issues, checked, passed = check_ranking_correctness(self.TABLE_ROW, holdings)
         assert checked == 1
@@ -1134,10 +1147,7 @@ class TestFalseCorrectionContexts:
 
         句子尾部「收益平平」会触发收益语境，但开头的 1.10% 是相对基准差。
         """
-        text = (
-            "组合今日跑输沪深300达1.10%，主要受低波动红利资产拖累，"
-            "而夏普比率仅0.09显示风险调整后收益平平。"
-        )
+        text = "组合今日跑输沪深300达1.10%，主要受低波动红利资产拖累，而夏普比率仅0.09显示风险调整后收益平平。"
         issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
         assert corrections == [], f"跑输指数差不应被误修正: {corrections}"
 
@@ -1272,10 +1282,7 @@ class TestTrimTargetContext:
         原缺陷触发句：整段无句号合成一句，含"利润"触发收益语境，
         30%/40% 被当收益率修正为最近邻 601398 的 70.2%。
         """
-        text = (
-            "锁定银行板块部分利润：建设银行（+171.23%）建议止盈约30-40%持仓，"
-            "工商银行（+70.18%）止盈约20-30%。"
-        )
+        text = "锁定银行板块部分利润：建设银行（+171.23%）建议止盈约30-40%持仓，工商银行（+70.18%）止盈约20-30%。"
         issues, checked, passed, corrections = check_numerical_consistency(text, real_holdings)
         assert corrections == [], f"止盈目标比例不应被修正: {corrections}"
 
@@ -1300,8 +1307,7 @@ class TestTrimTargetContext:
     def test_run_fact_check_trim_not_rewritten(self, real_holdings):
         """run_fact_check 整链路：止盈比例不被自动修正，摘要无修正明细。"""
         html = (
-            "<p>锁定银行板块部分利润：建设银行（+171.23%）建议止盈约30-40%持仓，"
-            "工商银行（+70.18%）止盈约20-30%。</p>"
+            "<p>锁定银行板块部分利润：建设银行（+171.23%）建议止盈约30-40%持仓，工商银行（+70.18%）止盈约20-30%。</p>"
         )
         corr, summ = run_fact_check(html, real_holdings, "智囊团深度复盘")
         assert "30-40%" in corr  # 内容不被篡改
@@ -1411,8 +1417,13 @@ class TestWarningThresholdContext:
     def cashflow_holdings(self) -> list[dict]:
         """易方达国证自由现金流 ETF（159222），真实收益率 -11.8%。"""
         return [
-            {"name": "易方达国证自由现金流 ETF", "code": "159222",
-             "market_value": 14976.4, "cost": 16980.0, "profit_rate": -11.8},
+            {
+                "name": "易方达国证自由现金流 ETF",
+                "code": "159222",
+                "market_value": 14976.4,
+                "cost": 16980.0,
+                "profit_rate": -11.8,
+            },
         ]
 
     def test_warning_threshold_not_corrected(self, cashflow_holdings):
@@ -1739,3 +1750,97 @@ class TestSubjectAttributionMulti:
         )
         issues, checked, passed, corrections = check_numerical_consistency(text, holdings)
         assert corrections == [], f"+130% 应归 040046（实际 130.61%）通过，不应被远距尾名误路由: {corrections}"
+
+
+# ── 品种代码笔误自动纠正 ──
+
+
+class TestCodeTypoAutoCorrection:
+    """品种代码近似纠正通道：detect/apply_code_corrections + run_fact_check 整链路。
+
+    实盘穿透深度模块复现——LLM 把持仓 561910（招商中证电池主题ETF）易位一位数字
+    写成 161910，后紧跟"规模达10.2%"权重声称。纠正在品种存在性告警基础上，仅当
+    非合法有效 / 唯一近邻（编辑距离≤1）/ 权重声称吻合三个条件全满足时才执行；
+    歧义、建议语境、指数/穿透代码、权重不吻合等边界一律不自动纠正。
+    """
+
+    @staticmethod
+    def _battery_holdings() -> list[dict]:
+        """组合市值 100 万，561910 权重恰为 10.2%（实盘穿透误码场景比例 35516/347197≈10.2%）。"""
+        return [
+            {
+                "name": "招商中证电池主题ETF",
+                "code": "561910",
+                "market_value": 102000.0,
+                "cost": 90000.0,
+            },
+            {
+                "name": "华安纳斯达克100ETF联接A",
+                "code": "040046",
+                "market_value": 898000.0,
+                "cost": 700000.0,
+            },
+        ]
+
+    def test_detect_real_transposed_code_with_weight_corroboration(self):
+        """实盘场景：161910（561910 易位一位）后跟"规模达10.2%" → 检出纠正，reason 带候选权重。"""
+        text = "该 ETF 161910 规模达10.2%，负收益持续性需跟踪。"
+        corrections = detect_code_corrections(text, self._battery_holdings())
+        assert len(corrections) == 1
+        bad, good, _sentence, reason = corrections[0]
+        assert bad == "161910"
+        assert good == "561910"
+        assert "561910" in reason and "招商中证电池主题ETF" in reason and "10.2%" in reason
+
+    def test_apply_code_corrections_full_text_replace(self):
+        """apply 全文替换错码为候选（错码是单一所指，残留即隐藏缺陷 → 不做 count=1）。"""
+        html = "<table><tr><td>161910 规模达10.2%</td></tr><tr><td>另见 561910 的持续性</td></tr></table>"
+        corrected = apply_code_corrections(html, [("161910", "561910", "", "")])
+        assert "161910" not in corrected
+        assert corrected.count("561910") == 2  # 原真实码 + 替换后的错码位置
+
+    def test_no_correction_when_weight_claim_mismatch(self):
+        """权重声称与实际权重偏差超容差 → 不自动纠正（30.0% vs 10.2%）。"""
+        text = "该 ETF 161910 规模达 30.0%，需关注。"
+        assert detect_code_corrections(text, self._battery_holdings()) == []
+
+    def test_no_correction_when_multiple_near_neighbors(self):
+        """唯一近邻被破坏（两个持仓代码均在编辑距离≤1）→ 歧义，保持告警不自动纠正。"""
+        holdings = [
+            {"name": "电池A", "code": "561910", "market_value": 50000.0},
+            {"name": "电池B", "code": "561930", "market_value": 50000.0},
+        ]
+        text = "该 ETF 561920 规模达 50%，需关注。"
+        assert detect_code_corrections(text, holdings) == []
+
+    def test_no_correction_in_suggestion_context(self):
+        """建议语境引用非持仓代码（合法推荐）→ 不自动纠正。"""
+        text = "若看好电池方向，建议关注 161910 的配置机会（非持仓）。"
+        assert detect_code_corrections(text, self._battery_holdings()) == []
+
+    def test_no_correction_when_bad_in_extra_valid_codes(self):
+        """错码属于穿透分析等额外有效代码 → 排除，不自动纠正。"""
+        text = "161910 规模达10.2%，穿透标的存在。"
+        extra = {"161910"}
+        assert detect_code_corrections(text, self._battery_holdings(), extra_valid_codes=extra) == []
+
+    def test_no_correction_for_index_code(self):
+        """常见指数代码 → 属合法有效代码，不自动纠正。"""
+        text = "跟踪沪深300（000300），规模占比10.2%。"
+        assert detect_code_corrections(text, self._battery_holdings()) == []
+
+    def test_run_fact_check_real_scenario_auto_correct(self):
+        """run_fact_check 整链路：实盘 161910/561910 场景自动纠正并纳入已修正明细。
+
+        用"占比"作权重声称词（数值检查器的 _is_position_weight_context 亦认可，
+        10.2% 不会走数值修正路径），使整链路聚焦代码笔误纠正通道——
+        修正后错码从内容与 ⚠ 告警中消失，摘要标注"自动修正 1 处代码"。
+        """
+        html = "<p>该基金 161910 占比10.2%，负收益持续性需跟踪。</p>"
+        corr, summ = run_fact_check(html, self._battery_holdings(), "穿透深度分析")
+        assert "161910" not in corr  # 内容中错码已替换为 561910
+        assert "561910" in corr
+        assert "已修正明细" in summ
+        assert "161910→561910" in summ  # 修正明细列出纠正（供用户查看）
+        assert "自动修正 1 处代码" in summ
+        assert "品种代码 161910 不在当前持仓中" not in summ  # ⚠ 不再重复列出已修正码

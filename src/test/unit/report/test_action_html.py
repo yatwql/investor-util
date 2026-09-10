@@ -45,7 +45,7 @@ def _order_with_action() -> list[dict]:
     return order
 
 
-def _render(action_data, action_enabled: bool = True) -> "BeautifulSoup":
+def _render(action_data, action_enabled: bool = True, decision_review_data=None) -> "BeautifulSoup":
     """渲染 action 与 expert_review 可见、其余隐藏的模板。
 
     expert_review 章节在模板中嵌套于 `section_visible("global_macro")` 守卫内
@@ -56,6 +56,7 @@ def _render(action_data, action_enabled: bool = True) -> "BeautifulSoup":
     sv_dict = {sec["key"]: (sec["key"] in ("action", "expert_review", "global_macro")) for sec in order}
     data = _build_minimal_render_data(order, numbers, sv_dict)
     data["action_data"] = action_data
+    data["decision_review_data"] = decision_review_data
     # 行动章节可见性同时受 board 层（enable_action）与数据层控制；
     # 此处用 sv_dict 模拟 board 层开关（与生产 html_writer 的两层合并等效）
     if not action_enabled:
@@ -169,6 +170,74 @@ class TestHtmlActionSection(unittest.TestCase):
         """enable_action 关 → 行动建议章节整体不渲染。"""
         section = self._section(_action_data(), action_enabled=False)
         self.assertIsNone(section, "enable_action 关闭时不应有 #sec-action 章节")
+
+
+class TestHtmlDecisionReviewBlock(unittest.TestCase):
+    """行动章内嵌「历史决策复盘」区块（decision_review_data）HTML 呈现测试。"""
+
+    def _section(self, decision_review_data):
+        return _render(_action_data(), decision_review_data=decision_review_data).find(id="sec-action")
+
+    @staticmethod
+    def _review_data(**extra) -> dict:
+        """构造 decision_review_data 契约 mock（1 条 settled + 1 条 pending）。"""
+        d = {
+            "available": True,
+            "disclaimer": "本复盘基于历史判断与真实行情的滞后对账，仅供反思参考，不构成任何投资建议。",
+            "pending_count": 1,
+            "settled_count": 1,
+            "sample_sufficient": False,
+            "direction_accuracy": None,
+            "alpha_mean": None,
+            "recent_pending": [
+                {"code": "600519", "name": "贵州茅台", "direction": "看空（减仓/卖出建议）", "detail": "止盈线 +20%"},
+            ],
+            "recent_settled": [
+                {
+                    "code": "159915",
+                    "name": "创业板ETF",
+                    "direction": "看多（加仓建议）",
+                    "outcome": "miss",
+                    "raw_return": -0.03,
+                    "settle_date": "2026-09-08",
+                    "horizon_bars": 7,
+                },
+            ],
+        }
+        d.update(extra)
+        return d
+
+    def test_block_hidden_when_no_review_data(self):
+        """decision_review_data 缺省（None）→ 行动章无⑤复盘区块（既有输出不变）。"""
+        text = self._section(None).get_text()
+        self.assertNotIn("历史决策复盘", text)
+        self.assertNotIn("待结算", text)
+
+    def test_settled_and_pending_rows(self):
+        """复盘区块渲染 settled（兑现/未兑现+区间涨跌）与 pending（待结算）行。"""
+        text = self._section(self._review_data()).get_text()
+        self.assertIn("⑤ 历史决策复盘", text)
+        self.assertIn("仅供反思参考", text)
+        self.assertIn("159915", text)
+        self.assertIn("未兑现", text)  # outcome=miss
+        self.assertIn("-3.0%", text)  # raw_return -0.03 → -3.0%
+        self.assertIn("600519", text)
+        self.assertIn("待结算", text)
+        # settled_count>0 且样本不足 → 计数提示行
+        self.assertIn("已结算 1 条", text)
+        self.assertNotIn("方向命中", text)  # 样本不足不给命中率结论
+
+    def test_accuracy_summary_when_sample_sufficient(self):
+        """样本充足（sample_sufficient=True）→ 命中率 + 超额均值摘要行。"""
+        data = self._review_data(
+            settled_count=21,
+            sample_sufficient=True,
+            direction_accuracy=0.6,
+            alpha_mean=0.012,
+        )
+        text = self._section(data).get_text()
+        self.assertIn("方向命中 60%", text)
+        self.assertIn("超额均值 +1.20%", text)
 
 
 class TestHtmlActionSummaryInExpertReview(unittest.TestCase):

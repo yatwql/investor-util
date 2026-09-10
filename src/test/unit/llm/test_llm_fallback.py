@@ -131,3 +131,36 @@ class TestBuildFallbackLlmContent:
         result = build_fallback_llm_content(("<p>OK</p>", None, None, "<p>OK</p>"), force=True)
         for text in result:
             assert "⚠️" in text
+
+
+# ── is_placeholder_content 测试 ────────────────────────────────
+
+
+class TestIsPlaceholderContent:
+    """占位内容识别测试（供 LLM 输出质量分级等只读旁路使用）。"""
+
+    def test_every_module_placeholder_recognised(self):
+        """四个正式模块的占位模板均可被识别。"""
+        from src.python.llm.fallback import is_placeholder_content
+
+        for key in ("global_macro", "expert_review", "health_check", "penetration_deep"):
+            assert is_placeholder_content(get_placeholder_text(key)) is True
+
+    def test_real_content_not_recognised(self):
+        """正常 LLM 输出不被误判为占位。"""
+        from src.python.llm.fallback import is_placeholder_content
+
+        assert is_placeholder_content("<h3>持仓体检报告</h3><p>总分 84/100</p>") is False
+
+    def test_empty_is_not_placeholder(self):
+        """空内容返回 False —— 「是否为空」由调用方另行判定。"""
+        from src.python.llm.fallback import is_placeholder_content
+
+        assert is_placeholder_content("") is False
+        assert is_placeholder_content(None) is False
+
+    def test_warning_emoji_alone_is_not_enough(self):
+        """仅含 ⚠️ 的正文（如截断提示）不算占位。"""
+        from src.python.llm.fallback import is_placeholder_content
+
+        assert is_placeholder_content("<p>⚠️ 输出已被截断</p>") is False

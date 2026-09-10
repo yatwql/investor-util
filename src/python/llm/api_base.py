@@ -188,6 +188,7 @@ _THINKING_SUPPORTED_PREFIXES = (
     "claude-sonnet-4",
     "claude-opus-4",
     "claude-fable-5",
+    "deepseek-flash",
     "deepseek-v4-",
     "deepseek-chat",
     "gemini-3.5-",
@@ -195,7 +196,10 @@ _THINKING_SUPPORTED_PREFIXES = (
 )
 
 # 使用 output_config.effort（而非 thinking.budget_tokens）控制思考深度的模型。
-_THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-v4-", "deepseek-chat")
+# deepseek-flash 是 DeepSeek 新一代 Flash 的正式模型名，与它接管的 deepseek-v4-flash
+# 同属强制推理族——漏登记会让「未开启 thinking 时显式禁用」的安全网失效，请求落入
+# 默认思考模式占满 max_tokens 而无正文。
+_THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-flash", "deepseek-v4-", "deepseek-chat")
 
 
 def _supports_extended_thinking(model: str) -> bool:

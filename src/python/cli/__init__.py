@@ -1,6 +1,7 @@
 """CLI 命令行模式包。"""
 
 from src.python.cli.cli import (
+    _apply_cli_experiments,
     _build_parser,
     _cli_read_holdings,
     _cli_read_holdings_with_flows,
@@ -9,6 +10,7 @@ from src.python.cli.cli import (
     _EXIT_SUCCESS,
     _handle_cache,
     _handle_cache_update,
+    _handle_doctor,
     _handle_report,
     _handle_view_logs,
     _handle_whatif,
@@ -16,6 +18,7 @@ from src.python.cli.cli import (
 )
 
 __all__ = [
+    "_apply_cli_experiments",
     "_build_parser",
     "_cli_read_holdings",
     "_cli_read_holdings_with_flows",
@@ -24,6 +27,7 @@ __all__ = [
     "_EXIT_SUCCESS",
     "_handle_cache",
     "_handle_cache_update",
+    "_handle_doctor",
     "_handle_report",
     "_handle_view_logs",
     "_handle_whatif",

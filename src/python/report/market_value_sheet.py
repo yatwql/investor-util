@@ -17,6 +17,7 @@ from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.core.code_utils import is_qdii_extended
+from src.python.core.num_utils import finite_or
 from src.python.core.registry import get_report_sheet_name
 from src.python.report.excel_writer import (
     auto_width,
@@ -78,8 +79,8 @@ def _weighted_avg_cost(buckets: dict | None) -> float | None:
     cost = 0.0
     for bucket in ("low", "high", "unpriced"):
         b = buckets.get(bucket) or {}
-        shares += float(b.get("shares", 0.0) or 0.0)
-        cost += float(b.get("cost", 0.0) or 0.0)
+        shares += finite_or(b.get("shares", 0.0))
+        cost += finite_or(b.get("cost", 0.0))
     if shares <= 0:
         return None
     return cost / shares

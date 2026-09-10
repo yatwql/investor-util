@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from src.python.core.num_utils import finite_or
+
 
 def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
     """将成本流水数据（fund_flow_data）转成 HTML 模板友好展示映射（per-code 展示值）。
@@ -37,7 +39,7 @@ def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
         "cost_map": {code: _weighted_avg_cost(buckets) for code, buckets in cost_tiers.items()},
         "tier_map": {code: _tier_label(buckets) for code, buckets in cost_tiers.items()},
         "div_map": dict(dividends),
-        "div_total": float((fund_flow_data.get("dividends") or {}).get("total", 0.0) or 0.0),
+        "div_total": finite_or((fund_flow_data.get("dividends") or {}).get("total", 0.0)),
     }
 
 

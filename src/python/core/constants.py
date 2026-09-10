@@ -36,7 +36,7 @@ PROJECT_ROOT = _find_project_root()
 # 应用名称（单一来源，TUI 首页 / 启动日志 / Web 首页 / HTML 报告首页 / Excel 首页统一引用）
 APP_NAME = "投资复盘助手"
 
-APP_VERSION = "0.10.15"
+APP_VERSION = "0.10.16"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
@@ -88,14 +88,30 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
     "claude-fable-5": {"input": 3.0, "output": 15.0, "input_cache_hit": 0.30},
     "gpt-4o": {"input": 2.5, "output": 10.0, "input_cache_hit": 2.5},
     "gpt-4o-mini": {"input": 0.15, "output": 0.6, "input_cache_hit": 0.15},
-    # ── DeepSeek 峰谷定价（2026-08-17 起生效，元/百万 token）──
-    # base 为闲时价；peak 为高峰价（高峰时段为闲时的 2 倍）。
-    "deepseek-v4-flash": {
-        "input": 1.5,
-        "output": 4.5,
-        "input_cache_hit": 0.05,
-        "peak": {"input": 3.0, "output": 9.0, "input_cache_hit": 0.10},
+    # ── DeepSeek 峰谷定价（元/百万 token）──
+    # base 为闲时价；peak 为高峰价（高峰时段为闲时的 2 倍）。峰谷时段与周末规则
+    # 见下方 PRICING_PEAK_PERIODS / PRICING_WEEKEND_ALWAYS_IDLE。
+    #
+    # deepseek-flash（DeepSeek 新一代 Flash 正式模型名，2026-09-10 发布）沿用
+    # flash 系列定价：闲时 输入 1.0/输出 4.0/缓存命中 0.02，高峰翻倍
+    # 2.0/8.0/0.04（2026-09-10 12:00 北京时间起 flash 系列官方降价，最高 60%）。
+    "deepseek-flash": {
+        "input": 1.0,
+        "output": 4.0,
+        "input_cache_hit": 0.02,
+        "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04},
     },
+    # 别名 deepseek-v4-flash / deepseek-v4-flash-vision-exp 端点仍接受，底层模型
+    # 已由新一代 Flash 接管并按同一单价计费，故数值与 deepseek-flash 一致。
+    "deepseek-v4-flash": {
+        "input": 1.0,
+        "output": 4.0,
+        "input_cache_hit": 0.02,
+        "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04},
+    },
+    # deepseek-v4-pro 单价未随本轮 flash 调价变动。注意其服务于 2026-09-14 12:00
+    # （北京时间）下线，在该时刻至新一代 Pro 上线前，请求自动路由到 deepseek-flash
+    # 并按其单价计费——本表按模型自身单价记录，路由期实际费用低于此估算值。
     "deepseek-v4-pro": {
         "input": 4.5,
         "output": 13.5,

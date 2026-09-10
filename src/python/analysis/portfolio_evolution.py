@@ -24,6 +24,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.python.core.num_utils import finite_or
+
 logger = logging.getLogger("invest")
 
 # 有效期数下限：快照去重后不足该值视为数据不足（占位展示）
@@ -46,8 +48,8 @@ def _holding_weight(h: Any, total_mv: float, total_cost: float) -> float:
     Returns:
         权重（0~1 浮点数）
     """
-    mv = getattr(h, "market_value", 0.0) or 0.0
-    cost = getattr(h, "cost_total", 0.0) or 0.0
+    mv = finite_or(getattr(h, "market_value", 0.0))
+    cost = finite_or(getattr(h, "cost_total", 0.0))
     if total_mv > 0 and mv > 0:
         return mv / total_mv
     if total_cost > 0 and cost > 0:
@@ -163,9 +165,9 @@ def build_evolution_data(
 
     for idx, sd in enumerate(snapshots):
         periods.append(_format_period_label(sd.timestamp or ""))
-        total_value.append(round(sd.total_value or 0.0, 2))
-        total_cost.append(round(sd.total_cost or 0.0, 2))
-        total_pnl.append(round(sd.total_pnl or 0.0, 2))
+        total_value.append(round(finite_or(sd.total_value), 2))
+        total_cost.append(round(finite_or(sd.total_cost), 2))
+        total_pnl.append(round(finite_or(sd.total_pnl), 2))
 
         # 汇总全部账户持仓
         all_holdings: list[Any] = []
@@ -175,7 +177,7 @@ def build_evolution_data(
             hs = list(getattr(acc, "holdings", ()) or ())
             all_holdings.extend(hs)
             per_account.append((getattr(acc, "account_name", ""), hs))
-            account_value.append(sum(getattr(h, "market_value", 0.0) or 0.0 for h in hs))
+            account_value.append(sum(finite_or(getattr(h, "market_value", 0.0)) for h in hs))
 
         holding_counts.append(len(all_holdings))
 
@@ -186,15 +188,15 @@ def build_evolution_data(
                 account_flows.setdefault(name or "全部", []).append(round(av / _acct_total * 100, 2))
         else:
             # 市值为 0（旧快照）时用成本口径
-            _acct_cost_total = sum(sum(getattr(h, "cost_total", 0.0) or 0.0 for h in hs) for _n, hs in per_account)
+            _acct_cost_total = sum(sum(finite_or(getattr(h, "cost_total", 0.0)) for h in hs) for _n, hs in per_account)
             if _acct_cost_total > 0:
                 for (name, hs), _av in zip(per_account, account_value):
-                    _cv = sum(getattr(h, "cost_total", 0.0) or 0.0 for h in hs)
+                    _cv = sum(finite_or(getattr(h, "cost_total", 0.0)) for h in hs)
                     account_flows.setdefault(name or "全部", []).append(round(_cv / _acct_cost_total * 100, 2))
 
         # 集中度 HHI + TOP 持仓权重
-        _tot_mv = sd.total_value or 0.0
-        _tot_cost = sd.total_cost or 0.0
+        _tot_mv = finite_or(sd.total_value)
+        _tot_cost = finite_or(sd.total_cost)
         weights = [_holding_weight(h, _tot_mv, _tot_cost) for h in all_holdings]
         if weights and any(w > 0 for w in weights):
             hhi.append(_compute_hhi(weights))

@@ -26,6 +26,7 @@ from src.python.analysis.portfolio_evolution import (
     _holding_weight,
 )
 from src.python.analysis.simple_rebalance import _THRESHOLD
+from src.python.core.num_utils import finite_or
 
 logger = logging.getLogger("invest")
 
@@ -133,7 +134,10 @@ def _snapshot_hhi(sd: Any) -> float | None:
         HHI 值（0~1）或 None（无有效权重）
     """
     all_holdings = [h for acc in sd.accounts for h in (getattr(acc, "holdings", ()) or ())]
-    weights = [_holding_weight(h, sd.total_value or 0.0, sd.total_cost or 0.0) for h in all_holdings]
+    weights = [
+        _holding_weight(h, finite_or(getattr(sd, "total_value", 0.0)), finite_or(getattr(sd, "total_cost", 0.0)))
+        for h in all_holdings
+    ]
     if weights and any(w > 0 for w in weights):
         return _compute_hhi(weights)
     return None
@@ -150,8 +154,8 @@ def _over_limit_items(sd: Any, threshold_pct: float) -> list[dict[str, Any]]:
         [{code, name, weight_pct, threshold_pct}]，超限品种为空时返回空列表
     """
     out: list[dict[str, Any]] = []
-    total_mv = sd.total_value or 0.0
-    total_cost = sd.total_cost or 0.0
+    total_mv = finite_or(sd.total_value)
+    total_cost = finite_or(sd.total_cost)
     for acc in sd.accounts:
         for h in getattr(acc, "holdings", ()) or ():
             weight_pct = round(_holding_weight(h, total_mv, total_cost) * 100, 2)

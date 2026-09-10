@@ -21,6 +21,7 @@ from src.python.tui.tui_keys import KEY_CTRL_C, KEY_DOWN, KEY_ENTER, KEY_UP, get
 from src.python.tui.tui_handlers import execute_item
 from src.python.tui.tui_menu import (
     MENU_ITEMS,
+    _apply_feature_gates,
     exit_app,
     index_by_key,
     print_header,
@@ -94,6 +95,7 @@ def _bind_callbacks() -> None:
         _cmd_refresh_config,
     )
     from src.python.tui.handlers_log import (
+        _cmd_run_doctor,
         _cmd_view_health_history,
         _cmd_view_logs,
     )
@@ -123,6 +125,7 @@ def _bind_callbacks() -> None:
         "R": _cmd_refresh_config,
         "V": _cmd_view_logs,
         "H": _cmd_view_health_history,
+        "D": _cmd_run_doctor,
     }
     for i, (key, _label, _cb, is_exit) in enumerate(MENU_ITEMS):
         MENU_ITEMS[i] = (key, _label, callbacks.get(key), is_exit)
@@ -131,6 +134,7 @@ def _bind_callbacks() -> None:
 def main() -> None:
     """TUI 主循环。支持方向键导航 + Enter 确认 + 字母快捷键 + Ctrl+C。"""
     init_config()
+    _apply_feature_gates()  # 必须在 _bind_callbacks 之前：裁剪后索引才与渲染一致
     _bind_callbacks()
     atexit.register(_print_session_usage_on_exit)
 

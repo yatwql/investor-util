@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from src.python.core.decision_header import build_structured_header_instruction
 from src.python.llm.prompts_core import (
     _build_concept_sector_block,
     _build_data_degradation_block,
@@ -20,6 +21,10 @@ from src.python.llm.prompts_core import (
     _build_profit_attribution_block,
     _build_rebalance_block,
     _fmt_wan,
+)
+from src.python.llm.prompts_signals import (
+    _build_sector_flow_block,
+    _build_signal_digest_block,
 )
 from src.python.llm.prompts_tables import (
     _calc_country_exposure,
@@ -73,25 +78,8 @@ def _build_global_macro_prompt(
 
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
-    # ── 行业资金流向 ──
-    flow_text = ""
-    if sector_flow:
-        top_sectors = sector_flow[:5]  # 前 5 个行业
-        flow_lines = []
-        for s in top_sectors:
-            name = s.get("name", "")
-            chg = s.get("change_pct")
-            inflow = s.get("main_net_inflow")
-            inflow_pct = s.get("main_net_inflow_pct")
-            parts = [f"{name}"]
-            if chg is not None:
-                parts.append(f"涨跌{chg:+.2f}%")
-            if inflow is not None:
-                parts.append(f"主力净流入{inflow:,.0f}")
-            if inflow_pct is not None:
-                parts.append(f"净占比{inflow_pct:.2f}%")
-            flow_lines.append("  ".join(parts))
-        flow_text = "\n【行业资金流向】\n" + "\n".join(flow_lines)
+    # ── 行业资金流向（方向词 + 分方向排名，见 prompts_signals）──
+    flow_text = _build_sector_flow_block(sector_flow)
 
     total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
     comp_text = f"\n{competitive_context}" if competitive_context else ""
@@ -207,6 +195,8 @@ def _build_expert_review_prompt(
     enable_qa_concentration: bool = False,
     industry_concentration: dict[str, float] | None = None,
     skip_scenarios: bool = False,  # 辩论模式跳过所有情景分析
+    enable_signal_digest: bool = False,
+    enable_structured_header: bool = False,
 ) -> str:
     """构建智囊团深度复盘的用户提示词（紧凑格式）。
 
@@ -220,6 +210,11 @@ def _build_expert_review_prompt(
         metrics: 量化指标字典，compute_all_metrics() 的输出。
         skip_scenarios: True 时跳过所有情景分析指令（辩论 pro/con 用，
             避免双重情景输出）。
+        enable_signal_digest: 注入算法评级预消化信号块（实验项
+            ``signal_pre_digest``；无可用信号时静默跳过）。
+        enable_structured_header: 追加受控 JSON 决策头契约（实验项
+            ``decision_header_parse``）。关闭时提示词与未加此项前逐字节一致，
+            不扰动既有缓存指纹。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
@@ -233,6 +228,7 @@ def _build_expert_review_prompt(
     rebalance_text = _build_rebalance_block(holdings_details, total_mv)
     fx_text = _build_fx_exposure_block(holdings_details)
     total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
+    signal_text = _build_signal_digest_block(pipeline_data) if enable_signal_digest else ""
 
     parts = [
         f"【当前时间】{now_bj}（北京时间）",
@@ -240,6 +236,9 @@ def _build_expert_review_prompt(
         f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）今日{total_today_profit:+,.0f}",
         f"【分布】{' '.join(cat_parts)}{pen_text}",
     ]
+    # 算法评级信号置顶：先给结论再看明细，避免模型从裸数值另行推断方向
+    if signal_text:
+        parts.append(signal_text)
     if diff_text:
         parts.append(diff_text)
     if degradation_text:
@@ -276,6 +275,10 @@ def _build_expert_review_prompt(
         "| 🟡 中 | XXX | 减仓/加仓/持有 | 简述理由 |\n"
         "| 🟢 低 | XXX | 减仓/加仓/持有 | 简述理由 |\n"
     )
+    # 结构化决策头（实验项 decision_header_parse）：与上表同源，供抽取侧优先读取。
+    # 关闭时 append 空串，提示词逐字节不变。
+    if enable_structured_header:
+        parts.append(build_structured_header_instruction())
     parts += [
         "",
         "【持仓明细】",
@@ -364,6 +367,8 @@ def _build_health_check_prompt(
     holdings_details: list[dict] | None = None,
     pipeline_data: dict | None = None,
     degradation_events: list[dict] | None = None,
+    *,
+    enable_signal_digest: bool = False,
 ) -> str:
     """构建持仓体检报告的用户提示词。
 
@@ -372,6 +377,8 @@ def _build_health_check_prompt(
     Args:
         pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要）。
         degradation_events: DegradationTracker.get_log() 输出。
+        enable_signal_digest: 注入算法评级预消化信号块（实验项
+            ``signal_pre_digest``；无可用信号时静默跳过）。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
@@ -384,6 +391,7 @@ def _build_health_check_prompt(
     dq_detail = _build_data_quality_detail_block(degradation_events)
     attribution_text = _build_profit_attribution_block(holdings_details)
     total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
+    signal_text = _build_signal_digest_block(pipeline_data) if enable_signal_digest else ""
 
     parts = [
         f"【当前时间】{now_bj}（北京时间）",
@@ -391,6 +399,9 @@ def _build_health_check_prompt(
         f"成本{total_cost:,.0f} 盈亏{total_profit:+,.0f}（收益率{total_rate:+.2f}%）今日{total_today_profit:+,.0f}",
         f"【分布】{' '.join(cat_parts)}{pen_text}",
     ]
+    # 算法评级信号置顶：先给结论再看明细，避免模型从裸数值另行推断方向
+    if signal_text:
+        parts.append(signal_text)
     if diff_text:
         parts.append(diff_text)
     if degradation_text:
