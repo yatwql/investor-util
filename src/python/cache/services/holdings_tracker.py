@@ -13,7 +13,8 @@ import os
 
 from .._groups import clear_by_prefix
 from .._paths import _cache_path
-from .._store import clear, set
+from .._store import clear, get, set
+from .._ttl import get_ttl
 
 logger = logging.getLogger("invest")
 
@@ -48,21 +49,22 @@ def compute_holdings_codes(holdings: list) -> builtins.set[str]:
 
 
 def _read_holdings_tracking(tracking_key: str) -> dict | None:
-    """读取上次存储的持仓跟踪数据。
+    """读取上次存储的持仓跟踪数据（经 cache API）。
+
+    必须走 ``cache.get``（C2 缓存统一管理）：直接 open + json.load 读缓存文件会
+    绕过注册表为 `holdings_tracking` 声明的 CACHE_MONTHLY（TTL 声明形同虚设）、
+    缓存层的 `.json.gz` 优先读与 BOM 容错（`utf-8-sig`）、损坏文件自动清理与
+    命中率统计——其中编码异常还会因旧实现的 except 元组不含 UnicodeDecodeError
+    而**直接抛出**打断主流程。超过 TTL 时返回 None，调用方按「无上轮记录」处理
+    （视其代码为新增并刷新，方向上宁多刷不漏刷）。
 
     Returns:
-        跟踪数据字典（含 fingerprint / codes），文件不存在或损坏时返回 None
+        跟踪数据字典（含 fingerprint / codes），不存在/过期/损坏时返回 None
     """
-    track_path = _cache_path(tracking_key)
-    if not os.path.exists(track_path):
+    data = get(tracking_key, get_ttl("tracking", tracking_key))
+    if not isinstance(data, dict):
         return None
-    try:
-        with open(track_path, encoding="utf-8") as f:
-            payload = json.load(f)
-        return payload.get("_data")
-    except (json.JSONDecodeError, OSError, KeyError):
-        logger.warning("读取持仓跟踪缓存数据失败，将重新生成")
-        return None
+    return data
 
 
 def _clear_holdings_related_caches() -> list[str]:

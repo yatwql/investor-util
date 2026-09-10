@@ -6,6 +6,17 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 持仓跟踪缓存读取回归 cache API（C2，自审 rf-323）（2026-09-10）
+
+- **缺陷（自审 rf-323）**：`cache/services/holdings_tracker.py::_read_holdings_tracking` **绕过 cache API 直接读缓存文件**（`_cache_path()` + `open` + `json.load` + 手取 `payload["_data"]`），违反 C2「所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 接口读写，禁止直接操作 `data/cache/` 文件系统」。逐项后果：
+  - **TTL 声明失效**：注册表为 `holdings_tracking` 声明 `CACHE_MONTHLY`，旁路读取使该声明完全不起作用（C2 表头所列「TTL 失效」后果的实例）。
+  - **gzip 变体读不到**：缓存层读路径优先 `.json.gz`（超 100KB 自动转储），旁路读取只看 `.json`——一旦转储，跟踪记录被静默当作不存在，全部代码误判为新增（方向上属过度刷新，非漏刷）。
+  - **BOM/编码容错缺失**：缓存层用 `utf-8-sig` 读取并捕获 `UnicodeDecodeError`，旁路读取用 `utf-8` 且异常元组不含 `UnicodeDecodeError`——带 BOM 的跟踪文件会**直接抛出**打断主流程而非降级。
+  - **损坏文件不清理、命中率不统计**：缓存层读失败会自动删除损坏文件并记录 hit/miss，旁路读取两者皆无。
+- **改动**：改经 `cache.get(tracking_key, get_ttl("tracking", tracking_key))` 读取，TTL 取自注册表声明；返回值非 dict 时视为无记录返回 None（「不存在/损坏」的处置统一交回缓存层）。函数 docstring 补充「必须走 cache API」的理由与过期语义。
+- **行为变更**：跟踪记录超过 `CACHE_MONTHLY` 后读取返回 None，调用方按「无上轮记录」处理——即全部代码视为新增并触发关联缓存刷新（**修复**方向：宁多刷不漏刷）；TTL 内行为不变。
+- **测试**：`test_holdings_tracker.py` 新增 `TestReadHoldingsTrackingUsesCacheApi` 三例（经 `cache.set` 写入后读到内层数据 / TTL 置负 → None / 无记录 → None），并补强首次运行用例断言「无上轮记录 → 全部代码视为新增」。TTL 用例为判别点——已验证还原旧实现后转红（旧实现无视 TTL，会返回过期指纹并跳过刷新）。
+
 ### 代码类型判定回归中心化（C1，自审 rf-333）（2026-09-10）
 
 - **缺陷（自审 rf-333）**：全局架构审计（C1~C24 逐条对照）发现两处**绕过 `core/code_utils.py` 自建代码前缀判定**，违反 C1「所有资产代码类型判定必须使用 `core/code_utils.py`，禁止任何模块自行实现判定逻辑」：

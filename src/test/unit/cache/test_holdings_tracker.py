@@ -8,8 +8,6 @@
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
@@ -147,6 +145,8 @@ class TestCheckAndRefreshCaches:
         holdings = [_MockHolding("600519"), _MockHolding("000001")]
         new_codes = check_and_refresh_caches(holdings)
         assert len(cleared) == 1  # 清除操作被调用
+        # 首次运行无上轮记录 → 全部代码视为新增（供主流程主动取数）
+        assert sorted(new_codes) == ["000001", "600519"]
 
     def test_fingerprint_match_returns_empty(self, monkeypatch):
         """指纹相同 → 返回空列表，不刷新缓存。"""
@@ -208,3 +208,46 @@ class TestCheckAndRefreshCaches:
         holdings = [_MockHolding("600519", shares=200)]  # 仅份额变
         result = check_and_refresh_caches(holdings)
         assert result == []  # 无新增代码
+
+
+# ── _read_holdings_tracking 必须经 cache API ───────────────────
+# 回归背景（C2 缓存 API 唯一入口）：该函数曾直接 open + json.load 读缓存文件
+# 并自行取 "_data"，绕过注册表声明的 TTL 与缓存层统一处理。后果是过期指纹
+# 仍被当作有效值复用——持仓变更后关联缓存永不刷新（静默失效）。
+# 注意：旧的直接读实现同样能通过「读取已存数据」类断言，故此处必须以
+# TTL 判定为判别点，否则测试无法拦住回退。
+
+
+class TestReadHoldingsTrackingUsesCacheApi:
+    """_read_holdings_tracking() 经 cache API 读取（C2 缓存 API 唯一入口）。"""
+
+    def test_returns_unwrapped_payload(self, monkeypatch):
+        """经 cache.set 写入后读取 → 返回内层数据（已解包 envelope）。"""
+        from src.python.cache.services.holdings_tracker import _read_holdings_tracking
+        from src.python.cache._store import set as cache_set
+
+        cache_set("holdings_tracking", {"fingerprint": "fp-1", "codes": ["600519"]})
+
+        data = _read_holdings_tracking("holdings_tracking")
+        assert data == {"fingerprint": "fp-1", "codes": ["600519"]}
+
+    def test_expired_entry_returns_none(self, monkeypatch):
+        """超过 TTL 的跟踪数据 → None（调用方按「无上轮记录」处理并刷新）。
+
+        判别点：直接读文件的实现无视 TTL，会返回这条过期指纹并跳过刷新。
+        """
+        from src.python.cache import services
+        from src.python.cache.services.holdings_tracker import _read_holdings_tracking
+        from src.python.cache._store import set as cache_set
+
+        cache_set("holdings_tracking", {"fingerprint": "fp-stale", "codes": ["600519"]})
+        # TTL 置为负值 → 任意时间戳均判定过期
+        monkeypatch.setattr(services.holdings_tracker, "get_ttl", lambda *a, **k: -1.0)
+
+        assert _read_holdings_tracking("holdings_tracking") is None
+
+    def test_missing_entry_returns_none(self):
+        """无跟踪数据（首次运行）→ None。"""
+        from src.python.cache.services.holdings_tracker import _read_holdings_tracking
+
+        assert _read_holdings_tracking("holdings_tracking") is None
