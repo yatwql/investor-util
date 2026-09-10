@@ -38,6 +38,7 @@ from src.python.llm.prompts_core import (
 
 # ── 从 prompts_tables 导出 ────────────────────────────────
 from src.python.llm.prompts_tables import (
+    _build_data_quality_detail_block,
     _build_holdings_summary,
     _build_news_correlation_summary,
     _calc_country_exposure,
@@ -103,6 +104,7 @@ __all__ = [
     "_build_concept_sector_block",
     "_build_rebalance_block",
     "_build_competitive_context_block",
+    "_build_data_quality_detail_block",
     # Prompt 构建函数
     "_build_global_macro_prompt",
     "_build_expert_review_prompt",

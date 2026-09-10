@@ -149,9 +149,17 @@ class TestHealthCheckDegradationInjection:
     """health_check prompt 数据质量详情注入测试。"""
 
     def test_health_check_contains_degradation_detail(self):
-        """degradation_events 非空时 prompt 含数据质量详情。"""
-        from src.python.llm.prompts_action import _build_health_check_prompt
+        """渲染好的数据质量块传入时 prompt 含数据质量详情。
 
+        块由**调用方渲染一次**后传入（同一实例既进提示词又进指纹，见
+        ``llm/module_fingerprint.py``），本函数不自行渲染。
+        """
+        from src.python.llm.prompts_action import _build_health_check_prompt
+        from src.python.llm.prompts_tables import _build_data_quality_detail_block
+
+        dq_text = _build_data_quality_detail_block(
+            [{"source_key": "tencent", "failure_type": "unreachable", "degraded": True, "count": 2}]
+        )
         prompt = _build_health_check_prompt(
             total_mv=10000,
             total_cost=9000,
@@ -159,15 +167,13 @@ class TestHealthCheckDegradationInjection:
             total_today_profit=100,
             holdings_count=2,
             categories={"股票": 2},
-            degradation_events=[
-                {"source_key": "tencent", "failure_type": "unreachable", "degraded": True, "count": 2},
-            ],
+            data_quality_text=dq_text,
         )
         assert "【数据质量详细状态】" in prompt
         assert "tencent" in prompt
 
     def test_health_check_no_degradation(self):
-        """degradation_events 为 None 时仍含基础降级块。"""
+        """未传数据质量块时仍含基础降级块。"""
         from src.python.llm.prompts_action import _build_health_check_prompt
 
         prompt = _build_health_check_prompt(
@@ -180,6 +186,47 @@ class TestHealthCheckDegradationInjection:
         )
         # 即使无 degradation_events，pipeline_data 中的 degradation 块仍可存在
         assert "【持仓明细】" in prompt
+
+    @pytest.mark.parametrize("blank", [None, ""])
+    def test_absent_data_quality_text_renders_same_prompt_as_none(self, blank):
+        """``None`` 与空串（「未提供」的两种写法）必须渲染出同一份提示词。
+
+        回归：指纹侧 `data_quality_text or ""` 早已把两者折叠成同一个空串，提示词侧
+        却只认 ``None``——空串被渲染成空段、``None`` 渲染成默认块，两种不同提示词
+        共用同一指纹，缓存复用后模块结论与当前提示词段不符。
+        """
+        from src.python.llm.prompts_action import _build_health_check_prompt
+
+        kwargs = dict(
+            total_mv=10000,
+            total_cost=9000,
+            total_profit=1000,
+            total_today_profit=100,
+            holdings_count=2,
+            categories={"股票": 2},
+        )
+        prompt = _build_health_check_prompt(data_quality_text=blank, **kwargs)
+        baseline = _build_health_check_prompt(**kwargs)
+
+        assert prompt == baseline
+        assert "【数据质量】" in prompt
+
+    def test_data_quality_text_fingerprint_matches_prompt_rendering(self):
+        """指纹侧与提示词侧对同一输入给出一致判定（None 与空串折叠后同段同指纹）。"""
+        from src.python.llm.module_fingerprint import ModuleFingerprintInputs, health_check_fingerprint
+
+        def _fp(raw):
+            return health_check_fingerprint(
+                ModuleFingerprintInputs(
+                    total_mv=10000,
+                    total_cost=9000,
+                    total_profit=1000,
+                    total_today_profit=100,
+                    data_quality_text=raw or "",
+                )
+            )
+
+        assert _fp(None) == _fp("")
 
 
 class TestLLMGeneratorWiring:
@@ -238,10 +285,10 @@ class TestLLMGeneratorWiring:
         sig = inspect.signature(generate_expert_review)
         assert "metrics" in sig.parameters
 
-    def test_health_check_generator_accepts_degradation_events(self):
-        """generate_health_check 接受 degradation_events 参数。"""
+    def test_health_check_generator_accepts_data_quality_text(self):
+        """generate_health_check 接受调用方渲染好的数据质量块参数。"""
         from src.python.llm.generators import generate_health_check
 
         import inspect
         sig = inspect.signature(generate_health_check)
-        assert "degradation_events" in sig.parameters
+        assert "data_quality_text" in sig.parameters

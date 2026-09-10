@@ -20,10 +20,12 @@
     信号摘要对三模块统一参与哈希（口径一致优先于逐模块精简——多算只带来无害的
     过度失效，漏算则导致内容与键脱钩的陈旧缓存）。
   - **覆盖以「提示词是否真的含该段」为准**：进了提示词的内容必须进指纹
-    （``competitive_context`` / ``metrics``），不进提示词的段落不并入（纯成本失效）。
-  - **一次渲染、两侧共享同一实例**：``competitive_context`` 由调用方
-    （``generate_all_llm``）渲染一次后同时交给预检侧与写侧，两边不得各自渲染
-    ——两次渲染会让「进键的文本」与「进提示词的文本」退化为靠纪律对齐。
+    （``competitive_context`` / ``metrics`` / ``data_quality_text``），不进提示词的
+    段落不并入（纯成本失效）。
+  - **一次渲染、两侧共享同一实例**：``competitive_context`` 与
+    ``data_quality_text`` 由调用方（``generate_all_llm``）渲染一次后同时交给预检侧
+    与写侧，两边不得各自渲染——两次渲染会让「进键的文本」与「进提示词的文本」
+    退化为靠纪律对齐。
   - 返回值为**指纹本体**（不含 ``CACHE_PREFIX_LLM + 模块名`` 前缀），缓存键由两侧
     按同一形态自行拼装。
 """
@@ -75,6 +77,9 @@ class ModuleFingerprintInputs:
             与提示词共享**同一实例**（仅提示词含该段的模块使用）
         metrics: 量化指标字典（指标表 / 情景分析 / 风格一致性的共同来源，
             仅 expert_review 使用）
+        data_quality_text: **已渲染**的数据质量详细状态文本块，由调用方渲染一次后
+            与提示词共享**同一实例**（仅提示词含该段的模块使用——目前仅
+            health_check）
     """
 
     total_mv: float = 0.0
@@ -90,6 +95,7 @@ class ModuleFingerprintInputs:
     us_indices: dict | None = None
     competitive_context: str = ""
     metrics: dict | None = None
+    data_quality_text: str = ""
 
 
 def debate_feature_cache_suffix() -> str:
@@ -192,16 +198,29 @@ def debate_procon_fingerprint(inputs: ModuleFingerprintInputs) -> str:
 
 
 def health_check_fingerprint(inputs: ModuleFingerprintInputs) -> str:
-    """持仓体检报告：基础指纹 + 信号预消化后缀。"""
-    _fp = build_llm_fingerprint(
-        total_mv=inputs.total_mv,
-        total_cost=inputs.total_cost,
-        total_profit=inputs.total_profit,
-        total_today_profit=inputs.total_today_profit,
-        holdings_details=inputs.holdings_details,
-        penetrated_assets=inputs.penetrated_assets,
-        categories=inputs.categories,
-        history_data=inputs.history_data,
+    """持仓体检报告：基础指纹 + 数据质量详细状态块 + 信号预消化后缀。
+
+    数据质量块（【数据质量详细状态】）由其提示词直接承载，故必须进键：否则
+    「数据源故障期间生成并缓存、随后源恢复」时持仓未变故键不变，预检命中旧键、
+    复用陈述与此刻事实相反的故障结论。该块为**已渲染文本**，与注入提示词的实例
+    同一（见模块 docstring）。
+
+    成本口径：该块是**本次运行**的数据源画像（事件集只在进程内累积，不含时间戳
+    等易变字段），且本模块指纹本就含 ``total_today_profit``——交易日内持仓一有
+    盈亏变化即换键，故纳入本块带来的边际额外失效接近零。
+    """
+    _fp = compute_fingerprint(
+        build_llm_fingerprint(
+            total_mv=inputs.total_mv,
+            total_cost=inputs.total_cost,
+            total_profit=inputs.total_profit,
+            total_today_profit=inputs.total_today_profit,
+            holdings_details=inputs.holdings_details,
+            penetrated_assets=inputs.penetrated_assets,
+            categories=inputs.categories,
+            history_data=inputs.history_data,
+        ),
+        inputs.data_quality_text,
     )
     _fp += _signal_digest_cache_suffix(inputs.pipeline_data)
     return _fp

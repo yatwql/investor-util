@@ -366,7 +366,7 @@ def _build_health_check_prompt(
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
     pipeline_data: dict | None = None,
-    degradation_events: list[dict] | None = None,
+    data_quality_text: str | None = None,
     *,
     enable_signal_digest: bool = False,
 ) -> str:
@@ -376,7 +376,12 @@ def _build_health_check_prompt(
 
     Args:
         pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要）。
-        degradation_events: DegradationTracker.get_log() 输出。
+        data_quality_text: **已渲染**的数据质量详细状态文本块
+            （``_build_data_quality_detail_block()`` 的输出）。调用方渲染一次后
+            同时交给本函数与模块指纹构造，两侧共享同一实例——本函数不自行渲染。
+            传 ``None`` 或空串表示未提供（旁路/测试），按「无降级事件」渲染；两者
+            判据必须相同，否则指纹侧把 ``None`` 与 ``""`` 折叠成同一个空串、本函数
+            却渲染出不同文本，会让两种提示词共用一份缓存。
         enable_signal_digest: 注入算法评级预消化信号块（实验项
             ``signal_pre_digest``；无可用信号时静默跳过）。
     """
@@ -387,8 +392,11 @@ def _build_health_check_prompt(
     pen_text = _format_penetration_block(penetrated_assets)
     diff_text = _build_difpipeline_data_block(pipeline_data)
     degradation_text = _build_data_degradation_block(pipeline_data)
-    # 数据质量详情
-    dq_detail = _build_data_quality_detail_block(degradation_events)
+    # 数据质量详情：调用方渲染的同一实例既进本提示词、又进模块指纹
+    # （llm/module_fingerprint.py 模块 docstring）；未提供（None 或空串）时按无降级
+    # 事件渲染。判据用 `not` 而非 `is None`——指纹侧 `data_quality_text or ""` 早已把
+    # 两者折叠成同一个值，此处若只认 None，空串就会渲染成空段却与 None 共用指纹。
+    dq_detail = _build_data_quality_detail_block(None) if not data_quality_text else data_quality_text
     attribution_text = _build_profit_attribution_block(holdings_details)
     total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
     signal_text = _build_signal_digest_block(pipeline_data) if enable_signal_digest else ""

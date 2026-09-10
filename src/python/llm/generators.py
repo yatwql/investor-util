@@ -258,10 +258,15 @@ def generate_health_check(
     http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
     pipeline_data: dict | None = None,
-    degradation_events: list[dict] | None = None,
+    data_quality_text: str | None = None,
     history_data: dict | None = None,
 ) -> tuple[str | None, bool]:
-    """生成持仓体检报告。"""
+    """生成持仓体检报告。
+
+    ``data_quality_text`` 为调用方渲染好的数据质量详细状态块：同一实例既进指纹
+    又进提示词（否则「源故障期间缓存、恢复后复用」会让报告陈述与此刻事实相反），
+    本函数不自行渲染——见 ``llm/module_fingerprint.py`` 模块 docstring。
+    """
     _enable_signal_digest = is_feature_enabled("signal_pre_digest")
     # 指纹输入闭包与预检侧同构（见 generate_expert_review 同名注释）。
     _fingerprint_inputs = ModuleFingerprintInputs(
@@ -274,6 +279,7 @@ def generate_health_check(
         categories=categories,
         history_data=history_data,
         pipeline_data=pipeline_data,
+        data_quality_text=data_quality_text or "",
     )
 
     def _fingerprint():
@@ -290,7 +296,7 @@ def generate_health_check(
             penetrated_assets,
             holdings_details=holdings_details,
             pipeline_data=pipeline_data,
-            degradation_events=degradation_events,
+            data_quality_text=data_quality_text,
             enable_signal_digest=_enable_signal_digest,
         )
 

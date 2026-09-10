@@ -48,6 +48,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_DISABLED,
     LLM_MODULE_FAILURE,
     _build_competitive_context_block,
+    _build_data_quality_detail_block,
 )
 from src.python.llm.skeleton import is_llm_module_enabled
 from src.python.core.registry import get_llm_module_name, get_llm_module_names
@@ -111,6 +112,7 @@ def _compute_module_cache_info(
     pipeline_data: dict | None = None,
     competitive_context: str = "",
     metrics: dict | None = None,
+    data_quality_text: str = "",
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
 
@@ -118,9 +120,10 @@ def _compute_module_cache_info(
     本函数**不再自行拼接**模块指纹——预检键与写侧键同源由结构保证，
     而非靠两侧逐字对齐的注释纪律（历史偏差见该模块 docstring）。
 
-    ``competitive_context`` / ``metrics`` 是提示词正文段的输入（详见
-    ``llm/module_fingerprint.py``）：本函数只对**调用方已渲染好**的同一实例取
-    哈希，不自行渲染——两次渲染会让「进键的文本」与「进提示词的文本」脱钩。
+    ``competitive_context`` / ``metrics`` / ``data_quality_text`` 是提示词正文段的
+    输入（详见 ``llm/module_fingerprint.py``）：本函数只对**调用方已渲染好**的
+    同一实例取哈希，不自行渲染——两次渲染会让「进键的文本」与「进提示词的文本」
+    脱钩。
     """
     _inputs = ModuleFingerprintInputs(
         total_mv=total_mv,
@@ -136,6 +139,7 @@ def _compute_module_cache_info(
         us_indices=us_indices,
         competitive_context=competitive_context,
         metrics=metrics,
+        data_quality_text=data_quality_text,
     )
     fp_global_macro = global_macro_fingerprint(_inputs)
     fp_expert_review = expert_review_fingerprint(_inputs)
@@ -239,7 +243,7 @@ def _build_module_fns(
     pipeline_data: dict | None = None,
     competitive_context: str = "",
     metrics: dict | None = None,
-    degradation_events: list[dict] | None = None,
+    data_quality_text: str = "",
     history_data: dict | None = None,
 ) -> dict[str, Callable]:
     """构建 LLM 模块名称 → 生成函数闭包 的映射。
@@ -296,7 +300,7 @@ def _build_module_fns(
             http_client=c,
             llm_config=lc,
             pipeline_data=pipeline_data,
-            degradation_events=degradation_events,
+            data_quality_text=data_quality_text,
             history_data=history_data,
         ),
         "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
@@ -337,7 +341,7 @@ def _dispatch_llm_workers(
     holdings_data: list | None = None,
     penetrated_assets_for_news: list[dict] | None = None,
     metrics: dict | None = None,
-    degradation_events: list[dict] | None = None,
+    data_quality_text: str = "",
     comparison_indices: dict[str, str] | None = None,
     history_data: dict | None = None,
     _debate_info_container: list | None = None,
@@ -351,13 +355,15 @@ def _dispatch_llm_workers(
         competitive_context: 由调用方（``generate_all_llm``）渲染一次的竞争语境
             文本块，与其交给预检侧的**同一实例**——本函数不再自行渲染，
             否则进提示词的文本可能与进指纹的文本不同（缓存键与内容脱钩）。
+        data_quality_text: 同理由调用方渲染一次的数据质量详细状态块，同样与
+            预检侧共享同一实例（仅 health_check 提示词含该段）。
     """
     if not any(needs.values()):
         return {}
 
-    # 量化指标 + 降级事件传递
+    # 量化指标 + 数据质量块传递
     _metrics = metrics
-    _degradation_events = degradation_events
+    _data_quality_text = data_quality_text
 
     results_dict: dict[str, dict] = {}
     _label_map: dict[str, str] = get_llm_module_names()
@@ -421,7 +427,7 @@ def _dispatch_llm_workers(
         pipeline_data=pipeline_data,
         competitive_context=competitive_context,
         metrics=_metrics,
-        degradation_events=_degradation_events,
+        data_quality_text=_data_quality_text,
         history_data=history_data,
     )
 
@@ -558,7 +564,9 @@ def generate_all_llm(
         pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
         history_data: 组合历史走势数据字典（含风险指标）。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
-        degradation_events: DegradationTracker.get_log() 输出。
+        degradation_events: DegradationTracker.get_log() 输出。本函数将其渲染成数据质量
+            详细状态块**一次**，同一实例既进 health_check 指纹又进其提示词——否则
+            数据源恢复后仍会复用故障期间缓存的健康结论。
         comparison_indices: {代码: 名称} 对比指数池，用于竞争语境多指数对比。
 
     Returns:
@@ -582,6 +590,11 @@ def generate_all_llm(
         metrics=metrics,
     )
 
+    # ── 数据质量详细状态块：同样渲染**一次**，同一实例既进指纹（经预检）又进
+    #    health_check 提示词（经 worker 分发）。否则数据源故障期间生成的体检结论
+    #    会在源恢复后仍被复用——报告陈述与此刻事实相反，且不报错。 ──
+    data_quality_text = _build_data_quality_detail_block(degradation_events)
+
     cache_info = _compute_module_cache_info(
         llm_config,
         a_indices,
@@ -599,6 +612,7 @@ def generate_all_llm(
         pipeline_data=pipeline_data,
         competitive_context=competitive_context,
         metrics=metrics,
+        data_quality_text=data_quality_text,
     )
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
@@ -634,7 +648,7 @@ def generate_all_llm(
         sector_flow,
         pipeline_data=pipeline_data,
         metrics=metrics,
-        degradation_events=degradation_events,
+        data_quality_text=data_quality_text,
         comparison_indices=comparison_indices,
         history_data=history_data,
         _debate_info_container=_debate_info_container,

@@ -8,9 +8,10 @@
     history_data 而预检侧传了 → 两侧键永不同源、预检 read 永远落空）
   - 辩论增强后缀（conditional / qa_concentration）两侧同时生效
   - 不承接信号块的模块（穿透深度）不受 pipeline_data 影响
-  - **提示词覆盖**：竞争语境块与量化指标进了提示词就必须进指纹（否则键不变、
-    恒命中按旧数据算出的陈旧对比结论）；且只进「提示词确实包含该段」的模块
-    ——卫生检查/穿透深度的提示词不含它们，并入只是纯成本
+  - **提示词覆盖**：竞争语境块 / 量化指标 / 数据质量详细状态块进了提示词就必须
+    进指纹（否则键不变、恒命中按旧数据算出的陈旧结论——数据质量块尤其严重：
+    源恢复后仍复述故障）；且只进「提示词确实包含该段」的模块——卫生检查/穿透
+    深度的提示词不含对比块与指标，并入只是纯成本
   - 辩论三键的基础指纹同样覆盖其提示词内容，但不并入辩论提示词没有的段落
 
 运行：
@@ -47,6 +48,10 @@ _COMPETITIVE_BLOCK_CHANGED = "【今日对比】组合 +0.50% vs 沪深300 +1.42
 _METRICS = {"sharpe_ratio": 1.2, "calmar_ratio": 0.8, "annualized_volatility": 0.15, "max_drawdown": -0.10}
 _METRICS_CHANGED = {"sharpe_ratio": 2.4, "calmar_ratio": 1.6, "annualized_volatility": 0.31, "max_drawdown": -0.24}
 
+# 数据质量详细状态块（health_check 提示词第五维度）：**已渲染文本**
+_DQ_BLOCK = "【数据质量详细状态】\n连接失败: tencent(2次)\n触发降级: 2 次"
+_DQ_BLOCK_CHANGED = "【数据质量详细状态】\n数据为空: eastmoney(1次)"
+
 _TOTAL_MV = 100000.0
 _TOTAL_COST = 90000.0
 _TOTAL_PROFIT = 10000.0
@@ -65,6 +70,8 @@ _SCENARIOS: dict[str, dict] = {
     "competitive_block_with_history": {"competitive_context": _COMPETITIVE_BLOCK, "history_data": _HISTORY},
     "metrics": {"metrics": _METRICS},
     "metrics_changed": {"metrics": _METRICS_CHANGED},
+    "data_quality_block": {"data_quality_text": _DQ_BLOCK},
+    "data_quality_block_changed": {"data_quality_text": _DQ_BLOCK_CHANGED},
 }
 
 
@@ -78,6 +85,7 @@ def _precheck_info(
     pipeline_data=None,
     competitive_context: str = "",
     metrics=None,
+    data_quality_text: str = "",
 ) -> dict[str, dict]:
     """调用预检侧拿到各模块缓存信息（与生产同一入口）。"""
     return _compute_module_cache_info(
@@ -97,6 +105,7 @@ def _precheck_info(
         pipeline_data=pipeline_data,
         competitive_context=competitive_context,
         metrics=metrics,
+        data_quality_text=data_quality_text,
     )
 
 
@@ -106,12 +115,13 @@ def _write_kwargs(
     pipeline_data=None,
     competitive_context: str = "",
     metrics=None,
+    data_quality_text: str = "",
 ) -> dict:
     """按模块签名构造写侧生成函数的实参。
 
     竞争语境块只传给提示词确实包含它的模块（全球政经局势 / 智囊团复盘），
-    量化指标只给智囊团复盘；其余模块的生成函数没有这两个形参——它们不进提示词，
-    也就不该进指纹。
+    量化指标只给智囊团复盘，数据质量块只给持仓体检；其余模块的生成函数没有
+    这些形参——它们不进提示词，也就不该进指纹。
     """
     if module_key == "global_macro":
         kwargs = {
@@ -141,6 +151,8 @@ def _write_kwargs(
         kwargs["competitive_context"] = competitive_context
     if module_key == "expert_review":
         kwargs["metrics"] = metrics
+    if module_key == "health_check":
+        kwargs["data_quality_text"] = data_quality_text
     return kwargs
 
 
@@ -150,6 +162,7 @@ def _write_fingerprint(
     pipeline_data=None,
     competitive_context: str = "",
     metrics=None,
+    data_quality_text: str = "",
 ) -> str:
     """调用写侧生成函数并取回其指纹闭包输出（skeleton 入口被 mock，不触网）。"""
     generator_fn = {
@@ -160,7 +173,9 @@ def _write_fingerprint(
     }[module_key]
     with patch.object(generators, "generate_llm_module") as mock_gen:
         mock_gen.return_value = ("内容", False)
-        generator_fn(**_write_kwargs(module_key, history_data, pipeline_data, competitive_context, metrics))
+        generator_fn(
+            **_write_kwargs(module_key, history_data, pipeline_data, competitive_context, metrics, data_quality_text)
+        )
     return mock_gen.call_args.kwargs["fingerprint_fn"]()
 
 
@@ -211,11 +226,13 @@ def test_precheck_key_equals_write_key(module_key: str, scenario: str):
     pipeline_data = spec.get("pipeline_data")
     competitive_context = spec.get("competitive_context", "")
     metrics = spec.get("metrics")
+    data_quality_text = spec.get("data_quality_text", "")
 
     expected = CACHE_PREFIX_LLM + (
-        f"{module_key}_{_write_fingerprint(module_key, history_data, pipeline_data, competitive_context, metrics)}"
+        f"{module_key}_"
+        f"{_write_fingerprint(module_key, history_data, pipeline_data, competitive_context, metrics, data_quality_text)}"
     )
-    actual = _precheck_info(history_data, pipeline_data, competitive_context, metrics)[module_key]["key"]
+    actual = _precheck_info(history_data, pipeline_data, competitive_context, metrics, data_quality_text)[module_key]["key"]
 
     assert actual == expected, f"{module_key} / {scenario}：预检键与写侧键不同源 → 预检永不命中"
 
@@ -321,6 +338,38 @@ def test_competitive_block_enters_precheck_key_not_only_write_side():
     changed = _precheck_info(competitive_context=_COMPETITIVE_BLOCK_CHANGED)["expert_review"]["key"]
 
     assert baseline != changed, "预检侧未随竞争语境块换键"
+
+
+def test_data_quality_block_enters_health_check_fingerprint():
+    """数据质量块内容变化 ⇒ 持仓体检指纹随之变化。
+
+    否则「源故障期间生成并缓存、随后恢复」时持仓未变故键不变，预检命中旧键、
+    复用陈述与此刻事实相反的故障结论——报告出错却不报错。
+    """
+    baseline = _write_fingerprint("health_check", data_quality_text=_DQ_BLOCK)
+    changed = _write_fingerprint("health_check", data_quality_text=_DQ_BLOCK_CHANGED)
+    empty = _write_fingerprint("health_check")
+
+    assert baseline != changed, "数据质量块变化未换键 → 会复用陈述故障的陈旧体检结论"
+    assert baseline != empty, "数据质量块未进入指纹"
+
+
+@pytest.mark.parametrize("module_key", ("global_macro", "expert_review", "penetration_deep"))
+def test_data_quality_block_ignored_without_block_in_prompt(module_key: str):
+    """提示词不含数据质量块的模块，指纹不随其变化（并入即纯成本失效）。
+
+    数据质量块是**每次运行**的数据源画像，且 ``record()`` 在真实取数路径上无条件
+    触发，故恒非空；把它并入不含该段的模块只会让这些模块每份报告必 miss。
+    """
+    assert _write_fingerprint(module_key, data_quality_text=_DQ_BLOCK) == _write_fingerprint(module_key)
+
+
+def test_data_quality_block_enters_precheck_key_not_only_write_side():
+    """预检侧同样随数据质量块换键——只改写侧会让预检恒命中旧键。"""
+    baseline = _precheck_info(data_quality_text=_DQ_BLOCK)["health_check"]["key"]
+    changed = _precheck_info(data_quality_text=_DQ_BLOCK_CHANGED)["health_check"]["key"]
+
+    assert baseline != changed, "预检侧未随数据质量块换键"
 
 
 # ═══════════════════════════════════════════════════════════════

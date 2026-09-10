@@ -554,6 +554,73 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         )
 
 
+class TestDataQualityBlockRenderedOnce(unittest.TestCase):
+    """数据质量详细状态块：每次运行只渲染一次，且进指纹的实例与进提示词的实例是同一个。
+
+    health_check 的提示词含【数据质量详细状态】段（由 ``degradation_events`` 渲染），
+    而模块缓存键由指纹决定。若「进键的文本」与「进提示词的文本」来自两次独立渲染，
+    两侧就只能靠纪律对齐——渲染器一改而指纹不动，缓存键就与内容脱钩，预检命中旧键后
+    直接复用按旧降级事件算出的健康结论（源已恢复、报告仍称其失败）。故以哨兵字符串
+    锁定「同一实例」。
+    """
+
+    _SENTINEL = "【数据质量详细状态】哨兵块-用于锁定同一实例"
+
+    def test_block_rendered_once_and_shared_by_fingerprint_and_prompt(self) -> None:
+        from src.python.llm import generators_orchestrator as orch
+
+        rendered: list[str] = []
+
+        def _fake_render(*_args, **_kwargs):
+            rendered.append(self._SENTINEL)
+            return self._SENTINEL
+
+        llm_config = {
+            "enabled_llm": {
+                "global_macro": False,
+                "expert_review": False,
+                "health_check": True,
+                "penetration_deep": False,
+            }
+        }
+        with (
+            patch.object(orch, "get_llm_config", return_value=llm_config),
+            patch.object(orch, "_build_competitive_context_block", return_value=""),
+            patch.object(orch, "_build_data_quality_detail_block", side_effect=_fake_render),
+            patch.object(orch, "_compute_module_cache_info", wraps=orch._compute_module_cache_info) as mock_info,
+            patch.object(orch, "generate_health_check", return_value=("<p>体检</p>", False)) as mock_health,
+            patch.object(orch, "ThreadPoolExecutor", new=SynchronousExecutor),
+            patch.object(orch, "make_http_client", return_value=MagicMock()),
+        ):
+            generate_all_llm(
+                [],
+                [],
+                100000.0,
+                90000.0,
+                10000.0,
+                500.0,
+                1,
+                {"股票": 100000.0},
+                force=True,
+                degradation_events=[{"source_key": "tencent", "failure_type": "unreachable", "degraded": True}],
+            )
+
+        self.assertEqual(len(rendered), 1, "数据质量块被渲染了多次 → 两侧可能各渲染一份")
+
+        # 预检侧（进指纹）拿到的实例
+        self.assertIs(
+            mock_info.call_args.kwargs["data_quality_text"],
+            self._SENTINEL,
+            "预检侧的数据质量块不是本次渲染的实例 → 指纹与提示词可能脱钩",
+        )
+        # 写侧（进提示词）拿到的实例
+        self.assertIs(
+            mock_health.call_args.kwargs["data_quality_text"],
+            self._SENTINEL,
+            "health_check 提示词收到的数据质量块与预检侧不是同一实例",
+        )
+
+
 class TestCompetitiveContextRenderedOnce(unittest.TestCase):
     """竞争语境块：每次运行只渲染一次，且进指纹的实例与进提示词的实例是同一个。
 
