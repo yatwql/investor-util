@@ -71,6 +71,16 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "enable_interactive_charts": True,
     # ── 决策跨期反思闭环（实验功能，默认关闭） ──
     "decision_reflection": False,
+    # ── 信号预消化（实验功能，默认关闭） ──
+    "signal_pre_digest": False,
+    # ── 模块级质量分级（实验功能，默认关闭） ──
+    "module_quality_gate": False,
+    # ── 决策头结构化（实验功能，默认关闭） ──
+    "decision_header_parse": False,
+    # ── 确定性数值信号沉淀（实验功能，默认关闭） ──
+    "signal_ledger": False,
+    # ── 系统自检（实验功能，默认关闭） ──
+    "doctor_check": False,
 }
 
 # ── 实验性功能定义 ──────────────────────────────────────────
@@ -84,6 +94,26 @@ EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
     "decision_reflection": (
         "决策跨期反思闭环",
         "登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词",
+    ),
+    "signal_pre_digest": (
+        "信号预消化",
+        "市场温度/估值分位/尾部风险预消化为带方向标注的信号行注入复盘与体检提示词",
+    ),
+    "module_quality_gate": (
+        "模块级质量分级",
+        "按完整性/一致性给各 LLM 模块输出评 A~F 级，低评级随内容头部标注质量提示（不阻断不重试）",
+    ),
+    "decision_header_parse": (
+        "决策头结构化",
+        "提示词追加受控 JSON 决策头，抽取优先读结构化、失败回落确定性表格解析（决策词归一，防写反方向）",
+    ),
+    "signal_ledger": (
+        "确定性信号沉淀",
+        "确定性算法评级（温度/估值/尾部风险/风格/再平衡超限）沉淀为带实时-非实时标签的账本，统计默认只算实时",
+    ),
+    "doctor_check": (
+        "系统自检",
+        "一键体检运行环境/配置/目录/数据源，失败项附修复建议（doctor 命令、TUI 菜单 D、Web 运行状态区）",
     ),
 }
 

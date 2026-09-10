@@ -39,6 +39,7 @@ from src.python.llm.prompts import (
 )
 from src.python.config.features import is_feature_enabled
 from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
+from src.python.core.decision_header import structured_header_cache_suffix
 from src.python.llm._hallucination_filter import _filter_hallucinated_codes
 from src.python.llm.skeleton import generate_llm_module
 
@@ -180,6 +181,10 @@ def generate_expert_review(
     _fp_suffix = _build_feature_suffix()
     _enable_conditional = "c" in _fp_suffix
     _enable_qa_concentration = "q" in _fp_suffix
+    _enable_signal_digest = is_feature_enabled("signal_pre_digest")
+    # 结构化决策头（decision_header_parse）：开关判定收敛在 suffix 函数内，
+    # 预检闭包同调同一函数保证读写键同源；关闭 → "" 且不追加提示词契约段。
+    _structured_suffix = structured_header_cache_suffix()
     _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
 
     def _fingerprint():
@@ -220,6 +225,8 @@ def generate_expert_review(
             enable_conditional=_enable_conditional,
             enable_qa_concentration=_enable_qa_concentration,
             industry_concentration=_industry_conc,
+            enable_signal_digest=_enable_signal_digest,
+            enable_structured_header=bool(_structured_suffix),
         )
 
     return generate_llm_module(

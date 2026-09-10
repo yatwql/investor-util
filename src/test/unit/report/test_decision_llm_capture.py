@@ -91,7 +91,20 @@ class TestIterAndParseRows:
         assert row["magnitude"] == "mid"
 
     def test_unrecognized_operation_skipped(self):
-        assert cap._parse_table_row("| 🔴 高 | 600900 长江电力 | 观望 | 理由 |") is None
+        # 词表外动词（方向二义，刻意不收）→ 整行无效，不登记
+        assert cap._parse_table_row("| 🔴 高 | 600900 长江电力 | 止盈 | 理由 |") is None
+        assert cap._parse_table_row("| 🔴 高 | 600900 长江电力 | 调仓 | 理由 |") is None
+
+    def test_flat_extended_word_parsed_as_neutral(self):
+        # 扩展词观望 → 中性（0），可解析但不具方向语义（登记侧剔除）
+        row = cap._parse_table_row("| 🔴 高 | 600900 长江电力 | 观望 | 理由 |")
+        assert row is not None and row["direction"] == dl.DIRECTION_FLAT
+
+    def test_negated_operation_parsed_as_unknown(self):
+        # 否定语境 → 判不出方向（防「不建议加仓」被写成 +1 污染账本）
+        assert cap._parse_table_row("| 🔴 高 | 600900 长江电力 | 不建议加仓 | 理由 |") is None
+        # 二义词同句 → 不猜
+        assert cap._parse_table_row("| 🔴 高 | 600900 长江电力 | 加仓或减仓 | 理由 |") is None
 
     def test_no_code_row_skipped(self):
         # 表头行有「品种」列但无 code → 跳过（已在 header 用例验证）；此处验证理由含代码不影响
@@ -165,6 +178,84 @@ class TestExtract:
         )
         rows = cap.extract_llm_decisions(html, _HOLDINGS)
         assert _ids_for(rows) == ["561910"]
+
+
+class TestRegressionMisleadingRows:
+    """缺陷回归：误导性操作格不得被写成方向（子串包含时代的静默误判）。"""
+
+    def test_negated_add_not_registered(self):
+        html = _HTML_HEADER + "<p>| 🔴 高 | 561910 招商中证电池主题ETF | 不建议加仓 | 估值偏高 |</p>"
+        assert cap.extract_llm_decisions(html, _HOLDINGS) == []
+
+    def test_ambiguous_add_or_cut_not_registered(self):
+        html = _HTML_HEADER + "<p>| 🔴 高 | 561910 招商中证电池主题ETF | 加仓或减仓 | 视行情 |</p>"
+        assert cap.extract_llm_decisions(html, _HOLDINGS) == []
+
+    def test_negated_cut_not_registered(self):
+        html = _HTML_HEADER + "<p>| 🔴 高 | 561910 招商中证电池主题ETF | 暂不减仓 | 继续观察 |</p>"
+        assert cap.extract_llm_decisions(html, _HOLDINGS) == []
+
+    def test_extended_word_still_registered(self):
+        # 扩展词（清仓/增持）语义单向 → 正常登记
+        html = _HTML_HEADER + "<p>| 🔴 高 | 561910 招商中证电池主题ETF | 清仓 | 逻辑破坏 |</p>"
+        rows = cap.extract_llm_decisions(html, _HOLDINGS)
+        assert _ids_for(rows) == ["561910"]
+        assert rows[0]["direction"] == dl.DIRECTION_SHORT
+
+
+class TestStructuredHeader:
+    """结构化决策头（实验项 decision_header_parse）优先 + 表格兜底。"""
+
+    @pytest.fixture(autouse=True)
+    def _enable_structured(self):
+        set_feature_enabled("decision_header_parse", True)
+        yield
+
+    def test_structured_takes_priority(self):
+        # 表行给「减仓」，决策头给「加仓」→ 以结构化头为准
+        html = _HTML_HEADER + (
+            "<p>| 🔴 高 | 561910 招商中证电池主题ETF | 减仓 | 负收益 |</p>"
+            '<p>决策头：{"decisions":[{"code":"561910","action":"加仓","priority":"高"}]}</p>'
+        )
+        rows = cap.extract_llm_decisions(html, _HOLDINGS)
+        assert _ids_for(rows) == ["561910"]
+        assert rows[0]["direction"] == dl.DIRECTION_LONG
+
+    def test_malformed_header_falls_back_to_table(self):
+        html = _HTML_HEADER + (
+            "<p>| 🔴 高 | 561910 招商中证电池主题ETF | 减仓 | 负收益 |</p><p>决策头：{不是合法 JSON</p>"
+        )
+        rows = cap.extract_llm_decisions(html, _HOLDINGS)
+        assert _ids_for(rows) == ["561910"]
+        assert rows[0]["direction"] == dl.DIRECTION_SHORT
+
+    def test_empty_decisions_falls_back_to_table(self):
+        html = _HTML_HEADER + (
+            '<p>| 🔴 高 | 561910 招商中证电池主题ETF | 减仓 | 负收益 |</p><p>决策头：{"decisions":[]}</p>'
+        )
+        rows = cap.extract_llm_decisions(html, _HOLDINGS)
+        assert _ids_for(rows) == ["561910"]
+
+    def test_invalid_action_dropped_whole_batch_malformed(self):
+        # 词表外 action（原样透传的反面）→ 丢弃该条；全批不可用 → 回落表格
+        html = _HTML_HEADER + (
+            "<p>| 🟢 低 | 600900 长江电力 | 加仓 | 分红稳定 |</p>"
+            '<p>决策头：{"decisions":[{"code":"561910","action":"可能减仓","priority":"高"}]}</p>'
+        )
+        rows = cap.extract_llm_decisions(html, _HOLDINGS)
+        # 结构化头里没有合法条目 → 整批不可用 → 表格兜底（长江电力加仓）
+        assert _ids_for(rows) == ["600900"]
+        assert rows[0]["direction"] == dl.DIRECTION_LONG
+
+    def test_flag_off_ignores_header(self):
+        reset_feature_flags()
+        set_feature_enabled("decision_reflection", True)
+        html = _HTML_HEADER + (
+            "<p>| 🔴 高 | 561910 招商中证电池主题ETF | 减仓 | 负收益 |</p>"
+            '<p>决策头：{"decisions":[{"code":"561910","action":"加仓","priority":"高"}]}</p>'
+        )
+        rows = cap.extract_llm_decisions(html, _HOLDINGS)
+        assert rows[0]["direction"] == dl.DIRECTION_SHORT  # 开关关闭 → 走表格
 
 
 class TestRegister:

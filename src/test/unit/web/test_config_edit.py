@@ -74,6 +74,11 @@ _EXPECTED_WHITELIST = {
     "llm_debate_conditional",
     "llm_debate_qa_concentration",
     "decision_reflection",
+    "signal_pre_digest",
+    "module_quality_gate",
+    "decision_header_parse",
+    "signal_ledger",
+    "doctor_check",
 }
 
 
@@ -164,12 +169,17 @@ class TestGetSurface:
             "news_correlation",
         }
         assert data["llm"]["hidden_modules"] == ["debate_pro", "debate_con", "debate_synthesis"]
-        # 实验性功能面 = 注册表全集（3 辩论 + 决策跨期反思闭环），默认全关
+        # 实验性功能面 = 注册表全集，默认全关
         assert set(data["llm"]["experiments"]) == {
             "llm_debate_procon",
             "llm_debate_conditional",
             "llm_debate_qa_concentration",
             "decision_reflection",
+            "signal_pre_digest",
+            "module_quality_gate",
+            "decision_header_parse",
+            "signal_ledger",
+            "doctor_check",
         }
         assert all(v is False for v in data["llm"]["experiments"].values())
 
