@@ -680,7 +680,8 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 ```
 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
-- 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-flash`（DeepSeek-V4.1-Flash 正式模型名，2026-09-10 发布，与前者同价）、`deepseek-chat`（V3，功能受限）
+- 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-flash`（DeepSeek-V4.1-Flash 正式模型名，2026-09-10 发布，与前者同价）
+- **已停用模型名**：`deepseek-chat` / `deepseek-reasoner` 是 flash 系列非思考 / 思考模式的兼容别名（**不是**独立的 V3 模型），已于 2026-07-24 下线，端点不再接受——新配置请改用 `deepseek-flash`。旧名仍留在 `MODEL_PRICING` 中仅为让停用前产生的历史调用能算出费用
 - **注意**：`deepseek-v4-pro` 于 2026-09-14 12:00（北京时间）下线，在此之前请求自动路由到 V4.1-Flash 并按 V4.1-Flash 单价计费；`deepseek-v4-flash` 与 `deepseek-v4-flash-vision-exp` 底层模型同样由 V4.1-Flash 接管，价格不变。费用估算以 `core/constants.py` 的 `MODEL_PRICING` 为准
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
@@ -803,14 +804,15 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 | `gpt-4o` | 2.50 | 10.00 | 2.50 | OpenAI 主力（缓存无折扣） |
 | `gpt-4o-mini` | 0.15 | 0.60 | 0.15 | OpenAI 轻量（缓存无折扣） |
 | `deepseek-v4-flash` | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | ⭐ 高性价比推荐，默认模型（峰谷定价，闲时/高峰；2026-09-10 降价） |
+| `deepseek-flash` | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | DeepSeek-V4.1-Flash 正式模型名（2026-09-10 发布，与 v4-flash 同价同底层） |
 | `deepseek-v4-pro` | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | DeepSeek 增强推理（峰谷定价，闲时/高峰） |
-| `deepseek-chat` | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | DeepSeek V3（峰谷定价，闲时/高峰） |
+| `deepseek-chat` / `deepseek-reasoner` | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | **已停用别名**（flash 系列非思考 / 思考模式的兼容名，2026-07-24 下线，端点不再接受；保留单价仅为历史记录计费） |
 | `gemini-3.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 新一代（可选） |
 | `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比（代码默认） |
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
 | `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
 
-> **峰谷定价（DeepSeek）**：`deepseek-v4-*` 三个模型采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 v4-flash 降价），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在工作日（周一至周五）生效**，为**北京时间 09:00–12:00、14:00–18:00**；工作日其余时间为闲时、**周末（周六/周日）全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` 中覆盖；含 `"peak"` 子段的模型工作日高峰时段按 `peak` 价计费，其余时段（含周末全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
+> **峰谷定价（DeepSeek）**：`deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` / `deepseek-reasoner` 采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 flash 系列降价），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在工作日（周一至周五）生效**，为**北京时间 09:00–12:00、14:00–18:00**；工作日其余时间为闲时、**周末（周六/周日）全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` 中覆盖；含 `"peak"` 子段的模型工作日高峰时段按 `peak` 价计费，其余时段（含周末全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
 >
 > **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash 工作日闲时/周末：输入 3000 tokens × ¥1.0 + 输出 2000 tokens × ¥4.0 = ¥0.011/次（工作日高峰时段则 ×2、×8）。缓存命中时输入部分按 `input_cache_hit` 计费。
 >

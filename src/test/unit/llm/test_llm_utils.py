@@ -483,9 +483,52 @@ class TestPricing(unittest.TestCase):
         self.assertEqual(cost_peak, "¥0.040")
         self.assertEqual(cost_idle, "¥0.020")
 
+    def test_retired_flash_aliases_billed_as_flash_series(self) -> None:
+        """已停用别名 deepseek-chat / deepseek-reasoner 与 flash 系列同价（闲时与高峰两段）。
+
+        二者分别是 v4-flash 的非思考 / 思考模式别名（2026-07-24 下线）。条目保留而非
+        删除，是为了让停用前产生的历史调用仍能算出金额——删条目会让这些记录一律显示
+        "-"，把「模型确实存在过」的历史费用变成不可读。锁定「模型名 → 单价」可防止
+        误改单价导致费用估算整体偏移。
+        """
+        reference_idle = estimate_cost("deepseek-flash", 1_000_000, 1_000_000, at_time=self._IDLE_TIME)
+        reference_peak = estimate_cost("deepseek-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
+        self.assertEqual(reference_idle, "¥5.000")
+        self.assertEqual(reference_peak, "¥10.000")
+        for alias in ("deepseek-chat", "deepseek-reasoner"):
+            self.assertEqual(
+                estimate_cost(alias, 1_000_000, 1_000_000, at_time=self._IDLE_TIME),
+                reference_idle,
+            )
+            self.assertEqual(
+                estimate_cost(alias, 1_000_000, 1_000_000, at_time=self._PEAK_TIME),
+                reference_peak,
+            )
+
+    def test_retired_alias_cache_hit_rate_follows_flash_series(self) -> None:
+        """别名条目须带缓存命中价（闲时 0.02）——缺该字段会回落为 input 价，高估约 50 倍。"""
+        for alias in ("deepseek-chat", "deepseek-reasoner"):
+            self.assertEqual(
+                estimate_cost(
+                    alias,
+                    1_000_000,
+                    0,
+                    cache_hit_input_tokens=1_000_000,
+                    at_time=self._IDLE_TIME,
+                ),
+                "¥0.020",
+            )
+
     def test_pricing_merged_has_defaults(self) -> None:
         """PRICING_MERGED 应包含所有内置模型。"""
-        for model in ("deepseek-flash", "deepseek-v4-flash", "claude-sonnet-4-6", "gpt-4o"):
+        for model in (
+            "deepseek-flash",
+            "deepseek-v4-flash",
+            "deepseek-chat",
+            "deepseek-reasoner",
+            "claude-sonnet-4-6",
+            "gpt-4o",
+        ):
             self.assertIn(model, PRICING_MERGED)
 
     def test_currency_symbols(self) -> None:

@@ -183,6 +183,7 @@ _MODEL_LINE_RE = re.compile(r"模型[：:]\s*([^|<\s][^|]*)")
 
 
 # ── Extended Thinking 模型兼容性名单 ──
+# 含已停用别名 deepseek-chat（同下方推理族名单的保留理由：存量配置/兼容端点仍可能用）。
 
 _THINKING_SUPPORTED_PREFIXES = (
     "claude-sonnet-4",
@@ -199,6 +200,9 @@ _THINKING_SUPPORTED_PREFIXES = (
 # deepseek-flash 是 DeepSeek 新一代 Flash 的正式模型名，与它接管的 deepseek-v4-flash
 # 同属强制推理族——漏登记会让「未开启 thinking 时显式禁用」的安全网失效，请求落入
 # 默认思考模式占满 max_tokens 而无正文。
+# deepseek-chat 为 flash 系列的**已停用别名**（详见 constants.py MODEL_PRICING），
+# 保留在推理族名单中是刻意为之：未迁移的存量配置与第三方兼容端点仍可能发出该模型名，
+# 命中名单才能照旧施加「显式禁用思考」安全网，而不是让其落入默认思考模式。
 _THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-flash", "deepseek-v4-", "deepseek-chat")
 
 
