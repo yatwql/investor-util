@@ -6,6 +6,12 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 死代码清理：未接线的股息率取值（自审 rf-332）（2026-09-10）
+
+- **缺陷（自审 rf-332）**：`analysis/metrics_risk.py::get_dividend_yield` 在全仓（`src/`、测试、模板、文档）**零调用点**——自早期量化指标体系引入后未接入任何报告章节、LLM 提示词或纪律判定，仅由 `analysis/metrics.py` 与 `analysis/__init__.py` 两层 `__all__` 转出，形成「看起来是公共能力、实则从不执行」的假接口。更实际的问题是它**按早期缓存键契约取数**（`dividend_{code}` / `price_{code}` + `item.get("year"/"dividend"/"cash_dividend")` 多形态猜测），保留即保留一份与现行情链路无关的取数路径——将来误接时不会报错，只会静默拿到空值。
+- **改动**：删除 `get_dividend_yield` 函数体与其在 `metrics_risk.__all__`、`metrics.py`（导入 + `__all__` + 模块 docstring 清单）、`analysis/__init__.py`（导入 + `__all__`）三处导出。报告中的股息信息另由持仓/流水链路（`compute_dividend_totals`）承担，不受影响。
+- **测试**：全量单元/场景测试无一处引用该名（删除后 `src/test/unit/analysis` 全绿），不新增用例——死代码的验收标准即「删除后无回归」。
+
 ### 开发版本切换（2026-09-10）
 
 - 发布 v0.10.17 后，APP_VERSION 与全部管理文档版本头切换至 v0.10.18-dev。

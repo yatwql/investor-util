@@ -23,7 +23,6 @@
   win_rate(holdings) -> dict
   turnover_rate(holdings_before, holdings_after) → float | None
   risk_contribution(weights, volatilities) → list[dict]
-  get_dividend_yield(code) → float | None
   compute_all_metrics(...) → dict
   sanitize_metric(value) → float | None
   truncate_extreme_values(series) → list[float]
@@ -54,7 +53,6 @@ from src.python.analysis.metrics_returns import (  # noqa: F401
     truncate_extreme_values,
 )
 from src.python.analysis.metrics_risk import (  # noqa: F401
-    get_dividend_yield,
     hhi,
     individual_volatility,
     portfolio_beta,
@@ -77,7 +75,6 @@ __all__ = [
     "win_rate",
     "turnover_rate",
     "risk_contribution",
-    "get_dividend_yield",
     "compute_all_metrics",
     "sanitize_metric",
     "individual_volatility",
