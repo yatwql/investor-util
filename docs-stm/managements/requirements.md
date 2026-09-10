@@ -851,7 +851,7 @@ LLM 五维度量化评分，每项满分 100：
 | R-LLM-04 | Provider 不可用时自动按策略递补下一备选 Provider，全链失败时降级占位文本 |
 | R-LLM-05 | 所有 LLM 模块的 API 调用量（Token、费用、模块明细）需在报告中统计展示 |
 | R-LLM-06 | Multi-Provider Chain 支持 4 种切换策略：priority（优先级排序）、weighted（加权随机）、cost_first（价格最低优先）、fallback_only（仅主 provider 失败时切换，等价于 priority）。`proxy_preferred` 为 per-provider 后处理标记，不属策略 |
-| R-LLM-07 | 敏感凭据（api_key、model、endpoint）必须与 Provider 路由配置分离存储到 llm_key.json，通过 credentials_ref 引用，Provider 路由配置存于 llm_providers.json |
+| R-LLM-07 | 凭据（api_key）**只**存放于 `llm_key.json` 的凭据块，Provider 路由配置（`llm_providers.json`）必须经 `credentials_ref` 引用，不得内联 `api_key`——出现非空内联值时该条目校验不通过并被跳过并给出可执行修正提示；`model`/`endpoint` 作为非敏感路由字段可写在路由条目中并按条目优先覆盖凭据块同名值，条目缺省时取值于凭据块 |
 | R-LLM-08 | 各 Provider 的失败原因（API 错误 / 超时 / 网络异常等）需追踪记录，在报告中按模块展示失败明细 |
 
 ### 7.2 全球政经局势
@@ -1211,9 +1211,9 @@ LLM 五维度量化评分，每项满分 100：
 |:-----|:----:|:----:|:------:|:-----|
 | `name` | str | ✅ | — | 唯一标识名称，用于引用和日志 |
 | `provider` | str | ✅ | — | Provider 类型：`claude` / `openai` / `gemini` |
-| `credentials_ref` | str | ✅* | — | 引用 `llm_key.json` 中的凭据块名（*与内联 api_key/model 二选一） |
-| `api_key` | str | △ | — | 内联 API 密钥（仅当 credentials_ref 未指定时必填；与 credentials_ref 互斥） |
-| `model` | str | △ | — | 内联模型名（同上） |
+| `credentials_ref` | str | ✅ | — | 引用 `llm_key.json` 中的凭据块名——**凭据的唯一合法来源，必填**；缺失、非字符串或纯空白时该条目校验不通过并被跳过 |
+| `api_key` | str | — | — | **禁止出现在本文件**（凭据分离：本文件受版本控制）。出现非空值时该条目校验不通过并被跳过，提示将密钥写入 `llm_key.json` 的凭据块后以 `credentials_ref` 引用 |
+| `model` | str | — | — | 可选的非敏感路由覆盖；与凭据块同名键同名时**本条目的值优先**，缺省（或空白）时取凭据块的值 |
 | `endpoint` | str | — | 各 Provider 默认值 | 端点 URL 覆盖 |
 | `priority` | int | — | 99 | 优先级（数值越小优先级越高），priority 策略使用 |
 | `weight` | int | — | 1 | 权重值，weighted 策略使用 |

@@ -425,6 +425,7 @@ investor-util/
 │       │   │   ├── test_cache_core.py       #   缓存核心功能测试（含 TTL/目录/常量）
 │       │   │   ├── test_cache_cleanup.py    #   缓存清理与统计测试
 │       │   │   ├── test_cache_format.py     #   缓存格式测试
+│       │   │   ├── test_atomic_write.py     #   原子写入原语（新建/覆盖/父目录创建/失败返回 False 且不抛/旧内容保留/临时文件不残留/Windows 占用回退）
 │       │   │   ├── test_cache_edge.py       #   缓存边缘场景测试
 │       │   │   ├── test_circuit_breaker_gateway.py #   统一熔断网关（Provider/LLM/指标三路聚合）
 │       │   │   ├── test_check_sources.py    #   数据源健康检查（整体耗时预算/慢源超时/竞态兜底）

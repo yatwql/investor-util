@@ -6,6 +6,21 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 管理文档与用户文档同步（架构约束判据回填 + 台账刷新）（2026-09-10）
+
+- **架构设计约束表判据回填**（`technical.md` §架构设计约束，5 行）：本次自审暴露的共性是「规则只有口号、没有可操作判据」，逐条补判据与适用范围：
+  - 代码类型判定中心化 —— 适用范围覆盖「按代码前缀分类资产类型」与「判定代码是否合法」两类判定，点名 `config/`、`report/` 同在范围内（本次违规正落在这两处）。
+  - Provider Chain 必经 —— 适用范围补「report/ 与 analysis/ 层取估值/行业等外部数据必须经 fetcher 网关入口（`fetcher/industry.py::fetch_valuation_fields`），不得 import `providers.*` 直连」。
+  - 报告序号与显示名不可硬编码 —— 规则拆为两张注册表各自点名（章节顺序/可见性取 `_REPORT_SECTION_DEFAULT`，页签显示名取 `_REPORT_SHEET_NAMES`，页签名一律经 `get_report_sheet_name()` 取用）；违反后果补「配置里一个名、页签上另一个名」的漂移形态；适用范围补 `fund_style_classify.py` 等写入层。
+  - LLM 模块注册 —— 补「注册项必须有真实调用方」「模块配置项与显示名同样由中央注册表提供，不在别处建副本」；违反后果补「无人调用的注册分支误导后续维护者按『已被编排』推断调度与并发行为」与「统计口径把未编排项计入」。
+  - LLM 模块缓存指纹唯一事实来源 —— 补覆盖判据「提示词正文里出现哪一段，对应入参就必须进指纹」，并说明辩论三键仅写侧使用、不进 `MODULE_FINGERPRINT_BUILDERS`，但构造同样由该模块提供、综合键须覆盖白脸/黑脸两段完整正文。
+- **自我审查台账**（`review-findings.md`）：新增「已解决待归档（v0.10.18-dev）」表登记 rf-322 ~ rf-335（一行一问题，处置详情指向本文件对应条目），编号源 `rf-next` 由 322 更新为 336。
+- **需求文档**（`requirements.md`）：`llm_providers.json` 的 Provider 条目字段表与 R-LLM-07 按凭据分离的现行实现校正——`credentials_ref` 为凭据唯一合法来源（必填，缺失/空白即跳过该条目）、`api_key` 禁止出现在该文件（非空即拒并给出迁移指引）、`model`/`endpoint` 为非敏感路由字段可按条目覆盖凭据块同名值。原表把内联 `api_key` 记为与 `credentials_ref` 二选一的合法形态，与实现不符。
+- **测试计划**（`testplan.md`）：「原子写入恢复」回归行补 `core/test_atomic_write.py` 的原语级用例清单（新建/覆盖/父目录创建/临时文件不残留/失败返回 False 且不抛并保留原内容/Windows 占用回退 rename）。
+- **开发者指南**（`developer-guide.md`）：「新增 LLM 模块检查清单」第 ④ 步现为「注册调度入口」并指名 `llm/generators_orchestrator.py` + `llm/module_fingerprint.py`，明确指纹不进 orchestrator、预检侧与写侧只允许调用同一构建函数；指纹说明段拆成两条——「提示词内容必须进指纹（唯一事实来源 `llm/module_fingerprint.py`，含竞争格局/数据质量文本/指标/`pipeline_data` 派生两段，且只进提示词实际含该段的模块）」与「实验开关改变提示词 → 同一后缀函数供两侧调用」。
+- **目录结构**（`folders.md`）：补 `src/test/unit/core/test_atomic_write.py` 行（原子写入原语用例），使目录树与仓库文件一致。
+- **留待发布刷新**：`test-coverage.md` 的模式/子标记计数是发布前由 `--mode bench --update-docs` 与 `collect-test-coverage.py` 回填的数据快照，本次未手改，避免与自动回填的模式表口径不一致（发布门禁统一刷新）。
+
 ### 指纹补齐提示词承载段与综合键全文口径（自审 rf-331）（2026-09-10）
 
 - **缺陷（自审 rf-331）**：指纹覆盖纪律要求「一次渲染、两侧共享；进了提示词的必须进指纹」。核查发现两处**键与提示词内容脱钩**，且都不报错、只表现为静默的陈旧结论：
@@ -18,10 +33,10 @@
 - **行为变更**：键形态变化，升级后首份报告的三处相关缓存（`expert_review` / `health_check` / 辩论三键）为一次性未命中重算，其后恢复正常命中。正常路径的报告内容无变化；变化只发生在「此前会命中陈旧结论」的场景。
 - **测试**：`test_module_fingerprint.py` 新增 7 例——`test_degradation_block_is_in_prompt_for_covered_modules`（前提校验：该块确实进了提示词，否则下述用例无的放矢）、`test_degradation_block_enters_fingerprint` / `test_diff_block_enters_fingerprint`（两模块参数化：事件集或环比内容变化必须换键，且与「无 pipeline_data」的基线不同）、`test_pipeline_blocks_ignored_without_block_in_prompt`（`global_macro` / `penetration_deep` 提示词不含该两段，指纹不得随之变化——反向防纯成本失效）、`test_pipeline_block_enters_precheck_key_not_only_write_side`（预检侧同样换键且与写侧逐字符同源）、`test_debate_fingerprint_covers_pipeline_blocks_in_its_prompt`、`test_debate_synthesis_fingerprint_covers_full_procon_text`（用例前提显式断言两段正文前 200 字符完全相同）、`test_debate_synthesis_fingerprint_covers_config_driven_prompt_text`（仅改情景描述、开关位不变也必须换键）；`test_debate_generators.py` 新增 `test_synthesis_fingerprint_covers_full_procon_text`——走**生产路径**（`generate_debate_procon` 三段 mock 后取第三段的 `fingerprint_fn`）而非直接调用指纹函数。共 10 例已用 `git stash` 还原旧实现验证转红。
 
-### pipeline_data 键台账回归三方一致（C19，自审 rf-328）（2026-09-10）
+### pipeline_data 键台账回归三方一致（自审 rf-328）（2026-09-10）
 
-- **缺陷（自审 rf-328）**：C19 要求 pipeline_data 的键必须先在附录 H（`technical.md` 的 Schema 台账）登记类型与写入/消费模块后才能使用。实际存在**三方漂移**——代码 `_PIPELINE_DATA_KNOWN_KEYS`、类型断言表 `_PIPELINE_DATA_TYPE_MAP`、附录 H 台账各说各话：
-  - `diff`（环比对比差异，9 键）**在两个代码清单里长期存在且被汇总 Excel δ 列、行动章环比上下文、LLM 环比提示词三处消费，却从未登记进附录 H**——台账漏登在用键，C19 的「先登记后使用」对它是空文；且因无台账可对照，其 9 键结构在文档里无处可查。
+- **缺陷（自审 rf-328）**：数据契约登记纪律要求 pipeline_data 的键必须先在附录 H（`technical.md` 的 Schema 台账）登记类型与写入/消费模块后才能使用。实际存在**三方漂移**——代码 `_PIPELINE_DATA_KNOWN_KEYS`、类型断言表 `_PIPELINE_DATA_TYPE_MAP`、附录 H 台账各说各话：
+  - `diff`（环比对比差异，9 键）**在两个代码清单里长期存在且被汇总 Excel δ 列、行动章环比上下文、LLM 环比提示词三处消费，却从未登记进附录 H**——台账漏登在用键，该纪律的「先登记后使用」对它是空文；且因无台账可对照，其 9 键结构在文档里无处可查。
   - `decision_review_data`（决策复盘区块）**反向漏登**：`report/_experimental_seams.py::record_llm_decisions_and_review_block` 往 pipeline_data 里写它，行动章（HTML 模板 + `action_sheet.py`）读它，但代码两份清单与附录 H **三处都没有**——写路径每次命中「包含未知键」告警，类型断言表也无从校验。
   - `portfolio_daily_returns`（组合日收益率）是**死键**：登记在代码两份清单里，但全仓无任何消费者（`history_data.daily_returns_portfolio` 由 `_full_risk_metrics` 直接读取，无需再投射为顶层键），且同样不在附录 H。
   - 附带：`pipeline_data_builder.py` 模块 docstring 与 `_validate_keys` 的告警文案都把登记处指向 `data-channels-schema.md`——该文件**只存在于 `docs-stm/archive/v0.7.x/`**，照着提示去登记的开发者找不到文件。
@@ -29,67 +44,67 @@
 - **行为变更**：① 实验功能「决策跨期反思闭环」开启时，写 `decision_review_data` 不再产生「未知键」WARNING（此前每轮报告固定刷一条噪音告警）；② `pipeline_data` 中不再出现永无消费者的 `portfolio_daily_returns`（`_snapshot.py`/`_full_risk_metrics.py` 的 `extra` 透传机制本身保留，其 docstring 由「如 risk_metrics」改为中性的「调用方 kwargs」以免继续暗示该键的存在）。报告输出无变化。
 - **测试**：`test_pipeline_data_builder.py` 新增 `TestSchemaRegisteredInAppendixH` 四例——`test_known_keys_documented_in_appendix_h` 与 `test_type_map_keys_documented_in_appendix_h` 从 `technical.md` 现场解析附录 H 表格键名，锁定「代码用键 ⊆ 台账登记键」（解析结果为空即视为台账标题/格式变更而失败，防台账被改格式后校验静默失效）；`test_decision_review_data_registered`（类型登记 + `build()` 注入无告警，用 `assertNoLogs`）与 `test_portfolio_daily_returns_is_not_a_pipeline_key`（死键不得复活）。四例均已验证还原旧实现后转红。
 
-### 凭据分离校验收紧为硬拒绝（C18，自审 rf-327）（2026-09-10）
+### 凭据分离校验收紧为硬拒绝（自审 rf-327）（2026-09-10）
 
-- **缺陷（自审 rf-327）**：`config/_llm_providers.py::_validate_provider_entry` 对「条目内联 `api_key`」的处理是**先校验必填、再告警放行**——无 `credentials_ref` 时把内联 `api_key`/`model` 当合法配置接受，仅在 `_parse_providers_list` 里记一条「建议迁移」的 WARNING 后照常进入运行期 provider 链。这与 C18 的字面要求不符：`llm_providers.json` **是版本控制内文件**（`.gitignore` 白名单放行，`git ls-files` 可证），内联 `api_key` 即「凭据随配置入库」，WARNING 级提示既拦不住误提交，也不改变已经发生的泄露。附带发现同一段逻辑的另一处**文档与实现不符**：`_llm_providers_defaults.py` 生成的模板注释邀请用户「按需修改 model / endpoint」，但 `_parse_providers_list` 在 `credentials_ref` 分支下**只透传 `credentials_ref`、丢弃 entry 级 `model`**——照模板改的 `model` 覆盖被静默忽略（`_resolve_entry_credentials` 里 entry 级优先的分支因此永收不到值），用户看到的是「改了没反应」。
+- **缺陷（自审 rf-327）**：`config/_llm_providers.py::_validate_provider_entry` 对「条目内联 `api_key`」的处理是**先校验必填、再告警放行**——无 `credentials_ref` 时把内联 `api_key`/`model` 当合法配置接受，仅在 `_parse_providers_list` 里记一条「建议迁移」的 WARNING 后照常进入运行期 provider 链。这与凭据分离约束的字面要求不符：`llm_providers.json` **是版本控制内文件**（`.gitignore` 白名单放行，`git ls-files` 可证），内联 `api_key` 即「凭据随配置入库」，WARNING 级提示既拦不住误提交，也不改变已经发生的泄露。附带发现同一段逻辑的另一处**文档与实现不符**：`_llm_providers_defaults.py` 生成的模板注释邀请用户「按需修改 model / endpoint」，但 `_parse_providers_list` 在 `credentials_ref` 分支下**只透传 `credentials_ref`、丢弃 entry 级 `model`**——照模板改的 `model` 覆盖被静默忽略（`_resolve_entry_credentials` 里 entry 级优先的分支因此永收不到值），用户看到的是「改了没反应」。
 - **改动**：
   - 校验层：内联 `api_key` **非空即拒**（不再是必填校验 + 放行），WARNING 文案直接给出迁移指引（移入 `llm_key.json` 凭据块 + 用 `credentials_ref` 引用）；`credentials_ref` 升为**必填**（唯一合法凭据来源）；`model` 由「无 ref 时必填」改为**始终可选**（凭据块可提供），仅校验类型不为非法；纯空白视同未设置，不因可选字段的空白拒收整条。
   - 解析层：`entry_dict` 恒写 `credentials_ref`；`model` 恢复透传（非空才写，空串会让 `_resolve_entry_credentials` 的 falsy 判断跳过凭据块同名值）——模板注释承诺的「按需修改 model」至此真正生效。
   - `llm/api.py::_resolve_entry_credentials` docstring 补「凭据来源边界」说明：`entry["api_key"]` 分支只服务运行期直接构造的内存条目，配置来源的条目永不带该键；llm_key.json 的单键 flat 格式也不走此分支（由 `get_llm_config()` 合并为顶层键走单 Provider 模式）。
 - **行为变更（需注意）**：① 内联 `api_key` 的条目由「告警后照常使用」变为**整条跳过**——若链中只剩该条，则该模块回落占位文本；② `credentials_ref` 缺失的条目同样被跳过；③ entry 级 `model` 覆盖**开始生效**（此前对 `credentials_ref` 条目无效）。已验证本仓 `data/config/llm_providers.json` 的实际条目均为 `credentials_ref` 形态、无内联 `api_key`，默认模板 `_llm_providers_defaults.py` 亦本就合规，故现有配置不受影响；旧内联配置的迁移路径见 `how-to-config-llm.md`。
-- **文档**：`llm-technical.md` §5.3 重写为「凭据分离的边界是 `api_key`，不是全部字段」——`model`/`endpoint` 属非敏感路由字段，可留在路由配置按条目覆盖，并列出「硬拒绝 + 必填 + entry 覆盖」三条规则与迁移步骤；调用链示意同步。`how-to-config-llm.md` 的「Provider 条目字段」表补 `model`/`endpoint` 两行（原表漏列 `model`，而旧实现下它还是条件必填），并加「不得内联 `api_key`」警示块。`technical.md` C18 约束行改为「`credentials_ref` 必填、内联 `api_key` 硬校验拒绝」，适用范围补 `config/_llm_providers.py`、`llm/api.py`。
+- **文档**：`llm-technical.md` §5.3 重写为「凭据分离的边界是 `api_key`，不是全部字段」——`model`/`endpoint` 属非敏感路由字段，可留在路由配置按条目覆盖，并列出「硬拒绝 + 必填 + entry 覆盖」三条规则与迁移步骤；调用链示意同步。`how-to-config-llm.md` 的「Provider 条目字段」表补 `model`/`endpoint` 两行（原表漏列 `model`，而旧实现下它还是条件必填），并加「不得内联 `api_key`」警示块。`technical.md` 凭据分离约束行改为「`credentials_ref` 必填、内联 `api_key` 硬校验拒绝」，适用范围补 `config/_llm_providers.py`、`llm/api.py`。
 - **测试**：`test_config_llm_multi.py` 相关用例整体迁移到 `credentials_ref` 形态，并把原 `test_api_key_stripped`（断言内联字段被保留供运行期读取）替换为三例：`test_inline_api_key_rejected`（内联条目不出现在运行期列表）、`test_model_carried_as_routing_override`（entry 级 model 覆盖被透传）、`test_blank_model_not_carried`（空串不写键）；`TestValidateProviderEntry` 的「缺 api_key / 缺 model 告警」两例替换为 `test_inline_api_key_rejected` / `test_missing_credentials_ref_errors` / `test_model_optional` / `test_empty_inline_api_key_no_warning`。已验证还原旧实现后其中 5 例转红。
 
-### LLM 模块显示名回归中央注册表（C9，自审 rf-330）（2026-09-10）
+### LLM 模块显示名回归中央注册表（模块注册一致性，自审 rf-330）（2026-09-10）
 
-- **缺陷（自审 rf-330）**：`config/_llm_settings_defaults.py` 自留一份模块显示名映射 `_MODULE_LABELS`（5 条：global_macro / expert_review / health_check / penetration_deep / news_correlation），与 `core/registry.py::get_llm_module_names()`（8 条，多出 debate_pro / debate_con / debate_synthesis）**并存**，违反 C9「LLM 模块元信息以注册表为单一事实来源」。这份副本的两处实际后果：
+- **缺陷（自审 rf-330）**：`config/_llm_settings_defaults.py` 自留一份模块显示名映射 `_MODULE_LABELS`（5 条：global_macro / expert_review / health_check / penetration_deep / news_correlation），与 `core/registry.py::get_llm_module_names()`（8 条，多出 debate_pro / debate_con / debate_synthesis）**并存**，违反「LLM 模块元信息以中央注册表为单一事实来源」。这份副本的两处实际后果：
   - `_module_block()` 对未登记的模块走 `_MODULE_LABELS.get(module, module)` 回退，即**新增模块在配置模板里显示为裸键名**（如 `// debate_pro — debate_pro`）而非中文名——不报错、不告警，只是注释变成英文键。
   - 同文件内 `news_correlation` 的显示名**写了两遍**：`_MODULE_LABELS` 里一条，模板 `_section(f"财经新闻热点与持仓关联分析 — news_correlation")` 又硬编码一次。两处相邻但无约束，改一处忘另一处即静默不一致（该模块因不支持 `output_brief` 而单独拼接，正是漏走 `_module_block()` 统一取值路径的那一个）。
 - **改动**：`_MODULE_LABELS = get_llm_module_names()`（模块级导入中央注册表），副本删除；`news_correlation` 区块标题改取 `_MODULE_LABELS.get("news_correlation", "news_correlation")`，与其他模块同一取值路径，并补注释说明该模块为何不走 `_module_block`（无 `output_brief` 键）。
 - **行为变更**：无——已验证改前改后 `_get_default_llm_settings_template()` 的**输出逐字相同**（diff 为空）：既有 5 个模块的显示名与注册表本就一致，本次仅消除副本与重复。
 - **测试**：`test_config.py::TestLlmSettingsTemplateConsistency` 新增两例：`test_module_labels_derived_from_registry`（映射须与 `get_llm_module_names()` 深度相等 + `enabled_llm` 每个子键都能查到显示名，已验证还原旧实现后转红——旧副本少 3 个 debate 模块）、`test_template_module_titles_match_registry`（从渲染出的模板里正则抽出各「显示名 — 模块」区块标题，逐个比对注册表取值，属渲染结果层锁定）。配置单元测试 100 例全绿。
 
-### 移除新闻关联的误导性编排注册（C9，自审 rf-329）（2026-09-10）
+### 移除新闻关联的误导性编排注册（模块注册一致性，自审 rf-329）（2026-09-10）
 
-- **缺陷（自审 rf-329）**：编排层 `_dispatch_llm_workers` 内有一条 news_correlation 注册分支——仅当调用方传入 `news_data` 且 `holdings_data` 时，把 `_make_news_correlation_closure(...)` 写进 `_MODULE_FNS`。但这两个参数在**任何调用方都未传入**（`generate_all_llm` 是唯一调用方，其签名与实参均无此项），分支永不执行。连带整条「预计算」链同样是死代码：模块级变量 `_news_correlation_result`、公开读取接口 `get_news_correlation_result()`、结果回写函数 `_store_news_correlation_result()`、闭包工厂 `_make_news_correlation_closure()`，以及 `run_news_correlation_safe()` 里「若已有 orchestrator 预计算结果则直接返回」的短路——四处没有一处可达。危害不在性能而在**语义**：注册表与文档呈现出「新闻关联由编排层统一调度、结果经模块级变量复用」的图景，与真实路径（`report/news_correlation.py` 直调 `run_news_correlation_safe`）不符，正是 C9 所防的「注册与实际运行路径漂移」；后来者若照此图景扩展（例如给 `generate_all_llm` 加新闻参数以「启用」预计算），会同时把 `(list, bool, dict)` 的三元返回塞进期望 `(str|None, bool)` 二元返回的线程池，异常只在运行期暴露。
+- **缺陷（自审 rf-329）**：编排层 `_dispatch_llm_workers` 内有一条 news_correlation 注册分支——仅当调用方传入 `news_data` 且 `holdings_data` 时，把 `_make_news_correlation_closure(...)` 写进 `_MODULE_FNS`。但这两个参数在**任何调用方都未传入**（`generate_all_llm` 是唯一调用方，其签名与实参均无此项），分支永不执行。连带整条「预计算」链同样是死代码：模块级变量 `_news_correlation_result`、公开读取接口 `get_news_correlation_result()`、结果回写函数 `_store_news_correlation_result()`、闭包工厂 `_make_news_correlation_closure()`，以及 `run_news_correlation_safe()` 里「若已有 orchestrator 预计算结果则直接返回」的短路——四处没有一处可达。危害不在性能而在**语义**：注册表与文档呈现出「新闻关联由编排层统一调度、结果经模块级变量复用」的图景，与真实路径（`report/news_correlation.py` 直调 `run_news_correlation_safe`）不符，正是「注册须与真实运行路径一致」所防的漂移；后来者若照此图景扩展（例如给 `generate_all_llm` 加新闻参数以「启用」预计算），会同时把 `(list, bool, dict)` 的三元返回塞进期望 `(str|None, bool)` 二元返回的线程池，异常只在运行期暴露。
 - **改动**：删除上述四处死代码与 `run_news_correlation_safe` 的预计算短路；`_dispatch_llm_workers` 去掉三个永不使用的参数（`news_data` / `holdings_data` / `penetrated_assets_for_news`）及注册分支；`llm/__init__.py` 与编排门面的 re-export 同步移除 `get_news_correlation_result`。`_llm_news_correlation.py` 模块 docstring 改写为说明**为何不经编排层**（返回类型二元/三元不兼容 + 实际由报告侧直调），并注明已被移除的误导路径，避免该分支再被「复原」。模块显示名/设置键不受影响，仍由 `core/registry.py::get_llm_module_name` 单一登记。
 - **行为变更**：无——被删的路径在删除前即不可达；`report/news_correlation.py` 走的 `run_news_correlation_safe` 直调入口行为不变（其内部分支减少一条恒假判断）。
 - **测试**：`test_generate_all_llm.py` 新增 `TestNewsCorrelationNotOrchestrated` 三例：`test_dispatch_has_no_news_correlation_params`（签名不得再含三个死参数，已验证还原旧实现后转红）、`test_dispatch_never_returns_news_correlation`（实跑分发，结果键即为传入模块键，无注入）、`test_precompute_result_api_removed`（`src.python.llm` 不再暴露预计算结果读取接口，已验证还原旧实现后转红）。LLM 单元测试 996 例全绿。
 
-### 报表页签显示名注册表驱动（C7，自审 rf-326）（2026-09-10）
+### 报表页签显示名注册表驱动（自审 rf-326）（2026-09-10）
 
-- **缺陷（自审 rf-326）**：`report/excel_generator.py::_write_data_source_matrix_sheet` 把「数据源可用性矩阵」页签的**表内标题写成字面量**，绕开显示名注册表，违反 C7「报表页签标题由注册表驱动，禁止硬编码」。同一显示名因此存在于两处——`core/registry.py::_REPORT_SECTION_DEFAULT`（页签名，经 `excel_sheet_factory` 生成 `ws.title`）与写入层字面量——改一处不会同步另一处，且无任何测试拦截漂移。同批核对发现「数据源可用性矩阵」「LLM API 用量」两个页签**未登记**在 `_REPORT_SHEET_NAMES`（该表按表头注释只排除「已由 `get_llm_module_name()` 注册」的 LLM 模块章，此二键不属此列，属遗漏）；未登记时 `get_report_sheet_name()` 走「回退为键名」兜底返回英文键，故仅改写入层调用而不补登记，会把 `data_source_status` 这个英文键当标题写进报告——补登记是该修复成立的前提。
+- **缺陷（自审 rf-326）**：`report/excel_generator.py::_write_data_source_matrix_sheet` 把「数据源可用性矩阵」页签的**表内标题写成字面量**，绕开显示名注册表，违反「报表页签标题由注册表驱动、禁止硬编码显示名」。同一显示名因此存在于两处——`core/registry.py::_REPORT_SECTION_DEFAULT`（页签名，经 `excel_sheet_factory` 生成 `ws.title`）与写入层字面量——改一处不会同步另一处，且无任何测试拦截漂移。同批核对发现「数据源可用性矩阵」「LLM API 用量」两个页签**未登记**在 `_REPORT_SHEET_NAMES`（该表按表头注释只排除「已由 `get_llm_module_name()` 注册」的 LLM 模块章，此二键不属此列，属遗漏）；未登记时 `get_report_sheet_name()` 走「回退为键名」兜底返回英文键，故仅改写入层调用而不补登记，会把 `data_source_status` 这个英文键当标题写进报告——补登记是该修复成立的前提。
 - **改动**：`_REPORT_SHEET_NAMES` 补登 `data_source_status` / `llm_usage` 中文显示名；`_write_data_source_matrix_sheet` 改取 `get_report_sheet_name("data_source_status")`。`developer-guide.md` 的注册表说明同步校正——原文称「页签标题与顺序由**独立的 `_REPORT_SECTION_DEFAULT`** 注册表驱动，`get_report_sheet_name()` / `get_report_section_order()` 均读该注册表」，与实际不符（`get_report_sheet_name` 读的是 `_REPORT_SHEET_NAMES`）；改为说明两张注册表的职责分工：「页签叫什么」由 `_REPORT_SHEET_NAMES` 管、「章按什么顺序排」由 `_REPORT_SECTION_DEFAULT` 管，新增页签的登记路径一并写明。
 - **行为变更**：无——该页签表内标题此前即与注册表登记值一致，本次仅把取值收敛到注册表（`llm_usage` 表内标题取自 `ws.title`，不受影响）。
 - **测试**：`test_registry.py` 新增 `TestReportSheetNames` 三例：`test_sheet_names_match_section_names`（遍历 `_REPORT_SHEET_NAMES`，断言每个键都在 `_REPORT_SECTION_DEFAULT` 中且显示名逐字相同——把「两张注册表漂移」变成红灯）、`test_data_source_status_name_registered`（回归：标题取注册表值而非字面量，已验证还原旧实现后转红）、`test_unknown_key_falls_back_to_key`（锁定未登记键回退为键名的既有语义）。另清理该文件三处多余的 f-string 前缀（ruff F541）。
 
-### 估值取数回归 Provider Chain 与会话复用（C4 + C6，自审 rf-324 / rf-325 / rf-334）（2026-09-10）
+### 估值取数回归 Provider Chain 与会话复用（自审 rf-324 / rf-325 / rf-334）（2026-09-10）
 
-- **缺陷（自审 rf-324，C6）**：`report/fund_style_classify.py::_push2_extended` 直接 import `fetcher.industry.make_push2_request` 发起 push2 请求——该入口是 provider 函数的**薄透传**，不经 Provider Chain，因而没有备用源递补（`eastmoney_industry_rest`）、不经 `industry_` 文件缓存、不登记 `FailureDiagnostics` 数据源状态（provider 模块内部的熔断计数仍在，故问题被掩盖得更深），也不参与会话复用；provider 侧失败时报告层只看到一条「扩展数据获取失败」告警，数据源可用性矩阵里毫无痕迹。同批发现 `fetcher/industry.py::make_push2_request` 在本轮修复后**已无任何生产调用方**，作为「绕开 Chain 的现成入口」继续留在网关层，正是同类违规的温床——一并删除。
-- **缺陷（自审 rf-325，C6）**：`report/orchestrator.py::_fetch_valuation_for_code` 直接 `from src.python.providers.eastmoney_industry import fetch_valuation_fields`，**报告层直连 provider 模块**，同样绕开 Chain 与文件缓存，且与 C6「Provider Chain 必经」直接冲突。
-- **缺陷（自审 rf-334，C4）**：`_get_industry_avg_pe` 对每个代码**发两次同参数 push2 请求**——先 `fetch_industry_data` 取行业归属，再 `_push2_extended` 取 PE；而 PE（f9）本就是同一次 push2 响应里的字段（provider `_FIELDS` 已含 f9/f20/f23），第一次请求的响应里就有。C4（会话级 API 复用）要求同一会话同一 API 只取一次，此处是纯浪费（每只持仓多一次请求，直接放大限频风险）。
+- **缺陷（自审 rf-324，绕开 Provider Chain）**：`report/fund_style_classify.py::_push2_extended` 直接 import `fetcher.industry.make_push2_request` 发起 push2 请求——该入口是 provider 函数的**薄透传**，不经 Provider Chain，因而没有备用源递补（`eastmoney_industry_rest`）、不经 `industry_` 文件缓存、不登记 `FailureDiagnostics` 数据源状态（provider 模块内部的熔断计数仍在，故问题被掩盖得更深），也不参与会话复用；provider 侧失败时报告层只看到一条「扩展数据获取失败」告警，数据源可用性矩阵里毫无痕迹。同批发现 `fetcher/industry.py::make_push2_request` 在本轮修复后**已无任何生产调用方**，作为「绕开 Chain 的现成入口」继续留在网关层，正是同类违规的温床——一并删除。
+- **缺陷（自审 rf-325，绕开 Provider Chain）**：`report/orchestrator.py::_fetch_valuation_for_code` 直接 `from src.python.providers.eastmoney_industry import fetch_valuation_fields`，**报告层直连 provider 模块**，同样绕开 Chain 与文件缓存，且与「Provider Chain 必经」的网关约束直接冲突。
+- **缺陷（自审 rf-334，重复取数）**：`_get_industry_avg_pe` 对每个代码**发两次同参数 push2 请求**——先 `fetch_industry_data` 取行业归属，再 `_push2_extended` 取 PE；而 PE（f9）本就是同一次 push2 响应里的字段（provider `_FIELDS` 已含 f9/f20/f23），第一次请求的响应里就有。会话级 API 复用要求同一会话同一 API 只取一次，此处是纯浪费（每只持仓多一次请求，直接放大限频风险）。
 - **改动**：
   - `providers/eastmoney_industry.py::fetch_industry_and_concepts` 的返回值补 `market_cap`（f20，与既有 pe/pb 同源同请求），`fetch_valuation_fields` 从 provider 移除（避免 provider 层再提供一个「非 Chain」取值口）。
   - `fetcher/industry.py::_industry_transform` **透传** pe/pb/market_cap（原实现在网关转换层丢弃这三个字段，迫使消费方另想办法取数）；新增 `fetch_valuation_fields(code)` 作为 PE/PB 的**网关入口**（经 `fetch_industry_data_cached` → Chain + 文件/会话缓存），`_push2_extended` 与 `_get_industry_avg_pe` 改从行业结果直接取 PE，`report/orchestrator.py` 改 import 网关入口；`fetcher/industry.py::make_push2_request` 删除。
   - **旧缓存载荷迁移**：行业缓存 TTL 为两周，而旧载荷不含扩展行情字段，`fetch_with_fallback` 命中即返回——不处理的话旧载荷会在存活期内被当作有效命中，PE 取用静默退化为「不可得」（无异常、无告警）。新增 `_drop_legacy_cached_payload`：判据取「键是否存在」（新载荷无论 provider 是否给出都会带键，值为 None 表该源不提供），缺键即清除并回落重取；单代码至多迁移一次，旧载荷全部过期后成为无害空转。
   - `analysis/valuation_percentile.py` 模块 docstring 的取数路径同步为网关入口（原文写「复用 providers…make_push2_request 通道」，已失真）。
 - **行为变更**：`_push2_extended` 的取数来源由「独立 push2 请求」变为「行业数据结果」，其 `extended_{code}` 全天缓存与腾讯侧降级链（`_tencent_extended`）保持不变；PE/PB 现在享受 Chain 的熔断/降级/诊断与 7 天行业文件缓存，同一代码同一轮**只请求一次**。
-- **测试**：`test_fund_style.py` 各用例改自行业结果提供 PE，`test_single_fetch_per_code` 替换原「session_cache 填充」用例——以「每个代码恰好调用一次行业入口、未二次请求」锁定 C4 回归（旧实现下即两次取数）；`test_fetcher_industry.py` 新增 `TestFetchValuationFields`（网关入口契约：投影/不可得/字段缺失/经入口取数）与 `TestLegacyIndustryCacheMigration`（旧载荷清除、新载荷不误删、转换层透传字段）；`test_eastmoney_industry.py` 原 `TestFetchValuationFields` 改为 `TestIndustryExtendedFields`（锁定一次请求带出 pe/pb/market_cap）。
+- **测试**：`test_fund_style.py` 各用例改自行业结果提供 PE，`test_single_fetch_per_code` 替换原「session_cache 填充」用例——以「每个代码恰好调用一次行业入口、未二次请求」锁定会话复用回归（旧实现下即两次取数）；`test_fetcher_industry.py` 新增 `TestFetchValuationFields`（网关入口契约：投影/不可得/字段缺失/经入口取数）与 `TestLegacyIndustryCacheMigration`（旧载荷清除、新载荷不误删、转换层透传字段）；`test_eastmoney_industry.py` 原 `TestFetchValuationFields` 改为 `TestIndustryExtendedFields`（锁定一次请求带出 pe/pb/market_cap）。
 
-### 原子写入收敛到唯一原语（C3，自审 rf-322）（2026-09-10）
+### 原子写入收敛到唯一原语（自审 rf-322）（2026-09-10）
 
-- **缺陷（自审 rf-322）**：全局架构审计发现 C3（缓存原子写入）在实现层**逐字重复了 4 份 mkstemp + os.replace 拷贝**（`core/jsonl_store.py`、`core/provider_registry.py`、`report/history_snapshot.py`、`config/features.py`），另有 **5 处写入完全无原子性**（违反 C3 字面要求）：
+- **缺陷（自审 rf-322）**：全局架构审计发现缓存原子写入约束在实现层**逐字重复了 4 份 mkstemp + os.replace 拷贝**（`core/jsonl_store.py`、`core/provider_registry.py`、`report/history_snapshot.py`、`config/features.py`），另有 **5 处写入完全无原子性**（违反原子写入的字面要求）：
   - `analysis/_silence.py::_save_silence_state`、`analysis/circuit_breaker_wrapper.py::_save_state` 与 `_migrate_legacy`、`report/data_status.py::_persist`：`open(path, "w")` 直接覆盖——中断即留截断 JSON，下次读取解析失败，静默期状态/断路状态/降级记忆**整份丢失**（断路器「失忆」后已熔断的源被立即重试）。其中 `data_status` 的降级状态文件被高频改写，并发读取方还可能读到半写内容。
   - `providers/news_dedup.py::_flush_anchors`：`open(..., "a")` 逐行追加——中途中断留下**半行** JSONL，而读取方按行解析，该行及其后记录一并作废。
-  - 多份拷贝的实质风险与 C3 补充说明一致：改一处必漏其余，且各调用点拿不到成败（无法据此决定后续动作）。
-- **改动**：新增 `core/atomic_write.py`（`write_text_atomic` / `write_json_atomic`，mkstemp + 同目录 os.replace；Windows 下 os.replace 遭占用时回退「删目标 + rename」，与 `cache/_io.py::_write_atomic` 同一处置），上述 8 处全部迁移到该原语，`jsonl_store` 另抽出批量入口 `append_jsonl_atomic_many`（锚点文件已达数万行，逐行调用等价于每行整文件重写，O(n²)）。原语契约：**失败记日志并如实返回布尔、不向上抛**，调用方按需还原异常类型（`history_snapshot.save` 即据返回值重新抛 `OSError`，保持其「失败即抛」的对外契约）。`cache/` 子包（需 gzip 分支与文件锁）与 `config/_core.py::_atomic_write`（契约是「失败即抛且保留异常类型」，被 `init_config()` 的 Windows 并发容忍分支与 TUI 的权限提示依赖）两处**有意不合并**，理由写在原语 docstring 与 C3 约束行内。
+  - 多份拷贝的实质风险与原子写入约束的补充说明一致：改一处必漏其余，且各调用点拿不到成败（无法据此决定后续动作）。
+- **改动**：新增 `core/atomic_write.py`（`write_text_atomic` / `write_json_atomic`，mkstemp + 同目录 os.replace；Windows 下 os.replace 遭占用时回退「删目标 + rename」，与 `cache/_io.py::_write_atomic` 同一处置），上述 8 处全部迁移到该原语，`jsonl_store` 另抽出批量入口 `append_jsonl_atomic_many`（锚点文件已达数万行，逐行调用等价于每行整文件重写，O(n²)）。原语契约：**失败记日志并如实返回布尔、不向上抛**，调用方按需还原异常类型（`history_snapshot.save` 即据返回值重新抛 `OSError`，保持其「失败即抛」的对外契约）。`cache/` 子包（需 gzip 分支与文件锁）与 `config/_core.py::_atomic_write`（契约是「失败即抛且保留异常类型」，被 `init_config()` 的 Windows 并发容忍分支与 TUI 的权限提示依赖）两处**有意不合并**，理由写在原语 docstring 与原子写入约束行内。
 - **行为变更（均为修正方向）**：① 上述 5 处由「非原子覆盖」变为原子替换，写失败时旧文件原样保留；② `news_dedup` 落盘失败时**撤回**本轮登记的 `(source,title)` 已写 key（旧实现 key 留在集合里，该对新闻此后每轮都被判「已写」而永不重试，锚点**永久丢失**却只记一条 warning）；③ `circuit_breaker_wrapper._migrate_legacy` 显式以写入成败决定是否删除旧文件，删旧失败由静默的 debug 改为 warning；④ `jsonl_store`/`history_snapshot` 的 os.replace 在 Windows 占用场景获得回退路径。
-- **测试**：新增 `src/test/unit/core/test_atomic_write.py`（12 例：正常写入/目录创建/覆盖/无临时残骸、mkstemp 失败与替换失败均返回 False 且旧内容原样保留、序列化失败、Windows 占用回退）；`test_news_sources.py::TestFlushAnchorsDedup` 新增写失败回滚用例（以「锚点目录被同名文件占位」构造真实 IO 故障，已验证还原旧实现后转红——旧实现 key 未撤回）；`test_features_edge.py` 新增功能开关写失败不抛出且内存态仍同步用例。C3 相关单元测试 4080 例全绿。
+- **测试**：新增 `src/test/unit/core/test_atomic_write.py`（12 例：正常写入/目录创建/覆盖/无临时残骸、mkstemp 失败与替换失败均返回 False 且旧内容原样保留、序列化失败、Windows 占用回退）；`test_news_sources.py::TestFlushAnchorsDedup` 新增写失败回滚用例（以「锚点目录被同名文件占位」构造真实 IO 故障，已验证还原旧实现后转红——旧实现 key 未撤回）；`test_features_edge.py` 新增功能开关写失败不抛出且内存态仍同步用例。原子写入相关单元测试 4080 例全绿。
 
-### 持仓跟踪缓存读取回归 cache API（C2，自审 rf-323）（2026-09-10）
+### 持仓跟踪缓存读取回归 cache API（自审 rf-323）（2026-09-10）
 
-- **缺陷（自审 rf-323）**：`cache/services/holdings_tracker.py::_read_holdings_tracking` **绕过 cache API 直接读缓存文件**（`_cache_path()` + `open` + `json.load` + 手取 `payload["_data"]`），违反 C2「所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 接口读写，禁止直接操作 `data/cache/` 文件系统」。逐项后果：
-  - **TTL 声明失效**：注册表为 `holdings_tracking` 声明 `CACHE_MONTHLY`，旁路读取使该声明完全不起作用（C2 表头所列「TTL 失效」后果的实例）。
+- **缺陷（自审 rf-323）**：`cache/services/holdings_tracker.py::_read_holdings_tracking` **绕过 cache API 直接读缓存文件**（`_cache_path()` + `open` + `json.load` + 手取 `payload["_data"]`），违反「所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 接口读写，禁止直接操作 `data/cache/` 文件系统」的约束。逐项后果：
+  - **TTL 声明失效**：注册表为 `holdings_tracking` 声明 `CACHE_MONTHLY`，旁路读取使该声明完全不起作用（即该约束表头所列「TTL 失效」后果的实例）。
   - **gzip 变体读不到**：缓存层读路径优先 `.json.gz`（超 100KB 自动转储），旁路读取只看 `.json`——一旦转储，跟踪记录被静默当作不存在，全部代码误判为新增（方向上属过度刷新，非漏刷）。
   - **BOM/编码容错缺失**：缓存层用 `utf-8-sig` 读取并捕获 `UnicodeDecodeError`，旁路读取用 `utf-8` 且异常元组不含 `UnicodeDecodeError`——带 BOM 的跟踪文件会**直接抛出**打断主流程而非降级。
   - **损坏文件不清理、命中率不统计**：缓存层读失败会自动删除损坏文件并记录 hit/miss，旁路读取两者皆无。
@@ -97,12 +112,12 @@
 - **行为变更**：跟踪记录超过 `CACHE_MONTHLY` 后读取返回 None，调用方按「无上轮记录」处理——即全部代码视为新增并触发关联缓存刷新（**修复**方向：宁多刷不漏刷）；TTL 内行为不变。
 - **测试**：`test_holdings_tracker.py` 新增 `TestReadHoldingsTrackingUsesCacheApi` 三例（经 `cache.set` 写入后读到内层数据 / TTL 置负 → None / 无记录 → None），并补强首次运行用例断言「无上轮记录 → 全部代码视为新增」。TTL 用例为判别点——已验证还原旧实现后转红（旧实现无视 TTL，会返回过期指纹并跳过刷新）。
 
-### 代码类型判定回归中心化（C1，自审 rf-333）（2026-09-10）
+### 代码类型判定回归中心化（自审 rf-333）（2026-09-10）
 
-- **缺陷（自审 rf-333）**：全局架构审计（C1~C24 逐条对照）发现两处**绕过 `core/code_utils.py` 自建代码前缀判定**，违反 C1「所有资产代码类型判定必须使用 `core/code_utils.py`，禁止任何模块自行实现判定逻辑」：
+- **缺陷（自审 rf-333）**：全局架构审计（架构设计约束表逐条对照）发现两处**绕过 `core/code_utils.py` 自建代码前缀判定**，违反「所有资产代码类型判定必须使用 `core/code_utils.py`，禁止任何模块自行实现判定逻辑」的约束：
   - `report/chart_data_builder.py::_infer_property`——按 `code[:1] in ("6","0","3")` 判股票、`("5","1")` 判基金。**实际影响**：北交所（8 开头）股票全部落入「其他」资产属性，饼图与持仓分类表口径不一致（68xxxx 科创板仅因首字符恰为 6 而蒙对，语义上仍是巧合而非判定）。
   - `config/anonymizer.py::_categorize_holding` / `_categorize_detail`——中心判定之外**并存**一张「0/3/6 开头即股票」回退表（外加 `except ImportError: pass` 兜底）。两套判定并存即会漂移，且把错误前缀知识散落到匿名化层；`except ImportError` 兜底在当前包结构下永不可达，属防御性死代码。
-  - 违规后果与 C1 表头描述一致：代码前缀知识散落多处，新增资产类型时需全局搜索替换、极易遗漏。
+  - 违规后果与约束表头描述一致：代码前缀知识散落多处，新增资产类型时需全局搜索替换、极易遗漏。
 - **改动**：`_infer_property` 改委托 `is_a_share_code()` / `is_exchange_fund_code()`（模块级导入，与同文件其他 `core.*` 导入一致）；`anonymizer` 两处改为模块级导入 `is_fund_holding` 并无条件委托，删除内联前缀表与 `except ImportError` 分支。判定语义单一来源化后，两处随 `code_utils` 演进自动跟进。
 - **行为变更**：`_infer_property` 对北交所代码（如 830799）由「其他」变为「股票」——属**修正**而非回归（与持仓分类表口径对齐）；其余代码分类结果不变。
 - **测试**：`test_anonymizer.py` 把失效的 `test_import_error_falls_back_to_prefix`（在原实现下已因模块级导入提前绑定而形同虚设）替换为 `test_delegates_to_central_judgment`（mock 中心函数返回值双向验证无条件委托）+ 新增 `test_beijing_exchange_stock_not_misclassified_as_fund`；`test_chart_data_builder.py` 新增 `test_infer_property_star_and_bse_boards_classified` 锁定科创板/北交所归「股票」、5 开头场内基金归「基金」。两用例均已验证还原旧实现后转红。另清理该测试文件历史遗留的未使用 `import logging`（ruff F401）。

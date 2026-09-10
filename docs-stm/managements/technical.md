@@ -3303,10 +3303,10 @@ web/ (Web 服务层，薄入口)
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C1** | **代码类型判定中心化** — 所有资产代码类型判定必须使用 `core/code_utils.py` 提供的函数，禁止任何模块自行实现判定逻辑 | 系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落，"魔法判定"遍地，新增资产类型时需全局搜索替换 | 代码评审不通过；新增资产类型时遗漏大量散落判定点 | 所有涉及代码类型判定的模块（fetcher/、report/、llm/ 等） |
+| **C1** | **代码类型判定中心化** — 所有资产代码类型判定必须使用 `core/code_utils.py` 提供的函数，禁止任何模块自行实现判定逻辑 | 系统 20+ 处需要判断资产类型（A 股/ETF/基金/QDII/港股/债券等），分散判定导致代码前缀知识散落，"魔法判定"遍地，新增资产类型时需全局搜索替换 | 代码评审不通过；新增资产类型时遗漏大量散落判定点 | 所有涉及代码类型判定的模块（fetcher/、report/、llm/、config/ 等）；含「按代码前缀分类资产类型」与「判定代码是否合法」两类判定，一律复用 `core/code_utils.py` 的判定函数，不得自建前缀表或白名单 |
 | **C4** | **会话级 API 复用** — 同次会话内同一 API 返回的数据必须通过 `DataSourceRegistry.session_cache` 复用，禁止重复 HTTP 请求 | 避免同一资产在多个模块中重复请求相同 API 数据，降低 API 限频风险，提升性能 | API 调用量膨胀、触发限频、报告生成时间增长 | 所有通过 Provider 获取数据的模块 |
 | **C5** | **HTTP 客户端统一** — 所有 HTTP 请求必须使用 `core/http_client.py` 工厂方法创建客户端实例 | 统一 SSL 配置、超时策略、连接池管理；防止各模块自行构造 request 导致配置散落、连接池泄漏。该工厂同时是**数据源记录-回放（cassette）的唯一注入点**（§2.6）：绕过工厂自建客户端的 provider 不受回放替换，回放用例会**真实联网并静默通过**——离线保证随之失效 | SSL 配置不一致、连接泄漏、重试策略不统一；绕过工厂的请求使 cassette 回放静默失效（测试实际联网而无人察觉） | 所有发起 HTTP 请求的模块（providers/、llm/） |
-| **C6** | **Provider Chain 必经** — 大多数数据获取必须通过 `fetch_with_fallback()` 走 Chain 路由，不得直接调用 Provider 函数 | 跳过 Chain 直接调用 Provider 会导致熔断器不被激活（故障后无冷却恢复）、fallback 链路断路（某 Provider 失败时不会自动递补）、日志审计缺失 | 熔断器失效、fallback 断路、故障记录缺失 | fetcher/ 各模块（例外：index.py 直调 Provider 的双链路 fallback 硬编码，熔断器不适用于指数场景） |
+| **C6** | **Provider Chain 必经** — 大多数数据获取必须通过 `fetch_with_fallback()` 走 Chain 路由，不得直接调用 Provider 函数 | 跳过 Chain 直接调用 Provider 会导致熔断器不被激活（故障后无冷却恢复）、fallback 链路断路（某 Provider 失败时不会自动递补）、日志审计缺失 | 熔断器失效、fallback 断路、故障记录缺失 | fetcher/ 各模块（例外：index.py 直调 Provider 的双链路 fallback 硬编码，熔断器不适用于指数场景）；report/ 与 analysis/ 层取估值/行业等外部数据必须经 fetcher 网关入口（如 `fetcher/industry.py::fetch_valuation_fields`），不得 import `providers.*` 直连 |
 | **C24** | **凭据值不落日志与产物** — 需要凭据的数据源必须经 `core/datasource_credential.py` 登记声明（源标识 + 环境变量名 + 申请地址），凭据值只从环境变量读取；对外一律只暴露「环境变量名 + 是否就绪」，**凭据值永不落日志、永不写入报告/缓存**。未就绪的源由链路主动跳过并给出「缺什么、去哪申请」，不得当作「源不可达」反复重试或计入熔断 | 凭据一旦出现在日志/报告/缓存中，即随日志文件、报告产物、问题反馈与截图外泄，且事后无法区分「是否已泄露」；把配置级缺失（key 没配）混入可用性统计，会污染数据源可用性矩阵的语义——用户看到的是「源不稳定」而非「你没配 key」 | 凭据泄露（日志/报告被复制、上传、粘贴即泄露）；用户据失真的可用性矩阵排查错误方向，反复重试注定失败的请求 | providers/ 各数据源、`fetcher/chain.py`（未就绪主动跳过且不计熔断）、`core/check_sources.py`、`core/doctor.py`、`core/datasource_credential.py`（唯一声明点） |
 
 ### 8.2 缓存层约束
@@ -3320,7 +3320,7 @@ web/ (Web 服务层，薄入口)
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号不可硬编码** — 报告 19 个模块的序号和显示名称必须通过 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号 | 序号配置失效、用户自定义顺序不生效 | report/ 编排器（excel_generator.py、html_writer.py） |
+| **C7** | **报告序号与显示名不可硬编码** — 报告 19 个模块的章节顺序/可见性由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，页签显示名由同文件的 `_REPORT_SHEET_NAMES` 注册表驱动（两表键一一对应、同名显示名由测试锁定，页签名一律经 `get_report_sheet_name()` 取用），均支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号；显示名散落在写入层则重命名页签必须全局搜索，两处清单一旦不同步便出现「配置里叫一个名、页签上叫另一个名」 | 序号配置失效、用户自定义顺序不生效；页签显示名与注册表/配置脱节 | report/ 编排器与写入层（excel_generator.py、html_writer.py、fund_style_classify.py 等）；任何写入页签名的模块均须经 `get_report_sheet_name()`，不得直接写中文字面量 |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在附录 H（pipeline_data Schema 定义）中预定义类型、可选性、写入/消费模块后，才能在代码中使用该键 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
@@ -3331,10 +3331,10 @@ web/ (Web 服务层，薄入口)
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C9** | **LLM 模块注册** — 新增 LLM 分析模块时，必须在 `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `core/registry.py` 的 `DataModuleDef` 注册表中同时注册（详见 `llm-technical.md` §12） | 仅在 orchestrator 注册会导致缓存/TTL/统计遗漏；仅在 registry 注册会导致编排调度遗漏 | LLM 调度遗漏、缓存 TTL 未定义、用量统计缺失 | llm/ 包 + core/registry.py |
+| **C9** | **LLM 模块注册** — 新增 LLM 分析模块时，必须在 `generators_orchestrator.py` 的 `_MODULE_FNS` 字典和 `core/registry.py` 的 `DataModuleDef` 注册表中同时注册（详见 `llm-technical.md` §12）；注册项必须有真实调用方——模块运行所需配置项、显示名等同样由中央注册表提供，不在别处建副本；编排注册仅对确经编排线程池调度的模块生效，无人调用或无独立调度语义的注册分支属注册漂移，应移除而非保留 | 仅在 orchestrator 注册会导致缓存/TTL/统计遗漏；仅在 registry 注册会导致编排调度遗漏；无人调用的注册分支会误导后续维护者按「已被编排」去推断调度与并发行为，并让统计口径把未编排项计入 | LLM 调度遗漏、缓存 TTL 未定义、用量统计缺失；显示名/配置项副本漂移；统计口径失真 | llm/ 包 + core/registry.py + config/（LLM 模块相关默认值） |
 | **C17** | **Multi-LLM Provider Chain** — 所有 LLM API 调用必须通过 Provider Chain（`strategy.py` + `api.py`）路由，`call_llm()` 返回 `(result, usage, provider_name)` 三元组，provider_name 记录实际使用的 Provider 条目名（详见 `llm-technical.md` §5.2） | 手动切换 Provider 导致配置散落、失败无法递补、Provider 名称不可追踪 | API 调用不经过 Chain → 无法自动递补、Provider 名称缺失 → 缓存键冲突、用量统计不准确 | llm/api.py、llm/skeleton.py、llm/strategy.py |
 | **C18** | **credentials_ref 凭据分离** — API 凭据（api_key）必须通过 `llm_key.json` 的 `credentials_ref` 引用，禁止在 `llm_providers.json` 中直接存储敏感凭据；`credentials_ref` 为**必填**、内联 `api_key` 为**硬校验拒绝**（非仅告警，详见 `llm-technical.md` §5.3） | 凭据与路由配置混存导致凭据泄露风险；凭据变更时需同时修改两份配置 | 凭据泄露风险、凭据变更需多处修改、凭据复用困难 | data/config/llm_providers.json、data/config/llm_key.json、config/_core.py、config/_llm_providers.py、llm/api.py |
-| **C21** | **LLM 模块缓存指纹唯一事实来源** — 各 LLM 模块的缓存指纹（写侧与预检侧共用的那一个哈希）必须由 `llm/module_fingerprint.py` 的 `MODULE_FINGERPRINT_BUILDERS` 统一构造，写侧（`generators.py` 各生成器）与预检侧（`generators_orchestrator.py::_compute_module_cache_info`）只允许调用同一构建函数，禁止任一环节自行拼接指纹片段（详见 `llm-technical.md` §13.1） | 指纹决定缓存键，缓存键必须读写同源。两侧各自拼接时，任一侧新增一个影响提示词的入参/开关后缀而未同步另一侧，两侧计算结果即永久不等——写侧照常写入，预检侧却永不命中，表现为「开关/参数看似生效但每次仍全量调用 LLM」的静默性能退化与日志噪声，且因无异常而极难察觉 | 预检缓存恒不命中 → 每次报告重复调用 LLM（费用与耗时翻倍）、日志噪声；反向漂移则命中过期键导致提示词开关形同虚设 | llm/module_fingerprint.py（唯一构造点）、llm/generators.py、llm/generators_orchestrator.py |
+| **C21** | **LLM 模块缓存指纹唯一事实来源** — 各 LLM 模块的缓存指纹（写侧与预检侧共用的那一个哈希）必须由 `llm/module_fingerprint.py` 的 `MODULE_FINGERPRINT_BUILDERS` 统一构造，写侧（`generators.py` 各生成器）与预检侧（`generators_orchestrator.py::_compute_module_cache_info`）只允许调用同一构建函数，禁止任一环节自行拼接指纹片段；指纹的覆盖判据是「该模块的提示词实际承载了哪些入参」——提示词正文里出现哪一段（含 `pipeline_data` 派生的环比差异段、数据质量降级段），对应入参就必须进指纹；辩论三键（白脸/黑脸/综合）仅写侧使用、不进 `MODULE_FINGERPRINT_BUILDERS`，但构造同样由本模块的函数提供，综合键须覆盖白脸/黑脸两段完整正文而非提示词模板文本（详见 `llm-technical.md` §13.1） | 指纹决定缓存键，缓存键必须读写同源。两侧各自拼接时，任一侧新增一个影响提示词的入参/开关后缀而未同步另一侧，两侧计算结果即永久不等——写侧照常写入，预检侧却永不命中，表现为「开关/参数看似生效但每次仍全量调用 LLM」的静默性能退化与日志噪声，且因无异常而极难察觉 | 预检缓存恒不命中 → 每次报告重复调用 LLM（费用与耗时翻倍）、日志噪声；反向漂移则命中过期键导致提示词开关形同虚设 | llm/module_fingerprint.py（唯一构造点）、llm/generators.py、llm/generators_orchestrator.py |
 
 ### 8.5 基础设施约束
 
