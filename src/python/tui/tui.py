@@ -94,6 +94,7 @@ def _bind_callbacks() -> None:
         _cmd_refresh_config,
     )
     from src.python.tui.handlers_log import (
+        _cmd_run_doctor,
         _cmd_view_health_history,
         _cmd_view_logs,
     )
@@ -123,6 +124,7 @@ def _bind_callbacks() -> None:
         "R": _cmd_refresh_config,
         "V": _cmd_view_logs,
         "H": _cmd_view_health_history,
+        "D": _cmd_run_doctor,
     }
     for i, (key, _label, _cb, is_exit) in enumerate(MENU_ITEMS):
         MENU_ITEMS[i] = (key, _label, callbacks.get(key), is_exit)

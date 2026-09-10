@@ -22,6 +22,7 @@ from src.python.core.code_utils import (
 from src.python.fetcher.price import fetch_market_data, _price_cache_fresh
 from src.python.core.market_hours import is_market_open as _mh_is_market_open
 from src.python.core.market_hours import is_midday_break as _mh_is_midday_break
+from src.python.core.num_utils import finite_or, is_finite_number
 from src.python.core.models import Holding
 from src.python.core.provider_registry import FetchStrategy, get_registry
 
@@ -438,8 +439,15 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
             source_api="",
         )
 
-    price = mkt.get("price", 0.0) or 0.0
-    yclose = mkt.get("yesterday_close", 0.0) or 0.0
+    # 行情来自外部数据源，NaN/±inf 必须在此拦下——``or 0.0`` 对 NaN 无效
+    # （NaN 为真值），会让脏价格直入市值/盈亏/溢价全链。
+    price = finite_or(mkt.get("price", 0.0))
+    yclose = finite_or(mkt.get("yesterday_close", 0.0))
+    # 昨收缺失/非有限值时不可用 0.0 当代理价：那会把「全天涨幅」算成
+    # price×shares，凭空造出当日盈亏。此情形一律按「当日盈亏未知」记 0.0。
+    # 注意只在**非有限**时降级——负的有限昨收属既有容忍口径（同负价格），
+    # 仍照常参与计算，不在本次修复范围。
+    yclose_usable = is_finite_number(mkt.get("yesterday_close"))
     nav_date = mkt.get("price_date", "")
     source = mkt.get("source", "--")
     source_api = mkt.get("source_api", "")
@@ -450,10 +458,10 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
     profit = round(mv - cost, 2)
     profit_rate = profit / cost if cost > 0 else None
 
-    # 本日盈亏
-    if source_api == "tencent":
+    # 本日盈亏（昨收不可用时记 0.0，不猜测）
+    if source_api == "tencent" and yclose_usable:
         today_profit = round((price - yclose) * h.shares, 2)
-    elif nav_date:
+    elif nav_date and yclose_usable:
         trading_day = get_last_trading_day()
         today_profit = round((price - yclose) * h.shares, 2) if nav_date == trading_day else 0.0
     else:

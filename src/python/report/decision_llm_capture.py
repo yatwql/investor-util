@@ -34,6 +34,7 @@ from typing import Any, Iterable
 
 from src.python.config.features import is_feature_enabled
 from src.python.core import decision_ledger as dl
+from src.python.core.num_utils import finite_or
 from src.python.core.decision_header import (
     MAGNITUDE_RANK,
     STRUCTURED_HEADER_FLAG,
@@ -137,7 +138,7 @@ def _build_holdings_index(holdings_details: list[dict[str, Any]] | None) -> dict
         if not code:
             continue
         try:
-            price = float(holding.get("price") or 0)
+            price = finite_or(holding.get("price"))
         except (TypeError, ValueError):
             price = 0.0
         entry = {"name": str(holding.get("name") or "").strip(), "price": price}

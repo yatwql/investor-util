@@ -15,6 +15,7 @@ import logging
 from typing import Any
 
 from src.python.analysis.crisis_annotation import CRISIS_INTERVALS
+from src.python.core.num_utils import finite_or
 from src.python.report.downsample import downsample_bars
 
 logger = logging.getLogger("invest")
@@ -287,11 +288,11 @@ def _build_category_doughnut_dataset(details: list | None, cat_data: list | None
     if cat_data is not None:
         for group in cat_data:
             prop = str(group.get("property") or "其他")
-            total_by_prop[prop] = total_by_prop.get(prop, 0.0) + float(group.get("sub_mv", 0) or 0)
+            total_by_prop[prop] = total_by_prop.get(prop, 0.0) + finite_or(group.get("sub_mv", 0))
     elif details:
         for d in details:
             prop = getattr(d, "property", None) or _infer_property(d)
-            total_by_prop[prop] = total_by_prop.get(prop, 0.0) + float(getattr(d, "market_value", 0) or 0)
+            total_by_prop[prop] = total_by_prop.get(prop, 0.0) + finite_or(getattr(d, "market_value", 0))
     else:
         return _empty_dataset()
 
@@ -335,7 +336,7 @@ def _build_industry_bar_dataset(penetration: dict | None) -> dict:
     for entry in top10:
         # None / 空字符串 / 纯空白 → 归入"其他"（边缘场景，见 test_chart_data_builder_edge.py）
         sector = (entry.get("sector") or "").strip() or "其他"
-        mv = float(entry.get("mv", 0) or 0)
+        mv = finite_or(entry.get("mv", 0))
         sector_mv[sector] = sector_mv.get(sector, 0.0) + mv
 
     # 按市值降序，最多 10 个行业
@@ -363,7 +364,7 @@ def _build_penetration_bar_dataset(penetration: dict | None) -> dict:
         return _empty_dataset()
 
     labels = [e.get("name", f"标的{i + 1}") for i, e in enumerate(top10)]
-    values = [round(float(e.get("mv", 0) or 0), 2) for e in top10]
+    values = [round(finite_or(e.get("mv", 0)), 2) for e in top10]
 
     return {
         "labels": labels,

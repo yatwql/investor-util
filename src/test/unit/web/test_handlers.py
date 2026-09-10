@@ -885,3 +885,97 @@ class TestHealthHistoryEndpoint:
             resp = app_client.get("/api/health/history")
         assert resp.status_code == 500
         assert resp.get_json()["error_code"] == "HEALTH_HISTORY_READ_FAILED"
+
+
+class TestDoctorEndpoint:
+    """/api/doctor 系统自检（实验功能 doctor_check）。
+
+    Web 侧只做参数解析与 JSON 渲染，检查逻辑全在 core.doctor（其自身测试见
+    test_doctor.py）——故此处 mock 掉 run_doctor_checks，只断言接口契约。
+    """
+
+    _SAMPLE = [
+        {"group": "环境", "label": "Python 版本", "ok": True, "message": "3.12", "hint": ""},
+        {"group": "目录", "label": "输出目录", "ok": False, "message": "不可写", "hint": "chmod +w"},
+    ]
+
+    def test_success_envelope(self, app_client):
+        """200 + results/ok_count/bad_count 三键。"""
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._SAMPLE):
+            resp = app_client.get("/api/doctor")
+
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["ok_count"] == 1
+        assert data["bad_count"] == 1
+        assert data["results"][1]["hint"] == "chmod +w"
+
+    def test_network_default_on(self, app_client):
+        """默认含联网检查。"""
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._SAMPLE) as mock_run:
+            app_client.get("/api/doctor")
+
+        assert mock_run.call_args.kwargs["include_network"] is True
+
+    def test_network_off(self, app_client):
+        """network=0 → 跳过联网检查。"""
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._SAMPLE) as mock_run:
+            resp = app_client.get("/api/doctor?network=0")
+
+        assert resp.status_code == 200
+        assert mock_run.call_args.kwargs["include_network"] is False
+
+    def test_timeout_clamped_to_ceiling(self, app_client):
+        """timeout 超上限被钳制，防单次自检拖垮接口。"""
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._SAMPLE) as mock_run:
+            app_client.get("/api/doctor?timeout=999")
+
+        assert mock_run.call_args.kwargs["max_timeout"] == 15.0
+
+    def test_timeout_invalid_falls_back_default(self, app_client):
+        """非法 timeout → 回落到默认值而非 400（自检不该被查询串绊倒）。"""
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._SAMPLE) as mock_run:
+            resp = app_client.get("/api/doctor?timeout=abc")
+
+        assert resp.status_code == 200
+        assert mock_run.call_args.kwargs["max_timeout"] == 12.0
+
+    def test_broken_config_still_returns_200(self, app_client):
+        """配置损坏时自检照常出结果（含失败行）——这正是它存在的场景。"""
+        with patch("src.python.config.get_config", side_effect=RuntimeError("配置文件损坏")):
+            resp = app_client.get("/api/doctor?network=0")
+
+        assert resp.status_code == 200
+        data = resp.get_json()["data"]
+        assert data["bad_count"] >= 1
+        assert any("配置文件损坏" in r["message"] for r in data["results"])
+
+
+class TestSystemInfoDoctorGate:
+    """status_grid /api/status 的 doctor_enabled 可见性开关。"""
+
+    def test_enabled_reflects_flag_on(self, monkeypatch):
+        with patch("src.python.config.features.is_feature_enabled", return_value=True):
+            assert _build_system_info()["doctor_enabled"] is True
+
+    def test_disabled_reflects_flag_off(self, monkeypatch):
+        with patch("src.python.config.features.is_feature_enabled", return_value=False):
+            assert _build_system_info()["doctor_enabled"] is False
+
+    def test_flag_read_failure_hides_card(self, monkeypatch):
+        """开关读不出来时隐藏卡片（保守），而不是抛错毁掉整个状态区。"""
+        with patch("src.python.config.features.is_feature_enabled", side_effect=RuntimeError("坏了")):
+            assert _build_system_info()["doctor_enabled"] is False
+
+    def test_index_card_absent_when_disabled(self, app_client):
+        with patch("src.python.config.features.is_feature_enabled", return_value=False):
+            html = app_client.get("/").get_data(as_text=True)
+
+        assert 'id="doctor-list"' not in html
+
+    def test_index_card_present_when_enabled(self, app_client):
+        with patch("src.python.config.features.is_feature_enabled", return_value=True):
+            html = app_client.get("/").get_data(as_text=True)
+
+        assert 'id="doctor-list"' in html
+        assert 'id="doctor-run"' in html

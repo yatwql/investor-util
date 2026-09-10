@@ -65,6 +65,9 @@
     els.resultFooter = $('result-footer');
     els.healthList = $('health-list');
     els.historyList = $('history-list');
+    // 系统自检卡片（实验功能 doctor_check 关闭时不存在于 DOM）
+    els.doctorList = $('doctor-list');
+    els.doctorRun = $('doctor-run');
     els.logLevel = $('log-level');
     els.logList = $('log-list');
     els.logStatus = $('log-status');
@@ -82,6 +85,11 @@
     $('health-refresh').addEventListener('click', function () {
       loadHealth(true);
     });
+    if (els.doctorRun) {
+      els.doctorRun.addEventListener('click', function () {
+        loadDoctor();
+      });
+    }
     $('config-reload').addEventListener('click', function () {
       loadConfigEdit();
     });
@@ -609,6 +617,81 @@
       row.appendChild(meta);
       els.healthList.appendChild(row);
     });
+  }
+
+  /* ── 状态区：系统自检（实验功能 doctor_check，卡片不存在时整段跳过） ── */
+  function loadDoctor() {
+    if (!els.doctorList) return;
+    els.doctorList.textContent = '';
+    var busy = document.createElement('p');
+    busy.className = 'status-text status-busy';
+    busy.textContent = '自检中（含数据源联网检查，最多约 12 秒）...';
+    els.doctorList.appendChild(busy);
+    els.doctorRun.disabled = true;
+
+    fetch('/api/doctor', { signal: AbortSignal.timeout(15000) })
+      .then(handleResponse)
+      .then(function (data) {
+        renderDoctor(data || {});
+      })
+      .catch(function () {
+        els.doctorList.textContent = '';
+        var p = document.createElement('p');
+        p.className = 'status-text status-error';
+        p.textContent = '系统自检失败，请稍后重试';
+        els.doctorList.appendChild(p);
+      })
+      .finally(function () {
+        els.doctorRun.disabled = false;
+      });
+  }
+
+  function renderDoctor(data) {
+    els.doctorList.textContent = '';
+    var results = data.results || [];
+    if (!results.length) {
+      var p = document.createElement('p');
+      p.className = 'status-text status-busy';
+      p.textContent = '无自检结果';
+      els.doctorList.appendChild(p);
+      return;
+    }
+    var currentGroup = null;
+    results.forEach(function (item) {
+      if (item.group !== currentGroup) {
+        currentGroup = item.group;
+        var head = document.createElement('div');
+        head.className = 'doctor-group';
+        head.textContent = currentGroup;
+        els.doctorList.appendChild(head);
+      }
+      var row = document.createElement('div');
+      row.className = 'health-row ' + (item.ok ? 'health-ok' : 'health-err');
+      var name = document.createElement('span');
+      name.className = 'health-name';
+      name.textContent = item.label;
+      var status = document.createElement('span');
+      status.className = 'health-status';
+      status.textContent = item.ok ? '正常' : '异常';
+      var meta = document.createElement('span');
+      meta.className = 'health-meta';
+      meta.textContent = item.message;
+      row.appendChild(name);
+      row.appendChild(status);
+      row.appendChild(meta);
+      els.doctorList.appendChild(row);
+      // 失败项附修复建议——自检的价值一半在「告诉用户下一步做什么」
+      if (!item.ok && item.hint) {
+        var hint = document.createElement('div');
+        hint.className = 'doctor-hint';
+        hint.textContent = '→ ' + item.hint;
+        els.doctorList.appendChild(hint);
+      }
+    });
+    var summary = document.createElement('p');
+    summary.className = 'status-text ' + (data.bad_count ? 'status-error' : 'status-ok');
+    summary.textContent = '共 ' + results.length + ' 项 — 通过 ' + data.ok_count + ' / 未通过 ' + data.bad_count;
+    els.doctorList.appendChild(summary);
   }
 
   /* ── ⑦ 日志查看：手动加载 + 级别筛选 + 原生折叠展示 ──

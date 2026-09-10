@@ -124,6 +124,26 @@ def _build_parser() -> argparse.ArgumentParser:
         "  view-logs --lines 200        只读末尾 200 行"
     )
 
+    # ── doctor 子命令（实验功能 doctor_check）──
+    doctor_p = sub.add_parser("doctor", help="系统自检：环境/配置/目录/数据源一键体检（无需 config）")
+    doctor_p.add_argument(
+        "--offline",
+        action="store_true",
+        help="跳过数据源网络检查（仅查本地环境/配置/目录，瞬时返回）",
+    )
+    doctor_p.add_argument(
+        "--timeout",
+        type=float,
+        default=8.0,
+        help="网络检查整体耗时预算秒数（默认 8，防止慢速数据源拖住自检）",
+    )
+    doctor_p.epilog = (
+        "示例:\n"
+        "  doctor              完整自检（含数据源联通性）\n"
+        "  doctor --offline    仅本地自检，不联网\n"
+        "  doctor --timeout 15 放宽网络检查耗时预算"
+    )
+
     return parser
 
 
@@ -478,6 +498,37 @@ def _handle_check_sources() -> int:
     return 2  # unreachable, run_check_sources calls sys.exit
 
 
+def _use_ansi_color() -> bool:
+    """终端是否支持 ANSI 着色（无 TTY / 设了 NO_COLOR / 非 UTF-8 编码时降级）。"""
+    if os.environ.get("NO_COLOR"):
+        return False
+    if not sys.stdout.isatty():
+        return False
+    return bool(sys.stdout.encoding and sys.stdout.encoding.upper() in ("UTF-8", "UTF8"))
+
+
+def _handle_doctor(args: argparse.Namespace) -> int:
+    """处理 doctor 子命令——系统自检。
+
+    纯只读诊断，不需要 config 初始化：配置损坏正是自检要定位的场景之一。
+
+    Returns:
+        int 退出码（_EXIT_SUCCESS=全部通过, _EXIT_PARTIAL=有失败项）。
+        自检失败不是命令本身失败——命令跑完了并给出了结论，故用 PARTIAL 而非 SEVERE。
+    """
+    from src.python.core.doctor import (
+        format_doctor_report,
+        run_doctor_checks,
+        summarize_doctor_results,
+    )
+
+    results = run_doctor_checks(include_network=not args.offline, max_timeout=args.timeout)
+    print(format_doctor_report(results, use_color=_use_ansi_color()))
+
+    _ok_count, bad_count = summarize_doctor_results(results)
+    return _EXIT_PARTIAL if bad_count else _EXIT_SUCCESS
+
+
 def _handle_view_logs(args: argparse.Namespace) -> int:
     """处理 view-logs 子命令——读取结构化运行日志。
 
@@ -535,6 +586,10 @@ def main() -> int:
     # view-logs 无需 config：配置损坏时仍可查看日志诊断
     if args.command == "view-logs":
         return _handle_view_logs(args)
+
+    # doctor 同样无需 config：配置损坏正是它要定位的场景，此时不能因配置读不出而拒绝自检
+    if args.command == "doctor":
+        return _handle_doctor(args)
 
     init_config(config_path=args.config)
     config = get_config()

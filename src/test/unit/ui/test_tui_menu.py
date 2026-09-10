@@ -41,8 +41,8 @@ class TestMenuItems(unittest.TestCase):
             _tm.MENU_ITEMS[i] = (key, label, None, is_exit)
 
     def test_item_count(self) -> None:
-        """菜单项应为 19 个。"""
-        self.assertEqual(len(MENU_ITEMS), 19)
+        """菜单项应为 20 个（含受开关约束的 [D] 系统自检）。"""
+        self.assertEqual(len(MENU_ITEMS), 20)
 
     def test_whatif_item(self) -> None:
         """What-if 菜单项在报告生成组后（第 4 项，快捷键 W）。"""
@@ -62,7 +62,7 @@ class TestMenuItems(unittest.TestCase):
 
     def test_last_item_exit(self) -> None:
         """最后一项快捷键 X，is_exit=True。"""
-        key, label, cb, is_exit = MENU_ITEMS[18]
+        key, label, cb, is_exit = MENU_ITEMS[19]
         self.assertEqual(key, "X")
         self.assertIn("退出", label)
         self.assertIsNone(cb)
@@ -81,6 +81,14 @@ class TestMenuItems(unittest.TestCase):
         key, label, cb, is_exit = MENU_ITEMS[17]
         self.assertEqual(key, "H")
         self.assertIn("健康历史", label)
+        self.assertIsNone(cb)
+        self.assertFalse(is_exit)
+
+    def test_doctor_item(self) -> None:
+        """系统自检项在健康历史后、退出前（快捷键 D）。"""
+        key, label, cb, is_exit = MENU_ITEMS[18]
+        self.assertEqual(key, "D")
+        self.assertIn("系统自检", label)
         self.assertIsNone(cb)
         self.assertFalse(is_exit)
 
@@ -115,7 +123,10 @@ class TestIndexByKey(unittest.TestCase):
         self.assertEqual(index_by_key("W"), 3)
 
     def test_find_X(self) -> None:
-        self.assertEqual(index_by_key("X"), 18)
+        self.assertEqual(index_by_key("X"), 19)
+
+    def test_find_D(self) -> None:
+        self.assertEqual(index_by_key("D"), 18)
 
     def test_find_V(self) -> None:
         self.assertEqual(index_by_key("V"), 16)
@@ -205,6 +216,74 @@ class TestFilterMenuLlmModules(unittest.TestCase):
         self.assertIn("debate_pro", names)
         self.assertIn("debate_con", names)
         self.assertIn("debate_synthesis", names)
+
+
+@pytest.mark.unit
+@pytest.mark.unit_ui
+class TestFeatureGatedMenuItems:
+    """受功能开关约束的菜单项（[D] 系统自检）。
+
+    `_apply_feature_gates` 就裁剪 `MENU_ITEMS`，故每个用例前后都必须快照/还原——
+    否则会污染同进程内其它测试对菜单项数量的断言。
+    """
+
+    @pytest.fixture(autouse=True)
+    def _restore_menu(self):
+        import src.python.tui.tui_menu as tm
+
+        snapshot = list(tm.MENU_ITEMS)
+        yield
+        tm.MENU_ITEMS[:] = snapshot
+
+    def _apply(self, enabled: bool):
+        import src.python.tui.tui_menu as tm
+
+        with patch("src.python.config.features.is_feature_enabled", return_value=enabled):
+            tm._apply_feature_gates()
+
+    def test_gated_keys_are_registered_in_menu(self):
+        """门控表里的键必须真实存在于菜单——否则开关写了也没人看得见。"""
+        import src.python.tui.tui_menu as tm
+
+        keys = {item[0] for item in tm.MENU_ITEMS}
+        assert set(tm.FEATURE_GATED_ITEMS) <= keys
+
+    def test_gated_flag_is_registered_feature(self):
+        """门控开关必须是注册表中已声明的功能开关（防拼写错误静默失效）。"""
+        import src.python.tui.tui_menu as tm
+        from src.python.config.features import FEATURE_FLAGS
+
+        for flag in tm.FEATURE_GATED_ITEMS.values():
+            assert flag in FEATURE_FLAGS
+
+    def test_doctor_item_hidden_when_flag_off(self):
+        import src.python.tui.tui_menu as tm
+
+        self._apply(enabled=False)
+        assert "D" not in {item[0] for item in tm.MENU_ITEMS}
+
+    def test_doctor_item_visible_when_flag_on(self):
+        import src.python.tui.tui_menu as tm
+
+        self._apply(enabled=True)
+        assert "D" in {item[0] for item in tm.MENU_ITEMS}
+
+    def test_callback_binding_survives_gating(self):
+        """裁剪后其余项的回调绑定不受影响（索引与渲染一致）。"""
+        import src.python.tui.tui_menu as tm
+
+        self._apply(enabled=False)
+        keys = [item[0] for item in tm.MENU_ITEMS]
+        assert keys[-1] == "X"
+        assert len(keys) == len(set(keys))
+
+    def test_gating_is_idempotent(self):
+        import src.python.tui.tui_menu as tm
+
+        self._apply(enabled=False)
+        first = list(tm.MENU_ITEMS)
+        self._apply(enabled=False)
+        assert tm.MENU_ITEMS == first
 
 
 if __name__ == "__main__":

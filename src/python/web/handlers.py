@@ -262,6 +262,15 @@ def _build_system_info() -> dict:
     info["anonymization"] = anon_labels.get(anon_mode, anon_mode)
     info["privacy_shown"] = bool(get_flag("_privacy_notice_shown"))
 
+    # 系统自检卡片可见性（实验功能 doctor_check，与 TUI 菜单 D 同一开关）
+    try:
+        from src.python.config.features import is_feature_enabled
+
+        info["doctor_enabled"] = is_feature_enabled("doctor_check")
+    except Exception:
+        logger.warning("读取功能开关失败，系统自检卡片按隐藏处理", exc_info=True)
+        info["doctor_enabled"] = False
+
     try:
         llm_config = get_llm_config()
     except Exception:
@@ -565,6 +574,35 @@ def _handle_health():
     return _ok(results)
 
 
+def _handle_doctor():
+    """GET /api/doctor — 系统自检（实验功能 doctor_check）。
+
+    查询参数：
+      network — ``0`` 跳过数据源联网检查（默认 1，含网络检查）
+
+    与 /api/health 的分工：health 只探测数据源；doctor 还覆盖环境/配置/目录，
+    故不与其共享缓存（doctor 的本地项是廉价的，网络项复用 health 的 60s 缓存
+    并不成立——两者预算不同）。
+
+    Returns:
+        {results: [...], ok_count: int, bad_count: int}
+        每项含 group / label / ok / message / hint。
+    """
+    from src.python.core.doctor import run_doctor_checks, summarize_doctor_results
+
+    include_network = request.args.get("network", "1") != "0"
+    _MAX_TIMEOUT_CEILING = 15.0
+    try:
+        timeout = min(float(request.args.get("timeout", 12.0)), _MAX_TIMEOUT_CEILING)
+    except (TypeError, ValueError):
+        timeout = 12.0
+
+    # 整体预算低于前端 abort 阈值（留余量），未完成项由 run_health_checks 标"超时"
+    results = run_doctor_checks(include_network=include_network, max_timeout=max(timeout, 1.0))
+    ok_count, bad_count = summarize_doctor_results(results)
+    return _ok({"results": results, "ok_count": ok_count, "bad_count": bad_count})
+
+
 def _handle_logs():
     """GET /api/logs — 结构化日志查看（日志可视化）。
 
@@ -647,6 +685,7 @@ def create_handlers(app, run_manager) -> None:
     app.add_url_rule("/api/reports/<path:filename>", "serve_report", _handle_serve_report, methods=["GET"])
     app.add_url_rule("/api/health", "health", _handle_health, methods=["GET"])
     app.add_url_rule("/api/health/history", "health_history", _handle_health_history, methods=["GET"])
+    app.add_url_rule("/api/doctor", "doctor", _handle_doctor, methods=["GET"])
     app.add_url_rule("/api/logs", "logs", _handle_logs, methods=["GET"])
 
     app.add_url_rule("/api/config/edit", "config_edit", _handle_config_edit, methods=["GET", "POST"])

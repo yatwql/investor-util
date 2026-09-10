@@ -19,6 +19,7 @@ from src.python.cli import (
     _cli_read_holdings,
     _cli_read_holdings_with_flows,
     _handle_cache_update,
+    _handle_doctor,
     _handle_report,
     _handle_view_logs,
     _handle_whatif,
@@ -755,3 +756,104 @@ class TestMainViewLogs:
         args = mock_handle.call_args[0][0]
         assert args.command == "view-logs"
         assert args.lines == 300
+
+
+# ═══════════════════════════════════════════════════════════════
+# doctor 子命令
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestArgparseDoctor:
+    """doctor 子命令参数解析。"""
+
+    def test_doctor_defaults(self):
+        """doctor 默认联网 + 8s 超时。"""
+        args = _build_parser().parse_args(["doctor"])
+        assert args.command == "doctor"
+        assert args.offline is False
+        assert args.timeout == 8.0
+
+    def test_doctor_params(self):
+        """--offline / --timeout 透传。"""
+        args = _build_parser().parse_args(["doctor", "--offline", "--timeout", "3.5"])
+        assert args.offline is True
+        assert args.timeout == 3.5
+
+
+@pytest.mark.unit
+class TestHandleDoctor:
+    """_handle_doctor 输出与退出码。"""
+
+    _OK = [{"group": "环境", "label": "Python 版本", "ok": True, "message": "3.12", "hint": ""}]
+    _BAD = [{"group": "目录", "label": "输出目录", "ok": False, "message": "不可写", "hint": "chmod +w"}]
+
+    def test_all_ok_returns_success(self, capsys):
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._OK):
+            code = _handle_doctor(MagicMock(offline=False, timeout=8.0))
+
+        assert code == _EXIT_SUCCESS
+        assert "Python 版本" in capsys.readouterr().out
+
+    def test_any_bad_returns_partial(self, capsys):
+        """有失败项 → _EXIT_PARTIAL（命令跑完了，只是结论不佳；非 SEVERE）。"""
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._BAD):
+            code = _handle_doctor(MagicMock(offline=False, timeout=8.0))
+
+        assert code == _EXIT_PARTIAL
+        assert "chmod +w" in capsys.readouterr().out
+
+    def test_offline_skips_network(self):
+        """--offline 不触发联网检查。"""
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._OK) as mock_run:
+            _handle_doctor(MagicMock(offline=True, timeout=8.0))
+
+        assert mock_run.call_args.kwargs["include_network"] is False
+
+    def test_timeout_passthrough(self):
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._OK) as mock_run:
+            _handle_doctor(MagicMock(offline=False, timeout=2.5))
+
+        assert mock_run.call_args.kwargs["max_timeout"] == 2.5
+
+    def test_no_color_env_plain_output(self, capsys, monkeypatch):
+        """NO_COLOR 下输出不含 ANSI 转义（管道/日志场景）。"""
+        monkeypatch.setenv("NO_COLOR", "1")
+        with patch("src.python.core.doctor.run_doctor_checks", return_value=self._OK):
+            _handle_doctor(MagicMock(offline=False, timeout=8.0))
+
+        assert "\033[" not in capsys.readouterr().out
+
+
+@pytest.mark.unit
+class TestMainDoctor:
+    """main() doctor 分派（config 之前，与 view-logs 同理）。"""
+
+    def test_dispatches_before_init_config(self):
+        """配置损坏正是 doctor 要诊断的场景，故不得先 init_config。"""
+        with (
+            patch("src.python.cli.cli._handle_doctor", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config") as mock_init,
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "doctor", "--offline"]):
+                code = main()
+
+        assert code == _EXIT_SUCCESS
+        mock_handle.assert_called_once()
+        mock_init.assert_not_called()
+
+    def test_passes_args_to_handler(self):
+        with (
+            patch("src.python.cli.cli._handle_doctor", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "doctor", "--timeout", "4"]):
+                main()
+
+        args = mock_handle.call_args[0][0]
+        assert args.command == "doctor"
+        assert args.timeout == 4.0

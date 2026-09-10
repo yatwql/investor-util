@@ -10,6 +10,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 
 from src.python.core import holding_status
 from src.python.core.models import DividendRecord, HoldingsFile, Holding, TradeRecord
+from src.python.core.num_utils import safe_num
 
 logger = logging.getLogger("invest")
 
@@ -371,15 +372,20 @@ def _safe_str(value) -> str:
 
 
 def _safe_float(value, field: str, sheet: str, row: int) -> float | None:
-    """将单元格值转为 float；None 或转换失败时记录警告并返回 None。"""
+    """将单元格值转为 float；None、转换失败或非有限值时记录警告并返回 None。
+
+    非有限值（``=NA()`` 公式错误、Excel 错误单元格会返回 NaN）必须在此拦下：
+    NaN 不抛异常且为真值，会绕过调用方的 ``shares <= 0`` 等正整数校验，
+    把脏行放进 ``Holding`` 并污染后续全部市值计算。
+    """
     if value is None:
         logger.warning("工作表 '%s' 第 %d 行 '%s' 为空，跳过该行", sheet, row, field)
         return None
-    try:
-        return float(value)
-    except (ValueError, TypeError):
+    parsed = safe_num(value, default=None)
+    if parsed is None:
         logger.warning("工作表 '%s' 第 %d 行 '%s' 无法解析 (%s)，跳过该行", sheet, row, field, value)
         return None
+    return float(parsed)
 
 
 def _match_header(actual: list[str], expected: list[str]) -> bool:

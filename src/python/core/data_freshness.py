@@ -24,6 +24,8 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from src.python.core.num_utils import finite_or
+
 logger = logging.getLogger("invest")
 
 # ── 新鲜度常量 ───────────────────────────────────────────────
@@ -159,8 +161,8 @@ def detect_price_jumps(
         if freshness not in (FRESHNESS_FRESH, FRESHNESS_CACHED):
             continue
 
-        price = _detail_value(detail, "price", 0.0) or 0.0
-        yesterday_close = _detail_value(detail, "yesterday_close", 0.0) or 0.0
+        price = finite_or(_detail_value(detail, "price", 0.0))
+        yesterday_close = finite_or(_detail_value(detail, "yesterday_close", 0.0))
         if not yesterday_close or abs(yesterday_close) <= 1e-10:
             continue
 
@@ -235,12 +237,12 @@ def build_freshness_summary(
         jump = jump_by_code.get((h.code or "").strip())
         change_pct = (
             round(
-                ((_detail_value(detail, "price", 0.0) or 0.0) - (_detail_value(detail, "yesterday_close", 0.0) or 0.0))
-                / (_detail_value(detail, "yesterday_close", 0.0) or 1.0)
+                (finite_or(_detail_value(detail, "price", 0.0)) - finite_or(_detail_value(detail, "yesterday_close", 0.0)))
+                / finite_or(_detail_value(detail, "yesterday_close", 0.0), 1.0)
                 * 100,
                 2,
             )
-            if detail and (_detail_value(detail, "yesterday_close", 0.0) or 0.0) > 0
+            if detail and finite_or(_detail_value(detail, "yesterday_close", 0.0)) > 0
             else 0.0
         )
         items.append(

@@ -27,6 +27,7 @@ import re
 from typing import Any
 
 from src.python.core import decision_ledger as dl
+from src.python.core.num_utils import finite_or
 
 logger = logging.getLogger("invest")
 
@@ -53,7 +54,7 @@ def _holdings_price_map(holdings_details: list[dict[str, Any]] | None) -> dict[s
         if not code:
             continue
         try:
-            price = float(holding.get("price") or 0)
+            price = finite_or(holding.get("price"))
         except (TypeError, ValueError):
             price = 0.0
         price_map[code] = price

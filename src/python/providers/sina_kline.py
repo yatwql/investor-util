@@ -19,6 +19,7 @@ from src.python.core.code_utils import (
     is_a_share_code,
     is_exchange_fund_code,
 )
+from src.python.core.num_utils import safe_num
 
 logger = logging.getLogger("invest")
 
@@ -176,8 +177,9 @@ def _parse_kline_json(data: list | dict | None) -> list[dict]:
 
 
 def _parse_sina_kline_float(v: Any) -> float:
-    """安全解析 Sina K 线浮点数字段。"""
-    try:
-        return float(v) if v is not None else 0.0
-    except (ValueError, TypeError):
-        return 0.0
+    """安全解析 Sina K 线浮点数字段，失败/NaN/±inf 返回 0.0。
+
+    归一收敛于 :func:`core.num_utils.safe_num`——K 线数值会进入
+    ``analysis/`` 全部收益序列指标，NaN 泄漏的爆炸半径最大。
+    """
+    return float(safe_num(v, default=0.0))  # type: ignore[arg-type]

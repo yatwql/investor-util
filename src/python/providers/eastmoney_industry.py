@@ -24,6 +24,7 @@ import httpx
 
 from src.python.core.code_utils import get_push2_secid
 from src.python.core.http_client import make_http_client
+from src.python.core.num_utils import safe_num
 
 logger = logging.getLogger("invest")
 
@@ -134,18 +135,11 @@ def _extract_industry(inner: dict, key: str) -> str:
 def _extract_number(inner: dict, key: str) -> float | None:
     """从 push2 响应中提取数值字段（如 f9 市盈率 / f23 市净率）。
 
-    返回 float；字段缺失、非数值或 "-"（占位）返回 None。
+    返回 float；字段缺失、非数值、"-"（占位）或 NaN/±inf 返回 None。
+    归一收敛于 :func:`core.num_utils.safe_num`。
     """
-    raw = inner.get(key)
-    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
-        return float(raw)
-    if isinstance(raw, str):
-        try:
-            value = float(raw.strip())
-            return value
-        except ValueError:
-            return None
-    return None
+    value = safe_num(inner.get(key), default=None)
+    return float(value) if value is not None else None
 
 
 def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:

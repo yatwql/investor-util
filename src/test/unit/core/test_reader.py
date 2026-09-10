@@ -95,13 +95,32 @@ class TestSafeFloat(unittest.TestCase):
         self.assertIsNone(result)
         self.assertIn("第 2 行 '份额' 无法解析 (abc)", log.output[0])
 
-    def test_boolean_true(self):
-        """布尔值 True -> 1.0。"""
-        self.assertEqual(reader._safe_float(True, "份额", "测试表", 2), 1.0)
+    def test_boolean_true_returns_none(self):
+        """布尔值 True -> None（份额列出现布尔是脏数据，不得静默变 1 股）。"""
+        with self.assertLogs("invest", level="WARNING") as log:
+            result = reader._safe_float(True, "份额", "测试表", 2)
+        self.assertIsNone(result)
+        self.assertIn("无法解析 (True)", log.output[0])
 
-    def test_boolean_false(self):
-        """布尔值 False -> 0.0。"""
-        self.assertEqual(reader._safe_float(False, "份额", "测试表", 2), 0.0)
+    def test_boolean_false_returns_none(self):
+        """布尔值 False -> None（同上，不得静默变 0 股）。"""
+        with self.assertLogs("invest", level="WARNING") as log:
+            result = reader._safe_float(False, "份额", "测试表", 2)
+        self.assertIsNone(result)
+        self.assertIn("无法解析 (False)", log.output[0])
+
+    def test_nan_returns_none(self):
+        """NaN -> None（Excel =NA()/错误单元格；NaN 绕过 shares<=0 校验放行脏行）。"""
+        with self.assertLogs("invest", level="WARNING") as log:
+            result = reader._safe_float(float("nan"), "份额", "测试表", 2)
+        self.assertIsNone(result)
+        self.assertIn("无法解析 (nan)", log.output[0])
+
+    def test_inf_returns_none(self):
+        """±inf -> None。"""
+        with self.assertLogs("invest", level="WARNING"):
+            self.assertIsNone(reader._safe_float(float("inf"), "份额", "测试表", 2))
+            self.assertIsNone(reader._safe_float(float("-inf"), "每份成本", "测试表", 3))
 
 
 class TestMatchHeader(unittest.TestCase):
