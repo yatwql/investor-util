@@ -396,7 +396,11 @@ def _build_health_check_prompt(
     # （llm/module_fingerprint.py 模块 docstring）；未提供（None 或空串）时按无降级
     # 事件渲染。判据用 `not` 而非 `is None`——指纹侧 `data_quality_text or ""` 早已把
     # 两者折叠成同一个值，此处若只认 None，空串就会渲染成空段却与 None 共用指纹。
-    dq_detail = _build_data_quality_detail_block(None) if not data_quality_text else data_quality_text
+    dq_detail = (
+        _build_data_quality_detail_block(None, (pipeline_data or {}).get("data_freshness"))
+        if not data_quality_text
+        else data_quality_text
+    )
     attribution_text = _build_profit_attribution_block(holdings_details)
     total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
     signal_text = _build_signal_digest_block(pipeline_data) if enable_signal_digest else ""

@@ -461,7 +461,7 @@ if not any(needs.values()):
 
 首次运行（`is_first_check=True`）时输出"暂无历史对比数据"标记。
 
-**degradation_events 暴露**：`generate_all_llm()` 接收 `degradation_events` 参数，供 `health_check` 的第 5 维「数据质量」引用【数据质量降级】事件；传 `None`/空列表时该维度的降级详情段恒返回「今日无降级记录，所有数据源正常。」。调用点 `report/_llm_news.py::_submit_llm_future` 在**主线程**提交线程池前取一次 `DegradationTracker.get_log()` 快照随参传入（数据获取阶段已结束，此处读取即定稿；主线程读取避免与工作线程并发写入交错）——**不可改在 `generate_all_llm` 内部自行取**，那会让 LLM 层反向依赖 `report/` 的降级追踪器，且与 `expert_review` 经 `_build_data_degradation_block(pipeline_data)` 的口径分叉。`generate_all_llm()` 把该事件集渲染成数据质量详细状态块**一次**，同一实例既进 `health_check` 指纹又进其提示词（见 §7.1「提示词内容覆盖」）——数据健康结论与缓存键同源，源恢复后重出报告不会复用故障期间的结论。
+**degradation_events 暴露**：`generate_all_llm()` 接收 `degradation_events` 参数，供 `health_check` 的第 5 维「数据质量」引用降级事件；无降级事件时该段恒返回「今日无降级记录，所有数据源正常。」。该维度另需评**净值新鲜度**，其基准是**交易日**而非运行时刻——渲染时一并传入 `pipeline_data` 的 `data_freshness` 契约（`trading_day`/`prev_trading_day` + 逐品种 `stale`/`degraded` 清单），由 `_build_nav_freshness_basis_lines()` 产出「净值新鲜度基准」「净值滞后品种」行。报告可在非交易日运行（如周六凌晨生成上一交易日数据的报告），此时运行时刻与最近交易日相差一个自然日，若让模型自行以运行时刻做自然日差，QDII 与部分场外基金正常的 T-1 净值会被写成「净值更新延迟」。滞后清单直接引用 `core/data_freshness.py` 的判定结论，与「数据质量仪表盘」可信度区块同源，不由模型从裸日期另行推断。调用点 `report/_llm_news.py::_submit_llm_future` 在**主线程**提交线程池前取一次 `DegradationTracker.get_log()` 快照随参传入（数据获取阶段已结束，此处读取即定稿；主线程读取避免与工作线程并发写入交错）——**不可改在 `generate_all_llm` 内部自行取**，那会让 LLM 层反向依赖 `report/` 的降级追踪器，且与 `expert_review` 经 `_build_data_degradation_block(pipeline_data)` 的口径分叉。`generate_all_llm()` 把该事件集渲染成数据质量详细状态块**一次**，同一实例既进 `health_check` 指纹又进其提示词（见 §7.1「提示词内容覆盖」）——数据健康结论与缓存键同源，源恢复后重出报告不会复用故障期间的结论。
 
 > **LLM 输出侧质量分级不属本层**：`report/llm_quality.py`（实验功能 `module_quality_gate`）消费本层输出后逐模块评级并注入横幅，位于 `report/` 而非 `llm/`——`llm/` 不得反向依赖 `report/`（`report/llm_content.py` 已依赖 `llm/`）。设计见 `technical.md` §4.11。
 
@@ -784,7 +784,7 @@ penetrated_assets ──→ extract_stable_penetration()
 |:-----|:-----------------|:---------|:-----|
 | `competitive_context` | `global_macro` / `expert_review` / 辩论三键 | `prompts_core._build_competitive_context_block()` | 竞争语境块（【今日对比】/【区间对比】），由 A 股/美股指数、对比指数配置、区间收益与量化指标渲染而成 |
 | `metrics` | `expert_review` / 辩论三键 | 提示词正文（【量化指标】/ 情景分析 / 风格一致性） | 量化指标字典 |
-| `data_quality_text` | `health_check` | `prompts_tables._build_data_quality_detail_block()` | 数据质量详细状态块（【数据质量详细状态】：连接失败 / 数据为空 / 触发降级计数），由 `degradation_events`（本进程内的降级事件日志）渲染而成 |
+| `data_quality_text` | `health_check` | `prompts_tables._build_data_quality_detail_block()` | 数据质量详细状态块（【数据质量详细状态】：净值新鲜度基准 + 净值滞后/无有效行情清单 + 连接失败 / 数据为空 / 触发降级计数），由 `degradation_events`（本进程内的降级事件日志）与 `data_freshness` 契约（交易日 + 逐品种新鲜度）共同渲染而成 |
 | `pipeline_data` 派生的【环比变化】【数据质量降级】两段 | `expert_review` / `health_check` / 辩论三键 | `prompts_core._build_difpipeline_data_block()` / `_build_data_degradation_block()` | 由 `_pipeline_block_cache_suffix()` 调用**提示词侧同一构建器**取文本再哈希——「进键的文本」与「进提示词的文本」同源 |
 
 **两个结构性保证**：
@@ -888,7 +888,7 @@ cache_get(optimistic_key, ttl) → 命中 → 直接返回（+ 缓存标记）
 - 流动性（场内场外/停牌/封闭期）
 - 收益合理性（与市场/同类对比）
 - 成本结构（分布与浮盈浮亏比）
-- 数据质量（输入数据完整性与可靠性，引用【数据质量降级】事件）
+- 数据质量（输入数据完整性与可靠性，引用【数据质量详细状态】的事实——降级事件 + 净值新鲜度基准）
 
 **穿透深度分析** (`_SYSTEM_PENETRATION_DEEP`)：三节分析（行业集中度、品种集中度、国别/币种暴露）+ 综合建议。
 

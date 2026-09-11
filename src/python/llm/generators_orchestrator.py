@@ -573,7 +573,11 @@ def generate_all_llm(
     # ── 数据质量详细状态块：同样渲染**一次**，同一实例既进指纹（经预检）又进
     #    health_check 提示词（经 worker 分发）。否则数据源故障期间生成的体检结论
     #    会在源恢复后仍被复用——报告陈述与此刻事实相反，且不报错。 ──
-    data_quality_text = _build_data_quality_detail_block(degradation_events)
+    #    一并注入 data_freshness 契约：体检第 5 维还要评净值新鲜度，其基准是
+    #    交易日（非运行时刻），且滞后清单须与「数据质量仪表盘」可信度区块同源。 ──
+    data_quality_text = _build_data_quality_detail_block(
+        degradation_events, (pipeline_data or {}).get("data_freshness")
+    )
 
     cache_info = _compute_module_cache_info(
         llm_config,

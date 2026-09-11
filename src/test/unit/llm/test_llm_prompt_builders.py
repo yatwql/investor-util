@@ -36,6 +36,98 @@ class TestBuildHealthCheckPrompt(unittest.TestCase):
 
 
 @pytest.mark.unit_llm
+class TestNavFreshnessBasisInjection(unittest.TestCase):
+    """体检「数据质量」维度的净值新鲜度基准注入（缺陷回归）。
+
+    缺陷场景：报告在非交易日运行（周六凌晨生成上一交易日数据的报告），QDII
+    净值为前一交易日（T-1）本属正常；提示词旧口径以**运行时刻**与净值日期做
+    自然日差，使模型把正常的 T-1 净值写成「净值更新延迟」。
+    """
+
+    # 契约形如 data_freshness：交易日 2026-09-11（周五），前一交易日 2026-09-10
+    _FRESHNESS = {
+        "available": True,
+        "trading_day": "2026-09-11",
+        "prev_trading_day": "2026-09-10",
+        "items": [
+            {"code": "040046", "freshness": "cached"},
+            {"code": "017730", "freshness": "cached"},
+            {"code": "600900", "freshness": "fresh"},
+        ],
+    }
+
+    def _lagging_section(self, text: str) -> str:
+        """截取「净值滞后品种」行（含其后的行）。"""
+        self.assertIn("净值滞后品种", text)
+        return text.split("净值滞后品种", 1)[1]
+
+    def test_basis_uses_trading_day_not_run_time(self):
+        """基准行给出交易日/前一交易日，并禁止以运行时刻自然日差判定延迟。"""
+        from src.python.llm.prompts_tables import _build_data_quality_detail_block
+
+        text = _build_data_quality_detail_block([], self._FRESHNESS)
+        self.assertIn("最近交易日 2026-09-11", text)
+        self.assertIn("前一交易日 2026-09-10", text)
+        self.assertIn("自然日差", text)
+        self.assertIn("不构成延迟", text)
+
+    def test_qdii_t1_not_listed_as_lagging(self):
+        """QDII 的 T-1 净值（cached）不得进入滞后清单。"""
+        from src.python.llm.prompts_tables import _build_data_quality_detail_block
+
+        text = _build_data_quality_detail_block([], self._FRESHNESS)
+        lagging = self._lagging_section(text).split("\n", 1)[0]
+        self.assertEqual(lagging, "（净值日期早于前一交易日）：无")
+        self.assertNotIn("040046", lagging)
+        self.assertNotIn("017730", lagging)
+
+    def test_stale_code_listed_as_lagging(self):
+        """净值日期早于前一交易日的品种才计入滞后清单。"""
+        from src.python.llm.prompts_tables import _build_data_quality_detail_block
+
+        freshness = {
+            **self._FRESHNESS,
+            "items": [*self._FRESHNESS["items"], {"code": "123456", "freshness": "stale"}],
+        }
+        text = _build_data_quality_detail_block([], freshness)
+        lagging = self._lagging_section(text).split("\n", 1)[0]
+        self.assertIn("123456", lagging)
+        self.assertNotIn("040046", lagging)
+
+    def test_unavailable_freshness_keeps_legacy_text(self):
+        """契约不可用时不注入基准行，保持既有文案。"""
+        from src.python.llm.prompts_tables import _build_data_quality_detail_block
+
+        for fresh in (None, {"available": False}, {}):
+            text = _build_data_quality_detail_block(None, fresh)
+            self.assertEqual(text, "【数据质量】今日无降级记录，所有数据源正常。")
+
+    def test_health_check_prompt_carries_basis(self):
+        """体检提示词经 pipeline_data 注入基准行（旁路渲染路径）。"""
+        from src.python.llm.prompts_action import _build_health_check_prompt
+
+        prompt = _build_health_check_prompt(
+            total_mv=10000,
+            total_cost=9000,
+            total_profit=1000,
+            total_today_profit=100,
+            holdings_count=3,
+            categories={"基金": 3},
+            pipeline_data={"data_freshness": self._FRESHNESS},
+        )
+        self.assertIn("最近交易日 2026-09-11", prompt)
+        self.assertIn("净值滞后品种（净值日期早于前一交易日）：无", prompt)
+
+    def test_health_check_system_prompt_anchors_on_trading_day(self):
+        """体检系统提示词以交易日为基准判定延迟，不再以「距当前日期」表述。"""
+        from src.python.llm.prompts_core import _SYSTEM_HEALTH_CHECK
+
+        self.assertNotIn("净值日期距当前日期", _SYSTEM_HEALTH_CHECK)
+        self.assertIn("净值滞后品种", _SYSTEM_HEALTH_CHECK)
+        self.assertIn("不构成延迟", _SYSTEM_HEALTH_CHECK)
+
+
+@pytest.mark.unit_llm
 class TestBuildPenetrationDeepPrompt(unittest.TestCase):
     """_build_penetration_deep_prompt 提示词构建。"""
 

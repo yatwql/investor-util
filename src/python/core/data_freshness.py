@@ -209,13 +209,25 @@ def build_freshness_summary(
     Returns:
         契约 dict：::
             {"available": bool, "items": list[dict], "abnormal_count": int,
-             "summary": str}
+             "summary": str, "trading_day": str, "prev_trading_day": str}
         items 每项：:
             {"code", "name", "account", "freshness", "freshness_label",
              "jump", "jump_label", "change_pct"}
+
+        交易日随契约一并回传：消费方（体检报告数据质量维度）须以**交易日**而非
+        运行时刻为基准判断新鲜度——报告在非交易日运行（如周六凌晨跑上一交易日
+        的数据）时，运行时刻与最近交易日相差一个自然日，仅凭自然日差会把正常的
+        T-1 净值误报为延迟。
     """
     if not holdings:
-        return {"available": False, "items": [], "abnormal_count": 0, "summary": "无持仓品种"}
+        return {
+            "available": False,
+            "items": [],
+            "abnormal_count": 0,
+            "summary": "无持仓品种",
+            "trading_day": trading_day,
+            "prev_trading_day": prev_trading_day,
+        }
 
     # 未显式传入交易日时，以明细中最新 nav_date 作为最近交易日近似
     t_day = trading_day or _infer_latest_nav_date(details)
@@ -269,6 +281,8 @@ def build_freshness_summary(
         "items": items,
         "abnormal_count": len(abnormal),
         "summary": summary,
+        "trading_day": t_day,
+        "prev_trading_day": p_day,
     }
 
 

@@ -3,7 +3,7 @@
 覆盖：
   - classify_freshness — 单品种新鲜度分类（实时/缓存/过期/降级）
   - detect_price_jumps — 单日 ±20% 异常跳变检测（含阈值边界 / 非交易日不误报）
-  - build_freshness_summary — 可信度摘要数据契约（abnormal_count / summary / 跳变标注）
+  - build_freshness_summary — 可信度摘要数据契约（abnormal_count / summary / 跳变标注 / 交易日回传）
 
 运行：
   python -m pytest src/test/unit/core/test_data_freshness.py -v
@@ -264,6 +264,20 @@ class TestBuildFreshnessSummary(unittest.TestCase):
         summary = df.build_freshness_summary(holdings, details)  # trading_day/prev 均缺省
         self.assertTrue(summary["available"])
         self.assertEqual(summary["items"][0]["freshness"], df.FRESHNESS_FRESH)
+
+    def test_contract_carries_trading_day(self):
+        """契约回传交易日/前一交易日——体检「数据质量」维度的判定基准。
+
+        报告可在非交易日运行（如周六凌晨生成上一交易日数据的报告），此时运行
+        时刻与最近交易日相差一个自然日；消费方须用契约回传的交易日（而非运行
+        时刻）判定净值新鲜度，否则正常的 T-1 净值会被误报为延迟。
+        """
+        holdings = [_holding("华安纳斯达克100ETF联接基金A", "040046")]
+        details = [_detail("040046", "华安纳斯达克100ETF联接基金A", nav_date=_PREV)]
+        summary = df.build_freshness_summary(holdings, details, _T, _PREV)
+        self.assertEqual(summary["trading_day"], _T)
+        self.assertEqual(summary["prev_trading_day"], _PREV)
+        self.assertEqual(summary["items"][0]["freshness"], df.FRESHNESS_CACHED)
 
     def test_zero_yesterday_close_change_pct_zero(self):
         """明细存在但昨收为 0 → change_pct 记 0.0（不除零），不判跳变。"""
