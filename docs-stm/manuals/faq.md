@@ -80,7 +80,7 @@ New-Item -ItemType SymbolicLink -Path .venv -Target D:\path\to\venvs\investor-ut
 
 创建后，Python、pip、pytest、VSCode 全部自动跟随到实际目录，无需环境变量、无需 `activate`。`.gitignore` 已有 `.venv/`，不污染仓库。多个项目可指向同一个外部 `.venv` 节省磁盘空间。
 
-启动脚本会自动识别链接：检测到 `.venv` 是符号链接/Junction 时，直接使用（`launch.sh` 第 34~42 行、`launch.ps1` 第 44~53 行）。
+启动脚本会自动识别链接：检测到 `.venv` 是符号链接/Junction 时，直接使用（`launch.sh` 第 42~50 行、`launch.ps1` 第 57~66 行）。
 
 **方案 B：VENV_PATH 环境变量（启动脚本原生支持）**
 
@@ -101,7 +101,7 @@ VENV_PATH=/path/to/venvs/investor-util ./scripts/launch.sh
 echo 'export VENV_PATH=/path/to/venvs/investor-util' >> ~/.bashrc && source ~/.bashrc
 ```
 
-原理（`launch.sh` 第 43~56 行 / `launch.ps1` 第 54~77 行）：
+原理（`launch.sh` 第 51~64 行 / `launch.ps1` 第 67~81 行）：
 1. 检测到 `VENV_PATH` → 外部目录不存在时自动 `python -m venv` 创建
 2. 自动创建 `.venv` 符号链接（`ln -s` / `New-Item -ItemType Junction`）
 3. 下次启动时走到方案 A 的检测逻辑，直接复用
@@ -270,7 +270,7 @@ A: 可以。编辑 `data/config/config.json` 的 `rebalance` 段：
 
 **Q: 如何自定义 HTML 报告样式？**
 
-A: 直接编辑 `src/python/tmpl/report_template.html`，所有样式在 `<style>` 标签内集中定义。修改后重新生成报告即可生效，无需重启程序。
+A: 直接编辑 `src/static/tmpl/report_template.html`，所有样式在 `<style>` 标签内集中定义。修改后重新生成报告即可生效，无需重启程序。
 
 ---
 
@@ -347,7 +347,7 @@ A: 程序内置多数据源自动 fallback 机制（股票/ETF：腾讯→新浪
 
 **Q: 港股通股票如何取价？**
 
-A: 港股通代码以 `0` 开头（如 `00700`），走腾讯财经港股行情接口，与 A 股共用相同链路。取价方式标注为"实时价(HK)"，汇率换算由腾讯接口自动返回人民币计价数据。
+A: 港股通代码为 **5 位纯数字**（如 `00700`、`03690`），程序按代码位数识别，归入「股票 / A股」分类——与 A 股的 6 位代码格式不同（`is_hk_stock_code` 只按"5 位纯数字"判定，不看首位数字）。行情侧港股通代码不在场内行情链路（腾讯/新浪，只处理 6 位代码）的覆盖范围内，取不到行情时市值/盈亏显示 `--`、取价方式列标注"暂无行情"，不影响其他持仓的计算。
 
 **Q: 如何验证网络连通性？**
 

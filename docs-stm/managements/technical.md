@@ -42,6 +42,10 @@
   - [4.12 组合演进（多快照趋势）](#412-组合演进多快照趋势)
   - [4.13 调仓 What-if 模拟](#413-调仓-what-if-模拟)
   - [4.14 HTML 暗色模式](#414-html-暗色模式)
+  - [4.15 决策头结构化与决策词归一解析](#415-决策头结构化与决策词归一解析)
+  - [4.16 确定性数值信号沉淀与实时/非实时标签纪律](#416-确定性数值信号沉淀与实时非实时标签纪律)
+  - [4.17 健壮性三件套（数值归一防线 / 失败原因可读 / 系统自检）](#417-健壮性三件套数值归一防线--失败原因可读--系统自检)
+  - [4.18 决策跨期反思闭环](#418-决策跨期反思闭环)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -493,27 +497,29 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 
 #### 1.7.2 argparse 结构
 
-`_build_parser()`：`prog="investor-util"`，全局参数 + 5 个子命令。
+`_build_parser()`：`prog="investor-util"`，全局参数 + 7 个子命令。
 
 - **全局参数**：`--config`（备用配置文件路径）、`--output`（报告输出目录，覆盖 config 的 output_dir）、`--verbose`（进度同步到 stderr，默认仅写 logs/app.log）、`--non-interactive`（跳过首次运行交互式引导，定时任务/脚本使用）、`--experiment NAME`（可重复；启用实验性功能且**仅本次运行生效、不写盘**。NAME 取开关名或显示名，`all` = 全部启用。取值经 `_experiment_name` argparse type 回调即时校验：空串/未知名即报错，可选值由 `features.describe_experiment_flags()` 生成）、`--feature NAME=VALUE`（可重复；**全部**功能开关的双向一次性开关，同样是仅本次运行、不写盘。VALUE 取 `on/off/true/false/1/0`（大小写不敏感），NAME 取注册表键名。取值经 `_feature_override` argparse type 回调即时校验：非 `NAME=VALUE` 形态、未知开关名、不可识别取值均即报错并列出可选值；同名后者覆盖前者。两者共用一个应用原语，`--feature` 在 `--experiment` 之后应用，故显式取值可覆盖 `--experiment` 的隐式「置开」）、`--version`。
 - **`report`**：`--type basic/both/full`（默认 basic）、`--history auto/off`（未指定回退配置层 `history.fetch_mode`，仅 both/full 有效）、`--force-llm`。
 - **`cache`**：互斥组 `--update basic/position/all` / `--clean` / `--stats`。
 - **`whatif`**：`--candidate`（目标持仓，必填）、`--base`（基准持仓，缺省用 config 持仓）、`--effective-date`（调仓生效日，opt-in 联网取历史做时序回测）。
+- **`cassettes`**：数据源记录-回放维护（`core/cassette.py`），无参数列出已录制响应，`--verify` 逐条离线回放并交当前解析器解析（不联网）；**无需 config 且只读离线**（main() 中特殊前置分派）。
 - **`check-sources`**：数据源健康检查，**无需 config**（main() 中特殊前置分派）。
 - **`view-logs`**：结构化运行日志查看（`core/log_reader.py::read_log`），`--level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`（最小级别阈值）、`--lines N`（默认 5000，读取末尾行数上限）、`--since/--until`（时间前缀过滤）；**无需 config**（main() 中特殊前置分派，配置损坏时仍可查日志诊断）。
 - **`doctor`**：系统自检（`core/doctor.py`，§4.17.3），`--offline`（跳过数据源联网检查）、`--timeout SECONDS`（默认 8.0，联网检查总预算）；**无需 config 且不受 `doctor_check` 开关约束**（main() 中特殊前置分派——配置损坏正是它要诊断的场景，若被开关拦住即成死锁）。
 
 #### 1.7.3 主流程
 
-`main()`：`setup_logger` → `_build_parser` → `parse_args` → `check-sources` / `view-logs` / `doctor` 特殊处理（均不 init_config，经 `_prepare_early_exit_switches(groups, pairs)` 先加载 `features.json` 覆写再叠加 `--experiment` / `--feature` 增量）→ `init_config` + `get_config` → `_apply_cli_experiments(args.experiment)` + `_apply_cli_switches(args.feature)`（命令行功能开关，须在配置初始化**之后**——覆写加载已完成，此处只做本次运行的增量 `set_feature_enabled`，绝不 `save_feature_overrides` 写盘；顺序为实验组简写在前、`--feature` 显式取值在后，故后者可覆盖前者）→ `startup_wizard(non_interactive)`（非交互/CI 环境自动跳过，不阻塞命令）→ 按 `args.command` 分派 `_handle_report` / `_handle_cache` / `_handle_whatif`。
+`main()`：`setup_logger` → `_build_parser` → `parse_args` → `check-sources` / `view-logs` / `doctor` / `cassettes` 特殊处理（均不 init_config，经 `_prepare_early_exit_switches(groups, pairs)` 先加载 `features.json` 覆写再叠加 `--experiment` / `--feature` 增量）→ `init_config` + `get_config` → `_apply_cli_experiments(args.experiment)` + `_apply_cli_switches(args.feature)`（命令行功能开关，须在配置初始化**之后**——覆写加载已完成，此处只做本次运行的增量 `set_feature_enabled`，绝不 `save_feature_overrides` 写盘；顺序为实验组简写在前、`--feature` 显式取值在后，故后者可覆盖前者）→ `startup_wizard(non_interactive)`（非交互/CI 环境自动跳过，不阻塞命令）→ 按 `args.command` 分派 `_handle_report` / `_handle_cache` / `_handle_whatif`。
 
 **持仓定位差异**：CLI 不经过 TUI 文件选择器——`_cli_resolve_holdings_file()` 通过 config 的 `holdings_dir + holdings_filename` 直接定位；若该路径为目录则自动选第一个 `.xlsx`（多个时告警）。`_cli_read_holdings()` / `_cli_read_holdings_with_flows()` 分别读主表与「主表+流水」，与 TUI 读取路径对齐。
 
 #### 1.7.4 子命令处理器
 
-- **`_handle_report`**：`CliProgressReporter(verbose)` 注入 `generate_report`（§4.2）；`--output` 覆盖 `output_dir`，`--warm` 传 `warm_cache`，`--history` 为 None 时回退配置层解析；返回 `result.exit_code`。
+- **`_handle_report`**：`CliProgressReporter(verbose)` 注入 `generate_report`（§4.2）；`--output` 覆盖 `output_dir`，`--history` 为 None 时回退配置层解析；返回 `result.exit_code`。
 - **`_handle_cache`**：三分支——`--clean` 委托 `cleanup_cache`；`--stats` 委托 `get_cache_stats` + 打印 LLM 配置状态；`--update` 委托 `update_basic_cache`/`update_position_cache`（§3.6），`--update all` 采用**最大努力模式**（basic 失败仍继续 position，退出码取两者 max）。
 - **`_handle_whatif`**：解析 `--base`/`--candidate` 两份持仓 → `run_whatif_simulation()`（§4.13）→ 结果 `ok` 判定，失败返回 2；`--effective-date` 触发时序回测扩展。
+- **`_handle_cassettes`**：无参数时经 `core/cassette.py::list_cassettes()` 列出已录制响应（来源/录制时间/交互数/大小）；`--verify` 时经 `fetcher/cassette_checks.py::CASSETTE_CHECKS` + `verify_cassettes()` 离线回放，有解析失败返回 `_EXIT_SEVERE`。纯只读展示层，不联网、不碰用户配置。
 - **`_handle_check_sources`**：`run_check_sources()`（内部 `sys.exit`）。
 - **`_handle_view_logs`**：调 `core/log_reader.py::read_log(limit, level, since, until)`，输出每条 `time [LEVEL] message`（多行 body 缩进）；无匹配 → 提示并返回 0；ValueError/OSError → 记录日志 + 返回 `_EXIT_SEVERE`。**薄展示层，无解析逻辑**（解析/过滤全在 `core/log_reader.py`）。
 - **`_handle_doctor`**：调 `core/doctor.py::run_doctor_checks(include_network=not offline, max_timeout=timeout)` → `format_doctor_report(results, use_color=_use_ansi_color())` → 按 `summarize_doctor_results()` 返回 `_EXIT_SUCCESS`（全通过）/ `_EXIT_PARTIAL`（有失败项）。`_use_ansi_color()` 遵循 `NO_COLOR` + `isatty` + UTF-8 三项判据，终端不支持颜色时自动降级为纯文本（§4.17.3）。
@@ -1688,7 +1694,7 @@ verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使�
 
 #### HTML 端实现
 
-`html_writer.py:_compute_section_visibility()` 集中实现两层合并：
+`html_writer_nav.py:_compute_section_visibility()` 集中实现两层合并：
 
 ```python
 board_flags = {
@@ -2562,7 +2568,7 @@ tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互�
 
 **打印协调**：暗色下 `@media print` 的 CSS 覆盖只影响非 canvas 部分，canvas 像素仍暗色。`theme.js` 用**捕获阶段**监听 `beforeprint`（`addEventListener('beforeprint', fn, true)`——捕获先于 chart-print.js 的冒泡阶段快照执行）：若暗色，先移除 `data-theme` + 重读变量 + 遍历图表 `update()`（同步渲染浅色像素）→ chart-print.js 快照抓到浅色；`afterprint` 捕获阶段恢复暗色 + 重绘（`restoreAfterPrint` 标志记录状态）。`@media print` 同时隐藏 `.theme-toggle-btn`。
 
-**JS 资产**：`html_writer.py::_JS_ASSETS` 增加 `theme.js`（第 8 个本地 bundle），whatif 复用同一复制函数；两模板均在 `toc.js` 之后以 `defer` 加载（DOMContentLoaded 前执行，无 FOUC）。**单文件自包含**：`html_writer_assets.py::_inline_js_assets` 在保存前把 8 个资产内容内嵌——移除 head 区 `<script defer src="X.js">` 外链标签，按 bundle 依赖顺序追加为行内 `<script>` 到 `</body>` 前（复刻 defer 时序：DOM 解析完后、DOMContentLoaded 前按序执行，chart-init 能取到已解析 canvas/chart-data、toc.js/theme.js 内部 DOMContentLoaded 监听仍触发），报告 HTML 单文件完全自包含（Web 下载到其他目录/单发移动端浏览不依赖同目录松散 JS）；`_copy_js_assets` 保留作兜底（资产缺失/读取失败/含 `</script` 序列时该资产外链标签保留原位，松散文件仍可加载）。
+**JS 资产**：`html_writer_assets.py::_JS_ASSETS` 增加 `theme.js`（第 8 个本地 bundle），whatif 复用同一复制函数；两模板均在 `toc.js` 之后以 `defer` 加载（DOMContentLoaded 前执行，无 FOUC）。**单文件自包含**：`html_writer_assets.py::_inline_js_assets` 在保存前把 8 个资产内容内嵌——移除 head 区 `<script defer src="X.js">` 外链标签，按 bundle 依赖顺序追加为行内 `<script>` 到 `</body>` 前（复刻 defer 时序：DOM 解析完后、DOMContentLoaded 前按序执行，chart-init 能取到已解析 canvas/chart-data、toc.js/theme.js 内部 DOMContentLoaded 监听仍触发），报告 HTML 单文件完全自包含（Web 下载到其他目录/单发移动端浏览不依赖同目录松散 JS）；`_copy_js_assets` 保留作兜底（资产缺失/读取失败/含 `</script` 序列时该资产外链标签保留原位，松散文件仍可加载）。
 
 **架构约束遵从**：
 
@@ -2962,7 +2968,7 @@ config/
 
 ### 6.2 中央注册表
 
-**设计目标**：消除 `config/` / `cache/cache.py` / `core/constants.py` 三处分散维护的遗漏风险，做到"一处注册，全局生效"。
+**设计目标**：消除 `config/` / `cache/_ttl.py` / `core/constants.py` 三处分散维护的遗漏风险，做到"一处注册，全局生效"。
 
 #### DataModuleDef 条目结构
 
