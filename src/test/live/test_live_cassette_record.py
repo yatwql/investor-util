@@ -65,7 +65,11 @@ def test_record_fund_nav(cassette_recording):
 
 @pytest.mark.cassette("fund_holdings", source="tiantian")
 def test_record_fund_holdings(cassette_recording):
-    """天天基金持仓：整页 HTML 表格解析路径（格式漂移最敏感的一类）。"""
+    """天天基金持仓（ETF 联接基金）：取数阶梯 + 主页面目标 ETF 锚点解析。
+
+    录联接基金而非普通基金——普通基金的年份域季报通常直接命中，不会请求主页面，
+    录下来与 ``fund_quarterly_holdings`` 重复；联接基金才会走完阶梯并落到锚点。
+    """
     _record_and_selfcheck(cassette_recording, "fund_holdings")
 
 

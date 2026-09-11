@@ -73,6 +73,45 @@ class TestPenetrationFooterReportPeriods(unittest.TestCase):
 
         self.assertNotIn("各基金持仓报告期", _sheet_text(ws))
 
+    def test_feeder_fund_shows_penetration_source(self):
+        """联接基金的持仓穿透自目标 ETF，须标出来源并明示未折算持有比例。
+
+        未折算说明不可省略：联接基金约 95% 资产投向目标 ETF，按 100% 归因
+        会轻微高估底层标的权重，读者当作精确值会误判真实暴露。
+        """
+        wb = Workbook()
+        ws = wb.active
+        summary = _summary(
+            report_periods=[
+                {
+                    "name": "博时纳斯达克100ETF发起式联接(QDII)A人民币",
+                    "code": "016055",
+                    "period": "2026-06-30",
+                    "feeder_target_code": "513390",
+                    "feeder_target_name": "纳指100ETF博时",
+                }
+            ]
+        )
+
+        ps._write_penetration_footer(ws, 0, summary)
+
+        text = _sheet_text(ws)
+        self.assertIn("016055)", text)
+        self.assertIn("穿透自目标 ETF 513390 纳指100ETF博时", text)
+        self.assertIn("未折算持有比例", text)
+
+    def test_non_feeder_fund_has_no_source_annotation(self):
+        """非联接基金不带来源标注（避免给普通基金加上误导性说明）。"""
+        wb = Workbook()
+        ws = wb.active
+        summary = _summary(report_periods=[{"name": "易方达蓝筹", "code": "005827", "period": "2026-06-30"}])
+
+        ps._write_penetration_footer(ws, 0, summary)
+
+        text = _sheet_text(ws)
+        self.assertIn("易方达蓝筹(005827) 2026-06-30", text)
+        self.assertNotIn("穿透自目标 ETF", text)
+
 
 class TestPenetrationFooterStaleFunds(unittest.TestCase):
     """报告期陈旧被剔除的基金须在备注中说明原因与原始报告期。"""

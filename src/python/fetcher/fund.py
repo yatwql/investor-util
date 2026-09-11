@@ -81,9 +81,18 @@ _FUND_HOLD_PROVIDERS: dict[str, tuple[str, _ProviderFunc]] = {
 
 
 def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
-    """获取基金前 10 大持仓。
+    """获取基金底层持仓（联接基金穿透到其目标 ETF）。
 
     Provider Chain（可配置）：天天基金
+
+    联接基金（ETF 联接/指数联接）的资产就是目标 ETF、本身不持有股票，其季报
+    股票表按构造为空。此时 provider 会带回 ``feeder_target_code``，本函数以该
+    代码**发起一次独立取数**（走完整链路 + 会话缓存）取其持仓，并在结果上标注
+    ``feeder_penetration`` 来源，供报告层说明「底层暴露穿透自目标 ETF」。
+
+    穿透深度恒为 1：只有名称含「联接」的基金才带回目标 ETF，而 ETF 名称不含
+    「联接」，故第二跳的结果不会再生出新的目标。第二跳失败时原样返回该基金的
+    自身结果（通常为空），由既有「持仓不可用」路径降级。
     """
     from src.python.report.data_status import get_tracker
 
@@ -104,7 +113,61 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
         _t.record(_src_key, "T2", success=True)
     else:
         _t.record(_src_key, "T2", success=False, failure_type="unreachable", message=diag.summary())
-    return result
+
+    return with_feeder_penetration(code, result)
+
+
+def with_feeder_penetration(code: str, result: dict[str, Any] | None) -> dict[str, Any] | None:
+    """联接基金穿透：以目标 ETF 的持仓代理该基金的底层暴露（**幂等**）。
+
+    目标 ETF 经 :func:`fetch_fund_holdings_cached` 取数——与任何基金走同一条
+    链路与会话缓存。若用户同时持有该目标 ETF，同一会话内其持仓只请求一次。
+
+    **为何是幂等的后处理而非链路内一步**：批量的缓存预检（``execute_with_cache_check``）
+    命中文件缓存时会直接返回缓存值、**不执行任务**，因此单条取数路径上的穿透
+    在缓存热时不会被触发。凡「从缓存或网络产出持仓」之处都须过一遍本函数；
+    已带 ``feeder_penetration`` 的结果原样返回，重复调用无副作用。
+
+    Args:
+        code: 基金代码
+        result: 取数结果（可为 None）
+
+    Returns:
+        穿透后的合并结果；非联接基金、开关关闭或目标 ETF 亦不可得时原样返回 result。
+    """
+    if not result or result.get("feeder_penetration"):
+        return result
+    target_code = result.get("feeder_target_code")
+    if not target_code:
+        return result
+
+    from src.python.config.features import is_feature_enabled
+
+    if not is_feature_enabled("feeder_penetration"):
+        logger.info("基金 %s 为联接基金，但 switch feeder_penetration 已关闭，不穿透目标 ETF %s", code, target_code)
+        return result
+
+    target = fetch_fund_holdings_cached(target_code)
+    if not target or not target.get("holdings"):
+        logger.warning("[穿透] 联接基金 %s 的目标 ETF %s 亦无持仓数据，维持原结果", code, target_code)
+        return result
+
+    logger.info(
+        "[穿透] 联接基金 %s 的底层资产穿透自目标 ETF %s（%s），报告期 %s",
+        code,
+        target_code,
+        target.get("name") or "未知",
+        target.get("date") or "未知",
+    )
+    return {
+        **target,
+        "code": code,
+        "name": result.get("name") or target.get("name", ""),
+        "feeder_penetration": {
+            "target_code": target_code,
+            "target_name": target.get("name", ""),
+        },
+    }
 
 
 def fetch_fund_rankings_cached(code: str) -> dict[str, Any] | None:
@@ -235,7 +298,8 @@ def fetch_fund_holdings_batch(
 
     hold_map: dict[str, dict[str, Any] | None] = {}
     for code, r in zip(fund_codes, results):
-        hold_map[code] = r.result if r.success else None
+        # 缓存预检命中时任务未执行，穿透须在此补做（幂等，未命中项为无操作）
+        hold_map[code] = with_feeder_penetration(code, r.result if r.success else None)
 
     if own:
         dispatcher.shutdown()

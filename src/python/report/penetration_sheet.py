@@ -38,6 +38,25 @@ logger = logging.getLogger("invest")
 # 模块级降级阈值控制器（单例工厂共享，统一管理）
 _tracker = get_tracker()
 
+_FEEDER_SOURCE_TEMPLATE = "（穿透自目标 ETF {code} {name}，未折算持有比例）"
+"""联接基金的穿透来源标注。
+
+未折算说明必须随标注出现：联接基金约 95% 资产投向目标 ETF，按 100% 归因会
+轻微高估底层标的权重。读者若把穿透结果当作精确值会误判真实暴露。"""
+
+
+def period_entry_label(entry: dict) -> str:
+    """报告期明细条目的展示文本（基金名 + 报告期 + 穿透来源）。
+
+    各基金持仓在报告中只此一处上屏，措辞集中于此，避免多端各写各的。
+    """
+    label = f"{entry['name']}({entry['code']}) {entry['period']}"
+    target_code = entry.get("feeder_target_code")
+    if target_code:
+        label += _FEEDER_SOURCE_TEMPLATE.format(code=target_code, name=entry.get("feeder_target_name") or "")
+    return label
+
+
 _NCOLS = 10
 _CURRENT_YEAR = datetime.now().year
 _HEADERS = [
@@ -270,7 +289,7 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
     report_periods = summary.get("report_periods", [])
     if report_periods:
         row += 1
-        period_text = "；".join(f"{p['name']}({p['code']}) {p['period']}" for p in report_periods)
+        period_text = "；".join(period_entry_label(p) for p in report_periods)
         write_data_row(ws, row, [f"  各基金持仓报告期：{period_text}"])
     return row
 

@@ -90,6 +90,7 @@ _EXPECTED_WHITELIST = {
     "enable_interactive_charts",
     "doctor_check",
     "datasource_adapter",
+    "feeder_penetration",
 }
 
 
@@ -212,6 +213,7 @@ class TestGetSurface:
             "enable_interactive_charts",
             "doctor_check",
             "datasource_adapter",
+            "feeder_penetration",
         }
         assert all(v is True for v in data["features"]["standard"].values())
         # 显示名同源下发（前端不再手写标签字典，避免与注册表漂移）

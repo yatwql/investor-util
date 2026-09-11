@@ -478,7 +478,8 @@ investor-util/
 │       │   │   ├── test_fetcher_index.py    #   指数行情获取测试
 │       │   │   ├── test_fetcher_industry.py #   行业分类获取测试
 │       │   │   ├── test_fetcher_price.py    #   行情价格获取测试
-│       │   │   ├── test_fund.py             #   基金数据获取测试
+│       │   │   ├── test_fund.py             #   基金数据获取测试（含联接基金穿透后处理：幂等/缓存命中补做/开关）
+│       │   │   ├── test_fund_edge.py        #   联接基金穿透边缘场景
 │       │   │   ├── test_fund_manager.py     #   基金经理数据测试
 │       │   │   ├── test_quote_adapter_parity.py # 行情域适配契约等价性（与既有转换函数逐源比对 + 链两槽选择）
 │       │   │   ├── test_source_adapter.py       # 数据源适配契约（注册表/三段式/声明式归一）
@@ -553,7 +554,8 @@ investor-util/
 │       │   │   ├── test_numeric_guard_regression.py # 非有限数值归一防线（各解析器拦截 NaN/±inf + 合法输入行为不变）
 │       │   │   ├── test_tencent.py            #   腾讯财经 API 测试
 │       │   │   ├── test_tencent_edge.py       #   腾讯财经边缘场景
-│       │   │   └── test_tiantian.py           #   天天基金 API 测试
+│       │   │   ├── test_tiantian.py           #   天天基金 API 测试（含基金持仓三跳阶梯次序与目标 ETF 锚点解析）
+│       │   │   └── test_tiantian_holdings_edge.py # 基金持仓取数阶梯与目标 ETF 锚点边缘场景
 │       │   ├── report/              #   报告单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_benchmark.py              #   业绩基准测试

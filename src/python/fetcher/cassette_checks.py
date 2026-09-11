@@ -26,6 +26,13 @@ from src.python.providers import tiantian_holdings
 _STOCK_CODE = "600519"
 _ETF_CODE = "510300"
 _FUND_CODE = "110022"
+_FEEDER_FUND_CODE = "016055"
+"""ETF 联接基金标的——其季报股票表按构造为空，取数会走到主页面锚点那一步。
+
+``fund_holdings`` 录制取它而非 ``_FUND_CODE``：普通基金的年份域季报通常直接命中
+（第 1 跳），不会请求主页面，录下来与 ``fund_quarterly_holdings`` 重复；联接基金
+才会走到「主页面 → 目标 ETF 锚点」，那正是本录制要盯的路径。
+"""
 _KLINE_DAYS = 5
 
 CASSETTE_CHECKS: dict[str, Callable[[], Any]] = {
@@ -33,7 +40,7 @@ CASSETTE_CHECKS: dict[str, Callable[[], Any]] = {
     "sina_quote": lambda: sina_provider.fetch_price(_STOCK_CODE),
     "tencent_kline": lambda: tencent.fetch_kline(_STOCK_CODE, days=_KLINE_DAYS),
     "fund_nav": lambda: eastmoney.fetch_nav(_FUND_CODE),
-    "fund_holdings": lambda: tiantian_holdings.fetch_fund_holdings(_FUND_CODE),
+    "fund_holdings": lambda: tiantian_holdings.fetch_fund_holdings(_FEEDER_FUND_CODE),
     "fund_quarterly_holdings": lambda: tiantian_holdings.fetch_quarterly_holdings(_FUND_CODE),
 }
 

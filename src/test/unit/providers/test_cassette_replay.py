@@ -105,18 +105,26 @@ def test_fund_nav_real_response_parses_jsonp_payload():
 
 
 @pytest.mark.cassette("fund_holdings")
-def test_fund_holdings_real_response_parses_html_table():
-    """天天基金持仓页：整页 HTML 表格抽取，重仓股顺序与占比逐项锁定。"""
-    data = tiantian_holdings.fetch_fund_holdings("110022")
+def test_fund_holdings_real_response_resolves_feeder_target():
+    """天天基金联接基金：季报股票表按构造为空 → 落到主页面并由锚点解析出目标 ETF。
+
+    录制标的为 ETF 联接基金（普通基金的年份域季报直接命中、不请求主页面，录下来
+    与 ``fund_quarterly_holdings`` 重复）。本用例盯的是本基金**独有**的那条路径：
+    联接基金自身无股票持仓，底层暴露只能取自目标 ETF，故需带回 ``feeder_target_code``
+    交给 fetcher 层发起第二跳。
+
+    录制内容亦真实反映了阶梯的**次序**：先按最近 4 个完整季度 × jjcc/zqcc 逐档
+    尝试（8 次请求，均无持仓），再退到主页面由锚点定位——若把无年份兜底提回与
+    年份域并列，此处会取到陈年分区而非目标 ETF。
+    """
+    data = tiantian_holdings.fetch_fund_holdings("016055")
 
     assert data is not None
-    assert data["code"] == "110022"
-    assert data["name"] == "易方达消费行业股票"
-    holdings = data["holdings"]
-    assert len(holdings) == 10
-    assert holdings[0] == {"name": "贵州茅台", "code": "600519", "ratio": pytest.approx(9.77)}
-    assert holdings[1] == {"name": "美的集团", "code": "000333", "ratio": pytest.approx(9.31)}
-    assert holdings[2] == {"name": "山西汾酒", "code": "600809", "ratio": pytest.approx(8.5)}
+    assert data["code"] == "016055"
+    assert data["name"] == "博时纳斯达克100ETF发起式联接"
+    assert data["holdings"] == [], "联接基金自身不持有股票，其股票表按构造为空"
+    assert data["date"] == "", "报告期只从季报接口取；主页面不得产出报告期"
+    assert data["feeder_target_code"] == "513390", "目标 ETF 由页面锚点动态解析，不由映射表维护"
 
 
 @pytest.mark.cassette("fund_quarterly_holdings")

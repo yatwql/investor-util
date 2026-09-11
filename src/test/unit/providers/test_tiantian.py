@@ -3,11 +3,13 @@
 import unittest
 
 from src.python.providers.tiantian_holdings import (
-    _extract_fund_meta,
+    _extract_fund_name,
     _extract_quarterly_meta,
     _find_holdings_table,
     _parse_holdings_rows,
     _parse_quarterly_holdings,
+    fetch_fund_holdings,
+    parse_feeder_target_etf,
 )
 from src.python.providers.tiantian_ranking import (
     _calc_rating_from_entry,
@@ -116,20 +118,167 @@ class TestParseHoldingsRows(unittest.TestCase):
         self.assertEqual(_parse_holdings_rows(""), [])
 
 
-class TestExtractFundMeta(unittest.TestCase):
-    """_extract_fund_meta — 从 HTML 提取基金名称和报告日期。"""
+class TestExtractFundName(unittest.TestCase):
+    """_extract_fund_name — 只从 HTML 提取基金名称。
 
-    def test_extracts_name_and_date(self):
+    报告期不在此处提取（页面无可靠来源），故本函数无第二返回值。按字节窗口
+    盲扫日期实测 10 只基金 0 命中，且可能误抓导航控件里的当天日期——比空值
+    更危险，不采用。
+    """
+
+    def test_extracts_name(self):
         html = "<title>易方达蓝筹精选混合(005827)</title>" + " " * 2000 + "2026-03-31"
-        name, date = _extract_fund_meta(html)
-        self.assertEqual(name, "易方达蓝筹精选混合")
-        self.assertEqual(date, "2026-03-31")
+        self.assertEqual(_extract_fund_name(html), "易方达蓝筹精选混合")
 
     def test_no_title(self):
-        html = "无标题页面"
-        name, date = _extract_fund_meta(html)
-        self.assertEqual(name, "")
-        self.assertEqual(date, "")
+        self.assertEqual(_extract_fund_name("无标题页面"), "")
+
+
+class TestParseFeederTargetEtf(unittest.TestCase):
+    """parse_feeder_target_etf — 解析联接基金的目标 ETF 锚点。
+
+    两个方向的真实形态互为反向：联接基金页的锚点标签止于「ETF」、指向场内目标
+    ETF；常规 ETF 页的锚点标签多「联接」二字、指向场外联接基金。
+    """
+
+    # 实测形态（016055 博时纳指联接）：标签止于「ETF」，指向场内 513390
+    _ANCHOR = (
+        "<div>博时纳斯达克100ETF发起式联接(QDII)A人民币"
+        "<a style='float: right;' href=\"http://fund.eastmoney.com/513390.html\">查看相关ETF></a></div>"
+    )
+    # 实测形态（561910 电池ETF招商）：标签为「查看相关ETF联接」，指向场外 016019
+    _REVERSE_ANCHOR = "<a style='float: right;' href=\"http://fund.eastmoney.com/016019.html\">查看相关ETF联接></a>"
+
+    def test_extracts_target_code(self):
+        self.assertEqual(parse_feeder_target_etf(self._ANCHOR, "016055"), "513390")
+
+    def test_rejects_anchor_pointing_to_self(self):
+        """锚点指向自身时不穿透（否则会自引用取数）。"""
+        self.assertIsNone(parse_feeder_target_etf(self._ANCHOR, "513390"))
+
+    def test_returns_none_without_anchor(self):
+        self.assertIsNone(parse_feeder_target_etf("<div>无锚点页面</div>", "016055"))
+
+    def test_rejects_non_exchange_target(self):
+        """锚点指向非场内基金代码时不穿透（目标 ETF 必为场内品种）。"""
+        html = '<a href="http://fund.eastmoney.com/005827.html">查看相关ETF></a>'
+        self.assertIsNone(parse_feeder_target_etf(html, "016055"))
+
+    def test_ignores_anchor_without_label(self):
+        """无「查看相关ETF」标签的普通链接不算锚点。"""
+        html = '<a href="http://fund.eastmoney.com/513390.html">查看更多</a>'
+        self.assertIsNone(parse_feeder_target_etf(html, "016055"))
+
+    def test_rejects_reverse_link_on_regular_etf_page(self):
+        """常规 ETF 页的锚点是**反向**链接（回指其联接基金），不得当作目标 ETF。
+
+        两类页面的锚点标签仅差「联接」二字，`查看相关ETF` 又是 `查看相关ETF联接`
+        的前缀——不加否定前瞻会把 `561910` 的底层暴露错认成 `016019` 的持仓。
+        """
+        self.assertIsNone(parse_feeder_target_etf(self._REVERSE_ANCHOR, "561910"))
+
+    def test_rejects_reverse_label_even_if_target_is_exchange_code(self):
+        """标签规则独立成立：反向链接即便指向场内代码也不认。"""
+        html = '<a href="http://fund.eastmoney.com/513390.html">查看相关ETF联接></a>'
+        self.assertIsNone(parse_feeder_target_etf(html, "561910"))
+
+
+class TestFetchFundHoldingsLadder(unittest.TestCase):
+    """fetch_fund_holdings — 三跳取数阶梯的**次序**（次序即陈年数据隔离）。
+
+    次序不变量：
+      第 1 跳命中即返回，不再请求主页面；
+      第 3 跳（无年份兜底，通常已陈旧）仅在「主页面无持仓且无目标 ETF 锚点」时到达。
+    回归防线：若把兜底提回与年份域并列，联接基金会被最早可得报告遮蔽
+    （其季报股票表按构造为空、抓到的却是陈年分区），本组用例会立刻失败。
+    """
+
+    _DATED = {"code": "110022", "name": "易方达消费行业", "date": "2026-06-30", "holdings": [{"name": "贵州茅台"}]}
+    _LEGACY = {"code": "016055", "name": "博时纳指联接", "date": "2023-09-30", "holdings": [{"name": "旧持仓"}]}
+    _FEEDER_HTML = (
+        "<title>博时纳斯达克100ETF发起式联接(QDII)A人民币(016055)</title>"
+        '<a href="http://fund.eastmoney.com/513390.html">查看相关ETF></a>'
+    )
+    # 常规 ETF 页的「相关」链接是**反向**的：指向其场外联接基金（实测 561910 → 016019）
+    _NORMAL_ETF_HTML = (
+        "<title>华夏上证50ETF(510050)</title>"
+        '<a href="http://fund.eastmoney.com/016019.html">查看相关ETF联接></a>'
+        "<table><tr><td>股票名称</td><td>占净值比例</td></tr>"
+        '<tr><td><a stockcode="stock_600519">贵州茅台</a></td><td>9.50%</td></tr>'
+        '<tr><td><a stockcode="stock_000858">五粮液</a></td><td>5.20%</td></tr>'
+        '<tr><td><a stockcode="stock_601318">中国平安</a></td><td>4.10%</td></tr></table>'
+    )
+
+    @patch("src.python.providers.tiantian_holdings._fetch_dated_quarterly", return_value=_DATED)
+    @patch("src.python.providers.tiantian_holdings._request_fund_html")
+    def test_hop1_hit_skips_main_page(self, mock_html, _mock_dated):
+        """第 1 跳（年份域季报）命中：不请求主页面。"""
+        result = fetch_fund_holdings("110022")
+        self.assertEqual(result["date"], "2026-06-30")
+        mock_html.assert_not_called()
+
+    @patch("src.python.providers.tiantian_holdings._fetch_legacy_quarterly", return_value=_LEGACY)
+    @patch("src.python.providers.tiantian_holdings._fetch_dated_quarterly", return_value=None)
+    @patch("src.python.providers.tiantian_holdings._request_fund_html", return_value=None)
+    def test_hop3_skipped_when_main_page_request_fails(self, _m1, _m2, _m3):
+        """主页面请求失败即返回 None，不落到第 3 跳。"""
+        self.assertIsNone(fetch_fund_holdings("016055"))
+
+    @patch("src.python.providers.tiantian_holdings._fetch_legacy_quarterly", return_value=_LEGACY)
+    @patch("src.python.providers.tiantian_holdings._fetch_dated_quarterly", return_value=None)
+    @patch("src.python.providers.tiantian_holdings._request_fund_html")
+    def test_feeder_returns_target_and_skips_hop3(self, mock_html, _dated, mock_legacy):
+        """联接基金：带回目标 ETF，且绝不落到第 3 跳的陈年报告。"""
+        mock_html.return_value = self._FEEDER_HTML
+        result = fetch_fund_holdings("016055")
+        self.assertEqual(result["feeder_target_code"], "513390")
+        self.assertEqual(result["holdings"], [])
+        mock_legacy.assert_not_called()
+
+    @patch("src.python.providers.tiantian_holdings._fetch_legacy_quarterly", return_value=_LEGACY)
+    @patch("src.python.providers.tiantian_holdings._fetch_dated_quarterly", return_value=None)
+    @patch("src.python.providers.tiantian_holdings._request_fund_html")
+    def test_regular_etf_reverse_link_not_treated_as_feeder(self, mock_html, _dated, mock_legacy):
+        """误判防线：常规 ETF 页也有「相关」链接，但它是反向的（回指联接基金）。
+
+        两重独立防线各自都能拦下——名称不含「联接」故不进穿透分支；即便进入，
+        ``(?!联)`` 前瞻也会拒绝「查看相关ETF联接」这一标签形态。
+        """
+        mock_html.return_value = self._NORMAL_ETF_HTML
+        result = fetch_fund_holdings("510050")
+        self.assertNotIn("feeder_target_code", result)
+        self.assertEqual(len(result["holdings"]), 3)
+        mock_legacy.assert_not_called()
+
+    @patch("src.python.providers.tiantian_holdings._fetch_legacy_quarterly", return_value=_LEGACY)
+    @patch("src.python.providers.tiantian_holdings._fetch_dated_quarterly", return_value=None)
+    @patch("src.python.providers.tiantian_holdings._request_fund_html")
+    def test_hop2_holdings_win_over_hop3(self, mock_html, _dated, mock_legacy):
+        """主页面取到前十大即返回，不再落到无年份兜底。"""
+        mock_html.return_value = self._NORMAL_ETF_HTML
+        result = fetch_fund_holdings("510050")
+        self.assertEqual(result["holdings"][0]["name"], "贵州茅台")
+        mock_legacy.assert_not_called()
+
+    @patch("src.python.providers.tiantian_holdings._fetch_legacy_quarterly", return_value=_LEGACY)
+    @patch("src.python.providers.tiantian_holdings._fetch_dated_quarterly", return_value=None)
+    @patch("src.python.providers.tiantian_holdings._request_fund_html")
+    def test_hop3_reached_only_when_hop2_yields_nothing(self, mock_html, _dated, mock_legacy):
+        """主页面无持仓且无锚点：退回无年份兜底（其陈旧性由报告层时效闸门裁决）。"""
+        mock_html.return_value = "<title>某基金(016055)</title><div>无持仓表</div>"
+        result = fetch_fund_holdings("016055")
+        self.assertEqual(result["date"], "2023-09-30")
+        mock_legacy.assert_called_once()
+
+    @patch("src.python.providers.tiantian_holdings._fetch_legacy_quarterly", return_value=None)
+    @patch("src.python.providers.tiantian_holdings._fetch_dated_quarterly", return_value=None)
+    @patch("src.python.providers.tiantian_holdings._request_fund_html")
+    def test_all_hops_empty_returns_named_empty_result(self, mock_html, _dated, _legacy):
+        """三跳皆空：返回带名称的空持仓（供报告层判「持仓不可用」）。"""
+        mock_html.return_value = "<title>某基金(016055)</title><div>无持仓表</div>"
+        result = fetch_fund_holdings("016055")
+        self.assertEqual(result["name"], "某基金")
+        self.assertEqual(result["holdings"], [])
 
 
 class TestParseQuarterlyHoldings(unittest.TestCase):

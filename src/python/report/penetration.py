@@ -382,7 +382,14 @@ def _merge_fund_layer(
             continue
 
         # 报告期可用：登记到明细，供报告标注每个标的的持仓时点
-        report_periods.append({"name": fund.name, "code": fund.code, "period": report_period})
+        # 联接基金的持仓穿透自其目标 ETF，须一并登记来源，避免读者把目标 ETF
+        # 的成分股误认为该联接基金的直接暴露
+        feeder_source = holdings_data.get("feeder_penetration")
+        period_entry = {"name": fund.name, "code": fund.code, "period": report_period}
+        if feeder_source:
+            period_entry["feeder_target_code"] = feeder_source.get("target_code", "")
+            period_entry["feeder_target_name"] = feeder_source.get("target_name", "")
+        report_periods.append(period_entry)
 
         for item in valid_items:
             stock_name = item.get("name", "").strip()

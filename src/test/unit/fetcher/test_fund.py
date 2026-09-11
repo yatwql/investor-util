@@ -436,3 +436,133 @@ class TestFetchFundHoldingsBatch(unittest.TestCase):
         # Check that the source references fetch_fund_holdings_cached
         src = inspect.getsource(fetch_fund_holdings_batch)
         self.assertIn("fetch_fund_holdings_cached", src)
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    @patch("src.python.fetcher.batch.BatchDispatcher")
+    def test_penetration_applied_on_cache_hit(self, mock_dispatcher_cls, mock_cached):
+        """**缓存预检命中**时穿透仍须生效。
+
+        回归防线：``execute_with_cache_check`` 命中文件缓存会直接返回缓存值而
+        **不执行任务**（无网络、无 provider 调用），若穿透只挂在单条取数链路内，
+        缓存一热就整段被跳过——修复只在冷缓存下有效。本用例模拟该命中路径
+        （result 由 dispatcher 直接给出，任务未跑），断言穿透在后处理处补做。
+        """
+        mock_disp = MagicMock()
+        mock_disp.execute_with_cache_check.return_value = [
+            type(
+                "R",
+                (),
+                {
+                    "success": True,
+                    "result": {"code": "016055", "name": "某联接基金", "holdings": [], "feeder_target_code": "513390"},
+                },
+            )(),
+        ]
+        mock_dispatcher_cls.return_value = mock_disp
+        mock_cached.return_value = {
+            "code": "513390",
+            "name": "纳指100ETF博时",
+            "date": "2026-06-30",
+            "holdings": [{"name": "苹果", "code": "AAPL", "ratio": 9.0}],
+        }
+
+        from src.python.fetcher.fund import fetch_fund_holdings_batch
+
+        result = fetch_fund_holdings_batch(["016055"])
+
+        entry = result["016055"]
+        self.assertEqual(entry["code"], "016055")
+        self.assertEqual(entry["feeder_penetration"]["target_code"], "513390")
+        self.assertEqual(len(entry["holdings"]), 1)
+
+
+class TestWithFeederPenetration(unittest.TestCase):
+    """with_feeder_penetration — 联接基金以目标 ETF 的持仓代理底层暴露。
+
+    必须是**幂等**的后处理：单条取数与批量两条路径都要过一遍，重复调用无副作用。
+    """
+
+    _FEEDER = {"code": "016055", "name": "某联接基金", "date": "", "holdings": [], "feeder_target_code": "513390"}
+    _TARGET = {
+        "code": "513390",
+        "name": "纳指100ETF博时",
+        "date": "2026-06-30",
+        "holdings": [{"name": "苹果", "code": "AAPL", "ratio": 9.0}],
+    }
+
+    def test_none_result_passthrough(self):
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        self.assertIsNone(with_feeder_penetration("016055", None))
+
+    def test_non_feeder_passthrough(self):
+        """非联接基金（无目标 ETF）原样返回。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        plain = {"code": "110022", "name": "易方达消费行业", "date": "2026-06-30", "holdings": [{"name": "贵州茅台"}]}
+        self.assertIs(with_feeder_penetration("110022", plain), plain)
+
+    def test_idempotent(self):
+        """已穿透的结果原样返回（不重复取目标 ETF、不覆盖来源标注）。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        done = {
+            **self._TARGET,
+            "code": "016055",
+            "feeder_penetration": {"target_code": "513390", "target_name": "纳指100ETF博时"},
+        }
+        with patch("src.python.fetcher.fund.fetch_fund_holdings_cached") as mock_cached:
+            self.assertIs(with_feeder_penetration("016055", done), done)
+        mock_cached.assert_not_called()
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_penetrates_and_labels_source(self, mock_cached):
+        """穿透后保留本基金代码/名称，并记录目标 ETF 供报告层标注来源。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        mock_cached.return_value = self._TARGET
+        result = with_feeder_penetration("016055", dict(self._FEEDER))
+
+        self.assertEqual(result["code"], "016055")
+        self.assertEqual(result["name"], "某联接基金")
+        self.assertEqual(result["date"], "2026-06-30")
+        self.assertEqual(result["holdings"], self._TARGET["holdings"])
+        self.assertEqual(result["feeder_penetration"], {"target_code": "513390", "target_name": "纳指100ETF博时"})
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_target_unavailable_returns_original(self, mock_cached):
+        """目标 ETF 亦取不到时原样返回，交由既有「持仓不可用」路径降级。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        mock_cached.return_value = None
+        result = with_feeder_penetration("016055", dict(self._FEEDER))
+        self.assertEqual(result["holdings"], [])
+        self.assertNotIn("feeder_penetration", result)
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_target_without_holdings_returns_original(self, mock_cached):
+        """目标 ETF 有响应但持仓为空，同样不产生穿透结果。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        mock_cached.return_value = {"code": "513390", "name": "纳指100ETF博时", "date": "", "holdings": []}
+        result = with_feeder_penetration("016055", dict(self._FEEDER))
+        self.assertNotIn("feeder_penetration", result)
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_switch_off_returns_original(self, mock_cached):
+        """switch 关闭时不穿透（回退到「联接基金无底层资产」）。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        with patch("src.python.config.features.is_feature_enabled", return_value=False):
+            result = with_feeder_penetration("016055", dict(self._FEEDER))
+        self.assertNotIn("feeder_penetration", result)
+        mock_cached.assert_not_called()
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_switch_on_by_default(self, mock_cached):
+        """默认开启：不经配置即可穿透。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        mock_cached.return_value = self._TARGET
+        result = with_feeder_penetration("016055", dict(self._FEEDER))
+        self.assertIn("feeder_penetration", result)

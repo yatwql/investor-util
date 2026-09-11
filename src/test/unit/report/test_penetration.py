@@ -1079,5 +1079,63 @@ class TestStaleHoldingsReportPeriod(unittest.TestCase):
         self.assertEqual(summary["failed_funds"], 0, "报告期陈旧属独立计数，不混入获取失败")
 
 
+class TestFeederPenetrationReportPeriod(unittest.TestCase):
+    """联接基金的持仓穿透自目标 ETF，报告期明细须登记该来源。
+
+    实测场景：联接基金的季报股票表按构造为空（其资产即目标 ETF），不穿透时
+    只能落到陈年分区、被时效闸门剔除。穿透后底层暴露是**目标 ETF 的成分股**，
+    若报告只写本基金名，读者会把它们误认为该联接基金的直接持仓。
+    """
+
+    @staticmethod
+    def _holdings_data(code: str, name: str, feeder: dict[str, str] | None = None) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "code": code,
+            "name": name,
+            "date": recent_holdings_period(),
+            "holdings": [{"name": "苹果", "code": "AAPL", "ratio": 20.0}],
+        }
+        if feeder is not None:
+            data["feeder_penetration"] = feeder
+        return data
+
+    @patch("src.python.report.penetration.fetch_fund_manager", return_value=None)
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_feeder_source_recorded_in_period_details(self, mock_batch, mock_manager):
+        """穿透结果登记本基金名 + 目标 ETF 来源，市值仍按本基金持仓归集。"""
+        from src.python.report.penetration import _merge_fund_layer
+
+        name = "博时纳斯达克100ETF发起式联接(QDII)A人民币"
+        mock_batch.return_value = {
+            "016055": self._holdings_data("016055", name, {"target_code": "513390", "target_name": "纳指100ETF博时"})
+        }
+
+        funds = [Holding("支付宝", name, "016055", 100, 10.0)]
+        merge = _merge_fund_layer(funds, {"016055": 1000.0})
+
+        self.assertIn("苹果", merge.merged)
+        self.assertEqual(merge.stale_count, 0)
+        entry = merge.period_details[0]
+        self.assertEqual(entry["code"], "016055")
+        self.assertEqual(entry["name"], name)
+        self.assertEqual(entry["feeder_target_code"], "513390")
+        self.assertEqual(entry["feeder_target_name"], "纳指100ETF博时")
+
+    @patch("src.python.report.penetration.fetch_fund_manager", return_value=None)
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_non_feeder_entry_has_no_source_keys(self, mock_batch, mock_manager):
+        """非联接基金不带来源键（无来源即无标注，不产出空字段）。"""
+        from src.python.report.penetration import _merge_fund_layer
+
+        mock_batch.return_value = {"005827": self._holdings_data("005827", "易方达蓝筹")}
+
+        funds = [Holding("支付宝", "易方达蓝筹", "005827", 100, 10.0)]
+        merge = _merge_fund_layer(funds, {"005827": 1000.0})
+
+        entry = merge.period_details[0]
+        self.assertNotIn("feeder_target_code", entry)
+        self.assertNotIn("feeder_target_name", entry)
+
+
 if __name__ == "__main__":
     unittest.main()
