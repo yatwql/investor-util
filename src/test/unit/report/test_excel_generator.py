@@ -189,6 +189,86 @@ class TestGenerateExcelReport(unittest.TestCase):
 
         mock_notice.assert_called_once()
 
+    # ── 行动建议页签（basic 路径就地构建 action_data） ──
+
+    @staticmethod
+    def _action_detail():
+        """构造含行动建议消费字段的真实明细对象（shares/account 缺一不可）。"""
+        from src.python.report.market_value import DetailRow
+
+        return DetailRow(
+            account="证券账户",
+            name="长江电力",
+            code="600900",
+            price=28.5,
+            shares=1000.0,
+            market_value=28500.0,
+            cost=20000.0,
+            profit=8500.0,
+            profit_rate=0.425,
+            today_profit=100.0,
+        )
+
+    def test_action_data_built_when_not_injected(self) -> None:
+        """basic 路径无编排层注入 → 由行情明细就地构建，行动建议页签非占位。
+
+        回归：契约声明「action 纯算法，basic/both/full 均可见」，但 basic 路径此前
+        既不传 enable_action 也不传 action_data，页签恒为「无持仓数据」占位。
+        """
+        from src.python.report.excel_generator import generate_excel_report
+
+        with patch("src.python.report.action_sheet.write_action_sheet") as mock_write:
+            generate_excel_report(
+                self.holdings,
+                details=[self._action_detail()],
+                enable_action=True,
+                progress=self.progress,
+            )
+
+        mock_write.assert_called_once()
+        action_data = mock_write.call_args.args[1]
+        self.assertIsInstance(action_data, dict)
+        self.assertTrue(action_data.get("available"), "行动建议页签应拿到可用数据而非降级占位")
+
+    def test_action_data_not_rebuilt_when_injected(self) -> None:
+        """编排层已注入 action_data 时原样透传，不重复构建（保持单一事实来源）。"""
+        from src.python.report.excel_generator import generate_excel_report
+
+        injected = {"available": True, "summary": "编排层注入"}
+
+        with (
+            patch("src.python.report.action_sheet.write_action_sheet") as mock_write,
+            patch("src.python.analysis.action_advisor.build_action_data") as mock_build,
+        ):
+            generate_excel_report(
+                self.holdings,
+                details=[self._action_detail()],
+                enable_action=True,
+                pipeline_data={"action_data": injected},
+                progress=self.progress,
+            )
+
+        mock_build.assert_not_called()
+        self.assertIs(mock_write.call_args.args[1], injected)
+
+    def test_action_sheet_skipped_when_disabled(self) -> None:
+        """enable_action=False → 不创建行动建议页签，也不构建 action_data。"""
+        from src.python.report.excel_generator import generate_excel_report
+
+        with (
+            patch("src.python.report.action_sheet.write_action_sheet") as mock_write,
+            patch("src.python.analysis.action_advisor.build_action_data") as mock_build,
+        ):
+            generate_excel_report(
+                self.holdings,
+                details=[self._action_detail()],
+                enable_action=False,
+                progress=self.progress,
+            )
+
+        mock_write.assert_not_called()
+        mock_build.assert_not_called()
+
     # ── 新闻路径 ──
 
     def test_with_news(self) -> None:

@@ -4,7 +4,7 @@
   - 轻量级行情获取（both 路径，无指数/穿透/分类）
   - 组合演进 / 快照差异数据注入（pipeline_data 键）
   - 校验函数（prepare_report_data / capture_snapshot 完整性断言）
-  - both 路径持仓明细 → 行动建议消费字段子集
+  - 持仓明细 → 行动建议消费字段子集（basic/both 共用）
 
 由 `_report_generation.py`（聚合门面）re-export 对外提供。
 """
@@ -133,11 +133,11 @@ def _validate_pipeline_snapshot(pipeline_data: dict | None) -> None:
                 logger.warning("[checkpoint] pipeline_data.diff 类型异常: %s", type(_diff).__name__)
 
 
-# ── both 路径持仓明细 → 行动建议消费字段子集 ──
+# ── 持仓明细 → 行动建议消费字段子集（basic/both 共用） ──
 
 
-def _both_action_holdings_details(details: list) -> list[dict]:
-    """both 路径持仓明细 → 行动建议消费的字段子集（数据契约同 orchestrator 组装）。
+def _action_holdings_details(details: list) -> list[dict]:
+    """持仓明细 → 行动建议消费的字段子集（数据契约同 orchestrator 组装）。
 
     交易纪律依赖收益率数据（profit_rate），统一换算为百分数（小数 ×100）；
     shares/price 供调仓建议可行化层计算可执行卖出份额与金额；

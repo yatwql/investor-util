@@ -24,7 +24,7 @@ from src.python.report._chart_dataset_factory import _build_chart_datasets_for_r
 from src.python.report._full_risk_metrics import _prepare_full_risk_metrics  # noqa: F401
 from src.python.report._report_health import _collect_health_checks, _spawn_health_checks  # noqa: F401
 from src.python.report._report_helpers import (  # noqa: F401
-    _both_action_holdings_details,
+    _action_holdings_details,
     _compute_details,
     _inject_evolution_data,
     _inject_snapshot_diff_data,
@@ -383,7 +383,7 @@ def _generate_report_both(
 
     if pipeline_data is not None:
         pipeline_data["action_data"] = build_action_data(
-            _both_action_holdings_details(details),
+            _action_holdings_details(details),
             sum(d.market_value for d in details),
             portfolio_peak_mv=compute_portfolio_peak_mv((history_data or {}).get("bars")),
         )

@@ -6,6 +6,16 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### basic 路径接通「行动建议」（2026-09-12）
+
+- **问题**：多份契约一致声明「行动建议为纯算法，basic/both/full 均可见」（`requirements.md` R-ACT-01、`technical.md` 章节契约、`reports-instruction.md` 页签表与分组说明、`how-to-config.md`、TUI 手册），但 **basic 路径实际拿不到**——`orchestrator.generate_report` 的 basic 分支既未下传 `enable_action`（页签根本不创建），也无 `pipeline_data` 注入（即便创建也只会写「无持仓数据，行动建议无法生成」占位）。
+- **判定为「实现漏」而非「文档错」的三条独立证据**：① `core/registry.py` 中 `action` 条目自身的注释写明「纯算法，basic/both/full 均可见」且 `data_flag=None`（无数据可用性判定）；② `git log -S enable_action -- src/python/report/orchestrator.py` **零结果**——从未接线，而非被移除，且 basic 分支**确实**下传了同级的 `is_enable_data_quality` / `is_enable_cost_lots`，属不对称省略；③ 全部文档仅一处异说（`reports-instruction.md` 的「按菜单快速索引」B 行），与其余文档相左。
+- **改动（两处接线）**：① `report/orchestrator.py` basic 分支下传 `enable_action=is_enable_action(config)`；② `report/excel_generator.py::generate_excel_report` 在行情明细落成后，若 `enable_action` 开启且 `pipeline_data` 未携带 `action_data`，则由该明细就地构建。both/full 由编排层在历史走势就绪后注入，**已注入时原样透传、不重复构建**，编排层仍是唯一事实来源。
+- **降级口径**：basic 不含历史走势，故 `portfolio_peak_mv` 缺省——组合级回撤纪律按「峰值未知」处理（不激活），止盈/止损/再平衡等其余纪律不受影响；无持仓数据时仍写原降级占位。
+- **命名订正**：持仓明细 → 行动建议的投影函数原名 `_both_action_holdings_details`（both 专用语义），现由 basic 共用，更名为 `report/_report_helpers.py::_action_holdings_details`，模块内两处引用同步。
+- **测试**：`unit/report/test_excel_generator.py` 新增三例——未注入时就地构建且页签拿到可用数据（**回归用例：停用注入逻辑即失败，已实测红-绿**）、已注入时原样透传且不重复构建、开关关闭时既不建页签也不构建；`unit/report/test_orchestrator.py` 的 basic 精确 kwargs 断言补 `enable_action=True`，作为「开关必须显式下传」的接线守卫。
+- **文档同步**：`reports-instruction.md`（「按菜单快速索引」中行动建议由 B 行移至 E 行——E 已含该页签，B 为「E 全部 + 其余」，原写法会把 E 的页签漏报）；`technical.md`（补 `action_data` 三路径组装口径；附录 H 台账来源列补 basic 就地构建）。
+
 ### 报告章节默认顺序对齐仓库配置（§6.3 口径统一）（2026-09-12）
 
 - **问题**：「行动建议」的默认序号在文档中并存两种说法——`requirements.md` §6.3、`how-to-config.md` 章节排序表、`reports-instruction.md` 页签表已按 10 写，而 `technical.md` 两处契约行与 `reports-instruction.md` 的旁注仍写「注册表默认顺序为行动建议=17」。根因不是笔误，而是**同时存在两份顺序**：注册表出厂默认（`action`=17）与仓库 `config.json` 的 `report_section_order`（`action`=10）。两份顺序并存，任一处改动都会让另一处悄悄过期。

@@ -287,6 +287,25 @@ def generate_excel_report(
     )
     a_idx, us_idx = resolve_indices(a_indices, us_indices, modules, prog)
 
+    # ── 行动建议数据契约（action_data）就地兜底 ──
+    # both/full 路径由编排层组装后经 pipeline_data 注入（历史走势就绪，可带
+    # 组合历史峰值市值）；basic 路径不经编排层，此处由刚落成的行情明细就地构建，
+    # 使「行动建议」页签在 basic 下同样可用（契约声明 basic/both/full 均可见）。
+    # 已注入时不重复构建，保持编排层为唯一事实来源。
+    # portfolio_peak_mv 缺省：basic 不含历史走势，组合峰值未知，回撤纪律按
+    # 「峰值未知」处理（组合级回撤不激活），其余纪律不受影响。
+    if enable_action and not (pipeline_data or {}).get("action_data"):
+        _action_details = data.get("details") or []
+        if _action_details:
+            from src.python.analysis.action_advisor import build_action_data
+            from src.python.report._report_helpers import _action_holdings_details
+
+            pipeline_data = {**(pipeline_data or {})}
+            pipeline_data["action_data"] = build_action_data(
+                _action_holdings_details(_action_details),
+                data.get("total_mv", 0.0),
+            )
+
     # ── 各页签写入 ──
     pen_result = write_content_sheets(
         sheets,

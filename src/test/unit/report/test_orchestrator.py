@@ -300,13 +300,16 @@ class TestGenerateReport:
         assert result.holdings_ok is True
         assert result.report_generated is True
         assert result.exit_code == 0
-        # 验证 generate_excel_report 被正确调用（数据质量仪表盘默认开，成本流式子模块默认关）
+        # 验证 generate_excel_report 被正确调用（行动建议/数据质量仪表盘默认开，
+        # 成本流式子模块默认关）——enable_action 必须显式下传，漏传则行动建议页签
+        # 在 basic 路径下静默缺席（页签由 board 层开关决定创建与否）
         mock_gen.assert_called_once_with(
             mock_holdings,
             include_news=False,
             output_dir="reports",
             section_order=[{"key": "overview"}],
             progress=mock_reporter,
+            enable_action=True,
             enable_data_quality=True,
             enable_cost_lots=False,
             transactions=None,

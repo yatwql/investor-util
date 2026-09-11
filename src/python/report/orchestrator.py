@@ -377,7 +377,7 @@ def generate_report(
 
     if report_type == "basic":
         # basic 路径：仅生成 Excel，不调 prepare_report_data / capture_snapshot / fetch_history_data
-        from src.python.config import is_enable_cost_lots, is_enable_data_quality
+        from src.python.config import is_enable_action, is_enable_cost_lots, is_enable_data_quality
         from src.python.core.perf import PerfCollector
         from src.python.core.registry import get_report_section_order
         from src.python.report._report_generation import _collect_health_checks, _spawn_health_checks
@@ -400,6 +400,9 @@ def generate_report(
                 progress=reporter,
                 # 数据质量仪表盘子模块开关（basic 无行情数据，品种覆盖区块显示降级占位）
                 enable_data_quality=is_enable_data_quality(config),
+                # 行动建议章节开关（basic 纯算法可见；action_data 由 excel_generator
+                # 就地由行情明细构建——basic 不经编排层，无 pipeline_data 注入）
+                enable_action=is_enable_action(config),
                 # 成本流水子模块开关 + 交易/分红流水（汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计）
                 enable_cost_lots=is_enable_cost_lots(config),
                 transactions=transactions,
