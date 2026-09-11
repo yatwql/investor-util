@@ -77,8 +77,13 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     # Web 按钮触发）。失败的默认值会让最需要它的人（环境坏掉的那批）恰好看不到
     # 它，故默认开；可在 features.json 中置 false 关闭，TUI [D] 与 Web 卡片随之隐藏。
     "doctor_check": True,
-    # ── 数据源适配契约（实验功能，默认关闭） ──
-    "datasource_adapter": False,
+    # ── 数据源适配契约（默认开启） ──
+    # 内部接缝：开关开/关下报告产物逐源等价（唯一差异是东财源多出 market_cap/pe
+    # 两个 None 键，下游一律 .get() 读取、语义不变，见 test_quote_adapter_parity.py），
+    # 故它对用户没有可感知收益，不该以默认关的形态占一个用户开关；而默认关的实际
+    # 代价是生产路径从不执行适配器分支，新数据源/新字段的契约得不到实跑覆盖。
+    # 开关保留为回退杠杆：features.json / 面板置 false 即走既有转换函数。
+    "datasource_adapter": True,
     # ── 数据源凭据就绪指引（实验功能，默认关闭） ──
     "datasource_credential_ready": False,
 }
@@ -126,11 +131,6 @@ EXPERIMENTAL_FEATURES: dict[str, tuple[str, str, bool]] = {
     "signal_ledger": (
         "确定性信号沉淀",
         "确定性算法评级（温度/估值/尾部风险/风格/再平衡超限）沉淀为带实时-非实时标签的账本，统计默认只算实时",
-        True,
-    ),
-    "datasource_adapter": (
-        "数据源适配契约",
-        "三段式（参数转译→抓取→映射到标准字段）适配器 + 声明式 alias 归一，行情域试点；关闭时走既有转换函数",
         True,
     ),
     "datasource_credential_ready": (

@@ -995,10 +995,10 @@ class TestMainEarlyExitExperiments:
     def test_experiment_flag_effective_on_early_exit_command(self, command, patch_target):
         """--experiment 指定的开关在该命令分派前已生效。"""
         seen = self._enabled_during_dispatch(
-            ["cli.py", "--experiment", "datasource_adapter", command],
+            ["cli.py", "--experiment", "module_quality_gate", command],
             patch_target,
         )
-        assert seen["datasource_adapter"] is True
+        assert seen["module_quality_gate"] is True
         assert seen["signal_ledger"] is False  # 未指定的开关不受影响
 
     def test_without_experiment_flag_keeps_defaults(self):
@@ -1019,7 +1019,10 @@ class TestMainEarlyExitExperiments:
 
         seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")
         assert seen["signal_ledger"] is True
-        assert seen["datasource_adapter"] is False
+        # 常规开关（默认开、非实验项）不受 --experiment 取值域影响，保持默认
+        from src.python.config.features import is_feature_enabled
+
+        assert is_feature_enabled("datasource_adapter") is True
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -78,7 +78,6 @@ _EXPECTED_WHITELIST = {
     "module_quality_gate",
     "decision_header_parse",
     "signal_ledger",
-    "datasource_adapter",
     "datasource_credential_ready",
 }
 
@@ -180,7 +179,6 @@ class TestGetSurface:
             "module_quality_gate",
             "decision_header_parse",
             "signal_ledger",
-            "datasource_adapter",
             "datasource_credential_ready",
         }
         assert all(v is False for v in data["llm"]["experiments"].values())

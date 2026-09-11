@@ -74,7 +74,7 @@ investor-util/
 │   │   │   ├── industry.py           #   行业分类/概念板块数据获取
 │   │   │   ├── news.py               #   新闻数据获取封装层（聚合器+关键词转发）
 │   │   │   ├── price.py              #   行情价格获取（股票/ETF）
-│   │   │   ├── quote_adapters.py     #   行情域数据源适配器（腾讯/新浪/东方财富，实验开关 datasource_adapter）
+│   │   │   ├── quote_adapters.py     #   行情域数据源适配器（腾讯/新浪/东方财富，开关 datasource_adapter 默认开）
 │   │   │   └── source_adapter.py     #   数据源适配契约（三段式基类 + 声明式 alias 归一 + 注册表/自检）
 │   │   │
 │   │   ├── providers/                # 数据源提供商实现

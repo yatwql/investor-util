@@ -17,7 +17,7 @@
   - [2.2 三层熔断架构](#22-三层熔断架构)
   - [2.3 Fetcher 调度架构](#23-fetcher-调度架构)
   - [2.4 关键机制](#24-关键机制)
-  - [2.5 数据源适配契约（实验：`datasource_adapter`，默认关）](#25-数据源适配契约实验datasource_adapter默认关)
+  - [2.5 数据源适配契约（`datasource_adapter`，默认开）](#25-数据源适配契约datasource_adapter默认开)
   - [2.6 数据源记录-回放（测试基建，无开关）](#26-数据源记录-回放测试基建无开关)
   - [2.7 数据源凭据就绪指引（实验：`datasource_credential_ready`，默认关）](#27-数据源凭据就绪指引实验datasource_credential_ready默认关)
 - [3. 缓存层详细设计](#3-缓存层详细设计)
@@ -1078,7 +1078,7 @@ fetch_index_data(code)
 | 00 代码降级成功 | `[price] [002943 广发多因子] 降级成功——通过场外基金链路获取到净值` |
 | 汇总失败资产 | `市场行情获取：14 成功，1 失败；失败资产: ['广发多因子(002943)']` |
 
-### 2.5 数据源适配契约（实验：`datasource_adapter`，默认关）
+### 2.5 数据源适配契约（`datasource_adapter`，默认开）
 
 接入一个数据源要做的三件事被拆成三个可独立检验的小函数，**声明在前、代码在后**：
 
@@ -1102,8 +1102,8 @@ fetch_index_data(code)
 **接入链路的方式**：`adapter_chain_slots(domain)` 把某域的适配器映射为 Provider Chain 的两个入参
 （`provider_fn_map` / `transform`），因此链路顺序、缓存键、熔断、降级全部复用
 `fetcher/chain.fetch_with_fallback`，**不新造第二条获取路径**。行情域试点见
-`fetcher/price.py::_price_chain_slots()`——开关关闭时返回既有手写映射对象本身（逐字节行为不变），
-开启时改用适配器映射。
+`fetcher/price.py::_price_chain_slots()`——默认（开关开启）返回适配器映射，
+在 `features.json` 中置 false 则返回既有手写映射对象本身（逐字节行为不变）。
 
 **试点范围与等价性**：仅行情域三源（腾讯/新浪/东方财富），与既有转换函数逐源等价，
 唯一有意差异是东方财富既有转换函数不含 `market_cap`/`pe` 两个键而契约恒为全字段（补 `None`）——
@@ -3199,9 +3199,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `doctor` | 系统自检（环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，失败项附可执行建议，自身永不抛异常） | 诊断 | 诊断 | 开关 `doctor_check`（默认开；CLI `doctor` 子命令不受开关约束） |
 | `doctor_check` | 自检功能上屏门控（TUI 菜单 [D] 与 Web 状态区自检卡片可见性） | 诊断 | 诊断 | 开关 `doctor_check`（默认开，非实验项） |
 | `datasource_fields` | 数据域标准字段记录（`schemas/datasource_fields.py`，类型注解即缺省语义） | 数据源适配 | 数据获取 | 随 `datasource_adapter` |
-| `source_adapter` | 数据源适配契约（`SourceAdapter` 基类 + 注册表 + 自检报告 `survey_adapters`） | 数据源适配 | 数据获取 | 实验开关 `datasource_adapter`（默认关） |
-| `quote_adapters` | 行情域适配器（腾讯/新浪/东方财富三源） | 数据源适配 | 数据获取 | 实验开关 `datasource_adapter`（默认关） |
-| `adapter_chain_slots` | 适配器映射为 Provider Chain 两槽（provider_fn_map / transform） | 数据源适配 | 数据获取 | 实验开关 `datasource_adapter`（默认关） |
+| `source_adapter` | 数据源适配契约（`SourceAdapter` 基类 + 注册表 + 自检报告 `survey_adapters`） | 数据源适配 | 数据获取 | 开关 `datasource_adapter`（默认开，非实验项） |
+| `quote_adapters` | 行情域适配器（腾讯/新浪/东方财富三源） | 数据源适配 | 数据获取 | 开关 `datasource_adapter`（默认开，非实验项） |
+| `adapter_chain_slots` | 适配器映射为 Provider Chain 两槽（provider_fn_map / transform） | 数据源适配 | 数据获取 | 开关 `datasource_adapter`（默认开，非实验项） |
 | `cassette` | 数据源记录-回放（真实响应体离线录制/回放引擎，`Cassette`/`cassette_replay`/`cassette_record`） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建，不控制运行时行为） |
 | `cassette_checks` | 已录制响应 → 当前解析器的绑定表（录制自检与 `cassettes --verify` 共用） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |
 | `use_transport_factory` | 传输工厂注入点（`make_http_client` 的响应来源替换，C5 唯一构造点上的挂载） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |

@@ -321,7 +321,7 @@ def _check_source_adapters() -> list[dict[str, Any]]:
         ]
 
     domains = "、".join(sorted({r["domain"] for r in reports}))
-    path_state = "已启用" if enabled else "未启用（实验开关 datasource_adapter 关闭，链路走既有转换函数）"
+    path_state = "已启用" if enabled else "未启用（开关 datasource_adapter 已关闭，链路走既有转换函数）"
     bad = [r for r in reports if not r["ok"]]
     if bad:
         detail = "；".join(f"{r['display_name']}：{r['message']}" for r in bad)

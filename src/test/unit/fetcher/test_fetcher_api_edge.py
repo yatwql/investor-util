@@ -88,27 +88,29 @@ class TestProviderHttpErrors(unittest.TestCase):
 
 
 class TestProviderChainFallback(unittest.TestCase):
-    """Provider Chain 多级降级：主链→备链→过期缓存。"""
+    """Provider Chain 多级降级：主链→备链→过期缓存。
+
+    注入点是 provider 函数本身（``providers.tencent.fetch_price`` 等），而非既有手写
+    映射表 ``price._PRICE_PROVIDERS``——行情链路默认经数据源适配器取数，适配器委托的
+    正是这几个函数，patch 映射表拦不到链路实际调用（patch 了也不生效，用例会因真实
+    请求被测试网络守卫拦下而静默变成「全链路失败」的另一条路径）。
+    """
 
     @patch("src.python.fetcher.chain.cache_get", return_value=None)
     @patch("src.python.fetcher.chain.cache_set")
-    @patch.dict(
-        "src.python.fetcher.price._PRICE_PROVIDERS",
-        {
-            "tencent": ("腾讯财经", MagicMock(return_value=None)),
-            "sina": (
-                "新浪财经",
-                MagicMock(
-                    return_value={
-                        "name": "长江电力",
-                        "code": "600900",
-                        "price": 27.0,
-                        "yesterday_close": 26.5,
-                        "price_date": "2026-07-03",
-                    }
-                ),
-            ),
-        },
+    @patch("src.python.providers.tencent.fetch_price", MagicMock(return_value=None))
+    @patch("src.python.providers.eastmoney.fetch_nav", MagicMock(return_value=None))
+    @patch(
+        "src.python.providers.sina.fetch_price",
+        MagicMock(
+            return_value={
+                "name": "长江电力",
+                "code": "600900",
+                "price": 27.0,
+                "yesterday_close": 26.5,
+                "price_date": "2026-07-03",
+            }
+        ),
     )
     def test_primary_fails_fallback_succeeds(self, mock_set, mock_get):
         """腾讯（主）返回 None → 新浪（备）成功。"""
@@ -124,14 +126,10 @@ class TestProviderChainFallback(unittest.TestCase):
         """全部 Provider 失败 → 降级使用过期缓存。"""
         # 模拟无有效缓存，有过期缓存
         mock_get.side_effect = lambda key, ttl: None if ttl < 3600 else {"price": 26.0, "stale": True}
-        from src.python.fetcher.price import _PRICE_PROVIDERS
-
-        with patch.dict(
-            _PRICE_PROVIDERS,
-            {
-                "tencent": ("腾讯", MagicMock(return_value=None)),
-                "sina": ("新浪", MagicMock(return_value=None)),
-            },
+        with (
+            patch("src.python.providers.tencent.fetch_price", MagicMock(return_value=None)),
+            patch("src.python.providers.sina.fetch_price", MagicMock(return_value=None)),
+            patch("src.python.providers.eastmoney.fetch_nav", MagicMock(return_value=None)),
         ):
             from src.python.fetcher.price import fetch_market_data
 
@@ -143,14 +141,10 @@ class TestProviderChainFallback(unittest.TestCase):
     @patch("src.python.fetcher.chain.cache_set")
     def test_all_providers_fail_no_cache_returns_none(self, mock_set, mock_get):
         """全部 Provider 失败且无过期缓存 → 返回 None。"""
-        from src.python.fetcher.price import _PRICE_PROVIDERS
-
-        with patch.dict(
-            _PRICE_PROVIDERS,
-            {
-                "tencent": ("腾讯", MagicMock(return_value=None)),
-                "sina": ("新浪", MagicMock(return_value=None)),
-            },
+        with (
+            patch("src.python.providers.tencent.fetch_price", MagicMock(return_value=None)),
+            patch("src.python.providers.sina.fetch_price", MagicMock(return_value=None)),
+            patch("src.python.providers.eastmoney.fetch_nav", MagicMock(return_value=None)),
         ):
             from src.python.fetcher.price import fetch_market_data
 
@@ -162,26 +156,22 @@ class TestProviderChainFallback(unittest.TestCase):
     def test_provider_raises_exception_fallback(self, mock_set, mock_get):
         """Provider 抛出异常 → 跳过该链路，尝试下一链路。"""
         mock_get.return_value = None
-        from src.python.fetcher.price import _PRICE_PROVIDERS
-
         failing = MagicMock(side_effect=RuntimeError("Unexpected crash"))
-        with patch.dict(
-            _PRICE_PROVIDERS,
-            {
-                "tencent": ("腾讯", failing),
-                "sina": (
-                    "新浪",
-                    MagicMock(
-                        return_value={
-                            "name": "长江电力",
-                            "code": "600900",
-                            "price": 27.5,
-                            "yesterday_close": 27.0,
-                            "price_date": "2026-07-03",
-                        }
-                    ),
+        with (
+            patch("src.python.providers.tencent.fetch_price", failing),
+            patch("src.python.providers.eastmoney.fetch_nav", MagicMock(return_value=None)),
+            patch(
+                "src.python.providers.sina.fetch_price",
+                MagicMock(
+                    return_value={
+                        "name": "长江电力",
+                        "code": "600900",
+                        "price": 27.5,
+                        "yesterday_close": 27.0,
+                        "price_date": "2026-07-03",
+                    }
                 ),
-            },
+            ),
         ):
             from src.python.fetcher.price import fetch_market_data
 

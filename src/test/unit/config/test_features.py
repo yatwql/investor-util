@@ -200,6 +200,54 @@ class TestDoctorCheckPromotion:
 
 
 @pytest.mark.unit
+class TestDatasourceAdapterPromotion:
+    """数据源适配契约的开关归类与默认值。
+
+    它是内部接缝而非用户功能：开关开/关下报告产物逐源等价（唯一非等价处是
+    东财源多出 market_cap/pe 两个 None 键，下游一律 ``.get()`` 读取，语义不变，
+    由 ``test_quote_adapter_parity.py`` 逐源锁定），所以「打开它」对用户没有可
+    感知收益，不该以默认关的形态摆一个不可理解的选择；而默认关的实际代价是
+    生产路径从不执行适配器分支，新数据源/新字段的契约得不到实跑覆盖。故转正为
+    常规开关、默认开启；开关保留为回退杠杆（features.json 置 false 即回退）。
+    """
+
+    def test_default_enabled(self):
+        from src.python.config.features import get_feature_defaults
+
+        assert get_feature_defaults()["datasource_adapter"] is True
+
+    def test_not_in_experimental_registry(self):
+        """不在实验注册表里：不再上实验面板，也不再进产物自述。"""
+        assert "datasource_adapter" not in EXPERIMENTAL_FEATURES
+
+    def test_switch_still_honored(self):
+        """转正不等于不可关：回退杠杆仍有效。"""
+        from src.python.config.features import is_feature_enabled, set_feature_enabled
+
+        set_feature_enabled("datasource_adapter", False)
+
+        assert is_feature_enabled("datasource_adapter") is False
+
+    def test_default_config_runs_adapter_chain(self):
+        """默认配置（无任何覆写）下链路即走适配器分支——转正的实际效果。
+
+        缺陷场景：默认关时生产路径永远取既有转换函数，适配器分支只在测试里
+        被显式打开，接新数据源时契约是否真的能跑通没有实跑证据。
+        """
+        from src.python.fetcher import price as price_module
+
+        providers, _transforms = price_module._price_chain_slots()
+
+        assert providers is not price_module._PRICE_PROVIDERS
+
+    def test_not_in_report_notice_after_promotion(self):
+        """开启状态下产物自述为空——常规开关不进实验功能清单。"""
+        from src.python.report.experimental_notice import enabled_notice_line
+
+        assert enabled_notice_line() is None
+
+
+@pytest.mark.unit
 class TestRegistryLiveness:
     """开关注册表每一项都必须有消费者。
 

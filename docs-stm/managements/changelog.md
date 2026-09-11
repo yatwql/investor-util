@@ -6,6 +6,14 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 数据源适配契约转正为默认开启（plan-39 批次①）（2026-09-11）
+
+- **转正理由**：它是**内部接缝而非用户功能**——开关开/关下报告产物逐源等价（唯一差异是东财源多出 `market_cap`/`pe` 两个 `None` 键，下游一律 `.get()` 读取、取值语义不变，由 `test_quote_adapter_parity.py` 端到端锁定），用户打开它没有任何可感知收益，摆在面板上只会让人误以为「开了有好处」；而默认关的实际代价是**生产路径从不执行适配器分支**——适配器只在测试里被显式打开，接入新数据源/新字段时契约能否真的跑通没有实跑证据。
+- **改动**：`config/features.py` —— 从 `EXPERIMENTAL_FEATURES` 移出（不再上实验面板、不再进产物自述），`_FEATURE_FLAGS_DEFAULT` 保留同名键并改默认 `True`。**开关保留为回退杠杆**：`features.json` 置 `false` 即回退既有手写转换函数（行为逐字节不变，`_price_chain_slots()` 返回既有映射对象本身）。消费点口径复核：`fetcher/price.py::_price_chain_slots()` 的判定逻辑不变（仅默认值变）、`core/doctor.py` 的「数据源适配」组措辞由「实验开关…关闭」改为「开关…已关闭」、`report/excel_generator.py` 兜底清单的示例开关名换为非 LLM 实验项。
+- **取舍需知**：该开关自此不在 TUI 菜单 `[S]`、Web 配置面板与 CLI `--experiment` 的可选集内（三者由实验注册表驱动），关闭入口改经 `features.json`——此缺口由 plan-39 批次②（功能开关注册表统一）补上：注册表合并后常规开关将获得与实验开关同等的三渠道入口（TUI 面板「常规开关」块 / Web 配置面板同组 / CLI `--feature NAME=VALUE` 双向）。
+- **文档同步**：`requirements.md`（§5.7 标题、R-ADP-06/08、features.json 表行默认值与说明）；`technical.md`（目录 §2.5 标题、§2.5 接入方式段落、功能语义命名表 `source_adapter`/`quote_adapters`/`adapter_chain_slots` 三行开关口径由「实验开关（默认关）」改为「开关（默认开，非实验项）」）；`developer-guide.md`（转正判据增「内部接缝类开关也应转正」一段，`datasource_adapter` 为该模式首例）；`folders.md`（`quote_adapters.py` 说明）；`how-to-config.md` §M 开关表默认值 `false`→`true` 与实验面板说明、`how-to-use-tui-menu.md`（实验面板编号 6~15→6~14 与对照表）、`how-to-use-web-mode.md`、`how-to-config-llm.md`。
+- **回归测试**（覆盖项 +5）：新增 `unit/config/test_features.py::TestDatasourceAdapterPromotion`——默认开启、不在实验注册表、置 `false` 仍生效（回退杠杆）、**默认配置下链路即走适配器分支**（`_price_chain_slots()` 返回的不是既有映射对象，此条即「转正的实际效果」，默认值若改回关闭立即失败）、开启状态下不进产物自述。既有用例口径同步：`unit_web::test_config_edit.py` 的白名单全集与实验面板载荷中移除该键，`unit_cli::test_cli.py` 中原以该开关为实验开关样本的早返回用例改用 `module_quality_gate`。
+
 ### 产物自述假阳性开关与系统自检转正（自审 rf-345）（2026-09-11）
 
 - **问题一：报告自述出现假阳性开关**。`enabled_experimental_features()` 遍历整个 `EXPERIMENTAL_FEATURES` 注册表，凡启用即列入 HTML 页脚与 Excel 清单——而系统自检（`doctor_check`）只门控 TUI 菜单 `[D]` 与 Web 卡片两个入口的可见性，**不改报告任何字节**。一个只影响入口显隐的开关出现在「本报告在哪些实验功能下生成」的清单里，读者会推断内容受其影响。引入该自述时（rf-342）注册表里尚无「只影响入口」类成员，故当时口径无懈可击——缺陷随注册表成员变化而出现。
