@@ -2144,14 +2144,14 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 | 质量 | 300 质量 | sh000930 | 全指质量代理 |
 
 - 低波（sh000931）不进 MVP 因子集合（保留为扩展位）
-- `FACTOR_STALE_DAYS=120` 新鲜度校验：最后一根 bar 距今 > 120 天的因子从集合剔除并告警（`stale_factors`），剩余因子 < 2 时落 §1.4.5 数据不足分支
+- `FACTOR_STALE_TRADING_DAYS=86` 新鲜度校验：最后一根 bar 距今 > 86 个**交易日**（约 4 个月）的因子从集合剔除并告警（`stale_factors`），剩余因子 < 2 时落 §1.4.5 数据不足分支。距离以交易日而非自然日计——长假（春节/国庆）会以十数个自然日拉开两个相邻交易日，按自然日差会把正常因子误判为停更。计数由 `core/trading_calendar.py::count_trading_days_elapsed` 提供，日期无法解析时按「未知」视为未停更（宁可不剔除也不误剔除）
 - 基准对照 `baseline_betas`：沪深300（sh000300）在同一回归窗口的因子暴露，用于风格漂移判断（复用既有指数链路）
 
-**数据新鲜度判定标准（`scripts/probe-csi-factor-indices.py::evaluate`，与 `FACTOR_STALE_DAYS` 同维度）**：
+**数据新鲜度判定标准（`scripts/probe-csi-factor-indices.py::evaluate`；该脚本是一次性决策闸门，按**自然日**计，与运行时守护的 `FACTOR_STALE_TRADING_DAYS`（交易日）口径有意不同）**：
 
 - **有效** = K 线条数 ≥ `threshold` **且** 最新日期距今 ≤ `stale` 天。仅看条数会把停更指数误判为有效（如 300 成长仅有 2023 年旧数据）→ 双维度联合判定。
 - **判定分级**：全部 5 个主候选有效 → `5f` 全量 5 因子可行；≥3 个有效 → `3f` MVP 3 因子可行（停更因子需找替代代理）；仅 1-2 个有效 → `infeasible` 不可实现。
-- **默认参数**：`--days 365`（回归建议 ≥365）、`--threshold 60`、`--stale 120`（与 `FACTOR_STALE_DAYS` 一致）。
+- **默认参数**：`--days 365`（回归建议 ≥365）、`--threshold 60`、`--stale 120`（自然日口径，与运行时的 86 个交易日同为「约 4 个月」，见上）。
 
 **计算方案**：
 
@@ -3330,7 +3330,7 @@ web/ (Web 服务层，薄入口)
 本节定义系统架构层面的**设计约束**。所有新增或修改的代码必须遵守，违反即视为架构违规。
 约束按职责域分组，每个约束包含：设计目的（为何存在）、违反后果（不遵守的影响）、适用范围（哪些模块/场景受约束）。
 
-> **约束外参照（语义命名纪律）**：除上表 C1~C24 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
+> **约束外参照（语义命名纪律）**：除上表 C1~C25 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
 
 ### 8.1 数据获取层约束
 
@@ -3358,6 +3358,7 @@ web/ (Web 服务层，薄入口)
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在附录 H（pipeline_data Schema 定义）中预定义类型、可选性、写入/消费模块后，才能在代码中使用该键 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
 | **C20** | **HTML 图表图下说明强制** — HTML 报告中每张图表下方必须渲染图下说明（`.chart-caption`），明确标注该图表是什么、用途是什么；说明必须跟随对应图表 canvas 的渲染分支一同出现（图表有数据 → 说明出现，图表空数据 → 说明不出现） | 图表无说明时用户无法快速理解该图的含义与用途，可读性下降；屏幕阅读器等无障碍场景无法获得图表意图 | 代码评审不通过；图下说明缺失或与图表渲染分支不一致 | 模板 `report_template.html`（所有 chart canvas 渲染处，含净值/回撤/资产构成/行业分布/穿透 TOP10/量化指标 radar 共 6 处）、`chart-*` 前端图表模块 |
+| **C25** | **时间距离一律以交易日计** — 凡「距今多久」用于判定**数据新鲜度/停更/跳空/持仓期/观察期**的场景，一律以**交易日**计数，禁止用自然日差；交易日来源唯一为 `core/trading_calendar.py`（`count_trading_days_elapsed` / `get_last_trading_day` / `get_prev_trading_day`），各模块不得自建日历或另写自然日差。自然日差仅可用于本身就以自然日定义的量（如静默期天数、缓存 TTL） | 交易日与自然日在长假/周末处相差十数个自然日：按自然日差判定，长假前后的两个相邻交易日会被判为「延迟」「停更」「数据跳空」；在非交易日运行报告时，运行时刻与最近交易日天然相差一个自然日，会把正常的 T-1 净值误报为滞后 | 报告在长假后/非交易日运行即出现成批假告警（数据质量「延迟」、因子被误剔除、K 线被误判跳空、新仓观察期被误判已过），用户据假告警排查错误方向 | `core/trading_calendar.py`（唯一实现，`report/market_value.py` 按原公共名重新导出保持既有导入路径）、`fetcher/chain.py`（跳空判定）、`analysis/style_factor_regression.py`（停更因子剔除）、`analysis/rebalance.py`（新仓观察期）、`core/data_freshness.py` 及其消费方（报告「数据质量」维度、提示词新鲜度基准） |
 | **C22** | **报告管线实验挂载点集中** — 接入报告管线的实验功能必须经 `report/_experimental_seams.py` 的挂载点函数接入，禁止在 `_generate_report_full` 内联 `try/except` 守护；所有挂载点共享同一契约「**实验功能自身的异常绝不中断报告主链路**」（降级为一条告警 + 一条异常日志），且**挂载点工序顺序固定**——结算先于 LLM 拉取、质量横幅晚于决策登记、信号沉淀晚于 LLM 生成 | 守护判据复制即漂移：四处内联 try/except 时改一处必漏三处（与缓存指纹「读写两份拼接」同一病根）；顺序调换会使当次教训读不到新结算结果、横幅改写文本污染决策表解析、尾部风险等迟到键漏采 | 实验功能异常中断整条报告链路；实验结论静默失真（结算/沉淀漏采、解析污染）且无异常可循 | `report/_report_generation.py`（唯一调用点，仅按序调用挂载点）、`report/_experimental_seams.py`（唯一守护实现）、所有向 `pipeline_data` 注入数据的实验功能 |
 
 ### 8.4 LLM 集成层约束
@@ -3657,7 +3658,7 @@ investor-util/
 
 > `position_status`（品种覆盖诊断，C19 契约）：`{"available": bool, "items": list[dict], "abnormal_count": int, "summary": str}`。`items` 每项含 code/name/account/status/status_label/reason；status 取值 `ok`/`nav_missing`/`possibly_delisted`/`bad_code_format`/`name_mismatch`（本地信号=代码格式+名称比对，数据信号=行情/净值可用性，见 `core/holding_status.py`）。由 `core/holding_status.py::build_coverage_summary` 计算、`report/orchestrator.py::prepare_report_data` 组装，both 路径在 `_report_generation.py` 直接以 `build_coverage_summary` 注入。消费方：数据质量仪表盘（`report_submodules.data_quality`，「品种覆盖」区块，Excel 见 `report/data_quality_sheet.py`、HTML 见模板 `report_template.html`）；basic 路径无行情数据时 available=False，品种覆盖区块落降级占位。
 
-> `data_freshness`（数据可信度诊断，C19 契约）：`{"available": bool, "items": list[dict], "abnormal_count": int, "summary": str, "trading_day": str, "prev_trading_day": str}`。`trading_day`/`prev_trading_day` 为本次判定所依据的最近交易日与其前一交易日，随契约一并回传——消费方判断新鲜度必须以其为基准，不得以运行时刻替代（报告可在非交易日运行，运行时刻与最近交易日天然相差一个自然日，用自然日差会把正常的 T-1 净值误报为延迟）；体检报告「数据质量」维度即消费此二字段构造基准行。`items` 每项含 code/name/account/freshness/freshness_label/reason/jump/jump_label/change_pct；freshness 取值 `fresh`（净值=当日）/`cached`（=上一交易日，正常 T-1）/`stale`（更早或缺失）/`degraded`（无有效行情）。单日跳变仅对 fresh/cached 品种判定（|涨跌幅| ≥ ±20% 标记 jump，label「疑似数据错误（单日 +X.XX%）」），stale/degraded 跳过以免跨非交易日累计涨跌误报。由 `core/data_freshness.py`（`classify_freshness`/`detect_price_jumps`/`build_freshness_summary`）计算，交易日依据 `report/market_value.py::get_last_trading_day/get_prev_trading_day`（akshare 日历缓存）。由 `report/orchestrator.py::prepare_report_data` 组装，both 路径在 `_report_generation.py` 直接以 `build_freshness_summary` 注入。消费方：数据质量仪表盘（`report_submodules.data_quality`，「可信度」区块 + 报告头部「N 个品种数据异常」摘要行，Excel 见 `report/data_quality_sheet.py`、HTML 见模板 `report_template.html`）；basic 路径无行情数据时 available=False，可信度区块落降级占位。
+> `data_freshness`（数据可信度诊断，C19 契约）：`{"available": bool, "items": list[dict], "abnormal_count": int, "summary": str, "trading_day": str, "prev_trading_day": str}`。`trading_day`/`prev_trading_day` 为本次判定所依据的最近交易日与其前一交易日，随契约一并回传——消费方判断新鲜度必须以其为基准，不得以运行时刻替代（报告可在非交易日运行，运行时刻与最近交易日天然相差一个自然日，用自然日差会把正常的 T-1 净值误报为延迟）；体检报告「数据质量」维度即消费此二字段构造基准行。`items` 每项含 code/name/account/freshness/freshness_label/reason/jump/jump_label/change_pct；freshness 取值 `fresh`（净值=当日）/`cached`（=上一交易日，正常 T-1）/`stale`（更早或缺失）/`degraded`（无有效行情）。单日跳变仅对 fresh/cached 品种判定（|涨跌幅| ≥ ±20% 标记 jump，label「疑似数据错误（单日 +X.XX%）」），stale/degraded 跳过以免跨非交易日累计涨跌误报。由 `core/data_freshness.py`（`classify_freshness`/`detect_price_jumps`/`build_freshness_summary`）计算，交易日依据 `core/trading_calendar.py::get_last_trading_day/get_prev_trading_day`（akshare 日历缓存；`report/market_value.py` 按原公共名重新导出保持既有导入路径，实现已下沉至 `core/` 供各层共用）。由 `report/orchestrator.py::prepare_report_data` 组装，both 路径在 `_report_generation.py` 直接以 `build_freshness_summary` 注入。消费方：数据质量仪表盘（`report_submodules.data_quality`，「可信度」区块 + 报告头部「N 个品种数据异常」摘要行，Excel 见 `report/data_quality_sheet.py`、HTML 见模板 `report_template.html`）；basic 路径无行情数据时 available=False，可信度区块落降级占位。
 
 > `fund_flow_data`（成本流水，C19 契约，开关 `report_submodules.cost_lots` 默认关）：`{"available": bool, "xirr": dict\|None, "cost_tiers": dict\|None, "dividends": dict\|None}`。`xirr` 含 `{"rate": float\|None, "ok": bool, "message": str}`（资金加权收益率，Newton-Raphson + bisection 回退，natural-day 年化 `t=days/365`，投资者视角现金流）；`cost_tiers` 含 `{"available": bool, "per_code": {code: {"low"/"high"/"unpriced": {"shares", "cost"}}}}`（成本分档，批次成本价 ≤ 市价 → 低成本档、> 市价 → 高成本档、无市价单列未分档，由 `analysis/cost_flow.compute_cost_tiers` 计算）；`dividends` 含 `{"available": bool, "per_code": {code: 分红累计金额}}`（分红现金流累计）。由 `analysis/cost_flow.py::build_fund_flow_data(transactions, dividends, holdings, current_prices)` 计算（纯计算层，不依赖 report/），在 Excel 渲染层 `report/excel_market_data.py::_build_flow_data` 基于交易/分红流水组装（开关关闭或流水为空 → None，汇总/市值/分类页签保持既有输出）。消费方（Excel 汇总/市值/分类页签，开关开启时）：「投资分析汇总」盈亏汇总末尾追加「资金加权收益率 (XIRR)」行（无可用现金流写「未录入流水/无法计算」占位）、「市值核算明细表」追加「资金加权成本」列（批次成本价按份额加权，`report/market_value_sheet.py::_weighted_avg_cost`）、「持仓分类表」追加「成本分档」「分红累计」子列（`report/category.py::_tier_label` + `div_sum` 小计/总计）。数据入口：持仓 Excel 可选「交易流水」「分红流水」页签（`core/reader.py::read_holdings_with_flows`，不破坏既有 4 列），经 `report/orchestrator.generate_report(transactions=..., dividends=...)` 贯穿。
 

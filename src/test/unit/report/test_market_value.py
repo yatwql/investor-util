@@ -22,6 +22,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 
+from src.python.core import trading_calendar
 from src.python.core.models import Holding
 from src.python.report import market_value as mv
 import pytest
@@ -269,7 +270,7 @@ class TestPriceUpdateStatus(unittest.TestCase):
     def setUp(self) -> None:
         self._patch_open = patch("src.python.report.market_value.is_market_open", return_value=False)
         self._patch_midday = patch("src.python.report.market_value.is_midday_break", return_value=False)
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_open.start()
         self._patch_midday.start()
         self._patch_td.start()
@@ -528,104 +529,104 @@ class TestGetLastTradingDay(unittest.TestCase):
     def _mock_td(self, d):
         return d.strftime("%Y-%m-%d") in _mock_calendar()
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_saturday(self, mock_dt, mock_td):
         """周六 → 上周五。"""
         mock_dt.now.return_value = datetime(2026, 6, 27, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_sunday(self, mock_dt, mock_td):
         """周日 → 上周五。"""
         mock_dt.now.return_value = datetime(2026, 6, 28, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_monday_after_open(self, mock_dt, mock_td):
         """周一 10:00（已开盘）→ 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 29, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-29")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_monday_before_open(self, mock_dt, mock_td):
         """周一 02:35（盘前）→ 上周五。"""
         mock_dt.now.return_value = datetime(2026, 6, 29, 2, 35, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_monday_early_morning(self, mock_dt, mock_td):
         """周一 9:00（盘前）→ 上周五。"""
         mock_dt.now.return_value = datetime(2026, 6, 29, 9, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_monday_at_open(self, mock_dt, mock_td):
         """周一 9:30（开盘）→ 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 29, 9, 30, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-29")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_wednesday(self, mock_dt, mock_td):
         """周三 10:00 → 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 24, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-24")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_wednesday_before_open(self, mock_dt, mock_td):
         """周三 7:00（盘前）→ 周二。"""
         mock_dt.now.return_value = datetime(2026, 6, 24, 7, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-23")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_friday_after_open(self, mock_dt, mock_td):
         """周五 10:00 → 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 26, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_friday_before_open(self, mock_dt, mock_td):
         """周五 7:00（盘前）→ 周四。"""
         mock_dt.now.return_value = datetime(2026, 6, 26, 7, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-25")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_holiday_monday_after_open(self, mock_dt, mock_td):
         """端午节后周一 10:00 → 当天为交易日，返回当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-22")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_holiday_friday_before_open(self, mock_dt, mock_td):
         """端午节 06-19 盘前 → 退回 06-18。"""
         mock_dt.now.return_value = datetime(2026, 6, 19, 7, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-18")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_holiday_friday_after_open(self, mock_dt, mock_td):
         """端午节 06-19 10:00（非交易日）→ 退回最近交易日 06-18。"""
         mock_dt.now.return_value = datetime(2026, 6, 19, 10, 0, 0)
@@ -641,69 +642,69 @@ class TestGetLastTradingDay(unittest.TestCase):
 class TestGetPrevTradingDay(unittest.TestCase):
     """测试 get_prev_trading_day 前一交易日计算（mock 交易日历）。"""
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_monday_to_pre_holiday(self, mock_td):
         """端午节后周一 → 跳过假期 → 上周四 06-18。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-22"), "2026-06-18")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_tuesday_to_monday(self, mock_td):
         """周二 → 周一。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-23"), "2026-06-22")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_wednesday_to_tuesday(self, mock_td):
         """周三 → 周二。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-24"), "2026-06-23")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_thursday_to_wednesday(self, mock_td):
         """周四 → 周三。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-25"), "2026-06-24")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_friday_to_thursday(self, mock_td):
         """周五 → 周四。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-26"), "2026-06-25")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_saturday_to_friday(self, mock_td):
         """周六 → 周五。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-27"), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_sunday_to_friday(self, mock_td):
         """周日 → 周五。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-28"), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_empty_string_calls_get_last_trading_day(self, mock_td):
         """空字符串 → 调用 get_last_trading_day。"""
         mock_td.return_value = True  # 模拟所有日期都是交易日
-        with patch("src.python.report.market_value.get_last_trading_day") as mock_ltd:
+        with patch("src.python.core.trading_calendar.get_last_trading_day") as mock_ltd:
             mock_ltd.return_value = "2026-06-26"
             result = mv.get_prev_trading_day("")
             self.assertEqual(result, "2026-06-25")
             mock_ltd.assert_called_once()
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_invalid_date(self, mock_td):
         """无效日期字符串 → 返回空字符串。"""
         mock_td.return_value = True
         self.assertEqual(mv.get_prev_trading_day("not-a-date"), "")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_none_date(self, mock_td):
         """None 作为日期 → falsy 判断触发，回退到 get_last_trading_day（不会进入异常分支）。"""
         mock_td.return_value = True
-        with patch("src.python.report.market_value.get_last_trading_day") as mock_ltd:
+        with patch("src.python.core.trading_calendar.get_last_trading_day") as mock_ltd:
             mock_ltd.return_value = "2026-06-26"
             result = mv.get_prev_trading_day(None)
             self.assertEqual(result, "2026-06-25")
@@ -764,7 +765,7 @@ class TestTradingCalendarConcurrency(unittest.TestCase):
         from src.python.cache import clear as cache_clear
 
         # 缓存隔离：确保所有线程都走到 akshare 未命中分支
-        cache_clear(mv._TRADING_CALENDAR_CACHE_KEY)
+        cache_clear(trading_calendar._TRADING_CALENDAR_CACHE_KEY)
 
         # ── 注入 fake akshare：统计 tool_trade_date_hist_sina 回调并发深度 ──
         depth = {"active": 0, "max_active": 0}
@@ -789,7 +790,7 @@ class TestTradingCalendarConcurrency(unittest.TestCase):
 
         def worker():
             try:
-                results.append(mv._get_trading_calendar())
+                results.append(trading_calendar._get_trading_calendar())
             except Exception as exc:
                 errors.append(exc)
 
@@ -825,7 +826,7 @@ class TestDeterminePriceType(unittest.TestCase):
         self.prev = "2026-06-25"  # Thursday
         # _count_trading_days_back → _is_trading_day → akshare 交易日历（真实网络）。
         # 用例 mock 了 is_market_open/get_prev_trading_day，但漏 _is_trading_day。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -949,7 +950,7 @@ class TestGenerateDetails(unittest.TestCase):
         # _generate_details → _determine_price_type → _count_trading_days_back
         # → _is_trading_day → akshare 交易日历（真实网络）。用例已 mock
         # get_last_trading_day/is_market_open 等，但漏 _is_trading_day，统一隔离。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
         self.eastmoney_mock_data = {
@@ -1204,7 +1205,7 @@ class TestPremiumRate(unittest.TestCase):
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day（akshare
         # 网络）+ is_market_open/is_midday_break（东方财富 push2 HTTP）。统一隔离。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_open = patch("src.python.report.market_value.is_market_open", return_value=False)
         self._patch_midday = patch("src.python.report.market_value.is_midday_break", return_value=False)
         self._patch_td.start()
@@ -1305,7 +1306,7 @@ class TestTodayProfitOffMarket(unittest.TestCase):
         self._ld_patcher.start()
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
         self._td_patcher = unittest.mock.patch(
-            "src.python.report.market_value._is_trading_day",
+            "src.python.core.trading_calendar._is_trading_day",
             side_effect=_mock_is_trading_day,
         )
         self._td_patcher.start()
@@ -1391,7 +1392,7 @@ class TestPremiumPlaceholder(unittest.TestCase):
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -1490,7 +1491,7 @@ class TestTodayProfitEastMoneyNonTDay(unittest.TestCase):
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -1542,7 +1543,7 @@ class TestTodayProfitTencentAlways(unittest.TestCase):
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day（akshare 网络）
         # + is_market_open/is_midday_break（东方财富 push2 HTTP）。统一隔离。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_open = patch("src.python.report.market_value.is_market_open", return_value=False)
         self._patch_midday = patch("src.python.report.market_value.is_midday_break", return_value=False)
         self._patch_td.start()
@@ -1609,7 +1610,7 @@ class TestTodayProfitEdgeCases(unittest.TestCase):
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -1657,7 +1658,7 @@ class TestPremiumInWriteSheet(unittest.TestCase):
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -1687,7 +1688,7 @@ class TestCurrencyConversion(unittest.TestCase):
         # → _is_trading_day → akshare 交易日历（真实网络）。这些用例已 mock
         # get_last_trading_day/is_market_open，但漏 _is_trading_day，补上以
         # 隔离 akshare 网络调用。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 

@@ -290,6 +290,7 @@ investor-util/
 │   │   │   ├── signal_ledger.py      #   确定性信号沉淀账本（五类评级登记/幂等去重/实时-非实时标签折叠/摘要+缓存指纹/开关），无 analysis 依赖
 │   │   │   ├── perf.py               #   性能收集（PerfCollector 计时 + 数据源健康检查持久化）
 │   │   │   ├── provider_registry.py  #   数据源注册中心（熔断器/会话缓存）
+│   │   │   ├── trading_calendar.py   #   交易日历原语（唯一实现：交易日判定/最近及前一交易日/交易日区间计数，akshare 日历缓存；各层共用，report/market_value.py 按原公共名重新导出）
 │   │   │   ├── reader.py             #   持仓 xlsx 文件读取
 │   │   │   └── registry.py           #   中央注册表（模块/TTL/分组定义）
 │   │   │
@@ -462,7 +463,8 @@ investor-util/
 │       │   │   ├── test_registry.py         #   中央注册表测试
 │       │   │   ├── test_registry_edge.py    #   注册表边缘场景
 │       │   │   ├── test_signal_ledger.py    #   确定性信号账本测试（登记/幂等去重/实时-非实时折叠/摘要与缓存后缀）
-│       │   │   └── test_signal_ledger_edge.py # 信号账本边缘场景（未识别新鲜度/路径敌意/畸形记录/非有限值）
+│       │   │   ├── test_signal_ledger_edge.py # 信号账本边缘场景（未识别新鲜度/路径敌意/畸形记录/非有限值）
+│       │   │   └── test_trading_calendar.py  #   交易日历原语测试（交易日区间计数/长假与周末不误计/日历不可用回退）
 │       │   ├── cache/               #   缓存单元测试
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_cache_io.py         #   缓存 IO 测试

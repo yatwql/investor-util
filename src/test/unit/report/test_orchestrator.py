@@ -264,7 +264,7 @@ class TestGenerateReport:
         before = _snapshot_reports()
         with (
             # 市场数据网络依赖：交易日历（akshare）+ A 股/美股指数（腾讯/新浪）
-            patch("src.python.report.market_value._get_trading_calendar", return_value=set()),
+            patch("src.python.core.trading_calendar._get_trading_calendar", return_value=set()),
             patch("src.python.fetcher.index.fetch_indices", return_value={}),
             patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
             # 后台数据源健康检查（全量 HTTP 连通性探测）
@@ -912,8 +912,9 @@ class TestGenerateReport:
 
         assert isinstance(result, ReportResult)
         assert result.report_generated is True
-        # prepare_report_data 被调用且传入了 config
-        mock_prep.assert_called_once_with(mock_holdings, mock_reporter, config)
+        # prepare_report_data 被调用且传入了 config；transactions 透传（未提供时为 None），
+        # 供持仓明细附加 holding_days（再平衡误报防护的「新买入品种观察期」判据）
+        mock_prep.assert_called_once_with(mock_holdings, mock_reporter, config, transactions=None)
         # HTML 和 Excel 报告生成
         assert mock_html.call_count >= 1
         assert mock_xls.call_count >= 1

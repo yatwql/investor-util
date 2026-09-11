@@ -136,17 +136,45 @@ def _validate_pipeline_snapshot(pipeline_data: dict | None) -> None:
 # ── 持仓明细 → 行动建议消费字段子集（basic/both 共用） ──
 
 
-def _action_holdings_details(details: list) -> list[dict]:
+def attach_holding_trading_days(rows: list[dict], transactions: list | None) -> None:
+    """为行动建议持仓明细就地附加 holding_days（首次买入至今的交易日数）。
+
+    再平衡误报防护的第 (2) 类「新买入品种观察期」依赖该字段。无交易流水或
+    品种无买入记录时不写入该键——防护按「未知」跳过观察期过滤，宁可不抑制
+    也不误抑制。
+
+    Args:
+        rows: 行动建议持仓明细（orchestrator / _action_holdings_details 产物）。
+        transactions: 交易流水记录（可为 None / 空）。
+    """
+    if not transactions:
+        return
+    from src.python.analysis.rebalance import build_holding_trading_days
+    from src.python.report.market_value import get_last_trading_day
+
+    trading_days = build_holding_trading_days(transactions, get_last_trading_day())
+    for row in rows:
+        days = trading_days.get(row.get("code", ""))
+        if days is not None:
+            row["holding_days"] = days
+
+
+def _action_holdings_details(details: list, transactions: list | None = None) -> list[dict]:
     """持仓明细 → 行动建议消费的字段子集（数据契约同 orchestrator 组装）。
 
     交易纪律依赖收益率数据（profit_rate），统一换算为百分数（小数 ×100）；
     shares/price 供调仓建议可行化层计算可执行卖出份额与金额；
     channel 为场内/场外渠道上下文（按账户关键词判定），供可行化层按渠道
     计算份额取整与费用（场外整数份 + 赎回费）。
+
+    Args:
+        details: DetailRow 列表。
+        transactions: 交易流水记录（可为 None）；提供时附加 holding_days
+            （再平衡误报防护的「新买入品种观察期」判据）。
     """
     from src.python.core.code_utils import is_offsite_fund
 
-    return [
+    rows = [
         {
             "name": d.name,
             "code": d.code,
@@ -161,3 +189,5 @@ def _action_holdings_details(details: list) -> list[dict]:
         }
         for d in details
     ]
+    attach_holding_trading_days(rows, transactions)
+    return rows

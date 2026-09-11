@@ -48,6 +48,7 @@ from src.python.core.code_utils import (
     is_etf_by_name_or_code,
 )
 from src.python.config._core import get_config
+from src.python.core.trading_calendar import count_trading_days_elapsed
 from src.python.analysis._silence import (
     _filter_silenced_signals,
     _update_silence_state,
@@ -64,7 +65,12 @@ __all__ = [
     "equity_fixed_income_deviation",
     "compute_rebalance_signals",
     "resolve_rebalance_config",
+    "build_holding_trading_days",
 ]
+
+# 新买入品种观察期（交易日）：建仓不足此交易日数的品种，其超限/偏离信号视为
+# 建仓期短期波动，暂不触发再平衡（requirements R-RBL-07 第 (2) 条）
+MIN_NEW_POSITION_TRADING_DAYS: int = 20
 
 # ── 预设阈值集 ──────────────────────────────────────────────────
 # key: profile 名称 → {threshold, deviation_threshold}
@@ -109,6 +115,48 @@ def resolve_rebalance_config(rebalance_config: dict[str, Any] | None) -> dict[st
     return result
 
 
+def build_holding_trading_days(
+    transactions: list[Any] | None,
+    trading_day: str,
+) -> dict[str, int]:
+    """按代码统计自首次买入到基准交易日的持仓交易日数。
+
+    数据来源为持仓 Excel 可选「交易流水」页签：取每个代码最早一条买入
+    （`action == "buy"`）记录的日期，与基准交易日之间按**交易日**计数。
+    不用自然日差——长假会把自然日差显著放大（如春节前后相邻的两个交易日
+    相差逾一周），按自然日会把刚建仓的品种误判为已过观察期。
+
+    Args:
+        transactions: TradeRecord 列表（可为 None / 空），记录需含 code/date/action。
+        trading_day: 基准交易日（YYYY-MM-DD），通常取 get_last_trading_day()。
+
+    Returns:
+        {code: 持仓交易日数}。无买入记录或日期非法的代码不出现在结果中——
+        消费方按「未知则不做观察期过滤」处理，宁可不抑制也不误抑制。
+    """
+    if not transactions:
+        return {}
+
+    first_buy: dict[str, str] = {}
+    for t in transactions:
+        if getattr(t, "action", "") != "buy":
+            continue
+        code = str(getattr(t, "code", "") or "")
+        # 流水页签允许 YYYY/MM/DD 形态，归一化为 YYYY-MM-DD（与交易日历口径一致）
+        date = str(getattr(t, "date", "") or "").replace("/", "-")
+        if not code or not date:
+            continue
+        if code not in first_buy or date < first_buy[code]:
+            first_buy[code] = date
+
+    trading_days: dict[str, int] = {}
+    for code, date in first_buy.items():
+        elapsed = count_trading_days_elapsed(date, trading_day)
+        if elapsed is not None:
+            trading_days[code] = elapsed
+    return trading_days
+
+
 # ── 误报防护 ────────────────────────────────────────────────────
 
 
@@ -120,7 +168,7 @@ def _apply_false_positive_protection(
 
     三类防护：
       (1) 分红/拆股假超限：检查 shares 字段是否可用，持有量未变时标记 low_confidence
-      (2) 新买入短期波动：holding_days < 20 时直接过滤
+      (2) 新买入短期波动：持仓不足 MIN_NEW_POSITION_TRADING_DAYS 个交易日时直接过滤
       (3) 临近行权/到期品种：标注 near_maturity 字段
 
     Args:
@@ -159,12 +207,14 @@ def _apply_false_positive_protection(
         else:
             sig["shares_available"] = False
 
-        # (2) 新买入短期波动
+        # (2) 新买入短期波动（holding_days 由 build_holding_trading_days 按
+        #     交易流水首次买入日以交易日计，未知时不参与过滤）
         holding_days = holding.get("holding_days")
-        if holding_days is not None and holding_days < 20:
-            # 不足 20 个交易日 → 过滤
+        if holding_days is not None and holding_days < MIN_NEW_POSITION_TRADING_DAYS:
             sig["false_positive"] = True
-            sig["false_positive_reason"] = f"持仓仅 {holding_days} 天，不足 20 个交易日，暂不触发再平衡"
+            sig["false_positive_reason"] = (
+                f"持仓仅 {holding_days} 个交易日，不足 {MIN_NEW_POSITION_TRADING_DAYS} 个交易日，暂不触发再平衡"
+            )
             continue
 
         # (3) 临近行权/到期品种

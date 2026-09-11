@@ -383,7 +383,7 @@ def _generate_report_both(
 
     if pipeline_data is not None:
         pipeline_data["action_data"] = build_action_data(
-            _action_holdings_details(details),
+            _action_holdings_details(details, transactions),
             sum(d.market_value for d in details),
             portfolio_peak_mv=compute_portfolio_peak_mv((history_data or {}).get("bars")),
         )
@@ -540,7 +540,7 @@ def _generate_report_full(
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
     perf.start("数据准备")
-    prep = prepare_report_data(holdings, reporter, config)
+    prep = prepare_report_data(holdings, reporter, config, transactions=transactions)
     _validate_prep_completeness(prep)
     perf.stop()
 

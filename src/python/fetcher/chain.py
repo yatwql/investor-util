@@ -19,6 +19,7 @@ from src.python.config import get_config
 from src.python.core.constants import CACHE_WEEKLY
 from src.python.core.datasource_credential import credential_hint, credential_ready_enabled, missing_credential
 from src.python.core.provider_registry import TRANSPORT_FAILURE, get_registry
+from src.python.core.trading_calendar import count_trading_days_elapsed
 
 logger = logging.getLogger("invest")
 
@@ -440,6 +441,9 @@ _HISTORY_PROVIDER_MAP: dict[str, str] = {
     "eastmoney": "src.python.providers.eastmoney",
 }
 
+# 新旧 K 线之间缺失的交易日数超过此值 → 判定数据跳空（部分历史不可达）
+_MAX_GAP_TRADING_DAYS: int = 5
+
 
 def _call_history_provider(
     provider_name: str,
@@ -549,23 +553,26 @@ def _validate_continuity(cached: list[dict], new_data: list[dict], cache_key: st
         logger.warning("[%s] 新旧数据重叠——可能是历史修正，自动全量刷新", cache_key)
         cache_set(f"{cache_key}_correction_flag", True)
         return True
-    elif _gap_days(last_old.get("date"), first_new.get("date")) > 5:
-        logger.warning("[%s] 数据跳空 >5 交易日——部分历史不可达", cache_key)
+    else:
+        gap = _missing_trading_days(last_old.get("date"), first_new.get("date"))
+        if gap > _MAX_GAP_TRADING_DAYS:
+            logger.warning("[%s] 数据跳空 %d 个交易日——部分历史不可达", cache_key, gap)
     return False
 
 
-def _gap_days(date1: str | None, date2: str | None) -> int:
-    """计算两个日期字符串之间的天数差（简单近似）。"""
+def _missing_trading_days(date1: str | None, date2: str | None) -> int:
+    """计算两个 K 线日期之间**缺失**的交易日数（不含两端）。
+
+    以交易日而非自然日计——周末与长假会放大自然日差（如国庆前后相邻的两个
+    交易日相差 10 个自然日），按自然日判定会把正常连续的 K 线误判为跳空。
+    相邻交易日 → 0；两端相等/逆序、日期为空或格式非法 → 0。
+    """
     if not date1 or not date2:
         return 0
-    try:
-        from datetime import datetime
-
-        d1 = datetime.strptime(date1, "%Y-%m-%d")
-        d2 = datetime.strptime(date2, "%Y-%m-%d")
-        return abs((d2 - d1).days)
-    except (ValueError, TypeError):
+    elapsed = count_trading_days_elapsed(date1, date2)
+    if elapsed is None or elapsed <= 0:
         return 0
+    return elapsed - 1
 
 
 # 模块加载时自动注册默认 Provider Chain，使 registry.get_chain() 和策略选择器生效

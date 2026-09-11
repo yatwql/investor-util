@@ -272,8 +272,10 @@ class TestCountTradingDaysBack(unittest.TestCase):
     def setUp(self):
         # 模拟交易日历：包含必要的前后交易日
         # 以 2026-07-03（周五）为 T
+        # 交易日历原语已下沉至 core/trading_calendar.py，须在此打桩（原
+        # report/market_value.py 仅为重新导出，打桩该名不再影响实现）。
         self._calendar_patcher = patch(
-            "src.python.report.market_value._get_trading_calendar",
+            "src.python.core.trading_calendar._get_trading_calendar",
         )
         self._mock_calendar = self._calendar_patcher.start()
         # 7月：1(三) 2(四) 3(五) 6(一) 7(二) 8(三) 9(四) 10(五)
@@ -296,7 +298,7 @@ class TestCountTradingDaysBack(unittest.TestCase):
         self._calendar_patcher.stop()
 
     def _count(self, trading_day: str, nav_date: str) -> int | None:
-        from src.python.report.market_value import _count_trading_days_back
+        from src.python.core.trading_calendar import _count_trading_days_back
 
         return _count_trading_days_back(trading_day, nav_date)
 

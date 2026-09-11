@@ -20,6 +20,7 @@ from src.python.analysis.rebalance import (
     _filter_silenced_signals,
     _load_silence_state,
     _save_silence_state,
+    build_holding_trading_days,
     classify_holding,
     compute_target_deviation,
     equity_fixed_income_deviation,
@@ -872,6 +873,79 @@ class TestFalsePositiveProtection:
         result = compute_rebalance_signals(holdings, 10000, {"threshold": 0.15})
         assert len(result) >= 1
         assert result[0]["shares_available"] is True
+
+
+# ── 持仓交易日数（新买入观察期判据的生产者） ────────────────────
+
+
+class TestBuildHoldingTradingDays:
+    """交易流水 → 各品种持仓交易日数。"""
+
+    @staticmethod
+    def _tx(date: str, code: str, action: str = "buy"):
+        from src.python.core.models import TradeRecord
+
+        return TradeRecord(date=date, code=code, action=action, shares=100.0, price=1.0)
+
+    def _calendar(self):
+        from unittest.mock import patch
+
+        return patch(
+            "src.python.core.trading_calendar._get_trading_calendar",
+            return_value={"2026-09-09", "2026-09-10", "2026-09-11"},
+        )
+
+    def test_counts_from_first_buy(self):
+        """取最早一条买入记录为建仓日，按交易日计数（而非自然日）。"""
+        tx = [
+            self._tx("2026-09-10", "600001"),
+            self._tx("2026-09-01", "600001"),  # 更早的买入 → 建仓日
+            self._tx("2026-09-09", "600001"),
+        ]
+        with self._calendar():
+            # 建仓日 2026-09-01 → 基准日 2026-09-11，经过 09-09/09-10/09-11 共 3 个交易日
+            assert build_holding_trading_days(tx, "2026-09-11") == {"600001": 3}
+
+    def test_normalizes_slash_date(self):
+        """YYYY/MM/DD 形态归一化后参与计算。"""
+        with self._calendar():
+            assert build_holding_trading_days([self._tx("2026/09/09", "600001")], "2026-09-11") == {"600001": 2}
+
+    def test_sell_only_code_excluded(self):
+        """仅有卖出记录的品种不产出（未知则不参与观察期过滤）。"""
+        with self._calendar():
+            assert build_holding_trading_days([self._tx("2026-09-09", "600002", action="sell")], "2026-09-11") == {}
+
+    def test_invalid_date_excluded(self):
+        """日期非法的记录不产出。"""
+        with self._calendar():
+            assert build_holding_trading_days([self._tx("bad-date", "600003")], "2026-09-11") == {}
+
+    def test_empty_transactions(self):
+        """无交易流水 → 空字典（不误报也不误抑制）。"""
+        assert build_holding_trading_days(None, "2026-09-11") == {}
+        assert build_holding_trading_days([], "2026-09-11") == {}
+
+    def test_observation_window_boundary(self):
+        """阈值边界：19 个交易日过滤、20 个交易日放行。"""
+        for holding_days, expected_count in ((19, 0), (20, 1)):
+            holdings = [
+                {"name": "A", "code": "600001", "market_value": 5000, "holding_days": holding_days},
+            ]
+            assert len(compute_rebalance_signals(holdings, 10000, {"threshold": 0.15})) == expected_count
+
+    def test_reason_reports_trading_days(self):
+        """过滤原因以交易日表述（回归：原实现措辞为「N 天」而判据实为交易日）。"""
+        from src.python.analysis.rebalance import _apply_false_positive_protection
+
+        signals = [{"code": "600001", "type": "single_overflow", "action": "减仓"}]
+        holdings = [{"name": "A", "code": "600001", "holding_days": 3}]
+        kept = _apply_false_positive_protection(signals, holdings)
+
+        assert kept == []
+        assert signals[0]["false_positive"] is True
+        assert "3 个交易日" in signals[0]["false_positive_reason"]
+        assert "不足 20 个交易日" in signals[0]["false_positive_reason"]
 
 
 # ── 静默期测试 ──────────────────────────────────────────────────

@@ -302,7 +302,7 @@ def generate_excel_report(
 
             pipeline_data = {**(pipeline_data or {})}
             pipeline_data["action_data"] = build_action_data(
-                _action_holdings_details(_action_details),
+                _action_holdings_details(_action_details, transactions),
                 data.get("total_mv", 0.0),
             )
 

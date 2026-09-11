@@ -10,8 +10,8 @@
   - 章节编号暗号（"N 章"/"第 N 章"指代报告具体章节）检出，计数表述（共 N 章等）豁免
   - 迭代轮次暗号（"第 N 轮"/"轮N"指代开发迭代轮次）检出，计数/运行时表述（共 N 轮/
     轮询/轮动等）豁免
-  - 架构约束代号（C1~C24，technical.md 定义）在注释/文档正文属暗号须检出；约束定义处
-    （technical.md / llm-technical.md）豁免；非约束 C+数字（色值 C00000、C25+、内嵌
+  - 架构约束代号（C1~C25，technical.md 定义）在注释/文档正文属暗号须检出；约束定义处
+    （technical.md / llm-technical.md）豁免；非约束 C+数字（色值 C00000、C26+、内嵌
     AB14/MC19）不误伤
 
 测试通过脚本 import 方式直接复用 PATTERNS / EXCLUDE_LINE / 各扫描函数，
@@ -384,7 +384,7 @@ class TestDocTraceDetection:
         assert _doc_hit(doc_traces, "R17 兼容") is None
 
     def test_arch_constraint_cipher_flagged(self, doc_traces):
-        """文档正文架构约束代号（C1~C24）属暗号须检出（须改写为语义描述）。"""
+        """文档正文架构约束代号（C1~C25）属暗号须检出（须改写为语义描述）。"""
         flagged = [
             "C19 契约",
             "C20 图下说明",
@@ -392,6 +392,7 @@ class TestDocTraceDetection:
             "C22 挂载点集中",
             "C23 注册表唯一事实来源",
             "C24 凭据值不落日志",
+            "C25 交易日基准",
             "C1 约束：代码类型判定复用 code_utils",
             "C14 合规，不写 _ENV.globals",
         ]
@@ -399,10 +400,10 @@ class TestDocTraceDetection:
             assert _doc_hit(doc_traces, line) is not None, f"架构约束代号未检出: {line}"
 
     def test_arch_constraint_cipher_false_positives(self, doc_traces):
-        """非约束的 C+数字组合不得误伤：十六进制色值、C25+、内嵌命中。"""
+        """非约束的 C+数字组合不得误伤：十六进制色值、C26+、内嵌命中。"""
         legit = [
             "色值 C00000 不随版本变",
-            "C25 方案不在约束表",
+            "C26 方案不在约束表",
             "AB14 协议对接",
             "MC19 型号",
         ]
@@ -856,11 +857,11 @@ class TestTaskCodeCommentPatterns:
             assert _code_hit(code_traces, line) is None, f"合法字母+数字被误伤: {line}"
 
     def test_magic_number_letter_digit_flagged(self, code_traces):
-        """MAGIC：注释中"字母+数字/连续字母+数字"（R11/P1/C25/AB14/HH6）属魔法编号须检出。"""
+        """MAGIC：注释中"字母+数字/连续字母+数字"（R11/P1/C26/AB14/HH6）属魔法编号须检出。"""
         flagged = [
             "P1 优先级",
             "R17 兼容",
-            "C25 兼容",  # 超出约束表编号范围仍是字母+数字，属魔法编号
+            "C26 兼容",  # 超出约束表编号范围仍是字母+数字，属魔法编号
             "AB14 兼容",  # 连续字母+数字（内嵌命中也是魔法编号）
             "MC19 协议",
             "D8 数据",
@@ -915,7 +916,7 @@ class TestTaskCodeCommentPatterns:
             assert _code_hit(code_traces, line) is None, f"合法字母_数字被误伤: {line}"
 
     def test_arch_constraint_codes_flagged(self, code_traces):
-        """架构约束代号（C1~C24，technical.md 定义）在注释中属暗号须检出。"""
+        """架构约束代号（C1~C25，technical.md 定义）在注释中属暗号须检出。"""
         flagged = [
             "C1 约束：代码类型判定复用 code_utils",
             "C3 原子写入",
@@ -926,6 +927,7 @@ class TestTaskCodeCommentPatterns:
             "C22 挂载点集中",
             "C23 注册表唯一事实来源",
             "C24 凭据值不落日志",
+            "C25 交易日基准",
         ]
         for line in flagged:
             assert _code_hit(code_traces, line) is not None, f"架构约束代号未检出: {line}"

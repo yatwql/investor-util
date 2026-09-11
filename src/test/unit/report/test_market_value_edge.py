@@ -42,32 +42,32 @@ class TestCountTradingDaysBack(unittest.TestCase):
 
     # ── 正常场景 ────────────────────────────────────────
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_same_day_returns_none(self, mock_istd):
         """nav_date == trading_day → None（无需回退）。"""
         mock_istd.side_effect = self._side_effect_is_trading_day
         self.assertIsNone(self._call("2026-07-01"))
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_prev_trading_day_returns_1(self, mock_istd):
         """nav_date == T-1 → 返回 1。"""
         mock_istd.side_effect = self._side_effect_is_trading_day
         self.assertEqual(self._call("2026-06-30"), 1)
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_two_days_back(self, mock_istd):
         """nav_date == T-2（跨 1 个自然日）→ 返回 2。"""
         mock_istd.side_effect = self._side_effect_is_trading_day
         self.assertEqual(self._call("2026-06-29"), 2)
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_five_days_back_skip_weekend(self, mock_istd):
         """nav_date == T-5（跨周末）→ 返回 5。"""
         mock_istd.side_effect = self._side_effect_is_trading_day
         # T=周三，往前 5 个交易日 = 上周三(06-24)
         self.assertEqual(self._call("2026-06-24"), 5)
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_six_plus_days_back(self, mock_istd):
         """nav_date > 5 个交易日前 → 返回正确 N。"""
         mock_istd.side_effect = self._side_effect_is_trading_day
@@ -78,13 +78,13 @@ class TestCountTradingDaysBack(unittest.TestCase):
 
     # ── 异常场景 ────────────────────────────────────────
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_future_date_returns_none(self, mock_istd):
         """nav_date > trading_day（未来日期）→ None。"""
         mock_istd.side_effect = self._side_effect_is_trading_day
         self.assertIsNone(self._call("2026-07-02"))
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_nav_beyond_60_days_lookback(self, mock_istd):
         """nav_date 超出 60 个自然日查找范围 → None。"""
         mock_istd.side_effect = self._side_effect_is_trading_day

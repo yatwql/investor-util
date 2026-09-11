@@ -6,6 +6,22 @@
 
 ## [0.10.19-dev] - 开发中（未发布）
 
+### 「距今多久」判定一律改用交易日（缺陷修复 rf-352）（2026-09-12）
+
+- **背景**：承接 rf-351，用户指出判定逻辑本身也应以交易日为准——「其实判定交易数据以及报告数据是否新鲜，都应该用交易日进行判定，而不是自然日进行判断」。核对后确认同一病根（以自然日差代交易日）在三处确定性判定中复现，并升格为架构约束。
+- **三处违规**：
+  - **K 线增量跳空判定**（`fetcher/chain.py`）：旧实现取新旧 K 线日期的**自然日差** > 5 即判「数据跳空——部分历史不可达」。长假（春节/国庆）前后两个相邻交易日相隔 8~10 个自然日，会被误判为跳空并触发不必要的全量重拉。
+  - **停更因子剔除**（`analysis/style_factor_regression.py`）：`FACTOR_STALE_DAYS=120`（自然日）判定因子指数末根 K 线是否停更。长假期间无数据属正常，按自然日会把仅隔数日的因子判为停更剔除，剩余因子 < 2 时整块风格回归直接落「数据不足」。
+  - **再平衡新仓观察期**（`analysis/rebalance.py`）：R-RBL-07 第 (2) 条要求「新买入品种不足 20 日不触发」，原实现读 `holding_days` 字段——该字段**全项目无生产者**，防护实际从未生效（形同虚设）。
+- **原语下沉（DRY，一处实现三处共用）**：交易日历原语自 `report/market_value.py` 下沉至 `core/trading_calendar.py`（`_get_trading_calendar`/`_is_trading_day`/`get_last_trading_day`/`get_prev_trading_day`/`_count_trading_days_back` + 新增公共原语 `count_trading_days_elapsed`），使 `fetcher/` 与 `analysis/` 得以复用而不反向依赖 `report/`；`market_value.py` 按原公共名重新导出，既有导入路径与测试补丁点不变（下沉动因为分层无环：`report/market_value.py` 已 import `fetcher.price`，反向导入即成环）。
+- **修复**：
+  - `fetcher/chain.py` — 新增 `_missing_trading_days()`（相邻交易日 → 0），跳空阈值语义化为 `_MAX_GAP_TRADING_DAYS=5`，日志改「数据跳空 N 个交易日」。
+  - `analysis/style_factor_regression.py` — 常量改名 `FACTOR_STALE_TRADING_DAYS=86`（约 4 个月交易日数），按交易日计龄；日期无法解析时按「未知」视为未停更（宁可不剔除也不误剔除）。
+  - `analysis/rebalance.py` — 新增 `build_holding_trading_days()`（按交易流水首次买入日、以交易日计至基准交易日）+ `MIN_NEW_POSITION_TRADING_DAYS=20`，防护理由文案回显实际交易日数；**为该无生产者字段补上生产者**——`report/_report_helpers.py::attach_holding_trading_days()` 在编排期写入 `holding_days`，三处 `holdings_details` 生产者（完整报告、双路径、Excel 基础路径）与 `_action_holdings_details` 调用点均已接入交易流水；无流水/无买入记录时该键不写入，防护按「未知」跳过过滤。
+- **约束升格**：技术设计文档 §8.3 新增架构约束「**时间距离一律以交易日计**」——凡用于判定数据新鲜度/停更/跳空/持仓期/观察期的「距今多久」一律以交易日计，交易日来源唯一为 `core/trading_calendar.py`，各模块不得自建日历或另写自然日差；自然日差仅限本身以自然日定义的量（静默期天数、缓存 TTL）。`scripts/check-code-traces.py` / `check-doc-traces.py` 的约束代号检测范围同步放开至新编号。
+- **回归测试**：新增 `src/test/unit/core/test_trading_calendar.py`（交易日区间计数/周末与长假不误计/日历不可用回退/非法日期）与三处修复的边界用例（相邻 K 线缺失交易日 → 0、长假不被误剔除、观察期 19 与 20 交易日边界、防护理由回显交易日数、距离确以交易日传入）；既有 44 处交易日历补丁目标同步重定向至 `core.trading_calendar`。
+- **文档**：`technical.md`（§8.3 新增「时间距离一律以交易日计」约束、因子停更阈值口径与 probe 脚本自然日口径的差异说明、`data_freshness` 交易日来源改指 `core/trading_calendar.py`）、`requirements.md` R-RBL-07 第 (2) 条改「不足 20 个交易日」并写明持仓期取数口径、`folders.md` 目录树、`CLAUDE.md` 约束条数同步。
+
 ### 体检「数据质量」维度的净值新鲜度基准（缺陷修复 rf-351）（2026-09-12）
 
 - **背景**：用户在 2026-09-12（周六）运行报告，持仓体检报告第 5 维「数据质量」写出「QDII净值更新滞后：040046、017730、016055、096001净值日期为2026-09-10，当前时间为2026-09-12，存在延迟」。用户指出：报告虽在 9 月 12 日运行，**交易日仍是 9 月 11 日**，QDII 净值为 T-1 即 9 月 10 日**属正常，不存在延迟**。

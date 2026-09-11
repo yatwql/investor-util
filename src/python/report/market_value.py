@@ -5,12 +5,10 @@
 from __future__ import annotations
 
 import logging
-import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
-from src.python import cache
 from src.python.core.code_utils import (
     is_a_share_code,
     is_etf_by_name,
@@ -26,6 +24,16 @@ from src.python.core.num_utils import finite_or, is_finite_number
 from src.python.core.models import Holding
 from src.python.core.provider_registry import FetchStrategy, get_registry
 
+# 交易日历原语已下沉至 core/trading_calendar.py——fetcher / analysis 等下层同样需要
+# 交易日判定，而 report 层不得被下层反向依赖。此处按原公共名重新导出，
+# 保持既有导入路径不变（report/html_writer.py、report/summary.py、
+# fetcher/price.py、report/orchestrator.py 等）。
+from src.python.core.trading_calendar import (
+    _count_trading_days_back,
+    get_last_trading_day,
+    get_prev_trading_day,
+)
+
 logger = logging.getLogger("invest")
 
 # 占位符 — 非 QDII 或无参考净值时使用
@@ -39,8 +47,6 @@ __all__ = [
     "_count_trading_days_back",
     "_determine_price_type",
     "_generate_details",
-    "_get_trading_calendar",
-    "_is_trading_day",
     "classify_holdings",
     "get_last_trading_day",
     "get_prev_trading_day",
@@ -192,159 +198,6 @@ def is_market_open() -> bool:
 def is_midday_break() -> bool:
     """委派 market_hours.is_midday_break。"""
     return _mh_is_midday_break()
-
-
-# ── 交易日历（节假日感知） ───────────────────────────────
-_TRADING_CALENDAR_CACHE_KEY = "trading_calendar"
-
-# akshare 交易日历调用串行锁：tool_trade_date_hist_sina() 内部使用
-# py_mini_racer(V8) 解密新浪接口，而 V8 初始化不是线程安全的——多线程并发首次
-# 初始化会触发 [FATAL:partition_address_space.cc(243)] Check failed:
-# !IsConfigurablePoolInitialized() 直接 abort 整个进程（try/except 无法捕获）。
-# 菜单 2 并行价格抓取 / 报告生成的并发路径可能多线程同时命中本缓存未命中分支，
-# 必须在此串行化（V8 顺序初始化是安全的）。
-_TRADING_CALENDAR_AKSHARE_LOCK = threading.Lock()
-
-
-def _get_trading_calendar() -> set[str]:
-    """获取 A 股交易日历（YYYY-MM-DD 字符串集合）。
-
-    通过 akshare 获取全年交易日数据并缓存。若获取失败，返回空集合，
-    由调用方（get_last_trading_day）回退到简易周度判断。
-
-    线程安全：缓存未命中分支用模块级锁串行化 akshare(V8) 调用（见
-    _TRADING_CALENDAR_AKSHARE_LOCK），避免并发初始化 py_mini_racer 触发
-    进程级 FATAL 崩溃。
-
-    Returns:
-        交易日日期字符串集合
-    """
-    cached = cache.get(_TRADING_CALENDAR_CACHE_KEY, cache.get_ttl("calendar"))
-    if cached is not None and isinstance(cached, list):
-        return set(cached)
-
-    with _TRADING_CALENDAR_AKSHARE_LOCK:
-        # 双重检查：等待锁期间其他线程可能已写入缓存
-        cached = cache.get(_TRADING_CALENDAR_CACHE_KEY, cache.get_ttl("calendar"))
-        if cached is not None and isinstance(cached, list):
-            return set(cached)
-        try:
-            import akshare as ak
-
-            df = ak.tool_trade_date_hist_sina()
-            dates: set[str] = set(df["trade_date"].dropna().astype(str).tolist())
-            if dates:
-                cache.set(_TRADING_CALENDAR_CACHE_KEY, sorted(dates))
-                logger.info("交易日历已更新（%d 个交易日）", len(dates))
-                return dates
-        except Exception as exc:
-            logger.warning("获取交易日历失败: %s，使用简易节假日判断回退", exc)
-
-        return set()
-
-
-def _is_trading_day(date: datetime) -> bool:
-    """判断给定日期是否为 A 股交易日。
-
-    优先使用 akshare 日历，失败时回退到简易判断（非周六日即为交易日）。
-
-    Args:
-        date: 待判断的日期
-
-    Returns:
-        True 表示为交易日
-    """
-    calendar = _get_trading_calendar()
-    date_str = date.strftime("%Y-%m-%d")
-    if calendar:
-        return date_str in calendar
-    # 回退：仅排除周六日
-    return date.weekday() < 5
-
-
-def get_last_trading_day() -> str:
-    """获取最近一个交易日（YYYY-MM-DD），含节假日感知。
-
-    判断逻辑：
-    1. 使用 akshare 交易日历判定节假日（端午、中秋、国庆等）
-    2. A 股盘前（< 9:30）退回上一交易日
-    3. 盘中/盘后（≥ 9:30）且当天为交易日 → 返回当天
-    4. 非交易日则向前查找最近一个交易日
-
-    Returns:
-        YYYY-MM-DD 格式的交易日字符串
-    """
-    now = datetime.now(timezone(timedelta(hours=8)))
-    # 若盘前（< 9:30），基准日设为昨天
-    check = now - timedelta(days=1) if now.hour < 9 or now.hour == 9 and now.minute < 30 else now
-
-    # 从基准日起向前查找最近一个交易日
-    for _ in range(14):  # 最多回溯 14 天（覆盖长假）
-        if _is_trading_day(check):
-            return check.strftime("%Y-%m-%d")
-        check -= timedelta(days=1)
-
-    # 极端回退（不应到达）
-    return now.strftime("%Y-%m-%d")
-
-
-def get_prev_trading_day(trading_day: str = "") -> str:
-    """获取指定交易日的前一个交易日，含节假日感知。
-
-    使用 akshare 交易日历向前查找，找不到时回退到简易周度判断。
-
-    Args:
-        trading_day: YYYY-MM-DD 格式的交易日，默认取最近交易日
-
-    Returns:
-        前一个交易日 YYYY-MM-DD
-    """
-    if not trading_day:
-        trading_day = get_last_trading_day()
-    try:
-        dt = datetime.strptime(trading_day, "%Y-%m-%d")
-        # 从 trading_day - 1 起向前查找最近一个交易日
-        check = dt - timedelta(days=1)
-        for _ in range(14):
-            if _is_trading_day(check):
-                return check.strftime("%Y-%m-%d")
-            check -= timedelta(days=1)
-        return (dt - timedelta(days=1)).strftime("%Y-%m-%d")
-    except (ValueError, TypeError):
-        return ""
-
-
-def _count_trading_days_back(trading_day: str, nav_date: str) -> int | None:
-    """计算 nav_date 比 trading_day 早多少个交易日。
-
-    用于场外基金净值日期的 T-N 判定，替代简单的自然日差值。
-    例如：T=周一，nav_date=上周四 → 返回 2（上周五为 T-1）。
-
-    Args:
-        trading_day: 基准交易日（YYYY-MM-DD）
-        nav_date: 目标日期（YYYY-MM-DD）
-
-    Returns:
-        交易日数差（T-1 返回 1，T-2 返回 2...），
-        nav_date >= trading_day 时返回 None，
-        超出 60 个自然日查找范围时返回 None
-    """
-    try:
-        td_dt = datetime.strptime(trading_day, "%Y-%m-%d")
-        nav_dt = datetime.strptime(nav_date, "%Y-%m-%d")
-        if nav_dt >= td_dt:
-            return None
-        check = td_dt - timedelta(days=1)
-        count = 0
-        for _ in range(60):
-            if _is_trading_day(check):
-                count += 1
-                if check.strftime("%Y-%m-%d") == nav_date:
-                    return count
-            check -= timedelta(days=1)
-        return None
-    except (ValueError, TypeError):
-        return None
 
 
 def _determine_price_type(source_api: str, nav_date: str, trading_day: str) -> str:

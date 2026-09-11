@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.19-dev
-> **编号源**：`rf-next = 352`（新增问题取此编号，完成后更新为 +1；已用最大 rf-351，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 353`（新增问题取此编号，完成后更新为 +1；已用最大 rf-352，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -42,12 +42,13 @@
 
 ### 已解决待归档（v0.10.19-dev）
 
-> 非架构约束违规：rf-351 为用户在实际报告中发现的持仓体检「数据质量」维度假阳性（非交易日运行时把正常的 T-1 净值判为延迟）。
+非架构约束违规：rf-351 为用户在实际报告中发现的持仓体检「数据质量」维度假阳性（非交易日运行时把正常的 T-1 净值判为延迟）；rf-352 为同一病根在三处确定性判定中的同源复现（以自然日代交易日），并升格为架构约束「时间距离一律以交易日计」。
 
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
 | **rf-351** | **体检报告「数据质量」维度把正常的 T-1 净值误报为延迟**：用户在 2026-09-12（周六）运行报告，体检报告第 5 维写出「QDII净值更新滞后：040046、017730、016055、096001净值日期为2026-09-10，当前时间为2026-09-12，存在延迟」。该判定同时错在两处——① **基准错**：报告在非交易日运行，最近交易日仍为 2026-09-11（周五），QDII 净值为 T-1 即 2026-09-10 属正常，运行时刻与净值日期相差 2 个自然日并不能推出延迟；② **口径错**：QDII 与部分场外基金的官方净值本就是 T-1，即便在交易日运行也非延迟。同一份报告的「数据质量仪表盘」可信度区块对这四只品种给的判定是「缓存（T-1）」（`data_freshness` 的 `cached`，正常），确定性层判定正确、仅提示词侧表述错误，属报告内自相矛盾。根因是 `_SYSTEM_HEALTH_CHECK` 第 5 维该条的表述为「基金净值更新延迟（净值日期距当前日期）」，让模型以运行时刻做自然日差，且未给交易日基准与 QDII T-1 例外；模型据持仓明细中的 `(QDII滞后1日)` 标注反把正常特性读成延迟证据 | `core/data_freshness.py::build_freshness_summary` 契约回传 `trading_day`/`prev_trading_day`；`llm/prompts_tables.py` 新增 `_build_nav_freshness_basis_lines()` 产出「净值新鲜度基准」「净值滞后品种」行，滞后清单直接引用 `stale`/`degraded` 判定而不由模型从裸日期推断；`_build_data_quality_detail_block()` 增加 `data_freshness` 入参，两处调用点（`llm/generators_orchestrator.py` 渲染一次进指纹又进提示词、`llm/prompts_action.py` 旁路兜底）同源传入；`_SYSTEM_HEALTH_CHECK` 第 5 维改为以交易日为基准并写明 QDII/场外 T-1 不构成延迟、禁止用自然日差判定。补回归测试六例（基准行取交易日而非运行时刻、QDII 的 `cached` 不入滞后清单、`stale` 才入清单、契约不可用时保持既有文案、体检提示词经 `pipeline_data` 注入基准、系统提示词不再含「净值日期距当前日期」）+ 契约回传交易日一例 |
 
+| **rf-352** | **三处「距今多久」判定以自然日替代交易日，长假/周末处误判**：rf-351 只修了提示词侧的基准表述，判定逻辑本身仍散落三处以自然日差计算——① `fetcher/chain.py` 的 K 线增量跳空判定（旧实现 `_gap_days()` 取两 K 线日期自然日差 > 5 即判「数据跳空」，长假后正常的相邻两根 K 线相隔 8~10 个自然日会被误判，进而触发不必要的全量重拉）；② `analysis/style_factor_regression.py` 的停更因子剔除（`FACTOR_STALE_DAYS=120` 自然日，长假前后无数据属正常，按自然日会把仅隔数日的因子判为停更剔除，剩余因子 < 2 时整块回归落「数据不足」）；③ `analysis/rebalance.py` 的再平衡「新买入品种观察期」防护（R-RBL-07 第 (2) 条要求「不足 20 日不触发」，原实现读的是 `holding_days` 字段，而该字段**全项目无生产者**，防护实际从未生效——属防护形同虚设）。用户指出：判定数据/报告新鲜度应以交易日而非自然日为准 | **原语下沉（DRY）**：交易日历原语自 `report/market_value.py` 下沉至 `core/trading_calendar.py`（`count_trading_days_elapsed` / `get_last_trading_day` / `get_prev_trading_day` / `_is_trading_day`），使 fetcher/ 与 analysis/ 可复用而不反向依赖 report/；`market_value.py` 按原公共名重新导出，既有导入路径与补丁点不变。**三处修复**：`fetcher/chain.py` 改以缺失**交易日**数判定跳空（阈值语义化为 `_MAX_GAP_TRADING_DAYS=5`，新增 `_missing_trading_days`）；`style_factor_regression.py` 常量改名 `FACTOR_STALE_TRADING_DAYS=86`（约 4 个月交易日数）并按交易日计龄，日期不可解析时视为未停更；`rebalance.py` 新增 `build_holding_trading_days()`（按交易流水首次买入日以交易日计持仓期）+ `MIN_NEW_POSITION_TRADING_DAYS=20`，由 `report/_report_helpers.py::attach_holding_trading_days` 在编排期写入 `holding_days`，三处 `holdings_details` 生产者（完整/双路径/Excel 基础）均已接入。**约束升格**：新增架构约束「时间距离一律以交易日计」（技术设计文档 §8.3），交易日来源唯一为 `core/trading_calendar.py`，自然日差仅限本身以自然日定义的量（静默期、缓存 TTL）。**回归测试**：新增 `test_trading_calendar.py`（交易日区间计数/长假与周末不误计/日历不可用回退）+ 三处修复各补边界与回归用例（相邻 K 线→0 缺失、长假不误剔除、观察期边界 19/20 交易日、理由文案回显交易日数），并将 44 处既有日历补丁目标同步重定向至 core |
 ### 已解决待归档（v0.10.18）
 
 > 全局架构约束逐条自检（C 表 24 项）发现并修复的违规项，详情见 `changelog.md` [0.10.18] 对应条目。约束语义见 `technical.md` §架构设计约束。

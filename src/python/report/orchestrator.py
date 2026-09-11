@@ -81,12 +81,18 @@ def prepare_report_data(
     holdings: list,
     reporter: ProgressReporter,
     config: dict,
+    transactions: list | None = None,
 ) -> dict:
     """获取行情、指数、穿透数据，整理持仓明细字典列表。
 
     使用内部 ThreadPoolExecutor。
     注意：config 参数传入后必须只读使用，不得 mutate。调用方持有的 dict 引用
     指向相同的配置对象，写入会导致跨模块状态污染。
+
+    Args:
+        transactions: 交易流水记录（可选）。提供时为持仓明细附加 holding_days
+            （首次买入至今的交易日数），供再平衡误报防护的「新买入品种观察期」
+            判定；缺省不附加该字段，防护按「未知」跳过观察期过滤。
     """
     from concurrent.futures import ThreadPoolExecutor
 
@@ -187,6 +193,11 @@ def prepare_report_data(
         }
         for d in details
     ]
+    # 新买入品种观察期判据（R-RBL-07 第 (2) 条）：按交易流水首次买入日以交易日计。
+    # 须在下方 build_action_data 之前附加，信号计算即已消费该字段。
+    from src.python.report._report_helpers import attach_holding_trading_days
+
+    attach_holding_trading_days(holdings_details, transactions)
 
     # 行动建议：组装 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）。
     # 此处为「中间占位构建」：组合历史峰值市值需等历史走势就绪（report 层

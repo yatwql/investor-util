@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 
 from src.python.fetcher.chain import (
     _call_history_provider,
+    _missing_trading_days,
     fetch_with_incremental_fallback,
     fetch_with_fallback,
     _get_chain,
@@ -594,6 +595,70 @@ class TestHistoryIndexChain(unittest.TestCase):
             self.assertEqual(result, [])
             # 全链失败时不写缓存（空数据不缓存）
             mock_cache_set.assert_not_called()
+
+
+# ============================================================
+#  _missing_trading_days — K 线跳空判定以交易日为基准
+# ============================================================
+
+# 测试日历（2026 年 9-10 月片段）：09-16 ~ 09-25 与 10-01 ~ 10-07 为假期
+_TEST_CALENDAR = {
+    "2026-09-08",
+    "2026-09-09",
+    "2026-09-10",
+    "2026-09-11",
+    "2026-09-14",
+    "2026-09-15",
+    "2026-09-28",
+    "2026-09-29",
+    "2026-09-30",
+    "2026-10-08",
+    "2026-10-09",
+    "2026-10-12",
+}
+
+
+class TestMissingTradingDays(unittest.TestCase):
+    """K 线缺口统计（缺失的交易日数，不含两端）。"""
+
+    def _calendar(self):
+        return patch(
+            "src.python.core.trading_calendar._get_trading_calendar",
+            return_value=_TEST_CALENDAR,
+        )
+
+    def test_adjacent_trading_days_no_gap(self):
+        """相邻交易日 → 0 个缺失。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-10", "2026-09-11"), 0)
+
+    def test_weekend_not_a_gap(self):
+        """周五 → 下周一：跨越周末但无缺失（回归：自然日差为 3）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-11", "2026-09-14"), 0)
+
+    def test_long_holiday_not_a_gap(self):
+        """长假前后相邻交易日：8 个自然日但无缺失（回归：自然日差为 8）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-30", "2026-10-08"), 0)
+
+    def test_counts_missing_sessions(self):
+        """区间内缺失的交易日逐一计数（09-11/09-14/09-15 三个交易日的 K 线缺失）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-10", "2026-09-28"), 3)
+
+    def test_large_gap_counts_up(self):
+        """长区间缺口按交易日累计（用于 >5 交易日告警阈值判定）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-08", "2026-10-12"), 10)
+
+    def test_invalid_or_missing_dates(self):
+        """空值 / 格式非法 / 逆序 → 0（不告警）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days(None, "2026-09-11"), 0)
+            self.assertEqual(_missing_trading_days("2026-09-11", None), 0)
+            self.assertEqual(_missing_trading_days("bad", "2026-09-11"), 0)
+            self.assertEqual(_missing_trading_days("2026-09-11", "2026-09-10"), 0)
 
 
 if __name__ == "__main__":

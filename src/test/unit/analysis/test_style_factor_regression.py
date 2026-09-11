@@ -21,6 +21,7 @@ import numpy as np
 import pytest
 
 from src.python.analysis.style_factor_regression import (
+    FACTOR_STALE_TRADING_DAYS,
     asif_portfolio_daily_returns,
     compute_factor_exposure,
     filter_stale_factor_klines,
@@ -171,7 +172,7 @@ class TestStaleFactorFilter:
     """停更因子剔除。"""
 
     def test_stale_factor_excluded(self):
-        """末根 K 线距今超过 FACTOR_STALE_DAYS → 剔除并返回 stale 列表。"""
+        """末根 K 线距今超过 FACTOR_STALE_TRADING_DAYS → 剔除并返回 stale 列表。"""
         today = "2026-08-01"
         stale_bar = [{"date": "2023-02-17", "close": 100.0}]
         fresh_bar = [{"date": "2026-07-30", "close": 100.0}]
@@ -193,6 +194,49 @@ class TestStaleFactorFilter:
         )
         assert fresh == {"value": [{"date": "2026-07-31", "close": 1.0}]}
         assert stale == []
+
+
+class TestStaleFactorTradingDayBasis:
+    """停更判定以交易日为基准（回归：原实现按自然日差，长假会误剔除）。"""
+
+    @staticmethod
+    def _bars(date_str: str) -> list[dict]:
+        return [{"date": date_str, "close": 100.0}]
+
+    def test_threshold_boundary_in_trading_days(self):
+        """阈值边界按交易日计：等于阈值保留、超过阈值剔除。"""
+        from unittest.mock import patch
+
+        for elapsed, expect_stale in (
+            (FACTOR_STALE_TRADING_DAYS, False),
+            (FACTOR_STALE_TRADING_DAYS + 1, True),
+        ):
+            with patch(
+                "src.python.analysis.style_factor_regression.count_trading_days_elapsed",
+                return_value=elapsed,
+            ):
+                fresh, stale = filter_stale_factor_klines({"value": self._bars("2026-07-31")}, "2026-08-01")
+            assert (stale == ["value"]) is expect_stale
+
+    def test_distance_measured_in_trading_days(self):
+        """末根 K 线相隔 4 个自然日但仅 1 个交易日 → 未停更。"""
+        from unittest.mock import patch
+
+        with patch(
+            "src.python.analysis.style_factor_regression.count_trading_days_elapsed",
+            return_value=1,
+        ) as mock_elapsed:
+            fresh, stale = filter_stale_factor_klines({"value": self._bars("2026-07-28")}, "2026-08-01")
+
+        assert stale == []
+        assert "value" in fresh
+        mock_elapsed.assert_called_once_with("2026-07-28", "2026-08-01")
+
+    def test_invalid_date_treated_as_fresh(self):
+        """日期非法（无法计算交易日距）→ 视为未停更，不误剔除。"""
+        fresh, stale = filter_stale_factor_klines({"value": self._bars("bad-date")}, "2026-08-01")
+        assert stale == []
+        assert "value" in fresh
 
 
 class TestAsifReturns:
