@@ -228,12 +228,18 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
     """写入穿透页签底部备注和统计信息。返回写入后的行号。"""
     row += 1
     if summary["unknown_mv"] > 0:
+        reasons = []
+        if summary["failed_funds"]:
+            reasons.append(f"{summary['failed_funds']} 只无法获取穿透数据")
+        stale_count = summary.get("stale_funds", 0)
+        if stale_count:
+            reasons.append(f"{stale_count} 只因持仓报告期陈旧被剔除")
         write_data_row(
             ws,
             row,
             [
                 f"* {summary['total_funds']} 只基金中，有 "
-                f"{summary['failed_funds']} 只无法获取穿透数据，"
+                f"{'、'.join(reasons) or '部分持仓不可用'}，"
                 f"合计市值 {summary['unknown_mv']:,.2f} 元未计入穿透 TOP10"
             ],
             [],
@@ -244,6 +250,13 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
             failed_names = "；".join(f"{f['name']}({f['code']})" for f in failed_details)
             write_data_row(ws, row, [f"  无法获取穿透的基金：{failed_names}"])
             row += 1
+        stale_details = summary.get("stale_fund_details", [])
+        if stale_details:
+            stale_names = "；".join(
+                f"{f['name']}({f['code']}) 报告期 {f['period']}，距今 {f['quarters']} 个完整季度" for f in stale_details
+            )
+            write_data_row(ws, row, [f"  报告期陈旧被剔除的基金：{stale_names}"])
+            row += 1
 
     info_line = (
         f"基金 {summary['total_funds']} 只（{summary['fund_breakdown']}）"
@@ -252,6 +265,13 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
         f"TOP10 覆盖 {summary['top10_coverage_pct']:.1f}%"
     )
     write_data_row(ws, row, [info_line])
+
+    # 报告期上屏：穿透结果按当期市值加权，须标出各基金持仓的时点
+    report_periods = summary.get("report_periods", [])
+    if report_periods:
+        row += 1
+        period_text = "；".join(f"{p['name']}({p['code']}) {p['period']}" for p in report_periods)
+        write_data_row(ws, row, [f"  各基金持仓报告期：{period_text}"])
     return row
 
 

@@ -19,6 +19,7 @@ import pytest
 from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 from src.python.report import penetration as pene
+from src.test.helpers import recent_holdings_period
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
@@ -54,7 +55,7 @@ class TestSP5QDII(unittest.TestCase):
             "513300": {
                 "code": "513300",
                 "name": "华夏纳斯达克100ETF(QDII)",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 12.0},
                     {"name": "微软", "code": "MSFT", "ratio": 10.0},
@@ -95,7 +96,7 @@ class TestSP5QDII(unittest.TestCase):
             "513300": {
                 "code": "513300",
                 "name": "华夏纳斯达克100ETF(QDII)",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 12.0},
                     {"name": "微软", "code": "MSFT", "ratio": 10.0},
@@ -134,7 +135,7 @@ class TestSP5QDII(unittest.TestCase):
             "513300": {
                 "code": "513300",
                 "name": "华夏纳斯达克100ETF(QDII)",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 12.0},
                 ],
@@ -171,7 +172,7 @@ class TestSP5QDII(unittest.TestCase):
             "513300": {
                 "code": "513300",
                 "name": "华夏纳斯达克100ETF(QDII)",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 12.0},
                 ],
@@ -232,7 +233,7 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
             "161125": {
                 "code": "161125",
                 "name": "易方达标普500指数(QDII)",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 7.5},
                     {"name": "微软", "code": "MSFT", "ratio": 6.8},
@@ -276,7 +277,7 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
             "161125": {
                 "code": "161125",
                 "name": "易方达标普500指数(QDII)",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 7.5},
                     {"name": "微软", "code": "MSFT", "ratio": 6.8},
@@ -317,7 +318,7 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
             "161125": {
                 "code": "161125",
                 "name": "易方达标普500指数(QDII)",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 7.5},
                     {"name": "微软", "code": "MSFT", "ratio": 6.8},
@@ -385,7 +386,7 @@ class TestSP8IndexLink(unittest.TestCase):
             "000961": {
                 "code": "000961",
                 "name": "天弘沪深300ETF联接A",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
                     {"name": "宁德时代", "code": "300750", "ratio": 8.0},
@@ -425,7 +426,7 @@ class TestSP8IndexLink(unittest.TestCase):
             "000961": {
                 "code": "000961",
                 "name": "天弘沪深300ETF联接A",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
                     {"name": "宁德时代", "code": "300750", "ratio": 8.0},
@@ -464,7 +465,7 @@ class TestSP8IndexLink(unittest.TestCase):
             "000961": {
                 "code": "000961",
                 "name": "天弘沪深300ETF联接A",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [{"name": f"股票{i:02d}", "code": f"600{i:04d}", "ratio": 3.0} for i in range(1, 16)],
             },
         }

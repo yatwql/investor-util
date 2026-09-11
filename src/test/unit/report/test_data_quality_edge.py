@@ -149,12 +149,12 @@ class TestNewFundEmptyHoldings(unittest.TestCase):
 
         funds = [_make_holding("新发基金", "019999", 100, 1.0, account="支付宝")]
         detail_map = {"019999": 100.0}
-        merged, unknown_mv, failed_count, failed_details = _merge_fund_layer(funds, detail_map)
+        merge = _merge_fund_layer(funds, detail_map)
 
-        self.assertEqual(failed_count, 1)
-        self.assertGreater(unknown_mv, 0)
-        self.assertEqual(len(failed_details), 1)
-        self.assertEqual(failed_details[0]["code"], "019999")
+        self.assertEqual(merge.failed_count, 1)
+        self.assertGreater(merge.unknown_mv, 0)
+        self.assertEqual(len(merge.failed_details), 1)
+        self.assertEqual(merge.failed_details[0]["code"], "019999")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
     def test_empty_holdings_mixed_with_normal(self, mock_batch):
@@ -178,13 +178,13 @@ class TestNewFundEmptyHoldings(unittest.TestCase):
             _make_holding("易方达蓝筹", "005827", 100, 10.0, account="支付宝"),
             _make_holding("新发基金", "019999", 100, 1.0, account="支付宝"),
         ]
-        merged, unknown_mv, failed_count, _ = _merge_fund_layer(funds, detail_map)
+        merge = _merge_fund_layer(funds, detail_map)
 
         # 正常基金穿透：贵州茅台 1000*50%=500
-        self.assertIn("贵州茅台", merged)
-        self.assertAlmostEqual(merged["贵州茅台"]["mv"], 500.0)
-        self.assertEqual(failed_count, 1)
-        self.assertGreater(unknown_mv, 0.0)
+        self.assertIn("贵州茅台", merge.merged)
+        self.assertAlmostEqual(merge.merged["贵州茅台"]["mv"], 500.0)
+        self.assertEqual(merge.failed_count, 1)
+        self.assertGreater(merge.unknown_mv, 0.0)
 
 
 # ═══════════════════════════════════════════════════════════

@@ -21,6 +21,7 @@ import pytest
 
 from src.python.core.models import Holding
 from src.python.report.penetration import classify_penetration
+from src.test.helpers import recent_holdings_period
 
 
 @pytest.mark.scenario_resilience
@@ -46,7 +47,7 @@ class ScenarioTestBase(unittest.TestCase):
             "510300": {
                 "code": "510300",
                 "name": "沪深300ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
             }
         }

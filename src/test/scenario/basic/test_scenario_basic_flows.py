@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from src.python.core.models import Holding
+from src.test.helpers import recent_holdings_period
 from src.python.report.excel_generator import generate_excel_report as _generate_excel_report
 
 # 基础业务场景（S1-S5）标记
@@ -225,7 +226,7 @@ class ScenarioTestBase(unittest.TestCase):
             "510300": {
                 "code": "510300",
                 "name": "沪深300ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
             }
         }

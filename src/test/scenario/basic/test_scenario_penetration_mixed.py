@@ -18,6 +18,7 @@ import pytest
 from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 from src.python.report import penetration as pene
+from src.test.helpers import recent_holdings_period
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
@@ -62,7 +63,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                     {"name": "比亚迪", "code": "002594", "ratio": 10.0},
@@ -71,7 +72,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "003095": {
                 "code": "003095",
                 "name": "中欧医疗健康混合",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "药明康德", "code": "603259", "ratio": 10.0},
                     {"name": "宁德时代", "code": "300750", "ratio": 5.0},
@@ -150,7 +151,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                     {"name": "比亚迪", "code": "002594", "ratio": 10.0},
@@ -159,7 +160,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "003095": {
                 "code": "003095",
                 "name": "中欧医疗健康混合",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "药明康德", "code": "603259", "ratio": 10.0},
                     {"name": "宁德时代", "code": "300750", "ratio": 5.0},
@@ -238,7 +239,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                 ],
@@ -246,7 +247,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "003095": {
                 "code": "003095",
                 "name": "中欧医疗健康混合",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 5.0},
                 ],
@@ -327,7 +328,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                     {"name": "比亚迪", "code": "002594", "ratio": 10.0},
@@ -336,7 +337,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "003095": {
                 "code": "003095",
                 "name": "中欧医疗健康混合",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "药明康德", "code": "603259", "ratio": 10.0},
                     {"name": "宁德时代", "code": "300750", "ratio": 5.0},
@@ -412,7 +413,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                 ],
@@ -420,7 +421,7 @@ class TestSP9MixedAllTypes(unittest.TestCase):
             "003095": {
                 "code": "003095",
                 "name": "中欧医疗健康混合",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "药明康德", "code": "603259", "ratio": 10.0},
                 ],
@@ -529,7 +530,7 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
             "159928": {
                 "code": "159928",
                 "name": "消费ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 12.0},
                     {"name": "五粮液", "code": "000858", "ratio": 8.0},
@@ -538,7 +539,7 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
             "005827": {
                 "code": "005827",
                 "name": "易方达蓝筹精选",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 15.0},
                     {"name": "腾讯控股", "code": "0700", "ratio": 10.0},
@@ -547,7 +548,7 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
             "000961": {
                 "code": "000961",
                 "name": "天弘沪深300ETF联接A",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
                     {"name": "宁德时代", "code": "300750", "ratio": 8.0},
@@ -632,7 +633,7 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
             "159928": {
                 "code": "159928",
                 "name": "消费ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 12.0},
                     {"name": "五粮液", "code": "000858", "ratio": 8.0},
@@ -641,7 +642,7 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
             "005827": {
                 "code": "005827",
                 "name": "易方达蓝筹精选",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 15.0},
                     {"name": "腾讯控股", "code": "0700", "ratio": 10.0},
@@ -650,7 +651,7 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
             "000961": {
                 "code": "000961",
                 "name": "天弘沪深300ETF联接A",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
                     {"name": "宁德时代", "code": "300750", "ratio": 8.0},
@@ -731,7 +732,7 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
             "159928": {
                 "code": "159928",
                 "name": "消费ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 12.0},
                 ],
@@ -739,7 +740,7 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
             "005827": {
                 "code": "005827",
                 "name": "易方达蓝筹精选",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "五粮液", "code": "000858", "ratio": 10.0},
                 ],
@@ -747,7 +748,7 @@ class TestSP10CrossHoldingMerge(unittest.TestCase):
             "000961": {
                 "code": "000961",
                 "name": "天弘沪深300ETF联接A",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 8.0},
                 ],

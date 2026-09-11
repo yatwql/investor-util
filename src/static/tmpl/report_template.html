@@ -1334,7 +1334,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         <div class="penetration-notes">
             {% set s = penetration["summary"] %}
             {% if s.get("unknown_mv", 0) > 0 %}
-            <div>* {{ s["total_funds"] }} 只基金中，有 {{ s["failed_funds"] }} 只无法获取穿透数据，合计市值 {{ s["unknown_mv"] | money }} 元未计入穿透 TOP10</div>
+            <div>* {{ s["total_funds"] }} 只基金中，有
+                {%- if s["failed_funds"] %} {{ s["failed_funds"] }} 只无法获取穿透数据{% endif -%}
+                {%- if s["failed_funds"] and s.get("stale_funds") %}、{% endif -%}
+                {%- if s.get("stale_funds") %} {{ s["stale_funds"] }} 只因持仓报告期陈旧被剔除{% endif -%}
+                ，合计市值 {{ s["unknown_mv"] | money }} 元未计入穿透 TOP10</div>
             {% set failed_details = s.get("failed_fund_details", []) %}
             {% if failed_details %}
             <div style="margin-left: 1.5em; font-size: 12px;">
@@ -1344,11 +1348,29 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 {% endfor %}
             </div>
             {% endif %}
+            {% set stale_details = s.get("stale_fund_details", []) %}
+            {% if stale_details %}
+            <div style="margin-left: 1.5em; font-size: 12px;">
+                报告期陈旧被剔除的基金：
+                {% for f in stale_details %}
+                <span class="source-tag">{{ f["name"] }}({{ f["code"] }}) 报告期 {{ f["period"] }}，距今 {{ f["quarters"] }} 个完整季度</span>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% endif %}
             <div>
                 基金 {{ s["total_funds"] }} 只（{{ s["fund_breakdown"] }}） + 直接持股 {{ s["total_stocks"] }} 只
                 → 穿透合并 {{ s["merged_count"] }} 个标的，TOP10 覆盖 {{ s["top10_coverage_pct"] }}%
             </div>
+            {% set report_periods = s.get("report_periods", []) %}
+            {% if report_periods %}
+            <div style="font-size: 12px;">
+                各基金持仓报告期：
+                {% for p in report_periods %}
+                <span class="source-tag">{{ p["name"] }}({{ p["code"] }}) {{ p["period"] }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% if valuation_enabled %}
             <div>* 估值分位说明：价格分位代理，非真实历史估值分位（PE/PB 为当前行情值）</div>
             {% endif %}

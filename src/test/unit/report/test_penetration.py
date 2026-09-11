@@ -20,6 +20,7 @@ from unittest.mock import patch
 from src.python.core.models import Holding
 from src.python.report import penetration as pene
 from src.python.report.market_value import DetailRow
+from src.test.helpers import recent_holdings_period
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
@@ -301,7 +302,7 @@ def _mock_fund_holdings_batch(holdings_by_code: dict[str, list[dict[str, Any]] |
             result[code] = {
                 "code": code,
                 "name": f"基金{code}",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": holdings_data,
             }
     return result
@@ -623,7 +624,7 @@ class TestPenetrationConcepts(unittest.TestCase):
                 "561910": {
                     "code": "561910",
                     "name": "电池ETF",
-                    "date": "2026-03-31",
+                    "date": recent_holdings_period(),
                     "holdings": [
                         {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                         {"name": "比亚迪", "code": "002594", "ratio": 10.0},
@@ -651,7 +652,7 @@ class TestPenetrationConcepts(unittest.TestCase):
                 "561910": {
                     "code": "561910",
                     "name": "电池ETF",
-                    "date": "2026-03-31",
+                    "date": recent_holdings_period(),
                     "holdings": [
                         {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                     ],
@@ -726,7 +727,7 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
                 "510300": {
                     "code": "510300",
                     "name": "沪深300ETF",
-                    "date": "2026-03-31",
+                    "date": recent_holdings_period(),
                     "holdings": [
                         {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
                         {"name": "宁德时代", "code": "300750", "ratio": 8.0},
@@ -791,7 +792,7 @@ class TestPenetrationRatioNormalization(unittest.TestCase):
                 "510300": {
                     "code": "510300",
                     "name": "沪深300ETF",
-                    "date": "2026-03-31",
+                    "date": recent_holdings_period(),
                     "holdings": [
                         {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
                     ],
@@ -818,7 +819,7 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                     {"name": "比亚迪", "code": "002594", "ratio": 10.0},
@@ -866,7 +867,7 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 50.0},
                 ],
@@ -968,6 +969,114 @@ class TestFundsWithUnavailableHoldings(unittest.TestCase):
         # 有效持仓占比之和 ≈ 100%
         total_ratio = sum(e["ratio_pct"] for e in result["top10"])
         self.assertAlmostEqual(total_ratio, 100.0, delta=0.02)
+
+
+class TestStaleHoldingsReportPeriod(unittest.TestCase):
+    """持仓报告期陈旧的基金不得按当期市值并入穿透 TOP10。
+
+    实测场景：天天基金在不指定年份的默认请求下会返回该基金最近一次披露的
+    报告，部分基金仅有早期报告（实测 2022-12-08）。该快照若按当期市值加权
+    并入 TOP10，得到的是数年前的配置权重，且报告中没有字段能让人看出这一点。
+    """
+
+    def _make_detail(self, code: str, market_value: float) -> MockDetailRow:
+        return MockDetailRow(code, market_value)
+
+    @staticmethod
+    def _holdings_data(code: str, name: str, period: str | None) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "code": code,
+            "name": name,
+            "holdings": [{"name": "苹果", "code": "AAPL", "ratio": 20.0}],
+        }
+        if period is not None:
+            data["date"] = period
+        return data
+
+    @patch("src.python.report.penetration.fetch_fund_manager", return_value=None)
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_stale_report_excluded_from_merge(self, mock_batch, mock_manager):
+        """报告期 2022-12-08（约四年前）的基金 → 不并入 merged，市值计入 unknown_mv。"""
+        from src.python.report.penetration import _merge_fund_layer
+
+        name = "华安纳斯达克100ETF联接(QDII)A"
+        mock_batch.return_value = {"040046": self._holdings_data("040046", name, "2022-12-08")}
+
+        funds = [Holding("支付宝", name, "040046", 100, 10.0)]
+        merge = _merge_fund_layer(funds, {"040046": 1000.0})
+
+        self.assertNotIn("苹果", merge.merged, "陈旧持仓不得进入穿透结果")
+        self.assertEqual(merge.stale_count, 1)
+        self.assertEqual(merge.stale_details[0]["code"], "040046")
+        self.assertEqual(merge.stale_details[0]["period"], "2022-12-08")
+        self.assertEqual(merge.period_details, [], "被剔除的基金不应出现在报告期明细中")
+        self.assertAlmostEqual(merge.unknown_mv, 1000.0)
+
+    @patch("src.python.report.penetration.fetch_fund_manager", return_value=None)
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_fresh_report_kept_and_period_recorded(self, mock_batch, mock_manager):
+        """报告期在阈值内 → 正常并入，并登记报告期供报告标注。"""
+        from src.python.report.penetration import _merge_fund_layer
+
+        name = "易方达蓝筹"
+        mock_batch.return_value = {"005827": self._holdings_data("005827", name, recent_holdings_period())}
+
+        funds = [Holding("支付宝", name, "005827", 100, 10.0)]
+        merge = _merge_fund_layer(funds, {"005827": 1000.0})
+
+        self.assertIn("苹果", merge.merged)
+        self.assertAlmostEqual(merge.merged["苹果"]["mv"], 200.0)
+        self.assertEqual(merge.stale_count, 0)
+        self.assertEqual(len(merge.period_details), 1)
+        self.assertEqual(merge.period_details[0]["period"], recent_holdings_period())
+        self.assertAlmostEqual(merge.unknown_mv, 0.0)
+
+    @patch("src.python.report.penetration.fetch_fund_manager", return_value=None)
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_missing_report_period_is_not_gated(self, mock_batch, mock_manager):
+        """接口未给报告期 → 不判陈旧（属数据缺失，由既有的获取失败路径处理）。"""
+        from src.python.report.penetration import _merge_fund_layer
+
+        mock_batch.return_value = {"005827": self._holdings_data("005827", "易方达蓝筹", None)}
+
+        funds = [Holding("支付宝", "易方达蓝筹", "005827", 100, 10.0)]
+        merge = _merge_fund_layer(funds, {"005827": 1000.0})
+
+        self.assertIn("苹果", merge.merged)
+        self.assertEqual(merge.stale_count, 0)
+        self.assertEqual(merge.period_details[0]["period"], "未知")
+
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
+    @patch("src.python.report.penetration.fetch_fund_manager", return_value=None)
+    @patch("src.python.report.penetration.fetch_fund_holdings_batch")
+    def test_summary_surfaces_stale_funds_and_periods(self, mock_batch, mock_manager, mock_ind):
+        """穿透结果 summary 携带陈旧剔除明细与各基金报告期（供 Excel/HTML 上屏）。"""
+        stale_name = "华安纳斯达克100ETF联接(QDII)A"
+        fresh_name = "易方达蓝筹"
+        mock_batch.return_value = {
+            "040046": self._holdings_data("040046", stale_name, "2022-12-08"),
+            "005827": self._holdings_data("005827", fresh_name, recent_holdings_period()),
+        }
+
+        holdings = [
+            Holding("支付宝", stale_name, "040046", 100, 10.0),
+            Holding("支付宝", fresh_name, "005827", 100, 10.0),
+        ]
+        details = [
+            self._make_detail("040046", 1000.0),
+            self._make_detail("005827", 2000.0),
+        ]
+
+        result = pene.compute_penetration_top10(holdings, details)
+        summary = result["summary"]
+
+        self.assertEqual(summary["stale_funds"], 1)
+        self.assertEqual(summary["stale_fund_details"][0]["code"], "040046")
+        self.assertEqual(summary["stale_fund_details"][0]["period"], "2022-12-08")
+        self.assertEqual([p["code"] for p in summary["report_periods"]], ["005827"])
+        # 陈旧基金全值计入 unknown_mv，不参与 TOP10 权重
+        self.assertAlmostEqual(summary["unknown_mv"], 1000.0)
+        self.assertEqual(summary["failed_funds"], 0, "报告期陈旧属独立计数，不混入获取失败")
 
 
 if __name__ == "__main__":

@@ -7,17 +7,17 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 268 | 66,275 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层；近期新增 `core/jsonl_store.py` JSONL 原子原语 + `core/signal_ledger.py` 确定性信号账本 + `report/signal_record.py` 信号登记适配器 + `core/num_utils.py` 数值归一原语 + `core/doctor.py` 系统自检 + `core/cassette.py` 请求回放引擎 + `core/datasource_credential.py` 数据源凭据声明 + `fetcher/source_adapter.py` 适配契约 + `fetcher/quote_adapters.py` 行情域适配器 + `llm/module_fingerprint.py` 模块指纹唯一事实来源 + `report/_experimental_seams.py` 实验挂载点） |
-| HTML 报告模板 | HTML | 4 | 3,826 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 主程序代码 | Python | 269 | 66,468 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层；近期新增 `core/jsonl_store.py` JSONL 原子原语 + `core/signal_ledger.py` 确定性信号账本 + `report/signal_record.py` 信号登记适配器 + `core/num_utils.py` 数值归一原语 + `core/doctor.py` 系统自检 + `core/cassette.py` 请求回放引擎 + `core/datasource_credential.py` 数据源凭据声明 + `fetcher/source_adapter.py` 适配契约 + `fetcher/quote_adapters.py` 行情域适配器 + `llm/module_fingerprint.py` 模块指纹唯一事实来源 + `report/_experimental_seams.py` 实验挂载点 + `report/holdings_freshness.py` 持仓报告期时效判定） |
+| HTML 报告模板 | HTML | 4 | 3,848 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 21 | 7,165 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
-| **源代码合计** | — | **296** | **77,581** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **353** | **102,518** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
-| **测试用例** | — | — | **6,677 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **源代码合计** | — | **297** | **77,796** | 主程序 + 模板 + 脚本 |
+| **测试代码** | Python | **355** | **102,918** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| **测试用例** | — | — | **6,706 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **4,995** | 含 README.md（201 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,794 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **130** | **50,029** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 119 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,430 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| **项目文档** | Markdown | **130** | **50,038** | 含 CLAUDE.md（74 行）；md 口径（managements 10 + plan 0 + archive 119 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,439 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 123 | 39,983 | 各版本 changelog/plan/review-findings 等（119 md 39,525 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 0 | 0 | 空目录——已完成迭代的设计文档随其迭代归档（外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -232,6 +232,7 @@ investor-util/
 │   │   │   ├── position_relationship_sheet.py # 持仓关系矩阵 Excel 页签（一章两区块：重合度 + 相关性）
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
+│   │   │   ├── holdings_freshness.py #   基金持仓报告期时效判定（完整季度数口径 + 陈旧阈值）
 │   │   │   ├── _snapshot.py          #   快照与历史数据（持仓快照/环比差异/组合历史走势）
 │   │   │   ├── news_correlation.py   #   新闻与持仓关联分析报告
 │   │   │   ├── orchestrator.py       #   报告编排共享层（TUI/CLI 共用，聚合门面）
@@ -590,6 +591,7 @@ investor-util/
 │       │   │   ├── test_fund_style.py             #   基金风格判定测试
 │       │   │   ├── test_history_snapshot_namespace.py      #   历史快照命名空间测试
 │       │   │   ├── test_history_snapshot_namespace_edge.py #   历史快照命名空间边缘场景
+│       │   │   ├── test_holdings_freshness.py      #   持仓报告期时效判定测试（写法兼容/季度数边界/阈值）
 │       │   │   ├── test_snapshot_namespace_consumers.py    #   快照命名空间消费方测试
 │       │   │   ├── test_style_factor_sheet.py     #   风格与因子分析页签呈现（一章三区块：风格表+因子回归+行业 Beta）
 │       │   │   ├── test_correlation_html.py       #   持仓关系矩阵章节（相关性/重合度区块）HTML 呈现
@@ -625,6 +627,7 @@ investor-util/
 │       │   │   ├── test_news_degradation_edge.py  #   新闻降级边缘场景
 │       │   │   ├── test_penetration.py            #   穿透分析测试
 │       │   │   ├── test_penetration_edge.py       #   穿透分析边缘场景
+│       │   │   ├── test_penetration_sheet.py      #   穿透页签写入测试（剔除原因与各基金报告期备注）
 │       │   │   ├── test_pipeline_data_builder.py    #   管线数据上下文组装测试（crisis_annotation/tail_risk/snapshot_diff 三键注册）
 │       │   │   ├── test_pipeline_utils.py          #   管线工具函数测试
 │       │   │   ├── test_portfolio_history.py      #   组合历史走势测试

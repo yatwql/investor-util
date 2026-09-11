@@ -23,7 +23,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import date, datetime
 from typing import Any
 
 from src.python.core.code_utils import (
@@ -41,6 +42,13 @@ from src.python.core.constants import PROJECT_ROOT
 from src.python.fetcher.fund import fetch_fund_holdings_batch
 from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.core.models import Holding
+from src.python.report.holdings_freshness import (
+    STALE_QUARTERS,
+    complete_quarters_since,
+    format_report_period,
+    is_stale_report,
+    parse_report_date,
+)
 from src.python.report.market_value import DetailRow
 
 logger = logging.getLogger("invest")
@@ -275,22 +283,45 @@ def _prefetch_manager_data(code: str) -> None:
         logger.debug("基金经理预取异常 [%s]（不阻塞穿透计算）", code, exc_info=True)
 
 
+@dataclass(frozen=True)
+class _FundLayerMerge:
+    """基金层穿透合并结果。
+
+    把「合并后的标的」与三类明细（获取失败、报告期陈旧、实际采用的报告期）
+    一并带回，避免调用方解包五六个位置返回值。
+    """
+
+    merged: dict[str, Any] = field(default_factory=dict)
+    unknown_mv: float = 0.0
+    failed_count: int = 0
+    failed_details: list[dict[str, str]] = field(default_factory=list)
+    stale_count: int = 0
+    stale_details: list[dict[str, str]] = field(default_factory=list)
+    period_details: list[dict[str, str]] = field(default_factory=list)
+
+
 def _merge_fund_layer(
     funds: list[Holding],
     detail_map: dict[str, float],
-) -> tuple[dict[str, Any], float, int, list[dict[str, str]]]:
-    """合并基金层穿透，返回 merged 字典 + 统计值。
+) -> _FundLayerMerge:
+    """合并基金层穿透，返回合并结果与明细。
 
-    批量并行获取所有基金持仓。
+    批量并行获取所有基金持仓。报告期陈旧的基金按「持仓不可用」处理：
+    快照与当期配置可能已严重脱节，按当期市值并入 TOP10 会得出错误权重。
     """
     merged: dict[str, Any] = {}
     unknown_mv = 0.0
     failed_count = 0
     failed_fund_details: list[dict[str, str]] = []
+    stale_count = 0
+    stale_fund_details: list[dict[str, str]] = []
+    report_periods: list[dict[str, str]] = []
 
     # ── 批量并行获取所有基金持仓（替换原串行循环内 fetch_fund_holdings） ──
     fund_codes = [f.code for f in funds]
     holdings_batch = fetch_fund_holdings_batch(fund_codes)
+
+    today = date.today()
 
     for fund in funds:
         fund_mv = detail_map.get(fund.code, 0.0)
@@ -324,6 +355,35 @@ def _merge_fund_layer(
             )
             continue
 
+        # 报告期闸门：陈旧的持仓快照按「持仓不可用」处理，与获取失败同档降级
+        raw_period = holdings_data.get("date")
+        report_date = parse_report_date(raw_period)
+        report_period = format_report_period(raw_period)
+        if is_stale_report(report_date, today):
+            unknown_mv += fund_mv
+            stale_count += 1
+            stale_fund_details.append(
+                {
+                    "name": fund.name,
+                    "code": fund.code,
+                    "period": report_period,
+                    "quarters": str(complete_quarters_since(report_date, today)),
+                }
+            )
+            logger.warning(
+                "[penetration] 基金 %s(%s) 持仓报告期为 %s，其后已走完 %d 个完整季度"
+                "（阈值 %d），快照与当期配置可能严重脱节，已按持仓不可用处理、未计入穿透 TOP10",
+                fund.name,
+                fund.code,
+                report_period,
+                complete_quarters_since(report_date, today),
+                STALE_QUARTERS,
+            )
+            continue
+
+        # 报告期可用：登记到明细，供报告标注每个标的的持仓时点
+        report_periods.append({"name": fund.name, "code": fund.code, "period": report_period})
+
         for item in valid_items:
             stock_name = item.get("name", "").strip()
             stock_code = item.get("code", "").strip()
@@ -346,7 +406,15 @@ def _merge_fund_layer(
             merged[norm_name]["mv"] += attributed_mv
             merged[norm_name]["funds"].append(f"[{tag}] {fund.name}({fund.code})")
 
-    return merged, unknown_mv, failed_count, failed_fund_details
+    return _FundLayerMerge(
+        merged=merged,
+        unknown_mv=unknown_mv,
+        failed_count=failed_count,
+        failed_details=failed_fund_details,
+        stale_count=stale_count,
+        stale_details=stale_fund_details,
+        period_details=report_periods,
+    )
 
 
 def _merge_stock_layer(
@@ -430,8 +498,16 @@ def _build_penetration_result(
     unknown_mv: float,
     failed_count: int,
     failed_fund_details: list[dict[str, str]],
+    *,
+    stale_count: int = 0,
+    stale_fund_details: list[dict[str, str]] | None = None,
+    report_periods: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    """从合并数据生成穿透 TOP10 返回字典。"""
+    """从合并数据生成穿透 TOP10 返回字典。
+
+    stale_count / stale_fund_details / report_periods 为报告期闸门的可选明细：
+    默认空值使不经过闸门的调用方（测试与降级路径）无需构造。"""
+
     total_mv = sum(v["mv"] for v in merged.values())
     sorted_items = sorted(merged.items(), key=lambda x: x[1]["mv"], reverse=True)
 
@@ -480,6 +556,9 @@ def _build_penetration_result(
             "unknown_mv": round(unknown_mv, 2),
             "failed_funds": failed_count,
             "failed_fund_details": failed_fund_details,
+            "stale_funds": stale_count,
+            "stale_fund_details": stale_fund_details or [],
+            "report_periods": report_periods or [],
         },
         "top10": top10_list,
     }
@@ -531,9 +610,11 @@ def compute_penetration_top10(
             ind_future = pen_exec.submit(batch_ind, list(known_a_codes))
 
         # 等待基金持仓获取完成
-        merged, unknown_mv, failed_count, failed_fund_details = fund_future.result()
+        fund_merge = fund_future.result()
     finally:
         pen_exec.shutdown(wait=False)
+
+    merged = fund_merge.merged
 
     # ── Phase 2: 合并直接持股 ──
     _merge_stock_layer(direct_stocks, detail_map, merged)
@@ -580,9 +661,12 @@ def compute_penetration_top10(
         classified,
         funds,
         direct_stocks,
-        unknown_mv,
-        failed_count,
-        failed_fund_details,
+        fund_merge.unknown_mv,
+        fund_merge.failed_count,
+        fund_merge.failed_details,
+        stale_count=fund_merge.stale_count,
+        stale_fund_details=fund_merge.stale_details,
+        report_periods=fund_merge.period_details,
     )
     result["industry_success"] = industry_success
     if not industry_success:

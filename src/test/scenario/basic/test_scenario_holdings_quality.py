@@ -21,6 +21,7 @@ from unittest.mock import patch
 import pytest
 
 from src.python.core.models import Holding
+from src.test.helpers import recent_holdings_period
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
@@ -237,13 +238,13 @@ class TestS0bSameFundACClass(unittest.TestCase):
                     "005827": {
                         "code": "005827",
                         "name": "易方达蓝筹精选",
-                        "date": "2026-03-31",
+                        "date": recent_holdings_period(),
                         "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
                     },
                     "012772": {
                         "code": "005827",
                         "name": "易方达蓝筹精选",
-                        "date": "2026-03-31",
+                        "date": recent_holdings_period(),
                         "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
                     },
                 },
@@ -311,13 +312,13 @@ class TestS0bSameFundACClass(unittest.TestCase):
                     "005827": {
                         "code": "005827",
                         "name": "易方达蓝筹精选",
-                        "date": "2026-03-31",
+                        "date": recent_holdings_period(),
                         "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
                     },
                     "012772": {
                         "code": "005827",
                         "name": "易方达蓝筹精选",
-                        "date": "2026-03-31",
+                        "date": recent_holdings_period(),
                         "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
                     },
                 },

@@ -20,6 +20,7 @@ import pytest
 from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 from src.python.report import penetration as pene
+from src.test.helpers import recent_holdings_period
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
@@ -177,7 +178,7 @@ class TestSP2BondFund(unittest.TestCase):
             "012325": {
                 "code": "012325",
                 "name": "招商鑫福中短债A",
-                "date": "2026-06-30",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "23国开10", "code": "230210", "ratio": 8.0},
                     {"name": "22国债14", "code": "220014", "ratio": 6.0},
@@ -216,7 +217,7 @@ class TestSP2BondFund(unittest.TestCase):
             "012325": {
                 "code": "012325",
                 "name": "招商鑫福中短债A",
-                "date": "2026-06-30",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "23国开10", "code": "230210", "ratio": 8.0},
                     {"name": "22国债14", "code": "220014", "ratio": 6.0},
@@ -256,7 +257,7 @@ class TestSP2BondFund(unittest.TestCase):
             "012325": {
                 "code": "012325",
                 "name": "招商鑫福中短债A",
-                "date": "2026-06-30",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "23国开10", "code": "230210", "ratio": 8.0},
                     {"name": "22国债14", "code": "220014", "ratio": 6.0},
@@ -298,7 +299,7 @@ class TestSP2BondFund(unittest.TestCase):
             "012325": {
                 "code": "012325",
                 "name": "招商鑫福中短债A",
-                "date": "2026-06-30",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "23国开10", "code": "230210", "ratio": 8.0},
                 ],
@@ -364,7 +365,7 @@ class TestSP3ETF(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                     {"name": "比亚迪", "code": "002594", "ratio": 10.0},
@@ -404,7 +405,7 @@ class TestSP3ETF(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                     {"name": "比亚迪", "code": "002594", "ratio": 10.0},
@@ -450,7 +451,7 @@ class TestSP3ETF(unittest.TestCase):
             "561910": {
                 "code": "561910",
                 "name": "电池ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "宁德时代", "code": "300750", "ratio": 15.0},
                     {"name": "比亚迪", "code": "002594", "ratio": 10.0},
@@ -488,7 +489,7 @@ class TestSP3ETF(unittest.TestCase):
             "513500": {
                 "code": "513500",
                 "name": "标普500ETF",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 7.5},
                     {"name": "微软", "code": "MSFT", "ratio": 6.8},
@@ -570,7 +571,7 @@ class TestSP4ActiveEquity(unittest.TestCase):
             "003095": {
                 "code": "003095",
                 "name": "中欧医疗健康混合",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "药明康德", "code": "603259", "ratio": 10.0},
                     {"name": "恒瑞医药", "code": "600276", "ratio": 8.0},
@@ -611,7 +612,7 @@ class TestSP4ActiveEquity(unittest.TestCase):
             "003095": {
                 "code": "003095",
                 "name": "中欧医疗健康混合",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "药明康德", "code": "603259", "ratio": 10.0},
                     {"name": "恒瑞医药", "code": "600276", "ratio": 8.0},
@@ -650,7 +651,7 @@ class TestSP4ActiveEquity(unittest.TestCase):
             "003095": {
                 "code": "003095",
                 "name": "中欧医疗健康混合",
-                "date": "2026-03-31",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "药明康德", "code": "603259", "ratio": 10.0},
                 ],
