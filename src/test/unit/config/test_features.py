@@ -3,20 +3,36 @@
 覆盖 ``features.EXPERIMENTAL_FEATURES`` 注册表驱动的名称解析
 （``resolve_experiment_flags`` / ``describe_experiment_flags``），
 该解析是 CLI ``--experiment`` 参数与 TUI 菜单 S / Web 配置面板同源的保证。
+
+另覆盖开关注册表自身的两条不变式：默认值表中每个开关都必须有消费者（声明即死
+的开关会让用户照文档配置后毫无效果），以及 ``features.json`` 里出现无消费者开关
+时必须告警而非静默忽略。
 """
 
 from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from src.python.config.features import (
     EXPERIMENT_ALL,
     EXPERIMENTAL_FEATURES,
+    FEATURE_FLAGS,
+    _FEATURE_FLAGS_DEFAULT,
     describe_experiment_flags,
+    load_feature_overrides,
     resolve_experiment_flags,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
+
+# 仓库根：src/test/unit/config/<本文件> → parents[4]
+_PROJECT_ROOT = Path(__file__).resolve().parents[4]
+_REGISTRY_FILE = _PROJECT_ROOT / "src" / "python" / "config" / "features.py"
 
 
 @pytest.mark.unit
@@ -76,3 +92,142 @@ class TestResolveExperimentFlags:
         for flag, (display_name, _desc) in EXPERIMENTAL_FEATURES.items():
             assert flag in text
             assert display_name in text
+
+
+@pytest.mark.unit
+class TestRegistryLiveness:
+    """开关注册表每一项都必须有消费者。
+
+    缺陷场景：``_FEATURE_FLAGS_DEFAULT`` 曾声明 16 项全仓无任何代码读取的开关
+    （LLM 模块启停、基金深度分析、新闻源、历史走势、匿名化总开关、缓存日清理）
+    ——这些能力实际由 ``config.json`` / ``llm_settings.json`` 各自的键控制，开关
+    声明了却从未接线（``git log -S`` 证实从未被任何提交消费过）。用户在
+    ``features.json`` 里照文档配置后不产生任何效果，而文档仍按生效开关介绍。
+    本类是该场景的回归防线。
+    """
+
+    # 已移出注册表的陈旧开关：能力各归其主，不得再回来（回来即意味着两处清单
+    # 重新漂移，且多半又是声明即死）
+    REMOVED_STALE_FLAGS = (
+        # LLM 模块启停 → llm_settings.json 的 enabled_llm
+        "llm_global_macro",
+        "llm_expert_review",
+        "llm_health_check",
+        "llm_penetration_deep",
+        "llm_news_correlation",
+        # 基金深度分析模块 → config.json 的 enable_fund_deep_analysis
+        "fund_deep_analysis_fund_manager",
+        "fund_deep_analysis_fund_concentration",
+        # 新闻源启停 → config.json 的 news_sources
+        "news_sina",
+        "news_eastmoney",
+        "news_cls",
+        "news_wallstreetcn",
+        "news_akshare",
+        # 历史走势与回撤 → config.json 的 enable_history
+        "history_portfolio",
+        "history_benchmark",
+        # 匿名化 → config.json 的 anonymization.mode
+        "anonymizer",
+        # 启动缓存清理 → 无条件执行，无开关（见 cache/__init__.py）
+        "cache_daily_cleanup",
+    )
+
+    @staticmethod
+    def _source_text_outside_registry() -> str:
+        """拼接 ``src/python`` 下除注册表自身外的全部源码文本。
+
+        不限于 ``is_feature_enabled`` 的直接实参：开关名也可能经模块常量、元组
+        或映射表间接传入（如指标开关的元组、熔断特性开关的映射），因此按「开关名
+        是否作为字符串字面量出现在消费方的源码里」判定。
+        """
+        chunks: list[str] = []
+        for path in sorted((_PROJECT_ROOT / "src" / "python").rglob("*.py")):
+            if path == _REGISTRY_FILE:
+                continue
+            chunks.append(path.read_text(encoding="utf-8"))
+        return "\n".join(chunks)
+
+    @pytest.mark.unit
+    def test_every_flag_has_a_consumer(self):
+        """默认值表中每个开关名都必须在注册表之外的源码里被引用。
+
+        新增开关若只在 ``_FEATURE_FLAGS_DEFAULT`` 里加一行、却没接线到任何消费点，
+        本用例即失败——那正是「用户照文档配置后毫无效果」的缺陷形态。
+        """
+        source = self._source_text_outside_registry()
+        dead = [flag for flag in _FEATURE_FLAGS_DEFAULT if not re.search(rf"""["']{re.escape(flag)}["']""", source)]
+        assert not dead, (
+            f"以下开关在 src/python 内无任何消费者，声明即死（用户配置后不产生效果）：{dead}；"
+            "请接线到消费点，或按其能力归属移到 config.json / llm_settings.json 并从注册表移除"
+        )
+
+    @pytest.mark.unit
+    def test_removed_stale_flags_stay_out(self):
+        """陈旧开关不得再回到默认值表（否则与各自的真实归属键重复且多半又无人读）。"""
+        resurrected = [flag for flag in self.REMOVED_STALE_FLAGS if flag in _FEATURE_FLAGS_DEFAULT]
+        assert not resurrected, (
+            f"以下开关已被移除，不得回到 _FEATURE_FLAGS_DEFAULT：{resurrected}；"
+            "对应能力分别归属 llm_settings.json 的 enabled_llm / config.json 的 "
+            "enable_fund_deep_analysis、news_sources、enable_history、anonymization.mode"
+        )
+
+    @pytest.mark.unit
+    def test_every_experimental_flag_is_registered(self):
+        """实验注册表中的开关都必须在默认值表登记，否则用户开了也无效。"""
+        unregistered = sorted(set(EXPERIMENTAL_FEATURES) - set(_FEATURE_FLAGS_DEFAULT))
+        assert not unregistered, f"实验开关未登记到 _FEATURE_FLAGS_DEFAULT（永远开不起来）：{unregistered}"
+
+
+@pytest.mark.unit
+class TestUnknownOverrideWarning:
+    """``features.json`` 中的无消费者开关必须告警，不静默忽略。"""
+
+    @staticmethod
+    def _rendered_warnings(mock_logger) -> list[str]:
+        """返回该 mock logger 上全部 warning 渲染后的文本。"""
+        rendered = []
+        for call in mock_logger.warning.call_args_list:
+            template = str(call.args[0]) if call.args else ""
+            try:
+                rendered.append(template % call.args[1:])
+            except (TypeError, ValueError):
+                rendered.append(template)
+        return rendered
+
+    @pytest.mark.unit
+    def test_unknown_flags_warn_in_one_message(self, tmp_path):
+        """无消费者开关 → 合并为一条 WARNING，且逐键列名（不刷屏、不静默）。"""
+        fpath = tmp_path / "features.json"
+        fpath.write_text(json.dumps({"no_such_switch": True, "another_ghost": False}), encoding="utf-8")
+
+        # patch.dict 传空值：进入时不预置任何键（预置会让「未知开关」在加载时变成
+        # 已知而绕过告警），退出时按快照还原，顺带清掉本次加载新增的键。
+        with (
+            patch("src.python.config.features._FEATURES_FILE", str(fpath)),
+            patch("src.python.config.features.logger") as mock_logger,
+            patch.dict(FEATURE_FLAGS, {}),
+        ):
+            load_feature_overrides()
+            warnings = [text for text in self._rendered_warnings(mock_logger) if "无消费者" in text]
+
+            assert len(warnings) == 1, "多个无消费者开关应合并为一条告警，而非逐键刷屏"
+            assert "no_such_switch" in warnings[0]
+            assert "another_ghost" in warnings[0]
+
+    @pytest.mark.unit
+    def test_known_flag_does_not_warn(self, tmp_path):
+        """已登记开关不触发无消费者告警，且覆写照常生效（正常配置不被误报）。"""
+        fpath = tmp_path / "features.json"
+        fpath.write_text(json.dumps({"metrics_hhi": False}), encoding="utf-8")
+
+        with (
+            patch("src.python.config.features._FEATURES_FILE", str(fpath)),
+            patch("src.python.config.features.logger") as mock_logger,
+            patch.dict(FEATURE_FLAGS, {}),
+        ):
+            load_feature_overrides()
+            warnings = [text for text in self._rendered_warnings(mock_logger) if "无消费者" in text]
+
+            assert warnings == []
+            assert FEATURE_FLAGS["metrics_hhi"] is False, "已登记开关的覆写仍须正常生效"

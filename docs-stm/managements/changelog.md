@@ -6,6 +6,16 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 功能开关注册表收敛：移除声明即死的陈旧开关（自审 rf-338）（2026-09-11）
+
+- **问题**：实验功能三通道（TUI / Web / CLI）核查时顺带发现，`features.json` 宣传的 35 项功能开关中有 **16 项声明即死**——全仓无任何代码读取其取值，用户照 `how-to-config.md` §M 配置后不产生任何效果：5 项 `llm_*`（`llm_global_macro` / `_expert_review` / `_health_check` / `_penetration_deep` / `_news_correlation`，模块启停实际由 `llm_settings.json` 的 `enabled_llm` 同键控制）、5 项 `news_*`（实际由 `config.json` 的 `news_sources` 控制）、`history_portfolio` / `history_benchmark`（实际由 `enable_history` 单键控制）、`fund_deep_analysis_fund_manager` / `_fund_concentration`（实际由 `enable_fund_deep_analysis` 控制）、`anonymizer`（实际由 `config.json` 的 `anonymization.mode` 控制）；`cache_daily_cleanup` 声称的「启动时自动清理过期缓存」与既有的启动敏感缓存清理（`cache/__init__.py`，无条件、90 天）无关，取值同样无人读。`git log -S` 逐项证实这 16 项从未被任何提交消费过（唯一的 `llm_global_macro` 命中是 `features.py` 模块文档串示例）。
+- **处置——移除而非接线**：这些能力已各自归属 `config.json` / `llm_settings.json`，且在 TUI 菜单 S（标准模块区、匿名化 A、板层开关）与 Web 配置面板上均有对应项，接线会造出第二份同义清单（违反「开关注册表唯一事实来源」的单源纪律），故按能力归属移除开关，无能力损失。
+- **注册表加注纪律**（`config/features.py`）：`_FEATURE_FLAGS_DEFAULT` 现为 **19 项**，就地写明「只登记有消费者的开关」并逐条指路各能力现归属文件，防止同义开关再被搬回；模块文档串与 `load_feature_overrides` 文档串中已失效的示例开关（`llm_global_macro` / `news_cls` / `anonymizer`）改用现存开关。
+- **无消费者键不再静默**：`load_feature_overrides()` 对 `features.json` 中出现的无消费者键，由逐键 `debug` 改为**合并为一条 WARNING** 列出键名——这类配置不驱动任何行为，静默忽略会让用户以为已生效，而逐键打印会在每次启动刷屏（该文件在模块导入时即加载）。
+- **文档同步**（三处口径由 35 项收敛至 19 项）：`how-to-config.md` §M（删 16 行开关表、JSON 示例改用现存开关、新增「本表只收录有消费者的开关」提示并指明各能力归属文件）、`how-to-use-tui-menu.md`（菜单说明改为 19 项 + 新增「不在 features.json 的开关」归属说明）、`requirements.md` §11.5、`technical.md` 配置矩阵行（补「只登记有消费者的开关」与无消费者键告警行为）。
+- **回归测试**（`test/unit/config/test_features.py`，`unit_config` +5）：新增 `TestRegistryLiveness` 三条——默认值表中每个开关名都必须在注册表之外的 `src/python` 源码里被引用（按字符串字面量判定，覆盖元组/映射间接传入，杜绝再次「声明即死」）、已移除的 16 项不得回归、实验注册表各项都须在默认值表登记；新增 `TestUnknownOverrideWarning` 两条——无消费者键合并为一条 WARNING 且逐键列名、已登记开关不误报且覆写照常生效。全量计数 6651 → **6656**（unit 6339 → 6344、standard 5420 → 5425、verify 4320 → 4325、all 6651 → 6656；report 1753 不变）。
+- **数据文档同步**：`test-coverage.md`（模式表 + 功能域「配置管理」行 + `unit_config` 子标记 + 单元组合计）、`folders.md` 项目统计表按本轮变更后的行数口径刷新。
+
 ### ruff lint 基线收敛（全仓零告警）（2026-09-11）
 
 - **基线声明**（`pyproject.toml`）：`[tool.ruff.lint]` 显式声明 `select`（等价 ruff 默认集），不再依赖会随版本升级静默漂移的隐式默认；`extend-exclude` 增加 `docs-stm`——归档目录内的历史脚本副本自此冻结，不参与 lint / format；新增 `per-file-ignores` 记录两类**刻意豁免**（各附就地说明）：可执行入口先注入项目根到 `sys.path` 再导入项目模块、子模块 re-export 块置于模块级代码之后，二者重排都会破坏原有加载顺序（E402）；函数内延迟导入 + 引号注解规避循环依赖造成的未定义名静态误报（F821）。

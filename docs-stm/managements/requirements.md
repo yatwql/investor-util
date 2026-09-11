@@ -1234,23 +1234,17 @@ LLM 五维度量化评分，每项满分 100：
 
 ### 11.5 features.json（功能开关注册表）
 
-独立配置文件，提供 35 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。
+独立配置文件，提供 19 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。仅收录「有消费者」的开关——LLM 模块启停与基金深度分析（`llm_settings.json` 的 `enabled_llm`）、新闻源（`config.json` 的 `news_sources`）、历史走势与回撤（`config.json` 的 `enable_history`）、匿名化模式（`config.json` 的 `anonymization.mode`）各有归属配置，不在此文件。
 
 | 开关名 | 类型 | 默认值 | 说明 |
 |:-------|:----:|:------:|:-----|
-| `llm_global_macro` / `llm_expert_review` / `llm_health_check` / `llm_penetration_deep` / `llm_news_correlation` | bool | true（llm_news_correlation 为保留字段） | LLM 各模块独立启停开关（llm_news_correlation 的实际启停由 llm_settings.json 的 enabled_llm.news_correlation 控制，默认 false） |
 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` | bool | false（全部默认关闭） | 辩论模式三增强通路独立启停：正反辩论/条件推理/集中度问答 |
 | `decision_reflection` | bool | false（默认关闭） | 决策跨期反思闭环启停：登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词 |
 | `signal_pre_digest` | bool | false（默认关闭） | 信号预消化启停：市场温度/估值分位/尾部风险预消化为带方向标注的信号行（`信号：… 看多/看空/中性/风险高/中/低`）注入专家复盘与持仓体检提示词 |
 | `module_quality_gate` | bool | false（默认关闭） | 模块级质量分级启停：对 4 个 LLM 模块输出按完整性/篇幅评 A~F，低评级中「内容在但存在缺陷」者随内容头部注入 `【内容质量提示】` 横幅（只标注、不阻断、不重试、不写回缓存） |
 | `decision_header_parse` | bool | false（默认关闭） | 决策头结构化启停：专家复盘提示词追加一行受控 JSON 决策头（`决策头：{"decisions":[…]}`），抽取侧优先读结构化头、失败回落确定性表格解析（决策词归一，防写反方向）；关闭时提示词逐字节不变 |
 | `signal_ledger` | bool | false（默认关闭） | 确定性数值信号沉淀启停：把市场温度/估值分位/尾部风险/风格因子/再平衡超限五类确定性评级沉淀为 `data/state/signal_ledger.jsonl` 账本，每条附实时-非实时来源标签；统计与注入提示词的摘要默认只算实时记录，防非实时记录冒充真实战绩 |
-| `fund_deep_analysis_fund_manager` / `fund_deep_analysis_fund_concentration` | bool | true | 基金深度分析模块启停（经理变更/集中度监控） |
-| `news_sina` / `news_eastmoney` / `news_cls` / `news_wallstreetcn` / `news_akshare` | bool | true（cls 默认关闭） | 各新闻源启停 |
-| `history_portfolio` / `history_benchmark` | bool | true | 历史走势与基准指数开关 |
 | `metrics_sharpe` / `metrics_calmar` / `metrics_hhi` / `metrics_winrate` / `metrics_turnover` / `metrics_risk_contribution` / `metrics_beta` | bool | true | 量化指标独立启停（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
-| `anonymizer` | bool | false | 匿名化功能全局开关（模式选择在 config.json 的 `anonymization.mode` 中配置） |
-| `cache_daily_cleanup` | bool | true | 启动时自动清理过期缓存 |
 | `enable_interactive_charts` | bool | true | 报告 HTML 交互图表（Chart.js）；关闭时回退基础 Canvas 图表 |
 | `doctor_check` | bool | false（默认关闭） | 系统自检功能上屏：开启后 TUI 菜单显示 `[D]` 系统自检项、Web 运行状态区渲染「系统自检」卡片（`GET /api/doctor`）。**仅约束 TUI/Web 两个日常入口**——`doctor` CLI 子命令不受本开关约束（配置损坏正是它要诊断的场景，被开关拦住会形成死锁） |
 | `datasource_adapter` | bool | false（默认关闭） | 数据源适配契约启停：行情域三源改由三段式适配器（参数转译→抓取→映射到标准字段）+ 声明式 alias 归一获取，与既有转换函数逐源等价（仅东方财富多出 `market_cap`/`pe` 两个 `None` 键）。**关闭时链路走既有转换函数、行为逐字节不变**；为接入新数据源/新字段预备，日常使用无需开启 |
@@ -1259,10 +1253,12 @@ LLM 五维度量化评分，每项满分 100：
 用法：在 `features.json` 中仅列出需覆写的开关，未列出的保持默认值。
 ```json
 {
-  "anonymizer": true,
-  "news_cls": false
+  "enable_interactive_charts": true,
+  "metrics_hhi": false
 }
 ```
+
+无消费者键（陈旧开关或拼写错误）不驱动任何行为：`load_feature_overrides()` 仍加载其值，但合并成一条 WARNING 列出键名，避免用户以为配置已生效。
 
 ---
 

@@ -5,10 +5,12 @@
 
 用法：
   >>> from src.python.config.features import is_feature_enabled, FEATURE_FLAGS
-  >>> if is_feature_enabled("llm_global_macro"):
-  ...     generate_global_macro()
+  >>> if is_feature_enabled("enable_interactive_charts"):
+  ...     embed_chart_assets()
 
 配置持久化：功能开关可通过 features.json 覆写默认值。
+模块级 LLM 分析章节、新闻源、报告章节等**不在此登记**——它们各有归属文件，
+见 ``_FEATURE_FLAGS_DEFAULT`` 上方说明。
 """
 
 from __future__ import annotations
@@ -32,27 +34,24 @@ _FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
 # 格式：{flag_name: default_enabled}
 # False = 功能默认关闭，需要用户手动启用
 # True  = 功能默认开启，可在 features.json 中关闭
+#
+# 本注册表只登记**有消费者的开关**（全仓必有一处 is_feature_enabled 读取其取值）。
+# 其余开关各有归属文件，不在此登记、也不要再往这里搬：
+#   - LLM 模块启停 / 基金深度分析模块 → llm_settings.json 的 enabled_llm（TUI 菜单 S
+#     标准模块区、Web 配置面板「LLM 分析章节」组）
+#   - 新闻源启停 → config.json 的 news_sources
+#   - 历史走势与回撤 → config.json 的 enable_history
+#   - 各报告章节与增强子模块 → config.json 的 enable_* 键
+#   - 匿名化模式 → config.json 的 anonymization.mode
+# 声明了却无人读取的开关会让用户照文档配置后毫无效果（本注册表曾含 16 项此类
+# 陈旧开关，已全部移除）。新增开关必须同时接线到消费点，回归测试见
+# test_features.py::TestRegistryLiveness。
 
 _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
-    # ── LLM 智能分析模块（5 项） ──
-    "llm_global_macro": True,
-    "llm_expert_review": True,
-    "llm_health_check": True,
-    "llm_penetration_deep": True,
-    "llm_news_correlation": True,
     # ── 辩论模式（实验功能，默认关闭） ──
     "llm_debate_procon": False,
     "llm_debate_conditional": False,
     "llm_debate_qa_concentration": False,
-    # ── 基金深度分析模块（2 项） ──
-    "fund_deep_analysis_fund_manager": True,
-    "fund_deep_analysis_fund_concentration": True,
-    # ── 新闻源（5 项） ──
-    "news_sina": True,
-    "news_eastmoney": True,
-    "news_cls": False,
-    "news_wallstreetcn": True,
-    "news_akshare": True,
     # ── 量化指标（7 项） ──
     "metrics_sharpe": True,
     "metrics_calmar": True,
@@ -61,12 +60,7 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "metrics_turnover": True,
     "metrics_risk_contribution": True,
     "metrics_beta": True,
-    # ── 历史数据与回撤（2 项） ──
-    "history_portfolio": True,
-    "history_benchmark": True,
-    # ── 功能特性（3 项） ──
-    "anonymizer": False,
-    "cache_daily_cleanup": True,
+    # ── 功能特性（1 项） ──
     "enable_interactive_charts": True,
     # ── 决策跨期反思闭环（实验功能，默认关闭） ──
     "decision_reflection": False,
@@ -281,8 +275,8 @@ def load_feature_overrides() -> None:
 
     JSON 格式：
       {
-        "llm_global_macro": false,
-        "news_cls": true
+        "enable_interactive_charts": false,
+        "metrics_hhi": true
       }
     """
     if not os.path.exists(_FEATURES_FILE):
@@ -300,6 +294,7 @@ def load_feature_overrides() -> None:
 
     valid_count = 0
     changed = 0
+    unknown: list[str] = []
     with _FEATURES_LOCK:
         for flag_name, value in overrides.items():
             if isinstance(value, bool) and flag_name in FEATURE_FLAGS:
@@ -307,12 +302,23 @@ def load_feature_overrides() -> None:
                 FEATURE_FLAGS[flag_name] = value
                 valid_count += 1
             elif isinstance(value, bool):
-                logger.debug("[features] 覆写未知开关 '%s'，仍加载", flag_name)
+                unknown.append(flag_name)
                 FEATURE_FLAGS[flag_name] = value
                 valid_count += 1
                 changed += 1
             else:
                 logger.warning("[features] 覆写 '%s' 值应为 bool，忽略", flag_name)
+
+    # 无消费者开关一次告警（多为陈旧开关或拼写错误）：这类键在本版本不驱动任何
+    # 行为，用户照文档配置后会毫无效果，必须让其可见。收集后合并成一条——逐键
+    # 打印会在每次启动刷屏，而 features.json 在模块导入时就会加载一次。
+    if unknown:
+        logger.warning(
+            "[features] features.json 含 %d 项无消费者的开关，配置后不产生任何效果"
+            "（请核对拼写，或查阅 how-to-config 的功能开关键表）: %s",
+            len(unknown),
+            "、".join(sorted(unknown)),
+        )
 
     if not valid_count:
         return
