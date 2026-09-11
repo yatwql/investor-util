@@ -63,7 +63,8 @@
 ```
 
 完整命令参考（全局参数 / report / cache / whatif / check-sources / view-logs / doctor / 使用示例 / 退出码 / 最佳实践；另有开发维护命令 `cassettes`，见开发者指南）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §13「定时任务」。
-`--experiment` 为全局参数，取值接受开关名（如 `module_quality_gate`）、显示名（如 `模块级质量分级`）或 `all`（全部启用），可重复指定。
+`--experiment` 为全局参数，取值接受开关名（如 `module_quality_gate`）、显示名（如 `模块级质量分级`）或 `all`（全部启用），可重复指定；它只作用于**实验组**且只开不关。
+`--feature NAME=VALUE` 是它的补集：面向**全部 19 项开关**、**双向**（`=off` 亦可），仅本次运行、不写入 `features.json`，在其之后应用，故 `--experiment all --feature module_quality_gate=off` 表示「其余实验功能全开、只关质量分级」。两个参数同样适用于 `doctor` / `check-sources` / `view-logs` / `cassettes` 等早返回命令。
 
 ---
 
@@ -168,7 +169,7 @@
 |:-:|:-----|:------|
 | 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
 | 2 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解、报告内容对照、缓存管理 |
-| 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、全局参数（含 `--experiment` 实验开关）、report/cache/whatif/check-sources/view-logs/doctor 子命令、使用示例、退出码、定时任务 |
+| 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、全局参数（含 `--experiment` 实验组简写与 `--feature NAME=VALUE` 全域开关）、report/cache/whatif/check-sources/view-logs/doctor 子命令、使用示例、退出码、定时任务 |
 | 4 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
 | 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、章节可见性 |
 | 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
