@@ -6,6 +6,14 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### TUI 配置面板盒线边框按显示宽度对齐（自审 rf-340）（2026-09-11）
+
+- **问题**：五个配置面板（LLM 分析章节 / 对比指数池 / 报告可选章节 / 报告增强子模块 / 持仓匿名化）的盒线行以 `len()`（码点数）手写空格补白——中文/全角字符在等宽终端占 2 列却只算 1，故含中文的行比含英文的行短；同一面板的上下边框、分隔线与内容行又各写各的补白数（`' ' * 22` / `' ' * 27` / `{name:<14s}` 对 `'─' * 42`），口径互不相同。实测单个面板的盒线行出现 **7 种行宽**（47~67 列），右边框参差不齐；中文名一长即撑破边框（报告可选章节面板的运行示意图行 65 列，边框仅 44 列）。
+- **新增排版助手**（`tui/text_layout.py`）：`display_width()` 按东亚宽度（`east_asian_width` 的 W/F 计 2 列）计算显示列数，先剥离 ANSI 颜色序列（着色开启时 `len()` 会把 `\033[92m` 等转义字符也算作可见字符，非 TTY 下这些常量为空串、问题被掩盖）；`pad_right()` 按显示宽度补齐表格列；`render_panel()` 接收标题与内容行列表（`None` 表示分隔线），按「标题所需」与「最长内容行」的较大者统一定宽，**四边对齐由构造保证**——调用方不必预估列宽，也不会因某行超宽而撑破右边框。
+- **面板改建**：上述五个面板全部改走 `render_panel()`，名称列宽取自各自清单内最长显示名（超宽名不截断，仅该行右移），状态方括号因此纵向对齐；原散落的空格魔法数与硬编码边框长度字面量全部移除。
+- **回归测试**（覆盖项 +21）：新增 `unit/ui/test_text_layout.py`（16 条：中英混排宽度、ANSI 剥离、组合字符、按显示宽度补白、一个面板内所有行等宽、超宽行不截断、分隔线/空白行/无内容行）与 `unit/handlers/test_handlers_config.py::TestConfigPanelsAreRectangular`（5 条：逐个面板驱动渲染，断言捕获到的盒线行显示宽度全等）。后者对改建前的实现实测**五条全数失败**（单面板 7 种行宽），确认其对缺陷场景有效。
+- **同形态待办**：报告层 `report/progress.py` 的模块耗时排行面板同属此形态（含条目行按码点补白），因该面板另带中缀分隔线与条形图，与本次的 TUI 面板不同构，另行处理。
+
 ### 功能开关注册表收敛：移除声明即死的陈旧开关（自审 rf-338）（2026-09-11）
 
 - **问题**：实验功能三通道（TUI / Web / CLI）核查时顺带发现，`features.json` 宣传的 35 项功能开关中有 **16 项声明即死**——全仓无任何代码读取其取值，用户照 `how-to-config.md` §M 配置后不产生任何效果：5 项 `llm_*`（`llm_global_macro` / `_expert_review` / `_health_check` / `_penetration_deep` / `_news_correlation`，模块启停实际由 `llm_settings.json` 的 `enabled_llm` 同键控制）、5 项 `news_*`（实际由 `config.json` 的 `news_sources` 控制）、`history_portfolio` / `history_benchmark`（实际由 `enable_history` 单键控制）、`fund_deep_analysis_fund_manager` / `_fund_concentration`（实际由 `enable_fund_deep_analysis` 控制）、`anonymizer`（实际由 `config.json` 的 `anonymization.mode` 控制）；`cache_daily_cleanup` 声称的「启动时自动清理过期缓存」与既有的启动敏感缓存清理（`cache/__init__.py`，无条件、90 天）无关，取值同样无人读。`git log -S` 逐项证实这 16 项从未被任何提交消费过（唯一的 `llm_global_macro` 命中是 `features.py` 模块文档串示例）。

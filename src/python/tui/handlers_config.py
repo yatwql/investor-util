@@ -22,6 +22,7 @@ from src.python.tui.tui_menu import (
     press_any_key,
     refresh_config,
 )
+from src.python.tui.text_layout import display_width, pad_right, render_panel
 
 logger = setup_logger()
 
@@ -147,9 +148,11 @@ def _cmd_config_llm_modules() -> None:
     # 实验性功能开关：(flag_key, 显示名)，清单与顺序取自注册表
     experiment_flags = [(flag, name) for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items()]
 
+    # 名称列宽：取清单内最长显示名，使各行状态方括号纵向对齐（超宽名不截断）
+    name_column = max(map(display_width, [*module_names.values(), *(label for _flag, label in experiment_flags)]))
+
     while True:
-        print()
-        print("  ┌── 配置支持LLM的报告分析章节 ──────────────┐")
+        rows: list[str | None] = []
         items: list[tuple[int, str, str, bool, str]] = []
 
         # ① 标准 LLM 模块（1-5）
@@ -157,21 +160,22 @@ def _cmd_config_llm_modules() -> None:
             status = enabled_map.get(sfx, True)
             status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
             items.append((i, sfx, name, status, "llm"))
-            print(f"  │ {i}. {name:<14s} [{status_str}]{' ' * 4}│")
+            rows.append(f"{i}. {pad_right(name, name_column)} [{status_str}]")
 
         # 分隔线 + 实验功能标记
-        print(f"  │{'─' * 42}│")
-        print(f"  │ ⚗ 实验性功能（默认关闭）{' ' * 22}│")
+        rows.append(None)
+        rows.append("⚗ 实验性功能（默认关闭）")
 
         # ② 实验性功能开关（编号紧随标准模块之后）
         for j, (flag, label) in enumerate(experiment_flags, len(module_names) + 1):
             status = is_feature_enabled(flag)
             status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
             items.append((j, flag, label, status, "experiment"))
-            print(f"  │ {j}. ⚗{label:<14s} [{status_str}]{' ' * 3}│")
+            rows.append(f"{j}. ⚗{pad_right(label, name_column)} [{status_str}]")
 
-        print(f"  │ 0. 返回主菜单{' ' * 27}│")
-        print(f"  └{'─' * 42}┘")
+        rows.append("0. 返回主菜单")
+        print()
+        print("\n".join(render_panel("配置支持LLM的报告分析章节", rows)))
         print("  ⚗ 实验性功能默认关闭，开启后按各自说明增强报告输出")
         print("     ⚠ 当前为实验阶段，输出质量可能不稳定")
         print()
@@ -217,23 +221,15 @@ def _cmd_config_comparison_indices() -> None:
         refresh_config()
         config = get_config_cache() or {}
         indices = config.get("comparison_indices", _DEFAULT_CONFIG.get("comparison_indices", {}))
-        print()
-        print("  ┌── 管理对比指数池 ──────────────────────┐")
-        print("  │ 自定义基准指数，用于报告中组合 vs 多指数对比  │")
-        print(f"  │ 当前指数 ({len(indices)} 个):{' ' * 21}│")
+        rows: list[str | None] = ["自定义基准指数，用于报告中组合 vs 多指数对比", f"当前指数 ({len(indices)} 个):"]
         if indices:
             for i, (code, name) in enumerate(indices.items(), 1):
-                label = f"{code} ({name})"
-                padding = " " * max(1, 35 - len(label))
-                print(f"  │   {i}. {label}{padding}│")
+                rows.append(f"  {i}. {code} ({name})")
         else:
-            print("  │   空池（仅显示沪深300） {' ' * 20}│")
-        print(f"  │{'─' * 42}│")
-        print("  │ A. 添加指数 {' ' * 30}│")
-        print("  │ D. 删除指数 {' ' * 30}│")
-        print("  │ R. 重置为默认预设{' ' * 27}│")
-        print("  │ 0. 返回主菜单{' ' * 27}│")
-        print(f"  └{'─' * 42}┘")
+            rows.append("  空池（仅显示沪深300）")
+        rows += [None, "A. 添加指数", "D. 删除指数", "R. 重置为默认预设", "0. 返回主菜单"]
+        print()
+        print("\n".join(render_panel("管理对比指数池", rows)))
         print()
         try:
             choice = input("  请选择 (A/D/R/0): ").strip().upper()
@@ -340,23 +336,28 @@ def _cmd_config_report_boards() -> None:
         portfolio_evolution = is_enable_portfolio_evolution(config)
         action = is_enable_action(config)
 
-        print()
-        print("  ┌── 配置报告可选章节 ────────────────────┐")
         fund_status = f"{GREEN}启用{RESET}" if fund_deep_analysis else f"{RED}禁用{RESET}"
         n_status = f"{GREEN}启用{RESET}" if news else f"{RED}禁用{RESET}"
         h_status = f"{GREEN}启用{RESET}" if history else f"{RED}禁用{RESET}"
         e_status = f"{GREEN}启用{RESET}" if portfolio_evolution else f"{RED}禁用{RESET}"
         a_status = f"{GREEN}启用{RESET}" if action else f"{RED}禁用{RESET}"
-        print(f"  │ 1. 基金深度分析      [{fund_status}]{' ' * 8}│")
-        print(f"  │ 2. 市场新闻          [{n_status}]{' ' * 8}│")
-        print(f"  │ 3. 组合历史走势+回撤  [{h_status}]{' ' * 8}│")
-        print(f"  │ 4. 组合演进          [{e_status}]{' ' * 8}│")
-        print(f"  │ 5. 行动建议          [{a_status}]{' ' * 8}│")
-        print("  │                                   │")
-        print("  │ 6. 报告增强子模块（数据质量/行业Beta/候选比较/成本流水/估值分位/市场温度）│")
-        print("  │ 7. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置 │")
-        print(f"  │ 0. 返回主菜单{' ' * 27}│")
-        print(f"  └{'─' * 42}┘")
+        # 编号后的章节名补齐到同一列，使状态方括号纵向对齐
+        section_column = max(
+            map(display_width, ["基金深度分析", "市场新闻", "组合历史走势+回撤", "组合演进", "行动建议"])
+        )
+        rows = [
+            f"1. {pad_right('基金深度分析', section_column)} [{fund_status}]",
+            f"2. {pad_right('市场新闻', section_column)} [{n_status}]",
+            f"3. {pad_right('组合历史走势+回撤', section_column)} [{h_status}]",
+            f"4. {pad_right('组合演进', section_column)} [{e_status}]",
+            f"5. {pad_right('行动建议', section_column)} [{a_status}]",
+            "",
+            "6. 报告增强子模块（数据质量/行业Beta/候选比较/成本流水/估值分位/市场温度）",
+            "7. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置",
+            "0. 返回主菜单",
+        ]
+        print()
+        print("\n".join(render_panel("配置报告可选章节", rows)))
         print()
         try:
             choice = input("  输入编号切换 (0-7): ").strip()
@@ -429,18 +430,21 @@ def _cmd_config_report_submodules() -> None:
         "market_temperature": is_enable_market_temperature,
     }
 
+    # 名称列宽：取子模块清单内最长显示名，使各行状态方括号纵向对齐
+    name_column = max(map(display_width, (label for _key, label, _desc in SUBMODULES)))
+
     while True:
         config = get_config()
-        print()
-        print("  ┌── 配置报告增强子模块 ───────────────────┐")
+        rows: list[str | None] = []
         items: list[tuple[int, str, bool]] = []
         for i, (key, label, _desc) in enumerate(SUBMODULES, 1):
             status = accessors[key](config)
             status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
             items.append((i, key, status))
-            print(f"  │ {i}. {label:<14s} [{status_str}]{' ' * 4}│")
-        print(f"  │ 0. 返回上一级{' ' * 25}│")
-        print(f"  └{'─' * 42}┘")
+            rows.append(f"{i}. {pad_right(label, name_column)} [{status_str}]")
+        rows.append("0. 返回上一级")
+        print()
+        print("\n".join(render_panel("配置报告增强子模块", rows)))
         print()
         try:
             choice = input("  输入编号切换 (0-6): ").strip()
@@ -512,19 +516,19 @@ def _cmd_config_anonymization_mode() -> None:
     # 定义显示顺序
     _ORDERED_KEYS = ["off", "code_display", "full_anonymous", "summary"]
 
+    # 说明列宽：取最长模式说明，使选中标记、编号与说明各占固定列
+    desc_column = max(map(display_width, ANONYMIZATION_MODE_DESCRIPTIONS.values()))
+
     while True:
         current = get_anonymization_mode()
-        print()
-        print(f"  ┌── 配置持仓匿名化 {'─' * 36}┐")
-        print(f"  │ 当前模式: {current}{' ' * (32 - len(current))}│")
-        print(f"  │{'─' * 48}│")
+        rows: list[str | None] = [f"当前模式: {current}", None]
         for idx, mode_key in enumerate(_ORDERED_KEYS, 1):
             desc = ANONYMIZATION_MODE_DESCRIPTIONS.get(mode_key, mode_key)
             marker = "►" if mode_key == current else " "
-            print(f"  │ {marker} {idx}. {desc}{' ' * max(1, 42 - len(desc))}│")
-        print(f"  │{'─' * 48}│")
-        print("  │ 0. 返回主菜单                              │")
-        print(f"  └{'─' * 48}┘")
+            rows.append(f"{marker} {idx}. {pad_right(desc, desc_column)}")
+        rows += [None, "0. 返回主菜单"]
+        print()
+        print("\n".join(render_panel("配置持仓匿名化", rows)))
         print()
         try:
             choice = input("  请选择 (0-4): ").strip()

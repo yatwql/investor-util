@@ -1,4 +1,7 @@
-"""测试 handlers_config 的 LLM 设置读写辅助函数。"""
+"""测试 handlers_config 的 LLM 设置读写辅助函数与配置面板渲染。
+
+面板渲染部分锁定「盒线边框四边对齐」这条不变式——补白按显示宽度而非码点数。
+"""
 
 from __future__ import annotations
 
@@ -6,6 +9,8 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from src.python.tui.text_layout import display_width
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
@@ -247,3 +252,79 @@ class TestConfigReportSubmodules:
         _cmd_config_report_submodules()
 
         mock_set.assert_not_called()
+
+
+class TestConfigPanelsAreRectangular:
+    """配置面板的盒线边框必须四边对齐。
+
+    缺陷场景：面板行以 `len()`（码点数）手写空格补白，中文/全角字符占 2 列却
+    只算 1；上下边框、分隔线、内容行又各写各的补白数，同一面板的右边框对不到
+    同一列。本类逐个面板驱动一次渲染，断言打印出的盒线行显示宽度全等。
+    """
+
+    @staticmethod
+    def _box_widths(captured: str) -> set[int]:
+        """收集捕获输出中盒线行的显示宽度（非盒线行——如面板下方的图例——不计）。"""
+        widths = set()
+        for line in captured.splitlines():
+            stripped = line.strip()
+            if stripped.startswith(("┌", "│", "└")) and stripped.endswith(("┐", "│", "┘")):
+                widths.add(display_width(line))
+        return widths
+
+    def _assert_rectangular(self, capsys, panel):
+        """驱动面板函数一次（输入 0 直接返回），断言其盒线行等宽。"""
+        panel()
+        widths = self._box_widths(capsys.readouterr().out)
+        assert widths, "未捕获到任何盒线行——面板渲染路径可能已变"
+        assert len(widths) == 1, f"面板右边框未对齐，出现 {len(widths)} 种行宽：{sorted(widths)}"
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.input", side_effect=["0"])
+    @patch("src.python.tui.handlers_config._read_llm_settings")
+    def test_llm_modules_panel_rectangular(self, mock_read, mock_input, mock_press, capsys):
+        """LLM 分析章节面板：标准模块行与实验开关行在同一右边框内。"""
+        mock_read.return_value = ({"enabled_llm": {}}, "/tmp/llm_settings.json")
+        from src.python.tui.handlers_config import _cmd_config_llm_modules
+
+        self._assert_rectangular(capsys, _cmd_config_llm_modules)
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["0"])
+    @patch("src.python.tui.handlers_config.get_config_cache")
+    def test_comparison_indices_panel_rectangular(self, mock_cache, mock_input, mock_refresh, mock_press, capsys):
+        """对比指数池面板：指数名含中文时右边框仍对齐。"""
+        mock_cache.return_value = {"comparison_indices": {"sh000905": "中证500", "sh000300": "沪深300"}}
+        from src.python.tui.handlers_config import _cmd_config_comparison_indices
+
+        self._assert_rectangular(capsys, _cmd_config_comparison_indices)
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["0"])
+    @patch("src.python.config.get_config", return_value={})
+    def test_report_boards_panel_rectangular(self, mock_get, mock_input, mock_refresh, mock_press, capsys):
+        """报告可选章节面板：最长行（增强子模块说明）决定宽度且不撑破边框。"""
+        from src.python.tui.handlers_config import _cmd_config_report_boards
+
+        self._assert_rectangular(capsys, _cmd_config_report_boards)
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["0"])
+    @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
+    def test_report_submodules_panel_rectangular(self, mock_get, mock_input, mock_refresh, mock_press, capsys):
+        """报告增强子模块面板：各子模块名长短不一，状态方括号仍对齐。"""
+        from src.python.tui.handlers_config import _cmd_config_report_submodules
+
+        self._assert_rectangular(capsys, _cmd_config_report_submodules)
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.input", side_effect=["0"])
+    @patch("src.python.config.anonymizer.get_anonymization_mode", return_value="full_anonymous")
+    def test_anonymization_panel_rectangular(self, mock_mode, mock_input, mock_press, capsys):
+        """匿名化面板：带选中标记的行与普通行同宽（自成一档内区宽度）。"""
+        from src.python.tui.handlers_config import _cmd_config_anonymization_mode
+
+        self._assert_rectangular(capsys, _cmd_config_anonymization_mode)
