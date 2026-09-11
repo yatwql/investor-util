@@ -399,14 +399,14 @@
 | 7 | `position_relationship` | 持仓关系矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章两区块：重合度 + 相关性） |
 | 8 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
 | 9 | `style_factor` | 风格与因子分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） |
-| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
-| 11 | `global_macro` | 全球政经局势 | LLM |
-| 12 | `expert_review` | 智囊团深度复盘 | LLM |
-| 13 | `health_check` | 持仓体检报告 | LLM |
-| 14 | `penetration_deep` | 穿透深度分析 | LLM |
-| 15 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
-| 16 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 17 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 10 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 11 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
+| 12 | `global_macro` | 全球政经局势 | LLM |
+| 13 | `expert_review` | 智囊团深度复盘 | LLM |
+| 14 | `health_check` | 持仓体检报告 | LLM |
+| 15 | `penetration_deep` | 穿透深度分析 | LLM |
+| 16 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
+| 17 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
 | 18 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
 | 19 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
@@ -430,7 +430,7 @@
 >
 > 空对象 `{}` 或缺失此字段时使用上述 19 项默认顺序。
 >
-> **本仓库配置**：`config.json` 的 `report_section_order` 已配置完整 18 项，将 `action`（行动建议）置于序号 10，其余模块依次顺延（`news_correlation`=11、`global_macro`=12、`expert_review`=13、`health_check`=14、`penetration_deep`=15、`portfolio_history_drawdown`=16、`portfolio_evolution`=17、`data_source_status`=18），与上表默认顺序仅差异在「行动建议提前至第 10 位」。清空为 `{}` 即恢复上表默认顺序（行动建议=17）。
+> **本仓库配置**：`config.json` 的 `report_section_order` 显式列出完整 18 项，取值与上表默认顺序**完全一致**（`action`=10、`news_correlation`=11、`global_macro`=12、`expert_review`=13、`health_check`=14、`penetration_deep`=15、`portfolio_history_drawdown`=16、`portfolio_evolution`=17、`data_source_status`=18）。因两者同序，清空为 `{}` 效果相同。
 
 **实用示例** — 将组合历史走势与回撤提到前面，关注回撤风险：
 

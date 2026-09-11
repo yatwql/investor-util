@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.18-dev
-> **编号源**：`rf-next = 348`（新增问题取此编号，完成后更新为 +1；已用最大 rf-347，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 349`（新增问题取此编号，完成后更新为 +1；已用最大 rf-348，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -76,6 +76,8 @@
 | **rf-346** | **功能开关的「面板可见性」被绑在「是否实验项」上**：`EXPERIMENTAL_FEATURES` 同时承担三件互不相干的事——决定面板可见性、决定默认关、决定是否进产物自述，于是「转正」（默认值改 `True` + 移出实验注册表）会**连带摘掉可见性**：`doctor_check` 转正后 TUI 菜单 `[S]` / Web 配置面板 / CLI `--experiment` 三处全部消失，关闭途径只剩手改 `features.json`；反方向同样成立——`metrics_*`（7 项）与 `enable_interactive_charts` 从来不在任何界面通道内，用户要关闭某项指标只能手写 JSON。用户看到的是 19 项同质开关，其中一半能改、一半不能，而「能不能改」取决于它是否被标为实验项，两者本无逻辑关系 | 注册表统一（合并 `EXPERIMENTAL_FEATURES` 与 `_FEATURE_FLAGS_DEFAULT` 为单条声明 `feature_switch_registry`：显示名/说明/分组/默认值/产物影响五字段，"面板可见性"由**分组属性**表达而非「是否实验项」）；转正 = 改一个字段，可见性自动延续。三渠道入口一律由注册表派生：TUI 面板分「实验性功能（默认关）」与「常规开关（默认开）」两块、Web 配置面板同构并下发标签与「影响报告」标记、CLI 新增 `--feature NAME=VALUE`（双向、仅本次运行、不写盘）。同时把 `datasource_adapter` 转正为默认开启（内部接缝，开关两态下报告产物逐源等价，不该占一个默认关的用户开关；见 developer-guide「内部接缝类开关也应转正」）。设计文档 `docs-stm/plan/feature-switch-registry-design.md`；计划项 plan-39 |
 
 | **rf-347** | **「常规 ETF 页也有相关锚点」这一误判防线的设计理由与实测相反**：设计稿称常规 ETF 主页含「查看相关ETF」锚点属**推荐位**，故须靠名称含「联接」过滤。落地前实测发现两类页面的相关链接**互为反向**——联接基金页标签止于「ETF」指向场内目标 ETF，常规 ETF 页标签为「查看相关ETF**联接**」指向该 ETF 的场外联接基金；且前者是后者的**前缀**，锚点正则 `查看相关ETF` 会一并命中反向链接。原设计只把「名称过滤」当唯一防线（且该过滤由调用方负责），一旦有常规 ETF 的名称含「联接」二字或调用方漏过滤，就会把该 ETF 的底层暴露错认成其联接基金的持仓。附带：测试夹具 `_NORMAL_ETF_HTML` 按设计稿的错误认知构造（在常规 ETF 页写「查看相关ETF」），测的是不存在的页面形态 | 锚点识别加**两重独立区分**并在正则内自证：① 标签须止于「ETF」（负向先行断言 `(?!联)`）；② 目标须为场内代码（`is_exchange_fund_code`，前缀 5/1）。实测 `561910` 的锚点两重各自都能挡下、`016055` 两重都通过。夹具改为真实形态（常规 ETF 页写「查看相关ETF联接」→ 场外 `016019`），补反向链接拒绝用例 2 例；设计文档 §3.3 的错误理由改写为实测结论并附两个方向的对照表 |
+
+| **rf-348** | **报告章节的默认顺序存在两个事实来源，文档随之分叉**：注册表出厂默认（`action`=17、`portfolio_evolution`=16）与仓库 `config.json` 的 `report_section_order`（`action`=10、其余顺延）并存且不同序，于是同一事实在文档中并存两种写法——`requirements.md` §6.3、`how-to-config.md` 排序表、`reports-instruction.md` 页签表按 10 写，`technical.md` 两处契约行与 `reports-instruction.md` 旁注仍按 17 写。两份顺序只要并存，改其一必使另一处的文档悄悄过期（本条的两种写法正由此而来，非笔误）。附带发现：`unit/report/test_excel_report_structure.py` 的表头自称「与 registry.py 对齐」，实为 `create_sheets` 的**输入**数据、序号只在本表内自洽（且刻意省略 `action`/`portfolio_evolution`），照该注释在下次改注册表时会被误当镜像同步——而它本非镜像 | 用户决策「改注册表默认值」：`core/registry.py::_REPORT_SECTION_DEFAULT` 的 `action` 由第 17 位前移至第 10 位（紧随 `style_factor`），其后 `news_correlation`…`portfolio_evolution` 顺延为 11…17，`data_source_status`=18、`llm_usage`=19 不变，双源分叉消除（清空 `report_section_order` 与保留它从此效果相同）。仅改变**出厂默认**（`{}` 配置的用户与全新 clone），本仓库显式配置同一顺序、报告产物逐字节不变。`unit/core/test_registry.py` 两处序号断言同步（evolution 16→17、action 17→10）并订正 docstring；两处测试文件的表头注释改为如实说明；`how-to-config.md` / `reports-instruction.md` / `technical.md` / `config.json` 四处旁注与 `number=` 取值同步 |
 
 ### 已解决待归档（v0.10.17-dev）
 

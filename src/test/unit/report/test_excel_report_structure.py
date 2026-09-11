@@ -19,7 +19,9 @@ import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
-# 标准注册表（精简版，仅含结构测试所需字段，与 registry.py 对齐）
+# 标准注册表（精简版：仅保留结构测试所需字段，省略 action / portfolio_evolution 两个扩展模块）。
+# 本表只作 create_sheets 的输入数据使用，序号仅在本表内自洽，不对照 registry.py 的真实序号——
+# 需要校验真实注册表序号时请用 test_registry.py。
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary", "name": "投资分析汇总", "number": 1, "type": "always"},
     {"key": "market_value", "name": "市值核算明细表", "number": 2, "type": "always"},
@@ -36,7 +38,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "health_check", "name": "持仓体检报告", "number": 13, "type": "llm"},
     {"key": "penetration_deep", "name": "穿透深度分析", "number": 14, "type": "llm"},
     {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 15, "type": "history"},
-    # 注：portfolio_evolution(16) / action(17) 为注册表扩展模块，此精简版省略
+    # 注：action / portfolio_evolution 为注册表扩展模块，此精简版省略
     {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always"},
     {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm"},
 ]

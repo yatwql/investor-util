@@ -532,25 +532,36 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "fund_deep_analysis",
         "data_flag": "style_factor_data",
     },
+    # ── action 类型（独立顶层开关 enable_action 控制，默认开，菜单 P 可切换） ──
+    # 行动建议：再平衡信号 + 交易纪律 + 调仓建议 + 收益归因（纯算法，basic/both/full 均可见）
+    # 出厂序号 10，与仓库 config.json 的 report_section_order 取值相同——该配置清空为 {}
+    # 时即回到本默认顺序，故两者必须同序，改动其一须同步另一处
+    {
+        "key": "action",
+        "name": "行动建议",
+        "number": 10,
+        "type": "action",
+        "data_flag": None,
+    },
     # ── news 类型（需启用新闻功能） ──
     {
         "key": "news_correlation",
         "name": "财经新闻热点与持仓关联分析",
-        "number": 10,
+        "number": 11,
         "type": "news",
         "data_flag": "news_data_available",
     },
     # ── llm 类型（需启用 LLM 功能） ──
-    {"key": "global_macro", "name": "全球政经局势", "number": 11, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 12, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "health_check", "name": "持仓体检报告", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "global_macro", "name": "全球政经局势", "number": 12, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "health_check", "name": "持仓体检报告", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 15, "type": "llm", "data_flag": "llm_data_available"},
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
     # 组合历史走势与回撤：一章分「走势表 + 回撤矩阵」两区块 + 危机区间标注（2015/2018/2020/2022）
     {
         "key": "portfolio_history_drawdown",
         "name": "组合历史走势与回撤",
-        "number": 15,
+        "number": 16,
         "type": "history",
         "data_flag": None,
     },
@@ -560,18 +571,9 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {
         "key": "portfolio_evolution",
         "name": "组合演进",
-        "number": 16,
+        "number": 17,
         "type": "evolution",
         "data_flag": "evolution_data",
-    },
-    # ── action 类型（独立顶层开关 enable_action 控制，默认开，菜单 P 可切换） ──
-    # 行动建议：再平衡信号 + 交易纪律 + 调仓建议 + 收益归因（纯算法，basic/both/full 均可见）
-    {
-        "key": "action",
-        "name": "行动建议",
-        "number": 17,
-        "type": "action",
-        "data_flag": None,
     },
     # ── always 类型（始终显示） ──
     {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always", "data_flag": None},

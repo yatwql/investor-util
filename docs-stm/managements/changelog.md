@@ -6,6 +6,14 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 报告章节默认顺序对齐仓库配置（§6.3 口径统一）（2026-09-12）
+
+- **问题**：「行动建议」的默认序号在文档中并存两种说法——`requirements.md` §6.3、`how-to-config.md` 章节排序表、`reports-instruction.md` 页签表已按 10 写，而 `technical.md` 两处契约行与 `reports-instruction.md` 的旁注仍写「注册表默认顺序为行动建议=17」。根因不是笔误，而是**同时存在两份顺序**：注册表出厂默认（`action`=17）与仓库 `config.json` 的 `report_section_order`（`action`=10）。两份顺序并存，任一处改动都会让另一处悄悄过期。
+- **处置（用户决策：改注册表默认值）**：`core/registry.py::_REPORT_SECTION_DEFAULT` 的 `action` 条目由第 17 位前移至第 10 位（紧随 `style_factor`），其后 `news_correlation` / `global_macro` / `expert_review` / `health_check` / `penetration_deep` / `portfolio_history_drawdown` / `portfolio_evolution` 依次顺延为 11…17，`data_source_status`=18、`llm_usage`=19 不变。出厂默认与仓库现值由此**同序**，清空 `report_section_order` 与保留它效果相同，双源分叉消除。
+- **影响面**：仅改变**出厂默认**（配置为 `{}` 的用户与全新 clone）；本仓库已显式配置同一顺序，报告产物**逐字节不变**。
+- **测试**：`unit/core/test_registry.py` 两处序号断言随之前移（`portfolio_evolution` 16→17、`action` 17→10，并订正 `action` 用例的 docstring）。另订正 `unit/report/test_excel_report_structure.py` 表头注释——该表原自称「与 registry.py 对齐」，实为 `create_sheets` 的**输入数据**、序号只在本表内自洽（且刻意省略 `action`/`portfolio_evolution`），照原注释会在下次改注册表时被误当作镜像同步；现改为如实说明并指向 `test_registry.py`。
+- **文档同步**：`how-to-config.md`（章节排序表 `action` 移至第 10 行、其余顺延；「本仓库配置」旁注由「仅差异在行动建议提前至第 10 位」改为「与默认顺序完全一致」）；`reports-instruction.md`（页签序号旁注同步为「与注册表默认顺序完全一致」）；`technical.md`（§4 章节契约 `action` 条 `number=17`→`10`；「报告序号可配置」约束行 `portfolio_evolution` `number=16`→`17`，两处旁注一并改写）；`data/config/config.json`（`report_section_order` 上方注释原写「清空为 {} 即恢复注册表默认顺序（行动建议=17）」，该前提已不成立，改为说明两者同序）。
+
 ### 执行效率约定入库 CLAUDE.md（2026-09-12）
 
 - **背景**：用户反馈某一轮「文档同步 + 门禁 + 提交」耗时 27 分钟，要求定位。核查该轮 transcript 后确认瓶颈不在工具——门禁（含两次 `dev-verify`，各约 24s）在 140 次 Bash 调用中合计仅约 2.4 分钟，时间主要花在 243 次「生成 → 调用 → 观察」往返上。故可压缩项是**往返次数**，而非任何单个慢工具。

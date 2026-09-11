@@ -319,17 +319,17 @@ class TestReportSectionDefault:
         sec = evo[0]
         assert sec["type"] == "evolution"
         assert sec["data_flag"] == "evolution_data"
-        assert sec["number"] == 16
+        assert sec["number"] == 17
 
     def test_action_registered_as_action_type(self):
         """action 应注册为 action 类型（独立顶层开关 enable_action 控制，默认开，
-        data_flag=None，序号 17 紧跟 portfolio_evolution）。"""
+        data_flag=None，序号 10 紧跟 style_factor）。"""
         act = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "action"]
         assert len(act) == 1, "缺少 action 模块条目"
         sec = act[0]
         assert sec["type"] == "action"
         assert sec["data_flag"] is None
-        assert sec["number"] == 17
+        assert sec["number"] == 10
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""
