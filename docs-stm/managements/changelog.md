@@ -14,6 +14,7 @@
 - **Excel 用量页签**：顶部说明行之后写入同一清单（两行：清单 + 一致性提示）。位置选在会话用量汇总区**之前**，故不受 `_write_llm_summary_section` 的「无用量即早退」影响——清单与用量无关，无用量时同样须出现。
 - **零开关不出行**：两处均判空，实验开关全关时报告一字不变，既有输出与既有测试不受影响。
 - **回归测试**（覆盖项 +11）：`unit_config` +4（`TestEnabledExperimentalFeatures`：默认全空、显示名取自注册表而非另写一份、多项启用按注册表顺序而非启用先后、默认开启的非实验开关不入列）；`unit_report` +7（`test_excel_report_structure.py::TestExcelExperimentalNotice` 三条：零开关页签不提实验功能、启用项按显示名逐项列出并给出总项数、无会话用量时该行仍在；`test_html_report_structure.py::TestFooterExperimentalNotice` 四条：页脚按显示名顿号相连列出、零开关不出现、上下文未注入时不出现空壳行、渲染上下文确已注入该变量）。
+- **未覆盖范围**：Excel 侧清单挂在「LLM API 用量」页签上，而该页签仅在 `include_llm` 为真时生成——LLM 分析整章关闭时，Excel 产物上仍不出现清单，而 `signal_ledger` / `datasource_adapter` 等非 LLM 实验开关此刻仍可能开启（HTML 页脚不受影响）。已登记为待处理问题（见 `review-findings.md`）。
 
 ### 基金持仓报告期上屏与陈旧闸门（自审 rf-339）（2026-09-11）
 
