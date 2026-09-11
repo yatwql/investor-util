@@ -31,6 +31,28 @@ def _init_llm_usage_sheet(ws: Any) -> int:
     return row
 
 
+def _write_experimental_notice(ws: Any, row: int) -> int:
+    """已启用实验性功能清单写入页签顶部，返回下一行号。
+
+    报告是可脱离本机流转的文件，读者须能判断内容是否为非默认开关下的产物；
+    清单取自 ``EXPERIMENTAL_FEATURES`` 注册表（与 TUI 面板 / Web 面板 / 日志
+    横幅同源）。无启用项时不写任何单元格，页签保持既有输出。
+    """
+    from src.python.config.features import enabled_experimental_features
+
+    enabled = enabled_experimental_features()
+    if not enabled:
+        return row
+
+    _NOTE_FONT = Font(size=9, bold=True, color="8A5A00")
+    _HINT_FONT = Font(size=9, color="666666")
+    names = "、".join(name for _flag, name in enabled)
+    ws.cell(row=row, column=1, value=f"⚗ 本报告在 {len(enabled)} 项实验性功能开启下生成：{names}").font = _NOTE_FONT
+    row += 1
+    ws.cell(row=row, column=1, value="实验功能输出质量可能不稳定，结论请自行复核").font = _HINT_FONT
+    return row + 2
+
+
 def _write_llm_summary_section(
     ws: Any,
     row: int,
@@ -272,6 +294,7 @@ def write_llm_usage_sheet(
     ]
 
     row = _init_llm_usage_sheet(ws)
+    row = _write_experimental_notice(ws, row)
     row = _write_llm_summary_section(
         ws, row, llm_session_usage, llm_endpoint=llm_endpoint, debate_mode_label=debate_mode_label
     )

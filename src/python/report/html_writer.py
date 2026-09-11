@@ -251,7 +251,11 @@ def _render_template(
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
+    from src.python.config.features import enabled_experimental_features
     from src.python.report.chart_data_builder import build_evolution_chart_data
+
+    # 实验功能清单：产物须自述生成条件（页脚）；零开关时为空列表，页脚不出现该行
+    enabled_experiments = [name for _flag, name in enabled_experimental_features()]
 
     # 估值分位 + 市场温度：开关关闭时为 None（模板保持既有输出）
     valuation_enabled = valuation_data is not None
@@ -310,6 +314,7 @@ def _render_template(
         debate_mode_label=_debate_mode_label,
         debate_info=debate_info,
         debate_mode_combination=_debate_mode_combination,
+        enabled_experiments=enabled_experiments,
         section_order=order,
         section_numbers=section_numbers,
         section_visible_dict=section_visible_dict,

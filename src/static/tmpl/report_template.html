@@ -2901,6 +2901,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {%- if debate_mode_combination %}
         <br>🧪 辩论模式已启用：{{ debate_mode_combination }}
         {%- endif %}
+        {%- if enabled_experiments %}
+        <br>⚗ 本报告在 {{ enabled_experiments | length }} 项实验性功能开启下生成：{{ enabled_experiments | join("、") }}
+        <br><span style="font-size:11px;">实验功能输出质量可能不稳定，结论请自行复核</span>
+        {%- endif %}
         <br><span style="font-size:11px;">本报告数据仅供本地处理，所有数据保存在当前设备。LLM 请求经由 API 发送到配置的 provider，不会用于训练。</span>
     </div>
 

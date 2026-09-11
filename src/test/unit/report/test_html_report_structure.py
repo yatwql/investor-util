@@ -1805,5 +1805,53 @@ class TestHtmlDataQualityBlocks(unittest.TestCase):
         self.assertIn("过期", failed_texts)
 
 
+# ═══════════════════════════════════════════════════════════════
+#  Test: Footer 实验功能清单
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestFooterExperimentalNotice(unittest.TestCase):
+    """页脚须自述生成条件：本报告在哪些实验性功能开启下生成。
+
+    HTML 报告可脱离本机流转，读者既看不到 features.json，也看不到生成时的
+    控制台横幅；缺了这行，行动章「历史决策复盘」等实验产物会被误读为常驻功能。
+    """
+
+    def _render_footer(self, enabled_experiments=None) -> BeautifulSoup:
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        if enabled_experiments is not None:
+            data["enabled_experiments"] = enabled_experiments
+        footer = _render_template(data).select_one(".report-footer")
+        self.assertIsNotNone(footer, "页脚容器应存在")
+        return footer
+
+    def test_lists_enabled_display_names(self):
+        """启用项按显示名顿号相连列出，并给出总项数与一致性提示。"""
+        text = self._render_footer(["辩论-正反辩论", "决策跨期反思闭环"]).get_text()
+
+        self.assertIn("⚗ 本报告在 2 项实验性功能开启下生成：辩论-正反辩论、决策跨期反思闭环", text)
+        self.assertIn("实验功能输出质量可能不稳定，结论请自行复核", text)
+
+    def test_no_line_when_none_enabled(self):
+        """零开关时页脚一字不提实验功能（既有输出不变）。"""
+        self.assertNotIn("⚗", self._render_footer([]).get_text())
+
+    def test_no_empty_shell_when_context_absent(self):
+        """上下文未注入该变量时同样不出现空壳行（模板须判空而非只判存在）。"""
+        self.assertNotIn("⚗", self._render_footer().get_text())
+
+    def test_writer_injects_context_variable(self):
+        """渲染上下文须注入该变量——漏传时模板判空而静默不显示，无任何报错。"""
+        import inspect
+
+        from src.python.report import html_writer
+
+        source = inspect.getsource(html_writer._render_template)
+        self.assertIn("enabled_experiments=", source, "_render_template 应将 enabled_experiments 载入模板上下文")
+
+
 if __name__ == "__main__":
     unittest.main()

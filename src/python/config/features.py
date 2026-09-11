@@ -183,6 +183,19 @@ def describe_experiment_flags() -> str:
     return "、".join(f"{flag}（{name}）" for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items())
 
 
+def enabled_experimental_features() -> list[tuple[str, str]]:
+    """返回当前已启用的实验功能 ``[(开关名, 显示名), ...]``（按注册表顺序）。
+
+    报告层用它在**产物自身上**标注生成条件（HTML 页脚 / Excel 用量页签）——
+    报告是可脱离本机流转的文件，读者须能判断内容是否为非默认开关下的产物。
+    清单同样取自 :data:`EXPERIMENTAL_FEATURES`，注册表仍是唯一来源。
+
+    Returns:
+        已启用项的 ``(开关名, 显示名)`` 列表；无启用项时返回空列表。
+    """
+    return [(flag, name) for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items() if is_feature_enabled(flag)]
+
+
 def log_experimental_features() -> None:
     """如果已启用实验性功能，在日志中以红色高亮显示具体开启了什么功能。
 
@@ -191,7 +204,7 @@ def log_experimental_features() -> None:
     实验功能影响」正是需要看到这条信息的时刻。
     通过 ``logger.error()`` 输出以触发 ``_ColoredFormatter`` 的红色着色。
     """
-    enabled = [(name, desc) for flag, (name, desc) in EXPERIMENTAL_FEATURES.items() if is_feature_enabled(flag)]
+    enabled = enabled_experimental_features()
     if not enabled:
         return
 
@@ -203,8 +216,8 @@ def log_experimental_features() -> None:
     logger.error(sep)
     logger.error("  ⚗ 实验性功能已开启！")
     logger.error(sep)
-    for name, desc in enabled:
-        logger.error("  ⚗ %s — %s", name, desc)
+    for flag, name in enabled:
+        logger.error("  ⚗ %s — %s", name, EXPERIMENTAL_FEATURES[flag][1])
     logger.error(sep)
 
 
@@ -213,6 +226,7 @@ __all__ = [
     "EXPERIMENT_ALL",
     "FEATURE_FLAGS",
     "describe_experiment_flags",
+    "enabled_experimental_features",
     "get_feature_defaults",
     "is_feature_enabled",
     "log_experimental_features",

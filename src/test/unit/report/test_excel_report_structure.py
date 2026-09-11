@@ -330,6 +330,77 @@ class TestExcelTextWrapping(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 
 
+class TestExcelExperimentalNotice(unittest.TestCase):
+    """用量页签须自述生成条件：本报告在哪些实验性功能开启下生成。
+
+    报告是可脱离本机流转的文件，读者无从访问 features.json 或生成时的控制台
+    日志；缺了这行，行动章「历史决策复盘」等实验产物会被误读为常驻功能。
+    """
+
+    def _write_sheet(self, ws):
+        from src.python.report.summary_llm_usage import write_llm_usage_sheet
+
+        write_llm_usage_sheet(
+            ws,
+            llm_session_usage=None,
+            llm_module_info=[{"name": "测试模块", "status_label": "成功", "status": "success"}],
+        )
+
+    def _make_ws(self):
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "LLM 用量"
+        return ws
+
+    def _sheet_text(self, ws):
+        return "\n".join(str(c.value) for row in ws.iter_rows() for c in row if c.value is not None)
+
+    def test_no_notice_when_all_flags_off(self):
+        """实验开关全关时页签一字不提实验功能（保持既有输出）。"""
+        ws = self._make_ws()
+
+        self._write_sheet(ws)
+
+        self.assertNotIn("⚗", self._sheet_text(ws))
+
+    def test_notice_lists_enabled_display_names(self):
+        """启用项按显示名逐项列出，并给出总项数。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("llm_debate_procon", True)
+        set_feature_enabled("signal_ledger", True)
+        ws = self._make_ws()
+
+        self._write_sheet(ws)
+
+        text = self._sheet_text(ws)
+        self.assertIn("⚗ 本报告在 2 项实验性功能开启下生成", text)
+        self.assertIn("辩论-正反辩论", text)
+        self.assertIn("确定性信号沉淀", text)
+        self.assertIn("实验功能输出质量可能不稳定，结论请自行复核", text)
+
+    def test_notice_survives_empty_session_usage(self):
+        """会话无用量统计时该行仍须出现（清单与用量无关，不受汇总区早退影响）。"""
+        from src.python.config.features import set_feature_enabled
+        from src.python.report.summary_llm_usage import write_llm_usage_sheet
+
+        set_feature_enabled("module_quality_gate", True)
+        ws = self._make_ws()
+
+        # 无用量 → _write_llm_summary_section 直接返回，不写「汇总数据」区
+        write_llm_usage_sheet(
+            ws,
+            llm_session_usage=None,
+            llm_module_info=[{"name": "测试模块", "status_label": "成功", "status": "success"}],
+        )
+
+        text = self._sheet_text(ws)
+        self.assertNotIn("汇总数据", text)
+        self.assertIn("模块级质量分级", text)
+
+
 class TestExcelModuleSheets(unittest.TestCase):
     """Excel 各模块页签可访问性测试 — 所有页签都能正确写入数据。"""
 

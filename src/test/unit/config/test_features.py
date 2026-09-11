@@ -24,6 +24,7 @@ from src.python.config.features import (
     FEATURE_FLAGS,
     _FEATURE_FLAGS_DEFAULT,
     describe_experiment_flags,
+    enabled_experimental_features,
     load_feature_overrides,
     resolve_experiment_flags,
 )
@@ -92,6 +93,44 @@ class TestResolveExperimentFlags:
         for flag, (display_name, _desc) in EXPERIMENTAL_FEATURES.items():
             assert flag in text
             assert display_name in text
+
+
+@pytest.mark.unit
+class TestEnabledExperimentalFeatures:
+    """已启用清单（报告产物标注生成条件的唯一取数口）。"""
+
+    def test_none_enabled_by_default(self):
+        """实验开关默认全关 → 清单为空（报告不出现该行）。"""
+        assert enabled_experimental_features() == []
+
+    def test_returns_display_name_of_enabled_flag(self):
+        """启用项返回 (开关名, 显示名)，显示名取自注册表而非另写一份。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+
+        assert enabled_experimental_features() == [("signal_ledger", EXPERIMENTAL_FEATURES["signal_ledger"][0])]
+
+    def test_follows_registry_order(self):
+        """多项启用时按注册表顺序返回，不随启用先后变化。"""
+        from src.python.config.features import set_feature_enabled
+
+        # 故意逆注册表顺序启用：signal_ledger 在注册表第 8，llm_debate_procon 第 1
+        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("llm_debate_procon", True)
+
+        assert [flag for flag, _name in enabled_experimental_features()] == [
+            "llm_debate_procon",
+            "signal_ledger",
+        ]
+
+    def test_only_experimental_flags_listed(self):
+        """默认开启的非实验开关（如 metrics_*）不进清单——清单只答「非默认产物」与否。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("metrics_hhi", True)
+
+        assert enabled_experimental_features() == []
 
 
 @pytest.mark.unit
