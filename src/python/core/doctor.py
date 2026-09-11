@@ -280,7 +280,11 @@ def _check_experimental_features() -> list[dict[str, Any]]:
     try:
         from src.python.config.features import EXPERIMENTAL_FEATURES, is_feature_enabled
 
-        enabled = [(name, desc) for flag, (name, desc) in EXPERIMENTAL_FEATURES.items() if is_feature_enabled(flag)]
+        enabled = [
+            (name, desc)
+            for flag, (name, desc, _affects_report) in EXPERIMENTAL_FEATURES.items()
+            if is_feature_enabled(flag)
+        ]
     except Exception as exc:  # noqa: BLE001
         return [_item(GROUP_FEATURES, "实验功能", False, f"读取失败: {type(exc).__name__}: {exc}")]
 
@@ -443,7 +447,7 @@ def format_doctor_report(results: list[dict[str, Any]], *, use_color: bool = Fal
     ok_count, bad_count = summarize_doctor_results(results)
     lines = [
         f"{APP_NAME} 系统自检 (v{APP_VERSION})",
-        "实验功能（doctor_check）：只读诊断，结论仅供参考",
+        "只读诊断，不改动任何文件，结论仅供参考",
         "─" * 55,
     ]
     ok_mark = "\033[32m[OK]\033[0m" if use_color else "[OK]"

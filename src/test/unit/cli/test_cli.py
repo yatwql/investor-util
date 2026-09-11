@@ -999,7 +999,7 @@ class TestMainEarlyExitExperiments:
             patch_target,
         )
         assert seen["datasource_adapter"] is True
-        assert seen["doctor_check"] is False  # 未指定的开关不受影响
+        assert seen["signal_ledger"] is False  # 未指定的开关不受影响
 
     def test_without_experiment_flag_keeps_defaults(self):
         """不传 --experiment → 实验开关保持默认关闭（对照组，防误判为恒真）。"""
@@ -1015,10 +1015,10 @@ class TestMainEarlyExitExperiments:
 
         os.makedirs(os.path.dirname(features._FEATURES_FILE), exist_ok=True)
         with open(features._FEATURES_FILE, "w", encoding="utf-8") as f:
-            json.dump({"doctor_check": True}, f)
+            json.dump({"signal_ledger": True}, f)
 
         seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")
-        assert seen["doctor_check"] is True
+        assert seen["signal_ledger"] is True
         assert seen["datasource_adapter"] is False
 
 

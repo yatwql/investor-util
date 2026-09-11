@@ -262,7 +262,7 @@ def _build_system_info() -> dict:
     info["anonymization"] = anon_labels.get(anon_mode, anon_mode)
     info["privacy_shown"] = bool(get_flag("_privacy_notice_shown"))
 
-    # 系统自检卡片可见性（实验功能 doctor_check，与 TUI 菜单 D 同一开关）
+    # 系统自检卡片可见性（doctor_check 开关，与 TUI 菜单 D 同一开关；默认开启）
     try:
         from src.python.config.features import is_feature_enabled
 
@@ -575,7 +575,7 @@ def _handle_health():
 
 
 def _handle_doctor():
-    """GET /api/doctor — 系统自检（实验功能 doctor_check）。
+    """GET /api/doctor — 系统自检（doctor_check 开关门控，默认开启）。
 
     查询参数：
       network — ``0`` 跳过数据源联网检查（默认 1，含网络检查）

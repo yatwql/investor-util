@@ -139,15 +139,16 @@
 | R-DIAG-02 | TUI 主菜单提供「V 查看最近运行日志（可按级别筛选）」「H 查看数据源健康历史（近期检查记录）」两项：级别筛选、ERROR/WARNING 着色（NO_COLOR/TTY 检测自动降级无着色）、traceback 折叠为「⤷ 堆栈详情 +N 行」 |
 | R-DIAG-03 | Web 提供 `GET /api/logs` 与 `GET /api/health/history` 接口及「⑦ 日志查看」卡：级别校验（非法 400）、`lines` clamp [1,5000]、`since/until` 透传、读取失败 500；前端手动加载不自动轮询，`<details>` 原生折叠 + 级别配色，全程 `textContent`（防 XSS） |
 
-### 3.6 系统自检（诊断，实验功能 `doctor_check`）
+### 3.6 系统自检（诊断，开关 `doctor_check` 默认开启）
 
 一键盘点运行环境，三端共用核心层 `core/doctor.py`，渠道层仅做薄展示。分组输出（环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，顺序由 `GROUP_ORDER` 锁定），**失败项附可执行修复建议**。**自检自身永不抛异常**（异常一律转为该组失败行）、**零重依赖**（不 import pandas——其缺失正是它要报告的场景）。
 
 | 需求标识 | 需求描述 |
 |:---------|:---------|
 | R-DIAG-04 | CLI 提供 `doctor` 子命令：`--offline` 跳过联网检查、`--timeout SECONDS` 限定单次检查预算；**无需 config 且在 `init_config` 之前分派**——配置损坏正是它要诊断的场景，被开关或配置初始化拦住会形成死锁；**不受 `doctor_check` 开关约束**。退出码 `0`=全部通过、`1`=命令跑完但有失败项（≠ 命令自身失败） |
-| R-DIAG-05 | TUI 主菜单提供 `[D]` 系统自检项，**受实验开关 `doctor_check` 约束**：开关关闭时该项由菜单门控就地裁剪，不出现在主菜单中 |
-| R-DIAG-06 | Web 提供 `GET /api/doctor` 接口（`network=0` 跳过联网、`timeout` 上限 15s、非法值回落默认）及运行状态区「系统自检」卡片，卡片可见性由 `system_info["doctor_enabled"]` 控制（受 `doctor_check` 开关约束）；接口在配置损坏时仍返回 200 并给出失败结果行 |
+| R-DIAG-05 | TUI 主菜单提供 `[D]` 系统自检项（默认出现），**由开关 `doctor_check` 门控**：`features.json` 中置 `false` 时该项由菜单门控就地裁剪，不出现在主菜单中 |
+| R-DIAG-06 | Web 提供 `GET /api/doctor` 接口（`network=0` 跳过联网、`timeout` 上限 15s、非法值回落默认）及运行状态区「系统自检」卡片（默认显示），卡片可见性由 `system_info["doctor_enabled"]` 控制（同上开关）；接口在配置损坏时仍返回 200 并给出失败结果行 |
+| R-DIAG-07 | 自检为只读诊断：不改动任何文件、不写产物，联网检查每次由调用方显式确认（TUI 询问后按需联网、Web 由按钮触发）。故其开关默认开启——默认关闭的代价是最需要它的人（环境故障者）恰好看不到它。开关不出现在「实验性功能」面板，改动经 `features.json` |
 
 ---
 
@@ -1246,7 +1247,7 @@ LLM 五维度量化评分，每项满分 100：
 | `signal_ledger` | bool | false（默认关闭） | 确定性数值信号沉淀启停：把市场温度/估值分位/尾部风险/风格因子/再平衡超限五类确定性评级沉淀为 `data/state/signal_ledger.jsonl` 账本，每条附实时-非实时来源标签；统计与注入提示词的摘要默认只算实时记录，防非实时记录冒充真实战绩 |
 | `metrics_sharpe` / `metrics_calmar` / `metrics_hhi` / `metrics_winrate` / `metrics_turnover` / `metrics_risk_contribution` / `metrics_beta` | bool | true | 量化指标独立启停（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
 | `enable_interactive_charts` | bool | true | 报告 HTML 交互图表（Chart.js）；关闭时回退基础 Canvas 图表 |
-| `doctor_check` | bool | false（默认关闭） | 系统自检功能上屏：开启后 TUI 菜单显示 `[D]` 系统自检项、Web 运行状态区渲染「系统自检」卡片（`GET /api/doctor`）。**仅约束 TUI/Web 两个日常入口**——`doctor` CLI 子命令不受本开关约束（配置损坏正是它要诊断的场景，被开关拦住会形成死锁） |
+| `doctor_check` | bool | true（默认开启） | 系统自检功能上屏：开启时 TUI 菜单显示 `[D]` 系统自检项、Web 运行状态区渲染「系统自检」卡片（`GET /api/doctor`）；置 false 则两处入口一并隐藏。**仅约束 TUI/Web 两个日常入口**——`doctor` CLI 子命令不受本开关约束（配置损坏正是它要诊断的场景，被开关拦住会形成死锁）。非实验开关，不出现在「实验性功能」面板 |
 | `datasource_adapter` | bool | false（默认关闭） | 数据源适配契约启停：行情域三源改由三段式适配器（参数转译→抓取→映射到标准字段）+ 声明式 alias 归一获取，与既有转换函数逐源等价（仅东方财富多出 `market_cap`/`pe` 两个 `None` 键）。**关闭时链路走既有转换函数、行为逐字节不变**；为接入新数据源/新字段预备，日常使用无需开启 |
 | `datasource_credential_ready` | bool | false（默认关闭） | 数据源凭据就绪指引启停：接入需 key 的源时补一行声明，链路即**主动跳过**缺凭据的源并给出可读指引（不进熔断计数）、`check-sources` 出 `⏭️` 跳过态与就绪摘要、`doctor` 出「数据源凭据」组。**当前全部数据源免费、声明表为空**，开启后可见的就是「均无需凭据（免费源）」。凭据只从环境变量读，**值永不落日志与报告** |
 

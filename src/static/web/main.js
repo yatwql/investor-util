@@ -65,7 +65,7 @@
     els.resultFooter = $('result-footer');
     els.healthList = $('health-list');
     els.historyList = $('history-list');
-    // 系统自检卡片（实验功能 doctor_check 关闭时不存在于 DOM）
+    // 系统自检卡片（doctor_check 关闭时不存在于 DOM）
     els.doctorList = $('doctor-list');
     els.doctorRun = $('doctor-run');
     els.logLevel = $('log-level');
@@ -619,7 +619,7 @@
     });
   }
 
-  /* ── 状态区：系统自检（实验功能 doctor_check，卡片不存在时整段跳过） ── */
+  /* ── 状态区：系统自检（doctor_check 关闭时卡片不存在，整段跳过） ── */
   function loadDoctor() {
     if (!els.doctorList) return;
     els.doctorList.textContent = '';

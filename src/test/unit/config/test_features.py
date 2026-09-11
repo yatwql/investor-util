@@ -55,7 +55,7 @@ class TestResolveExperimentFlags:
 
     def test_resolve_every_registry_entry(self):
         """注册表中每个实验功能的开关名与显示名均可解析。"""
-        for flag, (display_name, _desc) in EXPERIMENTAL_FEATURES.items():
+        for flag, (display_name, _desc, _a) in EXPERIMENTAL_FEATURES.items():
             by_flag, unknown_flag = resolve_experiment_flags([flag])
             by_name, unknown_name = resolve_experiment_flags([display_name])
             assert by_flag == {flag}, f"开关名解析失败: {flag}"
@@ -90,7 +90,7 @@ class TestResolveExperimentFlags:
     def test_describe_lists_all_entries(self):
         """清单描述串覆盖全部开关名与显示名。"""
         text = describe_experiment_flags()
-        for flag, (display_name, _desc) in EXPERIMENTAL_FEATURES.items():
+        for flag, (display_name, _desc, _a) in EXPERIMENTAL_FEATURES.items():
             assert flag in text
             assert display_name in text
 
@@ -131,6 +131,72 @@ class TestEnabledExperimentalFeatures:
         set_feature_enabled("metrics_hhi", True)
 
         assert enabled_experimental_features() == []
+
+
+@pytest.mark.unit
+class TestReportAffectingClassification:
+    """产物自述的准入口径：能否改变报告产物。
+
+    实验注册表第三字段是该问题的书面答案。报告是脱离本机流转的文件，其自述
+    只应列出可能改变内容的开关；列进一个不改报告任何字节的开关，读者会推断
+    内容受其影响（系统自检曾如此，转正前它门控 TUI 菜单与 Web 卡片，产物零影响）。
+    """
+
+    def test_every_entry_declares_affects_report(self):
+        """每项都必须显式回答——缺字段即注册表结构漂移，宣告声明不再被强制。"""
+        for flag, entry in EXPERIMENTAL_FEATURES.items():
+            assert len(entry) == 3, f"{flag} 未声明是否影响报告产物"
+            assert isinstance(entry[2], bool), f"{flag} 的 affects_report 须为布尔"
+
+    def test_entry_only_feature_excluded_from_notice(self, monkeypatch):
+        """只影响入口可见性的项不进清单（合成项验证，当前注册表恰无此类成员）。"""
+        from src.python.config import features
+
+        monkeypatch.setitem(features.EXPERIMENTAL_FEATURES, "ui_only_probe", ("仅入口探针", "只改面板显隐", False))
+        monkeypatch.setitem(features.FEATURE_FLAGS, "ui_only_probe", True)
+        monkeypatch.setitem(features.FEATURE_FLAGS, "signal_ledger", True)
+
+        flags = [flag for flag, _name in features.enabled_experimental_features()]
+
+        assert flags == ["signal_ledger"]
+
+    def test_doctor_check_never_in_report_notice(self):
+        """系统自检开启时产物自述仍为空——它不改报告任何字节。"""
+        from src.python.config.features import get_feature_defaults, set_feature_enabled
+        from src.python.report.experimental_notice import enabled_notice_line
+
+        set_feature_enabled("doctor_check", True)
+
+        assert get_feature_defaults()["doctor_check"] is True
+        assert enabled_notice_line() is None
+
+
+@pytest.mark.unit
+class TestDoctorCheckPromotion:
+    """系统自检的开关归类与默认值。
+
+    它曾是实验项（沿用「新增能力默认关」的发布惯例），但它是只读诊断——不改
+    产物、不写文件、联网检查每次显式确认。默认关的实际代价是：最需要它的人
+    （环境坏掉的那批）恰好看不到它。故转正为普通开关、默认开启；开关本身保留，
+    ``features.json`` 置 false 仍隐藏 TUI ``[D]`` 与 Web 卡片。
+    """
+
+    def test_default_enabled(self):
+        from src.python.config.features import get_feature_defaults
+
+        assert get_feature_defaults()["doctor_check"] is True
+
+    def test_not_in_experimental_registry(self):
+        """不在实验注册表里：不再上实验面板，也不再进产物自述。"""
+        assert "doctor_check" not in EXPERIMENTAL_FEATURES
+
+    def test_switch_still_honored(self):
+        """转正不等于不可关。"""
+        from src.python.config.features import is_feature_enabled, set_feature_enabled
+
+        set_feature_enabled("doctor_check", False)
+
+        assert is_feature_enabled("doctor_check") is False
 
 
 @pytest.mark.unit

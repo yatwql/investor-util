@@ -72,8 +72,11 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
     "decision_header_parse": False,
     # ── 确定性数值信号沉淀（实验功能，默认关闭） ──
     "signal_ledger": False,
-    # ── 系统自检（实验功能，默认关闭） ──
-    "doctor_check": False,
+    # ── 系统自检（默认开启） ──
+    # 只读诊断，不写任何产物、不改报告任何字节，联网检查每次显式确认（TUI 询问、
+    # Web 按钮触发）。失败的默认值会让最需要它的人（环境坏掉的那批）恰好看不到
+    # 它，故默认开；可在 features.json 中置 false 关闭，TUI [D] 与 Web 卡片随之隐藏。
+    "doctor_check": True,
     # ── 数据源适配契约（实验功能，默认关闭） ──
     "datasource_adapter": False,
     # ── 数据源凭据就绪指引（实验功能，默认关闭） ──
@@ -81,47 +84,59 @@ _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
 }
 
 # ── 实验性功能定义 ──────────────────────────────────────────
-# 格式: {flag_name: ("显示名", "说明")}
+# 格式: {flag_name: ("显示名", "说明", affects_report)}
 # 此处列出的功能默认关闭，用户在 features.json 中手动开启后，报告入口
 # （``report/orchestrator.generate_report``）会在日志中以红色高亮提示已启用项。
 # 本注册表同时是 TUI 菜单 [S] 试验功能面板与 Web 配置面板的渲染来源（渠道层
 # 不得另写清单）；CLI 侧经 ``--experiment <名|all>`` 增量启用（仅当前进程、
 # 不写盘，只开不关——关闭仍走 features.json / 面板）。
-EXPERIMENTAL_FEATURES: dict[str, tuple[str, str]] = {
-    "llm_debate_procon": ("辩论-正反辩论", "三段式(白脸→黑脸→综合)"),
-    "llm_debate_conditional": ("辩论-条件推理", "情景化分析(涨/跌/震荡)"),
-    "llm_debate_qa_concentration": ("辩论-集中度问答", "集中度风险问答"),
+#
+# 第三个字段是**准入自述的口径**：开启该功能后报告产物的内容是否可能不同。
+#   True  —— 进入报告自述（HTML 页脚 / Excel 落点）与控制台横幅，读者据此判断
+#            手上这份产物是否非默认开关下的结果。
+#   False —— 只改交互入口可见性的开关（如面板/菜单项显隐）不得进入产物自述：
+#            自述里列出一个不改报告任何字节的开关，读者会推断内容受其影响，
+#            而事实上零影响。新增实验项时必须回答这个问题——答 False 者不进自述。
+# 现状：以下各项均可能改变产物内容，故无 False 成员；该字段的作用是拦住下一个
+# 「只影响入口」的实验项，使其不能凭惯性落进产物自述。
+EXPERIMENTAL_FEATURES: dict[str, tuple[str, str, bool]] = {
+    "llm_debate_procon": ("辩论-正反辩论", "三段式(白脸→黑脸→综合)", True),
+    "llm_debate_conditional": ("辩论-条件推理", "情景化分析(涨/跌/震荡)", True),
+    "llm_debate_qa_concentration": ("辩论-集中度问答", "集中度风险问答", True),
     "decision_reflection": (
         "决策跨期反思闭环",
         "登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词",
+        True,
     ),
     "signal_pre_digest": (
         "信号预消化",
         "市场温度/估值分位/尾部风险预消化为带方向标注的信号行注入复盘与体检提示词",
+        True,
     ),
     "module_quality_gate": (
         "模块级质量分级",
         "按完整性/一致性给各 LLM 模块输出评 A~F 级，低评级随内容头部标注质量提示（不阻断不重试）",
+        True,
     ),
     "decision_header_parse": (
         "决策头结构化",
         "提示词追加受控 JSON 决策头，抽取优先读结构化、失败回落确定性表格解析（决策词归一，防写反方向）",
+        True,
     ),
     "signal_ledger": (
         "确定性信号沉淀",
         "确定性算法评级（温度/估值/尾部风险/风格/再平衡超限）沉淀为带实时-非实时标签的账本，统计默认只算实时",
-    ),
-    "doctor_check": (
-        "系统自检",
-        "一键体检运行环境/配置/目录/数据源，失败项附修复建议（doctor 命令、TUI 菜单 D、Web 运行状态区）",
+        True,
     ),
     "datasource_adapter": (
         "数据源适配契约",
         "三段式（参数转译→抓取→映射到标准字段）适配器 + 声明式 alias 归一，行情域试点；关闭时走既有转换函数",
+        True,
     ),
     "datasource_credential_ready": (
         "数据源凭据就绪",
         "声明数据源所需凭据，缺失时链路跳过并给出可读指引；体检与健康检查报告就绪状态（当前全部数据源免费无需凭据）",
+        True,
     ),
 }
 
@@ -140,7 +155,7 @@ def _match_experiment(token: str) -> str | None:
         命中的开关名，未匹配到返回 None
     """
     lowered = token.lower()
-    for flag, (display_name, _desc) in EXPERIMENTAL_FEATURES.items():
+    for flag, (display_name, _desc, _affects_report) in EXPERIMENTAL_FEATURES.items():
         if flag.lower() == lowered or display_name == token:
             return flag
     return None
@@ -180,20 +195,28 @@ def resolve_experiment_flags(names: list[str]) -> tuple[set[str], list[str]]:
 
 def describe_experiment_flags() -> str:
     """返回实验功能清单的人类可读串（供 CLI 帮助与报错提示复用）。"""
-    return "、".join(f"{flag}（{name}）" for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items())
+    return "、".join(f"{flag}（{name}）" for flag, (name, _desc, _a) in EXPERIMENTAL_FEATURES.items())
 
 
 def enabled_experimental_features() -> list[tuple[str, str]]:
-    """返回当前已启用的实验功能 ``[(开关名, 显示名), ...]``（按注册表顺序）。
+    """返回当前已启用、且**可能改变报告产物**的实验功能 ``[(开关名, 显示名), ...]``。
 
-    报告层用它在**产物自身上**标注生成条件（HTML 页脚 / Excel 用量页签）——
-    报告是可脱离本机流转的文件，读者须能判断内容是否为非默认开关下的产物。
-    清单同样取自 :data:`EXPERIMENTAL_FEATURES`，注册表仍是唯一来源。
+    报告层用它在**产物自身上**标注生成条件（HTML 页脚 / Excel 落点）——报告是
+    可脱离本机流转的文件，读者须能判断内容是否为非默认开关下的产物。
+
+    只列注册表中 ``affects_report`` 为真者：只改交互入口可见性的开关不改报告
+    任何字节，列进自述会让读者推断内容受其影响。清单取自
+    :data:`EXPERIMENTAL_FEATURES`，注册表仍是唯一来源；TUI 试验功能面板与 Web
+    配置面板渲染的是**整张注册表**（含不影响产物者），两者用途不同。
 
     Returns:
-        已启用项的 ``(开关名, 显示名)`` 列表；无启用项时返回空列表。
+        已启用项的 ``(开关名, 显示名)`` 列表，按注册表顺序；无启用项时返回空列表。
     """
-    return [(flag, name) for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items() if is_feature_enabled(flag)]
+    return [
+        (flag, name)
+        for flag, (name, _desc, affects_report) in EXPERIMENTAL_FEATURES.items()
+        if affects_report and is_feature_enabled(flag)
+    ]
 
 
 def log_experimental_features() -> None:

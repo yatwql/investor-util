@@ -267,6 +267,18 @@ class TestFeatureGatedMenuItems:
         self._apply(enabled=True)
         assert "D" in {item[0] for item in tm.MENU_ITEMS}
 
+    def test_doctor_item_visible_under_defaults(self):
+        """默认配置下 [D] 即在菜单里（系统自检已转正为默认开启）。
+
+        上面两条都用 patch 覆盖取值，测不出默认值本身——默认值若改回关闭，
+        它们仍全绿，而用户打开的菜单里会少一项。
+        """
+        import src.python.tui.tui_menu as tm
+
+        tm._apply_feature_gates()
+
+        assert "D" in {item[0] for item in tm.MENU_ITEMS}
+
     def test_callback_binding_survives_gating(self):
         """裁剪后其余项的回调绑定不受影响（索引与渲染一致）。"""
         import src.python.tui.tui_menu as tm

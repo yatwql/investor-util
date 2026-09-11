@@ -608,7 +608,7 @@ select:focus,
   border-radius: 6px;
 }
 
-/* ── 系统自检卡（实验功能 doctor_check）── */
+/* ── 系统自检卡（doctor_check 开关关闭时不存在于 DOM）── */
 /* 复用健康行的排版/配色，但自检结论是路径与原因长句，不能截断 */
 .doctor-list .health-meta {
   max-width: none;
@@ -642,17 +642,6 @@ select:focus,
   background: rgba(240, 173, 78, 0.12);
   border: 1px solid rgba(240, 173, 78, 0.4);
   border-radius: 6px;
-}
-
-.tag-experiment {
-  padding: 1px 6px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--color-warn, #b7791f);
-  background: rgba(240, 173, 78, 0.16);
-  border: 1px solid rgba(240, 173, 78, 0.4);
-  border-radius: 999px;
-  vertical-align: middle;
 }
 
 /* ── 日志查看卡（⑦）：手动加载 + 级别筛选 + 原生折叠 ── */

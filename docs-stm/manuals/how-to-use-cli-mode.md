@@ -51,9 +51,6 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 > # 单次启用确定性信号沉淀（五类确定性评级入账，附实时/非实时标签）
 > .venv/bin/python -m src.python.cli --experiment signal_ledger report --type full
 >
-> # 单次启用系统自检上屏（TUI 菜单 [D] / Web 自检卡片；doctor 子命令本身不受开关约束）
-> .venv/bin/python -m src.python.cli --experiment doctor_check report --type full
->
 > # 本次运行启用全部实验功能
 > .venv/bin/python -m src.python.cli --experiment all report --type full
 > ```
@@ -156,7 +153,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 **与其它子命令的两点不同**：
 
 1. **无需配置**——自检在加载配置**之前**执行。配置损坏正是它要诊断的场景，因此不会因配置读不出来而拒绝运行。
-2. **不受实验开关约束**——`doctor` 子命令始终可用，无需 `--experiment doctor_check`。该开关只控制 TUI 菜单项与 Web 自检卡片这两个日常入口的可见性（同理：若 CLI 也被开关拦住，就会陷入「开开关要先读配置、读配置失败又要开开关」的死锁）。
+2. **不受开关约束**——`doctor` 子命令始终可用，无需任何开关。`doctor_check` 开关（默认开启）只控制 TUI 菜单项与 Web 自检卡片这两个日常入口的可见性（同理：若 CLI 也被开关拦住，就会陷入「开开关要先读配置、读配置失败又要开开关」的死锁）。
 
 **退出码**：`0` = 全部检查通过；`1` = 自检跑完了但**存在失败项**（注意：这不是「命令失败」，而是一条诊断结论，脚本可用它判定环境是否可用）。
 

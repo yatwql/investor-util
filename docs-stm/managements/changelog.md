@@ -6,6 +6,16 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 产物自述假阳性开关与系统自检转正（自审 rf-345）（2026-09-11）
+
+- **问题一：报告自述出现假阳性开关**。`enabled_experimental_features()` 遍历整个 `EXPERIMENTAL_FEATURES` 注册表，凡启用即列入 HTML 页脚与 Excel 清单——而系统自检（`doctor_check`）只门控 TUI 菜单 `[D]` 与 Web 卡片两个入口的可见性，**不改报告任何字节**。一个只影响入口显隐的开关出现在「本报告在哪些实验功能下生成」的清单里，读者会推断内容受其影响。引入该自述时（rf-342）注册表里尚无「只影响入口」类成员，故当时口径无懈可击——缺陷随注册表成员变化而出现。
+- **问题二：归类口径与「新不新」绑定**。系统自检沿用「新增能力默认关」的发布惯例被归为实验项默认关，而它是只读诊断（不改产物、不写文件、联网检查每次由调用方显式确认，本地检查毫秒级返回）。默认关的实际代价是让**环境出故障的那批用户恰好看不到它**，而开启对默认输出零代价。
+- **自述准入口径显式化**（`config/features.py`）：注册表条目类型由 `(显示名, 说明)` 二元组扩为 `(显示名, 说明, 是否改变报告产物)` 三元组，`enabled_experimental_features()` 按第三位过滤——**新增实验项时必须书面回答「能否改变报告产物」**，答否者不进自述。这是准入判据的可执行形态：当前注册表十项均可能改变产物内容，故无 `False` 成员，该字段的作用是拦住下一个「只影响入口」的实验项（由一个合成项的单元用例守住）。三处解包点同步（`_match_experiment` / `describe_experiment_flags` / TUI 面板与 Web 面板清单生成）与 `core/doctor.py` 的解包。
+- **系统自检转正为默认开启**：移出 `EXPERIMENTAL_FEATURES`（不再上实验面板、不再进产物自述），`_FEATURE_FLAGS_DEFAULT` 保留同名键并改默认 `True`。**门控保留**——转正不等于不可关，TUI `FEATURE_GATED_ITEMS` 与 Web `system_info["doctor_enabled"]` 照旧读取该开关，`features.json` 置 `false` 仍隐藏两个入口；CLI `doctor` 子命令本就先于 `init_config` 分派、始终不受开关约束。**取舍需知**：该开关自此不在 TUI 菜单 `[S]`、Web 配置面板与 CLI `--experiment` 的可选集内（这三者由实验注册表驱动），关闭入口改经 `features.json`。
+- **失效资产清理**：随转正移除 Web 卡片标题的 `⚗ 实验性` 标签与其 CSS 规则 `.tag-experiment`（已无任何使用者），`core/doctor.py` 的报告首行由「实验功能（doctor_check）：只读诊断」改为「只读诊断，不改动任何文件，结论仅供参考」。
+- **文档同步**：`requirements.md`（§3.6 标题、R-DIAG-05/06 措辞、新增 R-DIAG-07、features.json 表行默认值与说明）；`technical.md`（分层表 / TUI 菜单 / Web 路由 / §4.17 拆分口径与 §4.17.3 三面上屏表 / 实验面板计数 11→10 / features.json 注册表条目三元组）；`developer-guide.md`（新增实验开关检查清单增列「回答产物影响」一步、更正注册表条目结构、新增「实验性」准入与转正判据、`doctor` 子命令不再称「不受实验开关约束」）；`folders.md`（`doctor.py` 说明 + 统计快照）；`test-coverage.md`（模式/功能域/分组/跨类计数）；`how-to-config.md` §M 开关表默认值 `false`→`true` 与实验面板说明、`how-to-config-llm.md`、`how-to-use-tui-menu.md`（实验面板编号 6~16→6~15 + `[D]` 章节）、`how-to-use-web-mode.md`、`how-to-use-cli-mode.md`（移除 `--experiment doctor_check` 示例）、`faq.md`（「找不到 `[D]`」改为「默认出现，被显式置 false 才消失」）。
+- **回归测试**（覆盖项 +8）：`unit_config` 新增 `TestReportAffectingClassification`（3 条：每项须显式声明、只影响入口的合成项不进自述、系统自检开启时自述仍为空）与 `TestDoctorCheckPromotion`（3 条：默认开启、不在实验注册表、置 false 仍生效）；`unit_ui::test_tui_menu.py::test_doctor_item_visible_under_defaults`（1 条：不 patch 取值，直接断言默认配置下 `[D]` 在菜单里）与 `unit_web::test_handlers.py::test_card_present_under_defaults`（1 条：默认配置下卡片即渲染且不再带实验性标签）——原有门控用例均以 `patch` 覆盖取值，测不出默认值本身（默认值若改回关闭它们仍全绿，而用户打开的菜单里会少一项）。`unit_core::test_doctor.py` 与 `unit_cli::test_cli.py` 中原以 `doctor_check` 为实验开关样本的用例改用 `signal_ledger`，`unit_web::test_config_edit.py` 中该键自白名单与实验面板载荷中移除。
+
 ### Excel 实验功能清单兜底落点（自审 rf-343）（2026-09-11）
 
 - **问题**：实验功能清单在 Excel 侧只落在「LLM API 用量」页签上，而该页签只在 LLM 章节开启时生成。LLM 分析整章关闭时，Excel 产物上不出现清单，而 `signal_ledger`（确定性信号沉淀）/ `datasource_adapter`（数据源适配契约）/ `decision_reflection`（决策跨期反思闭环，结算与确定性登记部分）等**非 LLM 实验开关**此刻仍可能开启——这批开关不依赖 LLM 章节，在 Excel 产物上遂完全无痕。HTML 页脚不受影响（页脚始终存在，清单照常上屏）。

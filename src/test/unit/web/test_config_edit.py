@@ -78,7 +78,6 @@ _EXPECTED_WHITELIST = {
     "module_quality_gate",
     "decision_header_parse",
     "signal_ledger",
-    "doctor_check",
     "datasource_adapter",
     "datasource_credential_ready",
 }
@@ -181,7 +180,6 @@ class TestGetSurface:
             "module_quality_gate",
             "decision_header_parse",
             "signal_ledger",
-            "doctor_check",
             "datasource_adapter",
             "datasource_credential_ready",
         }

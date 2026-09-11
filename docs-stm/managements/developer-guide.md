@@ -1129,7 +1129,7 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 
 **无需配置**：与 `view-logs` / `cassettes` 同例，在 `init_config()` **之前**分派——配置损坏正是自检要定位的场景，若被配置初始化拦住即成死锁。
 
-**不受实验开关约束**：自检由实验开关 `doctor_check` 门控，但该开关**只约束 TUI 菜单 `[D]` 与 Web 自检卡片两个日常入口**；CLI 子命令始终可用（同理，被开关拦住就失去了诊断手段）。
+**不受开关约束**：TUI 菜单 `[D]` 与 Web 自检卡片由 `doctor_check` 门控（该开关默认开启），但 CLI 子命令始终可用（同理，被开关拦住就失去了诊断手段）。
 
 **退出码**：0=全部通过，1=有失败项（`_EXIT_PARTIAL`）。自检有失败项不算命令本身失败——命令跑完了并给出了结论，故用 PARTIAL 而非 SEVERE。
 
@@ -1358,13 +1358,16 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 
 | # | 步骤 | 操作位置 | 产出 |
 |---|------|---------|------|
-| ① | **登记注册表** | `config/features.py` → `EXPERIMENTAL_FEATURES` | 追加 `ExperimentalFeature(name=..., label=..., description=...)`；`name` 即 `features.json` 键名与 `--experiment` 取值 |
+| ① | **登记注册表** | `config/features.py` → `EXPERIMENTAL_FEATURES` | 追加 `"<flag>": ("<显示名>", "<说明>", <affects_report>)` 三元组；键名即 `features.json` 键名与 `--experiment` 取值，显示名与说明自动下发三个面 |
 | ② | **声明默认值** | `config/features.py` → `_FEATURE_FLAGS_DEFAULT` | 新增同名键，默认 **`False`**（实验项缺省关闭） |
+| ②′ | **回答产物影响** | 同上三元组第三位 | 该开关**能否改变报告产物内容**——能则 `True`，仅影响入口可见性（菜单项/卡片显隐）则 `False`。答 `False` 者不进报告生成条件自述（`enabled_experimental_features()` 按此过滤）：报告是脱离本机流转的文件，列进一个不改任何字节的开关，读者会推断内容受其影响 |
 | ③ | **消费开关** | 功能实现处 | 一律经 `is_feature_enabled()` 读取；开关判定若影响提示词，须收敛在缓存后缀函数内部（见上方「缓存指纹必须读写两侧同源」） |
 | ④ | **覆盖三面** | 自动 | TUI 菜单 `S` / Web 配置面板 / CLI `--experiment` 均由注册表生成，无需改渠道代码 |
 | ⑤ | **验证** | 终端 | `.venv/bin/python -m pytest src/test/unit/config/test_features.py src/test/unit/web/test_config_edit.py -v` — 配置编辑白名单覆盖全部 TUI 可编辑键 |
 
 > **菜单项/卡片可见性由开关门控**：若实验功能有常驻入口（TUI 菜单项、Web 卡片），开关关闭时必须**就地裁剪**而非渲染后置灰——TUI 侧向 `tui/tui_menu.py::FEATURE_GATED_ITEMS` 登记 `(菜单项, 开关名)`，Web 侧由 `system_info` 透出 `*_enabled` 供前端决定是否渲染；`tui/tui_menu.py::_apply_feature_gates()` 是统一裁剪点。
+
+> **「实验性」的准入与转正判据**：实验项的判定口径是「**能否改变报告产物内容**」，而非「新不新」。新增能力默认关的惯例适用于会改变产物的能力（LLM 增强、指标开关、数据结构变更）——它们需要真实数据验证，默认关是对既有用户产物的保护。但**只读诊断类能力（不改产物、不写文件、不在默认路径产生隐式网络或耗时代价）应默认开启**：默认关的实际代价是让最需要它的人（环境出故障的那批）恰好看不到它，而开启对默认输出零代价。此类能力转正为普通开关后：① 从 `EXPERIMENTAL_FEATURES` 移出（不再上实验面板、不进产物自述）；② 在 `_FEATURE_FLAGS_DEFAULT` 保留同名键并改为默认 `True`；③ 门控读取（`FEATURE_GATED_ITEMS` / `system_info`）**保留**——转正不等于不可关，`features.json` 置 `false` 仍可隐藏入口；④ 门控表与消费点均须有「默认配置下入口可见」的测试，只依赖 `patch` 覆盖取值的用例测不出默认值本身。系统自检（`doctor_check`）是此模式的首例。
 
 > **诊断类命令不得依赖 config 初始化**：`doctor` / `view-logs` / `check-sources` 三个子命令在 `main()` 中**先于 `init_config` 分派**——配置损坏正是它们要定位的场景，若先初始化配置再分派，用户会在最需要诊断能力时被配置错误挡在门外（死锁）。新增诊断类命令遵循同一模式：**先分派、后初始化**，并把「命令失败」（退出码 2）与「命令跑完但结论不佳」（退出码 1）用 `_EXIT_SUCCESS` / `_EXIT_PARTIAL` / `_EXIT_SEVERE` 常量区分开，不得写裸字面量。**诊断类命令自身永不抛异常**——任何内部异常都转成一条结果行，否则等于在最需要它的时刻失效（`core/doctor.py`）。
 

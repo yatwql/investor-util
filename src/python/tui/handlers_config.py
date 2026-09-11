@@ -146,7 +146,7 @@ def _cmd_config_llm_modules() -> None:
     module_names = filter_menu_llm_modules(get_llm_module_names())
 
     # 实验性功能开关：(flag_key, 显示名)，清单与顺序取自注册表
-    experiment_flags = [(flag, name) for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items()]
+    experiment_flags = [(flag, name) for flag, (name, _desc, _a) in EXPERIMENTAL_FEATURES.items()]
 
     # 名称列宽：取清单内最长显示名，使各行状态方括号纵向对齐（超宽名不截断）
     name_column = max(map(display_width, [*module_names.values(), *(label for _flag, label in experiment_flags)]))

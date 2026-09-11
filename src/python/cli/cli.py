@@ -170,7 +170,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "  view-logs --lines 200        只读末尾 200 行"
     )
 
-    # ── doctor 子命令（实验功能 doctor_check）──
+    # ── doctor 子命令（只读诊断，不依赖 config 初始化）──
     doctor_p = sub.add_parser("doctor", help="系统自检：环境/配置/目录/数据源一键体检（无需 config）")
     doctor_p.add_argument(
         "--offline",

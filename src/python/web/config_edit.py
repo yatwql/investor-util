@@ -364,6 +364,6 @@ def get_config_edit_surface() -> dict:
             "experiments": experiments,
             # 实验开关显示名同样取自注册表，供前端直接渲染（避免前端另维护一份
             # 手写标签字典而与注册表漂移）。
-            "experiment_labels": {flag: name for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items()},
+            "experiment_labels": {flag: name for flag, (name, _desc, _a) in EXPERIMENTAL_FEATURES.items()},
         },
     }
