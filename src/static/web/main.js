@@ -866,9 +866,8 @@
       penetration_deep: '穿透深度分析',
       news_correlation: '财经新闻热点与持仓关联分析'
     },
-    // 实验开关显示名不在此维护：服务端 surface.llm.experiment_labels 按注册表下发，
-    // 由 renderConfigEdit 回填（避免前端手写字典与 features.EXPERIMENTAL_FEATURES 漂移）
-    experiments: {}
+    // 功能开关显示名不在此维护：服务端 surface.features.labels 按注册表下发，
+    // 渲染时经 opts.labels 传入（避免前端手写字典与 features.feature_switch_registry 漂移）
   };
 
   // 持仓匿名化枚举中文描述（对齐 config/anonymizer.ANONYMIZATION_MODE_DESCRIPTIONS）
@@ -899,12 +898,6 @@
 
   function renderConfigEdit(surface) {
     configState.surface = surface;
-    // 实验开关显示名回填（服务端按注册表下发，新增实验项无需改前端）
-    if (surface.llm && surface.llm.experiment_labels) {
-      Object.keys(surface.llm.experiment_labels).forEach(function (flag) {
-        CONFIG_LABELS.experiments[flag] = surface.llm.experiment_labels[flag];
-      });
-    }
     els.configPanel.textContent = '';
     // 面板顶部警示区（同源失败 403 专用）
     var panelErr = document.createElement('p');
@@ -929,9 +922,19 @@
         note: '辩论三模块（白脸/黑脸/综合）不在菜单展示，输出由下方「实验性功能」对应开关控制'
       })
     );
+    // 功能开关两块（实验组 / 常规组）：清单、显示名、「影响报告」标记全部由
+    // 服务端 surface.features 下发，前端只负责分块渲染
     els.configPanel.appendChild(
-      renderBoolGroup('experiments', '实验性功能（⚗ 实验性，默认关闭）', surface.llm.experiments, {
-        experimental: true
+      renderBoolGroup('features_experimental', '实验性功能（⚗ 默认关闭）', surface.features.experimental, {
+        experimental: true,
+        labels: surface.features.labels
+      })
+    );
+    els.configPanel.appendChild(
+      renderBoolGroup('features_standard', '常规开关（默认开启）', surface.features.standard, {
+        labels: surface.features.labels,
+        reportAffecting: surface.features.report_affecting,
+        note: '关闭「影响报告」的开关会改变报告产物内容；其余开关只影响入口显隐'
       })
     );
   }
@@ -992,9 +995,13 @@
 
     Object.keys(items).forEach(function (key) {
       var fullKey = opts && opts.prefix ? opts.prefix + key : key;
-      var label = (CONFIG_LABELS[groupKey] && CONFIG_LABELS[groupKey][key]) || key;
+      var labels = (opts && opts.labels) || CONFIG_LABELS[groupKey];
+      var label = (labels && labels[key]) || key;
       if (opts && opts.experimental) {
         label = '⚗ ' + label;
+      } else if (opts && opts.reportAffecting && opts.reportAffecting.indexOf(fullKey) !== -1) {
+        // 「关闭即改变报告内容」与其「只影响入口显隐」的开关须可区分（标记清单由服务端下发）
+        label = label + '（影响报告）';
       }
       var row = document.createElement('label');
       row.className = 'check-label config-row';

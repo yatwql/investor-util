@@ -1,8 +1,8 @@
 # 功能开关注册表统一 — 设计
 
-> 状态：**设计中**（批次①转正、批次②注册表统一）
+> 状态：**已实现**（2026-09-11，批次①转正 + 批次②注册表统一均已落地；计划项 plan-39、自审记录 rf-346）
 > 文档版本：0.10.18-dev
-> 相关约束：`technical.md` 架构设计约束「功能开关注册表唯一事实来源」（本设计修订该条口径）
+> 相关约束：`technical.md` 架构设计约束「功能开关注册表唯一事实来源」（本设计修订该条口径——适用范围扩至全部开关、登记点改指 `feature_switch_registry`，已同步落文）
 > 涉及模块：`config/features.py`（注册点）、`tui/handlers_config.py`、`web/config_edit.py` + `src/static/web/main.js`、`cli/cli.py`
 
 ---

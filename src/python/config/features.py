@@ -9,8 +9,12 @@
   ...     embed_chart_assets()
 
 配置持久化：功能开关可通过 features.json 覆写默认值。
+全部开关在 :data:`feature_switch_registry` 一处登记（显示名/说明/分组/默认值/
+产物影响），TUI 面板、Web 配置面板、CLI 取值域与文档清单一律由它派生——渠道层
+不得另写开关清单。分组（实验组 / 常规组）决定面板可见性，「转正」即改分组与
+默认值两个字段，可见性随之延续。
 模块级 LLM 分析章节、新闻源、报告章节等**不在此登记**——它们各有归属文件，
-见 ``_FEATURE_FLAGS_DEFAULT`` 上方说明。
+见 ``feature_switch_registry`` 上方说明。
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ import json
 import logging
 import os
 import threading
+from dataclasses import dataclass
 from typing import Any
 
 from src.python.core.atomic_write import write_json_atomic
@@ -30,10 +35,49 @@ logger = logging.getLogger("invest")
 
 _FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
 
-# ── 全部功能开关默认值 ──────────────────────────────────────
-# 格式：{flag_name: default_enabled}
-# False = 功能默认关闭，需要用户手动启用
-# True  = 功能默认开启，可在 features.json 中关闭
+# ── 分组常量 ────────────────────────────────────────────────
+# 分组表达的是**生命周期的当前状态**，不是优先级、不是新旧：
+#   GROUP_EXPERIMENTAL —— 会改变产物、需真实数据验证后择机转正，出厂默认关
+#   GROUP_STANDARD     —— 常驻能力，出厂默认开、用户可关
+# 「转正」= 把一条声明从实验组改到常规组并把 default 改 True。此前「默认值」与
+# 「是否实验项」是同一件事的两个名字：转正会连带摘掉面板入口（doctor_check 转正
+# 后只剩手改 features.json 一条关闭途径），而从未被标为实验项的 metrics_* 则从来
+# 没有过任何界面入口。分组把这两件事拆开——可见性由分组决定、取值由 default 决定。
+
+GROUP_EXPERIMENTAL = "experimental"
+GROUP_STANDARD = "standard"
+
+# 分组标题（TUI 菜单 [S] 与 Web 配置面板共用同一措辞，渠道层不另写文字）
+GROUP_LABELS: dict[str, str] = {
+    GROUP_EXPERIMENTAL: "⚗ 实验性功能（默认关闭）",
+    GROUP_STANDARD: "常规开关（默认开启）",
+}
+# 面板分块顺序（顺序即渲染顺序）
+GROUP_ORDER: tuple[str, ...] = (GROUP_EXPERIMENTAL, GROUP_STANDARD)
+
+
+@dataclass(frozen=True)
+class FeatureSwitchDef:
+    """单条功能开关声明。
+
+    Attributes:
+        label: 显示名（TUI 面板行名 / Web 配置面板标签，服务端同源下发）
+        desc: 一句话说明（CLI 报错提示、控制台横幅、文档）
+        group: 分组（``GROUP_EXPERIMENTAL`` / ``GROUP_STANDARD``）
+        default: 出厂默认值（``features.json`` 未覆写时的取值）
+        affects_report: 开启后报告产物内容是否可能不同——决定它是否进入产物自述
+    """
+
+    label: str
+    desc: str
+    group: str
+    default: bool
+    affects_report: bool
+
+
+# ── 功能开关注册表（唯一登记点） ────────────────────────────
+# 渠道层（TUI 面板、Web 配置面板、CLI 取值域与提示）与各文档清单一律由此派生，
+# **不得另写清单**——一处登记即三面上屏，改一处即三面同步。声明顺序即面板顺序。
 #
 # 本注册表只登记**有消费者的开关**（全仓必有一处 is_feature_enabled 读取其取值）。
 # 其余开关各有归属文件，不在此登记、也不要再往这里搬：
@@ -46,106 +90,127 @@ _FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
 # 声明了却无人读取的开关会让用户照文档配置后毫无效果（本注册表曾含 16 项此类
 # 陈旧开关，已全部移除）。新增开关必须同时接线到消费点，回归测试见
 # test_features.py::TestRegistryLiveness。
-
-_FEATURE_FLAGS_DEFAULT: dict[str, bool] = {
-    # ── 辩论模式（实验功能，默认关闭） ──
-    "llm_debate_procon": False,
-    "llm_debate_conditional": False,
-    "llm_debate_qa_concentration": False,
-    # ── 量化指标（7 项） ──
-    "metrics_sharpe": True,
-    "metrics_calmar": True,
-    "metrics_hhi": True,
-    "metrics_winrate": True,
-    "metrics_turnover": True,
-    "metrics_risk_contribution": True,
-    "metrics_beta": True,
-    # ── 功能特性（1 项） ──
-    "enable_interactive_charts": True,
-    # ── 决策跨期反思闭环（实验功能，默认关闭） ──
-    "decision_reflection": False,
-    # ── 信号预消化（实验功能，默认关闭） ──
-    "signal_pre_digest": False,
-    # ── 模块级质量分级（实验功能，默认关闭） ──
-    "module_quality_gate": False,
-    # ── 决策头结构化（实验功能，默认关闭） ──
-    "decision_header_parse": False,
-    # ── 确定性数值信号沉淀（实验功能，默认关闭） ──
-    "signal_ledger": False,
-    # ── 系统自检（默认开启） ──
-    # 只读诊断，不写任何产物、不改报告任何字节，联网检查每次显式确认（TUI 询问、
-    # Web 按钮触发）。失败的默认值会让最需要它的人（环境坏掉的那批）恰好看不到
-    # 它，故默认开；可在 features.json 中置 false 关闭，TUI [D] 与 Web 卡片随之隐藏。
-    "doctor_check": True,
-    # ── 数据源适配契约（默认开启） ──
-    # 内部接缝：开关开/关下报告产物逐源等价（唯一差异是东财源多出 market_cap/pe
-    # 两个 None 键，下游一律 .get() 读取、语义不变，见 test_quote_adapter_parity.py），
-    # 故它对用户没有可感知收益，不该以默认关的形态占一个用户开关；而默认关的实际
-    # 代价是生产路径从不执行适配器分支，新数据源/新字段的契约得不到实跑覆盖。
-    # 开关保留为回退杠杆：features.json / 面板置 false 即走既有转换函数。
-    "datasource_adapter": True,
-    # ── 数据源凭据就绪指引（实验功能，默认关闭） ──
-    "datasource_credential_ready": False,
-}
-
-# ── 实验性功能定义 ──────────────────────────────────────────
-# 格式: {flag_name: ("显示名", "说明", affects_report)}
-# 此处列出的功能默认关闭，用户在 features.json 中手动开启后，报告入口
-# （``report/orchestrator.generate_report``）会在日志中以红色高亮提示已启用项。
-# 本注册表同时是 TUI 菜单 [S] 试验功能面板与 Web 配置面板的渲染来源（渠道层
-# 不得另写清单）；CLI 侧经 ``--experiment <名|all>`` 增量启用（仅当前进程、
-# 不写盘，只开不关——关闭仍走 features.json / 面板）。
 #
-# 第三个字段是**准入自述的口径**：开启该功能后报告产物的内容是否可能不同。
-#   True  —— 进入报告自述（HTML 页脚 / Excel 落点）与控制台横幅，读者据此判断
-#            手上这份产物是否非默认开关下的结果。
-#   False —— 只改交互入口可见性的开关（如面板/菜单项显隐）不得进入产物自述：
-#            自述里列出一个不改报告任何字节的开关，读者会推断内容受其影响，
-#            而事实上零影响。新增实验项时必须回答这个问题——答 False 者不进自述。
-# 现状：以下各项均可能改变产物内容，故无 False 成员；该字段的作用是拦住下一个
-# 「只影响入口」的实验项，使其不能凭惯性落进产物自述。
-EXPERIMENTAL_FEATURES: dict[str, tuple[str, str, bool]] = {
-    "llm_debate_procon": ("辩论-正反辩论", "三段式(白脸→黑脸→综合)", True),
-    "llm_debate_conditional": ("辩论-条件推理", "情景化分析(涨/跌/震荡)", True),
-    "llm_debate_qa_concentration": ("辩论-集中度问答", "集中度风险问答", True),
-    "decision_reflection": (
+# ``affects_report`` 是**产物自述的准入口径**：开启该开关后报告产物的内容是否可能
+# 不同。True 者（实验组）进入报告自述（HTML 页脚 / Excel 落点）与控制台横幅，读者
+# 据此判断手上这份产物是否非默认开关下的结果；只改入口可见性的开关答 False，不得
+# 凭惯性落进自述——列出一个不改报告任何字节的开关，读者会推断内容受其影响。
+feature_switch_registry: dict[str, FeatureSwitchDef] = {
+    # ── 实验性功能：辩论三式 ──
+    "llm_debate_procon": FeatureSwitchDef("辩论-正反辩论", "三段式(白脸→黑脸→综合)", GROUP_EXPERIMENTAL, False, True),
+    "llm_debate_conditional": FeatureSwitchDef(
+        "辩论-条件推理", "情景化分析(涨/跌/震荡)", GROUP_EXPERIMENTAL, False, True
+    ),
+    "llm_debate_qa_concentration": FeatureSwitchDef(
+        "辩论-集中度问答", "集中度风险问答", GROUP_EXPERIMENTAL, False, True
+    ),
+    # ── 实验性功能：LLM 输出增强 ──
+    "decision_reflection": FeatureSwitchDef(
         "决策跨期反思闭环",
         "登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词",
+        GROUP_EXPERIMENTAL,
+        False,
         True,
     ),
-    "signal_pre_digest": (
+    "signal_pre_digest": FeatureSwitchDef(
         "信号预消化",
         "市场温度/估值分位/尾部风险预消化为带方向标注的信号行注入复盘与体检提示词",
+        GROUP_EXPERIMENTAL,
+        False,
         True,
     ),
-    "module_quality_gate": (
+    "module_quality_gate": FeatureSwitchDef(
         "模块级质量分级",
         "按完整性/一致性给各 LLM 模块输出评 A~F 级，低评级随内容头部标注质量提示（不阻断不重试）",
+        GROUP_EXPERIMENTAL,
+        False,
         True,
     ),
-    "decision_header_parse": (
+    "decision_header_parse": FeatureSwitchDef(
         "决策头结构化",
         "提示词追加受控 JSON 决策头，抽取优先读结构化、失败回落确定性表格解析（决策词归一，防写反方向）",
+        GROUP_EXPERIMENTAL,
+        False,
         True,
     ),
-    "signal_ledger": (
+    "signal_ledger": FeatureSwitchDef(
         "确定性信号沉淀",
         "确定性算法评级（温度/估值/尾部风险/风格/再平衡超限）沉淀为带实时-非实时标签的账本，统计默认只算实时",
+        GROUP_EXPERIMENTAL,
+        False,
         True,
     ),
-    "datasource_credential_ready": (
+    # ── 实验性功能：数据层 ──
+    "datasource_credential_ready": FeatureSwitchDef(
         "数据源凭据就绪",
         "声明数据源所需凭据，缺失时链路跳过并给出可读指引；体检与健康检查报告就绪状态（当前全部数据源免费无需凭据）",
+        GROUP_EXPERIMENTAL,
+        False,
         True,
+    ),
+    # ── 常规开关：量化指标（关闭即报告少一项指标） ──
+    "metrics_sharpe": FeatureSwitchDef("量化指标-夏普比率", "报告输出夏普比率", GROUP_STANDARD, True, True),
+    "metrics_calmar": FeatureSwitchDef("量化指标-卡玛比率", "报告输出卡玛比率", GROUP_STANDARD, True, True),
+    "metrics_hhi": FeatureSwitchDef("量化指标-HHI 集中度", "报告输出 HHI 集中度", GROUP_STANDARD, True, True),
+    "metrics_winrate": FeatureSwitchDef("量化指标-胜率", "报告输出胜率", GROUP_STANDARD, True, True),
+    "metrics_turnover": FeatureSwitchDef("量化指标-换手率", "报告输出换手率", GROUP_STANDARD, True, True),
+    "metrics_risk_contribution": FeatureSwitchDef(
+        "量化指标-风险贡献", "报告输出各持仓风险贡献", GROUP_STANDARD, True, True
+    ),
+    "metrics_beta": FeatureSwitchDef("量化指标-Beta", "报告输出组合 Beta", GROUP_STANDARD, True, True),
+    # ── 常规开关：功能特性 ──
+    "enable_interactive_charts": FeatureSwitchDef(
+        "报告图表交互",
+        "Chart.js 交互图（缩放/悬停）；关闭即回退 Canvas+表格静态渲染，且 HTML 不再单文件自包含",
+        GROUP_STANDARD,
+        True,
+        True,
+    ),
+    # ── 常规开关：只读诊断（不改产物、不写文件，默认关的代价是环境出故障者看不到它） ──
+    "doctor_check": FeatureSwitchDef(
+        "系统自检上屏",
+        "TUI 菜单 [D] 与 Web「系统自检」卡片可见性；CLI doctor 子命令不受本开关约束",
+        GROUP_STANDARD,
+        True,
+        False,
+    ),
+    # ── 常规开关：内部接缝（开关两态下报告产物逐源等价，保留为回退杠杆） ──
+    "datasource_adapter": FeatureSwitchDef(
+        "数据源适配契约",
+        "行情域三源走三段式适配器（参数转译→抓取→映射到标准字段）；置 false 回退既有转换函数",
+        GROUP_STANDARD,
+        True,
+        False,
     ),
 }
 
-# ── 实验功能名解析 ──────────────────────────────────────────
-# 「可开启的实验功能清单」唯一来源是 EXPERIMENTAL_FEATURES 注册表：
-# TUI 菜单 S / Web 配置面板直接遍历注册表渲染，命令行入口经下方解析函数
-# 校验取值，三者同源，新增实验开关无需改动任何入口代码。
+# 出厂默认值投影：``get_feature_defaults()`` 与兼容既有引用的取值表
+_FEATURE_FLAGS_DEFAULT: dict[str, bool] = {flag: d.default for flag, d in feature_switch_registry.items()}
+
+# ── 注册表查询 ──────────────────────────────────────────────
+
+
+def switches_in_group(group: str) -> list[tuple[str, FeatureSwitchDef]]:
+    """返回某分组下的开关声明 ``[(开关名, 声明), ...]``（顺序 = 注册表顺序）。
+
+    面板渲染与实验清单的唯一取数入口——渠道层据此分块，不自行筛选。
+    """
+    return [(flag, d) for flag, d in feature_switch_registry.items() if d.group == group]
+
+
+def is_experimental_switch(flag: str) -> bool:
+    """判定开关是否属实验组（``--experiment`` 的取值域即此集合）。"""
+    d = feature_switch_registry.get(flag)
+    return d is not None and d.group == GROUP_EXPERIMENTAL
+
+
+# ── 开关名解析（``--experiment`` / ``--feature``） ──────────
 
 EXPERIMENT_ALL = "all"
+
+# ``--feature NAME=VALUE`` 的取值词表（大小写不敏感）
+_SWITCH_TRUE_TOKENS = frozenset({"on", "true", "1", "yes", "enable", "enabled"})
+_SWITCH_FALSE_TOKENS = frozenset({"off", "false", "0", "no", "disable", "disabled"})
 
 
 def _match_experiment(token: str) -> str | None:
@@ -155,8 +220,8 @@ def _match_experiment(token: str) -> str | None:
         命中的开关名，未匹配到返回 None
     """
     lowered = token.lower()
-    for flag, (display_name, _desc, _affects_report) in EXPERIMENTAL_FEATURES.items():
-        if flag.lower() == lowered or display_name == token:
+    for flag, d in switches_in_group(GROUP_EXPERIMENTAL):
+        if flag.lower() == lowered or d.label == token:
             return flag
     return None
 
@@ -183,7 +248,7 @@ def resolve_experiment_flags(names: list[str]) -> tuple[set[str], list[str]]:
         if not token:
             continue
         if token.lower() == EXPERIMENT_ALL:
-            resolved.update(EXPERIMENTAL_FEATURES)
+            resolved.update(flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL))
             continue
         hit = _match_experiment(token)
         if hit is None:
@@ -195,7 +260,58 @@ def resolve_experiment_flags(names: list[str]) -> tuple[set[str], list[str]]:
 
 def describe_experiment_flags() -> str:
     """返回实验功能清单的人类可读串（供 CLI 帮助与报错提示复用）。"""
-    return "、".join(f"{flag}（{name}）" for flag, (name, _desc, _a) in EXPERIMENTAL_FEATURES.items())
+    return "、".join(f"{flag}（{d.label}）" for flag, d in switches_in_group(GROUP_EXPERIMENTAL))
+
+
+def describe_switches() -> str:
+    """返回全部功能开关清单的人类可读串（``--feature`` 报错提示复用）。"""
+    return "、".join(f"{flag}（{d.label}）" for flag, d in feature_switch_registry.items())
+
+
+def resolve_switch_values(pairs: list[tuple[str, bool]] | None) -> list[tuple[str, bool]]:
+    """把 ``--feature NAME=VALUE`` 解析结果收敛为待应用的覆写列表。
+
+    Args:
+        pairs: argparse 收集的 ``(开关名, 取值)`` 列表（可为 None）
+
+    Returns:
+        去重后的 ``(开关名, 取值)`` 列表，后者覆盖前者（同名重复时以最后一次为准）；
+        输入为空时返回空列表。
+    """
+    merged: dict[str, bool] = {}
+    for flag, value in pairs or []:
+        merged[flag] = value
+    return list(merged.items())
+
+
+def parse_switch_override(token: str) -> tuple[str, bool]:
+    """解析 ``--feature`` 的单个取值 ``NAME=VALUE``。
+
+    取值在 argparse ``type`` 回调中即时校验——错误的开关名或取值当场报错并列出
+    可选项，而不是等到运行中途静默无效。
+
+    Args:
+        token: 形如 ``module_quality_gate=on`` / ``doctor_check=off`` 的字符串
+
+    Returns:
+        ``(开关名, 取值)``
+
+    Raises:
+        ValueError: 缺少 ``=``、开关名未知、或取值不在词表内
+    """
+    name, sep, raw_value = token.partition("=")
+    name = name.strip()
+    if not sep or not name:
+        raise ValueError("应为 NAME=VALUE 形式（如 module_quality_gate=on）")
+    if name not in feature_switch_registry:
+        raise ValueError(f"未知功能开关 '{name}'；可选: {describe_switches()}")
+
+    value = raw_value.strip().lower()
+    if value in _SWITCH_TRUE_TOKENS:
+        return name, True
+    if value in _SWITCH_FALSE_TOKENS:
+        return name, False
+    raise ValueError(f"开关 '{name}' 的取值 '{raw_value}' 不可识别；可选: on / off")
 
 
 def enabled_experimental_features() -> list[tuple[str, str]]:
@@ -206,16 +322,16 @@ def enabled_experimental_features() -> list[tuple[str, str]]:
 
     只列注册表中 ``affects_report`` 为真者：只改交互入口可见性的开关不改报告
     任何字节，列进自述会让读者推断内容受其影响。清单取自
-    :data:`EXPERIMENTAL_FEATURES`，注册表仍是唯一来源；TUI 试验功能面板与 Web
-    配置面板渲染的是**整张注册表**（含不影响产物者），两者用途不同。
+    :data:`feature_switch_registry` 的实验组，注册表仍是唯一来源；TUI 菜单 [S] 与
+    Web 配置面板渲染的是**全部开关**（含不影响产物者与常规组），两者用途不同。
 
     Returns:
         已启用项的 ``(开关名, 显示名)`` 列表，按注册表顺序；无启用项时返回空列表。
     """
     return [
-        (flag, name)
-        for flag, (name, _desc, affects_report) in EXPERIMENTAL_FEATURES.items()
-        if affects_report and is_feature_enabled(flag)
+        (flag, d.label)
+        for flag, d in switches_in_group(GROUP_EXPERIMENTAL)
+        if d.affects_report and is_feature_enabled(flag)
     ]
 
 
@@ -240,21 +356,31 @@ def log_experimental_features() -> None:
     logger.error("  ⚗ 实验性功能已开启！")
     logger.error(sep)
     for flag, name in enabled:
-        logger.error("  ⚗ %s — %s", name, EXPERIMENTAL_FEATURES[flag][1])
+        logger.error("  ⚗ %s — %s", name, feature_switch_registry[flag].desc)
     logger.error(sep)
 
 
 __all__ = [
-    "EXPERIMENTAL_FEATURES",
     "EXPERIMENT_ALL",
     "FEATURE_FLAGS",
+    "GROUP_EXPERIMENTAL",
+    "GROUP_LABELS",
+    "GROUP_ORDER",
+    "GROUP_STANDARD",
+    "FeatureSwitchDef",
     "describe_experiment_flags",
+    "describe_switches",
     "enabled_experimental_features",
+    "feature_switch_registry",
     "get_feature_defaults",
+    "is_experimental_switch",
     "is_feature_enabled",
     "log_experimental_features",
+    "parse_switch_override",
     "resolve_experiment_flags",
+    "resolve_switch_values",
     "set_feature_enabled",
+    "switches_in_group",
     "load_feature_overrides",
     "save_feature_overrides",
     "reset_feature_flags",

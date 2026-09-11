@@ -1,8 +1,9 @@
-"""实验功能注册表与名称解析单元测试。
+"""功能开关注册表与名称解析单元测试。
 
-覆盖 ``features.EXPERIMENTAL_FEATURES`` 注册表驱动的名称解析
-（``resolve_experiment_flags`` / ``describe_experiment_flags``），
-该解析是 CLI ``--experiment`` 参数与 TUI 菜单 S / Web 配置面板同源的保证。
+覆盖 ``features.feature_switch_registry`` 注册表驱动的名称解析
+（``resolve_experiment_flags`` / ``describe_experiment_flags`` /
+``parse_switch_override``），该解析是 CLI ``--experiment`` / ``--feature`` 参数
+与 TUI 菜单 S / Web 配置面板同源的保证。
 
 另覆盖开关注册表自身的两条不变式：默认值表中每个开关都必须有消费者（声明即死
 的开关会让用户照文档配置后毫无效果），以及 ``features.json`` 里出现无消费者开关
@@ -20,13 +21,23 @@ import pytest
 
 from src.python.config.features import (
     EXPERIMENT_ALL,
-    EXPERIMENTAL_FEATURES,
     FEATURE_FLAGS,
+    GROUP_EXPERIMENTAL,
+    GROUP_LABELS,
+    GROUP_ORDER,
+    GROUP_STANDARD,
+    FeatureSwitchDef,
     _FEATURE_FLAGS_DEFAULT,
     describe_experiment_flags,
+    describe_switches,
     enabled_experimental_features,
+    feature_switch_registry,
+    is_experimental_switch,
     load_feature_overrides,
+    parse_switch_override,
     resolve_experiment_flags,
+    resolve_switch_values,
+    switches_in_group,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
@@ -34,6 +45,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 # 仓库根：src/test/unit/config/<本文件> → parents[4]
 _PROJECT_ROOT = Path(__file__).resolve().parents[4]
 _REGISTRY_FILE = _PROJECT_ROOT / "src" / "python" / "config" / "features.py"
+
+
+def _experimental_flags() -> set[str]:
+    """实验组开关名集合（注册表是唯一来源，测试也不另写清单）。"""
+    return {flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)}
 
 
 @pytest.mark.unit
@@ -48,18 +64,18 @@ class TestResolveExperimentFlags:
 
     def test_resolve_by_display_name(self):
         """按中文显示名解析（注册表驱动，无需维护第二份清单）。"""
-        display_name = EXPERIMENTAL_FEATURES["signal_pre_digest"][0]
+        display_name = feature_switch_registry["signal_pre_digest"].label
         flags, unknown = resolve_experiment_flags([display_name])
         assert flags == {"signal_pre_digest"}
         assert unknown == []
 
     def test_resolve_every_registry_entry(self):
         """注册表中每个实验功能的开关名与显示名均可解析。"""
-        for flag, (display_name, _desc, _a) in EXPERIMENTAL_FEATURES.items():
+        for flag, definition in switches_in_group(GROUP_EXPERIMENTAL):
             by_flag, unknown_flag = resolve_experiment_flags([flag])
-            by_name, unknown_name = resolve_experiment_flags([display_name])
+            by_name, unknown_name = resolve_experiment_flags([definition.label])
             assert by_flag == {flag}, f"开关名解析失败: {flag}"
-            assert by_name == {flag}, f"显示名解析失败: {display_name}"
+            assert by_name == {flag}, f"显示名解析失败: {definition.label}"
             assert unknown_flag == [] and unknown_name == []
 
     def test_resolve_flag_name_case_insensitive(self):
@@ -71,14 +87,14 @@ class TestResolveExperimentFlags:
     def test_resolve_all(self):
         """all 解析为全部实验功能。"""
         flags, unknown = resolve_experiment_flags([EXPERIMENT_ALL])
-        assert flags == set(EXPERIMENTAL_FEATURES)
+        assert flags == _experimental_flags()
         assert unknown == []
 
     def test_resolve_mixed_and_dedup(self):
         """多种写法混用并去重。"""
-        display_name = EXPERIMENTAL_FEATURES["decision_reflection"][0]
+        display_name = feature_switch_registry["decision_reflection"].label
         flags, unknown = resolve_experiment_flags(["signal_pre_digest", "SIGNAL_PRE_DIGEST", display_name, "all"])
-        assert flags == set(EXPERIMENTAL_FEATURES)
+        assert flags == _experimental_flags()
         assert unknown == []
 
     def test_unknown_reported_but_hits_kept(self):
@@ -90,9 +106,16 @@ class TestResolveExperimentFlags:
     def test_describe_lists_all_entries(self):
         """清单描述串覆盖全部开关名与显示名。"""
         text = describe_experiment_flags()
-        for flag, (display_name, _desc, _a) in EXPERIMENTAL_FEATURES.items():
+        for flag, definition in switches_in_group(GROUP_EXPERIMENTAL):
             assert flag in text
-            assert display_name in text
+            assert definition.label in text
+
+    def test_experiment_group_excludes_standard_switches(self):
+        """常规开关不得混进实验清单——否则会被当实验项写进产物自述。"""
+        assert "metrics_hhi" not in _experimental_flags()
+        assert "doctor_check" not in _experimental_flags()
+        assert "datasource_adapter" not in _experimental_flags()
+        assert is_experimental_switch("metrics_hhi") is False
 
 
 @pytest.mark.unit
@@ -109,7 +132,7 @@ class TestEnabledExperimentalFeatures:
 
         set_feature_enabled("signal_ledger", True)
 
-        assert enabled_experimental_features() == [("signal_ledger", EXPERIMENTAL_FEATURES["signal_ledger"][0])]
+        assert enabled_experimental_features() == [("signal_ledger", feature_switch_registry["signal_ledger"].label)]
 
     def test_follows_registry_order(self):
         """多项启用时按注册表顺序返回，不随启用先后变化。"""
@@ -144,15 +167,18 @@ class TestReportAffectingClassification:
 
     def test_every_entry_declares_affects_report(self):
         """每项都必须显式回答——缺字段即注册表结构漂移，宣告声明不再被强制。"""
-        for flag, entry in EXPERIMENTAL_FEATURES.items():
-            assert len(entry) == 3, f"{flag} 未声明是否影响报告产物"
-            assert isinstance(entry[2], bool), f"{flag} 的 affects_report 须为布尔"
+        for flag, definition in feature_switch_registry.items():
+            assert isinstance(definition.affects_report, bool), f"{flag} 的 affects_report 须为布尔"
 
     def test_entry_only_feature_excluded_from_notice(self, monkeypatch):
-        """只影响入口可见性的项不进清单（合成项验证，当前注册表恰无此类成员）。"""
+        """只影响入口可见性的项不进清单（合成项验证，当前实验组恰无此类成员）。"""
         from src.python.config import features
 
-        monkeypatch.setitem(features.EXPERIMENTAL_FEATURES, "ui_only_probe", ("仅入口探针", "只改面板显隐", False))
+        monkeypatch.setitem(
+            features.feature_switch_registry,
+            "ui_only_probe",
+            FeatureSwitchDef("仅入口探针", "只改面板显隐", GROUP_EXPERIMENTAL, False, False),
+        )
         monkeypatch.setitem(features.FEATURE_FLAGS, "ui_only_probe", True)
         monkeypatch.setitem(features.FEATURE_FLAGS, "signal_ledger", True)
 
@@ -187,8 +213,9 @@ class TestDoctorCheckPromotion:
         assert get_feature_defaults()["doctor_check"] is True
 
     def test_not_in_experimental_registry(self):
-        """不在实验注册表里：不再上实验面板，也不再进产物自述。"""
-        assert "doctor_check" not in EXPERIMENTAL_FEATURES
+        """不在实验组：不再进产物自述（面板可见性由常规组承接，转正不丢入口）。"""
+        assert "doctor_check" not in _experimental_flags()
+        assert is_experimental_switch("doctor_check") is False
 
     def test_switch_still_honored(self):
         """转正不等于不可关。"""
@@ -217,8 +244,9 @@ class TestDatasourceAdapterPromotion:
         assert get_feature_defaults()["datasource_adapter"] is True
 
     def test_not_in_experimental_registry(self):
-        """不在实验注册表里：不再上实验面板，也不再进产物自述。"""
-        assert "datasource_adapter" not in EXPERIMENTAL_FEATURES
+        """不在实验组：不再进产物自述（面板可见性由常规组承接，转正不丢入口）。"""
+        assert "datasource_adapter" not in _experimental_flags()
+        assert is_experimental_switch("datasource_adapter") is False
 
     def test_switch_still_honored(self):
         """转正不等于不可关：回退杠杆仍有效。"""
@@ -327,9 +355,118 @@ class TestRegistryLiveness:
 
     @pytest.mark.unit
     def test_every_experimental_flag_is_registered(self):
-        """实验注册表中的开关都必须在默认值表登记，否则用户开了也无效。"""
-        unregistered = sorted(set(EXPERIMENTAL_FEATURES) - set(_FEATURE_FLAGS_DEFAULT))
+        """实验组开关都必须在默认值表登记，否则用户开了也无效。"""
+        unregistered = sorted(_experimental_flags() - set(_FEATURE_FLAGS_DEFAULT))
         assert not unregistered, f"实验开关未登记到 _FEATURE_FLAGS_DEFAULT（永远开不起来）：{unregistered}"
+
+
+@pytest.mark.unit
+class TestFeatureSwitchRegistryInvariants:
+    """注册表的结构不变式（三渠道与文档清单一律由它派生）。"""
+
+    def test_defaults_are_derived_projection(self):
+        """默认值表是注册表的派生投影，不是第二份手写清单。"""
+        assert _FEATURE_FLAGS_DEFAULT == {flag: d.default for flag, d in feature_switch_registry.items()}
+
+    def test_registry_order_preserved_in_defaults(self):
+        """投影保序——面板顺序即注册表顺序，重排注册表不得打乱取值表。"""
+        assert list(_FEATURE_FLAGS_DEFAULT) == list(feature_switch_registry)
+
+    def test_every_definition_complete(self):
+        """每条声明字段齐备：显示名/说明非空，分组合法，默认值为布尔。"""
+        for flag, d in feature_switch_registry.items():
+            assert isinstance(d, FeatureSwitchDef), f"{flag} 不是 FeatureSwitchDef"
+            assert d.label.strip(), f"{flag} 缺显示名"
+            assert d.desc.strip(), f"{flag} 缺说明"
+            assert d.group in GROUP_ORDER, f"{flag} 分组 '{d.group}' 非法"
+            assert isinstance(d.default, bool), f"{flag} 默认值须为布尔"
+            assert isinstance(d.affects_report, bool), f"{flag} 的 affects_report 须为布尔"
+
+    def test_groups_partition_registry(self):
+        """两个分组恰好划分全部开关——漏归组的开关将没有面板入口。"""
+        grouped = [flag for group in GROUP_ORDER for flag, _d in switches_in_group(group)]
+        assert sorted(grouped) == sorted(feature_switch_registry)
+        assert len(grouped) == len(set(grouped)), "同一开关不得同时属两个分组"
+
+    def test_group_defaults_follow_lifecycle(self):
+        """分组即生命周期：实验组出厂关、常规组出厂开。
+
+        「转正」= 改分组 + 改默认值两处声明；两者不一致即状态自相矛盾
+        （实验组里默认开的项会被当实验项写进产物自述，而它其实人人都在用）。
+        """
+        for flag, d in switches_in_group(GROUP_EXPERIMENTAL):
+            assert d.default is False, f"实验组开关 {flag} 出厂默认应为关"
+        for flag, d in switches_in_group(GROUP_STANDARD):
+            assert d.default is True, f"常规组开关 {flag} 出厂默认应为开"
+
+    def test_labels_cover_all_groups(self):
+        """每个分组都有面板标题（缺标题则分组块渲染为无名块）。"""
+        assert set(GROUP_ORDER) <= set(GROUP_LABELS)
+
+
+@pytest.mark.unit
+class TestSwitchOverrideParsing:
+    """``--feature NAME=VALUE`` 取值解析（全注册表、双向、即时校验）。"""
+
+    def test_parse_off_and_on(self):
+        """off/on 双向均可解析——这是与 ``--experiment``（只开）的关键差异。"""
+        assert parse_switch_override("doctor_check=off") == ("doctor_check", False)
+        assert parse_switch_override("signal_ledger=on") == ("signal_ledger", True)
+
+    def test_parse_value_case_insensitive(self):
+        """取值大小写不敏感（开关名仍精确匹配）。"""
+        assert parse_switch_override("metrics_hhi=OFF") == ("metrics_hhi", False)
+        assert parse_switch_override("metrics_hhi=TRUE") == ("metrics_hhi", True)
+
+    def test_parse_accepts_numeric_and_yes_no(self):
+        """取值词表覆盖 1/0 与 yes/no。"""
+        assert parse_switch_override("metrics_beta=1") == ("metrics_beta", True)
+        assert parse_switch_override("metrics_beta=0") == ("metrics_beta", False)
+        assert parse_switch_override("metrics_winrate=no") == ("metrics_winrate", False)
+
+    def test_parse_tolerates_surrounding_spaces(self):
+        """``NAME = VALUE`` 两侧空白可容忍（手输命令行常见）。"""
+        assert parse_switch_override(" doctor_check = off ") == ("doctor_check", False)
+
+    def test_unknown_name_raises_with_options(self):
+        """未知开关名 → 报错并列出可选项，不静默失效。"""
+        with pytest.raises(ValueError) as err:
+            parse_switch_override("no_such_switch=on")
+        assert "no_such_switch" in str(err.value)
+        assert "doctor_check" in str(err.value)
+
+    def test_missing_equals_raises(self):
+        """缺 ``=`` → 报错（不把整个串当开关名而报「未知开关」）。"""
+        with pytest.raises(ValueError) as err:
+            parse_switch_override("doctor_check")
+        assert "NAME=VALUE" in str(err.value)
+
+    def test_unrecognized_value_raises(self):
+        """取值不在词表内 → 报错（如误传 ``doctor_check=maybe``）。"""
+        with pytest.raises(ValueError) as err:
+            parse_switch_override("doctor_check=maybe")
+        assert "maybe" in str(err.value)
+
+    def test_every_registry_flag_parsable(self):
+        """全部 19 项开关名都能被 ``--feature`` 取到（含常规组，这正是本批次的缺口）。"""
+        for flag in feature_switch_registry:
+            assert parse_switch_override(f"{flag}=off") == (flag, False)
+
+    def test_resolve_switch_values_last_wins(self):
+        """同名重复以最后一次为准（命令行从左到右覆盖）。"""
+        assert resolve_switch_values([("metrics_hhi", False), ("metrics_hhi", True)]) == [("metrics_hhi", True)]
+
+    def test_resolve_switch_values_empty(self):
+        """未传参数（None / 空列表）→ 空覆写，不触碰运行时开关。"""
+        assert resolve_switch_values(None) == []
+        assert resolve_switch_values([]) == []
+
+    def test_describe_switches_covers_all_registry(self):
+        """帮助提示串覆盖全注册表（含常规组），供报错时列出可选项。"""
+        text = describe_switches()
+        for flag, d in feature_switch_registry.items():
+            assert flag in text
+            assert d.label in text
 
 
 @pytest.mark.unit

@@ -1,4 +1,4 @@
-"""实验功能名解析边缘/异常场景测试。
+"""功能开关名解析边缘/异常场景测试。
 
 必须放在 *_edge.py 文件中（pytest_collection_modifyitems 强制约束）。
 """
@@ -10,10 +10,12 @@ from unittest.mock import patch
 import pytest
 
 from src.python.config.features import (
-    EXPERIMENTAL_FEATURES,
     FEATURE_FLAGS,
+    GROUP_EXPERIMENTAL,
+    parse_switch_override,
     resolve_experiment_flags,
     save_feature_overrides,
+    switches_in_group,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config, pytest.mark.edge]
@@ -48,7 +50,7 @@ class TestResolveExperimentFlagsEdge:
     def test_all_uppercase(self):
         """all 同样大小写不敏感。"""
         flags, unknown = resolve_experiment_flags(["ALL"])
-        assert flags == set(EXPERIMENTAL_FEATURES)
+        assert flags == {flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)}
         assert unknown == []
 
     @pytest.mark.edge
@@ -71,6 +73,42 @@ class TestResolveExperimentFlagsEdge:
         flags, unknown = resolve_experiment_flags(["bad", "bad"])
         assert flags == set()
         assert unknown == ["bad", "bad"]
+
+
+@pytest.mark.edge
+class TestParseSwitchOverrideEdge:
+    """``--feature NAME=VALUE`` 取值解析的畸形输入。"""
+
+    @pytest.mark.edge
+    def test_empty_value_raises(self):
+        """``doctor_check=`` → 取值空串视为笔误，报错而非按 false 处理。"""
+        with pytest.raises(ValueError):
+            parse_switch_override("doctor_check=")
+
+    @pytest.mark.edge
+    def test_equals_only_raises(self):
+        """孤立 ``=`` → 缺开关名，报错。"""
+        with pytest.raises(ValueError) as err:
+            parse_switch_override("=on")
+        assert "NAME=VALUE" in str(err.value)
+
+    @pytest.mark.edge
+    def test_empty_string_raises(self):
+        """空串 → 报错（不静默当作未指定）。"""
+        with pytest.raises(ValueError):
+            parse_switch_override("")
+
+    @pytest.mark.edge
+    def test_value_with_extra_equals_keeps_full_value(self):
+        """取值含多余 ``=`` → 整段参与词表比对，识别不了即报错，不静默截断。"""
+        with pytest.raises(ValueError):
+            parse_switch_override("doctor_check=off=extra")
+
+    @pytest.mark.edge
+    def test_name_case_sensitive(self):
+        """开关名不做大小写折叠（取值才折叠）——防止两个开关名折叠后互相误伤。"""
+        with pytest.raises(ValueError):
+            parse_switch_override("DOCTOR_CHECK=off")
 
 
 @pytest.mark.edge

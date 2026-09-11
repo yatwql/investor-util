@@ -69,7 +69,7 @@ _EXPECTED_WHITELIST = {
     "enabled_llm.health_check",
     "enabled_llm.penetration_deep",
     "enabled_llm.news_correlation",
-    # 7 实验性功能开关（菜单 S 实验块；清单取自 features.EXPERIMENTAL_FEATURES）
+    # 7 实验性功能开关（菜单 S 实验块；清单取自 features 注册表实验组）
     "llm_debate_procon",
     "llm_debate_conditional",
     "llm_debate_qa_concentration",
@@ -79,6 +79,17 @@ _EXPECTED_WHITELIST = {
     "decision_header_parse",
     "signal_ledger",
     "datasource_credential_ready",
+    # 8 常规开关（菜单 S 常规块；同为注册表成员，此前无任何界面入口）
+    "metrics_sharpe",
+    "metrics_calmar",
+    "metrics_hhi",
+    "metrics_winrate",
+    "metrics_turnover",
+    "metrics_risk_contribution",
+    "metrics_beta",
+    "enable_interactive_charts",
+    "doctor_check",
+    "datasource_adapter",
 }
 
 
@@ -86,8 +97,15 @@ class TestWhitelist:
     """T1/T2：白名单完备性与隐藏键语义。"""
 
     def test_whitelist_covers_all_tui_editable_keys(self):
-        """白名单 = 7 组 TUI 可编辑项全集，无多余键。"""
+        """白名单 = 8 组 TUI 可编辑项全集，无多余键。"""
         assert set(config_edit_whitelist) == _EXPECTED_WHITELIST
+
+    def test_feature_switches_whitelist_matches_registry(self):
+        """功能开关白名单项 = 注册表全集（渠道层不另写清单，新增开关自动上屏）。"""
+        from src.python.config.features import feature_switch_registry
+
+        whitelisted = {key for key, entry in config_edit_whitelist.items() if entry["target"] == "features"}
+        assert whitelisted == set(feature_switch_registry)
 
     @pytest.mark.parametrize(
         "key",
@@ -113,7 +131,7 @@ class TestGetSurface:
     """T3：面板全量读取。"""
 
     def test_surface_returns_all_groups(self, app_client):
-        """GET 返回 paths/sections/submodules/anonymization/comparison_indices/llm。"""
+        """GET 返回 paths/sections/submodules/anonymization/comparison_indices/llm/features。"""
         resp = app_client.get("/api/config/edit")
         assert resp.status_code == 200
         body = resp.get_json()
@@ -127,6 +145,7 @@ class TestGetSurface:
             "comparison_indices",
             "comparison_indices_defaults",
             "llm",
+            "features",
         }
         assert set(data["paths"]) == {"holdings_dir", "holdings_filename", "output_dir"}
         assert set(data["sections"]) == {
@@ -169,8 +188,8 @@ class TestGetSurface:
             "news_correlation",
         }
         assert data["llm"]["hidden_modules"] == ["debate_pro", "debate_con", "debate_synthesis"]
-        # 实验性功能面 = 注册表全集，默认全关
-        assert set(data["llm"]["experiments"]) == {
+        # 功能开封面 = 实验组（默认全关）+ 常规组（默认全开），两块划分全注册表
+        assert set(data["features"]["experimental"]) == {
             "llm_debate_procon",
             "llm_debate_conditional",
             "llm_debate_qa_concentration",
@@ -181,11 +200,32 @@ class TestGetSurface:
             "signal_ledger",
             "datasource_credential_ready",
         }
-        assert all(v is False for v in data["llm"]["experiments"].values())
+        assert all(v is False for v in data["features"]["experimental"].values())
+        assert set(data["features"]["standard"]) == {
+            "metrics_sharpe",
+            "metrics_calmar",
+            "metrics_hhi",
+            "metrics_winrate",
+            "metrics_turnover",
+            "metrics_risk_contribution",
+            "metrics_beta",
+            "enable_interactive_charts",
+            "doctor_check",
+            "datasource_adapter",
+        }
+        assert all(v is True for v in data["features"]["standard"].values())
         # 显示名同源下发（前端不再手写标签字典，避免与注册表漂移）
-        assert set(data["llm"]["experiment_labels"]) == set(data["llm"]["experiments"])
-        assert data["llm"]["experiment_labels"]["decision_header_parse"] == "决策头结构化"
-        assert data["llm"]["experiment_labels"]["signal_ledger"] == "确定性信号沉淀"
+        assert set(data["features"]["labels"]) == set(data["features"]["experimental"]) | set(
+            data["features"]["standard"]
+        )
+        assert data["features"]["labels"]["decision_header_parse"] == "决策头结构化"
+        assert data["features"]["labels"]["signal_ledger"] == "确定性信号沉淀"
+        assert data["features"]["labels"]["metrics_hhi"] == "量化指标-HHI 集中度"
+        # 「影响报告」标记同源下发：系统自检与数据源适配契约只影响入口/链路，不改产物
+        assert "doctor_check" not in data["features"]["report_affecting"]
+        assert "datasource_adapter" not in data["features"]["report_affecting"]
+        assert "metrics_hhi" in data["features"]["report_affecting"]
+        assert "enable_interactive_charts" in data["features"]["report_affecting"]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -376,6 +416,38 @@ class TestApplyFeaturesWrite:
 
         raw = open(_FEATURES_FILE, encoding="utf-8").read()
         assert '"signal_pre_digest": true' in raw
+
+    def test_standard_switch_write_takes_effect(self, app_client):
+        """常规开关（量化指标）写：features.json 含覆写，运行时开关生效。
+
+        缺陷场景：``metrics_*`` 与 ``enable_interactive_charts`` 从未出现在任何
+        界面通道内，用户只能手改 features.json 才能关掉一项指标；本用例锁定
+        Web 面板对常规组的写入路径与实验组同源可用。
+        """
+        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+
+        assert is_feature_enabled("metrics_hhi") is True  # 默认开
+
+        resp = app_client.post("/api/config/edit", json={"key": "metrics_hhi", "value": False})
+        assert resp.status_code == 200
+        assert resp.get_json()["data"]["value"] is False
+        assert is_feature_enabled("metrics_hhi") is False
+
+        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        assert '"metrics_hhi": false' in raw
+
+    def test_doctor_check_can_be_disabled_from_panel(self, app_client):
+        """系统自检转正后仍可从面板关闭——转正不再连入口一起摘掉（回归）。"""
+        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+
+        assert is_feature_enabled("doctor_check") is True  # 默认开
+
+        resp = app_client.post("/api/config/edit", json={"key": "doctor_check", "value": False})
+        assert resp.status_code == 200
+        assert is_feature_enabled("doctor_check") is False
+
+        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        assert '"doctor_check": false' in raw
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -32,9 +32,9 @@ _EXIT_SEVERE = 2
 def _experiment_name(value: str) -> tuple[str, ...]:
     """argparse type 回调 —— 校验并归一化 ``--experiment`` 取值。
 
-    取值清单取自 features.EXPERIMENTAL_FEATURES 注册表（与 TUI 菜单 S /
-    Web 配置面板同源），支持开关名、显示名与 ``all``。命中多个（``all``）
-    时返回全部开关名，调用方平铺后统一启用。
+    取值清单取自 features 注册表的实验组（与 TUI 菜单 S / Web 配置面板同源），
+    支持开关名、显示名与 ``all``。命中多个（``all``）时返回全部开关名，调用方
+    平铺后统一启用。
 
     名称解析本身容忍空白项（见 resolve_experiment_flags），但命令行取值
     为空串时属用户笔误，此处按非法取值报错，不静默忽略。
@@ -45,6 +45,21 @@ def _experiment_name(value: str) -> tuple[str, ...]:
     if unknown or not flags:
         raise argparse.ArgumentTypeError(f"未知实验功能 '{value}'；可选: {describe_experiment_flags()}、all")
     return tuple(sorted(flags))
+
+
+def _feature_override(value: str) -> tuple[str, bool]:
+    """argparse type 回调 —— 校验 ``--feature NAME=VALUE`` 取值。
+
+    与 ``--experiment`` 的区别见各自 help：本参数作用于**全部**功能开关（含常规
+    组）且**双向**（可关）。取值域与合法性在解析期即校验——错误的开关名或取值
+    当场报错并列出可选项，不留给运行时静默失效。
+    """
+    from src.python.config.features import parse_switch_override
+
+    try:
+        return parse_switch_override(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -66,7 +81,16 @@ def _build_parser() -> argparse.ArgumentParser:
         action="append",
         type=_experiment_name,
         help="启用实验性功能，仅本次运行生效（不写入 features.json）。可重复指定；"
-        "NAME 取开关名或显示名，all=全部启用。",
+        "NAME 取开关名或显示名，all=全部启用。等价于 --feature 的实验组只开简写。",
+    )
+    parser.add_argument(
+        "--feature",
+        metavar="NAME=VALUE",
+        action="append",
+        type=_feature_override,
+        help="覆写任意功能开关（含常规开关），仅本次运行生效（不写入 features.json）。可重复指定；"
+        "NAME 取开关名，VALUE ∈ on/off/true/false/1/0（大小写不敏感）。"
+        "与 --experiment 的区别：本参数是全开关双向覆写，后者只开实验组。",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s v{APP_VERSION}")
 
@@ -679,23 +703,52 @@ def _apply_cli_experiments(groups: list[tuple[str, ...]] | None) -> None:
     logging.getLogger("invest").info("[features] 命令行启用实验功能 %d 项: %s", len(flags), "、".join(flags))
 
 
-def _prepare_early_exit_experiments(groups: list[tuple[str, ...]] | None) -> None:
-    """为不初始化 config 的早返回命令应用实验开关。
+def _apply_cli_switches(pairs: list[tuple[str, bool]] | None) -> None:
+    """应用命令行指定的功能开关覆写（仅当前进程运行时，不写盘）。
+
+    与 ``_apply_cli_experiments`` 的差别是**双向**：``--feature doctor_check=off``
+    可关闭常规开关，用于临时复现「关掉这一项会怎样」而无须改盘上配置（实验开关
+    的关闭路径仍走 features.json / 面板）。同名重复以最后一次为准（见
+    ``resolve_switch_values``）。取值已在 argparse type 回调中校验。
+    """
+    from src.python.config.features import resolve_switch_values, set_feature_enabled
+
+    overrides = resolve_switch_values(pairs)
+    if not overrides:
+        return
+
+    import logging
+
+    for flag, value in overrides:
+        set_feature_enabled(flag, value)
+    logging.getLogger("invest").info(
+        "[features] 命令行覆写功能开关 %d 项: %s",
+        len(overrides),
+        "、".join(f"{flag}={'on' if value else 'off'}" for flag, value in overrides),
+    )
+
+
+def _prepare_early_exit_switches(groups: list[tuple[str, ...]] | None, pairs: list[tuple[str, bool]] | None) -> None:
+    """为不初始化 config 的早返回命令应用命令行开关（--experiment / --feature）。
 
     ``doctor``/``check-sources``/``view-logs``/``cassettes`` 先于 ``init_config()``
-    分派（配置损坏时这些命令仍须可用），故命令行开关需单独应用，否则
-    ``--experiment`` 会被静默忽略、用户据 doctor 结论误判实验功能状态。
+    分派（配置损坏时这些命令仍须可用），故命令行开关需单独应用，否则它们会被
+    静默忽略、用户据 doctor 结论误判开关状态。
 
     顺序与 ``init_config()`` 一致：features.json 覆写先于命令行增量——反过来
     会被随后的覆写值回冲。此处显式加载而非依赖 ``config.features`` 的导入时
-    自动加载：上面的 import 只在 ``groups`` 非空时才发生，直接依赖它会让
-    「没传 ``--experiment``」的情况一项覆写都不加载（重置为内置默认值）。
-    重复加载不会重复打印日志——``load_feature_overrides`` 仅在取值真变化时报 INFO。
+    自动加载：直接依赖它会让「两个参数都没传」的情况一项覆写都不加载
+    （重置为内置默认值）。重复加载不会重复打印日志——``load_feature_overrides``
+    仅在取值真变化时报 INFO。
+
+    ``--experiment`` 先于 ``--feature`` 应用：后者是显式取值，同名时应覆盖前者的
+    隐式「只开」。
     """
     from src.python.config.features import load_feature_overrides
 
     load_feature_overrides()
     _apply_cli_experiments(groups)
+    _apply_cli_switches(pairs)
 
 
 def main() -> int:
@@ -714,9 +767,9 @@ def main() -> int:
 
     from src.python.config import get_config, init_config
 
-    # 以下命令不初始化 config（配置损坏时仍须可用），实验开关需单独应用
+    # 以下命令不初始化 config（配置损坏时仍须可用），命令行开关需单独应用
     if args.command in ("check-sources", "view-logs", "doctor", "cassettes"):
-        _prepare_early_exit_experiments(args.experiment)
+        _prepare_early_exit_switches(args.experiment, args.feature)
 
     # cassettes 同样无需 config 且只读离线：维护已录制响应，不碰用户配置
     if args.command == "cassettes":
@@ -736,8 +789,9 @@ def main() -> int:
     init_config(config_path=args.config)
     config = get_config()
 
-    # 实验功能命令行开关（需在配置初始化之后：覆写加载已完成，此处为本次运行增量）
+    # 命令行开关（需在配置初始化之后：覆写加载已完成，此处为本次运行增量）
     _apply_cli_experiments(args.experiment)
+    _apply_cli_switches(args.feature)
 
     # 首次运行引导（非交互/CI/脚本环境自动跳过，不阻塞命令执行）
     try:

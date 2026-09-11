@@ -118,20 +118,24 @@ def _cmd_config_output_dir() -> None:
 
 
 def _cmd_config_llm_modules() -> None:
-    """配置各 LLM 报告的启用/停用（llm_settings.json + features.json 实验开关）。
+    """配置各 LLM 报告的启用/停用，以及全部功能开关（llm_settings.json + features.json）。
 
     标准 LLM 模块通过 enabled_llm 控制，存储在 llm_settings.json。
-    实验性功能（辩论模式增强、决策跨期反思闭环等）通过 Feature Flag 控制，
-    存储在 features.json；开关清单由 features.EXPERIMENTAL_FEATURES 注册表
-    驱动（显示名 + 说明 + 顺序均取自注册表），新增实验开关自动上屏。
+    功能开关（辩论模式增强、决策跨期反思闭环、量化指标、交互图表、系统自检、
+    数据源适配契约等）通过 Feature Flag 控制，存储在 features.json；两块的分组、
+    显示名与顺序均取自 ``features.feature_switch_registry``，新增开关自动上屏，
+    渠道层不另写清单。
     辩论白脸/黑脸/综合（debate_pro/con/synthesis）保留在注册表
     （缓存 TTL/前缀清理仍依赖），菜单层隐藏，不在此面板展示。
     """
     from src.python.config.features import (
-        EXPERIMENTAL_FEATURES,
+        GROUP_EXPERIMENTAL,
+        GROUP_LABELS,
+        GROUP_STANDARD,
         is_feature_enabled,
         save_feature_overrides,
         set_feature_enabled,
+        switches_in_group,
     )
     from src.python.core.registry import get_llm_module_names
 
@@ -145,11 +149,24 @@ def _cmd_config_llm_modules() -> None:
     # 实际辩论开关由下方实验性 Feature Flag（正反辩论等）控制
     module_names = filter_menu_llm_modules(get_llm_module_names())
 
-    # 实验性功能开关：(flag_key, 显示名)，清单与顺序取自注册表
-    experiment_flags = [(flag, name) for flag, (name, _desc, _a) in EXPERIMENTAL_FEATURES.items()]
+    # 功能开关分块：(分组标题, [(flag_key, 显示名), ...])，顺序即注册表顺序
+    switch_blocks = [
+        (GROUP_LABELS[group], [(flag, d.label) for flag, d in switches_in_group(group)])
+        for group in (GROUP_EXPERIMENTAL, GROUP_STANDARD)
+    ]
+    # 行首 ⚗ 标记仅给实验组（常规组靠分组标题区分，无需逐行标记）
+    experiment_flags = {flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)}
 
     # 名称列宽：取清单内最长显示名，使各行状态方括号纵向对齐（超宽名不截断）
-    name_column = max(map(display_width, [*module_names.values(), *(label for _flag, label in experiment_flags)]))
+    name_column = max(
+        map(
+            display_width,
+            [
+                *module_names.values(),
+                *(label for _title, block in switch_blocks for _flag, label in block),
+            ],
+        )
+    )
 
     while True:
         rows: list[str | None] = []
@@ -162,22 +179,26 @@ def _cmd_config_llm_modules() -> None:
             items.append((i, sfx, name, status, "llm"))
             rows.append(f"{i}. {pad_right(name, name_column)} [{status_str}]")
 
-        # 分隔线 + 实验功能标记
-        rows.append(None)
-        rows.append("⚗ 实验性功能（默认关闭）")
-
-        # ② 实验性功能开关（编号紧随标准模块之后）
-        for j, (flag, label) in enumerate(experiment_flags, len(module_names) + 1):
-            status = is_feature_enabled(flag)
-            status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
-            items.append((j, flag, label, status, "experiment"))
-            rows.append(f"{j}. ⚗{pad_right(label, name_column)} [{status_str}]")
+        # ② 功能开关：编号紧随标准模块之后，实验块在前、常规块追加在其后
+        # （既有实验项编号不位移——新块一律追加到末尾）
+        next_serial = len(module_names) + 1
+        for title, block in switch_blocks:
+            rows.append(None)
+            rows.append(title)
+            for j, (flag, label) in enumerate(block, next_serial):
+                status = is_feature_enabled(flag)
+                status_str = f"{GREEN}开启{RESET}" if status else f"{RED}关闭{RESET}"
+                marker = "⚗" if flag in experiment_flags else ""
+                items.append((j, flag, label, status, "feature"))
+                rows.append(f"{j}. {marker}{pad_right(label, name_column)} [{status_str}]")
+            next_serial += len(block)
 
         rows.append("0. 返回主菜单")
         print()
-        print("\n".join(render_panel("配置支持LLM的报告分析章节", rows)))
+        print("\n".join(render_panel("配置 LLM 报告章节与功能开关", rows)))
         print("  ⚗ 实验性功能默认关闭，开启后按各自说明增强报告输出")
         print("     ⚠ 当前为实验阶段，输出质量可能不稳定")
+        print("  常规开关默认开启，关闭即按各自说明收回对应能力（详见 how-to-config 手册）")
         print()
         try:
             total = len(items)

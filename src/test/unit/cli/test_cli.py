@@ -17,6 +17,7 @@ from src.python.cli import (
     _EXIT_SEVERE,
     _EXIT_SUCCESS,
     _apply_cli_experiments,
+    _apply_cli_switches,
     _build_parser,
     _cli_read_holdings,
     _cli_read_holdings_with_flows,
@@ -135,10 +136,11 @@ class TestArgparse:
 
     def test_experiment_all(self):
         """--experiment all 展开为全部实验功能。"""
-        from src.python.config.features import EXPERIMENTAL_FEATURES
+        from src.python.config.features import GROUP_EXPERIMENTAL, switches_in_group
 
+        expected = tuple(sorted(flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)))
         args = _build_parser().parse_args(["--experiment", "all", "report"])
-        assert args.experiment == [tuple(sorted(EXPERIMENTAL_FEATURES))]
+        assert args.experiment == [expected]
 
     def test_experiment_unknown_rejected(self):
         """未知名称 → argparse 报错 SystemExit(2)，不静默忽略。"""
@@ -182,6 +184,43 @@ class TestArgparse:
 
         args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx"])
         assert args.effective_date is None
+
+
+@pytest.mark.unit
+class TestArgparseFeatureOverrides:
+    """--feature NAME=VALUE 参数解析（全注册表、双向、即时校验）。"""
+
+    def test_feature_absent_by_default(self):
+        """未指定 --feature 时为 None（不触碰运行时开关）。"""
+        args = _build_parser().parse_args(["report"])
+        assert args.feature is None
+
+    def test_feature_off_on_standard_switch(self):
+        """常规开关也能经 --feature 关闭——本批次补上的正是这条通道。"""
+        args = _build_parser().parse_args(["--feature", "doctor_check=off", "report"])
+        assert args.feature == [("doctor_check", False)]
+
+    def test_feature_on_experimental_switch(self):
+        """实验开关同样可经 --feature 打开（与 --experiment 等价路径）。"""
+        args = _build_parser().parse_args(["--feature", "signal_ledger=on", "report"])
+        assert args.feature == [("signal_ledger", True)]
+
+    def test_feature_repeatable(self):
+        """可重复指定，逐项独立解析并保留顺序。"""
+        args = _build_parser().parse_args(["--feature", "metrics_hhi=off", "--feature", "metrics_beta=off", "report"])
+        assert args.feature == [("metrics_hhi", False), ("metrics_beta", False)]
+
+    def test_feature_unknown_name_rejected(self):
+        """未知开关名 → SystemExit(2)（解析期报错，不留到运行时静默失效）。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--feature", "no_such_switch=on", "report"])
+        assert exc.value.code == 2
+
+    def test_feature_bad_value_rejected(self):
+        """取值不在词表内 → SystemExit(2)。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--feature", "doctor_check=maybe", "report"])
+        assert exc.value.code == 2
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -235,6 +274,54 @@ class TestApplyCliExperiments:
         called: list[dict] = []
         monkeypatch.setattr(feat, "save_feature_overrides", lambda *a, **k: called.append({"a": a}))
         _apply_cli_experiments([("signal_pre_digest",)])
+        assert called == []
+
+
+@pytest.mark.unit
+class TestApplyCliSwitches:
+    """_apply_cli_switches 行为测试（--feature 双向覆写）。"""
+
+    def test_none_is_noop(self, monkeypatch):
+        """未传 --feature 时不改动任何开关。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "doctor_check", True)
+        _apply_cli_switches(None)
+        assert feat.FEATURE_FLAGS["doctor_check"] is True
+
+    def test_disables_standard_switch(self, monkeypatch):
+        """关闭常规开关——本参数相对 --experiment 的核心能力。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "doctor_check", True)
+        _apply_cli_switches([("doctor_check", False)])
+        assert feat.FEATURE_FLAGS["doctor_check"] is False
+
+    def test_enables_and_disables_in_one_run(self, monkeypatch):
+        """同一次运行内双向覆写互不干扰。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_hhi", True)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_ledger", False)
+        _apply_cli_switches([("metrics_hhi", False), ("signal_ledger", True)])
+        assert feat.FEATURE_FLAGS["metrics_hhi"] is False
+        assert feat.FEATURE_FLAGS["signal_ledger"] is True
+
+    def test_duplicate_key_last_wins(self, monkeypatch):
+        """同名重复以最后一次为准（命令行从左到右覆盖）。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_beta", True)
+        _apply_cli_switches([("metrics_beta", False), ("metrics_beta", True)])
+        assert feat.FEATURE_FLAGS["metrics_beta"] is True
+
+    def test_not_persisted(self, monkeypatch):
+        """仅本次运行生效，不写 features.json（实验开关的关闭路径仍走面板/文件）。"""
+        from src.python.config import features as feat
+
+        called: list[dict] = []
+        monkeypatch.setattr(feat, "save_feature_overrides", lambda *a, **k: called.append({"a": a}))
+        _apply_cli_switches([("doctor_check", False)])
         assert called == []
 
 
@@ -966,12 +1053,18 @@ class TestMainEarlyExitExperiments:
     @staticmethod
     def _enabled_during_dispatch(argv: list[str], patch_target: str) -> dict[str, bool]:
         """跑一次 main()，返回被分派函数执行瞬间各实验开关的生效值。"""
-        from src.python.config.features import EXPERIMENTAL_FEATURES, is_feature_enabled
+        from src.python.config.features import (
+            GROUP_EXPERIMENTAL,
+            GROUP_STANDARD,
+            is_feature_enabled,
+            switches_in_group,
+        )
 
         seen: dict[str, bool] = {}
 
         def _record(*_args, **_kwargs) -> int:
-            seen.update({flag: is_feature_enabled(flag) for flag in EXPERIMENTAL_FEATURES})
+            seen.update({flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_STANDARD)})
+            seen.update({flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)})
             return _EXIT_SUCCESS
 
         with (
@@ -1002,9 +1095,35 @@ class TestMainEarlyExitExperiments:
         assert seen["signal_ledger"] is False  # 未指定的开关不受影响
 
     def test_without_experiment_flag_keeps_defaults(self):
-        """不传 --experiment → 实验开关保持默认关闭（对照组，防误判为恒真）。"""
+        """不传开关参数 → 实验组保持默认关闭（对照组，防误判为恒真）。"""
+        from src.python.config.features import GROUP_EXPERIMENTAL, switches_in_group
+
         seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")
-        assert not any(seen.values())
+        experimental = [flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)]
+        assert not any(seen[flag] for flag in experimental)
+
+    @pytest.mark.parametrize(
+        ("command", "patch_target"),
+        [
+            ("doctor", "src.python.cli.cli._handle_doctor"),
+            ("cassettes", "src.python.cli.cli._handle_cassettes"),
+        ],
+    )
+    def test_feature_flag_effective_on_early_exit_command(self, command, patch_target):
+        """--feature 在早返回命令分派前已生效（含关闭常规开关的反向取值）。"""
+        seen = self._enabled_during_dispatch(
+            ["cli.py", "--feature", "doctor_check=off", command],
+            patch_target,
+        )
+        assert seen["doctor_check"] is False
+
+    def test_feature_flag_overrides_experiment_flag(self):
+        """同名时显式取值覆盖 --experiment 的隐式「只开」（后者先应用）。"""
+        seen = self._enabled_during_dispatch(
+            ["cli.py", "--experiment", "signal_ledger", "--feature", "signal_ledger=off", "doctor"],
+            "src.python.cli.cli._handle_doctor",
+        )
+        assert seen["signal_ledger"] is False
 
     def test_features_json_overrides_loaded_before_cli_flags(self):
         """早返回路径同样先读 features.json 覆写，再叠加命令行增量。"""

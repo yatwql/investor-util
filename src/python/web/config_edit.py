@@ -10,8 +10,8 @@
   config.json 顶层标量 → ``set_config``；嵌套 dict（report_submodules /
   comparison_indices）读合并后整块写；anonymization → ``set_anonymization_mode``；
   llm_settings.json → ``write_llm_settings``（自 tui 抽取的共享原语）；
-  features.json → ``save_feature_overrides``（实验性功能开关，清单由
-  ``features.EXPERIMENTAL_FEATURES`` 注册表驱动，与 TUI 菜单 S 同源）。
+  features.json → ``save_feature_overrides``（功能开关，清单由
+  ``features.feature_switch_registry`` 驱动，与 TUI 菜单 S 同源）。
 """
 
 from __future__ import annotations
@@ -20,7 +20,12 @@ import json
 import logging
 import os
 
-from src.python.config.features import EXPERIMENTAL_FEATURES
+from src.python.config.features import (
+    GROUP_EXPERIMENTAL,
+    GROUP_STANDARD,
+    feature_switch_registry,
+    switches_in_group,
+)
 from src.python.web.holdings_update import _atomic_copy
 
 logger = logging.getLogger("invest")
@@ -99,8 +104,9 @@ config_edit_whitelist = {
     "enabled_llm.health_check": {"kind": "bool", "target": "llm_settings", "writer": "llm"},
     "enabled_llm.penetration_deep": {"kind": "bool", "target": "llm_settings", "writer": "llm"},
     "enabled_llm.news_correlation": {"kind": "bool", "target": "llm_settings", "writer": "llm"},
-    # ── 7 实验性功能开关（features.json；清单取自 features.EXPERIMENTAL_FEATURES 注册表）──
-    **{flag: {"kind": "bool", "target": "features", "writer": "features"} for flag in EXPERIMENTAL_FEATURES},
+    # ── 7 功能开关（features.json；清单取自 features.feature_switch_registry 全注册表，
+    #      实验组与常规组同表同写入路径，分组只影响前端分块渲染）──
+    **{flag: {"kind": "bool", "target": "features", "writer": "features"} for flag in feature_switch_registry},
 }
 
 
@@ -349,7 +355,14 @@ def get_config_edit_surface() -> dict:
         except (OSError, json.JSONDecodeError) as e:
             logger.warning("读取 llm_settings.json 失败，LLM 开关按默认展示: %s", e)
     surface_enabled = {k: bool(enabled_map.get(k, True)) for k in _LLM_SURFACE_KEYS}
-    experiments = {flag: is_feature_enabled(flag) for flag in EXPERIMENTAL_FEATURES}
+    # 功能开关：按注册表分组下发（实验组 / 常规组各一块），显示名与「是否影响报告」
+    # 标记由服务端同源下发——前端不维护任何开关字典，避免与注册表漂移。
+    features_surface = {
+        "experimental": {flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)},
+        "standard": {flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_STANDARD)},
+        "labels": {flag: d.label for flag, d in feature_switch_registry.items()},
+        "report_affecting": [flag for flag, d in feature_switch_registry.items() if d.affects_report],
+    }
 
     return {
         "paths": paths,
@@ -361,9 +374,6 @@ def get_config_edit_surface() -> dict:
         "llm": {
             "enabled_llm": surface_enabled,
             "hidden_modules": list(_LLM_HIDDEN_MODULES),
-            "experiments": experiments,
-            # 实验开关显示名同样取自注册表，供前端直接渲染（避免前端另维护一份
-            # 手写标签字典而与注册表漂移）。
-            "experiment_labels": {flag: name for flag, (name, _desc, _a) in EXPERIMENTAL_FEATURES.items()},
         },
+        "features": features_surface,
     }

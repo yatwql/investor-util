@@ -33,7 +33,8 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir`（不存在时自动创建；支持绝对 / 相对路径） |
 | `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
 | `--non-interactive` | 跳过首次运行交互式引导（定时任务 / 脚本使用） |
-| `--experiment NAME` | 启用实验性功能，**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `signal_pre_digest`）或显示名（如 `信号预消化`），`all` = 全部启用 |
+| `--experiment NAME` | 启用**实验组**功能（只开不关的简写），**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `signal_pre_digest`）或显示名（如 `信号预消化`），`all` = 全部启用 |
+| `--feature NAME=VALUE` | 切换**任意**功能开关（实验组与常规组均可），**双向**（可开可关）、**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `doctor_check`），`VALUE` 取 `on`/`off`（也接受 `true`/`false`/`1`/`0`，大小写不敏感）。同名后写覆盖先写 |
 | `--version` | 显示版本号并退出 |
 
 > **`--experiment` 说明**：等价于在 TUI 菜单 **[S]** / Web 配置面板中临时勾选实验开关，但**只作用于当前这一次命令、不改动持久化配置**——CI / 定时任务可在不污染用户配置的前提下试用实验功能；反之，用户配置里已开启的实验开关不会被本参数关闭。
@@ -55,7 +56,19 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 > .venv/bin/python -m src.python.cli --experiment all report --type full
 > ```
 >
-> 取值写错会立即报错并列出全部可选值，不会静默忽略。当前可选实验功能清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)（与 TUI 菜单 [S] 实验块同源，由 `features.EXPERIMENTAL_FEATURES` 注册表驱动）。
+> 取值写错会立即报错并列出全部可选值，不会静默忽略。当前可选实验功能清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)（与 TUI 菜单 [S] 实验块同源，由 `features.feature_switch_registry` 注册表驱动）。
+
+> **`--feature` 说明**：`--experiment` 的补集——它面向**全部**开关而非仅实验组，且**双向**（既能开也能关）。常用来在不动持久化配置的前提下临时关闭某个默认开启的常规开关，或复现「关掉某开关后报告长什么样」：
+>
+> ```bash
+> # 本次运行关闭系统自检的界面入口（CLI 的 doctor 子命令本就不受该开关约束）
+> .venv/bin/python -m src.python.cli --feature doctor_check=off doctor
+>
+> # 一次运行关掉两个量化指标 + 关闭交互图表（HTML 回退静态渲染）
+> .venv/bin/python -m src.python.cli --feature metrics_hhi=off --feature metrics_beta=off --feature enable_interactive_charts=off report --type full
+> ```
+>
+> 两个参数可同时使用：`--feature` 在 `--experiment` 之后应用，故 `--experiment all --feature module_quality_gate=off` 表示「其余实验功能全开、只关掉质量分级」。
 
 ---
 

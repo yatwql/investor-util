@@ -2,6 +2,7 @@
 
 from src.python.cli.cli import (
     _apply_cli_experiments,
+    _apply_cli_switches,
     _build_parser,
     _cli_read_holdings,
     _cli_read_holdings_with_flows,
@@ -21,6 +22,7 @@ from src.python.cli.cli import (
 
 __all__ = [
     "_apply_cli_experiments",
+    "_apply_cli_switches",
     "_build_parser",
     "_cli_read_holdings",
     "_cli_read_holdings_with_flows",

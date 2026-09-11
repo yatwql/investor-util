@@ -391,7 +391,7 @@ TUI（Text User Interface）是系统**主要交互渠道**：桌面终端内的
 | `tui/tui_menu.py` | 菜单定义与渲染 | MENU_ITEMS 列表、render_menu/print_header/show_config、index_by_key、press_any_key/exit_app |
 | `tui/tui_keys.py` | 键盘封装 | 跨平台（Windows msvcrt / Linux tty+termios+select），标准化键名 KEY_UP/DOWN/ENTER/CTRL_C |
 | `tui/handlers_report.py` | 报告生成外壳 | `_run_generate` 骨架、`_prompt_history`/`_prompt_force_llm` 交互询问、E/B/L 三命令 |
-| `tui/handlers_config.py` | 配置管理外壳 | 目录/文件名/输出目录/章节/指数池/匿名化/LLM 模块/刷新等 8 项配置命令 |
+| `tui/handlers_config.py` | 配置管理外壳 | 目录/文件名/输出目录/章节/指数池/匿名化/LLM 模块与功能开关/刷新等 8 项配置命令 |
 | `tui/handlers_cache.py` | 缓存管理外壳 | 更新基础/持仓缓存、清理过期、查看统计 4 项命令 |
 | `tui/handlers_whatif.py` | 调仓模拟外壳 | What-if 对话流程，委托 `report/whatif_operations.py`（§4.13） |
 | `report/progress.py` | 进度报告 | TuiProgressReporter（`[..]`/`[OK]`/`[!]`/`[ERR]` 前缀 + 耗时排行） |
@@ -433,7 +433,7 @@ while True:
 | | `[P]` | 报告可选章节开关 |
 | | `[I]` | 对比指数池管理 |
 | | `[A]` | 持仓匿名化模式 |
-| | `[S]` | LLM 分析章节配置 |
+| | `[S]` | LLM 分析章节与功能开关配置（分三块：标准 LLM 模块 → 实验组 → 常规组） |
 | | `[R]` | 刷新配置 |
 | 缓存管理 | `[1]`/`[2]` | 更新基础类 / 行情类缓存 |
 | | `[3]`/`[4]` | 清理过期缓存 / 查看缓存统计 |
@@ -495,7 +495,7 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 
 `_build_parser()`：`prog="investor-util"`，全局参数 + 5 个子命令。
 
-- **全局参数**：`--config`（备用配置文件路径）、`--output`（报告输出目录，覆盖 config 的 output_dir）、`--verbose`（进度同步到 stderr，默认仅写 logs/app.log）、`--non-interactive`（跳过首次运行交互式引导，定时任务/脚本使用）、`--experiment NAME`（可重复；启用实验性功能且**仅本次运行生效、不写盘**。NAME 取开关名或显示名，`all` = 全部启用。取值经 `_experiment_name` argparse type 回调即时校验：空串/未知名即报错，可选值由 `features.describe_experiment_flags()` 生成）、`--version`。
+- **全局参数**：`--config`（备用配置文件路径）、`--output`（报告输出目录，覆盖 config 的 output_dir）、`--verbose`（进度同步到 stderr，默认仅写 logs/app.log）、`--non-interactive`（跳过首次运行交互式引导，定时任务/脚本使用）、`--experiment NAME`（可重复；启用实验性功能且**仅本次运行生效、不写盘**。NAME 取开关名或显示名，`all` = 全部启用。取值经 `_experiment_name` argparse type 回调即时校验：空串/未知名即报错，可选值由 `features.describe_experiment_flags()` 生成）、`--feature NAME=VALUE`（可重复；**全部**功能开关的双向一次性开关，同样是仅本次运行、不写盘。VALUE 取 `on/off/true/false/1/0`（大小写不敏感），NAME 取注册表键名。取值经 `_feature_override` argparse type 回调即时校验：非 `NAME=VALUE` 形态、未知开关名、不可识别取值均即报错并列出可选值；同名后者覆盖前者。两者共用一个应用原语，`--feature` 在 `--experiment` 之后应用，故显式取值可覆盖 `--experiment` 的隐式「置开」）、`--version`。
 - **`report`**：`--type basic/both/full`（默认 basic）、`--history auto/off`（未指定回退配置层 `history.fetch_mode`，仅 both/full 有效）、`--force-llm`。
 - **`cache`**：互斥组 `--update basic/position/all` / `--clean` / `--stats`。
 - **`whatif`**：`--candidate`（目标持仓，必填）、`--base`（基准持仓，缺省用 config 持仓）、`--effective-date`（调仓生效日，opt-in 联网取历史做时序回测）。
@@ -505,7 +505,7 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 
 #### 1.7.3 主流程
 
-`main()`：`setup_logger` → `_build_parser` → `parse_args` → `check-sources` / `view-logs` / `doctor` 特殊处理（均不 init_config）→ `init_config` + `get_config` → `_apply_cli_experiments(args.experiment)`（实验功能命令行开关，须在配置初始化**之后**——覆写加载已完成，此处只做本次运行的增量 `set_feature_enabled`，绝不 `save_feature_overrides` 写盘）→ `startup_wizard(non_interactive)`（非交互/CI 环境自动跳过，不阻塞命令）→ 按 `args.command` 分派 `_handle_report` / `_handle_cache` / `_handle_whatif`。
+`main()`：`setup_logger` → `_build_parser` → `parse_args` → `check-sources` / `view-logs` / `doctor` 特殊处理（均不 init_config，经 `_prepare_early_exit_switches(groups, pairs)` 先加载 `features.json` 覆写再叠加 `--experiment` / `--feature` 增量）→ `init_config` + `get_config` → `_apply_cli_experiments(args.experiment)` + `_apply_cli_switches(args.feature)`（命令行功能开关，须在配置初始化**之后**——覆写加载已完成，此处只做本次运行的增量 `set_feature_enabled`，绝不 `save_feature_overrides` 写盘；顺序为实验组简写在前、`--feature` 显式取值在后，故后者可覆盖前者）→ `startup_wizard(non_interactive)`（非交互/CI 环境自动跳过，不阻塞命令）→ 按 `args.command` 分派 `_handle_report` / `_handle_cache` / `_handle_whatif`。
 
 **持仓定位差异**：CLI 不经过 TUI 文件选择器——`_cli_resolve_holdings_file()` 通过 config 的 `holdings_dir + holdings_filename` 直接定位；若该路径为目录则自动选第一个 `.xlsx`（多个时告警）。`_cli_read_holdings()` / `_cli_read_holdings_with_flows()` 分别读主表与「主表+流水」，与 TUI 读取路径对齐。
 
@@ -583,7 +583,7 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 | GET | `/api/health/history` | 数据源健康历史 | `core/perf.py::summarize_health_history()` 最近 N 次运行摘要（含 ok/total、失败源）；读取失败 500 HEALTH_HISTORY_READ_FAILED |
 | GET | `/api/logs` | 结构化日志查看 | `core/log_reader.py::read_log()`；`?level=` 校验（非法 400 BAD_PARAM）、`?lines=` clamp [1,5000]、`?since/until` 透传；读取失败 500 LOG_READ_FAILED |
 | GET | `/api/doctor` | 系统自检（开关 `doctor_check`） | `core/doctor.py::run_doctor_checks()`，返回 `{results, ok_count, bad_count}`；`?network=0` 跳过联网检查、`?timeout=` clamp 上限 15s（非法值回落 12s 默认）；不与其它的健康缓存共享（预算不同） |
-| GET | `/api/config/edit` | 配置编辑面板 | 无守卫；返回 7 组可编辑面（路径/章节/子模块/匿名化/对比指数池/LLM 开关/实验性功能） |
+| GET | `/api/config/edit` | 配置编辑面板 | 无守卫；返回 8 组可编辑面（路径/章节/子模块/匿名化/对比指数池/LLM 开关/功能开关）+ 顶层 `features` 面（`experimental` / `standard` 两组取值 + `labels` + `report_affecting`） |
 | POST | `/api/config/edit` | 应用配置编辑 | `_is_same_origin()` 同源守卫（失败 403）；校验失败 400 BAD_PARAM；写共享配置异常 500 CONFIG_WRITE_FAILED |
 
 #### 1.8.5 RunManager 单 worker 串行队列
@@ -661,8 +661,8 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 
 Web 配置编辑面板的职责边界：**「能改什么」由白名单唯一确定，「怎么改」逐条等价 TUI 写入路径**，不引入任何 TUI 之外的新配置项。核心实现 `web/config_edit.py`：
 
-- **白名单 `config_edit_whitelist`**（小写模块级 dict，唯一事实来源）：点分键 → `{"kind", "target", "writer"}`。`kind` 取 `str`/`bool`/`enum`/`action`；`target` 取 `config`/`llm_settings`/`features`（落盘目标文件）；`writer` 取 `scalar`/`submodule`/`anonymization`/`llm`/`features`/`comparison_indices`（写入分派器）。全集 7 组：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、实验性功能开关 10（features.json；清单由 `features.EXPERIMENTAL_FEATURES` 注册表驱动，与 TUI 菜单 S 同源，面板显示名亦由注册表下发 `experiment_labels`）。
-- **写入分派逐条等价 TUI**：config.json 顶层标量 → `set_config`（`_PATH_CONFIG_KEYS` 路径键自动反绝对化）；嵌套 dict（report_submodules / comparison_indices）→ 读合并后 `set_config` 整块写；`anonymization.mode` → `set_anonymization_mode`；`enabled_llm.*` → 共享 `write_llm_settings`（`config/_llm_settings.py` 公开原语，自 `tui/handlers_config.py` 抽取，TUI 改委托、行为零变化；保留注释 + mkstemp + `os.replace` 原子写 + `get_llm_config()` 缓存刷新）；实验性功能开关 → `save_feature_overrides`（features.json）。
+- **白名单 `config_edit_whitelist`**（小写模块级 dict，唯一事实来源）：点分键 → `{"kind", "target", "writer"}`。`kind` 取 `str`/`bool`/`enum`/`action`；`target` 取 `config`/`llm_settings`/`features`（落盘目标文件）；`writer` 取 `scalar`/`submodule`/`anonymization`/`llm`/`features`/`comparison_indices`（写入分派器）。全集 8 组：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、增强子模块开关 6、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、功能开关 19（features.json；键集由 `features.feature_switch_registry` 注册表推导——分组、默认值与显示名同源，面板显示名与「影响报告」标记由 surface 下发，前端不写字典）。
+- **写入分派逐条等价 TUI**：config.json 顶层标量 → `set_config`（`_PATH_CONFIG_KEYS` 路径键自动反绝对化）；嵌套 dict（report_submodules / comparison_indices）→ 读合并后 `set_config` 整块写；`anonymization.mode` → `set_anonymization_mode`；`enabled_llm.*` → 共享 `write_llm_settings`（`config/_llm_settings.py` 公开原语，自 `tui/handlers_config.py` 抽取，TUI 改委托、行为零变化；保留注释 + mkstemp + `os.replace` 原子写 + `get_llm_config()` 缓存刷新）；功能开关（实验组与常规组同一路径）→ `save_feature_overrides`（features.json）。
 - **类型/枚举校验**：`set_config` 不做值类型/模式验证，白名单在 Web 层自行校验——kind=str 拒绝含路径分隔符，kind=bool 仅接受 `True`/`False`（`1`/`"true"`/`0.0` 等一律 400），kind=enum 严格匹配合法枚举值（大小写/空白/非字符串拒绝），对比指数池 code 拒绝含路径分隔符（防 `../` 穿越）且 name 长度受限。校验失败统一 400 BAD_PARAM（服务端中文文案）。
 - **写前备份 `config_backup_file`**：写目标文件前单槽 `.bak` 备份（复用 `holdings_update._atomic_copy`），原文件不存在时返回 None（不备份）；仅备份一次（后续写入目标存在已有 `.bak` 不覆盖），供手动还原（`.bak` 改回原名）。
 - **同源守卫**：`_handle_config_edit` POST 复用 `_is_same_origin()`（Sec-Fetch-Site + Origin 校验，同源或非浏览器放行）——Web 无内建认证/无 CSRF token，副作用写操作以此兜底跨站写请求，失败 403。
@@ -2749,7 +2749,7 @@ llm/skeleton.py            # 摘要注入 expert_review 提示词（开关门控
 | 向后兼容 | A1 合法输入行为不变、A2 `message=None` 时矩阵输出逐字不变，均有显式测试 |
 | 开关默认开 | `doctor_check` 缺省 `True`（只读诊断，无产物影响、无隐式网络代价）；置 `false` 时 TUI 无 `[D]` 项、Web 不渲染该卡片 |
 | 产物自述不含 | 不进 `enabled_experimental_features()`——它不改变报告任何字节，列进报告自述会误导读者 |
-| 三面同源 | 注册表 `EXPERIMENTAL_FEATURES` 一处新增即自动出现在 TUI 菜单 / Web 配置面板 / CLI `--experiment` |
+| 三面同源 | 注册表 `feature_switch_registry` 一处新增即自动出现在 TUI 菜单 / Web 配置面板 / CLI `--experiment` / `--feature` |
 | 只读诊断 | 写探测哨兵文件后立即删除；自检不改任何配置或缓存 |
 
 [↑ 回到顶部](#目录)
@@ -3202,6 +3202,12 @@ make_http_client(timeout=10.0) → httpx.Client
 | `source_adapter` | 数据源适配契约（`SourceAdapter` 基类 + 注册表 + 自检报告 `survey_adapters`） | 数据源适配 | 数据获取 | 开关 `datasource_adapter`（默认开，非实验项） |
 | `quote_adapters` | 行情域适配器（腾讯/新浪/东方财富三源） | 数据源适配 | 数据获取 | 开关 `datasource_adapter`（默认开，非实验项） |
 | `adapter_chain_slots` | 适配器映射为 Provider Chain 两槽（provider_fn_map / transform） | 数据源适配 | 数据获取 | 开关 `datasource_adapter`（默认开，非实验项） |
+| `feature_switch_registry` | 功能开关注册表（全部开关的唯一登记点，每条五字段：显示名/说明/分组/默认值/产物影响） | 功能开关 | 配置编辑 | 无（注册点自身；`features.json` 的键名即注册表键名） |
+| `switches_in_group` | 分组取数（功能开关面板分块与实验清单的唯一来源，顺序即注册表声明顺序） | 功能开关 | 配置编辑 | 无（查询助手） |
+| `is_experimental_switch` | 开关是否属实验组（面板 ⚗ 标识与「转正」判定的唯一判据） | 功能开关 | 配置编辑 | 无（查询助手） |
+| `parse_switch_override` | `--feature NAME=VALUE` 取值解析与即时校验（未知开关名/不可识别取值报错并列出可选值） | 功能开关 | 配置编辑 | 无（命令行一次性开关，不写盘） |
+| `resolve_switch_values` | 命令行开关增量的归并去重（同名后写覆盖先写） | 功能开关 | 配置编辑 | 无（命令行一次性开关，不写盘） |
+| `describe_switches` | 全注册表开关名清单（CLI 报错提示的可选值来源） | 功能开关 | 配置编辑 | 无（提示文案来源） |
 | `cassette` | 数据源记录-回放（真实响应体离线录制/回放引擎，`Cassette`/`cassette_replay`/`cassette_record`） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建，不控制运行时行为） |
 | `cassette_checks` | 已录制响应 → 当前解析器的绑定表（录制自检与 `cassettes --verify` 共用） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |
 | `use_transport_factory` | 传输工厂注入点（`make_http_client` 的响应来源替换，C5 唯一构造点上的挂载） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |
@@ -3346,7 +3352,7 @@ web/ (Web 服务层，薄入口)
 |:---|:-----|:---------|:---------|:---------|
 | **C8** | **日志统一** — 所有模块必须使用 `logging.getLogger("invest")` 获取日志器，禁止直接使用 `print()` 输出运行时诊断信息 | 统一日志名称使日志过滤、级别控制、格式管理集中生效；`print()` 无法控制日志级别，污染 stdout | 日志碎片化、日志级别失控、`print()` 干扰输出流 | 全模块（交互式 print 如进度提示不受此限） |
 | **C15** | **控制台日志着色** — WARNING 级别使用黄色输出、ERROR 级别使用红色输出；当 `NO_COLOR` 环境变量设置或输出非 TTY 时自动降级为无颜色 | 着色提升控制台日志的辨识度，便于快速定位告警和错误；降级保证日志导出、管道重定向时无转义字符污染输出 | 日志可读性降低、非 TTY 环境下转义字符污染 | `core/logger.py`（_ColoredFormatter） |
-| **C23** | **实验功能开关注册表唯一事实来源** — 实验功能的枚举、显示名、说明与默认值必须来自 `config/features.py` 的 `EXPERIMENTAL_FEATURES` / `_FEATURE_FLAGS_DEFAULT`；TUI 试验功能面板、Web 配置面板、CLI `--experiment` 取值校验与提示文案、用户文档与管理文档的开关清单**一律由该注册表驱动**，禁止任何渠道层另写一份清单 | 渠道各写清单时，新增/改名/删除实验开关必漏改某渠道——用户在该渠道看不到、开不了，或文档与实际开关对不上；清单是静态字面量，编译期与运行期均无任何提示，只会在用户报障时暴露 | 实验开关在部分渠道缺失或名称不一致；文档承诺的开关在界面中不存在（或反之）；新增实验功能的接入成本从「改一处」膨胀为「逐个渠道找清单」 | `config/features.py`（唯一注册点）、`tui/`（试验功能面板）、`web/`（配置面板）、`cli/`（`--experiment` 校验与报错提示）、`docs-stm/manuals/` 与 `docs-stm/managements/` 的开关清单 |
+| **C23** | **功能开关注册表唯一事实来源** — **全部**功能开关的枚举、显示名、说明、分组、默认值与产物影响必须来自 `config/features.py` 的 `feature_switch_registry`（`_FEATURE_FLAGS_DEFAULT` 是它的派生投影，非独立登记点）；TUI 功能开关面板、Web 配置面板、CLI `--experiment` / `--feature` 取值校验与提示文案、用户文档与管理文档的开关清单**一律由该注册表驱动**，禁止任何渠道层另写一份清单 | 渠道各写清单时，新增/改名/删除开关必漏改某渠道——用户在该渠道看不到、改不了，或文档与实际开关对不上；清单是静态字面量，编译期与运行期均无任何提示，只会在用户报障时暴露。**可见性若与「是否实验项」绑定**，则转正（默认值改 `true`）会连带摘掉面板入口，关闭途径只剩手改 `features.json`——可见性由**分组属性**表达，与默认值解耦 | 开关在部分渠道缺失或名称不一致；文档承诺的开关在界面中不存在（或反之）；新增开关的接入成本从「改一处」膨胀为「逐个渠道找清单」；转正即失去界面入口 | `config/features.py`（唯一注册点）、`tui/`（功能开关面板）、`web/`（配置面板）、`cli/`（`--experiment` / `--feature` 校验与报错提示）、`docs-stm/manuals/` 与 `docs-stm/managements/` 的开关清单 |
 | **C16** | **路径绝对化** — 配置层输出的路径型键（`holdings_dir`、`output_dir`、`llm_key_file`、`llm_providers_file`、`llm_settings_file`）必须为绝对路径，在 `get_config()` 返回前经 `_absolutize_paths()` 统一转换；下游消费者不得依赖 CWD | `tui/tui.py`/`cli/cli.py` 去掉了 `os.chdir`，相对路径无法被正确解析 | 路径查找失败、配置文件/持仓文件/报告输出找不到 | `config/_core.py`（转换点），所有消费路径型配置的模块 |
 
 ### 8.6 测试约束
@@ -3646,7 +3652,7 @@ investor-util/
 | `llm_settings.json`（非敏感 LLM 设置） | `_llm_settings_defaults._DEFAULT_LLM_SETTINGS`（全局 2 项 + 5 模块块 + 辩论 + 事实校验 + 计价） | `_llm_settings_defaults._get_default_llm_settings_template()`（逐行手拼，与 dict 深等，见一致性测试） | `_llm_settings.get_llm_config()`：合并 settings+key+providers 三文件，联合 mtime/size 失效；`_merge_llm_defaults()` 运行时按 `_DEFAULT_LLM_SETTINGS` 补齐缺失键 | `_ensure_llm_settings_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑；`_ensure_llm_settings_file` 仅首次创建） | `llm/pricing.py`（计价覆盖）、`llm/generators.py`、`llm/generators_orchestrator.py`、`llm/prompts_action.py`、`llm/skeleton.py`、`report/news_correlation.py`、`cli/cli.py`、`tui/tui_menu.py` + `tui/handlers_config.py`、`config/_validation.py` |
 | `llm_key.json`（敏感凭据） | 无（**C18 凭据分离**，代码默认值禁止内置 api_key） | 无模板 | `_llm_providers._load_llm_key_credentials()`（多凭据块字典；单凭据 flat 自动升级为 `_default`）；`get_llm_config()` 内联读取并合并覆盖同名字段（provider/endpoint 合法性告警） | 不自动创建；缺失时 `get_llm_config()` 回退判断 providers 链模式，两者皆无则 LLM 不可用（`generators_orchestrator` 降级占位） | `startup_wizard._write_llm_key_flat()`（首次引导交互式写入，C3 原子写） | `get_llm_config()` 合并主体；`_load_llm_key_credentials()` → providers 链 `credentials_ref` 凭据注入 |
 | `llm_providers.json`（多 Provider 链） | `_llm_providers_defaults._DEFAULT_LLM_PROVIDERS`（strategy=priority + 2 条示例链） | `_llm_providers_defaults._get_default_llm_providers_template()` | `_llm_providers._load_llm_providers()`（原始 JSON，根非 object/解析失败返回 None）；`get_llm_config()` 链模式（无 llm_key.json 时直接注入链数据）；`_inject_provider_chain_data()` 注入多链路由结果 | `_core._ensure_llm_providers_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑 / init 自动创建） | `get_llm_config()`（链模式无 key 依赖）；`startup_wizard.py`（就绪检查：key 存在 或 providers 有链）；`_inject_provider_chain_data` |
-| `features.json`（Feature Flag 覆写） | `features._FEATURE_FLAGS_DEFAULT`（19 项默认值：辩论 3 + 量化指标 7 + 交互图表 1 + 决策反思 1 + 信号预消化 1 + 模块质量分级 1 + 决策头结构化 1 + 确定性信号沉淀 1 + 系统自检 1（默认开，非实验项） + 数据源适配 1 + 数据源凭据就绪 1；**只登记有消费者的开关**——LLM 模块启停与基金深度分析归 `llm_settings.json` 的 `enabled_llm`，新闻源 / 历史走势 / 匿名化归 `config.json`，这些能力不再在 features.json 另立同义开关，由 `test_features.py::TestRegistryLiveness` 逐项守住）；实验开关清单见 `features.EXPERIMENTAL_FEATURES` 注册表（10 项，含显示名 + 说明 + 是否改变产物三项，驱动 TUI 菜单 S 与 Web 配置面板，并决定该开关是否进产物自述）；命令行一次性开关见 `features.resolve_experiment_flags` / `describe_experiment_flags`（`--experiment` 的解析与可选值来源，与注册表同源） | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；无消费者键仍加载、但合并为一条 WARNING 列出键名——这类配置不驱动任何行为，静默忽略会让用户以为已生效；非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化）+ Web `web/config_edit.py`（配置面板写入，白名单由注册表生成） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`core/decision_ledger.py`（决策跨期反思闭环）、`llm/prompts_signals.py`（信号预消化，开关判定收敛于缓存后缀函数）、`report/llm_quality.py`（模块质量分级，§4.11）、`core/decision_header.py`（决策头结构化缓存后缀，§4.15）、`core/signal_ledger.py`（确定性信号沉淀，开关判定收敛于摘要函数，§4.16）、`core/doctor.py`（系统自检功能清单上屏，§4.17.3）、`web/handlers.py`（自检卡片可见性，§4.17.3）、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态）、`tui/tui_menu.py`（菜单项门控）、`web/config_edit.py`（面板状态） |
+| `features.json`（Feature Flag 覆写） | `features.feature_switch_registry`（19 项声明，每条含显示名 + 说明 + 分组 + 默认值 + 是否改变产物五项；`_FEATURE_FLAGS_DEFAULT` 是其**派生投影**，非独立登记点）。实验组 9（辩论 3 + 决策反思 1 + 信号预消化 1 + 模块质量分级 1 + 决策头结构化 1 + 确定性信号沉淀 1 + 数据源凭据就绪 1，默认关）+ 常规组 10（量化指标 7 + 交互图表 1 + 系统自检 1 + 数据源适配 1，默认开）；分组即面板分块，决定该开关是否上屏与是否进产物自述（实验组 ∧ `affects_report`）；**只登记有消费者的开关**——LLM 模块启停与基金深度分析归 `llm_settings.json` 的 `enabled_llm`，新闻源 / 历史走势 / 匿名化归 `config.json`，这些能力不再在 features.json 另立同义开关，由 `test_features.py::TestRegistryLiveness` 逐项守住；命令行一次性开关见 `features.resolve_experiment_flags` / `describe_experiment_flags`（`--experiment`，实验组、只开）与 `features.parse_switch_override` / `resolve_switch_values` / `describe_switches`（`--feature NAME=VALUE`，全域、双向），两者与注册表同源 | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；无消费者键仍加载、但合并为一条 WARNING 列出键名——这类配置不驱动任何行为，静默忽略会让用户以为已生效；非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化）+ Web `web/config_edit.py`（配置面板写入，白名单由注册表生成） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`core/decision_ledger.py`（决策跨期反思闭环）、`llm/prompts_signals.py`（信号预消化，开关判定收敛于缓存后缀函数）、`report/llm_quality.py`（模块质量分级，§4.11）、`core/decision_header.py`（决策头结构化缓存后缀，§4.15）、`core/signal_ledger.py`（确定性信号沉淀，开关判定收敛于摘要函数，§4.16）、`core/doctor.py`（系统自检功能清单上屏，§4.17.3）、`web/handlers.py`（自检卡片可见性，§4.17.3）、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态）、`tui/tui_menu.py`（菜单项门控）、`web/config_edit.py`（面板状态） |
 
 #### I.1.1 解析职责归属（协调者 vs 委托）
 
@@ -3666,7 +3672,7 @@ investor-util/
 
 - **config.json — 全局整表共享**：所有模块经 `get_config()` 取合并后整表，按需读键；单入口缓存 + 双键（mtime+size）自动失效，无 per-key 订阅。章节可见性走 `_core.is_enable_*()` 读取器封装（缺失键返回各自默认值，语义见 §4.5 两层模型）。
 - **LLM 三件套 — 合一层**：`get_llm_config()` 是唯一 LLM 配置入口，将 settings（非敏感主体）+ key（凭据覆盖）+ providers（链注入）合并为**单份 dict** 下发给生成器/计价/提示词层；消费方不直接读文件。settings 读取时 `_merge_llm_defaults()` 运行时补默认，避免消费端 `.get()` 硬编码兜底与模板默认值两套值漂移。
-- **features — 全局内存开关 + 覆写文件**：默认值全量在代码内（`_FEATURE_FLAGS_DEFAULT`），`features.json` 只存覆写子集；模块导入时自动加载覆写，消费方只调 `is_feature_enabled(flag)`，不感知文件存在与否。
+- **features — 全局内存开关 + 覆写文件**：默认值全量在代码内（`feature_switch_registry` 的 `default` 字段，`_FEATURE_FLAGS_DEFAULT` 是其派生投影），`features.json` 只存覆写子集；模块导入时自动加载覆写，消费方只调 `is_feature_enabled(flag)`，不感知文件存在与否。
 - **凭据读写分离**：llm_key.json 是唯一「只写不自动读模板、无缺省」的文件——凭据由启动向导交互写入（C3 原子写），运行时由 providers 链 `credentials_ref` 或 `get_llm_config()` 合并引用，遵守 C18 凭据分离。
 
 #### I.3 模式小结

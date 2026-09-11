@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, patch
 from src.python.cli import (
     _EXIT_SUCCESS,
     _apply_cli_experiments,
+    _apply_cli_switches,
     _build_parser,
     _cli_read_holdings,
 )
@@ -137,11 +138,11 @@ class TestCliEdge:
     @pytest.mark.edge
     def test_experiment_all_then_name_dedup(self):
         """all 与具体名称混用 → 解析结果去重，不产生重复启用。"""
-        from src.python.config.features import EXPERIMENTAL_FEATURES
+        from src.python.config.features import GROUP_EXPERIMENTAL, switches_in_group
 
         args = _build_parser().parse_args(["--experiment", "all", "--experiment", "signal_pre_digest", "report"])
         flags = {flag for group in args.experiment for flag in group}
-        assert flags == set(EXPERIMENTAL_FEATURES)
+        assert flags == {flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)}
 
     @pytest.mark.edge
     def test_apply_experiments_duplicate_groups(self, monkeypatch):
@@ -151,3 +152,43 @@ class TestCliEdge:
         monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
         _apply_cli_experiments([("signal_pre_digest",), ("signal_pre_digest",)])
         assert feat.FEATURE_FLAGS["signal_pre_digest"] is True
+
+    @pytest.mark.edge
+    def test_feature_blank_value_rejected(self):
+        """--feature 取值空串 → argparse 报错，不静默按 false 处理。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--feature", "doctor_check=", "report"])
+        assert exc.value.code == 2
+
+    @pytest.mark.edge
+    def test_feature_missing_equals_rejected(self):
+        """--feature 缺 ``=`` → argparse 报错（不整个串当开关名报未知）。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--feature", "doctor_check", "report"])
+        assert exc.value.code == 2
+
+    @pytest.mark.edge
+    def test_feature_name_case_sensitive(self):
+        """开关名大小写不折叠 → 大写名报错（防两开关折叠后误伤）。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--feature", "DOCTOR_CHECK=off", "report"])
+        assert exc.value.code == 2
+
+    @pytest.mark.edge
+    def test_apply_switches_duplicate_pairs_last_wins(self, monkeypatch):
+        """同名重复取值按最后一次生效（幂等，不报错）。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_hhi", True)
+        _apply_cli_switches([("metrics_hhi", False), ("metrics_hhi", False)])
+        assert feat.FEATURE_FLAGS["metrics_hhi"] is False
+
+    @pytest.mark.edge
+    def test_apply_switches_none_and_empty_are_noop(self, monkeypatch):
+        """None / 空列表不触碰任何开关。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_hhi", True)
+        _apply_cli_switches(None)
+        _apply_cli_switches([])
+        assert feat.FEATURE_FLAGS["metrics_hhi"] is True

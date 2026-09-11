@@ -6,6 +6,24 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 功能开关注册表统一与三渠道可控（plan-39 批次②）（2026-09-11）
+
+- **问题**：功能开关注册表把三件互不相干的事拧在一个容器里——决定**面板可见性**、决定**默认关**、决定**是否进产物自述**。于是「转正」（默认值改 `True` 并移出实验注册表）会**连带摘掉可见性**：系统自检转正后，TUI 菜单 `[S]`、Web 配置面板、CLI 三处入口一并消失，关闭途径只剩手改 `features.json`；反方向同样成立——7 项量化指标与交互图表从来不在任何界面通道内，用户想关掉某项指标只能手写 JSON。用户看到的是 19 项同质开关，其中一半能在界面改、一半不能，而「能不能改」取决于它是否被标为实验项，两者本无逻辑关系。
+- **单条声明为唯一登记点**（`config/features.py`）：新增冻结 dataclass `FeatureSwitchDef`（显示名 / 说明 / **分组** / 默认值 / **产物影响**五字段）与 `feature_switch_registry`（19 项，声明顺序即面板顺序）；`_FEATURE_FLAGS_DEFAULT` 由逐项手写降为**派生投影**（`{flag: d.default}`），`EXPERIMENTAL_FEATURES` 容器退场——实验清单改由 `switches_in_group(GROUP_EXPERIMENTAL)` 表达。**「面板可见性」由此与「是否实验项」解耦**：可见性由分组属性决定，取值由 `default` 决定，转正只剩「改分组 + 改默认值」两个字段，面板入口自动延续。
+- **两个分组按生命周期划分**：`GROUP_EXPERIMENTAL`（⚗ 实验性功能（默认关闭），9 项）＝改变产物、待真实数据验证；`GROUP_STANDARD`（常规开关（默认开启），10 项）＝常驻能力、默认开而用户可关。分组是**当前状态**而非优先级或新旧。
+- **TUI 菜单 `[S]`**（`tui/handlers_config.py`）：面板改三块——标准 LLM 模块（1-5）→ 实验块（6-14）→ 常规块（15-24）。**常规块一律追加在实验块之后**，故既有编号锚点（6/9/10）不位移（由既有用例守住），新增两条用例锁定 15＝`metrics_sharpe`、23＝`doctor_check`；行首 ⚗ 标记只给实验组（常规组靠分组标题区分）；列宽取注册表全部显示名与标准模块名的最大值，仍走 `pad_right` 矩形对齐；两块走同一落盘路径（`set_feature_enabled` + `save_feature_overrides`）。
+- **Web 配置面板**（`web/config_edit.py` + `src/static/web/main.js`）：白名单实验组改为对**全注册表**推导（键集等于注册表键集，由用例断言）；surface 新增顶层 `features` 面——`{experimental, standard, labels, report_affecting}`，标签由服务端同源下发，前端不再持有任何开关字典（原 `experiments` / `experiment_labels` 键移除）。常规块中**关闭会改变报告产物内容**的项（量化指标、交互图表）标签带「（影响报告）」后缀，与只影响入口显隐的项（系统自检、数据源适配契约）相区分——这条差异正是用户改动前需要知道的。
+- **CLI 新增全局 `--feature NAME=VALUE`**（`cli/cli.py`）：**全域、双向、可重复、仅本次运行、不写盘**；`VALUE` 取 `on/off/true/false/1/0`（大小写不敏感），取值经 argparse `type` 回调即时校验——形态不合法、未知开关名、不可识别取值均即报错并列出可选值（可选值来自 `describe_switches()`）。同名后者覆盖前者（`resolve_switch_values` 归并去重）。**与 `--experiment` 的关系**：后者保留为实验组简写（只开、支持 `all`），`--feature` 在其**之后**应用，故 `--experiment all --feature module_quality_gate=off` 表示「其余实验功能全开、只关质量分级」。早返回命令（`doctor` / `check-sources` / `view-logs` / `cassettes`）经 `_prepare_early_exit_switches(groups, pairs)` 同样生效（先加载 `features.json` 覆写、再叠加命令行增量）。
+- **架构约束同步修订**（`technical.md` 架构设计约束表「功能开关注册表唯一事实来源」条）：条文由「实验功能开关注册表唯一事实来源」改为「**功能开关注册表唯一事实来源**」——枚举/显示名/说明/**分组**/默认值/产物影响一律来自 `feature_switch_registry`，适用范围由「实验开关」扩到「全部可切换开关」；渠道层不得另写清单的禁令不变而覆盖面扩大。违反后果补记本次实测的失效形态：可见性若与「是否实验项」绑定，转正即失去界面入口。
+- **文档同步**：`technical.md`（「功能开关注册表唯一事实来源」条文、§6.7 语义命名表新增 `feature_switch_registry` / `switches_in_group` / `is_experimental_switch` / `parse_switch_override` / `resolve_switch_values` / `describe_switches` 六行、CLI 全局参数、`main()` 流程、Web 路由与白名单 7 组→8 组、TUI 菜单表、features.json 矩阵行与消费模式）；`developer-guide.md`（检查清单改为「分组归属」两栏 + 五字段声明，两条转正判据的步骤改为「改分组+改默认值」，并补列常规组也可三面切换）；`requirements.md`（§11.5 注册表口径与分组、R-DIAG-05/07 与 `doctor_check` 表行改为常规组表述）；`how-to-config.md` §M（三入口改述、开关表按实验组/常规组拆两表且顺序对齐注册表、`[S]` 面板三块布局）；`how-to-use-tui-menu.md`（`[S]` 章节改「三块 + 常规块 15-24 对照表」、`[D]` 两处改为「可在 `[S]` 常规块切换」）；`how-to-use-cli-mode.md`（`--feature` 参数行 + 用法示例 + 与 `--experiment` 的关系）；`how-to-use-web-mode.md`（7 组→8 组、新增「常规开关」行、「影响报告」标记说明、自检卡片改述）；`how-to-start.md`（7 组→8 组）；`how-to-config-llm.md`（面板两组→三块、`--feature`）；`faq.md`（`[D]` 恢复方式改为「在常规块切回」）。
+- **回归测试**（覆盖项 +30 余，净增文件 6 处）：
+  - `unit/config/test_features.py`：新增 `TestFeatureSwitchRegistryInvariants`（默认值是派生投影、顺序即声明顺序、每条声明五字段齐备、分组划分覆盖全集不重不漏、**分组默认值遵循生命周期**——实验组全 `False` / 常规组全 `True`、`GROUP_LABELS` 覆盖 `GROUP_ORDER`）与 `TestSwitchOverrideParsing`（`on`/`off`、取值大小写不敏感、`1/0/yes/no`、空白容忍、未知名列出可选值、缺 `=`、取值不可识别、**19 项开关名全部可解析**、同名后者覆盖、`None`/空列表→空、`describe_switches` 覆盖全注册表）。
+  - `unit/config/test_features_edge.py`：`TestParseSwitchOverrideEdge`（空取值、`=on` 无开关名、空串、多余 `=` 保留为取值一部分、开关名大小写敏感）。
+  - `unit/cli/test_cli.py`：`TestArgparseFeatureOverrides`（默认 `None`、常规开关可关、实验开关可开、可重复、未知名 `SystemExit(2)`、取值非法 `SystemExit(2)`）与 `TestApplyCliSwitches`（应用、不写盘、`--feature` 覆盖 `--experiment` 的隐式置开、早返回命令 `doctor` / `cassettes` 同样生效）。
+  - `unit/cli/test_cli_edge.py`：空取值、缺 `=`、开关名大写被拒、重复对幂等、`None`/空列表无副作用。
+  - `unit/handlers/test_handlers_config.py`：常规块编号锚点两条（15→`metrics_sharpe`、23→`doctor_check`）。
+  - `unit/web/test_config_edit.py`：白名单键集等于注册表键集、surface 新 `features` 键（取值/标签/产物影响三部分）、常规开关写入落 `features.json` 生效、`doctor_check` 可从面板关闭。
+
 ### 数据源适配契约转正为默认开启（plan-39 批次①）（2026-09-11）
 
 - **转正理由**：它是**内部接缝而非用户功能**——开关开/关下报告产物逐源等价（唯一差异是东财源多出 `market_cap`/`pe` 两个 `None` 键，下游一律 `.get()` 读取、取值语义不变，由 `test_quote_adapter_parity.py` 端到端锁定），用户打开它没有任何可感知收益，摆在面板上只会让人误以为「开了有好处」；而默认关的实际代价是**生产路径从不执行适配器分支**——适配器只在测试里被显式打开，接入新数据源/新字段时契约能否真的跑通没有实跑证据。

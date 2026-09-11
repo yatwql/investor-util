@@ -278,13 +278,9 @@ def _check_experimental_features() -> list[dict[str, Any]]:
     故主动上屏而非等用户去翻日志。
     """
     try:
-        from src.python.config.features import EXPERIMENTAL_FEATURES, is_feature_enabled
+        from src.python.config.features import GROUP_EXPERIMENTAL, is_feature_enabled, switches_in_group
 
-        enabled = [
-            (name, desc)
-            for flag, (name, desc, _affects_report) in EXPERIMENTAL_FEATURES.items()
-            if is_feature_enabled(flag)
-        ]
+        enabled = [(d.label, d.desc) for flag, d in switches_in_group(GROUP_EXPERIMENTAL) if is_feature_enabled(flag)]
     except Exception as exc:  # noqa: BLE001
         return [_item(GROUP_FEATURES, "实验功能", False, f"读取失败: {type(exc).__name__}: {exc}")]
 
