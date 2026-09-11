@@ -6,6 +6,16 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### 管理文档与用户文档一致性核对（自审 rf-350）（2026-09-12）
+
+- **背景**：用户要求「核对所有的管理文档和用户文档，查看顺序或内容有需要调整的地方」。对 `docs-stm/managements/`（10 份）、`docs-stm/manuals/`（10 份）与 `README.md` 逐份与代码/文件系统实况比对，确认约 **57 处失配**，修正落在 **14 份文件**，零处代码改动——本批全部是文档追平实现。
+- **根因**：历次功能迭代的文档同步只覆盖「本轮改动的落点」，而**计数口径与清单类表述散布在多份文档中**，且没有任何校验环节比对全文。功能开关从 19 增至 20 时只同步了改动点附近的几处，余者（README、要求、计划、配置手册、目录树、测试计划）静默过期；同理，`[D]` 系统自检、`cassettes` 子命令、`scenario_perf`/`scenario_security` 两类测试加入时，清单类文档只在部分位置补齐。
+- **失配的六类形态**：① **计数口径过期**——开关 19→20、`[S]` 常规块 15-24→15-25、TUI 菜单项并存 19/17/20 三种写法、`--mode scenario` 子组写 6 而实为 4；② **清单缺项**——`requirements.md` §3.2 菜单表漏 `[D]` 整行、`P` 项只写 4 章节（实为 5 章节 + 6 子模块）、`technical.md` 子命令只写 5（实为 7）、TOC 缺 §4.15–4.18、「影响报告」清单漏 `feeder_penetration`；③ **失效引用**——`report/correlation_sheet.py`、`cache/cache.py`、`src/python/tmpl/report_template.html` 三个路径在仓库中**不存在**，已移除的 `--warm` 仍被描述，`_JS_ASSETS` 与 `_compute_section_visibility` 归属文件写错；④ **事实错误**——README 再平衡阈值三档预设与 `analysis/rebalance.py` 的 profiles **完全错位**、币种敞口章节号沿用改序号前的 §12/§14、faq 的港股通取价口径（声称走腾讯实时价并自动换算汇率，实际 5 位码不在场内行情链路内、实为「暂无行情」）、持仓集中度列数 10（实为 11）、同一文档内组合历史走势区块数「两区块」与「三区块」自相矛盾、LLM 用量模块明细列序与写入层相反、`plan/` 记为「0 份空目录」而实有 2 份；⑤ **快照失配**——`test-coverage.md` 中同一指标在文档内两处并存（edge 862/852、CLI 110/129）且 5 项过期；⑥ **表格结构**——引用块截断字段表致渲染错乱、`review-findings.md` 两个空行把表切成三段且 rf-345 排在 rf-344 之前。
+- **处置原则：核不实者一律不改并报备**。`faq.md` 末句「港股通和非 A 股品种的汇率换算由数据源接口自动处理」在代码中找不到支撑（汇率相关模块只做币种分类与占比，无取数或换算），但无法确证应改为哪种口径，**保留待用户确认**；`how-to-use-tui-menu.md`、`how-to-use-cli-mode.md`、`how-to-start.md`、`llm-technical.md` 逐项核对后确认无矛盾，未作改动。
+- **计数统一口径**：开关 **20 项**（实验组 9 + 常规组 11）、TUI 菜单 **20 项**、报告章节 **19 项**；`test-coverage.md` 全部计数改以 `scripts/collect-test-coverage.py` 实时收集为准（总收集 **6881**），并消除文档内两处冲突口径。`technical.md` 另对全文的「`X.py`」引用与「`X.py::sym`」符号做了存在性交叉验证——除已修三处外全部命中。
+- **测试文档订正**：`developer-guide.md` 的 `--mode scenario` 子组说明由「6 个子组」订正为「4 个子组」（`scenario_extreme`/`scenario_perf`/`scenario_security` 不携带裸 `scenario` 标记），并补 `scenario_perf`（性能基准）与 `scenario_security`（安全基线）两类说明，使「按职责分为 7 大类」名副其实。
+- **遗留**：`folders.md` 的行数/文件数总计属发布数据快照，按「发布数据文档刷新」流程在本版发布时统一刷新（本批只改结构性的文件计数：`docs-stm/plan/` 0→2 份、项目文档数 130→132）。
+
 ### basic 路径接通「行动建议」（2026-09-12）
 
 - **问题**：多份契约一致声明「行动建议为纯算法，basic/both/full 均可见」（`requirements.md` R-ACT-01、`technical.md` 章节契约、`reports-instruction.md` 页签表与分组说明、`how-to-config.md`、TUI 手册），但 **basic 路径实际拿不到**——`orchestrator.generate_report` 的 basic 分支既未下传 `enable_action`（页签根本不创建），也无 `pipeline_data` 注入（即便创建也只会写「无持仓数据，行动建议无法生成」占位）。
