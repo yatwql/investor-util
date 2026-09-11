@@ -76,13 +76,6 @@ def _drift_font(level: str) -> Font:
     return _DRIFT_FONTS.get(level, Font())
 
 
-def _style_remark(is_estimated: bool, is_first: bool) -> str:
-    """生成风格表备注列文本。"""
-    if is_first:
-        return "基准确立中"
-    return "估算风格" if is_estimated else ""
-
-
 def _factor_name(factor: str, factor_names: dict | None) -> str:
     """因子 key → 中文名（编排层 data.factor_names 为单一数据源）。"""
     if factor_names and factor in factor_names:
@@ -131,7 +124,7 @@ def _write_style_block(
             item.get("prev_style", "--"),
             drift_level,
             item.get("drift_score", "--") if item.get("drift_score") is not None else "--",
-            _style_remark(item.get("is_estimated", False), is_first),
+            item.get("remark", ""),  # 备注文案由分析层统一生成（含报告期标注）
             "📋 基线" if is_first else "✅",
         ]
         write_data_row(ws, row, row_data)

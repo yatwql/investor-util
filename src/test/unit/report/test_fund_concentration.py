@@ -30,6 +30,8 @@ from src.python.report.fund_concentration import (
     _save_history_snapshot,
     compute_concentration,
 )
+from src.python.report.holdings_freshness import evaluate_report_period
+from src.test.helpers import recent_holdings_period
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
@@ -171,6 +173,136 @@ class TestComputeConcentration(unittest.TestCase):
             }
         )
         self.assertEqual(result, [])
+
+
+# ── 报告期语义（环比是否有对比意义） ────────────────────
+
+
+class TestReportPeriodSemantics(unittest.TestCase):
+    """环比只在报告期推进时才有意义。
+
+    集中度取自基金的定期报告快照。接口可能一直回退到同一期早期报告，此时本次
+    与上期读的是同一份报告，环比恒为 0——报 0 会被读成"持仓结构没变化"，
+    实为"没有新数据可比"。故须据实标注「报告期未推进」，且不刷新快照记录。
+    """
+
+    def _funds(self, period: str) -> dict:
+        return {
+            "110011": {
+                "name": "易方达中小盘混合",
+                "holdings": [
+                    {"name": "茅台", "code": "600519", "ratio": 9.5},
+                    {"name": "五粮液", "code": "000858", "ratio": 8.0},
+                ],
+                "period_info": evaluate_report_period(period),
+            },
+        }
+
+    @patch("src.python.report.fund_concentration._save_history_snapshot")
+    @patch("src.python.report.fund_concentration._load_history_snapshot")
+    def test_same_period_reports_no_meaningful_change(self, mock_load, _mock_save):
+        """报告期与上期相同 → 环比标为无对比意义，而非 0。"""
+        period = recent_holdings_period()
+        mock_load.return_value = {"110011": {"top10_pct": 17.5, "period": period, "check_date": "2026-01-01"}}
+
+        item = compute_concentration(self._funds(period))[0]
+
+        self.assertTrue(item["period_unchanged"])
+        self.assertIsNone(item["change_pct"])
+        self.assertIn(period, item["comparison_note"])
+        self.assertEqual(item["report_period"], period)
+
+    @patch("src.python.report.fund_concentration._save_history_snapshot")
+    @patch("src.python.report.fund_concentration._load_history_snapshot")
+    def test_advanced_period_computes_change(self, mock_load, _mock_save):
+        """报告期推进 → 照常计算环比（闸门不可误伤正常对比）。"""
+        mock_load.return_value = {"110011": {"top10_pct": 10.0, "period": "2019-03-31", "check_date": "2019-06-01"}}
+
+        item = compute_concentration(self._funds(recent_holdings_period()))[0]
+
+        self.assertFalse(item["period_unchanged"])
+        self.assertAlmostEqual(item["change_pct"], 7.5)  # 17.5 - 10.0
+        self.assertEqual(item["comparison_note"], "")
+
+    @patch("src.python.report.fund_concentration._save_history_snapshot")
+    @patch("src.python.report.fund_concentration._load_history_snapshot")
+    def test_legacy_snapshot_without_period_still_compares(self, mock_load, _mock_save):
+        """旧快照无 period 字段 → 维持原行为照常对比（不制造行为悬崖）。"""
+        mock_load.return_value = {"110011": {"top10_pct": 10.0, "check_date": "2026-01-01"}}
+
+        item = compute_concentration(self._funds(recent_holdings_period()))[0]
+
+        self.assertFalse(item["period_unchanged"])
+        self.assertAlmostEqual(item["change_pct"], 7.5)
+
+    @patch("src.python.report.fund_concentration._save_history_snapshot")
+    @patch("src.python.report.fund_concentration._load_history_snapshot")
+    def test_stale_flag_carried_on_result(self, mock_load, _mock_save):
+        """报告期陈旧标记随行透出（供表格标注，不改变保留策略）。"""
+        mock_load.return_value = None
+
+        item = compute_concentration(self._funds("2020-03-31"))[0]
+
+        self.assertTrue(item["report_stale"])
+        self.assertIn("2020-03-31", item["report_period"])
+
+    @patch("src.python.report.fund_concentration.cache_set")
+    def test_snapshot_records_report_period(self, mock_set):
+        """快照记录报告期——没有它，下次运行无从判别是否换了一期报告。"""
+        _save_history_snapshot(
+            [{"code": "110011", "top3_pct": 24.5, "top5_pct": 35.5, "top10_pct": 35.5, "report_period": "2026-06-30"}]
+        )
+        args, _ = mock_set.call_args
+        self.assertEqual(args[1]["110011"]["period"], "2026-06-30")
+
+    @patch("src.python.report.fund_concentration.cache_set")
+    def test_unchanged_period_entry_carried_forward(self, mock_set):
+        """报告期未推进 → 快照条目原样沿用（不刷新 check_date 伪装成新观察）。"""
+        previous = {
+            "110011": {
+                "top3_pct": 24.5,
+                "top5_pct": 35.5,
+                "top10_pct": 35.5,
+                "period": "2025-06-30",
+                "check_date": "2025-08-01",
+            }
+        }
+        _save_history_snapshot(
+            [
+                {
+                    "code": "110011",
+                    "top3_pct": 24.5,
+                    "top5_pct": 35.5,
+                    "top10_pct": 35.5,
+                    "report_period": "2025-06-30",
+                    "period_unchanged": True,
+                }
+            ],
+            previous,
+        )
+        args, _ = mock_set.call_args
+        self.assertEqual(args[1]["110011"], previous["110011"])
+
+    @patch("src.python.report.fund_concentration.cache_set")
+    def test_advanced_period_entry_refreshed(self, mock_set):
+        """报告期推进 → 快照条目刷新为新一期。"""
+        previous = {"110011": {"top10_pct": 30.0, "period": "2025-06-30", "check_date": "2025-08-01"}}
+        _save_history_snapshot(
+            [
+                {
+                    "code": "110011",
+                    "top3_pct": 24.5,
+                    "top5_pct": 35.5,
+                    "top10_pct": 35.5,
+                    "report_period": "2026-06-30",
+                    "period_unchanged": False,
+                }
+            ],
+            previous,
+        )
+        args, _ = mock_set.call_args
+        self.assertEqual(args[1]["110011"]["period"], "2026-06-30")
+        self.assertAlmostEqual(args[1]["110011"]["top10_pct"], 35.5)
 
 
 # ── 快照读写测试 ──────────────────────────────────────

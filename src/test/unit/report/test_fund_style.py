@@ -47,6 +47,8 @@ from src.python.report.fund_style_report import (
     _grid_distance,
     analyze_style_for_all_funds,
 )
+from src.python.report.holdings_freshness import evaluate_report_period
+from src.test.helpers import recent_holdings_period
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
@@ -490,6 +492,71 @@ class TestAnalyzeStyleForAllFunds(unittest.TestCase):
         """无持仓 → 空结果"""
         result = analyze_style_for_all_funds({})
         self.assertEqual(result["results"], [])
+
+    @patch("src.python.fetcher.industry.fetch_industry_data")
+    @patch("src.python.report.fund_style_classify._push2_extended")
+    @patch("src.python.report.fund_style_report._load_snapshot")
+    def test_remark_carries_report_period(self, mock_load, mock_push2, mock_fetch_ind):
+        """备注含报告期——风格判定基于该期快照，跨年报告期的「无漂移」不足信。"""
+        mock_load.return_value = None
+        mock_push2.return_value = None
+        mock_fetch_ind.return_value = None
+        period = recent_holdings_period()
+        result = analyze_style_for_all_funds(
+            {
+                "110011": {
+                    "name": "易方达中小盘",
+                    "holdings": [{"name": "茅台", "code": "600519", "ratio": 100}],
+                    "period_info": evaluate_report_period(period),
+                },
+            }
+        )
+        r = result["results"][0]
+        self.assertEqual(r["report_period"], period)
+        self.assertFalse(r["report_stale"])
+        self.assertIn(period, r["remark"])
+
+    @patch("src.python.fetcher.industry.fetch_industry_data")
+    @patch("src.python.report.fund_style_classify._push2_extended")
+    @patch("src.python.report.fund_style_report._load_snapshot")
+    def test_remark_marks_stale_report_period(self, mock_load, mock_push2, mock_fetch_ind):
+        """报告期陈旧 → 备注显式标注（保留该基金，只作提示）。"""
+        mock_load.return_value = None
+        mock_push2.return_value = None
+        mock_fetch_ind.return_value = None
+        result = analyze_style_for_all_funds(
+            {
+                "110011": {
+                    "name": "陈年基金",
+                    "holdings": [{"name": "茅台", "code": "600519", "ratio": 100}],
+                    "period_info": evaluate_report_period("2020-03-31"),
+                },
+            }
+        )
+        r = result["results"][0]
+        self.assertTrue(r["report_stale"])
+        self.assertIn("2020-03-31", r["remark"])
+        self.assertIn("陈旧", r["remark"])
+
+    @patch("src.python.fetcher.industry.fetch_industry_data")
+    @patch("src.python.report.fund_style_classify._push2_extended")
+    @patch("src.python.report.fund_style_report._load_snapshot")
+    def test_unknown_period_not_flagged_stale(self, mock_load, mock_push2, mock_fetch_ind):
+        """无报告期信息 → 显示「未知」且不判陈旧（数据缺失不同于数据陈旧）。"""
+        mock_load.return_value = None
+        mock_push2.return_value = None
+        mock_fetch_ind.return_value = None
+        result = analyze_style_for_all_funds(
+            {
+                "110011": {
+                    "name": "某基金",
+                    "holdings": [{"name": "茅台", "code": "600519", "ratio": 100}],
+                },
+            }
+        )
+        r = result["results"][0]
+        self.assertFalse(r["report_stale"])
+        self.assertIn("未知", r["remark"])
 
 
 # ═══════════════════════════════════════════════════════════════

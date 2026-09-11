@@ -16,6 +16,11 @@ from src.python.report.fund_manager_analysis import build_first_check_summary, d
 from src.python.report.position_overlap import compute_overlap_matrix
 from src.python.report.fund_performance import is_fund
 from src.python.report.fund_style_report import analyze_style_for_all_funds
+from src.python.report.holdings_freshness import (
+    ReportPeriodInfo,
+    evaluate_report_period,
+    fund_period_label,
+)
 from src.python.report.html_builders import _build_category_data, _build_perf_data
 from src.python.report.llm_module_info import build_llm_module_info
 from src.python.report.market_value import (
@@ -289,6 +294,55 @@ def _render_manager_analysis(
         return {"results": [], "first_check_summary": None}
 
 
+def _fetch_fund_holdings_with_period(fund_codes: list[str]) -> dict[str, dict]:
+    """按基金代码取回持仓明细，并附报告期时效判定（HTML 侧深度分析共用）。
+
+    报告期须随持仓一并透出：持仓是定期报告的静态快照，接口可能回退到数年前
+    的报告期，而各消费者对时效的处置不同（重合度剔除、集中度看报告期是否推进、
+    风格保留但标注），故在此统一取好判定结果。
+    """
+    result: dict[str, dict] = {}
+    for code in fund_codes:
+        fh = fetch_fund_holdings_cached(code)
+        if fh and fh.get("holdings"):
+            result[code] = {
+                "name": fh.get("name", code),
+                "holdings": fh["holdings"],
+                "period_info": evaluate_report_period(fh.get("date")),
+            }
+        else:
+            _name = fh.get("name", code) if fh else code
+            logger.debug("基金深度分析跳过（无持仓数据）: %s (%s)", _name, code)
+    return result
+
+
+def _split_stale_funds(
+    fund_holdings_map: dict[str, dict],
+) -> tuple[dict[str, list[dict]], dict[str, str], list[str]]:
+    """拆分出报告期未陈旧的基金，返回（持仓, 名称, 陈旧标注）。
+
+    与 Excel 侧 `excel_fund_deep_analysis._split_fresh_fund_holdings` 同口径：
+    重合度按市值加权，陈年报告会以当期市值把数年前的持仓结构摊进矩阵。
+    """
+    fresh: dict[str, list[dict]] = {}
+    names: dict[str, str] = {}
+    stale_notes: list[str] = []
+    for code, info in fund_holdings_map.items():
+        period_info: ReportPeriodInfo = info.get("period_info") or evaluate_report_period(None)
+        if period_info.stale:
+            stale_notes.append(fund_period_label(info.get("name", code), period_info))
+            logger.warning(
+                "持仓重合度矩阵：剔除 %s —— 报告期 %s 已过 %d 个完整季度",
+                info.get("name", code),
+                period_info.period,
+                period_info.quarters,
+            )
+            continue
+        fresh[code] = info["holdings"]
+        names[code] = info.get("name", code)
+    return fresh, names, stale_notes
+
+
 def _render_overlap_matrix(
     holdings: list[Holding],
     details: list,
@@ -298,39 +352,37 @@ def _render_overlap_matrix(
     """构建持仓重合度矩阵数据。
 
     Returns:
-        compute_overlap_matrix() 的结果字典，或 None（不启用时）
+        compute_overlap_matrix() 的结果字典（含 `stale_fund_notes`），或 None（不启用时）
     """
+    empty = {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False, "stale_fund_notes": []}
     if not enable_fund_deep_analysis:
         return None
     prog.info("正在计算持仓重合度矩阵...")
     try:
         fund_codes = list(dict.fromkeys(h.code for h in holdings if is_fund(h)))
         if len(fund_codes) < 2:
-            return {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False}
+            return dict(empty)
 
-        fund_holdings: dict[str, list[dict]] = {}
-        fund_names: dict[str, str] = {}
-        for code in fund_codes:
-            fh = fetch_fund_holdings_cached(code)
-            if fh and fh.get("holdings"):
-                fund_holdings[code] = fh["holdings"]
-                fund_names[code] = fh.get("name", code)
+        fund_holdings_map = _fetch_fund_holdings_with_period(fund_codes)
+        fund_holdings, fund_names, stale_fund_notes = _split_stale_funds(fund_holdings_map)
+        empty["stale_fund_notes"] = stale_fund_notes
 
         if len(fund_holdings) < 2:
-            return {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False}
+            return dict(empty)
 
         fund_mv_map: dict[str, float] = {}
         for d in details:
-            if d.code in fund_codes:
+            if d.code in fund_holdings:
                 fund_mv_map[d.code] = fund_mv_map.get(d.code, 0.0) + d.market_value
 
         result = compute_overlap_matrix(fund_holdings, fund_mv_map=fund_mv_map if fund_mv_map else None)
         result["fund_names"] = fund_names
+        result["stale_fund_notes"] = stale_fund_notes
         prog.ok("持仓重合度矩阵计算完成")
         return result
     except Exception as e:
         logger.warning("持仓重合度矩阵计算失败: %s", e)
-        return {"funds": [], "fund_names": {}, "matrix": [], "pairs": [], "has_mv_data": False}
+        return dict(empty)
 
 
 def _render_concentration(
@@ -348,14 +400,7 @@ def _render_concentration(
     prog.info("正在计算持仓集中度...")
     try:
         fund_codes = list(dict.fromkeys(h.code for h in holdings if is_fund(h)))
-        fund_holdings: dict[str, dict] = {}
-        for code in fund_codes:
-            fh = fetch_fund_holdings_cached(code)
-            if fh and fh.get("holdings"):
-                fund_holdings[code] = {
-                    "name": fh.get("name", code),
-                    "holdings": fh["holdings"],
-                }
+        fund_holdings = _fetch_fund_holdings_with_period(fund_codes)
         if not fund_holdings:
             return {"results": []}
         results = compute_concentration(fund_holdings)
@@ -381,17 +426,7 @@ def _render_style_analysis(
     prog.info("正在分析基金风格漂移...")
     try:
         fund_codes = list(dict.fromkeys(h.code for h in holdings if is_fund(h)))
-        fund_holdings: dict[str, dict] = {}
-        for code in fund_codes:
-            fh = fetch_fund_holdings_cached(code)
-            if fh and fh.get("holdings"):
-                fund_holdings[code] = {
-                    "name": fh.get("name", code),
-                    "holdings": fh["holdings"],
-                }
-            else:
-                _name = fh.get("name", code) if fh else code
-                logger.debug("风格与因子分析跳过（无持仓数据）: %s (%s)", _name, code)
+        fund_holdings = _fetch_fund_holdings_with_period(fund_codes)
         if not fund_holdings:
             return {"results": []}
         result = analyze_style_for_all_funds(fund_holdings)

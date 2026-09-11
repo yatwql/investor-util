@@ -401,6 +401,92 @@ class TestExcelExperimentalNotice(unittest.TestCase):
         self.assertIn("模块级质量分级", text)
 
 
+class TestExcelSummaryFallbackNotice(unittest.TestCase):
+    """LLM 用量页签缺席或为空时，清单须落到汇总页脚（否则 Excel 侧无痕）。
+
+    非 LLM 实验开关（确定性信号沉淀 / 数据源适配 / 决策跨期反思闭环）不依赖 LLM
+    章节：整章关闭时用量页签根本不生成，清单若只挂在那个页签上，这批开关在 Excel
+    产物上便完全无痕。
+    """
+
+    def _sheets(self, usage: str | None = None) -> dict:
+        """构造页签字典：usage=None 无用量页签；"empty" 页签为空；"filled" 已载清单。"""
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "1.投资分析汇总"
+        ws.cell(row=1, column=1, value="投资分析汇总")
+        sheets: dict = {"summary": ws}
+        if usage:
+            ws_usage = wb.create_sheet("19.LLM API 用量")
+            if usage == "filled":
+                ws_usage.cell(row=1, column=1, value="⚗ 本报告在 1 项实验性功能开启下生成：确定性信号沉淀")
+            sheets["llm_usage"] = ws_usage
+        return sheets
+
+    def _summary_text(self, sheets: dict) -> str:
+        ws = sheets["summary"]
+        return "\n".join(str(c.value) for row in ws.iter_rows() for c in row if c.value is not None)
+
+    def _write(self, sheets: dict) -> None:
+        from src.python.report.excel_generator import _write_summary_experimental_notice
+
+        _write_summary_experimental_notice(sheets)
+
+    def test_fallback_lands_when_usage_sheet_absent(self):
+        """LLM 章节关闭（无用量页签）→ 汇总页脚出现清单与复核提示。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+        sheets = self._sheets()
+
+        self._write(sheets)
+
+        text = self._summary_text(sheets)
+        self.assertIn("⚗ 本报告在 1 项实验性功能开启下生成", text)
+        self.assertIn("确定性信号沉淀", text)
+        self.assertIn("实验功能输出质量可能不稳定，结论请自行复核", text)
+
+    def test_fallback_lands_when_usage_sheet_empty(self):
+        """用量页签存在但为空（取数早退）→ 仍须兜底上屏。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+        sheets = self._sheets(usage="empty")
+
+        self._write(sheets)
+
+        self.assertIn("确定性信号沉淀", self._summary_text(sheets))
+
+    def test_no_fallback_when_usage_sheet_carries_notice(self):
+        """清单已落在用量页签 → 汇总页脚不重复（同一事实说两遍会被当成两处来源）。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+        sheets = self._sheets(usage="filled")
+
+        self._write(sheets)
+
+        self.assertNotIn("⚗", self._summary_text(sheets))
+
+    def test_no_notice_when_all_flags_off(self):
+        """实验开关全关 → 汇总页脚一字不提（既有输出不变）。"""
+        sheets = self._sheets()
+
+        self._write(sheets)
+
+        self.assertNotIn("⚗", self._summary_text(sheets))
+
+    def test_missing_summary_sheet_is_noop(self):
+        """无汇总页签 → 静默跳过，不抛异常（页签集合由可见性配置决定）。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+
+        self._write({})  # 不抛异常即通过
+
+
 class TestExcelModuleSheets(unittest.TestCase):
     """Excel 各模块页签可访问性测试 — 所有页签都能正确写入数据。"""
 

@@ -126,6 +126,53 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
         logger.debug("[excel] 数据源可用性矩阵页签写入失败（非关键）", exc_info=True)
 
 
+def _llm_usage_sheet_carries_notice(sheets: dict[str, Any]) -> bool:
+    """LLM 用量页签是否已承载实验功能清单。
+
+    清单是 ``write_llm_usage_sheet`` 在页签初始化后立刻写入的第一段内容；该页签
+    缺席（``include_llm`` 关闭）或为空（用量数据/模块明细缺失导致写入早退）时，
+    清单在 Excel 侧无落点，须由汇总页脚兜底。
+    """
+    ws = sheets.get("llm_usage")
+    if ws is None:
+        return False
+    return any(cell.value is not None for row in ws.iter_rows() for cell in row)
+
+
+def _write_summary_experimental_notice(sheets: dict[str, Any]) -> None:
+    """汇总页签页脚写入实验功能清单（LLM 章节关闭时的兜底落点）。
+
+    ``signal_ledger`` / ``datasource_adapter`` / ``decision_reflection`` 等实验开关
+    不依赖 LLM 章节，若清单只挂在用量页签上，这批开关在 Excel 产物上完全无痕。
+    已落在用量页签时不重复写——同一事实说两遍会让读者以为有两处不同来源。
+    """
+    if _llm_usage_sheet_carries_notice(sheets):
+        return
+    ws = sheets.get("summary")
+    if ws is None:
+        return
+
+    from src.python.report.experimental_notice import NOTICE_HINT, enabled_notice_line
+    from openpyxl.styles import Font
+
+    line = enabled_notice_line()
+    if line is None:
+        return
+
+    ncols = 5
+    row = (ws.max_row or 1) + 2
+    for idx, (text, font) in enumerate(
+        [
+            (line, Font(size=9, bold=True, color="8A5A00")),
+            (NOTICE_HINT, Font(size=9, color="666666")),
+        ]
+    ):
+        _r = row + idx
+        ws.merge_cells(start_row=_r, start_column=1, end_row=_r, end_column=ncols)
+        ws.cell(row=_r, column=1, value=text).font = font
+    logger.info("汇总页签页脚已写入实验功能清单（LLM 用量页签无落点）")
+
+
 def generate_excel_report(
     holdings: list,
     include_news: bool = False,
@@ -406,6 +453,12 @@ def generate_excel_report(
 
     # ── 保存 ──
     with Timer("保存 Excel/HTML 文件"):
+        # 实验功能清单的兜底落点：LLM 用量页签未承载时落到汇总页脚
+        try:
+            _write_summary_experimental_notice(sheets)
+        except Exception:
+            logger.debug("[excel] 汇总页脚实验功能清单写入失败（非关键）", exc_info=True)
+
         # 在每个页签底部写入隐私声明脚注
         for _ws_name, _ws in sheets.items():
             if _ws is not None:

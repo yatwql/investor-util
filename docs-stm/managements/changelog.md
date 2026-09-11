@@ -6,6 +6,30 @@
 
 ## [0.10.18-dev] - 开发中（未发布）
 
+### Excel 实验功能清单兜底落点（自审 rf-343）（2026-09-11）
+
+- **问题**：实验功能清单在 Excel 侧只落在「LLM API 用量」页签上，而该页签只在 LLM 章节开启时生成。LLM 分析整章关闭时，Excel 产物上不出现清单，而 `signal_ledger`（确定性信号沉淀）/ `datasource_adapter`（数据源适配契约）/ `decision_reflection`（决策跨期反思闭环，结算与确定性登记部分）等**非 LLM 实验开关**此刻仍可能开启——这批开关不依赖 LLM 章节，在 Excel 产物上遂完全无痕。HTML 页脚不受影响（页脚始终存在，清单照常上屏）。
+- **兜底落点**（`report/excel_generator.py`）：汇总页签（`1.投资分析汇总`，始终生成）页脚写入同一清单与复核提示。**触发条件不止「页签不存在」**——核查中发现用量数据的取数链路上有多个早退点（无会话用量、无模块明细、页签缺失），任一命中都会得到一个存在但为空的用量页签，清单同样无痕，故判据取「用量页签缺席**或为空**」。已落在用量页签时不重复写：同一事实说两遍，读者会以为有两处不同来源。
+- **措辞单源**（新增 `report/experimental_notice.py`）：清单语句与复核提示收敛为 `enabled_notice_line()` / `NOTICE_HINT`，HTML 页脚、Excel 用量页签、Excel 汇总页脚三处共用同一函数取数，各落点只负责自身排版（字体、空行、合并列宽）。此前 HTML 侧在模板里拼句、Excel 侧在写入函数里拼句，两处措辞各写各的必然漂移。
+- **文档同步**：`how-to-config.md` §M 的「报告会自述生成条件」提示补明 LLM 章节关闭时清单改落汇总页脚，故 Excel 产物上无论 LLM 章节开关与否都能看到清单；「实验开关全关时两处均不出现」随之改为「各处均不出现」。
+- **回归测试**（覆盖项 +12）：`unit/report/test_excel_report_structure.py::TestExcelSummaryFallbackNotice`（5 条：页签缺席时落汇总页脚、页签为空时仍落、页签已载清单时不重复、开关全关时一字不提、无汇总页签时静默跳过）；`unit/report/test_excel_generator.py::test_summary_fallback_notice_wired`（1 条：生成流程确已调用兜底写入——漏调则该落点在真实产物上永不出现）；`unit/report/test_html_report_structure.py::test_wording_matches_excel_landing`（1 条：HTML 页脚句式与 Excel 落点逐字一致，防两份措辞漂移）；`scenario/basic/test_scenario_basic_flows.py::test_experimental_notice_lands_without_llm_chapter`（1 条：真实产出 xlsx 后重新打开断言——LLM 章节关闭时无用量页签、清单恰落在汇总页脚一处）。
+
+### 候选比较两列恒空（自审 rf-344）（2026-09-11）
+
+- **问题**：候选基金比较子表的**「风格」与「与持仓重合度」两列在取数成功时恒为空**。`fetch_fund_holdings_cached()` 返回 `{"name", "holdings", "date"}` 字典，而 `fund_candidate.py` 把它**整体**当作持仓列表传给下游——`classify_fund_style` 与 `compute_overlap_matrix` 都期望 `[{name, code, ratio}, ...]`，在字典上迭代得到键名字符串，随即抛 `AttributeError`；两处各被自身的 `try/except Exception` 吞成 `logger.debug`，于是两列恒显示 `--`。既有基金持仓基准侧同样传的是字典，两侧口径全错。既有单测全部 `mock` 掉 `compute_overlap_matrix`，真实入参形状从未被校验过，缺陷因此长期潜伏（本轮回溯报告期时效时撞见）。
+- **修复**：取 `fh["holdings"]` 后再传下游，候选持仓与既有基金持仓基准两侧口径统一为持仓列表；既有基金侧同时按报告期时效剔除陈旧者（其持仓与候选的「与持仓重合」计算同样按市值/比例口径失真）。
+- **回归测试**：`unit/report/test_fund_candidate.py::TestCandidateRowRealShapes` **不 mock 计算引擎**——喂真实形状的字典入参，断言风格列被填出、重合度按 Jaccard 精确取值（去掉修复即失败）。另有 `TestCollectExistingFundBaseline` 守住基准收集的返回形状。
+
+### 其余持仓消费者的报告期时效处置（自审 rf-341）（2026-09-11）
+
+- **问题**：穿透表已上屏报告期并对陈旧快照设闸门（rf-339），但其余持仓消费者仍只取 `["holdings"]`，同样会把数年前的快照按现行持仓呈现——`fund_concentration.py`（持仓集中度）、`excel_fund_deep_analysis.py` / `html_renderers.py`（基金深度分析）、`position_overlap.py`（重合度矩阵）、`fund_candidate.py`（候选比较）。集中度模块还会拿它与上一次快照算环比，得出与当期配置无关的「变化」。
+- **分层口径**（按模块语义，而非一刀切）：**重合度矩阵**按市值加权，陈旧权重失真最重，故剔除陈旧基金并在 Excel 与 HTML 两侧标注剔除清单（读者若发现某只基金缺席矩阵而无说明，只会以为矩阵算错了）；**集中度 / 风格 / 候选比较**以比例与分类为主，保留并标注报告期。
+- **统一标注**（`report/holdings_freshness.py::fund_period_label()`）：`{名称}（报告期 {期次}，已过 {N} 个完整季度）`。同一只基金在各章节若各写各的报告期文字，读者会以为是不同口径下的两件事。报告期判定经 `evaluate_report_period()` 一次取回展示文本与陈旧结论，显示与闸门不会各算各的漂移。
+- **集中度环比语义修正**（`fund_concentration.py` + `fund_concentration_sheet.py`）：快照增记 `period`。报告期与上期相同时，本次与上期读的是同一份报告，环比恒为 0——报 0 会被读成「持仓结构没变化」，实为「没有新数据可比」，故改标「无对比意义」并注明原因，快照条目**原样沿用**（含 `check_date`），不刷新成一次新观察。旧快照无 `period` 字段时维持原对比行为，不制造行为悬崖。页签新增「报告期」列（陈旧者带「（陈旧）」后缀）。
+- **风格与候选比较**：风格分析的报告期并入 `remark`（分析层统一生成，Excel 与 HTML 同源），候选比较标注风格与重合度所依据的报告期、并注明陈旧基准未计入重合度分母。原 `style_factor_sheet._style_remark()` 与其余两处标注实现重复，一并删除。
+- **产物留痕**：陈旧基金被剔除或保留之处，均同时落 WARNING 日志与产物内标注。共用脚注字体收敛为 `report/styles.py::NOTE_FONT`（原计划在三个文件各加一份）。
+- **回归测试**（覆盖项 +37）：`unit/report/test_fund_concentration.py::TestReportPeriodSemantics`（7 条：同报告期不报环比、报告期推进照常对比、旧快照维持原行为、陈旧标记透出、快照记录报告期、未推进条目原样沿用、推进条目刷新）与新增 `test_fund_concentration_sheet.py`（6 条：报告期列、陈旧后缀、「无对比意义」与「报告期未推进」标识、推进时照常呈现环比、首检不受影响）；`test_excel_fund_deep_analysis.py` +3、新增 `test_html_fund_deep_renderers.py`（9 条，HTML 侧同口径）、`test_correlation_sheet.py` +2（矩阵剔除留痕）、`test_fund_style.py` +3（备注含报告期与陈旧标记）、`test_fund_candidate.py`（真实入参形状 + 基准收集时序）；`test_html_report_structure.py::TestHtmlReportPeriodAnnotations`（8 条：HTML 产物须与 Excel 同口径——剔除横幅、报告期列、「无对比意义」、候选比较报告期注记，且无陈旧项时零噪声）。
+
 ### 报告自述生成条件：实验功能清单上屏（自审 rf-342）（2026-09-11）
 
 - **问题**：**实验性功能的开启状态在报告产物上不可见**。11 项实验开关（`features.json` 持久化 / CLI `--experiment` 仅当次进程）会改变报告内容——辩论三项改变 expert_review 形态、决策跨期反思闭环新增行动章「历史决策复盘」区块、模块级质量分级追加内容质量横幅，而信号预消化 / 决策头结构化 / 确定性信号沉淀只改内部路径、在产物上完全不留痕——但报告本身不说明自己是在哪些非默认开关下生成的。唯一的全局提示是 `log_experimental_features()` 打印的日志横幅，而它只活在控制台：报告一旦导出流转（HTML 外发、Excel 存档），读者既看不到 `features.json` 也看不到生成时的控制台，无从判断「历史决策复盘」区块是常驻功能还是本机实验开关的产物，也无从判断某处内容质量提示究竟是内容问题还是开关所致。现有痕迹还零散不成体系——辩论三项共用同一个「🧪 实验模式」标签（看不出是哪一种）、质量横幅不标来源开关。缺的正是可复现性的前提：**产物须自述其生成条件**。
@@ -14,7 +38,7 @@
 - **Excel 用量页签**：顶部说明行之后写入同一清单（两行：清单 + 一致性提示）。位置选在会话用量汇总区**之前**，故不受 `_write_llm_summary_section` 的「无用量即早退」影响——清单与用量无关，无用量时同样须出现。
 - **零开关不出行**：两处均判空，实验开关全关时报告一字不变，既有输出与既有测试不受影响。
 - **回归测试**（覆盖项 +11）：`unit_config` +4（`TestEnabledExperimentalFeatures`：默认全空、显示名取自注册表而非另写一份、多项启用按注册表顺序而非启用先后、默认开启的非实验开关不入列）；`unit_report` +7（`test_excel_report_structure.py::TestExcelExperimentalNotice` 三条：零开关页签不提实验功能、启用项按显示名逐项列出并给出总项数、无会话用量时该行仍在；`test_html_report_structure.py::TestFooterExperimentalNotice` 四条：页脚按显示名顿号相连列出、零开关不出现、上下文未注入时不出现空壳行、渲染上下文确已注入该变量）。
-- **未覆盖范围**：Excel 侧清单挂在「LLM API 用量」页签上，而该页签仅在 `include_llm` 为真时生成——LLM 分析整章关闭时，Excel 产物上仍不出现清单，而 `signal_ledger` / `datasource_adapter` 等非 LLM 实验开关此刻仍可能开启（HTML 页脚不受影响）。已登记为待处理问题（见 `review-findings.md`）。
+- **未覆盖范围**：Excel 侧清单挂在「LLM API 用量」页签上，而该页签仅在 `include_llm` 为真时生成——LLM 分析整章关闭时，Excel 产物上仍不出现清单，而 `signal_ledger` / `datasource_adapter` 等非 LLM 实验开关此刻仍可能开启（HTML 页脚不受影响）。该缺口随后由「Excel 实验功能清单兜底落点（自审 rf-343）」补上，措辞一并收敛为单源（`report/experimental_notice.py`）。
 
 ### 基金持仓报告期上屏与陈旧闸门（自审 rf-339）（2026-09-11）
 
@@ -24,7 +48,7 @@
 - **报告期上屏**：`summary` 增补 `stale_funds` / `stale_fund_details` / `report_periods`。Excel 穿透页签与 HTML 报告同步输出——剔除原因由「无法获取」细分为「N 只无法获取穿透数据」「M 只因持仓报告期陈旧被剔除」，并逐只列出被剔除基金的报告期与距今季度数；正文下方另起一行列出**各基金持仓报告期**，使穿透权重的时点可被核对。
 - **测试夹具时效化**：多处测试夹具把持仓报告期写死为绝对日期（`"2026-03-31"` 等）。此类字面量会随时间推移跨过阈值而使测试失败——新增 `src/test/helpers.py::recent_holdings_period()` 按当天返回最近一个完整季末，替换穿透相关测试夹具中的写死日期（7 个文件），消除这一时间炸弹。
 - **回归测试**（覆盖项 +29）：新增 `unit/report/test_holdings_freshness.py`（20 条：四种报告期写法与非法值、季度数在季末/当季/未来日期/跨年边界的取值、阈值边界恰好等于阈值即判陈旧、缺失报告期不判陈旧、展示文本规范化）；`unit/report/test_penetration.py::TestStaleHoldingsReportPeriod`（4 条：实测场景 2022-12-08 的基金被剔除出 `merged`、新鲜报告期正常并入并登记报告期、缺失报告期不设闸门、`summary` 三字段端到端贯通）；`unit/report/test_penetration_sheet.py`（5 条：备注中的剔除原因与明细、报告期行、仅获取失败时措辞不变）。去掉闸门后前两组中的两条定点用例立即失败，确认其对缺陷场景有效。
-- **未覆盖范围**：`fund_concentration.py`（集中度）、基金深度分析章节、重合度矩阵、候选基金比较仍只取 `["holdings"]`，同样会把陈旧快照按现行持仓呈现，已登记为待处理问题（见 `review-findings.md`）。
+- **未覆盖范围**：`fund_concentration.py`（集中度）、基金深度分析章节、重合度矩阵、候选基金比较仍只取 `["holdings"]`，同样会把陈旧快照按现行持仓呈现。该缺口随后由「其余持仓消费者的报告期时效处置（自审 rf-341）」按模块语义分层补齐（重合度剔除、其余保留并标注报告期），过程中另撞见候选比较两列恒空（自审 rf-344）。
 
 ### TUI 配置面板盒线边框按显示宽度对齐（自审 rf-340）（2026-09-11）
 

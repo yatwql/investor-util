@@ -216,14 +216,19 @@ def _overlap_result(**extra) -> dict:
 class TestExcelMergedRelationshipSheet(unittest.TestCase):
     """持仓关系矩阵页签·一章两区块（重合度 + 相关性）Excel 呈现测试。"""
 
-    def _write(self, overlap_result, correlation_data) -> "object":
+    def _write(self, overlap_result, correlation_data, stale_fund_notes=None) -> "object":
         from openpyxl import Workbook
 
         from src.python.report.position_relationship_sheet import write_position_relationship_sheet
 
         wb = Workbook()
         ws = wb.active
-        write_position_relationship_sheet(ws, overlap_result=overlap_result, correlation_data=correlation_data)
+        write_position_relationship_sheet(
+            ws,
+            overlap_result=overlap_result,
+            correlation_data=correlation_data,
+            stale_fund_notes=stale_fund_notes,
+        )
         return ws
 
     def _flat(self, ws) -> list[str]:
@@ -263,3 +268,20 @@ class TestExcelMergedRelationshipSheet(unittest.TestCase):
         flat = self._flat(ws)
         self.assertTrue(any("50.00%" in v for v in flat), "重合度 Jaccard 0.5 应呈现为 50.00%")
         self.assertTrue(any("100.00%" in v for v in flat), "对角线 1.0 应呈现为 100.00%")
+
+    def test_stale_fund_exclusion_noted(self):
+        """被剔除的陈旧基金须在矩阵上方留痕（否则读者以为矩阵算错了）。"""
+        ws = self._write(
+            _overlap_result(),
+            _correlation_data(),
+            stale_fund_notes=["陈年基金（报告期 2020-03-31，已过 20 个完整季度）"],
+        )
+        flat = self._flat(ws)
+        self.assertTrue(any("已从矩阵剔除" in v for v in flat), "应写剔除说明行")
+        self.assertTrue(any("陈年基金" in v and "2020-03-31" in v for v in flat), "应含被剔除基金名与报告期")
+
+    def test_no_stale_note_when_none_excluded(self):
+        """无陈旧基金 → 不出现剔除说明行（零噪声）。"""
+        ws = self._write(_overlap_result(), _correlation_data())
+        flat = self._flat(ws)
+        self.assertFalse(any("已从矩阵剔除" in v for v in flat), "无剔除时不应出现说明行")

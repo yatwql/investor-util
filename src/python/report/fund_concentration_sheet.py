@@ -1,14 +1,18 @@
 """持仓集中度监控 Excel 写入模块。
 
 输出列：
-  基金名称 | 基金代码 | 前3占比 | 前5占比 | 前10占比
-  | 上期前10占比 | 环比变化 | 预警级别
+  基金名称 | 基金代码 | 报告期 | 基金类型 | 前3占比 | 前5占比 | 前10占比
+  | 上期前10占比 | 环比变化 | 预警级别 | 标识
 
 着色规则：
   🔴 紧急 → 整行红色字体
   ⚠️ 关注 → 整行橙色字体
   ✅ 正常 → 默认字体
   首检 → 灰色字体
+
+「报告期」列标注本期持仓所依据的定期报告期次——集中度是静态快照的比例值，
+报告期跨年的基金其占比反映的是当时的配置。报告期与上期相同的基金环比无
+对比意义（本次与上期读的是同一份报告），据实标注而非报 0。
 """
 
 from __future__ import annotations
@@ -33,10 +37,11 @@ from src.python.report.styles import NORMAL_FONT
 
 logger = logging.getLogger("invest")
 
-_NCOLS = 10
+_NCOLS = 11
 _HEADERS = [
     "基金名称",
     "基金代码",
+    "报告期",
     "基金类型",
     "前3占比%",
     "前5占比%",
@@ -60,8 +65,10 @@ def _alert_font(level: str) -> Font:
     return _ALERT_FONTS.get(level, NORMAL_FONT)
 
 
-def _change_label(change_pct: float | None) -> str:
+def _change_label(change_pct: float | None, period_unchanged: bool = False) -> str:
     """生成环比变化标签。"""
+    if period_unchanged:
+        return "无对比意义"
     if change_pct is None:
         return "基线已记录"
     sign = "+" if change_pct >= 0 else ""
@@ -69,10 +76,12 @@ def _change_label(change_pct: float | None) -> str:
     return f"{arrow} {sign}{change_pct:.2f}%"
 
 
-def _flag_label(is_first: bool, alert_level: str) -> str:
+def _flag_label(is_first: bool, alert_level: str, period_unchanged: bool = False) -> str:
     """生成标识列文本。"""
     if is_first:
         return "📋 基线已记录"
+    if period_unchanged:
+        return "⎯ 报告期未推进"
     if alert_level == "紧急":
         return "🔴 紧急"
     if alert_level == "关注":
@@ -106,18 +115,23 @@ def write_concentration_sheet(
         alert = item.get("alert_level", "正常")
         row_font = _alert_font(alert)
         change_pct = item.get("change_pct")
+        period_unchanged = item.get("period_unchanged", False)
+        report_period = item.get("report_period", "")
+        if item.get("report_stale"):
+            report_period = f"{report_period}（陈旧）"
 
         row_data = [
             item.get("name", ""),
             item.get("code", ""),
+            report_period,
             "",  # 基金类型（暂无细分类别）
             item.get("top3_pct", 0),
             item.get("top5_pct", 0),
             item.get("top10_pct", 0),
             item.get("prev_top10_pct", "--") if item.get("prev_top10_pct") is not None else "—",
-            _change_label(change_pct),
+            _change_label(change_pct, period_unchanged),
             alert,
-            _flag_label(is_first, alert),
+            _flag_label(is_first, alert, period_unchanged),
         ]
         write_data_row(ws, i, row_data)
         # 对整行应用颜色字体

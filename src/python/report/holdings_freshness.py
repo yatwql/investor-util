@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime
 
 STALE_QUARTERS = 2
@@ -87,3 +88,49 @@ def format_report_period(raw: object) -> str:
         return parsed.strftime("%Y-%m-%d")
     text = str(raw or "").strip()
     return text or "未知"
+
+
+@dataclass(frozen=True)
+class ReportPeriodInfo:
+    """一次报告期判定的完整结果（展示文本 + 时效度量）。
+
+    各报告层消费者（穿透 / 重合度 / 集中度 / 风格 / 候选比较）共用同一判定，
+    避免「展示用文本」与「陈旧判定」两处口径各自演化——判据复制即漂移温床。
+    """
+
+    period: str
+    """展示用报告期文本（无法解析时原样返回，空值「未知」）。"""
+
+    quarters: int
+    """报告期之后已走完的完整季度数（无法解析时为 0）。"""
+
+    stale: bool
+    """是否陈旧到不可采信（口径见 :func:`is_stale_report`）。"""
+
+
+def evaluate_report_period(raw: object, today: date | None = None) -> ReportPeriodInfo:
+    """一次调用得出报告期的展示文本与时效判定。
+
+    Args:
+        raw: 持仓接口返回的报告期原文（``fetch_fund_holdings`` 的 ``date`` 字段）。
+        today: 判定基准日，默认当天（测试可注入固定日期）。
+
+    Returns:
+        判定结果；报告期缺失或无法解析时 ``stale`` 为 False、``quarters`` 为 0。
+    """
+    day = today or date.today()
+    parsed = parse_report_date(raw)
+    return ReportPeriodInfo(
+        period=format_report_period(raw),
+        quarters=complete_quarters_since(parsed, day) if parsed is not None else 0,
+        stale=is_stale_report(parsed, day),
+    )
+
+
+def fund_period_label(name: str, info: ReportPeriodInfo) -> str:
+    """基金持仓在报告中的标准报告期标注（名称 + 报告期 + 已过季度数）。
+
+    各消费者的标注措辞须一致——同一只基金在重合度、集中度、风格、候选比较
+    中若各写各的报告期文字，读者会以为是不同口径下的两件事。
+    """
+    return f"{name}（报告期 {info.period}，已过 {info.quarters} 个完整季度）"

@@ -30,6 +30,7 @@ from src.python.report.excel_writer import (
     write_header_row,
     write_title_row,
 )
+from src.python.report.styles import NOTE_FONT
 
 logger = logging.getLogger("invest")
 
@@ -134,16 +135,31 @@ def _compute_ncols(
     return max(n_funds + 2, n_codes + 2, _PAIRS_NCOLS, _OVERLAP_PAIR_NCOLS)
 
 
+def _write_stale_note(ws: Worksheet, row: int, notes: list[str]) -> int:
+    """写入被剔除的陈旧基金清单，返回下一行号。
+
+    删除数据必须留下痕迹：读者若发现某只基金缺席矩阵而无任何说明，
+    只会以为矩阵算错了。
+    """
+    if not notes:
+        return row
+    cell = ws.cell(row=row, column=1, value=f"⚠ 持仓报告期陈旧、已从矩阵剔除：{'；'.join(notes)}")
+    cell.font = NOTE_FONT
+    return row + 2
+
+
 def _write_overlap_block(
     ws: Worksheet,
     row: int,
     overlap_result: dict[str, Any] | None,
     fund_names: dict[str, str] | None,
     ncols: int,
+    stale_fund_notes: list[str] | None = None,
 ) -> int:
     """写入一、持仓重合度矩阵区块，返回下一行起始行号。"""
     write_title_row(ws, row, "一、持仓重合度矩阵", ncols=ncols)
     row += 1
+    row = _write_stale_note(ws, row, stale_fund_notes or [])
 
     overlap_result = overlap_result or {}
     funds = overlap_result.get("funds", [])
@@ -310,6 +326,7 @@ def write_position_relationship_sheet(
     overlap_result: dict[str, Any] | None = None,
     fund_names: dict[str, str] | None = None,
     correlation_data: dict[str, Any] | None = None,
+    stale_fund_notes: list[str] | None = None,
 ) -> None:
     """写入持仓关系矩阵页签（一章两区块：持仓重合度 + 持仓相关性）。
 
@@ -319,13 +336,14 @@ def write_position_relationship_sheet(
         fund_names: {fund_code: fund_name} 覆盖默认名称显示（重合度区块）。
         correlation_data: `position_relationship_data` 契约 dict（相关性区块数据源）；
             None 或 available=False 时相关性区块写占位。
+        stale_fund_notes: 因报告期陈旧而被剔除出重合度矩阵的基金标注文本；空则不写提示行。
     """
     _name = get_report_sheet_name("position_relationship")
     ncols = _compute_ncols(overlap_result, correlation_data)
     write_title_row(ws, 1, _name, ncols=ncols)
 
     row = 2
-    row = _write_overlap_block(ws, row, overlap_result, fund_names, ncols)
+    row = _write_overlap_block(ws, row, overlap_result, fund_names, ncols, stale_fund_notes)
     row = _write_correlation_block(ws, row, correlation_data, ncols)
 
     freeze_header(ws, row=2)

@@ -8,7 +8,10 @@
   - 单候选获取失败 → 该行 `available=False` + `reason`，不阻塞其余行；
   - 候选无有效代码 / 开关关闭 → `build_candidate_compare_data` 返回 None 或
     `available=False`，渲染层不输出比较子表；
-  - 候选超过 10 只 → 截断前 10，`exceed_limit=True`，渲染层提示。
+  - 候选超过 10 只 → 截断前 10，`exceed_limit=True`，渲染层提示；
+  - 持仓报告期陈旧（候选自身或作为重合度基准的现有基金）→ 保留候选行并标注
+    其报告期；基准侧的陈旧基金则剔除出重合度计算并如实列出，理由同「持仓
+    重合度矩阵」——该列只是矩阵的一格，口径须一致。
 
 与现有持仓重合度复用 `position_overlap.compute_overlap_matrix`（Jaccard 系数，
 不重复实现）；风格判定复用 `fund_style_classify.classify_fund_style`（复用中心化分类）。
@@ -23,6 +26,7 @@ from typing import Any
 from src.python.config import get_comparison_candidates, is_enable_candidate_compare
 from src.python.core.code_utils import is_fund_holding
 from src.python.fetcher.fund import fetch_fund_holdings_cached, fetch_fund_rankings_cached
+from src.python.report.holdings_freshness import evaluate_report_period, fund_period_label
 from src.python.report.position_overlap import compute_overlap_matrix
 from src.python.report.fund_style_classify import classify_fund_style
 
@@ -73,23 +77,27 @@ def resolve_candidates(
     return valid, invalid, exceeded
 
 
-def _collect_existing_fund_holdings(
+def _collect_existing_fund_baseline(
     holdings: list[Any] | None,
-) -> dict[str, list[dict[str, Any]]]:
-    """收集现有持仓基金的持仓明细（用于候选重合度计算）。
+) -> tuple[dict[str, list[dict[str, Any]]], list[str]]:
+    """收集现有持仓基金的持仓明细（候选重合度基准），并剔除报告期陈旧者。
 
     仅收集可成功获取的基金；获取失败/非基金持仓安全跳过（降级，不阻塞候选比较）。
     复用 `fetch_fund_holdings_cached` 会话缓存，与深度分析共享请求。
+
+    陈旧者剔除与「持仓重合度矩阵」同口径——候选行这一列本就是重合度矩阵的一格，
+    留着会让数年前的持仓结构以「与当前持仓的重合度」的名义呈现。
 
     Args:
         holdings: 原始持仓列表（Holding 模型或含 name/code/account 的对象）
 
     Returns:
-        {fund_code: [{name, code, ratio}, ...], ...}
+        ({fund_code: [{name, code, ratio}, ...], ...}, [陈旧基金标注文本, ...])
     """
     result: dict[str, list[dict[str, Any]]] = {}
+    stale_notes: list[str] = []
     if not holdings:
-        return result
+        return result, stale_notes
     for h in holdings:
         try:
             if not is_fund_holding(h.name, h.code, h.account):
@@ -98,11 +106,23 @@ def _collect_existing_fund_holdings(
             continue
         try:
             fh = fetch_fund_holdings_cached(h.code)
-            if fh:
-                result[h.code] = fh
         except Exception as e:  # 单基金获取失败降级
             logger.debug("候选重合度：现有基金 %s 持仓获取失败，跳过: %s", h.code, e)
-    return result
+            continue
+        if not fh or not fh.get("holdings"):
+            continue
+        period_info = evaluate_report_period(fh.get("date"))
+        if period_info.stale:
+            stale_notes.append(fund_period_label(fh.get("name") or h.code, period_info))
+            logger.warning(
+                "候选重合度：剔除 %s —— 报告期 %s 已过 %d 个完整季度",
+                fh.get("name") or h.code,
+                period_info.period,
+                period_info.quarters,
+            )
+            continue
+        result[h.code] = fh["holdings"]
+    return result, stale_notes
 
 
 def _pct_str(val: float | None) -> str:
@@ -124,7 +144,8 @@ def _build_candidate_row(
     数据结构（Excel/HTML 共用）：
       {code, name, rating, syl_{1m,3m,6m,1y}, syl_{...}_raw, rank_text,
        max_drawdown, max_drawdown_raw, style, overlap_name, overlap_jaccard,
-       overlap_jaccard_raw, available, reason}
+       overlap_jaccard_raw, report_period, report_stale, report_quarters,
+       report_label, available, reason}
 
     单候选数据获取失败 → `available=False` + `reason`，其余行不受影响。
 
@@ -146,6 +167,10 @@ def _build_candidate_row(
         "overlap_name": None,
         "overlap_jaccard": "--",
         "overlap_jaccard_raw": None,
+        "report_period": "未知",
+        "report_stale": False,
+        "report_quarters": 0,
+        "report_label": "",
         "available": False,
         "reason": "",
     }
@@ -191,8 +216,16 @@ def _build_candidate_row(
         except (TypeError, ValueError):
             pass
 
-    # 风格 + 与现有持仓重合度
-    cand_holdings = fetch_fund_holdings_cached(code)
+    # 风格 + 与现有持仓重合度。
+    # 注意：fetch_fund_holdings_cached 返回 {"name", "holdings", "date"} 字典，
+    # 下游风格判定与重合度计算要的是持仓**列表**，须先取 ["holdings"]。
+    cand_fh = fetch_fund_holdings_cached(code) or {}
+    cand_holdings = cand_fh.get("holdings") or []
+    period_info = evaluate_report_period(cand_fh.get("date"))
+    row["report_period"] = period_info.period
+    row["report_stale"] = period_info.stale
+    row["report_quarters"] = period_info.quarters
+    row["report_label"] = fund_period_label(row["name"], period_info)
     if cand_holdings:
         try:
             style = classify_fund_style(code, cand_holdings)
@@ -246,7 +279,8 @@ def build_candidate_compare_data(
     Returns:
         None — 开关 `report_submodules.candidate_compare` 关闭（不渲染比较子表）；
         {"available": False, "reason": ..., "rows": []} — 开关开但无有效候选；
-        {"available": True, "exceed_limit", "invalid", "rows": [...]} — 正常。
+        {"available": True, "exceed_limit", "invalid", "rows", "stale_baseline_notes"} — 正常。
+        `stale_baseline_notes` 列出因报告期陈旧而未进入重合度基准的现有持仓基金。
     """
     if not is_enable_candidate_compare(config):
         return None
@@ -262,11 +296,12 @@ def build_candidate_compare_data(
             "invalid": invalid,
             "rows": [],
         }
-    existing_holdings = _collect_existing_fund_holdings(holdings)
+    existing_holdings, stale_baseline_notes = _collect_existing_fund_baseline(holdings)
     rows = [_build_candidate_row(code, existing_holdings) for code in valid]
     return {
         "available": True,
         "exceed_limit": exceeded,
         "invalid": invalid,
         "rows": rows,
+        "stale_baseline_notes": stale_baseline_notes,
     }

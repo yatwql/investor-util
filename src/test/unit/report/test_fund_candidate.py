@@ -4,7 +4,9 @@
   - resolve_candidates 代码校验/去重/超上限截断
   - build_candidate_compare_data 开关门控 / 无候选降级 / 行构建 / 单候选失败降级
   - 与现有持仓重合度复用 compute_overlap_matrix
-全部 fetcher / 风格判定 / 重合度均为 mock，禁止真实网络请求。
+  - 候选行「风格」「重合度」两列在真实返回形状下被填出（回归：曾整字典当持仓列表传下游）
+  - 持仓报告期陈旧时的观测与处置（候选行保留并标注 / 重合度基准剔除）
+全部 fetcher 均为 mock，禁止真实网络请求。
 """
 
 from __future__ import annotations
@@ -17,6 +19,30 @@ import pytest
 from src.python.report import fund_candidate as fc
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+
+
+def _fh(holdings: list[dict], date: str | None = None, name: str | None = None) -> dict:
+    """构造 fetch_fund_holdings_cached 的真实返回形状。
+
+    该函数返回 ``{"name", "holdings", "date"}`` 字典而非持仓列表——测试若把持仓
+    列表直接当作返回值，就复现不出「整字典被当持仓列表传下游」这类缺陷。
+    """
+    result: dict = {"name": name or "测试基金", "holdings": holdings}
+    if date:
+        result["date"] = date
+    return result
+
+
+def _recent_period() -> str:
+    """最近一个已走完的季度末（避免夹具随时间推移被时效闸门判为陈旧）。"""
+    import datetime as _dt
+
+    today = _dt.date.today()
+    quarter_ends = [(3, 31), (6, 30), (9, 30), (12, 31)]
+    candidates = [_dt.date(today.year, m, d) for m, d in quarter_ends if _dt.date(today.year, m, d) <= today]
+    if not candidates:
+        candidates = [_dt.date(today.year - 1, 12, 31)]
+    return candidates[-1].strftime("%Y-%m-%d")
 
 
 def _rankings(code: str, name: str | None = None) -> dict:
@@ -108,7 +134,7 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         self.assertEqual(result["reason"], "no_valid_candidate")
         self.assertEqual(result["invalid"], ["not-a-code", "123"])
 
-    @patch("src.python.report.fund_candidate._collect_existing_fund_holdings")
+    @patch("src.python.report.fund_candidate._collect_existing_fund_baseline")
     @patch("src.python.report.fund_candidate.fetch_fund_holdings_cached")
     @patch("src.python.report.fund_candidate.fetch_fund_rankings_cached")
     @patch("src.python.report.fund_candidate.is_enable_candidate_compare")
@@ -118,11 +144,17 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         mock_enable.return_value = True
         mock_get.return_value = ["000001"]
         mock_rank.side_effect = lambda code: _rankings(code)
-        mock_hold.return_value = [
-            {"name": "贵州茅台", "code": "600519", "ratio": 10.0},
-            {"name": "宁德时代", "code": "300750", "ratio": 8.0},
-        ]
-        mock_collect.return_value = {"600519": [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]}
+        mock_hold.return_value = _fh(
+            [
+                {"name": "贵州茅台", "code": "600519", "ratio": 10.0},
+                {"name": "宁德时代", "code": "300750", "ratio": 8.0},
+            ],
+            date=_recent_period(),
+        )
+        mock_collect.return_value = (
+            {"600519": [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]},
+            [],
+        )
         with patch("src.python.report.fund_candidate.classify_fund_style") as mock_style:
             mock_style.return_value = {"code": "000001", "style": "大盘成长", "is_estimated": False, "details": []}
             with patch("src.python.report.fund_candidate.compute_overlap_matrix") as mock_overlap:
@@ -215,7 +247,7 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         self.assertIsNone(row["overlap_jaccard_raw"])
         mock_overlap.assert_not_called()
 
-    @patch("src.python.report.fund_candidate._collect_existing_fund_holdings")
+    @patch("src.python.report.fund_candidate._collect_existing_fund_baseline")
     @patch("src.python.report.fund_candidate.fetch_fund_holdings_cached")
     @patch("src.python.report.fund_candidate.fetch_fund_rankings_cached")
     @patch("src.python.report.fund_candidate.is_enable_candidate_compare")
@@ -225,8 +257,11 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         mock_enable.return_value = True
         mock_get.return_value = ["000001"]
         mock_rank.side_effect = lambda code: _rankings(code)
-        mock_hold.return_value = [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]
-        mock_collect.return_value = {"600519": [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]}
+        mock_hold.return_value = _fh([{"name": "贵州茅台", "code": "600519", "ratio": 10.0}], date=_recent_period())
+        mock_collect.return_value = (
+            {"600519": [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]},
+            [],
+        )
         with patch("src.python.report.fund_candidate.classify_fund_style") as mock_style:
             mock_style.return_value = {"code": "000001", "style": "--", "is_estimated": False, "details": []}
             with patch("src.python.report.fund_candidate.compute_overlap_matrix") as mock_overlap:
@@ -295,7 +330,7 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         self.assertEqual(row["max_drawdown"], "--")
         self.assertTrue(row["available"])
 
-    @patch("src.python.report.fund_candidate._collect_existing_fund_holdings")
+    @patch("src.python.report.fund_candidate._collect_existing_fund_baseline")
     @patch("src.python.report.fund_candidate.fetch_fund_holdings_cached")
     @patch("src.python.report.fund_candidate.fetch_fund_rankings_cached")
     @patch("src.python.report.fund_candidate.is_enable_candidate_compare")
@@ -305,8 +340,11 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         mock_enable.return_value = True
         mock_get.return_value = ["000001"]
         mock_rank.return_value = _rankings("000001")
-        mock_hold.return_value = [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]
-        mock_collect.return_value = {"600519": [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]}
+        mock_hold.return_value = _fh([{"name": "贵州茅台", "code": "600519", "ratio": 10.0}], date=_recent_period())
+        mock_collect.return_value = (
+            {"600519": [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]},
+            [],
+        )
         with patch("src.python.report.fund_candidate.classify_fund_style", side_effect=RuntimeError("boom")):
             with patch("src.python.report.fund_candidate.compute_overlap_matrix") as mock_overlap:
                 mock_overlap.return_value = {
@@ -328,7 +366,7 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         self.assertEqual(row["overlap_jaccard"], "--")
         self.assertTrue(row["available"])
 
-    @patch("src.python.report.fund_candidate._collect_existing_fund_holdings")
+    @patch("src.python.report.fund_candidate._collect_existing_fund_baseline")
     @patch("src.python.report.fund_candidate.fetch_fund_holdings_cached")
     @patch("src.python.report.fund_candidate.fetch_fund_rankings_cached")
     @patch("src.python.report.fund_candidate.is_enable_candidate_compare")
@@ -338,8 +376,11 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         mock_enable.return_value = True
         mock_get.return_value = ["000001"]
         mock_rank.return_value = _rankings("000001")
-        mock_hold.return_value = [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]
-        mock_collect.return_value = {"600519": [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]}
+        mock_hold.return_value = _fh([{"name": "贵州茅台", "code": "600519", "ratio": 10.0}], date=_recent_period())
+        mock_collect.return_value = (
+            {"600519": [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]},
+            [],
+        )
         with patch("src.python.report.fund_candidate.classify_fund_style") as mock_style:
             mock_style.return_value = {"code": "000001", "style": "--", "is_estimated": False, "details": []}
             with patch(
@@ -360,7 +401,7 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         mock_enable.return_value = True
         mock_get.return_value = ["000001"]
         mock_rank.return_value = _rankings("000001")
-        mock_hold.return_value = [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]
+        mock_hold.return_value = _fh([{"name": "贵州茅台", "code": "600519", "ratio": 10.0}])
         with patch("src.python.report.fund_candidate.classify_fund_style") as mock_style:
             mock_style.return_value = {"code": "000001", "style": "--", "is_estimated": False, "details": []}
             with patch("src.python.report.fund_candidate.compute_overlap_matrix") as mock_overlap:
@@ -375,8 +416,8 @@ class TestBuildCandidateCompareData(unittest.TestCase):
         self.assertEqual(fc._pct_str("not-a-number"), "--")
 
 
-class TestCollectExistingFundHoldings(unittest.TestCase):
-    """现有持仓基金持仓明细收集。"""
+class TestCollectExistingFundBaseline(unittest.TestCase):
+    """现有持仓基金持仓明细收集（候选重合度基准）。"""
 
     def _holding(self, name: str, code: str, account: str = "账户A"):
         class _H:
@@ -390,7 +431,7 @@ class TestCollectExistingFundHoldings(unittest.TestCase):
     @patch("src.python.report.fund_candidate.fetch_fund_holdings_cached")
     def test_collects_only_fund_holdings(self, mock_hold):
         """仅收集基金持仓；股票持仓安全跳过。"""
-        mock_hold.return_value = [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}]
+        mock_hold.return_value = _fh([{"name": "贵州茅台", "code": "600519", "ratio": 10.0}])
         holdings = [
             self._holding("贵州茅台", "600519"),  # 股票，跳过
             self._holding("沪深300指数基金", "110020"),  # 基金，收集
@@ -399,16 +440,20 @@ class TestCollectExistingFundHoldings(unittest.TestCase):
             "src.python.report.fund_candidate.is_fund_holding",
             side_effect=lambda n, c, a: c == "110020",
         ):
-            result = fc._collect_existing_fund_holdings(holdings)
+            result, stale = fc._collect_existing_fund_baseline(holdings)
         self.assertEqual(list(result.keys()), ["110020"])
+        # 基准值是持仓**列表**（下游判定/矩阵都按列表消费），不是整个返回字典
+        self.assertIsInstance(result["110020"], list)
+        self.assertEqual(stale, [])
 
     @patch("src.python.report.fund_candidate.fetch_fund_holdings_cached")
     def test_fetch_failure_skipped(self, mock_hold):
         """单基金持仓获取失败 → 跳过，不阻塞其余。"""
         mock_hold.side_effect = RuntimeError("network down")
         with patch("src.python.report.fund_candidate.is_fund_holding", return_value=True):
-            result = fc._collect_existing_fund_holdings([self._holding("基金A", "110020")])
+            result, stale = fc._collect_existing_fund_baseline([self._holding("基金A", "110020")])
         self.assertEqual(result, {})
+        self.assertEqual(stale, [])
 
     def test_missing_attributes_skipped(self):
         """持仓对象缺属性 → 安全跳过。"""
@@ -416,12 +461,106 @@ class TestCollectExistingFundHoldings(unittest.TestCase):
         class _H:
             pass
 
-        result = fc._collect_existing_fund_holdings([_H()])
+        result, stale = fc._collect_existing_fund_baseline([_H()])
         self.assertEqual(result, {})
+        self.assertEqual(stale, [])
 
     def test_empty_holdings(self):
         """空持仓 → 空映射。"""
-        self.assertEqual(fc._collect_existing_fund_holdings([]), {})
+        self.assertEqual(fc._collect_existing_fund_baseline([]), ({}, []))
+
+    @patch("src.python.report.fund_candidate.fetch_fund_holdings_cached")
+    def test_stale_report_period_excluded_from_baseline(self, mock_hold):
+        """报告期陈旧的现有基金不入基准，并留下可上屏的标注。"""
+        mock_hold.return_value = _fh(
+            [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}],
+            date="2020-03-31",
+            name="陈年基金",
+        )
+        with patch("src.python.report.fund_candidate.is_fund_holding", return_value=True):
+            result, stale = fc._collect_existing_fund_baseline([self._holding("陈年基金", "110020")])
+
+        self.assertEqual(result, {})
+        self.assertEqual(len(stale), 1)
+        self.assertIn("陈年基金", stale[0])
+        self.assertIn("2020-03-31", stale[0])
+        self.assertIn("完整季度", stale[0])
+
+    @patch("src.python.report.fund_candidate.fetch_fund_holdings_cached")
+    def test_recent_report_period_kept_in_baseline(self, mock_hold):
+        """报告期在披露节奏内的现有基金照常入基准（闸门不可误伤）。"""
+        mock_hold.return_value = _fh(
+            [{"name": "贵州茅台", "code": "600519", "ratio": 10.0}],
+            date=_recent_period(),
+        )
+        with patch("src.python.report.fund_candidate.is_fund_holding", return_value=True):
+            result, stale = fc._collect_existing_fund_baseline([self._holding("当代基金", "110020")])
+
+        self.assertEqual(list(result.keys()), ["110020"])
+        self.assertEqual(stale, [])
+
+
+class TestCandidateRowRealShapes(unittest.TestCase):
+    """候选行在真实返回形状下的两列填充（回归：整字典曾被当持仓列表传下游）。
+
+    既有用例全部 mock 掉风格判定与重合度矩阵，真实入参形状无人校验，
+    缺陷因此长期潜伏——故这里**不动**这两个下游，让它们拿到真实形状自行计算。
+    """
+
+    def _row(self):
+        with patch(
+            "src.python.report.fund_candidate.fetch_fund_holdings_cached",
+            return_value=_fh(
+                [
+                    {"name": "贵州茅台", "code": "600519", "ratio": 9.1},
+                    {"name": "五粮液", "code": "000858", "ratio": 7.2},
+                ],
+                date=_recent_period(),
+                name="候选基金",
+            ),
+        ):
+            with patch(
+                "src.python.report.fund_candidate.fetch_fund_rankings_cached",
+                return_value=_rankings("110011"),
+            ):
+                return fc._build_candidate_row(
+                    "110011",
+                    {
+                        "000001": [
+                            {"name": "贵州茅台", "code": "600519", "ratio": 8.0},
+                            {"name": "泸州老窖", "code": "000568", "ratio": 6.0},
+                        ]
+                    },
+                )
+
+    def test_style_column_filled_from_holdings_list(self):
+        """风格判定拿到持仓列表 → 风格列被填出（非 '--'）。"""
+        with patch("src.python.report.fund_candidate.classify_fund_style") as mock_style:
+            mock_style.return_value = {"code": "110011", "style": "大盘成长", "is_estimated": False, "details": []}
+            row = self._row()
+
+        self.assertEqual(row["style"], "大盘成长")
+        # 下游拿到的是持仓列表，不是 {"name","holdings","date"} 整字典
+        passed = mock_style.call_args[0][1]
+        self.assertIsInstance(passed, list)
+        self.assertEqual(len(passed), 2)
+
+    def test_overlap_column_filled_without_mocked_matrix(self):
+        """重合度矩阵接真实输入 → 重合度列被填出（曾因整字典入参恒为空）。"""
+        row = self._row()
+
+        self.assertEqual(row["overlap_name"], "000001")
+        self.assertAlmostEqual(row["overlap_jaccard_raw"], 1 / 3, places=4)
+        self.assertEqual(row["overlap_jaccard"], "33.33%")
+
+    def test_report_period_carried_on_row(self):
+        """候选行带上其持仓报告期与展示用标注。"""
+        row = self._row()
+
+        self.assertEqual(row["report_period"], _recent_period())
+        self.assertFalse(row["report_stale"])
+        self.assertIn("候选基金", row["report_label"])
+        self.assertIn(_recent_period(), row["report_label"])
 
 
 if __name__ == "__main__":

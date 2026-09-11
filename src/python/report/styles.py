@@ -19,6 +19,7 @@ NORMAL_FONT = Font(size=10)
 CONTENT_FONT = Font(size=11, color="000000")  # LLM 内容区正文
 BOLD_FONT = Font(size=10, bold=True)
 TITLE_FONT = Font(size=14, bold=True, color="FFFFFF")
+NOTE_FONT = Font(size=9, color="8A5A00")  # 数据前提/剔除说明等脚注（区别于正文数据行）
 
 # ── 填充 ──────────────────────────────────────────────────
 

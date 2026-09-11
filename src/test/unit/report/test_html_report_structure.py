@@ -1843,6 +1843,19 @@ class TestFooterExperimentalNotice(unittest.TestCase):
         """上下文未注入该变量时同样不出现空壳行（模板须判空而非只判存在）。"""
         self.assertNotIn("⚗", self._render_footer().get_text())
 
+    def test_wording_matches_excel_landing(self):
+        """HTML 页脚与 Excel 落点须同一句式——两处各写各的，措辞必然漂移。"""
+        from src.python.config.features import enabled_experimental_features, set_feature_enabled
+        from src.python.report.experimental_notice import enabled_notice_line
+
+        set_feature_enabled("signal_ledger", True)
+        line = enabled_notice_line()
+        self.assertIsNotNone(line)
+
+        text = self._render_footer([name for _flag, name in enabled_experimental_features()]).get_text()
+
+        self.assertIn(line, text, "HTML 页脚句式应与 Excel 落点一致")
+
     def test_writer_injects_context_variable(self):
         """渲染上下文须注入该变量——漏传时模板判空而静默不显示，无任何报错。"""
         import inspect
@@ -1851,6 +1864,154 @@ class TestFooterExperimentalNotice(unittest.TestCase):
 
         source = inspect.getsource(html_writer._render_template)
         self.assertIn("enabled_experiments=", source, "_render_template 应将 enabled_experiments 载入模板上下文")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 报告期时效标注（重合度剔除 / 集中度环比 / 候选比较）
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlReportPeriodAnnotations(unittest.TestCase):
+    """HTML 产物须与 Excel 同口径呈现报告期时效。
+
+    重合度按市值加权，陈旧基金剔除后必须在产物中留痕；集中度保留但标注报告期，
+    报告期未推进时标「无对比意义」而非报 0；候选比较标注其风格与重合度所依据的
+    报告期。缺了这些行，读者会把跨年快照当成当期持仓。
+    """
+
+    def _render(self, **overrides) -> BeautifulSoup:
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data.update(overrides)
+        return _render_template(data)
+
+    def _conc_result(self, **extra) -> dict:
+        base = {
+            "name": "易方达中小盘混合",
+            "code": "110011",
+            "report_period": "2026-06-30",
+            "report_stale": False,
+            "top3_pct": 24.5,
+            "top5_pct": 35.5,
+            "top10_pct": 35.5,
+            "prev_top10_pct": None,
+            "change_pct": None,
+            "alert_level": "正常",
+            "is_first_check": False,
+            "period_unchanged": False,
+        }
+        base.update(extra)
+        return base
+
+    # ── 重合度：剔除留痕 ────────────────────────────────────────
+
+    def test_stale_fund_exclusion_banner_rendered(self):
+        """陈旧基金被剔除出矩阵 → 区块顶部留痕（否则读者以为矩阵算错了）。"""
+        soup = self._render(
+            overlap_matrix={
+                "fund_names": {"a": "基金A", "b": "基金B"},
+                "funds": ["a", "b"],
+                "matrix": [[1.0, 0.5], [0.5, 1.0]],
+                "pairs": [],
+                "stale_fund_notes": ["陈年基金（报告期 2020-03-31，已过 20 个完整季度）"],
+            }
+        )
+        text = soup.select_one("#sec-position_relationship").get_text()
+        self.assertIn("已从矩阵剔除", text)
+        self.assertIn("陈年基金", text)
+        self.assertIn("2020-03-31", text)
+
+    def test_no_banner_without_stale_funds(self):
+        """无陈旧基金 → 不出现剔除横幅（零噪声）。"""
+        soup = self._render(
+            overlap_matrix={"fund_names": {}, "funds": [], "matrix": [], "pairs": [], "stale_fund_notes": []}
+        )
+        text = soup.select_one("#sec-position_relationship").get_text()
+        self.assertNotIn("已从矩阵剔除", text)
+
+    # ── 集中度：报告期列 + 环比语义 ─────────────────────────────
+
+    def test_concentration_period_column_rendered(self):
+        """「报告期」列随数据呈现，陈旧者带（陈旧）后缀。"""
+        soup = self._render(
+            concentration_analysis={"results": [self._conc_result(report_period="2020-03-31", report_stale=True)]}
+        )
+        text = soup.select_one("#sec-fund_concentration").get_text()
+        self.assertIn("报告期", text)
+        self.assertIn("2020-03-31（陈旧）", text)
+
+    def test_concentration_unchanged_period_marked(self):
+        """报告期未推进 → 环比「无对比意义」+ 标识「报告期未推进」。"""
+        soup = self._render(
+            concentration_analysis={"results": [self._conc_result(period_unchanged=True, prev_top10_pct=35.5)]}
+        )
+        text = soup.select_one("#sec-fund_concentration").get_text()
+        self.assertIn("无对比意义", text)
+        self.assertIn("报告期未推进", text)
+
+    def test_concentration_advanced_period_shows_change(self):
+        """报告期推进 → 照常呈现环比（闸门不可误伤正常对比）。"""
+        soup = self._render(
+            concentration_analysis={
+                "results": [self._conc_result(prev_top10_pct=30.0, change_pct=5.5, alert_level="正常")]
+            }
+        )
+        # 取表格内文本：区块脚注本就含「无对比意义」四字
+        text = soup.select_one("#sec-fund_concentration table").get_text()
+        self.assertIn("+5.50%", text)
+        self.assertNotIn("无对比意义", text)
+
+    # ── 候选比较：报告期标注 ────────────────────────────────────
+
+    def _candidate_data(self, **extra) -> dict:
+        row = {
+            "code": "000001",
+            "name": "候选基金A",
+            "available": True,
+            "rating": "优秀",
+            "syl_近1月": "1.23%",
+            "syl_近3月": "5.67%",
+            "syl_近6月": "11.01%",
+            "syl_近1年": "-2.01%",
+            "rank_text": "159/358",
+            "max_drawdown": "-18.50%",
+            "style": "大盘成长",
+            "overlap_name": "",
+            "overlap_jaccard": "--",
+            "report_label": "候选基金A（报告期 2026-06-30，已过 0 个完整季度）",
+        }
+        base = {"available": True, "exceed_limit": False, "invalid": [], "rows": [row]}
+        base.update(extra)
+        return base
+
+    def test_candidate_report_period_note_rendered(self):
+        """候选的风格与重合度基于定期报告快照 → 须标注报告期。"""
+        soup = self._render(candidate_data=self._candidate_data())
+        text = soup.select_one("#sec-fund_performance").get_text()
+        self.assertIn("持仓报告期", text)
+        self.assertIn("2026-06-30", text)
+
+    def test_candidate_stale_baseline_note_rendered(self):
+        """现有持仓陈旧未计入重合度基准 → 提示读者重合度分母不含它。"""
+        soup = self._render(
+            candidate_data=self._candidate_data(
+                stale_baseline_notes=["陈年基金（报告期 2020-03-31，已过 20 个完整季度）"]
+            )
+        )
+        text = soup.select_one("#sec-fund_performance").get_text()
+        self.assertIn("未计入重合度基准", text)
+        self.assertIn("陈年基金", text)
+
+    def test_no_notes_when_nothing_to_annotate(self):
+        """无可标注项 → 不写空壳备注行。"""
+        data = self._candidate_data()
+        data["rows"][0]["report_label"] = ""
+        soup = self._render(candidate_data=data)
+        text = soup.select_one("#sec-fund_performance").get_text()
+        self.assertNotIn("持仓报告期", text)
+        self.assertNotIn("未计入重合度基准", text)
 
 
 if __name__ == "__main__":

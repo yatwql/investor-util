@@ -43,7 +43,7 @@ from src.python.report.excel_writer import (
 )
 from src.python.report.market_value import DetailRow
 from src.python.report.penetration import ACTIVE_EQUITY, BOND_FUND, ETF, INDEX_LINK, QDII, classify_penetration
-from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, RED_FONT
+from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, NOTE_FONT, RED_FONT
 
 logger = logging.getLogger("invest")
 
@@ -543,6 +543,22 @@ def _write_candidate_compare_block(ws, row: int, candidate_data: dict[str, Any])
             fmt,
         )
         row += 1
+
+    # 报告期标注：候选的风格判定与重合度都基于其定期报告快照，读者须知道那是哪一期。
+    period_labels = [c["report_label"] for c in candidate_data.get("rows", []) if c.get("report_label")]
+    if period_labels:
+        ws.cell(row=row, column=1, value=f"持仓报告期：{'；'.join(period_labels)}").font = NOTE_FONT
+        row += 1
+
+    stale_baseline = candidate_data.get("stale_baseline_notes") or []
+    if stale_baseline:
+        ws.cell(
+            row=row,
+            column=1,
+            value=f"⚠ 现有持仓报告期陈旧、未计入重合度基准：{'；'.join(stale_baseline)}",
+        ).font = NOTE_FONT
+        row += 1
+
     if candidate_data.get("exceed_limit"):
         write_data_row(ws, row, ["候选基金超过 10 只，仅比较前 10 只", "", "", "", "", "", "", "", "", "", ""], fmt)
         row += 1

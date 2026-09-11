@@ -180,6 +180,15 @@ class TestGenerateExcelReport(unittest.TestCase):
         self.mock_fetch_idx.assert_called_once()
         self.mock_fetch_us_idx.assert_called_once()
 
+    def test_summary_fallback_notice_wired(self) -> None:
+        """生成流程须调用汇总页脚兜底写入（漏调则该落点在真实产物上永不出现）。"""
+        from src.python.report.excel_generator import generate_excel_report
+
+        with patch("src.python.report.excel_generator._write_summary_experimental_notice") as mock_notice:
+            generate_excel_report(self.holdings, include_llm=False, progress=self.progress)
+
+        mock_notice.assert_called_once()
+
     # ── 新闻路径 ──
 
     def test_with_news(self) -> None:
