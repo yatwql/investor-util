@@ -92,6 +92,16 @@ CLI 模式无需 TUI 界面，通过参数驱动，适合定时任务和脚本�
 >
 > 包装脚本自动定位项目虚拟环境解释器（`.venv/bin/python` / `.venv\Scripts\python.exe`）并切换到项目根目录；完整参数同下方「CLI 命令参考」，脚本速查见 [开发者指南](../managements/developer-guide.md#辅助脚本速查)。
 >
+> **只要完整报告（含 LLM）**：`scripts/llm.sh`（Linux/macOS）或 `scripts/llm.ps1`（Windows）是任务类型写死的快捷入口，等价于 TUI 菜单的「生成完整报告」——固定 `report --type full`，追加参数即为其报告级参数：
+>
+> ```bash
+> ./scripts/llm.sh                  # 生成完整报告（含 LLM）
+> ./scripts/llm.sh --force-llm      # 强制重新调用 LLM，跳过缓存
+> ./scripts/llm.sh --history off    # 本次不获取组合历史走势
+> ```
+>
+> 需要全局参数（`--config` / `--output` / `--experiment` / `--feature`）时仍用 `cli.sh` / `cli.ps1`——它们必须写在 `report` 子命令之前。
+>
 > **关于报告类型**：`basic`（CLI 默认，约 1 分钟）只生成核心 Excel 页签（汇总/市值/分类/穿透/基金业绩），新闻、历史、LLM 相关页签为降级占位；`both`（包装脚本无参数默认，约 2 分钟）生成 Excel+HTML 双格式且含新闻/基金深度/演进等全部非 LLM 页签；`full`（约 5 分钟）在 both 基础上再含 LLM 全球政经/智囊团等章节。组合历史走势默认自动获取（按配置 `history.fetch_mode`，默认 `auto`）；如需跳过可在 `both`/`full` 时加 `--history off`。
 >
 > CLI 模式与 TUI 模式共享同一套缓存和配置文件，两种模式可交替使用。

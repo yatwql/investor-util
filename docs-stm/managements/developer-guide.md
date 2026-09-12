@@ -707,6 +707,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-svg-text-overflow.py` | 诊断 | README SVG 架构图文字色像素越界精确检测 |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本（无参数启动 TUI；`web` 子命令启动 Web 浏览器模式） |
 | `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
+| `llm.sh` / `llm.ps1` | 启动 | Linux/macOS / Windows 完整报告快捷入口（固定 `report --type full`，等价 TUI「生成完整报告」） |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
 | `doctor` | 诊断 | cli.py 子命令：系统自检（环境/配置/目录/开关/适配/凭据/数据源七组，`--offline`/`--timeout`，不受实验开关约束） |
 | `view-logs` | 诊断 | cli.py 子命令：查看结构化运行日志（`--level`/`--lines`/`--since`/`--until`，与 TUI `[V]` 同实现） |
@@ -1071,6 +1072,25 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 > 注意：包装脚本的「无参数默认 both」与 CLI 本身的 `--type` 默认值（basic，仅 Excel）不同——直接直调 `.venv/bin/python -m src.python.cli report`（不带 `--type`）仍走 basic 轻量模式（只生成核心页签，新闻/历史/LLM 等页签为降级占位）。包装脚本无参数时自动补 `report --type both`，确保拿到完整非 LLM 报告。
 
 包装脚本相比直调的好处：自动切换到项目根目录、自动定位虚拟环境解释器（避免误用系统 python 缺失 pandas 等依赖）、无参数时自动补 `report` 子命令。CLI 完整参数说明见 [快速开始](../manuals/how-to-start.md) 的「CLI 命令行模式」一节。
+
+**`llm.sh` / `llm.ps1` — 完整报告快捷入口**
+
+只做一件事：生成含 LLM 分析章节的完整报告，等价于 TUI 菜单的「生成完整报告(Excel+HTML) [含LLM，按章节配置]」。
+子命令与报告类型写死在脚本里，免去每次敲 `report --type full`。
+
+```bash
+./scripts/llm.sh                  # 生成完整报告（含 LLM）
+./scripts/llm.sh --force-llm      # 强制重新调用 LLM，跳过缓存
+./scripts/llm.sh --history off    # 本次不获取组合历史走势
+```
+
+```powershell
+.\scripts\llm.ps1 --force-llm
+```
+
+追加的参数即 `report` 的报告级参数（`--type` / `--history` / `--force-llm`）；组合历史走势不写死，
+由配置 `history.fetch_mode` 决定（与 TUI 菜单一致）。需要全局参数（`--config` / `--output` /
+`--experiment` / `--feature`）时仍走 `cli.sh` / `cli.ps1`——它们必须写在 `report` 子命令之前。
 
 ### CLI 子命令
 

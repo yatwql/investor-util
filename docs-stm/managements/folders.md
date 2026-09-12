@@ -771,6 +771,8 @@ investor-util/
 │   ├── cli.sh                       #   Linux/macOS CLI 命令行包装（无参数默认生成报告 --type both）
 │   ├── launch.ps1                   #   Windows PowerShell 启动脚本
 │   ├── launch.sh                    #   Linux/macOS 启动脚本
+│   ├── llm.ps1                      #   Windows PowerShell 完整报告包装（固定 report --type full，含 LLM）
+│   ├── llm.sh                       #   Linux/macOS 完整报告包装（固定 report --type full，含 LLM）
 │   ├── test-runner.py               #   测试驱动（pytest 模式封装）
 │   ├── check-test-markers.py        #   测试标记合规检查
 │   ├── check-task-numbering.py      #   任务编号（plan-/rf-）全局一致性检查

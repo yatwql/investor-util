@@ -261,6 +261,18 @@ TUI 菜单与 CLI 子命令落到**同一个业务编排函数**（`report/orche
 1. **`history.fetch_mode = "prompt"` 时**：TUI 会停下来问；CLI 省略 `--history` 时按「获取」处理（非交互场景无从询问）。
 2. **`enable_history = false` 时**：历史走势整体不获取，此时加 `--history auto` 也不会生效——外层开关优先于本参数。TUI 与 CLI 行为一致。
 
+### 10.2 一键快捷入口
+
+若只想要 `[L]` 这一件事，`scripts/llm.sh`（Linux/macOS）与 `scripts/llm.ps1`（Windows）把子命令与报告类型写死在脚本里，免去每次敲 `report --type full`：
+
+```bash
+./scripts/llm.sh                  # 生成完整报告（含 LLM）
+./scripts/llm.sh --force-llm      # 强制重新调用 LLM，跳过缓存
+./scripts/llm.sh --history off    # 本次不获取组合历史走势
+```
+
+追加的参数即 `report` 的报告级参数。需要全局参数（`--config` / `--output` / `--experiment` / `--feature`）时仍走 `cli.sh` / `cli.ps1`——它们必须写在子命令之前。
+
 其余菜单项（配置类、缓存类、日志/健康/自检）在 CLI 侧均有独立子命令，见上方速查表与各节说明。
 
 ---

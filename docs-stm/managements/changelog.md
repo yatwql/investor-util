@@ -6,6 +6,14 @@
 
 ## [0.10.19-dev] - 开发中（未发布）
 
+### 完整报告快捷入口 llm.sh / llm.ps1（2026-09-12）
+
+- **背景**：用户要求为「生成完整报告（含 LLM）」提供一个最快捷的入口封装——等价于 TUI 菜单的 `[L]`，免去每次敲 `report --type full`。
+- **新增**：`scripts/llm.sh`（Linux/macOS）与 `scripts/llm.ps1`（Windows），沿用既有 `cli.sh` / `cli.ps1` 的结构（自动定位项目根目录 + 虚拟环境解释器 + 建数据目录），把子命令与报告类型写死为 `report --type full`；追加参数原样接在其后，即 `report` 的报告级参数（`--force-llm` / `--history`）。
+- **口径**：组合历史走势不写死 `--history`，由配置 `history.fetch_mode` 决定——与 TUI 菜单 `[L]` 的取数逻辑一致（`off` 跳过、`auto` 获取），而非无条件强制获取。需要全局参数（`--config` / `--output` / `--experiment` / `--feature`）时仍用 `cli.sh` / `cli.ps1`，它们必须写在 `report` 子命令之前（argparse 子解析器结构所限，见手册 §10.1）。
+- **编码**：`llm.ps1` 为 UTF-8 with BOM + CRLF，`llm.sh` 为 UTF-8 无 BOM 且置可执行位——与同目录既有脚本一致。
+- **文档**：手册 §10 新增「10.2 一键快捷入口」、`how-to-start.md` 便捷入口段补快捷入口说明、`developer-guide.md` 辅助脚本速查与脚本详解补两行、`folders.md` 目录树同步。
+
 ### CLI 手册补 TUI 菜单对照表（2026-09-12）
 
 - **背景**：用户问「CLI 脚本如何达成 TUI 模式中 [L] 的作用」，核对实现后给出等价命令与逐项参数映射；用户要求把映射表写入 CLI 手册。
