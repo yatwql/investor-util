@@ -84,7 +84,7 @@ def reset_credential_specs() -> None:
 
 
 def credential_ready_enabled() -> bool:
-    """本机制是否启用（实验开关 ``datasource_credential_ready``）。
+    """本机制是否启用（常规开关 ``datasource_credential_ready``，默认开启）。
 
     开关名收敛在此处——各调用点用本函数判定，不各自硬编码开关字符串；
     开关关闭时全部调用点的行为与未引入本机制时逐字一致。

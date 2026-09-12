@@ -1,4 +1,4 @@
-"""Web `/api/health` 凭据跳过态透传测试（实验功能 `datasource_credential_ready`）。
+"""Web `/api/health` 凭据跳过态透传测试（常规开关 `datasource_credential_ready`，默认开启）。
 
 `/api/health` 直接透传 `run_health_checks` 的结构，故凭据跳过项新增的
 ``skipped`` 标记须原样到达前端（凭据页/健康页据此区分「源故障」与「未配置」）。

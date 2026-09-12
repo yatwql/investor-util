@@ -241,7 +241,7 @@ def run_health_checks(max_timeout: float = 15.0) -> list[dict]:
     results: list[dict] = []
     results_lock = threading.Lock()
 
-    # 凭据就绪预检（实验开关 datasource_credential_ready）：未就绪的源**不发起
+    # 凭据就绪预检（开关 datasource_credential_ready）：未就绪的源**不发起
     # 探测**——探测只会拿到 401/403，与其如实报「源不可达」不如直接说明缺什么。
     # 跳过项不计入 err/warn（配置级问题，不是源故障），故不影响退出码。
     _gate = credential_ready_enabled()

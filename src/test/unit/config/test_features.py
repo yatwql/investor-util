@@ -58,16 +58,28 @@ class TestResolveExperimentFlags:
 
     def test_resolve_by_flag_name(self):
         """按开关名解析。"""
-        flags, unknown = resolve_experiment_flags(["signal_pre_digest"])
-        assert flags == {"signal_pre_digest"}
+        flags, unknown = resolve_experiment_flags(["signal_ledger"])
+        assert flags == {"signal_ledger"}
         assert unknown == []
 
     def test_resolve_by_display_name(self):
         """按中文显示名解析（注册表驱动，无需维护第二份清单）。"""
-        display_name = feature_switch_registry["signal_pre_digest"].label
+        display_name = feature_switch_registry["signal_ledger"].label
         flags, unknown = resolve_experiment_flags([display_name])
-        assert flags == {"signal_pre_digest"}
+        assert flags == {"signal_ledger"}
         assert unknown == []
+
+    def test_promoted_flag_rejected_after_leaving_experiment_group(self):
+        """已转正的开关不再被 ``--experiment`` 接受——它已不是实验项。
+
+        转正的语义边界：``--experiment`` 的取值域取注册表实验组，转正后该开关
+        改由 ``--feature NAME=VALUE``（全域双向）或 features.json 控制，若仍被
+        ``--experiment`` 接受，用户会以为它还是实验开关。
+        """
+        for promoted in ("signal_pre_digest", "module_quality_gate", "decision_header_parse"):
+            flags, unknown = resolve_experiment_flags([promoted])
+            assert flags == set(), f"{promoted} 已转正，不应再被实验清单解析命中"
+            assert unknown == [promoted]
 
     def test_resolve_every_registry_entry(self):
         """注册表中每个实验功能的开关名与显示名均可解析。"""
@@ -80,8 +92,8 @@ class TestResolveExperimentFlags:
 
     def test_resolve_flag_name_case_insensitive(self):
         """开关名大小写不敏感。"""
-        flags, unknown = resolve_experiment_flags(["SIGNAL_PRE_DIGEST"])
-        assert flags == {"signal_pre_digest"}
+        flags, unknown = resolve_experiment_flags(["SIGNAL_LEDGER"])
+        assert flags == {"signal_ledger"}
         assert unknown == []
 
     def test_resolve_all(self):
@@ -93,14 +105,14 @@ class TestResolveExperimentFlags:
     def test_resolve_mixed_and_dedup(self):
         """多种写法混用并去重。"""
         display_name = feature_switch_registry["decision_reflection"].label
-        flags, unknown = resolve_experiment_flags(["signal_pre_digest", "SIGNAL_PRE_DIGEST", display_name, "all"])
+        flags, unknown = resolve_experiment_flags(["signal_ledger", "SIGNAL_LEDGER", display_name, "all"])
         assert flags == _experimental_flags()
         assert unknown == []
 
     def test_unknown_reported_but_hits_kept(self):
         """未识别项进入 unknown，已识别项仍正常解析。"""
-        flags, unknown = resolve_experiment_flags(["signal_pre_digest", "no_such_feature"])
-        assert flags == {"signal_pre_digest"}
+        flags, unknown = resolve_experiment_flags(["signal_ledger", "no_such_feature"])
+        assert flags == {"signal_ledger"}
         assert unknown == ["no_such_feature"]
 
     def test_describe_lists_all_entries(self):
@@ -116,6 +128,9 @@ class TestResolveExperimentFlags:
         assert "doctor_check" not in _experimental_flags()
         assert "datasource_adapter" not in _experimental_flags()
         assert is_experimental_switch("metrics_hhi") is False
+        # 转正入常规块的读侧增强同理：混进实验清单会被当成「非默认产物」写进自述
+        assert "signal_pre_digest" not in _experimental_flags()
+        assert "decision_header_parse" not in _experimental_flags()
 
 
 @pytest.mark.unit
@@ -270,6 +285,67 @@ class TestDatasourceAdapterPromotion:
 
     def test_not_in_report_notice_after_promotion(self):
         """开启状态下产物自述为空——常规开关不进实验功能清单。"""
+        from src.python.report.experimental_notice import enabled_notice_line
+
+        assert enabled_notice_line() is None
+
+
+@pytest.mark.unit
+class TestReadSidePromotion:
+    """读侧增强的转正：默认开、不在实验组、关门仍有效、默认路径真的走新实现。
+
+    这批开关会改变产物内容，但代价面为零：只改提示词或加标注，**不增 LLM 调用
+    次数、不写盘**。写账本的 ``decision_reflection`` / ``signal_ledger`` 与换
+    调用次数的 ``llm_debate_procon`` 不在此列——前者引入默认写盘副作用、后者
+    把单次复盘调用放大，两者留在实验组由用户按需开启。
+    """
+
+    PROMOTED = (
+        "signal_pre_digest",
+        "module_quality_gate",
+        "decision_header_parse",
+        "llm_debate_conditional",
+        "datasource_credential_ready",
+    )
+
+    def test_default_enabled(self):
+        """出厂默认开——转正的实际效果（只 patch 取值的用例测不出默认值本身）。"""
+        from src.python.config.features import get_feature_defaults
+
+        defaults = get_feature_defaults()
+
+        for flag in self.PROMOTED:
+            assert defaults[flag] is True, f"{flag} 转正后出厂默认应为开"
+
+    def test_not_in_experimental_registry(self):
+        """不在实验组：不再进产物自述（面板可见性由常规组承接，转正不丢入口）。"""
+        for flag in self.PROMOTED:
+            assert flag not in _experimental_flags()
+            assert is_experimental_switch(flag) is False
+
+    def test_switch_still_honored(self):
+        """转正不等于不可关——关闭途径仍有效（features.json / ``--feature``）。"""
+        from src.python.config.features import is_feature_enabled, set_feature_enabled
+
+        for flag in self.PROMOTED:
+            set_feature_enabled(flag, False)
+            assert is_feature_enabled(flag) is False, f"{flag} 置 false 后仍未关闭"
+            set_feature_enabled(flag, True)
+
+    def test_prompt_affecting_defaults_live_in_production_path(self):
+        """默认配置下提示词类增强的缓存后缀已生效——生产路径真的走新实现。
+
+        后缀函数是「开关 → 缓存键」的唯一判定点（写侧指纹与预检侧共用），返回
+        非空即证明默认配置下提示词确实带上了增强段；默认值若被改回关，本用例转红。
+        """
+        from src.python.core.decision_header import structured_header_cache_suffix
+        from src.python.llm.module_fingerprint import debate_feature_cache_suffix
+
+        assert structured_header_cache_suffix() == "_dh"
+        assert debate_feature_cache_suffix() == "_c"
+
+    def test_not_in_report_notice_after_promotion(self):
+        """已转正项不进产物自述——常规开关不再是「非默认产物」的标记。"""
         from src.python.report.experimental_notice import enabled_notice_line
 
         assert enabled_notice_line() is None

@@ -293,6 +293,7 @@ def test_debate_enhance_suffix_enters_both_sides():
     """辩论增强开启 → 两侧同时换键（只改提示词的开关不得让预检命中旧键）。"""
     from src.python.config.features import FEATURE_FLAGS
 
+    FEATURE_FLAGS["llm_debate_conditional"] = False  # 转正后默认开，基准须显式关
     off_key = _precheck_info(history_data=_HISTORY)["expert_review"]["key"]
     off_fp = _write_fingerprint("expert_review", history_data=_HISTORY)
 
@@ -589,6 +590,7 @@ def test_debate_fingerprint_carries_debate_feature_suffix():
     from src.python.config.features import FEATURE_FLAGS
     from src.python.llm.module_fingerprint import debate_procon_fingerprint
 
+    FEATURE_FLAGS["llm_debate_conditional"] = False  # 转正后默认开，基准须显式关
     off = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK))
     FEATURE_FLAGS["llm_debate_conditional"] = True
     on = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK))

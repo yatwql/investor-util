@@ -119,20 +119,20 @@ class TestArgparse:
 
     def test_experiment_by_flag_name(self):
         """--experiment 接受开关名。"""
-        args = _build_parser().parse_args(["--experiment", "signal_pre_digest", "report"])
-        assert args.experiment == [("signal_pre_digest",)]
+        args = _build_parser().parse_args(["--experiment", "signal_ledger", "report"])
+        assert args.experiment == [("signal_ledger",)]
 
     def test_experiment_by_display_name(self):
         """--experiment 接受中文显示名（与 TUI 菜单 S 同源）。"""
-        args = _build_parser().parse_args(["--experiment", "信号预消化", "report"])
-        assert args.experiment == [("signal_pre_digest",)]
+        args = _build_parser().parse_args(["--experiment", "确定性信号沉淀", "report"])
+        assert args.experiment == [("signal_ledger",)]
 
     def test_experiment_repeatable(self):
         """--experiment 可重复指定，逐项独立解析。"""
         args = _build_parser().parse_args(
-            ["--experiment", "signal_pre_digest", "--experiment", "decision_reflection", "report"]
+            ["--experiment", "signal_ledger", "--experiment", "decision_reflection", "report"]
         )
-        assert args.experiment == [("signal_pre_digest",), ("decision_reflection",)]
+        assert args.experiment == [("signal_ledger",), ("decision_reflection",)]
 
     def test_experiment_all(self):
         """--experiment all 展开为全部实验功能。"""
@@ -1088,11 +1088,11 @@ class TestMainEarlyExitExperiments:
     def test_experiment_flag_effective_on_early_exit_command(self, command, patch_target):
         """--experiment 指定的开关在该命令分派前已生效。"""
         seen = self._enabled_during_dispatch(
-            ["cli.py", "--experiment", "module_quality_gate", command],
+            ["cli.py", "--experiment", "signal_ledger", command],
             patch_target,
         )
-        assert seen["module_quality_gate"] is True
-        assert seen["signal_ledger"] is False  # 未指定的开关不受影响
+        assert seen["signal_ledger"] is True
+        assert seen["decision_reflection"] is False  # 未指定的开关不受影响
 
     def test_without_experiment_flag_keeps_defaults(self):
         """不传开关参数 → 实验组保持默认关闭（对照组，防误判为恒真）。"""

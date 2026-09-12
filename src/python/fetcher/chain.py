@@ -251,7 +251,7 @@ def fetch_with_fallback(
                 diagnostics.add(label, "未注册")
             continue
 
-        # 凭据就绪预检（实验开关 datasource_credential_ready）：
+        # 凭据就绪预检（开关 datasource_credential_ready）：
         # 配置级问题（用户没配 key），**不计入熔断计数器**——混入可用性统计
         # 会污染数据源可用性矩阵的语义；仅以可读原因进入「错误即 UX」通道。
         # 开关关闭 / 无声明凭据 → 该分支恒不触发，行为与未引入本机制时逐字一致。

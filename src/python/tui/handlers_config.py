@@ -179,8 +179,9 @@ def _cmd_config_llm_modules() -> None:
             items.append((i, sfx, name, status, "llm"))
             rows.append(f"{i}. {pad_right(name, name_column)} [{status_str}]")
 
-        # ② 功能开关：编号紧随标准模块之后，实验块在前、常规块追加在其后
-        # （既有实验项编号不位移——新块一律追加到末尾）
+        # ② 功能开关：编号紧随标准模块之后，实验块在前、常规块在其后，逐块顺序派发
+        # 编号由分组与块内顺序派生、非硬编码：某项转正即离开实验块，落进常规块中
+        # 它在注册表声明处的顺序位置
         next_serial = len(module_names) + 1
         for title, block in switch_blocks:
             rows.append(None)

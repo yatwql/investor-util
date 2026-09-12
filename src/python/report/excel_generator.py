@@ -142,7 +142,7 @@ def _llm_usage_sheet_carries_notice(sheets: dict[str, Any]) -> bool:
 def _write_summary_experimental_notice(sheets: dict[str, Any]) -> None:
     """汇总页签页脚写入实验功能清单（LLM 章节关闭时的兜底落点）。
 
-    ``signal_ledger`` / ``module_quality_gate`` / ``decision_reflection`` 等实验开关
+    ``signal_ledger`` / ``decision_reflection`` 等实验开关
     不依赖 LLM 章节，若清单只挂在用量页签上，这批开关在 Excel 产物上完全无痕。
     已落在用量页签时不重复写——同一事实说两遍会让读者以为有两处不同来源。
     """

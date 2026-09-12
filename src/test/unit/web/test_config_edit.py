@@ -192,17 +192,17 @@ class TestGetSurface:
         # 功能开封面 = 实验组（默认全关）+ 常规组（默认全开），两块划分全注册表
         assert set(data["features"]["experimental"]) == {
             "llm_debate_procon",
-            "llm_debate_conditional",
             "llm_debate_qa_concentration",
             "decision_reflection",
-            "signal_pre_digest",
-            "module_quality_gate",
-            "decision_header_parse",
             "signal_ledger",
-            "datasource_credential_ready",
         }
         assert all(v is False for v in data["features"]["experimental"].values())
         assert set(data["features"]["standard"]) == {
+            "signal_pre_digest",
+            "module_quality_gate",
+            "decision_header_parse",
+            "llm_debate_conditional",
+            "datasource_credential_ready",
             "metrics_sharpe",
             "metrics_calmar",
             "metrics_hhi",
@@ -228,6 +228,12 @@ class TestGetSurface:
         assert "datasource_adapter" not in data["features"]["report_affecting"]
         assert "metrics_hhi" in data["features"]["report_affecting"]
         assert "enable_interactive_charts" in data["features"]["report_affecting"]
+        # 转正项仍按「能否改变产物」标注：读侧增强改提示词/头部标注 → 算影响报告
+        assert "signal_pre_digest" in data["features"]["report_affecting"]
+        assert "module_quality_gate" in data["features"]["report_affecting"]
+        assert "decision_header_parse" in data["features"]["report_affecting"]
+        assert "llm_debate_conditional" in data["features"]["report_affecting"]
+        assert "datasource_credential_ready" in data["features"]["report_affecting"]
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -372,18 +378,18 @@ class TestApplyFeaturesWrite:
         """llm_debate_conditional 写：features.json 含覆写，运行时开关生效。"""
         from src.python.config.features import _FEATURES_FILE, is_feature_enabled
 
-        assert is_feature_enabled("llm_debate_conditional") is False  # 默认关
+        assert is_feature_enabled("llm_debate_conditional") is True  # 转正后默认开
 
         resp = app_client.post(
             "/api/config/edit",
-            json={"key": "llm_debate_conditional", "value": True},
+            json={"key": "llm_debate_conditional", "value": False},
         )
         assert resp.status_code == 200
-        assert resp.get_json()["data"]["value"] is True
-        assert is_feature_enabled("llm_debate_conditional") is True
+        assert resp.get_json()["data"]["value"] is False
+        assert is_feature_enabled("llm_debate_conditional") is False
 
         raw = open(_FEATURES_FILE, encoding="utf-8").read()
-        assert '"llm_debate_conditional": true' in raw
+        assert '"llm_debate_conditional": false' in raw
 
     def test_decision_reflection_flag_write_takes_effect(self, app_client):
         """decision_reflection 写：features.json 含覆写，运行时开关生效。"""
@@ -406,18 +412,18 @@ class TestApplyFeaturesWrite:
         """signal_pre_digest 写：features.json 含覆写，运行时开关生效。"""
         from src.python.config.features import _FEATURES_FILE, is_feature_enabled
 
-        assert is_feature_enabled("signal_pre_digest") is False  # 默认关
+        assert is_feature_enabled("signal_pre_digest") is True  # 转正后默认开
 
         resp = app_client.post(
             "/api/config/edit",
-            json={"key": "signal_pre_digest", "value": True},
+            json={"key": "signal_pre_digest", "value": False},
         )
         assert resp.status_code == 200
-        assert resp.get_json()["data"]["value"] is True
-        assert is_feature_enabled("signal_pre_digest") is True
+        assert resp.get_json()["data"]["value"] is False
+        assert is_feature_enabled("signal_pre_digest") is False
 
         raw = open(_FEATURES_FILE, encoding="utf-8").read()
-        assert '"signal_pre_digest": true' in raw
+        assert '"signal_pre_digest": false' in raw
 
     def test_standard_switch_write_takes_effect(self, app_client):
         """常规开关（量化指标）写：features.json 含覆写，运行时开关生效。

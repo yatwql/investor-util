@@ -388,7 +388,7 @@ class TestExcelExperimentalNotice(unittest.TestCase):
         from src.python.config.features import set_feature_enabled
         from src.python.report.summary_llm_usage import write_llm_usage_sheet
 
-        set_feature_enabled("module_quality_gate", True)
+        set_feature_enabled("signal_ledger", True)
         ws = self._make_ws()
 
         # 无用量 → _write_llm_summary_section 直接返回，不写「汇总数据」区
@@ -400,7 +400,7 @@ class TestExcelExperimentalNotice(unittest.TestCase):
 
         text = self._sheet_text(ws)
         self.assertNotIn("汇总数据", text)
-        self.assertIn("模块级质量分级", text)
+        self.assertIn("确定性信号沉淀", text)
 
 
 class TestExcelSummaryFallbackNotice(unittest.TestCase):

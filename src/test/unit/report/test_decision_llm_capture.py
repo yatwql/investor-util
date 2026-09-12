@@ -204,7 +204,7 @@ class TestRegressionMisleadingRows:
 
 
 class TestStructuredHeader:
-    """结构化决策头（实验项 decision_header_parse）优先 + 表格兜底。"""
+    """结构化决策头（开关 decision_header_parse）优先 + 表格兜底。"""
 
     @pytest.fixture(autouse=True)
     def _enable_structured(self):
@@ -248,7 +248,7 @@ class TestStructuredHeader:
         assert rows[0]["direction"] == dl.DIRECTION_LONG
 
     def test_flag_off_ignores_header(self):
-        reset_feature_flags()
+        set_feature_enabled("decision_header_parse", False)  # 转正后默认开，基准须显式关
         set_feature_enabled("decision_reflection", True)
         html = _HTML_HEADER + (
             "<p>| 🔴 高 | 561910 招商中证电池主题ETF | 减仓 | 负收益 |</p>"

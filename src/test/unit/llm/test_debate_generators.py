@@ -54,6 +54,7 @@ class TestDebateProconFlow(unittest.TestCase):
         验证 generate_llm_module 的 system_prompt 关键字参数
         在 pro/con/synthesis 各阶段使用正确的模板常量。
         """
+        from src.python.config.features import set_feature_enabled
         from src.python.llm.prompts import (
             _SYSTEM_DEBATE_CON,
             _SYSTEM_DEBATE_PRO,
@@ -61,6 +62,7 @@ class TestDebateProconFlow(unittest.TestCase):
         )
         from src.python.llm.generators import generate_debate_procon
 
+        set_feature_enabled("llm_debate_conditional", False)  # 转正后默认开，基准须显式关
         with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
             mock_gen.side_effect = [
                 ("600519 贵州茅台适合长期持有，行业地位稳固。", False),

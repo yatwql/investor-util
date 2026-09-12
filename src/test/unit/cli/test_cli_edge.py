@@ -132,7 +132,7 @@ class TestCliEdge:
     def test_experiment_valid_then_invalid_rejected(self):
         """同一参数重复指定时，任一取值非法即整体报错（不部分生效）。"""
         with pytest.raises(SystemExit) as exc:
-            _build_parser().parse_args(["--experiment", "signal_pre_digest", "--experiment", "bad", "report"])
+            _build_parser().parse_args(["--experiment", "signal_ledger", "--experiment", "bad", "report"])
         assert exc.value.code == 2
 
     @pytest.mark.edge
@@ -140,7 +140,7 @@ class TestCliEdge:
         """all 与具体名称混用 → 解析结果去重，不产生重复启用。"""
         from src.python.config.features import GROUP_EXPERIMENTAL, switches_in_group
 
-        args = _build_parser().parse_args(["--experiment", "all", "--experiment", "signal_pre_digest", "report"])
+        args = _build_parser().parse_args(["--experiment", "all", "--experiment", "signal_ledger", "report"])
         flags = {flag for group in args.experiment for flag in group}
         assert flags == {flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)}
 

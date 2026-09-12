@@ -254,8 +254,10 @@ class TestSignalDigestCacheSuffix:
 
     def test_disabled_returns_empty(self):
         """开关关闭 → 空后缀（缓存键与未注入信号时逐字节一致）。"""
+        from src.python.config.features import FEATURE_FLAGS
         from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
+        FEATURE_FLAGS["signal_pre_digest"] = False  # 转正后默认开，基准须显式关
         assert _signal_digest_cache_suffix(self._SIGNAL_DATA) == ""
 
     def test_enabled_without_signal_returns_empty(self):
@@ -401,6 +403,9 @@ class TestGeneratorFingerprintWiring:
     @pytest.mark.parametrize("generator_name", ["generate_expert_review", "generate_health_check"])
     def test_flag_off_fingerprint_unchanged(self, generator_name):
         """开关关闭：有无信号数据都不进指纹（键不变、不误伤旧缓存）。"""
+        from src.python.config.features import FEATURE_FLAGS
+
+        FEATURE_FLAGS["signal_pre_digest"] = False  # 转正后默认开，基准须显式关
         without_signal = self._captured_fingerprints(generator_name, pipeline_data=None)
         with_signal = self._captured_fingerprints(generator_name, pipeline_data=_SIGNAL_PIPELINE_DATA)
 

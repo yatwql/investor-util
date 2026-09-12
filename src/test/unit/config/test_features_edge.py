@@ -42,8 +42,8 @@ class TestResolveExperimentFlagsEdge:
     @pytest.mark.edge
     def test_surrounding_whitespace_tolerated(self):
         """首尾空白被容忍。"""
-        flags, unknown = resolve_experiment_flags(["  signal_pre_digest  "])
-        assert flags == {"signal_pre_digest"}
+        flags, unknown = resolve_experiment_flags(["  signal_ledger  "])
+        assert flags == {"signal_ledger"}
         assert unknown == []
 
     @pytest.mark.edge

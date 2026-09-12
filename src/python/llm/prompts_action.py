@@ -210,10 +210,10 @@ def _build_expert_review_prompt(
         metrics: 量化指标字典，compute_all_metrics() 的输出。
         skip_scenarios: True 时跳过所有情景分析指令（辩论 pro/con 用，
             避免双重情景输出）。
-        enable_signal_digest: 注入算法评级预消化信号块（实验项
+        enable_signal_digest: 注入算法评级预消化信号块（开关
             ``signal_pre_digest``；无可用信号时静默跳过）。
-        enable_structured_header: 追加受控 JSON 决策头契约（实验项
-            ``decision_header_parse``）。关闭时提示词与未加此项前逐字节一致，
+        enable_structured_header: 追加受控 JSON 决策头契约（开关
+            ``decision_header_parse``，默认开启）。关闭时提示词与未加此项前逐字节一致，
             不扰动既有缓存指纹。
     """
     now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
@@ -275,7 +275,7 @@ def _build_expert_review_prompt(
         "| 🟡 中 | XXX | 减仓/加仓/持有 | 简述理由 |\n"
         "| 🟢 低 | XXX | 减仓/加仓/持有 | 简述理由 |\n"
     )
-    # 结构化决策头（实验项 decision_header_parse）：与上表同源，供抽取侧优先读取。
+    # 结构化决策头（开关 decision_header_parse）：与上表同源，供抽取侧优先读取。
     # 关闭时 append 空串，提示词逐字节不变。
     if enable_structured_header:
         parts.append(build_structured_header_instruction())

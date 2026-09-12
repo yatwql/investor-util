@@ -1,4 +1,4 @@
-"""链路凭据预检单元测试（实验功能 `datasource_credential_ready`）。
+"""链路凭据预检单元测试（常规开关 `datasource_credential_ready`，默认开启）。
 
 覆盖：开关开启且凭据缺失 → **跳过该 provider 并落到下一链路**、可读原因进入
 失败诊断、**不计入熔断失败计数**；补上凭据 → 该 provider 正常参与；开关关闭

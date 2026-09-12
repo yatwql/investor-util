@@ -1,4 +1,4 @@
-"""check-sources 凭据预检与就绪摘要单元测试（实验功能 `datasource_credential_ready`）。
+"""check-sources 凭据预检与就绪摘要单元测试（常规开关 `datasource_credential_ready`，默认开启）。
 
 覆盖：缺凭据的检查项**不发起探测**、产出跳过态（`⏭️`/`_SKIP`）并可读原因上屏、
 **不影响退出码**；开关关闭时输出与未引入本机制时一致；就绪摘要行随开关与声明表变化。

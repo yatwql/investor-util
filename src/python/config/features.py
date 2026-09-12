@@ -92,43 +92,20 @@ class FeatureSwitchDef:
 # test_features.py::TestRegistryLiveness。
 #
 # ``affects_report`` 是**产物自述的准入口径**：开启该开关后报告产物的内容是否可能
-# 不同。True 者（实验组）进入报告自述（HTML 页脚 / Excel 落点）与控制台横幅，读者
-# 据此判断手上这份产物是否非默认开关下的结果；只改入口可见性的开关答 False，不得
-# 凭惯性落进自述——列出一个不改报告任何字节的开关，读者会推断内容受其影响。
+# 不同。实验组中为 True 者进入报告自述（HTML 页脚 / Excel 落点）与控制台横幅，读者
+# 据此判断手上这份产物是否非默认开关下的结果；常规组中为 True 者在 Web 配置面板的
+# 项标签上带「（影响报告）」。只改入口可见性的开关答 False，不得凭惯性落进自述——
+# 列出一个不改报告任何字节的开关，读者会推断内容受其影响。
 feature_switch_registry: dict[str, FeatureSwitchDef] = {
-    # ── 实验性功能：辩论三式 ──
+    # ── 实验性功能：辩论-正反辩论（换调用次数的深度模式，非常驻能力） ──
     "llm_debate_procon": FeatureSwitchDef("辩论-正反辩论", "三段式(白脸→黑脸→综合)", GROUP_EXPERIMENTAL, False, True),
-    "llm_debate_conditional": FeatureSwitchDef(
-        "辩论-条件推理", "情景化分析(涨/跌/震荡)", GROUP_EXPERIMENTAL, False, True
-    ),
     "llm_debate_qa_concentration": FeatureSwitchDef(
         "辩论-集中度问答", "集中度风险问答", GROUP_EXPERIMENTAL, False, True
     ),
-    # ── 实验性功能：LLM 输出增强 ──
+    # ── 实验性功能：LLM 输出增强（写盘积累账本，需真实数据积累验证） ──
     "decision_reflection": FeatureSwitchDef(
         "决策跨期反思闭环",
         "登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词",
-        GROUP_EXPERIMENTAL,
-        False,
-        True,
-    ),
-    "signal_pre_digest": FeatureSwitchDef(
-        "信号预消化",
-        "市场温度/估值分位/尾部风险预消化为带方向标注的信号行注入复盘与体检提示词",
-        GROUP_EXPERIMENTAL,
-        False,
-        True,
-    ),
-    "module_quality_gate": FeatureSwitchDef(
-        "模块级质量分级",
-        "按完整性/一致性给各 LLM 模块输出评 A~F 级，低评级随内容头部标注质量提示（不阻断不重试）",
-        GROUP_EXPERIMENTAL,
-        False,
-        True,
-    ),
-    "decision_header_parse": FeatureSwitchDef(
-        "决策头结构化",
-        "提示词追加受控 JSON 决策头，抽取优先读结构化、失败回落确定性表格解析（决策词归一，防写反方向）",
         GROUP_EXPERIMENTAL,
         False,
         True,
@@ -140,12 +117,36 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         False,
         True,
     ),
-    # ── 实验性功能：数据层 ──
+    # ── 常规开关：LLM 输出增强（只读侧注入，不增调用次数、不写盘） ──
+    "signal_pre_digest": FeatureSwitchDef(
+        "信号预消化",
+        "市场温度/估值分位/尾部风险预消化为带方向标注的信号行注入复盘与体检提示词",
+        GROUP_STANDARD,
+        True,
+        True,
+    ),
+    "module_quality_gate": FeatureSwitchDef(
+        "模块级质量分级",
+        "按完整性/一致性给各 LLM 模块输出评 A~F 级，低评级随内容头部标注质量提示（不阻断不重试）",
+        GROUP_STANDARD,
+        True,
+        True,
+    ),
+    "decision_header_parse": FeatureSwitchDef(
+        "决策头结构化",
+        "提示词追加受控 JSON 决策头，抽取优先读结构化、失败回落确定性表格解析（决策词归一，防写反方向）",
+        GROUP_STANDARD,
+        True,
+        True,
+    ),
+    # ── 常规开关：辩论增强（在既有调用内追加情景段，不换调用次数） ──
+    "llm_debate_conditional": FeatureSwitchDef("辩论-条件推理", "情景化分析(涨/跌/震荡)", GROUP_STANDARD, True, True),
+    # ── 常规开关：数据层（声明表为空，当前就绪态只上体检与健康检查） ──
     "datasource_credential_ready": FeatureSwitchDef(
         "数据源凭据就绪",
         "声明数据源所需凭据，缺失时链路跳过并给出可读指引；体检与健康检查报告就绪状态（当前全部数据源免费无需凭据）",
-        GROUP_EXPERIMENTAL,
-        False,
+        GROUP_STANDARD,
+        True,
         True,
     ),
     # ── 常规开关：量化指标（关闭即报告少一项指标） ──
