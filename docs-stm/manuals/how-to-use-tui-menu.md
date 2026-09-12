@@ -1,7 +1,7 @@
 # TUI 菜单操作手册
 
 > **CLI 命令行模式**：CLI 模式（`.venv/bin/python -m src.python.cli`）使用 `--help` 参数查看等价操作，无需 TUI 界面。
-> 详见[CLI 命令行模式使用指南](how-to-use-cli-mode.md) §13「定时任务」。
+> 各菜单项与 CLI 子命令/参数的逐项对照见[CLI 命令行模式使用指南](how-to-use-cli-mode.md) §10.1「TUI 菜单 → CLI 命令对照」；定时任务见该文 §13。
 
 ## 主菜单总览
 

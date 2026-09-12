@@ -227,6 +227,42 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | 系统自检（一键体检） | `.venv/bin/python -m src.python.cli doctor --offline` |
 | 查看性能历史趋势 | `.venv/bin/python scripts/perf-view.py` |
 
+### 10.1 TUI 菜单 → CLI 命令对照
+
+TUI 菜单与 CLI 子命令落到**同一个业务编排函数**（`report/orchestrator.py::generate_report` 等），差别只在入参从哪来：TUI 在菜单里问，CLI 用参数传。下表按菜单项逐项对照。
+
+| TUI 菜单 | CLI 等价命令 |
+|:---------|:-------------|
+| **[E]** 生成基础版 Excel 分析报告 | `report --type basic` |
+| **[B]** 生成标准报告（Excel+HTML） | `report --type both --history auto` |
+| **[L]** 生成完整报告（Excel+HTML，含 LLM） | `report --type full --history auto` |
+| **[W]** 调仓 What-if 模拟 | `whatif --base <调仓前.xlsx> --candidate <调仓后.xlsx>` |
+
+以 `[L]` 为例，逐项拆开看更直观：
+
+| `[L]` 触发时 TUI 的行为 | CLI 对应参数 | 说明 |
+|:------------------------|:-------------|:-----|
+| 生成类型固定为 `full` | `--type full` | 报告类型默认是 `basic`，务必显式指定 |
+| 询问「是否获取组合历史走势数据」 | `--history auto` / `--history off` | 省略 `--history` 时按 `config.json` 的 `history.fetch_mode` 解析（`off` 跳过，`auto`/`prompt` 均视为获取） |
+| 询问「是否强制重新生成 LLM 内容」 | `--force-llm` | 不加则复用 LLM 缓存 |
+| 首次运行交互式引导 | `--non-interactive` | 跳过引导，定时任务/脚本建议带上 |
+| 结束打印 LLM 会话用量 | —（打印耗时汇总） | 两条路径的收尾输出不同，不影响产物 |
+
+所以 `[L]` 的完整等价命令是：
+
+```bash
+.venv/bin/python -m src.python.cli --non-interactive report --type full --history auto
+# 若要连同「强制重生成 LLM」一起答上（等价于询问时答 y）：
+.venv/bin/python -m src.python.cli --non-interactive report --type full --history auto --force-llm
+```
+
+两点需要留意（TUI 与 CLI 在这些情况下的行为差异，均不影响报告内容）：
+
+1. **`history.fetch_mode = "prompt"` 时**：TUI 会停下来问；CLI 省略 `--history` 时按「获取」处理（非交互场景无从询问）。
+2. **`enable_history = false` 时**：历史走势整体不获取，此时加 `--history auto` 也不会生效——外层开关优先于本参数。TUI 与 CLI 行为一致。
+
+其余菜单项（配置类、缓存类、日志/健康/自检）在 CLI 侧均有独立子命令，见上方速查表与各节说明。
+
 ---
 
 ## 11. 退出码含义
