@@ -2471,7 +2471,7 @@ DegradationTracker（降级决策层） ─  管"这批数据能不能信任"
     跨会话持久化
 ```
 
-#### LLM 输出侧质量分级（`report/llm_quality.py`，实验功能 `module_quality_gate` 默认关）
+#### LLM 输出侧质量分级（`report/llm_quality.py`，开关 `module_quality_gate` 默认开）
 
 上节的降级治理面向**数据源侧（输入）**；本模块把同一「降级披露」思路扩展到 **LLM 输出侧**——回答「这段模型输出能不能信」。借鉴外部 `quality_gate` 的 A~F 分级，但**只标注不阻断**：劣级不重试、不改生成流程、不影响缓存读写。
 
@@ -2606,7 +2606,7 @@ report/decision_llm_capture.py   # 抽取：结构化优先 → 表格兜底
 
 词表分**规范词**（减仓/加仓/持有，提示词契约固定三值）与**扩展词**（清仓·减持·卖出·止损 / 增持·买入·建仓 / 观望），只收语义单向词——`止盈`（可能部分落袋也可能清仓）、`调仓`（方向不明）**不入词表**：宁可判不出，不可判错。
 
-**结构化决策头（实验开关 `decision_header_parse`，默认关）**：开启时提示词末尾追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约；抽取侧先 `parse_structured_header` 读结构化头，逐字段归一校验（`action` 必须经上述判据归一为方向，否则丢弃该条；`code` 必须 6 位数字），全批不可用 → 回落确定性表格解析。两路产物形状统一为 `{code, name, direction, magnitude, detail, …}`（结构化头的 `priority` 在解析侧即归一为 `magnitude`），`_collect_decision` 对两路走同一段登记纪律（持有剔除 / code 白名单 / 名称回填 / 同码取高）。
+**结构化决策头（开关 `decision_header_parse`，默认开）**：开启时提示词末尾追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约；抽取侧先 `parse_structured_header` 读结构化头，逐字段归一校验（`action` 必须经上述判据归一为方向，否则丢弃该条；`code` 必须 6 位数字），全批不可用 → 回落确定性表格解析。两路产物形状统一为 `{code, name, direction, magnitude, detail, …}`（结构化头的 `priority` 在解析侧即归一为 `magnitude`），`_collect_decision` 对两路走同一段登记纪律（持有剔除 / code 白名单 / 名称回填 / 同码取高）。
 
 - **载荷提取用花括号配平扫描**（字符串/转义感知），而非 `find("{")`/`rfind("}")`——后者在同一行出现两个 JSON 对象时会把跨度拉通成非法 JSON；`决策头：` 后为空行时以空串兜底，不抛 `IndexError`。
 - **缓存键同源**：开关影响提示词 → **写侧指纹**与**预检指纹**都取自 `llm/module_fingerprint.py::expert_review_fingerprint()` 内无条件调用的 `structured_header_cache_suffix()`（开关判定收敛在函数内部）。关闭返回 `""`（键不变、不误伤旧缓存）；开启两侧同步换键，避免预检命中旧键而跳过重生成使开关形同虚设。关闭时提示词**逐字节不变**。
@@ -3206,13 +3206,13 @@ make_http_client(timeout=10.0) → httpx.Client
 | `decision_settlement` | 到期决策结算（幂等：同 decision 只结一次，行情不可得保持 pending） | 行动建议 | 监控 | 随 `decision_reflection` |
 | `decision_llm_capture` | LLM 操作建议表解析登记（误导性操作格不登记） | 行动建议 | 监控 | 随 `decision_reflection` |
 | `decision_review_block` | 「历史决策复盘」区块数据契约（结构稳定，HTML/Excel 双端消费） | 行动建议 | 监控 | 随 `decision_reflection` |
-| `decision_header_parse` | 决策头结构化 + 确定性解析兜底（词边界纪律归一解析器） | 行动建议 | 监控 | 实验开关 `decision_header_parse`（默认关） |
+| `decision_header_parse` | 决策头结构化 + 确定性解析兜底（词边界纪律归一解析器） | 行动建议 | 监控 | 开关 `decision_header_parse`（默认开，非实验项） |
 | `decision_header` | 决策词归一解析器（标签优先/长词优先/否定守卫/复合词左边界/二义不猜） | 行动建议 | 监控 | 随 `decision_header_parse`（A 通道无开关） |
-| `signal_pre_digest` | 信号预消化（资金流/温度/分位/尾部风险 → 带方向标注的一句话信号） | LLM 生成 | LLM 生成 | 实验开关 `signal_pre_digest`（默认关） |
+| `signal_pre_digest` | 信号预消化（资金流/温度/分位/尾部风险 → 带方向标注的一句话信号） | LLM 生成 | LLM 生成 | 开关 `signal_pre_digest`（默认开，非实验项） |
 | `prompts_signals` | 信号预消化提示词块（开关判定收敛于缓存后缀函数） | LLM 生成 | LLM 生成 | 随 `signal_pre_digest` |
 | `signal_ledger` | 确定性数值信号沉淀（五类评级登记 + live/demo 来源标签，排行榜默认 live_only） | LLM 生成 | 监控 | 实验开关 `signal_ledger`（默认关） |
 | `signal_record` | 确定性信号登记适配器（唯一持有语义词表映射，`core/` 不依赖 `analysis/`） | LLM 生成 | 监控 | 随 `signal_ledger` |
-| `module_quality_gate` | 模块级质量分级（4 个 LLM 模块按完整性/篇幅评 A~F，低评级注入质量横幅，只标注不阻断） | LLM 生成 | LLM 生成 | 实验开关 `module_quality_gate`（默认关） |
+| `module_quality_gate` | 模块级质量分级（4 个 LLM 模块按完整性/篇幅评 A~F，低评级注入质量横幅，只标注不阻断） | LLM 生成 | LLM 生成 | 开关 `module_quality_gate`（默认开，非实验项） |
 | `llm_quality` | 质量分级实现（口径判定 + 横幅注入 + Excel 载体契约） | LLM 生成 | LLM 生成 | 随 `module_quality_gate` |
 | `log_reader` | 日志读取（read_log/tail_log/parse_log） | 日志可视化 | 诊断 | 无（模块级） |
 | `view_logs` | 查看日志（CLI view-logs 子命令） | 日志可视化 | 诊断 | 无（子命令） |
@@ -3234,7 +3234,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `cassette` | 数据源记录-回放（真实响应体离线录制/回放引擎，`Cassette`/`cassette_replay`/`cassette_record`） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建，不控制运行时行为） |
 | `cassette_checks` | 已录制响应 → 当前解析器的绑定表（录制自检与 `cassettes --verify` 共用） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |
 | `use_transport_factory` | 传输工厂注入点（`make_http_client` 的响应来源替换，C5 唯一构造点上的挂载） | 数据源记录-回放 | 数据获取（测试基建） | 无（测试基建） |
-| `datasource_credential_ready` | 数据源凭据就绪指引（声明 → 就绪判定 → 可读指引） | 数据源可用性矩阵 | 监控 | 实验开关 `datasource_credential_ready`（默认关） |
+| `datasource_credential_ready` | 数据源凭据就绪指引（声明 → 就绪判定 → 可读指引） | 数据源可用性矩阵 | 监控 | 开关 `datasource_credential_ready`（默认开，非实验项） |
 | `credential_spec` | 数据源凭据声明（`CredentialSpec` 冻结 dataclass + `CREDENTIAL_SPECS` 注册表） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
 | `credential_readiness` | 凭据就绪矩阵与缺失指引（`missing_credential` / `credential_hint` / `credential_readiness`） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
 
@@ -3676,7 +3676,7 @@ investor-util/
 | `llm_settings.json`（非敏感 LLM 设置） | `_llm_settings_defaults._DEFAULT_LLM_SETTINGS`（全局 2 项 + 5 模块块 + 辩论 + 事实校验 + 计价） | `_llm_settings_defaults._get_default_llm_settings_template()`（逐行手拼，与 dict 深等，见一致性测试） | `_llm_settings.get_llm_config()`：合并 settings+key+providers 三文件，联合 mtime/size 失效；`_merge_llm_defaults()` 运行时按 `_DEFAULT_LLM_SETTINGS` 补齐缺失键 | `_ensure_llm_settings_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑；`_ensure_llm_settings_file` 仅首次创建） | `llm/pricing.py`（计价覆盖）、`llm/generators.py`、`llm/generators_orchestrator.py`、`llm/prompts_action.py`、`llm/skeleton.py`、`report/news_correlation.py`、`cli/cli.py`、`tui/tui_menu.py` + `tui/handlers_config.py`、`config/_validation.py` |
 | `llm_key.json`（敏感凭据） | 无（**C18 凭据分离**，代码默认值禁止内置 api_key） | 无模板 | `_llm_providers._load_llm_key_credentials()`（多凭据块字典；单凭据 flat 自动升级为 `_default`）；`get_llm_config()` 内联读取并合并覆盖同名字段（provider/endpoint 合法性告警） | 不自动创建；缺失时 `get_llm_config()` 回退判断 providers 链模式，两者皆无则 LLM 不可用（`generators_orchestrator` 降级占位） | `startup_wizard._write_llm_key_flat()`（首次引导交互式写入，C3 原子写） | `get_llm_config()` 合并主体；`_load_llm_key_credentials()` → providers 链 `credentials_ref` 凭据注入 |
 | `llm_providers.json`（多 Provider 链） | `_llm_providers_defaults._DEFAULT_LLM_PROVIDERS`（strategy=priority + 2 条示例链） | `_llm_providers_defaults._get_default_llm_providers_template()` | `_llm_providers._load_llm_providers()`（原始 JSON，根非 object/解析失败返回 None）；`get_llm_config()` 链模式（无 llm_key.json 时直接注入链数据）；`_inject_provider_chain_data()` 注入多链路由结果 | `_core._ensure_llm_providers_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑 / init 自动创建） | `get_llm_config()`（链模式无 key 依赖）；`startup_wizard.py`（就绪检查：key 存在 或 providers 有链）；`_inject_provider_chain_data` |
-| `features.json`（Feature Flag 覆写） | `features.feature_switch_registry`（20 项声明，每条含显示名 + 说明 + 分组 + 默认值 + 是否改变产物五项；`_FEATURE_FLAGS_DEFAULT` 是其**派生投影**，非独立登记点）。实验组 9（辩论 3 + 决策反思 1 + 信号预消化 1 + 模块质量分级 1 + 决策头结构化 1 + 确定性信号沉淀 1 + 数据源凭据就绪 1，默认关）+ 常规组 11（量化指标 7 + 交互图表 1 + 系统自检 1 + 数据源适配 1 + 联接基金穿透 1，默认开）；分组即面板分块，决定该开关是否上屏与是否进产物自述（实验组 ∧ `affects_report`）；**只登记有消费者的开关**——LLM 模块启停与基金深度分析归 `llm_settings.json` 的 `enabled_llm`，新闻源 / 历史走势 / 匿名化归 `config.json`，这些能力不再在 features.json 另立同义开关，由 `test_features.py::TestRegistryLiveness` 逐项守住；命令行一次性开关见 `features.resolve_experiment_flags` / `describe_experiment_flags`（`--experiment`，实验组、只开）与 `features.parse_switch_override` / `resolve_switch_values` / `describe_switches`（`--feature NAME=VALUE`，全域、双向），两者与注册表同源 | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；无消费者键仍加载、但合并为一条 WARNING 列出键名——这类配置不驱动任何行为，静默忽略会让用户以为已生效；非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化）+ Web `web/config_edit.py`（配置面板写入，白名单由注册表生成） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`core/decision_ledger.py`（决策跨期反思闭环）、`llm/prompts_signals.py`（信号预消化，开关判定收敛于缓存后缀函数）、`report/llm_quality.py`（模块质量分级，§4.11）、`core/decision_header.py`（决策头结构化缓存后缀，§4.15）、`core/signal_ledger.py`（确定性信号沉淀，开关判定收敛于摘要函数，§4.16）、`core/doctor.py`（系统自检功能清单上屏，§4.17.3）、`web/handlers.py`（自检卡片可见性，§4.17.3）、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态）、`tui/tui_menu.py`（菜单项门控）、`web/config_edit.py`（面板状态） |
+| `features.json`（Feature Flag 覆写） | `features.feature_switch_registry`（20 项声明，每条含显示名 + 说明 + 分组 + 默认值 + 是否改变产物五项；`_FEATURE_FLAGS_DEFAULT` 是其**派生投影**，非独立登记点）。实验组 4（辩论 2 + 决策反思 1 + 确定性信号沉淀 1，默认关）+ 常规组 16（信号预消化 1 + 模块质量分级 1 + 决策头结构化 1 + 辩论条件推理 1 + 数据源凭据就绪 1 + 量化指标 7 + 交互图表 1 + 系统自检 1 + 数据源适配 1 + 联接基金穿透 1，默认开）；分组即面板分块，决定该开关是否上屏与是否进产物自述（实验组 ∧ `affects_report`）；**只登记有消费者的开关**——LLM 模块启停与基金深度分析归 `llm_settings.json` 的 `enabled_llm`，新闻源 / 历史走势 / 匿名化归 `config.json`，这些能力不再在 features.json 另立同义开关，由 `test_features.py::TestRegistryLiveness` 逐项守住；命令行一次性开关见 `features.resolve_experiment_flags` / `describe_experiment_flags`（`--experiment`，实验组、只开）与 `features.parse_switch_override` / `resolve_switch_values` / `describe_switches`（`--feature NAME=VALUE`，全域、双向），两者与注册表同源 | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；无消费者键仍加载、但合并为一条 WARNING 列出键名——这类配置不驱动任何行为，静默忽略会让用户以为已生效；非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化）+ Web `web/config_edit.py`（配置面板写入，白名单由注册表生成） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`core/decision_ledger.py`（决策跨期反思闭环）、`llm/prompts_signals.py`（信号预消化，开关判定收敛于缓存后缀函数）、`report/llm_quality.py`（模块质量分级，§4.11）、`core/decision_header.py`（决策头结构化缓存后缀，§4.15）、`core/signal_ledger.py`（确定性信号沉淀，开关判定收敛于摘要函数，§4.16）、`core/doctor.py`（系统自检功能清单上屏，§4.17.3）、`web/handlers.py`（自检卡片可见性，§4.17.3）、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态）、`tui/tui_menu.py`（菜单项门控）、`web/config_edit.py`（面板状态） |
 
 #### I.1.1 解析职责归属（协调者 vs 委托）
 

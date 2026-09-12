@@ -33,21 +33,21 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir`（不存在时自动创建；支持绝对 / 相对路径） |
 | `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
 | `--non-interactive` | 跳过首次运行交互式引导（定时任务 / 脚本使用） |
-| `--experiment NAME` | 启用**实验组**功能（只开不关的简写），**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `signal_pre_digest`）或显示名（如 `信号预消化`），`all` = 全部启用 |
+| `--experiment NAME` | 启用**实验组**功能（只开不关的简写），**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `signal_ledger`）或显示名（如 `确定性信号沉淀`），`all` = 全部启用 |
 | `--feature NAME=VALUE` | 切换**任意**功能开关（实验组与常规组均可），**双向**（可开可关）、**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `doctor_check`），`VALUE` 取 `on`/`off`（也接受 `true`/`false`/`1`/`0`，大小写不敏感）。同名后写覆盖先写 |
 | `--version` | 显示版本号并退出 |
 
 > **`--experiment` 说明**：等价于在 TUI 菜单 **[S]** / Web 配置面板中临时勾选实验开关，但**只作用于当前这一次命令、不改动持久化配置**——CI / 定时任务可在不污染用户配置的前提下试用实验功能；反之，用户配置里已开启的实验开关不会被本参数关闭。
 >
 > ```bash
-> # 单次运行启用信号预消化
-> .venv/bin/python -m src.python.cli --experiment signal_pre_digest report --type full
+> # 单次运行启用正反辩论（三段式：白脸→黑脸→综合）
+> .venv/bin/python -m src.python.cli --experiment llm_debate_procon report --type full
 >
 > # 用显示名指定、可重复叠加
-> .venv/bin/python -m src.python.cli --experiment 决策跨期反思闭环 --experiment 模块级质量分级 report --type full
+> .venv/bin/python -m src.python.cli --experiment 决策跨期反思闭环 --experiment 确定性信号沉淀 report --type full
 >
-> # 单次启用决策头结构化（受控 JSON 决策头，抽取侧优先读结构化、失败回落表格解析）
-> .venv/bin/python -m src.python.cli --experiment decision_header_parse report --type full
+> # 单次启用辩论-集中度问答（单品种占比≥20% 时附加集中度量化评估）
+> .venv/bin/python -m src.python.cli --experiment llm_debate_qa_concentration report --type full
 >
 > # 单次启用确定性信号沉淀（五类确定性评级入账，附实时/非实时标签）
 > .venv/bin/python -m src.python.cli --experiment signal_ledger report --type full
@@ -68,7 +68,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 > .venv/bin/python -m src.python.cli --feature metrics_hhi=off --feature metrics_beta=off --feature enable_interactive_charts=off report --type full
 > ```
 >
-> 两个参数可同时使用：`--feature` 在 `--experiment` 之后应用，故 `--experiment all --feature module_quality_gate=off` 表示「其余实验功能全开、只关掉质量分级」。
+> 两个参数可同时使用：`--feature` 在 `--experiment` 之后应用，故 `--experiment all --feature signal_ledger=off` 表示「其余实验功能全开、只关掉信号沉淀」。
 
 ---
 

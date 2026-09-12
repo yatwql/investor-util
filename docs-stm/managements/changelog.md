@@ -6,6 +6,22 @@
 
 ## [0.10.19-dev] - 开发中（未发布）
 
+### 读侧增强类开关转正（五项默认开启）（2026-09-12）
+
+- **背景**：功能开关注册表统一（plan-39）把「面板可见性」与「是否实验项」解耦后，「转正」只剩「改分组 + 改默认值」两个字段、面板入口自动延续。据此盘点 9 项实验开关，其中 8 项在实际使用中已被用户手工打开——即**真实数据验证已经发生**，却让用户用配置承担本该由默认值表达的取舍；默认关的真实代价是这层机制在生产路径从不执行。
+- **转正判据（第三类，新增）**：**开启的代价是否只在读侧**——只在既有提示词或既有产物流水线上追加一段由**已算出**数据派生的内容，不新增 LLM 调用次数、不写新的持久化文件、无隐式网络与耗时，且该内容有确定收益。据此转正五项：
+  - `signal_pre_digest`（信号预消化）——资金流/涨跌/估值分位等数值指标进 LLM 前预消化为带方向标注的「信号：…」行；
+  - `module_quality_gate`（模块级质量分级）——按完整性/篇幅给 4 个 LLM 模块输出评 A~F，低评级中「内容在但存在缺陷」者注入【内容质量提示】横幅（只标注，不阻断不重试不写回缓存）；
+  - `decision_header_parse`（结构化决策头）——专家复盘提示词追加受控 JSON 决策头契约，抽取侧优先读结构化头、失败回落确定性表格解析；
+  - `llm_debate_conditional`（辩论-条件推理）——专家复盘追加条件推理段；
+  - `datasource_credential_ready`（数据源凭据就绪）——链路预检跳过缺凭据源并给可读指引（纯只读诊断，判据 A 的直接延用）。
+- **口径**：五项 `affects_report` **照实答 `True`**——它们确实改变产物内容，故 Web 配置面板照常带「（影响报告）」标记，TUI 面板不标 ⚗；关闭杠杆保留——`features.json` 对应项置 `false` 即回到「未引入本机制」的行为，CLI 用 `--feature NAME=off`（`--experiment` 只认仍在实验组的开关，`--feature` 为全域双向通道）。
+- **刻意不转正（判据的反面）**：**写盘积累型** `signal_ledger`（`decision_reflection` 同为落账机制）——默认开启等于未经用户知情选择就向 `data/state/*.jsonl` 写持久化状态，须由用户明确开启；**调用次数放大型** `llm_debate_procon`——把一次 `expert_review` 换成最多三次（pro → con → synthesis），默认开启直接改变费用与耗时量级；`llm_debate_qa_concentration` 触发面最窄（单品种占比 ≥20% 时才附加块）、覆盖最薄，待有真实触发样本后再评估。
+- **一次性副作用（升级须知）**：改变提示词的开关，其缓存后缀函数由「默认返回空」翻为「默认返回非空」——`core/decision_header.py::structured_header_cache_suffix()` → `_dh`、`llm/module_fingerprint.py::debate_feature_cache_suffix()` → `_c`、`llm/prompts_signals.py::_signal_digest_cache_suffix()` → 信号块摘要后缀。这些后缀是 `expert_review` 标准指纹的一部分，故**升级后首次运行会换键重生成一次**（属预期行为，非缺陷；两次运行之间缓存稳定）。
+- **程序改动**：`config/features.py` 五项声明改 `GROUP_STANDARD` + `default=True`（注册表仍是唯一登记点，三渠道上屏、面板编号、`enabled_experimental_features()` 产物自述全部自动派生）；源码 9 处注释/文档字符串由「实验开关/实验项」改述为「开关（默认开启）」。
+- **测试**：9 个用例的「关闭基线」原依赖 `reset_feature_flags()`，转正后该函数返回的是**已转正的默认值**（`True`）——全部改为在用例内**显式** `set_feature_enabled(flag, False)` 并附注「转正后默认开，基准须显式关」；`test_excel_report_structure.py::test_notice_survives_empty_session_usage` 的产物自述断言原指向 `module_quality_gate`（已非实验项、不再出现在实验提示中），改指向仍属实验组的 `signal_ledger`（「确定性信号沉淀」），保留该用例原意（早返回的用量摘要不影响实验提示）。涉及文件：`test_decision_header.py` / `test_decision_llm_capture.py` / `test_prompts_structured_header.py` / `test_prompts_signals.py` / `test_debate_generators.py` / `test_excel_report_structure.py`（199 例全绿）。
+- **文档**：`developer-guide.md` 新增「读侧增强类开关也应转正（第三类首例）」转正口径段 + 「刻意不转正的两类」说明；`README.md` / `how-to-config.md` / `how-to-use-tui-menu.md` / `how-to-use-cli-mode.md` / `how-to-use-web-mode.md` / `how-to-config-llm.md` / `faq.md` / `reports-instruction.md` / `llm-technical.md` / `technical.md` / `requirements.md` / `folders.md` 同步为常规开关口径，TUI 面板编号改为实验块 6-9 / 常规块 10-25（**转正项排在常规块块首 10-14，故既有常规开关 15-25 的编号不位移**）；CLI/README 中 `--experiment X` 的示例改用仍属实验组的开关。自审记录 rf-353。
+
 ### 完整报告快捷入口 llm.sh / llm.ps1（2026-09-12）
 
 - **背景**：用户要求为「生成完整报告（含 LLM）」提供一个最快捷的入口封装——等价于 TUI 菜单的 `[L]`，免去每次敲 `report --type full`。

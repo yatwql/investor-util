@@ -463,7 +463,7 @@ if not any(needs.values()):
 
 **degradation_events 暴露**：`generate_all_llm()` 接收 `degradation_events` 参数，供 `health_check` 的第 5 维「数据质量」引用降级事件；无降级事件时该段恒返回「今日无降级记录，所有数据源正常。」。该维度另需评**净值新鲜度**，其基准是**交易日**而非运行时刻——渲染时一并传入 `pipeline_data` 的 `data_freshness` 契约（`trading_day`/`prev_trading_day` + 逐品种 `stale`/`degraded` 清单），由 `_build_nav_freshness_basis_lines()` 产出「净值新鲜度基准」「净值滞后品种」行。报告可在非交易日运行（如周六凌晨生成上一交易日数据的报告），此时运行时刻与最近交易日相差一个自然日，若让模型自行以运行时刻做自然日差，QDII 与部分场外基金正常的 T-1 净值会被写成「净值更新延迟」。滞后清单直接引用 `core/data_freshness.py` 的判定结论，与「数据质量仪表盘」可信度区块同源，不由模型从裸日期另行推断。调用点 `report/_llm_news.py::_submit_llm_future` 在**主线程**提交线程池前取一次 `DegradationTracker.get_log()` 快照随参传入（数据获取阶段已结束，此处读取即定稿；主线程读取避免与工作线程并发写入交错）——**不可改在 `generate_all_llm` 内部自行取**，那会让 LLM 层反向依赖 `report/` 的降级追踪器，且与 `expert_review` 经 `_build_data_degradation_block(pipeline_data)` 的口径分叉。`generate_all_llm()` 把该事件集渲染成数据质量详细状态块**一次**，同一实例既进 `health_check` 指纹又进其提示词（见 §7.1「提示词内容覆盖」）——数据健康结论与缓存键同源，源恢复后重出报告不会复用故障期间的结论。
 
-> **LLM 输出侧质量分级不属本层**：`report/llm_quality.py`（实验功能 `module_quality_gate`）消费本层输出后逐模块评级并注入横幅，位于 `report/` 而非 `llm/`——`llm/` 不得反向依赖 `report/`（`report/llm_content.py` 已依赖 `llm/`）。设计见 `technical.md` §4.11。
+> **LLM 输出侧质量分级不属本层**：`report/llm_quality.py`（`module_quality_gate`）消费本层输出后逐模块评级并注入横幅，位于 `report/` 而非 `llm/`——`llm/` 不得反向依赖 `report/`（`report/llm_content.py` 已依赖 `llm/`）。设计见 `technical.md` §4.11。
 
 [↑ 回到顶部](#目录)
 
@@ -1271,7 +1271,7 @@ LLM 集成层与系统其他组件的接口：
 
 开关类后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要 → `_sg`、辩论增强 → `_c`/`_q`）**开关判定一律收敛在指纹构造器内部**：关闭时返回 `""`（键不变、不误伤旧缓存），开启时两侧同步换键——只改一侧会让预检命中旧键而跳过重生成，开关形同虚设。同源与覆盖保证由 `src/test/unit/llm/test_module_fingerprint.py` 锁定（断言预检键 == 写侧键、覆盖四模块 × 多场景；断言「进了提示词必须进键」与「未进提示词的模块不得被并入」），「一次渲染」由 `test_generate_all_llm.py::TestCompetitiveContextRenderedOnce` 与 `TestDataQualityBlockRenderedOnce` 以「渲染次数 == 1」+ 同一实例断言（`assertIs`）锁定。
 
-**结构化决策头（实验功能 `decision_header_parse`，默认关）**：开启时 `_build_expert_review_prompt` 在「### 操作建议」表之后追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约（`core/decision_header.build_structured_header_instruction()`，与解析器同源、由测试锁定互读）；关闭时 append 空串，提示词**逐字节不变**。该段只在标准模式 expert_review 生效，辩论模式路径不追加。解析侧归一见 `technical.md` §4.15。
+**结构化决策头（`decision_header_parse`，默认开）**：开启时 `_build_expert_review_prompt` 在「### 操作建议」表之后追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约（`core/decision_header.build_structured_header_instruction()`，与解析器同源、由测试锁定互读）；关闭时 append 空串，提示词**逐字节不变**。该段只在标准模式 expert_review 生效，辩论模式路径不追加。解析侧归一见 `technical.md` §4.15。
 
 **账本上下文注入（`skeleton.py::_LEDGER_CONTEXT_MODULES`）**：标准模式 `expert_review` 的 user prompt 首轮组装时，按开关追加两类**跨期账本上下文**——决策教训（`decision_ledger.lessons_block()`）与确定性信号摘要（`signal_ledger.summary_block()`）。两者各自做开关与样本门槛判断（关闭或无内容返回空串，注入逐字节无变化），故开关关闭时提示词不受影响；两处注入点与两处指纹后缀一一对应，见上表 `expert_review` 行。摘要**只统计实时来源记录**（非实时记录不参与），防止降级行情算出的评级污染跨期判断——纪律说明见 `technical.md` §4.16。
 
