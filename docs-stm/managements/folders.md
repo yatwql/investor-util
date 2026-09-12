@@ -16,10 +16,10 @@
 | **测试用例** | — | — | **6,881 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,026** | 含 README.md（202 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,824 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **132** | **50,719** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 119 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,640 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 123 | 39,983 | 各版本 changelog/plan/review-findings 等（119 md 39,525 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 2 | 479 | 当前设计文档（`feature-switch-registry-design.md` 功能开关注册表统一、`feeder-fund-penetration-design.md` 联接基金穿透）；已完成迭代的设计文档随其迭代归档（外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
+| **项目文档** | Markdown | **132** | **50,833** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 0 + archive 121 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,754 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 125 | 40,462 | 各版本 changelog/plan/review-findings 等（121 md 40,004 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | 当前为空；已实现的设计文档随其迭代归档（功能开关注册表统一与联接基金穿透两份现位于 v0.10.x 归档的 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -1001,9 +1001,13 @@ investor-util/
 │   │   │   │   ├── datasource-adapter-contract-design.md # 数据源适配契约设计（标准字段三段适配 + 适配器注册）
 │   │   │   │   ├── datasource-cassette-replay-design.md # 数据源记录-回放实现设计（真实响应体录制/离线回放）
 │   │   │   │   └── datasource-credential-ready-design.md # 数据源凭据声明与就绪指引设计（凭据声明表/就绪判定/上屏指引）
-│   │   │   └── llm-fingerprint-prompt-coverage/ # LLM 模块缓存指纹提示词覆盖设计（自审缺陷修复）
-│   │   │       └── llm-fingerprint-prompt-coverage-design.md # 指纹覆盖判据/一次渲染两侧共享/辩论三键口径
-│   ├── plan/                          #   中间设计文件（当前设计文档；已完成迭代的设计文档随其迭代归档）
+│   │   │   ├── llm-fingerprint-prompt-coverage/ # LLM 模块缓存指纹提示词覆盖设计（自审缺陷修复）
+│   │   │   │   └── llm-fingerprint-prompt-coverage-design.md # 指纹覆盖判据/一次渲染两侧共享/辩论三键口径
+│   │   │   ├── feature-switch-registry/ #   功能开关注册表统一设计归档（面板可见性/默认值/产物自述解耦）
+│   │   │   │   └── feature-switch-registry-unification-design.md # 单条开关声明 + 分组属性 + 三渠道入口派生
+│   │   │   └── feeder-fund-penetration/ #   联接基金穿透与基金持仓取数通道修正设计归档
+│   │   │       └── feeder-penetration-and-holdings-fetch-design.md # 取数阶梯次序修正 + 目标 ETF 代理底层暴露
+│   ├── plan/                          #   中间设计文件（当前无在办文档；实现落地后随迭代归档）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）

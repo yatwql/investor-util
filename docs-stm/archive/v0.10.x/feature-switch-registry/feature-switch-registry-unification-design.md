@@ -4,6 +4,7 @@
 > 文档版本：0.10.18-dev
 > 相关约束：`technical.md` 架构设计约束「功能开关注册表唯一事实来源」（本设计修订该条口径——适用范围扩至全部开关、登记点改指 `feature_switch_registry`，已同步落文）
 > 涉及模块：`config/features.py`（注册点）、`tui/handlers_config.py`、`web/config_edit.py` + `src/static/web/main.js`、`cli/cli.py`
+> 已归档。原始路径：`docs-stm/plan/feature-switch-registry-design.md` → `docs-stm/archive/v0.10.x/feature-switch-registry/`
 
 ---
 

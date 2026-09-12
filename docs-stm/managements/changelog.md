@@ -6,6 +6,13 @@
 
 ## [0.10.19-dev] - 开发中（未发布）
 
+### 已实现设计文档归档（plan 目录清空）（2026-09-12）
+
+- **背景**：`docs-stm/plan/` 的两份设计文档均已实现落地（功能开关注册表统一 plan-39、联接基金穿透与基金持仓取数通道修正 plan-40），留在「中间计划文件」目录会被误读为在办事项。
+- **归档**：按主题子目录 + 语义文件名迁入 v0.10.x 归档——`docs-stm/plan/feature-switch-registry-design.md` → `docs-stm/archive/v0.10.x/feature-switch-registry/feature-switch-registry-unification-design.md`；`docs-stm/plan/feeder-fund-penetration-design.md` → `docs-stm/archive/v0.10.x/feeder-fund-penetration/feeder-penetration-and-holdings-fetch-design.md`。两份均补「已归档。原始路径：…」头注，便于按历史引用回溯。
+- **引用同步**：`plan.md`（plan-39 / plan-40 两处设计文档索引）、`review-findings.md`（rf-346）、`folders.md`（`plan/` 统计行归零 + v0.10.x 目录树新增两个主题子目录 + 项目文档/归档统计按实测刷新）。
+- **口径**：`docs-stm/plan/` 自此为空——新设计文档仍按「中间计划文件 → `docs-stm/plan/`」归属，实现落地后即归档至对应版本的 `docs-stm/archive/` 主题子目录。
+
 ### 读侧增强类开关转正（五项默认开启）（2026-09-12）
 
 - **背景**：功能开关注册表统一（plan-39）把「面板可见性」与「是否实验项」解耦后，「转正」只剩「改分组 + 改默认值」两个字段、面板入口自动延续。据此盘点 9 项实验开关，其中 8 项在实际使用中已被用户手工打开——即**真实数据验证已经发生**，却让用户用配置承担本该由默认值表达的取舍；默认关的真实代价是这层机制在生产路径从不执行。

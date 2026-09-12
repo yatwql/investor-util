@@ -6,6 +6,7 @@
 > 涉及模块：`providers/tiantian_holdings.py`（取数阶梯 + 目标 ETF 解析）、`fetcher/fund.py`（第二跳合成）、`core/code_utils.py`（名称判定复用）、`report/penetration.py` + `report/penetration_sheet.py`（来源登记与标注）、`config/features.py`（`feeder_penetration` 开关）
 
 > 实现与原设计的差异汇总（详见各节）：识别复用了既有的 `is_index_link_by_name` 而非新增判定函数（§3.3）；穿透落在 fetcher 层的**幂等后处理**、并在单条与批量两处接缝调用（§3.4）；返回字段名为 `feeder_target_code`；`fund_holdings` cassette 改录联接基金（§10）。
+> 已归档。原始路径：`docs-stm/plan/feeder-fund-penetration-design.md` → `docs-stm/archive/v0.10.x/feeder-fund-penetration/`
 
 ---
 
