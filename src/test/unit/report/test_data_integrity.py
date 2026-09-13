@@ -4,7 +4,7 @@
   1. 三维度分类聚合一致 — 各分类小计 = 总计
   2. 穿透行业占比归一化 — 各行业占比之和 ≤ 100%
   3. 指数行情数值合理 — 上证≈3000、沪深300≈4000 等数量级
-  4. 多币种转换正确 — 美元份额 × 汇率中间价 = 人民币市值
+  4. 非人民币计价品种市值核算 — 按数据源价格 × 份额直接计市值（不做汇率折算）
   5. QDII 估值净值 vs 官方净值 — 估值净值 ≥ 0，官方净值延迟 T-2
   6. 基金业绩排名合理性 — 排名/收益率在合理范围内
   7. 溢价率计算 — (市价 - 净值) / 净值
@@ -259,15 +259,19 @@ class TestIndexValueRange(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 4. 多币种转换正确
+# 4. 非人民币计价品种市值核算（不做汇率折算）
 # ═══════════════════════════════════════════════════════════════
 
 
 @pytest.mark.data
 @pytest.mark.unit
 @pytest.mark.unit_report
-class TestMultiCurrencyConversion(unittest.TestCase):
-    """多币种转换：价格 × 汇率中间价 = 人民币市值（目前为占位符演练）。"""
+class TestForeignDenominatedMarketValue(unittest.TestCase):
+    """非人民币计价品种市值核算：价格 × 份额直接计市值。
+
+    程序不读取汇率数据源、不做跨币种折算——QDII 与场外基金的净值本身即以
+    人民币计值，币种敞口分析仅对市值做分类与占比（`analysis/fx_exposure.py`）。
+    """
 
     def test_detail_row_compute_with_high_price(self):
         """_compute_detail_row 处理美元计价净值（高价场景）正确。"""

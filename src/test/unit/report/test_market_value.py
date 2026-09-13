@@ -1680,8 +1680,8 @@ class TestPremiumInWriteSheet(unittest.TestCase):
         self.assertEqual(values[7], "--")
 
 
-class TestCurrencyConversion(unittest.TestCase):
-    """多币种转换正确 — 美元/港币份额处理。"""
+class TestForeignDenominatedMarketValue(unittest.TestCase):
+    """非人民币计价品种市值核算 — QDII/港股通份额按价格 × 份额直接计市值（不做汇率折算）。"""
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _count_trading_days_back

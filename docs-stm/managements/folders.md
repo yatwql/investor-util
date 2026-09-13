@@ -12,12 +12,12 @@
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 21 | 7,165 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
 | **源代码合计** | — | **299** | **78,944** | 主程序 + 模板 + 脚本 |
-| **测试代码** | Python | **360** | **105,975** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
-| **测试用例** | — | — | **6,920 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **测试代码** | Python | **361** | **106,055** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| **测试用例** | — | — | **6,924 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,086** | 含 README.md（202 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,884 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **132** | **50,888** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 0 + archive 121 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 9,723 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| **项目文档** | Markdown | **132** | **50,905** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 0 + archive 121 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 9,740 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 125 | 41,548 | 各版本 changelog/plan/review-findings 等（121 md 41,090 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 0 | 0 | 当前为空；已实现的设计文档随其迭代归档（功能开关注册表统一与联接基金穿透两份现位于 v0.10.x 归档的 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -655,6 +655,7 @@ investor-util/
 │       │   │   ├── test_test_runner_machine_info.py  #  test_runner 机器信息采集/bench 别名/耗时表格渲染测试
 │       │   │   ├── test_test_runner_doc_writer.py  #   test_runner 环境耗时对照文档自动更新（标记定位/列增改/round-trip）
 │       │   │   ├── test_extract_test_failures.py #   失败用例提取 data-jsonblob 解析（HTML 实体引号回归）
+│       │   │   ├── test_script_encoding.py  #   scripts/*.ps1 BOM+CRLF 与 scripts/*.sh 可执行位约定回归
 │       │   │   └── test_check_semantic_index.py  #   语义命名索引正反向校验脚本测试
 │       │   ├── startup/              #   首次运行引导单元测试
 │       │   │   ├── __init__.py       #       子包标记
