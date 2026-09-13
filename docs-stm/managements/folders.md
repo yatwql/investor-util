@@ -16,9 +16,9 @@
 | **测试用例** | — | — | **6,920 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,086** | 含 README.md（202 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,884 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **132** | **50,876** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 0 + archive 121 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 9,806 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 125 | 41,453 | 各版本 changelog/plan/review-findings 等（121 md 40,995 行 + 3 py 446 行 + 1 txt 12 行） |
+| **项目文档** | Markdown | **132** | **50,888** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 0 + archive 121 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 9,723 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 125 | 41,548 | 各版本 changelog/plan/review-findings 等（121 md 41,090 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 0 | 0 | 当前为空；已实现的设计文档随其迭代归档（功能开关注册表统一与联接基金穿透两份现位于 v0.10.x 归档的 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
