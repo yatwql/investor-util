@@ -1014,6 +1014,8 @@ investor-util/
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
 ├── pyproject.toml                    # Python 项目元数据
 ├── requirements.txt                  # Python 依赖清单
+├── .pi/                              # pi 编程助手项目配置（项目级设置，随仓库发布）
+│   └── settings.json                 #   项目级设置：changelog 折叠 / 静默启动 / fullscreen
 ├── .editorconfig                     # 编辑器编码规则（*.ps1 强制 UTF-8 BOM+CRLF）
 └── .gitignore                        # Git 忽略规则
 ```
