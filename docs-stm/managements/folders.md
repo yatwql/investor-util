@@ -19,7 +19,7 @@
 | **项目文档** | Markdown | **132** | **50,905** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 0 + archive 121 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 10 | 9,740 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 125 | 41,548 | 各版本 changelog/plan/review-findings 等（121 md 41,090 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 0 | 0 | 当前为空；已实现的设计文档随其迭代归档（功能开关注册表统一与联接基金穿透两份现位于 v0.10.x 归档的 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
+| ├ plan/ | 中间设计文件 | 1 | 283 | 在办设计文档：DataSinking 持仓个股财报摘要设计（`datasink-financial-report-digest-design.md`）；已实现的设计文档随其迭代归档（功能开关注册表统一与联接基金穿透两份现位于 v0.10.x 归档的 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -1008,7 +1008,8 @@ investor-util/
 │   │   │   │   └── feature-switch-registry-unification-design.md # 单条开关声明 + 分组属性 + 三渠道入口派生
 │   │   │   └── feeder-fund-penetration/ #   联接基金穿透与基金持仓取数通道修正设计归档
 │   │   │       └── feeder-penetration-and-holdings-fetch-design.md # 取数阶梯次序修正 + 目标 ETF 代理底层暴露
-│   ├── plan/                          #   中间设计文件（当前无在办文档；实现落地后随迭代归档）
+│   ├── plan/                          #   中间设计文件（在办设计文档；实现落地后随迭代归档）
+│   │   └── datasink-financial-report-digest-design.md # DataSinking 全文本财报接入设计（持仓个股财报摘要/密钥文件/计划感知限速）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
