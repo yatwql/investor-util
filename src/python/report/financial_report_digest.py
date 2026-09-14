@@ -17,7 +17,7 @@ from typing import Any
 from src.python.fetcher.financial_report import (
     DEFAULT_DOC_TYPES,
     DEFAULT_MAX_CHARS,
-    DEFAULT_SECTION,
+    DEFAULT_SECTIONS,
     collect_a_share_targets,
     fetch_symbol_report,
 )
@@ -79,8 +79,8 @@ def build_financial_report_digest(
         return _empty("未配置 DataSinking API key（详见数据源可用性矩阵）")
 
     section_cfg = config.get("datasink") or {}
-    sections = section_cfg.get("sections") or [DEFAULT_SECTION]
-    section = str(sections[0]) if sections else DEFAULT_SECTION
+    raw_sections = section_cfg.get("sections") or list(DEFAULT_SECTIONS)
+    sections = tuple(str(s) for s in raw_sections if str(s).strip()) or DEFAULT_SECTIONS
     max_chars = section_cfg.get("max_chars", DEFAULT_MAX_CHARS)
     max_chars = int(max_chars) if isinstance(max_chars, (int, float)) and max_chars > 0 else DEFAULT_MAX_CHARS
     doc_types = tuple(section_cfg.get("doc_types") or DEFAULT_DOC_TYPES)
@@ -100,7 +100,7 @@ def build_financial_report_digest(
 
     workers = get_batch_worker_count("datasink_workers", 3)
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="datasink_reports") as pool:
-        records = list(pool.map(lambda t: fetch_symbol_report(t["symbol"], doc_types, section, max_chars), targets))
+        records = list(pool.map(lambda t: fetch_symbol_report(t["symbol"], doc_types, sections, max_chars), targets))
 
     rows: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []

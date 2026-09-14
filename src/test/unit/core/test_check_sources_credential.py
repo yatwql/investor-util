@@ -118,7 +118,7 @@ class TestCredentialSummary:
     """就绪摘要行：无声明报「均无需凭据」，有声明报就绪比例。"""
 
     def test_summary_without_declarations(self):
-        assert "均无需凭据" in cs._credential_summary()
+        assert "未声明凭据需求" in cs._credential_summary()
         assert str(len(cs._checks)) in cs._credential_summary()
 
     def test_summary_with_declaration(self, monkeypatch):

@@ -95,3 +95,37 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
         monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: None)
         assert fr.fetch_symbol_report("600519.SS") is None
+
+    def test_multi_section_concatenation_order(self, monkeypatch):
+        """多章节按声明顺序拼接（各节正文以空行分隔），元数据取首个非空记录。"""
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
+        monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
+        parts = {"管理层讨论与分析": "A段", "财务报告": "B段"}
+        monkeypatch.setattr(
+            fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": parts.get(section, "")}
+        )
+        rec = fr.fetch_symbol_report("600519.SS", sections=("管理层讨论与分析", "财务报告"), max_chars=100)
+        assert rec is not None
+        assert rec["content"] == "A段\n\nB段"
+        rev = fr.fetch_symbol_report("600519.SS", sections=("财务报告", "管理层讨论与分析"), max_chars=100)
+        assert rev["content"] == "B段\n\nA段"
+
+    def test_multi_section_skips_missing(self, monkeypatch):
+        """某章节未命中（None 或空正文）时跳过，其余照常拼接。"""
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
+        monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
+        parts = {"管理层讨论与分析": "A段", "财务报告": ""}
+        monkeypatch.setattr(
+            fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": parts.get(section, "")}
+        )
+        rec = fr.fetch_symbol_report("600519.SS", sections=("管理层讨论与分析", "财务报告"), max_chars=100)
+        assert rec["content"] == "A段"
+
+    def test_all_sections_missing_returns_none(self, monkeypatch):
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
+        monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "  "})
+        assert fr.fetch_symbol_report("600519.SS", sections=("管理层讨论与分析", "财务报告")) is None

@@ -132,7 +132,7 @@ class TestGuards:
         monkeypatch.setattr(ds, "_QUOTA_FILE", str(tmp_path / "quota.json"))
         monkeypatch.setattr(ds, "resolve_daily_quota", lambda: 2)
         assert ds._request("/documents", {}) is not None
-        assert ds.quota_remaining() == 1
+        assert ds._read_quota()[1] == 1
 
 
 # ── HTTP 状态码分支 ─────────────────────────────────────────
@@ -188,11 +188,3 @@ class TestFetchPrimitives:
         data = ds.fetch_report_document(7, section="管理层讨论与分析")
         assert data["id"] == 7
         assert client.calls[0]["params"]["section"] == "管理层讨论与分析"
-
-    def test_sections_returns_titles(self, monkeypatch):
-        _prepare(monkeypatch, _FakeResp(payload={"sections": ["第一节", "管理层讨论与分析"]}))
-        assert ds.fetch_report_sections(7) == ["第一节", "管理层讨论与分析"]
-
-    def test_sections_non_list_returns_none(self, monkeypatch):
-        _prepare(monkeypatch, _FakeResp(payload={"sections": "oops"}))
-        assert ds.fetch_report_sections(7) is None

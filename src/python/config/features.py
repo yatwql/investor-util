@@ -141,10 +141,10 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
     ),
     # ── 常规开关：辩论增强（在既有调用内追加情景段，不换调用次数） ──
     "llm_debate_conditional": FeatureSwitchDef("辩论-条件推理", "情景化分析(涨/跌/震荡)", GROUP_STANDARD, True, True),
-    # ── 常规开关：数据层（声明表为空，当前就绪态只上体检与健康检查） ──
+    # ── 常规开关：数据层（就绪态上体检与健康检查） ──
     "datasource_credential_ready": FeatureSwitchDef(
         "数据源凭据就绪",
-        "声明数据源所需凭据，缺失时链路跳过并给出可读指引；体检与健康检查报告就绪状态（当前全部数据源免费无需凭据）",
+        "声明数据源所需凭据，缺失时链路跳过并给出可读指引；体检与健康检查报告就绪状态（需凭据的源如 DataSinking 财报）",
         GROUP_STANDARD,
         True,
         True,

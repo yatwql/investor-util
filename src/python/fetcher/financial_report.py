@@ -28,7 +28,7 @@ INDEX_PREFIX = "report_datasink_index_"
 DOC_PREFIX = "report_datasink_doc_"
 
 DEFAULT_DOC_TYPES: tuple[str, ...] = ("annual", "semiannual")
-DEFAULT_SECTION = "管理层讨论与分析"
+DEFAULT_SECTIONS: tuple[str, ...] = ("管理层讨论与分析",)
 DEFAULT_MAX_CHARS = 2000
 
 
@@ -92,15 +92,15 @@ def _fetch_document(doc_id: int | str, section: str) -> dict[str, Any] | None:
 def fetch_symbol_report(
     symbol: str,
     doc_types: tuple[str, ...] = DEFAULT_DOC_TYPES,
-    section: str = DEFAULT_SECTION,
+    sections: tuple[str, ...] = DEFAULT_SECTIONS,
     max_chars: int = DEFAULT_MAX_CHARS,
 ) -> dict[str, Any] | None:
-    """取单只 A 股的最新财报章节记录。
+    """取单只 A 股的最新财报章节记录（支持多章节拼接）。
 
     Args:
         symbol: FMP 风格符号（``600519.SS``）
         doc_types: 文种优先级（默认先年报、后半年报）
-        section: 章节标题（fuzzy 匹配；空串取全文）
+        sections: 章节标题列表（fuzzy 匹配；按顺序取，命中者拼接）
         max_chars: 正文截断长度（报告内摘要）
 
     Returns:
@@ -114,10 +114,23 @@ def fetch_symbol_report(
     doc_id = meta.get("id")
     if doc_id is None:
         return None
-    record = _fetch_document(doc_id, section)
-    if not record:
+
+    # 逐章节取正文（每节独立缓存），命中者按声明顺序拼接；元数据取首个非空记录
+    record: dict[str, Any] | None = None
+    contents: list[str] = []
+    for section in sections:
+        got = _fetch_document(doc_id, section)
+        if not got:
+            continue
+        if record is None:
+            record = got
+        text = str(got.get("content") or "").strip()
+        if text:
+            contents.append(text)
+    if record is None or not contents:
         return None
-    content = str(record.get("content") or "")
+
+    content = "\n\n".join(contents)
     return {
         "doc_id": record.get("doc_id") or doc_id,
         "symbol": record.get("symbol") or symbol,

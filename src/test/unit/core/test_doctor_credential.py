@@ -32,13 +32,13 @@ class TestCredentialGroup:
         assert doctor._check_datasource_credentials() == []
 
     def test_no_declaration_reports_free_sources(self, monkeypatch):
-        """开启且无任何声明 → 通过，说明当前全部免费源（现状如实呈现）。"""
+        """开启且无任何声明 → 通过，说明当前无声明需凭据的源（现状如实呈现）。"""
         monkeypatch.setitem(features.FEATURE_FLAGS, _FLAG, True)
         items = doctor._check_datasource_credentials()
         assert len(items) == 1
         assert items[0]["ok"] is True
         assert items[0]["group"] == doctor.GROUP_CREDENTIAL
-        assert "均无需凭据" in items[0]["message"]
+        assert "无声明需凭据" in items[0]["message"]
 
     def test_missing_credential_reports_failure_with_hint(self, monkeypatch):
         """声明了凭据但未配置 → 失败项，hint 指明变量名（错误即 UX）。"""

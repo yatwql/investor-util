@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.20-dev
-> **编号源**：`rf-next = 358`（新增问题取此编号，完成后更新为 +1；已用最大 rf-357，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 363`（新增问题取此编号，完成后更新为 +1；已用最大 rf-362，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -42,7 +42,7 @@
 
 ### 已解决待归档（v0.10.20-dev）
 
-均为发布 v0.10.19 后的自查整改：rf-354 为「多币种换算」这一从未实现的能力在文档与测试中被当作已验证项（rf-350 遗留项的收尾）；rf-355/rf-356 为脚本约定类——`scripts/*.ps1` 的 BOM+CRLF 约定、`scripts/*.sh` 可执行位入索引，两者此前均无任何校验环节；rf-357 为用户报障的缓存遮蔽缺陷（fix 只改代码未让旧载荷失效，TTL 内旧条目使修复在另一台机器完全失效）。
+均为发布 v0.10.19 后的自查整改：rf-354 为「多币种换算」这一从未实现的能力在文档与测试中被当作已验证项（rf-350 遗留项的收尾）；rf-355/rf-356 为脚本约定类——`scripts/*.ps1` 的 BOM+CRLF 约定、`scripts/*.sh` 可执行位入索引，两者此前均无任何校验环节；rf-357 为用户报障的缓存遮蔽缺陷（fix 只改代码未让旧载荷失效，TTL 内旧条目使修复在另一台机器完全失效）；rf-358~rf-362 为过去 96 小时实现的技术债与文档漂移审计整改（死代码/单一事实来源/配置形态、DataSinking 接入后的过时描述、用户文档计数与 testplan/technical 覆盖缺口）。
 
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
@@ -50,6 +50,11 @@
 | **rf-355** | **`scripts/*.ps1` 的 BOM+CRLF 约定只写在文档里，无实现校验**：`cli.ps1` 与 `launch.ps1` 为 UTF-8 with BOM 但**通体 LF**，与 `.editorconfig` 的 `[*.ps1] end_of_line = crlf` 及 CLAUDE.md 的「BOM + CRLF」约定不符（新写的 `llm.ps1` 反而合规）；仓库无任何校验环节，偏离只能靠人眼发现 | 两个文件行尾归一为 CRLF（保留 BOM）；新增 `src/test/unit/scripts/test_script_encoding.py` 回归守护——逐文件断言 `scripts/*.ps1` 以 BOM 开头且不含裸 LF（缺 BOM 时 Windows PowerShell 5.1 会按 GBK 误读中文注释而解析崩溃） |
 | **rf-356** | **`scripts/*.sh` 的可执行位未记入 git 索引**：仓库 `core.fileMode = false`，工作区权限不被跟踪，`cli.sh` / `launch.sh` / `llm.sh` 在索引中均为 `100644`——新克隆的仓库里 `./scripts/llm.sh` 报 permission denied，而 `how-to-use-cli-mode.md` / `developer-guide.md` / changelog 均按可执行方式调用/声称「置可执行位」 | `git update-index --chmod=+x` 将三个 `.sh` 的索引权限置为 `100755`（`llm.sh` 工作区权限同时由 777 归为 755）；新增回归用例断言索引权限为 `100755` 且工作区可执行（非 git 工作区/Windows 自动跳过） |
 | **rf-357** | **「改变载荷语义」的修复被 TTL 内的旧缓存遮蔽**（用户报障：QDII 联接穿透修复在另一台机器完全失效）：`d02e32e0` 把联接基金的取数改为三跳阶梯 + 目标 ETF 穿透，但未让修复前写下的 `fund_hold_*` 条目失效——旧条目无 `feeder_target_code`，新代码无从穿透，旧载荷「有持仓 + 早期报告期」（`2023-09-30` / `2022-12-08`）直接撞上时效闸门被记为持仓不可用；`hold` TTL 为 7 天，旧条目过期前修复被全程遮蔽（提交当时仅以「需 `--clear-cache`」提醒，依赖用户手动，属真实缺口） | 给 `fund_hold_*` 载荷盖语义版本 `hold_schema`（`_stamp_hold_schema`），读取侧以 `_is_current_hold_payload` 为准入判据、版本不符即视为未命中重取；`fetch_with_fallback` 新增 `cache_validate` 参数（覆盖新鲜命中与过期降级），批量预检回调 `_hold_cache_check` 同判据（命中会跳过任务，判据须同挂在此接缝）；回归用例 8 例（chain 3 + fund 5） |
+| **rf-358** | **新增即死代码 + 配置形态与语义不符**：`providers/datasink.py` 的 `fetch_report_sections()`（章节清单接口）、`quota_remaining()`（剩余配额）有定义、有单测却无任何生产消费者；`datasink.sections` 声明为列表但装配层只取 `sections[0]`，多章节配置被静默忽略 | 删除两个死函数及其单测（配额计数改由 `_read_quota` 断言）；`fetch_symbol_report` 改为按 `sections` 顺序逐章节取正文（每节独立缓存）并拼接，装配层传全部章节；补 3 例（顺序拼接/跳过缺失/全缺失返回 None） |
+| **rf-359** | **同一清单/数字写两份（单一事实来源违背）**：`report/data_source_matrix._SOURCE_CATALOG[*].prefixes` 与 `_SOURCE_CATEGORIES[*].prefixes` 各写一份（日后加类别必漂移）；`_DATASINK_PLAN_BILLING` 硬编码「3 请求/秒、8,191 篇/日」，与 `providers.datasink._PLAN_LIMITS` 的 `(3, 8191)` 重复（套餐额度调整后报告说明表与真实限速不一致） | 前缀改为从 `_CATEGORY_PREFIXES`（由 `_SOURCE_CATEGORIES` 派生）取；计费文案改由 provider 新增的 `billing_description(plan)` 生成（数字同源 `_PLAN_LIMITS`），删除 `_DATASINK_PLAN_BILLING` 与目录里的重复数字；`note` 只留「免费 key 需自备」 |
+| **rf-360** | **「全部数据源免费、声明表为空」描述在 DataSinking 接入后普遍过时**：`core/datasource_credential.py` 模块 docstring 与「声明即数据」注释、`config/features.py` 开关注释与描述、`core/doctor.py` / `core/check_sources.py` 回退文案、`technical.md` §2.7（标题仍写「实验：默认关」+ 正文「生产实现为空表/就绪矩阵报均无需凭据」+「凭据只从环境变量读取」）、`requirements.md` §5.8（R-CRD-01/02/03/06/07）、`how-to-config.md`（开关表行 + S 面板说明）——均与「首个需 key 源已接入、凭据走通用密钥文件」矛盾 | 全部按实现改写（中性/准确措辞）：代码注释与文案改为「未声明免凭据、需凭据的源主动跳过」；technical §2.7 标题改「常规开关默认开」、正文补 DataSinking 密钥文件与节名；requirements R-CRD-01/02/03/06/07 补 `key_file`/`key_field`/`key_section` 与密钥文件解析顺序；how-to-config 两处同步；同步更新受影响的 3 个测试断言文案 |
+| **rf-361** | **用户文档计数漂移**：`README.md` 三处「最多 19 个条件页签」（registry 已 20 项、新章节启用后最多 20），且无新章节/新数据源任何提及 | README 改 20，补「财报摘要（可选）」分组与 DataSinking key 说明（`data_key.json` 的 `datasink` 节 / `DATASINK_API_KEY`） |
+| **rf-362** | **testplan / technical 覆盖缺口**：`testplan.md` §4 回归清单无财报取数路径条目（同期联接穿透/cassette 均有）；`technical.md` 无 §4.x 叙述章节给「持仓个股财报摘要」 | testplan §4 增 P1 行（指向 test_datasink/test_financial_report/test_financial_report_digest/test_datasource_credential，含隔离防线）；technical 增 §4.19 章节（定位/鉴权/取数链路/限速配额/降级合规/缓存/数据源说明表） |
 
 ### 归档档案
 

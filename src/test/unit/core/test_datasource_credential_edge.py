@@ -44,7 +44,7 @@ class TestDeclarationEdges:
         assert missing_credential("broken") is not None
 
     def test_reset_clears_registry(self, monkeypatch):
-        """清空后回到生产初始状态（全部免费源）。"""
+        """清空后回到生产初始状态（未声明凭据需求的免费源）。"""
         monkeypatch.setenv("EDGE_KEY", "v")
         register_credential_spec(CredentialSpec("e1", "边缘源一", "EDGE_KEY"))
         register_credential_spec(CredentialSpec("e2", "边缘源二", "EDGE_KEY"))

@@ -385,6 +385,6 @@ def _credential_summary() -> str:
     """凭据就绪摘要行（仅实验开关开启时输出）。"""
     rows = credential_readiness()
     if not rows:
-        return f"凭据就绪：{len(_checks)} 个数据源均无需凭据（免费源）"
+        return f"凭据就绪：{len(_checks)} 个数据源均未声明凭据需求"
     ready = sum(1 for r in rows if r["ready"])
     return f"凭据就绪：{len(rows)} 个数据源需凭据，{ready} 个已就绪"

@@ -1,9 +1,9 @@
 """数据源凭据声明与就绪指引 —— 「声明 → 就绪判定 → 可读指引」。
 
-本项目当前的数据源**全部免费、无需凭据**（腾讯/新浪/东方财富/天天基金/
-华尔街见闻/财联社），故 ``CREDENTIAL_SPECS`` 声明表为空。机制的价值不在当下
-而在接入任何**需要 key 的源**时：把「此源需什么凭据」声明在源的定义旁，
-使调用方无需发出请求即可判定是否就绪——
+多数数据源免费（腾讯/新浪/东方财富/天天基金/华尔街见闻/财联社等）；
+需凭据的源（如 DataSinking 全文本财报）在其 provider 模块导入时登记一条
+``CredentialSpec``，把「此源需什么凭据」声明在源的定义旁，使调用方无需
+发出请求即可判定是否就绪——
 
   - 链路（``fetcher/chain.py``）**主动跳过**未就绪的源并给出「你缺什么、去哪
     申请」，而不是把它当作「源不可达」反复重试、甚至计入熔断（配置级问题
@@ -99,8 +99,8 @@ class CredentialSpec:
     key_file_setting: str = ""
 
 
-# 声明即数据：当前为空（全部免费源）。接入需 key 的源时在源模块内导入即注册，
-# 与 ``source_adapter.ADAPTER_REGISTRY`` 同习语。
+# 声明即数据：由各源模块导入即注册（如 providers/datasink.py 的 DataSinking 财报）；
+# 未声明的源视为免凭据，与 ``source_adapter.ADAPTER_REGISTRY`` 同习语。
 CREDENTIAL_SPECS: dict[str, CredentialSpec] = {}
 
 

@@ -163,108 +163,81 @@ def build_data_source_matrix() -> list[dict[str, Any]]:
 #  数据源说明表（实际使用清单：用途 / 计费 / 凭据要求）
 # ═══════════════════════════════════════════════════════════
 
-# 每行描述一个数据类别实际走的数据源链路、用途、计费与凭据要求。
-# prefixes 与 _SOURCE_CATEGORIES 对齐，用于判定「本次是否实际使用」；
-# 免费/需 key 口径与 datasource-reliability.md / 各用户手册一致。
+#: 类别前缀唯一来源（与 _SOURCE_CATEGORIES 同源——说明表不再各写一份 prefixes）
+_CATEGORY_PREFIXES: dict[str, list[str]] = {c["key"]: list(c["prefixes"]) for c in _SOURCE_CATEGORIES}
+
+#: 免费源的计费描述；需 key 的源由 providers.datasink.billing_description 按套餐动态给
+_FREE_BILLING = "免费"
+
+# 每行描述一个数据类别实际走的数据源链路、用途与凭据要求。
+# 「本次是否使用」的前缀取自 _CATEGORY_PREFIXES；计费文案的数字同源于 provider 层套餐表。
 _SOURCE_CATALOG: list[dict[str, Any]] = [
     {
         "id": "price",
         "category": "行情数据",
         "provider": "腾讯财经 / 新浪财经（场内）；东方财富 / 天天基金（场外净值）",
         "usage": "持仓实时价与场外基金净值",
-        "billing": "免费",
         "auth": "无需",
-        "prefixes": ["price_"],
-        "note": "",
     },
     {
         "id": "fund_rank",
         "category": "基金排名",
         "provider": "天天基金",
         "usage": "基金同类排名与区间收益",
-        "billing": "免费",
         "auth": "无需",
-        "prefixes": ["fund_rank_", "perf_rank"],
-        "note": "",
     },
     {
         "id": "fund_hold",
         "category": "基金持仓",
         "provider": "天天基金（基金主页面 + 季报 API）",
         "usage": "基金底层持仓（含联接基金穿透目标 ETF）",
-        "billing": "免费",
         "auth": "无需",
-        "prefixes": ["fund_hold_"],
-        "note": "",
     },
     {
         "id": "industry",
         "category": "行业分类",
         "provider": "东方财富 push2 → 东方财富 REST",
         "usage": "个股行业分类与概念板块",
-        "billing": "免费",
         "auth": "无需",
-        "prefixes": ["industry_", "penetration_industry"],
-        "note": "",
     },
     {
         "id": "index",
         "category": "指数数据",
         "provider": "腾讯财经 / 新浪财经（A 股）；新浪财经 / 腾讯财经（美股）",
         "usage": "A 股与美股指数行情",
-        "billing": "免费",
         "auth": "无需",
-        "prefixes": ["index_a", "index_us", "index_history_"],
-        "note": "",
     },
     {
         "id": "profit_forecast",
         "category": "盈利预测",
         "provider": "akshare",
         "usage": "机构盈利预测（穿透 TOP10 增强）",
-        "billing": "免费",
         "auth": "无需",
-        "prefixes": ["penetration_profit_forecast"],
-        "note": "",
     },
     {
         "id": "dividend",
         "category": "分红数据",
         "provider": "akshare",
         "usage": "持仓股票历史分红",
-        "billing": "免费",
         "auth": "无需",
-        "prefixes": ["penetration_dividend"],
-        "note": "",
     },
     {
         "id": "fund_flow",
         "category": "资金流向",
         "provider": "akshare",
         "usage": "行业资金流向（LLM 分析上下文）",
-        "billing": "免费",
         "auth": "无需",
-        "prefixes": ["ff_"],
-        "note": "",
     },
     {
         "id": "financial_report",
         "category": "财报全文",
         "provider": "DataSinking（api.datasink.ing）",
         "usage": "个股财报章节全文摘要（仅 A 股）",
-        "billing": "免费档（3 请求/秒、8,191 篇/日）",
         "auth": "需 key",
-        "prefixes": ["report_datasink_"],
         "credential_source_id": "datasink",
-        "note": "免费 key 需自备；付费档 31 请求/秒、131,071 篇/日",
+        "note": "免费 key 需自备（datasink.ing）",
     },
 ]
-
-#: 套餐 → 计费描述（「财报全文」行按 config.json 的 datasink.plan 动态展示）
-_DATASINK_PLAN_BILLING: dict[str, str] = {
-    "free": "免费档（3 请求/秒、8,191 篇/日）",
-    "yearly": "付费档（31 请求/秒、131,071 篇/日）",
-}
 
 
 def _datasink_plan() -> str:
@@ -302,13 +275,15 @@ def build_data_source_catalog() -> list[dict[str, Any]]:
 
     rows: list[dict[str, Any]] = []
     for cat in _SOURCE_CATALOG:
-        used = any(any(key == p or key.startswith(p) for p in cat["prefixes"]) for key in observed)
-        billing = (
-            _DATASINK_PLAN_BILLING.get(plan, cat["billing"]) if cat["id"] == "financial_report" else cat["billing"]
-        )
-        auth = cat["auth"]
+        prefixes = _CATEGORY_PREFIXES.get(cat["id"], [])
+        used = any(any(key == p or key.startswith(p) for p in prefixes) for key in observed)
         cred_id = cat.get("credential_source_id")
+        billing = _FREE_BILLING
+        auth = cat["auth"]
         if cred_id:
+            from src.python.providers import datasink as _datasink
+
+            billing = _datasink.billing_description(plan)
             row = readiness.get(cred_id)
             if row is not None:
                 auth = f"需 key（{'已就绪' if row.get('ready') else '未配置'}）"

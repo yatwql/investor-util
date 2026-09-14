@@ -356,7 +356,7 @@ def _check_datasource_credentials() -> list[dict[str, Any]]:
         return [_item(GROUP_CREDENTIAL, "凭据就绪", False, f"执行失败: {type(exc).__name__}: {exc}")]
 
     if not rows:
-        return [_item(GROUP_CREDENTIAL, "凭据就绪", True, "全部数据源均无需凭据（免费源）")]
+        return [_item(GROUP_CREDENTIAL, "凭据就绪", True, "当前无声明需凭据的数据源")]
 
     missing = [r for r in rows if not r["ready"]]
     if missing:

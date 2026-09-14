@@ -19,7 +19,7 @@
   - [2.4 关键机制](#24-关键机制)
   - [2.5 数据源适配契约（`datasource_adapter`，默认开）](#25-数据源适配契约datasource_adapter默认开)
   - [2.6 数据源记录-回放（测试基建，无开关）](#26-数据源记录-回放测试基建无开关)
-  - [2.7 数据源凭据就绪指引（实验：`datasource_credential_ready`，默认关）](#27-数据源凭据就绪指引实验datasource_credential_ready默认关)
+  - [2.7 数据源凭据就绪指引（常规开关 `datasource_credential_ready`，默认开）](#27-数据源凭据就绪指引常规开关datasource_credential_ready默认开)
 - [3. 缓存层详细设计](#3-缓存层详细设计)
   - [3.1 子模块结构](#31-子模块结构)
   - [3.2 核心接口与 TTL 分辨率](#32-核心接口与-ttl-分辨率)
@@ -46,6 +46,7 @@
   - [4.16 确定性数值信号沉淀与实时/非实时标签纪律](#416-确定性数值信号沉淀与实时非实时标签纪律)
   - [4.17 健壮性三件套（数值归一防线 / 失败原因可读 / 系统自检）](#417-健壮性三件套数值归一防线--失败原因可读--系统自检)
   - [4.18 决策跨期反思闭环](#418-决策跨期反思闭环)
+  - [4.19 持仓个股财报摘要（DataSinking 全文本财报）](#419-持仓个股财报摘要datasinking-全文本财报)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -1168,19 +1169,20 @@ fetch_index_data(code)
 
 ---
 
-### 2.7 数据源凭据就绪指引（实验：`datasource_credential_ready`，默认关）
+### 2.7 数据源凭据就绪指引（常规开关 `datasource_credential_ready`，默认开）
 
 把「此源需要什么凭据」**声明在数据里**，缺失时给出「缺什么 → 去哪申请」的可读指引，而不是等
 运行期拿到 HTTP 401 再当作「源不可达」反复重试（借鉴 OpenBB `Provider(credentials=[...])`；
 设计见实施设计文档「数据源凭据声明与就绪指引实施设计」）。
 
-**现状如实呈现**：当前全部数据源免费无需凭据，故 `CREDENTIAL_SPECS` 生产实现为**空表**，
-开关开启后的可观察行为就是就绪矩阵报告「N 个数据源均无需凭据（免费源）」。机制由**注入合成
-凭据声明**的单元测试证明可用——不为了演示而把假数据源写进生产注册表。
+**现状**：多数数据源免费无需凭据；首个需凭据的源为 **DataSinking 全文本财报**
+（`providers/datasink.py` 导入即登记 `CredentialSpec`，凭据取通用密钥文件
+`data/config/data_key.json` 的 `datasink` 节或环境变量 `DATASINK_API_KEY`）。**未声明的源**
+照常尝试；已声明未就绪的源由链路主动跳过并给可读指引。
 
 | 组成 | 位置 | 职责 |
 |:-----|:-----|:-----|
-| 声明与判定 | `core/datasource_credential.py` | `CredentialSpec` 冻结 dataclass + `CREDENTIAL_SPECS` 注册表（声明即数据，当前为空）；`missing_credential` 判定就绪（**空白串视为缺失**，源未声明 → `None` 即不需凭据）；`credential_hint` 可读指引；`credential_readiness` 就绪矩阵（**自身不抛异常**，供体检复用） |
+| 声明与判定 | `core/datasource_credential.py` | `CredentialSpec` 冻结 dataclass + `CREDENTIAL_SPECS` 注册表（声明即数据：源模块导入即注册，未声明的源免凭据）；`missing_credential` 判定就绪（**空白串视为缺失**，源未声明 → `None` 即不需凭据）；`credential_hint` 可读指引；`credential_readiness` 就绪矩阵（**自身不抛异常**，供体检复用）；就绪解析顺序「环境变量优先 → 密钥文件」（密钥文件以 provider 名为节，见 `data_key_file`） |
 | 链路预检跳过 | `fetcher/chain.py` | `fetch_with_fallback` 的 provider 循环内、熔断检查之后；历史 chain 的 `_try_providers` 遍历循环同样受控——两处都是「能取数的路径」，只堵一处等于机制半应用 |
 | 健康检查跳过 | `core/check_sources.py` | `_checks` 由三元组扩为 `(source_id, 显示名, 用途, 探测函数)`；缺失凭据**不发起探测**，直接产出 `skipped` 项（复用既有 `_SKIP` 符号 `⏭️`），末尾追加就绪摘要行 |
 | 体检分组 | `core/doctor.py` | 新增 `GROUP_CREDENTIAL`「数据源凭据」组，插在「数据源适配」与「数据源」之间 |
@@ -1190,12 +1192,11 @@ fetch_index_data(code)
 矩阵。`check-sources` 中跳过项计入 `skipped` 而非 `err`/`warn`，**不改变退出码**；`doctor` 的
 「数据源」组据此过滤掉跳过项（该组只报真实探测结果），避免同一问题被两个组重复计为失败。
 
-**安全口径**：凭据只从环境变量读取，**值永不落日志、永不写入报告/缓存**——日志与就绪矩阵
-只报告**变量名 + 是否就绪**，以及申请地址。
+**安全口径**：凭据从声明的密钥文件或环境变量读取（环境变量优先），**值永不落日志、永不写入报告/缓存**——日志与就绪矩阵只报告**来源类型 + 是否就绪**，以及申请地址。
 
-**不设凭据交互式配置向导**：无源需要凭据时该 UI 既无法验证也无法使用（YAGNI）；接入需 key 的
-源时补 `register_credential_spec(...)` 一行声明即可，四面上屏（链路/健康检查/体检/Web 健康页）
-均由既有面自动生效。
+**不设凭据交互式配置向导**：凭据由用户在密钥文件/环境变量自行填写，界面只报告就绪状态；
+新增需 key 的源时补 `register_credential_spec(...)` 一行声明即可，四面上屏
+（链路/健康检查/体检/Web 健康页）均由既有面自动生效。
 
 [↑ 回到顶部](#目录)
 
@@ -2802,6 +2803,22 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 **缓存指纹同源**：开关影响专家复盘提示词，故教训区块经 `lessons_cache_suffix()`（内容 md5 前若干位）进入 `llm/module_fingerprint.py` 中写侧与预检侧**共用的同一个**构建函数，开关与内容判定收敛在函数内部（无教训时返回空后缀）。
 
 **报告挂载点**：结算与确定性登记经 `report/_experimental_seams.py::record_deterministic_decisions` 置于 LLM 拉取**之前**（当次教训含本批结算结果，须在 LLM 注入前落档，否则提示词读不到新结算）；LLM 登记与复盘装配经 `record_llm_decisions_and_review_block` 置于 LLM 回退**之后**。两处异常守护由挂载点统一提供，实验特性故障绝不打断报告主链路。
+
+### 4.19 持仓个股财报摘要（DataSinking 全文本财报）
+
+**定位**：新增独立章「持仓个股财报摘要」（sheet key `financial_report_digest`，type `financial_report`，`report_submodules.financial_report_digest` 默认关）。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）指定章节的**原文摘要**，与「拿行情/拿持仓」互补：前者提供公司经营层叙事与财务口径原文。
+
+**数据源与鉴权**：DataSinking（`https://api.datasink.ing`）提供全文本财报 Markdown，仅覆盖 A 股（SSE/SZSE/BSE，代码经 `providers/datasink.py::to_fmp_symbol` 映射为 FMP 风格）。**需用户自备 API key**：凭据取通用密钥文件 `data/config/data_key.json` 的 `datasink` 节（`{"datasink": {"api_key": "..."}}`），环境变量 `DATASINK_API_KEY` 可覆盖；缺 key 时链路主动跳过并给申请指引，章节写占位。
+
+**取数链路**：`fetcher/financial_report.py` 逐标的取元数据（`/documents`，按 `doc_types` 年报优先）→ 逐章节取正文（`/documents/{id}?section=`，每节独立缓存、命中者按声明顺序以空行拼接）→ 按 `datasink.max_chars` 截断为摘要。单篇正文经 `fetch_with_fallback` + 财报域适配器两槽，复用缓存/熔断/降级。
+
+**限速与配额护栏**：每次 HTTP 请求前经 `RateLimiter` 以「间隔 = 1/每秒上限」限速（免费档 3 请求/秒；付费档 31）；日配额计数存 `data/state/datasink_quota.json`，超限即停并告警。**免费档无批量端点、必然逐篇请求**，故限速必须落在 provider 每次请求前（批量调度器层挡不住单条调用）。并发取数由 `batch.datasink_workers` 控制（默认 3），速率仍由 provider 兜底。
+
+**降级与合规**：401/403/429/非 200/网络不可达均返回空并按代码级降级（不计传输级熔断）；单标的失败进失败清单；`available=False` 时写占位。返回对象含披露平台归属字段 `source`，报告逐行标注（再分发时保留）。
+
+**缓存**：报告元数据两周（`report_datasink_index_`）、章节正文一月（`report_datasink_doc_`），随菜单缓存命令与 TTL 管理。**数据契约** `financial_report_digest_data`（附录 H）；语义命名行见 §6.7。
+
+**数据源说明表**：「数据源可用性矩阵」章在健康度表后附「数据源说明（实际使用清单）」表——逐数据类别列实际链路、用途、计费（财报全文随 `datasink.plan` 动态展示免费/付费档）与凭据要求（是否需 key + 就绪状态），并标本次运行是否实际使用（`report/data_source_matrix.py::build_data_source_catalog`，前缀取自 `_SOURCE_CATEGORIES`、计费取自 provider 套餐表，单一事实来源）。
 
 [↑ 回到顶部](#目录)
 

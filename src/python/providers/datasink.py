@@ -144,6 +144,19 @@ def resolve_daily_quota(cfg: dict[str, Any] | None = None) -> int:
     return int(_PLAN_LIMITS[resolve_plan(section)][1])
 
 
+_PLAN_TIER_LABELS: dict[str, str] = {"free": "免费档", "yearly": "付费档"}
+
+
+def billing_description(plan: str | None = None) -> str:
+    """套餐的计费与额度描述（报告「数据源说明表」消费）。
+
+    数字同源于 :data:`_PLAN_LIMITS`，不在别处重复硬编码。
+    """
+    resolved = plan if plan in _PLAN_LIMITS else "free"
+    rps, quota = _PLAN_LIMITS[resolved]
+    return f"{_PLAN_TIER_LABELS.get(resolved, '免费档')}（{rps} 请求/秒、{quota:,} 篇/日）"
+
+
 _limiter: Any = None
 _limiter_lock = threading.Lock()
 
@@ -179,16 +192,6 @@ def _read_quota() -> tuple[str, int]:
         return str(data.get("date", "")), int(data.get("count", 0) or 0)
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return "", 0
-
-
-def quota_remaining() -> int:
-    """当日剩余配额（不限时为 -1）。"""
-    quota = resolve_daily_quota()
-    if quota <= 0:
-        return -1
-    day, count = _read_quota()
-    used = count if day == date.today().isoformat() else 0
-    return max(0, quota - used)
 
 
 def _consume_quota() -> bool:
@@ -286,12 +289,3 @@ def fetch_report_document(doc_id: int | str, section: str | None = None) -> dict
     """取单篇文档（默认全文，含 ``content``）；给了 ``section`` 则只取该章节正文。"""
     data = _request(f"/documents/{doc_id}", {"section": section})
     return data
-
-
-def fetch_report_sections(doc_id: int | str) -> list[str] | None:
-    """取单篇文档的章节标题清单。"""
-    data = _request(f"/documents/{doc_id}/sections", {})
-    if data is None:
-        return None
-    sections = data.get("sections")
-    return [s for s in sections if isinstance(s, str)] if isinstance(sections, list) else None
