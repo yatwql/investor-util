@@ -17,6 +17,15 @@
 安全纪律：**凭据值永不落日志、永不写入报告/缓存**——本模块只读环境变量与
 声明的密钥文件，只对外报告「来源类型 + 是否就绪」。
 
+凭据文件通用化：多个数据源的 key 共用一个 ``data/config/data_key.json``，
+**以 provider（``source_id``）为节**（节内字段由 ``key_field`` 指定，默认
+``api_key``）——文件内容自述「哪个 key 属于哪个数据源」：
+
+    {
+      "datasink": {"api_key": "ds_xxx"},
+      "another_source": {"api_key": "yyy"}
+    }
+
 用法::
 
     from src.python.core.datasource_credential import (
@@ -27,8 +36,10 @@
     if spec is not None:
         logger.info("跳过：%s", credential_hint(spec))
 
-需要独立密钥文件的源额外声明 ``key_file``（默认路径，可为相对路径）与
-``key_field``（文件内的字段名）；环境变量优先于密钥文件（便于 CI / 临时切换）。
+需要密钥文件的源额外声明 ``key_file``（默认路径，可为相对路径）与
+``key_field``（节内字段名，默认 ``api_key``）；节名默认取 ``source_id``，
+可用 ``key_section`` 覆盖（便于一个数据源用多个 key 或节名与注册名不同）。
+环境变量优先于密钥文件（便于 CI / 临时切换）。
 """
 
 from __future__ import annotations
@@ -77,10 +88,13 @@ class CredentialSpec:
     apply_url: str = ""
     note: str = ""
     #: 承载凭据的本地密钥文件路径（可空；相对路径按 PROJECT_ROOT 解析）。
-    #: 用于「用户直接在文件里填 key」的源；环境变量优先于本文件。
+    #: 多个源共用 ``data/config/data_key.json``；环境变量优先于本文件。
     key_file: str = ""
     #: 密钥文件内的字段名（默认 ``api_key``）。
     key_field: str = "api_key"
+    #: 密钥文件内的节名（默认取 ``source_id``）——文件以 provider 为节，
+    #: 自述「哪个 key 属于哪个数据源」。
+    key_section: str = ""
     #: 可选的配置键名，用于覆盖 ``key_file``（配置层路径型键，运行时为绝对路径）。
     key_file_setting: str = ""
 
@@ -133,8 +147,13 @@ def _key_file_path(spec: CredentialSpec) -> str:
     return path if os.path.isabs(path) else os.path.join(PROJECT_ROOT, path)
 
 
-def _read_key_file(path: str, field: str) -> str:
-    """从 JSON 密钥文件读取字段值；文件缺失/不可解析/字段空白时返回空串。"""
+def _read_key_file(path: str, field: str, section: str = "") -> str:
+    """从 JSON 密钥文件读取字段值（文件缺失/不可解析/字段空白时返回空串）。
+
+    通用结构以 provider 为节（``{"datasink": {"api_key": "..."}}``）：
+    给了 ``section`` 且该节为对象时取节内字段；否则回退到顶层平铺字段
+    （兼容单源文件 ``{"api_key": "..."}``）。
+    """
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
@@ -142,7 +161,8 @@ def _read_key_file(path: str, field: str) -> str:
         return ""
     if not isinstance(data, dict):
         return ""
-    value = data.get(field)
+    section_data = data.get(section) if section else None
+    value = section_data.get(field) if isinstance(section_data, dict) else data.get(field)
     return value.strip() if isinstance(value, str) and not _is_blank(value) else ""
 
 
@@ -157,7 +177,7 @@ def resolve_credential(spec: CredentialSpec) -> tuple[str, str]:
         return env_val.strip(), "环境变量"
     path = _key_file_path(spec)
     if path:
-        value = _read_key_file(path, spec.key_field)
+        value = _read_key_file(path, spec.key_field, spec.key_section or spec.source_id)
         if value:
             return value, "密钥文件"
     return "", ""

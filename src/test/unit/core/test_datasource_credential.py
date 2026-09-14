@@ -155,7 +155,7 @@ class TestKeyFileCredential:
 
     def test_key_file_declared_and_present_is_ready(self, monkeypatch, tmp_path):
         monkeypatch.delenv(_ENV_VAR, raising=False)
-        key_file = self._write_key(tmp_path / "datasink_key.json", "secret-from-file")
+        key_file = self._write_key(tmp_path / "data_key.json", "secret-from-file")
         register_credential_spec(_spec(key_file=key_file))
 
         assert missing_credential("example") is None
@@ -165,7 +165,7 @@ class TestKeyFileCredential:
 
     def test_env_var_overrides_key_file(self, monkeypatch, tmp_path):
         monkeypatch.setenv(_ENV_VAR, "secret-from-env")
-        key_file = self._write_key(tmp_path / "datasink_key.json", "secret-from-file")
+        key_file = self._write_key(tmp_path / "data_key.json", "secret-from-file")
         register_credential_spec(_spec(key_file=key_file))
 
         assert credential_readiness()[0]["source"] == "环境变量"
@@ -177,22 +177,22 @@ class TestKeyFileCredential:
 
     def test_blank_key_field_counts_as_missing(self, monkeypatch, tmp_path):
         monkeypatch.delenv(_ENV_VAR, raising=False)
-        key_file = self._write_key(tmp_path / "datasink_key.json", "   ")
+        key_file = self._write_key(tmp_path / "data_key.json", "   ")
         register_credential_spec(_spec(key_file=key_file))
         assert missing_credential("example") is not None
 
     def test_malformed_key_file_counts_as_missing(self, monkeypatch, tmp_path):
         monkeypatch.delenv(_ENV_VAR, raising=False)
-        path = tmp_path / "datasink_key.json"
+        path = tmp_path / "data_key.json"
         path.write_text("{not-json", encoding="utf-8")
         register_credential_spec(_spec(key_file=str(path)))
         assert missing_credential("example") is not None
 
     def test_hint_names_key_file_and_field(self, monkeypatch, tmp_path):
         monkeypatch.delenv(_ENV_VAR, raising=False)
-        register_credential_spec(_spec(key_file=str(tmp_path / "datasink_key.json"), key_field="api_key"))
+        register_credential_spec(_spec(key_file=str(tmp_path / "data_key.json"), key_field="api_key"))
         hint = credential_hint(CREDENTIAL_SPECS["example"])
-        assert "datasink_key.json" in hint
+        assert "data_key.json" in hint
         assert "api_key" in hint
         assert _ENV_VAR in hint
 
@@ -203,17 +203,45 @@ class TestKeyFileCredential:
 
         monkeypatch.delenv(_ENV_VAR, raising=False)
         override = self._write_key(tmp_path / "override.json", "secret-from-config")
-        monkeypatch.setitem(_config_defaults._DEFAULT_CONFIG, "datasink_key_file", override)
+        monkeypatch.setitem(_config_defaults._DEFAULT_CONFIG, "data_key_file", override)
         _clear_config_cache()
-        register_credential_spec(_spec(key_file=str(tmp_path / "declared.json"), key_file_setting="datasink_key_file"))
+        register_credential_spec(_spec(key_file=str(tmp_path / "declared.json"), key_file_setting="data_key_file"))
 
         assert missing_credential("example") is None
         assert credential_readiness()[0]["key_file"] == override
 
+    def test_provider_section_structure(self, monkeypatch, tmp_path):
+        """通用密钥文件以 provider 为节：``{"example": {"api_key": "..."}}``。"""
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        path = tmp_path / "data_key.json"
+        path.write_text(json.dumps({"example": {"api_key": "secret-in-section"}}), encoding="utf-8")
+        register_credential_spec(_spec(key_file=str(path)))
+
+        assert credential_value("example") == "secret-in-section"
+        assert missing_credential("example") is None
+
+    def test_other_provider_section_does_not_leak(self, monkeypatch, tmp_path):
+        """文件里其它 provider 的节不会被误当作本源凭据。"""
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        path = tmp_path / "data_key.json"
+        path.write_text(json.dumps({"other": {"api_key": "other-secret"}}), encoding="utf-8")
+        register_credential_spec(_spec(key_file=str(path)))
+
+        assert missing_credential("example") is not None
+
+    def test_key_section_override(self, monkeypatch, tmp_path):
+        """节名可用 key_section 覆盖（注册名与文件节名不一致时）。"""
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        path = tmp_path / "data_key.json"
+        path.write_text(json.dumps({"custom_section": {"api_key": "secret"}}), encoding="utf-8")
+        register_credential_spec(_spec(key_file=str(path), key_section="custom_section"))
+
+        assert credential_value("example") == "secret"
+
     def test_credential_value_returns_secret_but_readiness_does_not(self, monkeypatch, tmp_path):
         """取值接口供取数使用；就绪矩阵仍不得回显凭据值。"""
         monkeypatch.delenv(_ENV_VAR, raising=False)
-        key_file = self._write_key(tmp_path / "datasink_key.json", "super-secret-value")
+        key_file = self._write_key(tmp_path / "data_key.json", "super-secret-value")
         register_credential_spec(_spec(key_file=key_file))
 
         assert credential_value("example") == "super-secret-value"

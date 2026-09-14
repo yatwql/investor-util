@@ -336,8 +336,8 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch, _doctor_probe_targets):
     # DataSinking 密钥文件路径 seed 到临时目录（凭据就绪判定与 provider 取数均读该键）
     monkeypatch.setitem(
         _cfg_defaults._DEFAULT_CONFIG,
-        "datasink_key_file",
-        str(tmp_path / "data/config/datasink_key.json"),
+        "data_key_file",
+        str(tmp_path / "data/config/data_key.json"),
     )
     _cfg_core._clear_config_cache()
     # 注：llm_settings.json 不在此处 seed 隔离路径。需要读写真实配置的测试

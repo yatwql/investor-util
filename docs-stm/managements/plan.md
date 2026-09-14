@@ -24,7 +24,7 @@
 
 #### ✅ `plan-42` 持仓个股财报摘要（DataSinking 全文本财报接入）— 已完成
 
-接入 [DataSinking](https://github.com/heubme2020/datasink) 全文本财报渠道：仅 A 股（SSE/SZSE/BSE）；凭据走单独密钥文件 `data/config/datasink_key.json`（环境变量 `DATASINK_API_KEY` 可覆盖）；免费档限速按套餐派生（3 请求/秒）+ 日配额护栏（8,191 篇/日）；新增报告章节「持仓个股财报摘要」（`report_submodules.financial_report_digest` 默认关，数据驱动型）。数据层（凭据/provider+限速/契约+链路+缓存）、章节装配、渲染接线（Excel 页签 + HTML 章节）均已完成并提交。
+接入 [DataSinking](https://github.com/heubme2020/datasink) 全文本财报渠道：仅 A 股（SSE/SZSE/BSE）；凭据走通用数据源密钥文件 `data/config/data_key.json`（以 provider 名为节，如 `{"datasink": {"api_key": "..."}}`；环境变量 `DATASINK_API_KEY` 可覆盖）；免费档限速按套餐派生（3 请求/秒）+ 日配额护栏（8,191 篇/日）；新增报告章节「持仓个股财报摘要」（`report_submodules.financial_report_digest` 默认关，数据驱动型）。数据层（凭据/provider+限速/契约+链路+缓存）、章节装配、渲染接线（Excel 页签 + HTML 章节）均已完成并提交。
 
 设计文档：[`datasink-financial-report-digest-design.md`](datasink-financial-report-digest-design.md)（含语义命名索引、文件级落点、限速与配额设计、配置 Schema、测试计划与风险）。
 

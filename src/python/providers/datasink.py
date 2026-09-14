@@ -5,10 +5,11 @@
   - 取单篇全文或单章节正文（`/documents/{id}`）
   - 取单篇的章节标题清单（`/documents/{id}/sections`）
 
-凭据：用户自备 API key，填在独立密钥文件（默认
-``data/config/datasink_key.json`` 的 ``api_key`` 字段），环境变量
-``DATASINK_API_KEY`` 可覆盖（便于 CI / 临时切换）。缺凭据时链路主动跳过，
-不发起请求。凭据值**永不落日志、报告与缓存**。
+凭据：用户自备 API key，写在通用密钥文件（默认
+``data/config/data_key.json``）以 provider 名为节的 ``api_key`` 字段：
+``{"datasink": {"api_key": "..."}}``；环境变量 ``DATASINK_API_KEY`` 可覆盖
+（便于 CI / 临时切换）。缺凭据时链路主动跳过，不发起请求。凭据值**永不落
+日志、报告与缓存**。
 
 限速与配额（免费档：3 请求/秒、8,191 篇/日）：
   - 每次 HTTP 请求前经 :class:`RateLimiter` 取得许可，间隔 = 1 / 每秒上限；
@@ -46,8 +47,9 @@ _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 SOURCE_ID = "datasink"
 DISPLAY_NAME = "DataSinking 财报"
 
-#: 密钥文件默认相对路径（配置键 ``datasink_key_file`` 可覆盖为绝对路径）
-DEFAULT_KEY_FILE = "data/config/datasink_key.json"
+#: 通用数据源密钥文件默认相对路径（配置键 ``data_key_file`` 可覆盖为绝对路径；
+#: 文件以 provider 名为节，本源的节名为 ``datasink``）
+DEFAULT_KEY_FILE = "data/config/data_key.json"
 
 #: 计划 → (每秒请求上限, 每日文档配额)。官方定价页口径。
 _PLAN_LIMITS: dict[str, tuple[int, int]] = {
@@ -66,7 +68,7 @@ _register_credential_spec(
         apply_url="https://datasink.ing",
         note="免费额度 3 请求/秒、8191 篇/日；付费 31 请求/秒、131071 篇/日",
         key_file=DEFAULT_KEY_FILE,
-        key_file_setting="datasink_key_file",
+        key_file_setting="data_key_file",
         key_field="api_key",
     )
 )

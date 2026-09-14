@@ -762,7 +762,7 @@ investor-util/
 │   ├── knowledge/                    #   知识数据（fund_benchmarks.json / sector_keywords.json，随仓库发布）
 │   ├── calibration/                  #   校准数据（dedup_anchors.jsonl，自动生成）
 │   ├── cache/                        #   API 响应缓存（自动生成，JSON/GZ）
-│   ├── config/                       #   配置文件（config.json / features.json / llm_key.json / llm_settings.json / llm_providers.json）
+│   ├── config/                       #   配置文件（config.json / features.json / llm_key.json / llm_settings.json / llm_providers.json / data_key.json）
 │   ├── state/                        #   运行时状态文件（.degradation_state.json / circuit_breaker.json / local_state.json 等，自动生成，机器本地不随仓库同步）
 │   └── history/snapshots/            #   持仓快照（自动生成，保留 60 天）
 │

@@ -849,7 +849,7 @@ LLM 五维度量化评分，每项满分 100：
 | 需求标识 | 需求描述 |
 |:---------|:---------|
 | R-FRD-01 | 新增独立报告章节「持仓个股财报摘要」，开关 `report_submodules.financial_report_digest` 默认关；仅覆盖 A 股（SSE/SZSE/BSE），按沪深京代码前缀映射 FMP 风格符号 |
-| R-FRD-02 | 数据源为 DataSinking 全文本财报，需用户自备 API key；key 存 `data/config/datasink_key.json`（仅 `api_key` 字段），环境变量 `DATASINK_API_KEY` 可覆盖文件；凭据值永不落日志/报告/缓存 |
+| R-FRD-02 | 数据源为 DataSinking 全文本财报，需用户自备 API key；key 存通用密钥文件 `data/config/data_key.json` 以 provider 名为节的 `api_key` 字段（如 `{"datasink": {"api_key": "..."}}`），环境变量 `DATASINK_API_KEY` 可覆盖文件；凭据值永不落日志/报告/缓存 |
 | R-FRD-03 | 对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）的配置章节（默认「管理层讨论与分析」，fuzzy 标题匹配）正文，按 `datasink.max_chars` 截断为摘要 |
 | R-FRD-04 | 免费 key 按套餐限速：请求间隔 = 1/每秒上限（free=3、yearly=31）且逐请求生效；日配额护栏（free=8191 篇/日，yearly=131071）超限即停并告警 |
 | R-FRD-05 | 缺凭据 / 无 A 股标的 / 全部无覆盖时章节写占位并给出可读指引，不阻断报告主链路；单标的失败进失败清单、不静默消失 |

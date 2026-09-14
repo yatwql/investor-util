@@ -53,7 +53,7 @@ DataSinking 提供**全文本财报 Markdown**，来源为各市场官方披露�
 | `financial_report` | 财报全文 | 数据域 | 新数据域标识 |
 | `datasink` | DataSinking 财报 | 数据源 | provider 名 / 链路名 / 限速键 / 凭据 source_id |
 | `financial_report_digest` | 持仓个股财报摘要 | 报告章节 | 章节 key 与 `report_submodules` 键 |
-| `datasink_key_file` | DataSinking 密钥文件路径 | 配置 | 顶层路径键，默认 `data/config/datasink_key.json` |
+| `data_key_file` | 数据源密钥文件路径 | 配置 | 顶层路径键，默认 `data/config/data_key.json`；通用文件以 provider（source_id）为节 |
 | `datasink_plan` | DataSinking 套餐 | 配置 | `free` / `yearly` |
 | `datasink_requests_per_second` | 每秒请求上限 | 配置 | 由套餐给出默认值，可覆盖 |
 | `datasink_daily_quota` | 每日文档配额 | 配置 | 日请求计数护栏阈值 |
@@ -76,7 +76,7 @@ DataSinking 提供**全文本财报 Markdown**，来源为各市场官方披露�
 | `src/python/fetcher/chain.py` | 新增默认链 `financial_report: ["datasink"]`；provider 映射；复用缓存键、熔断、降级 |
 | `src/python/fetcher/financial_report.py` | **新增**。域编排：持仓/穿透 → A 股符号集合 → 逐股取「最新年报优先、半年报兜底」→ 按章节取正文 → 返回摘要数据 |
 | `src/python/core/datasource_credential.py` | `CredentialSpec` 增加 `key_file` / `key_field`；就绪判定支持「密钥文件或环境变量」；就绪矩阵报告来源类型（仍不含凭据值） |
-| `src/python/config/_config_defaults.py` | 新增 `datasink` 段、`datasink_key_file` 路径键、`report_submodules.financial_report_digest`（默认关）、`batch.datasink_workers`、缓存 TTL 默认值 |
+| `src/python/config/_config_defaults.py` | 新增 `datasink` 段、`data_key_file` 路径键、`report_submodules.financial_report_digest`（默认关）、`batch.datasink_workers`、缓存 TTL 默认值 |
 | `src/python/core/registry.py` | `DataModuleDef`（`report_datasink_` 前缀缓存）；`_REPORT_SECTION_DEFAULT` 与 `_REPORT_SHEET_NAMES` 增加章节 |
 | `src/python/report/financial_report_digest.py` | **新增**。章节数据装配（表行、来源标注、失败清单） |
 | `src/python/report/data_source_matrix.py` | 新增数据源类别「财报全文」 |
@@ -111,15 +111,19 @@ DataSinking 提供**全文本财报 Markdown**，来源为各市场官方披露�
 
 ## 6. 密钥文件与凭据就绪
 
-**文件**：`data/config/datasink_key.json`（被 `.gitignore` 的 `data/` 规则覆盖，不入库）
+**文件**：`data/config/data_key.json`（通用数据源密钥文件，被 `.gitignore` 的 `data/` 规则覆盖，不入库）
 
 ```json
 {
-  "api_key": "ds_xxxxxxxx"
+  "datasink": {
+    "api_key": "ds_xxxxxxxx"
+  }
 }
 ```
 
-**配置键**：顶层 `datasink_key_file`，默认 `data/config/datasink_key.json`；与 `llm_key_file` 同为路径型键，经配置层 `_absolutize_paths()` 转绝对路径。
+以 provider（`source_id`）为节；一个文件容纳多个数据源的 key，文件内容自述「哪个 key 属于哪个数据源」。
+
+**配置键**：顶层 `data_key_file`，默认 `data/config/data_key.json`；与 `llm_key_file` 同为路径型键，经配置层 `_absolutize_paths()` 转绝对路径。
 
 **就绪判定**（扩展既有机制，保持「值永不落日志 / 报告 / 缓存」纪律）：
 
@@ -172,7 +176,7 @@ yearly → 31 req/s → 0.032s
 
 ```json
 {
-  "datasink_key_file": "data/config/datasink_key.json",
+  "data_key_file": "data/config/data_key.json",
   "datasink": {
     "plan": "free",
     "requests_per_second": 3,

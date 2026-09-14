@@ -189,7 +189,7 @@
 ### 3.9 DataSinking 全文本财报（持仓个股财报摘要）
 
 - **用途**：对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）的目标章节正文，装配为报告章节「持仓个股财报摘要」（开关 `report_submodules.financial_report_digest` 默认关）。
-- **鉴权**：用户自备 API key（免费 key 在 datasink.ing 领取）；key 存 `data/config/datasink_key.json` 的 `api_key` 字段，环境变量 `DATASINK_API_KEY` 可覆盖；凭据值不落日志/报告/缓存；缺 key 时链路主动跳过并给出申请指引。
+- **鉴权**：用户自备 API key（免费 key 在 datasink.ing 领取）；key 存通用密钥文件 `data/config/data_key.json` 以 provider 名为节的 `api_key` 字段（`{"datasink": {"api_key": "..."}}`），环境变量 `DATASINK_API_KEY` 可覆盖；凭据值不落日志/报告/缓存；缺 key 时链路主动跳过并给出申请指引。
 - **限额**：免费档 3 请求/秒 + 8,191 篇/日（付费 31 请求/秒 + 131,071 篇/日）；每次请求前经 `RateLimiter` 限速（间隔 = 1/每秒上限）+ 日配额护栏（超限即停）。免费档不支持批量端点，必然逐篇请求，故限速落在 provider 每次请求前。
 - **降级**：401/403（key 无效）、429（限速）、非 200、网络不可达均返回空并按代码级降级，不计入传输级熔断；单标的失败进失败清单不阻断整章。
 - **缓存**：报告元数据两周（`report_datasink_index_`）、章节正文一月（`report_datasink_doc_`），按类型参与菜单缓存命令与 TTL 清理。

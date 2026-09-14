@@ -42,7 +42,7 @@ _STRING_CONFIG_KEYS: set[str] = {
     "llm_key_file",
     "llm_settings_file",
     "llm_providers_file",
-    "datasink_key_file",
+    "data_key_file",
 }
 
 # 需要绝对化的路径型配置键（不包含纯文件名 holdings_filename）
@@ -52,7 +52,7 @@ _PATH_CONFIG_KEYS: set[str] = {
     "llm_key_file",
     "llm_settings_file",
     "llm_providers_file",
-    "datasink_key_file",
+    "data_key_file",
 }
 
 _MISSING = object()

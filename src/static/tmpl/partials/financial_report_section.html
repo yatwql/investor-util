@@ -76,7 +76,8 @@
                 {{ _frd.get("reason") or "暂无 A 股标的或未取到财报" }}。
             </p>
             <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
-                需在 data/config/datasink_key.json 配置 DataSinking API key（免费 key 可在 datasink.ing 领取）；
+                需在 data/config/data_key.json 中以 provider 名为节配置 DataSinking API key
+                （如 {"datasink": {"api_key": "..."}}；免费 key 可在 datasink.ing 领取）；
                 开启开关 report_submodules.financial_report_digest 后生效。
             </p>
         </div>
