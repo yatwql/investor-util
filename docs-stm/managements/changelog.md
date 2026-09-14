@@ -18,6 +18,14 @@
 - **数据源说明表**：「数据源可用性矩阵」章在健康度表后新增「数据源说明（实际使用清单）」表——逐数据类别列出实际链路（如财报全文=DataSinking）、用途、计费（免费/免费档/付费档，财报全文随 `datasink.plan` 动态展示）与凭据要求（是否需 key + 就绪状态），并标注本次运行是否实际使用（观测到 DegradationTracker 事件即为已使用）。Excel（旧样式页签与数据质量仪表盘两路）与 HTML 同步渲染，`build_data_source_catalog()` 输出契约。
 - **状态**：plan-42 全部完成——数据层（①②③）+ 章节装配（④a）+ 渲染接线（④b）+ 文档同步（⑤：requirements §6.12 R-FRD-01~07、technical 附录 H 与 §4.9/§6.7、datasource 两册、how-to-config、folders）。
 
+### 测试用例审计与修复（rf-365）（2026-09-14）
+
+- **审计口径**：333 个测试文件（`src/test/unit|scenario|integration`，`live/` 为 opt-in 排除）AST + 收集器全量扫描，按「无效（名实不符且无断言）/ 死（空体、同类重名、未收集）/ 冗余（AST 完全相同、同类同函数号）/ 目录语义（导入包 vs 目录期望）/ 命名与内容」五维盘点。
+- **官方门禁**：`check-test-markers.py --ci` 通过（无漏标、无 `_edge.py` 混放、无失效标记）；无无条件 `skip`；无同类重名；`live/` 未收集属 opt-in 设计而非死用例。
+- **修复（rf-365）**：6 例无效用例补真断言（`test_set_write_error_logged` 断言告警内容；`test_llm_api_base::TestLogTokenUsage` 4 例改 `assertLogs/assertNoLogs` 断言输入/输出/缓存命中并补 empty 分支；`test_handlers_cache::TestCmdCleanupCache` 2 例断言委托调用与等待按键；`test_html_report_structure_edge` 断言 2 处导航锚点模板）；删 1 例空体死用例；删 `test_llm_utils::TestLogTokenUsage` 冗余类（与 api_base 重复）；`git mv` 分类测试至 `unit/core/` 并改标 `unit_core`。新增回归守护 `test_test_quality_regression.py`（静态禁止空测试体）。
+- **保留（有意）**：18 例「不抛异常/no-op」弱断言测试（如 `SilentProgressReporter` 四个 no-op、空范围 no-crash、live 录制辅助）经逐例审阅为有意边界覆盖，不强制补断言；`unit/core` 与 `unit/cache` 的缓存测试拆分、`unit/analysis/test_bond_yield*` 走 fetcher 网关两处目录语义为历史布局，已记录待后续评估。
+- **统计刷新**：`folders.md`（测试代码 364/106,414、测试用例 6,991）与 `test-coverage.md`（bench 回填模式表 + 收集分组：报告生成 1828、核心基础设施 1210、unit_llm 954、unit_scripts 204、跨类 llm 750）同步。
+
 ### bench 全量计时与 integration 契约修复（rf-364）（2026-09-14）
 
 - **bench 全量跑**：`test-runner.py --mode bench --update-docs` 依次跑 14 个模式并回填 `test-coverage.md`（模式对应测试量 + 采集环境属性 + 各模式耗时对照，dragonball 采集日期 2026-09-14）。本机各模式耗时（worker=8）：unit ~17s / standard ~18s / scenario ~20s / dev-verify ~27s / verify ~15s / integration ~19s / edge ~14s / all ~26s。

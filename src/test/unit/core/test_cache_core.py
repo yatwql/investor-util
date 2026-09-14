@@ -288,14 +288,15 @@ class TestCacheSet(CacheTestBase):
         self.assertEqual(payload["_ts"], 2000.0)
         self.assertEqual(payload["_data"], "new")
 
-    @patch("src.python.cache._store.time.time")
     @patch("src.python.cache._store.tempfile.mkstemp")
-    def test_set_write_error_logged(self, mock_mkstemp, mock_time):
-        """写入 IOError → 不抛出异常，正常返回。"""
+    def test_set_write_error_logged(self, mock_mkstemp):
+        """临时文件创建失败 → 告警日志含原因，且不抛出异常。"""
         mock_mkstemp.side_effect = OSError("disk full")
         from src.python.cache import set
 
-        set("fail", "data")
+        with self.assertLogs("invest", level="WARNING") as cm:
+            set("fail", "data")
+        self.assertTrue(any("无法创建临时文件" in line for line in cm.output), cm.output)
 
     @patch("src.python.cache._store.time.time")
     def test_set_list_data(self, mock_time):

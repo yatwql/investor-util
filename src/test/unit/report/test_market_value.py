@@ -1648,10 +1648,6 @@ class TestTodayProfitEdgeCases(unittest.TestCase):
         self.assertEqual(detail.today_profit, expected)
         self.assertLess(detail.today_profit, 0)
 
-    def test_today_profit_in_price_update_status(self):
-        """"""
-        pass
-
 
 class TestPremiumInWriteSheet(unittest.TestCase):
     """验证 premium 在写入页签时的列值。"""

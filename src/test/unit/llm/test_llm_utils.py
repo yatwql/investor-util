@@ -1,5 +1,5 @@
 """Utility / helper 模块单元测试（markdown_to_html、compute_fingerprint、get_cache_ttl_llm、
-_supports_extended_thinking、_is_effort_model、_log_token_usage、_extract_content、
+_supports_extended_thinking、_is_effort_model、_extract_content、
 截断检测、Prompt 常量、Pricing 估算）。"""
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ from src.python.llm.api_base import (
     _check_openai_truncation,
     _extract_content,
     _is_effort_model,
-    _log_token_usage,
     _supports_extended_thinking,
 )
 from src.python.llm.fingerprint import compute_fingerprint, get_cache_ttl_llm
@@ -269,28 +268,6 @@ class TestPromptConstants(unittest.TestCase):
         self.assertIn("Phase", _SYSTEM_EXPERT_REVIEW)
         self.assertIn("约束", _SYSTEM_EXPERT_REVIEW)
         self.assertIn("Markdown", _SYSTEM_EXPERT_REVIEW)
-
-
-# ═══════════════════════════════════════════════════════════
-#  _log_token_usage（不会崩溃）
-# ═══════════════════════════════════════════════════════════
-
-
-class TestLogTokenUsage(unittest.TestCase):
-    """_log_token_usage 不会抛出异常。"""
-
-    def test_claude_usage(self) -> None:
-        # 应该正常日志，不抛异常
-        _log_token_usage("claude", {"input_tokens": 100, "output_tokens": 50}, "测试")
-
-    def test_openai_usage(self) -> None:
-        _log_token_usage("openai", {"prompt_tokens": 100, "completion_tokens": 50}, "测试")
-
-    def test_none_usage(self) -> None:
-        _log_token_usage("claude", None, "测试")
-
-    def test_empty_usage(self) -> None:
-        _log_token_usage("claude", {}, "测试")
 
 
 # ═══════════════════════════════════════════════════════════

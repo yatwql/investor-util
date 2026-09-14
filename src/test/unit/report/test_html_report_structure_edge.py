@@ -127,14 +127,16 @@ class TestHtmlCssStructure(unittest.TestCase):
                 "section_numbers['", title_html, f"section-title 缺少 section_numbers 引用: {title_html[:80]}"
             )
 
-    # ── 18 nav <a> in section-nav ──────────────────────────────
+    # ── 目录/横向导航的锚点模板 ──────────────────────────────
 
-    def test_nav_links_count_in_source(self):
-        """模板中 nav 循环应包含 18 个 <a> 标签（不考虑可见性）。"""
-        _ = re.findall(
-            r'<a\s+href="#sec-[^"]+">',
-            self.tmpl,
-        )
+    def test_nav_anchor_templates_present(self):
+        """模板保留两处导航锚点模板：分组折叠导航循环 + 扁平回退导航循环。
+
+        锚点由循环按可见章节生成，故锁定「锚点模板存在且为 2 处」（数字随
+        章节增减而变，不写死个数）。
+        """
+        anchors = re.findall(r'href="#sec-\{\{\s*sec\[', self.tmpl)
+        self.assertEqual(len(anchors), 2, f"应有 2 处导航锚点模板（分组 + 扁平），实际 {len(anchors)}")
 
 
 class TestHtmlRegressionChecks(unittest.TestCase):

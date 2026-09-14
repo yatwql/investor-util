@@ -7,7 +7,7 @@
   - is_qdii_extended       — QDII 识别（显式 + 隐式）
 
 运行：
-  pytest src/test/unit/report/test_classification_utils.py -v
+  pytest src/test/unit/core/test_code_utils_classification.py -v
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from src.python.core.code_utils import (
 )
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
 
 # ═══════════════════════════════════════════════════════════
