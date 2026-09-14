@@ -14,8 +14,8 @@
 措辞与判定习语对齐 ``doctor.py::_check_llm_credentials``（「错误即 UX」：
 不只报错，还告诉用户怎么办），不另创一套文案范式。
 
-安全纪律：**凭据值永不落日志、永不写入报告/缓存**——本模块只读环境变量、
-只对外报告「变量名 + 是否就绪」。
+安全纪律：**凭据值永不落日志、永不写入报告/缓存**——本模块只读环境变量与
+声明的密钥文件，只对外报告「来源类型 + 是否就绪」。
 
 用法::
 
@@ -26,12 +26,21 @@
     spec = missing_credential("example")
     if spec is not None:
         logger.info("跳过：%s", credential_hint(spec))
+
+需要独立密钥文件的源额外声明 ``key_file``（默认路径，可为相对路径）与
+``key_field``（文件内的字段名）；环境变量优先于密钥文件（便于 CI / 临时切换）。
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 from dataclasses import dataclass
+
+from src.python.core.constants import PROJECT_ROOT
+
+logger = logging.getLogger("invest")
 
 __all__ = [
     "CREDENTIAL_SPECS",
@@ -39,6 +48,7 @@ __all__ = [
     "credential_hint",
     "credential_readiness",
     "credential_ready_enabled",
+    "credential_value",
     "missing_credential",
     "register_credential_spec",
     "reset_credential_specs",
@@ -66,6 +76,13 @@ class CredentialSpec:
     env_var: str
     apply_url: str = ""
     note: str = ""
+    #: 承载凭据的本地密钥文件路径（可空；相对路径按 PROJECT_ROOT 解析）。
+    #: 用于「用户直接在文件里填 key」的源；环境变量优先于本文件。
+    key_file: str = ""
+    #: 密钥文件内的字段名（默认 ``api_key``）。
+    key_field: str = "api_key"
+    #: 可选的配置键名，用于覆盖 ``key_file``（配置层路径型键，运行时为绝对路径）。
+    key_file_setting: str = ""
 
 
 # 声明即数据：当前为空（全部免费源）。接入需 key 的源时在源模块内导入即注册，
@@ -99,6 +116,64 @@ def _is_blank(value: str | None) -> bool:
     return not (value or "").strip()
 
 
+def _key_file_path(spec: CredentialSpec) -> str:
+    """解析声明的密钥文件路径（配置覆盖优先；相对路径按项目根目录解析）。"""
+    path = spec.key_file
+    if spec.key_file_setting:
+        try:
+            from src.python.config import get_config
+
+            override = get_config().get(spec.key_file_setting)
+            if isinstance(override, str) and override.strip():
+                path = override
+        except Exception:  # 配置不可用时回退声明路径，就绪判定不应因配置层异常而崩溃
+            logger.debug("[credential] 读取 %s 配置失败，回退声明路径", spec.key_file_setting)
+    if not path:
+        return ""
+    return path if os.path.isabs(path) else os.path.join(PROJECT_ROOT, path)
+
+
+def _read_key_file(path: str, field: str) -> str:
+    """从 JSON 密钥文件读取字段值；文件缺失/不可解析/字段空白时返回空串。"""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return ""
+    if not isinstance(data, dict):
+        return ""
+    value = data.get(field)
+    return value.strip() if isinstance(value, str) and not _is_blank(value) else ""
+
+
+def resolve_credential(spec: CredentialSpec) -> tuple[str, str]:
+    """解析凭据值与来源——返回 ``(值, 来源)``，来源为「环境变量」/「密钥文件」/空串。
+
+    解析顺序：环境变量优先（便于 CI / 临时切换），否则读声明的密钥文件。
+    **值仅供取数使用**，调用方不得写入日志/报告/缓存。
+    """
+    env_val = os.environ.get(spec.env_var)
+    if not _is_blank(env_val):
+        return env_val.strip(), "环境变量"
+    path = _key_file_path(spec)
+    if path:
+        value = _read_key_file(path, spec.key_field)
+        if value:
+            return value, "密钥文件"
+    return "", ""
+
+
+def credential_value(source_id: str) -> str:
+    """返回指定源的凭据值（供取数使用）；未声明或缺失时为空串。
+
+    **安全纪律**：调用方不得把返回值写入日志、报告或缓存。
+    """
+    spec = CREDENTIAL_SPECS.get(source_id)
+    if spec is None:
+        return ""
+    return resolve_credential(spec)[0]
+
+
 def missing_credential(source_id: str) -> CredentialSpec | None:
     """该源是否「已声明需凭据但当前缺失」。
 
@@ -112,14 +187,18 @@ def missing_credential(source_id: str) -> CredentialSpec | None:
     spec = CREDENTIAL_SPECS.get(source_id)
     if spec is None:
         return None
-    if _is_blank(os.environ.get(spec.env_var)):
-        return spec
-    return None
+    if resolve_credential(spec)[0]:
+        return None
+    return spec
 
 
 def credential_hint(spec: CredentialSpec) -> str:
-    """缺失凭据的可读指引（含数据源名、变量名与申请地址）。"""
-    parts = [f"缺少凭据（数据源：{spec.display_name}）——请设置环境变量 {spec.env_var}"]
+    """缺失凭据的可读指引（含数据源名、密钥文件/变量名与申请地址）。"""
+    parts = [f"缺少凭据（数据源：{spec.display_name}）"]
+    if spec.key_file:
+        path = _key_file_path(spec) or spec.key_file
+        parts.append(f"请填写密钥文件 {path} 的 {spec.key_field} 字段")
+    parts.append(f"或设置环境变量 {spec.env_var}")
     if spec.apply_url:
         parts.append(f"申请地址：{spec.apply_url}")
     if spec.note:
@@ -140,7 +219,8 @@ def credential_readiness() -> list[dict]:
     rows: list[dict] = []
     for source_id in sorted(CREDENTIAL_SPECS):
         spec = CREDENTIAL_SPECS[source_id]
-        ready = not _is_blank(os.environ.get(spec.env_var))
+        value, source = resolve_credential(spec)
+        ready = bool(value)
         rows.append(
             {
                 "source_id": source_id,
@@ -148,7 +228,9 @@ def credential_readiness() -> list[dict]:
                 "required": True,
                 "ready": ready,
                 "env_var": spec.env_var,
-                "message": f"已就绪（环境变量 {spec.env_var} 已设置）" if ready else credential_hint(spec),
+                "key_file": _key_file_path(spec),
+                "source": source,
+                "message": f"已就绪（来源：{source}）" if ready else credential_hint(spec),
             }
         )
     return rows

@@ -66,8 +66,55 @@ class QuoteFields:
 
 
 DOMAIN_QUOTE = "quote"
+DOMAIN_FINANCIAL_REPORT = "financial_report"
+
+
+@dataclass(frozen=True)
+class FinancialReportFields:
+    """财报全文域标准字段 —— 全文本财报（DataSinking）的统一格式。
+
+    ``content`` 为章节正文（单篇取全文时为全文）；下游按需截断。``doc_id``
+    对应上游 ``id``（经 adapter 的 aliases 归一）。
+
+    Attributes:
+        doc_id: 文档 ID（上游 ``id``，用于 ``/documents/{id}``）
+        symbol: FMP 风格符号（如 ``600519.SS``）
+        exchange: 交易所（``sse`` / ``szse`` / ``bj`` …）
+        stock_code: 交易所本地代码（6 位）
+        stock_name: 公司名称（本地语言）
+        doc_type: 文种（``annual`` / ``semiannual`` / ``q1`` / ``q3`` / ``amendment``）
+        report_period: 报告期（YYYY-MM-DD，财报覆盖的财季）
+        title: 公告标题
+        word_count: 正文词数
+        announcement_time: 披露时间（毫秒 Unix 时间戳）
+        content: 正文 Markdown（章节正文或全文）
+        adjunct_url: 原披露链接（不可用时为空串）
+        source_api: 数据源标识（datasink）
+        source: 披露平台归属（合规要求再分发时保留）
+    """
+
+    doc_id: int = 0
+    symbol: str = ""
+    exchange: str = ""
+    stock_code: str = ""
+    stock_name: str = ""
+    doc_type: str = ""
+    report_period: str = ""
+    title: str = ""
+    word_count: int = 0
+    announcement_time: int = 0
+    content: str = ""
+    adjunct_url: str = ""
+    source_api: str = ""
+    source: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """转为标准字段 dict（全部字段均出现，字段序与声明序一致）。"""
+        return asdict(self)
+
 
 # 数据域 → 标准字段记录类（新增域时在此登记，契约自检据此校验适配器）
 DOMAIN_RECORDS: dict[str, type] = {
     DOMAIN_QUOTE: QuoteFields,
+    DOMAIN_FINANCIAL_REPORT: FinancialReportFields,
 }

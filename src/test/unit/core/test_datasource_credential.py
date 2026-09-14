@@ -12,6 +12,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from src.python.config import features
@@ -21,6 +23,7 @@ from src.python.core.datasource_credential import (
     credential_hint,
     credential_readiness,
     credential_ready_enabled,
+    credential_value,
     missing_credential,
     register_credential_spec,
 )
@@ -138,6 +141,85 @@ class TestCredentialReadiness:
         for sid in ("zeta", "alpha", "mid"):
             register_credential_spec(_spec(source_id=sid, display_name=sid))
         assert [r["source_id"] for r in credential_readiness()] == ["alpha", "mid", "zeta"]
+
+
+class TestKeyFileCredential:
+    """密钥文件凭据：用户直接在 JSON 文件里填 key（首例为 DataSinking 财报）。
+
+    判定顺序：环境变量优先（便于 CI / 临时切换），否则读声明的密钥文件。
+    """
+
+    def _write_key(self, path, value, field="api_key"):
+        path.write_text(json.dumps({field: value}, ensure_ascii=False), encoding="utf-8")
+        return str(path)
+
+    def test_key_file_declared_and_present_is_ready(self, monkeypatch, tmp_path):
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        key_file = self._write_key(tmp_path / "datasink_key.json", "secret-from-file")
+        register_credential_spec(_spec(key_file=key_file))
+
+        assert missing_credential("example") is None
+        row = credential_readiness()[0]
+        assert row["ready"] is True
+        assert row["source"] == "密钥文件"
+
+    def test_env_var_overrides_key_file(self, monkeypatch, tmp_path):
+        monkeypatch.setenv(_ENV_VAR, "secret-from-env")
+        key_file = self._write_key(tmp_path / "datasink_key.json", "secret-from-file")
+        register_credential_spec(_spec(key_file=key_file))
+
+        assert credential_readiness()[0]["source"] == "环境变量"
+
+    def test_missing_key_file_counts_as_missing(self, monkeypatch, tmp_path):
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        register_credential_spec(_spec(key_file=str(tmp_path / "absent.json")))
+        assert missing_credential("example") is not None
+
+    def test_blank_key_field_counts_as_missing(self, monkeypatch, tmp_path):
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        key_file = self._write_key(tmp_path / "datasink_key.json", "   ")
+        register_credential_spec(_spec(key_file=key_file))
+        assert missing_credential("example") is not None
+
+    def test_malformed_key_file_counts_as_missing(self, monkeypatch, tmp_path):
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        path = tmp_path / "datasink_key.json"
+        path.write_text("{not-json", encoding="utf-8")
+        register_credential_spec(_spec(key_file=str(path)))
+        assert missing_credential("example") is not None
+
+    def test_hint_names_key_file_and_field(self, monkeypatch, tmp_path):
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        register_credential_spec(_spec(key_file=str(tmp_path / "datasink_key.json"), key_field="api_key"))
+        hint = credential_hint(CREDENTIAL_SPECS["example"])
+        assert "datasink_key.json" in hint
+        assert "api_key" in hint
+        assert _ENV_VAR in hint
+
+    def test_config_setting_overrides_declared_path(self, monkeypatch, tmp_path):
+        """声明中的 key_file 可被配置键覆盖（配置层路径型键，运行时为绝对路径）。"""
+        from src.python.config import _config_defaults
+        from src.python.config._core import _clear_config_cache
+
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        override = self._write_key(tmp_path / "override.json", "secret-from-config")
+        monkeypatch.setitem(_config_defaults._DEFAULT_CONFIG, "datasink_key_file", override)
+        _clear_config_cache()
+        register_credential_spec(_spec(key_file=str(tmp_path / "declared.json"), key_file_setting="datasink_key_file"))
+
+        assert missing_credential("example") is None
+        assert credential_readiness()[0]["key_file"] == override
+
+    def test_credential_value_returns_secret_but_readiness_does_not(self, monkeypatch, tmp_path):
+        """取值接口供取数使用；就绪矩阵仍不得回显凭据值。"""
+        monkeypatch.delenv(_ENV_VAR, raising=False)
+        key_file = self._write_key(tmp_path / "datasink_key.json", "super-secret-value")
+        register_credential_spec(_spec(key_file=key_file))
+
+        assert credential_value("example") == "super-secret-value"
+        for row in credential_readiness():
+            assert "super-secret-value" not in str(row)
+        assert credential_value("undeclared") == ""
 
 
 class TestReadyEnabled:

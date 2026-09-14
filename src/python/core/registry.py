@@ -104,6 +104,21 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     DataModuleDef(
         "行业分类", "industry", cache_prefixes=("industry_",), cache_ttl=CACHE_TWO_WEEKS, cache_groups=("refresh",)
     ),
+    # ── 全文本财报（DataSinking；索引与正文分级 TTL）──
+    DataModuleDef(
+        "财报索引",
+        "report",
+        cache_prefixes=("report_datasink_index_",),
+        cache_ttl=CACHE_TWO_WEEKS,
+        cache_groups=("refresh",),
+    ),
+    DataModuleDef(
+        "财报正文",
+        "report_doc",
+        cache_prefixes=("report_datasink_doc_",),
+        cache_ttl=CACHE_MONTHLY,
+        cache_groups=("refresh",),
+    ),
     # ── 新闻（refresh 组）──
     DataModuleDef("新闻聚合", "news", cache_prefixes=("news_",), cache_ttl=900, cache_groups=("refresh",)),
     # ── LLM 智能分析模块 ──

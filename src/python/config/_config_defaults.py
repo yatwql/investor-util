@@ -38,6 +38,8 @@ _DEFAULT_CONFIG = {
     "llm_settings_file": os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
+    # DataSinking 全文本财报密钥文件（仅填 api_key 字段；用户自备，不入库）
+    "datasink_key_file": os.path.join(PROJECT_ROOT, "data/config/datasink_key.json"),
     # ── B. 报告章节可见性 ──
     "enable_fund_deep_analysis": True,  # 基金深度分析（业绩/经理变更/持仓关系/集中度/风格因子）
     "enable_news": True,  # 市场新闻
@@ -167,6 +169,7 @@ def _build_template_from_defaults() -> str:
         f'  "llm_settings_file": {json.dumps(d["llm_settings_file"])},',
         f'  "llm_key_file": {json.dumps(d["llm_key_file"])},',
         f'  "llm_providers_file": {json.dumps(d["llm_providers_file"])},',
+        f'  "datasink_key_file": {json.dumps(d["datasink_key_file"])},  // DataSinking 全文本财报密钥文件（仅填 api_key 字段）',
         "",
         # ── B ──
         "  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──",

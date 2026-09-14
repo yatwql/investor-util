@@ -245,6 +245,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch, _doctor_probe_targets):
         "src.python.core.perf._HEALTH_CHECK_FILE",
         str(tmp_path / "data/state/datasource_health.jsonl"),
     )
+    # DataSinking 日配额计数文件隔离（provider 请求前写盘）
+    monkeypatch.setattr(
+        "src.python.providers.datasink._QUOTA_FILE",
+        str(tmp_path / "data/state/datasink_quota.json"),
+    )
     # decision_ledger.jsonl 决策跨期反思账本文件隔离（无单例，
     # 路径隔离即状态隔离——lessons_block/lessons_cache_suffix 按需读档现算）
     monkeypatch.setattr(
@@ -327,6 +332,12 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch, _doctor_probe_targets):
         _cfg_defaults._DEFAULT_CONFIG,
         "llm_providers_file",
         str(tmp_path / "data/config/llm_providers.json"),
+    )
+    # DataSinking 密钥文件路径 seed 到临时目录（凭据就绪判定与 provider 取数均读该键）
+    monkeypatch.setitem(
+        _cfg_defaults._DEFAULT_CONFIG,
+        "datasink_key_file",
+        str(tmp_path / "data/config/datasink_key.json"),
     )
     _cfg_core._clear_config_cache()
     # 注：llm_settings.json 不在此处 seed 隔离路径。需要读写真实配置的测试
@@ -450,6 +461,14 @@ def _auto_reset_credential_specs():
     from src.python.core import datasource_credential
 
     datasource_credential.reset_credential_specs()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_datasink_limiter():
+    """重置 DataSinking 限速器单例（读配置一次，跨测试须重建）。"""
+    from src.python.providers import datasink
+
+    datasink.reset_datasink_limiter()
 
 
 @pytest.fixture(autouse=True)

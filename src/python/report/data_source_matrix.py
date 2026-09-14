@@ -25,6 +25,7 @@ _SOURCE_CATEGORIES: list[dict[str, Any]] = [
     {"key": "profit_forecast", "name": "盈利预测", "prefixes": ["penetration_profit_forecast"]},
     {"key": "dividend", "name": "分红数据", "prefixes": ["penetration_dividend"]},
     {"key": "fund_flow", "name": "资金流向", "prefixes": ["ff_"]},
+    {"key": "financial_report", "name": "财报全文", "prefixes": ["report_datasink_"]},
 ]
 
 

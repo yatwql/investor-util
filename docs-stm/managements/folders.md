@@ -75,11 +75,13 @@ investor-util/
 │   │   │   ├── news.py               #   新闻数据获取封装层（聚合器+关键词转发）
 │   │   │   ├── price.py              #   行情价格获取（股票/ETF）
 │   │   │   ├── quote_adapters.py     #   行情域数据源适配器（腾讯/新浪/东方财富，开关 datasource_adapter 默认开）
+│   │   │   ├── report_adapters.py    #   财报全文域适配器（DataSinking，声明式 alias 归一）
 │   │   │   └── source_adapter.py     #   数据源适配契约（三段式基类 + 声明式 alias 归一 + 注册表/自检）
 │   │   │
 │   │   ├── providers/                # 数据源提供商实现
 │   │   │   ├── __init__.py           #   子包标记
 │   │   │   ├── _utils.py             #   提供商模块共享工具函数
+│   │   │   ├── datasink.py           #   DataSinking 全文本财报（A 股；密钥文件/计划感知限速/日配额护栏）
 │   │   │   ├── tencent.py            #   腾讯财经 API（A 股/ETF 实时价）
 │   │   │   ├── sina.py               #   新浪财经 API（备用实时价/美股指数）
 │   │   │   ├── sina_kline.py          #   新浪财经 API — K 线数据
@@ -546,6 +548,7 @@ investor-util/
 │       │   │   └── test_wallstreetcn_news.py  #   华尔街见闻新闻源测试
 │       │   ├── providers/           #   数据源提供商单元测试
 │       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_datasink.py           #   DataSinking 财报 provider（符号映射/套餐限额/护栏/HTTP 分支/取数原语）
 │       │   │   ├── test_akshare_extras.py     #   akshare 封装测试
 │       │   │   ├── test_cassette_replay.py    #   已录制真实响应体的解析回归（精确值断言，离线回放）
 │       │   │   ├── test_eastmoney.py          #   东方财富 API 测试

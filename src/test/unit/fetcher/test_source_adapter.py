@@ -17,7 +17,7 @@ from typing import Any, ClassVar
 import pytest
 
 from src.python.fetcher import source_adapter as sa
-from src.python.schemas.datasource_fields import DOMAIN_QUOTE, QuoteFields
+from src.python.schemas.datasource_fields import DOMAIN_FINANCIAL_REPORT, DOMAIN_QUOTE, QuoteFields
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
 
@@ -64,9 +64,13 @@ class TestAdapterRegistry(unittest.TestCase):
     def test_survey_reports_all_passed(self):
         """已登记适配器全部通过契约自检。"""
         reports = sa.survey_adapters()
-        self.assertEqual(len(reports), 3)
         self.assertTrue(all(r["ok"] for r in reports), [r for r in reports if not r["ok"]])
-        self.assertEqual({r["domain"] for r in reports}, {DOMAIN_QUOTE})
+        # 行情域三源 + 财报全文域一源；断言域覆盖而非写死总数（新增数据域不应改本用例）
+        by_domain: dict[str, int] = {}
+        for r in reports:
+            by_domain[r["domain"]] = by_domain.get(r["domain"], 0) + 1
+        self.assertEqual(by_domain.get(DOMAIN_QUOTE), 3)
+        self.assertIn(DOMAIN_FINANCIAL_REPORT, by_domain)
 
     def test_survey_detects_alias_to_unknown_field(self):
         """alias 指向非标准字段 → 自检检出（防改名写错后静默丢字段）。"""

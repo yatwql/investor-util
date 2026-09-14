@@ -32,6 +32,8 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "fund_rank": ["tiantian"],
     "fund_hold": ["tiantian"],
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
+    # 全文本财报（DataSinking，仅 A 股；需用户自备 key）
+    "financial_report": ["datasink"],
     # 组合历史走势：历史数据 chains（复用现有 provider name，熔断器共享）
     "history_stock": ["tencent", "sina"],
     "history_fund_otc": ["tiantian", "eastmoney"],
