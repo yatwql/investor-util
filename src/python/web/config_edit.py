@@ -42,7 +42,7 @@ _SECTION_KEYS = (
     "enable_action",
 )
 
-# 报告增强子模块（菜单 P 6）
+# 报告增强子模块（菜单 P 7）
 _SUBMODULE_KEYS = (
     "data_quality",
     "industry_beta",
@@ -50,6 +50,7 @@ _SUBMODULE_KEYS = (
     "cost_lots",
     "valuation_percentile",
     "market_temperature",
+    "financial_report_digest",
 )
 
 # LLM 分析章节可编辑开关（菜单 S 标准模块；辩论三模块为隐藏项，不在白名单）
@@ -84,6 +85,7 @@ config_edit_whitelist = {
     "report_submodules.cost_lots": {"kind": "bool", "target": "config", "writer": "submodule"},
     "report_submodules.valuation_percentile": {"kind": "bool", "target": "config", "writer": "submodule"},
     "report_submodules.market_temperature": {"kind": "bool", "target": "config", "writer": "submodule"},
+    "report_submodules.financial_report_digest": {"kind": "bool", "target": "config", "writer": "submodule"},
     # ── 4 持仓匿名化枚举（config.json 顶层 anonymization，set_anonymization_mode）──
     "anonymization.mode": {
         "kind": "enum",

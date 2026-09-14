@@ -374,7 +374,7 @@ def _cmd_config_report_boards() -> None:
             f"4. {pad_right('组合演进', section_column)} [{e_status}]",
             f"5. {pad_right('行动建议', section_column)} [{a_status}]",
             "",
-            "6. 报告增强子模块（数据质量/行业Beta/候选比较/成本流水/估值分位/市场温度）",
+            "6. 报告增强子模块（数据质量/行业Beta/候选比较/成本流水/估值分位/市场温度/财报摘要）",
             "7. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置",
             "0. 返回主菜单",
         ]
@@ -417,17 +417,18 @@ def _cmd_config_report_boards() -> None:
 
 
 def _cmd_config_report_submodules() -> None:
-    """配置报告增强子模块（数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度）。
+    """配置报告增强子模块（数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度 / 持仓个股财报摘要）。
 
-    6 项增强子模块独立启停，实时保存到 config.json 的 `report_submodules`（数据质量仪表盘默认开，其余默认关）。
-    开启后对应章节按需增强区块（数据源可用性矩阵 / 风格与因子分析 / 基金业绩分析 /
-    资产穿透TOP10 / 投资分析汇总），不改变既有章节输出。
+    7 项增强子模块独立启停，实时保存到 config.json 的 `report_submodules`（数据质量仪表盘默认开，其余默认关）。
+    开启后对应章节按需增强区块或新增独立章（数据源可用性矩阵 / 风格与因子分析 / 基金业绩分析 /
+    资产穿透TOP10 / 投资分析汇总 / 持仓个股财报摘要），不改变既有章节输出。
     """
     from src.python.config import (
         get_config,
         is_enable_candidate_compare,
         is_enable_cost_lots,
         is_enable_data_quality,
+        is_enable_financial_report_digest,
         is_enable_industry_beta,
         is_enable_market_temperature,
         is_enable_valuation_percentile,
@@ -442,6 +443,7 @@ def _cmd_config_report_submodules() -> None:
         ("cost_lots", "成本流水", "成本分档 + XIRR + 分红累计"),
         ("valuation_percentile", "估值分位", "资产穿透TOP10 估值分位列"),
         ("market_temperature", "市场温度", "投资分析汇总 市场温度刻度行"),
+        ("financial_report_digest", "持仓个股财报摘要", "新增独立章：A 股财报章节摘要（需 DataSinking key）"),
     ]
     accessors = {
         "data_quality": is_enable_data_quality,
@@ -450,6 +452,7 @@ def _cmd_config_report_submodules() -> None:
         "cost_lots": is_enable_cost_lots,
         "valuation_percentile": is_enable_valuation_percentile,
         "market_temperature": is_enable_market_temperature,
+        "financial_report_digest": is_enable_financial_report_digest,
     }
 
     # 名称列宽：取子模块清单内最长显示名，使各行状态方括号纵向对齐
@@ -469,7 +472,7 @@ def _cmd_config_report_submodules() -> None:
         print("\n".join(render_panel("配置报告增强子模块", rows)))
         print()
         try:
-            choice = input("  输入编号切换 (0-6): ").strip()
+            choice = input("  输入编号切换 (0-7): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break

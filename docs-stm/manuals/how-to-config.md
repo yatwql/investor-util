@@ -187,7 +187,7 @@
 | `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
 | `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 菜单 P → 6 |
 | `report_submodules.market_temperature` | `false` | 「投资分析汇总」章市场温度刻度行开关，**默认关闭**。开启后该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明） | 菜单 P → 6 |
-| `report_submodules.financial_report_digest` | `false` | 「持仓个股财报摘要」独立章开关，**默认关闭**。开启后新增一章：对持仓 + 穿透中的 A 股标的取最新年报（无年报退半年报）的目标章节正文摘要。**需先配置 DataSinking API key**（`data/config/data_key.json` 的 `datasink` 节）；未配置时该章写占位并给出申请指引 | 手动编辑 |
+| `report_submodules.financial_report_digest` | `false` | 「持仓个股财报摘要」独立章开关，**默认关闭**。开启后新增一章：对持仓 + 穿透中的 A 股标的取最新年报（无年报退半年报）的目标章节正文摘要。**需先配置 DataSinking API key**（`data/config/data_key.json` 的 `datasink` 节）；未配置时该章写占位并给出申请指引 | 菜单 P → 6 |
 | `report_submodules.industry_beta` | `false` | 「风格与因子分析」章行业 Beta 子表开关，**默认关闭**。开启后该章展示行业 Beta 子表（组合对中证行业指数的回归敏感性：行业暴露占比 + β/t 值/显著性/相关性） | 菜单 P → 6 |
 | `report_submodules.cost_lots` | `false` | 成本流水开关，**默认关闭**。开启后汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计：持仓 Excel 含交易/分红流水走精确计算；无流水时自动切换为快照近似（按 `holdings_start_date` 建仓日一次性买入近似年化，未配置则仅成本分档近似），XIRR 标注「近似」 | 菜单 P → 6 |
 

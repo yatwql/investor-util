@@ -59,6 +59,7 @@ _EXPECTED_WHITELIST = {
     "report_submodules.cost_lots",
     "report_submodules.valuation_percentile",
     "report_submodules.market_temperature",
+    "report_submodules.financial_report_digest",
     # 4 持仓匿名化枚举（菜单 A）
     "anonymization.mode",
     # 5 对比指数池（菜单 I）
