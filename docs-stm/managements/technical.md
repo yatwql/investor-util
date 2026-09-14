@@ -2207,6 +2207,8 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 
 **联接基金穿透（开关 `feeder_penetration`，默认开）**：ETF 联接基金的资产就是目标 ETF、本身不持有股票，故其季报股票表按构造为空（实测 `016055` 四个近季度的响应体均为 59/50 字节空内容）——修复前它在报告里恒为「持仓不可用」，QDII 联接基金因此拿不到任何底层暴露。穿透做法：目标 ETF 由基金主页面锚点**动态解析**（`parse_feeder_target_etf`，不维护「联接基金 → 目标 ETF」映射表，基金公司更换标的 ETF 时锚点随页面同步更新），再由 `fetcher/fund.py::with_feeder_penetration` 以目标 ETF 的持仓与报告期代理该基金的底层暴露，并在结果中记 `feeder_penetration = {target_code, target_name}` 供报告层标注来源。两处要点：①**幂等**——该函数在单条取数与批量两个接缝都调用，因为批量路径的 `execute_with_cache_check` 缓存命中时会跳过任务、穿透若只在网络路径做则热缓存下静默失效，故以「已带 `feeder_penetration` 即原样返回」保证重复调用无副作用；②**结构深度恒为 1**——只有名称含「联接」的基金才产出 `feeder_target_code`，而 ETF 名称不含「联接」，故目标基金永不产出新的目标，无需运行时深度计数。联动判定复用既有 `core/code_utils.py::is_index_link_by_name`（不新增第二份「是否联接」关键词表）；锚点两重区分（标签须止于「ETF」`(?!联)` + 目标须为场内代码）用于排除常规 ETF 页的**反向**链接（回指其场外联接基金）。归因口径为 **100%（不折算持有比例）**——联接基金约 95% 投向目标 ETF，未折算会轻微高估底层权重，报告中标「穿透自目标 ETF `XXXXXX`（未折算持有比例）」把该已知偏差公开；折算需解析联接基金自身的基金投资明细，当前无对应取数通道。
 
+**持仓缓存载荷语义版本（`hold_schema`）**：`fund_hold_*` 缓存条目的字段含义会在修复中变化（如 V2 的「三跳阶梯 + 联接穿透」使旧联接条目缺 `feeder_target_code`），而条目结构/键未变——仅靠 `hold` TTL（7 天）会在过期前持续遮蔽修复。故 provider 产出经 `fetcher/fund.py::_stamp_hold_schema` 盖上 `hold_schema` 版本字段，读取侧以 `_is_current_hold_payload` 为准入判据：版本不符即视为未命中、丢弃重取。判据接在**两处**读缓存接缝——`fetch_with_fallback` 的 `cache_validate` 参数（含过期降级条目）与批量预检回调 `_hold_cache_check`（`execute_with_cache_check` 命中会跳过任务，判据若只挂在链路内则热缓存下失效，与穿透幂等后处理同一病根）。
+
 **板块分类（双层策略）**：
 
 ```
@@ -3179,6 +3181,8 @@ make_http_client(timeout=10.0) → httpx.Client
 | `parse_feeder_target_etf` | 目标 ETF 解析（联接基金主页面锚点 → 目标 ETF 代码，两重区分反向链接） | 资产穿透TOP10 | 数据获取 | 无（解析原语） |
 | `feeder_target_code` | 目标 ETF 标识（联接基金在第 2 跳的取数结果字段） | 资产穿透TOP10 | 数据获取 | 无（结果字段） |
 | `period_entry_label` | 报告期明细条目措辞（带穿透来源时补注目标 ETF 与「未折算持有比例」） | 资产穿透TOP10 | 报告配置 | 无（渲染原语） |
+| `hold_schema` | 基金持仓缓存载荷语义版本（读侧拒收非当前版本 → 视为未命中重取，防「语义变更型修复」被 TTL 内缓存遮蔽） | 资产穿透TOP10 | 数据获取 | 无（缓存契约字段，值见 `_HOLD_PAYLOAD_SCHEMA`） |
+| `cache_validate` | 缓存载荷准入判据（`fetch_with_fallback` 参数：载荷未通过判据即视为未命中、清缓存重取） | 资产穿透TOP10 | 数据获取 | 无（链路原语） |
 | `rebalance_advice` | 调仓建议 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `trade_discipline` | 交易纪律 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `return_attribution` | 收益归因 | 行动建议 | 调仓 | `enable_action`（默认开） |
@@ -3348,6 +3352,8 @@ web/ (Web 服务层，薄入口)
 |:---|:-----|:---------|:---------|:---------|
 | **C2** | **缓存统一管理** — 所有持久化缓存必须通过 `cache/` 子包的 `get()`/`set()` 接口读写，禁止直接操作 `data/cache/` 文件系统 | 直接操作文件系统导致 TTL 失效（缓存无法感知过期时间）、分组清理遗漏（菜单命令无法清除对应缓存）、路径穿越隐患 | 缓存不一致、TTL 失效、分组清理遗漏、路径安全风险 | 所有读写 data/cache/ 的模块 |
 | **C3** | **缓存原子写入** — 所有缓存/配置文件写入必须使用 `tempfile.mkstemp` + `os.replace` 原子写入模式；**实现收敛到唯一原语** `core/atomic_write.py`（`write_text_atomic` / `write_json_atomic`，成败如实布尔返回），各调用点不得自留第二份 mkstemp + os.replace 拷贝 | 直接覆写文件在断电/崩溃时产生半写损坏文件，导致后续读取解析失败；多份拷贝各自演化会让「原子」语义在其中一份上悄悄失效（修了 A 漏了 B），且调用点无法据成败判定后续动作（如写失败后误删唯一数据源） | 半写文件损坏、数据不完整、崩溃后无法自恢复；迁移类逻辑在写失败时误删数据源 | cache/ 子包（`cache/_io.py`+`_store.py`）、config/ 子包（`config/_core.py`）、`core/atomic_write.py` 及其调用方（`core/jsonl_store.py`、`core/provider_registry.py`、`report/history_snapshot.py`、`config/features.py`、`analysis/_silence.py`、`analysis/circuit_breaker_wrapper.py`、`report/data_status.py`）。例外（契约相反，有意不合并）：`cache/` 需 gzip 分支与文件锁；`config/_core.py::_atomic_write` 契约是「失败即抛且保留异常类型」（`init_config()` 的 `except PermissionError` 并发容忍分支、TUI 的权限不足提示依赖类型） |
+
+> **缓存载荷语义版本（词条外，非编号约束）**：当修复改变缓存**载荷字段的含义**而非键结构时，不得只靠 TTL 自然过期——旧条目在 TTL 内会被新代码误读，使修复在缓存未过期的机器上完全失效（已发生：QDII 联接穿透修复被 7 天旧 `fund_hold_*` 条目遮蔽）。规则：生产者在载荷里盖语义版本字段，读侧把「版本不符」当未命中（丢弃重取），判据接在**每一处读缓存接缝**（含批量缓存预检与过期降级）。通用原语：`fetch_with_fallback(cache_validate=...)`。
 
 ### 8.3 报告层约束
 

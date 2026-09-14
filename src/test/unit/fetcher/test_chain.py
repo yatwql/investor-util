@@ -105,6 +105,62 @@ class TestFetchWithFallback(unittest.TestCase):
         result = fetch_with_fallback("price", self.provider_fn_map, "test_key", 3600)
         self.assertEqual(result, {"cached": True})
 
+    # ── 缓存载荷准入判据（cache_validate） ────────────────
+
+    @patch("src.python.fetcher.chain.cache_get")
+    def test_cache_validate_accepts_current_payload(self, mock_cache_get):
+        """cache_validate 通过 → 直接返回缓存，不调用 provider。"""
+        mock_cache_get.return_value = {"hold_schema": 2, "holdings": []}
+        fn1 = MagicMock()
+        provider_map = {"p1": ("P1", fn1)}
+
+        result = fetch_with_fallback(
+            "price", provider_map, "k", 3600, cache_validate=lambda p: p.get("hold_schema") == 2
+        )
+
+        self.assertEqual(result, {"hold_schema": 2, "holdings": []})
+        fn1.assert_not_called()
+
+    @patch("src.python.fetcher.chain.cache_get")
+    @patch("src.python.fetcher.chain.cache_clear")
+    @patch("src.python.fetcher.chain.cache_set")
+    @patch("src.python.fetcher.chain._get_chain")
+    def test_cache_validate_rejects_legacy_payload(self, mock_chain, mock_set, mock_clear, mock_get):
+        """cache_validate 拒收旧语义载荷 → 清掉旧缓存并重取。
+
+        回归防线：只改载荷语义、不改键结构的修复，旧条目在 TTL 内会持续遮蔽修复；
+        准入判据不符时必须视为未命中（并清缓存，避免降级路径又把它捞回来）。
+        """
+        mock_chain.return_value = ["p1"]
+        mock_get.return_value = {"hold_schema": 1, "holdings": [{"name": "旧快照"}]}
+        fn1 = MagicMock(return_value={"hold_schema": 2, "holdings": []})
+        provider_map = {"p1": ("P1", fn1)}
+
+        result = fetch_with_fallback(
+            "price", provider_map, "k", 3600, cache_validate=lambda p: p.get("hold_schema") == 2
+        )
+
+        mock_clear.assert_called_once_with("k")
+        fn1.assert_called_once()
+        self.assertEqual(result, {"hold_schema": 2, "holdings": []})
+        mock_set.assert_called_once_with("k", {"hold_schema": 2, "holdings": []})
+
+    @patch("src.python.fetcher.chain.cache_get")
+    @patch("src.python.fetcher.chain._get_chain")
+    def test_cache_validate_rejects_legacy_stale(self, mock_chain, mock_get):
+        """过期降级条目同样须过准入判据；旧语义 → 不可用。"""
+        mock_chain.return_value = ["p1"]
+        # 第一次 cache_get（最新缓存）→ None；第二次（过期降级）→ 旧语义载荷
+        mock_get.side_effect = [None, {"hold_schema": 1}]
+        fn1 = MagicMock(side_effect=Exception("fail"))
+        provider_map = {"p1": ("P1", fn1)}
+
+        result = fetch_with_fallback(
+            "price", provider_map, "k", 3600, cache_validate=lambda p: p.get("hold_schema") == 2
+        )
+
+        self.assertIsNone(result)
+
     # ── Provider 成功路径 ────────────────────────────────
 
     @patch("src.python.fetcher.chain.cache_get")

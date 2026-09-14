@@ -210,6 +210,7 @@ def fetch_with_fallback(
     | None = None,
     validate: Callable[[dict[str, Any], str], bool] | None = None,
     diagnostics: FailureDiagnostics | None = None,
+    cache_validate: Callable[[Any], bool] | None = None,
 ) -> dict[str, Any] | None:
     """通用 Fallback 获取器。
 
@@ -221,17 +222,23 @@ def fetch_with_fallback(
     Args:
         diagnostics: 可选的失败原因收集器。传入时逐 provider 记录可读失败原因，
             供调用方写入降级事件（「错误即 UX」）；不传则零采集、零开销。
+        cache_validate: 可选的缓存载荷准入判据。缓存条目（含过期降级条目）
+            未通过判据时视为未命中、丢弃重取。用于「载荷语义已变更」的修复：
+            旧条目结构未变但含义已变，仅靠 TTL 会在过期前持续遮蔽修复。
     """
     chain = _get_chain(data_type)
-
-    # 1) 读缓存
-    cached = cache_get(cache_key, cache_ttl)
-    if cached is not None:
-        return cached
-
-    # 2) 遍历 chain 尝试（熔断委托 registry）
     kwargs = fn_kwargs or {}
     _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
+
+    # 1) 读缓存（准入判据不符 → 丢弃重取，避免旧语义载荷遮蔽修复）
+    cached = cache_get(cache_key, cache_ttl)
+    if cached is not None:
+        if cache_validate is None or cache_validate(cached):
+            return cached
+        logger.info("[%s]%s 缓存载荷语义版本过期，丢弃并重取", data_type, _code_tag)
+        cache_clear(cache_key)
+
+    # 2) 遍历 chain 尝试（熔断委托 registry）
     reg = get_registry()
     for provider_name in chain:
         entry = provider_fn_map.get(provider_name)
@@ -291,9 +298,9 @@ def fetch_with_fallback(
                 logger.warning("[%s]%s %s 连续失败，本会话后续请求跳过", data_type, _code_tag, provider_name)
         # else: 代码级空结果（API 不识别该代码）→ 不计入熔断计数器
 
-    # 3) 降级：全部 Provider 失败时尝试过期缓存
+    # 3) 降级：全部 Provider 失败时尝试过期缓存（同样须过准入判据）
     stale = cache_get(cache_key, CACHE_WEEKLY)
-    if stale is not None:
+    if stale is not None and (cache_validate is None or cache_validate(stale)):
         logger.info("[%s]%s 全部 Provider 不可用，降级使用过期缓存", data_type, _code_tag)
         return stale
 

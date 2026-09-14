@@ -75,6 +75,32 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
 
 _FUND_HOLD_CACHE_PREFIX = "fund_hold_"
 
+_HOLD_PAYLOAD_SCHEMA = 2
+"""``fund_hold_*`` 缓存载荷的语义版本（当前值）。
+
+递增场景：载荷字段的**含义**变化、以致不含新字段的旧条目被当前实现误读时
+（判据是「旧载荷是否会被误读」，不是字段数量增减）。
+V2 对应「三跳取数阶梯 + 联接基金穿透」：V1 的联接基金条目没有 ``feeder_target_code``，
+新代码会把「未穿透的旧快照」当作普通基金持仓读取，直接命中报告层时效闸门、被记为
+持仓不可用——修复发布后，缓存未过期的机器（``hold`` TTL 7 天）依旧复现用户报障。
+
+读侧以 :func:`_is_current_hold_payload` 为准入判据：版本不符即视为未命中、丢弃重取，
+使「改变载荷语义的修复」不再依赖用户手动清缓存。
+"""
+
+_HOLD_PAYLOAD_SCHEMA_FIELD = "hold_schema"
+
+
+def _stamp_hold_schema(raw: dict[str, Any], _source_label: str) -> dict[str, Any]:
+    """给 provider 产出的持仓载荷盖上当前语义版本（在缓存写入前生效）。"""
+    return {**raw, _HOLD_PAYLOAD_SCHEMA_FIELD: _HOLD_PAYLOAD_SCHEMA}
+
+
+def _is_current_hold_payload(payload: object) -> bool:
+    """缓存/预检载荷是否由当前语义版本写出（版本不符 → 视为未命中）。"""
+    return isinstance(payload, dict) and payload.get(_HOLD_PAYLOAD_SCHEMA_FIELD) == _HOLD_PAYLOAD_SCHEMA
+
+
 _FUND_HOLD_PROVIDERS: dict[str, tuple[str, _ProviderFunc]] = {
     "tiantian": ("天天基金", fetch_fund_holdings),
 }
@@ -108,6 +134,8 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
         get_ttl("hold", hold_cache_key),
         fn_kwargs={"code": code},
         diagnostics=diag,
+        transform=_stamp_hold_schema,
+        cache_validate=_is_current_hold_payload,
     )
     if result is not None:
         _t.record(_src_key, "T2", success=True)
@@ -280,9 +308,6 @@ def fetch_fund_holdings_batch(
 
     from functools import partial
 
-    from src.python.cache import get as cache_get
-    from src.python.cache import get_ttl
-
     items = [
         (
             f"{_FUND_HOLD_CACHE_PREFIX}{code}",
@@ -291,9 +316,14 @@ def fetch_fund_holdings_batch(
         for code in fund_codes
     ]
 
+    def _hold_cache_check(cache_id: str) -> Any:
+        """批量预检：旧语义载荷视为未命中（任务会经 fetch_with_fallback 丢弃重取）。"""
+        cached = cache_get(cache_id, get_ttl("hold", cache_id))
+        return cached if _is_current_hold_payload(cached) else None
+
     results = dispatcher.execute_with_cache_check(
         items,
-        cache_check_fn=lambda cache_id: cache_get(cache_id, get_ttl("hold", cache_id)),
+        cache_check_fn=_hold_cache_check,
     )
 
     hold_map: dict[str, dict[str, Any] | None] = {}
