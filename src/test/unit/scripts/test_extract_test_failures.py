@@ -43,7 +43,7 @@ pytestmark = [
 
 
 class TestFindJsonBlob:
-    """data-jsonblob 属性提取（rf-281 回归场景：HTML 实体引号导致 Extra data）。"""
+    """data-jsonblob 属性提取（回归场景：HTML 实体引号导致 Extra data）。"""
 
     def test_extracts_blob_with_html_entities(self, extract_script):
         """含 &#34; 实体引号与内嵌 HTML 的 blob 能完整提取且 JSON 可解析。

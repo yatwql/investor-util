@@ -427,18 +427,22 @@ EXCLUDE_LINE: list[str] = [
 ]
 
 # ── 测试回归场景元描述豁免（仅 src/test/ 文件生效） ──────────
-# 回归测试的 docstring / 注释必须描述"旧实现/修复前做错什么、修复后如何"
-# 才能表达防回退意图（如"旧实现把 3.41/4.43 修正成 1.9"、分隔注释引用
-# "rf-xxx 批次修复"），这类描述是测试元数据而非源码历史痕迹残留。
-# 与"工具说明行元描述豁免"同理，但仅对 src/test/ 路径生效——避免削弱
+# 回归测试的 docstring / 注释可描述"旧实现/修复前做错什么"以表达防回退意图
+# （如"旧实现把 3.41/4.43 修正成 1.9"），这类描述是测试元数据而非源码历史
+# 痕迹残留。与"工具说明行元描述豁免"同理，但仅对 src/test/ 路径生效——避免削弱
 # 源码侧检出（源码注释若残留"旧实现/修复前"叙述仍会被 PATTERNS 命中）。
+# **任务编号不在此豁免内**：注释/docstring 中残留 rf-/plan-/R- 编号一律检出
+# （见 scan_file 的硬禁止分支），测试元描述也不例外。
 TEST_META_EXCLUDE: list[str] = [
     r"(?:回归断言|回归场景|回归测试|回归：|回归:)",  # 回归测试 docstring/分隔注释
     r"(?:旧实现|原实现|修复前|修复后).{0,24}(?:误|把|被|会|曾|修正|改为|按|源头|×)",
-    r"rf-\d+\s*(?:批次|类)?修复",  # 引用历史任务编号的修复批次说明
 ]
 _COMPILED_EXCLUDE = [re.compile(p) for p in EXCLUDE_LINE]
 _TEST_META_COMPILED = [re.compile(p) for p in TEST_META_EXCLUDE]
+
+#: 任务编号硬禁止：注释/docstring 中出现 rf-/plan-/R- 编号一律检出，
+#: **不受**任何整行豁免（测试元描述/工具说明）放行——任务代号只属内部计划表。
+_TASK_ID_RE = re.compile(r"(?:rf|plan|R)-\d+")
 
 
 def _chapter_excludes() -> list[re.Pattern]:
@@ -642,6 +646,11 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
     is_test_file = "src/test/" in fpath.as_posix()
     for lineno, ctext in _iter_comment_lines(fpath):
         if not ctext.strip():
+            continue
+        # 任务编号硬禁止：注释/docstring 出现 rf-/plan-/R- 编号一律检出，
+        # 不被测试元描述/工具说明的整行豁免放行（任务代号只属内部计划表）
+        if _TASK_ID_RE.search(ctext):
+            hits.append((lineno, "CODE", "任务编号引用（如 rf-117、R-086）", ctext[:120]))
             continue
         if _is_excluded(ctext, test_file=is_test_file):
             if verbose:

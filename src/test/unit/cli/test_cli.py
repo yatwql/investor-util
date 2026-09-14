@@ -1043,7 +1043,7 @@ class TestMainDoctor:
 
 @pytest.mark.unit
 class TestMainEarlyExitExperiments:
-    """早返回命令（doctor/check-sources）的命令行实验开关（回归：rf-306）。
+    """早返回命令（doctor/check-sources）的命令行实验开关（早返回命令分派回归）。
 
     这些命令在 ``init_config()`` 之前分派，命令行 ``--experiment`` 若不随早返回
     路径一并应用，会被静默忽略——doctor 会报告「实验开关关闭」，而用户明明

@@ -329,7 +329,7 @@ class TestDedupByTitle(unittest.TestCase):
 
 
 class TestDedupFalseMergeGuard(unittest.TestCase):
-    """跨源误合并防护回归测试（rf-290 校准结论，2026-08-17）。
+    """跨源误合并防护回归测试（跨源误合并校准结论，2026-08-17）。
 
     旧规则（候选区 0.30 + 安全区 0.50 直接合并 + bg=2 梯度 0.40）实测
     误合并率 ~70-80%：不同事件共享财报/回购/指数/预警/地震等模板词天然

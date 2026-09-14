@@ -24,6 +24,7 @@
 - **文档漂移**：DataSinking 接入后「全部数据源免费、声明表为空」描述已过时——同步修正 `core/datasource_credential.py` 模块 docstring 与注释、`config/features.py` 开关注释/描述、`core/doctor.py` 与 `core/check_sources.py` 回退文案、`technical.md` §2.7（标题由「实验：默认关」改「常规开关默认开」+ 正文补密钥文件/节名）、`requirements.md` §5.8（R-CRD-01/02/03/06/07 补 `key_file`/`key_field`/`key_section` 与解析顺序）、`how-to-config.md` 两处；对应 3 个测试断言文案同步。
 - **用户文档与覆盖**：`README.md`「最多 19 个条件页签」→ 20 并补「财报摘要（可选）」与 DataSinking key 说明；`testplan.md` §4 增财报取数 P1 回归行；`technical.md` 增 §4.19「持仓个股财报摘要」叙述章节。
 - **门禁**：dev-verify 全绿；四个 `--ci` 检查 exit 0；ruff check + format 零告警。自审记录 rf-358~rf-362（`rf-next` 363）。
+- **任务编号纪律收紧（rf-363）**：`check-code-traces.py` 原先在 `src/test/` 对「回归…」整行与「rf-N 修复」两条予以豁免，使测试注释/docstring 可残留任务编号（共 7 处）。现改为 **任务编号硬禁止且先于整行豁免判定**（`scan_file` 用 `_TASK_ID_RE` 检出 rf-/plan-/R- 编号即报 CODE），删除 `TEST_META_EXCLUDE` 的 `rf-…修复` 条；7 处测试注释/docstring 清理为纯回归语义措辞；检查器测试同步（+2 例硬检出、改写 1 例豁免断言）；CLAUDE.md 补注「测试元描述豁免不适用于任务编号」。
 
 ### 修复：QDII 联接穿透被旧缓存遮蔽 — 持仓缓存载荷语义版本（rf-357）（2026-09-14）
 

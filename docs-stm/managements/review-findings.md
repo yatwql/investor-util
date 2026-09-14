@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.10.20-dev
-> **编号源**：`rf-next = 363`（新增问题取此编号，完成后更新为 +1；已用最大 rf-362，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 364`（新增问题取此编号，完成后更新为 +1；已用最大 rf-363，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -55,6 +55,7 @@
 | **rf-360** | **「全部数据源免费、声明表为空」描述在 DataSinking 接入后普遍过时**：`core/datasource_credential.py` 模块 docstring 与「声明即数据」注释、`config/features.py` 开关注释与描述、`core/doctor.py` / `core/check_sources.py` 回退文案、`technical.md` §2.7（标题仍写「实验：默认关」+ 正文「生产实现为空表/就绪矩阵报均无需凭据」+「凭据只从环境变量读取」）、`requirements.md` §5.8（R-CRD-01/02/03/06/07）、`how-to-config.md`（开关表行 + S 面板说明）——均与「首个需 key 源已接入、凭据走通用密钥文件」矛盾 | 全部按实现改写（中性/准确措辞）：代码注释与文案改为「未声明免凭据、需凭据的源主动跳过」；technical §2.7 标题改「常规开关默认开」、正文补 DataSinking 密钥文件与节名；requirements R-CRD-01/02/03/06/07 补 `key_file`/`key_field`/`key_section` 与密钥文件解析顺序；how-to-config 两处同步；同步更新受影响的 3 个测试断言文案 |
 | **rf-361** | **用户文档计数漂移**：`README.md` 三处「最多 19 个条件页签」（registry 已 20 项、新章节启用后最多 20），且无新章节/新数据源任何提及 | README 改 20，补「财报摘要（可选）」分组与 DataSinking key 说明（`data_key.json` 的 `datasink` 节 / `DATASINK_API_KEY`） |
 | **rf-362** | **testplan / technical 覆盖缺口**：`testplan.md` §4 回归清单无财报取数路径条目（同期联接穿透/cassette 均有）；`technical.md` 无 §4.x 叙述章节给「持仓个股财报摘要」 | testplan §4 增 P1 行（指向 test_datasink/test_financial_report/test_financial_report_digest/test_datasource_credential，含隔离防线）；technical 增 §4.19 章节（定位/鉴权/取数链路/限速配额/降级合规/缓存/数据源说明表） |
+| **rf-363** | **任务编号纪律存在测试侧豁免漏洞**：`check-code-traces.py` 的 `TEST_META_EXCLUDE` 含「回归…整行豁免」与「rf-N 修复」两条，导致 `src/test/` 注释/docstring 中的任务编号（如 `# rf-232 回归：…`、docstring `（回归：rf-306）`、`（rf-204 回归场景）`）被放行——与「任务代号只属内部计划表、不扩散到实现层」冲突；共 7 处残留 | 收紧为「任务编号硬禁止，先于整行豁免判定」：`scan_file` 在 `_is_excluded` 之前用 `_TASK_ID_RE` 检出 rf-/plan-/R- 编号即报 CODE；删除 `TEST_META_EXCLUDE` 的 `rf-…修复` 条；清理 7 处测试注释/docstring 的编号（保留回归语义）；检查器测试同步（新增测试文件/源码注释硬检出 2 例、改写 rf 豁免断言 1 例）；CLAUDE.md 补注 |
 
 ### 归档档案
 

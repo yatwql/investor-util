@@ -661,7 +661,7 @@ investor-util/
 │       │   │   ├── test_check_version_consistency.py #   版本号一致性检查脚本测试
 │       │   │   ├── test_task_numbering_check_scripts.py # 任务编号一致性检查脚本测试
 │       │   │   ├── test_task_numbering_hook_scripts.py # 任务编号自动保障 hook 脚本测试
-│       │   │   ├── test_trace_check_scripts.py  #   check-code/doc-traces 工具自身豁免+时序模式检出/豁免回归
+│       │   │   ├── test_trace_check_scripts.py  #   check-code/doc-traces 工具自身豁免+时序模式检出/豁免回归（含测试/源码注释任务编号硬检出）
 │       │   │   ├── test_test_runner_machine_info.py  #  test_runner 机器信息采集/bench 别名/耗时表格渲染测试
 │       │   │   ├── test_test_runner_doc_writer.py  #   test_runner 环境耗时对照文档自动更新（标记定位/列增改/round-trip）
 │       │   │   ├── test_extract_test_failures.py #   失败用例提取 data-jsonblob 解析（HTML 实体引号回归）
@@ -792,7 +792,7 @@ investor-util/
 │   ├── check-version-consistency.py #   版本号一致性检查
 │   ├── calibrate-dedup-threshold.py #   新闻去重阈值校准
 │   ├── collect-test-coverage.py     #   测试覆盖计数收集（pytest --collect-only 快照，供 test-coverage.md 更新）
-│   ├── check-code-traces.py         #   代码注释历史痕迹检查
+│   ├── check-code-traces.py         #   代码注释历史痕迹检查（含任务编号硬禁止：注释/docstring 出现 rf-/plan-/R- 编号一律检出，不受测试元描述豁免放行）
 │   ├── check-doc-traces.py          #   文档历史痕迹检查
 │   ├── check-semantic-index.py      #   功能语义命名表正反向一致性检查
 │   ├── llm-hallucination-sampler.py #   LLM 幻觉率采样测试（10组标准持仓+事实校验器验证）
