@@ -54,6 +54,7 @@ _DEFAULT_CONFIG = {
         "cost_lots": False,  # 成本流水：持仓 Excel 含交易/分红流水时，汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计
         "valuation_percentile": False,  # 估值分位：「资产穿透TOP10」章加估值分位列（当前 PE/PB + 价格分位代理）
         "market_temperature": False,  # 市场温度：「投资分析汇总」章加市场温度刻度行（三因子合成温度计）
+        "financial_report_digest": False,  # 持仓个股财报摘要：新增独立章（DataSinking 全文本财报，仅 A 股，需用户自备 key）
     },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,

@@ -249,6 +249,7 @@ def _render_template(
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约 market_temperature_data（汇总温度行，None=开关关闭）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
+    financial_report_digest_data: dict | None = None,  # 持仓个股财报摘要契约（None=开关关闭/无数据）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.config.features import enabled_experimental_features
@@ -345,6 +346,7 @@ def _render_template(
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,
         decision_review_data=decision_review_data,
+        financial_report_digest_data=financial_report_digest_data,
     )
 
 
@@ -391,6 +393,8 @@ def write_html_report(
     valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（「资产穿透TOP10」估值分位列，None=开关关闭）
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约 market_temperature_data（「投资分析汇总」温度行，None=开关关闭）
+    enable_financial_report_digest: bool = False,  # board 层：持仓个股财报摘要（report_submodules，默认关）
+    financial_report_digest_data: dict | None = None,  # data 层：财报摘要契约（None=无数据，章节隐藏）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
@@ -526,6 +530,8 @@ def write_html_report(
         style_factor_data=style_factor_data,
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
+        enable_financial_report_digest=enable_financial_report_digest,
+        financial_report_digest_data=financial_report_digest_data,
     )
 
     # ── 10b) 数据源状态摘要 ──
@@ -592,6 +598,7 @@ def write_html_report(
         industry_beta=(style_factor_data or {}).get("industry_beta"),
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
+        financial_report_digest_data=financial_report_digest_data,
         drawdown_min_span=drawdown_min_span,
         llm_enabled_flag=llm_enabled_flag,
         global_macro_content=global_macro_content,

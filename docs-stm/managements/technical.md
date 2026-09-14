@@ -3183,6 +3183,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `period_entry_label` | 报告期明细条目措辞（带穿透来源时补注目标 ETF 与「未折算持有比例」） | 资产穿透TOP10 | 报告配置 | 无（渲染原语） |
 | `hold_schema` | 基金持仓缓存载荷语义版本（读侧拒收非当前版本 → 视为未命中重取，防「语义变更型修复」被 TTL 内缓存遮蔽） | 资产穿透TOP10 | 数据获取 | 无（缓存契约字段，值见 `_HOLD_PAYLOAD_SCHEMA`） |
 | `cache_validate` | 缓存载荷准入判据（`fetch_with_fallback` 参数：载荷未通过判据即视为未命中、清缓存重取） | 资产穿透TOP10 | 数据获取 | 无（链路原语） |
+| `financial_report_digest` | 持仓个股财报摘要（新增独立章：A 股标的取最新年报章节原文摘要；数据源 DataSinking，需用户自备 key） | 持仓个股财报摘要 | 数据获取 | `report_submodules.financial_report_digest`（默认关） |
 | `rebalance_advice` | 调仓建议 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `trade_discipline` | 交易纪律 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `return_attribution` | 收益归因 | 行动建议 | 调仓 | `enable_action`（默认开） |
@@ -3637,6 +3638,7 @@ investor-util/
 | fund_flow_data | dict | 是 | prepare_report_data |
 | valuation_data | dict | 是 | prepare_report_data |
 | market_temperature_data | dict | 是 | prepare_report_data |
+| financial_report_digest_data | dict | 是 | prepare_report_data；both 路径由 _generate_report_both 就地构建 |
 | diff | dict | 是 | capture_snapshot |
 | decision_review_data | dict | 是 | record_llm_decisions_and_review_block |
 
@@ -3647,6 +3649,8 @@ investor-util/
 > `valuation_data`（估值分位，C19 契约，3 键 + 内嵌 `by_code` 子键）：`{"available": bool, "status": str, "by_code": {code: {"pe": float\|None, "pb": float\|None, "price_percentile": float\|None, "tier": str\|None, "sample_count": int, "percentile_available": bool}}}`。当前 PE/PB 由 `fetcher/industry.py::fetch_valuation_fields`（网关入口；东财 push2 扩展字段 f9/f23 与行业分类同属一次请求，经 Provider Chain + 文件/会话缓存取用，报告层不得直连 provider）；`price_percentile` 为历史 K 线价格分位代理（0~100，`analysis/valuation_percentile.py`，MIN_SAMPLES=60），非真实历史估值分位（盈利增长未纳入，渲染层必须展示 `DISCLAIMER`"价格分位代理，非真实历史估值分位"）。由 `report/orchestrator.py::compute_valuation_data` 计算（开关 `report_submodules.valuation_percentile` 默认关；关闭 → None → 「资产穿透TOP10」估值列隐藏；PE/PB 与 K 线皆不可得 → available=False 落 §1.4.5 占位）。消费方：穿透 TOP10 Excel `penetration_sheet` 估值分位列（ncols 10→11 + 表尾免责）与 HTML `report_template.html` 条件列（`valuation_enabled`）。
 
 > `market_temperature_data`（市场温度，C19 契约，9 键）：`{"available": bool, "status": str, "index_code": str, "index_name": str, "price_percentile": float\|None, "ma_deviation": float\|None, "volatility": float\|None, "score": float\|None, "tier": str\|None, "disclaimer": str}`。价格分位（复用估值分位的价格分位机制）+ 均线偏离 + 年化波动率三因子合成温度分（0~100，`analysis/market_temperature.py`，权重 0.5/0.3/0.2，各分量 clamp）；**温度计只给刻度、无仓位指令**（`TEMPERATURE_DISCLAIMER` 渲染层必须展示）。`ma_deviation`/`volatility` 为小数比例（0.032=3.2%），渲染层须 ×100 转百分数展示。由 `report/orchestrator.py::compute_market_temperature_data` 计算（指数 K 线 `fetch_index_history` 沪深300 走 Chain + session_cache；开关 `report_submodules.market_temperature` 默认关；关闭 → None → 「投资分析汇总」温度行隐藏；K 线不足 → `insufficient` 占位）。消费方：汇总 Excel `summary._write_market_temperature`（「市场指数」后刻度行）与 HTML kv-table（`market_temperature` 展示映射）。
+
+> `financial_report_digest_data`（持仓个股财报摘要，C19 契约，5 键）：`{"available": bool, "reason": str, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`symbol`/`report_period`/`doc_type`（中文标签）/`title`/`announcement_date`/`summary`/`source`/`adjunct_url`；`failures` 每项含 `code`/`name`/`reason`。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）的目标章节正文并按 `datasink.max_chars` 截断，由 `report/financial_report_digest.py::build_financial_report_digest` 装配（数据源 `providers/datasink.py`，取数编排 `fetcher/financial_report.py`）。开关 `report_submodules.financial_report_digest` 默认关（关闭 → None → 章节隐藏）；缺凭据/无 A 股标的/全部无覆盖 → `available=False` 降级。合规：`source` 为披露平台归属，渲染层须保留。C7 注册 type=`financial_report`、data_flag=`financial_report_digest_data`。消费方：Excel `report/financial_report_sheet.py` 与 HTML `partials/financial_report_section.html`。
 
 > `style_factor_data`（风格与因子分析，C19 契约，13 键 + 内嵌 `industry_beta` 子键）：主键 `{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/style_factor_regression.py` 计算、`report/orchestrator.py` 组装。子键 `industry_beta`（行业 Beta，`industry_beta.py::compute_industry_beta_analysis`，开关 `report_submodules.industry_beta` 默认关；关闭 → None → 区块隐藏）：`{"available": bool, "exposure": {industry: float}, "index_codes": {industry: str}, "betas": {industry: float}, "t_stats": {industry: float}, "significant": {industry: bool}, "correlations": {industry: float}, "unmapped_industries": list[str]}`——行业暴露占比按持仓市值聚合，行业指数为中证行业指数（`INDUSTRY_INDEX_MAP`），β 复用 `compute_factor_exposure` 单因子 OLS。C7 注册见 §8.3（type=`fund_deep_analysis`、data_flag=`style_factor_data`），计算方案/架构约束/降级分支见 §4.8 风格与因子分析。
 

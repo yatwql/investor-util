@@ -8,7 +8,7 @@
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
 | 主程序代码 | Python | 271 | 67,587 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层；近期新增 `core/jsonl_store.py` JSONL 原子原语 + `core/signal_ledger.py` 确定性信号账本 + `report/signal_record.py` 信号登记适配器 + `core/num_utils.py` 数值归一原语 + `core/doctor.py` 系统自检 + `core/cassette.py` 请求回放引擎 + `core/datasource_credential.py` 数据源凭据声明 + `fetcher/source_adapter.py` 适配契约 + `fetcher/quote_adapters.py` 行情域适配器 + `llm/module_fingerprint.py` 模块指纹唯一事实来源 + `report/_experimental_seams.py` 实验挂载点 + `report/holdings_freshness.py` 持仓报告期时效判定 + `report/experimental_notice.py` 实验功能清单语句单源 + `core/trading_calendar.py` 交易日历原语（时间距离一律以交易日计）） |
-| HTML 报告模板 | HTML | 4 | 3,877 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| HTML 报告模板 | HTML | 4 | 3,877 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 持仓个股财报摘要 `financial_report_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 21 | 7,165 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
 | **源代码合计** | — | **299** | **78,944** | 主程序 + 模板 + 脚本 |
@@ -226,6 +226,7 @@ investor-util/
 │   │   │   ├── style_factor_sheet.py  #   风格与因子分析 Excel 页签（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
 │   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
 │   │   │   ├── financial_report_digest.py # 持仓个股财报摘要章节数据装配（A 股标的 → 最新年报章节摘要）
+│   │   │   ├── financial_report_sheet.py # 持仓个股财报摘要 Excel 页签（逐股行 + 失败清单 + 来源标注）
 │   │   │   ├── action_sheet.py       #   行动建议 Excel 页签（再平衡信号/交易纪律/调仓建议/收益归因）
 │   │   │   ├── decision_record.py    #   决策复盘·确定性载体登记（再平衡卖出/调仓卖出建议，仅带基线价入账，同日去重）
 │   │   │   ├── decision_llm_capture.py # 决策复盘·LLM 操作建议表结构化解析（表头识别→逐代码方向登记，同日去重）
@@ -352,6 +353,7 @@ investor-util/
 │   │       ├── whatif_template.html  #   调仓 What-if 独立 HTML 页（双环图+变动明细）
 │   │       └── partials/             #   章节级 partial（report_template.html 经 Jinja include 引入）
 │   │           ├── evolution_section.html  #   组合演进章节（多快照趋势，含专用图表数据段）
+│   │           ├── financial_report_section.html # 持仓个股财报摘要章节（A 股财报章节原文摘要 + 来源归属）
 │   │           └── action_section.html     #   行动建议章节（再平衡信号/交易纪律/调仓建议/收益归因，开关 enable_action）
 │   │
 │   └── test/                         # 测试套件
@@ -611,6 +613,7 @@ investor-util/
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
 │       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现
 │       │   │   ├── test_financial_report_digest.py #   持仓个股财报摘要章节装配（降级契约/文种标签/披露日/失败清单）
+│       │   │   ├── test_financial_report_sheet.py  #   持仓个股财报摘要 Excel 页签（行写入/占位/失败清单）
 │       │   │   ├── test_action_html.py            #   行动建议章节 + 智囊团深度复盘「行动摘要」HTML 呈现（单源计算断言）
 │       │   │   ├── test_action_sheet.py           #   行动建议 Excel 页签呈现
 │       │   │   ├── test_decision_record.py        #   决策复盘·确定性载体登记（卖出建议入账/基线价守门/同日去重）

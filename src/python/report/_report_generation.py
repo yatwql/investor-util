@@ -72,6 +72,8 @@ def _generate_full_html_report(
     valuation_data: dict | None = None,
     market_temperature_data: dict | None = None,
     decision_review_data: dict | None = None,
+    enable_financial_report_digest: bool = False,
+    financial_report_digest_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -152,6 +154,8 @@ def _generate_full_html_report(
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
             decision_review_data=decision_review_data,
+            enable_financial_report_digest=enable_financial_report_digest,
+            financial_report_digest_data=financial_report_digest_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -189,6 +193,7 @@ def _generate_full_excel_report(
     enable_cost_lots: bool = False,
     transactions: list | None = None,
     dividends: list | None = None,
+    enable_financial_report_digest: bool = False,
 ) -> bool:
     """full 路径的 Excel 报告生成，返回是否成功。"""
     from src.python.report.excel_generator import generate_excel_report
@@ -222,6 +227,8 @@ def _generate_full_excel_report(
             enable_cost_lots=enable_cost_lots,
             transactions=transactions,
             dividends=dividends,
+            enable_financial_report_digest=enable_financial_report_digest,
+            financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
         )
         reporter.ok("Excel 报告已生成")
         return True
@@ -259,6 +266,7 @@ def _generate_report_both(
         is_enable_action,
         is_enable_cost_lots,
         is_enable_data_quality,
+        is_enable_financial_report_digest,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_news,
@@ -286,6 +294,7 @@ def _generate_report_both(
     _enable_action = is_enable_action(config)
     _enable_data_quality = is_enable_data_quality(config)
     _enable_cost_lots = is_enable_cost_lots(config)
+    _enable_financial_report_digest = is_enable_financial_report_digest(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
@@ -305,6 +314,13 @@ def _generate_report_both(
 
     valuation_data = compute_valuation_data(details, config, reporter)
     market_temperature_data = compute_market_temperature_data(config, reporter)
+    # 持仓个股财报摘要（数据契约）：both 路径不计算穿透，仅按持仓 A 股标的取数；
+    # 关闭 / 无 key 时为 None（章节隐藏/写占位）
+    financial_report_digest_data = None
+    if _enable_financial_report_digest:
+        from src.python.report.financial_report_digest import build_financial_report_digest
+
+        financial_report_digest_data = build_financial_report_digest(holdings, config, reporter)
 
     # ── 2. 快照对比（始终执行） ──
     perf.start("快照对比")
@@ -431,6 +447,8 @@ def _generate_report_both(
             fund_flow_data=fund_flow_data,
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
+            enable_financial_report_digest=_enable_financial_report_digest,
+            financial_report_digest_data=financial_report_digest_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -466,6 +484,8 @@ def _generate_report_both(
             dividends=dividends,
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
+            enable_financial_report_digest=_enable_financial_report_digest,
+            financial_report_digest_data=financial_report_digest_data,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True
@@ -510,6 +530,7 @@ def _generate_report_full(
         is_enable_action,
         is_enable_cost_lots,
         is_enable_data_quality,
+        is_enable_financial_report_digest,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_llm,
@@ -536,6 +557,7 @@ def _generate_report_full(
     _enable_llm = is_enable_llm(config)
     _enable_data_quality = is_enable_data_quality(config)
     _enable_cost_lots = is_enable_cost_lots(config)
+    _enable_financial_report_digest = is_enable_financial_report_digest(config)
     sec_order = get_report_section_order(config)
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
@@ -564,6 +586,8 @@ def _generate_report_full(
         # 估值分位 + 市场温度（数据契约，prep 中已组装；开关关闭时为 None）
         pipeline_data["valuation_data"] = prep.get("valuation_data")
         pipeline_data["market_temperature_data"] = prep.get("market_temperature_data")
+        # 持仓个股财报摘要（数据契约，prep 中已组装；开关关闭/无 key 时为 None）
+        pipeline_data["financial_report_digest_data"] = prep.get("financial_report_digest_data")
     _validate_pipeline_snapshot(pipeline_data)
     # 2b. 组合演进数据（聚合多期快照，evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
@@ -699,6 +723,8 @@ def _generate_report_full(
         (pipeline_data or {}).get("valuation_data"),
         (pipeline_data or {}).get("market_temperature_data"),
         (pipeline_data or {}).get("decision_review_data"),
+        enable_financial_report_digest=_enable_financial_report_digest,
+        financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
     )
 
     # ── 7. Excel 报告 ──
@@ -726,6 +752,7 @@ def _generate_report_full(
         _enable_cost_lots,
         transactions,
         dividends,
+        enable_financial_report_digest=_enable_financial_report_digest,
     )
 
     result.news_ok = news_ok

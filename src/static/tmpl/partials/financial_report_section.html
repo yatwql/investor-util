@@ -1,0 +1,87 @@
+{# ==============================================================
+   持仓个股财报摘要章节 partial（供 report_template.html 经 include 引入）。
+
+   依赖 context 变量（report_template.html 以 `{% include ... with context %}`
+   引入）：section_visible / section_numbers / financial_report_digest_data。
+
+   数据来源：DataSinking 全文本财报（仅 A 股，需用户自备 key）。摘要为报告章节
+   正文截断；每行标注披露平台归属（source），合规要求再分发时保留出处。
+   ============================================================== #}
+{% if section_visible("financial_report_digest") %}
+{% set _frd = financial_report_digest_data or {} %}
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  持仓个股财报摘要（DataSinking 全文本财报）        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section" id="sec-financial_report_digest" style="order: {{ section_numbers['financial_report_digest'] }};">
+    <div class="section-title">
+        {{ section_numbers['financial_report_digest'] }}、持仓个股财报摘要
+        <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">A 股财报章节原文摘要</span>
+    </div>
+    {% if _frd.get("available") %}
+    <div class="section-content">
+        <div class="summary-tag" style="margin-bottom: 8px;">
+            📄 已取到 <strong>{{ _frd.get("entry_count", 0) }}</strong> 只 A 股的财报章节摘要。
+            数据来源：DataSinking（保留披露平台归属）。
+        </div>
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>代码</th>
+                    <th>报告期</th>
+                    <th>文种</th>
+                    <th>披露日</th>
+                    <th>摘要</th>
+                    <th>来源 / 原文</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in _frd.get("rows", []) %}
+                <tr>
+                    <td class="text-left">{{ r.get("name", "") }}</td>
+                    <td>{{ r.get("code", "") }}</td>
+                    <td>{{ r.get("report_period", "") }}</td>
+                    <td>{{ r.get("doc_type", "") }}</td>
+                    <td>{{ r.get("announcement_date", "") }}</td>
+                    <td class="text-left" style="white-space:pre-wrap;">{{ r.get("summary", "") }}</td>
+                    <td class="text-left">
+                        {{ r.get("source", "") }}
+                        {% if r.get("adjunct_url") %}<br><a href="{{ r.get('adjunct_url') }}" target="_blank" rel="noopener">原文</a>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% set _frd_failures = _frd.get("failures", []) %}
+        {% if _frd_failures %}
+        <div class="penetration-notes" style="margin-top: 12px;">
+            <div><strong>未取到财报的标的</strong></div>
+            {% for f in _frd_failures %}
+            <div>* {{ f.get("name") or f.get("code") }}（{{ f.get("code") }}）：{{ f.get("reason", "") }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="penetration-notes" style="margin-top: 12px;">
+            <div>* 数据来源：DataSinking 全文本财报，仅覆盖 A 股（沪深京）；再分发时请保留披露平台归属</div>
+            <div>* 摘要为所选章节正文截断，完整内容见原文链接；取用章节与截断长度见 config.json 的 datasink 段</div>
+        </div>
+    </div>
+    {% else %}
+    <div class="section-content">
+        <div class="empty-note placeholder-note">
+            <p><strong>持仓个股财报摘要暂不可用</strong></p>
+            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+                {{ _frd.get("reason") or "暂无 A 股标的或未取到财报" }}。
+            </p>
+            <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
+                需在 data/config/datasink_key.json 配置 DataSinking API key（免费 key 可在 datasink.ing 领取）；
+                开启开关 report_submodules.financial_report_digest 后生效。
+            </p>
+        </div>
+    </div>
+    {% endif %}
+    <div class="back-to-top-link"><a href="#report-top" title="回到报告顶部">↑ 回到顶部</a></div>
+</div>
+{% endif %}

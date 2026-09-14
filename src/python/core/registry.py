@@ -381,6 +381,7 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "portfolio_evolution": "组合演进",
     "action": "行动建议",
     "data_source_status": "数据源可用性矩阵",
+    "financial_report_digest": "持仓个股财报摘要",
     "llm_usage": "LLM API 用量",
 }
 
@@ -592,8 +593,17 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     },
     # ── always 类型（始终显示） ──
     {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always", "data_flag": None},
+    # ── financial_report 类型（report_submodules.financial_report_digest 控制，默认关）──
+    # 持仓个股财报摘要：DataSinking 全文本财报（仅 A 股，需用户自备 key）
+    {
+        "key": "financial_report_digest",
+        "name": "持仓个股财报摘要",
+        "number": 19,
+        "type": "financial_report",
+        "data_flag": "financial_report_digest_data",
+    },
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 20, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 

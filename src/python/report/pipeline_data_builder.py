@@ -62,6 +62,9 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     # report/_experimental_seams.record_llm_decisions_and_review_block 注入；
     # 实验功能关闭或区块为空时键缺席，两条输出路径保持既有输出）
     "decision_review_data",
+    # 持仓个股财报摘要：A 股标的的财报章节摘要（report_submodules.financial_report_digest，
+    # 由 report/financial_report_digest.build_financial_report_digest 组装；开关关闭时为 None）
+    "financial_report_digest_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -96,6 +99,9 @@ _PREP_KNOWN_KEYS: set[str] = {
     # 市场温度：价格分位+均线偏离+波动率三因子合成温度计（report_submodules.market_temperature，
     # 由编排层 compute_market_temperature_data 组装；开关关闭时为 None）
     "market_temperature_data",
+    # 持仓个股财报摘要：A 股标的的财报章节摘要（report_submodules.financial_report_digest，
+    # 由 prepare_report_data 组装；开关关闭时为 None）
+    "financial_report_digest_data",
 }
 
 # ── 类型映射（用于自动类型断言） ──
@@ -117,6 +123,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "tail_risk_data": (dict, type(None)),
     "snapshot_diff_data": (dict, type(None)),
     "decision_review_data": (dict, type(None)),
+    "financial_report_digest_data": (dict, type(None)),
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
@@ -140,6 +147,7 @@ _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "fund_flow_data": dict,
     "valuation_data": dict,
     "market_temperature_data": dict,
+    "financial_report_digest_data": dict,
 }
 
 

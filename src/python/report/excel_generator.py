@@ -190,6 +190,7 @@ def generate_excel_report(
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
+    enable_financial_report_digest: bool = False,  # board 层：持仓个股财报摘要（report_submodules，默认关）
     enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
     enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
     progress: ProgressReporter | None = None,
@@ -203,6 +204,8 @@ def generate_excel_report(
     valuation_data: dict | None = None,  # 估值分位数据契约（「资产穿透TOP10」估值分位列；None 时从 pipeline_data 读取）
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约（「投资分析汇总」温度刻度行；None 时从 pipeline_data 读取）
+    financial_report_digest_data: dict
+    | None = None,  # 持仓个股财报摘要数据契约（report_submodules.financial_report_digest，默认关）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -259,6 +262,8 @@ def generate_excel_report(
         data_availability["news_data_available"] = True
     if include_llm:
         data_availability["llm_data_available"] = True
+    # 财报摘要：数据缺失（未配置 key/无 A 股标的）时隐藏该页签
+    data_availability["financial_report_digest_data"] = financial_report_digest_data is not None
 
     sheets = create_sheets(
         wb,
@@ -267,6 +272,7 @@ def generate_excel_report(
         enable_news=enable_news,
         enable_history=enable_history,
         enable_portfolio_evolution=enable_portfolio_evolution,
+        enable_financial_report_digest=enable_financial_report_digest,
         enable_action=enable_action,
         enable_llm=enable_llm,
         data_availability=data_availability,
@@ -376,6 +382,17 @@ def generate_excel_report(
             )
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
+
+    # ── 持仓个股财报摘要页签（financial_report_digest_data） ──
+    ws_frd = sheets.get("financial_report_digest")
+    if ws_frd is not None:
+        prog.info("正在写入持仓个股财报摘要页签...")
+        try:
+            from src.python.report.financial_report_sheet import write_financial_report_sheet
+
+            write_financial_report_sheet(ws_frd, financial_report_digest_data)
+        except Exception:
+            logger.debug("[excel] 持仓个股财报摘要页签写入失败（非关键）", exc_info=True)
 
     # ── 行动建议页签（行动板块，action_data） ──
     ws_action = sheets.get("action")

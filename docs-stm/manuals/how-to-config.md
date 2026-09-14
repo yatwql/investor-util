@@ -12,6 +12,7 @@
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
   "llm_providers_file": "data/config/llm_providers.json",
+  "datasink_key_file": "data/config/datasink_key.json",  // DataSinking 全文本财报密钥文件（仅填 api_key 字段）
 
   // ── B. 报告章节可见性 ──
   "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露+相关性
@@ -20,7 +21,7 @@
   "enable_portfolio_evolution": true,  // 组合演进
   "enable_action": true,     // 行动建议（默认开，可在菜单 P 关闭）
   // 报告子模块开关（数据质量仪表盘为长期可信核心默认开启；其余新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": true, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘默认开，其余默认关
+  "report_submodules": {"data_quality": true, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false, "financial_report_digest": false},  // 数据质量仪表盘默认开，其余默认关
   "comparison_candidates": [],  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合 candidate_compare）
 
   // ── C. 数据源与提供商 ──
@@ -33,6 +34,14 @@
     "akshare": true
   },
   "preferred_provider": {},
+  "datasink": {
+    "plan": "free",                 // free / yearly；决定限速与日配额的默认值
+    "requests_per_second": 0,       // 0=按 plan 自动（free=3，yearly=31）
+    "daily_quota": 0,               // 0=按 plan 自动（free=8191，yearly=131071）
+    "sections": ["管理层讨论与分析"],  // 取用的财报章节（fuzzy 标题匹配）
+    "max_chars": 2000,             // 单股摘要截断长度
+    "doc_types": ["annual", "semiannual"]  // 文种优先级（先年报、后半年报）
+  },
 
   // ── D. 市场时段与缓存 ──
   "market_hour_aware": ["price", "index"],
@@ -133,15 +142,17 @@
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
 | `llm_providers_file` | `data/config/llm_providers.json` | LLM 多 Provider 链式服务配置文件路径，参见 [LLM 配置指引](how-to-config-llm.md) | 手动编辑 |
+| `datasink_key_file` | `data/config/datasink_key.json` | DataSinking 全文本财报密钥文件路径（仅填 `api_key` 字段；免费 key 在 datasink.ing 领取。环境变量 `DATASINK_API_KEY` 可覆盖文件） | 手动编辑 |
 | `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量 = max(500, news_top_count × 2)，华尔街见闻硬上限 100 条除外） | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
+| `datasink.*` | `{plan: "free", ...}` | DataSinking 全文本财报配置：`plan`（free/yearly，决定限速与日配额默认值）、`requests_per_second` / `daily_quota`（0=按 plan 自动）、`sections`（取用章节）、`max_chars`（摘要截断）、`doc_types`（文种优先级）。免费档 3 请求/秒、8191 篇/日；仅覆盖 A 股 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s。低于 30s 的值在配置校验时告警，运行时自动钳制到 30s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
 | `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/W/C/F/O/1/2/3/4/P/I/A/S/R/V/H/D/X；其中 `D` 受 `doctor_check` 开关约束，该开关默认开启），启动后光标自动定位 | 手动编辑 |
-| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（19 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
+| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（20 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `comparison_indices` | `{"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}` | 竞争语境对比指数池。智囊团深度复盘中对比组合 vs 多指数的今日涨跌幅、区间累计收益和指标（夏普/波动率/最大回撤）。格式 `{指数代码: 显示名称}`。禁用时设为空对象 `{}` | 手动编辑 |
@@ -176,6 +187,7 @@
 | `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
 | `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 菜单 P → 6 |
 | `report_submodules.market_temperature` | `false` | 「投资分析汇总」章市场温度刻度行开关，**默认关闭**。开启后该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明） | 菜单 P → 6 |
+| `report_submodules.financial_report_digest` | `false` | 「持仓个股财报摘要」独立章开关，**默认关闭**。开启后新增一章：对持仓 + 穿透中的 A 股标的取最新年报（无年报退半年报）的目标章节正文摘要。**需先配置 DataSinking API key**（`data/config/datasink_key.json`）；未配置时该章写占位并给出申请指引 | 手动编辑 |
 | `report_submodules.industry_beta` | `false` | 「风格与因子分析」章行业 Beta 子表开关，**默认关闭**。开启后该章展示行业 Beta 子表（组合对中证行业指数的回归敏感性：行业暴露占比 + β/t 值/显著性/相关性） | 菜单 P → 6 |
 | `report_submodules.cost_lots` | `false` | 成本流水开关，**默认关闭**。开启后汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计：持仓 Excel 含交易/分红流水走精确计算；无流水时自动切换为快照近似（按 `holdings_start_date` 建仓日一次性买入近似年化，未配置则仅成本分档近似），XIRR 标注「近似」 | 菜单 P → 6 |
 
@@ -185,7 +197,7 @@
 
 ### A. 路径与文件
 
-路径/文件相关字段（`holdings_dir`、`holdings_filename`、`holdings_start_date`、`output_dir`、`llm_key_file`、`llm_settings_file`、`llm_providers_file`）见上方字段总表。
+路径/文件相关字段（`holdings_dir`、`holdings_filename`、`holdings_start_date`、`output_dir`、`llm_key_file`、`llm_settings_file`、`llm_providers_file`、`datasink_key_file`）见上方字段总表。
 
 ---
 

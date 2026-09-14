@@ -247,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 19
+        assert len(_REPORT_SECTION_DEFAULT) == 20
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -259,8 +259,17 @@ class TestReportSectionDefault:
             assert "data_flag" in sec, f"缺少 data_flag: {sec}"
 
     def test_type_values_are_valid(self):
-        """type 只能是 always/history/fund_deep_analysis/news/llm/evolution/action 之一。"""
-        valid_types = {"always", "history", "fund_deep_analysis", "news", "llm", "evolution", "action"}
+        """type 只能是 always/history/fund_deep_analysis/news/llm/evolution/action/financial_report 之一。"""
+        valid_types = {
+            "always",
+            "history",
+            "fund_deep_analysis",
+            "news",
+            "llm",
+            "evolution",
+            "action",
+            "financial_report",
+        }
         for sec in _REPORT_SECTION_DEFAULT:
             assert sec["type"] in valid_types, f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"
 

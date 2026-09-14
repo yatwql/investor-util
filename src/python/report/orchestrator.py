@@ -163,6 +163,11 @@ def prepare_report_data(
     # 开启时计算（价格分位+均线偏离+波动率三因子温度计）；关闭返回 None（汇总行隐藏）
     market_temperature_data = compute_market_temperature_data(config, reporter)
 
+    # 持仓个股财报摘要（数据契约 financial_report_digest_data）：
+    # report_submodules.financial_report_digest 开启时计算（A 股标的取最新年报章节摘要）；
+    # 关闭或无 key 时返回 None（章节隐藏/写占位）
+    financial_report_digest_data = compute_financial_report_digest_data(holdings, penetrated_assets, config, reporter)
+
     # 行动建议单一数据源：再平衡信号等纯算法产出，action_data数据契约
     # （单源计算，行动建议板块与智囊团深度复盘行动摘要共享同一对象）
     holdings_details = [
@@ -236,11 +241,47 @@ def prepare_report_data(
         "valuation_data": valuation_data,
         # 市场温度（数据契约 market_temperature_data；report_submodules.market_temperature 关闭时为 None）
         "market_temperature_data": market_temperature_data,
+        # 持仓个股财报摘要（数据契约 financial_report_digest_data；开关关闭/无 key 时为 None）
+        "financial_report_digest_data": financial_report_digest_data,
     }
 
 
 # ── 估值分位 编排 ──
 # 估值族留在门面：compute_valuation_data 内部经门面命名空间调用
+
+
+def compute_financial_report_digest_data(
+    holdings: list,
+    penetrated_assets: list | None,
+    config: dict,
+    reporter: ProgressReporter,
+) -> dict | None:
+    """编排持仓个股财报摘要数据（`financial_report_digest_data` 数据契约）。
+
+    report_submodules.financial_report_digest 开启时，对持仓 + 穿透中的 A 股
+    标的取最新年报（无年报退半年报）的目标章节正文；关闭时返回 None（章节隐藏）。
+    缺凭据 / 无 A 股标的 / 全部无覆盖时返回 available=False 的降级契约，
+    不阻断报告主链路。
+    """
+    from src.python.config import is_enable_financial_report_digest
+
+    if not is_enable_financial_report_digest(config):
+        return None
+    from src.python.report.financial_report_digest import build_financial_report_digest
+
+    penetrated_codes: list[str] = []
+    for asset in penetrated_assets or []:
+        if not isinstance(asset, dict):
+            continue
+        code = asset.get("code")
+        if code:
+            penetrated_codes.append(str(code))
+        codes = asset.get("codes")
+        if isinstance(codes, (list, set, tuple)):
+            penetrated_codes.extend(str(c) for c in codes)
+    return build_financial_report_digest(holdings, config, reporter, penetrated_codes=penetrated_codes)
+
+
 # _fetch_valuation_for_code（测试 patch 该路径），不可整体迁移。
 
 
