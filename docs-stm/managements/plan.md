@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办计划项为 plan-42（P1），P4 区无待办；仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-41）见上述归档文件。
+**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前无在办计划项（P1 / P4 两区均无待办），仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-42）见上述归档文件。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -20,11 +20,13 @@
 
 ### P1 — 当前待办
 
-#### 🔲 `plan-42` 持仓个股财报摘要（DataSinking 全文本财报接入）— 设计完成，待实施
+> 无待办项（plan-42 已完成，待随下次发布归档）。
 
-接入 [DataSinking](https://github.com/heubme2020/datasinking) 全文本财报渠道：仅覆盖 A 股（SSE/SZSE/BSE），凭据走单独密钥文件 `data/config/datasink_key.json`（未配置时链路主动跳过并给出申请指引），免费档限速按套餐派生（免费 3 请求/秒）+ 日配额护栏，新增报告章节「持仓个股财报摘要」（`report_submodules.financial_report_digest` 默认关，数据驱动型，仅在有数据时渲染）。数据域与适配器落到既有「数据源适配契约」，不新造获取路径。
+#### ✅ `plan-42` 持仓个股财报摘要（DataSinking 全文本财报接入）— 已完成
 
-设计文档：[`datasink-financial-report-digest-design.md`](datasink-financial-report-digest-design.md)（含语义命名索引、文件级落点、限速与配额设计、配置 Schema、测试计划、实施顺序与风险）。实施顺序见其 §14。
+接入 [DataSinking](https://github.com/heubme2020/datasink) 全文本财报渠道：仅 A 股（SSE/SZSE/BSE）；凭据走单独密钥文件 `data/config/datasink_key.json`（环境变量 `DATASINK_API_KEY` 可覆盖）；免费档限速按套餐派生（3 请求/秒）+ 日配额护栏（8,191 篇/日）；新增报告章节「持仓个股财报摘要」（`report_submodules.financial_report_digest` 默认关，数据驱动型）。数据层（凭据/provider+限速/契约+链路+缓存）、章节装配、渲染接线（Excel 页签 + HTML 章节）均已完成并提交。
+
+设计文档：[`datasink-financial-report-digest-design.md`](datasink-financial-report-digest-design.md)（含语义命名索引、文件级落点、限速与配额设计、配置 Schema、测试计划与风险）。
 
 ### P4 — 实验功能
 
