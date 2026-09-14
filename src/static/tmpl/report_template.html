@@ -2726,6 +2726,38 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div class="data-status-ok" style="border-left-color:#27ae60;padding-left:8px;">所有数据源运行正常</div>
             </div>
             {% endif %}
+            <!-- 数据源说明表（实际使用清单：用途 / 计费 / 凭据要求） -->
+            {% if data_source_catalog %}
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">数据源说明（实际使用清单）</div>
+                <table>
+                    <tr>
+                        <th>数据类别</th>
+                        <th>实际数据源（链路）</th>
+                        <th>用途</th>
+                        <th>计费</th>
+                        <th>凭据 / 就绪</th>
+                        <th>本次使用</th>
+                    </tr>
+                    {% for item in data_source_catalog %}
+                    <tr>
+                        <td style="text-align:left;font-weight:600;">{{ item.category }}</td>
+                        <td style="text-align:left;">{{ item.provider }}{% if item.note %}；{{ item.note }}{% endif %}</td>
+                        <td style="text-align:left;">{{ item.usage }}</td>
+                        <td>{{ item.billing }}</td>
+                        <td>{{ item.auth }}</td>
+                        <td>
+                            {% if item.used %}
+                            <span class="src-matrix-ok">&#10003; 已使用</span>
+                            {% else %}
+                            <span style="color:#999;">&#9675; 未使用</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endif %}
             {% if data_quality_enabled %}
             <!-- 品种覆盖区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
             <div class="data-status" style="margin-top:12px;">

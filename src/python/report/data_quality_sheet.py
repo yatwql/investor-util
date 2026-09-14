@@ -80,6 +80,7 @@ def write_data_quality_sheet(
     ncols = 5
     row = write_title_row(ws, 1, "数据质量仪表盘", ncols)
     row = _write_source_health_block(ws, row, matrix, ncols)
+    row = write_source_catalog_block(ws, row)
     row = _write_coverage_block(ws, row, position_status, ncols)
     row = _write_freshness_block(ws, row, data_freshness, ncols)
     auto_width(ws)
@@ -129,6 +130,46 @@ def _write_source_health_block(ws, row: int, matrix: list[dict], ncols: int) -> 
         for m in matrix:
             for sf in m.get("sample_failures", []):
                 row = write_data_row(ws, row, [m["name"], sf, "", "", ""])
+    return row
+
+
+def write_source_catalog_block(ws, row: int, catalog: list[dict] | None = None) -> int:
+    """写入数据源说明区块（实际使用清单：用途 / 计费 / 凭据要求）。
+
+    Args:
+        ws: openpyxl worksheet
+        row: 起始行号
+        catalog: `build_data_source_catalog()` 输出；None 时现算
+
+    Returns:
+        区块结束行号
+    """
+    from src.python.report.data_source_matrix import build_data_source_catalog
+
+    catalog = catalog if catalog is not None else build_data_source_catalog()
+    if not catalog:
+        return row
+    ncols = 6
+    row += 1
+    row = write_title_row(ws, row, "数据源说明（实际使用清单）", ncols)
+    row = write_header_row(ws, row, ["数据类别", "实际数据源（链路）", "用途", "计费", "凭据/就绪", "本次使用"])
+    for item in catalog:
+        provider = item.get("provider", "")
+        note = item.get("note") or ""
+        if note:
+            provider = f"{provider}；{note}"
+        row = write_data_row(
+            ws,
+            row,
+            [
+                item.get("category", ""),
+                provider,
+                item.get("usage", ""),
+                item.get("billing", ""),
+                item.get("auth", ""),
+                "✅ 已使用" if item.get("used") else "○ 未使用",
+            ],
+        )
     return row
 
 

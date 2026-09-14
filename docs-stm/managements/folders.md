@@ -255,7 +255,7 @@ investor-util/
 │   │   │   ├── summary.py            #   报告摘要生成
 │   │   │   ├── summary_llm_usage.py  #   LLM 使用情况摘要
 │   │   │   ├── data_status.py        #   数据质量状态（缺失/过期/降级标记）
-│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵（数据质量仪表盘关闭时的旧样式回退）
+│   │   │   ├── data_source_matrix.py #   数据源可用性矩阵 + 数据源说明表（实际链路/用途/计费/凭据）
 │   │   │   ├── data_quality_sheet.py #   数据质量仪表盘页签写入（源健康+品种覆盖，开关 data_quality）
 │   │   │   ├── downsample.py         #   P1 服务端下采样（日频→周/月聚合）
 │   │   │   ├── llm_content.py        #   LLM 分析结果写入报告（块级 HTML 分段 + 事实校验摘要分块着色）
@@ -581,7 +581,7 @@ investor-util/
 │       │   │   ├── test_data_status_message.py    #   降级事件可读失败原因（record message 透传/不影响降级判定/矩阵渲染优先取原因/无原因逐字回落）
 │       │   │   ├── test_numeric_guard_regression.py # 报告层数值归一防线（NaN 不再经 `or 0.0` 渗入市值/盈亏/涨幅，单个脏值不污染整列合计）
 │       │   │   ├── test_numeric_guard_regression_edge.py # 报告层数值归一边缘场景（全 NaN 列/档位判定边界/混合合法与脏值）
-│       │   │   ├── test_data_source_matrix.py     #   数据源可用性矩阵测试
+│       │   │   ├── test_data_source_matrix.py     #   数据源可用性矩阵 + 数据源说明表（用途/计费/凭据/本次使用）测试
 │       │   │   ├── test_data_status.py            #   数据状态测试
 │       │   │   ├── test_downsample.py             #   P1 服务端下采样测试（§4.9）
 │       │   │   ├── test_excel_fund_deep_analysis.py  #   Excel 基金深度分析页签测试

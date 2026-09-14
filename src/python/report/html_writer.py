@@ -250,6 +250,7 @@ def _render_template(
     | None = None,  # 市场温度数据契约 market_temperature_data（汇总温度行，None=开关关闭）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
     financial_report_digest_data: dict | None = None,  # 持仓个股财报摘要契约（None=开关关闭/无数据）
+    data_source_catalog: list | None = None,  # 数据源说明表（实际使用清单 / 计费 / 凭据）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
     from src.python.config.features import enabled_experimental_features
@@ -327,6 +328,7 @@ def _render_template(
         history_data=history_data,
         data_status_history=data_status_history,
         data_source_matrix=data_source_matrix,
+        data_source_catalog=data_source_catalog,
         report_year=datetime.now().year,
         data_unavailable=bool(total_mv == 0 and total_cost > 0),
         chart_datasets=chart_datasets,
@@ -552,9 +554,10 @@ def write_html_report(
     data_status_history = _build_history_data_status(history_data)
 
     # ── 10d) 数据源可用性矩阵 ──
-    from src.python.report.data_source_matrix import build_data_source_matrix
+    from src.python.report.data_source_matrix import build_data_source_catalog, build_data_source_matrix
 
     data_source_matrix = build_data_source_matrix()
+    data_source_catalog = build_data_source_catalog()
 
     # 因子中文名映射（单一数据源：analysis 层常量，经 context 传递）
     _factor_names: dict = {}
@@ -623,6 +626,7 @@ def write_html_report(
         history_data=history_data,
         data_status_history=data_status_history,
         data_source_matrix=data_source_matrix,
+        data_source_catalog=data_source_catalog,
         chart_datasets=chart_datasets,
         enable_interactive_charts=enable_interactive_charts,
         data_quality_enabled=enable_data_quality,

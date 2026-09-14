@@ -266,3 +266,74 @@ class TestBuildDataSourceMatrixDegradedList:
         assert len(rank_row["degraded_list"]) == 1
         assert "empty" in rank_row["degraded_list"][0]
         assert "fund_rank_001" in rank_row["degraded_list"][0]
+
+
+class TestBuildDataSourceCatalog:
+    """build_data_source_catalog — 数据源说明表（用途/计费/凭据/本次使用）。"""
+
+    def _catalog(self):
+        from src.python.report.data_source_matrix import build_data_source_catalog
+
+        return build_data_source_catalog()
+
+    def _by_id(self, rows, sid):
+        return next(r for r in rows if r["id"] == sid)
+
+    def test_returns_all_catalog_categories(self):
+        """说明表覆盖全部登记类别（含财报全文）。"""
+        rows = self._catalog()
+        ids = {r["id"] for r in rows}
+        assert {
+            "price",
+            "fund_rank",
+            "fund_hold",
+            "industry",
+            "index",
+            "profit_forecast",
+            "dividend",
+            "fund_flow",
+            "financial_report",
+        } <= ids
+
+    def test_used_flag_reflects_observed_events(self):
+        """本次观测到事件的类别标记为已使用；未观测到的为未使用。"""
+        from src.python.report.data_status import DegradationEvent, get_tracker
+
+        get_tracker()._events.append(
+            DegradationEvent(
+                source_key="report_datasink_600519.SS",
+                tier="T2",
+                success=True,
+                failure_type="",
+                degraded=False,
+                count=0,
+                effective_threshold=0,
+                timestamp=1000.0,
+            )
+        )
+        rows = self._catalog()
+        assert self._by_id(rows, "financial_report")["used"] is True
+        assert self._by_id(rows, "price")["used"] is False
+
+    def test_datasink_billing_follows_plan(self, monkeypatch):
+        """财报全文计费随 datasink.plan 变化（free / yearly）。"""
+        rows = self._catalog()
+        assert "免费档" in self._by_id(rows, "financial_report")["billing"]
+        monkeypatch.setattr("src.python.report.data_source_matrix._datasink_plan", lambda: "yearly")
+        rows = self._catalog()
+        assert "付费档" in self._by_id(rows, "financial_report")["billing"]
+
+    def test_datasink_auth_shows_credential_state(self, monkeypatch):
+        """财报全文凭据列附加就绪状态（未配置 key）。"""
+        from src.python.core.datasource_credential import CredentialSpec, register_credential_spec
+
+        monkeypatch.delenv("DATASINK_API_KEY", raising=False)
+        register_credential_spec(CredentialSpec("datasink", "DataSinking 财报", "DATASINK_API_KEY"))
+        rows = self._catalog()
+        assert self._by_id(rows, "financial_report")["auth"] == "需 key（未配置）"
+
+    def test_free_sources_marked_no_key(self):
+        """免费源凭据列为「无需」。"""
+        rows = self._catalog()
+        for sid in ("price", "fund_rank", "fund_hold", "industry", "index", "profit_forecast", "dividend", "fund_flow"):
+            assert self._by_id(rows, sid)["auth"] == "无需"

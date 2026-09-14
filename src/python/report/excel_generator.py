@@ -118,6 +118,10 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
                 for m in matrix:
                     for sf in m.get("sample_failures", []):
                         row = write_data_row(ws, row, [m["name"], sf, "", "", ""])
+            # 数据源说明表（实际使用清单：用途 / 计费 / 凭据要求）
+            from src.python.report.data_quality_sheet import write_source_catalog_block
+
+            write_source_catalog_block(ws, row)
             auto_width(ws)
             logger.info("数据源可用性矩阵页签已写入")
         else:

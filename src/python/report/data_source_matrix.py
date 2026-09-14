@@ -157,3 +157,171 @@ def build_data_source_matrix() -> list[dict[str, Any]]:
         )
 
     return matrix
+
+
+# ═══════════════════════════════════════════════════════════
+#  数据源说明表（实际使用清单：用途 / 计费 / 凭据要求）
+# ═══════════════════════════════════════════════════════════
+
+# 每行描述一个数据类别实际走的数据源链路、用途、计费与凭据要求。
+# prefixes 与 _SOURCE_CATEGORIES 对齐，用于判定「本次是否实际使用」；
+# 免费/需 key 口径与 datasource-reliability.md / 各用户手册一致。
+_SOURCE_CATALOG: list[dict[str, Any]] = [
+    {
+        "id": "price",
+        "category": "行情数据",
+        "provider": "腾讯财经 / 新浪财经（场内）；东方财富 / 天天基金（场外净值）",
+        "usage": "持仓实时价与场外基金净值",
+        "billing": "免费",
+        "auth": "无需",
+        "prefixes": ["price_"],
+        "note": "",
+    },
+    {
+        "id": "fund_rank",
+        "category": "基金排名",
+        "provider": "天天基金",
+        "usage": "基金同类排名与区间收益",
+        "billing": "免费",
+        "auth": "无需",
+        "prefixes": ["fund_rank_", "perf_rank"],
+        "note": "",
+    },
+    {
+        "id": "fund_hold",
+        "category": "基金持仓",
+        "provider": "天天基金（基金主页面 + 季报 API）",
+        "usage": "基金底层持仓（含联接基金穿透目标 ETF）",
+        "billing": "免费",
+        "auth": "无需",
+        "prefixes": ["fund_hold_"],
+        "note": "",
+    },
+    {
+        "id": "industry",
+        "category": "行业分类",
+        "provider": "东方财富 push2 → 东方财富 REST",
+        "usage": "个股行业分类与概念板块",
+        "billing": "免费",
+        "auth": "无需",
+        "prefixes": ["industry_", "penetration_industry"],
+        "note": "",
+    },
+    {
+        "id": "index",
+        "category": "指数数据",
+        "provider": "腾讯财经 / 新浪财经（A 股）；新浪财经 / 腾讯财经（美股）",
+        "usage": "A 股与美股指数行情",
+        "billing": "免费",
+        "auth": "无需",
+        "prefixes": ["index_a", "index_us", "index_history_"],
+        "note": "",
+    },
+    {
+        "id": "profit_forecast",
+        "category": "盈利预测",
+        "provider": "akshare",
+        "usage": "机构盈利预测（穿透 TOP10 增强）",
+        "billing": "免费",
+        "auth": "无需",
+        "prefixes": ["penetration_profit_forecast"],
+        "note": "",
+    },
+    {
+        "id": "dividend",
+        "category": "分红数据",
+        "provider": "akshare",
+        "usage": "持仓股票历史分红",
+        "billing": "免费",
+        "auth": "无需",
+        "prefixes": ["penetration_dividend"],
+        "note": "",
+    },
+    {
+        "id": "fund_flow",
+        "category": "资金流向",
+        "provider": "akshare",
+        "usage": "行业资金流向（LLM 分析上下文）",
+        "billing": "免费",
+        "auth": "无需",
+        "prefixes": ["ff_"],
+        "note": "",
+    },
+    {
+        "id": "financial_report",
+        "category": "财报全文",
+        "provider": "DataSinking（api.datasink.ing）",
+        "usage": "个股财报章节全文摘要（仅 A 股）",
+        "billing": "免费档（3 请求/秒、8,191 篇/日）",
+        "auth": "需 key",
+        "prefixes": ["report_datasink_"],
+        "credential_source_id": "datasink",
+        "note": "免费 key 需自备；付费档 31 请求/秒、131,071 篇/日",
+    },
+]
+
+#: 套餐 → 计费描述（「财报全文」行按 config.json 的 datasink.plan 动态展示）
+_DATASINK_PLAN_BILLING: dict[str, str] = {
+    "free": "免费档（3 请求/秒、8,191 篇/日）",
+    "yearly": "付费档（31 请求/秒、131,071 篇/日）",
+}
+
+
+def _datasink_plan() -> str:
+    """读 config.json 的 `datasink.plan`（缺失或异常回退 free）。"""
+    try:
+        from src.python.config import get_config
+
+        plan = (get_config().get("datasink") or {}).get("plan")
+        return str(plan).strip().lower() if plan else "free"
+    except Exception:
+        return "free"
+
+
+def build_data_source_catalog() -> list[dict[str, Any]]:
+    """数据源说明表：描述实际使用的数据源、用途、计费与凭据要求。
+
+    与 :func:`build_data_source_matrix` 互补：矩阵答「本次哪类源健康度如何」，
+    本表答「这类数据实际走哪些源、是否付费、是否需 key、本次有没有用」。
+
+    Returns:
+        每行含 ``id / category / provider / usage / billing / auth / used / note``。
+        ``used`` 为 True 表示本次运行观测到该类别的事件（实际使用）。
+        需 key 的类别（如财报全文）的 ``auth`` 附加就绪状态。
+    """
+    from src.python.core.datasource_credential import credential_readiness, credential_ready_enabled
+
+    observed = {ev["source_key"] for ev in get_tracker().get_log()}
+    readiness: dict[str, dict[str, Any]] = {}
+    if credential_ready_enabled():
+        try:
+            readiness = {row["source_id"]: row for row in credential_readiness()}
+        except Exception:
+            logger.debug("[matrix] 凭据就绪矩阵读取失败，说明表不附就绪态")
+    plan = _datasink_plan()
+
+    rows: list[dict[str, Any]] = []
+    for cat in _SOURCE_CATALOG:
+        used = any(any(key == p or key.startswith(p) for p in cat["prefixes"]) for key in observed)
+        billing = (
+            _DATASINK_PLAN_BILLING.get(plan, cat["billing"]) if cat["id"] == "financial_report" else cat["billing"]
+        )
+        auth = cat["auth"]
+        cred_id = cat.get("credential_source_id")
+        if cred_id:
+            row = readiness.get(cred_id)
+            if row is not None:
+                auth = f"需 key（{'已就绪' if row.get('ready') else '未配置'}）"
+        rows.append(
+            {
+                "id": cat["id"],
+                "category": cat["category"],
+                "provider": cat["provider"],
+                "usage": cat["usage"],
+                "billing": billing,
+                "auth": auth,
+                "used": used,
+                "note": cat.get("note", ""),
+            }
+        )
+    return rows
