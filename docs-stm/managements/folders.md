@@ -70,6 +70,7 @@ investor-util/
 │   │   │   ├── cassette_checks.py    #   已录制响应 → 当前解析器的绑定表（录制自检与 cassettes --verify 共用）
 │   │   │   ├── fund_manager.py       #   基金经理数据获取
 │   │   │   ├── history_diff.py       #   历史数据差分同步
+│   │   │   ├── financial_report.py   #   全文本财报取数编排（符号集合 → 元数据 → 章节正文；复用链路缓存/适配器）
 │   │   │   ├── index.py              #   指数行情获取（A股/美股，直连 API 不走 Chain）
 │   │   │   ├── industry.py           #   行业分类/概念板块数据获取
 │   │   │   ├── news.py               #   新闻数据获取封装层（聚合器+关键词转发）
@@ -224,6 +225,7 @@ investor-util/
 │   │   │   ├── fund_style_report.py     #   基金风格漂移检测与全基金分析入口
 │   │   │   ├── style_factor_sheet.py  #   风格与因子分析 Excel 页签（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
 │   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
+│   │   │   ├── financial_report_digest.py # 持仓个股财报摘要章节数据装配（A 股标的 → 最新年报章节摘要）
 │   │   │   ├── action_sheet.py       #   行动建议 Excel 页签（再平衡信号/交易纪律/调仓建议/收益归因）
 │   │   │   ├── decision_record.py    #   决策复盘·确定性载体登记（再平衡卖出/调仓卖出建议，仅带基线价入账，同日去重）
 │   │   │   ├── decision_llm_capture.py # 决策复盘·LLM 操作建议表结构化解析（表头识别→逐代码方向登记，同日去重）
@@ -483,6 +485,7 @@ investor-util/
 │       │   │   ├── test_fetcher_industry.py #   行业分类获取测试
 │       │   │   ├── test_fetcher_price.py    #   行情价格获取测试
 │       │   │   ├── test_fund.py             #   基金数据获取测试（含联接基金穿透后处理：幂等/缓存命中补做/开关）
+│       │   │   ├── test_financial_report.py  #   全文本财报取数编排（标的收集/元数据取用/字段装配/摘要截断）
 │       │   │   ├── test_fund_edge.py        #   联接基金穿透边缘场景
 │       │   │   ├── test_fund_manager.py     #   基金经理数据测试
 │       │   │   ├── test_quote_adapter_parity.py # 行情域适配契约等价性（与既有转换函数逐源比对 + 链两槽选择）
@@ -607,6 +610,7 @@ investor-util/
 │       │   │   ├── test_correlation_sheet.py      #   持仓关系矩阵页签（一章两区块）Excel 呈现
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
 │       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现
+│       │   │   ├── test_financial_report_digest.py #   持仓个股财报摘要章节装配（降级契约/文种标签/披露日/失败清单）
 │       │   │   ├── test_action_html.py            #   行动建议章节 + 智囊团深度复盘「行动摘要」HTML 呈现（单源计算断言）
 │       │   │   ├── test_action_sheet.py           #   行动建议 Excel 页签呈现
 │       │   │   ├── test_decision_record.py        #   决策复盘·确定性载体登记（卖出建议入账/基线价守门/同日去重）

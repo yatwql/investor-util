@@ -65,6 +65,16 @@ _DEFAULT_CONFIG = {
         "akshare": True,
     },
     "preferred_provider": {},
+    # DataSinking 全文本财报（仅 A 股；需用户自备 key）
+    # requests_per_second / daily_quota 为 0 时按 plan 自动（free=3/8191，yearly=31/131071）
+    "datasink": {
+        "plan": "free",
+        "requests_per_second": 0,
+        "daily_quota": 0,
+        "sections": ["管理层讨论与分析"],
+        "max_chars": 2000,
+        "doc_types": ["annual", "semiannual"],
+    },
     # ── D. 市场时段与缓存 ──
     "market_hour_aware": ["price", "index"],
     "market_hour_ttl": 30,
@@ -128,6 +138,7 @@ _DEFAULT_CONFIG = {
         "max_total_workers": 15,  # 全局 batch 线程硬上限（已有池不计入）
         "fund_workers": 3,  # 基金排名/持仓批量并发数
         "industry_workers": 8,  # 行业分类批量并发数
+        "datasink_workers": 3,  # 财报取数并发数（免费档批量上限 ≤3）
     },
     "batch_rate_limit": {  # Provider 级别请求间隔（秒），0=不限速
         "tencent": 0.0,
@@ -186,6 +197,8 @@ def _build_template_from_defaults() -> str:
         f'  "news_top_count": {json.dumps(d["news_top_count"])},',
         f'  "news_sources": {json.dumps(d["news_sources"], ensure_ascii=False)},',
         f'  "preferred_provider": {json.dumps(d["preferred_provider"])},',
+        "  // DataSinking 全文本财报（仅 A 股；requests_per_second/daily_quota 为 0 时按 plan 自动）",
+        f'  "datasink": {json.dumps(d["datasink"], ensure_ascii=False)},',
         "",
         # ── D ──
         "  // ── D. 市场时段与缓存 ──",
@@ -264,7 +277,8 @@ def _build_template_from_defaults() -> str:
         '  "batch": {',
         f'    "max_total_workers": {d["batch"]["max_total_workers"]},  // 全局 batch 线程硬上限（已有池不计入）',
         f'    "fund_workers": {d["batch"]["fund_workers"]},  // 基金排名/持仓批量并发数',
-        f'    "industry_workers": {d["batch"]["industry_workers"]}  // 行业分类批量并发数',
+        f'    "industry_workers": {d["batch"]["industry_workers"]},  // 行业分类批量并发数',
+        f'    "datasink_workers": {d["batch"]["datasink_workers"]}  // 财报取数并发数（免费档批量上限 ≤3）',
         "  },",
         '  "batch_rate_limit": {  // Provider 级别请求间隔（秒），0=不限速',
         f'    "tencent": {d["batch_rate_limit"]["tencent"]},  // 腾讯行情（不限速）',
