@@ -22,13 +22,14 @@
 | 指数历史日线 | 腾讯财经 K 线接口 | 新浪财经 K 线接口 | `history_index_` | 历史走势 |
 | 持仓重合度 | 运行时推导（基于持仓基金前 10 大重仓股的 Jaccard 相似度） | — | —（复用 `fund_hold_`，无独立缓存前缀） | — |
 | 基金风格扩展数据（市值/PE） | 东方财富 + 天天基金（基金持仓市值风格 + 市盈率/市净率数据） | — | `extended_` | 基础类 |
-| 个股财报全文（持仓个股财报摘要章） | DataSinking `api.datasink.ing`（全文本财报 Markdown，仅 A 股，**需用户自备 key**） | — | `report_datasink_` | 基础类 |
+| 个股财报全文（持仓个股财报摘要章） | DataSinking `api.datasink.ing`（全文本财报 Markdown，仅 A 股，**需用户自备 key**） | — | `report_datasink_index_` / `report_datasink_doc_` | 基础类 |
 
 > **缓存前缀**列对应 `data/cache/` 目录下的文件名前缀，同一前缀的文件按 TTL 统一管理。持仓重合度为运行时推导模块（复用 `fund_hold_` 缓存），无独立缓存前缀。
 > ¹ `bond_yield_rf` 为精确缓存键名（`exact_cache_keys`），非前缀匹配，单独管理。
 > 表中仅含具有 `cache_prefixes` 或 `exact_cache_keys` 的数据模块。此外还有少数 `exact_cache_keys` 模块，使用具体键名而非前缀匹配，不受 TTL 扫描清除影响（如 `trading_calendar`、`fund_benchmarks`、`holdings_tracking`、`fund_concentration_snapshot`、`fund_style_snapshot`、`fund_manager_snapshot`）。其中 `fund_benchmarks`、`fund_manager_snapshot` 等仍归属于缓存分组，可通过菜单 `[1]` 刷新。
 > **分组**列对应菜单 `[1]`（基础类）/ `[2]`（持仓类）的缓存刷新范围。历史走势类不受菜单缓存命令影响，仅按 TTL 过期。
 > **行业名归一化**：行业分类数据在入库时剥离行业名末尾的申万层级后缀（Ⅰ/Ⅱ/Ⅲ/Ⅳ，如「银行Ⅱ」「白酒Ⅱ」）——该后缀是申万分层命名标记，对零售报告读者是纯噪声，报告展示统一用剥离后的行业名（如「银行」「白酒」）。
+> **财报全文两级缓存**：`report_datasink_index_`（报告元数据，TTL 两周）/ `report_datasink_doc_`（章节正文，TTL 一月）；两者均归「基础类」，随菜单 `[1]` 与 TTL 管理。
 
 ### LLM 模块缓存
 
@@ -63,6 +64,15 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 - **A 股指数** → 腾讯财经 → 新浪财经（备用）
 - **美股指数** → 新浪财经 → 腾讯财经（备用）
 
+### 财报全文（DataSinking）
+
+由 `fetcher/financial_report.py` 逐标的取数、`report/financial_report_digest.py` 装配（章节 `financial_report_digest`，开关 `report_submodules.financial_report_digest` 默认关）：
+
+- **鉴权**：用户自备 key（免费 key 在 datasink.ing 领取），存通用密钥文件 `data/config/data_key.json` 的 `datasink` 节（`{"datasink": {"api_key": "..."}}`）或环境变量 `DATASINK_API_KEY`（优先）；缺 key 时链路主动跳过，章节写占位并给申请指引
+- **取数**：`/documents`（元数据，年报优先、半年报兜底）→ `/documents/{id}?section=`（按配置 `datasink.sections` 逐章节取正文并拼接）→ 按 `datasink.max_chars` 截断；单篇正文经 Provider Chain + 财报域适配器两槽（复用缓存/熔断/降级）
+- **限速与配额**：请求间隔 = 1/每秒上限（免费档 3 请求/秒、付费档 31），每次请求前经 `RateLimiter`；日配额计数存 `data/state/datasink_quota.json`（免费档 8,191 篇/日），超限即停并告警。免费档无批量端点，必然逐篇请求
+- **仅 A 股**：沪（600/601/603/605/688/689）→ `.SS`、深（000/001/002/003/300/301）→ `.SZ`、北（43/83/87/92）→ `.BJ`
+
 ---
 
 ## 数据质量说明
@@ -80,6 +90,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 | 行业资金流向 | 交易日实时 | akshare 今日排名，非交易日或盘前为空 |
 | 无风险利率 | 每日更新 | akshare 获取中国 10Y 国债收益率，config 可手动覆盖 |
 | 股票/ETF 历史日线 | 交易日更新 | 包含前复权数据，含开高低收与成交量（涨跌幅由相邻交易日收盘价推得；换手率另由组合两期持仓计算，取自行情 K 线之外） |
+| 个股财报全文 | 年报/半年报披露后（法定延迟，QDII 更晚） | DataSinking 转 Markdown，来源为官方披露平台（cninfo/DART/EDINET/MOPS），仅 A 股；报告期由接口返回，章节正文按配置截断；需自备 key |
 
 ---
 
@@ -93,6 +104,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 | 基金净值未更新 | 当日净值尚未发布、节假日 | 程序自动使用前一日净值，日志记录 INFO |
 | 新闻为空 | 网络异常、选中的新闻源全量不可用 | 自动跳过该源，其他源正常采集 |
 | 行业资金流向为空 | 非交易日、数据源休息 | 显示占位，不影响其他数据模块 |
+| 财报摘要为空 | 未配置 DataSinking key、无 A 股持仓/穿透标的、或该标的未覆盖 | 章节写占位并给出申请指引；配置 `data/config/data_key.json` 的 `datasink` 节并开启 `report_submodules.financial_report_digest` 后生效 |
 
 > 所有数据请求均经过 Provider Chain 处理：单个 provider 失败即切换链上下一个源 → 连续失败达阈值（3 次，行业链 6 次）后熔断该源 → 全部源不可用时降级使用过期缓存（如有）。日志中 WARNING 级别的消息对应数据降级事件，属正常行为。
 

@@ -18,6 +18,12 @@
 - **数据源说明表**：「数据源可用性矩阵」章在健康度表后新增「数据源说明（实际使用清单）」表——逐数据类别列出实际链路（如财报全文=DataSinking）、用途、计费（免费/免费档/付费档，财报全文随 `datasink.plan` 动态展示）与凭据要求（是否需 key + 就绪状态），并标注本次运行是否实际使用（观测到 DegradationTracker 事件即为已使用）。Excel（旧样式页签与数据质量仪表盘两路）与 HTML 同步渲染，`build_data_source_catalog()` 输出契约。
 - **状态**：plan-42 全部完成——数据层（①②③）+ 章节装配（④a）+ 渲染接线（④b）+ 文档同步（⑤：requirements §6.12 R-FRD-01~07、technical 附录 H 与 §4.9/§6.7、datasource 两册、how-to-config、folders）。
 
+### 数据源与统计快照刷新（datasource.md / folders.md / test-coverage.md）（2026-09-14）
+
+- **datasource.md**：DataSinking 行补两级缓存前缀（`report_datasink_index_` 两周 / `report_datasink_doc_` 一月）；新增「财报全文（DataSinking）」路由小节（鉴权/取数/限速配额/仅 A 股符号映射）；数据质量说明与常见问题各增一行。
+- **folders.md**：统计表按实测刷新（主程序 276 文件/68,852 行、HTML 模板 5/3,999、测试代码 363/106,356、测试用例 6,994、用户文档 11/5,114、项目文档 133/51,292、代码合计 305/80,340），主程序说明补 5 个新模块；目录树经校已含全部新文件。
+- **test-coverage.md**：收集快照同步（功能域与单元分组：数据源 Provider 303 / 数据获取调度 371 / 报告生成 1861 / 核心基础设施 1178 / unit 父标记 6681 / unit_scripts 203；报告测试文件 89），源模块清单补 `datasink` / `financial_report` / `report_adapters` / `financial_report_digest` / `financial_report_sheet`。计数以 `scripts/collect-test-coverage.py` 实时输出为准。
+
 ### 过去 96 小时实现审计整改（技术债 + 文档漂移，rf-358~rf-362）（2026-09-14）
 
 - **代码债**：删除 `providers/datasink.py` 的两个新增即死函数（`fetch_report_sections` / `quota_remaining`，仅定义+单测、无生产消费者）；`datasink.sections` 由「列表只取首项」改为**多章节顺序拼接**（逐章节取正文、每节独立缓存、空行分隔）；数据源说明表的前缀改从 `_SOURCE_CATEGORIES` 派生（`_CATEGORY_PREFIXES`）、计费文案改由 provider 新增 `billing_description(plan)` 生成（数字同源 `_PLAN_LIMITS`），消除前缀/套餐数字两处重复。
