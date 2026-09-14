@@ -10,36 +10,36 @@
 <!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **6607** | ~21s |
-| `standard` | **5655** | ~15s |
+| `unit` | **6681** | ~17s |
+| `standard` | **5729** | ~18s |
 | `scenario` | **245** | ~20s |
 | `regression` | **245** | ~20s |
-| `dev-verify` | **2556** | ~22s |
-| `verify` | **4459** | ~11s |
-| `integration` | **285** | ~18s |
+| `dev-verify` | **2615** | ~27s |
+| `verify` | **4518** | ~15s |
+| `integration` | **285** | ~19s |
 | `edge` | **885** | ~14s |
 | `data` | **69** | ~2s |
-| `all` | **6920** | ~23s |
+| `all` | **6994** | ~26s |
 | `smoke` | **26** | ~2s |
-| `report` | **1846** | ~11s |
-| `all_no_unit` | **313** | ~17s |
-| `scenario_extreme` | **9** | ~2s |
+| `report` | **1861** | ~12s |
+| `all_no_unit` | **313** | ~18s |
+| `scenario_extreme` | **9** | ~4s |
 <!-- mode-count-table:end -->
 
-> 注：典型耗时按 2026-09-13 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新模式对应测试量 + 下方两张环境耗时对照表。
+> 注：典型耗时按 2026-09-14 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新模式对应测试量 + 下方两张环境耗时对照表。
 >
 > 注：`模式对应测试量` 表覆盖项数为 pytest 实测执行计数（含参数化展开），由 `--mode bench --update-docs` 自动回填；功能域/场景分组/单元分组/跨类等子表为 `scripts/collect-test-coverage.py` 收集快照（仅收集不执行，需在项目 `.venv` 环境运行以包含 pandas 依赖的测试文件）。`perf`/`security` 为定向 mode（`scenario_perf`/`scenario_security` 独立标记，手工/发布前运行）**不进 bench**，故不在本表，计数见 `collect-test-coverage.py` 输出（perf: 5 / security: 9）。
 
 ### 环境耗时对照
 
-测试耗时随**硬件配置、操作系统与并行度**变化显著。下表对两台已实测机器（dragonball 2026-09-13 采集、stallman-NB1 2026-08-06 采集）做逐模式对照，便于在不同环境下粗估耗时量级。
+测试耗时随**硬件配置、操作系统与并行度**变化显著。下表对两台已实测机器（dragonball 2026-09-14 采集、stallman-NB1 2026-08-06 采集）做逐模式对照，便于在不同环境下粗估耗时量级。
 
 > 跨机器采集：在新机器上运行 `.venv/bin/python scripts/test-runner.py --mode bench --machine-info`，脚本输出「采集环境属性」表（见下）与各模式实测耗时表；追加 `--update-docs` 则自动将本机环境属性与实测耗时写入下方两张表（按主机名匹配/新增列，同机覆盖历史实测）。
 
 #### 采集环境属性
 
 <!-- env-table:start -->
-| 环境属性 | dragonball（2026-09-13 实测） | stallman-NB1（2026-08-06 实测） |
+| 环境属性 | dragonball（2026-09-14 实测） | stallman-NB1（2026-08-06 实测） |
 |:---------|:---------------------------|:---|
 | 操作系统 | Linux | Windows |
 | 系统版本 | 6.18.25-x64v3-xanmod1 | 11 |
@@ -54,33 +54,33 @@
 | Python 版本 | 3.13.5 | 3.13.0 |
 | 并行级别 | medium | medium |
 | worker 数 | 8 | 4 |
-| 采集日期 | 2026-09-13 | 2026-08-06 |
+| 采集日期 | 2026-09-14 | 2026-08-06 |
 <!-- env-table:end -->
 
 #### 各模式耗时对照
 
 <!-- duration-table:start -->
-| `--mode` | dragonball（2026-09-13 实测） | stallman-NB1（2026-08-06 实测） |
+| `--mode` | dragonball（2026-09-14 实测） | stallman-NB1（2026-08-06 实测） |
 |:---------|:---------------------------:|:---:|
-| `unit` | ~21s | ~4min |
-| `standard` | ~15s | ~4min |
+| `unit` | ~17s | ~4min |
+| `standard` | ~18s | ~4min |
 | `scenario` | ~20s | ~3min |
 | `regression` | ~20s | ~3min |
-| `verify,regression` | ~31s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
-| `dev-verify` | ~22s | ~2min |
-| `verify` | ~11s | ~46s |
-| `integration` | ~18s | ~1min |
+| `verify,regression` | ~36s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
+| `dev-verify` | ~27s | ~2min |
+| `verify` | ~15s | ~46s |
+| `integration` | ~19s | ~1min |
 | `edge` | ~14s | ~32s |
 | `data` | ~2s | ~14s |
-| `all` | ~23s | ~3min |
+| `all` | ~26s | ~3min |
 | `smoke` | ~2s | ~9s |
-| `report` | ~11s | ~2min |
-| `all_no_unit` | ~17s | ~1min |
-| `scenario_extreme` | ~2s | ~9s |
-| 数据更新时间 | 2026-09-13 | 2026-08-06 |
+| `report` | ~12s | ~2min |
+| `all_no_unit` | ~18s | ~1min |
+| `scenario_extreme` | ~4s | ~9s |
+| 数据更新时间 | 2026-09-14 | 2026-08-06 |
 <!-- duration-table:end -->
 
-> 两机差距因模式而异：多数模式 dragonball 较 stallman-NB1 快约 **10~20 倍**（如 `unit` ~21s vs ~4min、`all` ~23s vs ~3min），个别模式差约 4~20 倍（`edge` ~13s vs ~32s、`smoke` ~2s vs ~9s）。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。dragonball worker=8（medium=50% 核数），stallman-NB1 worker=4。
+> 两机差距因模式而异：多数模式 dragonball 较 stallman-NB1 快约 **10~20 倍**（如 `unit` ~17s vs ~4min、`all` ~26s vs ~3min），个别模式差约 4~20 倍（`edge` ~14s vs ~32s、`smoke` ~2s vs ~9s）。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。dragonball worker=8（medium=50% 核数），stallman-NB1 worker=4。
 
 **其他环境量级参考**（估算，非实测）：
 - **并行度**：耗时近似随 worker 数线性下降——当前 worker=8 改单线程执行时各并行模式约 ×5~8（`regression`/`edge`/`data`/`smoke`/`scenario_extreme` 等本为单线程的模式除外）

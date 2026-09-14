@@ -18,6 +18,12 @@
 - **数据源说明表**：「数据源可用性矩阵」章在健康度表后新增「数据源说明（实际使用清单）」表——逐数据类别列出实际链路（如财报全文=DataSinking）、用途、计费（免费/免费档/付费档，财报全文随 `datasink.plan` 动态展示）与凭据要求（是否需 key + 就绪状态），并标注本次运行是否实际使用（观测到 DegradationTracker 事件即为已使用）。Excel（旧样式页签与数据质量仪表盘两路）与 HTML 同步渲染，`build_data_source_catalog()` 输出契约。
 - **状态**：plan-42 全部完成——数据层（①②③）+ 章节装配（④a）+ 渲染接线（④b）+ 文档同步（⑤：requirements §6.12 R-FRD-01~07、technical 附录 H 与 §4.9/§6.7、datasource 两册、how-to-config、folders）。
 
+### bench 全量计时与 integration 契约修复（rf-364）（2026-09-14）
+
+- **bench 全量跑**：`test-runner.py --mode bench --update-docs` 依次跑 14 个模式并回填 `test-coverage.md`（模式对应测试量 + 采集环境属性 + 各模式耗时对照，dragonball 采集日期 2026-09-14）。本机各模式耗时（worker=8）：unit ~17s / standard ~18s / scenario ~20s / dev-verify ~27s / verify ~15s / integration ~19s / edge ~14s / all ~26s。
+- **暴露并修复真实回归（rf-364）**：bench 的 `all` / `all_no_unit` 报 2 例失败——`test_report_chapter_consistency.py` 的「全开」镜像未带新章节 `financial_report_digest` 的 board/data 参数（Excel 少一页签、HTML 该章节不可见）。该套件为 `integration` 标记、不在 dev-verify 门禁内，故此前未暴露。修复：为 `_excel_visible` / `_html_visible_keys` 与两个 all-enabled 用例补 `financial_report` 开关与 `financial_report_digest_data` 参数，并在「全开」场景显式启用。
+- **复跑**：`--mode all` **6982 passed / 0 failed**（含 12 skipped）；`test-coverage.md` 散文字面日期（两处采集说明与示例耗时）同步为 2026-09-14。
+
 ### 数据源与统计快照刷新（datasource.md / folders.md / test-coverage.md）（2026-09-14）
 
 - **datasource.md**：DataSinking 行补两级缓存前缀（`report_datasink_index_` 两周 / `report_datasink_doc_` 一月）；新增「财报全文（DataSinking）」路由小节（鉴权/取数/限速配额/仅 A 股符号映射）；数据质量说明与常见问题各增一行。
