@@ -96,7 +96,39 @@
 | 1 | 命名统一性（旧名残留 / 新旧名一致 / type 链） | 新名两文档一致；但 **type 语义化未在设计层写明**、`enable_*` 形参与 `board_flags` 映射链**两文档均未覆盖** | 设计层新增 §3.2「命名统一的下游影响清单」；施工单补 ④-1b 与命名检查白名单 |
 | 2 | 架构约束符合性 | 核实代码侧接缝：两侧 `board_flags` 含旧 type、`_validation.py` 允许集合含旧 type、Web 硬编码含旧名；前端与 TUI 已同源派生（无需改） | 同上批量修复；白名单明确「可见性旗标的语义身份」三处必须严格一致 |
 | 3 | 测试与守卫完备性 | **发现同名混淆**：`market_value`/`category` 在 100+ 测试中是**领域字段/领域模块**（`DetailRow.market_value`、`report/market_value.py`、`report/category.py` 的分类函数），而批次②原施工单写「删除 `report/category.py`」会**破坏领域层**；另发现 `test_features.py` 的 `fund_deep_analysis_fund_*` 字符串在 `src/` 无对应实现（需实施时核对语义） | 修正批次②（只迁移纯章节写入器、领域模块保留）；新增 §6.7「领域层 vs 章节层边界」；测试同步清单改为**区分章节键断言与领域词**并给出精确文件行 |
+| 5 | 接缝完整性（遗漏消费点） | 新增 4 处漏登接缝：`excel_module_loader.py`（模块键 `write_category_sheet`/`write_market_value_sheet` + 错误文案）、`html_writer_display.py`（**反向依赖** `market_value_sheet._weighted_avg_cost`，删模块会 ImportError）、partial 实况（仅 4 个 partial，**只有 M3 需并 partial**）、`chart_data_builder` 图键不变但图归属变；`features.py` 两开关名保留 | 接缝地图补 6 行；批次② 补 ②-4b/②-4c；批次④ 补 partial 实况；新增 §7.5 风险补充（3 条） |
+| 6 | 守卫与可验证性 | 7 项既有守卫均在位；但**无守卫清单**、**缺合并前基线方法**、「三处严格一致」缺正面自动化守卫 | 新增 §6.6b：既有守卫表（含随批次变化处）+ 每批新增守卫（`test_section_type_flag_consistency` / 模块加载器一致性 / 区块门禁 / 内容等价）+ 基线方法（`docs-stm/tmp/` 快照，不入库） |
 | 4 | 配置与校验面 | `_validation.py` 允许类型集合含旧 type、`config_edit.py` 硬编码含旧名（已列入 §3.2）；注册表 docstring「共 21 项」与架构约束表「报告 19 个模块」表述陈旧；`_config_defaults.py` 的 `report_section_order` 模板随注册表自动派生（无需手改） | 收尾步骤补「条目数表述同步」；确认模板无需手改 |
+
+## 6.6b 守卫清单与基线方法（第 6 轮复盘新增）
+
+**A. 既有守卫（每批必须保持绿，改前先跑基线）**
+
+| 守卫 | 文件 | 随批次变化处 |
+|:--|:--|:--|
+| 注册表条目数 | `test_registry.py:250`（`== 21`） | 每批 -1（21→20→19→18） |
+| HTML 容器数 | `test_html_report_structure_edge.py:93` | 每批 -1 |
+| Excel 章节列表 | `test_excel_report_structure.py` | 每批 -1 |
+| 双端一致性 | `test_report_chapter_consistency.py` | 夹具键名与开关参数 |
+| 配置样本 | `test_registry_edge.py` / `test_config_edge.py` | `report_section_order` 样本 |
+| 场景顺序 | `test_scenario_section_order.py` | 键集合断言 |
+| 语义命名表 | `test_check_semantic_index.py` | 合并章标识符行 |
+| 可见性 OR 语义 | `test_section_visibility.py`（批次①已建） | 无需改（表述层无章节名） |
+
+**B. 每批新增守卫**
+
+| 批次 | 新增守卫 | 断言 |
+|:--|:--|:--|
+| ② | `test_section_type_flag_consistency` | 遍历注册表 `type`，断言每类型在 `_validation.py` 允许集合与两侧 `board_flags` 键中**同时存在**（第 1、2 轮「三处严格一致」的**正面自动化守卫**，防旧 type 残留/新 type 漏配） |
+| ② | 模块加载器一致性 | `excel_module_loader` 装配键集合 == Excel 分派实际调用的写入器键集合 |
+| ③ | 区块门禁 | 功能开关关 → 分节块不写；开 → 写（③ 的集中度块；④ 的两开关各控一块） |
+| ②③④ | 内容等价 | 最小持仓（3 品种）跑 Excel，两个被并区块的**标题/列头/行数/数值**与基线逐一相等 |
+
+**C. 基线方法（可执行的等价性验证）**
+
+1. **批前**：在**批次② 开工前**用固定最小持仓（3 品种，含一个基金、一个 QDII、一个现金=0 边界）跑一次报告，把 Excel/HTML 产物存入 `docs-stm/tmp/baseline-<批次>/`（**运行时临时产物，不入库**），并记录两区块的「标题 / 列头 / 数据行」快照。
+2. **批后**：同夹具重跑，按快照逐项比对；差异必须能解释为「合并本身」（如标题、锚点、列顺序），**数据行数值差异视为回归**。
+3. **不可依赖人工肉眼**：上述比对落成单测（用 mock 数据构造，断言写出的单元格矩阵），基线快照仅作交叉核对。
 
 ## 6.7 领域层 vs 章节层边界（第 3、4 轮复盘新增）
 
@@ -112,6 +144,12 @@
 - 全部完成后：`--mode verify,regression`；`reports-instruction` 三处目录/可见性表与 `technical` §6.7/附录 H 复核；`changelog` 汇总一条迭代记录。
 - **条目数表述同步**（第 4 轮发现）：`core/registry.py` 的注册表 docstring「共 N 项」、`technical.md` 架构约束表中「报告 N 个模块」的表述、`how-to-config` 与 `reports-instruction` 的模块计数，必须与新条目数一致（防文档漂移）。
 - **不做**：不做配置兼容迁移；不引入契约层改名；不合并 LLM 相关条目（见设计层非目标）。
+
+## 7.5 风险补充（第 5 轮发现）
+
+- **`_weighted_avg_cost` 迁移致渲染链 ImportError**：`html_writer_display.py` 反向导入章节写入器模块内的计算函数——迁移时若只删模块不搬函数，HTML 显示层直接崩。**处置**：迁移前先跑 `.venv/bin/python -m pytest src/test/unit/report/test_html_writer.py -v` 建立基线，迁移后必须仍绿。
+- **`excel_module_loader` 模块键与分派调用不同步**：该 loader 用字符串键装配模块，改名遗漏会在 **Excel 生成期**才报「模块缺失」而非导入期。**处置**：批次② 收尾用 `grep -rn "write_category_sheet\|write_market_value_sheet" src/` 确认零命中。
+- **图表归属变化而图注未改**：`category_doughnut` 图随合并章移动，图下说明文案若写「分类表」需同步为合并章语义。
 
 ## 8. 风险与回退
 
