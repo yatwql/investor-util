@@ -6,6 +6,12 @@
 
 ## [0.10.20-dev] - 开发中（未发布）
 
+### 设计文档归档与计划状态收口（plan-42 / plan-43）（2026-09-15）
+
+- **计划状态**：`plan-43`（持仓个股基本面数据源主备与财务指标提取）由「设计完成，待实施」转为**已完成**（阶段①②③a③b④ + DataSinking 数据底座门禁；阶段⑤ 文档与门禁收尾随发布执行）；`plan.md` 的 P1 / P4 两区自此均为「无待办项」，编号源 `plan-next = 44` 不变。
+- **七次归档**：`docs-stm/plan/` 两份已实现设计文档迁入 `docs-stm/archive/v0.10.x/`——`datasink-financial-report-digest/datasink-financial-report-digest-design.md`（plan-42）与 `financial-indicator-source/financial-indicator-source-design.md`（plan-43）；文档头部状态行改为已实现态，文档间交叉引用、`plan.md` 与 changelog 内的设计文档引用一并改指归档路径，`docs-stm/plan/` 再次成为空目录。
+- **归档台账**：`archived_plan.0.10.x.md` 头部「归档时间/涵盖版本/归档内容」三行同步（涵盖范围扩至 v0.10.19），新增小节「P1 — 已完成（plan-42 / plan-43 完成态，2026-09-15 七次合并迁入）」并补「归档说明」条目；`folders.md` 目录树与统计（plan/ 归零、归档 127 文件 / 42,147 行）按实测刷新。
+
 ### LLM 侧注入：基本面信号与叙事-数字背离检测（plan-43 阶段④）（2026-09-15）
 
 - **五路确定性信号**：在既有 `signal_pre_digest`（默认开、注入专家复盘与持仓体检、**不新增 LLM 调用**）中新增两路——
@@ -62,7 +68,7 @@
 - **适配器与链路**：`fetcher/financial_indicator_adapters.py::AkshareFinancialAdapter`（标准字段直出，无需 alias）+ 新链 `financial_indicator: [akshare_financial]`；取数复用 `fetch_with_fallback`（缓存/熔断/降级），缓存前缀 `fin_indicator_`（一月 TTL、基础类）；配置校验放行新数据类型/源名。
 - **共享原语收敛（去重）**：A 股→FMP 符号映射统一为 `core/code_utils.py::to_fmp_symbol`（原在 datasink 内，现两个数据源共用）；akshare 取数超时封装统一为 `providers/_utils.py::run_with_timeout`（由 `akshare_extras` 抽出，避免第二份副本）。
 - **测试**：新增 `test_akshare_financial.py`（宽表归一/百分数换算/同名指标优先与逐期补齐/文种映射/各类降级，15 例）与 `test_financial_indicator.py`（适配器登记与自检/标准字段集/链注册/链路取回与降级，5 例）；`TestFmpSymbol` 随函数迁移至 `test_code_utils.py`（unit_core）。
-- **口径**：本阶段仅数据层（无报告消费）；真实 PE/PB 估值分位、质量因子与 LLM 注入属后续阶段（见 `docs-stm/plan/financial-indicator-source-design.md` §13）。
+- **口径**：本阶段仅数据层（无报告消费）；真实 PE/PB 估值分位、质量因子与 LLM 注入属后续阶段（见 `docs-stm/archive/v0.10.x/financial-indicator-source/financial-indicator-source-design.md` §13）。
 
 ### DataSinking 财报接入·数据层（plan-42 阶段①②③）（2026-09-14）
 

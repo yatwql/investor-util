@@ -1,8 +1,8 @@
 # 持仓个股基本面数据源主备与财务指标提取 — 设计文档
 
-> 文档类型：中间设计文件（实现落地后随迭代归档）
-> 关联：DataSinking 财报接入（`docs-stm/plan/datasink-financial-report-digest-design.md`）
-> 状态：设计完成，待实施
+> 文档类型：中间设计文件（已实现，2026-09-15 归档）
+> 关联：DataSinking 财报接入（`../datasink-financial-report-digest/datasink-financial-report-digest-design.md`）
+> 状态：**已实现**（plan-43 阶段①②③a③b④ 全部完成 + DataSinking 数据底座门禁，2026-09-15 归档；阶段⑤ 文档与门禁收尾随发布执行）
 
 ---
 

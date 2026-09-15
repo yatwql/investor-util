@@ -16,10 +16,10 @@
 | **测试用例** | — | — | **7,171 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,147** | 含 README.md（204 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,943 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **134** | **51,755** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,008 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 125 | 41,548 | 各版本 changelog/plan/review-findings 等（121 md 41,090 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 2 | 580 | 在办设计文档：DataSinking 持仓个股财报摘要设计（`datasink-financial-report-digest-design.md`）+ 持仓个股基本面数据源主备与财务指标提取设计（`financial-indicator-source-design.md`）；已实现的设计文档随其迭代归档（功能开关注册表统一与联接基金穿透两份现位于 v0.10.x 归档的 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
+| **项目文档** | Markdown | **134** | **51,770** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,006 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 127 | 42,147 | 各版本 changelog/plan/review-findings 等（123 md 41,689 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | **当前无在办设计文档**（已实现的设计文档随迭代归档：DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -1011,6 +1011,8 @@ investor-util/
 │   │   │   │   └── plan-readme-svg-layout.md #     README 嵌入 SVG 架构图 + 排版优化设计
 │   │   │   ├── env-benchmark-doc-update/     #   环境耗时对照文档自动更新
 │   │   │   │   └── plan-env-benchmark-doc-update.md # test-coverage.md 环境耗时表按主机名自动回填
+│   │   │   ├── datasink-financial-report-digest/ #   DataSinking 财报接入设计归档（持仓个股财报摘要）
+│   │   │   │   └── datasink-financial-report-digest-design.md # 凭据/计划感知限速/配额护栏/章节装配与渲染接线
 │   │   │   └── dedup-calibration/            #   新闻去重阈值校准分析归档（dedup 逐条样本 + 分布 + 判定）
 │   │   │       ├── dedup-calibration-report.md #   dedup 阈值校准原始计数（锚点总数/跨源跳过分布/维持现阈值依据）
 │   │   │       ├── dedup-review.md           #   dedup 灰色带（bg≥2 ratio 0.35~0.40）逐条示例 + 人工判定
@@ -1035,11 +1037,11 @@ investor-util/
 │   │   │   │   └── llm-fingerprint-prompt-coverage-design.md # 指纹覆盖判据/一次渲染两侧共享/辩论三键口径
 │   │   │   ├── feature-switch-registry/ #   功能开关注册表统一设计归档（面板可见性/默认值/产物自述解耦）
 │   │   │   │   └── feature-switch-registry-unification-design.md # 单条开关声明 + 分组属性 + 三渠道入口派生
-│   │   │   └── feeder-fund-penetration/ #   联接基金穿透与基金持仓取数通道修正设计归档
-│   │   │       └── feeder-penetration-and-holdings-fetch-design.md # 取数阶梯次序修正 + 目标 ETF 代理底层暴露
-│   ├── plan/                          #   中间设计文件（在办设计文档；实现落地后随迭代归档）
-│   │   ├── datasink-financial-report-digest-design.md # DataSinking 全文本财报接入设计（持仓个股财报摘要/密钥文件/计划感知限速）
-│   │   └── financial-indicator-source-design.md # 持仓个股基本面数据源主备与财务指标提取设计
+│   │   │   ├── feeder-fund-penetration/ #   联接基金穿透与基金持仓取数通道修正设计归档
+│   │   │   │   └── feeder-penetration-and-holdings-fetch-design.md # 取数阶梯次序修正 + 目标 ETF 代理底层暴露
+│   │   │   └── financial-indicator-source/ #   基本面数据源主备与财务指标提取设计归档
+│   │   │       └── financial-indicator-source-design.md # 标准字段契约/全文解析支路/真实估值分位(TTM)/底座门禁/LLM 注入
+│   └── plan/                          #   中间设计文件（当前无在办设计文档；已实现文档随七次合并迁入 v0.10.x 归档）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
