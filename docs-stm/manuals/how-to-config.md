@@ -21,7 +21,7 @@
   "enable_portfolio_evolution": true,  // 组合演进
   "enable_action": true,     // 行动建议（默认开，可在菜单 P 关闭）
   // 报告子模块开关（数据质量仪表盘为长期可信核心默认开启；其余新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": true, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false, "financial_report_digest": false},  // 数据质量仪表盘默认开，其余默认关
+  "report_submodules": {"data_quality": true, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": true, "financial_report_digest": false, "financial_indicator": false},  // 数据质量仪表盘与市场温度默认开，其余默认关
   "comparison_candidates": [],  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合 candidate_compare）
 
   // ── C. 数据源与提供商 ──
@@ -188,7 +188,7 @@
 | `report_submodules.candidate_compare` | `false` | 「基金业绩分析」章候选基金比较子表开关，**默认关闭**。开启后报告在该章主业绩表下方展示候选基金横向比较表（候选来自 `comparison_candidates`，比较维度：收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度） | 菜单 P → 6 |
 | `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
 | `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 菜单 P → 6 |
-| `report_submodules.market_temperature` | `false` | 「投资分析汇总」章市场温度刻度行开关，**默认关闭**。开启后该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明） | 菜单 P → 6 |
+| `report_submodules.market_temperature` | `true` | 「投资分析汇总」章市场温度刻度行开关，**默认开启**（无数据时该行**静默省略**，不写占位）。该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明）。关闭杠杆保留：菜单 P 或置 `false` | 菜单 P → 6 |
 | `report_submodules.financial_indicator` | `false` | 「财务指标」独立章开关，**默认关闭**。开启后新增一章：持仓 + 穿透 A 股基本面（指标列 + 质量档 + 年度趋势 + 当前 PE/PB）。**需 DataSinking 数据底座就绪**（`datasink.enabled` 为真且已配置 API key）；未就绪时该章**不出现**（静默回原样，不写占位） | 菜单 P → 7 |
 | `report_submodules.financial_report_digest` | `false` | 「持仓个股财报摘要」独立章开关，**默认关闭**。开启后新增一章：对持仓 + 穿透中的 A 股标的取最新年报（无年报退半年报）的目标章节正文摘要。**需先配置 DataSinking API key**（`data/config/data_key.json` 的 `datasink` 节）；未配置时该章写占位并给出申请指引 | 菜单 P → 6 |
 | `report_submodules.industry_beta` | `false` | 「风格与因子分析」章行业 Beta 子表开关，**默认关闭**。开启后该章展示行业 Beta 子表（组合对中证行业指数的回归敏感性：行业暴露占比 + β/t 值/显著性/相关性） | 菜单 P → 6 |
@@ -783,7 +783,7 @@ Web 模式（浏览器界面）提供「配置编辑」面板，可修改的配�
 |:--|:--|:--|
 | 路径与文件 | `holdings_dir` / `holdings_filename` / `output_dir` | `[C]` / `[F]` / `[O]` |
 | 报告章节 | `enable_fund_deep_analysis` / `enable_news` / `enable_history` / `enable_portfolio_evolution` / `enable_action` | `[P]` 1~5 |
-| 报告增强子模块 | `report_submodules.data_quality` / `industry_beta` / `candidate_compare` / `cost_lots` / `valuation_percentile` / `market_temperature` | `[P]` 6 |
+| 报告增强子模块 | `report_submodules.data_quality`（默认开）/ `market_temperature`（默认开）/ `industry_beta` / `candidate_compare` / `cost_lots` / `valuation_percentile` / `financial_report_digest` / `financial_indicator` | `[P]` 6 |
 | 持仓匿名化 | `anonymization.mode`（off / code_display / full_anonymous / summary） | `[A]` |
 | 对比指数池 | `comparison_indices`（增 / 删 / 重置默认） | `[I]` |
 | LLM 分析章节 | `enabled_llm.global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation` | `[S]` 标准模块 |

@@ -224,24 +224,23 @@ class TestWriteMarketTemperature(unittest.TestCase):
         wb = Workbook()
         return wb.active
 
-    def test_unavailable_placeholder(self):
+    def test_unavailable_writes_nothing(self):
+        """不可用 → **静默省略**（随默认开启，用户未主动要求的功能不出现降级痕迹）。"""
         from src.python.report.summary import _write_market_temperature
 
         ws = self._make_ws()
         row = _write_market_temperature(ws, 5, {"available": False, "status": "insufficient"})
-        assert ws.cell(row=5, column=1).value == "【市场温度】"
-        assert ws.cell(row=6, column=1).value == "市场温度"
-        assert ws.cell(row=6, column=2).value == "--（数据不足，暂不显示）"
-        assert ws.cell(row=7, column=1).value == "注"
-        assert row == 8
+        assert row == 5
+        assert ws.cell(row=5, column=1).value is None
+        assert ws.cell(row=6, column=1).value is None
 
-    def test_none_temperature_placeholder(self):
+    def test_none_temperature_writes_nothing(self):
         from src.python.report.summary import _write_market_temperature
 
         ws = self._make_ws()
         row = _write_market_temperature(ws, 5, None)
-        assert ws.cell(row=6, column=2).value == "--（数据不足，暂不显示）"
-        assert row == 8
+        assert row == 5
+        assert ws.cell(row=6, column=2).value is None
 
     def test_available_rows(self):
         from src.python.report.summary import _write_market_temperature

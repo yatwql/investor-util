@@ -1068,14 +1068,15 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
             </div>
 
-            {% if market_temperature %}
-            <!-- 市场温度（report_submodules.market_temperature 子模块） -->
+            {# 市场温度（report_submodules.market_temperature，默认开）：不可用时整块静默省略，
+               避免在用户未主动要求的功能上出现降级痕迹（与 Excel 同判据） #}
+            {% if market_temperature and market_temperature.available %}
             <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【市场温度】</h3>
             <table class="kv-table">
-                {% if market_temperature.available and market_temperature.score is not none %}
+                {% if market_temperature.score is not none %}
                 <tr><td>市场温度</td><td style="font-weight: 700;">{{ market_temperature.score | round(0) | int }} / 100（{{ market_temperature.tier }}）</td></tr>
                 {% else %}
-                <tr><td>市场温度</td><td>--（数据不足，暂不显示）</td></tr>
+                <tr><td>市场温度</td><td>--（{{ market_temperature.tier }}）</td></tr>
                 {% endif %}
                 {% if market_temperature.components %}
                 <tr>

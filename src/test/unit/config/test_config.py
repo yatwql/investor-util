@@ -1117,3 +1117,24 @@ class TestDatasinkFeatureGate:
         from src.python.config._config_defaults import _DEFAULT_CONFIG
 
         assert _DEFAULT_CONFIG["datasink"]["enabled"] is True
+
+
+class TestMarketTemperaturePromotion:
+    """市场温度转正（默认开）：默认值、显式关闭杠杆与访问器行为。"""
+
+    def test_default_is_on(self):
+        from src.python.config._config_defaults import _DEFAULT_CONFIG
+
+        assert _DEFAULT_CONFIG["report_submodules"]["market_temperature"] is True
+
+    def test_explicit_false_still_disables(self):
+        from src.python.config import is_enable_market_temperature
+
+        assert is_enable_market_temperature({"report_submodules": {"market_temperature": False}}) is False
+        assert is_enable_market_temperature({"report_submodules": {"market_temperature": True}}) is True
+
+    def test_missing_key_falls_back_to_off_for_partial_config(self):
+        """缺键（非默认配置，如显式给定的部分 config）→ 维持访问器既有语义（关）。"""
+        from src.python.config import is_enable_market_temperature
+
+        assert is_enable_market_temperature({}) is False

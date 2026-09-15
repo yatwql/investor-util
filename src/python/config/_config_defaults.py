@@ -53,7 +53,7 @@ _DEFAULT_CONFIG = {
         "candidate_compare": False,  # 「基金业绩分析」→ 候选基金比较子表（候选来自 comparison_candidates）
         "cost_lots": False,  # 成本流水：持仓 Excel 含交易/分红流水时，汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计
         "valuation_percentile": False,  # 估值分位：「资产穿透TOP10」章加估值分位列（当前 PE/PB + 价格分位代理）
-        "market_temperature": False,  # 市场温度：「投资分析汇总」章加市场温度刻度行（三因子合成温度计）
+        "market_temperature": True,  # 市场温度：「投资分析汇总」章加市场温度刻度行（三因子合成温度计；默认开，无数据时该行静默省略）
         "financial_report_digest": False,  # 持仓个股财报摘要：新增独立章（DataSinking 全文本财报，仅 A 股，需用户自备 key）
         "financial_indicator": False,  # 财务指标：新增独立章（持仓 A 股基本面：指标列 + 质量档 + 年度趋势 + 当前 PE/PB）
     },
@@ -196,7 +196,7 @@ def _build_template_from_defaults() -> str:
         f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进',
         f'  "enable_action": {json.dumps(d["enable_action"])},  // 行动建议独立章（决策行动，默认开，菜单 P 可切换）',
         '  // 报告子模块开关（数据质量仪表盘长期可信默认开，其余新增能力默认关闭，避免既有报告突然"变胖"）',
-        f'  "report_submodules": {json.dumps(d["report_submodules"], ensure_ascii=False)},  // 数据质量仪表盘默认开',
+        f'  "report_submodules": {json.dumps(d["report_submodules"], ensure_ascii=False)},  // 数据质量仪表盘与市场温度默认开',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",

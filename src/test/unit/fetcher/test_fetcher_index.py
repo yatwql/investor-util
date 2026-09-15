@@ -341,7 +341,8 @@ class TestFetchIndexHistory(unittest.TestCase):
 
         self.assertEqual(result, expected)
         mock_fetch.assert_called_once_with("history_index", "sh000300", 365, diagnostics=ANY)
-        mock_reg.session_cache_set.assert_called_once_with("history_index", "sh000300", expected, source="api")
+        # 缓存条目记为 (days, bars)：窗口天数随缓存一起记录，供后续调用者判断是否需重取
+        mock_reg.session_cache_set.assert_called_once_with("history_index", "sh000300", (365, expected), source="api")
 
     @patch("src.python.core.provider_registry.get_registry")
     def test_empty_code_returns_none(self, mock_get_reg):
@@ -387,7 +388,7 @@ class TestFetchIndexHistory(unittest.TestCase):
 
         self.assertEqual(result, [])
         # 空结果也写入会话缓存（避免重复请求）
-        mock_reg.session_cache_set.assert_called_once_with("history_index", "sh000300", [], source="api")
+        mock_reg.session_cache_set.assert_called_once_with("history_index", "sh000300", (365, []), source="api")
 
     @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
@@ -406,7 +407,40 @@ class TestFetchIndexHistory(unittest.TestCase):
 
         self.assertEqual(result, [])
         # 异常结果也写入会话缓存
-        mock_reg.session_cache_set.assert_called_once_with("history_index", "sh000300", [], source="api")
+        mock_reg.session_cache_set.assert_called_once_with("history_index", "sh000300", (365, []), source="api")
+
+    @patch("src.python.core.provider_registry.get_registry")
+    @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
+    def test_session_cache_reused_when_window_is_enough(self, mock_fetch, mock_get_reg):
+        """缓存窗口不小于本次需求 → 复用（0 额外请求）。"""
+        from src.python.core.provider_registry import NOT_FOUND  # noqa: F401
+
+        bars = [self._SAMPLE_KLINE_1]
+        mock_reg = MagicMock()
+        mock_reg.session_cache_get.return_value = (750, bars)
+        mock_get_reg.return_value = mock_reg
+
+        from src.python.fetcher.index import fetch_index_history
+
+        self.assertEqual(fetch_index_history("sh000300", 365), bars)
+        mock_fetch.assert_not_called()
+
+    @patch("src.python.core.provider_registry.get_registry")
+    @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
+    def test_session_cache_refetches_when_window_too_short(self, mock_fetch, mock_get_reg):
+        """缓存窗口不足 → 重取（避免「短窗口先取过 → 长窗口调用者拿到更短序列」）。"""
+
+        mock_reg = MagicMock()
+        mock_reg.session_cache_get.return_value = (365, [self._SAMPLE_KLINE_1])
+        mock_get_reg.return_value = mock_reg
+        longer = [self._SAMPLE_KLINE_1, self._SAMPLE_KLINE_2]
+        mock_fetch.return_value = longer
+
+        from src.python.fetcher.index import fetch_index_history
+
+        self.assertEqual(fetch_index_history("sh000300", 750), longer)
+        mock_fetch.assert_called_once_with("history_index", "sh000300", 750, diagnostics=ANY)
+        mock_reg.session_cache_set.assert_called_once_with("history_index", "sh000300", (750, longer), source="api")
 
     @patch("src.python.core.provider_registry.get_registry")
     @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")

@@ -335,21 +335,21 @@ def _write_market_temperature(ws: Worksheet, row: int, temperature: dict | None)
     Args:
         ws: 目标工作表
         row: 起始行
-        temperature: 市场温度数据契约（market_temperature_data）。None/不可用时
-            写占位文本 + 免责声明；可用时写分数刻度 + 三因子明细。
+        temperature: 市场温度数据契约（market_temperature_data）。**不可用或缺失时
+            不写任何行**（本行随市场温度转正默认开启，故采用「静默省略」而非占位——
+            用户未主动要求的功能不应出现降级痕迹）；可用时写分数刻度 + 三因子明细。
 
     Returns:
-        写入后的下一行行号。
+        写入后的下一行行号（不可用时原样返回 ``row``）。
     """
-    row = _write_section(ws, row, "【市场温度】")
-    disclaimer = (temperature or {}).get(
-        "disclaimer"
-    ) or "市场温度为价格分位、均线偏离与波动率三因子合成的信号，仅供参考，不构成任何仓位建议"
     if not temperature or not temperature.get("available"):
-        write_data_row(ws, row, ["市场温度", "--（数据不足，暂不显示）"])
-        row += 1
-        row = _write_kv_row(ws, row, "注", disclaimer)
+        logger.info("[summary] 市场温度不可用，本行静默省略")
         return row
+    row = _write_section(ws, row, "【市场温度】")
+    disclaimer = (
+        temperature.get("disclaimer")
+        or "市场温度为价格分位、均线偏离与波动率三因子合成的信号，仅供参考，不构成任何仓位建议"
+    )
 
     score = temperature.get("score")
     tier = temperature.get("tier") or "合理"
