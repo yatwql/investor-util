@@ -37,9 +37,9 @@
 
 **架构要点**：不新增 pipeline_data 键（pipeline_data 契约台账）；可见性模型最小扩展——注册表可选字段 `data_flag_any`（多契约 OR），未声明时行为不变；序号/显示名/页签名全部经注册表（注册表驱动）。
 
-**批次**：① 模型扩展 + 守卫 → ② M1 → ③ M2 → ④ M3+M4；每批一次提交、每批门禁。
+**批次**：① 模型扩展 + 守卫（**已实施**：`data_flag_any` + 两侧 OR + 12 例守卫）→ ② M1 `holdings_detail` → ③ M2 `position_structure` → ④ M3 `fundamental_snapshot` + M4；每批一次提交、每批门禁；施工步骤见实施层文档。
 
-设计文档：[`section-consolidation-design.md`](section-consolidation-design.md)（含现状核实、合并方案、约束对照、测试与文档同步清单、批次验收标准）。
+设计文档：[`section-consolidation-design.md`](section-consolidation-design.md)；实施层施工单：[`section-consolidation-iteration.md`](section-consolidation-iteration.md)（命名统一总表 / 接缝地图 / 逐批施工步骤与量化验收）（含现状核实、合并方案、约束对照、测试与文档同步清单、批次验收标准）。
 
 ### P4 — 实验功能
 
