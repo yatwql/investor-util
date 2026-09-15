@@ -16,8 +16,8 @@
 | **测试用例** | — | — | **7,174 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,148** | 含 README.md（204 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,944 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **134** | **51,840** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,076 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| **项目文档** | Markdown | **134** | **51,851** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,087 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 127 | 42,147 | 各版本 changelog/plan/review-findings 等（123 md 41,689 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 0 | 0 | **当前无在办设计文档**（已实现的设计文档随迭代归档：DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -58,7 +58,7 @@ investor-util/
 │   │   │   ├── _local_state.py       #   机器本地状态标志读写（首次引导/隐私已读，存 data/state/local_state.json）
 │   │   │   ├── _validation.py        #   配置校验函数集
 │   │   │   ├── anonymizer.py         #   匿名化模块（4 模式：关闭/代码显示/完全匿名/汇总）
-│   │   │   └── features.py           #   功能开关注册表（唯一登记点：20 项声明的显示名/说明/分组/默认值/产物影响；默认值字典为其派生投影；运行时覆写持久化到 data/config/features.json）
+│   │   │   └── features.py           #   功能开关注册表（唯一登记点：28 项声明的显示名/说明/分组/默认值/产物影响；默认值字典为其派生投影；运行时覆写持久化到 data/config/features.json；含报告章节与增强 8 项）
 │   │   │
 │   │   ├── fetcher/                  # 数据获取调度
 │   │   │   ├── __init__.py           #   子包标记

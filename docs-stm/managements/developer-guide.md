@@ -847,7 +847,7 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 
 校验技术设计文档（`technical.md`）「功能语义命名表」章节（`<!-- semantic-index:start/end -->` 标记区间）与代码的**正面一致性**，与 `check-code-traces.py` 的负面禁止互补：
 
-1. **正向**：`_config_defaults.py` 中 `report_submodules` 字典每个键（运行时配置开关）必须已登记在「功能语义命名表」中（防新增开关绕过登记）
+1. **正向**：功能开关注册表中 `GROUP_REPORT` 分组的每个键（报告章节与增强开关）必须已登记在「功能语义命名表」中（防新增开关绕过登记）
 2. **反向**：表中每个语义 slug 在 `src/python/` 下至少一处非注释代码引用（防僵尸条目——功能删除后表行残留）
 3. **合并章**：表下「合并章代码标识符」注声明的 sheet key 必须存在于 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表
 

@@ -6,6 +6,17 @@
 
 ## [0.10.20-dev] - 开发中（未发布）
 
+### 报告增强子模块并入功能开关注册表（plan-44 完成，不做兼容）（2026-09-15）
+
+- **决定**：按用户要求**不做 config.json 兼容**——注册表成为唯一真源，config.json 重生成，相关程序同步改。
+- **注册表**：新增分组 `GROUP_REPORT`「报告章节与增强」+ 8 条声明（`data_quality` / `market_temperature` 默认开，`industry_beta` / `candidate_compare` / `cost_lots` / `valuation_percentile` / `financial_report_digest` / `financial_indicator` 默认关；`affects_report=True`），注册表 20 → **28 项**；`GROUP_LABELS` / `GROUP_ORDER` / 契约注释同步。
+- **真源切换**：`_core.py` 8 个 `is_enable_*` 访问器改为 `is_feature_enabled(<flag>)`（`config` 形参保留但不再参与取值）；`_config_defaults.py` 删除 `report_submodules` 段与模板行；重生成 `data/config/config.json`；**把用户原有非默认取值搬入 `data/config/features.json`**（`valuation_percentile` / `financial_report_digest` / `financial_indicator` = true），8 项行为逐项保持。
+- **TUI**：`S` 面板新增「报告章节与增强」块（面板三块 → 四块）；顶层 `P` 面板收敛为 5 个基础报告章节（第 6 项改为「报告增强子模块 / LLM 分析章节 — 请在菜单 S 配置」，输入范围 (0-6)）；删除 `P` 子面板 `_cmd_config_report_submodules` 与其清单常量（面板编号漂移类问题随之消失）。
+- **Web**：`config_edit_whitelist` 删除 7 条 `report_submodules.*` 与 `submodule` 写原语；surface `submodules` 改由注册表 `GROUP_REPORT` 派生（键为裸开关名、写入走 `save_feature_overrides`）；前端该块改用注册表 labels 与「影响报告」标记（原 `report_submodules.` 前缀移除）。
+- **功能性修复**：`report/_report_factor_metrics.py` 的 `industry_beta` 判定原读 `config.report_submodules`（单源切换后会**永远判关**）→ 改读 `is_enable_industry_beta(config)`。
+- **测试**：删除旧的 config 驱动用例，新增注册表真源守卫——组内键集合与默认值、访问器 == 注册表默认、运行时覆盖即时生效、config.json 不再携带该段、Web 白名单无旧路径、写报告开关落 features、`S` 面板含报告块、`P` 子面板已移除；dev-verify 2747/0。
+- **文档**：`how-to-config`（删旧 8 行表项、功能开关表 20 → 28 项含新增 8 行、面板布局三块 → 四块、菜单索引改 `[S]` 报告块、配置示例移除该段）、`how-to-use-tui-menu`/`how-to-start`/`faq`/`reports-instruction`、`requirements` 配置表、`technical`（Web 写入分派与说明表口径）、`developer-guide`（语义登记正向校验对象改 `GROUP_REPORT`）、`plan.md`（plan-44 完成，`plan-next` 45）。
+
 ### 修复：报告增强子模块面板编号漂移（提示范围写死 + 手册编号错乱）（2026-09-15）
 
 - **现象（用户报障）**：按手册「菜单 P → 7」想开「财务指标」，实际开的是第 7 项「持仓个股财报摘要」；且面板提示写死 `输入编号切换 (0-7)` 而清单已 8 项。

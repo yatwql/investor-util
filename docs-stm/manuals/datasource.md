@@ -56,7 +56,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 - **A 股指数** → `history_index` 通道：腾讯财经 → 新浪财经（备用）
 - **美股指数** → `history_index_us` 通道：新浪财经 → 腾讯财经。两者共用指数 K 线函数（`fetch_index_kline`），新浪侧实现位于 `providers/sina_kline.py`，但其 `getKLineData` 端点对全部代码返回 404/空，实际取数通常由腾讯完成；而腾讯 K 线接口对 `gb_*` 代码支持有限，因此该通道可能整链取空——空结果按正常降级记录（成因与现状见 `datasource-reliability.md` §4.2）
 - **风格与因子分析·风格因子回归**（`analysis/style_factor_regression.py`，写入 `style_factor_data` 契约）复用 `history_index` 通道，并行拉取 CSI 风格因子指数 K 线（价值=sh000919、成长=sh000925、质量=sh000930）与基准指数（沪深300 sh000300）做 OLS 回归。因子指数不注册到 `_A_INDICES`（避免污染实时指数循环 fetch_indices），无专属缓存前缀，随 `history_index_` 统一按 TTL 管理
-- **风格与因子分析·行业 Beta 子表**（`analysis/industry_beta.py`，内嵌于 `style_factor_data.industry_beta`，开关 `report_submodules.industry_beta` 默认关）复用 `history_index` 通道拉取中证行业指数 K 线（`INDUSTRY_INDEX_MAP`：银行=sh000986、证券=sz399975、白酒/食品饮料=sz399997、半导体/电子=sz399995、有色/贵金属=sz399996、煤炭=sz399998、医药=sz399989、钢铁=sz399994、房地产=sh000980、能源=sh000928、环保=sz399973、保险=sz399983）做单因子 OLS（复用 `compute_factor_exposure`，不重复实现）；行业分类复用 `batch_fetch_industry_data`（`industry_` 前缀缓存）
+- **风格与因子分析·行业 Beta 子表**（`analysis/industry_beta.py`，内嵌于 `style_factor_data.industry_beta`，开关 功能开关 `industry_beta` 默认关）复用 `history_index` 通道拉取中证行业指数 K 线（`INDUSTRY_INDEX_MAP`：银行=sh000986、证券=sz399975、白酒/食品饮料=sz399997、半导体/电子=sz399995、有色/贵金属=sz399996、煤炭=sz399998、医药=sz399989、钢铁=sz399994、房地产=sh000980、能源=sh000928、环保=sz399973、保险=sz399983）做单因子 OLS（复用 `compute_factor_exposure`，不重复实现）；行业分类复用 `batch_fetch_industry_data`（`industry_` 前缀缓存）
 
 ### 实时行情
 
@@ -67,7 +67,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 
 ### 财报全文（DataSinking）
 
-由 `fetcher/financial_report.py` 逐标的取数、`report/financial_report_digest.py` 装配（章节 `financial_report_digest`，开关 `report_submodules.financial_report_digest` 默认关）：
+由 `fetcher/financial_report.py` 逐标的取数、`report/financial_report_digest.py` 装配（章节 `financial_report_digest`，开关 功能开关 `financial_report_digest` 默认关）：
 
 - **鉴权**：用户自备 key（免费 key 在 datasink.ing 领取），存通用密钥文件 `data/config/data_key.json` 的 `datasink` 节（`{"datasink": {"api_key": "..."}}`）或环境变量 `DATASINK_API_KEY`（优先）；缺 key 时链路主动跳过，章节写占位并给申请指引
 - **取数**：`/documents`（元数据，年报优先、半年报兜底）→ `/documents/{id}?section=`（按配置 `datasink.sections` 逐章节取正文并拼接）→ 按 `datasink.max_chars` 截断；单篇正文经 Provider Chain + 财报域适配器两槽（复用缓存/熔断/降级）
@@ -106,7 +106,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 | 基金净值未更新 | 当日净值尚未发布、节假日 | 程序自动使用前一日净值，日志记录 INFO |
 | 新闻为空 | 网络异常、选中的新闻源全量不可用 | 自动跳过该源，其他源正常采集 |
 | 行业资金流向为空 | 非交易日、数据源休息 | 显示占位，不影响其他数据模块 |
-| 财报摘要为空 | 未配置 DataSinking key、无 A 股持仓/穿透标的、或该标的未覆盖 | 章节写占位并给出申请指引；配置 `data/config/data_key.json` 的 `datasink` 节并开启 `report_submodules.financial_report_digest` 后生效 |
+| 财报摘要为空 | 未配置 DataSinking key、无 A 股持仓/穿透标的、或该标的未覆盖 | 章节写占位并给出申请指引；配置 `data/config/data_key.json` 的 `datasink` 节并开启 功能开关 `financial_report_digest` 后生效 |
 
 > 所有数据请求均经过 Provider Chain 处理：单个 provider 失败即切换链上下一个源 → 连续失败达阈值（3 次，行业链 6 次）后熔断该源 → 全部源不可用时降级使用过期缓存（如有）。日志中 WARNING 级别的消息对应数据降级事件，属正常行为。
 
