@@ -7,17 +7,17 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 276 | 68,852 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层；近期新增 `core/jsonl_store.py` JSONL 原子原语 + `core/signal_ledger.py` 确定性信号账本 + `report/signal_record.py` 信号登记适配器 + `core/num_utils.py` 数值归一原语 + `core/doctor.py` 系统自检 + `core/cassette.py` 请求回放引擎 + `core/datasource_credential.py` 数据源凭据声明 + `fetcher/source_adapter.py` 适配契约 + `fetcher/quote_adapters.py` 行情域适配器 + `llm/module_fingerprint.py` 模块指纹唯一事实来源 + `report/_experimental_seams.py` 实验挂载点 + `report/holdings_freshness.py` 持仓报告期时效判定 + `report/experimental_notice.py` 实验功能清单语句单源 + `core/trading_calendar.py` 交易日历原语（时间距离一律以交易日计） + `providers/datasink.py` 全文本财报 provider（密钥/限速/配额） + `fetcher/financial_report.py` 财报取数编排 + `fetcher/report_adapters.py` 财报域适配器 + `report/financial_report_digest.py` 财报摘要章节装配 + `report/financial_report_sheet.py` 财报摘要 Excel 页签） |
+| 主程序代码 | Python | 278 | 69,131 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层；近期新增 `core/jsonl_store.py` JSONL 原子原语 + `core/signal_ledger.py` 确定性信号账本 + `report/signal_record.py` 信号登记适配器 + `core/num_utils.py` 数值归一原语 + `core/doctor.py` 系统自检 + `core/cassette.py` 请求回放引擎 + `core/datasource_credential.py` 数据源凭据声明 + `fetcher/source_adapter.py` 适配契约 + `fetcher/quote_adapters.py` 行情域适配器 + `llm/module_fingerprint.py` 模块指纹唯一事实来源 + `report/_experimental_seams.py` 实验挂载点 + `report/holdings_freshness.py` 持仓报告期时效判定 + `report/experimental_notice.py` 实验功能清单语句单源 + `core/trading_calendar.py` 交易日历原语（时间距离一律以交易日计） + `providers/datasink.py` 全文本财报 provider（密钥/限速/配额） + `fetcher/financial_report.py` 财报取数编排 + `fetcher/report_adapters.py` 财报域适配器 + `report/financial_report_digest.py` 财报摘要章节装配 + `report/financial_report_sheet.py` 财报摘要 Excel 页签 + `providers/akshare_financial.py` 结构化财务指标主源 + `fetcher/financial_indicator_adapters.py` 财务指标域适配器 + `core/code_utils.py::to_fmp_symbol` 共享符号映射 + `providers/_utils.py::run_with_timeout` 共享取数超时原语） |
 | HTML 报告模板 | HTML | 5 | 3,999 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 持仓个股财报摘要 `financial_report_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 21 | 7,174 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
-| **源代码合计** | — | **305** | **80,340** | 主程序 + 模板 + 脚本 + SVG |
-| **测试代码** | Python | **364** | **106,414** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
-| **测试用例** | — | — | **6,991 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **源代码合计** | — | **307** | **80,619** | 主程序 + 模板 + 脚本 + SVG |
+| **测试代码** | Python | **366** | **106,733** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| **测试用例** | — | — | **7,011 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,114** | 含 README.md（204 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,910 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **134** | **51,571** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 9,853 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| **项目文档** | Markdown | **134** | **51,586** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 9,868 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 125 | 41,548 | 各版本 changelog/plan/review-findings 等（121 md 41,090 行 + 3 py 446 行 + 1 txt 12 行） |
 | ├ plan/ | 中间设计文件 | 2 | 553 | 在办设计文档：DataSinking 持仓个股财报摘要设计（`datasink-financial-report-digest-design.md`）+ 持仓个股基本面数据源主备与财务指标提取设计（`financial-indicator-source-design.md`）；已实现的设计文档随其迭代归档（功能开关注册表统一与联接基金穿透两份现位于 v0.10.x 归档的 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -77,6 +77,7 @@ investor-util/
 │   │   │   ├── price.py              #   行情价格获取（股票/ETF）
 │   │   │   ├── quote_adapters.py     #   行情域数据源适配器（腾讯/新浪/东方财富，开关 datasource_adapter 默认开）
 │   │   │   ├── report_adapters.py    #   财报全文域适配器（DataSinking，声明式 alias 归一）
+│   │   │   ├── financial_indicator_adapters.py # 财务指标域适配器（akshare 主源，标准字段直出）
 │   │   │   └── source_adapter.py     #   数据源适配契约（三段式基类 + 声明式 alias 归一 + 注册表/自检）
 │   │   │
 │   │   ├── providers/                # 数据源提供商实现
@@ -94,6 +95,7 @@ investor-util/
 │   │   │   ├── tiantian_nav.py         #   天天基金 API — 历史净值数据
 │   │   │   ├── tiantian_ranking.py     #   天天基金 API — 业绩排名/评级/风险分析
 │   │   │   ├── akshare_extras.py     #   akshare 封装（盈利预测/资金流向/分红）
+│   │   │   ├── akshare_financial.py  #   akshare 结构化财务指标（指标域主源；宽表归一为每报告期标准记录）
 │   │   │   ├── akshare_news.py       #   akshare 新闻源（财新网/CCTV）
 │   │   │   ├── sina_news.py          #   新浪财经新闻源
 │   │   │   ├── eastmoney_news.py     #   东方财富新闻源
@@ -489,6 +491,7 @@ investor-util/
 │       │   │   ├── test_fetcher_price.py    #   行情价格获取测试
 │       │   │   ├── test_fund.py             #   基金数据获取测试（含联接基金穿透后处理：幂等/缓存命中补做/开关）
 │       │   │   ├── test_financial_report.py  #   全文本财报取数编排（标的收集/元数据取用/字段装配/摘要截断）
+│       │   │   ├── test_financial_indicator.py #  财务指标域适配器与链路契约（适配器自检/字段集/链注册/降级）
 │       │   │   ├── test_fund_edge.py        #   联接基金穿透边缘场景
 │       │   │   ├── test_fund_manager.py     #   基金经理数据测试
 │       │   │   ├── test_quote_adapter_parity.py # 行情域适配契约等价性（与既有转换函数逐源比对 + 链两槽选择）
@@ -556,6 +559,7 @@ investor-util/
 │       │   │   ├── __init__.py      #       子包标记
 │       │   │   ├── test_datasink.py           #   DataSinking 财报 provider（符号映射/套餐限额/护栏/HTTP 分支/取数原语）
 │       │   │   ├── test_akshare_extras.py     #   akshare 封装测试
+│       │   │   ├── test_akshare_financial.py  #   akshare 结构化财务指标（宽表归一/百分数换算/同名指标优先/降级）
 │       │   │   ├── test_cassette_replay.py    #   已录制真实响应体的解析回归（精确值断言，离线回放）
 │       │   │   ├── test_eastmoney.py          #   东方财富 API 测试
 │       │   │   ├── test_eastmoney_industry.py #   东方财富行业分类测试

@@ -74,35 +74,8 @@ _register_credential_spec(
 )
 
 
-# ═══════════════════════════════════════════════════════════════
-#  符号映射（A 股 6 位代码 → FMP 风格）
-# ═══════════════════════════════════════════════════════════════
-
-
-def to_fmp_symbol(code: str) -> str:
-    """A 股 6 位代码 → FMP 风格符号；非 A 股代码返回空串。
-
-    沪市（600/601/603/605/688/689）→ ``.SS``；深市（000/001/002/003/300/301）
-    → ``.SZ``；北交所（43x/83x/87x/920）→ ``.BJ``。带后缀或前缀的输入原样
-    返回（已是符号格式）。
-    """
-    raw = (code or "").strip().upper()
-    if not raw:
-        return ""
-    if "." in raw:
-        return raw
-    if raw.startswith(("sh", "sz", "bj")) and len(raw) == 8:
-        return raw
-    if not (len(raw) == 6 and raw.isdigit()):
-        return ""
-    if raw.startswith(("600", "601", "603", "605", "688", "689")):
-        return f"{raw}.SS"
-    if raw.startswith(("000", "001", "002", "003", "300", "301")):
-        return f"{raw}.SZ"
-    if raw.startswith(("43", "83", "87", "92")):
-        return f"{raw}.BJ"
-    return ""
-
+# 符号映射 ``to_fmp_symbol`` 统一存放于 ``core/code_utils.py``（多个数据源共用同一
+# A 股→FMP 符号口径），本模块不再自留一份。
 
 # ═══════════════════════════════════════════════════════════════
 #  限速（计划感知）与日配额护栏

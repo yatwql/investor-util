@@ -119,6 +119,14 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         cache_ttl=CACHE_MONTHLY,
         cache_groups=("refresh",),
     ),
+    # ── 结构化财务指标（akshare 主源） ──
+    DataModuleDef(
+        "财务指标",
+        "fin_indicator",
+        cache_prefixes=("fin_indicator_",),
+        cache_ttl=CACHE_MONTHLY,
+        cache_groups=("refresh",),
+    ),
     # ── 新闻（refresh 组）──
     DataModuleDef("新闻聚合", "news", cache_prefixes=("news_",), cache_ttl=900, cache_groups=("refresh",)),
     # ── LLM 智能分析模块 ──

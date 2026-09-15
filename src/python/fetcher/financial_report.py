@@ -18,6 +18,7 @@ from typing import Any
 from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
+from src.python.core.code_utils import to_fmp_symbol
 from src.python.fetcher.source_adapter import adapter_chain_slots
 from src.python.providers import datasink
 from src.python.schemas.datasource_fields import DOMAIN_FINANCIAL_REPORT
@@ -48,12 +49,12 @@ def collect_a_share_targets(
     targets: dict[str, dict[str, str]] = {}
     for h in holdings:
         code = str(getattr(h, "code", "") or "").strip()
-        symbol = datasink.to_fmp_symbol(code)
+        symbol = to_fmp_symbol(code)
         if symbol and code not in targets:
             targets[code] = {"code": code, "name": str(getattr(h, "name", "") or ""), "symbol": symbol}
     for raw in penetrated_codes or []:
         code = str(raw or "").strip()
-        symbol = datasink.to_fmp_symbol(code)
+        symbol = to_fmp_symbol(code)
         if symbol and code not in targets:
             targets[code] = {"code": code, "name": "", "symbol": symbol}
     return [targets[k] for k in sorted(targets)]

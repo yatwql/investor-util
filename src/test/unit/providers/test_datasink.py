@@ -1,8 +1,11 @@
 """providers/datasink.py 单元测试。
 
-覆盖：A 股符号映射、套餐感知的速率与配额派生、凭据缺失跳过、
+覆盖：套餐感知的速率与配额派生、凭据缺失跳过、
 HTTP 各状态码分支（401/429/非 200/非 JSON）、请求前限速与配额护栏、
 列表/单篇/章节三个取数原语的响应解析。
+
+（A 股→FMP 符号映射已收敛至 ``core/code_utils.py``，其测试见
+``src/test/unit/core/test_code_utils.py::TestFmpSymbol``。）
 
 运行：
   pytest src/test/unit/providers/test_datasink.py -v
@@ -53,32 +56,6 @@ def _prepare(monkeypatch, resp: _FakeResp) -> _FakeClient:
     monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
     monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
     return client
-
-
-# ── 符号映射 ────────────────────────────────────────────────
-
-
-class TestFmpSymbol:
-    def test_shanghai(self):
-        assert ds.to_fmp_symbol("600519") == "600519.SS"
-        assert ds.to_fmp_symbol("688981") == "688981.SS"
-
-    def test_shenzhen(self):
-        assert ds.to_fmp_symbol("000001") == "000001.SZ"
-        assert ds.to_fmp_symbol("300750") == "300750.SZ"
-
-    def test_beijing(self):
-        assert ds.to_fmp_symbol("830799") == "830799.BJ"
-        assert ds.to_fmp_symbol("920002") == "920002.BJ"
-
-    def test_already_symbolic(self):
-        assert ds.to_fmp_symbol("600519.SS") == "600519.SS"
-
-    def test_non_a_share_returns_empty(self):
-        assert ds.to_fmp_symbol("7203") == ""
-        assert ds.to_fmp_symbol("AAPL") == ""
-        assert ds.to_fmp_symbol("") == ""
-        assert ds.to_fmp_symbol("12345") == ""
 
 
 # ── 套餐感知的速率与配额 ────────────────────────────────────

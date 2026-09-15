@@ -261,7 +261,11 @@ ADAPTER_REGISTRY: dict[str, dict[str, SourceAdapter]] = {}
 
 #: 承载适配器实现的模块（新增数据域时在此追加一行；按需惰性导入，避免
 #: 「为注册而 import」的隐式副作用依赖——调用方只与公开 API 打交道）
-ADAPTER_MODULES: tuple[str, ...] = ("src.python.fetcher.quote_adapters", "src.python.fetcher.report_adapters")
+ADAPTER_MODULES: tuple[str, ...] = (
+    "src.python.fetcher.quote_adapters",
+    "src.python.fetcher.report_adapters",
+    "src.python.fetcher.financial_indicator_adapters",
+)
 
 _ADAPTERS_LOADED = False
 

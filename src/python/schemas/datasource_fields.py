@@ -67,6 +67,7 @@ class QuoteFields:
 
 DOMAIN_QUOTE = "quote"
 DOMAIN_FINANCIAL_REPORT = "financial_report"
+DOMAIN_FINANCIAL_INDICATOR = "financial_indicator"
 
 
 @dataclass(frozen=True)
@@ -113,8 +114,62 @@ class FinancialReportFields:
         return asdict(self)
 
 
+# ═══════════════════════════════════════════════════════════════
+#  财务指标域（financial_indicator）
+# ═══════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True)
+class FinancialIndicatorFields:
+    """财务指标域标准字段 —— 上市公司**单报告期**结构化财务指标。
+
+    金额类字段单位为元；比率类字段（同比/毛利率/ROE/资产负债率）为
+    **小数比例**（0.1675 = 16.75%）。报告期以元数据为准，不从正文猜。
+
+    Attributes:
+        code: 6 位证券代码
+        symbol: FMP 风格符号
+        report_period: 报告期（YYYY-MM-DD）
+        doc_type: 文种（annual/semiannual/q1/q3）
+        revenue: 营业总收入（元）
+        net_profit: 归母净利润（元）
+        revenue_yoy: 营业总收入同比（小数）
+        net_profit_yoy: 归母净利润同比（小数）
+        gross_margin: 毛利率（小数）
+        roe: 净资产收益率（小数）
+        debt_ratio: 资产负债率（小数）
+        operating_cash_flow: 经营活动现金流净额（元）
+        eps: 基本每股收益（元）
+        bvps: 每股净资产（元）
+        source_api: 数据源标识（akshare_financial）
+        source: 数据源展示名
+    """
+
+    code: str = ""
+    symbol: str = ""
+    report_period: str = ""
+    doc_type: str = ""
+    revenue: float | None = None
+    net_profit: float | None = None
+    revenue_yoy: float | None = None
+    net_profit_yoy: float | None = None
+    gross_margin: float | None = None
+    roe: float | None = None
+    debt_ratio: float | None = None
+    operating_cash_flow: float | None = None
+    eps: float | None = None
+    bvps: float | None = None
+    source_api: str = ""
+    source: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """转为标准字段 dict（全部字段均出现，字段序与声明序一致）。"""
+        return asdict(self)
+
+
 # 数据域 → 标准字段记录类（新增域时在此登记，契约自检据此校验适配器）
 DOMAIN_RECORDS: dict[str, type] = {
     DOMAIN_QUOTE: QuoteFields,
     DOMAIN_FINANCIAL_REPORT: FinancialReportFields,
+    DOMAIN_FINANCIAL_INDICATOR: FinancialIndicatorFields,
 }

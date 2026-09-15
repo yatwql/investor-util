@@ -91,6 +91,34 @@ def is_exchange_fund_code(code: str) -> bool:
     return raw.startswith(_EXCHANGE_FUND_PREFIXES)
 
 
+def to_fmp_symbol(code: str) -> str:
+    """A 股 6 位代码 → FMP 风格符号；非 A 股代码返回空串。
+
+    沪市（600/601/603/605/688/689）→ ``.SS``；深市（000/001/002/003/300/301）
+    → ``.SZ``；北交所（43x/83x/87x/920）→ ``.BJ``。带后缀或前缀的输入原样
+    返回（已是符号格式）。
+
+    放在 code_utils 而非某个 provider 内：多个数据源（财报全文、财务指标）
+    都需要同一个符号口径，复制两份必然漂移。
+    """
+    raw = (code or "").strip().upper()
+    if not raw:
+        return ""
+    if "." in raw:
+        return raw
+    if raw.startswith(("sh", "sz", "bj")) and len(raw) == 8:
+        return raw
+    if not (len(raw) == 6 and raw.isdigit()):
+        return ""
+    if raw.startswith(("600", "601", "603", "605", "688", "689")):
+        return f"{raw}.SS"
+    if raw.startswith(("000", "001", "002", "003", "300", "301")):
+        return f"{raw}.SZ"
+    if raw.startswith(("43", "83", "87", "92")):
+        return f"{raw}.BJ"
+    return ""
+
+
 def is_hk_stock_code(code: str) -> bool:
     """判断是否为港股通标的（5 位纯数字代码，如 00700、03690）。
 

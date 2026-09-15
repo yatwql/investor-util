@@ -277,6 +277,18 @@
 | R-CRD-07 | **凭据值安全**：只从密钥文件/环境变量读取，**值永不落日志、永不写入报告与缓存**——日志与就绪矩阵只出现「来源类型 + 是否就绪」及申请地址 |
 | R-CRD-08 | 常规开关 `datasource_credential_ready` 默认开启，**关闭时不产生任何行为分支**（链路照常尝试、无跳过项、无就绪行、无凭据组，输出与未引入本机制时逐字节一致）；三面上屏同源注册表（TUI 菜单 `[S]` / Web 配置面板 / CLI `--feature NAME=VALUE`） |
 
+### 5.9 结构化财务指标数据域（`financial_indicator`）
+
+把上市公司定期报告中的关键财务指标收敛为每报告期一条标准记录，作为「真实估值分位 + 质量因子」的数据底座；主源为 akshare（无需凭据），备用支路为从已缓存财报全文解析（后续阶段接入）。
+
+| 需求标识 | 需求描述 |
+|:---------|:---------|
+| R-FIN-01 | **独立数据域与标准字段契约**：新增 `financial_indicator` 域与 `FinancialIndicatorFields` 记录类（`code`/`symbol`/`report_period`/`doc_type`/`revenue`/`net_profit`/`revenue_yoy`/`net_profit_yoy`/`gross_margin`/`roe`/`debt_ratio`/`operating_cash_flow`/`eps`/`bvps`/`source_api`/`source`），登记 `DOMAIN_RECORDS` 并接受适配器契约自检 |
+| R-FIN-02 | **主源（akshare）**：一次调用 `stock_financial_abstract` 取回宽表，按报告期归一为多条记录；金额类字段单位元、比率类字段百分数→**小数比例**；同名指标多分组时按表格顺序**首个非空**为准；非 A 股代码/未安装/超时/空表返回空 |
+| R-FIN-03 | **接入既有链路**：新增链 `financial_indicator: [akshare_financial]` 与适配器；取数复用 `fetch_with_fallback`（缓存/熔断/降级），不新造获取路径；缓存前缀 `fin_indicator_` 纳入注册表（一月 TTL、基础类） |
+| R-FIN-04 | **共享原语收敛**：A 股→FMP 符号映射统一为 `core/code_utils.py::to_fmp_symbol`，取数超时封装统一为 `providers/_utils.py::run_with_timeout`（多个 provider 共用，不自留副本） |
+| R-FIN-05 | **降级不阻断**：指标源不可用时返回空/None，由上层按「数据缺失」占位；不抛异常、不计入传输级熔断 |
+
 ---
 
 ## 6. 报告输出需求

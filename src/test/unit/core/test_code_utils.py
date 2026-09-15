@@ -1,7 +1,8 @@
-"""code_utils 指数代码判定函数单元测试。
+"""code_utils 指数代码与符号映射判定函数单元测试。
 
 覆盖：is_index_code / is_us_index_code / get_index_exchange_prefix /
-      is_otc_fund_by_name / is_a_share_code（00 重叠区场外基金辅助判定与 A 股代码判定）。
+      is_otc_fund_by_name / is_a_share_code（00 重叠区场外基金辅助判定与 A 股代码判定）/
+      to_fmp_symbol（A 股代码 → FMP 风格符号）。
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from src.python.core.code_utils import (
     is_index_code,
     is_otc_fund_by_name,
     is_us_index_code,
+    to_fmp_symbol,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
@@ -185,3 +187,33 @@ class TestIsAShareCode:
     def test_prefix_not_a_share(self) -> None:
         """带 sh/sz/bj 前缀但非 6 位 → False。"""
         assert is_a_share_code("sh60000") is False
+
+
+class TestFmpSymbol:
+    """to_fmp_symbol —— A 股 6 位代码 → FMP 风格符号（多数据源共用的符号口径）。"""
+
+    def test_shanghai(self):
+        """沪市 600/688 → .SS。"""
+        assert to_fmp_symbol("600519") == "600519.SS"
+        assert to_fmp_symbol("688981") == "688981.SS"
+
+    def test_shenzhen(self):
+        """深市 000/300 → .SZ。"""
+        assert to_fmp_symbol("000001") == "000001.SZ"
+        assert to_fmp_symbol("300750") == "300750.SZ"
+
+    def test_beijing(self):
+        """北交所 83/92 → .BJ。"""
+        assert to_fmp_symbol("830799") == "830799.BJ"
+        assert to_fmp_symbol("920002") == "920002.BJ"
+
+    def test_already_symbolic(self):
+        """已带后缀的输入原样返回。"""
+        assert to_fmp_symbol("600519.SS") == "600519.SS"
+
+    def test_non_a_share_returns_empty(self):
+        """非 A 股代码返回空串。"""
+        assert to_fmp_symbol("7203") == ""
+        assert to_fmp_symbol("AAPL") == ""
+        assert to_fmp_symbol("") == ""
+        assert to_fmp_symbol("12345") == ""

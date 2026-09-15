@@ -18,6 +18,15 @@
 - **数据源说明表**：「数据源可用性矩阵」章在健康度表后新增「数据源说明（实际使用清单）」表——逐数据类别列出实际链路（如财报全文=DataSinking）、用途、计费（免费/免费档/付费档，财报全文随 `datasink.plan` 动态展示）与凭据要求（是否需 key + 就绪状态），并标注本次运行是否实际使用（观测到 DegradationTracker 事件即为已使用）。Excel（旧样式页签与数据质量仪表盘两路）与 HTML 同步渲染，`build_data_source_catalog()` 输出契约。
 - **状态**：plan-42 全部完成——数据层（①②③）+ 章节装配（④a）+ 渲染接线（④b）+ 文档同步（⑤：requirements §6.12 R-FRD-01~07、technical 附录 H 与 §4.9/§6.7、datasource 两册、how-to-config、folders）。
 
+### 结构化财务指标数据域（`financial_indicator`，plan-43 阶段①）（2026-09-15）
+
+- **新增数据域与契约**：`financial_indicator` 域 + `FinancialIndicatorFields`（营收/净利/同比/毛利率/ROE/负债率/经营现金流/EPS/每股净资产；金额单位元、比率为小数比例、可选数值缺失取 `None`），登记 `DOMAIN_RECORDS` 并纳入适配器契约自检。
+- **主源 provider**：`providers/akshare_financial.py` —— 一次 `stock_financial_abstract` 取回宽表（指标 × 报告期），归一为每报告期一条标准记录；百分数（ROE/毛利率/负债率/同比）换算为小数比例；同名指标多分组按表格顺序首个非空为准；非 A 股/未安装/超时/空表返回空。
+- **适配器与链路**：`fetcher/financial_indicator_adapters.py::AkshareFinancialAdapter`（标准字段直出，无需 alias）+ 新链 `financial_indicator: [akshare_financial]`；取数复用 `fetch_with_fallback`（缓存/熔断/降级），缓存前缀 `fin_indicator_`（一月 TTL、基础类）；配置校验放行新数据类型/源名。
+- **共享原语收敛（去重）**：A 股→FMP 符号映射统一为 `core/code_utils.py::to_fmp_symbol`（原在 datasink 内，现两个数据源共用）；akshare 取数超时封装统一为 `providers/_utils.py::run_with_timeout`（由 `akshare_extras` 抽出，避免第二份副本）。
+- **测试**：新增 `test_akshare_financial.py`（宽表归一/百分数换算/同名指标优先与逐期补齐/文种映射/各类降级，15 例）与 `test_financial_indicator.py`（适配器登记与自检/标准字段集/链注册/链路取回与降级，5 例）；`TestFmpSymbol` 随函数迁移至 `test_code_utils.py`（unit_core）。
+- **口径**：本阶段仅数据层（无报告消费）；真实 PE/PB 估值分位、质量因子与 LLM 注入属后续阶段（见 `docs-stm/plan/financial-indicator-source-design.md` §13）。
+
 ### 测试用例审计与修复（rf-365）（2026-09-14）
 
 - **审计口径**：333 个测试文件（`src/test/unit|scenario|integration`，`live/` 为 opt-in 排除）AST + 收集器全量扫描，按「无效（名实不符且无断言）/ 死（空体、同类重名、未收集）/ 冗余（AST 完全相同、同类同函数号）/ 目录语义（导入包 vs 目录期望）/ 命名与内容」五维盘点。

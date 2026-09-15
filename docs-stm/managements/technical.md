@@ -2808,7 +2808,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **定位**：新增独立章「持仓个股财报摘要」（sheet key `financial_report_digest`，type `financial_report`，`report_submodules.financial_report_digest` 默认关）。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）指定章节的**原文摘要**，与「拿行情/拿持仓」互补：前者提供公司经营层叙事与财务口径原文。
 
-**数据源与鉴权**：DataSinking（`https://api.datasink.ing`）提供全文本财报 Markdown，仅覆盖 A 股（SSE/SZSE/BSE，代码经 `providers/datasink.py::to_fmp_symbol` 映射为 FMP 风格）。**需用户自备 API key**：凭据取通用密钥文件 `data/config/data_key.json` 的 `datasink` 节（`{"datasink": {"api_key": "..."}}`），环境变量 `DATASINK_API_KEY` 可覆盖；缺 key 时链路主动跳过并给申请指引，章节写占位。
+**数据源与鉴权**：DataSinking（`https://api.datasink.ing`）提供全文本财报 Markdown，仅覆盖 A 股（SSE/SZSE/BSE，代码经 `core/code_utils.py::to_fmp_symbol` 映射为 FMP 风格）。**需用户自备 API key**：凭据取通用密钥文件 `data/config/data_key.json` 的 `datasink` 节（`{"datasink": {"api_key": "..."}}`），环境变量 `DATASINK_API_KEY` 可覆盖；缺 key 时链路主动跳过并给申请指引，章节写占位。
 
 **取数链路**：`fetcher/financial_report.py` 逐标的取元数据（`/documents`，按 `doc_types` 年报优先）→ 逐章节取正文（`/documents/{id}?section=`，每节独立缓存、命中者按声明顺序以空行拼接）→ 按 `datasink.max_chars` 截断为摘要。单篇正文经 `fetch_with_fallback` + 财报域适配器两槽，复用缓存/熔断/降级。
 
@@ -3201,6 +3201,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `hold_schema` | 基金持仓缓存载荷语义版本（读侧拒收非当前版本 → 视为未命中重取，防「语义变更型修复」被 TTL 内缓存遮蔽） | 资产穿透TOP10 | 数据获取 | 无（缓存契约字段，值见 `_HOLD_PAYLOAD_SCHEMA`） |
 | `cache_validate` | 缓存载荷准入判据（`fetch_with_fallback` 参数：载荷未通过判据即视为未命中、清缓存重取） | 资产穿透TOP10 | 数据获取 | 无（链路原语） |
 | `financial_report_digest` | 持仓个股财报摘要（新增独立章：A 股标的取最新年报章节原文摘要；数据源 DataSinking，需用户自备 key） | 持仓个股财报摘要 | 数据获取 | `report_submodules.financial_report_digest`（默认关） |
+| `financial_indicator` | 财务指标数据域（上市公司单报告期结构化指标：营收/净利/同比/毛利率/ROE/负债率/现金流/EPS/每股净资产） | 资产穿透TOP10 | 数据获取 | 无（数据域） |
+| `FinancialIndicatorFields` | 财务指标标准字段记录（金额单位元；比率为小数比例；可选数值缺失取 None） | 资产穿透TOP10 | 数据获取 | 无（契约） |
+| `akshare_financial` | akshare 财务指标（指标域主源，无需凭据；一条调用多股） | 资产穿透TOP10 | 数据获取 | 无（provider） |
 | `rebalance_advice` | 调仓建议 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `trade_discipline` | 交易纪律 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `return_attribution` | 收益归因 | 行动建议 | 调仓 | `enable_action`（默认开） |

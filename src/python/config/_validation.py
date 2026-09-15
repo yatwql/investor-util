@@ -23,7 +23,14 @@ logger = logging.getLogger("invest")
 
 _KNOWN_NEWS_SOURCES: set[str] = {"sina", "eastmoney", "cls", "wallstreetcn", "akshare"}
 
-_KNOWN_PROVIDER_TYPES: set[str] = {"price", "fund_rank", "fund_hold", "industry", "financial_report"}
+_KNOWN_PROVIDER_TYPES: set[str] = {
+    "price",
+    "fund_rank",
+    "fund_hold",
+    "industry",
+    "financial_report",
+    "financial_indicator",
+}
 
 _KNOWN_PROVIDER_NAMES: set[str] = {
     "tencent",
@@ -33,6 +40,7 @@ _KNOWN_PROVIDER_NAMES: set[str] = {
     "eastmoney_industry",
     "eastmoney_industry_rest",
     "datasink",
+    "akshare_financial",
 }
 
 _STRING_CONFIG_KEYS: set[str] = {
