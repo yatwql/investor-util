@@ -18,10 +18,10 @@
 | **测试用例** | — | — | **7,175 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,171** | 含 README.md（204 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,967 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **136** | **51,924** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 9,878 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| **项目文档** | Markdown | **137** | **52,077** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 9,911 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 129 | 42,429 | 各版本 changelog/plan/review-findings 等（125 md 41,971 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 0 | 0 | **当前无在办设计文档**（已实现的设计文档随迭代归档：DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
+| ├ plan/ | 中间设计文件 | 1 | 120 | **当前无在办设计文档**（已实现的设计文档随迭代归档：DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -1046,7 +1046,8 @@ investor-util/
 │   │   │   │   └── feeder-penetration-and-holdings-fetch-design.md # 取数阶梯次序修正 + 目标 ETF 代理底层暴露
 │   │   │   └── financial-indicator-source/ #   基本面数据源主备与财务指标提取设计归档
 │   │   │       └── financial-indicator-source-design.md # 标准字段契约/全文解析支路/真实估值分位(TTM)/底座门禁/LLM 注入
-│   └── plan/                          #   中间设计文件（当前无在办设计文档；已实现文档随七次合并迁入 v0.10.x 归档）
+│   └── plan/                          #   中间设计文件（在办设计文档）
+│       └── section-consolidation-design.md # 报告章节整合设计（plan-45：四项合并/可见性模型扩展/批次验收）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）

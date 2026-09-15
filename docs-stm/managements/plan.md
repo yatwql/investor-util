@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.11.1-dev
-> **编号源**：`plan-next = 45`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-44，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 46`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-45，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -22,6 +22,24 @@
 
 > 无待办项（plan-42 / plan-43 摘要见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)；plan-44 摘要见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)）。
 
+
+#### 🔲 `plan-45` 报告章节整合（注册表条目 21 → 17，重生成配置模板）
+
+**动机**：注册表条目已有 21 个，其中若干同族/体量很薄/本是另一条目的子视图（市值核算明细与持仓分类同源；持仓关系矩阵与持仓集中度同属「持仓结构」；财报摘要是持仓基本面的叙事层；基金经理变更是基金业绩的子视图）。
+
+**决定（用户）**：不做配置兼容，**重生成 `config.json` 与配置模板**；设计与实施须逐条对照 `technical.md` §8 架构约束。
+
+**方案（保留吸收方主键，被吸收键移除）**：
+1. `market_value` 吸收 `category` → 「持仓明细与分类」（两区块；均 `always`）
+2. `position_relationship` 吸收 `fund_concentration` → 「持仓结构与集中度」（两区块；同 `type=fund_deep_analysis`；可见性取 OR）
+3. `financial_indicator` 吸收 `financial_report_digest` → 「持仓基本面」（两区块；两个功能开关各控一块）
+4. `fund_performance` 吸收 `fund_manager` → 「基金业绩分析」（经理变更为可选区块，board 门禁 `enable_fund_deep_analysis`；先例 `candidate_compare`）
+
+**架构要点**：不新增 pipeline_data 键（pipeline_data 契约台账）；可见性模型最小扩展——注册表可选字段 `data_flag_any`（多契约 OR），未声明时行为不变；序号/显示名/页签名全部经注册表（注册表驱动）。
+
+**批次**：① 模型扩展 + 守卫 → ② M1 → ③ M2 → ④ M3+M4；每批一次提交、每批门禁。
+
+设计文档：[`section-consolidation-design.md`](section-consolidation-design.md)（含现状核实、合并方案、约束对照、测试与文档同步清单、批次验收标准）。
 
 ### P4 — 实验功能
 
