@@ -526,8 +526,10 @@ def is_enable_valuation_percentile(config: dict | None = None) -> bool:
 def is_enable_market_temperature(config: dict | None = None) -> bool:
     """市场温度子模块是否启用（「投资分析汇总」章市场温度刻度行）。
 
-    读取 `report_submodules.market_temperature`，默认关（未开启时
-    「投资分析汇总」章既有输出不变）。
+    读取 `report_submodules.market_temperature`，**默认开**（与 `_DEFAULT_CONFIG` 同源；
+    数据不可用时该行静默省略，不写占位）；显式关闭（菜单 P 或置 false）时该章保持
+    引入本行前的既有输出。缺键回落值须与默认值一致——由
+    `test_config.py::TestReportSubmoduleDefaultConsistency` 逐项锁定。
 
     Args:
         config: 完整配置字典，为 None 时读取全局配置
@@ -536,11 +538,11 @@ def is_enable_market_temperature(config: dict | None = None) -> bool:
         config = get_config()
     submodules = config.get("report_submodules")
     if not isinstance(submodules, dict):
-        return False
+        return True
     val = submodules.get("market_temperature")
     if val is None:
-        logger.debug("config.json 缺少 report_submodules.market_temperature，使用默认值 false")
-        return False
+        logger.debug("config.json 缺少 report_submodules.market_temperature，使用默认值 true")
+        return True
     return bool(val)
 
 

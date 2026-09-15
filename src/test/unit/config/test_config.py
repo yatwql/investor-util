@@ -1133,8 +1133,30 @@ class TestMarketTemperaturePromotion:
         assert is_enable_market_temperature({"report_submodules": {"market_temperature": False}}) is False
         assert is_enable_market_temperature({"report_submodules": {"market_temperature": True}}) is True
 
-    def test_missing_key_falls_back_to_off_for_partial_config(self):
-        """缺键（非默认配置，如显式给定的部分 config）→ 维持访问器既有语义（关）。"""
+    def test_missing_key_falls_back_to_on(self):
+        """缺键回落值须与默认值一致（转正后为开）——避免「默认开但缺键判关」的错位。"""
         from src.python.config import is_enable_market_temperature
 
-        assert is_enable_market_temperature({}) is False
+        assert is_enable_market_temperature({}) is True
+        assert is_enable_market_temperature({"report_submodules": {}}) is True
+
+
+class TestReportSubmoduleDefaultConsistency:
+    """报告子模块「默认值 ↔ 访问器缺键回落」一致性护栏。
+
+    每个 `report_submodules` 开关在 config 缺该键时，访问器返回值必须等于
+    `_DEFAULT_CONFIG` 里的默认值——两者不一致会造成「配置写明默认开、实际判关」
+    （或反之）的错位（`market_temperature` 转正时所需同步改动之一）。
+    """
+
+    def test_every_switch_missing_key_matches_default(self):
+        from src.python.config import _core
+        from src.python.config._config_defaults import _DEFAULT_CONFIG
+
+        mismatches = []
+        for key, default in _DEFAULT_CONFIG["report_submodules"].items():
+            accessor = getattr(_core, f"is_enable_{key}", None)
+            assert accessor is not None, f"report_submodules.{key} 缺少同名访问器 is_enable_{key}"
+            if accessor({}) != bool(default) or accessor({"report_submodules": {}}) != bool(default):
+                mismatches.append(f"{key}=默认{bool(default)} 缺键判{accessor({})}")
+        assert not mismatches, f"默认值与访问器缺键回落不一致：{mismatches}"

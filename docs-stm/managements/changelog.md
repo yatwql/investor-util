@@ -6,6 +6,13 @@
 
 ## [0.10.20-dev] - 开发中（未发布）
 
+### 修复：市场温度缺键回落与默认值不一致（转正遗漏）+ 一致性护栏（2026-09-15）
+
+- **缺陷**：市场温度转正只改了 `_DEFAULT_CONFIG`，未同步访问器 `is_enable_market_temperature` 的**缺键回落值**（仍硬编码 false）——`report_submodules` 八项里唯一一处「默认开但缺键判关」的错位。运行时因 `get_config()` 会与默认值做嵌套合并而不显现，但部分 config 传入的路径（面板/编排部分字典）会出现「配置写明默认开、实际判关」。
+- **修复**：`is_enable_market_temperature` 缺键与 `report_submodules` 非 dict 时回落 **True**（与 `data_quality` 同口径），docstring 与 debug 日志文案同步。
+- **回归护栏**：新增 `test_config.py::TestReportSubmoduleDefaultConsistency`——逐项断言每个 `report_submodules` 开关的「默认值 == 访问器缺键回落」，并要求存在同名访问器；今后任何开关转正若只改默认值就会立刻报红。
+- **测试**：既有「缺键回落为关」的断言改为「回落为开」，另补 `report_submodules: {}` 两态。dev-verify 2757/0。
+
 ### 市场温度转正（默认开启，无数据静默省略）（2026-09-15）
 
 - **转正口径**：`report_submodules.market_temperature` 由默认关改为**默认开**。判据取本仓库「读侧增强类开关」纪律——开启的代价基本只在读侧：只在既有产物流水线（「投资分析汇总」章）追加一段由**已算出**数据派生的内容，不新增 LLM 调用次数、不写新的持久化文件；**例外与已知代价**照实记录于下。
