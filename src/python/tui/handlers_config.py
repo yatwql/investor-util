@@ -417,17 +417,18 @@ def _cmd_config_report_boards() -> None:
 
 
 def _cmd_config_report_submodules() -> None:
-    """配置报告增强子模块（数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度 / 持仓个股财报摘要）。
+    """配置报告增强子模块（数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度 / 持仓个股财报摘要 / 财务指标）。
 
-    7 项增强子模块独立启停，实时保存到 config.json 的 `report_submodules`（数据质量仪表盘默认开，其余默认关）。
+    8 项增强子模块独立启停，实时保存到 config.json 的 `report_submodules`（数据质量仪表盘默认开，其余默认关）。
     开启后对应章节按需增强区块或新增独立章（数据源可用性矩阵 / 风格与因子分析 / 基金业绩分析 /
-    资产穿透TOP10 / 投资分析汇总 / 持仓个股财报摘要），不改变既有章节输出。
+    资产穿透TOP10 / 投资分析汇总 / 持仓个股财报摘要 / 财务指标），不改变既有章节输出。
     """
     from src.python.config import (
         get_config,
         is_enable_candidate_compare,
         is_enable_cost_lots,
         is_enable_data_quality,
+        is_enable_financial_indicator,
         is_enable_financial_report_digest,
         is_enable_industry_beta,
         is_enable_market_temperature,
@@ -444,6 +445,7 @@ def _cmd_config_report_submodules() -> None:
         ("valuation_percentile", "估值分位", "资产穿透TOP10 估值分位列"),
         ("market_temperature", "市场温度", "投资分析汇总 市场温度刻度行"),
         ("financial_report_digest", "持仓个股财报摘要", "新增独立章：A 股财报章节摘要（需 DataSinking key）"),
+        ("financial_indicator", "财务指标", "新增独立章：A 股基本面（指标 + 质量档 + 趋势 + 当前 PE/PB）"),
     ]
     accessors = {
         "data_quality": is_enable_data_quality,
@@ -453,6 +455,7 @@ def _cmd_config_report_submodules() -> None:
         "valuation_percentile": is_enable_valuation_percentile,
         "market_temperature": is_enable_market_temperature,
         "financial_report_digest": is_enable_financial_report_digest,
+        "financial_indicator": is_enable_financial_indicator,
     }
 
     # 名称列宽：取子模块清单内最长显示名，使各行状态方括号纵向对齐

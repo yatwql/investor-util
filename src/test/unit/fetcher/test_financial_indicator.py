@@ -240,6 +240,75 @@ def test_chain_returns_none_when_both_unavailable(monkeypatch):
     assert out is None
 
 
+class TestIndicatorSeries:
+    """多期序列取数（主源多期 / 降级单期 / 缓存 / 价格映射）。"""
+
+    def test_main_source_multiperiod(self, monkeypatch):
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        records = [
+            {"report_period": "2025-12-31", "revenue": 130.0},
+            {"report_period": "2024-12-31", "revenue": 100.0},
+        ]
+        monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", lambda code, limit=8: records)
+        assert fi.fetch_indicator_series("600900") == records
+
+    def test_fallback_to_chain_single_period(self, monkeypatch):
+        """主源无覆盖时退化为链路单期记录（不伪造历史期）。"""
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", lambda code, limit=8: [])
+        monkeypatch.setattr(fi, "fetch_latest_indicator", lambda code: {"report_period": "2025-12-31"})
+        series = fi.fetch_indicator_series("600900")
+        assert [r["report_period"] for r in series] == ["2025-12-31"]
+
+    def test_series_cached_across_calls(self, monkeypatch):
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        calls = {"n": 0}
+
+        def _history(code, limit=8):
+            calls["n"] += 1
+            return [{"report_period": "2025-12-31"}]
+
+        monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", _history)
+        fi.fetch_indicator_series("600900")
+        fi.fetch_indicator_series("600900")
+        assert calls["n"] == 1
+
+    def test_non_a_share_returns_empty_without_request(self, monkeypatch):
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        called = {"n": 0}
+
+        def _history(code, limit=8):
+            called["n"] += 1
+            return []
+
+        monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", _history)
+        assert fi.fetch_indicator_series("7203") == []
+        assert called["n"] == 0
+
+    def test_collect_price_map_skips_bad_prices(self):
+        from types import SimpleNamespace
+
+        from src.python.fetcher.financial_indicator import collect_price_map
+
+        details = [
+            SimpleNamespace(code="600900", price=28.5),
+            SimpleNamespace(code="000001", price=0),
+            SimpleNamespace(code="600519", price="bad"),
+            SimpleNamespace(code="", price=10.0),
+            SimpleNamespace(code="601398", price=5.2),
+        ]
+        assert collect_price_map(details) == {"600900": 28.5, "601398": 5.2}
+        assert collect_price_map(None) == {}
+
+
 def test_fetch_via_chain_returns_standard_record(monkeypatch):
     """经链路两槽取回恰为标准字段集（provider 已输出标准键，无需 alias）。"""
     from src.python.cache import get_ttl

@@ -167,6 +167,11 @@ def prepare_report_data(
     # report_submodules.financial_report_digest 开启时计算（A 股标的取最新年报章节摘要）；
     # 关闭或无 key 时返回 None（章节隐藏/写占位）
     financial_report_digest_data = compute_financial_report_digest_data(holdings, penetrated_assets, config, reporter)
+    # 财务指标（数据契约 financial_indicator_data）：report_submodules.financial_indicator
+    # 开启时计算（A 股标的指标 + 质量档 + 趋势 + 当前 PE/PB）；关闭时返回 None（章节隐藏）
+    financial_indicator_data = compute_financial_indicator_data(
+        holdings, penetrated_assets, config, reporter, details=details
+    )
 
     # 行动建议单一数据源：再平衡信号等纯算法产出，action_data数据契约
     # （单源计算，行动建议板块与智囊团深度复盘行动摘要共享同一对象）
@@ -243,6 +248,8 @@ def prepare_report_data(
         "market_temperature_data": market_temperature_data,
         # 持仓个股财报摘要（数据契约 financial_report_digest_data；开关关闭/无 key 时为 None）
         "financial_report_digest_data": financial_report_digest_data,
+        # 财务指标（数据契约 financial_indicator_data；开关关闭时为 None）
+        "financial_indicator_data": financial_indicator_data,
     }
 
 
@@ -269,17 +276,53 @@ def compute_financial_report_digest_data(
         return None
     from src.python.report.financial_report_digest import build_financial_report_digest
 
-    penetrated_codes: list[str] = []
+    penetrated_codes = _penetrated_codes(penetrated_assets)
+    return build_financial_report_digest(holdings, config, reporter, penetrated_codes=penetrated_codes)
+
+
+def _penetrated_codes(penetrated_assets: list | None) -> list[str]:
+    """穿透资产中的证券代码（资产自身 code + 其 codes 列表）。"""
+    codes: list[str] = []
     for asset in penetrated_assets or []:
         if not isinstance(asset, dict):
             continue
         code = asset.get("code")
         if code:
-            penetrated_codes.append(str(code))
-        codes = asset.get("codes")
-        if isinstance(codes, (list, set, tuple)):
-            penetrated_codes.extend(str(c) for c in codes)
-    return build_financial_report_digest(holdings, config, reporter, penetrated_codes=penetrated_codes)
+            codes.append(str(code))
+        nested = asset.get("codes")
+        if isinstance(nested, (list, set, tuple)):
+            codes.extend(str(c) for c in nested)
+    return codes
+
+
+def compute_financial_indicator_data(
+    holdings: list,
+    penetrated_assets: list | None,
+    config: dict,
+    reporter: ProgressReporter,
+    details: list | None = None,
+) -> dict | None:
+    """编排财务指标数据（`financial_indicator_data` 数据契约）。
+
+    report_submodules.financial_indicator 开启时，对持仓 + 穿透中的 A 股标的
+    取多期指标（主源 akshare，失败落 DataSinking 解析支路），派生质量档/年度趋势/
+    当前 PE/PB（PE/PB 需现价，取自行情明细）；关闭时返回 None（章节隐藏）。
+    无 A 股标的 / 数据源不可用时返回 available=False 的降级契约，不阻断主链路。
+    """
+    from src.python.config import is_enable_financial_indicator
+
+    if not is_enable_financial_indicator(config):
+        return None
+    from src.python.fetcher.financial_indicator import collect_price_map
+    from src.python.report.financial_indicator import build_financial_indicator
+
+    return build_financial_indicator(
+        holdings,
+        config,
+        reporter,
+        penetrated_codes=_penetrated_codes(penetrated_assets),
+        prices=collect_price_map(details),
+    )
 
 
 # _fetch_valuation_for_code（测试 patch 该路径），不可整体迁移。

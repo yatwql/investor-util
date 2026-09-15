@@ -177,6 +177,8 @@ class TestPrepareReportData:
             "market_temperature_data",
             # 持仓个股财报摘要契约（report_submodules.financial_report_digest 关闭时为 None）
             "financial_report_digest_data",
+            # 财务指标契约（report_submodules.financial_indicator 关闭时为 None）
+            "financial_indicator_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 

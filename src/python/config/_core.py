@@ -422,6 +422,27 @@ def is_enable_financial_report_digest(config: dict | None = None) -> bool:
     return bool(val)
 
 
+def is_enable_financial_indicator(config: dict | None = None) -> bool:
+    """财务指标章是否启用。
+
+    读取 `report_submodules.financial_indicator`，默认关（开启后新增独立章；
+    数据驱动：无数据时章节内写占位）。
+
+    Args:
+        config: 完整配置字典，为 None 时读取全局配置
+    """
+    if config is None:
+        config = get_config()
+    submodules = config.get("report_submodules")
+    if not isinstance(submodules, dict):
+        return False
+    val = submodules.get("financial_indicator")
+    if val is None:
+        logger.debug("config.json 缺少 report_submodules.financial_indicator，使用默认值 false")
+        return False
+    return bool(val)
+
+
 def is_enable_cost_lots(config: dict | None = None) -> bool:
     """成本流水子模块是否启用（成本分档 + XIRR + 分红累计渲染）。
 

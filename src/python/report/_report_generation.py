@@ -74,6 +74,8 @@ def _generate_full_html_report(
     decision_review_data: dict | None = None,
     enable_financial_report_digest: bool = False,
     financial_report_digest_data: dict | None = None,
+    enable_financial_indicator: bool = False,
+    financial_indicator_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -156,6 +158,8 @@ def _generate_full_html_report(
             decision_review_data=decision_review_data,
             enable_financial_report_digest=enable_financial_report_digest,
             financial_report_digest_data=financial_report_digest_data,
+            enable_financial_indicator=enable_financial_indicator,
+            financial_indicator_data=financial_indicator_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -194,6 +198,7 @@ def _generate_full_excel_report(
     transactions: list | None = None,
     dividends: list | None = None,
     enable_financial_report_digest: bool = False,
+    enable_financial_indicator: bool = False,
 ) -> bool:
     """full 路径的 Excel 报告生成，返回是否成功。"""
     from src.python.report.excel_generator import generate_excel_report
@@ -229,6 +234,8 @@ def _generate_full_excel_report(
             dividends=dividends,
             enable_financial_report_digest=enable_financial_report_digest,
             financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
+            enable_financial_indicator=enable_financial_indicator,
+            financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
         )
         reporter.ok("Excel 报告已生成")
         return True
@@ -266,6 +273,7 @@ def _generate_report_both(
         is_enable_action,
         is_enable_cost_lots,
         is_enable_data_quality,
+        is_enable_financial_indicator,
         is_enable_financial_report_digest,
         is_enable_fund_deep_analysis,
         is_enable_history,
@@ -295,6 +303,7 @@ def _generate_report_both(
     _enable_data_quality = is_enable_data_quality(config)
     _enable_cost_lots = is_enable_cost_lots(config)
     _enable_financial_report_digest = is_enable_financial_report_digest(config)
+    _enable_financial_indicator = is_enable_financial_indicator(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
@@ -321,6 +330,17 @@ def _generate_report_both(
         from src.python.report.financial_report_digest import build_financial_report_digest
 
         financial_report_digest_data = build_financial_report_digest(holdings, config, reporter)
+
+    # 财务指标（数据契约）：both 路径同样只按持仓 A 股标的取数（无穿透），
+    # 现价取自行情明细（PE/PB 用）；关闭时为 None（章节隐藏）
+    financial_indicator_data = None
+    if _enable_financial_indicator:
+        from src.python.fetcher.financial_indicator import collect_price_map
+        from src.python.report.financial_indicator import build_financial_indicator
+
+        financial_indicator_data = build_financial_indicator(
+            holdings, config, reporter, prices=collect_price_map(details)
+        )
 
     # ── 2. 快照对比（始终执行） ──
     perf.start("快照对比")
@@ -449,6 +469,8 @@ def _generate_report_both(
             market_temperature_data=market_temperature_data,
             enable_financial_report_digest=_enable_financial_report_digest,
             financial_report_digest_data=financial_report_digest_data,
+            enable_financial_indicator=_enable_financial_indicator,
+            financial_indicator_data=financial_indicator_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -486,6 +508,8 @@ def _generate_report_both(
             market_temperature_data=market_temperature_data,
             enable_financial_report_digest=_enable_financial_report_digest,
             financial_report_digest_data=financial_report_digest_data,
+            enable_financial_indicator=_enable_financial_indicator,
+            financial_indicator_data=financial_indicator_data,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True
@@ -530,6 +554,7 @@ def _generate_report_full(
         is_enable_action,
         is_enable_cost_lots,
         is_enable_data_quality,
+        is_enable_financial_indicator,
         is_enable_financial_report_digest,
         is_enable_fund_deep_analysis,
         is_enable_history,
@@ -558,6 +583,7 @@ def _generate_report_full(
     _enable_data_quality = is_enable_data_quality(config)
     _enable_cost_lots = is_enable_cost_lots(config)
     _enable_financial_report_digest = is_enable_financial_report_digest(config)
+    _enable_financial_indicator = is_enable_financial_indicator(config)
     sec_order = get_report_section_order(config)
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
@@ -588,6 +614,8 @@ def _generate_report_full(
         pipeline_data["market_temperature_data"] = prep.get("market_temperature_data")
         # 持仓个股财报摘要（数据契约，prep 中已组装；开关关闭/无 key 时为 None）
         pipeline_data["financial_report_digest_data"] = prep.get("financial_report_digest_data")
+        # 财务指标（数据契约，prep 中已组装；开关关闭时为 None）
+        pipeline_data["financial_indicator_data"] = prep.get("financial_indicator_data")
     _validate_pipeline_snapshot(pipeline_data)
     # 2b. 组合演进数据（聚合多期快照，evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
@@ -725,6 +753,8 @@ def _generate_report_full(
         (pipeline_data or {}).get("decision_review_data"),
         enable_financial_report_digest=_enable_financial_report_digest,
         financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
+        enable_financial_indicator=_enable_financial_indicator,
+        financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
     )
 
     # ── 7. Excel 报告 ──
@@ -753,6 +783,7 @@ def _generate_report_full(
         transactions,
         dividends,
         enable_financial_report_digest=_enable_financial_report_digest,
+        enable_financial_indicator=_enable_financial_indicator,
     )
 
     result.news_ok = news_ok

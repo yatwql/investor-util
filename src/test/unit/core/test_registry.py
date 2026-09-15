@@ -247,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 20
+        assert len(_REPORT_SECTION_DEFAULT) == 21
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -269,6 +269,7 @@ class TestReportSectionDefault:
             "evolution",
             "action",
             "financial_report",
+            "financial_indicator",
         }
         for sec in _REPORT_SECTION_DEFAULT:
             assert sec["type"] in valid_types, f"{sec['key']}: type={sec['type']!r} 不在 {valid_types}"

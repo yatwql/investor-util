@@ -390,6 +390,7 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "action": "行动建议",
     "data_source_status": "数据源可用性矩阵",
     "financial_report_digest": "持仓个股财报摘要",
+    "financial_indicator": "财务指标",
     "llm_usage": "LLM API 用量",
 }
 
@@ -610,8 +611,17 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "financial_report",
         "data_flag": "financial_report_digest_data",
     },
+    # ── financial_indicator 类型（report_submodules.financial_indicator 控制，默认关）──
+    # 财务指标：持仓 A 股基本面（指标列 + 质量档 + 年度趋势 + 当前 PE/PB）
+    {
+        "key": "financial_indicator",
+        "name": "财务指标",
+        "number": 20,
+        "type": "financial_indicator",
+        "data_flag": "financial_indicator_data",
+    },
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 20, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 21, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 
@@ -648,7 +658,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 
     处理逻辑：
-      1. 无配置或配置为空 → 返回完整 19 项默认顺序（与当前硬编码一致）
+      1. 无配置或配置为空 → 返回完整 21 项默认顺序（与当前硬编码一致）
       2. 用户配置的模块使用配置序号，其余保持默认序号
       3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
       4. llm_usage 始终固定在最后一位
@@ -658,7 +668,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
                 为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
 
     Returns:
-        [{key, name, number, type, data_flag}, ...] 共 19 项
+        [{key, name, number, type, data_flag}, ...] 共 21 项
     """
     if config is None:
         return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]

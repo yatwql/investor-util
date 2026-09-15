@@ -38,6 +38,7 @@ class TestReportChapterConsistency(unittest.TestCase):
         action=False,
         llm=True,
         financial_report=False,
+        financial_indicator=False,
         data_availability=None,
     ):
         """镜像 generate_excel_report 的页签构造，返回 (key 列表, 标题列表)。
@@ -66,6 +67,7 @@ class TestReportChapterConsistency(unittest.TestCase):
             enable_history=history,
             enable_portfolio_evolution=evolution,
             enable_financial_report_digest=financial_report,
+            enable_financial_indicator=financial_indicator,
             enable_action=action,
             enable_llm=llm,
             data_availability=data_availability,
@@ -83,6 +85,7 @@ class TestReportChapterConsistency(unittest.TestCase):
         action=False,
         llm=True,
         financial_report=False,
+        financial_indicator=False,
     ):
         """镜像 write_html_report 的可见性计算，返回按连续编号的有序 key 列表。
 
@@ -114,6 +117,8 @@ class TestReportChapterConsistency(unittest.TestCase):
             evolution_data={} if evolution else None,
             enable_financial_report_digest=financial_report,
             financial_report_digest_data={} if financial_report else None,
+            enable_financial_indicator=financial_indicator,
+            financial_indicator_data={} if financial_indicator else None,
         )
         ordered = sorted(visible_numbers.items(), key=lambda kv: kv[1])
         return [k for k, _ in ordered]
@@ -142,7 +147,9 @@ class TestReportChapterConsistency(unittest.TestCase):
     def test_excel_sheets_match_registry_order_all_enabled(self):
         """全开时 Excel 页签顺序 == 注册表顺序，标题 == 「序号.章节名」，llm_usage 末位。"""
         order = get_report_section_order()
-        excel_keys, excel_titles = self._excel_visible(order, action=True, financial_report=True)
+        excel_keys, excel_titles = self._excel_visible(
+            order, action=True, financial_report=True, financial_indicator=True
+        )
 
         registry_keys = [s["key"] for s in order]
         self.assertEqual(excel_keys, registry_keys, "Excel 页签顺序必须等于注册表顺序")
@@ -175,6 +182,8 @@ class TestReportChapterConsistency(unittest.TestCase):
             evolution_data={},
             enable_financial_report_digest=True,
             financial_report_digest_data={},
+            enable_financial_indicator=True,
+            financial_indicator_data={},
         )
 
         self.assertEqual(
@@ -200,7 +209,7 @@ class TestReportChapterConsistency(unittest.TestCase):
         order = get_report_section_order()
         scenarios = [
             # (场景名, board 开关 kwargs)；action 默认关，全开场景显式开启
-            ("全开", {"action": True, "financial_report": True}),
+            ("全开", {"action": True, "financial_report": True, "financial_indicator": True}),
             ("基金深度关闭", {"fund_deep": False, "action": True}),
             ("新闻关闭", {"news": False, "action": True}),
             ("LLM 关闭", {"llm": False, "action": True}),

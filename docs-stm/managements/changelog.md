@@ -18,6 +18,16 @@
 - **数据源说明表**：「数据源可用性矩阵」章在健康度表后新增「数据源说明（实际使用清单）」表——逐数据类别列出实际链路（如财报全文=DataSinking）、用途、计费（免费/免费档/付费档，财报全文随 `datasink.plan` 动态展示）与凭据要求（是否需 key + 就绪状态），并标注本次运行是否实际使用（观测到 DegradationTracker 事件即为已使用）。Excel（旧样式页签与数据质量仪表盘两路）与 HTML 同步渲染，`build_data_source_catalog()` 输出契约。
 - **状态**：plan-42 全部完成——数据层（①②③）+ 章节装配（④a）+ 渲染接线（④b）+ 文档同步（⑤：requirements §6.12 R-FRD-01~07、technical 附录 H 与 §4.9/§6.7、datasource 两册、how-to-config、folders）。
 
+### 财务指标报告章（plan-43 阶段③a）（2026-09-15）
+
+- **新增「财务指标」独立章**：持仓 + 穿透 A 股基本面（Excel 页签 + HTML `partials/financial_indicator_section.html` + 导航「基础信息」组），开关 `report_submodules.financial_indicator` 默认关、数据驱动（无数据隐藏/写占位），不改变既有章节输出。
+- **取数**：`fetcher/financial_indicator.py` —— 多期序列**主源一次调用**（akshare），主源不可用时**退化为链路单期**（解析支路只能给最新一期，**不伪造历史期**）；缓存前缀 `fin_indicator_hist_` 归入 `fin_indicator` 模块；非 A 股不发请求。现价经 `collect_price_map` 取自行情明细。
+- **派生（纯计算层）**：`analysis/financial_indicator.py` —— 质量档（ROE/毛利率/资产负债率/经营现金流对净利覆盖 四维阈值各 0~3 分后均值分档 优/良/中/弱；**缺维度跳过而非按 0 分**、脏值不参与、**非投资建议/非评级**）、年度趋势（仅比较相邻两个**年报**，避免把季报累计值当年度值；±3% 内为持平；两指标方向不一致记「波动」）、当前 PE/PB（亏损或净资产非正留空）、趋势点截取。
+- **装配与呈现**：`report/financial_indicator.py::build_financial_indicator`（管线契约 5 键；全部失败时保留失败清单）+ `report/financial_indicator_sheet.py`（金额亿元、比率百分数、缺失写「—」）。
+- **接线（与「持仓个股财报摘要」同构）**：config 开关与访问器、章节注册（type=`financial_indicator`、data_flag=`financial_indicator_data`、number 20；llm_usage 顺延 21）、`pipeline_data` 键表/类型表/附录 H、Excel 工厂与写页签、HTML 导航分组与模板 partial、编排层（`prepare_report_data` 与 both 路径各自构建）、TUI 配置菜单（8 项子模块）。
+- **测试**：新增 70 例 —— 分析层派生（`test_financial_indicator.py` 26 例）+ 边缘（`test_financial_indicator_edge.py` 20 例，`*_edge.py` 隔离）+ 装配/开关/接线（`test_financial_indicator.py` 报告层 17 例）+ 页签（`test_financial_indicator_sheet.py` 4 例）+ 多期取数层（`test_financial_indicator.py` 取数层 7 例）；同步更新既有断言（注册表 21 项、类型集合、HTML 章节数 21、双端章节一致性夹具、场景全类型集合）。
+- **口径声明**：质量档为**启发式通用阈值分档**（不区分行业），PE/PB 为**当前值**；历史 PE/PB 分位（TTM 口径）属阶段③b。
+
 ### 财务指标全文解析备用支路（`datasink_indicator`，plan-43 阶段②）（2026-09-15）
 
 - **实测推翻原设计前提**：DataSinking 的 Markdown **不保留表格**（PDF 报表被压平为「标签紧连数字」的整段正文，如 `...营业收入86,241,940,222.2084,491,870,566.52...`），且不存在 `主要会计数据与财务指标` 章节（该名 404）；指标实际在**第二节「公司简介和主要财务指标」**（别名 `主要财务指标` 命中共章），季报为「主要财务数据」。据此**修订设计文档 §5**（新增 §5.0 前提修订）：解析策略由「读表格」改为「锚点 + 前若干数值」，并把解析**收窄到该章节**（报表正文存在附注编号与金额粘连的误读风险，收益低于风险）。

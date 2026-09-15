@@ -30,6 +30,7 @@ def create_sheets(
     enable_history: bool = True,  # board 层
     enable_portfolio_evolution: bool = True,  # board 层：组合演进
     enable_financial_report_digest: bool = False,  # board 层：持仓个股财报摘要（report_submodules，默认关）
+    enable_financial_indicator: bool = False,  # board 层：财务指标（report_submodules，默认关）
     enable_action: bool = False,  # board 层：行动建议（config 默认开）
     enable_llm: bool = True,  # board 层
     data_availability: dict[str, bool] | None = None,  # data 层
@@ -58,6 +59,7 @@ def create_sheets(
         "history": enable_history,
         "evolution": enable_portfolio_evolution,
         "financial_report": enable_financial_report_digest,
+        "financial_indicator": enable_financial_indicator,
         "action": enable_action,
         "llm": enable_llm,
     }

@@ -1,0 +1,107 @@
+{# ==============================================================
+   财务指标章节 partial（供 report_template.html 经 include 引入）。
+
+   依赖 context 变量（以 `{% include ... with context %}` 引入）：
+   section_visible / section_numbers / financial_indicator_data。
+
+   数据来源：akshare 主源（无凭据要求）；主源不可用时由 DataSinking 财报章节解析
+   支路兜底（覆盖营收/净利/现金流/每股收益/ROE 与同比）。质量档为启发式分档，
+   PE/PB 为「当前值」（历史分位属后续阶段）。
+   ============================================================== #}
+{% macro yi(v) %}{% if v is not none %}{{ "%.2f"|format(v / 1e8) }}{% else %}—{% endif %}{% endmacro %}
+{% macro pct(v) %}{% if v is not none %}{{ "%.2f"|format(v * 100) }}%{% else %}—{% endif %}{% endmacro %}
+{% macro num(v, d) %}{% if v is not none %}{{ ("%." ~ d ~ "f")|format(v) }}{% else %}—{% endif %}{% endmacro %}
+{% if section_visible("financial_indicator") %}
+{% set _fi = financial_indicator_data or {} %}
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  财务指标（持仓 A 股基本面）                            -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section" id="sec-financial_indicator" style="order: {{ section_numbers['financial_indicator'] }};">
+    <div class="section-title">
+        {{ section_numbers['financial_indicator'] }}、财务指标
+        <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">持仓 A 股基本面（报告期快照）</span>
+    </div>
+    {% if _fi.get("available") %}
+    <div class="section-content">
+        <div class="summary-tag" style="margin-bottom: 8px;">
+            📊 已取到 <strong>{{ _fi.get("entry_count", 0) }}</strong> 只 A 股的财务指标。
+            口径为<strong>报告期快照</strong>（非实时），金额单位亿元、比率为小数比例换算的百分数。
+        </div>
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>代码</th>
+                    <th>报告期</th>
+                    <th>营收(亿)</th>
+                    <th>归母净利(亿)</th>
+                    <th>净利同比</th>
+                    <th>毛利率</th>
+                    <th>ROE</th>
+                    <th>负债率</th>
+                    <th>经营现金流(亿)</th>
+                    <th>EPS</th>
+                    <th>PE</th>
+                    <th>PB</th>
+                    <th>质量档</th>
+                    <th>年度趋势</th>
+                    <th>来源</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in _fi.get("rows", []) %}
+                <tr>
+                    <td class="text-left">{{ r.get("name", "") }}</td>
+                    <td>{{ r.get("code", "") }}</td>
+                    <td>{{ r.get("report_period", "") }}<br><span style="font-size:11px;color:var(--text-faint);">{{ r.get("doc_type_label", "") }}</span></td>
+                    <td>{{ yi(r.get("revenue")) }}</td>
+                    <td>{{ yi(r.get("net_profit")) }}</td>
+                    <td>{{ pct(r.get("net_profit_yoy")) }}</td>
+                    <td>{{ pct(r.get("gross_margin")) }}</td>
+                    <td>{{ pct(r.get("roe")) }}</td>
+                    <td>{{ pct(r.get("debt_ratio")) }}</td>
+                    <td>{{ yi(r.get("operating_cash_flow")) }}</td>
+                    <td>{{ num(r.get("eps"), 4) }}</td>
+                    <td>{{ num(r.get("pe"), 2) }}</td>
+                    <td>{{ num(r.get("pb"), 2) }}</td>
+                    <td>{{ r.get("quality_grade") or "—" }}{% if r.get("quality_score") is not none %}<br><span style="font-size:11px;color:var(--text-faint);">{{ r.get("quality_score") }}/3</span>{% endif %}</td>
+                    <td>{{ r.get("trend") or "—" }}</td>
+                    <td class="text-left" style="font-size:12px;">{{ r.get("source", "") }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% if _fi.get("failures") %}
+        <div class="penetration-notes" style="margin-top: 12px;">
+            <div><strong>以下标的未取到指标</strong>（不影响其余标的）：</div>
+            {% for f in _fi.get("failures", []) %}
+            <div>* {{ f.get("name") or f.get("code") }}（{{ f.get("code") }}）：{{ f.get("reason") }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="penetration-notes" style="margin-top: 12px;">
+            <div>* 指标为<strong>报告期快照</strong>（最新定期报告口径），非实时数据；披露有法定延迟</div>
+            <div>* 质量档为<strong>启发式分档</strong>（ROE / 毛利率 / 资产负债率 / 经营现金流对净利覆盖四维均值），不区分行业，仅供横向扫视线索，**非投资建议、非评级**</div>
+            <div>* PE/PB 为<strong>当前值</strong>（现价 ÷ 该报告期每股收益/每股净资产）；亏损或净资产非正时留空；历史分位不在此章</div>
+            <div>* 数据源：akshare 结构化指标（主源）；主源不可用时由 DataSinking 财报章节解析兜底（该支路不提供毛利率/负债率/每股净资产）</div>
+        </div>
+    </div>
+    {% else %}
+    <div class="section-content">
+        <div class="empty-note placeholder-note">
+            <p><strong>财务指标暂不可用</strong></p>
+            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+                {{ _fi.get("reason") or "暂无 A 股标的或未取到指标" }}。
+            </p>
+            <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
+                指标主源为 akshare（需本地安装，无需凭据）；备用支路需 DataSinking key。
+                开启开关 report_submodules.financial_indicator 后生效。
+            </p>
+        </div>
+    </div>
+    {% endif %}
+    <div class="back-to-top-link"><a href="#report-top" title="回到报告顶部">↑ 回到顶部</a></div>
+</div>
+{% endif %}

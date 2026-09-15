@@ -128,7 +128,17 @@ class TestScenarioSectionOrder(unittest.TestCase):
             type_counts[sec["type"]] = type_counts.get(sec["type"], 0) + 1
         self.assertEqual(
             set(type_counts.keys()),
-            {"always", "history", "fund_deep_analysis", "news", "llm", "evolution", "action", "financial_report"},
+            {
+                "always",
+                "history",
+                "fund_deep_analysis",
+                "news",
+                "llm",
+                "evolution",
+                "action",
+                "financial_report",
+                "financial_indicator",
+            },
         )
         self.assertEqual(type_counts["always"], 6)
         self.assertEqual(type_counts["history"], 1)

@@ -1359,8 +1359,16 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
 
         self.assertEqual(
             by_key["basic"],
-            ["summary", "market_value", "category", "penetration", "data_source_status", "financial_report_digest"],
-            "「基础信息」组应含数据源可用性矩阵与持仓个股财报摘要",
+            [
+                "summary",
+                "market_value",
+                "category",
+                "penetration",
+                "data_source_status",
+                "financial_report_digest",
+                "financial_indicator",
+            ],
+            "「基础信息」组应含数据源可用性矩阵、持仓个股财报摘要与财务指标",
         )
         self.assertEqual(
             by_key["fund_deep"],

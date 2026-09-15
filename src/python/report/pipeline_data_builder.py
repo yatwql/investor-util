@@ -65,6 +65,9 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     # 持仓个股财报摘要：A 股标的的财报章节摘要（report_submodules.financial_report_digest，
     # 由 report/financial_report_digest.build_financial_report_digest 组装；开关关闭时为 None）
     "financial_report_digest_data",
+    # 财务指标：持仓 A 股基本面（report_submodules.financial_indicator，
+    # 由 report/financial_indicator.build_financial_indicator 组装；开关关闭时为 None）
+    "financial_indicator_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -102,6 +105,9 @@ _PREP_KNOWN_KEYS: set[str] = {
     # 持仓个股财报摘要：A 股标的的财报章节摘要（report_submodules.financial_report_digest，
     # 由 prepare_report_data 组装；开关关闭时为 None）
     "financial_report_digest_data",
+    # 财务指标：持仓 A 股基本面（report_submodules.financial_indicator，
+    # 由 prepare_report_data 组装；开关关闭时为 None）
+    "financial_indicator_data",
 }
 
 # ── 类型映射（用于自动类型断言） ──
@@ -124,6 +130,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "snapshot_diff_data": (dict, type(None)),
     "decision_review_data": (dict, type(None)),
     "financial_report_digest_data": (dict, type(None)),
+    "financial_indicator_data": (dict, type(None)),
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
@@ -148,6 +155,7 @@ _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "valuation_data": dict,
     "market_temperature_data": dict,
     "financial_report_digest_data": dict,
+    "financial_indicator_data": dict,
 }
 
 

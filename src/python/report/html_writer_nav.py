@@ -32,6 +32,7 @@ _SECTION_NAV_GROUP_MAP: dict[str, str] = {
     "penetration": "basic",
     "data_source_status": "basic",
     "financial_report_digest": "basic",
+    "financial_indicator": "basic",
     # 基金深度分析：基金业绩 + 基金深度分析系列章节
     "fund_performance": "fund_deep",
     "fund_manager": "fund_deep",
@@ -73,12 +74,14 @@ def _compute_section_visibility(
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
     enable_financial_report_digest: bool = False,  # board 层：持仓个股财报摘要（report_submodules，默认关）
+    enable_financial_indicator: bool = False,  # board 层：财务指标（report_submodules，默认关）
     enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     style_factor_data: dict | None = None,  # data 层：风格与因子 dict（None=无数据，章节隐藏）
     position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 dict（相关性区块数据源）
     evolution_data: dict | None = None,  # data 层：组合演进 dict（None=无数据，章节隐藏）
     financial_report_digest_data: dict | None = None,  # data 层：财报摘要 dict（None=无数据，章节隐藏）
+    financial_indicator_data: dict | None = None,  # data 层：财务指标 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
     """计算报告模块序号 + 可见性字典 + 闭包函数。
 
@@ -96,6 +99,7 @@ def _compute_section_visibility(
         "history": enable_history,
         "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
         "financial_report": enable_financial_report_digest,  # ← board 层：持仓个股财报摘要
+        "financial_indicator": enable_financial_indicator,  # ← board 层：财务指标章
         "action": enable_action,  # ← board 层：行动建议（config 默认开）
         "llm": enable_llm,  # ← board 层
     }
@@ -116,6 +120,7 @@ def _compute_section_visibility(
         # available=False 时模板写占位文本（快照不足，§1.4.5）
         "evolution_data": evolution_data is not None,
         "financial_report_digest_data": financial_report_digest_data is not None,
+        "financial_indicator_data": financial_indicator_data is not None,
     }
 
     # 两层合并：section_visible = board_ok AND data_ok
