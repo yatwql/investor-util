@@ -6,18 +6,6 @@
 
 ## [0.10.20-dev] - 开发中（未发布）
 
-### DataSinking 财报接入·数据层（plan-42 阶段①②③）（2026-09-14）
-
-- **凭据**：`CredentialSpec` 扩展 `key_file` / `key_field` / `key_section` / `key_file_setting`，就绪判定支持「环境变量或密钥文件」（环境变量优先）；新增 `credential_value()` 取值接口，就绪矩阵增「来源类型」与密钥文件路径，**值永不回显**。密钥文件通用化：新增顶层路径键 `data_key_file`（默认 `data/config/data_key.json`），文件**以 provider（source_id）为节**（如 `{"datasink": {"api_key": "..."}}`），一个文件容纳多个数据源的 key；纳入绝对化与测试隔离。
-- **provider**：新增 `providers/datasink.py` —— DataSinking 全文本财报（`/documents`、`/documents/{id}`、`/documents/{id}/sections`）；A 股 6 位代码 → FMP 符号映射；**计划感知限速**（间隔 = 1/每秒上限，免费 3 请求/秒、付费 31，由 `datasink.plan` / `requests_per_second` 派生）在**每次 HTTP 请求前** `RateLimiter.acquire`（免费档无批量端点、必然逐篇请求，限速必须落在本层）+ **日配额护栏**（`data/state/datasink_quota.json`，免费 8,191 篇/日，超限即停）；401/429/非 200/网络不可达均返回空并按代码级降级（不计传输级熔断）；凭据值不落日志。
-- **契约与链路**：新增数据域 `financial_report` 与标准字段记录 `FinancialReportFields`（登记 `DOMAIN_RECORDS`）；新增 `fetcher/report_adapters.py::DataSinkReportAdapter`（上游 `id` → 标准 `doc_id`，契约自检通过），登记 `ADAPTER_MODULES`；新增默认链 `financial_report: ["datasink"]`；缓存注册 `report_datasink_index_`（两周）/ `report_datasink_doc_`（一月）；数据源可用性矩阵新增「财报全文」类别；配置校验已知类型/名称放行 `financial_report` / `datasink`。
-- **测试**：新增 `test_datasink.py`（26 例：符号映射/套餐限额派生/凭据缺失跳过/请求前限速与配额护栏/401·429·非 200·非 JSON/取数原语）；`test_datasource_credential.py` 增密钥文件 8 例（就绪/环境变量覆盖/空值与损坏/配置路径覆盖/取值不回显）；适配器自检用例改为断言域覆盖而非写死总数。dev-verify 2602 passed / 0 failed。
-- **章节装配（阶段④a）**：新增 `fetcher/financial_report.py`（A 股标的收集含去重与穿透合并；元数据按年报→半年报顺序取最新一篇并缓存；单篇正文经链路 + 财报域适配器归一；摘要按 `datasink.max_chars` 截断）与 `report/financial_report_digest.py`（`financial_report_digest_data` 契约：`available`/`rows`/`failures`/`entry_count`，含文种中文标签与披露日换算；缺凭据/无 A 股标的/全部无覆盖均降级不抛异常）。新增 `datasink` 配置段（plan / requests_per_second / daily_quota / sections / max_chars / doc_types）与 `batch.datasink_workers`。新增测试 14 例。
-- **渲染接线（阶段④b）**：注册表新增章节 `financial_report_digest`（type=`financial_report`、data_flag=`financial_report_digest_data`、页签名「持仓个股财报摘要」）；新增开关 `report_submodules.financial_report_digest`（默认关）与 `is_enable_financial_report_digest`；pipeline_data 契台登记（`pipeline_data_builder` 三处 + technical.md 附录 H）；Excel 自动建页签与写盘（`report/financial_report_sheet.py`）、HTML 章节 partial（`partials/financial_report_section.html`）与目录分组；both/full 双路径均按开关注入契约。新增页签测试 3 例；同步更新写死章节数/类型/分组/契约的既有用例（注册表 20 项 + 新 type）。
-- **配置与入口补全**：`report_submodules.financial_report_digest` 接入 TUI 菜单 P 子菜单（第 7 项）与 Web 配置面板白名单，用户无需手改 config.json 即可开启；`batch.datasink_workers` 由财报摘要装配层消费（`ThreadPoolExecutor` 并发取数，默认 3，免费档批量上限 ≤3；每秒速率仍由 provider 限速器逐请求兜底）。
-- **数据源说明表**：「数据源可用性矩阵」章在健康度表后新增「数据源说明（实际使用清单）」表——逐数据类别列出实际链路（如财报全文=DataSinking）、用途、计费（免费/免费档/付费档，财报全文随 `datasink.plan` 动态展示）与凭据要求（是否需 key + 就绪状态），并标注本次运行是否实际使用（观测到 DegradationTracker 事件即为已使用）。Excel（旧样式页签与数据质量仪表盘两路）与 HTML 同步渲染，`build_data_source_catalog()` 输出契约。
-- **状态**：plan-42 全部完成——数据层（①②③）+ 章节装配（④a）+ 渲染接线（④b）+ 文档同步（⑤：requirements §6.12 R-FRD-01~07、technical 附录 H 与 §4.9/§6.7、datasource 两册、how-to-config、folders）。
-
 ### LLM 侧注入：基本面信号与叙事-数字背离检测（plan-43 阶段④）（2026-09-15）
 
 - **五路确定性信号**：在既有 `signal_pre_digest`（默认开、注入专家复盘与持仓体检、**不新增 LLM 调用**）中新增两路——
@@ -27,8 +15,9 @@
 - **门禁联动**：两路新信号依赖 DataSinking 数据底座（`datasink.enabled` + 凭据）；未就绪时对应契约缺席 → 信号自动缺席（不注入即无感）。
 - **缓存同源**：信号块内容进 `_signal_digest_cache_suffix()` 指纹——新增信号即换键，避免「提示词带新信号、缓存还是旧内容」的错配；写侧与预检侧无条件调用同一构建器（开关判定仍收敛在该函数内）。未改写 pipeline_data 契约（附录 H 不变）。
 - **测试**：+16 例 —— 基本面信号（分布与方向/弱质下滑看空/矛盾判中性/门禁缺席）+ 背离检测（双向命中并列依据/同向与中性与持平皆静默/仅配对标的不单侧判断/上限截断/契约缺席）+ 块与缓存（合流与要求行、无背离不得出现要求行、指纹随信号变化）。
+- **状态**：plan-43 阶段①②③a③b④ 全部完成（结构化指标主源 → 全文解析备用支路 → 财务指标报告章 → 真实 PE/PB 分位（TTM）与数据底座门禁 → LLM 侧信号注入与背离检测）；阶段⑤（文档与门禁收尾）随发布执行。
 
-### DataSinking 数据底座门禁（静默回原样）（2026-09-15）
+### DataSinking 数据底座门禁（静默回原样，plan-43 门禁）（2026-09-15）
 
 - **新增门禁**：`config.datasink_feature_ready()` —— 配置位 `datasink.enabled`（默认开）**且**凭据就绪；纯本地判定（零网络请求、零延迟），供依赖该数据底座的分析能力前置检查；新增 `config.is_enable_datasink()` 读配置位。
 - **覆盖范围**：财务指标章 + 真实历史估值分位（持仓个股财报摘要本已需 key，形态不变）。
@@ -74,6 +63,18 @@
 - **共享原语收敛（去重）**：A 股→FMP 符号映射统一为 `core/code_utils.py::to_fmp_symbol`（原在 datasink 内，现两个数据源共用）；akshare 取数超时封装统一为 `providers/_utils.py::run_with_timeout`（由 `akshare_extras` 抽出，避免第二份副本）。
 - **测试**：新增 `test_akshare_financial.py`（宽表归一/百分数换算/同名指标优先与逐期补齐/文种映射/各类降级，15 例）与 `test_financial_indicator.py`（适配器登记与自检/标准字段集/链注册/链路取回与降级，5 例）；`TestFmpSymbol` 随函数迁移至 `test_code_utils.py`（unit_core）。
 - **口径**：本阶段仅数据层（无报告消费）；真实 PE/PB 估值分位、质量因子与 LLM 注入属后续阶段（见 `docs-stm/plan/financial-indicator-source-design.md` §13）。
+
+### DataSinking 财报接入·数据层（plan-42 阶段①②③）（2026-09-14）
+
+- **凭据**：`CredentialSpec` 扩展 `key_file` / `key_field` / `key_section` / `key_file_setting`，就绪判定支持「环境变量或密钥文件」（环境变量优先）；新增 `credential_value()` 取值接口，就绪矩阵增「来源类型」与密钥文件路径，**值永不回显**。密钥文件通用化：新增顶层路径键 `data_key_file`（默认 `data/config/data_key.json`），文件**以 provider（source_id）为节**（如 `{"datasink": {"api_key": "..."}}`），一个文件容纳多个数据源的 key；纳入绝对化与测试隔离。
+- **provider**：新增 `providers/datasink.py` —— DataSinking 全文本财报（`/documents`、`/documents/{id}`、`/documents/{id}/sections`）；A 股 6 位代码 → FMP 符号映射；**计划感知限速**（间隔 = 1/每秒上限，免费 3 请求/秒、付费 31，由 `datasink.plan` / `requests_per_second` 派生）在**每次 HTTP 请求前** `RateLimiter.acquire`（免费档无批量端点、必然逐篇请求，限速必须落在本层）+ **日配额护栏**（`data/state/datasink_quota.json`，免费 8,191 篇/日，超限即停）；401/429/非 200/网络不可达均返回空并按代码级降级（不计传输级熔断）；凭据值不落日志。
+- **契约与链路**：新增数据域 `financial_report` 与标准字段记录 `FinancialReportFields`（登记 `DOMAIN_RECORDS`）；新增 `fetcher/report_adapters.py::DataSinkReportAdapter`（上游 `id` → 标准 `doc_id`，契约自检通过），登记 `ADAPTER_MODULES`；新增默认链 `financial_report: ["datasink"]`；缓存注册 `report_datasink_index_`（两周）/ `report_datasink_doc_`（一月）；数据源可用性矩阵新增「财报全文」类别；配置校验已知类型/名称放行 `financial_report` / `datasink`。
+- **测试**：新增 `test_datasink.py`（26 例：符号映射/套餐限额派生/凭据缺失跳过/请求前限速与配额护栏/401·429·非 200·非 JSON/取数原语）；`test_datasource_credential.py` 增密钥文件 8 例（就绪/环境变量覆盖/空值与损坏/配置路径覆盖/取值不回显）；适配器自检用例改为断言域覆盖而非写死总数。dev-verify 2602 passed / 0 failed。
+- **章节装配（阶段④a）**：新增 `fetcher/financial_report.py`（A 股标的收集含去重与穿透合并；元数据按年报→半年报顺序取最新一篇并缓存；单篇正文经链路 + 财报域适配器归一；摘要按 `datasink.max_chars` 截断）与 `report/financial_report_digest.py`（`financial_report_digest_data` 契约：`available`/`rows`/`failures`/`entry_count`，含文种中文标签与披露日换算；缺凭据/无 A 股标的/全部无覆盖均降级不抛异常）。新增 `datasink` 配置段（plan / requests_per_second / daily_quota / sections / max_chars / doc_types）与 `batch.datasink_workers`。新增测试 14 例。
+- **渲染接线（阶段④b）**：注册表新增章节 `financial_report_digest`（type=`financial_report`、data_flag=`financial_report_digest_data`、页签名「持仓个股财报摘要」）；新增开关 `report_submodules.financial_report_digest`（默认关）与 `is_enable_financial_report_digest`；pipeline_data 契台登记（`pipeline_data_builder` 三处 + technical.md 附录 H）；Excel 自动建页签与写盘（`report/financial_report_sheet.py`）、HTML 章节 partial（`partials/financial_report_section.html`）与目录分组；both/full 双路径均按开关注入契约。新增页签测试 3 例；同步更新写死章节数/类型/分组/契约的既有用例（注册表 20 项 + 新 type）。
+- **配置与入口补全**：`report_submodules.financial_report_digest` 接入 TUI 菜单 P 子菜单（第 7 项）与 Web 配置面板白名单，用户无需手改 config.json 即可开启；`batch.datasink_workers` 由财报摘要装配层消费（`ThreadPoolExecutor` 并发取数，默认 3，免费档批量上限 ≤3；每秒速率仍由 provider 限速器逐请求兜底）。
+- **数据源说明表**：「数据源可用性矩阵」章在健康度表后新增「数据源说明（实际使用清单）」表——逐数据类别列出实际链路（如财报全文=DataSinking）、用途、计费（免费/免费档/付费档，财报全文随 `datasink.plan` 动态展示）与凭据要求（是否需 key + 就绪状态），并标注本次运行是否实际使用（观测到 DegradationTracker 事件即为已使用）。Excel（旧样式页签与数据质量仪表盘两路）与 HTML 同步渲染，`build_data_source_catalog()` 输出契约。
+- **状态**：plan-42 全部完成——数据层（①②③）+ 章节装配（④a）+ 渲染接线（④b）+ 文档同步（⑤：requirements §6.12 R-FRD-01~07、technical 附录 H 与 §4.9/§6.7、datasource 两册、how-to-config、folders）。
 
 ### 测试用例审计与修复（rf-365）（2026-09-14）
 
