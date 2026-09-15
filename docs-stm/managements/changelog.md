@@ -18,6 +18,16 @@
 - **数据源说明表**：「数据源可用性矩阵」章在健康度表后新增「数据源说明（实际使用清单）」表——逐数据类别列出实际链路（如财报全文=DataSinking）、用途、计费（免费/免费档/付费档，财报全文随 `datasink.plan` 动态展示）与凭据要求（是否需 key + 就绪状态），并标注本次运行是否实际使用（观测到 DegradationTracker 事件即为已使用）。Excel（旧样式页签与数据质量仪表盘两路）与 HTML 同步渲染，`build_data_source_catalog()` 输出契约。
 - **状态**：plan-42 全部完成——数据层（①②③）+ 章节装配（④a）+ 渲染接线（④b）+ 文档同步（⑤：requirements §6.12 R-FRD-01~07、technical 附录 H 与 §4.9/§6.7、datasource 两册、how-to-config、folders）。
 
+### 财务指标全文解析备用支路（`datasink_indicator`，plan-43 阶段②）（2026-09-15）
+
+- **实测推翻原设计前提**：DataSinking 的 Markdown **不保留表格**（PDF 报表被压平为「标签紧连数字」的整段正文，如 `...营业收入86,241,940,222.2084,491,870,566.52...`），且不存在 `主要会计数据与财务指标` 章节（该名 404）；指标实际在**第二节「公司简介和主要财务指标」**（别名 `主要财务指标` 命中共章），季报为「主要财务数据」。据此**修订设计文档 §5**（新增 §5.0 前提修订）：解析策略由「读表格」改为「锚点 + 前若干数值」，并把解析**收窄到该章节**（报表正文存在附注编号与金额粘连的误读风险，收益低于风险）。
+- **纯解析层**：新增 `analysis/financial_indicator_extract.py` —— 锚点表（营收/归母净利/经营现金流/基本每股收益/加权 ROE，含「归属于母公司股东」旧式行文）+ 否定环视排除「扣除非经常性损益后的…」同口径干扰 + 有限取值窗口（超窗判为跨行、弃用）+ 按报告期精度选数值模式（金额两位小数、每股四位、比率两位，避免 `1.41011.3281` 无分隔连写误切）+ 金额单位换算（取锚点前最近「单位：X」，**无声明即不产金额**）+ 逐字段幅度/区间校验；同比由本期/上年**同口径**两值算术派生。报告期/文种一律由元数据给出。
+- **解析适配器**：`fetcher/financial_indicator_adapters.py` 新增 `DataSinkIndicatorAdapter`（`datasink_indicator`），**逐章节试取、命中即止**（避免同一章节被多个别名重复取回白耗配额）；取数经既有 `fetcher/financial_report.py` 链（复用其缓存/限速/配额/熔断，**不另建 HTTP 通道**）。
+- **链路**：`financial_indicator: [akshare_financial, datasink_indicator]`（主源失败落解析支路）；配置校验放行新源名 `datasink_indicator`。
+- **覆盖面（诚实边界）**：解析支路提供营收/归母净利/营收同比/净利同比/经营现金流净额/基本每股收益/ROE 共 7 项；毛利率、资产负债率、每股净资产**不在该章节**，恒为 `None`（由主源 akshare 提供）。
+- **实测复核**：新增真实正文夹具 `src/test/data/fixtures/datasink_indicator_section_600900.md`（长江电力 600900.SS 2025 年报该章节全文，附 `README.md` 记来源与核对值），逐字段复现披露值——营收 86,241,940,222.20 元、归母净利 34,502,809,176.39 元、经营现金流 60,562,925,570.41 元、EPS 1.4101 元/股、ROE 15.90%、同比 2.07% / 6.17%。
+- **测试**：`test_financial_indicator_extract.py`（真实夹具回归 + 行文变体/单位/精度/扣非排除/降级）+ `test_financial_indicator_extract_edge.py`（窗口边界/异常幅度/越界比率/零基数同比/截断正文，`*_edge.py` 隔离）+ `test_financial_indicator.py` 扩充（链路顺序、落解析支路且源身份为 `datasink_indicator`、逐章节试取、非 A 股不发请求、双源皆失败返回 None）。
+
 ### 结构化财务指标数据域（`financial_indicator`，plan-43 阶段①）（2026-09-15）
 
 - **新增数据域与契约**：`financial_indicator` 域 + `FinancialIndicatorFields`（营收/净利/同比/毛利率/ROE/负债率/经营现金流/EPS/每股净资产；金额单位元、比率为小数比例、可选数值缺失取 `None`），登记 `DOMAIN_RECORDS` 并纳入适配器契约自检。

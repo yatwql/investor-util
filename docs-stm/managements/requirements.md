@@ -285,9 +285,12 @@
 |:---------|:---------|
 | R-FIN-01 | **独立数据域与标准字段契约**：新增 `financial_indicator` 域与 `FinancialIndicatorFields` 记录类（`code`/`symbol`/`report_period`/`doc_type`/`revenue`/`net_profit`/`revenue_yoy`/`net_profit_yoy`/`gross_margin`/`roe`/`debt_ratio`/`operating_cash_flow`/`eps`/`bvps`/`source_api`/`source`），登记 `DOMAIN_RECORDS` 并接受适配器契约自检 |
 | R-FIN-02 | **主源（akshare）**：一次调用 `stock_financial_abstract` 取回宽表，按报告期归一为多条记录；金额类字段单位元、比率类字段百分数→**小数比例**；同名指标多分组时按表格顺序**首个非空**为准；非 A 股代码/未安装/超时/空表返回空 |
-| R-FIN-03 | **接入既有链路**：新增链 `financial_indicator: [akshare_financial]` 与适配器；取数复用 `fetch_with_fallback`（缓存/熔断/降级），不新造获取路径；缓存前缀 `fin_indicator_` 纳入注册表（一月 TTL、基础类） |
+| R-FIN-03 | **接入既有链路**：新增链 `financial_indicator: [akshare_financial, datasink_indicator]` 与两个适配器；取数复用 `fetch_with_fallback`（缓存/熔断/降级），不新造获取路径；缓存前缀 `fin_indicator_` 纳入注册表（一月 TTL、基础类） |
 | R-FIN-04 | **共享原语收敛**：A 股→FMP 符号映射统一为 `core/code_utils.py::to_fmp_symbol`，取数超时封装统一为 `providers/_utils.py::run_with_timeout`（多个 provider 共用，不自留副本） |
 | R-FIN-05 | **降级不阻断**：指标源不可用时返回空/None，由上层按「数据缺失」占位；不抛异常、不计入传输级熔断 |
+| R-FIN-06 | **全文解析支路**：`datasink_indicator` 适配器逐章节试取 `公司简介和主要财务指标` → `主要财务数据`（**命中即止**，不重复取同章节），由 `analysis/financial_indicator_extract.py` 纯解析为同一标准字段集；正文为空/无可识别指标行 → None，继续降级 |
+| R-FIN-07 | **解析护栏（宁缺勿错）**：锚点只用标准披露行文并对「扣除非经常性损益后的…」加否定环视；数值仅在锚点后有限窗口内取（超窗弃用）；按报告期精度选模式（金额两位小数、每股四位、比率两位）以免无分隔连写误切；金额取锚点前最近「单位：X」换算到元、**无声明即不产金额**；逐字段幅度/区间校验不通过取 None；同比由本期/上年同口径两值算术派生（不推断口径），无上年或上年为 0 → None；报告期一律由元数据给出 |
+| R-FIN-08 | **真实形态回归**：以真实年报章节夹具（`src/test/data/fixtures/`）锁定上游正文形态与逐字段核对值（含同比），配套合成样本与边缘场景（`*_edge.py`）测试；上游形态变化时重新取样并同步修订护栏 |
 
 ---
 

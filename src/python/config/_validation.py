@@ -40,6 +40,7 @@ _KNOWN_PROVIDER_NAMES: set[str] = {
     "eastmoney_industry",
     "eastmoney_industry_rest",
     "datasink",
+    "datasink_indicator",
     "akshare_financial",
 }
 

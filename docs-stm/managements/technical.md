@@ -3204,6 +3204,8 @@ make_http_client(timeout=10.0) → httpx.Client
 | `financial_indicator` | 财务指标数据域（上市公司单报告期结构化指标：营收/净利/同比/毛利率/ROE/负债率/现金流/EPS/每股净资产） | 资产穿透TOP10 | 数据获取 | 无（数据域） |
 | `FinancialIndicatorFields` | 财务指标标准字段记录（金额单位元；比率为小数比例；可选数值缺失取 None） | 资产穿透TOP10 | 数据获取 | 无（契约） |
 | `akshare_financial` | akshare 财务指标（指标域主源，无需凭据；一条调用多股） | 资产穿透TOP10 | 数据获取 | 无（provider） |
+| `datasink_indicator` | DataSinking 指标解析（备用支路：从「公司简介和主要财务指标」章节压平正文按锚点提取指标） | 资产穿透TOP10 | 数据获取 | 无（provider / 适配器） |
+| `financial_indicator_extract` | 财务指标提取（压平正文 → 标准字段的纯解析层：锚点 + 取值窗口 + 精度模式 + 合理性校验） | 资产穿透TOP10 | 数据获取 | 无（纯解析） |
 | `rebalance_advice` | 调仓建议 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `trade_discipline` | 交易纪律 | 行动建议 | 调仓 | `enable_action`（默认开） |
 | `return_attribution` | 收益归因 | 行动建议 | 调仓 | `enable_action`（默认开） |
