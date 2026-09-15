@@ -171,7 +171,7 @@ skeleton.py:generate_llm_content()
 | `prompts_core.py` | 工具 | System Prompt 常量 + 上下文构建块（数据降级/收益归因/竞争语境/再平衡/概念板块/管线差异） | `_SYSTEM_*` 常量 + `_build_system_debate_synthesis()` |
 | `prompts_tables.py` | 工具 | 持仓/穿透/指标/情景/数据质量/汇率等数据块格式化为 Markdown | `_format_holdings_block()` / `_build_holdings_summary()` |
 | `prompts_action.py` | 工具 | 各模块 User Prompt 构建（global_macro / expert_review / health_check / penetration_deep / debate_synthesis）+ 集中度问答块 | `_build_expert_review_prompt()` / `_build_qa_concentration_block()` |
-| `prompts_signals.py` | 工具 | 信号预消化：行业资金流向段方向标注与分方向排名（无开关，默认路径）+ 算法评级信号块（市场温度/估值分位/尾部风险 → `信号：…` 行，`signal_pre_digest` 开关，判定收敛于缓存后缀函数保证读写键同源） | `_build_sector_flow_block()` / `_build_signal_digest_block()` / `_signal_digest_cache_suffix()` |
+| `prompts_signals.py` | 工具 | 信号预消化：行业资金流向段方向标注与分方向排名（无开关，默认路径）+ 算法评级信号块（市场温度/估值分位/尾部风险/持仓基本面/叙事与数字背离 → `信号：…` 行，`signal_pre_digest` 开关，判定收敛于缓存后缀函数保证读写键同源） | `_build_sector_flow_block()` / `_build_signal_digest_block()` / `_signal_digest_cache_suffix()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `compute_fingerprint()` / `build_llm_fingerprint()` |
 | `module_fingerprint.py` | 工具 | **模块指纹的唯一事实来源（预检侧与写侧同源）**：四模块指纹构造器 + 输入闭包 + 注册表，两侧都调用同一函数，结构性消除「预检键 ≠ 写侧键」的漂移 | `MODULE_FINGERPRINT_BUILDERS` / `ModuleFingerprintInputs` / `*_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `track_session_usage()` / `get_session_usage()` |
@@ -893,6 +893,22 @@ cache_get(optimistic_key, ttl) → 命中 → 直接返回（+ 缓存标记）
 **穿透深度分析** (`_SYSTEM_PENETRATION_DEEP`)：三节分析（行业集中度、品种集中度、国别/币种暴露）+ 综合建议。
 
 **新闻关联分析** (`_SYSTEM_NEWS_CORRELATION`)：批量分析模式下使用的 System Prompt，要求 LLM 按 JSON 数组格式输出每条新闻与持仓组合的关联度评分、影响方向（正面/负面/中性）及简要理由。每批最多 10 条新闻，分析时需引用品种代码，禁止虚构数据。
+
+#### 确定性信号预消化（`signal_pre_digest`，默认开启）
+
+把**算法已经算出、但此前只走渲染层**的确定性结论在进提示词前写成带方向标注的「结论行」，让模型读到方向判断而非裸数值自行解读。`prompts_signals.py` 只读既有数据契约、不写 pipeline_data、不新增键：
+
+| 信号 | 来源契约 | 方向词轴 | 说明 |
+|:--|:--|:--|:--|
+| 市场温度 | `market_temperature_data` | 看多/中性/看空 | 档位映射 + 温度分 |
+| 持仓估值分位 | `valuation_data` | 看多/中性/看空 | 逐只档位聚合成分布（低估多于高估 → 看多），并列判中性 |
+| 尾部风险 | `tail_risk_data` | 风险高/中/低 | 幅度轴与方向轴正交，不套看空 |
+| **持仓基本面** | `financial_indicator_data` | 看多/中性/看空 | 质量档（优/良/弱）与年度趋势（增长/下滑）两侧**同向才给方向**，矛盾或无判据判中性；同行给出平均 ROE |
+| **叙事与数字背离** | `financial_report_digest_data` × `financial_indicator_data` | **需交叉核实** | 按代码配对，对摘要做**词频语气**判定（乐观/悲观词表，不做语义理解）× 指标方向（年度趋势优先、其次归母净利/营收同比，±3% 内持平）；仅在「叙事乐观而数字走弱」或反之时产信号，列出依据（叙事偏向 + 同比 + 趋势），**不推断原因也不下结论** |
+
+- **背离要求行按需追加**：块内出现背离项时追加一行 `（存在「叙事与数字背离」项：请在结论中显式指出背离点，说明你以哪一侧为准及核实方向）`；**无背离项时该行不出现**，提示词与未引入该项时逐字节一致。
+- **门禁联动**：基本面与背离两路依赖 DataSinking 数据底座（`datasink.enabled` + 凭据）；未就绪时 `financial_indicator_data` / `financial_report_digest_data` 为 None → 对应信号自动缺席（不注入即无感）。
+- **缓存同源**：信号块内容进 `_signal_digest_cache_suffix()` 指纹，新增信号使键随内容变化；开关关闭或块为空返回 `""`（键与未注入时逐字节一致，不误伤旧缓存）。写入侧与预检侧均无条件调用同一构建器。
 
 ### 8.2 User Prompt 构建
 

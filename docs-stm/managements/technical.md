@@ -3205,6 +3205,8 @@ make_http_client(timeout=10.0) → httpx.Client
 | `financial_indicator_data` | 财务指标数据契约（C19：available/reason/rows/failures/entry_count） | 财务指标 | 数据获取 | 无（契约） |
 | `financial_indicator_sheet` | 财务指标页签（Excel 呈现：亿元/百分数/倍数，缺失写「—」） | 财务指标 | 报告输出 | 无（渲染） |
 | `compute_real_valuation` | 真实历史估值分位（TTM 口径：多期每股收益差分 × 历史收盘价 → 历史 PE/PB 序列 → 当前值分位） | 资产穿透TOP10 | 分析计算 | 无（纯计算） |
+| `_fundamental_signal` | 持仓基本面信号（质量档与年度趋势同向才给方向，逐只指标聚合为分布） | LLM 提示词信号 | LLM 注入 | `signal_pre_digest`（默认开） |
+| `_narrative_divergence_signal` | 叙事与数字背离信号（摘要语气词频 × 指标趋势/同比确定性比对，只列依据不下结论） | LLM 提示词信号 | LLM 注入 | `signal_pre_digest`（默认开） |
 | `datasink_feature_ready` | DataSinking 数据底座就绪判定（配置位 `datasink.enabled` 开启 且 凭据就绪；纯本地、零请求）——门禁财务指标章与真实历史估值分位 | 财务指标 | 数据获取 | `datasink.enabled`（默认开） |
 | `FinancialIndicatorFields` | 财务指标标准字段记录（金额单位元；比率为小数比例；可选数值缺失取 None） | 资产穿透TOP10 | 数据获取 | 无（契约） |
 | `akshare_financial` | akshare 财务指标（指标域主源，无需凭据；一条调用多股） | 资产穿透TOP10 | 数据获取 | 无（provider） |
