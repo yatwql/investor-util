@@ -43,11 +43,11 @@
 |:--|:--|
 | ②-1 注册表 | 删除 `market_value` 与 `category` 两个条目；新增 `holdings_detail`「持仓明细与分类」（`type=always`、`data_flag=None`，置于原 position 1/2 的顺序位） |
 | ②-2 页签名表 | 删除两条，新增 `"holdings_detail": "持仓明细与分类"` |
-| ②-3 Excel 写入器 | 新建 `report/holdings_detail_sheet.py::write_holdings_detail_sheet(ws, ...)`（吸收两表：区块①市值明细 15 列 + 分账户小计；区块②分类汇总）；删除 `report/market_value_sheet.py`、`report/category.py` |
+| ②-3 Excel 写入器 | 新建 `report/holdings_detail_sheet.py::write_holdings_detail_sheet(ws, ...)`（吸收两表：区块①市值明细 15 列 + 分账户小计；区块②分类汇总）。**领域层不动**：`report/market_value.py`（`DetailRow`/`classify_holdings`/`_compute_premium` 等）与 `report/category.py`（`_categorize_holding`/`_tier_label`/`build_category_data_status`/`calc_yield_text`/`_load_dividend_data` 等）**保留不改名不删除**（被生产代码与 100+ 测试引用）；仅删除**纯章节写入器** `report/market_value_sheet.py`，并把 `category.py` 中的章节写入器 `write_category_sheet`/`_write_category_group` 迁入新模块后移除 |
 | ②-4 Excel 分派 | `excel_generator.py` 与 `excel_content_sheets.py` 的 `sheets["market_value"]/["category"]` 三处改为 `sheets["holdings_detail"]` 一次调用 |
 | ②-5 HTML | `report_template.html` 两个 `div.section` 合并为一个 `sec-holdings_detail`（`section_numbers['holdings_detail']`、标题「持仓明细与分类」，内含两区块小节标题）；删除旧锚点 |
-| ②-6 命名统一检查 | `grep -rn "market_value\|sec-category" src/ docs-stm/` 仅允许命中历史 changelog / 归档 / `pipeline_data` 契约（如无则应为零）；`category` 作为普通词（分类）不误删——按标识符边界检索 |
-| ②-7 测试同步 | `test_registry`（条目数 21→20、类型集合）、`test_html_report_structure(_edge)`（章节容器数、锚点）、`test_report_chapter_consistency`（双端一致性夹具）、`test_scenario_section_order`、`test_excel_report_structure`、`test_category*.py`/`test_market_value_sheet.py` → 合并为 `test_holdings_detail_sheet.py` |
+| ②-6 命名统一检查 | `grep -rn "market_value\|sec-category" src/ docs-stm/` 仅允许命中历史 changelog / 归档；**`category` 与 `market_value` 存在合法残留**（Excel 列名「分类」「市值」等中文词、`category` 作为普通英文词、历史变更记录），按**标识符边界**检索并在提交信息中记录逐项判定 |
+| ②-7 测试同步（**区分章节键与领域词**） | **受影响（章节键断言）**：`test_registry.py:250`（条目数 21 → 20）、`test_registry_edge.py`/`test_config_edge.py`（`report_section_order` 样本含 `market_value`/`category`）、`test_html_report_structure_edge.py:93`（HTML 容器数 21）、`test_html_report_structure.py`（导航分组与锚点）、`test_excel_report_structure.py`（section 列表含 `market_value`/`category`）、`test_report_chapter_consistency.py`（双端一致性夹具）、`test_scenario_section_order.py`、`test_config_edit.py`、`test_check_semantic_index.py`（合并章标识符）与各写入器单测（`test_market_value_sheet.py`/`test_category.py`/`test_category_edge.py` → 合并为 `test_holdings_detail_sheet.py`）。**不受影响（领域词）**：`market_value` 作为 **`DetailRow` 字段名 / 市值计算模块名** 出现在 100+ 个测试中（`test_market_value.py`、`test_liquidity*.py`、`test_rebalance*.py`、各场景测试等）——**不在改名范围**，实施时不得批量替换；`category` 作为「分类」领域词同理 |
 | ②-8 文档同步 | `reports-instruction`（对照表/章节分组/可见性表）、`technical` §6.7 语义表与 §4.x 叙述、`how-to-config`（若涉及）、`folders` 树与统计、`changelog` |
 | 验收 | 条目数 20；Excel 页签减少 1 个且内容等同（两表逐格比对用例）；HTML 章节减少 1 个；`--mode dev-verify` 全绿 |
 
@@ -68,6 +68,7 @@
 | 步骤 | 动作 |
 |:--|:--|
 | ④-1 注册表 | 合并为 `fundamental_snapshot`「持仓基本面」（`type=financial_indicator` 语义化为 `type=fundamental_snapshot`；`data_flag_any=("financial_indicator_data","financial_report_digest_data")`）；`fund_performance` 条目不变 |
+| ④-1b type 与 board 层链 | **两侧 `board_flags` 同步**：删除 `"financial_report"` 项、`"financial_indicator"` 改 `"fundamental_snapshot"`（`excel_sheet_factory.create_sheets` 与 `html_writer_nav._compute_section_visibility`）；**删除已不存在条目的 `enable_*` 形参**（`enable_financial_report_digest`，含 `html_writer`/`excel_generator`/`_report_generation` 三处调用链）；`config/_validation.py` 已知类型集合删旧增新；`web/config_edit.py` 硬编码处同步 |
 | ④-2 页签名表 | `"fundamental_snapshot": "持仓基本面"`；`fund_performance` 名称不变 |
 | ④-3 Excel | 新建 `report/fundamental_snapshot_sheet.py::write_fundamental_snapshot_sheet`（区块①指标表 19 列 / 区块②摘要 9 列）；删除 `financial_indicator_sheet.py`、`financial_report_sheet.py`；经理变更区块并入 `fund_performance` 写入器（删除 `fund_manager_sheet.py`） |
 | ④-4 HTML | 新建 `partials/fundamental_snapshot_section.html`（两区块，**区块级开关**：区块②需 `is_feature_enabled("financial_report_digest")` 且契约就绪）；删除两个旧 partial；`report_template.html` 的 `sec-fund_manager`(1499) 区块删除并并入 `sec-fund_performance`(1393)（区块级门禁 `is_enable_fund_deep_analysis()`） |
@@ -76,10 +77,40 @@
 | ④-7 测试 | 区块级门禁用例两条（摘要区块随开关关闭消失 / 经理区块随 `enable_fund_deep_analysis=false` 消失且主业绩表保留）；条目数 18；配置模板重生成后的一致性用例 |
 | 验收 | 条目数 18；`--mode verify,regression` + 四个 `--ci` + 版本一致性 + ruff 全绿 |
 
+## 6.5 命名统一「允许保留的旧名」白名单（防误删）
+
+| 类别 | 允许保留 | 理由 |
+|:--|:--|:--|
+| **契约键** | `position_relationship_data` / `concentration_data` / `manager_data` / `financial_indicator_data` / `financial_report_digest_data` | 契约描述数据内容而非章节；改名会污染契约台账的写入/消费语义 |
+| **功能开关名** | `financial_indicator` / `financial_report_digest`（`GROUP_REPORT` 两项） | 开关名对应「数据能力」（指标 / 财报摘要），非章节名；两者仍各控合并章的一个区块 |
+| **既有专有词** | `fin_indicator_` 缓存前缀、`financial_report` **数据源类别**（数据源说明表的 `financial_report` 类别 id，指 DataSinking 财报全文） | 分别属缓存注册表与数据源目录，与报告章节无关 |
+| **历史记录** | `docs-stm/managements/changelog.md`、`docs-stm/archive/**` | 历史变更记录不改写 |
+
+> 判定口径：**章节层**（注册表键 / 显示名 / 页签名 / HTML 锚点 / partial 名 / 写入器模块与函数）
+> 一律新名；**数据与配置层**（契约键 / 功能开关名 / 缓存前缀 / 数据源类别）保持各自既有语义名。
+
+## 6.6 复盘记录（十轮）
+
+| 轮次 | 主题 | 发现 | 处置 |
+|:--|:--|:--|:--|
+| 1 | 命名统一性（旧名残留 / 新旧名一致 / type 链） | 新名两文档一致；但 **type 语义化未在设计层写明**、`enable_*` 形参与 `board_flags` 映射链**两文档均未覆盖** | 设计层新增 §3.2「命名统一的下游影响清单」；施工单补 ④-1b 与命名检查白名单 |
+| 2 | 架构约束符合性 | 核实代码侧接缝：两侧 `board_flags` 含旧 type、`_validation.py` 允许集合含旧 type、Web 硬编码含旧名；前端与 TUI 已同源派生（无需改） | 同上批量修复；白名单明确「可见性旗标的语义身份」三处必须严格一致 |
+| 3 | 测试与守卫完备性 | **发现同名混淆**：`market_value`/`category` 在 100+ 测试中是**领域字段/领域模块**（`DetailRow.market_value`、`report/market_value.py`、`report/category.py` 的分类函数），而批次②原施工单写「删除 `report/category.py`」会**破坏领域层**；另发现 `test_features.py` 的 `fund_deep_analysis_fund_*` 字符串在 `src/` 无对应实现（需实施时核对语义） | 修正批次②（只迁移纯章节写入器、领域模块保留）；新增 §6.7「领域层 vs 章节层边界」；测试同步清单改为**区分章节键断言与领域词**并给出精确文件行 |
+| 4 | 配置与校验面 | `_validation.py` 允许类型集合含旧 type、`config_edit.py` 硬编码含旧名（已列入 §3.2）；注册表 docstring「共 21 项」与架构约束表「报告 19 个模块」表述陈旧；`_config_defaults.py` 的 `report_section_order` 模板随注册表自动派生（无需手改） | 收尾步骤补「条目数表述同步」；确认模板无需手改 |
+
+## 6.7 领域层 vs 章节层边界（第 3、4 轮复盘新增）
+
+| 层 | 模块/命名 | 是否随章节合并改名 |
+|:--|:--|:--|
+| **章节层** | 注册表键 / 显示名 / 页签名 / HTML 锚点与 partial / **纯章节写入器**（`market_value_sheet.py::write_market_value_sheet`、`category.py::write_category_sheet`、`position_relationship_sheet.py`、`fund_concentration_sheet.py`、`fund_manager_sheet.py`、`financial_indicator_sheet.py`、`financial_report_sheet.py`） | **改名/迁移**（新名见 §1 总表） |
+| **领域层** | `report/market_value.py`（`DetailRow`/`classify_holdings`/`_compute_premium`/`is_market_open`）、`report/category.py`（`_categorize_holding`/`_tier_label`/`build_category_data_status`/`calc_yield_text`）、`analysis/*` 的 `market_value` 字段 | **保留**——领域概念（市值/分类）与报告章节同词不同义；批量替换会破坏 100+ 处生产与测试引用 |
+| **缓存类型域** | `core/registry.py::get_exact_type_map()` 的 `fund_manager_snapshot`/`fund_concentration_snapshot`（缓存 data_type 精确映射） | **不改**——它映射的是**缓存类型**（快照缓存），与报告章节无关；合并后这两个数据能力不变 |
+
 ## 7. 收尾（每批之后 + 全部完成后）
 
 - 每批：`--mode dev-verify` + 四个 `--ci` + `ruff check`/`format` + `check-version-consistency`；命名统一 grep 检查；`folders`/`test-coverage` 统计刷新。
 - 全部完成后：`--mode verify,regression`；`reports-instruction` 三处目录/可见性表与 `technical` §6.7/附录 H 复核；`changelog` 汇总一条迭代记录。
+- **条目数表述同步**（第 4 轮发现）：`core/registry.py` 的注册表 docstring「共 N 项」、`technical.md` 架构约束表中「报告 N 个模块」的表述、`how-to-config` 与 `reports-instruction` 的模块计数，必须与新条目数一致（防文档漂移）。
 - **不做**：不做配置兼容迁移；不引入契约层改名；不合并 LLM 相关条目（见设计层非目标）。
 
 ## 8. 风险与回退

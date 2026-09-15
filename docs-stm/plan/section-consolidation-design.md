@@ -44,7 +44,7 @@
 |:--|:--|:--|:--|:--|:--|
 | M1 | 市值核算明细 + 持仓分类 → **持仓明细与分类** | `holdings_detail` / 「持仓明细与分类」 | `report/holdings_detail_sheet.py::write_holdings_detail_sheet`；主模板 `sec-holdings_detail`（内联，原 `sec-market_value`/`sec-category` 删除） | 区块①15 列市值明细 + 分账户小计；区块②分类汇总表 | 两者均为 `always`（无 board 开关），data_flag 均空 → 合并后仍 `always`，零门禁变化 |
 | M2 | 持仓关系矩阵 + 持仓集中度 → **持仓结构与集中度** | `position_structure` / 「持仓结构与集中度」 | `report/position_structure_sheet.py::write_position_structure_sheet`；主模板 `sec-position_structure`（原 `sec-position_relationship`/`sec-fund_concentration` 删除） | 区块①重合度 + 相关性矩阵；区块②TOP-N 占比 + HHI + 三级预警 | 两者同 `type=fund_deep_analysis`（同一 board 开关）；data_flag 取 OR（见 §5） |
-| M3 | 财报摘要 → **持仓基本面** 的区块 | `fundamental_snapshot` / 「持仓基本面」 | `report/fundamental_snapshot_sheet.py::write_fundamental_snapshot_sheet`；`partials/fundamental_snapshot_section.html`（原 `financial_indicator_sheet.py`/`financial_report_sheet.py` 与两个 partial 删除） | 区块①财务指标表（19 列）；区块②财报章节摘要（9 列） | 两者同属功能开关 `GROUP_REPORT` 且同受数据底座门禁；**两个功能开关各控一块**（保留独立关闭杠杆，区块级判定见 §5） |
+| M3 | 财报摘要 → **持仓基本面** 的区块 | `fundamental_snapshot` / 「持仓基本面」（**type 同步语义化**：`financial_report` 类型删除、`financial_indicator` 类型名改为 `fundamental_snapshot`） | `report/fundamental_snapshot_sheet.py::write_fundamental_snapshot_sheet`；`partials/fundamental_snapshot_section.html`（原 `financial_indicator_sheet.py`/`financial_report_sheet.py` 与两个 partial 删除） | 区块①财务指标表（19 列）；区块②财报章节摘要（9 列） | 两者同属功能开关 `GROUP_REPORT` 且同受数据底座门禁；**两个功能开关各控一块**（保留独立关闭杠杆，区块级判定见 §5） |
 | M4 | 基金经理变更 → **基金业绩分析** 的区块 | `fund_performance`（键与显示名语义未变） | `fund_performance` 章写入器吸收经理变更区块（原 `fund_manager_sheet.py` 删除） | 区块①主业绩表（含候选比较子表）；区块②基金经理变更（8 列） | 被吸收项 `type=fund_deep_analysis`（board 开关 `enable_fund_deep_analysis`）→ 区块级判定；**先例**：`report_submodules.candidate_compare` 已是本条目内的可选子表 |
 
 合并后注册表（17 项，编号重排，`llm_usage` 仍强制末位）：
@@ -52,6 +52,26 @@
 风格与因子分析 / 行动建议 / 财经新闻热点与持仓关联分析 / 全球政经局势 /
 智囊团深度复盘 / 持仓体检报告 / 穿透深度分析 / 组合历史走势与回撤 / 组合演进 /
 数据源可用性矩阵 / 持仓基本面 / LLM API 用量。
+
+## 3.2 命名统一的下游影响清单（type / 参数 / 白名单链）
+
+章节改名不止于注册表键——以下**同链条命名**必须一并统一，否则出现「一处新名、多处旧名」的
+语义裂缝（第 1、2 轮复盘发现的原缺失项）：
+
+| 影响点 | 位置 | 动作 |
+|:--|:--|:--|
+| 注册表 `type` 值 | `core/registry.py::_REPORT_SECTION_DEFAULT` | `financial_report` 类型**删除**（其唯一使用方为财报摘要条目）；`financial_indicator` 类型名改为 `fundamental_snapshot`；`always` / `fund_deep_analysis` 等**语义未变的类型不改** |
+| board 层映射（Excel 侧） | `report/excel_sheet_factory.py::create_sheets` 的 `board_flags` 字典 | 删除 `"financial_report": enable_financial_report_digest` 项；`"financial_indicator"` 改为 `"fundamental_snapshot"`；合并后财报摘要区块不再走 board 层（改由功能开关在区块渲染层判定） |
+| board 层映射（HTML 侧） | `report/html_writer_nav.py::_compute_section_visibility` 的 `board_flags` 字典 | 同上（含 `enable_*` 形参） |
+| `enable_*` 形参链 | `report/html_writer.py` / `report/excel_generator.py` / `report/_report_generation.py` | 章节被合并后**不再存在**的形参删除（如 `enable_financial_report_digest`）；仍存在的条目沿用既有 `enable_<条目键>` 命名规则，键改名则形参改名 |
+| 可见性旗标名的类型集合 | `config/_validation.py` 的已知类型集合 | 删除 `financial_report`、将 `financial_indicator` 改为 `fundamental_snapshot`（与注册表 `type` 严格一致，防配置校验放行失效类型） |
+| 配置编辑面 | `web/config_edit.py` 的 `sections` 负载与白名单 | 按新条目键同步（该面由注册表派生者无需改，硬编码处须改） |
+| 前端标签字典 | `static/web/main.js` | **无需改**（显示名由服务端按注册表下发；第 2 轮已核实前端无硬编码字典） |
+| TUI 面板 | `tui/handlers_config.py` | **无需改**（面板按注册表派生；第 2 轮已核实） |
+
+> 命名链纪律：**注册表 `type` 是「可见性旗标的语义身份」**，它必须与 `_validation.py` 的
+> 允许集合、两侧 `board_flags` 映射键、以及 `create_sheets`/`_compute_section_visibility`
+> 的 `enable_*` 形参**三处严格一致**；任一处保留旧名即视为命名未统一。
 
 ## 4. 架构约束对照
 
