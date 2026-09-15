@@ -403,29 +403,28 @@
 | 键 | 模块标识 | 报告模块的唯一标识，见下方列表 |
 | 值 | 正整数 | 显示序号（1~99），决定该模块在报告中的视觉位置 |
 
-**19 个模块标识及默认顺序：**
+**18 个模块标识及默认顺序：**
 
 | 默认序号 | 模块标识 | 显示名称 | 类型 |
 |:--------:|:---------|:---------|:-----|
 | 1 | `summary` | 投资分析汇总 | 始终显示 |
-| 2 | `market_value` | 市值核算明细表 | 始终显示 |
-| 3 | `category` | 持仓分类表 | 始终显示 |
-| 4 | `penetration` | 资产穿透TOP10 | 始终显示 |
-| 5 | `fund_performance` | 基金业绩分析 | 始终显示 |
-| 6 | `fund_manager` | 基金经理变更监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 7 | `position_relationship` | 持仓关系矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章两区块：重合度 + 相关性） |
-| 8 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 9 | `style_factor` | 风格与因子分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） |
-| 10 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
-| 11 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
-| 12 | `global_macro` | 全球政经局势 | LLM |
-| 13 | `expert_review` | 智囊团深度复盘 | LLM |
-| 14 | `health_check` | 持仓体检报告 | LLM |
-| 15 | `penetration_deep` | 穿透深度分析 | LLM |
-| 16 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
-| 17 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 18 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
-| 19 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 2 | `holdings_detail` | 持仓明细与分类 | 始终显示（同页签两区块：市值明细 + 分类汇总） |
+| 3 | `penetration` | 资产穿透TOP10 | 始终显示 |
+| 4 | `fund_performance` | 基金业绩分析 | 始终显示 |
+| 5 | `fund_manager` | 基金经理变更监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 6 | `position_relationship` | 持仓关系矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章两区块：重合度 + 相关性） |
+| 7 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
+| 8 | `style_factor` | 风格与因子分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） |
+| 9 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
+| 11 | `global_macro` | 全球政经局势 | LLM |
+| 12 | `expert_review` | 智囊团深度复盘 | LLM |
+| 13 | `health_check` | 持仓体检报告 | LLM |
+| 14 | `penetration_deep` | 穿透深度分析 | LLM |
+| 15 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
+| 16 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
+| 17 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
+| 18 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 

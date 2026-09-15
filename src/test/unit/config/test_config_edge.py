@@ -50,13 +50,12 @@ class TestValidateReportSectionOrderEdge(unittest.TestCase):
             {
                 "report_section_order": {
                     "summary": 1,
-                    "market_value": 1,
-                    "category": 1,
+                    "holdings_detail": 1,
                     "penetration": 1,
                 }
             }
         )
-        self.assertEqual(n, 3)  # 第 1 个不重复，后 3 个重复
+        self.assertEqual(n, 2)  # 第 1 个不重复，后 2 个重复
 
     def test_llm_usage_and_unknown_together(self):
         """llm_usage 配置 + 未知 key → 2 问题。"""

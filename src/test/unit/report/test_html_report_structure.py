@@ -34,8 +34,7 @@ _TEMPLATE_PATH = os.path.normpath(
 # 默认注册表 key（按默认顺序，与 registry.py 对齐）
 _ALL_KEYS_DEFAULT = [
     "summary",
-    "market_value",
-    "category",
+    "holdings_detail",
     "penetration",
     "fund_performance",
     "fund_manager",
@@ -51,7 +50,7 @@ _ALL_KEYS_DEFAULT = [
     "llm_usage",
 ]
 
-_ALWAYS_KEYS = {"summary", "market_value", "category", "penetration", "fund_performance"}
+_ALWAYS_KEYS = {"summary", "holdings_detail", "penetration", "fund_performance"}
 _FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_relationship", "fund_concentration", "style_factor"}
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
@@ -70,21 +69,20 @@ _LLM_SUPPORTED_KEYS = {
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary", "name": "投资分析汇总", "number": 1},
-    {"key": "market_value", "name": "市值核算明细表", "number": 2},
-    {"key": "category", "name": "持仓分类表", "number": 3},
-    {"key": "penetration", "name": "资产穿透TOP10", "number": 4},
-    {"key": "fund_performance", "name": "基金业绩分析", "number": 5},
-    {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
-    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
-    {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
-    {"key": "style_factor", "name": "风格与因子分析", "number": 9},
-    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
-    {"key": "global_macro", "name": "全球政经局势", "number": 11},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 12},
-    {"key": "health_check", "name": "持仓体检报告", "number": 13},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 14},
-    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 15},
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 16},
+    {"key": "holdings_detail", "name": "持仓明细与分类", "number": 2},
+    {"key": "penetration", "name": "资产穿透TOP10", "number": 3},
+    {"key": "fund_performance", "name": "基金业绩分析", "number": 4},
+    {"key": "fund_manager", "name": "基金经理变更监控", "number": 5},
+    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 6},
+    {"key": "fund_concentration", "name": "持仓集中度监控", "number": 7},
+    {"key": "style_factor", "name": "风格与因子分析", "number": 8},
+    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 9},
+    {"key": "global_macro", "name": "全球政经局势", "number": 10},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 11},
+    {"key": "health_check", "name": "持仓体检报告", "number": 12},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 13},
+    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 14},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 15},
 ]
 
 
@@ -227,9 +225,9 @@ class TestHtmlNavStructure(unittest.TestCase):
     # ── Nav links ──────────────────────────────────────────────
 
     def test_nav_link_count(self):
-        """导航链接数量应等于可见模块数（全部可见 = 16）。"""
+        """导航链接数量应等于可见模块数（全部可见 = 15）。"""
         links = self.soup.select("nav.section-nav a")
-        self.assertEqual(len(links), 16, f"导航应有 16 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 15, f"导航应有 15 个链接，实际 {len(links)}")
 
     def test_every_nav_link_has_corresponding_section(self):
         """每个导航链接的 href 指向一个存在的 section id。"""
@@ -418,23 +416,22 @@ class TestHtmlCustomOrder(unittest.TestCase):
         cls.custom_order: list[dict] = [
             {"key": "fund_performance", "name": "基金业绩分析", "number": 1},
             {"key": "summary", "name": "投资分析汇总", "number": 2},
-            {"key": "market_value", "name": "市值核算明细表", "number": 3},
-            {"key": "category", "name": "持仓分类表", "number": 4},
-            {"key": "penetration", "name": "资产穿透TOP10", "number": 5},
+            {"key": "holdings_detail", "name": "持仓明细与分类", "number": 3},
+            {"key": "penetration", "name": "资产穿透TOP10", "number": 4},
             # 基金深度分析保持默认
-            {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
-            {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
-            {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
-            {"key": "style_factor", "name": "风格与因子分析", "number": 9},
+            {"key": "fund_manager", "name": "基金经理变更监控", "number": 5},
+            {"key": "position_relationship", "name": "持仓关系矩阵", "number": 6},
+            {"key": "fund_concentration", "name": "持仓集中度监控", "number": 7},
+            {"key": "style_factor", "name": "风格与因子分析", "number": 8},
             # news 保持默认
-            {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
+            {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 9},
             # llm 保持默认
-            {"key": "global_macro", "name": "全球政经局势", "number": 11},
-            {"key": "expert_review", "name": "智囊团深度复盘", "number": 12},
-            {"key": "health_check", "name": "持仓体检报告", "number": 13},
-            {"key": "penetration_deep", "name": "穿透深度分析", "number": 14},
-            {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 15},
-            {"key": "llm_usage", "name": "LLM API 用量", "number": 16},
+            {"key": "global_macro", "name": "全球政经局势", "number": 10},
+            {"key": "expert_review", "name": "智囊团深度复盘", "number": 11},
+            {"key": "health_check", "name": "持仓体检报告", "number": 12},
+            {"key": "penetration_deep", "name": "穿透深度分析", "number": 13},
+            {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 14},
+            {"key": "llm_usage", "name": "LLM API 用量", "number": 15},
         ]
         cls.numbers = {sec["key"]: sec["number"] for sec in cls.custom_order}
         cls.sv_dict = {sec["key"]: True for sec in cls.custom_order}
@@ -487,8 +484,8 @@ class TestHtmlCustomOrder(unittest.TestCase):
                 orders[sec_id] = int(m.group(1))
 
         self.assertIn("sec-llm_usage", orders)
-        # llm_usage 的 order 应为 16（默认值，未配置时保持）
-        self.assertEqual(orders["sec-llm_usage"], 16, "llm_usage 的 order 应为 16（末位）")
+        # llm_usage 的 order 应为 15（末位，合并章节后总条目 20）
+        self.assertEqual(orders["sec-llm_usage"], 15, "llm_usage 的 order 应为 15（末位）")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1097,9 +1094,9 @@ class TestHtmlTocSidebar(unittest.TestCase):
         self.assertEqual(sidebars[0].get("aria-label"), "章节目录")
 
     def test_toc_link_count_matches_sections(self):
-        """目录链接数量 = 可见模块数（全部可见 = 16）。"""
+        """目录链接数量 = 可见模块数（全部可见 = 15）。"""
         links = self.soup.select("#toc-sidebar a[href^='#sec-']")
-        self.assertEqual(len(links), 16, f"目录应有 16 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 15, f"目录应有 15 个链接，实际 {len(links)}")
 
     def test_every_toc_link_has_corresponding_section(self):
         """每个目录链接的 href 指向一个存在的 section id。"""
@@ -1152,8 +1149,7 @@ class TestHtmlTocSidebar(unittest.TestCase):
         # 预期分组顺序（测试常量）：基础信息 → 基金深度分析 → 历史 → LLM（行动建议组空，跳过）
         expected_keys = [
             "summary",
-            "market_value",
-            "category",
+            "holdings_detail",
             "penetration",
             "fund_performance",
             "fund_manager",
@@ -1302,7 +1298,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
 
         self.assertEqual(
             _group_keys("basic"),
-            ["summary", "market_value", "category", "penetration"],
+            ["summary", "holdings_detail", "penetration"],
             "「基础信息」组应含 4 个基础章节",
         )
         self.assertEqual(
@@ -1361,8 +1357,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             by_key["basic"],
             [
                 "summary",
-                "market_value",
-                "category",
+                "holdings_detail",
                 "penetration",
                 "data_source_status",
                 "financial_report_digest",

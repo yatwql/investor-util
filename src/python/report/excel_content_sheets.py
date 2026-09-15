@@ -1,6 +1,6 @@
 """核心内容页签写入模块。
 
-职责：写入汇总 / 分类 / 穿透 / 基金业绩 4 个核心页签。
+职责：写入汇总 / 持仓明细与分类 / 穿透 / 基金业绩 4 个核心页签。
 """
 
 from __future__ import annotations
@@ -23,11 +23,11 @@ def write_content_sheets(
     valuation_data: dict | None = None,
     market_temperature_data: dict | None = None,
 ) -> dict:
-    """写入汇总 / 分类 / 穿透 / 基金业绩页签，返回穿透结果。
+    """写入汇总 / 持仓明细与分类 / 穿透 / 基金业绩页签，返回穿透结果。
 
     Args:
         enable_cost_lots: 成本流水子模块开关。关闭时 fund_flow_data 不传
-            （汇总/分类两章保持既有输出）；开启时透传 data["fund_flow_data"]
+            （汇总/持仓明细与分类两章保持既有输出）；开启时透传 data["fund_flow_data"]
             （数据契约：成本分档 + XIRR + 分红累计，无流水时 available=False）。
         valuation_data: 估值分位数据契约（「资产穿透TOP10」估值分位列），
             开关关闭或 None 时穿透页签保持既有输出（10 列）。
@@ -53,9 +53,9 @@ def write_content_sheets(
     )
 
     prog.call_sheet(
-        get_report_sheet_name("category"),
-        modules.get("write_category_sheet"),
-        sheets["category"],
+        get_report_sheet_name("holdings_detail"),
+        modules.get("write_holdings_detail_sheet"),
+        sheets["holdings_detail"],
         holdings,
         data["details"],
         fund_flow_data=fund_flow_data,

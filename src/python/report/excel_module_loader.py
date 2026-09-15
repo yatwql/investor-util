@@ -50,14 +50,6 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("汇总页模块缺失 (summary)")
 
     try:
-        from src.python.report.category import write_category_sheet
-
-        modules["write_category_sheet"] = write_category_sheet
-    except ImportError:
-        modules["write_category_sheet"] = None
-        prog.add_error("持仓分类模块缺失 (category)")
-
-    try:
         from src.python.report.market_value import (
             _generate_details,
             classify_holdings,
@@ -81,12 +73,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("行情市值计算模块缺失 (market_value)")
 
     try:
-        from src.python.report.market_value_sheet import write_market_value_sheet
+        from src.python.report.holdings_detail_sheet import write_holdings_detail_sheet
 
-        modules["write_market_value_sheet"] = write_market_value_sheet
+        modules["write_holdings_detail_sheet"] = write_holdings_detail_sheet
     except ImportError:
-        modules["write_market_value_sheet"] = None
-        prog.add_error("行情市值写入模块缺失 (market_value_sheet)")
+        modules["write_holdings_detail_sheet"] = None
+        prog.add_error("持仓明细与分类写入模块缺失 (holdings_detail_sheet)")
 
     try:
         from src.python.report.penetration import compute_penetration_top10

@@ -38,8 +38,7 @@ class TestGetReportSectionOrderEdge:
             {
                 "report_section_order": {
                     "summary": 1,
-                    "market_value": 1,
-                    "category": 1,
+                    "holdings_detail": 1,
                     "penetration": 1,
                     "fund_performance": 1,
                 }
@@ -48,7 +47,7 @@ class TestGetReportSectionOrderEdge:
         # 已配置 5 项都在前面（key 顺序 = 排序前插入顺序）
         first_5 = [s["key"] for s in order[:5]]
         assert "summary" in first_5
-        assert "market_value" in first_5
+        assert "holdings_detail" in first_5
         assert order[-1]["key"] == "llm_usage"
 
     def test_none_config_value_fallsback(self):

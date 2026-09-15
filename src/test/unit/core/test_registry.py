@@ -247,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 21
+        assert len(_REPORT_SECTION_DEFAULT) == 20
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -309,13 +309,13 @@ class TestReportSectionDefault:
 
     def test_style_factor_registered_as_fund_deep_analysis(self):
         """style_factor 应注册为 fund_deep_analysis 模块（data_flag=style_factor_data，
-        一章三区块：基金风格表 + 风格因子回归 + 行业 Beta，序号 9）。"""
+        一章三区块：基金风格表 + 风格因子回归 + 行业 Beta，序号 8）。"""
         sf = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "style_factor"]
         assert len(sf) == 1, "缺少 style_factor 模块条目"
         sec = sf[0]
         assert sec["type"] == "fund_deep_analysis"
         assert sec["data_flag"] == "style_factor_data"
-        assert sec["number"] == 9
+        assert sec["number"] == 8
         # 旧章节 key 与旧 data_flag 不应注册
         keys = [s["key"] for s in _REPORT_SECTION_DEFAULT]
         assert "fund_style" not in keys, "旧基金风格章节 key 不应再注册"
@@ -329,17 +329,17 @@ class TestReportSectionDefault:
         sec = evo[0]
         assert sec["type"] == "evolution"
         assert sec["data_flag"] == "evolution_data"
-        assert sec["number"] == 17
+        assert sec["number"] == 16
 
     def test_action_registered_as_action_type(self):
         """action 应注册为 action 类型（独立顶层开关 enable_action 控制，默认开，
-        data_flag=None，序号 10 紧跟 style_factor）。"""
+        data_flag=None，序号 9 紧跟 style_factor）。"""
         act = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "action"]
         assert len(act) == 1, "缺少 action 模块条目"
         sec = act[0]
         assert sec["type"] == "action"
         assert sec["data_flag"] is None
-        assert sec["number"] == 10
+        assert sec["number"] == 9
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""
@@ -348,7 +348,7 @@ class TestReportSectionDefault:
         assert not duplicates, f"重复的 key: {duplicates}"
 
     def test_old_relationship_sections_removed(self):
-        """持仓关系矩阵一章两区块：旧章节 key 与旧 data_flag 不再注册，position_relationship 以序号 7 注册。"""
+        """持仓关系矩阵一章两区块：旧章节 key 与旧 data_flag 不再注册，position_relationship 以序号 6 注册。"""
         keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         assert "fund_overlap" not in keys, "旧重合度章节 key 不应再注册"
         assert "correlation_analysis" not in keys, "旧相关性章节 key 不应再注册"
@@ -356,7 +356,7 @@ class TestReportSectionDefault:
         assert len(pr) == 1, "缺少 position_relationship 模块条目"
         sec = pr[0]
         assert sec["name"] == "持仓关系矩阵"
-        assert sec["number"] == 7
+        assert sec["number"] == 6
         assert sec["type"] == "fund_deep_analysis"
         assert sec["data_flag"] == "position_relationship_data"
         # 旧 data_flag（overlap_data / correlation_data）不应再出现
@@ -460,10 +460,10 @@ class TestGetReportSectionOrder:
     def test_partial_config_unconfigured_after_configured(self):
         """未配置项排在已配置项之后。"""
         order = get_report_section_order({"report_section_order": {"fund_manager": 1, "summary": 2}})
-        # 检查前两项之后第一项是未配置的 market_value（默认顺序第 2 位）
-        # 但注意 market_value 默认序号是 2，与 summary 重复
+        # 检查前两项之后第一项是未配置的 holdings_detail（默认顺序第 2 位）
+        # 但注意 holdings_detail 默认序号是 2，与 summary 重复
         keys_after = [s["key"] for s in order[2:]]
-        assert "market_value" in keys_after
+        assert "holdings_detail" in keys_after
         assert "position_relationship" in keys_after
 
     def test_llm_usage_always_last(self):
@@ -493,7 +493,7 @@ class TestGetReportSectionOrder:
         assert summary_entry["number"] == -5
 
     def test_full_config_reverse_order(self):
-        """全部 21 项都配了 → 按配置序号排序，llm_usage 最后。"""
+        """全部 20 项都配了 → 按配置序号排序，llm_usage 最后。"""
         all_keys = [s["key"] for s in _REPORT_SECTION_DEFAULT if s["key"] != "llm_usage"]
         # 反序配置
         full_config = {k: i + 1 for i, k in enumerate(reversed(all_keys))}

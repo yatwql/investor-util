@@ -77,29 +77,19 @@ def resolve_market_data(
     holdings: list,
     details: list | None,
     modules: dict[str, Any],
-    ws2: Any,
     prog: ProgressReporter,
     enable_cost_lots: bool = False,
     transactions: list | None = None,
     dividends: list | None = None,
 ) -> dict[str, Any]:
-    """行情市值页写入，返回核心数据字典。"""
-    mvs = modules.get("write_market_value_sheet")
-    classify = modules.get("classify_holdings")
+    """行情市值**数据**解析，返回核心数据字典。
 
-    if mvs is None:
-        data = {
-            "total_mv": 0.0,
-            "total_cost": 0.0,
-            "total_profit": 0.0,
-            "today_profit": 0.0,
-            "details": details or [],
-            "categories": {},
-            "update_status": (0, 0, True),
-            "fund_flow_data": None,
-        }
-        prog.add_error("行情市值模块缺失，跳过 Sheet 2")
-    elif details is not None:
+    本函数不再写页签：「持仓明细与分类」页签由编排层调用
+    `holdings_detail_sheet.write_holdings_detail_sheet` 一次写入（两个区块）。
+    """
+    gen_details = modules.get("_generate_details")
+
+    if details is not None:
         logger.info("复用外部传入的市值核算数据，共 %d 条", len(details))
         data = {
             "total_mv": sum(d.market_value for d in details),
@@ -108,31 +98,30 @@ def resolve_market_data(
             "today_profit": sum(d.today_profit for d in details),
             "details": details,
         }
-        fund_flow_data = _build_flow_data(enable_cost_lots, transactions, dividends, holdings, details)
-        data["fund_flow_data"] = fund_flow_data
-        with Timer(get_report_sheet_name("market_value")):
-            mvs(ws2, details=details, fund_flow_data=fund_flow_data)
+        data["fund_flow_data"] = _build_flow_data(enable_cost_lots, transactions, dividends, holdings, details)
     else:
-        with Timer("行情数据获取 (" + get_report_sheet_name("market_value") + ")"):
+        with Timer("行情数据获取 (" + get_report_sheet_name("holdings_detail") + ")"):
             prog.info("正在获取行情数据（首次耗时较长，后续使用缓存）...")
-            gen_details = modules.get("_generate_details")
-            details = gen_details(holdings) if gen_details else []
+            if gen_details is None:
+                prog.add_error("行情市值计算模块缺失，行情明细为空")
+                details = []
+            else:
+                details = gen_details(holdings)
             total_mv = sum(d.market_value for d in details)
             total_cost = sum(d.cost for d in details)
             total_profit = sum(d.profit for d in details)
             today_profit = sum(d.today_profit for d in details)
-            fund_flow_data = _build_flow_data(enable_cost_lots, transactions, dividends, holdings, details)
-            mvs(ws2, details=details, fund_flow_data=fund_flow_data)
             data = {
                 "total_mv": total_mv,
                 "total_cost": total_cost,
                 "total_profit": total_profit,
                 "today_profit": today_profit,
                 "details": details,
-                "fund_flow_data": fund_flow_data,
+                "fund_flow_data": _build_flow_data(enable_cost_lots, transactions, dividends, holdings, details),
             }
         prog.ok("行情数据获取完成")
 
+    classify = modules.get("classify_holdings")
     data["categories"] = classify(holdings) if classify else {}
 
     _mkt_all_zero = data["total_mv"] == 0 and data["total_cost"] > 0

@@ -24,8 +24,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 # 需要校验真实注册表序号时请用 test_registry.py。
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary", "name": "投资分析汇总", "number": 1, "type": "always"},
-    {"key": "market_value", "name": "市值核算明细表", "number": 2, "type": "always"},
-    {"key": "category", "name": "持仓分类表", "number": 3, "type": "always"},
+    {"key": "holdings_detail", "name": "持仓明细与分类", "number": 2, "type": "always"},
     {"key": "penetration", "name": "资产穿透TOP10", "number": 4, "type": "always"},
     {"key": "fund_performance", "name": "基金业绩分析", "number": 5, "type": "always"},
     {"key": "fund_manager", "name": "基金经理变更监控", "number": 6, "type": "fund_deep_analysis"},
@@ -85,7 +84,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         custom_order = [
             {"key": "fund_performance", "name": "基金业绩分析", "number": 1, "type": "always"},
             {"key": "summary", "name": "投资分析汇总", "number": 2, "type": "always"},
-            {"key": "market_value", "name": "市值核算明细表", "number": 3, "type": "always"},
+            {"key": "holdings_detail", "name": "持仓明细与分类", "number": 3, "type": "always"},
         ]
         wb = self._make_wb()
         sheets = create_sheets(wb, custom_order, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
@@ -108,7 +107,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         )
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         self.assertEqual(list(sheets.keys()), expected_keys, "全部启用时页签顺序应与默认注册表一致")
-        self.assertEqual(len(sheets), 17)
+        self.assertEqual(len(sheets), 16)
 
     def test_sheet_order_visibility_filtering(self):
         """可见性过滤 → 只创建匹配 type 的页签且顺序保持。"""
@@ -128,7 +127,7 @@ class TestExcelSheetOrder(unittest.TestCase):
             sec["key"] for sec in _REPORT_SECTION_DEFAULT if sec["type"] in ("always", "fund_deep_analysis")
         ]
         self.assertEqual(list(sheets.keys()), expected_keys)
-        self.assertEqual(len(sheets), 10, "always + 基金深度分析 = 10")
+        self.assertEqual(len(sheets), 9, "always + 基金深度分析 = 9")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -229,13 +228,13 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         custom_order = [
             {"key": "fund_performance", "name": "基金业绩分析", "number": 1, "type": "always"},
             {"key": "summary", "name": "投资分析汇总", "number": 2, "type": "always"},
-            {"key": "market_value", "name": "市值核算明细表", "number": 3, "type": "always"},
+            {"key": "holdings_detail", "name": "持仓明细与分类", "number": 3, "type": "always"},
         ]
         wb = self._make_wb()
         sheets = create_sheets(wb, custom_order, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
         self.assertEqual(sheets["fund_performance"].title, "1.基金业绩分析", "fund_performance 应使用自定义序号 1")
         self.assertEqual(sheets["summary"].title, "2.投资分析汇总", "summary 应使用自定义序号 2")
-        self.assertEqual(sheets["market_value"].title, "3.市值核算明细表", "market_value 应使用自定义序号 3")
+        self.assertEqual(sheets["holdings_detail"].title, "3.持仓明细与分类", "holdings_detail 应使用自定义序号 3")
 
     def test_title_order_tracks_section_order(self):
         """页签标题顺序与 section_order 的 number 值排序一致。"""

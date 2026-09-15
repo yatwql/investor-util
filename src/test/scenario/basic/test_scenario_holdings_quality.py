@@ -411,7 +411,7 @@ class TestS0dSpecialCharacters(unittest.TestCase):
                 self.assertAlmostEqual(row.market_value, 1000.0)  # 10 * 100
 
     def test_special_chars_excel_sheet_write(self):
-        """特殊字符名称 → write_market_value_sheet 不崩溃。"""
+        """特殊字符名称 → 市值明细区块写入不崩溃。"""
         from src.python.report.market_value import DetailRow
 
         details = []
@@ -442,7 +442,7 @@ class TestS0dSpecialCharacters(unittest.TestCase):
         wb = openpyxl.Workbook()
         ws = wb.active
 
-        from src.python.report.market_value_sheet import write_market_value_sheet
+        from src.python.report.holdings_detail_sheet import _write_market_value_block
 
         with (
             patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
@@ -453,9 +453,9 @@ class TestS0dSpecialCharacters(unittest.TestCase):
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             try:
-                write_market_value_sheet(ws, details=details)
+                _write_market_value_block(ws, details, None, 1)
             except Exception as e:
-                self.fail(f"write_market_value_sheet 含特殊字符名称崩溃: {e}")
+                self.fail(f"市值明细区块写入含特殊字符名称崩溃: {e}")
 
     def test_special_chars_html_filters(self):
         """特殊字符名称 → HTML 模板过滤器不崩溃。"""

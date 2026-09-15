@@ -25,10 +25,9 @@ _NAV_GROUP_LABELS: list[tuple[str, str]] = [
 
 # 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础信息」组）
 _SECTION_NAV_GROUP_MAP: dict[str, str] = {
-    # 基础信息：汇总/明细/分类/穿透/数据源可用性
+    # 基础信息：汇总/持仓明细与分类/穿透/数据源可用性
     "summary": "basic",
-    "market_value": "basic",
-    "category": "basic",
+    "holdings_detail": "basic",
     "penetration": "basic",
     "data_source_status": "basic",
     "financial_report_digest": "basic",

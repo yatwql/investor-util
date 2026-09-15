@@ -14,7 +14,7 @@ from src.python.core.num_utils import finite_or
 def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
     """将成本流水数据（fund_flow_data）转成 HTML 模板友好展示映射（per-code 展示值）。
 
-    复用 market_value_sheet._weighted_avg_cost / category._tier_label 计算逻辑，
+    复用 holdings_detail_sheet._weighted_avg_cost / category._tier_label 计算逻辑，
     避免双实现。无数据或开关关闭时返回 None（模板不渲染成本流水列）。
 
     Args:
@@ -27,7 +27,7 @@ def _build_flow_display(fund_flow_data: dict | None) -> dict | None:
     if not fund_flow_data:
         return None
     from src.python.report.category import _tier_label
-    from src.python.report.market_value_sheet import _weighted_avg_cost
+    from src.python.report.holdings_detail_sheet import _weighted_avg_cost
 
     cost_tiers = (fund_flow_data.get("cost_tiers") or {}).get("per_code", {})
     dividends = (fund_flow_data.get("dividends") or {}).get("per_code", {})

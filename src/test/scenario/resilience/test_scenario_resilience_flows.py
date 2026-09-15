@@ -359,7 +359,7 @@ class TestScenarioZeroCost(ScenarioTestBase):
         """cost_price=0 → 所有字段正确。"""
         mock_td.return_value = "2026-06-30"
         from src.python.report.market_value import _compute_detail_row
-        from src.python.report.market_value_sheet import _detail_to_row_values
+        from src.python.report.holdings_detail_sheet import _detail_to_row_values
 
         h = Holding("证券", "测试零成本", "600000", 100, 0.0)
         mkt = {

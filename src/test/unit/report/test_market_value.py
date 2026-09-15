@@ -33,7 +33,7 @@ from src.python.report.market_value import (
     _compute_detail_row,
     price_update_status,
 )
-from src.python.report.market_value_sheet import (
+from src.python.report.holdings_detail_sheet import (
     _detail_to_row_values,
 )
 
@@ -1255,7 +1255,7 @@ class TestPremiumRate(unittest.TestCase):
     def test_premium_in_row_values(self):
         """detail_to_row_values 中溢价率列索引正确。"""
         from src.python.report.market_value import DetailRow
-        from src.python.report.market_value_sheet import (
+        from src.python.report.holdings_detail_sheet import (
             _detail_to_row_values,
         )
 

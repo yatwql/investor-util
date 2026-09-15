@@ -14,6 +14,7 @@ import unittest
 import pytest
 
 from src.python.report import category as cat
+from src.python.report.market_value import DetailRow
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
@@ -22,7 +23,7 @@ class TestYieldTextEdge(unittest.TestCase):
     """calc_yield_text 边界/异常情况。"""
 
     def setUp(self):
-        self.d = cat.DetailRow()
+        self.d = DetailRow()
         self.d.name = "长江电力"
         self.d.code = "600900"
         self.d.price = 50.0
@@ -34,7 +35,7 @@ class TestYieldTextEdge(unittest.TestCase):
 
     def test_price_zero(self):
         """最新价为 0 → "--"。"""
-        d = cat.DetailRow()
+        d = DetailRow()
         d.price = 0.0
         result = cat.calc_yield_text("000001", d, {"000001": {"avg_dividend": 0.50}})
         self.assertEqual(result, "--")

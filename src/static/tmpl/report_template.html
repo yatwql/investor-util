@@ -1098,9 +1098,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  市值核算 (Market Value)                               -->
-    <div class="section" id="sec-market_value" style="order: {{ section_numbers['market_value'] }};">
-        <div class="section-title">{{ section_numbers['market_value'] }}、市值核算明细表</div>
+    <!--  持仓明细与分类 (Holdings Detail)                       -->
+    <div class="section" id="sec-holdings_detail" style="order: {{ section_numbers['holdings_detail'] }};">
+        <div class="section-title">{{ section_numbers['holdings_detail'] }}、持仓明细与分类</div>
+        <div class="block-title">一、市值核算明细</div>
         <div class="section-content" style="padding: 0;">
             <table>
                 <thead>
@@ -1174,14 +1175,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </tbody>
             </table>
         </div>
-        {{ render_back_to_top() }}
-    </div>
 
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  持仓分类表 (Category Summary)                         -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section" id="sec-category" style="order: {{ section_numbers['category'] }};">
-        <div class="section-title">{{ section_numbers['category'] }}、持仓分类表</div>
+        <div class="block-title">二、持仓分类汇总</div>
         <div class="section-content" style="padding: 0;">
             <table>
                 <thead>

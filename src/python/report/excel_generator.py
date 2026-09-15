@@ -289,12 +289,13 @@ def generate_excel_report(
 
     # ── 行情市值 + 指数 ──
     # 成本流水子模块：开关开启时由 resolve_market_data 组装 fund_flow_data
-    # （成本分档 + XIRR + 分红累计，基于交易/分红流水 + 行情明细价格）
+    # （成本分档 + XIRR + 分红累计，基于交易/分红流水 + 行情明细价格）。
+    # 本函数只解析数据；「持仓明细与分类」页签由 write_content_sheets 一次写入
+    # （市值明细区块 + 分类汇总区块，见 holdings_detail_sheet）。
     data = resolve_market_data(
         holdings,
         details,
         modules,
-        sheets["market_value"],
         prog,
         enable_cost_lots=enable_cost_lots,
         transactions=transactions,
