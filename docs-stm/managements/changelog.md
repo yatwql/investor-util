@@ -18,6 +18,24 @@
 - **数据源说明表**：「数据源可用性矩阵」章在健康度表后新增「数据源说明（实际使用清单）」表——逐数据类别列出实际链路（如财报全文=DataSinking）、用途、计费（免费/免费档/付费档，财报全文随 `datasink.plan` 动态展示）与凭据要求（是否需 key + 就绪状态），并标注本次运行是否实际使用（观测到 DegradationTracker 事件即为已使用）。Excel（旧样式页签与数据质量仪表盘两路）与 HTML 同步渲染，`build_data_source_catalog()` 输出契约。
 - **状态**：plan-42 全部完成——数据层（①②③）+ 章节装配（④a）+ 渲染接线（④b）+ 文档同步（⑤：requirements §6.12 R-FRD-01~07、technical 附录 H 与 §4.9/§6.7、datasource 两册、how-to-config、folders）。
 
+### DataSinking 数据底座门禁（静默回原样）（2026-09-15）
+
+- **新增门禁**：`config.datasink_feature_ready()` —— 配置位 `datasink.enabled`（默认开）**且**凭据就绪；纯本地判定（零网络请求、零延迟），供依赖该数据底座的分析能力前置检查；新增 `config.is_enable_datasink()` 读配置位。
+- **覆盖范围**：财务指标章 + 真实历史估值分位（持仓个股财报摘要本已需 key，形态不变）。
+- **未就绪即静默回原样**：财务指标章 `build_financial_indicator` **门禁先于任何取数**（零网络开销）并返回 `None` → 章节整体隐藏、**不写占位**；真实分位 `_fetch_valuation_for_code` 不取指标不算分位，`compute_valuation_data` 置 `basis_mode="proxy_only"` → 估值列文案回到 `分位 45%（合理）`、免责语回到原单口径句（Excel 与 HTML 同一判据，抽取 `penetration_sheet.valuation_footer_note` 单一来源）。
+- **就绪时**：财务指标章正常装配；真实分位生效为 `basis_mode="real_ttm"`，估值列标注口径（`真实分位 …（…，PE-TTM）` / 无基本面覆盖回落 `价格分位 …（…，代理）`）。
+- **测试**：+9 例 —— 门禁判定（配置位缺省/关闭/凭据缺失组合）、门禁先于取数（零调用断言）、装配层与编排层未就绪返回 None、真实分位未就绪不取数且 `basis_mode=proxy_only`、免责语回原样与双口径两态。
+- **文档**：requirements R-FIN-13 / R-VAL-04、how-to-config（`datasink.enabled` 与财务指标章开关行）、technical（门禁判据与 `basis_mode` 契约位、语义表 +1 行）。
+
+### 真实历史估值分位（TTM 口径，plan-43 阶段③b）（2026-09-15）
+
+- **口径升级**：把「价格自身分位」升级为「真实估值分位」——历史 PE/PB 序列衡量贵不贵；无基本面覆盖时回落价格代理并标注口径，**两种口径不得混展示**。
+- **TTM 每股收益**（`analysis/valuation_percentile.py`）：年报直取当年 EPS；一季报/半年报/三季报按「上年年报 + 本期累计 − 去年同期累计」差分；所需期数不全 → 该期不产 TTM（不猜）。
+- **生效日 = 法定披露截止日**（年报/一季报 4-30、半年报 8-31、三季报 10-31；年报为次年）——**避免前视偏差**：某期数据仅在该日之后的历史价格上生效，绝不用未来财报解释过去价格；同日生效（年报与一季报同在 4-30）按报告期新者胜（否则退化为输入顺序，可能取到更旧口径）。
+- **序列与分位**：逐交易日取「该日已生效最新一期基本面」→ PE = 收盘价 ÷ TTM EPS（TTM ≤ 0 即亏损不产）、PB = 收盘价 ÷ 该期每股净资产（非正不产）；分位 = 历史值 ≤ 当前值占比，样本 < 60 判数据不足；**PE 优先、PB 兜底**，`basis` 如实标注。
+- **接线**：编排层 `_fetch_valuation_for_code` 增取指标序列（取数/计算异常各自收敛降级，不影响估值行）→ `by_code[code].real` + `real_available`；`penetration_sheet._get_valuation_text` 优先真实分位（`真实分位 45%（合理，PE-TTM）`），回落标 `价格分位 …（…，代理）`；Excel 表尾与 HTML 页脚免责语同步为双口径说明。
+- **测试**：+28 例 —— 派生层（TTM 差分四类/披露生效日/排序与同日并列/无前视对齐/PB 时点取值/亏损剔除/分位与档位/各类降级）+ 边缘（脏值基本面/非正与不可解析价格/生效日含边界/空序列）+ 接线（真实分位注入 by_code、无基本面回落、取数异常收敛）+ 既有文案断言同步。
+
 ### 财务指标报告章（plan-43 阶段③a）（2026-09-15）
 
 - **新增「财务指标」独立章**：持仓 + 穿透 A 股基本面（Excel 页签 + HTML `partials/financial_indicator_section.html` + 导航「基础信息」组），开关 `report_submodules.financial_indicator` 默认关、数据驱动（无数据隐藏/写占位），不改变既有章节输出。

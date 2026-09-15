@@ -1372,7 +1372,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
             {% endif %}
             {% if valuation_enabled %}
+            {% if valuation_real_basis %}
+            <div>* 估值分位说明：真实历史估值分位（TTM 口径，按法定披露截止日生效）优先；无基本面覆盖时回落价格分位代理（非真实历史估值分位）。PE/PB 为当前行情值</div>
+            {% else %}
             <div>* 估值分位说明：价格分位代理，非真实历史估值分位（PE/PB 为当前行情值）</div>
+            {% endif %}
             {% endif %}
         </div>
         {% else %}

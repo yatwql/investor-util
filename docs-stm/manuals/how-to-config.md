@@ -35,6 +35,7 @@
   },
   "preferred_provider": {},
   "datasink": {
+    "enabled": true,               // 数据底座总开关：关闭后依赖它的分析（财务指标章/真实估值分位）静默回原样
     "plan": "free",                 // free / yearly；决定限速与日配额的默认值
     "requests_per_second": 0,       // 0=按 plan 自动（free=3，yearly=31）
     "daily_quota": 0,               // 0=按 plan 自动（free=8191，yearly=131071）
@@ -146,7 +147,7 @@
 | `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量 = max(500, news_top_count × 2)，华尔街见闻硬上限 100 条除外） | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
-| `datasink.*` | `{plan: "free", ...}` | DataSinking 全文本财报配置：`plan`（free/yearly，决定限速与日配额默认值）、`requests_per_second` / `daily_quota`（0=按 plan 自动）、`sections`（取用章节）、`max_chars`（摘要截断）、`doc_types`（文种优先级）。免费档 3 请求/秒、8191 篇/日；仅覆盖 A 股 | 手动编辑 |
+| `datasink.*` | `{enabled: true, plan: "free", ...}` | DataSinking 数据底座配置：`enabled`（**总开关，默认开**；关闭后所有依赖该底座的分析——财务指标章、真实历史估值分位——**静默回到引入前的报告形态**，不产生任何可感知变化）、`plan`（free/yearly，决定限速与日配额默认值）、`requests_per_second` / `daily_quota`（0=按 plan 自动）、`sections`（取用章节）、`max_chars`（摘要截断）、`doc_types`（文种优先级）。免费档 3 请求/秒、8191 篇/日；仅覆盖 A 股 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s。低于 30s 的值在配置校验时告警，运行时自动钳制到 30s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
@@ -187,6 +188,7 @@
 | `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
 | `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 菜单 P → 6 |
 | `report_submodules.market_temperature` | `false` | 「投资分析汇总」章市场温度刻度行开关，**默认关闭**。开启后该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明） | 菜单 P → 6 |
+| `report_submodules.financial_indicator` | `false` | 「财务指标」独立章开关，**默认关闭**。开启后新增一章：持仓 + 穿透 A 股基本面（指标列 + 质量档 + 年度趋势 + 当前 PE/PB）。**需 DataSinking 数据底座就绪**（`datasink.enabled` 为真且已配置 API key）；未就绪时该章**不出现**（静默回原样，不写占位） | 菜单 P → 7 |
 | `report_submodules.financial_report_digest` | `false` | 「持仓个股财报摘要」独立章开关，**默认关闭**。开启后新增一章：对持仓 + 穿透中的 A 股标的取最新年报（无年报退半年报）的目标章节正文摘要。**需先配置 DataSinking API key**（`data/config/data_key.json` 的 `datasink` 节）；未配置时该章写占位并给出申请指引 | 菜单 P → 6 |
 | `report_submodules.industry_beta` | `false` | 「风格与因子分析」章行业 Beta 子表开关，**默认关闭**。开启后该章展示行业 Beta 子表（组合对中证行业指数的回归敏感性：行业暴露占比 + β/t 值/显著性/相关性） | 菜单 P → 6 |
 | `report_submodules.cost_lots` | `false` | 成本流水开关，**默认关闭**。开启后汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计：持仓 Excel 含交易/分红流水走精确计算；无流水时自动切换为快照近似（按 `holdings_start_date` 建仓日一次性买入近似年化，未配置则仅成本分档近似），XIRR 标注「近似」 | 菜单 P → 6 |

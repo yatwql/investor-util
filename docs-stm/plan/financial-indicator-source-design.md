@@ -158,7 +158,7 @@ financial_indicator: ["akshare_financial", "datasink_indicator"]
 
 | 派生 | 输入 | 用途 | 对应章节 |
 |---|---|---|---|
-| 真实历史 PE/PB 分位 | `eps`/`bvps` 多期 + 历史收盘价 | 替代或补充现有**价格分位代理**，给出真实估值分位 | 资产穿透 TOP10 |
+| 真实历史 PE/PB 分位 | `eps`/`bvps` 多期 + 历史收盘价 | 替代或补充现有**价格分位代理**，给出真实估值分位 | 资产穿透 TOP10 | ✅ 已实现（阶段③b，**TTM 口径**：年报直取 / 季报累计差分；生效日取法定披露截止日以避免前视偏差；PE 优先 PB 兜底；无基本面覆盖回落价格代理并标注口径） |
 | 质量因子 | `roe`/`gross_margin`/`debt_ratio`/`operating_cash_flow` | 盈利质量与财务健康度 | 风格与因子分析·持仓体检 |
 | 基本面趋势 | 多期 `revenue`/`net_profit` 序列 | 增长趋势与拐点 | 持仓个股财报摘要 |
 | 财报风险信号 | `amendment` 文种、审计意见章节、披露延迟（`announcement_time` − `report_period`） | 治理风险预警 | 持仓体检·数据质量仪表盘 |

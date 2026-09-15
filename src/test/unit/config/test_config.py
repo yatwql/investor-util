@@ -1089,3 +1089,31 @@ class TestIsEnableAction(unittest.TestCase):
         """行动建议开关独立于组合演进开关。"""
         self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": True}))
         self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": False, "enable_action": True}))
+
+
+class TestDatasinkFeatureGate:
+    """DataSinking 数据底座门禁：配置位 + 凭据双条件（纯本地判定）。"""
+
+    def test_enabled_flag_default_true_when_section_missing(self):
+        from src.python.config import is_enable_datasink
+
+        assert is_enable_datasink({}) is True
+        assert is_enable_datasink({"datasink": {}}) is True
+        assert is_enable_datasink({"datasink": {"enabled": True}}) is True
+        assert is_enable_datasink({"datasink": {"enabled": False}}) is False
+
+    def test_feature_ready_requires_enabled_and_credential(self, monkeypatch):
+        import src.python.core.datasource_credential as cred
+        from src.python.config import datasink_feature_ready
+
+        monkeypatch.setattr(cred, "missing_credential", lambda _sid: None)
+        assert datasink_feature_ready({"datasink": {"enabled": True}}) is True
+        assert datasink_feature_ready({"datasink": {"enabled": False}}) is False
+
+        monkeypatch.setattr(cred, "missing_credential", lambda _sid: object())
+        assert datasink_feature_ready({"datasink": {"enabled": True}}) is False
+
+    def test_default_config_has_enabled_true(self):
+        from src.python.config._config_defaults import _DEFAULT_CONFIG
+
+        assert _DEFAULT_CONFIG["datasink"]["enabled"] is True

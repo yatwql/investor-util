@@ -422,6 +422,43 @@ def is_enable_financial_report_digest(config: dict | None = None) -> bool:
     return bool(val)
 
 
+def is_enable_datasink(config: dict | None = None) -> bool:
+    """DataSinking 数据底座是否启用（配置位 ``datasink.enabled``，缺省视为启用）。
+
+    Args:
+        config: 完整配置字典，为 None 时读取全局配置
+    """
+    if config is None:
+        config = get_config()
+    section = config.get("datasink")
+    if not isinstance(section, dict):
+        return True
+    val = section.get("enabled")
+    if val is None:
+        logger.debug("config.json 缺少 datasink.enabled，按默认启用处理")
+        return True
+    return bool(val)
+
+
+def datasink_feature_ready(config: dict | None = None) -> bool:
+    """依赖 DataSinking 数据底座的分析能力是否就绪：**配置位开启 且 凭据已配置**。
+
+    财务指标章与真实历史估值分位据此门禁——不就绪时两者静默回退到引入前的
+    报告形态（不出现章节、估值列文案与免责语逐字保持原样），避免半可用状态
+    干扰阅读与业务分析。判定为**纯本地检查**（零网络请求、零延迟）。
+
+    Args:
+        config: 完整配置字典，为 None 时读取全局配置
+    """
+    if config is None:
+        config = get_config()
+    if not is_enable_datasink(config):
+        return False
+    from src.python.core.datasource_credential import missing_credential
+
+    return missing_credential("datasink") is None
+
+
 def is_enable_financial_indicator(config: dict | None = None) -> bool:
     """财务指标章是否启用。
 

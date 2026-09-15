@@ -22,6 +22,14 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 _CONTRACT_KEYS = {"available", "reason", "rows", "failures", "entry_count"}
 
 
+@pytest.fixture(autouse=True)
+def _datasink_ready(monkeypatch):
+    """本文件默认在「DataSinking 数据底座就绪」下验证装配逻辑；门禁用例自行关闭。"""
+    import src.python.config as cfg
+
+    monkeypatch.setattr(cfg, "datasink_feature_ready", lambda config=None: True)
+
+
 def _holding(code="600900", name="长江电力"):
     return SimpleNamespace(code=code, name=name)
 
@@ -160,6 +168,43 @@ class TestOrchestration:
             None,
         )
         assert {r["code"] for r in out["rows"]} == {"600519", "000001", "600036"}
+
+
+class TestDatasinkGate:
+    """DataSinking 数据底座门禁：未就绪时章节整体静默隐藏（返回 None，不写占位）。"""
+
+    def test_not_ready_returns_none(self, monkeypatch):
+        import src.python.config as cfg
+
+        monkeypatch.setattr(cfg, "datasink_feature_ready", lambda config=None: False)
+        monkeypatch.setattr(fi, "fetch_indicator_series", lambda code, limit=8: [_record()])
+        assert fi.build_financial_indicator([_holding()]) is None
+
+    def test_gate_checked_before_any_fetch(self, monkeypatch):
+        """门禁不通过时不得发起取数（零网络、零延迟）。"""
+        import src.python.config as cfg
+
+        monkeypatch.setattr(cfg, "datasink_feature_ready", lambda config=None: False)
+        called = {"n": 0}
+
+        def _series(code, limit=8):
+            called["n"] += 1
+            return []
+
+        monkeypatch.setattr(fi, "fetch_indicator_series", _series)
+        assert fi.build_financial_indicator([_holding()]) is None
+        assert called["n"] == 0
+
+    def test_orchestrator_returns_none_when_not_ready(self, monkeypatch):
+        import src.python.config as cfg
+
+        monkeypatch.setattr(cfg, "datasink_feature_ready", lambda config=None: False)
+        from src.python.report.orchestrator import compute_financial_indicator_data
+
+        out = compute_financial_indicator_data(
+            [_holding()], None, {"report_submodules": {"financial_indicator": True}}, None
+        )
+        assert out is None
 
 
 class TestSwitchAndWiring:

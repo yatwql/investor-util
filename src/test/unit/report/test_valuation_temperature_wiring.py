@@ -113,6 +113,7 @@ class TestAttachValuationToPenetration(unittest.TestCase):
         result = _attach_valuation_to_penetration(original, val)
         assert "valuation_text" not in original["top10"][0]
         assert result is not original
+        # 未声明 basis_mode → 保持引入前的原始文案（静默回原样）
         assert result["top10"][0]["valuation_text"] == "PE 12.3 · PB 1.56 · 分位 45%（合理）"
         assert result["summary"] == original["summary"]
 
@@ -167,6 +168,53 @@ class TestGetValuationText(unittest.TestCase):
 
         val = {"by_code": {"600001": {"price_percentile": 30.0, "tier": "低估", "percentile_available": True}}}
         assert _get_valuation_text(val, ["600001"]) == "分位 30%（低估）"
+
+    def test_real_ttm_percentile_takes_precedence(self):
+        """有真实历史估值分位（TTM 口径）时优先展示，并标注口径。"""
+        from src.python.report.penetration_sheet import _get_valuation_text
+
+        val = {
+            "basis_mode": "real_ttm",
+            "by_code": {
+                "600001": {
+                    "pe": 12.3,
+                    "pb": 1.56,
+                    "price_percentile": 70.0,
+                    "tier": "高估",
+                    "percentile_available": True,
+                    "real": {
+                        "available": True,
+                        "pe_percentile": 22.5,
+                        "pb_percentile": None,
+                        "tier": "低估",
+                        "basis": "pe_ttm",
+                    },
+                    "real_available": True,
+                }
+            },
+        }
+        assert _get_valuation_text(val, ["600001"]) == "PE 12.3 · PB 1.56 · 真实分位 22%（低估，PE-TTM）"
+
+    def test_real_pb_basis_labelled(self):
+        """PE 无覆盖回落 PB 口径时如实标注 basis。"""
+        from src.python.report.penetration_sheet import _get_valuation_text
+
+        val = {
+            "basis_mode": "real_ttm",
+            "by_code": {
+                "600001": {
+                    "real": {
+                        "available": True,
+                        "pe_percentile": None,
+                        "pb_percentile": 81.0,
+                        "tier": "高估",
+                        "basis": "pb",
+                    },
+                    "real_available": True,
+                }
+            },
+        }
+        assert _get_valuation_text(val, ["600001"]) == "真实分位 81%（高估，PB）"
 
 
 class TestWriteMarketTemperature(unittest.TestCase):
@@ -262,6 +310,87 @@ class TestComputeValuationData(unittest.TestCase):
         assert result["status"] == "source_failed"
 
 
+class TestRealValuationWiring(unittest.TestCase):
+    """_fetch_valuation_for_code：真实历史估值分位（TTM）接入与降级。"""
+
+    def _bars(self, days=120):
+        import datetime
+
+        base = datetime.date(2025, 5, 1)
+        return [
+            {"date": (base + datetime.timedelta(days=i)).isoformat(), "close": 20.0 + i * 0.05} for i in range(days)
+        ]
+
+    def test_real_ttm_merged_into_by_code(self):
+        from src.python.report.orchestrator import _fetch_valuation_for_code
+
+        records = [{"report_period": "2024-12-31", "doc_type": "annual", "eps": 2.0, "bvps": 10.0}]
+        with (
+            patch("src.python.config.datasink_feature_ready", return_value=True),
+            patch("src.python.fetcher.industry.fetch_valuation_fields", return_value={"pe": 10.5, "pb": 2.1}),
+            patch("src.python.report.orchestrator._fetch_holding_bars", return_value=self._bars()),
+            patch("src.python.fetcher.financial_indicator.fetch_indicator_series", return_value=records),
+        ):
+            out = _fetch_valuation_for_code("600001", "测试股票")
+        self.assertTrue(out["real_available"], out)
+        self.assertTrue(out["real"]["available"])
+        self.assertEqual(out["real"]["basis"], "pe_ttm")
+        self.assertEqual(out["real"]["report_period"], "2024-12-31")
+        self.assertIn("tier", out["real"])
+
+    def test_no_fundamentals_degrades_to_proxy_only(self):
+        """无基本面覆盖 → real 不可用，价格代理字段保留（不伪造真实分位）。"""
+        from src.python.report.orchestrator import _fetch_valuation_for_code
+
+        with (
+            patch("src.python.config.datasink_feature_ready", return_value=True),
+            patch("src.python.fetcher.industry.fetch_valuation_fields", return_value={"pe": 10.5, "pb": 2.1}),
+            patch("src.python.report.orchestrator._fetch_holding_bars", return_value=self._bars()),
+            patch("src.python.fetcher.financial_indicator.fetch_indicator_series", return_value=[]),
+        ):
+            out = _fetch_valuation_for_code("600001", "测试股票")
+        self.assertTrue(out["percentile_available"])
+        self.assertFalse(out["real_available"])
+        self.assertEqual(out["real"]["reason"], "no_fundamentals")
+
+    def test_datasink_not_ready_skips_real_and_keeps_proxy(self):
+        """数据底座未就绪 → 不取指标、不算真实分位，且契约标 basis_mode=proxy_only。"""
+        from src.python.report.orchestrator import _fetch_valuation_for_code
+
+        called = {"n": 0}
+
+        def _series(code, limit=8):
+            called["n"] += 1
+            return [{"report_period": "2024-12-31", "eps": 2.0, "bvps": 10.0}]
+
+        with (
+            patch("src.python.config.datasink_feature_ready", return_value=False),
+            patch("src.python.fetcher.industry.fetch_valuation_fields", return_value={"pe": 10.5, "pb": 2.1}),
+            patch("src.python.report.orchestrator._fetch_holding_bars", return_value=self._bars()),
+            patch("src.python.fetcher.financial_indicator.fetch_indicator_series", side_effect=_series),
+        ):
+            out = _fetch_valuation_for_code("600001", "测试股票")
+        self.assertFalse(out["real_available"])
+        self.assertEqual(out["real"]["reason"], "datasink_unavailable")
+        self.assertEqual(called["n"], 0)
+
+    def test_indicator_fetch_exception_is_contained(self):
+        """指标取数抛异常 → 降级为空子契约，不影响估值行。"""
+        from src.python.report.orchestrator import _fetch_valuation_for_code
+
+        with (
+            patch("src.python.config.datasink_feature_ready", return_value=True),
+            patch("src.python.fetcher.industry.fetch_valuation_fields", return_value={"pe": 10.5, "pb": 2.1}),
+            patch("src.python.report.orchestrator._fetch_holding_bars", return_value=self._bars()),
+            patch(
+                "src.python.fetcher.financial_indicator.fetch_indicator_series",
+                side_effect=RuntimeError("boom"),
+            ),
+        ):
+            out = _fetch_valuation_for_code("600001", "测试股票")
+        self.assertFalse(out["real_available"])
+
+
 class TestComputeMarketTemperatureData(unittest.TestCase):
     """compute_market_temperature_data：编排市场温度数据契约。"""
 
@@ -305,3 +434,21 @@ class TestComputeMarketTemperatureData(unittest.TestCase):
             result = compute_market_temperature_data(config, MagicMock())
         assert result["available"] is False
         assert result["status"] == "source_failed"
+
+
+class TestValuationFooterText(unittest.TestCase):
+    """估值列免责语：真实口径生效用双口径说明，否则逐字保持引入前的原样。"""
+
+    def test_proxy_only_keeps_original_note(self):
+        from src.python.analysis.valuation_percentile import DISCLAIMER
+        from src.python.report.penetration_sheet import valuation_footer_note
+
+        for payload in (None, {"available": True, "by_code": {}}, {"by_code": {}, "basis_mode": "proxy_only"}):
+            assert valuation_footer_note(payload) == f"* 估值分位说明：{DISCLAIMER}（PE/PB 为当前行情值）"
+
+    def test_real_basis_documents_both(self):
+        from src.python.report.penetration_sheet import valuation_footer_note
+
+        note = valuation_footer_note({"by_code": {}, "basis_mode": "real_ttm"})
+        assert "真实历史估值分位（TTM 口径" in note
+        assert "价格分位代理" in note

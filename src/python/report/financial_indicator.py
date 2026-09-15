@@ -99,8 +99,16 @@ def build_financial_indicator(
         prices: ``{代码: 现价}``（用于当前 PE/PB；缺价则该行 PE/PB 留空）
 
     Returns:
-        ``{available, reason, rows, failures, entry_count}``
+        ``{available, reason, rows, failures, entry_count}``；
+        **DataSinking 数据底座未就绪（配置位关闭或缺凭据）时返回 None**——
+        章节整体隐藏（不写占位），报告形态与引入本能力前逐字一致
     """
+    from src.python.config import datasink_feature_ready
+
+    if not datasink_feature_ready(config):
+        logger.info("[financial_indicator] DataSinking 数据底座未就绪，财务指标章静默跳过")
+        return None
+
     targets = collect_a_share_targets(holdings, penetrated_codes)
     if not targets:
         return _empty("无 A 股持仓或穿透标的")

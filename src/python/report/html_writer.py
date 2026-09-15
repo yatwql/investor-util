@@ -262,6 +262,8 @@ def _render_template(
 
     # 估值分位 + 市场温度：开关关闭时为 None（模板保持既有输出）
     valuation_enabled = valuation_data is not None
+    # 真实分位口径是否生效（未生效时页脚保持引入前的原始免责语）
+    valuation_real_basis = (valuation_data or {}).get("basis_mode") == "real_ttm"
     penetration_display = _attach_valuation_to_penetration(penetration, valuation_data)
     market_temperature = _build_temperature_display(market_temperature_data)
     # 目录分组导航：按「基础信息/基金深度分析/行动建议/历史/LLM」五组折叠（_sv_fn 闭包过滤不可见章节）
@@ -272,6 +274,7 @@ def _render_template(
         section_groups=section_groups,
         llm_supported_sections=_LLM_SUPPORTED_SECTIONS,
         valuation_enabled=valuation_enabled,
+        valuation_real_basis=valuation_real_basis,
         market_temperature=market_temperature,
         now=now_str,
         today=today_str,

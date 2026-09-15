@@ -70,6 +70,9 @@ _DEFAULT_CONFIG = {
     # DataSinking 全文本财报（仅 A 股；需用户自备 key）
     # requests_per_second / daily_quota 为 0 时按 plan 自动（free=3/8191，yearly=31/131071）
     "datasink": {
+        # 数据底座总开关：关闭后所有依赖 DataSinking 的分析（财务指标章 / 真实历史估值分位 /
+        # 持仓个股财报摘要）静默回到引入前的报告形态，不产生任何可感知变化
+        "enabled": True,
         "plan": "free",
         "requests_per_second": 0,
         "daily_quota": 0,

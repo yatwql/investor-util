@@ -349,10 +349,12 @@ def compute_valuation_data(
         report_submodules.valuation_percentile 关闭时返回 None（列隐藏）；
         push2/K 线均不可用时 available=False（占位，§1.4.5）。
     """
-    from src.python.config import is_enable_valuation_percentile
+    from src.python.config import datasink_feature_ready, is_enable_valuation_percentile
 
     if not is_enable_valuation_percentile(config):
         return None
+    # 真实分位口径是否生效：未就绪时渲染层保持价格分位的原始文案与免责语（静默回原样）
+    real_basis = datasink_feature_ready(config)
 
     from concurrent.futures import ThreadPoolExecutor
 
@@ -384,7 +386,12 @@ def compute_valuation_data(
             return unavailable_valuation("source_failed")
 
         reporter.ok("估值分位计算完成")
-        return {"available": True, "status": "ok", "by_code": by_code}
+        return {
+            "available": True,
+            "status": "ok",
+            "by_code": by_code,
+            "basis_mode": "real_ttm" if real_basis else "proxy_only",
+        }
     except Exception:
         logger.exception("[valuation] 估值分位编排异常，章节降级")
         return unavailable_valuation("source_failed")
@@ -413,7 +420,10 @@ def _fetch_valuation_for_code(
     pe_pb = fetch_valuation_fields(code)
     bars = _fetch_holding_bars(code, name, days) or []
     pct = compute_price_percentile(bars)
-    if not pe_pb and not pct.get("available"):
+    # 真实历史估值分位（TTM 口径）：多期基本面（基金/指标域，主源失败落解析支路）
+    # × 历史收盘价，两者任一不可得则该项降级（不伪造历史期）
+    real = _real_valuation_for_code(code, bars)
+    if not pe_pb and not pct.get("available") and not real.get("available"):
         return None
     return {
         "pe": (pe_pb or {}).get("pe"),
@@ -422,7 +432,35 @@ def _fetch_valuation_for_code(
         "tier": pct.get("tier"),
         "sample_count": pct.get("sample_count", 0),
         "percentile_available": bool(pct.get("available")),
+        # 真实历史估值分位子契约（TTM 口径）：渲染层优先展示；不可用时回落价格代理
+        "real": real,
+        "real_available": bool(real.get("available")),
     }
+
+
+def _real_valuation_for_code(code: str, bars: list[dict]) -> dict:
+    """单只标的的真实历史估值分位（TTM 口径）；取数失败降级为空子契约。
+
+    DataSinking 数据底座未就绪时**不做任何取数与计算**（渲染层同时退回价格分位
+    的原始文案与免责语，报告形态与引入本口径前逐字一致）。
+    """
+    from src.python.analysis.valuation_percentile import compute_real_valuation
+    from src.python.config import datasink_feature_ready
+    from src.python.fetcher.financial_indicator import fetch_indicator_series
+
+    if not datasink_feature_ready():
+        return {"available": False, "reason": "datasink_unavailable"}
+
+    try:
+        records = fetch_indicator_series(code)
+    except Exception:
+        logger.debug("[valuation] %s 指标序列取数失败，真实估值分位降级", code, exc_info=True)
+        records = []
+    try:
+        return compute_real_valuation(bars, records)
+    except Exception:
+        logger.debug("[valuation] %s 真实估值分位计算异常，降级", code, exc_info=True)
+        return {"available": False, "reason": "compute_failed"}
 
 
 # ── generate_report ──
