@@ -353,3 +353,61 @@ def test_fetch_via_chain_degrades_when_provider_empty(monkeypatch):
         transform=transform_map,
     )
     assert out is None
+
+
+class TestIndicatorUsageMarking:
+    """财务指标域取数须打「本次取用」标记（主源与解析支路分别标记）。"""
+
+    def _keys(self):
+        from src.python.report.data_status import get_tracker
+
+        return [e["source_key"] for e in get_tracker().get_log()]
+
+    def test_main_source_marks_used(self, monkeypatch):
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        monkeypatch.setattr(
+            akshare_financial,
+            "fetch_financial_indicator_history",
+            lambda code, limit=8: [{"report_period": "2025-12-31"}],
+        )
+        fi.fetch_indicator_series("600900")
+        assert "fin_indicator_akshare_financial" in self._keys()
+
+    def test_fallback_delegates_to_latest_indicator(self, monkeypatch):
+        """主源无覆盖 → 委派链路取单期记录（取用标记由链路段负责）。"""
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        calls = {"n": 0}
+
+        def _latest(code):
+            calls["n"] += 1
+            return {"report_period": "2025-12-31", "source_api": "datasink_indicator"}
+
+        monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", lambda code, limit=8: [])
+        monkeypatch.setattr(fi, "fetch_latest_indicator", _latest)
+        assert fi.fetch_indicator_series("600900")[0]["source_api"] == "datasink_indicator"
+        assert calls["n"] == 1
+
+    def test_chain_path_marks_source_from_record(self, monkeypatch):
+        """链路单期路径按记录的 source_api 打标（解析支路也算本次取用）。"""
+        from src.python.fetcher import financial_indicator as fi
+
+        monkeypatch.setattr("src.python.fetcher.source_adapter.adapter_chain_slots", lambda domain: ({}, {}))
+        monkeypatch.setattr(
+            "src.python.fetcher.chain.fetch_with_fallback",
+            lambda *a, **k: {"report_period": "2025-12-31", "source_api": "datasink_indicator"},
+        )
+        assert fi.fetch_latest_indicator("600900") is not None
+        assert "fin_indicator_datasink_indicator" in self._keys()
+
+    def test_no_data_marks_nothing(self, monkeypatch):
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", lambda code, limit=8: [])
+        monkeypatch.setattr(fi, "fetch_latest_indicator", lambda code: None)
+        assert fi.fetch_indicator_series("600900") == []
+        assert self._keys() == []

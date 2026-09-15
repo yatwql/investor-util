@@ -45,7 +45,7 @@ def fetch_latest_indicator(code: str) -> dict[str, Any] | None:
         return None
     provider_map, transform_map = adapter_chain_slots(DOMAIN_FINANCIAL_INDICATOR)
     cache_key = f"fin_indicator_{code}"
-    return fetch_with_fallback(
+    record = fetch_with_fallback(
         "financial_indicator",
         provider_map,
         cache_key,
@@ -53,6 +53,11 @@ def fetch_latest_indicator(code: str) -> dict[str, Any] | None:
         fn_kwargs={"code": code},
         transform=transform_map,
     )
+    if record:
+        from src.python.report.data_status import mark_data_used
+
+        mark_data_used(f"fin_indicator_{record.get('source_api') or 'unknown'}")
+    return record
 
 
 def fetch_indicator_series(code: str, limit: int = DEFAULT_PERIODS) -> list[dict[str, Any]]:
@@ -71,6 +76,10 @@ def fetch_indicator_series(code: str, limit: int = DEFAULT_PERIODS) -> list[dict
         return cached
 
     records: list[dict[str, Any]] = list(akshare_financial.fetch_financial_indicator_history(code, limit=limit))
+    if records:
+        from src.python.report.data_status import mark_data_used
+
+        mark_data_used(f"fin_indicator_{akshare_financial.SOURCE_ID}")
     if not records:
         latest = fetch_latest_indicator(code)
         if latest:

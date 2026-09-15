@@ -60,16 +60,29 @@ def collect_a_share_targets(
     return [targets[k] for k in sorted(targets)]
 
 
+def _mark_used(source_key: str) -> None:
+    """标记「本次取用了 DataSinking 数据」——供数据源说明表的「本次使用」列。
+
+    只记成功事件（含缓存命中返回），不参与降级计数：章节名 fuzzy 未命中等
+    预期内空结果不应被计为源故障（详见 ``data_status.mark_data_used``）。
+    """
+    from src.python.report.data_status import mark_data_used
+
+    mark_data_used(source_key)
+
+
 def _fetch_index(symbol: str, doc_types: tuple[str, ...]) -> list[dict[str, Any]] | None:
     """取某符号的报告元数据（按文种顺序试取最新一篇），带缓存。"""
     cache_key = f"{INDEX_PREFIX}{symbol}"
     cached = cache_get(cache_key, get_ttl("report", cache_key))
     if cached is not None:
+        _mark_used(f"{INDEX_PREFIX.rstrip('_')}")
         return cached if isinstance(cached, list) else None
     for doc_type in doc_types:
         items = datasink.fetch_report_documents(symbol, doc_type=doc_type, order="desc", size=1)
         if items:
             cache_set(cache_key, items)
+            _mark_used(f"{INDEX_PREFIX.rstrip('_')}")
             return items
     return None
 
@@ -80,7 +93,7 @@ def _fetch_document(doc_id: int | str, section: str) -> dict[str, Any] | None:
 
     provider_map, transform_map = adapter_chain_slots(DOMAIN_FINANCIAL_REPORT)
     cache_key = f"{DOC_PREFIX}{doc_id}_{section or 'full'}"
-    return fetch_with_fallback(
+    record = fetch_with_fallback(
         "financial_report",
         provider_map,
         cache_key,
@@ -88,6 +101,9 @@ def _fetch_document(doc_id: int | str, section: str) -> dict[str, Any] | None:
         fn_kwargs={"doc_id": doc_id, "section": section or None},
         transform=transform_map,
     )
+    if record:
+        _mark_used(DOC_PREFIX.rstrip("_"))
+    return record
 
 
 def fetch_symbol_report(

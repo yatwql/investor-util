@@ -759,3 +759,36 @@ class TestGetTracker:
         log = t.get_log()
         assert log[0]["degraded"] is True
         assert log[0]["count"] >= 1
+
+
+class TestMarkDataUsed:
+    """mark_data_used：数据源说明表「本次使用」列的取用标记（只记成功）。"""
+
+    def test_records_success_event(self):
+        from src.python.report.data_status import get_tracker, mark_data_used
+
+        mark_data_used("report_datasink_doc")
+        log = get_tracker().get_log()
+        assert [e["source_key"] for e in log] == ["report_datasink_doc"]
+        assert log[0]["success"] is True
+
+    def test_does_not_count_as_degradation(self):
+        """取用标记不得推进降级计数（多次标记后仍不降级）。"""
+        from src.python.report.data_status import get_tracker, mark_data_used
+
+        for _ in range(5):
+            mark_data_used("report_datasink_index")
+        log = get_tracker().get_log()
+        assert len(log) == 5
+        assert all(e["success"] is True and e["degraded"] is False for e in log)
+
+    def test_never_raises(self, monkeypatch):
+        """观测性副作用不得影响取数：tracker 异常时静默。"""
+        import src.python.report.data_status as ds
+
+        class _Boom:
+            def record(self, *a, **k):
+                raise RuntimeError("boom")
+
+        monkeypatch.setattr(ds, "get_tracker", lambda *a, **k: _Boom())
+        ds.mark_data_used("report_datasink_doc")  # 不应抛出

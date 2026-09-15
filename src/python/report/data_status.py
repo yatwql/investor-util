@@ -150,6 +150,26 @@ def get_tracker(persist_path: str | None = None) -> DegradationTracker:
     return _tracker_instance
 
 
+def mark_data_used(source_key: str, tier: str = "T2") -> None:
+    """标记「本次运行取用了该类别数据」（只记成功事件，**不参与降级计数**）。
+
+    用途：「数据源说明表」的「本次使用」列（由 ``report.data_source_matrix`` 依据
+    tracker 事件前缀判定）。该类别的取数链路在**取得数据时**（含命中缓存的返回）
+    调用本函数，使该列反映「这次报告有没有用到这类源」，而非「这次有没有发生降级」。
+
+    为何只记成功：章节名 fuzzy 未命中（指定章节在该文档不存在）、标的不在源覆盖
+    范围等**预期内的空结果**大量存在，若按失败计入 T2 连续失败阈值（2 次），
+    会把预期内空结果误报为源故障降级；失败与降级仍由各域既有机制披露
+    （provider 日志、章节失败清单、链路 FailureDiagnostics）。
+
+    自身不抛异常（观测性副作用不得影响取数）。
+    """
+    try:
+        get_tracker().record(source_key, tier, success=True)
+    except Exception:  # 观测失败不影响主链路
+        logger.debug("[data_status] 取用标记失败（非关键）: %s", source_key, exc_info=True)
+
+
 def reset_tracker() -> None:
     """重置 DegradationTracker 单例（测试用）。
 

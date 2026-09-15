@@ -129,3 +129,59 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
         monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "  "})
         assert fr.fetch_symbol_report("600519.SS", sections=("管理层讨论与分析", "财务报告")) is None
+
+
+class TestDatasinkUsageMarking:
+    """取数链路须打「本次取用」标记（数据源说明表「本次使用」列的数据来源）。"""
+
+    def _keys(self):
+        from src.python.report.data_status import get_tracker
+
+        return [e["source_key"] for e in get_tracker().get_log()]
+
+    def test_index_fetch_marks_used(self, monkeypatch):
+        from src.python.fetcher import financial_report as fr
+
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(
+            fr, "datasink", type("D", (), {"fetch_report_documents": staticmethod(lambda *a, **k: [{"id": 1}])})
+        )
+        assert fr._fetch_index("600900.SS", ("annual",)) == [{"id": 1}]
+        assert "report_datasink_index" in self._keys()
+
+    def test_index_cache_hit_marks_used(self, monkeypatch):
+        """命中缓存也算「本次取用」（读者关心的是这次报告有没有用到该源）。"""
+        from src.python.fetcher import financial_report as fr
+
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: [{"id": 2}])
+        assert fr._fetch_index("600900.SS", ("annual",)) == [{"id": 2}]
+        assert "report_datasink_index" in self._keys()
+
+    def test_index_miss_marks_nothing(self, monkeypatch):
+        from src.python.fetcher import financial_report as fr
+
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(
+            fr, "datasink", type("D", (), {"fetch_report_documents": staticmethod(lambda *a, **k: None)})
+        )
+        assert fr._fetch_index("600900.SS", ("annual",)) is None
+        assert self._keys() == []
+
+    def test_document_fetch_marks_used(self, monkeypatch):
+        from src.python.fetcher import financial_report as fr
+
+        monkeypatch.setattr(fr, "adapter_chain_slots", lambda domain: ({}, {}))
+        monkeypatch.setattr(
+            "src.python.fetcher.chain.fetch_with_fallback",
+            lambda *a, **k: {"doc_id": 1, "content": "x"},
+        )
+        assert fr._fetch_document(1, "管理层讨论与分析") is not None
+        assert "report_datasink_doc" in self._keys()
+
+    def test_document_miss_marks_nothing(self, monkeypatch):
+        from src.python.fetcher import financial_report as fr
+
+        monkeypatch.setattr(fr, "adapter_chain_slots", lambda domain: ({}, {}))
+        monkeypatch.setattr("src.python.fetcher.chain.fetch_with_fallback", lambda *a, **k: None)
+        assert fr._fetch_document(1, "管理层讨论与分析") is None
+        assert self._keys() == []

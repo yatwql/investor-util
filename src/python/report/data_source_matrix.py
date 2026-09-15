@@ -26,6 +26,7 @@ _SOURCE_CATEGORIES: list[dict[str, Any]] = [
     {"key": "dividend", "name": "分红数据", "prefixes": ["penetration_dividend"]},
     {"key": "fund_flow", "name": "资金流向", "prefixes": ["ff_"]},
     {"key": "financial_report", "name": "财报全文", "prefixes": ["report_datasink_"]},
+    {"key": "financial_indicator", "name": "财务指标", "prefixes": ["fin_indicator_"]},
 ]
 
 
@@ -232,10 +233,18 @@ _SOURCE_CATALOG: list[dict[str, Any]] = [
         "id": "financial_report",
         "category": "财报全文",
         "provider": "DataSinking（api.datasink.ing）",
-        "usage": "个股财报章节全文摘要（仅 A 股）",
+        "usage": "个股财报章节全文摘要，兼作财务指标解析的备用支路（仅 A 股）",
         "auth": "需 key",
         "credential_source_id": "datasink",
-        "note": "免费 key 需自备（datasink.ing）",
+        "note": "免费 key 需自备（datasink.ing）；需开启 report_submodules.financial_report_digest 或 financial_indicator 才会取用",
+    },
+    {
+        "id": "financial_indicator",
+        "category": "财务指标",
+        "provider": "akshare 结构化财务指标（主源）；DataSinking 财报章节解析（备用支路）",
+        "usage": "持仓 A 股基本面（指标列 / 质量档 / 年度趋势 / 真实 PE·PB 分位）",
+        "auth": "无需（主源）",
+        "note": "备用支路需 DataSinking key；两者均需开启 report_submodules.financial_indicator 或 valuation_percentile",
     },
 ]
 
@@ -259,7 +268,9 @@ def build_data_source_catalog() -> list[dict[str, Any]]:
 
     Returns:
         每行含 ``id / category / provider / usage / billing / auth / used / note``。
-        ``used`` 为 True 表示本次运行观测到该类别的事件（实际使用）。
+        ``used`` 为 True 表示本次运行**取得过该类别数据**（含命中缓存）——由各类别的
+        取数链路以 ``report.data_status.mark_data_used`` 标记（**只记成功、不记降级**，
+        故「未使用」仅说明本次未取到该类数据，不等于该源故障）。
         需 key 的类别（如财报全文）的 ``auth`` 附加就绪状态。
     """
     from src.python.core.datasource_credential import credential_readiness, credential_ready_enabled

@@ -6,6 +6,14 @@
 
 ## [0.10.20-dev] - 开发中（未发布）
 
+### 修复：数据源说明表误报「未使用」（财务指标/财报全文取用标记缺失）（2026-09-15）
+
+- **现象（用户报障）**：运行最新程序后「数据源可用性矩阵」章的「数据源说明（实际使用清单）」表仍把 DataSinking 标为 `○ 未使用`。
+- **根因一（配置，非缺陷）**：DataSinking 相关能力**均为默认关的 opt-in**——用户 `config.json` 的 `report_submodules` 只有 `data_quality` / `market_temperature` 为真，`financial_report_digest`、`financial_indicator`、`valuation_percentile` 均为关（前两者甚至未出现在该段，走默认关），因此本次运行**根本没有任何代码路径去调用 DataSinking**，`未使用` 属实。
+- **根因二（真实缺陷）**：说明表的 `used` 取自 `DegradationTracker` 事件前缀（`report_datasink_`），而**该域的取数链路从未写任何 tracker 事件**（`providers/datasink.py`、`fetcher/financial_report.py` 均无记录点，与 price/fund/index/industry 各自在 fetcher 层记事件的惯例不一致）——即使用户开启开关并成功取数，也永远显示 `未使用`；同时 `financial_indicator` 域（缓存前缀 `fin_indicator_`）**根本没有类别行**，在说明表中完全缺席。
+- **修复**：① 新增 `report/data_status.py::mark_data_used(source_key)`——「本次取用」标记，**只记成功事件、不参与降级计数**（章节名 fuzzy 未命中等预期内空结果若按失败计入 T2 阈值会把预期内空结果误报为源故障；失败与降级仍由 provider 日志、章节失败清单、链路诊断披露），自身不抛异常；② `fetcher/financial_report.py` 在索引与正文**取得数据时**（含缓存命中）标记 `report_datasink_index` / `report_datasink_doc`（`_fetch_index` 的缓存命中、provider 命中与 `_fetch_document` 的链路返回三处）；③ `fetcher/financial_indicator.py` 标记 `fin_indicator_{source_api}`（主源 akshare 与解析支路 datasink_indicator 分别标记）；④ `report/data_source_matrix.py` 新增 `financial_indicator` 类别行（`_SOURCE_CATEGORIES` 与说明表清单同源）并补 `财报全文` / `财务指标` 行的「需开启哪些开关才会取用」备注，同时修订 `used` 语义说明（「取得过该类别数据（含缓存命中）；`未使用` ≠ 源故障」）。
+- **测试**：+17 例——`mark_data_used`（记成功事件/不推进降级计数/异常不抛）+ 说明表（新类别行与备注、按前缀判定 used、无关类别不受影响）+ 财报域（索引与正文的取用标记、缓存命中亦标记、未取到不标记）+ 指标域（主源标记、解析支路按 `source_api` 标记、链路段标记、无数据不标记）。
+
 ### 设计文档归档与计划状态收口（plan-42 / plan-43）（2026-09-15）
 
 - **计划状态**：`plan-43`（持仓个股基本面数据源主备与财务指标提取）由「设计完成，待实施」转为**已完成**（阶段①②③a③b④ + DataSinking 数据底座门禁；阶段⑤ 文档与门禁收尾随发布执行）；`plan.md` 的 P1 / P4 两区自此均为「无待办项」，编号源 `plan-next = 44` 不变。

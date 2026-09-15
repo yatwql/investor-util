@@ -337,3 +337,43 @@ class TestBuildDataSourceCatalog:
         rows = self._catalog()
         for sid in ("price", "fund_rank", "fund_hold", "industry", "index", "profit_forecast", "dividend", "fund_flow"):
             assert self._by_id(rows, sid)["auth"] == "无需"
+
+
+class TestDataSourceCatalog:
+    """数据源说明表：类别清单、取用判定与开关提示。"""
+
+    def _rows(self):
+        from src.python.report.data_source_matrix import build_data_source_catalog
+
+        return {r["id"]: r for r in build_data_source_catalog()}
+
+    def test_financial_indicator_category_present(self):
+        row = self._rows()["financial_indicator"]
+        assert row["category"] == "财务指标"
+        assert "akshare" in row["provider"]
+        assert "DataSinking" in row["provider"]
+        assert "report_submodules.financial_indicator" in row["note"]
+
+    def test_financial_report_row_hints_required_switches(self):
+        """财报全文行须写明「需开启哪些开关才会取用」（否则读者会误以为未被调用）。"""
+        row = self._rows()["financial_report"]
+        assert "financial_report_digest" in row["note"]
+        assert "financial_indicator" in row["note"]
+
+    def test_used_by_category_prefix(self):
+        from src.python.report.data_status import mark_data_used
+
+        rows = self._rows()
+        assert rows["financial_report"]["used"] is False
+        assert rows["financial_indicator"]["used"] is False
+        mark_data_used("report_datasink_doc")
+        mark_data_used("fin_indicator_akshare_financial")
+        rows = self._rows()
+        assert rows["financial_report"]["used"] is True
+        assert rows["financial_indicator"]["used"] is True
+        # 不相干类别不受影响
+        assert rows["price"]["used"] is False
+
+    def test_used_false_when_nothing_fetched(self):
+        rows = self._rows()
+        assert all(r["used"] is False for r in rows.values())
