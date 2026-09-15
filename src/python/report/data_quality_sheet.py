@@ -1,6 +1,6 @@
 """数据质量仪表盘页签写入 —「数据源可用性矩阵」章节改造。
 
-`report_submodules.data_quality` 开关（默认关）开启时，该页签以
+功能开关 `data_quality` 开关（默认关）开启时，该页签以
 「数据质量仪表盘」标题展示三个区块：
 
   区块 A 源健康   — 数据源可用性矩阵（现状保留，来自 DegradationTracker 聚合）

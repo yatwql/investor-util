@@ -139,7 +139,7 @@ def prepare_report_data(
     # 内嵌 industry_beta 子键（行业 Beta 子表）。
     factor_exposure = compute_factor_exposure_data(holdings, config, reporter)
     if factor_exposure is not None:
-        # 行业 Beta 子表：report_submodules.industry_beta 开关关闭时返回 None（区块隐藏）；
+        # 行业 Beta 子表：功能开关 `industry_beta` 开关关闭时返回 None（区块隐藏）；
         # 开启但数据不足时 available=False（标题 + 占位，不阻塞本页签其余区块）
         factor_exposure["industry_beta"] = compute_industry_beta_data(holdings, details, config, reporter)
     # 持仓关系矩阵（相关性区块）：同因子暴露，基金深度分析关闭时为 None（章节隐藏）。
@@ -156,18 +156,18 @@ def prepare_report_data(
         prev_trading_day=get_prev_trading_day(),
     )
 
-    # 估值分位（数据契约 valuation_data）：report_submodules.valuation_percentile
+    # 估值分位（数据契约 valuation_data）：功能开关 `valuation_percentile`
     # 开启时计算（当前 PE/PB + 价格分位代理）；关闭返回 None（「资产穿透TOP10」列隐藏）
     valuation_data = compute_valuation_data(details, config, reporter)
-    # 市场温度（数据契约 market_temperature_data）：report_submodules.market_temperature
+    # 市场温度（数据契约 market_temperature_data）：功能开关 `market_temperature`
     # 开启时计算（价格分位+均线偏离+波动率三因子温度计）；关闭返回 None（汇总行隐藏）
     market_temperature_data = compute_market_temperature_data(config, reporter)
 
     # 持仓个股财报摘要（数据契约 financial_report_digest_data）：
-    # report_submodules.financial_report_digest 开启时计算（A 股标的取最新年报章节摘要）；
+    # 功能开关 `financial_report_digest` 开启时计算（A 股标的取最新年报章节摘要）；
     # 关闭或无 key 时返回 None（章节隐藏/写占位）
     financial_report_digest_data = compute_financial_report_digest_data(holdings, penetrated_assets, config, reporter)
-    # 财务指标（数据契约 financial_indicator_data）：report_submodules.financial_indicator
+    # 财务指标（数据契约 financial_indicator_data）：功能开关 `financial_indicator`
     # 开启时计算（A 股标的指标 + 质量档 + 趋势 + 当前 PE/PB）；关闭时返回 None（章节隐藏）
     financial_indicator_data = compute_financial_indicator_data(
         holdings, penetrated_assets, config, reporter, details=details
@@ -242,9 +242,9 @@ def prepare_report_data(
         "data_freshness": freshness_summary,
         # 行动建议单一数据源（数据契约 action_data；行动建议板块 + 智囊团深度复盘行动摘要）
         "action_data": action_data,
-        # 估值分位（数据契约 valuation_data；report_submodules.valuation_percentile 关闭时为 None）
+        # 估值分位（数据契约 valuation_data；功能开关 `valuation_percentile` 关闭时为 None）
         "valuation_data": valuation_data,
-        # 市场温度（数据契约 market_temperature_data；report_submodules.market_temperature 关闭时为 None）
+        # 市场温度（数据契约 market_temperature_data；功能开关 `market_temperature` 关闭时为 None）
         "market_temperature_data": market_temperature_data,
         # 持仓个股财报摘要（数据契约 financial_report_digest_data；开关关闭/无 key 时为 None）
         "financial_report_digest_data": financial_report_digest_data,
@@ -265,7 +265,7 @@ def compute_financial_report_digest_data(
 ) -> dict | None:
     """编排持仓个股财报摘要数据（`financial_report_digest_data` 数据契约）。
 
-    report_submodules.financial_report_digest 开启时，对持仓 + 穿透中的 A 股
+    功能开关 `financial_report_digest` 开启时，对持仓 + 穿透中的 A 股
     标的取最新年报（无年报退半年报）的目标章节正文；关闭时返回 None（章节隐藏）。
     缺凭据 / 无 A 股标的 / 全部无覆盖时返回 available=False 的降级契约，
     不阻断报告主链路。
@@ -304,7 +304,7 @@ def compute_financial_indicator_data(
 ) -> dict | None:
     """编排财务指标数据（`financial_indicator_data` 数据契约）。
 
-    report_submodules.financial_indicator 开启时，对持仓 + 穿透中的 A 股标的
+    功能开关 `financial_indicator` 开启时，对持仓 + 穿透中的 A 股标的
     取多期指标（主源 akshare，失败落 DataSinking 解析支路），派生质量档/年度趋势/
     当前 PE/PB（PE/PB 需现价，取自行情明细）；关闭时返回 None（章节隐藏）。
     无 A 股标的 / 数据源不可用时返回 available=False 的降级契约，不阻断主链路。
@@ -346,7 +346,7 @@ def compute_valuation_data(
 
     Returns:
         数据子契约 dict（含 available/status/by_code）；
-        report_submodules.valuation_percentile 关闭时返回 None（列隐藏）；
+        功能开关 `valuation_percentile` 关闭时返回 None（列隐藏）；
         push2/K 线均不可用时 available=False（占位，§1.4.5）。
     """
     from src.python.config import datasink_feature_ready, is_enable_valuation_percentile
@@ -490,7 +490,7 @@ def generate_report(
             None 表示未显式指定，按 `config.history.fetch_mode` 决定
             （默认 auto，即获取）
         transactions: 交易流水记录（「交易流水」页签，无则 None）。
-            成本流水子模块（report_submodules.cost_lots）开启时用于成本分档 + XIRR
+            成本流水子模块（功能开关 `cost_lots`）开启时用于成本分档 + XIRR
         dividends: 分红流水记录（「分红流水」页签，无则 None）。
             成本流水子模块开启时用于分红累计 + XIRR
         snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域）。

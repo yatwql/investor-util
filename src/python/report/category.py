@@ -54,7 +54,7 @@ _HEADERS = [
     "本日盈亏",
     "年均股息率",
 ]
-# 成本流水子列（report_submodules.cost_lots 开启时追加，默认关不渲染）
+# 成本流水子列（功能开关 `cost_lots` 开启时追加，默认关不渲染）
 _EXTRA_HEADERS = ["成本分档", "分红累计"]
 _NCOLS_WITH_FLOW = _NCOLS + len(_EXTRA_HEADERS)
 

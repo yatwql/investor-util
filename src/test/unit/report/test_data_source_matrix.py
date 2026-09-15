@@ -352,7 +352,7 @@ class TestDataSourceCatalog:
         assert row["category"] == "财务指标"
         assert "akshare" in row["provider"]
         assert "DataSinking" in row["provider"]
-        assert "report_submodules.financial_indicator" in row["note"]
+        assert "财务指标" in row["category"] and "功能开关" in row["note"]
 
     def test_financial_report_row_hints_required_switches(self):
         """财报全文行须写明「需开启哪些开关才会取用」（否则读者会误以为未被调用）。"""

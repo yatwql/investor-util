@@ -131,8 +131,7 @@ def _cmd_config_llm_modules() -> None:
     from src.python.config.features import (
         GROUP_EXPERIMENTAL,
         GROUP_LABELS,
-        GROUP_REPORT,
-        GROUP_STANDARD,
+        GROUP_ORDER,
         is_feature_enabled,
         save_feature_overrides,
         set_feature_enabled,
@@ -152,8 +151,7 @@ def _cmd_config_llm_modules() -> None:
 
     # 功能开关分块：(分组标题, [(flag_key, 显示名), ...])，顺序即注册表顺序
     switch_blocks = [
-        (GROUP_LABELS[group], [(flag, d.label) for flag, d in switches_in_group(group)])
-        for group in (GROUP_EXPERIMENTAL, GROUP_STANDARD, GROUP_REPORT)
+        (GROUP_LABELS[group], [(flag, d.label) for flag, d in switches_in_group(group)]) for group in GROUP_ORDER
     ]
     # 行首 ⚗ 标记仅给实验组（常规组靠分组标题区分，无需逐行标记）
     experiment_flags = {flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)}

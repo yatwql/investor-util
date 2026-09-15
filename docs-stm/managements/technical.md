@@ -3183,7 +3183,7 @@ make_http_client(timeout=10.0) → httpx.Client
 
 ### 6.7 功能语义命名表
 
-> **纪律**：英文 slug 即**代码/配置标识符**（函数名、变量名、`report_submodules.*` 键），中文名即**文档/UI 描述**。语义名即代码名——任务代号不进入实现层（禁止用任何任务编号/F 系列/`plan-N`/`rf-N` 命名），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表（`plan.md`/`review-findings.md`）链接锚点。新增功能**先定语义名再设计**。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE，退出码 2）+ `scripts/check-semantic-index.py --ci`（正面校验本表与代码正反向一致），并已纳入「架构设计约束」章节的约束外参照（见该章节开头）。注：小写短局部名（`h1/t1/f1`）与 Excel 单元格（`A1:B1`）等结构性记号属合法豁免。
+> **纪律**：英文 slug 即**代码/配置标识符**（函数名、变量名、功能开关名如 `financial_indicator`），中文名即**文档/UI 描述**。语义名即代码名——任务代号不进入实现层（禁止用任何任务编号/F 系列/`plan-N`/`rf-N` 命名），函数/变量/模块/注释/文档一律用语义名；任务编号仅作为内部计划表（`plan.md`/`review-findings.md`）链接锚点。新增功能**先定语义名再设计**。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE，退出码 2）+ `scripts/check-semantic-index.py --ci`（正面校验本表与代码正反向一致），并已纳入「架构设计约束」章节的约束外参照（见该章节开头）。注：小写短局部名（`h1/t1/f1`）与 Excel 单元格（`A1:B1`）等结构性记号属合法豁免。
 >
 > 以下为当前已实现功能/合并章的语义命名索引（活索引），以本表为唯一现状基准。
 

@@ -52,14 +52,15 @@ _EXPECTED_WHITELIST = {
     "enable_history",
     "enable_portfolio_evolution",
     "enable_action",
-    # 3 报告增强子模块开关（菜单 P 6）
-    "report_submodules.data_quality",
-    "report_submodules.industry_beta",
-    "report_submodules.candidate_compare",
-    "report_submodules.cost_lots",
-    "report_submodules.valuation_percentile",
-    "report_submodules.market_temperature",
-    "report_submodules.financial_report_digest",
+    # 3 报告章节与增强开关（菜单 S 报告块；注册表 GROUP_REPORT）
+    "data_quality",
+    "industry_beta",
+    "candidate_compare",
+    "cost_lots",
+    "valuation_percentile",
+    "market_temperature",
+    "financial_report_digest",
+    "financial_indicator",
     # 4 持仓匿名化枚举（菜单 A）
     "anonymization.mode",
     # 5 对比指数池（菜单 I）
@@ -395,3 +396,19 @@ class TestReportGroupOverWeb:
         apply_config_edit({"key": "cost_lots", "value": True})
         assert is_feature_enabled("cost_lots") is True
         set_feature_enabled("cost_lots", False)
+
+
+class TestWebPanelCoversAllSwitches:
+    """Web 配置面板的开关面必须覆盖注册表全部开关（含报告组），防渠道层漏渲染。"""
+
+    def test_surface_flags_cover_registry(self):
+        from src.python.config.features import feature_switch_registry
+        from src.python.web.config_edit import get_config_edit_surface
+
+        surface = get_config_edit_surface()
+        shown = set()
+        for group in ("experimental", "standard"):
+            shown |= set(surface["features"][group])
+        shown |= set(surface["submodules"])
+        missing = set(feature_switch_registry) - shown
+        assert not missing, f"Web 面板未渲染这些开关：{sorted(missing)}"

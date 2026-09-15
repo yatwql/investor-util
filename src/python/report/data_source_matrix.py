@@ -236,7 +236,7 @@ _SOURCE_CATALOG: list[dict[str, Any]] = [
         "usage": "个股财报章节全文摘要，兼作财务指标解析的备用支路（仅 A 股）",
         "auth": "需 key",
         "credential_source_id": "datasink",
-        "note": "免费 key 需自备（datasink.ing）；需开启 report_submodules.financial_report_digest 或 financial_indicator 才会取用",
+        "note": "免费 key 需自备（datasink.ing）；需开启 功能开关 `financial_report_digest` 或 financial_indicator 才会取用",
     },
     {
         "id": "financial_indicator",
@@ -244,7 +244,7 @@ _SOURCE_CATALOG: list[dict[str, Any]] = [
         "provider": "akshare 结构化财务指标（主源）；DataSinking 财报章节解析（备用支路）",
         "usage": "持仓 A 股基本面（指标列 / 质量档 / 年度趋势 / 真实 PE·PB 分位）",
         "auth": "无需（主源）",
-        "note": "备用支路需 DataSinking key；两者均需开启 report_submodules.financial_indicator 或 valuation_percentile",
+        "note": "备用支路需 DataSinking key；两者均需开启 功能开关 `financial_indicator` 或 valuation_percentile",
     },
 ]
 

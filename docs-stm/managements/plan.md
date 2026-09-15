@@ -43,7 +43,7 @@
 
 **验收标准**：`report_submodules` 在代码与文档中**零残留**（`grep -r report_submodules src/ docs-stm/` 仅剩历史 changelog/归档）；`S` 面板与 Web 面板各出现「报告章节与增强」一块共 8 项、可开关且落 `features.json`；8 个开关行为与现状逐项等价；四个 `--ci` + `--mode verify` + ruff 全绿。
 
-设计文档：[`report-submodule-registry-merger-design.md`](report-submodule-registry-merger-design.md)（待补；本条目即其提纲）。
+实施记录：见 `changelog.md`「报告增强子模块并入功能开关注册表（plan-44 完成，不做兼容）」条（本条目即设计记录；不再另建设计文档）。
 
 ### P4 — 实验功能
 

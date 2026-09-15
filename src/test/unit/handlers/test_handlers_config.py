@@ -366,6 +366,8 @@ class TestReportGroupMovedToSwitchPanel:
         assert "报告增强子模块 / LLM 分析章节 — 请在菜单 S 配置" in src
 
     def test_switch_panel_renders_report_group(self):
+        """面板分组由注册表 GROUP_ORDER 派生（渠道层不得另写清单）。"""
         src = self._source()
-        assert "GROUP_REPORT" in src
-        assert "for group in (GROUP_EXPERIMENTAL, GROUP_STANDARD, GROUP_REPORT)" in src
+        assert "GROUP_ORDER" in src
+        assert "for group in GROUP_ORDER" in src
+        assert "GROUP_EXPERIMENTAL, GROUP_STANDARD, GROUP_REPORT" not in src

@@ -1,7 +1,7 @@
 """财务指标 Excel 页签 — 每只 A 股一行基本面指标。
 
 数据来自 ``financial_indicator_data`` 契约（akshare 主源 / DataSinking 解析支路，
-``report_submodules.financial_indicator`` 开关，默认关）。
+`功能开关 `financial_indicator`` 开关，默认关）。
 
 金额列以「亿元」呈现（便于横向比较），比率列以百分数呈现；缺失值写「—」而非 0。
 不可用时写占位文本（``available=False``，§1.4.5 数据降级治理）。

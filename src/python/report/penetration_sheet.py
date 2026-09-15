@@ -72,7 +72,7 @@ _HEADERS = [
     "年均股息",
     "来源明细",
 ]
-# 估值分位列（report_submodules.valuation_percentile 开启时追加，ncols=11）
+# 估值分位列（功能开关 `valuation_percentile` 开启时追加，ncols=11）
 _VALUATION_HEADER = "估值分位"
 
 
@@ -337,7 +337,7 @@ def write_penetration_sheet(
                           内部重复计算，用于调用方已算过一轮的场景
         valuation_data: 估值分位数据契约（valuation_data）。非 None 时追加
             「估值分位」列（ncols 10→11，表尾附免责声明），当前 PE/PB + 价格
-            分位代理；None 时保持既有 10 列输出（report_submodules.valuation_percentile 关闭）
+            分位代理；None 时保持既有 10 列输出（功能开关 `valuation_percentile` 关闭）
     """
 
     ncols = _NCOLS + (1 if valuation_data is not None else 0)

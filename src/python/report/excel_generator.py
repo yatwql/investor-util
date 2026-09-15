@@ -197,21 +197,21 @@ def generate_excel_report(
     enable_financial_report_digest: bool = False,  # board 层：持仓个股财报摘要（report_submodules，默认关）
     enable_financial_indicator: bool = False,  # board 层：财务指标（report_submodules，默认关）
     enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
-    enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
+    enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（功能开关 `data_quality`）
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
     pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
     history_data: dict | None = None,  # 组合历史走势数据（含基准指数）
     debate_info: dict | None = None,
-    enable_cost_lots: bool = False,  # 子模块：成本流水（成本分档 + XIRR + 分红累计，report_submodules.cost_lots）
+    enable_cost_lots: bool = False,  # 子模块：成本流水（成本分档 + XIRR + 分红累计，功能开关 `cost_lots`）
     transactions: list | None = None,  # 交易流水记录（「交易流水」页签，无则 None）
     dividends: list | None = None,  # 分红流水记录（「分红流水」页签，无则 None）
     valuation_data: dict | None = None,  # 估值分位数据契约（「资产穿透TOP10」估值分位列；None 时从 pipeline_data 读取）
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约（「投资分析汇总」温度刻度行；None 时从 pipeline_data 读取）
     financial_report_digest_data: dict
-    | None = None,  # 持仓个股财报摘要数据契约（report_submodules.financial_report_digest，默认关）
-    financial_indicator_data: dict | None = None,  # 财务指标数据契约（report_submodules.financial_indicator，默认关）
+    | None = None,  # 持仓个股财报摘要数据契约（功能开关 `financial_report_digest`，默认关）
+    financial_indicator_data: dict | None = None,  # 财务指标数据契约（功能开关 `financial_indicator`，默认关）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -244,9 +244,9 @@ def generate_excel_report(
         transactions: 交易流水记录（「交易流水」页签），成本分档/FIFO 批次与 XIRR 现金流用
         dividends: 分红流水记录（「分红流水」页签），分红累计与 XIRR 现金流用
         valuation_data: 估值分位数据契约（当前 PE/PB + 价格分位代理），
-            report_submodules.valuation_percentile 关闭或传入 None 时穿透页签保持既有输出。
+            功能开关 `valuation_percentile` 关闭或传入 None 时穿透页签保持既有输出。
         market_temperature_data: 市场温度数据契约（三因子合成温度计），
-            report_submodules.market_temperature 关闭或传入 None 时汇总页签保持既有输出。
+            功能开关 `market_temperature` 关闭或传入 None 时汇总页签保持既有输出。
     """
     prog = progress if progress is not None else SilentProgressReporter()
 

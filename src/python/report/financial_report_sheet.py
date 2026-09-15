@@ -1,7 +1,7 @@
 """持仓个股财报摘要 Excel 页签 — 每只 A 股一行财报章节摘要。
 
 数据来自 ``financial_report_digest_data`` 契约（DataSinking 全文本财报，
-``report_submodules.financial_report_digest`` 开关，默认关）。
+`功能开关 `financial_report_digest`` 开关，默认关）。
 
 不可用时写占位文本（``available=False``，§1.4.5 数据降级治理）。
 """

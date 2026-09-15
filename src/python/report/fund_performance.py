@@ -449,7 +449,7 @@ def write_fund_performance_sheet(
     data_status = build_perf_data_status(adjusted_ratings, len(fund_holdings_sorted))
     _write_data_status_foot(ws, data_status, start_row=row)
 
-    # 候选基金比较子表（report_submodules.candidate_compare 默认关；关闭时 build 返回 None）
+    # 候选基金比较子表（功能开关 `candidate_compare` 默认关；关闭时 build 返回 None）
     candidate_data = build_candidate_compare_data(holdings)
     if candidate_data is not None:
         if candidate_data.get("available"):
