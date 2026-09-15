@@ -1,5 +1,5 @@
 # 目录结构与项目统计
-> 文档版本：0.10.20-dev
+> 文档版本：0.11.0
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -13,11 +13,11 @@
 | HTML 报告模板 | HTML | 6 | 4,112 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 持仓个股财报摘要 `financial_report_section.html` + 财务指标 `financial_indicator_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 21 | 7,174 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
-| **源代码合计** | — | **313** | **82,462** | 主程序 + 模板 + 脚本 + SVG |
-| **测试代码** | Python | **372** | **108,578** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| **源代码合计** | — | **313** | **82,347** | 主程序 + 模板 + 脚本 + SVG |
+| **测试代码** | Python | **372** | **108,583** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
 | **测试用例** | — | — | **7,175 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **11** | **5,161** | 含 README.md（204 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 10 | 4,957 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
+| **用户文档** | Markdown | **11** | **5,171** | 含 README.md（204 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 10 | 4,967 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
 | **项目文档** | Markdown | **134** | **51,900** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 10 | 10,136 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 127 | 42,147 | 各版本 changelog/plan/review-findings 等（123 md 41,689 行 + 3 py 446 行 + 1 txt 12 行） |
