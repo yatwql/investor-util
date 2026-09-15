@@ -46,14 +46,17 @@ _FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
 
 GROUP_EXPERIMENTAL = "experimental"
 GROUP_STANDARD = "standard"
+#: 报告章节与增强子模块（注册表分组 ``GROUP_REPORT``；取值落 features.json）
+GROUP_REPORT = "report"
 
 # 分组标题（TUI 菜单 [S] 与 Web 配置面板共用同一措辞，渠道层不另写文字）
 GROUP_LABELS: dict[str, str] = {
     GROUP_EXPERIMENTAL: "⚗ 实验性功能（默认关闭）",
     GROUP_STANDARD: "常规开关（默认开启）",
+    GROUP_REPORT: "报告章节与增强（默认多数关闭）",
 }
 # 面板分块顺序（顺序即渲染顺序）
-GROUP_ORDER: tuple[str, ...] = (GROUP_EXPERIMENTAL, GROUP_STANDARD)
+GROUP_ORDER: tuple[str, ...] = (GROUP_EXPERIMENTAL, GROUP_STANDARD, GROUP_REPORT)
 
 
 @dataclass(frozen=True)
@@ -85,8 +88,10 @@ class FeatureSwitchDef:
 #     标准模块区、Web 配置面板「LLM 分析章节」组）
 #   - 新闻源启停 → config.json 的 news_sources
 #   - 历史走势与回撤 → config.json 的 enable_history
-#   - 各报告章节与增强子模块 → config.json 的 enable_* 键
+#   - 基础报告章节（基金深度分析/市场新闻/组合演进/行动建议）→ config.json 的 enable_*
 #   - 匿名化模式 → config.json 的 anonymization.mode
+# 注：报告增强子模块（数据质量/行业Beta/候选比较/成本流水/估值分位/市场温度/财报摘要/
+# 财务指标）原在 config.json 的 report_submodules 段，现已并入本注册表（GROUP_REPORT）。
 # 声明了却无人读取的开关会让用户照文档配置后毫无效果（本注册表曾含 16 项此类
 # 陈旧开关，已全部移除）。新增开关必须同时接线到消费点，回归测试见
 # test_features.py::TestRegistryLiveness。
@@ -190,6 +195,63 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         "置 false 则联接基金维持「持仓不可用」",
         GROUP_STANDARD,
         True,
+        True,
+    ),
+    # ── 报告章节与增强（声明顺序即面板顺序）──
+    "data_quality": FeatureSwitchDef(
+        "数据质量仪表盘",
+        "「数据源可用性矩阵」章渲染数据覆盖/时效/降级状态区块",
+        GROUP_REPORT,
+        True,
+        True,
+    ),
+    "industry_beta": FeatureSwitchDef(
+        "行业Beta子表",
+        "「风格与因子分析」章渲染行业 Beta 子表（行业暴露 + 回归敏感性）",
+        GROUP_REPORT,
+        False,
+        True,
+    ),
+    "candidate_compare": FeatureSwitchDef(
+        "候选基金比较子表",
+        "「基金业绩分析」章渲染候选基金横向比较表（候选来自 comparison_candidates）",
+        GROUP_REPORT,
+        False,
+        True,
+    ),
+    "cost_lots": FeatureSwitchDef(
+        "成本流水",
+        "汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计（需持仓 Excel 含交易/分红流水）",
+        GROUP_REPORT,
+        False,
+        True,
+    ),
+    "valuation_percentile": FeatureSwitchDef(
+        "估值分位",
+        "「资产穿透TOP10」章渲染估值分位列（真实历史 PE/PB 分位，无覆盖时回落价格分位代理）",
+        GROUP_REPORT,
+        False,
+        True,
+    ),
+    "market_temperature": FeatureSwitchDef(
+        "市场温度",
+        "「投资分析汇总」章渲染市场温度刻度行（三因子合成；数据不足时该行静默省略）",
+        GROUP_REPORT,
+        True,
+        True,
+    ),
+    "financial_report_digest": FeatureSwitchDef(
+        "持仓个股财报摘要",
+        "新增独立章：A 股标的财报章节摘要（需 DataSinking key）",
+        GROUP_REPORT,
+        False,
+        True,
+    ),
+    "financial_indicator": FeatureSwitchDef(
+        "财务指标",
+        "新增独立章：持仓 A 股基本面（指标 + 质量档 + 趋势 + 当前 PE/PB；需数据底座就绪）",
+        GROUP_REPORT,
+        False,
         True,
     ),
 }
@@ -376,6 +438,7 @@ __all__ = [
     "GROUP_EXPERIMENTAL",
     "GROUP_LABELS",
     "GROUP_ORDER",
+    "GROUP_REPORT",
     "GROUP_STANDARD",
     "FeatureSwitchDef",
     "describe_experiment_flags",

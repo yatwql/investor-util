@@ -912,7 +912,12 @@
       renderBoolGroup('sections', '报告章节', surface.sections, {})
     );
     els.configPanel.appendChild(
-      renderBoolGroup('submodules', '报告增强子模块', surface.submodules, { prefix: 'report_submodules.' })
+      // 报告章节与增强：键即功能开关名（注册表 GROUP_REPORT），显示名与「影响报告」
+      // 标记由服务端同源下发，前端不维护字典
+      renderBoolGroup('submodules', '报告章节与增强', surface.submodules, {
+        labels: surface.features.labels,
+        reportAffecting: surface.features.report_affecting
+      })
     );
     els.configPanel.appendChild(renderAnonGroup(surface.anonymization));
     els.configPanel.appendChild(renderIndicesGroup(surface));

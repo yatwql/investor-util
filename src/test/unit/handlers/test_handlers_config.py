@@ -273,77 +273,8 @@ class TestConfigLlmModulesExperimentalFlags:
 
 
 # 报告增强子模块基准配置（与 config.json 默认一致：数据质量仪表盘默认开，其余默认关）
-_SUB_BASE_CONFIG = {
-    "report_submodules": {
-        "data_quality": True,
-        "industry_beta": False,
-        "candidate_compare": False,
-        "cost_lots": False,
-        "valuation_percentile": False,
-        "market_temperature": False,
-    }
-}
-
-
-class TestConfigReportSubmodules:
-    """_cmd_config_report_submodules: 报告增强子模块开关切换（mock 输入与配置读写）。"""
-
-    @patch("src.python.tui.handlers_config.press_any_key")
-    @patch("src.python.tui.handlers_config.refresh_config")
-    @patch("src.python.tui.handlers_config.input", side_effect=["1", "0"])
-    @patch("src.python.config.set_config")
-    @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
-    def test_toggle_data_quality_off(self, mock_get, mock_set, mock_input, mock_refresh, mock_press):
-        """输入 1 → 关闭数据质量仪表盘（默认开启），整体写回 report_submodules。"""
-        from src.python.tui.handlers_config import _cmd_config_report_submodules
-
-        _cmd_config_report_submodules()
-
-        expected = dict(_SUB_BASE_CONFIG["report_submodules"])
-        expected["data_quality"] = False
-        mock_set.assert_called_once_with("report_submodules", expected)
-        mock_press.assert_called_once()
-
-    @patch("src.python.tui.handlers_config.press_any_key")
-    @patch("src.python.tui.handlers_config.refresh_config")
-    @patch("src.python.tui.handlers_config.input", side_effect=["2", "0"])
-    @patch("src.python.config.set_config")
-    @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
-    def test_toggle_industry_beta_on(self, mock_get, mock_set, mock_input, mock_refresh, mock_press):
-        """输入 2 → 开启行业Beta子表，其余子模块保持关闭。"""
-        from src.python.tui.handlers_config import _cmd_config_report_submodules
-
-        _cmd_config_report_submodules()
-
-        expected = dict(_SUB_BASE_CONFIG["report_submodules"])
-        expected["industry_beta"] = True
-        mock_set.assert_called_once_with("report_submodules", expected)
-
-    @patch("src.python.tui.handlers_config.press_any_key")
-    @patch("src.python.tui.handlers_config.refresh_config")
-    @patch("src.python.tui.handlers_config.input", side_effect=["9", "0"])
-    @patch("src.python.config.set_config")
-    @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
-    def test_invalid_number_then_return(self, mock_get, mock_set, mock_input, mock_refresh, mock_press):
-        """无效编号不写配置，随后 0 正常返回。"""
-        from src.python.tui.handlers_config import _cmd_config_report_submodules
-
-        _cmd_config_report_submodules()
-
-        mock_set.assert_not_called()
-
-    @patch("src.python.tui.handlers_config.press_any_key")
-    @patch("src.python.tui.handlers_config.refresh_config")
-    @patch("src.python.tui.handlers_config.input", side_effect=["0"])
-    @patch("src.python.config.set_config")
-    @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
-    def test_zero_returns_without_change(self, mock_get, mock_set, mock_input, mock_refresh, mock_press):
-        """直接 0 返回，不触发任何写配置。"""
-        from src.python.tui.handlers_config import _cmd_config_report_submodules
-
-        _cmd_config_report_submodules()
-
-        mock_set.assert_not_called()
+#: 面板渲染测试用的最小配置（报告增强子模块已并入功能开关注册表，不再出现在 config）
+_SUB_BASE_CONFIG: dict = {}
 
 
 class TestConfigPanelsAreRectangular:
@@ -406,53 +337,35 @@ class TestConfigPanelsAreRectangular:
     @patch("src.python.tui.handlers_config.refresh_config")
     @patch("src.python.tui.handlers_config.input", side_effect=["0"])
     @patch("src.python.config.get_config", return_value=_SUB_BASE_CONFIG)
-    def test_report_submodules_panel_rectangular(self, mock_get, mock_input, mock_refresh, mock_press, capsys):
-        """报告增强子模块面板：各子模块名长短不一，状态方括号仍对齐。"""
-        from src.python.tui.handlers_config import _cmd_config_report_submodules
-
-        self._assert_rectangular(capsys, _cmd_config_report_submodules)
-
-    @patch("src.python.tui.handlers_config.press_any_key")
-    @patch("src.python.tui.handlers_config.input", side_effect=["0"])
-    @patch("src.python.config.anonymizer.get_anonymization_mode", return_value="full_anonymous")
-    def test_anonymization_panel_rectangular(self, mock_mode, mock_input, mock_press, capsys):
+    def test_anonymization_panel_rectangular(self, mock_get, mock_input, mock_refresh, mock_press, capsys):
         """匿名化面板：带选中标记的行与普通行同宽（自成一档内区宽度）。"""
         from src.python.tui.handlers_config import _cmd_config_anonymization_mode
 
         self._assert_rectangular(capsys, _cmd_config_anonymization_mode)
 
 
-class TestReportSubmodulePanelCoversSwitches:
-    """P 面板清单 ↔ report_submodules 开关集合一致性 + 文档按名称定位（防编号漂移）。"""
+class TestReportGroupMovedToSwitchPanel:
+    """报告章节与增强子模块已并入功能开关注册表：P 面板不再另设入口，S 面板新增一块。"""
 
-    def test_panel_covers_all_switches(self):
-        from src.python.config._config_defaults import _DEFAULT_CONFIG
-        from src.python.tui.handlers_config import REPORT_SUBMODULE_ITEMS
-
-        keys = [key for key, _label, _desc in REPORT_SUBMODULE_ITEMS]
-        assert set(keys) == set(_DEFAULT_CONFIG["report_submodules"]), (
-            "面板清单与 report_submodules 开关不一致（新增开关须补面板项）"
-        )
-        assert len(keys) == len(set(keys)), "面板清单存在重复键"
-
-    def test_panel_prompt_range_matches_item_count(self):
-        """报告增强子模块面板的提示范围须由清单长度派生（曾写死 (0-7) 而清单已 8 项）。"""
+    def _source(self) -> str:
         from pathlib import Path
 
-        src = Path(__file__).resolve().parents[4] / "src" / "python" / "tui" / "handlers_config.py"
-        text = src.read_text(encoding="utf-8")
-        body = text.split("def _cmd_config_report_submodules")[1].split("\ndef ")[0]
-        assert "输入编号切换 (0-7)" not in body, "该面板提示的编号范围不得写死"
-        assert "输入编号切换 (0-{len(SUBMODULES)})" in body
-
-    def test_docs_reference_each_switch_by_name(self):
-        """使用手册按**名称**定位面板项（编号随清单增删漂移，名称不漂移）。"""
-        from pathlib import Path
-
-        from src.python.tui.handlers_config import REPORT_SUBMODULE_ITEMS
-
-        doc = (Path(__file__).resolve().parents[4] / "docs-stm" / "manuals" / "how-to-config.md").read_text(
+        return (Path(__file__).resolve().parents[4] / "src" / "python" / "tui" / "handlers_config.py").read_text(
             encoding="utf-8"
         )
-        missing = [label for _key, label, _desc in REPORT_SUBMODULE_ITEMS if f"菜单 P → 「{label}」" not in doc]
-        assert not missing, f"使用手册缺少按名称的菜单定位：{missing}"
+
+    def test_p_subpanel_removed(self):
+        src = self._source()
+        assert "_cmd_config_report_submodules" not in src, "P 子面板应已删除"
+        assert "REPORT_SUBMODULE_ITEMS" not in src, "面板清单常量应随子面板删除"
+
+    def test_boards_panel_points_to_switch_menu(self):
+        """基础章节面板第 6 项提示改到菜单 [S]，输入范围收为 (0-6)。"""
+        src = self._source()
+        assert "输入编号切换 (0-6)" in src
+        assert "报告增强子模块 / LLM 分析章节 — 请在菜单 S 配置" in src
+
+    def test_switch_panel_renders_report_group(self):
+        src = self._source()
+        assert "GROUP_REPORT" in src
+        assert "for group in (GROUP_EXPERIMENTAL, GROUP_STANDARD, GROUP_REPORT)" in src

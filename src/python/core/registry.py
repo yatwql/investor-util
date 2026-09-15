@@ -549,7 +549,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     },
     # ── 风格与因子分析（「基金风格表 + 风格因子回归」两区块 + 行业 Beta 子表） ──
     # 区块一：基金风格表（渲染期派生）· 区块二：风格因子回归（style_factor_data 子键）
-    # · 区块三：行业 Beta 子表（style_factor_data.industry_beta，report_submodules.industry_beta 开关默认关）
+    # · 区块三：行业 Beta 子表（style_factor_data.industry_beta，功能开关 industry_beta 默认关）
     {
         "key": "style_factor",
         "name": "风格与因子分析",
@@ -602,7 +602,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     },
     # ── always 类型（始终显示） ──
     {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always", "data_flag": None},
-    # ── financial_report 类型（report_submodules.financial_report_digest 控制，默认关）──
+    # ── financial_report 类型（功能开关 financial_report_digest 控制，默认关）──
     # 持仓个股财报摘要：DataSinking 全文本财报（仅 A 股，需用户自备 key）
     {
         "key": "financial_report_digest",
@@ -611,7 +611,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "financial_report",
         "data_flag": "financial_report_digest_data",
     },
-    # ── financial_indicator 类型（report_submodules.financial_indicator 控制，默认关）──
+    # ── financial_indicator 类型（功能开关 financial_indicator 控制，默认关）──
     # 财务指标：持仓 A 股基本面（指标列 + 质量档 + 年度趋势 + 当前 PE/PB）
     {
         "key": "financial_indicator",

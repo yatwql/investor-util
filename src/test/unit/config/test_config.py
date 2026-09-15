@@ -913,124 +913,6 @@ class TestIsEnablePortfolioEvolution(unittest.TestCase):
         )
 
 
-class TestIsEnableDataQuality(unittest.TestCase):
-    """数据质量仪表盘子模块开关（report_submodules.data_quality，默认开）。"""
-
-    def test_default_true_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认开启（长期可信核心）。"""
-        self.assertTrue(cfg.is_enable_data_quality({}))
-        self.assertTrue(cfg.is_enable_data_quality({"enable_fund_deep_analysis": True}))
-
-    def test_true_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 默认开启。"""
-        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": "not-a-dict"}))
-        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": None}))
-
-    def test_default_config_says_enabled(self):
-        """默认配置模板 report_submodules.data_quality=True（默认开启的事实来源）。"""
-        self.assertTrue(cfg._config_defaults._DEFAULT_CONFIG["report_submodules"]["data_quality"])
-
-    def test_false_when_disabled(self):
-        """report_submodules.data_quality=false → 关闭。"""
-        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": {"data_quality": False}}))
-
-    def test_true_when_enabled(self):
-        """report_submodules.data_quality=true → 开启。"""
-        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": {"data_quality": True}}))
-
-    def test_independent_from_other_submodules(self):
-        """data_quality 开关独立于同容器其他键。"""
-        self.assertTrue(
-            cfg.is_enable_data_quality({"report_submodules": {"data_quality": True, "industry_beta": False}})
-        )
-        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": {"data_quality": False, "tail_risk": True}}))
-
-
-class TestIsEnableCandidateCompare(unittest.TestCase):
-    """候选基金比较子模块开关（report_submodules.candidate_compare）。"""
-
-    def test_default_false_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
-        self.assertFalse(cfg.is_enable_candidate_compare({}))
-        self.assertFalse(cfg.is_enable_candidate_compare({"enable_fund_deep_analysis": True}))
-
-    def test_false_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 关闭。"""
-        self.assertFalse(cfg.is_enable_candidate_compare({"report_submodules": "not-a-dict"}))
-        self.assertFalse(cfg.is_enable_candidate_compare({"report_submodules": None}))
-
-    def test_false_when_disabled(self):
-        """report_submodules.candidate_compare=false → 关闭。"""
-        self.assertFalse(cfg.is_enable_candidate_compare({"report_submodules": {"candidate_compare": False}}))
-
-    def test_true_when_enabled(self):
-        """report_submodules.candidate_compare=true → 开启。"""
-        self.assertTrue(cfg.is_enable_candidate_compare({"report_submodules": {"candidate_compare": True}}))
-
-    def test_independent_from_other_submodules(self):
-        """candidate_compare 开关独立于同容器其他键。"""
-        self.assertTrue(
-            cfg.is_enable_candidate_compare({"report_submodules": {"candidate_compare": True, "data_quality": False}})
-        )
-
-
-class TestIsEnableCostLots(unittest.TestCase):
-    """成本流水子模块开关（report_submodules.cost_lots，默认关）。"""
-
-    def test_default_false_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
-        self.assertFalse(cfg.is_enable_cost_lots({}))
-        self.assertFalse(cfg.is_enable_cost_lots({"enable_fund_deep_analysis": True}))
-
-    def test_false_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 关闭。"""
-        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": "not-a-dict"}))
-        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": None}))
-
-    def test_false_when_disabled(self):
-        """report_submodules.cost_lots=false → 关闭。"""
-        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": False}}))
-
-    def test_true_when_enabled(self):
-        """report_submodules.cost_lots=true → 开启。"""
-        self.assertTrue(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True}}))
-
-    def test_independent_from_other_submodules(self):
-        """cost_lots 开关独立于同容器其他键。"""
-        self.assertTrue(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True, "candidate_compare": False}}))
-
-
-class TestIsEnableIndustryBeta(unittest.TestCase):
-    """行业 Beta 子模块开关（report_submodules.industry_beta）。"""
-
-    def test_default_false_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
-        self.assertFalse(cfg.is_enable_industry_beta({}))
-        self.assertFalse(cfg.is_enable_industry_beta({"enable_fund_deep_analysis": True}))
-
-    def test_false_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 关闭。"""
-        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": "not-a-dict"}))
-        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": None}))
-
-    def test_false_when_disabled(self):
-        """report_submodules.industry_beta=false → 关闭。"""
-        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": False}}))
-
-    def test_true_when_enabled(self):
-        """report_submodules.industry_beta=true → 开启。"""
-        self.assertTrue(cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": True}}))
-
-    def test_independent_from_other_submodules(self):
-        """industry_beta 开关独立于同容器其他键。"""
-        self.assertTrue(
-            cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": True, "data_quality": False}})
-        )
-        self.assertFalse(
-            cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": False, "market_temperature": True}})
-        )
-
-
 class TestGetComparisonCandidates(unittest.TestCase):
     """get_comparison_candidates 候选代码列表访问器。"""
 
@@ -1119,44 +1001,51 @@ class TestDatasinkFeatureGate:
         assert _DEFAULT_CONFIG["datasink"]["enabled"] is True
 
 
-class TestMarketTemperaturePromotion:
-    """市场温度转正（默认开）：默认值、显式关闭杠杆与访问器行为。"""
+class TestReportGroupSwitches:
+    """报告章节与增强开关：功能开关注册表为唯一真源（GROUP_REPORT）。"""
 
-    def test_default_is_on(self):
-        from src.python.config._config_defaults import _DEFAULT_CONFIG
+    KEYS = (
+        "data_quality",
+        "industry_beta",
+        "candidate_compare",
+        "cost_lots",
+        "valuation_percentile",
+        "market_temperature",
+        "financial_report_digest",
+        "financial_indicator",
+    )
 
-        assert _DEFAULT_CONFIG["report_submodules"]["market_temperature"] is True
+    def test_registry_group_covers_exactly_these_keys(self):
+        from src.python.config.features import GROUP_REPORT, switches_in_group
 
-    def test_explicit_false_still_disables(self):
-        from src.python.config import is_enable_market_temperature
+        assert tuple(flag for flag, _d in switches_in_group(GROUP_REPORT)) == self.KEYS
 
-        assert is_enable_market_temperature({"report_submodules": {"market_temperature": False}}) is False
-        assert is_enable_market_temperature({"report_submodules": {"market_temperature": True}}) is True
+    def test_accessor_matches_registry_default(self):
+        """每个开关的访问器取值 == 注册表默认值（缺键回落由注册表统一表达）。"""
+        from src.python.config import _core
+        from src.python.config.features import feature_switch_registry
 
-    def test_missing_key_falls_back_to_on(self):
-        """缺键回落值须与默认值一致（转正后为开）——避免「默认开但缺键判关」的错位。"""
+        for flag in self.KEYS:
+            accessor = getattr(_core, f"is_enable_{flag}")
+            assert accessor() is bool(feature_switch_registry[flag].default), flag
+
+    def test_accessor_follows_runtime_override(self):
+        """运行时覆盖（features.json / --feature）即时反映到访问器。"""
+        from src.python.config import is_enable_financial_indicator
+        from src.python.config.features import set_feature_enabled
+
+        assert is_enable_financial_indicator() is False
+        set_feature_enabled("financial_indicator", True)
+        assert is_enable_financial_indicator() is True
+
+    def test_config_json_no_longer_carries_report_submodules(self):
+        from src.python.config import get_config
+
+        assert "report_submodules" not in get_config()
+
+    def test_config_argument_is_ignored(self):
+        """config 形参仅为兼容签名保留，不再参与取值。"""
         from src.python.config import is_enable_market_temperature
 
         assert is_enable_market_temperature({}) is True
-        assert is_enable_market_temperature({"report_submodules": {}}) is True
-
-
-class TestReportSubmoduleDefaultConsistency:
-    """报告子模块「默认值 ↔ 访问器缺键回落」一致性护栏。
-
-    每个 `report_submodules` 开关在 config 缺该键时，访问器返回值必须等于
-    `_DEFAULT_CONFIG` 里的默认值——两者不一致会造成「配置写明默认开、实际判关」
-    （或反之）的错位（`market_temperature` 转正时所需同步改动之一）。
-    """
-
-    def test_every_switch_missing_key_matches_default(self):
-        from src.python.config import _core
-        from src.python.config._config_defaults import _DEFAULT_CONFIG
-
-        mismatches = []
-        for key, default in _DEFAULT_CONFIG["report_submodules"].items():
-            accessor = getattr(_core, f"is_enable_{key}", None)
-            assert accessor is not None, f"report_submodules.{key} 缺少同名访问器 is_enable_{key}"
-            if accessor({}) != bool(default) or accessor({"report_submodules": {}}) != bool(default):
-                mismatches.append(f"{key}=默认{bool(default)} 缺键判{accessor({})}")
-        assert not mismatches, f"默认值与访问器缺键回落不一致：{mismatches}"
+        assert is_enable_market_temperature({"report_submodules": {"market_temperature": False}}) is True

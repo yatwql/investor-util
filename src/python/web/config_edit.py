@@ -7,8 +7,7 @@
 - ``config_backup_file``：写共享配置文件前的单槽 .bak 备份（mkstemp + os.replace 原子写）。
 
 写入语义与 TUI 逐条等价（对齐 tui/handlers_config.py 编辑路径）：
-  config.json 顶层标量 → ``set_config``；嵌套 dict（report_submodules /
-  comparison_indices）读合并后整块写；anonymization → ``set_anonymization_mode``；
+  config.json 顶层标量 → ``set_config``；嵌套 dict（comparison_indices）读合并后整块写；anonymization → ``set_anonymization_mode``；
   llm_settings.json → ``write_llm_settings``（自 tui 抽取的共享原语）；
   features.json → ``save_feature_overrides``（功能开关，清单由
   ``features.feature_switch_registry`` 驱动，与 TUI 菜单 S 同源）。
@@ -22,6 +21,7 @@ import os
 
 from src.python.config.features import (
     GROUP_EXPERIMENTAL,
+    GROUP_REPORT,
     GROUP_STANDARD,
     feature_switch_registry,
     switches_in_group,
@@ -78,14 +78,6 @@ config_edit_whitelist = {
     "enable_history": {"kind": "bool", "target": "config", "writer": "scalar"},
     "enable_portfolio_evolution": {"kind": "bool", "target": "config", "writer": "scalar"},
     "enable_action": {"kind": "bool", "target": "config", "writer": "scalar"},
-    # ── 3 报告增强子模块开关（config.json 嵌套 dict，读合并整块写）──
-    "report_submodules.data_quality": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.industry_beta": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.candidate_compare": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.cost_lots": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.valuation_percentile": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.market_temperature": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.financial_report_digest": {"kind": "bool", "target": "config", "writer": "submodule"},
     # ── 4 持仓匿名化枚举（config.json 顶层 anonymization，set_anonymization_mode）──
     "anonymization.mode": {
         "kind": "enum",
@@ -159,13 +151,6 @@ def _dispatch_write(entry: dict, key: str, value) -> None:
         from src.python.config import set_config
 
         set_config(key, value)
-    elif writer == "submodule":
-        from src.python.config import get_config, set_config
-
-        config = get_config()
-        submodules = dict(config.get("report_submodules") or {})
-        submodules[key.split(".", 1)[1]] = value
-        set_config("report_submodules", submodules)
     elif writer == "anonymization":
         from src.python.config.anonymizer import set_anonymization_mode
 
@@ -304,16 +289,10 @@ def get_config_edit_surface() -> dict:
     from src.python.config import (
         get_config,
         is_enable_action,
-        is_enable_candidate_compare,
-        is_enable_cost_lots,
-        is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
-        is_enable_industry_beta,
-        is_enable_market_temperature,
         is_enable_news,
         is_enable_portfolio_evolution,
-        is_enable_valuation_percentile,
     )
     from src.python.config import _strip_json_comments
     from src.python.config._config_defaults import _DEFAULT_CONFIG
@@ -334,14 +313,9 @@ def get_config_edit_surface() -> dict:
         "enable_portfolio_evolution": is_enable_portfolio_evolution(config),
         "enable_action": is_enable_action(config),
     }
-    submodules = {
-        "data_quality": is_enable_data_quality(config),
-        "industry_beta": is_enable_industry_beta(config),
-        "candidate_compare": is_enable_candidate_compare(config),
-        "cost_lots": is_enable_cost_lots(config),
-        "valuation_percentile": is_enable_valuation_percentile(config),
-        "market_temperature": is_enable_market_temperature(config),
-    }
+    # 报告章节与增强：取值与显示名皆由功能开关注册表派生（GROUP_REPORT；
+    # 前端仍按 submodules 块渲染）
+    submodules = {flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_REPORT)}
     anon_mode = get_anonymization_mode()
     indices = config.get("comparison_indices") or _DEFAULT_CONFIG.get("comparison_indices", {})
 

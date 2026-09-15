@@ -360,66 +360,45 @@ def is_enable_history(config: dict | None = None) -> bool:
 
 
 def is_enable_data_quality(config: dict | None = None) -> bool:
-    """数据质量仪表盘子模块是否启用。
+    """数据质量仪表盘子模块是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
 
-    读取 `report_submodules.data_quality`，默认开（数据质量仪表盘为长期可信核心，
-    与 `enable_action` 缺省开启口径一致；显式关闭时「数据源可用性矩阵」保持既有输出）。
+    取值来自功能开关注册表（``features.data_quality``，数据质量仪表盘为长期可信核心，出厂默认开），可用 `features.json`
+    覆盖；``config`` 形参仅为兼容既有调用签名保留，**取值不再读它**。
 
     Args:
-        config: 完整配置字典，为 None 时读取全局配置
+        config: 兼容形参（不参与取值）
     """
-    if config is None:
-        config = get_config()
-    submodules = config.get("report_submodules")
-    if not isinstance(submodules, dict):
-        return True
-    val = submodules.get("data_quality")
-    if val is None:
-        logger.debug("config.json 缺少 report_submodules.data_quality，使用默认值 true")
-        return True
-    return bool(val)
+    from src.python.config.features import is_feature_enabled
+
+    return is_feature_enabled("data_quality")
 
 
 def is_enable_candidate_compare(config: dict | None = None) -> bool:
-    """候选基金比较子表是否启用。
+    """候选基金比较子表是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
 
-    读取 `report_submodules.candidate_compare`，默认关（未开启时既有
-    「基金业绩分析」章输出不变）。
+    取值来自功能开关注册表（``features.candidate_compare``，出厂默认关），可用 `features.json`
+    覆盖；``config`` 形参仅为兼容既有调用签名保留，**取值不再读它**。
 
     Args:
-        config: 完整配置字典，为 None 时读取全局配置
+        config: 兼容形参（不参与取值）
     """
-    if config is None:
-        config = get_config()
-    submodules = config.get("report_submodules")
-    if not isinstance(submodules, dict):
-        return False
-    val = submodules.get("candidate_compare")
-    if val is None:
-        logger.debug("config.json 缺少 report_submodules.candidate_compare，使用默认值 false")
-        return False
-    return bool(val)
+    from src.python.config.features import is_feature_enabled
+
+    return is_feature_enabled("candidate_compare")
 
 
 def is_enable_financial_report_digest(config: dict | None = None) -> bool:
-    """持仓个股财报摘要章是否启用。
+    """持仓个股财报摘要章是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
 
-    读取 `report_submodules.financial_report_digest`，默认关（需用户自备
-    DataSinking API key；未开启或无 key 时该章不渲染）。
+    取值来自功能开关注册表（``features.financial_report_digest``，出厂默认关（需 DataSinking key）），可用 `features.json`
+    覆盖；``config`` 形参仅为兼容既有调用签名保留，**取值不再读它**。
 
     Args:
-        config: 完整配置字典，为 None 时读取全局配置
+        config: 兼容形参（不参与取值）
     """
-    if config is None:
-        config = get_config()
-    submodules = config.get("report_submodules")
-    if not isinstance(submodules, dict):
-        return False
-    val = submodules.get("financial_report_digest")
-    if val is None:
-        logger.debug("config.json 缺少 report_submodules.financial_report_digest，使用默认值 false")
-        return False
-    return bool(val)
+    from src.python.config.features import is_feature_enabled
+
+    return is_feature_enabled("financial_report_digest")
 
 
 def is_enable_datasink(config: dict | None = None) -> bool:
@@ -460,110 +439,73 @@ def datasink_feature_ready(config: dict | None = None) -> bool:
 
 
 def is_enable_financial_indicator(config: dict | None = None) -> bool:
-    """财务指标章是否启用。
+    """财务指标章是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
 
-    读取 `report_submodules.financial_indicator`，默认关（开启后新增独立章；
-    数据驱动：无数据时章节内写占位）。
+    取值来自功能开关注册表（``features.financial_indicator``，出厂默认关（数据驱动）），可用 `features.json`
+    覆盖；``config`` 形参仅为兼容既有调用签名保留，**取值不再读它**。
 
     Args:
-        config: 完整配置字典，为 None 时读取全局配置
+        config: 兼容形参（不参与取值）
     """
-    if config is None:
-        config = get_config()
-    submodules = config.get("report_submodules")
-    if not isinstance(submodules, dict):
-        return False
-    val = submodules.get("financial_indicator")
-    if val is None:
-        logger.debug("config.json 缺少 report_submodules.financial_indicator，使用默认值 false")
-        return False
-    return bool(val)
+    from src.python.config.features import is_feature_enabled
+
+    return is_feature_enabled("financial_indicator")
 
 
 def is_enable_cost_lots(config: dict | None = None) -> bool:
-    """成本流水子模块是否启用（成本分档 + XIRR + 分红累计渲染）。
+    """成本流水子模块是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
 
-    读取 `report_submodules.cost_lots`，默认关（未开启时既有
-    「投资分析汇总」/「市值核算明细表」/「持仓分类表」输出不变）。
-    持仓 Excel 含「交易流水」「分红流水」页签时才建议开启。
+    取值来自功能开关注册表（``features.cost_lots``，出厂默认关），可用 `features.json`
+    覆盖；``config`` 形参仅为兼容既有调用签名保留，**取值不再读它**。
 
     Args:
-        config: 完整配置字典，为 None 时读取全局配置
+        config: 兼容形参（不参与取值）
     """
-    if config is None:
-        config = get_config()
-    submodules = config.get("report_submodules")
-    if not isinstance(submodules, dict):
-        return False
-    val = submodules.get("cost_lots")
-    if val is None:
-        logger.debug("config.json 缺少 report_submodules.cost_lots，使用默认值 false")
-        return False
-    return bool(val)
+    from src.python.config.features import is_feature_enabled
+
+    return is_feature_enabled("cost_lots")
 
 
 def is_enable_valuation_percentile(config: dict | None = None) -> bool:
-    """估值分位子模块是否启用（「资产穿透TOP10」章估值分位列）。
+    """估值分位子模块是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
 
-    读取 `report_submodules.valuation_percentile`，默认关（未开启时
-    「资产穿透TOP10」章既有输出不变）。
+    取值来自功能开关注册表（``features.valuation_percentile``，出厂默认关），可用 `features.json`
+    覆盖；``config`` 形参仅为兼容既有调用签名保留，**取值不再读它**。
 
     Args:
-        config: 完整配置字典，为 None 时读取全局配置
+        config: 兼容形参（不参与取值）
     """
-    if config is None:
-        config = get_config()
-    submodules = config.get("report_submodules")
-    if not isinstance(submodules, dict):
-        return False
-    val = submodules.get("valuation_percentile")
-    if val is None:
-        logger.debug("config.json 缺少 report_submodules.valuation_percentile，使用默认值 false")
-        return False
-    return bool(val)
+    from src.python.config.features import is_feature_enabled
+
+    return is_feature_enabled("valuation_percentile")
 
 
 def is_enable_market_temperature(config: dict | None = None) -> bool:
-    """市场温度子模块是否启用（「投资分析汇总」章市场温度刻度行）。
+    """市场温度子模块是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
 
-    读取 `report_submodules.market_temperature`，**默认开**（与 `_DEFAULT_CONFIG` 同源；
-    数据不可用时该行静默省略，不写占位）；显式关闭（菜单 P 或置 false）时该章保持
-    引入本行前的既有输出。缺键回落值须与默认值一致——由
-    `test_config.py::TestReportSubmoduleDefaultConsistency` 逐项锁定。
+    取值来自功能开关注册表（``features.market_temperature``，出厂默认开；数据不可用时该行静默省略），可用 `features.json`
+    覆盖；``config`` 形参仅为兼容既有调用签名保留，**取值不再读它**。
 
     Args:
-        config: 完整配置字典，为 None 时读取全局配置
+        config: 兼容形参（不参与取值）
     """
-    if config is None:
-        config = get_config()
-    submodules = config.get("report_submodules")
-    if not isinstance(submodules, dict):
-        return True
-    val = submodules.get("market_temperature")
-    if val is None:
-        logger.debug("config.json 缺少 report_submodules.market_temperature，使用默认值 true")
-        return True
-    return bool(val)
+    from src.python.config.features import is_feature_enabled
+
+    return is_feature_enabled("market_temperature")
 
 
 def is_enable_industry_beta(config: dict | None = None) -> bool:
-    """行业 Beta 子模块开关（「风格与因子分析」章行业 Beta 子表）。
+    """行业 Beta 子表是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
 
-    读取 `report_submodules.industry_beta`，默认关（未开启时该章既有输出不变）。
+    取值来自功能开关注册表（``features.industry_beta``，出厂默认关），可用 `features.json`
+    覆盖；``config`` 形参仅为兼容既有调用签名保留，**取值不再读它**。
 
     Args:
-        config: 完整配置字典，为 None 时读取全局配置
+        config: 兼容形参（不参与取值）
     """
-    if config is None:
-        config = get_config()
-    submodules = config.get("report_submodules")
-    if not isinstance(submodules, dict):
-        return False
-    val = submodules.get("industry_beta")
-    if val is None:
-        logger.debug("config.json 缺少 report_submodules.industry_beta，使用默认值 false")
-        return False
-    return bool(val)
+    from src.python.config.features import is_feature_enabled
+
+    return is_feature_enabled("industry_beta")
 
 
 def get_comparison_candidates(config: dict | None = None) -> list[str]:

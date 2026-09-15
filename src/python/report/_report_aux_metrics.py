@@ -33,7 +33,7 @@ def compute_market_temperature_data(
 
     Returns:
         数据子契约 dict（含 available/status/score/tier/disclaimer）；
-        report_submodules.market_temperature 关闭时返回 None（行隐藏）；
+        功能开关 `market_temperature` 关闭时返回 None（行隐藏）；
         指数 K 线不足时 available=False（占位，§1.4.5）。
     """
     from src.python.config import is_enable_market_temperature

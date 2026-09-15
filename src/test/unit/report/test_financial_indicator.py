@@ -147,13 +147,10 @@ class TestOrchestration:
         from src.python.report.orchestrator import compute_financial_indicator_data
 
         details = [SimpleNamespace(code="600900", price=40.0)]
-        out = compute_financial_indicator_data(
-            [_holding()],
-            None,
-            {"report_submodules": {"financial_indicator": True}},
-            None,
-            details=details,
-        )
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("financial_indicator", True)
+        out = compute_financial_indicator_data([_holding()], None, {}, None, details=details)
         assert out is not None and out["available"] is True
         assert out["rows"][0]["pe"] == pytest.approx(20.0)
 
@@ -161,10 +158,13 @@ class TestOrchestration:
         monkeypatch.setattr(fi, "fetch_indicator_series", lambda code, limit=8: [_record()])
         from src.python.report.orchestrator import compute_financial_indicator_data
 
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("financial_indicator", True)
         out = compute_financial_indicator_data(
             [],
             [{"code": "600519"}, {"codes": ["000001", "600036"]}],
-            {"report_submodules": {"financial_indicator": True}},
+            {},
             None,
         )
         assert {r["code"] for r in out["rows"]} == {"600519", "000001", "600036"}
@@ -208,17 +208,20 @@ class TestDatasinkGate:
 
 
 class TestSwitchAndWiring:
-    def test_switch_accessor_defaults_off(self):
+    def test_switch_accessor_follows_registry(self):
+        """取值来自功能开关注册表（config 形参已不参与取值）。"""
         from src.python.config import is_enable_financial_indicator
+        from src.python.config.features import set_feature_enabled
 
-        assert is_enable_financial_indicator({}) is False
-        assert is_enable_financial_indicator({"report_submodules": {}}) is False
-        assert is_enable_financial_indicator({"report_submodules": {"financial_indicator": True}}) is True
+        assert is_enable_financial_indicator() is False
+        set_feature_enabled("financial_indicator", True)
+        assert is_enable_financial_indicator() is True
 
     def test_default_config_has_switch_off(self):
-        from src.python.config._config_defaults import _DEFAULT_CONFIG
+        """默认关的事实来源 = 功能开关注册表（GROUP_REPORT）。"""
+        from src.python.config.features import feature_switch_registry
 
-        assert _DEFAULT_CONFIG["report_submodules"]["financial_indicator"] is False
+        assert feature_switch_registry["financial_indicator"].default is False
 
     def test_registry_section_registered(self):
         from src.python.core.registry import _REPORT_SECTION_DEFAULT, get_report_section_keys, get_report_sheet_name

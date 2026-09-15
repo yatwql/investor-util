@@ -46,17 +46,6 @@ _DEFAULT_CONFIG = {
     "enable_history": True,  # 组合历史走势+回撤
     "enable_portfolio_evolution": True,  # 组合演进
     "enable_action": True,  # 行动建议独立章（再平衡信号+交易纪律+调仓建议+收益归因，默认开，菜单 P 可切换）
-    # 报告子模块开关（数据质量仪表盘为长期可信核心，默认开启；其余新增能力默认关闭，避免既有报告突然"变胖"）
-    "report_submodules": {
-        "data_quality": True,  # 「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖，长期可信，默认开）
-        "industry_beta": False,  # 「风格与因子分析」→ 行业 Beta 子表（穿透行业暴露占比 + 行业指数 β）
-        "candidate_compare": False,  # 「基金业绩分析」→ 候选基金比较子表（候选来自 comparison_candidates）
-        "cost_lots": False,  # 成本流水：持仓 Excel 含交易/分红流水时，汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计
-        "valuation_percentile": False,  # 估值分位：「资产穿透TOP10」章加估值分位列（当前 PE/PB + 价格分位代理）
-        "market_temperature": True,  # 市场温度：「投资分析汇总」章加市场温度刻度行（三因子合成温度计；默认开，无数据时该行静默省略）
-        "financial_report_digest": False,  # 持仓个股财报摘要：新增独立章（DataSinking 全文本财报，仅 A 股，需用户自备 key）
-        "financial_indicator": False,  # 财务指标：新增独立章（持仓 A 股基本面：指标列 + 质量档 + 年度趋势 + 当前 PE/PB）
-    },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -103,7 +92,7 @@ _DEFAULT_CONFIG = {
     "user_fund_benchmarks": {},
     # 竞争语境对比指数池（默认沪深300+中证500+中证全债）
     "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
-    "comparison_candidates": [],  # 候选基金比较子表候选（6 位基金代码列表，≤10；与 report_submodules.candidate_compare 配合）
+    "comparison_candidates": [],  # 候选基金比较子表候选（6 位基金代码列表，≤10；配合功能开关 candidate_compare）
     # ── G. 持仓快照 ──
     "history": {
         "fetch_mode": "auto",  # 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
@@ -196,7 +185,6 @@ def _build_template_from_defaults() -> str:
         f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进',
         f'  "enable_action": {json.dumps(d["enable_action"])},  // 行动建议独立章（决策行动，默认开，菜单 P 可切换）',
         '  // 报告子模块开关（数据质量仪表盘长期可信默认开，其余新增能力默认关闭，避免既有报告突然"变胖"）',
-        f'  "report_submodules": {json.dumps(d["report_submodules"], ensure_ascii=False)},  // 数据质量仪表盘与市场温度默认开',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",
@@ -225,7 +213,7 @@ def _build_template_from_defaults() -> str:
         f'  "user_fund_benchmarks": {json.dumps(d["user_fund_benchmarks"])},',
         "  // 竞争语境对比指数池（默认沪深300+中证500+中证全债）",
         f'  "comparison_indices": {json.dumps(d["comparison_indices"], ensure_ascii=False)},',
-        "  // 候选基金比较子表候选（6 位基金代码列表，≤10；与 report_submodules.candidate_compare 配合）",
+        "  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合功能开关 candidate_compare）",
         f'  "comparison_candidates": {json.dumps(d["comparison_candidates"])},',
         "",
         # ── G ──

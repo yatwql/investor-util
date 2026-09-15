@@ -277,7 +277,10 @@ class TestComputeValuationData(unittest.TestCase):
     def test_switch_on_contract(self):
         from src.python.report.orchestrator import compute_valuation_data
 
-        config = {"report_submodules": {"valuation_percentile": True}}
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("valuation_percentile", True)
+        config: dict = {}
         detail = MagicMock()
         detail.code = "600001"
         detail.name = "测试股票"
@@ -299,7 +302,10 @@ class TestComputeValuationData(unittest.TestCase):
         """PE/PB 与 K 线均不可得 → available=False 占位（§1.4.5）。"""
         from src.python.report.orchestrator import compute_valuation_data
 
-        config = {"report_submodules": {"valuation_percentile": True}}
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("valuation_percentile", True)
+        config: dict = {}
         detail = MagicMock()
         detail.code = "600001"
         detail.name = "测试股票"
@@ -394,14 +400,19 @@ class TestComputeMarketTemperatureData(unittest.TestCase):
     """compute_market_temperature_data：编排市场温度数据契约。"""
 
     def test_switch_off_returns_none(self):
+        from src.python.config.features import set_feature_enabled
         from src.python.report.orchestrator import compute_market_temperature_data
 
+        set_feature_enabled("market_temperature", False)
         assert compute_market_temperature_data({}, MagicMock()) is None
 
     def test_switch_on_available(self):
         from src.python.report.orchestrator import compute_market_temperature_data
 
-        config = {"report_submodules": {"market_temperature": True}}
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("market_temperature", True)
+        config: dict = {}
         # 需 ≥ MIN_SAMPLES(60) 根 K 线；恒平序列 → 分位 100、偏离/波动率 0，合成可得
         bars = [{"date": f"2024-01-{i:02d}", "close": 100.0} for i in range(1, 91)]
         with patch("src.python.fetcher.index.fetch_index_history", return_value=bars):
@@ -415,7 +426,10 @@ class TestComputeMarketTemperatureData(unittest.TestCase):
     def test_switch_on_insufficient(self):
         from src.python.report.orchestrator import compute_market_temperature_data
 
-        config = {"report_submodules": {"market_temperature": True}}
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("market_temperature", True)
+        config: dict = {}
         with patch("src.python.fetcher.index.fetch_index_history", return_value=[]):
             result = compute_market_temperature_data(config, MagicMock())
         assert result["available"] is False
@@ -425,7 +439,10 @@ class TestComputeMarketTemperatureData(unittest.TestCase):
         """编排异常 → source_failed 占位。"""
         from src.python.report.orchestrator import compute_market_temperature_data
 
-        config = {"report_submodules": {"market_temperature": True}}
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("market_temperature", True)
+        config: dict = {}
         with patch(
             "src.python.fetcher.index.fetch_index_history",
             side_effect=RuntimeError("boom"),
