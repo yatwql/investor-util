@@ -67,15 +67,33 @@
 
 | 步骤 | 动作 |
 |:--|:--|
-| ④-1 注册表 | 合并为 `fundamental_snapshot`「持仓基本面」（`type=financial_indicator` 语义化为 `type=fundamental_snapshot`；`data_flag_any=("financial_indicator_data","financial_report_digest_data")`）；`fund_performance` 条目不变 |
+| ④-1 注册表 | 两处合并：**①** `financial_report_digest`(#19) + `financial_indicator`(#20) → `fundamental_snapshot`「持仓基本面」（`type=financial_indicator` 语义化为 `type=fundamental_snapshot`；`data_flag_any=("financial_indicator_data","financial_report_digest_data")`）；**②删除 `fund_manager`(#6) 条目**——其「基金经理变更监控」区块并入 `fund_performance`(#5)，章节语义由此变为「基金业绩分析（含经理变更）」。`fund_performance` 条目本身的 key/name/number 规则按既有再编号逻辑处理 |
 | ④-1b type 与 board 层链 | **两侧 `board_flags` 同步**：删除 `"financial_report"` 项、`"financial_indicator"` 改 `"fundamental_snapshot"`（`excel_sheet_factory.create_sheets` 与 `html_writer_nav._compute_section_visibility`）；**删除已不存在条目的 `enable_*` 形参**（`enable_financial_report_digest`，含 `html_writer`/`excel_generator`/`_report_generation` 三处调用链）；`config/_validation.py` 已知类型集合删旧增新；`web/config_edit.py` 硬编码处同步 |
-| ④-2 页签名表 | `"fundamental_snapshot": "持仓基本面"`；`fund_performance` 名称不变 |
+| ④-2 页签名表 | 增 `"fundamental_snapshot": "持仓基本面"`；**删除 `"fund_manager": "基金经理变更监控"` 映射**；`fund_performance` 名称不变 |
 | ④-3 Excel | 新建 `report/fundamental_snapshot_sheet.py::write_fundamental_snapshot_sheet`（区块①指标表 19 列 / 区块②摘要 9 列）；删除 `financial_indicator_sheet.py`、`financial_report_sheet.py`；经理变更区块并入 `fund_performance` 写入器（删除 `fund_manager_sheet.py`） |
 | ④-4 HTML | 新建 `partials/fundamental_snapshot_section.html`（两区块，**区块级开关**：区块②需 `is_feature_enabled("financial_report_digest")` 且契约就绪）；删除两个旧 partial；`report_template.html` 的 `sec-fund_manager`(1499) 区块删除并并入 `sec-fund_performance`(1393)（区块级门禁 `is_enable_fund_deep_analysis()`） |
 | ④-5 配置 | `_get_default_config_template()` 与 `data/config/config.json` **重生成**（新条目顺序/名称；`report_section_order` 按新条目） |
 | ④-6 开关 | `features.py::GROUP_REPORT` 保留 `financial_indicator` 与 `financial_report_digest` 两个功能开关（各控一块）；`fundamental_snapshot` 章节级门禁 = 数据底座就绪（沿用既有 `datasink_feature_ready`） |
-| ④-7 测试 | 区块级门禁用例两条（摘要区块随开关关闭消失 / 经理区块随 `enable_fund_deep_analysis=false` 消失且主业绩表保留）；条目数 18；配置模板重生成后的一致性用例 |
-| 验收 | 条目数 18；`--mode verify,regression` + 四个 `--ci` + 版本一致性 + ruff 全绿 |
+| ④-7 测试 | 区块级门禁用例两条（摘要区块随开关关闭消失 / 经理区块随 `enable_fund_deep_analysis=false` 消失且主业绩表保留）；**条目数 17**（④ 含两处合并：财报两章合一 -1、`fund_manager` 并入基金业绩 -1）；配置模板重生成后的一致性用例 |
+| 验收 | **条目数 17**；页签名表不再含 `fund_manager`；`fund_performance` 章节内含经理变更区块；`--mode verify,regression` + 四个 `--ci` + 版本一致性 + ruff 全绿 |
+
+## 6.4b 批次依赖与回退矩阵（第 7、8 轮复盘新增）
+
+**依赖链**：①(可见性模型 OR，已完成，零行为) → ②(always 组两章，受众最广故先行) → ③(fund_deep_analysis 组两章) → ④(财报两章 + `fund_manager` 并入基金业绩)。③④ 均改 `_compute_section_visibility` 与 fund 深度分析分组，**④ 建立在 ③ 之后**。
+
+| 共享文件（各批都要改） | ② | ③ | ④ |
+|:--|:-:|:-:|:-:|
+| `core/registry.py`（条目/type/data_flag） | ✓ | ✓ | ✓ |
+| `report/excel_sheet_factory.py` + `html_writer_nav.py` | ✓ | ✓ | ✓ |
+| `report/excel_generator.py` / `excel_content_sheets.py` / `excel_fund_deep_analysis.py` | ✓ | ✓ | ✓ |
+| `report/excel_module_loader.py`（模块键） | ✓ | — | ✓ |
+| `src/static/tmpl/report_template.html` | ✓ | ✓ | ✓ |
+| `partials/*` | — | — | ✓ |
+| `_get_default_config_template()` + `data/config/config.json` | ✓ | ✓ | ✓ |
+
+**回退纪律**：因上述文件跨批共改，**回退必须逆序**（④→③→②），每批一次独立提交以便 `git revert` 单批；若需中断，可停在 ② 或 ③ 后（各批独立成章的中间态均可用）。
+
+**版本身份**：四批同属 **0.11.1-dev** 开发期，逐批提交、逐批门禁，随该版本一并发布；若跨版本，发布前按"版本号一致"流程统一刷新条目数表述。
 
 ## 6.5 命名统一「允许保留的旧名」白名单（防误删）
 
@@ -96,6 +114,8 @@
 | 1 | 命名统一性（旧名残留 / 新旧名一致 / type 链） | 新名两文档一致；但 **type 语义化未在设计层写明**、`enable_*` 形参与 `board_flags` 映射链**两文档均未覆盖** | 设计层新增 §3.2「命名统一的下游影响清单」；施工单补 ④-1b 与命名检查白名单 |
 | 2 | 架构约束符合性 | 核实代码侧接缝：两侧 `board_flags` 含旧 type、`_validation.py` 允许集合含旧 type、Web 硬编码含旧名；前端与 TUI 已同源派生（无需改） | 同上批量修复；白名单明确「可见性旗标的语义身份」三处必须严格一致 |
 | 3 | 测试与守卫完备性 | **发现同名混淆**：`market_value`/`category` 在 100+ 测试中是**领域字段/领域模块**（`DetailRow.market_value`、`report/market_value.py`、`report/category.py` 的分类函数），而批次②原施工单写「删除 `report/category.py`」会**破坏领域层**；另发现 `test_features.py` 的 `fund_deep_analysis_fund_*` 字符串在 `src/` 无对应实现（需实施时核对语义） | 修正批次②（只迁移纯章节写入器、领域模块保留）；新增 §6.7「领域层 vs 章节层边界」；测试同步清单改为**区分章节键断言与领域词**并给出精确文件行 |
+| 7 | 批次依赖与可回退性 | ②③④ 共改 7 个文件（registry/两侧可见性/Excel 三处分派/模板/配置模板），**无法任意顺序单独回退**；计划未说明依赖链与版本身份 | 新增 §6.4b「批次依赖与回退矩阵」（依赖链 + 共享文件表 + 逆序回退纪律 + 版本身份） |
+| 8 | 计数一致性与非目标边界 | **硬伤**：④-3/④-4 删除 `fund_manager` 条目对应区块，但 ④-1 未声明删除该条目、④-7/验收仍写「条目数 18」——实际 ④ 含两处合并（财报两章 + 经理并入），应为 **17** | 修正 ④-1（显式删除 `fund_manager` 条目与页签名）、④-7/验收/§6.6b 计数 → 17；非目标边界（LLM 条目不合并）经核对与注册表现状一致，予以保留 |
 | 5 | 接缝完整性（遗漏消费点） | 新增 4 处漏登接缝：`excel_module_loader.py`（模块键 `write_category_sheet`/`write_market_value_sheet` + 错误文案）、`html_writer_display.py`（**反向依赖** `market_value_sheet._weighted_avg_cost`，删模块会 ImportError）、partial 实况（仅 4 个 partial，**只有 M3 需并 partial**）、`chart_data_builder` 图键不变但图归属变；`features.py` 两开关名保留 | 接缝地图补 6 行；批次② 补 ②-4b/②-4c；批次④ 补 partial 实况；新增 §7.5 风险补充（3 条） |
 | 6 | 守卫与可验证性 | 7 项既有守卫均在位；但**无守卫清单**、**缺合并前基线方法**、「三处严格一致」缺正面自动化守卫 | 新增 §6.6b：既有守卫表（含随批次变化处）+ 每批新增守卫（`test_section_type_flag_consistency` / 模块加载器一致性 / 区块门禁 / 内容等价）+ 基线方法（`docs-stm/tmp/` 快照，不入库） |
 | 4 | 配置与校验面 | `_validation.py` 允许类型集合含旧 type、`config_edit.py` 硬编码含旧名（已列入 §3.2）；注册表 docstring「共 21 项」与架构约束表「报告 19 个模块」表述陈旧；`_config_defaults.py` 的 `report_section_order` 模板随注册表自动派生（无需手改） | 收尾步骤补「条目数表述同步」；确认模板无需手改 |
@@ -106,7 +126,7 @@
 
 | 守卫 | 文件 | 随批次变化处 |
 |:--|:--|:--|
-| 注册表条目数 | `test_registry.py:250`（`== 21`） | 每批 -1（21→20→19→18） |
+| 注册表条目数 | `test_registry.py:250`（`== 21`） | ② -1 →20；③ -1 →19；④ **-2** →**17**（财报两章合一 + `fund_manager` 并入基金业绩） |
 | HTML 容器数 | `test_html_report_structure_edge.py:93` | 每批 -1 |
 | Excel 章节列表 | `test_excel_report_structure.py` | 每批 -1 |
 | 双端一致性 | `test_report_chapter_consistency.py` | 夹具键名与开关参数 |
