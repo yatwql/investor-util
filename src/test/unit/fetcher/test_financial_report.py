@@ -53,10 +53,9 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(
             fr.datasink,
             "fetch_report_documents",
-            lambda symbol, doc_type=None, **k: (
-                [{"id": 7, "report_period": "2025-12-31", "doc_type": doc_type}] if doc_type == "annual" else None
-            ),
+            lambda symbol, **k: [{"id": 7, "report_period": "2025-12-31", "doc_type": "annual"}],
         )
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节管理层讨论与分析"])
         monkeypatch.setattr(
             fr,
             "_fetch_document",
@@ -84,6 +83,7 @@ class TestFetchSymbolReport:
         calls: list = []
         monkeypatch.setattr(fr, "cache_get", lambda *a, **k: [{"id": 9}])
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: calls.append(1) or None)
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: None)
         monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "x"})
         rec = fr.fetch_symbol_report("600519.SS")
         assert rec is not None and rec["doc_id"] == 9
@@ -144,9 +144,21 @@ class TestDatasinkUsageMarking:
 
         monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
         monkeypatch.setattr(
-            fr, "datasink", type("D", (), {"fetch_report_documents": staticmethod(lambda *a, **k: [{"id": 1}])})
+            fr,
+            "datasink",
+            type(
+                "D",
+                (),
+                {
+                    "fetch_report_documents": staticmethod(
+                        lambda *a, **k: [{"id": 1, "doc_type": "annual", "report_period": "2025-12-31"}]
+                    )
+                },
+            ),
         )
-        assert fr._fetch_index("600900.SS", ("annual",)) == [{"id": 1}]
+        assert fr._fetch_index("600900.SS", ("annual",)) == [
+            {"id": 1, "doc_type": "annual", "report_period": "2025-12-31"}
+        ]
         assert "report_datasink_index" in self._keys()
 
     def test_index_cache_hit_marks_used(self, monkeypatch):
@@ -185,3 +197,108 @@ class TestDatasinkUsageMarking:
         monkeypatch.setattr("src.python.fetcher.chain.fetch_with_fallback", lambda *a, **k: None)
         assert fr._fetch_document(1, "管理层讨论与分析") is None
         assert self._keys() == []
+
+
+class TestLatestPeriodAndSectionResolution:
+    """取最新报告期（跨文种）与按实际章节名精确取正文。"""
+
+    def _index(self, monkeypatch, items):
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
+        monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda symbol, **k: list(items))
+
+    def test_latest_period_wins_over_annual(self, monkeypatch):
+        """半年报（2026-06-30）比年报（2025-12-31）新 → 取半年报，不再「年报优先」。"""
+        self._index(
+            monkeypatch,
+            [
+                {"id": 59797, "doc_type": "annual", "report_period": "2025-12-31"},
+                {"id": 818577, "doc_type": "semiannual", "report_period": "2026-06-30"},
+                {"id": 59795, "doc_type": "q1", "report_period": "2026-03-31"},
+            ],
+        )
+        picked = fr._fetch_index("600900.SS")
+        assert [i["id"] for i in picked] == [818577, 59795, 59797]
+
+    def test_doc_types_whitelist_filters(self, monkeypatch):
+        """配置文种白名单非空时仅保留该类（可限定只取年报等）。"""
+        self._index(
+            monkeypatch,
+            [
+                {"id": 1, "doc_type": "annual", "report_period": "2025-12-31"},
+                {"id": 2, "doc_type": "semiannual", "report_period": "2026-06-30"},
+            ],
+        )
+        assert [i["id"] for i in fr._fetch_index("600900.SS", ("annual",))] == [1]
+
+    def test_whitelist_without_match_returns_none(self, monkeypatch):
+        self._index(monkeypatch, [{"id": 1, "doc_type": "annual", "report_period": "2025-12-31"}])
+        assert fr._fetch_index("600900.SS", ("q3",)) is None
+
+    def test_pick_sections_matches_actual_names(self):
+        available = [
+            "公司代码：600900公司简称：长江电力",
+            "第三节管理层讨论与分析",
+            "第八节财务报告",
+            "五、主要会计数据和财务指标",
+        ]
+        assert fr._pick_sections(available, ("管理层讨论与分析", "主要会计数据")) == [
+            "第三节管理层讨论与分析",
+            "五、主要会计数据和财务指标",
+        ]
+
+    def test_pick_sections_dedups_and_keeps_preference_order(self):
+        available = ["第三节管理层讨论与分析", "五、主要会计数据和财务指标"]
+        picked = fr._pick_sections(available, ("主要会计数据", "管理层讨论与分析"))
+        assert picked == ["五、主要会计数据和财务指标", "第三节管理层讨论与分析"]
+        # 同一章节不被两个偏好重复取用
+        assert fr._pick_sections(available, ("管理层讨论与分析", "管理层讨论与分析")) == ["第三节管理层讨论与分析"]
+
+    def test_pick_sections_falls_back_to_preferences(self):
+        assert fr._pick_sections(None, ("管理层讨论与分析",)) == ["管理层讨论与分析"]
+
+    def test_uses_exact_section_name_from_list(self, monkeypatch):
+        """按实际章节名（第三节管理层讨论与分析）请求正文，而非硬编码裸名。"""
+        self._index(monkeypatch, [{"id": 7, "doc_type": "annual", "report_period": "2025-12-31"}])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节管理层讨论与分析"])
+        seen: list[str] = []
+
+        def _doc(doc_id, section):
+            seen.append(section)
+            return {"doc_id": doc_id, "content": "正文", "report_period": "2025-12-31", "doc_type": "annual"}
+
+        monkeypatch.setattr(fr, "_fetch_document", _doc)
+        assert fr.fetch_symbol_report("600900.SS") is not None
+        assert seen == ["第三节管理层讨论与分析"]
+
+    def test_missing_first_section_falls_through_to_next(self, monkeypatch):
+        """首选项章节 404 → 继续试下一候选（不整只标的判失败）。"""
+        self._index(monkeypatch, [{"id": 7, "doc_type": "annual", "report_period": "2025-12-31"}])
+        monkeypatch.setattr(
+            fr, "_fetch_sections", lambda doc_id: ["第三节管理层讨论与分析", "五、主要会计数据和财务指标"]
+        )
+
+        def _doc(doc_id, section):
+            if section == "第三节管理层讨论与分析":
+                return None  # 模拟 404
+            return {"doc_id": doc_id, "content": "财务数据", "report_period": "2025-12-31", "doc_type": "annual"}
+
+        monkeypatch.setattr(fr, "_fetch_document", _doc)
+        rec = fr.fetch_symbol_report("600900.SS")
+        assert rec is not None and rec["content"] == "财务数据"
+
+    def test_sections_list_is_cached(self, monkeypatch):
+        """章节清单命中缓存不重复请求（清单本身是 1 次额外请求，必须缓存）。"""
+        calls = {"n": 0}
+        store: dict = {}
+
+        def _sections(doc_id):
+            calls["n"] += 1
+            return ["第三节管理层讨论与分析"]
+
+        monkeypatch.setattr(fr.datasink, "fetch_report_sections", _sections)
+        monkeypatch.setattr(fr, "cache_get", lambda key, ttl=None: store.get(key))
+        monkeypatch.setattr(fr, "cache_set", lambda key, value: store.__setitem__(key, value))
+        assert fr._fetch_sections(7) == ["第三节管理层讨论与分析"]
+        assert fr._fetch_sections(7) == ["第三节管理层讨论与分析"]
+        assert calls["n"] == 1

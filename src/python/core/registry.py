@@ -108,7 +108,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     DataModuleDef(
         "财报索引",
         "report",
-        cache_prefixes=("report_datasink_index_",),
+        cache_prefixes=("report_datasink_index_", "report_datasink_sections_"),
         cache_ttl=CACHE_TWO_WEEKS,
         cache_groups=("refresh",),
     ),

@@ -165,3 +165,25 @@ class TestFetchPrimitives:
         data = ds.fetch_report_document(7, section="管理层讨论与分析")
         assert data["id"] == 7
         assert client.calls[0]["params"]["section"] == "管理层讨论与分析"
+
+
+class TestFetchReportSections:
+    """章节清单端点：返回章节名列表，异常形态一律 None。"""
+
+    def test_returns_section_names(self, monkeypatch):
+        from src.python.providers import datasink as ds
+
+        monkeypatch.setattr(
+            ds, "_request", lambda path, params: {"sections": ["第三节管理层讨论与分析", "第八节财务报告"]}
+        )
+        assert ds.fetch_report_sections(59797) == ["第三节管理层讨论与分析", "第八节财务报告"]
+
+    def test_filters_blank_and_non_list(self, monkeypatch):
+        from src.python.providers import datasink as ds
+
+        monkeypatch.setattr(ds, "_request", lambda path, params: {"sections": ["  ", "甲", ""]})
+        assert ds.fetch_report_sections(1) == ["甲"]
+        monkeypatch.setattr(ds, "_request", lambda path, params: {"sections": "oops"})
+        assert ds.fetch_report_sections(1) is None
+        monkeypatch.setattr(ds, "_request", lambda path, params: None)
+        assert ds.fetch_report_sections(1) is None

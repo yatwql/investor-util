@@ -27,10 +27,25 @@ logger = logging.getLogger("invest")
 
 INDEX_PREFIX = "report_datasink_index_"
 DOC_PREFIX = "report_datasink_doc_"
+SECTIONS_PREFIX = "report_datasink_sections_"
 
-DEFAULT_DOC_TYPES: tuple[str, ...] = ("annual", "semiannual")
-DEFAULT_SECTIONS: tuple[str, ...] = ("管理层讨论与分析",)
+#: 文种白名单（**空 = 不限文种**）：默认取**最新报告期**——半年报/季报通常比年报新，
+#: 故不再按「年报优先、命中即止」排序，而是跨文种按报告期取最新一篇。
+DEFAULT_DOC_TYPES: tuple[str, ...] = ()
+
+#: 章节**偏好**列表（按顺序在文档实际章节名中做子串匹配）：年报/半年报取「管理层讨论
+#: 与分析」，季报多为「主要财务数据/主要会计数据」，旧格式用「董事会报告」。
+DEFAULT_SECTIONS: tuple[str, ...] = (
+    "管理层讨论与分析",
+    "经营情况讨论与分析",
+    "主要财务数据",
+    "主要会计数据",
+    "董事会报告",
+)
 DEFAULT_MAX_CHARS = 2000
+
+#: 索引一次取回的候选篇数（本地按报告期排序后取最新一篇）
+_INDEX_SCAN_SIZE = 10
 
 
 def collect_a_share_targets(
@@ -71,20 +86,66 @@ def _mark_used(source_key: str) -> None:
     mark_data_used(source_key)
 
 
-def _fetch_index(symbol: str, doc_types: tuple[str, ...]) -> list[dict[str, Any]] | None:
-    """取某符号的报告元数据（按文种顺序试取最新一篇），带缓存。"""
+def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str, Any]] | None:
+    """取某符号的报告元数据（**跨文种取最新报告期**，按报告期倒序），带缓存。
+
+    一次请求取回最近若干篇（不带 ``doc_type`` 过滤），本地按「报告期 → 披露时间」
+    倒序，故半年报/季报（通常比年报新）自然排在年报之前；``doc_types`` 非空时仅作为
+    文种白名单过滤。
+    """
     cache_key = f"{INDEX_PREFIX}{symbol}"
     cached = cache_get(cache_key, get_ttl("report", cache_key))
     if cached is not None:
         _mark_used(f"{INDEX_PREFIX.rstrip('_')}")
         return cached if isinstance(cached, list) else None
-    for doc_type in doc_types:
-        items = datasink.fetch_report_documents(symbol, doc_type=doc_type, order="desc", size=1)
-        if items:
-            cache_set(cache_key, items)
-            _mark_used(f"{INDEX_PREFIX.rstrip('_')}")
-            return items
+
+    items = datasink.fetch_report_documents(symbol, order="desc", size=_INDEX_SCAN_SIZE)
+    if not items:
+        return None
+    wanted = {str(t).strip().lower() for t in (doc_types or ()) if str(t).strip()}
+    picked = [i for i in items if not wanted or str(i.get("doc_type") or "").lower() in wanted]
+    if not picked:
+        return None
+    picked.sort(
+        key=lambda i: (str(i.get("report_period") or ""), int(i.get("announcement_time") or 0)),
+        reverse=True,
+    )
+    cache_set(cache_key, picked)
+    _mark_used(f"{INDEX_PREFIX.rstrip('_')}")
+    return picked
+
+
+def _fetch_sections(doc_id: int | str) -> list[str] | None:
+    """取该文档的**实际章节名清单**（带缓存）；不可得时返回 None（调用方回退偏好名直取）。"""
+    cache_key = f"{SECTIONS_PREFIX}{doc_id}"
+    cached = cache_get(cache_key, get_ttl("report", cache_key))
+    if isinstance(cached, list):
+        return cached
+    sections = datasink.fetch_report_sections(doc_id)
+    if sections:
+        cache_set(cache_key, sections)
+        return sections
     return None
+
+
+def _pick_sections(available: list[str] | None, preferences: tuple[str, ...]) -> list[str]:
+    """按偏好顺序在**实际章节名**中做子串匹配，返回精确章节名（去重保序）。
+
+    每个偏好只取首个匹配项，避免同一章节被多个偏好重复拼接；``available`` 不可得时
+    回退为偏好名直取（服务端 fuzzy 匹配）。
+    """
+    if not available:
+        return [str(p) for p in preferences if str(p).strip()]
+    picked: list[str] = []
+    for pref in preferences:
+        key = str(pref).strip()
+        if not key:
+            continue
+        for name in available:
+            if key in name and name not in picked:
+                picked.append(name)
+                break
+    return picked
 
 
 def _fetch_document(doc_id: int | str, section: str) -> dict[str, Any] | None:
@@ -116,8 +177,8 @@ def fetch_symbol_report(
 
     Args:
         symbol: FMP 风格符号（``600519.SS``）
-        doc_types: 文种优先级（默认先年报、后半年报）
-        sections: 章节标题列表（fuzzy 匹配；按顺序取，命中者拼接）
+        doc_types: 文种白名单（**空 = 不限文种**；跨文种取最新报告期）
+        sections: 章节**偏好**列表（在文档实际章节名中按顺序子串匹配，命中者拼接）
         max_chars: 正文截断长度（报告内摘要）
 
     Returns:
@@ -132,10 +193,13 @@ def fetch_symbol_report(
     if doc_id is None:
         return None
 
-    # 逐章节取正文（每节独立缓存），命中者按声明顺序拼接；元数据取首个非空记录
+    # 先取该文档的实际章节名清单（1 次请求，带缓存），再按偏好匹配**精确章节名**；
+    # 清单不可得时回退偏好名直取（服务端 fuzzy 匹配）——避免裸章节名 404 被误判为
+    # 「该标的未取到财报」（此前多数「未取到财报」正是该原因）
+    resolved = _pick_sections(_fetch_sections(doc_id), sections)
     record: dict[str, Any] | None = None
     contents: list[str] = []
-    for section in sections:
+    for section in resolved:
         got = _fetch_document(doc_id, section)
         if not got:
             continue

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import os
 import threading
 from datetime import date
@@ -41,6 +42,8 @@ from src.python.core.http_client import make_http_client
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://api.datasink.ing"
+#: 429 限速后的退避秒数（重试一次；免费档 3 请求/秒）
+_RATE_LIMIT_BACKOFF = 1.0
 _TIMEOUT = 20.0
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 
@@ -219,8 +222,19 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
         logger.warning("[datasink] 凭据无效（HTTP %d），请检查 API key", resp.status_code)
         return None
     if resp.status_code == 429:
-        logger.warning("[datasink] 触发限速（HTTP 429），请降低请求频率或升级套餐")
-        return None
+        # 限速：等待一个限速窗口后**重试一次**（免费档 3 请求/秒，并发路径下仍可能触顶）
+        logger.warning("[datasink] 触发限速（HTTP 429），%.1fs 后重试一次", _RATE_LIMIT_BACKOFF)
+        time.sleep(_RATE_LIMIT_BACKOFF)
+        _get_limiter().acquire(SOURCE_ID)
+        try:
+            with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+                resp = client.get(f"{_BASE_URL}{path}", params=query, headers=_HEADERS)
+        except Exception as e:
+            logger.warning("[datasink] 重试失败 %s: %s", path, e)
+            return None
+        if resp.status_code != 200:
+            logger.warning("[datasink] 重试仍失败（HTTP %d），跳过 %s", resp.status_code, path)
+            return None
     if resp.status_code != 200:
         logger.warning("[datasink] 请求 %s 返回 HTTP %d", path, resp.status_code)
         return None
@@ -262,3 +276,19 @@ def fetch_report_document(doc_id: int | str, section: str | None = None) -> dict
     """取单篇文档（默认全文，含 ``content``）；给了 ``section`` 则只取该章节正文。"""
     data = _request(f"/documents/{doc_id}", {"section": section})
     return data
+
+
+def fetch_report_sections(doc_id: int | str) -> list[str] | None:
+    """取单篇文档的**章节名清单**（用于按实际章节名精确取正文）。
+
+    章节名各公司/文种不同（如「第三节管理层讨论与分析」「五、主要会计数据和财务指标」），
+    硬编码裸章节名会因服务端匹配规则不一致而 404。先取清单再按子串匹配选择，
+    即可避免「章节名猜错 → 整只标的被判未取到财报」。
+    """
+    data = _request(f"/documents/{doc_id}/sections", {})
+    if data is None:
+        return None
+    sections = data.get("sections")
+    if not isinstance(sections, list):
+        return None
+    return [str(s) for s in sections if str(s).strip()]

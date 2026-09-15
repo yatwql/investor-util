@@ -78,7 +78,8 @@ _DEFAULT_CONFIG = {
         "daily_quota": 0,
         "sections": ["管理层讨论与分析"],
         "max_chars": 2000,
-        "doc_types": ["annual", "semiannual"],
+        # 文种白名单：空 = 不限文种，取**最新报告期**（半年报/季报通常比年报新）
+        "doc_types": [],
     },
     # ── D. 市场时段与缓存 ──
     "market_hour_aware": ["price", "index"],
@@ -143,7 +144,7 @@ _DEFAULT_CONFIG = {
         "max_total_workers": 15,  # 全局 batch 线程硬上限（已有池不计入）
         "fund_workers": 3,  # 基金排名/持仓批量并发数
         "industry_workers": 8,  # 行业分类批量并发数
-        "datasink_workers": 3,  # 财报取数并发数（免费档批量上限 ≤3）
+        "datasink_workers": 2,  # 财报取数并发数（免费档批量上限 ≤3）
     },
     "batch_rate_limit": {  # Provider 级别请求间隔（秒），0=不限速
         "tencent": 0.0,

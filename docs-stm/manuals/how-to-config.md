@@ -41,7 +41,8 @@
     "daily_quota": 0,               // 0=按 plan 自动（free=8191，yearly=131071）
     "sections": ["管理层讨论与分析"],  // 取用的财报章节（fuzzy 标题匹配）
     "max_chars": 2000,             // 单股摘要截断长度
-    "doc_types": ["annual", "semiannual"]  // 文种优先级（先年报、后半年报）
+    "doc_types": [],               // 文种白名单：空 = 不限文种（取最新报告期，半年报/季报通常比年报新）
+    "sections": ["管理层讨论与分析"]  // 章节偏好（按顺序在文档实际章节名中子串匹配，命中即取）
   },
 
   // ── D. 市场时段与缓存 ──
@@ -147,7 +148,7 @@
 | `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量 = max(500, news_top_count × 2)，华尔街见闻硬上限 100 条除外） | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
-| `datasink.*` | `{enabled: true, plan: "free", ...}` | DataSinking 数据底座配置：`enabled`（**总开关，默认开**；关闭后所有依赖该底座的分析——财务指标章、真实历史估值分位——**静默回到引入前的报告形态**，不产生任何可感知变化）、`plan`（free/yearly，决定限速与日配额默认值）、`requests_per_second` / `daily_quota`（0=按 plan 自动）、`sections`（取用章节）、`max_chars`（摘要截断）、`doc_types`（文种优先级）。免费档 3 请求/秒、8191 篇/日；仅覆盖 A 股 | 手动编辑 |
+| `datasink.*` | `{enabled: true, plan: "free", ...}` | DataSinking 数据底座配置：`enabled`（**总开关，默认开**；关闭后所有依赖该底座的分析——财务指标章、真实历史估值分位——**静默回到引入前的报告形态**，不产生任何可感知变化）、`plan`（free/yearly，决定限速与日配额默认值）、`requests_per_second` / `daily_quota`（0=按 plan 自动）、`sections`（取用章节）、`max_chars`（摘要截断）、`doc_types`（**文种白名单，空数组 = 不限文种**，默认取最新报告期——半年报/季报通常比年报新）、`sections`（章节**偏好**列表，按顺序在文档实际章节名中子串匹配，季报会自动落到「主要财务数据/主要会计数据」）。免费档 3 请求/秒（触发 429 时自动退避重试一次）、8191 篇/日；仅覆盖 A 股 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s。低于 30s 的值在配置校验时告警，运行时自动钳制到 30s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |

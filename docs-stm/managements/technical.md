@@ -2810,7 +2810,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **数据源与鉴权**：DataSinking（`https://api.datasink.ing`）提供全文本财报 Markdown，仅覆盖 A 股（SSE/SZSE/BSE，代码经 `core/code_utils.py::to_fmp_symbol` 映射为 FMP 风格）。**需用户自备 API key**：凭据取通用密钥文件 `data/config/data_key.json` 的 `datasink` 节（`{"datasink": {"api_key": "..."}}`），环境变量 `DATASINK_API_KEY` 可覆盖；缺 key 时链路主动跳过并给申请指引，章节写占位。
 
-**取数链路**：`fetcher/financial_report.py` 逐标的取元数据（`/documents`，按 `doc_types` 年报优先）→ 逐章节取正文（`/documents/{id}?section=`，每节独立缓存、命中者按声明顺序以空行拼接）→ 按 `datasink.max_chars` 截断为摘要。单篇正文经 `fetch_with_fallback` + 财报域适配器两槽，复用缓存/熔断/降级。
+**取数链路**：`fetcher/financial_report.py` 逐标的取元数据（`/documents`，**不带文种过滤**取最近若干篇后本地按「报告期 → 披露时间」倒序取最新一篇，故半年报/季报优先于年报；`doc_types` 非空时作白名单）→ 取该文档**实际章节名清单**（`/documents/{id}/sections`，缓存于 `report_datasink_sections_`）→ 按 `sections` 偏好子串匹配出**精确章节名**逐个取正文（每节独立缓存、命中者按声明顺序以空行拼接；首选项 404 时继续试下一候选，清单不可得时回退偏好名直取）→ 按 `datasink.max_chars` 截断为摘要。单篇正文经 `fetch_with_fallback` + 财报域适配器两槽，复用缓存/熔断/降级。
 
 **限速与配额护栏**：每次 HTTP 请求前经 `RateLimiter` 以「间隔 = 1/每秒上限」限速（免费档 3 请求/秒；付费档 31）；日配额计数存 `data/state/datasink_quota.json`，超限即停并告警。**免费档无批量端点、必然逐篇请求**，故限速必须落在 provider 每次请求前（批量调度器层挡不住单条调用）。并发取数由 `batch.datasink_workers` 控制（默认 3），速率仍由 provider 兜底。
 

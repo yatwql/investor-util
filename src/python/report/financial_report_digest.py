@@ -92,13 +92,14 @@ def build_financial_report_digest(
     if reporter is not None:
         reporter.info(f"正在获取 {len(targets)} 只 A 股的财报摘要...")
 
-    # 并发取数：worker 数取 config 的 batch.datasink_workers（默认 3，免费档批量上限 ≤3）；
+    # 并发取数：worker 数取 config 的 batch.datasink_workers（默认 2——免费档 3 请求/秒，
+    # 而每标的现为「索引 + 章节清单 + 正文」三次请求，并发过高易触 429）；
     # 每秒速率仍由 provider 层限速器逐请求兜底（线程安全），并发只提高请求管道利用率
     from concurrent.futures import ThreadPoolExecutor
 
     from src.python.fetcher.batch import get_batch_worker_count
 
-    workers = get_batch_worker_count("datasink_workers", 3)
+    workers = get_batch_worker_count("datasink_workers", 2)
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="datasink_reports") as pool:
         records = list(pool.map(lambda t: fetch_symbol_report(t["symbol"], doc_types, sections, max_chars), targets))
 
