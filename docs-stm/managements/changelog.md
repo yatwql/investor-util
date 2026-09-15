@@ -6,6 +6,23 @@
 
 ## [0.10.20-dev] - 开发中（未发布）
 
+### 测试套件冗余审计 + TUI 菜单 [S] 描述修正（2026-09-15）
+
+**测试套件审计**（AST + 收集器双口径，347 个测试文件）：
+- 同文件同体冗余 10 对 → **真冗余 1 对**：`test_tiantian` 的 `test_percentile_only_fallback` 与
+  `test_excellent_top_10pct` 同体同义 → 改为 `test_rank_takes_precedence_over_percentile`
+  （percentile=90 + rank 5/100 → 优秀），既消除同体又**新增「rank/total 优先于 percentile」覆盖**（依
+  `tiantian_ranking` 的矛盾时以排名为准语义）
+- 恒真断言 1 处：`test_logger` 的 `assert True` → 改为捕获 stderr 断言无 `Logging error`（可观测结果）
+- **判定为非冗余（保留）**：跨文件同体 8 组为并行契约（新浪/腾讯各自归一化、各模块缓存后缀开关），
+  每条独立可失败；零断言 37 例经抽样为 `self._assert_*` 辅助断言（检测器假阳性）与 rf-365 已判定的
+  有意 no-op/no-crash 边界覆盖；空体用例 0、不可收集测试 0、同类重名 0
+
+**TUI 菜单 `[S]` 描述**：原「配置LLM分析章节」不能概括该菜单（面板实为「配置 LLM 报告章节与功能开关」，
+含标准 LLM 模块 + 实验性功能 + 常规开关 + 报告章节与增强共 28 项功能开关）→ 描述改为
+「配置功能开关（LLM 分析章节 + 实验性/常规/报告章节与增强开关）」；手册 `how-to-start`（菜单速览）与
+`how-to-use-tui-menu`（主菜单总览 + 该菜单项小节标题）同步。
+
 ### 报告增强子模块并入功能开关注册表（plan-44 完成，不做兼容）（2026-09-15）
 
 - **决定**：按用户要求**不做 config.json 兼容**——注册表成为唯一真源，config.json 重生成，相关程序同步改。
