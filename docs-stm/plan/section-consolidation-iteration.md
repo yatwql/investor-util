@@ -107,13 +107,15 @@
 > 判定口径：**章节层**（注册表键 / 显示名 / 页签名 / HTML 锚点 / partial 名 / 写入器模块与函数）
 > 一律新名；**数据与配置层**（契约键 / 功能开关名 / 缓存前缀 / 数据源类别）保持各自既有语义名。
 
-## 6.6 复盘记录（十轮）
+## 6.6 复盘记录（十轮 —— 已完成）
 
 | 轮次 | 主题 | 发现 | 处置 |
 |:--|:--|:--|:--|
 | 1 | 命名统一性（旧名残留 / 新旧名一致 / type 链） | 新名两文档一致；但 **type 语义化未在设计层写明**、`enable_*` 形参与 `board_flags` 映射链**两文档均未覆盖** | 设计层新增 §3.2「命名统一的下游影响清单」；施工单补 ④-1b 与命名检查白名单 |
 | 2 | 架构约束符合性 | 核实代码侧接缝：两侧 `board_flags` 含旧 type、`_validation.py` 允许集合含旧 type、Web 硬编码含旧名；前端与 TUI 已同源派生（无需改） | 同上批量修复；白名单明确「可见性旗标的语义身份」三处必须严格一致 |
 | 3 | 测试与守卫完备性 | **发现同名混淆**：`market_value`/`category` 在 100+ 测试中是**领域字段/领域模块**（`DetailRow.market_value`、`report/market_value.py`、`report/category.py` 的分类函数），而批次②原施工单写「删除 `report/category.py`」会**破坏领域层**；另发现 `test_features.py` 的 `fund_deep_analysis_fund_*` 字符串在 `src/` 无对应实现（需实施时核对语义） | 修正批次②（只迁移纯章节写入器、领域模块保留）；新增 §6.7「领域层 vs 章节层边界」；测试同步清单改为**区分章节键断言与领域词**并给出精确文件行 |
+| 9 | 跨文档同步面与术语统一 | 同步面远大于计划所列：`technical.md`（含**两处陈旧「报告 19 个模块」**、功能语义命名表需新增三行）、`requirements.md`、`testplan.md`（§4 回归清单）、`folders.md`（**26 处 `financial_indicator` 需甄别**：fetcher/analysis 保留 vs report 章节改名）、`test-coverage.md`，以及 4 份用户文档（README / reports-instruction / how-to-config / faq） | 新增 §6.8「文档同步清单」（管理文档 / 用户文档 / 门禁脚本 / 纪律四类） |
+| 10 | 文档自洽与命名索引关系 | 落地前需保证两文档咬合；`check-semantic-index.py` 正反向校验要求「先改表再改码」 | 新增 §6.9「文档自洽终检」（命名表逐字一致 / 条目数三处一致 / 术语无矛盾 / 未触碰生产代码） |
 | 7 | 批次依赖与可回退性 | ②③④ 共改 7 个文件（registry/两侧可见性/Excel 三处分派/模板/配置模板），**无法任意顺序单独回退**；计划未说明依赖链与版本身份 | 新增 §6.4b「批次依赖与回退矩阵」（依赖链 + 共享文件表 + 逆序回退纪律 + 版本身份） |
 | 8 | 计数一致性与非目标边界 | **硬伤**：④-3/④-4 删除 `fund_manager` 条目对应区块，但 ④-1 未声明删除该条目、④-7/验收仍写「条目数 18」——实际 ④ 含两处合并（财报两章 + 经理并入），应为 **17** | 修正 ④-1（显式删除 `fund_manager` 条目与页签名）、④-7/验收/§6.6b 计数 → 17；非目标边界（LLM 条目不合并）经核对与注册表现状一致，予以保留 |
 | 5 | 接缝完整性（遗漏消费点） | 新增 4 处漏登接缝：`excel_module_loader.py`（模块键 `write_category_sheet`/`write_market_value_sheet` + 错误文案）、`html_writer_display.py`（**反向依赖** `market_value_sheet._weighted_avg_cost`，删模块会 ImportError）、partial 实况（仅 4 个 partial，**只有 M3 需并 partial**）、`chart_data_builder` 图键不变但图归属变；`features.py` 两开关名保留 | 接缝地图补 6 行；批次② 补 ②-4b/②-4c；批次④ 补 partial 实况；新增 §7.5 风险补充（3 条） |
@@ -157,6 +159,45 @@
 | **章节层** | 注册表键 / 显示名 / 页签名 / HTML 锚点与 partial / **纯章节写入器**（`market_value_sheet.py::write_market_value_sheet`、`category.py::write_category_sheet`、`position_relationship_sheet.py`、`fund_concentration_sheet.py`、`fund_manager_sheet.py`、`financial_indicator_sheet.py`、`financial_report_sheet.py`） | **改名/迁移**（新名见 §1 总表） |
 | **领域层** | `report/market_value.py`（`DetailRow`/`classify_holdings`/`_compute_premium`/`is_market_open`）、`report/category.py`（`_categorize_holding`/`_tier_label`/`build_category_data_status`/`calc_yield_text`）、`analysis/*` 的 `market_value` 字段 | **保留**——领域概念（市值/分类）与报告章节同词不同义；批量替换会破坏 100+ 处生产与测试引用 |
 | **缓存类型域** | `core/registry.py::get_exact_type_map()` 的 `fund_manager_snapshot`/`fund_concentration_snapshot`（缓存 data_type 精确映射） | **不改**——它映射的是**缓存类型**（快照缓存），与报告章节无关；合并后这两个数据能力不变 |
+
+## 6.8 文档同步清单（第 9 轮复盘新增，每批收尾必查）
+
+**A. 管理文档**
+
+| 文档 | 同步点 |
+|:--|:--|
+| `technical.md` | 章节名与条目数表述（**两处陈旧的「报告 19 个模块」→ 新条目数**；「报告模块注册表约束」条目中的模块数表述）；**「功能语义命名表」新增三行**（`holdings_detail` / `position_structure` / `fundamental_snapshot`），且必须**先改表再改码** |
+| `requirements.md` | 相关功能条目中的章节名（本仓 `market_value`/`category`/`financial_indicator` 等命中处） |
+| `testplan.md` | §4 回归清单新增「章节合并后逐表/逐区块比对」项 |
+| `folders.md` | 目录树增删 report 模块（新增 `holdings_detail_sheet.py`/`position_structure_sheet.py`/`fundamental_snapshot_sheet.py`，删除被并方）+ 统计表刷新；**必须区分** fetcher/analysis 的 `financial_indicator*`（**保留**）与 report 章节模块（改名/删除） |
+| `test-coverage.md` | 测试文件重命名后的计数刷新（收尾跑 `collect-test-coverage.py`） |
+
+**B. 用户文档**（章节清单直接面向用户，全部需同步）
+
+- `README.md`（章节清单）、`manuals/reports-instruction.md`（各章节表格与说明）、`manuals/how-to-config.md`（`report_section_order` 示例与章节表）、`manuals/faq.md`（章节名出现处）
+
+**C. 门禁脚本与索引**
+
+- `scripts/check-semantic-index.py` 依赖 `technical.md` 的「功能语义命名表」做正/反向一致校验 → 表与代码必须同步落地（先表后码）
+- `src/test/unit/scripts/test_check_semantic_index.py` 的合并章标识符断言需随新名更新
+- `src/test/unit/core/test_registry.py:250` 的条目数断言（每批 -1；④ -2）
+
+**D. 纪律**
+
+- 用户文档与管理文档一律使用**新显示名**；历史 `changelog.md` 与 `archive/**` **不改写**
+- 每批提交前跑：`.venv/bin/python scripts/check-doc-traces.py --ci`（防陈旧表述）与 `check-semantic-index.py --ci`
+
+## 6.9 文档自洽终检（第 10 轮复盘）
+
+十轮复盘的收尾动作——两文档落地前互相咬合：
+
+| 检查项 | 要求 |
+|:--|:--|
+| 两张命名表 | 设计层 §1 与实施层 §1 的新/旧名映射**逐字一致** |
+| 批次编号与条目数 | 施工单（②③④）、守卫表 §6.6b、各批「验收」行的条目数与页签/章节增减**三处一致**（21→20→19→17） |
+| 「共 N 项」表述 | `registry.py` docstring、`technical.md` 的注册表约束条目、`test_registry.py:250` 断言**三处一致**（收尾步骤已列） |
+| 分层面术语 | §6.5（可保留旧名白名单）与 §6.7（领域层/章节层/缓存类型域）**无矛盾**；契约键在两表中口径一致 |
+| 回溯性 | 每个「整改」仅改写计划文档，**未触碰任何生产代码**（四批实施另起提交） |
 
 ## 7. 收尾（每批之后 + 全部完成后）
 
