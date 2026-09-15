@@ -222,7 +222,6 @@ investor-util/
 │   │   │   ├── fund_performance.py   #   基金业绩分析（排名/回撤/超额收益）
 │   │   │   ├── fund_candidate.py     #   候选基金比较（基金业绩分析章候选比较子表数据构建，candidate_compare 默认关）
 │   │   │   ├── fund_concentration.py #   基金持仓集中度分析
-│   │   │   ├── fund_concentration_sheet.py # 集中度 Excel 页签
 │   │   │   ├── fund_manager_analysis.py # 基金经理分析
 │   │   │   ├── fund_manager_sheet.py #   基金经理 Excel 页签
 │   │   │   ├── position_overlap.py   #   基金持仓重叠分析（重合度计算引擎）
@@ -243,7 +242,7 @@ investor-util/
 │   │   │   ├── signal_record.py      #   确定性信号沉淀适配器（五类评级→账本记录，含实时-非实时来源标注，实验开关 signal_ledger）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── portfolio_history_drawdown_sheet.py # 组合历史走势与回撤 Excel 页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注）
-│   │   │   ├── position_relationship_sheet.py # 持仓关系矩阵 Excel 页签（一章两区块：重合度 + 相关性）
+│   │   │   ├── position_structure_sheet.py # 持仓结构与集中度 Excel 页签（一章三区块：重合度 + 相关性 + 集中度）
 │   │   │   ├── _history_quality.py   #   历史走势数据质量校验
 │   │   │   ├── history_snapshot.py   #   持仓快照管理（保留 60 天）
 │   │   │   ├── holdings_freshness.py #   基金持仓报告期时效判定（完整季度数口径 + 陈旧阈值）
@@ -616,7 +615,6 @@ investor-util/
 │       │   │   ├── test_fund_deep_analysis_sheet_edge.py # 基金深度分析页签边缘场景
 │       │   │   ├── test_fund_candidate.py         #   候选基金比较测试（基金业绩分析章候选比较子表）
 │       │   │   ├── test_fund_concentration.py     #   基金集中度测试
-│       │   │   ├── test_fund_concentration_sheet.py # 集中度 Excel 页签测试（报告期列/环比语义/陈旧标记）
 │       │   │   ├── test_fund_manager_analysis.py  #   基金经理分析测试
 │       │   │   ├── test_fund_manager_sheet.py     #   基金经理页签测试
 │       │   │   ├── test_position_overlap.py       #   持仓重合度计算测试
@@ -628,7 +626,7 @@ investor-util/
 │       │   │   ├── test_snapshot_namespace_consumers.py    #   快照命名空间消费方测试
 │       │   │   ├── test_style_factor_sheet.py     #   风格与因子分析页签呈现（一章三区块：风格表+因子回归+行业 Beta）
 │       │   │   ├── test_correlation_html.py       #   持仓关系矩阵章节（相关性/重合度区块）HTML 呈现
-│       │   │   ├── test_correlation_sheet.py      #   持仓关系矩阵页签（一章两区块）Excel 呈现
+│       │   │   ├── test_position_structure_sheet.py # 持仓结构与集中度页签（三区块 + 合并等价 + OR 可见性）
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
 │       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现
 │       │   │   ├── test_financial_report_digest.py #   持仓个股财报摘要章节装配（降级契约/文种标签/披露日/失败清单）

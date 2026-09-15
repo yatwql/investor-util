@@ -1,15 +1,16 @@
-"""持仓关系矩阵 Excel 写入模块 — 持仓重合度 + 持仓相关性合一页签（一章两区块）。
+"""持仓结构与集中度 — Excel 写入层（一章三区块）。
 
 输出内容：
   一、持仓重合度矩阵（基金×基金对称矩阵 + 配对明细）—— 数据不足时写占位
   二、持仓相关性矩阵（品种×品种下三角矩阵 + 配对明细 + 说明）—— 数据不足时写占位
+  三、持仓集中度监控（前3/5/10 占比 + 环比变化 + 预警）—— 无数据时写占位
 
-任一区块数据不足时该区块独立降级（§1.4.5），互不影响；
-两区块均无数据时整页写占位。
+各区块数据不足时独立降级（§1.4.5），互不影响；区块一二的可见性为
+`position_relationship_data`（重合度 ∪ 相关性），区块三为 `concentration_data`，
+章节整体按注册表 `data_flag_any` 的 OR 口径显示。
 
-配色说明：
-  重合度区块热力图：>50% 红 / 30-50% 橙 / 15-30% 黄 / >0 绿；
-  相关性区块与 HTML 模板保持一致（红=正相关 / 蓝=负相关 / 白=不显著 / 灰=N/A）。
+配色：重合度热力图（>50% 红 / 30-50% 橙 / 15-30% 黄 / >0 绿）；
+相关性热力格与 HTML 模板一致（红=正相关 / 蓝=负相关 / 白=不显著 / 灰=N/A）。
 """
 
 from __future__ import annotations
@@ -30,9 +31,11 @@ from src.python.report.excel_writer import (
     write_header_row,
     write_title_row,
 )
-from src.python.report.styles import NOTE_FONT
+from src.python.report.styles import NOTE_FONT, NORMAL_FONT
 
 logger = logging.getLogger("invest")
+
+__all__ = ["write_position_structure_sheet"]
 
 # ── 重合度区块热力图颜色 ───────────────────────────────────────
 
@@ -318,17 +321,126 @@ def _write_correlation_block(
     return row
 
 
+# ── 集中度区块 ─
+
+_CONC_NCOLS = 11
+_CONC_HEADERS = [
+    "基金名称",
+    "基金代码",
+    "报告期",
+    "基金类型",
+    "前3占比%",
+    "前5占比%",
+    "前10占比%",
+    "上期前10占比%",
+    "环比变化",
+    "预警级别",
+    "标识",
+]
+
+# ── 预警字体 ────────────────────────────────────────────────
+
+_ALERT_FONTS: dict[str, Font] = {
+    "紧急": Font(color="CC0000"),
+    "关注": Font(color="FF8C00"),
+    "正常": Font(color="008000"),
+}
+
+
+def _alert_font(level: str) -> Font:
+    return _ALERT_FONTS.get(level, NORMAL_FONT)
+
+
+def _change_label(change_pct: float | None, period_unchanged: bool = False) -> str:
+    """生成环比变化标签。"""
+    if period_unchanged:
+        return "无对比意义"
+    if change_pct is None:
+        return "基线已记录"
+    sign = "+" if change_pct >= 0 else ""
+    arrow = "↑" if change_pct > 0 else "↓" if change_pct < 0 else "→"
+    return f"{arrow} {sign}{change_pct:.2f}%"
+
+
+def _flag_label(is_first: bool, alert_level: str, period_unchanged: bool = False) -> str:
+    """生成标识列文本。"""
+    if is_first:
+        return "📋 基线已记录"
+    if period_unchanged:
+        return "⎯ 报告期未推进"
+    if alert_level == "紧急":
+        return "🔴 紧急"
+    if alert_level == "关注":
+        return "⚠️ 关注"
+    return "✅ 正常"
+
+
+# ── 区块三：持仓集中度 ──────────────────────────────────────
+
+
+def _write_concentration_block(
+    ws: Worksheet,
+    row: int,
+    concentration_data: list[dict[str, Any]] | None,
+) -> int:
+    """写入区块三「持仓集中度监控」，返回下一行起始行号。
+
+    报告期列标注本期持仓所依据的定期报告期次；报告期与上期相同的基金环比无
+    对比意义（本次与上期读的是同一份报告），据实标注而非报 0。
+    """
+    parent_row = write_title_row(ws, row, "三、持仓集中度监控", ncols=_CONC_NCOLS)
+    row = write_header_row(ws, parent_row, _CONC_HEADERS)
+
+    if not concentration_data:
+        row = _write_placeholder(ws, STATUS_MESSAGES["concentration_unavailable"], row=row + 1, max_cols=_CONC_NCOLS)
+        logger.info("持仓集中度区块：无数据，写入占位")
+        return row
+
+    for item in concentration_data:
+        is_first = item.get("is_first_check", False)
+        alert = item.get("alert_level", "正常")
+        row_font = _alert_font(alert)
+        change_pct = item.get("change_pct")
+        period_unchanged = item.get("period_unchanged", False)
+        report_period = item.get("report_period", "")
+        if item.get("report_stale"):
+            report_period = f"{report_period}（陈旧）"
+
+        row_data = [
+            item.get("name", ""),
+            item.get("code", ""),
+            report_period,
+            "",  # 基金类型（暂无细分类别）
+            item.get("top3_pct", 0),
+            item.get("top5_pct", 0),
+            item.get("top10_pct", 0),
+            item.get("prev_top10_pct", "--") if item.get("prev_top10_pct") is not None else "—",
+            _change_label(change_pct, period_unchanged),
+            alert,
+            _flag_label(is_first, alert, period_unchanged),
+        ]
+        write_data_row(ws, row, row_data)
+        # 对整行应用颜色字体
+        for col in range(1, _CONC_NCOLS + 1):
+            ws.cell(row=row, column=col).font = row_font
+        row += 1
+
+    logger.info("持仓集中度区块写入完成: %d 条", len(concentration_data))
+    return row
+
+
 # ── 页签入口 ─────────────────────────────────────────────────
 
 
-def write_position_relationship_sheet(
+def write_position_structure_sheet(
     ws: Worksheet,
     overlap_result: dict[str, Any] | None = None,
     fund_names: dict[str, str] | None = None,
     correlation_data: dict[str, Any] | None = None,
     stale_fund_notes: list[str] | None = None,
+    concentration_data: list[dict[str, Any]] | None = None,
 ) -> None:
-    """写入持仓关系矩阵页签（一章两区块：持仓重合度 + 持仓相关性）。
+    """写入持仓结构与集中度页签（一章三区块）。
 
     Args:
         ws: openpyxl Worksheet 对象
@@ -337,15 +449,19 @@ def write_position_relationship_sheet(
         correlation_data: `position_relationship_data` 契约 dict（相关性区块数据源）；
             None 或 available=False 时相关性区块写占位。
         stale_fund_notes: 因报告期陈旧而被剔除出重合度矩阵的基金标注文本；空则不写提示行。
+        concentration_data: compute_concentration() 的返回结果（集中度区块数据源）；
+            None 或空列表时集中度区块写占位。
     """
-    _name = get_report_sheet_name("position_relationship")
+    _name = get_report_sheet_name("position_structure")
     ncols = _compute_ncols(overlap_result, correlation_data)
     write_title_row(ws, 1, _name, ncols=ncols)
 
     row = 2
     row = _write_overlap_block(ws, row, overlap_result, fund_names, ncols, stale_fund_notes)
     row = _write_correlation_block(ws, row, correlation_data, ncols)
+    row += 1
+    _write_concentration_block(ws, row, concentration_data)
 
     freeze_header(ws, row=2)
     auto_width(ws, min_width=10, max_width=30)
-    logger.info("持仓关系矩阵页签写入完成")
+    logger.info("持仓结构与集中度页签写入完成")

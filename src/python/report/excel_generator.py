@@ -272,6 +272,13 @@ def generate_excel_report(
     data_availability["financial_report_digest_data"] = financial_report_digest_data is not None
     # 财务指标：数据缺失（无 A 股标的/数据源不可用）时隐藏该页签
     data_availability["financial_indicator_data"] = financial_indicator_data is not None
+    # 持仓结构与集中度（合并章节，data_flag_any 两契约 OR）：基金深度分析开启时，
+    # 重合度/集中度均由下游计算（数据不足时区块各自写占位），故两契约均视为就绪；
+    # 关闭时由 board 层（fund_deep_analysis）隐藏，与 HTML 侧口径一致。
+    data_availability["position_relationship_data"] = (
+        enable_fund_deep_analysis or (pipeline_data or {}).get("position_relationship_data") is not None
+    )
+    data_availability["concentration_data"] = enable_fund_deep_analysis
 
     sheets = create_sheets(
         wb,

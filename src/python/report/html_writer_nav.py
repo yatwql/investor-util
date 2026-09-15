@@ -35,8 +35,7 @@ _SECTION_NAV_GROUP_MAP: dict[str, str] = {
     # 基金深度分析：基金业绩 + 基金深度分析系列章节
     "fund_performance": "fund_deep",
     "fund_manager": "fund_deep",
-    "position_relationship": "fund_deep",
-    "fund_concentration": "fund_deep",
+    "position_structure": "fund_deep",
     "style_factor": "fund_deep",
     # 行动建议：再平衡信号/交易纪律/调仓建议/收益归因（决策建议，非风险章节）
     "action": "action",

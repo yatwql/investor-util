@@ -120,23 +120,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("持仓重合度计算模块缺失 (position_overlap)")
 
     try:
-        from src.python.report.position_relationship_sheet import write_position_relationship_sheet
+        from src.python.report.position_structure_sheet import write_position_structure_sheet
 
-        modules["write_position_relationship_sheet"] = write_position_relationship_sheet
+        modules["write_position_structure_sheet"] = write_position_structure_sheet
     except ImportError:
-        modules["write_position_relationship_sheet"] = None
-        prog.add_error("持仓关系矩阵模块缺失 (position_relationship)")
-
-    try:
-        from src.python.report.fund_concentration import compute_concentration
-        from src.python.report.fund_concentration_sheet import write_concentration_sheet
-
-        modules["compute_concentration"] = compute_concentration
-        modules["write_concentration_sheet"] = write_concentration_sheet
-    except ImportError:
-        modules["compute_concentration"] = lambda _fh: []
-        modules["write_concentration_sheet"] = None
-        prog.add_error("持仓集中度监控模块缺失 (fund_concentration)")
+        modules["write_position_structure_sheet"] = None
+        prog.add_error("持仓结构与集中度写入模块缺失 (position_structure)")
 
     try:
         from src.python.report.fund_style_report import analyze_style_for_all_funds

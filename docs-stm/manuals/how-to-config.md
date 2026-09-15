@@ -214,7 +214,7 @@
 
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
-| `enable_fund_deep_analysis` | `true` | `config.json` | 基金经理变更监控、持仓关系矩阵、持仓集中度监控、风格与因子分析 | 基金深度分析章节组 |
+| `enable_fund_deep_analysis` | `true` | `config.json` | 基金经理变更监控、持仓结构与集中度、风格与因子分析 | 基金深度分析章节组 |
 | `enable_news` | `true` | `config.json` | 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
 | `enable_history` | `true` | `config.json` | 组合历史走势与回撤 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
 | `enable_portfolio_evolution` | `true` | `config.json` | 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
@@ -403,7 +403,7 @@
 | 键 | 模块标识 | 报告模块的唯一标识，见下方列表 |
 | 值 | 正整数 | 显示序号（1~99），决定该模块在报告中的视觉位置 |
 
-**18 个模块标识及默认顺序：**
+**15 个模块标识及默认顺序：**
 
 | 默认序号 | 模块标识 | 显示名称 | 类型 |
 |:--------:|:---------|:---------|:-----|
@@ -412,19 +412,18 @@
 | 3 | `penetration` | 资产穿透TOP10 | 始终显示 |
 | 4 | `fund_performance` | 基金业绩分析 | 始终显示 |
 | 5 | `fund_manager` | 基金经理变更监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 6 | `position_relationship` | 持仓关系矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章两区块：重合度 + 相关性） |
-| 7 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 8 | `style_factor` | 风格与因子分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） |
-| 9 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
-| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
-| 11 | `global_macro` | 全球政经局势 | LLM |
-| 12 | `expert_review` | 智囊团深度复盘 | LLM |
-| 13 | `health_check` | 持仓体检报告 | LLM |
-| 14 | `penetration_deep` | 穿透深度分析 | LLM |
-| 15 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
-| 16 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 17 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
-| 18 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 6 | `position_structure` | 持仓结构与集中度 | 基金深度分析（enable_fund_deep_analysis 控制；一章三区块：重合度 + 相关性 + 集中度，任一区块有数据即显示） |
+| 6 | `style_factor` | 风格与因子分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） |
+| 7 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 8 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
+| 9 | `global_macro` | 全球政经局势 | LLM |
+| 10 | `expert_review` | 智囊团深度复盘 | LLM |
+| 11 | `health_check` | 持仓体检报告 | LLM |
+| 12 | `penetration_deep` | 穿透深度分析 | LLM |
+| 13 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
+| 14 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
+| 15 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
+| 16 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 
@@ -442,7 +441,7 @@
 }
 ```
 
-> 效果：基金经理/持仓关系矩阵/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
+> 效果：基金经理/持仓结构与集中度/风格 3 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
 > 空对象 `{}` 或缺失此字段时使用上述 19 项默认顺序。
 >

@@ -59,6 +59,10 @@ class TestReportChapterConsistency(unittest.TestCase):
                 data_availability["news_data_available"] = True
             if llm:
                 data_availability["llm_data_available"] = True
+            # 合并章节「持仓结构与集中度」：两契约 OR（基金深度分析开启时下游计算占位）
+            if fund_deep:
+                data_availability["position_relationship_data"] = True
+                data_availability["concentration_data"] = True
         sheets = create_sheets(
             wb,
             order,
@@ -273,9 +277,8 @@ class TestReportChapterConsistency(unittest.TestCase):
         self.assertEqual(excel_keys, html_keys, "显式数据缺口下两端可见集合应一致")
         for hidden in (
             "fund_manager",
-            "fund_concentration",
             "style_factor",
-            "position_relationship",
+            "position_structure",
             "portfolio_evolution",
         ):
             self.assertNotIn(hidden, excel_keys, f"Excel 不应创建缺数据页签 {hidden}")

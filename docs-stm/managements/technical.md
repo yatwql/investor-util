@@ -1724,8 +1724,9 @@ for sec in section_order:
 |:----------|:---------|:-----------------|:------|
 | `None` | 始终可见 | `always` / `history` | 不依赖数据状态 |
 | `manager_data` | `manager_analysis is not None` | `fund_deep_analysis` | 基金经理变更监控 |
-| `position_relationship_data` | `overlap_matrix is not None or position_relationship_data is not None` | `fund_deep_analysis` | 持仓关系矩阵（重合度 + 相关性一章两区块） |
-| `concentration_data` | `concentration_analysis is not None` | `fund_deep_analysis` | 持仓集中度监控 |
+| `position_relationship_data` | `overlap_matrix is not None or position_relationship_data is not None` | `fund_deep_analysis` | 持仓结构与集中度·区块一/二（重合度 + 相关性） |
+| `concentration_data` | `concentration_analysis is not None` | `fund_deep_analysis` | 持仓结构与集中度·区块三（集中度） |
+| （`position_structure` 用 `data_flag_any`） | 上述两者任一就绪（OR，悲观判定） | `fund_deep_analysis` | 合并章节：任一区块有数据即显示（见「持仓结构与集中度」） |
 | `style_factor_data` | `style_factor_data is not None or style_analysis is not None` | `fund_deep_analysis` | 风格与因子分析（风格表 + 因子回归 + 行业 Beta 一章三区块） |
 | `evolution_data` | `evolution_data is not None` | `evolution` | 组合演进（多快照趋势） |
 | `news_data_available` | `include_news` flag（新闻数据可用） | `news` | 新闻关联分析 |
@@ -1992,11 +1993,11 @@ prune()：两阶段自动清理
                          │
               ┌──────────┴──────────┐
               │                     │
-        基金经理变更监控        持仓关系矩阵
+        基金经理变更监控      持仓结构与集中度
         快照比对检测          重合度+相关性一章两区块
               │               Jaccard+重叠率 / Pearson+显著性
               │
-        持仓集中度监控          风格与因子分析
+        风格与因子分析
         TOP N 占比+环比       一章三区块
               │              风格表+因子回归+行业Beta
               │              OLS 回归风格画像
@@ -2024,9 +2025,9 @@ fund_manager_snapshot 快照（精确键名，每日更新）
 - 每个基金独立判断，互不干扰
 - 快照使用精确键名（`fund_manager_snapshot`），无指纹后缀，每日 TTL 过期自动刷新
 
-#### 持仓关系矩阵
+#### 持仓结构与集中度
 
-一章两区块合一页签（`report/position_relationship_sheet.py`）：**一、持仓重合度矩阵**（基金×基金 Jaccard + 配对明细）；**二、持仓相关性矩阵**（品种×品种 Pearson 下三角矩阵 + 配对明细 + 说明）。任一区块数据不足时该区块独立降级（§1.4.5），互不影响；两区块均无数据时整页写占位。章节可见性由 `position_relationship_data` 判定：`overlap_matrix is not None or position_relationship_data is not None`（二者任一有数据即渲染章节）。
+一章三区块合一页签（`report/position_structure_sheet.py::write_position_structure_sheet`）：**一、持仓重合度矩阵**（基金×基金 Jaccard + 配对明细）；**二、持仓相关性矩阵**（品种×品种 Pearson 下三角矩阵 + 配对明细 + 说明）；**三、持仓集中度监控**（前3/5/10 占比 + 环比变化 + 三级预警）。任一区块数据不足时该区块独立降级（§1.4.5），互不影响。章节可见性由注册表 `data_flag_any=("position_relationship_data","concentration_data")` 判定（OR，悲观：两契约都未登记时不建页签/不渲染章节）。
 
 重合度计算（`position_overlap.py::compute_overlap_matrix`，双指标）：
 
@@ -2044,11 +2045,11 @@ Excel 热力图着色：
     0%     → 无着色
 ```
 
-触发条件：持仓中基金数量 ≥ 2 只。相关性区块数据契约见附录 H（C19 契约）（`position_relationship_data`，11 键）。
+触发条件：持仓中基金数量 ≥ 2 只（区块一）；区块三由 `report/fund_concentration.py::compute_concentration` 计算。相关性区块数据契约见附录 H（C19 契约）（`position_relationship_data`，11 键）。
 
 **报告期时效**：重合度按市值加权，陈旧快照的权重与当期脱节最重，故**报告期陈旧的基金不进入矩阵**（口径见 `report/holdings_freshness.py`），被剔除者逐只在矩阵上方标注报告期与已过季度数——读者若发现某只基金缺席矩阵而无说明，只会以为矩阵算错了。风格分析与候选比较按模块语义保留陈旧数据并标注报告期（比例/分类口径不受市值时点影响）。
 
-#### 持仓集中度监控
+#### 持仓结构与集中度·区块三（持仓集中度监控）
 
 基于持仓 TOP N 占比 + 环比变化（`fund_concentration.py`）：
 
@@ -3019,7 +3020,7 @@ class DataModuleDef:
 | 精确键名（refresh/无分组） | 3 | benchmark、tracking、calendar |
 | 历史走势（无分组） | 3 | history_stock、history_fund_otc、history_index |
 
-> 注：`position_relationship`（持仓关系矩阵）为报告章节（#7，运行时从 fund_hold 推导），**非**缓存数据模块，故不计入上表。
+> 注：`position_structure`（持仓结构与集中度）为报告章节（#6，运行时从 fund_hold 推导），**非**缓存数据模块，故不计入上表。
 
 #### 计算模块注册表（`_COMPUTATION_REGISTRY`）
 
@@ -3192,6 +3193,8 @@ make_http_client(timeout=10.0) → httpx.Client
 |:--|:--|:--|:--|:--|
 | `holdings_detail` | 持仓明细与分类（合并章：市值核算明细区块 + 持仓分类汇总区块同页签呈现） | 持仓明细与分类 | 报告输出 | 始终显示（type=always） |
 | `holdings_detail_sheet` | 合并章 Excel 写入器（`write_holdings_detail_sheet`；区块写入器 `_write_market_value_block` / `_write_category_block`） | 持仓明细与分类 | 报告输出 | 无（渲染） |
+| `position_structure` | 持仓结构与集中度（合并章：重合度区块 + 相关性区块 + 集中度区块同页签呈现；可见性 `data_flag_any` OR） | 持仓结构与集中度 | 报告输出 | 基金深度分析（`enable_fund_deep_analysis` 控制） |
+| `position_structure_sheet` | 合并章 Excel 写入器（`write_position_structure_sheet`；区块写入器 `_write_overlap_block` / `_write_correlation_block` / `_write_concentration_block`） | 持仓结构与集中度 | 报告输出 | 无（渲染） |
 | `candidate_compare` | 候选基金比较 | 基金业绩分析 | 买入/选基 | 功能开关 `candidate_compare`（默认关） |
 | `valuation_percentile` | 估值分位 | 资产穿透TOP10 | 买入/选基 | 功能开关 `valuation_percentile`（默认关） |
 | `market_temperature` | 市场温度 | 投资分析汇总 | 买入/选基 | 功能开关 `market_temperature`（默认关） |
@@ -3275,7 +3278,7 @@ make_http_client(timeout=10.0) → httpx.Client
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 
-> **合并章代码标识符**：三个合并章 sheet key 统一为语义名——`position_relationship`（持仓关系矩阵，合并 `fund_overlap` + `correlation_analysis`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号命名。
+> **合并章代码标识符**：合并章 sheet key 统一为语义名——`holdings_detail`（持仓明细与分类，合并 `market_value` + `category`）、`position_structure`（持仓结构与集中度，合并 `position_relationship` + `fund_concentration`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号命名。
 <!-- semantic-index:end -->
 
 > **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~19（被合并的 key 已删除、`action` 章已插入，保持其余相对顺序）；被合并的 key（`fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure`）在用户 config `report_section_order` 中已失效，可清理（`config/_validation.py` 对未知 key 仅告警不报错）。
@@ -3687,7 +3690,7 @@ investor-util/
 
 > `style_factor_data`（风格与因子分析，C19 契约，13 键 + 内嵌 `industry_beta` 子键）：主键 `{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/style_factor_regression.py` 计算、`report/orchestrator.py` 组装。子键 `industry_beta`（行业 Beta，`industry_beta.py::compute_industry_beta_analysis`，开关 功能开关 `industry_beta` 默认关；关闭 → None → 区块隐藏）：`{"available": bool, "exposure": {industry: float}, "index_codes": {industry: str}, "betas": {industry: float}, "t_stats": {industry: float}, "significant": {industry: bool}, "correlations": {industry: float}, "unmapped_industries": list[str]}`——行业暴露占比按持仓市值聚合，行业指数为中证行业指数（`INDUSTRY_INDEX_MAP`），β 复用 `compute_factor_exposure` 单因子 OLS。C7 注册见 §8.3（type=`fund_deep_analysis`、data_flag=`style_factor_data`），计算方案/架构约束/降级分支见 §4.8 风格与因子分析。
 
-> `position_relationship_data`（持仓关系矩阵·相关性区块数据，C19 契约，11 键）：`{"available": bool, "status": str, "window": int, "sample_count": int, "codes": list[str], "names": {code: str}, "matrix": list[list[float\|None]], "p_values": list[list[float\|None]], "pairs": list[dict], "insufficient_codes": list[str], "note": str}`。下三角矩阵（row>col 有值、对角=1.0、上三角 None），配对明细含 code_a/name_a/code_b/name_b/pearson/p_value/significant/samples。由 `analysis/correlation.py` 计算、`report/orchestrator.py::compute_correlation_data` 注入，作为「持仓关系矩阵」的二、相关性区块数据源（一章两区块，见 §4.8 持仓关系矩阵）。C7 注册见 §8.3（type=`fund_deep_analysis`、data_flag=`position_relationship_data`，章节可见性 = `overlap_matrix is not None or position_relationship_data is not None`），数据不足（重叠样本 <60 / 品种 <2）落 §1.4.5 降级。
+> `position_relationship_data`（持仓关系矩阵·相关性区块数据，C19 契约，11 键）：`{"available": bool, "status": str, "window": int, "sample_count": int, "codes": list[str], "names": {code: str}, "matrix": list[list[float\|None]], "p_values": list[list[float\|None]], "pairs": list[dict], "insufficient_codes": list[str], "note": str}`。下三角矩阵（row>col 有值、对角=1.0、上三角 None），配对明细含 code_a/name_a/code_b/name_b/pearson/p_value/significant/samples。由 `analysis/correlation.py` 计算、`report/orchestrator.py::compute_correlation_data` 注入，作为「持仓结构与集中度」的区块二（相关性）数据源（一章三区块，见 §4.8 持仓结构与集中度）。C7 注册见 §8.3（type=`fund_deep_analysis`；旧条目 data_flag=`position_relationship_data` 现并入合并章 `position_structure` 的 `data_flag_any`，章节可见性 = 重合度/相关性/集中度任一就绪），数据不足（重叠样本 <60 / 品种 <2）落 §1.4.5 降级。
 
 > `evolution_data`（组合演进，C19 契约，多快照趋势聚合）：`{"available": bool, "snapshot_count": int, "min_snapshots": int, "periods": list[str], "total_value": list[float], "total_cost": list[float], "total_pnl": list[float], "holding_counts": list[int], "account_flows": {account: list[float]}, "hhi": list[float\|None], "top_holdings": list[dict], "reason": str}`。`top_holdings` 每项含 code/name/weights（各期占比 %）/present_count（出现期数）；历史快照 `market_value=0.0` 时权重回退成本口径。由 `analysis/portfolio_evolution.py` 计算、`report/orchestrator.py` 注入（C7 注册 type=`evolution`、data_flag=`evolution_data`，见 §4.12），有效快照 < MIN_SNAPSHOTS=3 时 `available=false` 落 §1.4.5 降级。
 

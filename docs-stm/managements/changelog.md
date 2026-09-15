@@ -6,6 +6,32 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### plan-45 章节整合·批次③ `position_structure` 实施（2026-09-16）
+
+**目标**：把「持仓关系矩阵」与「持仓集中度监控」两章合并为同页签三区块的新章 `position_structure`「持仓结构与集中度」（注册表条目 20 → 19，零 alias）。
+
+**注册表与可见性（多契约 OR）**
+- 删除 `position_relationship`/`fund_concentration` 两条，新增 `position_structure`（`type=fund_deep_analysis`、`data_flag=None`、`data_flag_any=("position_relationship_data","concentration_data")`、序号 6），其后序号整体 −1（19 条连续 1..19）；`_REPORT_SHEET_NAMES` 同步；docstring 计数 20 → 19
+- `html_writer_nav._SECTION_NAV_GROUP_MAP` → `position_structure: fund_deep`（可见性 OR 复用批次①的 `data_flag_any` 模型）
+- **Excel 侧契约 flag 同步登记**（rf-367）：`excel_generator` 按与 HTML 同口径写入 `position_relationship_data`/`concentration_data`——否则 `data_flag_any` 的悲观口径会使页签恒不创建
+
+**Excel / HTML 渲染**
+- 新增 `report/position_structure_sheet.py::write_position_structure_sheet`（区块① 持仓重合度矩阵 + 配对明细；区块② 持仓相关性矩阵（下三角 + 配对 + 说明）；区块③ 持仓集中度监控（11 列 + 预警着色）），供数入参 `concentration_data` 新增；删除 `report/position_relationship_sheet.py` 与 `report/fund_concentration_sheet.py`（领域计算 `position_overlap.py`/`fund_concentration.py` 保持不动）
+- `excel_fund_deep_analysis` 两处分派合并为 `sheets.get("position_structure")` 一次调用（两契约数据独立组装、各自异常隔离、区块级降级），`excel_module_loader` 装配键改 `write_position_structure_sheet`
+- `report_template.html`：两个 `div.section` 合并为 `sec-position_structure`，区块小节标题改 `.block-title`（一、持仓重合度矩阵 / 二、持仓相关性矩阵 / 三、持仓集中度监控）；进入章节先归一 `overlap_matrix`（`or {}`），集中度数据在缺失时按空列表降级
+- `data/config/config.json` 的 `report_section_order` 重生成（`position_structure`=6，其余 −1，共 16 项显式列出 + llm_usage 末位）
+
+**测试（新增/同步）**
+- `test_correlation_sheet.py` → `test_position_structure_sheet.py`（区块二用例改调 orchestrator；集中度区块用例自 `test_fund_concentration_sheet.py` 迁入并改调 `_write_concentration_block`）；新增 `TestWritePositionStructureSheet`：首行章名 + 三区块小节标题同页签、**内容等价**（各区块行值与独立写入逐一相等）、仅有关系数据/仅有集中度数据两侧的 OR 降级
+- `test_section_visibility.py` 增合并章 OR 三例（仅 `position_relationship_data` 就绪可见 / 仅 `concentration_data` 就绪可见 / 两者皆无隐藏）；`test_registry` 放宽「非 always 类型须有 data_flag」为「data_flag 或 data_flag_any」（多契约模型）
+- 章节键断言同步：条目数 20→19、HTML 容器/导航/目录 15→14、Excel 页签数 16→15；集成一致性测试镜像补两契约 flag
+
+**文档同步**：`technical.md`（可见性旗标表改三区块 + `data_flag_any` 行、§4.x 章节叙述、缓存表注、合并章注同步为四个合并章、功能语义命名表新增 2 行、基金深度块图）、`requirements.md`（§6.3 表与 §6.4 章节定义合并 + 小节序号 −1）、`testplan.md`、用户文档 5 份（章节表与计数）、`folders.md`（目录树）、`plan.md`（批次③ 已实施）
+
+**实施期自查**：`rf-367` —— 合并章 `data_flag_any` 与 Excel 侧 `data_availability` 未登记的组合会使页签被悲观判定隐藏（integration 两侧一致性测试捕获），已修并补守卫。
+
+**门禁**：`--mode verify,regression` 全绿；四个 `--ci` + 版本一致性 + ruff check/format 全绿。
+
 ### plan-45 章节整合·批次② `holdings_detail` 实施（2026-09-16）
 
 **目标**：把「市值核算明细表」与「持仓分类表」两章合并为同页签两区块的新章 `holdings_detail`「持仓明细与分类」（注册表条目 21 → 20，零 alias）。

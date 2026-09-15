@@ -124,3 +124,31 @@ class TestHtmlSideMatchesExcel:
             )
         ]
         assert _visibility(order, position_relationship_data={}, enable_fund_deep_analysis=False)["merged"] is False
+
+
+class TestPositionStructureMergedChapter:
+    """合并章「持仓结构与集中度」的 OR 可见性（真实注册表条目，一侧就绪即可见）。"""
+
+    @staticmethod
+    def _section():
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT
+
+        return next(s for s in _REPORT_SECTION_DEFAULT if s["key"] == "position_structure")
+
+    def test_registered_with_two_contracts(self):
+        sec = self._section()
+        assert sec["type"] == "fund_deep_analysis"
+        assert sec["data_flag"] is None
+        assert sec["data_flag_any"] == ("position_relationship_data", "concentration_data")
+
+    def test_visible_when_only_relationship_contract_ready(self):
+        sec = self._section()
+        assert should_create_sheet(sec, {"position_relationship_data": True, "concentration_data": False}) is True
+
+    def test_visible_when_only_concentration_contract_ready(self):
+        sec = self._section()
+        assert should_create_sheet(sec, {"position_relationship_data": False, "concentration_data": True}) is True
+
+    def test_hidden_when_both_contracts_absent(self):
+        sec = self._section()
+        assert should_create_sheet(sec, {"position_relationship_data": False, "concentration_data": False}) is False

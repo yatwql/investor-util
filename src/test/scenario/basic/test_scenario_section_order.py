@@ -85,11 +85,10 @@ class TestScenarioSectionOrder(unittest.TestCase):
     def test_fund_deep_analysis_type_contract(self):
         """基金深度分析类型模块共 4 个（含风格与因子分析一章三区块）。"""
         fund_deep_analysis = [s for s in self._default if s["type"] == "fund_deep_analysis"]
-        self.assertEqual(len(fund_deep_analysis), 4)
+        self.assertEqual(len(fund_deep_analysis), 3)
         keys = [s["key"] for s in fund_deep_analysis]
         self.assertIn("fund_manager", keys)
-        self.assertIn("position_relationship", keys)
-        self.assertIn("fund_concentration", keys)
+        self.assertIn("position_structure", keys)
         self.assertIn("style_factor", keys)
         self.assertNotIn("fund_style", keys)
         self.assertNotIn("factor_exposure", keys)
@@ -142,7 +141,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
         )
         self.assertEqual(type_counts["always"], 5)
         self.assertEqual(type_counts["history"], 1)
-        self.assertEqual(type_counts["fund_deep_analysis"], 4)
+        self.assertEqual(type_counts["fund_deep_analysis"], 3)
         self.assertEqual(type_counts["news"], 1)
         self.assertEqual(type_counts["llm"], 5)
         self.assertEqual(type_counts["evolution"], 1)

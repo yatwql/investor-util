@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.1-dev
-> **编号源**：`rf-next = 367`（新增问题取此编号，完成后更新为 +1；已用最大 rf-365，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 368`（新增问题取此编号，完成后更新为 +1；已用最大 rf-367，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -59,6 +59,7 @@
 | **rf-364** | **plan-42 新增章节未同步 integration 三方一致性契约测试**：`test_report_chapter_consistency.py` 的「全开」镜像（`_excel_visible` / `_html_visible_keys` / 两个 all-enabled 用例）未带新章节 `financial_report_digest` 的 board/data 参数，导致 Excel 少一页签、HTML 该章节不可见——`--mode all` / `all_no_unit` 各有 2 例失败；该套件为 `integration` 标记、不在 dev-verify 门禁内，故此前未暴露（由 `--mode bench` 全量跑出） | 为镜像补 `financial_report` 开关与 `financial_report_digest_data` 数据参数，「全开」场景显式启用；`--mode all` 复跑 6982 passed / 0 failed |
 | **rf-365** | **测试用例审计：无效/死/冗余/目录语义不符用例**（全仓 333 文件 / 6,991 例，AST+收集扫描）：① 6 例「名实不符」无效用例——名字承诺断言却无任何断言（`test_cache_core::test_set_write_error_logged`、`test_llm_api_base::TestLogTokenUsage`、`test_handlers_cache::TestCmdCleanupCache` 2 例、`test_html_report_structure_edge::test_nav_links_count_in_source` 把 `re.findall` 结果赋给 `_` 丢弃）；② 1 例空体死用例（`test_market_value::test_today_profit_in_price_update_status` 仅 `pass`）；③ 1 组冗余——`test_llm_utils` 与 `test_llm_api_base` 各有一个 `TestLogTokenUsage` 测同一函数；④ 1 处目录语义不符——`unit/report/test_classification_utils.py` 测 `core.code_utils` 却标 `unit_report`。另 18 例「不抛异常/no-op」弱断言经审为有意，保留 | 补断言：`test_set_write_error_logged` 断言告警含「无法创建临时文件」；`test_llm_api_base::TestLogTokenUsage` 用 `assertLogs/assertNoLogs` 断言输入/输出/缓存命中内容并补 empty 分支；`test_handlers_cache` 断言 `cleanup_cache` 以 `TuiProgressReporter` 调用一次且 `press_any_key` 调用；`test_html_report_structure_edge` 改为断言 2 处导航锚点模板存在。删除空体死用例；删除 `test_llm_utils::TestLogTokenUsage` 冗余类（覆盖并入 api_base）。`git mv` 分类测试至 `unit/core/test_code_utils_classification.py` 并改标 `unit_core`。新增回归守护 `test_test_quality_regression.py`（静态禁止空测试体）。`--mode bench` 复跑 30,459 通过 / 0 失败 |
 | **rf-366** | **章节合并施工单把「数据源类别」误判为「注册表 type 允许集合」**：`section-consolidation-iteration.md` 的下游影响清单（§3.2）要求「`config/_validation.py` 已知类型集合删旧增新」——该集合实为 `_KNOWN_PROVIDER_TYPES`（数据源类别 id：price/fund_rank/fund_hold/industry/financial_report/financial_indicator），与注册表章节 `type` 无关；照此实施会误改数据源校验白名单，而真正的注册表 type 约束（两侧 `board_flags` 显式登记）反而无人守 | 实施期更正 §3.2 该行（标注作废 + 说明真实约束）；新增正面守卫 `unit/report/test_section_type_flag_consistency.py`（注册表 type ↔ 两侧 board_flags 键一致 + 无残留废弃 type + 写入器模块键装配一致）；同步 §6.6b 守卫表实施标记。变更详情见 changelog [0.11.1-dev] |
+| **rf-367** | **合并章 `data_flag_any` 在 Excel 侧被悲观判定吞掉页签**：`extend` 可见性模型新增多契约 OR 后，`should_create_sheet` 对 `data_flag_any` 取「未登记即未就绪」的**悲观**口径；而 `excel_generator` 构造 `data_availability` 时只登记 news/llm/两份财报契约，导致合并章 `position_structure` 的两契约（`position_relationship_data`/`concentration_data`）恒未登记 → **Excel 页签恒不创建**（HTML 侧因 `overlap_matrix`/`concentration_analysis` 直传而正常）。由 integration `test_report_chapter_consistency`（两侧可见集合一致性）捕获，dev-verify/单测均不覆盖 | `excel_generator` 按与 HTML 同口径登记两契约 flag（基金深度分析开启时下游恒计算，故视为就绪；关闭时由 board 层隐藏）；集成测试镜像同步补 flag；`test_section_visibility` 增合并章 OR 三例（仅关系就绪/仅集中度就绪/两者皆无）。变更详情见 changelog [0.11.1-dev] |
 
 ### 归档档案
 

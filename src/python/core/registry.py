@@ -381,8 +381,7 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "penetration": "资产穿透TOP10",
     "fund_performance": "基金业绩分析",
     "fund_manager": "基金经理变更监控",
-    "position_relationship": "持仓关系矩阵",
-    "fund_concentration": "持仓集中度监控",
+    "position_structure": "持仓结构与集中度",
     "style_factor": "风格与因子分析",
     "portfolio_history_drawdown": "组合历史走势与回撤",
     "portfolio_evolution": "组合演进",
@@ -536,18 +535,12 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "data_flag": "manager_data",
     },
     {
-        "key": "position_relationship",
-        "name": "持仓关系矩阵",
+        "key": "position_structure",
+        "name": "持仓结构与集中度",
         "number": 6,
         "type": "fund_deep_analysis",
-        "data_flag": "position_relationship_data",
-    },
-    {
-        "key": "fund_concentration",
-        "name": "持仓集中度监控",
-        "number": 7,
-        "type": "fund_deep_analysis",
-        "data_flag": "concentration_data",
+        "data_flag": None,
+        "data_flag_any": ("position_relationship_data", "concentration_data"),
     },
     # ── 风格与因子分析（「基金风格表 + 风格因子回归」两区块 + 行业 Beta 子表） ──
     # 区块一：基金风格表（渲染期派生）· 区块二：风格因子回归（style_factor_data 子键）
@@ -555,7 +548,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {
         "key": "style_factor",
         "name": "风格与因子分析",
-        "number": 8,
+        "number": 7,
         "type": "fund_deep_analysis",
         "data_flag": "style_factor_data",
     },
@@ -566,7 +559,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {
         "key": "action",
         "name": "行动建议",
-        "number": 9,
+        "number": 8,
         "type": "action",
         "data_flag": None,
     },
@@ -574,21 +567,21 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {
         "key": "news_correlation",
         "name": "财经新闻热点与持仓关联分析",
-        "number": 10,
+        "number": 9,
         "type": "news",
         "data_flag": "news_data_available",
     },
     # ── llm 类型（需启用 LLM 功能） ──
-    {"key": "global_macro", "name": "全球政经局势", "number": 11, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 12, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "health_check", "name": "持仓体检报告", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 14, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "global_macro", "name": "全球政经局势", "number": 10, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 11, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "health_check", "name": "持仓体检报告", "number": 12, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 13, "type": "llm", "data_flag": "llm_data_available"},
     # ── history 类型（始终显示，数据不可用时显示占位文本） ──
     # 组合历史走势与回撤：一章分「走势表 + 回撤矩阵」两区块 + 危机区间标注（2015/2018/2020/2022）
     {
         "key": "portfolio_history_drawdown",
         "name": "组合历史走势与回撤",
-        "number": 15,
+        "number": 14,
         "type": "history",
         "data_flag": None,
     },
@@ -598,18 +591,18 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {
         "key": "portfolio_evolution",
         "name": "组合演进",
-        "number": 16,
+        "number": 15,
         "type": "evolution",
         "data_flag": "evolution_data",
     },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 17, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 16, "type": "always", "data_flag": None},
     # ── financial_report 类型（功能开关 financial_report_digest 控制，默认关）──
     # 持仓个股财报摘要：DataSinking 全文本财报（仅 A 股，需用户自备 key）
     {
         "key": "financial_report_digest",
         "name": "持仓个股财报摘要",
-        "number": 18,
+        "number": 17,
         "type": "financial_report",
         "data_flag": "financial_report_digest_data",
     },
@@ -618,12 +611,12 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {
         "key": "financial_indicator",
         "name": "财务指标",
-        "number": 19,
+        "number": 18,
         "type": "financial_indicator",
         "data_flag": "financial_indicator_data",
     },
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 20, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 
@@ -670,7 +663,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
                 为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
 
     Returns:
-        [{key, name, number, type, data_flag}, ...] 共 20 项
+        [{key, name, number, type, data_flag}, ...] 共 19 项
     """
     if config is None:
         return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]

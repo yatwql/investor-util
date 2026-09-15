@@ -38,8 +38,7 @@ _ALL_KEYS_DEFAULT = [
     "penetration",
     "fund_performance",
     "fund_manager",
-    "position_relationship",
-    "fund_concentration",
+    "position_structure",
     "style_factor",
     "news_correlation",
     "global_macro",
@@ -51,7 +50,7 @@ _ALL_KEYS_DEFAULT = [
 ]
 
 _ALWAYS_KEYS = {"summary", "holdings_detail", "penetration", "fund_performance"}
-_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_relationship", "fund_concentration", "style_factor"}
+_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_structure", "style_factor"}
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
 _HISTORY_KEYS = {"portfolio_history_drawdown"}
@@ -73,16 +72,15 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "penetration", "name": "资产穿透TOP10", "number": 3},
     {"key": "fund_performance", "name": "基金业绩分析", "number": 4},
     {"key": "fund_manager", "name": "基金经理变更监控", "number": 5},
-    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 6},
-    {"key": "fund_concentration", "name": "持仓集中度监控", "number": 7},
-    {"key": "style_factor", "name": "风格与因子分析", "number": 8},
-    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 9},
-    {"key": "global_macro", "name": "全球政经局势", "number": 10},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 11},
-    {"key": "health_check", "name": "持仓体检报告", "number": 12},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 13},
-    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 14},
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 15},
+    {"key": "position_structure", "name": "持仓结构与集中度", "number": 6},
+    {"key": "style_factor", "name": "风格与因子分析", "number": 7},
+    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 8},
+    {"key": "global_macro", "name": "全球政经局势", "number": 9},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 10},
+    {"key": "health_check", "name": "持仓体检报告", "number": 11},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 12},
+    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 13},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 14},
 ]
 
 
@@ -225,9 +223,9 @@ class TestHtmlNavStructure(unittest.TestCase):
     # ── Nav links ──────────────────────────────────────────────
 
     def test_nav_link_count(self):
-        """导航链接数量应等于可见模块数（全部可见 = 15）。"""
+        """导航链接数量应等于可见模块数（全部可见 = 14）。"""
         links = self.soup.select("nav.section-nav a")
-        self.assertEqual(len(links), 15, f"导航应有 15 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 14, f"导航应有 14 个链接，实际 {len(links)}")
 
     def test_every_nav_link_has_corresponding_section(self):
         """每个导航链接的 href 指向一个存在的 section id。"""
@@ -420,18 +418,17 @@ class TestHtmlCustomOrder(unittest.TestCase):
             {"key": "penetration", "name": "资产穿透TOP10", "number": 4},
             # 基金深度分析保持默认
             {"key": "fund_manager", "name": "基金经理变更监控", "number": 5},
-            {"key": "position_relationship", "name": "持仓关系矩阵", "number": 6},
-            {"key": "fund_concentration", "name": "持仓集中度监控", "number": 7},
-            {"key": "style_factor", "name": "风格与因子分析", "number": 8},
+            {"key": "position_structure", "name": "持仓结构与集中度", "number": 6},
+            {"key": "style_factor", "name": "风格与因子分析", "number": 7},
             # news 保持默认
-            {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 9},
+            {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 8},
             # llm 保持默认
-            {"key": "global_macro", "name": "全球政经局势", "number": 10},
-            {"key": "expert_review", "name": "智囊团深度复盘", "number": 11},
-            {"key": "health_check", "name": "持仓体检报告", "number": 12},
-            {"key": "penetration_deep", "name": "穿透深度分析", "number": 13},
-            {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 14},
-            {"key": "llm_usage", "name": "LLM API 用量", "number": 15},
+            {"key": "global_macro", "name": "全球政经局势", "number": 9},
+            {"key": "expert_review", "name": "智囊团深度复盘", "number": 10},
+            {"key": "health_check", "name": "持仓体检报告", "number": 11},
+            {"key": "penetration_deep", "name": "穿透深度分析", "number": 12},
+            {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 13},
+            {"key": "llm_usage", "name": "LLM API 用量", "number": 14},
         ]
         cls.numbers = {sec["key"]: sec["number"] for sec in cls.custom_order}
         cls.sv_dict = {sec["key"]: True for sec in cls.custom_order}
@@ -484,8 +481,8 @@ class TestHtmlCustomOrder(unittest.TestCase):
                 orders[sec_id] = int(m.group(1))
 
         self.assertIn("sec-llm_usage", orders)
-        # llm_usage 的 order 应为 15（末位，合并章节后总条目 20）
-        self.assertEqual(orders["sec-llm_usage"], 15, "llm_usage 的 order 应为 15（末位）")
+        # llm_usage 的 order 应为 14（末位，合并章节后总条目 19）
+        self.assertEqual(orders["sec-llm_usage"], 14, "llm_usage 的 order 应为 14（末位）")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1096,7 +1093,7 @@ class TestHtmlTocSidebar(unittest.TestCase):
     def test_toc_link_count_matches_sections(self):
         """目录链接数量 = 可见模块数（全部可见 = 15）。"""
         links = self.soup.select("#toc-sidebar a[href^='#sec-']")
-        self.assertEqual(len(links), 15, f"目录应有 15 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 14, f"目录应有 14 个链接，实际 {len(links)}")
 
     def test_every_toc_link_has_corresponding_section(self):
         """每个目录链接的 href 指向一个存在的 section id。"""
@@ -1153,8 +1150,7 @@ class TestHtmlTocSidebar(unittest.TestCase):
             "penetration",
             "fund_performance",
             "fund_manager",
-            "position_relationship",
-            "fund_concentration",
+            "position_structure",
             "style_factor",
             "portfolio_history_drawdown",
             "news_correlation",
@@ -1306,8 +1302,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             [
                 "fund_performance",
                 "fund_manager",
-                "position_relationship",
-                "fund_concentration",
+                "position_structure",
                 "style_factor",
             ],
             "「基金深度分析」组应含基金业绩 + 基金深度分析四章（含持仓关系矩阵/风格与因子分析）",
@@ -1370,8 +1365,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             [
                 "fund_performance",
                 "fund_manager",
-                "position_relationship",
-                "fund_concentration",
+                "position_structure",
                 "style_factor",
             ],
         )
@@ -1921,7 +1915,7 @@ class TestHtmlReportPeriodAnnotations(unittest.TestCase):
                 "stale_fund_notes": ["陈年基金（报告期 2020-03-31，已过 20 个完整季度）"],
             }
         )
-        text = soup.select_one("#sec-position_relationship").get_text()
+        text = soup.select_one("#sec-position_structure").get_text()
         self.assertIn("已从矩阵剔除", text)
         self.assertIn("陈年基金", text)
         self.assertIn("2020-03-31", text)
@@ -1931,7 +1925,7 @@ class TestHtmlReportPeriodAnnotations(unittest.TestCase):
         soup = self._render(
             overlap_matrix={"fund_names": {}, "funds": [], "matrix": [], "pairs": [], "stale_fund_notes": []}
         )
-        text = soup.select_one("#sec-position_relationship").get_text()
+        text = soup.select_one("#sec-position_structure").get_text()
         self.assertNotIn("已从矩阵剔除", text)
 
     # ── 集中度：报告期列 + 环比语义 ─────────────────────────────
@@ -1941,7 +1935,7 @@ class TestHtmlReportPeriodAnnotations(unittest.TestCase):
         soup = self._render(
             concentration_analysis={"results": [self._conc_result(report_period="2020-03-31", report_stale=True)]}
         )
-        text = soup.select_one("#sec-fund_concentration").get_text()
+        text = soup.select_one("#sec-position_structure").get_text()
         self.assertIn("报告期", text)
         self.assertIn("2020-03-31（陈旧）", text)
 
@@ -1950,7 +1944,7 @@ class TestHtmlReportPeriodAnnotations(unittest.TestCase):
         soup = self._render(
             concentration_analysis={"results": [self._conc_result(period_unchanged=True, prev_top10_pct=35.5)]}
         )
-        text = soup.select_one("#sec-fund_concentration").get_text()
+        text = soup.select_one("#sec-position_structure").get_text()
         self.assertIn("无对比意义", text)
         self.assertIn("报告期未推进", text)
 
@@ -1962,7 +1956,7 @@ class TestHtmlReportPeriodAnnotations(unittest.TestCase):
             }
         )
         # 取表格内文本：区块脚注本就含「无对比意义」四字
-        text = soup.select_one("#sec-fund_concentration table").get_text()
+        text = soup.select_one("#sec-position_structure table").get_text()
         self.assertIn("+5.50%", text)
         self.assertNotIn("无对比意义", text)
 

@@ -26,19 +26,19 @@ from src.test.unit.report.test_html_report_structure import (
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
-_PR_SECTION = {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7}
+_PR_SECTION = {"key": "position_structure", "name": "持仓结构与集中度", "number": 6}
 
 
 def _order_with_relationship() -> list[dict]:
-    """默认清单中将 position_relationship 置为可见（其余隐藏）。"""
+    """默认清单中将 position_structure 置为可见（其余隐藏）。"""
     return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
 
 
 def _render_correlation(correlation_data) -> "BeautifulSoup":
-    """渲染 position_relationship 可见、其余隐藏的模板。"""
+    """渲染 position_structure 可见、其余隐藏的模板。"""
     order = _order_with_relationship()
     numbers = {sec["key"]: sec["number"] for sec in order}
-    sv_dict = {sec["key"]: (sec["key"] == "position_relationship") for sec in order}
+    sv_dict = {sec["key"]: (sec["key"] == "position_structure") for sec in order}
     data = _build_minimal_render_data(order, numbers, sv_dict)
     data["position_relationship_data"] = correlation_data
     # 章节可见需重合度或相关性任一区块有数据：此处以相关性区块驱动（overlap 置空）
@@ -80,7 +80,7 @@ class TestHtmlCorrelationSection(unittest.TestCase):
     """持仓关系矩阵章节·相关性区块 HTML 呈现测试。"""
 
     def _section(self, correlation_data):
-        return _render_correlation(correlation_data).find(id="sec-position_relationship")
+        return _render_correlation(correlation_data).find(id="sec-position_structure")
 
     def test_full_rendering_when_available(self):
         """available=True → 汇总卡 + 相关度最高 + 热力矩阵 + 配对明细 + 说明。"""
@@ -208,11 +208,11 @@ class TestHtmlMergedRelationshipSection(unittest.TestCase):
     def _render_merged(self, overlap_matrix, correlation_data) -> "BeautifulSoup":
         order = _order_with_relationship()
         numbers = {sec["key"]: sec["number"] for sec in order}
-        sv_dict = {sec["key"]: (sec["key"] == "position_relationship") for sec in order}
+        sv_dict = {sec["key"]: (sec["key"] == "position_structure") for sec in order}
         data = _build_minimal_render_data(order, numbers, sv_dict)
         data["overlap_matrix"] = overlap_matrix
         data["position_relationship_data"] = correlation_data
-        return _render_template(data).find(id="sec-position_relationship")
+        return _render_template(data).find(id="sec-position_structure")
 
     def test_both_blocks_render_in_merged_section(self):
         """重合度 + 相关性同时提供 → 同一章节内两个子区块依次呈现。"""

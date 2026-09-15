@@ -76,26 +76,25 @@
 
   // ── E. 行为调优 ──
   "default_menu_key": "L",
-  // 报告章节显示顺序（report_section_order：完整配置 17 项，按序号升序排列；llm_usage 自动置末位）
-  // 本仓库显式列出全部 17 项，取值与注册表出厂默认同序（行动建议=9）；清空为 {} 效果相同
+  // 报告章节显示顺序（report_section_order：完整配置 16 项，按序号升序排列；llm_usage 自动置末位）
+  // 本仓库显式列出全部 16 项，取值与注册表出厂默认同序（行动建议=8）；清空为 {} 效果相同
   "report_section_order": {
     "summary": 1,
     "holdings_detail": 2,
     "penetration": 3,
     "fund_performance": 4,
     "fund_manager": 5,
-    "position_relationship": 6,
-    "fund_concentration": 7,
-    "style_factor": 8,
-    "action": 9,
-    "news_correlation": 10,
-    "global_macro": 11,
-    "expert_review": 12,
-    "health_check": 13,
-    "penetration_deep": 14,
-    "portfolio_history_drawdown": 15,
-    "portfolio_evolution": 16,
-    "data_source_status": 17
+    "position_structure": 6,
+    "style_factor": 7,
+    "action": 8,
+    "news_correlation": 9,
+    "global_macro": 10,
+    "expert_review": 11,
+    "health_check": 12,
+    "penetration_deep": 13,
+    "portfolio_history_drawdown": 14,
+    "portfolio_evolution": 15,
+    "data_source_status": 16
   },
   "degradation": {
     "t2": {

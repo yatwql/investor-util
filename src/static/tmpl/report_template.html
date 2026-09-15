@@ -1544,7 +1544,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  持仓关系矩阵（重合度 + 相关性 一章两区块）               -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("position_relationship") %}
+    {% if section_visible("position_structure") %}
+    {% set overlap_matrix = overlap_matrix or {} %}
     {% set _fund_names = overlap_matrix.get("fund_names", {}) %}
     {% set _funds = overlap_matrix.get("funds", []) %}
     {% set _matrix = overlap_matrix.get("matrix", []) %}
@@ -1555,11 +1556,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% set _corr_matrix = _corr_data.get("matrix", []) %}
     {% set _corr_pvals = _corr_data.get("p_values", []) %}
     {% set _corr_pairs = _corr_data.get("pairs", []) %}
-    <div class="section" id="sec-position_relationship" style="order: {{ section_numbers['position_relationship'] }};">
-        <div class="section-title">{{ section_numbers['position_relationship'] }}、持仓关系矩阵</div>
+    <div class="section" id="sec-position_structure" style="order: {{ section_numbers['position_structure'] }};">
+        <div class="section-title">{{ section_numbers['position_structure'] }}、持仓结构与集中度</div>
         <div class="section-content">
             <!-- 区块一：持仓重合度矩阵 -->
-            <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">一、持仓重合度矩阵</div>
+            <div class="block-title">一、持仓重合度矩阵</div>
             {% set _stale_notes = overlap_matrix.get("stale_fund_notes", []) %}
             {% if _stale_notes %}
             <div class="notice-banner" style="margin-bottom: 8px; font-size: 12px;">
@@ -1660,7 +1661,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
             <!-- 区块二：持仓相关性矩阵 -->
             <br>
-            <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">二、持仓相关性矩阵</div>
+            <div class="block-title">二、持仓相关性矩阵</div>
             {% if position_relationship_data and position_relationship_data.get("available") and _corr_codes %}
             <div class="summary-tag" style="margin-bottom: 8px;">
                 📊 <strong>{{ _corr_codes | length }}</strong> 个品种，最近 <strong>{{ position_relationship_data["window"] }}</strong> 个交易日重叠样本（有效 {{ position_relationship_data["sample_count"] }} 期）
@@ -1793,19 +1794,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% else %}
             <div class="empty-section">📭 持仓相关性数据不足（需要至少 2 只重叠样本品种方可计算持仓相关性矩阵）</div>
             {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
-
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  持仓集中度监控                                       -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("fund_concentration") %}
-    {% set conc_results = concentration_analysis["results"] %}
-    <div class="section" id="sec-fund_concentration" style="order: {{ section_numbers['fund_concentration'] }};">
-        <div class="section-title">{{ section_numbers['fund_concentration'] }}、持仓集中度监控</div>
-        <div class="section-content">
+            <div class="block-title">三、持仓集中度监控</div>
+            {% set conc_results = concentration_analysis["results"] if concentration_analysis else [] %}
             {% if conc_results %}
             {% set high_risk = conc_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
             {% if high_risk %}

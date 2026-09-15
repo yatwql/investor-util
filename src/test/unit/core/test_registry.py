@@ -247,7 +247,7 @@ class TestReportSectionDefault:
 
     def test_total_sections(self):
         """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 20
+        assert len(_REPORT_SECTION_DEFAULT) == 19
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -289,7 +289,10 @@ class TestReportSectionDefault:
         """
         for sec in _REPORT_SECTION_DEFAULT:
             if sec["type"] not in ("always", "history", "action"):
-                assert sec["data_flag"] is not None, f"{sec['key']}: {sec['type']} 类型缺少 data_flag"
+                # 多契约合并章以 data_flag_any（OR）替代单契约 data_flag
+                assert sec["data_flag"] is not None or sec.get("data_flag_any"), (
+                    f"{sec['key']}: {sec['type']} 类型缺少 data_flag/data_flag_any"
+                )
 
     def test_default_numbers_are_unique(self):
         """默认序号应唯一且非零。"""
@@ -315,7 +318,7 @@ class TestReportSectionDefault:
         sec = sf[0]
         assert sec["type"] == "fund_deep_analysis"
         assert sec["data_flag"] == "style_factor_data"
-        assert sec["number"] == 8
+        assert sec["number"] == 7
         # 旧章节 key 与旧 data_flag 不应注册
         keys = [s["key"] for s in _REPORT_SECTION_DEFAULT]
         assert "fund_style" not in keys, "旧基金风格章节 key 不应再注册"
@@ -329,17 +332,17 @@ class TestReportSectionDefault:
         sec = evo[0]
         assert sec["type"] == "evolution"
         assert sec["data_flag"] == "evolution_data"
-        assert sec["number"] == 16
+        assert sec["number"] == 15
 
     def test_action_registered_as_action_type(self):
         """action 应注册为 action 类型（独立顶层开关 enable_action 控制，默认开，
-        data_flag=None，序号 9 紧跟 style_factor）。"""
+        data_flag=None，序号 8 紧跟 style_factor）。"""
         act = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "action"]
         assert len(act) == 1, "缺少 action 模块条目"
         sec = act[0]
         assert sec["type"] == "action"
         assert sec["data_flag"] is None
-        assert sec["number"] == 9
+        assert sec["number"] == 8
 
     def test_no_duplicate_keys(self):
         """key 不得重复。"""
@@ -348,17 +351,18 @@ class TestReportSectionDefault:
         assert not duplicates, f"重复的 key: {duplicates}"
 
     def test_old_relationship_sections_removed(self):
-        """持仓关系矩阵一章两区块：旧章节 key 与旧 data_flag 不再注册，position_relationship 以序号 6 注册。"""
+        """持仓结构与集中度一章三区块：旧章节 key 与旧 data_flag 不再注册，position_structure 以序号 6 注册（多契约 OR）。"""
         keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         assert "fund_overlap" not in keys, "旧重合度章节 key 不应再注册"
         assert "correlation_analysis" not in keys, "旧相关性章节 key 不应再注册"
-        pr = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "position_relationship"]
-        assert len(pr) == 1, "缺少 position_relationship 模块条目"
+        pr = [sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "position_structure"]
+        assert len(pr) == 1, "缺少 position_structure 模块条目"
         sec = pr[0]
-        assert sec["name"] == "持仓关系矩阵"
+        assert sec["name"] == "持仓结构与集中度"
         assert sec["number"] == 6
         assert sec["type"] == "fund_deep_analysis"
-        assert sec["data_flag"] == "position_relationship_data"
+        assert sec["data_flag"] is None
+        assert sec["data_flag_any"] == ("position_relationship_data", "concentration_data")
         # 旧 data_flag（overlap_data / correlation_data）不应再出现
         flags = [s.get("data_flag") for s in _REPORT_SECTION_DEFAULT]
         assert "overlap_data" not in flags, "旧重合度 data_flag 不应再出现"
@@ -464,7 +468,7 @@ class TestGetReportSectionOrder:
         # 但注意 holdings_detail 默认序号是 2，与 summary 重复
         keys_after = [s["key"] for s in order[2:]]
         assert "holdings_detail" in keys_after
-        assert "position_relationship" in keys_after
+        assert "position_structure" in keys_after
 
     def test_llm_usage_always_last(self):
         """llm_usage 即使被配置也强制最后。"""
@@ -493,7 +497,7 @@ class TestGetReportSectionOrder:
         assert summary_entry["number"] == -5
 
     def test_full_config_reverse_order(self):
-        """全部 20 项都配了 → 按配置序号排序，llm_usage 最后。"""
+        """全部 19 项都配了 → 按配置序号排序，llm_usage 最后。"""
         all_keys = [s["key"] for s in _REPORT_SECTION_DEFAULT if s["key"] != "llm_usage"]
         # 反序配置
         full_config = {k: i + 1 for i, k in enumerate(reversed(all_keys))}
