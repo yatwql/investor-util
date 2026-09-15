@@ -199,14 +199,14 @@ A: 编辑 `data/config/config.json` 的 `report_section_order` 字段，格式�
 ```json
 {
   "report_section_order": {
-    "fund_manager": 1,
-    "position_relationship": 2,
+    "position_structure": 1,
+    "fundamental_snapshot": 3,
     "summary": 5
   }
 }
 ```
 
-空对象 `{}` 或缺失此字段时使用 19 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
+空对象 `{}` 或缺失此字段时使用 17 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
 **Q: 菜单 P（配置报告可选章节）是做什么的？**
 

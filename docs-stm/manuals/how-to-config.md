@@ -403,7 +403,7 @@
 | 键 | 模块标识 | 报告模块的唯一标识，见下方列表 |
 | 值 | 正整数 | 显示序号（1~99），决定该模块在报告中的视觉位置 |
 
-**15 个模块标识及默认顺序：**
+**17 个模块标识及默认顺序：**
 
 | 默认序号 | 模块标识 | 显示名称 | 类型 |
 |:--------:|:---------|:---------|:-----|
@@ -422,7 +422,8 @@
 | 13 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
 | 14 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
 | 15 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
-| 16 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 16 | `fundamental_snapshot` | 持仓基本面 | 两功能开关各控一块（`financial_indicator` 财务指标区块 / `financial_report_digest` 财报摘要区块；任一开启即显示，需各自数据就绪） |
+| 17 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 
@@ -431,20 +432,19 @@
 ```json
 {
   "report_section_order": {
-    "fund_manager": 1,
-    "position_relationship": 2,
-    "fund_concentration": 3,
-    "style_factor": 4,
-    "summary": 5
+    "position_structure": 1,
+    "style_factor": 2,
+    "fundamental_snapshot": 3,
+    "summary": 4
   }
 }
 ```
 
-> 效果：基金经理/持仓结构与集中度/风格 3 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
+> 效果：持仓结构与集中度 / 风格与因子分析 / 持仓基本面 3 个模块显示序号 1~3 并排在最前，投资分析汇总显示序号 4 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
-> 空对象 `{}` 或缺失此字段时使用上述 19 项默认顺序。
+> 空对象 `{}` 或缺失此字段时使用上述 17 项默认顺序。
 >
-> **本仓库配置**：`config.json` 的 `report_section_order` 显式列出完整 18 项，取值与上表默认顺序**完全一致**（`action`=10、`news_correlation`=11、`global_macro`=12、`expert_review`=13、`health_check`=14、`penetration_deep`=15、`portfolio_history_drawdown`=16、`portfolio_evolution`=17、`data_source_status`=18）。因两者同序，清空为 `{}` 效果相同。
+> **本仓库配置**：`config.json` 的 `report_section_order` 显式列出完整 16 项（`llm_usage` 自动置末位，故合计 17），取值与上表默认顺序**完全一致**（`action`=7、`news_correlation`=8、`global_macro`=9、`expert_review`=10、`health_check`=11、`penetration_deep`=12、`portfolio_history_drawdown`=13、`portfolio_evolution`=14、`data_source_status`=15、`fundamental_snapshot`=16）。因两者同序，清空为 `{}` 效果相同。
 
 **实用示例** — 将组合历史走势与回撤提到前面，关注回撤风险：
 

@@ -208,7 +208,7 @@
 > | `llm_debate_conditional` | 13 | 常规 | 辩论-条件推理 |
 > | `datasource_credential_ready` | 14 | 常规 | 数据源凭据就绪指引（声明 → 就绪判定 → 可读指引） |
 >
-> 除上表外，`features.json` 还管理量化指标（`metrics_*`）、交互图表（`enable_interactive_charts`）、系统自检上屏（`doctor_check`）、数据源适配契约（`datasource_adapter`）、联接基金穿透（`feeder_penetration`）等，共 20 项开关（实验组默认关、常规组默认开）。完整清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)。
+> 除上表外，`features.json` 还管理量化指标（`metrics_*`）、交互图表（`enable_interactive_charts`）、系统自检上屏（`doctor_check`）、数据源适配契约（`datasource_adapter`）、联接基金穿透（`feeder_penetration`）等；连同注册表的 28 项功能开关共同构成 `features.json` 的键空间（缺省值：实验组默认关、常规组默认开、报告组多数默认关）。完整清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)。
 > **不在 `features.json` 的开关**：LLM 模块启停与基金深度分析走 `llm_settings.json` 的 `enabled_llm`（本菜单标准模块区，编号 1-5），新闻源走 `config.json` 的 `news_sources`，历史走势与回撤走 `config.json` 的 `enable_history`，匿名化模式走 `config.json` 的 `anonymization.mode`（菜单 **[A]**）。
 
 #### [A] 配置持仓匿名化（代码/名称脱敏）

@@ -46,7 +46,7 @@
   - [4.16 确定性数值信号沉淀与实时/非实时标签纪律](#416-确定性数值信号沉淀与实时非实时标签纪律)
   - [4.17 健壮性三件套（数值归一防线 / 失败原因可读 / 系统自检）](#417-健壮性三件套数值归一防线--失败原因可读--系统自检)
   - [4.18 决策跨期反思闭环](#418-决策跨期反思闭环)
-  - [4.19 持仓个股财报摘要（DataSinking 全文本财报）](#419-持仓个股财报摘要datasinking-全文本财报)
+  - [4.19 持仓基本面（财务指标 + 持仓个股财报摘要）](#419-持仓基本面财务指标--持仓个股财报摘要一章两区块)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -1738,7 +1738,7 @@ for sec in section_order:
 
 ### 4.6 报告序号可配置
 
-报告 19 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
+报告 17 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
 #### 注册表结构
 
@@ -1746,15 +1746,15 @@ for sec in section_order:
 
 ```python
 {
-    "key": "fund_manager",      # 模块标识
-    "name": "基金经理变更监控",   # 显示名称
-    "number": 6,                 # 默认序号
-    "type": "fund_deep_analysis",          # 可见性类型
-    "data_flag": "manager_data", # 数据标志键名
+    "key": "position_structure",   # 模块标识
+    "name": "持仓结构与集中度",     # 显示名称
+    "number": 5,                   # 默认序号
+    "type": "fund_deep_analysis",   # 可见性类型
+    "data_flag_any": ("position_relationship_data", "concentration_data"),  # 多契约 OR
 }
 ```
 
-19 个模块分布：`always`×6、`基金深度分析`×4、`news`×1、`llm`×5、`history`×1、`evolution`×1、`action`×1。
+17 个模块分布：`always`×5、`fund_deep_analysis`×2、`news`×1、`llm`×5、`history`×1、`evolution`×1、`action`×1、`fundamental_snapshot`×1。
 
 #### 合并规则流程
 
@@ -1764,7 +1764,7 @@ get_report_section_order(config)
     ▼
 ┌────────────────────────┐
 │ config 中有             │
-│ report_section_order?  │── NO ──→ 返回完整 19 项默认顺序
+│ report_section_order?  │── NO ──→ 返回完整 17 项默认顺序
 └───────────┬────────────┘
            YES
             │
@@ -1995,17 +1995,17 @@ prune()：两阶段自动清理
                          │
               ┌──────────┴──────────┐
               │                     │
-        基金经理变更监控      持仓结构与集中度
-        快照比对检测          重合度+相关性一章两区块
-              │               Jaccard+重叠率 / Pearson+显著性
+        持仓结构与集中度      风格与因子分析
+        重合度+相关性+集中度   一章三区块
+        Jaccard/重叠率/Pearson 风格表+因子回归+行业Beta
               │
-        风格与因子分析
-        TOP N 占比+环比       一章三区块
+        基金经理变更块
+        （基金业绩章末尾块）   一章两区块
               │              风格表+因子回归+行业Beta
               │              OLS 回归风格画像
 ```
 
-#### 基金经理变更监控
+#### 基金经理变更监控块（「基金业绩分析」章末尾区块）
 
 基于快照比对检测基金经理变更：
 
@@ -2172,7 +2172,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 |:-----|:---------|
 | **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定；因子指数**不作为 `_A_INDICES` 成员**（避免污染实时指数行情循环与报告"指数对比"章节噪声），代码集合定义为分析模块内部常量 |
 | **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "sina"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（降级接受），Tencent 故障时因子章节落 §1.4.5 数据不足分支 |
-| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 19 个模块序号连续（1~19），`style_factor` 为基金深度分析一章三区块（风格表 + 风格因子回归 + 行业 Beta 子表） |
+| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 17 个模块序号连续（1~17），`style_factor` 为基金深度分析一章三区块（风格表 + 风格因子回归 + 行业 Beta 子表） |
 | **C14** (渲染期数据不可写入模块级全局变量) | 风格与因子数据通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
 | **C19** (pipeline_data Schema 契约) | 新增 `style_factor_data` 键（类型 `dict`，内嵌 `industry_beta` 子键），键结构见附录 H，先定义类型再使用 |
 | **§1.4.5** (数据降级治理) | 区分两分支：① **数据不足**——因子指数历史不足 36 期或有效样本 < 36，标记 `style_factor_data.available=false`，显示"数据不足"占位文本，**不走 DegradationTracker**（系数据量不足，非故障）；② **数据源故障**——`fetch_index_history` 返回空（chain 全失败），走 DegradationTracker 记录 T2 降级事件，显示"数据源暂不可用"，与数据不足文案区分。行业 Beta 子表独立降级（`industry_beta=None` 开关关闭隐藏 / `available=false` 标题+占位），**绝不输出误导性数字** |

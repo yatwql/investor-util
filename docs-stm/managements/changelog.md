@@ -6,6 +6,21 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### plan-45 四批后管理/用户文档一致性与顺序整改（rf-369）（2026-09-16）
+
+对 10 份管理文档 + 11 份用户文档逐份核对「章节表顺序/编号、清单完整性、示例与计数、章归属表述」，按注册表现状（17 条）整改：
+
+- **requirements.md**：§6.3 补 `fundamental_snapshot` 行（16）并把 `llm_usage` 归位 17；§6.4 小节编号重排为连续 1..18（17 个报告章节 + 成本流水子模块），补 6.4.16 持仓基本面（两条区块字段表，指向 §5.9/§6.12），经理变更块降为「基金业绩分析」章内 h5 子标题
+- **how-to-config.md**：表头 15→17、补 `fundamental_snapshot` 行与 `llm_usage`=17；示例 JSON 的已删键（`fund_manager`/`position_relationship`/`fund_concentration`）→ `position_structure`/`fundamental_snapshot`；「19 项默认顺序」「完整 18 项」及示例序号全部按现状改写
+- **reports-instruction.md**：类型分组表编号错位（基金业绩 3→4、数据源 14→15、LLM 用量 16→17）、基金深度分析「共 4 个」→2、删除基金评价表重复的「持仓集中度」行、菜单快速索引与「19 个页签/7 组」→「17 个页签/8 组」
+- **folders.md**：HTML 模板行 partial 清单换为 `fundamental_snapshot_section.html`（并修正文件数/行数）、目录树删三个已删模块行并补 `test_section_visibility.py` 与新 partial、把 `fundamental_snapshot_sheet.py` 归入财报装配组、统计快照按实测刷新（主程序 280/70,669、测试 372/109,257、用例 7,213、源代码合计 310/82,270、项目文档 138/52,459、用户文档 11/5,159、managements 10/10,040）
+- **technical.md**：三处「19 个模块」→17（含注册表约束条目与模块分布行：always×5 / fund_deep×2 / fundamental_snapshot×1 等）、注册表结构示例改用 `position_structure`（含 `data_flag_any`）、基金深度块图与「基金经理变更监控」小节标题改为章内区块、TOC 条目随 §4.19 改题同步
+- **test-coverage.md**：按 `scripts/collect-test-coverage.py` 实测刷新模式计数（unit 6900 / standard 5903 / verify 4696 / report 1902 / data 68 / all 7213）、unit 子标记（unit_report 1902 / unit_config 359 / unit_core 1213 / unit_analysis 811 / unit_web 212）与跨类标记（edge 931 / data 68）；报告域测试清单补三个合并章测试文件
+- **testplan.md**：§4 新增 P1「报告章节合并」回归行（三个合并章的逐格等价 + OR 可见性 + type/board_flags/装配键守卫 + 两侧一致性 + 经理块门控）
+- **用户文档**：README（页签 21→17、分组七→八、「全部 20 项开关」→28）、how-to-use-tui-menu（基金深度分析 3→2 章 + 经理块说明、features.json 开关计数表述）、how-to-use-web-mode（报告增强子模块清单补财务指标、菜单归属 `[S]`）、faq（示例 JSON 与 19→17 项）、datasource / datasource-reliability（数据源用途归属改「持仓基本面章·区块①/②」）、developer-guide（示例键与 17 个模块键）
+
+门禁：四个 `--ci` + `dev-verify`（2748 passed）全绿。
+
 ### plan-45 章节整合·批次④ `fundamental_snapshot` + 经理变更并入（plan-45 完成）（2026-09-16）
 
 **目标**：把「财务指标」与「持仓个股财报摘要」两章合并为同页签两区块的新章 `fundamental_snapshot`「持仓基本面」，并把「基金经理变更监控」章并入「基金业绩分析」章末尾区块（注册表条目 19 → 17，零 alias）。**四批全部完成：21 → 17 条**。

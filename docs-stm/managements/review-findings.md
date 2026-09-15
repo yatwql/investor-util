@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.1-dev
-> **编号源**：`rf-next = 369`（新增问题取此编号，完成后更新为 +1；已用最大 rf-368，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 370`（新增问题取此编号，完成后更新为 +1；已用最大 rf-369，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -61,6 +61,7 @@
 | **rf-366** | **章节合并施工单把「数据源类别」误判为「注册表 type 允许集合」**：`section-consolidation-iteration.md` 的下游影响清单（§3.2）要求「`config/_validation.py` 已知类型集合删旧增新」——该集合实为 `_KNOWN_PROVIDER_TYPES`（数据源类别 id：price/fund_rank/fund_hold/industry/financial_report/financial_indicator），与注册表章节 `type` 无关；照此实施会误改数据源校验白名单，而真正的注册表 type 约束（两侧 `board_flags` 显式登记）反而无人守 | 实施期更正 §3.2 该行（标注作废 + 说明真实约束）；新增正面守卫 `unit/report/test_section_type_flag_consistency.py`（注册表 type ↔ 两侧 board_flags 键一致 + 无残留废弃 type + 写入器模块键装配一致）；同步 §6.6b 守卫表实施标记。变更详情见 changelog [0.11.1-dev] |
 | **rf-367** | **合并章 `data_flag_any` 在 Excel 侧被悲观判定吞掉页签**：`extend` 可见性模型新增多契约 OR 后，`should_create_sheet` 对 `data_flag_any` 取「未登记即未就绪」的**悲观**口径；而 `excel_generator` 构造 `data_availability` 时只登记 news/llm/两份财报契约，导致合并章 `position_structure` 的两契约（`position_relationship_data`/`concentration_data`）恒未登记 → **Excel 页签恒不创建**（HTML 侧因 `overlap_matrix`/`concentration_analysis` 直传而正常）。由 integration `test_report_chapter_consistency`（两侧可见集合一致性）捕获，dev-verify/单测均不覆盖 | `excel_generator` 按与 HTML 同口径登记两契约 flag（基金深度分析开启时下游恒计算，故视为就绪；关闭时由 board 层隐藏）；集成测试镜像同步补 flag；`test_section_visibility` 增合并章 OR 三例（仅关系就绪/仅集中度就绪/两者皆无）。变更详情见 changelog [0.11.1-dev] |
 | **rf-368** | **章节合并的 board 层参数链比施工单预估更长（漏改即运行期 TypeError）**：④-1b 预计 `enable_financial_report_digest` 需改「`html_writer`/`excel_generator`/`_report_generation` 三处调用链」，实际 `_report_generation.py` 内另有 2 处包装函数签名与 2 处调用点（含 full 路径组装处共 5 处），首次改动后 `--mode verify` 立刻报 `unexpected keyword argument`；另 `technical.md` 功能语义命名表残留 `financial_indicator_sheet` 僵尸条目，由 `check-semantic-index` 的「表内 slug 无代码引用」判据捕获 | 参数链按 `grep -rn` 全量清单一次性改净（含两处包装函数与 full 路径调用点）；语义命名表把 `financial_indicator_sheet` 替换为 `fundamental_snapshot_sheet` 并新增 `fundamental_snapshot` 合并章行；两处均由既有守卫捕获（集成/verify + `--ci` 语义索引），无需新增守卫。变更详情见 changelog [0.11.1-dev] |
+| **rf-369** | **章节合并四批后管理/用户文档出现顺序与内容漂移**（逐份核对发现，共 6 类）：① `requirements.md` §6.3 漏 `fundamental_snapshot` 行且 `llm_usage` 编号滞留 16；§6.4 编号重复（两个 6.4.5）且缺 持仓基本面 小节 → 已补行、§6.4 重排为 1..18（17 个报告章节 + 成本流水子模块），经理变更块降为章内子标题；② `how-to-config.md` 表头「15 个模块」与缺 `fundamental_snapshot` 行、`llm_usage` 编号错位，示例 JSON 仍用已删键（`fund_manager`/`position_relationship`/`fund_concentration`），「19 项/18 项」计数陈旧；③ `reports-instruction.md` 类型分组表编号错位（基金业绩 3→4、数据源 14→15、LLM 用量 16→17）、基金深度分析「共 4 个」→2、基金评价表重复的「持仓集中度」行、菜单索引与「19 个页签」陈旧；④ `folders.md` HTML 模板行仍列两个旧 partial、目录树残留三个已删模块行、缺 `test_section_visibility.py` 与合并 partial、统计快照陈旧；⑤ `technical.md` 三处「19 个模块」、注册表示例用已删条目、基金深度块图与小节标题未随合并更新、TOC 条目未随 §4.19 改题；⑥ 用户文档 `README/faq/how-to-use-*`/`datasource*` 的页签计数、示例 JSON、管理菜单 `[P]`/`[S]` 归属与章归属表述陈旧 | 逐份按注册表现状整改（章节表编号与顺序对齐 17 条注册表；示例键全部替换为现存键；计数/清单以实测或注册表为准）；`test-coverage.md` 按 `collect-test-coverage.py` 实测刷新模式/子标记/跨类计数；补 `testplan.md` §4「报告章节合并」回归行；`folders.md` 统计与目录树按实测刷新。变更详情见 changelog [0.11.1-dev] |
 
 ### 归档档案
 
