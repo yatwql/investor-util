@@ -6,6 +6,7 @@
   "llm_settings_file": "data/config/llm_settings.json",
   "llm_key_file": "data/config/llm_key.json",
   "llm_providers_file": "data/config/llm_providers.json",
+  "data_key_file": "data/config/data_key.json",  // 数据源密钥文件（通用；以 provider 名为节，如 {"datasink": {"api_key": "..."}}）
 
   // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──
   "enable_fund_deep_analysis": true,  // 基金深度分析（业绩/经理变更/持仓关系/集中度/风格因子）
@@ -20,6 +21,20 @@
   "news_top_count": 300,
   "news_sources": {"sina": true, "eastmoney": true, "cls": false, "wallstreetcn": true, "akshare": true},
   "preferred_provider": {},
+
+  // DataSinking 全文本财报（仅 A 股；需用户自备 key，见 data_key.json 的 datasink 节）
+  // enabled：数据底座总开关（关闭后依赖它的分析——财报摘要章 / 财务指标章 / 真实估值分位——静默回原样）
+  // doc_types：文种白名单，**空数组 = 不限文种**，取最新报告期（半年报/季报通常比年报新）
+  // sections：章节偏好列表（按顺序在文档实际章节名中子串匹配；季报会自动落到「主要财务数据/主要会计数据」）
+  "datasink": {
+    "enabled": true,
+    "plan": "free",
+    "requests_per_second": 0,  // 0 = 按 plan 自动（free=3/秒）
+    "daily_quota": 0,  // 0 = 按 plan 自动（free=8191 篇/日）
+    "sections": ["管理层讨论与分析"],
+    "max_chars": 2000,
+    "doc_types": []
+  },
 
   // ── D. 市场时段与缓存 ──
   "market_hour_aware": ["price", "index"],
@@ -159,7 +174,8 @@
   "batch": {
     "max_total_workers": 15,  // 全局 batch 线程硬上限（已有池不计入）
     "fund_workers": 3,  // 基金排名/持仓批量并发数
-    "industry_workers": 8  // 行业分类批量并发数
+    "industry_workers": 8,  // 行业分类批量并发数
+    "datasink_workers": 2  // 财报取数并发数（免费档批量上限 ≤3；每标的为索引+章节清单+正文共 3 次请求）
   },
   "batch_rate_limit": {  // Provider 级别请求间隔（秒），0=不限速
     "tencent": 0.0,  // 腾讯行情（不限速）
