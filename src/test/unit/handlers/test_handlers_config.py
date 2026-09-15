@@ -420,3 +420,39 @@ class TestConfigPanelsAreRectangular:
         from src.python.tui.handlers_config import _cmd_config_anonymization_mode
 
         self._assert_rectangular(capsys, _cmd_config_anonymization_mode)
+
+
+class TestReportSubmodulePanelCoversSwitches:
+    """P 面板清单 ↔ report_submodules 开关集合一致性 + 文档按名称定位（防编号漂移）。"""
+
+    def test_panel_covers_all_switches(self):
+        from src.python.config._config_defaults import _DEFAULT_CONFIG
+        from src.python.tui.handlers_config import REPORT_SUBMODULE_ITEMS
+
+        keys = [key for key, _label, _desc in REPORT_SUBMODULE_ITEMS]
+        assert set(keys) == set(_DEFAULT_CONFIG["report_submodules"]), (
+            "面板清单与 report_submodules 开关不一致（新增开关须补面板项）"
+        )
+        assert len(keys) == len(set(keys)), "面板清单存在重复键"
+
+    def test_panel_prompt_range_matches_item_count(self):
+        """报告增强子模块面板的提示范围须由清单长度派生（曾写死 (0-7) 而清单已 8 项）。"""
+        from pathlib import Path
+
+        src = Path(__file__).resolve().parents[4] / "src" / "python" / "tui" / "handlers_config.py"
+        text = src.read_text(encoding="utf-8")
+        body = text.split("def _cmd_config_report_submodules")[1].split("\ndef ")[0]
+        assert "输入编号切换 (0-7)" not in body, "该面板提示的编号范围不得写死"
+        assert "输入编号切换 (0-{len(SUBMODULES)})" in body
+
+    def test_docs_reference_each_switch_by_name(self):
+        """使用手册按**名称**定位面板项（编号随清单增删漂移，名称不漂移）。"""
+        from pathlib import Path
+
+        from src.python.tui.handlers_config import REPORT_SUBMODULE_ITEMS
+
+        doc = (Path(__file__).resolve().parents[4] / "docs-stm" / "manuals" / "how-to-config.md").read_text(
+            encoding="utf-8"
+        )
+        missing = [label for _key, label, _desc in REPORT_SUBMODULE_ITEMS if f"菜单 P → 「{label}」" not in doc]
+        assert not missing, f"使用手册缺少按名称的菜单定位：{missing}"

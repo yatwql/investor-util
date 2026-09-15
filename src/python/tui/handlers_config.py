@@ -374,7 +374,7 @@ def _cmd_config_report_boards() -> None:
             f"4. {pad_right('组合演进', section_column)} [{e_status}]",
             f"5. {pad_right('行动建议', section_column)} [{a_status}]",
             "",
-            "6. 报告增强子模块（数据质量/行业Beta/候选比较/成本流水/估值分位/市场温度/财报摘要）",
+            "6. 报告增强子模块（逐项开关：数据质量/估值分位/市场温度/财报摘要/财务指标等）",
             "7. LLM 分析章节（全球政经/智囊团/体检/穿透等） — 请在菜单 S 配置",
             "0. 返回主菜单",
         ]
@@ -416,6 +416,22 @@ def _cmd_config_report_boards() -> None:
     press_any_key()
 
 
+#: 报告增强子模块清单（面板顺序即选择编号；语义名 → 显示名 → 说明）。
+#: 模块级常量而非函数内局部变量：面板提示的编号范围、文档守卫测试与「清单是否覆盖
+#: 全部 report_submodules 开关」的一致性校验共用同一处事实来源
+#: （由 ``test_handlers_config.py::TestReportSubmodulePanelCoversSwitches`` 锁定）。
+REPORT_SUBMODULE_ITEMS: list[tuple[str, str, str]] = [
+    ("data_quality", "数据质量仪表盘", "数据源可用性矩阵增强（覆盖/时效/降级状态）"),
+    ("industry_beta", "行业Beta子表", "风格与因子分析：行业暴露 + 回归敏感性"),
+    ("candidate_compare", "候选基金比较子表", "基金业绩分析：候选基金横向比较"),
+    ("cost_lots", "成本流水", "成本分档 + XIRR + 分红累计"),
+    ("valuation_percentile", "估值分位", "资产穿透TOP10 估值分位列"),
+    ("market_temperature", "市场温度", "投资分析汇总 市场温度刻度行"),
+    ("financial_report_digest", "持仓个股财报摘要", "新增独立章：A 股财报章节摘要（需 DataSinking key）"),
+    ("financial_indicator", "财务指标", "新增独立章：A 股基本面（指标 + 质量档 + 趋势 + 当前 PE/PB）"),
+]
+
+
 def _cmd_config_report_submodules() -> None:
     """配置报告增强子模块（数据质量仪表盘 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 市场温度 / 持仓个股财报摘要 / 财务指标）。
 
@@ -437,16 +453,7 @@ def _cmd_config_report_submodules() -> None:
     )
 
     # 子模块定义：(配置键, 显示名, 说明)
-    SUBMODULES: list[tuple[str, str, str]] = [
-        ("data_quality", "数据质量仪表盘", "数据源可用性矩阵增强（覆盖/时效/降级状态）"),
-        ("industry_beta", "行业Beta子表", "风格与因子分析：行业暴露 + 回归敏感性"),
-        ("candidate_compare", "候选基金比较子表", "基金业绩分析：候选基金横向比较"),
-        ("cost_lots", "成本流水", "成本分档 + XIRR + 分红累计"),
-        ("valuation_percentile", "估值分位", "资产穿透TOP10 估值分位列"),
-        ("market_temperature", "市场温度", "投资分析汇总 市场温度刻度行"),
-        ("financial_report_digest", "持仓个股财报摘要", "新增独立章：A 股财报章节摘要（需 DataSinking key）"),
-        ("financial_indicator", "财务指标", "新增独立章：A 股基本面（指标 + 质量档 + 趋势 + 当前 PE/PB）"),
-    ]
+    SUBMODULES = REPORT_SUBMODULE_ITEMS
     accessors = {
         "data_quality": is_enable_data_quality,
         "industry_beta": is_enable_industry_beta,
@@ -475,7 +482,7 @@ def _cmd_config_report_submodules() -> None:
         print("\n".join(render_panel("配置报告增强子模块", rows)))
         print()
         try:
-            choice = input("  输入编号切换 (0-7): ").strip()
+            choice = input(f"  输入编号切换 (0-{len(SUBMODULES)}): ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
             break
