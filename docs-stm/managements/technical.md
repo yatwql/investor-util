@@ -280,7 +280,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.4 报告配置化
 
-**决策**：报告 20 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
+**决策**：报告 17 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
 **两层可见性模型**：
 
@@ -1723,7 +1723,6 @@ for sec in section_order:
 | data_flag | 判定依据 | 对应 section.type | 说明 |
 |:----------|:---------|:-----------------|:------|
 | `None` | 始终可见 | `always` / `history` | 不依赖数据状态 |
-| `manager_data` | `manager_analysis is not None` | `fund_deep_analysis` | 基金经理变更监控 |
 | `position_relationship_data` | `overlap_matrix is not None or position_relationship_data is not None` | `fund_deep_analysis` | 持仓结构与集中度·区块一/二（重合度 + 相关性） |
 | `concentration_data` | `concentration_analysis is not None` | `fund_deep_analysis` | 持仓结构与集中度·区块三（集中度） |
 | （`position_structure` 用 `data_flag_any`） | 上述两者任一就绪（OR，悲观判定） | `fund_deep_analysis` | 合并章节：任一区块有数据即显示（见「持仓结构与集中度」） |
@@ -1731,8 +1730,11 @@ for sec in section_order:
 | `evolution_data` | `evolution_data is not None` | `evolution` | 组合演进（多快照趋势） |
 | `news_data_available` | `include_news` flag（新闻数据可用） | `news` | 新闻关联分析 |
 | `llm_data_available` | `llm_enabled_flag`（LLM 生成成功） | `llm` | LLM 全部 5 模块 |
+| `financial_report_digest_data` | `financial_report_digest_data is not None` | `fundamental_snapshot` | 持仓基本面·区块二（财报摘要，功能开关 `financial_report_digest`） |
+| `financial_indicator_data` | `financial_indicator_data is not None` | `fundamental_snapshot` | 持仓基本面·区块一（财务指标，功能开关 `financial_indicator`） |
+| （`fundamental_snapshot` 用 `data_flag_any`） | 上述两者任一就绪（OR，悲观判定） | `fundamental_snapshot` | 合并章节：任一块就绪即显示；块级开关各控各的渲染 |
 
-`always` 类型模块（summary / holdings_detail / penetration / fund_performance / data_source_status）无 data_flag，始终显示。`evolution` 类型模块（`portfolio_evolution` 组合演进）由独立开关 `enable_portfolio_evolution` 控制，带 `evolution_data` 标志——聚合数据存在（`evolution_data is not None`）才渲染章节，`available=False` 时章节内写占位文本（与持仓关系矩阵·相关性区块降级模式一致）。`action` 类型模块（`action` 行动建议）由独立顶层开关 `enable_action`（默认开，菜单 P 可切换）控制，`data_flag` 为 `None`（纯算法计算，basic/both/full 均可见，无数据可用性判定）——开关关闭或无持仓数据时不渲染章节，落 §1.4.5 降级占位。
+`always` 类型模块（summary / holdings_detail / penetration / fund_performance / data_source_status）无 data_flag，始终显示。`evolution` 类型模块（`portfolio_evolution` 组合演进）由独立开关 `enable_portfolio_evolution` 控制，带 `evolution_data` 标志——聚合数据存在（`evolution_data is not None`）才渲染章节，`available=False` 时章节内写占位文本（与持仓关系矩阵·相关性区块降级模式一致）。`action` 类型模块（`action` 行动建议）由独立顶层开关 `enable_action`（默认开，菜单 P 可切换）控制，`data_flag` 为 `None`（纯算法计算，basic/both/full 均可见，无数据可用性判定）——开关关闭或无持仓数据时不渲染章节，落 §1.4.5 降级占位。`fundamental_snapshot` 类型模块（`fundamental_snapshot` 持仓基本面）为**合并章**：board 层 `enable_fundamental_snapshot`（= 财务指标与财报摘要两功能开关任一开启）与 data 层 `data_flag_any` 双契约 OR 共同决定，章内两个区块各由自己的功能开关控制（契约 None = 该块关闭，整块不渲染）。
 
 ### 4.6 报告序号可配置
 
@@ -2805,9 +2807,9 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **报告挂载点**：结算与确定性登记经 `report/_experimental_seams.py::record_deterministic_decisions` 置于 LLM 拉取**之前**（当次教训含本批结算结果，须在 LLM 注入前落档，否则提示词读不到新结算）；LLM 登记与复盘装配经 `record_llm_decisions_and_review_block` 置于 LLM 回退**之后**。两处异常守护由挂载点统一提供，实验特性故障绝不打断报告主链路。
 
-### 4.19 持仓个股财报摘要（DataSinking 全文本财报）
+### 4.19 持仓基本面（财务指标 + 持仓个股财报摘要，一章两区块）
 
-**定位**：新增独立章「持仓个股财报摘要」（sheet key `financial_report_digest`，type `financial_report`，功能开关 `financial_report_digest` 默认关）。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）指定章节的**原文摘要**，与「拿行情/拿持仓」互补：前者提供公司经营层叙事与财务口径原文。
+**定位**：合并章「持仓基本面」（sheet key `fundamental_snapshot`，type `fundamental_snapshot`），一章两区块：**区块① 财务指标**（功能开关 `financial_indicator`，默认关）+ **区块② 持仓个股财报摘要**（功能开关 `financial_report_digest`，默认关）。两区块各由自己的开关控制（契约 dict 为 None 表示该开关关闭 → 该块整体不渲染），章节整体可见性按注册表 `data_flag_any` 的 OR 口径（任一块就绪即显示；Excel 侧 `excel_generator` 同步登记两条契约 flag）。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）指定章节的**原文摘要**，与「拿行情/拿持仓」互补：前者提供公司经营层叙事与财务口径原文。
 
 **数据源与鉴权**：DataSinking（`https://api.datasink.ing`）提供全文本财报 Markdown，仅覆盖 A 股（SSE/SZSE/BSE，代码经 `core/code_utils.py::to_fmp_symbol` 映射为 FMP 风格）。**需用户自备 API key**：凭据取通用密钥文件 `data/config/data_key.json` 的 `datasink` 节（`{"datasink": {"api_key": "..."}}`），环境变量 `DATASINK_API_KEY` 可覆盖；缺 key 时链路主动跳过并给申请指引，章节写占位。
 
@@ -3205,14 +3207,15 @@ make_http_client(timeout=10.0) → httpx.Client
 | `period_entry_label` | 报告期明细条目措辞（带穿透来源时补注目标 ETF 与「未折算持有比例」） | 资产穿透TOP10 | 报告配置 | 无（渲染原语） |
 | `hold_schema` | 基金持仓缓存载荷语义版本（读侧拒收非当前版本 → 视为未命中重取，防「语义变更型修复」被 TTL 内缓存遮蔽） | 资产穿透TOP10 | 数据获取 | 无（缓存契约字段，值见 `_HOLD_PAYLOAD_SCHEMA`） |
 | `cache_validate` | 缓存载荷准入判据（`fetch_with_fallback` 参数：载荷未通过判据即视为未命中、清缓存重取） | 资产穿透TOP10 | 数据获取 | 无（链路原语） |
-| `financial_report_digest` | 持仓个股财报摘要（新增独立章：A 股标的取最新年报章节原文摘要；数据源 DataSinking，需用户自备 key） | 持仓个股财报摘要 | 数据获取 | 功能开关 `financial_report_digest`（默认关） |
-| `financial_indicator` | 财务指标（数据域 + 报告章：上市公司单报告期结构化指标 + 质量档 + 年度趋势 + 当前 PE/PB） | 财务指标 | 数据获取 | 功能开关 `financial_indicator`（默认关） |
-| `financial_indicator_data` | 财务指标数据契约（C19：available/reason/rows/failures/entry_count） | 财务指标 | 数据获取 | 无（契约） |
-| `financial_indicator_sheet` | 财务指标页签（Excel 呈现：亿元/百分数/倍数，缺失写「—」） | 财务指标 | 报告输出 | 无（渲染） |
+| `financial_report_digest` | 持仓个股财报摘要（持仓基本面章区块二：A 股标的取最新年报章节原文摘要；数据源 DataSinking，需用户自备 key） | 持仓基本面 | 数据获取 | 功能开关 `financial_report_digest`（默认关） |
+| `financial_indicator` | 财务指标（数据域 + 持仓基本面章区块一：上市公司单报告期结构化指标 + 质量档 + 年度趋势 + 当前 PE/PB） | 持仓基本面 | 数据获取 | 功能开关 `financial_indicator`（默认关） |
+| `financial_indicator_data` | 财务指标数据契约（C19：available/reason/rows/failures/entry_count） | 持仓基本面 | 数据获取 | 无（契约） |
+| `fundamental_snapshot` | 持仓基本面（合并章：财务指标区块 + 财报摘要区块同页签/同章节呈现；可见性 `data_flag_any` OR，块级开关各控各的） | 持仓基本面 | 报告输出 | `enable_fundamental_snapshot`（= 两功能开关任一开启） |
+| `fundamental_snapshot_sheet` | 合并章 Excel 写入器（`write_fundamental_snapshot_sheet`；区块写入器 `_write_indicator_block` / `_write_digest_block`） | 持仓基本面 | 报告输出 | 无（渲染） |
 | `compute_real_valuation` | 真实历史估值分位（TTM 口径：多期每股收益差分 × 历史收盘价 → 历史 PE/PB 序列 → 当前值分位） | 资产穿透TOP10 | 分析计算 | 无（纯计算） |
 | `_fundamental_signal` | 持仓基本面信号（质量档与年度趋势同向才给方向，逐只指标聚合为分布） | LLM 提示词信号 | LLM 注入 | `signal_pre_digest`（默认开） |
 | `_narrative_divergence_signal` | 叙事与数字背离信号（摘要语气词频 × 指标趋势/同比确定性比对，只列依据不下结论） | LLM 提示词信号 | LLM 注入 | `signal_pre_digest`（默认开） |
-| `datasink_feature_ready` | DataSinking 数据底座就绪判定（配置位 `datasink.enabled` 开启 且 凭据就绪；纯本地、零请求）——门禁财务指标章与真实历史估值分位 | 财务指标 | 数据获取 | `datasink.enabled`（默认开） |
+| `datasink_feature_ready` | DataSinking 数据底座就绪判定（配置位 `datasink.enabled` 开启 且 凭据就绪；纯本地、零请求）——门禁持仓基本面章区块二与真实历史估值分位 | 持仓基本面 | 数据获取 | `datasink.enabled`（默认开） |
 | `FinancialIndicatorFields` | 财务指标标准字段记录（金额单位元；比率为小数比例；可选数值缺失取 None） | 资产穿透TOP10 | 数据获取 | 无（契约） |
 | `akshare_financial` | akshare 财务指标（指标域主源，无需凭据；一条调用多股） | 资产穿透TOP10 | 数据获取 | 无（provider） |
 | `datasink_indicator` | DataSinking 指标解析（备用支路：从「公司简介和主要财务指标」章节压平正文按锚点提取指标） | 资产穿透TOP10 | 数据获取 | 无（provider / 适配器） |
@@ -3278,7 +3281,7 @@ make_http_client(timeout=10.0) → httpx.Client
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 
-> **合并章代码标识符**：合并章 sheet key 统一为语义名——`holdings_detail`（持仓明细与分类，合并 `market_value` + `category`）、`position_structure`（持仓结构与集中度，合并 `position_relationship` + `fund_concentration`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号命名。
+> **合并章代码标识符**：合并章 sheet key 统一为语义名——`holdings_detail`（持仓明细与分类，合并 `market_value` + `category`）、`position_structure`（持仓结构与集中度，合并 `position_relationship` + `fund_concentration`）、`fundamental_snapshot`（持仓基本面，合并 `financial_indicator` + `financial_report_digest`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号命名。
 <!-- semantic-index:end -->
 
 > **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~19（被合并的 key 已删除、`action` 章已插入，保持其余相对顺序）；被合并的 key（`fund_overlap`/`correlation_analysis`/`portfolio_history`/`drawdown_analysis`/`fund_style`/`factor_exposure`）在用户 config `report_section_order` 中已失效，可清理（`config/_validation.py` 对未知 key 仅告警不报错）。
@@ -3393,7 +3396,7 @@ web/ (Web 服务层，薄入口)
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号与显示名不可硬编码** — 报告 20 个模块的章节顺序/可见性由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，页签显示名由同文件的 `_REPORT_SHEET_NAMES` 注册表驱动（两表键一一对应、同名显示名由测试锁定，页签名一律经 `get_report_sheet_name()` 取用），均支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号；显示名散落在写入层则重命名页签必须全局搜索，两处清单一旦不同步便出现「配置里叫一个名、页签上叫另一个名」 | 序号配置失效、用户自定义顺序不生效；页签显示名与注册表/配置脱节 | report/ 编排器与写入层（excel_generator.py、html_writer.py、fund_style_classify.py 等）；任何写入页签名的模块均须经 `get_report_sheet_name()`，不得直接写中文字面量 |
+| **C7** | **报告序号与显示名不可硬编码** — 报告 17 个模块的章节顺序/可见性由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，页签显示名由同文件的 `_REPORT_SHEET_NAMES` 注册表驱动（两表键一一对应、同名显示名由测试锁定，页签名一律经 `get_report_sheet_name()` 取用），均支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号；显示名散落在写入层则重命名页签必须全局搜索，两处清单一旦不同步便出现「配置里叫一个名、页签上叫另一个名」 | 序号配置失效、用户自定义顺序不生效；页签显示名与注册表/配置脱节 | report/ 编排器与写入层（excel_generator.py、html_writer.py、fund_style_classify.py 等）；任何写入页签名的模块均须经 `get_report_sheet_name()`，不得直接写中文字面量 |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在附录 H（pipeline_data Schema 定义）中预定义类型、可选性、写入/消费模块后，才能在代码中使用该键 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
@@ -3684,9 +3687,9 @@ investor-util/
 
 > `market_temperature_data`（市场温度，C19 契约，9 键）：`{"available": bool, "status": str, "index_code": str, "index_name": str, "price_percentile": float\|None, "ma_deviation": float\|None, "volatility": float\|None, "score": float\|None, "tier": str\|None, "disclaimer": str}`。价格分位（复用估值分位的价格分位机制）+ 均线偏离 + 年化波动率三因子合成温度分（0~100，`analysis/market_temperature.py`，权重 0.5/0.3/0.2，各分量 clamp）；**温度计只给刻度、无仓位指令**（`TEMPERATURE_DISCLAIMER` 渲染层必须展示）。`ma_deviation`/`volatility` 为小数比例（0.032=3.2%），渲染层须 ×100 转百分数展示。由 `report/orchestrator.py::compute_market_temperature_data` 计算（指数 K 线 `fetch_index_history` 沪深300 走 Chain + session_cache；开关 功能开关 `market_temperature` 默认关；关闭 → None → 「投资分析汇总」温度行隐藏；K 线不足 → `insufficient` 占位）。消费方：汇总 Excel `summary._write_market_temperature`（「市场指数」后刻度行）与 HTML kv-table（`market_temperature` 展示映射）。
 
-> `financial_report_digest_data`（持仓个股财报摘要，C19 契约，5 键）：`{"available": bool, "reason": str, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`symbol`/`report_period`/`doc_type`（中文标签）/`title`/`announcement_date`/`summary`/`source`/`adjunct_url`；`failures` 每项含 `code`/`name`/`reason`。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）的目标章节正文并按 `datasink.max_chars` 截断，由 `report/financial_report_digest.py::build_financial_report_digest` 装配（数据源 `providers/datasink.py`，取数编排 `fetcher/financial_report.py`）。开关 功能开关 `financial_report_digest` 默认关（关闭 → None → 章节隐藏）；缺凭据/无 A 股标的/全部无覆盖 → `available=False` 降级。合规：`source` 为披露平台归属，渲染层须保留。C7 注册 type=`financial_report`、data_flag=`financial_report_digest_data`。消费方：Excel `report/financial_report_sheet.py` 与 HTML `partials/financial_report_section.html`。
+> `financial_report_digest_data`（持仓个股财报摘要，C19 契约，5 键）：`{"available": bool, "reason": str, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`symbol`/`report_period`/`doc_type`（中文标签）/`title`/`announcement_date`/`summary`/`source`/`adjunct_url`；`failures` 每项含 `code`/`name`/`reason`。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）的目标章节正文并按 `datasink.max_chars` 截断，由 `report/financial_report_digest.py::build_financial_report_digest` 装配（数据源 `providers/datasink.py`，取数编排 `fetcher/financial_report.py`）。开关 功能开关 `financial_report_digest` 默认关（关闭 → None → 章节隐藏）；缺凭据/无 A 股标的/全部无覆盖 → `available=False` 降级。合规：`source` 为披露平台归属，渲染层须保留。C7 注册：该契约并入合并章 `fundamental_snapshot` 的 `data_flag_any`（无独立 type）。消费方：Excel `report/fundamental_snapshot_sheet.py::_write_digest_block` 与 HTML `partials/fundamental_snapshot_section.html`（区块二）。
 >
-> `financial_indicator_data`（财务指标，C19 契约，5 键）：`{"available": bool, "reason": str, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`report_period`/`doc_type`/`doc_type_label`/`source_api`/`source`/`revenue`/`net_profit`/`revenue_yoy`/`net_profit_yoy`/`gross_margin`/`roe`/`debt_ratio`/`operating_cash_flow`/`eps`/`bvps`/`pe`/`pb`/`quality_grade`/`quality_score`/`trend`/`series`/`period_count`；`failures` 每项含 `code`/`name`/`reason`。对持仓 + 穿透中的 A 股标的取多期指标（`fetcher/financial_indicator.py`：主源 akshare 一次调用得多期，主源不可用时退化为链路单期记录），由 `analysis/financial_indicator.py::quality_grade`/`trend_label`/`current_valuation` 派生质量档（ROE/毛利率/资产负债率/经营现金流对净利覆盖 四维均值启发式，**非投资建议、非评级**，阈值不区分行业）、年度趋势（相邻年报营收与净利）与当前 PE/PB（现价 ÷ 该报告期每股收益/每股净资产；亏损或净资产非正留空），由 `report/financial_indicator.py::build_financial_indicator` 装配（现价来自行情明细，经 `fetcher/financial_indicator.py::collect_price_map`）。开关 功能开关 `financial_indicator` 默认关（关闭 → None → 章节隐藏）；无 A 股标的/数据源不可用 → `available=False` 降级。历史 PE/PB 分位（TTM 口径）属后续阶段，本章只给当前值。C7 注册 type=`financial_indicator`、data_flag=`financial_indicator_data`。消费方：Excel `report/financial_indicator_sheet.py` 与 HTML `partials/financial_indicator_section.html`。
+> `financial_indicator_data`（财务指标，C19 契约，5 键）：`{"available": bool, "reason": str, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`report_period`/`doc_type`/`doc_type_label`/`source_api`/`source`/`revenue`/`net_profit`/`revenue_yoy`/`net_profit_yoy`/`gross_margin`/`roe`/`debt_ratio`/`operating_cash_flow`/`eps`/`bvps`/`pe`/`pb`/`quality_grade`/`quality_score`/`trend`/`series`/`period_count`；`failures` 每项含 `code`/`name`/`reason`。对持仓 + 穿透中的 A 股标的取多期指标（`fetcher/financial_indicator.py`：主源 akshare 一次调用得多期，主源不可用时退化为链路单期记录），由 `analysis/financial_indicator.py::quality_grade`/`trend_label`/`current_valuation` 派生质量档（ROE/毛利率/资产负债率/经营现金流对净利覆盖 四维均值启发式，**非投资建议、非评级**，阈值不区分行业）、年度趋势（相邻年报营收与净利）与当前 PE/PB（现价 ÷ 该报告期每股收益/每股净资产；亏损或净资产非正留空），由 `report/financial_indicator.py::build_financial_indicator` 装配（现价来自行情明细，经 `fetcher/financial_indicator.py::collect_price_map`）。开关 功能开关 `financial_indicator` 默认关（关闭 → None → 章节隐藏）；无 A 股标的/数据源不可用 → `available=False` 降级。历史 PE/PB 分位（TTM 口径）属后续阶段，本章只给当前值。C7 注册：该契约并入合并章 `fundamental_snapshot` 的 `data_flag_any`（无独立 type）。消费方：Excel `report/fundamental_snapshot_sheet.py::_write_indicator_block` 与 HTML `partials/fundamental_snapshot_section.html`（区块一）。
 
 > `style_factor_data`（风格与因子分析，C19 契约，13 键 + 内嵌 `industry_beta` 子键）：主键 `{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/style_factor_regression.py` 计算、`report/orchestrator.py` 组装。子键 `industry_beta`（行业 Beta，`industry_beta.py::compute_industry_beta_analysis`，开关 功能开关 `industry_beta` 默认关；关闭 → None → 区块隐藏）：`{"available": bool, "exposure": {industry: float}, "index_codes": {industry: str}, "betas": {industry: float}, "t_stats": {industry: float}, "significant": {industry: bool}, "correlations": {industry: float}, "unmapped_industries": list[str]}`——行业暴露占比按持仓市值聚合，行业指数为中证行业指数（`INDUSTRY_INDEX_MAP`），β 复用 `compute_factor_exposure` 单因子 OLS。C7 注册见 §8.3（type=`fund_deep_analysis`、data_flag=`style_factor_data`），计算方案/架构约束/降级分支见 §4.8 风格与因子分析。
 

@@ -37,7 +37,6 @@ _ALL_KEYS_DEFAULT = [
     "holdings_detail",
     "penetration",
     "fund_performance",
-    "fund_manager",
     "position_structure",
     "style_factor",
     "news_correlation",
@@ -50,7 +49,7 @@ _ALL_KEYS_DEFAULT = [
 ]
 
 _ALWAYS_KEYS = {"summary", "holdings_detail", "penetration", "fund_performance"}
-_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_structure", "style_factor"}
+_FUND_DEEP_ANALYSIS_KEYS = {"position_structure", "style_factor"}
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
 _HISTORY_KEYS = {"portfolio_history_drawdown"}
@@ -71,16 +70,15 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "holdings_detail", "name": "持仓明细与分类", "number": 2},
     {"key": "penetration", "name": "资产穿透TOP10", "number": 3},
     {"key": "fund_performance", "name": "基金业绩分析", "number": 4},
-    {"key": "fund_manager", "name": "基金经理变更监控", "number": 5},
-    {"key": "position_structure", "name": "持仓结构与集中度", "number": 6},
-    {"key": "style_factor", "name": "风格与因子分析", "number": 7},
-    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 8},
-    {"key": "global_macro", "name": "全球政经局势", "number": 9},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 10},
-    {"key": "health_check", "name": "持仓体检报告", "number": 11},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 12},
-    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 13},
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 14},
+    {"key": "position_structure", "name": "持仓结构与集中度", "number": 5},
+    {"key": "style_factor", "name": "风格与因子分析", "number": 6},
+    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 7},
+    {"key": "global_macro", "name": "全球政经局势", "number": 8},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 9},
+    {"key": "health_check", "name": "持仓体检报告", "number": 10},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 11},
+    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 12},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 13},
 ]
 
 
@@ -223,9 +221,9 @@ class TestHtmlNavStructure(unittest.TestCase):
     # ── Nav links ──────────────────────────────────────────────
 
     def test_nav_link_count(self):
-        """导航链接数量应等于可见模块数（全部可见 = 14）。"""
+        """导航链接数量应等于可见模块数（全部可见 = 13）。"""
         links = self.soup.select("nav.section-nav a")
-        self.assertEqual(len(links), 14, f"导航应有 14 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 13, f"导航应有 13 个链接，实际 {len(links)}")
 
     def test_every_nav_link_has_corresponding_section(self):
         """每个导航链接的 href 指向一个存在的 section id。"""
@@ -417,18 +415,17 @@ class TestHtmlCustomOrder(unittest.TestCase):
             {"key": "holdings_detail", "name": "持仓明细与分类", "number": 3},
             {"key": "penetration", "name": "资产穿透TOP10", "number": 4},
             # 基金深度分析保持默认
-            {"key": "fund_manager", "name": "基金经理变更监控", "number": 5},
-            {"key": "position_structure", "name": "持仓结构与集中度", "number": 6},
-            {"key": "style_factor", "name": "风格与因子分析", "number": 7},
+            {"key": "position_structure", "name": "持仓结构与集中度", "number": 5},
+            {"key": "style_factor", "name": "风格与因子分析", "number": 6},
             # news 保持默认
-            {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 8},
+            {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 7},
             # llm 保持默认
-            {"key": "global_macro", "name": "全球政经局势", "number": 9},
-            {"key": "expert_review", "name": "智囊团深度复盘", "number": 10},
-            {"key": "health_check", "name": "持仓体检报告", "number": 11},
-            {"key": "penetration_deep", "name": "穿透深度分析", "number": 12},
-            {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 13},
-            {"key": "llm_usage", "name": "LLM API 用量", "number": 14},
+            {"key": "global_macro", "name": "全球政经局势", "number": 8},
+            {"key": "expert_review", "name": "智囊团深度复盘", "number": 9},
+            {"key": "health_check", "name": "持仓体检报告", "number": 10},
+            {"key": "penetration_deep", "name": "穿透深度分析", "number": 11},
+            {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 12},
+            {"key": "llm_usage", "name": "LLM API 用量", "number": 13},
         ]
         cls.numbers = {sec["key"]: sec["number"] for sec in cls.custom_order}
         cls.sv_dict = {sec["key"]: True for sec in cls.custom_order}
@@ -481,8 +478,8 @@ class TestHtmlCustomOrder(unittest.TestCase):
                 orders[sec_id] = int(m.group(1))
 
         self.assertIn("sec-llm_usage", orders)
-        # llm_usage 的 order 应为 14（末位，合并章节后总条目 19）
-        self.assertEqual(orders["sec-llm_usage"], 14, "llm_usage 的 order 应为 14（末位）")
+        # llm_usage 的 order 应为 13（末位，合并章节后总条目 17）
+        self.assertEqual(orders["sec-llm_usage"], 13, "llm_usage 的 order 应为 13（末位）")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1093,7 +1090,7 @@ class TestHtmlTocSidebar(unittest.TestCase):
     def test_toc_link_count_matches_sections(self):
         """目录链接数量 = 可见模块数（全部可见 = 15）。"""
         links = self.soup.select("#toc-sidebar a[href^='#sec-']")
-        self.assertEqual(len(links), 14, f"目录应有 14 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 13, f"目录应有 13 个链接，实际 {len(links)}")
 
     def test_every_toc_link_has_corresponding_section(self):
         """每个目录链接的 href 指向一个存在的 section id。"""
@@ -1149,7 +1146,6 @@ class TestHtmlTocSidebar(unittest.TestCase):
             "holdings_detail",
             "penetration",
             "fund_performance",
-            "fund_manager",
             "position_structure",
             "style_factor",
             "portfolio_history_drawdown",
@@ -1301,7 +1297,6 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             _group_keys("fund_deep"),
             [
                 "fund_performance",
-                "fund_manager",
                 "position_structure",
                 "style_factor",
             ],
@@ -1355,16 +1350,14 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 "holdings_detail",
                 "penetration",
                 "data_source_status",
-                "financial_report_digest",
-                "financial_indicator",
+                "fundamental_snapshot",
             ],
-            "「基础信息」组应含数据源可用性矩阵、持仓个股财报摘要与财务指标",
+            "「基础信息」组应含数据源可用性矩阵与持仓基本面",
         )
         self.assertEqual(
             by_key["fund_deep"],
             [
                 "fund_performance",
-                "fund_manager",
                 "position_structure",
                 "style_factor",
             ],

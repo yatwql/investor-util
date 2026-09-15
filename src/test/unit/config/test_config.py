@@ -710,7 +710,7 @@ class TestValidateReportSectionOrder(unittest.TestCase):
             {
                 "report_section_order": {
                     "summary": 1,
-                    "fund_manager": 6,
+                    "position_structure": 5,
                     "global_macro": 12,
                 }
             }
@@ -1049,3 +1049,27 @@ class TestReportGroupSwitches:
 
         assert is_enable_market_temperature({}) is True
         assert is_enable_market_temperature({"report_submodules": {"market_temperature": False}}) is True
+
+
+class TestReportSectionOrderTemplateMatchesRegistry:
+    """配置模板的 report_section_order 与注册表出厂默认同序（章节合并后一致性锁定）。"""
+
+    @pytest.mark.unit_config
+    def test_template_section_order_matches_registry_defaults(self):
+        """模板/默认配置的 report_section_order（若有）必须与注册表默认序号一致。"""
+        import json
+        import re
+
+        from src.python.config import _config_defaults as d
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT, get_report_section_keys
+
+        template = d._get_default_config_template()
+        m = re.search(r'"report_section_order":\s*(\{.*?\})', template, re.S)
+        assert m, "模板未包含 report_section_order"
+        order = json.loads(m.group(1))
+        if not order:  # 空 {} = 使用默认顺序，天然一致
+            return
+        defaults = {s["key"]: s["number"] for s in _REPORT_SECTION_DEFAULT}
+        assert set(order) <= get_report_section_keys(), f"模板含未知模块: {set(order) - get_report_section_keys()}"
+        for key, num in order.items():
+            assert defaults[key] == num, f"{key} 模板序号 {num} != 注册表默认 {defaults[key]}"

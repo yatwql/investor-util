@@ -6,6 +6,33 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### plan-45 章节整合·批次④ `fundamental_snapshot` + 经理变更并入（plan-45 完成）（2026-09-16）
+
+**目标**：把「财务指标」与「持仓个股财报摘要」两章合并为同页签两区块的新章 `fundamental_snapshot`「持仓基本面」，并把「基金经理变更监控」章并入「基金业绩分析」章末尾区块（注册表条目 19 → 17，零 alias）。**四批全部完成：21 → 17 条**。
+
+**注册表与可见性**
+- 删除 `fund_manager` 条目（其内容成为基金业绩章的块）；`financial_report_digest` + `financial_indicator` 两条 → 一条 `fundamental_snapshot`（`type=fundamental_snapshot`、`data_flag=None`、`data_flag_any=("financial_indicator_data","financial_report_digest_data")`、序号 16）；条目总数 17（序号连续 1..17）；`_REPORT_SHEET_NAMES` 同步（新增 `fundamental_snapshot: 持仓基本面`，删除 `fund_manager`/两条旧财报页签名）
+- board 层参数合并：两侧 `board_flags` 删除 `"financial_report"`、`"financial_indicator"` → `"fundamental_snapshot"`（`enable_fundamental_snapshot` = 两功能开关任一开启）；`enable_financial_report_digest` 形参链全量删除（`html_writer` / `excel_generator` / `_report_generation` 包装函数与两处调用点）；`html_writer_nav._SECTION_NAV_GROUP_MAP` 同步（删 `fund_manager`，两条旧财报章键 → `fundamental_snapshot: basic`）
+- `excel_generator` 的 `data_availability` 保持登记两契约 flag（`data_flag_any` 乐观/悲观口径与 HTML 侧一致）
+
+**Excel / HTML 渲染**
+- 新增 `report/fundamental_snapshot_sheet.py::write_fundamental_snapshot_sheet`（区块① 财务指标 19 列 + 区块② 财报摘要 9 列；契约 None = 该功能开关关闭 → 该块整体不写，含小节标题）；删除 `financial_indicator_sheet.py` / `financial_report_sheet.py`（`financial_indicator.py` 装配层与 `financial_report_digest.py` 保持不动）
+- `report/fund_performance.py` 吸收经理变更块：`write_fund_performance_sheet(..., manager_data=None)` + `_write_manager_block`（8 列 + 预警着色 + 占位）；删除 `fund_manager_sheet.py`
+- 经理数据改在内容阶段组装（`write_content_sheets` 新增 `enable_fund_deep_analysis` 参数，开启时 `detect_manager_changes` 注入），`excel_fund_deep_analysis` 不再单独写经理页签；`excel_module_loader` 装配键改 `write_fundamental_snapshot_sheet`（删除三个旧键）
+- HTML：新增 `partials/fundamental_snapshot_section.html`（一章两区块，块级开关 `financial_indicator_data` / `financial_report_digest_data` 非空才渲染该块），删除两个旧 partial；`report_template.html` 删除独立经理章节、内容并入 `sec-fund_performance` 末尾（块门禁 `manager_analysis` 非空 = 基金深度分析开启）
+- `data/config/config.json` 的 `report_section_order` 重生成（删除 `fund_manager`，新增 `fundamental_snapshot`=16）
+
+**测试（新增/同步）**
+- `test_financial_indicator_sheet.py` + `test_financial_report_sheet.py` → `test_fundamental_snapshot_sheet.py`（区块写入器用例 + 新增合并写入器：两区块小节标题同页签、契约 None 的块级门控两侧、两契约皆 None 仅剩章标题、**内容等价**）
+- `test_fund_manager_sheet.py` → `test_fund_performance_manager_block.py`（改调 `_write_manager_block`）；`test_fund_performance.py` 新增经理块门控两例（`manager_data=None` 不渲染经理块且主表照常 / 传入时渲染）
+- 章节键断言同步：条目数 19→17、HTML 容器 19→17、导航/目录 14→13、Excel 页签数 15→14（全开）；type 集合 `financial_report`/`financial_indicator` → `fundamental_snapshot`；`fund_deep_analysis` 计数 3→2；配置模板与注册表同序新增一致性用例
+
+**文档同步**：`technical.md`（模块数 20→17、可见性旗标表、`data_flag` 表、§4.19 改为「持仓基本面」、契约叙述的 C7 与消费方、功能语义命名表（僵尸条目 `financial_indicator_sheet` → `fundamental_snapshot_sheet` + 新增合并章行）、合并章注）、`requirements.md`（§6.3 表与 §6.4 小节合并重排、§5.9/§6.12 章节合并说明）、`testplan.md`、用户文档 5 份、`folders.md` 目录树、`plan.md`（批次④ 已实施，plan-45 完成）
+
+**实施期自查**：`rf-368` —— board 层参数链比施工单预估更长（实际 5 处调用点），首改即由 `--mode verify` 的 `unexpected keyword argument` 捕获并改净；`technical.md` 语义命名表僵尸条目由 `check-semantic-index` 捕获。
+
+**门禁**：`--mode verify,regression` 4939 passed / 0 failed；`dev-verify` 2748 passed；四个 `--ci` + 版本一致性 + ruff check/format 全绿。
+
 ### plan-45 章节整合·批次③ `position_structure` 实施（2026-09-16）
 
 **目标**：把「持仓关系矩阵」与「持仓集中度监控」两章合并为同页签三区块的新章 `position_structure`「持仓结构与集中度」（注册表条目 20 → 19，零 alias）。

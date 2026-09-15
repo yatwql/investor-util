@@ -157,11 +157,11 @@ class TestMessageConsistency(unittest.TestCase):
 
     def test_placeholder_texts_used_in_both(self):
         """基金深度分析 STATUS_MESSAGES key 完整且被 sheet 模块引用。"""
-        from src.python.report.fund_manager_sheet import write_fund_manager_sheet
+        from src.python.report.fund_performance import write_fund_performance_sheet
         from src.python.report.position_structure_sheet import write_position_structure_sheet
         from src.python.report.style_factor_sheet import write_style_factor_sheet
 
-        self.assertTrue(callable(write_fund_manager_sheet))
+        self.assertTrue(callable(write_fund_performance_sheet))
         self.assertTrue(callable(write_position_structure_sheet))
         self.assertTrue(callable(write_style_factor_sheet))
 

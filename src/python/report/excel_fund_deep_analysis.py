@@ -102,27 +102,6 @@ def write_fund_deep_analysis_sheets(
     if not enable_fund_deep_analysis:
         return
 
-    # ── 基金经理变更监控（独立逻辑，无 fetch_fund_holdings 依赖） ──
-    detect = modules.get("detect_manager_changes", lambda _h: [])
-    ws_mgr = sheets.get("fund_manager")
-    if ws_mgr is not None:
-        prog.info("正在分析基金经理变更...")
-        try:
-            manager_data = detect(holdings)
-        except Exception as e:
-            logger.warning("基金经理变更监控数据获取失败: %s", e)
-            prog.add_error("基金经理变更监控数据获取失败")
-            manager_data = None
-
-        write_fund_mgr = modules.get("write_fund_manager_sheet")
-        if write_fund_mgr:
-            try:
-                write_fund_mgr(ws_mgr, manager_data or [])
-                prog.ok("基金经理变更监控页签写入完成")
-            except Exception as e:
-                logger.warning("基金经理变更监控页签写入失败: %s", e)
-                prog.add_error("基金经理变更监控页签写入失败")
-
     # ── 持仓结构与集中度（一章三区块：持仓重合度 + 持仓相关性 + 持仓集中度） ──
     # 单页签一次写入：两区块数据源独立组装、各自独立降级（§1.4.5）；章节可见性为
     # data_flag_any 的 OR 口径（`position_relationship_data` ∪ `concentration_data`）。

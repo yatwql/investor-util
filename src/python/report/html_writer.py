@@ -400,8 +400,7 @@ def write_html_report(
     valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（「资产穿透TOP10」估值分位列，None=开关关闭）
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约 market_temperature_data（「投资分析汇总」温度行，None=开关关闭）
-    enable_financial_report_digest: bool = False,  # board 层：持仓个股财报摘要（report_submodules，默认关）
-    enable_financial_indicator: bool = False,  # board 层：财务指标（report_submodules，默认关）
+    enable_fundamental_snapshot: bool = False,  # board 层：持仓基本面章（两功能开关任一开启）
     financial_report_digest_data: dict | None = None,  # data 层：财报摘要契约（None=无数据，章节隐藏）
     financial_indicator_data: dict | None = None,  # data 层：财务指标契约（None=无数据，章节隐藏）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
@@ -539,9 +538,8 @@ def write_html_report(
         style_factor_data=style_factor_data,
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
-        enable_financial_report_digest=enable_financial_report_digest,
+        enable_fundamental_snapshot=enable_fundamental_snapshot,
         financial_report_digest_data=financial_report_digest_data,
-        enable_financial_indicator=enable_financial_indicator,
         financial_indicator_data=financial_indicator_data,
     )
 

@@ -22,6 +22,7 @@ def write_content_sheets(
     enable_cost_lots: bool = False,
     valuation_data: dict | None = None,
     market_temperature_data: dict | None = None,
+    enable_fund_deep_analysis: bool = False,
 ) -> dict:
     """写入汇总 / 持仓明细与分类 / 穿透 / 基金业绩页签，返回穿透结果。
 
@@ -35,6 +36,22 @@ def write_content_sheets(
             开关关闭或 None 时汇总页签保持既有输出。
     """
     fund_flow_data = data.get("fund_flow_data") if enable_cost_lots else None
+
+    # 基金经理变更监控：作为「基金业绩分析」章节的子区块（随 enable_fund_deep_analysis 显隐）。
+    # 若不开启基金深度分析则传 None（区块整体不写）。
+    manager_data: list | None = None
+    if enable_fund_deep_analysis:
+        detect = modules.get("detect_manager_changes")
+        if detect is not None:
+            prog.info("正在分析基金经理变更...")
+            try:
+                manager_data = detect(holdings)
+            except Exception as e:  # noqa: BLE001 - 保持既有隔离：数据失败不影响主表
+                import logging
+
+                logging.getLogger("invest").warning("基金经理变更监控数据获取失败: %s", e)
+                prog.add_error("基金经理变更监控数据获取失败")
+                manager_data = None
 
     prog.call_sheet(
         get_report_sheet_name("summary"),
@@ -80,6 +97,7 @@ def write_content_sheets(
         sheets["fund_performance"],
         holdings,
         data["details"],
+        manager_data=manager_data,
     )
 
     return pen_result

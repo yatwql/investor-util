@@ -72,9 +72,8 @@ def _generate_full_html_report(
     valuation_data: dict | None = None,
     market_temperature_data: dict | None = None,
     decision_review_data: dict | None = None,
-    enable_financial_report_digest: bool = False,
+    enable_fundamental_snapshot: bool = False,
     financial_report_digest_data: dict | None = None,
-    enable_financial_indicator: bool = False,
     financial_indicator_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
@@ -156,9 +155,8 @@ def _generate_full_html_report(
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
             decision_review_data=decision_review_data,
-            enable_financial_report_digest=enable_financial_report_digest,
+            enable_fundamental_snapshot=enable_fundamental_snapshot,
             financial_report_digest_data=financial_report_digest_data,
-            enable_financial_indicator=enable_financial_indicator,
             financial_indicator_data=financial_indicator_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
@@ -197,8 +195,7 @@ def _generate_full_excel_report(
     enable_cost_lots: bool = False,
     transactions: list | None = None,
     dividends: list | None = None,
-    enable_financial_report_digest: bool = False,
-    enable_financial_indicator: bool = False,
+    enable_fundamental_snapshot: bool = False,
 ) -> bool:
     """full 路径的 Excel 报告生成，返回是否成功。"""
     from src.python.report.excel_generator import generate_excel_report
@@ -232,9 +229,8 @@ def _generate_full_excel_report(
             enable_cost_lots=enable_cost_lots,
             transactions=transactions,
             dividends=dividends,
-            enable_financial_report_digest=enable_financial_report_digest,
+            enable_fundamental_snapshot=enable_fundamental_snapshot,
             financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
-            enable_financial_indicator=enable_financial_indicator,
             financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
         )
         reporter.ok("Excel 报告已生成")
@@ -467,9 +463,8 @@ def _generate_report_both(
             fund_flow_data=fund_flow_data,
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
-            enable_financial_report_digest=_enable_financial_report_digest,
+            enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
             financial_report_digest_data=financial_report_digest_data,
-            enable_financial_indicator=_enable_financial_indicator,
             financial_indicator_data=financial_indicator_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
@@ -506,9 +501,8 @@ def _generate_report_both(
             dividends=dividends,
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
-            enable_financial_report_digest=_enable_financial_report_digest,
+            enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
             financial_report_digest_data=financial_report_digest_data,
-            enable_financial_indicator=_enable_financial_indicator,
             financial_indicator_data=financial_indicator_data,
         )
         reporter.ok("Excel 报告已生成")
@@ -751,9 +745,8 @@ def _generate_report_full(
         (pipeline_data or {}).get("valuation_data"),
         (pipeline_data or {}).get("market_temperature_data"),
         (pipeline_data or {}).get("decision_review_data"),
-        enable_financial_report_digest=_enable_financial_report_digest,
+        enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
         financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
-        enable_financial_indicator=_enable_financial_indicator,
         financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
     )
 
@@ -782,8 +775,7 @@ def _generate_report_full(
         _enable_cost_lots,
         transactions,
         dividends,
-        enable_financial_report_digest=_enable_financial_report_digest,
-        enable_financial_indicator=_enable_financial_indicator,
+        enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
     )
 
     result.news_ok = news_ok

@@ -218,6 +218,7 @@ investor-util/
 │   │   │   ├── market_value.py       #   市值计算与盈亏分析
 │   │   │   ├── category.py           #   持仓分类领域函数（分类/档位/股息/数据状态）
 │   │   │   ├── holdings_detail_sheet.py # 持仓明细与分类 Excel 页签（区块①市值明细 + 区块②分类汇总）
+│   │   │   ├── fundamental_snapshot_sheet.py # 持仓基本面 Excel 页签（区块①财务指标 + 区块②财报摘要）
 │   │   │   ├── chart_data_builder.py #   Chart.js 6 图数据集预处理器
 │   │   │   ├── fund_performance.py   #   基金业绩分析（排名/回撤/超额收益）
 │   │   │   ├── fund_candidate.py     #   候选基金比较（基金业绩分析章候选比较子表数据构建，candidate_compare 默认关）
@@ -231,7 +232,6 @@ investor-util/
 │   │   │   ├── style_factor_sheet.py  #   风格与因子分析 Excel 页签（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
 │   │   │   ├── evolution_sheet.py    #   组合演进 Excel 页签（总市值/HHI/TOP 变迁）
 │   │   │   ├── financial_indicator.py # 财务指标章数据装配（多期指标 + 质量档 + 趋势 + 当前 PE/PB，C19 契约）
-│   │   │   ├── financial_indicator_sheet.py # 财务指标 Excel 页签（亿元/百分数/倍数，缺失写「—」）
 │   │   │   ├── financial_report_digest.py # 持仓个股财报摘要章节数据装配（A 股标的 → 最新年报章节摘要）
 │   │   │   ├── financial_report_sheet.py # 持仓个股财报摘要 Excel 页签（逐股行 + 失败清单 + 来源标注）
 │   │   │   ├── action_sheet.py       #   行动建议 Excel 页签（再平衡信号/交易纪律/调仓建议/收益归因）
@@ -616,7 +616,6 @@ investor-util/
 │       │   │   ├── test_fund_candidate.py         #   候选基金比较测试（基金业绩分析章候选比较子表）
 │       │   │   ├── test_fund_concentration.py     #   基金集中度测试
 │       │   │   ├── test_fund_manager_analysis.py  #   基金经理分析测试
-│       │   │   ├── test_fund_manager_sheet.py     #   基金经理页签测试
 │       │   │   ├── test_position_overlap.py       #   持仓重合度计算测试
 │       │   │   ├── test_fund_performance.py       #   基金业绩测试
 │       │   │   ├── test_fund_style.py             #   基金风格判定测试
@@ -630,9 +629,7 @@ investor-util/
 │       │   │   ├── test_evolution_html.py         #   组合演进章节 HTML 呈现（图表+图下说明）
 │       │   │   ├── test_evolution_sheet.py        #   组合演进 Excel 页签呈现
 │       │   │   ├── test_financial_report_digest.py #   持仓个股财报摘要章节装配（降级契约/文种标签/披露日/失败清单）
-│       │   │   ├── test_financial_report_sheet.py  #   持仓个股财报摘要 Excel 页签（行写入/占位/失败清单）
 │       │   │   ├── test_financial_indicator.py #   财务指标章装配与接线（契约/C19 登记/质量档·趋势·PE·PB/开关/编排接缝）
-│       │   │   ├── test_financial_indicator_sheet.py # 财务指标 Excel 页签（数值格式/「—」占位/不可用原因）
 │       │   │   ├── test_action_html.py            #   行动建议章节 + 智囊团深度复盘「行动摘要」HTML 呈现（单源计算断言）
 │       │   │   ├── test_action_sheet.py           #   行动建议 Excel 页签呈现
 │       │   │   ├── test_decision_record.py        #   决策复盘·确定性载体登记（卖出建议入账/基线价守门/同日去重）
@@ -658,6 +655,8 @@ investor-util/
 │       │   │   ├── test_market_value.py           #   市值计算测试
 │       │   │   ├── test_market_value_edge.py      #   市值边缘场景
 │       │   │   ├── test_holdings_detail_sheet.py  #   持仓明细与分类页签测试（两区块 + 合并等价）
+│       │   │   ├── test_fundamental_snapshot_sheet.py # 持仓基本面页签测试（两区块 + 块级开关门控 + 合并等价）
+│       │   │   ├── test_fund_performance_manager_block.py # 基金经理变更块测试（块门控 + 预警着色）
 │       │   │   ├── test_market_value_strategy_edge.py # 市值策略边缘场景
 │       │   │   ├── test_news_correlation.py       #   新闻关联报告测试
 │       │   │   ├── test_news_degradation_edge.py  #   新闻降级边缘场景

@@ -226,11 +226,12 @@ class TestSwitchAndWiring:
     def test_registry_section_registered(self):
         from src.python.core.registry import _REPORT_SECTION_DEFAULT, get_report_section_keys, get_report_sheet_name
 
-        section = next(s for s in _REPORT_SECTION_DEFAULT if s["key"] == "financial_indicator")
-        assert section["type"] == "financial_indicator"
-        assert section["data_flag"] == "financial_indicator_data"
-        assert "financial_indicator" in get_report_section_keys()
-        assert get_report_sheet_name("financial_indicator") == "财务指标"
+        section = next(s for s in _REPORT_SECTION_DEFAULT if s["key"] == "fundamental_snapshot")
+        assert section["type"] == "fundamental_snapshot"
+        assert section["data_flag"] is None
+        assert section["data_flag_any"] == ("financial_indicator_data", "financial_report_digest_data")
+        assert "fundamental_snapshot" in get_report_section_keys()
+        assert get_report_sheet_name("fundamental_snapshot") == "持仓基本面"
 
     def test_pipeline_contract_registered_with_optional_type(self):
         from src.python.report.pipeline_data_builder import (
@@ -246,11 +247,11 @@ class TestSwitchAndWiring:
     def test_nav_group_and_template_include(self):
         from src.python.report.html_writer_nav import _SECTION_NAV_GROUP_MAP
 
-        assert _SECTION_NAV_GROUP_MAP["financial_indicator"] == "basic"
+        assert _SECTION_NAV_GROUP_MAP["fundamental_snapshot"] == "basic"
 
         tmpl_dir = Path(__file__).resolve().parents[3] / "static" / "tmpl"
         template = (tmpl_dir / "report_template.html").read_text(encoding="utf-8")
-        partial = (tmpl_dir / "partials" / "financial_indicator_section.html").read_text(encoding="utf-8")
-        assert 'include "partials/financial_indicator_section.html"' in template
-        assert 'section_visible("financial_indicator")' in partial
+        partial = (tmpl_dir / "partials" / "fundamental_snapshot_section.html").read_text(encoding="utf-8")
+        assert 'include "partials/fundamental_snapshot_section.html"' in template
+        assert 'section_visible("fundamental_snapshot")' in partial
         assert "financial_indicator_data" in partial

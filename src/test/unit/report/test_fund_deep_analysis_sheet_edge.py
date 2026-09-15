@@ -23,26 +23,26 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
 class TestFundManagerSheetEmpty(unittest.TestCase):
-    """fund_manager_sheet 空数据占位"""
+    """基金经理变更块（fund_performance._write_manager_block）空数据占位"""
 
     def setUp(self):
         self.wb = openpyxl.Workbook()
         self.ws = self.wb.active
 
     def test_empty_manager_data_writes_placeholder(self):
-        """manager_data=[] → 第4行含占位文本。"""
-        from src.python.report.fund_manager_sheet import write_fund_manager_sheet
+        """manager_data=[] → 占位文本。"""
+        from src.python.report.fund_performance import _write_manager_block
 
-        write_fund_manager_sheet(self.ws, [])
+        _write_manager_block(self.ws, 1, [])  # noqa: E501
         placeholder = self.ws.cell(row=4, column=1).value
         self.assertIsNotNone(placeholder)
         self.assertIn("暂不可用", str(placeholder))
 
     def test_empty_manager_data_status_message(self):
         """占位文本来自 STATUS_MESSAGES。"""
-        from src.python.report.fund_manager_sheet import write_fund_manager_sheet
+        from src.python.report.fund_performance import _write_manager_block
 
-        write_fund_manager_sheet(self.ws, [])
+        _write_manager_block(self.ws, 1, [])  # noqa: E501
         self.assertEqual(
             self.ws.cell(row=4, column=1).value,
             STATUS_MESSAGES["manager_unavailable"],

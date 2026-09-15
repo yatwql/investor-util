@@ -63,6 +63,11 @@ class TestReportChapterConsistency(unittest.TestCase):
             if fund_deep:
                 data_availability["position_relationship_data"] = True
                 data_availability["concentration_data"] = True
+            # 合并章节「持仓基本面」：两契约 OR（各由自己的功能开关决定是否注入）
+            if financial_report:
+                data_availability["financial_report_digest_data"] = True
+            if financial_indicator:
+                data_availability["financial_indicator_data"] = True
         sheets = create_sheets(
             wb,
             order,
@@ -70,8 +75,7 @@ class TestReportChapterConsistency(unittest.TestCase):
             enable_news=news,
             enable_history=history,
             enable_portfolio_evolution=evolution,
-            enable_financial_report_digest=financial_report,
-            enable_financial_indicator=financial_indicator,
+            enable_fundamental_snapshot=financial_report or financial_indicator,
             enable_action=action,
             enable_llm=llm,
             data_availability=data_availability,
@@ -119,9 +123,8 @@ class TestReportChapterConsistency(unittest.TestCase):
             style_factor_data=placeholder,
             position_relationship_data=placeholder,
             evolution_data={} if evolution else None,
-            enable_financial_report_digest=financial_report,
+            enable_fundamental_snapshot=financial_report or financial_indicator,
             financial_report_digest_data={} if financial_report else None,
-            enable_financial_indicator=financial_indicator,
             financial_indicator_data={} if financial_indicator else None,
         )
         ordered = sorted(visible_numbers.items(), key=lambda kv: kv[1])
@@ -184,9 +187,8 @@ class TestReportChapterConsistency(unittest.TestCase):
             style_factor_data={},
             position_relationship_data={},
             evolution_data={},
-            enable_financial_report_digest=True,
+            enable_fundamental_snapshot=True,
             financial_report_digest_data={},
-            enable_financial_indicator=True,
             financial_indicator_data={},
         )
 

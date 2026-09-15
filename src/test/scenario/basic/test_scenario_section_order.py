@@ -83,11 +83,10 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(sec["data_flag"], "evolution_data")
 
     def test_fund_deep_analysis_type_contract(self):
-        """基金深度分析类型模块共 4 个（含风格与因子分析一章三区块）。"""
+        """基金深度分析类型模块共 3 个（持仓结构与集中度一章三区块 + 风格与因子分析一章三区块）。"""
         fund_deep_analysis = [s for s in self._default if s["type"] == "fund_deep_analysis"]
-        self.assertEqual(len(fund_deep_analysis), 3)
+        self.assertEqual(len(fund_deep_analysis), 2)
         keys = [s["key"] for s in fund_deep_analysis]
-        self.assertIn("fund_manager", keys)
         self.assertIn("position_structure", keys)
         self.assertIn("style_factor", keys)
         self.assertNotIn("fund_style", keys)
@@ -121,7 +120,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
             self.assertEqual(s1["number"], s2["number"])
 
     def test_all_visibility_types_present(self):
-        """8 种 type 都有对应模块（含组合演进专属 evolution、行动建议专属 action、财报摘要专属 financial_report 类型）。"""
+        """7 种 type 都有对应模块（含组合演进专属 evolution、行动建议专属 action、持仓基本面专属 fundamental_snapshot 类型）。"""
         type_counts: dict[str, int] = {}
         for sec in self._default:
             type_counts[sec["type"]] = type_counts.get(sec["type"], 0) + 1
@@ -135,18 +134,17 @@ class TestScenarioSectionOrder(unittest.TestCase):
                 "llm",
                 "evolution",
                 "action",
-                "financial_report",
-                "financial_indicator",
+                "fundamental_snapshot",
             },
         )
         self.assertEqual(type_counts["always"], 5)
         self.assertEqual(type_counts["history"], 1)
-        self.assertEqual(type_counts["fund_deep_analysis"], 3)
+        self.assertEqual(type_counts["fund_deep_analysis"], 2)
         self.assertEqual(type_counts["news"], 1)
         self.assertEqual(type_counts["llm"], 5)
         self.assertEqual(type_counts["evolution"], 1)
         self.assertEqual(type_counts["action"], 1)
-        self.assertEqual(type_counts["financial_report"], 1)
+        self.assertEqual(type_counts["fundamental_snapshot"], 1)
 
 
 class TestScenarioCustomSectionOrder(unittest.TestCase):

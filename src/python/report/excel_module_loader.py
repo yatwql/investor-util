@@ -100,16 +100,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("基金业绩模块缺失 (fund_performance)")
 
     try:
-        from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
-        from src.python.report.fund_manager_sheet import write_fund_manager_sheet
+        from src.python.report.fundamental_snapshot_sheet import write_fundamental_snapshot_sheet
 
-        modules["detect_manager_changes"] = detect_manager_changes
-        modules["write_fund_manager_sheet"] = write_fund_manager_sheet
-        modules["build_first_check_summary"] = build_first_check_summary
+        modules["write_fundamental_snapshot_sheet"] = write_fundamental_snapshot_sheet
     except ImportError:
-        modules["detect_manager_changes"] = lambda _h: []
-        modules["write_fund_manager_sheet"] = None
-        prog.add_error("基金经理变更监控模块缺失 (fund_manager)")
+        modules["write_fundamental_snapshot_sheet"] = None
+        prog.add_error("持仓基本面写入模块缺失 (fundamental_snapshot)")
 
     try:
         from src.python.report.position_overlap import compute_overlap_matrix

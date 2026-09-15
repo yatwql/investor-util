@@ -36,8 +36,7 @@ def create_sheets(
     enable_news: bool = True,  # board 层
     enable_history: bool = True,  # board 层
     enable_portfolio_evolution: bool = True,  # board 层：组合演进
-    enable_financial_report_digest: bool = False,  # board 层：持仓个股财报摘要（功能开关，默认关）
-    enable_financial_indicator: bool = False,  # board 层：财务指标（功能开关，默认关）
+    enable_fundamental_snapshot: bool = False,  # board 层：持仓基本面章（两功能开关任一开启）
     enable_action: bool = False,  # board 层：行动建议（config 默认开）
     enable_llm: bool = True,  # board 层
     data_availability: dict[str, bool] | None = None,  # data 层
@@ -65,8 +64,7 @@ def create_sheets(
         "news": enable_news,  # ← 配置驱动的 board 层值
         "history": enable_history,
         "evolution": enable_portfolio_evolution,
-        "financial_report": enable_financial_report_digest,
-        "financial_indicator": enable_financial_indicator,
+        "fundamental_snapshot": enable_fundamental_snapshot,
         "action": enable_action,
         "llm": enable_llm,
     }

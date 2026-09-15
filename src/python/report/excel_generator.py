@@ -194,8 +194,7 @@ def generate_excel_report(
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
-    enable_financial_report_digest: bool = False,  # board 层：持仓个股财报摘要（report_submodules，默认关）
-    enable_financial_indicator: bool = False,  # board 层：财务指标（report_submodules，默认关）
+    enable_fundamental_snapshot: bool = False,  # board 层：持仓基本面章（= 财务指标或财报摘要任一开关开启）
     enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
     enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（功能开关 `data_quality`）
     progress: ProgressReporter | None = None,
@@ -287,8 +286,7 @@ def generate_excel_report(
         enable_news=enable_news,
         enable_history=enable_history,
         enable_portfolio_evolution=enable_portfolio_evolution,
-        enable_financial_report_digest=enable_financial_report_digest,
-        enable_financial_indicator=enable_financial_indicator,
+        enable_fundamental_snapshot=enable_fundamental_snapshot,
         enable_action=enable_action,
         enable_llm=enable_llm,
         data_availability=data_availability,
@@ -339,6 +337,7 @@ def generate_excel_report(
         modules,
         prog,
         enable_cost_lots=enable_cost_lots,
+        enable_fund_deep_analysis=enable_fund_deep_analysis,
         valuation_data=valuation_data if valuation_data is not None else (pipeline_data or {}).get("valuation_data"),
         market_temperature_data=(
             market_temperature_data
@@ -400,27 +399,20 @@ def generate_excel_report(
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
 
-    # ── 持仓个股财报摘要页签（financial_report_digest_data） ──
-    ws_frd = sheets.get("financial_report_digest")
-    if ws_frd is not None:
-        prog.info("正在写入持仓个股财报摘要页签...")
+    # ── 持仓基本面页签（财务指标 + 财报摘要，一章两区块） ──
+    ws_fs = sheets.get("fundamental_snapshot")
+    if ws_fs is not None:
+        prog.info("正在写入持仓基本面页签...")
         try:
-            from src.python.report.financial_report_sheet import write_financial_report_sheet
+            from src.python.report.fundamental_snapshot_sheet import write_fundamental_snapshot_sheet
 
-            write_financial_report_sheet(ws_frd, financial_report_digest_data)
+            write_fundamental_snapshot_sheet(
+                ws_fs,
+                indicator_data=financial_indicator_data,
+                digest_data=financial_report_digest_data,
+            )
         except Exception:
-            logger.debug("[excel] 持仓个股财报摘要页签写入失败（非关键）", exc_info=True)
-
-    # ── 财务指标页签（financial_indicator_data） ──
-    ws_fi = sheets.get("financial_indicator")
-    if ws_fi is not None:
-        prog.info("正在写入财务指标页签...")
-        try:
-            from src.python.report.financial_indicator_sheet import write_financial_indicator_sheet
-
-            write_financial_indicator_sheet(ws_fi, financial_indicator_data)
-        except Exception:
-            logger.debug("[excel] 财务指标页签写入失败（非关键）", exc_info=True)
+            logger.debug("[excel] 持仓基本面页签写入失败（非关键）", exc_info=True)
 
     # ── 行动建议页签（行动板块，action_data） ──
     ws_action = sheets.get("action")

@@ -30,11 +30,9 @@ _SECTION_NAV_GROUP_MAP: dict[str, str] = {
     "holdings_detail": "basic",
     "penetration": "basic",
     "data_source_status": "basic",
-    "financial_report_digest": "basic",
-    "financial_indicator": "basic",
+    "fundamental_snapshot": "basic",
     # 基金深度分析：基金业绩 + 基金深度分析系列章节
     "fund_performance": "fund_deep",
-    "fund_manager": "fund_deep",
     "position_structure": "fund_deep",
     "style_factor": "fund_deep",
     # 行动建议：再平衡信号/交易纪律/调仓建议/收益归因（决策建议，非风险章节）
@@ -71,8 +69,7 @@ def _compute_section_visibility(
     enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
-    enable_financial_report_digest: bool = False,  # board 层：持仓个股财报摘要（report_submodules，默认关）
-    enable_financial_indicator: bool = False,  # board 层：财务指标（report_submodules，默认关）
+    enable_fundamental_snapshot: bool = False,  # board 层：持仓基本面章（两功能开关任一开启）
     enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     style_factor_data: dict | None = None,  # data 层：风格与因子 dict（None=无数据，章节隐藏）
@@ -96,8 +93,7 @@ def _compute_section_visibility(
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
-        "financial_report": enable_financial_report_digest,  # ← board 层：持仓个股财报摘要
-        "financial_indicator": enable_financial_indicator,  # ← board 层：财务指标章
+        "fundamental_snapshot": enable_fundamental_snapshot,  # ← board 层：持仓基本面章
         "action": enable_action,  # ← board 层：行动建议（config 默认开）
         "llm": enable_llm,  # ← board 层
     }

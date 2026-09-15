@@ -18,6 +18,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.cache import get_ttl
@@ -43,7 +44,7 @@ from src.python.report.excel_writer import (
 )
 from src.python.report.market_value import DetailRow
 from src.python.report.penetration import ACTIVE_EQUITY, BOND_FUND, ETF, INDEX_LINK, QDII, classify_penetration
-from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, NOTE_FONT, RED_FONT
+from src.python.report.styles import BLUE_FONT, DARK_GREEN_FONT, GREEN_FONT, NOTE_FONT, NORMAL_FONT, RED_FONT
 
 logger = logging.getLogger("invest")
 
@@ -399,16 +400,21 @@ def write_fund_performance_sheet(
     ws: Worksheet,
     holdings: list[Holding],
     details: list[DetailRow],
+    manager_data: list[dict[str, Any]] | None = None,
 ) -> None:
-    """写入基金业绩分析。
+    """写入基金业绩分析（主表 + 基金经理变更监控块）。
 
     对每只基金调 API 获取区间收益和同类排名，汇总为 11 列表格。
     评级同时考虑同类排名百分位和业绩比较基准（超额收益评分）。
+    主表之后追加「基金经理变更监控」块（基金业绩的子视图）；
+    `manager_data` 为 None 表示基金深度分析未开启 → 该块整体不写。
 
     Args:
         ws: 目标工作表
         holdings: 原始持仓列表
         details: 市值核算明细行列表
+        manager_data: 基金经理变更检测结果（`detect_manager_changes()` 返回值）；
+            None 表示未开启基金深度分析（块不渲染）。
     """
     row = write_title_row(ws, 1, get_report_sheet_name("fund_performance"), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
@@ -458,6 +464,10 @@ def write_fund_performance_sheet(
             # 开关已开启但无有效候选（comparison_candidates 未配置或代码非法）：
             # 写出标题 + 占位提示，避免静默消失（§1.4.5 数据降级治理）
             _write_candidate_unavailable_block(ws, row + 1, candidate_data)
+
+    # 基金经理变更监控块（基金业绩的子视图；随 enable_fund_deep_analysis 显隐）
+    if manager_data is not None:
+        row = _write_manager_block(ws, row + 1, manager_data)
 
     freeze_header(ws, 2)
     auto_width(ws, min_width=10, max_width=30)
@@ -627,3 +637,72 @@ def _num_formats() -> list[str | None]:
         None,  # 10 业绩评价（文本）
         None,  # 11 同类排名（文本）
     ]
+
+
+# ── 基金经理变更监控块（基金业绩分析的子视图） ──────────────
+
+_MANAGER_NCOLS = 8
+_MANAGER_HEADERS = [
+    "基金名称",
+    "基金代码",
+    "当前基金经理",
+    "任职天数",
+    "1月内变更",
+    "3月内变更",
+    "6月内变更",
+    "预警级别",
+]
+
+_MANAGER_ALERT_FONTS: dict[str, Font] = {
+    "紧急": Font(color="CC0000"),  # 红色
+    "关注": Font(color="FF8C00"),  # 暗橙色
+    "首检": Font(color="808080"),  # 灰色
+}
+
+
+def _manager_alert_font(level: str) -> Font:
+    """根据预警级别返回行字体。"""
+    return _MANAGER_ALERT_FONTS.get(level, NORMAL_FONT)
+
+
+def _manager_change_label(changed: bool, is_first: bool) -> str:
+    """生成变更状态标签。"""
+    if is_first:
+        return "—"
+    return "🔴 是" if changed else "✅ 否"
+
+
+def _write_manager_block(ws: Worksheet, row: int, manager_data: list[dict[str, Any]]) -> int:
+    """写入「基金经理变更监控」块，返回下一可用行号。"""
+    row = write_title_row(ws, row, "三、基金经理变更监控", ncols=_MANAGER_NCOLS)
+    row = write_header_row(ws, row, _MANAGER_HEADERS)
+
+    if not manager_data:
+        row = _write_placeholder(ws, STATUS_MESSAGES["manager_unavailable"], row=row + 1, max_cols=_MANAGER_NCOLS)
+        logger.info("基金经理变更监控块：无数据，写入占位")
+        return row
+
+    for item in manager_data:
+        is_first = item.get("is_first_check", False)
+        alert = item.get("alert_level", "正常")
+        row_font = _manager_alert_font(alert)
+        write_data_row(
+            ws,
+            row,
+            [
+                item.get("name", ""),
+                item.get("code", ""),
+                item.get("current_manager", "--"),
+                str(item.get("tenure_days", 0)),
+                _manager_change_label(item.get("changed_1m", False), is_first),
+                _manager_change_label(item.get("changed_3m", False), is_first),
+                _manager_change_label(item.get("changed_6m", False), is_first),
+                alert,
+            ],
+        )
+        for col in range(1, _MANAGER_NCOLS + 1):
+            ws.cell(row=row, column=col).font = row_font
+        row += 1
+
+    logger.info("基金经理变更监控块写入完成: %d 条", len(manager_data))
+    return row

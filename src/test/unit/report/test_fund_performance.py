@@ -1042,3 +1042,50 @@ class TestWriteCandidateUnavailableBlock(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestManagerBlockGating(unittest.TestCase):
+    """经理变更块门控：manager_data=None（未开启基金深度分析）→ 块整体不写，主表照常。"""
+
+    def test_manager_block_absent_when_manager_data_none(self):
+        import openpyxl
+
+        from src.python.core.models import Holding
+        from src.python.report.fund_performance import write_fund_performance_sheet
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        holdings = [Holding(account="A", name="某基金", code="040046", shares=100.0, cost_price=1.0)]
+        with unittest.mock.patch("src.python.report.fund_performance.fetch_fund_rankings_batch", return_value={}):
+            write_fund_performance_sheet(ws, holdings, [], manager_data=None)
+        flat = [str(c.value) for row in ws.iter_rows() for c in row if c.value is not None]
+        self.assertTrue(any("基金业绩分析" in v for v in flat), "主表标题应在")
+        self.assertFalse(any("基金经理变更监控" in v for v in flat), "未开启时不得渲染经理块")
+
+    def test_manager_block_present_when_manager_data_given(self):
+        import openpyxl
+
+        from src.python.core.models import Holding
+        from src.python.report.fund_performance import write_fund_performance_sheet
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        holdings = [Holding(account="A", name="某基金", code="040046", shares=100.0, cost_price=1.0)]
+        manager = [
+            {
+                "name": "某基金",
+                "code": "040046",
+                "current_manager": "张三",
+                "tenure_days": 120,
+                "changed_1m": False,
+                "changed_3m": True,
+                "changed_6m": True,
+                "alert_level": "关注",
+                "is_first_check": False,
+            }
+        ]
+        with unittest.mock.patch("src.python.report.fund_performance.fetch_fund_rankings_batch", return_value={}):
+            write_fund_performance_sheet(ws, holdings, [], manager_data=manager)
+        flat = [str(c.value) for row in ws.iter_rows() for c in row if c.value is not None]
+        self.assertTrue(any("基金经理变更监控" in v for v in flat), "开启时应渲染经理块")
+        self.assertIn("张三", flat)

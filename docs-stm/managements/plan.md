@@ -37,7 +37,7 @@
 
 **架构要点**：不新增 pipeline_data 键（pipeline_data 契约台账）；可见性模型最小扩展——注册表可选字段 `data_flag_any`（多契约 OR），未声明时行为不变；序号/显示名/页签名全部经注册表（注册表驱动）。
 
-**批次**：① 模型扩展 + 守卫（**已实施**：`data_flag_any` + 两侧 OR + 12 例守卫）→ **② M1 `holdings_detail`（已实施）**：注册表 21→20 条、Excel 页签与 HTML 章节各减 1（12/20 列并入同页签两区块）、新增 `holdings_detail_sheet.py` + `test_holdings_detail_sheet.py` + 一致性守卫、领域层（`market_value.py`/`category.py` 分类函数）保持改名不动 → **③ M2 `position_structure`（已实施）**：注册表 20→19 条、三区块合一同页签、可见性 `data_flag_any` OR（Excel 侧同步登记两契约 flag）、新增 `position_structure_sheet.py` + 测试与 OR 守卫 → ④ M3 `fundamental_snapshot` + M4；每批一次提交、每批门禁；施工步骤见实施层文档。
+**批次**：① 模型扩展 + 守卫（**已实施**：`data_flag_any` + 两侧 OR + 12 例守卫）→ **② M1 `holdings_detail`（已实施）**：注册表 21→20 条、Excel 页签与 HTML 章节各减 1（12/20 列并入同页签两区块）、新增 `holdings_detail_sheet.py` + `test_holdings_detail_sheet.py` + 一致性守卫、领域层（`market_value.py`/`category.py` 分类函数）保持改名不动 → **③ M2 `position_structure`（已实施）**：注册表 20→19 条、三区块合一同页签、可见性 `data_flag_any` OR（Excel 侧同步登记两契约 flag）、新增 `position_structure_sheet.py` + 测试与 OR 守卫 → **④ M3 `fundamental_snapshot` + M4（已实施）**：注册表 19→17 条；财务指标与财报摘要合为同页签两区块（各自功能开关控块）、`fund_manager` 章节并入「基金业绩分析」章末尾区块、board 层参数合并为 `enable_fundamental_snapshot`；新增 `fundamental_snapshot_sheet.py` + 合并 partial + 测试与块级门控守卫。**plan-45 四批全部完成**（21 → 17 条）。
 
 设计文档：[`section-consolidation-design.md`](section-consolidation-design.md)；实施层施工单：[`section-consolidation-iteration.md`](section-consolidation-iteration.md)（命名统一总表 / 接缝地图 / 逐批施工步骤与量化验收）（含现状核实、合并方案、约束对照、测试与文档同步清单、批次验收标准）。
 
