@@ -200,6 +200,7 @@ def _cmd_config_llm_modules() -> None:
         print("     ⚠ 当前为实验阶段，输出质量可能不稳定")
         print("  常规开关默认开启，关闭即按各自说明收回对应能力（详见 how-to-config 手册）")
         print("  报告章节与增强默认多数关闭，开启即新增对应章节/列（依赖见各条说明）")
+        print("  基础报告章节组（基金深度分析/市场新闻/历史走势+回撤/组合演进/行动建议）在菜单 [P] 配置")
         print()
         try:
             total = len(items)
@@ -383,6 +384,7 @@ def _cmd_config_report_boards() -> None:
         ]
         print()
         print("\n".join(render_panel("配置报告可选章节", rows)))
+        print("  提示：报告章节与增强、LLM 分析章节请在菜单 [S] 配置")
         print()
         try:
             choice = input("  输入编号切换 (0-6): ").strip()
