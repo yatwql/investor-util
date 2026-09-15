@@ -28,17 +28,24 @@
 | 用户 `report_section_order` | 18 个 pin（1~18）；**未知键被静默忽略**（实测：`{"ghost_section":3}` 不影响输出） |
 | 可见性模型 | 两层：board 层按 `type` 查 `board_flags`；data 层按 `data_flag` 查 `data_flags`/`data_availability`；两者 AND |
 
-## 3. 合并方案（四项，均**保留吸收方主键**）
+## 3. 合并方案（四项，**统一采用新语义命名**）
 
-保留主键的目的：既有 `report_section_order` pin、`report_submodules` 开关名与测试引用
-**不需要迁移**；被吸收条目的键从注册表移除（其 pin 变成无害空操作）。
+**命名决定（用户要求）**：合并后**一律使用新的统一语义名**——注册表键、显示名、Excel 页签名、
+页签写入器模块/函数、HTML 锚点与 partial 文件名全部按合并后的语义命名；旧键、旧页签名、旧写入器、
+旧 partial **全部删除，不留 alias**（配置模板与 `config.json` 重生成，不做兼容）。
 
-| # | 合并 | 保留键 / 新显示名 | 区块构成 | 门禁策略 |
-|:--|:--|:--|:--|:--|
-| M1 | 市值核算明细 + 持仓分类 → **持仓明细与分类** | `market_value` / 「持仓明细与分类」 | 区块①15 列市值明细 + 分账户小计；区块②分类汇总表 | 两者均为 `always`（无 board 开关），data_flag 均空 → 合并后仍 `always`，零门禁变化 |
-| M2 | 持仓关系矩阵 + 持仓集中度 → **持仓结构与集中度** | `position_relationship` / 「持仓结构与集中度」 | 区块①重合度 + 相关性矩阵；区块②TOP-N 占比 + HHI + 三级预警 | 两者同 `type=fund_deep_analysis`（同一 board 开关）；data_flag 取 OR（见 §5） |
-| M3 | 财报摘要 → **持仓基本面** 的区块 | `financial_indicator` / 「持仓基本面」 | 区块①财务指标表（19 列）；区块②财报章节摘要（9 列） | 两者同属功能开关 `GROUP_REPORT` 且同受数据底座门禁；**两个功能开关各控一块**（保留独立关闭杠杆，区块级判定见 §5） |
-| M4 | 基金经理变更 → **基金业绩分析** 的区块 | `fund_performance` / 「基金业绩分析」 | 区块①主业绩表（含候选比较子表）；区块②基金经理变更（8 列） | 被吸收项 `type=fund_deep_analysis`（board 开关 `enable_fund_deep_analysis`）→ 区块级判定；**先例**：`report_submodules.candidate_compare` 已是本条目内的可选子表 |
+> **语义统一的边界**：**章节层统一新名**（条目键/显示名/页签名/写入器/模板），
+> **契约层保留各区块自己的语义名**（`position_relationship_data` / `concentration_data` /
+> `financial_indicator_data` / `financial_report_digest_data` / `manager_data`）——契约描述的是
+> 「数据内容」而非「章节」，把两个区块的数据塞进一个伪契约键会破坏契约台账的语义（每个键须有
+> 明确写入方与消费方）。
+
+| # | 合并 | **新条目键** / 新显示名 | 页签写入器 / 模板 | 区块构成 | 门禁策略 |
+|:--|:--|:--|:--|:--|:--|
+| M1 | 市值核算明细 + 持仓分类 → **持仓明细与分类** | `holdings_detail` / 「持仓明细与分类」 | `report/holdings_detail_sheet.py::write_holdings_detail_sheet`；主模板 `sec-holdings_detail`（内联，原 `sec-market_value`/`sec-category` 删除） | 区块①15 列市值明细 + 分账户小计；区块②分类汇总表 | 两者均为 `always`（无 board 开关），data_flag 均空 → 合并后仍 `always`，零门禁变化 |
+| M2 | 持仓关系矩阵 + 持仓集中度 → **持仓结构与集中度** | `position_structure` / 「持仓结构与集中度」 | `report/position_structure_sheet.py::write_position_structure_sheet`；主模板 `sec-position_structure`（原 `sec-position_relationship`/`sec-fund_concentration` 删除） | 区块①重合度 + 相关性矩阵；区块②TOP-N 占比 + HHI + 三级预警 | 两者同 `type=fund_deep_analysis`（同一 board 开关）；data_flag 取 OR（见 §5） |
+| M3 | 财报摘要 → **持仓基本面** 的区块 | `fundamental_snapshot` / 「持仓基本面」 | `report/fundamental_snapshot_sheet.py::write_fundamental_snapshot_sheet`；`partials/fundamental_snapshot_section.html`（原 `financial_indicator_sheet.py`/`financial_report_sheet.py` 与两个 partial 删除） | 区块①财务指标表（19 列）；区块②财报章节摘要（9 列） | 两者同属功能开关 `GROUP_REPORT` 且同受数据底座门禁；**两个功能开关各控一块**（保留独立关闭杠杆，区块级判定见 §5） |
+| M4 | 基金经理变更 → **基金业绩分析** 的区块 | `fund_performance`（键与显示名语义未变） | `fund_performance` 章写入器吸收经理变更区块（原 `fund_manager_sheet.py` 删除） | 区块①主业绩表（含候选比较子表）；区块②基金经理变更（8 列） | 被吸收项 `type=fund_deep_analysis`（board 开关 `enable_fund_deep_analysis`）→ 区块级判定；**先例**：`report_submodules.candidate_compare` 已是本条目内的可选子表 |
 
 合并后注册表（17 项，编号重排，`llm_usage` 仍强制末位）：
 投资分析汇总 / 持仓明细与分类 / 资产穿透TOP10 / 基金业绩分析 / 持仓结构与集中度 /
@@ -118,3 +125,6 @@ HTML 章节容器数与导航分组映射（`test_html_report_structure*`）、�
 | ④ | M3 持仓基本面 + M4 基金经理变更并入基金业绩（区块级门禁） | 区块随各自开关独立显隐；配置模板重生成后 `--mode verify,regression` 全绿 |
 
 每批一次提交、每批跑门禁；批次①单独提交（模型先行，风险隔离）。
+
+**每批的命名统一检查（强制）**：`grep -rn "<旧键\|旧页签名\|旧写入器名\|旧 partial 名>" src/ docs-stm/ 仅应命中历史 changelog/归档`；
+并同步 `technical.md` §6.7 语义命名表（新增合并条目名、删除被吸收条目名）。

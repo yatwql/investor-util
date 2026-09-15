@@ -14,11 +14,18 @@ def should_create_sheet(section: dict, data_availability: dict[str, bool] | None
     无 data_flag 的模块（always、history）始终创建；data_flag
     未出现在 data_availability 中时视为已就绪（如基金深度分析的
     数据在页签创建后才写入，由下游函数自行兜底）。
+
+    ``data_flag_any``（可选）为**多契约 OR** 口径，供章节合并后的条目使用：
+    任一契约就绪即创建；未登记视为**未就绪**（悲观——否则合并条目在契约缺省时
+    会创建空页签；单契约路径的乐观口径保持不变）。
     """
+    avail = data_availability or {}
+    flag_any = section.get("data_flag_any")
+    if flag_any:
+        return any(avail.get(name, False) for name in flag_any)
     flag_name = section.get("data_flag")
     if not flag_name:
         return True
-    avail = data_availability or {}
     return avail.get(flag_name, True)
 
 

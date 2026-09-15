@@ -29,11 +29,11 @@
 
 **决定（用户）**：不做配置兼容，**重生成 `config.json` 与配置模板**；设计与实施须逐条对照 `technical.md` §8 架构约束。
 
-**方案（保留吸收方主键，被吸收键移除）**：
-1. `market_value` 吸收 `category` → 「持仓明细与分类」（两区块；均 `always`）
-2. `position_relationship` 吸收 `fund_concentration` → 「持仓结构与集中度」（两区块；同 `type=fund_deep_analysis`；可见性取 OR）
-3. `financial_indicator` 吸收 `financial_report_digest` → 「持仓基本面」（两区块；两个功能开关各控一块）
-4. `fund_performance` 吸收 `fund_manager` → 「基金业绩分析」（经理变更为可选区块，board 门禁 `enable_fund_deep_analysis`；先例 `candidate_compare`）
+**方案（统一新语义命名：旧键/旧页签名/旧写入器/旧 partial 全部删除，不留 alias）**：
+1. 新条目 `holdings_detail`「持仓明细与分类」（= 市值核算明细 + 持仓分类；两区块，均 `always`）
+2. 新条目 `position_structure`「持仓结构与集中度」（= 持仓关系矩阵 + 持仓集中度；同 `type=fund_deep_analysis`；可见性取 OR）
+3. 新条目 `fundamental_snapshot`「持仓基本面」（= 财务指标 + 财报摘要；两区块；两个功能开关各控一块）
+4. `fund_performance`「基金业绩分析」吸收基金经理变更为可选区块（键与显示名语义未变；区块 board 门禁 `enable_fund_deep_analysis`；先例 `candidate_compare`）
 
 **架构要点**：不新增 pipeline_data 键（pipeline_data 契约台账）；可见性模型最小扩展——注册表可选字段 `data_flag_any`（多契约 OR），未声明时行为不变；序号/显示名/页签名全部经注册表（注册表驱动）。
 

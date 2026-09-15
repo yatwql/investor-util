@@ -517,6 +517,10 @@ def get_computation_module(module_key: str) -> ComputModuleDef | None:
 
 
 # ── 报告模块注册表（序号可配置） ──────────────────────────────
+# 条目字段：key / name / number / type / data_flag（单契约可见性旗标）；
+# 可选 data_flag_any（多契约 OR：任一契约就绪则该条目可见，供章节合并后一条目承载
+# 多个区块使用；OR 采用悲观判定——未登记视为未就绪，避免契约缺省时显示空章节。
+# 未声明 data_flag_any 时行为与单契约判定完全一致）。
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── always 类型（始终显示，无 data_flag 依赖） ──

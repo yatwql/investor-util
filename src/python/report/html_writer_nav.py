@@ -130,8 +130,12 @@ def _compute_section_visibility(
         if not board_ok:
             section_visible_dict[sec["key"]] = False
             continue
+        flag_any = sec.get("data_flag_any")
         flag_name = sec.get("data_flag")
-        if not flag_name:
+        if flag_any:
+            # 多契约 OR（与 Excel 侧同口径，悲观判定）
+            section_visible_dict[sec["key"]] = any(data_flags.get(name, False) for name in flag_any)
+        elif not flag_name:
             section_visible_dict[sec["key"]] = True
         else:
             section_visible_dict[sec["key"]] = data_flags.get(flag_name, False)
