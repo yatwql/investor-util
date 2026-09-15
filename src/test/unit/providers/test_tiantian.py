@@ -527,9 +527,10 @@ class TestCalcRatingFromEntry(unittest.TestCase):
             "较差",
         )
 
-    def test_percentile_only_fallback(self):
+    def test_rank_takes_precedence_over_percentile(self):
+        """rank/total 与 percentile 矛盾时以排名为准（percentile 90 本应落偏差档）。"""
         self.assertEqual(
-            _calc_rating_from_entry({"percentile": "5.0"}),
+            _calc_rating_from_entry({"percentile": "90.0", "rank": "5", "total": "100"}),
             "优秀",
         )
 

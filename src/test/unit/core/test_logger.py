@@ -13,6 +13,7 @@ _ClosedStreamSilentHandler，仅对 "closed file" 竞态静默。
 
 from __future__ import annotations
 
+import contextlib
 import io
 import logging
 from unittest import mock
@@ -48,8 +49,11 @@ class TestClosedStreamSilentHandler:
 
         # StreamHandler.emit 内部 try/except → handleError，本类对
         # "closed file" 静默返回，不会打印 `--- Logging error ---`
-        handler.emit(self._make_record())
-        assert True  # 到达此处即未抛异常
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            handler.emit(self._make_record())
+        # 真正要守的是「未委托父类打印 --- Logging error ---」（仅不抛异常兜不住该回归）
+        assert "Logging error" not in err.getvalue()
 
     def test_handle_error_silent_for_closed_file(self):
         """handleError 对 "closed file" 异常静默（不委托父类打印路径）。"""
