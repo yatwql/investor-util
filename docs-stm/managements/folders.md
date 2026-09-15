@@ -16,10 +16,10 @@
 | **测试用例** | — | — | **6,991 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,114** | 含 README.md（204 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,910 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **133** | **51,305** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 1 + archive 121 md），py/txt 不计行 |
+| **项目文档** | Markdown | **134** | **51,571** | 含 CLAUDE.md（75 行）；md 口径（managements 10 + plan 2 + archive 121 md），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 10 | 9,853 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 125 | 41,548 | 各版本 changelog/plan/review-findings 等（121 md 41,090 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 1 | 287 | 在办设计文档：DataSinking 持仓个股财报摘要设计（`datasink-financial-report-digest-design.md`）；已实现的设计文档随其迭代归档（功能开关注册表统一与联接基金穿透两份现位于 v0.10.x 归档的 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
+| ├ plan/ | 中间设计文件 | 2 | 553 | 在办设计文档：DataSinking 持仓个股财报摘要设计（`datasink-financial-report-digest-design.md`）+ 持仓个股基本面数据源主备与财务指标提取设计（`financial-indicator-source-design.md`）；已实现的设计文档随其迭代归档（功能开关注册表统一与联接基金穿透两份现位于 v0.10.x 归档的 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份现位于 v0.10.x 归档的四个借鉴来源目录：`tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -1020,7 +1020,8 @@ investor-util/
 │   │   │   └── feeder-fund-penetration/ #   联接基金穿透与基金持仓取数通道修正设计归档
 │   │   │       └── feeder-penetration-and-holdings-fetch-design.md # 取数阶梯次序修正 + 目标 ETF 代理底层暴露
 │   ├── plan/                          #   中间设计文件（在办设计文档；实现落地后随迭代归档）
-│   │   └── datasink-financial-report-digest-design.md # DataSinking 全文本财报接入设计（持仓个股财报摘要/密钥文件/计划感知限速）
+│   │   ├── datasink-financial-report-digest-design.md # DataSinking 全文本财报接入设计（持仓个股财报摘要/密钥文件/计划感知限速）
+│   │   └── financial-indicator-source-design.md # 持仓个股基本面数据源主备与财务指标提取设计
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
