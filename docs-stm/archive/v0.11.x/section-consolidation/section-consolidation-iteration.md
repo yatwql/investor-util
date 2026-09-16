@@ -1,9 +1,13 @@
 # 报告章节整合实施层（迭代施工单）
 
-> 文档类型：中间设计文件（实施层）——与设计层 [`section-consolidation-design.md`](section-consolidation-design.md) 配套
+> 文档类型：中间设计文件（实施层，**已实现，2026-09-16 归档**）
+> 归档位置：`docs-stm/archive/v0.11.x/section-consolidation/`
 > 分工：设计层定「合并什么、为什么、新语义名、架构约束对照」；**本文件是施工单**——逐批列出改动文件、
 > 命名统一动作、测试同步清单与量化验收标准，实施时按批次勾选并逐批提交
-> 状态：批次①已实施；批次②③④待实施
+> 状态：**✅ 四批全部实施完成**——① 可见性模型扩展（`bce98ee2`）→ ② `holdings_detail`（`a11db932`）→
+> ③ `position_structure`（`b8c0d862`）→ ④ `fundamental_snapshot` + 经理变更并入（`f2c1a23a`），
+> 注册表条目 **21 → 17**；每批一次提交、每批门禁；实施期自查 rf-366/367/368，
+> 十轮复盘整改记录见 §6.6。
 
 ## 1. 命名统一总表（唯一施工依据）
 
@@ -35,7 +39,7 @@
 可见性模型扩展：注册表可选字段 `data_flag_any`（多契约 OR，悲观判定）+ Excel/HTML 两侧支持 +
 `src/test/unit/report/test_section_visibility.py`（12 例）。**零条目变更、行为零变化**。
 
-## 4. 批次② 施工单：`holdings_detail`（持仓明细与分类）
+## 4. 批次② 施工单：`holdings_detail`（持仓明细与分类）—— ✅ 已实施
 
 **前置**：无（两个来源条目均 `always`、无契约键）。
 
@@ -51,7 +55,7 @@
 | ②-8 文档同步 | `reports-instruction`（对照表/章节分组/可见性表）、`technical` §6.7 语义表与 §4.x 叙述、`how-to-config`（若涉及）、`folders` 树与统计、`changelog` |
 | 验收 | 条目数 20；Excel 页签减少 1 个且内容等同（两表逐格比对用例）；HTML 章节减少 1 个；`--mode dev-verify` 全绿 |
 
-## 5. 批次③ 施工单：`position_structure`（持仓结构与集中度）
+## 5. 批次③ 施工单：`position_structure`（持仓结构与集中度）—— ✅ 已实施
 
 | 步骤 | 动作 |
 |:--|:--|
@@ -63,7 +67,7 @@
 | ③-6 测试 | 增加**OR 可见性用例**：仅有 `position_relationship_data` 时页签/章节可见；两者皆无时隐藏；**两契约写入点不动** |
 | 验收 | 条目数 19；OR 语义用例通过；两区块内容等同（逐表比对） |
 
-## 6. 批次④ 施工单：`fundamental_snapshot` + 经理变更并入基金业绩
+## 6. 批次④ 施工单：`fundamental_snapshot` + 经理变更并入基金业绩 —— ✅ 已实施
 
 | 步骤 | 动作 |
 |:--|:--|

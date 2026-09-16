@@ -18,10 +18,10 @@
 | **测试用例** | — | — | **7,213 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,159** | 含 README.md（204 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,955 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **138** | **52,459** | 含 CLAUDE.md（75 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 2 + archive md 125），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,040 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 129 | 42,429 | 各版本 changelog/plan/review-findings 等（125 md 41,971 行 + 3 py 446 行 + 1 txt 12 行） |
-| ├ plan/ | 中间设计文件 | 2 | 373 | **当前无在办设计文档**（已实现的设计文档随迭代归档：DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
+| **项目文档** | Markdown | **138** | **52,515** | 含 CLAUDE.md（75 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 0 + archive md 127），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,051 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 131 | 42,847 | 各版本 changelog/plan/review-findings 与设计文档归档（127 md 42,389 行 + 3 py 446 行 + 1 txt 12 行） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | **当前无在办设计文档（目录为空）**（已实现的设计文档随迭代归档：报告章节整合的设计层与实施层两份位于 v0.11.x 归档的 `section-consolidation/`；DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -987,7 +987,10 @@ investor-util/
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   ├── v0.11.x/                         # v0.11.x 版本归档（0.11 系列首份）
 │   │   │   ├── archived_changelog.0.11.x.md # v0.11.0 已发布变更记录
-│   │   │   └── archived_plan.0.11.x.md    # plan-44 完成态记录
+│   │   │   ├── archived_plan.0.11.x.md    # plan-44 / plan-45 完成态记录（含 plan-45 设计文档索引）
+│   │   │   └── section-consolidation/     # plan-45 报告章节整合设计归档（设计层 + 实施层）
+│   │   │       ├── section-consolidation-design.md    # 设计层：四项合并/可见性模型扩展/约束对照/验收标准
+│   │   │       └── section-consolidation-iteration.md # 实施层：命名统一总表/接缝地图/逐批施工单/十轮复盘记录
 │   │   └── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
 │   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（含设计文档索引）
 │   │   │   ├── archived_changelog.0.10.x.md #    变更日志归档 v0.10.x
@@ -1042,9 +1045,7 @@ investor-util/
 │   │   │   │   └── feeder-penetration-and-holdings-fetch-design.md # 取数阶梯次序修正 + 目标 ETF 代理底层暴露
 │   │   │   └── financial-indicator-source/ #   基本面数据源主备与财务指标提取设计归档
 │   │   │       └── financial-indicator-source-design.md # 标准字段契约/全文解析支路/真实估值分位(TTM)/底座门禁/LLM 注入
-│   └── plan/                          #   中间设计文件（在办设计文档）
-│       ├── section-consolidation-design.md # 报告章节整合设计（设计层：四项合并/可见性模型扩展/约束对照）
-│       └── section-consolidation-iteration.md # 报告章节整合实施层（迭代施工单：命名统一/接缝地图/逐批步骤）
+│   └── plan/                          #   中间设计文件（在办设计文档；**当前为空**——plan-45 设计与实施层文档已随完成态归档至 archive/v0.11.x/section-consolidation/）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）

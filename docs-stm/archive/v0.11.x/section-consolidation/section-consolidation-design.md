@@ -1,9 +1,13 @@
 # 报告章节整合设计（章节整合第二轮）
 
-> 文档类型：中间设计文件（实现落地后随迭代归档）
+> 文档类型：中间设计文件（**已实现，2026-09-16 归档**）
+> 归档位置：`docs-stm/archive/v0.11.x/section-consolidation/`
 > 关联：`core/registry.py` 报告模块注册表、`report/excel_sheet_factory.py` 与
 > `report/html_writer_nav.py` 两层可见性模型、`technical.md` §8 架构设计约束
-> 状态：设计完成，待实施（批次①~④）
+> 状态：**已实现**——plan-45 四批（①模型扩展 → ②`holdings_detail` → ③`position_structure` →
+> ④`fundamental_snapshot` + 经理变更并入）全部落地，注册表条目 21 → 17；
+> 实施记录见 `../../managements/changelog.md`「plan-45 章节整合·批次②/③/④」三条与
+> 同目录 [`section-consolidation-iteration.md`](section-consolidation-iteration.md)（施工单与复盘记录）
 
 ## 1. 背景与目标
 
