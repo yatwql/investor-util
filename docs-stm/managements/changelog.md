@@ -6,6 +6,19 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 管理/用户文档二次核对与整改（rf-371）（2026-09-16）
+
+技术债整改（rf-370）后逐份复核 10 份管理文档 + 11 份用户文档的「顺序/编号、清单完整性、示例与计数、章归属表述」，整改 6 类：
+
+- **`technical.md`**：Web 配置编辑接口表的可编辑面分组名改用 surface 实际键（`report_switches`）；白名单段落去掉已不存在的 `submodule` writer、「增强子模块开关 6」「功能开关 20」改为「报告章节与增强 8（`report_switches` 独立视图）+ 功能开关 28（实验 4 + 常规 16 + 报告 8）」并补记 43 条白名单；契约注记序号随章节合并更新（`portfolio_evolution` number=14、`action` number=7、「报告顺序完整 16 项」）；`features.json` 行改「28 项声明 / 三组（实验 4 + 常规 16 + 报告 8）」
+- **`requirements.md`**：P 菜单条目删除已随 plan-44 移除的「报告增强子模块配置（8 项）」入口（改指菜单 `[S]`「报告章节与增强」块）；R-WEB-08 可编辑面清单改用 `report_switches`；features.json 章节改「28 项 / 三块（实验 4 + 常规 16 + 报告 8）」
+- **`how-to-config.md`**：配置样例中「报告子模块开关」注释改为指向 `features.json`（功能开关注册表，菜单 `[S]`）；`report_section_order` 行的「默认顺序（20 项）」改 17 项
+- **统计快照刷新**：`test-coverage.md` 按 `collect-test-coverage.py` 实测更新模式计数（unit 6900→6905、standard 5903→5908、report 1902→1907、all 7213→7218）、`unit_report` 与「报告生成」功能域计数；`folders.md` 更新测试代码（372 文件 / 109,295 行）、测试用例（7,218 个）、管理文档（10 / 10,085 行）与项目文档合计（52,549 行）
+
+校验：章节表编号与注册表逐一比对（requirements §6.3 / how-to-config / reports-instruction 全 OK）、§6.4 编号 1..18 连续、README 分组合计 17、语义表 97 slug 覆盖全部 28 个开关、目录树全量比对无遗漏、陈旧表述扫描零命中。
+
+门禁：四个 `--ci` + `--mode verify,regression` + `dev-verify` + ruff + 版本一致性全绿。
+
 ### 过去 96 小时实现技术债整改（plan-42~45，rf-370）（2026-09-16）
 
 审计窗口内 67 次提交（plan-42~45 及发布/文档收尾）的代码、配置与测试，整改 7 类技术债：
