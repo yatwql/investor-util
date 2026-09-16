@@ -6,6 +6,18 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### plan-46 设计文档归档（docs-stm/plan → archive/v0.11.x/prosperity-framework）（2026-09-16）
+
+plan-46（景气度框架诊断，实验性功能）已实施完成，按「中间设计文件随完成态归档」惯例把设计文档从 `docs-stm/plan/` 归档到 `docs-stm/archive/v0.11.x/prosperity-framework/`（`git mv` 保留历史）：
+
+- `prosperity-framework-design.md` — 头部状态改为「**已实现，2026-09-16 归档**」并补归档位置、后续项指引（`plan-47`/`plan-48`/`plan-49`）与实施记录指向
+- `archived_plan.0.11.x.md`：新增「P1 — 已完成（plan-46 完成态）」条目（动机 / 方案（六项落地）/ 不做 / 口径要点（含两轮修订）/ **5 处实施期缺陷修复**（rf-373~377）/ 降级矩阵结论 / 后续项 / 设计文档索引），头部涵盖版本与归档内容同步
+- `plan.md`：plan-46 详细条目移出（完成态转入归档），P1 待办区保留 `plan-47`/`plan-48`/`plan-49`；待办说明与归档清单更新为 plan-44 / plan-45 / plan-46
+- `folders.md`：`plan/` 目录树与统计改为「当前为空」；`archive/v0.11.x/` 树新增 `prosperity-framework/`（含设计文档说明）；archive 统计与项目文档合计同步（138 → 139 文件）
+- 归档后 `docs-stm/plan/` 为空（后续新设计文档仍放此处）
+
+门禁：四个 `--ci` + `dev-verify` + ruff 全绿。
+
 ### 景气度框架诊断：降级矩阵复核（6 场景）+ 剩余问题登记（plan-47~49）（2026-09-16）
 
 按「先验证稳定性、再谈扩展与转正」的结论执行：**隔离目录**下（`docs-stm/tmp/pf-sweep`，跑完清理；不改真实 `reports/`、不写用户配置）复跑 6 个场景，验证实验功能的降级行为。

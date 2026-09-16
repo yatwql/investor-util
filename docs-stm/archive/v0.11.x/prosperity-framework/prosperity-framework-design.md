@@ -1,7 +1,12 @@
 # 景气度框架诊断（投资分析方法引入）— 设计文档
 
-> 文档类型：中间设计文件（设计层）｜实施层见 `prosperity-framework-iteration.md`
-> 计划项：`plan-46`｜实验性功能开关：`prosperity_framework`（默认关）
+> 文档类型：中间设计文件（**已实现，2026-09-16 归档**）
+> 归档位置：`docs-stm/archive/v0.11.x/prosperity-framework/`
+> 计划项：`plan-46`（**已实施**：分析模块 / 实验开关 / 数据契约 / 双端渲染 / 配置 / 测试 / 文档全部落地）
+> 实验性功能开关：`prosperity_framework`（默认关；保持方法原意，未转正——转正判据见 `plan-49`）
+> 后续项：`plan-47`（基金持仓 ROE 加权）/ `plan-48`（场外流动性补齐）见 `../../managements/plan.md`
+> 实施记录：`../../managements/changelog.md`「plan-46 景气度框架诊断」系列条目（含 5 处缺陷修复与两轮口径修订）、
+> 计划完成态摘要见 [`../archived_plan.0.11.x.md`](../archived_plan.0.11.x.md)
 > 上游借鉴：**zhengxi-views（郑希观点库，MIT License）** — <https://github.com/lyra81604/zhengxi-views>
 > 归属说明：上游为「AI Skill」形态（原文语料 + 方法框架 + 基金数据 + 六维评分卡）。本项目**只借鉴其
 > 可计算的方法骨架与评分口径**（`references/method.md` / `references/scorecard.md`），**不引入其语料、

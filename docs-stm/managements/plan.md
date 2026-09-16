@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办 **plan-47 / plan-48 / plan-49**（均源自 plan-46 真实持仓复核与降级矩阵的剩余项，非阻塞）；P1 区已完成 plan-42 / plan-43 / plan-44 / plan-45 / plan-46；仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-43）见 `archived_plan.0.10.x.md`，v0.11.x 已完成项（plan-44 / plan-45）见 `archived_plan.0.11.x.md`。
+**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办 **plan-47 / plan-48 / plan-49**（均源自 plan-46 真实持仓复核与降级矩阵的剩余项，非阻塞）；P1 区已完成 plan-42 / plan-43 / plan-44 / plan-45 / plan-46（plan-46 完成态与设计文档索引见归档）；仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-43）见 `archived_plan.0.10.x.md`，v0.11.x 已完成项（plan-44 / plan-45）见 `archived_plan.0.11.x.md`。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -22,18 +22,6 @@
 
 > 无待办项（plan-42 / plan-43 摘要见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)；plan-44 / plan-45 摘要见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-45 的设计与实施层文档见 [`archive/v0.11.x/section-consolidation/`](../archive/v0.11.x/section-consolidation/)）。
 
-
-#### ✅ `plan-46` 景气度框架诊断（借鉴 zhengxi-views 的投资分析方法，实验性功能）— 已实施（2026-09-16）
-
-**动机**：上游 `zhengxi-views`（郑希观点库，MIT）把一位主动权益基金经理公开表述的方法蒸馏为「可操作流程 + 六维评分卡」。本项目只借鉴其**可计算骨架与评分口径**，转成对本仓持仓组合的诊断（不引入其语料/快照/检索）。
-
-**方案**：新增实验性功能开关 `prosperity_framework`（默认关）+ 纯计算模块 `analysis/prosperity_framework.py` + 数据契约 `prosperity_framework_data`（数据契约台账）+ 行动建议章内嵌块（HTML/Excel）；六维 = 景气方向/通胀属性 25 + ROE 低位弹性 20 + 全球视野/中国比较优势 15 + 流动性 10 + 集中度与周期拼接 15 + 业绩与回撤印证 15；数据缺失维度独立降级进 `unverified`（不臆造得分）。
-
-**不做**：不引入上游语料与基金快照、不做全市场基金检索/对比、不新增 LLM 调用、不新增外部数据源、不改变既有章节输出（开关关 → 零字节变化）。
-
-设计文档：[`prosperity-framework-design.md`](prosperity-framework-design.md)（含上游归属与许可、数据映射、六维口径、契约结构、约束对照、测试与文档同步清单、验收标准）；实施层施工单见后续迭代文档。
-
-**降级矩阵（实施后真实场景复核，2026-09-16）**：6 个场景（交易日基线 / 非交易日行情全零 / `history` 关闭 / 基本面契约缺失 / 关基金深度分析 / 快照 <2 期）均**报告生成成功且块始终渲染**，降级语义正确——非交易日：①③→0、④ `unverified`、总分 1/55；`history` 关闭：⑥ `unverified`（38/65，不崩）；快照 <2 期：⑤ `partial`（换手子项不计分，41/80）；其余场景与基线一致。**设计文档归档**：待 v0.11.1 发布时按惯例迁入 `docs-stm/archive/v0.11.x/`。
 
 #### 🔲 `plan-47` 景气度框架诊断：基金持仓 ROE 加权（扩展 ② 维覆盖率）
 
@@ -71,7 +59,7 @@
 
 ## 归档
 
-- [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项（plan-44 / plan-45，含 plan-45 设计文档索引）
+- [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项（plan-44 / plan-45 / plan-46，含 plan-45 与 plan-46 设计文档索引）
 - [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项
 - [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项（含设计文档索引）
 - [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10（含设计文档索引 + 已完成项）
