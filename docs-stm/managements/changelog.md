@@ -6,6 +6,30 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### plan-46 景气度框架诊断（实验性功能）实施（2026-09-16）
+
+借鉴开源项目 **zhengxi-views**（郑希观点库，MIT；<https://github.com/lyra81604/zhengxi-views>）从公开采访蒸馏的景气度投资方法骨架，落地为本仓的**实验性功能 `prosperity_framework`**（默认关）：把「全球视野找变化 → 顺产业链找通胀环节 → 落到中国比较优势环节 → 选流动性够 + ROE 低位有弹性的标的 → 多维跟踪与周期拼接 → 组合分散 + 行业比例 + 退出纪律」转成对**本仓持仓组合**的可计算诊断。**只借鉴可计算骨架与评分口径**（不引入其语料库、基金快照、全市场检索）。
+
+**六维评分卡（满分 100）**：景气方向/通胀属性 25 + ROE 低位弹性 20 + 全球视野/中国比较优势 15 + 流动性 10 + 集中度与周期拼接 15 + 业绩与回撤印证 15；输入全部取自既有能力（穿透重仓板块/概念、`financial_indicator_data` 的 ROE、`check_liquidity` 变现天数、历史快照换手代理、`history_data` 收益与回撤），**不新增外部数据源与 LLM 调用**。
+
+**实现**
+- 新增 `analysis/prosperity_framework.py`（纯计算；市价读取经 `finite_or` 归一）；配置新增顶层键 `prosperity_framework`（景气/全球比较优势/防御关键词 + 集中度目标，手动编辑）并重生成 `config.json`
+- 实验开关 `prosperity_framework`（实验组、默认关、`affects_report=True`）；实验块由 4 项增至 5 项（追加在组末，既有编号不变）
+- 契约 `prosperity_framework_data` 进数据契约台账（pipeline_data 键 + 类型映射）与附录 H（键表 + 逐键契约说明）
+- 组装辅助 `report/_report_aux_metrics.py::compute_prosperity_framework_data`：开关关闭返回 None；穿透优先取 `prep.penetrated_assets`（缺失按需计算）；流动性/快照取数失败降级为该维未验证
+- 接线：`_report_generation` 的 both 与 full 两路径注入契约；`excel_generator` 在 basic 路径就绪后就地兜底
+- 渲染：行动建议章内嵌块——HTML `partials/action_section.html` ⑥ 块（总分/评级 + 六维明细 + 持仓视角 + 需核实清单 + 免责句）、Excel `report/action_sheet.py::_write_prosperity_block`
+
+**降级与诚信口径（红线）**：数据缺失维度一律 `unverified`（**不计分、不臆造**）并给出可读原因；总分只按已计分维度折算（`scored_weight` / `total_score_pct`），界面同时显示未验证清单；渲染固定带免责句（衡量「组合与框架的契合度」，非组合优劣、非投资建议）；每条得分在 `evidence` 中给出可追溯口径。
+
+**测试**：`unit/analysis/test_prosperity_framework.py`（27 例：六维计分/缺数据降级/总分口径/持仓视角/评级边界/配置覆盖）+ `test_prosperity_framework_edge.py`（13 例：空/None/零/异常类型/全防御/未知板块/极端集中度/快照缺失/负收益深回撤）+ `unit/report/test_prosperity_framework_wiring.py`（7 例：开关门控、prep 穿透口径、Excel/HTML 双端块显隐）；TUI 面板编号断言与文档串同步。
+
+**文档同步**：设计文档 `docs-stm/plan/prosperity-framework-design.md`（含上游归属与许可、数据映射、六维口径、契约结构、约束对照、验收标准）；`technical.md`（§4.20 叙述 + 语义表 3 行 + 附录 H + 附录 I 段号）；`requirements.md`（§5.11 R-PF-01~08 + 配置键）；`how-to-config.md`（开关表 + 配置键 + 实验组计数 4→5）；`reports-instruction.md`（行动建议章块）；`README.md`；`testplan.md`（§4 回归行）；`folders.md`（树 + 统计）；`plan.md`（plan-46 已实施）。
+
+**实施期自查**：`rf-372` —— 新增实验开关触发三处跨接缝漂移（TUI 面板编号断言、附录 H 台账一致性用例、both 路径无 `prep` 变量），均已修正并同步测试与文档。
+
+门禁：四个 `--ci` + `--mode verify,regression` 4980 passed / 0 failed + `dev-verify` + ruff + 版本一致性全绿。
+
 ### 管理/用户文档二次核对与整改（rf-371）（2026-09-16）
 
 技术债整改（rf-370）后逐份复核 10 份管理文档 + 11 份用户文档的「顺序/编号、清单完整性、示例与计数、章归属表述」，整改 6 类：

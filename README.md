@@ -64,7 +64,7 @@
 
 完整命令参考（全局参数 / report / cache / whatif / check-sources / view-logs / doctor / 使用示例 / 退出码 / 最佳实践；另有开发维护命令 `cassettes`，见开发者指南）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §13「定时任务」。
 `--experiment` 为全局参数，取值接受开关名（如 `signal_ledger`）、显示名（如 `确定性信号沉淀`）或 `all`（全部启用），可重复指定；它只作用于**实验组**且只开不关。
-`--feature NAME=VALUE` 是它的补集：面向**全部 28 项功能开关**、**双向**（`=off` 亦可），仅本次运行、不写入 `features.json`，在其之后应用，故 `--experiment all --feature signal_ledger=off` 表示「其余实验功能全开、只关信号沉淀」。两个参数同样适用于 `doctor` / `check-sources` / `view-logs` / `cassettes` 等早返回命令。
+`--feature NAME=VALUE` 是它的补集：面向**全部 29 项功能开关**、**双向**（`=off` 亦可），仅本次运行、不写入 `features.json`，在其之后应用，故 `--experiment all --feature signal_ledger=off` 表示「其余实验功能全开、只关信号沉淀」。两个参数同样适用于 `doctor` / `check-sources` / `view-logs` / `cassettes` 等早返回命令。
 
 ---
 
@@ -90,6 +90,7 @@
   - **历史走势**（1 个）：组合历史走势与回撤（一章两区块：走势表 + 回撤矩阵 + 危机区间标注）——始终可见，数据不可用时占位
   - **行动建议**（1 个）：行动建议——开启 `enable_action` 时生成（默认开，菜单 P 可切换；再平衡信号/交易纪律/调仓建议/收益归因）
   - **LLM 分析**（5 个）：全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析、LLM API 用量——启用 LLM 时生成
+- **景气度框架诊断（实验）** — 借鉴开源「郑希观点库」蒸馏的景气度投资方法：六维评分卡（景气方向/通胀环节、ROE 低位弹性、全球比较优势、流动性、集中度与周期拼接、业绩与回撤印证）评估组合契合度，数据缺失维度标「需核实」不计分（实验开关 `prosperity_framework`，默认关；详见配置指南）
 - **HTML 报告** — 单页完整渲染（响应式 CSS、盈亏着色、财经新闻热点与持仓关联分析、9 张 Chart.js 交互图表（主报告 6 张 + 组合演进另加 3 张）——悬停/缩放，全部页面顺序展示）
 
 ### 📰 新闻与数据增强

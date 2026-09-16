@@ -127,7 +127,7 @@
 > | 菜单 | 面板标题 | 管什么 | 存放 |
 > |:--|:--|:--|:--|
 > | `[P]` | 配置报告可选章节 | **基础报告章节组 5 项**：基金深度分析 / 市场新闻 / 组合历史走势+回撤 / 组合演进 / 行动建议 | `config.json` 顶层 `enable_*` |
-> | `[S]` | 配置 LLM 报告章节与功能开关 | **LLM 分析章节**（`enabled_llm`）+ **三类功能开关共 28 项**（⚗实验 4 / 常规 16 / 报告章节与增强 8） | `llm_settings.json` / `features.json` |
+> | `[S]` | 配置 LLM 报告章节与功能开关 | **LLM 分析章节**（`enabled_llm`）+ **三类功能开关共 29 项**（⚗实验 5 / 常规 16 / 报告章节与增强 8） | `llm_settings.json` / `features.json` |
 >
 > 简记：**`[P]` = 整章组的开关（`config.json`）；`[S]` = 能力开关与细粒度开关（`features.json` / `llm_settings.json`）**。
 > 报告增强子模块（数据质量仪表盘 / 市场温度 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 持仓个股财报摘要 / 财务指标）属功能开关，**只在 `[S]` 的报告块**；两个面板下方互相给出跳转提示。
@@ -208,7 +208,7 @@
 > | `llm_debate_conditional` | 13 | 常规 | 辩论-条件推理 |
 > | `datasource_credential_ready` | 14 | 常规 | 数据源凭据就绪指引（声明 → 就绪判定 → 可读指引） |
 >
-> 除上表外，`features.json` 还管理量化指标（`metrics_*`）、交互图表（`enable_interactive_charts`）、系统自检上屏（`doctor_check`）、数据源适配契约（`datasource_adapter`）、联接基金穿透（`feeder_penetration`）等；连同注册表的 28 项功能开关共同构成 `features.json` 的键空间（缺省值：实验组默认关、常规组默认开、报告组多数默认关）。完整清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)。
+> 除上表外，`features.json` 还管理量化指标（`metrics_*`）、交互图表（`enable_interactive_charts`）、系统自检上屏（`doctor_check`）、数据源适配契约（`datasource_adapter`）、联接基金穿透（`feeder_penetration`）等；连同注册表的 29 项功能开关共同构成 `features.json` 的键空间（缺省值：实验组默认关、常规组默认开、报告组多数默认关）。完整清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)。
 > **不在 `features.json` 的开关**：LLM 模块启停与基金深度分析走 `llm_settings.json` 的 `enabled_llm`（本菜单标准模块区，编号 1-5），新闻源走 `config.json` 的 `news_sources`，历史走势与回撤走 `config.json` 的 `enable_history`，匿名化模式走 `config.json` 的 `anonymization.mode`（菜单 **[A]**）。
 
 #### [A] 配置持仓匿名化（代码/名称脱敏）

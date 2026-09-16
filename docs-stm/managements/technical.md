@@ -47,6 +47,7 @@
   - [4.17 健壮性三件套（数值归一防线 / 失败原因可读 / 系统自检）](#417-健壮性三件套数值归一防线--失败原因可读--系统自检)
   - [4.18 决策跨期反思闭环](#418-决策跨期反思闭环)
   - [4.19 持仓基本面（财务指标 + 持仓个股财报摘要）](#419-持仓基本面财务指标--持仓个股财报摘要一章两区块)
+  - [4.20 景气度框架诊断（实验性功能 prosperity_framework）](#420-景气度框架诊断实验性功能-prosperity_framework)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -668,7 +669,7 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 
 Web 配置编辑面板的职责边界：**「能改什么」由白名单唯一确定，「怎么改」逐条等价 TUI 写入路径**，不引入任何 TUI 之外的新配置项。核心实现 `web/config_edit.py`：
 
-- **白名单 `config_edit_whitelist`**（小写模块级 dict，唯一事实来源）：点分键 → `{"kind", "target", "writer"}`。`kind` 取 `str`/`bool`/`enum`/`action`；`target` 取 `config`/`llm_settings`/`features`（落盘目标文件）；`writer` 取 `scalar`/`anonymization`/`llm`/`features`/`comparison_indices`（写入分派器）。全集 7 组 43 条（前端把第 7 组「功能开关」渲染成「实验性功能」「常规开关」两块，报告组另经 surface `report_switches` 成块，故界面共 8 块）：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、报告章节与增强 8（`report_switches`，与第 7 组同一批开关的独立视图）、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、功能开关 28（features.json 全注册表：实验 4 + 常规 16 + 报告 8；分组、默认值与显示名同源，面板显示名与「影响报告」标记由 surface 下发，前端不写字典）。
+- **白名单 `config_edit_whitelist`**（小写模块级 dict，唯一事实来源）：点分键 → `{"kind", "target", "writer"}`。`kind` 取 `str`/`bool`/`enum`/`action`；`target` 取 `config`/`llm_settings`/`features`（落盘目标文件）；`writer` 取 `scalar`/`anonymization`/`llm`/`features`/`comparison_indices`（写入分派器）。全集 7 组 44 条（前端把第 7 组「功能开关」渲染成「实验性功能」「常规开关」两块，报告组另经 surface `report_switches` 成块，故界面共 8 块）：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、报告章节与增强 8（`report_switches`，与第 7 组同一批开关的独立视图）、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、功能开关 29（features.json 全注册表：实验 5 + 常规 16 + 报告 8；分组、默认值与显示名同源，面板显示名与「影响报告」标记由 surface 下发，前端不写字典）。
 - **写入分派逐条等价 TUI**：config.json 顶层标量 → `set_config`（`_PATH_CONFIG_KEYS` 路径键自动反绝对化）；嵌套 dict（comparison_indices）→ 读合并后 `set_config` 整块写；报告章节与增强开关（`GROUP_REPORT`）→ `save_feature_overrides`；`anonymization.mode` → `set_anonymization_mode`；`enabled_llm.*` → 共享 `write_llm_settings`（`config/_llm_settings.py` 公开原语，自 `tui/handlers_config.py` 抽取，TUI 改委托、行为零变化；保留注释 + mkstemp + `os.replace` 原子写 + `get_llm_config()` 缓存刷新）；功能开关（三组同一路径）→ `save_feature_overrides`（features.json）。
 - **类型/枚举校验**：`set_config` 不做值类型/模式验证，白名单在 Web 层自行校验——kind=str 拒绝含路径分隔符，kind=bool 仅接受 `True`/`False`（`1`/`"true"`/`0.0` 等一律 400），kind=enum 严格匹配合法枚举值（大小写/空白/非字符串拒绝），对比指数池 code 拒绝含路径分隔符（防 `../` 穿越）且 name 长度受限。校验失败统一 400 BAD_PARAM（服务端中文文案）。
 - **写前备份 `config_backup_file`**：写目标文件前单槽 `.bak` 备份（复用 `holdings_update._atomic_copy`），原文件不存在时返回 None（不备份）；仅备份一次（后续写入目标存在已有 `.bak` 不覆盖），供手动还原（`.bak` 改回原名）。
@@ -2827,6 +2828,29 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 ---
 
+### 4.20 景气度框架诊断（实验性功能 `prosperity_framework`）
+
+**定位**：把开源项目 **zhengxi-views**（郑希观点库，MIT；<https://github.com/lyra81604/zhengxi-views>）从公开采访蒸馏的「景气度投资」方法骨架——全球视野找技术/需求变化 → 顺产业链找「正在涨价（通胀）」的环节 → 落到中国有比较优势的环节 → 选「流动性够 + ROE 低位有修复弹性」的标的 → 多维跟踪、周期拼接 → 组合分散 + 行业比例调整 + 想好退出——转成对本仓**持仓组合**的可计算诊断。**只借鉴其可计算骨架与评分口径**（其语料库、基金快照、全市场检索均不引入），设计见 `docs-stm/plan/prosperity-framework-design.md`。
+
+**六维评分卡（满分 100）**：
+
+| 维度 | 权重 | 计算口径（全部取自既有能力） | 数据缺失时 |
+|:--|:--:|:--|:--|
+| ① 景气方向 / 通胀属性 | 25 | 板块/概念（穿透重仓优先，无穿透则退回 `classify_sector` 直接持仓）命中 `boom_keywords` 的市值占比按 60% 满分档折算；命中 `defensive_keywords` 反向扣减 | 不依赖外部数据 |
+| ② ROE 低位弹性 | 20 | `financial_indicator_data` 的 ROE 分布：低 ROE（<10%）权重按 50% 满分档折算，年度趋势改善加分 | `unverified`（提示开启 `financial_indicator`） |
+| ③ 全球视野 / 中国比较优势 | 15 | 命中 `global_edge_keywords` 的权重（40% 满分档）+ 非 A 股/港股等境外资产占比加分（上限 5 分） | 不依赖外部数据 |
+| ④ 流动性 | 10 | `analysis/liquidity.py::check_liquidity` 的最差场内变现天数分档（<1 日 10 / <3 日 7 / <5 日 4 / 否则 2） | 全为场外或数据缺失 → `unverified` |
+| ⑤ 集中度与周期拼接 | 15 | 前十大集中度（`concentration_target_pct` 目标档）+ 换手代理（最近两期历史快照持仓集合变动率 1−Jaccard；高换手为加分项） | 无第二期快照 → 换手子项 `unverified`（`partial`） |
+| ⑥ 业绩与回撤印证 | 15 | `history_data` 区间收益与最大回撤（正收益 8 分 / 跑赢最强基准 +4 / 回撤 ≤15% +3、≤25% +1） | 无历史走势 → `unverified` |
+
+**总分与评级口径**：只累计 `status != unverified` 的维度（`scored_weight`），`total_score_pct = total_score / scored_weight`；评级四档 ≥80 高度契合 / 60–79 较契合 / 40–59 部分契合 / <40 不契合。**红线**：缺数据维度**不计分、不臆造**（进 `unverified` 清单），渲染固定带免责句（衡量「组合与框架的契合度」，非组合优劣、非投资建议）。
+
+**数据流**：`analysis/prosperity_framework.py::build_prosperity_framework_data`（纯计算，市价读取经 `finite_or` 归一）→ `report/_report_aux_metrics.py::compute_prosperity_framework_data`（组装：穿透优先取 `prep.penetrated_assets`、缺失按需计算；流动性/快照取数失败降级为该维未验证；开关关闭返回 None）→ `pipeline_data["prosperity_framework_data"]`（both/full 由 `_report_generation` 注入；basic 由 `excel_generator` 就地兜底）→ 行动建议章内嵌块（HTML `partials/action_section.html` ⑥ / Excel `report/action_sheet.py::_write_prosperity_block`）。
+
+**配置**：顶层键 `prosperity_framework`（`boom_keywords` / `global_edge_keywords` / `defensive_keywords` / `concentration_target_pct`，手动编辑）。
+
+**开关**：实验组 `prosperity_framework`（默认关、`affects_report=True`）；关闭时报告与未引入时逐字节一致。
+
 ## 5. LLM 集成层（概要设计）
 
 ### 5.1 架构总览
@@ -3743,7 +3767,7 @@ investor-util/
 | `llm_settings.json`（非敏感 LLM 设置） | `_llm_settings_defaults._DEFAULT_LLM_SETTINGS`（全局 2 项 + 5 模块块 + 辩论 + 事实校验 + 计价） | `_llm_settings_defaults._get_default_llm_settings_template()`（逐行手拼，与 dict 深等，见一致性测试） | `_llm_settings.get_llm_config()`：合并 settings+key+providers 三文件，联合 mtime/size 失效；`_merge_llm_defaults()` 运行时按 `_DEFAULT_LLM_SETTINGS` 补齐缺失键 | `_ensure_llm_settings_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑；`_ensure_llm_settings_file` 仅首次创建） | `llm/pricing.py`（计价覆盖）、`llm/generators.py`、`llm/generators_orchestrator.py`、`llm/prompts_action.py`、`llm/skeleton.py`、`report/news_correlation.py`、`cli/cli.py`、`tui/tui_menu.py` + `tui/handlers_config.py`、`config/_validation.py` |
 | `llm_key.json`（敏感凭据） | 无（**C18 凭据分离**，代码默认值禁止内置 api_key） | 无模板 | `_llm_providers._load_llm_key_credentials()`（多凭据块字典；单凭据 flat 自动升级为 `_default`）；`get_llm_config()` 内联读取并合并覆盖同名字段（provider/endpoint 合法性告警） | 不自动创建；缺失时 `get_llm_config()` 回退判断 providers 链模式，两者皆无则 LLM 不可用（`generators_orchestrator` 降级占位） | `startup_wizard._write_llm_key_flat()`（首次引导交互式写入，C3 原子写） | `get_llm_config()` 合并主体；`_load_llm_key_credentials()` → providers 链 `credentials_ref` 凭据注入 |
 | `llm_providers.json`（多 Provider 链） | `_llm_providers_defaults._DEFAULT_LLM_PROVIDERS`（strategy=priority + 2 条示例链） | `_llm_providers_defaults._get_default_llm_providers_template()` | `_llm_providers._load_llm_providers()`（原始 JSON，根非 object/解析失败返回 None）；`get_llm_config()` 链模式（无 llm_key.json 时直接注入链数据）；`_inject_provider_chain_data()` 注入多链路由结果 | `_core._ensure_llm_providers_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑 / init 自动创建） | `get_llm_config()`（链模式无 key 依赖）；`startup_wizard.py`（就绪检查：key 存在 或 providers 有链）；`_inject_provider_chain_data` |
-| `features.json`（Feature Flag 覆写） | `features.feature_switch_registry`（28 项声明，每条含显示名 + 说明 + 分组 + 默认值 + 是否改变产物五项；`_FEATURE_FLAGS_DEFAULT` 是其**派生投影**，非独立登记点）。实验组 4（辩论 2 + 决策反思 1 + 确定性信号沉淀 1，默认关）+ 常规组 16（信号预消化 1 + 模块质量分级 1 + 决策头结构化 1 + 辩论条件推理 1 + 数据源凭据就绪 1 + 量化指标 7 + 交互图表 1 + 系统自检 1 + 数据源适配 1 + 联接基金穿透 1，默认开）+ 报告组 8（数据质量 / 市场温度 / 行业 Beta / 候选比较 / 成本流水 / 估值分位 / 财报摘要 / 财务指标，两项默认开）；分组即面板分块，决定该开关是否上屏与是否进产物自述（实验组 ∧ `affects_report`）；**只登记有消费者的开关**——LLM 模块启停与基金深度分析归 `llm_settings.json` 的 `enabled_llm`，新闻源 / 历史走势 / 匿名化归 `config.json`，这些能力不再在 features.json 另立同义开关，由 `test_features.py::TestRegistryLiveness` 逐项守住；命令行一次性开关见 `features.resolve_experiment_flags` / `describe_experiment_flags`（`--experiment`，实验组、只开）与 `features.parse_switch_override` / `resolve_switch_values` / `describe_switches`（`--feature NAME=VALUE`，全域、双向），两者与注册表同源 | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；无消费者键仍加载、但合并为一条 WARNING 列出键名——这类配置不驱动任何行为，静默忽略会让用户以为已生效；非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化）+ Web `web/config_edit.py`（配置面板写入，白名单由注册表生成） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`core/decision_ledger.py`（决策跨期反思闭环）、`llm/prompts_signals.py`（信号预消化，开关判定收敛于缓存后缀函数）、`report/llm_quality.py`（模块质量分级，§4.11）、`core/decision_header.py`（决策头结构化缓存后缀，§4.15）、`core/signal_ledger.py`（确定性信号沉淀，开关判定收敛于摘要函数，§4.16）、`core/doctor.py`（系统自检功能清单上屏，§4.17.3）、`web/handlers.py`（自检卡片可见性，§4.17.3）、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态）、`tui/tui_menu.py`（菜单项门控）、`web/config_edit.py`（面板状态） |
+| `features.json`（Feature Flag 覆写） | `features.feature_switch_registry`（29 项声明，每条含显示名 + 说明 + 分组 + 默认值 + 是否改变产物五项；`_FEATURE_FLAGS_DEFAULT` 是其**派生投影**，非独立登记点）。实验组 5（辩论 2 + 决策反思 1 + 确定性信号沉淀 1 + 景气度框架诊断 1，默认关）+ 常规组 16（信号预消化 1 + 模块质量分级 1 + 决策头结构化 1 + 辩论条件推理 1 + 数据源凭据就绪 1 + 量化指标 7 + 交互图表 1 + 系统自检 1 + 数据源适配 1 + 联接基金穿透 1，默认开）+ 报告组 8（数据质量 / 市场温度 / 行业 Beta / 候选比较 / 成本流水 / 估值分位 / 财报摘要 / 财务指标，两项默认开）；分组即面板分块，决定该开关是否上屏与是否进产物自述（实验组 ∧ `affects_report`）；**只登记有消费者的开关**——LLM 模块启停与基金深度分析归 `llm_settings.json` 的 `enabled_llm`，新闻源 / 历史走势 / 匿名化归 `config.json`，这些能力不再在 features.json 另立同义开关，由 `test_features.py::TestRegistryLiveness` 逐项守住；命令行一次性开关见 `features.resolve_experiment_flags` / `describe_experiment_flags`（`--experiment`，实验组、只开）与 `features.parse_switch_override` / `resolve_switch_values` / `describe_switches`（`--feature NAME=VALUE`，全域、双向），两者与注册表同源 | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；无消费者键仍加载、但合并为一条 WARNING 列出键名——这类配置不驱动任何行为，静默忽略会让用户以为已生效；非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化）+ Web `web/config_edit.py`（配置面板写入，白名单由注册表生成） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`core/decision_ledger.py`（决策跨期反思闭环）、`llm/prompts_signals.py`（信号预消化，开关判定收敛于缓存后缀函数）、`report/llm_quality.py`（模块质量分级，§4.11）、`core/decision_header.py`（决策头结构化缓存后缀，§4.15）、`core/signal_ledger.py`（确定性信号沉淀，开关判定收敛于摘要函数，§4.16）、`core/doctor.py`（系统自检功能清单上屏，§4.17.3）、`web/handlers.py`（自检卡片可见性，§4.17.3）、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态）、`tui/tui_menu.py`（菜单项门控）、`web/config_edit.py`（面板状态） |
 
 #### I.1.1 解析职责归属（协调者 vs 委托）
 

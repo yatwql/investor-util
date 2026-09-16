@@ -817,6 +817,21 @@ LLM 五维度量化评分，每项满分 100：
 | R-SNP-05 | 快照对比输出：总市值变化、总盈亏变化、新增/清仓/增持/减持品种 TOP5 |
 | R-SNP-06 | 首次运行无历史快照时跳过对比，下次自动建立基线 |
 
+### 5.11 景气度框架诊断（实验性开关 `prosperity_framework`）
+
+> 方法骨架借鉴开源项目 zhengxi-views（郑希观点库，MIT）：只借鉴其可计算骨架与六维评分卡口径，不引入其语料/基金快照/检索。设计见 `docs-stm/plan/prosperity-framework-design.md`。
+
+| # | 需求 | 说明 |
+|---|------|------|
+| R-PF-01 | **实验性开关**：`prosperity_framework` 默认关（`GROUP_EXPERIMENTAL`、`affects_report=True`）；关闭时报告与未引入时**逐字节一致**（零行为变化） |
+| R-PF-02 | **六维评分卡**：景气方向/通胀属性 25 + ROE 低位弹性 20 + 全球视野/中国比较优势 15 + 流动性 10 + 集中度与周期拼接 15 + 业绩与回撤印证 15 = 满分 100 |
+| R-PF-03 | **客观化口径**：全部输入取自既有能力（穿透重仓的板块/概念、`financial_indicator_data` 的 ROE、`check_liquidity` 的变现天数、历史快照的换手代理、`history_data` 的区间收益与最大回撤）；不新增外部数据源、不新增 LLM 调用 |
+| R-PF-04 | **数据缺失不臆造**：维度数据缺失一律标 `unverified`，**不计分**并给出可读原因；总分只按已计分维度折算（`scored_weight` / `total_score_pct`），界面同时显示未验证清单 |
+| R-PF-05 | **评级口径**：≥80 高度契合 / 60–79 较契合 / 40–59 部分契合 / <40 不契合；渲染固定带免责句（衡量「组合与框架的契合度」，非组合优劣，非投资建议） |
+| R-PF-06 | **呈现位置**：行动建议章内嵌块（HTML ⑥ 块 + Excel `_write_prosperity_block`），不新增报告章节、不改注册表条目与序号 |
+| R-PF-07 | **可核对**：每条维度得分在 `evidence` 中给出可追溯口径（含占比/天数/收益率等数值），持仓视角清单按权重降序列出板块与 ROE 备注 |
+| R-PF-08 | **配置**：顶层键 `prosperity_framework`（`boom_keywords` / `global_edge_keywords` / `defensive_keywords` / `concentration_target_pct`，手动编辑）；关键词与目标值可随投资框架演进调整 |
+
 ### 6.7 流动性风险分析
 
 | 需求标识 | 需求描述 |
@@ -1293,7 +1308,7 @@ LLM 五维度量化评分，每项满分 100：
 
 ### 11.5 features.json（功能开关注册表）
 
-独立配置文件，提供 28 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。开关分**实验组**（4 项，默认关，面板以 ⚗ 标识）、**常规组**（16 项，默认开）与**报告章节与增强组**（8 项，多数默认关）三块，分组表达「生命周期的当前状态」而非优先级——**转正**即把声明从实验组改到常规组、默认值改 `true`，面板可见性随分组自动延续。两组在 TUI 菜单 `[S]` / Web 配置面板 / CLI（`--experiment` 实验组简写、`--feature NAME=VALUE` 全域双向）中**同样可切换**；唯一登记点是 `config/features.py::feature_switch_registry`（显示名/说明/分组/默认值/产物影响五字段），渠道层不得另写清单。仅收录「有消费者」的开关——LLM 模块启停与基金深度分析（`llm_settings.json` 的 `enabled_llm`）、新闻源（`config.json` 的 `news_sources`）、历史走势与回撤（`config.json` 的 `enable_history`）、匿名化模式（`config.json` 的 `anonymization.mode`）各有归属配置，不在此文件。
+独立配置文件，提供 29 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。开关分**实验组**（4 项，默认关，面板以 ⚗ 标识）、**常规组**（16 项，默认开）与**报告章节与增强组**（8 项，多数默认关）三块，分组表达「生命周期的当前状态」而非优先级——**转正**即把声明从实验组改到常规组、默认值改 `true`，面板可见性随分组自动延续。两组在 TUI 菜单 `[S]` / Web 配置面板 / CLI（`--experiment` 实验组简写、`--feature NAME=VALUE` 全域双向）中**同样可切换**；唯一登记点是 `config/features.py::feature_switch_registry`（显示名/说明/分组/默认值/产物影响五字段），渠道层不得另写清单。仅收录「有消费者」的开关——LLM 模块启停与基金深度分析（`llm_settings.json` 的 `enabled_llm`）、新闻源（`config.json` 的 `news_sources`）、历史走势与回撤（`config.json` 的 `enable_history`）、匿名化模式（`config.json` 的 `anonymization.mode`）各有归属配置，不在此文件。
 
 | 开关名 | 类型 | 默认值 | 说明 |
 |:-------|:----:|:------:|:-----|
