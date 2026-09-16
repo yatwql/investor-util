@@ -225,6 +225,97 @@ class TestReportPeriodBacktrack:
         assert seen[0] == "管理层讨论与分析"
         assert rec["content"] == "正文"
 
+    def test_annual_preferred_over_newer_quarterly(self, monkeypatch):
+        """年报/半年报优先于更新的季报（季报无「管理层讨论与分析」，先试它是白跑）。"""
+        self._patch_index(
+            monkeypatch,
+            [
+                {"id": 1, "report_period": "2026-03-31", "doc_type": "q1"},  # 最新
+                {"id": 2, "report_period": "2025-12-31", "doc_type": "annual"},
+            ],
+        )
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
+        monkeypatch.setattr(
+            fr,
+            "_fetch_document",
+            lambda doc_id, section: {"doc_id": doc_id, "report_period": str(doc_id), "content": f"doc{doc_id}"},
+        )
+        rec = fr.fetch_symbol_report("601939.SS")
+        assert rec["doc_id"] == 2  # 年报先试（即便一季报更新）
+
+    def test_notice_document_skipped(self, monkeypatch):
+        """标题含「公告」的条目是信息披露公告，不是财报正文（索引里混排）。"""
+        self._patch_index(
+            monkeypatch,
+            [
+                {
+                    "id": 1,
+                    "report_period": "2026-03-31",
+                    "doc_type": "q1",
+                    "title": "关于变更2026年第一季度报告预约披露时间的公告",
+                },
+                {"id": 2, "report_period": "2025-12-31", "doc_type": "annual", "title": "某行2025年度报告"},
+            ],
+        )
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "正文"})
+        rec = fr.fetch_symbol_report("601939.SS")
+        assert rec["doc_id"] == 2
+
+    def test_fulltext_fallback_locates_keyword(self, monkeypatch):
+        """章节阶全失败 → 整篇下载后按偏好关键词定位片段（不取封面/目录）。"""
+        self._patch_index(monkeypatch, [{"id": 9, "report_period": "2025-12-31", "doc_type": "annual"}])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["附件"])
+        full = "封面：某行2025年度报告\n公司简介……\n主要财务数据\n营业收入 100 亿元"
+        monkeypatch.setattr(
+            fr,
+            "_fetch_document",
+            lambda doc_id, section: {"doc_id": doc_id, "content": full} if section == "" else None,
+        )
+        rec = fr.fetch_symbol_report("601398.SS", max_chars=40)
+        assert rec is not None
+        assert rec["section_source"] == fr.SECTION_SOURCE_FULLTEXT
+        assert rec["summary"].startswith("主要财务数据")
+        assert "封面" not in rec["summary"]
+
+    def test_fulltext_fallback_skips_toc_occurrence(self, monkeypatch):
+        """关键词首次命中在目录行（点线引导）时跳到正文那一次，不把目录当摘要。"""
+        self._patch_index(monkeypatch, [{"id": 9, "report_period": "2025-12-31", "doc_type": "annual"}])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["附件"])
+        full = (
+            "目录\n董事会报告 ................................ 12\n第一章 公司简介\n"
+            "董事会报告\n主要业务：提供银行及相关金融服务\n利润及股息分配……"
+        )
+        monkeypatch.setattr(
+            fr,
+            "_fetch_document",
+            lambda doc_id, section: {"doc_id": doc_id, "content": full} if section == "" else None,
+        )
+        rec = fr.fetch_symbol_report("601398.SS", max_chars=30)
+        assert rec["summary"].startswith("董事会报告\n主要业务")
+        assert "........" not in rec["summary"]
+
+    def test_fulltext_fallback_head_when_no_keyword(self, monkeypatch):
+        """全文里没有任何偏好关键词 → 退化为正文开头片段（仍有内容，不判失败）。"""
+        self._patch_index(monkeypatch, [{"id": 9, "report_period": "2025-12-31", "doc_type": "annual"}])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["附件"])
+        monkeypatch.setattr(
+            fr,
+            "_fetch_document",
+            lambda doc_id, section: {"doc_id": doc_id, "content": "公司简介正文"} if section == "" else None,
+        )
+        rec = fr.fetch_symbol_report("601398.SS", max_chars=10)
+        assert rec["summary"] == "公司简介正文"
+        assert rec["section_source"] == fr.SECTION_SOURCE_FULLTEXT
+
+    def test_sections_hit_marks_section_source(self, monkeypatch):
+        """章节阶命中时标记取用方式为 sections（排查时区分两阶）。"""
+        self._patch_index(monkeypatch, [{"id": 1, "report_period": "2025-12-31", "doc_type": "annual"}])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "正文"})
+        rec = fr.fetch_symbol_report("600900.SS")
+        assert rec["section_source"] == fr.SECTION_SOURCE_SECTIONS
+
     def test_failure_reasons(self, monkeypatch):
         """失败原因细分：索引无报告 / 目标章节缺失（附已试报告期）。"""
         self._patch_index(monkeypatch, [])

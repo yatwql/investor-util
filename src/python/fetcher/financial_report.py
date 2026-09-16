@@ -47,6 +47,20 @@ DEFAULT_MAX_CHARS = 2000
 #: 索引一次取回的候选篇数（本地按报告期排序后取最新一篇）
 _INDEX_SCAN_SIZE = 10
 
+#: 优先文种：经营讨论/管理层讨论章节只存在于年报与半年报，季报仅有财务数据段，
+#: 故回溯时年报/半年报优先，季报仅作最后兜底（减少无效请求、优先拿有内容的报告）
+_PREFERRED_DOC_TYPES = ("annual", "semiannual")
+
+#: 标题含下列词的条目与财报混排在索引里但非财报正文（如「关于变更…报告预约披露时间的公告」），跳过
+_NOTICE_TITLE_KEYWORDS = ("公告",)
+
+#: 全文兜底最多尝试的候选篇数：单篇可达 40 万字（银行年报），比章节路径更保守
+_FULLTEXT_FALLBACK_LIMIT = 2
+
+#: 取用方式（写入记录，供排查区分「章节命中」与「全文定位」）
+SECTION_SOURCE_SECTIONS = "sections"
+SECTION_SOURCE_FULLTEXT = "fulltext"
+
 #: 单标的候选报告篇数：最新一篇缺目标章节时向前回溯（半年报 → 一季报 → 上年年报），
 #: 命中即止。上限 3 篇兼顾覆盖率与请求配额（每篇 1 次章节清单 + 若干次正文请求）：
 #: 银行股半年报在 DataSinking 侧常缺「管理层讨论与分析」章节，回溯到上年年报即可取到。
@@ -257,6 +271,7 @@ def _assemble_record(
     symbol: str,
     content: str,
     max_chars: int,
+    section_source: str = SECTION_SOURCE_SECTIONS,
 ) -> dict[str, Any]:
     """正文 + 元数据 → 单标的财报记录契约。"""
     return {
@@ -271,7 +286,69 @@ def _assemble_record(
         "word_count": record.get("word_count") or meta.get("word_count", 0),
         "source": record.get("source", ""),
         "adjunct_url": record.get("adjunct_url", ""),
+        "section_source": section_source,
     }
+
+
+def _is_notice(meta: dict[str, Any]) -> bool:
+    """标题是否信息披露公告（非财报正文）——索引把两者混排在一起。"""
+    title = str(meta.get("title") or "")
+    return any(k in title for k in _NOTICE_TITLE_KEYWORDS)
+
+
+def _order_report_candidates(items: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """候选报告排序：**年报/半年报优先**，其余（季报）按报告期倒序在后。
+
+    索引本身已按「报告期 → 披露时间」倒序，故这里只做**稳定**分组，不改变组内顺序。
+    季报不含「管理层讨论与分析」，把它排后面可避免「最新一季报无目标章节 → 回溯」的
+    无谓请求；信息披露公告（标题含「公告」）直接剔除。
+    """
+    usable = [m for m in items if m.get("id") is not None and not _is_notice(m)]
+    preferred_ids = {id(m) for m in usable if str(m.get("doc_type") or "") in _PREFERRED_DOC_TYPES}
+    preferred = [m for m in usable if id(m) in preferred_ids]
+    others = [m for m in usable if id(m) not in preferred_ids]
+    return (preferred + others)[: max(1, int(limit))]
+
+
+#: 判定「目录行」的探测窗口与点线特征：目录条目形如「董事会报告 ......」，
+#: 关键词首个命中常落在目录里，取到目录行等于摘要无内容
+_TOC_PROBE_CHARS = 90
+
+
+def _is_toc_line(content: str, pos: int) -> bool:
+    """该位置是否是目录行（**同一行内**出现点线引导/省略号）。
+
+    只看关键词到行尾这一行：正文段落里出现省略号（「利润及股息分配……」）不应被误判为目录。
+    """
+    line_end = content.find("\n", pos)
+    line = content[pos : line_end if line_end >= 0 else pos + _TOC_PROBE_CHARS][:_TOC_PROBE_CHARS]
+    return ("...." in line) or ("…" in line) or (".." in line)
+
+
+def _locate_from_fulltext(doc_id: int | str, preferences: list[str], max_chars: int) -> tuple[str, str]:
+    """整篇正文中按偏好关键词**定位片段**（章节接口与偏好名直取都失败时的兜底）。
+
+    部分标的（如银行股）在源侧章节未被解析出来（``/sections`` 残缺 + 裸章节名 404），
+    但**整篇正文可得**，且正文里含关键词（季报的「主要财务数据」往往就在正文里）。
+    取关键词所在位置起的 ``max_chars`` 字，避免把封面/目录/公司简介当摘要；
+    **跳过目录行**——部分报告（如银行年报）里关键词首个命中落在目录（「董事会报告 ……」），
+    只出现在目录里的关键词会被跳过、继续试下一个偏好。
+
+    Returns:
+        ``(片段, 命中的偏好关键词)``；未取到全文时 ``("", "")``；
+        全文里没有任一偏好关键词时退化为正文开头片段（关键词为空串）。
+    """
+    doc = _fetch_document(doc_id, "")
+    content = str((doc or {}).get("content") or "")
+    if not content.strip():
+        return "", ""
+    for pref in preferences:
+        pos = content.find(pref)
+        while pos >= 0 and _is_toc_line(content, pos):
+            pos = content.find(pref, pos + 1)  # 跳过目录行，找正文里那一次
+        if pos >= 0:
+            return content[pos : pos + max_chars], pref
+    return content[:max_chars], ""
 
 
 def fetch_symbol_report_detailed(
@@ -283,9 +360,15 @@ def fetch_symbol_report_detailed(
 ) -> tuple[dict[str, Any] | None, str]:
     """取单只 A 股的目标章节记录，并返回未取到的原因（供契约失败清单展示）。
 
-    报告期回溯：从最新报告期起，最多试 ``max_candidates`` 篇（命中即止）。银行股
-    半年报在 DataSinking 侧常缺「管理层讨论与分析」（或章节清单残缺且直取 404），
-    回溯到一季报/上年年报即可取到；报告期与文种如实写入记录，展示层不会误标。
+    报告期回溯：最多试 ``max_candidates`` 篇（命中即止），且**年报/半年报优先于季报**
+    （季报无「管理层讨论与分析」，仅作最后兜底）。银行股半年报在 DataSinking 侧常缺
+    「管理层讨论与分析」（或章节清单残缺且直取 404），回溯到上年年报即可取到；报告期
+    与文种如实写入记录，展示层不会误标。
+
+    两阶取数（逐阶降级，不新造请求路径）：
+      ① **章节阶**：章节清单匹配（含残缺回退）→ 逐个取章节正文
+      ② **全文阶**：章节阶全失败时整篇下载后按偏好关键词定位片段（最多
+         ``_FULLTEXT_FALLBACK_LIMIT`` 篇）
 
     Returns:
         ``(记录 | None, 原因文案)``；成功时原因为空串。
@@ -294,16 +377,29 @@ def fetch_symbol_report_detailed(
     if not items:
         return None, REASON_INDEX_EMPTY
     preferences = [str(p).strip() for p in sections if str(p).strip()]
+    candidates = _order_report_candidates(items, max_candidates)
     tried: list[str] = []
-    for meta in items[: max(1, int(max_candidates))]:
+    for meta in candidates:
         doc_id = meta.get("id")
-        if doc_id is None:
-            continue
         tried.append(str(meta.get("report_period") or meta.get("title") or doc_id))
         record, contents = _collect_doc_sections(doc_id, preferences)
         if record is None or not contents:
             continue
         return _assemble_record(record, meta, symbol, "\n\n".join(contents), max_chars), ""
+
+    # ② 全文阶：源侧章节未解析出来时，整篇下载后按关键词定位片段
+    for meta in candidates[:_FULLTEXT_FALLBACK_LIMIT]:
+        doc_id = meta.get("id")
+        excerpt, matched = _locate_from_fulltext(doc_id, preferences, max_chars)
+        if not excerpt.strip():
+            continue
+        logger.info("[financial_report] %s 走全文兜底（doc=%s，命中关键词=%s）", symbol, doc_id, matched or "无")
+        full_record = _fetch_document(doc_id, "") or meta
+        return (
+            _assemble_record(full_record, meta, symbol, excerpt, max_chars, section_source=SECTION_SOURCE_FULLTEXT),
+            "",
+        )
+
     return None, REASON_SECTIONS_MISSING.format(periods="、".join(tried) or "无")
 
 
