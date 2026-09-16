@@ -108,6 +108,52 @@ _DEFAULT_CONFIG = {
         "excess_threshold_up": 80,  # 超额收益 ≥ 此值 → 评级上调一级
         "excess_threshold_down": 40,  # 超额收益 < 此值 → 评级下调一级
     },
+    # ── M. 景气度框架诊断（实验性功能 `prosperity_framework`）──
+    # 六维评分卡的关键词与目标值：方法骨架借鉴开源项目 zhengxi-views（MIT）；
+    # 详见 docs-stm/plan/prosperity-framework-design.md
+    "prosperity_framework": {
+        # 景气/通胀方向关键词（匹配板块与概念；偏好供给端创造需求的科技通胀）
+        "boom_keywords": [
+            "光通信",
+            "光模块",
+            "算力",
+            "数据中心",
+            "液冷",
+            "半导体",
+            "存储",
+            "芯片",
+            "AI",
+            "电力设备",
+            "电网",
+            "储能",
+            "新能源",
+            "有色",
+            "铜",
+            "稀土",
+            "军工",
+            "创新药",
+            "科技",
+        ],
+        # 中国有全球比较优势的环节关键词
+        "global_edge_keywords": [
+            "光通信",
+            "光模块",
+            "半导体设备",
+            "半导体材料",
+            "芯片",
+            "电力设备",
+            "电网",
+            "锂电",
+            "光伏",
+            "储能",
+            "消费电子",
+            "新能源",
+        ],
+        # 防御/红利方向关键词（景气维度反向扣减项）
+        "defensive_keywords": ["银行", "白酒", "食品饮料", "公用事业", "红利", "地产", "房地产", "保险", "消费"],
+        # 前十大重仓集中度目标（%）
+        "concentration_target_pct": 50.0,
+    },
     # ── I. 再平衡配置 ──
     "rebalance": {
         "threshold": 0.15,  # 单品种权重超限阈值（默认 15%）
@@ -257,6 +303,15 @@ def _build_template_from_defaults() -> str:
         # ── J ──
         "  // ── J. 流动性配置 ──",
         f'  "redemption_limits": {json.dumps(d["redemption_limits"])},  // 场外基金单日赎回上限（code → 金额，空=未配置）',
+        "",
+        # ── M ──
+        "  // ── M. 景气度框架诊断（实验性功能 prosperity_framework）──",
+        '  "prosperity_framework": {',
+        f'    "boom_keywords": {json.dumps(d["prosperity_framework"]["boom_keywords"], ensure_ascii=False)},  // 景气/通胀方向关键词（板块与概念匹配）',
+        f'    "global_edge_keywords": {json.dumps(d["prosperity_framework"]["global_edge_keywords"], ensure_ascii=False)},  // 中国有全球比较优势的环节关键词',
+        f'    "defensive_keywords": {json.dumps(d["prosperity_framework"]["defensive_keywords"], ensure_ascii=False)},  // 防御/红利方向关键词（反向扣减）',
+        f'    "concentration_target_pct": {d["prosperity_framework"]["concentration_target_pct"]}  // 前十大重仓集中度目标（%）',
+        "  },",
         "",
         # ── K ──
         "  // ── K. 匿名化配置 ──",

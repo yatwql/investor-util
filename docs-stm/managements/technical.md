@@ -3293,6 +3293,9 @@ make_http_client(timeout=10.0) → httpx.Client
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 
+| `prosperity_framework` | 景气度框架诊断（六维评分卡：景气方向/ROE 低位弹性/全球视野与比较优势/流动性/集中度与周期拼接/业绩与回撤印证；缺数据维度标记需核实、不计分） | 行动建议（章内嵌块） | 调仓 | 实验开关 `prosperity_framework`（默认关） |
+| `build_prosperity_framework_data` | 景气度框架诊断装配入口（纯计算；输入市值明细/穿透/基本面/流动性/快照/历史走势 → 契约） | 行动建议（章内嵌块） | 分析计算 | 随 `prosperity_framework` |
+| `prosperity_framework_data` | 景气度框架诊断数据契约（available/reason/六维明细/持仓视角/未验证清单；类型 dict） | 行动建议（章内嵌块） | 报告输出 | 无（契约） |
 > **合并章代码标识符**：合并章 sheet key 统一为语义名——`holdings_detail`（持仓明细与分类，合并 `market_value` + `category`）、`position_structure`（持仓结构与集中度，合并 `position_relationship` + `fund_concentration`）、`fundamental_snapshot`（持仓基本面，合并 `financial_indicator` + `financial_report_digest`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号命名。
 <!-- semantic-index:end -->
 

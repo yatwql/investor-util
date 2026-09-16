@@ -107,6 +107,14 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
     "llm_debate_qa_concentration": FeatureSwitchDef(
         "辩论-集中度问答", "集中度风险问答", GROUP_EXPERIMENTAL, False, True
     ),
+    # ── 实验性功能：投资方法框架（借展开源骨架，需真实组合样本验证评分口径） ──
+    "prosperity_framework": FeatureSwitchDef(
+        "景气度框架诊断",
+        "六维评分卡（景气方向/ROE 低位弹性/全球比较优势/流动性/集中度与周期拼接/业绩回撤印证）评估组合契合度，缺数据维度标记需核实",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
     # ── 实验性功能：LLM 输出增强（写盘积累账本，需真实数据积累验证） ──
     "decision_reflection": FeatureSwitchDef(
         "决策跨期反思闭环",
