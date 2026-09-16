@@ -141,6 +141,29 @@ class TestRequestStatus:
         monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
         assert ds._request("/documents", {}) is None
 
+    def test_section_probe_404_logged_debug_not_warning(self, monkeypatch, caplog):
+        """章节名探测 404（预期内落空）只记 DEBUG，不刷 WARNING 噪音。"""
+        _prepare(monkeypatch, _FakeResp(status_code=404, payload={}))
+        with caplog.at_level("DEBUG"):
+            assert ds._request("/documents/7", {"section": "管理层讨论与分析"}) is None
+        assert any(r.levelname == "DEBUG" and "探测未命中" in r.message for r in caplog.records)
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+    def test_sections_endpoint_404_logged_debug(self, monkeypatch, caplog):
+        """/sections 清单探测 404 同样只记 DEBUG（该文档章节未被源侧解析）。"""
+        _prepare(monkeypatch, _FakeResp(status_code=404, payload={}))
+        with caplog.at_level("DEBUG"):
+            assert ds._request("/documents/7/sections", {}) is None
+        assert any(r.levelname == "DEBUG" and "探测未命中" in r.message for r in caplog.records)
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+    def test_document_level_404_still_warns(self, monkeypatch, caplog):
+        """文档级 404（不带 section，非 /sections 探测）仍记 WARNING。"""
+        _prepare(monkeypatch, _FakeResp(status_code=404, payload={}))
+        with caplog.at_level("DEBUG"):
+            assert ds._request("/documents/7", {}) is None
+        assert any(r.levelname == "WARNING" and "返回 HTTP 404" in r.message for r in caplog.records)
+
     def test_key_not_in_logs(self, monkeypatch, caplog):
         _prepare(monkeypatch, _FakeResp(status_code=401, payload={}))
         with caplog.at_level("WARNING"):

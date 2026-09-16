@@ -184,6 +184,31 @@ class TestOrchestration:
         assert by_code["000001"]["target_source"] == "穿透"
 
 
+class TestPenetratedTargets:
+    """穿透 → 标的清单：真实 top10 契约的来源键是 ``sources``（非 merged 层的 ``funds``）。"""
+
+    def test_top10_shape_sources_key(self):
+        """top10 契约形态（`_build_penetration_result` 归一后的 sources）须带出基金名。"""
+        from src.python.report.orchestrator import _penetrated_targets
+
+        out = _penetrated_targets(
+            [
+                {"name": "阳光电源", "codes": ["300274"], "sources": ["[ETF] 招商中证电池主题ETF(561910)"]},
+                {"name": "长江电力", "codes": ["600900"], "sources": ["直接持有"]},
+            ]
+        )
+        assert out[0]["name"] == "阳光电源"
+        assert out[0]["sources"] == ["[ETF] 招商中证电池主题ETF(561910)"]
+        assert out[1]["sources"] == []  # 「直接持有」来源被剔除（以持仓身份入列）
+
+    def test_merged_shape_funds_key_still_supported(self):
+        """合并层原始形态（funds）仍可用（测试/降级路径直接喂 merged 值）。"""
+        from src.python.report.orchestrator import _penetrated_targets
+
+        out = _penetrated_targets([{"name": "新易盛", "codes": {"300502"}, "funds": ["[QDII] 某基金(017730)"]}])
+        assert out[0]["sources"] == ["[QDII] 某基金(017730)"]
+
+
 class TestDatasinkGate:
     """DataSinking 数据底座门禁：未就绪时章节整体静默隐藏（返回 None，不写占位）。"""
 

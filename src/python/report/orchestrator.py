@@ -295,9 +295,10 @@ def _penetrated_targets(penetrated_assets: list | None) -> list[dict[str, Any]]:
         if not isinstance(asset, dict):
             continue
         name = str(asset.get("name") or "")
-        sources = [
-            str(f).strip() for f in (asset.get("funds") or []) if str(f).strip() and str(f).strip() != "直接持有"
-        ]
+        # top10 契约（`_build_penetration_result`）已把合并层的 funds 归一为 sources；
+        # 同时兼容 merged 原始形态（测试/降级路径直接喂 merged 值时）
+        raw_sources = asset.get("sources") or asset.get("funds") or []
+        sources = [str(f).strip() for f in raw_sources if str(f).strip() and str(f).strip() != "直接持有"]
         codes: list[str] = []
         code = asset.get("code")
         if code:

@@ -236,7 +236,15 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
             logger.warning("[datasink] 重试仍失败（HTTP %d），跳过 %s", resp.status_code, path)
             return None
     if resp.status_code != 200:
-        logger.warning("[datasink] 请求 %s 返回 HTTP %d", path, resp.status_code)
+        # 404 的两种语义分开记：**带 section 的探测**（章节名未命中，调用方本来就会
+        # 换下一章节名/下一步降级路径）与 ``/sections`` 清单探测（该文档章节未被解析）
+        # 属预期内落空 → DEBUG，不刷 WARNING 噪音；文档级缺失（不带 section 的
+        # ``/documents/{id}``、``/documents`` 列表）仍是 WARNING。
+        probing = bool(params.get("section")) or path.endswith("/sections")
+        if resp.status_code == 404 and probing:
+            logger.debug("[datasink] 探测未命中（HTTP 404，预期内，按降级路径继续）：%s", path)
+        else:
+            logger.warning("[datasink] 请求 %s 返回 HTTP %d", path, resp.status_code)
         return None
     try:
         data = resp.json()
