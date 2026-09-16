@@ -40,6 +40,8 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "data_freshness",
     # 行动建议单一数据源：行动板块 + 智囊团深度复盘行动摘要（单源计算两处呈现）
     "action_data",
+    # 景气度框架诊断（实验性功能 prosperity_framework）：六维评分卡组合契合度
+    "prosperity_framework_data",
     # 成本流水：成本分档 + XIRR + 分红累计（功能开关 `cost_lots`，
     # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
     "fund_flow_data",
@@ -131,6 +133,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "decision_review_data": (dict, type(None)),
     "financial_report_digest_data": (dict, type(None)),
     "financial_indicator_data": (dict, type(None)),
+    "prosperity_framework_data": dict,
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {

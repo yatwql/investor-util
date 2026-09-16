@@ -338,6 +338,25 @@ def generate_excel_report(
         ),
     )
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
+
+    # ── 景气度框架诊断契约（实验性功能 prosperity_framework）就地兜底 ──
+    # basic 路径不经编排层；此处穿透结果已就绪，就地组装（full/both 由编排层注入）
+    if not (pipeline_data or {}).get("prosperity_framework_data"):
+        from src.python.config import get_config
+        from src.python.report._report_aux_metrics import compute_prosperity_framework_data
+
+        _pf = compute_prosperity_framework_data(
+            holdings,
+            data.get("details"),
+            {"penetrated_assets": (pen_result or {}).get("top10")},
+            get_config(),
+            prog,
+            financial_indicator_data=financial_indicator_data,
+            history_data=history_data,
+        )
+        if _pf is not None:
+            pipeline_data = {**(pipeline_data or {})}
+            pipeline_data["prosperity_framework_data"] = _pf
     # 风格与因子分析：数据契约 数据在编排层注入 pipeline_data（style_factor_data 主键），
     # 此处透传页签写入（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
     write_fund_deep_analysis_sheets(
@@ -417,6 +436,7 @@ def generate_excel_report(
                 ws_action,
                 (pipeline_data or {}).get("action_data"),
                 decision_review_data=(pipeline_data or {}).get("decision_review_data"),
+                prosperity_framework_data=(pipeline_data or {}).get("prosperity_framework_data"),
             )
         except Exception:
             logger.debug("[excel] 行动建议页签写入失败（非关键）", exc_info=True)

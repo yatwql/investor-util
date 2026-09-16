@@ -82,14 +82,17 @@ def write_action_sheet(
     ws: Worksheet,
     action_data: dict[str, Any] | None,
     decision_review_data: dict[str, Any] | None = None,
+    prosperity_framework_data: dict[str, Any] | None = None,
 ) -> None:
-    """写入行动建议页签。
+    """写入行动建议页签（行动板块 + 可选章内块）。
 
     Args:
         ws: openpyxl Worksheet 对象
         action_data: `action_data` 契约 dict；None 或 available=False 时写占位。
         decision_review_data: 「历史决策复盘」契约 dict（决策跨期反思闭环，
             默认关闭）；None 时行动页签保持既有输出。
+        prosperity_framework_data: 「景气度框架诊断」契约 dict（实验性功能
+            `prosperity_framework`，默认关闭）；None 时页签保持既有输出。
     """
     _name = get_report_sheet_name("action")
     _ncols = 5
@@ -101,6 +104,8 @@ def write_action_sheet(
         if decision_review_data and decision_review_data.get("available"):
             _row = row + 1
             _write_review_block(ws, _row, decision_review_data, _ncols)
+        if prosperity_framework_data and prosperity_framework_data.get("available"):
+            _write_prosperity_block(ws, row + 1, prosperity_framework_data, _ncols)
         auto_width(ws)
         logger.info("行动建议：无持仓数据，写入占位")
         return
@@ -194,6 +199,11 @@ def write_action_sheet(
         row += 1
         row = _write_review_block(ws, row, decision_review_data, _ncols)
 
+    # 子块 6：景气度框架诊断（实验性功能 prosperity_framework，默认关闭）
+    if prosperity_framework_data and prosperity_framework_data.get("available"):
+        row += 1
+        row = _write_prosperity_block(ws, row, prosperity_framework_data, _ncols)
+
     auto_width(ws)
     logger.info("行动建议页签已写入")
 
@@ -258,4 +268,50 @@ def _write_review_block(
             row,
             [f"待结算 {review_data.get('pending_count', 0)} 条（决策满 5 个交易日后用真实行情对账）", "", "", "", ""],
         )
+    return row
+
+
+def _write_prosperity_block(ws, row: int, data: dict[str, Any], ncols: int) -> int:
+    """写入「景气度框架诊断」块（实验性功能，六维评分卡）。
+
+    含总分/评级、六维明细（依据行）、持仓视角与「需核实」清单；结尾固定免责句
+    （契合度而非优劣判断，非投资建议）。
+    """
+    row = write_title_row(ws, row, "景气度框架诊断（实验性）", ncols=ncols)
+    row = write_data_row(
+        ws,
+        row,
+        [
+            f"总分 {data.get('total_score', 0)}/{data.get('scored_weight', 0)}"
+            f"（{data.get('total_score_pct', 0)}%）—— 评级：{data.get('rating_label', '')}",
+            "",
+            "",
+            "",
+            "",
+        ],
+    )
+    row = write_header_row(ws, row, ["维度", "得分", "满分", "依据", ""])
+    for dim in data.get("dimensions", []):
+        evidence = "；".join(dim.get("evidence") or []) or "-"
+        status = dim.get("status")
+        if status == "unverified":
+            evidence = "；".join(dim.get("unverified") or []) or "数据缺失，未计分"
+        row = write_data_row(ws, row, [dim.get("name", ""), dim.get("score", 0), dim.get("max_score", 0), evidence, ""])
+    for item in data.get("holdings_view", [])[:10]:
+        notes = "；".join(item.get("notes") or []) or "-"
+        roe = item.get("roe")
+        roe_text = f"{roe:.2%}" if isinstance(roe, (int, float)) else "需核实"
+        row = write_data_row(
+            ws,
+            row,
+            [
+                f"{item.get('name', '')}（{item.get('code', '')}）",
+                f"{item.get('weight_pct', 0)}%",
+                f"板块 {item.get('sector', '')}",
+                f"ROE {roe_text}｜{notes}",
+                "",
+            ],
+        )
+    for text in (data.get("unverified") or []) + (data.get("notes") or []):
+        row = write_data_row(ws, row, [f"* {text}", "", "", "", ""])
     return row

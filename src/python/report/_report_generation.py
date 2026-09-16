@@ -420,6 +420,23 @@ def _generate_report_both(
             portfolio_peak_mv=compute_portfolio_peak_mv((history_data or {}).get("bars")),
         )
 
+    # 景气度框架诊断（实验性功能 prosperity_framework）：开关关闭返回 None（零行为变化）。
+    # 依赖已算好的基本面契约（ROE）与历史走势（收益/回撤印证），故置于两者之后。
+    from src.python.report._report_aux_metrics import compute_prosperity_framework_data
+
+    _pf_data = compute_prosperity_framework_data(
+        holdings,
+        details,
+        None,
+        config,
+        reporter,
+        financial_indicator_data=financial_indicator_data,
+        history_data=history_data,
+        pipeline_data=pipeline_data,
+    )
+    if _pf_data is not None and pipeline_data is not None:
+        pipeline_data["prosperity_framework_data"] = _pf_data
+
     # ── 4. HTML 报告 ──
     _news_label = "含新闻" if _enable_news else "无新闻"
     reporter.info(f"正在生成 HTML 报告（{_news_label}）...")
@@ -457,6 +474,7 @@ def _generate_report_both(
             position_status=(pipeline_data or {}).get("position_status"),
             data_freshness=(pipeline_data or {}).get("data_freshness"),
             action_data=(pipeline_data or {}).get("action_data"),
+            prosperity_framework_data=(pipeline_data or {}).get("prosperity_framework_data"),
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
@@ -704,6 +722,24 @@ def _generate_report_full(
     # 过早登记会漏采；适配器对缺失键逐项跳过，故不构成硬依赖。
     record_deterministic_signals(pipeline_data, prep, reporter)
     perf.stop()
+
+    # 景气度框架诊断（实验性功能 prosperity_framework）：开关关闭返回 None（零行为变化）。
+    # full 路径 prep 已含穿透重仓（`penetrated_assets`），基本面与历史走势亦已就绪。
+    from src.python.report._report_aux_metrics import compute_prosperity_framework_data
+
+    _pf_data = compute_prosperity_framework_data(
+        holdings,
+        prep["details"],
+        prep,
+        config,
+        reporter,
+        financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data")
+        or prep.get("financial_indicator_data"),
+        history_data=history_data,
+        pipeline_data=pipeline_data,
+    )
+    if _pf_data is not None and pipeline_data is not None:
+        pipeline_data["prosperity_framework_data"] = _pf_data
 
     # ── 6. HTML 报告 ──
     # 成本流水数据（fund_flow_data）：复用 excel_market_data 组装逻辑，

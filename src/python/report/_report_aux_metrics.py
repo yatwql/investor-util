@@ -153,3 +153,104 @@ def compute_correlation_data(
     except Exception:
         logger.exception("[correlation] 相关性矩阵计算异常，章节降级")
         return unavailable_result("source_failed")
+
+
+def compute_prosperity_framework_data(
+    holdings,
+    details,
+    prep: dict | None,
+    config: dict,
+    reporter: ProgressReporter | None = None,
+    *,
+    financial_indicator_data: dict | None = None,
+    history_data: dict | None = None,
+    pipeline_data: dict | None = None,
+) -> dict | None:
+    """编排景气度框架诊断契约（`prosperity_framework_data`，实验性功能）。
+
+    数据来源全部为既有能力：穿透重仓（`prep["penetrated_assets"]`，缺失时现算）提供
+    板块/概念，`financial_indicator_data` 提供个股 ROE，`check_liquidity` 提供场内变现
+    天数（失败即降级为 None → 该维标记未验证），历史快照提供换手代理，
+    `history_data` 提供区间收益与最大回撤。
+
+    Args:
+        holdings: 原始持仓列表
+        details: 市值明细行（DetailRow）
+        prep: `prepare_report_data` 的 prep 字典（读 `penetrated_assets`）
+        config: 完整配置（只读）
+        reporter: 可选进度上报
+        financial_indicator_data: 基本面契约（可来自 pipeline_data）
+        history_data: 组合历史走势数据
+        pipeline_data: 已组装契约（读 `financial_indicator_data` 作为缺省来源）
+
+    Returns:
+        契约 dict；功能开关 `prosperity_framework` 关闭时返回 None（零行为变化）。
+    """
+    from src.python.config.features import is_feature_enabled
+    from src.python.analysis.prosperity_framework import build_prosperity_framework_data
+
+    if not is_feature_enabled("prosperity_framework"):
+        return None
+
+    if reporter is not None:
+        reporter.info("正在评估景气度框架契合度（实验性）...")
+
+    details = list(details or [])
+    penetration_data = None
+    if prep and prep.get("penetrated_assets"):
+        penetration_data = {"top10": prep["penetrated_assets"]}
+    elif details:
+        try:
+            from src.python.report.penetration import compute_penetration_top10
+
+            penetration_data = compute_penetration_top10(holdings, details) or None
+        except Exception:  # 穿透失败不影响诊断其余维度
+            logger.debug("[prosperity_framework] 穿透数据不可用，退回直接持仓板块口径", exc_info=True)
+
+    liquidity_signals = None
+    try:
+        from src.python.analysis.liquidity import check_liquidity
+
+        liquidity_signals = (
+            check_liquidity(
+                [
+                    {
+                        "code": getattr(d, "code", ""),
+                        "name": getattr(d, "name", ""),
+                        "market_value": getattr(d, "market_value", 0.0),
+                    }
+                    for d in details
+                ],
+                sum(float(getattr(d, "market_value", 0.0) or 0.0) for d in details),
+                (config or {}).get("redemption_limits"),
+            )
+            or None
+        )
+    except Exception:  # 流动性取数失败 → 该维标记未验证
+        logger.debug("[prosperity_framework] 流动性信号不可用，该维标记未验证", exc_info=True)
+
+    snapshots = None
+    try:
+        from src.python.report import history_snapshot
+
+        snapshots = history_snapshot.load_all() or None
+    except Exception:
+        logger.debug("[prosperity_framework] 历史快照不可用，换手代理标记未验证", exc_info=True)
+
+    if financial_indicator_data is None and pipeline_data:
+        financial_indicator_data = pipeline_data.get("financial_indicator_data")
+
+    data = build_prosperity_framework_data(
+        details,
+        penetration_data=penetration_data,
+        financial_indicator_data=financial_indicator_data,
+        liquidity_signals=liquidity_signals,
+        snapshots=snapshots,
+        history_data=history_data,
+        config=config,
+    )
+    if reporter is not None and data.get("available"):
+        reporter.ok(
+            f"景气度框架诊断完成：{data['total_score']}/{data['scored_weight']}（{data['total_score_pct']}%，{data['rating_label']}）"
+        )
+    return data

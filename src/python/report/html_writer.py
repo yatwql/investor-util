@@ -241,6 +241,8 @@ def _render_template(
     position_status: dict | None = None,  # 品种覆盖诊断 position_status
     data_freshness: dict | None = None,  # 可信度摘要 data_freshness
     action_data: dict | None = None,  # 行动建议单一数据源 action_data（行动板块 + 智囊团深度复盘行动摘要）
+    prosperity_framework_data: dict
+    | None = None,  # 景气度框架诊断契约（实验性功能 prosperity_framework，None=开关关闭）
     crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data
     tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部）
@@ -348,6 +350,7 @@ def _render_template(
         position_status=position_status,
         data_freshness=data_freshness,
         action_data=action_data,
+        prosperity_framework_data=prosperity_framework_data,
         crisis_annotation_data=crisis_annotation_data,
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,
@@ -386,6 +389,8 @@ def write_html_report(
     position_status: dict | None = None,  # 品种覆盖诊断 position_status（品种覆盖区块）
     data_freshness: dict | None = None,  # 可信度摘要 data_freshness（可信度区块 + 头部摘要行）
     action_data: dict | None = None,  # 行动建议单一数据源 action_data（行动板块 + 智囊团深度复盘行动摘要）
+    prosperity_framework_data: dict
+    | None = None,  # 景气度框架诊断契约（实验性功能 prosperity_framework，None=开关关闭）
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
@@ -641,6 +646,7 @@ def write_html_report(
         position_status=position_status,
         data_freshness=data_freshness,
         action_data=action_data,
+        prosperity_framework_data=prosperity_framework_data,
         crisis_annotation_data=crisis_annotation_data,
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,
