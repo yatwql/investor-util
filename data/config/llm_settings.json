@@ -94,8 +94,9 @@
   // ═══════════════════════════════════════════
   "debate": {
     // 正反辩论 — 三段式(白脸→黑脸→综合)
+    // 每阶段 max_tokens 覆盖（null=按代码兜底 12288；经 max_tokens_override 优先于 max_tokens_expert_review）
     "procon": {
-      "per_call_max_tokens": null,
+      "per_call_max_tokens": 12288,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
     },

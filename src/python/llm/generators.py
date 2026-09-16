@@ -479,7 +479,9 @@ def generate_debate_procon(
     _per_call_max_tokens = procon_cfg.get("per_call_max_tokens")
     _synthesis_temperature = procon_cfg.get("synthesis_temperature", 0.5)
 
-    _max_tokens = _per_call_max_tokens if _per_call_max_tokens is not None else 8192
+    # 每阶段输出上限兜底：配置缺省/为 null 时用 12288（原 8192 在智囊团复盘三段式下
+    # 偏紧，实测 pro 段即被截断触发重试，故整体上调 50%）
+    _max_tokens = _per_call_max_tokens if _per_call_max_tokens is not None else 12288
     _timeout = debate_cfg.get("per_call_timeout_override", 90)
 
     # ── Token 预算守卫 ─────────────────────────────────

@@ -322,6 +322,36 @@ class TestDebateProconFlow(unittest.TestCase):
             for call in mock_gen.call_args_list:
                 self.assertEqual(call.kwargs.get("max_tokens_override"), 4096)
 
+    def test_per_call_max_tokens_fallback_is_12288(self):
+        """配置缺省/为 null 时，每阶段上限兜底为 12288（原 8192 偏紧会截断 pro 段）。
+
+        现场：用户 `llm_settings.json` 的 `debate.procon.per_call_max_tokens` 为 null、
+        模块级 `max_tokens_expert_review=24000`，但辩论路径不看模块级配置 →
+        实际按 8192 调用，智囊团复盘三段式下 pro 段被截断并触发重试（日志 ERROR）。
+        """
+        from src.python.llm.generators import generate_debate_procon
+
+        for procon_cfg in (None, {"per_call_max_tokens": None, "synthesis_temperature": 0.5}):
+            kwargs = dict(self.base_kwargs)
+            kwargs["llm_config"] = {
+                "max_tokens_expert_review": 24000,
+                "debate": {
+                    "max_total_tokens_per_report": 48000,
+                    "per_call_timeout_override": 90,
+                    "procon": procon_cfg or {},
+                },
+            }
+            with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
+                mock_gen.side_effect = [("p", False), ("c", False), ("s", False)]
+                generate_debate_procon(**kwargs)
+                self.assertEqual(mock_gen.call_count, 3)
+                for call in mock_gen.call_args_list:
+                    self.assertEqual(
+                        call.kwargs.get("max_tokens_override"),
+                        12288,
+                        f"procon_cfg={procon_cfg} 时每阶段上限应兜底 12288（不得回退 8192）",
+                    )
+
     # ── 测试：穿透资产代码加入 valid_codes（幻觉过滤误伤修复） ──
 
     def _capture_con_raw_filter(self, kwargs: dict):

@@ -76,7 +76,7 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     "reasoning_effort_news_correlation": "high",
     "news_correlation_top_n": 30,
     "debate": {
-        "procon": {"per_call_max_tokens": None, "synthesis_model": None, "synthesis_temperature": 0.5},
+        "procon": {"per_call_max_tokens": 12288, "synthesis_model": None, "synthesis_temperature": 0.5},
         "conditional": {
             "scenarios": [
                 {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
@@ -196,6 +196,9 @@ def _get_default_llm_settings_template() -> str:
     debate = d["debate"]
     lines.append('  "debate": {')
     lines.append("    // 正反辩论 — 三段式(白脸→黑脸→综合)")
+    lines.append(
+        "    // 每阶段输出上限（默认 12288；null 时按代码兜底 12288，经 max_tokens_override 优先于 max_tokens_expert_review）"
+    )
     lines.append(f'    "procon": {json.dumps(debate["procon"], indent=4, ensure_ascii=False)},')
     lines.append("    // 条件推理 — 情景化分析")
     lines.append('    "conditional": {')

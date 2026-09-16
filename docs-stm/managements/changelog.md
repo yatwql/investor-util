@@ -6,6 +6,23 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 修复：辩论模式每阶段输出上限 8192 → 12288（智囊团复盘截断）（2026-09-16）
+
+**现场**：`logs/app.log` 反复出现 `LLM 输出被截断 [Claude]: max_tokens_expert_review=8192, 实际输出=8192 tokens`，随后自动以 12288 重生成（一次多余调用 + ERROR 噪音）。
+
+**根因**：用户开启了**辩论模式**（`llm_debate_procon`），智囊团复盘走 `generate_debate_procon` 三段式路径，其每阶段上限取 `debate.procon.per_call_max_tokens`（**不看**模块级 `max_tokens_expert_review=24000`）；而模板默认与用户配置该键均为 `null` → 落到代码兜底 **8192**，pro 段即被截断。
+
+**修改（按 +50%）**：
+- 代码兜底：`llm/generators.py::generate_debate_procon` 的 `_max_tokens` 兜底 **8192 → 12288**
+- 模板默认：`config/_llm_settings_defaults.py` 的 `debate.procon.per_call_max_tokens` **null → 12288**（并在模板中补该键语义注释，用户可见可调）
+- 用户配置：`data/config/llm_settings.json` 的 `debate.procon.per_call_max_tokens` **null → 12288**
+- 文档同步：`requirements.md`（R-LLM-DB-PROCON-06 与配置矩阵行）、`technical.md`（Token 预算守卫表）、`how-to-config-llm.md`（辩论段说明与示例）
+- 回归测试：`test_debate_generators.py::test_per_call_max_tokens_fallback_is_12288`（配置缺省/为 null 两种情形下，三段调用的 `max_tokens_override` 必须为 12288，不得回退 8192）
+
+注：模块级 `max_tokens_expert_review`（24000，非辩论路径使用）未改动；辩论总预算 `max_total_tokens_per_report`（48000）与单次超时（90s）亦不变。
+
+门禁：四个 `--ci` + `--mode verify,regression` + ruff 全绿。
+
 ### plan-46 设计文档归档（docs-stm/plan → archive/v0.11.x/prosperity-framework）（2026-09-16）
 
 plan-46（景气度框架诊断，实验性功能）已实施完成，按「中间设计文件随完成态归档」惯例把设计文档从 `docs-stm/plan/` 归档到 `docs-stm/archive/v0.11.x/prosperity-framework/`（`git mv` 保留历史）：
