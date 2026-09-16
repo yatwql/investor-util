@@ -54,9 +54,9 @@ LLM 配置由三个独立文件管理：
     "news_correlation": false
   },
   "temperature_global_macro": 0.3,
-  "max_tokens_global_macro": 2048,
+  "max_tokens_global_macro": 3072,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 24000,
+  "max_tokens_expert_review": 36000,
   "pricing": {
     "currency": "CNY",
     "timezone": "Asia/Shanghai",
@@ -302,7 +302,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: [], weekend_always_idle: true}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）、`weekend_always_idle`（周末全天闲时开关，默认 `true`）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
-- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，默认 12288（null 时按代码兜底同值））、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 48000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**本段仅控制辩论行为的参数，启停由 Feature Flag（`llm_debate_*`）决定，非配置直接启用**；决策跨期反思闭环（`decision_reflection`）同样由 Feature Flag 启停，无独立配置段
+- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，默认 18432（null 时按代码兜底同值））、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 72000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**本段仅控制辩论行为的参数，启停由 Feature Flag（`llm_debate_*`）决定，非配置直接启用**；决策跨期反思闭环（`decision_reflection`）同样由 Feature Flag 启停，无独立配置段
 
 ### 模块级配置
 
@@ -311,12 +311,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `system_prompt_{module}` | string / null | `null` | 系统提示词覆盖，`null`=使用代码内置 prompt |
 | `model_{module}` | string / null | `null` | 独立指定本模块使用的模型，`null`=使用 Provider 默认模型。**仅 flat 模式生效；多链模式优先使用 `llm_providers.json` 中凭据块定义的模型** |
 | `temperature_{module}` | float | 0.1~0.8（模块差异） | 采样温度，0=确定性最高，1=最大多样性 |
-| `max_tokens_{module}` | int | 2048~24000（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试）。**DeepSeek 为 thinking + 正文共享预算**（详见下方 DeepSeek V4 说明） |
+| `max_tokens_{module}` | int | 3072~36000（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试）。**DeepSeek 为 thinking + 正文共享预算**（详见下方 DeepSeek V4 说明） |
 | `timeout_{module}` | int | 60~120（模块差异） | API 超时秒数 |
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
 | `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式（news_correlation）不支持** |
 | `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude / DeepSeek / Gemini 2.5） |
-| `thinking_budget_{module}` | int | 4000~16000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
+| `thinking_budget_{module}` | int | 6000~24000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
 > 各模块默认值差异详见下方「各模块推荐参数值」表。
@@ -402,12 +402,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_global_macro": null,
   "model_global_macro": null,
   "temperature_global_macro": 0.3,
-  "max_tokens_global_macro": 2048,
+  "max_tokens_global_macro": 3072,
   "timeout_global_macro": 60,
   "cache_enabled_global_macro": true,
   "output_brief_global_macro": false,
   "thinking_enabled_global_macro": false,
-  "thinking_budget_global_macro": 4000,
+  "thinking_budget_global_macro": 6000,
   "reasoning_effort_global_macro": "high",
 
   // ═══════════════════════════════════════════
@@ -416,12 +416,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_expert_review": null,
   "model_expert_review": null,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 24000,
+  "max_tokens_expert_review": 36000,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
   "output_brief_expert_review": false,
   "thinking_enabled_expert_review": true,
-  "thinking_budget_expert_review": 16000,
+  "thinking_budget_expert_review": 24000,
   "reasoning_effort_expert_review": "low",
 
   // ═══════════════════════════════════════════
@@ -430,12 +430,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_health_check": null,
   "model_health_check": null,
   "temperature_health_check": 0.1,
-  "max_tokens_health_check": 16000,
+  "max_tokens_health_check": 24000,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
   "output_brief_health_check": false,
   "thinking_enabled_health_check": true,
-  "thinking_budget_health_check": 12000,
+  "thinking_budget_health_check": 18000,
   "reasoning_effort_health_check": "medium",
 
   // ═══════════════════════════════════════════
@@ -444,12 +444,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_penetration_deep": null,
   "model_penetration_deep": null,
   "temperature_penetration_deep": 0.1,
-  "max_tokens_penetration_deep": 8192,
+  "max_tokens_penetration_deep": 12288,
   "timeout_penetration_deep": 90,
   "cache_enabled_penetration_deep": true,
   "output_brief_penetration_deep": false,
   "thinking_enabled_penetration_deep": false,
-  "thinking_budget_penetration_deep": 8000,
+  "thinking_budget_penetration_deep": 12000,
   "reasoning_effort_penetration_deep": "high",
 
   // ═══════════════════════════════════════════
@@ -459,11 +459,11 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_news_correlation": null,
   "model_news_correlation": null,
   "temperature_news_correlation": 0.1,
-  "max_tokens_news_correlation": 2000,
+  "max_tokens_news_correlation": 3000,
   "timeout_news_correlation": 60,
   "cache_enabled_news_correlation": true,
   "thinking_enabled_news_correlation": false,
-  "thinking_budget_news_correlation": 4000,
+  "thinking_budget_news_correlation": 6000,
   "reasoning_effort_news_correlation": "high",
   "news_correlation_top_n": 30,
 
@@ -474,8 +474,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "debate": {
     // 正反辩论 — 三段式(白脸→黑脸→综合)
     "procon": {
-      // 每阶段 max_tokens 覆盖（默认 12288；null=按代码兜底同值；经 max_tokens_override 优先于 max_tokens_expert_review）
-      "per_call_max_tokens": 12288,
+      // 每阶段 max_tokens 覆盖（默认 18432；null=按代码兜底同值；经 max_tokens_override 优先于 max_tokens_expert_review）
+      "per_call_max_tokens": 18432,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
     },
@@ -493,7 +493,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
-    "max_total_tokens_per_report": 48000,
+    "max_total_tokens_per_report": 72000,
     // 辩论模式单次 API 调用超时覆盖（秒）
     "per_call_timeout_override": 90
   },
@@ -540,11 +540,11 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 | 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | reasoning_effort | output_brief_limit |
 |------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:----------------:|:------------------:|
-| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | high | **200 字** |
-| **智囊团深度复盘** | null | **0.3**（低温保事实） | **24000** | **120s** | **true** ⭐ | 16000 | **low** | 300 字 |
-| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **16000** | **120s** | **true** | 12000 | **medium** | 300 字 |
-| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **8192** | **90s** | false | 8000 | high | 300 字 |
-| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | high | 不适用 |
+| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **3072** | **60s** | false | 6000 | high | **200 字** |
+| **智囊团深度复盘** | null | **0.3**（低温保事实） | **36000** | **120s** | **true** ⭐ | 24000 | **low** | 300 字 |
+| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **24000** | **120s** | **true** | 18000 | **medium** | 300 字 |
+| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **12288** | **90s** | false | 12000 | high | 300 字 |
+| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **3000** | **60s** | false | 6000 | high | 不适用 |
 
 > **补充**：财经新闻关联分析还支持 `news_correlation_top_n` 配置项（默认 `30`），控制送 LLM 分析的新闻条数上限，按关键词匹配数降序选取。增大此值会线性增加 Token 消耗，减小则降低 LLM 关联分析的覆盖率。设为 `0` 可完全禁用 LLM 分析（仅保留关键词匹配）。
 
@@ -581,7 +581,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 ```json
 {
   "thinking_enabled_expert_review": true,
-  "thinking_budget_expert_review": 16000
+  "thinking_budget_expert_review": 24000
 }
 ```
 
@@ -600,8 +600,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 | 配置项 | 管什么 | expert 默认值 |
 |--------|--------|:------------:|
-| `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 24000 |
-| `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 16000 |
+| `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 36000 |
+| `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 24000 |
 
 **API 硬性约束（仅 Claude / Gemini）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。代码自动保护：若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。若配置开启但模型不支持，自动跳过并记录 WARNING。
 
@@ -612,7 +612,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 **思考耗尽自动兜底**：开启 Extended Thinking 时若出现"思考部分耗尽 max_tokens 预算"，程序会**自动关闭 thinking 同 Provider 重试一次**（`call_claude` 层安全网，日志 `关闭 thinking 重试一次，避免模块整体失败`），保证有正文产出；重试仍失败才切换下一 Provider。因此正常情况下不再因思考耗尽直接丢模块内容。
 
-**调参建议**：若日志仍频繁出现 `LLM 输出思考部分耗尽 max_tokens 预算`，请**增大对应模块的 `max_tokens_{module}`**（DeepSeek 为 thinking + 正文共享预算，需 > `thinking_budget` + 正文余量）或**降低 `reasoning_effort_{module}`**。当前默认 expert_review 24000 / health_check 16000（对应 thinking_budget 16000/12000 + 正文余量，DeepSeek V4 输出上限 384K 无 API 拒绝风险），配合自动兜底双重保障。
+**调参建议**：若日志仍频繁出现 `LLM 输出思考部分耗尽 max_tokens 预算`，请**增大对应模块的 `max_tokens_{module}`**（DeepSeek 为 thinking + 正文共享预算，需 > `thinking_budget` + 正文余量）或**降低 `reasoning_effort_{module}`**。当前默认 expert_review 36000 / health_check 24000（对应 thinking_budget 24000/18000 + 正文余量，DeepSeek V4 输出上限 384K 无 API 拒绝风险；2026-09-16 全模块整体上调 50%），配合自动兜底双重保障。
 
 ### 效果参考
 

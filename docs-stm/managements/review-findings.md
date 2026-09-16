@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.1-dev
-> **编号源**：`rf-next = 379`（新增问题取此编号，完成后更新为 +1；已用最大 rf-378，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 380`（新增问题取此编号，完成后更新为 +1；已用最大 rf-379，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -37,6 +37,14 @@
 | # | 问题 | 修复方向 |
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
+
+#### P2C — LLM Thinking 预算与 max_tokens 约束（2026-09-16）
+
+> 处理「思考耗尽 max_tokens」日志时发现；本次修复只做 +50% 上调上限，未改动此逻辑。
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-379** | `llm/api.py::_resolve_thinking_budget` 兜底方向可疑：配置的 `thinking_budget_{module}` 小于 `max_tokens + 1024` 时被判「不足」并**提升到 `max_tokens + 4096`** → 实际发送 `budget_tokens > max_tokens`。但 Anthropic 官方约束是 `budget_tokens < max_tokens`（Gemini 2.5 亦要求 thinkingBudget 小于 maxOutputTokens），方向相反 → Claude/Gemini 原生模型 + 开启 thinking 时可能被 API 拒绝（日志表现：「Claude API 响应格式异常」后关闭 thinking 重试）。手册 `how-to-config-llm.md`「thinking_budget 与 max_tokens 的关系」将该方向写为「API 硬约束须 ≥ max_tokens + 1024」，同样待核实 | ① 查证 Anthropic / Gemini 真实约束并构造复现（两者是否都要求 budget < max_tokens）；② 若方向确认写反，改为「budget 上限 = max_tokens − 正文余量（如 −2048 或 −20%）」；③ 同步更新手册与 `llm-technical.md`；④ 补 payload 级回归测试（Claude / Gemini 两条路径各一） |
 
 ## 已解决问题
 

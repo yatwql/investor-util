@@ -71,3 +71,55 @@ class TestWriteLlmSettingsShared:
         write_llm_settings({"model": "claude"}, str(path))
 
         assert calls == [1]
+
+
+class TestTokenCapHeadroom:
+    """模块 token 上限基线：思考型模型须给正文留余量（防「思考耗尽 max_tokens」）。
+
+    背景：`max_tokens_{module}` 是 thinking + 正文**共享预算**。实测智囊团复盘
+    在预算偏紧时思考占满预算、响应无正文（日志「LLM 输出思考部分耗尽 max_tokens
+    预算，未生成最终文本」），程序只能关闭 thinking 重试一次（多一次调用）。
+    2026-09-16 按 +50% 整体上调各模块 max_tokens / thinking_budget，本用例锁定基线，
+    防止误改回旧值导致思考耗尽复发。
+    """
+
+    EXPECTED = {
+        "max_tokens_global_macro": 3072,
+        "thinking_budget_global_macro": 6000,
+        "max_tokens_expert_review": 36000,
+        "thinking_budget_expert_review": 24000,
+        "max_tokens_health_check": 24000,
+        "thinking_budget_health_check": 18000,
+        "max_tokens_penetration_deep": 12288,
+        "thinking_budget_penetration_deep": 12000,
+        "max_tokens_news_correlation": 3000,
+        "thinking_budget_news_correlation": 6000,
+    }
+
+    def test_module_token_caps_match_baseline(self):
+        """各模块 max_tokens / thinking_budget 默认值须为 +50% 后的基线值。"""
+        from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS
+
+        actual = {k: _DEFAULT_LLM_SETTINGS[k] for k in self.EXPECTED}
+        assert actual == self.EXPECTED
+
+    def test_thinking_enabled_modules_keep_body_headroom(self):
+        """开启 thinking 的模块：max_tokens 必须大于 thinking_budget（否则无正文余量）。"""
+        from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS
+
+        d = _DEFAULT_LLM_SETTINGS
+        for module in ("expert_review", "health_check"):
+            assert d[f"thinking_enabled_{module}"] is True, f"{module} 应默认开启 thinking"
+            assert d[f"max_tokens_{module}"] > d[f"thinking_budget_{module}"], (
+                f"{module}: max_tokens({d[f'max_tokens_{module}']}) 须大于 "
+                f"thinking_budget({d[f'thinking_budget_{module}']})，否则思考会占满预算"
+            )
+
+    def test_debate_stage_caps_sized_for_thinking(self):
+        """辩论每阶段上限与总预算：18432/72000（三段 3×18432=55296 < 72000，守卫不早trigger）。"""
+        from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS
+
+        debate = _DEFAULT_LLM_SETTINGS["debate"]
+        assert debate["procon"]["per_call_max_tokens"] == 18432
+        assert debate["max_total_tokens_per_report"] == 72000
+        assert 3 * debate["procon"]["per_call_max_tokens"] < debate["max_total_tokens_per_report"]

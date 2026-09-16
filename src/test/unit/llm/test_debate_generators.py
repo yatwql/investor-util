@@ -270,7 +270,7 @@ class TestDebateProconFlow(unittest.TestCase):
 
         # 显式低预算（threshold = 100 chars，2x = 200 chars）触发守卫：
         # pro 短（pro 单独 < 2x 不回退全部）、con 长（pro+con 超 1x 跳过 synthesis）。
-        # 正常三段输出远低于默认预算（48000），守卫仅在病态输出时触发，
+        # 正常三段输出远低于默认预算（72000），守卫仅在病态输出时触发，
         # 故用显式低预算构造超限场景。
         kwargs = dict(self.base_kwargs)
         kwargs["llm_config"] = {
@@ -322,12 +322,13 @@ class TestDebateProconFlow(unittest.TestCase):
             for call in mock_gen.call_args_list:
                 self.assertEqual(call.kwargs.get("max_tokens_override"), 4096)
 
-    def test_per_call_max_tokens_fallback_is_12288(self):
-        """配置缺省/为 null 时，每阶段上限兜底为 12288（原 8192 偏紧会截断 pro 段）。
+    def test_per_call_max_tokens_fallback_is_18432(self):
+        """配置缺省/为 null 时，每阶段上限兜底为 18432（两轮各 +50%：8192 → 12288 → 18432）。
 
         现场：用户 `llm_settings.json` 的 `debate.procon.per_call_max_tokens` 为 null、
-        模块级 `max_tokens_expert_review=24000`，但辩论路径不看模块级配置 →
-        实际按 8192 调用，智囊团复盘三段式下 pro 段被截断并触发重试（日志 ERROR）。
+        模块级 `max_tokens_expert_review` 更大，但辩论路径不看模块级配置 →
+        实际按旧兜底值调用，智囊团复盘三段式下 pro 段被截断；思考型模型还会先把
+        预算吃在 thinking 上（无正文），故兜底再上调 50%。
         """
         from src.python.llm.generators import generate_debate_procon
 
@@ -348,8 +349,8 @@ class TestDebateProconFlow(unittest.TestCase):
                 for call in mock_gen.call_args_list:
                     self.assertEqual(
                         call.kwargs.get("max_tokens_override"),
-                        12288,
-                        f"procon_cfg={procon_cfg} 时每阶段上限应兜底 12288（不得回退 8192）",
+                        18432,
+                        f"procon_cfg={procon_cfg} 时每阶段上限应兜底 18432（不得回退旧值）",
                     )
 
     # ── 测试：穿透资产代码加入 valid_codes（幻觉过滤误伤修复） ──

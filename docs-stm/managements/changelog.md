@@ -6,6 +6,37 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 修复：思考耗尽 max_tokens —— 全模块 token 上限整体上调 50%（2026-09-16）
+
+**现场**：`logs/app.log` 出现 `LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本（建议增大对应 max_tokens 配置或降低 reasoning_effort）` + `Extended Thinking 思考部分耗尽 max_tokens 预算（无正文），关闭 thinking 重试一次`。
+
+**根因**：`max_tokens_{module}` 是 **thinking + 正文共享预算**。预算偏紧时思考先吃满预算、响应仅含 thinking block 无正文 → 只能关闭 thinking 重试一次（多一次调用，且本次深度下降）。
+
+**修改（按 +50% 整体上调，模板 + 用户配置文件同步）**：
+
+| 配置项 | 旧 → 新 |
+|---|---|
+| `max_tokens_global_macro` | 2048 → **3072** |
+| `thinking_budget_global_macro` | 4000 → **6000** |
+| `max_tokens_expert_review` | 24000 → **36000** |
+| `thinking_budget_expert_review` | 16000 → **24000** |
+| `max_tokens_health_check` | 16000 → **24000** |
+| `thinking_budget_health_check` | 12000 → **18000** |
+| `max_tokens_penetration_deep` | 8192 → **12288** |
+| `thinking_budget_penetration_deep` | 8000 → **12000** |
+| `max_tokens_news_correlation` | 2000 → **3000** |
+| `thinking_budget_news_correlation` | 4000 → **6000** |
+| `debate.procon.per_call_max_tokens` | 12288 → **18432** |
+| `debate.max_total_tokens_per_report` | 48000 → **72000** |
+
+- 代码兜底：`llm/generators.py::generate_debate_procon` 的 `_max_tokens` 兜底 12288 → **18432**（三段 3×18432 = 55296 < 72000，预算守卫不会被提前触发）
+- 模板：`config/_llm_settings_defaults.py` 同步全部新值（用户可见可调）
+- 用户配置：`data/config/llm_settings.json` 同步全部新值
+- 文档同步：`how-to-config-llm.md`（示例 JSON / 模块参数表 / `thinking_budget` 与 `max_tokens` 关系 / 调参建议）、`llm-technical.md`（各模块默认 max_tokens 表）、`requirements.md`（辩论 per-call 与总预算两行）
+- 回归测试：`test_llm_settings.py::TestTokenCapHeadroom`（基线值 + 「thinking 模块 max_tokens > thinking_budget」正文余量不变量 + 辩论三段预算关系）；`test_debate_generators.py` 兜底值同步为 18432
+
+注：caps 是**上限**而非固定用量，正常输出不会因此变长；只在被截断/耗尽场景才多消耗预算，从而省掉一次多余的「关闭 thinking 重试」调用。
+
 ### 修复：辩论模式每阶段输出上限 8192 → 12288（智囊团复盘截断）（2026-09-16）
 
 **现场**：`logs/app.log` 反复出现 `LLM 输出被截断 [Claude]: max_tokens_expert_review=8192, 实际输出=8192 tokens`，随后自动以 12288 重生成（一次多余调用 + ERROR 噪音）。

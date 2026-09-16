@@ -479,13 +479,13 @@ def generate_debate_procon(
     _per_call_max_tokens = procon_cfg.get("per_call_max_tokens")
     _synthesis_temperature = procon_cfg.get("synthesis_temperature", 0.5)
 
-    # 每阶段输出上限兜底：配置缺省/为 null 时用 12288（原 8192 在智囊团复盘三段式下
-    # 偏紧，实测 pro 段即被截断触发重试，故整体上调 50%）
-    _max_tokens = _per_call_max_tokens if _per_call_max_tokens is not None else 12288
+    # 每阶段输出上限兜底：配置缺省/为 null 时用 18432（原 8192 在智囊团复盘三段式下偏紧，
+    # 实测 pro 段即被截断触发重试；思考型模型还会先把预算吃在 thinking 上，故再上调 50%）
+    _max_tokens = _per_call_max_tokens if _per_call_max_tokens is not None else 18432
     _timeout = debate_cfg.get("per_call_timeout_override", 90)
 
     # ── Token 预算守卫 ─────────────────────────────────
-    _max_total_tokens_budget = debate_cfg.get("max_total_tokens_per_report", 48000)
+    _max_total_tokens_budget = debate_cfg.get("max_total_tokens_per_report", 72000)
     # 中文+Markdown 混排输出约 1 字符 ≈ 1 token，按 1:1 折算字符级阈值；
     # 若按 1.5 token/字符估算，守卫会在真实预算 ~65% 处过早触发。
     _budget_char_threshold = int(_max_total_tokens_budget)
