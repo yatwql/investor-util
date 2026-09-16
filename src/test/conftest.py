@@ -472,6 +472,14 @@ def _auto_reset_datasink_limiter():
 
 
 @pytest.fixture(autouse=True)
+def _auto_reset_hithink_limiter():
+    """重置同花顺数据服务限速器单例（读配置一次，跨测试须重建）。"""
+    from src.python.providers import hithink
+
+    hithink.reset_hithink_limiter()
+
+
+@pytest.fixture(autouse=True)
 def _auto_reset_anchor_state():
     """自动重置新闻去重锚点模块单例状态，防止测试间状态污染。
 

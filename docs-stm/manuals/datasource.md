@@ -24,6 +24,7 @@
 | 基金风格扩展数据（市值/PE） | 东方财富 + 天天基金（基金持仓市值风格 + 市盈率/市净率数据） | — | `extended_` | 基础类 |
 | 个股财报全文（持仓基本面章·区块②） | DataSinking `api.datasink.ing`（全文本财报 Markdown，仅 A 股，**需用户自备 key**） | — | `report_datasink_index_` / `report_datasink_doc_` | 基础类 |
 | 个股财务指标（持仓基本面章·区块①） | akshare `stock_financial_abstract`（东方财富关键指标，宽表） | DataSinking「公司简介和主要财务指标」章节解析（`datasink_indicator`） | `fin_indicator_` | 基础类 |
+| A 股行情 / 财务 / 基金 / 情绪面（**待接入各域**） | 同花顺金融数据服务 `fuyao.aicubes.cn`（官方源，**需用户自备 key**） | — | 各域前缀（接入时登记） | 基础类 / 分析类 |
 
 > **缓存前缀**列对应 `data/cache/` 目录下的文件名前缀，同一前缀的文件按 TTL 统一管理。持仓重合度为运行时推导模块（复用 `fund_hold_` 缓存），无独立缓存前缀。
 > ¹ `bond_yield_rf` 为精确缓存键名（`exact_cache_keys`），非前缀匹配，单独管理。
@@ -65,6 +66,17 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 - **A 股指数** → 腾讯财经 → 新浪财经（备用）
 - **美股指数** → 新浪财经 → 腾讯财经（备用）
 
+### 同花顺金融数据服务（hithink）
+
+- **用途与边界**：A 股行情快照 / 历史日 K（含前·后复权）、财务报表与五类财务指标、估值快照（PE/PB/PS/PCF，**仅现值无历史**）、交易日历、复权因子事件流、指数与板块成分股、公募基金披露持仓 / 历史持仓 / 净值、涨跌停与连板天梯、龙虎榜（全部·机构·游资）。**不含**：分钟 K/tick、**海外行情**、**宏观数据**、**新闻公告原文与研报** → 不可用于替代财报全文与新闻链路
+
+- **鉴权**：用户自备 key（免费申领 <https://fuyao.aicubes.cn/admin/>），存通用密钥文件 `data/config/data_key.json` 的 `hithink` 节（`{"hithink": {"api_key": "..."}}`）或环境变量 `HITHINK_FINANCE_API_KEY`（优先）；缺 key 时链路主动跳过，不发请求
+
+- **限流**：官方**不限累计调用次数**，按负载动态限流（HTTP 429 或信封 `code=4001`）。本程序每次请求前经 `RateLimiter`（间隔 = 1/qps，默认 3，可经 `config.json` 的 `hithink.qps` 覆盖）；**命中限流不立即重试**（遵循官方指引），记 WARNING 后由链路降级
+
+- **响应信封**：`{code, message, request_id, data}`，HTTP 状态码恒 200，业务错误看 `code`（`0` 成功；`2001` 凭据无效、`2003` 权限不足、`4001` 频率超限、`5003` 数据源不可用等）
+
+- **状态**：provider 层已就绪（`providers/hithink.py`）；各数据域的链路接入（财务指标 / 基金持仓 / 行情 / 情绪面）按 `plan.md` 计划表分阶段推进
 ### 财报全文（DataSinking）
 
 由 `fetcher/financial_report.py` 逐标的取数、`report/financial_report_digest.py` 装配（章节 `financial_report_digest`，开关 功能开关 `financial_report_digest` 默认关）：

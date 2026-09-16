@@ -1,0 +1,300 @@
+"""providers/hithink.py 单元测试（同花顺金融数据服务）。
+
+覆盖：凭据门禁（缺 key 不发请求）、限速器先于请求、响应信封解析（成功/业务错误码/
+非 JSON/结构异常）、HTTP 各状态码分支（429 不立即重试 / 401 / 500）、thscode 映射
+（A 股 / 场内 ETF / 场外基金 / 已带后缀 / 非法）、四域接口的路径与参数拼装。
+
+说明：无 API key 时全部走 mock 响应（官方契约来自文档
+``https://fuyao.aicubes.cn/llms-full.txt``）；真实连通验证待 key 配置后补做。
+
+运行：
+  pytest src/test/unit/providers/test_hithink.py -v
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from src.python.providers import hithink as ht
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
+
+
+class _FakeResp:
+    def __init__(self, status_code: int = 200, payload=None, json_error: bool = False) -> None:
+        self.status_code = status_code
+        self._payload = payload
+        self._json_error = json_error
+
+    def json(self):
+        if self._json_error:
+            raise ValueError("not json")
+        return self._payload
+
+
+class _FakeClient:
+    def __init__(self, resp: _FakeResp) -> None:
+        self._resp = resp
+        self.calls: list[dict] = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False
+
+    def get(self, url, params=None, headers=None):
+        self.calls.append({"url": url, "params": params, "headers": headers})
+        return self._resp
+
+
+def _prepare(monkeypatch, resp: _FakeResp, key: str = "test-key") -> _FakeClient:
+    """注入假凭据 + 假 HTTP 客户端 + 无操作限速器，返回客户端以便断言请求。"""
+    client = _FakeClient(resp)
+    monkeypatch.setattr(ht, "missing_credential", lambda _sid: None)
+    monkeypatch.setattr(ht, "credential_value", lambda _sid: key)
+    monkeypatch.setattr(ht, "make_http_client", lambda **_kw: client)
+    monkeypatch.setattr(ht, "_get_limiter", lambda: _NoopLimiter())
+    return client
+
+
+class _NoopLimiter:
+    def __init__(self) -> None:
+        self.acquired: list[str] = []
+
+    def acquire(self, source_id: str) -> None:
+        self.acquired.append(source_id)
+
+
+class TestCredentialGate:
+    def test_missing_credential_skips_without_http(self, monkeypatch):
+        called = {"n": 0}
+
+        def _boom(**_kw):
+            called["n"] += 1
+            raise AssertionError("缺凭据时不得发起请求")
+
+        monkeypatch.setattr(ht, "missing_credential", lambda _sid: object())
+        monkeypatch.setattr(ht, "make_http_client", _boom)
+        assert ht.fetch_trading_days() is None
+        assert called["n"] == 0
+
+    def test_empty_key_skips_without_http(self, monkeypatch):
+        monkeypatch.setattr(ht, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(ht, "credential_value", lambda _sid: "")
+
+        def _boom(**_kw):
+            raise AssertionError("空凭据时不得发起请求")
+
+        monkeypatch.setattr(ht, "make_http_client", _boom)
+        assert ht.fetch_trading_days() is None
+
+    def test_key_sent_in_header_and_never_in_url(self, monkeypatch):
+        client = _prepare(monkeypatch, _FakeResp(payload={"code": 0, "data": {"item": []}}))
+        ht.fetch_trading_days()
+        call = client.calls[0]
+        assert call["headers"]["X-api-key"] == "test-key"
+        assert "test-key" not in call["url"]
+        assert "test-key" not in str(call["params"])
+
+
+class TestEnvelope:
+    def test_success_returns_data(self, monkeypatch):
+        _prepare(monkeypatch, _FakeResp(payload={"code": 0, "message": "success", "data": {"item": [1]}}))
+        assert ht.fetch_trading_days() == {"item": [1]}
+
+    @pytest.mark.parametrize("code", [1001, 2001, 3001, 4001, 5003])
+    def test_business_error_code_returns_none(self, monkeypatch, code):
+        _prepare(monkeypatch, _FakeResp(payload={"code": code, "message": "err", "data": None}))
+        assert ht.fetch_trading_days() is None
+
+    def test_data_null_returns_none(self, monkeypatch):
+        _prepare(monkeypatch, _FakeResp(payload={"code": 0, "data": None}))
+        assert ht.fetch_trading_days() is None
+
+    def test_non_dict_body_returns_none(self, monkeypatch):
+        _prepare(monkeypatch, _FakeResp(payload=[1, 2, 3]))
+        assert ht.fetch_trading_days() is None
+
+    def test_non_json_returns_none(self, monkeypatch):
+        _prepare(monkeypatch, _FakeResp(payload=None, json_error=True))
+        assert ht.fetch_trading_days() is None
+
+    def test_business_error_logged_with_hint(self, monkeypatch, caplog):
+        _prepare(monkeypatch, _FakeResp(payload={"code": 2001, "message": "unauthorized"}))
+        with caplog.at_level("WARNING"):
+            ht.fetch_trading_days()
+        assert "未认证" in caplog.text
+
+
+class TestHttpStatus:
+    @pytest.mark.parametrize("status", [401, 403, 500, 503])
+    def test_error_status_returns_none(self, monkeypatch, status):
+        _prepare(monkeypatch, _FakeResp(status_code=status, payload={}))
+        assert ht.fetch_trading_days() is None
+
+    def test_rate_limited_429_not_retried(self, monkeypatch):
+        """官方要求触发限流后不要立即连续重试：429 直接返回空（客户端只被调一次）。"""
+        client = _prepare(monkeypatch, _FakeResp(status_code=429, payload={}))
+        assert ht.fetch_trading_days() is None
+        assert len(client.calls) == 1
+
+    def test_network_error_returns_none(self, monkeypatch):
+        def _boom(**_kw):
+            raise OSError("unreachable")
+
+        monkeypatch.setattr(ht, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(ht, "credential_value", lambda _sid: "test-key")
+        monkeypatch.setattr(ht, "make_http_client", _boom)
+        assert ht.fetch_trading_days() is None
+
+
+class TestLimiter:
+    def test_limiter_acquired_before_request(self, monkeypatch):
+        client = _prepare(monkeypatch, _FakeResp(payload={"code": 0, "data": {}}))
+        limiter = _NoopLimiter()
+        monkeypatch.setattr(ht, "_get_limiter", lambda: limiter)
+        ht.fetch_trading_days()
+        assert limiter.acquired == [ht.SOURCE_ID]
+        assert client.calls  # 已发出请求
+
+
+class TestToThscode:
+    @pytest.mark.parametrize(
+        ("code", "expected"),
+        [
+            ("600519", "600519.SH"),
+            ("601398", "601398.SH"),
+            ("688200", "688200.SH"),
+            ("000001", "000001.SZ"),
+            ("300750", "300750.SZ"),
+            ("430047", "430047.BJ"),
+            ("561910", "561910.SH"),  # 场内 ETF（沪）
+            ("159222", "159222.SZ"),  # 场内 ETF（深）
+            ("600519.SH", "600519.SH"),  # 已带后缀原样返回
+        ],
+    )
+    def test_a_share_and_etf(self, code, expected):
+        assert ht.to_thscode(code) == expected
+
+    @pytest.mark.parametrize("code", ["011506", "007730", "240012", "002943"])
+    def test_offsite_fund_uses_of_suffix(self, code):
+        assert ht.to_thscode(code, is_fund=True) == f"{code}.OF"
+
+    def test_fund_flag_distinguishes_code_overlap(self):
+        """`00` 重叠区：同一代码既可能是深市股票也可能是场外基金，由调用方语义决定。"""
+        assert ht.to_thscode("002943") == "002943.SZ"
+        assert ht.to_thscode("002943", is_fund=True) == "002943.OF"
+
+    @pytest.mark.parametrize("code", ["", "  ", "8300000", "AAPL", "MU"])
+    def test_unmappable_returns_empty(self, code):
+        assert ht.to_thscode(code) == ""
+
+
+class TestEndpointParams:
+    """四域接口的路径与参数拼装（字段名以官方契约为准）。"""
+
+    def _capture(self, monkeypatch):
+        client = _prepare(monkeypatch, _FakeResp(payload={"code": 0, "data": {"item": []}}))
+        return client
+
+    def test_financial_indicators(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_financial_indicators("600519.SH", "2025-4")
+        call = client.calls[0]
+        assert call["url"].endswith("/api/a-share/financials/indicators")
+        assert call["params"] == {"thscode": "600519.SH", "report": "2025-4"}
+
+    def test_income_statements_limit_mode(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_income_statements("600519.SH", period="quarterly", limit=8)
+        assert client.calls[0]["params"] == {"thscode": "600519.SH", "period": "quarterly", "limit": 8}
+
+    def test_statement_window_mode_excludes_limit(self, monkeypatch):
+        """start/end 与 limit 互斥（官方约束：同时传会返回 code=1004）。"""
+        client = self._capture(monkeypatch)
+        ht.fetch_balance_sheets("600519.SH", limit=4, start=1_700_000_000_000, end=1_750_000_000_000)
+        params = client.calls[0]["params"]
+        assert params["start"] == 1_700_000_000_000 and params["end"] == 1_750_000_000_000
+        assert "limit" not in params
+
+    def test_cash_flow_path(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_cash_flow_statements("000001.SZ")
+        assert client.calls[0]["url"].endswith("/api/a-share/financials/cash-flow-statements")
+
+    def test_valuation_snapshot_joins_codes(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_valuation_snapshot(["600519.SH", "", "000001.SZ"])
+        assert client.calls[0]["params"] == {"thscodes": "600519.SH,000001.SZ"}
+
+    def test_valuation_snapshot_empty_codes_no_request(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        assert ht.fetch_valuation_snapshot([]) is None
+        assert client.calls == []
+
+    def test_price_snapshot_batch_and_paging_modes(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_price_snapshot(["600519.SH", "000001.SZ"])
+        assert client.calls[0]["params"] == {"thscodes": "600519.SH,000001.SZ"}
+        ht.fetch_price_snapshot(limit=100, offset=0)
+        assert client.calls[1]["params"] == {"limit": 100, "offset": 0}
+
+    def test_price_history_defaults_forward_adjust(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_price_history("600519.SH", 1_700_000_000_000, 1_750_000_000_000)
+        assert client.calls[0]["params"] == {
+            "thscode": "600519.SH",
+            "interval": "1d",
+            "start": 1_700_000_000_000,
+            "end": 1_750_000_000_000,
+            "adjust": "forward",
+        }
+
+    def test_adjustment_factors_optional_window(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_adjustment_factors("600519.SH")
+        assert client.calls[0]["params"] == {"thscode": "600519.SH"}
+        ht.fetch_adjustment_factors("000001.SZ", "2021-01-01", "2026-01-01")
+        assert client.calls[1]["params"]["from"] == "2021-01-01"
+
+    def test_index_constituents(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_index_constituents("000300.SH")
+        assert client.calls[0]["url"].endswith("/api/a-share-index/constituents/ths-stock-list")
+
+    def test_special_data_sentiment(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_limit_up_ladder()
+        assert client.calls[0]["url"].endswith("/api/a-share/special-data/limit-up-ladder")
+        ht.fetch_dragon_tiger_list("hot_money", "2026-07-01")
+        assert client.calls[1]["params"] == {"board_type": "hot_money", "date": "2026-07-01"}
+
+    def test_fund_endpoints(self, monkeypatch):
+        client = self._capture(monkeypatch)
+        ht.fetch_fund_portfolio_holdings("025480.OF")
+        assert client.calls[0]["url"].endswith("/api/fund/portfolio/holdings")
+        assert client.calls[0]["params"] == {"thscode": "025480.OF"}
+        ht.fetch_fund_stock_history("011506.OF", "annual", "2025-12-31")
+        assert client.calls[1]["url"].endswith("/api/fund/portfolio/stock-history")
+        ht.fetch_fund_nav("011506.OF", range_="year", nav_type="unit")
+        assert client.calls[2]["params"] == {"thscode": "011506.OF", "range": "year", "nav_type": "unit"}
+
+
+class TestCredentialSpec:
+    def test_spec_registered_with_key_file_section(self):
+        """凭据声明：环境变量优先，密钥文件以 `hithink` 为节（与 datasink 同模式）。
+
+        声明表由 conftest 的 autouse fixture 逐测试清空，故此处重新执行模块导入
+        （注册发生在模块导入期，与 datasink 同模式）后再断言。
+        """
+        import importlib
+
+        from src.python.core.datasource_credential import CREDENTIAL_SPECS
+
+        mod = importlib.reload(ht)
+        spec = CREDENTIAL_SPECS[mod.SOURCE_ID]
+        assert spec.env_var == "HITHINK_FINANCE_API_KEY"
+        assert spec.key_file == ht.DEFAULT_KEY_FILE
+        assert spec.key_section == ht.SOURCE_ID
+        assert "fuyao.aicubes.cn" in spec.apply_url
