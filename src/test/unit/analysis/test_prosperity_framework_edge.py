@@ -132,7 +132,7 @@ def test_penetration_top10_empty_list_falls_back_to_direct():
         [_FakeDetail("300308", "中际旭创", 100_000.0)], penetration_data={"top10": []}
     )
     boom = next(d for d in data["dimensions"] if d["key"] == "boom_cycle")
-    assert any("直接持仓板块分布" in e for e in boom["evidence"])
+    assert any("并集" in e and "归一" in e for e in boom["evidence"])
 
 
 def test_detail_row_objects_with_negative_market_value():

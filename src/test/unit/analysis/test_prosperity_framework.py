@@ -120,9 +120,77 @@ class TestBoomDimension:
         assert boom["score"] == 0
 
     def test_falls_back_to_direct_holdings_without_penetration(self):
+        """无穿透数据 → 退化纯直接持仓口径（覆盖≈100%）。"""
         data = build_prosperity_framework_data(_details())
         boom = next(d for d in data["dimensions"] if d["key"] == "boom_cycle")
-        assert any("直接持仓板块分布" in e for e in boom["evidence"])
+        assert any("并集" in e and "归一" in e for e in boom["evidence"])
+
+    def test_union_coverage_includes_uncovered_direct_holdings(self):
+        """并集口径：穿透只覆盖一部分时，其余直接持仓仍按板块计入（旧口径漏 65% 市值）。"""
+        details = [
+            _row("600519", "贵州茅台", 500_000.0),
+            _row("011506", "建信高端装备股票A", 400_000.0),
+            _row("561910", "招商中证电池主题ETF", 100_000.0),
+        ]
+        # 穿透只覆盖了茅台（50%）与电池 ETF 底层（10%）
+        penetration = {
+            "top10": [
+                {"name": "贵州茅台", "sector": "消费", "concepts": ["白酒"], "codes": ["600519"], "ratio_pct": 50.0},
+                {
+                    "name": "宁德时代",
+                    "sector": "电池",
+                    "concepts": [],
+                    "codes": ["300750"],
+                    "sources": ["[ETF] 招商中证电池主题ETF(561910)"],
+                    "ratio_pct": 10.0,
+                },
+            ]
+        }
+        data = build_prosperity_framework_data(details, penetration_data=penetration)
+        boom = next(d for d in data["dimensions"] if d["key"] == "boom_cycle")
+        evidence = "；".join(boom["evidence"])
+        # 覆盖 = 穿透 60% + 未覆盖直接持仓（建信高端装备 40%）= 100%，按已覆盖部分归一
+        assert "覆盖 100.00% 市值" in evidence
+        assert "归一" in evidence
+        assert boom["score"] > 0, "未被穿透覆盖的景气方向持仓必须计入（旧口径会漏 65% 市值）"
+
+    def test_union_coverage_not_double_counted(self):
+        """穿透项已覆盖的基金/直接持仓不再按其自身权重重复计入（覆盖 ≤100%）。"""
+        from src.python.analysis.prosperity_framework import _sector_weight_items
+
+        details = [
+            _row("600519", "贵州茅台", 500_000.0),
+            _row("561910", "招商中证电池主题ETF", 500_000.0),
+        ]
+        penetration = {
+            "top10": [
+                {
+                    "name": "贵州茅台",
+                    "sector": "消费",
+                    "concepts": ["白酒"],
+                    "codes": ["600519"],
+                    "sources": ["直接持有"],
+                    "ratio_pct": 50.0,
+                },
+                {
+                    "name": "宁德时代",
+                    "sector": "电池",
+                    "concepts": [],
+                    "codes": ["300750"],
+                    "sources": ["[ETF] 招商中证电池主题ETF(561910)"],
+                    "ratio_pct": 30.0,
+                },
+            ]
+        }
+        items, covered, pen_pct = _sector_weight_items(penetration, details)
+        # 覆盖 = 穿透 80%（ETF 自身权重由其底层标的代表，不重复计入）
+        assert covered == 80.0, (items, covered)
+        assert pen_pct == 80.0
+        weights = {text: w for text, w in items}
+        # 归一后：茅台 50/80 = 62.5、宁德 30/80 = 37.5
+        assert weights.get("贵州茅台 消费 白酒") == 62.5
+        assert weights.get("宁德时代 电池 ") == 37.5
+        assert not any("招商中证电池主题ETF" in k for k in weights), "已被穿透覆盖的基金不得重复计入"
 
 
 class TestRoeDimension:
@@ -368,3 +436,36 @@ class TestPerformanceDimensionBenchmarkShapes:
         dim = next(d for d in data["dimensions"] if d["key"] == "performance")
         assert dim["status"] == "scored"
         assert "业绩与回撤印证" not in " ".join(data["unverified"])
+
+
+class TestBoomDefensiveExclusivity:
+    """互斥归类：同一标的命中多类词时按防御优先，景气+防御之和 ≤100%（归一后）。"""
+
+    def test_overlapping_keyword_counted_once_as_defensive(self):
+        from src.python.analysis.prosperity_framework import _score_boom
+
+        details = [_row("600900", "长江电力", 100_000.0)]
+        cfg = {
+            "boom_keywords": ["电力"],
+            "global_edge_keywords": [],
+            "defensive_keywords": ["电力"],  # 刻意重叠
+            "concentration_target_pct": 50.0,
+        }
+        dim = _score_boom(None, details, cfg)
+        evidence = "；".join(dim["evidence"])
+        assert "命中景气关键词的权重 0.00%" in evidence, evidence
+        assert "防御/红利关键词 100.00%" in evidence, evidence
+
+    def test_no_overlap_without_shared_keywords(self):
+        from src.python.analysis.prosperity_framework import _score_boom
+
+        details = [_row("600900", "长江电力", 100_000.0)]
+        cfg = {
+            "boom_keywords": ["能源资源"],
+            "global_edge_keywords": [],
+            "defensive_keywords": ["银行"],
+            "concentration_target_pct": 50.0,
+        }
+        dim = _score_boom(None, details, cfg)
+        evidence = "；".join(dim["evidence"])
+        assert "命中景气关键词的权重 100.00%" in evidence, evidence

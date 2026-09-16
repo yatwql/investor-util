@@ -2836,12 +2836,12 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 | 维度 | 权重 | 计算口径（全部取自既有能力） | 数据缺失时 |
 |:--|:--:|:--|:--|
-| ① 景气方向 / 通胀属性 | 25 | 板块/概念（穿透重仓优先，无穿透则退回 `classify_sector` 直接持仓）命中 `boom_keywords` 的市值占比按 60% 满分档折算；命中 `defensive_keywords` 反向扣减 | 不依赖外部数据 |
+| ① 景气方向 / 通胀属性 | 25 | **并集口径 + 归一**（`_sector_weight_items`）：穿透重仓（含基金拆解，按 `codes`/`sources` 标记已覆盖）+ 未被覆盖的其余直接持仓（`classify_sector` 板块）；命中 `boom_keywords` 权重按 60% 满分档折算、`defensive_keywords` 反向扣减（**防御优先、互斥不重复计**）；覆盖率在证据中披露 | 不依赖外部数据 |
 | ② ROE 低位弹性 | 20 | `financial_indicator_data` 的 ROE 分布：低 ROE（<10%）权重按 50% 满分档折算，年度趋势改善加分 | `unverified`（提示开启 `financial_indicator`） |
-| ③ 全球视野 / 中国比较优势 | 15 | 命中 `global_edge_keywords` 的权重（40% 满分档）+ 非 A 股/港股等境外资产占比加分（上限 5 分） | 不依赖外部数据 |
+| ③ 全球视野 / 中国比较优势 | 15 | 命中 `global_edge_keywords` 的权重（口径同维度①并集归一，40% 满分档）+ 非 A 股/港股等境外资产占比加分（上限 5 分） | 不依赖外部数据 |
 | ④ 流动性 | 10 | `analysis/liquidity.py::check_liquidity` 的最差场内变现天数分档（<1 日 10 / <3 日 7 / <5 日 4 / 否则 2） | 全为场外或数据缺失 → `unverified` |
 | ⑤ 集中度与周期拼接 | 15 | 前十大集中度（`concentration_target_pct` 目标档）+ 换手代理（最近两期历史快照持仓集合变动率 1−Jaccard；高换手为加分项） | 无第二期快照 → 换手子项 `unverified`（`partial`） |
-| ⑥ 业绩与回撤印证 | 15 | `history_data` 区间收益与最大回撤（正收益 8 分 / 跑赢最强基准 +4 / 回撤 ≤15% +3、≤25% +1） | 无历史走势 → `unverified` |
+| ⑥ 业绩与回撤印证 | 15 | `history_data` 区间收益与最大回撤（正收益 8 分 / 跑赢最强基准 +4 / 回撤 ≤15% +3、≤25% +1）；`benchmarks` 兼容 `list[dict]`（生产）与 `dict[str, dict]`（注入），无法解析的基准跳过不计 | `status=unavailable` / 无收益字段 → `unverified`；仅回撤样本不足 → `partial` |
 
 **总分与评级口径**：只累计 `status != unverified` 的维度（`scored_weight`），`total_score_pct = total_score / scored_weight`；评级四档 ≥80 高度契合 / 60–79 较契合 / 40–59 部分契合 / <40 不契合。**红线**：缺数据维度**不计分、不臆造**（进 `unverified` 清单），渲染固定带免责句（衡量「组合与框架的契合度」，非组合优劣、非投资建议）。
 

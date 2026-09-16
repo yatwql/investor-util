@@ -108,7 +108,7 @@ class TestOrchestrationHelper:
             None,
         )
         boom = next(d for d in out["dimensions"] if d["key"] == "boom_cycle")
-        assert any("穿透后" in e for e in boom["evidence"])
+        assert any("穿透重仓" in e and "归一" in e for e in boom["evidence"])
 
 
 class TestExcelRendering:

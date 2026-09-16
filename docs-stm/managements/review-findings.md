@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.1-dev
-> **编号源**：`rf-next = 376`（新增问题取此编号，完成后更新为 +1；已用最大 rf-375，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 377`（新增问题取此编号，完成后更新为 +1；已用最大 rf-376，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -68,6 +68,7 @@
 | **rf-373** | **实验性功能异常冒泡拖垮主报告（用户报障）+ 既有的全零行情 Excel 崩溃**：① `prosperity_framework` 的换手代理按 dict 取快照字段，而 `history_snapshot.load_all()` 返回 `SnapshotData` 冻结 dataclass → `AttributeError` 自实验功能冒泡，**整份 full 报告生成失败**（`logs/app.log` 现场）；同时暴露**韧性缺口**：单维/整体计算异常无隔离，实验功能可影响主报告，违反数据降级治理纪律。② 场景测试进一步暴露**既有缺陷**：「持仓明细与分类」页签在行情全零时先写整行合并的提示行、再以该行为数据起点写明细 → `MergedCell` 只读崩溃（源自合并前 `market_value_sheet.py`，批次② 原样带入；既有单测用 MagicMock 工作表故漏检） | ①快照字段提取改为 `_snapshot_holding_codes()`（兼容 dataclass 与 dict，缺失字段按空集且不抛）；单维经 `_guard_dimension()` 降级、组装辅助整体 try/except 返回 None、三个调用点再加一层兜底；新增 5+4+4 例回归（含真实 `SnapshotData` 与场景级「报告必须生成成功」断言）。②提示行后显式重置 `data_start`；新增 2 例真实 openpyxl 回归（全零不崩溃 + 行序断言）。变更详情见 changelog [0.11.1-dev] |
 | **rf-374** | **同一契约的多条渲染调用链只补了一条（用户复核报障）**：`_generate_full_html_report`（full 路径 HTML 包装）未声明/转发 `prosperity_framework_data`，而 both 路径调用点已转发——批量替换时 `count=1` 只命中一处，导致「开关已开但菜单 L 的 HTML 无块」。Excel 侧因就地构建契约不受影响，故问题只在 L 的 HTML 上暴露，单元/场景测试（当时只覆盖 both 与 Excel）也未拦住 | 补齐包装函数参数声明与转发、full 调用点传入；新增 `TestHtmlCallSiteSeam` 3 例源码级/签名级守卫（「每处 write_html_report 调用都须带该参数」），并做真实数据端到端复核（both/full 的 HTML+Excel 均含块）。变更详情见 changelog [0.11.1-dev] |
 | **rf-375** | **维度⑥「业绩与回撤印证」误报缺失（基准契约结构假设错误，用户复核报障）**：`history_data["benchmarks"]` 的生产契约是 **`list[dict]`**（`PortfolioHistoryCalculator.get_combined_timeseries` docstring 明示），而实现按 `dict[str, dict]` 调 `.values()` → `AttributeError` 被新增的维度守卫吞成「需核实」；同时 `drawdown_available=False` 被误判为整维缺失（实为仅回撤子项缺失，收益仍可计分）；`finite_or(None)` 内部 `float(None)` 亦会抛 TypeError（数值守卫用法错误） | 新增 `_benchmark_returns()` 兼容两种形态并对非 dict/缺字段/bool/非数值一律跳过（类型判定先于 `finite_or`）；回撤样本不足改为 `partial`（仅回撤子项不计分）；`status=degraded` 计分带注记。新增 8 例回归（含真实形态端到端），并以真实管线复核六维全部可计分。变更详情见 changelog [0.11.1-dev] |
+| **rf-376** | **景气度框架诊断口径覆盖不足 + 双份词表 + 重复计数（用户真实持仓复核暴露）**：① 维度①③原按「有穿透数据就只看穿透」实现，实际只覆盖 **34.6%** 市值（QDII/联接/债基等未穿透持仓全部漏掉）；② 模块内置词表与配置层 `_config_defaults` 各存一份 → 补词只改配置层时模块默认值仍命中不到（假「无命中」）；③ 同一标的同时命中景气与防御词（如「电力」「债/现金」类策略名）被各计一次 → 两者之和 >100%；④ 用户实际持有板块（制造/高端装备/能源资源/电力/电池/债）不在默认词表 | ①新增 `_sector_weight_items()` 并集口径（穿透项 + 未覆盖直接持仓）并按已覆盖市值归一，证据披露覆盖率；②模块默认值改为从 `config/_config_defaults` 派生（单一事实来源）；③改为防御优先的互斥归类；④按真实持仓补词（景气 +8/全球 +4/防御 +3）并重生成 `config.json`。新增 4 例回归（未穿透持仓计入、已覆盖不重复、互斥归类、无重叠正常）。真实持仓复核：总分 32 → 42/100（评级 不契合 → 部分契合）。变更详情见 changelog [0.11.1-dev] |
 
 ### 归档档案
 

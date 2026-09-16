@@ -31,6 +31,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from src.python.core.num_utils import finite_or
@@ -39,9 +40,28 @@ logger = logging.getLogger("invest")
 
 __all__ = ["build_prosperity_framework_data", "RATING_THRESHOLDS", "DEFAULT_CONFIG"]
 
+
 # ── 默认配置（可经 config.json 的 `prosperity_framework` 段覆盖） ─────────
-DEFAULT_CONFIG: dict[str, Any] = {
-    # 景气/通胀方向关键词（匹配板块与概念字段；偏好供给端创造需求的科技通胀）
+def _config_defaults_for_module() -> dict[str, Any]:
+    """从配置层单一事实来源读取默认关键词与阈值（`config/_config_defaults._DEFAULT_CONFIG`）。
+
+    词表只维护一处（配置层），本模块不再另存一份 —— 否则两处漂移会导致
+    「config.json 加了词、模块默认值里没有」这类假命中（真实持仓复核踩到）。
+    配置层不可用时退回内置最小词表（保持功能可用）。
+    """
+    try:
+        from src.python.config import _config_defaults as _cd
+
+        section = _cd._DEFAULT_CONFIG.get("prosperity_framework") or {}
+        if section:
+            return {key: value for key, value in section.items() if key in _FALLBACK_CONFIG}
+    except Exception:  # 配置层不可用（如极简运行环境）→ 退回内置
+        logger.debug("[prosperity_framework] 配置层默认值不可读，使用内置回退词表", exc_info=True)
+    return dict(_FALLBACK_CONFIG)
+
+
+_FALLBACK_CONFIG: dict[str, Any] = {
+    # 内置最小词表（仅当配置层不可读时使用；正常路径以配置层为准）
     "boom_keywords": [
         "光通信",
         "光模块",
@@ -56,14 +76,19 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "电网",
         "储能",
         "新能源",
+        "电池",
+        "光伏",
         "有色",
         "铜",
         "稀土",
         "军工",
         "创新药",
         "科技",
+        "高端装备",
+        "制造",
+        "能源资源",
+        "电力",
     ],
-    # 中国有全球比较优势的环节关键词（第三个维度）
     "global_edge_keywords": [
         "光通信",
         "光模块",
@@ -73,16 +98,34 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "电力设备",
         "电网",
         "锂电",
+        "电池",
         "光伏",
         "储能",
         "消费电子",
         "新能源",
+        "高端装备",
+        "制造",
+        "电力",
     ],
-    # 防御/红利方向关键词（作为景气维度的反向扣减项）
-    "defensive_keywords": ["银行", "白酒", "食品饮料", "公用事业", "红利", "地产", "房地产", "保险", "消费"],
-    # 前十大重仓集中度目标（%）：框架偏好「分散但不失主线」，超过该值视为集中度偏高
+    "defensive_keywords": [
+        "银行",
+        "白酒",
+        "食品饮料",
+        "公用事业",
+        "红利",
+        "地产",
+        "房地产",
+        "保险",
+        "消费",
+        "债",
+        "货币",
+        "现金",
+    ],
     "concentration_target_pct": 50.0,
 }
+
+# 默认配置：单一事实来源为配置层（`config/_config_defaults`），本模块只做读取
+DEFAULT_CONFIG: dict[str, Any] = _config_defaults_for_module()
 
 # 评级阈值（对齐上游评分卡口径：≥80 高度契合 / 60–79 较契合 / 40–59 部分契合 / <40 不契合）
 RATING_THRESHOLDS: tuple[tuple[int, str, str], ...] = (
@@ -162,7 +205,56 @@ def _guard_dimension(build, key: str, name: str, max_score: int) -> dict[str, An
         return _unverified_dimension(key, name, max_score, "该维计算异常，已跳过（详见日志）")
 
 
-# ── 维度① 景气方向 / 通胀属性 ─────────────────────────────────
+def _sector_weight_items(
+    penetration_data: dict[str, Any] | None,
+    holdings_details: list[dict[str, Any]],
+) -> tuple[list[tuple[str, float]], float, float]:
+    """构造「板块/概念 → 权重」清单（**并集口径 + 归一化**，供维度①③共用）。
+
+    口径（真实持仓复核发现旧口径只覆盖 34.6% 市值，故修订为并集）：
+
+      - 穿透 top10 每项按其 `ratio_pct`（占组合市值比）计入，并把它覆盖的**直接持仓代码**
+        （`codes`）与**贡献该标的的基金代码**（`sources` 形如 `[权益] 名称(011506)`）标记为已覆盖；
+      - 未被穿透项覆盖的其余直接持仓（QDII/联接基金/债基/未穿透基金等）按自身组合权重 +
+        `classify_sector` 板块计入；
+      - 各权重按**已覆盖部分**归一为 100（阈值口径 = 「占已覆盖市值的比例」，并披露覆盖率）。
+
+    Returns:
+        (items, covered_pct, penetration_pct)：items 为归一后 [(文本, 权重%), ...]。
+    """
+    from src.python.report.penetration import classify_sector
+
+    raw: list[tuple[str, float]] = []
+    top10 = (penetration_data or {}).get("top10") or []
+    covered_codes: set[str] = set()
+    pen_pct = 0.0
+    for item in top10:
+        if not isinstance(item, dict):
+            continue
+        text = " ".join([str(item.get("name", "")), str(item.get("sector", "")), " ".join(item.get("concepts") or [])])
+        weight = finite_or(item.get("ratio_pct"))
+        raw.append((text, weight))
+        pen_pct += weight
+        for code in item.get("codes") or []:
+            covered_codes.add(str(code))
+        for src in item.get("sources") or []:
+            m = re.search(r"\((\d{6})\)", str(src))
+            if m:
+                covered_codes.add(m.group(1))
+
+    total = sum(finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details)
+    for d in holdings_details:
+        code = str(getattr(d, "code", ""))
+        if code and code in covered_codes:
+            continue  # 已由穿透项计入，避免重复计数
+        sector = classify_sector(getattr(d, "name", ""), code)
+        raw.append((f"{sector} {getattr(d, 'name', '')}", _pct(finite_or(getattr(d, "market_value", 0.0)), total)))
+
+    covered = sum(w for _, w in raw)
+    if covered <= 0:
+        return [], 0.0, round(pen_pct, 2)
+    items = [(text, round(w / covered * 100, 2)) for text, w in raw]
+    return items, round(covered, 2), round(pen_pct, 2)
 
 
 def _boom_weights(
@@ -172,32 +264,23 @@ def _boom_weights(
 ) -> tuple[float, float, list[str], str]:
     """返回 (景气占比, 防御占比, 证据, 口径说明)。
 
-    口径优先穿透后重仓（含基金底层，`penetration_data.top10`）；无穿透数据时退回
-    直接持仓的板块分布（`classify_sector`）。
+    口径：**并集** —— 穿透 top10 各底层标的（含基金持仓拆解）+ 未被穿透覆盖的直接持仓，
+    合计覆盖≈100% 市值（见 `_sector_weight_items`）。
     """
-    from src.python.report.penetration import classify_sector
-
-    items: list[tuple[str, str, float]] = []  # (名称, 板块文本, 权重%)
-    top10 = (penetration_data or {}).get("top10") or []
-    if top10:
-        for item in top10:
-            text = " ".join([item.get("name", ""), item.get("sector", ""), " ".join(item.get("concepts") or [])])
-            items.append((item.get("name", ""), text, finite_or(item.get("ratio_pct"))))
-        scope = "穿透后 TOP10 板块/概念分布"
-    else:
-        total = sum(finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details) if holdings_details else 0.0
-        for d in holdings_details:
-            sector = classify_sector(getattr(d, "name", ""), getattr(d, "code", ""))
-            weight = _pct(finite_or(getattr(d, "market_value", 0.0)), total)
-            items.append((getattr(d, "name", ""), f"{sector} {getattr(d, 'name', '')}", weight))
-        scope = "直接持仓板块分布（无穿透数据）"
-
-    covered = sum(w for _, _, w in items)
-    boom = sum(w for _, text, w in items if _matches(text, cfg["boom_keywords"]))
-    defensive = sum(w for _, text, w in items if _matches(text, cfg["defensive_keywords"]))
+    items, covered, pen_pct = _sector_weight_items(penetration_data, holdings_details)
+    # 互斥归类（防御优先）：同一标的可能既命中景气词又命中防御词（如「电力」与「公用事业」
+    # 类文本、「债」「现金」类策略名），若各计一次会使两者之和 >100%，故按防御优先归类。
+    defensive = sum(w for text, w in items if _matches(text, cfg["defensive_keywords"]))
+    boom = sum(
+        w for text, w in items if _matches(text, cfg["boom_keywords"]) and not _matches(text, cfg["defensive_keywords"])
+    )
+    scope = (
+        f"穿透重仓 + 其余持仓板块的并集（覆盖 {covered:.2f}% 市值，其中穿透项 {pen_pct:.2f}%）；"
+        f"以下占比按已覆盖部分归一"
+    )
     evidence = [
-        f"{scope}：覆盖 {covered:.2f}% 市值",
-        f"命中景气关键词的权重 {boom:.2f}%、防御/红利关键词 {defensive:.2f}%",
+        f"{scope}",
+        f"命中景气关键词的权重 {boom:.2f}%、防御/红利关键词 {defensive:.2f}%（同一标的按防御优先归类，互斥不重复计）",
     ]
     return boom, defensive, evidence, scope
 
@@ -323,23 +406,9 @@ def _score_global_edge(
 ) -> dict[str, Any]:
     from src.python.core.code_utils import is_a_share_code, is_hk_stock_code
 
-    items: list[tuple[str, float]] = []
-    top10 = (penetration_data or {}).get("top10") or []
-    if top10:
-        for item in top10:
-            text = " ".join([item.get("name", ""), item.get("sector", ""), " ".join(item.get("concepts") or [])])
-            items.append((text, finite_or(item.get("ratio_pct"))))
-    else:
-        from src.python.report.penetration import classify_sector
-
-        total = sum(finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details) or 0.0
-        for d in holdings_details:
-            sector = classify_sector(getattr(d, "name", ""), getattr(d, "code", ""))
-            items.append(
-                (f"{sector} {getattr(d, 'name', '')}", _pct(finite_or(getattr(d, "market_value", 0.0)), total))
-            )
-
+    items, covered, pen_pct = _sector_weight_items(penetration_data, holdings_details)
     edge = sum(w for text, w in items if _matches(text, cfg["global_edge_keywords"]))
+
     total_mv = sum(finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details)
     offshore = sum(
         finite_or(getattr(d, "market_value", 0.0))
@@ -357,7 +426,8 @@ def _score_global_edge(
         "max_score": _W_GLOBAL,
         "status": "scored",
         "evidence": [
-            f"命中「中国有全球比较优势」关键词的权重 {edge:.2f}%（按 40% 满分档折算）",
+            f"命中「中国有全球比较优势」关键词的权重 {edge:.2f}%（按 40% 满分档折算；"
+            f"口径同维度①并集归一，覆盖 {covered:.2f}% 市值）",
             f"非 A 股 / 港股等境外及港股通资产占比 {offshore_pct:.2f}%（全球暴露加分，上限 5 分）",
         ],
         "unverified": [],
