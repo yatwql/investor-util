@@ -753,7 +753,7 @@ def _holdings_view(
             notes.append("命中防御/红利关键词（反向扣减项）")
         roe = roe_by_code.get(code)
         if roe is None:
-            notes.append("ROE 需核实（未取到基本面）")
+            pass  # ROE 缺失由渲染层在 ROE 列标「需核实」，此处不再重复成备注
         elif roe < _LOW_ROE_THRESHOLD:
             notes.append(f"低 ROE（{roe:.1%}）→ 存在修复弹性")
         view.append(
