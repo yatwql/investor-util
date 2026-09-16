@@ -560,13 +560,49 @@ def _score_concentration(
     )
 
 
+def _benchmark_returns(benchmarks: Any) -> list[tuple[str, float]]:
+    """提取对比基准的区间收益率，返回 [(名称, 收益率%), ...]。
+
+    兼容两种形态（**生产为 list**，见 `PortfolioHistoryCalculator.get_combined_timeseries`
+    的 `benchmarks` 契约：`[{code, name, bars, total_return_pct, ...}, ...]`）：
+
+      - list/tuple[dict]：生产形态
+      - dict[str, dict]：测试/外部注入形态
+
+    非 dict 元素、缺 `total_return_pct`、非有限数值一律跳过（**不得抛异常**）。
+    """
+    if isinstance(benchmarks, dict):
+        items: list[Any] = list(benchmarks.values())
+    elif isinstance(benchmarks, (list, tuple)):
+        items = list(benchmarks)
+    else:
+        return []
+
+    out: list[tuple[str, float]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        raw = item.get("total_return_pct")
+        # bool 是 int 子类但语义上不是收益率；仅接受 int/float（字符串一律跳过，
+        # 且不可用 finite_or(None) —— 其内部 float(None) 会抛 TypeError）
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            continue
+        value = finite_or(raw, None)
+        if value is None:
+            continue
+        name = str(item.get("name") or item.get("code") or "基准")
+        out.append((name, float(value)))
+    return out
+
+
 # ── 维度⑥ 业绩与回撤印证 ─────────────────────────────────────
 
 
 def _score_performance(history_data: dict[str, Any] | None) -> dict[str, Any]:
     data = history_data or {}
-    available = bool(data) and data.get("status") in (None, "ok") and data.get("drawdown_available", True)
-    if not data or data.get("total_return_pct") is None:
+    status = data.get("status")
+    # status: ok（正常）/ degraded（部分持仓缺失，收益口径可用但需标注）/ unavailable（不可用）
+    if not data or data.get("total_return_pct") is None or status not in (None, "ok", "degraded"):
         return {
             "key": "performance",
             "name": "业绩与回撤印证",
@@ -574,37 +610,43 @@ def _score_performance(history_data: dict[str, Any] | None) -> dict[str, Any]:
             "max_score": _W_PERFORMANCE,
             "status": "unverified",
             "evidence": [],
-            "unverified": ["无组合历史走势数据（`history` 配置关闭或样本不足）→ 该维不计分"],
+            "unverified": ["无可用组合历史走势数据（`history` 配置关闭 / status=unavailable / 样本不足）→ 该维不计分"],
         }
 
     total_return_pct = finite_or(data.get("total_return_pct"))
     max_drawdown_pct = abs(finite_or(data.get("max_drawdown_pct")))
-    benchmarks = data.get("benchmarks") or {}
-    bench_returns = [
-        finite_or(v.get("total_return_pct"))
-        for v in benchmarks.values()
-        if isinstance(v, dict) and v.get("total_return_pct") is not None
-    ]
-    bench_best = max(bench_returns) if bench_returns else None
+    bench_pairs = _benchmark_returns(data.get("benchmarks"))
+    bench_best_name, bench_best = max(bench_pairs, key=lambda x: x[1]) if bench_pairs else (None, None)
 
     score = 8 if total_return_pct > 0 else 3
     evidence = [f"组合区间累计收益 {total_return_pct:+.2f}%"]
     if bench_best is not None:
+        label = f"{bench_best_name} {bench_best:+.2f}%" if bench_best_name else f"{bench_best:+.2f}%"
         if total_return_pct >= bench_best:
             score += 4
-            evidence.append(f"跑赢最强对比基准（{bench_best:+.2f}%）→ 加分")
+            evidence.append(f"跑赢最强对比基准（{label}）→ 加分")
         else:
-            evidence.append(f"未跑赢最强对比基准（{bench_best:+.2f}%）")
-    if max_drawdown_pct <= 15:
-        score += 3
-        evidence.append(f"最大回撤 {max_drawdown_pct:.2f}%（≤15% → 加分；框架视回撤为进攻性资产的自然结果）")
-    elif max_drawdown_pct <= 25:
-        score += 1
-        evidence.append(f"最大回撤 {max_drawdown_pct:.2f}%（≤25% → 小幅加分）")
+            evidence.append(f"未跑赢最强对比基准（{label}）")
+    elif data.get("benchmarks"):
+        evidence.append("对比基准数据不可解析，仅按组合自身收益/回撤计分")
+    drawdown_available = bool(data.get("drawdown_available", True))
+    if drawdown_available:
+        if max_drawdown_pct <= 15:
+            score += 3
+            evidence.append(f"最大回撤 {max_drawdown_pct:.2f}%（≤15% → 加分；框架视回撤为进攻性资产的自然结果）")
+        elif max_drawdown_pct <= 25:
+            score += 1
+            evidence.append(f"最大回撤 {max_drawdown_pct:.2f}%（≤25% → 小幅加分）")
+        else:
+            evidence.append(f"最大回撤 {max_drawdown_pct:.2f}%（>25%）")
     else:
-        evidence.append(f"最大回撤 {max_drawdown_pct:.2f}%（>25%）")
+        evidence.append("历史样本不足（<60 交易日）→ 回撤子项未计分（收益部分仍计入）")
 
-    unverified = [] if available else ["组合历史数据 status 非正常值，收益/回撤口径可能不完整"]
+    unverified = []
+    if status == "degraded":
+        unverified.append("组合历史数据 status=degraded（部分持仓缺历史），收益/回撤口径可能不完整")
+    if not drawdown_available:
+        unverified.append("历史样本不足（<60 交易日）→ 回撤子项不计分")
     return {
         "key": "performance",
         "name": "业绩与回撤印证",

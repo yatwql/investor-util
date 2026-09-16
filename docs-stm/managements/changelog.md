@@ -6,6 +6,17 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 修复：维度⑥「业绩与回撤印证」误报缺失（基准结构假设错误）（2026-09-16）
+
+用户复核报障「业绩与回撤印证说缺失，但组合历史走势与回撤章节明明有数据」→ 定位为**结构假设错误**：`PortfolioHistoryCalculator.get_combined_timeseries()` 的 `benchmarks` 契约是 **`list[dict]`**（`[{code, name, bars, total_return_pct, max_drawdown_pct, …}]`），而实现按 `dict[str, dict]` 调 `.values()` → `AttributeError` 被维度守卫吞成「需核实」。真实数据（用户持仓）：组合区间收益 **-18.11%**、最大回撤 **-22.42%**、沪深300 **-10.36%**，数据齐全却未计分。
+
+- **修正确性**：新增 `_benchmark_returns()` 同时兼容 `list[dict]`（生产形态）与 `dict[str, dict]`（注入形态）；非 dict 元素/缺字段/`bool`/非数值一律跳过且**不抛异常**（注意 `finite_or(None)` 内部 `float(None)` 会抛 TypeError，故先做类型判定）；证据文案带基准名（如「未跑赢最强对比基准（沪深300 -10.36%）」）
+- **修降级语义**：`drawdown_available=False`（历史样本 <60 交易日）时**只降级回撤子项**（收益仍计分，标 `partial` 并列入未验证），不再整维判为缺失；`status=degraded` 也计分但标注口径可能不完整；仅 `status=unavailable`/无收益字段才 `unverified`
+- **回归测试**：`TestPerformanceDimensionBenchmarkShapes` 8 例（list 形态计分且证据含基准名、未跑赢场景 4 分档、dict 形态兼容、畸形基准 5 种输入不抛异常、degraded 计分带注记、unavailable 未验证、回撤样本不足 partial、真实形态经契约端到端 scored）
+- **真实管线复核**：both 路径实际块输出「总分 32/100（32%）」，六维全部可计分——景气 0/25、ROE 9/20、全球 5/15、流动性 10/10、集中度与周期拼接 4/15、业绩与回撤印证 **4/15**（组合 -18.11% / 沪深300 -10.36% / 回撤 22.42%）
+
+门禁：四个 `--ci` + `--mode verify,regression` 4997 passed / 0 failed + ruff 全绿。
+
 ### 修复：full 路径（菜单 L）HTML 未转发景气度框架契约（2026-09-16）
 
 用户复核报障「开关已开、运行后行动建议章后没有新增内容」→ 定位为**接缝缺口**：`_generate_full_html_report`（full 路径 HTML 包装函数）既未声明也未转发 `prosperity_framework_data`，而 both 路径已转发——`count=1` 的批量替换只覆盖了其中一条调用链。**Excel 侧不受影响**（`generate_excel_report` 自行就地构建契约），故 both/full 的 Excel 一直有块，HTML 仅在 both 路径有块。

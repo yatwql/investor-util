@@ -73,6 +73,22 @@ def _snapshots() -> list[dict]:
 
 
 def _history() -> dict:
+    """生产形态 history_data（`benchmarks` 为 **list[dict]**，见
+    `PortfolioHistoryCalculator.get_combined_timeseries` 契约）。"""
+    return {
+        "status": "ok",
+        "drawdown_available": True,
+        "total_return_pct": 18.5,
+        "max_drawdown_pct": -12.0,
+        "benchmarks": [
+            {"code": "sh000300", "name": "沪深300", "total_return_pct": 6.0},
+            {"code": "sh000905", "name": "中证500", "total_return_pct": 9.0},
+        ],
+    }
+
+
+def _history_legacy_dict_benchmarks() -> dict:
+    """旧/注入形态：benchmarks 为 dict[str, dict]（兼容性用例）。"""
     return {
         "status": "ok",
         "drawdown_available": True,
@@ -260,3 +276,95 @@ class TestRatingBoundaries:
         from src.python.analysis.prosperity_framework import _rating
 
         assert _rating(score)[1] == expected
+
+
+class TestPerformanceDimensionBenchmarkShapes:
+    """基准形态回归：`benchmarks` 生产为 list[dict]（原先按 dict 取值 → AttributeError
+    被维度守卫吞成「需核实」，用户报障「组合历史走势与回撤章节有数据、但该维显示缺失」）。"""
+
+    def _details(self):
+        return [DetailRow(account="A", name="某标的", code="300308", market_value=100_000.0, cost=90_000.0)]
+
+    def test_list_benchmarks_scored_with_name(self):
+        """list[dict] 生产形态 → 该维可计分，证据含基准名与收益率。"""
+        from src.python.analysis.prosperity_framework import _score_performance
+
+        dim = _score_performance(_history())
+        assert dim["status"] == "scored"
+        assert dim["score"] == dim["max_score"]  # 收益正 + 跑赢最强 + 回撤 ≤15%
+        assert any("中证500 +9.00%" in e for e in dim["evidence"])
+
+    def test_underperform_benchmark_scores_base_plus_drawdown(self):
+        """未跑赢最强基准 + 回撤 >15% → 不得加分（真实数据形态复核口径）。"""
+        from src.python.analysis.prosperity_framework import _score_performance
+
+        dim = _score_performance(
+            {
+                "status": "ok",
+                "drawdown_available": True,
+                "total_return_pct": -18.11,
+                "max_drawdown_pct": -22.42,
+                "benchmarks": [{"code": "sh000300", "name": "沪深300", "total_return_pct": -10.36}],
+            }
+        )
+        assert dim["status"] == "scored"
+        assert dim["score"] == 4  # 收益非正 3 分 + 回撤 ≤25% 加 1 分
+        assert any("未跑赢最强对比基准（沪深300 -10.36%）" in e for e in dim["evidence"])
+        assert any("最大回撤 22.42%" in e for e in dim["evidence"])
+
+    def test_legacy_dict_benchmarks_still_supported(self):
+        from src.python.analysis.prosperity_framework import _score_performance
+
+        dim = _score_performance(_history_legacy_dict_benchmarks())
+        assert dim["status"] == "scored"
+
+    def test_malformed_benchmarks_do_not_raise(self):
+        """畸形基准（非 dict 元素/缺字段/非数值）→ 不抛异常，仅按自身收益回撤计分。"""
+        from src.python.analysis.prosperity_framework import _score_performance
+
+        for bad in (["oops", 3, None], [{"code": "x"}], [{"total_return_pct": "n/a"}], "not-a-list", 42):
+            dim = _score_performance(
+                {
+                    "status": "ok",
+                    "drawdown_available": True,
+                    "total_return_pct": 5.0,
+                    "max_drawdown_pct": -8.0,
+                    "benchmarks": bad,
+                }
+            )
+            assert dim["status"] == "scored", bad
+            assert 0 <= dim["score"] <= dim["max_score"], bad
+
+    def test_status_degraded_scored_with_note(self):
+        """status=degraded（部分持仓缺历史）→ 仍计分，但标注口径可能不完整。"""
+        from src.python.analysis.prosperity_framework import _score_performance
+
+        dim = _score_performance(
+            {"status": "degraded", "drawdown_available": True, "total_return_pct": 3.0, "max_drawdown_pct": -9.0}
+        )
+        assert dim["status"] == "partial"
+        assert dim["score"] > 0
+        assert any("degraded" in u for u in dim["unverified"])
+
+    def test_status_unavailable_unverified(self):
+        from src.python.analysis.prosperity_framework import _score_performance
+
+        dim = _score_performance({"status": "unavailable", "total_return_pct": None})
+        assert dim["status"] == "unverified"
+        assert dim["score"] == 0
+
+    def test_drawdown_unavailable_partial(self):
+        from src.python.analysis.prosperity_framework import _score_performance
+
+        dim = _score_performance(
+            {"status": "ok", "drawdown_available": False, "total_return_pct": 4.0, "max_drawdown_pct": 0.0}
+        )
+        assert dim["status"] == "partial"
+        assert any("样本不足" in u for u in dim["unverified"])
+
+    def test_contract_through_builder_with_real_shape(self):
+        """端到端：真实形态 history_data（含 bars/benchmarks 列表）→ 维度⑥ scored。"""
+        data = build_prosperity_framework_data(self._details(), history_data=_history())
+        dim = next(d for d in data["dimensions"] if d["key"] == "performance")
+        assert dim["status"] == "scored"
+        assert "业绩与回撤印证" not in " ".join(data["unverified"])
