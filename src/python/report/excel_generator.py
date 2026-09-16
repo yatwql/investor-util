@@ -345,15 +345,19 @@ def generate_excel_report(
         from src.python.config import get_config
         from src.python.report._report_aux_metrics import compute_prosperity_framework_data
 
-        _pf = compute_prosperity_framework_data(
-            holdings,
-            data.get("details"),
-            {"penetrated_assets": (pen_result or {}).get("top10")},
-            get_config(),
-            prog,
-            financial_indicator_data=financial_indicator_data,
-            history_data=history_data,
-        )
+        try:
+            _pf = compute_prosperity_framework_data(
+                holdings,
+                data.get("details"),
+                {"penetrated_assets": (pen_result or {}).get("top10")},
+                get_config(),
+                prog,
+                financial_indicator_data=financial_indicator_data,
+                history_data=history_data,
+            )
+        except Exception:  # 双保险：实验性诊断异常不得中断报告生成
+            logger.warning("[prosperity_framework] 诊断装配异常，本次跳过（主报告不受影响）", exc_info=True)
+            _pf = None
         if _pf is not None:
             pipeline_data = {**(pipeline_data or {})}
             pipeline_data["prosperity_framework_data"] = _pf

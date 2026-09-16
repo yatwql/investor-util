@@ -424,16 +424,20 @@ def _generate_report_both(
     # 依赖已算好的基本面契约（ROE）与历史走势（收益/回撤印证），故置于两者之后。
     from src.python.report._report_aux_metrics import compute_prosperity_framework_data
 
-    _pf_data = compute_prosperity_framework_data(
-        holdings,
-        details,
-        None,
-        config,
-        reporter,
-        financial_indicator_data=financial_indicator_data,
-        history_data=history_data,
-        pipeline_data=pipeline_data,
-    )
+    try:
+        _pf_data = compute_prosperity_framework_data(
+            holdings,
+            details,
+            None,
+            config,
+            reporter,
+            financial_indicator_data=financial_indicator_data,
+            history_data=history_data,
+            pipeline_data=pipeline_data,
+        )
+    except Exception:  # 双保险：实验性诊断异常不得中断整份报告
+        logger.warning("[prosperity_framework] 诊断装配异常，本次跳过（主报告不受影响）", exc_info=True)
+        _pf_data = None
     if _pf_data is not None and pipeline_data is not None:
         pipeline_data["prosperity_framework_data"] = _pf_data
 

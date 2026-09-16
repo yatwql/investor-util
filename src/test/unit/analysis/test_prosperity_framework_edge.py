@@ -140,3 +140,90 @@ def test_detail_row_objects_with_negative_market_value():
     data = build_prosperity_framework_data(rows)
     assert data["available"] is True
     assert data["total_score"] >= 0
+
+
+# ═══════════════════════════════════════════════════════════════
+#  缺陷回归：快照形态（生产为冻结 dataclass，非 dict）
+#  现场（logs/app.log 2026-09-16）：HistorySnapshot.load_all() 返回 SnapshotData
+#  dataclass，而实现按 dict 取值 → AttributeError 冒泡，整份 full 报告生成失败。
+# ═══════════════════════════════════════════════════════════════
+
+
+def _snapshot_data(codes: list[str], *, total_value: float = 1_000_000.0):
+    """构造生产形态的 SnapshotData（冻结 dataclass）。"""
+    from src.python.schemas.history import AccountSnapshot, SnapshotData, SnapshotHolding
+
+    holdings = tuple(
+        SnapshotHolding(code=c, name=f"标的{c}", shares=100.0, cost_price=10.0, market_value=1000.0) for c in codes
+    )
+    return SnapshotData(
+        accounts=(AccountSnapshot(account_name="证券", holdings=holdings),),
+        total_value=total_value,
+        total_cost=800_000.0,
+        total_pnl=200_000.0,
+        total_pnl_pct=25.0,
+        timestamp="2026-09-16T15:00:00",
+        fingerprint="fp",
+    )
+
+
+class TestSnapshotShapeRegression:
+    """快照形态兼容：dataclass（生产）与 dict（测试注入）都要能算换手代理。"""
+
+    def test_snapshotdata_dataclass_computes_turnover(self):
+        """生产形态（SnapshotData）→ 换手代理可算，且**不抛异常**（缺陷回归）。"""
+        from src.python.analysis.prosperity_framework import _turnover_proxy_pct
+
+        snaps = [_snapshot_data(["600519", "300308"]), _snapshot_data(["600519", "601398"])]
+        # Jaccard = 1/3 → 变动率 66.67%
+        assert _turnover_proxy_pct(snaps) == 66.67
+
+    def test_snapshotdata_through_full_contract(self):
+        """端到端：dataclass 快照进入契约构建，集中度维度为 scored（回归主路径）。"""
+        details = [_FakeDetail("600519", "贵州茅台", 100_000.0), _FakeDetail("300308", "中际旭创", 100_000.0)]
+        data = build_prosperity_framework_data(
+            details,
+            snapshots=[_snapshot_data(["600519", "300308"]), _snapshot_data(["600519", "601398"])],
+        )
+        conc = next(d for d in data["dimensions"] if d["key"] == "concentration_cycle")
+        assert conc["status"] == "scored"
+        assert data["turnover_proxy_pct"] == 66.67
+
+    def test_dict_shape_still_supported(self):
+        """dict 形态（既有测试/外部注入）保持可用。"""
+        from src.python.analysis.prosperity_framework import _turnover_proxy_pct
+
+        snaps = [
+            {"holdings": [{"code": "A"}, {"code": "B"}]},
+            {"holdings": [{"code": "A"}, {"code": "C"}]},
+        ]
+        assert _turnover_proxy_pct(snaps) == 66.67
+        snaps_accounts = [
+            {"accounts": [{"holdings": [{"code": "A"}]}]},
+            {"accounts": [{"holdings": [{"code": "B"}]}]},
+        ]
+        assert _turnover_proxy_pct(snaps_accounts) == 100.0
+
+    def test_malformed_snapshot_objects_degrade_not_raise(self):
+        """畸形快照（无 accounts/holdings 字段的对象）→ 不抛异常，该子项未验证。"""
+        from src.python.analysis.prosperity_framework import _turnover_proxy_pct
+
+        assert _turnover_proxy_pct([object(), object()]) is None
+        assert _turnover_proxy_pct([None, None]) is None
+        details = [_FakeDetail("600519", "贵州茅台", 100_000.0)]
+        data = build_prosperity_framework_data(details, snapshots=[object(), object()])  # 不得抛异常
+        conc = next(d for d in data["dimensions"] if d["key"] == "concentration_cycle")
+        assert conc["status"] == "partial"
+        assert any("无历史快照" in u or "不可解析" in u for u in conc["unverified"])
+
+    def test_snapshot_missing_holdings_attr(self):
+        """带 accounts 但缺失 holdings 字段的对象 → 视为该期无持仓（未验证）。"""
+        from src.python.analysis.prosperity_framework import _turnover_proxy_pct
+
+        class _Acc:
+            pass
+
+        class _Snap:
+            accounts = (_Acc(),)
+
+        assert _turnover_proxy_pct([_Snap(), _Snap()]) is None

@@ -240,15 +240,21 @@ def compute_prosperity_framework_data(
     if financial_indicator_data is None and pipeline_data:
         financial_indicator_data = pipeline_data.get("financial_indicator_data")
 
-    data = build_prosperity_framework_data(
-        details,
-        penetration_data=penetration_data,
-        financial_indicator_data=financial_indicator_data,
-        liquidity_signals=liquidity_signals,
-        snapshots=snapshots,
-        history_data=history_data,
-        config=config,
-    )
+    try:
+        data = build_prosperity_framework_data(
+            details,
+            penetration_data=penetration_data,
+            financial_indicator_data=financial_indicator_data,
+            liquidity_signals=liquidity_signals,
+            snapshots=snapshots,
+            history_data=history_data,
+            config=config,
+        )
+    except Exception:
+        # 实验性诊断**不得拖垮主报告**：任何异常降级为「本契约缺席」（等价于开关关闭），
+        # 记录完整堆栈便于定位；契约缺席时渲染层不出现该块、其余章节零影响。
+        logger.warning("[prosperity_framework] 诊断计算失败，本次跳过该模块（主报告不受影响）", exc_info=True)
+        return None
     if reporter is not None and data.get("available"):
         reporter.ok(
             f"景气度框架诊断完成：{data['total_score']}/{data['scored_weight']}（{data['total_score_pct']}%，{data['rating_label']}）"

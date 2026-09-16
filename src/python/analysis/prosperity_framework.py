@@ -140,6 +140,28 @@ def _rating(score_pct: int) -> tuple[str, str]:
     return "low_fit", "不契合"
 
 
+def _unverified_dimension(key: str, name: str, max_score: int, reason: str) -> dict[str, Any]:
+    """构造「未验证」维度结果（不计分、给出可读原因）。"""
+    return {
+        "key": key,
+        "name": name,
+        "score": 0,
+        "max_score": max_score,
+        "status": "unverified",
+        "evidence": [],
+        "unverified": [reason],
+    }
+
+
+def _guard_dimension(build, key: str, name: str, max_score: int) -> dict[str, Any]:
+    """执行单维计算；异常时降级为「未验证」维度（**不得**让单维异常拖垮整份契约）。"""
+    try:
+        return build()
+    except Exception:
+        logger.warning("[prosperity_framework] 维度「%s」计算异常，已降级为未验证", name, exc_info=True)
+        return _unverified_dimension(key, name, max_score, "该维计算异常，已跳过（详见日志）")
+
+
 # ── 维度① 景气方向 / 通胀属性 ─────────────────────────────────
 
 
@@ -409,20 +431,60 @@ def _top10_concentration_pct(holdings_details: list[dict[str, Any]]) -> float | 
     return _pct(sum(values[:10]), total)
 
 
-def _turnover_proxy_pct(snapshots: list[dict[str, Any]] | None) -> float | None:
-    """换手代理（周期拼接）：最近两期快照持仓集合的变动率（1 - Jaccard）。"""
+def _snapshot_holding_codes(snap: Any) -> set[str]:
+    """从一期快照中提取持仓代码集合。
+
+    兼容两种形态（快照来源经 `history_snapshot.load_all()`，返回**冻结 dataclass**）：
+
+      - `SnapshotData` 对象：`snap.accounts[*].holdings[*].code`（生产形态）
+      - dict 形态：`{"accounts": [{"holdings": [{"code": ...}]}]}` 或
+        `{"holdings"/"details": [{"code": ...}]}`（测试/外部注入形态）
+
+    任何字段缺失/类型异常一律按「无该字段」处理（返回值可能为空集），
+    由调用方判定该期不可用 —— 本函数**不得抛异常**（诊断功能不拖垮主报告）。
+    """
+    codes: set[str] = set()
+
+    def _harvest(items: Any) -> None:
+        for item in items or []:
+            if isinstance(item, dict):
+                code = item.get("code")
+            else:
+                code = getattr(item, "code", None)
+            if code:
+                codes.add(str(code))
+
+    accounts = getattr(snap, "accounts", None)
+    if accounts is None and isinstance(snap, dict):
+        accounts = snap.get("accounts")
+    for account in accounts or []:
+        holdings = getattr(account, "holdings", None)
+        if holdings is None and isinstance(account, dict):
+            holdings = account.get("holdings")
+        _harvest(holdings)
+
+    if not codes and isinstance(snap, dict):
+        _harvest(snap.get("holdings") or snap.get("details"))
+    return codes
+
+
+def _turnover_proxy_pct(snapshots: list[Any] | None) -> float | None:
+    """换手代理（周期拼接）：最近两期快照持仓集合的变动率（1 - Jaccard）。
+
+    Args:
+        snapshots: 按时间升序的快照序列（`SnapshotData` 对象或 dict 形态）。
+
+    Returns:
+        变动率百分比；不足两期 / 任一期无持仓 / 形态不可解析时返回 None
+        （该子项标记未验证，不计分）。
+    """
     if not snapshots or len(snapshots) < 2:
         return None
-
-    def _codes(snap: dict[str, Any]) -> set[str]:
-        out: set[str] = set()
-        for item in snap.get("holdings") or snap.get("details") or []:
-            code = str(item.get("code") or "")
-            if code:
-                out.add(code)
-        return out
-
-    prev, cur = _codes(snapshots[-2]), _codes(snapshots[-1])
+    try:
+        prev, cur = _snapshot_holding_codes(snapshots[-2]), _snapshot_holding_codes(snapshots[-1])
+    except Exception:  # 形态异常 → 该子项未验证（不得冒泡）
+        logger.warning("[prosperity_framework] 快照形态不可解析，换手代理标记未验证", exc_info=True)
+        return None
     if not prev or not cur:
         return None
     union = prev | cur
@@ -433,7 +495,7 @@ def _turnover_proxy_pct(snapshots: list[dict[str, Any]] | None) -> float | None:
 
 def _score_concentration(
     holdings_details: list[dict[str, Any]],
-    snapshots: list[dict[str, Any]] | None,
+    snapshots: list[Any] | None,
     cfg: dict[str, Any],
 ) -> tuple[dict[str, Any], float | None, float | None]:
     concentration = _top10_concentration_pct(holdings_details)
@@ -595,6 +657,19 @@ def _holdings_view(
     return view
 
 
+def _safe_holdings_view(
+    holdings_details: list[dict[str, Any]],
+    roe_by_code: dict[str, float],
+    cfg: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """持仓视角清单（异常时返回空清单，不影响契约其余部分）。"""
+    try:
+        return _holdings_view(holdings_details, roe_by_code, cfg)
+    except Exception:
+        logger.warning("[prosperity_framework] 持仓视角清单构建异常，已置空", exc_info=True)
+        return []
+
+
 # ── 入口 ──────────────────────────────────────────────────────
 
 
@@ -604,7 +679,7 @@ def build_prosperity_framework_data(
     penetration_data: dict[str, Any] | None = None,
     financial_indicator_data: dict[str, Any] | None = None,
     liquidity_signals: list[dict[str, Any]] | None = None,
-    snapshots: list[dict[str, Any]] | None = None,
+    snapshots: list[Any] | None = None,
     history_data: dict[str, Any] | None = None,
     config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -615,7 +690,7 @@ def build_prosperity_framework_data(
         penetration_data: `compute_penetration_top10()` 结果（提供穿透后板块与占比；可为 None）。
         financial_indicator_data: `financial_indicator_data` 契约（提供个股 ROE 与年度趋势）。
         liquidity_signals: `check_liquidity()` 结果（提供场内变现天数）。
-        snapshots: 历史快照列表（最近两期用于换手代理）。
+        snapshots: 历史快照序列（`SnapshotData` 对象或 dict；最近两期用于换手代理）。
         history_data: 组合历史走势数据（提供区间收益与最大回撤）。
         config: 完整配置字典（读取 `prosperity_framework` 段）。
 
@@ -632,12 +707,34 @@ def build_prosperity_framework_data(
             "notes": notes,
         }
 
-    boom = _score_boom(penetration_data, details, cfg)
-    roe_dim, roe_by_code = _score_roe(details, financial_indicator_data)
-    global_dim = _score_global_edge(penetration_data, details, cfg)
-    liquidity_dim = _score_liquidity(liquidity_signals)
-    concentration_dim, concentration, turnover = _score_concentration(details, snapshots, cfg)
-    performance_dim = _score_performance(history_data)
+    boom = _guard_dimension(
+        lambda: _score_boom(penetration_data, details, cfg), "boom_cycle", "景气方向/通胀属性", _W_BOOM
+    )
+    global_dim = _guard_dimension(
+        lambda: _score_global_edge(penetration_data, details, cfg), "global_edge", "全球视野/中国比较优势", _W_GLOBAL
+    )
+    liquidity_dim = _guard_dimension(lambda: _score_liquidity(liquidity_signals), "liquidity", "流动性", _W_LIQUIDITY)
+    performance_dim = _guard_dimension(
+        lambda: _score_performance(history_data), "performance", "业绩与回撤印证", _W_PERFORMANCE
+    )
+
+    roe_dim: dict[str, Any]
+    roe_by_code: dict[str, float] = {}
+    try:
+        roe_dim, roe_by_code = _score_roe(details, financial_indicator_data)
+    except Exception:
+        logger.warning("[prosperity_framework] 维度「ROE 低位弹性」计算异常，已降级为未验证", exc_info=True)
+        roe_dim = _unverified_dimension("roe_elasticity", "ROE 低位弹性", _W_ROE, "该维计算异常，已跳过（详见日志）")
+
+    concentration: float | None = None
+    turnover: float | None = None
+    try:
+        concentration_dim, concentration, turnover = _score_concentration(details, snapshots, cfg)
+    except Exception:
+        logger.warning("[prosperity_framework] 维度「集中度与周期拼接」计算异常，已降级为未验证", exc_info=True)
+        concentration_dim = _unverified_dimension(
+            "concentration_cycle", "集中度与周期拼接", _W_CONCENTRATION, "该维计算异常，已跳过（详见日志）"
+        )
 
     dimensions = [boom, roe_dim, global_dim, liquidity_dim, concentration_dim, performance_dim]
     scored = [d for d in dimensions if d["status"] != "unverified"]
@@ -669,7 +766,7 @@ def build_prosperity_framework_data(
         "rating": rating,
         "rating_label": rating_label,
         "dimensions": dimensions,
-        "holdings_view": _holdings_view(details, roe_by_code, cfg),
+        "holdings_view": _safe_holdings_view(details, roe_by_code, cfg),
         "concentration_pct": concentration,
         "turnover_proxy_pct": turnover,
         "unverified": unverified,

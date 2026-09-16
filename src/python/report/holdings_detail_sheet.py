@@ -317,9 +317,10 @@ def _write_market_value_block(
 
     row = write_title_row(ws, start_row, _BLOCK_TITLE_MARKET_VALUE, ncols)
     row = write_header_row(ws, row, headers)
-    data_start = row
 
-    # 若所有行情数据全零，写一行醒目提示
+    # 若所有行情数据全零，写一行醒目提示。注意：提示行**整行合并**（标题样式），
+    # 数据必须自其**下一行**开始写入 —— 往合并区写字会抛
+    # `AttributeError: 'MergedCell' object attribute 'value' is read-only`。
     _all_zero = all(d.price == 0 for d in _details) if _details else False
     if _all_zero:
         _WARN_FONT = Font(size=10, bold=True, color="CC0000")
@@ -327,6 +328,8 @@ def _write_market_value_block(
         ws.cell(row=row, column=1, value="⚠ 行情数据全部不可用（非交易时段/网络异常），以下市值/盈亏均为占位 —")
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
         row += 1
+
+    data_start = row  # 数据起始行（提示行之后）
 
     # 按账户分组写入明细 + 小计
     grand_mv, grand_cost, grand_profit, grand_today, row = _write_account_groupings(
@@ -464,14 +467,15 @@ def _write_category_block(
 
     row = write_title_row(ws, start_row, _BLOCK_TITLE_CATEGORY, ncols)
     row = write_header_row(ws, row, headers)
-    data_start = row
 
-    # 若所有行情数据全零，写一行醒目提示
+    # 若所有行情数据全零，写一行醒目提示（该行为单格写入、未合并，数据自其后开始）
     _all_zero = all(d.market_value == 0 for d in details)
     if _all_zero and details:
         cell = ws.cell(row=row, column=1, value="⚠ 行情数据全部不可用（非交易时段/网络异常），以下市值/盈亏均为占位 —")
         cell.font = Font(size=10, bold=True, color="CC0000")
         row += 1
+
+    data_start = row
 
     dividend_data, dividend_success = _load_dividend_data(holdings)
     grand_mv = grand_cost = grand_profit = grand_today = grand_div = 0.0

@@ -6,6 +6,21 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 修复：景气度框架诊断拖垮整份报告 + 行情全零 Excel 崩溃（2026-09-16）
+
+**缺陷①（P0，用户报障「运行后有数据处理异常」）**：`logs/app.log` 显示 `AttributeError: 'SnapshotData' object has no attribute 'get'` → **整份 full 报告生成失败**。根因：`analysis/prosperity_framework.py::_turnover_proxy_pct` 按 dict 取快照字段，而 `report/history_snapshot.load_all()` 返回的是 **`SnapshotData` 冻结 dataclass**（`.accounts[*].holdings[*].code`）；异常自实验功能冒泡，违反「实验功能不得影响主报告」与数据降级治理纪律。
+
+- **修正确性**：新增 `_snapshot_holding_codes()` 同时兼容 `SnapshotData` 对象（生产形态）与 dict 形态（`accounts`/`holdings`/`details` 键），缺失字段按空集处理且**不抛异常**
+- **修韧性**（三道防线）：① 单维计算经 `_guard_dimension()` 包裹 → 单维异常降级为「未验证」，不影响其余维度与契约；② 组装辅助 `compute_prosperity_framework_data` 整体 try/except → 警告 + 返回 None（等价开关关闭，块不渲染）；③ 三个调用点（`_report_generation` 的 both/full、`excel_generator` basic 兜底）各自再加一层兜底
+- **回归测试**：`test_prosperity_framework_edge.py` 新增快照形态回归 5 例（dataclass 可算换手代理 66.67%、端到端契约 scored、dict 形态兼容、畸形对象降级、缺 holdings 属性）；`test_prosperity_framework_wiring.py` 新增韧性隔离 4 例（build 抛异常 → 返回 None、坏快照不崩、单维异常隔离、真实 `SnapshotData` 全链路）；新增场景测试 `test_scenario_prosperity_framework.py` 4 例（真实 dataclass 快照 + 隔离输出目录驱动 `generate_excel_report`：功能开/关、坏快照、构建抛异常四种情形**报告均须生成成功**）
+
+**缺陷②（既有缺陷，被本轮场景测试暴露）**：行情全零（非交易时段/网络异常）时，「持仓明细与分类」页签先写**整行合并**的提示行，随后仍以该行为数据起点写入明细 → `AttributeError: 'MergedCell' object attribute 'value' is read-only`，Excel 报告生成失败。该缺陷源自合并前的 `market_value_sheet.py`（批次② 原样带入），既有单测因用 MagicMock 工作表而漏检。
+
+- **修复**：`holdings_detail_sheet._write_market_value_block` 中提示行之后显式重置 `data_start = row`（分类区块同样显式化数据起点语义）
+- **回归测试**：`test_holdings_detail_sheet.py::TestAllZeroPriceRegression` 2 例（真实 openpyxl：全零场景不崩溃 + 提示行在数据行之前）
+
+**验证**：用户真实快照（73 期 `SnapshotData`）只读复算 → 换手代理与契约均正常；四个 `--ci` + `--mode verify,regression` 4989 passed / 0 failed + `dev-verify` 2779 passed + ruff check/format 全绿。
+
 ### plan-46 景气度框架诊断（实验性功能）实施（2026-09-16）
 
 借鉴开源项目 **zhengxi-views**（郑希观点库，MIT；<https://github.com/lyra81604/zhengxi-views>）从公开采访蒸馏的景气度投资方法骨架，落地为本仓的**实验性功能 `prosperity_framework`**（默认关）：把「全球视野找变化 → 顺产业链找通胀环节 → 落到中国比较优势环节 → 选流动性够 + ROE 低位有弹性的标的 → 多维跟踪与周期拼接 → 组合分散 + 行业比例 + 退出纪律」转成对**本仓持仓组合**的可计算诊断。**只借鉴可计算骨架与评分口径**（不引入其语料库、基金快照、全市场检索）。

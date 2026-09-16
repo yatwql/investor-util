@@ -227,3 +227,71 @@ class TestHtmlRendering:
         html = self._render(None)
         # 模板内保留 HTML 注释，但渲染块本身（含「（实验性）」小标题）不得出现
         assert "⑥ 景气度框架诊断（实验性）" not in html
+
+
+class TestResilienceIsolation:
+    """韧性防线：实验性诊断的任何异常都不得影响主报告（缺陷回归）。"""
+
+    def test_helper_returns_none_when_build_raises(self, monkeypatch):
+        """构建函数抛异常 → 组装辅助返回 None（不冒泡），主报告流程不受影响。"""
+        from src.python.report import _report_aux_metrics
+
+        monkeypatch.setattr("src.python.config.features.is_feature_enabled", lambda _k: True)
+        monkeypatch.setattr("src.python.analysis.liquidity.check_liquidity", lambda *_a, **_k: [])
+
+        def _boom(*_a, **_k):
+            raise AttributeError("'SnapshotData' object has no attribute 'get'")
+
+        monkeypatch.setattr("src.python.analysis.prosperity_framework.build_prosperity_framework_data", _boom)
+        assert _report_aux_metrics.compute_prosperity_framework_data([], _details(), {}, {}, None) is None
+
+    def test_broken_snapshots_do_not_break_contract(self, monkeypatch):
+        """快照形态异常（对象非 dict 形态）→ 契约仍可构建（集中度维度降级）。"""
+        from src.python.report import _report_aux_metrics
+
+        monkeypatch.setattr("src.python.config.features.is_feature_enabled", lambda _k: True)
+        monkeypatch.setattr("src.python.analysis.liquidity.check_liquidity", lambda *_a, **_k: [])
+        monkeypatch.setattr("src.python.report.history_snapshot.load_all", lambda *_a, **_k: [object(), object()])
+        out = _report_aux_metrics.compute_prosperity_framework_data([], _details(), {}, {}, None)
+        assert out is not None and out["available"] is True
+        assert out["turnover_proxy_pct"] is None
+
+    def test_dimension_failure_isolated_to_that_dimension(self, monkeypatch):
+        """单维计算异常 → 该维 unverified，其余维度与契约不受影响。"""
+        from src.python.analysis import prosperity_framework as pf
+
+        monkeypatch.setattr(pf, "_score_liquidity", lambda _s: (_ for _ in ()).throw(RuntimeError("boom")))
+        data = pf.build_prosperity_framework_data(_details(), penetration_data=None)
+        liquidity = next(d for d in data["dimensions"] if d["key"] == "liquidity")
+        assert liquidity["status"] == "unverified"
+        assert any("计算异常" in u for u in liquidity["unverified"])
+        boom = next(d for d in data["dimensions"] if d["key"] == "boom_cycle")
+        assert boom["status"] == "scored"
+
+    def test_real_snapshotdata_runs_end_to_end(self, monkeypatch):
+        """真实 SnapshotData 对象经组装辅助全链路（缺陷现场复现 → 不得失败）。"""
+        from src.python.report import _report_aux_metrics
+        from src.python.schemas.history import AccountSnapshot, SnapshotData, SnapshotHolding
+
+        def _snap(codes):
+            holdings = tuple(
+                SnapshotHolding(code=c, name=c, shares=100.0, cost_price=10.0, market_value=1000.0) for c in codes
+            )
+            return SnapshotData(
+                accounts=(AccountSnapshot(account_name="证券", holdings=holdings),),
+                total_value=1_000_000.0,
+                total_cost=800_000.0,
+                total_pnl=200_000.0,
+                total_pnl_pct=25.0,
+                timestamp="2026-09-16T15:00:00",
+                fingerprint="fp",
+            )
+
+        monkeypatch.setattr("src.python.config.features.is_feature_enabled", lambda _k: True)
+        monkeypatch.setattr("src.python.analysis.liquidity.check_liquidity", lambda *_a, **_k: [])
+        monkeypatch.setattr(
+            "src.python.report.history_snapshot.load_all",
+            lambda *_a, **_k: [_snap(["600519", "300308"]), _snap(["600519", "601398"])],
+        )
+        out = _report_aux_metrics.compute_prosperity_framework_data([], _details(), {}, {}, None)
+        assert out is not None and out["turnover_proxy_pct"] == 66.67

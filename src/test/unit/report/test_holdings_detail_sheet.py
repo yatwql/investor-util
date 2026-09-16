@@ -1187,3 +1187,57 @@ class TestWriteHoldingsDetailSheet(unittest.TestCase):
         self.assertIn("资金加权成本", all_vals)
         self.assertIn("成本分档", all_vals)
         self.assertIn("分红累计", all_vals)
+
+
+class TestAllZeroPriceRegression(unittest.TestCase):
+    """缺陷回归：行情全零时提示行**整行合并**，数据必须自其后一行写入。
+
+    现场（logs/app.log 2026-09-16 场景测试暴露）：提示行 `merge_cells` 后仍以该行为
+    数据起点 → `AttributeError: 'MergedCell' object attribute 'value' is read-only`，
+    导致整份 Excel 报告生成失败。既有实现（合并前的 market_value_sheet）同样有此缺陷，
+    批次② 合并时原样带入。
+    """
+
+    def _ws(self):
+        import openpyxl
+
+        wb = openpyxl.Workbook()
+        return wb.active
+
+    def test_all_zero_price_writes_warning_and_data_without_crash(self):
+        ws = self._ws()
+        zero_details = [
+            hds.DetailRow(
+                account="A", name="贵州茅台", code="600519", price=0.0, shares=100.0, market_value=0.0, cost=140000.0
+            ),
+            hds.DetailRow(
+                account="A", name="某基金", code="040046", price=0.0, shares=1000.0, market_value=0.0, cost=1200.0
+            ),
+        ]
+        holdings = [
+            Holding(code="600519", name="贵州茅台", shares=100.0, cost_price=1400.0, account="A"),
+            Holding(code="040046", name="某基金", shares=1000.0, cost_price=1.2, account="A"),
+        ]
+        # 不得抛异常（缺陷现场在此崩溃）
+        hds.write_holdings_detail_sheet(ws, holdings, zero_details)
+
+        flat = [str(c.value) for row in ws.iter_rows() for c in row if c.value is not None]
+        self.assertTrue(any("行情数据全部不可用" in v for v in flat), "应写入全零提示行")
+        self.assertIn("贵州茅台", flat, "数据行应写在提示行之后")
+        self.assertIn("A 小计", flat)
+
+    def test_all_zero_price_indicator_block_order(self):
+        """区块① 中提示行之后的数据行号必须大于提示行行号（防写回合并区）。"""
+        ws = self._ws()
+        zero_details = [
+            hds.DetailRow(
+                account="A", name="贵州茅台", code="600519", price=0.0, shares=100.0, market_value=0.0, cost=140000.0
+            )
+        ]
+        hds.write_holdings_detail_sheet(ws, [], zero_details)
+        warn_row = next(
+            r for r in range(1, ws.max_row + 1) if "行情数据全部不可用" in str(ws.cell(row=r, column=1).value or "")
+        )
+        data_row = next((r for r in range(1, ws.max_row + 1) if ws.cell(row=r, column=2).value == "贵州茅台"), None)
+        self.assertIsNotNone(data_row, "全零场景仍应写出数据行")
+        self.assertGreater(data_row, warn_row, "数据行必须在提示行之后")
