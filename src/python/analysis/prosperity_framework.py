@@ -31,7 +31,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 from src.python.core.num_utils import finite_or
@@ -205,22 +204,61 @@ def _guard_dimension(build, key: str, name: str, max_score: int) -> dict[str, An
         return _unverified_dimension(key, name, max_score, "该维计算异常，已跳过（详见日志）")
 
 
+def _fund_type_fallback_label(name: str, code: str) -> str:
+    """板块识别失败时的**基金类型兜底标签**（返回可被关键词匹配消费的文本）。
+
+    背景（真实持仓复核）：`classify_sector` 依赖品种名称关键词表，QDII/联接/债基/
+    宽基 ETF 等常返回 `--`，导致并集口径下大批权重"无板块信息"（实测约 51% 权重）。
+    本函数按**基金类型**给出保守标签，标签文本只命中「防御」侧词或不命中任何侧
+    （**绝不**把固收/宽基塞进景气侧）：
+
+      - 债券/货币/超短债等固收 → ``债券现金``（命中 `defensive_keywords` 的「债」「货币」）
+      - QDII/海外标的 → ``境外资产``（中性；境外暴露已由维度③的境外占比单独加分）
+      - 宽基/指数/ETF 联接 → ``宽基指数``（中性）
+      - 其余（主动权益等） → ``未分类资产``（中性）
+
+    优先级说明：**ETF/指数判定先于货币基金判定** —— `code_utils.is_money_fund_by_name`
+    对含「现金」字样的非货基（如「国证自由现金流 ETF」）也会返回 True，若先判货币会把
+    场内权益 ETF 误标为固收/现金，故此处以 ETF/指数为最高优先级。
+    """
+    from src.python.core.code_utils import (
+        is_bond_fund_by_name,
+        is_convertible_bond_by_name,
+        is_etf_by_name_or_code,
+        is_index_fund_by_name,
+        is_index_link_by_name,
+        is_money_fund_by_name,
+        is_qdii_extended,
+    )
+
+    if is_etf_by_name_or_code(name, code) or is_index_fund_by_name(name) or is_index_link_by_name(name):
+        return "宽基指数"
+    if is_qdii_extended(name):
+        return "境外资产"
+    if is_bond_fund_by_name(name) or is_convertible_bond_by_name(name) or is_money_fund_by_name(name):
+        return "债券现金"
+    return "未分类资产"
+
+
 def _sector_weight_items(
     penetration_data: dict[str, Any] | None,
     holdings_details: list[dict[str, Any]],
-) -> tuple[list[tuple[str, float]], float, float]:
-    """构造「板块/概念 → 权重」清单（**并集口径 + 归一化**，供维度①③共用）。
+) -> tuple[list[tuple[str, float]], float, float, float, int]:
+    """构造「板块/概念 → 权重」清单（**并集口径 + 类型兜底 + 归一化**）。
 
-    口径（真实持仓复核发现旧口径只覆盖 34.6% 市值，故修订为并集）：
+    口径（含两轮真实持仓修订）：
 
-      - 穿透 top10 每项按其 `ratio_pct`（占组合市值比）计入，并把它覆盖的**直接持仓代码**
-        （`codes`）与**贡献该标的的基金代码**（`sources` 形如 `[权益] 名称(011506)`）标记为已覆盖；
-      - 未被穿透项覆盖的其余直接持仓（QDII/联接基金/债基/未穿透基金等）按自身组合权重 +
-        `classify_sector` 板块计入；
-      - 各权重按**已覆盖部分**归一为 100（阈值口径 = 「占已覆盖市值的比例」，并披露覆盖率）。
+      - **视角一（穿透底层）**：穿透 top10 每项按其 `ratio_pct` 计入；
+      - **视角二（持仓自身）**：每个直接持仓按自身组合权重计入 —— 板块优先取
+        `classify_sector`，识别失败（`--`，QDII/联接/债基/宽基 ETF 常见）时用
+        `_fund_type_fallback_label` 的**基金类型标签**兜底（固收→防御侧、
+        境外/宽基/主动权益→中性，绝不进景气侧）；**直接持有的证券**（其代码在
+        top10 的 `codes` 中）已在视角一计入，视角二跳过以避免重复；
+      - 两视角叠加后按合计**归一**为 100（阈值口径 = 「占合计的占比」；穿透项与
+        持仓自身对同一基金会有部分重合，属口径设计，非重复计数错误）。
 
     Returns:
-        (items, covered_pct, penetration_pct)：items 为归一后 [(文本, 权重%), ...]。
+        (items, covered_pct, penetration_pct, fallback_pct, fallback_count)
     """
     from src.python.report.penetration import classify_sector
 
@@ -237,24 +275,35 @@ def _sector_weight_items(
         pen_pct += weight
         for code in item.get("codes") or []:
             covered_codes.add(str(code))
-        for src in item.get("sources") or []:
-            m = re.search(r"\((\d{6})\)", str(src))
-            if m:
-                covered_codes.add(m.group(1))
+        # 注：`sources`（贡献该底层的基金）**不**加入去重集合 —— 基金持仓按其自身
+        # 板块/类型标签单独计入（两视角叠加），否则基金权重只能由 top10 底层代表，
+        # 实测覆盖率仅 48%（其余 52% 权重无信息）。
 
     total = sum(finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details)
+    fallback_pct = 0.0
+    fallback_count = 0
     for d in holdings_details:
         code = str(getattr(d, "code", ""))
         if code and code in covered_codes:
             continue  # 已由穿透项计入，避免重复计数
-        sector = classify_sector(getattr(d, "name", ""), code)
-        raw.append((f"{sector} {getattr(d, 'name', '')}", _pct(finite_or(getattr(d, "market_value", 0.0)), total)))
+        name = str(getattr(d, "name", ""))
+        weight = _pct(finite_or(getattr(d, "market_value", 0.0)), total)
+        sector = classify_sector(name, code)
+        if sector in ("--", "", None):
+            # 兜底项**只用类型标签参与关键词判定**（不带名称）：类型兜底本就是保守降级，
+            # 若把名称一并带入，「自由现金流 ETF」会被防御词「现金」误命中为固收/现金。
+            label = _fund_type_fallback_label(name, code)
+            raw.append((label, weight))
+            fallback_pct += weight
+            fallback_count += 1
+        else:
+            raw.append((f"{sector} {name}", weight))
 
     covered = sum(w for _, w in raw)
     if covered <= 0:
-        return [], 0.0, round(pen_pct, 2)
+        return [], 0.0, round(pen_pct, 2), 0.0, 0
     items = [(text, round(w / covered * 100, 2)) for text, w in raw]
-    return items, round(covered, 2), round(pen_pct, 2)
+    return items, round(covered, 2), round(pen_pct, 2), round(fallback_pct, 2), fallback_count
 
 
 def _boom_weights(
@@ -267,20 +316,18 @@ def _boom_weights(
     口径：**并集** —— 穿透 top10 各底层标的（含基金持仓拆解）+ 未被穿透覆盖的直接持仓，
     合计覆盖≈100% 市值（见 `_sector_weight_items`）。
     """
-    items, covered, pen_pct = _sector_weight_items(penetration_data, holdings_details)
+    items, covered, pen_pct, fallback_pct, fallback_count = _sector_weight_items(penetration_data, holdings_details)
     # 互斥归类（防御优先）：同一标的可能既命中景气词又命中防御词（如「电力」与「公用事业」
     # 类文本、「债」「现金」类策略名），若各计一次会使两者之和 >100%，故按防御优先归类。
     defensive = sum(w for text, w in items if _matches(text, cfg["defensive_keywords"]))
     boom = sum(
         w for text, w in items if _matches(text, cfg["boom_keywords"]) and not _matches(text, cfg["defensive_keywords"])
     )
-    scope = (
-        f"穿透重仓 + 其余持仓板块的并集（覆盖 {covered:.2f}% 市值，其中穿透项 {pen_pct:.2f}%）；"
-        f"以下占比按已覆盖部分归一"
-    )
+    scope = f"口径：穿透底层（{pen_pct:.2f}%）+ 持仓自身板块/类型，两视角叠加（合计 {covered:.2f}%）后归一"
     evidence = [
         f"{scope}",
         f"命中景气关键词的权重 {boom:.2f}%、防御/红利关键词 {defensive:.2f}%（同一标的按防御优先归类，互斥不重复计）",
+        f"基金类型兜底 {fallback_count} 只（{fallback_pct:.2f}% 权重，按固收/境外/宽基等类型标签，不计入景气侧）",
     ]
     return boom, defensive, evidence, scope
 
@@ -406,7 +453,7 @@ def _score_global_edge(
 ) -> dict[str, Any]:
     from src.python.core.code_utils import is_a_share_code, is_hk_stock_code
 
-    items, covered, pen_pct = _sector_weight_items(penetration_data, holdings_details)
+    items, covered, pen_pct, fallback_pct, fallback_count = _sector_weight_items(penetration_data, holdings_details)
     edge = sum(w for text, w in items if _matches(text, cfg["global_edge_keywords"]))
 
     total_mv = sum(finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details)
@@ -427,7 +474,7 @@ def _score_global_edge(
         "status": "scored",
         "evidence": [
             f"命中「中国有全球比较优势」关键词的权重 {edge:.2f}%（按 40% 满分档折算；"
-            f"口径同维度①并集归一，覆盖 {covered:.2f}% 市值）",
+            f"口径同维度①（穿透底层 + 持仓自身板块叠加归一，穿透项 {pen_pct:.2f}%）",
             f"非 A 股 / 港股等境外及港股通资产占比 {offshore_pct:.2f}%（全球暴露加分，上限 5 分）",
         ],
         "unverified": [],

@@ -2836,7 +2836,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 | 维度 | 权重 | 计算口径（全部取自既有能力） | 数据缺失时 |
 |:--|:--:|:--|:--|
-| ① 景气方向 / 通胀属性 | 25 | **并集口径 + 归一**（`_sector_weight_items`）：穿透重仓（含基金拆解，按 `codes`/`sources` 标记已覆盖）+ 未被覆盖的其余直接持仓（`classify_sector` 板块）；命中 `boom_keywords` 权重按 60% 满分档折算、`defensive_keywords` 反向扣减（**防御优先、互斥不重复计**）；覆盖率在证据中披露 | 不依赖外部数据 |
+| ① 景气方向 / 通胀属性 | 25 | **两视角叠加 + 归一 + 类型兜底**（`_sector_weight_items`）：视角一 = 穿透底层（按 `ratio_pct`）；视角二 = 每个直接持仓按自身权重（`classify_sector` 板块；识别失败用 `_fund_type_fallback_label` 类型标签兜底：固收→防御侧、境外/宽基/主动权益→中性且只按标签参与判定）；直接持有的证券视角二跳过；命中 `boom_keywords` 按 60% 满分档折算、`defensive_keywords` 反向扣减（防御优先互斥）；证据披露叠加合计与兜底只数 | 不依赖外部数据 |
 | ② ROE 低位弹性 | 20 | `financial_indicator_data` 的 ROE 分布：低 ROE（<10%）权重按 50% 满分档折算，年度趋势改善加分 | `unverified`（提示开启 `financial_indicator`） |
 | ③ 全球视野 / 中国比较优势 | 15 | 命中 `global_edge_keywords` 的权重（口径同维度①并集归一，40% 满分档）+ 非 A 股/港股等境外资产占比加分（上限 5 分） | 不依赖外部数据 |
 | ④ 流动性 | 10 | `analysis/liquidity.py::check_liquidity` 的最差场内变现天数分档（<1 日 10 / <3 日 7 / <5 日 4 / 否则 2） | 全为场外或数据缺失 → `unverified` |

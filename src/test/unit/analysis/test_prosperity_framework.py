@@ -120,10 +120,10 @@ class TestBoomDimension:
         assert boom["score"] == 0
 
     def test_falls_back_to_direct_holdings_without_penetration(self):
-        """无穿透数据 → 退化纯直接持仓口径（覆盖≈100%）。"""
+        """无穿透数据 → 退化纯直接持仓口径（穿透项 0%）。"""
         data = build_prosperity_framework_data(_details())
         boom = next(d for d in data["dimensions"] if d["key"] == "boom_cycle")
-        assert any("并集" in e and "归一" in e for e in boom["evidence"])
+        assert any("两视角叠加" in e and "穿透底层（0.00%）" in e for e in boom["evidence"])
 
     def test_union_coverage_includes_uncovered_direct_holdings(self):
         """并集口径：穿透只覆盖一部分时，其余直接持仓仍按板块计入（旧口径漏 65% 市值）。"""
@@ -149,13 +149,12 @@ class TestBoomDimension:
         data = build_prosperity_framework_data(details, penetration_data=penetration)
         boom = next(d for d in data["dimensions"] if d["key"] == "boom_cycle")
         evidence = "；".join(boom["evidence"])
-        # 覆盖 = 穿透 60% + 未覆盖直接持仓（建信高端装备 40%）= 100%，按已覆盖部分归一
-        assert "覆盖 100.00% 市值" in evidence
-        assert "归一" in evidence
-        assert boom["score"] > 0, "未被穿透覆盖的景气方向持仓必须计入（旧口径会漏 65% 市值）"
+        # 视角一 60%（茅台 50 + 宁德 10）+ 视角二 50%（建信 40 + 电池 ETF 10，二者代码均不在 codes 内）
+        assert "两视角叠加（合计 110.00%）" in evidence, evidence
+        assert boom["score"] > 0, "持仓自身板块必须计入（旧口径只算穿透会漏 65% 市值）"
 
     def test_union_coverage_not_double_counted(self):
-        """穿透项已覆盖的基金/直接持仓不再按其自身权重重复计入（覆盖 ≤100%）。"""
+        """直接持有的证券不重复计入；基金（穿透来源）按其类型标签单独计入。"""
         from src.python.analysis.prosperity_framework import _sector_weight_items
 
         details = [
@@ -182,15 +181,15 @@ class TestBoomDimension:
                 },
             ]
         }
-        items, covered, pen_pct = _sector_weight_items(penetration, details)
-        # 覆盖 = 穿透 80%（ETF 自身权重由其底层标的代表，不重复计入）
-        assert covered == 80.0, (items, covered)
+        items, covered, pen_pct, _fb_pct, _fb_n = _sector_weight_items(penetration, details)
+        # 视角一 50+30 = 80；视角二：茅台代码在 codes 内 → 跳过；ETF 按类型标签计入 50 → 合计 130
+        assert covered == 130.0, (items, covered)
         assert pen_pct == 80.0
         weights = {text: w for text, w in items}
-        # 归一后：茅台 50/80 = 62.5、宁德 30/80 = 37.5
-        assert weights.get("贵州茅台 消费 白酒") == 62.5
-        assert weights.get("宁德时代 电池 ") == 37.5
-        assert not any("招商中证电池主题ETF" in k for k in weights), "已被穿透覆盖的基金不得重复计入"
+        assert weights.get("贵州茅台 消费 白酒") == pytest.approx(50 / 130 * 100, abs=0.01)
+        assert weights.get("宁德时代 电池 ") == pytest.approx(30 / 130 * 100, abs=0.01)
+        # 基金按其自身类型/板块计入（两视角叠加口径），不再被整只跳过
+        assert any("招商中证电池主题ETF" in k for k in weights), weights
 
 
 class TestRoeDimension:
@@ -469,3 +468,72 @@ class TestBoomDefensiveExclusivity:
         dim = _score_boom(None, details, cfg)
         evidence = "；".join(dim["evidence"])
         assert "命中景气关键词的权重 100.00%" in evidence, evidence
+
+
+class TestFundTypeFallback:
+    """基金类型兜底标签：板块识别失败时按类型补标签（覆盖 QDII/债基/宽基等）。
+
+    现场（真实持仓复核）：`classify_sector` 对 QDII/联接/债基/宽基 ETF 返回 `--`，
+    导致并集口径下约 51% 权重无板块信息。兜底标签**只进防御侧或中性**，不进景气侧。
+    """
+
+    def _items(self, rows):
+        from src.python.analysis.prosperity_framework import _sector_weight_items
+
+        return _sector_weight_items(None, rows)
+
+    def test_bond_fund_labeled_defensive(self):
+        items, covered, _p, fb_pct, fb_n = self._items([_row("012325", "兴全恒慧30天持有超短债C", 100_000.0)])
+        text = items[0][0]
+        assert text.startswith("债券现金"), text
+        assert fb_n == 1 and fb_pct == 100.0
+        from src.python.analysis.prosperity_framework import DEFAULT_CONFIG as C
+
+        assert any(k in text for k in C["defensive_keywords"]), "固收标签必须命中防御侧词"
+        assert not any(k in text for k in C["boom_keywords"]), "固收标签不得命中景气侧词"
+
+    def test_non_money_etf_not_labeled_defensive(self):
+        """回归：`is_money_fund_by_name` 对「自由现金流 ETF」返回 True，但 ETF 优先 → 中性。"""
+        # 名称含「现金」→ 部分货币基金判定助手会返回 True（实测对带空格写法成立）；
+        # 兜底项以 ETF 判定优先 + 只按类型标签参与关键词匹配，故不得被判为防御/固收
+        items, *_ = self._items([_row("159222", "易方达国证自由现金流 ETF", 100_000.0)])
+        text = items[0][0]
+        assert text == "宽基指数", text
+        from src.python.analysis.prosperity_framework import DEFAULT_CONFIG as C
+
+        assert not any(k in text for k in C["defensive_keywords"])
+        assert not any(k in text for k in C["boom_keywords"])
+
+    def test_qdii_labeled_neutral_offshore(self):
+        items, *_ = self._items([_row("017730", "嘉实全球产业升级股票(QDII)A", 100_000.0)])
+        assert items[0][0].startswith("境外资产")
+
+    def test_active_equity_labeled_uncategorized(self):
+        items, *_ = self._items([_row("002943", "广发多因子灵活配置混合", 100_000.0)])
+        assert items[0][0].startswith("未分类资产")
+
+    def test_existing_sector_not_overridden(self):
+        """已有板块（如个股/主题基金「制造」「新能源」）不被兜底标签覆盖。"""
+        items, *_ = self._items([_row("011506", "建信高端装备股票A", 100_000.0)])
+        assert "宽基指数" not in items[0][0] and "未分类资产" not in items[0][0], items[0][0]
+
+    def test_fund_heavy_portfolio_reaches_full_coverage(self):
+        """基金为主的组合：兜底后并集覆盖≈100%，且景气+防御+中性三者归一后合计 100%。"""
+        from src.python.analysis.prosperity_framework import _score_boom
+
+        details = [
+            _row("012325", "兴全恒慧30天持有超短债C", 100_000.0),
+            _row("017730", "嘉实全球产业升级股票(QDII)A", 100_000.0),
+            _row("159222", "易方达国证自由现金流 ETF", 100_000.0),
+            _row("002943", "广发多因子灵活配置混合", 100_000.0),
+        ]
+        items, covered, _p, fb_pct, fb_n = self._items(details)
+        assert covered == 100.0 and fb_n == 4
+        dim = _score_boom(
+            None, details, {**__import__("src.python.analysis.prosperity_framework", fromlist=["x"]).DEFAULT_CONFIG}
+        )
+        evidence = "；".join(dim["evidence"])
+        assert "基金类型兜底 4 只" in evidence
+        # 固收（超短债）25% 进防御侧；QDII/宽基/主动权益均为中性 → 景气 0%
+        assert "命中景气关键词的权重 0.00%" in evidence, evidence
+        assert "防御/红利关键词 25.00%" in evidence, evidence
