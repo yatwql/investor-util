@@ -5,8 +5,8 @@
 check-code-traces.py 只做负面禁止（禁任务代号/魔法编号），本脚本做正面一致性校验，
 三向检查：
 
-  1. 正向：src/python/config/_config_defaults.py 中 report_submodules 字典的
-     每个键（运行时配置开关）必须已登记在「功能语义命名表」中（表外键报错，防新增开关绕过登记）
+  1. 正向：src/python/config/features.py 的功能开关注册表（``feature_switch_registry``）
+     每个键（运行时功能开关）必须已登记在「功能语义命名表」中（表外键报错，防新增开关绕过登记）
   2. 反向：表中每个语义 slug 在 src/python/ 下至少一处非注释代码引用
      （防僵尸条目——功能已删除但表行残留）
   3. 合并章：表下「合并章代码标识符」注声明的 sheet key 必须存在于
@@ -39,6 +39,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _TECHNICAL_MD = REPO_ROOT / "docs-stm" / "managements" / "technical.md"
+_FEATURES_PY = REPO_ROOT / "src/python/config/features.py"
 _CONFIG_DEFAULTS = REPO_ROOT / "src" / "python" / "config" / "_config_defaults.py"
 _REGISTRY_PY = REPO_ROOT / "src" / "python" / "core" / "registry.py"
 _CODE_ROOT = REPO_ROOT / "src" / "python"
@@ -103,17 +104,19 @@ def parse_merged_sheet_keys(doc_text: str) -> list[str]:
 # ═══════════════════════════════════════════════════════════════
 
 
-def report_submodules_keys(source: str) -> list[str]:
-    """ast 解析 _config_defaults.py，返回 report_submodules 字典的全部键。"""
+def feature_switch_keys(source: str) -> list[str]:
+    """ast 解析 features.py，返回功能开关注册表（feature_switch_registry）的全部键。
+
+    注册表取值统一为单一事实来源（旧 ``report_submodules`` 机制已移除），
+    故「表外键」校验挂在注册表上：新增开关必须同步登记「功能语义命名表」。
+    """
     tree = ast.parse(source)
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Dict):
+        if not isinstance(node, ast.AnnAssign) or not isinstance(node.target, ast.Name):
             continue
-        for i, k in enumerate(node.keys):
-            if isinstance(k, ast.Constant) and k.value == "report_submodules":
-                val = node.values[i]
-                if isinstance(val, ast.Dict):
-                    return [kk.value for kk in val.keys if isinstance(kk, ast.Constant) and isinstance(kk.value, str)]
+        if node.target.id != "feature_switch_registry" or not isinstance(node.value, ast.Dict):
+            continue
+        return [k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)]
     return []
 
 
@@ -195,7 +198,7 @@ def slug_exists_in_code(code_root: Path, slug: str) -> bool:
 
 def run_checks(
     doc_text: str,
-    defaults_source: str,
+    features_source: str,
     registry_source: str,
     code_root: Path,
 ) -> list[str]:
@@ -208,15 +211,13 @@ def run_checks(
 
     table_slugs = parse_table_slugs(doc_text)
     merged_keys = parse_merged_sheet_keys(doc_text)
-    submodule_keys = report_submodules_keys(defaults_source)
+    switch_keys = feature_switch_keys(features_source)
     registry_keys = registry_section_keys(registry_source)
 
-    # 正向：report_submodules 键必须在表中登记
-    for key in submodule_keys:
+    # 正向：功能开关注册表键必须在表中登记
+    for key in switch_keys:
         if key not in table_slugs:
-            findings.append(
-                f"{_CONFIG_DEFAULTS.relative_to(REPO_ROOT)}: report_submodules.{key} 未在「功能语义命名表」登记"
-            )
+            findings.append(f"{_FEATURES_PY.relative_to(REPO_ROOT)}: 功能开关 {key} 未在「功能语义命名表」登记")
 
     # 反向：表中 slug 必须在代码中存在（防僵尸条目）
     for slug in table_slugs:
@@ -244,23 +245,23 @@ def main() -> None:
     args = parser.parse_args()
 
     doc_text = _TECHNICAL_MD.read_text(encoding="utf-8")
-    defaults_source = _CONFIG_DEFAULTS.read_text(encoding="utf-8")
+    features_source = _FEATURES_PY.read_text(encoding="utf-8")
     registry_source = _REGISTRY_PY.read_text(encoding="utf-8")
 
-    findings = run_checks(doc_text, defaults_source, registry_source, _CODE_ROOT)
+    findings = run_checks(doc_text, features_source, registry_source, _CODE_ROOT)
 
     if args.verbose:
         table_slugs = parse_table_slugs(doc_text)
         merged_keys = parse_merged_sheet_keys(doc_text)
-        submodule_keys = report_submodules_keys(defaults_source)
+        switch_keys = feature_switch_keys(features_source)
         registry_keys = registry_section_keys(registry_source)
         print(f"  表内 slug（{len(table_slugs)}）：{', '.join(table_slugs)}")
-        print(f"  report_submodules 键（{len(submodule_keys)}）：{', '.join(submodule_keys)}")
+        print(f"  功能开关（{len(switch_keys)}）：{', '.join(switch_keys)}")
         print(f"  合并章 sheet key（{len(merged_keys)}）：{', '.join(merged_keys)}")
         print(f"  registry 章节 key（{len(registry_keys)}）：{', '.join(registry_keys)}")
 
     if not findings:
-        print("[OK] 语义命名索引正反向校验通过（表内 slug 均存在、report_submodules 均登记、合并章 key 均在 registry）")
+        print("[OK] 语义命名索引正反向校验通过（表内 slug 均存在、功能开关均登记、合并章 key 均在 registry）")
         sys.exit(0)
 
     for f in findings:

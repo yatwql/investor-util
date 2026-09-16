@@ -5,10 +5,14 @@
 
 from __future__ import annotations
 
+import logging
+
 from typing import Any
 
 from src.python.core.registry import get_report_sheet_name
 from src.python.report.progress import ProgressReporter
+
+logger = logging.getLogger("invest")
 
 
 def write_content_sheets(
@@ -46,10 +50,8 @@ def write_content_sheets(
             prog.info("正在分析基金经理变更...")
             try:
                 manager_data = detect(holdings)
-            except Exception as e:  # noqa: BLE001 - 保持既有隔离：数据失败不影响主表
-                import logging
-
-                logging.getLogger("invest").warning("基金经理变更监控数据获取失败: %s", e)
+            except Exception as e:  # 保持既有隔离：数据失败不影响主表
+                logger.warning("基金经理变更监控数据获取失败: %s", e)
                 prog.add_error("基金经理变更监控数据获取失败")
                 manager_data = None
 

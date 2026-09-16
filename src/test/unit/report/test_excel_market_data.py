@@ -4,7 +4,7 @@
   - _build_flow_data — 成本流水子模块开关门控 + 无流水 available=False 占位契约
   - resolve_market_data — fund_flow_data 注入 data 字典（汇总/持仓明细与分类页签渲染数据源）
 
-开关 `report_submodules.cost_lots` 对应 _build_flow_data 的 enable_cost_lots：
+功能开关 `cost_lots` 对应 _build_flow_data 的 enable_cost_lots：
 False → None（汇总/持仓明细与分类页签保持既有输出）；True → 计算 fund_flow_data 契约。
 """
 

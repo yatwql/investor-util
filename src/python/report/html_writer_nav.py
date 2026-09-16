@@ -99,7 +99,6 @@ def _compute_section_visibility(
     }
     # data 层：各模块数据就绪状态
     data_flags: dict[str, bool] = {
-        "manager_data": manager_analysis is not None,
         "concentration_data": concentration_analysis is not None,
         "style_data": style_analysis is not None,
         "news_data_available": include_news,  # ← data 层（菜单类型+数据状态）

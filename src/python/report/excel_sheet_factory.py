@@ -29,6 +29,37 @@ def should_create_sheet(section: dict, data_availability: dict[str, bool] | None
     return avail.get(flag_name, True)
 
 
+def build_data_availability(
+    *,
+    include_news: bool = False,
+    include_llm: bool = False,
+    enable_fund_deep_analysis: bool = False,
+    financial_report_digest_data: dict | None = None,
+    financial_indicator_data: dict | None = None,
+    position_relationship_data: dict | None = None,
+) -> dict[str, bool]:
+    """构造 data 层可用性字典（章节可见性的单一事实来源）。
+
+    注册表的 ``data_flag`` / ``data_flag_any`` 查此字典判定章节是否创建；
+    合并章的契约 flag 口径集中在此处，避免各调用点（生成器、一致性测试镜像）
+    各写一份而漂移：
+
+      - 财报摘要 / 财务指标：契约非 None 即就绪（None = 对应功能开关关闭）
+      - 持仓结构与集中度（合并章，两契约 OR）：基金深度分析开启时，重合度与集中度
+        均由下游计算（数据不足时区块各自写占位）→ 两契约视为就绪；关闭时由 board 层隐藏
+    """
+    availability: dict[str, bool] = {}
+    if include_news:
+        availability["news_data_available"] = True
+    if include_llm:
+        availability["llm_data_available"] = True
+    availability["financial_report_digest_data"] = financial_report_digest_data is not None
+    availability["financial_indicator_data"] = financial_indicator_data is not None
+    availability["position_relationship_data"] = enable_fund_deep_analysis or position_relationship_data is not None
+    availability["concentration_data"] = enable_fund_deep_analysis
+    return availability
+
+
 def create_sheets(
     wb: Any,
     section_order: list[dict],

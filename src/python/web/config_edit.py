@@ -313,9 +313,8 @@ def get_config_edit_surface() -> dict:
         "enable_portfolio_evolution": is_enable_portfolio_evolution(config),
         "enable_action": is_enable_action(config),
     }
-    # 报告章节与增强：取值与显示名皆由功能开关注册表派生（GROUP_REPORT；
-    # 前端仍按 submodules 块渲染）
-    submodules = {flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_REPORT)}
+    # 报告章节与增强：取值与显示名皆由功能开关注册表派生（GROUP_REPORT）
+    report_switches = {flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_REPORT)}
     anon_mode = get_anonymization_mode()
     indices = config.get("comparison_indices") or _DEFAULT_CONFIG.get("comparison_indices", {})
 
@@ -343,7 +342,7 @@ def get_config_edit_surface() -> dict:
     return {
         "paths": paths,
         "sections": sections,
-        "submodules": submodules,
+        "report_switches": report_switches,
         "anonymization": {"mode": anon_mode, "options": list(_ANON_MODES)},
         "comparison_indices": dict(indices),
         "comparison_indices_defaults": dict(_DEFAULT_CONFIG.get("comparison_indices", {})),

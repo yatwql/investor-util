@@ -25,21 +25,19 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary", "name": "投资分析汇总", "number": 1, "type": "always"},
     {"key": "holdings_detail", "name": "持仓明细与分类", "number": 2, "type": "always"},
-    {"key": "penetration", "name": "资产穿透TOP10", "number": 4, "type": "always"},
-    {"key": "fund_performance", "name": "基金业绩分析", "number": 5, "type": "always"},
-    {"key": "fund_manager", "name": "基金经理变更监控", "number": 6, "type": "fund_deep_analysis"},
-    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7, "type": "fund_deep_analysis"},
-    {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8, "type": "fund_deep_analysis"},
-    {"key": "style_factor", "name": "风格与因子分析", "number": 9, "type": "fund_deep_analysis"},
-    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10, "type": "news"},
-    {"key": "global_macro", "name": "全球政经局势", "number": 11, "type": "llm"},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 12, "type": "llm"},
-    {"key": "health_check", "name": "持仓体检报告", "number": 13, "type": "llm"},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 14, "type": "llm"},
-    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 15, "type": "history"},
-    # 注：action / portfolio_evolution 为注册表扩展模块，此精简版省略
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always"},
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm"},
+    {"key": "penetration", "name": "资产穿透TOP10", "number": 3, "type": "always"},
+    {"key": "fund_performance", "name": "基金业绩分析", "number": 4, "type": "always"},
+    {"key": "position_structure", "name": "持仓结构与集中度", "number": 5, "type": "fund_deep_analysis"},
+    {"key": "style_factor", "name": "风格与因子分析", "number": 6, "type": "fund_deep_analysis"},
+    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 8, "type": "news"},
+    {"key": "global_macro", "name": "全球政经局势", "number": 9, "type": "llm"},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 10, "type": "llm"},
+    {"key": "health_check", "name": "持仓体检报告", "number": 11, "type": "llm"},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 12, "type": "llm"},
+    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 13, "type": "history"},
+    # 注：action / portfolio_evolution / fundamental_snapshot 为注册表其余条目，此精简切片省略
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 15, "type": "always"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 17, "type": "llm"},
 ]
 
 
@@ -107,7 +105,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         )
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         self.assertEqual(list(sheets.keys()), expected_keys, "全部启用时页签顺序应与默认注册表一致")
-        self.assertEqual(len(sheets), 16)
+        self.assertEqual(len(sheets), 14)
 
     def test_sheet_order_visibility_filtering(self):
         """可见性过滤 → 只创建匹配 type 的页签且顺序保持。"""
@@ -127,7 +125,7 @@ class TestExcelSheetOrder(unittest.TestCase):
             sec["key"] for sec in _REPORT_SECTION_DEFAULT if sec["type"] in ("always", "fund_deep_analysis")
         ]
         self.assertEqual(list(sheets.keys()), expected_keys)
-        self.assertEqual(len(sheets), 9, "always + 基金深度分析 = 9")
+        self.assertEqual(len(sheets), 7, "always + 基金深度分析 = 7")
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -152,3 +152,46 @@ class TestPositionStructureMergedChapter:
     def test_hidden_when_both_contracts_absent(self):
         sec = self._section()
         assert should_create_sheet(sec, {"position_relationship_data": False, "concentration_data": False}) is False
+
+
+class TestBuildDataAvailability:
+    """data 层可用性字典单一事实来源（excel_sheet_factory.build_data_availability）。"""
+
+    def test_merged_chapter_flags_when_fund_deep_on(self):
+        """基金深度分析开启 → 持仓结构与集中度两契约视为就绪（下游计算占位）。"""
+        from src.python.report.excel_sheet_factory import build_data_availability
+
+        avail = build_data_availability(enable_fund_deep_analysis=True)
+        assert avail["position_relationship_data"] is True
+        assert avail["concentration_data"] is True
+
+    def test_merged_chapter_flags_when_fund_deep_off(self):
+        """关闭且无契约 → 两契约均不就绪（data_flag_any 悲观判定隐藏章节）。"""
+        from src.python.report.excel_sheet_factory import build_data_availability
+
+        avail = build_data_availability(enable_fund_deep_analysis=False)
+        assert avail["position_relationship_data"] is False
+        assert avail["concentration_data"] is False
+
+    def test_position_relationship_contract_alone_marks_ready(self):
+        """关闭基金深度分析但显式注入关系契约 → 关系契约就绪（OR 的另一侧）。"""
+        from src.python.report.excel_sheet_factory import build_data_availability
+
+        avail = build_data_availability(enable_fund_deep_analysis=False, position_relationship_data={})
+        assert avail["position_relationship_data"] is True
+        assert avail["concentration_data"] is False
+
+    def test_financial_contracts_follow_switch(self):
+        """持仓基本面两契约：契约非 None = 开关开启（各控一块）。"""
+        from src.python.report.excel_sheet_factory import build_data_availability
+
+        avail = build_data_availability(financial_report_digest_data={}, financial_indicator_data=None)
+        assert avail["financial_report_digest_data"] is True
+        assert avail["financial_indicator_data"] is False
+
+    def test_news_llm_flags_follow_include(self):
+        from src.python.report.excel_sheet_factory import build_data_availability
+
+        avail = build_data_availability(include_news=True, include_llm=False)
+        assert avail["news_data_available"] is True
+        assert "llm_data_available" not in avail

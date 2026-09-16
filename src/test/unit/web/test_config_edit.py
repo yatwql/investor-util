@@ -380,13 +380,13 @@ class TestReportGroupOverWeb:
         for flag in ("data_quality", "market_temperature", "financial_indicator"):
             assert config_edit_whitelist[flag] == {"kind": "bool", "target": "features", "writer": "features"}
 
-    def test_surface_submodules_derives_from_registry(self):
+    def test_surface_report_switches_derives_from_registry(self):
         from src.python.config.features import GROUP_REPORT, switches_in_group
         from src.python.web.config_edit import get_config_edit_surface
 
         surface = get_config_edit_surface()
-        assert set(surface["submodules"]) == {flag for flag, _d in switches_in_group(GROUP_REPORT)}
-        assert "labels" not in surface["submodules"]  # 显示名由 features.labels 同源下发
+        assert set(surface["report_switches"]) == {flag for flag, _d in switches_in_group(GROUP_REPORT)}
+        assert "labels" not in surface["report_switches"]  # 显示名由 features.labels 同源下发
 
     def test_writing_report_flag_lands_in_features_store(self):
         from src.python.config.features import is_feature_enabled, set_feature_enabled
@@ -409,6 +409,6 @@ class TestWebPanelCoversAllSwitches:
         shown = set()
         for group in ("experimental", "standard"):
             shown |= set(surface["features"][group])
-        shown |= set(surface["submodules"])
+        shown |= set(surface["report_switches"])
         missing = set(feature_switch_registry) - shown
         assert not missing, f"Web 面板未渲染这些开关：{sorted(missing)}"

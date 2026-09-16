@@ -15,6 +15,8 @@ from typing import Any
 
 import pytest
 
+from src.python.report.data_status import STATUS_MESSAGES
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
@@ -529,11 +531,12 @@ class TestWritePositionStructureSheet(unittest.TestCase):
         write_position_structure_sheet(ws, self._overlap(), correlation_data=self._correlation())
         col_a = [ws.cell(row=r, column=1).value for r in range(1, ws.max_row + 1)]
         self.assertIn("三、持仓集中度监控", col_a)
-        # 占位文案出现在集中度区块之后
+        # 占位文案出现在集中度区块之后，且不留任何集中度数据行（无 name/占比）
         idx = col_a.index("三、持仓集中度监控")
-        tail = " ".join(str(v) for v in col_a[idx:] if v)
-        self.assertIn("集中度", tail)
-        self.assertNotIn("161725", [v for v in col_a[idx:] if isinstance(v, str) and v == "161725"])
+        tail = [str(v) for v in col_a[idx:] if v]
+        self.assertIn(STATUS_MESSAGES["concentration_unavailable"], tail)
+        self.assertNotIn("招商中证白酒", " ".join(tail))
+        self.assertNotIn("top10", " ".join(tail).lower())
 
     def test_only_concentration_data_renders_other_blocks_as_placeholder(self):
         """仅有集中度数据 → 重合度/相关性区块写占位，集中度正常（OR 可见性另一侧）。"""

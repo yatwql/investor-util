@@ -691,7 +691,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
 | `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
-| `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（表外键 / 僵尸条目 / 合并章 key 缺失） |
+| `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |

@@ -6,6 +6,27 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 过去 96 小时实现技术债整改（plan-42~45，rf-370）（2026-09-16）
+
+审计窗口内 67 次提交（plan-42~45 及发布/文档收尾）的代码、配置与测试，整改 7 类技术债：
+
+**① 语义索引正向校验失效（最重要）**：`scripts/check-semantic-index.py` 的正向项仍在解析 `_config_defaults.py` 的 `report_submodules` 字典——该机制已随「报告增强子模块并入功能开关注册表」移除，校验恒为空集，**新增开关可绕过「功能语义命名表」登记**。
+- 改为 AST 解析 `src/python/config/features.py::feature_switch_registry`，校验「每个功能开关都已在语义表登记」（表外键报错）；脚本 docstring、`-v` 输出、`--ci` 摘要与单测（`TestReportSubmodulesKeys` → `TestFeatureSwitchKeys`、run_checks 夹具改 features.py 形态）同步
+- 新校验立刻暴露 **12 个开关未登记** → `technical.md` 功能语义命名表补 12 行：`llm_debate_procon`/`llm_debate_conditional`/`llm_debate_qa_concentration`、7 个 `metrics_*`（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta）、`enable_interactive_charts`、`datasource_adapter`
+
+**② data 层可用性字典双份实现**：`excel_generator` 内联构造 + integration 一致性测试手写镜像，章节合并每批需改两处（rf-367 即此类漂移）。
+- 下沉为 `report/excel_sheet_factory.build_data_availability()`（合并章契约 OR、契约 None、news/llm 口径集中一处），生成器与集成测试镜像改用同一函数；新增 5 例口径守卫（fund_deep 开/关、单契约注入、两财报契约随开关、news/llm 随 include）
+
+**③ 死代码 / 死认知**：删除 `html_writer_nav` 的 `manager_data` data_flag（章节移除后无消费方；集成测试镜像同步删）；`registry.py` docstring 示例键 `fund_manager` → `position_structure`。
+
+**④ Web 面旧机制命名**：surface 键 `submodules` → `report_switches`（`web/config_edit.py` + `static/web/main.js` 渲染调用同步）；删除前端 `CONFIG_LABELS.submodules` 陈旧字典（漏列两个开关且与服务端 `features.labels` 同源下发设计矛盾）。
+
+**⑤ 测试用例陈旧 / 失效断言**：`test_excel_report_structure` 夹具改用当前注册表切片（删 `fund_manager`/`position_relationship`/`fund_concentration`，序号与页签计数同步 16/9 → 14/7）；`test_config` 的「重复序号」「多问题累加」用例改用现存键（此前误走「未知键」分支，断言通过但未测目标行为）；`test_orchestrator`/`test_excel_market_data`/`test_holdings_detail_sheet` 注释去掉 `report_submodules.*` 旧表述；`test_financial_indicator` 的「旧配置不再生效」守护样本改为中性旧键名；plan-45 新增用例的**恒真断言**（先按值过滤再断言不存在）改为「占位文案存在 + 无集中度数据行」正向断言。
+
+**⑥ 配置与模板漂移**：`data/config/config.json` 按当前模板重生成（补 plan-43 引入的 `holdings_start_date`，其余键值保持仓库现值：相对路径、显式 `cache_ttl`、显式 `report_section_order` 16 项），`validate_config()` 0 问题。
+
+门禁：四个 `--ci`（含改造后的语义索引）+ `--mode verify,regression` + ruff check/format + 版本一致性全绿。
+
 ### plan-45 设计与实施层文档归档（docs-stm/plan → archive/v0.11.x）（2026-09-16）
 
 plan-45（报告章节整合，注册表 21 → 17）四批全部实施完成，按「中间设计文件随完成态归档」惯例把两份文档从 `docs-stm/plan/` 归档到 `docs-stm/archive/v0.11.x/section-consolidation/`：

@@ -15,7 +15,7 @@ from src.python.report.excel_llm_usage import write_llm_section_and_usage
 from src.python.report.excel_market_data import resolve_indices, resolve_market_data
 from src.python.report.excel_module_loader import load_report_modules
 from src.python.report.excel_news_warning import write_news_sheet
-from src.python.report.excel_sheet_factory import create_sheets
+from src.python.report.excel_sheet_factory import build_data_availability, create_sheets
 from src.python.report.progress import ProgressReporter, SilentProgressReporter, Timer
 
 logger = setup_logger()
@@ -261,23 +261,15 @@ def generate_excel_report(
     wb.remove(wb.active)
     order = section_order or get_report_section_order()  # 内部名 order，避免影子覆盖参数
 
-    # 构造 data 层可用性字典
-    data_availability: dict[str, bool] = {}
-    if include_news:
-        data_availability["news_data_available"] = True
-    if include_llm:
-        data_availability["llm_data_available"] = True
-    # 财报摘要：数据缺失（未配置 key/无 A 股标的）时隐藏该页签
-    data_availability["financial_report_digest_data"] = financial_report_digest_data is not None
-    # 财务指标：数据缺失（无 A 股标的/数据源不可用）时隐藏该页签
-    data_availability["financial_indicator_data"] = financial_indicator_data is not None
-    # 持仓结构与集中度（合并章节，data_flag_any 两契约 OR）：基金深度分析开启时，
-    # 重合度/集中度均由下游计算（数据不足时区块各自写占位），故两契约均视为就绪；
-    # 关闭时由 board 层（fund_deep_analysis）隐藏，与 HTML 侧口径一致。
-    data_availability["position_relationship_data"] = (
-        enable_fund_deep_analysis or (pipeline_data or {}).get("position_relationship_data") is not None
+    # 构造 data 层可用性字典（口径集中于 excel_sheet_factory.build_data_availability）
+    data_availability = build_data_availability(
+        include_news=include_news,
+        include_llm=include_llm,
+        enable_fund_deep_analysis=enable_fund_deep_analysis,
+        financial_report_digest_data=financial_report_digest_data,
+        financial_indicator_data=financial_indicator_data,
+        position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
     )
-    data_availability["concentration_data"] = enable_fund_deep_analysis
 
     sheets = create_sheets(
         wb,

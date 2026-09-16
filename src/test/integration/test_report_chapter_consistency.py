@@ -49,25 +49,20 @@ class TestReportChapterConsistency(unittest.TestCase):
         """
         from openpyxl import Workbook
 
-        from src.python.report.excel_sheet_factory import create_sheets
+        from src.python.report.excel_sheet_factory import build_data_availability, create_sheets
 
         wb = Workbook()
         wb.remove(wb.active)
         if data_availability is None:
-            data_availability = {}
-            if news:
-                data_availability["news_data_available"] = True
-            if llm:
-                data_availability["llm_data_available"] = True
-            # 合并章节「持仓结构与集中度」：两契约 OR（基金深度分析开启时下游计算占位）
-            if fund_deep:
-                data_availability["position_relationship_data"] = True
-                data_availability["concentration_data"] = True
-            # 合并章节「持仓基本面」：两契约 OR（各由自己的功能开关决定是否注入）
-            if financial_report:
-                data_availability["financial_report_digest_data"] = True
-            if financial_indicator:
-                data_availability["financial_indicator_data"] = True
+            # 与生产同源：data 层可用性字典由 excel_sheet_factory.build_data_availability 构造
+            data_availability = build_data_availability(
+                include_news=news,
+                include_llm=llm,
+                enable_fund_deep_analysis=fund_deep,
+                position_relationship_data={} if fund_deep else None,
+                financial_report_digest_data={} if financial_report else None,
+                financial_indicator_data={} if financial_indicator else None,
+            )
         sheets = create_sheets(
             wb,
             order,
@@ -250,7 +245,6 @@ class TestReportChapterConsistency(unittest.TestCase):
 
         order = get_report_section_order()
         gap_avail = {
-            "manager_data": False,
             "concentration_data": False,
             "style_factor_data": False,
             "position_relationship_data": False,

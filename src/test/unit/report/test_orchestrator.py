@@ -171,13 +171,13 @@ class TestPrepareReportData:
             "data_freshness",
             # 行动建议单一数据源：「行动建议」章行动板块 + 「智囊团深度复盘」章行动摘要共享（数据契约）
             "action_data",
-            # 估值分位契约（report_submodules.valuation_percentile 关闭时为 None）
+            # 估值分位契约（功能开关 valuation_percentile 关闭时为 None）
             "valuation_data",
-            # 市场温度契约（report_submodules.market_temperature 关闭时为 None）
+            # 市场温度契约（功能开关 market_temperature 关闭时为 None）
             "market_temperature_data",
-            # 持仓个股财报摘要契约（report_submodules.financial_report_digest 关闭时为 None）
+            # 持仓个股财报摘要契约（功能开关 financial_report_digest 关闭时为 None）
             "financial_report_digest_data",
-            # 财务指标契约（report_submodules.financial_indicator 关闭时为 None）
+            # 财务指标契约（功能开关 financial_indicator 关闭时为 None）
             "financial_indicator_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"

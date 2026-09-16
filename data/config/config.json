@@ -2,37 +2,27 @@
   // ── A. 路径与文件 ──
   "holdings_dir": "data/holdings",
   "holdings_filename": "个人投资持仓信息.xlsx",
+  "holdings_start_date": "",  // 组合建仓日期（YYYY-MM-DD，可选）：未录入交易/分红流水时，按「建仓日一次性买入」近似年化；空=仅成本分档近似
   "output_dir": "reports",
   "llm_settings_file": "data/config/llm_settings.json",
   "llm_key_file": "data/config/llm_key.json",
   "llm_providers_file": "data/config/llm_providers.json",
-  "data_key_file": "data/config/data_key.json",  // 数据源密钥文件（通用；以 provider 名为节，如 {"datasink": {"api_key": "..."}}）
+  "data_key_file": "data/config/data_key.json",  // 数据源密钥文件（通用；以 provider 名为节）
 
   // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──
   "enable_fund_deep_analysis": true,  // 基金深度分析（业绩/经理变更/持仓关系/集中度/风格因子）
   "enable_news": true,  // 市场新闻
   "enable_history": true,  // 组合历史走势+回撤
   "enable_portfolio_evolution": true,  // 组合演进
-  "enable_action": true,  // 行动建议独立章（再平衡信号+交易纪律+调仓建议+收益归因，默认开，菜单 P 可切换）
+  "enable_action": true,  // 行动建议独立章（决策行动，默认开，菜单 P 可切换）
+  // 报告子模块开关（数据质量仪表盘长期可信默认开，其余新增能力默认关闭，避免既有报告突然"变胖"）
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
   "news_sources": {"sina": true, "eastmoney": true, "cls": false, "wallstreetcn": true, "akshare": true},
   "preferred_provider": {},
-
-  // DataSinking 全文本财报（仅 A 股；需用户自备 key，见 data_key.json 的 datasink 节）
-  // enabled：数据底座总开关（关闭后依赖它的分析——财报摘要章 / 财务指标章 / 真实估值分位——静默回原样）
-  // doc_types：文种白名单，**空数组 = 不限文种**，取最新报告期（半年报/季报通常比年报新）
-  // sections：章节偏好列表（按顺序在文档实际章节名中子串匹配；季报会自动落到「主要财务数据/主要会计数据」）
-  "datasink": {
-    "enabled": true,
-    "plan": "free",
-    "requests_per_second": 0,  // 0 = 按 plan 自动（free=3/秒）
-    "daily_quota": 0,  // 0 = 按 plan 自动（free=8191 篇/日）
-    "sections": ["管理层讨论与分析"],
-    "max_chars": 2000,
-    "doc_types": []
-  },
+  // DataSinking 全文本财报（仅 A 股；requests_per_second/daily_quota 为 0 时按 plan 自动）
+  "datasink": {"enabled": true, "plan": "free", "requests_per_second": 0, "daily_quota": 0, "sections": ["管理层讨论与分析"], "max_chars": 2000, "doc_types": []},
 
   // ── D. 市场时段与缓存 ──
   "market_hour_aware": ["price", "index"],
@@ -76,26 +66,7 @@
 
   // ── E. 行为调优 ──
   "default_menu_key": "L",
-  // 报告章节显示顺序（report_section_order：完整配置 16 项，按序号升序排列；llm_usage 自动置末位）
-  // 本仓库显式列出全部 16 项，取值与注册表出厂默认同序（行动建议=7）；清空为 {} 效果相同
-  "report_section_order": {
-    "summary": 1,
-    "holdings_detail": 2,
-    "penetration": 3,
-    "fund_performance": 4,
-    "position_structure": 5,
-    "style_factor": 6,
-    "action": 7,
-    "news_correlation": 8,
-    "global_macro": 9,
-    "expert_review": 10,
-    "health_check": 11,
-    "penetration_deep": 12,
-    "portfolio_history_drawdown": 13,
-    "portfolio_evolution": 14,
-    "data_source_status": 15,
-    "fundamental_snapshot": 16
-  },
+  "report_section_order": {"summary": 1, "holdings_detail": 2, "penetration": 3, "fund_performance": 4, "position_structure": 5, "style_factor": 6, "action": 7, "news_correlation": 8, "global_macro": 9, "expert_review": 10, "health_check": 11, "penetration_deep": 12, "portfolio_history_drawdown": 13, "portfolio_evolution": 14, "data_source_status": 15, "fundamental_snapshot": 16},
   "degradation": {
     "t2": {
       "unreachable_threshold": 2,
@@ -171,7 +142,7 @@
     "max_total_workers": 15,  // 全局 batch 线程硬上限（已有池不计入）
     "fund_workers": 3,  // 基金排名/持仓批量并发数
     "industry_workers": 8,  // 行业分类批量并发数
-    "datasink_workers": 2  // 财报取数并发数（免费档批量上限 ≤3；每标的为索引+章节清单+正文共 3 次请求）
+    "datasink_workers": 2  // 财报取数并发数（免费档批量上限 ≤3）
   },
   "batch_rate_limit": {  // Provider 级别请求间隔（秒），0=不限速
     "tencent": 0.0,  // 腾讯行情（不限速）

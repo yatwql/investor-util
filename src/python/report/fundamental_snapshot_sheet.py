@@ -216,11 +216,13 @@ def write_fundamental_snapshot_sheet(
     """
     write_title_row(ws, 1, get_report_sheet_name("fundamental_snapshot"), ncols=len(_INDICATOR_COLUMNS))
 
+    # 两区块顺序固定：区块① 自第 3 行起（区块小节标题 + 标题下留空），区块② 紧随其后；
+    # 契约 None 表示该功能开关关闭 → 该区块整体不写（不留标题/分隔）
     row = 3
     if indicator_data is not None:
         row = _write_indicator_block(ws, row, indicator_data) + 2
     if digest_data is not None:
-        row = _write_digest_block(ws, row, digest_data) + 1
+        _write_digest_block(ws, row, digest_data)
 
     freeze_header(ws, row=2)
     auto_width(ws, min_width=10, max_width=48)

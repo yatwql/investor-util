@@ -851,14 +851,6 @@
       enable_portfolio_evolution: '组合演进',
       enable_action: '行动建议'
     },
-    submodules: {
-      data_quality: '数据质量仪表盘',
-      industry_beta: '行业Beta子表',
-      candidate_compare: '候选基金比较子表',
-      cost_lots: '成本流水',
-      valuation_percentile: '估值分位',
-      market_temperature: '市场温度'
-    },
     llm: {
       global_macro: '全球政经局势',
       expert_review: '智囊团深度复盘',
@@ -914,7 +906,7 @@
     els.configPanel.appendChild(
       // 报告章节与增强：键即功能开关名（注册表 GROUP_REPORT），显示名与「影响报告」
       // 标记由服务端同源下发，前端不维护字典
-      renderBoolGroup('submodules', '报告章节与增强', surface.submodules, {
+      renderBoolGroup('report_switches', '报告章节与增强', surface.report_switches, {
         labels: surface.features.labels,
         reportAffecting: surface.features.report_affecting
       })

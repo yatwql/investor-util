@@ -778,7 +778,7 @@ class TestWeightedAvgCost(unittest.TestCase):
 class TestWriteMarketValueBlockFlow(unittest.TestCase):
     """_write_market_value_block 资金加权成本列渲染测试。
 
-    开关 `report_submodules.cost_lots` 对应 fund_flow_data 是否传入：
+    功能开关 `cost_lots` 对应 fund_flow_data 是否传入：
     None → 保持既有 15 列；非 None → 追加「资金加权成本」列（第 16 列）。
     """
 

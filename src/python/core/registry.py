@@ -620,7 +620,7 @@ def get_report_section_number(key: str, config: dict | None = None) -> int:
     未配置时返回默认注册表中的序号。
 
     Args:
-        key: 模块键名，如 "fund_manager"
+        key: 模块键名，如 "position_structure"
         config: 完整配置字典，为 None 时使用默认注册表序号
 
     Returns:

@@ -202,7 +202,7 @@ class TestDatasinkGate:
         from src.python.report.orchestrator import compute_financial_indicator_data
 
         out = compute_financial_indicator_data(
-            [_holding()], None, {"report_submodules": {"financial_indicator": True}}, None
+            [_holding()], None, {"legacy_removed_key": {"financial_indicator": True}}, None
         )
         assert out is None
 

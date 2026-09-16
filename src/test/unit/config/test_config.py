@@ -744,7 +744,7 @@ class TestValidateReportSectionOrder(unittest.TestCase):
 
     def test_duplicate_number_warns(self):
         """重复序号 → 1 问题（仅第二次出现时告警）。"""
-        n = cfg.validate_config({"report_section_order": {"summary": 1, "fund_manager": 1}})
+        n = cfg.validate_config({"report_section_order": {"summary": 1, "position_structure": 1}})
         self.assertEqual(n, 1)
 
     def test_llm_usage_in_config_warns(self):
@@ -759,7 +759,7 @@ class TestValidateReportSectionOrder(unittest.TestCase):
                 "report_section_order": {
                     "unknown_key": 1,
                     "summary": "abc",
-                    "fund_manager": -3,
+                    "position_structure": -3,
                 }
             }
         )

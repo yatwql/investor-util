@@ -3278,6 +3278,18 @@ make_http_client(timeout=10.0) → httpx.Client
 | `datasource_credential_ready` | 数据源凭据就绪指引（声明 → 就绪判定 → 可读指引） | 数据源可用性矩阵 | 监控 | 开关 `datasource_credential_ready`（默认开，非实验项） |
 | `credential_spec` | 数据源凭据声明（`CredentialSpec` 冻结 dataclass + `CREDENTIAL_SPECS` 注册表） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
 | `credential_readiness` | 凭据就绪矩阵与缺失指引（`missing_credential` / `credential_hint` / `credential_readiness`） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
+| `enable_interactive_charts` | 报告图表交互（6 图 Chart.js 渲染，含离线/无引擎守卫与 Canvas 回退） | 投资分析汇总 / 资产穿透TOP10 / 持仓结构与集中度等图表区 | 报告输出 | 常规开关（默认开） |
+| `datasource_adapter` | 数据源适配契约（三段式适配 + 行情域三源等价性校验） | 数据源可用性矩阵 | 数据获取 | 常规开关（默认开；不改报告产物，只影响取数路径校验口径） |
+| `llm_debate_procon` | 辩论-正反辩论（三段式：白脸 → 黑脸 → 综合） | 智囊团深度复盘 | LLM 注入 | 实验开关（默认关） |
+| `llm_debate_conditional` | 辩论-条件推理（上涨 / 下跌 / 震荡情景注入） | 智囊团深度复盘 | LLM 注入 | 常规开关（默认开） |
+| `llm_debate_qa_concentration` | 辩论-集中度问答（单品种占比 ≥20% 时附集中度量化评估） | 智囊团深度复盘 | LLM 注入 | 实验开关（默认关） |
+| `metrics_sharpe` | 量化指标-夏普比率 | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |
+| `metrics_calmar` | 量化指标-卡玛比率 | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |
+| `metrics_hhi` | 量化指标-HHI 集中度 | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |
+| `metrics_winrate` | 量化指标-胜率 | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |
+| `metrics_turnover` | 量化指标-换手率 | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |
+| `metrics_risk_contribution` | 量化指标-风险贡献 | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |
+| `metrics_beta` | 量化指标-组合 Beta | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |
 
 > **子功能并入说明**：以下语义已并入其他功能，不作为独立标识符参与本表校验——`dividend_flow`（分红现金流，并入 `fund_flow`）、`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。
 
