@@ -19,7 +19,8 @@ from src.python.fetcher.financial_report import (
     DEFAULT_MAX_CHARS,
     DEFAULT_SECTIONS,
     collect_a_share_targets,
-    fetch_symbol_report,
+    fetch_symbol_report_detailed,
+    target_source_label,
 )
 from src.python.providers import datasink
 
@@ -60,7 +61,7 @@ def build_financial_report_digest(
     holdings: list,
     config: dict | None = None,
     reporter: Any = None,
-    penetrated_codes: list[str] | None = None,
+    penetrated_targets: list[dict[str, Any] | str] | None = None,
 ) -> dict[str, Any]:
     """构建「持仓个股财报摘要」数据契约。
 
@@ -68,11 +69,12 @@ def build_financial_report_digest(
         holdings: 持仓对象列表
         config: 完整配置字典（读 ``datasink`` 段）
         reporter: 可选进度报告器
-        penetrated_codes: 穿透底层的证券代码（可空）
+        penetrated_targets: 穿透标的（``{"code", "name", "sources"}``，可空）
 
     Returns:
         ``{available, reason, rows, failures, entry_count}``；不可用时
-        ``available=False`` 且 ``reason`` 说明原因。
+        ``available=False`` 且 ``reason`` 说明原因。行含 ``target_source``
+        （直接持有 / 穿透：来源基金），失败行含具体原因（索引无报告 / 目标章节缺失）。
     """
     config = config or {}
     if datasink.missing_credential(datasink.SOURCE_ID) is not None:
@@ -85,7 +87,7 @@ def build_financial_report_digest(
     max_chars = int(max_chars) if isinstance(max_chars, (int, float)) and max_chars > 0 else DEFAULT_MAX_CHARS
     doc_types = tuple(section_cfg.get("doc_types") or DEFAULT_DOC_TYPES)
 
-    targets = collect_a_share_targets(holdings, penetrated_codes)
+    targets = collect_a_share_targets(holdings, penetrated_targets)
     if not targets:
         return _empty("无 A 股持仓或穿透标的")
 
@@ -101,19 +103,32 @@ def build_financial_report_digest(
 
     workers = get_batch_worker_count("datasink_workers", 2)
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="datasink_reports") as pool:
-        records = list(pool.map(lambda t: fetch_symbol_report(t["symbol"], doc_types, sections, max_chars), targets))
+        records = list(
+            pool.map(lambda t: fetch_symbol_report_detailed(t["symbol"], doc_types, sections, max_chars), targets)
+        )
 
     rows: list[dict[str, Any]] = []
     failures: list[dict[str, str]] = []
-    for target, record in zip(targets, records):
+    for target, (record, reason) in zip(targets, records):
+        label = target_source_label(target)
         if not record:
-            failures.append({"code": target["code"], "name": target["name"], "reason": "未取到财报"})
+            failures.append(
+                {
+                    "code": target["code"],
+                    "name": target["name"],
+                    "kind": str(target.get("kind") or ""),
+                    "target_source": label,
+                    "reason": reason or "未取到财报",
+                }
+            )
             continue
         rows.append(
             {
                 "code": target["code"],
                 "name": target["name"] or str(record.get("symbol") or target["symbol"]),
                 "symbol": target["symbol"],
+                "kind": str(target.get("kind") or ""),
+                "target_source": label,
                 "report_period": str(record.get("report_period") or ""),
                 "doc_type": _doc_type_label(str(record.get("doc_type") or "")),
                 "title": str(record.get("title") or ""),

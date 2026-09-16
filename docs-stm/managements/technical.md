@@ -2810,11 +2810,11 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 ### 4.19 持仓基本面（财务指标 + 持仓个股财报摘要，一章两区块）
 
-**定位**：合并章「持仓基本面」（sheet key `fundamental_snapshot`，type `fundamental_snapshot`），一章两区块：**区块① 财务指标**（功能开关 `financial_indicator`，默认关）+ **区块② 持仓个股财报摘要**（功能开关 `financial_report_digest`，默认关）。两区块各由自己的开关控制（契约 dict 为 None 表示该开关关闭 → 该块整体不渲染），章节整体可见性按注册表 `data_flag_any` 的 OR 口径（任一块就绪即显示；Excel 侧 `excel_generator` 同步登记两条契约 flag）。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）指定章节的**原文摘要**，与「拿行情/拿持仓」互补：前者提供公司经营层叙事与财务口径原文。
+**定位**：合并章「持仓基本面」（sheet key `fundamental_snapshot`，type `fundamental_snapshot`），一章两区块：**区块① 财务指标**（功能开关 `financial_indicator`，默认关）+ **区块② 持仓个股财报摘要**（功能开关 `financial_report_digest`，默认关）。两区块各由自己的开关控制（契约 dict 为 None 表示该开关关闭 → 该块整体不渲染），章节整体可见性按注册表 `data_flag_any` 的 OR 口径（任一块就绪即显示；Excel 侧 `excel_generator` 同步登记两条契约 flag）。对持仓 + 穿透中的 **A 股个股**标的（场外基金排除，见 §4.19 取数链路），取目标章节的**原文摘要**，与「拿行情/拿持仓」互补：前者提供公司经营层叙事与财务口径原文。两区块均含「标的来源」列（直接持有 / 穿透：来源基金），穿透标的名称由穿透层回填中文名。
 
 **数据源与鉴权**：DataSinking（`https://api.datasink.ing`）提供全文本财报 Markdown，仅覆盖 A 股（SSE/SZSE/BSE，代码经 `core/code_utils.py::to_fmp_symbol` 映射为 FMP 风格）。**需用户自备 API key**：凭据取通用密钥文件 `data/config/data_key.json` 的 `datasink` 节（`{"datasink": {"api_key": "..."}}`），环境变量 `DATASINK_API_KEY` 可覆盖；缺 key 时链路主动跳过并给申请指引，章节写占位。
 
-**取数链路**：`fetcher/financial_report.py` 逐标的取元数据（`/documents`，**不带文种过滤**取最近若干篇后本地按「报告期 → 披露时间」倒序取最新一篇，故半年报/季报优先于年报；`doc_types` 非空时作白名单）→ 取该文档**实际章节名清单**（`/documents/{id}/sections`，缓存于 `report_datasink_sections_`）→ 按 `sections` 偏好子串匹配出**精确章节名**逐个取正文（每节独立缓存、命中者按声明顺序以空行拼接；首选项 404 时继续试下一候选，清单不可得时回退偏好名直取）→ 按 `datasink.max_chars` 截断为摘要。单篇正文经 `fetch_with_fallback` + 财报域适配器两槽，复用缓存/熔断/降级。
+**取数链路**：`fetcher/financial_report.py` 逐标的取元数据（`/documents`，**不带文种过滤**取最近若干篇后本地按「报告期 → 披露时间」倒序取最新一篇，故半年报/季报优先于年报；`doc_types` 非空时作白名单）→ 取该文档**实际章节名清单**（`/documents/{id}/sections`，缓存于 `report_datasink_sections_`）→ 按 `sections` 偏好子串匹配出**精确章节名**逐个取正文（每节独立缓存、命中者按声明顺序以空行拼接；首选项 404 时继续试下一候选；清单不可得**或非空但残缺**时回退偏好名直取）→ 仍无正文则**按报告期回溯上一份报告**（`_REPORT_CANDIDATE_LIMIT=3`：半年报 → 一季报 → 上年年报，命中即止，报告期/文种如实写入）→ 按 `datasink.max_chars` 截断为摘要。单篇正文经 `fetch_with_fallback` + 财报域适配器两槽，复用缓存/熔断/降级。**标的清单**由 `collect_a_share_targets(holdings, penetrated)` 生成：持仓场外基金经 `is_otc_fund_by_name` 剔除（`00` 重叠区），穿透标的带 `name`/`sources`（来源基金）用于展示层回填与来源标注；失败原因由 `fetch_symbol_report_detailed` 返回（索引无报告 / 目标章节缺失 + 已试报告期）。
 
 **限速与配额护栏**：每次 HTTP 请求前经 `RateLimiter` 以「间隔 = 1/每秒上限」限速（免费档 3 请求/秒；付费档 31）；日配额计数存 `data/state/datasink_quota.json`，超限即停并告警。**免费档无批量端点、必然逐篇请求**，故限速必须落在 provider 每次请求前（批量调度器层挡不住单条调用）。并发取数由 `batch.datasink_workers` 控制（默认 3），速率仍由 provider 兜底。
 

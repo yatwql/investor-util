@@ -127,11 +127,17 @@ class TestAssembly:
         assert result["entry_count"] == 1
         assert [f["code"] for f in result["failures"]] == ["000001"]
 
-    def test_penetrated_codes_are_included(self, monkeypatch):
+    def test_penetrated_targets_included_with_name_and_source(self, monkeypatch):
+        """穿透标的名回填 + 来源标注（区块①不再只剩代码、无名称）。"""
         monkeypatch.setattr(fi, "fetch_indicator_series", lambda code, limit=8: [_record()])
-        result = fi.build_financial_indicator([], penetrated_codes=["600519"])
+        result = fi.build_financial_indicator(
+            [],
+            penetrated_targets=[{"code": "600519", "name": "贵州茅台", "sources": ["[ETF] 某ETF(561910)"]}],
+        )
         assert result["entry_count"] == 1
         assert result["rows"][0]["code"] == "600519"
+        assert result["rows"][0]["name"] == "贵州茅台"
+        assert result["rows"][0]["target_source"] == "穿透：[ETF] 某ETF(561910)"
 
 
 class TestOrchestration:
@@ -154,7 +160,7 @@ class TestOrchestration:
         assert out is not None and out["available"] is True
         assert out["rows"][0]["pe"] == pytest.approx(20.0)
 
-    def test_penetrated_assets_codes_are_forwarded(self, monkeypatch):
+    def test_penetrated_assets_names_are_forwarded(self, monkeypatch):
         monkeypatch.setattr(fi, "fetch_indicator_series", lambda code, limit=8: [_record()])
         from src.python.report.orchestrator import compute_financial_indicator_data
 
@@ -163,11 +169,19 @@ class TestOrchestration:
         set_feature_enabled("financial_indicator", True)
         out = compute_financial_indicator_data(
             [],
-            [{"code": "600519"}, {"codes": ["000001", "600036"]}],
+            [
+                {"name": "贵州茅台", "codes": ["600519"], "funds": ["[ETF] 某ETF(561910)"]},
+                {"name": "平安银行", "codes": ["000001", "600036"], "funds": ["直接持有"]},
+            ],
             {},
             None,
         )
         assert {r["code"] for r in out["rows"]} == {"600519", "000001", "600036"}
+        by_code = {r["code"]: r for r in out["rows"]}
+        assert by_code["600519"]["name"] == "贵州茅台"
+        assert by_code["600519"]["target_source"] == "穿透：[ETF] 某ETF(561910)"
+        # 穿透层里记「直接持有」的来源被剔除（该标的以持仓身份入列）
+        assert by_code["000001"]["target_source"] == "穿透"
 
 
 class TestDatasinkGate:

@@ -30,14 +30,59 @@ class TestCollectTargets:
         assert [t["code"] for t in targets] == ["000001", "600519"]
         assert targets[1]["symbol"] == "600519.SS"
 
-    def test_merges_penetrated_codes(self):
+    def test_merges_penetrated_targets_with_name_and_sources(self):
+        """穿透标的带中文名与来源基金（展示层据此回填名称并标注穿透来源）。"""
         holdings = [SimpleNamespace(code="600519", name="贵州茅台")]
-        targets = fr.collect_a_share_targets(holdings, penetrated_codes=["300750", "AAPL"])
-        assert [t["code"] for t in targets] == ["300750", "600519"]
-        assert targets[0]["symbol"] == "300750.SZ"
+        targets = fr.collect_a_share_targets(
+            holdings,
+            [
+                {"code": "300274", "name": "阳光电源", "sources": ["[ETF] 招商中证电池主题ETF(561910)"]},
+                "AAPL",  # 非 A 股
+            ],
+        )
+        assert [t["code"] for t in targets] == ["300274", "600519"]
+        assert targets[0]["symbol"] == "300274.SZ"
+        assert targets[0]["name"] == "阳光电源"
+        assert targets[0]["kind"] == "penetrated"
+        assert targets[0]["sources"] == ["[ETF] 招商中证电池主题ETF(561910)"]
+        assert targets[1]["kind"] == "holding"
+        assert targets[1]["sources"] == ["直接持有"]
+
+    def test_bare_penetrated_code_keeps_name_empty(self):
+        """裸代码（旧形态）仍可用：名称为空，展示层回退 symbol。"""
+        targets = fr.collect_a_share_targets([], ["300750"])
+        assert targets[0]["name"] == ""
+        assert targets[0]["kind"] == "penetrated"
+
+    def test_direct_holding_wins_over_penetrated(self):
+        """同代码既是持仓又在穿透层时按持仓计（来源记「直接持有」）。"""
+        holdings = [SimpleNamespace(code="600900", name="长江电力")]
+        targets = fr.collect_a_share_targets(holdings, [{"code": "600900", "name": "长江电力", "sources": ["[ETF] X"]}])
+        assert len(targets) == 1
+        assert targets[0]["kind"] == "holding"
+
+    def test_otc_fund_code_excluded_from_a_share_targets(self):
+        """场外基金代码落在 00 重叠区时不取个股财报（002943 基金 ≠ 002943.SZ 股票）。
+
+        现场：持仓「广发多因子灵活配置混合」(002943) 被判为深市 A 股，
+        表格里出现该基金名 + 深市股票 002943.SZ 宇晶股份的半年报（张冠李戴）。
+        """
+        fund = SimpleNamespace(code="002943", name="广发多因子灵活配置混合")
+        assert fr.collect_a_share_targets([fund]) == []
+        stock = SimpleNamespace(code="002943", name="宇晶股份")
+        assert [t["code"] for t in fr.collect_a_share_targets([stock])] == ["002943"]
 
     def test_empty(self):
         assert fr.collect_a_share_targets([]) == []
+
+    def test_target_source_label(self):
+        """来源标签：持仓「直接持有」；穿透拼接来源基金，超过 2 个以「…」略去。"""
+        assert fr.target_source_label({"kind": "holding", "sources": ["直接持有"]}) == "直接持有"
+        assert fr.target_source_label({"kind": "penetrated", "sources": []}) == "穿透"
+        one = fr.target_source_label({"kind": "penetrated", "sources": ["[ETF] A"]})
+        assert one == "穿透：[ETF] A"
+        many = fr.target_source_label({"kind": "penetrated", "sources": ["A", "B", "C"]})
+        assert many == "穿透：A；B…"
 
 
 class TestFetchSymbolReport:
@@ -129,6 +174,70 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
         monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "  "})
         assert fr.fetch_symbol_report("600519.SS", sections=("管理层讨论与分析", "财务报告")) is None
+
+
+class TestReportPeriodBacktrack:
+    """最新报告缺目标章节时回溯上一份（银行股半年报缺「管理层讨论与分析」）。"""
+
+    def _patch_index(self, monkeypatch, items):
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: items)
+        monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
+
+    def test_backtrack_to_earlier_report(self, monkeypatch):
+        """最新半年报无正文 → 回溯一季报 → 上年年报命中，报告期如实为年报。"""
+        self._patch_index(
+            monkeypatch,
+            [
+                {"id": 1, "report_period": "2026-06-30", "doc_type": "semiannual"},
+                {"id": 2, "report_period": "2026-03-31", "doc_type": "q1"},
+                {"id": 3, "report_period": "2025-12-31", "doc_type": "annual"},
+            ],
+        )
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
+        monkeypatch.setattr(
+            fr,
+            "_fetch_document",
+            lambda doc_id, section: (
+                {"doc_id": 3, "report_period": "2025-12-31", "doc_type": "annual", "content": "年报正文"}
+                if doc_id == 3
+                else None
+            ),
+        )
+        rec = fr.fetch_symbol_report("601939.SS")
+        assert rec is not None
+        assert rec["report_period"] == "2025-12-31"
+        assert rec["doc_type"] == "annual"
+        assert rec["content"] == "年报正文"
+
+    def test_degenerate_section_list_falls_back_to_direct_names(self, monkeypatch):
+        """章节清单非空但残缺（只有无关章节）时回退偏好名直取，不白丢整篇。"""
+        self._patch_index(monkeypatch, [{"id": 810006, "report_period": "2026-06-30"}])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["一、有限售条件股份", "二、无限售条件股份"])
+        seen: list[str] = []
+
+        def _doc(doc_id, section):
+            seen.append(section)
+            return {"doc_id": doc_id, "content": "正文"} if section == "管理层讨论与分析" else None
+
+        monkeypatch.setattr(fr, "_fetch_document", _doc)
+        rec = fr.fetch_symbol_report("601939.SS")
+        assert rec is not None
+        assert seen[0] == "管理层讨论与分析"
+        assert rec["content"] == "正文"
+
+    def test_failure_reasons(self, monkeypatch):
+        """失败原因细分：索引无报告 / 目标章节缺失（附已试报告期）。"""
+        self._patch_index(monkeypatch, [])
+        monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: None)
+        assert fr.fetch_symbol_report_detailed("601398.SS") == (None, fr.REASON_INDEX_EMPTY)
+
+        self._patch_index(monkeypatch, [{"id": 1, "report_period": "2026-06-30"}])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["一、股份变动情况"])
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: None)
+        rec, reason = fr.fetch_symbol_report_detailed("601398.SS")
+        assert rec is None
+        assert "2026-06-30" in reason
+        assert reason.startswith("目标章节缺失")
 
 
 class TestDatasinkUsageMarking:

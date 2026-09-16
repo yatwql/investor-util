@@ -107,6 +107,12 @@ class TestIndicatorBlock(unittest.TestCase):
         self.assertTrue(any("20.21" in v for v in flat), flat)
         self.assertTrue(any("优" in v for v in flat), flat)
 
+    def test_target_source_column_present(self):
+        """区块①列序锁定：标的来源列紧随代码（与区块②一致的口径）。"""
+        from src.python.report.fundamental_snapshot_sheet import _INDICATOR_COLUMNS
+
+        self.assertEqual(_INDICATOR_COLUMNS[:4], ["名称", "代码", "标的来源", "报告期"])
+
     def test_missing_values_render_dash_not_zero(self):
         row = dict(_indicator_data()["rows"][0])
         row.update({"gross_margin": None, "pe": None, "quality_grade": "", "trend": ""})
@@ -176,6 +182,19 @@ class TestDigestBlock(unittest.TestCase):
         ws = self._write(None)
         flat = self._flat(ws)
         self.assertTrue(any("暂无可用财报数据" in v for v in flat))
+
+    def test_target_source_column_present(self):
+        """区块②列序锁定：标的来源列紧随代码（区分直接持有 / 穿透来源基金）。"""
+        from src.python.report.fundamental_snapshot_sheet import _DIGEST_COLUMNS
+
+        self.assertEqual(
+            _DIGEST_COLUMNS,
+            ["名称", "代码", "标的来源", "报告期", "文种", "标题", "披露日", "摘要", "来源", "原文链接"],
+        )
+        base = _digest_data()
+        ws = self._write(_digest_data(rows=[{**base["rows"][0], "target_source": "穿透：[ETF] 电池ETF(561910)"}]))
+        flat = self._flat(ws)
+        self.assertTrue(any("穿透：[ETF] 电池ETF(561910)" in v for v in flat))
 
 
 # ═══════════════════════════════════════════════════════════

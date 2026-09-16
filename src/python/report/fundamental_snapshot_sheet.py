@@ -2,9 +2,9 @@
 
 职责：把「财务指标」与「持仓个股财报摘要」两张表写入同一个工作表，分两个区块：
 
-  区块① 财务指标（A 股基本面：营收/净利/同比/毛利率/ROE/负债率/现金流/EPS/每股净资产
-        + 质量档 + 年度趋势 + 当前 PE/PB），19 列
-  区块② 持仓个股财报摘要（DataSinking 全文本财报章节正文摘要），9 列
+  区块① 财务指标（A 股基本面：名称/代码/标的来源/报告期/文种 + 营收/净利/同比/毛利率/ROE/
+        负债率/现金流/EPS/每股净资产 + 质量档 + 年度趋势 + 当前 PE/PB + 数据来源），20 列
+  区块② 持仓个股财报摘要（DataSinking 全文本财报章节正文摘要），10 列
 
 两个区块各由**独立功能开关**驱动（`financial_indicator` / `financial_report_digest`）：
 契约 dict 为 None 表示该开关关闭 → 该区块整体不写；契约非 None 但 `available=False`
@@ -34,6 +34,7 @@ logger = logging.getLogger("invest")
 _INDICATOR_COLUMNS = [
     "名称",
     "代码",
+    "标的来源",
     "报告期",
     "文种",
     "营收(亿)",
@@ -54,7 +55,7 @@ _INDICATOR_COLUMNS = [
 ]
 
 # ── 区块② 持仓个股财报摘要 ──────────────────────────────────
-_DIGEST_COLUMNS = ["名称", "代码", "报告期", "文种", "标题", "披露日", "摘要", "来源", "原文链接"]
+_DIGEST_COLUMNS = ["名称", "代码", "标的来源", "报告期", "文种", "标题", "披露日", "摘要", "来源", "原文链接"]
 
 _DASH = "—"
 
@@ -108,6 +109,7 @@ def _write_indicator_block(ws: Worksheet, row: int, indicator_data: dict[str, An
             [
                 r.get("name") or "",
                 r.get("code") or "",
+                r.get("target_source") or "",
                 r.get("report_period") or "",
                 r.get("doc_type_label") or r.get("doc_type") or "",
                 _yi(r.get("revenue")),
@@ -166,6 +168,7 @@ def _write_digest_block(ws: Worksheet, row: int, digest_data: dict[str, Any] | N
             [
                 item.get("name", ""),
                 item.get("code", ""),
+                item.get("target_source", ""),
                 item.get("report_period", ""),
                 item.get("doc_type", ""),
                 item.get("title", ""),
@@ -191,7 +194,9 @@ def _write_digest_block(ws: Worksheet, row: int, digest_data: dict[str, Any] | N
     body += 1
     body = write_title_row(ws, body, "说明", ncols=ncols)
     for note in (
-        "数据来源：DataSinking 全文本财报（请保留披露平台归属）；仅覆盖 A 股（沪深京）",
+        "数据来源：DataSinking 全文本财报（请保留披露平台归属）；仅覆盖 A 股（沪深京）个股",
+        "标的来源列说明：直接持有 = 你的持仓；穿透：XX 基金 = 该标的来自基金/ETF 重仓（非直接持有）",
+        "报告期列如实反映取到的那份报告：最新报告缺目标章节时自动回溯上一份（半年报→一季报→上年年报）",
         "摘要为报告章节正文截断，完整内容见原文链接；具体取用章节与截断长度见 config.json 的 datasink 段",
     ):
         body = write_data_row(ws, body, [note] + [""] * (ncols - 1))

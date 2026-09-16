@@ -6,6 +6,26 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 修复：持仓基本面财报摘要四处缺陷（穿透名称/来源、基金撞号、章节残缺回退、报告期回溯）（2026-09-16）
+
+**现场**（用户问询）：报告「16.持仓基本面」区块②「持仓个股财报摘要」只有 6 只 A 股，且名称列出现 `300274.SZ`、`300502.SZ` 等代码，无法判断是持仓还是穿透；查询中另发现「广发多因子灵活配置混合」行配的是深市 002943.SZ 宇晶股份的半年报。
+
+**根因（四处）**：
+1. **穿透名称/来源未带入契约**：穿透层（`penetration.py`）一直带 `name` 与 `funds`（来源基金），但标的清单只取代码 → 展示层回退 symbol、无来源信息
+2. **场外基金代码撞号**：`002943` 既是场外基金也是深市股票代码，`to_fmp_symbol` 按前缀判 A 股即命中（`is_otc_fund_by_name` 早已能区分，两区块都没用）
+3. **章节清单非空但残缺时不回退**：建行半年报被 DataSinking 只解析出 2 个无关章节 → 匹配为空且仅在「清单不可得」时才回退偏好名直取 → 整篇白丢
+4. **最新一期缺章节即判失败**：半年报缺「管理层讨论与分析」时不回溯上年年报；失败原因统一写「未取到财报」
+
+**修改**：
+- `fetcher/financial_report.py`：`collect_a_share_targets` 持仓侧过 `is_otc_fund_by_name` 剔除场外基金、穿透侧带 `name`/`sources`（兼容裸代码）、直接持仓优先；新增 `target_source_label`（直接持有 / 穿透：来源基金…）；抽出 `_collect_doc_sections`（清单不可得**或残缺**均回退偏好名直取）；新增 `fetch_symbol_report_detailed`（按报告期回溯最多 3 篇 + 失败原因），`fetch_symbol_report` 变薄包装
+- `report/financial_report_digest.py`：契约行新增 `target_source`，失败项带 `kind`/`target_source`/细化原因；穿透名称回填（缺名仍回退 symbol）
+- `report/financial_indicator.py` + `report/orchestrator.py`：`_penetrated_codes` → `_penetrated_targets`（名称 + 来源基金），区块① 同步享受名称回填与来源标注
+- `report/fundamental_snapshot_sheet.py`：区块①、区块② 各增「标的来源」列（19→20 列 / 9→10 列），说明区补标的来源与报告期回溯口径
+- 文档：`requirements.md`（R-FRD-01/03/05、章节表与两区块列数）、`technical.md` §4.19、`reports-instruction.md`、`datasource.md`、`datasource-reliability.md`
+- 自审：`review-findings.md` 记 rf-380~rf-383（已解决）、rf-384（源侧未解析章节是否加全文兜底，待评估），`rf-next → 385`
+
+**实测（真实持仓 + 真实穿透，2026-09-16）**：行数 6 → 7；穿透标的显示中文名（阳光电源/中际旭创/新易盛/宁德时代/华峰测控）并标注来源基金；场外基金 002943 不再入列；建设银行由「未取到」变为取到 2025 年报（回溯生效）；工商银行仍缺（源侧未解析章节），失败原因写明「目标章节缺失（已试报告期：2026-03-31、2025-12-31、2025-09-30）」。
+
 ### 修复：思考耗尽 max_tokens —— 全模块 token 上限整体上调 50%（2026-09-16）
 
 **现场**：`logs/app.log` 出现 `LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本（建议增大对应 max_tokens 配置或降低 reasoning_effort）` + `Extended Thinking 思考部分耗尽 max_tokens 预算（无正文），关闭 thinking 重试一次`。

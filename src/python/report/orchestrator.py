@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from src.python.report.progress import ProgressReporter
 
@@ -276,23 +277,37 @@ def compute_financial_report_digest_data(
         return None
     from src.python.report.financial_report_digest import build_financial_report_digest
 
-    penetrated_codes = _penetrated_codes(penetrated_assets)
-    return build_financial_report_digest(holdings, config, reporter, penetrated_codes=penetrated_codes)
+    return build_financial_report_digest(
+        holdings, config, reporter, penetrated_targets=_penetrated_targets(penetrated_assets)
+    )
 
 
-def _penetrated_codes(penetrated_assets: list | None) -> list[str]:
-    """穿透资产中的证券代码（资产自身 code + 其 codes 列表）。"""
-    codes: list[str] = []
+def _penetrated_targets(penetrated_assets: list | None) -> list[dict[str, Any]]:
+    """穿透资产 → 标的清单（``code`` + 中文名 + 来源基金标签）。
+
+    穿透层每个资产条目形如 ``{"name": "阳光电源", "codes": {"300274"},
+    "funds": ["[ETF] 招商中证电池主题ETF(561910)"]}``：名称与来源一路带到
+    展示层，避免穿透标的只显示 ``300274.SZ``、也无法判断是持仓还是穿透。
+    直接持有的资产在穿透层也记 ``直接持有``，此处剔除（该标的会以持仓身份入列）。
+    """
+    targets: list[dict[str, Any]] = []
     for asset in penetrated_assets or []:
         if not isinstance(asset, dict):
             continue
+        name = str(asset.get("name") or "")
+        sources = [
+            str(f).strip() for f in (asset.get("funds") or []) if str(f).strip() and str(f).strip() != "直接持有"
+        ]
+        codes: list[str] = []
         code = asset.get("code")
         if code:
             codes.append(str(code))
         nested = asset.get("codes")
         if isinstance(nested, (list, set, tuple)):
             codes.extend(str(c) for c in nested)
-    return codes
+        for c in codes:
+            targets.append({"code": c, "name": name, "sources": sources})
+    return targets
 
 
 def compute_financial_indicator_data(
@@ -320,7 +335,7 @@ def compute_financial_indicator_data(
         holdings,
         config,
         reporter,
-        penetrated_codes=_penetrated_codes(penetrated_assets),
+        penetrated_targets=_penetrated_targets(penetrated_assets),
         prices=collect_price_map(details),
     )
 

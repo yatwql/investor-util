@@ -25,7 +25,7 @@ from src.python.analysis.financial_indicator import (
     trend_points,
 )
 from src.python.fetcher.financial_indicator import fetch_indicator_series
-from src.python.fetcher.financial_report import collect_a_share_targets
+from src.python.fetcher.financial_report import collect_a_share_targets, target_source_label
 
 logger = logging.getLogger("invest")
 
@@ -57,6 +57,7 @@ def _row(target: dict[str, str], series: list[dict[str, Any]], price: float | No
     return {
         "code": target["code"],
         "name": target["name"],
+        "target_source": target_source_label(target),
         "report_period": latest.get("report_period") or "",
         "doc_type": latest.get("doc_type") or "",
         "doc_type_label": _doc_type_label(str(latest.get("doc_type") or "")),
@@ -86,7 +87,7 @@ def build_financial_indicator(
     holdings: list,
     config: dict | None = None,
     reporter: Any = None,
-    penetrated_codes: list[str] | None = None,
+    penetrated_targets: list[dict[str, Any] | str] | None = None,
     prices: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """构建「财务指标」数据契约。
@@ -95,7 +96,8 @@ def build_financial_indicator(
         holdings: 持仓对象列表
         config: 完整配置字典（当前未读取，保留与同类装配函数一致的签名）
         reporter: 可选进度报告器
-        penetrated_codes: 穿透底层的证券代码（可空）
+        penetrated_targets: 穿透标的（``{"code", "name", "sources"}``，可空；
+            名称用于回填中文名，避免展示层只剩代码）
         prices: ``{代码: 现价}``（用于当前 PE/PB；缺价则该行 PE/PB 留空）
 
     Returns:
@@ -109,7 +111,7 @@ def build_financial_indicator(
         logger.info("[financial_indicator] DataSinking 数据底座未就绪，财务指标章静默跳过")
         return None
 
-    targets = collect_a_share_targets(holdings, penetrated_codes)
+    targets = collect_a_share_targets(holdings, penetrated_targets)
     if not targets:
         return _empty("无 A 股持仓或穿透标的")
 
@@ -131,7 +133,12 @@ def build_financial_indicator(
     for target, series in zip(targets, series_list):
         if not series:
             failures.append(
-                {"code": target["code"], "name": target["name"], "reason": "无指标数据（未覆盖或数据源不可用）"}
+                {
+                    "code": target["code"],
+                    "name": target["name"],
+                    "target_source": target_source_label(target),
+                    "reason": "无指标数据（未覆盖或数据源不可用）",
+                }
             )
             continue
         rows.append(_row(target, series, prices.get(target["code"])))

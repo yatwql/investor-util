@@ -18,7 +18,7 @@ from typing import Any
 from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
-from src.python.core.code_utils import to_fmp_symbol
+from src.python.core.code_utils import is_otc_fund_by_name, to_fmp_symbol
 from src.python.fetcher.source_adapter import adapter_chain_slots
 from src.python.providers import datasink
 from src.python.schemas.datasource_fields import DOMAIN_FINANCIAL_REPORT
@@ -47,31 +47,87 @@ DEFAULT_MAX_CHARS = 2000
 #: 索引一次取回的候选篇数（本地按报告期排序后取最新一篇）
 _INDEX_SCAN_SIZE = 10
 
+#: 单标的候选报告篇数：最新一篇缺目标章节时向前回溯（半年报 → 一季报 → 上年年报），
+#: 命中即止。上限 3 篇兼顾覆盖率与请求配额（每篇 1 次章节清单 + 若干次正文请求）：
+#: 银行股半年报在 DataSinking 侧常缺「管理层讨论与分析」章节，回溯到上年年报即可取到。
+_REPORT_CANDIDATE_LIMIT = 3
+
+#: 未取到财报的原因文案（写入契约 failures，展示层原样透出）
+REASON_INDEX_EMPTY = "索引无该标的报告"
+REASON_SECTIONS_MISSING = "目标章节缺失（已试报告期：{periods}）"
+
+#: 标的来源标签（直接持仓 / 穿透自基金）
+_TARGET_SOURCE_HOLDING = "直接持有"
+
+#: 穿透来源基金最大展示个数（超出以「…」略去，避免单元格过长）
+_TARGET_SOURCE_LIMIT = 2
+
+
+def target_source_label(target: dict[str, Any]) -> str:
+    """标的来源标签：直接持仓写「直接持有」，穿透写「穿透：来源基金…」。"""
+    if str(target.get("kind") or "") != "penetrated":
+        return _TARGET_SOURCE_HOLDING
+    sources = [str(s).strip() for s in (target.get("sources") or []) if str(s).strip()]
+    if not sources:
+        return "穿透"
+    shown = "；".join(sources[:_TARGET_SOURCE_LIMIT])
+    return f"穿透：{shown}" + ("…" if len(sources) > _TARGET_SOURCE_LIMIT else "")
+
 
 def collect_a_share_targets(
     holdings: list,
-    penetrated_codes: list[str] | None = None,
-) -> list[dict[str, str]]:
-    """持仓 + 穿透资产中的 A 股标的（去重、按代码升序）。
+    penetrated_targets: list[dict[str, Any] | str] | None = None,
+) -> list[dict[str, Any]]:
+    """持仓 + 穿透资产中的 A 股**个股**标的（去重、按代码升序）。
+
+    两类排除/合并规则：
+      - 持仓中的**场外基金**不取个股财报：基金代码与深市股票在 ``00`` 前缀重叠
+        （如 ``002943`` 既是场外基金「广发多因子灵活配置混合」也是深市股票
+        「宇晶股份」），只按代码判 A 股会让基金名配到股票财报（张冠李戴）。
+        判定复用 ``is_otc_fund_by_name``（名称 + 代码双维度，仅 00 重叠区生效）。
+      - 穿透标的带**中文名与来源基金**（来自穿透层的 ``name`` / ``funds``），
+        用于展示层回填名称并标注「穿透：XX 基金」，避免只显示 ``300274.SZ``。
+        兼容裸代码字符串（无名称时展示层回退 symbol）。
 
     Args:
         holdings: 持仓对象列表（具备 ``code`` / ``name`` 属性）
-        penetrated_codes: 穿透底层的证券代码（可空）
+        penetrated_targets: 穿透标的（``{"code", "name", "sources"}`` 或裸代码，可空）
 
     Returns:
-        ``[{"code", "name", "symbol"}]``；非 A 股代码被过滤
+        ``[{"code", "name", "symbol", "kind", "sources"}]``；非 A 股代码被过滤。
+        ``kind`` 取 ``holding`` / ``penetrated``；同代码时直接持仓优先（来源记「直接持有」）。
     """
-    targets: dict[str, dict[str, str]] = {}
+    targets: dict[str, dict[str, Any]] = {}
     for h in holdings:
         code = str(getattr(h, "code", "") or "").strip()
+        name = str(getattr(h, "name", "") or "")
         symbol = to_fmp_symbol(code)
-        if symbol and code not in targets:
-            targets[code] = {"code": code, "name": str(getattr(h, "name", "") or ""), "symbol": symbol}
-    for raw in penetrated_codes or []:
-        code = str(raw or "").strip()
+        if not symbol or code in targets or is_otc_fund_by_name(name, code):
+            continue
+        targets[code] = {
+            "code": code,
+            "name": name,
+            "symbol": symbol,
+            "kind": "holding",
+            "sources": [_TARGET_SOURCE_HOLDING],
+        }
+    for raw in penetrated_targets or []:
+        if isinstance(raw, str):
+            code, name, sources = raw.strip(), "", []
+        else:
+            code = str(raw.get("code") or "").strip()
+            name = str(raw.get("name") or "")
+            sources = [str(s).strip() for s in (raw.get("sources") or []) if str(s).strip()]
         symbol = to_fmp_symbol(code)
-        if symbol and code not in targets:
-            targets[code] = {"code": code, "name": "", "symbol": symbol}
+        if not symbol or code in targets:
+            continue
+        targets[code] = {
+            "code": code,
+            "name": name,
+            "symbol": symbol,
+            "kind": "penetrated",
+            "sources": sources,
+        }
     return [targets[k] for k in sorted(targets)]
 
 
@@ -167,36 +223,20 @@ def _fetch_document(doc_id: int | str, section: str) -> dict[str, Any] | None:
     return record
 
 
-def fetch_symbol_report(
-    symbol: str,
-    doc_types: tuple[str, ...] = DEFAULT_DOC_TYPES,
-    sections: tuple[str, ...] = DEFAULT_SECTIONS,
-    max_chars: int = DEFAULT_MAX_CHARS,
-) -> dict[str, Any] | None:
-    """取单只 A 股的最新财报章节记录（支持多章节拼接）。
+def _collect_doc_sections(doc_id: int | str, preferences: list[str]) -> tuple[dict[str, Any] | None, list[str]]:
+    """取单篇文档的目标章节正文（多节按偏好顺序拼接）。
 
-    Args:
-        symbol: FMP 风格符号（``600519.SS``）
-        doc_types: 文种白名单（**空 = 不限文种**；跨文种取最新报告期）
-        sections: 章节**偏好**列表（在文档实际章节名中按顺序子串匹配，命中者拼接）
-        max_chars: 正文截断长度（报告内摘要）
+    先取该文档的实际章节名清单（1 次请求，带缓存），按偏好做**精确章节名**匹配；
+    匹配为空时回退偏好名直取（服务端 fuzzy）。两种清单异常都要兜住：
+      - 清单不可得（None）
+      - 清单**非空但残缺**（DataSinking 解析异常，如某银行半年报只解析出
+        「一、有限售条件股份/二、无限售条件股份」两节）——此时按清单匹配必然为空，
+        不回退等于白白丢掉整篇报告
 
     Returns:
-        ``{doc_id, symbol, report_period, doc_type, title, announcement_time,
-        content, summary, source, adjunct_url, word_count}``；无覆盖时 None
+        ``(首个非空正文记录 | None, 正文列表)``
     """
-    items = _fetch_index(symbol, doc_types)
-    if not items:
-        return None
-    meta = items[0]
-    doc_id = meta.get("id")
-    if doc_id is None:
-        return None
-
-    # 先取该文档的实际章节名清单（1 次请求，带缓存），再按偏好匹配**精确章节名**；
-    # 清单不可得时回退偏好名直取（服务端 fuzzy 匹配）——避免裸章节名 404 被误判为
-    # 「该标的未取到财报」（此前多数「未取到财报」正是该原因）
-    resolved = _pick_sections(_fetch_sections(doc_id), sections)
+    resolved = _pick_sections(_fetch_sections(doc_id), tuple(preferences)) or list(preferences)
     record: dict[str, Any] | None = None
     contents: list[str] = []
     for section in resolved:
@@ -208,12 +248,19 @@ def fetch_symbol_report(
         text = str(got.get("content") or "").strip()
         if text:
             contents.append(text)
-    if record is None or not contents:
-        return None
+    return record, contents
 
-    content = "\n\n".join(contents)
+
+def _assemble_record(
+    record: dict[str, Any],
+    meta: dict[str, Any],
+    symbol: str,
+    content: str,
+    max_chars: int,
+) -> dict[str, Any]:
+    """正文 + 元数据 → 单标的财报记录契约。"""
     return {
-        "doc_id": record.get("doc_id") or doc_id,
+        "doc_id": record.get("doc_id") or meta.get("id"),
         "symbol": record.get("symbol") or symbol,
         "report_period": record.get("report_period") or meta.get("report_period", ""),
         "doc_type": record.get("doc_type") or meta.get("doc_type", ""),
@@ -225,3 +272,58 @@ def fetch_symbol_report(
         "source": record.get("source", ""),
         "adjunct_url": record.get("adjunct_url", ""),
     }
+
+
+def fetch_symbol_report_detailed(
+    symbol: str,
+    doc_types: tuple[str, ...] = DEFAULT_DOC_TYPES,
+    sections: tuple[str, ...] = DEFAULT_SECTIONS,
+    max_chars: int = DEFAULT_MAX_CHARS,
+    max_candidates: int = _REPORT_CANDIDATE_LIMIT,
+) -> tuple[dict[str, Any] | None, str]:
+    """取单只 A 股的目标章节记录，并返回未取到的原因（供契约失败清单展示）。
+
+    报告期回溯：从最新报告期起，最多试 ``max_candidates`` 篇（命中即止）。银行股
+    半年报在 DataSinking 侧常缺「管理层讨论与分析」（或章节清单残缺且直取 404），
+    回溯到一季报/上年年报即可取到；报告期与文种如实写入记录，展示层不会误标。
+
+    Returns:
+        ``(记录 | None, 原因文案)``；成功时原因为空串。
+    """
+    items = _fetch_index(symbol, doc_types)
+    if not items:
+        return None, REASON_INDEX_EMPTY
+    preferences = [str(p).strip() for p in sections if str(p).strip()]
+    tried: list[str] = []
+    for meta in items[: max(1, int(max_candidates))]:
+        doc_id = meta.get("id")
+        if doc_id is None:
+            continue
+        tried.append(str(meta.get("report_period") or meta.get("title") or doc_id))
+        record, contents = _collect_doc_sections(doc_id, preferences)
+        if record is None or not contents:
+            continue
+        return _assemble_record(record, meta, symbol, "\n\n".join(contents), max_chars), ""
+    return None, REASON_SECTIONS_MISSING.format(periods="、".join(tried) or "无")
+
+
+def fetch_symbol_report(
+    symbol: str,
+    doc_types: tuple[str, ...] = DEFAULT_DOC_TYPES,
+    sections: tuple[str, ...] = DEFAULT_SECTIONS,
+    max_chars: int = DEFAULT_MAX_CHARS,
+) -> dict[str, Any] | None:
+    """取单只 A 股的目标章节记录（支持多章节拼接与报告期回溯）。
+
+    Args:
+        symbol: FMP 风格符号（``600519.SS``）
+        doc_types: 文种白名单（**空 = 不限文种**；跨文种取最新报告期）
+        sections: 章节**偏好**列表（在文档实际章节名中按顺序子串匹配，命中者拼接）
+        max_chars: 正文截断长度（报告内摘要）
+
+    Returns:
+        ``{doc_id, symbol, report_period, doc_type, title, announcement_time,
+        content, summary, source, adjunct_url, word_count}``；无覆盖时 None
+    """
+    record, _reason = fetch_symbol_report_detailed(symbol, doc_types, sections, max_chars)
+    return record
