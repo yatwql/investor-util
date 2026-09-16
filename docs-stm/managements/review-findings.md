@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.1-dev
-> **编号源**：`rf-next = 374`（新增问题取此编号，完成后更新为 +1；已用最大 rf-373，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 375`（新增问题取此编号，完成后更新为 +1；已用最大 rf-374，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -66,6 +66,7 @@
 | **rf-371** | **技术债整改后管理/用户文档二次核对（6 类）**：① `technical.md` Web 接口表与白名单段落仍用旧 surface 名（「子模块」）+ 已不存在的 `submodule` writer，且「增强子模块开关 6 / 功能开关 20」计数陈旧（实际报告组 8 / 注册表 28）；② 契约注记中的注册序号未随章节合并更新（`portfolio_evolution` number=17→14、`action` number=10→7、「报告顺序完整 18 项」→16 项）；③ `features.json` 行仍写「20 项声明 / 实验组 4 + 常规组 16」，缺报告组 8；④ `requirements.md`：P 菜单仍描述「可进入报告增强子模块配置（8 项）」（该子面板已随 plan-44 移除）、R-WEB-08 可编辑面清单用「子模块」、features.json 章节写「20 项…两块」；⑤ `how-to-config.md`：配置样例注释仍写「报告子模块开关」、`report_section_order` 说明「默认顺序（20 项）」；⑥ 统计快照滞后于本轮测试/文档改动（test-coverage 模式与 unit_report/功能域计数、folders 测试代码/用例/管理文档/项目文档合计） | 逐处按现状整改：surface 名统一为 `report_switches`、writer 集合去 `submodule`、计数改 8/28（三组）、序号与项数改 14/7/16、P 菜单与样例注释按现状改写；`test-coverage.md` 按 `collect-test-coverage.py` 实测刷新（unit 6905 / standard 5908 / report 1907 / all 7218 / unit_report 1907 / 报告生成 1907），`folders.md` 统计按实测刷新（测试 372 文件 / 109,295 行、用例 7,218、管理文档 10/10,085、项目文档 52,549 行）。变更详情见 changelog [0.11.1-dev] |
 | **rf-372** | **新增实验开关触发跨接缝漂移（3 处）**：① `features.py` 实验组新增一项后，`test_handlers_config` 的 TUI 面板编号断言（常规块自 10 起、量化指标 15、doctor_check 23）与实际编号（11/16/24）不符 → 5 例失败；② `pipeline_data` 新增契约键未同步 `technical.md` 附录 H → `test_pipeline_data_builder` 的台账/附录一致性用例 2 例失败；③ `_report_generation` 的 both 路径**没有 `prep` 变量**（只有 full 路径调 `prepare_report_data`），首次插入契约组装时用 `prep` 直接 `NameError`，影响 orchestrator/snapshot 相关 11 例 | ①按「编号由分组与块内顺序派生」原则把开关追加到实验组末尾（既有实验编号不变）并同步测试编号与文档串（11/16/24）；②附录 H 补键表行 + 逐键契约说明；③both 路径传 `None`（由组装辅按需计算穿透）、full 路径用 `prep` 且基本面来源改 `pipeline_data`/`prep` 双取。变更详情见 changelog [0.11.1-dev] |
 | **rf-373** | **实验性功能异常冒泡拖垮主报告（用户报障）+ 既有的全零行情 Excel 崩溃**：① `prosperity_framework` 的换手代理按 dict 取快照字段，而 `history_snapshot.load_all()` 返回 `SnapshotData` 冻结 dataclass → `AttributeError` 自实验功能冒泡，**整份 full 报告生成失败**（`logs/app.log` 现场）；同时暴露**韧性缺口**：单维/整体计算异常无隔离，实验功能可影响主报告，违反数据降级治理纪律。② 场景测试进一步暴露**既有缺陷**：「持仓明细与分类」页签在行情全零时先写整行合并的提示行、再以该行为数据起点写明细 → `MergedCell` 只读崩溃（源自合并前 `market_value_sheet.py`，批次② 原样带入；既有单测用 MagicMock 工作表故漏检） | ①快照字段提取改为 `_snapshot_holding_codes()`（兼容 dataclass 与 dict，缺失字段按空集且不抛）；单维经 `_guard_dimension()` 降级、组装辅助整体 try/except 返回 None、三个调用点再加一层兜底；新增 5+4+4 例回归（含真实 `SnapshotData` 与场景级「报告必须生成成功」断言）。②提示行后显式重置 `data_start`；新增 2 例真实 openpyxl 回归（全零不崩溃 + 行序断言）。变更详情见 changelog [0.11.1-dev] |
+| **rf-374** | **同一契约的多条渲染调用链只补了一条（用户复核报障）**：`_generate_full_html_report`（full 路径 HTML 包装）未声明/转发 `prosperity_framework_data`，而 both 路径调用点已转发——批量替换时 `count=1` 只命中一处，导致「开关已开但菜单 L 的 HTML 无块」。Excel 侧因就地构建契约不受影响，故问题只在 L 的 HTML 上暴露，单元/场景测试（当时只覆盖 both 与 Excel）也未拦住 | 补齐包装函数参数声明与转发、full 调用点传入；新增 `TestHtmlCallSiteSeam` 3 例源码级/签名级守卫（「每处 write_html_report 调用都须带该参数」），并做真实数据端到端复核（both/full 的 HTML+Excel 均含块）。变更详情见 changelog [0.11.1-dev] |
 
 ### 归档档案
 

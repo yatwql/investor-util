@@ -6,6 +6,16 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 修复：full 路径（菜单 L）HTML 未转发景气度框架契约（2026-09-16）
+
+用户复核报障「开关已开、运行后行动建议章后没有新增内容」→ 定位为**接缝缺口**：`_generate_full_html_report`（full 路径 HTML 包装函数）既未声明也未转发 `prosperity_framework_data`，而 both 路径已转发——`count=1` 的批量替换只覆盖了其中一条调用链。**Excel 侧不受影响**（`generate_excel_report` 自行就地构建契约），故 both/full 的 Excel 一直有块，HTML 仅在 both 路径有块。
+
+- 修复：`_generate_full_html_report` 补参数声明与转发（→ `write_html_report`），full 路径调用点补传 `pipeline_data` 中的契约
+- 守卫（防再漏）：`test_prosperity_framework_wiring.py::TestHtmlCallSiteSeam` 3 例——① 源码级断言 `_report_generation.py` 中**每处** `write_html_report(...)` 调用都带该参数（新增其它 HTML 调用链忘记转发即失败）；② 包装函数签名含该参数且函数体内转发；③ full 路径调用点从 `pipeline_data` 取契约传入
+- 真实数据复核（用户真实持仓 + 真实配置，输出到 `docs-stm/tmp/` 并清理）：both 与 full 两路径的 HTML 均含「⑥ 景气度框架诊断（实验性）」块与免责句；Excel「7.行动建议」页签含块（本次实测「总分 28/85（33%）—— 评级：不契合」）
+
+门禁：四个 `--ci` + `--mode verify,regression` 4989 passed / 0 failed + ruff 全绿。
+
 ### 修复：景气度框架诊断拖垮整份报告 + 行情全零 Excel 崩溃（2026-09-16）
 
 **缺陷①（P0，用户报障「运行后有数据处理异常」）**：`logs/app.log` 显示 `AttributeError: 'SnapshotData' object has no attribute 'get'` → **整份 full 报告生成失败**。根因：`analysis/prosperity_framework.py::_turnover_proxy_pct` 按 dict 取快照字段，而 `report/history_snapshot.load_all()` 返回的是 **`SnapshotData` 冻结 dataclass**（`.accounts[*].holdings[*].code`）；异常自实验功能冒泡，违反「实验功能不得影响主报告」与数据降级治理纪律。

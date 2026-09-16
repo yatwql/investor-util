@@ -295,3 +295,48 @@ class TestResilienceIsolation:
         )
         out = _report_aux_metrics.compute_prosperity_framework_data([], _details(), {}, {}, None)
         assert out is not None and out["turnover_proxy_pct"] == 66.67
+
+
+class TestHtmlCallSiteSeam:
+    """接缝守卫：**每条** HTML 生成调用链都必须把契约传到模板（缺陷回归）。
+
+    现场（用户报障「行动建议后没加内容」）：`_generate_full_html_report`（菜单 L 走的
+    full 路径）未接收/转发 `prosperity_framework_data`，而 both 路径已转发 —— 只在
+    一条路径上补参数就会漏掉另一条。故以「源码级调用点全覆盖」方式守卫：
+    新增其它 HTML 调用链时，若忘记转发，本用例立即失败。
+    """
+
+    def _source(self) -> str:
+        from pathlib import Path
+
+        return Path("src/python/report/_report_generation.py").read_text(encoding="utf-8")
+
+    def test_every_write_html_report_call_passes_contract(self):
+        """`_report_generation.py` 中每处 write_html_report(...) 调用都须带该参数。"""
+        import re
+
+        src = self._source()
+        calls = re.findall(r"write_html_report\(\s*\n(.*?)\n\s*\)", src, re.S)
+        assert len(calls) >= 2, f"预期至少两处 HTML 调用点（both/full），实际 {len(calls)}"
+        missing = [c.strip().splitlines()[0] for c in calls if "prosperity_framework_data" not in c]
+        assert not missing, f"以下 HTML 调用点未转发 prosperity_framework_data: {missing}"
+
+    def test_full_html_wrapper_signature_and_forwarding(self):
+        """`_generate_full_html_report` 须声明该参数（并在函数体内转发）。"""
+        import inspect
+
+        from src.python.report import _report_generation
+
+        sig = inspect.signature(_report_generation._generate_full_html_report)
+        assert "prosperity_framework_data" in sig.parameters
+        body = inspect.getsource(_report_generation._generate_full_html_report)
+        assert "prosperity_framework_data=prosperity_framework_data" in body, "包装函数须把参数转发给 write_html_report"
+
+    def test_full_path_call_site_passes_contract(self):
+        """full 路径的包装调用点须从 pipeline_data 取契约传入。"""
+        import inspect
+
+        from src.python.report import _report_generation
+
+        src = inspect.getsource(_report_generation._generate_report_full)
+        assert 'prosperity_framework_data=(pipeline_data or {}).get("prosperity_framework_data")' in src
