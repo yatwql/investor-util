@@ -6,6 +6,17 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 新增：pi 模型采样配置（DeepSeek 编程档，`.pi/models.json`）（2026-09-16）
+
+**背景**：pi 支持 `samplingParams`（自由采样参数字典，逐字合并进请求体、覆盖 pi 自身字段），可用它固定 DeepSeek 的采样；但 pi CLI 只读 `~/.pi/agent/models.json`，项目级 `.pi/` 只支持 settings/扩展/技能/主题。
+
+**落地**：
+- 新增 `.pi/models.json`（版本受控的模型配置）：`deepseek-v4-flash` 与 `deepseek-v4-pro` 两个内置模型覆盖 `samplingParams.temperature = 0.0`（DeepSeek 官方参数建议：代码生成/数学解题 0.0；通用对话 1.3、创意写作 1.5）+ `maxTokens = 65536`（内置 384K 对编程偏大，收窄为单次响应设成本上限；思考与正文共享该预算）
+- 未改动 `thinkingLevelMap` / `compat` / `contextWindow` / `input`，`pi --list-models` 复核覆盖生效且无加载告警（`max-out` 显示 65.5K）
+- 生效方式：仓库文件为唯一事实来源，软链到全局路径（`ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json`）；`developer-guide.md` 新增「pi 模型采样配置（DeepSeek 编程档）」小节说明理由、验证与排查；`folders.md` 目录树同步
+
+**实测依据**：用项目 DeepSeek key 直连 OpenAI 兼容端点验证 `temperature`/`top_p` 被接受（HTTP 200，响应含 `reasoning_content`）；`pi --list-models` 确认覆盖生效。
+
 ### 新增：同花顺官方金融数据服务 provider（阶段 1）（2026-09-16）
 
 **背景**：现有链路多处依赖非官方爬虫源（穿透基金持仓走天天基金 HTML、财务指标走 akshare），行情只有腾讯/新浪两条非官方链路，市场情绪（涨跌停/连板/龙虎榜）完全空白。同花顺官方数据服务（<https://fuyao.aicubes.cn>）为官方源、**不限累计调用次数**、字段级契约明确。

@@ -1061,6 +1061,7 @@ investor-util/
 ├── requirements.txt                  # Python 依赖清单
 ├── .pi/                              # pi 编程助手项目配置（项目级设置，随仓库发布）
 │   └── settings.json                 #   项目级设置：changelog 折叠 / 静默启动 / fullscreen
+│   └── models.json                   #   pi 模型配置（DeepSeek 编程档：temperature 0.0 + maxTokens 收窄；需软链到 ~/.pi/agent/ 生效）
 ├── .editorconfig                     # 编辑器编码规则（*.ps1 强制 UTF-8 BOM+CRLF）
 └── .gitignore                        # Git 忽略规则
 ```
