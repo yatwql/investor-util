@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办 **plan-47 / plan-48 / plan-49**（源自 plan-46 真实持仓复核与降级矩阵的剩余项，非阻塞）、**plan-50**（财报取数第二数据源）、**plan-51**（同花顺官方金融数据接入：阶段 1 与阶段 3 已完成，阶段 2 / 4 / 5 在办；设计文档在 `docs-stm/plan/hithink-financial-data-design.md`，全部阶段完成后归档至 `docs-stm/archive/v0.11.x/hithink-data-source/`）；P1 区已完成 plan-42 / plan-43 / plan-44 / plan-45 / plan-46（plan-46 完成态与设计文档索引见归档）；仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-43）见 `archived_plan.0.10.x.md`，v0.11.x 已完成项（plan-44 / plan-45 / plan-46）见 `archived_plan.0.11.x.md`。
+**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办 **plan-47 / plan-48 / plan-49**（源自 plan-46 真实持仓复核与降级矩阵的剩余项，非阻塞）与 **plan-50**（财报取数第二数据源）；**plan-51**（同花顺官方金融数据接入，五阶段全部完成）已完成态与设计文档见归档 `docs-stm/archive/v0.11.x/hithink-data-source/`；P1 区已完成 plan-42 / plan-43 / plan-44 / plan-45 / plan-46（plan-46 完成态与设计文档索引见归档）；仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-43）见 `archived_plan.0.10.x.md`，v0.11.x 已完成项（plan-44 / plan-45 / plan-46）见 `archived_plan.0.11.x.md`。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -34,28 +34,6 @@
 **约束与红线**：① 新契约字段须进数据契约台账 + 附录 H + 双端一致性测试；② 属**推演**而非方法原话（框架原意是选股层面的 ROE 弹性）→ 渲染文案必须标「按框架推演」；③ 不得因该扩展影响既有章节输出（开关关闭时零变化）。
 
 **预估成本**：中高（穿透层扩展 + 新契约 + 报告耗时 +几秒）；**价值**中（②覆盖 21.9% → 60~80%）。
-
-#### 🟡 `plan-51` 同花顺官方金融数据接入（四域：财务指标 / 基金持仓 / 行情·日历·公司行动 / 情绪面）
-
-**动机**：现有链路多处依赖非官方爬虫源（穿透基金持仓走天天基金 HTML、财务指标走 akshare），长期有降级与漂移风险；行情缺第三条正交链路；市场情绪（涨跌停/连板/龙虎榜）完全空白。同花顺官方 API（<https://fuyao.aicubes.cn>）为官方源、不限累计调用次数、字段级契约明确。
-
-**覆盖边界（官方声明，不可误用）**：不含分钟 K/tick、**海外行情**、**宏观数据**、**新闻公告原文与研报** → **不能**替代 DataSinking 财报全文（区块② 缺口仍由 plan-50 承接）。
-
-**阶段与进度**：
-
-| 阶段 | 内容 | 状态 |
-|---|---|---|
-| 阶段 1 | provider 层：`providers/hithink.py`（凭据声明 / qps 限速器 / 信封与错误码 / 触发限流不重试 / 16 个域接口 / `to_thscode` 映射）+ 55 例单测 | ✅ **已实现并实测通过**：key 已配置，11 端点真实连通 10 通（指数成分股接口 429，阶段 4 复核）；默认 qps 按实测由 3 降为 2。实测字段结构见设计文档 §4.1 |
-| 阶段 2 | 财务指标域第三链路 | ✅ **已实现**：`analysis/financial_statement_derive.py`（三张合并报表纯派生为标准字段）+ `HithinkIndicatorAdapter`（链路第三槽）+ `fetch_hithink_indicator_series`（主源不可用时的**多期**回退，优于单期兜底）。**实测与主源完全对齐**：报告期（2026-06-30/03-31/2025-12-31/09-30）与营收/归母净利/毛利率/负债率/现金流/EPS 全一致，同比 0.033562 相同；差异仅 ROE（期末口径 6.47% vs 加权 6.55%）与 `bvps`（官方不给总股本 → 恒缺失）。PE/PB 口径修正（rf-386）待契约字段落地，见该项 |
-| 阶段 3 | 基金披露持仓两源链 | ✅ **已实现**：`_FUND_HOLD_PROVIDERS` = 天天基金（主，三跳阶梯）→ 同花顺官方披露持仓（备，需 key）；两侧形态经 `_normalize_hold_payload` 归一（同花顺只取 `asset_type=stock`、报告期取披露结束日、联接基金由 `fund` 型资产直返目标 ETF）；**不递增 `hold_schema`**（归一后形态不变、旧条目不被误读）；顺序可用 `preferred_provider.fund_hold` 调换。实测 `016055.OF`→`513390.SH`、`012325.OF` 全债券被过滤 |
-| 阶段 4 | 行情/日历/复权 | ✅ **已实现**：① 行情第三槽（`price_stock` = 腾讯 → 新浪 → 同花顺，新增 `HithinkQuoteAdapter`；实测 600900 价 28.44/昨收 28.46，**官方 `pe_ttm` 一并带入**）；② 历史日 K 第三槽（`history_stock` 同序 + `_HISTORY_PROVIDER_MAP` 注册，`fetch_kline` 前复权、支持 `start_from` 增量；**实测踩坑：上游历史 K 线日期字段是 `date_ms` 而非快照的 `timestamp`**）；③ 交易日历官方兜底（akshare 失败 → `calendar/trading-days`，实测 243 个交易日）。**收尾项**：复权因子事件流（`adjustment_factors`）尚无消费者——计划用于「分红流水漏记校验」（与成本流水的分红累计交叉核对），待阶段收尾接入，暂记 rf-389 |
-| 阶段 5 | 情绪面能力 | ✅ **已实现（形态收敛）**：龙虎榜 + 连板梯队 → 只保留**命中持仓/穿透标的代码**的事件行，渲染为**行动建议章内嵌块**（与景气度框架同一模式，开关 `market_sentiment` 默认关），未新开独立章——理由：一个表不值得新增章节+页签，且与既有「报告增强子模组内嵌章内区块」模式一致。零命中时仍给市场概览（避免价值型组合恒空、分不清「空」与「坏」）。**未做**：注入 LLM 信号预消化（可选增强，随信号预消化机制后续评估） |
-
-**前置条件已完成**：API key 已写入 `data/config/data_key.json` 的 `hithink` 节（文件由 `.gitignore` 忽略，不入库）。
-
-**约束与红线**：① provider 只取原始响应，字段归一交 `source_adapter`、缓存/熔断/降级交 `fetch_with_fallback`（不新造取数路径）；② 新数据域须登记 `DOMAIN_RECORDS` + 附录 H + 双端一致性测试；③ 新章节挂 Feature Flag 且默认关（关闭时输出逐字节一致）；④ 凭据值永不落日志/报告/缓存。
-
-**预估成本**：阶段 2 低、阶段 3 中、阶段 4 中、阶段 5 中高；**价值**：高（把三条爬虫主源换成/补上官方源，并新增情绪面能力）。
 
 #### 🔲 `plan-50` 财报取数第二数据源（巨潮 cninfo 备用链路）
 
@@ -95,7 +73,7 @@
 
 ## 归档
 
-- [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项（plan-44 / plan-45 / plan-46，含 plan-45 与 plan-46 设计文档索引）
+- [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项（plan-44 / plan-45 / plan-46 / plan-51，含各自设计文档索引）
 - [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项
 - [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项（含设计文档索引）
 - [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10（含设计文档索引 + 已完成项）
