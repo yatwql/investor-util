@@ -291,18 +291,7 @@ def to_thscode(code: str, *, is_fund: bool = False) -> str:
     return ""
 
 
-# ── A 股：财务报表与指标 ─────────────────────────────────────
-
-
-def fetch_financial_indicators(thscode: str, report: str) -> dict[str, Any] | None:
-    """单只 A 股指定报告期的五类财务指标（成长/盈利/偿债/营运/现金流）。
-
-    Args:
-        thscode: 如 ``600519.SH``
-        report: 报告期，格式 ``yyyy-1``（一季报）/ ``yyyy-2``（中报）/ ``yyyy-3``
-            （三季报）/ ``yyyy-4``（年报）
-    """
-    return _request("/api/a-share/financials/indicators", {"thscode": thscode, "report": report})
+# ── A 股：财务报表（三张合并报表；指标由报表派生，见 analysis/financial_statement_derive.py）──
 
 
 def _statement_params(thscode: str, period: str, limit: int, start: int | None, end: int | None) -> dict[str, Any]:
@@ -403,14 +392,6 @@ def fetch_adjustment_factors(
     )
 
 
-# ── 指数与板块 ──────────────────────────────────────────────
-
-
-def fetch_index_constituents(thscode: str) -> dict[str, Any] | None:
-    """同花顺指数 / 板块（含沪深 300 等标准指数）的成分股清单。"""
-    return _request("/api/a-share-index/constituents/ths-stock-list", {"thscode": thscode})
-
-
 # ── 情绪面（涨跌停 / 龙虎榜）────────────────────────────────
 
 
@@ -501,11 +482,6 @@ def fetch_fund_stock_history(thscode: str, report_type: str, end_date: str) -> d
     )
 
 
-def fetch_fund_nav(thscode: str, range_: str | None = None, nav_type: str = "unit,adj") -> dict[str, Any] | None:
-    """基金净值序列（``range_``：``week``/``month``/``tmonth``/``hyear``/``year``/``twoyear``/``tyear``/``fyear``）。"""
-    return _request("/api/fund/performance/nav", {"thscode": thscode, "range": range_, "nav_type": nav_type})
-
-
 __all__ = [
     "DEFAULT_KEY_FILE",
     "DEFAULT_QPS",
@@ -515,16 +491,13 @@ __all__ = [
     "fetch_balance_sheets",
     "fetch_cash_flow_statements",
     "fetch_dragon_tiger_list",
-    "fetch_financial_indicators",
     "fetch_fund_holdings",
     "fetch_kline",
     "fetch_price",
-    "fetch_fund_nav",
     "fetch_fund_portfolio_holdings",
     "fetch_fund_stock_history",
     "fund_thscode_candidates",
     "fetch_income_statements",
-    "fetch_index_constituents",
     "fetch_limit_up_ladder",
     "fetch_price_history",
     "fetch_price_snapshot",

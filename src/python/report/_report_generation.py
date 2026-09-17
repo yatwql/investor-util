@@ -18,6 +18,7 @@ from src.python.report._experimental_seams import (
     record_llm_decisions_and_review_block,
 )
 from src.python.report.progress import ProgressReporter
+from src.python.report._report_output import _generate_full_excel_report  # noqa: F401
 
 # ── 子模块 re-export ────────────────────────────────────
 from src.python.report._chart_dataset_factory import _build_chart_datasets_for_report  # noqa: F401
@@ -167,80 +168,6 @@ def _generate_full_html_report(
         reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("HTML 报告写入失败")
         result.errors.append("HTML 报告生成失败")
-        return False
-
-
-# ── _generate_full_excel_report ────────────────────────
-
-
-def _generate_full_excel_report(
-    holdings: list,
-    prep: dict,
-    output_dir: str | None,
-    news_ok: bool,
-    llm_content: tuple,
-    news_data: list,
-    news_llm_meta: dict,
-    sec_order: list,
-    pipeline_data: dict | None,
-    history_data: dict | None,
-    reporter: ProgressReporter,
-    enable_fund_deep_analysis: bool,
-    enable_news: bool,
-    enable_history: bool,
-    enable_llm: bool,
-    debate_info: dict | None,
-    result,
-    enable_portfolio_evolution: bool = True,
-    enable_action: bool = False,
-    enable_data_quality: bool = False,
-    enable_cost_lots: bool = False,
-    transactions: list | None = None,
-    dividends: list | None = None,
-    enable_fundamental_snapshot: bool = False,
-) -> bool:
-    """full 路径的 Excel 报告生成，返回是否成功。"""
-    from src.python.report.excel_generator import generate_excel_report
-
-    reporter.info("正在生成 Excel 报告...")
-    try:
-        generate_excel_report(
-            holdings,
-            include_news=news_ok,
-            output_dir=output_dir or prep["output_dir"],
-            news_top_count=prep["news_top_count"],
-            include_llm=enable_llm,
-            llm_content=llm_content,
-            details=prep["details"],
-            a_indices=prep["a_indices"],
-            us_indices=prep["us_indices"],
-            news_data=news_data,
-            news_llm_meta=news_llm_meta,
-            section_order=sec_order,
-            progress=reporter,
-            pipeline_data=pipeline_data,
-            history_data=history_data,
-            enable_fund_deep_analysis=enable_fund_deep_analysis,
-            enable_news=enable_news,
-            enable_history=enable_history,
-            enable_portfolio_evolution=enable_portfolio_evolution,
-            enable_action=enable_action,
-            enable_llm=enable_llm,
-            debate_info=debate_info,
-            enable_data_quality=enable_data_quality,
-            enable_cost_lots=enable_cost_lots,
-            transactions=transactions,
-            dividends=dividends,
-            enable_fundamental_snapshot=enable_fundamental_snapshot,
-            financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
-            financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
-        )
-        reporter.ok("Excel 报告已生成")
-        return True
-    except Exception:
-        reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
-        logger.exception("Excel 报告生成失败")
-        result.errors.append("Excel 报告生成失败")
         return False
 
 
@@ -442,13 +369,6 @@ def _generate_report_both(
         _pf_data = None
     if _pf_data is not None and pipeline_data is not None:
         pipeline_data["prosperity_framework_data"] = _pf_data
-
-    # 市场情绪与持仓热点（报告增强开关 market_sentiment）：开关关闭返回 None（零行为变化）
-    from src.python.report._report_aux_metrics import compute_market_sentiment_data
-
-    _ms_data = compute_market_sentiment_data(holdings, None, config, reporter)
-    if _ms_data is not None and pipeline_data is not None:
-        pipeline_data["market_sentiment_data"] = _ms_data
 
     # 市场情绪与持仓热点（报告增强开关 market_sentiment）：开关关闭返回 None（零行为变化）
     from src.python.report._report_aux_metrics import compute_market_sentiment_data

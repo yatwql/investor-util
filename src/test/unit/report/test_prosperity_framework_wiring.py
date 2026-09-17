@@ -309,10 +309,14 @@ class TestHtmlCallSiteSeam:
     def _source(self) -> str:
         from pathlib import Path
 
-        return Path("src/python/report/_report_generation.py").read_text(encoding="utf-8")
+        # 输出包装层已从编排模块拆出，两文件都要扫——否则守卫只盯旧文件、漏掉真正的调用点
+        return "\n".join(
+            Path(f).read_text(encoding="utf-8")
+            for f in ("src/python/report/_report_generation.py", "src/python/report/_report_output.py")
+        )
 
     def test_every_write_html_report_call_passes_contract(self):
-        """`_report_generation.py` 中每处 write_html_report(...) 调用都须带该参数。"""
+        """报告输出模块中每处 write_html_report(...) 调用都须带该参数。"""
         import re
 
         src = self._source()

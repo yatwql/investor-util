@@ -393,13 +393,6 @@ class TestEndpointParams:
         client = _prepare(monkeypatch, _FakeResp(payload={"code": 0, "data": {"item": []}}))
         return client
 
-    def test_financial_indicators(self, monkeypatch):
-        client = self._capture(monkeypatch)
-        ht.fetch_financial_indicators("600519.SH", "2025-4")
-        call = client.calls[0]
-        assert call["url"].endswith("/api/a-share/financials/indicators")
-        assert call["params"] == {"thscode": "600519.SH", "report": "2025-4"}
-
     def test_income_statements_limit_mode(self, monkeypatch):
         client = self._capture(monkeypatch)
         ht.fetch_income_statements("600519.SH", period="quarterly", limit=8)
@@ -453,11 +446,6 @@ class TestEndpointParams:
         ht.fetch_adjustment_factors("000001.SZ", "2021-01-01", "2026-01-01")
         assert client.calls[1]["params"]["from"] == "2021-01-01"
 
-    def test_index_constituents(self, monkeypatch):
-        client = self._capture(monkeypatch)
-        ht.fetch_index_constituents("000300.SH")
-        assert client.calls[0]["url"].endswith("/api/a-share-index/constituents/ths-stock-list")
-
     def test_special_data_sentiment(self, monkeypatch):
         client = self._capture(monkeypatch)
         ht.fetch_limit_up_ladder()
@@ -472,8 +460,7 @@ class TestEndpointParams:
         assert client.calls[0]["params"] == {"thscode": "025480.OF"}
         ht.fetch_fund_stock_history("011506.OF", "annual", "2025-12-31")
         assert client.calls[1]["url"].endswith("/api/fund/portfolio/stock-history")
-        ht.fetch_fund_nav("011506.OF", range_="year", nav_type="unit")
-        assert client.calls[2]["params"] == {"thscode": "011506.OF", "range": "year", "nav_type": "unit"}
+        # 基金净值端点（fetch_fund_nav）已按「无消费者即死代码」删除
 
 
 class TestCredentialSpec:

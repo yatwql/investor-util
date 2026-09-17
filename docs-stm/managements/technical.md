@@ -2848,7 +2848,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **数据流（市场情绪与持仓热点）**：`providers/hithink.py`（官方龙虎榜 + 连板梯队）→ `analysis/market_sentiment.py::build_market_sentiment`（纯装配：只保留命中持仓/穿透标的**代码**的事件行，金额换算亿元）→ `report/_report_aux_metrics.py::compute_market_sentiment_data`（开关门禁 + 异常兜底；取数缓存 1h）→ `pipeline_data["market_sentiment_data"]`（both/full 由 `_report_generation` 注入；basic 由 `excel_generator` 就地兜底）→ 行动建议章内嵌块（HTML `partials/action_section.html` ⑦ / Excel `report/action_sheet.py::_write_market_sentiment_block`）。
 
-**数据流**：`analysis/prosperity_framework.py::build_prosperity_framework_data`（纯计算，市价读取经 `finite_or` 归一）→ `report/_report_aux_metrics.py::compute_prosperity_framework_data`（组装：穿透优先取 `prep.penetrated_assets`、缺失按需计算；流动性/快照取数失败降级为该维未验证；开关关闭返回 None）→ `pipeline_data["prosperity_framework_data"]`（both/full 由 `_report_generation` 注入；basic 由 `excel_generator` 就地兜底）→ 行动建议章内嵌块（HTML `partials/action_section.html` ⑥ / Excel `report/action_sheet.py::_write_prosperity_block`）。
+**数据流**：`analysis/prosperity_framework.py::build_prosperity_framework_data`（装配入口；打分内核在 `analysis/prosperity_scoring.py`，市价读取经 `finite_or` 归一）→ `report/_report_aux_metrics.py::compute_prosperity_framework_data`（组装：穿透优先取 `prep.penetrated_assets`、缺失按需计算；流动性/快照取数失败降级为该维未验证；开关关闭返回 None）→ `pipeline_data["prosperity_framework_data"]`（both/full 由 `_report_generation` 注入；basic 由 `excel_generator` 就地兜底）→ 行动建议章内嵌块（HTML `partials/action_section.html` ⑥ / Excel `report/action_sheet.py::_write_prosperity_block`）。
 
 **配置**：顶层键 `prosperity_framework`（`boom_keywords` / `global_edge_keywords` / `defensive_keywords` / `concentration_target_pct`，手动编辑）。
 
