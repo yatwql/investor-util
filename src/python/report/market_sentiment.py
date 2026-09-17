@@ -50,9 +50,13 @@ def build_market_sentiment_data(
     dragon_tiger = _fetch_cached(_LHB_CACHE_KEY, lambda: hithink.fetch_dragon_tiger_list("all"))
     ladder = _fetch_cached(_LADDER_CACHE_KEY, hithink.fetch_limit_up_ladder)
     if dragon_tiger or ladder:
-        from src.python.report.data_status import mark_data_used
+        from src.python.report.data_status import mark_data_used, mark_provider_used
 
         mark_data_used("sentiment")
+        # provider 级归属：本链路的唯一源就是同花顺（逐端点计数，两个端点均命中即 ×2）
+        for _payload in (dragon_tiger, ladder):
+            if _payload:
+                mark_provider_used("sentiment", hithink.SOURCE_ID, hithink.DISPLAY_NAME)
 
     contract = build_market_sentiment(dragon_tiger, ladder, tracked_targets(holdings, penetrated_assets))
     logger.info(

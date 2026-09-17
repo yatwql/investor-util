@@ -167,6 +167,25 @@ class TestWriteDataQualitySheet(unittest.TestCase):
         self.assertIn("行情数据", joined)
         self.assertIn("降级", joined)
 
+    def test_source_health_renders_provider_hits(self):
+        """源健康区块含「命中源」列并渲染 provider 归属文本（同花顺等兜底源可见）。"""
+        row = {**_matrix_row("行情数据"), "providers_text": "同花顺金融数据 ×2"}
+        write_data_quality_sheet(self.ws, [row], None)
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 7)
+        ]
+        joined = "|".join(cells)
+        self.assertIn("命中源", joined)
+        self.assertIn("同花顺金融数据 ×2", joined)
+
+    def test_source_health_tolerates_missing_provider_field(self):
+        """矩阵行缺 providers_text（旧契约行）时写占位而非报错。"""
+        write_data_quality_sheet(self.ws, [_matrix_row("行情数据")], None)
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 7)
+        ]
+        self.assertIn("—", "|".join(cells))
+
     def test_position_coverage_block_renders(self):
         """品种覆盖区块列出品种状态行。"""
         write_data_quality_sheet(
@@ -286,3 +305,21 @@ class TestSourceMatrixDefaultStyle(unittest.TestCase):
         self.assertIn("降级", joined)
         # 开关关闭时不含「品种覆盖」区块
         self.assertNotIn("品种覆盖", joined)
+
+    def test_default_style_renders_provider_hits(self):
+        """开关关闭时旧样式页签同样渲染「命中源」列。"""
+        from src.python.report.excel_generator import _write_data_source_matrix_sheet
+        from src.python.report.progress import SilentProgressReporter
+
+        row = {**_matrix_row("行情数据"), "providers_text": "腾讯财经 ×3"}
+        with patch(
+            "src.python.report.data_source_matrix.build_data_source_matrix",
+            return_value=[row],
+        ):
+            _write_data_source_matrix_sheet(self.ws, SilentProgressReporter())
+        cells = [
+            str(self.ws.cell(row=r, column=c).value or "") for r in range(1, self.ws.max_row + 1) for c in range(1, 7)
+        ]
+        joined = "|".join(cells)
+        self.assertIn("命中源", joined)
+        self.assertIn("腾讯财经 ×3", joined)

@@ -738,7 +738,7 @@
 | `candidate_compare` | `false` | 「基金业绩分析」章渲染候选基金横向比较子表（候选来自 `comparison_candidates`） |
 | `cost_lots` | `false` | 汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计（需持仓 Excel 含交易/分红流水） |
 | `valuation_percentile` | `false` | 「资产穿透TOP10」章渲染估值分位列（真实历史 PE/PB 分位，无覆盖回落价格分位代理） |
-| `market_sentiment` | `false` | 行动建议章内嵌块「市场情绪与持仓热点」：持仓/穿透标的命中当日龙虎榜或连板梯队的事件行（需同花顺 key） |
+| `market_sentiment` | `false` | 行动建议章内嵌块「市场情绪与持仓热点」：持仓/穿透标的命中当日龙虎榜或连板梯队的事件行（需同花顺 key；**只显示命中项——无命中时该区块不渲染**，须先确认是否已取到数据：可用性矩阵的「市场情绪」行与「命中源（本次取数）」列、`logs/app.log` 的 `[market_sentiment] 命中 N 条`，`N=0` 表示已取到但当日无事件行） |
 | `financial_report_digest` | `false` | 持仓基本面章区块②：A 股标的财报章节摘要（需 DataSinking key） |
 | `financial_indicator` | `false` | 持仓基本面章区块①：持仓 A 股基本面（指标/质量档/趋势/当前 PE·PB；需数据底座就绪） |
 

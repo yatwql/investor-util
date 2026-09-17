@@ -289,8 +289,9 @@ def fetch_with_fallback(
             data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform
         )
         if result is not None and result is not TRANSPORT_FAILURE:
-            # 成功 → 恢复熔断计数器
+            # 成功 → 恢复熔断计数器 + 登记 provider 级归属（矩阵「命中源」列的数据来源）
             reg.record_success(provider_name)
+            _mark_provider_used(data_type, provider_name, source_label)
             cache_set(cache_key, result)
             return result
 
@@ -367,6 +368,7 @@ def _try_providers(
                     diagnostics.add(provider_name, "返回空")
                 continue
             registry.record_success(provider_name)
+            _mark_provider_used(chain_name, provider_name, _history_provider_label(provider_name))
             return data
         except Exception as e:
             reason = _brief_reason(f"{type(e).__name__}: {e}")
@@ -455,6 +457,44 @@ _HISTORY_PROVIDER_MAP: dict[str, str] = {
     "eastmoney": "src.python.providers.eastmoney",
     "hithink": "src.python.providers.hithink",
 }
+
+#: 历史链路 provider 展示名——模块未声明 ``DISPLAY_NAME`` 者在此补齐（声明了的以模块为准）
+_HISTORY_PROVIDER_LABELS: dict[str, str] = {
+    "tencent": "腾讯财经",
+    "sina": "新浪财经",
+    "tiantian": "天天基金",
+    "eastmoney": "东方财富",
+}
+
+
+def _mark_provider_used(data_type: str, provider_name: str, display_name: str) -> None:
+    """登记「本次该数据类别由此 provider 服务」（矩阵「命中源」列的归属来源）。
+
+    延迟导入 ``report.data_status``：链路层不依赖报告层观测设施（避免模块级循环），
+    观测失败也不得影响取数。
+    """
+    try:
+        from src.python.report.data_status import mark_provider_used
+
+        mark_provider_used(data_type, provider_name, display_name)
+    except Exception:  # 观测失败不影响主链路
+        logger.debug("[chain] provider 归属登记失败（非关键）: %s/%s", data_type, provider_name, exc_info=True)
+
+
+def _history_provider_label(provider_name: str) -> str:
+    """历史链路 provider → 展示名（模块 ``DISPLAY_NAME`` 优先；其次本表；末位回退标识）。"""
+    module_path = _HISTORY_PROVIDER_MAP.get(provider_name)
+    if module_path:
+        try:
+            import importlib
+
+            declared = getattr(importlib.import_module(module_path), "DISPLAY_NAME", "")
+            if declared:
+                return str(declared)
+        except Exception:  # 展示名解析失败不影响取数
+            logger.debug("[history] provider 展示名解析失败: %s", provider_name, exc_info=True)
+    return _HISTORY_PROVIDER_LABELS.get(provider_name, provider_name)
+
 
 # 新旧 K 线之间缺失的交易日数超过此值 → 判定数据跳空（部分历史不可达）
 _MAX_GAP_TRADING_DAYS: int = 5

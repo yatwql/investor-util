@@ -170,6 +170,58 @@ def mark_data_used(source_key: str, tier: str = "T2") -> None:
         logger.debug("[data_status] 取用标记失败（非关键）: %s", source_key, exc_info=True)
 
 
+# ── provider 级归属（矩阵「命中源」列）──────────
+# 与类别级取用标记正交：类别级答「这类数据本次取到了吗」（说明表「本次使用」列），
+# provider 级答「本次是哪个源服务的」（矩阵「命中源」列）。链路在某个 provider 成功
+# 返回时登记，故只反映**本次网络取数**的归属——命中缓存时无 provider 参与，
+# 该类别「命中源」留空而类别级「已使用」仍为真。
+#
+# 存放于本模块的登记表而非 DegradationTracker：归属是纯观测事实，既不该参与降级计数，
+# 也不该在 ``.degradation_state.json`` 里堆积 provider 键。
+
+_provider_usage: dict[str, dict[str, dict[str, Any]]] = {}
+_provider_usage_lock = threading.Lock()
+
+
+def mark_provider_used(data_type: str, provider_id: str, display_name: str = "") -> None:
+    """登记「本次运行该数据类别由哪个 provider 实际服务」（provider 级归属）。
+
+    Args:
+        data_type: 链路数据类型（如 ``"price_stock"``、``"financial_indicator"``）；
+            ``report.data_source_matrix`` 按其 ``data_types`` 声明映射到数据类别
+        provider_id: provider 标识（如 ``"tencent"``、``"hithink"``）
+        display_name: provider 展示名（如 ``"同花顺金融数据"``）；缺省时回退 provider_id
+
+    自身不抛异常（观测性副作用不得影响取数）。
+    """
+    try:
+        if not data_type or not provider_id:
+            return
+        with _provider_usage_lock:
+            bucket = _provider_usage.setdefault(data_type, {})
+            entry = bucket.setdefault(provider_id, {"count": 0, "label": display_name or provider_id})
+            entry["count"] = int(entry["count"]) + 1
+            if display_name:
+                entry["label"] = display_name
+    except Exception:  # 观测失败不影响主链路
+        logger.debug("[data_status] provider 归属登记失败（非关键）: %s/%s", data_type, provider_id, exc_info=True)
+
+
+def get_provider_usage() -> dict[str, dict[str, dict[str, Any]]]:
+    """provider 归属登记表快照：``{data_type: {provider_id: {count, label}}}``。"""
+    with _provider_usage_lock:
+        return {
+            data_type: {pid: dict(entry) for pid, entry in bucket.items()}
+            for data_type, bucket in _provider_usage.items()
+        }
+
+
+def reset_provider_usage() -> None:
+    """清空 provider 归属登记表（测试隔离用；生产代码不得调用）。"""
+    with _provider_usage_lock:
+        _provider_usage.clear()
+
+
 def reset_tracker() -> None:
     """重置 DegradationTracker 单例（测试用）。
 

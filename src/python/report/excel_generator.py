@@ -61,7 +61,7 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
     """
     prog.info("正在写入数据源可用性矩阵...")
     try:
-        from src.python.report.data_source_matrix import build_data_source_matrix
+        from src.python.report.data_source_matrix import MATRIX_HEADERS, build_data_source_matrix
         from src.python.report.excel_writer import (
             auto_width,
             write_data_row,
@@ -76,13 +76,13 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
 
         matrix = build_data_source_matrix()
         if matrix:
-            ncols = 5
+            ncols = len(MATRIX_HEADERS)
             # 标题取自页签显示名注册表（与页签名同源），不硬编码字面量
             row = write_title_row(ws, 1, get_report_sheet_name("data_source_status"), ncols)
             row = write_header_row(
                 ws,
                 row,
-                ["数据源", "状态", "详情", "成功", "失败/降级"],
+                list(MATRIX_HEADERS),
             )
             for m in matrix:
                 if m["status"] == "ok":
@@ -97,10 +97,17 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
                 row = write_data_row(
                     ws,
                     row,
-                    [m["name"], status_label, m["detail"], m["ok"], f"{m['degraded']}/{m['failed']}"],
+                    [
+                        m["name"],
+                        status_label,
+                        m.get("providers_text", "—"),
+                        m["detail"],
+                        m["ok"],
+                        f"{m['degraded']}/{m['failed']}",
+                    ],
                 )
                 if m["status"] != "ok":
-                    for col in range(1, 6):
+                    for col in range(1, ncols + 1):
                         ws.cell(row=row - 1, column=col).font = _font
 
             has_degraded = any(m["degraded_list"] for m in matrix)
@@ -109,7 +116,7 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
                 row = write_title_row(ws, row, "降级明细", ncols)
                 for m in matrix:
                     for dg in m.get("degraded_list", []):
-                        row = write_data_row(ws, row, [m["name"], dg, "", "", ""])
+                        row = write_data_row(ws, row, [m["name"], dg, "", "", "", ""])
 
             has_failures = any(m["sample_failures"] for m in matrix)
             if has_failures:
@@ -117,7 +124,7 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
                 row = write_title_row(ws, row, "失败明细", ncols)
                 for m in matrix:
                     for sf in m.get("sample_failures", []):
-                        row = write_data_row(ws, row, [m["name"], sf, "", "", ""])
+                        row = write_data_row(ws, row, [m["name"], sf, "", "", "", ""])
             # 数据源说明表（实际使用清单：用途 / 计费 / 凭据要求）
             from src.python.report.data_quality_sheet import write_source_catalog_block
 

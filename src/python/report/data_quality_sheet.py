@@ -79,7 +79,7 @@ def write_data_quality_sheet(
     """
     ncols = 5
     row = write_title_row(ws, 1, "数据质量仪表盘", ncols)
-    row = _write_source_health_block(ws, row, matrix, ncols)
+    row = _write_source_health_block(ws, row, matrix)
     row = write_source_catalog_block(ws, row)
     row = _write_coverage_block(ws, row, position_status, ncols)
     row = _write_freshness_block(ws, row, data_freshness, ncols)
@@ -88,14 +88,20 @@ def write_data_quality_sheet(
     return row
 
 
-def _write_source_health_block(ws, row: int, matrix: list[dict], ncols: int) -> int:
-    """写入区块 A：源健康（数据源可用性矩阵，现状保留）。
+def _write_source_health_block(ws, row: int, matrix: list[dict]) -> int:
+    """写入区块 A：源健康（数据源可用性矩阵，现状保留 + 「命中源」列）。
+
+    列宽取 :data:`data_source_matrix.MATRIX_HEADERS`（矩阵行的展示契约），
+    与其它区块（5 列）不同宽——区块内部标题按本区块列数合并。
 
     Returns:
         区块结束行号
     """
+    from src.python.report.data_source_matrix import MATRIX_HEADERS
+
+    ncols = len(MATRIX_HEADERS)
     row = write_title_row(ws, row, "源健康（数据源可用性）", ncols)
-    row = write_header_row(ws, row, ["数据源", "状态", "详情", "成功", "失败/降级"])
+    row = write_header_row(ws, row, list(MATRIX_HEADERS))
     for m in matrix:
         if m["status"] == "ok":
             status_label = "✅ 正常"
@@ -109,10 +115,17 @@ def _write_source_health_block(ws, row: int, matrix: list[dict], ncols: int) -> 
         row = write_data_row(
             ws,
             row,
-            [m["name"], status_label, m["detail"], m["ok"], f"{m['degraded']}/{m['failed']}"],
+            [
+                m["name"],
+                status_label,
+                m.get("providers_text", "—"),
+                m["detail"],
+                m["ok"],
+                f"{m['degraded']}/{m['failed']}",
+            ],
         )
         if m["status"] != "ok":
-            for col in range(1, 6):
+            for col in range(1, ncols + 1):
                 ws.cell(row=row - 1, column=col).font = _font
 
     _degraded_list = [dg for m in matrix for dg in m.get("degraded_list", [])]
@@ -121,7 +134,7 @@ def _write_source_health_block(ws, row: int, matrix: list[dict], ncols: int) -> 
         row = write_title_row(ws, row, "降级明细", ncols)
         for m in matrix:
             for dg in m.get("degraded_list", []):
-                row = write_data_row(ws, row, [m["name"], dg, "", "", ""])
+                row = write_data_row(ws, row, [m["name"], dg, "", "", "", ""])
 
     _failures = [sf for m in matrix for sf in m.get("sample_failures", [])]
     if _failures:
@@ -129,7 +142,7 @@ def _write_source_health_block(ws, row: int, matrix: list[dict], ncols: int) -> 
         row = write_title_row(ws, row, "失败明细", ncols)
         for m in matrix:
             for sf in m.get("sample_failures", []):
-                row = write_data_row(ws, row, [m["name"], sf, "", "", ""])
+                row = write_data_row(ws, row, [m["name"], sf, "", "", "", ""])
     return row
 
 

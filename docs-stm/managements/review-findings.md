@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.1-dev
-> **编号源**：`rf-next = 394`（新增问题取此编号，完成后更新为 +1；已用最大 rf-393，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 396`（新增问题取此编号，完成后更新为 +1；已用最大 rf-395，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -68,6 +68,8 @@
 | **rf-385** | **读错契约键名 → 「标的来源」列只剩「穿透」二字**：穿透 top10 契约由 `_build_penetration_result` 归一，来源键是 **`sources`**（合并层的 `funds` 已被改名为 `sources`），而 `_penetrated_targets` 只读 `funds` → 来源基金标签全丢，报告里只能显示「穿透」（用户 20:58 报告实测）；同时用户那次运行的工行摘要为 `--- stock_code: ...`（文档头），源于当时「目录行判定」窗口过宽把所有关键词命中都跳过 → 退回正文开头 | `_penetrated_targets` 改读 `sources` 并保留 `funds` 兼容（合并层原始形态）；回归用例 2 例（top10 形态带出基金名 / merged 形态兼容）；「目录行判定」改为**行内**判定（`_is_toc_line` 只看关键词到行尾这一行内的点线/省略号，正文段落里的「…」不误伤），工行摘要恢复为「董事会报告/主要业务…」正文段 |
 | **rf-387** | **technical.md 引用了已改名的函数**：阶段 3 把 `fetcher/fund.py::_stamp_hold_schema` 升级为 `_normalize_hold_payload`（跨源归一 + 盖语义版本），但技术设计文档 §4.x「持仓缓存载荷语义版本」段仍写旧名——文档与实现脱钩（本次全量文档审计发现，属机械核对类漂移） | 文档改为 `_normalize_hold_payload` 并补「归一 + 盖版本」语义；同段新增「两源链与载荷归一」说明（同花顺形态映射规则 + 为何不递增 `hold_schema`）；语义命名表新增 `hithink` / `fund_thscode_candidates` / `_normalize_hold_payload` 三行 |
 | **rf-388** | **用户手册 7 处目录链接锚点失效**：`reports-instruction.md`「页面/章节分组」的 7 个标题写作 `### ① 基础核心（type=always）`（带圈数字 + 全角括号），而目录链接写作 `#基础核心typealways`——带圈数字的 GitHub 锚点归属不确定，链接可能整体失效（本次审计发现，属用户可感知的导航缺陷） | 7 个标题各补显式 HTML 锚点 `<a id="…"></a>`（与目录链接逐一对应），保留原有带圈编号与目录文本；无需改动目录即可确定性可用 |
+| **rf-394** | **报告无法回答「本次数据由哪个源服务」→ 用户据失真信息排查**：已配置的同花顺 key 在报告中一字未提，使用者误以为 key 未生效。三因叠加：矩阵只按数据类别聚合（tracker 事件键只含代码、不含 provider）、说明表链路文案硬编码未随同花顺接入同步（`datasource.md` 已登记）、市场情绪（同花顺唯一源）的标记键 `sentiment` 不匹配任何类别前缀而落入「其他数据源」桶 | 链路成功分支登记 provider 级归属（`mark_provider_used`，不进降级计数器与降级状态文件），矩阵新增「命中源」列（HTML + Excel 两处）与 `history`/`sentiment` 类别及 `data_types` 映射（全覆盖由不变式用例强制），说明表补齐同花顺兜底槽位与市场情绪行（含 key 就绪态）；回归用例 15 例。**排查结论已回用户**：key 在用，同花顺兜底槽位需前序源失败才轮到（龙虎榜/连板天梯为唯一源类别） |
+| **rf-395** | **测试写用户状态文件（后台线程越过用例级隔离）**：验证隔离时发现 `src/test/unit/report/` 全量运行后 `.venv/bin/python -m pytest` 会改写真实的 `data/state/.degradation_state.json`（实测 3/6 次，基线 0/3 次）。堆栈定位：`fetcher/industry.py` 经 `BatchDispatcher` 派发的**后台线程活过用例 teardown**，此时路径 monkeypatch 已还原，线程内 `get_tracker()` 新建实例落到真实路径并 `_persist_state()` 写盘（本次因代码/健康检查键已存在而内容恰好不变，换一批代码即会写入测试数据）——违反 CLAUDE.md「运行测试不得修改用户数据」 | `conftest.py` 新增会话级兜底隔离 `_install_session_state_fallback_isolation`（在 `pytest_configure` 调用）：把 `data_status._default_persist_path` 替换为会话级临时目录，用例内仍被 `tmp_path` 覆盖、teardown 后回落到兜底值；`testplan.md` §5.8 补「后台线程兜底隔离」条。验证：同一全量运行 3/3 次不再触碰真实状态文件，1960 用例全通。**遗留**：其余 `data/state/*` 写入方（perf/health/silence 等）同样面临「后台线程越过用例级补丁」的类问题，尚未逐项验证（现有 mtime 观测无泄漏；彻底治本需把状态目录改为可注入的单一来源） |
 ---
 ### 已解决待归档（v0.10.20-dev）
 

@@ -2823,7 +2823,9 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **缓存**：报告元数据两周（`report_datasink_index_`）、章节正文一月（`report_datasink_doc_`），随菜单缓存命令与 TTL 管理。**数据契约** `financial_report_digest_data`（附录 H）；语义命名行见 §6.7。
 
-**数据源说明表**：「数据源可用性矩阵」章在健康度表后附「数据源说明（实际使用清单）」表——逐数据类别列实际链路、用途、计费（财报全文随 `datasink.plan` 动态展示免费/付费档）与凭据要求（是否需 key + 就绪状态），并标本次运行是否实际使用（`report/data_source_matrix.py::build_data_source_catalog`，前缀取自 `_SOURCE_CATEGORIES`、计费取自 provider 套餐表，单一事实来源）。**「本次使用」判定口径**：该类别的取数链路在**取得数据时**（含命中缓存的返回）经 `report/data_status.py::mark_data_used()` 记一条成功事件，说明表据事件前缀判定 `used`；**只记成功、不记降级**——章节名 fuzzy 未命中、标的不在源覆盖范围等预期内空结果不计入 T2 连续失败阈值（否则会把预期内空结果误报为源故障），失败与降级仍由 provider 日志、章节失败清单与链路 FailureDiagnostics 披露。因此 `未使用` 的含义是「本次未取到该类数据」，**不等于**源故障；对 DataSinking 类源另注明「需开启哪些功能开关才会取用」。类别清单含 `financial_report`（`report_datasink_`）与 `financial_indicator`（`fin_indicator_`），两者同时进入可用性矩阵与说明表。
+**数据源说明表**：「数据源可用性矩阵」章在健康度表后附「数据源说明（实际使用清单）」表——逐数据类别列实际链路、用途、计费（财报全文随 `datasink.plan` 动态展示免费/付费档）与凭据要求（是否需 key + 就绪状态），并标本次运行是否实际使用（`report/data_source_matrix.py::build_data_source_catalog`，前缀取自 `_SOURCE_CATEGORIES`、计费取自 provider 套餐表，单一事实来源）。**「本次使用」判定口径**：该类别的取数链路在**取得数据时**（含命中缓存的返回）经 `report/data_status.py::mark_data_used()` 记一条成功事件，说明表据事件前缀判定 `used`；**只记成功、不记降级**——章节名 fuzzy 未命中、标的不在源覆盖范围等预期内空结果不计入 T2 连续失败阈值（否则会把预期内空结果误报为源故障），失败与降级仍由 provider 日志、章节失败清单与链路 FailureDiagnostics 披露。因此 `未使用` 的含义是「本次未取到该类数据」，**不等于**源故障；对 DataSinking 类源另注明「需开启哪些功能开关才会取用」。类别清单含 `financial_report`（`report_datasink_`）与 `financial_indicator`（`fin_indicator_`），两者同时进入可用性矩阵与说明表；含同花顺兜底槽位的类别（`price` / `fund_hold` / `history` / `financial_indicator`）在「实际数据源（链路）」列显式列出「→ 同花顺金融数据（…，需 key）」，市场情绪（`sentiment`，同花顺**唯一源**）单列一行并附 key 就绪态。
+
+**矩阵「命中源」列（provider 级归属）**：矩阵行除了类别健康度，还叠加一层 provider 级归属，回答使用者最常问的「我配的 key 到底被用上了吗」——类别健康度事件（`price_price_stock_600900` 这类键）只含代码不含 provider，**同花顺作为兜底槽接管时旧口径在报告里一字未提**，导致使用者误以为 key 未生效。修复：链路在某个 provider 成功返回时经 `report/data_status.py::mark_provider_used(data_type, provider_id, 展示名)` 登记（`fetcher/chain.py` 的 `fetch_with_fallback` 与 `_try_providers` 两处成功分支 + 同花顺独占的 `report/market_sentiment.py`、`fetcher/financial_indicator.py` 多期序列支路），矩阵按 `_SOURCE_CATEGORIES` 各行的 `data_types` 声明映射归入对应行并渲染为 `名称 ×次数`（按次数降序；无归属显示 `—`）。登记表存放于 `data_status.py` 模块级字典而非 DegradationTracker——归属是纯观测事实，既不参与降级计数，也不在 `.degradation_state.json` 里堆积 provider 键；归属只反映**本次网络取数**，命中缓存时该列为 `—` 而说明表「本次使用」仍为已使用（两列并读即得「用了谁的数」与「有没有取到」）。历史日 K 等类别只登记缓存键、不记降级事件，其矩阵行由 provider 归属单独成立（详情写「取数 N 次（无降级事件）」）。链路的 data_type 必须全部有归属类别，否则命中源静默丢失——`UNMAPPED_CHAIN_DATA_TYPES` 登记有意不进矩阵者（如 `bond_yield`），由 `test_data_source_matrix.py` 的不变式用例强制。附带修复：矩阵类别补齐 `history`（历史走势）与 `sentiment`（市场情绪），与 `datasource.md` 已登记的类别口径一致。
 
 [↑ 回到顶部](#目录)
 
@@ -3313,6 +3315,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `datasource_credential_ready` | 数据源凭据就绪指引（声明 → 就绪判定 → 可读指引） | 数据源可用性矩阵 | 监控 | 开关 `datasource_credential_ready`（默认开，非实验项） |
 | `credential_spec` | 数据源凭据声明（`CredentialSpec` 冻结 dataclass + `CREDENTIAL_SPECS` 注册表） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
 | `credential_readiness` | 凭据就绪矩阵与缺失指引（`missing_credential` / `credential_hint` / `credential_readiness`） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
+| `mark_provider_used` | provider 级归属登记（链路成功时记「本数据类别由此 provider 服务」；矩阵「命中源」列数据来源） | 数据源可用性矩阵 | 监控 | 无（观测记录，不改产物判定） |
+| `get_provider_usage` | provider 归属登记表快照（`{data_type: {provider_id: {count, label}}}`） | 数据源可用性矩阵 | 监控 | 无 |
+| `reset_provider_usage` | 清空 provider 归属登记表（测试隔离） | 数据源可用性矩阵 | 监控 | 无 |
 | `enable_interactive_charts` | 报告图表交互（6 图 Chart.js 渲染，含离线/无引擎守卫与 Canvas 回退） | 投资分析汇总 / 资产穿透TOP10 / 持仓结构与集中度等图表区 | 报告输出 | 常规开关（默认开） |
 | `datasource_adapter` | 数据源适配契约（三段式适配 + 行情域三源等价性校验） | 数据源可用性矩阵 | 数据获取 | 常规开关（默认开；不改报告产物，只影响取数路径校验口径） |
 | `llm_debate_procon` | 辩论-正反辩论（三段式：白脸 → 黑脸 → 综合） | 智囊团深度复盘 | LLM 注入 | 实验开关（默认关） |

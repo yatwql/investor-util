@@ -6,6 +6,21 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 数据源可用性矩阵：新增 provider 级「命中源」列 + 说明表补齐同花顺兜底槽位（2026-09-18，plan-52 / rf-394）
+
+**背景**（用户反馈）：「已提供同花顺 key，但报告的数据源可用性矩阵没提到用了这个数据源」。排查确认**并非 key 未生效**——同一次运行的 `data/cache/sentiment_*` 由同花顺接口刷新（`logs/app.log` 有 `正在获取市场情绪（龙虎榜 / 连板梯队）...` → `[market_sentiment] 命中 0 条`），而是报告口径缺失。
+
+**根因三条**：① 矩阵只按**数据类别**聚合，其 tracker 事件键（`price_price_stock_600900`）只含代码不含 provider → 从未、也无法点名某个源；② 说明表「实际数据源（链路）」是硬编码文案，未随同花顺接入同步（`datasource.md` 已登记、`data_source_matrix.py` 未更新）；③ 市场情绪（同花顺**唯一源**）的取用标记键 `sentiment` 不匹配任何类别前缀 → 落入「其他数据源」桶，连类别名都不显示。
+
+**变更**：
+- **provider 级归属登记**：`report/data_status.py` 新增 `mark_provider_used` / `get_provider_usage` / `reset_provider_usage`（存放于模块级登记表而非 DegradationTracker——归属是纯观测事实，不参与降级计数、不在 `.degradation_state.json` 堆积 provider 键）；`fetcher/chain.py` 的 `fetch_with_fallback` 与 `_try_providers` 两处成功分支登记（历史链路经 `_history_provider_label` 解析展示名），`report/market_sentiment.py`、`fetcher/financial_indicator.py`（多期序列支路）同步登记
+- **矩阵**：行新增 `providers` / `providers_text`（按命中次数降序渲染为 `名称 ×次数`，无归属显示 `—`）；类别新增 `history`（历史走势）与 `sentiment`（市场情绪）并声明各链路 `data_types` 映射（链路 data_type 全覆盖由不变式用例强制，`UNMAPPED_CHAIN_DATA_TYPES` 登记有意不进矩阵者如 `bond_yield`）；`MATRIX_HEADERS` 作为 Excel 两处渲染的列头单一来源；历史日 K 等无类别事件的类别由 provider 归属单独成行
+- **渲染**：HTML 模板与 Excel（数据质量仪表盘页签 + 旧样式页签）矩阵表新增「命中源（本次取数）」列
+- **说明表**：price / fund_hold / history / financial_indicator 四行补「→ 同花顺金融数据（…，需 key）」；新增「市场情绪」行（同花顺唯一源 + key 就绪态 + 所需开关 `market_sentiment`）；财报全文行注明「同花顺不含公告原文，故无兜底源」；计费解析泛化为「行内显式 → provider 动态套餐 → 免费」；`used` 判定对无类别级标记的类别（历史走势）以 provider 归属为补充正面证据
+- **测试**：矩阵/说明表 12 例新用例（provider 归属、市场情绪行、兜底槽位文案、`data_types` 全覆盖不变式）+ Excel 渲染 3 例；`conftest.py` 新增 `reset_provider_usage` autouse 隔离
+- **测试隔离修复**（验证过程中发现）：`src/test/unit/report/` 全量运行会改写真实的 `data/state/.degradation_state.json`——`fetcher/industry.py` 的**后台批量线程活过用例 teardown**，路径 monkeypatch 已还原后线程内 `get_tracker()` 新建实例落到真实路径写盘。`conftest.py` 新增会话级兜底隔离（`_install_session_state_fallback_isolation`，在 `pytest_configure` 调用）：默认降级状态路径改为会话级临时目录，用例内仍被 `tmp_path` 覆盖、teardown 后回落到兜底值；`testplan.md` §5.8 补该条。验证 3/3 次不再触碰真实状态文件
+- **文档**：`datasource.md`（同花顺「已接入域」补市场情绪开关口径 + 新增「在报告里怎么看同花顺有没被用上」段）、`technical.md`（功能语义命名表新增 3 行 + 命中源机制说明）、`requirements.md` §6.4.15 字段表（6 列 + 状态规则）、`reports-instruction.md` 章节说明
+
 ### 归档：plan-51（同花顺官方金融数据接入）设计文档随完成态归档（2026-09-17）
 
 **背景**：plan-51 五个阶段全部落地——provider 层（凭据/qps 限速/信封错误码）、财务指标第三链路（三张合并报表派生）、基金披露持仓两源链（备源 + 联接基金直返目标 ETF）、行情与历史日 K 第三槽与交易日历官方兜底、市场情绪章内区块（开关默认关）。

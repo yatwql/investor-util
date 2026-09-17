@@ -75,16 +75,18 @@ def fetch_indicator_series(code: str, limit: int = DEFAULT_PERIODS) -> list[dict
     if isinstance(cached, list):
         return cached
 
-    from src.python.report.data_status import mark_data_used
+    from src.python.report.data_status import mark_data_used, mark_provider_used
 
     records: list[dict[str, Any]] = list(akshare_financial.fetch_financial_indicator_history(code, limit=limit))
     if records:
         mark_data_used(f"fin_indicator_{akshare_financial.SOURCE_ID}")
+        mark_provider_used("financial_indicator", akshare_financial.SOURCE_ID, akshare_financial.DISPLAY_NAME)
     if not records:
         # 主源不可用 → 官方合并报表派生（同花顺，需 key；一次链路给足多期，优于单期兜底）
         records = fetch_hithink_indicator_series(code, limit=limit)
         if records:
             mark_data_used(f"fin_indicator_{hithink.SOURCE_ID}")
+            mark_provider_used("financial_indicator", hithink.SOURCE_ID, hithink.DISPLAY_NAME)
     if not records:
         latest = fetch_latest_indicator(code)
         if latest:

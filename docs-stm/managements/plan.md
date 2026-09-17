@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.11.1-dev
-> **编号源**：`plan-next = 52`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-51，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 53`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-52，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办 **plan-47 / plan-48 / plan-49**（源自 plan-46 真实持仓复核与降级矩阵的剩余项，非阻塞）与 **plan-50**（财报取数第二数据源）；**plan-51**（同花顺官方金融数据接入，五阶段全部完成）已完成态与设计文档见归档 `docs-stm/archive/v0.11.x/hithink-data-source/`；P1 区已完成 plan-42 / plan-43 / plan-44 / plan-45 / plan-46（plan-46 完成态与设计文档索引见归档）；仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-43）见 `archived_plan.0.10.x.md`，v0.11.x 已完成项（plan-44 / plan-45 / plan-46）见 `archived_plan.0.11.x.md`。
+**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办 **plan-47 / plan-48 / plan-49**（源自 plan-46 真实持仓复核与降级矩阵的剩余项，非阻塞）与 **plan-50**（财报取数第二数据源）；**plan-51**（同花顺官方金融数据接入，五阶段全部完成）已完成态与设计文档见归档 `docs-stm/archive/v0.11.x/hithink-data-source/`；**plan-52**（数据源可用性矩阵 provider 级「命中源」列 + 说明表同花顺兜底槽位披露，用户反馈触发）已完成（摘要见下方 P1 区）；P1 区已完成 plan-42 / plan-43 / plan-44 / plan-45 / plan-46（plan-46 完成态与设计文档索引见归档）；仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-43）见 `archived_plan.0.10.x.md`，v0.11.x 已完成项（plan-44 / plan-45 / plan-46）见 `archived_plan.0.11.x.md`。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -21,6 +21,14 @@
 ### P1 — 当前待办
 
 > 无待办项（plan-42 / plan-43 摘要见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)；plan-44 / plan-45 摘要见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-45 的设计与实施层文档见 [`archive/v0.11.x/section-consolidation/`](../archive/v0.11.x/section-consolidation/)）。
+
+#### ✅ `plan-52` 数据源可用性矩阵：provider 级「命中源」列（已完成 2026-09-18）
+
+> 用户反馈触发：「已提供同花顺 key，但报告的数据源可用性矩阵没提到用了这个数据源」。排查确认**属于报告口径缺失，而非 key 未生效**——同一次运行的 `data/cache/sentiment_*` 由同花顺接口刷新（`logs/app.log` 有 `正在获取市场情绪…` → `[market_sentiment] 命中 0 条`），证明 key 在用。
+
+**根因三条**：① 矩阵只按**数据类别**聚合，其 tracker 事件键（`price_price_stock_600900`）只含代码不含 provider → 从未、也无法点名某个源；② 说明表「实际数据源（链路）」是硬编码文案，未随同花顺接入同步（`datasource.md` 已登记、`data_source_matrix.py` 未更新）；③ 市场情绪（同花顺**唯一源**）的取用标记键 `sentiment` 不匹配任何类别前缀 → 落入「其他数据源」桶，连类别名都不显示。
+
+**交付**：`report/data_status.py` 新增 provider 级归属登记（`mark_provider_used` / `get_provider_usage` / `reset_provider_usage`；模块级登记表，不参与降级计数、不在 `.degradation_state.json` 堆积 provider 键）；`fetcher/chain.py` 两处成功分支 + `report/market_sentiment.py` + `fetcher/financial_indicator.py` 多期序列支路登记归属；矩阵新增「命中源（本次取数）」列（HTML + Excel 两处渲染）与 `history`（历史走势）/ `sentiment`（市场情绪）两个类别及 `data_types` 映射（链路 data_type 全覆盖由不变式用例强制，`UNMAPPED_CHAIN_DATA_TYPES` 登记有意缺席者）；说明表补齐同花顺兜底槽位与市场情绪行（含 key 就绪态与所需开关），计费解析泛化为「行内显式 → provider 动态套餐 → 免费」。详细变更见 `changelog.md`。
 
 
 #### 🔲 `plan-47` 景气度框架诊断：基金持仓 ROE 加权（扩展 ② 维覆盖率）

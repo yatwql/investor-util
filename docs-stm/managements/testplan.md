@@ -493,6 +493,7 @@ def test_get_ttl_closed(self, mock_open):
 ### 5.8 测试隔离要求
 
 - 测试不操作真实 `data/cache/` 和 `data/state/`，所有缓存/状态操作使用 `tempfile.mkdtemp` 临时目录
+- **后台线程兜底隔离**：用例级 monkeypatch 只能约束用例存活期，**后台批量线程**（如 `fetcher/industry.py` 经 `BatchDispatcher` 派发的取数）可能活过 teardown——此时路径补丁已还原，线程内新建的 tracker 会落到真实 `data/state/` 写盘。`conftest.py::_install_session_state_fallback_isolation` 在会话开始即把降级状态文件默认路径改为会话级临时目录（用例内仍被 `tmp_path` 覆盖，teardown 后回落到兜底值），新增此类后台写入方时须同步纳入
 - 测试不写磁盘配置，`config.json` 通过 `os.environ` 或 `tempfile` 隔离
 - 网络测试全部 mock，不发起真实 HTTP 请求
 - 测试间互不依赖，每个 `setUp` 清理状态

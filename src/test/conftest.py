@@ -79,6 +79,26 @@ _KNOWN_MARKERS: set[str] = {
 _BUILTIN_MARKERS: set[str] = {"skip", "skipif", "xfail", "usefixtures", "filterwarnings"}
 
 
+def _install_session_state_fallback_isolation() -> None:
+    """会话级兜底隔离：降级状态文件的默认路径。
+
+    用例级 ``_isolate_sensitive_paths`` 把 ``_default_persist_path`` 指向 ``tmp_path``，
+    但**后台批量线程**（如 ``fetcher/industry.py`` 经 ``BatchDispatcher`` 派发的取数）
+    可能活过用例 teardown——此时 monkeypatch 已还原，线程内 ``get_tracker()`` 会新建
+    实例并落到真实路径写盘，污染用户的 ``data/state/.degradation_state.json``。
+
+    故在会话开始即把该函数替换为「会话级临时目录」实现：用例内仍被 ``tmp_path``
+    覆盖，teardown 后回落到本兜底值而非真实路径，测试全程不触碰真实状态文件。
+    """
+    import tempfile
+    from pathlib import Path
+
+    from src.python.report import data_status
+
+    fallback = Path(tempfile.mkdtemp(prefix="pytest-state-")) / ".degradation_state.json"
+    data_status._default_persist_path = lambda: str(fallback)
+
+
 def pytest_configure(config):
     """注册自定义标记，避免 pytest 警告。"""
     config.addinivalue_line("markers", "scenario: 业务场景集成测试（S0a-S0d + S1-S33 + T1-T21）")
@@ -130,6 +150,7 @@ def pytest_configure(config):
         'cassette: 声明用例所需的已录制数据源响应（`@pytest.mark.cassette("名称", source="源")`），'
         "运行期离线回放真实响应体，不发起网络请求",
     )
+    _install_session_state_fallback_isolation()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -656,6 +677,19 @@ def _reset_degradation_tracker():
     from src.python.report.data_status import reset_tracker
 
     reset_tracker()
+
+
+@pytest.fixture(autouse=True)
+def _reset_provider_usage():
+    """自动清空 provider 归属登记表，防止测试间状态污染。
+
+    ``mark_provider_used`` 的登记表是模块级状态（矩阵「命中源」列的数据源），
+    与 _reset_degradation_tracker 同模式：逐用例清空，避免某用例登记的
+    provider 归属泄漏到后续用例的 build_data_source_matrix() 输出。
+    """
+    from src.python.report.data_status import reset_provider_usage
+
+    reset_provider_usage()
 
 
 @pytest.fixture(autouse=True)
