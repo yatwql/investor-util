@@ -3,6 +3,7 @@
 > 版本：0.11.1-dev ｜ 状态：**阶段 1 已实测通过、阶段 3 已实施**（provider 层 + 55 例单测 + 11 端点真实连通，见 §4.1）；阶段 2~5 待实施（映射表按实测字段落表）
 > 上游：<https://github.com/HiThink-Tech/Financial-API>（同花顺官方 A 股数据服务）
 > 契约来源：<https://fuyao.aicubes.cn/llms-full.txt>（完整接口文档聚合）
+> 归档去向：全部 5 个阶段完成后，本文档随完成态归档至 `docs-stm/archive/v0.11.x/hithink-data-source/`（与 plan-45 / plan-46 的设计文档先例一致）；未完成前留在 `docs-stm/plan/`。当前进度：阶段 1 ✅ / 阶段 2 ⬜ / 阶段 3 ✅ / 阶段 4 ⬜ / 阶段 5 ⬜
 
 ---
 

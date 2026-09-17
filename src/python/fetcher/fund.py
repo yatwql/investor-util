@@ -21,6 +21,7 @@ from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.config import get_config
 from src.python.core.constants import PROJECT_ROOT
+from src.python.core.num_utils import ms_to_date_str
 from src.python.fetcher.chain import FailureDiagnostics, fetch_with_fallback
 from src.python.providers import hithink as _hithink
 from src.python.providers.tiantian_holdings import fetch_fund_holdings as _tiantian_fund_holdings
@@ -131,26 +132,10 @@ def _normalize_hithink_holdings(raw: dict[str, Any]) -> dict[str, Any]:
     return {
         "code": str(raw.get("code") or raw.get("_thscode") or ""),
         "name": "",
-        "date": _ms_to_date(raw.get("end_date_ms") or raw.get("publish_date_ms")),
+        "date": ms_to_date_str(raw.get("end_date_ms") or raw.get("publish_date_ms")),
         "holdings": holdings,
         **({"feeder_target_code": str(raw["feeder_target_code"])} if raw.get("feeder_target_code") else {}),
     }
-
-
-def _ms_to_date(value: object) -> str:
-    """毫秒时间戳 → ``YYYY-MM-DD``（Asia/Shanghai 自然日）；非法值返回空串。"""
-    try:
-        ts = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return ""
-    if ts <= 0:
-        return ""
-    from datetime import datetime
-
-    try:
-        return datetime.fromtimestamp(ts / 1000.0).strftime("%Y-%m-%d")
-    except (OSError, OverflowError, ValueError):
-        return ""
 
 
 def _normalize_hold_payload(raw: dict[str, Any], source_label: str = "") -> dict[str, Any]:

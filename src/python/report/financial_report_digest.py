@@ -11,9 +11,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Any
 
+from src.python.core.num_utils import ms_to_date_str
 from src.python.fetcher.financial_report import (
     DEFAULT_DOC_TYPES,
     DEFAULT_MAX_CHARS,
@@ -37,20 +37,6 @@ _DOC_TYPE_LABELS = {
 
 def _doc_type_label(doc_type: str) -> str:
     return _DOC_TYPE_LABELS.get(str(doc_type), str(doc_type))
-
-
-def _announcement_date(announcement_time: Any) -> str:
-    """毫秒 Unix 时间戳 → YYYY-MM-DD；非法值返回空串。"""
-    try:
-        ts = float(announcement_time)
-    except (TypeError, ValueError):
-        return ""
-    if ts <= 0:
-        return ""
-    try:
-        return datetime.fromtimestamp(ts / 1000.0).strftime("%Y-%m-%d")
-    except (OSError, OverflowError, ValueError):
-        return ""
 
 
 def _empty(reason: str) -> dict[str, Any]:
@@ -132,7 +118,7 @@ def build_financial_report_digest(
                 "report_period": str(record.get("report_period") or ""),
                 "doc_type": _doc_type_label(str(record.get("doc_type") or "")),
                 "title": str(record.get("title") or ""),
-                "announcement_date": _announcement_date(record.get("announcement_time")),
+                "announcement_date": ms_to_date_str(record.get("announcement_time")),
                 "summary": str(record.get("summary") or ""),
                 "source": str(record.get("source") or ""),
                 "adjunct_url": str(record.get("adjunct_url") or ""),

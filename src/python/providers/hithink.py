@@ -32,6 +32,7 @@ from typing import Any
 
 from src.python.core.code_utils import to_fmp_symbol
 from src.python.core.datasource_credential import (
+    DEFAULT_DATA_KEY_FILE,
     CredentialSpec,
     credential_value,
     missing_credential,
@@ -50,8 +51,9 @@ _BASE_URL = "https://fuyao.aicubes.cn"
 _TIMEOUT = 20.0
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 
-#: 通用数据源密钥文件默认相对路径（配置键 ``data_key_file`` 可覆盖为绝对路径）
-DEFAULT_KEY_FILE = "data/config/data_key.json"
+#: 通用数据源密钥文件默认相对路径——单一事实来源见 ``core/datasource_credential``
+#: （配置键 ``data_key_file`` 可覆盖为绝对路径）；本模块保留同名别名以维持既有引用面
+DEFAULT_KEY_FILE = DEFAULT_DATA_KEY_FILE
 
 #: 默认每秒请求上限（官方不给固定额度）。实测取 3.0 时会触发 429（连续拉取 11 个端点即被
 #: 限流），故按实测下调为 2.0；``config.json`` 的 ``hithink.qps`` 可覆盖

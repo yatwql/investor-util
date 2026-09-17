@@ -35,7 +35,12 @@ from typing import Any
 
 from src.python.core.atomic_write import write_json_atomic
 from src.python.core.constants import PROJECT_ROOT
-from src.python.core.datasource_credential import CredentialSpec, credential_value, missing_credential
+from src.python.core.datasource_credential import (
+    DEFAULT_DATA_KEY_FILE,
+    CredentialSpec,
+    credential_value,
+    missing_credential,
+)
 from src.python.core.datasource_credential import register_credential_spec as _register_credential_spec
 from src.python.core.http_client import make_http_client
 
@@ -50,9 +55,9 @@ _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 SOURCE_ID = "datasink"
 DISPLAY_NAME = "DataSinking 财报"
 
-#: 通用数据源密钥文件默认相对路径（配置键 ``data_key_file`` 可覆盖为绝对路径；
-#: 文件以 provider 名为节，本源的节名为 ``datasink``）
-DEFAULT_KEY_FILE = "data/config/data_key.json"
+#: 通用数据源密钥文件默认相对路径——单一事实来源见 ``core/datasource_credential``
+#: （配置键 ``data_key_file`` 可覆盖为绝对路径）；本模块保留同名别名以维持既有引用面
+DEFAULT_KEY_FILE = DEFAULT_DATA_KEY_FILE
 
 #: 计划 → (每秒请求上限, 每日文档配额)。官方定价页口径。
 _PLAN_LIMITS: dict[str, tuple[int, int]] = {

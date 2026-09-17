@@ -6,6 +6,27 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 技术债整改（近 48h 实现复核）+ plan/设计文档状态核对（2026-09-17）
+
+**一、技术债复核（近 48h：131 个源文件、+13k/−4k 行）**
+
+审查维度：死代码（无生产引用）、同一语义多处实现（DRY/单一事实来源）、已改名符号残留、文件体积硬上限、测试标记与隔离、TODO/待实测标记。
+
+**已修复**：
+- **DRY ①「密钥文件默认路径」双份定义**：`providers/datasink.py` 与 `providers/hithink.py` 各写一份 `data/config/data_key.json` 字面量 → 收敛到 `core/datasource_credential.py::DEFAULT_DATA_KEY_FILE`（该模块本就是「通用密钥文件以 provider 为节」机制的归属地），两 provider 保留同名别名以维持既有引用面（含测试与配置校验）
+- **DRY ②「毫秒戳 → YYYY-MM-DD」三处重复**：`fetcher/fund.py::_ms_to_date` 与 `report/financial_report_digest.py::_announcement_date` 为同一逻辑（宽容口径 + 越界兜底）→ 收敛为 `core/num_utils.py::ms_to_date_str`（该原语模块的既定口径：只保证返回值可安全展示、绝不抛），两处调用点改为复用；新增边界用例（0/负数/NaN/inf/超范围/数值字符串），测试改指共享原语
+
+**新登记（未修）**：
+- `rf-389` **provider API 面暂时大于消费面**：同花顺 provider 16 个端点仅 2 个已接线，其余属已批准的 plan-51 阶段 2/4/5 既定 API 面（已逐个实测字段）→ **保留并跟踪**，阶段收尾时复核；若阶段取消则按 rf-358 先例删除
+- `rf-390` **两主程序文件越过 800 行硬上限**：`analysis/prosperity_framework.py` 934 行、`report/_report_generation.py` 828 行 → 记为待拆分（含拆分轴与影响面）。**本次按 ① 轴做过一次机械拆分尝试，首轮 34 例失败**（再导出清单不完整导致装配层 `NameError` + 脚本生成的 re-export 块语法错误），已**回退不提交**，并在条目内记下失败原因，拆分改由人工逐符号核对引用闭包后实施
+
+**二、plan.md 与设计文件状态核对（归档判定）**
+
+- `docs-stm/plan/`：仅 `hithink-financial-data-design.md`（plan-51 设计层）。**不归档**——5 个阶段中阶段 1 / 阶段 3 已完成，阶段 2 / 4 / 5 在办；已在文档头部写死归档去向（全部完成后 → `docs-stm/archive/v0.11.x/hithink-data-source/`，与 plan-45 / plan-46 先例一致）并标注当前进度
+- `plan.md`：概述行补在办集合（plan-47/48/49/50/51）与 v0.11.x 归档引用（44/45/46）；**plan-47** 补前置条件更新（阶段 3 已提供官方披露持仓 top10，全量穿透仍待历史持仓接口）；**plan-50** 补「不可被 plan-51 替代」实测结论（同花顺官方不含公告原文）；plan-51 阶段表状态复核
+- 归档区核对：`archive/v0.11.x/` 结构（archived_plan + archived_changelog + section-consolidation/ + prosperity-framework/）与 `plan.md` 归档清单一致；无已完成但未归档的迭代设计文件
+- 编号源复核：`plan-next = 52`、`rf-next = 391`
+
 ### 新增：基金披露持仓两源链（同花顺官方源接入 `fund_hold`）（2026-09-16）
 
 **目标**：把「基金底层持仓」从单一天天基金爬虫链路升级为**双源链**——天天基金（主）不可用时由同花顺官方披露持仓接管，提升穿透与基金业绩的数据可用性，并为后续「基金持仓 ROE 加权（需全量穿透）」打数据基础。

@@ -123,9 +123,15 @@ class TestTargetSource:
 
 class TestHelpers:
     def test_announcement_date_boundaries(self):
-        assert frd._announcement_date(0) == ""
-        assert frd._announcement_date(None) == ""
-        assert frd._announcement_date("bad") == ""
+        """时间戳归一原语：非法/缺失一律空串（`core/num_utils.ms_to_date_str` 唯一实现）。"""
+        from src.python.core.num_utils import ms_to_date_str
+
+        assert ms_to_date_str(0) == ""
+        assert ms_to_date_str(None) == ""
+        assert ms_to_date_str("bad") == ""
+        assert ms_to_date_str(-1) == ""
+        assert ms_to_date_str(1e30) == ""  # 超出 datetime 可表示范围
+        assert ms_to_date_str(1767225600000) == "2026-01-01"
 
     def test_doc_type_label_fallback(self):
         assert frd._doc_type_label("semiannual") == "半年报"

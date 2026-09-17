@@ -1,4 +1,4 @@
-"""数值归一原语 —— 全链路防 NaN/±inf 污染。
+"""数值/时间字段归一原语 —— 全链路防 NaN/±inf 污染与非法时间戳。
 
 背景：``float("nan")`` 是**真值**，``float("inf")`` 更会一路穿透到聚合、
 绘图与 JSON 序列化。``nan or 0.0`` 这类看似兜底的写法实际什么也没拦
@@ -15,14 +15,19 @@
 - :func:`safe_num` —— **宽容**：数值字符串会尝试解析（对接 JSON/网页脏字段）。
 - :func:`strict_num` —— **严格**：只接受 ``int``/``float``，字符串一律视为非数值
   （对接序列化敏感场景，如账本落盘——字符串化数值混入会破坏类型契约）。
+
+时间字段同理：上游（基金披露、财报元数据等）给的是**毫秒 Unix 时间戳**，
+展示层与契约层要的是 ``YYYY-MM-DD`` 自然日；非法/缺失一律返回空串而不是抛异常
+（:func:`ms_to_date_str`）。
 """
 
 from __future__ import annotations
 
 import math
+from datetime import datetime
 from typing import Any
 
-__all__ = ["finite_or", "is_finite_number", "safe_num", "strict_num"]
+__all__ = ["finite_or", "is_finite_number", "ms_to_date_str", "safe_num", "strict_num"]
 
 
 def strict_num(value: Any, *, default: float | int | None = None) -> float | int | None:
@@ -96,3 +101,21 @@ def is_finite_number(value: Any) -> bool:
     也避免调用方误写 ``if not value``（``0`` 是合法数值却为假）。
     """
     return strict_num(value) is not None
+
+
+def ms_to_date_str(value: Any) -> str:
+    """毫秒 Unix 时间戳 → ``YYYY-MM-DD``（本地自然日）；非法/缺失返回空串。
+
+    上游（基金披露持仓、财报元数据等）的时间字段是毫秒戳，展示层与数据契约要的是
+    自然日字符串。三种非法形态统一兜底、绝不抛：非数值（``None``/``"bad"``）、
+    非正值（``0`` / 负数，上游用 0 表示「无」）、超出 ``datetime`` 可表示范围。
+
+    与 :func:`safe_num` 同一取舍：**宽容**——只保证返回可安全展示的字符串。
+    """
+    num = safe_num(value)
+    if num is None or num <= 0:
+        return ""
+    try:
+        return datetime.fromtimestamp(num / 1000.0).strftime("%Y-%m-%d")
+    except (OSError, OverflowError, ValueError):
+        return ""

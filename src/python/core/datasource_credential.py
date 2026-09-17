@@ -53,8 +53,14 @@ from src.python.core.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
 
+#: 通用数据源密钥文件默认相对路径（多个 provider 共用同一文件，以 provider 为节；
+#: 配置键 ``data_key_file`` 可覆盖为绝对路径）。**单一事实来源**：各 provider 模块
+#: 以 ``DEFAULT_KEY_FILE = DEFAULT_DATA_KEY_FILE`` 引用本常量，不得各写一份字面量。
+DEFAULT_DATA_KEY_FILE = "data/config/data_key.json"
+
 __all__ = [
     "CREDENTIAL_SPECS",
+    "DEFAULT_DATA_KEY_FILE",
     "CredentialSpec",
     "credential_hint",
     "credential_readiness",

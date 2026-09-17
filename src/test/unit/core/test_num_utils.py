@@ -156,3 +156,26 @@ class TestSignalLedgerParity:
         from src.python.core.signal_ledger import _safe_number
 
         assert strict_num(value) == _safe_number(value)
+
+
+@pytest.mark.unit
+@pytest.mark.unit_core
+class TestMsToDateStr:
+    """毫秒戳 → YYYY-MM-DD 归一原语（各取数/装配层共用，唯一实现）。"""
+
+    def test_valid_timestamp(self):
+        from src.python.core.num_utils import ms_to_date_str
+
+        assert ms_to_date_str(1767225600000) == "2026-01-01"
+
+    @pytest.mark.parametrize("bad", [None, "", "bad", 0, -1, float("nan"), float("inf"), 1e30])
+    def test_invalid_returns_empty(self, bad):
+        from src.python.core.num_utils import ms_to_date_str
+
+        assert ms_to_date_str(bad) == ""
+
+    def test_numeric_string_is_tolerated(self):
+        """宽容口径与 safe_num 一致：数值字符串按数值处理（上游 JSON 常给字符串）。"""
+        from src.python.core.num_utils import ms_to_date_str
+
+        assert ms_to_date_str("1767225600000") == "2026-01-01"
