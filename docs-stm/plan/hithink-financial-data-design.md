@@ -3,7 +3,7 @@
 > 版本：0.11.1-dev ｜ 状态：**阶段 1 已实测通过、阶段 3 已实施**（provider 层 + 55 例单测 + 11 端点真实连通，见 §4.1）；阶段 2~5 待实施（映射表按实测字段落表）
 > 上游：<https://github.com/HiThink-Tech/Financial-API>（同花顺官方 A 股数据服务）
 > 契约来源：<https://fuyao.aicubes.cn/llms-full.txt>（完整接口文档聚合）
-> 归档去向：全部 5 个阶段完成后，本文档随完成态归档至 `docs-stm/archive/v0.11.x/hithink-data-source/`（与 plan-45 / plan-46 的设计文档先例一致）；未完成前留在 `docs-stm/plan/`。当前进度：阶段 1 ✅ / 阶段 2 ✅ / 阶段 3 ✅ / 阶段 4 ✅（复权因子消费待接）/ 阶段 5 ⬜
+> 归档去向：全部 5 个阶段完成后，本文档随完成态归档至 `docs-stm/archive/v0.11.x/hithink-data-source/`（与 plan-45 / plan-46 的设计文档先例一致）；未完成前留在 `docs-stm/plan/`。当前进度：阶段 1 ✅ / 阶段 2 ✅ / 阶段 3 ✅ / 阶段 4 ✅（复权因子消费待接）/ 阶段 5 ✅（形态收敛为章内区块）
 
 ---
 
@@ -112,12 +112,20 @@
 - **待接消费者**：`adjustment_factors`（复权因子事件流）目前无生产消费者——计划用于
   **分红流水漏记校验**（用官方除权除息事件与用户「分红流水」页签交叉核对），属阶段收尾项。
 
-### 阶段 5 ⬜ 情绪面新章节（新能力）
+### 阶段 5 ✅ 情绪面能力（形态收敛为章内区块）
 
-- 新数据域 `market_sentiment`（涨跌停池 / 连板天梯 / 龙虎榜）+ 报告章节「市场情绪与资金热点」，
-  **功能开关默认关**；可选把「持仓/穿透标的当日上榜、所属概念连板」注入既有 LLM 信号预消化
-  （`signal_pre_digest` 机制），与「财经新闻热点与持仓关联」章节互补。
-- 需先定契约（新域 → `schemas/datasource_fields.py` 登记 + 附录 H + 双端可见性一致性测试）。
+- **数据**：同花顺官方龙虎榜（`dragon-tiger-list`）+ 连板梯队（`limit-up-ladder`）→
+  `analysis/market_sentiment.py::build_market_sentiment` 纯装配，**只保留命中持仓/穿透标的
+  代码**的事件行（按代码精确匹配，不做概念联想——两侧概念口径不一，按名匹配会大量假命中）。
+- **渲染**：行动建议章内嵌块「市场情绪与持仓热点」（Excel `report/action_sheet.py::_write_market_sentiment_block`
+  + HTML `partials/action_section.html` ⑦），开关 `market_sentiment`（报告组，默认关），契约
+  `market_sentiment_data` 已登记附录 H 契约台账。
+- **形态收敛（相对本设计初稿的偏离）**：初稿计划「新数据域 + 独立章节」，实现改为**章内区块**——
+  ① 一个表不值得新增独立章与页签（与景气度框架同构）；② 数据是**市场级**（无 per-code 语义），
+  套 per-code 的链路域模型反而错位，故走「provider + 报告层装配」而非链路适配器。
+- **零命中语义**：只要有一源可用就出契约（`available=True`、`rows` 可为空 + 明确说明 + 保留市场概览），
+  避免价值型组合（常年不涨停/不上榜）章节恒空、读者分不清「无事件」与「取数失败」。
+- **未做**：把情绪事件注入 LLM 信号预消化（`signal_pre_digest`）——属可选增强，待该机制扩展时评估。
 
 ---
 

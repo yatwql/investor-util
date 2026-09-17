@@ -339,6 +339,19 @@ def generate_excel_report(
     )
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
 
+    # ── 市场情绪契约（报告增强开关 market_sentiment）就地兜底 ──
+    # basic 路径不经编排层；此处穿透结果已就绪，就地组装（full/both 由编排层注入）
+    if not (pipeline_data or {}).get("market_sentiment_data"):
+        from src.python.config import get_config
+        from src.python.report._report_aux_metrics import compute_market_sentiment_data
+
+        _ms_data = compute_market_sentiment_data(
+            holdings, {"penetrated_assets": (pen_result or {}).get("top10")}, get_config(), prog
+        )
+        if _ms_data is not None:
+            pipeline_data = {**(pipeline_data or {})}
+            pipeline_data["market_sentiment_data"] = _ms_data
+
     # ── 景气度框架诊断契约（实验性功能 prosperity_framework）就地兜底 ──
     # basic 路径不经编排层；此处穿透结果已就绪，就地组装（full/both 由编排层注入）
     if not (pipeline_data or {}).get("prosperity_framework_data"):
@@ -441,6 +454,7 @@ def generate_excel_report(
                 (pipeline_data or {}).get("action_data"),
                 decision_review_data=(pipeline_data or {}).get("decision_review_data"),
                 prosperity_framework_data=(pipeline_data or {}).get("prosperity_framework_data"),
+                market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
             )
         except Exception:
             logger.debug("[excel] 行动建议页签写入失败（非关键）", exc_info=True)

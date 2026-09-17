@@ -155,6 +155,39 @@ def compute_correlation_data(
         return unavailable_result("source_failed")
 
 
+def compute_market_sentiment_data(
+    holdings,
+    prep: dict | None,
+    config: dict,
+    reporter: ProgressReporter | None = None,
+) -> dict | None:
+    """编排市场情绪契约（``market_sentiment_data``，报告增强开关默认关）。
+
+    数据来源：同花顺官方（龙虎榜 + 连板梯队），只保留**命中持仓/穿透标的代码**的事件行；
+    开关关闭返回 ``None``（零行为变化），缺凭据/两源不可用返回 ``available=False`` 降级契约。
+
+    Args:
+        holdings: 原始持仓列表
+        prep: prep 字典（读 ``penetrated_assets`` 作为穿透标的来源）
+        config: 完整配置（只读）
+        reporter: 可选进度上报
+    """
+    from src.python.config import is_enable_market_sentiment
+
+    if not is_enable_market_sentiment(config):
+        return None
+    from src.python.report.market_sentiment import build_market_sentiment_data
+
+    if reporter is not None:
+        reporter.info("正在获取市场情绪（龙虎榜 / 连板梯队）...")
+    penetrated = (prep or {}).get("penetrated_assets") or []
+    try:
+        return build_market_sentiment_data(holdings, penetrated, config)
+    except Exception:  # 增强模块异常不得中断主报告
+        logger.warning("[market_sentiment] 市场情绪装配异常，本次跳过（主报告不受影响）", exc_info=True)
+        return None
+
+
 def compute_prosperity_framework_data(
     holdings,
     details,

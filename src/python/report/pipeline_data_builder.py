@@ -42,6 +42,8 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "action_data",
     # 景气度框架诊断（实验性功能 prosperity_framework）：六维评分卡组合契合度
     "prosperity_framework_data",
+    # 市场情绪与持仓热点（报告增强开关 market_sentiment）：龙虎榜/连板梯队 ∩ 持仓与穿透
+    "market_sentiment_data",
     # 成本流水：成本分档 + XIRR + 分红累计（功能开关 `cost_lots`，
     # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
     "fund_flow_data",
@@ -134,6 +136,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "financial_report_digest_data": (dict, type(None)),
     "financial_indicator_data": (dict, type(None)),
     "prosperity_framework_data": dict,
+    "market_sentiment_data": dict,
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {

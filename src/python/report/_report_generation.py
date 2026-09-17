@@ -443,6 +443,20 @@ def _generate_report_both(
     if _pf_data is not None and pipeline_data is not None:
         pipeline_data["prosperity_framework_data"] = _pf_data
 
+    # 市场情绪与持仓热点（报告增强开关 market_sentiment）：开关关闭返回 None（零行为变化）
+    from src.python.report._report_aux_metrics import compute_market_sentiment_data
+
+    _ms_data = compute_market_sentiment_data(holdings, None, config, reporter)
+    if _ms_data is not None and pipeline_data is not None:
+        pipeline_data["market_sentiment_data"] = _ms_data
+
+    # 市场情绪与持仓热点（报告增强开关 market_sentiment）：开关关闭返回 None（零行为变化）
+    from src.python.report._report_aux_metrics import compute_market_sentiment_data
+
+    _ms_data = compute_market_sentiment_data(holdings, None, config, reporter)
+    if _ms_data is not None and pipeline_data is not None:
+        pipeline_data["market_sentiment_data"] = _ms_data
+
     # ── 4. HTML 报告 ──
     _news_label = "含新闻" if _enable_news else "无新闻"
     reporter.info(f"正在生成 HTML 报告（{_news_label}）...")
@@ -481,6 +495,7 @@ def _generate_report_both(
             data_freshness=(pipeline_data or {}).get("data_freshness"),
             action_data=(pipeline_data or {}).get("action_data"),
             prosperity_framework_data=(pipeline_data or {}).get("prosperity_framework_data"),
+            market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),

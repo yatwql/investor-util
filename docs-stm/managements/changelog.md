@@ -6,6 +6,22 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 新增：市场情绪与持仓热点（行动建议章内嵌块，plan-51 阶段 5）（2026-09-17）
+
+**能力**：把同花顺官方市场级情绪数据收敛为「与我有关」的事件行——**仅保留命中持仓/穿透标的代码**的条目，渲染为行动建议章内嵌块「市场情绪与持仓热点」（开关 `market_sentiment`，报告组，默认关，菜单 E/B/L 均可输出）。
+
+**实现**：
+- `analysis/market_sentiment.py`（纯装配）：龙虎榜命中行（净买额/游资净买额/机构净买额/上榜原因/概念，金额换算亿元、概念取前三）+ 连板梯队命中行（取**最新交易日**、板位标签、次日封板）；**只按代码精确匹配，不做概念联想**（两侧概念口径不一，按名匹配会大量假命中）
+- `report/market_sentiment.py`：开关门禁（关闭返回 None，零网络开销）+ 缺凭据降级契约 + 取数带 1h 缓存（`sentiment_dragon_tiger` / `sentiment_ladder`）+ 数据源使用标记
+- **零命中语义**：只要一源可用就出契约（`available=True`、`rows` 可空 + 明确说明 + 保留市场概览：龙虎榜只数、连板各板位家数）——价值型组合常年不涨停/不上榜，若零命中即降级会让章节恒空、读者分不清「无事件」与「取数失败」
+- 渲染：Excel `report/action_sheet.py::_write_market_sentiment_block` + HTML `partials/action_section.html` ⑦（双端口径说明同源）；接线镜像既有「景气度框架」模式：`_report_aux_metrics.compute_market_sentiment_data` → `pipeline_data["market_sentiment_data"]`（full/both 由编排层注入、basic 由 `excel_generator` 就地兜底）→ 行动建议章
+- 契约台账：`market_sentiment_data` 登记附录 H（表行 + 逐键说明）与功能语义命名表；缓存模块 `sentiment_`（1h）登记注册表
+- 回归 26 例：`unit/analysis/test_market_sentiment.py`（命中过滤/亿元换算/概念截断/最新交易日/概览/零命中与降级契约/脏值）、`unit/report/test_market_sentiment.py`（开关与凭据门禁/取数缓存/命中装配/开关注册/缓存模块登记）、`unit/report/test_market_sentiment_wiring.py`（编排门禁与异常兜底/Excel 区块三种形态/HTML 同源）
+
+**形态收敛（相对设计初稿）**：初稿为「新数据域 + 独立章节」，实现改为**章内区块**——一个表不值得新增章节与页签（与景气度框架同构），且情绪数据是市场级（无 per-code 语义），套 per-code 链路域模型反而错位；已在设计文档 §3 记录偏离与理由。**未做**：把情绪事件注入 LLM 信号预消化（可选增强，待该机制扩展时评估）。
+
+文档：plan.md 阶段 5 完成（含收敛说明）、设计文档 §3、technical（附录 H 契约行 + 逐键说明 + 语义命名表 4 行 + 数据流）、requirements（数据源表）、reports-instruction（章内区块说明）、how-to-config（开关行）、datasource / datasource-reliability（已接入域）、testplan（回归行）、folders（目录树与统计）、changelog 本条。
+
 ### 新增：行情/历史日 K 第三链路 + 交易日历官方兜底（plan-51 阶段 4）（2026-09-17）
 
 **实现**：

@@ -1012,6 +1012,7 @@ class TestReportGroupSwitches:
         "valuation_percentile",
         "market_temperature",
         "financial_report_digest",
+        "market_sentiment",
         "financial_indicator",
     )
 

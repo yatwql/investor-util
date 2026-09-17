@@ -83,6 +83,7 @@ def write_action_sheet(
     action_data: dict[str, Any] | None,
     decision_review_data: dict[str, Any] | None = None,
     prosperity_framework_data: dict[str, Any] | None = None,
+    market_sentiment_data: dict[str, Any] | None = None,
 ) -> None:
     """写入行动建议页签（行动板块 + 可选章内块）。
 
@@ -93,6 +94,8 @@ def write_action_sheet(
             默认关闭）；None 时行动页签保持既有输出。
         prosperity_framework_data: 「景气度框架诊断」契约 dict（实验性功能
             `prosperity_framework`，默认关闭）；None 时页签保持既有输出。
+        market_sentiment_data: 「市场情绪与持仓热点」契约 dict（报告增强开关
+            `market_sentiment`，默认关闭）；None 时页签保持既有输出。
     """
     _name = get_report_sheet_name("action")
     _ncols = 5
@@ -106,6 +109,8 @@ def write_action_sheet(
             _write_review_block(ws, _row, decision_review_data, _ncols)
         if prosperity_framework_data and prosperity_framework_data.get("available"):
             _write_prosperity_block(ws, row + 1, prosperity_framework_data, _ncols)
+        if market_sentiment_data is not None:
+            _write_market_sentiment_block(ws, row + 1, market_sentiment_data, _ncols)
         auto_width(ws)
         logger.info("行动建议：无持仓数据，写入占位")
         return
@@ -203,6 +208,8 @@ def write_action_sheet(
     if prosperity_framework_data and prosperity_framework_data.get("available"):
         row += 1
         row = _write_prosperity_block(ws, row, prosperity_framework_data, _ncols)
+    if market_sentiment_data is not None and action_data and action_data.get("available"):
+        row = _write_market_sentiment_block(ws, row, market_sentiment_data, _ncols)
 
     auto_width(ws)
     logger.info("行动建议页签已写入")
@@ -269,6 +276,80 @@ def _write_review_block(
             [f"待结算 {review_data.get('pending_count', 0)} 条（决策满 5 个交易日后用真实行情对账）", "", "", "", ""],
         )
     return row
+
+
+def _write_market_sentiment_block(ws, row: int, data: dict[str, Any], ncols: int) -> int:
+    """写入「市场情绪与持仓热点」块（报告增强开关 `market_sentiment`，默认关）。
+
+    只列**命中持仓/穿透标的代码**的当日事件：上榜龙虎榜（净买额/上榜原因）与
+    进入连板梯队（板位/次日封板）；不可用时写降级原因，不阻断行动建议章其余内容。
+    """
+    row = write_title_row(ws, row, "市场情绪与持仓热点", ncols=ncols)
+    if not data.get("available"):
+        row = write_data_row(ws, row, [f"（{data.get('reason') or '暂无可用情绪数据'}）", "", "", "", ""])
+        for f in data.get("failures") or []:
+            row = write_data_row(ws, row, [f"⚠ {f.get('source', '')}：{f.get('reason', '')}", "", "", "", ""])
+        return row
+
+    summary = data.get("summary") or {}
+    caps = "；".join(f"{k} {v} 家" for k, v in (summary.get("board_caps") or {}).items() if v) or "—"
+    row = write_data_row(
+        ws,
+        row,
+        [
+            f"交易日 {data.get('trade_date') or '未知'}｜龙虎榜上榜 {summary.get('lhb_stock_count') or '—'} 只"
+            f"｜连板梯队（{summary.get('ladder_date') or '未知'}）：{caps}",
+            "",
+            "",
+            "",
+            "",
+        ],
+    )
+    if not (data.get("rows") or []):
+        row = write_data_row(ws, row, [f"（{data.get('reason') or '当日无命中事件'}）", "", "", "", ""])
+    row = write_header_row(ws, row, ["名称", "代码", "标的来源", "事件", "说明"])
+    for item in data.get("rows") or []:
+        if item.get("event_type") == "龙虎榜":
+            parts = [f"净买额 {item.get('net_value_yi')} 亿"]
+            if item.get("hot_money_net_value_yi") is not None:
+                parts.append(f"游资 {item.get('hot_money_net_value_yi')} 亿")
+            if item.get("org_net_value_yi") is not None:
+                parts.append(f"机构 {item.get('org_net_value_yi')} 亿")
+            if item.get("range_days"):
+                parts.append(f"{item.get('range_days')} 日榜")
+            if item.get("limit_reason"):
+                parts.append(str(item.get("limit_reason")))
+            if item.get("concepts"):
+                parts.append(f"概念 {item.get('concepts')}")
+        else:
+            parts = [f"{item.get('board_label') or ''}", f"日期 {item.get('event_date') or ''}"]
+            if item.get("seal_nextday"):
+                parts.append("次日封板")
+        row = write_data_row(
+            ws,
+            row,
+            [
+                item.get("name") or "",
+                item.get("code") or "",
+                item.get("holding_kind") or "",
+                item.get("event_type") or "",
+                "｜".join(p for p in parts if p),
+            ],
+        )
+    for f in data.get("failures") or []:
+        row = write_data_row(ws, row, [f"⚠ {f.get('source', '')}：{f.get('reason', '')}", "", "", "", ""])
+    row += 1
+    return write_data_row(
+        ws,
+        row,
+        [
+            "说明：仅列持仓/穿透标的命中当日龙虎榜或连板梯队的事件（按代码精确匹配，不做概念联想）；非投资建议",
+            "",
+            "",
+            "",
+            "",
+        ],
+    )
 
 
 def _write_prosperity_block(ws, row: int, data: dict[str, Any], ncols: int) -> int:

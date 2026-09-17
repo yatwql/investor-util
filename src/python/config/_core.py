@@ -438,6 +438,20 @@ def datasink_feature_ready(config: dict | None = None) -> bool:
     return missing_credential("datasink") is None
 
 
+def is_enable_market_sentiment(config: dict | None = None) -> bool:
+    """市场情绪章是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
+
+    取值来自功能开关注册表（``features.market_sentiment``，出厂默认关），可用 `features.json`
+    覆盖；``config`` 形参仅为兼容既有调用签名保留。
+
+    Args:
+        config: 兼容用（不参与取值）
+    """
+    from src.python.config.features import is_feature_enabled
+
+    return is_feature_enabled("market_sentiment")
+
+
 def is_enable_financial_indicator(config: dict | None = None) -> bool:
     """财务指标章是否启用（报告增强开关，登记于功能开关注册表 ``GROUP_REPORT``）。
 
