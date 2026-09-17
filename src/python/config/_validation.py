@@ -42,6 +42,7 @@ _KNOWN_PROVIDER_NAMES: set[str] = {
     "datasink",
     "datasink_indicator",
     "akshare_financial",
+    "hithink",
 }
 
 _STRING_CONFIG_KEYS: set[str] = {

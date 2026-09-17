@@ -6,6 +6,35 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 新增：基金披露持仓两源链（同花顺官方源接入 `fund_hold`）（2026-09-16）
+
+**目标**：把「基金底层持仓」从单一天天基金爬虫链路升级为**双源链**——天天基金（主）不可用时由同花顺官方披露持仓接管，提升穿透与基金业绩的数据可用性，并为后续「基金持仓 ROE 加权（需全量穿透）」打数据基础。
+
+**落地**：
+- **链路**：`fetcher/chain.py::_DEFAULT_CHAINS["fund_hold"] = ["tiantian", "hithink"]`，provider 表 `fetcher/fund.py::_FUND_HOLD_PROVIDERS` 同序（天天基金主 → 同花顺官方备，需 key；未配置 key 时由既有凭据预检自动跳过，不计熔断）。顺序可用 `config.json` 的 `preferred_provider.fund_hold` 调换（已加入校验白名单）
+- **载荷归一**：`_stamp_hold_schema` 升级为 `_normalize_hold_payload`（按载荷形状识别源）——天天基金形态**原样透传**（主源可用时输出逐字不变）；同花顺形态映射为统一契约 `code/name/date/holdings`：只取 `asset_type=stock`（债券/基金资产不进股票层，避免污染占比分母）、`hold_ratio`→`ratio`（与天天基金同口径的百分数原值）、报告期取 `end_date_ms`（回退 `publish_date_ms`）→ `YYYY-MM-DD`（供报告层时效闸门判定）
+- **联接基金信号**：`providers/hithink.py::fetch_fund_holdings`（项目代码入口）在「持仓仅一只 `fund` 型资产」时直接带回 `feeder_target_code`（实测 `016055.OF` → `513390.SH` 博时纳斯达克100ETF），既有 `feeder_penetration` 链路据此穿透，省去 HTML 锚点探测
+- **代码候选解析**：新增 `fund_thscode_candidates`（4/5 位补零 + 场内/场外后缀，逐个试到命中）——实测 `16055.OF` 报 `code=3001`、`016055.OF` 命中（仓库读取层本就补零，此处为防御性一致）
+- **不递增 `hold_schema`**：缓存写入前必经归一，载荷恒为同一形态、旧条目不会被误读；递增只会让全体用户的白缓存失效（判据是「旧载荷是否会被误读」）——该决策已写入语义版本字段的文档串
+- 回归测试：`unit/fetcher/test_fund.py`（同花顺形态归一/主源形态透传/链路顺序/备源接管/语义版本）+ `unit/providers/test_hithink.py`（候选解析/联接信号/取数入口）共 20+ 例
+
+**实测（真实 key）**：股票型 `011506.OF`、QDII `017730.OF`（返回 AMD/MU/KLAC 等境外持仓）、场内 ETF `561910.SH` 均返回 10 项股票持仓；联接基金 `016055.OF` 返回单只 `fund` 型目标 ETF；债券型 `012325.OF` 仅 `bond` 持仓 → 股票层正确为空（与天天基金「股票表为空」同口径）。
+
+**文档**：`technical.md`（架构图链路、目录树、取数阶梯段新增「两源链与载荷归一」、语义命名表新增 3 行）、`requirements.md`（数据源清单 + 三跳阶梯段补备源规则）、`datasource.md` / `datasource-reliability.md`（基金持仓降级目标与同花顺已接入域）、`testplan.md`（回归清单新增两源链行）、`folders.md`、设计文档阶段 3 完成态。
+
+### 文档：全量管理文档 + 用户文档一致性审计与修订（2026-09-16）
+
+**背景**：本轮连续改动（LLM 上限、财报摘要、同花顺接入、阶段 3）后，对 10 份管理文档 + 10 份用户手册 + README 做了一次逐项核对（版本头/目录锚点/陈旧表述/计数/凭据清单）。
+
+**发现问题与处置**：
+- **`technical.md` 引用已改名的函数**（`_stamp_hold_schema` → `_normalize_hold_payload`）：文档与实现脱钩 → 已改正并补两源链说明（记为 rf-387）
+- **用户手册 7 处目录链接锚点失效**（`reports-instruction.md`「页面/章节分组」标题为 `### ① 基础核心（type=always）`，目录却按 `#基础核心typealways` 链接，带圈数字的锚点归属不确定）：7 个标题各补显式 HTML 锚点，保留带圈编号与目录文本，链接确定性可用（记为 rf-388）
+- **需凭据源清单缺同花顺**：`README.md`（数据源与凭据段）、`how-to-config.md`（示例注释 / `data_key_file` 字段说明 / `datasource_credential_ready` 开关描述两处）已补 `hithink` 节与 `HITHINK_FINANCE_API_KEY`
+- **计数漂移**：`folders.md` 统计（主程序 281→282 文件 / 71,674→72,729 行、测试 375→379 / 109,928→112,135、用例 7,285→7,395、用户文档 5,159→5,184 行）；`test-coverage.md` unit 子标记按 `collect-test-coverage.py` 实时收集刷新（providers 315→380、fetcher 408→427、report 1847→1929、analysis 788→874、core 1215→1213、config 358→362、llm 968→969）
+- **顺序与结构核对**：章节编号/分组顺序、目录与标题对应、provider 链路示意宽度对齐、管理文档「编号源」标记（plan-next 52 / rf-next 389）均已复核；`模式对应测试量` 表为 bench 派生产物，按既有约定留待发布前 `--mode bench --update-docs` 回填（文档内已有该说明）
+
+**自审**：`review-findings.md` 记 rf-387、rf-388（均为已解决），`rf-next → 389`。
+
 ### 同花顺数据服务：key 配置 + provider 实测通过（11 端点 10 通）（2026-09-16）
 
 **落地**：

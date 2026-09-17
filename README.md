@@ -79,7 +79,9 @@
 - **Web 浏览器模式** — `launch.sh web` / `launch.ps1 web` 启动轻量 Web 界面：浏览器内上传持仓 Excel → 选择报告格式 → 实时查看生成进度 → 预览 HTML / 下载 Excel，无需终端交互（详见 [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md)）
 - **多账户支持** — Excel 每页工作表为一个独立账户，自动识别
 - **实时行情获取** — 腾讯财经（场内实时价）、东方财富（场外基金净值），多数据源自动 fallback
-- **财报全文（可选）** — DataSinking 全文本财报（仅 A 股，需自备 API key，配于 `data/config/data_key.json` 的 `datasink` 节或环境变量 `DATASINK_API_KEY`）；未配置时对应章节写占位并给申请指引
+- **需凭据的数据源（均为可选，未配置即自动跳过对应链路）**：
+  - **财报全文** — DataSinking 全文本财报（仅 A 股），配于 `data/config/data_key.json` 的 `datasink` 节或环境变量 `DATASINK_API_KEY`；未配置时对应章节写占位并给申请指引
+  - **同花顺金融数据**（官方 A 股数据服务）— 当前用作**基金披露持仓链路的备用源**（天天基金不可用时接管），并已就绪财务指标 / 行情 / 情绪面等 provider 能力；配于 `data_key.json` 的 `hithink` 节或环境变量 `HITHINK_FINANCE_API_KEY`（免费申领见 datasource 手册）
 - **智能缓存** — API 响应按指定频率缓存，减少网络请求，支持手动刷新和缓存管理
 - **Excel 报告** — 最多 17 个条件页签，分八组：
   - **基础核算**（5 个）：投资分析汇总、持仓明细与分类、资产穿透TOP10、基金业绩分析、数据源可用性矩阵——每次生成必有

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import threading
 import unittest
+from unittest import mock
 from unittest.mock import MagicMock, patch
 
 from src.python.fetcher.fund import (
@@ -568,6 +569,114 @@ class TestWithFeederPenetration(unittest.TestCase):
         self.assertIn("feeder_penetration", result)
 
 
+class TestHithinkHoldingsNormalization(unittest.TestCase):
+    """同花顺披露持仓 → 规范化持仓契约（阶段 3 两源链的备源归一）。"""
+
+    def _hithink_raw(self, **extra):
+        raw = {
+            "_thscode": "011506.OF",
+            "total_stock_ratio_pct": 57.7,
+            "timestamp": 0,
+            "item": [
+                {"ticker": "688200", "stock_name": "华峰测控", "hold_ratio": 9.53, "asset_type": "stock"},
+                {"ticker": "300308", "stock_name": "中际旭创", "hold_ratio": 7.39, "asset_type": "stock"},
+                # 债券/基金资产必须被剔除：穿透层是股票层，混入会污染占比分母
+                {"ticker": "2120089", "stock_name": "21北京银行永续债01", "hold_ratio": 4.94, "asset_type": "bond"},
+                {"ticker": "513390", "stock_name": "博时纳斯达克100ETF", "hold_ratio": 93.5, "asset_type": "fund"},
+                {"ticker": "999999", "stock_name": "无占比项", "hold_ratio": None, "asset_type": "stock"},
+                {"ticker": "888888", "stock_name": "超限项", "hold_ratio": 120.0, "asset_type": "stock"},
+            ],
+            "end_date_ms": 1782748800000,
+        }
+        raw.update(extra)
+        return raw
+
+    def test_maps_items_to_canonical_holdings(self):
+        from src.python.fetcher.fund import _normalize_hold_payload
+
+        out = _normalize_hold_payload(self._hithink_raw(), "同花顺金融数据")
+        self.assertEqual([h["code"] for h in out["holdings"]], ["688200", "300308"])
+        self.assertEqual(out["holdings"][0], {"name": "华峰测控", "code": "688200", "ratio": 9.53})
+        self.assertEqual(out["date"], "2026-06-30")  # end_date_ms → YYYY-MM-DD（Asia/Shanghai）
+        self.assertEqual(out["name"], "")  # 上游该端点不提供基金名
+        self.assertEqual(out["hold_schema"], 2)
+
+    def test_publish_date_fallback_and_invalid_ts(self):
+        from src.python.fetcher.fund import _normalize_hold_payload
+
+        pub = _normalize_hold_payload(self._hithink_raw(end_date_ms=None, publish_date_ms=1782748800000))
+        self.assertEqual(pub["date"], "2026-06-30")
+        bad = _normalize_hold_payload(self._hithink_raw(end_date_ms=None, publish_date_ms="bad"))
+        self.assertEqual(bad["date"], "")
+
+    def test_feeder_target_code_preserved(self):
+        """联接基金：provider 带回的目标 ETF 代码必须原样保留（既有穿透链路依赖它）。"""
+        from src.python.fetcher.fund import _normalize_hold_payload
+
+        out = _normalize_hold_payload(self._hithink_raw(feeder_target_code="513390"), "同花顺金融数据")
+        self.assertEqual(out["feeder_target_code"], "513390")
+
+    def test_tiantian_shape_passes_through_unchanged(self):
+        """主源（天天基金）形态逐字透传——保证主源可用时输出不变。"""
+        from src.python.fetcher.fund import _normalize_hold_payload
+
+        raw = {
+            "code": "011506",
+            "name": "建信高端装备股票A",
+            "date": "2026-03-31",
+            "holdings": [{"name": "x", "code": "1", "ratio": 1.0}],
+        }
+        out = _normalize_hold_payload(raw, "天天基金")
+        self.assertEqual({k: v for k, v in out.items() if k != "hold_schema"}, raw)
+
+
+class TestFundHoldProviderChain(unittest.TestCase):
+    """两源链：天天基金为主、同花顺官方源为备（顺序即链路顺序）。"""
+
+    def test_provider_order_and_identity(self):
+        from src.python.fetcher.fund import _FUND_HOLD_PROVIDERS
+
+        self.assertEqual(list(_FUND_HOLD_PROVIDERS), ["tiantian", "hithink"])
+        self.assertEqual(_FUND_HOLD_PROVIDERS["hithink"][0], "同花顺金融数据")
+        self.assertTrue(callable(_FUND_HOLD_PROVIDERS["hithink"][1]))
+
+    def test_hithink_used_when_tiantian_fails(self):
+        """主源返回空 → 链路切到同花顺备源并归一为规范形态。"""
+        from src.python.fetcher import fund as fund_mod
+
+        calls: list[tuple[str, str]] = []
+
+        def _tia(code):
+            calls.append(("tiantian", code))
+            return None
+
+        def _hit(code):
+            calls.append(("hithink", code))
+            return {
+                "_thscode": "561910.SH",
+                "item": [{"ticker": "300274", "stock_name": "阳光电源", "hold_ratio": 10.19, "asset_type": "stock"}],
+                "end_date_ms": 1782748800000,
+            }
+
+        with (
+            mock.patch.dict(
+                fund_mod._FUND_HOLD_PROVIDERS,
+                {"tiantian": ("天天基金", _tia), "hithink": ("同花顺金融数据", _hit)},
+            ),
+            mock.patch("src.python.fetcher.chain.cache_get", return_value=None),
+            mock.patch("src.python.fetcher.chain.cache_set"),
+            # 同花顺为需凭据源：测试环境无 key，显式放行凭据预检，否则备源会被跳过
+            mock.patch("src.python.fetcher.chain.missing_credential", return_value=None),
+            mock.patch.object(fund_mod, "with_feeder_penetration", side_effect=lambda _c, r: r),
+        ):
+            out = fund_mod.fetch_fund_holdings("561910")
+
+        self.assertEqual([c[0] for c in calls], ["tiantian", "hithink"])
+        self.assertEqual(out["holdings"][0]["name"], "阳光电源")
+        self.assertEqual(out["date"], "2026-06-30")
+        self.assertEqual(out["hold_schema"], 2)
+
+
 class TestHoldPayloadSchema(unittest.TestCase):
     """``fund_hold_*`` 缓存载荷语义版本（``hold_schema``）——修复自失效防线。
 
@@ -577,16 +686,19 @@ class TestHoldPayloadSchema(unittest.TestCase):
     """
 
     def test_stamp_adds_schema_field(self):
-        """provider 产出经 transform 盖章后带版本字段。"""
+        """provider 产出经 transform 盖章后带版本字段（天天基金形态原样透传）。"""
         from src.python.fetcher.fund import (
             _HOLD_PAYLOAD_SCHEMA,
             _HOLD_PAYLOAD_SCHEMA_FIELD,
-            _stamp_hold_schema,
+            _normalize_hold_payload,
         )
 
-        stamped = _stamp_hold_schema({"code": "016055"}, "天天基金")
+        stamped = _normalize_hold_payload(
+            {"code": "016055", "name": "某基金", "date": "2026-03-31", "holdings": []}, "天天基金"
+        )
         self.assertEqual(stamped[_HOLD_PAYLOAD_SCHEMA_FIELD], _HOLD_PAYLOAD_SCHEMA)
         self.assertEqual(stamped["code"], "016055")
+        self.assertEqual(stamped["date"], "2026-03-31")
 
     def test_current_payload_detection(self):
         """带当前版本字段才准入；旧载荷与空值均拒收。"""

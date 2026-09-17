@@ -30,7 +30,8 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "price_fund_otc": ["eastmoney"],
     "price": ["tencent", "eastmoney"],
     "fund_rank": ["tiantian"],
-    "fund_hold": ["tiantian"],
+    # 基金披露持仓：天天基金为主，同花顺官方源为备（官方源需 key，未配置时链路自动跳过）
+    "fund_hold": ["tiantian", "hithink"],
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
     # 全文本财报（DataSinking，仅 A 股；需用户自备 key）
     "financial_report": ["datasink"],

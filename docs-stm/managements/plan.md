@@ -45,7 +45,7 @@
 |---|---|---|
 | 阶段 1 | provider 层：`providers/hithink.py`（凭据声明 / qps 限速器 / 信封与错误码 / 触发限流不重试 / 16 个域接口 / `to_thscode` 映射）+ 55 例单测 | ✅ **已实现并实测通过**：key 已配置，11 端点真实连通 10 通（指数成分股接口 429，阶段 4 复核）；默认 qps 按实测由 3 降为 2。实测字段结构见设计文档 §4.1 |
 | 阶段 2 | 财务指标域第三链路：`HithinkIndicatorAdapter` → `FinancialIndicatorFields`（五类 `ability` 与首批 `index_id` 已实测取到，全量清单需落表；**顺带以官方 `pe_ttm`/`pb_mrq` 修正项目自算 PE 口径**——实测长江电力 47.19 vs 官方 19.17） | ⬜ 待办 |
-| 阶段 3 | 基金披露持仓：穿透链路改两源链（hithink 官方披露持仓 ⇄ 天天基金），缓存归 `fund_hold_` + `hold_schema` 语义版本闸门；交叉校验后评估 `plan-47` 全量穿透 | ⬜ 待办 |
+| 阶段 3 | 基金披露持仓两源链 | ✅ **已实现**：`_FUND_HOLD_PROVIDERS` = 天天基金（主，三跳阶梯）→ 同花顺官方披露持仓（备，需 key）；两侧形态经 `_normalize_hold_payload` 归一（同花顺只取 `asset_type=stock`、报告期取披露结束日、联接基金由 `fund` 型资产直返目标 ETF）；**不递增 `hold_schema`**（归一后形态不变、旧条目不被误读）；顺序可用 `preferred_provider.fund_hold` 调换。实测 `016055.OF`→`513390.SH`、`012325.OF` 全债券被过滤 |
 | 阶段 4 | 行情第三链路（腾讯→新浪→同花顺）+ 历史日 K 前/后复权 + `fetch_trading_days` 校准 `core/trading_calendar.py` + 复权因子事件流 | ⬜ 待办 |
 | 阶段 5 | 情绪面新能力：新数据域 `market_sentiment`（涨跌停池/连板天梯/龙虎榜）+ 报告章节（开关默认关）+ 可选注入 LLM 信号预消化 | ⬜ 待办 |
 

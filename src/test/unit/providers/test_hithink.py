@@ -217,6 +217,80 @@ class TestToThscode:
         assert ht.to_thscode(code) == ""
 
 
+class TestFundHoldingsByCode:
+    """基金代码 → 候选 thscode 解析 + 披露持仓取数（阶段 3 备源入口）。"""
+
+    def test_candidates_pad_short_codes(self):
+        """4/5 位代码补零（持仓 Excel 会丢前导零），实测不补零返回 code=3001。"""
+        assert ht.fund_thscode_candidates("16055") == ["016055.OF"]
+        assert ht.fund_thscode_candidates("2943") == ["002943.OF"]
+
+    def test_candidates_onsite_etf_first_then_of(self):
+        """5/1 开头 6 位先试场内后缀，再试 .OF（两类后缀同形，命中即止）。"""
+        assert ht.fund_thscode_candidates("561910") == ["561910.SH", "561910.OF"]
+        assert ht.fund_thscode_candidates("159222") == ["159222.SZ", "159222.OF"]
+        assert ht.fund_thscode_candidates("011506") == ["011506.OF"]
+
+    def test_candidates_already_suffixed_and_invalid(self):
+        assert ht.fund_thscode_candidates("011506.OF") == ["011506.OF"]
+        assert ht.fund_thscode_candidates("") == []
+        assert ht.fund_thscode_candidates("ABC123") == []
+
+    def test_fetch_tries_candidates_until_hit(self, monkeypatch):
+        tried: list[str] = []
+
+        def _fake(thscode):
+            tried.append(thscode)
+            if thscode == "016055.OF":
+                return {
+                    "item": [
+                        {
+                            "ticker": "513390",
+                            "stock_name": "博时纳斯达克100ETF",
+                            "asset_type": "fund",
+                            "hold_ratio": 93.5,
+                        }
+                    ]
+                }
+            return None  # 0016055.OF 这类错误候选返回空
+
+        monkeypatch.setattr(ht, "fetch_fund_portfolio_holdings", _fake)
+        out = ht.fetch_fund_holdings("16055")
+        assert tried == ["016055.OF"]
+        assert out["_thscode"] == "016055.OF"
+
+    def test_feeder_target_detected_from_single_fund_item(self, monkeypatch):
+        """联接基金：持仓仅一只 fund 型资产 → 取该 ETF 代码作穿透目标（省去 HTML 探测）。"""
+        monkeypatch.setattr(
+            ht,
+            "fetch_fund_portfolio_holdings",
+            lambda t: {
+                "item": [
+                    {"ticker": "513390", "stock_name": "博时纳斯达克100ETF", "asset_type": "fund", "hold_ratio": 93.5}
+                ]
+            },
+        )
+        assert ht.fetch_fund_holdings("016055")["feeder_target_code"] == "513390"
+
+    def test_no_feeder_target_when_stock_items_present(self, monkeypatch):
+        """股票型基金不产生穿透目标（fund 型资产与股票并存时不判联接）。"""
+        monkeypatch.setattr(
+            ht,
+            "fetch_fund_portfolio_holdings",
+            lambda t: {
+                "item": [
+                    {"ticker": "688200", "stock_name": "华峰测控", "asset_type": "stock", "hold_ratio": 9.53},
+                    {"ticker": "513390", "stock_name": "某ETF", "asset_type": "fund", "hold_ratio": 5.0},
+                ]
+            },
+        )
+        assert "feeder_target_code" not in ht.fetch_fund_holdings("011506")
+
+    def test_returns_none_when_all_candidates_empty(self, monkeypatch):
+        monkeypatch.setattr(ht, "fetch_fund_portfolio_holdings", lambda t: None)
+        assert ht.fetch_fund_holdings("12325") is None
+
+
 class TestEndpointParams:
     """四域接口的路径与参数拼装（字段名以官方契约为准）。"""
 

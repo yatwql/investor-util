@@ -1,6 +1,6 @@
 # 同花顺金融数据服务接入设计（hithink）
 
-> 版本：0.11.1-dev ｜ 状态：**阶段 1 已实现并实测通过**（provider 层 + 55 例单测 + 11 端点真实连通，见 §4.1）；阶段 2~5 待实施（映射表按实测字段落表）
+> 版本：0.11.1-dev ｜ 状态：**阶段 1 已实测通过、阶段 3 已实施**（provider 层 + 55 例单测 + 11 端点真实连通，见 §4.1）；阶段 2~5 待实施（映射表按实测字段落表）
 > 上游：<https://github.com/HiThink-Tech/Financial-API>（同花顺官方 A 股数据服务）
 > 契约来源：<https://fuyao.aicubes.cn/llms-full.txt>（完整接口文档聚合）
 
@@ -66,12 +66,23 @@
 - **前置实测项**：已取到五类 `ability` 与首批 `index_id`（见 §4.1）；阶段 2 需把**每类指标的全量清单**落成映射表（逐项对齐 `FinancialIndicatorFields` 的营收/净利/同比/毛利率/ROE/负债率/现金流/EPS/每股净资产）。
 - 收益：akshare 主源失效时不必依赖 DataSinking 的章节解析支路。
 
-### 阶段 3 ⬜ 基金披露持仓域（收益最大）
+### 阶段 3 ✅ 基金披露持仓域（已实施）
 
-- 现穿透链路是「天天基金专用路径」（`providers/tiantian_holdings.py` + `fetcher/fund.py`），
-  本阶段把它改为**两源链**：`hithink`（官方披露持仓，含历史）与 `tiantian`（既有行为）互为备份。
-- 缓存归 `fund_hold_` 前缀，沿用 `hold_schema` **载荷语义版本**闸门（跨源字段形态不同 → 版本号区分，防旧载荷遮蔽）。
-- **实测项**：交叉校验同一基金的持仓占比与报告期（对齐 `plan-47` 的全量穿透需求评估）。
+- 链路：`fetcher/chain.py::_DEFAULT_CHAINS["fund_hold"] = ["tiantian", "hithink"]`，provider 表
+  `fetcher/fund.py::_FUND_HOLD_PROVIDERS` 同序（天天基金主 → 同花顺官方备，需 key）。
+- **载荷归一**：`_normalize_hold_payload`（按形状识别）——天天基金形态原样透传（主源可用时输出逐字不变）；
+  同花顺形态映射为 `code/name/date/holdings`：只取 `asset_type=stock`（债券/基金资产不进股票层）、
+  `hold_ratio`→`ratio`、报告期取 `end_date_ms`（回退 `publish_date_ms`）→ `YYYY-MM-DD`。
+- **联接基金信号**：`providers/hithink.py::fetch_fund_holdings` 在「持仓仅一只 `fund` 型资产」时直返
+  `feeder_target_code`，既有 `feeder_penetration` 链路据此穿透（省去 HTML 探测）。
+- **代码候选解析**：`fund_thscode_candidates`（补零 + 场内/场外后缀，逐个试到命中）——实测 `16055.OF`
+  报 `code=3001`、`016055.OF` 命中（仓库读取层已补零，此处为防御）。
+- **不递增 `hold_schema`**：缓存写入前必经归一，载荷恒为同一形态，旧条目不会被误读；递增只会让全体用户白缓存失效。
+- 实测：股票型 `011506.OF` / QDII `017730.OF`（含 AMD/MU/KLAC）/ ETF `561910.SH` 均返回 10 项股票持仓；
+  联接基金 `016055.OF` → 单只 `fund` 型（`513390.SH` 博时纳斯达克100ETF）；债券型 `012325.OF` 仅 `bond`
+  持仓 → 股票层为空（与天天基金「股票表为空」同口径）。
+- **阶段 3 收尾待办**：① 用同花顺**历史**持仓接口（`/portfolio/stock-history`）支撑 `plan-47` **全量穿透**
+  （现披露持仓仅前 10 大）；② 与天天基金做同基金占比/报告期交叉校验（校准容差）。
 
 ### 阶段 4 ⬜ 行情 / 日历 / 公司行动
 

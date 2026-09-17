@@ -700,7 +700,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
  │  history_fund_otc: 天天基金 pingzhongdata → 东方财富净值分页       │
  │  industry:       东方财富 push2          →  行情页 quotedata      │
  │  fund_rank:      天天基金（直达）                                   │
- │  fund_hold:      天天基金（直达）                                   │
+ │  fund_hold:      天天基金 → 同花顺官方（需 key）                   │
  │  bond_yield:     akshare bond_zh_us_rate（国债收益率，无风险利率）│
  └──────────────────────────────────────────────────────────────────┘
 ```
@@ -946,7 +946,7 @@ fetcher/
 ├── price.py            股票/ETF 最新价 + 场外基金净值 + 00 代码降级
 ├── index.py            A 股/美股指数（直调 Provider，不走 Chain）
 │                       + fetch_index_history 历史日线（走 Chain，C6 约束）
-├── fund.py             基金排名/持仓/基准（天天基金数据）
+├── fund.py             基金排名/持仓/基准（天天基金数据 + 同花顺官方备源）
 ├── fund_manager.py     基金经理数据（天天基金 HTML 解析）
 ├── industry.py         行业分类+概念板块（push2 双链路）
 ├── chain.py            Provider 优先链定义 + fallback 路由 + 增量合并
@@ -2210,9 +2210,10 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 
 次序本身就是隔离手段：无年份兜底被压到第 3 跳、且联接基金在第 2 跳即返回，故它无法遮蔽联接基金。**取数层不做时效判定**——陈旧判据唯一归属 `report/holdings_freshness.py`（`is_stale_report` / `STALE_QUARTERS`），复制到取数层即「判据复制」，两者日后必然漂移；第 3 跳的陈年报告照常上送，由报告层时效闸门裁决并标注「报告期 X，距今 N 个完整季度」。
 
+**两源链与载荷归一（基金披露持仓）**：`fetcher/fund.py::_FUND_HOLD_PROVIDERS` 为「天天基金（主，三跳阶梯 + 联接穿透）→ 同花顺官方披露持仓（备，需 key）」；链路顺序可用 `config.json` 的 `preferred_provider.fund_hold` 调换。两侧字段形态不同，统一经 `_normalize_hold_payload` 归一后再落缓存：**天天基金形态原样透传**（保证主源可用时输出逐字不变），**同花顺形态**（`item[]` + `asset_type`）按形状识别——只取 `asset_type=stock`（穿透层是股票层，债券/基金资产混入会污染占比分母）、`hold_ratio`→`ratio`（与天天基金同口径的百分数原值）、报告期取 `end_date_ms`（回退 `publish_date_ms`）→ `YYYY-MM-DD` 供时效闸门判定、联接基金（持仓仅一只 `fund` 型资产）取该 ETF 代码作 `feeder_target_code`。**不递增 `hold_schema`**：缓存写入前必经归一，载荷恒为同一形态，旧条目不会被误读，递增只会让全体用户的白缓存失效（判据是「旧载荷是否会被误读」）。
 **联接基金穿透（开关 `feeder_penetration`，默认开）**：ETF 联接基金的资产就是目标 ETF、本身不持有股票，故其季报股票表按构造为空（实测 `016055` 四个近季度的响应体均为 59/50 字节空内容）——修复前它在报告里恒为「持仓不可用」，QDII 联接基金因此拿不到任何底层暴露。穿透做法：目标 ETF 由基金主页面锚点**动态解析**（`parse_feeder_target_etf`，不维护「联接基金 → 目标 ETF」映射表，基金公司更换标的 ETF 时锚点随页面同步更新），再由 `fetcher/fund.py::with_feeder_penetration` 以目标 ETF 的持仓与报告期代理该基金的底层暴露，并在结果中记 `feeder_penetration = {target_code, target_name}` 供报告层标注来源。两处要点：①**幂等**——该函数在单条取数与批量两个接缝都调用，因为批量路径的 `execute_with_cache_check` 缓存命中时会跳过任务、穿透若只在网络路径做则热缓存下静默失效，故以「已带 `feeder_penetration` 即原样返回」保证重复调用无副作用；②**结构深度恒为 1**——只有名称含「联接」的基金才产出 `feeder_target_code`，而 ETF 名称不含「联接」，故目标基金永不产出新的目标，无需运行时深度计数。联动判定复用既有 `core/code_utils.py::is_index_link_by_name`（不新增第二份「是否联接」关键词表）；锚点两重区分（标签须止于「ETF」`(?!联)` + 目标须为场内代码）用于排除常规 ETF 页的**反向**链接（回指其场外联接基金）。归因口径为 **100%（不折算持有比例）**——联接基金约 95% 投向目标 ETF，未折算会轻微高估底层权重，报告中标「穿透自目标 ETF `XXXXXX`（未折算持有比例）」把该已知偏差公开；折算需解析联接基金自身的基金投资明细，当前无对应取数通道。
 
-**持仓缓存载荷语义版本（`hold_schema`）**：`fund_hold_*` 缓存条目的字段含义会在修复中变化（如 V2 的「三跳阶梯 + 联接穿透」使旧联接条目缺 `feeder_target_code`），而条目结构/键未变——仅靠 `hold` TTL（7 天）会在过期前持续遮蔽修复。故 provider 产出经 `fetcher/fund.py::_stamp_hold_schema` 盖上 `hold_schema` 版本字段，读取侧以 `_is_current_hold_payload` 为准入判据：版本不符即视为未命中、丢弃重取。判据接在**两处**读缓存接缝——`fetch_with_fallback` 的 `cache_validate` 参数（含过期降级条目）与批量预检回调 `_hold_cache_check`（`execute_with_cache_check` 命中会跳过任务，判据若只挂在链路内则热缓存下失效，与穿透幂等后处理同一病根）。
+**持仓缓存载荷语义版本（`hold_schema`）**：`fund_hold_*` 缓存条目的字段含义会在修复中变化（如 V2 的「三跳阶梯 + 联接穿透」使旧联接条目缺 `feeder_target_code`），而条目结构/键未变——仅靠 `hold` TTL（7 天）会在过期前持续遮蔽修复。故 provider 产出经 `fetcher/fund.py::_normalize_hold_payload` 归一后盖上 `hold_schema` 版本字段，读取侧以 `_is_current_hold_payload` 为准入判据：版本不符即视为未命中、丢弃重取。判据接在**两处**读缓存接缝——`fetch_with_fallback` 的 `cache_validate` 参数（含过期降级条目）与批量预检回调 `_hold_cache_check`（`execute_with_cache_check` 命中会跳过任务，判据若只挂在链路内则热缓存下失效，与穿透幂等后处理同一病根）。
 
 **板块分类（双层策略）**：
 
@@ -3217,6 +3218,9 @@ make_http_client(timeout=10.0) → httpx.Client
 <!-- semantic-index:start -->
 | 语义 slug | 中文名（文档/UI） | 归入章节 | 决策链环节 | config 开关 |
 |:--|:--|:--|:--|:--|
+| `hithink` | 同花顺金融数据服务 provider（A 股行情/财务/基金/情绪面；凭据声明/qps 限速/信封错误码） | 数据源 | 数据获取 | 需凭据源（`data_key.json` 的 `hithink` 节或 `HITHINK_FINANCE_API_KEY`） |
+| `fund_thscode_candidates` | 基金代码 → thscode 候选（补零 + 场内/场外后缀，逐个试到命中） | 基金业绩分析 | 数据获取 | 无 |
+| `_normalize_hold_payload` | 持仓载荷归一（provider 原始载荷 → 规范化持仓契约 `code/name/date/holdings` + `hold_schema`） | 基金业绩分析 | 数据获取 | 无 |
 | `holdings_detail` | 持仓明细与分类（合并章：市值核算明细区块 + 持仓分类汇总区块同页签呈现） | 持仓明细与分类 | 报告输出 | 始终显示（type=always） |
 | `holdings_detail_sheet` | 合并章 Excel 写入器（`write_holdings_detail_sheet`；区块写入器 `_write_market_value_block` / `_write_category_block`） | 持仓明细与分类 | 报告输出 | 无（渲染） |
 | `position_structure` | 持仓结构与集中度（合并章：重合度区块 + 相关性区块 + 集中度区块同页签呈现；可见性 `data_flag_any` OR） | 持仓结构与集中度 | 报告输出 | 基金深度分析（`enable_fund_deep_analysis` 控制） |

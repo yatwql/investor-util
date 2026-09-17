@@ -22,8 +22,9 @@ from src.python.cache import set as cache_set
 from src.python.config import get_config
 from src.python.core.constants import PROJECT_ROOT
 from src.python.fetcher.chain import FailureDiagnostics, fetch_with_fallback
+from src.python.providers import hithink as _hithink
+from src.python.providers.tiantian_holdings import fetch_fund_holdings as _tiantian_fund_holdings
 from src.python.core.http_client import make_http_client
-from src.python.providers.tiantian_holdings import fetch_fund_holdings
 from src.python.providers.tiantian_ranking import fetch_fund_rankings
 
 logger = logging.getLogger("invest")
@@ -86,14 +87,14 @@ V2 对应「三跳取数阶梯 + 联接基金穿透」：V1 的联接基金条�
 
 读侧以 :func:`_is_current_hold_payload` 为准入判据：版本不符即视为未命中、丢弃重取，
 使「改变载荷语义的修复」不再依赖用户手动清缓存。
+
+**新增 provider 不递增版本**（同花顺官方源接入即为此例）：缓存写入前必经
+:func:`_normalize_hold_payload` 归一，缓存里的载荷恒为同一规范化形态，旧条目不会
+被新代码误读；递增只会让全体用户的白缓存失效。仅当**规范化形态本身的含义**变化
+（如 ``date`` 语义、``ratio`` 口径）时才递增。
 """
 
 _HOLD_PAYLOAD_SCHEMA_FIELD = "hold_schema"
-
-
-def _stamp_hold_schema(raw: dict[str, Any], _source_label: str) -> dict[str, Any]:
-    """给 provider 产出的持仓载荷盖上当前语义版本（在缓存写入前生效）。"""
-    return {**raw, _HOLD_PAYLOAD_SCHEMA_FIELD: _HOLD_PAYLOAD_SCHEMA}
 
 
 def _is_current_hold_payload(payload: object) -> bool:
@@ -101,8 +102,74 @@ def _is_current_hold_payload(payload: object) -> bool:
     return isinstance(payload, dict) and payload.get(_HOLD_PAYLOAD_SCHEMA_FIELD) == _HOLD_PAYLOAD_SCHEMA
 
 
+def _normalize_hithink_holdings(raw: dict[str, Any]) -> dict[str, Any]:
+    """同花顺披露持仓 → 项目规范化持仓契约（``code/name/date/holdings``）。
+
+    - ``item[{stock_name, ticker, hold_ratio, asset_type}]`` → ``holdings[{name, code, ratio}]``，
+      仅取 ``asset_type == "stock"``——穿透层是**股票层**，债券/基金资产混入会污染占比分母
+      （实测短债基金 012325.OF 的持仓全为 ``bond``）。``ratio`` 与天天基金同口径（百分数原值）
+    - 报告期取 ``end_date_ms``（缺失回退 ``publish_date_ms``）→ ``YYYY-MM-DD``，供报告层时效闸门判定
+    - ``name`` 上游不带（该端点只回持仓明细）→ 置空，调用方用持仓表里的基金名
+    - 联接基金的 ``feeder_target_code`` 由 provider 层带回（实测 016055.OF → 513390.SH），此处原样保留
+    """
+    holdings: list[dict[str, Any]] = []
+    for item in raw.get("item") or []:
+        if not isinstance(item, dict) or str(item.get("asset_type") or "") != "stock":
+            continue
+        ratio = item.get("hold_ratio")
+        try:
+            ratio = float(ratio)
+        except (TypeError, ValueError):
+            continue
+        if not 0 < ratio <= 100:
+            continue
+        name = str(item.get("stock_name") or "").strip()
+        code = str(item.get("ticker") or "").strip()
+        if not name or not code:
+            continue
+        holdings.append({"name": name, "code": code, "ratio": ratio})
+    return {
+        "code": str(raw.get("code") or raw.get("_thscode") or ""),
+        "name": "",
+        "date": _ms_to_date(raw.get("end_date_ms") or raw.get("publish_date_ms")),
+        "holdings": holdings,
+        **({"feeder_target_code": str(raw["feeder_target_code"])} if raw.get("feeder_target_code") else {}),
+    }
+
+
+def _ms_to_date(value: object) -> str:
+    """毫秒时间戳 → ``YYYY-MM-DD``（Asia/Shanghai 自然日）；非法值返回空串。"""
+    try:
+        ts = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return ""
+    if ts <= 0:
+        return ""
+    from datetime import datetime
+
+    try:
+        return datetime.fromtimestamp(ts / 1000.0).strftime("%Y-%m-%d")
+    except (OSError, OverflowError, ValueError):
+        return ""
+
+
+def _normalize_hold_payload(raw: dict[str, Any], source_label: str = "") -> dict[str, Any]:
+    """provider 原始载荷 → 规范化持仓契约 + 盖当前语义版本。
+
+    天天基金侧本来就是这个形态（原样透传，保证主源输出逐字不变）；同花顺侧为官方
+    披露持仓形态（``item[]`` + ``asset_type``），按形状识别后归一。识别用形状而非
+    ``source_label``：显示名可变，载荷形状稳定。
+    """
+    if "holdings" not in raw and "item" in raw:
+        raw = _normalize_hithink_holdings(raw)
+    return {**raw, _HOLD_PAYLOAD_SCHEMA_FIELD: _HOLD_PAYLOAD_SCHEMA}
+
+
 _FUND_HOLD_PROVIDERS: dict[str, tuple[str, _ProviderFunc]] = {
-    "tiantian": ("天天基金", fetch_fund_holdings),
+    # 顺序即链路顺序：天天基金为主（保持既有输出逐字不变），同花顺官方源为备
+    # （主源失败/无持仓时接住；可用 config.json 的 preferred_provider.fund_hold 调换）
+    "tiantian": ("天天基金", _tiantian_fund_holdings),
+    "hithink": ("同花顺金融数据", _hithink.fetch_fund_holdings),
 }
 
 
@@ -134,7 +201,7 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
         get_ttl("hold", hold_cache_key),
         fn_kwargs={"code": code},
         diagnostics=diag,
-        transform=_stamp_hold_schema,
+        transform=_normalize_hold_payload,
         cache_validate=_is_current_hold_payload,
     )
     if result is not None:

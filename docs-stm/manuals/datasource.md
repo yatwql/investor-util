@@ -9,7 +9,7 @@
 | A 股指数行情 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` | `index_` | 持仓类 |
 | 美股指数行情 | 新浪财经 `hq.sinajs.cn`（gb_* 前缀） | 腾讯财经 `qt.gtimg.cn` | `index_` | 持仓类 |
 | 基金业绩排名 | 天天基金 `fund.eastmoney.com`（`pingzhongdata/{code}.js` JS 变量解析） | — | `fund_perf_` | 基础类 |
-| 基金持仓数据 | 天天基金 `fund.eastmoney.com/{code}.html`（HTML 解析） | 天天基金 `fundf10.eastmoney.com`（季报 API `FundArchivesDatas.aspx`，回溯 4 个季度） | `fund_hold_` | 基础类 |
+| 基金持仓数据 | 天天基金 `fund.eastmoney.com/{code}.html`（HTML 解析） | 天天基金 `fundf10.eastmoney.com`（季报 API `FundArchivesDatas.aspx`，回溯 4 个季度）→ **同花顺金融数据**（官方披露持仓，需 key；联接基金直返目标 ETF） | `fund_hold_` | 基础类 |
 | 基金经理数据 | 天天基金 `fund.eastmoney.com/{code}.html`（HTML 解析，与基金业绩排名同源） | 天天基金 `fundf10.eastmoney.com/jjjl_{code}.html`（档案页） | `fund_manager_` | 基础类 |
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业 + 概念板块归属） | 东方财富 REST 行情页（仅行业，无概念） | `industry_` | 基础类 |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `profit_forecast_` | 基础类 |
@@ -77,7 +77,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 - **响应信封**：`{code, message, request_id, data}`，HTTP 状态码恒 200，业务错误看 `code`（`0` 成功；`2001` 凭据无效、`2003` 权限不足、`4001` 频率超限、`5003` 数据源不可用等）
 
 - **实测（2026-09-16，key 已配置）**：11 个端点实测 10 通；`/api/a-share-index/constituents/ths-stock-list`（指数/板块成分股）两次 429 → 该接口限流更严或需更高权限，接入前复核。另发现官方估值口径为 TTM/MRQ，与项目自算 PE（报告期 EPS 口径）不可比（长江电力 19.17 vs 47.19）
-- **状态**：provider 层已就绪并实测通过（`providers/hithink.py`）；各数据域的链路接入（财务指标 / 基金持仓 / 行情 / 情绪面）按 `plan.md` 计划表分阶段推进
+- **已接入域**：**基金披露持仓**（`fund_hold` 链路**备源**：天天基金全链不可用时接管，载荷经同一归一器落到同一契约；联接基金直接返回目标 ETF，省去 HTML 探测）。provider 层其余域（财务指标 / 行情 / 情绪面）按 `plan.md` 计划表分阶段推进
 ### 财报全文（DataSinking）
 
 由 `fetcher/financial_report.py` 逐标的取数、`report/financial_report_digest.py` 装配（章节 `financial_report_digest`，开关 功能开关 `financial_report_digest` 默认关）：

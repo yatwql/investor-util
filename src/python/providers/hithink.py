@@ -349,6 +349,64 @@ def fetch_fund_portfolio_holdings(thscode: str) -> dict[str, Any] | None:
     return _request("/api/fund/portfolio/holdings", {"thscode": thscode})
 
 
+def fund_thscode_candidates(code: str) -> list[str]:
+    """基金代码 → thscode 候选（按命中概率排序，调用方逐个试到命中为止）。
+
+    仓库里的基金代码有三种形态，单一后缀猜想必然漏：
+      - 场外基金 6 位：``011506`` → ``011506.OF``
+      - 场外基金 5/4 位（持仓 Excel 丢前导零）：``16055`` → ``016055.OF``、
+        ``2943`` → ``002943.OF``（实测不补零返回 ``code=3001 Fund not found``）
+      - 场内 ETF/LOF：``561910`` → ``561910.SH``、``159222`` → ``159222.SZ``
+
+    两类后缀理论上同形（存在 5xxxxxx 的场外基金），故 5/1 开头的 6 位代码先试
+    场内后缀再试 ``.OF``；命中即止，未命中代价仅一次轻量请求（结果另有缓存兜底）。
+    """
+    raw = (code or "").strip().upper()
+    if not raw:
+        return []
+    if "." in raw:
+        return [raw]
+    if not raw.isdigit():
+        return []
+    cands: list[str] = []
+    if len(raw) == 6 and raw.startswith("5"):
+        cands.append(f"{raw}.SH")
+    if len(raw) == 6 and raw.startswith("1"):
+        cands.append(f"{raw}.SZ")
+    if len(raw) <= 6:
+        cands.append(f"{raw.zfill(6)}.OF")
+    return list(dict.fromkeys(cands))
+
+
+def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
+    """基金**项目代码** → 同花顺披露持仓原始载荷（含后缀候选解析）。
+
+    与 :func:`fetch_fund_portfolio_holdings` 的分工：本函数吃项目内代码（可能丢
+    前导零、可能是场内 ETF），逐个候选 thscode 试到命中为止；返回的是上游原始
+    ``data``（字段归一由 ``fetcher/fund.py`` 的规范化变换承担），并补两个装配层
+    需要、上游不给的标量：
+
+      - ``_thscode``：命中的 thscode（便于日志与排查）
+      - ``feeder_target_code``：**联接基金**信号——持仓只有一只 ``fund`` 型资产
+        （如 ``016055.OF`` → ``513390.SH`` 博时纳斯达克100ETF）时取其 ticker，
+        供既有「联接基金穿透到目标 ETF」链路使用（省去 HTML 探测）
+    """
+    for thscode in fund_thscode_candidates(code):
+        data = fetch_fund_portfolio_holdings(thscode)
+        if not data:
+            continue
+        items = [i for i in (data.get("item") or []) if isinstance(i, dict)]
+        if not items:
+            continue
+        payload = {**data, "_thscode": thscode}
+        fund_items = [i for i in items if str(i.get("asset_type") or "") == "fund"]
+        stock_items = [i for i in items if str(i.get("asset_type") or "") == "stock"]
+        if len(fund_items) == 1 and not stock_items and fund_items[0].get("ticker"):
+            payload["feeder_target_code"] = str(fund_items[0]["ticker"])
+        return payload
+    return None
+
+
 def fetch_fund_stock_history(thscode: str, report_type: str, end_date: str) -> dict[str, Any] | None:
     """基金指定报告期的历史股票持仓。"""
     return _request(
@@ -372,9 +430,11 @@ __all__ = [
     "fetch_cash_flow_statements",
     "fetch_dragon_tiger_list",
     "fetch_financial_indicators",
+    "fetch_fund_holdings",
     "fetch_fund_nav",
     "fetch_fund_portfolio_holdings",
     "fetch_fund_stock_history",
+    "fund_thscode_candidates",
     "fetch_income_statements",
     "fetch_index_constituents",
     "fetch_limit_up_ladder",

@@ -113,7 +113,7 @@
 
 17 个报告页签/章节按 `type` 划分为 8 组，各组显示条件和用途不同：
 
-### ① 基础核心（type=always）
+### ① 基础核心（type=always）<a id="基础核心typealways"></a>
 
 始终显示，报告的基础骨架。共 5 个模块：
 
@@ -125,7 +125,7 @@
 | 4 | **基金业绩分析** | always | 收益率、评级、基准对比 |
 | 15 | **数据源可用性矩阵** | always | 各数据源实时可用性状态汇总 + 数据源说明表（用途/计费/凭据） |
 
-### ② 基金深度分析（type=fund_deep_analysis）
+### ② 基金深度分析（type=fund_deep_analysis）<a id="基金深度分析typefund_deep_analysis"></a>
 
 需要基金持仓数据，有数据才显示。共 2 个模块：
 
@@ -136,7 +136,7 @@
 
 > 菜单 B/L 可输出，有基金持仓数据且基金深度分析计算完成后才渲染。
 
-### ③ 市场新闻（type=news）
+### ③ 市场新闻（type=news）<a id="市场新闻typenews"></a>
 
 需要启用新闻功能。共 1 个模块：
 
@@ -146,7 +146,7 @@
 
 > 菜单 B/L 可输出，依赖 `enable_news = true`。
 
-### ④ LLM 分析（type=llm）
+### ④ LLM 分析（type=llm）<a id="llm-分析typellm"></a>
 
 需要启用 LLM 功能。共 5 个模块：
 
@@ -181,7 +181,7 @@
 > **内容完全缺失或为降级占位符时不叠加该横幅**——此时章节本身已是醒目的占位提示，重复标注只会增加噪声。
 > 评级**只标注、不阻断、不重试、不写回 LLM 缓存**：不影响报告生成，也不改变缓存内容，纯为读者提供采信度参考。三入口开启方式见 [常规配置指引](how-to-config.md) §M。
 
-### ⑤ 历史走势（type=history）
+### ⑤ 历史走势（type=history）<a id="历史走势typehistory"></a>
 
 始终显示，数据不可用时显示占位文本。共 1 个模块（一章三区块）：
 
@@ -191,7 +191,7 @@
 
 > 菜单 B/L 可输出，由 `history.fetch_mode` 配置（`"off"` / `"prompt"` / `"auto"`）控制获取行为，数据不可用时不阻断报告生成。
 
-### ⑥ 组合演进（type=evolution）
+### ⑥ 组合演进（type=evolution）<a id="组合演进typeevolution"></a>
 
 由独立开关 `enable_portfolio_evolution` 控制，数据不可用时显示占位文本。共 1 个模块（一章多区块）：
 
@@ -201,7 +201,7 @@
 
 > 菜单 E/B/L 可输出，依赖 `enable_portfolio_evolution = true`。持仓快照不受开关影响，始终自动记录，开关仅控制报告展示。变化摘要复用同一批快照数据（`data/history/snapshots/`），与趋势演进同开关、同数据源。
 
-### ⑦ 行动建议（type=action）
+### ⑦ 行动建议（type=action）<a id="行动建议typeaction"></a>
 
 由独立顶层开关 `enable_action` 控制（**默认开启**，可在菜单 `P` 关闭），数据不可用时显示占位文本。共 1 个模块：
 
