@@ -11,8 +11,8 @@
 
 限流：官方口径「不限制累计调用次数」，但按实时负载动态限流（HTTP 429 或信封
 ``code=4001``）。文档明确要求「降低并发与频率、避免立即连续重试」，故本层：
-  ① 每次请求前经 ``RateLimiter`` 取得许可（间隔 = 1/qps，默认 3.0 与保守口径对齐，
-     可经 ``config.json`` 的 ``hithink.qps`` 覆盖）；
+  ① 每次请求前经 ``RateLimiter`` 取得许可（间隔 = 1/qps，默认 2.0——**实测值**：
+     3.0 时连续拉取 11 个端点即被 429；可经 ``config.json`` 的 ``hithink.qps`` 覆盖）；
   ② 命中限流记 WARNING 并返回空，交链路降级——**不做立即重试**（与 datasink 的
      「退避后重试一次」不同，遵循各源官方指引）。
 
@@ -53,8 +53,9 @@ _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 #: 通用数据源密钥文件默认相对路径（配置键 ``data_key_file`` 可覆盖为绝对路径）
 DEFAULT_KEY_FILE = "data/config/data_key.json"
 
-#: 默认每秒请求上限（官方不给固定额度，取保守值；``config.json`` 的 ``hithink.qps`` 可覆盖）
-DEFAULT_QPS = 3.0
+#: 默认每秒请求上限（官方不给固定额度）。实测取 3.0 时会触发 429（连续拉取 11 个端点即被
+#: 限流），故按实测下调为 2.0；``config.json`` 的 ``hithink.qps`` 可覆盖
+DEFAULT_QPS = 2.0
 
 #: 业务错误码 → 语义（响应信封 ``code`` 非 0 时的日志依据）
 _ERROR_HINTS: dict[int, str] = {

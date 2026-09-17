@@ -43,13 +43,13 @@
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
-| 阶段 1 | provider 层：`providers/hithink.py`（凭据声明 / qps 限速器 / 信封与错误码 / 触发限流不重试 / 16 个域接口 / `to_thscode` 映射）+ 52 例单测 | ✅ 已实现（设计见 `docs-stm/plan/hithink-financial-data-design.md`） |
-| 阶段 2 | 财务指标域第三链路：`HithinkIndicatorAdapter` → `FinancialIndicatorFields`（**需实测校准 `index_id` 清单**） | ⬜ 待办 |
+| 阶段 1 | provider 层：`providers/hithink.py`（凭据声明 / qps 限速器 / 信封与错误码 / 触发限流不重试 / 16 个域接口 / `to_thscode` 映射）+ 55 例单测 | ✅ **已实现并实测通过**：key 已配置，11 端点真实连通 10 通（指数成分股接口 429，阶段 4 复核）；默认 qps 按实测由 3 降为 2。实测字段结构见设计文档 §4.1 |
+| 阶段 2 | 财务指标域第三链路：`HithinkIndicatorAdapter` → `FinancialIndicatorFields`（五类 `ability` 与首批 `index_id` 已实测取到，全量清单需落表；**顺带以官方 `pe_ttm`/`pb_mrq` 修正项目自算 PE 口径**——实测长江电力 47.19 vs 官方 19.17） | ⬜ 待办 |
 | 阶段 3 | 基金披露持仓：穿透链路改两源链（hithink 官方披露持仓 ⇄ 天天基金），缓存归 `fund_hold_` + `hold_schema` 语义版本闸门；交叉校验后评估 `plan-47` 全量穿透 | ⬜ 待办 |
 | 阶段 4 | 行情第三链路（腾讯→新浪→同花顺）+ 历史日 K 前/后复权 + `fetch_trading_days` 校准 `core/trading_calendar.py` + 复权因子事件流 | ⬜ 待办 |
 | 阶段 5 | 情绪面新能力：新数据域 `market_sentiment`（涨跌停池/连板天梯/龙虎榜）+ 报告章节（开关默认关）+ 可选注入 LLM 信号预消化 | ⬜ 待办 |
 
-**前置条件**：需用户自备 API key（<https://fuyao.aicubes.cn/admin/> 免费申领），写入 `data/config/data_key.json` 的 `hithink` 节或环境变量 `HITHINK_FINANCE_API_KEY`；阶段 2 起的字段映射须以真实响应校准。
+**前置条件已完成**：API key 已写入 `data/config/data_key.json` 的 `hithink` 节（文件由 `.gitignore` 忽略，不入库）。
 
 **约束与红线**：① provider 只取原始响应，字段归一交 `source_adapter`、缓存/熔断/降级交 `fetch_with_fallback`（不新造取数路径）；② 新数据域须登记 `DOMAIN_RECORDS` + 附录 H + 双端一致性测试；③ 新章节挂 Feature Flag 且默认关（关闭时输出逐字节一致）；④ 凭据值永不落日志/报告/缓存。
 

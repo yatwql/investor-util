@@ -1,6 +1,6 @@
 # 同花顺金融数据服务接入设计（hithink）
 
-> 版本：0.11.1-dev ｜ 状态：**阶段 1 已实现**（provider 层 + 52 例单测）；阶段 2~5 待实施（需 API key 实测校准字段）
+> 版本：0.11.1-dev ｜ 状态：**阶段 1 已实现并实测通过**（provider 层 + 55 例单测 + 11 端点真实连通，见 §4.1）；阶段 2~5 待实施（映射表按实测字段落表）
 > 上游：<https://github.com/HiThink-Tech/Financial-API>（同花顺官方 A 股数据服务）
 > 契约来源：<https://fuyao.aicubes.cn/llms-full.txt>（完整接口文档聚合）
 
@@ -49,7 +49,7 @@
 
 ## 3. 阶段划分
 
-### 阶段 1 ✅ provider 层（已实现）
+### 阶段 1 ✅ provider 层（已实现 + 实测通过，见 §4.1）
 
 `providers/hithink.py`：凭据声明（`CredentialSpec`，节名 `hithink`，环境变量 `HITHINK_FINANCE_API_KEY`）、
 限速器（间隔 = 1/qps，默认 3，可经 `config.json` 的 `hithink.qps` 覆盖）、
@@ -63,8 +63,7 @@
 
 - 新增 `fetcher/financial_indicator_adapters.py::HithinkIndicatorAdapter`，把
   `financials/indicators` 的五类 `index_id`/`value` 映射到既有 `FinancialIndicatorFields`。
-- **前置实测项**：文档只给「五类指标」分类，**具体 `index_id` 字段名清单需拉官方指标表 +
-  用真实响应校准**（无 key 无法确认，故不先写死映射表）。
+- **前置实测项**：已取到五类 `ability` 与首批 `index_id`（见 §4.1）；阶段 2 需把**每类指标的全量清单**落成映射表（逐项对齐 `FinancialIndicatorFields` 的营收/净利/同比/毛利率/ROE/负债率/现金流/EPS/每股净资产）。
 - 收益：akshare 主源失效时不必依赖 DataSinking 的章节解析支路。
 
 ### 阶段 3 ⬜ 基金披露持仓域（收益最大）
@@ -98,7 +97,28 @@
 4. 报告回归：开启对应开关跑一次完整报告，核对新区块/新链路与 `dev-verify` 门禁。
 
 ---
+## 4.1 实测结果（2026-09-16，key 已配置）
 
+**连通性**：11 个端点实测，**10 个成功**；失败 1 个：`/api/a-share-index/constituents/ths-stock-list` 连续两次 429（同时段其他端点正常，退避 3s 后仍 429）→ 判定为**该接口独立限流或权限要求更高**，阶段 4 接入前需复核。
+
+**关键字段结构（实测，可直接用于阶段 2/3 映射）**：
+
+| 端点 | 实测结构 |
+|---|---|
+| `financials/indicators` | `{thscode, report, abilities:[{ability, indicators:[{index_id, value}]}]}`；实测五类：`growth`(4) / `profitability`(5) / `solvency`(5) / `operation`(5) / `cash-flow`(4)，`index_id` 形如 `calculate_operating_income_yoy_growth_ratio`、`total_assets_net_ratio`、`current_ratio`、`total_assets_turnover_ratio`、`net_profit_cash_content`（**全量清单待阶段 2 落表**） |
+| `financials/income-statements` | `item[{thscode, ticker, period, fiscal_year, fiscal_period, report_date_ms, period_end_ms, currency, operating_income, operating_costs, ...}]` |
+| `valuations/snapshot` | `item[{thscode, ticker, name, pe_ttm, pe_mrq, pb_mrq, ps_ttm, pcf_ttm}]` |
+| `prices/snapshot` | `item[{thscode, ticker, volume, turnover, last_price, price_change, price_change_ratio_pct, open_price, high_price, low_price, prev_price}]` |
+| `corporate-actions/adjustment-factors` | `item[{ticker, ex_date_ms, dividend_per_share, per_share_bonus}]`（长江电力 26 条事件） |
+| `fund/portfolio/holdings` | 汇总 `{total_stock_ratio_pct, stock_ratio_pct, main_industry, concentration_ratio}` + `item[{thscode, ticker, stock_name, hold_ratio, asset_type, position_capital, position_count, security_market_value_rate_pct, period_increase_rate_pct, investment_rank, start_date_ms, ...}]`；实测 建信高端装备(011506.OF) 10 项（华峰测控 9.53% / 长川科技 8.95% / 中际旭创 7.39%），报告期 2026-04-01（2026Q1 披露） |
+| `fund/performance/nav` | `item[{nav_date, unit_nav, adj_nav}]` |
+| `special-data/dragon-tiger-list` | `{timestamp, board_type, trade_date, count, stock_count, stock_items[{thscode, ticker, name, concept_list, change, net_value, net_rate, hot_rank, buy_value, sell_value, limit_reason, range_days, org_net_value}], hot_money_items}`；实测 2026-09-16 共 73 条 |
+| `special-data/limit-up-ladder` | `{window:{length, date_list, board_caps}, item[{date, boards}]}` 近 30 个交易日 |
+| `calendar/trading-days` | `item[{date_ms, date}]`，实测 243 个交易日 |
+
+**限流实测**：默认 3 qps 时连续拉取 11 个端点即触发 429 → **默认 qps 下调为 2.0**（`config.json` 的 `hithink.qps` 可覆盖），并保持「触发限流不立即重试」策略。
+
+**口径差异发现（重要）**：项目现有「当前 PE/PB」是**自算**（现价 ÷ 报告期 EPS/BVPS），与官方 TTM/MRQ 口径不可比——长江电力实测：项目报告 47.19（半年报 EPS 口径）vs 官方 `pe_ttm` 19.17；PB 一致（3.22 vs 3.21）。阶段 2 应以官方 `pe_ttm`/`pe_mrq`/`pb_mrq` 为准（并顺带获得 `ps_ttm`/`pcf_ttm` 两个新维度）。
 ## 5. 架构约束自查（对照 `technical.md` 架构设计约束）
 
 - **不新造取数路径**：provider 只取原始响应；字段归一交 `source_adapter`，缓存/熔断/降级交 `fetcher/chain`（C-取数链路分层）。

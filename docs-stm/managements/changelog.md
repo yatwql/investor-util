@@ -6,6 +6,19 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 同花顺数据服务：key 配置 + provider 实测通过（11 端点 10 通）（2026-09-16）
+
+**落地**：
+- `data/config/data_key.json` 新增 `hithink` 节（key 由用户申领；文件已被 `.gitignore` 忽略，凭据不入库、不落日志/报告/缓存）
+- provider 实测（11 端点）：交易日历、财务指标、利润表、估值快照、行情快照、复权因子、基金披露持仓、基金净值、龙虎榜、连板天梯 **全部连通**；仅 `/api/a-share-index/constituents/ths-stock-list`（指数/板块成分股）两次 429（其余端点正常）→ 判定该接口限流更严或需更高权限，阶段 4 接入前复核
+- 默认限速按实测由 3 qps **下调为 2.0**（3 时连续拉 11 个端点即被 429）；新增「配置覆盖 qps / 非法值回落默认」回归用例 3 例（累计 55 例）
+- 设计文档新增 §4.1「实测结果」：逐端点字段结构（可直接用于阶段 2/3 映射）、限流观察、口径差异发现；`plan.md` 阶段 1 标注实测通过、阶段 2 前置就绪
+
+**实测关键发现**：
+- 财务指标为 `abilities[5]`（growth/profitability/solvency/operation/cash-flow）+ `indicators[{index_id, value}]`，首批 `index_id` 已取到（如 `calculate_operating_income_yoy_growth_ratio`、`total_assets_net_ratio`）
+- 基金披露持仓含逐项 `hold_ratio`/`investment_rank`/`start_date_ms` 与汇总（`total_stock_ratio_pct`/`main_industry`/`concentration_ratio`）；实测建信高端装备(011506.OF) 10 项、报告期 2026Q1 —— 阶段 3/全量穿透的数据基础已确认存在
+- **口径差异**：官方估值为 TTM/MRQ，项目自算 PE 用报告期 EPS → 长江电力 47.19 vs 19.17（PB 一致 3.22 vs 3.21）；记为 `rf-386`（待处理），阶段 2 改为以官方为准
+
 ### 新增：pi 模型采样配置（DeepSeek 编程档，`.pi/models.json`）（2026-09-16）
 
 **背景**：pi 支持 `samplingParams`（自由采样参数字典，逐字合并进请求体、覆盖 pi 自身字段），可用它固定 DeepSeek 的采样；但 pi CLI 只读 `~/.pi/agent/models.json`，项目级 `.pi/` 只支持 settings/扩展/技能/主题。

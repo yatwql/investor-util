@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.1-dev
-> **编号源**：`rf-next = 386`（新增问题取此编号，完成后更新为 +1；已用最大 rf-385，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 387`（新增问题取此编号，完成后更新为 +1；已用最大 rf-386，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -46,6 +46,7 @@
 |---|------|----------|
 | **rf-379** | `llm/api.py::_resolve_thinking_budget` 兜底方向可疑：配置的 `thinking_budget_{module}` 小于 `max_tokens + 1024` 时被判「不足」并**提升到 `max_tokens + 4096`** → 实际发送 `budget_tokens > max_tokens`。但 Anthropic 官方约束是 `budget_tokens < max_tokens`（Gemini 2.5 亦要求 thinkingBudget 小于 maxOutputTokens），方向相反 → Claude/Gemini 原生模型 + 开启 thinking 时可能被 API 拒绝（日志表现：「Claude API 响应格式异常」后关闭 thinking 重试）。手册 `how-to-config-llm.md`「thinking_budget 与 max_tokens 的关系」将该方向写为「API 硬约束须 ≥ max_tokens + 1024」，同样待核实 | ① 查证 Anthropic / Gemini 真实约束并构造复现（两者是否都要求 budget < max_tokens）；② 若方向确认写反，改为「budget 上限 = max_tokens − 正文余量（如 −2048 或 −20%）」；③ 同步更新手册与 `llm-technical.md`；④ 补 payload 级回归测试（Claude / Gemini 两条路径各一） |
 
+| **rf-386** | **「当前 PE/PB」口径与官方 TTM/MRQ 不可比**：项目用**报告期 EPS/BVPS** 自算（`analysis/financial_indicator.py::current_valuation`），而市场通用口径是 TTM/MRQ——实测长江电力同一时点：项目报告 PE **47.19**（2026 半年报 EPS 口径）vs 同花顺官方 `pe_ttm` **19.17**（差约 2.5 倍），PB 基本一致（3.22 vs 3.21）。后果：报告里「当前 PE」与任何外部/官方口径对比都会显得离谱（半年报 EPS 使 PE 虚高近一倍），估值判断被误导 | 阶段 2 引入同花顺估值快照后，改为**以官方 `pe_ttm`/`pe_mrq`/`pb_mrq` 为准**（并顺带获得 `ps_ttm`/`pcf_ttm` 两个新维度）；官方不可用时回退现有自算值，但须在列名/脚注标注口径（`PE(TTM)` vs `PE(自算)`） |
 ## 已解决问题
 
 ### 已解决待归档（v0.11.1-dev）

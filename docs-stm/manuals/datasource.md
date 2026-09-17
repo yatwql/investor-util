@@ -72,11 +72,12 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 
 - **鉴权**：用户自备 key（免费申领 <https://fuyao.aicubes.cn/admin/>），存通用密钥文件 `data/config/data_key.json` 的 `hithink` 节（`{"hithink": {"api_key": "..."}}`）或环境变量 `HITHINK_FINANCE_API_KEY`（优先）；缺 key 时链路主动跳过，不发请求
 
-- **限流**：官方**不限累计调用次数**，按负载动态限流（HTTP 429 或信封 `code=4001`）。本程序每次请求前经 `RateLimiter`（间隔 = 1/qps，默认 3，可经 `config.json` 的 `hithink.qps` 覆盖）；**命中限流不立即重试**（遵循官方指引），记 WARNING 后由链路降级
+- **限流**：官方**不限累计调用次数**，按负载动态限流（HTTP 429 或信封 `code=4001`）。本程序每次请求前经 `RateLimiter`（间隔 = 1/qps，**默认 2（实测值：3 时连续拉 11 个端点即被 429）**，可经 `config.json` 的 `hithink.qps` 覆盖）；**命中限流不立即重试**（遵循官方指引），记 WARNING 后由链路降级
 
 - **响应信封**：`{code, message, request_id, data}`，HTTP 状态码恒 200，业务错误看 `code`（`0` 成功；`2001` 凭据无效、`2003` 权限不足、`4001` 频率超限、`5003` 数据源不可用等）
 
-- **状态**：provider 层已就绪（`providers/hithink.py`）；各数据域的链路接入（财务指标 / 基金持仓 / 行情 / 情绪面）按 `plan.md` 计划表分阶段推进
+- **实测（2026-09-16，key 已配置）**：11 个端点实测 10 通；`/api/a-share-index/constituents/ths-stock-list`（指数/板块成分股）两次 429 → 该接口限流更严或需更高权限，接入前复核。另发现官方估值口径为 TTM/MRQ，与项目自算 PE（报告期 EPS 口径）不可比（长江电力 19.17 vs 47.19）
+- **状态**：provider 层已就绪并实测通过（`providers/hithink.py`）；各数据域的链路接入（财务指标 / 基金持仓 / 行情 / 情绪面）按 `plan.md` 计划表分阶段推进
 ### 财报全文（DataSinking）
 
 由 `fetcher/financial_report.py` 逐标的取数、`report/financial_report_digest.py` 装配（章节 `financial_report_digest`，开关 功能开关 `financial_report_digest` 默认关）：

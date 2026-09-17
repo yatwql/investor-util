@@ -159,6 +159,32 @@ class TestLimiter:
         assert client.calls  # 已发出请求
 
 
+class TestQpsConfig:
+    """限速间隔：默认取实测保守值，可由 config.json 的 hithink.qps 覆盖。"""
+
+    def test_default_qps_is_conservative(self):
+        """默认 2.0（实测 3.0 会触发 429），且不得高于该实测基线。"""
+        assert ht.DEFAULT_QPS == 2.0
+
+    def test_config_qps_overrides_default(self, monkeypatch):
+        import src.python.config as cfg
+
+        monkeypatch.setattr(cfg, "get_config", lambda: {"hithink": {"qps": 5}})
+        ht.reset_hithink_limiter()
+        limiter = ht._get_limiter()
+        assert limiter._limits[ht.SOURCE_ID] == pytest.approx(1 / 5)
+        ht.reset_hithink_limiter()
+
+    def test_invalid_config_falls_back_to_default(self, monkeypatch):
+        import src.python.config as cfg
+
+        monkeypatch.setattr(cfg, "get_config", lambda: {"hithink": {"qps": "fast"}})
+        ht.reset_hithink_limiter()
+        limiter = ht._get_limiter()
+        assert limiter._limits[ht.SOURCE_ID] == pytest.approx(1 / ht.DEFAULT_QPS)
+        ht.reset_hithink_limiter()
+
+
 class TestToThscode:
     @pytest.mark.parametrize(
         ("code", "expected"),
