@@ -15,8 +15,10 @@
 from __future__ import annotations
 
 import logging
+
+from src.python.core.constants import BEIJING_TZ
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from src.python import cache
 
@@ -111,7 +113,7 @@ def get_last_trading_day() -> str:
     Returns:
         YYYY-MM-DD 格式的交易日字符串
     """
-    now = datetime.now(timezone(timedelta(hours=8)))
+    now = datetime.now(BEIJING_TZ)
     # 若盘前（< 9:30），基准日设为昨天
     check = now - timedelta(days=1) if now.hour < 9 or now.hour == 9 and now.minute < 30 else now
 

@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import logging
+
+from src.python.core.constants import BEIJING_TZ
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Any, Callable
 
 from src.python.core.num_utils import safe_num
@@ -66,7 +68,7 @@ def ts_to_str(ts: int) -> str:
         "YYYY-MM-DD HH:MM" 格式的字符串，转换失败返回 ""
     """
     try:
-        bj_tz = timezone(timedelta(hours=8))
+        bj_tz = BEIJING_TZ
         dt = datetime.fromtimestamp(ts, tz=bj_tz)
         return dt.strftime("%Y-%m-%d %H:%M")
     except (OSError, ValueError, OverflowError):

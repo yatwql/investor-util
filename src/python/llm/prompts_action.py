@@ -10,7 +10,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+
+from src.python.core.constants import BEIJING_TZ
+from datetime import datetime
 from typing import Any
 
 from src.python.core.decision_header import build_structured_header_instruction
@@ -62,7 +64,7 @@ def _build_global_macro_prompt(
         sector_flow: 行业资金流向数据（可选），含主力净流入排名
         competitive_context: 竞争语境文本（可选），由呼叫方构建
     """
-    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    now_bj = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     idx_text = "A股:"
     for idx in (a_indices or {}).values():
         name = idx.get("name", "")
@@ -216,7 +218,7 @@ def _build_expert_review_prompt(
             ``decision_header_parse``，默认开启）。关闭时提示词与未加此项前逐字节一致，
             不扰动既有缓存指纹。
     """
-    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    now_bj = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
     holdings_text = _format_holdings_block(holdings_details, compact=True)
@@ -385,7 +387,7 @@ def _build_health_check_prompt(
         enable_signal_digest: 注入算法评级预消化信号块（实验项
             ``signal_pre_digest``；无可用信号时静默跳过）。
     """
-    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    now_bj = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
     holdings_text = _format_holdings_block(holdings_details, show_cost=True)
@@ -458,7 +460,7 @@ def _build_penetration_deep_prompt(
     要求 LLM 基于穿透 TOP10 和持仓行业分类，
     分析行业集中度、品种集中度、国别/币种暴露。
     """
-    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    now_bj = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
     holdings_text = _format_holdings_block(holdings_details)

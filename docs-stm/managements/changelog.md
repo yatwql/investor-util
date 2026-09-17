@@ -6,6 +6,21 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 修复：CI 时区缺陷（日期换算按北京时间固定，附时区无关性守卫）（2026-09-17）
+
+**现场**：GitHub Actions（ubuntu-latest，UTC）在 commit `2d934682` 上 **P0（dev-verify）三个 Python 版本全红**，本地（CST）全绿——失败用例为本次新增的 `TestHithinkHoldingsNormalization::test_maps_items_to_canonical_holdings`：`AssertionError: 2026-06-29 != 2026-06-30`。
+
+**根因**：新抽出的「毫秒戳 → YYYY-MM-DD」共享原语用了 `datetime.fromtimestamp(...)`（**本机时区**）。`1782748800000` = 2026-06-30 00:00 CST = 2026-06-29 16:00 UTC → CI 上少一天。同类内联写法仓库内还有 11 处（`core/market_hours.py`、`core/trading_calendar.py`、`llm/prompts_action.py`×4、`providers/akshare_news.py`×3、`providers/_utils.py`），任一漏改都会让报告日期/交易日边界随运行环境漂移。
+
+**修改**：
+- 新增 `core.constants.BEIJING_TZ`（UTC+8 固定偏移，无 DST）作为**项目统一自然日口径**的唯一事实来源
+- `core/num_utils.py::ms_to_date_str` 按 `BEIJING_TZ` 解释为北京自然日（不再用本机时区）
+- 11 处内联 `timezone(timedelta(hours=8))` 全部收敛到该常量（`market_hours` 保留 `_BJ_TZ` 别名以维持模块内可读性）
+- 新增回归守卫 `test_independent_of_process_timezone`：Unix 下依次切 `UTC` / `Asia/Shanghai` / `America/New_York` 三次，断言换算结果恒等
+- 自审：`review-findings.md` 记 rf-391（已解决），`rf-next → 392`
+
+**验证**：CST 与 UTC 双时区复跑——dev-verify 2891 / verify 4856 / regression 249 / scenario+integration 317 全绿；ruff 全绿。
+
 ### 技术债整改（近 48h 实现复核）+ plan/设计文档状态核对（2026-09-17）
 
 **一、技术债复核（近 48h：131 个源文件、+13k/−4k 行）**

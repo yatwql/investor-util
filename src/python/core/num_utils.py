@@ -5,7 +5,7 @@
 （NaN 为真，``or`` 短路不生效）。本模块把散落在 providers/analysis/report
 各层的十来个私有解析器收敛为一处实现，只保证一条不变量——**返回的数值一定有限**。
 
-分层：本模块零项目内依赖（纯 stdlib），因此 ``core`` / ``providers`` /
+分层：本模块只依赖 ``core.constants``（该模块本身仅用 stdlib，故不成环），因此 ``core`` / ``providers`` /
 ``analysis`` / ``report`` / ``fetcher`` 任一侧均可安全导入。这是它不放在
 ``analysis/_math_utils.py`` 的原因——那个模块是统计专用，且 ``analysis``
 已依赖 ``core``，反向导入会成环。
@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import math
 from datetime import datetime
+
+from src.python.core.constants import BEIJING_TZ
 from typing import Any
 
 __all__ = ["finite_or", "is_finite_number", "ms_to_date_str", "safe_num", "strict_num"]
@@ -111,11 +113,14 @@ def ms_to_date_str(value: Any) -> str:
     非正值（``0`` / 负数，上游用 0 表示「无」）、超出 ``datetime`` 可表示范围。
 
     与 :func:`safe_num` 同一取舍：**宽容**——只保证返回可安全展示的字符串。
+
+    时区：一律按 :data:`core.constants.BEIJING_TZ`（UTC+8 固定偏移）解释为**北京自然日**，
+    不用本机时区——否则同一毫秒戳在不同运行环境会算成相邻两天（CI 跑 UTC 时实测踩过）。
     """
     num = safe_num(value)
     if num is None or num <= 0:
         return ""
     try:
-        return datetime.fromtimestamp(num / 1000.0).strftime("%Y-%m-%d")
+        return datetime.fromtimestamp(num / 1000.0, tz=BEIJING_TZ).strftime("%Y-%m-%d")
     except (OSError, OverflowError, ValueError):
         return ""

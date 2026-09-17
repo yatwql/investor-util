@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.1-dev
-> **编号源**：`rf-next = 391`（新增问题取此编号，完成后更新为 +1；已用最大 rf-390，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 392`（新增问题取此编号，完成后更新为 +1；已用最大 rf-391，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -48,6 +48,7 @@
 
 | **rf-386** | **「当前 PE/PB」口径与官方 TTM/MRQ 不可比**：项目用**报告期 EPS/BVPS** 自算（`analysis/financial_indicator.py::current_valuation`），而市场通用口径是 TTM/MRQ——实测长江电力同一时点：项目报告 PE **47.19**（2026 半年报 EPS 口径）vs 同花顺官方 `pe_ttm` **19.17**（差约 2.5 倍），PB 基本一致（3.22 vs 3.21）。后果：报告里「当前 PE」与任何外部/官方口径对比都会显得离谱（半年报 EPS 使 PE 虚高近一倍），估值判断被误导 | 阶段 2 引入同花顺估值快照后，改为**以官方 `pe_ttm`/`pe_mrq`/`pb_mrq` 为准**（并顺带获得 `ps_ttm`/`pcf_ttm` 两个新维度）；官方不可用时回退现有自算值，但须在列名/脚注标注口径（`PE(TTM)` vs `PE(自算)`） |
 | **rf-389** | **provider API 面暂时大于消费面**：`providers/hithink.py` 的 16 个端点函数中**仅 2 个已接线**（`fetch_fund_holdings` → `fund_hold` 备源、`fetch_financial_indicators` 测试引用），其余 14 个（估值/行情/K 线/日历/复权因子/指数成分/情绪面/基金净值与历史持仓等）无生产消费者。与 rf-358「新增即死代码」判据相近，但**性质不同**：这些端点属已批准的 plan-51 阶段 2/4/5 的既定 API 面，且已在设计文档 §4.1 逐个实测过字段结构 | **保留并跟踪**（不删）：阶段 2/4/5 逐个接线时自然消除；**若某阶段被取消，则按 rf-358 先例删除对应端点及其单测**。审查依据：`plan.md` plan-51 阶段表 + 设计文档 §3；建议每次阶段收尾时复核本项 |
+| **rf-391** | **日期换算依赖本机时区 → CI 与本地结果不一致（P0 门禁在 CI 侧失败）**：新增的「毫秒戳 → YYYY-MM-DD」共享原语最初用 ``datetime.fromtimestamp``（**本机时区**），本地 CST 把 ``1782748800000`` 解为 2026-06-30，CI（ubuntu-latest，UTC）解为 2026-06-29 → `TestHithinkHoldingsNormalization` 在 CI 三个 Python 版本上全红（本地全绿，故提交前未暴露）。同类内联写法在仓库还有 11 处（`market_hours`/`trading_calendar`/`prompts_action`/`akshare_news`/`_utils`），任一处漏改都会让报告日期随运行环境漂移 | ① 新增项目统一口径常量 `core.constants.BEIJING_TZ`（UTC+8 固定偏移），原语按它解释为**北京自然日**；② 11 处内联 `timezone(timedelta(hours=8))` 全部改为引用该常量（单一事实来源，仅 `constants.py` 保留定义）；③ 新增**时区无关性回归守卫**（Unix 下切 UTC/Asia·Shanghai/America·New_York 三次，断言结果恒等）；④ 双时区复跑门禁：CST/UTC 下 dev-verify 2891、verify 4856、regression 249、scenario+integration 317 全绿 |
 | **rf-390** | **主程序两文件越过 800 行硬上限**（48h 审计发现）：`analysis/prosperity_framework.py` 934 行（plan-46 新增）、`report/_report_generation.py` 828 行（plan-45/46 增长）——CLAUDE.md 规定 >800 行为硬上限必须拆分 | **待拆分**：① `prosperity_framework.py` 按「配置与权重常量 + 六个维度打分器 + 视图/装配」三段切分，把维度打分器（约 600 行）移入 `analysis/prosperity_scoring.py` 并在原模块 re-export 私有名（保持既有测试与报告的 import 面不变）；② `_report_generation.py` 把 prep 组装与 full 路径接线拆为 `_report_prep.py`。　**2026-09-17 拆分尝试记录**：按上述 ① 轴做过一次机械拆分（生成 `analysis/prosperity_scoring.py` + 原模块 re-export），首轮即有 34 例失败——根因是**再导出清单不完整**（权重常量 `_W_*`/`_LIQUIDITY_*` 等被移走但未回填，装配层 `NameError`），且脚本生成的 re-export 块语法错误；已**回退**（不提交半成品）。结论：① 轴可行但须**人工**逐符号核对「迁移块 → 剩余代码」的引用闭包（脚本只按顶层符号名分析，漏掉了 `logger`/`finite_or` 之外的隐式依赖与再导出完整性），建议拆分为独立任务并配 `--mode verify` 全量回归 |拆分须逐文件跑受影响测试 + 更新 `folders.md`/语义表/`technical.md` 模块树 |## 已解决问题
 
 ### 已解决待归档（v0.11.1-dev）

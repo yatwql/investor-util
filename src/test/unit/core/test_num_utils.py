@@ -174,6 +174,36 @@ class TestMsToDateStr:
 
         assert ms_to_date_str(bad) == ""
 
+    @pytest.mark.skipif(not hasattr(__import__("time"), "tzset"), reason="tzset 仅 Unix 可用")
+    def test_independent_of_process_timezone(self, monkeypatch):
+        """日期换算与进程时区无关（CI 跑 UTC、本地跑 CST 时结果必须一致）。
+
+        回归背景：原先用 ``datetime.fromtimestamp``（本机时区），CI（UTC）把
+        CST 午夜附近的毫秒戳算成前一天，与本地结果不一致 → 提交前门禁在 CI 侧失败。
+        修法是按 ``core.constants.BEIJING_TZ`` 固定解释为北京自然日；本用例切换
+        进程时区三次，断言结果恒等。
+        """
+        import os
+        import time as _time
+
+        from src.python.core.num_utils import ms_to_date_str
+
+        original = os.environ.get("TZ")
+        results: list[str] = []
+        try:
+            for tz in ("UTC", "Asia/Shanghai", "America/New_York"):
+                monkeypatch.setenv("TZ", tz)
+                _time.tzset()
+                results.append(ms_to_date_str(1782748800000))
+        finally:
+            if original is None:
+                monkeypatch.delenv("TZ", raising=False)
+            else:
+                monkeypatch.setenv("TZ", original)
+            _time.tzset()
+
+        assert set(results) == {"2026-06-30"}
+
     def test_numeric_string_is_tolerated(self):
         """宽容口径与 safe_num 一致：数值字符串按数值处理（上游 JSON 常给字符串）。"""
         from src.python.core.num_utils import ms_to_date_str

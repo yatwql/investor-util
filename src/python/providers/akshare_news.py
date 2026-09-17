@@ -12,7 +12,9 @@ akshare 是一个开源 Python 财经数据接口库，底层封装了东方财�
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+
+from src.python.core.constants import BEIJING_TZ
+from datetime import datetime
 from typing import Any
 
 logger = logging.getLogger("invest")
@@ -47,7 +49,7 @@ def _fetch_from_caixin(num: int = 100) -> list[dict[str, Any]]:
         logger.debug("财新新闻: 结果为空")
         return []
 
-    bj_tz = timezone(timedelta(hours=8))
+    bj_tz = BEIJING_TZ
     now_bj = datetime.now(bj_tz)
     today_str = now_bj.strftime("%Y-%m-%d")
 
@@ -112,7 +114,7 @@ def _fetch_cctv_news(date_str: str | None = None) -> list[dict[str, Any]]:
         return []
 
     if not date_str:
-        bj_tz = timezone(timedelta(hours=8))
+        bj_tz = BEIJING_TZ
         date_str = datetime.now(bj_tz).strftime("%Y%m%d")
 
     try:
@@ -125,7 +127,7 @@ def _fetch_cctv_news(date_str: str | None = None) -> list[dict[str, Any]]:
         logger.debug("CCTV 新闻: 结果为空")
         return []
 
-    bj_tz = timezone(timedelta(hours=8))
+    bj_tz = BEIJING_TZ
     parsed: list[dict[str, Any]] = []
     seen_titles: set[str] = set()
 

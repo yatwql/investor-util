@@ -5,6 +5,7 @@
 """
 
 import os
+from datetime import timedelta, timezone
 
 
 def _find_project_root() -> str:
@@ -163,3 +164,8 @@ PRICING_WEEKEND_ALWAYS_IDLE: bool = True
 
 # 峰谷时段判定所用 IANA 时区（默认北京时间）
 PRICING_TIMEZONE: str = "Asia/Shanghai"
+
+#: 项目统一北京时间口径（UTC+8 固定偏移，无夏令时）。**所有「自然日」判定都用它**：
+#: 毫秒戳 → 日期的展示/契约转换、交易日边界、峰谷时段判定——用本机时区会随运行环境漂移
+#: （CI 跑 UTC 时，CST 午夜附近的毫秒戳会算成前一天，测试与报告日期随之不一致）。
+BEIJING_TZ = timezone(timedelta(hours=8))
