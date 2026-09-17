@@ -26,7 +26,7 @@ logger = logging.getLogger("invest")
 # ── Provider Chain 定义 ──────────────────────────────────────
 
 _DEFAULT_CHAINS: dict[str, list[str]] = {
-    "price_stock": ["tencent", "sina"],
+    "price_stock": ["tencent", "sina", "hithink"],
     "price_fund_otc": ["eastmoney"],
     "price": ["tencent", "eastmoney"],
     "fund_rank": ["tiantian"],
@@ -39,7 +39,8 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     # 财务指标：akshare 主源 → DataSinking 章节解析支路 → 同花顺官方报表派生（需 key）
     "financial_indicator": ["akshare_financial", "datasink_indicator", "hithink"],
     # 组合历史走势：历史数据 chains（复用现有 provider name，熔断器共享）
-    "history_stock": ["tencent", "sina"],
+    # 历史日 K：腾讯（前复权）→ 新浪 → 同花顺官方（前复权，需 key）
+    "history_stock": ["tencent", "sina", "hithink"],
     "history_fund_otc": ["tiantian", "eastmoney"],
     "history_index": ["tencent", "sina"],
     # 美股指数历史日线：新浪实现 fetch_index_kline（providers/sina_kline.py，经
@@ -452,6 +453,7 @@ _HISTORY_PROVIDER_MAP: dict[str, str] = {
     "sina": "src.python.providers.sina",
     "tiantian": "src.python.providers.tiantian_nav",
     "eastmoney": "src.python.providers.eastmoney",
+    "hithink": "src.python.providers.hithink",
 }
 
 # 新旧 K 线之间缺失的交易日数超过此值 → 判定数据跳空（部分历史不可达）

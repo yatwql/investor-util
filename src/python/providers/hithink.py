@@ -41,6 +41,7 @@ from src.python.core.datasource_credential import (
     register_credential_spec as _register_credential_spec,
 )
 from src.python.core.http_client import make_http_client
+from src.python.core.num_utils import ms_to_date_str
 
 logger = logging.getLogger("invest")
 
@@ -169,6 +170,89 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
         return None
     data = body.get("data")
     return data if isinstance(data, dict) else None
+
+
+# ── 行情与历史 K 线（链路槽：形态对齐 providers/tencent.py）──
+
+
+def fetch_price(code: str) -> dict[str, Any] | None:
+    """单只 A 股 / 场内基金实时行情（行情域链路第三槽）。
+
+    形态对齐 ``providers/tencent.fetch_price``：``{name, code, price, yesterday_close,
+    open, high, low, volume, turnover, price_date, pe, source}``（``market_cap`` 本源自
+    不提供，由适配器 default 落 ``None``）。非 A 股/场内基金返回 ``None``。
+    """
+    symbol = to_thscode(code)
+    if not symbol:
+        return None
+    data = fetch_price_snapshot([symbol])
+    items = [i for i in ((data or {}).get("item") or []) if isinstance(i, dict)]
+    if not items:
+        return None
+    item = items[0]
+    price_date = ms_to_date_str(data.get("timestamp")) or ms_to_date_str(item.get("timestamp"))
+    return {
+        "name": str(item.get("name") or ""),
+        "code": str(item.get("ticker") or code).strip(),
+        "price": item.get("last_price"),
+        "yesterday_close": item.get("prev_price"),
+        "open": item.get("open_price"),
+        "high": item.get("high_price"),
+        "low": item.get("low_price"),
+        "volume": item.get("volume"),
+        "turnover": item.get("turnover"),
+        "price_date": price_date,
+        "source": DISPLAY_NAME,
+    }
+
+
+def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict[str, Any]]:
+    """历史日 K（**前复权**），形态对齐 ``providers/tencent.fetch_kline``。
+
+    上游字段名：历史 K 线的日期是 ``date_ms``（行情快照才是 ``timestamp``），
+    实测混用会导致解析出 0 条。
+
+    Returns:
+        ``[{date, open, close, high, low, volume}, ...]`` 按日期升序；失败返回空列表。
+    """
+    symbol = to_thscode(code)
+    if not symbol:
+        return []
+    days = min(max(days, 5), 365)
+    end_ms = _now_ms()
+    # 多取日历天余量（含非交易日），再按 days 截尾；增量模式只要求覆盖 start_from 之后
+    span_ms = int((days + (60 if start_from is None else 20)) * 86_400_000)
+    data = fetch_price_history(symbol, end_ms - span_ms, end_ms, adjust="forward")
+    bars: list[dict[str, Any]] = []
+    for item in (data or {}).get("item") or []:
+        if not isinstance(item, dict):
+            continue
+        date = ms_to_date_str(item.get("date_ms") or item.get("timestamp"))
+        if not date:
+            continue
+        bars.append(
+            {
+                "date": date,
+                "open": item.get("open_price"),
+                "close": item.get("close_price"),
+                "high": item.get("high_price"),
+                "low": item.get("low_price"),
+                "volume": item.get("volume"),
+            }
+        )
+    bars.sort(key=lambda b: b["date"])
+    if start_from:
+        bars = [b for b in bars if b["date"] > str(start_from)]
+    return bars[-days:]
+
+
+def _now_ms() -> int:
+    """当前时刻（毫秒 Unix 时间戳）——按项目统一北京时间口径取「今天」。"""
+    from datetime import datetime
+
+    from src.python.core.constants import BEIJING_TZ
+
+    return int(datetime.now(BEIJING_TZ).timestamp() * 1000)
 
 
 # ── 代码映射 ────────────────────────────────────────────────
@@ -433,6 +517,8 @@ __all__ = [
     "fetch_dragon_tiger_list",
     "fetch_financial_indicators",
     "fetch_fund_holdings",
+    "fetch_kline",
+    "fetch_price",
     "fetch_fund_nav",
     "fetch_fund_portfolio_holdings",
     "fetch_fund_stock_history",

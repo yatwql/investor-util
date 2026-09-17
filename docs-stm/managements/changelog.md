@@ -6,6 +6,18 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 新增：行情/历史日 K 第三链路 + 交易日历官方兜底（plan-51 阶段 4）（2026-09-17）
+
+**实现**：
+- **行情第三槽**：`price_stock` = 腾讯 → 新浪 → **同花顺**；新增 `fetch_price(code)`（形态对齐既有 provider）与 `HithinkQuoteAdapter`（`last_price`→`price`、`prev_price`→`yesterday_close`、不提供总市值→`None`）。实测 600900：价 28.44 / 昨收 28.46 / 价格日 2026-09-17
+- **历史日 K 第三槽**：`history_stock` 同序，`_HISTORY_PROVIDER_MAP` 注册 `src.python.providers.hithink`；`fetch_kline(code, days, start_from)`取**前复权**日 K、对齐既有 provider 形态（`{date, open, close, high, low, volume}` 升序，支持增量起点）。**实测坑**：上游历史 K 线日期字段是 `date_ms`（行情快照才是 `timestamp`），混用会解析出 0 条——已在模块文档串注明
+- **交易日历官方兜底**：akshare 失败后尝试 `calendar/trading-days`（惰性导入 providers，避免 core→providers 层次反转），再失败才走简易周度判断；实测官方序列 243 个交易日
+- 回归 20 例：`unit/providers/test_hithink.py`（行情映射/非 A 股跳过/`date_ms` 解析与排序/增量过滤/前复权参数）、`unit/fetcher/test_quote_adapter_hithink.py`（别名归一/契约自检/行情与历史链路段言/`_HISTORY_PROVIDER_MAP`/场外链不受影响）、`unit/core/test_trading_calendar.py`（官方兜底写入缓存、两源皆失败返回空集合）；既有断言同步（行情域四源、history_stock 三段）
+
+**收尾项（未做）**：`adjustment_factors` 复权因子事件流暂无消费者——计划用于**分红流水漏记校验**（官方除权除息事件 × 用户「分红流水」页签交叉核对），已登记在 rf-389 待接线清单与 plan.md 阶段 4 收尾项。
+
+文档：`plan.md`（阶段 4 完成 + 收尾项）、设计文档 §3、`datasource.md`（行情/历史行 + 已接入域 + 质量说明 + 第三链路口径）、`datasource-reliability.md`（§3.1/§3.2/§3.8 降级目标 + §3.10 已接入域）、`technical.md`（语义命名表 3 行）、`requirements.md`（数据源表）、`testplan.md`（回归行）、`folders.md`（统计）、`changelog` 本条。
+
 ### 修复：分阶段测试报告互相覆盖（详细报告丢失 Phase A）+ PE/PB 官方口径（rf-386）（2026-09-17）
 
 **一、分阶段报告覆盖（自审发现，rf-392）**

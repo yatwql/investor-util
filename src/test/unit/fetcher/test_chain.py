@@ -575,9 +575,9 @@ class TestHistoryIndexChain(unittest.TestCase):
         self.assertEqual(chain, ["tencent", "sina"])
 
     def test_history_stock_unaffected(self):
-        """新增 history_index 不影响 history_stock 链。"""
+        """history_stock 链固定为三段（腾讯 → 新浪 → 同花顺官方），不被指数链改动波及。"""
         chain = _get_chain("history_stock")
-        self.assertEqual(chain, ["tencent", "sina"])
+        self.assertEqual(chain, ["tencent", "sina", "hithink"])
 
     def test_call_history_provider_dispatches_index(self):
         """_call_history_provider("tencent", "history_index", ...) 调用 fetch_index_kline。"""

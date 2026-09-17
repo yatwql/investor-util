@@ -3220,6 +3220,9 @@ make_http_client(timeout=10.0) → httpx.Client
 |:--|:--|:--|:--|:--|
 | `hithink` | 同花顺金融数据服务 provider（A 股行情/财务/基金/情绪面；凭据声明/qps 限速/信封错误码） | 数据源 | 数据获取 | 需凭据源（`data_key.json` 的 `hithink` 节或 `HITHINK_FINANCE_API_KEY`） |
 | `fund_thscode_candidates` | 基金代码 → thscode 候选（补零 + 场内/场外后缀，逐个试到命中） | 基金业绩分析 | 数据获取 | 无 |
+| `HithinkQuoteAdapter` | 同花顺官方行情适配器（行情域第三槽；`last_price`→`price`、`prev_price`→`yesterday_close`，不提供总市值 → None） | 持仓明细 | 数据获取 | 需凭据源（`hithink` 节） |
+| `fetch_price` | 单只 A 股/场内基金官方行情快照（链路槽形态：`{name, code, price, yesterday_close, open, high, low, volume, turnover, price_date}`） | 持仓明细 | 数据获取 | 需凭据源 |
+| `fetch_kline` | 官方历史日 K（前复权；`date_ms` 字段、支持 `start_from` 增量，对齐既有 provider 形态） | 流动性分析 | 数据获取 | 需凭据源 |
 | `_normalize_hold_payload` | 持仓载荷归一（provider 原始载荷 → 规范化持仓契约 `code/name/date/holdings` + `hold_schema`） | 基金业绩分析 | 数据获取 | 无 |
 | `holdings_detail` | 持仓明细与分类（合并章：市值核算明细区块 + 持仓分类汇总区块同页签呈现） | 持仓明细与分类 | 报告输出 | 始终显示（type=always） |
 | `holdings_detail_sheet` | 合并章 Excel 写入器（`write_holdings_detail_sheet`；区块写入器 `_write_market_value_block` / `_write_category_block`） | 持仓明细与分类 | 报告输出 | 无（渲染） |

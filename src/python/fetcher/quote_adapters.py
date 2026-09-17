@@ -14,7 +14,7 @@ from typing import Any, ClassVar
 
 from src.python.core.num_utils import safe_num
 from src.python.fetcher.source_adapter import SourceAdapter, register_adapter
-from src.python.providers import eastmoney, tencent
+from src.python.providers import eastmoney, tencent, hithink
 from src.python.providers import sina as sina_provider
 from src.python.schemas.datasource_fields import DOMAIN_QUOTE
 
@@ -73,6 +73,26 @@ class EastMoneyQuoteAdapter(SourceAdapter):
         return super().transform_data(raw, source)
 
 
+class HithinkQuoteAdapter(SourceAdapter):
+    """同花顺官方行情适配器（行情域第三槽，需凭据）。
+
+    官方快照字段与标准字段异名，按 alias 归一；不提供总市值 → ``None``。
+    """
+
+    domain: ClassVar[str] = DOMAIN_QUOTE
+    source_id: ClassVar[str] = "hithink"
+    display_name: ClassVar[str] = hithink.DISPLAY_NAME
+    aliases: ClassVar[dict[str, str]] = {
+        "last_price": "price",
+        "prev_price": "yesterday_close",
+    }
+    defaults: ClassVar[dict[str, Any]] = {"market_cap": None, "pe": None}
+
+    def extract_data(self, query: dict[str, Any]) -> Any:
+        return hithink.fetch_price(query.get("code"))
+
+
 register_adapter(TencentQuoteAdapter())
 register_adapter(SinaQuoteAdapter())
 register_adapter(EastMoneyQuoteAdapter())
+register_adapter(HithinkQuoteAdapter())

@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -96,3 +97,34 @@ class TestCalendarUnavailableFallback:
         """日历不可用 → 周六不计入。"""
         with _with_calendar(set()):
             assert count_trading_days_elapsed("2026-09-11", "2026-09-12") == 0
+
+
+class TestHithinkCalendarFallback:
+    """akshare 不可用 → 同花顺官方近一年交易日序列兜底（需 key；再失败才走简易判断）。"""
+
+    def test_official_series_used_when_akshare_fails(self, monkeypatch):
+        from src.python.core import trading_calendar as tc
+        from src.python.providers import hithink
+
+        monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
+        written: list = []
+        monkeypatch.setattr(tc.cache, "set", lambda key, value: written.append((key, value)))
+        monkeypatch.setitem(sys.modules, "akshare", None)  # import akshare 触发 ImportError
+        monkeypatch.setattr(
+            hithink,
+            "fetch_trading_days",
+            lambda: {"item": [{"date": "2026-09-17"}, {"date": "2026-09-18"}]},
+        )
+        dates = tc._get_trading_calendar()
+        assert dates == {"2026-09-17", "2026-09-18"}
+        assert written  # 官方序列同样写缓存
+
+    def test_both_sources_fail_returns_empty(self, monkeypatch):
+        from src.python.core import trading_calendar as tc
+        from src.python.providers import hithink
+
+        monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
+        monkeypatch.setattr(tc.cache, "set", lambda *a, **k: None)
+        monkeypatch.setitem(sys.modules, "akshare", None)
+        monkeypatch.setattr(hithink, "fetch_trading_days", lambda: None)
+        assert tc._get_trading_calendar() == set()

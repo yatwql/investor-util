@@ -118,8 +118,8 @@ class TestChainSlotSelection(unittest.TestCase):
         """开关开启时改用适配器映射（源集合不变）。"""
         set_feature_enabled("datasource_adapter", True)
         providers, transforms = price_module._price_chain_slots()
-        self.assertEqual(set(providers), {"tencent", "sina", "eastmoney"})
-        self.assertEqual(set(transforms), {"tencent", "sina", "eastmoney"})
+        self.assertEqual(set(providers), {"tencent", "sina", "eastmoney", "hithink"})
+        self.assertEqual(set(transforms), {"tencent", "sina", "eastmoney", "hithink"})
         self.assertEqual(providers["tencent"][0], "腾讯财经")
 
 

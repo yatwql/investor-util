@@ -77,9 +77,27 @@ def _get_trading_calendar() -> set[str]:
                 logger.info("交易日历已更新（%d 个交易日）", len(dates))
                 return dates
         except Exception as exc:
-            logger.warning("获取交易日历失败: %s，使用简易节假日判断回退", exc)
+            logger.warning("获取交易日历失败: %s，尝试同花顺官方序列兜底", exc)
 
-        return set()
+    # akshare 不可用 → 官方近一年交易日序列兜底（需 key；缺凭据/失败则返回空集合，
+    # 由调用方回退简易周度判断）。**惰性导入**避免 core → providers 的层次反转。
+    try:
+        from src.python.providers import hithink
+
+        data = hithink.fetch_trading_days() or {}
+        dates = {
+            str(item.get("date"))
+            for item in (data.get("item") or [])
+            if isinstance(item, dict) and str(item.get("date") or "").strip()
+        }
+        if dates:
+            cache.set(_TRADING_CALENDAR_CACHE_KEY, sorted(dates))
+            logger.info("交易日历已更新（同花顺官方序列，%d 个交易日）", len(dates))
+            return dates
+    except Exception as exc:  # 官方源不可用同样降级，不抛
+        logger.warning("同花顺交易日历兜底失败: %s", exc)
+
+    return set()
 
 
 def _is_trading_day(date: datetime) -> bool:

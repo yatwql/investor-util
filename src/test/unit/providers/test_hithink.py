@@ -217,6 +217,101 @@ class TestToThscode:
         assert ht.to_thscode(code) == ""
 
 
+class TestQuoteAndKline:
+    """行情快照与历史日 K（链路槽：形态对齐既有 provider）。"""
+
+    def test_fetch_price_maps_snapshot_fields(self, monkeypatch):
+        monkeypatch.setattr(
+            ht,
+            "fetch_price_snapshot",
+            lambda codes: {
+                "timestamp": 1789608712000,
+                "item": [
+                    {
+                        "ticker": "600900",
+                        "last_price": 28.44,
+                        "prev_price": 28.46,
+                        "open_price": 28.46,
+                        "high_price": 28.56,
+                        "low_price": 28.11,
+                        "volume": 37527710.0,
+                        "turnover": 1.06e9,
+                    }
+                ],
+            },
+        )
+        out = ht.fetch_price("600900")
+        assert out["price"] == 28.44
+        assert out["yesterday_close"] == 28.46
+        assert out["price_date"] == "2026-09-17"
+        assert out["source"] == ht.DISPLAY_NAME
+        assert out["code"] == "600900"
+
+    def test_fetch_price_unsupported_code_returns_none(self, monkeypatch):
+        called = {"n": 0}
+        monkeypatch.setattr(ht, "fetch_price_snapshot", lambda codes: called.__setitem__("n", 1))
+        assert ht.fetch_price("AAPL") is None
+        assert called["n"] == 0
+
+    def test_fetch_price_empty_items_returns_none(self, monkeypatch):
+        monkeypatch.setattr(ht, "fetch_price_snapshot", lambda codes: {"item": []})
+        assert ht.fetch_price("600900") is None
+
+    def test_fetch_kline_reads_date_ms_and_sorts(self, monkeypatch):
+        """上游历史 K 线的日期字段是 `date_ms`（不是行情快照的 `timestamp`）。"""
+        items = [
+            {
+                "date_ms": 1789056000000,
+                "open_price": 27.9,
+                "close_price": 28.0,
+                "high_price": 28.1,
+                "low_price": 27.8,
+                "volume": 10,
+            },
+            {
+                "date_ms": 1788796800000,
+                "open_price": 27.8,
+                "close_price": 27.9,
+                "high_price": 28.0,
+                "low_price": 27.7,
+                "volume": 20,
+            },
+        ]
+        monkeypatch.setattr(ht, "fetch_price_history", lambda *a, **k: {"item": items})
+        bars = ht.fetch_kline("600900", days=30)
+        assert [b["date"] for b in bars] == ["2026-09-08", "2026-09-11"]
+        assert bars[0]["open"] == 27.8 and bars[0]["volume"] == 20
+
+    def test_fetch_kline_incremental_filter(self, monkeypatch):
+        items = [
+            {"date_ms": 1788796800000, "close_price": 27.9, "volume": 1},
+            {"date_ms": 1789056000000, "close_price": 28.0, "volume": 2},
+        ]
+        monkeypatch.setattr(ht, "fetch_price_history", lambda *a, **k: {"item": items})
+        bars = ht.fetch_kline("600900", days=30, start_from="2026-09-08")
+        assert [b["date"] for b in bars] == ["2026-09-11"]
+
+    def test_fetch_kline_empty_and_unsupported(self, monkeypatch):
+        monkeypatch.setattr(ht, "fetch_price_history", lambda *a, **k: {"item": []})
+        assert ht.fetch_kline("600900") == []
+        monkeypatch.setattr(
+            ht, "fetch_price_history", lambda *a, **k: (_ for _ in ()).throw(AssertionError("非 A 股不应请求"))
+        )
+        assert ht.fetch_kline("AAPL") == []
+
+    def test_kline_uses_forward_adjust(self, monkeypatch):
+        captured: dict = {}
+
+        def _hist(thscode, start, end, adjust="forward"):
+            captured.update({"thscode": thscode, "adjust": adjust})
+            return {"item": []}
+
+        monkeypatch.setattr(ht, "fetch_price_history", _hist)
+        ht.fetch_kline("600900", days=10)
+        assert captured["thscode"] == "600900.SH"
+        assert captured["adjust"] == "forward"
+
+
 class TestFundHoldingsByCode:
     """基金代码 → 候选 thscode 解析 + 披露持仓取数（阶段 3 备源入口）。"""
 

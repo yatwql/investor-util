@@ -48,7 +48,7 @@
 | 阶段 1 | provider 层：`providers/hithink.py`（凭据声明 / qps 限速器 / 信封与错误码 / 触发限流不重试 / 16 个域接口 / `to_thscode` 映射）+ 55 例单测 | ✅ **已实现并实测通过**：key 已配置，11 端点真实连通 10 通（指数成分股接口 429，阶段 4 复核）；默认 qps 按实测由 3 降为 2。实测字段结构见设计文档 §4.1 |
 | 阶段 2 | 财务指标域第三链路 | ✅ **已实现**：`analysis/financial_statement_derive.py`（三张合并报表纯派生为标准字段）+ `HithinkIndicatorAdapter`（链路第三槽）+ `fetch_hithink_indicator_series`（主源不可用时的**多期**回退，优于单期兜底）。**实测与主源完全对齐**：报告期（2026-06-30/03-31/2025-12-31/09-30）与营收/归母净利/毛利率/负债率/现金流/EPS 全一致，同比 0.033562 相同；差异仅 ROE（期末口径 6.47% vs 加权 6.55%）与 `bvps`（官方不给总股本 → 恒缺失）。PE/PB 口径修正（rf-386）待契约字段落地，见该项 |
 | 阶段 3 | 基金披露持仓两源链 | ✅ **已实现**：`_FUND_HOLD_PROVIDERS` = 天天基金（主，三跳阶梯）→ 同花顺官方披露持仓（备，需 key）；两侧形态经 `_normalize_hold_payload` 归一（同花顺只取 `asset_type=stock`、报告期取披露结束日、联接基金由 `fund` 型资产直返目标 ETF）；**不递增 `hold_schema`**（归一后形态不变、旧条目不被误读）；顺序可用 `preferred_provider.fund_hold` 调换。实测 `016055.OF`→`513390.SH`、`012325.OF` 全债券被过滤 |
-| 阶段 4 | 行情第三链路（腾讯→新浪→同花顺）+ 历史日 K 前/后复权 + `fetch_trading_days` 校准 `core/trading_calendar.py` + 复权因子事件流 | ⬜ 待办 |
+| 阶段 4 | 行情/日历/复权 | ✅ **已实现**：① 行情第三槽（`price_stock` = 腾讯 → 新浪 → 同花顺，新增 `HithinkQuoteAdapter`；实测 600900 价 28.44/昨收 28.46，**官方 `pe_ttm` 一并带入**）；② 历史日 K 第三槽（`history_stock` 同序 + `_HISTORY_PROVIDER_MAP` 注册，`fetch_kline` 前复权、支持 `start_from` 增量；**实测踩坑：上游历史 K 线日期字段是 `date_ms` 而非快照的 `timestamp`**）；③ 交易日历官方兜底（akshare 失败 → `calendar/trading-days`，实测 243 个交易日）。**收尾项**：复权因子事件流（`adjustment_factors`）尚无消费者——计划用于「分红流水漏记校验」（与成本流水的分红累计交叉核对），待阶段收尾接入，暂记 rf-389 |
 | 阶段 5 | 情绪面新能力：新数据域 `market_sentiment`（涨跌停池/连板天梯/龙虎榜）+ 报告章节（开关默认关）+ 可选注入 LLM 信号预消化 | ⬜ 待办 |
 
 **前置条件已完成**：API key 已写入 `data/config/data_key.json` 的 `hithink` 节（文件由 `.gitignore` 忽略，不入库）。

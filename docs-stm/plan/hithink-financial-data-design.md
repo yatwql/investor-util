@@ -3,7 +3,7 @@
 > 版本：0.11.1-dev ｜ 状态：**阶段 1 已实测通过、阶段 3 已实施**（provider 层 + 55 例单测 + 11 端点真实连通，见 §4.1）；阶段 2~5 待实施（映射表按实测字段落表）
 > 上游：<https://github.com/HiThink-Tech/Financial-API>（同花顺官方 A 股数据服务）
 > 契约来源：<https://fuyao.aicubes.cn/llms-full.txt>（完整接口文档聚合）
-> 归档去向：全部 5 个阶段完成后，本文档随完成态归档至 `docs-stm/archive/v0.11.x/hithink-data-source/`（与 plan-45 / plan-46 的设计文档先例一致）；未完成前留在 `docs-stm/plan/`。当前进度：阶段 1 ✅ / 阶段 2 ✅ / 阶段 3 ✅ / 阶段 4 ⬜ / 阶段 5 ⬜
+> 归档去向：全部 5 个阶段完成后，本文档随完成态归档至 `docs-stm/archive/v0.11.x/hithink-data-source/`（与 plan-45 / plan-46 的设计文档先例一致）；未完成前留在 `docs-stm/plan/`。当前进度：阶段 1 ✅ / 阶段 2 ✅ / 阶段 3 ✅ / 阶段 4 ✅（复权因子消费待接）/ 阶段 5 ⬜
 
 ---
 
@@ -97,12 +97,20 @@
 - **阶段 3 收尾待办**：① 用同花顺**历史**持仓接口（`/portfolio/stock-history`）支撑 `plan-47` **全量穿透**
   （现披露持仓仅前 10 大）；② 与天天基金做同基金占比/报告期交叉校验（校准容差）。
 
-### 阶段 4 ⬜ 行情 / 日历 / 公司行动
+### 阶段 4 ✅ 行情 / 日历 / 公司行动（复权因子消费待接）
 
-- `fetcher/quote_adapters.py::HithinkQuoteAdapter` → quote 域**第三链路**（腾讯→新浪→同花顺）。
-- 历史日 K 的**前/后复权**可作为组合历史走势/回撤的复权口径来源。
-- `fetch_trading_days()` 校准 `core/trading_calendar.py`；`fetch_adjustment_factors()` 供持仓成本
-  与「年均股息」列交叉校验。
+- **行情第三槽**：`price_stock` = 腾讯 → 新浪 → **同花顺**；新增
+  `HithinkQuoteAdapter`（别名 `last_price`→`price`、`prev_price`→`yesterday_close`，
+  不提供总市值 → `None`）。实测 600900：价 28.44 / 昨收 28.46 / 价格日 2026-09-17。
+- **历史日 K 第三槽**：`history_stock` = 腾讯 → 新浪 → **同花顺**（`_HISTORY_PROVIDER_MAP`
+  注册 `src.python.providers.hithink`），`providers/hithink.fetch_kline(code, days, start_from)`
+  取**前复权**日 K 并对齐既有 provider 形态（`{date, open, close, high, low, volume}` 升序）。
+  **实测坑**：上游历史 K 线日期字段是 `date_ms`（行情快照才是 `timestamp`），混用会解析出 0 条。
+- **交易日历官方兜底**：`core/trading_calendar._get_trading_calendar()` 在 akshare 失败后尝试
+  `calendar/trading-days`（惰性导入 providers，避免 core→providers 层次反转；再失败才走简易周度判断）。
+  实测官方序列 243 个交易日。
+- **待接消费者**：`adjustment_factors`（复权因子事件流）目前无生产消费者——计划用于
+  **分红流水漏记校验**（用官方除权除息事件与用户「分红流水」页签交叉核对），属阶段收尾项。
 
 ### 阶段 5 ⬜ 情绪面新章节（新能力）
 

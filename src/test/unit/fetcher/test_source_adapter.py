@@ -44,7 +44,7 @@ class TestAdapterRegistry(unittest.TestCase):
     def test_quote_domain_adapters_registered(self):
         """行情域已登记腾讯/新浪/东方财富三个适配器。"""
         adapters = sa.get_adapters(DOMAIN_QUOTE)
-        self.assertEqual(sorted(adapters), ["eastmoney", "sina", "tencent"])
+        self.assertEqual(sorted(adapters), ["eastmoney", "hithink", "sina", "tencent"])
         self.assertEqual(adapters["tencent"].display_name, "腾讯财经")
 
     def test_unknown_domain_returns_empty(self):
@@ -65,11 +65,12 @@ class TestAdapterRegistry(unittest.TestCase):
         """已登记适配器全部通过契约自检。"""
         reports = sa.survey_adapters()
         self.assertTrue(all(r["ok"] for r in reports), [r for r in reports if not r["ok"]])
-        # 行情域三源 + 财报全文域一源；断言域覆盖而非写死总数（新增数据域不应改本用例）
+        # 行情域四源（腾讯/新浪/东方财富/同花顺）+ 财报全文域等；断言域覆盖而非写死总数
+        # （新增数据域或新增同域源时，本用例只按域计数，需同步更新该域的期望数）
         by_domain: dict[str, int] = {}
         for r in reports:
             by_domain[r["domain"]] = by_domain.get(r["domain"], 0) + 1
-        self.assertEqual(by_domain.get(DOMAIN_QUOTE), 3)
+        self.assertEqual(by_domain.get(DOMAIN_QUOTE), 4)
         self.assertIn(DOMAIN_FINANCIAL_REPORT, by_domain)
 
     def test_survey_detects_alias_to_unknown_field(self):
