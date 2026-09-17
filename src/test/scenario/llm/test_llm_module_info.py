@@ -59,14 +59,21 @@ class TestLlmModuleInfoContract(unittest.TestCase):
 
         # 与规范字段结构一致（Excel 侧消费同一结构）
         expected_entry = {
-            "key": "health_check", "name": "持仓体检报告",
-            "status": "disabled", "status_label": "已禁用",
-            "model": "", "input_tokens": 0, "output_tokens": 0,
-            "total_tokens": 0, "cache_hit_tokens": 0,
-            "cost": 0.0, "cached": False, "thinking": False, "endpoint": "",
+            "key": "health_check",
+            "name": "持仓体检报告",
+            "status": "disabled",
+            "status_label": "已禁用",
+            "model": "",
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "cache_hit_tokens": 0,
+            "cost": 0.0,
+            "cached": False,
+            "thinking": False,
+            "endpoint": "",
         }
-        self.assertEqual(self._key_for_comparison(hc_html),
-                         self._key_for_comparison(expected_entry))
+        self.assertEqual(self._key_for_comparison(hc_html), self._key_for_comparison(expected_entry))
 
     def test_failure_reason_label_mapping(self):
         """各失败原因 → 状态标签映射契约。"""
@@ -129,9 +136,13 @@ class TestLlmModuleInfoContract(unittest.TestCase):
         # 即使 per_module 有数据，failure 优先覆盖
         per_module = {
             "global_macro": {
-                "model": "test", "cached": False,
-                "input_tokens": 100, "output_tokens": 50,
-                "cache_hit_tokens": 0, "cost": 0.001, "thinking": False,
+                "model": "test",
+                "cached": False,
+                "input_tokens": 100,
+                "output_tokens": 50,
+                "cache_hit_tokens": 0,
+                "cost": 0.001,
+                "thinking": False,
                 "endpoint": "",
             },
         }
@@ -149,9 +160,13 @@ class TestLlmModuleInfoContract(unittest.TestCase):
 
         per_module = {
             "expert_review": {
-                "model": "claude-sonnet-4", "cached": False,
-                "input_tokens": 1500, "output_tokens": 800,
-                "cache_hit_tokens": 0, "cost": 0.005, "thinking": True,
+                "model": "claude-sonnet-4",
+                "cached": False,
+                "input_tokens": 1500,
+                "output_tokens": 800,
+                "cache_hit_tokens": 0,
+                "cost": 0.005,
+                "thinking": True,
                 "endpoint": "",
             },
         }
@@ -166,15 +181,21 @@ class TestLlmModuleInfoContract(unittest.TestCase):
 
         # 与规范字段结构一致
         expected_entry = {
-            "key": "expert_review", "name": "智囊团深度复盘",
-            "status": "success", "status_label": "成功",
+            "key": "expert_review",
+            "name": "智囊团深度复盘",
+            "status": "success",
+            "status_label": "成功",
             "model": "claude-sonnet-4",
-            "input_tokens": 1500, "output_tokens": 800,
-            "total_tokens": 2300, "cache_hit_tokens": 0,
-            "cost": 0.005, "cached": False, "thinking": True, "endpoint": "",
+            "input_tokens": 1500,
+            "output_tokens": 800,
+            "total_tokens": 2300,
+            "cache_hit_tokens": 0,
+            "cost": 0.005,
+            "cached": False,
+            "thinking": True,
+            "endpoint": "",
         }
-        self.assertEqual(self._key_for_comparison(er_html),
-                         self._key_for_comparison(expected_entry))
+        self.assertEqual(self._key_for_comparison(er_html), self._key_for_comparison(expected_entry))
 
     def test_cached_state_contract(self):
         """cached 状态 → 状态、标签、缓存命中 Token 契约。"""
@@ -182,9 +203,13 @@ class TestLlmModuleInfoContract(unittest.TestCase):
 
         per_module = {
             "global_macro": {
-                "model": "ds", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 500, "cost": 0.0, "thinking": False,
+                "model": "ds",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 500,
+                "cost": 0.0,
+                "thinking": False,
                 "endpoint": "",
             },
         }
@@ -198,15 +223,21 @@ class TestLlmModuleInfoContract(unittest.TestCase):
 
         # 与规范字段结构一致
         expected_entry = {
-            "key": "global_macro", "name": "全球政经局势",
-            "status": "cached", "status_label": "缓存",
+            "key": "global_macro",
+            "name": "全球政经局势",
+            "status": "cached",
+            "status_label": "缓存",
             "model": "ds",
-            "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-            "cache_hit_tokens": 500, "cost": 0.0, "cached": True,
-            "thinking": False, "endpoint": "",
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "cache_hit_tokens": 500,
+            "cost": 0.0,
+            "cached": True,
+            "thinking": False,
+            "endpoint": "",
         }
-        self.assertEqual(self._key_for_comparison(gm_html),
-                         self._key_for_comparison(expected_entry))
+        self.assertEqual(self._key_for_comparison(gm_html), self._key_for_comparison(expected_entry))
 
     def test_mixed_states_distribution(self):
         """混合状态（缓存+成功+失败+无数据）→ 各模块分发正确。"""
@@ -215,15 +246,23 @@ class TestLlmModuleInfoContract(unittest.TestCase):
         failure = {"penetration_deep": FAIL_REASON_NETWORK_ERROR}
         per_module = {
             "global_macro": {
-                "model": "ds", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 500, "cost": 0.0, "thinking": False,
+                "model": "ds",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 500,
+                "cost": 0.0,
+                "thinking": False,
                 "endpoint": "",
             },
             "expert_review": {
-                "model": "claude", "cached": False,
-                "input_tokens": 2000, "output_tokens": 1000,
-                "cache_hit_tokens": 0, "cost": 0.008, "thinking": True,
+                "model": "claude",
+                "cached": False,
+                "input_tokens": 2000,
+                "output_tokens": 1000,
+                "cache_hit_tokens": 0,
+                "cost": 0.008,
+                "thinking": True,
                 "endpoint": "",
             },
         }
@@ -243,17 +282,25 @@ class TestLlmModuleInfoContract(unittest.TestCase):
 
         per_module_round1 = {
             "global_macro": {
-                "model": "ds", "cached": False,
-                "input_tokens": 1000, "output_tokens": 500,
-                "cache_hit_tokens": 0, "cost": 0.005, "thinking": False,
+                "model": "ds",
+                "cached": False,
+                "input_tokens": 1000,
+                "output_tokens": 500,
+                "cache_hit_tokens": 0,
+                "cost": 0.005,
+                "thinking": False,
                 "endpoint": "",
             },
         }
         per_module_round2 = {
             "expert_review": {
-                "model": "claude", "cached": False,
-                "input_tokens": 2000, "output_tokens": 1000,
-                "cache_hit_tokens": 0, "cost": 0.008, "thinking": True,
+                "model": "claude",
+                "cached": False,
+                "input_tokens": 2000,
+                "output_tokens": 1000,
+                "cache_hit_tokens": 0,
+                "cost": 0.008,
+                "thinking": True,
                 "endpoint": "",
             },
         }
@@ -272,41 +319,59 @@ class TestLlmModuleInfoContract(unittest.TestCase):
 
         per_module = {
             "global_macro": {
-                "model": "ds", "cached": True,
-                "input_tokens": 0, "output_tokens": 0,
-                "cache_hit_tokens": 500, "cost": 0.0, "thinking": False,
+                "model": "ds",
+                "cached": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_hit_tokens": 500,
+                "cost": 0.0,
+                "thinking": False,
                 "endpoint": "",
             },
             "expert_review": {
-                "model": "claude", "cached": False,
-                "input_tokens": 100, "output_tokens": 50,
-                "cache_hit_tokens": 0, "cost": 0.001, "thinking": True,
+                "model": "claude",
+                "cached": False,
+                "input_tokens": 100,
+                "output_tokens": 50,
+                "cache_hit_tokens": 0,
+                "cost": 0.001,
+                "thinking": True,
                 "endpoint": "",
             },
             "health_check": {
-                "model": "gpt4", "cached": False,
-                "input_tokens": 200, "output_tokens": 100,
-                "cache_hit_tokens": 0, "cost": 0.002, "thinking": False,
+                "model": "gpt4",
+                "cached": False,
+                "input_tokens": 200,
+                "output_tokens": 100,
+                "cache_hit_tokens": 0,
+                "cost": 0.002,
+                "thinking": False,
                 "endpoint": "",
             },
             "penetration_deep": {
-                "model": "ds", "cached": False,
-                "input_tokens": 300, "output_tokens": 150,
-                "cache_hit_tokens": 0, "cost": 0.003, "thinking": False,
+                "model": "ds",
+                "cached": False,
+                "input_tokens": 300,
+                "output_tokens": 150,
+                "cache_hit_tokens": 0,
+                "cost": 0.003,
+                "thinking": False,
                 "endpoint": "",
             },
             "news_correlation": {
-                "model": "claude", "cached": False,
-                "input_tokens": 400, "output_tokens": 200,
-                "cache_hit_tokens": 0, "cost": 0.004, "thinking": False,
+                "model": "claude",
+                "cached": False,
+                "input_tokens": 400,
+                "output_tokens": 200,
+                "cache_hit_tokens": 0,
+                "cost": 0.004,
+                "thinking": False,
                 "endpoint": "",
             },
         }
         result = build_llm_module_info({}, per_module)
         html_keys = [m["key"] for m in result if m["status"] != "unknown"]
 
-        expected_order = ["global_macro", "expert_review",
-                          "health_check", "penetration_deep",
-                          "news_correlation"]
+        expected_order = ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]
         self.assertEqual(html_keys, expected_order)
         self.assertEqual(len(result), 5)

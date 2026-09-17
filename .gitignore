@@ -14,6 +14,8 @@ data/
 !data/config/config.json
 !data/config/llm_settings.json
 !data/config/llm_providers.json
+# 数据源密钥文件（含各数据源 API key）——绝不入库；格式见 how-to-config.md，不在仓库提供模板
+data/config/data_key.json
 !data/knowledge/
 !data/knowledge/*.json
 !src/test/data/

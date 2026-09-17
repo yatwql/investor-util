@@ -38,21 +38,14 @@ _DEFAULT_CONFIG = {
     "llm_settings_file": os.path.join(PROJECT_ROOT, "data/config/llm_settings.json"),
     "llm_key_file": os.path.join(PROJECT_ROOT, "data/config/llm_key.json"),
     "llm_providers_file": os.path.join(PROJECT_ROOT, "data/config/llm_providers.json"),
+    # 数据源密钥文件（通用；以 provider 名为节，如 {"datasink": {"api_key": "..."}}）
+    "data_key_file": os.path.join(PROJECT_ROOT, "data/config/data_key.json"),
     # ── B. 报告章节可见性 ──
     "enable_fund_deep_analysis": True,  # 基金深度分析（业绩/经理变更/持仓关系/集中度/风格因子）
     "enable_news": True,  # 市场新闻
     "enable_history": True,  # 组合历史走势+回撤
     "enable_portfolio_evolution": True,  # 组合演进
     "enable_action": True,  # 行动建议独立章（再平衡信号+交易纪律+调仓建议+收益归因，默认开，菜单 P 可切换）
-    # 报告子模块开关（数据质量仪表盘为长期可信核心，默认开启；其余新增能力默认关闭，避免既有报告突然"变胖"）
-    "report_submodules": {
-        "data_quality": True,  # 「数据源可用性矩阵」→「数据质量仪表盘」（源健康+品种覆盖，长期可信，默认开）
-        "industry_beta": False,  # 「风格与因子分析」→ 行业 Beta 子表（穿透行业暴露占比 + 行业指数 β）
-        "candidate_compare": False,  # 「基金业绩分析」→ 候选基金比较子表（候选来自 comparison_candidates）
-        "cost_lots": False,  # 成本流水：持仓 Excel 含交易/分红流水时，汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计
-        "valuation_percentile": False,  # 估值分位：「资产穿透TOP10」章加估值分位列（当前 PE/PB + 价格分位代理）
-        "market_temperature": False,  # 市场温度：「投资分析汇总」章加市场温度刻度行（三因子合成温度计）
-    },
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
     "news_sources": {
@@ -63,6 +56,20 @@ _DEFAULT_CONFIG = {
         "akshare": True,
     },
     "preferred_provider": {},
+    # DataSinking 全文本财报（仅 A 股；需用户自备 key）
+    # requests_per_second / daily_quota 为 0 时按 plan 自动（free=3/8191，yearly=31/131071）
+    "datasink": {
+        # 数据底座总开关：关闭后所有依赖 DataSinking 的分析（财务指标章 / 真实历史估值分位 /
+        # 持仓个股财报摘要）静默回到引入前的报告形态，不产生任何可感知变化
+        "enabled": True,
+        "plan": "free",
+        "requests_per_second": 0,
+        "daily_quota": 0,
+        "sections": ["管理层讨论与分析"],
+        "max_chars": 2000,
+        # 文种白名单：空 = 不限文种，取**最新报告期**（半年报/季报通常比年报新）
+        "doc_types": [],
+    },
     # ── D. 市场时段与缓存 ──
     "market_hour_aware": ["price", "index"],
     "market_hour_ttl": 30,
@@ -85,7 +92,7 @@ _DEFAULT_CONFIG = {
     "user_fund_benchmarks": {},
     # 竞争语境对比指数池（默认沪深300+中证500+中证全债）
     "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
-    "comparison_candidates": [],  # 候选基金比较子表候选（6 位基金代码列表，≤10；与 report_submodules.candidate_compare 配合）
+    "comparison_candidates": [],  # 候选基金比较子表候选（6 位基金代码列表，≤10；配合功能开关 candidate_compare）
     # ── G. 持仓快照 ──
     "history": {
         "fetch_mode": "auto",  # 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
@@ -100,6 +107,77 @@ _DEFAULT_CONFIG = {
     "performance_evaluation": {
         "excess_threshold_up": 80,  # 超额收益 ≥ 此值 → 评级上调一级
         "excess_threshold_down": 40,  # 超额收益 < 此值 → 评级下调一级
+    },
+    # ── M. 景气度框架诊断（实验性功能 `prosperity_framework`）──
+    # 六维评分卡的关键词与目标值：方法骨架借鉴开源项目 zhengxi-views（MIT）；
+    # 详见 docs-stm/plan/prosperity-framework-design.md
+    "prosperity_framework": {
+        # 景气/通胀方向关键词（匹配板块与概念；偏好供给端创造需求的科技通胀）
+        "boom_keywords": [
+            "光通信",
+            "光模块",
+            "算力",
+            "数据中心",
+            "液冷",
+            "半导体",
+            "存储",
+            "芯片",
+            "AI",
+            "电力设备",
+            "电网",
+            "储能",
+            "新能源",
+            "有色",
+            "铜",
+            "稀土",
+            "军工",
+            "创新药",
+            "科技",
+            "电池",
+            "光伏",
+            "高端装备",
+            "制造",
+            "能源资源",
+            "电力",
+            "石油",
+            "煤炭",
+        ],
+        # 中国有全球比较优势的环节关键词
+        "global_edge_keywords": [
+            "光通信",
+            "光模块",
+            "半导体设备",
+            "半导体材料",
+            "芯片",
+            "电力设备",
+            "电网",
+            "锂电",
+            "光伏",
+            "储能",
+            "消费电子",
+            "新能源",
+            "电池",
+            "高端装备",
+            "制造",
+            "电力",
+        ],
+        # 防御/红利方向关键词（景气维度反向扣减项）
+        "defensive_keywords": [
+            "银行",
+            "白酒",
+            "食品饮料",
+            "公用事业",
+            "红利",
+            "地产",
+            "房地产",
+            "保险",
+            "消费",
+            "债",
+            "货币",
+            "现金",
+        ],
+        # 前十大重仓集中度目标（%）
+        "concentration_target_pct": 50.0,
     },
     # ── I. 再平衡配置 ──
     "rebalance": {
@@ -126,6 +204,7 @@ _DEFAULT_CONFIG = {
         "max_total_workers": 15,  # 全局 batch 线程硬上限（已有池不计入）
         "fund_workers": 3,  # 基金排名/持仓批量并发数
         "industry_workers": 8,  # 行业分类批量并发数
+        "datasink_workers": 2,  # 财报取数并发数（免费档批量上限 ≤3）
     },
     "batch_rate_limit": {  # Provider 级别请求间隔（秒），0=不限速
         "tencent": 0.0,
@@ -167,6 +246,7 @@ def _build_template_from_defaults() -> str:
         f'  "llm_settings_file": {json.dumps(d["llm_settings_file"])},',
         f'  "llm_key_file": {json.dumps(d["llm_key_file"])},',
         f'  "llm_providers_file": {json.dumps(d["llm_providers_file"])},',
+        f'  "data_key_file": {json.dumps(d["data_key_file"])},  // 数据源密钥文件（通用；以 provider 名为节）',
         "",
         # ── B ──
         "  // ── B. 报告可选章节（关闭后对应页签/章节完全隐藏）──",
@@ -176,13 +256,14 @@ def _build_template_from_defaults() -> str:
         f'  "enable_portfolio_evolution": {json.dumps(d["enable_portfolio_evolution"])},  // 组合演进',
         f'  "enable_action": {json.dumps(d["enable_action"])},  // 行动建议独立章（决策行动，默认开，菜单 P 可切换）',
         '  // 报告子模块开关（数据质量仪表盘长期可信默认开，其余新增能力默认关闭，避免既有报告突然"变胖"）',
-        f'  "report_submodules": {json.dumps(d["report_submodules"], ensure_ascii=False)},  // 数据质量仪表盘默认开',
         "",
         # ── C ──
         "  // ── C. 数据源与提供商 ──",
         f'  "news_top_count": {json.dumps(d["news_top_count"])},',
         f'  "news_sources": {json.dumps(d["news_sources"], ensure_ascii=False)},',
         f'  "preferred_provider": {json.dumps(d["preferred_provider"])},',
+        "  // DataSinking 全文本财报（仅 A 股；requests_per_second/daily_quota 为 0 时按 plan 自动）",
+        f'  "datasink": {json.dumps(d["datasink"], ensure_ascii=False)},',
         "",
         # ── D ──
         "  // ── D. 市场时段与缓存 ──",
@@ -203,7 +284,7 @@ def _build_template_from_defaults() -> str:
         f'  "user_fund_benchmarks": {json.dumps(d["user_fund_benchmarks"])},',
         "  // 竞争语境对比指数池（默认沪深300+中证500+中证全债）",
         f'  "comparison_indices": {json.dumps(d["comparison_indices"], ensure_ascii=False)},',
-        "  // 候选基金比较子表候选（6 位基金代码列表，≤10；与 report_submodules.candidate_compare 配合）",
+        "  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合功能开关 candidate_compare）",
         f'  "comparison_candidates": {json.dumps(d["comparison_candidates"])},',
         "",
         # ── G ──
@@ -248,6 +329,15 @@ def _build_template_from_defaults() -> str:
         "  // ── J. 流动性配置 ──",
         f'  "redemption_limits": {json.dumps(d["redemption_limits"])},  // 场外基金单日赎回上限（code → 金额，空=未配置）',
         "",
+        # ── M ──
+        "  // ── M. 景气度框架诊断（实验性功能 prosperity_framework）──",
+        '  "prosperity_framework": {',
+        f'    "boom_keywords": {json.dumps(d["prosperity_framework"]["boom_keywords"], ensure_ascii=False)},  // 景气/通胀方向关键词（板块与概念匹配）',
+        f'    "global_edge_keywords": {json.dumps(d["prosperity_framework"]["global_edge_keywords"], ensure_ascii=False)},  // 中国有全球比较优势的环节关键词',
+        f'    "defensive_keywords": {json.dumps(d["prosperity_framework"]["defensive_keywords"], ensure_ascii=False)},  // 防御/红利方向关键词（反向扣减）',
+        f'    "concentration_target_pct": {d["prosperity_framework"]["concentration_target_pct"]}  // 前十大重仓集中度目标（%）',
+        "  },",
+        "",
         # ── K ──
         "  // ── K. 匿名化配置 ──",
         '  "anonymization": {',
@@ -261,7 +351,8 @@ def _build_template_from_defaults() -> str:
         '  "batch": {',
         f'    "max_total_workers": {d["batch"]["max_total_workers"]},  // 全局 batch 线程硬上限（已有池不计入）',
         f'    "fund_workers": {d["batch"]["fund_workers"]},  // 基金排名/持仓批量并发数',
-        f'    "industry_workers": {d["batch"]["industry_workers"]}  // 行业分类批量并发数',
+        f'    "industry_workers": {d["batch"]["industry_workers"]},  // 行业分类批量并发数',
+        f'    "datasink_workers": {d["batch"]["datasink_workers"]}  // 财报取数并发数（免费档批量上限 ≤3）',
         "  },",
         '  "batch_rate_limit": {  // Provider 级别请求间隔（秒），0=不限速',
         f'    "tencent": {d["batch_rate_limit"]["tencent"]},  // 腾讯行情（不限速）',

@@ -6,7 +6,7 @@
 在 conftest.py 的标记注册列表中可见所有 unit_* 标记名：
   - unit_providers / unit_fetcher / unit_llm / unit_news
   - unit_report / unit_config / unit_core / unit_analysis
-	  - unit_ui / unit_cli
+          - unit_ui / unit_cli
 
 用法：
   pytest src/test/unit/ -m "unit_core"    # 仅 core 子模块
@@ -70,7 +70,4 @@ def _is_under_unit(item) -> bool:
 
 def _has_subunit_marker(item) -> bool:
     """检查测试项是否已有 unit_* 子标记（排除 unit 父标记本身）。"""
-    return any(
-        m.name.startswith("unit_") and m.name != "unit"
-        for m in item.iter_markers()
-    )
+    return any(m.name.startswith("unit_") and m.name != "unit" for m in item.iter_markers())

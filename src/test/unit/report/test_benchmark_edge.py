@@ -49,7 +49,7 @@ class TestNormalizeBenchmarksEdge(unittest.TestCase):
     def test_close_zero_at_align_start(self):
         """align_start 附近 close = 0 被过滤 → 起算日自动前移到首个有效日。"""
         bars = [
-            {"date": "2026-01-05", "close": 0},     # 无效，被过滤
+            {"date": "2026-01-05", "close": 0},  # 无效，被过滤
             {"date": "2026-01-06", "close": 100.0},
             {"date": "2026-01-07", "close": 102.0},
         ]
@@ -115,7 +115,7 @@ class TestNormalizeBenchmarksEdge(unittest.TestCase):
         """中间有 close=0，前后有正常数据 → 0 条被过滤，剩余 LOCF。"""
         bars = [
             {"date": "2026-01-05", "close": 100.0},
-            {"date": "2026-01-06", "close": 0},        # 过滤
+            {"date": "2026-01-06", "close": 0},  # 过滤
             {"date": "2026-01-07", "close": 105.0},
             {"date": "2026-01-08", "close": 103.0},
         ]
@@ -127,5 +127,4 @@ class TestNormalizeBenchmarksEdge(unittest.TestCase):
         # 有效: 1/5=100, 1/7=105, 1/8=103
         # align_start = 1/5, close_at_start=100
         # 1/5: 100, 1/6: LOCF→100, 1/7: 105, 1/8: 103
-        self.assertEqual([b["value"] for b in bm["bars"]],
-                         [100.0, 100.0, 105.0, 103.0])
+        self.assertEqual([b["value"] for b in bm["bars"]], [100.0, 100.0, 105.0, 103.0])

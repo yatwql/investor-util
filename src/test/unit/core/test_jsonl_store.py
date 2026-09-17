@@ -63,6 +63,36 @@ class TestAppendJsonlAtomic:
         leftovers = [p for p in os.listdir(tmp_path) if p.startswith(".probe_")]
         assert leftovers == []
 
+    def test_returns_true_on_success(self, tmp_path):
+        assert append_jsonl_atomic(str(tmp_path / "events.jsonl"), '{"a": 1}\n') is True
+
+    def test_returns_false_and_keeps_file_intact_when_replace_fails(self, tmp_path, monkeypatch):
+        """原子替换失败 → 返回 False 且旧内容原样保留（不抛异常）。"""
+        target = tmp_path / "events.jsonl"
+        append_jsonl_atomic(str(target), '{"a": 1}\n')
+
+        def _boom(*_args, **_kwargs):
+            raise OSError("磁盘满")
+
+        monkeypatch.setattr(os, "replace", _boom)
+
+        assert append_jsonl_atomic(str(target), '{"a": 2}\n') is False
+        assert read_jsonl(str(target)) == [{"a": 1}]
+
+    def test_returns_false_when_tempfile_creation_fails(self, tmp_path, monkeypatch):
+        """临时文件都建不出来（目录只读/磁盘满）→ 返回 False，不抛异常。
+
+        此路径曾因 `mkstemp` 失败后仍去 `os.remove(tmp_path)` 而抛 NameError。
+        """
+        import tempfile as _tempfile
+
+        def _boom(*_args, **_kwargs):
+            raise OSError("磁盘满")
+
+        monkeypatch.setattr(_tempfile, "mkstemp", _boom)
+
+        assert append_jsonl_atomic(str(tmp_path / "events.jsonl"), '{"a": 1}\n') is False
+
 
 class TestReadJsonl:
     """容错读取。"""

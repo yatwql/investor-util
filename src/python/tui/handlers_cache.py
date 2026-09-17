@@ -211,13 +211,13 @@ def _cmd_show_cache_stats() -> None:
     cache_dir = get_cache_dir()
 
     # ── 1. data/cache 缓存文件 ──
-    print(f"  ════════════════ data/cache ════════════════")
+    print("  ════════════════ data/cache ════════════════")
     print(f"  目录: {cache_dir}")
     print(f"  文件: {stats.total_files} 个 | 大小: {stats.total_size_bytes / 1024:.0f} KB")
     if stats.hit_total > 0:
         print(f"  命中率:   {stats.hit_rate:.1f}% ({stats.hit_total} 次请求)")
     if stats.top_by_size:
-        print(f"  最大文件:")
+        print("  最大文件:")
         for key, size in stats.top_by_size[:3]:
             size_kb = size / 1024
             disp = f"{size_kb / 1024:.1f} MB" if size_kb >= 1024 else f"{size_kb:.0f} KB"
@@ -231,7 +231,7 @@ def _cmd_show_cache_stats() -> None:
     # ── 2. data/history/snapshots 快照文件 ──
     if stats.snapshot_files > 0:
         print()
-        print(f"  ════════ data/history/snapshots ════════")
+        print("  ════════ data/history/snapshots ════════")
         _hist_dir = os.path.join(PROJECT_ROOT, "data", "history", "snapshots")
         print(f"  目录: {os.path.abspath(_hist_dir)}")
         print(f"  文件: {stats.snapshot_files} 个 | 大小: {stats.snapshot_size_bytes / 1024:.0f} KB")
@@ -241,15 +241,15 @@ def _cmd_show_cache_stats() -> None:
         )
         if _latest:
             print(f"  最新: {datetime.fromtimestamp(_latest).strftime('%Y-%m-%d %H:%M')}")
-        print(f"  （持仓快照，超期自动删除，不随缓存清理）")
+        print("  （持仓快照，超期自动删除，不随缓存清理）")
 
     # ── 3. data/state 运行时状态文件 ──
     if stats.state_files > 0:
         print()
-        print(f"  ═══════════════ data/state ═══════════════")
+        print("  ═══════════════ data/state ═══════════════")
         _state_dir = os.path.join(PROJECT_ROOT, "data", "state")
         print(f"  目录: {os.path.abspath(_state_dir)}")
         print(f"  文件: {stats.state_files} 个 | 大小: {stats.state_size_bytes / 1024:.1f} KB")
-        print(f"  （运行时状态，跨会话持久化，不随缓存清理）")
+        print("  （运行时状态，跨会话持久化，不随缓存清理）")
 
     press_any_key()

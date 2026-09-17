@@ -162,7 +162,6 @@ class TestMalformedLedger:
     def test_append_failure_silent(self, tmp_path, monkeypatch):
         """os.replace 失败 → 不向上抛，保证 report seam 主链路不中断。"""
         lp = str(tmp_path / "ledger.jsonl")
-        import src.python.core.decision_ledger as mod
 
         def boom(src, dst):
             raise OSError("disk full")

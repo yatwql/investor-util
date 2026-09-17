@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from typing import NoReturn
 
 # 确保项目根目录在 sys.path 中（支持直接执行 python src/python/cli/cli.py）
 _src_dir = os.path.dirname(os.path.abspath(__file__))
@@ -31,9 +32,9 @@ _EXIT_SEVERE = 2
 def _experiment_name(value: str) -> tuple[str, ...]:
     """argparse type 回调 —— 校验并归一化 ``--experiment`` 取值。
 
-    取值清单取自 features.EXPERIMENTAL_FEATURES 注册表（与 TUI 菜单 S /
-    Web 配置面板同源），支持开关名、显示名与 ``all``。命中多个（``all``）
-    时返回全部开关名，调用方平铺后统一启用。
+    取值清单取自 features 注册表的实验组（与 TUI 菜单 S / Web 配置面板同源），
+    支持开关名、显示名与 ``all``。命中多个（``all``）时返回全部开关名，调用方
+    平铺后统一启用。
 
     名称解析本身容忍空白项（见 resolve_experiment_flags），但命令行取值
     为空串时属用户笔误，此处按非法取值报错，不静默忽略。
@@ -44,6 +45,21 @@ def _experiment_name(value: str) -> tuple[str, ...]:
     if unknown or not flags:
         raise argparse.ArgumentTypeError(f"未知实验功能 '{value}'；可选: {describe_experiment_flags()}、all")
     return tuple(sorted(flags))
+
+
+def _feature_override(value: str) -> tuple[str, bool]:
+    """argparse type 回调 —— 校验 ``--feature NAME=VALUE`` 取值。
+
+    与 ``--experiment`` 的区别见各自 help：本参数作用于**全部**功能开关（含常规
+    组）且**双向**（可关）。取值域与合法性在解析期即校验——错误的开关名或取值
+    当场报错并列出可选项，不留给运行时静默失效。
+    """
+    from src.python.config.features import parse_switch_override
+
+    try:
+        return parse_switch_override(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -65,7 +81,16 @@ def _build_parser() -> argparse.ArgumentParser:
         action="append",
         type=_experiment_name,
         help="启用实验性功能，仅本次运行生效（不写入 features.json）。可重复指定；"
-        "NAME 取开关名或显示名，all=全部启用。",
+        "NAME 取开关名或显示名，all=全部启用。等价于 --feature 的实验组只开简写。",
+    )
+    parser.add_argument(
+        "--feature",
+        metavar="NAME=VALUE",
+        action="append",
+        type=_feature_override,
+        help="覆写任意功能开关（含常规开关），仅本次运行生效（不写入 features.json）。可重复指定；"
+        "NAME 取开关名，VALUE ∈ on/off/true/false/1/0（大小写不敏感）。"
+        "与 --experiment 的区别：本参数是全开关双向覆写，后者只开实验组。",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s v{APP_VERSION}")
 
@@ -122,6 +147,25 @@ def _build_parser() -> argparse.ArgumentParser:
         "输出: 调仓模拟.xlsx / .html（最新版固定名，历史归档至日期子目录；默认零网络请求，指定生效日时联网取历史做假设推演，不构成收益承诺）"
     )
 
+    # ── cassettes 子命令（只读维护，无需 config）──
+    cassettes_p = sub.add_parser(
+        "cassettes",
+        help="数据源记录-回放：列出已录制响应 / 离线校验能否被当前解析器解析（无需 config）",
+    )
+    cassettes_p.add_argument(
+        "--verify",
+        action="store_true",
+        help="逐条离线回放并交给当前解析器解析（不联网）；有解析失败则退出码 2",
+    )
+    cassettes_p.epilog = (
+        "示例:\n"
+        "  cassettes           列出已录制 cassette（来源/录制时间/交互数）\n"
+        "  cassettes --verify  离线校验每份录制的解析路径\n"
+        "\n"
+        "刷新录制需联网且为显式动作：\n"
+        "  python scripts/test-runner.py --mode live --record-cassettes"
+    )
+
     # ── check-sources 子命令 ──
     check_p = sub.add_parser("check-sources", help="数据源健康检查（无需 config）")
     check_p.epilog = "示例:\n  check-sources    测试各数据源联通性"
@@ -150,7 +194,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "  view-logs --lines 200        只读末尾 200 行"
     )
 
-    # ── doctor 子命令（实验功能 doctor_check）──
+    # ── doctor 子命令（只读诊断，不依赖 config 初始化）──
     doctor_p = sub.add_parser("doctor", help="系统自检：环境/配置/目录/数据源一键体检（无需 config）")
     doctor_p.add_argument(
         "--offline",
@@ -587,6 +631,56 @@ def _handle_view_logs(args: argparse.Namespace) -> int:
     return _EXIT_SUCCESS
 
 
+def _handle_cassettes(args: argparse.Namespace) -> int:
+    """处理 cassettes 子命令——数据源记录-回放维护（只读、离线）。
+
+    纯只读维护命令，与 ``doctor`` 同例：无需 config、不受任何实验开关约束。
+    本命令不发起网络请求——``--verify`` 的回放传输在 socket 之前拦截。
+
+    Returns:
+        int 退出码（_EXIT_SUCCESS=正常, _EXIT_SEVERE=有录制的解析路径失败）。
+    """
+    from src.python.core.cassette import CASSETTE_DIR, list_cassettes, verify_cassettes
+
+    entries = list_cassettes()
+    if not entries:
+        print(f"未找到已录制的数据源响应（目录: {CASSETTE_DIR}）")
+        return _EXIT_SUCCESS
+
+    if not args.verify:
+        print(f"已录制数据源响应 {len(entries)} 份（{CASSETTE_DIR}）:")
+        for entry in entries:
+            if "error" in entry:
+                print(f"  [ERR] {entry['name']} — {entry['error']}")
+                continue
+            print(
+                f"  {entry['name']}  来源={entry['source'] or '-'}  录制于={entry['recorded_at'] or '-'}"
+                f"  交互={entry['interactions']}  大小={entry['size_bytes'] / 1024:.1f} KB"
+            )
+        return _EXIT_SUCCESS
+
+    from src.python.fetcher.cassette_checks import CASSETTE_CHECKS
+
+    verdicts = verify_cassettes(CASSETTE_CHECKS)
+    print(f"离线回放校验 {len(verdicts)} 份数据源响应（不联网，交给当前解析器）：")
+    failures = 0
+    for verdict in verdicts:
+        status = verdict["status"]
+        if status == "ok":
+            print(f"  [OK] {verdict['name']}（{verdict.get('interactions', 0)} 条交互）")
+        elif status == "skipped":
+            print(f"  [!] {verdict['name']} — 跳过：{verdict['detail']}")
+        else:
+            failures += 1
+            print(f"  [ERR] {verdict['name']} — {verdict['detail']}")
+
+    if failures:
+        print(f"[ERR] {failures} 份录制的解析路径失败（上游格式可能已变，需重新录制）")
+        return _EXIT_SEVERE
+    print("[OK] 全部录制的解析路径正常")
+    return _EXIT_SUCCESS
+
+
 # ── 主入口 ───────────────────────────────────────────────
 
 
@@ -609,6 +703,54 @@ def _apply_cli_experiments(groups: list[tuple[str, ...]] | None) -> None:
     logging.getLogger("invest").info("[features] 命令行启用实验功能 %d 项: %s", len(flags), "、".join(flags))
 
 
+def _apply_cli_switches(pairs: list[tuple[str, bool]] | None) -> None:
+    """应用命令行指定的功能开关覆写（仅当前进程运行时，不写盘）。
+
+    与 ``_apply_cli_experiments`` 的差别是**双向**：``--feature doctor_check=off``
+    可关闭常规开关，用于临时复现「关掉这一项会怎样」而无须改盘上配置（实验开关
+    的关闭路径仍走 features.json / 面板）。同名重复以最后一次为准（见
+    ``resolve_switch_values``）。取值已在 argparse type 回调中校验。
+    """
+    from src.python.config.features import resolve_switch_values, set_feature_enabled
+
+    overrides = resolve_switch_values(pairs)
+    if not overrides:
+        return
+
+    import logging
+
+    for flag, value in overrides:
+        set_feature_enabled(flag, value)
+    logging.getLogger("invest").info(
+        "[features] 命令行覆写功能开关 %d 项: %s",
+        len(overrides),
+        "、".join(f"{flag}={'on' if value else 'off'}" for flag, value in overrides),
+    )
+
+
+def _prepare_early_exit_switches(groups: list[tuple[str, ...]] | None, pairs: list[tuple[str, bool]] | None) -> None:
+    """为不初始化 config 的早返回命令应用命令行开关（--experiment / --feature）。
+
+    ``doctor``/``check-sources``/``view-logs``/``cassettes`` 先于 ``init_config()``
+    分派（配置损坏时这些命令仍须可用），故命令行开关需单独应用，否则它们会被
+    静默忽略、用户据 doctor 结论误判开关状态。
+
+    顺序与 ``init_config()`` 一致：features.json 覆写先于命令行增量——反过来
+    会被随后的覆写值回冲。此处显式加载而非依赖 ``config.features`` 的导入时
+    自动加载：直接依赖它会让「两个参数都没传」的情况一项覆写都不加载
+    （重置为内置默认值）。重复加载不会重复打印日志——``load_feature_overrides``
+    仅在取值真变化时报 INFO。
+
+    ``--experiment`` 先于 ``--feature`` 应用：后者是显式取值，同名时应覆盖前者的
+    隐式「只开」。
+    """
+    from src.python.config.features import load_feature_overrides
+
+    load_feature_overrides()
+    _apply_cli_experiments(groups)
+    _apply_cli_switches(pairs)
+
+
 def main() -> int:
     """CLI 主入口。
 
@@ -625,6 +767,14 @@ def main() -> int:
 
     from src.python.config import get_config, init_config
 
+    # 以下命令不初始化 config（配置损坏时仍须可用），命令行开关需单独应用
+    if args.command in ("check-sources", "view-logs", "doctor", "cassettes"):
+        _prepare_early_exit_switches(args.experiment, args.feature)
+
+    # cassettes 同样无需 config 且只读离线：维护已录制响应，不碰用户配置
+    if args.command == "cassettes":
+        return _handle_cassettes(args)
+
     if args.command == "check-sources":
         return _handle_check_sources()
 
@@ -639,8 +789,9 @@ def main() -> int:
     init_config(config_path=args.config)
     config = get_config()
 
-    # 实验功能命令行开关（需在配置初始化之后：覆写加载已完成，此处为本次运行增量）
+    # 命令行开关（需在配置初始化之后：覆写加载已完成，此处为本次运行增量）
     _apply_cli_experiments(args.experiment)
+    _apply_cli_switches(args.feature)
 
     # 首次运行引导（非交互/CI/脚本环境自动跳过，不阻塞命令执行）
     try:
@@ -661,13 +812,20 @@ def main() -> int:
     return _EXIT_SEVERE
 
 
-if __name__ == "__main__":
+def run_cli() -> NoReturn:
+    """CLI 进程入口：执行 ``main()`` 并以退出码结束进程。
+
+    ``python -m src.python.cli``（``__main__.py``）与 ``python src/python/cli/cli.py``
+    两条入口共用本函数，保证退出码与边界日志一致。**退出码是命令对外契约的一部分**
+    （``doctor`` / ``cassettes --verify`` 等都靠它表达「有失败项」），入口若丢弃
+    ``main()`` 的返回值，脚本化调用（cron/CI/包装脚本）就永远只看到成功。
+    """
     from src.python.core.logger import log_app_boundary
 
     try:
         sys.exit(main())
     except SystemExit:
-        # 正常退出路径
+        # 正常退出路径（含 argparse 的 --help/参数错误）
         log_app_boundary("关闭", "CLI模式")
         raise
     except KeyboardInterrupt:
@@ -682,3 +840,7 @@ if __name__ == "__main__":
         logging.getLogger("invest").exception("CLI 未处理异常")
         log_app_boundary("关闭", "CLI模式")
         sys.exit(2)
+
+
+if __name__ == "__main__":
+    run_cli()

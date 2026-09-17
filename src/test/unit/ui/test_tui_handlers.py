@@ -32,12 +32,14 @@ from src.python.tui.tui_handlers import (
     select_holdings_file,
 )
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 
 
 # ═══════════════════════════════════════════════════════════════
 # 基础测试
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestPrintErrorWithHint(unittest.TestCase):
     """print_error_with_hint 错误提示格式测试。"""
@@ -93,6 +95,7 @@ class TestPrintErrorWithHint(unittest.TestCase):
 # _Timer 测试
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestTimer(unittest.TestCase):
     """_Timer 上下文管理器测试。"""
 
@@ -104,13 +107,13 @@ class TestTimer(unittest.TestCase):
 
     def test_enter_sets_start(self):
         """__enter__ 记录开始时间。"""
-        with patch.object(_time_module, 'time', return_value=12345.0):
+        with patch.object(_time_module, "time", return_value=12345.0):
             with _Timer("test") as t:
                 self.assertEqual(t.start, 12345.0)
 
     def test_exit_records_elapsed(self):
         """__exit__ 正确记录耗时。"""
-        with patch.object(_time_module, 'time', side_effect=[1000.0, 1005.5]):
+        with patch.object(_time_module, "time", side_effect=[1000.0, 1005.5]):
             with _Timer("test"):
                 pass
         self.assertEqual(len(_timing_records), 1)
@@ -119,7 +122,7 @@ class TestTimer(unittest.TestCase):
 
     def test_multiple_timers(self):
         """多个计时器各自记录互不干扰。"""
-        with patch.object(_time_module, 'time', side_effect=[100.0, 102.0, 102.0, 105.0]):
+        with patch.object(_time_module, "time", side_effect=[100.0, 102.0, 102.0, 105.0]):
             with _Timer("fast"):
                 pass
             with _Timer("slow"):
@@ -130,7 +133,7 @@ class TestTimer(unittest.TestCase):
 
     def test_nested_timers(self):
         """嵌套计时器正确工作。"""
-        with patch.object(_time_module, 'time', side_effect=[0.0, 0.5, 1.0, 2.0]):
+        with patch.object(_time_module, "time", side_effect=[0.0, 0.5, 1.0, 2.0]):
             with _Timer("outer"):
                 with _Timer("inner"):
                     pass
@@ -148,7 +151,7 @@ class TestTimer(unittest.TestCase):
 
     def test_elapsed_is_float(self):
         """耗时记录为浮点数。"""
-        with patch.object(_time_module, 'time', side_effect=[0.0, 0.0]):
+        with patch.object(_time_module, "time", side_effect=[0.0, 0.0]):
             with _Timer("test"):
                 pass
         self.assertIsInstance(_timing_records[0][1], float)
@@ -157,7 +160,7 @@ class TestTimer(unittest.TestCase):
         """大量计时器均被追加到列表中。"""
         n = 10
         times = list(range(n * 2))
-        with patch.object(_time_module, 'time', side_effect=times):
+        with patch.object(_time_module, "time", side_effect=times):
             for i in range(n):
                 with _Timer(f"t{i}"):
                     pass
@@ -167,6 +170,7 @@ class TestTimer(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 # print_timing_summary 测试
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestPrintTimingSummary(unittest.TestCase):
     """print_timing_summary 输出格式化测试。"""
@@ -243,6 +247,7 @@ class TestPrintTimingSummary(unittest.TestCase):
 # print_llm_session_usage 测试
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestPrintLlmSessionUsage(unittest.TestCase):
     """print_llm_session_usage 输出测试。"""
 
@@ -313,6 +318,7 @@ class TestPrintLlmSessionUsage(unittest.TestCase):
 # print_error_with_hint 扩展测试
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestPrintErrorWithHintExtended(unittest.TestCase):
     """print_error_with_hint 额外关键词及边界测试。"""
 
@@ -359,6 +365,7 @@ class TestPrintErrorWithHintExtended(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 # execute_item 测试
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestExecuteItem(unittest.TestCase):
     """execute_item 菜单执行调度与防重入测试。"""
@@ -430,6 +437,7 @@ class TestExecuteItem(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 # select_holdings_file 测试
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestSelectHoldingsFile(unittest.TestCase):
     """select_holdings_file 文件选择逻辑测试。"""

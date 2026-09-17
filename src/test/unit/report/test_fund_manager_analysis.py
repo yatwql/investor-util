@@ -26,7 +26,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.python.fetcher.fund_manager import fetch_fund_manager
 from src.python.report.fund_manager_analysis import (
     _calc_alert_level,
     _load_snapshot,
@@ -42,8 +41,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 def _make_holding(code: str, name: str, account: str = "测试账户") -> Holding:
     """构造测试用 Holding 对象。"""
     return Holding(
-        account=account, name=name, code=code,
-        shares=1000, cost_price=1.0,
+        account=account,
+        name=name,
+        code=code,
+        shares=1000,
+        cost_price=1.0,
     )
 
 
@@ -88,7 +90,9 @@ class TestDetectManagerChanges(unittest.TestCase):
     @patch("src.python.report.fund_manager_analysis.fetch_fund_manager")
     @patch("src.python.report.fund_manager_analysis._load_snapshot")
     def test_first_run_all_first_check(
-        self, mock_snapshot: MagicMock, mock_manager: MagicMock,
+        self,
+        mock_snapshot: MagicMock,
+        mock_manager: MagicMock,
     ):
         """首次运行（无快照）→ 全部标注首检。"""
         mock_snapshot.return_value = None  # 首次运行
@@ -108,7 +112,10 @@ class TestDetectManagerChanges(unittest.TestCase):
     @patch("src.python.report.fund_manager_analysis._load_snapshot")
     @patch("src.python.report.fund_manager_analysis._update_snapshot")
     def test_manager_unchanged_all_normal(
-        self, mock_update: MagicMock, mock_snapshot: MagicMock, mock_manager: MagicMock,
+        self,
+        mock_update: MagicMock,
+        mock_snapshot: MagicMock,
+        mock_manager: MagicMock,
     ):
         """经理未变更 → 全部正常。"""
         mock_snapshot.return_value = {
@@ -131,7 +138,10 @@ class TestDetectManagerChanges(unittest.TestCase):
     @patch("src.python.report.fund_manager_analysis._load_snapshot")
     @patch("src.python.report.fund_manager_analysis._update_snapshot")
     def test_manager_changed_1m_emergency(
-        self, mock_update: MagicMock, mock_snapshot: MagicMock, mock_manager: MagicMock,
+        self,
+        mock_update: MagicMock,
+        mock_snapshot: MagicMock,
+        mock_manager: MagicMock,
     ):
         """经理变更（1 月内）→ 🔴 紧急。"""
         mock_snapshot.return_value = {
@@ -139,14 +149,13 @@ class TestDetectManagerChanges(unittest.TestCase):
         }
         # 当前经理为"李四"且 start_date 为最近（30 天内）
         import datetime
+
         recent_date = (datetime.datetime.now() - datetime.timedelta(days=15)).strftime("%Y-%m-%d")
         mock_manager.side_effect = lambda code: {
             "110011": {"manager_name": "李四", "start_date": recent_date, "tenure_days": 15, "history": []},
         }.get(code)
 
-        results = detect_manager_changes(
-            [_make_holding("110011", "易方达中小盘混合")]
-        )
+        results = detect_manager_changes([_make_holding("110011", "易方达中小盘混合")])
 
         self.assertEqual(len(results), 1)
         r = results[0]
@@ -157,21 +166,23 @@ class TestDetectManagerChanges(unittest.TestCase):
     @patch("src.python.report.fund_manager_analysis._load_snapshot")
     @patch("src.python.report.fund_manager_analysis._update_snapshot")
     def test_manager_changed_3m_warning(
-        self, mock_update: MagicMock, mock_snapshot: MagicMock, mock_manager: MagicMock,
+        self,
+        mock_update: MagicMock,
+        mock_snapshot: MagicMock,
+        mock_manager: MagicMock,
     ):
         """经理变更（3 月内）→ ⚠️ 关注。"""
         mock_snapshot.return_value = {
             "110011": {"manager_name": "张三", "check_date": "2026-03-01"},
         }
         import datetime
+
         date_60d = (datetime.datetime.now() - datetime.timedelta(days=60)).strftime("%Y-%m-%d")
         mock_manager.side_effect = lambda code: {
             "110011": {"manager_name": "李四", "start_date": date_60d, "tenure_days": 60, "history": []},
         }.get(code)
 
-        results = detect_manager_changes(
-            [_make_holding("110011", "易方达中小盘混合")]
-        )
+        results = detect_manager_changes([_make_holding("110011", "易方达中小盘混合")])
 
         self.assertEqual(len(results), 1)
         r = results[0]
@@ -189,7 +200,9 @@ class TestDetectManagerChanges(unittest.TestCase):
     @patch("src.python.report.fund_manager_analysis.fetch_fund_manager")
     @patch("src.python.report.fund_manager_analysis._load_snapshot")
     def test_manager_fetch_failed(
-        self, mock_snapshot: MagicMock, mock_manager: MagicMock,
+        self,
+        mock_snapshot: MagicMock,
+        mock_manager: MagicMock,
     ):
         """经理信息获取失败 → 显示"--"。"""
         mock_snapshot.return_value = {
@@ -197,9 +210,7 @@ class TestDetectManagerChanges(unittest.TestCase):
         }
         mock_manager.return_value = None  # 获取失败
 
-        results = detect_manager_changes(
-            [_make_holding("110011", "易方达中小盘混合")]
-        )
+        results = detect_manager_changes([_make_holding("110011", "易方达中小盘混合")])
 
         self.assertEqual(len(results), 1)
         r = results[0]

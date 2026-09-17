@@ -3,13 +3,15 @@
 CLI 命令行模式无需 TUI 菜单界面，通过命令行参数驱动，适合**定时任务、脚本化批量生成、服务器 / 无桌面环境**使用。本文从用户角度完整介绍 CLI 模式的命令结构、子命令参数与使用技巧。
 
 > **入口**：`.venv/bin/python -m src.python.cli [全局参数] <子命令> [子命令参数]`
-> **定时任务**：配合 Windows 任务计划程序 / Linux cron 自动运行，见本文 [§12 定时任务](#12-定时任务)。
+> **定时任务**：配合 Windows 任务计划程序 / Linux cron 自动运行，见本文 [§13 定时任务](#13-定时任务)。
 
 ---
 
 ## 1. 命令结构
 
-CLI 命令分两层：**全局参数**（位于子命令之前）+ **子命令**（`report` / `cache` / `whatif` / `check-sources` / `view-logs` / `doctor`）。
+CLI 命令分两层：**全局参数**（位于子命令之前）+ **子命令**（`report` / `cache` / `whatif` / `check-sources` / `view-logs` / `doctor` / `cassettes`）。
+
+> 其中 `cassettes` 是**开发维护命令**（列出/校验已录制的数据源真实响应，供离线回归使用），日常使用报告功能不需要它——详见 [开发者指南](../managements/developer-guide.md) → CLI 子命令。
 
 ```bash
 # 查看帮助
@@ -31,32 +33,42 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir`（不存在时自动创建；支持绝对 / 相对路径） |
 | `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
 | `--non-interactive` | 跳过首次运行交互式引导（定时任务 / 脚本使用） |
-| `--experiment NAME` | 启用实验性功能，**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `signal_pre_digest`）或显示名（如 `信号预消化`），`all` = 全部启用 |
+| `--experiment NAME` | 启用**实验组**功能（只开不关的简写），**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `signal_ledger`）或显示名（如 `确定性信号沉淀`），`all` = 全部启用 |
+| `--feature NAME=VALUE` | 切换**任意**功能开关（实验组与常规组均可），**双向**（可开可关）、**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `doctor_check`），`VALUE` 取 `on`/`off`（也接受 `true`/`false`/`1`/`0`，大小写不敏感）。同名后写覆盖先写 |
 | `--version` | 显示版本号并退出 |
 
 > **`--experiment` 说明**：等价于在 TUI 菜单 **[S]** / Web 配置面板中临时勾选实验开关，但**只作用于当前这一次命令、不改动持久化配置**——CI / 定时任务可在不污染用户配置的前提下试用实验功能；反之，用户配置里已开启的实验开关不会被本参数关闭。
 >
 > ```bash
-> # 单次运行启用信号预消化
-> .venv/bin/python -m src.python.cli --experiment signal_pre_digest report --type full
+> # 单次运行启用正反辩论（三段式：白脸→黑脸→综合）
+> .venv/bin/python -m src.python.cli --experiment llm_debate_procon report --type full
 >
 > # 用显示名指定、可重复叠加
-> .venv/bin/python -m src.python.cli --experiment 决策跨期反思闭环 --experiment 模块级质量分级 report --type full
+> .venv/bin/python -m src.python.cli --experiment 决策跨期反思闭环 --experiment 确定性信号沉淀 report --type full
 >
-> # 单次启用决策头结构化（受控 JSON 决策头，抽取侧优先读结构化、失败回落表格解析）
-> .venv/bin/python -m src.python.cli --experiment decision_header_parse report --type full
+> # 单次启用辩论-集中度问答（单品种占比≥20% 时附加集中度量化评估）
+> .venv/bin/python -m src.python.cli --experiment llm_debate_qa_concentration report --type full
 >
 > # 单次启用确定性信号沉淀（五类确定性评级入账，附实时/非实时标签）
 > .venv/bin/python -m src.python.cli --experiment signal_ledger report --type full
->
-> # 单次启用系统自检上屏（TUI 菜单 [D] / Web 自检卡片；doctor 子命令本身不受开关约束）
-> .venv/bin/python -m src.python.cli --experiment doctor_check report --type full
 >
 > # 本次运行启用全部实验功能
 > .venv/bin/python -m src.python.cli --experiment all report --type full
 > ```
 >
-> 取值写错会立即报错并列出全部可选值，不会静默忽略。当前可选实验功能清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)（与 TUI 菜单 [S] 实验块同源，由 `features.EXPERIMENTAL_FEATURES` 注册表驱动）。
+> 取值写错会立即报错并列出全部可选值，不会静默忽略。当前可选实验功能清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)（与 TUI 菜单 [S] 实验块同源，由 `features.feature_switch_registry` 注册表驱动）。
+
+> **`--feature` 说明**：`--experiment` 的补集——它面向**全部**开关而非仅实验组，且**双向**（既能开也能关）。常用来在不动持久化配置的前提下临时关闭某个默认开启的常规开关，或复现「关掉某开关后报告长什么样」：
+>
+> ```bash
+> # 本次运行关闭系统自检的界面入口（CLI 的 doctor 子命令本就不受该开关约束）
+> .venv/bin/python -m src.python.cli --feature doctor_check=off doctor
+>
+> # 一次运行关掉两个量化指标 + 关闭交互图表（HTML 回退静态渲染）
+> .venv/bin/python -m src.python.cli --feature metrics_hhi=off --feature metrics_beta=off --feature enable_interactive_charts=off report --type full
+> ```
+>
+> 两个参数可同时使用：`--feature` 在 `--experiment` 之后应用，故 `--experiment all --feature signal_ledger=off` 表示「其余实验功能全开、只关掉信号沉淀」。
 
 ---
 
@@ -132,7 +144,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 
 ## 8. `doctor` 子命令（系统自检）
 
-一键盘点运行环境，分组报告 **环境 / 配置 / 目录 / 功能开关 / 数据源** 五类检查结果，**失败项附可执行修复建议**。适合新机部署、报告跑不起来、怀疑配置损坏时先跑一遍。
+一键盘点运行环境，分组报告 **环境 / 配置 / 目录 / 功能开关 / 数据源适配 / 数据源凭据 / 数据源** 七类检查结果，**失败项附可执行修复建议**。适合新机部署、报告跑不起来、怀疑配置损坏时先跑一遍。
 
 ```bash
 .venv/bin/python -m src.python.cli doctor
@@ -141,7 +153,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | 参数 | 说明 |
 |:-----|:-----|
 | `--offline` | 跳过联网检查（数据源连通性），纯本地自检、秒级返回 |
-| `--timeout SECONDS` | 单次检查的耗时预算（默认 8 秒） |
+| `--timeout SECONDS` | **网络检查整体**的耗时预算（默认 8 秒；对全部联网检查共用一个预算，防止慢速数据源拖住自检） |
 
 ```bash
 # 纯本地自检（不联网）
@@ -154,7 +166,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 **与其它子命令的两点不同**：
 
 1. **无需配置**——自检在加载配置**之前**执行。配置损坏正是它要诊断的场景，因此不会因配置读不出来而拒绝运行。
-2. **不受实验开关约束**——`doctor` 子命令始终可用，无需 `--experiment doctor_check`。该开关只控制 TUI 菜单项与 Web 自检卡片这两个日常入口的可见性（同理：若 CLI 也被开关拦住，就会陷入「开开关要先读配置、读配置失败又要开开关」的死锁）。
+2. **不受开关约束**——`doctor` 子命令始终可用，无需任何开关。`doctor_check` 开关（默认开启）只控制 TUI 菜单项与 Web 自检卡片这两个日常入口的可见性（同理：若 CLI 也被开关拦住，就会陷入「开开关要先读配置、读配置失败又要开开关」的死锁）。
 
 **退出码**：`0` = 全部检查通过；`1` = 自检跑完了但**存在失败项**（注意：这不是「命令失败」，而是一条诊断结论，脚本可用它判定环境是否可用）。
 
@@ -214,6 +226,54 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | 查看最近运行日志 | `.venv/bin/python -m src.python.cli view-logs --level WARNING` |
 | 系统自检（一键体检） | `.venv/bin/python -m src.python.cli doctor --offline` |
 | 查看性能历史趋势 | `.venv/bin/python scripts/perf-view.py` |
+
+### 10.1 TUI 菜单 → CLI 命令对照
+
+TUI 菜单与 CLI 子命令落到**同一个业务编排函数**（`report/orchestrator.py::generate_report` 等），差别只在入参从哪来：TUI 在菜单里问，CLI 用参数传。下表按菜单项逐项对照。
+
+| TUI 菜单 | CLI 等价命令 |
+|:---------|:-------------|
+| **[E]** 生成基础版 Excel 分析报告 | `report --type basic` |
+| **[B]** 生成标准报告（Excel+HTML） | `report --type both --history auto` |
+| **[L]** 生成完整报告（Excel+HTML，含 LLM） | `report --type full --history auto` |
+| **[W]** 调仓 What-if 模拟 | `whatif --base <调仓前.xlsx> --candidate <调仓后.xlsx>` |
+
+以 `[L]` 为例，逐项拆开看更直观：
+
+| `[L]` 触发时 TUI 的行为 | CLI 对应参数 | 说明 |
+|:------------------------|:-------------|:-----|
+| 生成类型固定为 `full` | `--type full` | 报告类型默认是 `basic`，务必显式指定 |
+| 询问「是否获取组合历史走势数据」 | `--history auto` / `--history off` | 省略 `--history` 时按 `config.json` 的 `history.fetch_mode` 解析（`off` 跳过，`auto`/`prompt` 均视为获取） |
+| 询问「是否强制重新生成 LLM 内容」 | `--force-llm` | 不加则复用 LLM 缓存 |
+| 首次运行交互式引导 | `--non-interactive` | 跳过引导，定时任务/脚本建议带上 |
+| 结束打印 LLM 会话用量 | —（打印耗时汇总） | 两条路径的收尾输出不同，不影响产物 |
+
+所以 `[L]` 的完整等价命令是：
+
+```bash
+.venv/bin/python -m src.python.cli --non-interactive report --type full --history auto
+# 若要连同「强制重生成 LLM」一起答上（等价于询问时答 y）：
+.venv/bin/python -m src.python.cli --non-interactive report --type full --history auto --force-llm
+```
+
+两点需要留意（TUI 与 CLI 在这些情况下的行为差异，均不影响报告内容）：
+
+1. **`history.fetch_mode = "prompt"` 时**：TUI 会停下来问；CLI 省略 `--history` 时按「获取」处理（非交互场景无从询问）。
+2. **`enable_history = false` 时**：历史走势整体不获取，此时加 `--history auto` 也不会生效——外层开关优先于本参数。TUI 与 CLI 行为一致。
+
+### 10.2 一键快捷入口
+
+若只想要 `[L]` 这一件事，`scripts/llm.sh`（Linux/macOS）与 `scripts/llm.ps1`（Windows）把子命令与报告类型写死在脚本里，免去每次敲 `report --type full`：
+
+```bash
+./scripts/llm.sh                  # 生成完整报告（含 LLM）
+./scripts/llm.sh --force-llm      # 强制重新调用 LLM，跳过缓存
+./scripts/llm.sh --history off    # 本次不获取组合历史走势
+```
+
+追加的参数即 `report` 的报告级参数。需要全局参数（`--config` / `--output` / `--experiment` / `--feature`）时仍走 `cli.sh` / `cli.ps1`——它们必须写在子命令之前。
+
+其余菜单项（配置类、缓存类、日志/健康/自检）在 CLI 侧均有独立子命令，见上方速查表与各节说明。
 
 ---
 

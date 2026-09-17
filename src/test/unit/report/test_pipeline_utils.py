@@ -29,10 +29,13 @@ class TestPipelineUtils:
         class _MockReporter:
             def ok(self, msg: str) -> None:
                 logged.append(("ok", msg))
+
             def info(self, msg: str) -> None:
                 logged.append(("info", msg))
+
             def warn(self, msg: str) -> None:
                 logged.append(("warn", msg))
+
             def add_error(self, msg: str) -> None:
                 logged.append(("error", msg))
 
@@ -50,10 +53,13 @@ class TestPipelineUtils:
         class _MockReporter:
             def ok(self, msg: str) -> None:
                 logged.append(("ok", msg))
+
             def info(self, msg: str) -> None:
                 logged.append(("info", msg))
+
             def warn(self, msg: str) -> None:
                 logged.append(("warn", msg))
+
             def add_error(self, msg: str) -> None:
                 logged.append(("error", msg))
 
@@ -69,11 +75,20 @@ class TestPipelineUtils:
         fut.set_result(content + (True, False, True, False) + ({"mode": "procon"},))
 
         class _MockReporter:
-            def ok(self, *a): pass
-            def info(self, *a): pass
-            def warn(self, *a): pass
-            def add_error(self, *a): pass
-            def error(self, *a): pass
+            def ok(self, *a):
+                pass
+
+            def info(self, *a):
+                pass
+
+            def warn(self, *a):
+                pass
+
+            def add_error(self, *a):
+                pass
+
+            def error(self, *a):
+                pass
 
         llm_content, debate_info = _collect_llm_future_result(fut, _MockReporter())
         assert llm_content[:4] == content
@@ -87,11 +102,20 @@ class TestPipelineUtils:
         fut.set_exception(ValueError("test error"))
 
         class _MockReporter:
-            def ok(self, *a): pass
-            def info(self, *a): pass
-            def warn(self, *a): pass
-            def add_error(self, *a): pass
-            def error(self, *a): pass
+            def ok(self, *a):
+                pass
+
+            def info(self, *a):
+                pass
+
+            def warn(self, *a):
+                pass
+
+            def add_error(self, *a):
+                pass
+
+            def error(self, *a):
+                pass
 
         llm_content, debate_info = _collect_llm_future_result(fut, _MockReporter())
         assert all(c is None for c in llm_content)
@@ -105,9 +129,14 @@ class TestPipelineUtils:
         fut.set_result(([{"title": "新闻1"}], {"total": 1}))
 
         class _MockReporter:
-            def ok(self, *a): pass
-            def warn(self, *a): pass
-            def add_error(self, *a): pass
+            def ok(self, *a):
+                pass
+
+            def warn(self, *a):
+                pass
+
+            def add_error(self, *a):
+                pass
 
         data, meta, ok = _collect_news_future_result(fut, _MockReporter())
         assert len(data) == 1
@@ -122,9 +151,14 @@ class TestPipelineUtils:
         fut.set_exception(RuntimeError("test error"))
 
         class _MockReporter:
-            def ok(self, *a): pass
-            def warn(self, *a): pass
-            def add_error(self, *a): pass
+            def ok(self, *a):
+                pass
+
+            def warn(self, *a):
+                pass
+
+            def add_error(self, *a):
+                pass
 
         data, meta, ok = _collect_news_future_result(fut, _MockReporter())
         assert data == []

@@ -50,14 +50,6 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("汇总页模块缺失 (summary)")
 
     try:
-        from src.python.report.category import write_category_sheet
-
-        modules["write_category_sheet"] = write_category_sheet
-    except ImportError:
-        modules["write_category_sheet"] = None
-        prog.add_error("持仓分类模块缺失 (category)")
-
-    try:
         from src.python.report.market_value import (
             _generate_details,
             classify_holdings,
@@ -81,12 +73,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("行情市值计算模块缺失 (market_value)")
 
     try:
-        from src.python.report.market_value_sheet import write_market_value_sheet
+        from src.python.report.holdings_detail_sheet import write_holdings_detail_sheet
 
-        modules["write_market_value_sheet"] = write_market_value_sheet
+        modules["write_holdings_detail_sheet"] = write_holdings_detail_sheet
     except ImportError:
-        modules["write_market_value_sheet"] = None
-        prog.add_error("行情市值写入模块缺失 (market_value_sheet)")
+        modules["write_holdings_detail_sheet"] = None
+        prog.add_error("持仓明细与分类写入模块缺失 (holdings_detail_sheet)")
 
     try:
         from src.python.report.penetration import compute_penetration_top10
@@ -108,16 +100,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("基金业绩模块缺失 (fund_performance)")
 
     try:
-        from src.python.report.fund_manager_analysis import build_first_check_summary, detect_manager_changes
-        from src.python.report.fund_manager_sheet import write_fund_manager_sheet
+        from src.python.report.fundamental_snapshot_sheet import write_fundamental_snapshot_sheet
 
-        modules["detect_manager_changes"] = detect_manager_changes
-        modules["write_fund_manager_sheet"] = write_fund_manager_sheet
-        modules["build_first_check_summary"] = build_first_check_summary
+        modules["write_fundamental_snapshot_sheet"] = write_fundamental_snapshot_sheet
     except ImportError:
-        modules["detect_manager_changes"] = lambda _h: []
-        modules["write_fund_manager_sheet"] = None
-        prog.add_error("基金经理变更监控模块缺失 (fund_manager)")
+        modules["write_fundamental_snapshot_sheet"] = None
+        prog.add_error("持仓基本面写入模块缺失 (fundamental_snapshot)")
 
     try:
         from src.python.report.position_overlap import compute_overlap_matrix
@@ -128,23 +116,12 @@ def load_report_modules(prog: ProgressReporter) -> dict[str, Any]:
         prog.add_error("持仓重合度计算模块缺失 (position_overlap)")
 
     try:
-        from src.python.report.position_relationship_sheet import write_position_relationship_sheet
+        from src.python.report.position_structure_sheet import write_position_structure_sheet
 
-        modules["write_position_relationship_sheet"] = write_position_relationship_sheet
+        modules["write_position_structure_sheet"] = write_position_structure_sheet
     except ImportError:
-        modules["write_position_relationship_sheet"] = None
-        prog.add_error("持仓关系矩阵模块缺失 (position_relationship)")
-
-    try:
-        from src.python.report.fund_concentration import compute_concentration
-        from src.python.report.fund_concentration_sheet import write_concentration_sheet
-
-        modules["compute_concentration"] = compute_concentration
-        modules["write_concentration_sheet"] = write_concentration_sheet
-    except ImportError:
-        modules["compute_concentration"] = lambda _fh: []
-        modules["write_concentration_sheet"] = None
-        prog.add_error("持仓集中度监控模块缺失 (fund_concentration)")
+        modules["write_position_structure_sheet"] = None
+        prog.add_error("持仓结构与集中度写入模块缺失 (position_structure)")
 
     try:
         from src.python.report.fund_style_report import analyze_style_for_all_funds

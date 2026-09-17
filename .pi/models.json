@@ -1,0 +1,20 @@
+{
+  "providers": {
+    "deepseek": {
+      "modelOverrides": {
+        "deepseek-v4-flash": {
+          "maxTokens": 65536,
+          "samplingParams": {
+            "temperature": 0.0
+          }
+        },
+        "deepseek-v4-pro": {
+          "maxTokens": 65536,
+          "samplingParams": {
+            "temperature": 0.0
+          }
+        }
+      }
+    }
+  }
+}

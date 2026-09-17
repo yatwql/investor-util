@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -29,6 +28,7 @@ pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 # ═══════════════════════════════════════════════════════════════
 #  S29: 分红送转除权
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.scenario_basic
 @pytest.mark.scenario
@@ -47,20 +47,21 @@ class TestS29DividendSplit(unittest.TestCase):
         # 除权后：200 股 × 5.0  = 1000（总成本不变）
         h = Holding("证券", "长江电力", "600900", shares=200, cost_price=5.0)
         mkt = {
-            "price": 6.0, "yesterday_close": 5.5,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "长江电力", "code": "600900",
+            "price": 6.0,
+            "yesterday_close": 5.5,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "长江电力",
+            "code": "600900",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
         self.assertEqual(row.shares, 200.0)
-        self.assertEqual(row.cost, 1000.0)          # 200 × 5.0 = 1000
+        self.assertEqual(row.cost, 1000.0)  # 200 × 5.0 = 1000
         self.assertEqual(row.market_value, 1200.0)  # 200 × 6.0 = 1200
-        self.assertEqual(row.profit, 200.0)          # 1200 - 1000
+        self.assertEqual(row.profit, 200.0)  # 1200 - 1000
 
     def test_split_profit_rate_after_ex_rights(self):
         """除权除息后股价调整 → 收益率基于除权成本正确计算。"""
@@ -71,19 +72,20 @@ class TestS29DividendSplit(unittest.TestCase):
         # 除权后股价 7 元
         h = Holding("证券", "长江电力", "600900", shares=200, cost_price=5.0)
         mkt = {
-            "price": 7.0, "yesterday_close": 5.5,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "长江电力", "code": "600900",
+            "price": 7.0,
+            "yesterday_close": 5.5,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "长江电力",
+            "code": "600900",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
         self.assertEqual(row.market_value, 1400.0)  # 200 × 7.0
-        self.assertEqual(row.cost, 1000.0)           # 200 × 5.0
-        self.assertEqual(row.profit, 400.0)          # 1400 - 1000
+        self.assertEqual(row.cost, 1000.0)  # 200 × 5.0
+        self.assertEqual(row.profit, 400.0)  # 1400 - 1000
         # profit_rate = profit / cost
         self.assertIsNotNone(row.profit_rate)
         self.assertAlmostEqual(row.profit_rate, 0.4)  # 400 / 1000
@@ -95,25 +97,27 @@ class TestS29DividendSplit(unittest.TestCase):
         # 送股获得 100 股，成本为 0
         h = Holding("证券", "某股票", "600111", shares=100, cost_price=0.0)
         mkt = {
-            "price": 15.0, "yesterday_close": 14.5,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "某股票", "code": "600111",
+            "price": 15.0,
+            "yesterday_close": 14.5,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "某股票",
+            "code": "600111",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
         self.assertEqual(row.cost, 0.0)
         self.assertEqual(row.market_value, 1500.0)  # 100 × 15.0
-        self.assertEqual(row.profit, 1500.0)         # 1500 - 0
-        self.assertIsNone(row.profit_rate)            # 零成本不触发除零
+        self.assertEqual(row.profit, 1500.0)  # 1500 - 0
+        self.assertIsNone(row.profit_rate)  # 零成本不触发除零
 
 
 # ═══════════════════════════════════════════════════════════════
 #  S30: 定投成本摊薄
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.scenario_basic
 @pytest.mark.scenario
@@ -129,20 +133,21 @@ class TestS30DcaCostAveraging(unittest.TestCase):
         # 加权平均成本 = (1000 + 1200) / 200 = 11.0
         h = Holding("证券", "沪深300ETF", "510300", shares=200, cost_price=11.0)
         mkt = {
-            "price": 13.0, "yesterday_close": 12.8,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "沪深300ETF", "code": "510300",
+            "price": 13.0,
+            "yesterday_close": 12.8,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "沪深300ETF",
+            "code": "510300",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
         self.assertEqual(row.shares, 200.0)
-        self.assertEqual(row.cost, 2200.0)          # 200 × 11.0
+        self.assertEqual(row.cost, 2200.0)  # 200 × 11.0
         self.assertEqual(row.market_value, 2600.0)  # 200 × 13.0
-        self.assertEqual(row.profit, 400.0)          # 2600 - 2200
+        self.assertEqual(row.profit, 400.0)  # 2600 - 2200
 
     def test_dca_three_batches_uneven(self):
         """三批不等额买入 → 加权平均成本正确。"""
@@ -157,21 +162,21 @@ class TestS30DcaCostAveraging(unittest.TestCase):
         total_cost = 200 * 8.0 + 100 * 10.0 + 50 * 12.0  # 3200
         wavg = round(total_cost / total_shares, 2)  # 9.14
 
-        h = Holding("证券", "中证500ETF", "510500",
-                    shares=total_shares, cost_price=wavg)
+        h = Holding("证券", "中证500ETF", "510500", shares=total_shares, cost_price=wavg)
         mkt = {
-            "price": 11.0, "yesterday_close": 10.8,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "中证500ETF", "code": "510500",
+            "price": 11.0,
+            "yesterday_close": 10.8,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "中证500ETF",
+            "code": "510500",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
         self.assertAlmostEqual(row.cost, total_cost, delta=1.0)  # 允许舍入误差
-        self.assertAlmostEqual(row.market_value, 3850.0)          # 350 × 11.0
+        self.assertAlmostEqual(row.market_value, 3850.0)  # 350 × 11.0
 
     def test_dca_loss_position(self):
         """定投后市价低于加权平均成本 → 亏损。"""
@@ -180,19 +185,20 @@ class TestS30DcaCostAveraging(unittest.TestCase):
         # 加权平均成本 11.0，市价 9.0 → 亏损
         h = Holding("证券", "科创50ETF", "588000", shares=200, cost_price=11.0)
         mkt = {
-            "price": 9.0, "yesterday_close": 9.2,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "科创50ETF", "code": "588000",
+            "price": 9.0,
+            "yesterday_close": 9.2,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "科创50ETF",
+            "code": "588000",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
-        self.assertEqual(row.cost, 2200.0)          # 200 × 11.0
+        self.assertEqual(row.cost, 2200.0)  # 200 × 11.0
         self.assertEqual(row.market_value, 1800.0)  # 200 × 9.0
-        self.assertEqual(row.profit, -400.0)         # 1800 - 2200
+        self.assertEqual(row.profit, -400.0)  # 1800 - 2200
         self.assertIsNotNone(row.profit_rate)
         self.assertAlmostEqual(row.profit_rate, -0.1818, places=3)
 
@@ -200,6 +206,7 @@ class TestS30DcaCostAveraging(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 #  S31: 部分调仓卖出
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.scenario_basic
 @pytest.mark.scenario
@@ -214,20 +221,21 @@ class TestS31PartialSell(unittest.TestCase):
         # 剩余：100 股 × 10.0（加权平均成本不变）
         h = Holding("证券", "贵州茅台", "600519", shares=100, cost_price=10.0)
         mkt = {
-            "price": 12.0, "yesterday_close": 11.8,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "贵州茅台", "code": "600519",
+            "price": 12.0,
+            "yesterday_close": 11.8,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "贵州茅台",
+            "code": "600519",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
         self.assertEqual(row.shares, 100.0)
-        self.assertEqual(row.cost, 1000.0)          # 100 × 10.0
+        self.assertEqual(row.cost, 1000.0)  # 100 × 10.0
         self.assertEqual(row.market_value, 1200.0)  # 100 × 12.0
-        self.assertEqual(row.profit, 200.0)          # 1200 - 1000
+        self.assertEqual(row.profit, 200.0)  # 1200 - 1000
 
     def test_partial_sell_most(self):
         """卖出大部分（90%）→ 剩余少量份额成本正确。"""
@@ -237,20 +245,21 @@ class TestS31PartialSell(unittest.TestCase):
         # 剩余：100 股 × 5.0
         h = Holding("证券", "工商银行", "601398", shares=100, cost_price=5.0)
         mkt = {
-            "price": 5.5, "yesterday_close": 5.4,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "工商银行", "code": "601398",
+            "price": 5.5,
+            "yesterday_close": 5.4,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "工商银行",
+            "code": "601398",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
         self.assertEqual(row.shares, 100.0)
-        self.assertEqual(row.cost, 500.0)           # 100 × 5.0
-        self.assertEqual(row.market_value, 550.0)   # 100 × 5.5
-        self.assertEqual(row.profit, 50.0)           # 550 - 500
+        self.assertEqual(row.cost, 500.0)  # 100 × 5.0
+        self.assertEqual(row.market_value, 550.0)  # 100 × 5.5
+        self.assertEqual(row.profit, 50.0)  # 550 - 500
 
     def test_partial_sell_all_cleared(self):
         """全部卖出 → shares=0，残值归零。"""
@@ -258,14 +267,15 @@ class TestS31PartialSell(unittest.TestCase):
 
         h = Holding("证券", "工商银行", "601398", shares=0, cost_price=0.0)
         mkt = {
-            "price": 5.5, "yesterday_close": 5.4,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "工商银行", "code": "601398",
+            "price": 5.5,
+            "yesterday_close": 5.4,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "工商银行",
+            "code": "601398",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
         self.assertEqual(row.shares, 0.0)
@@ -277,6 +287,7 @@ class TestS31PartialSell(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 #  S32: 跨账户转仓
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.scenario_basic
 @pytest.mark.scenario
@@ -293,14 +304,15 @@ class TestS32CrossAccount(unittest.TestCase):
         h2 = Holding("信用账户", "长江电力", "600900", shares=50, cost_price=10.0)
 
         mkt = {
-            "price": 25.0, "yesterday_close": 24.5,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "长江电力", "code": "600900",
+            "price": 25.0,
+            "yesterday_close": 24.5,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "长江电力",
+            "code": "600900",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row1 = _compute_detail_row(h1, mkt)
                 row2 = _compute_detail_row(h2, mkt)
 
@@ -341,19 +353,23 @@ class TestS32CrossAccount(unittest.TestCase):
         h2 = Holding("信用账户", "贵州茅台", "600519", shares=50, cost_price=200.0)
 
         mkt1 = {
-            "price": 25.0, "yesterday_close": 24.5,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "长江电力", "code": "600900",
+            "price": 25.0,
+            "yesterday_close": 24.5,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "长江电力",
+            "code": "600900",
         }
         mkt2 = {
-            "price": 1800.0, "yesterday_close": 1780.0,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "贵州茅台", "code": "600519",
+            "price": 1800.0,
+            "yesterday_close": 1780.0,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "贵州茅台",
+            "code": "600519",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row1 = _compute_detail_row(h1, mkt1)
                 row2 = _compute_detail_row(h2, mkt2)
 
@@ -367,6 +383,7 @@ class TestS32CrossAccount(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 #  S33: 新股中签待上市
 # ═══════════════════════════════════════════════════════════════
+
 
 @pytest.mark.scenario_basic
 @pytest.mark.scenario
@@ -382,11 +399,11 @@ class TestS33IpoPendingListing(unittest.TestCase):
         row = _compute_detail_row(h, None)
 
         self.assertEqual(row.shares, 500.0)
-        self.assertEqual(row.cost, 11250.0)         # 500 × 22.5
-        self.assertEqual(row.market_value, 0.0)      # 无行情
+        self.assertEqual(row.cost, 11250.0)  # 500 × 22.5
+        self.assertEqual(row.market_value, 0.0)  # 无行情
         self.assertEqual(row.price, 0.0)
         self.assertEqual(row.price_type, "暂无行情")
-        self.assertEqual(row.profit, 0.0)            # 无行情时 profit 硬编码为 0（不显示伪亏损）
+        self.assertEqual(row.profit, 0.0)  # 无行情时 profit 硬编码为 0（不显示伪亏损）
 
     def test_ipo_with_market_data_after_listing(self):
         """新股上市后有行情 → 正常按市价计算。"""
@@ -395,20 +412,21 @@ class TestS33IpoPendingListing(unittest.TestCase):
         # 上市首日，发行价 22.5，开盘价 30.0
         h = Holding("证券", "某新股", "789001", shares=500, cost_price=22.5)
         mkt = {
-            "price": 30.0, "yesterday_close": 22.5,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "某新股", "code": "789001",
+            "price": 30.0,
+            "yesterday_close": 22.5,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "某新股",
+            "code": "789001",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row = _compute_detail_row(h, mkt)
 
         self.assertEqual(row.shares, 500.0)
-        self.assertEqual(row.cost, 11250.0)          # 500 × 22.5
+        self.assertEqual(row.cost, 11250.0)  # 500 × 22.5
         self.assertEqual(row.market_value, 15000.0)  # 500 × 30.0
-        self.assertEqual(row.profit, 3750.0)          # 15000 - 11250
+        self.assertEqual(row.profit, 3750.0)  # 15000 - 11250
 
     def test_ipo_multiple_allocations(self):
         """多只新股中签 → 各自计算不干扰。"""
@@ -419,14 +437,15 @@ class TestS33IpoPendingListing(unittest.TestCase):
 
         # 新股A 有行情（已上市），新股B 无行情（未上市）
         mkt1 = {
-            "price": 30.0, "yesterday_close": 22.5,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "新股A", "code": "789001",
+            "price": 30.0,
+            "yesterday_close": 22.5,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "新股A",
+            "code": "789001",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
-            with patch("src.python.report.market_value.is_market_open",
-                       return_value=False):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
+            with patch("src.python.report.market_value.is_market_open", return_value=False):
                 row1 = _compute_detail_row(h1, mkt1)
                 row2 = _compute_detail_row(h2, None)
 

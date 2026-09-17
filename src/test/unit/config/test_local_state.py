@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
-
 from src.python.config._local_state import get_flag, set_flag
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
 
 # ── 读写 ─────────────────────────────────────────────────────
 

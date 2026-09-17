@@ -2,6 +2,7 @@
 
 覆盖日志输出、verbose 模式、配置加载、退出码等跨模块场景。
 """
+
 from __future__ import annotations
 
 import logging
@@ -57,8 +58,10 @@ class TestCliIntegration:
             patch("src.python.report.orchestrator.generate_report") as mock_gen,
         ):
             from src.python.cli.cli import _handle_report
-            args = MagicMock(type="basic", history="off", force_llm=False,
-                              warm=False, output="/custom/path", verbose=False)
+
+            args = MagicMock(
+                type="basic", history="off", force_llm=False, warm=False, output="/custom/path", verbose=False
+            )
             _handle_report(args, test_config)
 
         mock_gen.assert_called_once()
@@ -72,8 +75,7 @@ class TestCliIntegration:
 
         mock_result = MagicMock()
         mock_result.exit_code = 0
-        test_config = {"holdings_dir": "/test/holdings",
-                        "holdings_filename": "test.xlsx"}
+        test_config = {"holdings_dir": "/test/holdings", "holdings_filename": "test.xlsx"}
 
         with (
             patch("src.python.cli.cli._cli_read_holdings") as mock_read,
@@ -87,16 +89,19 @@ class TestCliIntegration:
     def test_cli_exit_code_success(self):
         """正常完成 → exit 0。"""
         from src.python.cli.cli import _EXIT_SUCCESS
+
         assert _EXIT_SUCCESS == 0
 
     def test_cli_exit_code_partial(self):
         """部分失败 → exit 1。"""
         from src.python.cli.cli import _EXIT_PARTIAL
+
         assert _EXIT_PARTIAL == 1
 
     def test_cli_exit_code_severe(self):
         """严重错误 → exit 2。"""
         from src.python.cli.cli import _EXIT_SEVERE
+
         assert _EXIT_SEVERE == 2
 
     def test_handle_report_return_exit_code(self):
@@ -113,7 +118,7 @@ class TestCliIntegration:
             patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
         ):
             from src.python.cli.cli import _handle_report
-            args = MagicMock(type="basic", history="off", force_llm=False,
-                              warm=False, output=None, verbose=False)
+
+            args = MagicMock(type="basic", history="off", force_llm=False, warm=False, output=None, verbose=False)
             code = _handle_report(args, {})
         assert code == 0

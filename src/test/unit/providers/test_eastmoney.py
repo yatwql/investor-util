@@ -15,8 +15,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
 
 class TestStripJsonp(unittest.TestCase):
@@ -24,6 +24,7 @@ class TestStripJsonp(unittest.TestCase):
 
     def _call(self, text: str) -> str:
         from src.python.providers.eastmoney import _strip_jsonp
+
         return _strip_jsonp(text)
 
     @pytest.mark.smoke
@@ -49,6 +50,7 @@ class TestSafeFloat(unittest.TestCase):
 
     def _call(self, s: str) -> float:
         from src.python.providers.eastmoney import _safe_float
+
         return _safe_float(s)
 
     @pytest.mark.smoke
@@ -76,13 +78,11 @@ class TestFallbackFundf10(unittest.TestCase):
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
         mock_response = MagicMock()
-        mock_response.text = (
-            '<table><tr><td class="bold">1.2345</td>'
-            '<td class="">2026-07-01</td></tr></table>'
-        )
+        mock_response.text = '<table><tr><td class="bold">1.2345</td><td class="">2026-07-01</td></tr></table>'
         mock_client.get.return_value = mock_response
 
         from src.python.providers.eastmoney import _fallback_fundf10
+
         result = _fallback_fundf10("011506")
         self.assertIsNotNone(result)
         self.assertEqual(result["nav"], 1.2345)
@@ -96,9 +96,11 @@ class TestFallbackFundf10(unittest.TestCase):
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
         import httpx
+
         mock_client.get.side_effect = httpx.RequestError("network error")
 
         from src.python.providers.eastmoney import _fallback_fundf10
+
         self.assertIsNone(_fallback_fundf10("011506"))
 
     @patch("src.python.providers.eastmoney.make_http_client")
@@ -112,6 +114,7 @@ class TestFallbackFundf10(unittest.TestCase):
         mock_client.get.return_value = mock_response
 
         from src.python.providers.eastmoney import _fallback_fundf10
+
         self.assertIsNone(_fallback_fundf10("011506"))
 
 
@@ -136,6 +139,7 @@ class TestFetchNav(unittest.TestCase):
         self._make_mock_client(mock_factory, jsonp)
 
         from src.python.providers.eastmoney import fetch_nav
+
         result = fetch_nav("011506")
         self.assertIsNotNone(result)
         self.assertEqual(result["nav"], 1.2345)
@@ -147,13 +151,16 @@ class TestFetchNav(unittest.TestCase):
     @patch("src.python.providers.eastmoney.make_http_client")
     def test_success_with_yesterday(self, mock_factory):
         """有前一日净值 → 正确计算。"""
-        jsonp = ('jQuery({"Data": {"LSJZList": ['
-                 '{"DWJZ":"1.2345","LJJZ":"2.3456","FSRQ":"2026-07-01"},'
-                 '{"DWJZ":"1.2000","LJJZ":"2.3000","FSRQ":"2026-06-30"}'
-                 ']}})')
+        jsonp = (
+            'jQuery({"Data": {"LSJZList": ['
+            '{"DWJZ":"1.2345","LJJZ":"2.3456","FSRQ":"2026-07-01"},'
+            '{"DWJZ":"1.2000","LJJZ":"2.3000","FSRQ":"2026-06-30"}'
+            "]}})"
+        )
         self._make_mock_client(mock_factory, jsonp)
 
         from src.python.providers.eastmoney import fetch_nav
+
         result = fetch_nav("011506")
         self.assertEqual(result["nav"], 1.2345)
         self.assertEqual(result["yesterday_nav"], 1.2000)
@@ -168,10 +175,12 @@ class TestFetchNav(unittest.TestCase):
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
         import httpx
+
         mock_client.get.side_effect = httpx.TimeoutException("timeout")
         mock_fallback.return_value = {"nav": 1.1, "source": "天天基金(备用链路)"}
 
         from src.python.providers.eastmoney import fetch_nav
+
         result = fetch_nav("011506")
         self.assertIsNotNone(result)
         self.assertEqual(result["source"], "天天基金(备用链路)")
@@ -184,6 +193,7 @@ class TestFetchNav(unittest.TestCase):
         mock_fallback.return_value = {"nav": 1.1, "source": "天天基金(备用链路)"}
 
         from src.python.providers.eastmoney import fetch_nav
+
         result = fetch_nav("011506")
         self.assertIsNotNone(result)
 
@@ -195,6 +205,7 @@ class TestFetchNav(unittest.TestCase):
         mock_fallback.return_value = None
 
         from src.python.providers.eastmoney import fetch_nav
+
         result = fetch_nav("011506")
         self.assertIsNone(result)
 
@@ -208,10 +219,12 @@ class TestFetchNav(unittest.TestCase):
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
         import httpx
+
         mock_client.get.side_effect = httpx.TimeoutException("timeout")
         mock_fallback.return_value = None
 
         from src.python.providers.eastmoney import fetch_nav
+
         self.assertIsNone(fetch_nav("011506"))
 
 
@@ -227,9 +240,11 @@ class TestQdiiNavRelationships(unittest.TestCase):
             if mock_data:
                 mock_client.get.return_value.status_code = 200
                 import json
+
                 mock_client.get.return_value.text = json.dumps(mock_data)
             else:
                 import httpx
+
                 mock_client.get.side_effect = httpx.TimeoutException("timeout")
 
             from src.python.providers.eastmoney import fetch_nav
@@ -238,44 +253,47 @@ class TestQdiiNavRelationships(unittest.TestCase):
 
     def test_official_nav_non_negative(self):
         """官方净值 ≥ 0。"""
-        result = self._call_fetch_nav({
-            "Data": {"LSJZList": [{"NAV": 1.5, "NAVdate": "2026-07-01"}]}
-        })
+        result = self._call_fetch_nav({"Data": {"LSJZList": [{"NAV": 1.5, "NAVdate": "2026-07-01"}]}})
         if result and "NAV" in result:
             self.assertGreaterEqual(result["NAV"], 0)
 
     def test_estimated_nav_vs_official(self):
         """估值净值与官方净值的关系合理：两者差距通常在 ±5% 以内。"""
         # 模拟典型 scenario：估值 1.48，官方 1.50
-        result = self._call_fetch_nav({
-            "Data": {"LSJZList": [
-                {"NAV": 1.50, "NAVdate": "2026-07-01"},
-                {"NAV": 1.48, "NAVdate": "2026-06-30"},  # 估值净值（T-1）
-            ]}
-        })
+        result = self._call_fetch_nav(
+            {
+                "Data": {
+                    "LSJZList": [
+                        {"NAV": 1.50, "NAVdate": "2026-07-01"},
+                        {"NAV": 1.48, "NAVdate": "2026-06-30"},  # 估值净值（T-1）
+                    ]
+                }
+            }
+        )
         if result and "NAV" in result:
             self.assertGreaterEqual(result["NAV"], 0)
 
     def test_official_nav_delayed_t2(self):
         """QDII 官方净值通常延迟 T-2（验证数据日期合理性）。"""
-        result = self._call_fetch_nav({
-            "Data": {"LSJZList": [{"NAV": 1.5, "NAVdate": "2026-06-28"}]}
-        })
+        result = self._call_fetch_nav({"Data": {"LSJZList": [{"NAV": 1.5, "NAVdate": "2026-06-28"}]}})
         # fetch_nav 返回最新一条 NAV
         if result and "NAVdate" in result:
             self.assertIn("2026-06-28", result["NAVdate"])
 
     def test_nav_date_ascending_order(self):
         """净值日期应递增（旧→新）。"""
-        result = self._call_fetch_nav({
-            "Data": {"LSJZList": [
-                {"NAV": 1.4, "NAVdate": "2026-06-28"},
-                {"NAV": 1.5, "NAVdate": "2026-07-01"},
-            ]}
-        })
+        result = self._call_fetch_nav(
+            {
+                "Data": {
+                    "LSJZList": [
+                        {"NAV": 1.4, "NAVdate": "2026-06-28"},
+                        {"NAV": 1.5, "NAVdate": "2026-07-01"},
+                    ]
+                }
+            }
+        )
         # 如果 fetch_nav 返回多条，验证日期顺序
         if result and isinstance(result, list):
             dates = [r.get("NAVdate", "") for r in result if "NAVdate" in r]
             if len(dates) >= 2:
-                self.assertLessEqual(dates[0], dates[1],
-                                     "净值日期应递增")
+                self.assertLessEqual(dates[0], dates[1], "净值日期应递增")

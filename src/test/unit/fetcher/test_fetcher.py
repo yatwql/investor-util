@@ -14,16 +14,15 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from src.python.fetcher.chain import _get_chain, fetch_with_fallback
 from src.python.fetcher.price import fetch_market_data
 from src.python.fetcher.index import fetch_us_indices
 from src.python.fetcher.fund import fetch_fund_benchmark
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
-
-
 
 
 class TestProviderChain(unittest.TestCase):
@@ -72,15 +71,26 @@ class TestFetchMarketData(unittest.TestCase):
 
     @patch("src.python.fetcher.chain.cache_set", MagicMock())
     @patch("src.python.fetcher.chain.cache_get")
-    @patch.dict("src.python.fetcher.price._PRICE_PROVIDERS", {
-        "tencent": ("腾讯财经", MagicMock(return_value={
-            "name": "长江电力", "code": "600900",
-            "price": 27.0, "yesterday_close": 26.5,
-            "price_date": "2026-06-27"
-        })),
-    }, clear=True)
+    @patch(
+        "src.python.providers.tencent.fetch_price",
+        MagicMock(
+            return_value={
+                "name": "长江电力",
+                "code": "600900",
+                "price": 27.0,
+                "yesterday_close": 26.5,
+                "price_date": "2026-06-27",
+            }
+        ),
+    )
+    @patch("src.python.providers.sina.fetch_price", MagicMock(return_value=None))
+    @patch("src.python.providers.eastmoney.fetch_nav", MagicMock(return_value=None))
     def test_cache_miss_calls_api(self, mock_cache_get):
-        """缓存未命中 → 调 API 并返回数据。"""
+        """缓存未命中 → 调 API 并返回数据。
+
+        注入点是 provider 函数本身（而非既有手写映射表）：行情链路默认经数据源
+        适配器取数，适配器委托的正是这几个函数，patch 映射表已拦不到调用。
+        """
         mock_cache_get.return_value = None
         result = fetch_market_data("600900", "长江电力")
         self.assertIsNotNone(result)
@@ -88,10 +98,9 @@ class TestFetchMarketData(unittest.TestCase):
 
     @patch("src.python.fetcher.chain.cache_set", MagicMock())
     @patch("src.python.fetcher.chain.cache_get")
-    @patch.dict("src.python.fetcher.price._PRICE_PROVIDERS", {
-        "tencent": ("腾讯财经", MagicMock(return_value=None)),
-        "eastmoney": ("东方财富", MagicMock(return_value=None)),
-    }, clear=True)
+    @patch("src.python.providers.tencent.fetch_price", MagicMock(return_value=None))
+    @patch("src.python.providers.sina.fetch_price", MagicMock(return_value=None))
+    @patch("src.python.providers.eastmoney.fetch_nav", MagicMock(return_value=None))
     def test_api_failure_returns_none(self, mock_cache_get):
         """缓存未命中 + API 全部失败 → 返回 None。"""
         mock_cache_get.return_value = None
@@ -100,18 +109,31 @@ class TestFetchMarketData(unittest.TestCase):
 
     @patch("src.python.fetcher.chain.cache_set", MagicMock())
     @patch("src.python.fetcher.chain.cache_get")
-    @patch.dict("src.python.fetcher.price._PRICE_PROVIDERS", {
-        "tencent": ("腾讯财经", MagicMock(return_value={
-            "name": "非匹配名称", "code": "600900",
-            "price": 15.0, "yesterday_close": 14.5,
-            "price_date": "2026-06-26"
-        })),
-        "sina": ("新浪财经", MagicMock(return_value={
-            "name": "长江电力", "code": "600900",
-            "price": 16.0, "yesterday_close": 15.5,
-            "price_date": "2026-06-26"
-        })),
-    }, clear=True)
+    @patch(
+        "src.python.providers.tencent.fetch_price",
+        MagicMock(
+            return_value={
+                "name": "非匹配名称",
+                "code": "600900",
+                "price": 15.0,
+                "yesterday_close": 14.5,
+                "price_date": "2026-06-26",
+            }
+        ),
+    )
+    @patch(
+        "src.python.providers.sina.fetch_price",
+        MagicMock(
+            return_value={
+                "name": "长江电力",
+                "code": "600900",
+                "price": 16.0,
+                "yesterday_close": 15.5,
+                "price_date": "2026-06-26",
+            }
+        ),
+    )
+    @patch("src.python.providers.eastmoney.fetch_nav", MagicMock(return_value=None))
     def test_name_mismatch_logged(self, mock_cache_get):
         """名称不匹配但备选链路有数据 → 不阻塞返回。"""
         mock_cache_get.return_value = None
@@ -125,8 +147,7 @@ class TestFetchUsIndices(unittest.TestCase):
     @patch("src.python.fetcher.index.cache_get")
     @patch("src.python.fetcher.index.tencent.fetch_index_price", return_value=None)
     @patch("src.python.fetcher.index.sina.fetch_us_indices")
-    def test_api_failure_returns_empty(self, mock_sina, mock_tencent,
-                                        mock_cache_get):
+    def test_api_failure_returns_empty(self, mock_sina, mock_tencent, mock_cache_get):
         """所有链路失败 → 返回空字典。"""
         mock_cache_get.return_value = None
         mock_sina.side_effect = Exception("API error")

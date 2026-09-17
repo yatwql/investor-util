@@ -17,13 +17,12 @@ import json
 import os
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import pytest
 
 from src.python.config import _comments
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_config]
-
 
 
 class TestConfigAtomicWrite(unittest.TestCase):
@@ -40,7 +39,7 @@ class TestConfigAtomicWrite(unittest.TestCase):
     def test_atomic_write_creates_config(self, mock_get_path):
         """set_config → 目标文件被原子写入。"""
         mock_get_path.return_value = self.config_path
-        from src.python.config import set_config, get_config
+        from src.python.config import set_config
 
         set_config("test_key", "hello")
 
@@ -172,9 +171,11 @@ class TestConfigAtomicWriteFailure(unittest.TestCase):
         # mkstemp 返回一个不存在的 fd → 后续写入失败
         mock_mkstemp.return_value = (999, os.path.join(self.tmp.name, "bad.tmp"))
 
-        from src.python.config import set_config, _config_cache
+        from src.python.config import _clear_config_cache, set_config
 
-        _config_cache = None
+        # 断言的是「写入失败后临时文件被清理」，缓存放行与否不影响该路径；
+        # 先清缓存以避免上一次测试的缓存命中短路掉本次写入失败。
+        _clear_config_cache()
         with self.assertRaises(Exception):
             set_config("partial", "data")
 
@@ -224,7 +225,6 @@ class TestConfigCacheInvalidation(unittest.TestCase):
         """外部修改 config.json → get_config 重新读取。"""
         mock_get_path.return_value = self.config_path
         from src.python.config import set_config, get_config
-
 
         set_config("ext", "original")
         self.assertEqual(get_config().get("ext"), "original")

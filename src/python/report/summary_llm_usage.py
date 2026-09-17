@@ -31,6 +31,27 @@ def _init_llm_usage_sheet(ws: Any) -> int:
     return row
 
 
+def _write_experimental_notice(ws: Any, row: int) -> int:
+    """已启用实验性功能清单写入页签顶部，返回下一行号。
+
+    报告是可脱离本机流转的文件，读者须能判断内容是否为非默认开关下的产物。
+    文案由 ``report.experimental_notice`` 统一提供（与汇总页脚兜底落点同源），
+    本函数只负责页签内的排版。无启用项时不写任何单元格，页签保持既有输出。
+    """
+    from src.python.report.experimental_notice import NOTICE_HINT, enabled_notice_line
+
+    line = enabled_notice_line()
+    if line is None:
+        return row
+
+    _NOTE_FONT = Font(size=9, bold=True, color="8A5A00")
+    _HINT_FONT = Font(size=9, color="666666")
+    ws.cell(row=row, column=1, value=line).font = _NOTE_FONT
+    row += 1
+    ws.cell(row=row, column=1, value=NOTICE_HINT).font = _HINT_FONT
+    return row + 2
+
+
 def _write_llm_summary_section(
     ws: Any,
     row: int,
@@ -272,6 +293,7 @@ def write_llm_usage_sheet(
     ]
 
     row = _init_llm_usage_sheet(ws)
+    row = _write_experimental_notice(ws, row)
     row = _write_llm_summary_section(
         ws, row, llm_session_usage, llm_endpoint=llm_endpoint, debate_mode_label=debate_mode_label
     )

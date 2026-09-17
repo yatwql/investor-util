@@ -34,8 +34,7 @@ class TestS14LlmDisabled(unittest.TestCase):
         with ExitStack() as stack:
             stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {}))
             # 即使 LLM_MODULE_FAILURE 有内容，llm_enabled=False 也应覆盖
-            llm_module_info, llm_endpoint, module_disabled, llm_session_usage = \
-                _render_llm_module_info(False)
+            llm_module_info, llm_endpoint, module_disabled, llm_session_usage = _render_llm_module_info(False)
 
         self.assertEqual(len(llm_module_info), 5)
         for mi in llm_module_info:
@@ -51,12 +50,16 @@ class TestS14LlmDisabled(unittest.TestCase):
         from src.python.report.html_renderers import _render_llm_module_info
 
         with ExitStack() as stack:
-            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {
-                "global_macro": FAIL_REASON_API_ERROR,
-                "expert_review": FAIL_REASON_DISABLED,
-            }))
-            llm_module_info, llm_endpoint, module_disabled, llm_session_usage = \
-                _render_llm_module_info(False)
+            stack.enter_context(
+                patch(
+                    "src.python.llm.prompts.LLM_MODULE_FAILURE",
+                    {
+                        "global_macro": FAIL_REASON_API_ERROR,
+                        "expert_review": FAIL_REASON_DISABLED,
+                    },
+                )
+            )
+            llm_module_info, llm_endpoint, module_disabled, llm_session_usage = _render_llm_module_info(False)
 
         # llm_enabled=False 时 session_usage 总为 None
         self.assertIsNone(llm_session_usage)
@@ -78,36 +81,37 @@ class TestS14LlmDisabled(unittest.TestCase):
         import shutil
 
         with ExitStack() as stack:
-            mock_details = stack.enter_context(
-                patch("src.python.report.html_renderers._generate_details"))
-            mock_a_idx = stack.enter_context(
-                patch("src.python.report.html_renderers.fetch_indices"))
-            mock_us_idx = stack.enter_context(
-                patch("src.python.report.html_renderers.fetch_us_indices"))
-            mock_pen = stack.enter_context(
-                patch("src.python.report.html_renderers.compute_penetration_top10"))
-            mock_cat = stack.enter_context(
-                patch("src.python.report.html_renderers._build_category_data"))
-            mock_status = stack.enter_context(
-                patch("src.python.report.html_renderers.price_update_status"))
-            mock_perf = stack.enter_context(
-                patch("src.python.report.html_renderers._build_perf_data"))
-            mock_llm = stack.enter_context(
-                patch("src.python.llm.generate_all_llm"))
+            mock_details = stack.enter_context(patch("src.python.report.html_renderers._generate_details"))
+            mock_a_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_indices"))
+            mock_us_idx = stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices"))
+            mock_pen = stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10"))
+            mock_cat = stack.enter_context(patch("src.python.report.html_renderers._build_category_data"))
+            mock_status = stack.enter_context(patch("src.python.report.html_renderers.price_update_status"))
+            mock_perf = stack.enter_context(patch("src.python.report.html_renderers._build_perf_data"))
+            mock_llm = stack.enter_context(patch("src.python.llm.generate_all_llm"))
             # 隔离 LLM_MODULE_FAILURE 全局状态，避免前序测试污染
-            stack.enter_context(
-                patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {}))
-            mock_template = stack.enter_context(
-                patch("src.python.report.html_writer._ENV.get_template"))
+            stack.enter_context(patch("src.python.llm.prompts.LLM_MODULE_FAILURE", {}))
+            mock_template = stack.enter_context(patch("src.python.report.html_writer._ENV.get_template"))
 
-            mock_details.return_value = [MagicMock(market_value=1000, cost=500,
-                                                   profit=500, today_profit=50,
-                                                   name="长江电力", code="600900",
-                                                   price=55, yesterday_close=54,
-                                                   profit_rate=1.0, source="腾讯",
-                                                   price_type="real", premium="",
-                                                   shares=100, cost_price=50,
-                                                   nav_date="")]
+            mock_details.return_value = [
+                MagicMock(
+                    market_value=1000,
+                    cost=500,
+                    profit=500,
+                    today_profit=50,
+                    name="长江电力",
+                    code="600900",
+                    price=55,
+                    yesterday_close=54,
+                    profit_rate=1.0,
+                    source="腾讯",
+                    price_type="real",
+                    premium="",
+                    shares=100,
+                    cost_price=50,
+                    nav_date="",
+                )
+            ]
             mock_a_idx.return_value = {}
             mock_us_idx.return_value = {}
             mock_pen.return_value = {}

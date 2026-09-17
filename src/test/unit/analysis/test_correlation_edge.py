@@ -21,7 +21,6 @@ import pytest
 
 from src.python.analysis.correlation import (
     DEFAULT_WINDOW,
-    MIN_HOLDINGS,
     MIN_SAMPLES,
     _is_valid_return,
     _pearson_pvalue,
@@ -196,7 +195,7 @@ class TestExtremeValues:
     def test_one_constant_one_varying(self):
         """一序列常数、另一变化 → (0, 1.0) 不显著，绝不硬算。"""
         n = 70
-        dates = _dates(n)
+        _dates(n)
         x = [0.01] * n
         y = [0.02 * i for i in range(1, n + 1)]
         r, p = _pearson_pvalue(x, y)

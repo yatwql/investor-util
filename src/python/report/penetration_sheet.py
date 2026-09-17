@@ -11,6 +11,7 @@ from datetime import datetime
 
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.analysis.valuation_percentile import DISCLAIMER_PROXY, DISCLAIMER_REAL
 from src.python.cache import get_cache_age_by_data_type, get_ttl
 from src.python.core.code_utils import is_a_share_code
 from src.python.core.models import Holding
@@ -38,6 +39,25 @@ logger = logging.getLogger("invest")
 # 模块级降级阈值控制器（单例工厂共享，统一管理）
 _tracker = get_tracker()
 
+_FEEDER_SOURCE_TEMPLATE = "（穿透自目标 ETF {code} {name}，未折算持有比例）"
+"""联接基金的穿透来源标注。
+
+未折算说明必须随标注出现：联接基金约 95% 资产投向目标 ETF，按 100% 归因会
+轻微高估底层标的权重。读者若把穿透结果当作精确值会误判真实暴露。"""
+
+
+def period_entry_label(entry: dict) -> str:
+    """报告期明细条目的展示文本（基金名 + 报告期 + 穿透来源）。
+
+    各基金持仓在报告中只此一处上屏，措辞集中于此，避免多端各写各的。
+    """
+    label = f"{entry['name']}({entry['code']}) {entry['period']}"
+    target_code = entry.get("feeder_target_code")
+    if target_code:
+        label += _FEEDER_SOURCE_TEMPLATE.format(code=target_code, name=entry.get("feeder_target_name") or "")
+    return label
+
+
 _NCOLS = 10
 _CURRENT_YEAR = datetime.now().year
 _HEADERS = [
@@ -52,22 +72,37 @@ _HEADERS = [
     "年均股息",
     "来源明细",
 ]
-# 估值分位列（report_submodules.valuation_percentile 开启时追加，ncols=11）
+# 估值分位列（功能开关 `valuation_percentile` 开启时追加，ncols=11）
 _VALUATION_HEADER = "估值分位"
+
+
+def valuation_footer_note(valuation_data: dict | None) -> str:
+    """估值分位列的免责说明行。
+
+    真实口径生效（``basis_mode == "real_ttm"``）时同时说明两种口径；否则**逐字保持
+    引入真实口径前的原始免责语**——未启用该能力的报告不产生任何可感知变化。
+    """
+    if (valuation_data or {}).get("basis_mode") == "real_ttm":
+        return f"* 估值分位说明：{DISCLAIMER_REAL}；无基本面覆盖时回落{DISCLAIMER_PROXY}（PE/PB 为当前行情值）"
+    return f"* 估值分位说明：{DISCLAIMER_PROXY}（PE/PB 为当前行情值）"
 
 
 def _get_valuation_text(valuation_data: dict | None, codes: list[str]) -> str:
     """根据估值分位数据契约与代码列表，生成估值分位列文本。
+
+    分位口径优先取**真实历史估值分位**（TTM 口径，`real` 子契约）；无基本面覆盖时
+    回落**价格分位代理**（并在文本中如实标注口径）。两者均不可用则仅展示 PE/PB 当前值。
 
     Args:
         valuation_data: 估值分位数据契约（valuation_data，by_code 子键）。
         codes: 穿透标的关联的证券代码列表（依次查找首个有数据的代码）。
 
     Returns:
-        展示文本（如 "PE 12.3 · PB 1.56 · 分位 45%（合理）"）；无数据返回 "--"。
+        展示文本（如 "PE 12.3 · PB 1.56 · 真实分位 45%（合理，PE-TTM）"）；无数据返回 "--"。
     """
     if not valuation_data:
         return "--"
+    real_basis = valuation_data.get("basis_mode") == "real_ttm"
     by_code = valuation_data.get("by_code") or {}
     for code in codes:
         info = by_code.get(code)
@@ -80,8 +115,16 @@ def _get_valuation_text(valuation_data: dict | None, codes: list[str]) -> str:
             parts.append(f"PE {pe:.1f}")
         if pb is not None:
             parts.append(f"PB {pb:.2f}")
-        if info.get("percentile_available") and info.get("price_percentile") is not None:
-            parts.append(f"分位 {info['price_percentile']:.0f}%（{info.get('tier', '--')}）")
+        real = info.get("real") or {}
+        if real_basis and real.get("available"):
+            pct = real.get("pe_percentile") if real.get("basis") == "pe_ttm" else real.get("pb_percentile")
+            basis = "PE-TTM" if real.get("basis") == "pe_ttm" else "PB"
+            parts.append(f"真实分位 {pct:.0f}%（{real.get('tier', '--')}，{basis}）")
+        elif info.get("percentile_available") and info.get("price_percentile") is not None:
+            # 真实口径未生效 → 保持引入前的原始文案（不附加「代理」标注，静默回原样）
+            label = "价格分位" if real_basis else "分位"
+            suffix = "，代理" if real_basis else ""
+            parts.append(f"{label} {info['price_percentile']:.0f}%（{info.get('tier', '--')}{suffix}）")
         return " · ".join(parts) if parts else "--"
     return "--"
 
@@ -228,12 +271,18 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
     """写入穿透页签底部备注和统计信息。返回写入后的行号。"""
     row += 1
     if summary["unknown_mv"] > 0:
+        reasons = []
+        if summary["failed_funds"]:
+            reasons.append(f"{summary['failed_funds']} 只无法获取穿透数据")
+        stale_count = summary.get("stale_funds", 0)
+        if stale_count:
+            reasons.append(f"{stale_count} 只因持仓报告期陈旧被剔除")
         write_data_row(
             ws,
             row,
             [
                 f"* {summary['total_funds']} 只基金中，有 "
-                f"{summary['failed_funds']} 只无法获取穿透数据，"
+                f"{'、'.join(reasons) or '部分持仓不可用'}，"
                 f"合计市值 {summary['unknown_mv']:,.2f} 元未计入穿透 TOP10"
             ],
             [],
@@ -244,6 +293,13 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
             failed_names = "；".join(f"{f['name']}({f['code']})" for f in failed_details)
             write_data_row(ws, row, [f"  无法获取穿透的基金：{failed_names}"])
             row += 1
+        stale_details = summary.get("stale_fund_details", [])
+        if stale_details:
+            stale_names = "；".join(
+                f"{f['name']}({f['code']}) 报告期 {f['period']}，距今 {f['quarters']} 个完整季度" for f in stale_details
+            )
+            write_data_row(ws, row, [f"  报告期陈旧被剔除的基金：{stale_names}"])
+            row += 1
 
     info_line = (
         f"基金 {summary['total_funds']} 只（{summary['fund_breakdown']}）"
@@ -252,6 +308,13 @@ def _write_penetration_footer(ws: Worksheet, row: int, summary: dict) -> int:
         f"TOP10 覆盖 {summary['top10_coverage_pct']:.1f}%"
     )
     write_data_row(ws, row, [info_line])
+
+    # 报告期上屏：穿透结果按当期市值加权，须标出各基金持仓的时点
+    report_periods = summary.get("report_periods", [])
+    if report_periods:
+        row += 1
+        period_text = "；".join(period_entry_label(p) for p in report_periods)
+        write_data_row(ws, row, [f"  各基金持仓报告期：{period_text}"])
     return row
 
 
@@ -274,9 +337,8 @@ def write_penetration_sheet(
                           内部重复计算，用于调用方已算过一轮的场景
         valuation_data: 估值分位数据契约（valuation_data）。非 None 时追加
             「估值分位」列（ncols 10→11，表尾附免责声明），当前 PE/PB + 价格
-            分位代理；None 时保持既有 10 列输出（report_submodules.valuation_percentile 关闭）
+            分位代理；None 时保持既有 10 列输出（功能开关 `valuation_percentile` 关闭）
     """
-    from src.python.analysis.valuation_percentile import DISCLAIMER
 
     ncols = _NCOLS + (1 if valuation_data is not None else 0)
     headers = _HEADERS + ([_VALUATION_HEADER] if valuation_data is not None else [])
@@ -323,10 +385,10 @@ def write_penetration_sheet(
         row += 1
 
     row = _write_penetration_footer(ws, row, summary)
-    # 估值分位免责声明（价格分位代理，非真实历史估值分位）
+    # 估值分位免责声明：真实口径生效时说明双口径，否则保持引入前的原始免责语
     if valuation_data is not None:
         row += 1
-        write_data_row(ws, row, [f"* 估值分位说明：{DISCLAIMER}（PE/PB 为当前行情值）"])
+        write_data_row(ws, row, [valuation_footer_note(valuation_data)])
         row += 1
     data_status = build_penetration_data_status(result, profit_success, dividend_success)
     _write_data_status_foot(ws, data_status, start_row=row)

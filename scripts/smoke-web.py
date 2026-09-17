@@ -18,7 +18,7 @@
   9. 产物目录隔离  run 的 output_dir 落在临时目录，非项目真实 reports/
  10. 正式-用存量   POST /api/runs            → 无 file_id 提交 202 + run_id；
                                               带 file_id / 非法 mode → 400 BAD_PARAM
- 11. 配置编辑      GET /api/config/edit      → 200 + 7 组可编辑面；
+ 11. 配置编辑      GET /api/config/edit      → 200 + 7 组可编辑面（含 report_switches）；
                                               合法保存 enable_news → 200；
                                               非法键 → 400 BAD_PARAM
 
@@ -158,7 +158,6 @@ def _check_health(client, results):
 
 
 def _check_upload(client, results) -> str | None:
-    from src.python.web.upload import _file_registry
 
     xlsx = _make_holdings_xlsx()
     resp = client.post("/api/upload", data={"file": (io.BytesIO(xlsx), "持仓.xlsx")})
@@ -359,7 +358,7 @@ def _check_config_edit(client, results) -> None:
     ok = ok and set(data) >= {
         "paths",
         "sections",
-        "submodules",
+        "report_switches",
         "anonymization",
         "comparison_indices",
         "comparison_indices_defaults",

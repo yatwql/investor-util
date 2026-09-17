@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from src.python.report.progress import ProgressReporter
 
@@ -81,12 +82,18 @@ def prepare_report_data(
     holdings: list,
     reporter: ProgressReporter,
     config: dict,
+    transactions: list | None = None,
 ) -> dict:
     """获取行情、指数、穿透数据，整理持仓明细字典列表。
 
     使用内部 ThreadPoolExecutor。
     注意：config 参数传入后必须只读使用，不得 mutate。调用方持有的 dict 引用
     指向相同的配置对象，写入会导致跨模块状态污染。
+
+    Args:
+        transactions: 交易流水记录（可选）。提供时为持仓明细附加 holding_days
+            （首次买入至今的交易日数），供再平衡误报防护的「新买入品种观察期」
+            判定；缺省不附加该字段，防护按「未知」跳过观察期过滤。
     """
     from concurrent.futures import ThreadPoolExecutor
 
@@ -133,7 +140,7 @@ def prepare_report_data(
     # 内嵌 industry_beta 子键（行业 Beta 子表）。
     factor_exposure = compute_factor_exposure_data(holdings, config, reporter)
     if factor_exposure is not None:
-        # 行业 Beta 子表：report_submodules.industry_beta 开关关闭时返回 None（区块隐藏）；
+        # 行业 Beta 子表：功能开关 `industry_beta` 开关关闭时返回 None（区块隐藏）；
         # 开启但数据不足时 available=False（标题 + 占位，不阻塞本页签其余区块）
         factor_exposure["industry_beta"] = compute_industry_beta_data(holdings, details, config, reporter)
     # 持仓关系矩阵（相关性区块）：同因子暴露，基金深度分析关闭时为 None（章节隐藏）。
@@ -150,12 +157,22 @@ def prepare_report_data(
         prev_trading_day=get_prev_trading_day(),
     )
 
-    # 估值分位（数据契约 valuation_data）：report_submodules.valuation_percentile
+    # 估值分位（数据契约 valuation_data）：功能开关 `valuation_percentile`
     # 开启时计算（当前 PE/PB + 价格分位代理）；关闭返回 None（「资产穿透TOP10」列隐藏）
     valuation_data = compute_valuation_data(details, config, reporter)
-    # 市场温度（数据契约 market_temperature_data）：report_submodules.market_temperature
+    # 市场温度（数据契约 market_temperature_data）：功能开关 `market_temperature`
     # 开启时计算（价格分位+均线偏离+波动率三因子温度计）；关闭返回 None（汇总行隐藏）
     market_temperature_data = compute_market_temperature_data(config, reporter)
+
+    # 持仓个股财报摘要（数据契约 financial_report_digest_data）：
+    # 功能开关 `financial_report_digest` 开启时计算（A 股标的取最新年报章节摘要）；
+    # 关闭或无 key 时返回 None（章节隐藏/写占位）
+    financial_report_digest_data = compute_financial_report_digest_data(holdings, penetrated_assets, config, reporter)
+    # 财务指标（数据契约 financial_indicator_data）：功能开关 `financial_indicator`
+    # 开启时计算（A 股标的指标 + 质量档 + 趋势 + 当前 PE/PB）；关闭时返回 None（章节隐藏）
+    financial_indicator_data = compute_financial_indicator_data(
+        holdings, penetrated_assets, config, reporter, details=details
+    )
 
     # 行动建议单一数据源：再平衡信号等纯算法产出，action_data数据契约
     # （单源计算，行动建议板块与智囊团深度复盘行动摘要共享同一对象）
@@ -187,6 +204,11 @@ def prepare_report_data(
         }
         for d in details
     ]
+    # 新买入品种观察期判据（R-RBL-07 第 (2) 条）：按交易流水首次买入日以交易日计。
+    # 须在下方 build_action_data 之前附加，信号计算即已消费该字段。
+    from src.python.report._report_helpers import attach_holding_trading_days
+
+    attach_holding_trading_days(holdings_details, transactions)
 
     # 行动建议：组装 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）。
     # 此处为「中间占位构建」：组合历史峰值市值需等历史走势就绪（report 层
@@ -221,15 +243,104 @@ def prepare_report_data(
         "data_freshness": freshness_summary,
         # 行动建议单一数据源（数据契约 action_data；行动建议板块 + 智囊团深度复盘行动摘要）
         "action_data": action_data,
-        # 估值分位（数据契约 valuation_data；report_submodules.valuation_percentile 关闭时为 None）
+        # 估值分位（数据契约 valuation_data；功能开关 `valuation_percentile` 关闭时为 None）
         "valuation_data": valuation_data,
-        # 市场温度（数据契约 market_temperature_data；report_submodules.market_temperature 关闭时为 None）
+        # 市场温度（数据契约 market_temperature_data；功能开关 `market_temperature` 关闭时为 None）
         "market_temperature_data": market_temperature_data,
+        # 持仓个股财报摘要（数据契约 financial_report_digest_data；开关关闭/无 key 时为 None）
+        "financial_report_digest_data": financial_report_digest_data,
+        # 财务指标（数据契约 financial_indicator_data；开关关闭时为 None）
+        "financial_indicator_data": financial_indicator_data,
     }
 
 
 # ── 估值分位 编排 ──
 # 估值族留在门面：compute_valuation_data 内部经门面命名空间调用
+
+
+def compute_financial_report_digest_data(
+    holdings: list,
+    penetrated_assets: list | None,
+    config: dict,
+    reporter: ProgressReporter,
+) -> dict | None:
+    """编排持仓个股财报摘要数据（`financial_report_digest_data` 数据契约）。
+
+    功能开关 `financial_report_digest` 开启时，对持仓 + 穿透中的 A 股
+    标的取最新年报（无年报退半年报）的目标章节正文；关闭时返回 None（章节隐藏）。
+    缺凭据 / 无 A 股标的 / 全部无覆盖时返回 available=False 的降级契约，
+    不阻断报告主链路。
+    """
+    from src.python.config import is_enable_financial_report_digest
+
+    if not is_enable_financial_report_digest(config):
+        return None
+    from src.python.report.financial_report_digest import build_financial_report_digest
+
+    return build_financial_report_digest(
+        holdings, config, reporter, penetrated_targets=_penetrated_targets(penetrated_assets)
+    )
+
+
+def _penetrated_targets(penetrated_assets: list | None) -> list[dict[str, Any]]:
+    """穿透资产 → 标的清单（``code`` + 中文名 + 来源基金标签）。
+
+    穿透层每个资产条目形如 ``{"name": "阳光电源", "codes": {"300274"},
+    "funds": ["[ETF] 招商中证电池主题ETF(561910)"]}``：名称与来源一路带到
+    展示层，避免穿透标的只显示 ``300274.SZ``、也无法判断是持仓还是穿透。
+    直接持有的资产在穿透层也记 ``直接持有``，此处剔除（该标的会以持仓身份入列）。
+    """
+    targets: list[dict[str, Any]] = []
+    for asset in penetrated_assets or []:
+        if not isinstance(asset, dict):
+            continue
+        name = str(asset.get("name") or "")
+        # top10 契约（`_build_penetration_result`）已把合并层的 funds 归一为 sources；
+        # 同时兼容 merged 原始形态（测试/降级路径直接喂 merged 值时）
+        raw_sources = asset.get("sources") or asset.get("funds") or []
+        sources = [str(f).strip() for f in raw_sources if str(f).strip() and str(f).strip() != "直接持有"]
+        codes: list[str] = []
+        code = asset.get("code")
+        if code:
+            codes.append(str(code))
+        nested = asset.get("codes")
+        if isinstance(nested, (list, set, tuple)):
+            codes.extend(str(c) for c in nested)
+        for c in codes:
+            targets.append({"code": c, "name": name, "sources": sources})
+    return targets
+
+
+def compute_financial_indicator_data(
+    holdings: list,
+    penetrated_assets: list | None,
+    config: dict,
+    reporter: ProgressReporter,
+    details: list | None = None,
+) -> dict | None:
+    """编排财务指标数据（`financial_indicator_data` 数据契约）。
+
+    功能开关 `financial_indicator` 开启时，对持仓 + 穿透中的 A 股标的
+    取多期指标（主源 akshare，失败落 DataSinking 解析支路），派生质量档/年度趋势/
+    当前 PE/PB（PE/PB 需现价，取自行情明细）；关闭时返回 None（章节隐藏）。
+    无 A 股标的 / 数据源不可用时返回 available=False 的降级契约，不阻断主链路。
+    """
+    from src.python.config import is_enable_financial_indicator
+
+    if not is_enable_financial_indicator(config):
+        return None
+    from src.python.fetcher.financial_indicator import collect_price_map
+    from src.python.report.financial_indicator import build_financial_indicator
+
+    return build_financial_indicator(
+        holdings,
+        config,
+        reporter,
+        penetrated_targets=_penetrated_targets(penetrated_assets),
+        prices=collect_price_map(details),
+    )
+
+
 # _fetch_valuation_for_code（测试 patch 该路径），不可整体迁移。
 
 
@@ -251,13 +362,15 @@ def compute_valuation_data(
 
     Returns:
         数据子契约 dict（含 available/status/by_code）；
-        report_submodules.valuation_percentile 关闭时返回 None（列隐藏）；
+        功能开关 `valuation_percentile` 关闭时返回 None（列隐藏）；
         push2/K 线均不可用时 available=False（占位，§1.4.5）。
     """
-    from src.python.config import is_enable_valuation_percentile
+    from src.python.config import datasink_feature_ready, is_enable_valuation_percentile
 
     if not is_enable_valuation_percentile(config):
         return None
+    # 真实分位口径是否生效：未就绪时渲染层保持价格分位的原始文案与免责语（静默回原样）
+    real_basis = datasink_feature_ready(config)
 
     from concurrent.futures import ThreadPoolExecutor
 
@@ -289,7 +402,12 @@ def compute_valuation_data(
             return unavailable_valuation("source_failed")
 
         reporter.ok("估值分位计算完成")
-        return {"available": True, "status": "ok", "by_code": by_code}
+        return {
+            "available": True,
+            "status": "ok",
+            "by_code": by_code,
+            "basis_mode": "real_ttm" if real_basis else "proxy_only",
+        }
     except Exception:
         logger.exception("[valuation] 估值分位编排异常，章节降级")
         return unavailable_valuation("source_failed")
@@ -311,12 +429,17 @@ def _fetch_valuation_for_code(
         单代码估值子契约 dict；PE/PB 与价格分位皆不可得返回 None。
     """
     from src.python.analysis.valuation_percentile import compute_price_percentile
-    from src.python.providers.eastmoney_industry import fetch_valuation_fields
+    from src.python.fetcher.industry import fetch_valuation_fields
 
+    # 经 fetcher 网关取数（Provider Chain 必经）：享受链路熔断/降级/诊断与缓存，
+    # 且 PE/PB 与行业分类同属一次 push2 响应，不再直连 provider 模块。
     pe_pb = fetch_valuation_fields(code)
     bars = _fetch_holding_bars(code, name, days) or []
     pct = compute_price_percentile(bars)
-    if not pe_pb and not pct.get("available"):
+    # 真实历史估值分位（TTM 口径）：多期基本面（基金/指标域，主源失败落解析支路）
+    # × 历史收盘价，两者任一不可得则该项降级（不伪造历史期）
+    real = _real_valuation_for_code(code, bars)
+    if not pe_pb and not pct.get("available") and not real.get("available"):
         return None
     return {
         "pe": (pe_pb or {}).get("pe"),
@@ -325,7 +448,35 @@ def _fetch_valuation_for_code(
         "tier": pct.get("tier"),
         "sample_count": pct.get("sample_count", 0),
         "percentile_available": bool(pct.get("available")),
+        # 真实历史估值分位子契约（TTM 口径）：渲染层优先展示；不可用时回落价格代理
+        "real": real,
+        "real_available": bool(real.get("available")),
     }
+
+
+def _real_valuation_for_code(code: str, bars: list[dict]) -> dict:
+    """单只标的的真实历史估值分位（TTM 口径）；取数失败降级为空子契约。
+
+    DataSinking 数据底座未就绪时**不做任何取数与计算**（渲染层同时退回价格分位
+    的原始文案与免责语，报告形态与引入本口径前逐字一致）。
+    """
+    from src.python.analysis.valuation_percentile import compute_real_valuation
+    from src.python.config import datasink_feature_ready
+    from src.python.fetcher.financial_indicator import fetch_indicator_series
+
+    if not datasink_feature_ready():
+        return {"available": False, "reason": "datasink_unavailable"}
+
+    try:
+        records = fetch_indicator_series(code)
+    except Exception:
+        logger.debug("[valuation] %s 指标序列取数失败，真实估值分位降级", code, exc_info=True)
+        records = []
+    try:
+        return compute_real_valuation(bars, records)
+    except Exception:
+        logger.debug("[valuation] %s 真实估值分位计算异常，降级", code, exc_info=True)
+        return {"available": False, "reason": "compute_failed"}
 
 
 # ── generate_report ──
@@ -355,7 +506,7 @@ def generate_report(
             None 表示未显式指定，按 `config.history.fetch_mode` 决定
             （默认 auto，即获取）
         transactions: 交易流水记录（「交易流水」页签，无则 None）。
-            成本流水子模块（report_submodules.cost_lots）开启时用于成本分档 + XIRR
+            成本流水子模块（功能开关 `cost_lots`）开启时用于成本分档 + XIRR
         dividends: 分红流水记录（「分红流水」页签，无则 None）。
             成本流水子模块开启时用于分红累计 + XIRR
         snapshot_namespace: 快照隔离域（None=共享主目录；如 "web"=web 试算域）。
@@ -375,7 +526,7 @@ def generate_report(
 
     if report_type == "basic":
         # basic 路径：仅生成 Excel，不调 prepare_report_data / capture_snapshot / fetch_history_data
-        from src.python.config import is_enable_cost_lots, is_enable_data_quality
+        from src.python.config import is_enable_action, is_enable_cost_lots, is_enable_data_quality
         from src.python.core.perf import PerfCollector
         from src.python.core.registry import get_report_section_order
         from src.python.report._report_generation import _collect_health_checks, _spawn_health_checks
@@ -398,6 +549,9 @@ def generate_report(
                 progress=reporter,
                 # 数据质量仪表盘子模块开关（basic 无行情数据，品种覆盖区块显示降级占位）
                 enable_data_quality=is_enable_data_quality(config),
+                # 行动建议章节开关（basic 纯算法可见；action_data 由 excel_generator
+                # 就地由行情明细构建——basic 不经编排层，无 pipeline_data 注入）
+                enable_action=is_enable_action(config),
                 # 成本流水子模块开关 + 交易/分红流水（汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计）
                 enable_cost_lots=is_enable_cost_lots(config),
                 transactions=transactions,

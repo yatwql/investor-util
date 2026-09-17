@@ -10,7 +10,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+
+from src.python.core.constants import BEIJING_TZ
+from datetime import datetime
 from typing import Any
 
 from src.python.core.decision_header import build_structured_header_instruction
@@ -62,7 +64,7 @@ def _build_global_macro_prompt(
         sector_flow: 行业资金流向数据（可选），含主力净流入排名
         competitive_context: 竞争语境文本（可选），由呼叫方构建
     """
-    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    now_bj = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     idx_text = "A股:"
     for idx in (a_indices or {}).values():
         name = idx.get("name", "")
@@ -210,13 +212,13 @@ def _build_expert_review_prompt(
         metrics: 量化指标字典，compute_all_metrics() 的输出。
         skip_scenarios: True 时跳过所有情景分析指令（辩论 pro/con 用，
             避免双重情景输出）。
-        enable_signal_digest: 注入算法评级预消化信号块（实验项
+        enable_signal_digest: 注入算法评级预消化信号块（开关
             ``signal_pre_digest``；无可用信号时静默跳过）。
-        enable_structured_header: 追加受控 JSON 决策头契约（实验项
-            ``decision_header_parse``）。关闭时提示词与未加此项前逐字节一致，
+        enable_structured_header: 追加受控 JSON 决策头契约（开关
+            ``decision_header_parse``，默认开启）。关闭时提示词与未加此项前逐字节一致，
             不扰动既有缓存指纹。
     """
-    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    now_bj = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
     holdings_text = _format_holdings_block(holdings_details, compact=True)
@@ -275,7 +277,7 @@ def _build_expert_review_prompt(
         "| 🟡 中 | XXX | 减仓/加仓/持有 | 简述理由 |\n"
         "| 🟢 低 | XXX | 减仓/加仓/持有 | 简述理由 |\n"
     )
-    # 结构化决策头（实验项 decision_header_parse）：与上表同源，供抽取侧优先读取。
+    # 结构化决策头（开关 decision_header_parse）：与上表同源，供抽取侧优先读取。
     # 关闭时 append 空串，提示词逐字节不变。
     if enable_structured_header:
         parts.append(build_structured_header_instruction())
@@ -366,7 +368,7 @@ def _build_health_check_prompt(
     penetrated_assets: list[dict] | None = None,
     holdings_details: list[dict] | None = None,
     pipeline_data: dict | None = None,
-    degradation_events: list[dict] | None = None,
+    data_quality_text: str | None = None,
     *,
     enable_signal_digest: bool = False,
 ) -> str:
@@ -376,19 +378,31 @@ def _build_health_check_prompt(
 
     Args:
         pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要）。
-        degradation_events: DegradationTracker.get_log() 输出。
+        data_quality_text: **已渲染**的数据质量详细状态文本块
+            （``_build_data_quality_detail_block()`` 的输出）。调用方渲染一次后
+            同时交给本函数与模块指纹构造，两侧共享同一实例——本函数不自行渲染。
+            传 ``None`` 或空串表示未提供（旁路/测试），按「无降级事件」渲染；两者
+            判据必须相同，否则指纹侧把 ``None`` 与 ``""`` 折叠成同一个空串、本函数
+            却渲染出不同文本，会让两种提示词共用一份缓存。
         enable_signal_digest: 注入算法评级预消化信号块（实验项
             ``signal_pre_digest``；无可用信号时静默跳过）。
     """
-    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    now_bj = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
     holdings_text = _format_holdings_block(holdings_details, show_cost=True)
     pen_text = _format_penetration_block(penetrated_assets)
     diff_text = _build_difpipeline_data_block(pipeline_data)
     degradation_text = _build_data_degradation_block(pipeline_data)
-    # 数据质量详情
-    dq_detail = _build_data_quality_detail_block(degradation_events)
+    # 数据质量详情：调用方渲染的同一实例既进本提示词、又进模块指纹
+    # （llm/module_fingerprint.py 模块 docstring）；未提供（None 或空串）时按无降级
+    # 事件渲染。判据用 `not` 而非 `is None`——指纹侧 `data_quality_text or ""` 早已把
+    # 两者折叠成同一个值，此处若只认 None，空串就会渲染成空段却与 None 共用指纹。
+    dq_detail = (
+        _build_data_quality_detail_block(None, (pipeline_data or {}).get("data_freshness"))
+        if not data_quality_text
+        else data_quality_text
+    )
     attribution_text = _build_profit_attribution_block(holdings_details)
     total_rate = (total_profit / total_cost * 100) if total_cost else 0.0
     signal_text = _build_signal_digest_block(pipeline_data) if enable_signal_digest else ""
@@ -446,7 +460,7 @@ def _build_penetration_deep_prompt(
     要求 LLM 基于穿透 TOP10 和持仓行业分类，
     分析行业集中度、品种集中度、国别/币种暴露。
     """
-    now_bj = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M")
+    now_bj = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
 
     holdings_text = _format_holdings_block(holdings_details)

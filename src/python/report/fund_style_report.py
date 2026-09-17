@@ -17,6 +17,7 @@ from src.python.report.fund_style_base import (
     _update_snapshot,
 )
 from src.python.report.fund_style_classify import classify_fund_style
+from src.python.report.holdings_freshness import evaluate_report_period
 
 logger = logging.getLogger("invest")
 
@@ -80,7 +81,8 @@ def analyze_style_for_all_funds(
 
     Returns:
         {"results": [{code, name, current_style, prev_style, drift_level,
-                      drift_score, is_estimated, is_first_check, ...}, ...],
+                      drift_score, is_estimated, is_first_check,
+                      report_period, report_stale, ...}, ...],
          "snapshot_updated": bool}
     """
     snapshot = _load_snapshot() or {}
@@ -96,6 +98,10 @@ def analyze_style_for_all_funds(
         if not holdings:
             continue
 
+        # 风格判定与漂移检测都基于该基金的定期报告快照，报告期须随行上屏：
+        # 报告期跨年的基金本期与上期风格相同，并不代表风格稳定。
+        period_info = info.get("period_info") or evaluate_report_period(info.get("date"))
+
         # 风格判定
         style_result = classify_fund_style(code, holdings)
         current_style = style_result.get("style", "--")
@@ -106,14 +112,15 @@ def analyze_style_for_all_funds(
         prev_style = prev_entry.get("style") if prev_entry else None
         is_first_check = is_first_run or prev_style is None
 
-        # 生成备注
-        remark_parts = []
+        # 生成备注（含报告期：风格判定与漂移检测都基于该期快照，
+        # 报告期跨年的基金本期与上期风格相同，并不代表风格稳定）
+        remark_parts: list[str] = []
         if is_first_check:
-            remark = "基准确立中"
-        else:
-            if is_estimated:
-                remark_parts.append("估算风格")
-            remark = "；".join(remark_parts) if remark_parts else ""
+            remark_parts.append("基准确立中")
+        elif is_estimated:
+            remark_parts.append("估算风格")
+        remark_parts.append(f"报告期 {period_info.period}" + ("（陈旧）" if period_info.stale else ""))
+        remark = "；".join(remark_parts)
 
         if is_first_check:
             drift_level = "基准确立中" if current_style != "--" else "--"
@@ -134,6 +141,8 @@ def analyze_style_for_all_funds(
                 "is_estimated": is_estimated,
                 "is_first_check": is_first_check,
                 "remark": remark,
+                "report_period": period_info.period,
+                "report_stale": period_info.stale,
                 "details": style_result.get("details", []),
             }
         )

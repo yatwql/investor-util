@@ -19,7 +19,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import sys
@@ -345,28 +344,28 @@ def _generate_report(
     target_met = overall_rate < 0.05
 
     lines: list[str] = []
-    lines.append(f"# LLM 幻觉率采样报告")
-    lines.append(f"")
+    lines.append("# LLM 幻觉率采样报告")
+    lines.append("")
     lines.append(f"- **生成时间**: {now_bj}")
     lines.append(f"- **LLM 模块**: {module_name}")
     lines.append(f"- **Dry-Run**: {'是（未调用 LLM API）' if dry_run else '否'}")
     lines.append(f"- **数据集数**: {len(all_results)}")
-    lines.append(f"")
+    lines.append("")
 
     # ── 汇总表 ──
-    lines.append(f"## 汇总")
-    lines.append(f"")
-    lines.append(f"| 指标 | 值 |")
-    lines.append(f"|------|----|")
+    lines.append("## 汇总")
+    lines.append("")
+    lines.append("| 指标 | 值 |")
+    lines.append("|------|----|")
     lines.append(f"| 总事实校验项 | {total_checks} |")
     lines.append(f"| ❌ 疑似幻觉 — 数值一致性 | {total_issues_numerical} |")
     lines.append(f"| ❌ 疑似幻觉 — 品种存在性（声称持有） | {total_issues_symbol} |")
     lines.append(f"| ❌ 疑似幻觉 — 排名正确性 | {total_issues_rank} |")
     lines.append(f"| ℹ️ 建议提及（非幻觉，不计入率） | {total_suggestions} |")
     lines.append(f"| **幻觉率** | **{overall_rate:.2%}** |")
-    lines.append(f"| 目标 | < 5% |")
+    lines.append("| 目标 | < 5% |")
     lines.append(f"| **达标** | **{'✅ 是' if target_met else '❌ 否'}** |")
-    lines.append(f"")
+    lines.append("")
 
     lines.append("> **说明**：")
     lines.append('> - 品种存在性告警分为"声称持有"（幻觉）和"建议提及"（非幻觉），')
@@ -374,11 +373,11 @@ def _generate_report(
     lines.append("> - 数值一致性告警可能包含误报——仓位占比（如 52.4%）、")
     lines.append(">   情景假设百分比等非收益率数值会被标记为偏差。")
     lines.append(">   建议人工复核后确认实际幻觉率。")
-    lines.append(f"")
+    lines.append("")
 
     # ── 各数据集详情 ──
-    lines.append(f"## 各数据集详情")
-    lines.append(f"")
+    lines.append("## 各数据集详情")
+    lines.append("")
 
     for i, r in enumerate(all_results, 1):
         ds = r["dataset"]
@@ -388,34 +387,34 @@ def _generate_report(
         sym_sug_count = fc.get("sym_suggestion_count", 0)
 
         lines.append(f"### 数据集 {i}: {name}")
-        lines.append(f"")
+        lines.append("")
         lines.append(f"- **描述**: {ds.get('description', '')}")
         lines.append(f"- **品种数**: {len(ds['holdings_details'])}")
         lines.append(f"- **LLM 输出**: {'%d 字符' % len(r['llm_output']) if r.get('llm_output') else '空'}")
         lines.append(f"- **校验项**: {fc['total_checks']} | **幻觉率**: {ds_rate:.2%}")
         if sym_sug_count:
             lines.append(f"- **建议提及**（不计入幻觉率）: {sym_sug_count} 项")
-        lines.append(f"")
+        lines.append("")
 
         # 汇总每个检查器
         sym_issues_count = len(fc["issues"]["symbol"])
         sym_sug_local = len(fc["issues"].get("symbol_suggestion", []))
-        lines.append(f"#### 检查器明细")
-        lines.append(f"")
-        lines.append(f"| 检查器 | 校验项 | 告警（幻觉） | 建议提及 |")
-        lines.append(f"|--------|:------:|:-----------:|:--------:|")
+        lines.append("#### 检查器明细")
+        lines.append("")
+        lines.append("| 检查器 | 校验项 | 告警（幻觉） | 建议提及 |")
+        lines.append("|--------|:------:|:-----------:|:--------:|")
         lines.append(f"| 数值一致性 | {fc.get('num_checked', 0)} | {len(fc['issues']['numerical'])} | -- |")
         lines.append(f"| 品种存在性 | {fc.get('sym_checked', 0)} | {sym_issues_count} | {sym_sug_local} |")
         lines.append(f"| 排名正确性 | {fc.get('rank_checked', 0)} | {len(fc['issues']['rank'])} | -- |")
-        lines.append(f"")
+        lines.append("")
 
         # 告警详情
         has_any_issue = any(fc["issues"][k] for k in ("numerical", "symbol", "rank"))
         has_suggestion = bool(sym_sug_local)
         if has_any_issue or has_suggestion:
             if has_any_issue:
-                lines.append(f"#### 告警详情")
-                lines.append(f"")
+                lines.append("#### 告警详情")
+                lines.append("")
                 for cat, cat_label in [
                     ("numerical", "数值一致性"),
                     ("symbol", "品种存在性（幻觉）"),
@@ -425,19 +424,19 @@ def _generate_report(
                         lines.append(f"**{cat_label}**：")
                         for issue in fc["issues"][cat]:
                             lines.append(f"- ❌ {issue}")
-                        lines.append(f"")
+                        lines.append("")
             if has_suggestion:
-                lines.append(f"**品种存在性（建议提及 — 不计入幻觉率）**：")
+                lines.append("**品种存在性（建议提及 — 不计入幻觉率）**：")
                 for issue in fc["issues"].get("symbol_suggestion", []):
                     lines.append(f"- ℹ️ {issue}")
-                lines.append(f"")
+                lines.append("")
         else:
-            lines.append(f"✅ 无告警 —— 全部通过")
-            lines.append(f"")
+            lines.append("✅ 无告警 —— 全部通过")
+            lines.append("")
 
-    lines.append(f"---")
-    lines.append(f"")
-    lines.append(f"*由 `scripts/llm-hallucination-sampler.py` 自动生成*")
+    lines.append("---")
+    lines.append("")
+    lines.append("*由 `scripts/llm-hallucination-sampler.py` 自动生成*")
 
     return "\n".join(lines)
 
@@ -490,10 +489,10 @@ def main():
         prompt_path = os.path.join(prompt_dir, f"hallucination-prompts-{module_name}.md")
         prompt_lines: list[str] = [
             f"# LLM 幻觉率采样 — 构建的 Prompt（{module_name}）",
-            f"",
+            "",
             f"生成时间: {datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')}",
-            f"Dry-Run: 是",
-            f"",
+            "Dry-Run: 是",
+            "",
         ]
 
     # ── 2. 逐个数据集执行 ──
@@ -520,9 +519,9 @@ def main():
         elapsed = time.time() - start_ts
 
         if dry_run and llm_output:
-            prompt_lines.append(f"---")
+            prompt_lines.append("---")
             prompt_lines.append(f"## 数据集 {idx}: {name}")
-            prompt_lines.append(f"")
+            prompt_lines.append("")
             prompt_lines.append("```")
             # 截取前 2000 字符
             if len(llm_output) > 2000:
@@ -530,7 +529,7 @@ def main():
             else:
                 prompt_lines.append(llm_output)
             prompt_lines.append("```")
-            prompt_lines.append(f"")
+            prompt_lines.append("")
 
         if not llm_output and not dry_run:
             logger.warning("  [%d/%d] %s → LLM 返回空（跳过事实校验）", idx, len(datasets), name)

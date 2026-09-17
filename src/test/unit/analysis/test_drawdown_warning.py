@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
-
 from src.python.analysis.drawdown_warning import (
     compute_drawdown_warning,
     current_drawdown_percentile,
     rolling_max_drawdown,
 )
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 # ── rolling_max_drawdown 测试 ─────────────────────────────────
 
@@ -141,10 +140,7 @@ class TestComputeDrawdownWarning:
 
     def test_normal_drawdown_bars(self):
         """正常波动范围 → alert_level=normal。"""
-        bars = [
-            {"date": f"2026-01-{d:02d}", "drawdown_pct": -0.01 + i * 0.001}
-            for i, d in enumerate(range(1, 20))
-        ]
+        bars = [{"date": f"2026-01-{d:02d}", "drawdown_pct": -0.01 + i * 0.001} for i, d in enumerate(range(1, 20))]
         result = compute_drawdown_warning(bars, name="组合A")
         assert result["name"] == "组合A"
         assert "windows" in result

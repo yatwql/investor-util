@@ -113,7 +113,7 @@ def build_trend_report(
     lines: list[str] = [
         "# 报告生成性能趋势",
         "",
-        f"**数据来源**：`data/state/perf_history.jsonl`",
+        "**数据来源**：`data/state/perf_history.jsonl`",
         f"**总记录数**：{len(records)} 条",
         f"**分组数**：{len(groups)} 组",
         "",

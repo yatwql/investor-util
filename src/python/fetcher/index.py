@@ -227,19 +227,23 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
 
     from src.python.fetcher.chain import FailureDiagnostics, fetch_with_incremental_fallback
 
-    # 先查会话缓存（会话级复用）
+    # 先查会话缓存（会话级复用）：缓存条目记为 ``(days, bars)``，**仅在缓存窗口不小于
+    # 本次需求时复用**——否则「某调用者先用短窗口取过 → 后续要长窗口的调用者拿到更短
+    # 序列」（窗口缩水）；旧形态（裸列表）视为窗口未知，沿用既有行为
     from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     reg = get_registry()
+    days = min(max(days, 5), 3650)
     cached = reg.session_cache_get("history_index", code)
     if cached is not NOT_FOUND:
-        return cached
+        cached_days, cached_bars = cached if isinstance(cached, tuple) else (0, cached)
+        if cached_days == 0 or cached_days >= days:
+            return cached_bars
 
-    # 美股指数使用独立 chain（新浪优先，腾讯备用；腾讯 K-line 不支持 gb_* 代码）
+    # 美股指数使用独立 chain（新浪优先，腾讯备用；腾讯 K-line 对 gb_* 支持有限）
     from src.python.core.code_utils import is_us_index_code
 
     chain_name = "history_index_us" if is_us_index_code(code) else "history_index"
-    days = min(max(days, 5), 3650)
     diag = FailureDiagnostics()
     try:
         result = fetch_with_incremental_fallback(chain_name, code, days, diagnostics=diag)
@@ -258,8 +262,8 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     else:
         _t.record(_src_key, "T2", success=False, failure_type="unreachable", message=diag.summary())
 
-    # 写入会话缓存（即使为空也缓存，避免重复请求）
-    reg.session_cache_set("history_index", code, result, source="api")
+    # 写入会话缓存（即使为空也缓存，避免重复请求；同时记下窗口天数供后续调用者判断）
+    reg.session_cache_set("history_index", code, (days, result), source="api")
     return result
 
 

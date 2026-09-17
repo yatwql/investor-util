@@ -8,14 +8,14 @@ from __future__ import annotations
 from typing import Any
 
 from src.python.core.logger import setup_logger
-from src.python.core.registry import get_report_section_order
+from src.python.core.registry import get_report_section_order, get_report_sheet_name
 from src.python.report.excel_fund_deep_analysis import write_fund_deep_analysis_sheets
 from src.python.report.excel_content_sheets import write_content_sheets
 from src.python.report.excel_llm_usage import write_llm_section_and_usage
 from src.python.report.excel_market_data import resolve_indices, resolve_market_data
 from src.python.report.excel_module_loader import load_report_modules
 from src.python.report.excel_news_warning import write_news_sheet
-from src.python.report.excel_sheet_factory import create_sheets
+from src.python.report.excel_sheet_factory import build_data_availability, create_sheets
 from src.python.report.progress import ProgressReporter, SilentProgressReporter, Timer
 
 logger = setup_logger()
@@ -77,7 +77,8 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
         matrix = build_data_source_matrix()
         if matrix:
             ncols = 5
-            row = write_title_row(ws, 1, "数据源可用性矩阵", ncols)
+            # 标题取自页签显示名注册表（与页签名同源），不硬编码字面量
+            row = write_title_row(ws, 1, get_report_sheet_name("data_source_status"), ncols)
             row = write_header_row(
                 ws,
                 row,
@@ -117,12 +118,63 @@ def _write_data_source_matrix_sheet(ws, prog) -> None:
                 for m in matrix:
                     for sf in m.get("sample_failures", []):
                         row = write_data_row(ws, row, [m["name"], sf, "", "", ""])
+            # 数据源说明表（实际使用清单：用途 / 计费 / 凭据要求）
+            from src.python.report.data_quality_sheet import write_source_catalog_block
+
+            write_source_catalog_block(ws, row)
             auto_width(ws)
             logger.info("数据源可用性矩阵页签已写入")
         else:
             logger.debug("[excel] 数据源矩阵为空，跳过页签写入")
     except Exception:
         logger.debug("[excel] 数据源可用性矩阵页签写入失败（非关键）", exc_info=True)
+
+
+def _llm_usage_sheet_carries_notice(sheets: dict[str, Any]) -> bool:
+    """LLM 用量页签是否已承载实验功能清单。
+
+    清单是 ``write_llm_usage_sheet`` 在页签初始化后立刻写入的第一段内容；该页签
+    缺席（``include_llm`` 关闭）或为空（用量数据/模块明细缺失导致写入早退）时，
+    清单在 Excel 侧无落点，须由汇总页脚兜底。
+    """
+    ws = sheets.get("llm_usage")
+    if ws is None:
+        return False
+    return any(cell.value is not None for row in ws.iter_rows() for cell in row)
+
+
+def _write_summary_experimental_notice(sheets: dict[str, Any]) -> None:
+    """汇总页签页脚写入实验功能清单（LLM 章节关闭时的兜底落点）。
+
+    ``signal_ledger`` / ``decision_reflection`` 等实验开关
+    不依赖 LLM 章节，若清单只挂在用量页签上，这批开关在 Excel 产物上完全无痕。
+    已落在用量页签时不重复写——同一事实说两遍会让读者以为有两处不同来源。
+    """
+    if _llm_usage_sheet_carries_notice(sheets):
+        return
+    ws = sheets.get("summary")
+    if ws is None:
+        return
+
+    from src.python.report.experimental_notice import NOTICE_HINT, enabled_notice_line
+    from openpyxl.styles import Font
+
+    line = enabled_notice_line()
+    if line is None:
+        return
+
+    ncols = 5
+    row = (ws.max_row or 1) + 2
+    for idx, (text, font) in enumerate(
+        [
+            (line, Font(size=9, bold=True, color="8A5A00")),
+            (NOTICE_HINT, Font(size=9, color="666666")),
+        ]
+    ):
+        _r = row + idx
+        ws.merge_cells(start_row=_r, start_column=1, end_row=_r, end_column=ncols)
+        ws.cell(row=_r, column=1, value=text).font = font
+    logger.info("汇总页签页脚已写入实验功能清单（LLM 用量页签无落点）")
 
 
 def generate_excel_report(
@@ -142,19 +194,23 @@ def generate_excel_report(
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
+    enable_fundamental_snapshot: bool = False,  # board 层：持仓基本面章（= 财务指标或财报摘要任一开关开启）
     enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
-    enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
+    enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（功能开关 `data_quality`）
     progress: ProgressReporter | None = None,
     section_order: list[dict] | None = None,
     pipeline_data: dict | None = None,  # 组合历史走势：环比对比数据（drives delta columns）
     history_data: dict | None = None,  # 组合历史走势数据（含基准指数）
     debate_info: dict | None = None,
-    enable_cost_lots: bool = False,  # 子模块：成本流水（成本分档 + XIRR + 分红累计，report_submodules.cost_lots）
+    enable_cost_lots: bool = False,  # 子模块：成本流水（成本分档 + XIRR + 分红累计，功能开关 `cost_lots`）
     transactions: list | None = None,  # 交易流水记录（「交易流水」页签，无则 None）
     dividends: list | None = None,  # 分红流水记录（「分红流水」页签，无则 None）
     valuation_data: dict | None = None,  # 估值分位数据契约（「资产穿透TOP10」估值分位列；None 时从 pipeline_data 读取）
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约（「投资分析汇总」温度刻度行；None 时从 pipeline_data 读取）
+    financial_report_digest_data: dict
+    | None = None,  # 持仓个股财报摘要数据契约（功能开关 `financial_report_digest`，默认关）
+    financial_indicator_data: dict | None = None,  # 财务指标数据契约（功能开关 `financial_indicator`，默认关）
 ) -> None:
     """生成 Excel 报告的核心逻辑。
 
@@ -187,9 +243,9 @@ def generate_excel_report(
         transactions: 交易流水记录（「交易流水」页签），成本分档/FIFO 批次与 XIRR 现金流用
         dividends: 分红流水记录（「分红流水」页签），分红累计与 XIRR 现金流用
         valuation_data: 估值分位数据契约（当前 PE/PB + 价格分位代理），
-            report_submodules.valuation_percentile 关闭或传入 None 时穿透页签保持既有输出。
+            功能开关 `valuation_percentile` 关闭或传入 None 时穿透页签保持既有输出。
         market_temperature_data: 市场温度数据契约（三因子合成温度计），
-            report_submodules.market_temperature 关闭或传入 None 时汇总页签保持既有输出。
+            功能开关 `market_temperature` 关闭或传入 None 时汇总页签保持既有输出。
     """
     prog = progress if progress is not None else SilentProgressReporter()
 
@@ -205,12 +261,15 @@ def generate_excel_report(
     wb.remove(wb.active)
     order = section_order or get_report_section_order()  # 内部名 order，避免影子覆盖参数
 
-    # 构造 data 层可用性字典
-    data_availability: dict[str, bool] = {}
-    if include_news:
-        data_availability["news_data_available"] = True
-    if include_llm:
-        data_availability["llm_data_available"] = True
+    # 构造 data 层可用性字典（口径集中于 excel_sheet_factory.build_data_availability）
+    data_availability = build_data_availability(
+        include_news=include_news,
+        include_llm=include_llm,
+        enable_fund_deep_analysis=enable_fund_deep_analysis,
+        financial_report_digest_data=financial_report_digest_data,
+        financial_indicator_data=financial_indicator_data,
+        position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
+    )
 
     sheets = create_sheets(
         wb,
@@ -219,6 +278,7 @@ def generate_excel_report(
         enable_news=enable_news,
         enable_history=enable_history,
         enable_portfolio_evolution=enable_portfolio_evolution,
+        enable_fundamental_snapshot=enable_fundamental_snapshot,
         enable_action=enable_action,
         enable_llm=enable_llm,
         data_availability=data_availability,
@@ -226,18 +286,38 @@ def generate_excel_report(
 
     # ── 行情市值 + 指数 ──
     # 成本流水子模块：开关开启时由 resolve_market_data 组装 fund_flow_data
-    # （成本分档 + XIRR + 分红累计，基于交易/分红流水 + 行情明细价格）
+    # （成本分档 + XIRR + 分红累计，基于交易/分红流水 + 行情明细价格）。
+    # 本函数只解析数据；「持仓明细与分类」页签由 write_content_sheets 一次写入
+    # （市值明细区块 + 分类汇总区块，见 holdings_detail_sheet）。
     data = resolve_market_data(
         holdings,
         details,
         modules,
-        sheets["market_value"],
         prog,
         enable_cost_lots=enable_cost_lots,
         transactions=transactions,
         dividends=dividends,
     )
     a_idx, us_idx = resolve_indices(a_indices, us_indices, modules, prog)
+
+    # ── 行动建议数据契约（action_data）就地兜底 ──
+    # both/full 路径由编排层组装后经 pipeline_data 注入（历史走势就绪，可带
+    # 组合历史峰值市值）；basic 路径不经编排层，此处由刚落成的行情明细就地构建，
+    # 使「行动建议」页签在 basic 下同样可用（契约声明 basic/both/full 均可见）。
+    # 已注入时不重复构建，保持编排层为唯一事实来源。
+    # portfolio_peak_mv 缺省：basic 不含历史走势，组合峰值未知，回撤纪律按
+    # 「峰值未知」处理（组合级回撤不激活），其余纪律不受影响。
+    if enable_action and not (pipeline_data or {}).get("action_data"):
+        _action_details = data.get("details") or []
+        if _action_details:
+            from src.python.analysis.action_advisor import build_action_data
+            from src.python.report._report_helpers import _action_holdings_details
+
+            pipeline_data = {**(pipeline_data or {})}
+            pipeline_data["action_data"] = build_action_data(
+                _action_holdings_details(_action_details, transactions),
+                data.get("total_mv", 0.0),
+            )
 
     # ── 各页签写入 ──
     pen_result = write_content_sheets(
@@ -249,6 +329,7 @@ def generate_excel_report(
         modules,
         prog,
         enable_cost_lots=enable_cost_lots,
+        enable_fund_deep_analysis=enable_fund_deep_analysis,
         valuation_data=valuation_data if valuation_data is not None else (pipeline_data or {}).get("valuation_data"),
         market_temperature_data=(
             market_temperature_data
@@ -257,6 +338,42 @@ def generate_excel_report(
         ),
     )
     write_news_sheet(sheets, holdings, pen_result, include_news, news_data, news_llm_meta, news_top_count, prog)
+
+    # ── 市场情绪契约（报告增强开关 market_sentiment）就地兜底 ──
+    # basic 路径不经编排层；此处穿透结果已就绪，就地组装（full/both 由编排层注入）
+    if not (pipeline_data or {}).get("market_sentiment_data"):
+        from src.python.config import get_config
+        from src.python.report._report_aux_metrics import compute_market_sentiment_data
+
+        _ms_data = compute_market_sentiment_data(
+            holdings, {"penetrated_assets": (pen_result or {}).get("top10")}, get_config(), prog
+        )
+        if _ms_data is not None:
+            pipeline_data = {**(pipeline_data or {})}
+            pipeline_data["market_sentiment_data"] = _ms_data
+
+    # ── 景气度框架诊断契约（实验性功能 prosperity_framework）就地兜底 ──
+    # basic 路径不经编排层；此处穿透结果已就绪，就地组装（full/both 由编排层注入）
+    if not (pipeline_data or {}).get("prosperity_framework_data"):
+        from src.python.config import get_config
+        from src.python.report._report_aux_metrics import compute_prosperity_framework_data
+
+        try:
+            _pf = compute_prosperity_framework_data(
+                holdings,
+                data.get("details"),
+                {"penetrated_assets": (pen_result or {}).get("top10")},
+                get_config(),
+                prog,
+                financial_indicator_data=financial_indicator_data,
+                history_data=history_data,
+            )
+        except Exception:  # 双保险：实验性诊断异常不得中断报告生成
+            logger.warning("[prosperity_framework] 诊断装配异常，本次跳过（主报告不受影响）", exc_info=True)
+            _pf = None
+        if _pf is not None:
+            pipeline_data = {**(pipeline_data or {})}
+            pipeline_data["prosperity_framework_data"] = _pf
     # 风格与因子分析：数据契约 数据在编排层注入 pipeline_data（style_factor_data 主键），
     # 此处透传页签写入（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
     write_fund_deep_analysis_sheets(
@@ -310,6 +427,21 @@ def generate_excel_report(
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
 
+    # ── 持仓基本面页签（财务指标 + 财报摘要，一章两区块） ──
+    ws_fs = sheets.get("fundamental_snapshot")
+    if ws_fs is not None:
+        prog.info("正在写入持仓基本面页签...")
+        try:
+            from src.python.report.fundamental_snapshot_sheet import write_fundamental_snapshot_sheet
+
+            write_fundamental_snapshot_sheet(
+                ws_fs,
+                indicator_data=financial_indicator_data,
+                digest_data=financial_report_digest_data,
+            )
+        except Exception:
+            logger.debug("[excel] 持仓基本面页签写入失败（非关键）", exc_info=True)
+
     # ── 行动建议页签（行动板块，action_data） ──
     ws_action = sheets.get("action")
     if ws_action is not None:
@@ -321,6 +453,8 @@ def generate_excel_report(
                 ws_action,
                 (pipeline_data or {}).get("action_data"),
                 decision_review_data=(pipeline_data or {}).get("decision_review_data"),
+                prosperity_framework_data=(pipeline_data or {}).get("prosperity_framework_data"),
+                market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
             )
         except Exception:
             logger.debug("[excel] 行动建议页签写入失败（非关键）", exc_info=True)
@@ -405,6 +539,12 @@ def generate_excel_report(
 
     # ── 保存 ──
     with Timer("保存 Excel/HTML 文件"):
+        # 实验功能清单的兜底落点：LLM 用量页签未承载时落到汇总页脚
+        try:
+            _write_summary_experimental_notice(sheets)
+        except Exception:
+            logger.debug("[excel] 汇总页脚实验功能清单写入失败（非关键）", exc_info=True)
+
         # 在每个页签底部写入隐私声明脚注
         for _ws_name, _ws in sheets.items():
             if _ws is not None:

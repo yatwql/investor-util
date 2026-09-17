@@ -17,23 +17,36 @@ from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.config import get_config
 from src.python.core.constants import CACHE_WEEKLY
+from src.python.core.datasource_credential import credential_hint, credential_ready_enabled, missing_credential
 from src.python.core.provider_registry import TRANSPORT_FAILURE, get_registry
+from src.python.core.trading_calendar import count_trading_days_elapsed
 
 logger = logging.getLogger("invest")
 
 # ── Provider Chain 定义 ──────────────────────────────────────
 
 _DEFAULT_CHAINS: dict[str, list[str]] = {
-    "price_stock": ["tencent", "sina"],
+    "price_stock": ["tencent", "sina", "hithink"],
     "price_fund_otc": ["eastmoney"],
     "price": ["tencent", "eastmoney"],
     "fund_rank": ["tiantian"],
-    "fund_hold": ["tiantian"],
+    # 基金披露持仓：天天基金为主，同花顺官方源为备（官方源需 key，未配置时链路自动跳过）
+    "fund_hold": ["tiantian", "hithink"],
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
+    # 全文本财报（DataSinking，仅 A 股；需用户自备 key）
+    "financial_report": ["datasink"],
+    # 结构化财务指标（akshare 主源；备用支路 datasink_indicator 从财报全文解析）
+    # 财务指标：akshare 主源 → DataSinking 章节解析支路 → 同花顺官方报表派生（需 key）
+    "financial_indicator": ["akshare_financial", "datasink_indicator", "hithink"],
     # 组合历史走势：历史数据 chains（复用现有 provider name，熔断器共享）
-    "history_stock": ["tencent", "sina"],
+    # 历史日 K：腾讯（前复权）→ 新浪 → 同花顺官方（前复权，需 key）
+    "history_stock": ["tencent", "sina", "hithink"],
     "history_fund_otc": ["tiantian", "eastmoney"],
     "history_index": ["tencent", "sina"],
+    # 美股指数历史日线：新浪实现 fetch_index_kline（providers/sina_kline.py，经
+    # providers/sina.py 重导出），但其 getKLineData 端点对全部代码返回 404/空，
+    # 故实际取数通常由腾讯完成；腾讯 K 线接口对 gb_* 代码支持有限，该链可能整链
+    # 取空——空结果按正常降级记录，不视作配置错误。
     "history_index_us": ["sina", "tencent"],
     # 无风险利率：首选 akshare（bond_zh_us_rate），配置兜底
     "bond_yield": ["akshare"],
@@ -204,6 +217,7 @@ def fetch_with_fallback(
     | None = None,
     validate: Callable[[dict[str, Any], str], bool] | None = None,
     diagnostics: FailureDiagnostics | None = None,
+    cache_validate: Callable[[Any], bool] | None = None,
 ) -> dict[str, Any] | None:
     """通用 Fallback 获取器。
 
@@ -215,17 +229,23 @@ def fetch_with_fallback(
     Args:
         diagnostics: 可选的失败原因收集器。传入时逐 provider 记录可读失败原因，
             供调用方写入降级事件（「错误即 UX」）；不传则零采集、零开销。
+        cache_validate: 可选的缓存载荷准入判据。缓存条目（含过期降级条目）
+            未通过判据时视为未命中、丢弃重取。用于「载荷语义已变更」的修复：
+            旧条目结构未变但含义已变，仅靠 TTL 会在过期前持续遮蔽修复。
     """
     chain = _get_chain(data_type)
-
-    # 1) 读缓存
-    cached = cache_get(cache_key, cache_ttl)
-    if cached is not None:
-        return cached
-
-    # 2) 遍历 chain 尝试（熔断委托 registry）
     kwargs = fn_kwargs or {}
     _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
+
+    # 1) 读缓存（准入判据不符 → 丢弃重取，避免旧语义载荷遮蔽修复）
+    cached = cache_get(cache_key, cache_ttl)
+    if cached is not None:
+        if cache_validate is None or cache_validate(cached):
+            return cached
+        logger.info("[%s]%s 缓存载荷语义版本过期，丢弃并重取", data_type, _code_tag)
+        cache_clear(cache_key)
+
+    # 2) 遍历 chain 尝试（熔断委托 registry）
     reg = get_registry()
     for provider_name in chain:
         entry = provider_fn_map.get(provider_name)
@@ -243,6 +263,17 @@ def fetch_with_fallback(
             logger.warning("[%s]%s 未知 Provider '%s'，跳过", data_type, _code_tag, provider_name)
             if diagnostics is not None:
                 diagnostics.add(label, "未注册")
+            continue
+
+        # 凭据就绪预检（开关 datasource_credential_ready）：
+        # 配置级问题（用户没配 key），**不计入熔断计数器**——混入可用性统计
+        # 会污染数据源可用性矩阵的语义；仅以可读原因进入「错误即 UX」通道。
+        # 开关关闭 / 无声明凭据 → 该分支恒不触发，行为与未引入本机制时逐字一致。
+        _spec = missing_credential(provider_name) if credential_ready_enabled() else None
+        if _spec is not None:
+            logger.info("[%s]%s %s 缺少凭据，跳过（%s）", data_type, _code_tag, label, _spec.env_var)
+            if diagnostics is not None:
+                diagnostics.add(label, credential_hint(_spec))
             continue
 
         source_label, fetch_fn = entry
@@ -274,9 +305,9 @@ def fetch_with_fallback(
                 logger.warning("[%s]%s %s 连续失败，本会话后续请求跳过", data_type, _code_tag, provider_name)
         # else: 代码级空结果（API 不识别该代码）→ 不计入熔断计数器
 
-    # 3) 降级：全部 Provider 失败时尝试过期缓存
+    # 3) 降级：全部 Provider 失败时尝试过期缓存（同样须过准入判据）
     stale = cache_get(cache_key, CACHE_WEEKLY)
-    if stale is not None:
+    if stale is not None and (cache_validate is None or cache_validate(stale)):
         logger.info("[%s]%s 全部 Provider 不可用，降级使用过期缓存", data_type, _code_tag)
         return stale
 
@@ -317,6 +348,15 @@ def _try_providers(
             logger.debug("[%s] %s 已被熔断，跳过", chain_name, provider_name)
             if diagnostics is not None:
                 diagnostics.add(provider_name, "已被熔断跳过")
+            continue
+        # 凭据就绪预检：与 fetch_with_fallback 同一判定（见彼处注释——配置级
+        # 问题不计入熔断）。历史 chain 若缺此分支，需 key 的源会在此被当作
+        # 「不可达」反复重试并累计熔断，正是本机制要消除的行为。
+        _spec = missing_credential(provider_name) if credential_ready_enabled() else None
+        if _spec is not None:
+            logger.info("[%s] %s 缺少凭据，跳过（%s）", chain_name, provider_name, _spec.env_var)
+            if diagnostics is not None:
+                diagnostics.add(provider_name, credential_hint(_spec))
             continue
         logger.info("[%s] 尝试 %s（code=%s, days=%d）", chain_name, provider_name, code, days)
         try:
@@ -413,7 +453,11 @@ _HISTORY_PROVIDER_MAP: dict[str, str] = {
     "sina": "src.python.providers.sina",
     "tiantian": "src.python.providers.tiantian_nav",
     "eastmoney": "src.python.providers.eastmoney",
+    "hithink": "src.python.providers.hithink",
 }
+
+# 新旧 K 线之间缺失的交易日数超过此值 → 判定数据跳空（部分历史不可达）
+_MAX_GAP_TRADING_DAYS: int = 5
 
 
 def _call_history_provider(
@@ -454,7 +498,9 @@ def _call_history_provider(
         fn = getattr(mod, "fetch_fund_nav_history", None)
         if fn:
             return fn(code)
-    elif chain_name == "history_index":
+    elif chain_name in ("history_index", "history_index_us"):
+        # 两条链共用指数 K 线函数：命中 provider 有实现才真正发起请求，
+        # 无实现者落到末尾的统一告警。
         fn = getattr(mod, "fetch_index_kline", None)
         if fn:
             return fn(code, days=days, start_from=start_from)
@@ -466,6 +512,7 @@ def _call_history_provider(
     fn_name = {
         "history_stock": "fetch_kline",
         "history_index": "fetch_index_kline",
+        "history_index_us": "fetch_index_kline",
         "history_fund_otc": "fetch_fund_nav_history",
     }.get(chain_name, "未知函数")
     logger.warning("[history] %s 无 %s 函数", provider_name, fn_name)
@@ -521,23 +568,26 @@ def _validate_continuity(cached: list[dict], new_data: list[dict], cache_key: st
         logger.warning("[%s] 新旧数据重叠——可能是历史修正，自动全量刷新", cache_key)
         cache_set(f"{cache_key}_correction_flag", True)
         return True
-    elif _gap_days(last_old.get("date"), first_new.get("date")) > 5:
-        logger.warning("[%s] 数据跳空 >5 交易日——部分历史不可达", cache_key)
+    else:
+        gap = _missing_trading_days(last_old.get("date"), first_new.get("date"))
+        if gap > _MAX_GAP_TRADING_DAYS:
+            logger.warning("[%s] 数据跳空 %d 个交易日——部分历史不可达", cache_key, gap)
     return False
 
 
-def _gap_days(date1: str | None, date2: str | None) -> int:
-    """计算两个日期字符串之间的天数差（简单近似）。"""
+def _missing_trading_days(date1: str | None, date2: str | None) -> int:
+    """计算两个 K 线日期之间**缺失**的交易日数（不含两端）。
+
+    以交易日而非自然日计——周末与长假会放大自然日差（如国庆前后相邻的两个
+    交易日相差 10 个自然日），按自然日判定会把正常连续的 K 线误判为跳空。
+    相邻交易日 → 0；两端相等/逆序、日期为空或格式非法 → 0。
+    """
     if not date1 or not date2:
         return 0
-    try:
-        from datetime import datetime
-
-        d1 = datetime.strptime(date1, "%Y-%m-%d")
-        d2 = datetime.strptime(date2, "%Y-%m-%d")
-        return abs((d2 - d1).days)
-    except (ValueError, TypeError):
+    elapsed = count_trading_days_elapsed(date1, date2)
+    if elapsed is None or elapsed <= 0:
         return 0
+    return elapsed - 1
 
 
 # 模块加载时自动注册默认 Provider Chain，使 registry.get_chain() 和策略选择器生效

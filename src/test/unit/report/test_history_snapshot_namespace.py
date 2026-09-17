@@ -57,9 +57,7 @@ def test_save_web_namespace_writes_subdir():
     assert os.path.isfile(path)
     # 主目录无此文件
     main_dir_files = [
-        f
-        for f in os.listdir(hs.HISTORY_SNAPSHOT_DIR)
-        if f.startswith("snapshot_") and f.endswith(".json")
+        f for f in os.listdir(hs.HISTORY_SNAPSHOT_DIR) if f.startswith("snapshot_") and f.endswith(".json")
     ]
     assert main_dir_files == []
 

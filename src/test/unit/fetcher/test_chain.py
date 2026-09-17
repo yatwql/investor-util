@@ -15,15 +15,15 @@ from unittest.mock import MagicMock, patch
 
 from src.python.fetcher.chain import (
     _call_history_provider,
+    _missing_trading_days,
     fetch_with_incremental_fallback,
     fetch_with_fallback,
     _get_chain,
     reset_provider_skip,
 )
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
-
-
 
 
 # ============================================================
@@ -85,6 +85,7 @@ class TestGetChain(unittest.TestCase):
 #  fetch_with_fallback
 # ============================================================
 
+
 class TestFetchWithFallback(unittest.TestCase):
     """Provider Chain 通用 Fallback 获取器测试。"""
 
@@ -103,6 +104,62 @@ class TestFetchWithFallback(unittest.TestCase):
         mock_cache_get.return_value = {"cached": True}
         result = fetch_with_fallback("price", self.provider_fn_map, "test_key", 3600)
         self.assertEqual(result, {"cached": True})
+
+    # ── 缓存载荷准入判据（cache_validate） ────────────────
+
+    @patch("src.python.fetcher.chain.cache_get")
+    def test_cache_validate_accepts_current_payload(self, mock_cache_get):
+        """cache_validate 通过 → 直接返回缓存，不调用 provider。"""
+        mock_cache_get.return_value = {"hold_schema": 2, "holdings": []}
+        fn1 = MagicMock()
+        provider_map = {"p1": ("P1", fn1)}
+
+        result = fetch_with_fallback(
+            "price", provider_map, "k", 3600, cache_validate=lambda p: p.get("hold_schema") == 2
+        )
+
+        self.assertEqual(result, {"hold_schema": 2, "holdings": []})
+        fn1.assert_not_called()
+
+    @patch("src.python.fetcher.chain.cache_get")
+    @patch("src.python.fetcher.chain.cache_clear")
+    @patch("src.python.fetcher.chain.cache_set")
+    @patch("src.python.fetcher.chain._get_chain")
+    def test_cache_validate_rejects_legacy_payload(self, mock_chain, mock_set, mock_clear, mock_get):
+        """cache_validate 拒收旧语义载荷 → 清掉旧缓存并重取。
+
+        回归防线：只改载荷语义、不改键结构的修复，旧条目在 TTL 内会持续遮蔽修复；
+        准入判据不符时必须视为未命中（并清缓存，避免降级路径又把它捞回来）。
+        """
+        mock_chain.return_value = ["p1"]
+        mock_get.return_value = {"hold_schema": 1, "holdings": [{"name": "旧快照"}]}
+        fn1 = MagicMock(return_value={"hold_schema": 2, "holdings": []})
+        provider_map = {"p1": ("P1", fn1)}
+
+        result = fetch_with_fallback(
+            "price", provider_map, "k", 3600, cache_validate=lambda p: p.get("hold_schema") == 2
+        )
+
+        mock_clear.assert_called_once_with("k")
+        fn1.assert_called_once()
+        self.assertEqual(result, {"hold_schema": 2, "holdings": []})
+        mock_set.assert_called_once_with("k", {"hold_schema": 2, "holdings": []})
+
+    @patch("src.python.fetcher.chain.cache_get")
+    @patch("src.python.fetcher.chain._get_chain")
+    def test_cache_validate_rejects_legacy_stale(self, mock_chain, mock_get):
+        """过期降级条目同样须过准入判据；旧语义 → 不可用。"""
+        mock_chain.return_value = ["p1"]
+        # 第一次 cache_get（最新缓存）→ None；第二次（过期降级）→ 旧语义载荷
+        mock_get.side_effect = [None, {"hold_schema": 1}]
+        fn1 = MagicMock(side_effect=Exception("fail"))
+        provider_map = {"p1": ("P1", fn1)}
+
+        result = fetch_with_fallback(
+            "price", provider_map, "k", 3600, cache_validate=lambda p: p.get("hold_schema") == 2
+        )
+
+        self.assertIsNone(result)
 
     # ── Provider 成功路径 ────────────────────────────────
 
@@ -238,8 +295,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def validate(raw, provider):
             return provider == "p2" or raw.get("data") is not None
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, validate=validate)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, validate=validate)
 
         self.assertEqual(result, {"data": "ok"})
 
@@ -256,8 +312,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def validate(raw, provider):
             return True
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, validate=validate)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, validate=validate)
 
         self.assertEqual(result, {"data": "good"})
         fn2.assert_not_called()
@@ -277,8 +332,7 @@ class TestFetchWithFallback(unittest.TestCase):
                 raise ValueError("validation error")
             return True
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, validate=validate)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, validate=validate)
 
         self.assertEqual(result, {"data": "ok"})
 
@@ -297,8 +351,7 @@ class TestFetchWithFallback(unittest.TestCase):
         def transform(raw, source_label):
             return {"price": float(raw["price"]), "source": source_label}
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, transform=transform)
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform=transform)
 
         self.assertEqual(result, {"price": 100.0, "source": "P1"})
 
@@ -315,11 +368,11 @@ class TestFetchWithFallback(unittest.TestCase):
 
         def t1(raw, label):
             return {"price": int(raw["price"]) * 2, "from": label}
+
         def t2(raw, label):
             return {"price": int(raw["price"]) * 3, "from": label}
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
 
         # p1 成功，使用 t1 转换
         self.assertEqual(result, {"price": 200, "from": "P1"})
@@ -334,7 +387,8 @@ class TestFetchWithFallback(unittest.TestCase):
         provider_map = {"p1": ("P1", fn1)}
 
         result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, transform={"p_other": lambda r, l: None})
+            "price", provider_map, "test_key", 3600, transform={"p_other": lambda _r, _l: None}
+        )
 
         self.assertEqual(result, {"data": "raw"})
 
@@ -350,11 +404,11 @@ class TestFetchWithFallback(unittest.TestCase):
 
         def t1(raw, label):
             raise ValueError("p1 transform failed")
+
         def t2(raw, label):
             return {"data": raw["data"], "transformed": True}
 
-        result = fetch_with_fallback(
-            "price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
+        result = fetch_with_fallback("price", provider_map, "test_key", 3600, transform={"p1": t1, "p2": t2})
 
         self.assertEqual(result, {"data": "good", "transformed": True})
 
@@ -448,6 +502,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         """全部 provider 在熔断中 → True。"""
         from src.python.fetcher.chain import is_provider_chain_broken
         from src.python.core.provider_registry import get_registry
+
         mock_chain.return_value = ["p1", "p2"]
         reg = get_registry()
         reg.register_provider("p1", 2)
@@ -465,6 +520,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         """仅部分 provider 熔断 → False。"""
         from src.python.fetcher.chain import is_provider_chain_broken
         from src.python.core.provider_registry import get_registry
+
         mock_chain.return_value = ["p1", "p2"]
         reg = get_registry()
         reg.register_provider("p1", 2)
@@ -480,6 +536,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         """无 provider 熔断 → False。"""
         from src.python.fetcher.chain import is_provider_chain_broken
         from src.python.core.provider_registry import get_registry
+
         mock_chain.return_value = ["p1", "p2"]
         reg = get_registry()
         reg.register_provider("p1", 2)
@@ -490,6 +547,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
     def test_empty_chain(self, mock_chain):
         """空链 → True（无可用 provider）。"""
         from src.python.fetcher.chain import is_provider_chain_broken
+
         mock_chain.return_value = []
         self.assertTrue(is_provider_chain_broken("test"))
 
@@ -498,6 +556,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         """单 provider 链且已熔断 → True。"""
         from src.python.fetcher.chain import is_provider_chain_broken
         from src.python.core.provider_registry import get_registry
+
         mock_chain.return_value = ["p1"]
         reg = get_registry()
         reg.register_provider("p1", 2)
@@ -516,9 +575,9 @@ class TestHistoryIndexChain(unittest.TestCase):
         self.assertEqual(chain, ["tencent", "sina"])
 
     def test_history_stock_unaffected(self):
-        """新增 history_index 不影响 history_stock 链。"""
+        """history_stock 链固定为三段（腾讯 → 新浪 → 同花顺官方），不被指数链改动波及。"""
         chain = _get_chain("history_stock")
-        self.assertEqual(chain, ["tencent", "sina"])
+        self.assertEqual(chain, ["tencent", "sina", "hithink"])
 
     def test_call_history_provider_dispatches_index(self):
         """_call_history_provider("tencent", "history_index", ...) 调用 fetch_index_kline。"""
@@ -529,6 +588,22 @@ class TestHistoryIndexChain(unittest.TestCase):
             result = _call_history_provider("tencent", "history_index", "sh000300", 30, None)
             self.assertEqual(len(result), 1)
             mock_mod.fetch_index_kline.assert_called_once_with("sh000300", days=30, start_from=None)
+
+    def test_call_history_provider_dispatches_us_index(self):
+        """history_index_us 与 history_index 同走 fetch_index_kline。
+
+        回归：该链名此前不在 `_call_history_provider` 的任何分支里，直接落到
+        「无 未知函数 函数」告警并恒返回 []——链路看似配了 [sina, tencent]，实际
+        一个 provider 都不会被调用。
+        """
+        mock_mod = MagicMock()
+        mock_mod.fetch_index_kline = MagicMock(return_value=[{"date": "2026-07-01", "close": 5000.0}])
+
+        with patch("importlib.import_module", return_value=mock_mod):
+            result = _call_history_provider("tencent", "history_index_us", "gb_inx", 30, None)
+
+        self.assertEqual(len(result), 1)
+        mock_mod.fetch_index_kline.assert_called_once_with("gb_inx", days=30, start_from=None)
 
     def test_call_history_provider_stock_unaffected(self):
         """history_stock 仍调用 fetch_kline，不受历史指数分支影响。"""
@@ -561,13 +636,13 @@ class TestHistoryIndexChain(unittest.TestCase):
 
     def test_double_failure_returns_empty(self):
         """history_index 全链路失败 → 空列表（不缓存空结果）。"""
-        from src.python.fetcher.chain import fetch_with_incremental_fallback
 
         # mock 所有 provider 返回空
-        with patch("src.python.fetcher.chain.cache_get") as mock_cache_get, \
-             patch("src.python.fetcher.chain.cache_set") as mock_cache_set, \
-             patch("src.python.fetcher.chain._try_providers") as mock_try:
-
+        with (
+            patch("src.python.fetcher.chain.cache_get") as mock_cache_get,
+            patch("src.python.fetcher.chain.cache_set") as mock_cache_set,
+            patch("src.python.fetcher.chain._try_providers") as mock_try,
+        ):
             mock_cache_get.return_value = []
             mock_try.return_value = []  # 全链路失败
 
@@ -576,6 +651,70 @@ class TestHistoryIndexChain(unittest.TestCase):
             self.assertEqual(result, [])
             # 全链失败时不写缓存（空数据不缓存）
             mock_cache_set.assert_not_called()
+
+
+# ============================================================
+#  _missing_trading_days — K 线跳空判定以交易日为基准
+# ============================================================
+
+# 测试日历（2026 年 9-10 月片段）：09-16 ~ 09-25 与 10-01 ~ 10-07 为假期
+_TEST_CALENDAR = {
+    "2026-09-08",
+    "2026-09-09",
+    "2026-09-10",
+    "2026-09-11",
+    "2026-09-14",
+    "2026-09-15",
+    "2026-09-28",
+    "2026-09-29",
+    "2026-09-30",
+    "2026-10-08",
+    "2026-10-09",
+    "2026-10-12",
+}
+
+
+class TestMissingTradingDays(unittest.TestCase):
+    """K 线缺口统计（缺失的交易日数，不含两端）。"""
+
+    def _calendar(self):
+        return patch(
+            "src.python.core.trading_calendar._get_trading_calendar",
+            return_value=_TEST_CALENDAR,
+        )
+
+    def test_adjacent_trading_days_no_gap(self):
+        """相邻交易日 → 0 个缺失。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-10", "2026-09-11"), 0)
+
+    def test_weekend_not_a_gap(self):
+        """周五 → 下周一：跨越周末但无缺失（回归：自然日差为 3）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-11", "2026-09-14"), 0)
+
+    def test_long_holiday_not_a_gap(self):
+        """长假前后相邻交易日：8 个自然日但无缺失（回归：自然日差为 8）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-30", "2026-10-08"), 0)
+
+    def test_counts_missing_sessions(self):
+        """区间内缺失的交易日逐一计数（09-11/09-14/09-15 三个交易日的 K 线缺失）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-10", "2026-09-28"), 3)
+
+    def test_large_gap_counts_up(self):
+        """长区间缺口按交易日累计（用于 >5 交易日告警阈值判定）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days("2026-09-08", "2026-10-12"), 10)
+
+    def test_invalid_or_missing_dates(self):
+        """空值 / 格式非法 / 逆序 → 0（不告警）。"""
+        with self._calendar():
+            self.assertEqual(_missing_trading_days(None, "2026-09-11"), 0)
+            self.assertEqual(_missing_trading_days("2026-09-11", None), 0)
+            self.assertEqual(_missing_trading_days("bad", "2026-09-11"), 0)
+            self.assertEqual(_missing_trading_days("2026-09-11", "2026-09-10"), 0)
 
 
 if __name__ == "__main__":

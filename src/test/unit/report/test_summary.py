@@ -22,8 +22,8 @@ from unittest.mock import MagicMock, call, patch
 
 from src.python.report import summary as s
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -44,7 +44,10 @@ class TestWriteSection(unittest.TestCase):
         row = s._write_section(self.ws, 3, "【持仓概况】")
         self.assertEqual(row, 4)
         self.ws.merge_cells.assert_called_once_with(
-            start_row=3, start_column=1, end_row=3, end_column=8,
+            start_row=3,
+            start_column=1,
+            end_row=3,
+            end_column=8,
         )
 
     def test_write_section_styles(self):
@@ -79,13 +82,12 @@ class TestWriteKvRow(unittest.TestCase):
     def test_write_kv_row_colored(self, mock_data):
         """_write_kv_row_colored：写入 key/value 并应用字体到两列。"""
         from openpyxl.styles import Font
+
         red_font = Font(color="CC0000")
 
-        row = s._write_kv_row_colored(self.ws, 5, "价格更新状态",
-                                        "3/5 (尚有缺失)", red_font)
+        row = s._write_kv_row_colored(self.ws, 5, "价格更新状态", "3/5 (尚有缺失)", red_font)
         self.assertEqual(row, 6)
-        mock_data.assert_called_once_with(
-            self.ws, 5, ["价格更新状态", "3/5 (尚有缺失)"])
+        mock_data.assert_called_once_with(self.ws, 5, ["价格更新状态", "3/5 (尚有缺失)"])
 
         # 两列单元格都调用了 ws.cell
         calls = self.ws.cell.call_args_list
@@ -100,6 +102,7 @@ class TestWriteKvRow(unittest.TestCase):
     def test_write_kv_row_colored_blue(self, mock_data):
         """_write_kv_row_colored：蓝色字体正常应用。"""
         from openpyxl.styles import Font
+
         blue_font = Font(color="2E75B6")
 
         s._write_kv_row_colored(self.ws, 8, "状态", "全部已更新", blue_font)
@@ -192,9 +195,14 @@ class TestWriteSummarySheet(unittest.TestCase):
     # ── 辅助方法 ──────────────────────────────────────────
 
     def _call_summary_sheet(
-        self, ws,
-        total_mv, total_cost, total_profit, today_profit,
-        categories=None, update_status=None,
+        self,
+        ws,
+        total_mv,
+        total_cost,
+        total_profit,
+        today_profit,
+        categories=None,
+        update_status=None,
         a_indices: dict[str, dict[str, Any]] | None = None,
         us_indices: dict[str, dict[str, Any]] | None = None,
         fund_flow_data: dict | None = None,
@@ -204,23 +212,16 @@ class TestWriteSummarySheet(unittest.TestCase):
         使用 ExitStack 统一管理所有 patch 的生命周期。
         """
         with ExitStack() as stack:
-            mock_title = stack.enter_context(
-                patch("src.python.report.summary.write_title_row", return_value=3))
-            mock_header = stack.enter_context(
-                patch("src.python.report.summary.write_header_row", return_value=4))
-            mock_data = stack.enter_context(
-                patch("src.python.report.summary.write_data_row"))
-            mock_freeze = stack.enter_context(
-                patch("src.python.report.summary.freeze_header"))
-            mock_auto = stack.enter_context(
-                patch("src.python.report.summary.auto_width"))
+            mock_title = stack.enter_context(patch("src.python.report.summary.write_title_row", return_value=3))
+            mock_header = stack.enter_context(patch("src.python.report.summary.write_header_row", return_value=4))
+            mock_data = stack.enter_context(patch("src.python.report.summary.write_data_row"))
+            mock_freeze = stack.enter_context(patch("src.python.report.summary.freeze_header"))
+            mock_auto = stack.enter_context(patch("src.python.report.summary.auto_width"))
             mock_day = stack.enter_context(
-                patch("src.python.report.summary.get_last_trading_day",
-                       return_value="2026-06-26"))
-            mock_dt = stack.enter_context(
-                patch("src.python.report.summary.datetime"))
-            mock_pfont = stack.enter_context(
-                patch("src.python.report.summary.profit_font"))
+                patch("src.python.report.summary.get_last_trading_day", return_value="2026-06-26")
+            )
+            mock_dt = stack.enter_context(patch("src.python.report.summary.datetime"))
+            mock_pfont = stack.enter_context(patch("src.python.report.summary.profit_font"))
 
             # 固定 datetime.now() 输出
             mock_now = MagicMock()
@@ -230,9 +231,15 @@ class TestWriteSummarySheet(unittest.TestCase):
             mock_dt.now.return_value = mock_now
 
             s.write_summary_sheet(
-                ws, total_mv, total_cost, total_profit, today_profit,
-                categories=categories, update_status=update_status,
-                a_indices=a_indices, us_indices=us_indices,
+                ws,
+                total_mv,
+                total_cost,
+                total_profit,
+                today_profit,
+                categories=categories,
+                update_status=update_status,
+                a_indices=a_indices,
+                us_indices=us_indices,
                 fund_flow_data=fund_flow_data,
             )
 
@@ -282,10 +289,10 @@ class TestWriteSummarySheet(unittest.TestCase):
         # today_rate = 5000/145000*100 ≈ 3.45%
 
         self.categories = {
-            "场内股票": ["s1", "s2"],              # 2
-            "场内ETF": ["e1", "e2", "e3"],          # 3
-            "国内场外": ["f1"],                      # 1
-            "QDII": ["q1"],                          # 1
+            "场内股票": ["s1", "s2"],  # 2
+            "场内ETF": ["e1", "e2", "e3"],  # 3
+            "国内场外": ["f1"],  # 1
+            "QDII": ["q1"],  # 1
         }  # 合计 7
 
         self.update_done = (5, 5, True)
@@ -293,25 +300,17 @@ class TestWriteSummarySheet(unittest.TestCase):
         self.update_empty = (0, 0, True)
 
         self.a_indices = {
-            "sh000001": {"name": "上证指数", "price": 3200.50,
-                          "yesterday_close": 3180.00, "change_pct": 0.64},
-            "sz399001": {"name": "深证成指", "price": 10500.00,
-                          "yesterday_close": 10450.00, "change_pct": 0.48},
-            "sh000300": {"name": "沪深300", "price": 4200.00,
-                          "yesterday_close": 4180.00, "change_pct": 0.48},
-            "sh000688": {"name": "科创板50", "price": 950.00,
-                          "yesterday_close": 940.00, "change_pct": 1.06},
-            "sz399006": {"name": "创业板指", "price": 2100.00,
-                          "yesterday_close": 2080.00, "change_pct": 0.96},
+            "sh000001": {"name": "上证指数", "price": 3200.50, "yesterday_close": 3180.00, "change_pct": 0.64},
+            "sz399001": {"name": "深证成指", "price": 10500.00, "yesterday_close": 10450.00, "change_pct": 0.48},
+            "sh000300": {"name": "沪深300", "price": 4200.00, "yesterday_close": 4180.00, "change_pct": 0.48},
+            "sh000688": {"name": "科创板50", "price": 950.00, "yesterday_close": 940.00, "change_pct": 1.06},
+            "sz399006": {"name": "创业板指", "price": 2100.00, "yesterday_close": 2080.00, "change_pct": 0.96},
         }
 
         self.us_indices = {
-            "gb_dji": {"name": "道琼斯", "price": 38000.00,
-                        "yesterday_close": 37900.00, "change_pct": 0.26},
-            "gb_ixic": {"name": "纳斯达克", "price": 16500.00,
-                         "yesterday_close": 16400.00, "change_pct": 0.61},
-            "gb_inx": {"name": "标普500", "price": 5100.00,
-                        "yesterday_close": 5080.00, "change_pct": 0.39},
+            "gb_dji": {"name": "道琼斯", "price": 38000.00, "yesterday_close": 37900.00, "change_pct": 0.26},
+            "gb_ixic": {"name": "纳斯达克", "price": 16500.00, "yesterday_close": 16400.00, "change_pct": 0.61},
+            "gb_inx": {"name": "标普500", "price": 5100.00, "yesterday_close": 5080.00, "change_pct": 0.39},
         }
 
     # ════════════════════════════════════════════════════════
@@ -321,7 +320,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_basic_info_rows(self):
         """基本信息：统计时间 + 所属交易日写入。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
         )
         pairs = self._data_pairs(mocks["mock_data"])
@@ -331,7 +334,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_title_and_header(self):
         """标题行 + 表头行被调用。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
         )
         mocks["mock_title"].assert_called_once_with(self.ws, 1, "投资分析汇总", 8)
@@ -344,7 +351,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_categories_written(self):
         """各类别 + 持仓总数正确渲染。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
         )
         pairs = self._data_pairs(mocks["mock_data"])
@@ -357,7 +368,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_categories_none(self):
         """categories=None -> 持仓总数显示 --。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=None,
         )
         pairs = self._data_pairs(mocks["mock_data"])
@@ -366,7 +381,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_categories_empty_dict(self):
         """categories={} -> 空字典为 falsy，走 else 分支显示 --。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories={},
         )
         pairs = self._data_pairs(mocks["mock_data"])
@@ -377,7 +396,11 @@ class TestWriteSummarySheet(unittest.TestCase):
         """部分分类无数据：仅有场内股票和 QDII。"""
         partial = {"场内股票": ["s1"], "QDII": ["q1", "q2"]}
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=partial,
         )
         pairs = self._data_pairs(mocks["mock_data"])
@@ -394,50 +417,82 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_update_status_done(self):
         """全部更新（5/5 True）-> 蓝字 + '全部已更新'。"""
         self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             update_status=self.update_done,
         )
         self._assert_pairs_contain(
-            self._data_pairs(self._call_summary_sheet(
-                self.ws, self.mv, self.cost, self.profit, self.today,
-                categories=self.categories,
-                update_status=self.update_done,
-            )["mock_data"]),
-            "价格更新状态", "5/5  (全部已更新)",
+            self._data_pairs(
+                self._call_summary_sheet(
+                    self.ws,
+                    self.mv,
+                    self.cost,
+                    self.profit,
+                    self.today,
+                    categories=self.categories,
+                    update_status=self.update_done,
+                )["mock_data"]
+            ),
+            "价格更新状态",
+            "5/5  (全部已更新)",
         )
 
     def test_update_status_partial(self):
         """部分更新（3/5 False）-> 红字 + '尚有缺失'。"""
         self._assert_pairs_contain(
-            self._data_pairs(self._call_summary_sheet(
-                self.ws, self.mv, self.cost, self.profit, self.today,
-                categories=self.categories,
-                update_status=self.update_partial,
-            )["mock_data"]),
-            "价格更新状态", "3/5  (尚有缺失)",
+            self._data_pairs(
+                self._call_summary_sheet(
+                    self.ws,
+                    self.mv,
+                    self.cost,
+                    self.profit,
+                    self.today,
+                    categories=self.categories,
+                    update_status=self.update_partial,
+                )["mock_data"]
+            ),
+            "价格更新状态",
+            "3/5  (尚有缺失)",
         )
 
     def test_update_status_zero_total(self):
         """总数为 0 -> 显示 --。"""
         self._assert_pairs_contain(
-            self._data_pairs(self._call_summary_sheet(
-                self.ws, self.mv, self.cost, self.profit, self.today,
-                categories=self.categories,
-                update_status=self.update_empty,
-            )["mock_data"]),
-            "价格更新状态", "--",
+            self._data_pairs(
+                self._call_summary_sheet(
+                    self.ws,
+                    self.mv,
+                    self.cost,
+                    self.profit,
+                    self.today,
+                    categories=self.categories,
+                    update_status=self.update_empty,
+                )["mock_data"]
+            ),
+            "价格更新状态",
+            "--",
         )
 
     def test_update_status_none(self):
         """update_status=None -> 显示 --。"""
         self._assert_pairs_contain(
-            self._data_pairs(self._call_summary_sheet(
-                self.ws, self.mv, self.cost, self.profit, self.today,
-                categories=self.categories,
-                update_status=None,
-            )["mock_data"]),
-            "价格更新状态", "--",
+            self._data_pairs(
+                self._call_summary_sheet(
+                    self.ws,
+                    self.mv,
+                    self.cost,
+                    self.profit,
+                    self.today,
+                    categories=self.categories,
+                    update_status=None,
+                )["mock_data"]
+            ),
+            "价格更新状态",
+            "--",
         )
 
     # ════════════════════════════════════════════════════════
@@ -447,7 +502,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_profit_summary_values(self):
         """盈亏汇总 6 行数据计算正确。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
         )
         pairs = self._data_pairs(mocks["mock_data"])
@@ -462,7 +521,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_profit_font_called_for_profit_value(self):
         """总盈亏 >0 时 profit_font 被调用。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
         )
         mocks["mock_profit_font"].assert_any_call(30000.0)
@@ -471,7 +534,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_profit_font_negative(self):
         """总盈亏 <0 时 profit_font 被调用并传入负值。"""
         mocks = self._call_summary_sheet(
-            self.ws, 80000.0, 100000.0, -20000.0, -3000.0,
+            self.ws,
+            80000.0,
+            100000.0,
+            -20000.0,
+            -3000.0,
             categories=self.categories,
         )
         mocks["mock_profit_font"].assert_any_call(-20000.0)
@@ -480,7 +547,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_profit_font_rate_positive(self):
         """收益率正数时 profit_font 传入原始浮点数值（不经字符串格式化舍入）。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
         )
         # 总收益率 25.0% → 小数 0.25
@@ -491,7 +562,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_profit_font_rate_negative(self):
         """收益率负值时 profit_font 传入原始浮点数值（不经字符串格式化舍入）。"""
         mocks = self._call_summary_sheet(
-            self.ws, 90000.0, 100000.0, -10000.0, -2000.0,
+            self.ws,
+            90000.0,
+            100000.0,
+            -10000.0,
+            -2000.0,
             categories=self.categories,
         )
         # profit_rate = -10.0% → 小数 -0.10
@@ -502,7 +577,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_zero_cost_edge_case(self):
         """总成本为 0 时 profit_rate = 0.0，不除零。"""
         mocks = self._call_summary_sheet(
-            self.ws, 10000.0, 0.0, 10000.0, 500.0,
+            self.ws,
+            10000.0,
+            0.0,
+            10000.0,
+            500.0,
             categories=self.categories,
         )
         pairs = self._data_pairs(mocks["mock_data"])
@@ -519,7 +598,11 @@ class TestWriteSummarySheet(unittest.TestCase):
         """开关开启且有 XIRR 数值时，盈亏汇总末尾追加「资金加权收益率 (XIRR)」行。"""
         fund_flow = {"available": True, "xirr": {"rate": 0.1234, "ok": True, "message": ""}}
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             fund_flow_data=fund_flow,
         )
@@ -530,7 +613,11 @@ class TestWriteSummarySheet(unittest.TestCase):
         """开关开启但无可用现金流（xirr.rate=None）时写占位文本「未录入流水/无法计算」。"""
         fund_flow = {"available": False, "xirr": {"rate": None, "ok": False, "message": "no flows"}}
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             fund_flow_data=fund_flow,
         )
@@ -545,8 +632,12 @@ class TestWriteSummarySheet(unittest.TestCase):
             "cost_tiers": {"available": False, "per_code": {}},
             "dividends": {"available": False, "per_code": {}},
         }
-        mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+        self._call_summary_sheet(
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             fund_flow_data=fund_flow,
         )
@@ -561,7 +652,11 @@ class TestWriteSummarySheet(unittest.TestCase):
         """快照近似（approximate=True）且 XIRR 可用 → 标签加注「，近似」。"""
         fund_flow = {"available": True, "approximate": True, "xirr": {"rate": 0.09}}
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             fund_flow_data=fund_flow,
         )
@@ -572,7 +667,11 @@ class TestWriteSummarySheet(unittest.TestCase):
         """快照近似未配置建仓日期（approximate=True，xirr=None）→ 占位「未配置建仓日期/无法计算」。"""
         fund_flow = {"available": True, "approximate": True, "xirr": None}
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             fund_flow_data=fund_flow,
         )
@@ -588,8 +687,12 @@ class TestWriteSummarySheet(unittest.TestCase):
             "cost_tiers": {"available": True, "per_code": {}},
             "dividends": {"available": False, "per_code": {}},
         }
-        mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+        self._call_summary_sheet(
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             fund_flow_data=fund_flow,
         )
@@ -602,7 +705,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_no_xirr_row_when_flow_disabled(self):
         """开关关闭（fund_flow_data=None）时盈亏汇总不含 XIRR 行，保持既有输出。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             fund_flow_data=None,
         )
@@ -621,7 +728,11 @@ class TestWriteSummarySheet(unittest.TestCase):
         因本日和上日使用相同的 key，通过位置索引区分。
         """
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             a_indices=self.a_indices,
         )
@@ -638,7 +749,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_a_indices_yesterday_values(self):
         """A 股指数上日收盘写入。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             a_indices=self.a_indices,
         )
@@ -655,13 +770,15 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_a_indices_negative_change(self):
         """A 股指数负涨跌幅正确显示符号。"""
         a_down = {
-            "sh000001": {"name": "上证指数", "price": 3100.00,
-                          "yesterday_close": 3200.00, "change_pct": -3.12},
-            "sz399001": {"name": "深证成指", "price": 10000.00,
-                          "yesterday_close": 10500.00, "change_pct": -4.76},
+            "sh000001": {"name": "上证指数", "price": 3100.00, "yesterday_close": 3200.00, "change_pct": -3.12},
+            "sz399001": {"name": "深证成指", "price": 10000.00, "yesterday_close": 10500.00, "change_pct": -4.76},
         }
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             a_indices=a_down,
         )
@@ -675,13 +792,15 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_a_indices_missing_code(self):
         """A 股缺失某个代码 -> 显示 --。"""
         partial = {
-            "sh000001": {"name": "上证指数", "price": 3200.50,
-                          "yesterday_close": 3180.00, "change_pct": 0.64},
-            "sh000300": {"name": "沪深300", "price": 4200.00,
-                          "yesterday_close": 4180.00, "change_pct": 0.48},
+            "sh000001": {"name": "上证指数", "price": 3200.50, "yesterday_close": 3180.00, "change_pct": 0.64},
+            "sh000300": {"name": "沪深300", "price": 4200.00, "yesterday_close": 4180.00, "change_pct": 0.48},
         }
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             a_indices=partial,
         )
@@ -698,11 +817,14 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_a_indices_zero_price(self):
         """A 股价格 <=0 视为无效 -> 本日显示 --，上日仍有值。"""
         zero_price = {
-            "sh000001": {"name": "上证指数", "price": 0,
-                          "yesterday_close": 3200.00, "change_pct": 0},
+            "sh000001": {"name": "上证指数", "price": 0, "yesterday_close": 3200.00, "change_pct": 0},
         }
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             a_indices=zero_price,
         )
@@ -720,7 +842,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_a_indices_none(self):
         """a_indices=None -> '暂无数据'。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             a_indices=None,
             us_indices=None,
@@ -735,7 +861,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_us_indices_today_values(self):
         """美股指数最新行情写入。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             us_indices=self.us_indices,
         )
@@ -750,7 +880,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_us_indices_yesterday_values(self):
         """美股指数上日收盘写入。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             us_indices=self.us_indices,
         )
@@ -765,11 +899,14 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_us_indices_missing_code(self):
         """美股缺失某个代码 -> 显示 --。"""
         partial = {
-            "gb_dji": {"name": "道琼斯", "price": 38000.00,
-                        "yesterday_close": 37900.00, "change_pct": 0.26},
+            "gb_dji": {"name": "道琼斯", "price": 38000.00, "yesterday_close": 37900.00, "change_pct": 0.26},
         }
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             us_indices=partial,
         )
@@ -784,7 +921,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_us_indices_none(self):
         """us_indices=None -> '暂无数据'。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             us_indices=None,
         )
@@ -798,7 +939,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_both_indices_together(self):
         """A 股 + 美股同时出现，各行均写入。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             a_indices=self.a_indices,
             us_indices=self.us_indices,
@@ -824,7 +969,11 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_freeze_and_auto_width_called(self):
         """freeze_header 和 auto_width 在末尾被调用。"""
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
         )
         mocks["mock_freeze"].assert_called_once_with(self.ws, 2)
@@ -833,24 +982,28 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_worksheet_title_not_overwritten(self):
         """写入器不修改页签标题（职责在 _create_sheets）。"""
         self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
         )
         self.assertEqual(self.ws.title, "fixture_title")
 
     def test_section_headers_written(self):
         """三个章节标题（持仓概况/盈亏汇总/市场指数）通过 section 写入。"""
         self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=self.categories,
             a_indices=self.a_indices,
             us_indices=self.us_indices,
         )
         # 提取 _write_section 中 ws.cell 的 value 参数
-        cell_values = [
-            c[1]["value"]
-            for c in self.ws.cell.call_args_list
-            if "value" in c[1]
-        ]
+        cell_values = [c[1]["value"] for c in self.ws.cell.call_args_list if "value" in c[1]]
         self.assertIn("【持仓概况】", cell_values)
         self.assertIn("【盈亏汇总】", cell_values)
         self.assertIn("【市场指数】", cell_values)
@@ -858,16 +1011,16 @@ class TestWriteSummarySheet(unittest.TestCase):
     def test_section_headers_without_data(self):
         """无分类/无指数时仍写入章节标题。"""
         self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=None,
             a_indices=None,
             us_indices=None,
         )
-        cell_values = [
-            c[1]["value"]
-            for c in self.ws.cell.call_args_list
-            if "value" in c[1]
-        ]
+        cell_values = [c[1]["value"] for c in self.ws.cell.call_args_list if "value" in c[1]]
         self.assertIn("【持仓概况】", cell_values)
         self.assertIn("【盈亏汇总】", cell_values)
         self.assertIn("【市场指数】", cell_values)
@@ -882,7 +1035,11 @@ class TestWriteSummarySheet(unittest.TestCase):
             "期货": ["f1"],  # 额外 key，应被忽略
         }
         mocks = self._call_summary_sheet(
-            self.ws, self.mv, self.cost, self.profit, self.today,
+            self.ws,
+            self.mv,
+            self.cost,
+            self.profit,
+            self.today,
             categories=extra,
         )
         pairs = self._data_pairs(mocks["mock_data"])
@@ -907,6 +1064,7 @@ class TestWriteModuleDataRows(unittest.TestCase):
 
     def setUp(self):
         import openpyxl
+
         self.wb = openpyxl.Workbook()
         self.ws = self.wb.active
         self.start_row = 5
@@ -927,14 +1085,25 @@ class TestWriteModuleDataRows(unittest.TestCase):
 
     def test_cache_hit_row(self):
         """缓存命中 → 蓝字'缓存'、费用'已计入原调用'、缓存✓、Thinking—。"""
-        rows, end = self._run([
-            {"key": "global_macro", "name": "全球政经局势",
-             "status": "cached", "status_label": "缓存",
-             "model": "deepseek-v4-flash",
-             "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-             "cache_hit_tokens": 500, "cost": 0.0, "cached": True,
-             "thinking": False, "endpoint": ""},
-        ])
+        rows, end = self._run(
+            [
+                {
+                    "key": "global_macro",
+                    "name": "全球政经局势",
+                    "status": "cached",
+                    "status_label": "缓存",
+                    "model": "deepseek-v4-flash",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "cache_hit_tokens": 500,
+                    "cost": 0.0,
+                    "cached": True,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+            ]
+        )
         self.assertIn(self.start_row, rows)
         r = rows[self.start_row]
         self.assertEqual(r[1], "全球政经局势")
@@ -946,22 +1115,33 @@ class TestWriteModuleDataRows(unittest.TestCase):
 
     def test_success_with_thinking_row(self):
         """真实调用+Thinking → 绿字'成功'、费用¥、缓存—、Thinking✓。"""
-        rows, end = self._run([
-            {"key": "expert_review", "name": "智囊团深度复盘",
-             "status": "success", "status_label": "成功",
-             "model": "claude-sonnet-4",
-             "input_tokens": 1500, "output_tokens": 800, "total_tokens": 2300,
-             "cache_hit_tokens": 0, "cost": 0.005, "cached": False,
-             "thinking": True, "endpoint": ""},
-        ])
+        rows, end = self._run(
+            [
+                {
+                    "key": "expert_review",
+                    "name": "智囊团深度复盘",
+                    "status": "success",
+                    "status_label": "成功",
+                    "model": "claude-sonnet-4",
+                    "input_tokens": 1500,
+                    "output_tokens": 800,
+                    "total_tokens": 2300,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.005,
+                    "cached": False,
+                    "thinking": True,
+                    "endpoint": "",
+                },
+            ]
+        )
         r = rows[self.start_row]
         self.assertEqual(r[1], "智囊团深度复盘")
         self.assertEqual(r[2], "成功")
         self.assertEqual(r[3], "claude-sonnet-4")
-        self.assertEqual(r[4], "2,300")   # total_tokens 格式化
+        self.assertEqual(r[4], "2,300")  # total_tokens 格式化
         self.assertEqual(r[5], "1,500")
         self.assertEqual(r[6], "800")
-        self.assertEqual(r[7], "—")       # cache_hit_tokens=0 → —
+        self.assertEqual(r[7], "—")  # cache_hit_tokens=0 → —
         self.assertIsInstance(r[8], str)
         self.assertIn("¥", str(r[8]))
         self.assertEqual(r[9], "—")
@@ -969,13 +1149,25 @@ class TestWriteModuleDataRows(unittest.TestCase):
 
     def test_disabled_row(self):
         """禁用 → 灰字、模型—、费用—、缓存—、Thinking—。"""
-        rows, end = self._run([
-            {"key": "health_check", "name": "持仓体检报告",
-             "status": "disabled", "status_label": "已禁用",
-             "model": "", "input_tokens": 0, "output_tokens": 0,
-             "total_tokens": 0, "cache_hit_tokens": 0, "cost": 0.0,
-             "cached": False, "thinking": False, "endpoint": ""},
-        ])
+        rows, end = self._run(
+            [
+                {
+                    "key": "health_check",
+                    "name": "持仓体检报告",
+                    "status": "disabled",
+                    "status_label": "已禁用",
+                    "model": "",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.0,
+                    "cached": False,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+            ]
+        )
         r = rows[self.start_row]
         self.assertEqual(r[1], "持仓体检报告")
         self.assertEqual(r[2], "已禁用")
@@ -986,48 +1178,119 @@ class TestWriteModuleDataRows(unittest.TestCase):
 
     def test_failed_row(self):
         """失败 → 红字错误原因。"""
-        rows, end = self._run([
-            {"key": "penetration_deep", "name": "穿透深度分析",
-             "status": "failed", "status_label": "LLM API 调用失败",
-             "model": "", "input_tokens": 0, "output_tokens": 0,
-             "total_tokens": 0, "cache_hit_tokens": 0, "cost": 0.0,
-             "cached": False, "thinking": False, "endpoint": ""},
-        ])
+        rows, end = self._run(
+            [
+                {
+                    "key": "penetration_deep",
+                    "name": "穿透深度分析",
+                    "status": "failed",
+                    "status_label": "LLM API 调用失败",
+                    "model": "",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.0,
+                    "cached": False,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+            ]
+        )
         r = rows[self.start_row]
         self.assertEqual(r[2], "LLM API 调用失败")
         self.assertEqual(r[3], "—")
 
     def test_no_status_label_skipped(self):
         """status_label 为空 → 跳过该行，不写入。"""
-        rows, end = self._run([
-            {"key": "unknown", "name": "未知模块", "status": "unknown",
-             "status_label": "", "model": "", "input_tokens": 0,
-             "output_tokens": 0, "total_tokens": 0, "cache_hit_tokens": 0,
-             "cost": 0.0, "cached": False, "thinking": False, "endpoint": ""},
-        ])
+        rows, end = self._run(
+            [
+                {
+                    "key": "unknown",
+                    "name": "未知模块",
+                    "status": "unknown",
+                    "status_label": "",
+                    "model": "",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.0,
+                    "cached": False,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+            ]
+        )
         self.assertEqual(end, self.start_row)
         self.assertNotIn(self.start_row, rows)
 
     def test_mixed_rows(self):
         """4 种状态混合 → 各行正确渲染，行号递增。"""
-        rows, end = self._run([
-            {"key": "gm", "name": "全球政经局势", "status": "cached",
-             "status_label": "缓存", "model": "ds", "cached": True,
-             "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-             "cache_hit_tokens": 500, "cost": 0.0, "thinking": False, "endpoint": ""},
-            {"key": "er", "name": "智囊团深度复盘", "status": "success",
-             "status_label": "成功", "model": "claude", "cached": False,
-             "input_tokens": 1000, "output_tokens": 500, "total_tokens": 1500,
-             "cache_hit_tokens": 0, "cost": 0.003, "thinking": True, "endpoint": ""},
-            {"key": "hc", "name": "持仓体检报告", "status": "disabled",
-             "status_label": "已禁用", "model": "", "cached": False,
-             "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-             "cache_hit_tokens": 0, "cost": 0.0, "thinking": False, "endpoint": ""},
-            {"key": "pd", "name": "穿透深度分析", "status": "failed",
-             "status_label": "LLM API 调用失败", "model": "", "cached": False,
-             "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
-             "cache_hit_tokens": 0, "cost": 0.0, "thinking": False, "endpoint": ""},
-        ])
+        rows, end = self._run(
+            [
+                {
+                    "key": "gm",
+                    "name": "全球政经局势",
+                    "status": "cached",
+                    "status_label": "缓存",
+                    "model": "ds",
+                    "cached": True,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "cache_hit_tokens": 500,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+                {
+                    "key": "er",
+                    "name": "智囊团深度复盘",
+                    "status": "success",
+                    "status_label": "成功",
+                    "model": "claude",
+                    "cached": False,
+                    "input_tokens": 1000,
+                    "output_tokens": 500,
+                    "total_tokens": 1500,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.003,
+                    "thinking": True,
+                    "endpoint": "",
+                },
+                {
+                    "key": "hc",
+                    "name": "持仓体检报告",
+                    "status": "disabled",
+                    "status_label": "已禁用",
+                    "model": "",
+                    "cached": False,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+                {
+                    "key": "pd",
+                    "name": "穿透深度分析",
+                    "status": "failed",
+                    "status_label": "LLM API 调用失败",
+                    "model": "",
+                    "cached": False,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "cache_hit_tokens": 0,
+                    "cost": 0.0,
+                    "thinking": False,
+                    "endpoint": "",
+                },
+            ]
+        )
         self.assertEqual(end, self.start_row + 4)
         self.assertEqual(rows[self.start_row][1], "全球政经局势")
         self.assertEqual(rows[self.start_row + 1][1], "智囊团深度复盘")
@@ -1039,4 +1302,3 @@ class TestWriteModuleDataRows(unittest.TestCase):
         self.assertIn("¥", str(rows[self.start_row + 1][8]))
         # 成功行 Thinking
         self.assertEqual(rows[self.start_row + 1][10], "✓")
-

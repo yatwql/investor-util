@@ -11,7 +11,7 @@
   无需扩展现有报告生成函数的参数表，HTML 与 Excel 两条输出路径同时生效。
 - **只读分级**：判定依据全部来自内容本身（正文长度、必需章节标记、降级
   占位签名），不引入额外数据依赖，也不写回缓存（缓存内容保持原样）。
-- **实验开关**：由 ``features.module_quality_gate`` 控制，默认关闭。
+- **开关**：由 ``features.module_quality_gate`` 控制（常规开关，默认开启）。
 
 分级口径（A~F，自上而下首个命中者胜出）：
 
@@ -41,7 +41,7 @@ from src.python.report.llm_content import _strip_html
 
 logger = logging.getLogger("invest")
 
-# 实验开关名（注册于 src/python/config/features.py）
+# 开关名（注册于 src/python/config/features.py）
 _FEATURE_FLAG = "module_quality_gate"
 
 # 承载评级的模块顺序，与 llm_content 四元组位置一一对应

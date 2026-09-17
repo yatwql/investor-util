@@ -16,12 +16,13 @@ A 股市场当前是否在交易时段。
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from src.python.core.constants import BEIJING_TZ
+from datetime import datetime
 
 logger = logging.getLogger("invest")
 
 # ── 北京时区常量 ──────────────────────────────────────────
-_BJ_TZ = timezone(timedelta(hours=8))
+_BJ_TZ = BEIJING_TZ  # 项目统一北京时间口径（单一事实来源见 core.constants）
 
 # ── A 股交易时段（内置默认值，用于 fallback） ───────────
 # 早盘 09:30 (570min) – 11:30 (690min)

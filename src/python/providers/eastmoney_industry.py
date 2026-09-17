@@ -172,9 +172,12 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
         "industry_id": _extract_industry(inner, "f198"),
         "concepts": _extract_concept_list(inner),
         "concept_ids": [],
-        # 扩展估值字段（f9=动态市盈率, f23=市净率）：供估值分位子模块复用，
-        # 同一次 push2 请求带出，不重复发请求（复用既有请求通道纪律）。
+        # 扩展行情字段（f9=动态市盈率, f20=总市值, f23=市净率）：三者与行业分类
+        # 同属一次 push2 请求的响应（见 _FIELDS），故一并带出。消费方（估值分位、
+        # 基金风格）直接取用即可，**不得**为拿这些字段再发一次同参数请求——
+        # 那正是会话缓存要消除的重复取数。
         "pe": _extract_number(inner, "f9"),
+        "market_cap": _extract_number(inner, "f20"),
         "pb": _extract_number(inner, "f23"),
     }
 
@@ -183,24 +186,6 @@ def fetch_industry_and_concepts(code: str) -> dict[str, Any] | None:
     )
     reg.session_cache_set("industry", code, result)
     return result
-
-
-def fetch_valuation_fields(code: str) -> dict[str, float | None] | None:
-    """获取一只证券的当前 PE/PB（东财 push2 扩展字段）。
-
-    复用 ``fetch_industry_and_concepts`` 的 push2 请求与会话缓存——同一代码
-    同一会话内不重复发起 HTTP 请求（复用既有 push2 请求通道纪律）。
-
-    Args:
-        code: 6 位证券代码
-
-    Returns:
-        {"pe": float|None, "pb": float|None}；API 异常返回 None。
-    """
-    result = fetch_industry_and_concepts(code)
-    if result is None:
-        return None
-    return {"pe": result.get("pe"), "pb": result.get("pb")}
 
 
 def fetch_industry(code: str) -> str | None:

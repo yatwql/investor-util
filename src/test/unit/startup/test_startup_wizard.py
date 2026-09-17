@@ -18,8 +18,6 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
-
 from src.python import startup_wizard
 from src.python.config._llm_providers import (
     _get_llm_key_path,
@@ -35,6 +33,8 @@ from src.python.startup_wizard import (
     mark_wizard_shown,
     show_startup_wizard_if_needed,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_ui]
 
 
 def _key_path() -> Path:
@@ -138,8 +138,9 @@ class TestWriteLlmKeyFlat:
 
     def test_writes_model_and_endpoint(self):
         """带 model/endpoint → 一并写入。"""
-        _write_llm_key_flat("sk-x", provider="claude", model="claude-sonnet-4-6",
-                            endpoint="https://api.deepseek.com/anthropic")
+        _write_llm_key_flat(
+            "sk-x", provider="claude", model="claude-sonnet-4-6", endpoint="https://api.deepseek.com/anthropic"
+        )
         creds = _load_llm_key_credentials()["_default"]
         assert creds["model"] == "claude-sonnet-4-6"
         assert creds["endpoint"] == "https://api.deepseek.com/anthropic"
@@ -206,7 +207,8 @@ class TestShowStartupWizard:
         """全部就绪 → 打印"一切就绪"。"""
         self._interactive(monkeypatch)
         monkeypatch.setattr(
-            startup_wizard, "_detect_startup_state",
+            startup_wizard,
+            "_detect_startup_state",
             lambda config: {"holdings_ok": True, "llm_key_ok": True, "llm_degraded": False},
         )
         show_startup_wizard_if_needed()
@@ -216,9 +218,11 @@ class TestShowStartupWizard:
         """交互输入 Key → 原子写入 llm_key.json。"""
         self._interactive(monkeypatch)
         # 无持仓、无凭据 → 降级提示路径；用户选择 y 并输入 key
-        monkeypatch.setattr(startup_wizard, "_detect_startup_state",
-                            lambda config: {"holdings_ok": False, "llm_key_ok": False,
-                                            "llm_degraded": True})
+        monkeypatch.setattr(
+            startup_wizard,
+            "_detect_startup_state",
+            lambda config: {"holdings_ok": False, "llm_key_ok": False, "llm_degraded": True},
+        )
         answers = iter(["y", "sk-interactive"])  # 先答 y，再输入 key
         monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))
         show_startup_wizard_if_needed()
@@ -232,9 +236,11 @@ class TestShowStartupWizard:
     def test_user_skips_key(self, monkeypatch, capsys):
         """用户选择跳过 Key 输入 → 不写文件。"""
         self._interactive(monkeypatch)
-        monkeypatch.setattr(startup_wizard, "_detect_startup_state",
-                            lambda config: {"holdings_ok": True, "llm_key_ok": False,
-                                            "llm_degraded": True})
+        monkeypatch.setattr(
+            startup_wizard,
+            "_detect_startup_state",
+            lambda config: {"holdings_ok": True, "llm_key_ok": False, "llm_degraded": True},
+        )
         # 第一次 input 是"现在配置 LLM Key?[y/N]" → n；第二次不会再触发
         monkeypatch.setattr("builtins.input", lambda prompt="": "n")
         show_startup_wizard_if_needed()

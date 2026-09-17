@@ -21,12 +21,12 @@ import unittest
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
 from src.test.unit.report.test_html_report_structure import (
     _build_minimal_render_data,
     _render_template,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 # 行动建议章节（type=action，enable_action 默认开）与智囊团深度复盘章节（行动摘要宿主）
 _ACTION_SECTION = {"key": "action", "name": "行动建议", "number": 17, "type": "action"}

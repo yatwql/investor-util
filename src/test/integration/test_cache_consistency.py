@@ -11,7 +11,6 @@ from unittest.mock import patch
 
 import pytest
 
-from src.python.core.models import Holding
 
 pytestmark = [pytest.mark.integration, pytest.mark.integration_cache]
 
@@ -27,6 +26,7 @@ class TestCrossModuleCacheConsistency(unittest.TestCase):
     def test_fetch_market_data_cache_prefix(self):
         """fetch_market_data 使用正确缓存前缀，不同前缀不冲突。"""
         from src.python.fetcher.price import _price_cache_key
+
         key = _price_cache_key("600519")
         self.assertIn("price_", key)
         self.assertEqual(key, "price_600519")
@@ -41,9 +41,12 @@ class TestCrossModuleCacheConsistency(unittest.TestCase):
 
         cache_key = "price_600519"
         cached_data = {
-            "price": 160.0, "yesterday_close": 158.0,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "贵州茅台", "code": "600519",
+            "price": 160.0,
+            "yesterday_close": 158.0,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "贵州茅台",
+            "code": "600519",
             "source": "腾讯行情",
         }
 
@@ -54,8 +57,7 @@ class TestCrossModuleCacheConsistency(unittest.TestCase):
         # 通过 patch("src.python.providers.tencent.fetch_price") 等方式无法拦截。
         # 此处 mock _price_cache_fresh 使缓存数据直接生效，避免因 price_date
         # 早于最近交易日而触发的跨日重取。
-        with patch("src.python.fetcher.price._price_cache_fresh",
-                    return_value=True):
+        with patch("src.python.fetcher.price._price_cache_fresh", return_value=True):
             result = fetch_market_data("600519", "贵州茅台")
 
         self.assertIsNotNone(result)
@@ -67,6 +69,7 @@ class TestCrossModuleCacheConsistency(unittest.TestCase):
     def test_cache_prefix_consistency_price(self):
         """market_value 和 fetcher.price 使用相同缓存前缀。"""
         from src.python.core.registry import get_prefix_type_map
+
         prefix_map = get_prefix_type_map()
         self.assertIn("price_", prefix_map)
         self.assertEqual(prefix_map["price_"], "price")
@@ -77,26 +80,22 @@ class TestCrossModuleCacheConsistency(unittest.TestCase):
         fetch_indices 缓存可被 report/excel_generator 等模块重用。
         """
         from src.python.fetcher.index import fetch_indices
-        from src.python.cache import get as cache_get
 
         mock_data = {
-            "sh000001": {"name": "上证指数", "code": "sh000001",
-                         "price": 3050.5, "change_pct": 0.5},
+            "sh000001": {"name": "上证指数", "code": "sh000001", "price": 3050.5, "change_pct": 0.5},
         }
 
         with (
-            patch("src.python.fetcher.index._fetch_indices_from_tencent",
-                  return_value=mock_data),
-            patch("src.python.fetcher.index._fetch_indices_from_sina",
-                  return_value={}),
-            patch("src.python.fetcher.index.cache_get",
-                  return_value=None),
+            patch("src.python.fetcher.index._fetch_indices_from_tencent", return_value=mock_data),
+            patch("src.python.fetcher.index._fetch_indices_from_sina", return_value={}),
+            patch("src.python.fetcher.index.cache_get", return_value=None),
         ):
             result = fetch_indices()
             self.assertEqual(result["sh000001"]["price"], 3050.5)
 
         # 验证缓存键格式
         from src.python.fetcher.index import _index_cache_key
+
         key = _index_cache_key("sh000001")
         self.assertIn("index_", key)
         self.assertEqual(key, "index_sh000001")

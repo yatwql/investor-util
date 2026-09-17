@@ -14,13 +14,14 @@ import json
 import os
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core, pytest.mark.edge]
 
 
 # ── 测试基类 ─────────────────────────────────
+
 
 class _CacheTestBase:
     """测试辅助方法。"""
@@ -35,9 +36,9 @@ class _CacheTestBase:
         self._p_groups.start()
 
     def tearDown(self):
-        if hasattr(self, '_p_groups'):
+        if hasattr(self, "_p_groups"):
             self._p_groups.stop()
-        if hasattr(self, '_p_cleanup'):
+        if hasattr(self, "_p_cleanup"):
             self._p_cleanup.stop()
         self._p_paths.stop()
         self.cache_dir.cleanup()
@@ -86,30 +87,37 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
         """开盘时段 → 使用较短 refresh 间隔。"""
         mock_ttl.return_value = 120
         from src.python.cache import get_ttl
+
         result = get_ttl("price_600900")
         self.assertEqual(result, 120)
 
     def test_market_open_clamps_min_30(self):
         """刷新 TTL 最小值限制为 30 秒。"""
-        with patch("src.python.cache._ttl._is_market_open", return_value=True), \
-             patch("src.python.config.get_config") as mock_cfg:
+        with (
+            patch("src.python.cache._ttl._is_market_open", return_value=True),
+            patch("src.python.config.get_config") as mock_cfg,
+        ):
             mock_cfg.return_value = {
                 "market_hour_aware": ["price"],
                 "market_hour_ttl": 5,
             }
             from src.python.cache import get_ttl
+
             result = get_ttl("price")
             self.assertGreaterEqual(result, 30)
 
     def test_market_open_clamps_max_86400(self):
         """刷新 TTL 最大值限制为 86400 秒。"""
-        with patch("src.python.cache._ttl._is_market_open", return_value=True), \
-             patch("src.python.config.get_config") as mock_cfg:
+        with (
+            patch("src.python.cache._ttl._is_market_open", return_value=True),
+            patch("src.python.config.get_config") as mock_cfg,
+        ):
             mock_cfg.return_value = {
                 "market_hour_aware": ["price"],
                 "market_hour_ttl": 999999,
             }
             from src.python.cache import get_ttl
+
             result = get_ttl("price")
             self.assertLessEqual(result, 86400)
 
@@ -119,6 +127,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
         """非市场感知类型 → 使用静态 TTL。"""
         mock_ttl.return_value = 86400
         from src.python.cache import get_ttl
+
         result = get_ttl("some_random_key")
         self.assertEqual(result, 86400)
 
@@ -128,6 +137,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
         """收盘后 → 使用静态默认 TTL。"""
         mock_ttl.return_value = 86400
         from src.python.cache import get_ttl
+
         result = get_ttl("price_600900")
         self.assertEqual(result, 86400)
 
@@ -137,29 +147,36 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
         """收盘后无配置 → 使用默认静态 TTL。"""
         mock_ttl.return_value = 86400
         from src.python.cache import get_ttl
+
         result = get_ttl("benchmark_index")
         self.assertEqual(result, 86400)
 
     def test_market_hour_ttl_missing_fallback_to_30(self):
         """market_hour_ttl 配置缺失 → 默认 30 秒。"""
-        with patch("src.python.cache._ttl._is_market_open", return_value=True), \
-             patch("src.python.config.get_config") as mock_cfg:
+        with (
+            patch("src.python.cache._ttl._is_market_open", return_value=True),
+            patch("src.python.config.get_config") as mock_cfg,
+        ):
             mock_cfg.return_value = {
                 "market_hour_aware": ["price"],
             }
             from src.python.cache import get_ttl
+
             result = get_ttl("price")
             self.assertEqual(result, 30)
 
     def test_invalid_market_hour_ttl_fallback_to_30(self):
         """market_hour_ttl 配置值非法 → 使用 30 秒默认值。"""
-        with patch("src.python.cache._ttl._is_market_open", return_value=True), \
-             patch("src.python.config.get_config") as mock_cfg:
+        with (
+            patch("src.python.cache._ttl._is_market_open", return_value=True),
+            patch("src.python.config.get_config") as mock_cfg,
+        ):
             mock_cfg.return_value = {
                 "market_hour_aware": ["price"],
                 "market_hour_ttl": "not_a_number",
             }
             from src.python.cache import get_ttl
+
             result = get_ttl("price")
             self.assertEqual(result, 30)
 
@@ -170,6 +187,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
         mock_open.return_value = False
         mock_ttl.return_value = 86400
         from src.python.cache import get_ttl
+
         result = get_ttl("price_600900")
         self.assertEqual(result, 86400)
 
@@ -180,6 +198,7 @@ class TestGetTTLMarketHourAware(unittest.TestCase, _CacheTestBase):
         mock_open.return_value = False
         mock_ttl.return_value = 86400
         from src.python.cache import get_ttl
+
         result = get_ttl("price_600900")
         self.assertEqual(result, 86400)
 
@@ -210,8 +229,7 @@ class TestGzipCacheEdge(unittest.TestCase, _CacheTestBase):
 
         json_path = _cache_path("boundary_key")
         gz_path = json_path + ".gz"
-        self.assertTrue(os.path.exists(json_path),
-                        "≤100KB 数据应仍为 .json")
+        self.assertTrue(os.path.exists(json_path), "≤100KB 数据应仍为 .json")
         self.assertFalse(os.path.exists(gz_path))
 
     @patch("src.python.cache._store.time.time")
@@ -226,6 +244,7 @@ class TestGzipCacheEdge(unittest.TestCase, _CacheTestBase):
             f.write(b"this is not valid gzip data")
 
         from src.python.cache import get
+
         result = get("corrupted_gz", 3600)
 
         self.assertIsNone(result)
@@ -249,6 +268,7 @@ class TestBomCacheFile(unittest.TestCase):
     def test_bom_cache_file_readable(self):
         """含 UTF-8 BOM 头的 .json 缓存文件 → _read_cache_data() 正常解析。"""
         from src.python.cache import _read_cache_data
+
         # 用 utf-8-sig 写入产生 BOM
         fpath = os.path.join(self.tmp.name, "bom_test.json")
         payload = '{"_ts": 1000.0, "_data": {"price": 10.5}}'

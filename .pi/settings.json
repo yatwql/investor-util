@@ -1,0 +1,8 @@
+{
+  "collapseChangelog": true,
+  "quietStartup": true,
+  "tuiMode": "fullscreen",
+  "terminal": {
+    "clearOnShrink": false
+  }
+}

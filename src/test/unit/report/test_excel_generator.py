@@ -80,7 +80,7 @@ class _SheetMocks:
 
     def __init__(self) -> None:
         self.write_summary = MagicMock()
-        self.write_market_value = MagicMock(
+        self.write_holdings_detail = MagicMock(
             return_value=(
                 10000.0,
                 8000.0,
@@ -92,7 +92,6 @@ class _SheetMocks:
         self.classify_holdings = MagicMock(return_value={})
         self.get_last_trading_day = MagicMock(return_value="2026-07-01")
         self.price_update_status = MagicMock(return_value=(1, 0, True))
-        self.write_category = MagicMock()
         self.compute_penetration = MagicMock(return_value={})
         self.write_penetration = MagicMock()
         self.write_fund_performance = MagicMock()
@@ -103,11 +102,10 @@ class _SheetMocks:
             patch("src.python.report.summary.write_summary_sheet", self.write_summary),
             patch("src.python.report.excel_writer.create_workbook"),
             patch("src.python.report.excel_writer.save_workbook", return_value="reports/test.xlsx"),
-            patch("src.python.report.market_value_sheet.write_market_value_sheet", self.write_market_value),
+            patch("src.python.report.holdings_detail_sheet.write_holdings_detail_sheet", self.write_holdings_detail),
             patch("src.python.report.market_value.classify_holdings", self.classify_holdings),
             patch("src.python.report.market_value.get_last_trading_day", self.get_last_trading_day),
             patch("src.python.report.market_value.price_update_status", self.price_update_status),
-            patch("src.python.report.category.write_category_sheet", self.write_category),
             patch("src.python.report.penetration.compute_penetration_top10", self.compute_penetration),
             patch("src.python.report.penetration_sheet.write_penetration_sheet", self.write_penetration),
             patch("src.python.report.fund_performance.write_fund_performance_sheet", self.write_fund_performance),
@@ -180,13 +178,102 @@ class TestGenerateExcelReport(unittest.TestCase):
         self.mock_fetch_idx.assert_called_once()
         self.mock_fetch_us_idx.assert_called_once()
 
+    def test_summary_fallback_notice_wired(self) -> None:
+        """生成流程须调用汇总页脚兜底写入（漏调则该落点在真实产物上永不出现）。"""
+        from src.python.report.excel_generator import generate_excel_report
+
+        with patch("src.python.report.excel_generator._write_summary_experimental_notice") as mock_notice:
+            generate_excel_report(self.holdings, include_llm=False, progress=self.progress)
+
+        mock_notice.assert_called_once()
+
+    # ── 行动建议页签（basic 路径就地构建 action_data） ──
+
+    @staticmethod
+    def _action_detail():
+        """构造含行动建议消费字段的真实明细对象（shares/account 缺一不可）。"""
+        from src.python.report.market_value import DetailRow
+
+        return DetailRow(
+            account="证券账户",
+            name="长江电力",
+            code="600900",
+            price=28.5,
+            shares=1000.0,
+            market_value=28500.0,
+            cost=20000.0,
+            profit=8500.0,
+            profit_rate=0.425,
+            today_profit=100.0,
+        )
+
+    def test_action_data_built_when_not_injected(self) -> None:
+        """basic 路径无编排层注入 → 由行情明细就地构建，行动建议页签非占位。
+
+        回归：契约声明「action 纯算法，basic/both/full 均可见」，但 basic 路径此前
+        既不传 enable_action 也不传 action_data，页签恒为「无持仓数据」占位。
+        """
+        from src.python.report.excel_generator import generate_excel_report
+
+        with patch("src.python.report.action_sheet.write_action_sheet") as mock_write:
+            generate_excel_report(
+                self.holdings,
+                details=[self._action_detail()],
+                enable_action=True,
+                progress=self.progress,
+            )
+
+        mock_write.assert_called_once()
+        action_data = mock_write.call_args.args[1]
+        self.assertIsInstance(action_data, dict)
+        self.assertTrue(action_data.get("available"), "行动建议页签应拿到可用数据而非降级占位")
+
+    def test_action_data_not_rebuilt_when_injected(self) -> None:
+        """编排层已注入 action_data 时原样透传，不重复构建（保持单一事实来源）。"""
+        from src.python.report.excel_generator import generate_excel_report
+
+        injected = {"available": True, "summary": "编排层注入"}
+
+        with (
+            patch("src.python.report.action_sheet.write_action_sheet") as mock_write,
+            patch("src.python.analysis.action_advisor.build_action_data") as mock_build,
+        ):
+            generate_excel_report(
+                self.holdings,
+                details=[self._action_detail()],
+                enable_action=True,
+                pipeline_data={"action_data": injected},
+                progress=self.progress,
+            )
+
+        mock_build.assert_not_called()
+        self.assertIs(mock_write.call_args.args[1], injected)
+
+    def test_action_sheet_skipped_when_disabled(self) -> None:
+        """enable_action=False → 不创建行动建议页签，也不构建 action_data。"""
+        from src.python.report.excel_generator import generate_excel_report
+
+        with (
+            patch("src.python.report.action_sheet.write_action_sheet") as mock_write,
+            patch("src.python.analysis.action_advisor.build_action_data") as mock_build,
+        ):
+            generate_excel_report(
+                self.holdings,
+                details=[self._action_detail()],
+                enable_action=False,
+                progress=self.progress,
+            )
+
+        mock_write.assert_not_called()
+        mock_build.assert_not_called()
+
     # ── 新闻路径 ──
 
     def test_with_news(self) -> None:
         """include_news=True → 新闻页签创建。"""
         from src.python.report.excel_generator import generate_excel_report
 
-        with patch("src.python.report.news_correlation.write_news_sheet") as mock_news:
+        with patch("src.python.report.news_correlation.write_news_sheet"):
             with patch("src.python.report.news_correlation.build_news_data", return_value=([], {})):
                 generate_excel_report(
                     self.holdings,
@@ -203,7 +290,7 @@ class TestGenerateExcelReport(unittest.TestCase):
         news_data = [{"title": "新闻1", "intro": "简介", "matched_keywords": ["test"]}]
         news_llm_meta = {"llm_enabled": False}
 
-        with patch("src.python.report.news_correlation.write_news_sheet") as mock_news:
+        with patch("src.python.report.news_correlation.write_news_sheet"):
             generate_excel_report(
                 self.holdings,
                 include_news=True,
@@ -313,7 +400,7 @@ class TestGenerateExcelReport(unittest.TestCase):
         """行情市值模块缺失 → add_error + 后续模块继续。"""
         from src.python.report.excel_generator import generate_excel_report
 
-        with patch("src.python.report.market_value_sheet.write_market_value_sheet", None):
+        with patch("src.python.report.holdings_detail_sheet.write_holdings_detail_sheet", None):
             generate_excel_report(
                 self.holdings,
                 progress=self.progress,
@@ -321,7 +408,7 @@ class TestGenerateExcelReport(unittest.TestCase):
 
         errors = self.progress.get_errors()
         self.assertTrue(
-            any("market_value_sheet" in e.lower() or "行情市值" in e for e in errors),
+            any("holdings_detail" in e.lower() or "持仓明细" in e for e in errors),
             f"预期 market_value 错误，得到: {errors}",
         )
 
@@ -385,7 +472,7 @@ class TestGenerateExcelReport(unittest.TestCase):
             mocks.compute_penetration.assert_called_once()
             mocks.write_penetration.assert_called_once()
             # 市值模块仍应被调用
-            mocks.write_market_value.assert_called_once()
+            mocks.write_holdings_detail.assert_called_once()
         finally:
             for p in patchers:
                 p.stop()
@@ -787,20 +874,19 @@ class TestCreateSheets(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
 
         wb = self._make_wb()
-        # always(6) + history(1) + evolution(1) = 8 个页签，连续编号 1-8（组合演进为独立 evolution 类型）
+        # always(5) + history(1) + evolution(1) = 7 个页签，连续编号 1-7（组合演进为独立 evolution 类型）
         sheets = create_sheets(
             wb, _REPORT_SECTION_DEFAULT, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False
         )
-        self.assertEqual(len(sheets), 8)
+        self.assertEqual(len(sheets), 7)
         expected_titles = {
             "summary": "1.投资分析汇总",
-            "market_value": "2.市值核算明细表",
-            "category": "3.持仓分类表",
-            "penetration": "4.资产穿透TOP10",
-            "fund_performance": "5.基金业绩分析",
-            "portfolio_history_drawdown": "6.组合历史走势与回撤",
-            "portfolio_evolution": "7.组合演进",
-            "data_source_status": "8.数据源可用性矩阵",
+            "holdings_detail": "2.持仓明细与分类",
+            "penetration": "3.资产穿透TOP10",
+            "fund_performance": "4.基金业绩分析",
+            "portfolio_history_drawdown": "5.组合历史走势与回撤",
+            "portfolio_evolution": "6.组合演进",
+            "data_source_status": "7.数据源可用性矩阵",
         }
         for key, title in expected_titles.items():
             self.assertIn(key, sheets, f"{key} should be created")
@@ -838,8 +924,8 @@ class TestCreateSheets(unittest.TestCase):
             data_availability={"news_data_available": True},
         )
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
-        # always(6) + history(1) + evolution(1) + news(1) = 9
-        self.assertEqual(len(sheets), 9)
+        # always(5) + history(1) + evolution(1) + news(1) = 8
+        self.assertEqual(len(sheets), 8)
         for key in news_keys:
             self.assertIn(key, sheets)
 
@@ -849,7 +935,7 @@ class TestCreateSheets(unittest.TestCase):
         from src.python.report.excel_sheet_factory import create_sheets
 
         wb = self._make_wb()
-        # always(6) + history(1) = 7（evolution 关闭，无组合演进页签）
+        # always(5) + history(1) = 6（evolution 关闭，无组合演进页签）
         sheets = create_sheets(
             wb,
             _REPORT_SECTION_DEFAULT,
@@ -858,7 +944,7 @@ class TestCreateSheets(unittest.TestCase):
             enable_llm=False,
             enable_portfolio_evolution=False,
         )
-        self.assertEqual(len(sheets), 7)
+        self.assertEqual(len(sheets), 6)
         self.assertNotIn("portfolio_evolution", sheets)
         # 其他 always 页签不受影响
         self.assertIn("summary", sheets)
@@ -873,7 +959,7 @@ class TestCreateSheets(unittest.TestCase):
         sheets = create_sheets(
             wb, _REPORT_SECTION_DEFAULT, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False
         )
-        self.assertEqual(len(sheets), 8)
+        self.assertEqual(len(sheets), 7)
         self.assertIn("portfolio_evolution", sheets)
 
 

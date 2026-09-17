@@ -1,7 +1,7 @@
 """TUI 运行状态诊断命令处理器。
 
 菜单 [V] 查看最近运行日志（可按级别筛选）、[H] 查看数据源健康历史、
-[D] 系统自检（实验功能 doctor_check，未启用时该菜单项不出现）。
+[D] 系统自检（默认开启，features.json 中 doctor_check 为 false 时该菜单项不出现）。
 三者同属只读诊断面，故归于一模块。
 
 所有解析/聚合逻辑委托核心层（core/log_reader.py、core/perf.py、core/doctor.py），
@@ -110,7 +110,7 @@ def _cmd_view_health_history() -> None:
     press_any_key()
 
 
-# ── 系统自检（实验功能 doctor_check）────────────────────────
+# ── 系统自检（doctor_check 开关门控）────────────────────────
 
 # TUI 内网络检查的整体耗时预算（短于 CLI——交互场景不能让用户干等）
 _DOCTOR_NETWORK_TIMEOUT = 6.0

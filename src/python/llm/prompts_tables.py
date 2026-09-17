@@ -17,6 +17,7 @@ import logging
 
 from src.python.analysis.fx_exposure import fx_exposure as _fx_exposure
 from src.python.core.code_utils import get_currency_by_code
+from src.python.core.data_freshness import FRESHNESS_DEGRADED, FRESHNESS_STALE
 from src.python.llm.prompts_core import _fmt_holding_line, _fmt_wan
 
 logger = logging.getLogger("invest")
@@ -210,22 +211,82 @@ def _build_alignment_block(alignment_summary: str | None) -> str:
     return "\n" + alignment_summary
 
 
-def _build_data_quality_detail_block(degradation_events: list[dict] | None) -> str:
+def _build_nav_freshness_basis_lines(data_freshness: dict | None) -> list[str]:
+    """渲染净值新鲜度基准行（供持仓体检报告「数据质量」维度）。
+
+    基准取自 `data_freshness` 契约回传的**交易日**，而非运行时刻。报告可在非
+    交易日运行（如周六凌晨生成上一交易日数据的报告）：此时运行时刻与最近交易日
+    相差一个自然日，若让模型以运行时刻为基准做自然日差，正常的 T-1 净值（QDII
+    与部分场外基金的官方净值本就滞后一个交易日）会被误报为「净值更新延迟」。
+
+    滞后清单直接引用 `core/data_freshness.py` 的判定结论（`stale`/`degraded`），
+    与报告「数据质量仪表盘」可信度区块同源，避免模型从裸日期另行推断。
+
+    Args:
+        data_freshness: `data_freshness` 契约 dict（可为 None）
+
+    Returns:
+        基准行列表；契约不可用或无交易日时返回空列表（不注入任何行）。
+    """
+    if not data_freshness or not data_freshness.get("available"):
+        return []
+
+    trading_day = str(data_freshness.get("trading_day") or "")
+    prev_trading_day = str(data_freshness.get("prev_trading_day") or "")
+    if not trading_day:
+        return []
+
+    basis = f"净值新鲜度基准：最近交易日 {trading_day}"
+    if prev_trading_day:
+        basis += f"，前一交易日 {prev_trading_day}"
+    lines = [
+        basis,
+        "净值日期等于最近交易日（T）或前一交易日（T-1）均属正常更新——QDII 与部分场外基金的"
+        "官方净值本就是 T-1，不构成延迟；仅净值日期早于前一交易日才计延迟。"
+        "不得用运行时刻与净值日期的自然日差判定延迟。",
+    ]
+
+    items = data_freshness.get("items") or []
+
+    def _codes(freshness: str) -> list[str]:
+        return [str(i.get("code") or "") for i in items if i.get("freshness") == freshness]
+
+    lagging = _codes(FRESHNESS_STALE)
+    lines.append("净值滞后品种（净值日期早于前一交易日）：" + ("、".join(lagging) if lagging else "无"))
+    unavailable = _codes(FRESHNESS_DEGRADED)
+    if unavailable:
+        lines.append("无有效行情品种：" + "、".join(unavailable))
+    return lines
+
+
+def _build_data_quality_detail_block(
+    degradation_events: list[dict] | None,
+    data_freshness: dict | None = None,
+) -> str:
     """构建数据质量详细信息块，供 health_check prompt 使用。
 
     从 DegradationTracker 的 events 日志中提取结构化数据质量信息，
     比 _build_data_degradation_block 更详细，包含降级频次和时间。
 
+    同时注入净值新鲜度基准行（`_build_nav_freshness_basis_lines`）：体检报告
+    第 5 维「数据质量」既要评数据源降级，也要评净值新鲜度，而新鲜度须以交易日
+    为基准判定，不能由模型按运行时刻自行推算。
+
     Args:
         degradation_events: DegradationTracker.get_log() 的输出
+        data_freshness: `data_freshness` 契约 dict（可为 None；不可用时不注入基准行）
 
     Returns:
         格式化的数据质量详细文本块
     """
-    if not degradation_events:
-        return "【数据质量】今日无降级记录，所有数据源正常。"
+    basis_lines = _build_nav_freshness_basis_lines(data_freshness)
 
-    lines = ["【数据质量详细状态】"]
+    if not degradation_events:
+        if not basis_lines:
+            return "【数据质量】今日无降级记录，所有数据源正常。"
+        return "\n".join(["【数据质量详细状态】", *basis_lines, "今日无降级记录，所有数据源正常。"])
+
+    lines = ["【数据质量详细状态】", *basis_lines]
     unreachable: dict[str, int] = {}
     empty: dict[str, int] = {}
     degraded_events: list[dict] = []

@@ -180,9 +180,7 @@ class TestFetchWithFallbackDiagnostics(unittest.TestCase):
         mock_get.return_value = None
         diag = FailureDiagnostics()
 
-        fetch_with_fallback(
-            "price", {"p1": ("P1", MagicMock(return_value={"ok": 1}))}, "k", 3600, diagnostics=diag
-        )
+        fetch_with_fallback("price", {"p1": ("P1", MagicMock(return_value={"ok": 1}))}, "k", 3600, diagnostics=diag)
 
         self.assertEqual(diag.summary(), "ghost(未注册)")
 
@@ -223,9 +221,7 @@ class TestFetchWithFallbackDiagnostics(unittest.TestCase):
         mock_chain.return_value = ["p1"]
         mock_get.return_value = None
 
-        result = fetch_with_fallback(
-            "price", {"p1": ("P1", MagicMock(side_effect=TimeoutError("x")))}, "k", 3600
-        )
+        result = fetch_with_fallback("price", {"p1": ("P1", MagicMock(side_effect=TimeoutError("x")))}, "k", 3600)
 
         self.assertIsNone(result)
 

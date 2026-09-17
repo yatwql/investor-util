@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -186,6 +187,40 @@ class TestAppendSignals:
         path.write_text('{broken\n{"id": "x", "signal_type": "tail_risk"}\n', encoding="utf-8")
 
         assert len(sl.load_signals(str(path))) == 1
+
+    def test_write_failure_reports_zero_registered(self, tmp_path, monkeypatch):
+        """落盘失败不得返回去重结果 —— 否则调用方报绿色「登记 N 条」而账本零新增。
+
+        回归：`append_signals` 曾在 `append_jsonl_atomic` 吞异常后仍无条件 `return
+        fresh`，磁盘满/无写权限时上报成功、账本为空，下次运行还会因读不到 id 重复登记。
+        """
+        target = tmp_path / "signals.jsonl"
+
+        def _boom(*_args, **_kwargs):
+            raise OSError("磁盘满")
+
+        monkeypatch.setattr(os, "replace", _boom)
+
+        assert sl.append_signals([_sig(sl.SIGNAL_TAIL_RISK, "尾部正常")], path=str(target)) == []
+        assert sl.load_signals(str(target)) == []
+
+    def test_append_signal_returns_none_when_write_fails(self, tmp_path, monkeypatch):
+        """单条入口同口径：写失败即「未落账」，返回 None 而非乐观记录。"""
+
+        def _boom(*_args, **_kwargs):
+            raise OSError("磁盘满")
+
+        monkeypatch.setattr(os, "replace", _boom)
+
+        assert (
+            sl.append_signal(
+                signal_type=sl.SIGNAL_TAIL_RISK,
+                report_date="2026-09-10",
+                rating="尾部正常",
+                path=str(tmp_path / "signals.jsonl"),
+            )
+            is None
+        )
 
 
 class TestFoldSignals:

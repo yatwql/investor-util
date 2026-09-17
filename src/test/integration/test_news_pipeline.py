@@ -24,13 +24,16 @@ class TestNewsPipeline(unittest.TestCase):
     验证各子步骤端到端协同工作，mock 外部 API 避免真实请求。
     """
 
-    def _mock_news_item(self, title: str, url: str = "",
-                        intro: str = "", source: str = "新浪财经",
-                        ctime: str = "2026-07-03 10:00:00") -> dict:
+    def _mock_news_item(
+        self, title: str, url: str = "", intro: str = "", source: str = "新浪财经", ctime: str = "2026-07-03 10:00:00"
+    ) -> dict:
         return {
-            "title": title, "url": url or f"http://test.com/{hash(title)}",
-            "intro": intro or f"{title}简介", "source": source,
-            "ctime": ctime, "content": f"{title}正文",
+            "title": title,
+            "url": url or f"http://test.com/{hash(title)}",
+            "intro": intro or f"{title}简介",
+            "source": source,
+            "ctime": ctime,
+            "content": f"{title}正文",
         }
 
     def test_aggregate_news_deduplicates_by_url(self):
@@ -48,13 +51,16 @@ class TestNewsPipeline(unittest.TestCase):
         ]
 
         with (
-            patch("src.python.providers.news_aggregator.get_enabled_sources",
-                  return_value=["sina"]),
-            patch("src.python.providers.news_aggregator._fetch_from_all_sources",
-                  return_value=(mock_news, {"sina": (2, "OK")})),
+            patch("src.python.providers.news_aggregator.get_enabled_sources", return_value=["sina"]),
+            patch(
+                "src.python.providers.news_aggregator._fetch_from_all_sources",
+                return_value=(mock_news, {"sina": (2, "OK")}),
+            ),
             patch("src.python.providers.news_aggregator._save_news_cache"),
-            patch("src.python.providers.news_aggregator.correlate_news_with_holdings",
-                  side_effect=lambda items, keywords, **kw: items),
+            patch(
+                "src.python.providers.news_aggregator.correlate_news_with_holdings",
+                side_effect=lambda items, keywords, **kw: items,
+            ),
         ):
             result = aggregate_news(keywords=["茅台"], top_n=10)
 
@@ -103,21 +109,28 @@ class TestNewsPipeline(unittest.TestCase):
         ]
 
         mock_news = [
-            {"title": "茅台股价新高", "intro": "贵州茅台今日大涨",
-             "url": "http://test.com/mt", "source": "新浪财经",
-             "ctime": "2026-07-03", "content": ""},
-            {"title": "易方达基金分红", "intro": "易方达基金发布分红公告",
-             "url": "http://test.com/yfd", "source": "东方财富",
-             "ctime": "2026-07-03", "content": ""},
+            {
+                "title": "茅台股价新高",
+                "intro": "贵州茅台今日大涨",
+                "url": "http://test.com/mt",
+                "source": "新浪财经",
+                "ctime": "2026-07-03",
+                "content": "",
+            },
+            {
+                "title": "易方达基金分红",
+                "intro": "易方达基金发布分红公告",
+                "url": "http://test.com/yfd",
+                "source": "东方财富",
+                "ctime": "2026-07-03",
+                "content": "",
+            },
         ]
 
         with (
-            patch("src.python.providers.news_aggregator.aggregate_news",
-                  return_value=mock_news),
-            patch("src.python.providers.news_keywords.build_holding_keywords",
-                  return_value=["茅台", "易方达"]),
-            patch("src.python.fetcher.industry.batch_fetch_industry_data",
-                  return_value={}),
+            patch("src.python.providers.news_aggregator.aggregate_news", return_value=mock_news),
+            patch("src.python.providers.news_keywords.build_holding_keywords", return_value=["茅台", "易方达"]),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
         ):
             news_result, news_meta = build_news_data(holdings, top_n=10)
 

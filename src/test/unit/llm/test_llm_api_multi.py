@@ -28,7 +28,7 @@ class TestChainEmptyContentRetry(unittest.TestCase):
         from src.python.llm.api import call_llm
 
         mock_call.side_effect = [
-            ("", {"input_tokens": 100}),           # 首次空内容
+            ("", {"input_tokens": 100}),  # 首次空内容
             ("retry success", {"input_tokens": 200}),  # 安抚后成功
         ]
 
@@ -52,8 +52,8 @@ class TestChainEmptyContentRetry(unittest.TestCase):
         from src.python.llm.api import _CONTENT_FILTER_RECOVERY
 
         mock_call.side_effect = [
-            ("", {}),                          # 首次空
-            ("ok", {}),                        # 安抚后成功
+            ("", {}),  # 首次空
+            ("ok", {}),  # 安抚后成功
         ]
 
         config = {
@@ -77,9 +77,9 @@ class TestChainRetryExhaustedFallback(unittest.TestCase):
         from src.python.llm.api import call_llm
 
         mock_call.side_effect = [
-            ("", {"input_tokens": 10}),     # p1 原始空
-            ("", {"input_tokens": 20}),     # p1 安抚仍空
-            ("fb ok", {"prompt_tokens": 5}),   # p2 成功
+            ("", {"input_tokens": 10}),  # p1 原始空
+            ("", {"input_tokens": 20}),  # p1 安抚仍空
+            ("fb ok", {"prompt_tokens": 5}),  # p2 成功
         ]
 
         config = {
@@ -100,8 +100,10 @@ class TestChainRetryExhaustedFallback(unittest.TestCase):
         from src.python.llm.api import call_llm
 
         mock_call.side_effect = [
-            ("", {}), ("", {}),   # p1 原始 + 安抚
-            ("", {}), ("", {}),   # p2 原始 + 安抚
+            ("", {}),
+            ("", {}),  # p1 原始 + 安抚
+            ("", {}),
+            ("", {}),  # p2 原始 + 安抚
         ]
 
         config = {
@@ -172,8 +174,8 @@ class TestChainExceptionSafety(unittest.TestCase):
         from src.python.llm.api import call_llm
 
         mock_call.side_effect = [
-            ("", {"input_tokens": 10}),     # p1 原始空
-            RuntimeError("安抚重试异常"),   # p1 安抚抛异常
+            ("", {"input_tokens": 10}),  # p1 原始空
+            RuntimeError("安抚重试异常"),  # p1 安抚抛异常
             ("p2 rescue", {"prompt_tokens": 5}),  # p2 成功
         ]
 
@@ -235,6 +237,7 @@ class TestChainFailureTracking(unittest.TestCase):
     def _pop_failure(self, key: str) -> None:
         """清理 LLM_MODULE_FAILURE 避免测试间污染。"""
         from src.python.llm.prompts import LLM_MODULE_FAILURE
+
         LLM_MODULE_FAILURE.pop(key, None)
 
     @patch("src.python.llm.api.call_single_provider")
@@ -273,7 +276,7 @@ class TestChainFailureTracking(unittest.TestCase):
 
         self._pop_failure("expert_review")
         mock_call.side_effect = [
-            (None, None),           # p1 api_error
+            (None, None),  # p1 api_error
             RuntimeError("crash"),  # p2 异常
         ]
 
@@ -341,7 +344,10 @@ class TestModulePreferredRouting(unittest.TestCase):
             "_strategy": "priority",
         }
         content, usage, provider_name = call_llm(
-            "sys", "user", config, config_field="max_tokens_global_macro",
+            "sys",
+            "user",
+            config,
+            config_field="max_tokens_global_macro",
         )
 
         self.assertEqual(content, "preferred result")

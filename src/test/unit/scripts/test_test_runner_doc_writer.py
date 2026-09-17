@@ -503,7 +503,7 @@ class TestDocFileAndArgs:
         assert args.machine_info is False
 
     def test_display_path_cross_drive_fallback(self, runner_script):
-        # rf-232 回归：Windows 跨盘符 relpath 抛 ValueError → 降级返回绝对路径
+        # 回归：Windows 跨盘符 relpath 抛 ValueError → 降级返回绝对路径
         # 不崩溃；POSIX 无盘符概念，正常返回相对路径（断言平台无关）。
         start = runner_script._PROJECT_ROOT
         if os.name == "nt":

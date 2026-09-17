@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import logging
 
-from openpyxl.styles import Font
-from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.core.code_utils import (
     is_a_share_code,
@@ -24,20 +22,7 @@ from src.python.core.code_utils import (
 )
 from src.python.core.models import Holding
 from src.python.core.num_utils import finite_or
-from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES, DataStatus, DataStatusItem
-from src.python.report.excel_writer import (
-    _write_data_status_foot,
-    auto_width,
-    freeze_header,
-    write_data_row,
-    write_header_row,
-    write_subtotal_row,
-    write_title_row,
-    write_total_row,
-)
-from src.python.report.market_value import DetailRow
-from src.python.report.styles import FMT_MONEY, FMT_PERCENT, profit_font
 
 logger = logging.getLogger("invest")
 
@@ -54,7 +39,7 @@ _HEADERS = [
     "本日盈亏",
     "年均股息率",
 ]
-# 成本流水子列（report_submodules.cost_lots 开启时追加，默认关不渲染）
+# 成本流水子列（功能开关 `cost_lots` 开启时追加，默认关不渲染）
 _EXTRA_HEADERS = ["成本分档", "分红累计"]
 _NCOLS_WITH_FLOW = _NCOLS + len(_EXTRA_HEADERS)
 
@@ -207,180 +192,3 @@ def calc_yield_text(code: str, d, dividend_data: dict) -> str:
     except Exception:
         logger.warning("[category] 股息率计算异常", exc_info=True)
         return "--"
-
-
-def _write_category_group(
-    ws: Worksheet,
-    row: int,
-    group: list[Holding],
-    prop: str,
-    sub: str,
-    detail_map: dict,
-    dividend_data: dict,
-    fund_flow_data: dict | None = None,
-) -> tuple[int, float, float, float, float, float]:
-    """写入一个分类分组的明细行和小计。
-
-    fund_flow_data 非 None 时追加「成本分档」「分红累计」子列（数据契约）。
-
-    Returns:
-        (next_row, mv, cost, profit, today, div_sum)
-    """
-    has_flow = fund_flow_data is not None
-    tier_map = (fund_flow_data or {}).get("cost_tiers", {}).get("per_code", {})
-    div_map = (fund_flow_data or {}).get("dividends", {}).get("per_code", {})
-    div_sum = 0.0
-
-    for h in group:
-        d = detail_map.get(h.code)
-        if d:
-            vals = [
-                prop,
-                sub,
-                h.name,
-                h.code,
-                d.market_value,
-                d.cost,
-                d.profit,
-                d.profit_rate,
-                d.today_profit,
-                calc_yield_text(h.code, d, dividend_data),
-            ]
-        else:
-            vals = [prop, sub, h.name, h.code, 0.0, 0.0, 0.0, 0.0, 0.0, "--"]
-        if has_flow:
-            vals += [_tier_label(tier_map.get(h.code)), div_map.get(h.code, 0.0)]
-            div_sum += div_map.get(h.code, 0.0)
-        write_data_row(ws, row, vals, _num_formats(has_flow))
-        row += 1
-
-    sub_mv = sum(detail_map.get(h.code, DetailRow()).market_value for h in group if h.code in detail_map)
-    sub_cost = sum(detail_map.get(h.code, DetailRow()).cost for h in group if h.code in detail_map)
-    sub_profit = sum(detail_map.get(h.code, DetailRow()).profit for h in group if h.code in detail_map)
-    sub_today = sum(detail_map.get(h.code, DetailRow()).today_profit for h in group if h.code in detail_map)
-    sub_rate = sub_profit / sub_cost if sub_cost > 0 else 0.0
-
-    subtotal_vals = ["", "", len(group), sub_mv, sub_cost, sub_profit, sub_rate, sub_today, "--"]
-    if has_flow:
-        subtotal_vals += ["", div_sum]
-    ncols = _NCOLS_WITH_FLOW if has_flow else _NCOLS
-    write_subtotal_row(ws, row, f"{prop} - {sub} 小计", subtotal_vals, ncols, _num_formats(has_flow))
-    return row + 1, sub_mv, sub_cost, sub_profit, sub_today, div_sum
-
-
-def write_category_sheet(
-    ws: Worksheet,
-    holdings: list[Holding],
-    details: list[DetailRow],
-    fund_flow_data: dict | None = None,
-) -> None:
-    """写入持仓分类表。
-
-    分类层级：
-      资产属性 → 投资分类 → 持仓明细 → 小计 → 总计
-    每行含市值、成本、盈亏、收益率、本日盈亏、年均股息率。
-
-    Args:
-        ws: 目标工作表
-        holdings: 原始持仓列表
-        details: 市值核算明细行列表
-        fund_flow_data: 成本流水数据契约（非 None 时追加「成本分档」「分红累计」
-            子列；None 时保持既有 10 列输出）
-    """
-    has_flow = fund_flow_data is not None
-    ncols = _NCOLS_WITH_FLOW if has_flow else _NCOLS
-    headers = _HEADERS + _EXTRA_HEADERS if has_flow else _HEADERS
-
-    detail_map: dict[str, DetailRow] = {d.code: d for d in details}
-
-    cat_groups: dict[tuple[str, str], list[Holding]] = {}
-    for h in holdings:
-        prop, sub = _categorize_holding(h)
-        cat_groups.setdefault((prop, sub), []).append(h)
-
-    _PROP_ORDER = {"股票": 0, "基金": 1, "债券": 2, "现金": 3, "其他": 4}
-    _SUB_ORDER = {"A股": 0, "QDII": 1, "主动": 2, "被动": 3, "指数": 4, "混合": 5, "纯债": 6, "货币": 7, "其他": 8}
-    sorted_groups = sorted(
-        cat_groups.items(),
-        key=lambda x: (_PROP_ORDER.get(x[0][0], 99), _SUB_ORDER.get(x[0][1], 99)),
-    )
-
-    row = write_title_row(ws, 1, get_report_sheet_name("category"), ncols)
-    row = write_header_row(ws, row, headers)
-    data_start = row
-
-    # 若所有行情数据全零，写一行醒目提示
-    _all_zero = all(d.market_value == 0 for d in details)
-    if _all_zero and details:
-        cell = ws.cell(row=row, column=1, value="⚠ 行情数据全部不可用（非交易时段/网络异常），以下市值/盈亏均为占位 —")
-        cell.font = Font(size=10, bold=True, color="CC0000")
-        row += 1
-
-    dividend_data, dividend_success = _load_dividend_data(holdings)
-    grand_mv = grand_cost = grand_profit = grand_today = grand_div = 0.0
-
-    for (prop, sub), group in sorted_groups:
-        row, smv, scost, sprofit, stoday, sdiv = _write_category_group(
-            ws,
-            row,
-            group,
-            prop,
-            sub,
-            detail_map,
-            dividend_data,
-            fund_flow_data,
-        )
-        grand_mv += smv
-        grand_cost += scost
-        grand_profit += sprofit
-        grand_today += stoday
-        grand_div += sdiv
-
-    grand_rate = grand_profit / grand_cost if grand_cost > 0 else 0.0
-    total_vals = ["", "", "-", grand_mv, grand_cost, grand_profit, grand_rate, grand_today, "--"]
-    if has_flow:
-        total_vals += ["", grand_div]
-    write_total_row(ws, row, "总计", total_vals, ncols, _num_formats(has_flow))
-
-    _apply_profit_colors(ws, data_start, row)
-    freeze_header(ws, 2)
-    auto_width(ws)
-    logger.info(
-        "%s写入完成，共 %d 个分组，%d 条持仓", get_report_sheet_name("category"), len(sorted_groups), len(holdings)
-    )
-
-    data_status = build_category_data_status(dividend_success)
-    _write_data_status_foot(ws, data_status, start_row=row + 1, max_cols=ncols)
-
-
-def _num_formats(has_flow: bool = False) -> list[str | None]:
-    """每列的 Excel 数字格式。"""
-    fmt = [
-        "",  # 1  资产属性
-        "",  # 2  投资分类
-        "",  # 3  名称
-        "",  # 4  代码
-        FMT_MONEY,  # 5  市值
-        FMT_MONEY,  # 6  成本
-        FMT_MONEY,  # 7  盈亏
-        FMT_PERCENT,  # 8  收益率
-        FMT_MONEY,  # 9  本日盈亏
-        "",  # 10 年均股息率（字符串格式）
-    ]
-    if has_flow:
-        fmt += ["", FMT_MONEY]  # 11 成本分档（文本）、12 分红累计（金额）
-    return fmt
-
-
-def _apply_profit_colors(ws, start_row: int, end_row: int) -> None:
-    """对盈亏列 (7)、收益率列 (8)、本日盈亏列 (9) 着色。"""
-    for r in range(start_row, end_row + 1):
-        # 盈亏列 (7) 和本日盈亏列 (9)：数值型
-        for col in (7, 9):
-            cell = ws.cell(row=r, column=col)
-            if isinstance(cell.value, (int, float)):
-                cell.font = profit_font(cell.value)
-        # 收益率列 (8)：可能是百分比数值
-        rate_cell = ws.cell(row=r, column=8)
-        if isinstance(rate_cell.value, (int, float)):
-            rate_cell.font = profit_font(rate_cell.value)

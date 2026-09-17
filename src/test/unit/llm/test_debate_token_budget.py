@@ -7,15 +7,24 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm]
 
 _MIN_HOLDINGS = [
-    {"name": "测试A", "code": "000001", "market_value": 100000, "cost": 80000,
-     "profit": 20000, "profit_rate": 0.25, "change_pct": 1.5, "nav_date": "2026-07-20", "source_api": "mock"},
+    {
+        "name": "测试A",
+        "code": "000001",
+        "market_value": 100000,
+        "cost": 80000,
+        "profit": 20000,
+        "profit_rate": 0.25,
+        "change_pct": 1.5,
+        "nav_date": "2026-07-20",
+        "source_api": "mock",
+    },
 ]
 
 _LONG_TEXT = "分析" * 2000  # 4000 chars — 配合显式低预算（100×1.0=100 chars）超 1× 阈值
@@ -58,8 +67,13 @@ class TestDebateTokenBudgetExceeded(unittest.TestCase):
         from src.python.llm.generators import generate_debate_procon
 
         result = generate_debate_procon(
-            100000, 80000, 20000, 1000, 1,
-            {"股票": 1}, [],
+            100000,
+            80000,
+            20000,
+            1000,
+            1,
+            {"股票": 1},
+            [],
             holdings_details=_MIN_HOLDINGS,
         )
 
@@ -96,8 +110,13 @@ class TestDebateTokenBudgetNormal(unittest.TestCase):
         from src.python.llm.generators import generate_debate_procon
 
         result = generate_debate_procon(
-            100000, 80000, 20000, 1000, 1,
-            {"股票": 1}, [],
+            100000,
+            80000,
+            20000,
+            1000,
+            1,
+            {"股票": 1},
+            [],
             holdings_details=_MIN_HOLDINGS,
         )
 
@@ -133,8 +152,13 @@ class TestDebateTokenBudget2xFallback(unittest.TestCase):
         from src.python.llm.generators import generate_debate_procon
 
         result = generate_debate_procon(
-            100000, 80000, 20000, 1000, 1,
-            {"股票": 1}, [],
+            100000,
+            80000,
+            20000,
+            1000,
+            1,
+            {"股票": 1},
+            [],
             holdings_details=_MIN_HOLDINGS,
         )
 

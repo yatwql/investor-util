@@ -3,7 +3,6 @@
 覆盖 api_base.py 的基础设施函数（常量 + 检测 + 内容提取 + 重试骨架 + 失败追踪）。
 """
 
-import json
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -419,7 +418,6 @@ class TestCallLlmWithRetry(unittest.TestCase):
     def test_retry_then_succeed(self, mock_record_success, mock_attempt, mock_cb_open) -> None:
         """失败重试后成功 → (content, usage)。"""
         from src.python.llm.api_base import call_llm_with_retry
-        from src.python.llm.api_base import _is_retry_available
 
         # 第一次 retryable, 第二次 success
         mock_attempt.side_effect = [
@@ -461,7 +459,6 @@ class TestCallLlmWithRetry(unittest.TestCase):
         mock_client = MagicMock()
 
         # Make sure max_retries is 0 so only 1 attempt
-        from src.python.llm.api_base import _is_retry_available
 
         with patch("src.python.llm.api_base._is_retry_available", return_value=False):
             result, usage = call_llm_with_retry(
@@ -588,28 +585,46 @@ class TestTruncationWarning(unittest.TestCase):
 
 
 class TestLogTokenUsage(unittest.TestCase):
-    """_log_token_usage — Token 用量日志。"""
+    """_log_token_usage — Token 用量日志（info 行内容与 silent 分支）。"""
 
     def test_claude_usage_logged(self) -> None:
-        """Claude 格式用量 → 打印日志。"""
+        """Claude 格式用量 → info 日志含输入/输出/缓存命中，不抛异常。"""
         from src.python.llm.api_base import _log_token_usage
 
         usage = {"input_tokens": 100, "output_tokens": 50, "cache_read_input_tokens": 10}
-        # Should not raise
-        _log_token_usage("claude", usage, "test_label", model_name="test-model")
+        with self.assertLogs("invest", level="INFO") as cm:
+            _log_token_usage("claude", usage, "test_label", model_name="test-model")
+        joined = "".join(cm.output)
+        self.assertIn("输入 100", joined)
+        self.assertIn("输出 50", joined)
+        self.assertIn("缓存命中 10", joined)
+        self.assertIn("test_label", joined)
 
     def test_openai_usage_logged(self) -> None:
-        """OpenAI 格式用量 → 打印日志。"""
+        """OpenAI 格式用量 → info 日志含输入/输出（无缓存命中字段）。"""
         from src.python.llm.api_base import _log_token_usage
 
         usage = {"prompt_tokens": 200, "completion_tokens": 100}
-        _log_token_usage("openai", usage, "test_label", model_name="test-model")
+        with self.assertLogs("invest", level="INFO") as cm:
+            _log_token_usage("openai", usage, "test_label", model_name="test-model")
+        joined = "".join(cm.output)
+        self.assertIn("输入 200", joined)
+        self.assertIn("输出 100", joined)
+        self.assertNotIn("缓存命中", joined)
 
     def test_none_usage_ignored(self) -> None:
-        """usage 为 None → 跳过。"""
+        """usage 为 None → 提前返回，不产生 info 日志。"""
         from src.python.llm.api_base import _log_token_usage
 
-        _log_token_usage("claude", None, "test_label")  # Should not raise
+        with self.assertNoLogs("invest", level="INFO"):
+            _log_token_usage("claude", None, "test_label")
+
+    def test_empty_usage_ignored(self) -> None:
+        """usage 为空 dict（falsy）→ 提前返回，不产生 info 日志。"""
+        from src.python.llm.api_base import _log_token_usage
+
+        with self.assertNoLogs("invest", level="INFO"):
+            _log_token_usage("claude", {}, "test_label")
 
 
 # ═══════════════════════════════════════════════════════════════

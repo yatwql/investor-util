@@ -24,8 +24,10 @@ class TestCircuitBreakerBoundary(unittest.TestCase):
 
     def setUp(self):
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         self._orig_failures = _circuit_failures.copy()
         self._orig_open_until = _circuit_open_until.copy()
         _circuit_failures.clear()
@@ -33,8 +35,10 @@ class TestCircuitBreakerBoundary(unittest.TestCase):
 
     def tearDown(self):
         from src.python.llm.circuit_breaker import (
-            _circuit_failures, _circuit_open_until,
+            _circuit_failures,
+            _circuit_open_until,
         )
+
         _circuit_failures.clear()
         _circuit_failures.update(self._orig_failures)
         _circuit_open_until.clear()
@@ -44,9 +48,11 @@ class TestCircuitBreakerBoundary(unittest.TestCase):
     def test_exact_60s_boundary_half_open(self, mock_time):
         """冷却期满 60s 整 → 半开（允许试探请求）。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _cb_is_open,
+            _cb_record_failure,
+            _cb_is_open,
             _CIRCUIT_BREAKER_RECOVERY,
         )
+
         url = "https://api.test.com/v1"
         mock_time.time.return_value = 1000.0
 
@@ -62,9 +68,11 @@ class TestCircuitBreakerBoundary(unittest.TestCase):
     def test_recovery_time_not_reached(self, mock_time):
         """冷却期 59s（未满 60s）→ 仍然熔断。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _cb_is_open,
+            _cb_record_failure,
+            _cb_is_open,
             _CIRCUIT_BREAKER_RECOVERY,
         )
+
         url = "https://api.test.com/v1"
         mock_time.time.return_value = 1000.0
 
@@ -80,8 +88,10 @@ class TestCircuitBreakerBoundary(unittest.TestCase):
     def test_multiple_endpoints_different_states(self, mock_time):
         """多个 endpoint 处于不同熔断状态（开/闭/计数中）。"""
         from src.python.llm.circuit_breaker import (
-            _cb_record_failure, _cb_is_open,
+            _cb_record_failure,
+            _cb_is_open,
         )
+
         url_a = "https://api.anthropic.com/v1"
         url_b = "https://api.openai.com/v1"
         url_c = "https://api.deepseek.com/v1"

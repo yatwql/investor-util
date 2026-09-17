@@ -35,22 +35,20 @@ class TestS0cLargeHoldings(unittest.TestCase):
 
     def setUp(self):
         # 类级公共 patch：阻止所有网络调用 + 固定交易日/时间
-        self._price_patcher = patch(
-            "src.python.report.market_value.fetch_market_data")
+        self._price_patcher = patch("src.python.report.market_value.fetch_market_data")
         self._mock_price = self._price_patcher.start()
         self._mock_price.return_value = {
-            "price": 10.0, "yesterday_close": 9.8,
-            "price_date": "2026-07-03", "source": "腾讯财经",
+            "price": 10.0,
+            "yesterday_close": 9.8,
+            "price_date": "2026-07-03",
+            "source": "腾讯财经",
             "source_api": "tencent",
         }
 
-        self._td_patcher = patch(
-            "src.python.report.market_value.get_last_trading_day",
-            return_value="2026-07-03")
+        self._td_patcher = patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03")
         self._mock_td = self._td_patcher.start()
 
-        self._dt_patcher = patch(
-            "src.python.report.market_value.datetime")
+        self._dt_patcher = patch("src.python.report.market_value.datetime")
         self._mock_dt = self._dt_patcher.start()
         self._mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
         self._mock_dt.timezone = timezone
@@ -62,18 +60,23 @@ class TestS0cLargeHoldings(unittest.TestCase):
         self._td_patcher.stop()
         self._dt_patcher.stop()
 
-    def _make_holding(self, account: str, name: str, code: str,
-                       shares: float, cost_price: float) -> Holding:
+    def _make_holding(self, account: str, name: str, code: str, shares: float, cost_price: float) -> Holding:
         return Holding(
-            account=account, name=name, code=code,
-            shares=shares, cost_price=cost_price,
+            account=account,
+            name=name,
+            code=code,
+            shares=shares,
+            cost_price=cost_price,
         )
 
     def _build_mkt(self, name: str, code: str) -> dict:
         return {
-            "price": 10.0, "yesterday_close": 9.8,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": name, "code": code,
+            "price": 10.0,
+            "yesterday_close": 9.8,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": name,
+            "code": code,
         }
 
     def test_large_holdings_generate_details(self):
@@ -81,8 +84,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
         from src.python.report.market_value import _generate_details
 
         holdings = [
-            self._make_holding("证券", f"批量股票{i:03d}", f"600{i:04d}",
-                               100, 10.0)
+            self._make_holding("证券", f"批量股票{i:03d}", f"600{i:04d}", 100, 10.0)
             for i in range(_LARGE_HOLDINGS_COUNT)
         ]
         details = _generate_details(holdings, "2026-07-03")
@@ -97,9 +99,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
         from src.python.report.market_value import _compute_detail_row
 
         holdings = [
-            self._make_holding("证券", f"批量{i:03d}", f"600{i:04d}",
-                               100, 10.0)
-            for i in range(_LARGE_HOLDINGS_COUNT)
+            self._make_holding("证券", f"批量{i:03d}", f"600{i:04d}", 100, 10.0) for i in range(_LARGE_HOLDINGS_COUNT)
         ]
 
         total_mv = 0.0
@@ -115,23 +115,11 @@ class TestS0cLargeHoldings(unittest.TestCase):
 
         holdings = []
         # 证券账户 50 条
-        holdings.extend([
-            self._make_holding("证券", f"ZQ{i:03d}", f"600{i:04d}",
-                               100, 10.0)
-            for i in range(50)
-        ])
+        holdings.extend([self._make_holding("证券", f"ZQ{i:03d}", f"600{i:04d}", 100, 10.0) for i in range(50)])
         # 支付宝 30 条
-        holdings.extend([
-            self._make_holding("支付宝", f"ZFB{i:03d}", f"000{i:04d}",
-                               200, 5.0)
-            for i in range(30)
-        ])
+        holdings.extend([self._make_holding("支付宝", f"ZFB{i:03d}", f"000{i:04d}", 200, 5.0) for i in range(30)])
         # 微信 21 条
-        holdings.extend([
-            self._make_holding("微信", f"WX{i:03d}", f"300{i:04d}",
-                               50, 20.0)
-            for i in range(21)
-        ])
+        holdings.extend([self._make_holding("微信", f"WX{i:03d}", f"300{i:04d}", 50, 20.0) for i in range(21)])
 
         self.assertEqual(len(holdings), 101)
 
@@ -150,8 +138,7 @@ class TestS0cLargeHoldings(unittest.TestCase):
         from src.python.report.market_value import _generate_details
 
         holdings = [
-            self._make_holding("证券", f"批量{i:04d}", f"600{i%9000+1000:04d}",
-                               100, 10.0)
+            self._make_holding("证券", f"批量{i:04d}", f"600{i % 9000 + 1000:04d}", 100, 10.0)
             for i in range(_EXTREME_HOLDINGS_COUNT)
         ]
         details = _generate_details(holdings, "2026-07-03")
@@ -176,12 +163,13 @@ class TestScenarioExtreme(unittest.TestCase):
 
         h = Holding("证券", "长江电力", "600900", 10_000_000_000, 28.0)
         mkt = {
-            "price": 28.5, "yesterday_close": 28.0,
+            "price": 28.5,
+            "yesterday_close": 28.0,
             "price_date": "2026-07-03",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
             detail = _compute_detail_row(h, mkt)
 
         # 市值 = 28.5 * 10^10
@@ -195,12 +183,13 @@ class TestScenarioExtreme(unittest.TestCase):
 
         h = Holding("证券", "长江电力", "600900", 1, 28.0)
         mkt = {
-            "price": 28.55, "yesterday_close": 28.0,
+            "price": 28.55,
+            "yesterday_close": 28.0,
             "price_date": "2026-07-03",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
             detail = _compute_detail_row(h, mkt)
 
         # 市值 = 28.55 * 1
@@ -216,12 +205,13 @@ class TestScenarioExtreme(unittest.TestCase):
 
         h = Holding("证券", "极小仓位", "600000", 0.001, 1000.0)
         mkt = {
-            "price": 1050.0, "yesterday_close": 1000.0,
+            "price": 1050.0,
+            "yesterday_close": 1000.0,
             "price_date": "2026-07-03",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
             detail = _compute_detail_row(h, mkt)
 
         # 不应崩溃
@@ -234,12 +224,13 @@ class TestScenarioExtreme(unittest.TestCase):
 
         h = Holding("支付宝", "易方达蓝筹", "005827", 1000, 2.1234567)
         mkt = {
-            "price": 2.2345678, "yesterday_close": 2.1000001,
+            "price": 2.2345678,
+            "yesterday_close": 2.1000001,
             "price_date": "2026-07-03",
-            "source": "天天基金", "source_api": "eastmoney",
+            "source": "天天基金",
+            "source_api": "eastmoney",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
             detail = _compute_detail_row(h, mkt)
 
         # 计算应有 round 保护
@@ -254,12 +245,13 @@ class TestScenarioExtreme(unittest.TestCase):
 
         h = Holding("证券", "极端组合", "600000", 0, 0.0)
         mkt = {
-            "price": 0.0, "yesterday_close": 0.0,
+            "price": 0.0,
+            "yesterday_close": 0.0,
             "price_date": "",
-            "source": "--", "source_api": "",
+            "source": "--",
+            "source_api": "",
         }
-        with patch("src.python.report.market_value.get_last_trading_day",
-                   return_value="2026-07-03"):
+        with patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"):
             detail = _compute_detail_row(h, mkt)
 
         # 零份额 + 零成本 → 全零

@@ -23,12 +23,12 @@
   "system_prompt_global_macro": null,
   "model_global_macro": null,
   "temperature_global_macro": 0.3,
-  "max_tokens_global_macro": 2048,
+  "max_tokens_global_macro": 3072,
   "timeout_global_macro": 60,
   "cache_enabled_global_macro": true,
   "output_brief_global_macro": false,
   "thinking_enabled_global_macro": false,
-  "thinking_budget_global_macro": 4000,
+  "thinking_budget_global_macro": 6000,
   "reasoning_effort_global_macro": "high",
 
   // ═══════════════════════════════════════════
@@ -37,12 +37,12 @@
   "system_prompt_expert_review": null,
   "model_expert_review": null,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 24000,
+  "max_tokens_expert_review": 36000,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
   "output_brief_expert_review": false,
   "thinking_enabled_expert_review": true,
-  "thinking_budget_expert_review": 16000,
+  "thinking_budget_expert_review": 24000,
   "reasoning_effort_expert_review": "low",
 
   // ═══════════════════════════════════════════
@@ -51,12 +51,12 @@
   "system_prompt_health_check": null,
   "model_health_check": null,
   "temperature_health_check": 0.1,
-  "max_tokens_health_check": 16000,
+  "max_tokens_health_check": 24000,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
   "output_brief_health_check": false,
   "thinking_enabled_health_check": true,
-  "thinking_budget_health_check": 12000,
+  "thinking_budget_health_check": 18000,
   "reasoning_effort_health_check": "medium",
 
   // ═══════════════════════════════════════════
@@ -65,12 +65,12 @@
   "system_prompt_penetration_deep": null,
   "model_penetration_deep": null,
   "temperature_penetration_deep": 0.1,
-  "max_tokens_penetration_deep": 8192,
+  "max_tokens_penetration_deep": 12288,
   "timeout_penetration_deep": 90,
   "cache_enabled_penetration_deep": true,
   "output_brief_penetration_deep": false,
   "thinking_enabled_penetration_deep": false,
-  "thinking_budget_penetration_deep": 8000,
+  "thinking_budget_penetration_deep": 12000,
   "reasoning_effort_penetration_deep": "high",
 
   // ═══════════════════════════════════════════
@@ -80,11 +80,11 @@
   "system_prompt_news_correlation": null,
   "model_news_correlation": null,
   "temperature_news_correlation": 0.1,
-  "max_tokens_news_correlation": 2000,
+  "max_tokens_news_correlation": 3000,
   "timeout_news_correlation": 60,
   "cache_enabled_news_correlation": true,
   "thinking_enabled_news_correlation": false,
-  "thinking_budget_news_correlation": 4000,
+  "thinking_budget_news_correlation": 6000,
   "reasoning_effort_news_correlation": "high",
   "news_correlation_top_n": 30,
 
@@ -94,8 +94,9 @@
   // ═══════════════════════════════════════════
   "debate": {
     // 正反辩论 — 三段式(白脸→黑脸→综合)
+    // 每阶段 max_tokens 覆盖（null=按代码兜底 12288；经 max_tokens_override 优先于 max_tokens_expert_review）
     "procon": {
-      "per_call_max_tokens": null,
+      "per_call_max_tokens": 18432,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
     },
@@ -113,7 +114,7 @@
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
-    "max_total_tokens_per_report": 48000,
+    "max_total_tokens_per_report": 72000,
     // 辩论模式单次 API 调用超时覆盖（秒）
     "per_call_timeout_override": 90
   },

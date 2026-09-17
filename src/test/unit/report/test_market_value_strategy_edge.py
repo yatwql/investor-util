@@ -11,12 +11,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import PropertyMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from src.python.core.models import Holding
-from src.python.core.provider_registry import FetchStrategy, get_registry
+from src.python.core.provider_registry import get_registry
 from src.python.report import market_value as mv
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
@@ -24,24 +24,33 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 # ── 测试数据 ────────────────────────────────────────────────
 
 _TENCENT_DATA = {
-    "name": "电池ETF", "code": "561910",
-    "price": 10.5, "yesterday_close": 10.0,
+    "name": "电池ETF",
+    "code": "561910",
+    "price": 10.5,
+    "yesterday_close": 10.0,
     "price_date": "2026-06-26",
-    "source_api": "tencent", "source": "腾讯财经",
+    "source_api": "tencent",
+    "source": "腾讯财经",
 }
 
 _EASTMONEY_DATA = {
-    "name": "中欧医疗健康混合C", "code": "003095",
-    "price": 1.5, "yesterday_close": 1.48,
+    "name": "中欧医疗健康混合C",
+    "code": "003095",
+    "price": 1.5,
+    "yesterday_close": 1.48,
     "price_date": "2026-06-25",
-    "source_api": "eastmoney", "source": "东方财富",
+    "source_api": "eastmoney",
+    "source": "东方财富",
 }
 
 _QDII_DATA = {
-    "name": "华夏纳斯达克100ETF(QDII)", "code": "513300",
-    "price": 1.6, "yesterday_close": 1.55,
+    "name": "华夏纳斯达克100ETF(QDII)",
+    "code": "513300",
+    "price": 1.6,
+    "yesterday_close": 1.55,
     "price_date": "2026-06-25",
-    "source_api": "tencent", "source": "腾讯财经",
+    "source_api": "tencent",
+    "source": "腾讯财经",
 }
 
 
@@ -237,6 +246,7 @@ class TestStrategyLogging:
         """
         _setup_registry()
         import logging
+
         caplog.set_level(logging.INFO)
         # 预填 session cache
         get_registry().session_cache_set("price", "561910", _TENCENT_DATA, source="test")

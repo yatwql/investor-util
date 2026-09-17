@@ -5,13 +5,13 @@
   - 补强模式能检出真实历史痕迹（此前/曾经/原始/历史实现/旧逻辑/迁移到新/重构前）
   - 合法运行时/当前状态描述不被误伤（历史数据/当前版本/此前已配置/之前缓存过）
   - 文档「工具说明」元描述行豁免
-  - 测试文件回归场景元描述豁免（仅 src/test/：旧实现/修复前/回归场景/rf-xxx 批次修复）
+  - 测试文件回归场景元描述豁免（仅 src/test/：旧实现/修复前/回归场景；任务编号不在豁免内）
   - 版本号/任务编号等既有模式仍工作
   - 章节编号暗号（"N 章"/"第 N 章"指代报告具体章节）检出，计数表述（共 N 章等）豁免
   - 迭代轮次暗号（"第 N 轮"/"轮N"指代开发迭代轮次）检出，计数/运行时表述（共 N 轮/
     轮询/轮动等）豁免
-  - 架构约束代号（C1~C20，technical.md 定义）在注释/文档正文属暗号须检出；约束定义处
-    （technical.md / llm-technical.md）豁免；非约束 C+数字（色值 C00000、C21+、内嵌
+  - 架构约束代号（C1~C25，technical.md 定义）在注释/文档正文属暗号须检出；约束定义处
+    （technical.md / llm-technical.md）豁免；非约束 C+数字（色值 C00000、C26+、内嵌
     AB14/MC19）不误伤
 
 测试通过脚本 import 方式直接复用 PATTERNS / EXCLUDE_LINE / 各扫描函数，
@@ -230,7 +230,7 @@ class TestTestFileMetaExemption:
         legit = [
             "回归场景：建设银行'今日下跌3.41%'曾被误修正为 1.9%（误当收益率）。",
             "回归断言 1.9 → 187.1（而非旧实现把 3.41/4.43 修正成 1.9）。",
-            "# ── 回归：百分单位契约 + 单日涨跌语境 + 表格行归因（rf-159 批次修复） ──",
+            "# ── 回归：百分单位契约 + 单日涨跌语境 + 表格行归因 ──",
         ]
         for line in legit:
             assert code_traces._is_excluded(line, test_file=True) is True, f"回归元描述未豁免: {line}"
@@ -245,10 +245,35 @@ class TestTestFileMetaExemption:
         for line in legit:
             assert code_traces._is_excluded(line, test_file=True) is True, f"旧行为描述未豁免: {line}"
 
-    def test_rf_task_id_batch_note_exempted_in_test_file(self, code_traces):
-        """引用历史任务编号的修复批次说明（rf-xxx 批次修复）在测试文件应豁免。"""
-        assert code_traces._is_excluded("表格行归因（rf-159 批次修复）", test_file=True) is True
+    def test_rf_task_id_in_test_comment_not_exempted(self, code_traces):
+        """任务编号不属测试元描述豁免范围：测试注释中的 rf-N 仍视为违规。
+
+        `TEST_META_EXCLUDE` 只覆盖「回归场景/旧实现」等元描述；任务代号只属
+        内部计划表（plan.md/review-findings.md），不扩散到实现层注释。
+        """
+        assert code_traces._is_excluded("表格行归因（rf-159 批次修复）", test_file=True) is False
         assert code_traces._is_excluded("表格行归因（rf-159 批次修复）", test_file=False) is False
+
+    def test_task_id_hard_ban_in_test_file_comment(self, code_traces):
+        """scan_file 对 src/test/ 注释中的任务编号硬检出（不受整行豁免放行）。"""
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "src" / "test" / "sample.py"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(
+                "x = 1  # 回归：某修复（rf-159 批次修复）\n",
+                encoding="utf-8",
+            )
+            hits = code_traces.scan_file(p, verbose=False)
+            assert any(h[1] == "CODE" for h in hits), f"测试注释中的任务编号未检出: {hits}"
+
+    def test_task_id_hard_ban_in_source_comment(self, code_traces):
+        """scan_file 对源码注释中的任务编号同样硬检出。"""
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "src" / "python" / "sample.py"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("y = 2  # 见 plan-18 任务\n", encoding="utf-8")
+            hits = code_traces.scan_file(p, verbose=False)
+            assert any(h[1] == "CODE" for h in hits), f"源码注释中的任务编号未检出: {hits}"
 
     def test_not_exempted_outside_test_file(self, code_traces):
         """同样的旧实现叙述在非测试文件（test_file=False）仍应被检出——工具应检出此历史痕迹，源码侧不削弱。"""
@@ -384,10 +409,15 @@ class TestDocTraceDetection:
         assert _doc_hit(doc_traces, "R17 兼容") is None
 
     def test_arch_constraint_cipher_flagged(self, doc_traces):
-        """文档正文架构约束代号（C1~C20）属暗号须检出（须改写为语义描述）。"""
+        """文档正文架构约束代号（C1~C25）属暗号须检出（须改写为语义描述）。"""
         flagged = [
             "C19 契约",
             "C20 图下说明",
+            "C21 指纹同源",
+            "C22 挂载点集中",
+            "C23 注册表唯一事实来源",
+            "C24 凭据值不落日志",
+            "C25 交易日基准",
             "C1 约束：代码类型判定复用 code_utils",
             "C14 合规，不写 _ENV.globals",
         ]
@@ -395,10 +425,10 @@ class TestDocTraceDetection:
             assert _doc_hit(doc_traces, line) is not None, f"架构约束代号未检出: {line}"
 
     def test_arch_constraint_cipher_false_positives(self, doc_traces):
-        """非约束的 C+数字组合不得误伤：十六进制色值、C21+、内嵌命中。"""
+        """非约束的 C+数字组合不得误伤：十六进制色值、C26+、内嵌命中。"""
         legit = [
             "色值 C00000 不随版本变",
-            "C21 方案不在约束表",
+            "C26 方案不在约束表",
             "AB14 协议对接",
             "MC19 型号",
         ]
@@ -408,7 +438,7 @@ class TestDocTraceDetection:
 
 class TestDocCipherExemptFiles:
     """架构约束代号豁免文件：约束定义处（technical.md / llm-technical.md）
-    正文大量引用 C1~C20（技术名称表）属定义载体，豁免；其余文档（含
+    正文大量引用 C1~C21（技术名称表）属定义载体，豁免；其余文档（含
     trace-exempt 的计划/变更记录文档）正文一律禁。"""
 
     def _scan(self, doc_traces, name: str, content: str, chapter_only: bool) -> list:
@@ -423,14 +453,14 @@ class TestDocCipherExemptFiles:
         return [h for h in self._scan(doc_traces, name, content, chapter_only) if h[1] == "CIPHER"]
 
     def test_regular_doc_flagged_both_modes(self, doc_traces):
-        """普通文档（含 trace-exempt 的计划/变更记录）正文出现 C1~C20 一律检出。"""
+        """普通文档（含 trace-exempt 的计划/变更记录）正文出现 C1~C21 一律检出。"""
         content = "C19 契约注入 pipeline_data\n"
         for chapter_only in (False, True):
             hits = self._cipher_hits(doc_traces, "other.md", content, chapter_only)
             assert len(hits) == 1, f"chapter_only={chapter_only} 应检出 CIPHER: {hits}"
 
     def test_technical_md_exempt_both_modes(self, doc_traces):
-        """technical.md（约束定义处）正文引用 C1~C20 属定义载体，豁免。"""
+        """technical.md（约束定义处）正文引用 C1~C21 属定义载体，豁免。"""
         content = "C19 契约 / C20 图下说明 / C1 约束\n"
         for chapter_only in (False, True):
             hits = self._cipher_hits(doc_traces, "technical.md", content, chapter_only)
@@ -852,11 +882,11 @@ class TestTaskCodeCommentPatterns:
             assert _code_hit(code_traces, line) is None, f"合法字母+数字被误伤: {line}"
 
     def test_magic_number_letter_digit_flagged(self, code_traces):
-        """MAGIC：注释中"字母+数字/连续字母+数字"（R11/P1/C21/AB14/HH6）属魔法编号须检出。"""
+        """MAGIC：注释中"字母+数字/连续字母+数字"（R11/P1/C26/AB14/HH6）属魔法编号须检出。"""
         flagged = [
             "P1 优先级",
             "R17 兼容",
-            "C21 兼容",  # 超出 C1~C20 范围仍是字母+数字，属魔法编号
+            "C26 兼容",  # 超出约束表编号范围仍是字母+数字，属魔法编号
             "AB14 兼容",  # 连续字母+数字（内嵌命中也是魔法编号）
             "MC19 协议",
             "D8 数据",
@@ -911,13 +941,18 @@ class TestTaskCodeCommentPatterns:
             assert _code_hit(code_traces, line) is None, f"合法字母_数字被误伤: {line}"
 
     def test_arch_constraint_codes_flagged(self, code_traces):
-        """架构约束代号（C1~C20，technical.md 定义）在注释中属暗号须检出。"""
+        """架构约束代号（C1~C25，technical.md 定义）在注释中属暗号须检出。"""
         flagged = [
             "C1 约束：代码类型判定复用 code_utils",
             "C3 原子写入",
             "C8 日志统一",
             "C14 合规，不写 _ENV.globals",
             "C20 图下说明",
+            "C21 指纹同源",
+            "C22 挂载点集中",
+            "C23 注册表唯一事实来源",
+            "C24 凭据值不落日志",
+            "C25 交易日基准",
         ]
         for line in flagged:
             assert _code_hit(code_traces, line) is not None, f"架构约束代号未检出: {line}"

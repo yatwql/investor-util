@@ -91,10 +91,12 @@ class TestHtmlCssStructure(unittest.TestCase):
             self.assertIn('style="order:', sec_tag, f"section div 缺少 order 样式: {sec_tag}")
 
     def test_section_count(self):
-        """模板 + partials 应共含 19 个 .section 容器（含 style_factor、position_relationship、
-        portfolio_evolution、action）。
+        """模板 + partials 应共含 17 个 .section 容器（含 style_factor、position_structure、
+        portfolio_evolution、financial_report_digest、financial_indicator、action）。
 
-        组合演进/行动建议章节已拆入 partials/evolution_section.html 与 partials/action_section.html
+        组合演进/行动建议/持仓个股财报摘要/财务指标章节已拆入 partials/evolution_section.html、
+        partials/action_section.html、partials/financial_report_section.html 与
+        partials/financial_indicator_section.html
         （经 include 引入），因此统计需覆盖 tmpl/partials/ 下的 partial 文件。
         """
         sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
@@ -108,8 +110,8 @@ class TestHtmlCssStructure(unittest.TestCase):
                     extra += len(re.findall(r'<div\s+class="section"[^>]*>', f.read()))
         self.assertEqual(
             len(sections) + extra,
-            19,
-            f"应有 19 个 .section 容器（主模板 {len(sections)} + partial {extra}），实际 {len(sections) + extra}",
+            17,
+            f"应有 17 个 .section 容器（主模板 {len(sections)} + partial {extra}），实际 {len(sections) + extra}",
         )
 
     # ── section-title pattern ──────────────────────────────────
@@ -126,14 +128,16 @@ class TestHtmlCssStructure(unittest.TestCase):
                 "section_numbers['", title_html, f"section-title 缺少 section_numbers 引用: {title_html[:80]}"
             )
 
-    # ── 18 nav <a> in section-nav ──────────────────────────────
+    # ── 目录/横向导航的锚点模板 ──────────────────────────────
 
-    def test_nav_links_count_in_source(self):
-        """模板中 nav 循环应包含 18 个 <a> 标签（不考虑可见性）。"""
-        _ = re.findall(
-            r'<a\s+href="#sec-[^"]+">',
-            self.tmpl,
-        )
+    def test_nav_anchor_templates_present(self):
+        """模板保留两处导航锚点模板：分组折叠导航循环 + 扁平回退导航循环。
+
+        锚点由循环按可见章节生成，故锁定「锚点模板存在且为 2 处」（数字随
+        章节增减而变，不写死个数）。
+        """
+        anchors = re.findall(r'href="#sec-\{\{\s*sec\[', self.tmpl)
+        self.assertEqual(len(anchors), 2, f"应有 2 处导航锚点模板（分组 + 扁平），实际 {len(anchors)}")
 
 
 class TestHtmlRegressionChecks(unittest.TestCase):

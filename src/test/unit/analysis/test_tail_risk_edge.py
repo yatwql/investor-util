@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
-
 from src.python.analysis.tail_risk import compute_tail_risk
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
 
 
 def _bars(values: list[float], start: str = "2026-01-01") -> list[dict]:

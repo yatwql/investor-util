@@ -167,8 +167,9 @@ class TestDirectoryChecks:
     def test_output_dir_unwritable_is_reported(self, tmp_path):
         target = tmp_path / "out"
         target.mkdir()
-        with patch("src.python.config.get_config", return_value={"output_dir": str(target)}), patch.object(
-            doctor, "_check_writable", return_value=(False, "不可写: 权限不足")
+        with (
+            patch("src.python.config.get_config", return_value={"output_dir": str(target)}),
+            patch.object(doctor, "_check_writable", return_value=(False, "不可写: 权限不足")),
         ):
             items = [r for r in doctor._check_directories() if r["label"] == "输出目录"]
 
@@ -189,13 +190,13 @@ class TestFeatureGateReporting:
 
     def test_enabled_experiments_listed_by_display_name(self):
         def _enabled(flag: str) -> bool:
-            return flag == "doctor_check"
+            return flag == "signal_ledger"
 
         with patch("src.python.config.features.is_feature_enabled", side_effect=_enabled):
             items = doctor._check_experimental_features()
 
         assert items[0]["ok"] is True
-        assert "系统自检" in items[0]["message"]
+        assert "确定性信号沉淀" in items[0]["message"]
 
 
 @pytest.mark.unit
@@ -232,9 +233,9 @@ class TestSummaryAndRender:
         assert "照此修复" in text
         assert "不该显示" not in text
 
-    def test_render_marks_experimental_status(self):
-        """自检是实验功能——输出必须自陈，不让用户误以为它是稳定结论。"""
-        assert "doctor_check" in format_doctor_report([])
+    def test_render_states_read_only_scope(self):
+        """输出必须自陈只读范围——用户据此判断它会不会动自己的文件。"""
+        assert "只读诊断" in format_doctor_report([])
 
     def test_render_plain_when_color_disabled(self):
         text = format_doctor_report(_local_checks(), use_color=False)

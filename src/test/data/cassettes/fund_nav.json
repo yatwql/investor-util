@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "name": "fund_nav",
+  "source": "eastmoney",
+  "recorded_at": "2026-09-10T18:38:38+08:00",
+  "interactions": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "https://api.fund.eastmoney.com/f10/lsjz?callback=jQuery&fundCode=110022&pageIndex=1&pageSize=3"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "date": "Thu, 10 Sep 2026 10:38:38 GMT",
+          "content-type": "application/json; charset=utf-8",
+          "content-length": "828",
+          "connection": "keep-alive",
+          "cache-control": "no-cache",
+          "pragma": "no-cache",
+          "expires": "-1"
+        },
+        "body": "jQuery({\"Data\":{\"LSJZList\":[{\"FSRQ\":\"2026-09-09\",\"DWJZ\":\"2.8900\",\"LJJZ\":\"2.8900\",\"SDATE\":null,\"ACTUALSYI\":\"\",\"NAVTYPE\":\"1\",\"JZZZL\":\"-0.62\",\"SGZT\":\"开放申购\",\"SHZT\":\"开放赎回\",\"FHFCZ\":\"\",\"FHFCZ10\":\"\",\"FHFCBZ\":\"\",\"DTYPE\":null,\"FHSP\":\"\"},{\"FSRQ\":\"2026-09-08\",\"DWJZ\":\"2.9080\",\"LJJZ\":\"2.9080\",\"SDATE\":null,\"ACTUALSYI\":\"\",\"NAVTYPE\":\"1\",\"JZZZL\":\"-0.58\",\"SGZT\":\"开放申购\",\"SHZT\":\"开放赎回\",\"FHFCZ\":\"\",\"FHFCZ10\":\"\",\"FHFCBZ\":\"\",\"DTYPE\":null,\"FHSP\":\"\"},{\"FSRQ\":\"2026-09-07\",\"DWJZ\":\"2.9250\",\"LJJZ\":\"2.9250\",\"SDATE\":null,\"ACTUALSYI\":\"\",\"NAVTYPE\":\"1\",\"JZZZL\":\"-1.25\",\"SGZT\":\"开放申购\",\"SHZT\":\"开放赎回\",\"FHFCZ\":\"\",\"FHFCZ10\":\"\",\"FHFCBZ\":\"\",\"DTYPE\":null,\"FHSP\":\"\"}],\"FundType\":\"001\",\"SYType\":null,\"isNewType\":false,\"Feature\":null},\"ErrCode\":0,\"ErrMsg\":null,\"TotalCount\":3883,\"Expansion\":null,\"PageSize\":3,\"PageIndex\":1})",
+        "encoding": "utf-8"
+      }
+    }
+  ]
+}

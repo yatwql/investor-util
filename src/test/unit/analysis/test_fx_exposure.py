@@ -130,6 +130,42 @@ class TestFxExposureEdge:
         assert result["has_foreign"] is True
 
 
+class TestFxExposureOtherCurrency:
+    """第三种币种（非 CNY/HKD/USD）行渲染。
+
+    当前 `get_currency_by_code()` 只返回 CNY/HKD/USD，故该行走不到；但取值来源只
+    覆盖三种时，「其他」行的标签必须与已知币种同一取法（查 `_CURRENCY_LABELS`），
+    否则一旦新增币种（如 JPY）该分支即抛 NameError，把整段敞口分析打断。
+    """
+
+    def test_other_currency_row_labeled(self):
+        """出现未知币种 → 「其他」行带中文标签，不抛 NameError。"""
+        from unittest.mock import patch
+
+        from src.python.analysis.fx_exposure import fx_exposure
+
+        holdings = [
+            {"name": "贵州茅台", "code": "600519", "market_value": 50_000},
+            {"name": "某日股", "code": "7203", "market_value": 50_000},
+        ]
+
+        def _fake_currency(name, code):
+            """日股代码 → JPY（模拟将来新增币种）。"""
+            return "JPY" if code == "7203" else "CNY"
+
+        with patch(
+            "src.python.analysis.fx_exposure.get_currency_by_code",
+            side_effect=_fake_currency,
+        ):
+            result = fx_exposure(holdings)
+
+        other = [e for e in result["exposures"] if e["currency"] == "其他"]
+        assert len(other) == 1, "未知币种未汇总为「其他」行"
+        assert other[0]["label"] == "其他币种"
+        assert other[0]["pct"] == 50.0
+        assert result["has_foreign"] is True
+
+
 class TestBuildFxExposureBlock:
     """_build_fx_exposure_block prompt 构建测试。"""
 

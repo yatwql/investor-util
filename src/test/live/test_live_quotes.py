@@ -5,6 +5,7 @@
 断言原则：只校验返回「结构」（字段存在、类型、非空），不校验具体数值，
 容忍真实行情波动（休市、指数涨跌、数据源改字段等）。
 """
+
 from __future__ import annotations
 
 import pytest
@@ -12,10 +13,10 @@ import pytest
 pytestmark = [pytest.mark.live]
 
 # 选稳定、流通性好的标的做连通性验证
-_A_STOCK = "600900"      # 长江电力
-_ETF = "510300"          # 沪深300ETF
-_FUND = "110022"         # 易方达消费行业（场外基金）
-_INDEX = "sh000001"      # 上证指数
+_A_STOCK = "600900"  # 长江电力
+_ETF = "510300"  # 沪深300ETF
+_FUND = "110022"  # 易方达消费行业（场外基金）
+_INDEX = "sh000001"  # 上证指数
 
 
 @pytest.mark.live

@@ -54,9 +54,9 @@ LLM 配置由三个独立文件管理：
     "news_correlation": false
   },
   "temperature_global_macro": 0.3,
-  "max_tokens_global_macro": 2048,
+  "max_tokens_global_macro": 3072,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 24000,
+  "max_tokens_expert_review": 36000,
   "pricing": {
     "currency": "CNY",
     "timezone": "Asia/Shanghai",
@@ -141,10 +141,14 @@ LLM 配置由三个独立文件管理：
 | `name` | ✅ | string | Provider 唯一标识名，用于日志和缓存键 |
 | `provider` | ✅ | string | 服务商类型：`claude` / `openai` / `gemini` |
 | `credentials_ref` | ✅ | string | 引用 `llm_key.json` 中的凭据块键名 |
+| `model` | ❌ | string | 路由字段：覆盖凭据块中的同名模型名；缺省时用凭据块的值 |
+| `endpoint` | ❌ | string | 路由字段：覆盖凭据块中的同名端点；缺省时用凭据块的值 |
 | `priority` | ❌ | int | 优先级（数值越小越优先），默认 99 |
 | `weight` | ❌ | int | 加权随机权重，仅 `weighted` 策略有效，默认 1 |
 | `timeout` | ❌ | int | 超时秒数，覆盖全局 timeout，默认 60 |
 | `proxy_preferred` | ❌ | bool | `true` 时优先使用代理直连（而非自动路由），默认 `false` |
+
+> **不得内联 `api_key`**：本文件可提交仓库（团队共享调优参数），因此**只放路由字段**——写入 `api_key` 等于把密钥随配置入库。校验器遇到非空内联 `api_key` 会记 WARNING 并**跳过整条 provider**（不是仅告警后放行）。密钥一律写在 `llm_key.json` 的凭据块里，本文件用 `credentials_ref` 引用。`model` / `endpoint` 属非敏感路由字段，可留在本文件按条目覆盖凭据块同名值。
 
 ### 切换策略
 
@@ -232,7 +236,7 @@ LLM Provider 状态
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
-- 菜单 **[S]** 面板分两组：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）与 ⚗ 实验性功能（编号紧随标准模块之后，由 `features.json` 的 Feature Flag 控制，见下方 `debate` 配置段）。实验开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**登记决策并用真实行情结算命中率，再将教训回灌专家复盘提示词（行动建议章内嵌「历史决策复盘」块）；**信号预消化（`signal_pre_digest`）**把市场温度档位/持仓估值分位分布/尾部风险幅度预消化为 `信号：{指标} {结论}（{依据}）` 的方向行，置于智囊团复盘与持仓体检提示词的结论位置，降低模型读裸数值自行推断方向的误判率；**模块级质量分级（`module_quality_gate`）**对 4 个 LLM 模块输出按完整性与篇幅评 A~F，低评级中「内容在但存在缺陷」者（缺必需章节/篇幅明显偏短）在模块内容头部注入 `【内容质量提示】` 横幅（评级 + 具体原因 + 降级参考提示），**只标注、不阻断生成、不触发重试、不写回缓存**——A/B 级健康输出零噪音，内容缺失型（空内容/降级占位）已有各自醒目提示故不叠加横幅；**决策头结构化（`decision_header_parse`）**在专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读结构化头、失败回落确定性表格解析——两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），防「不建议加仓」「加仓或减仓」这类表述被判成相反方向写入决策账本；**关闭时该段不追加**，提示词与缓存指纹逐字节不变；**确定性信号沉淀（`signal_ledger`）**把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类确定性算法评级沉淀为账本 `data/state/signal_ledger.jsonl`，每条记录附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施：逐品种行情新鲜度 + 数据源降级事件，非实时即本次由降级/缓存行情算出），并把摘要注入智囊团复盘提示词——**统计与摘要默认只算实时记录**，防止降级数据算出的评级冒充真实战绩；关闭时账本不写盘、提示词与缓存指纹逐字节不变；**系统自检（`doctor_check`）**开启 TUI 菜单 `[D]` 与 Web「系统自检」卡片，一键盘点环境/配置/目录/功能开关/数据源五组，其中「配置」组会校验本文件的 LLM 凭据是否可读——**自检只读、自身永不抛异常**，且 CLI 的 `doctor` 子命令不受本开关约束。以上开关均可用 CLI 全局参数 `--experiment` 单次启用（不写盘）
+- 菜单 **[S]** 面板分三块：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）、⚗ 实验性功能（6-9，由 `features.json` 的 Feature Flag 控制，见下方 `debate` 配置段）与常规开关（10-25，默认开启的常驻开关，与 LLM 无关，详见 [配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)）。实验开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**登记决策并用真实行情结算命中率，再将教训回灌专家复盘提示词（行动建议章内嵌「历史决策复盘」块）；**信号预消化（`signal_pre_digest`）**把市场温度档位/持仓估值分位分布/尾部风险幅度预消化为 `信号：{指标} {结论}（{依据}）` 的方向行，置于智囊团复盘与持仓体检提示词的结论位置，降低模型读裸数值自行推断方向的误判率；**模块级质量分级（`module_quality_gate`）**对 4 个 LLM 模块输出按完整性与篇幅评 A~F，低评级中「内容在但存在缺陷」者（缺必需章节/篇幅明显偏短）在模块内容头部注入 `【内容质量提示】` 横幅（评级 + 具体原因 + 降级参考提示），**只标注、不阻断生成、不触发重试、不写回缓存**——A/B 级健康输出零噪音，内容缺失型（空内容/降级占位）已有各自醒目提示故不叠加横幅；**决策头结构化（`decision_header_parse`）**在专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读结构化头、失败回落确定性表格解析——两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），防「不建议加仓」「加仓或减仓」这类表述被判成相反方向写入决策账本；**关闭时该段不追加**，提示词与缓存指纹逐字节不变；**确定性信号沉淀（`signal_ledger`）**把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类确定性算法评级沉淀为账本 `data/state/signal_ledger.jsonl`，每条记录附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施：逐品种行情新鲜度 + 数据源降级事件，非实时即本次由降级/缓存行情算出），并把摘要注入智囊团复盘提示词——**统计与摘要默认只算实时记录**，防止降级数据算出的评级冒充真实战绩；关闭时账本不写盘、提示词与缓存指纹逐字节不变；**系统自检（`doctor_check`）**不在实验块而在**常规块**（默认开启、只读、不改报告产物），提供 TUI 菜单 `[D]` 与 Web「系统自检」卡片，一键盘点环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，其中「配置」组会校验本文件的 LLM 凭据是否可读——**自检只读、自身永不抛异常**，且 CLI 的 `doctor` 子命令不受该开关约束；本段未展开的**数据源凭据就绪（`datasource_credential_ready`）**属数据层、与 LLM 无关（详见 [配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)）。以上开关均可用 CLI 全局参数 `--experiment`（实验组简写，只开）或 `--feature NAME=VALUE`（全部开关、双向）单次切换（不写盘）
 - 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
 - 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
 
@@ -298,7 +302,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: [], weekend_always_idle: true}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）、`weekend_always_idle`（周末全天闲时开关，默认 `true`）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
-- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，null=默认 8192）、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 48000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**本段仅控制辩论行为的参数，启停由 Feature Flag（`llm_debate_*`）决定，非配置直接启用**；决策跨期反思闭环（`decision_reflection`）同样由 Feature Flag 启停，无独立配置段
+- `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，默认 18432（null 时按代码兜底同值））、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 72000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**本段仅控制辩论行为的参数，启停由 Feature Flag（`llm_debate_*`）决定，非配置直接启用**；决策跨期反思闭环（`decision_reflection`）同样由 Feature Flag 启停，无独立配置段
 
 ### 模块级配置
 
@@ -307,12 +311,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `system_prompt_{module}` | string / null | `null` | 系统提示词覆盖，`null`=使用代码内置 prompt |
 | `model_{module}` | string / null | `null` | 独立指定本模块使用的模型，`null`=使用 Provider 默认模型。**仅 flat 模式生效；多链模式优先使用 `llm_providers.json` 中凭据块定义的模型** |
 | `temperature_{module}` | float | 0.1~0.8（模块差异） | 采样温度，0=确定性最高，1=最大多样性 |
-| `max_tokens_{module}` | int | 2048~24000（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试）。**DeepSeek 为 thinking + 正文共享预算**（详见下方 DeepSeek V4 说明） |
+| `max_tokens_{module}` | int | 3072~36000（模块差异） | 输出最大 token 数，超过时内容被截断（触发自动重试）。**DeepSeek 为 thinking + 正文共享预算**（详见下方 DeepSeek V4 说明） |
 | `timeout_{module}` | int | 60~120（模块差异） | API 超时秒数 |
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
 | `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式（news_correlation）不支持** |
 | `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude / DeepSeek / Gemini 2.5） |
-| `thinking_budget_{module}` | int | 4000~16000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
+| `thinking_budget_{module}` | int | 6000~24000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
 > 各模块默认值差异详见下方「各模块推荐参数值」表。
@@ -398,12 +402,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_global_macro": null,
   "model_global_macro": null,
   "temperature_global_macro": 0.3,
-  "max_tokens_global_macro": 2048,
+  "max_tokens_global_macro": 3072,
   "timeout_global_macro": 60,
   "cache_enabled_global_macro": true,
   "output_brief_global_macro": false,
   "thinking_enabled_global_macro": false,
-  "thinking_budget_global_macro": 4000,
+  "thinking_budget_global_macro": 6000,
   "reasoning_effort_global_macro": "high",
 
   // ═══════════════════════════════════════════
@@ -412,12 +416,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_expert_review": null,
   "model_expert_review": null,
   "temperature_expert_review": 0.3,
-  "max_tokens_expert_review": 24000,
+  "max_tokens_expert_review": 36000,
   "timeout_expert_review": 120,
   "cache_enabled_expert_review": true,
   "output_brief_expert_review": false,
   "thinking_enabled_expert_review": true,
-  "thinking_budget_expert_review": 16000,
+  "thinking_budget_expert_review": 24000,
   "reasoning_effort_expert_review": "low",
 
   // ═══════════════════════════════════════════
@@ -426,12 +430,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_health_check": null,
   "model_health_check": null,
   "temperature_health_check": 0.1,
-  "max_tokens_health_check": 16000,
+  "max_tokens_health_check": 24000,
   "timeout_health_check": 120,
   "cache_enabled_health_check": true,
   "output_brief_health_check": false,
   "thinking_enabled_health_check": true,
-  "thinking_budget_health_check": 12000,
+  "thinking_budget_health_check": 18000,
   "reasoning_effort_health_check": "medium",
 
   // ═══════════════════════════════════════════
@@ -440,12 +444,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_penetration_deep": null,
   "model_penetration_deep": null,
   "temperature_penetration_deep": 0.1,
-  "max_tokens_penetration_deep": 8192,
+  "max_tokens_penetration_deep": 12288,
   "timeout_penetration_deep": 90,
   "cache_enabled_penetration_deep": true,
   "output_brief_penetration_deep": false,
   "thinking_enabled_penetration_deep": false,
-  "thinking_budget_penetration_deep": 8000,
+  "thinking_budget_penetration_deep": 12000,
   "reasoning_effort_penetration_deep": "high",
 
   // ═══════════════════════════════════════════
@@ -455,11 +459,11 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "system_prompt_news_correlation": null,
   "model_news_correlation": null,
   "temperature_news_correlation": 0.1,
-  "max_tokens_news_correlation": 2000,
+  "max_tokens_news_correlation": 3000,
   "timeout_news_correlation": 60,
   "cache_enabled_news_correlation": true,
   "thinking_enabled_news_correlation": false,
-  "thinking_budget_news_correlation": 4000,
+  "thinking_budget_news_correlation": 6000,
   "reasoning_effort_news_correlation": "high",
   "news_correlation_top_n": 30,
 
@@ -470,8 +474,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
   "debate": {
     // 正反辩论 — 三段式(白脸→黑脸→综合)
     "procon": {
-      // 每阶段 max_tokens 覆盖（null=默认 8192；经 max_tokens_override 优先于 max_tokens_expert_review）
-      "per_call_max_tokens": null,
+      // 每阶段 max_tokens 覆盖（默认 18432；null=按代码兜底同值；经 max_tokens_override 优先于 max_tokens_expert_review）
+      "per_call_max_tokens": 18432,
       "synthesis_model": null,
       "synthesis_temperature": 0.5
     },
@@ -489,7 +493,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
-    "max_total_tokens_per_report": 48000,
+    "max_total_tokens_per_report": 72000,
     // 辩论模式单次 API 调用超时覆盖（秒）
     "per_call_timeout_override": 90
   },
@@ -536,11 +540,11 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 | 模块 | model | temperature | max_tokens | timeout | thinking_enabled | thinking_budget | reasoning_effort | output_brief_limit |
 |------|:-----:|:-----------:|:----------:|:-------:|:----------------:|:---------------:|:----------------:|:------------------:|
-| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **2048** | **60s** | false | 4000 | high | **200 字** |
-| **智囊团深度复盘** | null | **0.3**（低温保事实） | **24000** | **120s** | **true** ⭐ | 16000 | **low** | 300 字 |
-| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **16000** | **120s** | **true** | 12000 | **medium** | 300 字 |
-| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **8192** | **90s** | false | 8000 | high | 300 字 |
-| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **2000** | **60s** | false | 4000 | high | 不适用 |
+| **全球政经局势** | null（使用默认） | **0.3**（低温保事实） | **3072** | **60s** | false | 6000 | high | **200 字** |
+| **智囊团深度复盘** | null | **0.3**（低温保事实） | **36000** | **120s** | **true** ⭐ | 24000 | **low** | 300 字 |
+| **持仓体检报告** | null | **0.1**（极低温保数值精确） | **24000** | **120s** | **true** | 18000 | **medium** | 300 字 |
+| **穿透深度分析** | null | **0.1**（极低温保数值精确） | **12288** | **90s** | false | 12000 | high | 300 字 |
+| **财经新闻关联分析** | null（可换轻量模型降成本） | **0.1**（极低温保 JSON） | **3000** | **60s** | false | 6000 | high | 不适用 |
 
 > **补充**：财经新闻关联分析还支持 `news_correlation_top_n` 配置项（默认 `30`），控制送 LLM 分析的新闻条数上限，按关键词匹配数降序选取。增大此值会线性增加 Token 消耗，减小则降低 LLM 关联分析的覆盖率。设为 `0` 可完全禁用 LLM 分析（仅保留关键词匹配）。
 
@@ -577,7 +581,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 ```json
 {
   "thinking_enabled_expert_review": true,
-  "thinking_budget_expert_review": 16000
+  "thinking_budget_expert_review": 24000
 }
 ```
 
@@ -596,8 +600,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 | 配置项 | 管什么 | expert 默认值 |
 |--------|--------|:------------:|
-| `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 24000 |
-| `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 16000 |
+| `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 36000 |
+| `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 24000 |
 
 **API 硬性约束（仅 Claude / Gemini）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。代码自动保护：若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。若配置开启但模型不支持，自动跳过并记录 WARNING。
 
@@ -608,7 +612,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 **思考耗尽自动兜底**：开启 Extended Thinking 时若出现"思考部分耗尽 max_tokens 预算"，程序会**自动关闭 thinking 同 Provider 重试一次**（`call_claude` 层安全网，日志 `关闭 thinking 重试一次，避免模块整体失败`），保证有正文产出；重试仍失败才切换下一 Provider。因此正常情况下不再因思考耗尽直接丢模块内容。
 
-**调参建议**：若日志仍频繁出现 `LLM 输出思考部分耗尽 max_tokens 预算`，请**增大对应模块的 `max_tokens_{module}`**（DeepSeek 为 thinking + 正文共享预算，需 > `thinking_budget` + 正文余量）或**降低 `reasoning_effort_{module}`**。当前默认 expert_review 24000 / health_check 16000（对应 thinking_budget 16000/12000 + 正文余量，DeepSeek V4 输出上限 384K 无 API 拒绝风险），配合自动兜底双重保障。
+**调参建议**：若日志仍频繁出现 `LLM 输出思考部分耗尽 max_tokens 预算`，请**增大对应模块的 `max_tokens_{module}`**（DeepSeek 为 thinking + 正文共享预算，需 > `thinking_budget` + 正文余量）或**降低 `reasoning_effort_{module}`**。当前默认 expert_review 36000 / health_check 24000（对应 thinking_budget 24000/18000 + 正文余量，DeepSeek V4 输出上限 384K 无 API 拒绝风险；2026-09-16 全模块整体上调 50%），配合自动兜底双重保障。
 
 ### 效果参考
 
@@ -680,7 +684,8 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 ```
 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
-- 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-flash`（DeepSeek-V4.1-Flash 正式模型名，2026-09-10 发布，与前者同价）、`deepseek-chat`（V3，功能受限）
+- 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-flash`（DeepSeek-V4.1-Flash 正式模型名，2026-09-10 发布，与前者同价）
+- **已停用模型名**：`deepseek-chat` / `deepseek-reasoner` 是 flash 系列非思考 / 思考模式的兼容别名（**不是**独立的 V3 模型），已于 2026-07-24 下线，端点不再接受——新配置请改用 `deepseek-flash`。旧名仍留在 `MODEL_PRICING` 中仅为让停用前产生的历史调用能算出费用
 - **注意**：`deepseek-v4-pro` 于 2026-09-14 12:00（北京时间）下线，在此之前请求自动路由到 V4.1-Flash 并按 V4.1-Flash 单价计费；`deepseek-v4-flash` 与 `deepseek-v4-flash-vision-exp` 底层模型同样由 V4.1-Flash 接管，价格不变。费用估算以 `core/constants.py` 的 `MODEL_PRICING` 为准
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
@@ -803,14 +808,15 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 | `gpt-4o` | 2.50 | 10.00 | 2.50 | OpenAI 主力（缓存无折扣） |
 | `gpt-4o-mini` | 0.15 | 0.60 | 0.15 | OpenAI 轻量（缓存无折扣） |
 | `deepseek-v4-flash` | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | ⭐ 高性价比推荐，默认模型（峰谷定价，闲时/高峰；2026-09-10 降价） |
+| `deepseek-flash` | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | DeepSeek-V4.1-Flash 正式模型名（2026-09-10 发布，与 v4-flash 同价同底层） |
 | `deepseek-v4-pro` | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | DeepSeek 增强推理（峰谷定价，闲时/高峰） |
-| `deepseek-chat` | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | DeepSeek V3（峰谷定价，闲时/高峰） |
+| `deepseek-chat` / `deepseek-reasoner` | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | **已停用别名**（flash 系列非思考 / 思考模式的兼容名，2026-07-24 下线，端点不再接受；保留单价仅为历史记录计费） |
 | `gemini-3.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 新一代（可选） |
 | `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比（代码默认） |
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
 | `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
 
-> **峰谷定价（DeepSeek）**：`deepseek-v4-*` 三个模型采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 v4-flash 降价），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在工作日（周一至周五）生效**，为**北京时间 09:00–12:00、14:00–18:00**；工作日其余时间为闲时、**周末（周六/周日）全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` 中覆盖；含 `"peak"` 子段的模型工作日高峰时段按 `peak` 价计费，其余时段（含周末全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
+> **峰谷定价（DeepSeek）**：`deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` / `deepseek-reasoner` 采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 flash 系列降价），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在工作日（周一至周五）生效**，为**北京时间 09:00–12:00、14:00–18:00**；工作日其余时间为闲时、**周末（周六/周日）全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` 中覆盖；含 `"peak"` 子段的模型工作日高峰时段按 `peak` 价计费，其余时段（含周末全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
 >
 > **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash 工作日闲时/周末：输入 3000 tokens × ¥1.0 + 输出 2000 tokens × ¥4.0 = ¥0.011/次（工作日高峰时段则 ×2、×8）。缓存命中时输入部分按 `input_cache_hit` 计费。
 >

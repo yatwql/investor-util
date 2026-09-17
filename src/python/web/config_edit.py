@@ -7,11 +7,10 @@
 - ``config_backup_file``：写共享配置文件前的单槽 .bak 备份（mkstemp + os.replace 原子写）。
 
 写入语义与 TUI 逐条等价（对齐 tui/handlers_config.py 编辑路径）：
-  config.json 顶层标量 → ``set_config``；嵌套 dict（report_submodules /
-  comparison_indices）读合并后整块写；anonymization → ``set_anonymization_mode``；
+  config.json 顶层标量 → ``set_config``；嵌套 dict（comparison_indices）读合并后整块写；anonymization → ``set_anonymization_mode``；
   llm_settings.json → ``write_llm_settings``（自 tui 抽取的共享原语）；
-  features.json → ``save_feature_overrides``（实验性功能开关，清单由
-  ``features.EXPERIMENTAL_FEATURES`` 注册表驱动，与 TUI 菜单 S 同源）。
+  features.json → ``save_feature_overrides``（功能开关，清单由
+  ``features.feature_switch_registry`` 驱动，与 TUI 菜单 S 同源）。
 """
 
 from __future__ import annotations
@@ -20,7 +19,13 @@ import json
 import logging
 import os
 
-from src.python.config.features import EXPERIMENTAL_FEATURES
+from src.python.config.features import (
+    GROUP_EXPERIMENTAL,
+    GROUP_REPORT,
+    GROUP_STANDARD,
+    feature_switch_registry,
+    switches_in_group,
+)
 from src.python.web.holdings_update import _atomic_copy
 
 logger = logging.getLogger("invest")
@@ -37,7 +42,7 @@ _SECTION_KEYS = (
     "enable_action",
 )
 
-# 报告增强子模块（菜单 P 6）
+# 报告增强子模块（菜单 P 7）
 _SUBMODULE_KEYS = (
     "data_quality",
     "industry_beta",
@@ -45,6 +50,7 @@ _SUBMODULE_KEYS = (
     "cost_lots",
     "valuation_percentile",
     "market_temperature",
+    "financial_report_digest",
 )
 
 # LLM 分析章节可编辑开关（菜单 S 标准模块；辩论三模块为隐藏项，不在白名单）
@@ -72,13 +78,6 @@ config_edit_whitelist = {
     "enable_history": {"kind": "bool", "target": "config", "writer": "scalar"},
     "enable_portfolio_evolution": {"kind": "bool", "target": "config", "writer": "scalar"},
     "enable_action": {"kind": "bool", "target": "config", "writer": "scalar"},
-    # ── 3 报告增强子模块开关（config.json 嵌套 dict，读合并整块写）──
-    "report_submodules.data_quality": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.industry_beta": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.candidate_compare": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.cost_lots": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.valuation_percentile": {"kind": "bool", "target": "config", "writer": "submodule"},
-    "report_submodules.market_temperature": {"kind": "bool", "target": "config", "writer": "submodule"},
     # ── 4 持仓匿名化枚举（config.json 顶层 anonymization，set_anonymization_mode）──
     "anonymization.mode": {
         "kind": "enum",
@@ -99,8 +98,9 @@ config_edit_whitelist = {
     "enabled_llm.health_check": {"kind": "bool", "target": "llm_settings", "writer": "llm"},
     "enabled_llm.penetration_deep": {"kind": "bool", "target": "llm_settings", "writer": "llm"},
     "enabled_llm.news_correlation": {"kind": "bool", "target": "llm_settings", "writer": "llm"},
-    # ── 7 实验性功能开关（features.json；清单取自 features.EXPERIMENTAL_FEATURES 注册表）──
-    **{flag: {"kind": "bool", "target": "features", "writer": "features"} for flag in EXPERIMENTAL_FEATURES},
+    # ── 7 功能开关（features.json；清单取自 features.feature_switch_registry 全注册表，
+    #      实验组与常规组同表同写入路径，分组只影响前端分块渲染）──
+    **{flag: {"kind": "bool", "target": "features", "writer": "features"} for flag in feature_switch_registry},
 }
 
 
@@ -151,13 +151,6 @@ def _dispatch_write(entry: dict, key: str, value) -> None:
         from src.python.config import set_config
 
         set_config(key, value)
-    elif writer == "submodule":
-        from src.python.config import get_config, set_config
-
-        config = get_config()
-        submodules = dict(config.get("report_submodules") or {})
-        submodules[key.split(".", 1)[1]] = value
-        set_config("report_submodules", submodules)
     elif writer == "anonymization":
         from src.python.config.anonymizer import set_anonymization_mode
 
@@ -296,16 +289,10 @@ def get_config_edit_surface() -> dict:
     from src.python.config import (
         get_config,
         is_enable_action,
-        is_enable_candidate_compare,
-        is_enable_cost_lots,
-        is_enable_data_quality,
         is_enable_fund_deep_analysis,
         is_enable_history,
-        is_enable_industry_beta,
-        is_enable_market_temperature,
         is_enable_news,
         is_enable_portfolio_evolution,
-        is_enable_valuation_percentile,
     )
     from src.python.config import _strip_json_comments
     from src.python.config._config_defaults import _DEFAULT_CONFIG
@@ -326,14 +313,8 @@ def get_config_edit_surface() -> dict:
         "enable_portfolio_evolution": is_enable_portfolio_evolution(config),
         "enable_action": is_enable_action(config),
     }
-    submodules = {
-        "data_quality": is_enable_data_quality(config),
-        "industry_beta": is_enable_industry_beta(config),
-        "candidate_compare": is_enable_candidate_compare(config),
-        "cost_lots": is_enable_cost_lots(config),
-        "valuation_percentile": is_enable_valuation_percentile(config),
-        "market_temperature": is_enable_market_temperature(config),
-    }
+    # 报告章节与增强：取值与显示名皆由功能开关注册表派生（GROUP_REPORT）
+    report_switches = {flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_REPORT)}
     anon_mode = get_anonymization_mode()
     indices = config.get("comparison_indices") or _DEFAULT_CONFIG.get("comparison_indices", {})
 
@@ -349,21 +330,25 @@ def get_config_edit_surface() -> dict:
         except (OSError, json.JSONDecodeError) as e:
             logger.warning("读取 llm_settings.json 失败，LLM 开关按默认展示: %s", e)
     surface_enabled = {k: bool(enabled_map.get(k, True)) for k in _LLM_SURFACE_KEYS}
-    experiments = {flag: is_feature_enabled(flag) for flag in EXPERIMENTAL_FEATURES}
+    # 功能开关：按注册表分组下发（实验组 / 常规组各一块），显示名与「是否影响报告」
+    # 标记由服务端同源下发——前端不维护任何开关字典，避免与注册表漂移。
+    features_surface = {
+        "experimental": {flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)},
+        "standard": {flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_STANDARD)},
+        "labels": {flag: d.label for flag, d in feature_switch_registry.items()},
+        "report_affecting": [flag for flag, d in feature_switch_registry.items() if d.affects_report],
+    }
 
     return {
         "paths": paths,
         "sections": sections,
-        "submodules": submodules,
+        "report_switches": report_switches,
         "anonymization": {"mode": anon_mode, "options": list(_ANON_MODES)},
         "comparison_indices": dict(indices),
         "comparison_indices_defaults": dict(_DEFAULT_CONFIG.get("comparison_indices", {})),
         "llm": {
             "enabled_llm": surface_enabled,
             "hidden_modules": list(_LLM_HIDDEN_MODULES),
-            "experiments": experiments,
-            # 实验开关显示名同样取自注册表，供前端直接渲染（避免前端另维护一份
-            # 手写标签字典而与注册表漂移）。
-            "experiment_labels": {flag: name for flag, (name, _desc) in EXPERIMENTAL_FEATURES.items()},
         },
+        "features": features_surface,
     }

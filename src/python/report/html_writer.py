@@ -241,6 +241,9 @@ def _render_template(
     position_status: dict | None = None,  # 品种覆盖诊断 position_status
     data_freshness: dict | None = None,  # 可信度摘要 data_freshness
     action_data: dict | None = None,  # 行动建议单一数据源 action_data（行动板块 + 智囊团深度复盘行动摘要）
+    prosperity_framework_data: dict
+    | None = None,  # 景气度框架诊断契约（实验性功能 prosperity_framework，None=开关关闭）
+    market_sentiment_data: dict | None = None,  # 市场情绪与持仓热点契约（报告增强开关 market_sentiment，None=开关关闭）
     crisis_annotation_data: dict | None = None,  # 危机区间标注 crisis_annotation_data
     tail_risk_data: dict | None = None,  # 尾部风险统计 tail_risk_data（指标卡）
     snapshot_diff_data: dict | None = None,  # 快照差异摘要 snapshot_diff_data（组合演进章顶部）
@@ -249,12 +252,21 @@ def _render_template(
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约 market_temperature_data（汇总温度行，None=开关关闭）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
+    financial_report_digest_data: dict | None = None,  # 持仓个股财报摘要契约（None=开关关闭/无数据）
+    financial_indicator_data: dict | None = None,  # 财务指标契约（None=开关关闭/无数据）
+    data_source_catalog: list | None = None,  # 数据源说明表（实际使用清单 / 计费 / 凭据）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
+    from src.python.config.features import enabled_experimental_features
     from src.python.report.chart_data_builder import build_evolution_chart_data
+
+    # 实验功能清单：产物须自述生成条件（页脚）；零开关时为空列表，页脚不出现该行
+    enabled_experiments = [name for _flag, name in enabled_experimental_features()]
 
     # 估值分位 + 市场温度：开关关闭时为 None（模板保持既有输出）
     valuation_enabled = valuation_data is not None
+    # 真实分位口径是否生效（未生效时页脚保持引入前的原始免责语）
+    valuation_real_basis = (valuation_data or {}).get("basis_mode") == "real_ttm"
     penetration_display = _attach_valuation_to_penetration(penetration, valuation_data)
     market_temperature = _build_temperature_display(market_temperature_data)
     # 目录分组导航：按「基础信息/基金深度分析/行动建议/历史/LLM」五组折叠（_sv_fn 闭包过滤不可见章节）
@@ -265,6 +277,7 @@ def _render_template(
         section_groups=section_groups,
         llm_supported_sections=_LLM_SUPPORTED_SECTIONS,
         valuation_enabled=valuation_enabled,
+        valuation_real_basis=valuation_real_basis,
         market_temperature=market_temperature,
         now=now_str,
         today=today_str,
@@ -310,6 +323,7 @@ def _render_template(
         debate_mode_label=_debate_mode_label,
         debate_info=debate_info,
         debate_mode_combination=_debate_mode_combination,
+        enabled_experiments=enabled_experiments,
         section_order=order,
         section_numbers=section_numbers,
         section_visible_dict=section_visible_dict,
@@ -321,6 +335,7 @@ def _render_template(
         history_data=history_data,
         data_status_history=data_status_history,
         data_source_matrix=data_source_matrix,
+        data_source_catalog=data_source_catalog,
         report_year=datetime.now().year,
         data_unavailable=bool(total_mv == 0 and total_cost > 0),
         chart_datasets=chart_datasets,
@@ -336,10 +351,14 @@ def _render_template(
         position_status=position_status,
         data_freshness=data_freshness,
         action_data=action_data,
+        prosperity_framework_data=prosperity_framework_data,
+        market_sentiment_data=market_sentiment_data,
         crisis_annotation_data=crisis_annotation_data,
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,
         decision_review_data=decision_review_data,
+        financial_report_digest_data=financial_report_digest_data,
+        financial_indicator_data=financial_indicator_data,
     )
 
 
@@ -368,10 +387,13 @@ def write_html_report(
     enable_history: bool = True,
     enable_portfolio_evolution: bool = True,
     enable_action: bool = False,  # 行动建议独立章（enable_action config 默认开）
-    enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（report_submodules.data_quality）
+    enable_data_quality: bool = False,  # 子模块：数据质量仪表盘（功能开关 `data_quality`）
     position_status: dict | None = None,  # 品种覆盖诊断 position_status（品种覆盖区块）
     data_freshness: dict | None = None,  # 可信度摘要 data_freshness（可信度区块 + 头部摘要行）
     action_data: dict | None = None,  # 行动建议单一数据源 action_data（行动板块 + 智囊团深度复盘行动摘要）
+    prosperity_framework_data: dict
+    | None = None,  # 景气度框架诊断契约（实验性功能 prosperity_framework，None=开关关闭）
+    market_sentiment_data: dict | None = None,  # 市场情绪与持仓热点契约（报告增强开关 market_sentiment，None=开关关闭）
     debate_info: dict | None = None,
     chart_datasets: dict | None = None,
     enable_interactive_charts: bool = False,
@@ -386,6 +408,9 @@ def write_html_report(
     valuation_data: dict | None = None,  # 估值分位数据契约 valuation_data（「资产穿透TOP10」估值分位列，None=开关关闭）
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约 market_temperature_data（「投资分析汇总」温度行，None=开关关闭）
+    enable_fundamental_snapshot: bool = False,  # board 层：持仓基本面章（两功能开关任一开启）
+    financial_report_digest_data: dict | None = None,  # data 层：财报摘要契约（None=无数据，章节隐藏）
+    financial_indicator_data: dict | None = None,  # data 层：财务指标契约（None=无数据，章节隐藏）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
@@ -521,6 +546,9 @@ def write_html_report(
         style_factor_data=style_factor_data,
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
+        enable_fundamental_snapshot=enable_fundamental_snapshot,
+        financial_report_digest_data=financial_report_digest_data,
+        financial_indicator_data=financial_indicator_data,
     )
 
     # ── 10b) 数据源状态摘要 ──
@@ -541,9 +569,10 @@ def write_html_report(
     data_status_history = _build_history_data_status(history_data)
 
     # ── 10d) 数据源可用性矩阵 ──
-    from src.python.report.data_source_matrix import build_data_source_matrix
+    from src.python.report.data_source_matrix import build_data_source_catalog, build_data_source_matrix
 
     data_source_matrix = build_data_source_matrix()
+    data_source_catalog = build_data_source_catalog()
 
     # 因子中文名映射（单一数据源：analysis 层常量，经 context 传递）
     _factor_names: dict = {}
@@ -587,6 +616,8 @@ def write_html_report(
         industry_beta=(style_factor_data or {}).get("industry_beta"),
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
+        financial_report_digest_data=financial_report_digest_data,
+        financial_indicator_data=financial_indicator_data,
         drawdown_min_span=drawdown_min_span,
         llm_enabled_flag=llm_enabled_flag,
         global_macro_content=global_macro_content,
@@ -611,12 +642,15 @@ def write_html_report(
         history_data=history_data,
         data_status_history=data_status_history,
         data_source_matrix=data_source_matrix,
+        data_source_catalog=data_source_catalog,
         chart_datasets=chart_datasets,
         enable_interactive_charts=enable_interactive_charts,
         data_quality_enabled=enable_data_quality,
         position_status=position_status,
         data_freshness=data_freshness,
         action_data=action_data,
+        prosperity_framework_data=prosperity_framework_data,
+        market_sentiment_data=market_sentiment_data,
         crisis_annotation_data=crisis_annotation_data,
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,

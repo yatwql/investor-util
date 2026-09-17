@@ -15,9 +15,9 @@ from datetime import date, timedelta
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
-
 from src.python.analysis.tail_risk import compute_tail_risk
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 
 def _bars_from_returns(returns: list[float], start: str = "2026-01-01", base: float = 100.0) -> list[dict]:

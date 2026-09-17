@@ -2,10 +2,10 @@
 
 测试目标：
   - _build_flow_data — 成本流水子模块开关门控 + 无流水 available=False 占位契约
-  - resolve_market_data — fund_flow_data 注入 data 字典（汇总/市值/分类页签渲染数据源）
+  - resolve_market_data — fund_flow_data 注入 data 字典（汇总/持仓明细与分类页签渲染数据源）
 
-开关 `report_submodules.cost_lots` 对应 _build_flow_data 的 enable_cost_lots：
-False → None（汇总/市值/分类页签保持既有输出）；True → 计算 fund_flow_data 契约。
+功能开关 `cost_lots` 对应 _build_flow_data 的 enable_cost_lots：
+False → None（汇总/持仓明细与分类页签保持既有输出）；True → 计算 fund_flow_data 契约。
 """
 
 from __future__ import annotations
@@ -90,7 +90,6 @@ class TestResolveMarketDataFlow(unittest.TestCase):
     def test_fund_flow_data_injected_when_enabled(self):
         """开关开启且外部传入明细时，data 含 fund_flow_data（透传 _build_flow_data 结果）。"""
         modules = {
-            "write_market_value_sheet": MagicMock(),
             "classify_holdings": MagicMock(return_value={}),
         }
         detail = MagicMock()
@@ -104,7 +103,6 @@ class TestResolveMarketDataFlow(unittest.TestCase):
                 holdings=[MagicMock()],
                 details=[detail],
                 modules=modules,
-                ws2=MagicMock(),
                 prog=MagicMock(),
                 enable_cost_lots=True,
                 transactions=[MagicMock()],
@@ -117,7 +115,6 @@ class TestResolveMarketDataFlow(unittest.TestCase):
     def test_fund_flow_data_none_when_disabled(self):
         """开关关闭（enable_cost_lots=False）→ data 中 fund_flow_data 为 None（保持既有输出）。"""
         modules = {
-            "write_market_value_sheet": MagicMock(),
             "classify_holdings": MagicMock(return_value={}),
         }
         detail = MagicMock()
@@ -127,7 +124,6 @@ class TestResolveMarketDataFlow(unittest.TestCase):
             holdings=[MagicMock()],
             details=[detail],
             modules=modules,
-            ws2=MagicMock(),
             prog=MagicMock(),
             enable_cost_lots=False,
         )

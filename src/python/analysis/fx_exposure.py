@@ -96,7 +96,7 @@ def fx_exposure(holdings_details: list[dict[str, Any]] | None) -> dict[str, Any]
         exposures.append(
             {
                 "currency": CURRENCY_OTHER,
-                "label": _CURRENCY_OTHER,
+                "label": _CURRENCY_LABELS.get(CURRENCY_OTHER, CURRENCY_OTHER),
                 "total_mv": round(other_mv, 2),
                 "pct": round(other_pct, 1),
             }

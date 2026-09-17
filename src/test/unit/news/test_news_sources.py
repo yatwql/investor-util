@@ -16,14 +16,13 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from src.python.providers.news_sources import (
-
     _FETCH_MAP,
     _SOURCE_LABELS,
     get_source_label,
 )
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
 
 class TestSourceMetadata(unittest.TestCase):
@@ -330,7 +329,7 @@ class TestDedupByTitle(unittest.TestCase):
 
 
 class TestDedupFalseMergeGuard(unittest.TestCase):
-    """跨源误合并防护回归测试（rf-290 校准结论，2026-08-17）。
+    """跨源误合并防护回归测试（跨源误合并校准结论，2026-08-17）。
 
     旧规则（候选区 0.30 + 安全区 0.50 直接合并 + bg=2 梯度 0.40）实测
     误合并率 ~70-80%：不同事件共享财报/回购/指数/预警/地震等模板词天然
@@ -562,9 +561,41 @@ class TestFlushAnchorsDedup(unittest.TestCase):
         self._record_cross_skip("新闻A", "新闻B")
         news_dedup._flush_anchors()
         self.assertGreaterEqual(
-            len(news_dedup._WRITTEN_ANCHOR_KEYS), 1,
+            len(news_dedup._WRITTEN_ANCHOR_KEYS),
+            1,
             "flush 后进程级 key 集合应包含已写记录",
         )
+
+    def test_write_failure_rolls_back_written_keys(self) -> None:
+        """落盘失败 → 撤回本次登记的 key，锚点不被永久判为「已写」而丢失。
+
+        回归背景：key 在「决定要写」时即加入 `_WRITTEN_ANCHOR_KEYS`，若落盘只走
+        ``open(..., "a")`` 且失败仅记一条 warning，key 就留在集合里——该对新闻
+        此后每轮都被判「已写」而永不重试，锚点永久丢失（校准数字少计却无任何
+        异常提示）。正确语义是批量原子写 + 失败回滚 key。
+
+        失败以真实 IO 故障构造（锚点目录被同名普通文件占位），使直接追加的写法
+        同样走到「记录警告」路径——断言在其下确为红，而非仅因接口改名而报错。
+        """
+        from src.python.providers import news_dedup
+
+        blocker = os.path.join(self._tmpdir, "blocker")
+        with open(blocker, "w", encoding="utf-8") as f:
+            f.write("占位：同名目录无法创建")
+        news_dedup._ANCHOR_PATH = os.path.join(blocker, "anchors.jsonl")
+
+        self._record_cross_skip("新闻E", "新闻F")
+        news_dedup._flush_anchors()
+
+        self.assertEqual(news_dedup._WRITTEN_ANCHOR_KEYS, set(), "写失败后 key 应被撤回")
+
+        # 恢复可写路径后重试 → 该对新闻仍能落盘，未被「已写」集合拦掉
+        news_dedup._ANCHOR_PATH = self._anchor_path
+        self._record_cross_skip("新闻E", "新闻F")
+        news_dedup._flush_anchors()
+        with open(self._anchor_path, encoding="utf-8") as f:
+            lines = f.readlines()
+        self.assertEqual(len(lines), 1, f"重试后应写入 1 条: {lines}")
 
 
 if __name__ == "__main__":

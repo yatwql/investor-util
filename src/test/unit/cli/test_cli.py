@@ -5,30 +5,36 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_cli]
-
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 from src.python.cli import (
     _EXIT_PARTIAL,
     _EXIT_SEVERE,
     _EXIT_SUCCESS,
     _apply_cli_experiments,
+    _apply_cli_switches,
     _build_parser,
     _cli_read_holdings,
     _cli_read_holdings_with_flows,
     _handle_cache_update,
+    _handle_cassettes,
     _handle_doctor,
     _handle_report,
     _handle_view_logs,
     _handle_whatif,
     main,
+    run_cli,
 )
+from src.python.core.constants import PROJECT_ROOT
 from src.python.core.log_reader import LogEntry
 from src.python.report.whatif_operations import WhatifRunResult
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_cli]
 
 # ═══════════════════════════════════════════════════════════════
 # argparse 参数解析
@@ -113,27 +119,28 @@ class TestArgparse:
 
     def test_experiment_by_flag_name(self):
         """--experiment 接受开关名。"""
-        args = _build_parser().parse_args(["--experiment", "signal_pre_digest", "report"])
-        assert args.experiment == [("signal_pre_digest",)]
+        args = _build_parser().parse_args(["--experiment", "signal_ledger", "report"])
+        assert args.experiment == [("signal_ledger",)]
 
     def test_experiment_by_display_name(self):
         """--experiment 接受中文显示名（与 TUI 菜单 S 同源）。"""
-        args = _build_parser().parse_args(["--experiment", "信号预消化", "report"])
-        assert args.experiment == [("signal_pre_digest",)]
+        args = _build_parser().parse_args(["--experiment", "确定性信号沉淀", "report"])
+        assert args.experiment == [("signal_ledger",)]
 
     def test_experiment_repeatable(self):
         """--experiment 可重复指定，逐项独立解析。"""
         args = _build_parser().parse_args(
-            ["--experiment", "signal_pre_digest", "--experiment", "decision_reflection", "report"]
+            ["--experiment", "signal_ledger", "--experiment", "decision_reflection", "report"]
         )
-        assert args.experiment == [("signal_pre_digest",), ("decision_reflection",)]
+        assert args.experiment == [("signal_ledger",), ("decision_reflection",)]
 
     def test_experiment_all(self):
         """--experiment all 展开为全部实验功能。"""
-        from src.python.config.features import EXPERIMENTAL_FEATURES
+        from src.python.config.features import GROUP_EXPERIMENTAL, switches_in_group
 
+        expected = tuple(sorted(flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)))
         args = _build_parser().parse_args(["--experiment", "all", "report"])
-        assert args.experiment == [tuple(sorted(EXPERIMENTAL_FEATURES))]
+        assert args.experiment == [expected]
 
     def test_experiment_unknown_rejected(self):
         """未知名称 → argparse 报错 SystemExit(2)，不静默忽略。"""
@@ -177,6 +184,43 @@ class TestArgparse:
 
         args = _build_parser().parse_args(["whatif", "--candidate", "after.xlsx"])
         assert args.effective_date is None
+
+
+@pytest.mark.unit
+class TestArgparseFeatureOverrides:
+    """--feature NAME=VALUE 参数解析（全注册表、双向、即时校验）。"""
+
+    def test_feature_absent_by_default(self):
+        """未指定 --feature 时为 None（不触碰运行时开关）。"""
+        args = _build_parser().parse_args(["report"])
+        assert args.feature is None
+
+    def test_feature_off_on_standard_switch(self):
+        """常规开关也能经 --feature 关闭——本批次补上的正是这条通道。"""
+        args = _build_parser().parse_args(["--feature", "doctor_check=off", "report"])
+        assert args.feature == [("doctor_check", False)]
+
+    def test_feature_on_experimental_switch(self):
+        """实验开关同样可经 --feature 打开（与 --experiment 等价路径）。"""
+        args = _build_parser().parse_args(["--feature", "signal_ledger=on", "report"])
+        assert args.feature == [("signal_ledger", True)]
+
+    def test_feature_repeatable(self):
+        """可重复指定，逐项独立解析并保留顺序。"""
+        args = _build_parser().parse_args(["--feature", "metrics_hhi=off", "--feature", "metrics_beta=off", "report"])
+        assert args.feature == [("metrics_hhi", False), ("metrics_beta", False)]
+
+    def test_feature_unknown_name_rejected(self):
+        """未知开关名 → SystemExit(2)（解析期报错，不留到运行时静默失效）。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--feature", "no_such_switch=on", "report"])
+        assert exc.value.code == 2
+
+    def test_feature_bad_value_rejected(self):
+        """取值不在词表内 → SystemExit(2)。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["--feature", "doctor_check=maybe", "report"])
+        assert exc.value.code == 2
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -230,6 +274,54 @@ class TestApplyCliExperiments:
         called: list[dict] = []
         monkeypatch.setattr(feat, "save_feature_overrides", lambda *a, **k: called.append({"a": a}))
         _apply_cli_experiments([("signal_pre_digest",)])
+        assert called == []
+
+
+@pytest.mark.unit
+class TestApplyCliSwitches:
+    """_apply_cli_switches 行为测试（--feature 双向覆写）。"""
+
+    def test_none_is_noop(self, monkeypatch):
+        """未传 --feature 时不改动任何开关。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "doctor_check", True)
+        _apply_cli_switches(None)
+        assert feat.FEATURE_FLAGS["doctor_check"] is True
+
+    def test_disables_standard_switch(self, monkeypatch):
+        """关闭常规开关——本参数相对 --experiment 的核心能力。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "doctor_check", True)
+        _apply_cli_switches([("doctor_check", False)])
+        assert feat.FEATURE_FLAGS["doctor_check"] is False
+
+    def test_enables_and_disables_in_one_run(self, monkeypatch):
+        """同一次运行内双向覆写互不干扰。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_hhi", True)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_ledger", False)
+        _apply_cli_switches([("metrics_hhi", False), ("signal_ledger", True)])
+        assert feat.FEATURE_FLAGS["metrics_hhi"] is False
+        assert feat.FEATURE_FLAGS["signal_ledger"] is True
+
+    def test_duplicate_key_last_wins(self, monkeypatch):
+        """同名重复以最后一次为准（命令行从左到右覆盖）。"""
+        from src.python.config import features as feat
+
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_beta", True)
+        _apply_cli_switches([("metrics_beta", False), ("metrics_beta", True)])
+        assert feat.FEATURE_FLAGS["metrics_beta"] is True
+
+    def test_not_persisted(self, monkeypatch):
+        """仅本次运行生效，不写 features.json（实验开关的关闭路径仍走面板/文件）。"""
+        from src.python.config import features as feat
+
+        called: list[dict] = []
+        monkeypatch.setattr(feat, "save_feature_overrides", lambda *a, **k: called.append({"a": a}))
+        _apply_cli_switches([("doctor_check", False)])
         assert called == []
 
 
@@ -947,3 +1039,327 @@ class TestMainDoctor:
         args = mock_handle.call_args[0][0]
         assert args.command == "doctor"
         assert args.timeout == 4.0
+
+
+@pytest.mark.unit
+class TestMainEarlyExitExperiments:
+    """早返回命令（doctor/check-sources）的命令行实验开关（早返回命令分派回归）。
+
+    这些命令在 ``init_config()`` 之前分派，命令行 ``--experiment`` 若不随早返回
+    路径一并应用，会被静默忽略——doctor 会报告「实验开关关闭」，而用户明明
+    指定了该开关，据此判断实验功能状态即得到相反答案。
+    """
+
+    @staticmethod
+    def _enabled_during_dispatch(argv: list[str], patch_target: str) -> dict[str, bool]:
+        """跑一次 main()，返回被分派函数执行瞬间各实验开关的生效值。"""
+        from src.python.config.features import (
+            GROUP_EXPERIMENTAL,
+            GROUP_STANDARD,
+            is_feature_enabled,
+            switches_in_group,
+        )
+
+        seen: dict[str, bool] = {}
+
+        def _record(*_args, **_kwargs) -> int:
+            seen.update({flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_STANDARD)})
+            seen.update({flag: is_feature_enabled(flag) for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)})
+            return _EXIT_SUCCESS
+
+        with (
+            patch(patch_target, side_effect=_record),
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", argv):
+                main()
+        return seen
+
+    @pytest.mark.parametrize(
+        ("command", "patch_target"),
+        [
+            ("doctor", "src.python.cli.cli._handle_doctor"),
+            ("check-sources", "src.python.cli.cli._handle_check_sources"),
+            ("cassettes", "src.python.cli.cli._handle_cassettes"),
+        ],
+    )
+    def test_experiment_flag_effective_on_early_exit_command(self, command, patch_target):
+        """--experiment 指定的开关在该命令分派前已生效。"""
+        seen = self._enabled_during_dispatch(
+            ["cli.py", "--experiment", "signal_ledger", command],
+            patch_target,
+        )
+        assert seen["signal_ledger"] is True
+        assert seen["decision_reflection"] is False  # 未指定的开关不受影响
+
+    def test_without_experiment_flag_keeps_defaults(self):
+        """不传开关参数 → 实验组保持默认关闭（对照组，防误判为恒真）。"""
+        from src.python.config.features import GROUP_EXPERIMENTAL, switches_in_group
+
+        seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")
+        experimental = [flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)]
+        assert not any(seen[flag] for flag in experimental)
+
+    @pytest.mark.parametrize(
+        ("command", "patch_target"),
+        [
+            ("doctor", "src.python.cli.cli._handle_doctor"),
+            ("cassettes", "src.python.cli.cli._handle_cassettes"),
+        ],
+    )
+    def test_feature_flag_effective_on_early_exit_command(self, command, patch_target):
+        """--feature 在早返回命令分派前已生效（含关闭常规开关的反向取值）。"""
+        seen = self._enabled_during_dispatch(
+            ["cli.py", "--feature", "doctor_check=off", command],
+            patch_target,
+        )
+        assert seen["doctor_check"] is False
+
+    def test_feature_flag_overrides_experiment_flag(self):
+        """同名时显式取值覆盖 --experiment 的隐式「只开」（后者先应用）。"""
+        seen = self._enabled_during_dispatch(
+            ["cli.py", "--experiment", "signal_ledger", "--feature", "signal_ledger=off", "doctor"],
+            "src.python.cli.cli._handle_doctor",
+        )
+        assert seen["signal_ledger"] is False
+
+    def test_features_json_overrides_loaded_before_cli_flags(self):
+        """早返回路径同样先读 features.json 覆写，再叠加命令行增量。"""
+        import json
+        import os
+
+        from src.python.config import features
+
+        os.makedirs(os.path.dirname(features._FEATURES_FILE), exist_ok=True)
+        with open(features._FEATURES_FILE, "w", encoding="utf-8") as f:
+            json.dump({"signal_ledger": True}, f)
+
+        seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")
+        assert seen["signal_ledger"] is True
+        # 常规开关（默认开、非实验项）不受 --experiment 取值域影响，保持默认
+        from src.python.config.features import is_feature_enabled
+
+        assert is_feature_enabled("datasource_adapter") is True
+
+
+# ═══════════════════════════════════════════════════════════════
+# cassettes 子命令
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestArgparseCassettes:
+    """cassettes 子命令参数解析。"""
+
+    def test_defaults_to_listing(self):
+        """不带 --verify → 列表模式（不触发解析校验）。"""
+        args = _build_parser().parse_args(["cassettes"])
+        assert args.command == "cassettes"
+        assert args.verify is False
+
+    def test_verify_flag(self):
+        args = _build_parser().parse_args(["cassettes", "--verify"])
+        assert args.verify is True
+
+
+@pytest.mark.unit
+class TestHandleCassettes:
+    """_handle_cassettes 输出与退出码。"""
+
+    _OK_ENTRY = {
+        "name": "tencent_quote",
+        "path": "/x/tencent_quote.json",
+        "size_bytes": 2048,
+        "source": "腾讯行情",
+        "recorded_at": "2026-09-10T18:38:37+08:00",
+        "interactions": 1,
+    }
+    _BAD_ENTRY = {"name": "broken", "path": "/x/broken.json", "size_bytes": 3, "error": "cassette 不是合法 JSON"}
+
+    def test_empty_directory_returns_success(self, capsys):
+        """未录制任何 cassette：提示目录并正常退出（非错误）。"""
+        with patch("src.python.core.cassette.list_cassettes", return_value=[]):
+            code = _handle_cassettes(MagicMock(verify=False))
+
+        assert code == _EXIT_SUCCESS
+        assert "未找到已录制的数据源响应" in capsys.readouterr().out
+
+    def test_listing_shows_source_and_interactions(self, capsys):
+        with patch("src.python.core.cassette.list_cassettes", return_value=[self._OK_ENTRY]):
+            code = _handle_cassettes(MagicMock(verify=False))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SUCCESS
+        assert "tencent_quote" in out
+        assert "腾讯行情" in out
+        assert "交互=1" in out
+
+    def test_unreadable_cassette_marked_error(self, capsys):
+        """损坏文件如实以 [ERR] 呈现，不静默跳过（否则「已录制」是假的）。"""
+        with patch("src.python.core.cassette.list_cassettes", return_value=[self._BAD_ENTRY]):
+            code = _handle_cassettes(MagicMock(verify=False))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SUCCESS
+        assert "[ERR] broken" in out
+        assert "不是合法 JSON" in out
+
+    def test_verify_all_ok_returns_success(self, capsys):
+        verdicts = [{"name": "tencent_quote", "status": "ok", "detail": "", "interactions": 1}]
+        with patch("src.python.core.cassette.verify_cassettes", return_value=verdicts):
+            code = _handle_cassettes(MagicMock(verify=True))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SUCCESS
+        assert "[OK] tencent_quote" in out
+        assert "全部录制的解析路径正常" in out
+
+    def test_verify_any_fail_returns_severe(self, capsys):
+        """有解析失败 → _EXIT_SEVERE（回放通道坏了，须重新录制）。"""
+        verdicts = [{"name": "tencent_quote", "status": "fail", "detail": "KeyError: 'data'"}]
+        with patch("src.python.core.cassette.verify_cassettes", return_value=verdicts):
+            code = _handle_cassettes(MagicMock(verify=True))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SEVERE
+        assert "[ERR] tencent_quote" in out
+        assert "1 份录制的解析路径失败" in out
+
+    def test_verify_skipped_is_partial_marker_but_not_failure(self, capsys):
+        """未登记解析器的 cassette 记 [!] 跳过，不算失败（也不伪造成 OK）。"""
+        verdicts = [{"name": "future_source", "status": "skipped", "detail": "未登记解析器，仅校验文件可读"}]
+        with patch("src.python.core.cassette.verify_cassettes", return_value=verdicts):
+            code = _handle_cassettes(MagicMock(verify=True))
+
+        out = capsys.readouterr().out
+        assert code == _EXIT_SUCCESS
+        assert "[!] future_source" in out
+        assert "[OK] future_source" not in out
+
+    def test_verify_uses_registered_parsers(self):
+        """--verify 必须带上解析器登记表，否则校验退化为「只查文件可读」。"""
+        from src.python.fetcher.cassette_checks import CASSETTE_CHECKS
+
+        with patch("src.python.core.cassette.verify_cassettes", return_value=[]) as mock_verify:
+            _handle_cassettes(MagicMock(verify=True))
+
+        assert mock_verify.call_args[0][0] is CASSETTE_CHECKS
+
+
+@pytest.mark.unit
+class TestMainCassettes:
+    """main() cassettes 分派（config 之前，只读离线维护）。"""
+
+    def test_dispatches_before_init_config(self):
+        """cassettes 不碰用户配置：损坏配置下也须可用。"""
+        with (
+            patch("src.python.cli.cli._handle_cassettes", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config") as mock_init,
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "cassettes"]):
+                code = main()
+
+        assert code == _EXIT_SUCCESS
+        mock_handle.assert_called_once()
+        mock_init.assert_not_called()
+
+    def test_passes_verify_to_handler(self):
+        with (
+            patch("src.python.cli.cli._handle_cassettes", return_value=_EXIT_SUCCESS) as mock_handle,
+            patch("src.python.config.init_config"),
+            patch("src.python.config.get_config"),
+            patch("src.python.core.logger.setup_logger"),
+        ):
+            with patch.object(__import__("sys"), "argv", ["cli.py", "cassettes", "--verify"]):
+                main()
+
+        args = mock_handle.call_args[0][0]
+        assert args.command == "cassettes"
+        assert args.verify is True
+
+
+# ═══════════════════════════════════════════════════════════════
+# 进程入口与退出码传递
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.mark.unit
+class TestRunCli:
+    """run_cli() 把 main() 的返回值/异常翻译为进程退出码。"""
+
+    def test_propagates_return_code(self):
+        """main() 返回的非零码必须向上抛 SystemExit（否则失败被吞成 0）。"""
+        with (
+            patch("src.python.cli.cli.main", return_value=_EXIT_SEVERE),
+            patch("src.python.core.logger.log_app_boundary"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                run_cli()
+
+        assert exc.value.code == _EXIT_SEVERE
+
+    def test_keyboard_interrupt_maps_to_130(self, caplog):
+        """Ctrl-C → 130（shell 约定），不当作崩溃。"""
+        with (
+            patch("src.python.cli.cli.main", side_effect=KeyboardInterrupt),
+            patch("src.python.core.logger.log_app_boundary"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                run_cli()
+
+        assert exc.value.code == 130
+
+    def test_unhandled_exception_maps_to_severe(self):
+        """未处理异常 → 2，且不得把 traceback 直接抛给用户。"""
+        with (
+            patch("src.python.cli.cli.main", side_effect=RuntimeError("boom")),
+            patch("src.python.core.logger.log_app_boundary"),
+        ):
+            with pytest.raises(SystemExit) as exc:
+                run_cli()
+
+        assert exc.value.code == _EXIT_SEVERE
+
+    def test_boundary_log_written_on_exit(self):
+        """退出时记录应用边界（日志可追溯本次运行）。"""
+        with (
+            patch("src.python.cli.cli.main", return_value=_EXIT_SUCCESS),
+            patch("src.python.core.logger.log_app_boundary") as mock_boundary,
+        ):
+            with pytest.raises(SystemExit):
+                run_cli()
+
+        assert mock_boundary.call_args[0][0] == "关闭"
+
+
+@pytest.mark.unit
+class TestModuleEntryPoint:
+    """``python -m src.python.cli`` 必须把退出码传给 shell。
+
+    回归：``__main__.py`` 曾只调 ``main()`` 而丢弃返回值，导致 ``scripts/cli.sh``
+    / ``scripts/cli.ps1`` / cron / CI 调用的退出码恒为 0——``doctor``（部分失败=1、
+    严重=2）与 ``cassettes --verify``（解析失败=2）的结论对外部不可见。
+    这里用 ``runpy`` 以 ``__main__`` 身份执行该入口，并预先把 ``main`` 打桩为固定
+    返回码，断言进程退出码就是它（而非恒 0）。
+    """
+
+    _PROBE = (
+        "import runpy, src.python.cli.cli as cli; "
+        "cli.main = lambda: 7; "
+        "runpy.run_module('src.python.cli', run_name='__main__')"
+    )
+
+    def test_module_entry_propagates_exit_code(self):
+        proc = subprocess.run(
+            [sys.executable, "-c", self._PROBE],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        assert proc.returncode == 7, f"退出码未传递（stdout={proc.stdout!r} stderr={proc.stderr!r})"

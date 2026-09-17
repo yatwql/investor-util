@@ -12,6 +12,7 @@
   "llm_key_file": "data/config/llm_key.json",
   "llm_settings_file": "data/config/llm_settings.json",
   "llm_providers_file": "data/config/llm_providers.json",
+  "data_key_file": "data/config/data_key.json",  // 数据源密钥文件（通用；以 provider 名为节，如 {"datasink": {"api_key": "..."}, "hithink": {"api_key": "..."}}）
 
   // ── B. 报告章节可见性 ──
   "enable_fund_deep_analysis": true,  // 基金深度分析+因子暴露+相关性
@@ -19,8 +20,7 @@
   "enable_history": true,   // 组合历史走势与回撤
   "enable_portfolio_evolution": true,  // 组合演进
   "enable_action": true,     // 行动建议（默认开，可在菜单 P 关闭）
-  // 报告子模块开关（数据质量仪表盘为长期可信核心默认开启；其余新增能力默认关闭，避免既有报告突然"变胖"）
-  "report_submodules": {"data_quality": true, "industry_beta": false, "candidate_compare": false, "cost_lots": false, "valuation_percentile": false, "market_temperature": false},  // 数据质量仪表盘默认开，其余默认关
+  // 报告章节与增强开关见 data/config/features.json（功能开关注册表，菜单 [S] 报告块；本文件不再承载）
   "comparison_candidates": [],  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合 candidate_compare）
 
   // ── C. 数据源与提供商 ──
@@ -33,6 +33,16 @@
     "akshare": true
   },
   "preferred_provider": {},
+  "datasink": {
+    "enabled": true,               // 数据底座总开关：关闭后依赖它的分析（财务指标章/真实估值分位）静默回原样
+    "plan": "free",                 // free / yearly；决定限速与日配额的默认值
+    "requests_per_second": 0,       // 0=按 plan 自动（free=3，yearly=31）
+    "daily_quota": 0,               // 0=按 plan 自动（free=8191，yearly=131071）
+    "sections": ["管理层讨论与分析"],  // 取用的财报章节（fuzzy 标题匹配）
+    "max_chars": 2000,             // 单股摘要截断长度
+    "doc_types": [],               // 文种白名单：空 = 不限文种（取最新报告期，半年报/季报通常比年报新）
+    "sections": ["管理层讨论与分析"]  // 章节偏好（按顺序在文档实际章节名中子串匹配，命中即取）
+  },
 
   // ── D. 市场时段与缓存 ──
   "market_hour_aware": ["price", "index"],
@@ -120,6 +130,15 @@
 }
 ```
 
+## 目录
+
+- [A. 路径与文件](#a-路径与文件) · [B. 报告章节可见性](#b-报告章节可见性) · [C. 数据源与提供商](#c-数据源与提供商)
+- [D. 市场时段与缓存](#d-市场时段与缓存) · [E. 行为调优](#e-行为调优) · [F. 业绩基准与无风险利率](#f-业绩基准与无风险利率)
+- [G. 组合历史走势与持仓快照](#g-组合历史走势与持仓快照) · [H. 业绩评价配置](#h-业绩评价配置) · [I. 再平衡配置](#i-再平衡配置)
+- [J. 流动性配置](#j-流动性配置) · [K. 匿名化配置](#k-匿名化配置) · [L. 批量并行调度](#l-批量并行调度)
+- [M. 功能开关（features.json）](#m-功能开关featuresjson) · [N. 缓存分组](#n-缓存分组) · [O. 机器本地状态（非 config.json）](#o-机器本地状态非-configjson) · [P. Web 模式配置编辑](#p-web-模式配置编辑)
+- [与菜单命令的对应关系](#与菜单命令的对应关系)
+
 ## 字段说明
 
 以下字段可通过 TUI 主菜单的对应命令修改（运行 `.venv/bin/python -m src.python.tui` 进入主菜单）。标有"手动编辑"的字段需直接修改 JSON 文件。
@@ -128,20 +147,23 @@
 |------|--------|------|----------|
 | `holdings_dir` | `data/holdings` | 持仓 xlsx 文件所在目录 | 菜单 `C` |
 | `holdings_filename` | `个人投资持仓信息.xlsx` | 要读取的持仓文件名 | 菜单 `F` |
-| `holdings_start_date` | `""` | 组合建仓日期（YYYY-MM-DD，可选）。持仓 Excel 未录入交易/分红流水时，成本流水子模块按「建仓日一次性买入」近似年化；空=不计算近似年化，仅成本分档近似（每份成本 vs 市价）。须配合 `report_submodules.cost_lots` 开启 | 手动编辑 |
+| `holdings_start_date` | `""` | 组合建仓日期（YYYY-MM-DD，可选）。持仓 Excel 未录入交易/分红流水时，成本流水子模块按「建仓日一次性买入」近似年化；空=不计算近似年化，仅成本分档近似（每份成本 vs 市价）。须配合功能开关 `cost_lots` 开启 | 手动编辑 |
 | `output_dir` | `reports` | 报告输出目录（最新版+按日期存档） | 菜单 `O` |
 | `llm_key_file` | `data/config/llm_key.json` | LLM 密钥文件路径（4 个必填字段 + 4 个可选回退字段） | 手动编辑 |
 | `llm_settings_file` | `data/config/llm_settings.json` | LLM 非敏感配置文件路径 | 手动编辑 |
 | `llm_providers_file` | `data/config/llm_providers.json` | LLM 多 Provider 链式服务配置文件路径，参见 [LLM 配置指引](how-to-config-llm.md) | 手动编辑 |
+| `data_key_file` | `data/config/data_key.json` | 数据源密钥文件路径（**通用**：以 provider 名为节，节内字段默认 `api_key`，如 `{"datasink": {"api_key": "..."}, "hithink": {"api_key": "..."}}`；一个文件容纳多个数据源的 key。各源申请地址见数据源可用性矩阵。环境变量如 `DATASINK_API_KEY` / `HITHINK_FINANCE_API_KEY` 可覆盖对应源） | 手动编辑 |
 | `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量 = max(500, news_top_count × 2)，华尔街见闻硬上限 100 条除外） | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
+| `datasink.*` | `{enabled: true, plan: "free", ...}` | DataSinking 数据底座配置：`enabled`（**总开关，默认开**；关闭后所有依赖该底座的分析——财务指标章、真实历史估值分位——**静默回到引入前的报告形态**，不产生任何可感知变化）、`plan`（free/yearly，决定限速与日配额默认值）、`requests_per_second` / `daily_quota`（0=按 plan 自动）、`sections`（取用章节）、`max_chars`（摘要截断）、`doc_types`（**文种白名单，空数组 = 不限文种**，默认取最新报告期——半年报/季报通常比年报新）、`sections`（章节**偏好**列表，按顺序在文档实际章节名中子串匹配，季报会自动落到「主要财务数据/主要会计数据」）。免费档 3 请求/秒（触发 429 时自动退避重试一次）、8191 篇/日；仅覆盖 A 股 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s。低于 30s 的值在配置校验时告警，运行时自动钳制到 30s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
-| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/W/C/F/O/1/2/3/4/P/I/A/S/R/X），启动后光标自动定位 | 手动编辑 |
-| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（19 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
+| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/W/C/F/O/1/2/3/4/P/I/A/S/R/V/H/D/X；其中 `D` 受 `doctor_check` 开关约束，该开关默认开启），启动后光标自动定位 | 手动编辑 |
+| `prosperity_framework` | 见默认值 | 景气度框架诊断（实验性功能 `prosperity_framework`）：`boom_keywords` / `global_edge_keywords` / `defensive_keywords`（板块与概念关键词表）+ `concentration_target_pct`（前十大集中度目标 %） | 手动编辑 |
+| `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（17 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
 | `user_fund_benchmarks` | `{}` | 自定义基金业绩基准覆盖（键=基金代码，值=基准代码） | 手动编辑 |
 | `comparison_indices` | `{"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}` | 竞争语境对比指数池。智囊团深度复盘中对比组合 vs 多指数的今日涨跌幅、区间累计收益和指标（夏普/波动率/最大回撤）。格式 `{指数代码: 显示名称}`。禁用时设为空对象 `{}` | 手动编辑 |
@@ -150,8 +172,6 @@
 | `history.lookback_days` | `90` | 组合历史走势取数窗口（K 线条数/交易日）。需 ≥60（回撤矩阵所需最少交易日）才计算回撤矩阵，上限 365（K 线源最多返回条数）。股票/ETF 按此取 K 线条数，OTC 基金全量净值截取最近 N 条 | 手动编辑 |
 | `history.snapshot_retention_days` | `60` | 持仓快照保留天数（`data/history/snapshots/`），超期自动删除 | 手动编辑 |
 | `history.snapshot_max_count` | `365` | 持仓快照最大数量上限，超限删除最旧的（安全兜底） | 手动编辑 |
-
-> 以上两条同样作用于 **Web 试算快照域**（`data/history/snapshots/web/`）：Web「临时试算」的快照按相同保留天数与上限在试算域内独立清理，与共享主目录互不影响。Web 模式无新增配置键。
 | `history.coverage_threshold` | `0.8` | 有效区间覆盖比例阈值（0~1）。有效区间起算日和截止日均要求 ≥此比例×总持仓 有数据，否则向前/向后递延截断。提高该值可增加起算日市值真实性，但会缩短有效区间 | 手动编辑 |
 | `history.benchmark_indices` | `{"sh000300": "沪深300"}` | 基准指数配置，格式 `{指数代码: 显示名称}`。组合历史走势图上叠加显示这些指数的归一化曲线。禁用时可设为空对象 `{}` | 手动编辑 |
 | `performance_evaluation.excess_threshold_up` | `80` | 超额收益 ≥ 此值（百分点）时基金业绩评级上调一级 | 手动编辑 |
@@ -173,19 +193,15 @@
 | `enable_history` | `true` | 历史走势章节可见性（组合历史走势与回撤，一章两区块：走势表 + 回撤矩阵 + 危机区间标注），关闭后对应章节完全隐藏。持仓快照不受影响，始终自动执行 | 菜单 `P` |
 | `enable_portfolio_evolution` | `true` | 组合演进章节可见性，关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
 | `enable_action` | `true` | 行动建议章节可见性，**默认开启**，关闭后隐藏 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。智囊团深度复盘同步隐藏「行动摘要」子块 | 菜单 `P` |
-| `report_submodules.data_quality` | `true` | 数据质量仪表盘子模块开关，**默认开启**（长期可信核心）。开启后报告展示数据质量仪表盘区块（数据覆盖/时效性/降级状态） | 菜单 P → 6 |
-| `report_submodules.candidate_compare` | `false` | 「基金业绩分析」章候选基金比较子表开关，**默认关闭**。开启后报告在该章主业绩表下方展示候选基金横向比较表（候选来自 `comparison_candidates`，比较维度：收益近1月/3月/6月/1年、同类排名、评级、最大回撤、风格、与现有持仓重合度） | 菜单 P → 6 |
-| `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合 `report_submodules.candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
-| `report_submodules.valuation_percentile` | `false` | 「资产穿透TOP10」章估值分位列开关，**默认关闭**。开启后该章为每只 TOP 持仓显示「估值分位」列（当前 PE/PB，来自东财行情扩展字段 + 3~5 年价格分位代理，代理结果显式标注"价格分位代理，非真实历史估值分位"） | 菜单 P → 6 |
-| `report_submodules.market_temperature` | `false` | 「投资分析汇总」章市场温度刻度行开关，**默认关闭**。开启后该章「市场指数」行下方显示「市场温度」行（沪深300 价格分位+20日均线偏离+年化波动率三因子合成温度计，仅提示贵贱无仓位指令，含免责声明） | 菜单 P → 6 |
-| `report_submodules.industry_beta` | `false` | 「风格与因子分析」章行业 Beta 子表开关，**默认关闭**。开启后该章展示行业 Beta 子表（组合对中证行业指数的回归敏感性：行业暴露占比 + β/t 值/显著性/相关性） | 菜单 P → 6 |
-| `report_submodules.cost_lots` | `false` | 成本流水开关，**默认关闭**。开启后汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计：持仓 Excel 含交易/分红流水走精确计算；无流水时自动切换为快照近似（按 `holdings_start_date` 建仓日一次性买入近似年化，未配置则仅成本分档近似），XIRR 标注「近似」 | 菜单 P → 6 |
+| `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合功能开关 `candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
+
+> 以上两条同样作用于 **Web 试算快照域**（`data/history/snapshots/web/`）：Web「临时试算」的快照按相同保留天数与上限在试算域内独立清理，与共享主目录互不影响。Web 模式无新增配置键。
 
 ---
 
 ### A. 路径与文件
 
-路径/文件相关字段（`holdings_dir`、`holdings_filename`、`holdings_start_date`、`output_dir`、`llm_key_file`、`llm_settings_file`、`llm_providers_file`）见上方字段总表。
+路径/文件相关字段（`holdings_dir`、`holdings_filename`、`holdings_start_date`、`output_dir`、`llm_key_file`、`llm_settings_file`、`llm_providers_file`、`data_key_file`）见上方字段总表。
 
 ---
 
@@ -195,9 +211,11 @@
 
 通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换基金深度分析/市场新闻/历史走势/组合演进/行动建议 5 个章节组的可见性。
 
+> **报告章节与增强子模块（数据质量仪表盘/市场温度/行业Beta子表/候选基金比较/成本流水/估值分位/持仓基本面区块①财务指标与区块②财报摘要）不在 `[P]`**——它们已并入功能开关注册表的「报告章节与增强」组，统一在菜单 `[S]` 的报告块配置（见 [M. 功能开关](#m-功能开关featuresjson)）。
+
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
-| `enable_fund_deep_analysis` | `true` | `config.json` | 基金经理变更监控、持仓关系矩阵、持仓集中度监控、风格与因子分析 | 基金深度分析章节组 |
+| `enable_fund_deep_analysis` | `true` | `config.json` | 持仓结构与集中度、风格与因子分析（+「基金业绩分析」章末尾的基金经理变更监控块） | 基金深度分析章节组 |
 | `enable_news` | `true` | `config.json` | 财经新闻热点与持仓关联分析 | 市场新闻章节组 |
 | `enable_history` | `true` | `config.json` | 组合历史走势与回撤 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
 | `enable_portfolio_evolution` | `true` | `config.json` | 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
@@ -386,29 +404,27 @@
 | 键 | 模块标识 | 报告模块的唯一标识，见下方列表 |
 | 值 | 正整数 | 显示序号（1~99），决定该模块在报告中的视觉位置 |
 
-**19 个模块标识及默认顺序：**
+**17 个模块标识及默认顺序：**
 
 | 默认序号 | 模块标识 | 显示名称 | 类型 |
 |:--------:|:---------|:---------|:-----|
 | 1 | `summary` | 投资分析汇总 | 始终显示 |
-| 2 | `market_value` | 市值核算明细表 | 始终显示 |
-| 3 | `category` | 持仓分类表 | 始终显示 |
-| 4 | `penetration` | 资产穿透TOP10 | 始终显示 |
-| 5 | `fund_performance` | 基金业绩分析 | 始终显示 |
-| 6 | `fund_manager` | 基金经理变更监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 7 | `position_relationship` | 持仓关系矩阵 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章两区块：重合度 + 相关性） |
-| 8 | `fund_concentration` | 持仓集中度监控 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示） |
-| 9 | `style_factor` | 风格与因子分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） |
-| 10 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
-| 11 | `global_macro` | 全球政经局势 | LLM |
-| 12 | `expert_review` | 智囊团深度复盘 | LLM |
-| 13 | `health_check` | 持仓体检报告 | LLM |
-| 14 | `penetration_deep` | 穿透深度分析 | LLM |
-| 15 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
-| 16 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
-| 17 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
-| 18 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
-| 19 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
+| 2 | `holdings_detail` | 持仓明细与分类 | 始终显示（同页签两区块：市值明细 + 分类汇总） |
+| 3 | `penetration` | 资产穿透TOP10 | 始终显示 |
+| 4 | `fund_performance` | 基金业绩分析 | 始终显示 |
+| 5 | `position_structure` | 持仓结构与集中度 | 基金深度分析（enable_fund_deep_analysis 控制；一章三区块：重合度 + 相关性 + 集中度，任一区块有数据即显示） |
+| 6 | `style_factor` | 风格与因子分析 | 基金深度分析（enable_fund_deep_analysis 控制；有数据才显示，一章三区块：基金风格表 + 风格因子回归 + 行业 Beta 子表） |
+| 7 | `action` | 行动建议 | 行动建议（enable_action 控制，**默认开**；再平衡信号/交易纪律/调仓建议/收益归因） |
+| 8 | `news_correlation` | 财经新闻热点与持仓关联分析 | 市场新闻（enable_news 控制） |
+| 9 | `global_macro` | 全球政经局势 | LLM |
+| 10 | `expert_review` | 智囊团深度复盘 | LLM |
+| 11 | `health_check` | 持仓体检报告 | LLM |
+| 12 | `penetration_deep` | 穿透深度分析 | LLM |
+| 13 | `portfolio_history_drawdown` | 组合历史走势与回撤 | 历史走势（enable_history 控制；数据不可用时占位，一章两区块：走势表 + 回撤矩阵 + 危机区间标注） |
+| 14 | `portfolio_evolution` | 组合演进 | 组合演进（enable_portfolio_evolution 控制；数据不可用时占位） |
+| 15 | `data_source_status` | 数据源可用性矩阵 | 始终显示 |
+| 16 | `fundamental_snapshot` | 持仓基本面 | 两功能开关各控一块（`financial_indicator` 财务指标区块 / `financial_report_digest` 财报摘要区块；任一开启即显示，需各自数据就绪） |
+| 17 | `llm_usage` | LLM API 用量 | LLM（**始终最后**） |
 
 **使用示例：**
 
@@ -417,20 +433,19 @@
 ```json
 {
   "report_section_order": {
-    "fund_manager": 1,
-    "position_relationship": 2,
-    "fund_concentration": 3,
-    "style_factor": 4,
-    "summary": 5
+    "position_structure": 1,
+    "style_factor": 2,
+    "fundamental_snapshot": 3,
+    "summary": 4
   }
 }
 ```
 
-> 效果：基金经理/持仓关系矩阵/集中度/风格 4 个模块显示序号 1~4 并排在最前，投资分析汇总显示序号 5 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
+> 效果：持仓结构与集中度 / 风格与因子分析 / 持仓基本面 3 个模块显示序号 1~3 并排在最前，投资分析汇总显示序号 4 紧随其后，其余未配置模块保持默认顺序排在更后。`llm_usage` 强制最后，不受配置影响。
 >
-> 空对象 `{}` 或缺失此字段时使用上述 19 项默认顺序。
+> 空对象 `{}` 或缺失此字段时使用上述 17 项默认顺序。
 >
-> **本仓库配置**：`config.json` 的 `report_section_order` 已配置完整 18 项，将 `action`（行动建议）置于序号 10，其余模块依次顺延（`news_correlation`=11、`global_macro`=12、`expert_review`=13、`health_check`=14、`penetration_deep`=15、`portfolio_history_drawdown`=16、`portfolio_evolution`=17、`data_source_status`=18），与上表默认顺序仅差异在「行动建议提前至第 10 位」。清空为 `{}` 即恢复上表默认顺序（行动建议=17）。
+> **本仓库配置**：`config.json` 的 `report_section_order` 显式列出完整 16 项（`llm_usage` 自动置末位，故合计 17），取值与上表默认顺序**完全一致**（`action`=7、`news_correlation`=8、`global_macro`=9、`expert_review`=10、`health_check`=11、`penetration_deep`=12、`portfolio_history_drawdown`=13、`portfolio_evolution`=14、`data_source_status`=15、`fundamental_snapshot`=16）。因两者同序，清空为 `{}` 效果相同。
 
 **实用示例** — 将组合历史走势与回撤提到前面，关注回撤风险：
 
@@ -669,44 +684,43 @@
 ---
 ### M. 功能开关（features.json）
 
-`data/config/features.json` 提供 **33 项功能开关**的运行时覆写。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
+`data/config/features.json` 提供 **29 项功能开关**的运行时覆写（含「报告章节与增强」8 项，统一登记于功能开关注册表）。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
 
 ```json
 {
-  "anonymizer": true,
-  "news_cls": true
+  "enable_interactive_charts": true,
+  "metrics_hhi": false
 }
 ```
 
-> **文件不必须存在** — 全部使用代码默认值时无需此文件。首次在菜单 **[S]** 切换实验性功能或手动创建后自动生效。
-> **实验开关的三个入口**：TUI 菜单 **[S]** 实验块 / Web 配置面板「实验性功能」组 / CLI 全局参数 `--experiment NAME`（仅本次运行生效、不写盘，取值支持开关名、显示名或 `all`，详见 [CLI 命令行模式使用指南](how-to-use-cli-mode.md) §2）。三者同源同一注册表，新增实验开关自动三处可用。
-> **注意**：features.json 是唯一**不支持注释**的配置文件（标准 JSON，`//`/`/* */` 均不可用）。所有开关的默认值与完整说明见下表，或直接查看源码 `src/python/config/features.py` 的 `_FEATURE_FLAGS_DEFAULT`。
+> **文件不必须存在** — 全部使用代码默认值时无需此文件。首次在菜单 **[S]** 切换功能开关或手动创建后自动生效。
+> **功能开关的三个入口**：TUI 菜单 **[S]**（实验块 + 常规块 + 报告章节与增强块）/ Web 配置面板（「实验性功能」「常规开关」「报告章节与增强」三组）/ CLI 全局参数——`--experiment NAME`（实验组简写，只开不关，取值支持开关名、显示名或 `all`）与 `--feature NAME=VALUE`（**全部**开关、双向可控，取值写 `on`/`off`）。两者均**仅本次运行生效、不写盘**，详见 [CLI 命令行模式使用指南](how-to-use-cli-mode.md) §2。三者同源同一注册表，新增开关自动三处可用。
+>
+> **报告会自述生成条件**：生成报告时，已启用的实验功能随产物一并标注——HTML 报告页脚、Excel「LLM API 用量」页签各列一行开关清单与「输出质量可能不稳定」提示；**LLM 分析章节关闭时该页签不生成**，清单改落到 Excel「投资分析汇总」页脚（`include_llm=False` 下的兜底落点），故无论 LLM 章节开关与否，Excel 产物上都能看到清单；实验开关全关时各处均不出现，报告与默认配置下的产物一致。报告导出流转后，读者据此即可判断手中的内容是否为非默认开关下的产物。
+> **注意**：features.json 是唯一**不支持注释**的配置文件（标准 JSON，`//`/`/* */` 均不可用）。所有开关的默认值与完整说明见下表，或直接查看源码 `src/python/config/features.py` 的 `feature_switch_registry`（唯一登记点，每条含显示名/说明/分组/默认值/是否影响报告五项）。
+> **本表只收录「有消费者」的开关**——每一项在本程序内都确有一处读取其取值。**LLM 模块启停、基金深度分析、新闻源、历史走势、匿名化、启动缓存清理不在此文件**，它们各有归属配置：LLM 模块与基金深度分析走 `llm_settings.json` 的 `enabled_llm`（TUI 菜单 **[S]** 标准模块区、Web 面板「LLM 分析章节」组），新闻源走 `config.json` 的 `news_sources`，历史走势与回撤走 `config.json` 的 `enable_history`，匿名化模式走 `config.json` 的 `anonymization.mode`（两侧面板均已上屏）。写在这些开关上的覆写不产生任何效果——程序启动时会在日志中告警列出，请据告警核对。
 
-全部 33 项开关：
+全部 29 项开关分三组（⚗实验 5 / 常规 16 / 报告章节与增强 8），**三组在 TUI 菜单 [S] / Web 配置面板 / CLI 中同样可切换**。
+
+**⚗ 实验组（5 项，默认关；开启会改变报告产物，故随产物自述生成条件）**：
 
 | 开关名 | 默认值 | 说明 |
 |:-------|:------:|:-----|
-| `llm_global_macro` | true | LLM 全球政经局势 |
-| `llm_expert_review` | true | LLM 智囊团深度复盘 |
-| `llm_health_check` | true | LLM 持仓体检报告 |
-| `llm_penetration_deep` | true | LLM 穿透深度分析 |
-| `llm_news_correlation` | true | LLM 财经新闻与持仓关联分析（实际启停还受 `llm_settings.json` 的 `enabled_llm` 控制） |
 | `llm_debate_procon` | **false** | 辩论-正反辩论（三段式：白脸→黑脸→综合） |
-| `llm_debate_conditional` | **false** | 辩论-条件推理（情景化分析：涨/跌/震荡） |
 | `llm_debate_qa_concentration` | **false** | 辩论-集中度问答（集中度风险问答） |
 | `decision_reflection` | **false** | 决策跨期反思闭环（登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词；行动建议章内嵌「历史决策复盘」块） |
-| `signal_pre_digest` | **false** | 信号预消化（市场温度/估值分位/尾部风险预消化为 `信号：…` 方向行注入智囊团复盘与持仓体检提示词，减少模型读裸数值的误判） |
-| `module_quality_gate` | **false** | 模块级质量分级（对 4 个 LLM 模块输出按完整性/篇幅评 A~F，低评级中「内容在但存在缺陷」者随内容头部注入 `【内容质量提示】` 横幅——只标注、不阻断、不重试、不写回缓存） |
-| `decision_header_parse` | **false** | 决策头结构化（专家复盘提示词追加一行受控 JSON 决策头 `决策头：{"decisions":[…]}`，抽取侧优先读结构化头、失败回落确定性表格解析；**决策词归一**判据防「不建议加仓」「加仓或减仓」等被写反方向；关闭时提示词逐字节不变） |
 | `signal_ledger` | **false** | 确定性信号沉淀（把市场温度/估值分位/尾部风险/风格因子/再平衡超限五类确定性评级沉淀为 `data/state/signal_ledger.jsonl` 账本，每条附**实时/非实时**来源标签；统计与提示词摘要**默认只算实时记录**，防降级行情算出的评级冒充真实战绩；同日重跑不重复入账） |
-| `doctor_check` | **false** | 系统自检上屏（开启后 TUI 主菜单出现 `[D]` 系统自检项、Web 运行状态区渲染「系统自检」卡片）。**仅约束 TUI/Web 两个日常入口**——CLI 的 `doctor` 子命令不受本开关约束，始终可用（配置损坏正是它要诊断的场景） |
-| `fund_deep_analysis_fund_manager` | true | 基金深度分析-基金经理 |
-| `fund_deep_analysis_fund_concentration` | true | 基金深度分析-基金集中度 |
-| `news_sina` | true | 新闻源-新浪财经 |
-| `news_eastmoney` | true | 新闻源-东方财富 |
-| `news_cls` | **false** | 新闻源-财联社 |
-| `news_wallstreetcn` | true | 新闻源-华尔街见闻 |
-| `news_akshare` | true | 新闻源-akshare 封装 |
+| `prosperity_framework` | **false** | 景气度框架诊断（六维评分卡评估组合与景气度框架的契合度：景气方向/通胀属性、ROE 低位弹性、全球视野/中国比较优势、流动性、集中度与周期拼接、业绩与回撤印证；数据缺失维度标「需核实」且**不计分**；行动建议章内嵌块） |
+
+**常规组（16 项，默认开；关闭即收回对应能力。其中信号预消化、模块级质量分级、决策头结构化、辩论-条件推理、数据源凭据就绪、量化指标、交互图表与联接基金穿透**关闭会改变报告产物内容**——Web 配置面板对这些项标注「（影响报告）」；系统自检与数据源适配只影响内部路径与入口显隐，不标注）**：
+
+| 开关名 | 默认值 | 说明 |
+|:-------|:------:|:-----|
+| `signal_pre_digest` | true | 信号预消化（市场温度/估值分位/尾部风险预消化为 `信号：…` 方向行注入智囊团复盘与持仓体检提示词，减少模型读裸数值的误判）。**默认开启**——读侧注入既有信号，不额外调用 LLM、不写盘；无可用信号时静默跳过、缓存键逐字节不变 |
+| `module_quality_gate` | true | 模块级质量分级（对 4 个 LLM 模块输出按完整性/篇幅评 A~F，低评级中「内容在但存在缺陷」者随内容头部注入 `【内容质量提示】` 横幅——只标注、不阻断、不重试、不写回缓存）。**默认开启**——纯只读分级，A/B 级健康输出零噪音 |
+| `decision_header_parse` | true | 决策头结构化（专家复盘提示词追加一行受控 JSON 决策头 `决策头：{"decisions":[…]}`，抽取侧优先读结构化头、失败回落确定性表格解析；**决策词归一**判据防「不建议加仓」「加仓或减仓」等被写反方向；关闭时提示词逐字节不变）。**默认开启**——两路抽取口径同源，关闭只是去掉一层机器可读保障 |
+| `llm_debate_conditional` | true | 辩论-条件推理（情景化分析：涨/跌/震荡）。**默认开启**——情景段与既有输出在同一次调用内产出，不换调用次数 |
+| `datasource_credential_ready` | true | 数据源凭据就绪指引（接入需 key 的源时补一行 `CredentialSpec` 声明即可：链路**主动跳过**缺凭据的源并给出「缺什么/去哪申请」可读指引、`check-sources` 出 `⏭️` 跳过态与就绪摘要、`doctor` 出「数据源凭据」组，均复用既有面、不新增界面。**当前需凭据的源为 DataSinking 财报与同花顺金融数据**（凭据取通用密钥文件 `data/config/data_key.json` 的 `datasink` / `hithink` 节，或环境变量 `DATASINK_API_KEY` / `HITHINK_FINANCE_API_KEY`）；未声明的源免凭据。凭据值**永不落日志与报告**）。**默认开启**——未声明凭据需求的源对报告产物零影响，且只读诊断不耗 LLM、不写盘 |
 | `metrics_sharpe` | true | 量化指标-夏普比率 |
 | `metrics_calmar` | true | 量化指标-卡玛比率 |
 | `metrics_hhi` | true | 量化指标-HHI 集中度 |
@@ -714,15 +728,23 @@
 | `metrics_turnover` | true | 量化指标-换手率 |
 | `metrics_risk_contribution` | true | 量化指标-风险贡献 |
 | `metrics_beta` | true | 量化指标-Beta |
-| `history_portfolio` | true | 历史走势-组合净值 |
-| `history_benchmark` | true | 历史走势-基准指数 |
-| `anonymizer` | false | 匿名化功能总开关（关闭后强制 off）；具体模式通过 config.json 的 anonymization.mode 设置 |
-| `cache_daily_cleanup` | true | 启动时自动清理过期缓存 |
 | `enable_interactive_charts` | true | 报告图表交互总开关（Chart.js 交互图，缩放/悬停）——**同时决定 HTML 报告是否单文件自包含**：开启时 8 个 Chart.js 资产内嵌进 HTML（下载到任意目录、单独发送到移动端浏览均正常，不依赖同目录 JS 文件）；关闭时回退到 Canvas + 表格静态渲染，HTML **不内嵌 JS**（需与 `reports/` 下的 .js 资产同目录才显示图表，移动/单发后会空白） |
+| `doctor_check` | **true** | 系统自检上屏（默认开启，TUI 主菜单出现 `[D]` 系统自检项、Web 运行状态区渲染「系统自检」卡片）。置 `false` 时这两个入口整体消失。**仅约束 TUI/Web 两个日常入口**——CLI 的 `doctor` 子命令不受本开关约束，始终可用（配置损坏正是它要诊断的场景）。默认开是因为它只读、不改报告产物、不写文件；它只影响入口显隐，故不进报告产物的生成条件自述 |
+| `datasource_adapter` | **true** | 数据源适配契约（行情域三源以三段式适配器「参数转译→抓取→映射到标准字段」+ 声明式 alias 归一获取，与既有转换函数逐源等价，仅东方财富多出 `market_cap`/`pe` 两个 `None` 键）。**默认开启**——它是内部接缝，开关两种取值下报告数值不变，故不该以默认关的形态让用户面对一个无差别的选择；置 `false` 即回退既有转换函数（逐字节等价）。接入新数据源/新字段时走该契约；`doctor` 的「数据源适配」组在开关关闭时也照常核验适配器声明与自检 |
+| `feeder_penetration` | **true** | ETF 联接基金的底层穿透（联接基金的资产就是目标 ETF、**本身不持有股票**，其季报股票表按构造为空，故此前拿不到任何底层暴露）。开启时按其**目标 ETF** 的持仓与报告期作为该基金的底层资产，目标 ETF 由基金主页面锚点动态解析（不维护映射表，基金公司更换标的时自动跟随）；报告中以「穿透自目标 ETF `XXXXXX`（未折算持有比例）」显式标注来源。置 `false` 即维持「联接基金无底层资产」 |
+| `data_quality` | `true` | 「数据源可用性矩阵」章渲染数据质量仪表盘区块（覆盖/时效/降级状态） |
+| `market_temperature` | `true` | 「投资分析汇总」章渲染市场温度刻度行（三因子合成；数据不足时该行静默省略） |
+| `industry_beta` | `false` | 「风格与因子分析」章渲染行业 Beta 子表（行业暴露 + β/t 值/显著性/相关性） |
+| `candidate_compare` | `false` | 「基金业绩分析」章渲染候选基金横向比较子表（候选来自 `comparison_candidates`） |
+| `cost_lots` | `false` | 汇总/市值/分类页签渲染成本分档 + XIRR + 分红累计（需持仓 Excel 含交易/分红流水） |
+| `valuation_percentile` | `false` | 「资产穿透TOP10」章渲染估值分位列（真实历史 PE/PB 分位，无覆盖回落价格分位代理） |
+| `market_sentiment` | `false` | 行动建议章内嵌块「市场情绪与持仓热点」：持仓/穿透标的命中当日龙虎榜或连板梯队的事件行（需同花顺 key） |
+| `financial_report_digest` | `false` | 持仓基本面章区块②：A 股标的财报章节摘要（需 DataSinking key） |
+| `financial_indicator` | `false` | 持仓基本面章区块①：持仓 A 股基本面（指标/质量档/趋势/当前 PE·PB；需数据底座就绪） |
 
-> **菜单 [S] 的面板布局**：LLM 配置面板分两组——标准 LLM 模块（由 `llm_settings.json` 的 `enabled_llm` 控制）与 ⚗ 实验性功能（编号紧随标准模块之后，由上方实验开关控制，各项相互独立、可组合开启；开关清单由 `features.py::EXPERIMENTAL_FEATURES` 注册表驱动，新增实验开关自动上屏）。**正反辩论（`llm_debate_procon`）**开启后，智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**为分析注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**在行动建议章内嵌「历史决策复盘」块（HTML + Excel）；**信号预消化（`signal_pre_digest`）**把市场温度/估值分位/尾部风险预先消化为 `信号：{指标} {结论}（{依据}）` 的行注入智囊团复盘与持仓体检提示词（结论置顶、明细在后），让模型读结论而非解读裸数值；**模块级质量分级（`module_quality_gate`）**对 4 个 LLM 模块输出按完整性与篇幅评 A~F，低评级中「内容在但存在缺陷」者（缺章节/篇幅明显偏短）在模块内容头部注入一条 `【内容质量提示】` 横幅说明评级与原因，提示读者该段输出需降级参考——**只标注、不阻断生成、不触发重试、不写回缓存**，A/B 级健康输出零噪音；**决策头结构化（`decision_header_parse`）**在专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读该结构化头、失败回落确定性表格解析——两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），使「不建议加仓」「加仓或减仓」这类表述不再被判成相反方向写入决策账本；**确定性信号沉淀（`signal_ledger`）**把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类确定性算法评级沉淀为 `data/state/signal_ledger.jsonl` 账本，每条记录附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施——逐品种行情新鲜度 + 数据源降级事件，非实时即本次由降级/缓存行情算出），并把摘要注入智囊团复盘提示词；**统计与摘要默认只算实时记录**，防止降级数据算出的评级冒充真实战绩，同日重跑不重复入账；**系统自检（`doctor_check`）**开启后在 TUI 主菜单显示 `[D]` 系统自检项、Web 运行状态区渲染「系统自检」卡片——一键盘点环境/配置/目录/功能开关/数据源五组，失败项附可执行修复建议，**只读诊断、自身永不抛异常**；该开关**只约束这两个日常入口**，CLI 的 `doctor` 子命令始终可用。
+> **菜单 [S] 的面板布局**：面板分四块——标准 LLM 模块（由 `llm_settings.json` 的 `enabled_llm` 控制）、⚗ 实验性功能（默认关闭）、常规开关（默认开启）、**报告章节与增强**（数据质量/行业Beta/候选比较/成本流水/估值分位/市场温度/财报摘要/财务指标，默认多数关闭，开启即新增对应章节/列/行）。三块功能开关的清单、分组与显示名均由 `features.py::feature_switch_registry` 注册表驱动（分组顺序取 `GROUP_ORDER`），新增开关自动上屏；**转正**（某项验证通过）只是把它从实验块挪到常规块，面板入口随之延续。上方开关表中：实验组（前 5 项）= 实验块，常规组（次 16 项）= 常规块，报告组（后 8 项）= 报告章节与增强块。**正反辩论（`llm_debate_procon`）**开启后，智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**为分析注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**在行动建议章内嵌「历史决策复盘」块（HTML + Excel）；**信号预消化（`signal_pre_digest`）**把市场温度/估值分位/尾部风险预先消化为 `信号：{指标} {结论}（{依据}）` 的行注入智囊团复盘与持仓体检提示词（结论置顶、明细在后），让模型读结论而非解读裸数值；**模块级质量分级（`module_quality_gate`）**对 4 个 LLM 模块输出按完整性与篇幅评 A~F，低评级中「内容在但存在缺陷」者（缺章节/篇幅明显偏短）在模块内容头部注入一条 `【内容质量提示】` 横幅说明评级与原因，提示读者该段输出需降级参考——**只标注、不阻断生成、不触发重试、不写回缓存**，A/B 级健康输出零噪音；**决策头结构化（`decision_header_parse`）**在专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读该结构化头、失败回落确定性表格解析——两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），使「不建议加仓」「加仓或减仓」这类表述不再被判成相反方向写入决策账本；**确定性信号沉淀（`signal_ledger`）**把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类确定性算法评级沉淀为 `data/state/signal_ledger.jsonl` 账本，每条记录附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施——逐品种行情新鲜度 + 数据源降级事件，非实时即本次由降级/缓存行情算出），并把摘要注入智囊团复盘提示词；**统计与摘要默认只算实时记录**，防止降级数据算出的评级冒充真实战绩，同日重跑不重复入账；**数据源凭据就绪（`datasource_credential_ready`）**为数据源声明所需凭据（密钥文件节名/字段或环境变量名 + 申请地址），缺失时链路**主动跳过该源并给出可读指引**（不进熔断计数）、`check-sources` 产出 `⏭️` 跳过态与就绪摘要行、`doctor` 增设「数据源凭据」组——**当前需凭据的源为 DataSinking 财报与同花顺金融数据**（其余免费），凭据值永不落日志与报告；**系统自检（`doctor_check`）**不出现在本实验面板中——它默认开启（TUI 主菜单即显示 `[D]` 系统自检项、Web 运行状态区即渲染「系统自检」卡片），一键盘点环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，失败项附可执行修复建议，**只读诊断、自身永不抛异常**；该开关**只约束这两个日常入口**，CLI 的 `doctor` 子命令始终可用；**联接基金穿透（`feeder_penetration`）**已转正入常规块——ETF 联接基金按其目标 ETF 的持仓与报告期穿透底层资产，目标 ETF 由主页面锚点动态解析，报告中标注「穿透自目标 ETF `XXXXXX`（未折算持有比例）」。
 
-> 以上 33 项为**全部**功能开关清单（默认值与代码 `features.py::_FEATURE_FLAGS_DEFAULT` 一致）。features.json 仅需列出需覆写的开关，未列出的保持默认值。
+> 以上 29 项为**全部**功能开关清单（默认值与代码 `features.py::feature_switch_registry` 一致）。features.json 仅需列出需覆写的开关，未列出的保持默认值。
 > 该文件不包含敏感信息，可安全纳入版本控制。
 
 ---
@@ -736,19 +758,6 @@
 | `refresh` | 基金业绩排名、基金持仓、行业分类、新闻聚合、LLM 新闻关联分析、机构盈利预测、行业资金流向、股票历史分红、基金业绩基准、基金经理数据、持仓重合度、基金风格扩展数据、无风险利率 | **可随时独立刷新的补充数据。** 不依赖持仓文件切换，任何时候都可以主动刷新 — 如盘中更新行业资金流向、拉取最新基金排名 |
 
 **无分组的模块**（`tracking` 持仓跟踪、`calendar` 交易日历、`fund_concentration` 集中度历史快照、`fund_style_snapshot` 风格快照、`history_stock` 历史 K 线、`history_fund_otc` 历史净值、`history_index` 指数历史日线）：未被任何分组覆盖，不会被菜单缓存命令误删。对应 TTL 可通过 `cache_ttl.{key}` 自行调整。
-
-### 与菜单命令的对应关系
-
-- **菜单 `[1]` 更新基础类缓存** → 清除 `refresh` 组全部缓存，然后重新拉取。适合：启动后先刷新补充数据，再生成报告。纯股票组合时自动跳过基金排名/持仓/基准刷新，仍主动重拉行业分类、分红、盈利预测、资金流向。新闻缓存清除后由后续报告生成按需重建。
-- **菜单 `[2]` 更新持仓类缓存** → 清除 `preload` 组全部缓存，然后并行拉取新持仓的价格和指数。适合：切换到另一份持仓文件时一键清理依赖旧持仓的缓存。
-
-两组互不重叠：`[1]` 不会误删价格/指数缓存，`[2]` 不会误删基金排名/行业分类缓存。
-
-> **调整建议：** 持仓变动少可将 `hold` 的 TTL 调大为 30 天，减少基金持仓的重复拉取。
->
-> **交易时段短 TTL：** `price` 和 `index` 在 A 股交易时段（09:30–11:30 + 13:00–15:00）自动使用 `market_hour_ttl`（默认 30s）替代常规 TTL，确保盘中实时行情。收盘后自动回落长 TTL 保持收盘价。可通过 `market_hours` 配置手动调整。
-
----
 
 ### O. 机器本地状态（非 config.json）
 
@@ -765,20 +774,35 @@
 
 ### P. Web 模式配置编辑
 
-Web 模式（浏览器界面）提供「配置编辑」面板，可修改的配置项与 TUI 主菜单**完全一致**（完整镜像），共 7 组：
+Web 模式（浏览器界面）提供「配置编辑」面板，可修改的配置项与 TUI 主菜单**完全一致**（完整镜像），共 8 组（其中「实验性功能」与「常规开关」为同一功能开关组的上下两块，合起来对应 TUI 菜单 `[S]` 的两块）：
 
 | 组 | 配置项 | 对应 TUI 菜单 |
 |:--|:--|:--|
 | 路径与文件 | `holdings_dir` / `holdings_filename` / `output_dir` | `[C]` / `[F]` / `[O]` |
 | 报告章节 | `enable_fund_deep_analysis` / `enable_news` / `enable_history` / `enable_portfolio_evolution` / `enable_action` | `[P]` 1~5 |
-| 报告增强子模块 | `report_submodules.data_quality` / `industry_beta` / `candidate_compare` / `cost_lots` / `valuation_percentile` / `market_temperature` | `[P]` 6 |
+| 报告章节与增强 | `data_quality`（默认开）/ `market_temperature`（默认开）/ `industry_beta` / `candidate_compare` / `cost_lots` / `valuation_percentile` / `financial_report_digest` / `financial_indicator` | `[S]` 报告块 |
 | 持仓匿名化 | `anonymization.mode`（off / code_display / full_anonymous / summary） | `[A]` |
 | 对比指数池 | `comparison_indices`（增 / 删 / 重置默认） | `[I]` |
 | LLM 分析章节 | `enabled_llm.global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation` | `[S]` 标准模块 |
-| 实验性功能 | `llm_debate_procon` / `llm_debate_conditional` / `llm_debate_qa_concentration` / `decision_reflection` / `signal_pre_digest` / `module_quality_gate` / `decision_header_parse` / `signal_ledger` / `doctor_check` | `[S]` 实验块 |
+| 实验性功能 | `llm_debate_procon` / `llm_debate_qa_concentration` / `decision_reflection` / `signal_ledger` / `prosperity_framework` | `[S]` 实验块（6-10） |
+| 常规开关 | `signal_pre_digest` / `module_quality_gate` / `decision_header_parse` / `llm_debate_conditional` / `datasource_credential_ready` / `metrics_*`（6 项）/ `enable_interactive_charts` / `doctor_check` / `datasource_adapter` / `feeder_penetration` | `[S]` 常规块 |
+| 报告章节与增强 | `data_quality`（默认开）/ `market_temperature`（默认开）/ `industry_beta` / `candidate_compare` / `cost_lots` / `valuation_percentile` / `financial_report_digest` / `financial_indicator` | `[S]` 报告块 |
 
 **写入行为**：
 - 面板修改**立即写入**共享配置文件（`config.json` / `llm_settings.json` / `features.json`），TUI / CLI 下次读取即生效（缓存按文件修改时间自动失效，无需手动刷新）。
 - 写共享配置文件**前自动备份**为 `{文件}.bak`（单槽轮转，仅保留最近一份），可手动还原：将 `.bak` 改回原文件名即可。
 - Web 与 TUI / CLI 编辑的是**同一份配置**。请避免 Web 与 TUI 同时修改配置（两者属不同进程，跨进程并发读-改-写可能互相覆盖）；`.bak` 提供最近一份回滚。
 - 隐藏项说明：LLM 辩论三模块（`debate_pro` / `debate_con` / `debate_synthesis`）为内部注册项，TUI 与 Web 面板均不展示，辩论输出由下方三个实验开关控制。
+
+### 与菜单命令的对应关系
+
+- **菜单 `[1]` 更新基础类缓存** → 清除 `refresh` 组全部缓存，然后重新拉取。适合：启动后先刷新补充数据，再生成报告。纯股票组合时自动跳过基金排名/持仓/基准刷新，仍主动重拉行业分类、分红、盈利预测、资金流向。新闻缓存清除后由后续报告生成按需重建。
+- **菜单 `[2]` 更新持仓类缓存** → 清除 `preload` 组全部缓存，然后并行拉取新持仓的价格和指数。适合：切换到另一份持仓文件时一键清理依赖旧持仓的缓存。
+
+两组互不重叠：`[1]` 不会误删价格/指数缓存，`[2]` 不会误删基金排名/行业分类缓存。
+
+> **调整建议：** 持仓变动少可将 `hold` 的 TTL 调大为 30 天，减少基金持仓的重复拉取。
+>
+> **交易时段短 TTL：** `price` 和 `index` 在 A 股交易时段（09:30–11:30 + 13:00–15:00）自动使用 `market_hour_ttl`（默认 30s）替代常规 TTL，确保盘中实时行情。收盘后自动回落长 TTL 保持收盘价。可通过 `market_hours` 配置手动调整。
+
+---

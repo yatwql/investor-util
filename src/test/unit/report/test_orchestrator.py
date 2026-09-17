@@ -9,8 +9,6 @@ import os
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
 from unittest.mock import MagicMock, patch
 
 from src.python.report._llm_news import _fetch_llm_and_news, _report_llm_module_results
@@ -21,6 +19,8 @@ from src.python.report.orchestrator import (
     generate_report,
     prepare_report_data,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
 def _real_reports_dir() -> str:
@@ -171,10 +171,14 @@ class TestPrepareReportData:
             "data_freshness",
             # 行动建议单一数据源：「行动建议」章行动板块 + 「智囊团深度复盘」章行动摘要共享（数据契约）
             "action_data",
-            # 估值分位契约（report_submodules.valuation_percentile 关闭时为 None）
+            # 估值分位契约（功能开关 valuation_percentile 关闭时为 None）
             "valuation_data",
-            # 市场温度契约（report_submodules.market_temperature 关闭时为 None）
+            # 市场温度契约（功能开关 market_temperature 关闭时为 None）
             "market_temperature_data",
+            # 持仓个股财报摘要契约（功能开关 financial_report_digest 关闭时为 None）
+            "financial_report_digest_data",
+            # 财务指标契约（功能开关 financial_indicator 关闭时为 None）
+            "financial_indicator_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 
@@ -264,7 +268,7 @@ class TestGenerateReport:
         before = _snapshot_reports()
         with (
             # 市场数据网络依赖：交易日历（akshare）+ A 股/美股指数（腾讯/新浪）
-            patch("src.python.report.market_value._get_trading_calendar", return_value=set()),
+            patch("src.python.core.trading_calendar._get_trading_calendar", return_value=set()),
             patch("src.python.fetcher.index.fetch_indices", return_value={}),
             patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
             # 后台数据源健康检查（全量 HTTP 连通性探测）
@@ -300,13 +304,16 @@ class TestGenerateReport:
         assert result.holdings_ok is True
         assert result.report_generated is True
         assert result.exit_code == 0
-        # 验证 generate_excel_report 被正确调用（数据质量仪表盘默认开，成本流式子模块默认关）
+        # 验证 generate_excel_report 被正确调用（行动建议/数据质量仪表盘默认开，
+        # 成本流式子模块默认关）——enable_action 必须显式下传，漏传则行动建议页签
+        # 在 basic 路径下静默缺席（页签由 board 层开关决定创建与否）
         mock_gen.assert_called_once_with(
             mock_holdings,
             include_news=False,
             output_dir="reports",
             section_order=[{"key": "overview"}],
             progress=mock_reporter,
+            enable_action=True,
             enable_data_quality=True,
             enable_cost_lots=False,
             transactions=None,
@@ -909,8 +916,9 @@ class TestGenerateReport:
 
         assert isinstance(result, ReportResult)
         assert result.report_generated is True
-        # prepare_report_data 被调用且传入了 config
-        mock_prep.assert_called_once_with(mock_holdings, mock_reporter, config)
+        # prepare_report_data 被调用且传入了 config；transactions 透传（未提供时为 None），
+        # 供持仓明细附加 holding_days（再平衡误报防护的「新买入品种观察期」判据）
+        mock_prep.assert_called_once_with(mock_holdings, mock_reporter, config, transactions=None)
         # HTML 和 Excel 报告生成
         assert mock_html.call_count >= 1
         assert mock_xls.call_count >= 1
@@ -955,8 +963,8 @@ class TestGenerateReport:
                 },
             ),
             patch("src.python.report._llm_news._fetch_llm_and_news") as mock_llm_news,
-            patch("src.python.report.html_writer.write_html_report") as mock_html,
-            patch("src.python.report.excel_generator.generate_excel_report") as mock_xls,
+            patch("src.python.report.html_writer.write_html_report"),
+            patch("src.python.report.excel_generator.generate_excel_report"),
             patch("src.python.core.registry.get_report_section_order", return_value=[]),
             patch("src.python.providers.akshare_extras.get_sector_fund_flow", return_value=[]),
             patch("src.python.config.is_enable_fund_deep_analysis", return_value=True),

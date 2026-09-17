@@ -22,7 +22,6 @@ import pytest
 
 from src.python.analysis.correlation import (
     DEFAULT_WINDOW,
-    MIN_HOLDINGS,
     MIN_SAMPLES,
     SIGNIFICANCE_LEVEL,
     _pearson_pvalue,

@@ -23,7 +23,14 @@ logger = logging.getLogger("invest")
 
 _KNOWN_NEWS_SOURCES: set[str] = {"sina", "eastmoney", "cls", "wallstreetcn", "akshare"}
 
-_KNOWN_PROVIDER_TYPES: set[str] = {"price", "fund_rank", "fund_hold", "industry"}
+_KNOWN_PROVIDER_TYPES: set[str] = {
+    "price",
+    "fund_rank",
+    "fund_hold",
+    "industry",
+    "financial_report",
+    "financial_indicator",
+}
 
 _KNOWN_PROVIDER_NAMES: set[str] = {
     "tencent",
@@ -32,6 +39,10 @@ _KNOWN_PROVIDER_NAMES: set[str] = {
     "tiantian",
     "eastmoney_industry",
     "eastmoney_industry_rest",
+    "datasink",
+    "datasink_indicator",
+    "akshare_financial",
+    "hithink",
 }
 
 _STRING_CONFIG_KEYS: set[str] = {
@@ -41,6 +52,7 @@ _STRING_CONFIG_KEYS: set[str] = {
     "llm_key_file",
     "llm_settings_file",
     "llm_providers_file",
+    "data_key_file",
 }
 
 # 需要绝对化的路径型配置键（不包含纯文件名 holdings_filename）
@@ -50,6 +62,7 @@ _PATH_CONFIG_KEYS: set[str] = {
     "llm_key_file",
     "llm_settings_file",
     "llm_providers_file",
+    "data_key_file",
 }
 
 _MISSING = object()

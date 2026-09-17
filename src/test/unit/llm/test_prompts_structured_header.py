@@ -1,4 +1,4 @@
-"""结构化决策头提示词契约单元测试（实验项 decision_header_parse）。
+"""结构化决策头提示词契约单元测试（开关 decision_header_parse，默认开启）。
 
 覆盖：开关关闭时 expert_review 提示词**逐字节不变**（缓存指纹不受扰动）、
 开启时追加「决策头：」契约行与规范词枚举、契约文本与解析器口径互相锁定、
@@ -86,6 +86,7 @@ class TestGeneratorFingerprintSuffix:
     """生成器指纹后缀随开关换键（预检键 = 读写键）。"""
 
     def test_suffix_off_is_empty(self):
+        set_feature_enabled(dh.STRUCTURED_HEADER_FLAG, False)  # 转正后默认开，基准须显式关
         assert dh.structured_header_cache_suffix() == ""
 
     def test_suffix_on_changes_key(self):
@@ -94,6 +95,7 @@ class TestGeneratorFingerprintSuffix:
 
     def test_generator_prompt_uses_flag(self):
         # generate_expert_review 的 _prompt 闭包随开关携带契约（避免读开关两处漂移）
+        set_feature_enabled(dh.STRUCTURED_HEADER_FLAG, False)  # 转正后默认开，基准须显式关
         source = _expert_review(enable_structured_header=bool(dh.structured_header_cache_suffix()))
         assert dh.STRUCTURED_HEADER_MARKER not in source
         set_feature_enabled(dh.STRUCTURED_HEADER_FLAG, True)

@@ -18,18 +18,14 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timedelta
-from typing import Any
-from unittest.mock import MagicMock, call, patch
+from datetime import datetime
+from unittest.mock import patch
 
-from openpyxl import Workbook
 
+from src.python.core import trading_calendar
 from src.python.core.models import Holding
 from src.python.report import market_value as mv
-from src.python.report.styles import BLUE_FONT
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
 
 # ── 市值明细计算与行情更新状态辅助导入 ────────────
 from src.python.report.market_value import (
@@ -37,11 +33,11 @@ from src.python.report.market_value import (
     _compute_detail_row,
     price_update_status,
 )
-from src.python.report.market_value_sheet import (
+from src.python.report.holdings_detail_sheet import (
     _detail_to_row_values,
 )
 
-
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 # ═══════════════════════════════════════════════════════════
 #  is_qdii_by_name（委派 code_utils）
@@ -54,41 +50,49 @@ class TestIsQdii(unittest.TestCase):
     def test_qdii_in_name(self):
         """名称含 QDII → True。"""
         from src.python.core.code_utils import is_qdii_by_name
+
         self.assertTrue(is_qdii_by_name("华夏纳斯达克100ETF(QDII)"))
 
     def test_qdii_lowercase(self):
         """名称含小写 qdii → True（大小写不敏感）。"""
         from src.python.core.code_utils import is_qdii_by_name
+
         self.assertTrue(is_qdii_by_name("华夏纳斯达克100ETF(qdii)"))
 
     def test_qdii_mixed_case(self):
         """名称含混合大小写 QdIi → True。"""
         from src.python.core.code_utils import is_qdii_by_name
+
         self.assertTrue(is_qdii_by_name("测试(QdIi)"))
 
     def test_non_qdii(self):
         """不含 QDII → False。"""
         from src.python.core.code_utils import is_qdii_by_name
+
         self.assertFalse(is_qdii_by_name("电池ETF"))
 
     def test_empty_string(self):
         """空字符串 → False。"""
         from src.python.core.code_utils import is_qdii_by_name
+
         self.assertFalse(is_qdii_by_name(""))
 
     def test_no_market_value_keyword(self):
         """含有其他相似关键词但不含 QDII → False。"""
         from src.python.core.code_utils import is_qdii_by_name
+
         self.assertFalse(is_qdii_by_name("QD股票基金"))
 
     def test_non_etf(self):
         """不含 ETF → False（通过 _etf_by_name 委派 code_utils）。"""
         from src.python.core.code_utils import is_etf_by_name
+
         self.assertFalse(is_etf_by_name("长江电力"))
 
-    def test_empty_string(self):
+    def test_etf_empty_string(self):
         """空字符串 → False。"""
         from src.python.core.code_utils import is_etf_by_name
+
         self.assertFalse(is_etf_by_name(""))
 
 
@@ -102,8 +106,11 @@ class TestClassifyHoldings(unittest.TestCase):
 
     def _h(self, name: str, code: str = "", account: str = "证券账户") -> Holding:
         return Holding(
-            account=account, name=name, code=code,
-            shares=1.0, cost_price=1.0,
+            account=account,
+            name=name,
+            code=code,
+            shares=1.0,
+            cost_price=1.0,
         )
 
     # ── QDII ─────────────────────────────────────────────
@@ -225,8 +232,7 @@ class TestClassifyHoldings(unittest.TestCase):
 
     def test_whitespace_stripped(self):
         """持仓名称/代码/账户的空格被清理。"""
-        h = Holding(account="  证券账户  ", name="  电池ETF  ", code="  561910  ",
-                    shares=1.0, cost_price=1.0)
+        h = Holding(account="  证券账户  ", name="  电池ETF  ", code="  561910  ", shares=1.0, cost_price=1.0)
         result = mv.classify_holdings([h])
         self.assertEqual(len(result["场内ETF"]), 1)
 
@@ -264,7 +270,7 @@ class TestPriceUpdateStatus(unittest.TestCase):
     def setUp(self) -> None:
         self._patch_open = patch("src.python.report.market_value.is_market_open", return_value=False)
         self._patch_midday = patch("src.python.report.market_value.is_midday_break", return_value=False)
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_open.start()
         self._patch_midday.start()
         self._patch_td.start()
@@ -274,7 +280,9 @@ class TestPriceUpdateStatus(unittest.TestCase):
 
     def _row(self, source_api: str, nav_date: str, name: str = "") -> mv.DetailRow:
         return mv.DetailRow(
-            source_api=source_api, nav_date=nav_date, name=name,
+            source_api=source_api,
+            nav_date=nav_date,
+            name=name,
         )
 
     # ── Tencent（场内）────────────────────────────────────
@@ -367,8 +375,8 @@ class TestPriceUpdateStatus(unittest.TestCase):
     def test_mixed_status(self, mock_open, mock_midday):
         """部分更新 → all_ok 为 False。"""
         details = [
-            self._row("tencent", "2026-06-26"),        # 已更新（已收市）
-            self._row("tencent", "2026-06-25"),          # 未更新
+            self._row("tencent", "2026-06-26"),  # 已更新（已收市）
+            self._row("tencent", "2026-06-25"),  # 未更新
             self._row("eastmoney", "2026-06-26", name="某基金"),  # 已更新
         ]
         updated, total, all_ok = mv.price_update_status(details, "2026-06-26")
@@ -494,8 +502,14 @@ class TestIsMarketOpen(unittest.TestCase):
 def _mock_calendar() -> set[str]:
     """模拟交易日历：周一到周五，排除 2026-06-19（端午节）。"""
     return {
-        "2026-06-18", "2026-06-22", "2026-06-23", "2026-06-24",
-        "2026-06-25", "2026-06-26", "2026-06-29", "2026-06-30",
+        "2026-06-18",
+        "2026-06-22",
+        "2026-06-23",
+        "2026-06-24",
+        "2026-06-25",
+        "2026-06-26",
+        "2026-06-29",
+        "2026-06-30",
     }
 
 
@@ -515,104 +529,104 @@ class TestGetLastTradingDay(unittest.TestCase):
     def _mock_td(self, d):
         return d.strftime("%Y-%m-%d") in _mock_calendar()
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_saturday(self, mock_dt, mock_td):
         """周六 → 上周五。"""
         mock_dt.now.return_value = datetime(2026, 6, 27, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_sunday(self, mock_dt, mock_td):
         """周日 → 上周五。"""
         mock_dt.now.return_value = datetime(2026, 6, 28, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_monday_after_open(self, mock_dt, mock_td):
         """周一 10:00（已开盘）→ 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 29, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-29")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_monday_before_open(self, mock_dt, mock_td):
         """周一 02:35（盘前）→ 上周五。"""
         mock_dt.now.return_value = datetime(2026, 6, 29, 2, 35, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_monday_early_morning(self, mock_dt, mock_td):
         """周一 9:00（盘前）→ 上周五。"""
         mock_dt.now.return_value = datetime(2026, 6, 29, 9, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_monday_at_open(self, mock_dt, mock_td):
         """周一 9:30（开盘）→ 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 29, 9, 30, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-29")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_wednesday(self, mock_dt, mock_td):
         """周三 10:00 → 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 24, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-24")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_wednesday_before_open(self, mock_dt, mock_td):
         """周三 7:00（盘前）→ 周二。"""
         mock_dt.now.return_value = datetime(2026, 6, 24, 7, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-23")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_friday_after_open(self, mock_dt, mock_td):
         """周五 10:00 → 当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 26, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_friday_before_open(self, mock_dt, mock_td):
         """周五 7:00（盘前）→ 周四。"""
         mock_dt.now.return_value = datetime(2026, 6, 26, 7, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-25")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_holiday_monday_after_open(self, mock_dt, mock_td):
         """端午节后周一 10:00 → 当天为交易日，返回当天。"""
         mock_dt.now.return_value = datetime(2026, 6, 22, 10, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-22")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_holiday_friday_before_open(self, mock_dt, mock_td):
         """端午节 06-19 盘前 → 退回 06-18。"""
         mock_dt.now.return_value = datetime(2026, 6, 19, 7, 0, 0)
         mock_td.side_effect = self._mock_td
         self.assertEqual(mv.get_last_trading_day(), "2026-06-18")
 
-    @patch("src.python.report.market_value._is_trading_day")
-    @patch("src.python.report.market_value.datetime")
+    @patch("src.python.core.trading_calendar._is_trading_day")
+    @patch("src.python.core.trading_calendar.datetime")
     def test_holiday_friday_after_open(self, mock_dt, mock_td):
         """端午节 06-19 10:00（非交易日）→ 退回最近交易日 06-18。"""
         mock_dt.now.return_value = datetime(2026, 6, 19, 10, 0, 0)
@@ -628,69 +642,69 @@ class TestGetLastTradingDay(unittest.TestCase):
 class TestGetPrevTradingDay(unittest.TestCase):
     """测试 get_prev_trading_day 前一交易日计算（mock 交易日历）。"""
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_monday_to_pre_holiday(self, mock_td):
         """端午节后周一 → 跳过假期 → 上周四 06-18。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-22"), "2026-06-18")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_tuesday_to_monday(self, mock_td):
         """周二 → 周一。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-23"), "2026-06-22")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_wednesday_to_tuesday(self, mock_td):
         """周三 → 周二。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-24"), "2026-06-23")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_thursday_to_wednesday(self, mock_td):
         """周四 → 周三。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-25"), "2026-06-24")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_friday_to_thursday(self, mock_td):
         """周五 → 周四。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-26"), "2026-06-25")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_saturday_to_friday(self, mock_td):
         """周六 → 周五。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-27"), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_sunday_to_friday(self, mock_td):
         """周日 → 周五。"""
         mock_td.side_effect = lambda d: d.strftime("%Y-%m-%d") in _mock_calendar()
         self.assertEqual(mv.get_prev_trading_day("2026-06-28"), "2026-06-26")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_empty_string_calls_get_last_trading_day(self, mock_td):
         """空字符串 → 调用 get_last_trading_day。"""
         mock_td.return_value = True  # 模拟所有日期都是交易日
-        with patch("src.python.report.market_value.get_last_trading_day") as mock_ltd:
+        with patch("src.python.core.trading_calendar.get_last_trading_day") as mock_ltd:
             mock_ltd.return_value = "2026-06-26"
             result = mv.get_prev_trading_day("")
             self.assertEqual(result, "2026-06-25")
             mock_ltd.assert_called_once()
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_invalid_date(self, mock_td):
         """无效日期字符串 → 返回空字符串。"""
         mock_td.return_value = True
         self.assertEqual(mv.get_prev_trading_day("not-a-date"), "")
 
-    @patch("src.python.report.market_value._is_trading_day")
+    @patch("src.python.core.trading_calendar._is_trading_day")
     def test_none_date(self, mock_td):
         """None 作为日期 → falsy 判断触发，回退到 get_last_trading_day（不会进入异常分支）。"""
         mock_td.return_value = True
-        with patch("src.python.report.market_value.get_last_trading_day") as mock_ltd:
+        with patch("src.python.core.trading_calendar.get_last_trading_day") as mock_ltd:
             mock_ltd.return_value = "2026-06-26"
             result = mv.get_prev_trading_day(None)
             self.assertEqual(result, "2026-06-25")
@@ -751,7 +765,7 @@ class TestTradingCalendarConcurrency(unittest.TestCase):
         from src.python.cache import clear as cache_clear
 
         # 缓存隔离：确保所有线程都走到 akshare 未命中分支
-        cache_clear(mv._TRADING_CALENDAR_CACHE_KEY)
+        cache_clear(trading_calendar._TRADING_CALENDAR_CACHE_KEY)
 
         # ── 注入 fake akshare：统计 tool_trade_date_hist_sina 回调并发深度 ──
         depth = {"active": 0, "max_active": 0}
@@ -776,7 +790,7 @@ class TestTradingCalendarConcurrency(unittest.TestCase):
 
         def worker():
             try:
-                results.append(mv._get_trading_calendar())
+                results.append(trading_calendar._get_trading_calendar())
             except Exception as exc:
                 errors.append(exc)
 
@@ -808,11 +822,11 @@ class TestDeterminePriceType(unittest.TestCase):
     """
 
     def setUp(self):
-        self.td = "2026-06-26"   # Friday
+        self.td = "2026-06-26"  # Friday
         self.prev = "2026-06-25"  # Thursday
         # _count_trading_days_back → _is_trading_day → akshare 交易日历（真实网络）。
         # 用例 mock 了 is_market_open/get_prev_trading_day，但漏 _is_trading_day。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -828,8 +842,7 @@ class TestDeterminePriceType(unittest.TestCase):
     @patch("src.python.report.market_value.is_midday_break", return_value=False)
     def test_tencent_closed_no_nav_date(self, _, __):
         """tencent + 已收市 + 无净值日期 → 场内收盘价(--)。"""
-        with patch("src.python.report.market_value.get_prev_trading_day",
-                   return_value=self.prev):
+        with patch("src.python.report.market_value.get_prev_trading_day", return_value=self.prev):
             result = mv._determine_price_type("tencent", "", self.td)
             self.assertEqual(result, "场内收盘价(--)")
 
@@ -844,8 +857,7 @@ class TestDeterminePriceType(unittest.TestCase):
     @patch("src.python.report.market_value.is_midday_break", return_value=False)
     def test_tencent_closed_nav_prev(self, _, __):
         """tencent + 已收市 + nav_date == T-1 → 场内收盘价(T-1)。"""
-        with patch("src.python.report.market_value.get_prev_trading_day",
-                   return_value=self.prev):
+        with patch("src.python.report.market_value.get_prev_trading_day", return_value=self.prev):
             result = mv._determine_price_type("tencent", self.prev, self.td)
             self.assertEqual(result, "场内收盘价(T-1)")
 
@@ -869,8 +881,7 @@ class TestDeterminePriceType(unittest.TestCase):
     @patch("src.python.report.market_value.is_midday_break", return_value=True)
     def test_tencent_midday_nav_prev(self, _, __):
         """tencent + 午间休市 + nav_date == T-1 → 仍为场内收盘价(T-1)。"""
-        with patch("src.python.report.market_value.get_prev_trading_day",
-                   return_value=self.prev):
+        with patch("src.python.report.market_value.get_prev_trading_day", return_value=self.prev):
             result = mv._determine_price_type("tencent", self.prev, self.td)
             self.assertEqual(result, "场内收盘价(T-1)")
 
@@ -888,8 +899,7 @@ class TestDeterminePriceType(unittest.TestCase):
 
     def test_eastmoney_nav_prev(self):
         """eastmoney + nav_date == T-1 → 官方净值(T-1)。"""
-        with patch("src.python.report.market_value.get_prev_trading_day",
-                   return_value=self.prev):
+        with patch("src.python.report.market_value.get_prev_trading_day", return_value=self.prev):
             result = mv._determine_price_type("eastmoney", self.prev, self.td)
             self.assertEqual(result, "官方净值(T-1)")
 
@@ -929,22 +939,28 @@ class TestGenerateDetails(unittest.TestCase):
 
     def setUp(self):
         self.tencent_mock_data = {
-            "name": "电池ETF", "code": "561910",
-            "price": 10.5, "yesterday_close": 10.0,
+            "name": "电池ETF",
+            "code": "561910",
+            "price": 10.5,
+            "yesterday_close": 10.0,
             "price_date": "2026-06-26",
-            "source_api": "tencent", "source": "腾讯财经",
+            "source_api": "tencent",
+            "source": "腾讯财经",
         }
         # _generate_details → _determine_price_type → _count_trading_days_back
         # → _is_trading_day → akshare 交易日历（真实网络）。用例已 mock
         # get_last_trading_day/is_market_open 等，但漏 _is_trading_day，统一隔离。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
         self.eastmoney_mock_data = {
-            "name": "中欧医疗健康混合", "code": "003095",
-            "price": 1.5, "yesterday_close": 1.48,
+            "name": "中欧医疗健康混合",
+            "code": "003095",
+            "price": 1.5,
+            "yesterday_close": 1.48,
             "price_date": "2026-06-26",
-            "source_api": "eastmoney", "source": "东方财富",
+            "source_api": "eastmoney",
+            "source": "东方财富",
         }
 
     @patch("src.python.report.market_value.fetch_market_data")
@@ -975,10 +991,10 @@ class TestGenerateDetails(unittest.TestCase):
         self.assertEqual(d.price_type, "场内收盘价(T)")
         self.assertEqual(d.premium, "--")
         self.assertEqual(d.shares, 1000.0)
-        self.assertEqual(d.market_value, 10500.0)       # 10.5 * 1000
-        self.assertEqual(d.cost, 1000.0)                 # 1.0 * 1000
-        self.assertEqual(d.profit, 9500.0)               # 10500 - 1000
-        self.assertAlmostEqual(d.profit_rate, 9.5)       # 9500 / 1000
+        self.assertEqual(d.market_value, 10500.0)  # 10.5 * 1000
+        self.assertEqual(d.cost, 1000.0)  # 1.0 * 1000
+        self.assertEqual(d.profit, 9500.0)  # 10500 - 1000
+        self.assertAlmostEqual(d.profit_rate, 9.5)  # 9500 / 1000
         # today_profit = (10.5 - 10.0) * 1000
         self.assertEqual(d.today_profit, 500.0)
 
@@ -1000,9 +1016,9 @@ class TestGenerateDetails(unittest.TestCase):
         self.assertEqual(d.source_api, "eastmoney")
         # eastmoney + nav_date==T → "官方净值(T)"
         self.assertEqual(d.price_type, "官方净值(T)")
-        self.assertEqual(d.cost, 1000.0)                 # 2.0 * 500
-        self.assertEqual(d.market_value, 750.0)           # 1.5 * 500
-        self.assertEqual(d.profit, -250.0)                # 750 - 1000
+        self.assertEqual(d.cost, 1000.0)  # 2.0 * 500
+        self.assertEqual(d.market_value, 750.0)  # 1.5 * 500
+        self.assertEqual(d.profit, -250.0)  # 750 - 1000
         # nav_date == T → today_profit = (1.5 - 1.48) * 500
         self.assertEqual(d.today_profit, 10.0)
 
@@ -1012,10 +1028,13 @@ class TestGenerateDetails(unittest.TestCase):
         """East Money + nav_date 过期 → today_profit 为 0。"""
         mock_ltd.return_value = "2026-06-26"
         mock_fetch.return_value = {
-            "name": "中欧医疗健康混合", "code": "003095",
-            "price": 1.5, "yesterday_close": 1.48,
-            "price_date": "2026-06-20",          # 6 天前，过期数据
-            "source_api": "eastmoney", "source": "东方财富",
+            "name": "中欧医疗健康混合",
+            "code": "003095",
+            "price": 1.5,
+            "yesterday_close": 1.48,
+            "price_date": "2026-06-20",  # 6 天前，过期数据
+            "source_api": "eastmoney",
+            "source": "东方财富",
         }
 
         h = Holding("支付宝", "中欧医疗健康混合", "003095", 100.0, 1.0)
@@ -1056,6 +1075,7 @@ class TestGenerateDetails(unittest.TestCase):
             elif code == "003095":
                 return self.eastmoney_mock_data
             return None
+
         mock_fetch.side_effect = side_effect
 
         holdings = [
@@ -1109,10 +1129,13 @@ class TestGenerateDetails(unittest.TestCase):
         """场外基金净值日期为 T-1（今日净值未出）→ 本日盈亏为 0。"""
         mock_ltd.return_value = "2026-06-26"
         mock_fetch.return_value = {
-            "name": "中欧医疗健康混合", "code": "003095",
-            "price": 1.5, "yesterday_close": 1.48,
-            "price_date": "2026-06-25",          # T-1（周四）
-            "source_api": "eastmoney", "source": "东方财富",
+            "name": "中欧医疗健康混合",
+            "code": "003095",
+            "price": 1.5,
+            "yesterday_close": 1.48,
+            "price_date": "2026-06-25",  # T-1（周四）
+            "source_api": "eastmoney",
+            "source": "东方财富",
         }
         h = Holding("支付宝", "中欧医疗健康混合", "003095", 500.0, 2.0)
         details = mv._generate_details([h], "2026-06-26")
@@ -1126,10 +1149,13 @@ class TestGenerateDetails(unittest.TestCase):
         """场外基金净值日期为 T-2（如 6/25 → T=6/29 周一）→ 显示官方净值(T-2)。"""
         mock_ltd.return_value = "2026-06-29"
         mock_fetch.return_value = {
-            "name": "016055", "code": "016055",
-            "price": 1.2, "yesterday_close": 1.18,
-            "price_date": "2026-06-25",          # T-2（周四）
-            "source_api": "eastmoney", "source": "东方财富",
+            "name": "016055",
+            "code": "016055",
+            "price": 1.2,
+            "yesterday_close": 1.18,
+            "price_date": "2026-06-25",  # T-2（周四）
+            "source_api": "eastmoney",
+            "source": "东方财富",
         }
         h = Holding("基金账户", "016055", "016055", 1000.0, 1.0)
         details = mv._generate_details([h], "2026-06-29")
@@ -1143,10 +1169,13 @@ class TestGenerateDetails(unittest.TestCase):
         """场外基金净值日期等于交易日（T）→ 本日盈亏正常计算。"""
         mock_ltd.return_value = "2026-06-26"
         mock_fetch.return_value = {
-            "name": "中欧医疗健康混合", "code": "003095",
-            "price": 1.5, "yesterday_close": 1.48,
-            "price_date": "2026-06-26",          # T（周五）
-            "source_api": "eastmoney", "source": "东方财富",
+            "name": "中欧医疗健康混合",
+            "code": "003095",
+            "price": 1.5,
+            "yesterday_close": 1.48,
+            "price_date": "2026-06-26",  # T（周五）
+            "source_api": "eastmoney",
+            "source": "东方财富",
         }
         h = Holding("支付宝", "中欧医疗健康混合", "003095", 500.0, 2.0)
         details = mv._generate_details([h], "2026-06-26")
@@ -1176,7 +1205,7 @@ class TestPremiumRate(unittest.TestCase):
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day（akshare
         # 网络）+ is_market_open/is_midday_break（东方财富 push2 HTTP）。统一隔离。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_open = patch("src.python.report.market_value.is_market_open", return_value=False)
         self._patch_midday = patch("src.python.report.market_value.is_midday_break", return_value=False)
         self._patch_td.start()
@@ -1189,16 +1218,18 @@ class TestPremiumRate(unittest.TestCase):
     def test_premium_placeholder_in_detail_row(self):
         """不在交易时段或不是 tencent 源 → premium=--。"""
         from src.python.report.market_value import (
-            _compute_detail_row, _FUND_PREMIUM_PLACEHOLDER,
+            _compute_detail_row,
+            _FUND_PREMIUM_PLACEHOLDER,
         )
         from src.python.core.models import Holding
 
-        h = Holding(account="证券", name="华夏纳斯达克100ETF(QDII)",
-                     code="513300", shares=100, cost_price=1.5)
+        h = Holding(account="证券", name="华夏纳斯达克100ETF(QDII)", code="513300", shares=100, cost_price=1.5)
         mkt = {
-            "price": 1.6, "yesterday_close": 1.55,
+            "price": 1.6,
+            "yesterday_close": 1.55,
             "price_date": "2026-06-26",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         self.assertEqual(detail.premium, _FUND_PREMIUM_PLACEHOLDER)
@@ -1206,15 +1237,17 @@ class TestPremiumRate(unittest.TestCase):
     def test_premium_type_is_string(self):
         """溢价率字段始终为字符串类型。"""
         from src.python.report.market_value import (
-            _compute_detail_row, _FUND_PREMIUM_PLACEHOLDER,
+            _compute_detail_row,
         )
         from src.python.core.models import Holding
 
-        h = Holding(account="证券", name="沪深300ETF",
-                     code="510300", shares=100, cost_price=4.0)
+        h = Holding(account="证券", name="沪深300ETF", code="510300", shares=100, cost_price=4.0)
         mkt = {
-            "price": 4.2, "yesterday_close": 4.1,
-            "price_date": "", "source": "东方财富", "source_api": "eastmoney",
+            "price": 4.2,
+            "yesterday_close": 4.1,
+            "price_date": "",
+            "source": "东方财富",
+            "source_api": "eastmoney",
         }
         detail = _compute_detail_row(h, mkt)
         self.assertIsInstance(detail.premium, str)
@@ -1222,12 +1255,14 @@ class TestPremiumRate(unittest.TestCase):
     def test_premium_in_row_values(self):
         """detail_to_row_values 中溢价率列索引正确。"""
         from src.python.report.market_value import DetailRow
-        from src.python.report.market_value_sheet import (
+        from src.python.report.holdings_detail_sheet import (
             _detail_to_row_values,
         )
 
         d = DetailRow(
-            account="证券", name="测试", code="600000",
+            account="证券",
+            name="测试",
+            code="600000",
             premium="--",
         )
         values = _detail_to_row_values(d)
@@ -1237,16 +1272,17 @@ class TestPremiumRate(unittest.TestCase):
     def test_premium_not_none(self):
         """溢价率不应为 None（避免 Excel 单元格显示空白）。"""
         from src.python.report.market_value import (
-            _compute_detail_row, _FUND_PREMIUM_PLACEHOLDER,
+            _compute_detail_row,
         )
         from src.python.core.models import Holding
 
-        h = Holding(account="证券", name="普通股票",
-                     code="600000", shares=100, cost_price=10.0)
+        h = Holding(account="证券", name="普通股票", code="600000", shares=100, cost_price=10.0)
         mkt = {
-            "price": 11.0, "yesterday_close": 10.5,
+            "price": 11.0,
+            "yesterday_close": 10.5,
             "price_date": "2026-06-26",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         self.assertIsNotNone(detail.premium)
@@ -1270,7 +1306,7 @@ class TestTodayProfitOffMarket(unittest.TestCase):
         self._ld_patcher.start()
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
         self._td_patcher = unittest.mock.patch(
-            "src.python.report.market_value._is_trading_day",
+            "src.python.core.trading_calendar._is_trading_day",
             side_effect=_mock_is_trading_day,
         )
         self._td_patcher.start()
@@ -1284,12 +1320,13 @@ class TestTodayProfitOffMarket(unittest.TestCase):
         from src.python.report.market_value import _compute_detail_row
         from src.python.core.models import Holding
 
-        h = Holding(account="支付宝", name="易方达蓝筹精选",
-                     code="005827", shares=1000, cost_price=2.0)
+        h = Holding(account="支付宝", name="易方达蓝筹精选", code="005827", shares=1000, cost_price=2.0)
         mkt = {
-            "price": 2.1, "yesterday_close": 2.05,
+            "price": 2.1,
+            "yesterday_close": 2.05,
             "price_date": "2026-06-24",  # ≠ 2026-06-26（非 T 日）
-            "source": "天天基金", "source_api": "tiantian",
+            "source": "天天基金",
+            "source_api": "tiantian",
         }
         detail = _compute_detail_row(h, mkt)
         self.assertEqual(detail.today_profit, 0.0)
@@ -1299,12 +1336,13 @@ class TestTodayProfitOffMarket(unittest.TestCase):
         from src.python.report.market_value import _compute_detail_row
         from src.python.core.models import Holding
 
-        h = Holding(account="支付宝", name="易方达蓝筹精选",
-                     code="005827", shares=1000, cost_price=2.0)
+        h = Holding(account="支付宝", name="易方达蓝筹精选", code="005827", shares=1000, cost_price=2.0)
         mkt = {
-            "price": 2.1, "yesterday_close": 2.05,
+            "price": 2.1,
+            "yesterday_close": 2.05,
             "price_date": "2026-06-26",  # == trading_day
-            "source": "天天基金", "source_api": "tiantian",
+            "source": "天天基金",
+            "source_api": "tiantian",
         }
         detail = _compute_detail_row(h, mkt)
         # today_profit = (2.1 - 2.05) * 1000 = 50.0
@@ -1315,12 +1353,13 @@ class TestTodayProfitOffMarket(unittest.TestCase):
         from src.python.report.market_value import _compute_detail_row
         from src.python.core.models import Holding
 
-        h = Holding(account="证券", name="长江电力",
-                     code="600900", shares=100, cost_price=20.0)
+        h = Holding(account="证券", name="长江电力", code="600900", shares=100, cost_price=20.0)
         mkt = {
-            "price": 21.0, "yesterday_close": 20.5,
+            "price": 21.0,
+            "yesterday_close": 20.5,
             "price_date": "",  # 腾讯源无净值日期
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         # tencent 源始终用 price - yclose 计算 today_profit
@@ -1331,13 +1370,13 @@ class TestTodayProfitOffMarket(unittest.TestCase):
         from src.python.report.market_value import _compute_detail_row
         from src.python.core.models import Holding
 
-
-        h = Holding(account="支付宝", name="某基金",
-                     code="000001", shares=100, cost_price=1.0)
+        h = Holding(account="支付宝", name="某基金", code="000001", shares=100, cost_price=1.0)
         mkt = {
-            "price": 1.1, "yesterday_close": 1.05,
+            "price": 1.1,
+            "yesterday_close": 1.05,
             "price_date": "",
-            "source": "天天基金", "source_api": "tiantian",
+            "source": "天天基金",
+            "source_api": "tiantian",
         }
         detail = _compute_detail_row(h, mkt)
         self.assertEqual(detail.today_profit, 0.0)
@@ -1353,7 +1392,7 @@ class TestPremiumPlaceholder(unittest.TestCase):
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -1365,8 +1404,11 @@ class TestPremiumPlaceholder(unittest.TestCase):
         mock_td.return_value = "2026-06-30"
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
         mkt = {
-            "price": 25.0, "yesterday_close": 24.5,
-            "price_date": "2026-06-30", "source": "腾讯财经", "source_api": "tencent",
+            "price": 25.0,
+            "yesterday_close": 24.5,
+            "price_date": "2026-06-30",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         self.assertEqual(detail.premium, _FUND_PREMIUM_PLACEHOLDER)
@@ -1379,8 +1421,11 @@ class TestPremiumPlaceholder(unittest.TestCase):
         mock_td.return_value = "2026-06-30"
         h = Holding("支付宝", "易方达蓝筹", "005827", 100, 2.0)
         mkt = {
-            "price": 2.1, "yesterday_close": 2.0,
-            "price_date": "2026-06-30", "source": "天天基金", "source_api": "eastmoney",
+            "price": 2.1,
+            "yesterday_close": 2.0,
+            "price_date": "2026-06-30",
+            "source": "天天基金",
+            "source_api": "eastmoney",
         }
         detail = _compute_detail_row(h, mkt)
         self.assertEqual(detail.premium, "--")
@@ -1392,8 +1437,11 @@ class TestPremiumPlaceholder(unittest.TestCase):
         mock_td.return_value = "2026-06-30"
         h = Holding("证券", "贵州茅台", "600519", 50, 200.0)
         mkt = {
-            "price": 2050.0, "yesterday_close": 2000.0,
-            "price_date": "2026-06-30", "source": "腾讯财经", "source_api": "tencent",
+            "price": 2050.0,
+            "yesterday_close": 2000.0,
+            "price_date": "2026-06-30",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         values = _detail_to_row_values(detail)
@@ -1413,10 +1461,20 @@ class TestPremiumPlaceholder(unittest.TestCase):
             Holding("支付宝", "易方达蓝筹", "005827", 100, 2.0),
         ]
         mkts = [
-            {"price": 25.0, "yesterday_close": 24.5, "price_date": "2026-06-30",
-             "source": "腾讯财经", "source_api": "tencent"},
-            {"price": 2.1, "yesterday_close": 2.0, "price_date": "2026-06-25",
-             "source": "天天基金", "source_api": "eastmoney"},
+            {
+                "price": 25.0,
+                "yesterday_close": 24.5,
+                "price_date": "2026-06-30",
+                "source": "腾讯财经",
+                "source_api": "tencent",
+            },
+            {
+                "price": 2.1,
+                "yesterday_close": 2.0,
+                "price_date": "2026-06-25",
+                "source": "天天基金",
+                "source_api": "eastmoney",
+            },
         ]
 
         for h, m in zip(holdings, mkts):
@@ -1433,15 +1491,17 @@ class TestTodayProfitEastMoneyNonTDay(unittest.TestCase):
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
     def _make_market_data(self, nav_date: str, source_api: str = "eastmoney") -> dict:
         return {
-            "price": 2.5, "yesterday_close": 2.4,
+            "price": 2.5,
+            "yesterday_close": 2.4,
             "price_date": nav_date,
-            "source": "天天基金", "source_api": source_api,
+            "source": "天天基金",
+            "source_api": source_api,
         }
 
     @patch("src.python.report.market_value.get_last_trading_day")
@@ -1483,7 +1543,7 @@ class TestTodayProfitTencentAlways(unittest.TestCase):
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day（akshare 网络）
         # + is_market_open/is_midday_break（东方财富 push2 HTTP）。统一隔离。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_open = patch("src.python.report.market_value.is_market_open", return_value=False)
         self._patch_midday = patch("src.python.report.market_value.is_midday_break", return_value=False)
         self._patch_td.start()
@@ -1500,9 +1560,11 @@ class TestTodayProfitTencentAlways(unittest.TestCase):
         mock_td.return_value = "2026-06-30"
         h = Holding("证券", "长江电力", "600900", 200, 10.0)
         mkt = {
-            "price": 28.5, "yesterday_close": 28.0,
+            "price": 28.5,
+            "yesterday_close": 28.0,
             "price_date": "2026-06-25",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         expected = round((28.5 - 28.0) * 200, 2)
@@ -1516,9 +1578,11 @@ class TestTodayProfitTencentAlways(unittest.TestCase):
         mock_td.return_value = "2026-06-30"
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
         mkt = {
-            "price": 25.5, "yesterday_close": 25.0,
+            "price": 25.5,
+            "yesterday_close": 25.0,
             "price_date": "",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         expected = round((25.5 - 25.0) * 100, 2)
@@ -1530,9 +1594,11 @@ class TestTodayProfitTencentAlways(unittest.TestCase):
         mock_td.return_value = "2026-06-30"
         h = Holding("证券", "纳斯达克ETF", "513300", 300, 1.5)
         mkt = {
-            "price": 1.8, "yesterday_close": 1.75,
+            "price": 1.8,
+            "yesterday_close": 1.75,
             "price_date": "2026-06-27",
-            "source": "腾讯财经", "source_api": "tencent",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         expected = round((1.8 - 1.75) * 300, 2)
@@ -1544,7 +1610,7 @@ class TestTodayProfitEdgeCases(unittest.TestCase):
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -1555,9 +1621,11 @@ class TestTodayProfitEdgeCases(unittest.TestCase):
         mock_td.return_value = "2026-06-30"
         h = Holding("支付宝", "易方达蓝筹", "005827", 100, 2.0)
         mkt = {
-            "price": 0.0, "yesterday_close": 0.0,
+            "price": 0.0,
+            "yesterday_close": 0.0,
             "price_date": "",
-            "source": "--", "source_api": "",
+            "source": "--",
+            "source_api": "",
         }
         detail = _compute_detail_row(h, mkt)
         self.assertEqual(detail.today_profit, 0.0)
@@ -1569,17 +1637,16 @@ class TestTodayProfitEdgeCases(unittest.TestCase):
         mock_td.return_value = "2026-06-30"
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
         mkt = {
-            "price": 24.0, "yesterday_close": 25.0,
-            "price_date": "2026-06-30", "source": "腾讯财经", "source_api": "tencent",
+            "price": 24.0,
+            "yesterday_close": 25.0,
+            "price_date": "2026-06-30",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         expected = round((24.0 - 25.0) * 100, 2)
         self.assertEqual(detail.today_profit, expected)
         self.assertLess(detail.today_profit, 0)
-
-    def test_today_profit_in_price_update_status(self):
-        """"""
-        pass
 
 
 class TestPremiumInWriteSheet(unittest.TestCase):
@@ -1587,7 +1654,7 @@ class TestPremiumInWriteSheet(unittest.TestCase):
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _is_trading_day → akshare 交易日历。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -1598,23 +1665,26 @@ class TestPremiumInWriteSheet(unittest.TestCase):
         mock_td.return_value = "2026-06-30"
         h = Holding("证券", "长江电力", "600900", 100, 10.0)
         mkt = {
-            "price": 25.0, "yesterday_close": 24.5,
-            "price_date": "2026-06-30", "source": "腾讯财经", "source_api": "tencent",
+            "price": 25.0,
+            "yesterday_close": 24.5,
+            "price_date": "2026-06-30",
+            "source": "腾讯财经",
+            "source_api": "tencent",
         }
         detail = _compute_detail_row(h, mkt)
         values = _detail_to_row_values(detail)
         self.assertEqual(values[7], "--")
 
 
-class TestCurrencyConversion(unittest.TestCase):
-    """多币种转换正确 — 美元/港币份额处理。"""
+class TestForeignDenominatedMarketValue(unittest.TestCase):
+    """非人民币计价品种市值核算 — QDII/港股通份额按价格 × 份额直接计市值（不做汇率折算）。"""
 
     def setUp(self) -> None:
         # _compute_detail_row → _determine_price_type → _count_trading_days_back
         # → _is_trading_day → akshare 交易日历（真实网络）。这些用例已 mock
         # get_last_trading_day/is_market_open，但漏 _is_trading_day，补上以
         # 隔离 akshare 网络调用。
-        self._patch_td = patch("src.python.report.market_value._is_trading_day", side_effect=_mock_is_trading_day)
+        self._patch_td = patch("src.python.core.trading_calendar._is_trading_day", side_effect=_mock_is_trading_day)
         self._patch_td.start()
         self.addCleanup(self._patch_td.stop)
 
@@ -1625,8 +1695,11 @@ class TestCurrencyConversion(unittest.TestCase):
         mock_td.return_value = "2026-07-01"
         h = Holding("支付宝", "华夏纳斯达克100ETF(QDII)", "513300", 100, 2.0)
         mkt = {
-            "price": 2.1, "yesterday_close": 2.0,
-            "price_date": "2026-07-01", "source": "天天基金", "source_api": "eastmoney",
+            "price": 2.1,
+            "yesterday_close": 2.0,
+            "price_date": "2026-07-01",
+            "source": "天天基金",
+            "source_api": "eastmoney",
             "nav_date": "2026-07-01",
         }
         detail = _compute_detail_row(h, mkt)
@@ -1639,8 +1712,11 @@ class TestCurrencyConversion(unittest.TestCase):
         mock_td.return_value = "2026-07-01"
         h = Holding("支付宝", "华夏纳斯达克100ETF(QDII)", "513300", 100, 2.0)
         mkt = {
-            "price": 2.1, "yesterday_close": 2.0,
-            "price_date": "2026-06-30", "source": "天天基金", "source_api": "eastmoney",
+            "price": 2.1,
+            "yesterday_close": 2.0,
+            "price_date": "2026-06-30",
+            "source": "天天基金",
+            "source_api": "eastmoney",
             "nav_date": "2026-06-30",
         }
         detail = _compute_detail_row(h, mkt)
@@ -1652,8 +1728,11 @@ class TestCurrencyConversion(unittest.TestCase):
         mock_td.return_value = "2026-07-01"
         h = Holding("支付宝", "华夏纳斯达克100ETF(QDII)", "513300", 100, 2.0)
         mkt = {
-            "price": 2.1, "yesterday_close": 2.0,
-            "price_date": "2026-06-30", "source": "天天基金", "source_api": "eastmoney",
+            "price": 2.1,
+            "yesterday_close": 2.0,
+            "price_date": "2026-06-30",
+            "source": "天天基金",
+            "source_api": "eastmoney",
             "nav_date": "2026-06-30",
         }
         detail = _compute_detail_row(h, mkt)

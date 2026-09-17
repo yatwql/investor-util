@@ -1011,10 +1011,26 @@ def _update_test_coverage_doc_file(machine_info: dict, results: list[dict]) -> N
     print(f"  [OK] 已更新 {_display_path(_DOC_COVERAGE_PATH, _PROJECT_ROOT)}（模式对应测试量 + 环境耗时对照）")
 
 
+def _phase_report_path(mode_key: str, phase_tag: str = "") -> str:
+    """该模式的 pytest-html 报告路径。
+
+    分阶段模式（dev-verify = Phase A 核心单元 + Phase B 基础场景）**每阶段一个文件**：
+    两阶段共用 ``report.html`` 会让后跑的阶段覆盖前者，详细报告只剩最后一阶段
+    （实测只剩 152 个场景用例、Phase A 的 2700+ 用例全丢），排查时看不到真正的失败面。
+    """
+    name = f"report_phase_{phase_tag}.html" if phase_tag else "report.html"
+    return os.path.join(_LATEST_DIR, mode_key, name)
+
+
 def _build_pytest_args(
-    mode_cfg: dict, mode_key: str, html_available: bool, coverage: bool, parallel_level: str | None = None
+    mode_cfg: dict,
+    mode_key: str,
+    html_available: bool,
+    coverage: bool,
+    parallel_level: str | None = None,
+    phase_tag: str = "",
 ) -> list[str]:
-    """构建 pytest 命令参数列表。"""
+    """构建 pytest 命令参数列表（``phase_tag`` 非空时报告文件名带阶段后缀）。"""
     args = [
         sys.executable,
         "-m",
@@ -1039,8 +1055,7 @@ def _build_pytest_args(
         print("      [!] pytest-xdist 未安装，降级单线程执行")
 
     if html_available:
-        report_path = os.path.join(_LATEST_DIR, mode_key, "report.html")
-        args.extend(["--html", report_path, "--self-contained-html"])
+        args.extend(["--html", _phase_report_path(mode_key, phase_tag), "--self-contained-html"])
 
     if coverage:
         if _check_pytest_cov():
@@ -1096,8 +1111,6 @@ def run_mode(
     elif timeout_override is not None:
         timeout = timeout_override
 
-    start = _time.time()
-    timed_out = False
     try:
         # 设置测试环境标识，使子进程（含 xdist worker）正确将日志写入 test.log
         _env = os.environ.copy()
@@ -1114,8 +1127,6 @@ def run_mode(
         )
     except subprocess.TimeoutExpired:
         print(f"  [ERR] {mode_key} 测试超时（{timeout}s）")
-        timed_out = True
-        elapsed = timeout
         stats: dict = {
             "mode": mode_key,
             "desc": mode_cfg.get("desc", ""),
@@ -1129,8 +1140,6 @@ def run_mode(
         }
         stats["timed_out"] = True
         return stats
-    else:
-        elapsed = _time.time() - start
 
     # 合并 stdout + stderr
     output = (proc.stdout or "") + (proc.stderr or "")
@@ -1175,6 +1184,20 @@ def _overall_status(results: list[dict]) -> tuple[str, str]:
     return "PARTIAL", f"{ok_count}/{len(results)} 模式通过"
 
 
+def _report_links_html(mode: str) -> str:
+    """汇总页「报告」列链接：分阶段模式的逐阶段报告全部列出（不再只剩最后跑的那一阶段）。"""
+    mode_dir = os.path.join(_LATEST_DIR, mode)
+    links: list[str] = []
+    if os.path.isfile(os.path.join(mode_dir, "report.html")):
+        links.append(f'<a href="{mode}/report.html">📄 查看</a>')
+    if os.path.isdir(mode_dir):
+        for name in sorted(os.listdir(mode_dir)):
+            if name.startswith("report_phase_") and name.endswith(".html"):
+                tag = name[len("report_phase_") : -len(".html")]
+                links.append(f'<a href="{mode}/{name}">📄 Phase {tag}</a>')
+    return " ".join(links) if links else '<span class="dim">无</span>'
+
+
 def _render_index_html(results: list[dict], coverage: bool, archive_path: str | None) -> str:
     """生成汇总页 HTML。"""
     total_passed = sum(r.get("passed", 0) for r in results)
@@ -1199,11 +1222,7 @@ def _render_index_html(results: list[dict], coverage: bool, archive_path: str | 
         else:
             badge = f'<span class="badge badge-fail">FAIL ({ec})</span>'
 
-        report_html = os.path.join(_LATEST_DIR, mode, "report.html")
-        if os.path.isfile(report_html):
-            report_link = f'<a href="{mode}/report.html">📄 查看</a>'
-        else:
-            report_link = '<span class="dim">无</span>'
+        report_link = _report_links_html(mode)
 
         rows_html += f"""\
     <tr>
@@ -1372,7 +1391,7 @@ def _run_phased(
             "marker": phase["marker"],
             "parallel": phase.get("parallel", False),
         }
-        pytest_args = _build_pytest_args(phase_cfg, mode_key, html_available, coverage, parallel_level)
+        pytest_args = _build_pytest_args(phase_cfg, mode_key, html_available, coverage, parallel_level, phase_tag=tag)
 
         timeout = phase.get("timeout_sec", 300)
         if no_timeout:

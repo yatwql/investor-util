@@ -43,14 +43,17 @@ class TestModuleContractChain(unittest.TestCase):
 
         h = Holding("证券", "贵州茅台", "600519", 100, 150.0)
         mkt = {
-            "price": 160.5, "yesterday_close": 158.0,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "source": "腾讯行情", "name": "贵州茅台", "code": "600519",
+            "price": 160.5,
+            "yesterday_close": 158.0,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "source": "腾讯行情",
+            "name": "贵州茅台",
+            "code": "600519",
         }
 
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 30)
@@ -95,17 +98,46 @@ class TestModuleContractChain(unittest.TestCase):
             Holding("证券", "沪深300ETF", "510300", 1000, 4.0),
         ]
         details = [
-            DetailRow("证券", "茅台", "600519", 160.0, "2026-07-03",
-                      158.0, "tencent", "--", 100, 16000.0, 15000.0, 1000.0,
-                      0.0667, 200.0, "腾讯行情", "tencent"),
-            DetailRow("证券", "沪深300ETF", "510300", 4.2, "2026-07-03",
-                      4.1, "tencent", "--", 1000, 4200.0, 4000.0, 200.0,
-                      0.05, 100.0, "腾讯行情", "tencent"),
+            DetailRow(
+                "证券",
+                "茅台",
+                "600519",
+                160.0,
+                "2026-07-03",
+                158.0,
+                "tencent",
+                "--",
+                100,
+                16000.0,
+                15000.0,
+                1000.0,
+                0.0667,
+                200.0,
+                "腾讯行情",
+                "tencent",
+            ),
+            DetailRow(
+                "证券",
+                "沪深300ETF",
+                "510300",
+                4.2,
+                "2026-07-03",
+                4.1,
+                "tencent",
+                "--",
+                1000,
+                4200.0,
+                4000.0,
+                200.0,
+                0.05,
+                100.0,
+                "腾讯行情",
+                "tencent",
+            ),
         ]
 
         with (
-            patch("src.python.fetcher.industry.batch_fetch_industry_data",
-                  return_value={}),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
 
@@ -157,8 +189,16 @@ class TestModuleContractChain(unittest.TestCase):
 
     def test_classify_penetration_types(self):
         """classify_penetration 返回值为预定义常量之一。"""
-        from src.python.report.penetration import classify_penetration, \
-            STOCK, ETF, QDII, BOND_FUND, INDEX_LINK, ACTIVE_EQUITY, IGNORE
+        from src.python.report.penetration import (
+            classify_penetration,
+            STOCK,
+            ETF,
+            QDII,
+            BOND_FUND,
+            INDEX_LINK,
+            ACTIVE_EQUITY,
+            IGNORE,
+        )
 
         valid_types = {STOCK, ETF, QDII, BOND_FUND, INDEX_LINK, ACTIVE_EQUITY, IGNORE}
         test_cases = [
@@ -194,13 +234,27 @@ class TestModuleContractChain(unittest.TestCase):
         from src.python.report.market_value import price_update_status, DetailRow
 
         details = [
-            DetailRow("证券", "茅台", "600519", 160.0, "2026-07-03",
-                      158.0, "tencent", "--", 100, 16000.0, 15000.0, 1000.0,
-                      0.0667, 200.0, "腾讯行情", "tencent"),
+            DetailRow(
+                "证券",
+                "茅台",
+                "600519",
+                160.0,
+                "2026-07-03",
+                158.0,
+                "tencent",
+                "--",
+                100,
+                16000.0,
+                15000.0,
+                1000.0,
+                0.0667,
+                200.0,
+                "腾讯行情",
+                "tencent",
+            ),
         ]
         with (
-            patch("src.python.report.market_value.get_prev_trading_day",
-                  return_value="2026-07-02"),
+            patch("src.python.report.market_value.get_prev_trading_day", return_value="2026-07-02"),
         ):
             updated, total, all_updated = price_update_status(details, "2026-07-03")
 

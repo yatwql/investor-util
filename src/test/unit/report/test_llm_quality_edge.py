@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
-
 from unittest.mock import MagicMock
 
 from src.python.report.llm_quality import (
@@ -24,6 +22,8 @@ from src.python.report.llm_quality import (
     apply_quality_banners,
     grade_module,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
 
 def _feature_on(monkeypatch) -> None:

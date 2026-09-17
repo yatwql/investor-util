@@ -2,7 +2,7 @@
 
 覆盖：
   - 回归场景：对「文档版本：」头部版本行做精确匹配，正文偶然出现目标版本号
-    不得误判通过（rf-204 修复——全文 contains 方案会漏检，头部锚定方案修正）
+    不得误判通过（回归修复——全文 contains 方案会漏检，头部锚定方案修正）
   - 头部版本行正确时通过、错误版本/缺失头部时判定不一致
   - --fix 自动修正头部版本行
   - 管理文档 CHECKS 注册为 header 校验，防止退回 contains
@@ -45,7 +45,7 @@ pytestmark = [
 
 
 class TestHeaderCheck:
-    """「文档版本：」头部版本行精确校验（rf-204 回归场景）。"""
+    """「文档版本：」头部版本行精确校验（回归场景）。"""
 
     def test_matching_header_passes(self, version_script):
         text = "> 文档版本：0.10.0\n\n正文……\n"
@@ -53,10 +53,7 @@ class TestHeaderCheck:
 
     def test_old_header_rejected_even_if_body_mentions_target(self, version_script):
         """回归断言：头部为旧版本号、正文出现目标版本号时，header 校验必须判定不一致。"""
-        text = (
-            "> 文档版本：0.9.13-dev\n\n"
-            "| rf-114 | 待 v0.10.0 稳定 2 个版本后删除旧渲染器 |\n"
-        )
+        text = "> 文档版本：0.9.13-dev\n\n| rf-114 | 待 v0.10.0 稳定 2 个版本后删除旧渲染器 |\n"
         # 全文 contains 方案：因正文出现目标版本号而误判通过。
         assert version_script._check_contains(text, ("{v}",), "0.10.0") is True
         # 新方案按头部行精确匹配：头部未同步则判定不一致。
@@ -98,7 +95,7 @@ class TestAutoFixHeader:
 
 
 class TestDocHeaderRegistration:
-    """管理文档 CHECKS 注册为 header 校验，防止退回全文 contains（rf-204 回归场景）。"""
+    """管理文档 CHECKS 注册为 header 校验，防止退回全文 contains（回归场景）。"""
 
     HEADER_DOCS = [
         "docs-stm/managements/plan.md",

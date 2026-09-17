@@ -13,19 +13,15 @@
 
 from __future__ import annotations
 
-import json
-import hashlib
 import threading
 import unittest
 from unittest.mock import MagicMock, patch
 
 from src.python.providers import akshare_extras as ae
 
-import sys
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
-
-
 
 
 class TestComputeDividendFingerprint(unittest.TestCase):
@@ -114,16 +110,22 @@ class TestGetDividendData(unittest.TestCase):
     @patch("src.python.providers.akshare_extras._compute_dividend_fingerprint", return_value="testfp")
     @patch("src.python.providers.akshare_extras.ak.stock_history_dividend")
     def test_success_path(
-        self, mock_ak: MagicMock,
-        mock_fp: MagicMock, mock_set: MagicMock, mock_get: MagicMock,
+        self,
+        mock_ak: MagicMock,
+        mock_fp: MagicMock,
+        mock_set: MagicMock,
+        mock_get: MagicMock,
     ) -> None:
         """正常路径：获取分红数据。"""
         # 模拟 ak.stock_history_dividend() 返回全量聚合数据
         import pandas as pd
-        full_df = pd.DataFrame([
-            {"代码": "600519", "名称": "贵州茅台", "年均股息": 19.4583, "分红次数": 3},
-            {"代码": "000858", "名称": "五粮液", "年均股息": 3.5, "分红次数": 5},
-        ])
+
+        full_df = pd.DataFrame(
+            [
+                {"代码": "600519", "名称": "贵州茅台", "年均股息": 19.4583, "分红次数": 3},
+                {"代码": "000858", "名称": "五粮液", "年均股息": 3.5, "分红次数": 5},
+            ]
+        )
         mock_ak.return_value = full_df
 
         result = ae.get_dividend_data(["600519", "000858"])
@@ -157,14 +159,20 @@ class TestGetDividendData(unittest.TestCase):
     @patch("src.python.providers.akshare_extras._compute_dividend_fingerprint", return_value="testfp")
     @patch("src.python.providers.akshare_extras.ak.stock_history_dividend")
     def test_dividend_memo_second_call(
-        self, mock_ak: MagicMock,
-        mock_fp: MagicMock, mock_set: MagicMock, mock_get: MagicMock,
+        self,
+        mock_ak: MagicMock,
+        mock_fp: MagicMock,
+        mock_set: MagicMock,
+        mock_get: MagicMock,
     ) -> None:
         """相同代码列表第二次调用应命中 memo，不重复 fetch。"""
         import pandas as pd
-        full_df = pd.DataFrame([
-            {"代码": "600519", "名称": "贵州茅台", "年均股息": 19.4583, "分红次数": 3},
-        ])
+
+        full_df = pd.DataFrame(
+            [
+                {"代码": "600519", "名称": "贵州茅台", "年均股息": 19.4583, "分红次数": 3},
+            ]
+        )
         mock_ak.return_value = full_df
 
         # 第一次调用 — 走 fetch

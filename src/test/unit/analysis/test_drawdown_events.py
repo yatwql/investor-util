@@ -14,12 +14,12 @@ from datetime import date, timedelta
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
-
 from src.python.analysis.drawdown_events import (
     compute_recovery_times,
     extract_drawdown_events,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 
 def _bars(values: list[float], start: str = "2026-01-01") -> list[dict]:

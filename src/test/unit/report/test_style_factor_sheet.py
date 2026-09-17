@@ -107,11 +107,7 @@ class TestStyleFactorSheet(unittest.TestCase):
         return ws
 
     def _flat(self, ws) -> list[str]:
-        return [
-            str(c.value) if c.value is not None else ""
-            for row in ws.iter_rows()
-            for c in row
-        ]
+        return [str(c.value) if c.value is not None else "" for row in ws.iter_rows() for c in row]
 
     def _pct_texts(self, ws) -> list[str]:
         """提取百分比格式单元格的展示文本（value × 100 后补 %）。"""
@@ -124,10 +120,7 @@ class TestStyleFactorSheet(unittest.TestCase):
 
     def _col_texts(self, ws, col: int) -> list[str]:
         """返回指定列的全部单元格文本。"""
-        return [
-            str(row[col - 1].value) if row[col - 1].value is not None else ""
-            for row in ws.iter_rows()
-        ]
+        return [str(row[col - 1].value) if row[col - 1].value is not None else "" for row in ws.iter_rows()]
 
     # ── 两区块同章渲染 ──
 

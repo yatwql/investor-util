@@ -178,9 +178,11 @@ def test_shared_evolution_excludes_web_namespace():
     web_ev = build_evolution_data(snapshot_namespace="web")
     assert web_ev["snapshot_count"] == 3
     # 主目录无 web 子目录快照
-    assert "web" not in os.listdir(hs.HISTORY_SNAPSHOT_DIR) or not any(
-        f.startswith("snapshot_") for f in os.listdir(hs.HISTORY_SNAPSHOT_DIR)
-    ) or len(hs.load_all()) == 3
+    assert (
+        "web" not in os.listdir(hs.HISTORY_SNAPSHOT_DIR)
+        or not any(f.startswith("snapshot_") for f in os.listdir(hs.HISTORY_SNAPSHOT_DIR))
+        or len(hs.load_all()) == 3
+    )
 
 
 # ── 编排层 generate_report 透传 ────────────────────────────

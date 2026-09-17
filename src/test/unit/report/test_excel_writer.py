@@ -21,11 +21,10 @@ from unittest.mock import patch
 from openpyxl import Workbook
 
 from src.python.report import excel_writer as ew
-from src.python.report.styles import FMT_MONEY, FMT_PERCENT
+from src.python.report.styles import FMT_MONEY
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
-
 
 
 class TestCreateWorkbook(unittest.TestCase):
@@ -224,10 +223,13 @@ class TestDataStatusFoot(unittest.TestCase):
     def test_all_available_no_render(self):
         """全部 available=True → 不新增任何行。"""
         max_row_before = self.ws.max_row
-        ew._write_data_status_foot(self.ws, {
-            "source_a": {"available": True, "tier": "T2", "message": "OK"},
-            "source_b": {"available": True, "tier": "T3", "message": "OK"},
-        })
+        ew._write_data_status_foot(
+            self.ws,
+            {
+                "source_a": {"available": True, "tier": "T2", "message": "OK"},
+                "source_b": {"available": True, "tier": "T3", "message": "OK"},
+            },
+        )
         self.assertEqual(self.ws.max_row, max_row_before)
 
     def test_empty_dict_no_render(self):
@@ -239,10 +241,14 @@ class TestDataStatusFoot(unittest.TestCase):
     def test_with_failures(self):
         """有失败项 → 渲染标题行 + 状态行。"""
         row_start = 5
-        next_row = ew._write_data_status_foot(self.ws, {
-            "industry": {"available": False, "tier": "T3", "message": "行业分类数据不可用"},
-            "rank": {"available": False, "tier": "T2", "message": "排名数据不可用"},
-        }, start_row=row_start)
+        next_row = ew._write_data_status_foot(
+            self.ws,
+            {
+                "industry": {"available": False, "tier": "T3", "message": "行业分类数据不可用"},
+                "rank": {"available": False, "tier": "T2", "message": "排名数据不可用"},
+            },
+            start_row=row_start,
+        )
         # 标题行 + 2 条状态 = 3 行
         self.assertEqual(next_row, row_start + 3)
         # 验证标题行
@@ -258,26 +264,33 @@ class TestDataStatusFoot(unittest.TestCase):
 
     def test_with_mixed_available(self):
         """混合 available=True/False → 只渲染失败项。"""
-        ew._write_data_status_foot(self.ws, {
-            "source_a": {"available": True, "tier": "T2", "message": "OK"},
-            "source_b": {"available": False, "tier": "T3", "message": "出错啦"},
-        }, start_row=1)
+        ew._write_data_status_foot(
+            self.ws,
+            {
+                "source_a": {"available": True, "tier": "T2", "message": "OK"},
+                "source_b": {"available": False, "tier": "T3", "message": "出错啦"},
+            },
+            start_row=1,
+        )
         # 标题 + 1 行 = 3 行
         row_val = self.ws.cell(row=2, column=1).value
         self.assertIn("ℹ", str(row_val))
 
     def test_tier_font_color(self):
         """状态行字体为灰色。"""
-        ew._write_data_status_foot(self.ws, {
-            "test": {"available": False, "tier": "T2", "message": "测试失败"},
-        }, start_row=1)
+        ew._write_data_status_foot(
+            self.ws,
+            {
+                "test": {"available": False, "tier": "T2", "message": "测试失败"},
+            },
+            start_row=1,
+        )
         cell = self.ws.cell(row=2, column=1)
         font_color = cell.font.color
         self.assertIsNotNone(font_color)
         # openpyxl 可能返回 Color 对象，也可能返回 str
-        color_str = str(font_color.rgb if hasattr(font_color, 'rgb') else font_color)
-        self.assertTrue("999" in color_str or "99" in color_str,
-                        f"字体颜色 {color_str} 不是灰色")
+        color_str = str(font_color.rgb if hasattr(font_color, "rgb") else font_color)
+        self.assertTrue("999" in color_str or "99" in color_str, f"字体颜色 {color_str} 不是灰色")
 
 
 class TestWritePlaceholder(unittest.TestCase):
@@ -309,4 +322,3 @@ class TestWriteStatusTitle(unittest.TestCase):
         ew._write_status_title(self.ws, 3, 5)
         cell_val = self.ws.cell(row=3, column=1).value
         self.assertEqual(cell_val, "数据加载状态")
-

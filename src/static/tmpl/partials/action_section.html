@@ -147,6 +147,118 @@
             <div>* 调仓建议：份额已按一手取整（A 股/场内基金 100 份），费用为本地静态费率估算，金额与现金按建议执行顺序累计；收益归因为后续增强能力，报告结构保持稳定</div>
         </div>
 
+        <!-- ⑦ 市场情绪与持仓热点（报告增强开关 market_sentiment，默认关闭） -->
+        {% set _ms = market_sentiment_data or {} %}
+        {% if market_sentiment_data is not none %}
+        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">⑦ 市场情绪与持仓热点</div>
+        {% if _ms.get("available") %}
+        <div class="summary-tag" style="margin-bottom: 8px;">
+            📣 交易日 <strong>{{ _ms.get("trade_date") or "未知" }}</strong>
+            ｜龙虎榜上榜 <strong>{{ _ms.get("summary", {}).get("lhb_stock_count") or "—" }}</strong> 只
+            ｜连板梯队（{{ _ms.get("summary", {}).get("ladder_date") or "未知" }}）：
+            {% for k, v in (_ms.get("summary", {}).get("board_caps") or {}).items() %}{{ k }} {{ v }} 家{% if not loop.last %}；{% endif %}{% endfor %}
+        </div>
+        {% if not _ms.get("rows") %}
+        <div style="font-size:12px;color:var(--text-muted);margin:4px 0 8px;">{{ _ms.get("reason") or "当日无命中事件" }}</div>
+        {% else %}
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>名称</th><th>代码</th><th>标的来源</th><th>事件</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+                {% for r in _ms.get("rows", []) %}
+                <tr>
+                    <td class="text-left">{{ r.get("name", "") }}</td>
+                    <td>{{ r.get("code", "") }}</td>
+                    <td>{{ r.get("holding_kind", "") }}</td>
+                    <td>{{ r.get("event_type", "") }}</td>
+                    <td class="text-left" style="font-size:12px;">
+                        {% if r.get("event_type") == "龙虎榜" %}
+                            净买额 {{ r.get("net_value_yi") }} 亿
+                            {% if r.get("hot_money_net_value_yi") is not none %}｜游资 {{ r.get("hot_money_net_value_yi") }} 亿{% endif %}
+                            {% if r.get("org_net_value_yi") is not none %}｜机构 {{ r.get("org_net_value_yi") }} 亿{% endif %}
+                            {% if r.get("range_days") %}｜{{ r.get("range_days") }} 日榜{% endif %}
+                            {% if r.get("limit_reason") %}<br><span style="color:var(--text-muted);">{{ r.get("limit_reason") }}</span>{% endif %}
+                        {% else %}
+                            {{ r.get("board_label", "") }}｜日期 {{ r.get("event_date", "") }}{% if r.get("seal_nextday") %}｜次日封板{% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="summary-tag">{{ _ms.get("reason") or "暂无可用情绪数据" }}</div>
+        {% for f in _ms.get("failures", []) %}
+        <div style="font-size:12px;color:var(--text-muted);">⚠ {{ f.get("source", "") }}：{{ f.get("reason", "") }}</div>
+        {% endfor %}
+        {% endif %}
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
+            * 仅列持仓/穿透标的命中当日龙虎榜或连板梯队的事件（按代码精确匹配，不做概念联想）；非投资建议
+        </div>
+        {% endif %}
+
+        <!-- ⑥ 景气度框架诊断（实验性功能 prosperity_framework，默认关闭） -->
+        {% set _pf = prosperity_framework_data or {} %}
+        {% if _pf.get("available") %}
+        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">⑥ 景气度框架诊断（实验性）</div>
+        <div class="summary-tag" style="margin-bottom: 8px;">
+            🧭 总分 <strong>{{ _pf.get("total_score", 0) }}</strong>/{{ _pf.get("scored_weight", 0) }}
+            （{{ _pf.get("total_score_pct", 0) }}%）—— 评级：<strong>{{ _pf.get("rating_label", "") }}</strong>
+            {% if _pf.get("unverified") %}<span style="color:var(--text-muted);font-size:12px;">（{{ _pf.get("unverified") | length }} 维数据缺失，未计分）</span>{% endif %}
+        </div>
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr><th>维度</th><th>得分</th><th>满分</th><th>依据 / 未验证原因</th></tr>
+            </thead>
+            <tbody>
+                {% for d in _pf.get("dimensions", []) %}
+                <tr>
+                    <td class="text-left">{{ d.get("name", "") }}</td>
+                    <td>{{ d.get("score", 0) }}</td>
+                    <td>{{ d.get("max_score", 0) }}</td>
+                    <td class="text-left" style="font-size:12px;">
+                        {% if d.get("status") == "unverified" %}
+                            {{ (d.get("unverified") or ["数据缺失，未计分"]) | join("；") }}
+                        {% else %}
+                            {{ (d.get("evidence") or ["-"]) | join("；") }}
+                            {% if d.get("unverified") %}<br><span style="color:var(--text-faint);">未验证：{{ d.get("unverified") | join("；") }}</span>{% endif %}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% if _pf.get("holdings_view") %}
+        <div style="font-weight: bold; font-size: 13px; margin: 12px 0 6px;">持仓视角（按权重降序，前 10）</div>
+        <table>
+            <thead><tr><th>名称（代码）</th><th>权重</th><th>板块</th><th>ROE / 备注</th></tr></thead>
+            <tbody>
+                {% for item in _pf.get("holdings_view", [])[:10] %}
+                <tr>
+                    <td class="text-left">{{ item.get("name", "") }}（{{ item.get("code", "") }}）</td>
+                    <td>{{ item.get("weight_pct", 0) }}%</td>
+                    <td class="text-left">{{ item.get("sector", "") }}</td>
+                    <td class="text-left" style="font-size:12px;">
+                        {% if item.get("roe") is not none %}ROE {{ "%.2f%%"|format(item.get("roe") * 100) }}{% else %}ROE 需核实{% endif %}
+                        {% if item.get("notes") %}｜{{ item.get("notes") | join("；") }}{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        <div class="penetration-notes" style="margin-top: 10px;">
+            {% for u in _pf.get("unverified", []) %}<div>* 需核实：{{ u }}</div>{% endfor %}
+            {% for n in _pf.get("notes", []) %}<div>* {{ n }}</div>{% endfor %}
+        </div>
+        {% endif %}
+
         <!-- ⑤ 历史决策复盘（决策跨期反思闭环，默认关闭） -->
         {% set _rev = decision_review_data or {} %}
         {% if _rev.get("available") %}

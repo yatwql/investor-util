@@ -12,13 +12,11 @@
 
 from __future__ import annotations
 
-import os
 
 import pytest
 
 from src.python.core.log_reader import (
     LOG_LEVELS,
-    LogEntry,
     default_log_path,
     parse_log,
     read_log,

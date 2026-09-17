@@ -471,7 +471,7 @@ class TestWriteHtmlReportFundDeepAnalysisEmpty(unittest.TestCase):
         return tmpl
 
     def test_all_fund_deep_analysis_sections_visible_when_empty(self):
-        """基金深度分析 4 模块全部返回空数据 → 4 个 section 均可见（section_visible_dict=True）。"""
+        """基金深度分析各章节全部返回空数据 → 对应 section 均可见（section_visible_dict=True）。"""
         from src.python.report.html_writer import write_html_report
 
         with ExitStack() as stack:
@@ -480,9 +480,7 @@ class TestWriteHtmlReportFundDeepAnalysisEmpty(unittest.TestCase):
 
         _, kwargs = tmpl.render.call_args
         svis = kwargs.get("section_visible_dict", {})
-        self.assertTrue(svis.get("fund_manager"), "基金经理 section 应可见")
-        self.assertTrue(svis.get("position_relationship"), "持仓关系 section 应可见")
-        self.assertTrue(svis.get("fund_concentration"), "集中度 section 应可见")
+        self.assertTrue(svis.get("position_structure"), "持仓结构与集中度 section 应可见")
         self.assertTrue(svis.get("style_factor"), "风格与因子 section 应可见")
 
     def test_fund_deep_analysis_empty_data_passed_to_template(self):

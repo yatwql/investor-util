@@ -10,7 +10,6 @@ from src.python.providers.eastmoney_industry import (
     fetch_industry_and_concepts,
     fetch_industry,
     fetch_concepts,
-    fetch_valuation_fields,
     _secid,
 )
 import pytest
@@ -424,8 +423,13 @@ class TestFetchConcepts(unittest.TestCase):
         self.assertEqual(result, [])
 
 
-class TestFetchValuationFields(unittest.TestCase):
-    """测试估值扩展字段获取（fetch_valuation_fields，复用 push2 请求通道）。"""
+class TestIndustryExtendedFields(unittest.TestCase):
+    """行业结果字典带出扩展行情字段（pe/pb/market_cap，同一请求带出）。
+
+    这些字段是 push2 响应的一部分（``_FIELDS`` 含 f9/f20/f23），在此断言
+    「一次请求带出全部字段」——消费方据此不得再发一次同参数请求，
+    网关层 ``fetcher/industry.py::fetch_valuation_fields`` 即由此取数。
+    """
 
     def setUp(self):
         from src.python.core.provider_registry import get_registry
@@ -434,42 +438,33 @@ class TestFetchValuationFields(unittest.TestCase):
         get_registry().reset()
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
-    def test_pe_pb_extracted(self, mock_client_cls):
-        """正常返回：从 push2 扩展字段提取 PE/PB。"""
-        mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_SUCCESS_RESPONSE))
-        result = fetch_valuation_fields("600900")
-        self.assertIsNotNone(result)
-        self.assertEqual(result["pe"], 12.34)
-        self.assertEqual(result["pb"], 1.56)
-
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_industry_result_contains_pe_pb(self, mock_client_cls):
-        """行业结果字典也带出 pe/pb（同一请求，无重复请求）。"""
+        """行业结果字典带出 pe/pb/market_cap（同一请求，无重复请求）。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_SUCCESS_RESPONSE))
         result = fetch_industry_and_concepts("600900")
         self.assertIsNotNone(result)
         self.assertEqual(result["pe"], 12.34)
         self.assertEqual(result["pb"], 1.56)
+        self.assertIn("market_cap", result)
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_missing_fields_return_none(self, mock_client_cls):
-        """字段缺失（无 f9/f23）→ pe/pb 为 None。"""
+        """字段缺失（无 f9/f23）→ pe/pb 为 None（不因缺字段而整条失败）。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_NO_CONCEPT_RESPONSE))
-        result = fetch_valuation_fields("600900")
+        result = fetch_industry_and_concepts("600900")
         self.assertIsNotNone(result)
         self.assertIsNone(result["pe"])
         self.assertIsNone(result["pb"])
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_data_none_returns_none(self, mock_client_cls):
-        """data 为 None → fetch_valuation_fields 返回 None。"""
+        """data 为 None → 返回 None。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_NO_DATA_RESPONSE))
-        self.assertIsNone(fetch_valuation_fields("600900"))
+        self.assertIsNone(fetch_industry_and_concepts("600900"))
 
     @patch("src.python.providers.eastmoney_industry.httpx.Client")
     def test_reuses_make_push2_request_channel(self, mock_client_cls):
-        """复用既有 push2 请求通道：fetch_valuation_fields 经 make_push2_request 发起，
-        同会话内同一代码不重复请求（复用纪律断言）。"""
+        """复用既有 push2 请求通道：经 make_push2_request 发起，同会话同代码不重复请求。"""
         with patch("src.python.providers.eastmoney_industry.make_push2_request") as mock_push2:
             mock_push2.side_effect = [
                 {
@@ -477,15 +472,17 @@ class TestFetchValuationFields(unittest.TestCase):
                     "f127": "电力",
                     "f129": "",
                     "f9": 10.0,
+                    "f20": 1e11,
                     "f23": 2.0,
                 },
                 # 第二次会话缓存命中，不应再次调用
                 AssertionError("make_push2_request 不应被调用第二次（会话缓存复用）"),
             ]
-            first = fetch_valuation_fields("600900")
-            second = fetch_valuation_fields("600900")
+            first = fetch_industry_and_concepts("600900")
+            second = fetch_industry_and_concepts("600900")
             self.assertEqual(first["pe"], 10.0)
             self.assertEqual(second["pe"], 10.0)
+            self.assertEqual(first["market_cap"], 1e11)
             mock_push2.assert_called_once_with("600900")
 
 

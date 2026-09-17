@@ -18,14 +18,14 @@ from datetime import date
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
-
 from src.python.analysis.crisis_annotation import (
     CRISIS_INTERVALS,
     _overlap_interval,
     _parse_window,
     build_crisis_annotation,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
 
 
 def _bars(pairs: list[tuple[str, float]]) -> list[dict]:

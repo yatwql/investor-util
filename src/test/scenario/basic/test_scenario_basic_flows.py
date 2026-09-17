@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from src.python.core.models import Holding
+from src.test.helpers import recent_holdings_period
 from src.python.report.excel_generator import generate_excel_report as _generate_excel_report
 
 # 基础业务场景（S1-S5）标记
@@ -24,11 +25,19 @@ pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
 class MockDetail:
     """模拟 DetailRow dataclass（完整 15 个字段）。"""
-    def __init__(self, name: str = "测试资产", code: str = "600000",
-                 price: float = 10.0, yesterday_close: float = 9.8,
-                 market_value: float = 1000.0, cost: float = 900.0,
-                 profit: float = 100.0, today_profit: float = 20.0,
-                 profit_rate: float = 0.1):
+
+    def __init__(
+        self,
+        name: str = "测试资产",
+        code: str = "600000",
+        price: float = 10.0,
+        yesterday_close: float = 9.8,
+        market_value: float = 1000.0,
+        cost: float = 900.0,
+        profit: float = 100.0,
+        today_profit: float = 20.0,
+        profit_rate: float = 0.1,
+    ):
         self.account = "测试账户"
         self.name = name
         self.code = code
@@ -50,21 +59,38 @@ class MockDetail:
 class TestGenerateExcelReport(unittest.TestCase):
     """_generate_excel_report 集成测试。"""
 
+    @staticmethod
+    def _sheet_text(ws) -> str:
+        """单元格文本拼接，供产物内容断言。"""
+        return "\n".join(str(c.value) for row in ws.iter_rows() for c in row if c.value is not None)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.holdings = [
-            Holding(account="证券", name="长江电力", code="600900",
-                    shares=100, cost_price=10.0),
-            Holding(account="证券", name="贵州茅台", code="600519",
-                    shares=50, cost_price=200.0),
+            Holding(account="证券", name="长江电力", code="600900", shares=100, cost_price=10.0),
+            Holding(account="证券", name="贵州茅台", code="600519", shares=50, cost_price=200.0),
         ]
         self.details = [
-            MockDetail(name="长江电力", code="600900", price=25.0,
-                       yesterday_close=24.5, market_value=2500.0,
-                       cost=1000.0, profit=1500.0, today_profit=50.0),
-            MockDetail(name="贵州茅台", code="600519", price=1800.0,
-                       yesterday_close=1780.0, market_value=90000.0,
-                       cost=10000.0, profit=80000.0, today_profit=1000.0),
+            MockDetail(
+                name="长江电力",
+                code="600900",
+                price=25.0,
+                yesterday_close=24.5,
+                market_value=2500.0,
+                cost=1000.0,
+                profit=1500.0,
+                today_profit=50.0,
+            ),
+            MockDetail(
+                name="贵州茅台",
+                code="600519",
+                price=1800.0,
+                yesterday_close=1780.0,
+                market_value=90000.0,
+                cost=10000.0,
+                profit=80000.0,
+                today_profit=1000.0,
+            ),
         ]
 
     def tearDown(self):
@@ -88,8 +114,9 @@ class TestGenerateExcelReport(unittest.TestCase):
 
         # 检查输出文件
         out_files = os.listdir(self.tmp.name)
-        self.assertTrue(any(f.endswith(".xlsx") for f in out_files),
-                        f"应在 {self.tmp.name} 中找到 xlsx 文件，实际有 {out_files}")
+        self.assertTrue(
+            any(f.endswith(".xlsx") for f in out_files), f"应在 {self.tmp.name} 中找到 xlsx 文件，实际有 {out_files}"
+        )
 
     @patch("src.python.fetcher.index.fetch_indices")
     @patch("src.python.fetcher.index.fetch_us_indices")
@@ -134,6 +161,48 @@ class TestGenerateExcelReport(unittest.TestCase):
 
         out_files = os.listdir(self.tmp.name)
         self.assertTrue(any(f.endswith(".xlsx") for f in out_files))
+
+    @patch("src.python.fetcher.index.fetch_indices")
+    @patch("src.python.fetcher.index.fetch_us_indices")
+    @patch("src.python.report.fund_performance.write_fund_performance_sheet")
+    def test_experimental_notice_lands_without_llm_chapter(self, mock_perf, mock_us_idx, mock_a_idx):
+        """LLM 整章关闭（无用量页签）→ 清单仍须落在汇总页脚。
+
+        确定性信号沉淀等实验开关不依赖 LLM 章节：清单若只挂在用量页签上，LLM 整章
+        关闭时这批开关在 Excel 产物上完全无痕。两个开关按生产调用一并关闭——报告
+        层同时传 include_llm 与 enable_llm，只关前者时页签仍会被创建（内容为空）。
+        """
+        from openpyxl import load_workbook
+
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+        mock_a_idx.return_value = {}
+        mock_us_idx.return_value = {}
+
+        _generate_excel_report(
+            self.holdings,
+            include_llm=False,
+            enable_llm=False,
+            output_dir=self.tmp.name,
+            details=self.details,
+            a_indices={},
+            us_indices={},
+        )
+
+        path = next(os.path.join(self.tmp.name, f) for f in os.listdir(self.tmp.name) if f.endswith(".xlsx"))
+        wb = load_workbook(path)
+        try:
+            titles = [ws.title for ws in wb.worksheets]
+            self.assertFalse(any("LLM API 用量" in t for t in titles), f"LLM 章节关闭时不应有用量页签，实际: {titles}")
+            landed = [
+                ws.title
+                for ws in wb.worksheets
+                if "⚗ 本报告在 1 项实验性功能开启下生成：确定性信号沉淀" in self._sheet_text(ws)
+            ]
+            self.assertEqual(landed, ["1.投资分析汇总"], "清单须恰落在汇总页脚一处")
+        finally:
+            wb.close()
 
     @patch("src.python.fetcher.index.fetch_indices")
     @patch("src.python.fetcher.index.fetch_us_indices")
@@ -191,21 +260,25 @@ class ScenarioTestBase(unittest.TestCase):
         self._price_patcher = patch("src.python.report.market_value.fetch_market_data")
         self._mock_price = self._price_patcher.start()
         self._mock_price.return_value = {
-            "price": 10.0, "yesterday_close": 9.8,
-            "price_date": "2026-06-26", "source": "腾讯财经",
+            "price": 10.0,
+            "yesterday_close": 9.8,
+            "price_date": "2026-06-26",
+            "source": "腾讯财经",
             "source_api": "tencent",
         }
 
         self._fund_patcher = patch("src.python.report.penetration.fetch_fund_holdings_batch")
         self._mock_fund = self._fund_patcher.start()
-        self._mock_fund.return_value = {"510300": {
-            "code": "510300", "name": "沪深300ETF",
-            "date": "2026-03-31",
-            "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
-        }}
+        self._mock_fund.return_value = {
+            "510300": {
+                "code": "510300",
+                "name": "沪深300ETF",
+                "date": recent_holdings_period(),
+                "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
+            }
+        }
 
-        self._ind_patcher = patch("src.python.fetcher.industry.batch_fetch_industry_data",
-                                   return_value={})
+        self._ind_patcher = patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
         self._mock_ind = self._ind_patcher.start()
 
         # LLM 相关 mock
@@ -221,11 +294,13 @@ class ScenarioTestBase(unittest.TestCase):
         self._ind_patcher.stop()
         self._llm_config_patcher.stop()
 
-    def _make_holding(self, account: str, name: str, code: str,
-                       shares: float, cost_price: float) -> Holding:
+    def _make_holding(self, account: str, name: str, code: str, shares: float, cost_price: float) -> Holding:
         return Holding(
-            account=account, name=name, code=code,
-            shares=shares, cost_price=cost_price,
+            account=account,
+            name=name,
+            code=code,
+            shares=shares,
+            cost_price=cost_price,
         )
 
 
@@ -267,16 +342,20 @@ class TestScenarioStock(ScenarioTestBase):
             details.append(dr)
 
         from src.python.report.penetration import compute_penetration_top10
+
         result = compute_penetration_top10(self.holdings, details)
         top10 = result.get("top10", [])
         code_set = {item.get("code", "").split(",")[0] for item in top10 if item.get("code")}
         expected = {"600519", "600900", "300750"}
-        self.assertTrue(expected.issubset(code_set) or code_set.issubset(expected),
-                        f"穿透 TOP10 代码 {code_set} 应与直接持股 {expected} 匹配")
+        self.assertTrue(
+            expected.issubset(code_set) or code_set.issubset(expected),
+            f"穿透 TOP10 代码 {code_set} 应与直接持股 {expected} 匹配",
+        )
 
     def test_no_fund_in_category(self):
         """纯股票 → 分类表中无基金行。"""
         from src.python.report.penetration import classify_penetration
+
         for h in self.holdings:
             cls = classify_penetration(h)
             self.assertEqual(cls, "stock", f"{h.name} 应为 stock")
@@ -284,24 +363,35 @@ class TestScenarioStock(ScenarioTestBase):
     def test_total_profit_correct(self):
         """总盈亏 = 各股票盈亏之和。"""
         from src.python.report.market_value import _compute_detail_row
-        details = [{
-            "price": 2050.0, "yesterday_close": 2000.0,
-            "price_date": "2026-06-26",
-            "source": "腾讯财经", "source_api": "tencent",
-        }, {
-            "price": 28.5, "yesterday_close": 28.0,
-            "price_date": "2026-06-26",
-            "source": "腾讯财经", "source_api": "tencent",
-        }, {
-            "price": 260.0, "yesterday_close": 250.0,
-            "price_date": "2026-06-26",
-            "source": "腾讯财经", "source_api": "tencent",
-        }]
+
+        details = [
+            {
+                "price": 2050.0,
+                "yesterday_close": 2000.0,
+                "price_date": "2026-06-26",
+                "source": "腾讯财经",
+                "source_api": "tencent",
+            },
+            {
+                "price": 28.5,
+                "yesterday_close": 28.0,
+                "price_date": "2026-06-26",
+                "source": "腾讯财经",
+                "source_api": "tencent",
+            },
+            {
+                "price": 260.0,
+                "yesterday_close": 250.0,
+                "price_date": "2026-06-26",
+                "source": "腾讯财经",
+                "source_api": "tencent",
+            },
+        ]
         total = 0
         for h, m in zip(self.holdings, details):
             d = _compute_detail_row(h, m)
             total += d.profit
-        self.assertAlmostEqual(total, (2050-2000)*100 + (28.5-28)*200 + (260-250)*50)
+        self.assertAlmostEqual(total, (2050 - 2000) * 100 + (28.5 - 28) * 200 + (260 - 250) * 50)
 
 
 @pytest.mark.scenario_fund
@@ -319,6 +409,7 @@ class TestScenarioFund(ScenarioTestBase):
     def test_classify_correct(self):
         """基金类型分类正确。"""
         from src.python.report.penetration import classify_penetration
+
         classes = {h.code: classify_penetration(h) for h in self.holdings}
         # 513300 是 ETF 含 QDII → QDII
         self.assertIn(classes.get("513300", ""), ("qdii", "etf"))
@@ -353,6 +444,7 @@ class TestScenarioFund(ScenarioTestBase):
             details.append(dr)
 
         from src.python.report.penetration import compute_penetration_top10
+
         result = compute_penetration_top10(self.holdings, details)
         top10 = result.get("top10", [])
         self.assertTrue(len(top10) > 0, "基金持仓穿透后 TOP10 不应为空")
@@ -376,12 +468,15 @@ class TestScenarioMixedAccounts(ScenarioTestBase):
         details = {}
         for h in self.holdings:
             details[h.code] = {
-                "code": h.code, "name": h.name, "price": h.cost_price * 1.05,
+                "code": h.code,
+                "name": h.name,
+                "price": h.cost_price * 1.05,
                 "market_value": h.cost_price * h.shares * 1.05,
                 "source_api": "tencent",
             }
 
         from src.python.report.market_value import _compute_detail_row
+
         rows = [_compute_detail_row(h, details[h.code]) for h in self.holdings]
 
         # 按账户分组求和
@@ -427,6 +522,7 @@ class TestScenarioNewHoldings(ScenarioTestBase):
         ]
 
         from src.python.report.market_value import _generate_details
+
         self._mock_price.reset_mock()
         details = _generate_details(holdings, "2026-06-26")
         self.assertEqual(len(details), 1)

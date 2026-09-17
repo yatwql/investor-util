@@ -62,9 +62,14 @@ def _classify_stock(
 
 
 def _push2_extended(code: str) -> dict[str, Any] | None:
-    """从东方财富 push2 API 获取市值+PE 扩展数据。
+    """获取市值+PE 扩展数据（复用行业数据请求通道，不另发 push2 请求）。
 
-    结果以全天 TTL 写入文件缓存，同一股票同日内跨进程不重复请求。
+    这些字段与行业分类同属**一次** push2 请求的响应（provider 的 ``_FIELDS``
+    已含 f9/f20/f23），故此处经 ``fetch_industry_data`` 取用——该入口自带
+    Provider Chain、文件缓存与会话缓存，同一股票同一轮只请求一次。
+
+    结果以全天 TTL 写入 ``extended_{code}`` 文件缓存，与 ``_tencent_extended``
+    共享（二级降级读取同一键，跨进程同日内不重复取数）。
 
     Args:
         code: 6 位 A 股代码
@@ -82,32 +87,25 @@ def _push2_extended(code: str) -> dict[str, Any] | None:
         return _cached
 
     try:
-        from src.python.fetcher.industry import make_push2_request
+        from src.python.fetcher.industry import fetch_industry_data
 
-        inner = make_push2_request(code)
-        if inner is None:
+        industry_data = fetch_industry_data(code)
+        if industry_data is None:
             return None
 
-        market_cap = inner.get("f20")
-        pe = inner.get("f9")
-        pb = inner.get("f23")
-
         result: dict[str, Any] = {}
-        if market_cap is not None:
+        for field in ("market_cap", "pe", "pb"):
+            value = industry_data.get(field)
+            if value is None:
+                continue
             with contextlib.suppress(ValueError, TypeError):
-                result["market_cap"] = float(market_cap)
-        if pe is not None:
-            with contextlib.suppress(ValueError, TypeError):
-                result["pe"] = float(pe)
-        if pb is not None:
-            with contextlib.suppress(ValueError, TypeError):
-                result["pb"] = float(pb)
+                result[field] = float(value)
 
         if result:
             _cache_set(_key, result)
         return result if result else None
     except Exception:
-        logger.warning("push2 扩展数据获取失败 [%s]", code, exc_info=True)
+        logger.warning("扩展数据获取失败 [%s]", code, exc_info=True)
         return None
 
 
@@ -165,11 +163,10 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
 def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
     """获取每只股票对应行业的平均 PE。
 
-    利用 push2 API 获取持仓各股的行业归属和 PE 数据，
-    按行业分组后以 **中位数** 作为行业平均 PE 基准（抗离群值）。
-
-    副作用：同时填充 registry session_cache（domain="extended"），
-    使 ``classify_fund_style`` 主循环直接命中缓存，不会重复请求。
+    行业归属与 PE 取自**同一次** ``fetch_industry_data`` 请求（provider 的 push2
+    响应本就同时带出 f127 与 f9），按行业分组后以 **中位数** 作为行业平均 PE
+    基准（抗离群值）。**不得**为取 PE 再单独请求一次 push2——同一代码同一轮
+    重复取数正是会话缓存要消除的浪费。
 
     Args:
         codes: 6 位 A 股代码列表
@@ -197,17 +194,16 @@ def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
             if not is_a_share_code(code):
                 continue
 
-            # push2 行业分类（通过 fetcher → chain → provider 路径）
+            # push2 行业分类 + 扩展行情（通过 fetcher → chain → provider 路径）。
+            # 同一次请求已带回 PE（f9），无需再发一次取价请求。
             industry_data = fetch_industry_data(code)
-            industry = industry_data.get("industry", "") if industry_data else ""
+            if not industry_data:
+                continue
+            industry = industry_data.get("industry", "")
             if not industry:
                 continue
 
-            # push2 扩展行情 PE（同时填充 registry session_cache，主循环复用）
-            ext = _push2_extended(code)
-            if ext is None:
-                continue
-            pe = ext.get("pe")
+            pe = industry_data.get("pe")
             if pe is None or pe <= 0:
                 continue
 

@@ -14,12 +14,50 @@ def should_create_sheet(section: dict, data_availability: dict[str, bool] | None
     无 data_flag 的模块（always、history）始终创建；data_flag
     未出现在 data_availability 中时视为已就绪（如基金深度分析的
     数据在页签创建后才写入，由下游函数自行兜底）。
+
+    ``data_flag_any``（可选）为**多契约 OR** 口径，供章节合并后的条目使用：
+    任一契约就绪即创建；未登记视为**未就绪**（悲观——否则合并条目在契约缺省时
+    会创建空页签；单契约路径的乐观口径保持不变）。
     """
+    avail = data_availability or {}
+    flag_any = section.get("data_flag_any")
+    if flag_any:
+        return any(avail.get(name, False) for name in flag_any)
     flag_name = section.get("data_flag")
     if not flag_name:
         return True
-    avail = data_availability or {}
     return avail.get(flag_name, True)
+
+
+def build_data_availability(
+    *,
+    include_news: bool = False,
+    include_llm: bool = False,
+    enable_fund_deep_analysis: bool = False,
+    financial_report_digest_data: dict | None = None,
+    financial_indicator_data: dict | None = None,
+    position_relationship_data: dict | None = None,
+) -> dict[str, bool]:
+    """构造 data 层可用性字典（章节可见性的单一事实来源）。
+
+    注册表的 ``data_flag`` / ``data_flag_any`` 查此字典判定章节是否创建；
+    合并章的契约 flag 口径集中在此处，避免各调用点（生成器、一致性测试镜像）
+    各写一份而漂移：
+
+      - 财报摘要 / 财务指标：契约非 None 即就绪（None = 对应功能开关关闭）
+      - 持仓结构与集中度（合并章，两契约 OR）：基金深度分析开启时，重合度与集中度
+        均由下游计算（数据不足时区块各自写占位）→ 两契约视为就绪；关闭时由 board 层隐藏
+    """
+    availability: dict[str, bool] = {}
+    if include_news:
+        availability["news_data_available"] = True
+    if include_llm:
+        availability["llm_data_available"] = True
+    availability["financial_report_digest_data"] = financial_report_digest_data is not None
+    availability["financial_indicator_data"] = financial_indicator_data is not None
+    availability["position_relationship_data"] = enable_fund_deep_analysis or position_relationship_data is not None
+    availability["concentration_data"] = enable_fund_deep_analysis
+    return availability
 
 
 def create_sheets(
@@ -29,6 +67,7 @@ def create_sheets(
     enable_news: bool = True,  # board 层
     enable_history: bool = True,  # board 层
     enable_portfolio_evolution: bool = True,  # board 层：组合演进
+    enable_fundamental_snapshot: bool = False,  # board 层：持仓基本面章（两功能开关任一开启）
     enable_action: bool = False,  # board 层：行动建议（config 默认开）
     enable_llm: bool = True,  # board 层
     data_availability: dict[str, bool] | None = None,  # data 层
@@ -56,6 +95,7 @@ def create_sheets(
         "news": enable_news,  # ← 配置驱动的 board 层值
         "history": enable_history,
         "evolution": enable_portfolio_evolution,
+        "fundamental_snapshot": enable_fundamental_snapshot,
         "action": enable_action,
         "llm": enable_llm,
     }

@@ -117,7 +117,9 @@ class TestMetricsBreakerPersistencePath:
         path = _cbw._METRICS_BREAKER_FILE
         # 跨平台路径规范化：Windows 分隔符为 \，统一转 / 再匹配（源码/conftest 均用 os.path/pathlib 构造）
         path_posix = path.replace(os.sep, "/")
-        assert "data/state/metrics_breaker.json" in path_posix, f"默认路径应指向 data/state/metrics_breaker.json，实际 {path}"
+        assert "data/state/metrics_breaker.json" in path_posix, (
+            f"默认路径应指向 data/state/metrics_breaker.json，实际 {path}"
+        )
         assert "data/cache" not in path_posix, f"不应再指向 data/cache，实际 {path}"
 
     def test_legacy_file_migrated_on_load(self, monkeypatch, tmp_path):

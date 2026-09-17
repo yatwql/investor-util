@@ -14,6 +14,7 @@ import os
 import datetime
 from typing import Any
 
+from src.python.core.atomic_write import write_json_atomic
 from src.python.core.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
@@ -49,19 +50,17 @@ def _load_silence_state(silence_file: str | None = None) -> dict[str, str]:
 
 
 def _save_silence_state(state: dict[str, str], silence_file: str | None = None) -> None:
-    """持久化静默期状态到文件。
+    """持久化静默期状态到文件（原子写：mkstemp + os.replace）。
+
+    直接 `open(path, "w")` 覆盖落盘时，进程中断会留下截断的 JSON，下次读取
+    解析失败即静默期状态整体丢失（信号会被重复推送）。落盘统一委托
+    ``core/atomic_write.write_json_atomic``。
 
     Args:
         state: {品种代码: 触发日期 (YYYY-MM-DD)}
         silence_file: 静默期文件路径。为 None 时使用 _SILENCE_FILE。
     """
-    path = silence_file or _SILENCE_FILE
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
-    except OSError as e:
-        logger.error("再平衡静默期文件写入失败: %s", e)
+    write_json_atomic(silence_file or _SILENCE_FILE, state, log_tag="silence", noun="静默期状态")
 
 
 def _filter_silenced_signals(

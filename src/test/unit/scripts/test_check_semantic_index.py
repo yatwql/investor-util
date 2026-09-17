@@ -4,7 +4,7 @@
   - 标记区间提取：start/end 标记存在返回正文、缺失返回 None
   - 表行解析：仅取第一列反引号 slug，开关列 enable_portfolio_evolution 不误取
   - 合并章 key 解析：仅取「合并章代码标识符」注，并入说明注（dividend_flow）不误取
-  - 权威源 ast 解析：report_submodules 字典键、registry._REPORT_SECTION_DEFAULT key
+  - 权威源 ast 解析：功能开关注册表（features.py）键、registry._REPORT_SECTION_DEFAULT key
     （Assign 与 AnnAssign 两种赋值形态）
   - 注释剔除：tokenize 剔除注释、字符串字面量保留
   - 反向存在性：代码中出现为 True、仅注释提及为 False、__pycache__ 跳过
@@ -74,7 +74,7 @@ class TestParseTableSlugs:
             "| 语义 slug | 中文名 | config 开关 |\n"
             "|:--|:--|:--|\n"
             "| `snapshot_diff` | 快照差异 | 随 `enable_portfolio_evolution` |\n"
-            "| `cost_lots` | 成本流水 | `report_submodules.cost_lots`（默认关） |\n"
+            "| `cost_lots` | 成本流水 | 功能开关 `cost_lots`（默认关） |\n"
             "<!-- semantic-index:end -->"
         )
         assert sem_index.parse_table_slugs(doc) == ["snapshot_diff", "cost_lots"]
@@ -96,12 +96,12 @@ class TestParseMergedSheetKeys:
             "> **子功能并入说明**：`dividend_flow`（分红现金流，并入 `fund_flow`）、"
             "`holding_diagnosis`（品种覆盖诊断，并入 `data_quality`）。\n"
             "\n"
-            "> **合并章代码标识符**：`position_relationship`（持仓关系矩阵，合并 "
+            "> **合并章代码标识符**：`position_structure`（持仓结构与集中度，合并 "
             "`fund_overlap` + `correlation_analysis`）、`portfolio_history_drawdown`（组合历史走势与回撤）。\n"
             "<!-- semantic-index:end -->"
         )
         assert sem_index.parse_merged_sheet_keys(doc) == [
-            "position_relationship",
+            "position_structure",
             "portfolio_history_drawdown",
         ]
 
@@ -109,22 +109,20 @@ class TestParseMergedSheetKeys:
 # ═══ 权威源 ast 解析 ═══
 
 
-class TestReportSubmodulesKeys:
-    def test_parses_nested_dict(self, sem_index):
+class TestFeatureSwitchKeys:
+    def test_parses_registry_keys(self, sem_index):
         source = (
-            '_DEFAULT_CONFIG = {\n'
-            '    "enable_action": False,\n'
-            '    "report_submodules": {\n'
-            '        "data_quality": False,\n'
-            '        "cost_lots": False,\n'
-            '    },\n'
-            '}\n'
+            "_OTHER: dict = {}\n"
+            "feature_switch_registry: dict[str, FeatureSwitchDef] = {\n"
+            '    "data_quality": FeatureSwitchDef("数据质量", "d", GROUP_REPORT, True, True),\n'
+            '    "cost_lots": FeatureSwitchDef("成本流水", "d", GROUP_REPORT, False, True),\n'
+            "}\n"
         )
-        assert sem_index.report_submodules_keys(source) == ["data_quality", "cost_lots"]
+        assert sem_index.feature_switch_keys(source) == ["data_quality", "cost_lots"]
 
-    def test_missing_key_returns_empty(self, sem_index):
-        source = '_DEFAULT_CONFIG = {"enable_action": True}\n'
-        assert sem_index.report_submodules_keys(source) == []
+    def test_missing_registry_returns_empty(self, sem_index):
+        source = 'feature_switch_registry: dict = {}\n_X = {"a": 1}\n'
+        assert sem_index.feature_switch_keys(source) == []
 
 
 class TestRegistrySectionKeys:
@@ -132,10 +130,10 @@ class TestRegistrySectionKeys:
         source = (
             "_REPORT_SECTION_DEFAULT: list[dict] = [\n"
             '    {"key": "summary", "name": "投资分析汇总", "number": 1},\n'
-            '    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},\n'
+            '    {"key": "position_structure", "name": "持仓结构与集中度", "number": 5},\n'
             "]\n"
         )
-        assert sem_index.registry_section_keys(source) == ["summary", "position_relationship"]
+        assert sem_index.registry_section_keys(source) == ["summary", "position_structure"]
 
     def test_plain_assign_form(self, sem_index):
         source = '_REPORT_SECTION_DEFAULT = [{"key": "action", "name": "行动建议", "number": 17}]\n'
@@ -151,11 +149,7 @@ class TestRegistrySectionKeys:
 
 class TestCodeWithoutComments:
     def test_strips_comments_keeps_strings(self, sem_index):
-        source = (
-            "# 顶部注释\n"
-            'x = 1  # 行尾注释\n'
-            'y = "rebalance_advice"  # 字符串保留\n'
-        )
+        source = '# 顶部注释\nx = 1  # 行尾注释\ny = "rebalance_advice"  # 字符串保留\n'
         stripped = sem_index._code_without_comments(source)
         assert "顶部注释" not in stripped
         assert "行尾注释" not in stripped
@@ -202,19 +196,17 @@ def _valid_doc() -> str:
         "| `candidate_compare` | 候选基金比较 |\n"
         "| `cost_lots` | 成本流水 |\n"
         "\n"
-        "> **合并章代码标识符**：`position_relationship`（持仓关系矩阵，合并 `fund_overlap`）。\n"
+        "> **合并章代码标识符**：`position_structure`（持仓结构与集中度，合并 `fund_overlap`）。\n"
         "<!-- semantic-index:end -->\n"
     )
 
 
-def _valid_defaults() -> str:
+def _valid_features() -> str:
     return (
-        '_DEFAULT_CONFIG = {\n'
-        '    "report_submodules": {\n'
-        '        "candidate_compare": False,\n'
-        '        "cost_lots": False,\n'
-        '    },\n'
-        '}\n'
+        "feature_switch_registry: dict[str, FeatureSwitchDef] = {\n"
+        '    "candidate_compare": FeatureSwitchDef("候选基金比较", "d", GROUP_REPORT, False, True),\n'
+        '    "cost_lots": FeatureSwitchDef("成本流水", "d", GROUP_REPORT, False, True),\n'
+        "}\n"
     )
 
 
@@ -222,7 +214,7 @@ def _valid_registry() -> str:
     return (
         "_REPORT_SECTION_DEFAULT: list[dict] = [\n"
         '    {"key": "summary", "name": "投资分析汇总", "number": 1},\n'
-        '    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},\n'
+        '    {"key": "position_structure", "name": "持仓结构与集中度", "number": 5},\n'
         "]\n"
     )
 
@@ -230,27 +222,20 @@ def _valid_registry() -> str:
 class TestRunChecks:
     def test_all_pass(self, sem_index, tmp_path):
         (tmp_path / "a.py").write_text(
-            "def build_candidate_compare(): pass\n"
-            'd = {"cost_lots": False}\n'
-            'def build_position_relationship(): pass\n',
+            'def build_candidate_compare(): pass\nd = {"cost_lots": False}\ndef build_position_relationship(): pass\n',
             encoding="utf-8",
         )
-        assert (
-            sem_index.run_checks(_valid_doc(), _valid_defaults(), _valid_registry(), tmp_path)
-            == []
-        )
+        assert sem_index.run_checks(_valid_doc(), _valid_features(), _valid_registry(), tmp_path) == []
 
     def test_forward_finds_unregistered_key(self, sem_index, tmp_path):
         (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
-        defaults = (
-            '_DEFAULT_CONFIG = {\n'
-            '    "report_submodules": {\n'
-            '        "market_temperature": False,\n'
-            '    },\n'
-            '}\n'
+        features = (
+            "feature_switch_registry: dict = {\n"
+            '    "market_temperature": FeatureSwitchDef("市场温度", "d", 1, False, True),\n'
+            "}\n"
         )
-        findings = sem_index.run_checks(_valid_doc(), defaults, _valid_registry(), tmp_path)
-        assert any("report_submodules.market_temperature" in f for f in findings)
+        findings = sem_index.run_checks(_valid_doc(), features, _valid_registry(), tmp_path)
+        assert any("功能开关 market_temperature" in f for f in findings)
 
     def test_reverse_finds_zombie(self, sem_index, tmp_path):
         (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
@@ -261,7 +246,7 @@ class TestRunChecks:
             "| `ghost_slug` | 幽灵条目 |\n"
             "<!-- semantic-index:end -->\n"
         )
-        findings = sem_index.run_checks(doc, _valid_defaults(), _valid_registry(), tmp_path)
+        findings = sem_index.run_checks(doc, _valid_features(), _valid_registry(), tmp_path)
         assert any("`ghost_slug`" in f for f in findings)
 
     def test_merged_key_missing_from_registry(self, sem_index, tmp_path):
@@ -273,12 +258,12 @@ class TestRunChecks:
             "> **合并章代码标识符**：`ghost_sheet`（幽灵合并章，合并 `old_key`）。\n"
             "<!-- semantic-index:end -->\n"
         )
-        findings = sem_index.run_checks(doc, _valid_defaults(), _valid_registry(), tmp_path)
+        findings = sem_index.run_checks(doc, _valid_features(), _valid_registry(), tmp_path)
         assert any("`ghost_sheet`" in f for f in findings)
 
     def test_missing_markers_short_circuits(self, sem_index, tmp_path):
         doc = "| `candidate_compare` | 候选基金比较 |\n"
-        findings = sem_index.run_checks(doc, _valid_defaults(), _valid_registry(), tmp_path)
+        findings = sem_index.run_checks(doc, _valid_features(), _valid_registry(), tmp_path)
         assert len(findings) == 1
         assert "semantic-index" in findings[0]
 
@@ -291,7 +276,5 @@ class TestRealRepoSmoke:
         doc_text = sem_index._TECHNICAL_MD.read_text(encoding="utf-8")
         defaults_source = sem_index._CONFIG_DEFAULTS.read_text(encoding="utf-8")
         registry_source = sem_index._REGISTRY_PY.read_text(encoding="utf-8")
-        findings = sem_index.run_checks(
-            doc_text, defaults_source, registry_source, sem_index._CODE_ROOT
-        )
+        findings = sem_index.run_checks(doc_text, defaults_source, registry_source, sem_index._CODE_ROOT)
         assert findings == []

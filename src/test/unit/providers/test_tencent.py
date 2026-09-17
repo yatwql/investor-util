@@ -26,7 +26,6 @@ from src.python.core.code_utils import is_index_code
 from src.python.providers.tencent import (
     _add_prefix,
     _parse_float,
-    _parse_kline_response,
     _parse_response,
     fetch_index_kline,
     fetch_price,
@@ -201,6 +200,7 @@ class TestFetchPrice(unittest.TestCase):
     def test_timeout_returns_none(self, mock_factory):
         """超时 → None。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -212,6 +212,7 @@ class TestFetchPrice(unittest.TestCase):
     def test_request_error_returns_none(self, mock_factory):
         """网络异常 → None。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -245,9 +246,15 @@ class TestFetchIndexKline(unittest.TestCase):
             }
         }
 
-    def _make_kline_entry(self, date: str, open_: float = 3990.0,
-                          close: float = 4000.0, high: float = 4010.0,
-                          low: float = 3980.0, volume: int = 1000000) -> list:
+    def _make_kline_entry(
+        self,
+        date: str,
+        open_: float = 3990.0,
+        close: float = 4000.0,
+        high: float = 4010.0,
+        low: float = 3980.0,
+        volume: int = 1000000,
+    ) -> list:
         """构造 Tencent K 线条目：[date, open, close, high, low, volume]"""
         return [date, str(open_), str(close), str(high), str(low), str(volume)]
 
@@ -260,8 +267,7 @@ class TestFetchIndexKline(unittest.TestCase):
         mock_resp = MagicMock()
         mock_resp.json.return_value = self._make_json_response(
             "sh000300",
-            [self._make_kline_entry("2026-07-01", close=4000.0),
-             self._make_kline_entry("2026-07-02", close=4010.0)],
+            [self._make_kline_entry("2026-07-01", close=4000.0), self._make_kline_entry("2026-07-02", close=4010.0)],
         )
         mock_client.get.return_value = mock_resp
 
@@ -307,6 +313,7 @@ class TestFetchIndexKline(unittest.TestCase):
     def test_timeout_returns_empty(self, mock_factory):
         """超时 → 空列表。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -338,7 +345,6 @@ class TestFetchIndexKline(unittest.TestCase):
         )
         mock_client.get.return_value = mock_resp
 
-        with patch("src.python.providers.tencent.is_index_code",
-                   wraps=is_index_code) as spy:
+        with patch("src.python.providers.tencent.is_index_code", wraps=is_index_code) as spy:
             fetch_index_kline("sh000300", 30)
             spy.assert_called_with("sh000300")

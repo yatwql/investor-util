@@ -1,7 +1,8 @@
 """LLM 批量编排门面 — 缓存预检查、线程池分发与 LLM 全量生成。
 
 本文件为聚合门面：
-  - 新闻关联责任单元（模块级结果缓存/闭包/安全直调） → `_llm_news_correlation.py`
+  - 新闻关联安全直调入口 → `_llm_news_correlation.py`（该模块不经本门面的线程池，
+    运行路径见其模块文档）
 门面保留缓存预检（`_compute_module_cache_info`/`_precheck_*`）、worker 分发
 （`_dispatch_llm_workers`/`_build_module_fns`）与主编排入口（`generate_all_llm`）
 ——其内部经门面命名空间解析被 mock patch 的辅助符号（`ThreadPoolExecutor`、
@@ -27,11 +28,7 @@ from src.python.llm.api_base import (
     LLM_TIMEOUT,
     _build_cache_hint_and_record,
 )
-from src.python.llm.fingerprint import (
-    build_llm_fingerprint,
-    compute_fingerprint,
-    get_cache_ttl_llm,
-)
+from src.python.llm.fingerprint import get_cache_ttl_llm
 from src.python.llm.fact_checker import run_fact_check
 from src.python.llm.generators import (
     generate_debate_procon,
@@ -40,17 +37,21 @@ from src.python.llm.generators import (
     generate_health_check,
     generate_penetration_deep_analysis,
 )
+from src.python.llm.module_fingerprint import (
+    ModuleFingerprintInputs,
+    expert_review_fingerprint,
+    global_macro_fingerprint,
+    health_check_fingerprint,
+    penetration_deep_fingerprint,
+)
 from src.python.llm.prompts import (
     CACHE_PREFIX_LLM,
     FAIL_REASON_DISABLED,
     LLM_MODULE_FAILURE,
     _build_competitive_context_block,
-    _signal_digest_cache_suffix,
+    _build_data_quality_detail_block,
 )
 from src.python.llm.skeleton import is_llm_module_enabled
-from src.python.core import decision_ledger  # 决策跨期反思闭环教训指纹后缀（同源现算）
-from src.python.core import signal_ledger  # 确定性信号沉淀摘要指纹后缀（同源现算）
-from src.python.core.decision_header import structured_header_cache_suffix
 from src.python.core.registry import get_llm_module_name, get_llm_module_names
 
 logger = logging.getLogger("invest")
@@ -58,12 +59,8 @@ _MN = get_llm_module_name
 
 
 # ── 子模块 re-export ──────────────────────────────────────
-# news_correlation 责任单元（模块级结果缓存 + 闭包 + 安全直调）
-# 在 `_llm_news_correlation.py` 中实现，此处 re-export。
+# news_correlation 安全直调入口在 `_llm_news_correlation.py` 中实现，此处 re-export。
 from src.python.llm._llm_news_correlation import (  # noqa: F401
-    _make_news_correlation_closure,
-    _store_news_correlation_result,
-    get_news_correlation_result,
     run_news_correlation_safe,
 )
 
@@ -76,7 +73,6 @@ __all__ = [
     "_precheck_all_modules",
     "_dispatch_llm_workers",
     "generate_all_llm",
-    "get_news_correlation_result",
     "run_news_correlation_safe",
 ]
 
@@ -110,20 +106,22 @@ def _compute_module_cache_info(
     *,
     history_data: dict | None = None,
     pipeline_data: dict | None = None,
+    competitive_context: str = "",
+    metrics: dict | None = None,
+    data_quality_text: str = "",
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
 
-    history_data 风险信号 Hash 加入专家/体检/穿透指纹。
-    pipeline_data 供信号预消化块计算指纹后缀（专家/体检两份）。
+    指纹一律取自 ``llm/module_fingerprint.py``（读写同源的唯一事实来源），
+    本函数**不再自行拼接**模块指纹——预检键与写侧键同源由结构保证，
+    而非靠两侧逐字对齐的注释纪律（历史偏差见该模块 docstring）。
+
+    ``competitive_context`` / ``metrics`` / ``data_quality_text`` 是提示词正文段的
+    输入（详见 ``llm/module_fingerprint.py``）：本函数只对**调用方已渲染好**的
+    同一实例取哈希，不自行渲染——两次渲染会让「进键的文本」与「进提示词的文本」
+    脱钩。
     """
-    fp_global_macro = compute_fingerprint(
-        a_indices,
-        us_indices,
-        total_mv,
-        total_profit,
-        categories,
-    )
-    fp_expert_review = build_llm_fingerprint(
+    _inputs = ModuleFingerprintInputs(
         total_mv=total_mv,
         total_cost=total_cost,
         total_profit=total_profit,
@@ -132,48 +130,17 @@ def _compute_module_cache_info(
         penetrated_assets=penetrated_assets,
         categories=categories,
         history_data=history_data,
+        pipeline_data=pipeline_data,
+        a_indices=a_indices,
+        us_indices=us_indices,
+        competitive_context=competitive_context,
+        metrics=metrics,
+        data_quality_text=data_quality_text,
     )
-    # 决策跨期反思闭环（decision_reflection）：预检指纹同样追加教训后缀，
-    # 与 generators.py expert_review 写侧闭包同调同源 → 预检键 = 读写键；
-    # 教训不变命中旧缓存，新结算 → 后缀变 → 预检 miss → 携带新教训重生成。
-    if decision_ledger.is_active():
-        fp_expert_review += decision_ledger.lessons_cache_suffix()
-    # 信号预消化（signal_pre_digest）：预检指纹同样追加信号块后缀，与 generators.py
-    # 写侧闭包同调同一函数（开关判定收敛在该函数内）——后缀表达式两侧逐字一致，
-    # 写侧修好任何键差时预检自动跟随；信号数值变化 → 后缀变 → 携带新信号重生成；
-    # 开关关闭 → ""（键不变、不误伤旧缓存）。
-    _signal_suffix = _signal_digest_cache_suffix(pipeline_data)
-    fp_expert_review += _signal_suffix
-    # 确定性数值信号沉淀（signal_ledger）：预检指纹同样追加同一后缀函数，与
-    # generators.py 写侧闭包同调同源；摘要文本变 → 后缀变 → 预检 miss → 带新摘要
-    # 重生成；关闭/样本不足 → ""（键不变、不误伤旧缓存）。开关判定收敛在该函数内。
-    fp_expert_review += signal_ledger.summary_cache_suffix()
-    # 结构化决策头（decision_header_parse）：预检指纹同样追加同一后缀函数，
-    # 与 generators.py 写侧闭包同调同源。开关关闭 → ""（键不变、不误伤旧缓存）；
-    # 开启 → 预检 key 与写侧 key 同步换键，避免预检误判命中而跳过重生成。
-    fp_expert_review += structured_header_cache_suffix()
-    fp_health_check = build_llm_fingerprint(
-        total_mv=total_mv,
-        total_cost=total_cost,
-        total_profit=total_profit,
-        total_today_profit=total_today_profit,
-        holdings_details=holdings_details,
-        penetrated_assets=penetrated_assets,
-        categories=categories,
-        history_data=history_data,
-    )
-    fp_health_check += _signal_suffix
-    fp_penetration_deep = build_llm_fingerprint(
-        total_mv=total_mv,
-        total_cost=total_cost,
-        total_profit=total_profit,
-        total_today_profit=total_today_profit,
-        holdings_details=holdings_details,
-        penetrated_assets=penetrated_assets,
-        categories=categories,
-        full_penetration=True,
-        history_data=history_data,
-    )
+    fp_global_macro = global_macro_fingerprint(_inputs)
+    fp_expert_review = expert_review_fingerprint(_inputs)
+    fp_health_check = health_check_fingerprint(_inputs)
+    fp_penetration_deep = penetration_deep_fingerprint(_inputs)
 
     force_flag = force
     info: dict[str, dict] = {
@@ -272,12 +239,17 @@ def _build_module_fns(
     pipeline_data: dict | None = None,
     competitive_context: str = "",
     metrics: dict | None = None,
-    degradation_events: list[dict] | None = None,
+    data_quality_text: str = "",
+    history_data: dict | None = None,
 ) -> dict[str, Callable]:
     """构建 LLM 模块名称 → 生成函数闭包 的映射。
 
     模块级集中注册，新增 LLM 模块只需在此添加条目。
     每个闭包签名: (http_client, llm_config) → (result_str | None, from_cache)。
+
+    history_data 贯通到三个承接模块，使其写侧指纹与预检指纹同源（见
+    ``llm/module_fingerprint.py``）；漏传会让写侧指纹少一项风险信号摘要，
+    预检键永不命中。
     """
     return {
         "global_macro": lambda c, lc: generate_global_macro(
@@ -309,6 +281,7 @@ def _build_module_fns(
             pipeline_data=pipeline_data,
             competitive_context=competitive_context,
             metrics=metrics,
+            history_data=history_data,
         ),
         "health_check": lambda c, lc: generate_health_check(
             total_mv,
@@ -323,7 +296,8 @@ def _build_module_fns(
             http_client=c,
             llm_config=lc,
             pipeline_data=pipeline_data,
-            degradation_events=degradation_events,
+            data_quality_text=data_quality_text,
+            history_data=history_data,
         ),
         "penetration_deep": lambda c, lc: generate_penetration_deep_analysis(
             total_mv,
@@ -337,6 +311,7 @@ def _build_module_fns(
             force=force,
             http_client=c,
             llm_config=lc,
+            history_data=history_data,
         ),
     }
 
@@ -358,36 +333,30 @@ def _dispatch_llm_workers(
     sector_flow: list[dict] | None,
     pipeline_data: dict | None = None,
     *,
-    news_data: list[dict] | None = None,
-    holdings_data: list | None = None,
-    penetrated_assets_for_news: list[dict] | None = None,
     metrics: dict | None = None,
-    degradation_events: list[dict] | None = None,
+    data_quality_text: str = "",
     comparison_indices: dict[str, str] | None = None,
     history_data: dict | None = None,
     _debate_info_container: list | None = None,
+    competitive_context: str = "",
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。
 
     Args:
         _debate_info_container: 辩论模式信息捕获容器（list[dict|None]），
             启用辩论模式时闭包写入 debate_info dict，调用方事后读取。
+        competitive_context: 由调用方（``generate_all_llm``）渲染一次的竞争语境
+            文本块，与其交给预检侧的**同一实例**——本函数不再自行渲染，
+            否则进提示词的文本可能与进指纹的文本不同（缓存键与内容脱钩）。
+        data_quality_text: 同理由调用方渲染一次的数据质量详细状态块，同样与
+            预检侧共享同一实例（仅 health_check 提示词含该段）。
     """
     if not any(needs.values()):
         return {}
 
-    # ── 预计算竞争语境文本块 ──
-    _competitive_context = _build_competitive_context_block(
-        a_indices,
-        total_mv,
-        total_today_profit,
-        comparison_indices=comparison_indices,
-        history_data=history_data,
-        metrics=metrics,
-    )
-    # 量化指标 + 降级事件传递
+    # 量化指标 + 数据质量块传递
     _metrics = metrics
-    _degradation_events = degradation_events
+    _data_quality_text = data_quality_text
 
     results_dict: dict[str, dict] = {}
     _label_map: dict[str, str] = get_llm_module_names()
@@ -449,9 +418,10 @@ def _dispatch_llm_workers(
         sector_flow=sector_flow,
         force=force,
         pipeline_data=pipeline_data,
-        competitive_context=_competitive_context,
+        competitive_context=competitive_context,
         metrics=_metrics,
-        degradation_events=_degradation_events,
+        data_quality_text=_data_quality_text,
+        history_data=history_data,
     )
 
     # ── 辩论模式路由：替换 expert_review 条目 ─────────────────
@@ -491,7 +461,7 @@ def _dispatch_llm_workers(
                     http_client=c,
                     llm_config=lc,
                     pipeline_data=pipeline_data,
-                    competitive_context=_competitive_context,
+                    competitive_context=competitive_context,
                     metrics=_metrics,
                 )
                 pro, con, synthesis = _result
@@ -523,15 +493,6 @@ def _dispatch_llm_workers(
         _MODULE_FNS["expert_review"] = _debate_wrapper
         logger.info("[debate] 辩论模式已启用，expert_review 路由已替换")
 
-    # news_correlation 可选集成：仅在提供了新闻和持仓数据时注册
-    if news_data is not None and holdings_data is not None:
-        _MODULE_FNS["news_correlation"] = _make_news_correlation_closure(
-            news_data,
-            holdings_data,
-            penetrated_assets_for_news,
-            force,
-        )
-
     _max_workers = (llm_config or {}).get("llm_max_concurrency", 3)
     with ThreadPoolExecutor(max_workers=_max_workers) as executor:
         _futures: dict[Future, str] = {
@@ -546,10 +507,6 @@ def _dispatch_llm_workers(
                 logger.info("%s生成完成" if result else "%s生成失败（跳过）", _label_map.get(key, key))
             except Exception:  # noqa: PERF203
                 logger.warning("LLM 生成线程异常", exc_info=True)
-
-    # 提取 news_correlation 结果到模块级变量（委托子模块存储）
-    if "news_correlation" in results_dict:
-        _store_news_correlation_result(results_dict["news_correlation"]["result"])
 
     return results_dict
 
@@ -587,7 +544,9 @@ def generate_all_llm(
         pipeline_data: 组合历史走势时间维度上下文（含 diff 差异摘要），传递给 expert_review 和 health_check。
         history_data: 组合历史走势数据字典（含风险指标）。
         metrics: 量化指标字典，compute_all_metrics() 的输出。
-        degradation_events: DegradationTracker.get_log() 输出。
+        degradation_events: DegradationTracker.get_log() 输出。本函数将其渲染成数据质量
+            详细状态块**一次**，同一实例既进 health_check 指纹又进其提示词——否则
+            数据源恢复后仍会复用故障期间缓存的健康结论。
         comparison_indices: {代码: 名称} 对比指数池，用于竞争语境多指数对比。
 
     Returns:
@@ -597,6 +556,28 @@ def generate_all_llm(
     llm_config = get_llm_config()
     if llm_config is None:
         return (None, None, None, None, False, False, False, False)
+
+    # ── 竞争语境块：此处渲染**一次**，同一实例既进指纹（经预检）又进提示词
+    #    （经 worker 分发）。两个消费点各自渲染会让「进键的文本」与「进提示词的
+    #    文本」只能靠纪律对齐——渲染器一改而键不动，预检就会命中旧键复用按旧
+    #    指数算出的对比结论。 ──
+    competitive_context = _build_competitive_context_block(
+        a_indices,
+        total_mv,
+        total_today_profit,
+        comparison_indices=comparison_indices,
+        history_data=history_data,
+        metrics=metrics,
+    )
+
+    # ── 数据质量详细状态块：同样渲染**一次**，同一实例既进指纹（经预检）又进
+    #    health_check 提示词（经 worker 分发）。否则数据源故障期间生成的体检结论
+    #    会在源恢复后仍被复用——报告陈述与此刻事实相反，且不报错。 ──
+    #    一并注入 data_freshness 契约：体检第 5 维还要评净值新鲜度，其基准是
+    #    交易日（非运行时刻），且滞后清单须与「数据质量仪表盘」可信度区块同源。 ──
+    data_quality_text = _build_data_quality_detail_block(
+        degradation_events, (pipeline_data or {}).get("data_freshness")
+    )
 
     cache_info = _compute_module_cache_info(
         llm_config,
@@ -613,6 +594,9 @@ def generate_all_llm(
         force,
         history_data=history_data,
         pipeline_data=pipeline_data,
+        competitive_context=competitive_context,
+        metrics=metrics,
+        data_quality_text=data_quality_text,
     )
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
@@ -648,10 +632,11 @@ def generate_all_llm(
         sector_flow,
         pipeline_data=pipeline_data,
         metrics=metrics,
-        degradation_events=degradation_events,
+        data_quality_text=data_quality_text,
         comparison_indices=comparison_indices,
         history_data=history_data,
         _debate_info_container=_debate_info_container,
+        competitive_context=competitive_context,
     )
 
     # 合并预检结果 + 工作线程结果

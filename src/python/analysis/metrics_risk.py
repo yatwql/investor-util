@@ -35,7 +35,6 @@ __all__ = [
     "win_rate",
     "turnover_rate",
     "risk_contribution",
-    "get_dividend_yield",
     "individual_volatility",
     "portfolio_beta",
     "portfolio_beta_analysis",
@@ -224,67 +223,6 @@ def risk_contribution(
         item["rank"] = rank
 
     return result
-
-
-# ── 分红数据 ────────────────────────────────────
-
-
-def get_dividend_yield(code: str) -> float | None:
-    """获取指定品种的年均股息率。
-
-    从缓存读取股票历史分红数据，计算年均每股分红 / 当前价格。
-
-    Args:
-        code: 证券代码
-
-    Returns:
-        股息率（如 0.03=3%），数据不可用时返回 None
-    """
-    try:
-        from src.python import cache as _cache
-
-        data = _cache.get(f"dividend_{code}", ttl=86400 * 30)
-        if not data or not isinstance(data, list):
-            return None
-
-        # 计算年均每股分红
-        total_dividend = 0.0
-        years: set[str] = set()
-        for item in data:
-            year = item.get("year", "") or item.get("date", "")[:4]
-            amount = item.get("dividend", 0) or item.get("amount", 0) or item.get("cash_dividend", 0)
-            try:
-                total_dividend += float(amount)
-                years.add(str(year))
-            except (ValueError, TypeError):
-                continue
-
-        if not years:
-            return None
-
-        avg_annual = total_dividend / len(years) if years else 0.0
-        if avg_annual <= 0:
-            return None
-
-        # 获取当前价格
-        price_data = _cache.get(f"price_{code}", ttl=86400)
-        if not price_data:
-            return None
-
-        if isinstance(price_data, dict):
-            current_price = price_data.get("price", 0) or price_data.get("close", 0)
-        elif isinstance(price_data, (int, float)):
-            current_price = float(price_data)
-        else:
-            return None
-
-        if current_price and current_price > 0:
-            return sanitize_metric(avg_annual / current_price)
-
-        return None
-    except Exception:
-        logger.warning("[metrics] 获取 %s 股息率失败", code, exc_info=True)
-        return None
 
 
 # ── 个股波动率 ──────────────────────────────────

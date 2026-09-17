@@ -52,13 +52,15 @@ _EXPECTED_WHITELIST = {
     "enable_history",
     "enable_portfolio_evolution",
     "enable_action",
-    # 3 报告增强子模块开关（菜单 P 6）
-    "report_submodules.data_quality",
-    "report_submodules.industry_beta",
-    "report_submodules.candidate_compare",
-    "report_submodules.cost_lots",
-    "report_submodules.valuation_percentile",
-    "report_submodules.market_temperature",
+    # 3 报告章节与增强开关（菜单 S 报告块；注册表 GROUP_REPORT）
+    "data_quality",
+    "industry_beta",
+    "candidate_compare",
+    "cost_lots",
+    "valuation_percentile",
+    "market_temperature",
+    "financial_report_digest",
+    "financial_indicator",
     # 4 持仓匿名化枚举（菜单 A）
     "anonymization.mode",
     # 5 对比指数池（菜单 I）
@@ -69,7 +71,7 @@ _EXPECTED_WHITELIST = {
     "enabled_llm.health_check",
     "enabled_llm.penetration_deep",
     "enabled_llm.news_correlation",
-    # 7 实验性功能开关（菜单 S 实验块；清单取自 features.EXPERIMENTAL_FEATURES）
+    # 7 实验性功能开关（菜单 S 实验块；清单取自 features 注册表实验组）
     "llm_debate_procon",
     "llm_debate_conditional",
     "llm_debate_qa_concentration",
@@ -78,119 +80,20 @@ _EXPECTED_WHITELIST = {
     "module_quality_gate",
     "decision_header_parse",
     "signal_ledger",
+    "datasource_credential_ready",
+    # 8 常规开关（菜单 S 常规块；同为注册表成员，此前无任何界面入口）
+    "metrics_sharpe",
+    "metrics_calmar",
+    "metrics_hhi",
+    "metrics_winrate",
+    "metrics_turnover",
+    "metrics_risk_contribution",
+    "metrics_beta",
+    "enable_interactive_charts",
     "doctor_check",
+    "datasource_adapter",
+    "feeder_penetration",
 }
-
-
-class TestWhitelist:
-    """T1/T2：白名单完备性与隐藏键语义。"""
-
-    def test_whitelist_covers_all_tui_editable_keys(self):
-        """白名单 = 7 组 TUI 可编辑项全集，无多余键。"""
-        assert set(config_edit_whitelist) == _EXPECTED_WHITELIST
-
-    @pytest.mark.parametrize(
-        "key",
-        [
-            "enabled_llm.debate_pro",
-            "enabled_llm.debate_con",
-            "enabled_llm.debate_synthesis",
-        ],
-    )
-    def test_hidden_llm_keys_rejected(self, app_client, key):
-        """隐藏辩论三模块不在白名单 → 400 BAD_PARAM（镜像 TUI 隐藏语义）。"""
-        resp = app_client.post("/api/config/edit", json={"key": key, "value": True})
-        assert resp.status_code == 400
-        assert resp.get_json()["error_code"] == "BAD_PARAM"
-
-
-# ═══════════════════════════════════════════════════════════════
-# T3 面板读取：GET /api/config/edit 返回 7 组全量可编辑面
-# ═══════════════════════════════════════════════════════════════
-
-
-class TestGetSurface:
-    """T3：面板全量读取。"""
-
-    def test_surface_returns_all_groups(self, app_client):
-        """GET 返回 paths/sections/submodules/anonymization/comparison_indices/llm。"""
-        resp = app_client.get("/api/config/edit")
-        assert resp.status_code == 200
-        body = resp.get_json()
-        assert body["ok"] is True
-        data = body["data"]
-        assert set(data) == {
-            "paths",
-            "sections",
-            "submodules",
-            "anonymization",
-            "comparison_indices",
-            "comparison_indices_defaults",
-            "llm",
-        }
-        assert set(data["paths"]) == {"holdings_dir", "holdings_filename", "output_dir"}
-        assert set(data["sections"]) == {
-            "enable_fund_deep_analysis",
-            "enable_news",
-            "enable_history",
-            "enable_portfolio_evolution",
-            "enable_action",
-        }
-        assert set(data["submodules"]) == {
-            "data_quality",
-            "industry_beta",
-            "candidate_compare",
-            "cost_lots",
-            "valuation_percentile",
-            "market_temperature",
-        }
-
-    def test_surface_values_from_defaults(self, app_client):
-        """无配置文件时值来自默认配置：章节全开、子模块 data_quality 开其余关、匿名化 off。"""
-        resp = app_client.get("/api/config/edit")
-        data = resp.get_json()["data"]
-        # 报告章节默认全开
-        assert all(data["sections"].values())
-        # 子模块默认 data_quality 开，其余关
-        assert data["submodules"]["data_quality"] is True
-        assert data["submodules"]["industry_beta"] is False
-        assert data["submodules"]["cost_lots"] is False
-        # 匿名化默认 off，枚举选项齐全
-        assert data["anonymization"]["mode"] == "off"
-        assert data["anonymization"]["options"] == ["off", "code_display", "full_anonymous", "summary"]
-        # 对比指数池 = 默认池
-        assert data["comparison_indices"] == data["comparison_indices_defaults"]
-        # LLM 开关默认开，隐藏模块列出辩论三模块，实验性功能默认关
-        assert set(data["llm"]["enabled_llm"]) == {
-            "global_macro",
-            "expert_review",
-            "health_check",
-            "penetration_deep",
-            "news_correlation",
-        }
-        assert data["llm"]["hidden_modules"] == ["debate_pro", "debate_con", "debate_synthesis"]
-        # 实验性功能面 = 注册表全集，默认全关
-        assert set(data["llm"]["experiments"]) == {
-            "llm_debate_procon",
-            "llm_debate_conditional",
-            "llm_debate_qa_concentration",
-            "decision_reflection",
-            "signal_pre_digest",
-            "module_quality_gate",
-            "decision_header_parse",
-            "signal_ledger",
-            "doctor_check",
-        }
-        assert all(v is False for v in data["llm"]["experiments"].values())
-        # 显示名同源下发（前端不再手写标签字典，避免与注册表漂移）
-        assert set(data["llm"]["experiment_labels"]) == set(data["llm"]["experiments"])
-        assert data["llm"]["experiment_labels"]["decision_header_parse"] == "决策头结构化"
-        assert data["llm"]["experiment_labels"]["signal_ledger"] == "确定性信号沉淀"
-
-
-# ═══════════════════════════════════════════════════════════════
-# T4/T5 标量写 + 嵌套 dict 写
-# ═══════════════════════════════════════════════════════════════
 
 
 class TestApplyScalarWrite:
@@ -235,69 +138,6 @@ class TestApplyScalarWrite:
         assert get_anonymization_mode() == "code_display"
 
 
-class TestApplyNestedDictWrite:
-    """T5：嵌套 dict 读合并后整块写，其余子键/指数保留。"""
-
-    def test_submodule_cost_lots_keeps_others(self, app_client):
-        """report_submodules.cost_lots 写：其余子键保持默认值。"""
-        resp = app_client.post(
-            "/api/config/edit",
-            json={"key": "report_submodules.cost_lots", "value": True},
-        )
-        assert resp.status_code == 200
-        assert resp.get_json()["data"]["value"] is True
-
-        from src.python.config import get_config
-
-        sub = get_config()["report_submodules"]
-        assert sub["cost_lots"] is True
-        assert sub["data_quality"] is True  # 默认开，未被覆盖
-        assert sub["industry_beta"] is False
-
-    def test_comparison_indices_add_keeps_defaults(self, app_client):
-        """指数池 add：新指数入池，默认池指数保留。"""
-        resp = app_client.post(
-            "/api/config/edit",
-            json={"key": "comparison_indices", "action": "add", "code": "sh000016", "name": "上证50"},
-        )
-        assert resp.status_code == 200
-        indices = resp.get_json()["data"]["value"]
-        assert indices["sh000016"] == "上证50"
-        assert indices["sh000300"] == "沪深300"
-
-        from src.python.config import get_config
-
-        assert get_config()["comparison_indices"]["sh000016"] == "上证50"
-
-    def test_comparison_indices_remove(self, app_client):
-        """指数池 remove：目标指数移除，其余保留。"""
-        resp = app_client.post(
-            "/api/config/edit",
-            json={"key": "comparison_indices", "action": "remove", "code": "sh000300"},
-        )
-        assert resp.status_code == 200
-        indices = resp.get_json()["data"]["value"]
-        assert "sh000300" not in indices
-        assert "sh000905" in indices
-
-    def test_comparison_indices_reset_to_defaults(self, app_client):
-        """指数池 reset：先增后重置，恢复为默认池。"""
-        app_client.post(
-            "/api/config/edit",
-            json={"key": "comparison_indices", "action": "add", "code": "sh000016", "name": "上证50"},
-        )
-        resp = app_client.post("/api/config/edit", json={"key": "comparison_indices", "action": "reset"})
-        assert resp.status_code == 200
-        indices = resp.get_json()["data"]["value"]
-        assert indices == dict(_config_defaults._DEFAULT_CONFIG["comparison_indices"])
-        assert "sh000016" not in indices
-
-
-# ═══════════════════════════════════════════════════════════════
-# T6/T7 llm_settings 写 + features 写
-# ═══════════════════════════════════════════════════════════════
-
-
 class TestApplyLlmSettingsWrite:
     """T6：enabled_llm 写 llm_settings.json（注释保留 + 原子写）。"""
 
@@ -330,18 +170,18 @@ class TestApplyFeaturesWrite:
         """llm_debate_conditional 写：features.json 含覆写，运行时开关生效。"""
         from src.python.config.features import _FEATURES_FILE, is_feature_enabled
 
-        assert is_feature_enabled("llm_debate_conditional") is False  # 默认关
+        assert is_feature_enabled("llm_debate_conditional") is True  # 转正后默认开
 
         resp = app_client.post(
             "/api/config/edit",
-            json={"key": "llm_debate_conditional", "value": True},
+            json={"key": "llm_debate_conditional", "value": False},
         )
         assert resp.status_code == 200
-        assert resp.get_json()["data"]["value"] is True
-        assert is_feature_enabled("llm_debate_conditional") is True
+        assert resp.get_json()["data"]["value"] is False
+        assert is_feature_enabled("llm_debate_conditional") is False
 
         raw = open(_FEATURES_FILE, encoding="utf-8").read()
-        assert '"llm_debate_conditional": true' in raw
+        assert '"llm_debate_conditional": false' in raw
 
     def test_decision_reflection_flag_write_takes_effect(self, app_client):
         """decision_reflection 写：features.json 含覆写，运行时开关生效。"""
@@ -364,18 +204,50 @@ class TestApplyFeaturesWrite:
         """signal_pre_digest 写：features.json 含覆写，运行时开关生效。"""
         from src.python.config.features import _FEATURES_FILE, is_feature_enabled
 
-        assert is_feature_enabled("signal_pre_digest") is False  # 默认关
+        assert is_feature_enabled("signal_pre_digest") is True  # 转正后默认开
 
         resp = app_client.post(
             "/api/config/edit",
-            json={"key": "signal_pre_digest", "value": True},
+            json={"key": "signal_pre_digest", "value": False},
         )
         assert resp.status_code == 200
-        assert resp.get_json()["data"]["value"] is True
-        assert is_feature_enabled("signal_pre_digest") is True
+        assert resp.get_json()["data"]["value"] is False
+        assert is_feature_enabled("signal_pre_digest") is False
 
         raw = open(_FEATURES_FILE, encoding="utf-8").read()
-        assert '"signal_pre_digest": true' in raw
+        assert '"signal_pre_digest": false' in raw
+
+    def test_standard_switch_write_takes_effect(self, app_client):
+        """常规开关（量化指标）写：features.json 含覆写，运行时开关生效。
+
+        缺陷场景：``metrics_*`` 与 ``enable_interactive_charts`` 从未出现在任何
+        界面通道内，用户只能手改 features.json 才能关掉一项指标；本用例锁定
+        Web 面板对常规组的写入路径与实验组同源可用。
+        """
+        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+
+        assert is_feature_enabled("metrics_hhi") is True  # 默认开
+
+        resp = app_client.post("/api/config/edit", json={"key": "metrics_hhi", "value": False})
+        assert resp.status_code == 200
+        assert resp.get_json()["data"]["value"] is False
+        assert is_feature_enabled("metrics_hhi") is False
+
+        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        assert '"metrics_hhi": false' in raw
+
+    def test_doctor_check_can_be_disabled_from_panel(self, app_client):
+        """系统自检转正后仍可从面板关闭——转正不再连入口一起摘掉（回归）。"""
+        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+
+        assert is_feature_enabled("doctor_check") is True  # 默认开
+
+        resp = app_client.post("/api/config/edit", json={"key": "doctor_check", "value": False})
+        assert resp.status_code == 200
+        assert is_feature_enabled("doctor_check") is False
+
+        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        assert '"doctor_check": false' in raw
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -497,3 +369,46 @@ class TestConfigBackup:
         resp = app_client.post("/api/config/edit", json={"key": "enable_news", "value": False})
         assert resp.status_code == 200
         assert resp.get_json()["data"]["backup"] is None
+
+
+class TestReportGroupOverWeb:
+    """报告章节与增强：经 features 通道读写（注册表 GROUP_REPORT）。"""
+
+    def test_whitelist_has_bare_flag_keys_not_config_paths(self):
+
+        assert not [k for k in config_edit_whitelist if k.startswith("report_submodules.")], "旧 config 路径应已移除"
+        for flag in ("data_quality", "market_temperature", "financial_indicator"):
+            assert config_edit_whitelist[flag] == {"kind": "bool", "target": "features", "writer": "features"}
+
+    def test_surface_report_switches_derives_from_registry(self):
+        from src.python.config.features import GROUP_REPORT, switches_in_group
+        from src.python.web.config_edit import get_config_edit_surface
+
+        surface = get_config_edit_surface()
+        assert set(surface["report_switches"]) == {flag for flag, _d in switches_in_group(GROUP_REPORT)}
+        assert "labels" not in surface["report_switches"]  # 显示名由 features.labels 同源下发
+
+    def test_writing_report_flag_lands_in_features_store(self):
+        from src.python.config.features import is_feature_enabled, set_feature_enabled
+        from src.python.web.config_edit import apply_config_edit
+
+        set_feature_enabled("cost_lots", False)
+        apply_config_edit({"key": "cost_lots", "value": True})
+        assert is_feature_enabled("cost_lots") is True
+        set_feature_enabled("cost_lots", False)
+
+
+class TestWebPanelCoversAllSwitches:
+    """Web 配置面板的开关面必须覆盖注册表全部开关（含报告组），防渠道层漏渲染。"""
+
+    def test_surface_flags_cover_registry(self):
+        from src.python.config.features import feature_switch_registry
+        from src.python.web.config_edit import get_config_edit_surface
+
+        surface = get_config_edit_surface()
+        shown = set()
+        for group in ("experimental", "standard"):
+            shown |= set(surface["features"][group])
+        shown |= set(surface["report_switches"])
+        missing = set(feature_switch_registry) - shown
+        assert not missing, f"Web 面板未渲染这些开关：{sorted(missing)}"

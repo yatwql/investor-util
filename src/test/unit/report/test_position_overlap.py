@@ -203,9 +203,11 @@ class TestComputeOverlapMatrix(unittest.TestCase):
 
     def test_one_fund(self):
         """1 只基金 → 空结构"""
-        result = compute_overlap_matrix({
-            "110011": [{"name": "茅台", "code": "600519", "ratio": 10}],
-        })
+        result = compute_overlap_matrix(
+            {
+                "110011": [{"name": "茅台", "code": "600519", "ratio": 10}],
+            }
+        )
         self.assertEqual(result["funds"], [])
         self.assertEqual(result["matrix"], [])
 
@@ -245,27 +247,31 @@ class TestOverlapEdgeCases(unittest.TestCase):
         oa = _overlap_ratio(a, b)
         self.assertGreater(oa, jac)
         # matrix 取 max
-        result = compute_overlap_matrix({
-            "110011": [{"name": n, "code": n, "ratio": 5} for n in a],
-            "162605": [{"name": n, "code": n, "ratio": 5} for n in b],
-        })
+        result = compute_overlap_matrix(
+            {
+                "110011": [{"name": n, "code": n, "ratio": 5} for n in a],
+                "162605": [{"name": n, "code": n, "ratio": 5} for n in b],
+            }
+        )
         self.assertAlmostEqual(result["matrix"][0][1], oa)
 
     def test_pairs_sorted_by_overlap(self):
         """配对按重合度降序排列"""
-        result = compute_overlap_matrix({
-            "110011": [
-                {"name": "A", "code": "A", "ratio": 5},
-                {"name": "B", "code": "B", "ratio": 5},
-            ],
-            "162605": [
-                {"name": "A", "code": "A", "ratio": 5},
-            ],
-            "519300": [
-                {"name": "C", "code": "C", "ratio": 5},
-                {"name": "D", "code": "D", "ratio": 5},
-            ],
-        })
+        result = compute_overlap_matrix(
+            {
+                "110011": [
+                    {"name": "A", "code": "A", "ratio": 5},
+                    {"name": "B", "code": "B", "ratio": 5},
+                ],
+                "162605": [
+                    {"name": "A", "code": "A", "ratio": 5},
+                ],
+                "519300": [
+                    {"name": "C", "code": "C", "ratio": 5},
+                    {"name": "D", "code": "D", "ratio": 5},
+                ],
+            }
+        )
         # 110011-162605 有共同标的 (A), 110011-519300 无, 162605-519300 无
         # 所以第一对应该是 110011-162605
         scores = [max(p["jaccard"], 0.01 if p["common_count"] > 0 else 0) for p in result["pairs"]]

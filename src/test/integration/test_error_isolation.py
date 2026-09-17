@@ -33,16 +33,18 @@ class TestErrorIsolationSemantics(unittest.TestCase):
 
         holdings = [Holding("证券", "茅台", "600519", 100, 150.0)]
         mock_mkt = {
-            "price": 160.0, "yesterday_close": 158.0,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "source": "腾讯行情", "name": "茅台", "code": "600519",
+            "price": 160.0,
+            "yesterday_close": 158.0,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "source": "腾讯行情",
+            "name": "茅台",
+            "code": "600519",
         }
 
         with (
-            patch("src.python.report.market_value.fetch_market_data",
-                  return_value=mock_mkt),
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.fetch_market_data", return_value=mock_mkt),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 30)
@@ -65,24 +67,33 @@ class TestErrorIsolationSemantics(unittest.TestCase):
 
         holdings = [Holding("证券", "茅台", "600519", 100, 150.0)]
         details = [
-            DetailRow("证券", "茅台", "600519", 160.0, "2026-07-03",
-                      158.0, "tencent", "--", 100, 16000.0, 15000.0, 1000.0,
-                      0.0667, 200.0, "腾讯行情", "tencent"),
+            DetailRow(
+                "证券",
+                "茅台",
+                "600519",
+                160.0,
+                "2026-07-03",
+                158.0,
+                "tencent",
+                "--",
+                100,
+                16000.0,
+                15000.0,
+                1000.0,
+                0.0667,
+                200.0,
+                "腾讯行情",
+                "tencent",
+            ),
         ]
 
         with (
-            patch("src.python.report.html_renderers.fetch_indices",
-                  return_value={}),
-            patch("src.python.report.html_renderers.fetch_us_indices",
-                  return_value={}),
-            patch("src.python.report.html_renderers.compute_penetration_top10",
-                  return_value={}),
-            patch("src.python.report.html_renderers._build_category_data",
-                  return_value=([], False)),
-            patch("src.python.report.html_renderers.price_update_status",
-                  return_value=(1, 1, True)),
-            patch("src.python.report.html_renderers._build_perf_data",
-                  return_value={}),
+            patch("src.python.report.html_renderers.fetch_indices", return_value={}),
+            patch("src.python.report.html_renderers.fetch_us_indices", return_value={}),
+            patch("src.python.report.html_renderers.compute_penetration_top10", return_value={}),
+            patch("src.python.report.html_renderers._build_category_data", return_value=([], False)),
+            patch("src.python.report.html_renderers.price_update_status", return_value=(1, 1, True)),
+            patch("src.python.report.html_renderers._build_perf_data", return_value={}),
             # 模拟 LLM content 异常（传入错误类型），验证仍生成 HTML
             patch("src.python.report.html_writer._ENV.get_template") as tmpl,
         ):
@@ -91,16 +102,20 @@ class TestErrorIsolationSemantics(unittest.TestCase):
             tmpl.return_value = mock_tmpl
 
             import tempfile
+
             tmp = tempfile.mkdtemp(prefix="test_isolation_")
             try:
                 path = write_html_report(
-                    holdings, output_dir=tmp,
-                    details=details, enable_llm=False,
+                    holdings,
+                    output_dir=tmp,
+                    details=details,
+                    enable_llm=False,
                 )
                 self.assertIsNotNone(path)
                 self.assertTrue(path.endswith(".html"))
             finally:
                 import shutil
+
                 shutil.rmtree(tmp, ignore_errors=True)
 
     def test_news_failure_does_not_block_excel(self):
@@ -113,9 +128,24 @@ class TestErrorIsolationSemantics(unittest.TestCase):
 
         holdings = [Holding("证券", "茅台", "600519", 100, 150.0)]
         details = [
-            DetailRow("证券", "茅台", "600519", 160.0, "2026-07-03",
-                      158.0, "tencent", "--", 100, 16000.0, 15000.0, 1000.0,
-                      0.0667, 200.0, "腾讯行情", "tencent"),
+            DetailRow(
+                "证券",
+                "茅台",
+                "600519",
+                160.0,
+                "2026-07-03",
+                158.0,
+                "tencent",
+                "--",
+                100,
+                16000.0,
+                15000.0,
+                1000.0,
+                0.0667,
+                200.0,
+                "腾讯行情",
+                "tencent",
+            ),
         ]
 
         with (
@@ -123,21 +153,24 @@ class TestErrorIsolationSemantics(unittest.TestCase):
             patch("src.python.fetcher.index.fetch_us_indices", return_value={}),
             patch("src.python.report.fund_performance.write_fund_performance_sheet"),
             # 新闻返回空（模拟获取失败）
-            patch("src.python.providers.news_aggregator.aggregate_news",
-                  return_value=[]),
+            patch("src.python.providers.news_aggregator.aggregate_news", return_value=[]),
         ):
             import tempfile
+
             tmp = tempfile.mkdtemp(prefix="test_isolation_excel_")
             try:
-                result = generate_excel_report(
-                    holdings, output_dir=tmp,
-                    details=details, a_indices={}, us_indices={},
+                generate_excel_report(
+                    holdings,
+                    output_dir=tmp,
+                    details=details,
+                    a_indices={},
+                    us_indices={},
                     include_news=True,
                 )
                 # generate_excel_report 返回 None（无 return 值），验证文件确实生成
                 expected_file = os.path.join(tmp, "个人投资分析报告.xlsx")
-                self.assertTrue(os.path.exists(expected_file),
-                                f"Excel 报告文件应存在于 {expected_file}")
+                self.assertTrue(os.path.exists(expected_file), f"Excel 报告文件应存在于 {expected_file}")
             finally:
                 import shutil
+
                 shutil.rmtree(tmp, ignore_errors=True)

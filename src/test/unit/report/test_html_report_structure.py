@@ -18,7 +18,6 @@ from __future__ import annotations
 import os
 import re
 import unittest
-from unittest.mock import patch
 
 import pytest
 from bs4 import BeautifulSoup
@@ -35,13 +34,10 @@ _TEMPLATE_PATH = os.path.normpath(
 # 默认注册表 key（按默认顺序，与 registry.py 对齐）
 _ALL_KEYS_DEFAULT = [
     "summary",
-    "market_value",
-    "category",
+    "holdings_detail",
     "penetration",
     "fund_performance",
-    "fund_manager",
-    "position_relationship",
-    "fund_concentration",
+    "position_structure",
     "style_factor",
     "news_correlation",
     "global_macro",
@@ -52,8 +48,8 @@ _ALL_KEYS_DEFAULT = [
     "llm_usage",
 ]
 
-_ALWAYS_KEYS = {"summary", "market_value", "category", "penetration", "fund_performance"}
-_FUND_DEEP_ANALYSIS_KEYS = {"fund_manager", "position_relationship", "fund_concentration", "style_factor"}
+_ALWAYS_KEYS = {"summary", "holdings_detail", "penetration", "fund_performance"}
+_FUND_DEEP_ANALYSIS_KEYS = {"position_structure", "style_factor"}
 _NEWS_KEYS = {"news_correlation"}
 _LLM_KEYS = {"global_macro", "expert_review", "health_check", "penetration_deep", "llm_usage"}
 _HISTORY_KEYS = {"portfolio_history_drawdown"}
@@ -71,21 +67,18 @@ _LLM_SUPPORTED_KEYS = {
 
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary", "name": "投资分析汇总", "number": 1},
-    {"key": "market_value", "name": "市值核算明细表", "number": 2},
-    {"key": "category", "name": "持仓分类表", "number": 3},
-    {"key": "penetration", "name": "资产穿透TOP10", "number": 4},
-    {"key": "fund_performance", "name": "基金业绩分析", "number": 5},
-    {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
-    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
-    {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
-    {"key": "style_factor", "name": "风格与因子分析", "number": 9},
-    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
-    {"key": "global_macro", "name": "全球政经局势", "number": 11},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 12},
-    {"key": "health_check", "name": "持仓体检报告", "number": 13},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 14},
-    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 15},
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 16},
+    {"key": "holdings_detail", "name": "持仓明细与分类", "number": 2},
+    {"key": "penetration", "name": "资产穿透TOP10", "number": 3},
+    {"key": "fund_performance", "name": "基金业绩分析", "number": 4},
+    {"key": "position_structure", "name": "持仓结构与集中度", "number": 5},
+    {"key": "style_factor", "name": "风格与因子分析", "number": 6},
+    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 7},
+    {"key": "global_macro", "name": "全球政经局势", "number": 8},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 9},
+    {"key": "health_check", "name": "持仓体检报告", "number": 10},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 11},
+    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 12},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 13},
 ]
 
 
@@ -177,7 +170,10 @@ def _render_template(render_data: dict) -> BeautifulSoup:
 
     # 注入 section_visible 闭包 + section_groups 分组导航（与生产代码相同的 context 变量方式，不写入 _ENV.globals）
     _sv_dict = render_data.get("section_visible_dict", {})
-    _sv_fn = lambda key, _d=_sv_dict: bool(_d.get(key, False))
+
+    def _sv_fn(key: str, _d: dict = _sv_dict) -> bool:
+        return bool(_d.get(key, False))
+
     section_groups = _build_section_nav_groups(
         render_data.get("section_order", []),
         _sv_fn,
@@ -225,9 +221,9 @@ class TestHtmlNavStructure(unittest.TestCase):
     # ── Nav links ──────────────────────────────────────────────
 
     def test_nav_link_count(self):
-        """导航链接数量应等于可见模块数（全部可见 = 16）。"""
+        """导航链接数量应等于可见模块数（全部可见 = 13）。"""
         links = self.soup.select("nav.section-nav a")
-        self.assertEqual(len(links), 16, f"导航应有 16 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 13, f"导航应有 13 个链接，实际 {len(links)}")
 
     def test_every_nav_link_has_corresponding_section(self):
         """每个导航链接的 href 指向一个存在的 section id。"""
@@ -416,23 +412,20 @@ class TestHtmlCustomOrder(unittest.TestCase):
         cls.custom_order: list[dict] = [
             {"key": "fund_performance", "name": "基金业绩分析", "number": 1},
             {"key": "summary", "name": "投资分析汇总", "number": 2},
-            {"key": "market_value", "name": "市值核算明细表", "number": 3},
-            {"key": "category", "name": "持仓分类表", "number": 4},
-            {"key": "penetration", "name": "资产穿透TOP10", "number": 5},
+            {"key": "holdings_detail", "name": "持仓明细与分类", "number": 3},
+            {"key": "penetration", "name": "资产穿透TOP10", "number": 4},
             # 基金深度分析保持默认
-            {"key": "fund_manager", "name": "基金经理变更监控", "number": 6},
-            {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7},
-            {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8},
-            {"key": "style_factor", "name": "风格与因子分析", "number": 9},
+            {"key": "position_structure", "name": "持仓结构与集中度", "number": 5},
+            {"key": "style_factor", "name": "风格与因子分析", "number": 6},
             # news 保持默认
-            {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10},
+            {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 7},
             # llm 保持默认
-            {"key": "global_macro", "name": "全球政经局势", "number": 11},
-            {"key": "expert_review", "name": "智囊团深度复盘", "number": 12},
-            {"key": "health_check", "name": "持仓体检报告", "number": 13},
-            {"key": "penetration_deep", "name": "穿透深度分析", "number": 14},
-            {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 15},
-            {"key": "llm_usage", "name": "LLM API 用量", "number": 16},
+            {"key": "global_macro", "name": "全球政经局势", "number": 8},
+            {"key": "expert_review", "name": "智囊团深度复盘", "number": 9},
+            {"key": "health_check", "name": "持仓体检报告", "number": 10},
+            {"key": "penetration_deep", "name": "穿透深度分析", "number": 11},
+            {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 12},
+            {"key": "llm_usage", "name": "LLM API 用量", "number": 13},
         ]
         cls.numbers = {sec["key"]: sec["number"] for sec in cls.custom_order}
         cls.sv_dict = {sec["key"]: True for sec in cls.custom_order}
@@ -485,8 +478,8 @@ class TestHtmlCustomOrder(unittest.TestCase):
                 orders[sec_id] = int(m.group(1))
 
         self.assertIn("sec-llm_usage", orders)
-        # llm_usage 的 order 应为 16（默认值，未配置时保持）
-        self.assertEqual(orders["sec-llm_usage"], 16, "llm_usage 的 order 应为 16（末位）")
+        # llm_usage 的 order 应为 13（末位，合并章节后总条目 17）
+        self.assertEqual(orders["sec-llm_usage"], 13, "llm_usage 的 order 应为 13（末位）")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1095,9 +1088,9 @@ class TestHtmlTocSidebar(unittest.TestCase):
         self.assertEqual(sidebars[0].get("aria-label"), "章节目录")
 
     def test_toc_link_count_matches_sections(self):
-        """目录链接数量 = 可见模块数（全部可见 = 16）。"""
+        """目录链接数量 = 可见模块数（全部可见 = 15）。"""
         links = self.soup.select("#toc-sidebar a[href^='#sec-']")
-        self.assertEqual(len(links), 16, f"目录应有 16 个链接，实际 {len(links)}")
+        self.assertEqual(len(links), 13, f"目录应有 13 个链接，实际 {len(links)}")
 
     def test_every_toc_link_has_corresponding_section(self):
         """每个目录链接的 href 指向一个存在的 section id。"""
@@ -1150,13 +1143,10 @@ class TestHtmlTocSidebar(unittest.TestCase):
         # 预期分组顺序（测试常量）：基础信息 → 基金深度分析 → 历史 → LLM（行动建议组空，跳过）
         expected_keys = [
             "summary",
-            "market_value",
-            "category",
+            "holdings_detail",
             "penetration",
             "fund_performance",
-            "fund_manager",
-            "position_relationship",
-            "fund_concentration",
+            "position_structure",
             "style_factor",
             "portfolio_history_drawdown",
             "news_correlation",
@@ -1300,16 +1290,14 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
 
         self.assertEqual(
             _group_keys("basic"),
-            ["summary", "market_value", "category", "penetration"],
+            ["summary", "holdings_detail", "penetration"],
             "「基础信息」组应含 4 个基础章节",
         )
         self.assertEqual(
             _group_keys("fund_deep"),
             [
                 "fund_performance",
-                "fund_manager",
-                "position_relationship",
-                "fund_concentration",
+                "position_structure",
                 "style_factor",
             ],
             "「基金深度分析」组应含基金业绩 + 基金深度分析四章（含持仓关系矩阵/风格与因子分析）",
@@ -1357,16 +1345,20 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
 
         self.assertEqual(
             by_key["basic"],
-            ["summary", "market_value", "category", "penetration", "data_source_status"],
-            "「基础信息」组应含数据源可用性矩阵",
+            [
+                "summary",
+                "holdings_detail",
+                "penetration",
+                "data_source_status",
+                "fundamental_snapshot",
+            ],
+            "「基础信息」组应含数据源可用性矩阵与持仓基本面",
         )
         self.assertEqual(
             by_key["fund_deep"],
             [
                 "fund_performance",
-                "fund_manager",
-                "position_relationship",
-                "fund_concentration",
+                "position_structure",
                 "style_factor",
             ],
         )
@@ -1801,6 +1793,215 @@ class TestHtmlDataQualityBlocks(unittest.TestCase):
         self.assertIn("实时", ok_texts)
         self.assertIn("名称不匹配", failed_texts)
         self.assertIn("过期", failed_texts)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: Footer 实验功能清单
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestFooterExperimentalNotice(unittest.TestCase):
+    """页脚须自述生成条件：本报告在哪些实验性功能开启下生成。
+
+    HTML 报告可脱离本机流转，读者既看不到 features.json，也看不到生成时的
+    控制台横幅；缺了这行，行动章「历史决策复盘」等实验产物会被误读为常驻功能。
+    """
+
+    def _render_footer(self, enabled_experiments=None) -> BeautifulSoup:
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        if enabled_experiments is not None:
+            data["enabled_experiments"] = enabled_experiments
+        footer = _render_template(data).select_one(".report-footer")
+        self.assertIsNotNone(footer, "页脚容器应存在")
+        return footer
+
+    def test_lists_enabled_display_names(self):
+        """启用项按显示名顿号相连列出，并给出总项数与一致性提示。"""
+        text = self._render_footer(["辩论-正反辩论", "决策跨期反思闭环"]).get_text()
+
+        self.assertIn("⚗ 本报告在 2 项实验性功能开启下生成：辩论-正反辩论、决策跨期反思闭环", text)
+        self.assertIn("实验功能输出质量可能不稳定，结论请自行复核", text)
+
+    def test_no_line_when_none_enabled(self):
+        """零开关时页脚一字不提实验功能（既有输出不变）。"""
+        self.assertNotIn("⚗", self._render_footer([]).get_text())
+
+    def test_no_empty_shell_when_context_absent(self):
+        """上下文未注入该变量时同样不出现空壳行（模板须判空而非只判存在）。"""
+        self.assertNotIn("⚗", self._render_footer().get_text())
+
+    def test_wording_matches_excel_landing(self):
+        """HTML 页脚与 Excel 落点须同一句式——两处各写各的，措辞必然漂移。"""
+        from src.python.config.features import enabled_experimental_features, set_feature_enabled
+        from src.python.report.experimental_notice import enabled_notice_line
+
+        set_feature_enabled("signal_ledger", True)
+        line = enabled_notice_line()
+        self.assertIsNotNone(line)
+
+        text = self._render_footer([name for _flag, name in enabled_experimental_features()]).get_text()
+
+        self.assertIn(line, text, "HTML 页脚句式应与 Excel 落点一致")
+
+    def test_writer_injects_context_variable(self):
+        """渲染上下文须注入该变量——漏传时模板判空而静默不显示，无任何报错。"""
+        import inspect
+
+        from src.python.report import html_writer
+
+        source = inspect.getsource(html_writer._render_template)
+        self.assertIn("enabled_experiments=", source, "_render_template 应将 enabled_experiments 载入模板上下文")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 报告期时效标注（重合度剔除 / 集中度环比 / 候选比较）
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlReportPeriodAnnotations(unittest.TestCase):
+    """HTML 产物须与 Excel 同口径呈现报告期时效。
+
+    重合度按市值加权，陈旧基金剔除后必须在产物中留痕；集中度保留但标注报告期，
+    报告期未推进时标「无对比意义」而非报 0；候选比较标注其风格与重合度所依据的
+    报告期。缺了这些行，读者会把跨年快照当成当期持仓。
+    """
+
+    def _render(self, **overrides) -> BeautifulSoup:
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data.update(overrides)
+        return _render_template(data)
+
+    def _conc_result(self, **extra) -> dict:
+        base = {
+            "name": "易方达中小盘混合",
+            "code": "110011",
+            "report_period": "2026-06-30",
+            "report_stale": False,
+            "top3_pct": 24.5,
+            "top5_pct": 35.5,
+            "top10_pct": 35.5,
+            "prev_top10_pct": None,
+            "change_pct": None,
+            "alert_level": "正常",
+            "is_first_check": False,
+            "period_unchanged": False,
+        }
+        base.update(extra)
+        return base
+
+    # ── 重合度：剔除留痕 ────────────────────────────────────────
+
+    def test_stale_fund_exclusion_banner_rendered(self):
+        """陈旧基金被剔除出矩阵 → 区块顶部留痕（否则读者以为矩阵算错了）。"""
+        soup = self._render(
+            overlap_matrix={
+                "fund_names": {"a": "基金A", "b": "基金B"},
+                "funds": ["a", "b"],
+                "matrix": [[1.0, 0.5], [0.5, 1.0]],
+                "pairs": [],
+                "stale_fund_notes": ["陈年基金（报告期 2020-03-31，已过 20 个完整季度）"],
+            }
+        )
+        text = soup.select_one("#sec-position_structure").get_text()
+        self.assertIn("已从矩阵剔除", text)
+        self.assertIn("陈年基金", text)
+        self.assertIn("2020-03-31", text)
+
+    def test_no_banner_without_stale_funds(self):
+        """无陈旧基金 → 不出现剔除横幅（零噪声）。"""
+        soup = self._render(
+            overlap_matrix={"fund_names": {}, "funds": [], "matrix": [], "pairs": [], "stale_fund_notes": []}
+        )
+        text = soup.select_one("#sec-position_structure").get_text()
+        self.assertNotIn("已从矩阵剔除", text)
+
+    # ── 集中度：报告期列 + 环比语义 ─────────────────────────────
+
+    def test_concentration_period_column_rendered(self):
+        """「报告期」列随数据呈现，陈旧者带（陈旧）后缀。"""
+        soup = self._render(
+            concentration_analysis={"results": [self._conc_result(report_period="2020-03-31", report_stale=True)]}
+        )
+        text = soup.select_one("#sec-position_structure").get_text()
+        self.assertIn("报告期", text)
+        self.assertIn("2020-03-31（陈旧）", text)
+
+    def test_concentration_unchanged_period_marked(self):
+        """报告期未推进 → 环比「无对比意义」+ 标识「报告期未推进」。"""
+        soup = self._render(
+            concentration_analysis={"results": [self._conc_result(period_unchanged=True, prev_top10_pct=35.5)]}
+        )
+        text = soup.select_one("#sec-position_structure").get_text()
+        self.assertIn("无对比意义", text)
+        self.assertIn("报告期未推进", text)
+
+    def test_concentration_advanced_period_shows_change(self):
+        """报告期推进 → 照常呈现环比（闸门不可误伤正常对比）。"""
+        soup = self._render(
+            concentration_analysis={
+                "results": [self._conc_result(prev_top10_pct=30.0, change_pct=5.5, alert_level="正常")]
+            }
+        )
+        # 取表格内文本：区块脚注本就含「无对比意义」四字
+        text = soup.select_one("#sec-position_structure table").get_text()
+        self.assertIn("+5.50%", text)
+        self.assertNotIn("无对比意义", text)
+
+    # ── 候选比较：报告期标注 ────────────────────────────────────
+
+    def _candidate_data(self, **extra) -> dict:
+        row = {
+            "code": "000001",
+            "name": "候选基金A",
+            "available": True,
+            "rating": "优秀",
+            "syl_近1月": "1.23%",
+            "syl_近3月": "5.67%",
+            "syl_近6月": "11.01%",
+            "syl_近1年": "-2.01%",
+            "rank_text": "159/358",
+            "max_drawdown": "-18.50%",
+            "style": "大盘成长",
+            "overlap_name": "",
+            "overlap_jaccard": "--",
+            "report_label": "候选基金A（报告期 2026-06-30，已过 0 个完整季度）",
+        }
+        base = {"available": True, "exceed_limit": False, "invalid": [], "rows": [row]}
+        base.update(extra)
+        return base
+
+    def test_candidate_report_period_note_rendered(self):
+        """候选的风格与重合度基于定期报告快照 → 须标注报告期。"""
+        soup = self._render(candidate_data=self._candidate_data())
+        text = soup.select_one("#sec-fund_performance").get_text()
+        self.assertIn("持仓报告期", text)
+        self.assertIn("2026-06-30", text)
+
+    def test_candidate_stale_baseline_note_rendered(self):
+        """现有持仓陈旧未计入重合度基准 → 提示读者重合度分母不含它。"""
+        soup = self._render(
+            candidate_data=self._candidate_data(
+                stale_baseline_notes=["陈年基金（报告期 2020-03-31，已过 20 个完整季度）"]
+            )
+        )
+        text = soup.select_one("#sec-fund_performance").get_text()
+        self.assertIn("未计入重合度基准", text)
+        self.assertIn("陈年基金", text)
+
+    def test_no_notes_when_nothing_to_annotate(self):
+        """无可标注项 → 不写空壳备注行。"""
+        data = self._candidate_data()
+        data["rows"][0]["report_label"] = ""
+        soup = self._render(candidate_data=data)
+        text = soup.select_one("#sec-fund_performance").get_text()
+        self.assertNotIn("持仓报告期", text)
+        self.assertNotIn("未计入重合度基准", text)
 
 
 if __name__ == "__main__":

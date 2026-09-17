@@ -221,7 +221,7 @@ class TestStructuredHeaderCacheSuffix:
     """缓存指纹后缀：开关关 → 空（不误伤旧缓存）；开 → 固定后缀换键。"""
 
     def test_flag_off_returns_empty(self):
-        reset_feature_flags()
+        set_feature_enabled(dh.STRUCTURED_HEADER_FLAG, False)  # 转正后默认开，基准须显式关
         assert dh.structured_header_cache_suffix() == ""
 
     def test_flag_on_returns_suffix(self):

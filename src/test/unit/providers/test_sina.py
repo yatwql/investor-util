@@ -13,8 +13,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
 
 class TestParseUsIndex(unittest.TestCase):
@@ -22,15 +22,12 @@ class TestParseUsIndex(unittest.TestCase):
 
     def _call(self, text: str):
         from src.python.providers.sina import _parse_us_index
+
         return _parse_us_index(text)
 
     def test_normal_line(self):
         """正常数据 → 正确解析所有字段。"""
-        line = (
-            'var hq_str_gb_dji="道琼斯指数,34500.00,'
-            '0.50,2026-07-01 04:30:00,+150.00,'
-            '0.00,34600.00,34400.00";'
-        )
+        line = 'var hq_str_gb_dji="道琼斯指数,34500.00,0.50,2026-07-01 04:30:00,+150.00,0.00,34600.00,34400.00";'
         result = self._call(line)
         self.assertIsNotNone(result)
         self.assertEqual(result["name"], "道琼斯指数")
@@ -87,11 +84,13 @@ class TestFetchUsIndices(unittest.TestCase):
     @patch("src.python.providers.sina.make_http_client")
     def test_success(self, mock_factory):
         """正常返回 → 正确解析美股三大指数。"""
-        text = self._make_response_text({
-            "gb_dji": "道琼斯,34500,0.5,2026-07-01,+150,0,34600,34400",
-            "gb_ixic": "纳斯达克,14000,0.3,2026-07-01,+42,0,14100,13900",
-            "gb_inx": "标普500,4500,0.4,2026-07-01,+18,0,4510,4490",
-        })
+        text = self._make_response_text(
+            {
+                "gb_dji": "道琼斯,34500,0.5,2026-07-01,+150,0,34600,34400",
+                "gb_ixic": "纳斯达克,14000,0.3,2026-07-01,+42,0,14100,13900",
+                "gb_inx": "标普500,4500,0.4,2026-07-01,+18,0,4510,4490",
+            }
+        )
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -100,6 +99,7 @@ class TestFetchUsIndices(unittest.TestCase):
         mock_client.get.return_value = mock_response
 
         from src.python.providers.sina import fetch_us_indices
+
         result = fetch_us_indices()
         self.assertEqual(len(result), 3)
         self.assertIn("gb_dji", result)
@@ -108,10 +108,12 @@ class TestFetchUsIndices(unittest.TestCase):
     @patch("src.python.providers.sina.make_http_client")
     def test_missing_code_skipped(self, mock_factory):
         """返回中包含未注册代码 → 跳过。"""
-        text = self._make_response_text({
-            "gb_unknown": "未知,100,0,2026-07-01,0,0,101,99",
-            "gb_dji": "道琼斯,34500,0.5,2026-07-01,+150,0,34600,34400",
-        })
+        text = self._make_response_text(
+            {
+                "gb_unknown": "未知,100,0,2026-07-01,0,0,101,99",
+                "gb_dji": "道琼斯,34500,0.5,2026-07-01,+150,0,34600,34400",
+            }
+        )
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -120,6 +122,7 @@ class TestFetchUsIndices(unittest.TestCase):
         mock_client.get.return_value = mock_response
 
         from src.python.providers.sina import fetch_us_indices
+
         result = fetch_us_indices()
         self.assertEqual(len(result), 1)
 
@@ -127,18 +130,21 @@ class TestFetchUsIndices(unittest.TestCase):
     def test_timeout_returns_empty(self, mock_factory):
         """超时 → 空字典。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
         mock_client.get.side_effect = httpx.TimeoutException("timeout")
 
         from src.python.providers.sina import fetch_us_indices
+
         self.assertEqual(fetch_us_indices(), {})
 
     @patch("src.python.providers.sina.make_http_client")
     def test_request_error_returns_empty(self, mock_factory):
         """网络异常 → 空字典。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -173,13 +179,16 @@ class TestFetchIndexKline(unittest.TestCase):
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
         mock_resp = MagicMock()
-        mock_resp.json.return_value = self._make_kline_json([
-            ["2026-07-01", 3990.0, 4000.0, 4010.0, 3980.0, 1000000],
-            ["2026-07-02", 4000.0, 4010.0, 4020.0, 3990.0, 1200000],
-        ])
+        mock_resp.json.return_value = self._make_kline_json(
+            [
+                ["2026-07-01", 3990.0, 4000.0, 4010.0, 3980.0, 1000000],
+                ["2026-07-02", 4000.0, 4010.0, 4020.0, 3990.0, 1200000],
+            ]
+        )
         mock_client.get.return_value = mock_resp
 
         from src.python.providers.sina import fetch_index_kline
+
         result = fetch_index_kline("sh000300", 30)
         self.assertEqual(len(result), 2)
         expected_keys = {"date", "open", "close", "high", "low", "volume"}
@@ -194,12 +203,15 @@ class TestFetchIndexKline(unittest.TestCase):
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
         mock_resp = MagicMock()
-        mock_resp.json.return_value = self._make_kline_json([
-            ["2026-07-01", 5490.0, 5500.0, 5510.0, 5480.0, 500000],
-        ])
+        mock_resp.json.return_value = self._make_kline_json(
+            [
+                ["2026-07-01", 5490.0, 5500.0, 5510.0, 5480.0, 500000],
+            ]
+        )
         mock_client.get.return_value = mock_resp
 
         from src.python.providers.sina import fetch_index_kline
+
         result = fetch_index_kline("gb_inx", 30)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["close"], 5500.0)
@@ -215,6 +227,7 @@ class TestFetchIndexKline(unittest.TestCase):
         mock_client.get.return_value = mock_resp
 
         from src.python.providers.sina import fetch_index_kline
+
         result = fetch_index_kline("sh000300", 30)
         self.assertEqual(result, [])
 
@@ -222,24 +235,28 @@ class TestFetchIndexKline(unittest.TestCase):
     def test_timeout_returns_empty(self, mock_factory):
         """超时 → 空列表。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
         mock_client.get.side_effect = httpx.TimeoutException("timeout")
 
         from src.python.providers.sina import fetch_index_kline
+
         result = fetch_index_kline("sh000300", 30)
         self.assertEqual(result, [])
 
     def test_non_index_code_returns_empty(self):
         """非指数代码 → 空列表。"""
         from src.python.providers.sina import fetch_index_kline
+
         result = fetch_index_kline("600900", 30)
         self.assertEqual(result, [])
 
     def test_empty_code_returns_empty(self):
         """空代码 → 空列表。"""
         from src.python.providers.sina import fetch_index_kline
+
         result = fetch_index_kline("", 30)
         self.assertEqual(result, [])
 
@@ -250,14 +267,17 @@ class TestFetchIndexKline(unittest.TestCase):
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
         mock_resp = MagicMock()
-        mock_resp.json.return_value = self._make_kline_json([
-            ["2026-07-01", 3990.0, 4000.0, 4010.0, 3980.0, 1000000],
-        ])
+        mock_resp.json.return_value = self._make_kline_json(
+            [
+                ["2026-07-01", 3990.0, 4000.0, 4010.0, 3980.0, 1000000],
+            ]
+        )
         mock_client.get.return_value = mock_resp
 
         from src.python.core.code_utils import is_index_code as _orig_is_index
-        with patch("src.python.providers.sina.is_index_code",
-                   wraps=_orig_is_index) as spy:
+
+        with patch("src.python.providers.sina.is_index_code", wraps=_orig_is_index) as spy:
             from src.python.providers.sina import fetch_index_kline
+
             fetch_index_kline("sh000300", 30)
             spy.assert_called_with("sh000300")

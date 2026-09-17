@@ -26,6 +26,7 @@ import copy
 import logging
 from typing import Any
 
+from src.python.core.code_utils import is_fund_holding
 from src.python.core.models import Holding
 
 logger = logging.getLogger("invest")
@@ -218,25 +219,15 @@ def _anonymize_detail_entry(d: dict[str, Any]) -> None:
 
 
 def _categorize_holding(h: Holding) -> str:
-    """对单条持仓进行分类。
+    """对单条持仓进行分类（基金 / 股票及其他）。
 
-    使用 code_utils.is_fund_holding 判断是否为基金。
-    简单回退：代码以 0/3/6 开头且字段齐全按股票处理。
+    类型判定统一委托 ``code_utils.is_fund_holding``（代码类型判定中心化），
+    本模块不自建前缀回退——自建前缀表既与中心判定漂移，
+    也把「0/3/6 开头即股票」这一错误知识散落到匿名化层。
     """
-    try:
-        from src.python.core.code_utils import is_fund_holding
-
-        if is_fund_holding(h.name, h.code, h.account):
-            return "基金"
-        return "股票/其他"
-    except ImportError:
-        pass
-
-    # 回退：按代码前缀粗略判断
-    code = h.code.strip()
-    if code and code[0] in ("0", "3", "6"):
-        return "股票/其他"
-    return "基金"
+    if is_fund_holding(h.name, h.code, h.account):
+        return "基金"
+    return "股票/其他"
 
 
 def _categorize_detail(d: dict[str, Any]) -> str:
@@ -244,19 +235,9 @@ def _categorize_detail(d: dict[str, Any]) -> str:
     code = d.get("code", "")
     name = d.get("name", "")
     account = d.get("account", "")
-    try:
-        from src.python.core.code_utils import is_fund_holding
-
-        if is_fund_holding(name, code, account):
-            return "基金"
-        return "股票/其他"
-    except ImportError:
-        pass
-
-    code_str = str(code).strip()
-    if code_str and code_str[0] in ("0", "3", "6"):
-        return "股票/其他"
-    return "基金"
+    if is_fund_holding(name, code, account):
+        return "基金"
+    return "股票/其他"
 
 
 def _aggregate_holdings_summary(holdings: list[Holding]) -> dict[str, dict[str, Any]]:

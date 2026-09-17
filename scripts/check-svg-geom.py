@@ -1,7 +1,8 @@
 """SVG 几何审查：文本越界 / 文本重叠 / 矩形对齐检查（估算字体宽度）。"""
 
 import xml.etree.ElementTree as ET
-import sys, re
+import sys
+import re
 
 
 def char_w(ch, fs, bold):
@@ -110,7 +111,6 @@ def main(paths):
                     if ox > 2:
                         overlap.append(f"  [{a[4]}] ∩ [{b[4]}] 重叠 {ox:.0f}x{oy:.0f}px")
         # 矩形底部对齐：x 范围重叠的矩形，底部应一致
-        cols = {}
         for tag, (rx0, ry0, rx1, ry1), fill in rects:
             for k in range(len(rects)):
                 pass

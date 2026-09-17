@@ -11,14 +11,21 @@
 from __future__ import annotations
 
 
+from src.python.report._experimental_seams import (
+    apply_module_quality_banners,
+    record_deterministic_decisions,
+    record_deterministic_signals,
+    record_llm_decisions_and_review_block,
+)
 from src.python.report.progress import ProgressReporter
+from src.python.report._report_output import _generate_full_excel_report  # noqa: F401
 
 # ── 子模块 re-export ────────────────────────────────────
 from src.python.report._chart_dataset_factory import _build_chart_datasets_for_report  # noqa: F401
 from src.python.report._full_risk_metrics import _prepare_full_risk_metrics  # noqa: F401
 from src.python.report._report_health import _collect_health_checks, _spawn_health_checks  # noqa: F401
 from src.python.report._report_helpers import (  # noqa: F401
-    _both_action_holdings_details,
+    _action_holdings_details,
     _compute_details,
     _inject_evolution_data,
     _inject_snapshot_diff_data,
@@ -66,6 +73,10 @@ def _generate_full_html_report(
     valuation_data: dict | None = None,
     market_temperature_data: dict | None = None,
     decision_review_data: dict | None = None,
+    prosperity_framework_data: dict | None = None,
+    enable_fundamental_snapshot: bool = False,
+    financial_report_digest_data: dict | None = None,
+    financial_indicator_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -139,6 +150,7 @@ def _generate_full_html_report(
             position_status=position_status,
             data_freshness=data_freshness,
             action_data=action_data,
+            prosperity_framework_data=prosperity_framework_data,
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=snapshot_diff_data,
@@ -146,6 +158,9 @@ def _generate_full_html_report(
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
             decision_review_data=decision_review_data,
+            enable_fundamental_snapshot=enable_fundamental_snapshot,
+            financial_report_digest_data=financial_report_digest_data,
+            financial_indicator_data=financial_indicator_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -153,76 +168,6 @@ def _generate_full_html_report(
         reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
         logger.exception("HTML 报告写入失败")
         result.errors.append("HTML 报告生成失败")
-        return False
-
-
-# ── _generate_full_excel_report ────────────────────────
-
-
-def _generate_full_excel_report(
-    holdings: list,
-    prep: dict,
-    output_dir: str | None,
-    news_ok: bool,
-    llm_content: tuple,
-    news_data: list,
-    news_llm_meta: dict,
-    sec_order: list,
-    pipeline_data: dict | None,
-    history_data: dict | None,
-    reporter: ProgressReporter,
-    enable_fund_deep_analysis: bool,
-    enable_news: bool,
-    enable_history: bool,
-    enable_llm: bool,
-    debate_info: dict | None,
-    result,
-    enable_portfolio_evolution: bool = True,
-    enable_action: bool = False,
-    enable_data_quality: bool = False,
-    enable_cost_lots: bool = False,
-    transactions: list | None = None,
-    dividends: list | None = None,
-) -> bool:
-    """full 路径的 Excel 报告生成，返回是否成功。"""
-    from src.python.report.excel_generator import generate_excel_report
-
-    reporter.info("正在生成 Excel 报告...")
-    try:
-        generate_excel_report(
-            holdings,
-            include_news=news_ok,
-            output_dir=output_dir or prep["output_dir"],
-            news_top_count=prep["news_top_count"],
-            include_llm=enable_llm,
-            llm_content=llm_content,
-            details=prep["details"],
-            a_indices=prep["a_indices"],
-            us_indices=prep["us_indices"],
-            news_data=news_data,
-            news_llm_meta=news_llm_meta,
-            section_order=sec_order,
-            progress=reporter,
-            pipeline_data=pipeline_data,
-            history_data=history_data,
-            enable_fund_deep_analysis=enable_fund_deep_analysis,
-            enable_news=enable_news,
-            enable_history=enable_history,
-            enable_portfolio_evolution=enable_portfolio_evolution,
-            enable_action=enable_action,
-            enable_llm=enable_llm,
-            debate_info=debate_info,
-            enable_data_quality=enable_data_quality,
-            enable_cost_lots=enable_cost_lots,
-            transactions=transactions,
-            dividends=dividends,
-        )
-        reporter.ok("Excel 报告已生成")
-        return True
-    except Exception:
-        reporter.add_error("Excel 报告生成失败（详情请查看日志文件 logs/app.log）")
-        logger.exception("Excel 报告生成失败")
-        result.errors.append("Excel 报告生成失败")
         return False
 
 
@@ -253,6 +198,8 @@ def _generate_report_both(
         is_enable_action,
         is_enable_cost_lots,
         is_enable_data_quality,
+        is_enable_financial_indicator,
+        is_enable_financial_report_digest,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_news,
@@ -280,6 +227,8 @@ def _generate_report_both(
     _enable_action = is_enable_action(config)
     _enable_data_quality = is_enable_data_quality(config)
     _enable_cost_lots = is_enable_cost_lots(config)
+    _enable_financial_report_digest = is_enable_financial_report_digest(config)
+    _enable_financial_indicator = is_enable_financial_indicator(config)
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
@@ -299,6 +248,24 @@ def _generate_report_both(
 
     valuation_data = compute_valuation_data(details, config, reporter)
     market_temperature_data = compute_market_temperature_data(config, reporter)
+    # 持仓个股财报摘要（数据契约）：both 路径不计算穿透，仅按持仓 A 股标的取数；
+    # 关闭 / 无 key 时为 None（章节隐藏/写占位）
+    financial_report_digest_data = None
+    if _enable_financial_report_digest:
+        from src.python.report.financial_report_digest import build_financial_report_digest
+
+        financial_report_digest_data = build_financial_report_digest(holdings, config, reporter)
+
+    # 财务指标（数据契约）：both 路径同样只按持仓 A 股标的取数（无穿透），
+    # 现价取自行情明细（PE/PB 用）；关闭时为 None（章节隐藏）
+    financial_indicator_data = None
+    if _enable_financial_indicator:
+        from src.python.fetcher.financial_indicator import collect_price_map
+        from src.python.report.financial_indicator import build_financial_indicator
+
+        financial_indicator_data = build_financial_indicator(
+            holdings, config, reporter, prices=collect_price_map(details)
+        )
 
     # ── 2. 快照对比（始终执行） ──
     perf.start("快照对比")
@@ -317,7 +284,6 @@ def _generate_report_both(
         pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
     # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
     #    （position_status + data_freshness）
-    from src.python.analysis.action_advisor import build_action_data
     from src.python.core.data_freshness import build_freshness_summary
     from src.python.core.holding_status import build_coverage_summary
     from src.python.report.market_value import get_last_trading_day, get_prev_trading_day
@@ -378,10 +344,38 @@ def _generate_report_both(
 
     if pipeline_data is not None:
         pipeline_data["action_data"] = build_action_data(
-            _both_action_holdings_details(details),
+            _action_holdings_details(details, transactions),
             sum(d.market_value for d in details),
             portfolio_peak_mv=compute_portfolio_peak_mv((history_data or {}).get("bars")),
         )
+
+    # 景气度框架诊断（实验性功能 prosperity_framework）：开关关闭返回 None（零行为变化）。
+    # 依赖已算好的基本面契约（ROE）与历史走势（收益/回撤印证），故置于两者之后。
+    from src.python.report._report_aux_metrics import compute_prosperity_framework_data
+
+    try:
+        _pf_data = compute_prosperity_framework_data(
+            holdings,
+            details,
+            None,
+            config,
+            reporter,
+            financial_indicator_data=financial_indicator_data,
+            history_data=history_data,
+            pipeline_data=pipeline_data,
+        )
+    except Exception:  # 双保险：实验性诊断异常不得中断整份报告
+        logger.warning("[prosperity_framework] 诊断装配异常，本次跳过（主报告不受影响）", exc_info=True)
+        _pf_data = None
+    if _pf_data is not None and pipeline_data is not None:
+        pipeline_data["prosperity_framework_data"] = _pf_data
+
+    # 市场情绪与持仓热点（报告增强开关 market_sentiment）：开关关闭返回 None（零行为变化）
+    from src.python.report._report_aux_metrics import compute_market_sentiment_data
+
+    _ms_data = compute_market_sentiment_data(holdings, None, config, reporter)
+    if _ms_data is not None and pipeline_data is not None:
+        pipeline_data["market_sentiment_data"] = _ms_data
 
     # ── 4. HTML 报告 ──
     _news_label = "含新闻" if _enable_news else "无新闻"
@@ -420,12 +414,17 @@ def _generate_report_both(
             position_status=(pipeline_data or {}).get("position_status"),
             data_freshness=(pipeline_data or {}).get("data_freshness"),
             action_data=(pipeline_data or {}).get("action_data"),
+            prosperity_framework_data=(pipeline_data or {}).get("prosperity_framework_data"),
+            market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
             crisis_annotation_data=crisis_annotation_data,
             tail_risk_data=tail_risk_data,
             snapshot_diff_data=(pipeline_data or {}).get("snapshot_diff_data"),
             fund_flow_data=fund_flow_data,
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
+            enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
+            financial_report_digest_data=financial_report_digest_data,
+            financial_indicator_data=financial_indicator_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -461,6 +460,9 @@ def _generate_report_both(
             dividends=dividends,
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
+            enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
+            financial_report_digest_data=financial_report_digest_data,
+            financial_indicator_data=financial_indicator_data,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True
@@ -505,6 +507,8 @@ def _generate_report_full(
         is_enable_action,
         is_enable_cost_lots,
         is_enable_data_quality,
+        is_enable_financial_indicator,
+        is_enable_financial_report_digest,
         is_enable_fund_deep_analysis,
         is_enable_history,
         is_enable_llm,
@@ -531,11 +535,13 @@ def _generate_report_full(
     _enable_llm = is_enable_llm(config)
     _enable_data_quality = is_enable_data_quality(config)
     _enable_cost_lots = is_enable_cost_lots(config)
+    _enable_financial_report_digest = is_enable_financial_report_digest(config)
+    _enable_financial_indicator = is_enable_financial_indicator(config)
     sec_order = get_report_section_order(config)
 
     # ── 1. 完整数据准备（含指数/穿透/分类） ──
     perf.start("数据准备")
-    prep = prepare_report_data(holdings, reporter, config)
+    prep = prepare_report_data(holdings, reporter, config, transactions=transactions)
     _validate_prep_completeness(prep)
     perf.stop()
 
@@ -559,6 +565,10 @@ def _generate_report_full(
         # 估值分位 + 市场温度（数据契约，prep 中已组装；开关关闭时为 None）
         pipeline_data["valuation_data"] = prep.get("valuation_data")
         pipeline_data["market_temperature_data"] = prep.get("market_temperature_data")
+        # 持仓个股财报摘要（数据契约，prep 中已组装；开关关闭/无 key 时为 None）
+        pipeline_data["financial_report_digest_data"] = prep.get("financial_report_digest_data")
+        # 财务指标（数据契约，prep 中已组装；开关关闭时为 None）
+        pipeline_data["financial_indicator_data"] = prep.get("financial_indicator_data")
     _validate_pipeline_snapshot(pipeline_data)
     # 2b. 组合演进数据（聚合多期快照，evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
@@ -599,42 +609,9 @@ def _generate_report_full(
         pipeline_data["action_data"] = _action_data
 
     # ── 3.6 决策跨期反思闭环（decision_reflection 实验功能，默认关）──
-    # 顺序：先结旧（用真实后续行情结算到期 pending），再入新（登记本报告
-    # final action_data 的确定性卖出建议为 pending）。结算必须先于 LLM 拉取：
-    # 否则当次教训（含本批结算结果）在 LLM 注入前未落档，注入读不到新结算。
-    # 开关关闭 → decision_ledger.is_active() False → 全链路无感（不读不写）。
-    from src.python.core import decision_ledger
-
-    if decision_ledger.is_active():
-        try:
-            from src.python.report import decision_record, decision_settlement
-
-            _report_date = prep["today_str"]
-            # ① 结算到期 pending 决策（幂等：同 decision 只结一次；未到期/行情
-            #    不可得保持 pending；无基线的早期登记暂缓不结）。结算须先于 LLM
-            #    拉取：否则当次教训（含本批结算结果）在 LLM 注入前未落档读不到。
-            _settle = decision_settlement.settle_pending_decisions(
-                report_date=_report_date,
-            )
-            if _settle.get("settled"):
-                reporter.ok(f"决策复盘：已结算 {_settle['settled']} 条到期决策")
-            elif _settle.get("deferred") or _settle.get("skipped"):
-                reporter.info("决策复盘：无到期可结算决策")
-            # ② 登记确定性卖出建议（入账必可结算：仅带持仓基线的 code 落账；
-            #    同日重复运行由账本 pending 防重，不累积重复 pending）
-            _reg = decision_record.register_action_decisions(
-                _action_data,
-                holdings_details=prep.get("holdings_details"),
-                report_date=_report_date,
-            )
-            if _reg.get("registered"):
-                reporter.ok(f"决策复盘：登记 {_reg['registered']} 条确定性建议")
-            else:
-                logger.info("[decision_reflection] 确定性建议登记为空（无卖出信号或无基线）")
-        except Exception:
-            # 实验功能异常不阻断报告主链路（外部行情拉取等不可控因素）
-            reporter.warn("决策复盘（确定性结算/登记）执行异常，已跳过")
-            logger.exception("[decision_reflection] 确定性结算/登记 seam 异常")
+    # 结算必须先于 LLM 拉取：否则当次教训（含本批结算结果）在 LLM 注入前未落档，
+    # 注入读不到新结算。挂载点实现与异常守护见 `_experimental_seams`。
+    record_deterministic_decisions(prep, _action_data, reporter)
 
     # ── 4. 行业资金流向 ──
     reporter.info("正在获取行业资金流向...")
@@ -672,74 +649,38 @@ def _generate_report_full(
             result.llm_ok = True
 
     # ── 5b. 决策跨期反思闭环（LLM 载体登记 + 复盘区块装配）──
-    # ③ 解析 expert_review 操作建议表 → 逐 code 方向登记（完整可解析路径才执行：
-    #    _enable_llm 关 / expert_review None / 降级回退占位均无「|」数据行 →
-    #    解析自然跳过，回退内容非真实意见不登记）；
-    # ④ 复盘区块数据契约装配 → 注入 pipeline_data 供 HTML/Excel 行动章内嵌块。
-    from src.python.core import decision_ledger
-
-    if decision_ledger.is_active():
-        try:
-            from src.python.report import decision_llm_capture, decision_review_block
-
-            if _enable_llm and llm_content and len(llm_content) > 1 and llm_content[1]:
-                _llm_reg = decision_llm_capture.register_llm_decisions(
-                    llm_content[1],
-                    prep.get("holdings_details"),
-                    report_date=prep["today_str"],
-                )
-                if _llm_reg.get("registered"):
-                    reporter.ok(f"决策复盘：登记 {_llm_reg['registered']} 条 LLM 操作建议")
-                else:
-                    logger.info("[decision_reflection] LLM 操作建议登记为空（无方向建议或同日已登记）")
-            _review_block = decision_review_block.build_review_block(
-                report_date=prep["today_str"],
-            )
-            if _review_block and pipeline_data is not None:
-                pipeline_data["decision_review_data"] = _review_block
-                reporter.info("决策复盘：行动章复盘区块数据已装配")
-        except Exception:
-            # 实验功能异常不阻断报告主链路（不装配复盘区块，报告保持既有输出）
-            reporter.warn("决策复盘（LLM 登记/复盘装配）执行异常，已跳过")
-            logger.exception("[decision_reflection] LLM 登记/复盘装配 seam 异常")
+    # ③ 登记 LLM 操作建议 ④ 复盘区块数据契约注入 pipeline_data（HTML/Excel 行动章
+    # 内嵌块消费）。挂载点实现与异常守护见 `_experimental_seams`。
+    record_llm_decisions_and_review_block(prep, llm_content, _enable_llm, pipeline_data, reporter)
 
     # ── 5c. 模块级质量分级（实验开关，默认关闭）──
-    # 对 4 个 LLM 模块输出做完整性/一致性评级，低评级模块内容头部注入
-    # 「内容质量提示」横幅；只标注不阻断、不重试、不写回缓存。
-    # 置于决策登记之后：横幅会改变内容文本，须避开操作建议表的解析。
-    try:
-        from src.python.report import llm_quality
-
-        llm_content = llm_quality.apply_quality_banners(llm_content, reporter)
-    except Exception:
-        # 实验功能异常不阻断报告主链路（分级失败时报告保持既有输出）
-        reporter.warn("模块级质量分级执行异常，已跳过")
-        logger.exception("[llm_quality] 模块级质量分级 seam 异常")
+    # 只标注不阻断、不重试、不写回缓存。置于决策登记之后：横幅会改变内容文本，
+    # 须避开操作建议表的解析。
+    llm_content = apply_module_quality_banners(llm_content, reporter)
 
     # ── 5d. 确定性数值信号沉淀（实验开关，默认关闭）──
-    # 抽取本轮市场温度/估值分位/尾部风险/风格因子/再平衡超限五类确定性评级，
-    # 打实时-非实时来源标签后入账（幂等：同日同类型同标的只记一次）。
     # 置于此处而非 3.6：尾部风险等 A 通道键在 LLM 生成阶段才注入 pipeline_data，
     # 过早登记会漏采；适配器对缺失键逐项跳过，故不构成硬依赖。
-    from src.python.core import signal_ledger
-
-    if signal_ledger.is_active():
-        try:
-            from src.python.report import signal_record
-
-            _sig = signal_record.register_deterministic_signals(
-                pipeline_data,
-                report_date=prep["today_str"],
-            )
-            if _sig.get("registered"):
-                reporter.ok(f"确定性信号沉淀：登记 {_sig['registered']} 条确定性评级")
-            else:
-                logger.info("[signal_ledger] 确定性信号登记为空（无可登记评级或同日已登记）")
-        except Exception:
-            # 实验功能异常不阻断报告主链路
-            reporter.warn("确定性信号沉淀执行异常，已跳过")
-            logger.exception("[signal_ledger] 确定性信号登记 seam 异常")
+    record_deterministic_signals(pipeline_data, prep, reporter)
     perf.stop()
+
+    # 景气度框架诊断（实验性功能 prosperity_framework）：开关关闭返回 None（零行为变化）。
+    # full 路径 prep 已含穿透重仓（`penetrated_assets`），基本面与历史走势亦已就绪。
+    from src.python.report._report_aux_metrics import compute_prosperity_framework_data
+
+    _pf_data = compute_prosperity_framework_data(
+        holdings,
+        prep["details"],
+        prep,
+        config,
+        reporter,
+        financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data")
+        or prep.get("financial_indicator_data"),
+        history_data=history_data,
+        pipeline_data=pipeline_data,
+    )
+    if _pf_data is not None and pipeline_data is not None:
+        pipeline_data["prosperity_framework_data"] = _pf_data
 
     # ── 6. HTML 报告 ──
     # 成本流水数据（fund_flow_data）：复用 excel_market_data 组装逻辑，
@@ -781,6 +722,10 @@ def _generate_report_full(
         (pipeline_data or {}).get("valuation_data"),
         (pipeline_data or {}).get("market_temperature_data"),
         (pipeline_data or {}).get("decision_review_data"),
+        prosperity_framework_data=(pipeline_data or {}).get("prosperity_framework_data"),
+        enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
+        financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
+        financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
     )
 
     # ── 7. Excel 报告 ──
@@ -808,6 +753,7 @@ def _generate_report_full(
         _enable_cost_lots,
         transactions,
         dividends,
+        enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
     )
 
     result.news_ok = news_ok

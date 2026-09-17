@@ -98,7 +98,7 @@ class TestMergeLlmDefaults(unittest.TestCase):
     def test_debate_defaults_preserved(self):
         """debate 段缺失 → 默认值保留（schema 校验由 _load_debate_config 兜底）。"""
         merged = self._merge({})
-        self.assertEqual(merged["debate"]["max_total_tokens_per_report"], 48000)
+        self.assertEqual(merged["debate"]["max_total_tokens_per_report"], 72000)
         self.assertEqual(merged["debate"]["qa_concentration"]["threshold"], 0.20)
 
 
@@ -710,7 +710,7 @@ class TestValidateReportSectionOrder(unittest.TestCase):
             {
                 "report_section_order": {
                     "summary": 1,
-                    "fund_manager": 6,
+                    "position_structure": 5,
                     "global_macro": 12,
                 }
             }
@@ -744,7 +744,7 @@ class TestValidateReportSectionOrder(unittest.TestCase):
 
     def test_duplicate_number_warns(self):
         """重复序号 → 1 问题（仅第二次出现时告警）。"""
-        n = cfg.validate_config({"report_section_order": {"summary": 1, "fund_manager": 1}})
+        n = cfg.validate_config({"report_section_order": {"summary": 1, "position_structure": 1}})
         self.assertEqual(n, 1)
 
     def test_llm_usage_in_config_warns(self):
@@ -759,7 +759,7 @@ class TestValidateReportSectionOrder(unittest.TestCase):
                 "report_section_order": {
                     "unknown_key": 1,
                     "summary": "abc",
-                    "fund_manager": -3,
+                    "position_structure": -3,
                 }
             }
         )
@@ -804,7 +804,7 @@ class TestDefaultConfigTemplateConsistency:
                     f"cache_ttl 键集不一致: {parsed['cache_ttl'].keys() ^ cfg._DEFAULT_CONFIG['cache_ttl'].keys()}"
                 )
                 for k in parsed["cache_ttl"]:
-                    assert type(parsed["cache_ttl"][k]) == type(cfg._DEFAULT_CONFIG["cache_ttl"][k]), (
+                    assert type(parsed["cache_ttl"][k]) is type(cfg._DEFAULT_CONFIG["cache_ttl"][k]), (
                         f"cache_ttl.{k} 类型不匹配: {type(parsed['cache_ttl'][k])} vs {type(cfg._DEFAULT_CONFIG['cache_ttl'][k])}"
                     )
             if key in _PATH_KEYS_IN_TEMPLATE:
@@ -846,6 +846,48 @@ class TestLlmSettingsTemplateConsistency:
             f"值差异: {[k for k in parsed if parsed.get(k) != _DEFAULT_LLM_SETTINGS.get(k)]}"
         )
 
+    @pytest.mark.unit_config
+    def test_module_labels_derived_from_registry(self):
+        """模块显示名取自中央注册表，不得另存副本。
+
+        历史缺陷：模板注释里的模块名是与注册表并存的第三份硬编码 —— 注册表改名
+        或新增模块时它不跟着动，生成的模板注释与实际模块名静默不一致。
+        """
+        from src.python.config import _llm_settings_defaults as d
+        from src.python.core.registry import get_llm_module_names, get_known_enabled_llm_keys
+
+        assert d._MODULE_LABELS == get_llm_module_names(), (
+            "模板模块名与注册表不一致：模板独有 "
+            f"{d._MODULE_LABELS.keys() - get_llm_module_names().keys()}，"
+            f"注册表独有 {get_llm_module_names().keys() - d._MODULE_LABELS.keys()}"
+        )
+        # enabled_llm 的每个子键都必须能在注册表里查到显示名（否则模板注释退化为裸键名）
+        missing = get_known_enabled_llm_keys() - d._MODULE_LABELS.keys()
+        assert not missing, f"enabled_llm 子键在注册表中无显示名: {sorted(missing)}"
+
+    @pytest.mark.unit_config
+    def test_template_module_titles_match_registry(self):
+        """模板中每个「<显示名> — <模块>」区块标题的显示名须与注册表一致（渲染结果层锁定）。"""
+        import re
+
+        from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS, _get_default_llm_settings_template
+        from src.python.core.registry import get_llm_module_name
+
+        template = _get_default_llm_settings_template()
+        titles = {
+            module: label for label, module in re.findall(r"^\s*//\s*(.+?)\s+—\s+([a-z_]+)\s*$", template, re.MULTILINE)
+        }
+        assert titles, "模板中未找到任何模块区块标题，正则或模板格式已变"
+
+        for module, label in titles.items():
+            assert label == get_llm_module_name(module), (
+                f"模板区块标题 {label!r} 与注册表 {get_llm_module_name(module)!r} 不一致（模块 {module}）"
+            )
+        # 每个 enabled_llm 子键都应有对应的配置区块
+        assert _DEFAULT_LLM_SETTINGS["enabled_llm"].keys() <= titles.keys(), (
+            f"以下模块在模板中缺少配置区块: {sorted(_DEFAULT_LLM_SETTINGS['enabled_llm'].keys() - titles.keys())}"
+        )
+
 
 class TestIsEnablePortfolioEvolution(unittest.TestCase):
     """is_enable_portfolio_evolution 访问器测试（组合演进章节开关）。"""
@@ -868,126 +910,6 @@ class TestIsEnablePortfolioEvolution(unittest.TestCase):
         self.assertTrue(cfg.is_enable_portfolio_evolution({"enable_fund_deep_analysis": False}))
         self.assertFalse(
             cfg.is_enable_portfolio_evolution({"enable_fund_deep_analysis": True, "enable_portfolio_evolution": False})
-        )
-
-
-class TestIsEnableDataQuality(unittest.TestCase):
-    """数据质量仪表盘子模块开关（report_submodules.data_quality，默认开）。"""
-
-    def test_default_true_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认开启（长期可信核心）。"""
-        self.assertTrue(cfg.is_enable_data_quality({}))
-        self.assertTrue(cfg.is_enable_data_quality({"enable_fund_deep_analysis": True}))
-
-    def test_true_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 默认开启。"""
-        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": "not-a-dict"}))
-        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": None}))
-
-    def test_default_config_says_enabled(self):
-        """默认配置模板 report_submodules.data_quality=True（默认开启的事实来源）。"""
-        self.assertTrue(cfg._config_defaults._DEFAULT_CONFIG["report_submodules"]["data_quality"])
-
-    def test_false_when_disabled(self):
-        """report_submodules.data_quality=false → 关闭。"""
-        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": {"data_quality": False}}))
-
-    def test_true_when_enabled(self):
-        """report_submodules.data_quality=true → 开启。"""
-        self.assertTrue(cfg.is_enable_data_quality({"report_submodules": {"data_quality": True}}))
-
-    def test_independent_from_other_submodules(self):
-        """data_quality 开关独立于同容器其他键。"""
-        self.assertTrue(
-            cfg.is_enable_data_quality({"report_submodules": {"data_quality": True, "industry_beta": False}})
-        )
-        self.assertFalse(cfg.is_enable_data_quality({"report_submodules": {"data_quality": False, "tail_risk": True}}))
-
-
-class TestIsEnableCandidateCompare(unittest.TestCase):
-    """候选基金比较子模块开关（report_submodules.candidate_compare）。"""
-
-    def test_default_false_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
-        self.assertFalse(cfg.is_enable_candidate_compare({}))
-        self.assertFalse(cfg.is_enable_candidate_compare({"enable_fund_deep_analysis": True}))
-
-    def test_false_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 关闭。"""
-        self.assertFalse(cfg.is_enable_candidate_compare({"report_submodules": "not-a-dict"}))
-        self.assertFalse(cfg.is_enable_candidate_compare({"report_submodules": None}))
-
-    def test_false_when_disabled(self):
-        """report_submodules.candidate_compare=false → 关闭。"""
-        self.assertFalse(cfg.is_enable_candidate_compare({"report_submodules": {"candidate_compare": False}}))
-
-    def test_true_when_enabled(self):
-        """report_submodules.candidate_compare=true → 开启。"""
-        self.assertTrue(cfg.is_enable_candidate_compare({"report_submodules": {"candidate_compare": True}}))
-
-    def test_independent_from_other_submodules(self):
-        """candidate_compare 开关独立于同容器其他键。"""
-        self.assertTrue(
-            cfg.is_enable_candidate_compare({"report_submodules": {"candidate_compare": True, "data_quality": False}})
-        )
-
-
-class TestIsEnableCostLots(unittest.TestCase):
-    """成本流水子模块开关（report_submodules.cost_lots，默认关）。"""
-
-    def test_default_false_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
-        self.assertFalse(cfg.is_enable_cost_lots({}))
-        self.assertFalse(cfg.is_enable_cost_lots({"enable_fund_deep_analysis": True}))
-
-    def test_false_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 关闭。"""
-        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": "not-a-dict"}))
-        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": None}))
-
-    def test_false_when_disabled(self):
-        """report_submodules.cost_lots=false → 关闭。"""
-        self.assertFalse(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": False}}))
-
-    def test_true_when_enabled(self):
-        """report_submodules.cost_lots=true → 开启。"""
-        self.assertTrue(cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True}}))
-
-    def test_independent_from_other_submodules(self):
-        """cost_lots 开关独立于同容器其他键。"""
-        self.assertTrue(
-            cfg.is_enable_cost_lots({"report_submodules": {"cost_lots": True, "candidate_compare": False}})
-        )
-
-
-class TestIsEnableIndustryBeta(unittest.TestCase):
-    """行业 Beta 子模块开关（report_submodules.industry_beta）。"""
-
-    def test_default_false_when_missing(self):
-        """config 缺失或 report_submodules 缺失 → 默认关闭（向后兼容）。"""
-        self.assertFalse(cfg.is_enable_industry_beta({}))
-        self.assertFalse(cfg.is_enable_industry_beta({"enable_fund_deep_analysis": True}))
-
-    def test_false_when_submodules_not_dict(self):
-        """report_submodules 非 dict → 关闭。"""
-        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": "not-a-dict"}))
-        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": None}))
-
-    def test_false_when_disabled(self):
-        """report_submodules.industry_beta=false → 关闭。"""
-        self.assertFalse(cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": False}}))
-
-    def test_true_when_enabled(self):
-        """report_submodules.industry_beta=true → 开启。"""
-        self.assertTrue(cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": True}}))
-
-    def test_independent_from_other_submodules(self):
-        """industry_beta 开关独立于同容器其他键。"""
-        self.assertTrue(
-            cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": True, "data_quality": False}})
-        )
-        self.assertFalse(
-            cfg.is_enable_industry_beta({"report_submodules": {"industry_beta": False, "market_temperature": True}})
         )
 
 
@@ -1049,3 +971,106 @@ class TestIsEnableAction(unittest.TestCase):
         """行动建议开关独立于组合演进开关。"""
         self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": True}))
         self.assertTrue(cfg.is_enable_action({"enable_portfolio_evolution": False, "enable_action": True}))
+
+
+class TestDatasinkFeatureGate:
+    """DataSinking 数据底座门禁：配置位 + 凭据双条件（纯本地判定）。"""
+
+    def test_enabled_flag_default_true_when_section_missing(self):
+        from src.python.config import is_enable_datasink
+
+        assert is_enable_datasink({}) is True
+        assert is_enable_datasink({"datasink": {}}) is True
+        assert is_enable_datasink({"datasink": {"enabled": True}}) is True
+        assert is_enable_datasink({"datasink": {"enabled": False}}) is False
+
+    def test_feature_ready_requires_enabled_and_credential(self, monkeypatch):
+        import src.python.core.datasource_credential as cred
+        from src.python.config import datasink_feature_ready
+
+        monkeypatch.setattr(cred, "missing_credential", lambda _sid: None)
+        assert datasink_feature_ready({"datasink": {"enabled": True}}) is True
+        assert datasink_feature_ready({"datasink": {"enabled": False}}) is False
+
+        monkeypatch.setattr(cred, "missing_credential", lambda _sid: object())
+        assert datasink_feature_ready({"datasink": {"enabled": True}}) is False
+
+    def test_default_config_has_enabled_true(self):
+        from src.python.config._config_defaults import _DEFAULT_CONFIG
+
+        assert _DEFAULT_CONFIG["datasink"]["enabled"] is True
+
+
+class TestReportGroupSwitches:
+    """报告章节与增强开关：功能开关注册表为唯一真源（GROUP_REPORT）。"""
+
+    KEYS = (
+        "data_quality",
+        "industry_beta",
+        "candidate_compare",
+        "cost_lots",
+        "valuation_percentile",
+        "market_temperature",
+        "financial_report_digest",
+        "market_sentiment",
+        "financial_indicator",
+    )
+
+    def test_registry_group_covers_exactly_these_keys(self):
+        from src.python.config.features import GROUP_REPORT, switches_in_group
+
+        assert tuple(flag for flag, _d in switches_in_group(GROUP_REPORT)) == self.KEYS
+
+    def test_accessor_matches_registry_default(self):
+        """每个开关的访问器取值 == 注册表默认值（缺键回落由注册表统一表达）。"""
+        from src.python.config import _core
+        from src.python.config.features import feature_switch_registry
+
+        for flag in self.KEYS:
+            accessor = getattr(_core, f"is_enable_{flag}")
+            assert accessor() is bool(feature_switch_registry[flag].default), flag
+
+    def test_accessor_follows_runtime_override(self):
+        """运行时覆盖（features.json / --feature）即时反映到访问器。"""
+        from src.python.config import is_enable_financial_indicator
+        from src.python.config.features import set_feature_enabled
+
+        assert is_enable_financial_indicator() is False
+        set_feature_enabled("financial_indicator", True)
+        assert is_enable_financial_indicator() is True
+
+    def test_config_json_no_longer_carries_report_submodules(self):
+        from src.python.config import get_config
+
+        assert "report_submodules" not in get_config()
+
+    def test_config_argument_is_ignored(self):
+        """config 形参仅为兼容签名保留，不再参与取值。"""
+        from src.python.config import is_enable_market_temperature
+
+        assert is_enable_market_temperature({}) is True
+        assert is_enable_market_temperature({"report_submodules": {"market_temperature": False}}) is True
+
+
+class TestReportSectionOrderTemplateMatchesRegistry:
+    """配置模板的 report_section_order 与注册表出厂默认同序（章节合并后一致性锁定）。"""
+
+    @pytest.mark.unit_config
+    def test_template_section_order_matches_registry_defaults(self):
+        """模板/默认配置的 report_section_order（若有）必须与注册表默认序号一致。"""
+        import json
+        import re
+
+        from src.python.config import _config_defaults as d
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT, get_report_section_keys
+
+        template = d._get_default_config_template()
+        m = re.search(r'"report_section_order":\s*(\{.*?\})', template, re.S)
+        assert m, "模板未包含 report_section_order"
+        order = json.loads(m.group(1))
+        if not order:  # 空 {} = 使用默认顺序，天然一致
+            return
+        defaults = {s["key"]: s["number"] for s in _REPORT_SECTION_DEFAULT}
+        assert set(order) <= get_report_section_keys(), f"模板含未知模块: {set(order) - get_report_section_keys()}"
+        for key, num in order.items():
+            assert defaults[key] == num, f"{key} 模板序号 {num} != 注册表默认 {defaults[key]}"

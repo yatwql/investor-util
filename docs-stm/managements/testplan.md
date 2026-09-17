@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.10.16
+> 文档版本：0.11.1-dev
 
 ---
 
@@ -32,6 +32,7 @@
 | `core/reader.py` | 标准格式 + 7 种异常 | 空文件、缺列、多工作表、全空行、数值类型转换失败、zip 损坏、临时文件（~$前缀自动跳过） |
 | `cache/` 子包 | 过期判断、读写、清理 | 原子写入、损坏恢复、TTL 边界（0s/1s/过期1s）、前缀匹配、并发 access、gzip 透明解压 |
 | `providers/*.py` | mock HTTP + 异常 | 200 正常 / 空数据 / 超时 / 429 / 503 / JSON 格式错误 / HTML 而非 JSON / 空响应 / 字段缺失 / 编码异常 |
+| `providers/tiantian_holdings.py` | 三跳阶梯次序 + 锚点解析 | **次序不变量**：第 1 跳命中即不请求主页面、第 2 跳请求失败即返 None 不落第 3 跳、第 3 跳仅在「第 2 跳无持仓且无目标 ETF 锚点」时到达、联接基金在第 2 跳即返回故第 3 跳**不可达**（回归锁定「兜底不得遮蔽联接基金」）；第 2 跳 `date=""`（报告期不从主页面取）；`parse_feeder_target_etf` 正反例——**常规 ETF 页的反向链接「查看相关ETF联接」必须被拒**（两重区分各测一遍）、锚点指向自身、目标非场内代码、无标签链接；`_extract_fund_name` 无括号标题返回空串 |
 | `llm/` 包 | 全路径覆盖 | API 路由、Provider 回退、截断检测+自动重试、空内容安抚重试、熔断器、缓存命中/未命中、Extended Thinking 注入/降级、thinking 耗尽自动重试（关闭 thinking 同 provider 重试一次，仍失败才切换）、thinking 并发信号量（`llm_max_thinking_concurrency` 串行化，`TestThinkingConcurrencyLimit`）、指纹确定性 |
 | `llm/` — 辩论模式 | 6 文件专项覆盖 | `test_debate_generators.py`（三段生成流程 pro→con→synthesis 控制）、`test_debate_prompts.py`（提示词模板/合成提示/集中度问答块）、`test_debate_token_budget.py`（Token 预算守卫 1×/2× 阈值）、`test_debate_edge.py`（边缘测试文件隔离 合规边缘场景 11 项）、`test_debate_conditional.py`（条件推理场景注入）、`test_debate_qa.py`（集中度问答阈值触发） |
 | `report/*.py` | 正常 + 空数据 + 边界 | 单条持仓、最大 100 条持仓、零成本/零市值、全亏损、全盈利、混合账户 |
@@ -40,7 +41,7 @@
 | `tui/handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
 | `tui/tui_menu.py` | 所有 20 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航、开关门控项 `[D]` 的裁剪与还原 |
 | `analysis/correlation.py` | Pearson 相关矩阵计算+降级 | 已知答案（r=±1/缩放不变）、不显著配对、下三角布局、配对 |r| 降序、数据不足/单品种/无有效收益降级、名称回退、数据契约键、NaN/Inf/None 过滤、重复日期去重、日期缺口对齐、极大幅值钳位、多品种大矩阵 |
-| `report/correlation_sheet.py` | 相关性页签 Excel 呈现 | 矩阵/配对/说明三区齐全、下三角+对角+上三角空、N/A 格、available=False/None 占位、配对 |r| 降序 |
+| `report/position_structure_sheet.py` | 重合度/相关性/集中度三区块 Excel 呈现 | 矩阵/配对/说明三区齐全、下三角+对角+上三角空、N/A 格、available=False/None 占位、配对 |r| 降序 |
 | `report/report_template.html`（correlation 模块） | 相关性章节 HTML 呈现 | 汇总卡+相关度最高+热力矩阵+配对明细、单元格样式分支（强正/强负/不显著/N/A）、不足品种提示、available=False 降级占位、correlation_data=None 章节隐藏 |
 | `analysis/portfolio_evolution.py` | 多快照趋势聚合计算 | 多账户合并、快照缺市值回退成本权重、HHI 计算、TOP 持仓变迁、快照数不足 available=False、历史快照容错跳过 |
 | `report/evolution_sheet.py` + `report_template.html`（evolution 模块） | 组合演进双端呈现 | 汇总/总市值/HHI/TOP/账户流/说明顺序、多账户流表、单账户无流表、HHI 无效期记 "-"、available=False 占位、evolution_data=None 章节隐藏、enable_portfolio_evolution=False 章节隐藏（board 层）、3 图各带 .chart-caption（图下说明） |
@@ -58,7 +59,8 @@
 
 | Edge Case 类型 | 示例 | 验证点 |
 |:---------------|:-----|:-------|
-| **零值边界** | 成本=0、市值=0、份额=0、收益率=NaN | 不抛出 ZeroDivisionError，输出 `0.0` 或 `--` |
+| **零值边界** | 成本=0、市值=0、份额=0 | 不抛出 ZeroDivisionError，输出 `0.0` 或 `--` |
+| **非有限数值** | 解析结果为 `float("nan")` / `float("±inf")`（上游脏值、除零派生） | **不抛异常**——`try: float(x) except` 与 `or 0.0` 对二者均**兜不住**（NaN 参与比较恒 False、`or` 不把 NaN 当假）；必须经 `core/num_utils.safe_num` 显式拦下，验证点见 `test_numeric_guard_regression.py` |
 | **极大/极小值** | 市值超 1e12、成本=0.0001、份额=1e8 | 数值不溢出，`_fmt_wan()` 正确定标 |
 | **空数据集** | 空持仓文件、空 API 响应、空缓存文件、空新闻列表 | 不崩溃，输出合理占位 |
 | **单条/极限大** | 1 条持仓 vs 1000 条持仓 | 前者不空转，后者有时间保护（不超时） |
@@ -156,11 +158,11 @@
 
 单元测试按被测模块分组，通过 **父子双层 marker** 实现灵活筛选：
 
-- **父标记 `unit`** 匹配全部 12 个已注册 `unit_*` 子标记（providers/fetcher/llm/news/report/config/config_edge/core/cli/ui/analysis/scripts，其中 `unit_config_edge` 为预留、暂无测试使用），用于全量单元测试运行（`-m "unit"`）
+- **父标记 `unit`** 匹配全部 12 个已注册 `unit_*` 子标记（providers/fetcher/llm/news/report/config/core/cli/ui/analysis/scripts/web，其中 `unit_web` 为 Web 入口层），用于全量单元测试运行（`-m "unit"`）
 - **子标记**如 `unit_providers`、`unit_fetcher`、`unit_llm` 等支持单独运行指定模块的测试（`-m "unit_providers"`）
 - 新增单元测试文件时，必须为其测试类标注子标记和父标记，缺一不可
 
-**跨类标记**（如 `llm`、`edge`、`smoke`）不依附于父子层级，可跨越单元/场景分类独立筛选。
+**跨类标记**（如 `llm`、`edge`、`smoke`、`data`、`cassette`、`live`）不依附于父子层级，可跨越单元/场景分类独立筛选。其中 `cassette` 声明用例所需的已录制真实响应（离线回放），`live` 为 opt-in 真实网络套件（默认跳过、不入门禁，仅 `--run-live` 或 `-m live` 运行）。
 
 各标记的定义、覆盖规模和典型耗时见 [`test-coverage.md`](./test-coverage.md) → 单元测试分组 / 跨类标记。
 
@@ -176,7 +178,7 @@
 | **数据流完整链路**：持仓 xlsx → 数据获取 → 缓存 → Excel/HTML 输出 | ✅ | `test_scenario_basic_flows.py` S1-S5 |
 | **Provider 回退链路端到端**：腾讯不可用 → 东方财富 → 过期缓存 | ✅ | `test_chain.py` |
 | **缓存与 API 协同**：缓存命中不调 API，缓存缺失调 API 并写入 | ✅ | `test_cache_core.py` / `test_cache_format.py` |
-| **原子写入恢复**：磁盘满/断电后缓存和配置文件完整性 | ✅ | `test_config_atomic.py` |
+| **原子写入恢复**：磁盘满/断电后缓存和配置文件完整性 | ✅ | `test_config_atomic.py`（配置层）+ `core/test_atomic_write.py`（原语：新建/覆盖/父目录创建/临时文件不残留/失败返回 False 且不抛并保留原内容/Windows 占用回退 rename） |
 | **模块间接口契约**：reader 输出 → market_value 输入 → penetration 输入 → ... 类型链正确 | ✅ | `test_module_contract.py` |
 | **错误隔离**：penetration/LLM/news_correlation 任一模块失败，不阻塞其他模块写入 | ✅ | `test_excel_generator.py` `test_sheet_exception_others_still_called` |
 | **LLM 输出→报告渲染**：Markdown → HTML/Jinja2 → 条件段落的渲染链路 | ✅ | `test_llm_module_info.py` / `test_llm_disabled.py` 等 |
@@ -185,6 +187,8 @@
 | **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ✅ | `test_tui_routing.py` |
 | **辩论管线集成**：orchestrator 辩论路由 _debate_wrapper → _debate_info_container → 8/9 元组返回 → HTML/Excel 渲染 | ✅ | `test_debate_pipeline.py` |
 | **Provider 降级链路**：断网/超时/异常响应 → 回退/熔断/降级占位（真实联通性由运行时治理，非门禁） | ✅ | `test_scenario_resilience_flows.py`（S7）/ T15/T16 / provider edge |
+| **联接基金穿透跨接缝**：取数层解析目标 ETF → fetcher 层以目标持仓代理 → 报告层登记来源并标注报告期 | ✅ | `test_fund.py` `TestWithFeederPenetration` + `test_penetration.py` / `test_penetration_sheet.py` |
+| **缓存预检接缝**：批量取数缓存命中时任务不执行，穿透仍须生效（幂等后处理在两处接缝调用） | ✅ | `test_fund.py` `TestFetchFundHoldingsBatch.test_penetration_applied_on_cache_hit` |
 
 ### 1.6 异常场景全覆盖
 
@@ -246,7 +250,7 @@
 | 场景 | 前置条件 | 操作 | 预期结果 |
 |------|----------|------|----------|
 | **T7: 国内场外基金** | 含多只国内场外基金 | 菜单 L | 净值日期标记 T 日（15:00 后）或 T-1（15:00 前）；本日盈亏仅当净值日期=T 时计算 |
-| **T8: QDII 场外基金** | 含 QDII 基金（美股/港股方向） | 菜单 L | 净值日期通常 T-2（跨境延迟）；估值净值与官方净值差异字段标记正确；美元份额币种转换 |
+| **T8: QDII 场外基金** | 含 QDII 基金（美股/港股方向） | 菜单 L | 净值日期通常 T-2（跨境延迟）；估值净值与官方净值差异字段标记正确；市值按数据源返回的净值（已为人民币计值）× 份额直接计算，不做汇率折算 |
 | **T9: 场内 ETF/LOF** | 含 ETF/LOF 持仓 | 菜单 E | 盘中实时价更新；盘后收盘价固化；IOPV/溢价率计算；振幅/换手率字段正确 |
 | **T10: 股票持仓** | 含 A 股股票 | 菜单 E | 实时价（盘中）/ 昨收（盘前盘后）；PE/PB/总市值等基本面字段盘后才更新 |
 | **T11: 混合持仓** | 同时含场外+场内+股票 | 菜单 B | 各类型行情获取互不干扰；市值核算中价格来源标识正确；报告完整无遗漏 |
@@ -267,7 +271,7 @@
 |------|----------|------|----------|
 | **T17: 跨月/跨年报告** | 12 月 31 日和 1 月 2 日分别生成 | `get_last_trading_day` 调用 | 跨年行情数据连续性正确，get_last_trading_day 返回正确日期 |
 | **T18: 季末/年末效应** | 基金季末调仓日前后净值跳变 | 菜单 E | 大额净值变动时 today_profit 计算正确、profit_rate 无除零异常 |
-| **T19: 汇率中间价故障** | 美元/港币汇率数据暂不可用 | 菜单 L（含 QDII 持仓） | QDII 净值降级为 T-1，不崩溃，today_profit=0 |
+| **T19: 场外品种净值日期非 T 日** | QDII/场外基金净值为 T-1 或 T-2（跨境延迟、非交易日运行等） | 菜单 L（含 QDII 持仓） | 本日盈亏为 0（仅净值日期 = 最近交易日才计当日盈亏）、市值照常核算、不崩溃 |
 | **T20: 节假日调休** | 调休工作日（周日上班）vs 调休放假（周六休息） | _is_trading_day 判断 | 交易日历包含调休规则时 is_trading_day 正确识别工作日/休息日 |
 | **T21: 港股通假期差异** | A 股开市但港股通因香港假期关闭 | 菜单 E（含港股通持仓） | QDII 净值延迟 T-1，price_type 正确标记，today_profit=0 |
 
@@ -298,8 +302,8 @@
 
 | 验证项 | 方法 | 现有测试 |
 |:-------|:-----|:--------:|
-| 市值 = 最新价 × 份额 | `test_market_value_sheet.py`（市值/成本/盈亏列计算断言） | ✅ |
-| 盈亏 = 市值 - 成本 | `test_market_value_sheet.py`（盈亏列计算 + 着色断言） | ✅ |
+| 市值 = 最新价 × 份额 | `test_holdings_detail_sheet.py`（市值/成本/盈亏列计算断言） | ✅ |
+| 盈亏 = 市值 - 成本 | `test_holdings_detail_sheet.py`（盈亏列计算 + 着色断言） | ✅ |
 | 分账户小计 = 该账户持仓合计数 | `test_category.py`（账户小计聚合一致性） | ✅ |
 | 总计 = 各账户小计之和 | `test_category.py`（三维度聚合一致：账户小计之和 = 总计） | ✅ |
 | 穿透 TOP10 合并逻辑 | 构造两个基金持相同股票 + 直接持有 | ✅ |
@@ -311,7 +315,7 @@
 | **三维度分类聚合一致**：资产属性/投资分类/账户的小计各自 = 总计 | 三类分类各自独立聚合，交叉验证无遗漏/无重复 | ✅ `test_data_integrity.py` |
 | **穿透行业占比归一化**：各行业占比之和 ≤ 100% | 穿透行业分布验证 | ✅ `test_data_integrity.py` |
 | **指数行情数值合理**：上证≈3000、沪深300≈4000、恒指≈20000、标普≈5000 | 数量级确认，非精确值 | ✅ `test_data_integrity.py` |
-| **多币种转换正确**：美元份额 × 汇率中间价 = 人民币市值 | 构造美元/港币持仓，验证币种转换 | ✅ `test_data_integrity.py` |
+| **非人民币计价品种市值核算**：按数据源价格 × 份额直接计市值（程序不做汇率折算） | 构造 QDII / 港股通持仓，验证市值与币种敞口分类 | ✅ `test_data_integrity.py` + `test_market_value.py` |
 | **QDII 估值净值 vs 官方净值关系**：估值净值 ≥ 0，官方净值延迟 T-2 | 双列数值关系合理性断言 | ✅ `test_data_integrity.py` |
 | **基金业绩排名数据合理性**：排名/收益率在 0-100% 范围内 | 天天基金排名数值验证 | ✅ `test_data_integrity.py` |
 
@@ -321,7 +325,7 @@
 
 | 验证项 | 标准 | 现有测试 |
 |:-------|:-----|:--------:|
-| **TUI 菜单** | 17 选项完整、中文字符正常、按键响应正确 | ✅ |
+| **TUI 菜单** | 20 选项完整、中文字符正常、按键响应正确 | ✅ |
 | **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
 | **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | ✅ |
 | **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | ✅ | `test_tui_edge.py` |
@@ -341,7 +345,7 @@
 | **LLM 缓存提示** | 缓存命中显示灰字"本次使用LLM缓存" | ✅ |
 | **报告文件管理** | 按日期归档、文件名含时间戳、不覆盖旧报告，自动清理 180 天前归档 | ✅ |
 | **首次运行引导** | 配置缺失时提示操作步骤而非直接报错 | ✅ | `test_config_firstrun_edge.py` |
-| **Web 配置编辑** | 配置面板 7 组可编辑项与 TUI 全集一致、即改即存、写前 `.bak` 备份、非法键 400 / 非同一来源 403、极端输入不落盘 | ✅ | `test_config_edit.py` / `test_config_edit_edge.py` / `smoke-web.py` 配置编辑检查（11 项断言） |
+| **Web 配置编辑** | 配置面板 8 块可编辑项（白名单 7 组，功能开关组分两块）与 TUI 全集一致、即改即存、写前 `.bak` 备份、非法键 400 / 非同一来源 403、极端输入不落盘 | ✅ | `test_config_edit.py` / `test_config_edit_edge.py` / `smoke-web.py` 配置编辑检查（11 项断言） |
 
 ---
 
@@ -354,14 +358,25 @@
 
 | 优先级 | 回归范围 | 触发条件 | 备注（自动化覆盖） |
 |:------:|:---------|:---------|:-----|
-| **P0** | `python scripts/test-runner.py --mode dev-verify` 通过（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量） | **任何代码变更** | 提交前极速验证 |
+| **P0** | `.venv/bin/python scripts/test-runner.py --mode dev-verify` 通过（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量） | **任何代码变更** | 提交前极速验证 |
 | **P0** | 已修复 Bug 的回归用例 | Bug 修复（MUST 补充） | 验证缺陷场景的断言 |
-| **P0** | 测试隔离验证：`pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
+| **P0** | 测试隔离验证：`.venv/bin/python -m pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
 | **P1** | 报告生成完整性（菜单 E/B/L 全链路） | config / report / html / llm 变更 | `scenario_basic` 管线冒烟/指标注入 + 场景测试（Excel 页签完整、不崩溃） |
 | **P1** | Excel 报告视觉质量 | 颜色/格式/样式相关变更 | `test_excel_writer.py` / `test_summary.py`（盈亏着色、评级色、LLM 状态色、冻结首行） |
+| **P1** | 报告章节合并（同页签多区块 + 多契约 OR 可见性 + 块级开关） | 注册表条目 / 章节键 / 页签写入器 / HTML 模板或 partial / board_flags 变更 | `test_holdings_detail_sheet.py` / `test_position_structure_sheet.py` / `test_fundamental_snapshot_sheet.py`（各合并章：章名与区块小节标题同页签、区块行值与独立写入**逐格等价**、契约 None 的块级门控）+ `test_section_visibility.py`（`data_flag_any` 多契约 OR：单契约就绪即可见、两者皆无隐藏）+ `test_section_type_flag_consistency.py`（注册表 type ↔ 两侧 board_flags ↔ 写入器装配键一致，防旧 type/旧模块键残留）+ `test_report_chapter_consistency.py`（Excel 页签与 HTML 章节两侧可见集合一致）+ `test_fund_performance_manager_block.py`（经理变更块随基金深度分析门控）。**回归防线**：合并章若漏改任一侧可见性、装配键或 board_flags，两侧一致性/一致性守卫用例立刻失败（实施期即由此捕获 `rf-367`） |
+| **P1** | 景气度框架诊断（实验性功能） | 分析框架/评分口径/关键词配置/行动建议章渲染变更 | `test_prosperity_framework.py`（六维计分、缺数据降级为未验证且不计分、总分口径与评级边界、配置覆盖）+ `test_prosperity_framework_edge.py`（空/None/零/异常类型/全防御/未知板块/极端集中度/负收益）+ `test_prosperity_framework_wiring.py`（开关关 → 契约缺席且双端无块；开 → 契约注入、Excel/HTML 块与契约一致）。**回归防线**：开关关闭时报告必须逐字节不变；缺数据维度若被算成得分（臆造）立即失败 |
 | **P1** | HTML 报告渲染结构 | html_writer / template 变更 | `test_html_report_structure.py`（中文不乱码、章节锚点、LLM 条件消失/出现） |
 | **P1** | 缓存刷新/清理/统计（菜单 [1][2][3][4]） | cache / handlers / registry 变更 | `test_handlers_cache.py` / `test_tui_handlers.py`（刷新/清理/统计不崩溃） |
 | **P1** | Provider 降级链路 | providers / fetcher 变更 | 熔断/回退/断网降级测试（S7/T15/T16 + provider edge 用例）；实际联通性由运行时 Provider Chain 回退 + 熔断治理，非门禁 |
+| **P1** | 基金持仓取数阶梯次序与联接基金穿透 | providers / fetcher / report 的持仓取数路径变更 | `test_tiantian.py` `TestFetchFundHoldingsLadder`（次序不变量：第 1 跳命中不发主页面请求、联接基金不可达第 3 跳）+ `test_fund_edge.py`（批量接缝幂等/异常不外抛）+ `test_penetration.py`（穿透来源登记）。**次序回归防线**：把无年份兜底提回与年份域并列，联接基金会被最早可得报告遮蔽，本组用例立刻失败 |
+| **P1** | 数据源**真实响应体**解析路径（cassette 离线回放） | providers / fetcher 的解析或归一路径变更 | `test_cassette_replay.py`（对上仓库录制的真实响应体做精确值断言，离线）；人工核验入口 `cassettes --verify`（解析器吃不下已录制响应体即报 `[ERR]` 并退出码 2）。上游字段改名/加前后缀/返回 HTML 错误页这类回归**只有真实响应体测得出**，手工构造的假响应测不出 |
+| **P1** | 真实历史估值分位（TTM 口径） | `analysis/valuation_percentile`（`compute_real_valuation`/`ttm_eps_by_period`/`disclosure_date`）、`report/orchestrator`（`_fetch_valuation_for_code`）、`report/penetration_sheet` 估值文案变更 | `test_valuation_percentile.py`（TTM 四类差分/披露生效日/落盘对齐**无前视**/PB 时点/亏损剔除/分位与档位/各类降级）+ `test_valuation_percentile_edge.py`（脏值/非正与不可解析价格/生效日边界/空序列）+ `test_valuation_temperature_wiring.py`（真实分位优先与口径标注、无基本面回落代理、取数异常收敛）。**关键回归**：生效日之前的历史价格**不得**参与估值序列（前视偏差是本口径最大的正确性风险）；数据底座未就绪时估值列文案与免责语须**逐字回原样**且不取数。另有提示词侧 `test_prompts_signals.py`（五路信号：基本面分布与方向、叙事-数字背离双向命中与「无背离不得出现要求行」、信号块指纹随内容变化） |
+| **P1** | 财务指标取数（主源 + 全文解析备用支路） | `providers/akshare_financial`、`analysis/financial_indicator_extract`、`fetcher/financial_indicator_adapters`、`fetcher/chain`（`financial_indicator` 链）变更 | `test_akshare_financial.py`（宽表归一/百分数换算/同名指标优先/降级）+ `test_financial_indicator_extract.py`（真实年报夹具逐字段复现：营收 862.42 亿、归母净利 345.03 亿、经营现金流 605.63 亿、EPS 1.4101、ROE 15.90%、同比 2.07%/6.17%；另有行文变体/单位换算/精度切分/扣非排除）+ `test_financial_indicator_extract_edge.py`（取值窗口边界/异常幅度/越界比率/零基数同比/截断正文）+ `test_financial_indicator.py`（链路顺序与降级、解析适配器逐章节试取与源身份注入、多期序列主源/退化单期/缓存/非 A 股不发请求/价格映射）+ 报告消费层 `test_financial_indicator.py`（契约键与 C19 登记、降级保留失败清单、质量档/趋势/PE·PB 装配、开关访问器、C7 注册与导航分组与模板 include、编排接缝开关关闭返 None 与现价贯通、穿透代码透传）+ `test_fundamental_snapshot_sheet.py`（页签数值格式与「—」占位、不可用原因与失败清单）+ 派生层 `test_financial_indicator.py`/`test_financial_indicator_edge.py`（四维阈值阶梯/缺维跳过/脏值不计分/分档边界/零基数与期数不足趋势/非正现价）。**隔离防线**：akshare 接口与 `financial_report.fetch_symbol_report` 均 mock，禁真实网络与真实密钥 |
+| **P1** | 市场情绪章内区块（纯装配只按代码命中/零命中仍出契约/开关门禁与异常兜底/双端渲染载体） | `analysis/market_sentiment.py`、`report/market_sentiment.py`、`report/action_sheet.py`、`report/_report_aux_metrics.py` | `unit/analysis/test_market_sentiment.py`、`unit/report/test_market_sentiment.py`、`unit/report/test_market_sentiment_wiring.py` | — |
+| **P1** | 行情/历史日 K 第三链路 + 交易日历官方兜底（适配器别名归一、`date_ms` 解析、增量起点、链路顺序、akshare 失败后官方序列兜底） | `providers/hithink.py`、`fetcher/quote_adapters.py`、`fetcher/chain.py`、`core/trading_calendar.py` | `unit/providers/test_hithink.py`（行情/K线）、`unit/fetcher/test_quote_adapter_hithink.py`、`unit/core/test_trading_calendar.py` | — |
+| **P1** | 财务指标第三链路（同花顺官方报表派生：口径与报告期归一、多期回退与主源优先、凭据跳过） | `analysis/financial_statement_derive.py`、`fetcher/financial_indicator_adapters.py`、`fetcher/financial_indicator.py` | `unit/analysis/test_financial_statement_derive.py`、`unit/fetcher/test_financial_indicator_hithink.py` | — |
+| **P1** | 基金持仓两源链（天天基金主 → 同花顺官方备；载荷归一 + 联接基金目标 ETF 信号，需 key 源由凭据预检跳过） | `fetcher/fund.py`、`providers/hithink.py`、`fetcher/chain.py` | `unit/fetcher/test_fund.py`（归一/链路顺序/备源接管）、`unit/providers/test_hithink.py`（候选解析/联接信号/取数入口） | — |
+| **P1** | 财报摘要取数（DataSinking 密钥/限速/配额/降级） | `providers/datasink`、`fetcher/financial_report`、`report/financial_report_digest`、`core/datasource_credential` 变更 | `test_datasink.py`（符号映射/套餐限速派生/日配额护栏/HTTP 401·429·非 200/取数原语）+ `test_financial_report.py`（标的收集/年报优先/多章节拼接/截断）+ `test_financial_report_digest.py`（降级契约/失败清单）+ `test_datasource_credential.py`（密钥文件节结构/就绪判定/环境变量优先）。**隔离防线**：密钥文件与 `data/state/datasink_quota.json` 均由 conftest 重定向到 tmp；免费档无批量端点、限速落在 provider 逐请求前 |
 | **P2** | 断网环境下自动降级 | 网络/超时/重试相关变更 | `test_scenario_resilience_flows.py::TestScenarioNetworkDown`（S7）+ T15/T16 |
 | **P2** | 清理缓存后全新运行 | provider / fetcher / cache 变更 | `test_scenario_basic_flows.py::TestScenarioNewHoldings`（S4） |
 | **P2** | 旧缓存格式兼容性验证 | cache.py / models.py 变更 | `test_cache_format.py`（gz→JSON 回退、透明读取） |
@@ -397,6 +412,12 @@ def test_fetch_price_normal(self, mock_client_cls):
 
 > 注意：provider 通过 `core/http_client.py` 创建 client（`with get_httpx_client() as client:`），
 > 应 mock `httpx.Client` 类的构造，而非直接 mock 模块函数。
+
+**真实响应体回归优先用 cassette 回放**（见 `technical.md` §2.6）。手工构造的假响应测的是
+「我以为上游长什么样」，字段改名、加前后缀、换分隔符、返回 HTML 错误页这类回归它在结构上测不出；
+对已完成记录的数据源（行情/K 线/基金净值/基金持仓），改用 `@pytest.mark.cassette("名称")` 声明所需
+夹具，运行期离线回放真实响应体、不发起网络请求。刷新夹具是显式联网动作：
+`test-runner --mode live --record-cassettes`（需 `--run-live` 同开，且仅录进 cassette 不入门禁）。
 
 ### 5.3 Mock LLM API
 
@@ -475,7 +496,7 @@ def test_get_ttl_closed(self, mock_open):
 - 测试不写磁盘配置，`config.json` 通过 `os.environ` 或 `tempfile` 隔离
 - 网络测试全部 mock，不发起真实 HTTP 请求
 - 测试间互不依赖，每个 `setUp` 清理状态
-- 每新增 test_*.py 后运行 `pytest --co` 验证无 patch 残留污染
+- 每新增 test_*.py 后运行 `.venv/bin/python -m pytest --co` 验证无 patch 残留污染
 - 不修改全局变量/环境变量（必须修改时用 `with patch.dict(os.environ, ...)`）
 
 ---
@@ -492,9 +513,9 @@ def test_get_ttl_closed(self, mock_open):
 
 ### 6.2 自动化测试门禁
 
-4. **全量 pytest 通过**：`pytest src/test/` 全部通过（0 failed, 0 error）
-5. **无测试污染**：`pytest --co` 验证无跨文件 patch 残留冲突
-6. **测试数量不降级**：新增功能后 `pytest --collect-only | tail -1` 报告的总测试数 ≥ 变更前（有删除须在 changelog.md 中说明理由）
+4. **全量 pytest 通过**：`.venv/bin/python -m pytest src/test/` 全部通过（0 failed, 0 error）
+5. **无测试污染**：`.venv/bin/python -m pytest --co` 验证无跨文件 patch 残留冲突
+6. **测试数量不降级**：新增功能后 `.venv/bin/python -m pytest --collect-only | tail -1` 报告的总测试数 ≥ 变更前（有删除须在 changelog.md 中说明理由）
 7. **测试用例 MUST**：新增功能必有对应测试用例，Bug 修复必有对应回归用例（验证缺陷场景的具体断言，非仅正常路径）
 8. **`test-coverage.md` 场景表更新**：新场景（S/Txx）必须在场景测试分组表补充条目
 
@@ -502,16 +523,16 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **P0 全通** — 不可提交代码：`python scripts/test-runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ Bug 回归用例 + 测试隔离验证（`pytest --co`）
-10. **P1 全通** — 不可合并 master：`python scripts/test-runner.py --mode verify` + §4 中 P1 级各自动化回归项全部通过（报告完整性 / Excel 视觉 / HTML 渲染 / 缓存刷新 / Provider 降级）
-11. **P2 已执行** — 可合入但不可发布：`python scripts/test-runner.py --mode verify,regression` + `python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`python scripts/test-runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行）
+9. **P0 全通** — 不可提交代码：`.venv/bin/python scripts/test-runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ Bug 回归用例 + 测试隔离验证（`.venv/bin/python -m pytest --co`）
+10. **P1 全通** — 不可合并 master：`.venv/bin/python scripts/test-runner.py --mode verify` + §4 中 P1 级各自动化回归项全部通过（报告完整性 / Excel 视觉 / HTML 渲染 / 缓存刷新 / Provider 降级）
+11. **P2 已执行** — 可合入但不可发布：`.venv/bin/python scripts/test-runner.py --mode verify,regression` + `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`.venv/bin/python scripts/test-runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行）
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
 ### 6.4 补充自动化门禁
 
 12. **异常场景全覆盖**：§1.6 异常场景清单全部 ✅（每项异常场景均有对应自动化用例，edge/resilience 标记），不允许存在仅靠人工确认的 🔴/🟡 项
 13. **报告文件视觉结构**：Excel 和 HTML 输出无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）→ `test_excel_writer.py` / `test_summary.py` / `test_html_report_structure.py`
-14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[V]/[H]/[X]）响应正确、无崩溃 → `test_tui_menu.py`（19 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
+14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[V]/[H]/[D]/[X]，其中 [D] 系统自检受 `doctor_check` 开关门控）响应正确、无崩溃 → `test_tui_menu.py`（20 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
 15. **whatif CLI**：`--candidate` 必填、`--base` 可选、缺失报参数错误、`--effective-date` 解析，生成/归档行为 → `test_cli.py::test_whatif_*` + `test_whatif_operations.py` / `test_whatif_sheet.py` / `test_whatif_html.py` / `test_whatif_writer.py`
 16. **whatif 生效日时序回测**：① 过去生效日→出「时序回测」页签/区 → `test_effective_date_merges_backtest` + `test_backtest_sheet_full` + `test_backtest_section_rendered`；② 缺省→维持现状（无回测）→ `test_no_effective_date_no_backtest_call` + `test_full_rendering_sections_without_backtest`；③ 未来/非法日期→降级占位、主报告正常 → `test_compute_backtest_days_invalid_format` / `test_compute_backtest_days_future_or_today_none` + `test_effective_date_exception_degrades` + `test_backtest_sheet_unavailable_reason_placeholder`；④ 断网/空缓存→回测不可用但报告仍生成 → `test_unavailable_returns_reason` / `test_unavailable_without_reason_falls_back` + `test_effective_date_bt_none_no_key`
 

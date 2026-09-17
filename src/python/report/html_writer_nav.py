@@ -25,17 +25,15 @@ _NAV_GROUP_LABELS: list[tuple[str, str]] = [
 
 # 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础信息」组）
 _SECTION_NAV_GROUP_MAP: dict[str, str] = {
-    # 基础信息：汇总/明细/分类/穿透/数据源可用性
+    # 基础信息：汇总/持仓明细与分类/穿透/数据源可用性
     "summary": "basic",
-    "market_value": "basic",
-    "category": "basic",
+    "holdings_detail": "basic",
     "penetration": "basic",
     "data_source_status": "basic",
+    "fundamental_snapshot": "basic",
     # 基金深度分析：基金业绩 + 基金深度分析系列章节
     "fund_performance": "fund_deep",
-    "fund_manager": "fund_deep",
-    "position_relationship": "fund_deep",
-    "fund_concentration": "fund_deep",
+    "position_structure": "fund_deep",
     "style_factor": "fund_deep",
     # 行动建议：再平衡信号/交易纪律/调仓建议/收益归因（决策建议，非风险章节）
     "action": "action",
@@ -71,11 +69,14 @@ def _compute_section_visibility(
     enable_fund_deep_analysis: bool = True,  # board 层：基金深度分析是否开启
     enable_history: bool = True,  # board 层：历史走势章节是否开启
     enable_portfolio_evolution: bool = True,  # board 层：组合演进章节是否开启
+    enable_fundamental_snapshot: bool = False,  # board 层：持仓基本面章（两功能开关任一开启）
     enable_action: bool = False,  # board 层：行动建议章节是否开启（config 默认开）
     enable_llm: bool = True,  # board 层：LLM 分析章节是否开启
     style_factor_data: dict | None = None,  # data 层：风格与因子 dict（None=无数据，章节隐藏）
     position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 dict（相关性区块数据源）
     evolution_data: dict | None = None,  # data 层：组合演进 dict（None=无数据，章节隐藏）
+    financial_report_digest_data: dict | None = None,  # data 层：财报摘要 dict（None=无数据，章节隐藏）
+    financial_indicator_data: dict | None = None,  # data 层：财务指标 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
     """计算报告模块序号 + 可见性字典 + 闭包函数。
 
@@ -92,12 +93,12 @@ def _compute_section_visibility(
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
+        "fundamental_snapshot": enable_fundamental_snapshot,  # ← board 层：持仓基本面章
         "action": enable_action,  # ← board 层：行动建议（config 默认开）
         "llm": enable_llm,  # ← board 层
     }
     # data 层：各模块数据就绪状态
     data_flags: dict[str, bool] = {
-        "manager_data": manager_analysis is not None,
         "concentration_data": concentration_analysis is not None,
         "style_data": style_analysis is not None,
         "news_data_available": include_news,  # ← data 层（菜单类型+数据状态）
@@ -111,6 +112,8 @@ def _compute_section_visibility(
         # evolution_data 同上：始终由编排层计算注入（非 None）→ 章节可见，
         # available=False 时模板写占位文本（快照不足，§1.4.5）
         "evolution_data": evolution_data is not None,
+        "financial_report_digest_data": financial_report_digest_data is not None,
+        "financial_indicator_data": financial_indicator_data is not None,
     }
 
     # 两层合并：section_visible = board_ok AND data_ok
@@ -120,8 +123,12 @@ def _compute_section_visibility(
         if not board_ok:
             section_visible_dict[sec["key"]] = False
             continue
+        flag_any = sec.get("data_flag_any")
         flag_name = sec.get("data_flag")
-        if not flag_name:
+        if flag_any:
+            # 多契约 OR（与 Excel 侧同口径，悲观判定）
+            section_visible_dict[sec["key"]] = any(data_flags.get(name, False) for name in flag_any)
+        elif not flag_name:
             section_visible_dict[sec["key"]] = True
         else:
             section_visible_dict[sec["key"]] = data_flags.get(flag_name, False)
@@ -134,7 +141,9 @@ def _compute_section_visibility(
     visible_numbers = {sec["key"]: idx for idx, sec in enumerate(ordered_visible, start=1)}
 
     # 创建渲染期 section_visible 闭包（不写入 _ENV.globals）
-    _sv_fn = lambda key, _d=section_visible_dict: bool(_d.get(key, False))
+    def _sv_fn(key: str, _d: dict[str, bool] = section_visible_dict) -> bool:
+        return bool(_d.get(key, False))
+
     return visible_numbers, section_visible_dict, _sv_fn
 
 

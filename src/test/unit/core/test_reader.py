@@ -23,7 +23,6 @@ from unittest.mock import MagicMock, patch
 from openpyxl.utils.exceptions import InvalidFileException
 
 from src.python.core import reader
-from src.python.core.models import Holding
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]

@@ -4,8 +4,8 @@ import unittest
 
 from src.python.llm.skeleton import is_llm_module_enabled
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 
 
 class TestIsLlmModuleEnabled(unittest.TestCase):
@@ -54,6 +54,7 @@ class TestHandleTruncation(unittest.TestCase):
     def test_not_truncated_preserves_usage(self):
         """结果不含截断标记 → 原样返回 (result, usage)。"""
         from src.python.llm.skeleton import _handle_truncation
+
         result = "正常内容"
         usage = {"input_tokens": 100, "output_tokens": 200}
         r, u = _handle_truncation(result, usage, 4096, "", "", {}, 60, None, "", None, "")
@@ -63,6 +64,7 @@ class TestHandleTruncation(unittest.TestCase):
     def test_none_result_preserves_usage(self):
         """result 为 None 时同样保留 usage（不走截断路径）。"""
         from src.python.llm.skeleton import _handle_truncation
+
         usage = {"input_tokens": 50, "output_tokens": 80}
         r, u = _handle_truncation(None, usage, 4096, "", "", {}, 60, None, "", None, "")
         self.assertIsNone(r)
@@ -71,6 +73,7 @@ class TestHandleTruncation(unittest.TestCase):
     def test_empty_result_preserves_usage(self):
         """空白字符串不走截断路径，保留 usage。"""
         from src.python.llm.skeleton import _handle_truncation
+
         usage = {"input_tokens": 10, "output_tokens": 20}
         r, u = _handle_truncation("", usage, 4096, "", "", {}, 60, None, "", None, "")
         self.assertEqual(r, "")

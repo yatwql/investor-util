@@ -54,6 +54,7 @@ class TestDebateProconFlow(unittest.TestCase):
         验证 generate_llm_module 的 system_prompt 关键字参数
         在 pro/con/synthesis 各阶段使用正确的模板常量。
         """
+        from src.python.config.features import set_feature_enabled
         from src.python.llm.prompts import (
             _SYSTEM_DEBATE_CON,
             _SYSTEM_DEBATE_PRO,
@@ -61,6 +62,7 @@ class TestDebateProconFlow(unittest.TestCase):
         )
         from src.python.llm.generators import generate_debate_procon
 
+        set_feature_enabled("llm_debate_conditional", False)  # 转正后默认开，基准须显式关
         with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
             mock_gen.side_effect = [
                 ("600519 贵州茅台适合长期持有，行业地位稳固。", False),
@@ -87,12 +89,13 @@ class TestDebateProconFlow(unittest.TestCase):
         )
         from src.python.llm.generators import generate_debate_procon
 
+        # 开关两处读点都要打桩：generators 用于推导 prompt 分支，
+        # module_fingerprint 用于推导缓存后缀（读写同源的唯一事实来源）。
+        _flag = lambda flag: flag == "llm_debate_conditional"  # noqa: E731
         with (
             patch("src.python.llm.generators.generate_llm_module") as mock_gen,
-            patch(
-                "src.python.llm.generators.is_feature_enabled",
-                side_effect=lambda flag: flag == "llm_debate_conditional",
-            ),
+            patch("src.python.llm.generators.is_feature_enabled", side_effect=_flag),
+            patch("src.python.llm.module_fingerprint.is_feature_enabled", side_effect=_flag),
         ):
             mock_gen.side_effect = [
                 ("600519 贵州茅台适合长期持有。", False),
@@ -109,6 +112,36 @@ class TestDebateProconFlow(unittest.TestCase):
             self.assertEqual(syn_prompt, _build_system_debate_synthesis(enable_conditional=True))
             # conditional 强化版不应包含基线"禁止情景分析"的冲突断言
             self.assertNotIn("不要在综合权衡中再次插入情景分析段落", syn_prompt)
+
+    def test_synthesis_fingerprint_covers_full_procon_text(self):
+        """综合步的 fingerprint_fn 取 pro/con **全文**：仅 200 字符之后不同也换键。
+
+        生产路径验证（非直接调用指纹函数）：旧实现只把 pro/con 前 200 字符摘要
+        拼进综合缓存键，正文差异落在 200 字符之后时键不动，综合步直接复用按旧
+        正文生成的结论且不报错。
+        """
+        from src.python.llm.generators import generate_debate_procon
+
+        prefix = "开头相同。" * 60  # 300 字符 > 200，差异落在旧摘要窗口之外
+
+        def _synthesis_fingerprint(pro_text: str) -> str:
+            with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
+                mock_gen.side_effect = [
+                    (pro_text, False),
+                    ("600519 估值已偏高，需注意回调风险。", False),
+                    ("综合双方意见，建议持有但设止盈。", False),
+                ]
+                generate_debate_procon(**self.base_kwargs)
+                return mock_gen.call_args_list[2].kwargs["fingerprint_fn"]()
+
+        fp_hold = _synthesis_fingerprint(prefix + "尾部：建议持有。")
+        fp_trim = _synthesis_fingerprint(prefix + "尾部：建议减仓。")
+
+        self.assertNotEqual(
+            fp_hold,
+            fp_trim,
+            "综合缓存键仍未覆盖 pro/con 全文 → 会复用按旧正文生成的综合结论",
+        )
 
     def test_user_prompt_is_not_empty(self):
         """user_prompt 参数在每个阶段均为非空字符串。"""
@@ -237,7 +270,7 @@ class TestDebateProconFlow(unittest.TestCase):
 
         # 显式低预算（threshold = 100 chars，2x = 200 chars）触发守卫：
         # pro 短（pro 单独 < 2x 不回退全部）、con 长（pro+con 超 1x 跳过 synthesis）。
-        # 正常三段输出远低于默认预算（48000），守卫仅在病态输出时触发，
+        # 正常三段输出远低于默认预算（72000），守卫仅在病态输出时触发，
         # 故用显式低预算构造超限场景。
         kwargs = dict(self.base_kwargs)
         kwargs["llm_config"] = {
@@ -288,6 +321,37 @@ class TestDebateProconFlow(unittest.TestCase):
             self.assertEqual(mock_gen.call_count, 3)
             for call in mock_gen.call_args_list:
                 self.assertEqual(call.kwargs.get("max_tokens_override"), 4096)
+
+    def test_per_call_max_tokens_fallback_is_18432(self):
+        """配置缺省/为 null 时，每阶段上限兜底为 18432（两轮各 +50%：8192 → 12288 → 18432）。
+
+        现场：用户 `llm_settings.json` 的 `debate.procon.per_call_max_tokens` 为 null、
+        模块级 `max_tokens_expert_review` 更大，但辩论路径不看模块级配置 →
+        实际按旧兜底值调用，智囊团复盘三段式下 pro 段被截断；思考型模型还会先把
+        预算吃在 thinking 上（无正文），故兜底再上调 50%。
+        """
+        from src.python.llm.generators import generate_debate_procon
+
+        for procon_cfg in (None, {"per_call_max_tokens": None, "synthesis_temperature": 0.5}):
+            kwargs = dict(self.base_kwargs)
+            kwargs["llm_config"] = {
+                "max_tokens_expert_review": 24000,
+                "debate": {
+                    "max_total_tokens_per_report": 48000,
+                    "per_call_timeout_override": 90,
+                    "procon": procon_cfg or {},
+                },
+            }
+            with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
+                mock_gen.side_effect = [("p", False), ("c", False), ("s", False)]
+                generate_debate_procon(**kwargs)
+                self.assertEqual(mock_gen.call_count, 3)
+                for call in mock_gen.call_args_list:
+                    self.assertEqual(
+                        call.kwargs.get("max_tokens_override"),
+                        18432,
+                        f"procon_cfg={procon_cfg} 时每阶段上限应兜底 18432（不得回退旧值）",
+                    )
 
     # ── 测试：穿透资产代码加入 valid_codes（幻觉过滤误伤修复） ──
 

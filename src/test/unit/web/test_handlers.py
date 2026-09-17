@@ -15,7 +15,7 @@ from urllib.parse import quote
 
 import pytest
 from openpyxl import Workbook
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import src.python.web.upload as upload
 from src.python.config import _config_defaults
@@ -979,3 +979,15 @@ class TestSystemInfoDoctorGate:
 
         assert 'id="doctor-list"' in html
         assert 'id="doctor-run"' in html
+
+    def test_card_present_under_defaults(self, app_client):
+        """默认配置下卡片即在，且不再标「实验性」（系统自检已转正）。
+
+        上面的 on/off 用例均以 patch 覆盖取值，默认值改回关闭时它们仍全绿。
+        """
+        assert _build_system_info()["doctor_enabled"] is True
+
+        html = app_client.get("/").get_data(as_text=True)
+
+        assert 'id="doctor-list"' in html
+        assert 'title="实验功能 doctor_check"' not in html

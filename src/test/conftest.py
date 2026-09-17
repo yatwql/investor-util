@@ -71,6 +71,8 @@ _KNOWN_MARKERS: set[str] = {
     "integration_cli",
     # 真实网络验证套件（opt-in，默认跳过，不入门禁）
     "live",
+    # 数据源记录-回放（用例声明所需 cassette，离线运行）
+    "cassette",
 }
 
 # pytest 内置标记 — 这些不算"项目标记"
@@ -123,6 +125,11 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "live: 真实网络验证套件（opt-in，默认跳过，仅 `-m live` 或 `--run-live` 运行；不入门禁）"
     )
+    config.addinivalue_line(
+        "markers",
+        'cassette: 声明用例所需的已录制数据源响应（`@pytest.mark.cassette("名称", source="源")`），'
+        "运行期离线回放真实响应体，不发起网络请求",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -130,8 +137,25 @@ def pytest_configure(config):
 # ═══════════════════════════════════════════════════════════════
 
 
+@pytest.fixture(scope="session")
+def _doctor_probe_targets(tmp_path_factory):
+    """doctor 目录探针的 session 级落点：``[(标签, 目录)]``，三个可写目录。
+
+    独立于各用例的 ``tmp_path``：``_check_writable`` 会在目标目录写哨兵文件
+    （随即删除），而有用例断言 `tmp_path` 内无残留，故探针落点不能在 tmp_path 下。
+    session 级复用单个目录，pytest 按保留策略自动清理。
+    """
+    base = tmp_path_factory.mktemp("doctor_probe")
+    targets: list[tuple[str, str]] = []
+    for label, rel in (("输出目录", "reports"), ("缓存目录", "data/cache"), ("日志目录", "logs")):
+        target = base / rel
+        target.mkdir(parents=True, exist_ok=True)
+        targets.append((label, str(target)))
+    return targets
+
+
 @pytest.fixture(autouse=True)
-def _isolate_sensitive_paths(tmp_path, monkeypatch):
+def _isolate_sensitive_paths(tmp_path, monkeypatch, _doctor_probe_targets):
     """自动将 config.json 和缓存目录重定向到临时目录。
 
     防止测试运行意外修改用户的真实配置文件（data/config/config.json）、
@@ -221,6 +245,11 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         "src.python.core.perf._HEALTH_CHECK_FILE",
         str(tmp_path / "data/state/datasource_health.jsonl"),
     )
+    # DataSinking 日配额计数文件隔离（provider 请求前写盘）
+    monkeypatch.setattr(
+        "src.python.providers.datasink._QUOTA_FILE",
+        str(tmp_path / "data/state/datasink_quota.json"),
+    )
     # decision_ledger.jsonl 决策跨期反思账本文件隔离（无单例，
     # 路径隔离即状态隔离——lessons_block/lessons_cache_suffix 按需读档现算）
     monkeypatch.setattr(
@@ -232,6 +261,14 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "src.python.core.signal_ledger._SIGNAL_LEDGER_FILE",
         str(tmp_path / "data/state/signal_ledger.jsonl"),
+    )
+    # doctor 自检目录探针隔离：_check_writable 会**真实写盘**（写哨兵文件后删除），
+    # 三个目标不重定向则每次自检测试都瞬写用户真实的 reports/、data/cache/、logs/，
+    # 用例中途失败还会留下探针残留。目标目录取 session 级独立临时目录 —— 不落在
+    # 各用例的 tmp_path 下（有用例断言 tmp_path 内无哨兵残留，见 test_doctor）。
+    monkeypatch.setattr(
+        "src.python.core.doctor._probe_targets",
+        lambda: list(_doctor_probe_targets),
     )
     # LLM 配置文件隔离
     monkeypatch.setattr(
@@ -295,6 +332,12 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch):
         _cfg_defaults._DEFAULT_CONFIG,
         "llm_providers_file",
         str(tmp_path / "data/config/llm_providers.json"),
+    )
+    # DataSinking 密钥文件路径 seed 到临时目录（凭据就绪判定与 provider 取数均读该键）
+    monkeypatch.setitem(
+        _cfg_defaults._DEFAULT_CONFIG,
+        "data_key_file",
+        str(tmp_path / "data/config/data_key.json"),
     )
     _cfg_core._clear_config_cache()
     # 注：llm_settings.json 不在此处 seed 隔离路径。需要读写真实配置的测试
@@ -394,6 +437,49 @@ def _auto_reset_provider_registry():
 
 
 @pytest.fixture(autouse=True)
+def _auto_reset_adapter_registry():
+    """自动重置数据源适配器注册表，防止测试间状态污染。
+
+    每个测试执行前先把注册表恢复为「模块导入后」的初始内容（即各适配器模块
+    注册的真实适配器），测试中临时注入的适配器不会泄漏到后续用例。
+    """
+    from src.python.fetcher import source_adapter
+
+    baseline = source_adapter.snapshot_adapters()
+    yield
+    source_adapter.restore_adapters(baseline)
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_credential_specs():
+    """自动重置数据源凭据声明表，防止测试间状态污染。
+
+    声明表在生产中为空（全部免费源），测试为验证机制会注入合成声明；
+    每个测试执行前清空，避免合成声明泄漏到后续用例（尤其会影响
+    check-sources / doctor 的凭据预检分支）。
+    """
+    from src.python.core import datasource_credential
+
+    datasource_credential.reset_credential_specs()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_datasink_limiter():
+    """重置 DataSinking 限速器单例（读配置一次，跨测试须重建）。"""
+    from src.python.providers import datasink
+
+    datasink.reset_datasink_limiter()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_hithink_limiter():
+    """重置同花顺数据服务限速器单例（读配置一次，跨测试须重建）。"""
+    from src.python.providers import hithink
+
+    hithink.reset_hithink_limiter()
+
+
+@pytest.fixture(autouse=True)
 def _auto_reset_anchor_state():
     """自动重置新闻去重锚点模块单例状态，防止测试间状态污染。
 
@@ -444,6 +530,12 @@ def pytest_addoption(parser):
         default=False,
         help="运行 @pytest.mark.live 真实网络验证套件（默认跳过，不入门禁）",
     )
+    parser.addoption(
+        "--record-cassettes",
+        action="store_true",
+        default=False,
+        help="录制数据源真实响应体写入 src/test/data/cassettes/（需与 --run-live 同用，默认关闭）",
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -459,6 +551,86 @@ def _skip_live_unless_requested(request):
         return
     if request.node.get_closest_marker("live") is not None:
         pytest.skip("live 套件为 opt-in（真实网络验证），需 `--run-live` 或 `-m live` 显式运行")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 数据源记录-回放（语义名 datasource_cassette）
+# ═══════════════════════════════════════════════════════════════
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_transport_factory():
+    """自动重置 HTTP 传输层注入点，防止测试间状态污染。
+
+    ``core.http_client._TRANSPORT_FACTORY`` 是模块级单例：某用例安装后若异常
+    退出未走到 ``use_transport_factory`` 的还原分支，后续用例的
+    ``make_http_client()`` 会持续拿到陈旧传输。与 ``_auto_reset_provider_registry``
+    同模式，前后各清一次。
+    """
+    from src.python.core import http_client
+
+    http_client._TRANSPORT_FACTORY = None
+    yield
+    http_client._TRANSPORT_FACTORY = None
+
+
+def _cassette_names(request) -> list[str]:
+    """取用例声明的 cassette 名称；用法错误直接报错而非静默忽略。"""
+    names: list[str] = []
+    for mark in request.node.iter_markers("cassette"):
+        if not mark.args or not isinstance(mark.args[0], str) or not mark.args[0]:
+            raise pytest.UsageError(
+                '[!] cassette 标记用法错误：需提供一个 cassette 名称，如 @pytest.mark.cassette("tencent_quote")'
+            )
+        names.append(mark.args[0])
+    return names
+
+
+@pytest.fixture(autouse=True)
+def _install_cassette_replay(request):
+    """按用例声明的 cassette 安装**离线回放**传输层（provider 零改动）。
+
+    安装方式是替换 ``make_http_client()`` 的传输层（``core.http_client``
+    的唯一构造点）。
+
+    规则：
+    - 未声明 ``@pytest.mark.cassette("名称")`` 的用例：不安装任何工厂，
+      行为与既有测试完全一致。
+    - 普通用例：安装离线回放（未命中即失败，**不回落真实网络**）。
+    - ``live`` 套件：**不装回放**——回放与「验证源可达」互斥，且录制用例需要
+      真实网络。录制由显式请求 ``cassette_recording`` fixture 的用例自行开启。
+    """
+    from src.python.core.cassette import cassette_replay
+
+    names = _cassette_names(request)
+    if not names or request.node.get_closest_marker("live") is not None:
+        yield
+        return
+    with cassette_replay(names):
+        yield
+
+
+@pytest.fixture
+def cassette_recording(request):
+    """录制会话 —— 需 ``--run-live`` + ``--record-cassettes`` 双开关，否则跳过。
+
+    录制传输照单全收该用例的全部流量，无法把不同请求归属到不同 cassette，
+    故要求「一用例一 cassette」：声明多个时直接报错。
+    """
+    from src.python.core.cassette import cassette_record
+
+    if not request.config.getoption("--record-cassettes"):
+        pytest.skip("未开启录制：需 `--run-live --record-cassettes` 双开关显式启用")
+
+    marks = list(request.node.iter_markers("cassette"))
+    names = _cassette_names(request)
+    if len(names) != 1:
+        raise pytest.UsageError(
+            f"[!] 录制模式下单个用例只能声明一个 cassette，实际声明了 {len(names)} 个："
+            f"{', '.join(names) or '（无）'}。请拆成多个用例分别录制。"
+        )
+    with cassette_record(names[0], source=marks[0].kwargs.get("source", "")) as session:
+        yield session
 
 
 @pytest.fixture(autouse=True)

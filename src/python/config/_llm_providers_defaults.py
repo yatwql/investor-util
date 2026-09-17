@@ -66,7 +66,7 @@ def _get_default_llm_providers_template() -> str:
     # ── strategy / preferred_providers ──
     lines.append(f'  "strategy": {json.dumps(d["strategy"])},')
     lines.append(f'  "preferred_providers": {json.dumps(d["preferred_providers"])},')
-    lines.append(f'  "providers": [')
+    lines.append('  "providers": [')
 
     # ── providers 列表 ──
     for idx, entry in enumerate(d["providers"]):

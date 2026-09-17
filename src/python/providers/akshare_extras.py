@@ -15,13 +15,13 @@ import json
 import logging
 import threading as _threading
 import time as _time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Any
 
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.core.code_utils import is_a_share_code
 from src.python.core.num_utils import safe_num
+from src.python.providers._utils import run_with_timeout
 
 logger = logging.getLogger("invest")
 
@@ -87,7 +87,6 @@ _CACHE_DIVIDEND_PREFIX = "dividend_"
 _TTL = 86400  # 盈利预测：1天
 _SECTOR_FLOW_TTL = 900  # 行业资金流向：15分钟
 _DIVIDEND_TTL = 2592000  # 分红：1个月
-_TIMEOUT = 15.0  # akshare 调用超时（秒）
 
 
 def _compute_index_fingerprint() -> str:
@@ -127,41 +126,6 @@ def _cache_key(prefix: str, fingerprint: str) -> str:
     return f"{prefix}nofp"
 
 
-def _run_with_timeout(fn, timeout: float = _TIMEOUT, retries: int = 1):
-    """在线程中执行函数，超时或异常时重试，全部失败返回 None。
-
-    Args:
-        fn: 要执行的函数
-        timeout: 每次调用的超时秒数
-        retries: 失败后的重试次数（默认 1 次）
-    """
-    for attempt in range(1 + retries):
-        pool = ThreadPoolExecutor(max_workers=1)
-        try:
-            fut = pool.submit(fn)
-            try:
-                return fut.result(timeout=timeout)
-            except TimeoutError:
-                logger.warning("akshare 调用超时 (%.1fs, 第 %d/%d 次)", timeout, attempt + 1, 1 + retries)
-                fut.cancel()
-                if attempt < retries:
-                    import time as _time
-
-                    _time.sleep(1)
-                continue
-            except Exception as e:
-                logger.warning("akshare 调用异常 (第 %d/%d 次): %s", attempt + 1, 1 + retries, e)
-                fut.cancel()
-                if attempt < retries:
-                    import time as _time
-
-                    _time.sleep(1)
-                continue
-        finally:
-            pool.shutdown(wait=False)
-    return None
-
-
 def get_profit_forecast() -> dict[str, dict]:
     """获取全量机构盈利预测数据。
 
@@ -197,7 +161,7 @@ def get_profit_forecast() -> dict[str, dict]:
     def _fetch():
         return ak.stock_profit_forecast_em()
 
-    df = _run_with_timeout(_fetch, timeout=30.0)
+    df = run_with_timeout(_fetch, timeout=30.0)
     if df is None:
         logger.warning("盈利预测获取失败（超时或网络错误）")
         return {}
@@ -285,7 +249,7 @@ def get_sector_fund_flow() -> list[dict[str, Any]]:
             sector_type="行业资金流",
         )
 
-    df = _run_with_timeout(_fetch)
+    df = run_with_timeout(_fetch)
     if df is None:
         _SECTOR_FLOW_FAILURE = "connection"
         logger.warning("行业资金流向获取失败")
@@ -463,7 +427,7 @@ def get_dividend_data(codes: list[str]) -> dict[str, dict]:
     def _fetch_div():
         return _fetch_all_dividends(a_codes)
 
-    result = _run_with_timeout(_fetch_div, timeout=60.0) or {}
+    result = run_with_timeout(_fetch_div, timeout=60.0) or {}
     if result:
         cache_set(_key, result)
     _memo_set(_memo_key_str, result)

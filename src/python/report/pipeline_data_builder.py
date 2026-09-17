@@ -12,7 +12,8 @@ A 通道（pipeline_data）流向：
 B 通道（prep）流向：
   prepare_report_data() → pipeline_data_builder.build_prep() → LLM / Excel
 
-数据契约 约束：所有键必须先在 data-channels-schema.md 中注册。
+数据契约约束：所有键必须先在 `technical.md` 附录 H（pipeline_data Schema 定义）中
+注册类型与写入/消费模块。
 """
 
 from __future__ import annotations
@@ -29,7 +30,6 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "diff",
     "data_degradation",
     "risk_metrics",
-    "portfolio_daily_returns",
     # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键）
     "style_factor_data",
     "position_relationship_data",
@@ -40,24 +40,38 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "data_freshness",
     # 行动建议单一数据源：行动板块 + 智囊团深度复盘行动摘要（单源计算两处呈现）
     "action_data",
-    # 成本流水：成本分档 + XIRR + 分红累计（report_submodules.cost_lots，
+    # 景气度框架诊断（实验性功能 prosperity_framework）：六维评分卡组合契合度
+    "prosperity_framework_data",
+    # 市场情绪与持仓热点（报告增强开关 market_sentiment）：龙虎榜/连板梯队 ∩ 持仓与穿透
+    "market_sentiment_data",
+    # 成本流水：成本分档 + XIRR + 分红累计（功能开关 `cost_lots`，
     # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
     "fund_flow_data",
-    # 估值分位：当前 PE/PB + 价格分位代理（report_submodules.valuation_percentile，
+    # 估值分位：当前 PE/PB + 价格分位代理（功能开关 `valuation_percentile`，
     # 由编排层 compute_valuation_data 组装；开关关闭时为 None）
     "valuation_data",
-    # 市场温度：价格分位+均线偏离+波动率三因子合成温度计（report_submodules.market_temperature，
+    # 市场温度：价格分位+均线偏离+波动率三因子合成温度计（功能开关 `market_temperature`，
     # 由编排层 compute_market_temperature_data 组装；开关关闭时为 None）
     "market_temperature_data",
-    # 宏观事件标注：危机/政策事件叠加到走势图的标注数据（report_submodules.crisis_annotation，
+    # 宏观事件标注：危机/政策事件叠加到走势图的标注数据（build_crisis_annotation(history_data)，
     # 由编排层 compute_crisis_annotation_data 组装；无事件时为 None）
     "crisis_annotation_data",
-    # 尾部风险：极端行情风险提示数据（report_submodules.tail_risk，
+    # 尾部风险：极端行情风险提示数据（尾部风险统计，
     # 由编排层 compute_tail_risk_data 组装；开关关闭时为 None）
     "tail_risk_data",
-    # 快照差异：当前持仓快照与上次快照的差异数据（report_submodules.snapshot_diff，
+    # 快照差异：当前持仓快照与上次快照的差异数据（快照差异摘要，
     # 由编排层 compute_snapshot_diff_data 组装；无差异时为 None）
     "snapshot_diff_data",
+    # 决策复盘区块：行动章内嵌复盘表数据（决策跨期反思闭环开启时由
+    # report/_experimental_seams.record_llm_decisions_and_review_block 注入；
+    # 实验功能关闭或区块为空时键缺席，两条输出路径保持既有输出）
+    "decision_review_data",
+    # 持仓个股财报摘要：A 股标的的财报章节摘要（功能开关 `financial_report_digest`，
+    # 由 report/financial_report_digest.build_financial_report_digest 组装；开关关闭时为 None）
+    "financial_report_digest_data",
+    # 财务指标：持仓 A 股基本面（功能开关 `financial_indicator`，
+    # 由 report/financial_indicator.build_financial_indicator 组装；开关关闭时为 None）
+    "financial_indicator_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -83,15 +97,21 @@ _PREP_KNOWN_KEYS: set[str] = {
     "data_freshness",
     # 行动建议单一数据源：由 prepare_report_data 组装（单源计算两处呈现）
     "action_data",
-    # 成本流水：成本分档 + XIRR + 分红累计（report_submodules.cost_lots，
+    # 成本流水：成本分档 + XIRR + 分红累计（功能开关 `cost_lots`，
     # 由 excel 渲染层 resolve_market_data 基于交易/分红流水组装）
     "fund_flow_data",
-    # 估值分位：当前 PE/PB + 价格分位代理（report_submodules.valuation_percentile，
+    # 估值分位：当前 PE/PB + 价格分位代理（功能开关 `valuation_percentile`，
     # 由编排层 compute_valuation_data 组装；开关关闭时为 None）
     "valuation_data",
-    # 市场温度：价格分位+均线偏离+波动率三因子合成温度计（report_submodules.market_temperature，
+    # 市场温度：价格分位+均线偏离+波动率三因子合成温度计（功能开关 `market_temperature`，
     # 由编排层 compute_market_temperature_data 组装；开关关闭时为 None）
     "market_temperature_data",
+    # 持仓个股财报摘要：A 股标的的财报章节摘要（功能开关 `financial_report_digest`，
+    # 由 prepare_report_data 组装；开关关闭时为 None）
+    "financial_report_digest_data",
+    # 财务指标：持仓 A 股基本面（功能开关 `financial_indicator`，
+    # 由 prepare_report_data 组装；开关关闭时为 None）
+    "financial_indicator_data",
 }
 
 # ── 类型映射（用于自动类型断言） ──
@@ -100,7 +120,6 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "diff": (dict, type(None)),
     "data_degradation": list,
     "risk_metrics": dict,
-    "portfolio_daily_returns": list,
     "style_factor_data": (dict, type(None)),
     "position_relationship_data": (dict, type(None)),
     "evolution_data": (dict, type(None)),
@@ -113,6 +132,11 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "crisis_annotation_data": (dict, type(None)),
     "tail_risk_data": (dict, type(None)),
     "snapshot_diff_data": (dict, type(None)),
+    "decision_review_data": (dict, type(None)),
+    "financial_report_digest_data": (dict, type(None)),
+    "financial_indicator_data": (dict, type(None)),
+    "prosperity_framework_data": dict,
+    "market_sentiment_data": dict,
 }
 
 _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
@@ -136,6 +160,8 @@ _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "fund_flow_data": dict,
     "valuation_data": dict,
     "market_temperature_data": dict,
+    "financial_report_digest_data": dict,
+    "financial_indicator_data": dict,
 }
 
 
@@ -154,7 +180,7 @@ def _validate_keys(data: dict, known_keys: set[str], label: str) -> None:
     """
     for k in data:
         if k not in known_keys:
-            logger.warning("[pipeline_data] %s 包含未知键 '%s'，请先在 data-channels-schema.md 注册", label, k)
+            logger.warning("[pipeline_data] %s 包含未知键 '%s'，请先在 technical.md 附录 H 注册", label, k)
 
 
 def _assert_type(value: Any, expected: type | tuple[type, ...], key: str) -> None:

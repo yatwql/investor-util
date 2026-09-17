@@ -14,32 +14,30 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
 
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
-# 标准注册表（精简版，仅含结构测试所需字段，与 registry.py 对齐）
+# 标准注册表（精简版：仅保留结构测试所需字段，省略 action / portfolio_evolution 两个扩展模块）。
+# 本表只作 create_sheets 的输入数据使用，序号仅在本表内自洽，不对照 registry.py 的真实序号——
+# 需要校验真实注册表序号时请用 test_registry.py。
 _REPORT_SECTION_DEFAULT: list[dict] = [
     {"key": "summary", "name": "投资分析汇总", "number": 1, "type": "always"},
-    {"key": "market_value", "name": "市值核算明细表", "number": 2, "type": "always"},
-    {"key": "category", "name": "持仓分类表", "number": 3, "type": "always"},
-    {"key": "penetration", "name": "资产穿透TOP10", "number": 4, "type": "always"},
-    {"key": "fund_performance", "name": "基金业绩分析", "number": 5, "type": "always"},
-    {"key": "fund_manager", "name": "基金经理变更监控", "number": 6, "type": "fund_deep_analysis"},
-    {"key": "position_relationship", "name": "持仓关系矩阵", "number": 7, "type": "fund_deep_analysis"},
-    {"key": "fund_concentration", "name": "持仓集中度监控", "number": 8, "type": "fund_deep_analysis"},
-    {"key": "style_factor", "name": "风格与因子分析", "number": 9, "type": "fund_deep_analysis"},
-    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 10, "type": "news"},
-    {"key": "global_macro", "name": "全球政经局势", "number": 11, "type": "llm"},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 12, "type": "llm"},
-    {"key": "health_check", "name": "持仓体检报告", "number": 13, "type": "llm"},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 14, "type": "llm"},
-    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 15, "type": "history"},
-    # 注：portfolio_evolution(16) / action(17) 为注册表扩展模块，此精简版省略
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always"},
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm"},
+    {"key": "holdings_detail", "name": "持仓明细与分类", "number": 2, "type": "always"},
+    {"key": "penetration", "name": "资产穿透TOP10", "number": 3, "type": "always"},
+    {"key": "fund_performance", "name": "基金业绩分析", "number": 4, "type": "always"},
+    {"key": "position_structure", "name": "持仓结构与集中度", "number": 5, "type": "fund_deep_analysis"},
+    {"key": "style_factor", "name": "风格与因子分析", "number": 6, "type": "fund_deep_analysis"},
+    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 8, "type": "news"},
+    {"key": "global_macro", "name": "全球政经局势", "number": 9, "type": "llm"},
+    {"key": "expert_review", "name": "智囊团深度复盘", "number": 10, "type": "llm"},
+    {"key": "health_check", "name": "持仓体检报告", "number": 11, "type": "llm"},
+    {"key": "penetration_deep", "name": "穿透深度分析", "number": 12, "type": "llm"},
+    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 13, "type": "history"},
+    # 注：action / portfolio_evolution / fundamental_snapshot 为注册表其余条目，此精简切片省略
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 15, "type": "always"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 17, "type": "llm"},
 ]
 
 
@@ -84,7 +82,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         custom_order = [
             {"key": "fund_performance", "name": "基金业绩分析", "number": 1, "type": "always"},
             {"key": "summary", "name": "投资分析汇总", "number": 2, "type": "always"},
-            {"key": "market_value", "name": "市值核算明细表", "number": 3, "type": "always"},
+            {"key": "holdings_detail", "name": "持仓明细与分类", "number": 3, "type": "always"},
         ]
         wb = self._make_wb()
         sheets = create_sheets(wb, custom_order, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
@@ -107,7 +105,7 @@ class TestExcelSheetOrder(unittest.TestCase):
         )
         expected_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
         self.assertEqual(list(sheets.keys()), expected_keys, "全部启用时页签顺序应与默认注册表一致")
-        self.assertEqual(len(sheets), 17)
+        self.assertEqual(len(sheets), 14)
 
     def test_sheet_order_visibility_filtering(self):
         """可见性过滤 → 只创建匹配 type 的页签且顺序保持。"""
@@ -127,7 +125,7 @@ class TestExcelSheetOrder(unittest.TestCase):
             sec["key"] for sec in _REPORT_SECTION_DEFAULT if sec["type"] in ("always", "fund_deep_analysis")
         ]
         self.assertEqual(list(sheets.keys()), expected_keys)
-        self.assertEqual(len(sheets), 10, "always + 基金深度分析 = 10")
+        self.assertEqual(len(sheets), 7, "always + 基金深度分析 = 7")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -228,13 +226,13 @@ class TestExcelSheetTitleFormat(unittest.TestCase):
         custom_order = [
             {"key": "fund_performance", "name": "基金业绩分析", "number": 1, "type": "always"},
             {"key": "summary", "name": "投资分析汇总", "number": 2, "type": "always"},
-            {"key": "market_value", "name": "市值核算明细表", "number": 3, "type": "always"},
+            {"key": "holdings_detail", "name": "持仓明细与分类", "number": 3, "type": "always"},
         ]
         wb = self._make_wb()
         sheets = create_sheets(wb, custom_order, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False)
         self.assertEqual(sheets["fund_performance"].title, "1.基金业绩分析", "fund_performance 应使用自定义序号 1")
         self.assertEqual(sheets["summary"].title, "2.投资分析汇总", "summary 应使用自定义序号 2")
-        self.assertEqual(sheets["market_value"].title, "3.市值核算明细表", "market_value 应使用自定义序号 3")
+        self.assertEqual(sheets["holdings_detail"].title, "3.持仓明细与分类", "holdings_detail 应使用自定义序号 3")
 
     def test_title_order_tracks_section_order(self):
         """页签标题顺序与 section_order 的 number 值排序一致。"""
@@ -329,6 +327,163 @@ class TestExcelTextWrapping(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════════
 #  Test: Sheet Accessibility & Module Writing
 # ═══════════════════════════════════════════════════════════════
+
+
+class TestExcelExperimentalNotice(unittest.TestCase):
+    """用量页签须自述生成条件：本报告在哪些实验性功能开启下生成。
+
+    报告是可脱离本机流转的文件，读者无从访问 features.json 或生成时的控制台
+    日志；缺了这行，行动章「历史决策复盘」等实验产物会被误读为常驻功能。
+    """
+
+    def _write_sheet(self, ws):
+        from src.python.report.summary_llm_usage import write_llm_usage_sheet
+
+        write_llm_usage_sheet(
+            ws,
+            llm_session_usage=None,
+            llm_module_info=[{"name": "测试模块", "status_label": "成功", "status": "success"}],
+        )
+
+    def _make_ws(self):
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "LLM 用量"
+        return ws
+
+    def _sheet_text(self, ws):
+        return "\n".join(str(c.value) for row in ws.iter_rows() for c in row if c.value is not None)
+
+    def test_no_notice_when_all_flags_off(self):
+        """实验开关全关时页签一字不提实验功能（保持既有输出）。"""
+        ws = self._make_ws()
+
+        self._write_sheet(ws)
+
+        self.assertNotIn("⚗", self._sheet_text(ws))
+
+    def test_notice_lists_enabled_display_names(self):
+        """启用项按显示名逐项列出，并给出总项数。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("llm_debate_procon", True)
+        set_feature_enabled("signal_ledger", True)
+        ws = self._make_ws()
+
+        self._write_sheet(ws)
+
+        text = self._sheet_text(ws)
+        self.assertIn("⚗ 本报告在 2 项实验性功能开启下生成", text)
+        self.assertIn("辩论-正反辩论", text)
+        self.assertIn("确定性信号沉淀", text)
+        self.assertIn("实验功能输出质量可能不稳定，结论请自行复核", text)
+
+    def test_notice_survives_empty_session_usage(self):
+        """会话无用量统计时该行仍须出现（清单与用量无关，不受汇总区早退影响）。"""
+        from src.python.config.features import set_feature_enabled
+        from src.python.report.summary_llm_usage import write_llm_usage_sheet
+
+        set_feature_enabled("signal_ledger", True)
+        ws = self._make_ws()
+
+        # 无用量 → _write_llm_summary_section 直接返回，不写「汇总数据」区
+        write_llm_usage_sheet(
+            ws,
+            llm_session_usage=None,
+            llm_module_info=[{"name": "测试模块", "status_label": "成功", "status": "success"}],
+        )
+
+        text = self._sheet_text(ws)
+        self.assertNotIn("汇总数据", text)
+        self.assertIn("确定性信号沉淀", text)
+
+
+class TestExcelSummaryFallbackNotice(unittest.TestCase):
+    """LLM 用量页签缺席或为空时，清单须落到汇总页脚（否则 Excel 侧无痕）。
+
+    非 LLM 实验开关（确定性信号沉淀 / 数据源适配 / 决策跨期反思闭环）不依赖 LLM
+    章节：整章关闭时用量页签根本不生成，清单若只挂在那个页签上，这批开关在 Excel
+    产物上便完全无痕。
+    """
+
+    def _sheets(self, usage: str | None = None) -> dict:
+        """构造页签字典：usage=None 无用量页签；"empty" 页签为空；"filled" 已载清单。"""
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "1.投资分析汇总"
+        ws.cell(row=1, column=1, value="投资分析汇总")
+        sheets: dict = {"summary": ws}
+        if usage:
+            ws_usage = wb.create_sheet("19.LLM API 用量")
+            if usage == "filled":
+                ws_usage.cell(row=1, column=1, value="⚗ 本报告在 1 项实验性功能开启下生成：确定性信号沉淀")
+            sheets["llm_usage"] = ws_usage
+        return sheets
+
+    def _summary_text(self, sheets: dict) -> str:
+        ws = sheets["summary"]
+        return "\n".join(str(c.value) for row in ws.iter_rows() for c in row if c.value is not None)
+
+    def _write(self, sheets: dict) -> None:
+        from src.python.report.excel_generator import _write_summary_experimental_notice
+
+        _write_summary_experimental_notice(sheets)
+
+    def test_fallback_lands_when_usage_sheet_absent(self):
+        """LLM 章节关闭（无用量页签）→ 汇总页脚出现清单与复核提示。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+        sheets = self._sheets()
+
+        self._write(sheets)
+
+        text = self._summary_text(sheets)
+        self.assertIn("⚗ 本报告在 1 项实验性功能开启下生成", text)
+        self.assertIn("确定性信号沉淀", text)
+        self.assertIn("实验功能输出质量可能不稳定，结论请自行复核", text)
+
+    def test_fallback_lands_when_usage_sheet_empty(self):
+        """用量页签存在但为空（取数早退）→ 仍须兜底上屏。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+        sheets = self._sheets(usage="empty")
+
+        self._write(sheets)
+
+        self.assertIn("确定性信号沉淀", self._summary_text(sheets))
+
+    def test_no_fallback_when_usage_sheet_carries_notice(self):
+        """清单已落在用量页签 → 汇总页脚不重复（同一事实说两遍会被当成两处来源）。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+        sheets = self._sheets(usage="filled")
+
+        self._write(sheets)
+
+        self.assertNotIn("⚗", self._summary_text(sheets))
+
+    def test_no_notice_when_all_flags_off(self):
+        """实验开关全关 → 汇总页脚一字不提（既有输出不变）。"""
+        sheets = self._sheets()
+
+        self._write(sheets)
+
+        self.assertNotIn("⚗", self._summary_text(sheets))
+
+    def test_missing_summary_sheet_is_noop(self):
+        """无汇总页签 → 静默跳过，不抛异常（页签集合由可见性配置决定）。"""
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("signal_ledger", True)
+
+        self._write({})  # 不抛异常即通过
 
 
 class TestExcelModuleSheets(unittest.TestCase):

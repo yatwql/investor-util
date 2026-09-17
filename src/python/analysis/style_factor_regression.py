@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from src.python.analysis._math_utils import _t_critical_95
+from src.python.core.trading_calendar import count_trading_days_elapsed
 
 logger = logging.getLogger("invest")
 
@@ -39,8 +40,9 @@ FACTOR_NAMES: dict[str, str] = {
     "quality": "质量",
 }
 
-# 因子指数末根 K 线距今超此天数视为停更，本次回归剔除
-FACTOR_STALE_DAYS: int = 120
+# 因子指数末根 K 线距今超此**交易日**数视为停更，本次回归剔除
+# （约 4 个月：120 自然日 ≈ 86 个交易日）
+FACTOR_STALE_TRADING_DAYS: int = 86
 
 # 基准指数（沪深300）——风格漂移对照用
 BASELINE_INDEX: str = "sh000300"
@@ -189,14 +191,17 @@ def klines_to_returns(bars: list[dict]) -> list[dict]:
 def filter_stale_factor_klines(
     factor_klines: dict[str, list[dict]],
     today_str: str,
-    stale_days: int = FACTOR_STALE_DAYS,
+    stale_trading_days: int = FACTOR_STALE_TRADING_DAYS,
 ) -> tuple[dict[str, list[dict]], list[str]]:
-    """剔除停更因子（末根 K 线距今超过 stale_days）。
+    """剔除停更因子（末根 K 线距今超过 stale_trading_days 个交易日）。
+
+    以**交易日**而非自然日计——长假会把自然日差显著放大（如春节前后相邻的
+    两个交易日可相差 10 个自然日），按自然日判定会误剔除仍在正常更新的因子。
 
     Args:
         factor_klines: {factor: [{"date", "close"}, ...]}（bars 升序）。
         today_str: 参考日期 "YYYY-MM-DD"。
-        stale_days: 停更判定阈值（天）。
+        stale_trading_days: 停更判定阈值（交易日）。
 
     Returns:
         (fresh_factors, stale_factors)：fresh 为未停更因子，stale 列出剔除因子。
@@ -207,6 +212,7 @@ def filter_stale_factor_klines(
         today = pd.Timestamp(today_str)
     except (ValueError, TypeError):
         today = pd.Timestamp.now()
+    today_canonical = today.strftime("%Y-%m-%d")
 
     fresh: dict[str, list[dict]] = {}
     stale: list[str] = []
@@ -217,17 +223,15 @@ def filter_stale_factor_klines(
         if not last_date:
             stale.append(factor)
             continue
-        try:
-            age_days = (today - pd.Timestamp(last_date)).days
-        except (ValueError, TypeError):
-            age_days = 0
-        if age_days > stale_days:
+        # 末根 K 线晚于参考日（数据异常）或格式非法 → 视为未停更
+        age_trading_days = count_trading_days_elapsed(last_date, today_canonical) or 0
+        if age_trading_days > stale_trading_days:
             stale.append(factor)
             logger.warning(
-                "[factor] 因子 %s（%s）已停更（末根 K 线距今 %d 天），本次回归剔除",
+                "[factor] 因子 %s（%s）已停更（末根 K 线距今 %d 个交易日），本次回归剔除",
                 FACTOR_NAMES.get(factor, factor),
                 FACTOR_INDICES.get(factor, ""),
-                age_days,
+                age_trading_days,
             )
         else:
             fresh[factor] = bars

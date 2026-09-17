@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.10.16
+> 文档版本：0.11.1-dev
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -161,7 +161,7 @@ skeleton.py:generate_llm_content()
 | `generators_orchestrator.py` | 编排层 | 4+1 模块并行调度，缓存预检查，线程池分发 | `generate_all_llm()` |
 | `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 | 各 `generate_*()` |
 | `generators_news.py` | 生成层 | 新闻 LLM 二次关联分析（批量模式 7 函数） | `enhance_news_correlation()` |
-| `_llm_news_correlation.py` | 私有 | 新闻关联责任单元：模块级结果缓存 + 闭包 + 安全直调，由 `generators_orchestrator.py`（聚合门面）re-export 对外提供 | `run_news_correlation_safe()` / `_make_news_correlation_closure()` |
+| `_llm_news_correlation.py` | 私有 | 新闻关联安全直调入口（返回类型 `(list[dict], bool, dict)` 与其余四模块的 `(str, bool)` 不同，**不经编排层线程池**，由 `report/news_correlation.py` 直接调用），由 `generators_orchestrator.py`（聚合门面）re-export 对外提供 | `run_news_correlation_safe()` |
 | `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑）+ `raw_filter_fn` 原始输出过滤钩子（markdown_to_html 之前） | `generate_llm_module()` |
 | `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、单 Provider 分派 | `call_llm()` / `call_single_provider()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `call_llm_with_retry()` |
@@ -171,8 +171,9 @@ skeleton.py:generate_llm_content()
 | `prompts_core.py` | 工具 | System Prompt 常量 + 上下文构建块（数据降级/收益归因/竞争语境/再平衡/概念板块/管线差异） | `_SYSTEM_*` 常量 + `_build_system_debate_synthesis()` |
 | `prompts_tables.py` | 工具 | 持仓/穿透/指标/情景/数据质量/汇率等数据块格式化为 Markdown | `_format_holdings_block()` / `_build_holdings_summary()` |
 | `prompts_action.py` | 工具 | 各模块 User Prompt 构建（global_macro / expert_review / health_check / penetration_deep / debate_synthesis）+ 集中度问答块 | `_build_expert_review_prompt()` / `_build_qa_concentration_block()` |
-| `prompts_signals.py` | 工具 | 信号预消化：行业资金流向段方向标注与分方向排名（无开关，默认路径）+ 算法评级信号块（市场温度/估值分位/尾部风险 → `信号：…` 行，`signal_pre_digest` 开关，判定收敛于缓存后缀函数保证读写键同源） | `_build_sector_flow_block()` / `_build_signal_digest_block()` / `_signal_digest_cache_suffix()` |
+| `prompts_signals.py` | 工具 | 信号预消化：行业资金流向段方向标注与分方向排名（无开关，默认路径）+ 算法评级信号块（市场温度/估值分位/尾部风险/持仓基本面/叙事与数字背离 → `信号：…` 行，`signal_pre_digest` 开关，判定收敛于缓存后缀函数保证读写键同源） | `_build_sector_flow_block()` / `_build_signal_digest_block()` / `_signal_digest_cache_suffix()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `compute_fingerprint()` / `build_llm_fingerprint()` |
+| `module_fingerprint.py` | 工具 | **模块指纹的唯一事实来源（预检侧与写侧同源）**：四模块指纹构造器 + 输入闭包 + 注册表，两侧都调用同一函数，结构性消除「预检键 ≠ 写侧键」的漂移 | `MODULE_FINGERPRINT_BUILDERS` / `ModuleFingerprintInputs` / `*_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `track_session_usage()` / `get_session_usage()` |
 | `cost_tracker.py` | 工具 | Token 预算管理、输入检查、成本摘要格式化（compact/verbose） | `reset_budget()` / `get_cost_summary()` |
 | `pricing.py` | 工具 | 模型定价合并、费用估算 | `estimate_cost()` / `reload_pricing()` |
@@ -180,6 +181,7 @@ skeleton.py:generate_llm_content()
 | `markdown.py` | 工具 | Markdown→HTML 转换 | `markdown_to_html()` |
 | `_api_claude.py` / `_api_gemini.py` / `_api_openai.py` | 私有 | 各 Provider 单次调用实现（自包含依赖，委托 api_base 重试 + Extended Thinking 注入），api.py 分派目标 | `call_claude()` / `call_gemini()` / `call_openai()` |
 | `_batch_mode.py` | 私有 | 批量模式分块执行（`_BATCH_CHUNK_SIZE=10` 每批、最多 3 批并行，受 `min(3, 批数, 6)` 约束） | `run_batch_mode()` |
+| `_hallucination_filter.py` | 私有 | LLM 输出虚构品种代码过滤（辩论模式等场景）：按「行内句段」粒度删除疑似代码 token，保留 HTML/CSS 标签与金融术语白名单防误伤 | `_filter_hallucinated_codes()` |
 
 ### 2.2 四大+一模块详情
 
@@ -187,16 +189,16 @@ skeleton.py:generate_llm_content()
 
 | 模块键 | 名称 | 默认 max_tokens | 默认 timeout | 默认 TTL | 默认 system_prompt |
 |:-------|:-----|:---------------:|:------------:|:--------:|:-------------------|
-| `global_macro` | 全球政经局势 | 2048 | 60s | 24h（86400s） | 宏观经济学家角色，500 字内，纯文本 |
-| `expert_review` | 智囊团深度复盘 | 24000 | 120s | 2h（7200s） | 召集令→圆桌会→定音锤三阶段 |
-| `health_check` | 持仓体检报告 | 16000 | 120s | 24h（86400s） | 五维度评分（风险分散度/流动性/收益合理性/成本结构/数据质量） |
-| `penetration_deep` | 穿透深度分析 | 8192 | 90s | 24h（86400s） | 行业/品种集中度+国别暴露 |
+| `global_macro` | 全球政经局势 | 3072 | 60s | 24h（86400s） | 宏观经济学家角色，500 字内，纯文本 |
+| `expert_review` | 智囊团深度复盘 | 36000 | 120s | 2h（7200s） | 召集令→圆桌会→定音锤三阶段 |
+| `health_check` | 持仓体检报告 | 24000 | 120s | 24h（86400s） | 五维度评分（风险分散度/流动性/收益合理性/成本结构/数据质量） |
+| `penetration_deep` | 穿透深度分析 | 12288 | 90s | 24h（86400s） | 行业/品种集中度+国别暴露 |
 
 #### 批量模式模块（1 个，通过 `generate_llm_module` 以批量模式调用）
 
 | 模块键 | 名称 | 默认 max_tokens | 默认 timeout | 默认 TTL | 默认 system_prompt |
 |:-------|:-----|:---------------:|:------------:|:--------:|:-------------------|
-| `news_correlation` | 新闻 LLM 关联分析 | 2000 | 60s | 1h（3600s） | 逐批分析新闻与持仓关联性（JSON 输出） |
+| `news_correlation` | 新闻 LLM 关联分析 | 3000 | 60s | 1h（3600s） | 逐批分析新闻与持仓关联性（JSON 输出） |
 
 **批量模式 vs 标准模式区别**：
 
@@ -459,9 +461,9 @@ if not any(needs.values()):
 
 首次运行（`is_first_check=True`）时输出"暂无历史对比数据"标记。
 
-**degradation_events 暴露**：`generate_all_llm()` 接收 `degradation_events` 参数，供 `health_check` 的第 5 维「数据质量」引用【数据质量降级】事件；传 `None`/空列表时该维度的降级详情段恒返回「今日无降级记录，所有数据源正常。」。调用点 `report/_llm_news.py::_submit_llm_future` 在**主线程**提交线程池前取一次 `DegradationTracker.get_log()` 快照随参传入（数据获取阶段已结束，此处读取即定稿；主线程读取避免与工作线程并发写入交错）——**不可改在 `generate_all_llm` 内部自行取**，那会让 LLM 层反向依赖 `report/` 的降级追踪器，且与 `expert_review` 经 `_build_data_degradation_block(pipeline_data)` 的口径分叉。health_check 缓存指纹不含提示词内容，故该修复在下次缓存未命中时自然生效，无需改缓存键。
+**degradation_events 暴露**：`generate_all_llm()` 接收 `degradation_events` 参数，供 `health_check` 的第 5 维「数据质量」引用降级事件；无降级事件时该段恒返回「今日无降级记录，所有数据源正常。」。该维度另需评**净值新鲜度**，其基准是**交易日**而非运行时刻——渲染时一并传入 `pipeline_data` 的 `data_freshness` 契约（`trading_day`/`prev_trading_day` + 逐品种 `stale`/`degraded` 清单），由 `_build_nav_freshness_basis_lines()` 产出「净值新鲜度基准」「净值滞后品种」行。报告可在非交易日运行（如周六凌晨生成上一交易日数据的报告），此时运行时刻与最近交易日相差一个自然日，若让模型自行以运行时刻做自然日差，QDII 与部分场外基金正常的 T-1 净值会被写成「净值更新延迟」。滞后清单直接引用 `core/data_freshness.py` 的判定结论，与「数据质量仪表盘」可信度区块同源，不由模型从裸日期另行推断。调用点 `report/_llm_news.py::_submit_llm_future` 在**主线程**提交线程池前取一次 `DegradationTracker.get_log()` 快照随参传入（数据获取阶段已结束，此处读取即定稿；主线程读取避免与工作线程并发写入交错）——**不可改在 `generate_all_llm` 内部自行取**，那会让 LLM 层反向依赖 `report/` 的降级追踪器，且与 `expert_review` 经 `_build_data_degradation_block(pipeline_data)` 的口径分叉。`generate_all_llm()` 把该事件集渲染成数据质量详细状态块**一次**，同一实例既进 `health_check` 指纹又进其提示词（见 §7.1「提示词内容覆盖」）——数据健康结论与缓存键同源，源恢复后重出报告不会复用故障期间的结论。
 
-> **LLM 输出侧质量分级不属本层**：`report/llm_quality.py`（实验功能 `module_quality_gate`）消费本层输出后逐模块评级并注入横幅，位于 `report/` 而非 `llm/`——`llm/` 不得反向依赖 `report/`（`report/llm_content.py` 已依赖 `llm/`）。设计见 `technical.md` §4.11。
+> **LLM 输出侧质量分级不属本层**：`report/llm_quality.py`（`module_quality_gate`）消费本层输出后逐模块评级并注入横幅，位于 `report/` 而非 `llm/`——`llm/` 不得反向依赖 `report/`（`report/llm_content.py` 已依赖 `llm/`）。设计见 `technical.md` §4.11。
 
 [↑ 回到顶部](#目录)
 
@@ -486,9 +488,10 @@ call_llm(system_prompt, user_prompt, llm_config, ...)
     ├─ ③ 遍历 Provider Chain（逐条尝试至成功）
     │      for entry in chain:
     │          _resolve_entry_credentials(entry, llm_config)
-    │            ├─ credentials_ref 查表 → api_key/model/endpoint
-    │            ├─ entry 级叠加覆盖
-    │            └─ 无 ref → 内联字段回退
+    │            ├─ credentials_ref 查表 → api_key（唯一凭据来源）+ model/endpoint 缺省值
+    │            ├─ entry 级路由覆盖（model/endpoint，非敏感字段）
+    │            └─ 无 ref → 内联 api_key 回退：仅服务运行期内存条目；
+    │               经配置解析的条目必有 ref（内联 api_key 在校验阶段即拒）
     │
     │          _call_provider_entry(entry, ...)
     │            ├─ "claude"  → call_claude()（_api_claude.py）
@@ -639,19 +642,21 @@ call_gemini() Extended Thinking 注入
 
 ### 5.3 credentials_ref 凭据引用
 
-**设计目的**：将敏感凭据（api_key、model、endpoint）与 Provider 路由配置分离，降低凭据泄露风险，支持凭据复用。
+**设计目的**：将**敏感凭据**（`api_key`）与 Provider 路由配置分离，降低凭据泄露风险，支持凭据复用。`model`/`endpoint` 是路由字段（非敏感），仍可留在路由配置上按条目覆盖——凭据分离的边界是 `api_key`，不是全部字段。
 
 **凭据来源**：`llm_config["_llm_credentials"]`，由 `config/_llm_providers.py` 的 `_load_llm_key_credentials()` 读取 `llm_key.json` 构建。
 
 **解析优先级**（`_resolve_entry_credentials()`）：
 
 1. **`credentials_ref` 查表**：从 `llm_config["_llm_credentials"]` 中查找对应键名的凭据块
-2. **entry 级叠加覆盖**：若 entry 本身也包含 `api_key`/`model`/`endpoint`，则覆盖凭据块中的同名字段
-3. **无 ref 回退**：无 `credentials_ref` 时，直接使用 entry 内联字段
+2. **entry 级路由覆盖**：entry 自带的 `model`/`endpoint`（非敏感路由字段）覆盖凭据块中的同名值
+3. **`api_key` 只来自凭据块**：经配置文件解析出的 entry 内联 `api_key` 不参与解析——它在 `_validate_provider_entry()` 阶段即被拒，该条目被整条跳过，根本走不到这里。函数内仍保留 `entry["api_key"]` 分支，服务于**运行期直接构造的内存条目**（调用方自行组装 dict 时不受配置校验约束）；该分支对配置来源的条目永不生效
 
 **兼容说明**：
 - **单键格式**：`llm_key.json` 为 `{"api_key": "...", "model": "..."}` 时，自动包裹为 `{"_default": {...}}`
-- **内联凭据**：`llm_providers.json` 的 entry 可直接含 `api_key`/`model`（无需 `credentials_ref`）
+- **内联凭据（本版起硬拒绝）**：`llm_providers.json` 的 entry **不得**再含 `api_key`——内联即「凭据随配置入库」，正是 C18 禁止的形态。校验器记 WARNING 并**跳过该条目**（不再是仅告警后放行）。旧配置需迁移：把 `api_key` 移入 `llm_key.json` 的凭据块，entry 改为 `"credentials_ref": "<块名>"`。
+- **`credentials_ref` 必填**：缺少或非法（非空字符串）的条目在 `_validate_provider_entry()` 阶段被拒并记 WARNING。
+- **`model` 仍可在 entry 上覆盖**：`model`/`endpoint` 属非敏感路由字段（模板注释邀请按需修改），entry 级取值优先于凭据块同名值。
 
 [↑ 回到顶部](#目录)
 
@@ -769,6 +774,32 @@ penetrated_assets ──→ extract_stable_penetration()
 
 **风险信号摘要**：`risk_metrics` 摘要（夏普/卡玛/HHI 等计算指标的 MD5 摘要）作为指纹哈希因子。风险信号变化时缓存自动失效，确保 LLM 提示词中包含的量化指标与最新计算结果一致。
 
+#### 提示词内容覆盖（`module_fingerprint.py`）
+
+模块指纹除「数据是否变化」外，还须覆盖「**提示词是否真的含该段内容**」——提示词里出现而指纹里缺席的段落，会让缓存键与提示词内容脱钩：键不变、预检命中旧键、直接复用按旧数据算出的结论，且**不报错**（表现为静默的陈旧内容）。
+
+按此纪律，三个**已渲染文本 / 派生指标**类输入纳入哈希：
+
+| 输入 | 进入提示词的模块 | 渲染位置 | 说明 |
+|:-----|:-----------------|:---------|:-----|
+| `competitive_context` | `global_macro` / `expert_review` / 辩论三键 | `prompts_core._build_competitive_context_block()` | 竞争语境块（【今日对比】/【区间对比】），由 A 股/美股指数、对比指数配置、区间收益与量化指标渲染而成 |
+| `metrics` | `expert_review` / 辩论三键 | 提示词正文（【量化指标】/ 情景分析 / 风格一致性） | 量化指标字典 |
+| `data_quality_text` | `health_check` | `prompts_tables._build_data_quality_detail_block()` | 数据质量详细状态块（【数据质量详细状态】：净值新鲜度基准 + 净值滞后/无有效行情清单 + 连接失败 / 数据为空 / 触发降级计数），由 `degradation_events`（本进程内的降级事件日志）与 `data_freshness` 契约（交易日 + 逐品种新鲜度）共同渲染而成 |
+| `pipeline_data` 派生的【环比变化】【数据质量降级】两段 | `expert_review` / `health_check` / 辩论三键 | `prompts_core._build_difpipeline_data_block()` / `_build_data_degradation_block()` | 由 `_pipeline_block_cache_suffix()` 调用**提示词侧同一构建器**取文本再哈希——「进键的文本」与「进提示词的文本」同源 |
+
+**两个结构性保证**：
+
+1. **覆盖以提示词为准，而非以「是否与持仓相关」为准**：每段只进「提示词确实含该段」的模块——`competitive_context` / `metrics` 不进 `health_check` / `penetration_deep`（其提示词不含这两段），`data_quality_text` 只进 `health_check`（仅它的提示词含数据质量段）。反向的 `history_data`/信号后缀也遵循同一判据：进提示词的进键，没进的不进键。
+2. **一次渲染、两侧共享同一实例**：`competitive_context` 与 `data_quality_text` 均由 `generate_all_llm()` 渲染**一次**，同一字符串实例同时交给预检侧（`_compute_module_cache_info`）与写侧（各生成函数）——两侧**不得各自渲染**。哈希「已渲染文本」而非哈希其输入 dict，使得「提示词内容变 ⇒ 键必变」由构造保证：将来改动渲染函数（增删字段、调整格式）不可能悄悄让键与提示词脱钩。若两侧各渲染一份，该保证就退化为靠纪律对齐的两次渲染一致性。
+
+**辩论三键（`debate_procon_fingerprint` / `debate_synthesis_fingerprint`）**：辩论模式绕过标准预检，其键族 `llm_debate_*` 与标准键不同，故**仅写侧**使用、不进 `MODULE_FINGERPRINT_BUILDERS`。其输入口径同样以辩论提示词实际包含的段落为准——含基础持仓 + 竞争语境块 + 量化指标 + 辩论增强后缀 + `pipeline_data` 派生的【环比变化】【数据质量降级】两段（白脸/黑脸复用 `_build_expert_review_prompt`，这两段随其进入提示词），**刻意不并入** `history_data` 与教训/信号摘要/结构化决策头后缀（辩论提示词不含这些段落，并入只会让白脸/黑脸/综合三次昂贵调用每份报告必 miss）。
+
+**辩论综合键（`debate_synthesis_fingerprint`）**：取「辩论基础指纹 + **综合提示词全文**」。综合提示词 = 白脸/黑脸**全文** + 条件推理情景段（`debate.conditional.scenarios` 驱动）+ 集中度问答段（`debate.qa_concentration.threshold` 驱动），由 `_build_debate_synthesis_prompt()` 一次性渲染。既然提示词就是这三者的函数，键直接取该渲染结果，无需逐项枚举入哈希的来源、也就不会漏项。此前本键另起一套：截取 pro/con **前 200 字符**摘要 + 开关位字母后缀，两处后果——正文差异落在 200 字符之后时键不动，仅改 config（情景名/描述、集中度阈值）而开关位不变时键同样不动；两种情形都命中按旧正文/旧配置生成的综合结论且不报错。
+
+**数据质量段的成本口径**：该段曾按「纳入后数据源抖动期间事件集持续变化会让该模块反复未命中（TTL 24h 下的重算成本）」的理由不纳入指纹；核查显示三点前提均不成立——① 事件集是**本进程内**的降级日志（`DegradationTracker._events` 只存内存、不落盘），该块因而是**本次运行的数据源画像**而非「一日累计」；② 该块已是聚合结果（仅失败源与计数，无时间戳/消息/`detail`）；③ 本模块指纹本就含 `total_today_profit`，交易日内持仓一有盈亏变化即换键，24h TTL 从不是真实驻留期。故纳入的边际额外失效接近零，而收益是消除一类**静默的错误结论**：源恢复后重出报告不再复用故障期间缓存的健康判断（详见 `review-findings.md` 已解决区）。
+
+上述纪律由 `src/test/unit/llm/test_module_fingerprint.py` 锁定：既断言「进了提示词必须进键」（含预检侧同源），也断言「未进提示词的模块不得被并入」。
+
 ### 7.2 缓存键模式
 
 ```
@@ -857,11 +888,27 @@ cache_get(optimistic_key, ttl) → 命中 → 直接返回（+ 缓存标记）
 - 流动性（场内场外/停牌/封闭期）
 - 收益合理性（与市场/同类对比）
 - 成本结构（分布与浮盈浮亏比）
-- 数据质量（输入数据完整性与可靠性，引用【数据质量降级】事件）
+- 数据质量（输入数据完整性与可靠性，引用【数据质量详细状态】的事实——降级事件 + 净值新鲜度基准）
 
 **穿透深度分析** (`_SYSTEM_PENETRATION_DEEP`)：三节分析（行业集中度、品种集中度、国别/币种暴露）+ 综合建议。
 
 **新闻关联分析** (`_SYSTEM_NEWS_CORRELATION`)：批量分析模式下使用的 System Prompt，要求 LLM 按 JSON 数组格式输出每条新闻与持仓组合的关联度评分、影响方向（正面/负面/中性）及简要理由。每批最多 10 条新闻，分析时需引用品种代码，禁止虚构数据。
+
+#### 确定性信号预消化（`signal_pre_digest`，默认开启）
+
+把**算法已经算出、但此前只走渲染层**的确定性结论在进提示词前写成带方向标注的「结论行」，让模型读到方向判断而非裸数值自行解读。`prompts_signals.py` 只读既有数据契约、不写 pipeline_data、不新增键：
+
+| 信号 | 来源契约 | 方向词轴 | 说明 |
+|:--|:--|:--|:--|
+| 市场温度 | `market_temperature_data` | 看多/中性/看空 | 档位映射 + 温度分 |
+| 持仓估值分位 | `valuation_data` | 看多/中性/看空 | 逐只档位聚合成分布（低估多于高估 → 看多），并列判中性 |
+| 尾部风险 | `tail_risk_data` | 风险高/中/低 | 幅度轴与方向轴正交，不套看空 |
+| **持仓基本面** | `financial_indicator_data` | 看多/中性/看空 | 质量档（优/良/弱）与年度趋势（增长/下滑）两侧**同向才给方向**，矛盾或无判据判中性；同行给出平均 ROE |
+| **叙事与数字背离** | `financial_report_digest_data` × `financial_indicator_data` | **需交叉核实** | 按代码配对，对摘要做**词频语气**判定（乐观/悲观词表，不做语义理解）× 指标方向（年度趋势优先、其次归母净利/营收同比，±3% 内持平）；仅在「叙事乐观而数字走弱」或反之时产信号，列出依据（叙事偏向 + 同比 + 趋势），**不推断原因也不下结论** |
+
+- **背离要求行按需追加**：块内出现背离项时追加一行 `（存在「叙事与数字背离」项：请在结论中显式指出背离点，说明你以哪一侧为准及核实方向）`；**无背离项时该行不出现**，提示词与未引入该项时逐字节一致。
+- **门禁联动**：基本面与背离两路依赖 DataSinking 数据底座（`datasink.enabled` + 凭据）；未就绪时 `financial_indicator_data` / `financial_report_digest_data` 为 None → 对应信号自动缺席（不注入即无感）。
+- **缓存同源**：信号块内容进 `_signal_digest_cache_suffix()` 指纹，新增信号使键随内容变化；开关关闭或块为空返回 `""`（键与未注入时逐字节一致，不误伤旧缓存）。写入侧与预检侧均无条件调用同一构建器。
 
 ### 8.2 User Prompt 构建
 
@@ -1029,7 +1076,7 @@ reload_pricing() → 合并 llm_settings.json → pricing
 
 ### 10.4 峰谷定价（DeepSeek）
 
-`MODEL_PRICING` 中含 `"peak"` 高峰价子段的模型（`deepseek-flash` / `deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat`）
+`MODEL_PRICING` 中含 `"peak"` 高峰价子段的模型（`deepseek-flash` / `deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat` / `deepseek-reasoner`）
 采用峰谷定价：工作日高峰时段按 `peak` 子段单价计费，其余时段（闲时，含周末全天）按 base 单价计费。
 
 - **高峰时段**（默认，**仅工作日**生效）：北京时间 09:00–12:00、14:00–18:00；工作日其余时间与
@@ -1224,15 +1271,23 @@ LLM 集成层与系统其他组件的接口：
 
 | LLM 模块 | 依赖数据源 | 缓存指纹依赖 |
 |:---------|:----------|:------------|
-| `global_macro` | A股指数 + 美股指数 + 总市值+总盈亏 + 分类 + (可选)行业资金流向 | 指数收盘价 + 持仓汇总 |
-| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动）+ 实验开关后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要指纹 → `_sg`） |
-| `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动） |
+| `global_macro` | A股指数 + 美股指数 + 总市值+总盈亏 + 分类 + (可选)行业资金流向 | 指数收盘价 + 持仓汇总 + 竞争语境块（`competitive_context`） |
+| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + 组合历史走势 + 竞争语境块 + 量化指标 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要（`history_data` 的 max_drawdown_pct / annualized_volatility / total_return_pct / status）+ 竞争语境块（`competitive_context`）+ 量化指标（`metrics`）+ 辩论增强后缀（`llm_debate_conditional` / `llm_debate_qa_concentration`）+ pipeline_data 派生块后缀（【环比变化】【数据质量降级】两段）+ 实验开关后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要指纹 → `_sg`） |
+| `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要 + 数据质量详细状态块（`data_quality_text`，本次运行的降级事件画像）+ pipeline_data 派生块后缀（【环比变化】【数据质量降级】两段）+ 信号预消化后缀（`signal_pre_digest`） |
 | `penetration_deep` | 同 expert_review + 穿透 TOP10（含行业/板块） | 同上 + 穿透 mv/ratio/sector（full_penetration=True） |
 | `news_correlation` | 过滤后的新闻列表 + 持仓摘要 + 穿透资产 + 行业/概念数据 | 标题前 80 字 + 持仓指纹 |
 
-**提示词受开关影响时的缓存键纪律**：凡实验开关**改变提示词内容**（`signal_pre_digest` 注入信号块、`decision_header_parse` 追加决策头契约、`signal_ledger` 注入确定性信号摘要），**写侧指纹闭包**（`generators.py::_fingerprint`）与 **orchestrator 预检指纹**（`_compute_module_cache_info`）必须**无条件同调同一后缀函数**、开关判定收敛在函数内部。关闭时返回 `""`（键不变、不误伤旧缓存），开启时两侧同步换键——只改一侧会让预检命中旧键而跳过重生成，开关形同虚设。
+**模块指纹的唯一事实来源（读写同源）**：模块缓存键统一为 `CACHE_PREFIX_LLM + f"{模块}_{指纹}"`，由**预检侧**（`generators_orchestrator._compute_module_cache_info`，判断能否跳过生成）与**写侧**（`generators.py` 各生成函数的 `_fingerprint` 闭包，经 `skeleton.py` 组装同一形态的键）两侧分别拼装。四模块的指纹构造**一律**取自 `llm/module_fingerprint.py`——两侧调用同一函数、同一 `ModuleFingerprintInputs` 输入闭包，**新增影响内容的输入只需改一处**。
 
-**结构化决策头（实验功能 `decision_header_parse`，默认关）**：开启时 `_build_expert_review_prompt` 在「### 操作建议」表之后追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约（`core/decision_header.build_structured_header_instruction()`，与解析器同源、由测试锁定互读）；关闭时 append 空串，提示词**逐字节不变**。该段只在标准模式 expert_review 生效，辩论模式路径不追加。解析侧归一见 `technical.md` §4.15。
+同源有两重含义，缺一即失效：**① 同函数**（两侧调同一构造器，见上）；**② 同输入**（两侧喂同一组值）。第 ② 重对**已渲染文本**类输入（`competitive_context` / `data_quality_text`）必须靠「一次渲染、共享同一实例」落实——由 `generate_all_llm()` 渲染一次后同时交给预检侧与写侧，两侧不得各自渲染（详见 §7.1「提示词内容覆盖」）。仅记「同函数」而两侧各渲染一份，等于把同源退回纪律层面。
+
+**覆盖判据**：指纹须覆盖「提示词里真的出现的段落」，而非「与持仓相关的数据」。故 `competitive_context` / `metrics` 只进**提示词确实包含它们**的模块（`global_macro` / `expert_review` / 辩论三键），`health_check` / `penetration_deep` 的提示词不含这两段、指纹也不并入（并入即纯成本失效）；`data_quality_text` 反之只进 `health_check`，同样是「只进真的含该段的模块」。
+
+历史教训：该纪律此前靠「两侧注释声明同调」维持，每逢新增输入都要两处手工各改一遍，漏改即产生**读写键永不同源**——预检 read 落空、每次报告全量派发，不报错、只表现为静默的性能与日志噪声（`history_data` 风险信号与辩论增强后缀各发生过一次）。反方向的漏改则产生**覆盖不足**——输入进了提示词却没进指纹，键不变、预检命中旧键、复用按旧数据算出的结论，同样不报错（`competitive_context` / `metrics` 发生过一次）。故本条纪律的落实方式是**结构性收敛而非复查纪律**：任何一方若再自行拼接模块指纹、或对同一输入各自渲染，即属违规。
+
+开关类后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要 → `_sg`、辩论增强 → `_c`/`_q`）**开关判定一律收敛在指纹构造器内部**：关闭时返回 `""`（键不变、不误伤旧缓存），开启时两侧同步换键——只改一侧会让预检命中旧键而跳过重生成，开关形同虚设。同源与覆盖保证由 `src/test/unit/llm/test_module_fingerprint.py` 锁定（断言预检键 == 写侧键、覆盖四模块 × 多场景；断言「进了提示词必须进键」与「未进提示词的模块不得被并入」），「一次渲染」由 `test_generate_all_llm.py::TestCompetitiveContextRenderedOnce` 与 `TestDataQualityBlockRenderedOnce` 以「渲染次数 == 1」+ 同一实例断言（`assertIs`）锁定。
+
+**结构化决策头（`decision_header_parse`，默认开）**：开启时 `_build_expert_review_prompt` 在「### 操作建议」表之后追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约（`core/decision_header.build_structured_header_instruction()`，与解析器同源、由测试锁定互读）；关闭时 append 空串，提示词**逐字节不变**。该段只在标准模式 expert_review 生效，辩论模式路径不追加。解析侧归一见 `technical.md` §4.15。
 
 **账本上下文注入（`skeleton.py::_LEDGER_CONTEXT_MODULES`）**：标准模式 `expert_review` 的 user prompt 首轮组装时，按开关追加两类**跨期账本上下文**——决策教训（`decision_ledger.lessons_block()`）与确定性信号摘要（`signal_ledger.summary_block()`）。两者各自做开关与样本门槛判断（关闭或无内容返回空串，注入逐字节无变化），故开关关闭时提示词不受影响；两处注入点与两处指纹后缀一一对应，见上表 `expert_review` 行。摘要**只统计实时来源记录**（非实时记录不参与），防止降级行情算出的评级污染跨期判断——纪律说明见 `technical.md` §4.16。
 
@@ -1282,8 +1337,9 @@ LLM 集成层与系统其他组件的接口：
 | claude-opus-4-6 | 15.00 | 75.00 | 1.50 | |
 | claude-sonnet-4-6 | 3.00 | 15.00 | 0.30 | |
 | claude-sonnet-4-8 | 3.00 | 15.00 | 0.30 | |
-| deepseek-chat | 1.50 / 3.00 | 4.50 / 9.00 | 0.05 / 0.10 | 峰谷定价（闲时/高峰） |
+| deepseek-chat | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；**已停用别名**（flash 系列非思考模式的兼容名，2026-07-24 下线，条目保留供历史记录计费） |
 | deepseek-flash | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；DeepSeek-V4.1-Flash 正式模型名（2026-09-10 发布） |
+| deepseek-reasoner | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；**已停用别名**（flash 系列思考模式的兼容名，2026-07-24 下线，条目保留供历史记录计费） |
 | deepseek-v4-flash | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；别名，端点仍接受、底层由 V4.1-Flash 接管并按同价计费 |
 | deepseek-v4-pro | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | 峰谷定价（闲时/高峰）；2026-09-14 12:00 起下线，之前请求路由到 V4.1-Flash 并按其单价计费 |
 | gemini-2.0-flash | 0.10 | 0.40 | 0.01 | |
@@ -1303,9 +1359,9 @@ LLM 集成层与系统其他组件的接口：
 
 | 模块 | 指纹依赖（稳定字段） | 排除字段 |
 |:-----|:-------------------|:---------|
-| `global_macro` | 指数收盘价 + 持仓汇总 | 无排除 |
-| `expert_review` | 品种/份额/成本 | 行情价/涨跌幅/净值日期 |
-| `health_check` | 品种/份额/成本 | 行情价/涨跌幅/净值日期 |
+| `global_macro` | 指数收盘价 + 持仓汇总 + 竞争语境块 | 无排除 |
+| `expert_review` | 品种/份额/成本 + 风险信号摘要 + 竞争语境块 + 量化指标 + 开关类后缀 | 行情价/涨跌幅/净值日期 |
+| `health_check` | 品种/份额/成本 + 风险信号摘要 + 数据质量详细状态块 + 信号预消化后缀 | 行情价/涨跌幅/净值日期 |
 | `penetration_deep` | 品种/份额/成本 + 穿透 mv/ratio/sector（`full_penetration=True`） | 行情价/涨跌幅 |
 | `news_correlation` | 标题前 80 字 + 持仓指纹 | 全文细节 |
 

@@ -18,15 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.python.llm import (
-    generate_all_llm,
-)
-from src.python.llm.generators import (
-    generate_expert_review,
-    generate_global_macro,
-    generate_health_check,
-    generate_penetration_deep_analysis,
-)
+from src.python.llm import generate_all_llm
 from src.test.helpers import SynchronousExecutor
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
@@ -46,19 +38,21 @@ class TestGenerateAllLlm(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._cfg_patcher = patch("src.python.llm.generators_orchestrator.get_llm_config",
-                                  return_value={"enabled_llm": {
-                                      "global_macro": True,
-                                      "expert_review": True,
-                                      "health_check": True,
-                                      "penetration_deep": True,
-                                  }})
+        cls._cfg_patcher = patch(
+            "src.python.llm.generators_orchestrator.get_llm_config",
+            return_value={
+                "enabled_llm": {
+                    "global_macro": True,
+                    "expert_review": True,
+                    "health_check": True,
+                    "penetration_deep": True,
+                }
+            },
+        )
         cls._cfg_patcher.start()
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor",
-                                   new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client",
-                                    new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
@@ -67,7 +61,9 @@ class TestGenerateAllLlm(unittest.TestCase):
         cls._exec_patcher.stop()
         cls._cfg_patcher.stop()
 
-    def test_force_passthrough(self, mock_expert: MagicMock, mock_macro: MagicMock, mock_health: MagicMock, mock_penetration: MagicMock) -> None:
+    def test_force_passthrough(
+        self, mock_expert: MagicMock, mock_macro: MagicMock, mock_health: MagicMock, mock_penetration: MagicMock
+    ) -> None:
         mock_macro.return_value = ("<p>宏</p>", False)
         mock_expert.return_value = ("<p>策略</p>", False)
         mock_health.return_value = ("<p>体检</p>", False)
@@ -89,7 +85,9 @@ class TestGenerateAllLlm(unittest.TestCase):
         self.assertTrue(kwargs_m.get("force"))
         self.assertTrue(kwargs_e.get("force"))
 
-    def test_force_false_default(self, mock_expert: MagicMock, mock_macro: MagicMock, mock_health: MagicMock, mock_penetration: MagicMock) -> None:
+    def test_force_false_default(
+        self, mock_expert: MagicMock, mock_macro: MagicMock, mock_health: MagicMock, mock_penetration: MagicMock
+    ) -> None:
         mock_macro.return_value = ("<p>m</p>", False)
         mock_expert.return_value = ("<p>e</p>", False)
         mock_health.return_value = ("<p>h</p>", False)
@@ -139,10 +137,19 @@ class TestGenerateAllLlm(unittest.TestCase):
             {"name": "宁德时代", "codes": ["300750"], "mv": 100.0, "ratio": 10.0, "sector": "电力设备"},
             {"name": "阳光电源", "codes": ["300274"], "mv": 80.0, "ratio": 8.0, "sector": "电力设备"},
         ]
-        with patch("src.python.llm.generators_orchestrator.run_fact_check", side_effect=_fake_fact_check), \
-             patch("src.python.llm.generators_orchestrator.get_llm_module_names", return_value=_labels):
+        with (
+            patch("src.python.llm.generators_orchestrator.run_fact_check", side_effect=_fake_fact_check),
+            patch("src.python.llm.generators_orchestrator.get_llm_module_names", return_value=_labels),
+        ):
             generate_all_llm(
-                {}, {}, 100000, 50000, 50000, 100, 10, {"股票": 10},
+                {},
+                {},
+                100000,
+                50000,
+                50000,
+                100,
+                10,
+                {"股票": 10},
                 penetrated_assets=_penetrated,
                 holdings_details=[{"code": "600519", "name": "贵州茅台", "market_value": 50000, "cost": 40000}],
                 force=True,
@@ -166,30 +173,36 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor",
-                                   new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client",
-                                    new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
     def tearDownClass(cls) -> None:
         cls._httpx_patcher.stop()
         cls._exec_patcher.stop()
+
     """测试 generate_* 函数接受外部 llm_config 参数。"""
 
     @patch("src.python.llm.skeleton.generate_llm_content")
     def test_global_macro_uses_passed_config(
-        self, mock_gen: MagicMock,
+        self,
+        mock_gen: MagicMock,
     ) -> None:
         """传入 llm_config → 被 _generate_llm_content 接收。"""
         from src.python.llm.generators import generate_global_macro
+
         mock_gen.return_value = ("<p>结果</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_global_macro": False}
         result, cached = generate_global_macro(
-            a_indices={}, us_indices={}, total_mv=0, total_profit=0, total_cost=0,
-            categories={}, llm_config=llm_config,
+            a_indices={},
+            us_indices={},
+            total_mv=0,
+            total_profit=0,
+            total_cost=0,
+            categories={},
+            llm_config=llm_config,
         )
         self.assertEqual(result, "<p>结果</p>")
         # 验证传递给 _generate_llm_content 的第一个参数是传入的 llm_config
@@ -197,45 +210,66 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
 
     @patch("src.python.llm.skeleton.generate_llm_content")
     def test_expert_review_uses_passed_config(
-        self, mock_gen: MagicMock,
+        self,
+        mock_gen: MagicMock,
     ) -> None:
         """gen_expert_review 传递 llm_config 到 _generate_llm_content。"""
         from src.python.llm.generators import generate_expert_review
+
         mock_gen.return_value = ("<p>复盘</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_expert_review": False}
         result, cached = generate_expert_review(
-            total_mv=0, total_cost=0, total_profit=0, total_today_profit=0,
-            holdings_count=1, categories={}, llm_config=llm_config,
+            total_mv=0,
+            total_cost=0,
+            total_profit=0,
+            total_today_profit=0,
+            holdings_count=1,
+            categories={},
+            llm_config=llm_config,
         )
         self.assertEqual(result, "<p>复盘</p>")
         self.assertIs(mock_gen.call_args[0][0], llm_config)
 
     @patch("src.python.llm.skeleton.generate_llm_content")
     def test_health_check_uses_passed_config(
-        self, mock_gen: MagicMock,
+        self,
+        mock_gen: MagicMock,
     ) -> None:
         """gen_health_check 传递 llm_config 到 _generate_llm_content。"""
         from src.python.llm.generators import generate_health_check
+
         mock_gen.return_value = ("<p>体检</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_health_check": False}
         result, cached = generate_health_check(
-            total_mv=0, total_cost=0, total_profit=0, total_today_profit=0,
-            holdings_count=1, categories={}, llm_config=llm_config,
+            total_mv=0,
+            total_cost=0,
+            total_profit=0,
+            total_today_profit=0,
+            holdings_count=1,
+            categories={},
+            llm_config=llm_config,
         )
         self.assertEqual(result, "<p>体检</p>")
         self.assertIs(mock_gen.call_args[0][0], llm_config)
 
     @patch("src.python.llm.skeleton.generate_llm_content")
     def test_penetration_uses_passed_config(
-        self, mock_gen: MagicMock,
+        self,
+        mock_gen: MagicMock,
     ) -> None:
         """gen_penetration_deep_analysis 传递 llm_config。"""
         from src.python.llm.generators import generate_penetration_deep_analysis
+
         mock_gen.return_value = ("<p>穿透</p>", False)
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_penetration_deep": False}
         result, cached = generate_penetration_deep_analysis(
-            total_mv=0, total_cost=0, total_profit=0, total_today_profit=0,
-            holdings_count=1, categories={}, llm_config=llm_config,
+            total_mv=0,
+            total_cost=0,
+            total_profit=0,
+            total_today_profit=0,
+            holdings_count=1,
+            categories={},
+            llm_config=llm_config,
         )
         self.assertEqual(result, "<p>穿透</p>")
         self.assertIs(mock_gen.call_args[0][0], llm_config)
@@ -255,19 +289,21 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._cfg_patcher = patch("src.python.llm.generators_orchestrator.get_llm_config",
-                                  return_value={"enabled_llm": {
-                                      "global_macro": True,
-                                      "expert_review": True,
-                                      "health_check": True,
-                                      "penetration_deep": True,
-                                  }})
+        cls._cfg_patcher = patch(
+            "src.python.llm.generators_orchestrator.get_llm_config",
+            return_value={
+                "enabled_llm": {
+                    "global_macro": True,
+                    "expert_review": True,
+                    "health_check": True,
+                    "penetration_deep": True,
+                }
+            },
+        )
         cls._cfg_patcher.start()
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor",
-                                   new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client",
-                                    new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
@@ -280,15 +316,26 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
 
     @patch("src.python.llm.generators_orchestrator.cache_get")
     def test_all_cached_no_threads(
-        self, mock_cache_get: MagicMock,
-        mock_expert: MagicMock, mock_macro: MagicMock,
-        mock_health: MagicMock, mock_penetration: MagicMock,
+        self,
+        mock_cache_get: MagicMock,
+        mock_expert: MagicMock,
+        mock_macro: MagicMock,
+        mock_health: MagicMock,
+        mock_penetration: MagicMock,
     ) -> None:
         """全部缓存命中 → 不调用 generate_* 函数。"""
         mock_cache_get.return_value = self.CACHED_CONTENT
         macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
-            {}, {}, 0, 0, 0, 0, 0, {},
-            holdings_details=[], penetrated_assets=[],
+            {},
+            {},
+            0,
+            0,
+            0,
+            0,
+            0,
+            {},
+            holdings_details=[],
+            penetrated_assets=[],
         )
         self.assertIsNotNone(macro)
         self.assertIsNotNone(expert)
@@ -305,9 +352,12 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
 
     @patch("src.python.llm.generators_orchestrator.cache_get")
     def test_none_cached_all_threads(
-        self, mock_cache_get: MagicMock,
-        mock_expert: MagicMock, mock_macro: MagicMock,
-        mock_health: MagicMock, mock_penetration: MagicMock,
+        self,
+        mock_cache_get: MagicMock,
+        mock_expert: MagicMock,
+        mock_macro: MagicMock,
+        mock_health: MagicMock,
+        mock_penetration: MagicMock,
     ) -> None:
         """全部未缓存 → 调用全部 generate_* 函数。"""
         mock_cache_get.return_value = None
@@ -317,8 +367,16 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_penetration.return_value = ("<p>穿透</p>", False)
 
         macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
-            {}, {}, 0, 0, 0, 0, 0, {},
-            holdings_details=[], penetrated_assets=[],
+            {},
+            {},
+            0,
+            0,
+            0,
+            0,
+            0,
+            {},
+            holdings_details=[],
+            penetrated_assets=[],
         )
         self.assertIsNotNone(macro)
         self.assertIsNotNone(expert)
@@ -331,9 +389,12 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
 
     @patch("src.python.llm.generators_orchestrator.cache_get")
     def test_force_skips_cache(
-        self, mock_cache_get: MagicMock,
-        mock_expert: MagicMock, mock_macro: MagicMock,
-        mock_health: MagicMock, mock_penetration: MagicMock,
+        self,
+        mock_cache_get: MagicMock,
+        mock_expert: MagicMock,
+        mock_macro: MagicMock,
+        mock_health: MagicMock,
+        mock_penetration: MagicMock,
     ) -> None:
         """force=True → 跳过缓存预检，全部线程生成。"""
         mock_cache_get.return_value = self.CACHED_CONTENT
@@ -343,8 +404,16 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         mock_penetration.return_value = ("<p>穿透</p>", False)
 
         macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
-            {}, {}, 0, 0, 0, 0, 0, {},
-            holdings_details=[], penetrated_assets=[],
+            {},
+            {},
+            0,
+            0,
+            0,
+            0,
+            0,
+            {},
+            holdings_details=[],
+            penetrated_assets=[],
             force=True,
         )
         self.assertIsNotNone(macro)
@@ -359,23 +428,36 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
 
     @patch("src.python.llm.generators_orchestrator.cache_get")
     def test_partial_cache_some_threads(
-        self, mock_cache_get: MagicMock,
-        mock_expert: MagicMock, mock_macro: MagicMock,
-        mock_health: MagicMock, mock_penetration: MagicMock,
+        self,
+        mock_cache_get: MagicMock,
+        mock_expert: MagicMock,
+        mock_macro: MagicMock,
+        mock_health: MagicMock,
+        mock_penetration: MagicMock,
     ) -> None:
         """部分缓存命中 → 仅未命中的模块提交线程。"""
+
         # 模拟 macro 和 expert 命中缓存，health 和 penetration 未命中
         def _side_effect(key, ttl=None):
             if "global_macro" in key or "expert_review" in key:
                 return self.CACHED_CONTENT
             return None
+
         mock_cache_get.side_effect = _side_effect
         mock_health.return_value = ("<p>体检</p>", False)
         mock_penetration.return_value = ("<p>穿透</p>", False)
 
         macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
-            {}, {}, 0, 0, 0, 0, 0, {},
-            holdings_details=[], penetrated_assets=[],
+            {},
+            {},
+            0,
+            0,
+            0,
+            0,
+            0,
+            {},
+            holdings_details=[],
+            penetrated_assets=[],
         )
         self.assertIsNotNone(macro)
         self.assertIsNotNone(expert)
@@ -393,16 +475,28 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
     @patch("src.python.llm.generators_orchestrator.cache_get")
     @patch("src.python.llm.api_base.record_per_module")
     def test_cache_hit_records_per_module(
-        self, mock_record: MagicMock, mock_cache_get: MagicMock,
-        mock_expert: MagicMock, mock_macro: MagicMock,
-        mock_health: MagicMock, mock_penetration: MagicMock,
+        self,
+        mock_record: MagicMock,
+        mock_cache_get: MagicMock,
+        mock_expert: MagicMock,
+        mock_macro: MagicMock,
+        mock_health: MagicMock,
+        mock_penetration: MagicMock,
     ) -> None:
         """全部缓存命中 → 为每个模块记录 per_module 用量（cached=True）。"""
         mock_cache_get.return_value = self.CACHED_CONTENT
 
         macro, expert, health, pen, mc, ec, hc, pc, *_ = generate_all_llm(
-            {}, {}, 0, 0, 0, 0, 0, {},
-            holdings_details=[], penetrated_assets=[],
+            {},
+            {},
+            0,
+            0,
+            0,
+            0,
+            0,
+            {},
+            holdings_details=[],
+            penetrated_assets=[],
         )
 
         self.assertEqual(mock_record.call_count, 4)
@@ -417,17 +511,24 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
 
     @patch("src.python.llm.api_base.record_per_module")
     def test_partial_cache_records_per_module(
-        self, mock_record: MagicMock,
-        mock_expert: MagicMock, mock_macro: MagicMock,
-        mock_health: MagicMock, mock_penetration: MagicMock,
+        self,
+        mock_record: MagicMock,
+        mock_expert: MagicMock,
+        mock_macro: MagicMock,
+        mock_health: MagicMock,
+        mock_penetration: MagicMock,
     ) -> None:
         """部分缓存命中 → 仅缓存命中模块记录 per_module。"""
         # 模拟 precheck 缓存：需要 mock cache_get 但该函数在 @patch 顺序中未直接传入
         # 直接调用 _precheck_one_cache 验证，而非 generate_all_llm
         from src.python.llm.generators_orchestrator import _precheck_one_cache
 
-        cache_info = {"key": "llm_global_macro_fp", "ttl": 3600,
-                       "can_cache": True, "thinking_key": "thinking_enabled_global_macro"}
+        cache_info = {
+            "key": "llm_global_macro_fp",
+            "ttl": 3600,
+            "can_cache": True,
+            "thinking_key": "thinking_enabled_global_macro",
+        }
         llm_config = {"model": "test-model", "endpoint": "https://test.endpoint"}
 
         with patch("src.python.llm.generators_orchestrator.cache_get", return_value=self.CACHED_CONTENT):
@@ -437,9 +538,157 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
         self.assertTrue(from_cache)
         # 当缓存内容不含模型名时，使用 llm_config["model"] 作为模型名
         mock_record.assert_called_once_with(
-            "global_macro", "test-model", cached=True,
-            thinking=False, endpoint="https://test.endpoint",
+            "global_macro",
+            "test-model",
+            cached=True,
+            thinking=False,
+            endpoint="https://test.endpoint",
         )
+
+
+class TestDataQualityBlockRenderedOnce(unittest.TestCase):
+    """数据质量详细状态块：每次运行只渲染一次，且进指纹的实例与进提示词的实例是同一个。
+
+    health_check 的提示词含【数据质量详细状态】段（由 ``degradation_events`` 渲染），
+    而模块缓存键由指纹决定。若「进键的文本」与「进提示词的文本」来自两次独立渲染，
+    两侧就只能靠纪律对齐——渲染器一改而指纹不动，缓存键就与内容脱钩，预检命中旧键后
+    直接复用按旧降级事件算出的健康结论（源已恢复、报告仍称其失败）。故以哨兵字符串
+    锁定「同一实例」。
+    """
+
+    _SENTINEL = "【数据质量详细状态】哨兵块-用于锁定同一实例"
+
+    def test_block_rendered_once_and_shared_by_fingerprint_and_prompt(self) -> None:
+        from src.python.llm import generators_orchestrator as orch
+
+        rendered: list[str] = []
+
+        def _fake_render(*_args, **_kwargs):
+            rendered.append(self._SENTINEL)
+            return self._SENTINEL
+
+        llm_config = {
+            "enabled_llm": {
+                "global_macro": False,
+                "expert_review": False,
+                "health_check": True,
+                "penetration_deep": False,
+            }
+        }
+        with (
+            patch.object(orch, "get_llm_config", return_value=llm_config),
+            patch.object(orch, "_build_competitive_context_block", return_value=""),
+            patch.object(orch, "_build_data_quality_detail_block", side_effect=_fake_render),
+            patch.object(orch, "_compute_module_cache_info", wraps=orch._compute_module_cache_info) as mock_info,
+            patch.object(orch, "generate_health_check", return_value=("<p>体检</p>", False)) as mock_health,
+            patch.object(orch, "ThreadPoolExecutor", new=SynchronousExecutor),
+            patch.object(orch, "make_http_client", return_value=MagicMock()),
+        ):
+            generate_all_llm(
+                [],
+                [],
+                100000.0,
+                90000.0,
+                10000.0,
+                500.0,
+                1,
+                {"股票": 100000.0},
+                force=True,
+                degradation_events=[{"source_key": "tencent", "failure_type": "unreachable", "degraded": True}],
+            )
+
+        self.assertEqual(len(rendered), 1, "数据质量块被渲染了多次 → 两侧可能各渲染一份")
+
+        # 预检侧（进指纹）拿到的实例
+        self.assertIs(
+            mock_info.call_args.kwargs["data_quality_text"],
+            self._SENTINEL,
+            "预检侧的数据质量块不是本次渲染的实例 → 指纹与提示词可能脱钩",
+        )
+        # 写侧（进提示词）拿到的实例
+        self.assertIs(
+            mock_health.call_args.kwargs["data_quality_text"],
+            self._SENTINEL,
+            "health_check 提示词收到的数据质量块与预检侧不是同一实例",
+        )
+
+
+class TestCompetitiveContextRenderedOnce(unittest.TestCase):
+    """竞争语境块：每次运行只渲染一次，且进指纹的实例与进提示词的实例是同一个。
+
+    模块缓存键由指纹决定，而竞争语境块（组合 vs 指数对比）是提示词内容的一部分。
+    若「进键的文本」与「进提示词的文本」来自两次独立渲染，两侧就只能靠纪律对齐
+    ——渲染器一改（换单位/加行/改口径说明）而指纹不动，缓存键就与内容脱钩，
+    预检命中旧键后直接复用按旧指数算出的对比结论。故以哨兵字符串锁定「同一实例」。
+    """
+
+    _SENTINEL = "【今日对比】哨兵块-用于锁定同一实例"
+
+    def test_block_rendered_once_and_shared_by_fingerprint_and_prompt(self) -> None:
+        from src.python.llm import generators_orchestrator as orch
+
+        rendered: list[str] = []
+
+        def _fake_render(*_args, **_kwargs):
+            rendered.append(self._SENTINEL)
+            return self._SENTINEL
+
+        llm_config = {
+            "enabled_llm": {
+                "global_macro": True,
+                "expert_review": True,
+                "health_check": True,
+                "penetration_deep": True,
+            }
+        }
+        with (
+            patch.object(orch, "get_llm_config", return_value=llm_config),
+            patch.object(orch, "_build_competitive_context_block", side_effect=_fake_render),
+            patch.object(orch, "_compute_module_cache_info", wraps=orch._compute_module_cache_info) as mock_info,
+            patch.object(orch, "generate_global_macro", return_value=("<p>宏</p>", False)) as mock_macro,
+            patch.object(orch, "generate_expert_review", return_value=("<p>复盘</p>", False)) as mock_expert,
+            patch.object(orch, "generate_health_check", return_value=("<p>体检</p>", False)),
+            patch.object(orch, "generate_penetration_deep_analysis", return_value=("<p>穿透</p>", False)),
+            patch.object(orch, "ThreadPoolExecutor", new=SynchronousExecutor),
+            patch.object(orch, "make_http_client", return_value=MagicMock()),
+        ):
+            generate_all_llm([], [], 100000.0, 90000.0, 10000.0, 500.0, 1, {"股票": 100000.0}, force=True)
+
+        self.assertEqual(len(rendered), 1, "竞争语境块被渲染了多次 → 两侧可能各渲染一份")
+
+        # 预检侧（进指纹）拿到的实例
+        self.assertIs(
+            mock_info.call_args.kwargs["competitive_context"],
+            self._SENTINEL,
+            "预检侧的竞争语境块不是本次渲染的实例 → 指纹与提示词可能脱钩",
+        )
+        # 写侧（进提示词）拿到的实例
+        for mock_fn, module_key in ((mock_macro, "global_macro"), (mock_expert, "expert_review")):
+            self.assertIs(
+                mock_fn.call_args.kwargs["competitive_context"],
+                self._SENTINEL,
+                f"{module_key} 提示词收到的竞争语境块与预检侧不是同一实例",
+            )
+
+    def test_expert_review_prompt_receives_metrics(self) -> None:
+        """量化指标同样只在提示词与指纹之间共享同一份数据（不得各自重算）。"""
+        from src.python.llm import generators_orchestrator as orch
+
+        metrics = {"sharpe_ratio": 1.2, "hhi": 0.3}
+        llm_config = {"enabled_llm": {"global_macro": False, "expert_review": True}}
+
+        with (
+            patch.object(orch, "get_llm_config", return_value=llm_config),
+            patch.object(orch, "_build_competitive_context_block", return_value=""),
+            patch.object(orch, "generate_expert_review", return_value=("<p>复盘</p>", False)) as mock_expert,
+            patch.object(orch, "ThreadPoolExecutor", new=SynchronousExecutor),
+            patch.object(orch, "make_http_client", return_value=MagicMock()),
+        ):
+            generate_all_llm(
+                [], [], 100000.0, 90000.0, 10000.0, 500.0, 1, {"股票": 100000.0}, force=True, metrics=metrics
+            )
+
+        self.assertIs(mock_expert.call_args.kwargs["metrics"], metrics)
 
 
 class TestThinkingConcurrencyLimit(unittest.TestCase):
@@ -492,9 +741,7 @@ class TestThinkingConcurrencyLimit(unittest.TestCase):
             patch("src.python.llm.generators_orchestrator._build_competitive_context_block", return_value=""),
             patch("src.python.llm.generators_orchestrator.make_http_client", return_value=MagicMock()),
         ):
-            result = _dispatch_llm_workers(
-                needs, llm_config, False, {}, {}, 0, 0, 0, 0, 0, {}, None, None, None
-            )
+            result = _dispatch_llm_workers(needs, llm_config, False, {}, {}, 0, 0, 0, 0, 0, {}, None, None, None)
 
         # 三个模块全部完成
         self.assertEqual(len(result), 3)
@@ -504,3 +751,52 @@ class TestThinkingConcurrencyLimit(unittest.TestCase):
         self.assertGreaterEqual(gap, 0.04, "thinking 模块应串行执行（并发限制未生效）")
         # 总并发不超 llm_max_concurrency
         self.assertLessEqual(_tracking["max_active"], 3)
+
+
+class TestNewsCorrelationNotOrchestrated(unittest.TestCase):
+    """新闻关联不经编排层线程池（模块注册须与真实运行路径一致）。
+
+    新闻关联的返回类型是 ``(list[dict], bool, dict)``（富化后的新闻列表），
+    与其余 HTML 生成模块的 ``(str, bool)`` 不同，由 `report/news_correlation.py`
+    直调 ``run_news_correlation_safe``。编排层曾另设一条「预计算 + 模块级变量
+    传递」路径（闭包包装成 JSON 字符串、结果经 ``_news_correlation_result``
+    传回），但该分支的入参 ``news_data`` / ``holdings_data`` 在任何调用方都
+    未传入，**永不执行**——注册表里有、运行时从不跑，正是「注册须与真实运行路径
+    一致」要防的注册漂移。
+    """
+
+    def test_dispatch_has_no_news_correlation_params(self) -> None:
+        """分发入口不再接受新闻/持仓入参（回归：旧签名含这三个永不使用的参数）。"""
+        import inspect
+
+        from src.python.llm.generators_orchestrator import _dispatch_llm_workers
+
+        params = set(inspect.signature(_dispatch_llm_workers).parameters)
+        for dead in ("news_data", "holdings_data", "penetrated_assets_for_news"):
+            self.assertNotIn(dead, params, f"编排层不应再接受 {dead}——该注册分支无调用方")
+
+    def test_dispatch_never_returns_news_correlation(self) -> None:
+        """实跑一次分发：结果键即传入的模块键，不含注入的 news_correlation。"""
+        from src.python.llm.generators_orchestrator import _dispatch_llm_workers
+
+        keys = ("health_check", "expert_review", "global_macro", "penetration_deep")
+        fns = {key: (lambda _c, _lc, _k=key: (f"<p>{_k}</p>", False)) for key in keys}
+        needs = dict.fromkeys(keys, True)
+
+        with (
+            patch("src.python.llm.generators_orchestrator._build_module_fns", return_value=fns),
+            patch("src.python.llm.generators_orchestrator._build_competitive_context_block", return_value=""),
+            patch("src.python.llm.generators_orchestrator.make_http_client", return_value=MagicMock()),
+        ):
+            result = _dispatch_llm_workers(needs, {}, False, {}, {}, 0, 0, 0, 0, 0, {}, None, None, None)
+
+        self.assertEqual(set(result), set(keys))
+
+    def test_precompute_result_api_removed(self) -> None:
+        """不再暴露「预计算结果」读取接口（路径移除后该 API 已无来源）。"""
+        import src.python.llm as llm_pkg
+
+        self.assertFalse(
+            hasattr(llm_pkg, "get_news_correlation_result"),
+            "编排层预计算路径已移除，不应再暴露其结果读取接口",
+        )

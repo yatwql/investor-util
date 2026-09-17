@@ -1068,14 +1068,15 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
             </div>
 
-            {% if market_temperature %}
-            <!-- 市场温度（report_submodules.market_temperature 子模块） -->
+            {# 市场温度（report_submodules.market_temperature，默认开）：不可用时整块静默省略，
+               避免在用户未主动要求的功能上出现降级痕迹（与 Excel 同判据） #}
+            {% if market_temperature and market_temperature.available %}
             <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【市场温度】</h3>
             <table class="kv-table">
-                {% if market_temperature.available and market_temperature.score is not none %}
+                {% if market_temperature.score is not none %}
                 <tr><td>市场温度</td><td style="font-weight: 700;">{{ market_temperature.score | round(0) | int }} / 100（{{ market_temperature.tier }}）</td></tr>
                 {% else %}
-                <tr><td>市场温度</td><td>--（数据不足，暂不显示）</td></tr>
+                <tr><td>市场温度</td><td>--（{{ market_temperature.tier }}）</td></tr>
                 {% endif %}
                 {% if market_temperature.components %}
                 <tr>
@@ -1097,9 +1098,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  市值核算 (Market Value)                               -->
-    <div class="section" id="sec-market_value" style="order: {{ section_numbers['market_value'] }};">
-        <div class="section-title">{{ section_numbers['market_value'] }}、市值核算明细表</div>
+    <!--  持仓明细与分类 (Holdings Detail)                       -->
+    <div class="section" id="sec-holdings_detail" style="order: {{ section_numbers['holdings_detail'] }};">
+        <div class="section-title">{{ section_numbers['holdings_detail'] }}、持仓明细与分类</div>
+        <div class="block-title">一、市值核算明细</div>
         <div class="section-content" style="padding: 0;">
             <table>
                 <thead>
@@ -1173,14 +1175,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </tbody>
             </table>
         </div>
-        {{ render_back_to_top() }}
-    </div>
 
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  持仓分类表 (Category Summary)                         -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <div class="section" id="sec-category" style="order: {{ section_numbers['category'] }};">
-        <div class="section-title">{{ section_numbers['category'] }}、持仓分类表</div>
+        <div class="block-title">二、持仓分类汇总</div>
         <div class="section-content" style="padding: 0;">
             <table>
                 <thead>
@@ -1334,7 +1330,11 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         <div class="penetration-notes">
             {% set s = penetration["summary"] %}
             {% if s.get("unknown_mv", 0) > 0 %}
-            <div>* {{ s["total_funds"] }} 只基金中，有 {{ s["failed_funds"] }} 只无法获取穿透数据，合计市值 {{ s["unknown_mv"] | money }} 元未计入穿透 TOP10</div>
+            <div>* {{ s["total_funds"] }} 只基金中，有
+                {%- if s["failed_funds"] %} {{ s["failed_funds"] }} 只无法获取穿透数据{% endif -%}
+                {%- if s["failed_funds"] and s.get("stale_funds") %}、{% endif -%}
+                {%- if s.get("stale_funds") %} {{ s["stale_funds"] }} 只因持仓报告期陈旧被剔除{% endif -%}
+                ，合计市值 {{ s["unknown_mv"] | money }} 元未计入穿透 TOP10</div>
             {% set failed_details = s.get("failed_fund_details", []) %}
             {% if failed_details %}
             <div style="margin-left: 1.5em; font-size: 12px;">
@@ -1344,13 +1344,35 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 {% endfor %}
             </div>
             {% endif %}
+            {% set stale_details = s.get("stale_fund_details", []) %}
+            {% if stale_details %}
+            <div style="margin-left: 1.5em; font-size: 12px;">
+                报告期陈旧被剔除的基金：
+                {% for f in stale_details %}
+                <span class="source-tag">{{ f["name"] }}({{ f["code"] }}) 报告期 {{ f["period"] }}，距今 {{ f["quarters"] }} 个完整季度</span>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% endif %}
             <div>
                 基金 {{ s["total_funds"] }} 只（{{ s["fund_breakdown"] }}） + 直接持股 {{ s["total_stocks"] }} 只
                 → 穿透合并 {{ s["merged_count"] }} 个标的，TOP10 覆盖 {{ s["top10_coverage_pct"] }}%
             </div>
+            {% set report_periods = s.get("report_periods", []) %}
+            {% if report_periods %}
+            <div style="font-size: 12px;">
+                各基金持仓报告期：
+                {% for p in report_periods %}
+                <span class="source-tag">{{ p["name"] }}({{ p["code"] }}) {{ p["period"] }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% if valuation_enabled %}
+            {% if valuation_real_basis %}
+            <div>* 估值分位说明：真实历史估值分位（TTM 口径，按法定披露截止日生效）优先；无基本面覆盖时回落价格分位代理（非真实历史估值分位）。PE/PB 为当前行情值</div>
+            {% else %}
             <div>* 估值分位说明：价格分位代理，非真实历史估值分位（PE/PB 为当前行情值）</div>
+            {% endif %}
             {% endif %}
         </div>
         {% else %}
@@ -1434,6 +1456,18 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </tbody>
             </table>
         </div>
+        {% set _cand_periods = candidate_data["rows"] | selectattr("available") | map(attribute="report_label") | select | list %}
+        {% set _stale_baseline = candidate_data.get("stale_baseline_notes") or [] %}
+        {% if _cand_periods or _stale_baseline %}
+        <div class="penetration-notes">
+            {% if _cand_periods %}
+            <div>* 持仓报告期：{{ _cand_periods | join("；") }}</div>
+            {% endif %}
+            {% if _stale_baseline %}
+            <div>* ⚠ 现有持仓报告期陈旧、未计入重合度基准：{{ _stale_baseline | join("；") }}</div>
+            {% endif %}
+        </div>
+        {% endif %}
         {% if candidate_data.get("exceed_limit") %}
         <div class="penetration-notes"><div>* 候选基金超过 10 只，仅比较前 10 只（超出部分忽略）。</div></div>
         {% endif %}
@@ -1449,68 +1483,64 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         <div class="penetration-notes">
             <div>* 业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿)；超额收益评分≥80上调一级、&lt;40下调一级</div>
         </div>
+
+        {# ── 基金经理变更监控块（基金业绩的子视图；manager_analysis 为 None 表示基金深度分析未开启）── #}
+        {% if manager_analysis %}
+        {% set _mgr_results = manager_analysis.get("results") or [] %}
+        <div class="block-title">基金经理变更监控</div>
+        {% if _mgr_results %}
+        {% if manager_analysis.get("first_check_summary") %}
+        <div class="notice-banner">📋 {{ manager_analysis["first_check_summary"] }}</div>
+        <br>
+        {% endif %}
+        {% set high_risk = _mgr_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
+        {% if high_risk %}
+        <div class="summary-tag" style="margin-bottom: 8px;">
+            ⚠️ <strong>{{ high_risk | length }}</strong> 只基金存在变更风险
+        </div>
+        {% endif %}
+        <table>
+            <thead>
+                <tr>
+                    <th>基金名称</th><th>代码</th><th>当前基金经理</th><th>任职天数</th>
+                    <th>1月内变更</th><th>3月内变更</th><th>6月内变更</th><th>预警级别</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in _mgr_results %}
+                {% set _alert = r.get("alert_level", "") %}
+                <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% elif _alert == '首检' %}row-first-check{% endif %}">
+                    <td class="text-left">{{ r["name"] }}</td>
+                    <td>{{ r["code"] }}</td>
+                    <td class="text-left">{{ r["current_manager"] }}</td>
+                    <td>{{ r["tenure_days"] }}</td>
+                    <td>{{ "—" if r["is_first_check"] else ("🔴 是" if r["changed_1m"] else "✅ 否") }}</td>
+                    <td>{{ "—" if r["is_first_check"] else ("⚠️ 是" if r["changed_3m"] else "✅ 否") }}</td>
+                    <td>{{ "—" if r["is_first_check"] else ("⚠️ 是" if r["changed_6m"] else "✅ 否") }}</td>
+                    <td class="{% if _alert == '紧急' %}red-text{% elif _alert == '关注' %}orange-text{% elif _alert == '首检' %}gray-text{% endif %}">
+                        {% if _alert == "紧急" %}🔴 {{ _alert }}{% elif _alert == "关注" %}⚠️ {{ _alert }}{% elif _alert == "首检" %}📋 {{ _alert }}{% else %}✅ {{ _alert }}{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="penetration-notes">
+            <div>* 预警级别标准：30天内变更→🔴紧急，90天内→⚠️关注，首次运行→📋首检（自下次起跟踪）</div>
+        </div>
+        {% else %}
+        <div class="empty-section">📭 暂无基金经理变更数据（本次分析未检测到基金经理任职未满180天）</div>
+        {% endif %}
+        {% endif %}
+
         {{ render_data_status(data_status_perf) }}
         {{ render_back_to_top() }}
     </div>
 
     <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  基金经理变更监控                                     -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("fund_manager") %}
-    <div class="section" id="sec-fund_manager" style="order: {{ section_numbers['fund_manager'] }};">
-        <div class="section-title">{{ section_numbers['fund_manager'] }}、基金经理变更监控</div>
-        <div class="section-content">
-            {% if manager_analysis["results"] %}
-            {% if manager_analysis.get("first_check_summary") %}
-            <div class="notice-banner">📋 {{ manager_analysis["first_check_summary"] }}</div>
-            <br>
-            {% endif %}
-            {% set high_risk = manager_analysis["results"] | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
-            {% if high_risk %}
-            <div class="summary-tag" style="margin-bottom: 8px;">
-                ⚠️ <strong>{{ high_risk | length }}</strong> 只基金存在变更风险
-            </div>
-            {% endif %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>基金名称</th><th>代码</th><th>当前基金经理</th><th>任职天数</th>
-                        <th>1月内变更</th><th>3月内变更</th><th>6月内变更</th><th>预警级别</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in manager_analysis["results"] %}
-                    {% set _alert = r.get("alert_level", "") %}
-                    <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% elif _alert == '首检' %}row-first-check{% endif %}">
-                        <td class="text-left">{{ r["name"] }}</td>
-                        <td>{{ r["code"] }}</td>
-                        <td class="text-left">{{ r["current_manager"] }}</td>
-                        <td>{{ r["tenure_days"] }}</td>
-                        <td>{{ "—" if r["is_first_check"] else ("🔴 是" if r["changed_1m"] else "✅ 否") }}</td>
-                        <td>{{ "—" if r["is_first_check"] else ("⚠️ 是" if r["changed_3m"] else "✅ 否") }}</td>
-                        <td>{{ "—" if r["is_first_check"] else ("⚠️ 是" if r["changed_6m"] else "✅ 否") }}</td>
-                        <td class="{% if _alert == '紧急' %}red-text{% elif _alert == '关注' %}orange-text{% elif _alert == '首检' %}gray-text{% endif %}">
-                            {% if _alert == "紧急" %}🔴 {{ _alert }}{% elif _alert == "关注" %}⚠️ {{ _alert }}{% elif _alert == "首检" %}📋 {{ _alert }}{% else %}✅ {{ _alert }}{% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <div class="penetration-notes">
-                <div>* 预警级别标准：30天内变更→🔴紧急，90天内→⚠️关注，首次运行→📋首检（自下次起跟踪）</div>
-            </div>
-            {% else %}
-            <div class="empty-section">📭 暂无基金经理变更数据（本次分析未检测到基金经理任职未满180天）</div>
-            {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
-
-    <!-- ═══════════════════════════════════════════════════════ -->
     <!--  持仓关系矩阵（重合度 + 相关性 一章两区块）               -->
     <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("position_relationship") %}
+    {% if section_visible("position_structure") %}
+    {% set overlap_matrix = overlap_matrix or {} %}
     {% set _fund_names = overlap_matrix.get("fund_names", {}) %}
     {% set _funds = overlap_matrix.get("funds", []) %}
     {% set _matrix = overlap_matrix.get("matrix", []) %}
@@ -1521,11 +1551,17 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% set _corr_matrix = _corr_data.get("matrix", []) %}
     {% set _corr_pvals = _corr_data.get("p_values", []) %}
     {% set _corr_pairs = _corr_data.get("pairs", []) %}
-    <div class="section" id="sec-position_relationship" style="order: {{ section_numbers['position_relationship'] }};">
-        <div class="section-title">{{ section_numbers['position_relationship'] }}、持仓关系矩阵</div>
+    <div class="section" id="sec-position_structure" style="order: {{ section_numbers['position_structure'] }};">
+        <div class="section-title">{{ section_numbers['position_structure'] }}、持仓结构与集中度</div>
         <div class="section-content">
             <!-- 区块一：持仓重合度矩阵 -->
-            <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">一、持仓重合度矩阵</div>
+            <div class="block-title">一、持仓重合度矩阵</div>
+            {% set _stale_notes = overlap_matrix.get("stale_fund_notes", []) %}
+            {% if _stale_notes %}
+            <div class="notice-banner" style="margin-bottom: 8px; font-size: 12px;">
+                ⚠ 持仓报告期陈旧、已从矩阵剔除：{{ _stale_notes | join("；") }}
+            </div>
+            {% endif %}
             {% if _funds and _pairs %}
             <div class="summary-tag" style="margin-bottom: 8px;">
                 📊 <strong>{{ _funds | length }}</strong> 只基金，共 <strong>{{ _pairs | length }}</strong> 对组合
@@ -1620,7 +1656,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
             <!-- 区块二：持仓相关性矩阵 -->
             <br>
-            <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">二、持仓相关性矩阵</div>
+            <div class="block-title">二、持仓相关性矩阵</div>
             {% if position_relationship_data and position_relationship_data.get("available") and _corr_codes %}
             <div class="summary-tag" style="margin-bottom: 8px;">
                 📊 <strong>{{ _corr_codes | length }}</strong> 个品种，最近 <strong>{{ position_relationship_data["window"] }}</strong> 个交易日重叠样本（有效 {{ position_relationship_data["sample_count"] }} 期）
@@ -1753,19 +1789,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% else %}
             <div class="empty-section">📭 持仓相关性数据不足（需要至少 2 只重叠样本品种方可计算持仓相关性矩阵）</div>
             {% endif %}
-        </div>
-        {{ render_back_to_top() }}
-    </div>
-    {% endif %}
-
-    <!-- ═══════════════════════════════════════════════════════ -->
-    <!--  持仓集中度监控                                       -->
-    <!-- ═══════════════════════════════════════════════════════ -->
-    {% if section_visible("fund_concentration") %}
-    {% set conc_results = concentration_analysis["results"] %}
-    <div class="section" id="sec-fund_concentration" style="order: {{ section_numbers['fund_concentration'] }};">
-        <div class="section-title">{{ section_numbers['fund_concentration'] }}、持仓集中度监控</div>
-        <div class="section-content">
+            <div class="block-title">三、持仓集中度监控</div>
+            {% set conc_results = concentration_analysis["results"] if concentration_analysis else [] %}
             {% if conc_results %}
             {% set high_risk = conc_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
             {% if high_risk %}
@@ -1776,7 +1801,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <table>
                 <thead>
                     <tr>
-                        <th>基金名称</th><th>代码</th><th>前3占比</th><th>前5占比</th><th>前10占比</th>
+                        <th>基金名称</th><th>代码</th><th>报告期</th><th>前3占比</th><th>前5占比</th><th>前10占比</th>
                         <th>上期前10</th><th>环比变化</th><th>预警</th>
                     </tr>
                 </thead>
@@ -1786,6 +1811,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                     <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% endif %}">
                         <td class="text-left">{{ r["name"] }}</td>
                         <td>{{ r["code"] }}</td>
+                        <td style="font-size: 12px; {{ 'color: #b06a00;' if r.get('report_stale') }}">
+                            {{ r.get("report_period", "") }}{% if r.get("report_stale") %}（陈旧）{% endif %}
+                        </td>
                         <td>{{ "%.2f"|format(r["top3_pct"]) }}%</td>
                         <td>{{ "%.2f"|format(r["top5_pct"]) }}%</td>
                         <td>{{ "%.2f"|format(r["top10_pct"]) }}%</td>
@@ -1797,6 +1825,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         {% if r.get("is_first_check") %}
                         <td><span class="gray-text">基线已记录</span></td>
                         <td><span class="gray-text">📋 首次</span></td>
+                        {% elif r.get("period_unchanged") %}
+                        <td><span class="gray-text">无对比意义</span></td>
+                        <td><span class="gray-text">⎯ 报告期未推进</span></td>
                         {% elif r.get("change_pct") is not none %}
                         {% set cp = r["change_pct"] %}
                         <td style="{% if cp > 10 %}color: var(--profit); font-weight: bold;{% endif %}">
@@ -1814,6 +1845,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </table>
             <div class="penetration-notes">
                 <div>* 环比变化 >+20% → 🔴 紧急，>+10% → ⚠️ 关注，前10占比 >80% → ⚠️ 关注</div>
+                <div>* 报告期 = 本期持仓所依据的定期报告期次；报告期与上期相同时环比无对比意义（本次与上期读的是同一份报告），据实标注而非报 0</div>
             </div>
             {% else %}
             <div class="empty-section">📭 暂无持仓集中度数据（未检测到基金持仓或 API 返回为空）</div>
@@ -2606,6 +2638,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
     {% include "partials/evolution_section.html" with context %}
 
+    {% include "partials/fundamental_snapshot_section.html" with context %}
+
     {% include "partials/action_section.html" with context %}
 
     {% if section_visible("data_source_status") %}
@@ -2675,6 +2709,38 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% else %}
             <div class="data-status" style="margin-top:0;">
                 <div class="data-status-ok" style="border-left-color:#27ae60;padding-left:8px;">所有数据源运行正常</div>
+            </div>
+            {% endif %}
+            <!-- 数据源说明表（实际使用清单：用途 / 计费 / 凭据要求） -->
+            {% if data_source_catalog %}
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">数据源说明（实际使用清单）</div>
+                <table>
+                    <tr>
+                        <th>数据类别</th>
+                        <th>实际数据源（链路）</th>
+                        <th>用途</th>
+                        <th>计费</th>
+                        <th>凭据 / 就绪</th>
+                        <th>本次使用</th>
+                    </tr>
+                    {% for item in data_source_catalog %}
+                    <tr>
+                        <td style="text-align:left;font-weight:600;">{{ item.category }}</td>
+                        <td style="text-align:left;">{{ item.provider }}{% if item.note %}；{{ item.note }}{% endif %}</td>
+                        <td style="text-align:left;">{{ item.usage }}</td>
+                        <td>{{ item.billing }}</td>
+                        <td>{{ item.auth }}</td>
+                        <td>
+                            {% if item.used %}
+                            <span class="src-matrix-ok">&#10003; 已使用</span>
+                            {% else %}
+                            <span style="color:#999;">&#9675; 未使用</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
             </div>
             {% endif %}
             {% if data_quality_enabled %}
@@ -2878,6 +2944,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         由 {{ app_name }} v{{ app_version }} 生成 · 个人投资分析报告 | 生成时间: {{ now }}
         {%- if debate_mode_combination %}
         <br>🧪 辩论模式已启用：{{ debate_mode_combination }}
+        {%- endif %}
+        {%- if enabled_experiments %}
+        <br>⚗ 本报告在 {{ enabled_experiments | length }} 项实验性功能开启下生成：{{ enabled_experiments | join("、") }}
+        <br><span style="font-size:11px;">实验功能输出质量可能不稳定，结论请自行复核</span>
         {%- endif %}
         <br><span style="font-size:11px;">本报告数据仅供本地处理，所有数据保存在当前设备。LLM 请求经由 API 发送到配置的 provider，不会用于训练。</span>
     </div>

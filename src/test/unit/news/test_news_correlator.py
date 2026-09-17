@@ -13,9 +13,8 @@ import unittest
 
 from src.python.providers.news_correlator import correlate_news_with_holdings
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
-
-
 
 
 class TestCorrelateNewsWithHoldings(unittest.TestCase):
@@ -77,10 +76,7 @@ class TestCorrelateNewsWithHoldings(unittest.TestCase):
 
     def test_top_n_limit(self) -> None:
         """top_n 限制返回条数。"""
-        news = [
-            {"title": f"新闻{i}", "intro": f"长江电力{i}", "url": f"http://a.com/{i}"}
-            for i in range(20)
-        ]
+        news = [{"title": f"新闻{i}", "intro": f"长江电力{i}", "url": f"http://a.com/{i}"} for i in range(20)]
         result = correlate_news_with_holdings(news, self.keywords, top_n=5)
         self.assertLessEqual(len(result), 5)
 

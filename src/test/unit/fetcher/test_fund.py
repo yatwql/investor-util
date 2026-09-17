@@ -14,16 +14,17 @@ from __future__ import annotations
 
 import threading
 import unittest
+from unittest import mock
 from unittest.mock import MagicMock, patch
 
 from src.python.fetcher.fund import (
-
     _BUILTIN_BENCHMARKS,
     _get_benchmark_lock,
     _get_full_benchmark_table,
     fetch_fund_benchmark,
 )
 import pytest
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
 
 
@@ -42,8 +43,7 @@ class TestGetFullBenchmarkTable(unittest.TestCase):
     def test_merges_user_overrides(self):
         """config.json 的 user_fund_benchmarks 覆盖内置库。"""
         overrides = {"561910": "自定义基准", "999999": "新基金基准"}
-        with patch("src.python.fetcher.fund.get_config",
-                   return_value={"user_fund_benchmarks": overrides}):
+        with patch("src.python.fetcher.fund.get_config", return_value={"user_fund_benchmarks": overrides}):
             table = _get_full_benchmark_table()
         self.assertEqual(table["561910"], "自定义基准")  # 覆盖
         self.assertEqual(table["999999"], "新基金基准")  # 新增
@@ -51,8 +51,7 @@ class TestGetFullBenchmarkTable(unittest.TestCase):
 
     def test_handles_none_user_benchmarks(self):
         """user_fund_benchmarks 为 None 时不崩溃（由 or {} 兜底）。"""
-        with patch("src.python.fetcher.fund.get_config",
-                   return_value={"user_fund_benchmarks": None}):
+        with patch("src.python.fetcher.fund.get_config", return_value={"user_fund_benchmarks": None}):
             table = _get_full_benchmark_table()
         self.assertEqual(table, _BUILTIN_BENCHMARKS)
 
@@ -69,6 +68,7 @@ class TestGetBenchmarkLock(unittest.TestCase):
     def tearDown(self):
         _benchmark_locks = {}  # 清理全局状态
         import src.python.fetcher.fund as _fm
+
         _fm._benchmark_locks.clear()
 
     def test_creates_lock_on_first_access(self):
@@ -104,10 +104,11 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_factory.return_value = mock_client
 
         resp = MagicMock()
-        resp.text = self._make_html('业绩比较基准：沪深300指数收益率×80%+中证全债×20%')
+        resp.text = self._make_html("业绩比较基准：沪深300指数收益率×80%+中证全债×20%")
         mock_client.get.return_value = resp
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertIsNotNone(result)
         self.assertIn("沪深300", result)
@@ -121,10 +122,11 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_factory.return_value = mock_client
 
         resp = MagicMock()
-        resp.text = self._make_html('业绩比较基准:沪深300指数收益率')
+        resp.text = self._make_html("业绩比较基准:沪深300指数收益率")
         mock_client.get.return_value = resp
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertEqual(result, "沪深300指数收益率")
 
@@ -136,12 +138,11 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_factory.return_value = mock_client
 
         resp = MagicMock()
-        resp.text = self._make_html(
-            '<script>var data = {benchmark: "中证500指数"}; var 基准: 沪深300指数</script>'
-        )
+        resp.text = self._make_html('<script>var data = {benchmark: "中证500指数"}; var 基准: 沪深300指数</script>')
         mock_client.get.return_value = resp
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertIsNotNone(result)
 
@@ -157,6 +158,7 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_client.get.return_value = resp
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertIsNone(result)
 
@@ -164,6 +166,7 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
     def test_handles_http_error(self, mock_factory):
         """HTTP 请求异常时返回 None。"""
         import httpx as _httpx_loc
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -171,6 +174,7 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
         mock_client.get.side_effect = _httpx_loc.RequestError("timeout")
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertIsNone(result)
 
@@ -178,19 +182,21 @@ class TestFetchBenchmarkFromApi(unittest.TestCase):
     def test_tries_multiple_urls(self, mock_factory):
         """第一个 URL 失败时尝试第二个 URL。"""
         import httpx as _httpx_loc
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
 
         # 第一个 URL 超时，第二个返回有效
         resp = MagicMock()
-        resp.text = self._make_html('业绩比较基准：中证全债指数')
+        resp.text = self._make_html("业绩比较基准：中证全债指数")
         mock_client.get.side_effect = [
             _httpx_loc.RequestError("timeout"),
             resp,
         ]
 
         from src.python.fetcher.fund import _fetch_benchmark_from_api
+
         result = _fetch_benchmark_from_api("000000")
         self.assertEqual(result, "中证全债指数")
 
@@ -200,6 +206,7 @@ class TestFetchFundBenchmark(unittest.TestCase):
 
     def tearDown(self):
         import src.python.fetcher.fund as _fm
+
         _fm._benchmark_locks.clear()
 
     @patch("src.python.fetcher.fund.cache_get")
@@ -220,7 +227,10 @@ class TestFetchFundBenchmark(unittest.TestCase):
     @patch("src.python.fetcher.fund.cache_set")
     @patch("src.python.fetcher.fund._fetch_benchmark_from_api")
     def test_uses_api_result_when_cache_misses(
-        self, mock_api, mock_set, mock_get,
+        self,
+        mock_api,
+        mock_set,
+        mock_get,
     ):
         """缓存未命中且 API 成功时，基准来自 API 并写入缓存表。"""
         mock_get.return_value = None
@@ -237,7 +247,10 @@ class TestFetchFundBenchmark(unittest.TestCase):
     @patch("src.python.fetcher.fund.cache_set")
     @patch("src.python.fetcher.fund._fetch_benchmark_from_api")
     def test_falls_back_to_builtin_when_api_fails(
-        self, mock_api, mock_set, mock_get,
+        self,
+        mock_api,
+        mock_set,
+        mock_get,
     ):
         """API 失败时使用内置知识库。"""
         mock_get.return_value = None
@@ -250,7 +263,10 @@ class TestFetchFundBenchmark(unittest.TestCase):
     @patch("src.python.fetcher.fund.cache_set")
     @patch("src.python.fetcher.fund._fetch_benchmark_from_api")
     def test_returns_dash_when_all_layers_fail(
-        self, mock_api, mock_set, mock_get,
+        self,
+        mock_api,
+        mock_set,
+        mock_get,
     ):
         """全部三层失败时返回 '--'。"""
         mock_get.return_value = None
@@ -275,9 +291,7 @@ class TestFetchFundBenchmark(unittest.TestCase):
             return {"000000": "沪深300"}
 
         mock_get.side_effect = _side
-        mock_api.side_effect = lambda code: (
-            api_called.set() or "沪深300"
-        )
+        mock_api.side_effect = lambda code: api_called.set() or "沪深300"
 
         import concurrent.futures
 
@@ -415,12 +429,363 @@ class TestFetchFundHoldingsBatch(unittest.TestCase):
 
     def test_calls_fetch_fund_holdings_cached_internally(self):
         """内部使用 fetch_fund_holdings_cached（含 session_cache）。"""
-        from src.python.fetcher.fund import fetch_fund_holdings_batch, fetch_fund_holdings_cached
+        from src.python.fetcher.fund import fetch_fund_holdings_batch
 
         # Verify the batch function uses the cached variant
-        from functools import partial
         import inspect
 
         # Check that the source references fetch_fund_holdings_cached
         src = inspect.getsource(fetch_fund_holdings_batch)
         self.assertIn("fetch_fund_holdings_cached", src)
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    @patch("src.python.fetcher.batch.BatchDispatcher")
+    def test_penetration_applied_on_cache_hit(self, mock_dispatcher_cls, mock_cached):
+        """**缓存预检命中**时穿透仍须生效。
+
+        回归防线：``execute_with_cache_check`` 命中文件缓存会直接返回缓存值而
+        **不执行任务**（无网络、无 provider 调用），若穿透只挂在单条取数链路内，
+        缓存一热就整段被跳过——修复只在冷缓存下有效。本用例模拟该命中路径
+        （result 由 dispatcher 直接给出，任务未跑），断言穿透在后处理处补做。
+        """
+        mock_disp = MagicMock()
+        mock_disp.execute_with_cache_check.return_value = [
+            type(
+                "R",
+                (),
+                {
+                    "success": True,
+                    "result": {"code": "016055", "name": "某联接基金", "holdings": [], "feeder_target_code": "513390"},
+                },
+            )(),
+        ]
+        mock_dispatcher_cls.return_value = mock_disp
+        mock_cached.return_value = {
+            "code": "513390",
+            "name": "纳指100ETF博时",
+            "date": "2026-06-30",
+            "holdings": [{"name": "苹果", "code": "AAPL", "ratio": 9.0}],
+        }
+
+        from src.python.fetcher.fund import fetch_fund_holdings_batch
+
+        result = fetch_fund_holdings_batch(["016055"])
+
+        entry = result["016055"]
+        self.assertEqual(entry["code"], "016055")
+        self.assertEqual(entry["feeder_penetration"]["target_code"], "513390")
+        self.assertEqual(len(entry["holdings"]), 1)
+
+
+class TestWithFeederPenetration(unittest.TestCase):
+    """with_feeder_penetration — 联接基金以目标 ETF 的持仓代理底层暴露。
+
+    必须是**幂等**的后处理：单条取数与批量两条路径都要过一遍，重复调用无副作用。
+    """
+
+    _FEEDER = {"code": "016055", "name": "某联接基金", "date": "", "holdings": [], "feeder_target_code": "513390"}
+    _TARGET = {
+        "code": "513390",
+        "name": "纳指100ETF博时",
+        "date": "2026-06-30",
+        "holdings": [{"name": "苹果", "code": "AAPL", "ratio": 9.0}],
+    }
+
+    def test_none_result_passthrough(self):
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        self.assertIsNone(with_feeder_penetration("016055", None))
+
+    def test_non_feeder_passthrough(self):
+        """非联接基金（无目标 ETF）原样返回。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        plain = {"code": "110022", "name": "易方达消费行业", "date": "2026-06-30", "holdings": [{"name": "贵州茅台"}]}
+        self.assertIs(with_feeder_penetration("110022", plain), plain)
+
+    def test_idempotent(self):
+        """已穿透的结果原样返回（不重复取目标 ETF、不覆盖来源标注）。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        done = {
+            **self._TARGET,
+            "code": "016055",
+            "feeder_penetration": {"target_code": "513390", "target_name": "纳指100ETF博时"},
+        }
+        with patch("src.python.fetcher.fund.fetch_fund_holdings_cached") as mock_cached:
+            self.assertIs(with_feeder_penetration("016055", done), done)
+        mock_cached.assert_not_called()
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_penetrates_and_labels_source(self, mock_cached):
+        """穿透后保留本基金代码/名称，并记录目标 ETF 供报告层标注来源。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        mock_cached.return_value = self._TARGET
+        result = with_feeder_penetration("016055", dict(self._FEEDER))
+
+        self.assertEqual(result["code"], "016055")
+        self.assertEqual(result["name"], "某联接基金")
+        self.assertEqual(result["date"], "2026-06-30")
+        self.assertEqual(result["holdings"], self._TARGET["holdings"])
+        self.assertEqual(result["feeder_penetration"], {"target_code": "513390", "target_name": "纳指100ETF博时"})
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_target_unavailable_returns_original(self, mock_cached):
+        """目标 ETF 亦取不到时原样返回，交由既有「持仓不可用」路径降级。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        mock_cached.return_value = None
+        result = with_feeder_penetration("016055", dict(self._FEEDER))
+        self.assertEqual(result["holdings"], [])
+        self.assertNotIn("feeder_penetration", result)
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_target_without_holdings_returns_original(self, mock_cached):
+        """目标 ETF 有响应但持仓为空，同样不产生穿透结果。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        mock_cached.return_value = {"code": "513390", "name": "纳指100ETF博时", "date": "", "holdings": []}
+        result = with_feeder_penetration("016055", dict(self._FEEDER))
+        self.assertNotIn("feeder_penetration", result)
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_switch_off_returns_original(self, mock_cached):
+        """switch 关闭时不穿透（回退到「联接基金无底层资产」）。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        with patch("src.python.config.features.is_feature_enabled", return_value=False):
+            result = with_feeder_penetration("016055", dict(self._FEEDER))
+        self.assertNotIn("feeder_penetration", result)
+        mock_cached.assert_not_called()
+
+    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
+    def test_switch_on_by_default(self, mock_cached):
+        """默认开启：不经配置即可穿透。"""
+        from src.python.fetcher.fund import with_feeder_penetration
+
+        mock_cached.return_value = self._TARGET
+        result = with_feeder_penetration("016055", dict(self._FEEDER))
+        self.assertIn("feeder_penetration", result)
+
+
+class TestHithinkHoldingsNormalization(unittest.TestCase):
+    """同花顺披露持仓 → 规范化持仓契约（阶段 3 两源链的备源归一）。"""
+
+    def _hithink_raw(self, **extra):
+        raw = {
+            "_thscode": "011506.OF",
+            "total_stock_ratio_pct": 57.7,
+            "timestamp": 0,
+            "item": [
+                {"ticker": "688200", "stock_name": "华峰测控", "hold_ratio": 9.53, "asset_type": "stock"},
+                {"ticker": "300308", "stock_name": "中际旭创", "hold_ratio": 7.39, "asset_type": "stock"},
+                # 债券/基金资产必须被剔除：穿透层是股票层，混入会污染占比分母
+                {"ticker": "2120089", "stock_name": "21北京银行永续债01", "hold_ratio": 4.94, "asset_type": "bond"},
+                {"ticker": "513390", "stock_name": "博时纳斯达克100ETF", "hold_ratio": 93.5, "asset_type": "fund"},
+                {"ticker": "999999", "stock_name": "无占比项", "hold_ratio": None, "asset_type": "stock"},
+                {"ticker": "888888", "stock_name": "超限项", "hold_ratio": 120.0, "asset_type": "stock"},
+            ],
+            "end_date_ms": 1782748800000,
+        }
+        raw.update(extra)
+        return raw
+
+    def test_maps_items_to_canonical_holdings(self):
+        from src.python.fetcher.fund import _normalize_hold_payload
+
+        out = _normalize_hold_payload(self._hithink_raw(), "同花顺金融数据")
+        self.assertEqual([h["code"] for h in out["holdings"]], ["688200", "300308"])
+        self.assertEqual(out["holdings"][0], {"name": "华峰测控", "code": "688200", "ratio": 9.53})
+        self.assertEqual(out["date"], "2026-06-30")  # end_date_ms → YYYY-MM-DD（Asia/Shanghai）
+        self.assertEqual(out["name"], "")  # 上游该端点不提供基金名
+        self.assertEqual(out["hold_schema"], 2)
+
+    def test_publish_date_fallback_and_invalid_ts(self):
+        from src.python.fetcher.fund import _normalize_hold_payload
+
+        pub = _normalize_hold_payload(self._hithink_raw(end_date_ms=None, publish_date_ms=1782748800000))
+        self.assertEqual(pub["date"], "2026-06-30")
+        bad = _normalize_hold_payload(self._hithink_raw(end_date_ms=None, publish_date_ms="bad"))
+        self.assertEqual(bad["date"], "")
+
+    def test_feeder_target_code_preserved(self):
+        """联接基金：provider 带回的目标 ETF 代码必须原样保留（既有穿透链路依赖它）。"""
+        from src.python.fetcher.fund import _normalize_hold_payload
+
+        out = _normalize_hold_payload(self._hithink_raw(feeder_target_code="513390"), "同花顺金融数据")
+        self.assertEqual(out["feeder_target_code"], "513390")
+
+    def test_tiantian_shape_passes_through_unchanged(self):
+        """主源（天天基金）形态逐字透传——保证主源可用时输出不变。"""
+        from src.python.fetcher.fund import _normalize_hold_payload
+
+        raw = {
+            "code": "011506",
+            "name": "建信高端装备股票A",
+            "date": "2026-03-31",
+            "holdings": [{"name": "x", "code": "1", "ratio": 1.0}],
+        }
+        out = _normalize_hold_payload(raw, "天天基金")
+        self.assertEqual({k: v for k, v in out.items() if k != "hold_schema"}, raw)
+
+
+class TestFundHoldProviderChain(unittest.TestCase):
+    """两源链：天天基金为主、同花顺官方源为备（顺序即链路顺序）。"""
+
+    def test_provider_order_and_identity(self):
+        from src.python.fetcher.fund import _FUND_HOLD_PROVIDERS
+
+        self.assertEqual(list(_FUND_HOLD_PROVIDERS), ["tiantian", "hithink"])
+        self.assertEqual(_FUND_HOLD_PROVIDERS["hithink"][0], "同花顺金融数据")
+        self.assertTrue(callable(_FUND_HOLD_PROVIDERS["hithink"][1]))
+
+    def test_hithink_used_when_tiantian_fails(self):
+        """主源返回空 → 链路切到同花顺备源并归一为规范形态。"""
+        from src.python.fetcher import fund as fund_mod
+
+        calls: list[tuple[str, str]] = []
+
+        def _tia(code):
+            calls.append(("tiantian", code))
+            return None
+
+        def _hit(code):
+            calls.append(("hithink", code))
+            return {
+                "_thscode": "561910.SH",
+                "item": [{"ticker": "300274", "stock_name": "阳光电源", "hold_ratio": 10.19, "asset_type": "stock"}],
+                "end_date_ms": 1782748800000,
+            }
+
+        with (
+            mock.patch.dict(
+                fund_mod._FUND_HOLD_PROVIDERS,
+                {"tiantian": ("天天基金", _tia), "hithink": ("同花顺金融数据", _hit)},
+            ),
+            mock.patch("src.python.fetcher.chain.cache_get", return_value=None),
+            mock.patch("src.python.fetcher.chain.cache_set"),
+            # 同花顺为需凭据源：测试环境无 key，显式放行凭据预检，否则备源会被跳过
+            mock.patch("src.python.fetcher.chain.missing_credential", return_value=None),
+            mock.patch.object(fund_mod, "with_feeder_penetration", side_effect=lambda _c, r: r),
+        ):
+            out = fund_mod.fetch_fund_holdings("561910")
+
+        self.assertEqual([c[0] for c in calls], ["tiantian", "hithink"])
+        self.assertEqual(out["holdings"][0]["name"], "阳光电源")
+        self.assertEqual(out["date"], "2026-06-30")
+        self.assertEqual(out["hold_schema"], 2)
+
+
+class TestHoldPayloadSchema(unittest.TestCase):
+    """``fund_hold_*`` 缓存载荷语义版本（``hold_schema``）——修复自失效防线。
+
+    回归场景（用户报障）：取数修复发布后，另一台机器仍报「QDII 持仓不可用」——
+    发布时写下的 ``fund_hold_*`` 条目没有 ``feeder_target_code``，当前实现把未穿透的
+    快照当作普通持仓读取、直接撞上报告层时效闸门。TTL 为 7 天，条目过期前修复被全程遮蔽。本类验证：旧语义载荷一律被视为未命中并重取。
+    """
+
+    def test_stamp_adds_schema_field(self):
+        """provider 产出经 transform 盖章后带版本字段（天天基金形态原样透传）。"""
+        from src.python.fetcher.fund import (
+            _HOLD_PAYLOAD_SCHEMA,
+            _HOLD_PAYLOAD_SCHEMA_FIELD,
+            _normalize_hold_payload,
+        )
+
+        stamped = _normalize_hold_payload(
+            {"code": "016055", "name": "某基金", "date": "2026-03-31", "holdings": []}, "天天基金"
+        )
+        self.assertEqual(stamped[_HOLD_PAYLOAD_SCHEMA_FIELD], _HOLD_PAYLOAD_SCHEMA)
+        self.assertEqual(stamped["code"], "016055")
+        self.assertEqual(stamped["date"], "2026-03-31")
+
+    def test_current_payload_detection(self):
+        """带当前版本字段才准入；旧载荷与空值均拒收。"""
+        from src.python.fetcher.fund import (
+            _HOLD_PAYLOAD_SCHEMA,
+            _HOLD_PAYLOAD_SCHEMA_FIELD,
+            _is_current_hold_payload,
+        )
+
+        self.assertTrue(_is_current_hold_payload({_HOLD_PAYLOAD_SCHEMA_FIELD: _HOLD_PAYLOAD_SCHEMA}))
+        self.assertFalse(_is_current_hold_payload({"code": "016055", "holdings": []}))
+        self.assertFalse(_is_current_hold_payload({_HOLD_PAYLOAD_SCHEMA_FIELD: _HOLD_PAYLOAD_SCHEMA - 1}))
+        self.assertFalse(_is_current_hold_payload(None))
+
+    def test_legacy_cached_payload_refetched_and_stamped(self):
+        """旧语义缓存条目 → 丢弃重取，新结果带版本字段。"""
+        from src.python.fetcher import fund as fm
+
+        legacy = {
+            "code": "016055",
+            "name": "某联接基金",
+            "date": "2023-09-30",
+            "holdings": [{"name": "英伟达", "code": "NVDA", "ratio": 7.0}],
+        }
+        fresh = {"code": "016055", "name": "某联接基金", "date": "", "holdings": [], "feeder_target_code": "513390"}
+        provider = MagicMock(return_value=fresh)
+
+        with (
+            patch("src.python.fetcher.chain.cache_get", return_value=legacy),
+            patch("src.python.fetcher.chain.cache_set"),
+            patch("src.python.fetcher.chain.cache_clear") as mock_clear,
+            patch.dict(fm._FUND_HOLD_PROVIDERS, {"tiantian": ("天天基金", provider)}),
+            patch("src.python.fetcher.fund.with_feeder_penetration", side_effect=lambda _c, r: r),
+        ):
+            result = fm.fetch_fund_holdings("016055")
+
+        mock_clear.assert_called_once_with("fund_hold_016055")
+        provider.assert_called_once()
+        self.assertEqual(result["hold_schema"], fm._HOLD_PAYLOAD_SCHEMA)
+        self.assertEqual(result["feeder_target_code"], "513390")
+
+    def test_current_cached_payload_returns_without_refetch(self):
+        """版本匹配的缓存条目 → 直接命中，不调 provider。"""
+        from src.python.fetcher import fund as fm
+
+        cached = {
+            "code": "016055",
+            "name": "某联接基金",
+            "date": "2026-06-30",
+            "holdings": [{"name": "苹果", "code": "AAPL", "ratio": 9.0}],
+            "hold_schema": fm._HOLD_PAYLOAD_SCHEMA,
+        }
+        provider = MagicMock(return_value={"code": "016055", "holdings": []})
+
+        with (
+            patch("src.python.fetcher.chain.cache_get", return_value=cached),
+            patch("src.python.fetcher.chain.cache_clear") as mock_clear,
+            patch.dict(fm._FUND_HOLD_PROVIDERS, {"tiantian": ("天天基金", provider)}),
+            patch("src.python.fetcher.fund.with_feeder_penetration", side_effect=lambda _c, r: r),
+        ):
+            result = fm.fetch_fund_holdings("016055")
+
+        provider.assert_not_called()
+        mock_clear.assert_not_called()
+        self.assertEqual(result["holdings"], cached["holdings"])
+
+    @patch("src.python.fetcher.batch.BatchDispatcher")
+    def test_batch_cache_check_rejects_legacy_payload(self, mock_dispatcher_cls):
+        """批量预检同样拒收旧语义载荷，迫使任务执行走重取路径。"""
+        from src.python.fetcher import fund as fm
+
+        captured: dict = {}
+        mock_disp = MagicMock()
+
+        def _fake_exec(items, cache_check_fn, **_kw):
+            captured["fn"] = cache_check_fn
+            return [type("R", (), {"success": True, "result": {"holdings": []}})()]
+
+        mock_disp.execute_with_cache_check.side_effect = _fake_exec
+        mock_dispatcher_cls.return_value = mock_disp
+
+        legacy = {"code": "016055", "date": "2023-09-30", "holdings": [{"name": "旧", "ratio": 1.0}]}
+        with patch("src.python.fetcher.fund.cache_get", return_value=legacy):
+            fm.fetch_fund_holdings_batch(["016055"])
+            self.assertIsNone(captured["fn"]("fund_hold_016055"))
+
+        current = {"code": "016055", "holdings": [], "hold_schema": fm._HOLD_PAYLOAD_SCHEMA}
+        with patch("src.python.fetcher.fund.cache_get", return_value=current):
+            fm.fetch_fund_holdings_batch(["016055"])
+            self.assertEqual(captured["fn"]("fund_hold_016055"), current)

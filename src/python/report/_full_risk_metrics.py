@@ -72,7 +72,6 @@ def _prepare_full_risk_metrics(
         prep["risk_metrics"] = _risk
         if pipeline_data is not None:
             pipeline_data["risk_metrics"] = _risk
-            pipeline_data["portfolio_daily_returns"] = history_data.get("daily_returns_portfolio", [])
 
     # [checkpoint] risk_metrics 完整性校验
     _injected = prep.get("risk_metrics", {})

@@ -20,8 +20,8 @@ from src.python.providers.sina_news import (
     fetch_news,
 )
 import pytest
-pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_news]
 
 
 class TestTsToStr(unittest.TestCase):
@@ -41,6 +41,7 @@ class TestTsToStr(unittest.TestCase):
     def test_negative_timestamp(self):
         """负数时间戳 → 始终返回字符串（各平台行为不同）。"""
         import sys as _sys
+
         result = ts_to_str(-1)
         self.assertIsInstance(result, str)
         if _sys.platform == "win32":
@@ -53,8 +54,11 @@ class TestParseNewsItem(unittest.TestCase):
     def test_normal_item(self):
         """正常条目 → 正确解析所有字段。"""
         item = {
-            "title": "新闻标题", "url": "http://example.com/news/1",
-            "intro": "简介内容", "ctime": "1782873000", "media_name": "新浪财经",
+            "title": "新闻标题",
+            "url": "http://example.com/news/1",
+            "intro": "简介内容",
+            "ctime": "1782873000",
+            "media_name": "新浪财经",
         }
         result = _parse_news_item(item)
         self.assertEqual(result["title"], "新闻标题")
@@ -96,8 +100,7 @@ class TestParseNewsItem(unittest.TestCase):
 
     def test_whitespace_stripped(self):
         """字段值去除前后空格。"""
-        item = {"title": "  标题  ", "url": "  http://u  ",
-                "intro": "  简介  ", "media_name": "  新浪  "}
+        item = {"title": "  标题  ", "url": "  http://u  ", "intro": "  简介  ", "media_name": "  新浪  "}
         result = _parse_news_item(item)
         self.assertEqual(result["title"], "标题")
         self.assertEqual(result["intro"], "简介")
@@ -117,14 +120,14 @@ class TestFetchNews(unittest.TestCase):
     def _mock_response(self, json_data: dict | None = None):
         """创建模拟 httpx.Response（200 OK）。"""
         import httpx
+
         resp = MagicMock(spec=httpx.Response)
         resp.status_code = 200
         resp.json.return_value = json_data or {}
         resp.raise_for_status.return_value = None
         return resp
 
-    def _setup_mock(self, mock_factory: MagicMock,
-                    mock_response: MagicMock) -> MagicMock:
+    def _setup_mock(self, mock_factory: MagicMock, mock_response: MagicMock) -> MagicMock:
         """配置 mock make_http_client。"""
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
@@ -137,14 +140,16 @@ class TestFetchNews(unittest.TestCase):
     @patch("src.python.providers.sina_news.make_http_client")
     def test_success_with_data(self, mock_factory):
         """正常返回 → 正确解析新闻列表。"""
-        mock_resp = self._mock_response({
-            "result": {"data": [
-                {"title": "新闻1", "url": "http://u1",
-                 "ctime": "1782873000", "media_name": "新浪财经"},
-                {"title": "新闻2", "url": "http://u2",
-                 "ctime": "1782873060", "media_name": "新浪财经"},
-            ]},
-        })
+        mock_resp = self._mock_response(
+            {
+                "result": {
+                    "data": [
+                        {"title": "新闻1", "url": "http://u1", "ctime": "1782873000", "media_name": "新浪财经"},
+                        {"title": "新闻2", "url": "http://u2", "ctime": "1782873060", "media_name": "新浪财经"},
+                    ]
+                },
+            }
+        )
         self._setup_mock(mock_factory, mock_resp)
 
         result = fetch_news(lid="2516", num=30)
@@ -188,6 +193,7 @@ class TestFetchNews(unittest.TestCase):
     def test_timeout_returns_empty(self, mock_factory):
         """超时异常 → 空列表。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -198,6 +204,7 @@ class TestFetchNews(unittest.TestCase):
     def test_request_error_returns_empty(self, mock_factory):
         """网络异常 → 空列表。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client
@@ -223,14 +230,18 @@ class TestFetchNews(unittest.TestCase):
     @patch("src.python.providers.sina_news.make_http_client")
     def test_invalid_items_skipped(self, mock_factory):
         """列表中含无效条目 → 跳过空标题和空 URL。"""
-        mock_resp = self._mock_response({
-            "result": {"data": [
-                {"title": "有效", "url": "http://u1"},
-                {"title": "", "url": "http://u2"},
-                {"title": "无URL", "url": ""},
-                {},
-            ]},
-        })
+        mock_resp = self._mock_response(
+            {
+                "result": {
+                    "data": [
+                        {"title": "有效", "url": "http://u1"},
+                        {"title": "", "url": "http://u2"},
+                        {"title": "无URL", "url": ""},
+                        {},
+                    ]
+                },
+            }
+        )
         self._setup_mock(mock_factory, mock_resp)
         result = fetch_news()
         self.assertEqual(len(result), 1)

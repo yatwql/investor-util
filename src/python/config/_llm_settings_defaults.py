@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from src.python.core.registry import get_llm_module_names
+
 # LLM 默认设置（与模板一一对应，确保一致性）
 _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     "max_retries": 2,
@@ -26,55 +28,55 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     "system_prompt_global_macro": None,
     "model_global_macro": None,
     "temperature_global_macro": 0.3,
-    "max_tokens_global_macro": 2048,
+    "max_tokens_global_macro": 3072,
     "timeout_global_macro": 60,
     "cache_enabled_global_macro": True,
     "output_brief_global_macro": False,
     "thinking_enabled_global_macro": False,
-    "thinking_budget_global_macro": 4000,
+    "thinking_budget_global_macro": 6000,
     "reasoning_effort_global_macro": "high",
     "system_prompt_expert_review": None,
     "model_expert_review": None,
     "temperature_expert_review": 0.3,
-    "max_tokens_expert_review": 24000,
+    "max_tokens_expert_review": 36000,
     "timeout_expert_review": 120,
     "cache_enabled_expert_review": True,
     "output_brief_expert_review": False,
     "thinking_enabled_expert_review": True,
-    "thinking_budget_expert_review": 16000,
+    "thinking_budget_expert_review": 24000,
     "reasoning_effort_expert_review": "low",
     "system_prompt_health_check": None,
     "model_health_check": None,
     "temperature_health_check": 0.1,
-    "max_tokens_health_check": 16000,
+    "max_tokens_health_check": 24000,
     "timeout_health_check": 120,
     "cache_enabled_health_check": True,
     "output_brief_health_check": False,
     "thinking_enabled_health_check": True,
-    "thinking_budget_health_check": 12000,
+    "thinking_budget_health_check": 18000,
     "reasoning_effort_health_check": "medium",
     "system_prompt_penetration_deep": None,
     "model_penetration_deep": None,
     "temperature_penetration_deep": 0.1,
-    "max_tokens_penetration_deep": 8192,
+    "max_tokens_penetration_deep": 12288,
     "timeout_penetration_deep": 90,
     "cache_enabled_penetration_deep": True,
     "output_brief_penetration_deep": False,
     "thinking_enabled_penetration_deep": False,
-    "thinking_budget_penetration_deep": 8000,
+    "thinking_budget_penetration_deep": 12000,
     "reasoning_effort_penetration_deep": "high",
     "system_prompt_news_correlation": None,
     "model_news_correlation": None,
     "temperature_news_correlation": 0.1,
-    "max_tokens_news_correlation": 2000,
+    "max_tokens_news_correlation": 3000,
     "timeout_news_correlation": 60,
     "cache_enabled_news_correlation": True,
     "thinking_enabled_news_correlation": False,
-    "thinking_budget_news_correlation": 4000,
+    "thinking_budget_news_correlation": 6000,
     "reasoning_effort_news_correlation": "high",
     "news_correlation_top_n": 30,
     "debate": {
-        "procon": {"per_call_max_tokens": None, "synthesis_model": None, "synthesis_temperature": 0.5},
+        "procon": {"per_call_max_tokens": 18432, "synthesis_model": None, "synthesis_temperature": 0.5},
         "conditional": {
             "scenarios": [
                 {"name": "上涨", "change": 0.20, "desc": "如果未来市场上涨 20%"},
@@ -83,7 +85,7 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
             ]
         },
         "qa_concentration": {"threshold": 0.20},
-        "max_total_tokens_per_report": 48000,
+        "max_total_tokens_per_report": 72000,
         "per_call_timeout_override": 90,
     },
     "fact_check": {
@@ -119,14 +121,11 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     },
 }
 
-# 模块显示名映射（与 _DEFAULT_LLM_SETTINGS["enabled_llm"] 的键名对齐）
-_MODULE_LABELS = {
-    "global_macro": "全球政经局势",
-    "expert_review": "智囊团深度复盘",
-    "health_check": "持仓体检报告",
-    "penetration_deep": "穿透深度分析",
-    "news_correlation": "财经新闻热点与持仓关联分析",
-}
+# 模块显示名映射（键 = settings_suffix，与 _DEFAULT_LLM_SETTINGS["enabled_llm"] 对齐）。
+# 唯一事实来源为中央注册表（core.registry），此处不再自留副本：模板注释里的模块名
+# 曾是与注册表并存的第三份硬编码 —— 注册表改名或新增模块时它不会跟着动，生成的
+# 模板注释就与实际模块名静默不一致（不报错，只误导用户）。
+_MODULE_LABELS = get_llm_module_names()
 
 
 def _get_default_llm_settings_template() -> str:
@@ -182,7 +181,9 @@ def _get_default_llm_settings_template() -> str:
     _module_block("penetration_deep")
 
     # ── news_correlation ──
-    _section("财经新闻热点与持仓关联分析 — news_correlation")
+    # 该模块无 output_brief 键（llm_settings_keys 已按后缀自动排除），故不走
+    # _module_block，单独拼接并保留说明注释；标题同样取自注册表。
+    _section(f"{_MODULE_LABELS.get('news_correlation', 'news_correlation')} — news_correlation")
     lines.append("  // （注：news_correlation 不支持 output_brief 模式）")
     for key in d:
         if key.endswith("_news_correlation"):
@@ -195,6 +196,9 @@ def _get_default_llm_settings_template() -> str:
     debate = d["debate"]
     lines.append('  "debate": {')
     lines.append("    // 正反辩论 — 三段式(白脸→黑脸→综合)")
+    lines.append(
+        "    // 每阶段输出上限（默认 18432；null 时按代码兜底 18432，经 max_tokens_override 优先于 max_tokens_expert_review）"
+    )
     lines.append(f'    "procon": {json.dumps(debate["procon"], indent=4, ensure_ascii=False)},')
     lines.append("    // 条件推理 — 情景化分析")
     lines.append('    "conditional": {')

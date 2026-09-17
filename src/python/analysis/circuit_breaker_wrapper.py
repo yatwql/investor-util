@@ -25,6 +25,7 @@ import os
 import time
 from typing import Any, Callable
 
+from src.python.core.atomic_write import write_json_atomic
 from src.python.core.constants import PROJECT_ROOT
 
 logger = logging.getLogger("invest")
@@ -103,13 +104,19 @@ class IndicatorBreaker:
         try:
             with open(legacy, encoding="utf-8") as f:
                 data = json.load(f)
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            os.remove(legacy)
-            logger.info("[breaker] 已从旧路径迁移状态文件 → %s", path)
         except (OSError, json.JSONDecodeError):
             logger.debug("[breaker] 旧状态文件迁移失败，跳过", exc_info=True)
+            return
+        # 顺序不可颠倒：新路径写入成功前不得删除旧文件——写失败时旧文件是
+        # 唯一的数据源，先删即断路状态永久丢失（原子写返回成败供此处判定）。
+        if not write_json_atomic(path, data, log_tag="breaker", noun="断路状态"):
+            return
+        try:
+            os.remove(legacy)
+        except OSError:
+            # 新文件已在，迁移本身已完成；残留旧文件仅影响缓存清理口径
+            logger.warning("[breaker] 旧状态文件删除失败，残留: %s", legacy, exc_info=True)
+        logger.info("[breaker] 已从旧路径迁移状态文件 → %s", path)
 
     def _load_state(self) -> None:
         """从 JSON 加载持久化的断路状态，超过 TTL 的条目自动清理。"""
@@ -150,12 +157,9 @@ class IndicatorBreaker:
             st["_saved_at"] = now
             clean[name] = st
         self._state = clean
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(clean, f, ensure_ascii=False, indent=2)
-        except OSError as e:
-            logger.warning("[breaker] 持久化失败: %s", e)
+        # 原子写：半写的状态文件会让下次启动读不出断路记录（断路器"失忆"，
+        # 已熔断的指标被立即重试）
+        write_json_atomic(path, clean, log_tag="breaker", noun="断路状态")
 
     # ── 断路判定 ────────────────────────────────────
 

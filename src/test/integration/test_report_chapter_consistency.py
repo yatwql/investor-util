@@ -37,6 +37,8 @@ class TestReportChapterConsistency(unittest.TestCase):
         evolution=True,
         action=False,
         llm=True,
+        financial_report=False,
+        financial_indicator=False,
         data_availability=None,
     ):
         """镜像 generate_excel_report 的页签构造，返回 (key 列表, 标题列表)。
@@ -47,16 +49,20 @@ class TestReportChapterConsistency(unittest.TestCase):
         """
         from openpyxl import Workbook
 
-        from src.python.report.excel_sheet_factory import create_sheets
+        from src.python.report.excel_sheet_factory import build_data_availability, create_sheets
 
         wb = Workbook()
         wb.remove(wb.active)
         if data_availability is None:
-            data_availability = {}
-            if news:
-                data_availability["news_data_available"] = True
-            if llm:
-                data_availability["llm_data_available"] = True
+            # 与生产同源：data 层可用性字典由 excel_sheet_factory.build_data_availability 构造
+            data_availability = build_data_availability(
+                include_news=news,
+                include_llm=llm,
+                enable_fund_deep_analysis=fund_deep,
+                position_relationship_data={} if fund_deep else None,
+                financial_report_digest_data={} if financial_report else None,
+                financial_indicator_data={} if financial_indicator else None,
+            )
         sheets = create_sheets(
             wb,
             order,
@@ -64,6 +70,7 @@ class TestReportChapterConsistency(unittest.TestCase):
             enable_news=news,
             enable_history=history,
             enable_portfolio_evolution=evolution,
+            enable_fundamental_snapshot=financial_report or financial_indicator,
             enable_action=action,
             enable_llm=llm,
             data_availability=data_availability,
@@ -71,7 +78,17 @@ class TestReportChapterConsistency(unittest.TestCase):
         return list(sheets.keys()), [ws.title for ws in sheets.values()]
 
     def _html_visible_keys(
-        self, order, *, fund_deep=True, news=True, history=True, evolution=True, action=False, llm=True
+        self,
+        order,
+        *,
+        fund_deep=True,
+        news=True,
+        history=True,
+        evolution=True,
+        action=False,
+        llm=True,
+        financial_report=False,
+        financial_indicator=False,
     ):
         """镜像 write_html_report 的可见性计算，返回按连续编号的有序 key 列表。
 
@@ -101,6 +118,9 @@ class TestReportChapterConsistency(unittest.TestCase):
             style_factor_data=placeholder,
             position_relationship_data=placeholder,
             evolution_data={} if evolution else None,
+            enable_fundamental_snapshot=financial_report or financial_indicator,
+            financial_report_digest_data={} if financial_report else None,
+            financial_indicator_data={} if financial_indicator else None,
         )
         ordered = sorted(visible_numbers.items(), key=lambda kv: kv[1])
         return [k for k, _ in ordered]
@@ -129,7 +149,9 @@ class TestReportChapterConsistency(unittest.TestCase):
     def test_excel_sheets_match_registry_order_all_enabled(self):
         """全开时 Excel 页签顺序 == 注册表顺序，标题 == 「序号.章节名」，llm_usage 末位。"""
         order = get_report_section_order()
-        excel_keys, excel_titles = self._excel_visible(order, action=True)
+        excel_keys, excel_titles = self._excel_visible(
+            order, action=True, financial_report=True, financial_indicator=True
+        )
 
         registry_keys = [s["key"] for s in order]
         self.assertEqual(excel_keys, registry_keys, "Excel 页签顺序必须等于注册表顺序")
@@ -160,6 +182,9 @@ class TestReportChapterConsistency(unittest.TestCase):
             style_factor_data={},
             position_relationship_data={},
             evolution_data={},
+            enable_fundamental_snapshot=True,
+            financial_report_digest_data={},
+            financial_indicator_data={},
         )
 
         self.assertEqual(
@@ -185,7 +210,7 @@ class TestReportChapterConsistency(unittest.TestCase):
         order = get_report_section_order()
         scenarios = [
             # (场景名, board 开关 kwargs)；action 默认关，全开场景显式开启
-            ("全开", {"action": True}),
+            ("全开", {"action": True, "financial_report": True, "financial_indicator": True}),
             ("基金深度关闭", {"fund_deep": False, "action": True}),
             ("新闻关闭", {"news": False, "action": True}),
             ("LLM 关闭", {"llm": False, "action": True}),
@@ -220,7 +245,6 @@ class TestReportChapterConsistency(unittest.TestCase):
 
         order = get_report_section_order()
         gap_avail = {
-            "manager_data": False,
             "concentration_data": False,
             "style_factor_data": False,
             "position_relationship_data": False,
@@ -249,9 +273,8 @@ class TestReportChapterConsistency(unittest.TestCase):
         self.assertEqual(excel_keys, html_keys, "显式数据缺口下两端可见集合应一致")
         for hidden in (
             "fund_manager",
-            "fund_concentration",
             "style_factor",
-            "position_relationship",
+            "position_structure",
             "portfolio_evolution",
         ):
             self.assertNotIn(hidden, excel_keys, f"Excel 不应创建缺数据页签 {hidden}")

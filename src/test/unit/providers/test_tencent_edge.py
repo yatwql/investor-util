@@ -22,6 +22,7 @@ class TestFetchIndexKlineEdge(unittest.TestCase):
     def test_request_error_returns_empty(self, mock_factory):
         """网络异常 → 空列表。"""
         import httpx
+
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
         mock_factory.return_value = mock_client

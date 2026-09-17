@@ -5,6 +5,7 @@
 """
 
 import os
+from datetime import timedelta, timezone
 
 
 def _find_project_root() -> str:
@@ -36,7 +37,7 @@ PROJECT_ROOT = _find_project_root()
 # 应用名称（单一来源，TUI 首页 / 启动日志 / Web 首页 / HTML 报告首页 / Excel 首页统一引用）
 APP_NAME = "投资复盘助手"
 
-APP_VERSION = "0.10.16"
+APP_VERSION = "0.11.1-dev"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
@@ -118,11 +119,22 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
         "input_cache_hit": 0.15,
         "peak": {"input": 9.0, "output": 27.0, "input_cache_hit": 0.30},
     },
+    # deepseek-chat / deepseek-reasoner 是 flash 系列的**已停用兼容别名**（二者分别
+    # 对应非思考 / 思考模式，并非独立模型；2026-07-24 23:59 北京时间下线后端点
+    # 不再接受，新请求一律失败）。条目按 flash 系列单价保留而非删除：
+    # 报告与性能页签在渲染时用本表估算**历史记录**（模型名 + token 数）的费用，删条目
+    # 会让停用前产生的调用一律显示 "-"。新配置请改用 deepseek-flash。
     "deepseek-chat": {
-        "input": 1.5,
-        "output": 4.5,
-        "input_cache_hit": 0.05,
-        "peak": {"input": 3.0, "output": 9.0, "input_cache_hit": 0.10},
+        "input": 1.0,
+        "output": 4.0,
+        "input_cache_hit": 0.02,
+        "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04},
+    },
+    "deepseek-reasoner": {
+        "input": 1.0,
+        "output": 4.0,
+        "input_cache_hit": 0.02,
+        "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04},
     },
     # Gemini
     "gemini-3.5-flash": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
@@ -152,3 +164,8 @@ PRICING_WEEKEND_ALWAYS_IDLE: bool = True
 
 # 峰谷时段判定所用 IANA 时区（默认北京时间）
 PRICING_TIMEZONE: str = "Asia/Shanghai"
+
+#: 项目统一北京时间口径（UTC+8 固定偏移，无夏令时）。**所有「自然日」判定都用它**：
+#: 毫秒戳 → 日期的展示/契约转换、交易日边界、峰谷时段判定——用本机时区会随运行环境漂移
+#: （CI 跑 UTC 时，CST 午夜附近的毫秒戳会算成前一天，测试与报告日期随之不一致）。
+BEIJING_TZ = timezone(timedelta(hours=8))

@@ -4,7 +4,7 @@
 pending 决策；同标的再现时用真实后续行情结算（方向正确率、超额 alpha），
 产出教训回灌后续分析提示词。
 
-设计约束遵从（详见 docs-stm/plan/decision-reflection-implementation.md）：
+设计约束遵从（详见 docs-stm/archive/v0.10.x/tradingagents-borrowing/decision-reflection-implementation.md）：
     分层约束  — 本模块属 core 层，只依赖 stdlib + PROJECT_ROOT，
                 禁止 import report/llm/analysis 下的任何模块
     （对齐 src/python/core/perf.py 位于 core 的先例）

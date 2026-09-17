@@ -18,13 +18,13 @@ import unittest
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
 from src.test.unit.report.test_html_report_structure import (
     _REPORT_SECTION_DEFAULT,
     _build_minimal_render_data,
     _render_template,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 _EVO_SECTION = {"key": "portfolio_evolution", "name": "组合演进", "number": 19}
 

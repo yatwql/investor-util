@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
-
 from unittest.mock import MagicMock
 
 from src.python.report.llm_content import _FACT_CHECK_FAIL_RE, _FACT_CHECK_PASS_RE
@@ -32,6 +30,8 @@ from src.python.report.llm_quality import (
     grade_module,
     grade_modules,
 )
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 # 健康体检报告所需章节齐备的正文（篇幅远超参考篇幅）
 _HEALTH_FULL = (

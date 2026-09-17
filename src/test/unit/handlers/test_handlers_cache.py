@@ -175,30 +175,31 @@ class TestPrintCacheRefreshReport(unittest.TestCase):
 
 @pytest.mark.unit_core
 class TestCmdCleanupCache(unittest.TestCase):
-    """_cmd_cleanup_cache 清理命令（委托 operations）。"""
+    """_cmd_cleanup_cache 清理命令（委托 operations 并等待按键）。"""
 
-    def test_cleanup_removed_some(self):
-        """清理到过期文件（verify delegation + TuiProgressReporter output）。"""
+    @patch("src.python.cache.operations.cleanup_cache", return_value=5)
+    @patch("src.python.tui.handlers_cache.press_any_key")
+    def test_cleanup_removed_some(self, mock_press, mock_cleanup):
+        """有过期文件：cleanup_cache 以 TuiProgressReporter 调用一次，并等待按键。"""
+        from src.python.report.progress import TuiProgressReporter
         from src.python.tui.handlers_cache import _cmd_cleanup_cache
 
-        with (
-            patch("src.python.cache.operations.cleanup_cache", return_value=5),
-            patch("src.python.tui.handlers_cache.press_any_key"),
-            patch("src.python.report.progress.TuiProgressReporter.ok"),
-            patch("src.python.report.progress.TuiProgressReporter.info"),
-            patch("sys.stdout", io.StringIO()),
-        ):
-            _cmd_cleanup_cache()
+        _cmd_cleanup_cache()
 
-    def test_cleanup_nothing(self):
-        """无过期文件（verify delegation + TuiProgressReporter output）。"""
+        mock_cleanup.assert_called_once()
+        self.assertIsInstance(mock_cleanup.call_args.args[0], TuiProgressReporter)
+        mock_press.assert_called_once()
+
+    @patch("src.python.cache.operations.cleanup_cache", return_value=0)
+    @patch("src.python.tui.handlers_cache.press_any_key")
+    def test_cleanup_nothing(self, mock_press, mock_cleanup):
+        """无过期文件（返回 0）：仍委托调用一次并等待按键，不抛异常。"""
         from src.python.tui.handlers_cache import _cmd_cleanup_cache
 
-        with (
-            patch("src.python.cache.operations.cleanup_cache", return_value=0),
-            patch("src.python.tui.handlers_cache.press_any_key"),
-        ):
-            _cmd_cleanup_cache()
+        _cmd_cleanup_cache()
+
+        mock_cleanup.assert_called_once()
+        mock_press.assert_called_once()
 
 
 @pytest.mark.unit_core

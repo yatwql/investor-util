@@ -200,8 +200,6 @@ class TestSignalDigestCacheSuffixEdge:
         from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
         FEATURE_FLAGS["signal_pre_digest"] = True
-        suffix = _signal_digest_cache_suffix(
-            {"tail_risk_data": {"available": True, "var95": 1.0}, "other": object()}
-        )
+        suffix = _signal_digest_cache_suffix({"tail_risk_data": {"available": True, "var95": 1.0}, "other": object()})
 
         assert suffix.startswith("_") and len(suffix) == 13

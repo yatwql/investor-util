@@ -15,6 +15,7 @@ import logging
 from typing import Any
 
 from src.python.analysis.crisis_annotation import CRISIS_INTERVALS
+from src.python.core.code_utils import is_a_share_code, is_exchange_fund_code
 from src.python.core.num_utils import finite_or
 from src.python.report.downsample import downsample_bars
 
@@ -314,11 +315,15 @@ def _build_category_doughnut_dataset(details: list | None, cat_data: list | None
 
 
 def _infer_property(d: Any) -> str:
-    """兜底：DetailRow 无 property 属性时，按代码前缀推断资产属性（尽力而为）。"""
+    """兜底：DetailRow 无 property 属性时，按代码类型推断资产属性（尽力而为）。
+
+    类型判定统一委托 ``core/code_utils``（代码类型判定中心化），不自行按
+    首字符判前缀——自建前缀表会漏掉科创板 68、北交所 8 与场内基金各段。
+    """
     code = str(getattr(d, "code", "") or "").strip()
-    if code[:1] in ("6", "0", "3"):
+    if is_a_share_code(code):
         return "股票"
-    if code[:1] in ("5", "1"):
+    if is_exchange_fund_code(code):
         return "基金"
     return "其他"
 

@@ -21,6 +21,7 @@ from unittest.mock import patch
 import pytest
 
 from src.python.core.models import Holding
+from src.test.helpers import recent_holdings_period
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
@@ -47,13 +48,15 @@ class TestS0aZeroSharesSkipped(unittest.TestCase):
 
         h = Holding("证券", "已清仓品种", "600999", shares=0, cost_price=10.0)
         mkt = {
-            "price": 12.0, "yesterday_close": 11.5,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "已清仓品种", "code": "600999",
+            "price": 12.0,
+            "yesterday_close": 11.5,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "已清仓品种",
+            "code": "600999",
         }
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -63,10 +66,10 @@ class TestS0aZeroSharesSkipped(unittest.TestCase):
             row = _compute_detail_row(h, mkt)
 
         self.assertEqual(row.shares, 0.0)
-        self.assertEqual(row.market_value, 0.0)   # 12.0 * 0 = 0
-        self.assertEqual(row.cost, 0.0)            # 10.0 * 0 = 0
-        self.assertEqual(row.profit, 0.0)          # 0 - 0 = 0
-        self.assertEqual(row.today_profit, 0.0)    # (12-11.5) * 0 = 0
+        self.assertEqual(row.market_value, 0.0)  # 12.0 * 0 = 0
+        self.assertEqual(row.cost, 0.0)  # 10.0 * 0 = 0
+        self.assertEqual(row.profit, 0.0)  # 0 - 0 = 0
+        self.assertEqual(row.today_profit, 0.0)  # (12-11.5) * 0 = 0
 
     def test_compute_detail_row_zero_shares_no_mkt(self):
         """份额=0 + 无行情 → cost=0（不崩溃）。"""
@@ -86,13 +89,15 @@ class TestS0aZeroSharesSkipped(unittest.TestCase):
 
         h = Holding("证券", "已清仓品种", "600999", shares=0, cost_price=0.0)
         mkt = {
-            "price": 12.0, "yesterday_close": 11.5,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "已清仓品种", "code": "600999",
+            "price": 12.0,
+            "yesterday_close": 11.5,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "已清仓品种",
+            "code": "600999",
         }
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -114,14 +119,16 @@ class TestS0aZeroSharesSkipped(unittest.TestCase):
         h2 = Holding("证券", "已清仓品种", "600999", shares=0, cost_price=10.0)
 
         mkt1 = {
-            "price": 160.0, "yesterday_close": 155.0,
-            "price_date": "2026-07-03", "source_api": "tencent",
-            "name": "正常股票", "code": "600519",
+            "price": 160.0,
+            "yesterday_close": 155.0,
+            "price_date": "2026-07-03",
+            "source_api": "tencent",
+            "name": "正常股票",
+            "code": "600519",
         }
 
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -187,41 +194,62 @@ class TestS0bSameFundACClass(unittest.TestCase):
         ]
         details = [
             DetailRow(
-                account="支付宝", name="易方达蓝筹精选A", code="005827",
-                price=1.8, nav_date="2026-07-03", yesterday_close=1.75,
-                price_type="T-1", premium="--", shares=500.0,
-                market_value=800.0, cost=1000.0, profit=-200.0,
-                profit_rate=-0.2, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="易方达蓝筹精选A",
+                code="005827",
+                price=1.8,
+                nav_date="2026-07-03",
+                yesterday_close=1.75,
+                price_type="T-1",
+                premium="--",
+                shares=500.0,
+                market_value=800.0,
+                cost=1000.0,
+                profit=-200.0,
+                profit_rate=-0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
             DetailRow(
-                account="支付宝", name="易方达蓝筹精选C", code="012772",
-                price=1.8, nav_date="2026-07-03", yesterday_close=1.75,
-                price_type="T-1", premium="--", shares=300.0,
-                market_value=480.0, cost=600.0, profit=-120.0,
-                profit_rate=-0.2, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="易方达蓝筹精选C",
+                code="012772",
+                price=1.8,
+                nav_date="2026-07-03",
+                yesterday_close=1.75,
+                price_type="T-1",
+                premium="--",
+                shares=300.0,
+                market_value=480.0,
+                cost=600.0,
+                profit=-120.0,
+                profit_rate=-0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
         ]
 
         with (
-            patch("src.python.report.penetration.fetch_fund_holdings_batch",
-                  return_value={
-                      "005827": {
-                          "code": "005827", "name": "易方达蓝筹精选",
-                          "date": "2026-03-31",
-                          "holdings": [{"name": "贵州茅台", "code": "600519",
-                                        "ratio": 16.0}],
-                      },
-                      "012772": {
-                          "code": "005827", "name": "易方达蓝筹精选",
-                          "date": "2026-03-31",
-                          "holdings": [{"name": "贵州茅台", "code": "600519",
-                                        "ratio": 16.0}],
-                      },
-                  }),
-            patch("src.python.fetcher.industry.batch_fetch_industry_data",
-                  return_value={}),
+            patch(
+                "src.python.report.penetration.fetch_fund_holdings_batch",
+                return_value={
+                    "005827": {
+                        "code": "005827",
+                        "name": "易方达蓝筹精选",
+                        "date": recent_holdings_period(),
+                        "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
+                    },
+                    "012772": {
+                        "code": "005827",
+                        "name": "易方达蓝筹精选",
+                        "date": recent_holdings_period(),
+                        "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
+                    },
+                },
+            ),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
 
@@ -240,41 +268,62 @@ class TestS0bSameFundACClass(unittest.TestCase):
         ]
         details = [
             DetailRow(
-                account="支付宝", name="易方达蓝筹精选A", code="005827",
-                price=1.8, nav_date="2026-07-03", yesterday_close=1.75,
-                price_type="T-1", premium="--", shares=500.0,
-                market_value=800.0, cost=1000.0, profit=-200.0,
-                profit_rate=-0.2, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="易方达蓝筹精选A",
+                code="005827",
+                price=1.8,
+                nav_date="2026-07-03",
+                yesterday_close=1.75,
+                price_type="T-1",
+                premium="--",
+                shares=500.0,
+                market_value=800.0,
+                cost=1000.0,
+                profit=-200.0,
+                profit_rate=-0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
             DetailRow(
-                account="支付宝", name="易方达蓝筹精选C", code="012772",
-                price=1.8, nav_date="2026-07-03", yesterday_close=1.75,
-                price_type="T-1", premium="--", shares=300.0,
-                market_value=480.0, cost=600.0, profit=-120.0,
-                profit_rate=-0.2, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="易方达蓝筹精选C",
+                code="012772",
+                price=1.8,
+                nav_date="2026-07-03",
+                yesterday_close=1.75,
+                price_type="T-1",
+                premium="--",
+                shares=300.0,
+                market_value=480.0,
+                cost=600.0,
+                profit=-120.0,
+                profit_rate=-0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
         ]
 
         with (
-            patch("src.python.report.penetration.fetch_fund_holdings_batch",
-                  return_value={
-                      "005827": {
-                          "code": "005827", "name": "易方达蓝筹精选",
-                          "date": "2026-03-31",
-                          "holdings": [{"name": "贵州茅台", "code": "600519",
-                                        "ratio": 16.0}],
-                      },
-                      "012772": {
-                          "code": "005827", "name": "易方达蓝筹精选",
-                          "date": "2026-03-31",
-                          "holdings": [{"name": "贵州茅台", "code": "600519",
-                                        "ratio": 16.0}],
-                      },
-                  }),
-            patch("src.python.fetcher.industry.batch_fetch_industry_data",
-                  return_value={}),
+            patch(
+                "src.python.report.penetration.fetch_fund_holdings_batch",
+                return_value={
+                    "005827": {
+                        "code": "005827",
+                        "name": "易方达蓝筹精选",
+                        "date": recent_holdings_period(),
+                        "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
+                    },
+                    "012772": {
+                        "code": "005827",
+                        "name": "易方达蓝筹精选",
+                        "date": recent_holdings_period(),
+                        "holdings": [{"name": "贵州茅台", "code": "600519", "ratio": 16.0}],
+                    },
+                },
+            ),
+            patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
         ):
             result = compute_penetration_top10(holdings, details)
 
@@ -306,7 +355,7 @@ class TestS0dSpecialCharacters(unittest.TestCase):
         ("证券", "科技ETF™", "510300"),
         ("证券", "测试♥基金", "003095"),
         ("支付宝", "（全角括号）测试", "003095"),
-        ("证券", "中歐盛世成長", "003095"),   # 繁体
+        ("证券", "中歐盛世成長", "003095"),  # 繁体
         ("证券", "S&P 500 ETF", "513500"),
         ("微信", " 前後空格 ", "003095"),
         ("支付宝", "Test·混合·名称", "003095"),
@@ -341,13 +390,15 @@ class TestS0dSpecialCharacters(unittest.TestCase):
             with self.subTest(name=name):
                 h = Holding(account, name, code, 100, 10.0)
                 mkt = {
-                    "price": 10.0, "yesterday_close": 9.8,
-                    "price_date": "2026-07-03", "source_api": "tencent",
-                    "name": name, "code": code,
+                    "price": 10.0,
+                    "yesterday_close": 9.8,
+                    "price_date": "2026-07-03",
+                    "source_api": "tencent",
+                    "name": name,
+                    "code": code,
                 }
                 with (
-                    patch("src.python.report.market_value.get_last_trading_day",
-                          return_value="2026-07-03"),
+                    patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
                     patch("src.python.report.market_value.datetime") as mock_dt,
                 ):
                     mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -360,30 +411,41 @@ class TestS0dSpecialCharacters(unittest.TestCase):
                 self.assertAlmostEqual(row.market_value, 1000.0)  # 10 * 100
 
     def test_special_chars_excel_sheet_write(self):
-        """特殊字符名称 → write_market_value_sheet 不崩溃。"""
+        """特殊字符名称 → 市值明细区块写入不崩溃。"""
         from src.python.report.market_value import DetailRow
 
         details = []
         for account, name, code in self.SPECIAL_NAMES:
             details.append(
                 DetailRow(
-                    account=account, name=name, code=code,
-                    price=10.0, nav_date="2026-07-03", yesterday_close=9.8,
-                    price_type="T", premium="--", shares=100.0,
-                    market_value=1000.0, cost=1000.0, profit=0.0,
-                    profit_rate=0.0, today_profit=0.0,
-                    source="mock", source_api="tencent",
+                    account=account,
+                    name=name,
+                    code=code,
+                    price=10.0,
+                    nav_date="2026-07-03",
+                    yesterday_close=9.8,
+                    price_type="T",
+                    premium="--",
+                    shares=100.0,
+                    market_value=1000.0,
+                    cost=1000.0,
+                    profit=0.0,
+                    profit_rate=0.0,
+                    today_profit=0.0,
+                    source="mock",
+                    source_api="tencent",
                 )
             )
 
         import openpyxl
+
         wb = openpyxl.Workbook()
         ws = wb.active
 
-        from src.python.report.market_value_sheet import write_market_value_sheet
+        from src.python.report.holdings_detail_sheet import _write_market_value_block
+
         with (
-            patch("src.python.report.market_value.get_last_trading_day",
-                  return_value="2026-07-03"),
+            patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-03"),
             patch("src.python.report.market_value.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = datetime(2026, 7, 3, 14, 0)
@@ -391,14 +453,17 @@ class TestS0dSpecialCharacters(unittest.TestCase):
             mock_dt.timedelta = timedelta
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             try:
-                write_market_value_sheet(ws, details=details)
+                _write_market_value_block(ws, details, None, 1)
             except Exception as e:
-                self.fail(f"write_market_value_sheet 含特殊字符名称崩溃: {e}")
+                self.fail(f"市值明细区块写入含特殊字符名称崩溃: {e}")
 
     def test_special_chars_html_filters(self):
         """特殊字符名称 → HTML 模板过滤器不崩溃。"""
         from src.python.report.html_jinja_env import (
-            _jinja_money, _jinja_shares, _jinja_price, _jinja_pct,
+            _jinja_money,
+            _jinja_shares,
+            _jinja_price,
+            _jinja_pct,
         )
 
         for account, name, code in self.SPECIAL_NAMES:

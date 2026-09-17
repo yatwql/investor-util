@@ -175,7 +175,7 @@ def _write_profit_summary(
             「资金加权收益率 (XIRR)」行（无可用现金流时写占位文本）：
             真实流水模式按契约渲染；快照近似模式（approximate=True）追加
             「可选进阶增强」说明行；None 时保持既有输出
-            （report_submodules.cost_lots 关闭）。
+            （功能开关 `cost_lots` 关闭）。
     """
     # 检测行情数据是否全部不可用 — 有持仓成本但市值全零
     _data_unavailable = total_mv == 0 and total_cost > 0
@@ -335,21 +335,21 @@ def _write_market_temperature(ws: Worksheet, row: int, temperature: dict | None)
     Args:
         ws: 目标工作表
         row: 起始行
-        temperature: 市场温度数据契约（market_temperature_data）。None/不可用时
-            写占位文本 + 免责声明；可用时写分数刻度 + 三因子明细。
+        temperature: 市场温度数据契约（market_temperature_data）。**不可用或缺失时
+            不写任何行**（本行随市场温度转正默认开启，故采用「静默省略」而非占位——
+            用户未主动要求的功能不应出现降级痕迹）；可用时写分数刻度 + 三因子明细。
 
     Returns:
-        写入后的下一行行号。
+        写入后的下一行行号（不可用时原样返回 ``row``）。
     """
-    row = _write_section(ws, row, "【市场温度】")
-    disclaimer = (temperature or {}).get(
-        "disclaimer"
-    ) or "市场温度为价格分位、均线偏离与波动率三因子合成的信号，仅供参考，不构成任何仓位建议"
     if not temperature or not temperature.get("available"):
-        write_data_row(ws, row, ["市场温度", "--（数据不足，暂不显示）"])
-        row += 1
-        row = _write_kv_row(ws, row, "注", disclaimer)
+        logger.info("[summary] 市场温度不可用，本行静默省略")
         return row
+    row = _write_section(ws, row, "【市场温度】")
+    disclaimer = (
+        temperature.get("disclaimer")
+        or "市场温度为价格分位、均线偏离与波动率三因子合成的信号，仅供参考，不构成任何仓位建议"
+    )
 
     score = temperature.get("score")
     tier = temperature.get("tier") or "合理"
@@ -462,9 +462,9 @@ def write_summary_sheet(
         a_indices: A 股指数 {代码: {name, price, yesterday_close, change_pct}}
         us_indices: 美股指数 {代码: {name, price, yesterday_close, change_pct}}
         fund_flow_data: 成本流水数据契约（非 None 时盈亏汇总追加 XIRR 行；
-            None 时保持既有输出，report_submodules.cost_lots 关闭）
+            None 时保持既有输出，功能开关 `cost_lots` 关闭）
         market_temperature_data: 市场温度数据契约（非 None 时在「市场指数」后
-            追加「市场温度」刻度行；None 时保持既有输出，report_submodules.market_temperature 关闭）
+            追加「市场温度」刻度行；None 时保持既有输出，功能开关 `market_temperature` 关闭）
     """
     row = write_title_row(ws, 1, get_report_sheet_name("summary"), _NCOLS)
     row = write_header_row(ws, row, _HEADERS)
@@ -480,7 +480,7 @@ def write_summary_sheet(
     row = _write_blanks(ws, row)
     row = _write_us_indices(ws, row, us_indices)
 
-    # 市场温度刻度行（report_submodules.market_temperature 子模块，非 None 才渲染）
+    # 市场温度刻度行（功能开关 `market_temperature` 子模块，非 None 才渲染）
     if market_temperature_data is not None:
         row = _write_blanks(ws, row)
         row = _write_market_temperature(ws, row, market_temperature_data)

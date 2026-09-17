@@ -298,11 +298,11 @@ class TestCategoryDoughnut:
         assert chart["labels"] == ["股票", "其他"]
 
     def test_infer_property_named_stock_classified_by_code(self) -> None:
-        """真实 DetailRow（含名称）按代码前缀分类，股票/基金不落入"其他"。
+        """真实 DetailRow（含名称）由中心类型判定分类，股票/基金不落入"其他"。
 
-        _infer_property 仅按代码前缀分类，不依赖 name 是否为空——含名称的
-        真实明细行同样正确归类；CASH 等无匹配前缀的代码仍归"其他"（兜底语义，
-        见 test_infer_property_fallback）。
+        _infer_property 委托 ``core/code_utils`` 判类型，不依赖 name 是否为空——
+        含名称的真实明细行同样正确归类；CASH 等无匹配类型的代码仍归"其他"
+        （兜底语义，见 test_infer_property_fallback）。
         """
         details = [
             SimpleNamespace(code="600000", name="浦发银行", market_value=10000.0),
@@ -313,6 +313,23 @@ class TestCategoryDoughnut:
         chart = ds["category_doughnut"]
         assert chart["labels"] == ["股票", "基金", "其他"]
         assert chart["datasets"][0]["data"] == [10000.0, 5000.0, 2000.0]
+
+    def test_infer_property_star_and_bse_boards_classified(self) -> None:
+        """科创板 68 / 北交所 8 开头的 A 股 → "股票"，不与场内基金混淆。
+
+        旧实现只认 6/0/3 开头，8xxxxx（北交所）会掉进"其他"（68xxxx 仅因首字符
+        是 6 而蒙对）；改由中心判定后两者均归"股票"。同时锁定 5 开头场内基金
+        仍归"基金"。
+        """
+        details = [
+            SimpleNamespace(code="688981", name="中芯国际", market_value=10000.0),
+            SimpleNamespace(code="830799", name="北交所某股", market_value=3000.0),
+            SimpleNamespace(code="510300", name="沪深300ETF", market_value=5000.0),
+        ]
+        ds = build_chart_datasets(history_data=None, details=details)
+        chart = ds["category_doughnut"]
+        assert chart["labels"] == ["股票", "基金"]
+        assert chart["datasets"][0]["data"] == [13000.0, 5000.0]
 
     def test_category_doughnut_prefers_cat_data(self) -> None:
         """传入 cat_data（持仓分类表权威数据）时，饼图优先取 cat_data。

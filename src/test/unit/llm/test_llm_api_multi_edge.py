@@ -49,8 +49,7 @@ class TestChainNoFallbackFields(unittest.TestCase):
         for call_args in call_args_list:
             kwargs = call_args[1] if len(call_args) > 1 else {}
             api_key = kwargs.get("api_key", "")
-            self.assertIn(api_key, ["sk-p1", "sk-p2"],
-                          "api_key 应来自 _provider_list，而非旧 fallback 字段")
+            self.assertIn(api_key, ["sk-p1", "sk-p2"], "api_key 应来自 _provider_list，而非旧 fallback 字段")
 
     @patch("src.python.llm.api.call_single_provider")
     def test_fallback_model_ignored(self, mock_call: MagicMock) -> None:
@@ -58,8 +57,8 @@ class TestChainNoFallbackFields(unittest.TestCase):
         from src.python.llm.api import call_llm
 
         mock_call.side_effect = [
-            (None, None),          # p1 失败
-            ("chain ok", {}),      # p2 成功
+            (None, None),  # p1 失败
+            ("chain ok", {}),  # p2 成功
         ]
 
         config = {
@@ -87,17 +86,15 @@ class TestFailureTrackingLegacyFormat(unittest.TestCase):
             "attempted": ["p1: api_error"],
             "final_status": "api_error",
         }
-        self.assertNotEqual(LLM_MODULE_FAILURE.get("health_check"), FAIL_REASON_DISABLED,
-                            "dict 格式不应等于禁用常量")
+        self.assertNotEqual(LLM_MODULE_FAILURE.get("health_check"), FAIL_REASON_DISABLED, "dict 格式不应等于禁用常量")
         LLM_MODULE_FAILURE.pop("health_check", None)
 
     def test_legacy_string_still_works(self) -> None:
         """字符串格式的 FAIL_REASON 能正确比较。"""
         from src.python.llm.prompts import (
             LLM_MODULE_FAILURE,
-            FAIL_REASON_API_ERROR, FAIL_REASON_TIMEOUT,
-            FAIL_REASON_NETWORK_ERROR, FAIL_REASON_NOT_CONFIGURED,
-            FAIL_REASON_CIRCUIT_OPEN, FAIL_REASON_DISABLED,
+            FAIL_REASON_API_ERROR,
+            FAIL_REASON_DISABLED,
         )
 
         # 验证旧格式仍然是 str，可被 == 比较
@@ -114,16 +111,17 @@ class TestFailureTrackingLegacyFormat(unittest.TestCase):
             "attempted": ["p1: api_error"],
             "final_status": FAIL_REASON_API_ERROR,
         }
-        self.assertNotIsInstance(LLM_MODULE_FAILURE.get("expert_review"), str,
-                                 "多链格式应为 dict 而非 str")
+        self.assertNotIsInstance(LLM_MODULE_FAILURE.get("expert_review"), str, "多链格式应为 dict 而非 str")
         LLM_MODULE_FAILURE.pop("expert_review", None)
 
     def test_legacy_placeholder_mapping_unchanged(self) -> None:
         """旧格式 _PLACEHOLDER_BY_REASON 映射未变更。"""
         from src.python.llm.prompts import (
-            FAIL_REASON_NOT_CONFIGURED, FAIL_REASON_API_ERROR,
-            FAIL_REASON_TIMEOUT, FAIL_REASON_NETWORK_ERROR,
-            FAIL_REASON_CIRCUIT_OPEN, FAIL_REASON_DISABLED,
+            FAIL_REASON_NOT_CONFIGURED,
+            FAIL_REASON_API_ERROR,
+            FAIL_REASON_TIMEOUT,
+            FAIL_REASON_NETWORK_ERROR,
+            FAIL_REASON_CIRCUIT_OPEN,
         )
         from src.python.report.llm_content import _PLACEHOLDER_BY_REASON
 

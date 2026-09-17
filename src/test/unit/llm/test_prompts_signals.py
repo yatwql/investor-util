@@ -3,7 +3,8 @@
 覆盖：
   - _build_sector_flow_block：方向词 + 非负量（裸值歧义缺陷回归）、分方向排名、
     每方向 TOP N 截断、空输入
-  - _build_signal_digest_block：市场温度 / 估值分位 / 尾部风险三路信号与降级跳过
+  - _build_signal_digest_block：市场温度 / 估值分位 / 尾部风险 / 持仓基本面 / 叙事-数字
+    背离五路信号与降级跳过
   - _signal_digest_cache_suffix：开关关闭无感、内容变化换键、确定性
   - _build_expert_review_prompt / _build_health_check_prompt 的 enable_signal_digest 注入
   - generate_expert_review / generate_health_check 的指纹后缀接线
@@ -184,7 +185,14 @@ class TestSignalDigestBlock:
         from src.python.llm.prompts_signals import _build_signal_digest_block
 
         text = _build_signal_digest_block(
-            {"tail_risk_data": {"available": True, "var95": 3.5, "max_single_day_drop": -4.2, "consecutive_down_days": 3}}
+            {
+                "tail_risk_data": {
+                    "available": True,
+                    "var95": 3.5,
+                    "max_single_day_drop": -4.2,
+                    "consecutive_down_days": 3,
+                }
+            }
         )
 
         assert "尾部风险 风险高" in text
@@ -247,8 +255,10 @@ class TestSignalDigestCacheSuffix:
 
     def test_disabled_returns_empty(self):
         """开关关闭 → 空后缀（缓存键与未注入信号时逐字节一致）。"""
+        from src.python.config.features import FEATURE_FLAGS
         from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
+        FEATURE_FLAGS["signal_pre_digest"] = False  # 转正后默认开，基准须显式关
         assert _signal_digest_cache_suffix(self._SIGNAL_DATA) == ""
 
     def test_enabled_without_signal_returns_empty(self):
@@ -394,6 +404,9 @@ class TestGeneratorFingerprintWiring:
     @pytest.mark.parametrize("generator_name", ["generate_expert_review", "generate_health_check"])
     def test_flag_off_fingerprint_unchanged(self, generator_name):
         """开关关闭：有无信号数据都不进指纹（键不变、不误伤旧缓存）。"""
+        from src.python.config.features import FEATURE_FLAGS
+
+        FEATURE_FLAGS["signal_pre_digest"] = False  # 转正后默认开，基准须显式关
         without_signal = self._captured_fingerprints(generator_name, pipeline_data=None)
         with_signal = self._captured_fingerprints(generator_name, pipeline_data=_SIGNAL_PIPELINE_DATA)
 
@@ -453,3 +466,185 @@ class TestGeneratorFingerprintWiring:
         assert high["health_check"]["key"] != low["health_check"]["key"]
         # 穿透深度分析不承接信号块 → 键不受影响
         assert high["penetration_deep"]["key"] == low["penetration_deep"]["key"]
+
+
+_FUNDAMENTAL = {
+    "available": True,
+    "rows": [
+        {
+            "code": "600900",
+            "name": "长江电力",
+            "quality_grade": "优",
+            "trend": "下滑",
+            "roe": 0.159,
+            "net_profit_yoy": -0.12,
+        },
+        {
+            "code": "601398",
+            "name": "工商银行",
+            "quality_grade": "良",
+            "trend": "增长",
+            "roe": 0.11,
+            "net_profit_yoy": 0.021,
+        },
+    ],
+}
+_NARRATIVE = {
+    "available": True,
+    "rows": [
+        {"code": "600900", "name": "长江电力", "summary": "公司经营业绩持续向好，营收稳定增长，盈利能力稳步提升"},
+        {"code": "601398", "name": "工商银行", "summary": "息差持续承压，营收下滑"},
+    ],
+}
+
+
+class TestFundamentalSignal:
+    """持仓基本面信号：分布聚合、方向判定与门禁缺席。"""
+
+    def test_distribution_and_direction(self):
+        from src.python.llm.prompts_signals import _fundamental_signal
+
+        line = _fundamental_signal({"financial_indicator_data": _FUNDAMENTAL})
+        assert line is not None
+        assert "信号：持仓基本面（2 只 A 股） 看多" in line
+        assert "质量档 优/良 2 只、弱 0 只" in line
+        assert "年度趋势 增长 1、下滑 1" in line
+        assert "平均 ROE 13.5%" in line
+
+    def test_weak_quality_and_decline_is_bearish(self):
+        from src.python.llm.prompts_signals import _fundamental_signal
+
+        data = {
+            "available": True,
+            "rows": [
+                {"quality_grade": "弱", "trend": "下滑", "roe": 0.01},
+                {"quality_grade": "弱", "trend": "下滑", "roe": 0.02},
+            ],
+        }
+        assert "看空" in _fundamental_signal({"financial_indicator_data": data})
+
+    def test_contradicting_sides_stay_neutral(self):
+        """质量好但趋势全面下滑 → 两侧矛盾，不硬造方向。"""
+        from src.python.llm.prompts_signals import _fundamental_signal
+
+        data = {
+            "available": True,
+            "rows": [
+                {"quality_grade": "优", "trend": "下滑", "roe": 0.20},
+                {"quality_grade": "优", "trend": "下滑", "roe": 0.18},
+            ],
+        }
+        assert "中性" in _fundamental_signal({"financial_indicator_data": data})
+
+    def test_absent_when_gate_off(self):
+        """数据底座门禁关闭 → 契约缺席 → 信号缺席（不注入即无感）。"""
+        from src.python.llm.prompts_signals import _fundamental_signal
+
+        assert _fundamental_signal({}) is None
+        assert _fundamental_signal({"financial_indicator_data": None}) is None
+        assert _fundamental_signal({"financial_indicator_data": {"available": False}}) is None
+        assert _fundamental_signal({"financial_indicator_data": {"available": True, "rows": []}}) is None
+
+
+class TestNarrativeDivergence:
+    """叙事与数字背离检测：语气词频 × 趋势/同比方向，只列依据不下结论。"""
+
+    def _signal(self, narrative=None, indicator=None):
+        from src.python.llm.prompts_signals import _narrative_divergence_signal
+
+        return _narrative_divergence_signal(
+            {
+                "financial_report_digest_data": _NARRATIVE if narrative is None else narrative,
+                "financial_indicator_data": _FUNDAMENTAL if indicator is None else indicator,
+            }
+        )
+
+    def test_both_directions_flagged_with_evidence(self):
+        line = self._signal()
+        assert line is not None
+        assert "信号：叙事与数字背离 需交叉核实" in line
+        assert "长江电力 600900（叙事偏乐观，归母净利同比 -12.0%，年度趋势下滑）" in line
+        assert "工商银行 601398（叙事偏悲观，归母净利同比 +2.1%，年度趋势增长）" in line
+
+    def test_aligned_narrative_and_numbers_is_silent(self):
+        """叙事与数字同向 → 不产背离信号。"""
+        narrative = {
+            "available": True,
+            "rows": [{"code": "600900", "name": "长江电力", "summary": "营收下滑，经营承压"}],
+        }
+        assert self._signal(narrative=narrative) is None
+
+    def test_neutral_tone_is_silent(self):
+        narrative = {
+            "available": True,
+            "rows": [{"code": "600900", "name": "长江电力", "summary": "公司披露了年度报告"}],
+        }
+        assert self._signal(narrative=narrative) is None
+
+    def test_flat_numbers_are_silent(self):
+        indicator = {
+            "available": True,
+            "rows": [
+                {"code": "600900", "name": "长江电力", "quality_grade": "优", "trend": "持平", "net_profit_yoy": 0.01}
+            ],
+        }
+        assert self._signal(indicator=indicator) is None
+
+    def test_only_matched_codes_are_compared(self):
+        """叙事侧有而指标侧无的标的跳过（不凭单侧下判断）。"""
+        narrative = {"available": True, "rows": [{"code": "999999", "name": "无指标股", "summary": "营收大幅增长"}]}
+        assert self._signal(narrative=narrative) is None
+
+    def test_limit_caps_listed_items(self):
+        rows_n, rows_i = [], []
+        for i in range(5):
+            code = f"60000{i}"
+            rows_n.append({"code": code, "name": f"股{i}", "summary": "营收增长，盈利提升"})
+            rows_i.append(
+                {"code": code, "name": f"股{i}", "quality_grade": "弱", "trend": "下滑", "net_profit_yoy": -0.2}
+            )
+        line = self._signal(
+            narrative={"available": True, "rows": rows_n}, indicator={"available": True, "rows": rows_i}
+        )
+        from src.python.llm.prompts_signals import NARRATIVE_DIVERGENCE_LIMIT
+
+        assert line.count("（叙事偏乐观") == NARRATIVE_DIVERGENCE_LIMIT
+
+    def test_absent_without_either_contract(self):
+        from src.python.llm.prompts_signals import _narrative_divergence_signal
+
+        assert _narrative_divergence_signal({}) is None
+        assert _narrative_divergence_signal({"financial_report_digest_data": _NARRATIVE}) is None
+        assert _narrative_divergence_signal({"financial_indicator_data": _FUNDAMENTAL}) is None
+
+
+class TestDigestBlockWithFundamentals:
+    """五路信号合流与背离要求行的按需追加。"""
+
+    def test_block_includes_new_signals_and_instruction(self):
+        from src.python.llm.prompts_signals import _build_signal_digest_block
+
+        block = _build_signal_digest_block(
+            {"financial_indicator_data": _FUNDAMENTAL, "financial_report_digest_data": _NARRATIVE}
+        )
+        assert "信号：持仓基本面" in block
+        assert "信号：叙事与数字背离" in block
+        assert "请在结论中显式指出背离点" in block
+
+    def test_instruction_line_absent_without_divergence(self):
+        """无背离项时不得出现要求行（提示词与未引入该项时逐字节一致）。"""
+        from src.python.llm.prompts_signals import _build_signal_digest_block
+
+        block = _build_signal_digest_block({"financial_indicator_data": _FUNDAMENTAL})
+        assert "信号：持仓基本面" in block
+        assert "叙事与数字背离" not in block
+        assert "请在结论中显式指出背离点" not in block
+
+    def test_cache_suffix_changes_when_signals_appear(self):
+        """新增信号进块 → 缓存指纹随之变化（读写键同源）。"""
+        from src.python.llm.prompts_signals import _signal_digest_cache_suffix
+
+        with patch("src.python.config.features.is_feature_enabled", return_value=True):
+            base = _signal_digest_cache_suffix({"valuation_data": {"available": True, "by_code": {}}})
+            with_fundamental = _signal_digest_cache_suffix({"financial_indicator_data": _FUNDAMENTAL})
+        assert base != with_fundamental

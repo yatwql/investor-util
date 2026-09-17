@@ -40,28 +40,32 @@ class TestBuildDataSourceMatrixDegradedList:
     ) -> None:
         """向 DegradationTracker 注入一条 record 事件。"""
         t = get_tracker()
-        t._events.append(t._make_event(
-            source_key=source_key,
-            tier=tier,
-            success=success,
-            failure_type=failure_type,
-            degraded=degraded,
-            count=1,
-            effective_threshold=1,
-            timestamp=1000.0,
-        ))
+        t._events.append(
+            t._make_event(
+                source_key=source_key,
+                tier=tier,
+                success=success,
+                failure_type=failure_type,
+                degraded=degraded,
+                count=1,
+                effective_threshold=1,
+                timestamp=1000.0,
+            )
+        )
         # 同步更新计数器（避免 _record_unsafe 影响，直接操作 _events）
         # 注：_make_event 是私有的——我们直接构造 DegradationEvent 对象
 
     def _add_raw_event(self, **kwargs) -> None:
         """向 DegradationTracker 注入一条 DegradationEvent。"""
         from src.python.report.data_status import DegradationEvent
+
         t = get_tracker()
         ev = DegradationEvent(**kwargs)
         t._events.append(ev)
 
     def _build(self) -> list[dict[str, Any]]:
         from src.python.report.data_source_matrix import build_data_source_matrix
+
         return build_data_source_matrix()
 
     # ── 测试用例 ─────────────────────────────
@@ -180,18 +184,33 @@ class TestBuildDataSourceMatrixDegradedList:
         """同一类别多条 degraded → degraded_list 含多项。"""
         self._add_raw_event(
             source_key="price_600900",
-            tier="T2", success=False, failure_type="unreachable",
-            degraded=True, count=3, effective_threshold=2, timestamp=1000.0,
+            tier="T2",
+            success=False,
+            failure_type="unreachable",
+            degraded=True,
+            count=3,
+            effective_threshold=2,
+            timestamp=1000.0,
         )
         self._add_raw_event(
             source_key="price_600519",
-            tier="T2", success=False, failure_type="timeout",
-            degraded=True, count=4, effective_threshold=2, timestamp=1001.0,
+            tier="T2",
+            success=False,
+            failure_type="timeout",
+            degraded=True,
+            count=4,
+            effective_threshold=2,
+            timestamp=1001.0,
         )
         self._add_raw_event(
             source_key="price_000001",
-            tier="T2", success=False, failure_type="unreachable",
-            degraded=True, count=3, effective_threshold=2, timestamp=1002.0,
+            tier="T2",
+            success=False,
+            failure_type="unreachable",
+            degraded=True,
+            count=3,
+            effective_threshold=2,
+            timestamp=1002.0,
         )
         matrix = self._build()
         price_row = next(r for r in matrix if r["key"] == "price")
@@ -206,8 +225,13 @@ class TestBuildDataSourceMatrixDegradedList:
         for code in ("price_a", "price_b", "price_c"):
             self._add_raw_event(
                 source_key=code,
-                tier="T4", success=False, failure_type="unreachable",
-                degraded=False, count=1, effective_threshold=1, timestamp=1000.0,
+                tier="T4",
+                success=False,
+                failure_type="unreachable",
+                degraded=False,
+                count=1,
+                effective_threshold=1,
+                timestamp=1000.0,
             )
         matrix = self._build()
         price_row = next(r for r in matrix if r["key"] == "price")
@@ -220,6 +244,7 @@ class TestBuildDataSourceMatrixDegradedList:
     def test_no_events_returns_empty(self):
         """无任何事件 → 空列表。"""
         from src.python.report.data_status import reset_tracker
+
         reset_tracker()
         matrix = self._build()
         assert matrix == []
@@ -228,11 +253,127 @@ class TestBuildDataSourceMatrixDegradedList:
         """degraded_list 每项格式包含 failure_type 描述。"""
         self._add_raw_event(
             source_key="fund_rank_001",
-            tier="T2", success=False, failure_type="empty",
-            degraded=True, count=3, effective_threshold=2, timestamp=1000.0,
+            tier="T2",
+            success=False,
+            failure_type="empty",
+            degraded=True,
+            count=3,
+            effective_threshold=2,
+            timestamp=1000.0,
         )
         matrix = self._build()
         rank_row = next(r for r in matrix if r["key"] == "fund_rank")
         assert len(rank_row["degraded_list"]) == 1
         assert "empty" in rank_row["degraded_list"][0]
         assert "fund_rank_001" in rank_row["degraded_list"][0]
+
+
+class TestBuildDataSourceCatalog:
+    """build_data_source_catalog — 数据源说明表（用途/计费/凭据/本次使用）。"""
+
+    def _catalog(self):
+        from src.python.report.data_source_matrix import build_data_source_catalog
+
+        return build_data_source_catalog()
+
+    def _by_id(self, rows, sid):
+        return next(r for r in rows if r["id"] == sid)
+
+    def test_returns_all_catalog_categories(self):
+        """说明表覆盖全部登记类别（含财报全文）。"""
+        rows = self._catalog()
+        ids = {r["id"] for r in rows}
+        assert {
+            "price",
+            "fund_rank",
+            "fund_hold",
+            "industry",
+            "index",
+            "profit_forecast",
+            "dividend",
+            "fund_flow",
+            "financial_report",
+        } <= ids
+
+    def test_used_flag_reflects_observed_events(self):
+        """本次观测到事件的类别标记为已使用；未观测到的为未使用。"""
+        from src.python.report.data_status import DegradationEvent, get_tracker
+
+        get_tracker()._events.append(
+            DegradationEvent(
+                source_key="report_datasink_600519.SS",
+                tier="T2",
+                success=True,
+                failure_type="",
+                degraded=False,
+                count=0,
+                effective_threshold=0,
+                timestamp=1000.0,
+            )
+        )
+        rows = self._catalog()
+        assert self._by_id(rows, "financial_report")["used"] is True
+        assert self._by_id(rows, "price")["used"] is False
+
+    def test_datasink_billing_follows_plan(self, monkeypatch):
+        """财报全文计费随 datasink.plan 变化（free / yearly）。"""
+        rows = self._catalog()
+        assert "免费档" in self._by_id(rows, "financial_report")["billing"]
+        monkeypatch.setattr("src.python.report.data_source_matrix._datasink_plan", lambda: "yearly")
+        rows = self._catalog()
+        assert "付费档" in self._by_id(rows, "financial_report")["billing"]
+
+    def test_datasink_auth_shows_credential_state(self, monkeypatch):
+        """财报全文凭据列附加就绪状态（未配置 key）。"""
+        from src.python.core.datasource_credential import CredentialSpec, register_credential_spec
+
+        monkeypatch.delenv("DATASINK_API_KEY", raising=False)
+        register_credential_spec(CredentialSpec("datasink", "DataSinking 财报", "DATASINK_API_KEY"))
+        rows = self._catalog()
+        assert self._by_id(rows, "financial_report")["auth"] == "需 key（未配置）"
+
+    def test_free_sources_marked_no_key(self):
+        """免费源凭据列为「无需」。"""
+        rows = self._catalog()
+        for sid in ("price", "fund_rank", "fund_hold", "industry", "index", "profit_forecast", "dividend", "fund_flow"):
+            assert self._by_id(rows, sid)["auth"] == "无需"
+
+
+class TestDataSourceCatalog:
+    """数据源说明表：类别清单、取用判定与开关提示。"""
+
+    def _rows(self):
+        from src.python.report.data_source_matrix import build_data_source_catalog
+
+        return {r["id"]: r for r in build_data_source_catalog()}
+
+    def test_financial_indicator_category_present(self):
+        row = self._rows()["financial_indicator"]
+        assert row["category"] == "财务指标"
+        assert "akshare" in row["provider"]
+        assert "DataSinking" in row["provider"]
+        assert "财务指标" in row["category"] and "功能开关" in row["note"]
+
+    def test_financial_report_row_hints_required_switches(self):
+        """财报全文行须写明「需开启哪些开关才会取用」（否则读者会误以为未被调用）。"""
+        row = self._rows()["financial_report"]
+        assert "financial_report_digest" in row["note"]
+        assert "financial_indicator" in row["note"]
+
+    def test_used_by_category_prefix(self):
+        from src.python.report.data_status import mark_data_used
+
+        rows = self._rows()
+        assert rows["financial_report"]["used"] is False
+        assert rows["financial_indicator"]["used"] is False
+        mark_data_used("report_datasink_doc")
+        mark_data_used("fin_indicator_akshare_financial")
+        rows = self._rows()
+        assert rows["financial_report"]["used"] is True
+        assert rows["financial_indicator"]["used"] is True
+        # 不相干类别不受影响
+        assert rows["price"]["used"] is False
+
+    def test_used_false_when_nothing_fetched(self):
+        rows = self._rows()
+        assert all(r["used"] is False for r in rows.values())

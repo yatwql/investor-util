@@ -4,418 +4,638 @@
 
 ---
 
-## [0.10.16] - 2026-09-10
-
-### 版本发布 v0.10.16（2026-09-10）
+## [0.11.1-dev] - 开发中（未发布）
 
-- **发布流程**：P2 发布门禁通过（`test-runner --mode verify,regression` 4219 通过 0 失败 + code/doc/task-numbering/semantic-index 四检查全绿 + 发布手动验证 `--mode perf,security` 14 通过）；版本号全链一致化至 v0.10.16（constants.py / pyproject.toml / README / 10 份管理文档）；发布数据文档刷新（`--mode bench --update-docs` 回填模式对应测试量与 dragonball 环境耗时对照；folders.md 测试代码 336 文件 94,305 行、测试用例 6,263；datasource-reliability.md 补记链路失败原因可读与 `doctor` 自检的分工）。
-- **版本标签**：`git tag v0.10.16` 已打并推送，发布可追溯。
-- **已解决项归档**：v0.10.16-dev 已解决项（rf-295 ~ rf-304；rf-297 与 rf-303 仍待办）整体迁入 `docs-stm/archive/v0.10.x/archived_review-findings.0.10.x.md` v0.10.16 章节，原文件保留待办区与归档引用。
+### 归档：plan-51（同花顺官方金融数据接入）设计文档随完成态归档（2026-09-17）
 
-### DeepSeek V4.1-Flash 正式模型名接入（`deepseek-flash`）（2026-09-10）
+**背景**：plan-51 五个阶段全部落地——provider 层（凭据/qps 限速/信封错误码）、财务指标第三链路（三张合并报表派生）、基金披露持仓两源链（备源 + 联接基金直返目标 ETF）、行情与历史日 K 第三槽与交易日历官方兜底、市场情绪章内区块（开关默认关）。
 
-- **背景**：DeepSeek 于 2026-09-10 发布 V4.1 Flash，**正式模型名为 `deepseek-flash`**；同日 12:00（北京时间）起 flash 系列降价（数字见下一条 2026-09-09 条目，已落库）。配套变化：① 别名 `deepseek-v4-flash` / `deepseek-v4-flash-vision-exp` 端点仍被接受，但底层模型由 V4.1-Flash 接管、**按同一单价计费**；② `deepseek-v4-pro` 于 **2026-09-14 12:00 下线**，该时刻至 V4.1 Pro 上线前请求自动路由到 V4.1-Flash 并按 **V4.1-Flash 单价**计费。
-- **缺陷（本次修复的两个真实缺口）**：`deepseek-flash` 既不在 `MODEL_PRICING`、也不匹配任何既有前缀键（`deepseek-v4-flash` 属 `deepseek-v4-` 族，与 `deepseek-flash` 互不为前缀），`estimate_cost()` 对其**返回 `"-"`**——费用页签与终端用量行显示为空。同一模型名还不在 `llm/api_base.py` 的思考模型白名单内，连带触发第二个缺口：该模型**既无法开启 Extended Thinking，也失去「未开启 thinking 时显式注入 `disabled`」的安全网**——请求会落入 DeepSeek 默认思考模式（effort=high）占满 `max_tokens` 而无正文，正是此前 `fix-deepseek-thinking` 修复过的那类失效。
-- **改动**：`core/constants.py` 新增 `deepseek-flash` 定价条目（闲时 输入 1.0/输出 4.0/缓存命中 0.02，高峰翻倍 2.0/8.0/0.04，与 flash 系列同价）并重写 DeepSeek 块注释（别名路由、v4-pro 下线时点与路由期计费口径）；`llm/api_base.py` 的 `_THINKING_SUPPORTED_PREFIXES` 与 `_THINKING_EFFORT_MODEL_PREFIXES` 双双纳入 `deepseek-flash`（后者附注漏登记的后果）；`config/_llm_settings_defaults.py` 计价注释示例改用正式模型名。
-- **影响面**：**不改动任何已配置的模型名与默认值**——现有 `deepseek-v4-flash` 配置继续可用且计费不变；`deepseek-flash` 仅作为可选入口新增。`deepseek-v4-pro` 的静态单价保持 4.50/13.50/0.15（在 09-14 下线前仍准确），路由期实际费用低于本表估算值，该口径差异在代码注释与 `llm-technical.md`/`how-to-config-llm.md` 中显式说明。
-- **测试**：新增 6 例 —— `test_llm_utils.py` 5 例（新名闲时 `¥5.000`/高峰 `¥10.000` 定价、与两个别名同价、缓存命中走峰谷价 0.02/0.04、`PRICING_MERGED` 含新键、`_supports_extended_thinking` 与 `_is_effort_model` 对新名（含大小写变体）判定为真）、`test_llm_api.py` 1 例（新名在未开 thinking 时命中 `thinking:disabled` 注入安全网）。
-- **文档**：`llm-technical.md`（§10.3 前缀匹配示例改用新名、§10.4 peak 模型清单补齐、定价快照表新增行并把 `deepseek-v4-flash` 标注为已接管的别名、`deepseek-v4-pro` 标注下线时点）、`how-to-config-llm.md`（Extended Thinking 的 DeepSeek 适用模型名单、DeepSeek Anthropic 接入的模型清单与路由说明）、`test-coverage.md`（`unit` 5948→5954、`unit_llm` 847→853、`llm` 跨类 650→656 及覆盖项描述）、`folders.md`（统计表随本轮改动重算）。
-- **来源**：DeepSeek 开放平台 2026-09-10 公告与 API 文档（`deepseek-flash` 正式模型名、别名路由、消费级计费口径以官方公告为准；本表为项目侧估算快照，可经 `llm_settings.json → pricing` 覆盖）。
-
-### 健壮性三件套：数值归一 / 失败原因可读 / 系统自检（plan-35）（2026-09-10）
-
-- **背景**：借鉴外部 augur 的健壮性实践识别出三项独立改进——① `float("nan")` / `float("±inf")` **不抛异常**，各 provider 解析器里 `try: float(x) except` 形态的兜底对它们完全无效，脏值直入市值核算/收益序列/绘图数据；② provider 链路失败只留 `failure_type` 短标识（`tencent: transport`），用户看不懂是哪个源、为什么失败；③ 缺少一次性盘点「环境/配置/目录/数据源」的诊断入口，出问题只能逐个命令试。分析见 `docs-stm/plan/augur-borrowing-analysis.md` §建议C；实现设计见 `docs-stm/plan/robustness-suite-implementation.md`。按缺口**性质**拆 A（真缺陷，无开关）/ B（实验增强，开关门控）三条独立落地路径。
-
-  **A1｜数值归一防线（无开关，默认路径生效）**——判为真缺陷，就近修。改动前是**约 10 个互不一致的私有解析器 + 4 种失败口径**，其中被依赖最广的 `providers/_utils.safe_float` 恰是 NaN/±inf 防线最弱的一个：
+**归档动作**：
+- `docs-stm/plan/hithink-financial-data-design.md` → `docs-stm/archive/v0.11.x/hithink-data-source/`（`git mv`，头部改为「已实现，2026-09-17 归档」并列出三项收尾项）
+- `archive/v0.11.x/archived_plan.0.11.x.md`：新增 plan-51 完成态段落（交付摘要 + 设计文档索引 + 收尾项），头部涵盖版本/归档内容/索引同步
+- `managements/plan.md`：plan-51 移出在办区（在办＝plan-47/48/49/50），概述行与归档清单更新（v0.11.x 已完成项含 plan-51）
+- `folders.md`：`plan/` 回到「当前为空」；归档树新增 `hithink-data-source/`；`archived_plan.0.11.x.md` 说明行同步
 
-  - `core/num_utils.py`（新增，零项目内依赖、纯 stdlib）：把散落的归一实现收敛为一处，只保证一条不变量——**返回的数值一定有限**。对外四个原语：`safe_num(value, default=...)`（宽容归一：数值字符串先尝试解析再施加有限性检查）、`strict_num(...)`（严格归一：仅接受 int/float 且有限，字符串一律非数值）、`finite_or(value, fallback=0.0)`（专治 `x or 0.0` 空防线惯用法）、`is_finite_number(...)`。`int` 一律原样返回（不强行转 float，避免整数份额/ID 被改写），`bool` 一律显式排除（它是 `int` 子类，混入会让 `True` 静默变 `1`）。
-  - **保留两个归一入口而非强行合一**：provider 解析器面对网页/JSON 字符串字段，用 `safe_num`；`signal_ledger._safe_number` 面对待落盘的账本值（字符串混入会破坏类型契约），用 `strict_num`——两层既有口径本就不同，合一反而出错。
-  - **四个确凿缺陷站点**：① `or 0.0` 惯用法对 NaN **完全无效**（`float("nan")` 是 truthy，`nan or 0.0` 求值为 `nan`）——`report/market_value.py` 的 `price = mkt.get("price", 0.0) or 0.0` 让 NaN 直入市值/盈亏/溢价全链，昨收为 NaN 时更会把「全天涨幅」算成 `price × shares` 凭空造出当日盈亏；同类站点见 `report/category.py` / `market_value_sheet.py` / `chart_data_builder.py` / `decision_record.py` / `decision_llm_capture.py`、`analysis/whatif.py` / `portfolio_evolution.py` / `snapshot_diff.py`、`core/data_freshness.py`、`report/html_writer_display.py`，均改用 `finite_or(...)`；② provider 解析器（`_utils.safe_float` / `tencent._parse_float` / `_parse_float_field` / `sina_kline._parse_sina_kline_float` / `eastmoney_industry._extract_number` / `akshare_extras._safe_float`）脏值路径返回 NaN/±inf 而非兜底值——K 线泄漏尤其危险，它直接进入 `analysis/` 全部收益序列指标；现各自委托 `safe_num` 并保持原有默认值口径（`0.0` 或 `None`）；③ `core/reader.py::_safe_float` 追加有限性检查——Excel 返回 NaN（`=NA()`/公式错误）时按「非法值」告警并返回 `None`，此前返回 NaN 使 `shares <= 0` 校验对 NaN 恒为 False 而**放行脏行**；④ `core/signal_ledger._safe_number` 收敛为委托 `strict_num`（语义原样提取，行为逐字不变）。
-  - **合法输入行为逐字不变**：改动只影响非有限值与非数值入参，正数/字符串数字/`None`/空串的返回与改动前完全一致；**不统一各层的 dirty 默认值语义**（`None` vs `0.0` 是既有契约，强行统一会波及数十处消费方，属超范围重构）——本次只保证「有限性」这一条不变量。纯 CLI 参数/时间戳等可证明非浮点的 `or` 站点保持原样，不做无意义改动。
+**收尾项（不影响已交付能力，登记在 plan 与 review-findings）**：① 复权因子事件流的消费方「分红流水漏记校验」；② 情绪事件注入 LLM 信号预消化（可选）；③ `rf-393` 实验挂载点约定与现状的一致性收敛。
 
-  **A2｜失败原因可读（无开关，默认路径生效）**——判为真缺陷，就近修：
+### 技术债：provider 端点收口（rf-389）+ 两处 800 行硬上限拆分（rf-390）（2026-09-17）
 
-  - `fetcher/chain.py` 新增 `FailureDiagnostics`：采集「展示名(原因)」条目，`summary()` 渲染为 `腾讯财经(连接超时)；新浪财经(返回空)`（单条原因按 `_REASON_MAX_LEN` 截断、空白折叠）。
-  - `fetcher/{price,fund,industry,index}.py` 在调用 provider 链路时构造诊断器并随失败 `_t.record(...)` 的 `message=` 参数透传。
-  - `report/data_status.py`：`record()` / `_record_unsafe()` 新增 `message: str | None = None`，写入 `DegradationEvent.detail = {"message": message}`（复用既有 `detail` 字典，与聚合路径 `record_aggregated()` 形状一致，`get_log()` 无需改动）。
-  - `report/data_source_matrix._failure_entry()`：渲染降级明细时**优先取该人类可读原因**，无原因时回落原 `failure_type` 短标识——**`message=None` 时矩阵输出与改动前逐字相同**（显式测试锁定）。
-  - **展示名一致性修复**（自审 rf-299）：熔断跳过与未注册两条分支原先写原始 provider id（`p1(已被熔断跳过)`），与同一循环内其余分支的展示名不一致；现把 `entry = provider_fn_map.get(provider_name)` 提到熔断检查之前，统一取 `label = entry[0] if entry else provider_name`。
+**一、同花顺 provider 端点收口（rf-389 结项）**
+- **已接线 12 个**：行情快照、历史日 K、交易日历、三张合并报表、估值快照、基金披露持仓、龙虎榜、连板梯队
+- **删除 3 个无消费者端点**（按「有定义无消费者即死代码」先例并同步删单测）：`fetch_financial_indicators`（阶段 2 改用报表派生后无消费者）、`fetch_fund_nav`（净值已有两条链路）、`fetch_index_constituents`（实测 429 且无消费者）
+- **保留 2 个有明确计划者**：`fetch_adjustment_factors`（分红流水漏记校验）、`fetch_fund_stock_history`（全量穿透，plan-47 前置）
 
-  **B｜系统自检（实验功能 `doctor_check`，默认关）**：
+**二、两处 800 行硬上限拆分（rf-390 结项）**
+- `analysis/prosperity_framework.py` 934 → **254 行**：配置默认值 + 权重常量 + 六维打分器移入 `analysis/prosperity_scoring.py`（731 行）；轴=「配置打分 vs 视图装配」，装配侧显式 re-export 全部迁移名（含私有常量/打分器），既有测试与报告层 import 面不变
+- `report/_report_generation.py` 843 → **763 行**：full 路径 Excel 输出包装移入 `report/_report_output.py`（87 行）；接缝守卫测试扫描范围同步扩到新模块
+- 顺带修掉该文件内**重复插入两份的市场情绪装配块**；过程记录：一次性机械拆分失败（再导出不完整 + 脚本语法错误）→ 改「逐文件逐符号核对 + 每步跑测试」完成
 
-  - `core/doctor.py`（新增）：一键自检运行环境，五组输出（环境 / 配置 / 目录 / 功能开关 / 数据源），**失败项附可执行修复建议**（`hint`）。对外三个函数：`run_doctor_checks(include_network, max_timeout)` / `summarize_doctor_results()` / `format_doctor_report(results, use_color)`。
-  - **两条不可让步的设计约束**：① **自检自身永不抛异常**——任何检查项异常都转成该组的失败结果行（配置损坏正是它最需要诊断的场景，此处抛 traceback 等于在最需要用它的时刻失效）；② **零重依赖**——不 import `core/reader.py`（pandas），持仓文件检查用 `os.listdir`，因为 pandas 缺失/损坏本身就是它要报告的一类失败。
-  - 检查项：Python 版本 `>= (3, 10)`、虚拟环境（`sys.prefix != sys.base_prefix`）、项目根与配置加载（惰性 `init_config()` / `get_config()`）、LLM 凭据（`get_llm_config()`，兼容多链 `_provider_list` 与扁平 `provider`/`api_key`）、目录存在性与可写性（写探测哨兵文件后**立即删除**，不留残留）、功能开关清单（信息性，不改结论）、数据源连通性（复用既有 `core/check_sources.run_health_checks`，可按 `include_network=False` 跳过）。
-  - **三面上屏**（与所有实验项同源，均由 `features.EXPERIMENTAL_FEATURES` 注册表驱动）：**CLI** = `doctor` 子命令（`--offline` 跳过联网、`--timeout SECONDS` 默认 8.0）；**TUI** = 菜单 `[D]` 系统自检（`tui/handlers_log.py::_cmd_run_doctor`，交互动线与其他诊断项一致）；**Web** = 运行状态区「系统自检」卡片（带 `⚗ 实验性` 标签）+ `GET /api/doctor`（`?network=0` / `?timeout=` clamp 上限 15s，非法值回落 12s 默认）。
-  - **显式启用入口**：CLI `--experiment doctor_check`（与所有实验项一致，无需另开门路）、TUI 菜单 `[S]`、Web 配置面板「实验性功能」区。
-  - **`doctor` 子命令不受开关约束**（有意为之）：它与 `check-sources` / `view-logs` 同样在 `init_config` **之前**分派——配置损坏正是它要诊断的场景，若因开关未开而拒绝执行，用户就陷入「开开关要先读配置、读配置失败又要开开关」的死锁。开关只约束 TUI `[D]` 与 Web 卡片这两个「日常会看见」的入口。
-  - **TUI 菜单项门控机制**：`tui/tui_menu.py` 新增 `FEATURE_GATED_ITEMS` 表 + `_apply_feature_gates()`，在 `tui.main()` 的 `init_config()` 之后、`_bind_callbacks()` 之前**就地**裁剪 `MENU_ITEMS`（切片赋值保持列表对象不变，调用方视图同步）；`_bind_callbacks()` 前调用保证裁剪后索引与渲染一致。
-  - **退出码语义**（自审 rf-300）：`_handle_doctor` 返回 `_EXIT_SUCCESS`（全通过）/ `_EXIT_PARTIAL`（命令跑完但有失败项）——**不是** `_EXIT_SEVERE`，命令本身没失败、只是结论不佳。`_use_ansi_color()` 遵循 `NO_COLOR` + `isatty` + UTF-8 三项判据，终端不支持颜色时自动降级纯文本。
-- **测试**：新增 8 文件 —— `test_num_utils.py`（A1：四个原语的合法输入/脏值/`bool` 排除/`int` 原样返回契约）、`test_num_utils_edge.py`（A1 边缘：非字符串非数值对象/超长字符串/嵌套容器/大小极端值）、`test_numeric_guard_regression.py`（A1 provider 层：各解析器「非有限值被拦下」+「合法输入行为不变」双向不变量）、`report/test_numeric_guard_regression.py` + `report/test_numeric_guard_regression_edge.py`（A1 报告层：`or 0.0` 站点不再泄漏 NaN 至市值/盈亏/涨幅、单个 NaN 不污染整列合计与档位判定）、`test_chain_diagnostics.py` 35 例（A2：原因渲染与截断、诊断器采集序、链路各失败分支的条目文案、熔断分支展示名一致性、无诊断器时既有行为不变、注册表失败上下文可读）、`test_data_status_message.py` ~20 例（A2：`message` → `detail` 透传、不影响降级判定、矩阵渲染优先取原因、无原因回落逐字不变）、`test_doctor.py` 27 例（B：结果结构契约、**三处「永不抛异常」**——配置坏/注册表坏/网络坏均出失败行、环境与目录检查含只读与残留断言、开关清单上屏、统计与渲染）。既有文件扩展：`test_tui_menu.py`（菜单 19→20 项 + `[D]` 项 + `TestFeatureGatedMenuItems` 6 例含开关开/关两态与幂等性，带 autouse 快照还原防污染）、`test_tui_routing.py`（键覆盖集补 `[D]`）、`test_cli.py`（`doctor` 子命令解析/处理/分派三组 8 例，含 `--offline` 与 `--timeout` 透传、`_EXIT_PARTIAL` 语义、config 之前分派）、`test_handlers.py`（`/api/doctor` 契约 6 例 + 自检卡片可见性 5 例）、`test_fetcher_index.py`（`diagnostics=ANY`）、`test_config_edit.py`（白名单与面板标签纳入 `doctor_check`）。
-- **文档**：`requirements.md`（features.json 32→33 项 + 开关表行）、`technical.md`（新增 §4.17 健壮性三件套 + 白名单/features.json 计数 + CLI 子命令/TUI 菜单/Web 路由/`is_feature_enabled` 消费者）、`folders.md`（目录树 + 统计重算）、`test-coverage.md`（模式/子标记/功能域计数）、`how-to-config.md`（§M 开关表行 + 三入口说明）/ `how-to-config-llm.md` / `how-to-use-tui-menu.md`（编号 14）/ `how-to-use-web-mode.md` / `how-to-use-cli-mode.md`（`doctor` 子命令 + `--experiment doctor_check` 示例）/ `faq.md`（新增两条答疑：「想快速确认环境到底哪里不对，有没有一键体检」+「TUI 主菜单里找不到 `[D]` 系统自检项」）、`developer-guide.md`（补「新增实验开关检查清单」五步表 + 「菜单项/卡片可见性由开关门控」纪律；「诊断类命令不得依赖 config 初始化」与「新增数值解析一律委托 `core/num_utils.py`」两条通用纪律）。
-- **记账**：plan-35 标记完成（见 plan.md P4 表）；自审记录 rf-299（熔断分支展示名不一致）、rf-300（退出码魔法数字）、rf-301（历史实现叙述注释与魔法编号 `F9` 违反代码痕迹纪律）、rf-302（技术设计文档正文出现任务编号括注，违反文档痕迹纪律）移入已解决待归档区。
-- **不变量**：A1 合法输入行为逐字不变；A2 无 `message` 时数据源矩阵输出与改动前**逐字相同**；B 关闭 `doctor_check` 时 TUI 无 `[D]` 项、Web 不渲染自检卡片，而 `doctor` CLI 子命令始终可用。
+**三、新登记**：`rf-393`（实验挂载点约定与现状不一致，需择一收敛），`rf-next → 394`。
 
-### 确定性数值信号沉淀与实时/非实时标签纪律（plan-34）（2026-09-10）
+文档：review-findings（rf-389/390 结项 + rf-393）、folders（新模块与统计）、technical（数据流指向拆分后模块）、changelog 本条。
 
-- **背景**：市场温度、估值分位、尾部风险、风格因子、再平衡超限这五类评级由**确定性算法**算出，但只活在一次报告生成的内存里与当页展示中——报告落盘即散失，跨期无法回答「上期判高估，事后对不对」。同时，这些评级里既有当日实时行情算出的、也有**降级/缓存行情**算出的，二者混在一起消费时，非实时数据算出的评级会冒充真实战绩。借鉴外部 augur `backtest.py` 的 `data_source` 标签与「排行榜默认 `live_only`」纪律。分析见 `docs-stm/plan/augur-borrowing-analysis.md` §建议B。
-- **实现设计**：`docs-stm/plan/signal-ledger-implementation.md`。
+### 新增：市场情绪与持仓热点（行动建议章内嵌块，plan-51 阶段 5）（2026-09-17）
 
-  **A｜缺陷修复：本项无**——五类评级当前的**输出**均为确定性且可复现，没有「算错」可修；仅有的处置隐患是**尚未发生的污染风险**（非实时数据混入统计），而消除该风险本身就属新增能力。**不制造一个缺陷来凑 A/B 结构**，避免把「新增功能」伪装成「修 bug」而掩盖真实变更面。
+**能力**：把同花顺官方市场级情绪数据收敛为「与我有关」的事件行——**仅保留命中持仓/穿透标的代码**的条目，渲染为行动建议章内嵌块「市场情绪与持仓热点」（开关 `market_sentiment`，报告组，默认关，菜单 E/B/L 均可输出）。
 
-  **B｜确定性信号沉淀（实验功能 `signal_ledger`，默认关）**：
+**实现**：
+- `analysis/market_sentiment.py`（纯装配）：龙虎榜命中行（净买额/游资净买额/机构净买额/上榜原因/概念，金额换算亿元、概念取前三）+ 连板梯队命中行（取**最新交易日**、板位标签、次日封板）；**只按代码精确匹配，不做概念联想**（两侧概念口径不一，按名匹配会大量假命中）
+- `report/market_sentiment.py`：开关门禁（关闭返回 None，零网络开销）+ 缺凭据降级契约 + 取数带 1h 缓存（`sentiment_dragon_tiger` / `sentiment_ladder`）+ 数据源使用标记
+- **零命中语义**：只要一源可用就出契约（`available=True`、`rows` 可空 + 明确说明 + 保留市场概览：龙虎榜只数、连板各板位家数）——价值型组合常年不涨停/不上榜，若零命中即降级会让章节恒空、读者分不清「无事件」与「取数失败」
+- 渲染：Excel `report/action_sheet.py::_write_market_sentiment_block` + HTML `partials/action_section.html` ⑦（双端口径说明同源）；接线镜像既有「景气度框架」模式：`_report_aux_metrics.compute_market_sentiment_data` → `pipeline_data["market_sentiment_data"]`（full/both 由编排层注入、basic 由 `excel_generator` 就地兜底）→ 行动建议章
+- 契约台账：`market_sentiment_data` 登记附录 H（表行 + 逐键说明）与功能语义命名表；缓存模块 `sentiment_`（1h）登记注册表
+- 回归 26 例：`unit/analysis/test_market_sentiment.py`（命中过滤/亿元换算/概念截断/最新交易日/概览/零命中与降级契约/脏值）、`unit/report/test_market_sentiment.py`（开关与凭据门禁/取数缓存/命中装配/开关注册/缓存模块登记）、`unit/report/test_market_sentiment_wiring.py`（编排门禁与异常兜底/Excel 区块三种形态/HTML 同源）
 
-  - `core/jsonl_store.py`（新增）：把 `perf._append_jsonl_atomic` 与 `decision_ledger._append_event_atomic` 中**已经重复两份**的「读全文 → 拼接 → 写临时文件 → `os.replace`」逻辑抽为共享原语 `append_jsonl_atomic()` / `read_jsonl()`，两个既有调用点改为委托——**不新增第三份拷贝**。各自保留原有 `prefix`（临时文件名）与日志标签，输出逐字节不变，由 `test_jsonl_store.py::TestDelegationPreservesBehaviour` 锁定（含 `decision_ledger` 的 `sort_keys=True` + `ensure_ascii=False` 序列化口径）。
-  - `core/signal_ledger.py`（新增）：账本核心，**零 `analysis/` 依赖**（分层约束 C）——`build_signal()` 记录形状 + `append_signals()` 批量幂等入账（读一次 → 按 `id = {report_date}|{signal_type}|{subject}` 去重含批内 → 一次原子写 → 同日重跑 `registered` 归零而 `skipped` 计数）、`fold_signals()` 折叠统计（**默认 `live_only=True`**）、`summary_block()` 提示词摘要（开关关闭或实时样本不足阈值 → 返回 `""`，判定**无条件执行**，保证「开关关闭 → 全链路无感」在注入路径同样成立）、`summary_cache_suffix()` 缓存后缀（无块 → `""`；有块 → `_sg` + 摘要 md5 前 12 位）。`_safe_number()` 把 `NaN`/`±inf`/bool/非数值归一为 `None` 后才落盘，防写出非法 JSON。
-  - **来源标签不引入新的合成数据开关**：`resolve_data_source()` 的「非实时」判定复用**既有数据质量设施**——持仓级按该 code 的 `data_freshness`（非 `fresh` → 非实时，文案取自 `core.data_freshness.FRESHNESS_LABELS` 不另写一份）、指数级/组合级按 `DegradationTracker` 事件 `source_key` 前缀（`index_history_` 对应温度/风格，`price_`/`fund_` 对应尾部风险）。**仅可证明为实时才算实时**——未识别的新鲜度取值一律保守判非实时；确无逐品种条目可证伪时（组合级/指数级）乐观取实时但**显式写入理由字段**，不静默。全程未新增 `pipeline_data` 键，故无需登记数据渠道契约。
-  - `report/signal_record.py`（新增）：五类评级 → 记录的**适配器**，也是唯一持有语义词表映射的一侧（`core/` 不得依赖 `analysis/`，故 `低估/便宜 → +1`、`高估/超限 → -1` 与尾部风险分档阈值下沉到 `report/` 层，账本只存通用整数方向，复用 `decision_ledger` 的 `DIRECTION_*` 常量）。跳过项：不可用占位（`available=False`）、无分位（`percentile_available=False`）、尾部风险样本不足 `MIN_TAIL_RISK_SAMPLE`、再平衡聚合提示行（`{"summary": True}`）、无 `code` 行。
-  - `report/_report_generation.py` **第 5d 步 seam**：置于决策头结构化（5c）之后、`perf.stop()` 之前——尾部风险等键在 LLM 生成阶段才注入 `pipeline_data`，过早登记会漏采（适配器对缺失键逐项跳过，故不构成硬依赖）；整体 `try/except` + `reporter` 告警，实验特性故障绝不打断报告主链路。
-  - `llm/skeleton.py`：`_LESSON_RECEIVER_MODULES` 更名 `_LEDGER_CONTEXT_MODULES`（该模块集现在承接**两类**账本上下文），标准模式 `expert_review` 首轮 user prompt 追加决策教训 + 确定性信号摘要，两者各自判开关与样本门槛。
-  - **缓存键同源**：开关影响提示词 → **写侧指纹**（`generators.py::_fingerprint`）与 **orchestrator 预检指纹**（`_compute_module_cache_info`）无条件同调 `signal_ledger.summary_cache_suffix()`，开关判定收敛在函数内部；关闭返回 `""`（键不变、不误伤旧缓存），开启两侧同步换键。
-- **测试**：新增 4 文件 118 例——`test_jsonl_store.py` 12 例（原子追加/容错读取/目录自动创建/临时文件不残留/两处委托行为不变）、`test_signal_ledger.py` 45 例（记录形状/批量幂等含批内去重/折叠统计/摘要与后缀/来源判定）、`test_signal_ledger_edge.py` 25 例（**未识别新鲜度取值的保守缺省**/账本路径是目录或不可读/超长与 Unicode 字段/畸形与缺字段记录/非有限数值/500 条批量单次原子写）、`test_signal_record.py` 36 例（五类抽取形状/不可用与聚合行跳过/持仓级与指数级与组合级 live-demo 判定矩阵/幂等与开关无感）。既有文件扩展：`conftest.py`（账本路径隔离重定向到 `tmp_path`）、`test_config_edit.py`（白名单与面板标签纳入 `signal_ledger`）。
-- **文档**：`requirements.md`（features.json 31→32 项 + 开关表行）、`technical.md`（新增 §4.16 确定性数值信号沉淀与实时/非实时标签纪律 + 白名单/features.json 计数 + `is_feature_enabled` 消费者）、`llm-technical.md`（§13.1 缓存指纹后缀列 + 账本上下文注入说明）、`folders.md`（目录树 + 统计重算）、`test-coverage.md`（模式/子标记/功能域计数）、`how-to-config.md`（§M 开关表行 + 三入口说明）/ `how-to-config-llm.md` / `how-to-use-tui-menu.md`（编号 13）/ `how-to-use-web-mode.md` / `how-to-use-cli-mode.md`（`--experiment signal_ledger` 示例）、`developer-guide.md`（补「追加型状态文件一律走共享原语」+「统计类输出默认只算实时记录」两条通用纪律，并在缓存指纹纪律中纳入 `signal_ledger`）、`README.md`（LLM 分析特性行）。
-- **记账**：plan-34 标记完成（见 plan.md P4 表）。
-- **不变量**：开关关闭时**提示词逐字节不变、账本不写盘、摘要返回空**；五类评级中任何一类缺失或不可用都只是**少登记一条**，不影响其余登记与报告生成。
-
-### 决策头结构化与决策词归一解析（plan-33）（2026-09-10）
-
-- **背景**：决策词（减仓/加仓/持有）在全仓库**只走展示、无人解析**——「操作建议」表仅存在于提示词契约中，`markdown_to_html` 又把表格降级为逐个 `<p>` 行；唯一消费方（决策账本抽取）用**子串包含**判方向。`不建议加仓` 会被判成 `+1`、`加仓或减仓` 会取靠前词判成 `-1`、`暂不减仓` 会被判成 `-1`。误判后果不是显示错一行，而是**按错误方向写入 `data/state/decision_ledger.jsonl`**，日后结算时污染命中率统计与教训回灌。分析见 `docs-stm/plan/llm-quality-signal-analysis.md` §3。
-- **实现设计**：`docs-stm/plan/decision-header-parse-implementation.md`。按缺口**性质**拆两条独立落地路径：
-
-  **A｜决策词归一解析器（无开关，默认路径生效）**——判为真缺陷，就近修：
-
-  - `core/decision_header.py`（新增）：词表 + 归一解析的共享层——**零项目内业务依赖**（仅取 `core.decision_ledger` 的方向常量作单一事实来源），消费方横跨 `llm/`（提示词词表）与 `report/`（抽取），放 `core/` 两个方向都无环。
-  - 判据六条：**标签优先于裸词**（整格精确匹配先行，未命中才降级全文扫描）、**长词优先**（词表按长度降序，防短词劫持）、**否定前缀守卫**（命中词左侧同子句内出现否定词或单字 `不/勿` 判未命中；**仅看左侧**——右侧限定语如 `建议加仓不必追高` 不构成否定）、**复合词左边界**（命中词紧邻左字符属 `加减增` 时跳过，`加减仓位`/`增减持` 不再被当成方向）、**二义不猜**（命中多方向返回 None，不做「取第一个」的静默选择）、**判不出返 None**（不落「持有」或任何方向默认值）。
-  - **复合词左边界取窄字符集**：中文无词间空格，字符级匹配无法照搬 `\b`；只收「加减增」三字——唯有它们能与其后的 `仓/持` 组成方向二义的复合短语；不收 `持/买/卖/清/观/止/建`，否则误杀「坚持持有」「逢低买入」等正常表述（已编码为回归矩阵）。
-  - **词表只收语义单向词**：规范词（减仓/加仓/持有）+ 扩展词（清仓·减持·卖出·止损 / 增持·买入·建仓 / 观望）；`止盈`（可能部分落袋也可能清仓）、`调仓`（方向不明）**不入词表**——宁可判不出，不可判错。
-  - `report/decision_llm_capture.py`：`_operation_direction`（子串包含）删除，改调 `parse_decision_word`；表格行解析、持仓白名单、baseline、同日去重等既有纪律原样保留——**删掉一处脆弱实现，而非叠加第二套解析器**。
-
-  **B｜结构化决策头（实验功能 `decision_header_parse`，默认关）**：
-
-  - `llm/prompts_action.py`：`enable_structured_header=True` 时在「### 操作建议」表后追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约（由 `build_structured_header_instruction()` 生成，与解析器同源、由测试锁定互读）；关闭时 append 空串，提示词**逐字节不变**。
-  - `core/decision_header.parse_structured_header()`：**花括号配平扫描**（字符串/转义感知）提取载荷，而非 `find("{")`/`rfind("}")`——后者在同一行出现两个 JSON 对象时会把跨度拉通成非法 JSON；`决策头：` 后为空行时以空串兜底，不抛 `IndexError`。逐字段**归一校验**（`action` 必须能归一为方向，否则丢弃该条而非原样透传；`code` 必须 6 位数字），全批不可用 → 回落确定性表格解析。
-  - **两路产物形状统一**为 `{code, name, direction, magnitude, detail, carrier, baseline_close}`（结构化头的 `priority` 在解析侧即归一为 `magnitude`），`_collect_decision` 对两路走同一段登记纪律（持有剔除 / code 白名单 / 名称回填 / 同码取高）。
-  - **缓存键同源**：开关影响提示词 → **写侧指纹**（`generators.py::_fingerprint`）与 **orchestrator 预检指纹**（`_compute_module_cache_info`）无条件同调 `structured_header_cache_suffix()`，开关判定收敛在函数内部。关闭返回 `""`（键不变、不误伤旧缓存）；开启两侧同步换键——只改一侧会让预检命中旧键而跳过重生成，开关形同虚设。辩论模式路径不追加该契约。
-- **顺带修一处前端漂移**（plan-32 遗留）：Web 配置面板的实验开关显示名由前端手写字典维护，`module_quality_gate` 加入注册表后未同步，面板上显示裸 flag 名。现改为服务端按注册表下发 `experiment_labels`、前端渲染时回填，手写字典清空——**新增实验项无需再改前端**。
-- **测试**：新增 3 文件 —— `test_decision_header.py`（核心：词表/标签优先/长词优先/否定守卫全表/二义不猜/子句边界/右侧限定语不否定/优先级/代码提取/结构化头/缓存后缀/契约与解析器互锁）、`test_decision_header_edge.py`（边缘：复合词左边界、**正常表述不被边界误杀**、嵌套否定、畸形载荷矩阵、边界值）、`test_prompts_structured_header.py`（提示词契约：开关关闭逐字节不变、契约位置、契约示例可解析、指纹换键）。既有文件扩展：`test_decision_llm_capture.py`（误导性操作格回归 4 例 + 结构化头优先/回落矩阵 5 例）、`test_config_edit.py`（白名单与面板标签）。
-- **文档**：`requirements.md`（features.json 30→31 项 + 开关表行）、`technical.md`（新增 §4.15 决策头结构化与决策词归一解析 + 白名单/features.json 计数 + `is_feature_enabled` 消费者）、`llm-technical.md`（§13.1 缓存指纹后缀纪律 + 提示词侧结构化头说明）、`folders.md`（目录树 + 统计重算）、`test-coverage.md`（计数同步）、`how-to-config.md`（§M 开关表行 + 面板说明）/ `how-to-config-llm.md` / `how-to-use-tui-menu.md`（编号 12）/ `how-to-use-web-mode.md` / `how-to-use-cli-mode.md`（`--experiment decision_header_parse` 示例）、`developer-guide.md`（「新增 LLM 模块检查清单」补「实验开关改变提示词 → 缓存指纹读写两侧同源」通用纪律）、`README.md`（LLM 分析特性行）。
-- **记账**：plan-33 标记完成（见 plan.md P4 表）。
-- **依赖方向**：解析器置于 `core/` 而非 `report/`——`llm/` 不得依赖 `report/`，而提示词层需要词表；共享层放 `core/` 使两个消费方向都无环。
-
-### 模块级质量分级注入（plan-32）（2026-09-10）
-
-- **背景**：现有【数据质量降级】披露只覆盖**输入侧**（数据源可达性），**输出侧**（LLM 各模块内容本身的完整性/一致性）无任何口径——内容缺章节、被占位符顶替、篇幅显著偏薄这类"内容在但不可信"的情形，下游读者拿到的是与正常输出无异的排版。借鉴外部 `agents/quality_gate.py` 的 A~F 分级机制（**劣级不阻断、不重试**，只把「降级 C/D/F」说明注入下游）。分析见 `docs-stm/plan/llm-quality-signal-analysis.md` §2。
-- **实现设计**：按缺口**性质**拆两条独立落地路径：
-
-  **A｜同域缺陷修复（无开关，默认路径生效）**——`rf-295` 判为真缺陷，就近修：
+**形态收敛（相对设计初稿）**：初稿为「新数据域 + 独立章节」，实现改为**章内区块**——一个表不值得新增章节与页签（与景气度框架同构），且情绪数据是市场级（无 per-code 语义），套 per-code 链路域模型反而错位；已在设计文档 §3 记录偏离与理由。**未做**：把情绪事件注入 LLM 信号预消化（可选增强，待该机制扩展时评估）。
 
-  - `report/_llm_news.py::_submit_llm_future` 向 `generate_all_llm` 补传 `degradation_events`（该参数早已存在，仅调用点漏传）→ 持仓体检第 5 维「数据质量」此前恒读「今日无降级记录，所有数据源正常。」（`prompts_tables._build_data_quality_detail_block(None)`），与同批专家复盘的降级摘要自相矛盾；现两侧同源。
-  - **主线程取快照**：`DegradationTracker.get_log()` 在提交线程池**之前**由主线程读一次随参传入，避免与工作线程的并发写入交错。
+文档：plan.md 阶段 5 完成（含收敛说明）、设计文档 §3、technical（附录 H 契约行 + 逐键说明 + 语义命名表 4 行 + 数据流）、requirements（数据源表）、reports-instruction（章内区块说明）、how-to-config（开关行）、datasource / datasource-reliability（已接入域）、testplan（回归行）、folders（目录树与统计）、changelog 本条。
 
-  **B｜LLM 输出侧质量分级（实验功能 `module_quality_gate`，默认关）**：
-
-  - `report/llm_quality.py`（新增）：`grade_module()` 对 4 个 LLM 模块（`global_macro` / `expert_review` / `health_check` / `penetration_deep`）按**触发器**评 A~F——`TRIGGER_EMPTY`/`PLACEHOLDER`（内容缺失）→ F、`TOO_SHORT`/`MISSING_SECTIONS`（结构缺陷）→ D、`THIN`（篇幅偏薄）→ C、`OK` → A~B。阈值按模块分档（`_LENGTH_THRESHOLDS` + `_DEFAULT_LENGTH_THRESHOLDS` 兜底），`_REQUIRED_MARKERS` 校验章节标记。**模块与阈值的对应由提示词章节标记一致性测试锁定**（标记漂移即测试失败）。
-  - **只标注、不阻断、不重试、不写回缓存**：`_ADVISORY_GRADES = {C, D, F}` 中**内容缺失型**（`TRIGGER_EMPTY`/`PLACEHOLDER`）**不再叠加横幅**——占位符/空内容本身已是醒目提示（`llm/fallback.py::is_placeholder_content()`），叠加只会重复噪声；横幅只服务「内容在但存在缺陷」的情形。
-  - **横幅以【内容质量提示】开头**，而非 `⚠ `——`_FACT_CHECK_FAIL_RE` 用 `^⚠ ` 且无 `MULTILINE`，若以该前缀开头会被 Excel 事实校验误判为失败行。
-  - **载体复用模块 HTML 字符串**：横幅与既有截断标记/缓存命中行/占位符/事实校验摘要走同一拼接载体，**HTML 与 Excel 双路径自动生效**，无新增下游透传管道（低技术债的关键取舍）。
-  - `report/_report_generation.py` 第 5c 步 seam（决策账本块之后、`perf.stop()` 之前），全程 `try/except` + `reporter` 告警——实验特性故障绝不打断报告主链路。
-  - **依赖方向**：模块置于 `report/` 而非 `llm/`——`report/llm_content.py` 依赖 `llm/`，反向依赖构成循环，故质量分级归 `report/` 侧。
-- **测试**：新增 2 文件 46 例——`test_llm_quality.py` 31 例（分级口径各触发器边界、横幅构造与文案、缺失型不叠加、载体契约、模块阈值与章节标记一致性锁）；`test_llm_quality_edge.py` 15 例（非 str 输入/空白内容/超长/畸形 HTML/未知模块键/关开关无感）。既有文件扩展：`test_llm_fallback.py`（占位符识别）、`test_orchestrator.py`（`degradation_events` 透传）、`test_config_edit.py`（白名单与 surface 纳入 `module_quality_gate`）、`test_handlers_config.py`（菜单编号连续性）。
-- **文档**：`requirements.md`（features.json 29→30 项 + 开关表行）、`technical.md`（新增 §4.11 输出侧质量分级 + 白名单/features.json 计数 + `report/llm_quality.py` 消费者）、`llm-technical.md`（§4.4 degradation_events 暴露 + fallback 模块行）、`folders.md`（目录树 + 统计重算）、`test-coverage.md`（模式/子标记/功能域计数 + `unit/report` 文件数）、`how-to-config.md`（§M 开关表行 + 三入口说明）/ `how-to-config-llm.md` / `how-to-use-tui-menu.md` / `how-to-use-web-mode.md`（实验开关清单与编号）、**`reports-instruction.md`**（§④ 新增「内容质量提示」横幅口径：评级触发表、A/B 不上屏、缺失型不叠加、只标注不阻断不写缓存）、**`faq.md`**（§LLM 相关新增「【内容质量提示】是什么意思」答疑）、**`developer-guide.md`**（「新增 LLM 模块检查清单」补「纳入质量分级」步骤——`_MODULE_KEYS`/`_LENGTH_THRESHOLDS`/`_REQUIRED_MARKERS` 三处登记点及一致性测试）、**`README.md`**（LLM 分析特性行）。
-- **记账**：plan-32 标记完成（见 plan.md P4 表）；`rf-295` 移入已解决待归档区。
+### 新增：行情/历史日 K 第三链路 + 交易日历官方兜底（plan-51 阶段 4）（2026-09-17）
 
-### 实验功能开关 CLI 参数（`--experiment`）（2026-09-10）
+**实现**：
+- **行情第三槽**：`price_stock` = 腾讯 → 新浪 → **同花顺**；新增 `fetch_price(code)`（形态对齐既有 provider）与 `HithinkQuoteAdapter`（`last_price`→`price`、`prev_price`→`yesterday_close`、不提供总市值→`None`）。实测 600900：价 28.44 / 昨收 28.46 / 价格日 2026-09-17
+- **历史日 K 第三槽**：`history_stock` 同序，`_HISTORY_PROVIDER_MAP` 注册 `src.python.providers.hithink`；`fetch_kline(code, days, start_from)`取**前复权**日 K、对齐既有 provider 形态（`{date, open, close, high, low, volume}` 升序，支持增量起点）。**实测坑**：上游历史 K 线日期字段是 `date_ms`（行情快照才是 `timestamp`），混用会解析出 0 条——已在模块文档串注明
+- **交易日历官方兜底**：akshare 失败后尝试 `calendar/trading-days`（惰性导入 providers，避免 core→providers 层次反转），再失败才走简易周度判断；实测官方序列 243 个交易日
+- 回归 20 例：`unit/providers/test_hithink.py`（行情映射/非 A 股跳过/`date_ms` 解析与排序/增量过滤/前复权参数）、`unit/fetcher/test_quote_adapter_hithink.py`（别名归一/契约自检/行情与历史链路段言/`_HISTORY_PROVIDER_MAP`/场外链不受影响）、`unit/core/test_trading_calendar.py`（官方兜底写入缓存、两源皆失败返回空集合）；既有断言同步（行情域四源、history_stock 三段）
 
-- **背景**：实验性功能开关此前只有 TUI 菜单 **[S]** 与 Web 配置面板两个入口（均由 `features.EXPERIMENTAL_FEATURES` 注册表驱动）；CLI 定时任务/脚本场景只能改用例化 `features.json`，无法「单次运行试用而不污染用户配置」。
-- **改动**：`cli/cli.py` 新增全局参数 `--experiment NAME`（`action="append"`，可重复），取值接受**开关名**（如 `signal_pre_digest`）/ **显示名**（如 `信号预消化`）/ **`all`**（全部启用）；`features.py` 新增 resolver 三件套 `EXPERIMENT_ALL` / `resolve_experiment_flags()` / `describe_experiment_flags()`；argparse `type` 回调 `_experiment_name` 在解析期即校验，写错**立即报错并列出全部可选值**（不静默忽略）。`_apply_cli_experiments(groups)` 在 `main()` 拿到配置后调用，**只走运行期 `set_feature_enabled`、绝不 `save_feature_overrides`**——单次运行生效、不写盘；反之用户已开启的开关也不会被本参数关闭。
-- **效果**：`TUI 菜单 S` / `Web 面板` / `CLI --experiment` 三入口同源同一注册表，新增实验项自动三处可用。
-- **测试**：新增 `test_features.py`（8 例）+ `test_features_edge.py`（7 例）——按开关名/显示名/大小写/`all`/混用去重解析、全注册表条目可解析、未知值上报但保留已命中项、空输入/空白 token/前后空白/无模糊匹配/显示名大小写敏感/重复未知值保留；`test_cli.py` 与 `test_cli_edge.py` 新增参数接线与报错路径用例。
-- **文档**：`how-to-use-cli-mode.md`（§2 全局参数表 + 用法示例）、`technical.md`（§1.7.2 参数 + §1.7.3 步骤）、`how-to-config.md`（§M 三入口说明）/ `how-to-config-llm.md`（实验开关 CLI 开启说明）、`README.md`（CLI 示例 + `--experiment` 取值说明）。
+**收尾项（未做）**：`adjustment_factors` 复权因子事件流暂无消费者——计划用于**分红流水漏记校验**（官方除权除息事件 × 用户「分红流水」页签交叉核对），已登记在 rf-389 待接线清单与 plan.md 阶段 4 收尾项。
 
-### 信号预消化（plan-31）（2026-09-10）
+文档：`plan.md`（阶段 4 完成 + 收尾项）、设计文档 §3、`datasource.md`（行情/历史行 + 已接入域 + 质量说明 + 第三链路口径）、`datasource-reliability.md`（§3.1/§3.2/§3.8 降级目标 + §3.10 已接入域）、`technical.md`（语义命名表 3 行）、`requirements.md`（数据源表）、`testplan.md`（回归行）、`folders.md`（统计）、`changelog` 本条。
 
-- **背景**：算法层算出的确定性结论有相当一部分只走渲染层、进不了提示词；进了的那部分又存在**裸值歧义**——行业资金流向段原先把净流出拼成「主力净流入-5,000,000」（label 固定「净流入」、数值带负号），模型读到的是自相矛盾的文本，只能靠推断符号含义；且数据源返回顺序无排名语义，截取前 5 行不构成任何「前列」含义。分析见 `docs-stm/plan/llm-quality-signal-analysis.md`。
-- **实现设计**：`docs-stm/plan/signal-pre-digestion-implementation.md`。按缺口的**性质**拆两条独立落地路径：
+### 修复：分阶段测试报告互相覆盖（详细报告丢失 Phase A）+ PE/PB 官方口径（rf-386）（2026-09-17）
 
-  **A｜资金流方向标注与排名（无开关，默认路径修复）**——判定为真缺陷，就近修：
+**一、分阶段报告覆盖（自审发现，rf-392）**
 
-  - `llm/prompts_signals.py`（新增）：`_build_sector_flow_block` 以「方向词 + 非负量」表达方向（`主力净流出1.20亿` 取代 `主力净流入-120000000`），净占比保留符号（比率非金额，同行有方向词可对照）；**按净额分方向排名**（净流入降序前 3 / 净流出升序前 3）而非合成单榜——只取降序前 N 会在全市场净流出日退化成「回撤最小的 N 个行业」，丢掉风险侧信号；无方向数据回退数据源原始顺序前 N 行。
-  - 非有限值不入提示词：`_is_number` 统一排除 `bool`（`True` 会被当 1 元）与 `NaN`/`±inf`（格式化后是 `nan`/`inf` 文字，比裸数值更糟）。
-  - `prompts_action._build_global_macro_prompt` 删除内联拼接改调该函数；`_fmt_amount` 万/亿 沿用、未达万级补「元」防裸数字无单位。
+现场：按 `test-reports/latest/` 核对详细报告时发现 `dev-verify/report.html` **只有 152 个用例**（Phase B 场景），Phase A 的 2700+ 核心单元用例全丢——两阶段共用同一报告路径，后跑的 Phase B 覆盖了 Phase A，真实失败明细（若 Phase A 红）在报告里看不到。
 
-  **B｜算法评级信号块（实验功能 `signal_pre_digest`，默认关）**：
+修改：
+- `scripts/test-runner.py` 抽出 `_phase_report_path(mode_key, phase_tag)`：分阶段模式每阶段一个报告文件（`report_phase_<tag>.html`），非分阶段模式维持 `report.html`（既有约定与 CI artifact 不变）
+- 汇总页新增 `_report_links_html(mode)`：逐阶段列出报告链接（实测汇总页出现「📄 Phase A」「📄 Phase B」两个链接）
+- 回归 `src/test/unit/scripts/test_test_runner_reports.py`（6 例）：分阶段/非分阶段路径、构建参数使用阶段路径、汇总页逐阶段链接 / 单 report.html 链接 / 无报告占位
 
-  - `_build_signal_digest_block`：市场温度档位（低估→看多 / 高估→看空）、持仓估值分位分布（低估多于高估→看多，并列→中性）、尾部风险幅度（VaR95 ≥3.0→风险高 / ≥1.5→风险中 / 其余→风险低）预消化为 `信号：{指标} {结论}（依据）` 行。**方向轴与风险轴分离**——尾部风险只有幅度没有好淡方向，套「看空」会把「波动大」误述成「看跌」。三路独立取用、缺一律跳过、全不可用返回空串（提示词与未启用时逐字节一致）。
-  - 注入专家复盘与持仓体检提示词（仅关键字参数 `enable_signal_digest=False`，位置在【分布】行后、【持仓明细】前——先结论后明细）；辩论模式各阶段不传该参数，属已文档化的 v1 边界。默认路径不传 → 提示词不变、辩论缓存键不受影响。
-  - **缓存指纹后缀同源**：开关判定收敛在 `_signal_digest_cache_suffix()` 内部，写侧指纹闭包与 orchestrator 预检闭包无条件同调同一函数（比照 `decision_ledger.lessons_cache_suffix()`）；开关关或块为空 → `""`（不误伤旧缓存），注入时取块内容指纹（信号数值变化即换键）。穿透深度分析不承接信号块故不追加。
-  - 只读既有 `pipeline_data` 键，**不新增数据契约键** → 附录 H 无需变更。
-- **测试**：新增 2 文件 52 例——`test_prompts_signals.py` 31 例（资金流方向词/非负量/排名/截断/双方向可见/空输入 + `_fmt_amount` 单位边界 + 三路信号方向映射与降级跳过 + 尾部风险档位边界 + 缓存后缀门控与确定性 + 两个提示词构建函数的注入开关 + 两个生成函数指纹接线与预检后缀）；`test_prompts_signals_edge.py` 21 例（畸形行/全非 dict/bool 净额/NaN 净额/字符串涨跌幅/极端净额/缺键回退 + `pipeline_data` 结构畸形/未知档位/非数值分位与 VaR95/缺可选字段 + 开关关闭时畸形数据无感）。`test_config_edit.py` 白名单与 surface 断言纳入 `signal_pre_digest` + 新增写生效用例；`test_handlers_config.py` 新增菜单第 10 项回归 + 第 6 项编号连续性保持。
-- **文档**：`requirements.md`（features.json 28→29 项 + 开关表行）、`folders.md`、`how-to-config.md` / `how-to-config-llm.md` / `how-to-use-tui-menu.md` / `how-to-use-web-mode.md`（实验开关清单与编号 6~10）、`technical.md`（features.json 行开关数与注册表项数）。
-- **记账**：plan-31 标记完成（见 plan.md P4 表）。实现期自审发现缓存指纹同源偏差（预检侧传 `history_data`、写侧不传 → 三模块预检永不命中，属性能/日志噪声非正确性缺陷），另案登记 rf-297，**不在本项范围内修复**。
+**二、PE/PB 改用官方 TTM/MRQ 口径（rf-386 关闭）**
 
-### 实验性功能开关上屏（TUI 菜单 S + Web 配置面板）（2026-09-10）
+现场：项目「当前 PE」用**报告期 EPS** 自算，与官方 TTM 口径差约 2.5 倍（实测长江电力 自算 47.19 vs 官方 19.17），在同一列里混用会误导估值判断。
 
-- **背景**：决策跨期反思闭环（`decision_reflection`）此前只能手工编辑 `features.json` 开关，TUI/Web 均无入口——两处 UI 各硬编码了一份**只含辩论**的开关列表（TUI `DEBATE_FLAGS`、Web `_DEBATE_FLAG_KEYS`），非辩论类实验开关无处安放。
-- **改动**：两处 UI 统一改由 `features.EXPERIMENTAL_FEATURES` 注册表（唯一事实来源，含显示名 + 说明 + 顺序）驱动——TUI 菜单 S 实验块与 Web 配置面板新增实验开关自动上屏，不再需要逐处手抄列表。Web 面板第 7 组由「辩论实验功能 / `debate`」泛化为「实验性功能 / `experiments`」，`config_edit_whitelist` 第 7 组由注册表生成。
-- **效果**：TUI 菜单 S 实验块由 3 项（6-8）扩展为 4 项（6-9），新增第 9 项「⚗ 决策跨期反思闭环」；Web 配置编辑面板「实验性功能（⚗ 实验性，默认关闭）」组新增同名开关；两处与 `features.json` 即改即存。
-- **测试**：`test_config_edit.py` 白名单/surface 断言更新 + 新增 decision_reflection 写生效用例；`test_handlers_config.py` 新增菜单第 9 项切换回归 + 第 6 项编号连续性用例。
-- **文档**：`how-to-use-tui-menu.md`（§S）、`how-to-config.md`（§M/§P）、`how-to-use-web-mode.md`、`how-to-config-llm.md`、`technical.md`（白名单组描述 + features.json 行）。
+修改：
+- 财务指标契约新增 `pe_ttm`（TTM 市盈率）与 `pb_mrq`（MRQ 市净率）两字段（`schemas/datasource_fields.py`）
+- `analysis/financial_statement_derive.derive_indicator_records` 支持传入官方估值快照并**只写最新一期**（历史期不倒填——估值只有「当下」一个快照，倒填等于造假）；`HithinkIndicatorAdapter` 抓取估值快照并注入
+- `analysis/financial_indicator.current_valuation` 改为**官方口径优先**（`pe_ttm`/`pb_mrq`），缺失时逐字段回退自算`现价 ÷ EPS / BVPS`；官方口径不依赖现价，无价时也能给出
+- 回归 11 例（派生注入只落最新期/无估值恒 None/脏值忽略；`current_valuation` 官方优先、部分缺失逐字段回退、无价仍可报、脏值忽略）
 
-### 决策跨期反思闭环（plan-30）（2026-09-10）
+实测（长江电力 600900，真实 key）：记录携带 `pe_ttm` 19.19 / `pb_mrq` 3.21，`current_valuation` 返回 (19.19, 3.21)（此前自算为 46.4）；无官方值记录仍按自算回退（20.0, 2.0）。
 
-- **背景**：原「对判断当次即评、事后无对账」——LLM 看多看空与确定性再平衡/行动建议无法用真实后续行情验证，判断质量无从沉淀、教训无法回灌后续分析。借鉴 TradingAgents-astock 两阶段延迟反馈 + augur「预测-真实结果结算、确定性命中率统计、立即持久化」合成一套闭环（分析见 `docs-stm/plan/reflection-decision-loop-analysis.md` + `augur-borrowing-analysis.md` §建议A）。
-- **实现设计**：`docs-stm/plan/decision-reflection-implementation.md`（分层依赖：`core/` 账本零 report/llm 依赖；`report/` 登记/结算/复盘消费 core；`llm/` 经 core 读教训回灌）。
-- **代码**（实验功能 `decision_reflection`，默认关，`features.json` 注册）：
-  - `core/decision_ledger.py`：决策账本核心——事件 JSONL 原子追加（`data/state/decision_ledger.jsonl`，无模块单例）、结算作独立追加事件（决策事件恒 `pending`）、`fold_ledger` 按 decision_id 折叠；教训区块 `lessons_block`/`lessons_cache_suffix`（md5 → 缓存指纹版本化）；`is_active()` 单源开关。
-  - `report/decision_record.py`：确定性载体登记（再平衡/调仓卖出建议，仅带基线价入账保证「入账必可结算」，同日 pending 去重）。
-  - `report/decision_llm_capture.py`：LLM 操作建议表结构化解析（表头识别 → 逐代码方向登记，同日去重）。
-  - `report/decision_settlement.py`：到期 pending 结算（真实后续行情对账，方向命中/超额 alpha，需样本数守门）。
-  - `report/decision_review_block.py` + `action_sheet.py`/`html_writer.py`/`action_section.html`：行动章内嵌「历史决策复盘」区块（HTML+Excel，5 列，命中小样本不报命中率结论）。
-  - `_report_generation.py` 两个 seam（确定性结算/登记在 LLM 拉取前；LLM 登记/复盘装配在回退后），`llm/skeleton.py` 教训注入 + `llm/generators*.py` 缓存指纹版本化——实验特性全程 try/except，故障绝不打断报告主链路。
-- **测试**：新增 6 文件 109 例（决策账本核心 30 + 边缘 16 + 记录 12 + LLM 捕获 22 + 结算 14 + 复盘区块 7）+ 既有行动双端 8 例（HTML 3 + Excel 5）扩展；决策复盘全套件含 render/excel 均通过。
-- **配套**：folders.md 目录树/统计（主程序 245→250 / 测试 309→315 / 测试用例 5,560→5,677 / 项目文档 119→120）+ test-coverage.md 计数同步。
-- **记账**：plan-30 标记完成（见 plan.md P4 表）。
+文档：`developer-guide.md`（测试报告布局含分阶段说明）、`technical.md`（附录 H 契约补两字段）、`requirements.md`（R-FIN-15）、`reports-instruction.md`（PE/PB 列口径）、`changelog` 本条；`review-findings.md` 记 rf-392（已解决）、rf-386 关闭（`rf-next → 393`）。
 
-### DeepSeek v4-flash 定价更新（2026-09-10 官方降价）（2026-09-09）
+### 新增：财务指标域第三链路 —— 同花顺官方合并报表派生（plan-51 阶段 2）（2026-09-17）
 
-- **背景**：DeepSeek 官方自 2026-09-10 12:00（北京时间）起对 v4-flash 系列降价（最高 60%），闲时 输入 ¥1.0/输出 ¥4.0/缓存命中 ¥0.02，高峰价翻倍 ¥2.0/¥8.0/¥0.04（元/百万 token）。本次降价**仅影响 flash 系列**，`deepseek-v4-pro` 与 `deepseek-chat` 价格不变。
-- **改动**：`core/constants.py` `MODEL_PRICING` 中 `deepseek-v4-flash` 更新为新价（含注释说明降价生效时点与范围）；`config/_llm_settings_defaults.py` 计价注释示例同步刷新。
-- **文档**：`llm-technical.md` 附录定价表 flash 行与 `how-to-config-llm.md` 定价参考同步为 2026-09-10 降价后数值。
-- **测试**：`test_llm_utils.py` 费用断言按新价更新（闲时 ¥0.011/¥5.000、高峰 ¥10.000、缓存命中、周末闲时各场景）。
-- **记账**：本变更不涉 plan-/rf- 编号（例行数据/文档刷新）。
+**目标**：主源 akshare（第三方封装，接口漂移风险）失效时，除 DataSinking 章节解析支路外再有一条**官方结构化**链路，并保住多期趋势能力。
 
-### 事实校验品种代码笔误自动纠正（rf-296）（2026-09-09）
-
-- **问题**：LLM 把持仓代码易位一位数字的笔误（实盘穿透深度模块 561910→161910）只有品种存在性**告警**、无自动纠正通道——用户需手工核错。唯一候选（编辑距离=1 唯一近邻）与其真实组合权重 10.2%（35516/347197）吻合也被放过。
-- **代码**：`src/python/llm/fact_checker/` 新增代码笔误自动纠正通道——`_corrections.py` `detect_code_corrections`/`apply_code_corrections`，辅助 `_utils.py` `_build_stock_weight_map`/`_edit_distance_le_one`。三个条件**全满足**才纠正：错码非 直接持仓/穿透 extra/常见指数 有效集且非建议语境、恰好**唯一**直接持仓代码与其编辑距离≤1、错码 token 后 ~24 字符内权重声称（占比/规模达/权重达，窗口常量 `_CODE_WEIGHT_SCAN_WINDOW`）与候选真实组合权重在默认容差 1.0pt 内吻合。`_runner.py` 在品种告警基础上接入，镜像数值修正纳入「已修正明细」摘要与日志并从 ⚠ 剔除；代码纠正全文替换（错码是单一所指，不做 count=1）。
-- **测试**：`test_fact_checker.py` 新增 `TestCodeTypoAutoCorrection` 8 例（实盘 161910/561910 检出+纠正+reason 带候选权重、全文替换、权重不吻合/多近邻歧义/建议语境/穿透 extra 排除/指数碰撞不误改、run_fact_check 整链路自动修正并入明细）；fact_checker 全 132 用例通过。
-- **边界说明**：数值检查器仅认 `占比/仓位/集中度` 权重语境，"规模达"仅代码纠正通道本地窗口认——建议语境引用非持仓代码（合法推荐）、歧义多近邻、指数/穿透代码一律不自动纠正。
-- **记账**：rf-296 修复归档（见 review-findings.md 已解决区 v0.10.16-dev）。
+**实现**：
+- 新增 `analysis/financial_statement_derive.py::derive_indicator_records`（纯函数）：三张合并报表 → 标准字段记录——营收=营业收入、归母净利=归属于母公司股东的净利润（缺失回退合并净利）、经营现金流=经营活动现金流净额、EPS=基本每股收益；毛利率=(营业收入−营业成本)/营业收入、负债率=负债合计/资产合计、ROE=归母净利/归母权益（期末口径）；同比与**上年同期**比较（同文种、报告期减一年），基数为 0 或缺失即 `None`
+- 新增 `fetcher/financial_indicator_adapters.py::HithinkIndicatorAdapter`（链路第三槽，单期）+ `fetcher/financial_indicator.py::fetch_hithink_indicator_series`（**多期**回退：三张报表各一次请求即得近若干期，优于链路单期兜底）；链路顺序 `akshare_financial → datasink_indicator → hithink`（可用 `preferred_provider.financial_indicator` 调换）
+- **报告期口径修正（实测发现）**：上游季度条目的 `period_end_ms` 是**披露窗口起点**（2026Q1 = 04-01）而非报告期末 → 改用 `fiscal_year`+`fiscal_period` 归一到标准季末（03-31/06-30/09-30/12-31），与主源报告期完全对齐（否则同报告期错位、同比与趋势比较失真）
+- 回归测试 27 例：`unit/analysis/test_financial_statement_derive.py`（口径算术/同比对齐/文种推断/季末归一/缺表即空/脏值兜底/降序限流）+ `unit/fetcher/test_financial_indicator_hithink.py`（适配器抓取与标准字段集/非 A 股跳过/契约自检/链路顺序/主源优先与备源回退/使用标记）
 
-### LLM 输出侧借鉴评估 + 待办登记（2026-09-09）
+**实测（长江电力 600900，真实 key）**：派生序列报告期（2026-06-30 / 2026-03-31 / 2025-12-31 / 2025-09-30）与主源一致；2026-06-30 各项数值一致（营收 379.29 亿、归母 147.56 亿、毛利率 57.89%、负债率 59.36%、经营现金流 241.28 亿、EPS 0.6031、营收同比 0.033562）；差异仅 ROE（期末 6.47% vs 加权 6.55%）与 `bvps` 恒缺失（官方不给总股本，该源不产 PB）。
 
-- **借鉴评估**：外部仓库 TradingAgents-astock 与 BruceLanLan/augur 的机制借鉴评估，识别 7 条可借用点登记为 P4 实验级候选（缺省关闭、需显式启用），见 `docs-stm/plan/` 三份深入分析文档 + plan.md P4「借用探索候选」表：
-  - TradingAgents-astock（2026-08-29 评估）：决策跨期反思闭环、信号预消化、模块级质量分级注入、决策头结构化+确定性解析兜底 → **plan-30/31/32/33**
-  - augur（2026-09-09 评估）：确定性结算学习、live/demo 标签纪律、健壮性三件套 → **plan-30 合并评估 + plan-34/35**
-- **待办登记**：借鉴分析同步发现 2 条 LLM 输出侧质量缺陷，登记 `review-findings.md` P2C（详见该文件）——
-  - **rf-295**：`_submit_llm_future` 漏传 `degradation_events` → health_check「数据质量」维度恒报全正常，与 expert_review 降级摘要口径可能矛盾（关联 plan-32 可作最小起步验证）
-  - **rf-296**：品种代码笔误（如实盘 561910→161910 易位一位）无自动纠正通道，fact_checker 仅告警不修正，唯一近邻 + 权重吻合也被放过 → **已随「品种代码笔误自动纠正（rf-296）」修复条目解决**（见本版本上方条目）
-- **配套**：folders.md 目录树/统计新增 `docs-stm/plan/` 3 份分析文档（project 文档 116→118 / 46,372→46,773）。
+**待办**：PE/PB 口径修正（`rf-386`）需为指标契约新增 `pe_ttm`/`pb_mrq` 字段并同步附录 H 与双端渲染，本次未做；同花顺估值快照接口已实测可取。
 
-### 开发版本切换（2026-08-29）
+**文档**：`plan.md`（阶段 2 完成）、设计文档 §3、`datasource.md`/`datasource-reliability.md`（财务指标降级链与已接入域）、`technical.md`（契约注记 + 语义命名表 2 行）、`requirements.md`（R-FIN-14 + 5.9 概述）、`testplan.md`（回归行）、`folders.md`（新文件与统计）。
 
-- 发布 v0.10.15 后，APP_VERSION 与全部管理文档版本头切换至 v0.10.16-dev。
+### 修复：CI 时区缺陷（日期换算按北京时间固定，附时区无关性守卫）（2026-09-17）
 
-## [0.10.15] - 2026-08-29
+**现场**：GitHub Actions（ubuntu-latest，UTC）在 commit `2d934682` 上 **P0（dev-verify）三个 Python 版本全红**，本地（CST）全绿——失败用例为本次新增的 `TestHithinkHoldingsNormalization::test_maps_items_to_canonical_holdings`：`AssertionError: 2026-06-29 != 2026-06-30`。
 
-### 版本发布 v0.10.15（2026-08-29）
+**根因**：新抽出的「毫秒戳 → YYYY-MM-DD」共享原语用了 `datetime.fromtimestamp(...)`（**本机时区**）。`1782748800000` = 2026-06-30 00:00 CST = 2026-06-29 16:00 UTC → CI 上少一天。同类内联写法仓库内还有 11 处（`core/market_hours.py`、`core/trading_calendar.py`、`llm/prompts_action.py`×4、`providers/akshare_news.py`×3、`providers/_utils.py`），任一漏改都会让报告日期/交易日边界随运行环境漂移。
 
-- **发布流程**：P2 发布门禁通过（`test-runner --mode verify,regression` 3737 通过 0 失败 + code/doc/task-numbering/semantic-index 四检查全绿 + 发布手动验证 `--mode perf,security` 14 通过）；版本号全链一致化至 v0.10.15（constants.py / pyproject.toml / README / 10 份管理文档）；发布数据文档刷新（test-coverage.md / folders.md / datasource 文档核对）。
-- **版本标签**：`git tag v0.10.15` 已打并推送，发布可追溯。
-- **已解决项归档**：v0.10.15-dev 已解决项（rf-288 ~ rf-294）整体迁入 `docs-stm/archive/v0.10.x/archived_review-findings.0.10.x.md` v0.10.15 章节，原文件保留待办区与归档引用。
+**修改**：
+- 新增 `core.constants.BEIJING_TZ`（UTC+8 固定偏移，无 DST）作为**项目统一自然日口径**的唯一事实来源
+- `core/num_utils.py::ms_to_date_str` 按 `BEIJING_TZ` 解释为北京自然日（不再用本机时区）
+- 11 处内联 `timezone(timedelta(hours=8))` 全部收敛到该常量（`market_hours` 保留 `_BJ_TZ` 别名以维持模块内可读性）
+- 新增回归守卫 `test_independent_of_process_timezone`：Unix 下依次切 `UTC` / `Asia/Shanghai` / `America/New_York` 三次，断言换算结果恒等
+- 自审：`review-findings.md` 记 rf-391（已解决），`rf-next → 392`
 
-### dedup 跨源收盘术语同义归一修复（rf-294）（2026-08-28）
+**验证**：CST 与 UTC 双时区复跑——dev-verify 2891 / verify 4856 / regression 249 / scenario+integration 317 全绿；ruff 全绿。
 
-- **问题**：跨源港股每日收评簇漏判——新浪用“收评”、东方财富用“收盘”，二者同义但仅标题开头时被前缀剥离，标题中段（如“港股收评”“港股午评”）保留差异，导致同为当日收盘汇总的两条新闻只共享“恒指涨”2 个 bigram（bg<3）被 `cross_skip` 漏判。校准工具 11847 条 skip 中发现 ~40 条此类真重复（比率 0.44~0.49）。
-- **修复**（`src/python/providers/news_dedup.py` `_normalize_title`）：收盘术语同义归一 `收盘→收评`、`午评→收评`（只增不减，不破坏既有合并）。归一后收评簇 overlap 2→4、ratio≈0.54≥安全区 0.50，进入合并。
-- **方向否决**：曾拟把 `收评/收盘/午评` 加入 `_STOP_BIGRAMS` 掩码，经 830 对锚点模拟证实会导致 7 对现有合并（午评类 cross_merge）bigram 重叠下降而回归（既破坏合并又不解决漏判），否决。
-- **测试**：`test_news_sources.py::TestDedupByTitle` 新增 `test_cross_source_roundup_closing_terminology_synonym_merged` + `_v2` 2 例（收评/收盘同日簇应合并）；news 全单测 205 通过、误合并防护 9 例仍通过。
-- **校验**：`check-code-traces.py`/`check-doc-traces.py`/`check-semantic-index.py`/`check-task-numbering.py` 均 [OK]；dev-verify 除 1 例预存在的 Windows 文件锁非确定性用例（`os.replace` PermissionError，无关本变更）外全绿。
+### 技术债整改（近 48h 实现复核）+ plan/设计文档状态核对（2026-09-17）
 
-### DeepSeek 峰谷定价适配周末全天闲时规则（plan-29）（2026-08-28）
+**一、技术债复核（近 48h：131 个源文件、+13k/−4k 行）**
 
-- **变更**：DeepSeek 官方 2026-08-23 起周末（周六/周日）全天不再区分峰谷，统一按闲时（低谷）价计费。适配后含 `"peak"` 高峰价子段的模型（`deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat`）在工作日高峰时段（北京时间 09:00–12:00、14:00–18:00）按 peak 价计费，其余时间（含周末全天）按 base 闲时价。
-- **代码**：`core/constants.py` 新增 `PRICING_WEEKEND_ALWAYS_IDLE`（默认 True）；`llm/pricing.py` 新增 `PRICING_WEEKEND_ALWAYS_IDLE` 模块级变量与 `_is_weekend()` 判定，`estimate_cost()` 峰谷判定按「工作日 + 钟点」双条件，周末恒闲时；`_is_peak_minute()` 增周末参数。
-- **配置**：`pricing` 段新增 `weekend_always_idle`（bool，默认 `true`，可设 `false` 恢复周末按钟点区分峰谷），`config/_llm_settings_defaults.py` 默认模板与用户 `data/config/llm_settings.json` 同步。
-- **测试**：`test_llm_utils.py::TestPricing` 周末闲时规则 4 例（默认开/周末高峰按闲时/周末缓存命中按闲时价/关闭开关恢复周末高峰），原以周六为工作日的用例改用周五（2026-08-21）固定时刻。
-- **文档**：how-to-config-llm.md（配置示例/完整模板/峰谷定价说明/参数表）、llm-technical.md §10.4 与附录 B、plan.md 新增 plan-29。
+审查维度：死代码（无生产引用）、同一语义多处实现（DRY/单一事实来源）、已改名符号残留、文件体积硬上限、测试标记与隔离、TODO/待实测标记。
 
-### 开发版本切换（2026-08-17）
+**已修复**：
+- **DRY ①「密钥文件默认路径」双份定义**：`providers/datasink.py` 与 `providers/hithink.py` 各写一份 `data/config/data_key.json` 字面量 → 收敛到 `core/datasource_credential.py::DEFAULT_DATA_KEY_FILE`（该模块本就是「通用密钥文件以 provider 为节」机制的归属地），两 provider 保留同名别名以维持既有引用面（含测试与配置校验）
+- **DRY ②「毫秒戳 → YYYY-MM-DD」三处重复**：`fetcher/fund.py::_ms_to_date` 与 `report/financial_report_digest.py::_announcement_date` 为同一逻辑（宽容口径 + 越界兜底）→ 收敛为 `core/num_utils.py::ms_to_date_str`（该原语模块的既定口径：只保证返回值可安全展示、绝不抛），两处调用点改为复用；新增边界用例（0/负数/NaN/inf/超范围/数值字符串），测试改指共享原语
 
-- 发布 v0.10.14 后，APP_VERSION 与全部管理文档版本头切换至 v0.10.15-dev。
+**新登记（未修）**：
+- `rf-389` **provider API 面暂时大于消费面**：同花顺 provider 16 个端点仅 2 个已接线，其余属已批准的 plan-51 阶段 2/4/5 既定 API 面（已逐个实测字段）→ **保留并跟踪**，阶段收尾时复核；若阶段取消则按 rf-358 先例删除
+- `rf-390` **两主程序文件越过 800 行硬上限**：`analysis/prosperity_framework.py` 934 行、`report/_report_generation.py` 828 行 → 记为待拆分（含拆分轴与影响面）。**本次按 ① 轴做过一次机械拆分尝试，首轮 34 例失败**（再导出清单不完整导致装配层 `NameError` + 脚本生成的 re-export 块语法错误），已**回退不提交**，并在条目内记下失败原因，拆分改由人工逐符号核对引用闭包后实施
 
-### all_no_unit live 卷入修复 + bench 重跑（rf-288）（2026-08-17）
+**二、plan.md 与设计文件状态核对（归档判定）**
 
-- **修复**：`test-runner.py` MODES `all_no_unit` marker 由 `not unit` 改为 `not unit and not live`——命令行 `-m` 覆盖 pytest.ini `addopts = -m "not live"`，使 14 项 opt-in live 真实网络套件卷入 `--mode all_no_unit` / bench（323 vs 正确口径 309）。补 `and not live` 后 `--mode all_no_unit` 收集 309，与 collect-test-coverage 口径一致。
-- **验证**：`--mode all_no_unit` collect 309（不再卷 live）；bench 全量重跑（含 all 5550 全 mock 零网络访问）回填 test-coverage.md 模式对应测试量表，all_no_unit 保持 309 稳定不反复。
-- **变更记录**：rf-288 已修复归档（见 review-findings.md 已解决区）。
+- `docs-stm/plan/`：仅 `hithink-financial-data-design.md`（plan-51 设计层）。**不归档**——5 个阶段中阶段 1 / 阶段 3 已完成，阶段 2 / 4 / 5 在办；已在文档头部写死归档去向（全部完成后 → `docs-stm/archive/v0.11.x/hithink-data-source/`，与 plan-45 / plan-46 先例一致）并标注当前进度
+- `plan.md`：概述行补在办集合（plan-47/48/49/50/51）与 v0.11.x 归档引用（44/45/46）；**plan-47** 补前置条件更新（阶段 3 已提供官方披露持仓 top10，全量穿透仍待历史持仓接口）；**plan-50** 补「不可被 plan-51 替代」实测结论（同花顺官方不含公告原文）；plan-51 阶段表状态复核
+- 归档区核对：`archive/v0.11.x/` 结构（archived_plan + archived_changelog + section-consolidation/ + prosperity-framework/）与 `plan.md` 归档清单一致；无已完成但未归档的迭代设计文件
+- 编号源复核：`plan-next = 52`、`rf-next = 391`
 
-### scripts/ 命名统一与清理（2026-08-17）
+### 新增：基金披露持仓两源链（同花顺官方源接入 `fund_hold`）（2026-09-16）
 
-- **脚本重命名 kebab-case**：7 个 snake_case 脚本统一为 kebab-case（`git mv` 保留历史）——`test_runner.py`→`test-runner.py`、`perf_report.py`→`perf-report.py`、`perf_view.py`→`perf-view.py`、`llm_hallucination_sampler.py`→`llm-hallucination-sampler.py`、`svg_geom_check.py`→`check-svg-geom.py`、`svg_pixel_check.py`→`check-svg-pixel.py`、`svg_text_overflow_check.py`→`check-svg-text-overflow.py`。同步更新脚本自引用、`src/` 注释、live/unit 测试、CI、CLAUDE.md/README/用户手册/管理文档全部引用；测试文件 `test_test_runner_*.py` 按约定不重命名。
-- **developer-guide 补 `probe-push2.py`**：速查表 + 诊断类章节补齐东方财富 push2 连通性探测条目（含 curl 对照判读）。
-- **删除低价值脚本**：`diagnose_gemini_proxy.py`（硬编码代理 IP `10.22.207.29:10037` 的单机排查临时产物）+ `reproduce_factcheck_corrections.py`（一次性事实校验修正复现，docstring 自认"不属于仓库交付物"，功能已被 rf-289 回归测试 `TestDescriptiveTailMatch` 正式覆盖）。同步移除 developer-guide 速查表行 + 章节、folders.md 目录树行，辅助脚本统计 23→21 / 7,394→7,165。
+**目标**：把「基金底层持仓」从单一天天基金爬虫链路升级为**双源链**——天天基金（主）不可用时由同花顺官方披露持仓接管，提升穿透与基金业绩的数据可用性，并为后续「基金持仓 ROE 加权（需全量穿透）」打数据基础。
 
-### dedup 跨源误合并率修复（rf-290）（2026-08-17）
+**落地**：
+- **链路**：`fetcher/chain.py::_DEFAULT_CHAINS["fund_hold"] = ["tiantian", "hithink"]`，provider 表 `fetcher/fund.py::_FUND_HOLD_PROVIDERS` 同序（天天基金主 → 同花顺官方备，需 key；未配置 key 时由既有凭据预检自动跳过，不计熔断）。顺序可用 `config.json` 的 `preferred_provider.fund_hold` 调换（已加入校验白名单）
+- **载荷归一**：`_stamp_hold_schema` 升级为 `_normalize_hold_payload`（按载荷形状识别源）——天天基金形态**原样透传**（主源可用时输出逐字不变）；同花顺形态映射为统一契约 `code/name/date/holdings`：只取 `asset_type=stock`（债券/基金资产不进股票层，避免污染占比分母）、`hold_ratio`→`ratio`（与天天基金同口径的百分数原值）、报告期取 `end_date_ms`（回退 `publish_date_ms`）→ `YYYY-MM-DD`（供报告层时效闸门判定）
+- **联接基金信号**：`providers/hithink.py::fetch_fund_holdings`（项目代码入口）在「持仓仅一只 `fund` 型资产」时直接带回 `feeder_target_code`（实测 `016055.OF` → `513390.SH` 博时纳斯达克100ETF），既有 `feeder_penetration` 链路据此穿透，省去 HTML 锚点探测
+- **代码候选解析**：新增 `fund_thscode_candidates`（4/5 位补零 + 场内/场外后缀，逐个试到命中）——实测 `16055.OF` 报 `code=3001`、`016055.OF` 命中（仓库读取层本就补零，此处为防御性一致）
+- **不递增 `hold_schema`**：缓存写入前必经归一，载荷恒为同一形态、旧条目不会被误读；递增只会让全体用户的白缓存失效（判据是「旧载荷是否会被误读」）——该决策已写入语义版本字段的文档串
+- 回归测试：`unit/fetcher/test_fund.py`（同花顺形态归一/主源形态透传/链路顺序/备源接管/语义版本）+ `unit/providers/test_hithink.py`（候选解析/联接信号/取数入口）共 20+ 例
 
-- **问题**：42560 条锚点分层随机采样人工判定，跨源合并区（cross_merge bg3/bg≥4/cross_merge_bg2/cross_safe 共 4180 条）约 70-80% 为误合并，每条误合并即报告丢失一条独立新闻：① `_STOP_BIGRAMS` 未覆盖财报/回购/指数/预警/地震等模板词，不同公司同类新闻天然共享 3-6 bigram（"美的集团累计回购A股股份" vs "中远海控累计回购A股股份" bg=5 误合并）；② 英文占位符统一 `_tk_` 使任意英文 token（msci/vn）共享相似度虚高 ratio；③ 候选区门槛 0.30 过低，跨源方向对立报道（"暂缓加息" vs "将加息"）也被合并；④ bg=2 梯度（ratio≥0.40）误合并率 ~85%（英伟达 Vera Rubin vs 英伟达投资）；⑤ 安全区 0.50 直接合并在 0.50-0.60 段误合并 ~40-50%（行云科技 vs 亿田智能 共享"算力服务合同"骨架 ratio 0.542）。
-- **修复**（`src/python/providers/news_dedup.py`）：
-  - `_STOP_BIGRAMS` 扩至 ~280 个模板词（财报/回购/指数/预警/地震/评级/货币单位/通用业务词），提取中文 bigram 前整体掩码替换为占位符（`_mask_stop`），消除模板词贡献并杜绝"累计|回购"跨词边界 bigram（计回）泄漏
-  - 英文占位符按长度分桶（`_tk2_`/`_tk4_`/`_tk6_`），不同长度英文词不再共享相似度
-  - 跨源候选区门槛 0.30→0.35；bg=2 梯度改为 ratio≥0.375 且共享 bigram 含英数/数字 token（CPI/PPI、荣耀IPO、SpaceX 类专名真重复），纯中文公司名共享不触发
-  - 安全区分级：ratio≥0.65 且专名 bg≥1 直接合并；0.50~0.65 需专名 bg≥2（防不同公司同模板 ratio 0.7+ 误合并）
-  - 新增跨源方向对立词对检测（上涨/下跌、加息/降息等分属两标题且共享实体 → 不合并，记录 cross_opposite）
-  - `_normalize_title` 保留空格防英文 token 粘连（"Blackwell AI"→blackwellai）+ 剥离"N级"（地震级数）+ 孤立年份数字不作专名 token
-  - ratio 双向取 max 消除 SequenceMatcher 贪心匹配方向不对称（含多英文占位块时 ratio(a,b)≠ratio(b,a) 差异可达 0.18）
-- **回归测试**：`test_news_sources.py` 新增 `TestDedupFalseMergeGuard` 9 例（同名不同事件/不同公司回购/不同地震/不同公司业绩快报/目标价骨架/算力合同骨架/不同指数/方向对立/同源不同公司）+ `TestDedupTokenGradientMerge` 3 例；锚点采样 13/13 误合并案例全部修复为保留，真重复 7/11 保持合并（4 条表述差异大按宁漏勿错原则接受漏判，如段永平减持澄清、欧元区CPI、南向资金、野村财报）。`unit/news` 44 用例全绿。
-- **校准脚本同步**：`scripts/calibrate-dedup-threshold.py` 阈值常量（0.35/0.375/0.65/0.50）与"当前阈值规则"摘要更新。
-- **提交**：`1aebd5ff`（dev 分支，已推送 origin/dev）——含 5 文件 +636/-63，pre-commit 任务编号一致性校验通过。
+**实测（真实 key）**：股票型 `011506.OF`、QDII `017730.OF`（返回 AMD/MU/KLAC 等境外持仓）、场内 ETF `561910.SH` 均返回 10 项股票持仓；联接基金 `016055.OF` 返回单只 `fund` 型目标 ETF；债券型 `012325.OF` 仅 `bond` 持仓 → 股票层正确为空（与天天基金「股票表为空」同口径）。
 
-### 文档同步：rf-289/rf-290 配套管理文档刷新（2026-08-17）
+**文档**：`technical.md`（架构图链路、目录树、取数阶梯段新增「两源链与载荷归一」、语义命名表新增 3 行）、`requirements.md`（数据源清单 + 三跳阶梯段补备源规则）、`datasource.md` / `datasource-reliability.md`（基金持仓降级目标与同花顺已接入域）、`testplan.md`（回归清单新增两源链行）、`folders.md`、设计文档阶段 3 完成态。
 
-- **technical.md「新闻去重算法」章节重写**：与 rf-290 新实现（五档阈值策略）对齐——cross_threshold 0.30→0.35、新增直接合并区 ratio≥0.65+bg≥1、安全区分级 0.50~0.65 需 bg≥2、候选区 bg=2 梯度 0.375+英数 token、方向对立防护、STOP 集 44→334 词 + 整体掩码机制、英文分桶 `_tk2_`/`_tk4_`/`_tk6_`、ratio 双向取 max；锚点体系补 `cross_merge_bg2`/`cross_opposite`。
-- **test-coverage.md 计数刷新**（collect-test-coverage.py 实时口径）：模式对应测试量 `unit` 5224→5241 / `standard` 4546→4563 / `verify` 3470→3487 / `all` 5533→5550；功能域新闻处理 191→203、LLM 智能分析 760→765；单元分组 `unit_llm` 760→765 / `unit_news` 191→203、父标记 5224→5241；跨类 `llm` 615→620。
-- **developer-guide.md**：calibrate-dedup-threshold 章节描述同步（"两档阈值"→当前五档体系）。
+### 文档：全量管理文档 + 用户文档一致性审计与修订（2026-09-16）
 
-### 事实校验描述性尾名匹配修复（rf-289）（2026-08-17）
+**背景**：本轮连续改动（LLM 上限、财报摘要、同花顺接入、阶段 3）后，对 10 份管理文档 + 10 份用户手册 + README 做了一次逐项核对（版本头/目录锚点/陈旧表述/计数/凭据清单）。
 
-- **问题**：2026-08-17 报告「事实校验自动修正 3.92%→36.3%（022365实际收益率36.3%）」——LLM 正确写出的"电池主题ETF（收益率-3.92%）"（561910 招商中证电池主题ETF 实际 -3.92%）被自动修正为 **-36.3%**。根因：`_locate_subject_code` 无法解析省略基金公司前缀的描述性缩写（"电池主题ETF"→561910），回退同句最近邻把 3.92 误路由到 022365（永赢科技智选混合C，实际 +36.29%），修正逻辑保留负号 → 报告出现 -36.3%，正确数据被改错。
-- **修复**：`src/python/llm/fact_checker/_utils.py` 新增 `_match_descriptive_tail` 描述性尾名匹配——逐持仓取核心名后缀（≥3 汉字）+ 产品后缀（ETF/股票A/混合C 等）拼完整候选，命中句中候选按 (距锚点距离, 候选长度) 择优，接入 `_locate_subject_code` 兜底（产品后缀将候选锚定为产品名，避免"科技""指数"等泛词误路由）。修复后"电池主题ETF（收益率-3.92%）"归因 561910 且 3.92 在容差内通过、不再误修正。
-- **回归测试**：`test_fact_checker.py` 新增 `TestDescriptiveTailMatch` 5 项（报告场景不误修正 / 错误值经尾名匹配修正且保留盈亏方向 / `_locate_subject_code` 直测 / 泛词不误路由 / `run_fact_check` 整链路）；全 LLM 单测 764 通过 + code/doc/task-numbering/semantic-index 四检查全绿。
+**发现问题与处置**：
+- **`technical.md` 引用已改名的函数**（`_stamp_hold_schema` → `_normalize_hold_payload`）：文档与实现脱钩 → 已改正并补两源链说明（记为 rf-387）
+- **用户手册 7 处目录链接锚点失效**（`reports-instruction.md`「页面/章节分组」标题为 `### ① 基础核心（type=always）`，目录却按 `#基础核心typealways` 链接，带圈数字的锚点归属不确定）：7 个标题各补显式 HTML 锚点，保留带圈编号与目录文本，链接确定性可用（记为 rf-388）
+- **需凭据源清单缺同花顺**：`README.md`（数据源与凭据段）、`how-to-config.md`（示例注释 / `data_key_file` 字段说明 / `datasource_credential_ready` 开关描述两处）已补 `hithink` 节与 `HITHINK_FINANCE_API_KEY`
+- **计数漂移**：`folders.md` 统计（主程序 281→282 文件 / 71,674→72,729 行、测试 375→379 / 109,928→112,135、用例 7,285→7,395、用户文档 5,159→5,184 行）；`test-coverage.md` unit 子标记按 `collect-test-coverage.py` 实时收集刷新（providers 315→380、fetcher 408→427、report 1847→1929、analysis 788→874、core 1215→1213、config 358→362、llm 968→969）
+- **顺序与结构核对**：章节编号/分组顺序、目录与标题对应、provider 链路示意宽度对齐、管理文档「编号源」标记（plan-next 52 / rf-next 389）均已复核；`模式对应测试量` 表为 bench 派生产物，按既有约定留待发布前 `--mode bench --update-docs` 回填（文档内已有该说明）
 
-### 事实校验主体归因误修正三处修复（rf-291/rf-292/rf-293）（2026-08-17）
+**自审**：`review-findings.md` 记 rf-387、rf-388（均为已解决），`rf-next → 389`。
 
-- **问题**：2026-08-17 报告自动修正把三处**正确数据改错**——① [持仓体检报告] 15/16 通过、自动修正 1 处 `181.37%→130.6%（040046）`，但 181.37% 是建设银行（601939）正确收益率；② 智囊团深度复盘 `130.61%→181.4%（601939）`，但 130.61% 是华安纳斯达克100（040046）正确收益率；③ `0.21%→-2.3%（561910）`，但 0.21% 是"今日组合 +0.21%"的组合本日收益。
-- **根因**（三处独立）：
-  1. **rf-293 单代码钉扎**：`_evaluate_percent_value` 句中恰含 1 个持仓代码（040046）时把所有百分比钉扎到该代码，"040046 收益率 +130.61%、建设银行收益率 +181.37%"中 181.37% 被误归 040046 → 误修正为 130.6%
-  2. **rf-291 短尾缺数字代号**：`_match_descriptive_tail` 未覆盖「核心名+数字代号」缩略（"华安纳斯达克100"→040046"华安纳斯达克100ETF联接基金A"），130.61% 回退同句最近邻 601939 → 误修正为 181.4%
-  3. **rf-292 组合当日收益无保护**："今日组合 +0.21%"组合本日收益无基准数据可校验，回退全局最近邻把 0.21% 误修正为数值最接近的品种收益率 561910 -2.3%
-- **修复**（`src/python/llm/fact_checker/`）：
-  - `_utils.py` `_locate_subject_code` 重构为「紧邻优先 + 代码/全名最近兜底」统一主体归因（代码/全名/简称/尾名四级来源；主体边缘距 ≤ `_ATTACHED_SUBJECT_MAX_DIST`=6 为紧邻，紧邻主体优先；无紧邻时句内代码/全名最近兜底，远距别名/尾名不得覆盖可靠主体）——替换原单代码钉扎分支，同句多主体各数值各自就近归因
-  - `_utils.py` `_leading_token` 改为仅取前导数字串（"100ETF联接基金A"→"100"，排除"ETF"等字母），`_match_descriptive_tail` 据此生成「核心名+数字代号」短尾候选（"华安纳斯达克100"）
-  - `_context.py` 新增 `_is_portfolio_daily_change_context`（前 18 字符时间词 + 数值紧邻"组合"标记），`_numerical.py` 在组合级累计收益语境之后、主体定位之前跳过——组合本日收益不再回退全局最近邻
-- **回归测试**：`test_fact_checker.py` 新增 `TestSubjectAttributionMulti` 4 项（体检单代码不钉扎全句 / 智囊团短尾简称不误路由 / 组合本日收益不误修正 / 同句远距尾名不覆盖可靠主体）；`test_fact_checker.py` 全 124 用例通过。
-- **P1 合入门禁**：`--mode verify` 通过（另机执行，0 失败）。
-- **文档同步**：test-coverage.md 模式表 bench 回填（unit 5245 / standard 4567 / verify 3491 / all 5554）、功能域 LLM 智能分析 765→769、单元分组 `unit_llm` 765→769、跨类 `llm` 620→624；folders.md 统计重计（源码 70,732 / 测试 87,638 / 用例 5,554）。
-- **变更记录**：rf-291/rf-292/rf-293 已修复归档（见 review-findings.md 已解决区）。
+### 同花顺数据服务：key 配置 + provider 实测通过（11 端点 10 通）（2026-09-16）
 
-## [0.10.14] - 2026-08-17
+**落地**：
+- `data/config/data_key.json` 新增 `hithink` 节（key 由用户申领；文件已被 `.gitignore` 忽略，凭据不入库、不落日志/报告/缓存）
+- provider 实测（11 端点）：交易日历、财务指标、利润表、估值快照、行情快照、复权因子、基金披露持仓、基金净值、龙虎榜、连板天梯 **全部连通**；仅 `/api/a-share-index/constituents/ths-stock-list`（指数/板块成分股）两次 429（其余端点正常）→ 判定该接口限流更严或需更高权限，阶段 4 接入前复核
+- 默认限速按实测由 3 qps **下调为 2.0**（3 时连续拉 11 个端点即被 429）；新增「配置覆盖 qps / 非法值回落默认」回归用例 3 例（累计 55 例）
+- 设计文档新增 §4.1「实测结果」：逐端点字段结构（可直接用于阶段 2/3 映射）、限流观察、口径差异发现；`plan.md` 阶段 1 标注实测通过、阶段 2 前置就绪
 
-### 版本发布 v0.10.14（2026-08-17）
+**实测关键发现**：
+- 财务指标为 `abilities[5]`（growth/profitability/solvency/operation/cash-flow）+ `indicators[{index_id, value}]`，首批 `index_id` 已取到（如 `calculate_operating_income_yoy_growth_ratio`、`total_assets_net_ratio`）
+- 基金披露持仓含逐项 `hold_ratio`/`investment_rank`/`start_date_ms` 与汇总（`total_stock_ratio_pct`/`main_industry`/`concentration_ratio`）；实测建信高端装备(011506.OF) 10 项、报告期 2026Q1 —— 阶段 3/全量穿透的数据基础已确认存在
+- **口径差异**：官方估值为 TTM/MRQ，项目自算 PE 用报告期 EPS → 长江电力 47.19 vs 19.17（PB 一致 3.22 vs 3.21）；记为 `rf-386`（待处理），阶段 2 改为以官方为准
 
-- **发布流程**：P2 发布门禁通过（`test-runner --mode verify,regression` 3710 通过 0 失败 + code/doc/task-numbering/semantic-index 四检查全绿 + 发布手动验证 `--mode perf,security` 14 通过）；版本号全链一致化至 v0.10.14（constants.py / pyproject.toml / README / 10 份管理文档）；发布数据文档刷新（test-coverage.md / folders.md / datasource 文档核对）。
-- **test-coverage.md `all_no_unit` 修正（rf-288 登记）**：发布前刷新发现模式对应测试量表 `all_no_unit` 被 bench 回填为 323（含 opt-in live 套件），而 `all`(5533) = `unit`(5224) + `all_no_unit`(309) 数学自洽证明 309 为正确口径——`test-runner.py` MODES `all_no_unit: "not unit"` 覆盖 pytest.ini `addopts = -m "not live"`，使 14 项 live 真实网络套件卷入。已按 collect-test-coverage.py 口径将表值修正为 309，并登记 rf-288 待修复（marker 补 `and not live`）。
+### 新增：pi 模型采样配置（DeepSeek 编程档，`.pi/models.json`）（2026-09-16）
 
-### docs-stm/tmp 有价值脚本迁移至 scripts/ + 归档（2026-08-17）
+**背景**：pi 支持 `samplingParams`（自由采样参数字典，逐字合并进请求体、覆盖 pi 自身字段），可用它固定 DeepSeek 的采样；但 pi CLI 只读 `~/.pi/agent/models.json`，项目级 `.pi/` 只支持 settings/扩展/技能/主题。
 
-- **有复用价值脚本迁入 `scripts/`**（此前在 git 忽略的临时区，无法留存/共享）：`reproduce_factcheck_corrections.py`（事实校验自动修正复现脚本）+ `check-svg-geom.py`/`check-svg-pixel.py`/`check-svg-text-overflow.py`（README SVG 架构图检查三件套，未来改架构图可复用）。4 脚本语法验证通过，`reproduce_factcheck_corrections.py` 的 `sys.path`（`../..`）在 scripts/ 下仍正确解析项目根。**后续（v0.10.15-dev）重新评估后判定其一次性排查属性，已删除**（见 changelog 当前版本「scripts/ 命名统一与清理」条目）。
-- **dedup 校准分析报告迁入归档区**：`cross_merge_bg2_review.md`/`dedup-calibration-report.md`/`dedup-review.md` → `docs-stm/archive/v0.10.x/dedup-calibration/`（rf-279/280 校准结论的依据与逐条样本，原 tmp 位置 git 忽略无法追溯）。
-- **清理低价值临时产物**：一次性迁移/清理脚本（migrate_*/clean_*）、被正式工具取代的 _extract_fails/_parse_report、覆盖历史快照（coverage-*.txt）、可再生产物（rf113 报告副本 + svg 渲染 png/jpg）、`__pycache__` 全数删除；docs-stm/tmp 现为空目录（git 忽略）。
-- **文档同步**：folders.md 目录树 scripts/ 补 4 脚本 + archive/ 补 dedup-calibration/，统计刷新（辅助脚本 19→23 / 7,106→7,394；archive 106→109 / 37,373→37,689；项目文档 45,933→46,249）。
+**落地**：
+- 新增 `.pi/models.json`（版本受控的模型配置）：`deepseek-v4-flash` 与 `deepseek-v4-pro` 两个内置模型覆盖 `samplingParams.temperature = 0.0`（DeepSeek 官方参数建议：代码生成/数学解题 0.0；通用对话 1.3、创意写作 1.5）+ `maxTokens = 65536`（内置 384K 对编程偏大，收窄为单次响应设成本上限；思考与正文共享该预算）
+- 未改动 `thinkingLevelMap` / `compat` / `contextWindow` / `input`，`pi --list-models` 复核覆盖生效且无加载告警（`max-out` 显示 65.5K）
+- 生效方式：仓库文件为唯一事实来源，软链到全局路径（`ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json`）；`developer-guide.md` 新增「pi 模型采样配置（DeepSeek 编程档）」小节说明理由、验证与排查；`folders.md` 目录树同步
 
-### 自审记录四次合并：已解决项迁入归档（2026-08-17）
+**实测依据**：用项目 DeepSeek key 直连 OpenAI 兼容端点验证 `temperature`/`top_p` 被接受（HTTP 200，响应含 `reasoning_content`）；`pi --list-models` 确认覆盖生效。
 
-- **review-findings.md 已解决区清空**：v0.10.14 已解决项（rf-282 ~ rf-287）随四次合并整体迁入 `docs-stm/archive/v0.10.x/archived_review-findings.0.10.x.md` v0.10.14 章节（延续 dev 批次提前归档惯例，三次合并 rf-276~281 先例）。原文件仅保留归档引用 + 待办区（rf-75~89 文件过长、rf-113/114 交互图表技术债、rf-257 Web 真机验收）。
-- **对应迭代计划状态**：rf-282~287 均为维护性修复（rf-272 衍生死参/遗留清理 + smoke-web CI 竞态 + bench 菜单键集 + 测试标记体系漂移），非 plan-* 迭代项，plan.md 无变更。
-- **变更记录**：各 rf 修复详情已在 [0.10.14] 各条目（死参数/遗留清理、Web 冒烟竞态、bench 回写、perf/security 定向 mode）；归档文件「归档说明」补四次合并记录。
+### 新增：同花顺官方金融数据服务 provider（阶段 1）（2026-09-16）
 
-### 补 perf/security 定向 mode + 测试标记体系清理（2026-08-17）
+**背景**：现有链路多处依赖非官方爬虫源（穿透基金持仓走天天基金 HTML、财务指标走 akshare），行情只有腾讯/新浪两条非官方链路，市场情绪（涨跌停/连板/龙虎榜）完全空白。同花顺官方数据服务（<https://fuyao.aicubes.cn>）为官方源、**不限累计调用次数**、字段级契约明确。
 
-- **新增 `--mode perf` / `--mode security`**：`scenario_perf`（端到端性能基准，5 项）与 `scenario_security`（安全基线，9 项）此前仅有 `collect-test-coverage.py` 能计数、`test-runner.py` 无对应定向 mode（只能靠裸 `-m` 或 `all` 触发）。现补齐定向 mode（`--help` 可见、可进标准 HTML 报告管线），并同步 `collect-test-coverage.py` 模式对应测试量枚举。二者仍为「独立标记、不入门禁、不进 bench」，按既定设计保留手动/发布前运行；testplan.md §6.3 P2 门禁追加**发布手动验证**项：`--mode perf,security`。
-- **清理死注册 `unit_config_edge`**：conftest 的 `_KNOWN_MARKERS` + `pytest_configure` 注册了它但全仓 0 用例（config 的 edge 测试已归入 `unit_config`+`edge`）。移除两处注册，无行为影响。
-- **顺带修复 rf-287**：`check-test-markers.py` 标记合规检查的 `KNOWN_MARKERS` 与 conftest 漂移——缺 `unit_web`/`integration_cli`/`live` 三个实际在用的标记，误报 17 处「未注册标记」、退出码 1（非门禁脚本，日常门禁未暴露）。按 conftest 对齐后 277 文件 0 违规恢复通过。
-- **验证**：check-test-markers 0 违规；collect-test-coverage 输出 perf:5 / security:9；`--mode perf,security` 实跑通过（见下节）。
+**官方覆盖边界（不可误用）**：不含分钟 K/tick、**海外行情**、**宏观数据**、**新闻公告原文与研报** → **不能**替代 DataSinking 的财报全文链路（区块② 缺口仍由财报第二数据源待办承接）。
 
-### bench --update-docs 同步回写模式对应测试量 + 顺带修复菜单键集缺陷（2026-08-16）
+**本次落地（阶段 1：provider 层）**：
+- 新增 `providers/hithink.py`：凭据声明（`CredentialSpec`，密钥文件 `data/config/data_key.json` 的 `hithink` 节 / 环境变量 `HITHINK_FINANCE_API_KEY` 优先）、qps 限速器（默认 3，可经 `config.json` 的 `hithink.qps` 覆盖）、响应信封解析与错误码语义表（`2001` 凭据无效 / `2003` 权限不足 / `4001` 频率超限 / `5003` 数据源不可用…）、**触发限流不立即重试**（遵循官方指引，与 datasink 的退避重试策略相反）、`to_thscode()` 代码映射（`.SH/.SZ/.BJ/.OF`，场外基金由调用方给语义以区分 `00` 重叠区）
+- 16 个域接口封装（只取原始响应，不做字段归一）：财务指标、利润表/资产负债表/现金流量表（`limit` 与 `start+end` 互斥）、估值快照、行情快照、历史日 K（含前/后复权）、交易日历、复权因子事件流、指数成分股、连板天梯、龙虎榜、基金披露持仓 / 历史股票持仓 / 净值
+- 回归测试 52 例（`src/test/unit/providers/test_hithink.py`）：凭据门禁（缺 key 零请求）、限速先于请求、信封成功/业务错误码/非 JSON/结构异常、HTTP 分支（429 不重试）、thscode 映射（含 `002943` 的股票/场外基金双语义）、各域路径与参数拼装
+- 测试隔离：限速器单例新增 `reset_hithink_limiter()` 与 `conftest.py` 的 autouse 重置 fixture（遵循单例重置强制要求）
+- 设计文档：`docs-stm/plan/hithink-financial-data-design.md`（语义命名表 / 五阶段划分 / 覆盖边界 / 验证计划 / 架构约束自查）；`plan.md` 立项 `plan-51`（阶段 2~5 待办）
+- 文档：`datasource.md`（清单 + 需凭据源说明）、`datasource-reliability.md` §3.10（可靠度 ★★★★★ 与已知限制）、`folders.md` 目录树
 
-- **功能**：`--mode bench --update-docs` 在更新环境耗时对照两表（采集环境属性 + 各模式耗时）之外，同步回写「模式对应测试量」表——覆盖项数 = pytest 实测执行计数（passed+failed+skipped+errors，含参数化展开），典型耗时 = 本机实测约值；未实测/超时模式保留原值。此前该表为 `collect-test-coverage.py` 静态快照，需人工回填易过期（实测由静态 5218/5527 刷新至 5224/5533）。
-- **实现**：`test-runner.py` 新增 `_DOC_MODE_COUNT_MARKERS` 标记对 + `_update_mode_count_table()` 纯函数，接入 `_update_test_coverage_doc`；test-coverage.md「模式对应测试量」表套标记并修正注释（原「不含参数化展开」表述与实际 collect 口径不符——collect 计数含参数化展开）。行覆盖率仍走独立 `--coverage` 参数，不并入 bench（插桩会拖慢实测且分段覆盖会重复计数）。
-- **顺带修复 rf-286**：bench 全量跑暴露 `test_menu_key_coverage` 菜单键集断言未同步日志可视化新增键——`MENU_ITEMS` 自加 `[V]`/`[H]` 后 19 键，断言仍为旧 17 键，`integration`/`all_no_unit`/`all` 模式必失败（integration 不在 P0 门禁内，全量跑才暴露）。修复：期望集补 `V`/`H`，集成/全量模式复跑通过。
-- **验证**：dev-verify 2056 通过；bench 全量 5533 项仅 rf-286 1 例失败（修复前），修复后 integration 281 / all_no_unit 323 / all 5533 全绿；doc_writer 单测新增 3 例模式计数表覆盖，44 例通过。
+**待办（阶段 2~5，需 API key 实测校准字段）**：财务指标域第三链路（`index_id` 清单需实测）、基金披露持仓两源链（对齐全量穿透需求）、行情第三链路与交易日历/复权因子、情绪面新章节（开关默认关）。
 
-### Web 冒烟脚本竞态修复 + CI 格式门禁修复（2026-08-16）
+### 修复：穿透来源键名读错（标的来源列只剩「穿透」）+ 探测性 404 日志噪音（2026-09-16）
 
-GitHub Actions 上报两项失败，均已修复：
+**现场**（用户运行报告后反馈「datasinks 报错 404」）：日志出现 7 条 `[datasink] 请求 /documents/xxxxx 返回 HTTP 404`；报告「16.持仓基本面」的**标的来源**列只能显示「穿透」，看不到来源基金；工行摘要显示为 `--- stock_code: ...`（文档头）。
 
-- **smoke-web.py 竞态（TemporaryDirectory `Directory not empty`）**：`test_smoke_web_run_smoke_all_pass` 偶发失败——`_check_formal_use_existing` 提交第二个 run（正式-用存量，202）后不轮询终态，`run_smoke()` 立即退出临时目录上下文；run 由后台 worker 线程（`web_run`，daemon）异步执行，退出时仍在写 `output/个人投资分析报告.xlsx`，`TemporaryDirectory` 清理撞上并发写（`OSError: Directory not empty`）。CI 并行调度（worker=2）放大竞态窗口，本地偶发、CI 高频。
-  **修复**：抽 `_poll_run_finished(client, run_id)` 轮询 helper，正式-用存量 run 提交后同样轮询至终态（done/failed），`_check_progress_events` 复用；断言语义不变（仍验证 202 + run_id），仅消除竞态窗口。回归测试新增 3 例（轮询至 done / failed / 永不到终态返回最后 status），本地 8 次连跑稳定。
-- **ruff format 11 文件格式不一致**：CI `ruff format --check src/python/ scripts/` 报 11 个历史文件需格式化——`scripts/` 6 个（calibrate-dedup-threshold / check-code-traces / check-semantic-index / check-version-consistency / install-claude-hook / probe-push2）+ `src/python/` 5 个（llm/fact_checker/_constants、_utils、llm/strategy、report/category、schemas/history）。均为纯格式调整（frozenset 折叠、多行参数合并等），无逻辑变更；修复后 `ruff format --check src/python/ scripts/` 全 263 文件通过。
-- **验证**：dev-verify 2053 通过（含 smoke-web 回归新增 3 例），0 失败。
+**三处根因与处置**：
+1. **探测性 404 被记成 WARNING（日志噪音）**：章节接口在部分文档上缺失/残缺时，程序按 `datasink.sections` 偏好章节名逐个探名，不存在即 404——属**预期内落空**，随后由「切下一章节名 / 回溯上一份报告 / 全文兜底」接住。改为：**带 `section` 的探测与 `/sections` 清单探测的 404 记 DEBUG**，文档级 404（`/documents/{id}` 无 section、`/documents` 列表）仍是 WARNING（回归用例 3 例）。本次运行实测：7 条 404 全部为探测落空，**`[financial_report_digest] 取到 8/8 只 A 股财报摘要`、0 条 ERROR**。
+2. **来源键名读错（真实缺陷）**：穿透 top10 契约由 `_build_penetration_result` 归一，来源键为 `sources`（合并层的 `funds` 已改名）；`_penetrated_targets` 只读 `funds` → 来源基金标签全丢。改为读 `sources`（保留 `funds` 兼容），标的来源列恢复为「穿透：[ETF] 招商中证电池主题ETF(561910)…」。
+3. **目录行判定过宽**：上一版按「关键词后 90 字里出现点线/省略号」判目录，正文段落里的省略号会误伤 → 所有命中被跳过 → 退回文档开头（`--- stock_code: ...`）。改为**行内**判定（只看关键词到行尾这一行）。
 
-### 日志可视化三端实现：CLI + TUI + Web（2026-08-16）
+**实测（真实持仓 + 真实 top10 穿透）**：区块② **8/8 行 0 失败**；标的来源逐行带出基金标签（如「穿透：[ETF] 招商中证电池主题ETF(561910)；[权益] 广发多因子灵活配置混合(002943)…」）；工行摘要恢复为「董事会报告/主要业务…」正文段。
 
-实现 plan-10「日志可视化」（P4 实验功能）：三端均提供结构化日志查看，数据源健康历史接线展示。核心解析/聚合逻辑全部集中在核心层，CLI/TUI/Web 仅做薄展示。
+**自审**：`review-findings.md` 记 rf-385（已解决），`rf-next → 386`。
 
-- **核心层 `core/log_reader.py`（新）**：三端共享的日志读取模块——`parse_log`（按时间戳切分记录，续行/traceback 归并，装饰性横幅识别 `is_decorative`）、`tail_log`（从文件尾部反向分块读取，64KB chunk，>100MB 大日志不卡顿）、`read_log`（级别阈值过滤 / since-until 时间前缀过滤，无效级别抛 ValueError）。日志路径惰性引用 `logger._LOG_FILE`，不硬编码。`LogEntry` 不可变 dataclass，`to_dict()` 供 Web JSON 序列化。
-- **核心层 `core/perf.py`**：新增 `summarize_health_history(limit=10)`——聚合 `data/state/datasource_health.jsonl` 为最近 N 次运行摘要（含 ok/total、失败源清单），接线此前零调用者的 `load_health_history`。
-- **CLI**：新增 `view-logs` 子命令（`--level`/`--lines`/`--since`/`--until`），在 `init_config` 之前分派——配置损坏时仍可查日志诊断；输出每条 `time [LEVEL] message`，多行 body 缩进展示。
-- **TUI**：菜单新增「V 查看最近运行日志（可按级别筛选）」「H 查看数据源健康历史（近期检查记录）」两项（17→19 项）；`handlers_log.py` 按级别筛选、ERROR 红/WARNING 黄着色（NO_COLOR/TTY 检测自动降级为无着色）、traceback 折叠为「⤷ 堆栈详情 +N 行」。
-- **Web**：后端新增 `GET /api/logs`（级别校验→400 / lines clamp [1,5000] / since-until 透传 / 读取失败→500）与 `GET /api/health/history`；前端「⑦ 日志查看」卡手动加载（不自动轮询，对齐设计文档「自动刷新高 IO → 手动刷新」），`<details>` 原生折叠 + 级别配色，全程 `textContent`（XSS 纪律）。
-- **回归测试**：新增 `test_log_reader.py` 21 例 + `test_handlers_log.py` 10 例 + `test_tui_menu.py` 更新（V/H 项）+ `test_cli.py` 扩展 10 例 + `test_handlers.py` 扩展 10 例，全部标注 pytest marker、隔离不触真实数据路径。
-- **文档同步**：
-  - technical.md §6.7 语义命名表新增 `log_reader`/`view_logs`/`health_history` 3 行；§1.7/1.8 三端结构（CLI 子命令 4→5、TUI 菜单 17→19、Web 路由 + `/api/logs` + `/api/health/history`）与 §6.3/6.4 已同步。
-  - requirements.md 新增 §3.5「日志可视化（诊断）」R-DIAG-01~03（CLI view-logs / TUI V+H / Web ⑦ 日志卡 + API）；§3.2 菜单表新增「诊断」组（[V]/[H]）；R-TUI-02 菜单数 17→19。
-  - 三渠道用户手册：CLI 手册新增 §7 `view-logs` 子命令章节（参数表+示例）并重编号 7-13、§9 速查表加行；TUI 手册主菜单总览加 [V]/[H] + 新增「诊断类」详解；Web 手册首页 6→7 卡片区 + 新增 §6 日志查看区；how-to-start/faq/README 子命令清单加 view-logs、定时任务引用 §11→§12。
-  - folders.md 目录树 + 统计刷新；plan.md plan-10 归档至 `archive/v0.10.x/log-visualization/`。
-  - **顺带修复 rf-284 文档同步缺口**：CLI 手册残留的 `--warm` 标志说明（参数表/示例/缓存预热章节）已删除——rf-284 删除代码后用户文档未跟上，现与 `cli.py` 一致。
-- **已确认覆盖不改代码**：「报告尾部数据源状态表」已由 `data_source_matrix`（registry.py section 18）在 HTML+Excel 双端渲染，与设计意图吻合。
+### 增强：财报摘要两阶取数（章节阶 + 全文兜底）与年报优先回溯（2026-09-16）
 
-### 死参数/遗留文件清理：html 渲染签名瘦身 + 遗留重复文件删除 + warm_cache 移除（2026-08-16）
+**背景**：上一轮修复后区块② 仍缺工商银行——直查源侧确认：工行 **2026 半年报未被 DataSinking 收录**（索引最新为一季报），2025 年报的 `/sections` 只解析出「附件/标题」两节、裸章节名直取全 404；但**整篇正文可下**（40.1 万字 / 2.5 秒），且一季报全文里**确实含**「主要财务数据」。
 
-三项自审独立跟踪项（rf-282/283/284，源自 rf-272 全仓 ARG001 死参数处置后遗留）一并收尾：
+**修改**：
 
-- **rf-282 渲染器签名瘦身**：`html_renderers._render_llm_content_section` 上下文参数从 15 个删至 2 个（`enable_llm`/`llm_content`）。函数职责仅为解包预生成的 4 元组 + 开关判定；其余 13 参（force_llm/a_indices/us_indices/总额/持仓/穿透/板块资金流等）均由编排层预置或由下游直接读取，属死参数。同步重构 `html_writer.py` 调用点。
-- **rf-283 遗留重复文件删除**：`report/_pipeline.py`（25KB，标注「遗留重复文件」）确认为死代码副本——零生产引用，活代码在 `report/_llm_news.py`。删除文件（`git rm`），`test_pipeline_utils.py` 测试迁移至活模块 `_llm_news.py`（`_collect_llm_future_result`/`_collect_news_future_result`/`_report_llm_module_results`），防双份漂移。
-- **rf-284 warm_cache 移除**：`orchestrator.generate_report.warm_cache` 参数声明但函数体内从未使用，唯一传入方是 CLI `--warm` 标志（web/TUI 不消费；TUI 新资产预热走独立 `check_and_warm_for_new_assets` 机制）。删除 `--warm` 标志 + `warm_cache` 参数 + 测试中 6 处引用同步清理。
-- **验证**：`test_pipeline_utils.py` 6 例通过；report+cli 全量单元测试 1596 例通过。
-- **自审登记**：review-findings.md 三项（rf-282/283/284）由 P3 待办区转「已解决」区。
+- **章节阶**（原路径）：`_order_report_candidates` 稳定分组——**年报/半年报优先于季报**（季报无「管理层讨论与分析」，仅作最后兜底），并跳过标题含「公告」的信息披露条目（与财报混排在索引里）
+- **全文阶**（新增降级）：章节阶全失败时整篇下载（`_locate_from_fulltext`，最多 `_FULLTEXT_FALLBACK_LIMIT=2` 篇）→ 在正文里按 `datasink.sections` 偏好关键词定位 `max_chars` 片段；**跳过目录行**（`_is_toc_line` 只判关键词到行尾这一行内的点线引导/省略号，避免把「利润及股息分配……」这类正文省略号误判为目录）
+- 记录新增 `section_source`（`sections` / `fulltext`），排查时能区分取用方式；契约字段与展示层列不变
+- 自审：`review-findings.md` 的 rf-384 转入已解决（含实现期发现的目录行定位问题）
+- `plan.md`：新增 **plan-50**「财报取数第二数据源（巨潮 cninfo 备用链路）」（源侧**完全未收录**的报告无法靠降级弥补），`plan-next → 51`
+- 文档：`requirements.md` R-FRD-03、`technical.md` §4.19、`datasource.md`、`datasource-reliability.md`、`reports-instruction.md`
 
-### extract-test-failures.py 修复：pytest-html 报告解析崩溃（2026-08-16）
+**实测（真实持仓 + 真实穿透）**：区块② **8/8 行、0 失败**——工商银行由「目标章节缺失」变为取到 **2025 年报「董事会报告」正文段**（`section_source=fulltext`），建设银行仍为 2025 年报（章节阶命中），其余 6 只为 2026 半年报；季报未被误用为经营讨论来源。
 
-- **缺陷（rf-281）**：`_find_json_blob` 用手工花括号扫描器提取 `data-jsonblob`，假设 JSON 引号以反斜杠转义；但 pytest-html 将 JSON 内引号编码为 HTML 实体 `&#34;`，扫描器从不进入字符串态，日志内嵌 HTML 的 `}` 在 depth==0 时提前截断 → `json.loads` 报 `JSONDecodeError: Extra data`，**全绿报告也崩溃**，导致依赖此工具的失败用例提取流程不可用。
-- **修复**：改为按属性值整体截取——`data-jsonblob=` 起始引号到下一个裸引号之间即为完整 JSON（blob 内引号均为实体编码，不会出现裸引号提前终止属性），取回后统一解码 `&#34;/&gt;/&lt;/&amp;`。
-- **回归测试**：新增 `src/test/unit/scripts/test_extract_test_failures.py` 4 例——实体引号 blob 完整提取且 JSON 可解析 / 日志内嵌花括号不干扰 / 无 data-jsonblob 返回 None / 属性无结束引号返回 None 不崩溃。已验证全绿报告 `--summary` 汇总正常、失败报告与 `--json` 输出均正常。
-- **测试统计同步**：按 `scripts/collect-test-coverage.py` 实时收集快照（总 5474）同步 `test-coverage.md`（模式总计 `all` 5461→5474、`unit`→5165、`verify`→3433、`dev-verify`→2019、`standard`→4487；unit 子标记 `unit_llm` 754→760、`unit_news` 188→191、`unit_scripts` 190→194；跨类 `llm` 609→615，其中 llm/news 增量来自 e777ca5f/4c4e156b 新增用例）与 `folders.md`（测试代码 306→307 文件、86,228→86,536 行；测试用例 5,461→5,474 个）。
-- **自审登记**：review-findings.md 新增 rf-281 已解决条目。
+### 修复：持仓基本面财报摘要四处缺陷（穿透名称/来源、基金撞号、章节残缺回退、报告期回溯）（2026-09-16）
 
-### dedup 校准脚本路径修复 + 基于最新数据重校准（2026-08-16）
+**现场**（用户问询）：报告「16.持仓基本面」区块②「持仓个股财报摘要」只有 6 只 A 股，且名称列出现 `300274.SZ`、`300502.SZ` 等代码，无法判断是持仓还是穿透；查询中另发现「广发多因子灵活配置混合」行配的是深市 002943.SZ 宇晶股份的半年报。
 
-- **路径不一致（rf-279）**：`scripts/calibrate-dedup-threshold.py` 默认读取 `data/cache/dedup_anchors.jsonl`，而 `src/python/providers/news_dedup.py` 自 commit `4e95d595`（2026-07-30）起将锚点写入 `data/calibration/dedup_anchors.jsonl`，脚本从未同步 → 校准报告基于 7-29 旧快照（119654 条），与当前去重行为脱节。修复：脚本默认 `--file` 路径改为 `data/calibration/dedup_anchors.jsonl`，与代码写入路径一致。
-- **重校准结论（基于最新 109018 条锚点）**：
-  - cross_skip 总量 20785 条，但 87% 为 bg=0/1（无实体重叠的安全跳过）；真实漏判候选 bg≥2 有 2239 条，与旧数据（2154）持平，未恶化。
-  - **维持现阈值**：bg=2 ratio≥0.35 的 523 条候选抽样人工审查，真实重复率仅约 25%（多为"关税退款""A股白酒领涨""原油上涨"等，其余为不同公司回购/财报/目标价误判候选）。降到 0.35 会误合并约 390 条不同事件，不值得。当前 bg=2 ratio≥0.40 梯度补偿已捕获 196 条高置信重复。
-  - 跨源 bigram≥4（4753 条）与同源 bigram≥4 阈值安全；跨源 bigram=3 边界 2418 条中仅 354 条 ratio≥0.40，降阈值需求不大。
-  - 可选优化（非本次必改）：bg≤1 ratio≥0.40 虚高噪声从 82→1468 条（+18x），是共享日期/事件名/财经关键词导致的 SequenceMatcher 比率虚高，可进一步改进归一化。
-- **自审登记**：review-findings.md 新增 rf-279 已解决条目。
+**根因（四处）**：
+1. **穿透名称/来源未带入契约**：穿透层（`penetration.py`）一直带 `name` 与 `funds`（来源基金），但标的清单只取代码 → 展示层回退 symbol、无来源信息
+2. **场外基金代码撞号**：`002943` 既是场外基金也是深市股票代码，`to_fmp_symbol` 按前缀判 A 股即命中（`is_otc_fund_by_name` 早已能区分，两区块都没用）
+3. **章节清单非空但残缺时不回退**：建行半年报被 DataSinking 只解析出 2 个无关章节 → 匹配为空且仅在「清单不可得」时才回退偏好名直取 → 整篇白丢
+4. **最新一期缺章节即判失败**：半年报缺「管理层讨论与分析」时不回溯上年年报；失败原因统一写「未取到财报」
 
-### dedup 锚点重复计数修复：写入层 + 统计层双重去重（2026-08-16）
+**修改**：
+- `fetcher/financial_report.py`：`collect_a_share_targets` 持仓侧过 `is_otc_fund_by_name` 剔除场外基金、穿透侧带 `name`/`sources`（兼容裸代码）、直接持仓优先；新增 `target_source_label`（直接持有 / 穿透：来源基金…）；抽出 `_collect_doc_sections`（清单不可得**或残缺**均回退偏好名直取）；新增 `fetch_symbol_report_detailed`（按报告期回溯最多 3 篇 + 失败原因），`fetch_symbol_report` 变薄包装
+- `report/financial_report_digest.py`：契约行新增 `target_source`，失败项带 `kind`/`target_source`/细化原因；穿透名称回填（缺名仍回退 symbol）
+- `report/financial_indicator.py` + `report/orchestrator.py`：`_penetrated_codes` → `_penetrated_targets`（名称 + 来源基金），区块① 同步享受名称回填与来源标注
+- `report/fundamental_snapshot_sheet.py`：区块①、区块② 各增「标的来源」列（19→20 列 / 9→10 列），说明区补标的来源与报告期回溯口径
+- 文档：`requirements.md`（R-FRD-01/03/05、章节表与两区块列数）、`technical.md` §4.19、`reports-instruction.md`、`datasource.md`、`datasource-reliability.md`
+- 自审：`review-findings.md` 记 rf-380~rf-383（已解决）、rf-384（源侧未解析章节是否加全文兜底，待评估），`rf-next → 385`
 
-重校准中发现锚点文件同一对 (source,title) 多轮运行重复追加（实测 61.6% 为重复记录，同一对最多重复 63 次），导致校准报告绝对数字严重失真（cross_skip bg=0 从真实 279 虚增至 13800）。修复为写入层 + 统计层双重去重：
+**实测（真实持仓 + 真实穿透，2026-09-16）**：行数 6 → 7；穿透标的显示中文名（阳光电源/中际旭创/新易盛/宁德时代/华峰测控）并标注来源基金；场外基金 002943 不再入列；建设银行由「未取到」变为取到 2025 年报（回溯生效）；工商银行仍缺（源侧未解析章节），失败原因写明「目标章节缺失（已试报告期：2026-03-31、2025-12-31、2025-09-30）」。
 
-- **写入层去重（`news_dedup.py`）**：新增进程级 `_WRITTEN_ANCHOR_KEYS` 已写 key 集合 + `_load_written_keys()` 惰性加载（首次 flush 前读一次现有文件，~110k 行/35MB 一次性成本），`_flush_anchors` 写入前按 `_anchor_key`（source 对 + 标题对，顺序无关）比对，只写新 key、写后入集合 → 跨会话、跨轮次拦截重复，无需每次读全文件。
-- **统计层去重（`calibrate-dedup-threshold.py`）**：`load_anchors` 按 (source_a, source_b, title_a, title_b) 顺序无关 key 去重，处理存量污染文件 → 校准锚点 109018→41761 条。
-- **测试隔离**：conftest 增加 `_ANCHOR_PATH` 路径重定向（`_isolate_sensitive_paths`）+ `_auto_reset_anchor_state` autouse fixture 重置锚点单例；`test_news_sources.py` 新增 `TestFlushAnchorsDedup` 3 例（同对跨轮只写一次 / 不同对正常追加 / key 集合缓存生效）。
-- **自审登记**：review-findings.md 新增 rf-280 已解决条目。
+### 修复：思考耗尽 max_tokens —— 全模块 token 上限整体上调 50%（2026-09-16）
 
-### fact_checker 校验层修复：条件阈值误修正 + 持仓简称匹配漏检（2026-08-16）
+**现场**：`logs/app.log` 出现 `LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本（建议增大对应 max_tokens 配置或降低 reasoning_effort）` + `Extended Thinking 思考部分耗尽 max_tokens 预算（无正文），关闭 thinking 重试一次`。
 
-排查 601939「130.61%」/600900「200%」两处报告数值时定位到 fact_checker 两处缺陷，均已修复并配回归测试：
+**根因**：`max_tokens_{module}` 是 **thinking + 正文共享预算**。预算偏紧时思考先吃满预算、响应仅含 thinking block 无正文 → 只能关闭 thinking 重试一次（多一次调用，且本次深度下降）。
 
-- **条件阈值误修正（rf-277）**：穿透深度分析原文「收益率超过 200% 后可考虑部分止盈」中的 200% 是**止盈目标阈值**（非对 600900 当前收益率的陈述），旧逻辑因"止盈"位于数值之后较远处（超出 `_TRIM_TARGET_KEYWORDS` 的 [-15,+5] 邻近窗口）未命中止盈语境，误将 200% 归因到最近名称"长江电力(600900)"并修正为 59.2%——把正确文本改错。修复：`_constants.py` 新增 `_CONDITION_TRIGGER_KEYWORDS`（超过/达到/突破/接近/降至等），`_context._is_trim_target_context` 增加「触发词（前 12 字符）+ 后置调仓动作词（后 25 字符）」双条件联合判定；仅有触发词无动作词（如"收益率超过200%，风险很大"）仍按收益率校验，不过度跳过。
-- **持仓简称匹配漏检（rf-278）**：辩论综合原文「华安纳指+180.5%、建设银行+180.55%」——华安纳指（040046）实际收益率 130.61%，LLM 反向串位写成 180.5%；旧逻辑 `_locate_subject_code` 仅按持仓全名匹配，"华安纳指"匹配不到"华安纳斯达克100ETF联接基金A" → 主体定位失败回退全局最近邻，180.5 恰命中 601939 真实值 180.55 → 误判通过、反向串位漏检。修复：`_constants.py` 新增 `_NAME_ALIAS_MAP` 简称归一化表（纳指→纳斯达克、建行→建设银行等），`_utils._locate_subject_code` 增加归一化后按持仓名称核心名（`_extract_core_name`，首个 ASCII 字母/数字前汉字部分）前缀匹配，归因到实际品种。
-- **回归测试**：`test_fact_checker.py` 新增 `TestTrimTargetContext` 2 例（条件阈值不误修正 + 无动作词仍校验）+ 新增 `TestNameAliasNormalized` 4 例（华安纳指错误值修正/正确值通过/建行简称不误伤/run_fact_check 整链路）；全量 115 例通过。
-- **自审登记**：review-findings.md 新增 rf-277 / rf-278 已解决条目。
+**修改（按 +50% 整体上调，模板 + 用户配置文件同步）**：
 
-### LLM 定价支持 DeepSeek 峰谷定价 + 时段可配置（2026-08-15）
+| 配置项 | 旧 → 新 |
+|---|---|
+| `max_tokens_global_macro` | 2048 → **3072** |
+| `thinking_budget_global_macro` | 4000 → **6000** |
+| `max_tokens_expert_review` | 24000 → **36000** |
+| `thinking_budget_expert_review` | 16000 → **24000** |
+| `max_tokens_health_check` | 16000 → **24000** |
+| `thinking_budget_health_check` | 12000 → **18000** |
+| `max_tokens_penetration_deep` | 8192 → **12288** |
+| `thinking_budget_penetration_deep` | 8000 → **12000** |
+| `max_tokens_news_correlation` | 2000 → **3000** |
+| `thinking_budget_news_correlation` | 4000 → **6000** |
+| `debate.procon.per_call_max_tokens` | 12288 → **18432** |
+| `debate.max_total_tokens_per_report` | 48000 → **72000** |
 
-- **定价更新**：`MODEL_PRICING` 中 `deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat` 三模型按 DeepSeek 官方 2026-08-17 峰谷定价更新——base（闲时）价 + 新增 `peak` 高峰价子段（闲时价 ×2）。如 flash：输入 ¥1.5/输出 ¥4.5/缓存命中 ¥0.05，高峰 ¥3/¥9/¥0.10。
-- **峰谷时段**：新增 `PRICING_PEAK_PERIODS` / `PRICING_IDLE_PERIODS` / `PRICING_TIMEZONE` 常量（默认高峰北京时间 09:00–12:00、14:00–18:00，闲时为其外全部时间），`estimate_cost()` 新增 `at_time` 参数按时段计费（缺省当前时间、按定价时区换算，naive 视为已在定价时区便于测试）。
-- **配置可覆盖**：`llm_settings.json → pricing` 段新增 `timezone` / `peak_periods` / `idle_periods` 三个非模型键，时段与时区可自定义；模型条目可携带 `peak` 子段覆盖高峰价。`reload_pricing()` 就地更新时段列表，保持对象身份稳定。
-- **回归测试**：`TestPricing` 新增 6 例峰谷用例（高峰/闲时价差、边界闭区间、无 peak 模型不受时段影响、缓存命中按 peak 费率、默认时段、自定义时段+模型价格覆盖）。
-- **文档同步**：`how-to-config-llm.md` 定价表与 Token 消耗参考按新价更新 + 峰谷说明；`llm-technical.md` §10 新增峰谷定价小节、附录 B 定价表更新。
+- 代码兜底：`llm/generators.py::generate_debate_procon` 的 `_max_tokens` 兜底 12288 → **18432**（三段 3×18432 = 55296 < 72000，预算守卫不会被提前触发）
+- 模板：`config/_llm_settings_defaults.py` 同步全部新值（用户可见可调）
+- 用户配置：`data/config/llm_settings.json` 同步全部新值
+- 文档同步：`how-to-config-llm.md`（示例 JSON / 模块参数表 / `thinking_budget` 与 `max_tokens` 关系 / 调参建议）、`llm-technical.md`（各模块默认 max_tokens 表）、`requirements.md`（辩论 per-call 与总预算两行）
+- 回归测试：`test_llm_settings.py::TestTokenCapHeadroom`（基线值 + 「thinking 模块 max_tokens > thinking_budget」正文余量不变量 + 辩论三段预算关系）；`test_debate_generators.py` 兜底值同步为 18432
 
-### v0.10.1+ 改动文档一致性审计修复（2026-08-15）
+注：caps 是**上限**而非固定用量，正常输出不会因此变长；只在被截断/耗尽场景才多消耗预算，从而省掉一次多余的「关闭 thinking 重试」调用。
 
-- **A 类事实错误**：README `enable_action` 默认值修正（默认开、菜单 P 可切换，原误述为默认关）；folders.md 统计与目录树同步 6 个新测试文件（`test_llm_settings`、`test_history_snapshot_namespace{,_edge}`、`test_snapshot_namespace_consumers`、`test_holdings_update{,_edge}`）；reports-instruction 浮盈/已实现盈亏文案修正。
-- **B 类用户文档缺口**：reports-instruction 补完整「成本流水分析」章节（开关 `report_submodules.cost_lots`、交易/分红流水表头、XIRR/成本分档/分红累计输出、快照近似模式文案）+ HTML TOC 加 LLM 标记说明；how-to-use-web-mode 补数据源健康代理诊断提示与产物写锁检测说明；datasource 补行业名归一化说明（剥离申万 Ⅰ~Ⅳ 后缀）；how-to-config `history.fetch_mode=off` 行补警告行为说明；how-to-start 持仓文件格式补可选流水页签块引用；faq 已实现盈亏答案引用 XIRR/cost_lots。
-- **C 类管理文档**：requirements 新增 R-ENV-05（CLI 包装脚本 cli.sh/cli.ps1）、R-WEB-09（Web 试算隔离）、§6.4.20 成本流水（R-CFL-01~04）、增强 R-OUT-07（report_section_order 细节）；technical 新增 §1.7.6 便捷入口包装脚本、语义命名表补 `report_section_order`/`generators_news` 行；test-coverage 测试计数快照刷新至实时值（`all` 5,455→5,461）。
-- **自审登记**：review-findings.md 新增 rf-276 已解决条目。
+### 修复：辩论模式每阶段输出上限 8192 → 12288（智囊团复盘截断）（2026-09-16）
 
----
+**现场**：`logs/app.log` 反复出现 `LLM 输出被截断 [Claude]: max_tokens_expert_review=8192, 实际输出=8192 tokens`，随后自动以 12288 重生成（一次多余调用 + ERROR 噪音）。
+
+**根因**：用户开启了**辩论模式**（`llm_debate_procon`），智囊团复盘走 `generate_debate_procon` 三段式路径，其每阶段上限取 `debate.procon.per_call_max_tokens`（**不看**模块级 `max_tokens_expert_review=24000`）；而模板默认与用户配置该键均为 `null` → 落到代码兜底 **8192**，pro 段即被截断。
+
+**修改（按 +50%）**：
+- 代码兜底：`llm/generators.py::generate_debate_procon` 的 `_max_tokens` 兜底 **8192 → 12288**
+- 模板默认：`config/_llm_settings_defaults.py` 的 `debate.procon.per_call_max_tokens` **null → 12288**（并在模板中补该键语义注释，用户可见可调）
+- 用户配置：`data/config/llm_settings.json` 的 `debate.procon.per_call_max_tokens` **null → 12288**
+- 文档同步：`requirements.md`（R-LLM-DB-PROCON-06 与配置矩阵行）、`technical.md`（Token 预算守卫表）、`how-to-config-llm.md`（辩论段说明与示例）
+- 回归测试：`test_debate_generators.py::test_per_call_max_tokens_fallback_is_12288`（配置缺省/为 null 两种情形下，三段调用的 `max_tokens_override` 必须为 12288，不得回退 8192）
+
+注：模块级 `max_tokens_expert_review`（24000，非辩论路径使用）未改动；辩论总预算 `max_total_tokens_per_report`（48000）与单次超时（90s）亦不变。
+
+门禁：四个 `--ci` + `--mode verify,regression` + ruff 全绿。
+
+### plan-46 设计文档归档（docs-stm/plan → archive/v0.11.x/prosperity-framework）（2026-09-16）
+
+plan-46（景气度框架诊断，实验性功能）已实施完成，按「中间设计文件随完成态归档」惯例把设计文档从 `docs-stm/plan/` 归档到 `docs-stm/archive/v0.11.x/prosperity-framework/`（`git mv` 保留历史）：
+
+- `prosperity-framework-design.md` — 头部状态改为「**已实现，2026-09-16 归档**」并补归档位置、后续项指引（`plan-47`/`plan-48`/`plan-49`）与实施记录指向
+- `archived_plan.0.11.x.md`：新增「P1 — 已完成（plan-46 完成态）」条目（动机 / 方案（六项落地）/ 不做 / 口径要点（含两轮修订）/ **5 处实施期缺陷修复**（rf-373~377）/ 降级矩阵结论 / 后续项 / 设计文档索引），头部涵盖版本与归档内容同步
+- `plan.md`：plan-46 详细条目移出（完成态转入归档），P1 待办区保留 `plan-47`/`plan-48`/`plan-49`；待办说明与归档清单更新为 plan-44 / plan-45 / plan-46
+- `folders.md`：`plan/` 目录树与统计改为「当前为空」；`archive/v0.11.x/` 树新增 `prosperity-framework/`（含设计文档说明）；archive 统计与项目文档合计同步（138 → 139 文件）
+- 归档后 `docs-stm/plan/` 为空（后续新设计文档仍放此处）
+
+门禁：四个 `--ci` + `dev-verify` + ruff 全绿。
+
+### 景气度框架诊断：降级矩阵复核（6 场景）+ 剩余问题登记（plan-47~49）（2026-09-16）
+
+按「先验证稳定性、再谈扩展与转正」的结论执行：**隔离目录**下（`docs-stm/tmp/pf-sweep`，跑完清理；不改真实 `reports/`、不写用户配置）复跑 6 个场景，验证实验功能的降级行为。
+
+**降级矩阵（全部符合预期）**
+
+| 场景 | 报告/块 | 六维表现 |
+|:--|:--|:--|
+| 0 交易日基线 | ✅ / ✅ | 42/80（52%）部分契合；① 9/25、③ 15/15、④ 10/10(partial)、⑤ 4/15、⑥ 4/15；② unverified（仅 A 股个股有 ROE） |
+| 1 非交易日（行情全零） | ✅ / ✅ **不崩** | 总分 1/55；①③→0（市值口径失效）、④ unverified、⑤ 仅换手子项；**验证 rf-373 修复**（原为合并单元格崩溃） |
+| 2 `history` 关闭 | ✅ / ✅ | 总分 38/65；⑥ `unverified` 并给出可读原因（不崩、不臆造） |
+| 3 基本面契约缺失 | ✅ / ✅ | ② `unverified` + 提示开启 `financial_indicator` |
+| 4 关基金深度分析 | ✅ / ✅ | ① 仍计分（退化为纯持仓类型口径）、③④⑤ 不受影响 |
+| 5 快照 <2 期 | ✅ / ✅ | ⑤ `partial`（换手子项不计分，41/80），集中度仍计分 |
+
+**剩余问题登记（`plan.md`）**：
+- `plan-47` 基金持仓 ROE 加权（扩展 ② 覆盖率：21.9% → 60~80%；依赖全量穿透；属推演须标「按框架推演」）
+- `plan-48` 场外流动性补齐（④ 维：`redemption_limits` 配置化 或 场外类型默认档）
+- `plan-49` 转正评估（判据：降级矩阵全绿 ✅ + 真实使用 ≥2 周 + 口径认可 + 门禁全绿；**当前结论：暂不转正**，保持实验组默认关）
+- `plan-46` 设计文档归档随 **v0.11.1 发布**进行（不在开发期归档）
+
+说明：本矩阵由隔离脚本执行，未修改任何生产代码（本轮无新缺陷，故未新增 review-findings 条目）。
+
+门禁：四个 `--ci` 全绿。
+
+### 景气度框架诊断：基金类型兜底补齐 + 两视角叠加口径（2026-09-16）
+
+用户确认为「A = 保持方法原意」后，补齐维度①的数据可得性（不改评分标准、不动阈值）：
+
+- **基金类型兜底标签** `_fund_type_fallback_label`：板块识别失败（`classify_sector` 返回 `--`）时按基金类型补保守标签 —— 固收/货币 → `债券现金`（防御侧）、QDII/海外 → `境外资产`（中性）、宽基/指数/ETF 联接 → `宽基指数`（中性）、其余 → `未分类资产`（中性）；**判定只用 `core/code_utils`**（类型判定中心化），且**ETF/指数判定优先于货币**（`is_money_fund_by_name` 对「国证自由现金流 ETF」会误判为货基，若先判货币会把场内权益 ETF 误标成固收）；兜底项**只按类型标签参与关键词匹配**（不带名称，防「现金」类误命中）
+- **两视角叠加口径**：视角一 = 穿透底层（`ratio_pct`）；视角二 = 每个直接持仓按自身权重（板块或类型标签）；**去重范围收窄为仅直接持有的证券** —— 原实现把出现在穿透 `sources` 里的基金整只跳过（只由 top10 底层代表），实测覆盖率仅 **48.47%**（8 只 QDII/联接/债基/宽基 ETF = 51.28% 权重无板块信息）；现两者叠加后归一，证据披露「穿透项 X% / 叠加合计 Y% / 兜底 N 只」
+- **回归测试**：新增 `TestFundTypeFallback` 6 例（固收→防御、ETF 不被货币误判为防御、QDII→境外中性、主动权益→未分类、已有板块不被覆盖、基金为主组合覆盖达标且景气+防御=归一后的确定值）；并同步并集/去重相关 4 例期望
+
+**真实持仓复核对比**
+
+| | 改前（仅穿透视角） | 改后（兜底 + 两视角） |
+|:--|:--|:--|
+| 维度① 可判定权重 | 48.47%（8 只 / 51.28% 权重无信息） | **115.62% 叠加后归一**，兜底 8 只全部接入 |
+| ① 得分 | 0/25（景气 14.71%） | **9/25**（景气 31.92%、防御 34.65%） |
+| **总分** | 42/100（部分契合） | **51/100（部分契合）** |
+
+门禁：四个 `--ci` + `--mode verify,regression` + ruff 全绿。
+
+### 修复：景气度框架诊断持仓视角 ROE 文案重复（2026-09-16）
+
+渲染后出现「ROE 需核实｜ROE 需核实（未取到基本面）」重复：契约 `holdings_view[*].notes` 与渲染层 ROE 列各自表达同一事实。现由**渲染层 ROE 列**唯一表达「需核实」，契约不再重复备注（保留「命中景气/防御关键词」「低 ROE（x%）→ 存在修复弹性」等增量信息）。
+
+门禁：四个 `--ci` + `--mode verify,regression` + ruff 全绿。
+
+### 景气度框架诊断：口径修订（并集归一 + 互斥归类 + 关键词补词）与配置同步（2026-09-16）
+
+按用户真实持仓复核，修订第①②③维的统计口径与默认词表（原口径只覆盖 34.6% 市值、且同一标的可被景气/防御重复计数）：
+
+- **并集覆盖 + 归一**（`_sector_weight_items`）：穿透重仓各底层标的（含基金拆解，按 `codes` 与 `sources` 里的基金代码标记已覆盖）+ **未被穿透覆盖的其余直接持仓**（QDII/联接/债基等，按 `classify_sector` 板块）合并后按已覆盖市值归一；证据披露覆盖率（如「覆盖 48.47% 市值…按已覆盖部分归一」），读者可见评分分母
+- **互斥归类（防御优先）**：同一标的命中多类词时只计防御类，避免景气+防御之和 >100%
+- **关键词补词（配置层单一事实来源）**：景气词加「电池/光伏/高端装备/制造/能源资源/电力/石油/煤炭」，全球优势词加「电池/高端装备/制造/电力」，防御词加「债/货币/现金」；模块默认值改为**从 `config/_config_defaults` 派生**（避免两处词表漂移），`config.json` 同步重生成（校验 0 问题）
+- **回归测试**：并集覆盖计入未穿透持仓、已覆盖基金不重复计入、互斥归类（重叠词只计防御）、无重叠时正常计分；`tests` 全绿
+
+**真实持仓复核对比**（同一份报告，改前 → 改后）
+
+| 维度 | 改前 | 改后 |
+|:--|:--|:--|
+| ① 景气方向/通胀属性 | 0/25（口径仅覆盖 34.6% 市值） | 0/25（并集覆盖 48.47%；景气 14.71%、防御 77.10%） |
+| ③ 全球视野/比较优势 | 5/15 | **15/15**（全球优势环节 25.64% + 境外占比 78.10%） |
+| ⑥ 业绩与回撤印证 | 缺失（基准结构假设错误） | 4/15（组合 -18.11% / 沪深300 -10.36% / 回撤 22.42%） |
+| **总分** | 32/100（不契合） | **42/100（部分契合）** |
+
+门禁：四个 `--ci` + `--mode verify,regression` 5001 passed / 0 failed + ruff 全绿。
+
+### 修复：维度⑥「业绩与回撤印证」误报缺失（基准结构假设错误）（2026-09-16）
+
+用户复核报障「业绩与回撤印证说缺失，但组合历史走势与回撤章节明明有数据」→ 定位为**结构假设错误**：`PortfolioHistoryCalculator.get_combined_timeseries()` 的 `benchmarks` 契约是 **`list[dict]`**（`[{code, name, bars, total_return_pct, max_drawdown_pct, …}]`），而实现按 `dict[str, dict]` 调 `.values()` → `AttributeError` 被维度守卫吞成「需核实」。真实数据（用户持仓）：组合区间收益 **-18.11%**、最大回撤 **-22.42%**、沪深300 **-10.36%**，数据齐全却未计分。
+
+- **修正确性**：新增 `_benchmark_returns()` 同时兼容 `list[dict]`（生产形态）与 `dict[str, dict]`（注入形态）；非 dict 元素/缺字段/`bool`/非数值一律跳过且**不抛异常**（注意 `finite_or(None)` 内部 `float(None)` 会抛 TypeError，故先做类型判定）；证据文案带基准名（如「未跑赢最强对比基准（沪深300 -10.36%）」）
+- **修降级语义**：`drawdown_available=False`（历史样本 <60 交易日）时**只降级回撤子项**（收益仍计分，标 `partial` 并列入未验证），不再整维判为缺失；`status=degraded` 也计分但标注口径可能不完整；仅 `status=unavailable`/无收益字段才 `unverified`
+- **回归测试**：`TestPerformanceDimensionBenchmarkShapes` 8 例（list 形态计分且证据含基准名、未跑赢场景 4 分档、dict 形态兼容、畸形基准 5 种输入不抛异常、degraded 计分带注记、unavailable 未验证、回撤样本不足 partial、真实形态经契约端到端 scored）
+- **真实管线复核**：both 路径实际块输出「总分 32/100（32%）」，六维全部可计分——景气 0/25、ROE 9/20、全球 5/15、流动性 10/10、集中度与周期拼接 4/15、业绩与回撤印证 **4/15**（组合 -18.11% / 沪深300 -10.36% / 回撤 22.42%）
+
+门禁：四个 `--ci` + `--mode verify,regression` 4997 passed / 0 failed + ruff 全绿。
+
+### 修复：full 路径（菜单 L）HTML 未转发景气度框架契约（2026-09-16）
+
+用户复核报障「开关已开、运行后行动建议章后没有新增内容」→ 定位为**接缝缺口**：`_generate_full_html_report`（full 路径 HTML 包装函数）既未声明也未转发 `prosperity_framework_data`，而 both 路径已转发——`count=1` 的批量替换只覆盖了其中一条调用链。**Excel 侧不受影响**（`generate_excel_report` 自行就地构建契约），故 both/full 的 Excel 一直有块，HTML 仅在 both 路径有块。
+
+- 修复：`_generate_full_html_report` 补参数声明与转发（→ `write_html_report`），full 路径调用点补传 `pipeline_data` 中的契约
+- 守卫（防再漏）：`test_prosperity_framework_wiring.py::TestHtmlCallSiteSeam` 3 例——① 源码级断言 `_report_generation.py` 中**每处** `write_html_report(...)` 调用都带该参数（新增其它 HTML 调用链忘记转发即失败）；② 包装函数签名含该参数且函数体内转发；③ full 路径调用点从 `pipeline_data` 取契约传入
+- 真实数据复核（用户真实持仓 + 真实配置，输出到 `docs-stm/tmp/` 并清理）：both 与 full 两路径的 HTML 均含「⑥ 景气度框架诊断（实验性）」块与免责句；Excel「7.行动建议」页签含块（本次实测「总分 28/85（33%）—— 评级：不契合」）
+
+门禁：四个 `--ci` + `--mode verify,regression` 4989 passed / 0 failed + ruff 全绿。
+
+### 修复：景气度框架诊断拖垮整份报告 + 行情全零 Excel 崩溃（2026-09-16）
+
+**缺陷①（P0，用户报障「运行后有数据处理异常」）**：`logs/app.log` 显示 `AttributeError: 'SnapshotData' object has no attribute 'get'` → **整份 full 报告生成失败**。根因：`analysis/prosperity_framework.py::_turnover_proxy_pct` 按 dict 取快照字段，而 `report/history_snapshot.load_all()` 返回的是 **`SnapshotData` 冻结 dataclass**（`.accounts[*].holdings[*].code`）；异常自实验功能冒泡，违反「实验功能不得影响主报告」与数据降级治理纪律。
+
+- **修正确性**：新增 `_snapshot_holding_codes()` 同时兼容 `SnapshotData` 对象（生产形态）与 dict 形态（`accounts`/`holdings`/`details` 键），缺失字段按空集处理且**不抛异常**
+- **修韧性**（三道防线）：① 单维计算经 `_guard_dimension()` 包裹 → 单维异常降级为「未验证」，不影响其余维度与契约；② 组装辅助 `compute_prosperity_framework_data` 整体 try/except → 警告 + 返回 None（等价开关关闭，块不渲染）；③ 三个调用点（`_report_generation` 的 both/full、`excel_generator` basic 兜底）各自再加一层兜底
+- **回归测试**：`test_prosperity_framework_edge.py` 新增快照形态回归 5 例（dataclass 可算换手代理 66.67%、端到端契约 scored、dict 形态兼容、畸形对象降级、缺 holdings 属性）；`test_prosperity_framework_wiring.py` 新增韧性隔离 4 例（build 抛异常 → 返回 None、坏快照不崩、单维异常隔离、真实 `SnapshotData` 全链路）；新增场景测试 `test_scenario_prosperity_framework.py` 4 例（真实 dataclass 快照 + 隔离输出目录驱动 `generate_excel_report`：功能开/关、坏快照、构建抛异常四种情形**报告均须生成成功**）
+
+**缺陷②（既有缺陷，被本轮场景测试暴露）**：行情全零（非交易时段/网络异常）时，「持仓明细与分类」页签先写**整行合并**的提示行，随后仍以该行为数据起点写入明细 → `AttributeError: 'MergedCell' object attribute 'value' is read-only`，Excel 报告生成失败。该缺陷源自合并前的 `market_value_sheet.py`（批次② 原样带入），既有单测因用 MagicMock 工作表而漏检。
+
+- **修复**：`holdings_detail_sheet._write_market_value_block` 中提示行之后显式重置 `data_start = row`（分类区块同样显式化数据起点语义）
+- **回归测试**：`test_holdings_detail_sheet.py::TestAllZeroPriceRegression` 2 例（真实 openpyxl：全零场景不崩溃 + 提示行在数据行之前）
+
+**验证**：用户真实快照（73 期 `SnapshotData`）只读复算 → 换手代理与契约均正常；四个 `--ci` + `--mode verify,regression` 4989 passed / 0 failed + `dev-verify` 2779 passed + ruff check/format 全绿。
+
+### plan-46 景气度框架诊断（实验性功能）实施（2026-09-16）
+
+借鉴开源项目 **zhengxi-views**（郑希观点库，MIT；<https://github.com/lyra81604/zhengxi-views>）从公开采访蒸馏的景气度投资方法骨架，落地为本仓的**实验性功能 `prosperity_framework`**（默认关）：把「全球视野找变化 → 顺产业链找通胀环节 → 落到中国比较优势环节 → 选流动性够 + ROE 低位有弹性的标的 → 多维跟踪与周期拼接 → 组合分散 + 行业比例 + 退出纪律」转成对**本仓持仓组合**的可计算诊断。**只借鉴可计算骨架与评分口径**（不引入其语料库、基金快照、全市场检索）。
+
+**六维评分卡（满分 100）**：景气方向/通胀属性 25 + ROE 低位弹性 20 + 全球视野/中国比较优势 15 + 流动性 10 + 集中度与周期拼接 15 + 业绩与回撤印证 15；输入全部取自既有能力（穿透重仓板块/概念、`financial_indicator_data` 的 ROE、`check_liquidity` 变现天数、历史快照换手代理、`history_data` 收益与回撤），**不新增外部数据源与 LLM 调用**。
+
+**实现**
+- 新增 `analysis/prosperity_framework.py`（纯计算；市价读取经 `finite_or` 归一）；配置新增顶层键 `prosperity_framework`（景气/全球比较优势/防御关键词 + 集中度目标，手动编辑）并重生成 `config.json`
+- 实验开关 `prosperity_framework`（实验组、默认关、`affects_report=True`）；实验块由 4 项增至 5 项（追加在组末，既有编号不变）
+- 契约 `prosperity_framework_data` 进数据契约台账（pipeline_data 键 + 类型映射）与附录 H（键表 + 逐键契约说明）
+- 组装辅助 `report/_report_aux_metrics.py::compute_prosperity_framework_data`：开关关闭返回 None；穿透优先取 `prep.penetrated_assets`（缺失按需计算）；流动性/快照取数失败降级为该维未验证
+- 接线：`_report_generation` 的 both 与 full 两路径注入契约；`excel_generator` 在 basic 路径就绪后就地兜底
+- 渲染：行动建议章内嵌块——HTML `partials/action_section.html` ⑥ 块（总分/评级 + 六维明细 + 持仓视角 + 需核实清单 + 免责句）、Excel `report/action_sheet.py::_write_prosperity_block`
+
+**降级与诚信口径（红线）**：数据缺失维度一律 `unverified`（**不计分、不臆造**）并给出可读原因；总分只按已计分维度折算（`scored_weight` / `total_score_pct`），界面同时显示未验证清单；渲染固定带免责句（衡量「组合与框架的契合度」，非组合优劣、非投资建议）；每条得分在 `evidence` 中给出可追溯口径。
+
+**测试**：`unit/analysis/test_prosperity_framework.py`（27 例：六维计分/缺数据降级/总分口径/持仓视角/评级边界/配置覆盖）+ `test_prosperity_framework_edge.py`（13 例：空/None/零/异常类型/全防御/未知板块/极端集中度/快照缺失/负收益深回撤）+ `unit/report/test_prosperity_framework_wiring.py`（7 例：开关门控、prep 穿透口径、Excel/HTML 双端块显隐）；TUI 面板编号断言与文档串同步。
+
+**文档同步**：设计文档 `docs-stm/plan/prosperity-framework-design.md`（含上游归属与许可、数据映射、六维口径、契约结构、约束对照、验收标准）；`technical.md`（§4.20 叙述 + 语义表 3 行 + 附录 H + 附录 I 段号）；`requirements.md`（§5.11 R-PF-01~08 + 配置键）；`how-to-config.md`（开关表 + 配置键 + 实验组计数 4→5）；`reports-instruction.md`（行动建议章块）；`README.md`；`testplan.md`（§4 回归行）；`folders.md`（树 + 统计）；`plan.md`（plan-46 已实施）。
+
+**实施期自查**：`rf-372` —— 新增实验开关触发三处跨接缝漂移（TUI 面板编号断言、附录 H 台账一致性用例、both 路径无 `prep` 变量），均已修正并同步测试与文档。
+
+门禁：四个 `--ci` + `--mode verify,regression` 4980 passed / 0 failed + `dev-verify` + ruff + 版本一致性全绿。
+
+### 管理/用户文档二次核对与整改（rf-371）（2026-09-16）
+
+技术债整改（rf-370）后逐份复核 10 份管理文档 + 11 份用户文档的「顺序/编号、清单完整性、示例与计数、章归属表述」，整改 6 类：
+
+- **`technical.md`**：Web 配置编辑接口表的可编辑面分组名改用 surface 实际键（`report_switches`）；白名单段落去掉已不存在的 `submodule` writer、「增强子模块开关 6」「功能开关 20」改为「报告章节与增强 8（`report_switches` 独立视图）+ 功能开关 28（实验 4 + 常规 16 + 报告 8）」并补记 43 条白名单；契约注记序号随章节合并更新（`portfolio_evolution` number=14、`action` number=7、「报告顺序完整 16 项」）；`features.json` 行改「28 项声明 / 三组（实验 4 + 常规 16 + 报告 8）」
+- **`requirements.md`**：P 菜单条目删除已随 plan-44 移除的「报告增强子模块配置（8 项）」入口（改指菜单 `[S]`「报告章节与增强」块）；R-WEB-08 可编辑面清单改用 `report_switches`；features.json 章节改「28 项 / 三块（实验 4 + 常规 16 + 报告 8）」
+- **`how-to-config.md`**：配置样例中「报告子模块开关」注释改为指向 `features.json`（功能开关注册表，菜单 `[S]`）；`report_section_order` 行的「默认顺序（20 项）」改 17 项
+- **统计快照刷新**：`test-coverage.md` 按 `collect-test-coverage.py` 实测更新模式计数（unit 6900→6905、standard 5903→5908、report 1902→1907、all 7213→7218）、`unit_report` 与「报告生成」功能域计数；`folders.md` 更新测试代码（372 文件 / 109,295 行）、测试用例（7,218 个）、管理文档（10 / 10,085 行）与项目文档合计（52,549 行）
+
+校验：章节表编号与注册表逐一比对（requirements §6.3 / how-to-config / reports-instruction 全 OK）、§6.4 编号 1..18 连续、README 分组合计 17、语义表 97 slug 覆盖全部 28 个开关、目录树全量比对无遗漏、陈旧表述扫描零命中。
+
+门禁：四个 `--ci` + `--mode verify,regression` + `dev-verify` + ruff + 版本一致性全绿。
+
+### 过去 96 小时实现技术债整改（plan-42~45，rf-370）（2026-09-16）
+
+审计窗口内 67 次提交（plan-42~45 及发布/文档收尾）的代码、配置与测试，整改 7 类技术债：
+
+**① 语义索引正向校验失效（最重要）**：`scripts/check-semantic-index.py` 的正向项仍在解析 `_config_defaults.py` 的 `report_submodules` 字典——该机制已随「报告增强子模块并入功能开关注册表」移除，校验恒为空集，**新增开关可绕过「功能语义命名表」登记**。
+- 改为 AST 解析 `src/python/config/features.py::feature_switch_registry`，校验「每个功能开关都已在语义表登记」（表外键报错）；脚本 docstring、`-v` 输出、`--ci` 摘要与单测（`TestReportSubmodulesKeys` → `TestFeatureSwitchKeys`、run_checks 夹具改 features.py 形态）同步
+- 新校验立刻暴露 **12 个开关未登记** → `technical.md` 功能语义命名表补 12 行：`llm_debate_procon`/`llm_debate_conditional`/`llm_debate_qa_concentration`、7 个 `metrics_*`（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta）、`enable_interactive_charts`、`datasource_adapter`
+
+**② data 层可用性字典双份实现**：`excel_generator` 内联构造 + integration 一致性测试手写镜像，章节合并每批需改两处（rf-367 即此类漂移）。
+- 下沉为 `report/excel_sheet_factory.build_data_availability()`（合并章契约 OR、契约 None、news/llm 口径集中一处），生成器与集成测试镜像改用同一函数；新增 5 例口径守卫（fund_deep 开/关、单契约注入、两财报契约随开关、news/llm 随 include）
+
+**③ 死代码 / 死认知**：删除 `html_writer_nav` 的 `manager_data` data_flag（章节移除后无消费方；集成测试镜像同步删）；`registry.py` docstring 示例键 `fund_manager` → `position_structure`。
+
+**④ Web 面旧机制命名**：surface 键 `submodules` → `report_switches`（`web/config_edit.py` + `static/web/main.js` 渲染调用同步）；删除前端 `CONFIG_LABELS.submodules` 陈旧字典（漏列两个开关且与服务端 `features.labels` 同源下发设计矛盾）。
+
+**⑤ 测试用例陈旧 / 失效断言**：`test_excel_report_structure` 夹具改用当前注册表切片（删 `fund_manager`/`position_relationship`/`fund_concentration`，序号与页签计数同步 16/9 → 14/7）；`test_config` 的「重复序号」「多问题累加」用例改用现存键（此前误走「未知键」分支，断言通过但未测目标行为）；`test_orchestrator`/`test_excel_market_data`/`test_holdings_detail_sheet` 注释去掉 `report_submodules.*` 旧表述；`test_financial_indicator` 的「旧配置不再生效」守护样本改为中性旧键名；plan-45 新增用例的**恒真断言**（先按值过滤再断言不存在）改为「占位文案存在 + 无集中度数据行」正向断言。
+
+**⑥ 配置与模板漂移**：`data/config/config.json` 按当前模板重生成（补 plan-43 引入的 `holdings_start_date`，其余键值保持仓库现值：相对路径、显式 `cache_ttl`、显式 `report_section_order` 16 项），`validate_config()` 0 问题。
+
+门禁：四个 `--ci`（含改造后的语义索引）+ `--mode verify,regression` + ruff check/format + 版本一致性全绿。
+
+### plan-45 设计与实施层文档归档（docs-stm/plan → archive/v0.11.x）（2026-09-16）
+
+plan-45（报告章节整合，注册表 21 → 17）四批全部实施完成，按「中间设计文件随完成态归档」惯例把两份文档从 `docs-stm/plan/` 归档到 `docs-stm/archive/v0.11.x/section-consolidation/`：
+
+- `section-consolidation-design.md` — 设计层（四项合并方案 / 可见性模型扩展 / 架构约束对照 / 测试与文档同步清单 / 四批次验收标准）；头部状态改为「**已实现**（2026-09-16 归档）」并补归档位置与实施记录指引
+- `section-consolidation-iteration.md` — 实施层施工单（命名统一总表 / 接缝地图 / 逐批施工步骤与量化验收 / 十轮复盘记录 / 守卫清单与基线方法 / 领域层与章节层边界 / 文档同步清单）；头部状态改为「**✅ 四批全部实施完成**」并列出四批提交号，批次②③④ 小节标题标注「✅ 已实施」
+- `docs-stm/archive/v0.11.x/archived_plan.0.11.x.md`：新增「P1 — 已完成（plan-45 完成态，2026-09-16 归档）」条目（动机/决定/方案/四批实施记录与提交号/十轮复盘/验收达成/实施记录指引 + 设计文档索引），头部涵盖版本与归档内容同步更新
+- `plan.md`：P1 待办区移除 plan-45 条目（恢复「无待办项」），待办说明与归档清单改为 plan-44 / plan-45 并指向新设计文档目录；`plan-next` 保持 46
+- `folders.md`：`plan/` 目录树改为空目录说明、统计行 2 文件/373 行 → 0；`archive/v0.11.x/` 树新增 `section-consolidation/`（含两份文档）；archive 统计 129/42,429 → 131/42,802（md 125→127），项目文档合计行同步
+
+门禁：四个 `--ci` + `dev-verify` 全绿。
+
+### plan-45 四批后管理/用户文档一致性与顺序整改（rf-369）（2026-09-16）
+
+对 10 份管理文档 + 11 份用户文档逐份核对「章节表顺序/编号、清单完整性、示例与计数、章归属表述」，按注册表现状（17 条）整改：
+
+- **requirements.md**：§6.3 补 `fundamental_snapshot` 行（16）并把 `llm_usage` 归位 17；§6.4 小节编号重排为连续 1..18（17 个报告章节 + 成本流水子模块），补 6.4.16 持仓基本面（两条区块字段表，指向 §5.9/§6.12），经理变更块降为「基金业绩分析」章内 h5 子标题
+- **how-to-config.md**：表头 15→17、补 `fundamental_snapshot` 行与 `llm_usage`=17；示例 JSON 的已删键（`fund_manager`/`position_relationship`/`fund_concentration`）→ `position_structure`/`fundamental_snapshot`；「19 项默认顺序」「完整 18 项」及示例序号全部按现状改写
+- **reports-instruction.md**：类型分组表编号错位（基金业绩 3→4、数据源 14→15、LLM 用量 16→17）、基金深度分析「共 4 个」→2、删除基金评价表重复的「持仓集中度」行、菜单快速索引与「19 个页签/7 组」→「17 个页签/8 组」
+- **folders.md**：HTML 模板行 partial 清单换为 `fundamental_snapshot_section.html`（并修正文件数/行数）、目录树删三个已删模块行并补 `test_section_visibility.py` 与新 partial、把 `fundamental_snapshot_sheet.py` 归入财报装配组、统计快照按实测刷新（主程序 280/70,669、测试 372/109,257、用例 7,213、源代码合计 310/82,270、项目文档 138/52,459、用户文档 11/5,159、managements 10/10,040）
+- **technical.md**：三处「19 个模块」→17（含注册表约束条目与模块分布行：always×5 / fund_deep×2 / fundamental_snapshot×1 等）、注册表结构示例改用 `position_structure`（含 `data_flag_any`）、基金深度块图与「基金经理变更监控」小节标题改为章内区块、TOC 条目随 §4.19 改题同步
+- **test-coverage.md**：按 `scripts/collect-test-coverage.py` 实测刷新模式计数（unit 6900 / standard 5903 / verify 4696 / report 1902 / data 68 / all 7213）、unit 子标记（unit_report 1902 / unit_config 359 / unit_core 1213 / unit_analysis 811 / unit_web 212）与跨类标记（edge 931 / data 68）；报告域测试清单补三个合并章测试文件
+- **testplan.md**：§4 新增 P1「报告章节合并」回归行（三个合并章的逐格等价 + OR 可见性 + type/board_flags/装配键守卫 + 两侧一致性 + 经理块门控）
+- **用户文档**：README（页签 21→17、分组七→八、「全部 20 项开关」→28）、how-to-use-tui-menu（基金深度分析 3→2 章 + 经理块说明、features.json 开关计数表述）、how-to-use-web-mode（报告增强子模块清单补财务指标、菜单归属 `[S]`）、faq（示例 JSON 与 19→17 项）、datasource / datasource-reliability（数据源用途归属改「持仓基本面章·区块①/②」）、developer-guide（示例键与 17 个模块键）
+
+门禁：四个 `--ci` + `dev-verify`（2748 passed）全绿。
+
+### plan-45 章节整合·批次④ `fundamental_snapshot` + 经理变更并入（plan-45 完成）（2026-09-16）
+
+**目标**：把「财务指标」与「持仓个股财报摘要」两章合并为同页签两区块的新章 `fundamental_snapshot`「持仓基本面」，并把「基金经理变更监控」章并入「基金业绩分析」章末尾区块（注册表条目 19 → 17，零 alias）。**四批全部完成：21 → 17 条**。
+
+**注册表与可见性**
+- 删除 `fund_manager` 条目（其内容成为基金业绩章的块）；`financial_report_digest` + `financial_indicator` 两条 → 一条 `fundamental_snapshot`（`type=fundamental_snapshot`、`data_flag=None`、`data_flag_any=("financial_indicator_data","financial_report_digest_data")`、序号 16）；条目总数 17（序号连续 1..17）；`_REPORT_SHEET_NAMES` 同步（新增 `fundamental_snapshot: 持仓基本面`，删除 `fund_manager`/两条旧财报页签名）
+- board 层参数合并：两侧 `board_flags` 删除 `"financial_report"`、`"financial_indicator"` → `"fundamental_snapshot"`（`enable_fundamental_snapshot` = 两功能开关任一开启）；`enable_financial_report_digest` 形参链全量删除（`html_writer` / `excel_generator` / `_report_generation` 包装函数与两处调用点）；`html_writer_nav._SECTION_NAV_GROUP_MAP` 同步（删 `fund_manager`，两条旧财报章键 → `fundamental_snapshot: basic`）
+- `excel_generator` 的 `data_availability` 保持登记两契约 flag（`data_flag_any` 乐观/悲观口径与 HTML 侧一致）
+
+**Excel / HTML 渲染**
+- 新增 `report/fundamental_snapshot_sheet.py::write_fundamental_snapshot_sheet`（区块① 财务指标 19 列 + 区块② 财报摘要 9 列；契约 None = 该功能开关关闭 → 该块整体不写，含小节标题）；删除 `financial_indicator_sheet.py` / `financial_report_sheet.py`（`financial_indicator.py` 装配层与 `financial_report_digest.py` 保持不动）
+- `report/fund_performance.py` 吸收经理变更块：`write_fund_performance_sheet(..., manager_data=None)` + `_write_manager_block`（8 列 + 预警着色 + 占位）；删除 `fund_manager_sheet.py`
+- 经理数据改在内容阶段组装（`write_content_sheets` 新增 `enable_fund_deep_analysis` 参数，开启时 `detect_manager_changes` 注入），`excel_fund_deep_analysis` 不再单独写经理页签；`excel_module_loader` 装配键改 `write_fundamental_snapshot_sheet`（删除三个旧键）
+- HTML：新增 `partials/fundamental_snapshot_section.html`（一章两区块，块级开关 `financial_indicator_data` / `financial_report_digest_data` 非空才渲染该块），删除两个旧 partial；`report_template.html` 删除独立经理章节、内容并入 `sec-fund_performance` 末尾（块门禁 `manager_analysis` 非空 = 基金深度分析开启）
+- `data/config/config.json` 的 `report_section_order` 重生成（删除 `fund_manager`，新增 `fundamental_snapshot`=16）
+
+**测试（新增/同步）**
+- `test_financial_indicator_sheet.py` + `test_financial_report_sheet.py` → `test_fundamental_snapshot_sheet.py`（区块写入器用例 + 新增合并写入器：两区块小节标题同页签、契约 None 的块级门控两侧、两契约皆 None 仅剩章标题、**内容等价**）
+- `test_fund_manager_sheet.py` → `test_fund_performance_manager_block.py`（改调 `_write_manager_block`）；`test_fund_performance.py` 新增经理块门控两例（`manager_data=None` 不渲染经理块且主表照常 / 传入时渲染）
+- 章节键断言同步：条目数 19→17、HTML 容器 19→17、导航/目录 14→13、Excel 页签数 15→14（全开）；type 集合 `financial_report`/`financial_indicator` → `fundamental_snapshot`；`fund_deep_analysis` 计数 3→2；配置模板与注册表同序新增一致性用例
+
+**文档同步**：`technical.md`（模块数 20→17、可见性旗标表、`data_flag` 表、§4.19 改为「持仓基本面」、契约叙述的注册表注册点与消费方、功能语义命名表（僵尸条目 `financial_indicator_sheet` → `fundamental_snapshot_sheet` + 新增合并章行）、合并章注）、`requirements.md`（§6.3 表与 §6.4 小节合并重排、§5.9/§6.12 章节合并说明）、`testplan.md`、用户文档 5 份、`folders.md` 目录树、`plan.md`（批次④ 已实施，plan-45 完成）
+
+**实施期自查**：`rf-368` —— board 层参数链比施工单预估更长（实际 5 处调用点），首改即由 `--mode verify` 的 `unexpected keyword argument` 捕获并改净；`technical.md` 语义命名表僵尸条目由 `check-semantic-index` 捕获。
+
+**门禁**：`--mode verify,regression` 4939 passed / 0 failed；`dev-verify` 2748 passed；四个 `--ci` + 版本一致性 + ruff check/format 全绿。
+
+### plan-45 章节整合·批次③ `position_structure` 实施（2026-09-16）
+
+**目标**：把「持仓关系矩阵」与「持仓集中度监控」两章合并为同页签三区块的新章 `position_structure`「持仓结构与集中度」（注册表条目 20 → 19，零 alias）。
+
+**注册表与可见性（多契约 OR）**
+- 删除 `position_relationship`/`fund_concentration` 两条，新增 `position_structure`（`type=fund_deep_analysis`、`data_flag=None`、`data_flag_any=("position_relationship_data","concentration_data")`、序号 6），其后序号整体 −1（19 条连续 1..19）；`_REPORT_SHEET_NAMES` 同步；docstring 计数 20 → 19
+- `html_writer_nav._SECTION_NAV_GROUP_MAP` → `position_structure: fund_deep`（可见性 OR 复用批次①的 `data_flag_any` 模型）
+- **Excel 侧契约 flag 同步登记**（rf-367）：`excel_generator` 按与 HTML 同口径写入 `position_relationship_data`/`concentration_data`——否则 `data_flag_any` 的悲观口径会使页签恒不创建
+
+**Excel / HTML 渲染**
+- 新增 `report/position_structure_sheet.py::write_position_structure_sheet`（区块① 持仓重合度矩阵 + 配对明细；区块② 持仓相关性矩阵（下三角 + 配对 + 说明）；区块③ 持仓集中度监控（11 列 + 预警着色）），供数入参 `concentration_data` 新增；删除 `report/position_relationship_sheet.py` 与 `report/fund_concentration_sheet.py`（领域计算 `position_overlap.py`/`fund_concentration.py` 保持不动）
+- `excel_fund_deep_analysis` 两处分派合并为 `sheets.get("position_structure")` 一次调用（两契约数据独立组装、各自异常隔离、区块级降级），`excel_module_loader` 装配键改 `write_position_structure_sheet`
+- `report_template.html`：两个 `div.section` 合并为 `sec-position_structure`，区块小节标题改 `.block-title`（一、持仓重合度矩阵 / 二、持仓相关性矩阵 / 三、持仓集中度监控）；进入章节先归一 `overlap_matrix`（`or {}`），集中度数据在缺失时按空列表降级
+- `data/config/config.json` 的 `report_section_order` 重生成（`position_structure`=6，其余 −1，共 16 项显式列出 + llm_usage 末位）
+
+**测试（新增/同步）**
+- `test_correlation_sheet.py` → `test_position_structure_sheet.py`（区块二用例改调 orchestrator；集中度区块用例自 `test_fund_concentration_sheet.py` 迁入并改调 `_write_concentration_block`）；新增 `TestWritePositionStructureSheet`：首行章名 + 三区块小节标题同页签、**内容等价**（各区块行值与独立写入逐一相等）、仅有关系数据/仅有集中度数据两侧的 OR 降级
+- `test_section_visibility.py` 增合并章 OR 三例（仅 `position_relationship_data` 就绪可见 / 仅 `concentration_data` 就绪可见 / 两者皆无隐藏）；`test_registry` 放宽「非 always 类型须有 data_flag」为「data_flag 或 data_flag_any」（多契约模型）
+- 章节键断言同步：条目数 20→19、HTML 容器/导航/目录 15→14、Excel 页签数 16→15；集成一致性测试镜像补两契约 flag
+
+**文档同步**：`technical.md`（可见性旗标表改三区块 + `data_flag_any` 行、§4.x 章节叙述、缓存表注、合并章注同步为四个合并章、功能语义命名表新增 2 行、基金深度块图）、`requirements.md`（§6.3 表与 §6.4 章节定义合并 + 小节序号 −1）、`testplan.md`、用户文档 5 份（章节表与计数）、`folders.md`（目录树）、`plan.md`（批次③ 已实施）
+
+**实施期自查**：`rf-367` —— 合并章 `data_flag_any` 与 Excel 侧 `data_availability` 未登记的组合会使页签被悲观判定隐藏（integration 两侧一致性测试捕获），已修并补守卫。
+
+**门禁**：`--mode verify,regression` 全绿；四个 `--ci` + 版本一致性 + ruff check/format 全绿。
+
+### plan-45 章节整合·批次② `holdings_detail` 实施（2026-09-16）
+
+**目标**：把「市值核算明细表」与「持仓分类表」两章合并为同页签两区块的新章 `holdings_detail`「持仓明细与分类」（注册表条目 21 → 20，零 alias）。
+
+**注册表与可见性**
+- `_REPORT_SECTION_DEFAULT`：删除 `market_value`/`category` 两条，新增 `holdings_detail`（`type=always`、`data_flag=None`、序号 2），其后条目序号整体 −1（20 条连续 1..20）；`_REPORT_SHEET_NAMES` 同步；docstring 计数 21 → 20
+- 两侧导航/分组映射同步（`html_writer_nav._SECTION_NAV_GROUP_MAP` → `holdings_detail: basic`）；无需改前端标签字典与 TUI 面板（均按注册表派生）
+
+**Excel / HTML 渲染**
+- 新增 `report/holdings_detail_sheet.py::write_holdings_detail_sheet`（区块① 市值明细 15/16 列 + 账户小计 + 总计；区块② 分类汇总 10/12 列 + 分类小计 + 总计），`_weighted_avg_cost` 随之迁移；删除纯章节写入器 `report/market_value_sheet.py`，`report/category.py` 仅保留分类领域函数（`_categorize_holding`/`_tier_label`/`build_category_data_status`/`calc_yield_text`/`_load_dividend_data`）——**领域层不改名不删除**
+- `resolve_market_data` 退化为纯数据解析（不再写页签），页签由 `write_content_sheets` 一次调用写入；`excel_module_loader` 装配键 `write_holdings_detail_sheet`（删除 `write_market_value_sheet`/`write_category_sheet`）；`html_writer_display` 反向依赖改指新模块
+- `report_template.html`：两个 `div.section` 合并为 `sec-holdings_detail`（含「一、市值核算明细」「二、持仓分类汇总」两个 `.block-title` 区块小节标题，分类区块的资产构成环形图与数据状态脚随区块保留）
+- `data/config/config.json` 的 `report_section_order` 重生成（`holdings_detail`=2，其余 −1，共 17 项显式列出 + llm_usage 末位）
+
+**测试（新增/同步）**
+- `test_market_value_sheet.py` → `test_holdings_detail_sheet.py`（区块①用例改调 `_write_market_value_block`，分类写入器用例自 `test_category.py` 迁入并改调 `_write_category_block`）；新增 `TestWriteHoldingsDetailSheet`：首行章名/两区块小节标题同页签/**内容等价**（两区块行值与独立写入逐一相等）/返回值契约/流水子列两区块各生效
+- 新增正面守卫 `unit/report/test_section_type_flag_consistency.py`：注册表 `type` ↔ 两侧 `board_flags` 键一致、两侧键集合一致、无残留废弃 type、分派层写入器模块键均已装配
+- 章节键断言同步：条目数 21→20、HTML 容器/导航/目录 16→15、Excel 页签数 8→7，配置样本与自定义顺序夹具改 `holdings_detail`；`total_value` 等领域字段（100+ 处）**不批量替换**
+
+**文档同步**：`technical.md`（模块数 19→20 两处、架构图与 always 类型清单、成本流水消费方章名、`holdings_detail_sheet` 契约路径、功能语义命名表新增 2 行）、`requirements.md`（§6.3 表与 §6.4 章节定义合并 + 后续小节序号 −1）、`testplan.md`（测试文件名）、`reports-instruction.md`/`how-to-config.md`/`how-to-use-tui-menu.md`/`faq.md`/`README.md`（章节表与计数）、`folders.md`（目录树 + 统计）、`plan.md`（批次② 已实施）
+
+**实施期自查**：`rf-366` —— 施工单 §3.2 把 `config/_validation.py::_KNOWN_PROVIDER_TYPES`（数据源类别 id）误判为注册表章节 `type` 的允许集合，已更正该行并补正面守卫（注册表 type ↔ 两侧 board_flags 一致）。
+
+**门禁**：`--mode dev-verify` 2748 passed / 0 failed；四个 `--ci` + 版本一致性 + ruff 全绿。
+
+### plan-45 设计文档十轮复盘（第 9~10 轮：跨文档同步与自洽终检）—— 十轮完成（2026-09-15）
+
+- **第 9 轮（跨文档同步面）**：审计发现同步面远大于计划所列——`technical.md`（章节名 + **两处陈旧的「报告 19 个模块」** + 「功能语义命名表」需新增三行）、`requirements.md`、`testplan.md`（§4 回归清单）、`folders.md`（**26 处 `financial_indicator` 命中需甄别**：fetcher/analysis 保留 vs report 章节模块改名/删除）、`test-coverage.md`，以及 4 份用户文档（`README.md`/`reports-instruction.md`/`how-to-config.md`/`faq.md`）。**处置**：新增 §6.8「文档同步清单」（管理文档 / 用户文档 / 门禁脚本与索引 / 纪律四类）。
+- **第 10 轮（文档自洽与命名索引）**：新增 §6.9「文档自洽终检」——两文档命名表逐字一致、条目数在施工单/守卫表/验收三处一致（21→20→19→17）、「共 N 项」表述三处一致、分层面术语无矛盾、确认十轮整改**未触碰任何生产代码**；并明确 `check-semantic-index.py` 正反向校验要求「先改表再改码」。
+
+### plan-45 设计文档十轮复盘（第 7~8 轮：批次依赖与计数硬伤）（2026-09-15）
+
+- **第 7 轮（批次依赖与可回退性）**：②③④ 共改 7 个文件（注册表 / 两侧可见性 / Excel 三处分派 / 模板 / 配置模板），**无法任意顺序单独回退**；新增 §6.4b「批次依赖与回退矩阵」——依赖链 ①→②→③→④（③④ 均改 `_compute_section_visibility` 与 fund 深度分组，④ 建立在 ③ 之后）、共享文件表、**逆序回退纪律**（④→③→②，每批一次提交）、版本身份（四批同属 0.11.1-dev）。
+- **第 8 轮（计数一致性与非目标边界）——修正硬伤**：批次④ 实际含**两处合并**（财报两章合一 + `fund_manager` 并入 `fund_performance`），但 ④-1 未声明删除 `fund_manager` 条目、④-7/验收/§6.6b 仍写「条目数 18」。已修正为 **17**（21→20→19→17），④-1 显式删除 `fund_manager` 条目、④-2 补删除其页签名映射。非目标边界（LLM 条目不合并）经与注册表现状核对一致，予以保留。
+
+### plan-45 设计文档十轮复盘（第 5~6 轮：接缝完整性与守卫）（2026-09-15）
+
+- **第 5 轮（接缝完整性）**：新增 4 处漏登接缝——`excel_module_loader.py` 的模块表键与错误文案、`html_writer_display.py` 对 `market_value_sheet._weighted_avg_cost` 的**反向依赖**（删模块将 ImportError，须迁移保位）、partial 实况（全仓仅 4 个 partial，**只有 M3 需合并 partial**）、`chart_data_builder` 六图键不变但图归属章节变化；`features.py` 两个 `FeatureSwitchDef` 开关名保留。**处置**：接缝地图补 6 行、批次② 补 ②-4b/②-4c、批次④ 修正 partial 步骤、新增 §7.5 风险补充 3 条。
+- **第 6 轮（守卫与可验证性）**：7 项既有守卫均在位但**无守卫清单**、**缺合并前基线方法**、「注册表 type 三处严格一致」缺正面自动化守卫。**处置**：新增 §6.6b「守卫清单与基线方法」——既有守卫表（标注每批变化处 21→20→19→18）、每批新增守卫（`test_section_type_flag_consistency`、模块加载器一致性、区块门禁、内容等价）、基线方法（批次② 前存 `docs-stm/tmp/` 快照，不入库；比对落成单测）。
+
+### plan-45 设计文档十轮复盘（第 3~4 轮：测试面与配置面）（2026-09-15）
+
+- **第 3 轮（测试与守卫）**：发现**同名混淆风险**——`market_value`/`category` 在 100+ 测试中属**领域层**（`DetailRow.market_value` 字段、`report/market_value.py` 市值计算、`report/category.py` 分类函数），而施工单原写「删除 `report/category.py`」会破坏领域层。修正：只迁移**纯章节写入器**，领域模块保留；新增 §6.7「领域层 vs 章节层边界」（含缓存类型域 `get_exact_type_map()` 的 `fund_manager_snapshot`/`fund_concentration_snapshot` 不改）；测试同步清单改为区分「章节键断言（逐文件行）」与「领域词（不在范围）」。
+- **第 4 轮（配置与校验面）**：`_validation.py` 允许类型集合与 `config_edit.py` 硬编码处已列入 §3.2 下游清单；发现注册表 docstring「共 21 项」与架构约束表「报告 19 个模块」表述陈旧 → 收尾步骤新增「条目数表述同步」；确认 `_config_defaults.py` 的 `report_section_order` 模板随注册表自动派生（无需手改）。
+
+### plan-45 设计文档十轮复盘（第 1~2 轮：命名链与架构约束）（2026-09-15）
+
+- **第 1 轮（命名统一性）**：设计层新增 §3.2「命名统一的下游影响清单」——把注册表 `type` 的语义化、两侧 `board_flags` 映射键、`enable_*` 形参链、`config/_validation.py` 允许类型集合、Web 硬编码面列入同一张表，明确「三处严格一致」纪律；施工单补 ④-1b 步骤。
+- **第 2 轮（架构约束符合性）**：核实代码侧接缝——两侧 `board_flags` 与 `_validation.py` 允许集合仍含旧 `type`，Web 面有硬编码；前端标签字典与 TUI 面板已按注册表派生（无需改）。**关键补充**：`enable_financial_report_digest` 形参在章节合并后必须删除（该章不再存在），涉及 `html_writer`/`excel_generator`/`_report_generation` 三处调用链。
+- 施工单新增「允许保留的旧名白名单」（契约键 / 功能开关名 / 缓存前缀 / 数据源类别 / 历史记录）与「复盘记录」表。
+
+### plan-45 实施层文档（迭代施工单）落地（2026-09-15）
+
+- 新增 `docs-stm/plan/section-consolidation-iteration.md`（实施层，与设计层 `section-consolidation-design.md` 配套）：**命名统一总表**（旧名→新语义名，旧名全部删除留零 alias；契约层不改名）、**接缝地图**（注册表/页签名表/两侧可见性判定/Excel 分派点行号/HTML 锚点行号/页签写入器/契约写入点）、**批次②③④ 逐条施工步骤**（含命名 grep 检查、测试与文档同步清单）、收尾与门禁、风险与回退。
+- `plan.md` 的 plan-45 条目补实施层文档引用并标注批次①已实施。
+
+### 立项：报告章节整合（plan-45，重生成配置模板）（2026-09-15）
+
+- 注册表条目 21 → 17 的四项合并（市值核算明细+持仓分类 / 持仓关系矩阵+持仓集中度 / 财报摘要并入持仓基本面 / 基金经理变更并入基金业绩），**保留吸收方主键**以免迁移 `report_section_order` pin 与开关名；按用户决定**重生成 `config.json` 与配置模板**（不做兼容）。
+- **统一语义命名**（用户要求）：合并后一律用新语义名——新条目键 `holdings_detail` / `position_structure` / `fundamental_snapshot`（`fund_performance` 语义未变），页签名、页签写入器模块与函数、HTML 锚点与 partial 文件名同步改名；旧键/旧页签名/旧写入器/旧 partial **全部删除不留 alias**，配置模板与 `config.json` 重生成。**契约层保留各区块自己的契约键**（不造伪契约键）。
+- 架构要点：可见性模型最小扩展——注册表可选字段 `data_flag_any`（多契约 OR，未声明时行为不变）；序号/显示名/页签名一律经注册表驱动；区块级门禁沿用「基金业绩分析章内候选比较子表」既有先例。
+- 批次①（可见性模型扩展）已完成并提交：注册表字段契约注释 + Excel（`should_create_sheet`）与 HTML（`_compute_section_visibility`）两侧 OR 支持（悲观判定）+ 新增 `test_section_visibility.py` 12 例守卫；既有条目零变更、行为零变化。
+- 设计文档 `docs-stm/plan/section-consolidation-design.md`（现状核实 / 四项合并方案 / 架构约束对照 / 测试与文档同步清单 / 四批次验收标准）；`plan-next` 45 → 46。
+
+### 发布 v0.11.0 及已发布记录归档（2026-09-15）
+
+- **发布**：`0.10.20-dev` → **v0.11.0**（本次跨越未发布的 0.10.20 编号，直接进入 0.11 系列）：`APP_VERSION`/`pyproject.toml`/README/9 份管理文档版本头/新版 changelog 段头全链同步（`check-version-consistency` [OK]）；发布数据文档按 `collect-test-coverage` 实时快照刷新（`test-coverage.md` 子表、`folders.md` 项目统计、`datasource.md` + `datasource-reliability.md` 逐类核对）；发布门禁（P2）`--mode verify,regression` 4,939 通过 / 0 失败 + 四个 `--ci` + ruff 全绿；打标签 `v0.11.0` 并推送。
+- **归档（0.11 系列首份）**：`[0.11.0]` 已发布变更记录整体迁入新建的 `docs-stm/archive/v0.11.x/archived_changelog.0.11.x.md`；`plan.md` 的 plan-44 完成态迁入 `docs-stm/archive/v0.11.x/archived_plan.0.11.x.md`（P1 区自此仅保留「无待办项」与归档引用，概述补 v0.11.x 已完成项指向）；`folders.md` 目录树新增 `archive/v0.11.x/` 并刷新归档/项目文档统计；changelog 与 plan 的「归档」段各补一条链接。
+- **开发版本**：打 tag 后即切换至 **0.11.1-dev**（`APP_VERSION` 与全部文档版本头），changelog 新增本轮开发段。
+
+> 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
+
 
 ## 归档
 
-- [`archived_changelog.0.10.x.md`](../archive/v0.10.x/archived_changelog.0.10.x.md) — v0.10.1 ~ v0.10.13（2026-08-04 ~ 2026-08-14）
+- [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0（2026-09-15，0.11 系列首份）
+- [`archived_changelog.0.10.x.md`](../archive/v0.10.x/archived_changelog.0.10.x.md) — v0.10.1 ~ v0.10.19（2026-08-04 ~ 2026-09-13）
 - [`archived_changelog.0.9.x.md`](../archive/v0.9.x/archived_changelog.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_changelog.0.8.x.md`](../archive/v0.8.x/archived_changelog.0.8.x.md) — v0.8.0 ~ v0.8.11（2026-07-21 ~ 2026-07-30）
 - [`archived_changelog.0.7.x.md`](../archive/v0.7.x/archived_changelog.0.7.x.md) — v0.7.0 ~ v0.7.9（2026-07-18 ~ 2026-07-21）

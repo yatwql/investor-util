@@ -19,6 +19,7 @@ import pytest
 from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 from src.python.report import penetration as pene
+from src.test.helpers import recent_holdings_period
 
 pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
 
@@ -47,14 +48,14 @@ class TestSP5QDII(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_qdii_source_tag(self, mock_enrich, mock_batch):
         """QDII → 来源包含"[QDII]"标签。"""
         mock_batch.return_value = {
             "513300": {
-                "code": "513300", "name": "华夏纳斯达克100ETF(QDII)",
-                "date": "2026-03-31",
+                "code": "513300",
+                "name": "华夏纳斯达克100ETF(QDII)",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 12.0},
                     {"name": "微软", "code": "MSFT", "ratio": 10.0},
@@ -64,12 +65,22 @@ class TestSP5QDII(unittest.TestCase):
         }
         details = [
             DetailRow(
-                account="证券", name="华夏纳斯达克100ETF(QDII)", code="513300",
-                price=1.2, nav_date="2026-07-03", yesterday_close=1.18,
-                price_type="T", premium="0.5%", shares=1000.0,
-                market_value=1200.0, cost=1500.0, profit=-300.0,
-                profit_rate=-0.2, today_profit=0.0,
-                source="mock", source_api="tencent",
+                account="证券",
+                name="华夏纳斯达克100ETF(QDII)",
+                code="513300",
+                price=1.2,
+                nav_date="2026-07-03",
+                yesterday_close=1.18,
+                price_type="T",
+                premium="0.5%",
+                shares=1000.0,
+                market_value=1200.0,
+                cost=1500.0,
+                profit=-300.0,
+                profit_rate=-0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tencent",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)
@@ -78,14 +89,14 @@ class TestSP5QDII(unittest.TestCase):
             self.assertTrue(tag_found, f"{entry['name']} 来源缺少 [QDII] 标签")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_qdii_sector_tech(self, mock_enrich, mock_batch):
         """QDII → 美股板块映射为"科技"。"""
         mock_batch.return_value = {
             "513300": {
-                "code": "513300", "name": "华夏纳斯达克100ETF(QDII)",
-                "date": "2026-03-31",
+                "code": "513300",
+                "name": "华夏纳斯达克100ETF(QDII)",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 12.0},
                     {"name": "微软", "code": "MSFT", "ratio": 10.0},
@@ -94,28 +105,37 @@ class TestSP5QDII(unittest.TestCase):
         }
         details = [
             DetailRow(
-                account="证券", name="华夏纳斯达克100ETF(QDII)", code="513300",
-                price=1.2, nav_date="2026-07-03", yesterday_close=1.18,
-                price_type="T", premium="0.5%", shares=1000.0,
-                market_value=1200.0, cost=1500.0, profit=-300.0,
-                profit_rate=-0.2, today_profit=0.0,
-                source="mock", source_api="tencent",
+                account="证券",
+                name="华夏纳斯达克100ETF(QDII)",
+                code="513300",
+                price=1.2,
+                nav_date="2026-07-03",
+                yesterday_close=1.18,
+                price_type="T",
+                premium="0.5%",
+                shares=1000.0,
+                market_value=1200.0,
+                cost=1500.0,
+                profit=-300.0,
+                profit_rate=-0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tencent",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)
         for entry in result["top10"]:
-            self.assertEqual(entry["sector"], "科技",
-                             f"{entry['name']} 板块应映射为科技")
+            self.assertEqual(entry["sector"], "科技", f"{entry['name']} 板块应映射为科技")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_qdii_breakdown(self, mock_enrich, mock_batch):
         """QDII → fund_breakdown 含"QDII"。"""
         mock_batch.return_value = {
             "513300": {
-                "code": "513300", "name": "华夏纳斯达克100ETF(QDII)",
-                "date": "2026-03-31",
+                "code": "513300",
+                "name": "华夏纳斯达克100ETF(QDII)",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 12.0},
                 ],
@@ -123,26 +143,36 @@ class TestSP5QDII(unittest.TestCase):
         }
         details = [
             DetailRow(
-                account="证券", name="华夏纳斯达克100ETF(QDII)", code="513300",
-                price=1.2, nav_date="2026-07-03", yesterday_close=1.18,
-                price_type="T", premium="0.5%", shares=1000.0,
-                market_value=1200.0, cost=1500.0, profit=-300.0,
-                profit_rate=-0.2, today_profit=0.0,
-                source="mock", source_api="tencent",
+                account="证券",
+                name="华夏纳斯达克100ETF(QDII)",
+                code="513300",
+                price=1.2,
+                nav_date="2026-07-03",
+                yesterday_close=1.18,
+                price_type="T",
+                premium="0.5%",
+                shares=1000.0,
+                market_value=1200.0,
+                cost=1500.0,
+                profit=-300.0,
+                profit_rate=-0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tencent",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)
         self.assertIn("QDII", result["summary"]["fund_breakdown"])
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_qdii_mv_calculation(self, mock_enrich, mock_batch):
         """QDII → 穿透市值 = 基金市值 × 比例。"""
         mock_batch.return_value = {
             "513300": {
-                "code": "513300", "name": "华夏纳斯达克100ETF(QDII)",
-                "date": "2026-03-31",
+                "code": "513300",
+                "name": "华夏纳斯达克100ETF(QDII)",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 12.0},
                 ],
@@ -150,12 +180,22 @@ class TestSP5QDII(unittest.TestCase):
         }
         details = [
             DetailRow(
-                account="证券", name="华夏纳斯达克100ETF(QDII)", code="513300",
-                price=1.2, nav_date="2026-07-03", yesterday_close=1.18,
-                price_type="T", premium="0.5%", shares=1000.0,
-                market_value=1200.0, cost=1500.0, profit=-300.0,
-                profit_rate=-0.2, today_profit=0.0,
-                source="mock", source_api="tencent",
+                account="证券",
+                name="华夏纳斯达克100ETF(QDII)",
+                code="513300",
+                price=1.2,
+                nav_date="2026-07-03",
+                yesterday_close=1.18,
+                price_type="T",
+                premium="0.5%",
+                shares=1000.0,
+                market_value=1200.0,
+                cost=1500.0,
+                profit=-300.0,
+                profit_rate=-0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tencent",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)
@@ -186,14 +226,14 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_qdii_index_source_tag(self, mock_enrich, mock_batch):
         """QDII 指数基金 → 来源含"[QDII]"，fund_breakdown 含"QDII"。"""
         mock_batch.return_value = {
             "161125": {
-                "code": "161125", "name": "易方达标普500指数(QDII)",
-                "date": "2026-03-31",
+                "code": "161125",
+                "name": "易方达标普500指数(QDII)",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 7.5},
                     {"name": "微软", "code": "MSFT", "ratio": 6.8},
@@ -205,12 +245,22 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
         }
         details = [
             DetailRow(
-                account="支付宝", name="易方达标普500指数(QDII)", code="161125",
-                price=1.5, nav_date="2026-07-03", yesterday_close=1.48,
-                price_type="T-1", premium="--", shares=2000.0,
-                market_value=3000.0, cost=2000.0, profit=1000.0,
-                profit_rate=0.5, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="易方达标普500指数(QDII)",
+                code="161125",
+                price=1.5,
+                nav_date="2026-07-03",
+                yesterday_close=1.48,
+                price_type="T-1",
+                premium="--",
+                shares=2000.0,
+                market_value=3000.0,
+                cost=2000.0,
+                profit=1000.0,
+                profit_rate=0.5,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)
@@ -220,14 +270,14 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
         self.assertIn("QDII", result["summary"]["fund_breakdown"])
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_qdii_index_sorted_by_mv(self, mock_enrich, mock_batch):
         """QDII 指数基金 → TOP10 按市值降序排列。"""
         mock_batch.return_value = {
             "161125": {
-                "code": "161125", "name": "易方达标普500指数(QDII)",
-                "date": "2026-03-31",
+                "code": "161125",
+                "name": "易方达标普500指数(QDII)",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 7.5},
                     {"name": "微软", "code": "MSFT", "ratio": 6.8},
@@ -237,12 +287,22 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
         }
         details = [
             DetailRow(
-                account="支付宝", name="易方达标普500指数(QDII)", code="161125",
-                price=1.5, nav_date="2026-07-03", yesterday_close=1.48,
-                price_type="T-1", premium="--", shares=2000.0,
-                market_value=3000.0, cost=2000.0, profit=1000.0,
-                profit_rate=0.5, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="易方达标普500指数(QDII)",
+                code="161125",
+                price=1.5,
+                nav_date="2026-07-03",
+                yesterday_close=1.48,
+                price_type="T-1",
+                premium="--",
+                shares=2000.0,
+                market_value=3000.0,
+                cost=2000.0,
+                profit=1000.0,
+                profit_rate=0.5,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)
@@ -251,14 +311,14 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
             self.assertGreaterEqual(mvs[i - 1], mvs[i])
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_qdii_index_5_stocks(self, mock_enrich, mock_batch):
         """QDII 指数基金 → 5 只成分股全部进入 TOP10。"""
         mock_batch.return_value = {
             "161125": {
-                "code": "161125", "name": "易方达标普500指数(QDII)",
-                "date": "2026-03-31",
+                "code": "161125",
+                "name": "易方达标普500指数(QDII)",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "苹果", "code": "AAPL", "ratio": 7.5},
                     {"name": "微软", "code": "MSFT", "ratio": 6.8},
@@ -270,12 +330,22 @@ class TestSP7QDIIIndexFund(unittest.TestCase):
         }
         details = [
             DetailRow(
-                account="支付宝", name="易方达标普500指数(QDII)", code="161125",
-                price=1.5, nav_date="2026-07-03", yesterday_close=1.48,
-                price_type="T-1", premium="--", shares=2000.0,
-                market_value=3000.0, cost=2000.0, profit=1000.0,
-                profit_rate=0.5, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="易方达标普500指数(QDII)",
+                code="161125",
+                price=1.5,
+                nav_date="2026-07-03",
+                yesterday_close=1.48,
+                price_type="T-1",
+                premium="--",
+                shares=2000.0,
+                market_value=3000.0,
+                cost=2000.0,
+                profit=1000.0,
+                profit_rate=0.5,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)
@@ -309,14 +379,14 @@ class TestSP8IndexLink(unittest.TestCase):
         ]
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_index_link_source_tag(self, mock_enrich, mock_batch):
         """联接基金 → 来源包含"[联接]"标签。"""
         mock_batch.return_value = {
             "000961": {
-                "code": "000961", "name": "天弘沪深300ETF联接A",
-                "date": "2026-03-31",
+                "code": "000961",
+                "name": "天弘沪深300ETF联接A",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
                     {"name": "宁德时代", "code": "300750", "ratio": 8.0},
@@ -325,12 +395,22 @@ class TestSP8IndexLink(unittest.TestCase):
         }
         details = [
             DetailRow(
-                account="支付宝", name="天弘沪深300ETF联接A", code="000961",
-                price=1.2, nav_date="2026-07-03", yesterday_close=1.18,
-                price_type="T-1", premium="--", shares=5000.0,
-                market_value=6000.0, cost=5000.0, profit=1000.0,
-                profit_rate=0.2, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="天弘沪深300ETF联接A",
+                code="000961",
+                price=1.2,
+                nav_date="2026-07-03",
+                yesterday_close=1.18,
+                price_type="T-1",
+                premium="--",
+                shares=5000.0,
+                market_value=6000.0,
+                cost=5000.0,
+                profit=1000.0,
+                profit_rate=0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)
@@ -339,14 +419,14 @@ class TestSP8IndexLink(unittest.TestCase):
             self.assertTrue(tag_found, f"{entry['name']} 来源缺少 [联接] 标签")
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_index_link_breakdown(self, mock_enrich, mock_batch):
         """联接基金 → fund_breakdown 含"联接"、merged_count 正确。"""
         mock_batch.return_value = {
             "000961": {
-                "code": "000961", "name": "天弘沪深300ETF联接A",
-                "date": "2026-03-31",
+                "code": "000961",
+                "name": "天弘沪深300ETF联接A",
+                "date": recent_holdings_period(),
                 "holdings": [
                     {"name": "贵州茅台", "code": "600519", "ratio": 16.0},
                     {"name": "宁德时代", "code": "300750", "ratio": 8.0},
@@ -355,12 +435,22 @@ class TestSP8IndexLink(unittest.TestCase):
         }
         details = [
             DetailRow(
-                account="支付宝", name="天弘沪深300ETF联接A", code="000961",
-                price=1.2, nav_date="2026-07-03", yesterday_close=1.18,
-                price_type="T-1", premium="--", shares=5000.0,
-                market_value=6000.0, cost=5000.0, profit=1000.0,
-                profit_rate=0.2, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="天弘沪深300ETF联接A",
+                code="000961",
+                price=1.2,
+                nav_date="2026-07-03",
+                yesterday_close=1.18,
+                price_type="T-1",
+                premium="--",
+                shares=5000.0,
+                market_value=6000.0,
+                cost=5000.0,
+                profit=1000.0,
+                profit_rate=0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)
@@ -368,28 +458,35 @@ class TestSP8IndexLink(unittest.TestCase):
         self.assertEqual(result["summary"]["merged_count"], 2)
 
     @patch("src.python.report.penetration.fetch_fund_holdings_batch")
-    @patch("src.python.fetcher.industry.batch_fetch_industry_data",
-           return_value={})
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
     def test_index_link_many_constituents(self, mock_enrich, mock_batch):
         """联接基金 → 超过 10 只成分股时只取 TOP10。"""
         mock_batch.return_value = {
             "000961": {
-                "code": "000961", "name": "天弘沪深300ETF联接A",
-                "date": "2026-03-31",
-                "holdings": [
-                    {"name": f"股票{i:02d}", "code": f"600{i:04d}", "ratio": 3.0}
-                    for i in range(1, 16)
-                ],
+                "code": "000961",
+                "name": "天弘沪深300ETF联接A",
+                "date": recent_holdings_period(),
+                "holdings": [{"name": f"股票{i:02d}", "code": f"600{i:04d}", "ratio": 3.0} for i in range(1, 16)],
             },
         }
         details = [
             DetailRow(
-                account="支付宝", name="天弘沪深300ETF联接A", code="000961",
-                price=1.2, nav_date="2026-07-03", yesterday_close=1.18,
-                price_type="T-1", premium="--", shares=5000.0,
-                market_value=6000.0, cost=5000.0, profit=1000.0,
-                profit_rate=0.2, today_profit=0.0,
-                source="mock", source_api="tiantian",
+                account="支付宝",
+                name="天弘沪深300ETF联接A",
+                code="000961",
+                price=1.2,
+                nav_date="2026-07-03",
+                yesterday_close=1.18,
+                price_type="T-1",
+                premium="--",
+                shares=5000.0,
+                market_value=6000.0,
+                cost=5000.0,
+                profit=1000.0,
+                profit_rate=0.2,
+                today_profit=0.0,
+                source="mock",
+                source_api="tiantian",
             ),
         ]
         result = pene.compute_penetration_top10(self.holdings, details)

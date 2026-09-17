@@ -65,7 +65,7 @@ class TestApplyLLMAnalysis(unittest.TestCase):
         self.assertEqual(result[3], ("低", "中性", ""))  # 缺失项默认值
 
     def test_irrelevant_not_filtered(self) -> None:
-        """"无关"不被过滤——元组中直接返回原始数据，由调用方决定是否跳过。"""
+        """ "无关"不被过滤——元组中直接返回原始数据，由调用方决定是否跳过。"""
         llm_resp = '[{"idx": 0, "relevance": "高", "sentiment": "中性", "analysis": "利好"}, {"idx": 1, "relevance": "无关", "sentiment": "中性", "analysis": "无关内容"}]'
         result = _apply_llm_news_correlation(self.news, llm_resp)
         self.assertEqual(len(result), 3)
@@ -116,17 +116,13 @@ class TestBatchNewsAnalysis(unittest.TestCase):
     """测试批次 财经新闻热点与持仓关联分析功能。"""
 
     def setUp(self) -> None:
-        self.news_5 = [
-            {"title": f"新闻{i}", "matched_keywords": ["茅台"]}
-            for i in range(5)
-        ]
+        self.news_5 = [{"title": f"新闻{i}", "matched_keywords": ["茅台"]} for i in range(5)]
 
     def test_handle_5_items_in_one_batch(self) -> None:
         """处理 5 条新闻的批次，全部成功返回。"""
-        llm_resp = json.dumps([
-            {"idx": i, "relevance": "高", "sentiment": "利好", "analysis": f"原因{i}"}
-            for i in range(5)
-        ])
+        llm_resp = json.dumps(
+            [{"idx": i, "relevance": "高", "sentiment": "利好", "analysis": f"原因{i}"} for i in range(5)]
+        )
         result = _apply_llm_news_correlation(self.news_5, llm_resp)
         self.assertEqual(len(result), 5)
         for i in range(5):
@@ -134,11 +130,13 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_partial_json_response(self) -> None:
         """LLM 返回 3 条结果给 5 条新闻 → 缺失 2 条填充默认值。"""
-        llm_resp = json.dumps([
-            {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
-            {"idx": 2, "relevance": "中", "sentiment": "中性", "analysis": "原因2"},
-            {"idx": 4, "relevance": "高", "sentiment": "利空", "analysis": "原因4"},
-        ])
+        llm_resp = json.dumps(
+            [
+                {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
+                {"idx": 2, "relevance": "中", "sentiment": "中性", "analysis": "原因2"},
+                {"idx": 4, "relevance": "高", "sentiment": "利空", "analysis": "原因4"},
+            ]
+        )
         result = _apply_llm_news_correlation(self.news_5, llm_resp)
         self.assertEqual(len(result), 5)
         self.assertEqual(result[0], ("高", "利好", "原因0"))
@@ -154,9 +152,11 @@ class TestBatchNewsAnalysis(unittest.TestCase):
 
     def test_fewer_results_than_requested(self) -> None:
         """LLM 返回 1 条结果给 5 条新闻 → 缺失 4 条填充默认值。"""
-        llm_resp = json.dumps([
-            {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
-        ])
+        llm_resp = json.dumps(
+            [
+                {"idx": 0, "relevance": "高", "sentiment": "利好", "analysis": "原因0"},
+            ]
+        )
         result = _apply_llm_news_correlation(self.news_5, llm_resp)
         self.assertEqual(len(result), 5)
         self.assertEqual(result[0], ("高", "利好", "原因0"))
@@ -182,8 +182,7 @@ class TestEnhanceNewsCorrelation(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm._batch_mode.ThreadPoolExecutor",
-                                   new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm._batch_mode.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
 
     @classmethod
@@ -268,11 +267,9 @@ class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor",
-                                   new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client",
-                                    new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
@@ -283,7 +280,9 @@ class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
     @patch("src.python.llm._batch_mode.cache_get", return_value=None)
     @patch("src.python.llm._batch_mode.call_llm")
     def test_passed_config_used(
-        self, mock_call: MagicMock, mock_cache_get: MagicMock,
+        self,
+        mock_call: MagicMock,
+        mock_cache_get: MagicMock,
     ) -> None:
         """传入 llm_config → 不需要内部 get_llm_config()。"""
         news = [{"title": "A", "matched_keywords": ["茅台"]}]
@@ -295,7 +294,9 @@ class TestEnhanceNewsCorrelationUsesLlmConfig(unittest.TestCase):
         )
         llm_config = {"provider": "claude", "api_key": "sk-test", "cache_enabled_news_correlation": False}
         result, cached, usage = enhance_news_correlation(
-            news, holdings, llm_config=llm_config,
+            news,
+            holdings,
+            llm_config=llm_config,
         )
         self.assertIn("llm_analysis", result[0])
         # 验证 call_llm 接受到 config（首个参数应为 llm_config）
@@ -313,8 +314,7 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm._batch_mode.ThreadPoolExecutor",
-                                   new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm._batch_mode.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
 
     @classmethod
@@ -335,7 +335,9 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
     @patch("src.python.llm._batch_mode.cache_get")
     @patch("src.python.llm._batch_mode.call_llm")
     def test_all_articles_cached(
-        self, mock_call: MagicMock, mock_cache_get: MagicMock,
+        self,
+        mock_call: MagicMock,
+        mock_cache_get: MagicMock,
         mock_cfg: MagicMock,
     ) -> None:
         """全部文章独立缓存命中 → cached=True + 不调用 LLM。"""
@@ -351,7 +353,9 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
     @patch("src.python.llm._batch_mode.cache_get", return_value=None)
     @patch("src.python.llm._batch_mode.call_llm")
     def test_no_cache_all_fresh(
-        self, mock_call: MagicMock, mock_cache_get: MagicMock,
+        self,
+        mock_call: MagicMock,
+        mock_cache_get: MagicMock,
         mock_cfg: MagicMock,
     ) -> None:
         """全部未缓存 → cached=False + 调用 LLM。"""
@@ -371,7 +375,9 @@ class TestEnhanceNewsCorrelationGranularCache(unittest.TestCase):
     @patch("src.python.llm._batch_mode.cache_get")
     @patch("src.python.llm._batch_mode.call_llm")
     def test_mixed_cache(
-        self, mock_call: MagicMock, mock_cache_get: MagicMock,
+        self,
+        mock_call: MagicMock,
+        mock_cache_get: MagicMock,
         mock_cfg: MagicMock,
     ) -> None:
         """部分文章缓存 → 仅未缓存文章走 LLM。"""

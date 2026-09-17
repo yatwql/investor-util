@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.10.16
+> 文档版本：0.11.1-dev
 
 ## 概述
 
@@ -18,6 +18,28 @@
 | **Python 环境** | 所有 Python 命令一律使用项目虚拟环境解释器——Linux/macOS 用 `.venv/bin/python`，Windows 用 `.venv\Scripts\python.exe`；**禁止**裸 `python3`/`python`/`pytest`（会命中系统解释器，缺失 pandas 等依赖）。运行测试、脚本、CLI 均同 |
 | **提交规范** | 约定式提交：`feat`/`fix`/`docs`/`refactor`/`test`/`chore`/`perf`/`ci` + 可选 scope；修复类可在标题标注对应任务编号 |
 | **日志** | `logging` → `logs/app.log` + console（INFO / WARNING / ERROR） |
+### pi 模型采样配置（DeepSeek 编程档）
+
+仓库内 `.pi/models.json` 是本项目**版本受控**的 pi 模型配置（DeepSeek 编程档）：
+
+| 覆盖项 | 值 | 为什么 |
+|---|---|---|
+| `samplingParams.temperature` | `0.0` | DeepSeek 官方参数建议：**代码生成/数学解题 用 0.0**（通用对话 1.3、创意写作 1.5）；低温让补丁/重构更确定、减少格式抖动。已实测该参数在 `deepseek-v4-flash` 的 OpenAI 兼容端点被接受（HTTP 200） |
+| `maxTokens` | `65536` | 内置目录值 384K 对编程偏大；收窄到 64K 仍远超常规补丁/文件写入需要，同时给单次响应设了成本上限。**注意思考（reasoning）与正文共享该预算**——预算被思考吃满时正文会被截断（与项目 LLM 层同一现象） |
+
+**未改动**：`thinkingLevelMap`（内置 `low/high/max` 已够用，用 `/thinking` 切档）、`compat`（`thinkingFormat: deepseek` 等由 pi 内置目录提供）、`contextWindow`（保持 1M 真实能力；若想更早触发压缩以降本，可自行下调，代价是上下文保留变少）、`input`（flash 为纯文本，视觉实验版另有一个模型）。
+
+**为什么放在 `.pi/` 而要软链生效**：pi CLI **只读** `~/.pi/agent/models.json`（`getModelsPath() = getAgentDir() + "/models.json"`，`getAgentDir()` 只认 `PI_AGENT_DIR` 或 `~/.pi/agent`），**不读项目级 `.pi/models.json`**；项目级 `.pi/` 仅支持 `settings.json`/扩展/技能/主题。因此仓库文件是**唯一事实来源**，用软链挂到全局路径生效：
+
+```bash
+ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
+```
+
+验证与排查：
+
+- `pi --list-models | grep deepseek` → `max-out` 应显示 `65.5K`（覆盖已生效）；出现 `Warning: errors loading models.json` 说明 JSON/schema 有问题
+- `samplingParams` 只对 **OpenAI 兼容传输**生效（pi 内置 deepseek provider 即 `openai-completions`）✓
+- 若 `~/.pi/agent/models.json` 已是实体文件（例如以后 `/login` 或 `pi config` 写过），软链会失败：先备份再决定合并
 
 ## 三级门禁
 
@@ -51,7 +73,7 @@
 .venv/bin/python scripts/check-semantic-index.py --ci
 ```
 
-**辅助（非阻塞）**：`.venv/bin/ruff format --check`（代码格式一致性）——格式问题可通过 `.venv/bin/ruff format` 自动修复，不阻止合并/发布。
+**辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
 
 > P1/P2 的完整要求（含手动验证项）见 [testplan.md](testplan.md) → 回归测试清单 / 门禁章节。
 
@@ -86,6 +108,8 @@
 > `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
 
 ## 测试指南
+
+**测试报告布局**：每次运行写入 `test-reports/latest/`——汇总页 `index.html`（各模式的通过/失败/耗时 + 报告链接）与该模式的 pytest-html 详细报告。**分阶段模式（如 `dev-verify` = Phase A 核心单元 + Phase B 基础场景）每阶段一个报告文件**（`<mode>/report_phase_A.html` / `report_phase_B.html`），汇总页逐阶段给链接；非分阶段模式仍是 `<mode>/report.html`。早前两阶段共用 `report.html`，后跑的阶段会覆盖前者，导致详细报告只剩最后一阶段（排查时看不到真正的失败面）。
 
 测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行，使用 `scripts/test-runner.py` 统一驱动并自动输出结构化报告。各 `--mode` 的精确测试项数统计见 [test-coverage.md](test-coverage.md)。
 
@@ -145,7 +169,7 @@ pip install pytest-cov coverage
 
 # ===== ③ 全量/CI 门禁（耗时较长） =====
 
-# 开发期快速验证（5 个 unit 子模块并行 + 基础场景）
+# 开发期快速验证（6 个 unit 子模块并行 + 基础场景）
 .venv/bin/python scripts/test-runner.py --mode dev-verify
 
 # 合入验证 — PR 前检查
@@ -230,7 +254,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 > 注意：P0-P3 是**问题影响力分级**，regression/verify/all 是**测试范围分级**，两者通过门禁阶段关联但不一一对应。例如 P0 问题恰好在 regression 模式中被检出，但 regression 模式并非仅包含"P0 级别"的测试用例——它覆盖全量业务场景，其中任何一项失败都可能导致 P0 阻断。
 
-> **耗时说明**：测试耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，因此本文档不标注具体秒数。各模式耗时对照见 [test-coverage.md](test-coverage.md)（「环境耗时对照」表，按机器分列实测）——需预估耗时先在表中定位本机环境列。若本机未在表中，可运行 `python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
+> **耗时说明**：测试耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，因此本文档不标注具体秒数。各模式耗时对照见 [test-coverage.md](test-coverage.md)（「环境耗时对照」表，按机器分列实测）——需预估耗时先在表中定位本机环境列。若本机未在表中，可运行 `.venv/bin/python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
 
 #### 三级验证流水线
 
@@ -268,12 +292,12 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 
 ##### 单元测试系列（`unit` / `standard`）
 
-- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（13 个子组：providers、fetcher、llm、news、report、config、config_edge、core、analysis、ui、cli、scripts、web），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
+- **`--mode unit`** 覆盖所有标记为 `unit_*` 的测试（12 个子组：providers、fetcher、llm、news、report、config、core、analysis、ui、cli、scripts、web），不含场景测试。这是对代码库中各独立模块的功能正确性验证，所有网络请求均为 mock，不依赖外部 API。
 - **`--mode standard`** 在 `unit` 基础上排除 edge（异常边界）和 data（数据正确性）两个跨类标记，仅保留"常规路径"的单元测试。适用于日常开发中快速验证模块本身逻辑正确，不需要关心边界情况。
 
 ##### 场景测试系列（`scenario` / `regression` / `integration` / `verify`）
 
-- **`--mode scenario`** 覆盖所有标记为 `scenario_*` 的测试（6 个子组：basic、resilience、llm、datetime、perf、security）。这些测试模拟真实用户操作（如菜单 E/B/L 生成报告），组合多个模块进行端到端验证。
+- **`--mode scenario`** 覆盖带 `scenario` 标记的场景测试（4 个子组：basic、resilience、llm、datetime；`scenario_extreme`、`scenario_perf`、`scenario_security` 不携带该标记，分别由 `--mode scenario_extreme` / `perf` / `security` 单独运行）。这些测试模拟真实用户操作（如菜单 E/B/L 生成报告），组合多个模块进行端到端验证。
 
   场景测试按职责分为 **7 大类**：
 
@@ -282,6 +306,8 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
   - **`scenario_extreme` — 极限场景**：验证极端数据下的正确性，包括超多持仓（S0c，200+ 条批量计算）和极端值（S10，超大/极小份额、高精度净值、零值组合）。标记 `scenario_extreme`，不包含在 `scenario` / `scenario_basic` / `scenario_resilience` 中，需单独运行 `--mode scenario_extreme`。
   - **`scenario_llm` — LLM 场景组合**：验证 LLM 模块在各种状态下的行为，包括缓存/成功/失败混合状态的颜色渲染、五种失败原因独立映射、Extended Thinking 标记、禁用优先原则、断网降级、全缓存无调用、三种输出格式（Excel/HTML/Summary）一致性。
   - **`scenario_datetime` — 日期/时间场景**：验证系统在不同市场时段（盘中/盘前/午休/盘后/非交易日/长假）、产品类型（场外基金/QDII/ETF/股票/混合）、边界条件（时段切换/缝隙/首次启动/断网）以及特殊日历（跨年/季末/汇率故障/调休/港股通假期）下的数据获取正确性和降级表现。
+  - **`scenario_perf` — 性能基准场景**：以 mock 持仓与 mock API 跑 20 品种全量报告生成管线，记录各阶段耗时分布建立性能基线（basic 模式目标 <60s，>120s 判失败）。
+  - **`scenario_security` — 安全基线场景**：5 项安全基线自动化验证——密钥文件权限不可公开读取、缓存文件不含明文密钥、匿名化模式报告不含真实名称/代码、LLM API 日志不记录完整密钥、HTML 报告不泄露文件系统路径。
 
 - **`--mode regression`** 与 `--mode scenario` 完全相同，但语义定位为"提交前回归验证"。建议在 git hook 或 CI 前置检查中使用此名称，使流水线意图更加清晰。
 - **`--mode integration`** 覆盖场景测试 + 集成测试（`scenario or integration`）。在全部业务场景基础上，增加模块间验证：接口契约、错误隔离、新闻流水线、缓存一致性、TUI 路由。用于修改了跨模块调用关系后的定向回归。
@@ -305,11 +331,55 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **不含 LLM 真实调用**（防费用）——LLM 连通性由运行时数据源健康检查覆盖。
 - 触发方式：`.venv/bin/python scripts/test-runner.py --mode live` 或 `.venv/bin/python -m pytest --run-live -m live`。
 
+##### 数据源真实响应录制与回放（cassette）
+
+**要解决的问题**：数据源单元测试全部喂**手工构造的假响应**，测的是「我以为上游长什么样」。上游字段改名、值加前后缀、换分隔符、错误页返回 HTML 这类回归，**只有真实响应体测得出**。cassette 把上游真实响应体录进仓库，此后离线回放——既有真实数据，又不碰网络，且随默认套件入门禁。
+
+| 组成 | 位置 |
+|:-----|:-----|
+| 回放引擎 | `src/python/core/cassette.py`（只依赖 stdlib + httpx + `core.http_client`） |
+| 解析器绑定表 | `src/python/fetcher/cassette_checks.py`（cassette 名 → 当前解析器调用） |
+| 已录制响应 | `src/test/data/cassettes/*.json`（git 跟踪） |
+| 回放回归用例 | `src/test/unit/providers/test_cassette_replay.py` |
+| 录制用例 | `src/test/live/test_live_cassette_record.py` |
+
+**在用例里用已录制响应**——声明所需 cassette，运行期自动离线回放，用例内的 provider 调用照常写：
+
+```python
+pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
+
+@pytest.mark.cassette("tencent_quote", source="腾讯行情")
+def test_tencent_quote_parses(self):
+    data = tencent.fetch_price("600519")     # 响应来自 cassette，不联网
+    assert data["price"] == pytest.approx(1285.13)
+```
+
+**刷新/新增录制**（显式联网动作，双开关缺一不可）：
+
+```bash
+# 录制全部登记的 cassette 并即时回放自检
+.venv/bin/python scripts/test-runner.py --mode live --record-cassettes
+
+# 只录一个
+.venv/bin/python -m pytest -m live --run-live --record-cassettes \
+    src/test/live/test_live_cassette_record.py -k tencent_quote
+```
+
+新增一个 cassette 需要三处同步：绑定表加一条解析器调用（`CASSETTE_CHECKS`）、录制用例加一个 `@pytest.mark.cassette(...)` 测试、回放回归用例加精确值断言。
+
+**离线保证与非目标**：
+
+- 回放**未命中即失败**（`CassetteMissError`），**绝不回落真实网络**——避免「以为在回放、实则在联网」。该异常刻意不继承 `httpx.HTTPError`，否则 provider 会把它当成网络错误降级到别的源，掩盖夹具缺失。
+- 非 live 用例的真实请求已被 `conftest.py` 的 `_block_external_network` 拦死，**机制上不可能意外产生录制**。
+- 录制产物进 git（每份几 KB ~ 百 KB），**不入门禁的 live 套件**；夹具刷新须走上面的显式开关。
+- 维护入口：`cassettes`（列出）/ `cassettes --verify`（离线回放 + 交当前解析器解析，失败退出码 2），见下节「CLI 子命令」。
+- 与「HTTP 客户端统一」约束的关系：回放寄生于「所有 HTTP 请求必须经 `core/http_client.py` 工厂」；绕过工厂自建客户端的 provider 不受回放替换，其用例会真实联网且静默通过。设计细节见 `technical.md` §2.6。
+
 ##### 全量（`all`）
 
 - **`--mode verify,regression`** 组合模式，等价于分别运行 verify（单元） + regression（场景）。约 30s，作为发布门禁。
 - **`--mode all`** 不设任何标记过滤（`.venv/bin/python -m pytest src/test/`），运行全量测试。需要全覆盖时手动调用。
-- **`--mode all_no_unit`** 排除所有单元测试（`-m "not unit"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。
+- **`--mode all_no_unit`** 排除所有单元测试与联网测试（`-m "not unit and not live"`），仅保留场景测试、集成测试和跨类测试。适用于想要全场景覆盖但跳过纯模块逻辑验证的场景。
 
 ##### 多模式组合
 
@@ -334,14 +404,17 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 | `data` | `data` | ~2s |
 | `scenario` | `scenario` | ~18s |
 | `integration` | `scenario or integration` | ~14s |
-| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts` | ~10s |
-| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts) and not (edge or data)` + `scenario_basic`（两阶段） | ~20s |
+| `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts or unit_web` | ~10s |
+| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web) and not (edge or data)` + `scenario_basic`（两阶段） | ~20s |
 | `all` | （无过滤，全量） | ~21s |
-| `all_no_unit` | `not unit` | ~10s |
+| `all_no_unit` | `not unit and not live` | ~10s |
 | `report` | `unit_report` | ~11s |
 | `scenario_extreme` | `scenario_extreme` | ~2s |
+| `perf` | `scenario_perf` | 见 test-coverage.md |
+| `security` | `scenario_security` | 见 test-coverage.md |
+| `live` | `live`（需 `--run-live`） | — |
 
-> 注：**Linux 开发机参考耗时**按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，仅作相对量级参考；完整说明及不同环境下的耗时对照见 [test-coverage.md](test-coverage.md)（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。若需本机实测，运行 `python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
+> 注：**Linux 开发机参考耗时**按 2026-08-05 实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8 = medium 50% 核数）。耗时与硬件/操作系统/并行度强相关，不同机器上可能相差一个数量级，仅作相对量级参考；完整说明及不同环境下的耗时对照见 [test-coverage.md](test-coverage.md)（顶部注 + 「采集环境属性」/「各模式耗时对照」表）。若需本机实测，运行 `.venv/bin/python scripts/test-runner.py --mode bench --update-docs` 自动采集回填。
 
 ##### 跨机器耗时采集与环境耗时对照（`bench` + `--machine-info` / `--update-docs`）
 
@@ -475,7 +548,6 @@ test-reports/latest/
 | `unit_config` | 配置管理 |
 | `unit_core` | 核心基础设施（缓存/模型/注册表等） |
 | `unit_analysis` | 分析计算（流动性/再平衡/汇率/债券收益率/情景） |
-| `unit_config_edge` | 配置管理边缘场景（必须放在 `*_edge.py`） |
 | `unit_ui` | TUI 交互 |
 | `unit_cli` | CLI 命令行模式 |
 | `unit_scripts` | 工程脚本（历史痕迹/版本一致性/任务编号检查） |
@@ -554,7 +626,7 @@ test-reports/latest/
 
 | 测试类型 | 放哪里 | 示例 |
 |:---------|:-------|:-----|
-| **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache_core.py` 追加 `TestCacheEdgeCases` |
+| **模块单元测试** | 已有对应 `test_<module>.py` 追加 | `test_cache_io.py` 追加 `TestCacheEdgeCases` |
 | **新模块测试** | 新建 `test_<新模块>.py` | `test_news_correlator.py` |
 | **业务场景测试** | `test_scenario_basic_flows.py`（基础链路 S1-S5）或 `test_scenario_resilience_flows.py`（异常容错 S6-S9）或 `test_scenario_extreme.py`（极限 S0c+S10） | S1 → `test_scenario_basic_flows.py` |
 | **持仓质量场景** | `test_scenario_holdings_quality.py` | S0a/S0b/S0d |
@@ -636,14 +708,14 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 
 | 脚本 | 分类 | 一句话 |
 |:-----|:-----|:-------|
-| `test-runner.py` | 测试 | pytest 标记模式封装驱动，支持 14 种 `--mode` |
+| `test-runner.py` | 测试 | pytest 标记模式封装驱动，支持 17 种 `--mode` |
 | `extract-test-failures.py` | 测试 | 从 pytest-html 报告提取失败用例详情 |
 | `check-code-traces.py` | 测试 | 代码注释/文档字符串中历史变更痕迹检查 |
 | `check-doc-traces.py` | 测试 | 面向读者文档（.md）中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
 | `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
-| `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（表外键 / 僵尸条目 / 合并章 key 缺失） |
+| `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
@@ -659,8 +731,12 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-svg-text-overflow.py` | 诊断 | README SVG 架构图文字色像素越界精确检测 |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本（无参数启动 TUI；`web` 子命令启动 Web 浏览器模式） |
 | `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
+| `llm.sh` / `llm.ps1` | 启动 | Linux/macOS / Windows 完整报告快捷入口（固定 `report --type full`，等价 TUI「生成完整报告」） |
 | `check-sources` | 诊断 | cli.py 子命令：数据源联通性检测 |
+| `doctor` | 诊断 | cli.py 子命令：系统自检（环境/配置/目录/开关/适配/凭据/数据源七组，`--offline`/`--timeout`，不受实验开关约束） |
+| `view-logs` | 诊断 | cli.py 子命令：查看结构化运行日志（`--level`/`--lines`/`--since`/`--until`，与 TUI `[V]` 同实现） |
 | `whatif` | 诊断 | cli.py 子命令：调仓 What-if 模拟（对比两份持仓生成独立 diff 报告，见 [快速开始](../manuals/how-to-start.md)） |
+| `cassettes` | 诊断 | cli.py 子命令：数据源记录-回放维护（列表 / `--verify` 离线回放校验，见下文「CLI 子命令」） |
 
 ### 测试类
 
@@ -795,7 +871,7 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 
 校验技术设计文档（`technical.md`）「功能语义命名表」章节（`<!-- semantic-index:start/end -->` 标记区间）与代码的**正面一致性**，与 `check-code-traces.py` 的负面禁止互补：
 
-1. **正向**：`_config_defaults.py` 中 `report_submodules` 字典每个键（运行时配置开关）必须已登记在「功能语义命名表」中（防新增开关绕过登记）
+1. **正向**：功能开关注册表中 `GROUP_REPORT` 分组的每个键（报告章节与增强开关）必须已登记在「功能语义命名表」中（防新增开关绕过登记）
 2. **反向**：表中每个语义 slug 在 `src/python/` 下至少一处非注释代码引用（防僵尸条目——功能删除后表行残留）
 3. **合并章**：表下「合并章代码标识符」注声明的 sheet key 必须存在于 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表
 
@@ -1017,9 +1093,28 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 .venv\Scripts\python.exe -m src.python.cli report --type both   # Windows 直调
 ```
 
-> 注意：包装脚本的「无参数默认 both」与 CLI 本身的 `--type` 默认值（basic，仅 Excel）不同——直接直调 `python -m src.python.cli report`（不带 `--type`）仍走 basic 轻量模式（只生成核心页签，新闻/历史/LLM 等页签为降级占位）。包装脚本无参数时自动补 `report --type both`，确保拿到完整非 LLM 报告。
+> 注意：包装脚本的「无参数默认 both」与 CLI 本身的 `--type` 默认值（basic，仅 Excel）不同——直接直调 `.venv/bin/python -m src.python.cli report`（不带 `--type`）仍走 basic 轻量模式（只生成核心页签，新闻/历史/LLM 等页签为降级占位）。包装脚本无参数时自动补 `report --type both`，确保拿到完整非 LLM 报告。
 
 包装脚本相比直调的好处：自动切换到项目根目录、自动定位虚拟环境解释器（避免误用系统 python 缺失 pandas 等依赖）、无参数时自动补 `report` 子命令。CLI 完整参数说明见 [快速开始](../manuals/how-to-start.md) 的「CLI 命令行模式」一节。
+
+**`llm.sh` / `llm.ps1` — 完整报告快捷入口**
+
+只做一件事：生成含 LLM 分析章节的完整报告，等价于 TUI 菜单的「生成完整报告(Excel+HTML) [含LLM，按章节配置]」。
+子命令与报告类型写死在脚本里，免去每次敲 `report --type full`。
+
+```bash
+./scripts/llm.sh                  # 生成完整报告（含 LLM）
+./scripts/llm.sh --force-llm      # 强制重新调用 LLM，跳过缓存
+./scripts/llm.sh --history off    # 本次不获取组合历史走势
+```
+
+```powershell
+.\scripts\llm.ps1 --force-llm
+```
+
+追加的参数即 `report` 的报告级参数（`--type` / `--history` / `--force-llm`）；组合历史走势不写死，
+由配置 `history.fetch_mode` 决定（与 TUI 菜单一致）。需要全局参数（`--config` / `--output` /
+`--experiment` / `--feature`）时仍走 `cli.sh` / `cli.ps1`——它们必须写在 `report` 子命令之前。
 
 ### CLI 子命令
 
@@ -1046,6 +1141,61 @@ CLI 模式的便捷入口，跳过 TUI 界面，直接以命令行模式运行�
 **检查覆盖范围**：腾讯财经行情、新浪财经行情、东方财富净值、天天基金持仓/排名、东方财富行业分类、新浪财经新闻、东方财富新闻、华尔街见闻、财联社、腾讯 K 线——共 **10 个端点**。
 
 **退出码**：0=全部正常，1=有告警（部分源慢），2=有失败。
+
+**`cassettes` — 数据源记录-回放维护**
+
+维护已录制的真实数据源响应（见上文「数据源真实响应录制与回放（cassette）」）。与 `doctor` 同例：**无需配置、不受任何实验开关约束、不发起网络请求**。
+
+```bash
+# 列出已录制响应（来源/录制时间/交互数/大小）
+.venv/bin/python -m src.python.cli cassettes
+
+# 逐条离线回放并交给当前解析器解析（不联网）
+.venv/bin/python -m src.python.cli cassettes --verify
+```
+
+**`--verify` 输出标记**：`[OK]` 解析正常；`[!]` 该 cassette 未登记解析器（只校验文件可读，不伪造成 OK）；`[ERR]` 解析器吃不下已录制的真实响应体——**上游格式可能已变，需重新录制**。
+
+**退出码**：0=正常（含列表模式与全部 `[OK]`/`[!]`），2=有录制的解析路径失败。
+
+**`doctor` — 系统自检**
+
+一次性盘点「跑不起来」的常见根因，分环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，失败项附可执行修复建议。与 `check-sources` 的分工：后者只测数据源联通性，前者还覆盖解释器/虚拟环境、配置可解析与关键字段、目录可读写。
+
+```bash
+# 完整自检（含数据源网络检查）
+.venv/bin/python -m src.python.cli doctor
+
+# 仅查本地环境/配置/目录，跳过网络（瞬时返回）
+.venv/bin/python -m src.python.cli doctor --offline
+
+# 收紧网络检查的整体耗时预算（秒，默认 8）
+.venv/bin/python -m src.python.cli doctor --timeout 5
+```
+
+**无需配置**：与 `view-logs` / `cassettes` 同例，在 `init_config()` **之前**分派——配置损坏正是自检要定位的场景，若被配置初始化拦住即成死锁。
+
+**不受开关约束**：TUI 菜单 `[D]` 与 Web 自检卡片由 `doctor_check` 门控（该开关默认开启），但 CLI 子命令始终可用（同理，被开关拦住就失去了诊断手段）。
+
+**退出码**：0=全部通过，1=有失败项（`_EXIT_PARTIAL`）。自检有失败项不算命令本身失败——命令跑完了并给出了结论，故用 PARTIAL 而非 SEVERE。
+
+**`view-logs` — 查看结构化运行日志**
+
+按级别/时间过滤读取日志尾部，**无需配置**（配置损坏时仍可查看日志诊断）。
+
+```bash
+# 查看最近日志（默认读末尾 5000 物理行）
+.venv/bin/python -m src.python.cli view-logs
+
+# 只看 ERROR + CRITICAL
+.venv/bin/python -m src.python.cli view-logs --level ERROR
+
+# 只看指定日期之后 / 只读末尾 200 行
+.venv/bin/python -m src.python.cli view-logs --since 2026-08-16
+.venv/bin/python -m src.python.cli view-logs --lines 200
+```
+
+级别/时间过滤与尾部读取逻辑全部委托 `core/log_reader.read_log()`（与 TUI 菜单 `[V]` 同一实现）。
 
 ### LLM 幻觉率采样测试
 
@@ -1181,8 +1331,8 @@ from src.python.core.registry import (
 
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
-- `get_report_section_number("fund_manager")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
-- `get_report_section_keys()` → 全部 19 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
+- `get_report_section_number("position_structure")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
+- `get_report_section_keys()` → 全部 17 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
 
 **计算模块查询**：
 
@@ -1230,7 +1380,7 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 | ① | **注册模块定义** | `core/registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
 | ② | **配置 JSON 键组** | `llm_settings.json` | 新增 9~10 个 `{key}_{suffix}` 配置键（`news_correlation` 不含 `output_brief`） |
 | ③ | **实现生成函数** | `llm/generators.py` | 新增生成函数，通过 `_call_llm()` 调用 LLM |
-| ④ | **注册调度入口** | `llm/generators_orchestrator.py` | 在 `_MODULE_FNS` 字典中添加新模块条目（键=settings_suffix，值=lambda 调用新函数）；在 `_compute_module_cache_info()` 中添加对应的指纹计算和 `info` 条目 |
+| ④ | **注册调度入口** | `llm/generators_orchestrator.py` + `llm/module_fingerprint.py` | 在 `_MODULE_FNS` 字典中添加新模块条目（键=settings_suffix，值=lambda 调用新函数）；在 `_compute_module_cache_info()` 中添加对应的 `info` 条目。**指纹不进 orchestrator**：在 `module_fingerprint.py` 的 `MODULE_FINGERPRINT_BUILDERS` 登记该模块的构造器（输入闭包 `ModuleFingerprintInputs`），预检侧按键取指纹、写侧闭包调用同一函数——两侧都不得自行拼接指纹片段 |
 | ⑤ | **添加报告页签** | `report/llm_content.py` | 在 `write_llm_sheets()` 的 `_module_keys` 和 `_module_contents` 列表中添加新模块键名 |
 | ⑥ | **暴露导出接口** | `llm/__init__.py` | 将新生成函数加入 `__all__` |
 | ⑦ | **运行注册表测试** | 终端 | `.venv/bin/python -m pytest src/test/unit/core/test_registry.py -v` — 验证 TTL/前缀/键名完整性 |
@@ -1238,27 +1388,45 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 
 > **LLM 模块补充步骤**：在上述 registry 清单基础上，新增 LLM 模块还需完成领域特定步骤——`llm/prompts.py` 新增 `_SYSTEM_{MODULE}` 常量与提示词构建函数；`report/html_writer.py`（HTML）+ `report/llm_content.py`（Excel）新章节双渲染；`config.json` → `cache_ttl` 添加 `llm_{module}` 条目；`llm_settings.json` 加入推荐默认值并更新 [配置指南](../manuals/how-to-config.md)。
 >
-> **纳入模块级质量分级（可选，实验功能 `module_quality_gate`）**：新模块默认不参与 `report/llm_quality.py` 的 A~F 分级（分级为只读旁路，未登记不影响任何既有功能）。若需纳入：在 `_MODULE_KEYS` 追加模块键（顺序须与 `llm_content` 四元组位置一致）、在 `_LENGTH_THRESHOLDS` 设定该模块的 `(降级下限, 参考篇幅)` 双阈值（依据真实健康输出实测字符数标定）；若其提示词规定了固定章节清单，还需在 `_REQUIRED_MARKERS` 登记标记——`test_llm_quality.py::TestRequiredMarkersMatchPrompts` 会直接比对提示词常量，标记与提示词不同步即测试失败。
+> **纳入模块级质量分级（可选，开关 `module_quality_gate`）**：新模块默认不参与 `report/llm_quality.py` 的 A~F 分级（分级为只读旁路，未登记不影响任何既有功能）。若需纳入：在 `_MODULE_KEYS` 追加模块键（顺序须与 `llm_content` 四元组位置一致）、在 `_LENGTH_THRESHOLDS` 设定该模块的 `(降级下限, 参考篇幅)` 双阈值（依据真实健康输出实测字符数标定）；若其提示词规定了固定章节清单，还需在 `_REQUIRED_MARKERS` 登记标记——`test_llm_quality.py::TestRequiredMarkersMatchPrompts` 会直接比对提示词常量，标记与提示词不同步即测试失败。
 
-> **实验开关改变提示词 → 缓存指纹必须读写两侧同源**：凡实验开关**会改变提示词内容**（`signal_pre_digest` 注入信号块、`decision_header_parse` 追加决策头契约、`signal_ledger` 注入确定性信号摘要），必须在**写侧指纹闭包**（`llm/generators.py` 各 `generate_*` 的 `_fingerprint`）与 **orchestrator 预检指纹**（`llm/generators_orchestrator._compute_module_cache_info`）**无条件调用同一个后缀函数**，并把开关判定**收敛在该函数内部**——只改一侧会让预检命中旧键、跳过重生成，开关形同虚设；两侧各读一次开关则迟早漂移。后缀函数关闭时返回 `""`（键不变、不误伤既有缓存），开启时返回稳定短串（如 `"_dh"`）。**内容指纹型**后缀（如 `decision_ledger.lessons_cache_suffix`、`prompts_signals._signal_digest_cache_suffix`、`signal_ledger.summary_cache_suffix`）另取块内容 md5 作版本，使数值变化即换键。
+> **提示词内容必须进指纹（唯一事实来源 `llm/module_fingerprint.py`）**：缓存键与提示词内容脱钩会静默复用陈旧结论（键不变 → 预检命中旧键 → 不重生成、不报错）。因此**凡进了提示词的段落都必须进该模块的指纹**：已渲染文本（`competitive_context` / `data_quality_text`）、量化指标（`metrics`）、以及 `pipeline_data` 派生的【环比变化】【数据质量降级】两段——**只进「提示词确实含该段」的模块**，不进提示词的模块并入即纯成本失效。判据与完整清单见 `llm-technical.md` §7.1。
+>
+> **开关改变提示词 → 同一后缀函数供两侧调用**：凡开关**会改变提示词内容**（`signal_pre_digest` 注入信号块、`decision_header_parse` 追加决策头契约、`signal_ledger` 注入确定性信号摘要、辩论增强后缀），其开关判定必须**收敛在后缀函数内部**，由 `module_fingerprint.py` 的构造器统一调用——写侧与预检侧只调用同一构造函数，不得任一环节自行拼接（自行拼接的后果是两侧结果永久不等：写侧照常写入、预检侧永不命中，表现为「开关看似生效但每次仍全量调用 LLM」）。后缀函数关闭时返回 `""`（键不变、不误伤既有缓存），开启时返回稳定短串（如 `"_dh"`）。**内容指纹型**后缀（如 `decision_ledger.lessons_cache_suffix`、`prompts_signals._signal_digest_cache_suffix`、`signal_ledger.summary_cache_suffix`）另取块内容 md5 作版本，使数值变化即换键。
 
 > **追加型状态文件一律走共享原语 `core/jsonl_store.py`**：`perf`（性能历史）、`decision_ledger`（决策账本）、`signal_ledger`（信号账本）三者的「读全文 → 拼接 → 写临时文件 → `os.replace`」逻辑已抽为 `append_jsonl_atomic()` / `read_jsonl()`，**新增任何 JSONL 持久化都不得再抄一份**——各自只保留自己的序列化口径（如 `decision_ledger` 的 `sort_keys=True` + `ensure_ascii=False`）与 `prefix`/日志标签，行为逐字不变由 `test_jsonl_store.py::TestDelegationPreservesBehaviour` 锁定。新增持久化文件时**必须**在 `src/test/conftest.py` 的 `_isolate_sensitive_paths` 中把路径重定向到 `tmp_path`，不得依赖测试自行清理。
 
 > **统计类输出默认只算「实时」记录**：凡把历史记录折叠成统计/排行榜/提示词摘要的功能（如 `signal_ledger.fold_signals(live_only=True)`），必须给每条记录附来源标签并可区分「可证明为实时」与其余，**默认只统计实时记录**、且**不引入新的合成数据开关**——来源判定复用既有数据质量设施（逐品种 `data_freshness` + 降级事件），未识别的取值一律保守判非实时；确需乐观缺省时（无逐品种条目可证伪）必须显式写入理由字段，不得静默。
 
-### 新增实验开关检查清单
+### 新增功能开关检查清单
 
-实验功能以**注册表驱动**：`config/features.py` 的 `EXPERIMENTAL_FEATURES` 是唯一事实源，一处登记即自动出现在三个面，**不得在任一渠道层另写一份开关清单**。
+全部功能开关以**注册表驱动**：`config/features.py` 的 `feature_switch_registry`（唯一事实源）一处登记，即自动出现在三个面，**不得在任一渠道层另写一份开关清单**。每条声明五个字段——显示名、说明、**分组**、**默认值**、产物影响。
+
+**先定分组，再定默认值**（两栏互不牵连，这是本注册表的核心取舍）：
+
+| 分组 | 成员特征 | `default` | 面板标题 |
+|:--|:--|:--|:--|
+| `GROUP_EXPERIMENTAL` | 会改变报告产物、需真实数据验证后择机转正 | `False` | ⚗ 实验性功能（默认关闭） |
+| `GROUP_STANDARD` | 常驻能力，用户可关但默认开 | `True` | 常规开关（默认开启） |
 
 | # | 步骤 | 操作位置 | 产出 |
 |---|------|---------|------|
-| ① | **登记注册表** | `config/features.py` → `EXPERIMENTAL_FEATURES` | 追加 `ExperimentalFeature(name=..., label=..., description=...)`；`name` 即 `features.json` 键名与 `--experiment` 取值 |
-| ② | **声明默认值** | `config/features.py` → `_FEATURE_FLAGS_DEFAULT` | 新增同名键，默认 **`False`**（实验项缺省关闭） |
+| ① | **登记注册表** | `config/features.py` → `feature_switch_registry` | 追加 `"<flag>": FeatureSwitchDef("<显示名>", "<说明>", <分组>, <默认值>, <affects_report>)`；键名即 `features.json` 键名、`--experiment` / `--feature` 取值，显示名与说明自动下发三个面。`_FEATURE_FLAGS_DEFAULT` 是注册表的**派生投影**，不得单独在此另登记（新增开关只改注册表一处） |
+| ② | **定分组与默认值** | 同上声明第 3、4 位 | 会改变产物且未验证 → 实验组 + `False`；常驻能力 → 常规组 + `True`。两者一同决定「是否上屏」与「出厂取值」——**可见性由分组表达，不再与默认值绑定**，转正因此不会摘掉面板入口 |
+| ②′ | **回答产物影响** | 同上声明第 5 位 | 该开关**能否改变报告产物内容**——能则 `True`，仅影响入口可见性（菜单项/卡片显隐）则 `False`。答 `False` 者不进报告生成条件自述（`enabled_experimental_features()` 按此过滤）：报告是脱离本机流转的文件，列进一个不改任何字节的开关，读者会推断内容受其影响 |
 | ③ | **消费开关** | 功能实现处 | 一律经 `is_feature_enabled()` 读取；开关判定若影响提示词，须收敛在缓存后缀函数内部（见上方「缓存指纹必须读写两侧同源」） |
-| ④ | **覆盖三面** | 自动 | TUI 菜单 `S` / Web 配置面板 / CLI `--experiment` 均由注册表生成，无需改渠道代码 |
-| ⑤ | **验证** | 终端 | `.venv/bin/python -m pytest src/test/unit/config/test_features.py src/test/unit/web/test_config_edit.py -v` — 配置编辑白名单覆盖全部 TUI 可编辑键 |
+| ④ | **覆盖三面** | 自动 | TUI 菜单 `[S]`（实验块 + 常规块，分块取自 `GROUP_ORDER`）/ Web 配置面板（同构两块）/ CLI `--experiment`（实验组简写）与 `--feature NAME=VALUE`（全域双向）均由注册表生成，无需改渠道代码 |
+| ⑤ | **验证** | 终端 | `.venv/bin/python -m pytest src/test/unit/config/test_features.py src/test/unit/web/test_config_edit.py -v` — 注册表不变量（分组合法 / 五字段齐备 / 键集与派生投影一致）+ 配置编辑白名单覆盖全注册表 |
 
 > **菜单项/卡片可见性由开关门控**：若实验功能有常驻入口（TUI 菜单项、Web 卡片），开关关闭时必须**就地裁剪**而非渲染后置灰——TUI 侧向 `tui/tui_menu.py::FEATURE_GATED_ITEMS` 登记 `(菜单项, 开关名)`，Web 侧由 `system_info` 透出 `*_enabled` 供前端决定是否渲染；`tui/tui_menu.py::_apply_feature_gates()` 是统一裁剪点。
+
+> **「实验性」的准入与转正判据**：实验项的判定口径是「**能否改变报告产物内容**」，而非「新不新」。新增能力默认关的惯例适用于会改变产物的能力（LLM 增强、指标开关、数据结构变更）——它们需要真实数据验证，默认关是对既有用户产物的保护。但**只读诊断类能力（不改产物、不写文件、不在默认路径产生隐式网络或耗时代价）应默认开启**：默认关的实际代价是让最需要它的人（环境出故障的那批）恰好看不到它，而开启对默认输出零代价。此类能力转正后：① 声明从 `GROUP_EXPERIMENTAL` 改到 `GROUP_STANDARD` 并把 `default` 改 `True`（**一处字段改动**）——面板可见性随分组自动延续，不再出现「转正即从面板消失」；② 不再进产物自述（`affects_report` 答 `False` 且不在实验组）；③ 门控读取（`FEATURE_GATED_ITEMS` / `system_info`）**保留**——转正不等于不可关，`features.json` 置 `false` 仍可隐藏入口；④ 门控表与消费点均须有「默认配置下入口可见」的测试，只依赖 `patch` 覆盖取值的用例测不出默认值本身。系统自检（`doctor_check`）是此模式的首例。
+
+> **内部接缝类开关也应转正（第二类首例：`datasource_adapter`）**：判据与上一条同源但落在另一面——**开关两种取值下报告产物是否等价**。若等价（新实现只是把既有路径换成结构更清晰的等价实现，差异经等价性回归测试逐项锁定且不影响下游取值语义），则它既不是用户可感知的功能、也不是用户能做的选择，摆在用户面前只会让人误以为「开了有好处」，而默认关的实际代价是**生产路径从不执行新实现**、新数据源/新字段接入时才第一次实跑。此类开关转正为常规组、**默认开**：① 声明改到 `GROUP_STANDARD` 且 `default` 置 `True`；② 开关本身保留为**回退杠杆**（`features.json` 置 false 即回退既有实现）；③ 测试补四向——默认值、不在实验组、显式关闭仍走既有实现、默认配置下走新实现（见 `test_features.py::TestDatasourceAdapterPromotion`）。数据源适配契约（`datasource_adapter`）是此模式的首例。
+
+> **读侧增强类开关也应转正（第三类首例：`signal_pre_digest` / `module_quality_gate` / `decision_header_parse` / `llm_debate_conditional` / `datasource_credential_ready`）**：判据落在「**开启的代价是否只在读侧**」——只在既有提示词或既有产物流水线上追加一段由**已算出的**数据派生的内容，不新增 LLM 调用次数、不写新的持久化文件、无隐式网络与耗时；且该段内容有确定的收益（方向性结论替代裸数值、结构化契约替代表格猜测、质量分级提示读者降级参考、缺凭据时给可读指引）。此类开关默认关的实际代价是**机制在生产路径从不执行**，用户手上的产物看不到这层增强；用户若逐项去 `features.json` 里打开它，等于用配置承担了本该由默认值表达的取舍（转正前本项目的实测样本：9 项实验开关里 8 项被用户手工打开，即真实数据验证已经发生）。转正口径：① 声明改到 `GROUP_STANDARD` 且 `default` 置 `True`；② `affects_report` **照实答 `True`**——它们确实改变产物内容（`signal_pre_digest` 注入信号块、`module_quality_gate` 注入质量横幅、`decision_header_parse` 追加契约行、`llm_debate_conditional` 追加情景段、`datasource_credential_ready` 改变数据源就绪行为），故 Web 面板照常带「（影响报告）」标记；③ 开关保留为关闭杠杆，`features.json` 置 false 即回到「未引入本机制」的行为；④ 凡开关改变提示词者，其缓存后缀函数（`structured_header_cache_suffix()` → `_dh`、`debate_feature_cache_suffix()` → `_c`、`prompts_signals._signal_digest_cache_suffix()`）随之由「默认返回空」变为「默认返回非空」——**升级后首次运行会换键重生成一次**，属预期行为，须在变更记录中写明；⑤ 测试补四向——默认值、不在实验组、显式关闭仍走未引入前的路径（关闭基线必须**显式**置 false，不能再依赖 `reset_feature_flags()`，它现在返回的是已转正的默认值）、默认配置下走增强路径（见 `test_features.py::TestReadSidePromotion`）。
+>
+> **刻意不转正的两类（判据的反面）**：**写盘积累型**——`decision_reflection` / `signal_ledger` 会向 `data/state/*.jsonl` 落账，默认开启等于未经用户选择就让程序开始写持久化状态，须由用户在知情前提下开启；**调用次数放大型**——`llm_debate_procon` 把一次 `expert_review` 调用换成最多三次（pro → con → synthesis），默认开启直接改变费用与耗时量级。`llm_debate_qa_concentration` 触发面最窄（单品种占比 ≥20% 时才附加块）、测试覆盖最薄，留待有真实触发样本后再评估。
 
 > **诊断类命令不得依赖 config 初始化**：`doctor` / `view-logs` / `check-sources` 三个子命令在 `main()` 中**先于 `init_config` 分派**——配置损坏正是它们要定位的场景，若先初始化配置再分派，用户会在最需要诊断能力时被配置错误挡在门外（死锁）。新增诊断类命令遵循同一模式：**先分派、后初始化**，并把「命令失败」（退出码 2）与「命令跑完但结论不佳」（退出码 1）用 `_EXIT_SUCCESS` / `_EXIT_PARTIAL` / `_EXIT_SEVERE` 常量区分开，不得写裸字面量。**诊断类命令自身永不抛异常**——任何内部异常都转成一条结果行，否则等于在最需要它的时刻失效（`core/doctor.py`）。
 
@@ -1309,7 +1477,11 @@ class ComputModuleDef:
 - LLM settings 键名 → `get_known_llm_settings_keys()`
 - LLM 模块名称 → `get_llm_module_names()`
 
-> 报表页签标题与顺序由独立的 `_REPORT_SECTION_DEFAULT` 注册表驱动，`get_report_sheet_name()` / `get_report_section_order()` 均读该注册表，**不**随 `_MODULE_REGISTRY` 自动派生。
+> 报表页签标题与顺序由两张**独立**注册表分别驱动，**不**随 `_MODULE_REGISTRY` 自动派生：
+> - `get_report_sheet_name(sheet_key)` → 读 `_REPORT_SHEET_NAMES`（sheet key → 中文标题映射）
+> - `get_report_section_order(config)` → 读 `_REPORT_SECTION_DEFAULT`（章顺序与分组）
+>
+> 二者职责不同：前者管「页签叫什么」，后者管「章按什么顺序排」。新增页签需在 `_REPORT_SHEET_NAMES` 登记标题；若该页签属报告章，还需在 `_REPORT_SECTION_DEFAULT` 登记顺序（`scripts/check-semantic-index.py` 校验合并章引用的 sheet key 存在于 `_REPORT_SECTION_DEFAULT`）。
 
 ### 测试
 
