@@ -6,6 +6,31 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 修复：分阶段测试报告互相覆盖（详细报告丢失 Phase A）+ PE/PB 官方口径（rf-386）（2026-09-17）
+
+**一、分阶段报告覆盖（自审发现，rf-392）**
+
+现场：按 `test-reports/latest/` 核对详细报告时发现 `dev-verify/report.html` **只有 152 个用例**（Phase B 场景），Phase A 的 2700+ 核心单元用例全丢——两阶段共用同一报告路径，后跑的 Phase B 覆盖了 Phase A，真实失败明细（若 Phase A 红）在报告里看不到。
+
+修改：
+- `scripts/test-runner.py` 抽出 `_phase_report_path(mode_key, phase_tag)`：分阶段模式每阶段一个报告文件（`report_phase_<tag>.html`），非分阶段模式维持 `report.html`（既有约定与 CI artifact 不变）
+- 汇总页新增 `_report_links_html(mode)`：逐阶段列出报告链接（实测汇总页出现「📄 Phase A」「📄 Phase B」两个链接）
+- 回归 `src/test/unit/scripts/test_test_runner_reports.py`（6 例）：分阶段/非分阶段路径、构建参数使用阶段路径、汇总页逐阶段链接 / 单 report.html 链接 / 无报告占位
+
+**二、PE/PB 改用官方 TTM/MRQ 口径（rf-386 关闭）**
+
+现场：项目「当前 PE」用**报告期 EPS** 自算，与官方 TTM 口径差约 2.5 倍（实测长江电力 自算 47.19 vs 官方 19.17），在同一列里混用会误导估值判断。
+
+修改：
+- 财务指标契约新增 `pe_ttm`（TTM 市盈率）与 `pb_mrq`（MRQ 市净率）两字段（`schemas/datasource_fields.py`）
+- `analysis/financial_statement_derive.derive_indicator_records` 支持传入官方估值快照并**只写最新一期**（历史期不倒填——估值只有「当下」一个快照，倒填等于造假）；`HithinkIndicatorAdapter` 抓取估值快照并注入
+- `analysis/financial_indicator.current_valuation` 改为**官方口径优先**（`pe_ttm`/`pb_mrq`），缺失时逐字段回退自算`现价 ÷ EPS / BVPS`；官方口径不依赖现价，无价时也能给出
+- 回归 11 例（派生注入只落最新期/无估值恒 None/脏值忽略；`current_valuation` 官方优先、部分缺失逐字段回退、无价仍可报、脏值忽略）
+
+实测（长江电力 600900，真实 key）：记录携带 `pe_ttm` 19.19 / `pb_mrq` 3.21，`current_valuation` 返回 (19.19, 3.21)（此前自算为 46.4）；无官方值记录仍按自算回退（20.0, 2.0）。
+
+文档：`developer-guide.md`（测试报告布局含分阶段说明）、`technical.md`（附录 H 契约补两字段）、`requirements.md`（R-FIN-15）、`reports-instruction.md`（PE/PB 列口径）、`changelog` 本条；`review-findings.md` 记 rf-392（已解决）、rf-386 关闭（`rf-next → 393`）。
+
 ### 新增：财务指标域第三链路 —— 同花顺官方合并报表派生（plan-51 阶段 2）（2026-09-17）
 
 **目标**：主源 akshare（第三方封装，接口漂移风险）失效时，除 DataSinking 章节解析支路外再有一条**官方结构化**链路，并保住多期趋势能力。

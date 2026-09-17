@@ -141,6 +141,8 @@ class FinancialIndicatorFields:
         operating_cash_flow: 经营活动现金流净额（元）
         eps: 基本每股收益（元）
         bvps: 每股净资产（元）
+        pe_ttm: 官方口径市盈率（TTM，滚动市盈率）——有则优先于「现价 ÷ 报告期 EPS」的自算值
+        pb_mrq: 官方口径市净率（MRQ，最近一期净资产）——同上
         source_api: 数据源标识（akshare_financial）
         source: 数据源展示名
     """
@@ -159,6 +161,8 @@ class FinancialIndicatorFields:
     operating_cash_flow: float | None = None
     eps: float | None = None
     bvps: float | None = None
+    pe_ttm: float | None = None
+    pb_mrq: float | None = None
     source_api: str = ""
     source: str = ""
 

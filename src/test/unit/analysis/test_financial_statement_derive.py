@@ -172,6 +172,63 @@ class TestDerivation:
         row = self._records(income=income, balance=balance, cashflow=cashflow)[0]
         assert row["doc_type"] == doc_type
 
+    def test_official_valuation_only_on_latest_period(self):
+        """官方估值只有当下快照 → 只挂最新一期；历史期恒 None（倒填等于造假）。"""
+        income = {
+            "item": [
+                {
+                    "fiscal_year": "2026",
+                    "fiscal_period": "Q2",
+                    "operating_income": 100.0,
+                    "parent_holder_net_profit": 10.0,
+                },
+                {
+                    "fiscal_year": "2026",
+                    "fiscal_period": "Q1",
+                    "operating_income": 50.0,
+                    "parent_holder_net_profit": 5.0,
+                },
+            ]
+        }
+        balance = {
+            "item": [
+                {
+                    "fiscal_year": "2026",
+                    "fiscal_period": "Q2",
+                    "assets_total": 1000.0,
+                    "total_debt": 500.0,
+                    "holder_equity_total": 400.0,
+                },
+                {
+                    "fiscal_year": "2026",
+                    "fiscal_period": "Q1",
+                    "assets_total": 1000.0,
+                    "total_debt": 500.0,
+                    "holder_equity_total": 400.0,
+                },
+            ]
+        }
+        cashflow = {
+            "item": [
+                {"fiscal_year": "2026", "fiscal_period": "Q2", "act_cash_flow_net": 30.0},
+                {"fiscal_year": "2026", "fiscal_period": "Q1", "act_cash_flow_net": 10.0},
+            ]
+        }
+        records = self._records(
+            income=income, balance=balance, cashflow=cashflow, valuation={"pe_ttm": 19.188161, "pb_mrq": 3.21403}
+        )
+        assert records[0]["report_period"] == "2026-06-30"
+        assert records[0]["pe_ttm"] == pytest.approx(19.188161)
+        assert records[0]["pb_mrq"] == pytest.approx(3.21403)
+        assert records[1]["pe_ttm"] is None and records[1]["pb_mrq"] is None
+
+    def test_default_valuation_fields_are_none(self):
+        """无估值入参（或脏值）时两字段恒 None，且键始终存在（契约字段齐备）。"""
+        row = self._records()[0]
+        assert row["pe_ttm"] is None and row["pb_mrq"] is None
+        dirty = self._records(valuation={"pe_ttm": "bad", "pb_mrq": None})[0]
+        assert dirty["pe_ttm"] is None and dirty["pb_mrq"] is None
+
     def test_bvps_always_none(self):
         """官方报表不给总股本 → 该源恒不产每股净资产（PB 不可用，已在模块文档串说明）。"""
         assert self._records()[0]["bvps"] is None

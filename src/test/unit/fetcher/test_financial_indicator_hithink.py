@@ -86,6 +86,11 @@ class TestHithinkIndicatorAdapter:
         monkeypatch.setattr(fia.hithink, "fetch_income_statements", _income_fn)
         monkeypatch.setattr(fia.hithink, "fetch_balance_sheets", _balance_fn)
         monkeypatch.setattr(fia.hithink, "fetch_cash_flow_statements", _cashflow_fn)
+        monkeypatch.setattr(
+            fia.hithink,
+            "fetch_valuation_snapshot",
+            lambda codes: overrides.get("valuation", {"item": [{"pe_ttm": 19.188161, "pb_mrq": 3.21403}]}),
+        )
         return calls
 
     def test_extract_returns_latest_standard_record(self, monkeypatch):
@@ -106,6 +111,18 @@ class TestHithinkIndicatorAdapter:
         assert record["source_api"] == "hithink"
         assert record["source"] == "同花顺金融数据"
         assert record["code"] == "600900"
+
+    def test_official_valuation_injected_into_latest_record(self, monkeypatch):
+        """估值快照的官方 TTM/MRQ 写入最新一期记录（PE/PB 口径优先的载体）。"""
+        self._patch(monkeypatch)
+        raw = fia.HithinkIndicatorAdapter().extract_data({"code": "600900"})
+        assert raw["pe_ttm"] == pytest.approx(19.188161)
+        assert raw["pb_mrq"] == pytest.approx(3.21403)
+
+    def test_valuation_absent_leaves_fields_none(self, monkeypatch):
+        self._patch(monkeypatch, valuation={})
+        raw = fia.HithinkIndicatorAdapter().extract_data({"code": "600900"})
+        assert raw["pe_ttm"] is None and raw["pb_mrq"] is None
 
     def test_non_a_share_code_skips_without_requests(self, monkeypatch):
         calls = self._patch(monkeypatch)

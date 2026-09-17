@@ -107,6 +107,7 @@ def derive_indicator_records(
     *,
     code: str,
     symbol: str,
+    valuation: dict[str, Any] | None = None,
     limit: int | None = None,
 ) -> list[dict[str, Any]]:
     """三张合并报表 → 标准财务指标记录（报告期降序）。
@@ -117,6 +118,7 @@ def derive_indicator_records(
         cashflow: 现金流量表原始响应
         code: 6 位证券代码
         symbol: thscode（如 ``600900.SH``）
+        valuation: 官方估值快照（``{"pe_ttm": …, "pb_mrq": …}``；仅写入**最新一期**）
         limit: 最多返回期数（``None`` = 全部）
 
     Returns:
@@ -151,6 +153,10 @@ def derive_indicator_records(
         by_key[(period, doc_type)] = row
 
     records = [by_key[k] for k in sorted(by_key, key=lambda k: k[0], reverse=True)]
+    if valuation and records:
+        # 官方估值只有「当下」一个快照 → 只挂到最新一期（历史期不能倒填，否则等于造假）
+        records[0]["pe_ttm"] = safe_num(valuation.get("pe_ttm"))
+        records[0]["pb_mrq"] = safe_num(valuation.get("pb_mrq"))
     return records[: int(limit)] if limit else records
 
 
@@ -202,6 +208,9 @@ def _build_row(
         "eps": safe_num(income.get("basic_eps")),
         # 官方资产负债表不提供总股本 → 无法折算每股净资产（该源不产 PB）
         "bvps": None,
+        # 官方估值（TTM/MRQ）只有当下快照，由调用方在最新一期上覆盖；历史期恒 None
+        "pe_ttm": None,
+        "pb_mrq": None,
         "source_api": SOURCE_API,
         "source": SOURCE_NAME,
     }

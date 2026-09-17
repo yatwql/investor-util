@@ -109,6 +109,8 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 ## 测试指南
 
+**测试报告布局**：每次运行写入 `test-reports/latest/`——汇总页 `index.html`（各模式的通过/失败/耗时 + 报告链接）与该模式的 pytest-html 详细报告。**分阶段模式（如 `dev-verify` = Phase A 核心单元 + Phase B 基础场景）每阶段一个报告文件**（`<mode>/report_phase_A.html` / `report_phase_B.html`），汇总页逐阶段给链接；非分阶段模式仍是 `<mode>/report.html`。早前两阶段共用 `report.html`，后跑的阶段会覆盖前者，导致详细报告只剩最后一阶段（排查时看不到真正的失败面）。
+
 测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行，使用 `scripts/test-runner.py` 统一驱动并自动输出结构化报告。各 `--mode` 的精确测试项数统计见 [test-coverage.md](test-coverage.md)。
 
 ### 前置条件

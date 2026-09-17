@@ -126,6 +126,29 @@ class TestCurrentValuation:
         assert pe == pytest.approx(20.0)
         assert pb is None
 
+    def test_official_ttm_mrq_wins_over_self_calc(self):
+        """官方 TTM/MRQ 优先：自算（现价 ÷ 报告期 EPS）在半年报上会明显虚高。
+
+        实测长江电力：自算 46.4（28.0 ÷ 0.6031）vs 官方 pe_ttm 19.19 —— 混用会误导估值判断。
+        """
+        pe, pb = current_valuation({"eps": 0.6031, "bvps": 8.83, "pe_ttm": 19.188161, "pb_mrq": 3.21403}, 28.0)
+        assert pe == pytest.approx(19.19)
+        assert pb == pytest.approx(3.21)
+
+    def test_partial_official_falls_back_per_field(self):
+        """只给一个官方值时，另一项仍按自算兜底（逐字段而非全有全无）。"""
+        pe, pb = current_valuation({"eps": 2.0, "bvps": 10.0, "pe_ttm": 12.5}, 40.0)
+        assert pe == pytest.approx(12.5)
+        assert pb == pytest.approx(4.0)
+
+    def test_official_values_without_price_still_reported(self):
+        """官方口径不依赖现价 → 无价时仍可给出 PE/PB。"""
+        assert current_valuation({"pe_ttm": 19.188161, "pb_mrq": 3.21403}, None) == (19.19, 3.21)
+
+    def test_dirty_official_values_are_ignored(self):
+        pe, pb = current_valuation({"eps": 2.0, "bvps": 10.0, "pe_ttm": "bad", "pb_mrq": float("nan")}, 40.0)
+        assert pe == pytest.approx(20.0) and pb == pytest.approx(4.0)
+
     def test_missing_price_or_record_is_empty(self):
         assert current_valuation({"eps": 2.0}, None) == (None, None)
         assert current_valuation(None, 40.0) == (None, None)

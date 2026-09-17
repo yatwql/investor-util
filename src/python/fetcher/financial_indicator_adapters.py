@@ -107,12 +107,18 @@ class HithinkIndicatorAdapter(SourceAdapter):
         if not symbol:
             logger.debug("[hithink] 非 A 股代码，跳过: %s", code)
             return None
+        valuation = hithink.fetch_valuation_snapshot([symbol]) or {}
+        valuation_item = next(
+            (i for i in (valuation.get("item") or []) if isinstance(i, dict)),
+            {},
+        )
         records = derive_indicator_records(
             hithink.fetch_income_statements(symbol, period="quarterly", limit=2),
             hithink.fetch_balance_sheets(symbol, period="quarterly", limit=2),
             hithink.fetch_cash_flow_statements(symbol, period="quarterly", limit=2),
             code=code,
             symbol=symbol,
+            valuation=valuation_item,
             limit=1,
         )
         return records[0] if records else None

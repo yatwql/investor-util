@@ -140,17 +140,34 @@ def trend_label(series: Iterable[Mapping[str, Any]] | None) -> str:
 
 
 def current_valuation(record: Mapping[str, Any] | None, price: float | None) -> tuple[float | None, float | None]:
-    """当前 PE / PB（现价 ÷ 每股收益 / 每股净资产）；无意义时返回 ``(None, None)``。
+    """当前 PE / PB；无意义时返回 ``(None, None)``。
 
-    亏损（EPS ≤ 0）或净资产非正（BVPS ≤ 0）时对应倍数无意义 → ``None``。
+    **口径优先级**：数据源提供的官方 ``pe_ttm`` / ``pb_mrq`` 优先——用「现价 ÷ 报告期
+    EPS」自算在半年报/季报上会明显虚高（实测长江电力 自算 47.19 vs 官方 TTM 19.17），
+    两者混在同一列会误导估值判断。官方值缺失（如 akshare 主源不提供）时回退自算：
+    ``PE = 现价 ÷ EPS``、``PB = 现价 ÷ BVPS``，亏损（EPS ≤ 0）或净资产非正
+    （BVPS ≤ 0）时对应倍数无意义 → ``None``。
     """
     price_num = _num(price)
-    if record is None or price_num is None or price_num <= 0:
+    if record is None:
         return None, None
+    pe = _round2(_num(record.get("pe_ttm")))
+    pb = _round2(_num(record.get("pb_mrq")))
+    if pe is not None and pb is not None:
+        return pe, pb
+    if price_num is None or price_num <= 0:
+        return pe, pb
     eps, bvps = _num(record.get("eps")), _num(record.get("bvps"))
-    pe = round(price_num / eps, 2) if eps is not None and eps > 0 else None
-    pb = round(price_num / bvps, 2) if bvps is not None and bvps > 0 else None
+    if pe is None and eps is not None and eps > 0:
+        pe = round(price_num / eps, 2)
+    if pb is None and bvps is not None and bvps > 0:
+        pb = round(price_num / bvps, 2)
     return pe, pb
+
+
+def _round2(value: float | None) -> float | None:
+    """保留两位小数；``None`` 原样返回（官方估值口径与自算口径统一到两位）。"""
+    return round(value, 2) if value is not None else None
 
 
 def trend_points(series: Iterable[Mapping[str, Any]] | None, limit: int = 4) -> list[dict[str, Any]]:

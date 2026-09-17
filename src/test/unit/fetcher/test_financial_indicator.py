@@ -62,6 +62,8 @@ def test_standard_fields_exact_set():
         "operating_cash_flow",
         "eps",
         "bvps",
+        "pe_ttm",
+        "pb_mrq",
         "source_api",
         "source",
     }
