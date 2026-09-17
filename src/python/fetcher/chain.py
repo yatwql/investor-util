@@ -36,7 +36,8 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     # 全文本财报（DataSinking，仅 A 股；需用户自备 key）
     "financial_report": ["datasink"],
     # 结构化财务指标（akshare 主源；备用支路 datasink_indicator 从财报全文解析）
-    "financial_indicator": ["akshare_financial", "datasink_indicator"],
+    # 财务指标：akshare 主源 → DataSinking 章节解析支路 → 同花顺官方报表派生（需 key）
+    "financial_indicator": ["akshare_financial", "datasink_indicator", "hithink"],
     # 组合历史走势：历史数据 chains（复用现有 provider name，熔断器共享）
     "history_stock": ["tencent", "sina"],
     "history_fund_otc": ["tiantian", "eastmoney"],

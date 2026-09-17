@@ -3,7 +3,7 @@
 > 版本：0.11.1-dev ｜ 状态：**阶段 1 已实测通过、阶段 3 已实施**（provider 层 + 55 例单测 + 11 端点真实连通，见 §4.1）；阶段 2~5 待实施（映射表按实测字段落表）
 > 上游：<https://github.com/HiThink-Tech/Financial-API>（同花顺官方 A 股数据服务）
 > 契约来源：<https://fuyao.aicubes.cn/llms-full.txt>（完整接口文档聚合）
-> 归档去向：全部 5 个阶段完成后，本文档随完成态归档至 `docs-stm/archive/v0.11.x/hithink-data-source/`（与 plan-45 / plan-46 的设计文档先例一致）；未完成前留在 `docs-stm/plan/`。当前进度：阶段 1 ✅ / 阶段 2 ⬜ / 阶段 3 ✅ / 阶段 4 ⬜ / 阶段 5 ⬜
+> 归档去向：全部 5 个阶段完成后，本文档随完成态归档至 `docs-stm/archive/v0.11.x/hithink-data-source/`（与 plan-45 / plan-46 的设计文档先例一致）；未完成前留在 `docs-stm/plan/`。当前进度：阶段 1 ✅ / 阶段 2 ✅ / 阶段 3 ✅ / 阶段 4 ⬜ / 阶段 5 ⬜
 
 ---
 
@@ -60,12 +60,24 @@
 
 单测 52 例：凭据门禁 / 限速先于请求 / 信封与错误码 / HTTP 分支（429 不重试）/ thscode 映射 / 各域路径与参数（含 `limit` 与 `start+end` 互斥）。
 
-### 阶段 2 ⬜ 财务指标域（第三链路 → 可升主源）
+### 阶段 2 ✅ 财务指标域（第三链路）
 
-- 新增 `fetcher/financial_indicator_adapters.py::HithinkIndicatorAdapter`，把
-  `financials/indicators` 的五类 `index_id`/`value` 映射到既有 `FinancialIndicatorFields`。
-- **前置实测项**：已取到五类 `ability` 与首批 `index_id`（见 §4.1）；阶段 2 需把**每类指标的全量清单**落成映射表（逐项对齐 `FinancialIndicatorFields` 的营收/净利/同比/毛利率/ROE/负债率/现金流/EPS/每股净资产）。
-- 收益：akshare 主源失效时不必依赖 DataSinking 的章节解析支路。
+- **实现**：`analysis/financial_statement_derive.py::derive_indicator_records`（三张合并报表 → 标准字段，纯函数）
+  + `fetcher/financial_indicator_adapters.py::HithinkIndicatorAdapter`（链路第三槽，单期）
+  + `fetcher/financial_indicator.py::fetch_hithink_indicator_series`（**多期**回退：三张报表各一次请求即得近若干期，
+  使趋势/质量档在同源序列上仍可算——优于链路单期兜底）。
+- **映射口径**（放弃逐项映射 `index_id`，改为从**报表原值派生**）：营收=营业收入、归母净利=归属于母公司股东的净利润
+  （缺失回退合并净利）、经营现金流=经营活动现金流净额、EPS=基本每股收益；毛利率=(营业收入−营业成本)/营业收入、
+  负债率=负债合计/资产合计、ROE=归母净利/归母权益（期末口径）；同比=与**上年同期**比较（同文种、报告期减一年）。
+- **报告期口径（关键实测修正）**：上游季度条目的 `period_end_ms` 是**披露窗口起点**（2026Q1 = 04-01）而非报告期末，
+  故改用 `fiscal_year`+`fiscal_period` 归一为标准季末（Q1→03-31 / Q2→06-30 / Q3→09-30 / Q4→12-31），
+  与主源 akshare 的报告期完全对齐（否则同报告期对不上，同比与趋势比较都会错位）。
+- **实测（长江电力 600900）**：报告期序列与主源一致；2026-06-30 各项数值与主源一致（营收 379.29 亿、归母 147.56 亿、
+  毛利率 57.89%、负债率 59.36%、经营现金流 241.28 亿、EPS 0.6031、营收同比 0.033562）；差异仅 ROE（6.47% 期末 vs 6.55% 加权）
+  与 `bvps` 恒缺失（官方资产负债表不提供总股本）。
+- **收益**：主源失效时不必依赖 DataSinking 的章节解析支路，且保住**多期趋势**能力。
+- **收尾待办**：PE/PB 口径修正（`rf-386`）——需为指标契约新增 `pe_ttm`/`pb_mrq` 字段并同步附录 H 与双端渲染，
+  本次未做（避免顺手改契约）。
 
 ### 阶段 3 ✅ 基金披露持仓域（已实施）
 

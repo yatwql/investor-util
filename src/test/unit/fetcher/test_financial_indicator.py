@@ -68,9 +68,10 @@ def test_standard_fields_exact_set():
 
 
 def test_chain_registered_with_main_and_fallback():
+    """链路三段：akshare 主源 → DataSinking 章节解析支路 → 同花顺官方报表派生。"""
     from src.python.fetcher.chain import _get_chain
 
-    assert _get_chain("financial_indicator") == ["akshare_financial", "datasink_indicator"]
+    assert _get_chain("financial_indicator") == ["akshare_financial", "datasink_indicator", "hithink"]
 
 
 def test_datasink_indicator_adapter_registered_and_self_test_ok():

@@ -19,10 +19,11 @@ import logging
 from typing import Any, ClassVar
 
 from src.python.analysis.financial_indicator_extract import extract_indicators
+from src.python.analysis.financial_statement_derive import derive_indicator_records
 from src.python.core.code_utils import to_fmp_symbol
 from src.python.fetcher import financial_report
 from src.python.fetcher.source_adapter import SourceAdapter, register_adapter
-from src.python.providers import akshare_financial
+from src.python.providers import akshare_financial, hithink
 from src.python.schemas.datasource_fields import DOMAIN_FINANCIAL_INDICATOR
 
 logger = logging.getLogger("invest")
@@ -86,5 +87,37 @@ class DataSinkIndicatorAdapter(SourceAdapter):
         return None
 
 
+class HithinkIndicatorAdapter(SourceAdapter):
+    """同花顺官方合并报表派生指标（第三链路；需凭据）。
+
+    抓取三张合并报表（利润表 / 资产负债表 / 现金流量表，各一次请求即得**多期**），
+    由 :func:`analysis.financial_statement_derive.derive_indicator_records` 纯派生为标准
+    字段记录。口径与主源对齐（比率小数、金额元），差异仅在 ROE（期末口径 vs 加权）
+    与 `bvps`（官方不给总股本 → 恒缺失）；同源序列内可比。
+    """
+
+    domain: ClassVar[str] = DOMAIN_FINANCIAL_INDICATOR
+    source_id: ClassVar[str] = hithink.SOURCE_ID
+    display_name: ClassVar[str] = hithink.DISPLAY_NAME
+
+    def extract_data(self, query: dict[str, Any]) -> Any:
+        """按 ``code``/``symbol`` 取**最新报告期**标准指标记录（链条单期契约）。"""
+        code = str(query.get("code") or "").strip()
+        symbol = str(query.get("symbol") or "").strip() or hithink.to_thscode(code)
+        if not symbol:
+            logger.debug("[hithink] 非 A 股代码，跳过: %s", code)
+            return None
+        records = derive_indicator_records(
+            hithink.fetch_income_statements(symbol, period="quarterly", limit=2),
+            hithink.fetch_balance_sheets(symbol, period="quarterly", limit=2),
+            hithink.fetch_cash_flow_statements(symbol, period="quarterly", limit=2),
+            code=code,
+            symbol=symbol,
+            limit=1,
+        )
+        return records[0] if records else None
+
+
 register_adapter(AkshareFinancialAdapter())
 register_adapter(DataSinkIndicatorAdapter())
+register_adapter(HithinkIndicatorAdapter())

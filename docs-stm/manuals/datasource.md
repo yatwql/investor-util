@@ -23,7 +23,7 @@
 | 持仓重合度 | 运行时推导（基于持仓基金前 10 大重仓股的 Jaccard 相似度） | — | —（复用 `fund_hold_`，无独立缓存前缀） | — |
 | 基金风格扩展数据（市值/PE） | 东方财富 + 天天基金（基金持仓市值风格 + 市盈率/市净率数据） | — | `extended_` | 基础类 |
 | 个股财报全文（持仓基本面章·区块②） | DataSinking `api.datasink.ing`（全文本财报 Markdown，仅 A 股，**需用户自备 key**） | — | `report_datasink_index_` / `report_datasink_doc_` | 基础类 |
-| 个股财务指标（持仓基本面章·区块①） | akshare `stock_financial_abstract`（东方财富关键指标，宽表） | DataSinking「公司简介和主要财务指标」章节解析（`datasink_indicator`） | `fin_indicator_` | 基础类 |
+| 个股财务指标（持仓基本面章·区块①） | akshare `stock_financial_abstract`（东方财富关键指标，宽表） | DataSinking「公司简介和主要财务指标」章节解析（`datasink_indicator`）→ **同花顺官方合并报表派生**（利润表/资产负债表/现金流量表，需 key；一次给多期） | `fin_indicator_` | 基础类 |
 | A 股行情 / 财务 / 基金 / 情绪面（**待接入各域**） | 同花顺金融数据服务 `fuyao.aicubes.cn`（官方源，**需用户自备 key**） | — | 各域前缀（接入时登记） | 基础类 / 分析类 |
 
 > **缓存前缀**列对应 `data/cache/` 目录下的文件名前缀，同一前缀的文件按 TTL 统一管理。持仓重合度为运行时推导模块（复用 `fund_hold_` 缓存），无独立缓存前缀。
@@ -77,7 +77,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 - **响应信封**：`{code, message, request_id, data}`，HTTP 状态码恒 200，业务错误看 `code`（`0` 成功；`2001` 凭据无效、`2003` 权限不足、`4001` 频率超限、`5003` 数据源不可用等）
 
 - **实测（2026-09-16，key 已配置）**：11 个端点实测 10 通；`/api/a-share-index/constituents/ths-stock-list`（指数/板块成分股）两次 429 → 该接口限流更严或需更高权限，接入前复核。另发现官方估值口径为 TTM/MRQ，与项目自算 PE（报告期 EPS 口径）不可比（长江电力 19.17 vs 47.19）
-- **已接入域**：**基金披露持仓**（`fund_hold` 链路**备源**：天天基金全链不可用时接管，载荷经同一归一器落到同一契约；联接基金直接返回目标 ETF，省去 HTML 探测）。provider 层其余域（财务指标 / 行情 / 情绪面）按 `plan.md` 计划表分阶段推进
+- **已接入域**：**财务指标**（`financial_indicator` 链路**第三槽**：主源不可用时由三张官方合并报表派生多期指标，口径与主源对齐）、**基金披露持仓**（`fund_hold` 链路**备源**：天天基金全链不可用时接管，载荷经同一归一器落到同一契约；联接基金直接返回目标 ETF，省去 HTML 探测）。provider 层其余域（财务指标 / 行情 / 情绪面）按 `plan.md` 计划表分阶段推进
 ### 财报全文（DataSinking）
 
 由 `fetcher/financial_report.py` 逐标的取数、`report/financial_report_digest.py` 装配（章节 `financial_report_digest`，开关 功能开关 `financial_report_digest` 默认关）：

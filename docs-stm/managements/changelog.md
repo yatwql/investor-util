@@ -6,6 +6,22 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 新增：财务指标域第三链路 —— 同花顺官方合并报表派生（plan-51 阶段 2）（2026-09-17）
+
+**目标**：主源 akshare（第三方封装，接口漂移风险）失效时，除 DataSinking 章节解析支路外再有一条**官方结构化**链路，并保住多期趋势能力。
+
+**实现**：
+- 新增 `analysis/financial_statement_derive.py::derive_indicator_records`（纯函数）：三张合并报表 → 标准字段记录——营收=营业收入、归母净利=归属于母公司股东的净利润（缺失回退合并净利）、经营现金流=经营活动现金流净额、EPS=基本每股收益；毛利率=(营业收入−营业成本)/营业收入、负债率=负债合计/资产合计、ROE=归母净利/归母权益（期末口径）；同比与**上年同期**比较（同文种、报告期减一年），基数为 0 或缺失即 `None`
+- 新增 `fetcher/financial_indicator_adapters.py::HithinkIndicatorAdapter`（链路第三槽，单期）+ `fetcher/financial_indicator.py::fetch_hithink_indicator_series`（**多期**回退：三张报表各一次请求即得近若干期，优于链路单期兜底）；链路顺序 `akshare_financial → datasink_indicator → hithink`（可用 `preferred_provider.financial_indicator` 调换）
+- **报告期口径修正（实测发现）**：上游季度条目的 `period_end_ms` 是**披露窗口起点**（2026Q1 = 04-01）而非报告期末 → 改用 `fiscal_year`+`fiscal_period` 归一到标准季末（03-31/06-30/09-30/12-31），与主源报告期完全对齐（否则同报告期错位、同比与趋势比较失真）
+- 回归测试 27 例：`unit/analysis/test_financial_statement_derive.py`（口径算术/同比对齐/文种推断/季末归一/缺表即空/脏值兜底/降序限流）+ `unit/fetcher/test_financial_indicator_hithink.py`（适配器抓取与标准字段集/非 A 股跳过/契约自检/链路顺序/主源优先与备源回退/使用标记）
+
+**实测（长江电力 600900，真实 key）**：派生序列报告期（2026-06-30 / 2026-03-31 / 2025-12-31 / 2025-09-30）与主源一致；2026-06-30 各项数值一致（营收 379.29 亿、归母 147.56 亿、毛利率 57.89%、负债率 59.36%、经营现金流 241.28 亿、EPS 0.6031、营收同比 0.033562）；差异仅 ROE（期末 6.47% vs 加权 6.55%）与 `bvps` 恒缺失（官方不给总股本，该源不产 PB）。
+
+**待办**：PE/PB 口径修正（`rf-386`）需为指标契约新增 `pe_ttm`/`pb_mrq` 字段并同步附录 H 与双端渲染，本次未做；同花顺估值快照接口已实测可取。
+
+**文档**：`plan.md`（阶段 2 完成）、设计文档 §3、`datasource.md`/`datasource-reliability.md`（财务指标降级链与已接入域）、`technical.md`（契约注记 + 语义命名表 2 行）、`requirements.md`（R-FIN-14 + 5.9 概述）、`testplan.md`（回归行）、`folders.md`（新文件与统计）。
+
 ### 修复：CI 时区缺陷（日期换算按北京时间固定，附时区无关性守卫）（2026-09-17）
 
 **现场**：GitHub Actions（ubuntu-latest，UTC）在 commit `2d934682` 上 **P0（dev-verify）三个 Python 版本全红**，本地（CST）全绿——失败用例为本次新增的 `TestHithinkHoldingsNormalization::test_maps_items_to_canonical_holdings`：`AssertionError: 2026-06-29 != 2026-06-30`。

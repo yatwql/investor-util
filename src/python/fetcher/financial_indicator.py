@@ -23,7 +23,7 @@ from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.core.code_utils import is_a_share_code
-from src.python.providers import akshare_financial
+from src.python.providers import akshare_financial, hithink
 from src.python.schemas.datasource_fields import DOMAIN_FINANCIAL_INDICATOR
 
 logger = logging.getLogger("invest")
@@ -75,11 +75,16 @@ def fetch_indicator_series(code: str, limit: int = DEFAULT_PERIODS) -> list[dict
     if isinstance(cached, list):
         return cached
 
+    from src.python.report.data_status import mark_data_used
+
     records: list[dict[str, Any]] = list(akshare_financial.fetch_financial_indicator_history(code, limit=limit))
     if records:
-        from src.python.report.data_status import mark_data_used
-
         mark_data_used(f"fin_indicator_{akshare_financial.SOURCE_ID}")
+    if not records:
+        # 主源不可用 → 官方合并报表派生（同花顺，需 key；一次链路给足多期，优于单期兜底）
+        records = fetch_hithink_indicator_series(code, limit=limit)
+        if records:
+            mark_data_used(f"fin_indicator_{hithink.SOURCE_ID}")
     if not records:
         latest = fetch_latest_indicator(code)
         if latest:
@@ -87,6 +92,28 @@ def fetch_indicator_series(code: str, limit: int = DEFAULT_PERIODS) -> list[dict
     if records:
         cache_set(cache_key, records)
     return records
+
+
+def fetch_hithink_indicator_series(code: str, limit: int = DEFAULT_PERIODS) -> list[dict[str, Any]]:
+    """同花顺官方报表派生的**多期**指标记录（主源不可用时的第二选择）。
+
+    与 :func:`fetch_latest_indicator`（链路单期）互补：三张报表各一次请求即得近若干期，
+    使趋势/质量档在同源序列上仍可计算。任一报表缺失即返回空列表，由链路继续降级。
+    """
+    from src.python.analysis.financial_statement_derive import derive_indicator_records
+    from src.python.providers import hithink
+
+    symbol = hithink.to_thscode(code)
+    if not symbol:
+        return []
+    return derive_indicator_records(
+        hithink.fetch_income_statements(symbol, period="quarterly", limit=limit + 4),
+        hithink.fetch_balance_sheets(symbol, period="quarterly", limit=limit + 4),
+        hithink.fetch_cash_flow_statements(symbol, period="quarterly", limit=limit + 4),
+        code=code,
+        symbol=symbol,
+        limit=limit,
+    )
 
 
 def collect_price_map(details: Any) -> dict[str, float]:
