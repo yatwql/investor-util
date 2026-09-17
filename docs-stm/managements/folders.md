@@ -21,7 +21,7 @@
 | **项目文档** | Markdown | **139** | **52,965** | 含 CLAUDE.md（75 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 0 + archive md 128），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 10 | 10,156 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 132 | 43,034 | 各版本 changelog/plan/review-findings 与设计文档归档（128 md 42,576 行） |
-| ├ plan/ | 中间设计文件 | 0 | 0 | **当前为空**——同花顺接入设计已随 plan-51 五阶段完成归档（见下方 v0.11.x 归档树的 `hithink-data-source/`）（在办设计文档写此处，完成后随完成态归档）；已实现的设计文档随完成态归档：景气度框架诊断设计位于 v0.11.x 归档的 `prosperity-framework/`，报告章节整合的设计层与实施层两份位于同版本的 `section-consolidation/`；DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | **当前为空**——同花顺接入设计已随「同花顺官方数据接入」计划完成归档（见下方 v0.11.x 归档树的 `hithink-data-source/`）（在办设计文档写此处，完成后随完成态归档）；已实现的设计文档随完成态归档：景气度框架诊断设计位于 v0.11.x 归档的 `prosperity-framework/`，报告章节整合的设计层与实施层两份位于同版本的 `section-consolidation/`；DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
