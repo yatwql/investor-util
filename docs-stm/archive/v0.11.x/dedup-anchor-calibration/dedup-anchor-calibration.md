@@ -1,5 +1,10 @@
 # 新闻去重锚点校准复核（2026-09-18）
 
+> **已实现，2026-09-18 随 v0.11.1 发布归档**（plan-53 新闻去重锚点校准体系修整；
+> 交付：校准工具口径与代码同源、锚点规则指纹与 `--compact` 压缩、`_TOKEN_LIKE` 收紧 + 价格方向对补充；
+> 结论摘要见 `docs-stm/managements/changelog.md` / `review-findings.md` 的 rf-396~rf-398 与 rf-399）
+
+
 > 背景：用户运行 `.venv/bin/python scripts/calibrate-dedup-threshold.py` 后贴回输出，
 > 其中「校准建议」给出三条动作（剥离年份、审查 bg≥2 跳过样本、审查同源 bg=2）。
 > 复核结论：**建议不可照做**——两条已实现或已过时，且报告数字混了规则时代。

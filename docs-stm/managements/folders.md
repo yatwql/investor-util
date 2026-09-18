@@ -1,5 +1,5 @@
 # 目录结构与项目统计
-> 文档版本：0.11.1
+> 文档版本：0.11.2-dev
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -18,10 +18,10 @@
 | **测试用例** | — | — | **7,530 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,190** | 含 README.md（207 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 4,983 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **139** | **52,965** | 含 CLAUDE.md（75 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 0 + archive md 128），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,156 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| **项目文档** | Markdown | **142** | **53,805** | 含 CLAUDE.md（75 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 0 + archive md 131），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,088 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 132 | 43,034 | 各版本 changelog/plan/review-findings 与设计文档归档（128 md 42,576 行） |
-| ├ plan/ | 中间设计文件 | 1 | 68 | **当前仅 `dedup-anchor-calibration.md`**（新闻去重锚点校准复核）；同花顺接入设计已随「同花顺官方数据接入」计划完成归档（见下方 v0.11.x 归档树的 `hithink-data-source/`）（在办设计文档写此处，完成后随完成态归档）；已实现的设计文档随完成态归档：景气度框架诊断设计位于 v0.11.x 归档的 `prosperity-framework/`，报告章节整合的设计层与实施层两份位于同版本的 `section-consolidation/`；DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
+| ├ plan/ | 中间设计文件 | 0 | 0 | **当前为空**——在办设计文档写此处，完成后随完成态归档；dedup-anchor-calibration.md 位于 v0.11.x 归档的 `dedup-anchor-calibration/`；同花顺接入设计位于 v0.11.x 的 `hithink-data-source/`，景气度框架诊断位于 `prosperity-framework/`，报告章节整合设计层与实施层位于 `section-consolidation/`；DataSinking 财报摘要与基本面数据源/财务指标两份位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -999,8 +999,9 @@ investor-util/
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   ├── v0.11.x/                         # v0.11.x 版本归档（0.11 系列首份）
-│   │   │   ├── archived_changelog.0.11.x.md # v0.11.0 已发布变更记录
-│   │   │   ├── archived_plan.0.11.x.md    # plan-44 / plan-45 / plan-46 / plan-51 完成态记录（含设计文档索引）
+│   │   │   ├── archived_changelog.0.11.x.md # v0.11.0 ~ v0.11.1 已发布变更记录
+│   │   │   ├── archived_plan.0.11.x.md    # plan-44 ~ plan-46 / plan-51 ~ plan-54 完成态记录（含设计文档索引）
+│   │   │   ├── archived_review-findings.0.11.x.md # rf-354 ~ rf-401 已修复记录（v0.11.0 ~ v0.11.1）
 │   │   │   ├── section-consolidation/     # plan-45 报告章节整合设计归档（设计层 + 实施层）
 │   │   │   │   ├── section-consolidation-design.md    # 设计层：四项合并/可见性模型扩展/约束对照/验收标准
 │   │   │   │   └── section-consolidation-iteration.md # 实施层：命名统一总表/接缝地图/逐批施工单/十轮复盘记录
@@ -1008,6 +1009,8 @@ investor-util/
 │   │   │   │   └── prosperity-framework-design.md # 上游归属与许可/数据可得性映射/六维口径（含两轮修订）/契约/约束对照/验收
 │   │   │   └── hithink-data-source/       # plan-51 同花顺官方数据接入设计归档（五阶段完成态）
 │   │   │       └── hithink-financial-data-design.md # 覆盖边界/四域接入方案/实测字段与限流/验证计划/架构约束自查标准
+│   │   │   └── dedup-anchor-calibration/  # plan-53 新闻去重锚点校准复核归档
+│   │   │       └── dedup-anchor-calibration.md # 锚点混代证据/当前规则重判分布/原建议逐条核对与处置
 │   │   └── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
 │   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（含设计文档索引）
 │   │   │   ├── archived_changelog.0.10.x.md #    变更日志归档 v0.10.x
@@ -1062,8 +1065,7 @@ investor-util/
 │   │   │   │   └── feeder-penetration-and-holdings-fetch-design.md # 取数阶梯次序修正 + 目标 ETF 代理底层暴露
 │   │   │   └── financial-indicator-source/ #   基本面数据源主备与财务指标提取设计归档
 │   │   │       └── financial-indicator-source-design.md # 标准字段契约/全文解析支路/真实估值分位(TTM)/底座门禁/LLM 注入
-│   └── plan/                          #   中间设计文件（在办设计文档）：当前仅 `dedup-anchor-calibration.md`（新闻去重锚点校准复核）；plan-46 设计文档已随完成态归档至 archive/v0.11.x/prosperity-framework/
-│       └── dedup-anchor-calibration.md # 锚点混代证据、当前规则重判分布、原建议逐条核对与处置
+│   └── plan/                          #   中间设计文件（在办设计文档）；当前为空——在办设计文档写此处，完成后移入对应版本的归档子目录
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）

@@ -1,8 +1,8 @@
 # 实现计划归档 — v0.11.x
 
-> 归档时间：2026-09-15（v0.11.0 发布当日并入，plan-44）；2026-09-16 增补（plan-45、plan-46，v0.11.1-dev 开发期）
+> 归档时间：2026-09-15（v0.11.0 发布当日并入，plan-44）；2026-09-16 增补（plan-45、plan-46）；2026-09-18 增补（plan-52、plan-53、plan-54，v0.11.1 发布当日并入）
 > 原始文件：`docs-stm/managements/plan.md（当前迭代部分）`
-> 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1-dev（plan-45 完成态）
+> 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1（2026-09-18：plan-52 矩阵命中源列 / plan-53 去重校准体系修整 / plan-54 48 小时技术债整改）
 > 归档内容：本迭代已实现的计划项完成态记录（plan-44 报告增强子模块并入功能开关注册表；plan-45 报告章节整合；plan-46 景气度框架诊断；plan-51 同花顺官方金融数据接入五阶段）；
 > plan-42 / plan-43 摘要见 `../v0.10.x/archived_plan.0.10.x.md`
 > 设计文档索引：plan-45 的设计层与实施层文档归档于 `section-consolidation/`；plan-46 的设计文档归档于 `prosperity-framework/`；plan-51 的设计文档归档于 `hithink-data-source/`（均见文末）
@@ -125,3 +125,36 @@
 **约束与红线**：① provider 只取原始响应，字段归一交 `source_adapter`、缓存/熔断/降级交 `fetch_with_fallback`（不新造取数路径）；② 新数据域须登记 `DOMAIN_RECORDS` + 附录 H + 双端一致性测试；③ 新章节挂 Feature Flag 且默认关（关闭时输出逐字节一致）；④ 凭据值永不落日志/报告/缓存。
 
 **预估成本**：阶段 2 低、阶段 3 中、阶段 4 中、阶段 5 中高；**价值**：高（把三条爬虫主源换成/补上官方源，并新增情绪面能力）。
+
+### P1 — 已完成（plan-52 / plan-53 / plan-54 完成态，2026-09-18 归档）
+
+#### ✅ `plan-52` 数据源可用性矩阵：provider 级「命中源」列（已完成 2026-09-18）
+
+> 用户反馈触发：「已提供同花顺 key，但报告的数据源可用性矩阵没提到用了这个数据源」。排查确认**属于报告口径缺失，而非 key 未生效**——同一次运行的 `data/cache/sentiment_*` 由同花顺接口刷新（`logs/app.log` 有 `正在获取市场情绪…` → `[market_sentiment] 命中 0 条`），证明 key 在用。
+
+**根因三条**：① 矩阵只按**数据类别**聚合，其 tracker 事件键（`price_price_stock_600900`）只含代码不含 provider → 从未、也无法点名某个源；② 说明表「实际数据源（链路）」是硬编码文案，未随同花顺接入同步（`datasource.md` 已登记、`data_source_matrix.py` 未更新）；③ 市场情绪（同花顺**唯一源**）的取用标记键 `sentiment` 不匹配任何类别前缀 → 落入「其他数据源」桶，连类别名都不显示。
+
+**交付**：`report/data_status.py` 新增 provider 级归属登记（`mark_provider_used` / `get_provider_usage` / `reset_provider_usage`；模块级登记表，不参与降级计数、不在 `.degradation_state.json` 堆积 provider 键）；`fetcher/chain.py` 两处成功分支 + `report/market_sentiment.py` + `fetcher/financial_indicator.py` 多期序列支路登记归属；矩阵新增「命中源（本次取数）」列（HTML + Excel 两处渲染）与 `history`（历史走势）/ `sentiment`（市场情绪）两个类别及 `data_types` 映射（链路 data_type 全覆盖由不变式用例强制，`UNMAPPED_CHAIN_DATA_TYPES` 登记有意缺席者）；说明表补齐同花顺兜底槽位与市场情绪行（含 key 就绪态与所需开关），计费解析泛化为「行内显式 → provider 动态套餐 → 免费」。详细变更见 `changelog.md`。
+
+#### ✅ `plan-53` 新闻去重锚点校准体系修整（已完成 2026-09-18）
+
+> 用户贴回 `scripts/calibrate-dedup-threshold.py` 输出触发复核。结论：原「校准建议」不可照做——两条已实现/已过时，且报告数字混了规则时代。复核证据、修正后分布与逐条结论见 [`../plan/dedup-anchor-calibration.md`](../plan/dedup-anchor-calibration.md)。
+
+**根因**：① 锚点文件 append-only 且**无规则版本字段**，收紧前的旧样本与新样本混在一起（实测 `cross_skip` 中 46% 的 ratio 低于当前候选区入口、`cross_safe` 中 508 条 `merged` 但 `bg=0`），使「需审查 N 条」类结论失真；② 工具**自写一份硬编码阈值**（正文 0.30 vs 代码 0.35）且建议文本引用了早已实现的年份剥离，输出误导性动作；③ `_TOKEN_LIKE` 把纯数字当专名证据（24 对共享数字的无关标题被 bg=2 梯度误合并）；④ 锚点文件 152 MB / 456,546 行中仅 51,718 个唯一对（重复行 89%），而 flush 与加载都是全文成本。
+
+**交付**：新校准工具（阈值与相似度口径均取自 `news_dedup`：`_pair_similarity` / `_CROSS_*` 常量；用当前代码重算并按当前阈值重判分支；历史时代单列；`--compact` 压缩 152 MB → 17 MB）；锚点新增 `anchor_rules_version`（`_rules_fingerprint()` 自动派生）+ 超 32 MB 加载告警；`_TOKEN_LIKE` 收紧 + 5 组价格方向对；回归用例 24 例（含 scripts 工具新测试文件）。
+
+#### ✅ `plan-54` 过去 48 小时实现的技术债整改（已完成 2026-09-18）
+
+> 触发：用户提出「过去 48 小时的实现有没有技术债，有就修」。扫描范围：`git log --since=50h`（22 commit）+ 未提交工作区；判据含体积硬上限/静默吞异常/债务标记/无引用定义/重复实现/文档与代码同步。
+
+**发现的四类债务与处置**（逐条见 `review-findings.md` rf-393 / rf-399~rf-401）：
+
+| 类别 | 实况 | 处置 |
+|:--|:--|:--|
+| 文件超 800 行硬上限 | `providers/news_dedup.py` 改动后 931 行（规则数据 + 主流程混居） | 拆为 `news_dedup_rules.py`（650 行，规则原语）+ `news_dedup.py`（327 行，锚点与主循环，原面 re-export）；拆分后同批样标题 ratio/overlap/掩码/指纹**逐值一致** |
+| 实验挂载点约束不一致 | 景气度框架诊断两条生成路径内联 try/except（full 路径双重守护），未过实验挂载点 | 新增 `_experimental_seams.record_prosperity_diagnosis`，两路径改调挂载点并删内联守护；该约束的适用面与工序顺序同步；新增 4 例挂载点用例（rf-393 收敛） |
+| 文档与代码脱钩 | 功能开关计数 4 份文档停在 29/8/4（实为 30/9/5）且报告组漏列市场情绪；`technical.md` 目录 2.7 锚点失效；新增文档相对链接少一层 | 4 份文档计数按注册表更正 + 补列表项；锚点补连字符；相对链接改 `../plan/…`（rf-400） |
+| 判据重复 | `analysis/financial_indicator._num` 与 `core.num_utils.safe_num` 各自实现「解析 + 有限性校验」 | `_num` 改为 `safe_num(value, default=None)` 的 float 投影，删除已无用的 `import math`（rf-401） |
+
+**未列入本次整改（已登记、非阻塞）**：rf-395 的遗留面——其余 `data/state/*` 写入方（perf/health/silence）同样面临「后台线程越过用例级补丁」，当前无实测泄露，彻底治本需把状态目录改为可注入的单一来源。
