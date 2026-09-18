@@ -122,3 +122,144 @@ class TestHtmlParity:
         assert "市场情绪与持仓热点" in text
         assert "market_sentiment_data" in text
         assert "不做概念联想" in text  # 口径说明双端一致
+
+
+class _StubPerf:
+    """PerfCollector 替身（只吞掉计时与落盘）。"""
+
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
+    def start(self, *args, **kwargs) -> None:
+        pass
+
+    def stop(self, *args, **kwargs) -> None:
+        pass
+
+    def save(self, *args, **kwargs) -> None:
+        pass
+
+
+def _prep_stub(tmp_path) -> dict:
+    """full 路径 prep 契约的最小替身（穿透标的非空，用于验证其被传入）。"""
+    return {
+        "output_dir": str(tmp_path),
+        "news_top_count": 0,
+        "details": [],
+        "holdings_details": [],
+        "total_mv": 0.0,
+        "penetrated_assets": [{"name": "中际旭创", "codes": ["300308"]}],
+        "a_indices": [],
+        "us_indices": [],
+        "risk_metrics": {},
+    }
+
+
+class TestFullPathInjection:
+    """full 路径（HTML+Excel+LLM）须在写 HTML 之前取数并注入市场情绪契约。
+
+    回归场景：`_generate_report_full` 曾只把契约给 Excel（靠 excel_generator 的就地
+    兜底才取数），HTML 侧既无形参也不传参——于是同一次运行的 HTML 不渲染情绪区块、
+    其「数据源可用性矩阵」缺「市场情绪」行、说明表记「未使用」，与 Excel 产物自相矛盾。
+    """
+
+    _SENTINEL = {"available": True, "rows": [], "entry_count": 0, "trade_date": "2026-09-18"}
+
+    def _run_full(self, monkeypatch, tmp_path) -> dict:
+        """跑一遍 full 编排（外部依赖全替身），返回传给 HTML 生成器的关键字实参。"""
+        from unittest.mock import MagicMock
+
+        import src.python.report._report_generation as rg
+
+        seen: dict = {}
+        for _flag in (
+            "is_enable_action",
+            "is_enable_cost_lots",
+            "is_enable_data_quality",
+            "is_enable_financial_indicator",
+            "is_enable_financial_report_digest",
+            "is_enable_fund_deep_analysis",
+            "is_enable_history",
+            "is_enable_llm",
+            "is_enable_news",
+            "is_enable_portfolio_evolution",
+        ):
+            monkeypatch.setattr(f"src.python.config.{_flag}", lambda *a, **k: False)
+        for _name in (
+            "_validate_prep_completeness",
+            "_validate_pipeline_snapshot",
+            "_spawn_health_checks",
+            "_collect_health_checks",
+            "record_deterministic_decisions",
+            "record_prosperity_diagnosis",
+            "record_llm_decisions_and_review_block",
+            "record_deterministic_signals",
+        ):
+            monkeypatch.setattr(rg, _name, lambda *a, **k: None)
+        monkeypatch.setattr(rg, "apply_module_quality_banners", lambda content, *a, **k: content)
+        monkeypatch.setattr(rg, "_prepare_full_risk_metrics", lambda *a, **k: ({}, None))
+        monkeypatch.setattr("src.python.report.orchestrator.prepare_report_data", lambda *a, **k: _prep_stub(tmp_path))
+        monkeypatch.setattr("src.python.report._snapshot.capture_snapshot", lambda *a, **k: {})
+        monkeypatch.setattr("src.python.analysis.action_advisor.build_action_data", lambda *a, **k: {})
+        monkeypatch.setattr("src.python.fetcher.akshare.get_sector_fund_flow", lambda *a, **k: None)
+        monkeypatch.setattr(
+            "src.python.report._llm_news._fetch_llm_and_news",
+            lambda *a, **k: ((None, None, None, None), [], {}, False, None),
+        )
+        monkeypatch.setattr("src.python.core.perf.PerfCollector", _StubPerf)
+        monkeypatch.setattr(
+            "src.python.report._report_aux_metrics.compute_market_sentiment_data",
+            lambda *a, **k: self._SENTINEL,
+        )
+        monkeypatch.setattr(rg, "_generate_full_html_report", lambda *a, **k: seen.update(k) or True)
+        monkeypatch.setattr(rg, "_generate_full_excel_report", lambda *a, **k: True)
+
+        rg._generate_report_full(
+            holdings=[SimpleNamespace(code="600900", name="长江电力")],
+            config={},
+            reporter=MagicMock(),
+            output_dir=str(tmp_path),
+        )
+        return seen
+
+    def test_orchestrator_injects_contract_before_html(self, monkeypatch, tmp_path):
+        """编排层取数结果必须出现在传给 HTML 生成器的实参中。"""
+        assert self._run_full(monkeypatch, tmp_path).get("market_sentiment_data") is self._SENTINEL
+
+    def test_html_generator_forwards_contract(self, monkeypatch, tmp_path):
+        """`_generate_full_html_report` 须把契约透传给 `write_html_report`。"""
+        from unittest.mock import MagicMock
+
+        import src.python.report._report_generation as rg
+        from src.python.report.orchestrator import ReportResult
+
+        seen: dict = {}
+        monkeypatch.setattr("src.python.config.features.is_feature_enabled", lambda *a, **k: False)
+        monkeypatch.setattr(rg, "_build_chart_datasets_for_report", lambda *a, **k: {})
+        monkeypatch.setattr(
+            "src.python.report.html_writer.write_html_report",
+            lambda *a, **k: seen.update(k) or str(tmp_path / "report.html"),
+        )
+
+        ok = rg._generate_full_html_report(
+            [],
+            _prep_stub(tmp_path),
+            str(tmp_path),
+            [],
+            (None, None, None, None),
+            [],
+            {},
+            True,
+            None,
+            MagicMock(),
+            False,
+            False,
+            False,
+            False,
+            None,
+            ReportResult(),
+            market_sentiment_data=self._SENTINEL,
+        )
+
+        assert ok is True
+        assert seen.get("market_sentiment_data") is self._SENTINEL

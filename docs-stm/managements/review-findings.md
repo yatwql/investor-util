@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.2-dev
-> **编号源**：`rf-next = 402`（新增问题取此编号，完成后更新为 +1；已用最大 rf-401，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 403`（新增问题取此编号，完成后更新为 +1；已用最大 rf-402，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -46,6 +46,11 @@
 
 ## 已解决问题
 
+### 已解决待归档（v0.11.2-dev）
+
+| # | 问题（违反的约束用语义描述） | 处置 |
+|---|------|------|
+| **rf-402** | **full 路径 HTML 漏接市场情绪契约 → 同一次运行两端产物自相矛盾**（用户问询「同花顺，市场情绪没开启么？我看数据可用性矩阵没提到它」曝光）：`_generate_report_full` 未注入 `market_sentiment_data`，且 `_generate_full_html_report` 无该形参、其 `write_html_report` 调用未传参——HTML 侧因此（a）行动建议章情绪区块不渲染（b）「数据源可用性矩阵」缺「市场情绪」行（矩阵只列本次取用过的类别，非源清单）（c）说明表记「○ 未使用」；而 Excel 侧靠 `excel_generator` 就地兜底在 HTML 落盘**之后**才取数 → 同一份运行里 xlsx 有「同花顺金融数据 ×2」行、HTML 没有（实测 2026-09-18 21:54；`logs/app.log` 三行时间戳 HTML 20.126 → 情绪取数 20.419/20.799 → Excel 21.032）。开关与凭据本无问题（`features.json` 已开 `market_sentiment`、hithink key 已就绪），属接线遗漏而非功能未开启 | 编排层在写 HTML 之前取数并注入 `pipeline_data`（与 both 路径同位：`record_prosperity_diagnosis` 之后、`# ── 6. HTML 报告 ──` 之前，透传 `prep` 以带出穿透标的），`_generate_full_html_report` 新增形参并透传 `write_html_report`；回归用例 2 例（编排注入 / HTML 生成器透传，已验证对修复前代码两者均失败）；Excel 就地兜底保留（basic 路径不经编排层） |
 
 ### 归档档案
 
