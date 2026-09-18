@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办 **plan-47 / plan-48 / plan-49 / plan-50**；已完成的 plan-52（矩阵命中源列）、plan-53（去重校准体系修整）、plan-54（48 小时技术债整改）随 v0.11.1 归档，完成态摘要见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)；v0.10.x 已完成项（plan-8、plan-17~plan-43）见 `archived_plan.0.10.x.md`，v0.11.x 已完成项（plan-44 / plan-45 / plan-46）见 `archived_plan.0.11.x.md`。
+**当前迭代**：本文档当前在办 **plan-47 / plan-48 / plan-49 / plan-50**。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
