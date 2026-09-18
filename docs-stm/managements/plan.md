@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
-> 文档版本：0.11.1-dev
-> **编号源**：`plan-next = 52`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-51，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.11.1
+> **编号源**：`plan-next = 55`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-54，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办 **plan-47 / plan-48 / plan-49**（源自 plan-46 真实持仓复核与降级矩阵的剩余项，非阻塞）与 **plan-50**（财报取数第二数据源）；**plan-51**（同花顺官方金融数据接入，五阶段全部完成）已完成态与设计文档见归档 `docs-stm/archive/v0.11.x/hithink-data-source/`；P1 区已完成 plan-42 / plan-43 / plan-44 / plan-45 / plan-46（plan-46 完成态与设计文档索引见归档）；仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-43）见 `archived_plan.0.10.x.md`，v0.11.x 已完成项（plan-44 / plan-45 / plan-46）见 `archived_plan.0.11.x.md`。
+**当前迭代**：投资功能优化 + 章节归并（目标 19 章）**已全部完成并发布**（P1 轮 1~11 + 阶段 D~G 轮 12~20，plan-17~plan-24，changelog v0.10.1/v0.10.3/v0.10.4）。详细设计、实施轮次、推荐实施顺序与发布门禁记录见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)（含设计文档索引：`plan-investment-features.md` 设计层 §4 章节归并方案与 §4.4 架构合规自查表 + `plan-investment-iteration.md` 实施层 21 轮每轮量化验收 + 已完成项摘要表 + 推荐实施顺序 ①~⑧ + P0 发布门禁记录）。本文档当前在办 **plan-47 / plan-48 / plan-49**（源自 plan-46 真实持仓复核与降级矩阵的剩余项，非阻塞）与 **plan-50**（财报取数第二数据源）；**plan-51**（同花顺官方金融数据接入，五阶段全部完成）已完成态与设计文档见归档 `docs-stm/archive/v0.11.x/hithink-data-source/`；**plan-52**（数据源可用性矩阵 provider 级「命中源」列 + 说明表同花顺兜底槽位披露，用户反馈触发）已完成（摘要见下方 P1 区）；**plan-53**（新闻去重锚点校准体系修整，校准输出复核触发）已完成（摘要见下方 P1 区）；**plan-54**（过去 48 小时实现的技术债整改：文件超限拆分 / 实验挂载点收敛 / 文档计数与链接校正 / 数值判据单一来源）已完成（摘要见下方 P1 区）；P1 区已完成 plan-42 / plan-43 / plan-44 / plan-45 / plan-46（plan-46 完成态与设计文档索引见归档）；仅保留待办登记区与归档引用；v0.10.x 已完成项（plan-8、plan-17~plan-43）见 `archived_plan.0.10.x.md`，v0.11.x 已完成项（plan-44 / plan-45 / plan-46）见 `archived_plan.0.11.x.md`。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -21,6 +21,37 @@
 ### P1 — 当前待办
 
 > 无待办项（plan-42 / plan-43 摘要见 [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md)；plan-44 / plan-45 摘要见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-45 的设计与实施层文档见 [`archive/v0.11.x/section-consolidation/`](../archive/v0.11.x/section-consolidation/)）。
+
+#### ✅ `plan-52` 数据源可用性矩阵：provider 级「命中源」列（已完成 2026-09-18）
+
+> 用户反馈触发：「已提供同花顺 key，但报告的数据源可用性矩阵没提到用了这个数据源」。排查确认**属于报告口径缺失，而非 key 未生效**——同一次运行的 `data/cache/sentiment_*` 由同花顺接口刷新（`logs/app.log` 有 `正在获取市场情绪…` → `[market_sentiment] 命中 0 条`），证明 key 在用。
+
+**根因三条**：① 矩阵只按**数据类别**聚合，其 tracker 事件键（`price_price_stock_600900`）只含代码不含 provider → 从未、也无法点名某个源；② 说明表「实际数据源（链路）」是硬编码文案，未随同花顺接入同步（`datasource.md` 已登记、`data_source_matrix.py` 未更新）；③ 市场情绪（同花顺**唯一源**）的取用标记键 `sentiment` 不匹配任何类别前缀 → 落入「其他数据源」桶，连类别名都不显示。
+
+**交付**：`report/data_status.py` 新增 provider 级归属登记（`mark_provider_used` / `get_provider_usage` / `reset_provider_usage`；模块级登记表，不参与降级计数、不在 `.degradation_state.json` 堆积 provider 键）；`fetcher/chain.py` 两处成功分支 + `report/market_sentiment.py` + `fetcher/financial_indicator.py` 多期序列支路登记归属；矩阵新增「命中源（本次取数）」列（HTML + Excel 两处渲染）与 `history`（历史走势）/ `sentiment`（市场情绪）两个类别及 `data_types` 映射（链路 data_type 全覆盖由不变式用例强制，`UNMAPPED_CHAIN_DATA_TYPES` 登记有意缺席者）；说明表补齐同花顺兜底槽位与市场情绪行（含 key 就绪态与所需开关），计费解析泛化为「行内显式 → provider 动态套餐 → 免费」。详细变更见 `changelog.md`。
+
+#### ✅ `plan-53` 新闻去重锚点校准体系修整（已完成 2026-09-18）
+
+> 用户贴回 `scripts/calibrate-dedup-threshold.py` 输出触发复核。结论：原「校准建议」不可照做——两条已实现/已过时，且报告数字混了规则时代。复核证据、修正后分布与逐条结论见 [`../plan/dedup-anchor-calibration.md`](../plan/dedup-anchor-calibration.md)。
+
+**根因**：① 锚点文件 append-only 且**无规则版本字段**，收紧前的旧样本与新样本混在一起（实测 `cross_skip` 中 46% 的 ratio 低于当前候选区入口、`cross_safe` 中 508 条 `merged` 但 `bg=0`），使「需审查 N 条」类结论失真；② 工具**自写一份硬编码阈值**（正文 0.30 vs 代码 0.35）且建议文本引用了早已实现的年份剥离，输出误导性动作；③ `_TOKEN_LIKE` 把纯数字当专名证据（24 对共享数字的无关标题被 bg=2 梯度误合并）；④ 锚点文件 152 MB / 456,546 行中仅 51,718 个唯一对（重复行 89%），而 flush 与加载都是全文成本。
+
+**交付**：新校准工具（阈值与相似度口径均取自 `news_dedup`：`_pair_similarity` / `_CROSS_*` 常量；用当前代码重算并按当前阈值重判分支；历史时代单列；`--compact` 压缩 152 MB → 17 MB）；锚点新增 `anchor_rules_version`（`_rules_fingerprint()` 自动派生）+ 超 32 MB 加载告警；`_TOKEN_LIKE` 收紧 + 5 组价格方向对；回归用例 24 例（含 scripts 工具新测试文件）。
+
+#### ✅ `plan-54` 过去 48 小时实现的技术债整改（已完成 2026-09-18）
+
+> 触发：用户提出「过去 48 小时的实现有没有技术债，有就修」。扫描范围：`git log --since=50h`（22 commit）+ 未提交工作区；判据含体积硬上限/静默吞异常/债务标记/无引用定义/重复实现/文档与代码同步。
+
+**发现的四类债务与处置**（逐条见 `review-findings.md` rf-393 / rf-399~rf-401）：
+
+| 类别 | 实况 | 处置 |
+|:--|:--|:--|
+| 文件超 800 行硬上限 | `providers/news_dedup.py` 改动后 931 行（规则数据 + 主流程混居） | 拆为 `news_dedup_rules.py`（650 行，规则原语）+ `news_dedup.py`（327 行，锚点与主循环，原面 re-export）；拆分后同批样标题 ratio/overlap/掩码/指纹**逐值一致** |
+| 实验挂载点约束不一致 | 景气度框架诊断两条生成路径内联 try/except（full 路径双重守护），未过实验挂载点 | 新增 `_experimental_seams.record_prosperity_diagnosis`，两路径改调挂载点并删内联守护；该约束的适用面与工序顺序同步；新增 4 例挂载点用例（rf-393 收敛） |
+| 文档与代码脱钩 | 功能开关计数 4 份文档停在 29/8/4（实为 30/9/5）且报告组漏列市场情绪；`technical.md` 目录 2.7 锚点失效；新增文档相对链接少一层 | 4 份文档计数按注册表更正 + 补列表项；锚点补连字符；相对链接改 `../plan/…`（rf-400） |
+| 判据重复 | `analysis/financial_indicator._num` 与 `core.num_utils.safe_num` 各自实现「解析 + 有限性校验」 | `_num` 改为 `safe_num(value, default=None)` 的 float 投影，删除已无用的 `import math`（rf-401） |
+
+**未列入本次整改（已登记、非阻塞）**：rf-395 的遗留面——其余 `data/state/*` 写入方（perf/health/silence）同样面临「后台线程越过用例级补丁」，当前无实测泄露，彻底治本需把状态目录改为可注入的单一来源。
 
 
 #### 🔲 `plan-47` 景气度框架诊断：基金持仓 ROE 加权（扩展 ② 维覆盖率）
@@ -69,14 +100,14 @@
 
 ### P4 — 实验功能
 
-> 无待办项（plan-30 ~ plan-41 全部完成，完成项摘要见归档）。
+> 无待办项。
 
 ## 归档
 
-- [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项（plan-44 / plan-45 / plan-46 / plan-51，含各自设计文档索引）
+- [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项
 - [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项
-- [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项（含设计文档索引）
-- [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10（含设计文档索引 + 已完成项）
+- [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项
+- [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10
 - [`archived_plan.0.7.x.md`](../archive/v0.7.x/archived_plan.0.7.x.md)
 - [`archived_plan.0.6.x.md`](../archive/v0.6.x/archived_plan.0.6.x.md)
 - [`archived_plan.0.5.x.md`](../archive/v0.5.x/archived_plan.0.5.x.md)

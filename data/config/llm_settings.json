@@ -29,7 +29,7 @@
   "output_brief_global_macro": false,
   "thinking_enabled_global_macro": false,
   "thinking_budget_global_macro": 6000,
-  "reasoning_effort_global_macro": "high",
+  "reasoning_effort_global_macro": "low",
 
   // ═══════════════════════════════════════════
   // 智囊团深度复盘 — expert_review
@@ -43,7 +43,7 @@
   "output_brief_expert_review": false,
   "thinking_enabled_expert_review": true,
   "thinking_budget_expert_review": 24000,
-  "reasoning_effort_expert_review": "low",
+  "reasoning_effort_expert_review": "medium",
 
   // ═══════════════════════════════════════════
   // 持仓体检报告 — health_check
@@ -57,7 +57,7 @@
   "output_brief_health_check": false,
   "thinking_enabled_health_check": true,
   "thinking_budget_health_check": 18000,
-  "reasoning_effort_health_check": "medium",
+  "reasoning_effort_health_check": "low",
 
   // ═══════════════════════════════════════════
   // 穿透深度分析 — penetration_deep
@@ -71,7 +71,7 @@
   "output_brief_penetration_deep": false,
   "thinking_enabled_penetration_deep": false,
   "thinking_budget_penetration_deep": 12000,
-  "reasoning_effort_penetration_deep": "high",
+  "reasoning_effort_penetration_deep": "low",
 
   // ═══════════════════════════════════════════
   // 财经新闻热点与持仓关联分析 — news_correlation
@@ -85,7 +85,7 @@
   "cache_enabled_news_correlation": true,
   "thinking_enabled_news_correlation": false,
   "thinking_budget_news_correlation": 6000,
-  "reasoning_effort_news_correlation": "high",
+  "reasoning_effort_news_correlation": "low",
   "news_correlation_top_n": 30,
 
   // ═══════════════════════════════════════════

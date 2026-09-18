@@ -598,5 +598,178 @@ class TestFlushAnchorsDedup(unittest.TestCase):
         self.assertEqual(len(lines), 1, f"重试后应写入 1 条: {lines}")
 
 
+class TestDedupNumericTokenNotProperNoun(unittest.TestCase):
+    """纯数字共享不算专名证据（bg=2 梯度不再为数字误合并）。
+
+    背景：旧判定 ``^[a-z0-9]+$`` 把纯数字 token 也算专名证据，于是只共享数字的
+    无关标题（如战机型号数字、榜单序号各自对应的两条不同新闻）会靠 bg=2 梯度
+    合并。锚点校准实测：收紧前 cross_merge_bg2 里 24 对仅靠数字证据成立。
+    """
+
+    def _make_item(self, title: str, source: str = "东方财富") -> dict:
+        return {"title": title, "_source": source, "url": "http://x.com/" + title[:10]}
+
+    def test_token_predicate_requires_letter(self) -> None:
+        """专名证据判定：纯数字不算，含字母/虚拟专名才算。"""
+        from src.python.providers.news_dedup import _TOKEN_LIKE
+
+        for digits in ("100", "4400", "35", "20"):
+            self.assertIsNone(_TOKEN_LIKE.match(digits), f"纯数字不应算专名证据: {digits}")
+        for proper in ("cpi", "5g", "kse100", "_tk:mlcc"):
+            self.assertIsNotNone(_TOKEN_LIKE.match(proper), f"应算专名证据: {proper}")
+
+    def test_shared_digits_only_not_merged(self) -> None:
+        """共享数字 35（战机型号）+ 模板 bigram 的不同事件不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("美国F-35战机在加州海军陆战队航空站附近坠毁", "新浪财经"),
+            self._make_item("伊称摧毁3架美军F35战机", "华尔街见闻"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_shared_digits_in_list_marker_not_merged(self) -> None:
+        """共享数字 20（榜单序号/版本号）的不同事件不合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("博时ETF王者挑战赛丨第三周周榜TOP20正式公布", "新浪财经"),
+            self._make_item("OpenClaw 2.0正式发布", "东方财富"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+    def test_letter_token_still_merged(self) -> None:
+        """对照：共享含字母专名（CPI/PPI）的真重复仍合并。"""
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("CPI同比增长2.5%PPI同比下降0.8%", "东方财富"),
+            self._make_item("统计局公布CPI和PPI数据：CPI涨2.5%PPI降0.8%", "新浪财经"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 1)
+
+
+class TestDedupOppositeDirectionExtended(unittest.TestCase):
+    """方向对立词对扩充（站稳/跌破、走高/走低、上探/下探、回升/回落、走软/走强）。
+
+    跨源候选区内，共享实体 + 方向相反分属两标题 → 不合并（否则"金价站稳4000"
+    与"黄金跌破4000"会被当作同一条改写重复）。该防护只在候选区（ratio < 0.50）
+    生效：ratio ≥ 0.50 的高相似对常在同标题内同时提到两个方向词（如"49股涨停
+    2股跌停"），把防护扩到安全区会误拦真重复（实测 6 对里 4 对属真重复）。
+    """
+
+    def _make_item(self, title: str, source: str = "东方财富") -> dict:
+        return {"title": title, "_source": source, "url": "http://x.com/" + title[:10]}
+
+    def test_extended_pairs_detected(self) -> None:
+        """新方向对能被检出（一正一反分属两标题）。"""
+        from src.python.providers.news_dedup import _has_opposite_direction
+
+        cases = [
+            ("金价站稳4000美元上方", "现货黄金跌破4000美元关口"),
+            ("算力硬件板块持续走高", "国际油价持续走低"),
+            ("金价上探4400美元", "黄金下探4200美元"),
+            ("存储芯片概念回升", "数字媒体板块回落"),
+            ("原油价格走软", "美元指数走强"),
+        ]
+        for a, b in cases:
+            self.assertTrue(_has_opposite_direction(a, b), f"应检出方向对立: {a} vs {b}")
+
+    def test_direction_opposite_entity_overlap_not_merged(self) -> None:
+        """共享 3 个实体 bigram 但方向相反（减持 vs 增持）→ 不合并。
+
+        此例防护起决定作用：共享实体重叠=3 已够主规则合并，靠方向对立拦下。
+        """
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        items = [
+            self._make_item("兆易创新：5月6日至6月12日朱一明合计减持约44亿元公司股份", "东方财富"),
+            self._make_item("兆易创新拟回购最高20亿元股份，董事长朱一明拟增持不低于10亿元", "新浪财经"),
+        ]
+        self.assertEqual(len(_dedup_by_title(items)), 2)
+
+
+class TestAnchorRulesVersion(unittest.TestCase):
+    """锚点规则指纹：让校准工具能区分规则时代，不靠人工维护版本号。
+
+    锚点文件 append-only，规则调整后旧样本与新样本混在一起会使校准报告失真
+    （实测 cross_skip 中 46% 的 ratio 低于当前候选区入口）。
+    """
+
+    def test_anchor_record_carries_rules_version(self) -> None:
+        """每条锚点带当前规则指纹。"""
+        from src.python.providers.news_dedup import ANCHOR_RULES_FIELD, _ANCHOR_RULES_VERSION, _make_anchor
+
+        anchor = _make_anchor(
+            {"title": "A", "_source": "x", "ctime": ""},
+            {"title": "B", "_source": "y", "ctime": ""},
+            0.4,
+            2,
+            True,
+            "cross_merge",
+        )
+        self.assertEqual(anchor[ANCHOR_RULES_FIELD], _ANCHOR_RULES_VERSION)
+        self.assertTrue(_ANCHOR_RULES_VERSION)
+
+    def test_fingerprint_follows_threshold_change(self) -> None:
+        """阈值一变，指纹随之变化（无需人工改版本号）。"""
+        from src.python.providers import news_dedup_rules
+
+        baseline = news_dedup_rules._ANCHOR_RULES_VERSION
+        with patch.object(news_dedup_rules, "_CROSS_BG2_RATIO", 0.45):
+            self.assertNotEqual(news_dedup_rules._rules_fingerprint(), baseline)
+
+    def test_fingerprint_follows_opposite_pair_change(self) -> None:
+        """方向词对一变，指纹随之变化（覆盖非数值规则数据）。"""
+        from src.python.providers import news_dedup_rules
+
+        baseline = news_dedup_rules._ANCHOR_RULES_VERSION
+        with patch.object(news_dedup_rules, "_OPPOSITE_PAIRS", (("上涨", "下跌"),)):
+            self.assertNotEqual(news_dedup_rules._rules_fingerprint(), baseline)
+
+
+class TestPairSimilarityMatchesLinkDecision(unittest.TestCase):
+    """``_pair_similarity`` 与链路内判定同口径（校准工具不得自带一套算法）。
+
+    校准工具拿锚点里的原始标题调 ``_pair_similarity`` 重算；若它与
+    ``_dedup_by_title`` 实际使用的口径不一致，校准结论就会系统性偏离线上行为。
+    """
+
+    def setUp(self) -> None:
+        import tempfile
+
+        from src.python.providers import news_dedup
+
+        self._tmpdir = tempfile.mkdtemp()
+        self._path_patch = patch(
+            "src.python.providers.news_dedup._ANCHOR_PATH", os.path.join(self._tmpdir, "anchors.jsonl")
+        )
+        self._path_patch.start()
+        news_dedup._WRITTEN_ANCHOR_KEYS = set()
+        news_dedup._ANCHOR_RECORDS = []
+
+    def tearDown(self) -> None:
+        self._path_patch.stop()
+
+    def test_recorded_ratio_and_overlap_match_pure_recompute(self) -> None:
+        """锚点记录里的 ratio/bigram_overlap 与纯重算结果一致（候选区样本）。"""
+        from src.python.providers import news_dedup
+        from src.python.providers.news_aggregator import _dedup_by_title
+
+        title_a = "美国F-35战机在加州海军陆战队航空站附近坠毁"
+        title_b = "伊称摧毁3架美军F35战机"
+        _dedup_by_title(
+            [
+                {"title": title_a, "_source": "东方财富", "url": "a"},
+                {"title": title_b, "_source": "新浪财经", "url": "b"},
+            ]
+        )
+        records = [r for r in news_dedup._ANCHOR_RECORDS if r.get("rule") in ("cross_skip", "cross_merge")]
+        self.assertTrue(records, "候选区样本应记录锚点")
+        ratio, overlap = news_dedup._pair_similarity(title_a, title_b)
+        self.assertEqual(records[0]["ratio"], round(ratio, 3))
+        self.assertEqual(records[0]["bigram_overlap"], overlap)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2654,6 +2654,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <tr>
                     <th>数据源</th>
                     <th>状态</th>
+                    <th>命中源（本次取数）</th>
                     <th>详情</th>
                     <th>正常</th>
                     <th>降级/失败</th>
@@ -2670,6 +2671,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <span class="src-matrix-failed">&#10007; 失败</span>
                         {% endif %}
                     </td>
+                    <td style="text-align:left;" class="src-matrix-detail">{{ m.get('providers_text', '—') }}</td>
                     <td style="text-align:left;" class="src-matrix-detail">{{ m.detail }}</td>
                     <td>{{ m.ok }}</td>
                     <td>{{ m.degraded }}/{{ m.failed }}</td>

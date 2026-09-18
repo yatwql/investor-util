@@ -20,9 +20,10 @@
 from __future__ import annotations
 
 import logging
-import math
 from collections.abc import Iterable, Mapping
 from typing import Any
+
+from src.python.core.num_utils import safe_num
 
 logger = logging.getLogger("invest")
 
@@ -46,12 +47,13 @@ _STATEMENT_DATE_SUFFIX = "-12-31"
 
 
 def _num(value: Any) -> float | None:
-    """取有限数值；NaN/±inf/缺失一律 None。"""
-    try:
-        num = float(value)
-    except (TypeError, ValueError):
-        return None
-    return num if math.isfinite(num) else None
+    """取有限浮点值；NaN/±inf/非数值（含 bool）一律 None。
+
+    解析与有限性判定复用 `core.num_utils.safe_num`（单一来源），此处只负责把
+    结果统一成 ``float``（该模块的指标字段一律浮点口径，防整数字段漏出去）。
+    """
+    num = safe_num(value, default=None)
+    return float(num) if num is not None else None
 
 
 def _points(value: float, thresholds: tuple[float, float, float], higher_is_better: bool) -> int:

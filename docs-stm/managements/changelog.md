@@ -4,7 +4,48 @@
 
 ---
 
-## [0.11.1-dev] - 开发中（未发布）
+## [0.11.1] - 2026-09-18
+
+### 过去 48 小时实现的技术债整改（2026-09-18，plan-54 / rf-393、rf-399~rf-401）
+
+**触发**：用户要求排查并修复近 48 小时实现中的技术债。扫描面：`git log --since=50h`（22 个 commit）与未提交工作区；判据：体积硬上限、静默吞异常、债务标记、无引用定义、重复实现、文档与代码同步、约束合规。
+
+**四类债务已整改**：
+- **文件超 800 行硬上限**：`providers/news_dedup.py` 931 行（阈值/模板词表/归一化/实体提取/指纹 + 锚点采集与主循环）→ 拆为 `news_dedup_rules.py`（650 行：规则数据与纯原语）+ `news_dedup.py`（327 行：锚点与比较循环，原面 re-export 全部规则名）；拆分后同批样标题的 ratio/overlap/掩码/指纹与拆分前**逐值一致**（rf-399）
+- **实验挂载点约束不一致（rf-393 结项）**：景气度框架诊断（实验组开关）在两条 HTML 生成路径内联 try/except（full 路径还是双重守护）→ 新增挂载点 `_experimental_seams.record_prosperity_diagnosis`（开关判定 + 契约注入，重依赖按需导入），两路径改调挂载点、删除内联守护；该约束的适用范围与工序顺序同步；新增 4 例挂载点用例。市场情绪为报告组开关（非实验组），不属该约束范围
+- **文档与代码脱钩（rf-400）**：`market_sentiment` 接入后计数未同步——`how-to-config.md`/`technical.md`/`requirements.md`/`README.md` 四份仍写 29 项（实 30）、报告章节与增强 8 项（实 9，漏列市场情绪）、实验组 4 项（实 5）；另修正 `technical.md` 目录 2.7 锚点（标题含空格 + 反引号时 GitHub 锚点会插入 `-`）与 `changelog.md` 新增文档的相对链接层级
+- **判据重复（rf-401）**：`analysis/financial_indicator._num` 与 `core.num_utils.safe_num` 各自实现「解析 + 有限性校验」→ `_num` 改为 `safe_num(value, default=None)` 的 float 投影，删除已无用的 `import math`
+
+**未整改（已登记、非阻塞）**：rf-395 遗留面——其余 `data/state/*` 写入方（perf/health/silence）同样面临「后台线程越过用例级补丁」，当前无实测泄露；彻底治本需把状态目录改为可注入的单一来源。
+
+**核对范围与验证**：20 份管理/用户文档 + README 全量核对（版本头 13/13 一致、changelog 时间序无逆序、目录锚点与跨文件链接除上表已修两项外全一致）；拆分后同批样标题的判定输出逐值比对（防拆分引入口径漂移）；新增/更新回归用例（去重 24 + 挂载点 4 + 矩阵 3）。**门禁**：`dev-verify` 2971 passed / 0 failed；`ruff check` + `ruff format --check` 全绿；四个 `--ci` 脚本全 [OK]。
+
+### 新闻去重锚点校准体系修整：规则指纹 + 当前口径重算 + 锚点压缩（2026-09-18，plan-53 / rf-396~rf-398）
+
+**背景**（用户贴回校准输出触发复核）：`calibrate-dedup-threshold.py` 的「校准建议」给出三条动作，复核结论为**不可照做**——两条已实现或已过时，且报告数字混了规则时代。复核证据与逐条结论见 [`plan/dedup-anchor-calibration.md`](../plan/dedup-anchor-calibration.md)。
+
+**变更**：
+- **口径对齐**：`news_dedup` 新增 `_pair_similarity` / `_ratio_of_norms` / `_overlap_of_norms`（相似度与实体重叠的唯一实现，链路内判定与校准工具共用），阈值全部常量化（`_CROSS_CANDIDATE_RATIO` / `_CROSS_BIGRAM_MIN` / `_SAME_SRC_BIGRAM_MIN` 等）；校准工具不再自写一份数字（此前正文 0.30 vs 代码 0.35 长期不一致）
+- **规则时代可区分**：锚点记录新增 `anchor_rules_version` 字段，值由 `_rules_fingerprint()` 自动派生（阈值 + 模板词表 + 方向词对 + 归一化正则 + 行为探针的 SHA1 前 10 位）——规则一改指纹即变，不靠人工维护；校准工具用当前代码重算 ratio/bg 并按当前阈值重判，历史时代样本单列不参与结论
+- **规则微调**：`_TOKEN_LIKE` 要求英数 token 含至少一个字母（纯数字不再算专名证据，翻转 24 对共享数字的误合并）；补 5 组价格方向对（站稳/跌破、走高/走低、上探/下探、回升/回落、走软/走强）。**已评估未采纳**：方向防护扩到安全区（实测 6 对里 4 对是真重复）
+- **锚点体积治理**：加载超 32 MB 告警指向压缩入口；新增 `--compact`（每标题对保留最新一条，两遍扫描 + 原子替换，实测 **152 MB / 456,546 行 → 17 MB / 51,718 行，2.5 s，幂等**）；静态注释里的过期体积数字（~110k 行/35MB）同步修正
+- **工具输出重建**：删除「让 `_normalize_title` 剥离年份」这类已实现建议（其举例实为板块指数骨架），补充真实原因与「少数同主体多篇报道属有意保守」说明；规则摘要从常量打印；死代码（`--dry-run` 的 `default=True` 使提示永不可达）与重复空行清除；修正 `cross_safe` 标题、`data/cache/` 过期路径
+- **测试**：`test_news_sources.py` 新增 4 个测试类（数字 token 不算专名、方向对扩充、规则指纹随阈值/词对变化、`_pair_similarity` 与链路判定等价）；新增 `src/test/unit/scripts/test_calibrate_dedup_threshold.py`（分支重判、压缩幂等与 dry-run、加载去重、报告口径与过时建议回归）
+
+### 数据源可用性矩阵：新增 provider 级「命中源」列 + 说明表补齐同花顺兜底槽位（2026-09-18，plan-52 / rf-394）
+
+**背景**（用户反馈）：「已提供同花顺 key，但报告的数据源可用性矩阵没提到用了这个数据源」。排查确认**并非 key 未生效**——同一次运行的 `data/cache/sentiment_*` 由同花顺接口刷新（`logs/app.log` 有 `正在获取市场情绪（龙虎榜 / 连板梯队）...` → `[market_sentiment] 命中 0 条`），而是报告口径缺失。
+
+**根因三条**：① 矩阵只按**数据类别**聚合，其 tracker 事件键（`price_price_stock_600900`）只含代码不含 provider → 从未、也无法点名某个源；② 说明表「实际数据源（链路）」是硬编码文案，未随同花顺接入同步（`datasource.md` 已登记、`data_source_matrix.py` 未更新）；③ 市场情绪（同花顺**唯一源**）的取用标记键 `sentiment` 不匹配任何类别前缀 → 落入「其他数据源」桶，连类别名都不显示。
+
+**变更**：
+- **provider 级归属登记**：`report/data_status.py` 新增 `mark_provider_used` / `get_provider_usage` / `reset_provider_usage`（存放于模块级登记表而非 DegradationTracker——归属是纯观测事实，不参与降级计数、不在 `.degradation_state.json` 堆积 provider 键）；`fetcher/chain.py` 的 `fetch_with_fallback` 与 `_try_providers` 两处成功分支登记（历史链路经 `_history_provider_label` 解析展示名），`report/market_sentiment.py`、`fetcher/financial_indicator.py`（多期序列支路）同步登记
+- **矩阵**：行新增 `providers` / `providers_text`（按命中次数降序渲染为 `名称 ×次数`，无归属显示 `—`）；类别新增 `history`（历史走势）与 `sentiment`（市场情绪）并声明各链路 `data_types` 映射（链路 data_type 全覆盖由不变式用例强制，`UNMAPPED_CHAIN_DATA_TYPES` 登记有意不进矩阵者如 `bond_yield`）；`MATRIX_HEADERS` 作为 Excel 两处渲染的列头单一来源；历史日 K 等无类别事件的类别由 provider 归属单独成行
+- **渲染**：HTML 模板与 Excel（数据质量仪表盘页签 + 旧样式页签）矩阵表新增「命中源（本次取数）」列
+- **说明表**：price / fund_hold / history / financial_indicator 四行补「→ 同花顺金融数据（…，需 key）」；新增「市场情绪」行（同花顺唯一源 + key 就绪态 + 所需开关 `market_sentiment`）；财报全文行注明「同花顺不含公告原文，故无兜底源」；计费解析泛化为「行内显式 → provider 动态套餐 → 免费」；`used` 判定对无类别级标记的类别（历史走势）以 provider 归属为补充正面证据
+- **测试**：矩阵/说明表 12 例新用例（provider 归属、市场情绪行、兜底槽位文案、`data_types` 全覆盖不变式）+ Excel 渲染 3 例；`conftest.py` 新增 `reset_provider_usage` autouse 隔离
+- **测试隔离修复**（验证过程中发现）：`src/test/unit/report/` 全量运行会改写真实的 `data/state/.degradation_state.json`——`fetcher/industry.py` 的**后台批量线程活过用例 teardown**，路径 monkeypatch 已还原后线程内 `get_tracker()` 新建实例落到真实路径写盘。`conftest.py` 新增会话级兜底隔离（`_install_session_state_fallback_isolation`，在 `pytest_configure` 调用）：默认降级状态路径改为会话级临时目录，用例内仍被 `tmp_path` 覆盖、teardown 后回落到兜底值；`testplan.md` §5.8 补该条。验证 3/3 次不再触碰真实状态文件
+- **文档**：`datasource.md`（同花顺「已接入域」补市场情绪开关口径 + 新增「在报告里怎么看同花顺有没被用上」段）、`technical.md`（功能语义命名表新增 3 行 + 命中源机制说明）、`requirements.md` §6.4.15 字段表（6 列 + 状态规则）、`reports-instruction.md` 章节说明
 
 ### 归档：plan-51（同花顺官方金融数据接入）设计文档随完成态归档（2026-09-17）
 

@@ -337,6 +337,57 @@ class TestDeterministicSignals:
         assert "确定性信号沉淀" in reporter.warns()[0]
 
 
+# ── ⑤ 景气度框架诊断 ────────────────────────────────────────
+
+
+class TestProsperityDiagnosisMount:
+    """景气度框架诊断挂载点（实验组开关，产出 ``prosperity_framework_data`` 契约）。
+
+    与其余挂载点共享同一守护契约：开关关闭零行为、下游异常只告警不外抛。
+    """
+
+    _AUX_PATCH = "src.python.report._report_aux_metrics.compute_prosperity_framework_data"
+
+    def test_flag_off_is_inert(self, reporter):
+        """开关关闭 → 不计算、不注入。"""
+        pipeline_data: dict = {}
+        with patch("src.python.config.features.is_feature_enabled", return_value=False):
+            seams.record_prosperity_diagnosis(None, None, None, {}, reporter, pipeline_data=pipeline_data)
+        assert pipeline_data == {}
+        assert reporter.warns() == []
+
+    def test_flag_on_injects_contract(self, reporter):
+        """开关打开 → 契约写入 ``pipeline_data``。"""
+        pipeline_data: dict = {}
+        with (
+            patch("src.python.config.features.is_feature_enabled", return_value=True),
+            patch(self._AUX_PATCH, return_value={"available": True}),
+        ):
+            seams.record_prosperity_diagnosis(None, None, None, {}, reporter, pipeline_data=pipeline_data)
+        assert pipeline_data["prosperity_framework_data"] == {"available": True}
+
+    def test_none_pipeline_data_does_not_raise(self, reporter):
+        """``pipeline_data=None``（干跑）不得因注入而抛异常。"""
+        with (
+            patch("src.python.config.features.is_feature_enabled", return_value=True),
+            patch(self._AUX_PATCH, return_value={"available": True}),
+        ):
+            seams.record_prosperity_diagnosis(None, None, None, {}, reporter, pipeline_data=None)
+        assert reporter.warns() == []
+
+    def test_downstream_exception_warns_only(self, reporter):
+        """下游异常 → 一条告警 + 契约缺席，不外抛、不中断报告。"""
+        pipeline_data: dict = {}
+        with (
+            patch("src.python.config.features.is_feature_enabled", return_value=True),
+            patch(self._AUX_PATCH, side_effect=RuntimeError("boom")),
+        ):
+            seams.record_prosperity_diagnosis(None, None, None, {}, reporter, pipeline_data=pipeline_data)
+        assert pipeline_data == {}
+        assert len(reporter.warns()) == 1
+        assert "景气度框架诊断" in reporter.warns()[0]
+
+
 # ── 接线守卫 ─────────────────────────────────────────────────
 
 

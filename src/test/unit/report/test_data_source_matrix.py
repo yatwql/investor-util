@@ -333,9 +333,21 @@ class TestBuildDataSourceCatalog:
         assert self._by_id(rows, "financial_report")["auth"] == "需 key（未配置）"
 
     def test_free_sources_marked_no_key(self):
-        """免费源凭据列为「无需」。"""
+        """免费源凭据列为「无需」；有兜底槽的类别标「无需（主源）」（key 要求写在 provider 文案）。"""
         rows = self._catalog()
-        for sid in ("price", "fund_rank", "fund_hold", "industry", "index", "profit_forecast", "dividend", "fund_flow"):
+        for sid in (
+            "price",
+            "fund_rank",
+            "fund_hold",
+            "industry",
+            "index",
+            "profit_forecast",
+            "dividend",
+            "fund_flow",
+            "history",
+        ):
+            assert self._by_id(rows, sid)["auth"].startswith("无需")
+        for sid in ("fund_rank", "industry", "index", "profit_forecast", "dividend", "fund_flow"):
             assert self._by_id(rows, sid)["auth"] == "无需"
 
 
@@ -377,3 +389,149 @@ class TestDataSourceCatalog:
     def test_used_false_when_nothing_fetched(self):
         rows = self._rows()
         assert all(r["used"] is False for r in rows.values())
+
+
+class TestProviderAttribution:
+    """矩阵「命中源」列 —— provider 级归属（本次这类数据由哪个源服务）。
+
+    回归背景：报告曾只能答「这类数据健康吗」——tracker 的类别键里只有代码、没有
+    provider，同花顺作为兜底槽接管时报告一字未提，令使用者误以为提供的 key 未被使用。
+    """
+
+    def _build(self):
+        from src.python.report.data_source_matrix import build_data_source_matrix
+
+        return build_data_source_matrix()
+
+    def _category_event(self, source_key: str, success: bool = True) -> None:
+        from src.python.report.data_status import DegradationEvent, get_tracker
+
+        get_tracker()._events.append(
+            DegradationEvent(
+                source_key=source_key,
+                tier="T2",
+                success=success,
+                failure_type="",
+                degraded=False,
+                count=0,
+                effective_threshold=0,
+                timestamp=1000.0,
+            )
+        )
+
+    def test_hithink_fallback_attributed_to_category_row(self):
+        """同花顺接管行情时，命中源列必须点名同花顺（而非只显示类别健康度）。"""
+        from src.python.report.data_status import mark_provider_used
+
+        self._category_event("price_price_stock_600900")
+        mark_provider_used("price_stock", "hithink", "同花顺金融数据")
+        row = next(r for r in self._build() if r["key"] == "price")
+        assert "同花顺金融数据 ×1" in row["providers_text"]
+        assert row["providers"]["hithink"]["count"] == 1
+
+    def test_sentiment_row_from_provider_hits_alone(self):
+        """市场情绪只有 provider 级归属（无类别事件）时仍须成行且点名同花顺。"""
+        from src.python.report.data_status import mark_provider_used
+
+        mark_provider_used("sentiment", "hithink", "同花顺金融数据")
+        mark_provider_used("sentiment", "hithink", "同花顺金融数据")
+        row = next(r for r in self._build() if r["key"] == "sentiment")
+        assert row["name"] == "市场情绪"
+        assert row["status"] == "ok"
+        assert "同花顺金融数据 ×2" in row["providers_text"]
+        assert "取数 2 次" in row["detail"]
+
+    def test_provider_hits_aggregate_across_data_types(self):
+        """同一类别的多个链路数据类型汇入同一行（行情含场内/场外两条链）。"""
+        from src.python.report.data_status import mark_provider_used
+
+        mark_provider_used("price_stock", "tencent", "腾讯财经")
+        mark_provider_used("price_fund_otc", "eastmoney", "东方财富")
+        row = next(r for r in self._build() if r["key"] == "price")
+        # 命中次数相同时按展示名排序（输出稳定，便于比对）
+        assert row["providers_text"] == "东方财富 ×1、腾讯财经 ×1"
+
+    def test_dash_when_no_provider_hits(self):
+        """命中缓存（无 provider 参与网络取数）时命中源列留空占位，而非硬凑一个源。"""
+        self._category_event("fund_hold_017730")
+        row = next(r for r in self._build() if r["key"] == "fund_hold")
+        assert row["providers_text"] == "—"
+
+    def test_history_data_types_mapped_to_history_category(self):
+        """历史日 K 无类别级事件，其行由 provider 归属单独成立。"""
+        from src.python.report.data_status import mark_provider_used
+
+        mark_provider_used("history_stock", "tencent", "腾讯财经")
+        row = next(r for r in self._build() if r["key"] == "history")
+        assert row["name"] == "历史走势"
+        assert "腾讯财经 ×1" in row["providers_text"]
+
+    def test_index_history_mapped_to_index_category(self):
+        """指数历史日 K 归入「指数数据」（与 index_history_ 类别前缀同口径）。"""
+        from src.python.report.data_status import mark_provider_used
+
+        mark_provider_used("history_index", "tencent", "腾讯财经")
+        row = next(r for r in self._build() if r["key"] == "index")
+        assert "腾讯财经 ×1" in row["providers_text"]
+
+    def test_every_chain_data_type_is_mapped(self):
+        """不变式：链路每个 data_type 必须有归属类别，否则命中源静默丢失。
+
+        有意不进矩阵者须显式登记在 ``UNMAPPED_CHAIN_DATA_TYPES``（未归属是决策、不是遗漏）。
+        """
+        from src.python.fetcher.chain import _DEFAULT_CHAINS
+        from src.python.report.data_source_matrix import UNMAPPED_CHAIN_DATA_TYPES, _SOURCE_CATEGORIES
+
+        declared = {dt for cat in _SOURCE_CATEGORIES for dt in cat.get("data_types", [cat["key"]])}
+        assert set(_DEFAULT_CHAINS) <= declared | set(UNMAPPED_CHAIN_DATA_TYPES)
+
+
+class TestCatalogFallbackAndSentimentRows:
+    """说明表须如实标注同花顺兜底槽位与市场情绪类别（用户误判 key 未生效的根因）。"""
+
+    def _rows(self):
+        from src.python.report.data_source_matrix import build_data_source_catalog
+
+        return {r["id"]: r for r in build_data_source_catalog()}
+
+    def test_fallback_rows_name_hithink_and_key(self):
+        """以同花顺为兜底槽的类别，provider 文案须点名同花顺并标「需 key」。"""
+        rows = self._rows()
+        for sid in ("price", "fund_hold", "financial_indicator", "history"):
+            assert "同花顺" in rows[sid]["provider"]
+            assert "需 key" in rows[sid]["provider"]
+
+    def test_financial_report_row_notes_no_fallback(self):
+        """财报全文无兜底源（同花顺不含公告原文）——写明以防读者误以为漏配。"""
+        assert "无兜底源" in self._rows()["financial_report"]["note"]
+
+    def test_sentiment_row_registered(self):
+        """市场情绪为同花顺唯一源：须有独立行、计费免费、注明所需开关。"""
+        row = self._rows()["sentiment"]
+        assert row["category"] == "市场情绪"
+        assert "同花顺" in row["provider"]
+        assert row["billing"].startswith("免费")
+        assert "market_sentiment" in row["note"]
+
+    def test_sentiment_auth_shows_credential_state(self, monkeypatch):
+        """凭据列附同花顺 key 就绪态。"""
+        from src.python.core.datasource_credential import CredentialSpec, register_credential_spec
+
+        monkeypatch.delenv("HITHINK_FINANCE_API_KEY", raising=False)
+        register_credential_spec(CredentialSpec("hithink", "同花顺金融数据", "HITHINK_FINANCE_API_KEY"))
+        assert self._rows()["sentiment"]["auth"] == "需 key（未配置）"
+
+    def test_sentiment_used_tracks_category_mark(self):
+        from src.python.report.data_status import mark_data_used
+
+        assert self._rows()["sentiment"]["used"] is False
+        mark_data_used("sentiment")
+        assert self._rows()["sentiment"]["used"] is True
+
+    def test_history_used_follows_provider_hits(self):
+        """历史走势只登记缓存键：其「本次使用」以 provider 归属为正面证据。"""
+        from src.python.report.data_status import mark_provider_used
+
+        assert self._rows()["history"]["used"] is False
+        mark_provider_used("history_stock", "tencent", "腾讯财经")
+        assert self._rows()["history"]["used"] is True

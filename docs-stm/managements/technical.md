@@ -1,5 +1,5 @@
 # 投资复盘助手 — 技术设计
-> 文档版本：0.11.1-dev
+> 文档版本：0.11.1
 
 ## 目录
 
@@ -19,7 +19,7 @@
   - [2.4 关键机制](#24-关键机制)
   - [2.5 数据源适配契约（`datasource_adapter`，默认开）](#25-数据源适配契约datasource_adapter默认开)
   - [2.6 数据源记录-回放（测试基建，无开关）](#26-数据源记录-回放测试基建无开关)
-  - [2.7 数据源凭据就绪指引（常规开关 `datasource_credential_ready`，默认开）](#27-数据源凭据就绪指引常规开关datasource_credential_ready默认开)
+  - [2.7 数据源凭据就绪指引（常规开关 `datasource_credential_ready`，默认开）](#27-数据源凭据就绪指引常规开关-datasource_credential_ready默认开)
 - [3. 缓存层详细设计](#3-缓存层详细设计)
   - [3.1 子模块结构](#31-子模块结构)
   - [3.2 核心接口与 TTL 分辨率](#32-核心接口与-ttl-分辨率)
@@ -2298,7 +2298,7 @@ industry_{code}.json
 
 #### 新闻去重算法
 
-`_dedup_by_title()` 采用**多档模糊去重 + 实体 bigram + 英数 token 辅助判定 + 方向对立防护**策略，阈值基于 42560 条锚点分层采样校准（2026-08-17，误合并率从 ~70-80% 压降至可控区间）。
+`_dedup_by_title()` 采用**多档模糊去重 + 实体 bigram + 英数 token 辅助判定 + 方向对立防护**策略，阈值基于 42560 条锚点分层采样校准（2026-08-17，误合并率从 ~70-80% 压降至可控区间）。判定口径（阈值常量 / 模板词表与掩码 / 标题归一化 / 实体 bigram 提取 / 相似度 / 方向词对 / 规则指纹）的唯一实现在 `providers/news_dedup_rules.py`；主流程模块 `providers/news_dedup.py` 只留锚点采集与比较循环，并原面 re-export 规则原语（既有引用面不变）。
 
 ##### 整体流程
 
@@ -2321,9 +2321,10 @@ _dedup_by_title(items)
     │
     ├── ③ 跨源候选区（0.35 ≤ ratio < 0.50）阶梯判定
     │       ├── 共享实体 bigram ≥ 3 → 合并（高实体重叠，低 ratio 门槛）
-    │       ├── 共享 ≥ 2 且 ratio ≥ 0.375 且含英数/数字 token → 合并
-    │       │   （CPI/PPI、荣耀IPO 类共享专名 token 的真重复）
-    │       ├── 方向对立（上涨vs下跌/加息vs降息分属两标题）且共享实体 → 不合并
+    │       ├── 共享 ≥ 2 且 ratio ≥ 0.375 且含**真专名** token → 合并
+    │       │   （英数 token 需含字母，纯数字不算："纳斯达克100 vs KSE-100" 类
+    │       │   共享数字的无关标题不再合并；CPI/PPI、荣耀IPO 仍靠此捕获）
+    │       ├── 方向对立（上涨vs下跌/加息vs降息/站稳vs跌破分属两标题）且共享实体 → 不合并
     │       └── 否则跳过
     │
     └── ④ 子串包含降级
@@ -2335,10 +2336,10 @@ _dedup_by_title(items)
 | 概念 | 含义 | 默认值 |
 |:-----|:------|:-------|
 | **ratio**（模糊匹配率） | `difflib.SequenceMatcher.ratio()` — 基于标准化标题的字符级相似度，双向取 max | — |
-| **cross_threshold**（跨源阈值） | 跨源新闻触发候选区判定的最低 ratio 门槛 | **0.35**（可调） |
-| **直接合并区** | ratio ≥ 0.65，且专名 bg ≥ 1，直接合并（改写型重复） | ≥0.65 |
-| **安全区** | 0.50 ≤ ratio < 0.65，需专名 bg ≥ 2 才合并 | [0.50, 0.65) |
-| **候选区** | 0.35 ≤ ratio < 0.50，阶梯判定（bg≥3 / bg=2+英数token / 方向对立） | [0.35, 0.50) |
+| **cross_threshold**（跨源阈值） | 跨源新闻触发候选区判定的最低 ratio 门槛 | `_CROSS_CANDIDATE_RATIO` = **0.35** |
+| **直接合并区** | ratio ≥ 0.65，且专名 bg ≥ 1，直接合并（改写型重复） | `_CROSS_DIRECT_RATIO` = 0.65 |
+| **安全区** | 0.50 ≤ ratio < 0.65，需专名 bg ≥ 2 才合并 | [`_CROSS_SAFE_RATIO`, 0.65) |
+| **候选区** | 0.35 ≤ ratio < 0.50，阶梯判定（bg≥3 / bg=2+真专名token / 方向对立） | [0.35, 0.50) |
 | **bigram（字符二元组）** | 中文标题的连续 2 字切片，用于提取实体身份 | — |
 | **实体 bigram** | 掩码模板词后的 bigram 集合 + 英数 token + 长英文专名虚拟位 | STOP 集含 334 个词 |
 | **bigram_overlap** | 两标题实体 bigram 交集大小 | 同源≥4/跨源≥3 判定重复 |
@@ -2385,13 +2386,13 @@ _dedup_by_title(items)
 | 同源（same_source） | 实体 bigram ≥ 4 判定重复 | 同源不会出现"突破3万亿"vs"跌破3万亿"对立报道，bigram 足以识别 |
 | 跨源直接合并（ratio ≥ 0.65） | 需专名 bg ≥ 1 才合并 | 高相似改写重复（"英国央行如期维持利率不变" vs "英国央行以6比3票数维持利率不变"）；但不同公司同模板（"XX：2026年半年度净利润同比增长N%"）ratio 可高达 0.7+，掩码后 bg=0（公司名不同），不能当改写重复 |
 | 跨源安全区（0.50 ≤ ratio < 0.65） | 需专名 bg ≥ 2 才合并 | 旧规则直接合并导致 40-50% 误合并（"行云科技签算力合同" vs "亿田智能签算力合同" 共享模板骨架 ratio 0.542） |
-| 跨源候选区（0.35 ≤ ratio < 0.50） | bg ≥ 3 合并；bg = 2 且 ratio ≥ 0.375 且含英数/数字 token 合并 | 纯中文公司名共享（"英伟达/伟达"）不代表同一事件；CPI/PPI、荣耀IPO 类共享专名 token 的真重复靠 bg=2 梯度捕获 |
-| 方向对立（候选区内） | 共享实体 + 相反方向词分属两标题 → 不合并 | 跨源会同时出现"美联储或暂缓加息"vs"城堡证券预计美联储将加息"对立报道，同源假设不成立，必须显式防护 |
+| 跨源候选区（0.35 ≤ ratio < 0.50） | bg ≥ 3 合并；bg = 2 且 ratio ≥ 0.375 且含**真专名** token 合并 | 纯中文公司名共享（"英伟达/伟达"）不代表同一事件；CPI/PPI、荣耀IPO 类共享专名 token 的真重复靠 bg=2 梯度捕获；**英数 token 需含字母**，纯数字（100/50/4000）不算专名证据——实测旧判定使 24 对共享数字的无关标题被合并（"纳斯达克100 vs KSE-100"、"F-35战机坠毁 vs 摧毁3架F35"） |
+| 方向对立（候选区内） | 共享实体 + 相反方向词分属两标题 → 不合并（含价格方向对：站稳/跌破、走高/走低、上探/下探、回升/回落、走软/走强） | 跨源会同时出现"美联储或暂缓加息"vs"城堡证券预计美联储将加息"对立报道，同源假设不成立，必须显式防护；**不扩到安全区**——高相似对常在同一标题内同时提到两个方向词（"49股涨停2股跌停"）或对立方词属于另一主体（"标普500创纪录新高"+"油价下跌"），扩到安全区会误拦真重复（实测 6 对里 4 对属真重复） |
 | 子串包含 | 短标题（≥6 字）被长标题完整包含 | 兜底，捕获大标题含小标题的极端情况 |
 
 ##### 锚点采集体系
 
-去重判定边界案例自动采集到 `dedup_anchors.jsonl`（append-only），供 `calibrate-dedup-threshold.py` 分析阈值合理性：
+去重判定边界案例自动采集到 `data/calibration/dedup_anchors.jsonl`（append-only），供 `calibrate-dedup-threshold.py` 分析阈值合理性：
 
 | 锚点规则 | 采集条件 | 用途 |
 |:---------|:---------|:------|
@@ -2402,14 +2403,49 @@ _dedup_by_title(items)
 | `cross_skip` | 跨源候选区但 bigram 不足 | 评估是否需要降低阈值 |
 | `cross_opposite` | 共享实体但方向对立被拦截 | 验证方向对立防护不误伤 |
 
+**锚点记录字段**：`ts / title_a / title_b / source_a / source_b / ratio / bigram_overlap / merged / rule / anchor_rules_version`。
+
+**规则时代指纹（`anchor_rules_version`）**：锚点文件跨规则时代累积（append-only），
+而规则一调整旧样本就成了「另一个时代的产物」——实测混代会使校准报告严重失真
+（收紧前存量里 46% 的 `cross_skip` 样本 ratio 低于当前候选区入口、`cross_safe` 中
+508 条 `merged` 但 `bg=0`，是 0.50 直合时代留下的误合并样例）。故每条锚点写入
+`news_dedup._rules_fingerprint()` 的结果（阈值/模板词表/方向词对/归一化正则 + 行为
+探针的 SHA1 前 10 位）——**规则一改指纹自动变**，不依赖人工维护版本号；校准工具据此
+区分时代，并拿标题用当前代码重算判定（详见下）。
+
+**体积治理**：文件 append-only 且历史上未被写侧去重覆盖的轮次留下大量重复行（实测
+456,546 行 / 152 MB 中仅 51,718 个唯一标题对，重复行占 89%），而 flush 与加载都是
+全文成本（`append_jsonl_atomic_many` 读全文 → 整文件替换）。故：① 加载时超过
+32 MB 告警并指向压缩入口；② `scripts/calibrate-dedup-threshold.py --compact` 按键
+压缩（每个标题对保留**最新**一条，两遍扫描 + 原子替换，实测 152 MB → 17 MB / 2.5 s，
+幂等）。写侧去重（`_WRITTEN_ANCHOR_KEYS`）已拦截新重复——存量的重复行来自写侧去重
+生效前的批量校准轮次。
+
 ##### 校准工具
 
-`.venv/bin/python scripts/calibrate-dedup-threshold.py` 分析 `data/cache/dedup_anchors.jsonl`，输出：
+`.venv/bin/python scripts/calibrate-dedup-threshold.py` 分析 `data/calibration/dedup_anchors.jsonl`。
 
-- 各规则覆盖统计（cross_skip / cross_merge / cross_merge_bg2 / cross_safe / cross_opposite / same_src）
-- 跨源 ratio 和 bigram 分布，按 bigram 分档（bg=0 无实体重叠 / bg=1 几乎无重叠 / bg≥2 需审查）
-- 边界样本明细（前 5~10 条）
-- 阈值评估建议（区分"实体重叠漏判"与"日期/财经关键词虚高"）
+**口径（关键）**：工具**不信任锚点里的 `ratio`/`bigram_overlap`/`rule`**（它们是各次记录
+当时的规则产物），而是拿 `title_a`/`title_b` 用当前代码重算并按当前阈值重判——阈值从
+`news_dedup` 的 `_CROSS_*` / `_SAME_SRC_BIGRAM_MIN` 读取，相似度口径的唯一实现是
+`news_dedup._pair_similarity`（与链路内判定同源，由等价性用例保证）。因此结论始终反映
+**当前**规则；记录时指纹与当前不同的样本单列「历史规则时代」作参照。此前工具自写一套
+硬编码阈值（候选区 0.30 vs 代码 0.35）与建议文本，长期输出误导性结论。
+
+输出：
+
+- 文件体积/唯一标题对/规则时代分布/与记录时判定不一致条数
+- 按当前规则重判的分支分布（同源合并/未达、跨源安全合并/保留、主规则合并、专名梯度合并、方向对立、候选区跳过、未进候选区）
+- 边界分析：`cross_skip` 的实体重叠分档与「降 `_CROSS_BG2_RATIO` 会新增多少合并」（含真专名的才是漏判候选）；`cross_merge` 的 bg=3 边界；`cross_safe` 的 0.50~0.65 擦边区；同源未达阈值的重叠分布
+- 边界样本明细（默认前 10 条）与当前阈值规则摘要（数字均取自常量）
+
+`--compact` 压缩锚点文件（每标题对保留最新一条，原子替换，幂等）；`--dry-run` 兼容保留
+（仅 `--compact` 会写盘）。
+
+> **已评估但未采纳的候选（避免重复讨论）**：把方向对立防护从候选区扩到安全区。实测安全区
+> （ratio ≥ 0.50）命中方向词的 6 对样本中 4 对是**真重复**——高相似对常常在同一标题里同时
+> 提到两个方向词（"49股涨停2股跌停"）、或对立方词属于另一主体（"标普500创纪录新高" + "油价
+> 下跌"）——扩到安全区会误拦真重复，故防护仍只在候选区生效。
 
 ### 4.11 数据降级治理体系
 
@@ -2823,7 +2859,9 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **缓存**：报告元数据两周（`report_datasink_index_`）、章节正文一月（`report_datasink_doc_`），随菜单缓存命令与 TTL 管理。**数据契约** `financial_report_digest_data`（附录 H）；语义命名行见 §6.7。
 
-**数据源说明表**：「数据源可用性矩阵」章在健康度表后附「数据源说明（实际使用清单）」表——逐数据类别列实际链路、用途、计费（财报全文随 `datasink.plan` 动态展示免费/付费档）与凭据要求（是否需 key + 就绪状态），并标本次运行是否实际使用（`report/data_source_matrix.py::build_data_source_catalog`，前缀取自 `_SOURCE_CATEGORIES`、计费取自 provider 套餐表，单一事实来源）。**「本次使用」判定口径**：该类别的取数链路在**取得数据时**（含命中缓存的返回）经 `report/data_status.py::mark_data_used()` 记一条成功事件，说明表据事件前缀判定 `used`；**只记成功、不记降级**——章节名 fuzzy 未命中、标的不在源覆盖范围等预期内空结果不计入 T2 连续失败阈值（否则会把预期内空结果误报为源故障），失败与降级仍由 provider 日志、章节失败清单与链路 FailureDiagnostics 披露。因此 `未使用` 的含义是「本次未取到该类数据」，**不等于**源故障；对 DataSinking 类源另注明「需开启哪些功能开关才会取用」。类别清单含 `financial_report`（`report_datasink_`）与 `financial_indicator`（`fin_indicator_`），两者同时进入可用性矩阵与说明表。
+**数据源说明表**：「数据源可用性矩阵」章在健康度表后附「数据源说明（实际使用清单）」表——逐数据类别列实际链路、用途、计费（财报全文随 `datasink.plan` 动态展示免费/付费档）与凭据要求（是否需 key + 就绪状态），并标本次运行是否实际使用（`report/data_source_matrix.py::build_data_source_catalog`，前缀取自 `_SOURCE_CATEGORIES`、计费取自 provider 套餐表，单一事实来源）。**「本次使用」判定口径**：该类别的取数链路在**取得数据时**（含命中缓存的返回）经 `report/data_status.py::mark_data_used()` 记一条成功事件，说明表据事件前缀判定 `used`；**只记成功、不记降级**——章节名 fuzzy 未命中、标的不在源覆盖范围等预期内空结果不计入 T2 连续失败阈值（否则会把预期内空结果误报为源故障），失败与降级仍由 provider 日志、章节失败清单与链路 FailureDiagnostics 披露。因此 `未使用` 的含义是「本次未取到该类数据」，**不等于**源故障；对 DataSinking 类源另注明「需开启哪些功能开关才会取用」。类别清单含 `financial_report`（`report_datasink_`）与 `financial_indicator`（`fin_indicator_`），两者同时进入可用性矩阵与说明表；含同花顺兜底槽位的类别（`price` / `fund_hold` / `history` / `financial_indicator`）在「实际数据源（链路）」列显式列出「→ 同花顺金融数据（…，需 key）」，市场情绪（`sentiment`，同花顺**唯一源**）单列一行并附 key 就绪态。
+
+**矩阵「命中源」列（provider 级归属）**：矩阵行除了类别健康度，还叠加一层 provider 级归属，回答使用者最常问的「我配的 key 到底被用上了吗」——类别健康度事件（`price_price_stock_600900` 这类键）只含代码不含 provider，**同花顺作为兜底槽接管时旧口径在报告里一字未提**，导致使用者误以为 key 未生效。修复：链路在某个 provider 成功返回时经 `report/data_status.py::mark_provider_used(data_type, provider_id, 展示名)` 登记（`fetcher/chain.py` 的 `fetch_with_fallback` 与 `_try_providers` 两处成功分支 + 同花顺独占的 `report/market_sentiment.py`、`fetcher/financial_indicator.py` 多期序列支路），矩阵按 `_SOURCE_CATEGORIES` 各行的 `data_types` 声明映射归入对应行并渲染为 `名称 ×次数`（按次数降序；无归属显示 `—`）。登记表存放于 `data_status.py` 模块级字典而非 DegradationTracker——归属是纯观测事实，既不参与降级计数，也不在 `.degradation_state.json` 里堆积 provider 键；归属只反映**本次网络取数**，命中缓存时该列为 `—` 而说明表「本次使用」仍为已使用（两列并读即得「用了谁的数」与「有没有取到」）。历史日 K 等类别只登记缓存键、不记降级事件，其矩阵行由 provider 归属单独成立（详情写「取数 N 次（无降级事件）」）。链路的 data_type 必须全部有归属类别，否则命中源静默丢失——`UNMAPPED_CHAIN_DATA_TYPES` 登记有意不进矩阵者（如 `bond_yield`），由 `test_data_source_matrix.py` 的不变式用例强制。附带修复：矩阵类别补齐 `history`（历史走势）与 `sentiment`（市场情绪），与 `datasource.md` 已登记的类别口径一致。
 
 [↑ 回到顶部](#目录)
 
@@ -3275,6 +3313,10 @@ make_http_client(timeout=10.0) → httpx.Client
 | `config_backup` | 配置写前备份（`.bak` 单槽轮转） | Web 配置 | 配置编辑 | 无（安全面） |
 | `report_section_order` | 报告模块序号配置（键=模块标识，值=序号；空对象用默认 17 项顺序） | 报告编排 | 报告配置 | 顶层配置键 `report_section_order`（`get_report_section_order()` 读取，`llm_usage` 强制末位） |
 | `generators_news` | 财经新闻 LLM 关联分析（新闻热词→持仓关联二次生成） | 财经新闻热点与持仓关联分析 | LLM 生成 | 随 `enable_news` + LLM 启用 |
+| `_pair_similarity` | 标题相似度口径的唯一实现（归一化 → 日期剥离 → 英文分桶占位 → 双向 ratio + 实体 bigram 交集；链路判定与校准工具共用，防两套口径漂移） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
+| `anchor_rules_version` | 锚点规则时代指纹字段（`_rules_fingerprint()` 由阈值/模板词表/方向词对/正则 + 行为探针派生，规则一改自动变，供校准工具区分时代） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
+| `news_dedup_rules` | 去重规则原语模块（阈值常量 / 模板词表与掩码 / 标题归一化 / 实体 bigram / 相似度口径 / 方向词对 / 规则指纹的唯一实现） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
+| `record_prosperity_diagnosis` | 景气度框架诊断挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供） | 行动建议（章内嵌块） | 报告输出 | 实验开关 `prosperity_framework`（默认关） |
 | `module_fingerprint` | LLM 模块缓存指纹唯一事实来源（预检侧与写侧同源） | LLM 生成 | LLM 生成 | 无（模块级） |
 | `decision_reflection` | 决策跨期反思闭环（登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词） | 行动建议 | 监控 | 实验开关 `decision_reflection`（默认关） |
 | `decision_ledger` | 决策账本（append-only JSONL，pending/settled 折叠统计） | 行动建议 | 监控 | 随 `decision_reflection` |
@@ -3313,6 +3355,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `datasource_credential_ready` | 数据源凭据就绪指引（声明 → 就绪判定 → 可读指引） | 数据源可用性矩阵 | 监控 | 开关 `datasource_credential_ready`（默认开，非实验项） |
 | `credential_spec` | 数据源凭据声明（`CredentialSpec` 冻结 dataclass + `CREDENTIAL_SPECS` 注册表） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
 | `credential_readiness` | 凭据就绪矩阵与缺失指引（`missing_credential` / `credential_hint` / `credential_readiness`） | 数据源可用性矩阵 | 监控 | 随 `datasource_credential_ready` |
+| `mark_provider_used` | provider 级归属登记（链路成功时记「本数据类别由此 provider 服务」；矩阵「命中源」列数据来源） | 数据源可用性矩阵 | 监控 | 无（观测记录，不改产物判定） |
+| `get_provider_usage` | provider 归属登记表快照（`{data_type: {provider_id: {count, label}}}`） | 数据源可用性矩阵 | 监控 | 无 |
+| `reset_provider_usage` | 清空 provider 归属登记表（测试隔离） | 数据源可用性矩阵 | 监控 | 无 |
 | `enable_interactive_charts` | 报告图表交互（6 图 Chart.js 渲染，含离线/无引擎守卫与 Canvas 回退） | 投资分析汇总 / 资产穿透TOP10 / 持仓结构与集中度等图表区 | 报告输出 | 常规开关（默认开） |
 | `datasource_adapter` | 数据源适配契约（三段式适配 + 行情域三源等价性校验） | 数据源可用性矩阵 | 数据获取 | 常规开关（默认开；不改报告产物，只影响取数路径校验口径） |
 | `llm_debate_procon` | 辩论-正反辩论（三段式：白脸 → 黑脸 → 综合） | 智囊团深度复盘 | LLM 注入 | 实验开关（默认关） |
@@ -3456,7 +3501,7 @@ web/ (Web 服务层，薄入口)
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在附录 H（pipeline_data Schema 定义）中预定义类型、可选性、写入/消费模块后，才能在代码中使用该键 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
 | **C20** | **HTML 图表图下说明强制** — HTML 报告中每张图表下方必须渲染图下说明（`.chart-caption`），明确标注该图表是什么、用途是什么；说明必须跟随对应图表 canvas 的渲染分支一同出现（图表有数据 → 说明出现，图表空数据 → 说明不出现） | 图表无说明时用户无法快速理解该图的含义与用途，可读性下降；屏幕阅读器等无障碍场景无法获得图表意图 | 代码评审不通过；图下说明缺失或与图表渲染分支不一致 | 模板 `report_template.html`（所有 chart canvas 渲染处，含净值/回撤/资产构成/行业分布/穿透 TOP10/量化指标 radar 共 6 处）、`chart-*` 前端图表模块 |
 | **C25** | **时间距离一律以交易日计** — 凡「距今多久」用于判定**数据新鲜度/停更/跳空/持仓期/观察期**的场景，一律以**交易日**计数，禁止用自然日差；交易日来源唯一为 `core/trading_calendar.py`（`count_trading_days_elapsed` / `get_last_trading_day` / `get_prev_trading_day`），各模块不得自建日历或另写自然日差。自然日差仅可用于本身就以自然日定义的量（如静默期天数、缓存 TTL） | 交易日与自然日在长假/周末处相差十数个自然日：按自然日差判定，长假前后的两个相邻交易日会被判为「延迟」「停更」「数据跳空」；在非交易日运行报告时，运行时刻与最近交易日天然相差一个自然日，会把正常的 T-1 净值误报为滞后 | 报告在长假后/非交易日运行即出现成批假告警（数据质量「延迟」、因子被误剔除、K 线被误判跳空、新仓观察期被误判已过），用户据假告警排查错误方向 | `core/trading_calendar.py`（唯一实现，`report/market_value.py` 按原公共名重新导出保持既有导入路径）、`fetcher/chain.py`（跳空判定）、`analysis/style_factor_regression.py`（停更因子剔除）、`analysis/rebalance.py`（新仓观察期）、`core/data_freshness.py` 及其消费方（报告「数据质量」维度、提示词新鲜度基准） |
-| **C22** | **报告管线实验挂载点集中** — 接入报告管线的实验功能必须经 `report/_experimental_seams.py` 的挂载点函数接入，禁止在 `_generate_report_full` 内联 `try/except` 守护；所有挂载点共享同一契约「**实验功能自身的异常绝不中断报告主链路**」（降级为一条告警 + 一条异常日志），且**挂载点工序顺序固定**——结算先于 LLM 拉取、质量横幅晚于决策登记、信号沉淀晚于 LLM 生成 | 守护判据复制即漂移：四处内联 try/except 时改一处必漏三处（与缓存指纹「读写两份拼接」同一病根）；顺序调换会使当次教训读不到新结算结果、横幅改写文本污染决策表解析、尾部风险等迟到键漏采 | 实验功能异常中断整条报告链路；实验结论静默失真（结算/沉淀漏采、解析污染）且无异常可循 | `report/_report_generation.py`（唯一调用点，仅按序调用挂载点）、`report/_experimental_seams.py`（唯一守护实现）、所有向 `pipeline_data` 注入数据的实验功能 |
+| **C22** | **报告管线实验挂载点集中** — 接入报告管线的实验功能必须经 `report/_experimental_seams.py` 的挂载点函数接入，禁止在 `_generate_report_full` 内联 `try/except` 守护；所有挂载点共享同一契约「**实验功能自身的异常绝不中断报告主链路**」（降级为一条告警 + 一条异常日志），且**挂载点工序顺序固定**——结算先于 LLM 拉取、质量横幅晚于决策登记、信号沉淀晚于 LLM 生成、景气度框架诊断晚于基本面契约与历史走势就绪 | 守护判据复制即漂移：四处内联 try/except 时改一处必漏三处（与缓存指纹「读写两份拼接」同一病根）；顺序调换会使当次教训读不到新结算结果、横幅改写文本污染决策表解析、尾部风险等迟到键漏采 | 实验功能异常中断整条报告链路；实验结论静默失真（结算/沉淀漏采、解析污染）且无异常可循 | `report/_report_generation.py`（唯一调用点，仅按序调用挂载点）、`report/_experimental_seams.py`（唯一守护实现，四条挂载点在 `_generate_report_full` 工序内、`record_prosperity_diagnosis` 在两条 HTML 生成路径内）、所有向 `pipeline_data` 注入数据的实验功能 |
 
 ### 8.4 LLM 集成层约束
 
@@ -3785,7 +3830,7 @@ investor-util/
 | `llm_settings.json`（非敏感 LLM 设置） | `_llm_settings_defaults._DEFAULT_LLM_SETTINGS`（全局 2 项 + 5 模块块 + 辩论 + 事实校验 + 计价） | `_llm_settings_defaults._get_default_llm_settings_template()`（逐行手拼，与 dict 深等，见一致性测试） | `_llm_settings.get_llm_config()`：合并 settings+key+providers 三文件，联合 mtime/size 失效；`_merge_llm_defaults()` 运行时按 `_DEFAULT_LLM_SETTINGS` 补齐缺失键 | `_ensure_llm_settings_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑；`_ensure_llm_settings_file` 仅首次创建） | `llm/pricing.py`（计价覆盖）、`llm/generators.py`、`llm/generators_orchestrator.py`、`llm/prompts_action.py`、`llm/skeleton.py`、`report/news_correlation.py`、`cli/cli.py`、`tui/tui_menu.py` + `tui/handlers_config.py`、`config/_validation.py` |
 | `llm_key.json`（敏感凭据） | 无（**C18 凭据分离**，代码默认值禁止内置 api_key） | 无模板 | `_llm_providers._load_llm_key_credentials()`（多凭据块字典；单凭据 flat 自动升级为 `_default`）；`get_llm_config()` 内联读取并合并覆盖同名字段（provider/endpoint 合法性告警） | 不自动创建；缺失时 `get_llm_config()` 回退判断 providers 链模式，两者皆无则 LLM 不可用（`generators_orchestrator` 降级占位） | `startup_wizard._write_llm_key_flat()`（首次引导交互式写入，C3 原子写） | `get_llm_config()` 合并主体；`_load_llm_key_credentials()` → providers 链 `credentials_ref` 凭据注入 |
 | `llm_providers.json`（多 Provider 链） | `_llm_providers_defaults._DEFAULT_LLM_PROVIDERS`（strategy=priority + 2 条示例链） | `_llm_providers_defaults._get_default_llm_providers_template()` | `_llm_providers._load_llm_providers()`（原始 JSON，根非 object/解析失败返回 None）；`get_llm_config()` 链模式（无 llm_key.json 时直接注入链数据）；`_inject_provider_chain_data()` 注入多链路由结果 | `_core._ensure_llm_providers_file()` 自动创建（`init_config()` 级联） | 无程序化写入（用户手动编辑 / init 自动创建） | `get_llm_config()`（链模式无 key 依赖）；`startup_wizard.py`（就绪检查：key 存在 或 providers 有链）；`_inject_provider_chain_data` |
-| `features.json`（Feature Flag 覆写） | `features.feature_switch_registry`（29 项声明，每条含显示名 + 说明 + 分组 + 默认值 + 是否改变产物五项；`_FEATURE_FLAGS_DEFAULT` 是其**派生投影**，非独立登记点）。实验组 5（辩论 2 + 决策反思 1 + 确定性信号沉淀 1 + 景气度框架诊断 1，默认关）+ 常规组 16（信号预消化 1 + 模块质量分级 1 + 决策头结构化 1 + 辩论条件推理 1 + 数据源凭据就绪 1 + 量化指标 7 + 交互图表 1 + 系统自检 1 + 数据源适配 1 + 联接基金穿透 1，默认开）+ 报告组 8（数据质量 / 市场温度 / 行业 Beta / 候选比较 / 成本流水 / 估值分位 / 财报摘要 / 财务指标，两项默认开）；分组即面板分块，决定该开关是否上屏与是否进产物自述（实验组 ∧ `affects_report`）；**只登记有消费者的开关**——LLM 模块启停与基金深度分析归 `llm_settings.json` 的 `enabled_llm`，新闻源 / 历史走势 / 匿名化归 `config.json`，这些能力不再在 features.json 另立同义开关，由 `test_features.py::TestRegistryLiveness` 逐项守住；命令行一次性开关见 `features.resolve_experiment_flags` / `describe_experiment_flags`（`--experiment`，实验组、只开）与 `features.parse_switch_override` / `resolve_switch_values` / `describe_switches`（`--feature NAME=VALUE`，全域、双向），两者与注册表同源 | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；无消费者键仍加载、但合并为一条 WARNING 列出键名——这类配置不驱动任何行为，静默忽略会让用户以为已生效；非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化）+ Web `web/config_edit.py`（配置面板写入，白名单由注册表生成） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`core/decision_ledger.py`（决策跨期反思闭环）、`llm/prompts_signals.py`（信号预消化，开关判定收敛于缓存后缀函数）、`report/llm_quality.py`（模块质量分级，§4.11）、`core/decision_header.py`（决策头结构化缓存后缀，§4.15）、`core/signal_ledger.py`（确定性信号沉淀，开关判定收敛于摘要函数，§4.16）、`core/doctor.py`（系统自检功能清单上屏，§4.17.3）、`web/handlers.py`（自检卡片可见性，§4.17.3）、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态）、`tui/tui_menu.py`（菜单项门控）、`web/config_edit.py`（面板状态） |
+| `features.json`（Feature Flag 覆写） | `features.feature_switch_registry`（30 项声明，每条含显示名 + 说明 + 分组 + 默认值 + 是否改变产物五项；`_FEATURE_FLAGS_DEFAULT` 是其**派生投影**，非独立登记点）。实验组 5（辩论 2 + 决策反思 1 + 确定性信号沉淀 1 + 景气度框架诊断 1，默认关）+ 常规组 16（信号预消化 1 + 模块质量分级 1 + 决策头结构化 1 + 辩论条件推理 1 + 数据源凭据就绪 1 + 量化指标 7 + 交互图表 1 + 系统自检 1 + 数据源适配 1 + 联接基金穿透 1，默认开）+ 报告组 9（数据质量 / 市场温度 / 行业 Beta / 候选比较 / 成本流水 / 估值分位 / 财报摘要 / 财务指标 / 市场情绪，两项默认开）；分组即面板分块，决定该开关是否上屏与是否进产物自述（实验组 ∧ `affects_report`）；**只登记有消费者的开关**——LLM 模块启停与基金深度分析归 `llm_settings.json` 的 `enabled_llm`，新闻源 / 历史走势 / 匿名化归 `config.json`，这些能力不再在 features.json 另立同义开关，由 `test_features.py::TestRegistryLiveness` 逐项守住；命令行一次性开关见 `features.resolve_experiment_flags` / `describe_experiment_flags`（`--experiment`，实验组、只开）与 `features.parse_switch_override` / `resolve_switch_values` / `describe_switches`（`--feature NAME=VALUE`，全域、双向），两者与注册表同源 | 无模板（缺省全量在代码内，文件仅存需覆写的子集） | `features.load_feature_overrides()`（模块导入时自动调用，覆写合并进内存 `FEATURE_FLAGS`；无消费者键仍加载、但合并为一条 WARNING 列出键名——这类配置不驱动任何行为，静默忽略会让用户以为已生效；非 bool 值忽略） | **惰性创建**：缺失不创建、直接走代码默认；仅 `save_feature_overrides()` 时才写盘 | `features.save_feature_overrides()`（原子写，`merge=True` 默认合并同名覆写）；TUI `handlers_config.py`（菜单开关持久化）+ Web `web/config_edit.py`（配置面板写入，白名单由注册表生成） | `is_feature_enabled()` 遍布：`llm/generators.py` + `generators_orchestrator.py`（辩论模式）、`report/_report_generation.py`（交互图表/指标开关）、`report/_debate_utils.py`、`core/decision_ledger.py`（决策跨期反思闭环）、`llm/prompts_signals.py`（信号预消化，开关判定收敛于缓存后缀函数）、`report/llm_quality.py`（模块质量分级，§4.11）、`core/decision_header.py`（决策头结构化缓存后缀，§4.15）、`core/signal_ledger.py`（确定性信号沉淀，开关判定收敛于摘要函数，§4.16）、`core/doctor.py`（系统自检功能清单上屏，§4.17.3）、`web/handlers.py`（自检卡片可见性，§4.17.3）、`analysis/circuit_breaker_wrapper.py`（熔断特性开关）、`tui/handlers_config.py`（菜单状态）、`tui/tui_menu.py`（菜单项门控）、`web/config_edit.py`（面板状态） |
 
 #### I.1.1 解析职责归属（协调者 vs 委托）
 

@@ -1,6 +1,8 @@
-"""新闻去重模块 — 标题模糊去重 + 实体 bigram 辅助判定 + 锚点采集。
+"""新闻去重主流程 — 标题模糊去重 + 锚点采集。
 
-包含 _dedup_by_title 去重核心逻辑及其依赖的所有常量和辅助函数。
+判定口径（阈值常量 / 模板词表 / 归一化 / 实体 bigram / 相似度 / 方向词对 / 规则指纹）
+在 ``providers/news_dedup_rules.py``；本模块负责锚点采集与比较循环，并原面
+re-export 规则原语（``from ...news_dedup import _normalize_title`` 等既有引用不受影响）。
 """
 
 from __future__ import annotations
@@ -8,12 +10,38 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import threading
 from typing import Any
 
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.jsonl_store import append_jsonl_atomic_many
+
+from src.python.providers.news_dedup_rules import (  # noqa: F401
+    # 规则原语全部再导出：既有 import 面（测试 / 校准工具 / 报告层）保持不变
+    ANCHOR_RULES_FIELD,
+    _ANCHOR_RULES_VERSION,
+    _CROSS_BG2_RATIO,
+    _CROSS_BIGRAM_MIN,
+    _CROSS_CANDIDATE_RATIO,
+    _CROSS_DIRECT_RATIO,
+    _CROSS_SAFE_RATIO,
+    _ENG_PLACEHOLDER,
+    _OPPOSITE_PAIRS,
+    _RATIO_CLEAN,
+    _SAME_SRC_BIGRAM_MIN,
+    _STOP_BIGRAMS,
+    _STOP_MASK_RE,
+    _TOKEN_LIKE,
+    _eng_len_placeholder,
+    _extract_entity_bigrams,
+    _has_opposite_direction,
+    _mask_stop,
+    _normalize_title,
+    _overlap_of_norms,
+    _pair_similarity,
+    _ratio_of_norms,
+    _rules_fingerprint,
+)
 
 logger = logging.getLogger("invest")
 
@@ -22,7 +50,7 @@ logger = logging.getLogger("invest")
 # aggregate_news() 结束时追写至 data/calibration/dedup_anchors.jsonl。
 # 一条记录为一个 JSON 行，append-only。格式：
 #   {"ts","title_a","title_b","source_a","source_b",
-#    "ratio","bigram_overlap","decision","rule"}
+#    "ratio","bigram_overlap","merged","rule","anchor_rules_version"}
 _ANCHOR_RECORDS: list[dict[str, Any]] = []
 _ANCHOR_LOCK = threading.Lock()
 _ANCHOR_PATH = os.path.join(
@@ -31,6 +59,8 @@ _ANCHOR_PATH = os.path.join(
     "calibration",
     "dedup_anchors.jsonl",
 )
+#: 体积告警线：超过此值在加载时提醒压缩（flush 写全文、加载解析全文件，均是全文成本）
+_ANCHOR_SIZE_WARN_BYTES = 32 * 1024 * 1024
 
 # 进程级"已写锚点 key"集合 — 防止同一对 (source,title) 在多轮运行中重复追加。
 # 背景：锚点文件 append-only，同一对新闻在每次真实抓取进入候选区时都会重新记录，
@@ -55,8 +85,12 @@ def _anchor_key(record: dict[str, Any]) -> str:
 def _load_written_keys() -> None:
     """惰性加载锚点文件已有 key 到 _WRITTEN_ANCHOR_KEYS（进程生命周期内一次）。
 
-    首次 flush 前调用，读一次现有文件（~110k 行/35MB，一次性成本），
-    之后所有 flush 仅内存比对。文件不存在或为空时静默返回空集合。
+    首次 flush 前调用，读一次现有文件，之后所有 flush 仅内存比对。文件不存在或
+    为空时静默返回空集合。
+
+    **体积关注**：本文件 append-only 且历史累积（曾达数百 MB、重复行占近九成），
+    而 flush 走 ``append_jsonl_atomic_many``（读全文 → 整文件替换）——文件越大，
+    每轮报告写盘成本越高。超过 ``_ANCHOR_SIZE_WARN_BYTES`` 时告警并指向压缩入口。
     """
     global _WRITTEN_KEYS_LOADED
     with _WRITTEN_KEYS_LOCK:
@@ -65,6 +99,18 @@ def _load_written_keys() -> None:
         _WRITTEN_KEYS_LOADED = True
         if not os.path.exists(_ANCHOR_PATH):
             return
+        try:
+            size = os.path.getsize(_ANCHOR_PATH)
+        except OSError:
+            size = 0
+        if size > _ANCHOR_SIZE_WARN_BYTES:
+            logger.warning(
+                "[dedup] 锚点文件已 %.1f MB（超过 %.0f MB 建议线）：flush 需读写全文、加载需解析全文件。"
+                "建议运行 `python scripts/calibrate-dedup-threshold.py --compact` 压缩（保留每个标题对最新一条）：%s",
+                size / 1e6,
+                _ANCHOR_SIZE_WARN_BYTES / 1e6,
+                _ANCHOR_PATH,
+            )
         try:
             with open(_ANCHOR_PATH, encoding="utf-8") as f:
                 for line in f:
@@ -86,67 +132,6 @@ def _record_anchor(record: dict[str, Any]) -> None:
         _ANCHOR_RECORDS.append(record)
 
 
-def _normalize_title(title: str) -> str:
-    """标准化标题：去标点、去空格、去常见前缀，过滤通用数字模式降虚高。
-
-    数字模式（百分比、金额、年份、排名标记）在不同新闻中可能无意共享，导致
-    SequenceMatcher 比率虚高和实体 bigram 中数字 token 的虚假重叠。
-    过滤后同时降低 bigram 提取噪声和比率比较的误判。
-
-    用于跨源标题去重，消除"快讯：""收评"等差异。
-    """
-    for prefix in (
-        "快讯",
-        "收评",
-        "收盘",
-        "早评",
-        "午评",
-        "盘中",
-        "盘后",
-        "数据图解",
-        "CCI快报",
-        "市场动态",
-        "市场洞察",
-        "行业深度",
-        "周刊提前读",
-        "公司观察",
-        "量化观察",
-        "刷屏",
-        "尾盘",
-        "华尔街见闻早餐",
-    ):
-        if title.startswith(prefix):
-            title = title[len(prefix) :]
-            break
-    # 同义收盘术语归一（收评/收盘/午评）：三者为同一收评簇语义（每日/午间
-    # 市场收盘汇总），只在标题开头时被上方前缀剥离，出现在标题中段（如
-    # "港股收评""港股午评"）会保留差异，导致相同收评簇共享 bigram 不足而漏判。
-    # 校准发现 cross_skip 漏判簇（"港股收评恒指涨0.07%…" vs "8月18日港股收盘
-    # 恒指涨0.07%…"）。归一为"收评"后两边带上同一 bigram 对齐，overlap 由 2 升至
-    # 4、ratio≥0.50，进入安全区合并；且仅增不减，不破坏既有合并。
-    title = title.replace("收盘", "收评").replace("午评", "收评")
-    # 过滤通用数字模式，避免跨源去重时不同新闻因共享
-    # "20%""25亿"等数字模式而获得虚高 SequenceMatcher 比率。
-    # 日期模式（2026年/7月/8日）已在 _dedup_by_title 的 _RATIO_CLEAN 中处理，
-    # 但前导日期（如 "7月18日美股成交额前20"）在 bigram 提取前剥离。
-    title = re.sub(r"\d+(?:\.?\d+)?%", "", title)  # 20%、2.5%
-    title = re.sub(r"\d+(?:\.?\d+)?[万亿]", "", title)  # 25亿、1.2万亿
-    # 孤立 4 位年份数字（如 "WAIC 2026" → "WAIC"），避免不同年报道因共享英文
-    # 事件名 + 不同年份标识导致 SequenceMatcher 比率虚高。
-    title = re.sub(r"(?<=[a-zA-Z])\s*\d{4}\b", "", title)
-    # 排名/列表标记（"前20""前10"），可安全移除的修饰语
-    title = re.sub(r"前\d+", "", title)
-    # 孤立 4 位年份数字（1900-2099），避免不同新闻因共享"2026"等年份数字
-    # 在实体 bigram 提取和 SequenceMatcher 中产生虚假重叠。
-    title = re.sub(r"\b(?:19|20)\d{2}\b", "", title)
-    # 地震等量级模式（"3.5级""4.4级"），剥离后避免"级地震"模板虚高
-    title = re.sub(r"\d+(?:\.?\d+)?级", "", title)
-    # ⚠ 保留空格：剥离标点但保留单词间空格，避免英文 token 粘连
-    # （"Blackwell AI" → blackwellai 无法切分，导致同事件两标题英文 token 不重叠）。
-    title = re.sub(r"[^\w一-鿿 ]", "", title)
-    return title.strip().lower()
-
-
 def _make_anchor(
     item_a: dict[str, Any],
     item_b: dict[str, Any],
@@ -155,7 +140,12 @@ def _make_anchor(
     merged: bool,
     rule: str,
 ) -> dict[str, Any]:
-    """构建一条锚点记录（边界案例），用于后续阈值校准。"""
+    """构建一条锚点记录（边界案例），用于后续阈值校准。
+
+    记录带 ``anchor_rules_version``（:data:`_ANCHOR_RULES_VERSION`）——校准工具
+    据此区分「哪个规则时代」的样本；同一标题对也可用标题重算（见
+    :func:`_pair_similarity`）。
+    """
     return {
         "ts": item_a.get("ctime", "") or item_b.get("ctime", ""),
         "title_a": item_a.get("title", ""),
@@ -166,6 +156,7 @@ def _make_anchor(
         "bigram_overlap": bigram_overlap,
         "merged": merged,
         "rule": rule,
+        ANCHOR_RULES_FIELD: _ANCHOR_RULES_VERSION,
     }
 
 
@@ -216,502 +207,38 @@ def _flush_anchors() -> None:
             _WRITTEN_ANCHOR_KEYS.discard(_anchor_key(r))
 
 
-# ── 高频财经常见动词/形容词/副词 — 不作为实体判定依据 ──────
-# ⚠ 2026-08-17 校准扩充：财报/回购/指数/预警/地震/目标价等模板词
-# 此前未覆盖，导致任何两条同类新闻（不同公司业绩快报、回购公告、指数行情、
-# 天气预警）天然共享 3-6 个 bigram，跨源 bg≥3 形同虚设（实测误合并 ~70-80%）。
-# 提取 bigram 前先整体掩码替换为占位符（见 _mask_stop），彻底消除模板词贡献，
-# 也杜绝"累计|回购"跨词边界 bigram（计回）泄漏。
-_STOP_BIGRAMS: set[str] = {
-    # 原有高频动词/形容词
-    "上调",
-    "下跌",
-    "上涨",
-    "超越",
-    "低于",
-    "高于",
-    "首次",
-    "今日",
-    "昨日",
-    "本周",
-    "上周",
-    "本月",
-    "上月",
-    "盘中",
-    "盘后",
-    "早盘",
-    "午盘",
-    "收盘",
-    "开盘",
-    "不会",
-    "将会",
-    "成为",
-    "宣布",
-    "公布",
-    "发布",
-    "推动",
-    "发力",
-    "实现",
-    "加大",
-    "降低",
-    "回升",
-    "有望",
-    "再度",
-    "时隔",
-    # 高频数理/报道用词
-    "同比",
-    "环比",
-    "预计",
-    "累计",
-    "显示",
-    "预期",
-    "影响",
-    "明显",
-    "相关",
-    "报告",
-    "数据",
-    "来源",
-    "表示",
-    "认为",
-    "其中",
-    "分别",
-    "总额",
-    "规定",
-    # ── 财报/业绩模板词 ──
-    "增长",
-    "下降",
-    "上升",
-    "下滑",
-    "扭亏",
-    "为盈",
-    "大增",
-    "大降",
-    "翻倍",
-    "净利",
-    "利润",
-    "归母",
-    "营收",
-    "收入",
-    "业绩",
-    "预增",
-    "预减",
-    "超出",
-    "不及",
-    "符合",
-    "超过",
-    "达到",
-    "接近",
-    "突破",
-    "创下",
-    "创出",
-    "创新",
-    "同期",
-    "季度",
-    "半年",
-    "年度",
-    "第一",
-    "第二",
-    "第三",
-    "第四",
-    "发生",
-    "截至",
-    "补充",
-    "暂缓",
-    "目前",
-    "此前",
-    "近日",
-    "今天",
-    "明天",
-    # ── 资本运作模板词 ──
-    "回购",
-    "增持",
-    "减持",
-    "股份",
-    "注销",
-    "股权",
-    "持股",
-    "股东",
-    "市值",
-    "股价",
-    "股本",
-    "流通",
-    "重组",
-    "并购",
-    "收购",
-    "出售",
-    "转让",
-    "质押",
-    "解禁",
-    "分红",
-    "派息",
-    "定增",
-    "配股",
-    "控股",
-    "全资",
-    "旗下",
-    "子公司",
-    "母公司",
-    "融资",
-    "募资",
-    "投资",
-    "入股",
-    "参股",
-    # ── 行情/指数模板词 ──
-    "指数",
-    "涨幅",
-    "跌幅",
-    "走强",
-    "走弱",
-    "收涨",
-    "收跌",
-    "低开",
-    "高开",
-    "翻红",
-    "翻绿",
-    "涨停",
-    "跌停",
-    "大涨",
-    "大跌",
-    "暴涨",
-    "暴跌",
-    "反弹",
-    "回落",
-    "成交",
-    "成交量",
-    "成交额",
-    "板块",
-    "主力",
-    "资金",
-    "净买",
-    "净卖",
-    "流入",
-    "流出",
-    "美股",
-    "港股",
-    "a股",
-    "期指",
-    "期货",
-    "合约",
-    "基准",
-    "点位",
-    "关口",
-    "大关",
-    "涨超",
-    "跌超",
-    "盘初",
-    "新高",
-    "新低",
-    "扩大",
-    "收窄",
-    # ── 预警/天气模板词 ──
-    "预警",
-    "暴雨",
-    "台风",
-    "高温",
-    "橙色",
-    "红色",
-    "黄色",
-    "蓝色",
-    "地震",
-    "震源",
-    "深度",
-    "洪水",
-    "干旱",
-    "寒潮",
-    "霜冻",
-    "雷电",
-    "大风",
-    "冰雹",
-    "信号",
-    "海啸",
-    # ── 评级/观点模板词 ──
-    "评级",
-    "目标价",
-    "目标",
-    "买入",
-    "卖出",
-    "持有",
-    "下调",
-    "重申",
-    "给予",
-    "维持",
-    "看多",
-    "看空",
-    "中性",
-    "超配",
-    "低配",
-    "展望",
-    "判断",
-    "加息",
-    "降息",
-    # ── 新闻格式模板词 ──
-    "报道",
-    "消息",
-    "回应",
-    "澄清",
-    "声明",
-    "公告",
-    "通知",
-    "提醒",
-    "提示",
-    "出炉",
-    "落地",
-    "进展",
-    "更新",
-    "详情",
-    "汇总",
-    "速览",
-    "快讯",
-    "披露",
-    "获悉",
-    "透露",
-    "据悉",
-    "知情",
-    # ── 连接/修饰词 ──
-    "拟将",
-    "或将",
-    "已获",
-    "共计",
-    "合计",
-    "凌晨",
-    "上午",
-    "下午",
-    "晚间",
-    "深夜",
-    "同时",
-    "此外",
-    "本次",
-    "可能",
-    "或许",
-    "仍然",
-    "依然",
-    "已经",
-    "正在",
-    "即将",
-    "日前",
-    "年内",
-    "至今",
-    "计划",
-    "方案",
-    "主席",
-    "会议",
-    # ── 数量/货币/单位 ──
-    "金额",
-    "规模",
-    "价值",
-    "合同",
-    "订单",
-    "签约",
-    "中标",
-    "招标",
-    "额度",
-    "数量",
-    "港元",
-    "美元",
-    "欧元",
-    "日元",
-    "英镑",
-    "韩元",
-    "澳元",
-    "加元",
-    "人民币",
-    "泰铢",
-    "卢布",
-    "台币",
-    "万股",
-    "亿股",
-    # ── 通用业务/技术名词 ──
-    "公司",
-    "集团",
-    "业务",
-    "产品",
-    "项目",
-    "政策",
-    "措施",
-    "机制",
-    "体系",
-    "结构",
-    "升级",
-    "转型",
-    "布局",
-    "推进",
-    "深化",
-    "优化",
-    "完善",
-    "健全",
-    "加强",
-    "强化",
-    "模式",
-    "场景",
-    "平台",
-    "生态",
-    "赛道",
-    "行业",
-    "科技",
-    "芯片",
-    "算力",
-    "服务",
-    "签订",
-    "恢复",
-    "设备",
-    "检查",
-    "工厂",
-    "工作",
-    "需要",
-    "时间",
-    "性能",
-    "采用",
-    # ── 地区修饰词 ──
-    "全国",
-    "全球",
-    "国际",
-    "国内",
-    "海外",
-    "境内",
-    "境外",
-}
-
-# 停用词掩码正则（长词优先，防重叠替换）：
-# "累计回购" → "□□"，杜绝跨词边界 bigram（计回/购股）泄漏；
-# 中文 bigram 提取时跳过含占位符的滑窗，使模板词彻底不贡献实体重叠。
-_STOP_MASK_RE = re.compile("|".join(re.escape(w) for w in sorted(_STOP_BIGRAMS, key=len, reverse=True)))
-
-
-def _mask_stop(text: str) -> str:
-    """将停用模板词整体替换为占位符，供 bigram 提取前掩码。"""
-    return _STOP_MASK_RE.sub("□", text)
-
-
-def _extract_entity_bigrams(text: str) -> set[str]:
-    """提取标题中的实体特征：中文 bigram + 英数 token + 长英文专名加权。
-
-    中文实体判定依赖 2-gram 重叠；英数 token 补全"AI""AMD"等被中文
-    正则过滤的专名；长度 ≥ 4 的英文专名（Anthropic/Meta/Helios 等）
-    额外插入 _tk: 前缀虚拟 bigram，使共享专名在 bigram 计数中获得
-    权重加成，避免因英文专名占比高但 token 条数少而漏过候选区。
-
-    模板词（见 _STOP_BIGRAMS）在提取前被整体掩码替换为占位符，
-    不产生任何中文 bigram——财报/回购/指数/预警等通用财经词汇不再
-    虚增实体重叠（此前不同公司同类新闻天然共享 3-6 bigram）。
-    孤立 4 位年份数字（2026 等）不作为专名 token。
-    """
-    # 英数 token：长度 ≥ 2 避免单字符噪声；孤立年份数字（19xx/20xx）
-    # 为通用时间标识，不作专名。
-    tokens = re.findall(r"[a-zA-Z]+|[0-9]+", text)
-    result: set[str] = set()
-    for t in tokens:
-        t_lower = t.lower()
-        if len(t_lower) >= 2 and not re.fullmatch(r"(?:19|20)\d{2}", t_lower):
-            result.add(t_lower)
-            # 长英文专名（≥4 字符）额外插入虚拟 bigram 占用位，
-            # 提升共享专名在实体重叠计数中的权重（如 Anthropic+Meta
-            # 在 bg 计数中额外贡献 2 点，使 bg=2+2=4 进入合并区）。
-            if t_lower.isalpha() and len(t_lower) >= 4:
-                result.add(f"_tk:{t_lower}")
-    # 中文 bigram：先掩码模板词，再滑窗提取，跳过含占位符的窗口
-    chinese_only = re.sub(r"[^一-鿿]", "", text)
-    masked = _mask_stop(chinese_only)
-    for i in range(len(masked) - 1):
-        bg = masked[i : i + 2]
-        if "□" in bg:
-            continue
-        result.add(bg)
-    return result
-
-
-# 用于 SequenceMatcher 的归一化——剥离通用日期模式，避免
-# "2026年7月票房破25亿" 与 "2026年7月经营质量因子" 等完全不同的
-# 新闻因共享日期格式而获得虚高 ratio，进入不必要的候选区。
-# ⚠ 仅用于 ratio 计算，不影响 kept_norms（后者用于 bigram 提取）。
-_RATIO_CLEAN = re.compile(r"\d{4}年|\d+月|\d+日")
-# 英文词占位化：用于 ratio 比较时降权共享英文专名（Anthropic/Meta 等），
-# 避免 SequenceMatcher 比率虚高。英文专名在 _extract_entity_bigrams
-# 中已有独立处理，不影响 bigram 提取。
-# ⚠ 按长度分桶占位（_tk2_/_tk4_/_tk6_）：统一 _tk_ 会让任意英文 token
-# （msci/vn、ETF/CPI…）都共享同一占位符，人为抬高 ratio 0.1+；
-# 分桶后仅同长度段英文词共享，恢复真实相似度。
-_ENG_PLACEHOLDER = re.compile(r"[a-z]+")
-
-
-def _eng_len_placeholder(match: re.Match) -> str:
-    """按英文 token 长度分桶的占位符：2-3 字符 → _tk2_，4-5 → _tk4_，6+ → _tk6_。"""
-    n = len(match.group())
-    if n <= 2:
-        return "_tk2_"
-    if n <= 5:
-        return "_tk4_"
-    return "_tk6_"
-
-
-# ── 跨源阈值常量（2026-08-17 校准定值） ──────────────────────────────
-# 42560 锚点分层采样验证：旧规则（候选区 0.30 + bg≥3 任意 ratio、
-# 安全区 0.50 直接合并、bg=2 梯度 0.40）误合并率 ~70-80%。新规则收紧：
-#   - 安全区：ratio ≥ 0.65 直接合并（改写型重复）；0.50~0.65 需专名 bg ≥ 2
-#     （防"算力服务合同""指数上涨 N%"等模板骨架把 ratio 推到 0.5+ 的误合并）
-#   - 候选区：ratio ≥ 0.35 进区；bg ≥ 3 合并；bg=2 需 ratio ≥ 0.38
-#     且共享 bigram 含英数/数字 token（纯中文公司名共享如"英伟达/伟达"
-#     不代表同一事件，不再触发）
-_CROSS_DIRECT_RATIO = 0.65
-_CROSS_SAFE_RATIO = 0.50
-_CROSS_BG2_RATIO = 0.375
-
-# 跨源方向对立词对：共享实体 + 相反方向词分属两标题 → 不合并。
-# 跨源会同时出现"暂缓加息"vs"将加息"这类方向对立报道，
-# 而同源规则假设同源不出现对立报道——跨源必须显式防护。
-_OPPOSITE_PAIRS: tuple[tuple[str, str], ...] = (
-    ("上涨", "下跌"),
-    ("加息", "降息"),
-    ("增持", "减持"),
-    ("上调", "下调"),
-    ("买入", "卖出"),
-    ("走强", "走弱"),
-    ("收涨", "收跌"),
-    ("扩大", "收窄"),
-    ("大涨", "大跌"),
-    ("涨停", "跌停"),
-    ("新高", "新低"),
-    ("看多", "看空"),
-)
-
-# 共享 bigram 中的英数/数字 token 或 _tk 虚拟专名（专名证据判定）
-_TOKEN_LIKE = re.compile(r"^[a-z0-9]+$|^_tk:[a-z]+$")
-
-
-def _has_opposite_direction(title_a: str, title_b: str) -> bool:
-    """两标题是否含相反方向的词对（一正一反分属两标题）。"""
-    return any((w1 in title_a and w2 in title_b) or (w2 in title_a and w1 in title_b) for w1, w2 in _OPPOSITE_PAIRS)
-
-
 def _dedup_by_title(
     items: list[dict[str, Any]],
-    cross_threshold: float = 0.35,
+    cross_threshold: float = _CROSS_CANDIDATE_RATIO,
 ) -> list[dict[str, Any]]:
     """基于标准化标题模糊去重 + 中文实体 bigram 辅助判定。
 
     五档阈值策略（2026-08-17 基于 42560 条锚点分层采样校准）：
-      - 同源：共享实体 bigram ≥ 4 即合并。
+      - 同源：共享实体 bigram ≥ ``_SAME_SRC_BIGRAM_MIN``(4) 即合并。
         同源不会同时出现方向对立报道（如"突破3万亿"vs"跌破3万亿"），
         所以不依赖 SequenceMatcher 阈值，只检查实体重叠。
       - 跨源安全区：
-        ① ratio ≥ 0.65 直接合并（高相似改写重复，如"英国央行如期维持利率不变"
-           vs"英国央行以6比3票数维持利率不变"）
+        ① ratio ≥ ``_CROSS_DIRECT_RATIO``(0.65) 且专名 bg ≥ 1 直接合并（高相似改写重复，
+           如"英国央行如期维持利率不变"vs"英国央行以6比3票数维持利率不变"）
         ② 0.50 ≤ ratio < 0.65 需专名 bg ≥ 2 才合并——旧规则直接合并导致
            40-50% 误合并（"行云科技签算力合同"vs"亿田智能签算力合同"共享模板骨架）
-      - 跨源候选区：cross_threshold(0.35) ≤ ratio < 0.50，阶梯判定：
-        ③ 共享 ≥ 3 个实体 bigram → 合并（高实体重叠，低 ratio 门槛）
-        ④ 共享 ≥ 2 个实体 bigram 且 ratio ≥ 0.38 且含英数/数字 token → 合并
+      - 跨源候选区：``_CROSS_CANDIDATE_RATIO``(0.35) ≤ ratio < 0.50，阶梯判定：
+        ③ 共享 ≥ ``_CROSS_BIGRAM_MIN``(3) 个实体 bigram → 合并（高实体重叠，低 ratio 门槛）
+        ④ 共享 ≥ 2 个实体 bigram 且 ratio ≥ bg=2 梯度阈值（0.375）且共享项含**真专名**
+           （英数 token 需含字母，纯数字不算；见 ``_TOKEN_LIKE``）→ 合并
            （CPI/PPI、荣耀IPO 类共享专名 token 的真重复；纯中文公司名共享
-           如"英伟达/伟达"不代表同一事件，不触发）
-        ⑤ 方向对立（上涨vs下跌/加息vs降息分属两标题）且共享实体 → 不合并
+           如"英伟达/伟达"、仅共享数字如"某指数 100 vs 另一指数 100"不代表同一事件）
+        ⑤ 方向对立（上涨vs下跌/加息vs降息/站稳vs跌破分属两标题）且共享实体 → 不合并
         ⑥ 否则跳过（实体重叠不足或 ratio 太低）
+
+    阈值全部取自本模块常量（``_CROSS_*`` / ``_SAME_SRC_BIGRAM_MIN``），校准工具
+    从同一处读取；相似度口径的唯一实现在 :func:`_pair_similarity`。
 
     模板词治理：_STOP_BIGRAMS 扩充财报/回购/指数/预警/地震/目标价等模板词，
     提取 bigram 前整体掩码替换（_mask_stop），消除同类新闻共享模板骨架的虚高
     重叠。英文专名占位按长度分桶（_tk2_/_tk4_/_tk6_），不同长度英文词不再
     共享相似度。_normalize_title 保留空格防英文 token 粘连。
     """
-    from difflib import SequenceMatcher
-
     if not items:
         return items
 
@@ -730,12 +257,10 @@ def _dedup_by_title(
             existing_item = kept[idx]
             same_source = bool(source) and bool(existing_src) and source == existing_src
 
-            # ① 同源：共享实体 bigram ≥ 4 即合并
+            # ① 同源：共享实体 bigram ≥ 阈值即合并
             if same_source:
-                bg1 = _extract_entity_bigrams(norm)
-                bg2 = _extract_entity_bigrams(existing)
-                overlap = len(bg1 & bg2)
-                if overlap >= 4:
+                overlap = _overlap_of_norms(norm, existing)
+                if overlap >= _SAME_SRC_BIGRAM_MIN:
                     is_dup = True
                     break
                 # 锚点：同源 bigram 接近阈值
@@ -746,22 +271,10 @@ def _dedup_by_title(
             #    剥离通用日期模式后比较，避免不同新闻因共享"2026年7月"等虚高；
             #    英文专名按长度分桶占位，避免共享专名（Anthropic/Meta/AMD）导致
             #    SequenceMatcher 比率虚高（英文专名在 _extract_entity_bigrams
-            #    中已有独立处理，ratio 中可降权）。
-            _norm_clean = _RATIO_CLEAN.sub("", norm)
-            _exist_clean = _RATIO_CLEAN.sub("", existing)
-            _norm_clean = _ENG_PLACEHOLDER.sub(_eng_len_placeholder, _norm_clean)
-            _exist_clean = _ENG_PLACEHOLDER.sub(_eng_len_placeholder, _exist_clean)
-            # SequenceMatcher 贪心匹配方向不对称（含多个英文占位块的串上
-            # ratio(a,b)≠ratio(b,a)，实测差异可达 0.18），取双向 max 消除
-            # 方向偏差，保证同一对标题相似度判定与比较顺序无关。
-            ratio = max(
-                SequenceMatcher(None, _norm_clean, _exist_clean).ratio(),
-                SequenceMatcher(None, _exist_clean, _norm_clean).ratio(),
-            )
+            #    中已有独立处理，ratio 中可降权）。口径实现见 _ratio_of_norms。
+            ratio = _ratio_of_norms(norm, existing)
             if ratio >= _CROSS_SAFE_RATIO:
-                bg1 = _extract_entity_bigrams(norm)
-                bg2 = _extract_entity_bigrams(existing)
-                overlap = len(bg1 & bg2)
+                overlap = _overlap_of_norms(norm, existing)
                 # ratio ≥ 0.65 直接合并也要求专名 bg ≥ 1：不同公司同模板
                 # （"XX：2026年半年度净利润同比增长N%"）ratio 可高达 0.7+，
                 # 但掩码后 bg=0（公司名不同），不能当作改写型重复。
@@ -776,23 +289,24 @@ def _dedup_by_title(
                 # 安全区但实体不足：跳过（记录锚点供校准，继续子串包含判定）
                 _record_anchor(_make_anchor(item, existing_item, ratio, overlap, False, "cross_safe"))
 
-            # ③ 跨源候选区：0.35 ≤ ratio < 0.50，需共享 ≥ 3 实体 bigram
+            # ③ 跨源候选区：候选区入口 ≤ ratio < 0.50，需共享 ≥ 3 实体 bigram
             if not same_source and ratio >= cross_threshold:
                 bg1 = _extract_entity_bigrams(norm)
                 bg2 = _extract_entity_bigrams(existing)
-                overlap = len(bg1 & bg2)
+                shared = bg1 & bg2
+                overlap = len(shared)
                 # ④ 方向对立检测：共享实体 + 相反方向词分属两标题 → 不合并
                 #    （"美联储或暂缓加息"vs"城堡证券预计美联储将加息"）
                 if overlap >= 1 and _has_opposite_direction(norm, existing):
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, False, "cross_opposite"))
-                elif overlap >= 3:
+                elif overlap >= _CROSS_BIGRAM_MIN:
                     is_dup = True
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge"))
                     break
-                # ⑤ bg=2 梯度：中高 ratio + 共享英数/数字 token（专名）→ 合并
-                #    纯中文实体共享（如"英伟达"2 bigram）不代表同一事件，不触发；
+                # ⑤ bg=2 梯度：中高 ratio + 共享**真专名** → 合并
+                #    英数 token 需含字母（纯数字共享不算专名证据）、或 _tk 虚拟专名；
                 #    CPI/PPI、荣耀IPO 等共享专名 token 的真重复靠此规则捕获。
-                elif overlap >= 2 and ratio >= _CROSS_BG2_RATIO and any(_TOKEN_LIKE.match(s) for s in (bg1 & bg2)):
+                elif overlap >= 2 and ratio >= _CROSS_BG2_RATIO and any(_TOKEN_LIKE.match(s) for s in shared):
                     is_dup = True
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge_bg2"))
                     break

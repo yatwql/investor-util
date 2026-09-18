@@ -1,5 +1,5 @@
 # 目录结构与项目统计
-> 文档版本：0.11.1-dev
+> 文档版本：0.11.1
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -9,19 +9,19 @@
 >
 > | 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
 > |---|---|---|---|---|
-| 主程序代码 | Python | 287 | 73,712 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层；近期新增 `core/jsonl_store.py` JSONL 原子原语 + `core/signal_ledger.py` 确定性信号账本 + `report/signal_record.py` 信号登记适配器 + `core/num_utils.py` 数值归一原语 + `core/doctor.py` 系统自检 + `core/cassette.py` 请求回放引擎 + `core/datasource_credential.py` 数据源凭据声明 + `fetcher/source_adapter.py` 适配契约 + `fetcher/quote_adapters.py` 行情域适配器 + `llm/module_fingerprint.py` 模块指纹唯一事实来源 + `report/_experimental_seams.py` 实验挂载点 + `report/holdings_freshness.py` 持仓报告期时效判定 + `report/experimental_notice.py` 实验功能清单语句单源 + `core/trading_calendar.py` 交易日历原语（时间距离一律以交易日计） + `providers/datasink.py` 全文本财报 provider（密钥/限速/配额） + `providers/hithink.py` 同花顺金融数据服务 provider（A 股行情/财务/基金/情绪面；凭据/qps 限速/信封错误码） + `fetcher/financial_report.py` 财报取数编排 + `fetcher/report_adapters.py` 财报域适配器 + `report/financial_report_digest.py` 财报摘要章节装配 + `providers/akshare_financial.py` 结构化财务指标主源 + `fetcher/financial_indicator_adapters.py` 财务指标域适配器 + `core/code_utils.py::to_fmp_symbol` 共享符号映射 + `providers/_utils.py::run_with_timeout` 共享取数超时原语 + `analysis/financial_indicator_extract.py` 财务指标全文解析（压平正文锚点提取，备用支路） + `fetcher/financial_indicator.py` 财务指标多期取数编排 + `analysis/financial_indicator.py` 财务指标派生（质量档/趋势/当前 PE·PB） + `report/financial_indicator.py` 财务指标章装配 + `report/holdings_detail_sheet.py` 持仓明细与分类 Excel 页签 + `report/position_structure_sheet.py` 持仓结构与集中度 Excel 页签 + `report/fundamental_snapshot_sheet.py` 持仓基本面 Excel 页签（三者均为章节合并写入器）） |
-| HTML 报告模板 | HTML | 5 | 4,089 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 持仓基本面 `fundamental_snapshot_section.html` + 行动建议 `action_section.html` 章节 partial） |
+| 主程序代码 | Python | 288 | 74,191 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层；近期新增 `core/jsonl_store.py` JSONL 原子原语 + `core/signal_ledger.py` 确定性信号账本 + `report/signal_record.py` 信号登记适配器 + `core/num_utils.py` 数值归一原语 + `core/doctor.py` 系统自检 + `core/cassette.py` 请求回放引擎 + `core/datasource_credential.py` 数据源凭据声明 + `fetcher/source_adapter.py` 适配契约 + `fetcher/quote_adapters.py` 行情域适配器 + `llm/module_fingerprint.py` 模块指纹唯一事实来源 + `report/_experimental_seams.py` 实验挂载点 + `report/holdings_freshness.py` 持仓报告期时效判定 + `report/experimental_notice.py` 实验功能清单语句单源 + `core/trading_calendar.py` 交易日历原语（时间距离一律以交易日计） + `providers/datasink.py` 全文本财报 provider（密钥/限速/配额） + `providers/hithink.py` 同花顺金融数据服务 provider（A 股行情/财务/基金/情绪面；凭据/qps 限速/信封错误码） + `fetcher/financial_report.py` 财报取数编排 + `fetcher/report_adapters.py` 财报域适配器 + `report/financial_report_digest.py` 财报摘要章节装配 + `providers/akshare_financial.py` 结构化财务指标主源 + `fetcher/financial_indicator_adapters.py` 财务指标域适配器 + `core/code_utils.py::to_fmp_symbol` 共享符号映射 + `providers/_utils.py::run_with_timeout` 共享取数超时原语 + `analysis/financial_indicator_extract.py` 财务指标全文解析（压平正文锚点提取，备用支路） + `fetcher/financial_indicator.py` 财务指标多期取数编排 + `analysis/financial_indicator.py` 财务指标派生（质量档/趋势/当前 PE·PB） + `report/financial_indicator.py` 财务指标章装配 + `report/holdings_detail_sheet.py` 持仓明细与分类 Excel 页签 + `report/position_structure_sheet.py` 持仓结构与集中度 Excel 页签 + `report/fundamental_snapshot_sheet.py` 持仓基本面 Excel 页签（三者均为章节合并写入器）） |
+| HTML 报告模板 | HTML | 5 | 4,203 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 持仓基本面 `fundamental_snapshot_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
-| 辅助脚本 | Python | 21 | 7,174 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
-| **源代码合计** | — | **316** | **85,290** | 主程序 + 模板 + 脚本 + SVG |
-| **测试代码** | Python | **386** | **113,367** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
-| **测试用例** | — | — | **7,484 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **11** | **5,186** | 含 README.md（205 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 10 | 4,979 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
+| 辅助脚本 | Python | 21 | 7,423 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
+| **源代码合计** | — | **317** | **86,132** | 主程序 + 模板 + 脚本 + SVG |
+| **测试代码** | Python | **387** | **114,036** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| **测试用例** | — | — | **7,530 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **用户文档** | Markdown | **11** | **5,190** | 含 README.md（207 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 10 | 4,983 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
 | **项目文档** | Markdown | **139** | **52,965** | 含 CLAUDE.md（75 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 0 + archive md 128），py/txt 不计行 |
 | ├ managements/ | 管理文档 | 10 | 10,156 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 132 | 43,034 | 各版本 changelog/plan/review-findings 与设计文档归档（128 md 42,576 行） |
-| ├ plan/ | 中间设计文件 | 0 | 0 | **当前为空**——同花顺接入设计已随「同花顺官方数据接入」计划完成归档（见下方 v0.11.x 归档树的 `hithink-data-source/`）（在办设计文档写此处，完成后随完成态归档）；已实现的设计文档随完成态归档：景气度框架诊断设计位于 v0.11.x 归档的 `prosperity-framework/`，报告章节整合的设计层与实施层两份位于同版本的 `section-consolidation/`；DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
+| ├ plan/ | 中间设计文件 | 1 | 68 | **当前仅 `dedup-anchor-calibration.md`**（新闻去重锚点校准复核）；同花顺接入设计已随「同花顺官方数据接入」计划完成归档（见下方 v0.11.x 归档树的 `hithink-data-source/`）（在办设计文档写此处，完成后随完成态归档）；已实现的设计文档随完成态归档：景气度框架诊断设计位于 v0.11.x 归档的 `prosperity-framework/`，报告章节整合的设计层与实施层两份位于同版本的 `section-consolidation/`；DataSinking 财报摘要与基本面数据源/财务指标两份现位于 v0.10.x 归档的 `datasink-financial-report-digest/` 与 `financial-indicator-source/`；功能开关注册表统一与联接基金穿透两份位于 `feature-switch-registry/` 与 `feeder-fund-penetration/`；外部借鉴系列 14 份位于 `tradingagents-borrowing/`、`augur-borrowing/`、`openbb-borrowing/`、`llm-fingerprint-prompt-coverage/`） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 目录树
@@ -106,6 +106,7 @@ investor-util/
 │   │   │   ├── wallstreetcn_news.py  #   华尔街见闻新闻源
 │   │   │   ├── news_aggregator.py    #   新闻聚合器（多源合并去重）
 │   │   │   ├── news_dedup.py         #   新闻标题去重
+│   │   │   ├── news_dedup_rules.py   #   去重规则原语（阈值/模板词表/归一化/实体 bigram/相似度/指纹）
 │   │   │   ├── news_correlator.py    #   新闻与持仓关联分析
 │   │   │   ├── news_keywords.py      #   新闻关键词提取与匹配
 │   │   │   └── news_sources.py       #   新闻源注册与配置
@@ -693,6 +694,7 @@ investor-util/
 │       │   │   ├── test_test_runner_machine_info.py  #  test_runner 机器信息采集/bench 别名/耗时表格渲染测试
 │       │   │   ├── test_test_runner_doc_writer.py  #   test_runner 环境耗时对照文档自动更新（标记定位/列增改/round-trip）
 │       │   │   ├── test_extract_test_failures.py #   失败用例提取 data-jsonblob 解析（HTML 实体引号回归）
+│       │   │   ├── test_calibrate_dedup_threshold.py # 去重校准工具：分支重判/锚点压缩幂等/报告口径与过时建议回归
 │       │   │   ├── test_script_encoding.py  #   scripts/*.ps1 BOM+CRLF 与 scripts/*.sh 可执行位约定回归
 │       │   │   └── test_check_semantic_index.py  #   语义命名索引正反向校验脚本测试
 │       │   ├── startup/              #   首次运行引导单元测试
@@ -1060,7 +1062,8 @@ investor-util/
 │   │   │   │   └── feeder-penetration-and-holdings-fetch-design.md # 取数阶梯次序修正 + 目标 ETF 代理底层暴露
 │   │   │   └── financial-indicator-source/ #   基本面数据源主备与财务指标提取设计归档
 │   │   │       └── financial-indicator-source-design.md # 标准字段契约/全文解析支路/真实估值分位(TTM)/底座门禁/LLM 注入
-│   └── plan/                          #   中间设计文件（在办设计文档）；**当前为空**——plan-46 设计文档已随完成态归档至 archive/v0.11.x/prosperity-framework/
+│   └── plan/                          #   中间设计文件（在办设计文档）：当前仅 `dedup-anchor-calibration.md`（新闻去重锚点校准复核）；plan-46 设计文档已随完成态归档至 archive/v0.11.x/prosperity-framework/
+│       └── dedup-anchor-calibration.md # 锚点混代证据、当前规则重判分布、原建议逐条核对与处置
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
