@@ -77,14 +77,14 @@
 
 ### P4 — 实验功能
 
-> 无待办项（plan-30 ~ plan-41 全部完成，完成项摘要见归档）。
+> 无待办项。
 
 ## 归档
 
-- [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项（plan-44 / plan-45 / plan-46 / plan-51，含各自设计文档索引）
+- [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项
 - [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项
-- [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项（含设计文档索引）
-- [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10（含设计文档索引 + 已完成项）
+- [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项
+- [`archived_plan.0.8.x.md`](../archive/v0.8.x/archived_plan.0.8.x.md) — v0.8.0 ~ v0.8.10
 - [`archived_plan.0.7.x.md`](../archive/v0.7.x/archived_plan.0.7.x.md)
 - [`archived_plan.0.6.x.md`](../archive/v0.6.x/archived_plan.0.6.x.md)
 - [`archived_plan.0.5.x.md`](../archive/v0.5.x/archived_plan.0.5.x.md)
