@@ -46,11 +46,12 @@
 
 ## 已解决问题
 
-> 本轮已解决项已随 v0.11.1 发布归档：`../archive/v0.11.x/archived_review-findings.0.11.x.md`（含 v0.11.1-dev 与 v0.10.20-dev 两张已解决表 + P2C 已结项行）。
+> 本轮已解决项已随 v0.11.1 发布归档：`../archive/v0.11.x/archived_review-findings.0.11.x.md`（rf-380 ~ rf-401：v0.11.1-dev 批次已解决表 + P2C 已结项行；rf-354 ~ rf-378 属 v0.10.20-dev 批次，按开发版本线归档于 `../archive/v0.10.x/archived_review-findings.0.10.x.md`）。
 
 ### 归档档案
 
-- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.19-dev（2026-08-04 ~ 2026-09-12）
+- [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — rf-380 ~ rf-401（v0.11.0 ~ v0.11.1 批次，2026-09-18 并入）
+- [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — rf-204 ~ rf-378（v0.10.1 ~ v0.10.20-dev，2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
 - [`archived_review-findings.0.7.x.md`](../archive/v0.7.x/archived_review-findings.0.7.x.md) 
