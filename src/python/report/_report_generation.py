@@ -16,6 +16,7 @@ from src.python.report._experimental_seams import (
     record_deterministic_decisions,
     record_deterministic_signals,
     record_llm_decisions_and_review_block,
+    record_prosperity_diagnosis,
 )
 from src.python.report.progress import ProgressReporter
 from src.python.report._report_output import _generate_full_excel_report  # noqa: F401
@@ -349,26 +350,19 @@ def _generate_report_both(
             portfolio_peak_mv=compute_portfolio_peak_mv((history_data or {}).get("bars")),
         )
 
-    # 景气度框架诊断（实验性功能 prosperity_framework）：开关关闭返回 None（零行为变化）。
-    # 依赖已算好的基本面契约（ROE）与历史走势（收益/回撤印证），故置于两者之后。
-    from src.python.report._report_aux_metrics import compute_prosperity_framework_data
-
-    try:
-        _pf_data = compute_prosperity_framework_data(
-            holdings,
-            details,
-            None,
-            config,
-            reporter,
-            financial_indicator_data=financial_indicator_data,
-            history_data=history_data,
-            pipeline_data=pipeline_data,
-        )
-    except Exception:  # 双保险：实验性诊断异常不得中断整份报告
-        logger.warning("[prosperity_framework] 诊断装配异常，本次跳过（主报告不受影响）", exc_info=True)
-        _pf_data = None
-    if _pf_data is not None and pipeline_data is not None:
-        pipeline_data["prosperity_framework_data"] = _pf_data
+    # 景气度框架诊断（实验性功能 prosperity_framework）：经实验挂载点接入（守护与
+    # 注入语义见 `_experimental_seams`）。依赖已算好的基本面契约（ROE）与历史走势
+    # （收益/回撤印证），故置于两者之后。
+    record_prosperity_diagnosis(
+        holdings,
+        details,
+        None,
+        config,
+        reporter,
+        financial_indicator_data=financial_indicator_data,
+        history_data=history_data,
+        pipeline_data=pipeline_data,
+    )
 
     # 市场情绪与持仓热点（报告增强开关 market_sentiment）：开关关闭返回 None（零行为变化）
     from src.python.report._report_aux_metrics import compute_market_sentiment_data
@@ -664,11 +658,9 @@ def _generate_report_full(
     record_deterministic_signals(pipeline_data, prep, reporter)
     perf.stop()
 
-    # 景气度框架诊断（实验性功能 prosperity_framework）：开关关闭返回 None（零行为变化）。
+    # 景气度框架诊断（实验性功能 prosperity_framework）：经实验挂载点接入。
     # full 路径 prep 已含穿透重仓（`penetrated_assets`），基本面与历史走势亦已就绪。
-    from src.python.report._report_aux_metrics import compute_prosperity_framework_data
-
-    _pf_data = compute_prosperity_framework_data(
+    record_prosperity_diagnosis(
         holdings,
         prep["details"],
         prep,
@@ -679,8 +671,6 @@ def _generate_report_full(
         history_data=history_data,
         pipeline_data=pipeline_data,
     )
-    if _pf_data is not None and pipeline_data is not None:
-        pipeline_data["prosperity_framework_data"] = _pf_data
 
     # ── 6. HTML 报告 ──
     # 成本流水数据（fund_flow_data）：复用 excel_market_data 组装逻辑，

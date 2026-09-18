@@ -94,7 +94,7 @@
 | O | 配置报告输出目录 | 设置报告输出目录（默认 `reports/`） |
 | I | 管理对比指数池（自定义基准指数） | 交互添加/删除对比基准指数 |
 | A | 配置持仓匿名化（代码/名称脱敏） | 交互式切换匿名化模式（关闭/代码显示/完全匿名/汇总） |
-| P | 配置报告可选章节 | 交互切换基金深度分析/市场新闻/组合历史走势+回撤/组合演进/行动建议 5 个章节的启用/停用（报告章节与增强的 8 项开关归菜单 `[S]`「报告章节与增强」块，不在本面板） |
+| P | 配置报告可选章节 | 交互切换基金深度分析/市场新闻/组合历史走势+回撤/组合演进/行动建议 5 个章节的启用/停用（报告章节与增强的 9 项开关归菜单 `[S]`「报告章节与增强」块，不在本面板） |
 | S | 配置 LLM 分析章节 | 交互切换各 LLM 报告的启用/停用，含实验性辩论模式（⚗ 标识） |
 | R | 刷新配置 | 重新加载 config.json / llm_settings.json / llm_key.json / llm_providers.json |
 | **缓存管理** | | |
@@ -1202,7 +1202,7 @@ LLM 五维度量化评分，每项满分 100：
 | `history.coverage_threshold` | float | 0.8 | — | 有效区间覆盖阈值 |
 | `history.benchmark_indices` | dict | {"sh000300":"沪深300"} | — | 基准指数配置，组合历史走势对比 |
 | `history.lookback_days` | int | 90 | — | 历史走势取数窗口（K 线条数/交易日），需 ≥ 60（MIN_SPAN）才能计算回撤分析 |
-| `features.json` 的 8 项报告开关 | bool | `data_quality` 与 `market_temperature` 默认开，其余 6 项默认关 | — | **报告章节与增强开关**（登记于功能开关注册表 `GROUP_REPORT`，存 `data/config/features.json`，菜单 `[S]` 报告块）：`data_quality`（数据质量仪表盘）/ `market_temperature`（市场温度，无数据时该行静默省略）/ `industry_beta`（行业 Beta 子表）/ `candidate_compare`（候选基金比较）/ `cost_lots`（成本流水）/ `valuation_percentile`（估值分位）/ `financial_report_digest`（持仓个股财报摘要）/ `financial_indicator`（财务指标） |
+| `features.json` 的 9 项报告开关 | bool | `data_quality` 与 `market_temperature` 默认开，其余 7 项默认关 | — | **报告章节与增强开关**（登记于功能开关注册表 `GROUP_REPORT`，存 `data/config/features.json`，菜单 `[S]` 报告块）：`data_quality`（数据质量仪表盘）/ `market_temperature`（市场温度，无数据时该行静默省略）/ `industry_beta`（行业 Beta 子表）/ `candidate_compare`（候选基金比较）/ `cost_lots`（成本流水）/ `valuation_percentile`（估值分位）/ `financial_report_digest`（持仓个股财报摘要）/ `financial_indicator`（财务指标）/ `market_sentiment`（市场情绪与资金热点，需同花顺 key） |
 | `holdings_start_date` | str | `""` | — | 组合建仓日期（YYYY-MM-DD，可选）。持仓 Excel 未录入交易/分红流水时，成本流水子模块按「建仓日一次性买入」近似年化（`build_approximate_fund_flow_data`）；空=不计算近似年化，仅成本分档近似（每份成本 vs 市价） |
 | `comparison_indices` | dict | {"sh000300":"沪深300","sh000905":"中证500","sh000012":"中证全债"} | — | 竞争语境对比指数池，支持多指数对比 |
 | `rebalance.threshold` | float | 0.15 | — | 单品种权重超限阈值（15%），超限触发再平衡建议 |
@@ -1315,7 +1315,7 @@ LLM 五维度量化评分，每项满分 100：
 
 ### 11.5 features.json（功能开关注册表）
 
-独立配置文件，提供 29 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。开关分**实验组**（4 项，默认关，面板以 ⚗ 标识）、**常规组**（16 项，默认开）与**报告章节与增强组**（8 项，多数默认关）三块，分组表达「生命周期的当前状态」而非优先级——**转正**即把声明从实验组改到常规组、默认值改 `true`，面板可见性随分组自动延续。两组在 TUI 菜单 `[S]` / Web 配置面板 / CLI（`--experiment` 实验组简写、`--feature NAME=VALUE` 全域双向）中**同样可切换**；唯一登记点是 `config/features.py::feature_switch_registry`（显示名/说明/分组/默认值/产物影响五字段），渠道层不得另写清单。仅收录「有消费者」的开关——LLM 模块启停与基金深度分析（`llm_settings.json` 的 `enabled_llm`）、新闻源（`config.json` 的 `news_sources`）、历史走势与回撤（`config.json` 的 `enable_history`）、匿名化模式（`config.json` 的 `anonymization.mode`）各有归属配置，不在此文件。
+独立配置文件，提供 30 项功能开关的运行时覆写。不配置时全部使用代码内置默认值。开关分**实验组**（5 项，默认关，面板以 ⚗ 标识）、**常规组**（16 项，默认开）与**报告章节与增强组**（9 项，多数默认关）三块，分组表达「生命周期的当前状态」而非优先级——**转正**即把声明从实验组改到常规组、默认值改 `true`，面板可见性随分组自动延续。两组在 TUI 菜单 `[S]` / Web 配置面板 / CLI（`--experiment` 实验组简写、`--feature NAME=VALUE` 全域双向）中**同样可切换**；唯一登记点是 `config/features.py::feature_switch_registry`（显示名/说明/分组/默认值/产物影响五字段），渠道层不得另写清单。仅收录「有消费者」的开关——LLM 模块启停与基金深度分析（`llm_settings.json` 的 `enabled_llm`）、新闻源（`config.json` 的 `news_sources`）、历史走势与回撤（`config.json` 的 `enable_history`）、匿名化模式（`config.json` 的 `anonymization.mode`）各有归属配置，不在此文件。
 
 | 开关名 | 类型 | 默认值 | 说明 |
 |:-------|:----:|:------:|:-----|

@@ -1,9 +1,11 @@
 """报告管线实验功能挂载点（seam）—— 同一守护语义只实现一次。
 
-三个实验功能（决策跨期反思闭环 / 模块级质量分级 / 确定性数值信号沉淀）在
-``_report_generation._generate_report_full`` 的固定工序位置插入挂载点。它们共享
-同一契约：**实验功能自身的异常绝不中断报告主链路**——单条实验逻辑出错只降级为
-一条告警，报告按既有输出继续生成。
+四个实验功能（决策跨期反思闭环 / 模块级质量分级 / 确定性数值信号沉淀 / 景气度框架诊断）
+在报告管线固定工序位置插入挂载点。前三个位于 ``_report_generation._generate_report_full``
+的工序序列内；景气度框架诊断（产出 ``prosperity_framework_data`` 契约）经
+:func:`record_prosperity_diagnosis` 接入两条 HTML 生成路径，注入点须晚于基本面契约
+（个股 ROE）与历史走势就绪。它们共享同一契约：**实验功能自身的异常绝不中断报告
+主链路**——单条实验逻辑出错只降级为一条告警，报告按既有输出继续生成。
 
 抽出本模块的两个理由：
 
@@ -195,9 +197,55 @@ def record_deterministic_signals(pipeline_data: dict | None, prep: dict, reporte
     _guarded("确定性信号沉淀", "signal_ledger", reporter, _action, None)
 
 
+def record_prosperity_diagnosis(
+    holdings: Any,
+    details: Any,
+    prep: dict | None,
+    config: dict,
+    reporter: ProgressReporter,
+    *,
+    financial_indicator_data: dict | None = None,
+    history_data: dict | None = None,
+    pipeline_data: dict | None = None,
+) -> None:
+    """景气度框架诊断（实验性功能）：装配契约并注入 ``pipeline_data``。
+
+    须置于**基本面契约（个股 ROE）与历史走势就绪之后**——诊断的 ② ROE 弹性与
+    ⑥ 业绩回撤印证分别读这两份契约，过早调用会两维全空。开关关闭 → 零行为
+    （不计算、不注入）；装配异常 → 一条告警 + 契约缺席（渲染层不出现该块，
+    其余章节零影响）。
+
+    开关判定在此处先做一次，避免开关关闭时为其付出子模块导入成本；
+    ``_report_aux_metrics`` 内部保留同一判定作为直接调用的兑底。
+    """
+
+    def _action() -> dict | None:
+        from src.python.config.features import is_feature_enabled
+
+        if not is_feature_enabled("prosperity_framework"):
+            return None
+        from src.python.report._report_aux_metrics import compute_prosperity_framework_data
+
+        return compute_prosperity_framework_data(
+            holdings,
+            details,
+            prep,
+            config,
+            reporter,
+            financial_indicator_data=financial_indicator_data,
+            history_data=history_data,
+            pipeline_data=pipeline_data,
+        )
+
+    data = _guarded("景气度框架诊断", "prosperity_framework", reporter, _action, None)
+    if data is not None and pipeline_data is not None:
+        pipeline_data["prosperity_framework_data"] = data
+
+
 __all__ = [
     "apply_module_quality_banners",
     "record_deterministic_decisions",
     "record_deterministic_signals",
     "record_llm_decisions_and_review_block",
+    "record_prosperity_diagnosis",
 ]

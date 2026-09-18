@@ -64,7 +64,7 @@
 
 完整命令参考（全局参数 / report / cache / whatif / check-sources / view-logs / doctor / 使用示例 / 退出码 / 最佳实践；另有开发维护命令 `cassettes`，见开发者指南）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)；定时任务配置见其 §13「定时任务」。
 `--experiment` 为全局参数，取值接受开关名（如 `signal_ledger`）、显示名（如 `确定性信号沉淀`）或 `all`（全部启用），可重复指定；它只作用于**实验组**且只开不关。
-`--feature NAME=VALUE` 是它的补集：面向**全部 29 项功能开关**、**双向**（`=off` 亦可），仅本次运行、不写入 `features.json`，在其之后应用，故 `--experiment all --feature signal_ledger=off` 表示「其余实验功能全开、只关信号沉淀」。两个参数同样适用于 `doctor` / `check-sources` / `view-logs` / `cassettes` 等早返回命令。
+`--feature NAME=VALUE` 是它的补集：面向**全部 30 项功能开关**、**双向**（`=off` 亦可），仅本次运行、不写入 `features.json`，在其之后应用，故 `--experiment all --feature signal_ledger=off` 表示「其余实验功能全开、只关信号沉淀」。两个参数同样适用于 `doctor` / `check-sources` / `view-logs` / `cassettes` 等早返回命令。
 
 ---
 

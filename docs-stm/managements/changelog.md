@@ -6,6 +6,20 @@
 
 ## [0.11.1-dev] - 开发中（未发布）
 
+### 过去 48 小时实现的技术债整改（2026-09-18，plan-54 / rf-393、rf-399~rf-401）
+
+**触发**：用户要求排查并修复近 48 小时实现中的技术债。扫描面：`git log --since=50h`（22 个 commit）与未提交工作区；判据：体积硬上限、静默吞异常、债务标记、无引用定义、重复实现、文档与代码同步、约束合规。
+
+**四类债务已整改**：
+- **文件超 800 行硬上限**：`providers/news_dedup.py` 931 行（阈值/模板词表/归一化/实体提取/指纹 + 锚点采集与主循环）→ 拆为 `news_dedup_rules.py`（650 行：规则数据与纯原语）+ `news_dedup.py`（327 行：锚点与比较循环，原面 re-export 全部规则名）；拆分后同批样标题的 ratio/overlap/掩码/指纹与拆分前**逐值一致**（rf-399）
+- **实验挂载点约束不一致（rf-393 结项）**：景气度框架诊断（实验组开关）在两条 HTML 生成路径内联 try/except（full 路径还是双重守护）→ 新增挂载点 `_experimental_seams.record_prosperity_diagnosis`（开关判定 + 契约注入，重依赖按需导入），两路径改调挂载点、删除内联守护；该约束的适用范围与工序顺序同步；新增 4 例挂载点用例。市场情绪为报告组开关（非实验组），不属该约束范围
+- **文档与代码脱钩（rf-400）**：`market_sentiment` 接入后计数未同步——`how-to-config.md`/`technical.md`/`requirements.md`/`README.md` 四份仍写 29 项（实 30）、报告章节与增强 8 项（实 9，漏列市场情绪）、实验组 4 项（实 5）；另修正 `technical.md` 目录 2.7 锚点（标题含空格 + 反引号时 GitHub 锚点会插入 `-`）与 `changelog.md` 新增文档的相对链接层级
+- **判据重复（rf-401）**：`analysis/financial_indicator._num` 与 `core.num_utils.safe_num` 各自实现「解析 + 有限性校验」→ `_num` 改为 `safe_num(value, default=None)` 的 float 投影，删除已无用的 `import math`
+
+**未整改（已登记、非阻塞）**：rf-395 遗留面——其余 `data/state/*` 写入方（perf/health/silence）同样面临「后台线程越过用例级补丁」，当前无实测泄露；彻底治本需把状态目录改为可注入的单一来源。
+
+**核对范围与验证**：20 份管理/用户文档 + README 全量核对（版本头 13/13 一致、changelog 时间序无逆序、目录锚点与跨文件链接除上表已修两项外全一致）；拆分后同批样标题的判定输出逐值比对（防拆分引入口径漂移）；新增/更新回归用例（去重 24 + 挂载点 4 + 矩阵 3）。**门禁**：`dev-verify` 2971 passed / 0 failed；`ruff check` + `ruff format --check` 全绿；四个 `--ci` 脚本全 [OK]。
+
 ### 新闻去重锚点校准体系修整：规则指纹 + 当前口径重算 + 锚点压缩（2026-09-18，plan-53 / rf-396~rf-398）
 
 **背景**（用户贴回校准输出触发复核）：`calibrate-dedup-threshold.py` 的「校准建议」给出三条动作，复核结论为**不可照做**——两条已实现或已过时，且报告数字混了规则时代。复核证据与逐条结论见 [`plan/dedup-anchor-calibration.md`](../plan/dedup-anchor-calibration.md)。
