@@ -37,6 +37,22 @@
 
 **验证**：`.venv/bin/python scripts/test-runner.py --mode dev-verify` → 2971 passed / 0 failed；`ruff check` + `ruff format --check` 全绿；四个 `--ci` 脚本全 [OK]。
 
+### 文档与实现全量核对：4 类共 28 处不一致修订（2026-09-19，rf-405~rf-408）
+
+**触发**：用户要求「核对管理文档和用户文档，比对程序和配置文件，查看有没有不一致的地方，要修订」。
+
+**核对口径**：以注册表（`feature_switch_registry` / 章节注册表 `_REPORT_SECTION_DEFAULT` / 数据模块缓存注册表）、`data/config/config.json` + `_DEFAULT_CONFIG`、文件系统、`pytest --collect-only`（`scripts/collect-test-coverage.py`）为事实源，逐条比对 11 份用户文档（README + manuals 10）+ 10 份管理文档。审计脚本（`docs-stm/tmp/audit_phase{1..7}.py`，gitignore）按「提取代码侧事实 → 反向扫文档断言」两面跑。
+
+**修订四类**：
+- **统计快照过期（rf-405，12 处）**：`test-coverage.md` 的 unit/standard/all/report/unit 父标记/unit_report/功能域「报告生成」与实测差 2（rf-402 新增的回归用例未回填）；`folders.md` 的主程序与测试代码行数、测试用例数、managements/项目文档行数未随代码与文档变动刷新（含「源代码合计」联动）
+- **目录树漏登 9 个文件（rf-406）**：`folders.md` 未随新增文件同步（`fetcher/financial_indicator.py` + 8 个测试文件）→ 按所属子包位置补条目并附职责说明（取自各文件 docstring）；补后重核「实际有而树内缺 0 / 树内有而磁盘无 0」
+- **TUI `[S]` 面板编号表与分组实况脱节（rf-407）**：实验块只列 4 项（缺 ⚗ 景气度框架诊断）、常规块 10-25 未随实验组扩容后移、报告块未编号、三处「第 23 项」位置引用失准、`how-to-use-web-mode.md` 实验清单缺项——而编号本是 `handlers_config.py` 从分组与注册表顺序**派生**（设计上非硬编码）→ 按实况重编（实验 6-10 / 常规 11-26 / 报告 27-35）
+- **零星数值/表述（rf-408，3 处）**：`requirements.md` 页签编号 1~19 与默认顺序 19 项（实况 17 个报告章节）；`technical.md` 功能语义命名表中 `market_temperature` 标为默认关（实况默认开）；`testplan.md` 「白名单 7 组」→「7 个可编辑面（功能开关面拆两块）」
+
+**核对为一致（未改）**：30 项开关分组计数与清单、报告章节表（17 项）与 Excel sheet 名、13 份版本头（`check-version-consistency`）、`how-to-config.md` 标量默认值表与 `_DEFAULT_CONFIG`、缓存 TTL 表与 LLM 默认 `max_tokens`/`timeout`、CLI 7 个子命令、`providers/` 与数据源清单路由、测试标记与 conftest；另有 2 类扫描报警经核实为误报（`market_temperature_data` 契约名被前缀匹配、`how-to-config.md` 中非开关表被当成开关表），未改。
+
+**验证**：`.venv/bin/python scripts/test-runner.py --mode dev-verify` → 2971 passed / 0 failed；`ruff check` + `ruff format --check` 全绿；四个 `--ci` 脚本全 [OK]。
+
 ## 归档
 
 - [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0 ~ v0.11.1（2026-09-15 ~ 2026-09-18）

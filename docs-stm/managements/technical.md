@@ -3270,7 +3270,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `position_structure_sheet` | 合并章 Excel 写入器（`write_position_structure_sheet`；区块写入器 `_write_overlap_block` / `_write_correlation_block` / `_write_concentration_block`） | 持仓结构与集中度 | 报告输出 | 无（渲染） |
 | `candidate_compare` | 候选基金比较 | 基金业绩分析 | 买入/选基 | 功能开关 `candidate_compare`（默认关） |
 | `valuation_percentile` | 估值分位 | 资产穿透TOP10 | 买入/选基 | 功能开关 `valuation_percentile`（默认关） |
-| `market_temperature` | 市场温度 | 投资分析汇总 | 买入/选基 | 功能开关 `market_temperature`（默认关） |
+| `market_temperature` | 市场温度 | 投资分析汇总 | 买入/选基 | 功能开关 `market_temperature`（默认开） |
 | `feeder_penetration` | 联接基金穿透（ETF 联接基金按其目标 ETF 的持仓穿透底层资产；同名键亦作取数结果中的穿透来源字段） | 资产穿透TOP10 | 数据获取 | 开关 `feeder_penetration`（默认开，非实验项） |
 | `with_feeder_penetration` | 穿透后处理（fetcher 层幂等后处理，目标 ETF 的持仓代理该基金的底层暴露） | 资产穿透TOP10 | 数据获取 | 随 `feeder_penetration` |
 | `parse_feeder_target_etf` | 目标 ETF 解析（联接基金主页面锚点 → 目标 ETF 代码，两重区分反向链接） | 资产穿透TOP10 | 数据获取 | 无（解析原语） |
