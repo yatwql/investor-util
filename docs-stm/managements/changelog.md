@@ -73,6 +73,20 @@
 
 **验证**：`.venv/bin/python scripts/check-doc-drift.py --ci` → [OK]（`--with-test-count` 连 test-coverage.md 计数一并核对）；`.venv/bin/python scripts/test-runner.py --mode dev-verify` → 3026 passed / 0 failed（较上次 +55，即本脚本的用例数）；`ruff check` + `ruff format --check` 全绿；`check-code-traces` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` 全 [OK]。
 
+### 修复一致性检查在 CI 上误报构建产物（2026-09-19，rf-410）
+
+**背景**：提交 `122694d3` 推送后 GitHub Actions 的 `test` job 在 3.11/3.12/3.13 三版本全红（`format` job 通过），失败步骤为新纳入的 P0 门禁（dev-verify）。
+
+**根因**：CI 的 P0 步骤在 `pip install -e ".[test]"` 之后运行，而 editable 安装会在 `src/` 下生成 `*.egg-info/`（该目录本就在 `.gitignore` 中）。一致性检查的目录树/统计比对把工作区所有文件都视为「应被 `folders.md` 登记的源文件」，于是把生成物报成「目录树缺条目」→ preflight 失败。本地未做 editable 安装，故「干净克隆 + 现有 venv」验证无法暴露该差异。
+
+**变更**：新增产物判定 `_is_generated()`——按目录名（`__pycache__` / `.eggs` / `build` / `dist` / `.pytest_cache` / `.ruff_cache` / `.mypy_cache` / `htmlcov` / `test-reports`）、后缀（`*.egg-info` / `*.dist-info`）、文件名（`.coverage`）与路径前缀（`docs-stm/tmp/`）识别构建/缓存产物；目录树比对与项目统计两条路径统一排除。
+
+**回归用例（+11）**：产物判定表（egg-info / pycache / build / dist-info / .coverage / tmp / test-reports 为产物；`core/atomic_write.py`、测试文件不是）+ 含产物的合成仓库用例（构造成员被忽略、真实文件缺条目仍报）。定位于 `TestGeneratedArtifacts`。
+
+**本地复现方式**（供后续同类排查）：在仓库根执行 `mkdir -p src/investor_util.egg-info && echo x > src/investor_util.egg-info/PKG-INFO`，即可复现「目录树缺条目」误报；修复后同一状态下检查通过。
+
+**验证**：`check-doc-drift --ci` → [OK]（`--with-test-count` 连 test-coverage.md 计数一并核对）；`dev-verify` → 3037 passed / 0 failed；`ruff check` + `ruff format --check` 全绿；五个 `--ci` 脚本全 [OK]；统计快照同步刷新（folders.md / test-coverage.md）。
+
 ## 归档
 
 - [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0 ~ v0.11.1（2026-09-15 ~ 2026-09-18）

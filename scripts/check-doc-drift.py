@@ -72,7 +72,33 @@ _HISTORY_DOCS = {_MANAGEMENTS / "changelog.md", _MANAGEMENTS / "review-findings.
 _TREE_ROOTS = ("src", "scripts", "docs-stm/managements", "docs-stm/manuals", "docs-stm/plan")
 
 #: 目录树重建时跳过的路径段（缓存/临时产物）
-_TREE_SKIP_PARTS = {"__pycache__", "docs-stm/tmp"}
+#: 构建/缓存产物（不入文档树、不计统计）：目录名 + 后缀规则
+_GENERATED_DIRS = {
+    "__pycache__",
+    ".eggs",
+    "build",
+    "dist",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    "htmlcov",
+    "test-reports",
+}
+_GENERATED_SUFFIXES = (".egg-info", ".dist-info")
+_GENERATED_FILES = {".coverage"}
+#: 多段路径形式的产物前缀（运行时临时目录）
+_GENERATED_PREFIXES = ("docs-stm/tmp/",)
+
+
+def _is_generated(rel: str) -> bool:
+    """相对路径是否属构建/缓存产物（`pip install -e` 的 egg-info、构建目录、缓存等）。
+
+    这些由工具链生成、不该出现在目录树里也不该计入统计——CI 上 `pip install -e ".[test]"`
+    会在 `src/` 下留下 `*.egg-info/`，若不排除会被误报为「目录树缺条目」。
+    """
+    if rel in _GENERATED_FILES or rel.startswith(_GENERATED_PREFIXES):
+        return True
+    return any(p in _GENERATED_DIRS or p.endswith(_GENERATED_SUFFIXES) for p in Path(rel).parts)
 
 
 def _rel(path: Path) -> str:
@@ -475,7 +501,7 @@ def _actual_files() -> set[str]:
             if not p.is_file():
                 continue
             rel = _rel(p)
-            if any(part in rel for part in _TREE_SKIP_PARTS):
+            if _is_generated(rel):
                 continue
             files.add(rel)
     return files
@@ -515,7 +541,8 @@ def _first_number(cell: str) -> str | None:
 
 
 def _count(files: list[Path]) -> tuple[int, int]:
-    return len(files), sum(len(p.read_text(encoding="utf-8", errors="ignore").splitlines()) for p in files)
+    kept = [p for p in files if not _is_generated(_rel(p))]
+    return len(kept), sum(len(p.read_text(encoding="utf-8", errors="ignore").splitlines()) for p in kept)
 
 
 def _stats_actual() -> dict[str, tuple[int, int]]:

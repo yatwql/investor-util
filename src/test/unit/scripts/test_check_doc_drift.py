@@ -358,6 +358,46 @@ class TestTestCoverageCounts:
         assert drift.check_test_coverage_counts("| `ghost_marker` | **1** |\n", {"unit": 1}) == []
 
 
+# ═══ 构建产物排除 ═══
+
+
+class TestGeneratedArtifacts:
+    """构建/缓存产物不得触发目录树误报（CI 的 `pip install -e` 会在 src/ 下生成 *.egg-info）。"""
+
+    @pytest.mark.parametrize(
+        ("rel", "expected"),
+        [
+            ("src/investor_util.egg-info/PKG-INFO", True),
+            ("src/investor_util.egg-info/SOURCES.txt", True),
+            ("src/python/__pycache__/mod.cpython-313.pyc", True),
+            ("build/lib/python/mod.py", True),
+            ("pkg/investor_util.dist-info/METADATA", True),
+            (".coverage", True),
+            ("docs-stm/tmp/scratch.py", True),
+            ("test-reports/latest/index.html", True),
+            ("src/python/core/atomic_write.py", False),
+            ("src/test/unit/scripts/test_check_doc_drift.py", False),
+        ],
+    )
+    def test_is_generated(self, drift, rel, expected):
+        assert drift._is_generated(rel) is expected
+
+    def test_tree_check_ignores_generated(self, drift, monkeypatch, tmp_path):
+        """忽略产物后：真实文件缺条目仍要报，产物不报。"""
+        (tmp_path / "src/pkg").mkdir(parents=True)
+        (tmp_path / "src/pkg/mod.py").write_text("x = 1\n", encoding="utf-8")
+        (tmp_path / "src/pkg/mod.egg-info").mkdir()
+        (tmp_path / "src/pkg/mod.egg-info/PKG-INFO").write_text("x\n", encoding="utf-8")
+        monkeypatch.setattr(drift, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(drift, "_TREE_ROOTS", ("src",))
+        doc = "```\ninvestor-util/\n├── src/              # 源代码\n│   └── pkg/\n│       └── mod.py  # 模块\n```\n"
+        assert drift.check_dir_tree(doc) == []
+
+        (tmp_path / "src/pkg/extra.py").write_text("y = 1\n", encoding="utf-8")
+        findings = drift.check_dir_tree(doc)
+        assert len(findings) == 1 and "extra.py" in findings[0]
+
+
 # ═══ 真实仓库冒烟 ═══
 
 
