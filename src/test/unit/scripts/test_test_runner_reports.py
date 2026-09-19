@@ -43,6 +43,22 @@ def _load_runner():
     return module
 
 
+class TestProjectRoot:
+    """项目根定位：拆包后 `_test_runner/paths.py` 的层级若算错会把报告写到 `scripts/` 下。"""
+
+    def test_project_root_is_repo_root(self):
+        runner = _load_runner()
+        assert Path(runner._PROJECT_ROOT).resolve() == _REPO_ROOT
+        assert Path(runner._LATEST_DIR) == _REPO_ROOT / "test-reports" / "latest"
+        assert Path(runner._SRC_DIR) == _REPO_ROOT / "src" / "test"
+
+    def test_report_dirs_live_under_repo_root(self):
+        runner = _load_runner()
+        for path in (runner._LATEST_DIR, runner._ARCHIVES_DIR):
+            assert Path(path).is_relative_to(_REPO_ROOT)
+            assert "scripts" not in Path(path).relative_to(_REPO_ROOT).parts
+
+
 class TestPhaseReportPath:
     def test_phased_gets_own_file(self):
         runner = _load_runner()

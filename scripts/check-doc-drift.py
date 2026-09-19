@@ -84,7 +84,6 @@ _GENERATED_DIRS = {
     ".ruff_cache",
     ".mypy_cache",
     "htmlcov",
-    "test-reports",
 }
 _GENERATED_SUFFIXES = (".egg-info", ".dist-info")
 _GENERATED_FILES = {".coverage"}
@@ -97,6 +96,10 @@ def _is_generated(rel: str) -> bool:
 
     这些由工具链生成、不该出现在目录树里也不该计入统计——CI 上 `pip install -e ".[test]"`
     会在 `src/` 下留下 `*.egg-info/`，若不排除会被误报为「目录树缺条目」。
+
+    **例外**：`test-reports/` 的规范位置是仓库根（不在受检根内），故**不**豁免——受检目录
+    （`src/`、`scripts/`、`docs-stm/{managements,manuals,plan}`）下出现 `test-reports/`
+    属误落（如入口把项目根算到了 `scripts/`），须由目录树检查报出。
     """
     if rel in _GENERATED_FILES or rel.startswith(_GENERATED_PREFIXES):
         return True

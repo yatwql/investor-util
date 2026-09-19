@@ -142,6 +142,22 @@
 
 **验证**：`check-svg.py --ci geom src/static/*.svg` → [OK]；`dev-verify` 3098 passed / 0 failed；`ruff check` + `format --check` 全绿；八个 `--ci` 检查脚本 + `check-doc-drift --with-test-count` 全 [OK]；folders.md 统计同步刷新。
 
+### 修复 test-runner 拆包期的报告误落位置 + 检查器漏检（2026-09-19，rf-414）
+
+**触发**：用户发现「scripts 目录下有 test-reports 目录」。
+
+**成因**：`test-runner.py` 拆包时，迁移把入口的项目根算式 `os.path.dirname(os.path.dirname(os.path.abspath(__file__)))` 原样搬进 `_test_runner/paths.py`——但该文件比入口深一级，于是 `_PROJECT_ROOT` 算成 `scripts/`，22:51 的两次 `dev-verify` 校验把归档与汇总页落到 `scripts/test-reports/`（内含 `archives/20260919/225126`、`225129`）。同一根因也让 preflight 路径拼成 `scripts/scripts/check-task-numbering.py` 而报错，因此在修复前已暴露；修好 `_PROJECT_ROOT` 后（22:51:35）随后几次运行（`225139` 起）即落回仓库根 `test-reports/`。
+
+**为何此前没被拦住**：产物本身在 `.gitignore` 内、从未入库；但**检查器漏检**——`check-doc-drift._is_generated()` 把任意层级的 `test-reports` 一律豁免，受检目录下的误落不会被报出。
+
+**变更**：
+- 删除误落目录（仓库根 `test-reports/` 为规范位置，未受影响）
+- `check-doc-drift._is_generated()` 不再豁免 `test-reports`：其规范位置在仓库根、本不在受检范围内，故受检目录（`src/`、`scripts/`、`docs-stm/{managements,manuals,plan}`）下出现必属误落；文档串写明该例外与成因
+- 回归用例：`check-doc-drift` 补「`scripts/test-reports/index.html` 须报目录树缺少」；`test-runner` 补 `TestProjectRoot`（`_PROJECT_ROOT` 必须等于仓库根、`_LATEST_DIR`/`_ARCHIVES_DIR` 不得含 `scripts` 段）
+- `CLAUDE.md`（目录结构同步条）与 `folders.md`（目录树条目）注明「`test-reports/` 只应在仓库根」
+
+**验证**：`check-doc-drift --with-test-count` → [OK]（含误落检测用例）；`dev-verify` 3098+ passed / 0 failed；`ruff check` + `format --check` 全绿；八个 `--ci` 检查脚本全 [OK]；复跑 `test-runner` 确认不再于 `scripts/` 下生成 test-reports。
+
 ## 归档
 
 - [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0 ~ v0.11.1（2026-09-15 ~ 2026-09-18）

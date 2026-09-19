@@ -374,13 +374,33 @@ class TestGeneratedArtifacts:
             ("pkg/investor_util.dist-info/METADATA", True),
             (".coverage", True),
             ("docs-stm/tmp/scratch.py", True),
-            ("test-reports/latest/index.html", True),
+            # test-reports 规范位置在仓库根（不在受检根内）→ 受检目录下出现属误落，须报出
+            ("test-reports/latest/index.html", False),
+            ("scripts/test-reports/index.html", False),
             ("src/python/core/atomic_write.py", False),
             ("src/test/unit/scripts/test_check_doc_drift.py", False),
         ],
     )
     def test_is_generated(self, drift, rel, expected):
         assert drift._is_generated(rel) is expected
+
+    def test_misplaced_test_reports_reported(self, drift, monkeypatch, tmp_path):
+        """受检目录下出现 test-reports/（入口把项目根算错等误落）→ 必须报「目录树缺少」。"""
+        (tmp_path / "scripts/test-reports").mkdir(parents=True)
+        (tmp_path / "scripts/test-reports/index.html").write_text("<html/>", encoding="utf-8")
+        real_rel = drift.rel
+
+        def _fake_rel(path):
+            try:
+                return str(Path(path).relative_to(tmp_path))
+            except ValueError:
+                return real_rel(path)
+
+        monkeypatch.setattr(drift, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(drift, "rel", _fake_rel)
+        monkeypatch.setattr(drift, "_TREE_ROOTS", ("scripts",))
+        findings = drift.check_dir_tree("```\ninvestor-util/\n```\n")
+        assert len(findings) == 1 and "scripts/test-reports/index.html" in findings[0]
 
     def test_tree_check_ignores_generated(self, drift, monkeypatch, tmp_path):
         """忽略产物后：真实文件缺条目仍要报，产物不报。"""
