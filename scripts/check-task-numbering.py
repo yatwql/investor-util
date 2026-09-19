@@ -138,7 +138,7 @@ def main() -> int:
             print("\n违规详情:")
         for v in all_violations:
             print(f"  [ERR] {v}")
-        return 1
+        return 2  # 契约：发现 finding → 退出码 2
 
     if not args.ci:
         print("[OK] 全部编号序列通过，无历史冲突风险")

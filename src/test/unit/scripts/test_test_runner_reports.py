@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import sys
 from pathlib import Path
@@ -64,7 +65,9 @@ class TestPhaseReportPath:
 
 class TestIndexLinks:
     def _make(self, runner, tmp_path, monkeypatch, files: list[str]):
-        monkeypatch.setattr(runner, "_LATEST_DIR", str(tmp_path))
+        # 汇总页渲染已拆到 _test_runner.report_html：目录常量在该模块内解析
+        report_html_mod = importlib.import_module("_test_runner.report_html")
+        monkeypatch.setattr(report_html_mod, "_LATEST_DIR", str(tmp_path))
         mode_dir = tmp_path / "dev-verify"
         mode_dir.mkdir(parents=True, exist_ok=True)
         for name in files:

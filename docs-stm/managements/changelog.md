@@ -105,6 +105,31 @@
 
 **验证**：`check-test-redundancy --ci` → [OK]（0 死用例 / 0 无断言 / 0 完全重复 / 0 自证）；`dev-verify` 全绿；`ruff check` + `ruff format --check` 全绿；`check-doc-drift --with-test-count` 连计数一并核对通过。
 
+### scripts/ 优化：性能修复 + 共享模块抽取 + test-runner 拆包（2026-09-19，rf-412 / rf-413）
+
+**触发**：用户问询「scripts 目录下的脚本有没有可优化的空间」。审计 23 个脚本（AST 克隆检测 + 真实计时 + cProfile + 调用方引用统计）。
+
+**① 性能（P0 门禁合计 15.7s → 4.0s）**
+- `check-semantic-index.py` **7.15s → 0.25s（≈29×）**：`slug_exists_in_code()` 曾对**每个 slug** 遍历全部 `.py` 并 tokenize 一次（116 slug × ~88 文件 ≈ 10,176 次全文件 tokenize；cProfile 显示 `tokenize` 占其 95% 耗时）。改为 `collect_code_texts()` 每次检查只收集一次、所有 slug 复用
+- `check-code-traces.py` **4.53s → 3.32s（−27%）**：89 个模式逐行逐一匹配（3.8 万注释行 × 89 ≈ 345 万次 regex）→ 加模式编译缓存 + **并集预筛**（单次扫描判定该行是否可能命中，未命中即跳过逐一匹配；命中后仍走精确分支，判定结果不变）；标识符模式同样改为预编译
+
+**② 共享模块（消除重复与漂移面）**
+- 新增 **`scripts/_checklib.py`**：统一 CLI 契约（`add_common_args()` 的 `-v/--verbose` + `--ci`）、统一输出与退出码（`report()`：通过 0 / 发现 finding 2，`--ci` 仅输出裸描述）、`REPO_ROOT`/`rel()`、文档标记区间与表区域解析（`extract_region`/`replace_region`/`extract_table_region`/`replace_table_region`）
+- 新增 **`scripts/_traces_common.py`**：两个历史痕迹检查脚本 4 个逐字节相同的函数（章节计数豁免 / 迭代轮次豁免）收拢一处；两脚本以原面 re-export + `__all__` 暴露同名符号，既有测试与调用方无需改动
+- 语义命名索引、文档一致性、测试冗余、版本一致性、编号一致性、测试标记等脚本改为复用 `_checklib`
+
+**③ 契约统一**：`check-version-consistency.py` 补 `--ci`（仅报失败、退出 2）；`check-task-numbering.py` / `check-test-markers.py` 发现违规退出 2（原为 1）；`check-svg-geom/pixel/text-overflow` 三件套合并为 **`check-svg.py`**（子命令 `geom` / `pixel` / `text-overflow`，带 `--ci` 与退出码 0/1/2）
+
+**④ `test-runner.py` 拆包（1,600 → 246 行入口 + 7 模块）**：`scripts/_test_runner/` 按职责拆分 `paths` / `modes` / `pytest_env` / `machine_info` / `doc_writer` / `report_html` / `runner`（最大 345 行）；入口保留 CLI 与主流程并 **原面 re-export 49 个符号**，既有测试与调用方零改动（受影响测试的 monkeypatch 改指向持有状态的子模块，如 `_test_runner.report_html._LATEST_DIR`）
+
+**⑤ 清理**：2 处死代码（`_ratio_band`、`_check_exact`）；新增 `src/test/unit/scripts/test_checklib.py`（38 例）覆盖共享设施与共享排除模式
+
+**⑥ 顺带修正 rf-413**：`check-svg` 的像素子命令依赖 Pillow 但依赖清单未声明（干净环境必 `ModuleNotFoundError`）→ 改为按需导入 + 可读指引 + `[svg]` 可选依赖组（`pyproject.toml` / `requirements.txt` 同步）
+
+**已知项（未纳入门禁）**：`check-svg.py geom` 对现有三张 SVG 报出 4 处「文本贴边」（右余量 1~4px，估宽模型边界值），已记入 `developer-guide.md` 作为版式提示；矩形底部对齐降为提示项（流程图同列卡片高度本就允许不同）。
+
+**验证**：`check-semantic-index --ci` / `check-code-traces --ci` / `check-doc-drift --ci`（含 `--with-test-count`）/ `check-test-redundancy --ci` 全 [OK]；`dev-verify` 3098 passed / 0 failed；`ruff check` + `format --check` 全绿；统计快照（folders.md / test-coverage.md）同步刷新。
+
 ## 归档
 
 - [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0 ~ v0.11.1（2026-09-15 ~ 2026-09-18）

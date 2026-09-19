@@ -14,6 +14,7 @@ _duration_mode_cells / _env_value 等函数，不运行真实 CLI、不触发任
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import os
 import sys
@@ -458,7 +459,9 @@ class TestDocFileAndArgs:
 
     def test_update_doc_file_writes_only_when_changed(self, runner_script, monkeypatch, tmp_path):
         target = tmp_path / "test-coverage.md"
-        monkeypatch.setattr(runner_script, "_DOC_COVERAGE_PATH", str(target))
+        # 写盘入口已拆到 _test_runner.doc_writer：目标路径常量在该模块内解析
+        doc_writer_mod = importlib.import_module("_test_runner.doc_writer")
+        monkeypatch.setattr(doc_writer_mod, "_DOC_COVERAGE_PATH", str(target))
         doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
         target.write_text(doc, encoding="utf-8")
         runner_script._update_test_coverage_doc_file(_MACHINE_INFO, [_res("unit", 15.2)])
@@ -471,20 +474,24 @@ class TestDocFileAndArgs:
     def test_update_doc_file_non_valueerror_degrades_to_err(self, runner_script, monkeypatch, tmp_path):
         # 写入器抛出非 ValueError 异常（防御性）：同样降级 [ERR] 且不落盘
         target = tmp_path / "test-coverage.md"
-        monkeypatch.setattr(runner_script, "_DOC_COVERAGE_PATH", str(target))
+        # 写盘入口已拆到 _test_runner.doc_writer：目标路径常量在该模块内解析
+        doc_writer_mod = importlib.import_module("_test_runner.doc_writer")
+        monkeypatch.setattr(doc_writer_mod, "_DOC_COVERAGE_PATH", str(target))
         doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
         target.write_text(doc, encoding="utf-8")
 
         def boom(_doc, _info, _res):
             raise RuntimeError("simulated unexpected error")
 
-        monkeypatch.setattr(runner_script, "_update_test_coverage_doc", boom)
+        monkeypatch.setattr(doc_writer_mod, "_update_test_coverage_doc", boom)
         runner_script._update_test_coverage_doc_file(_MACHINE_INFO, [_res("unit", 15.2)])
         assert target.read_text(encoding="utf-8") == doc  # 未落盘
 
     def test_update_doc_file_missing_markers_no_write(self, runner_script, monkeypatch, tmp_path):
         target = tmp_path / "test-coverage.md"
-        monkeypatch.setattr(runner_script, "_DOC_COVERAGE_PATH", str(target))
+        # 写盘入口已拆到 _test_runner.doc_writer：目标路径常量在该模块内解析
+        doc_writer_mod = importlib.import_module("_test_runner.doc_writer")
+        monkeypatch.setattr(doc_writer_mod, "_DOC_COVERAGE_PATH", str(target))
         doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"), with_markers=False)
         target.write_text(doc, encoding="utf-8")
         runner_script._update_test_coverage_doc_file(_MACHINE_INFO, [_res("unit", 15.2)])

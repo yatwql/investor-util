@@ -26,7 +26,8 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_checklib）
+from _checklib import REPO_ROOT, rel as repo_rel  # noqa: E402
 
 # ── 读取事实源 ──────────────────────────────────────────────
 
@@ -88,11 +89,6 @@ add_header(REPO_ROOT / "docs-stm" / "managements" / "developer-guide.md")
 # ── 校验逻辑 ────────────────────────────────────────────────
 
 
-def _check_exact(text: str, pattern_template: str, version: str) -> bool:
-    pattern = pattern_template.replace("{v}", re.escape(version))
-    return bool(re.search(pattern, text, re.MULTILINE))
-
-
 def _check_contains(text: str, patterns_template: tuple[str, ...], version: str) -> bool:
     return any(p.replace("{v}", version) in text for p in patterns_template)
 
@@ -150,8 +146,10 @@ def _auto_fix_pyproject(path: Path, version: str) -> bool:
 def main() -> None:
     version = _get_app_version()
     do_fix = "--fix" in sys.argv
+    ci_mode = "--ci" in sys.argv
 
-    print(f"[..] 校验版本号一致性 — APP_VERSION = {version}\n     来源：{CONSTANTS_FILE.relative_to(REPO_ROOT)}\n")
+    if not ci_mode:
+        print(f"[..] 校验版本号一致性 — APP_VERSION = {version}\n     来源：{repo_rel(CONSTANTS_FILE)}\n")
 
     all_ok = True
     checked = 0
@@ -161,8 +159,10 @@ def main() -> None:
         checked += 1
         rel = full_path.relative_to(REPO_ROOT)
 
+        rel = repo_rel(full_path)
         if not full_path.exists():
-            print(f"  [!] {rel} — 文件不存在，跳过")
+            if not ci_mode:
+                print(f"  [!] {rel} — 文件不存在，跳过")
             continue
 
         text = full_path.read_text(encoding="utf-8")
@@ -190,15 +190,25 @@ def main() -> None:
             ok = False
 
         if ok:
-            print(f"  [OK] {rel}")
+            if not ci_mode:
+                print(f"  [OK] {rel}")
         else:
             if assert_type == "header":
-                print(f"  [ERR] {rel} — 头部版本行未同步，期望 `> 文档版本：{version}`")
+                print(
+                    f"{rel}: 头部版本行未同步，期望 `> 文档版本：{version}`"
+                    if ci_mode
+                    else f"  [ERR] {rel} — 头部版本行未同步，期望 `> 文档版本：{version}`"
+                )
             else:
-                print(f"  [ERR] {rel} — 版本号未同步，期望包含 {version}")
+                print(
+                    f"{rel}: 版本号未同步，期望包含 {version}"
+                    if ci_mode
+                    else f"  [ERR] {rel} — 版本号未同步，期望包含 {version}"
+                )
             all_ok = False
 
-    print()
+    if not ci_mode:
+        print()
     if all_ok:
         print(f"[OK] 全部 {checked} 项通过 — 版本号一致")
         return
@@ -207,14 +217,15 @@ def main() -> None:
         print(f"[!] 已自动修正 {fixed} 项（pyproject 版本字段 / 管理文档头部版本行）。其他文件需手动更新。")
         sys.exit(0)
 
-    print("[ERR] 版本号不一致 — 请先手动更新后重试。")
-    print("      发布流程：")
-    print("        1. 修改 src/python/core/constants.py APP_VERSION")
-    print("        2. 运行 python scripts/check-version-consistency.py")
-    print("        3. 按 [ERR] 提示逐个更新文档版本号")
-    print("        4. 再次运行确认全部 [OK]")
-    print("        5. 提交 + 打标签")
-    sys.exit(1)
+    if not ci_mode:
+        print("[ERR] 版本号不一致 — 请先手动更新后重试。")
+        print("      发布流程：")
+        print("        1. 修改 src/python/core/constants.py APP_VERSION")
+        print("        2. 运行 python scripts/check-version-consistency.py")
+        print("        3. 按 [ERR] 提示逐个更新文档版本号")
+        print("        4. 再次运行确认全部 [OK]")
+        print("        5. 提交 + 打标签")
+    sys.exit(2)  # 契约：发现 finding → 退出码 2
 
 
 if __name__ == "__main__":

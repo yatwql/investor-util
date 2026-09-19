@@ -389,6 +389,16 @@ class TestGeneratedArtifacts:
         (tmp_path / "src/pkg/mod.egg-info").mkdir()
         (tmp_path / "src/pkg/mod.egg-info/PKG-INFO").write_text("x\n", encoding="utf-8")
         monkeypatch.setattr(drift, "REPO_ROOT", tmp_path)
+        # rel() 来自共享模块 _checklib，须一并替身到临时仓库根
+        real_rel = drift.rel
+
+        def _fake_rel(path):
+            try:
+                return str(Path(path).relative_to(tmp_path))
+            except ValueError:
+                return real_rel(path)
+
+        monkeypatch.setattr(drift, "rel", _fake_rel)
         monkeypatch.setattr(drift, "_TREE_ROOTS", ("src",))
         doc = "```\ninvestor-util/\n├── src/              # 源代码\n│   └── pkg/\n│       └── mod.py  # 模块\n```\n"
         assert drift.check_dir_tree(doc) == []

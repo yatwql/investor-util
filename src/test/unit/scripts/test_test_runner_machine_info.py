@@ -97,10 +97,12 @@ class TestMachineInfo:
 
     @pytest.mark.skipif(sys.platform != "linux", reason="依赖 Linux 读取路径")
     def test_collect_machine_info_no_crash_when_proc_missing(self, runner_script, monkeypatch):
-        monkeypatch.setattr(runner_script, "_read_cpu_model_linux", lambda: None)
-        monkeypatch.setattr(runner_script, "_count_physical_cores_linux", lambda: None)
-        monkeypatch.setattr(runner_script, "_mem_gib_linux", lambda: None)
-        monkeypatch.setattr(runner_script, "_linux_disk_info", lambda: (None, None))
+        # 实现已拆到 _test_runner.machine_info：monkeypatch 必须指向持有该名字的模块
+        machine_info_mod = importlib.import_module("_test_runner.machine_info")
+        monkeypatch.setattr(machine_info_mod, "_read_cpu_model_linux", lambda: None)
+        monkeypatch.setattr(machine_info_mod, "_count_physical_cores_linux", lambda: None)
+        monkeypatch.setattr(machine_info_mod, "_mem_gib_linux", lambda: None)
+        monkeypatch.setattr(machine_info_mod, "_linux_disk_info", lambda: (None, None))
         info = runner_script._collect_machine_info("medium")
         assert info["cpu_model"] is None
         assert info["cpu_threads"] == os.cpu_count()

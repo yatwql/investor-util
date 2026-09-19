@@ -11,6 +11,8 @@ itsdangerous==2.2.0
 click==8.4.2
 blinker==1.9.0
 
+Pillow>=10  # SVG 像素审查（scripts/check-svg.py pixel|text-overflow）需要
+
 pytest>=8.0
 pytest-mock>=3.15.1
 pytest-xdist>=3.6

@@ -40,7 +40,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import NamedTuple
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_checklib）
+from _checklib import REPO_ROOT, add_common_args, rel, report  # noqa: E402
+
 _TEST_ROOT = REPO_ROOT / "src" / "test"
 _LIVE_DIR = REPO_ROOT / "src" / "test" / "live"
 
@@ -50,14 +52,6 @@ _MOCK_ASSERT = re.compile(r"^assert_(called|any_call|has_calls|not_called)")
 _PYTEST_ASSERT = frozenset({"raises", "warns", "fail", "deprecated_call"})
 #: 常见的「被测对象句柄」类间接调用名（函数体内出现且无法解析时跳过重复比对）
 _SUT_ATTRS = frozenset({"_call", "_run", "fn", "r", "sut", "proc", "target", "_target"})
-
-
-def _rel(path: Path) -> str:
-    """仓库相对路径（非仓库内路径原样返回，供单元测试传合成路径）。"""
-    try:
-        return str(Path(path).resolve().relative_to(REPO_ROOT))
-    except ValueError:
-        return str(path)
 
 
 class TestCase(NamedTuple):
@@ -288,7 +282,7 @@ def collect_cases(include_live: bool) -> tuple[list[TestCase], dict[Path, ast.Mo
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except SyntaxError as exc:  # 语法错误由 pytest 自己报，这里不重复报
-            parse_errors.append(f"{_rel(path)}: 无法解析（{exc.msg}）")
+            parse_errors.append(f"{rel(path)}: 无法解析（{exc.msg}）")
             continue
         modules[path] = tree
         cases.extend(cases_in_module(path, tree))
@@ -311,14 +305,14 @@ def check_dead_tests(cases: list[TestCase], modules: dict[Path, ast.Module]) -> 
             continue
         if case.class_name and not case.class_name.startswith("Test"):
             findings.append(
-                f"{_rel(case.path)}:{case.lineno}: 用例 {case.class_name}::{case.name} 所在类名不以 Test 开头，pytest 不会收集（死用例）"
+                f"{rel(case.path)}:{case.lineno}: 用例 {case.class_name}::{case.name} 所在类名不以 Test 开头，pytest 不会收集（死用例）"
             )
     # 同名重复（后者覆盖前者）
     for path, counter in per_file.items():
         for (cls, name), n in counter.items():
             if n > 1:
                 findings.append(
-                    f"{_rel(path)}: {cls + '::' if cls else ''}{name} 在同一文件重复定义 {n} 次，仅最后一次会执行（其余为死用例）"
+                    f"{rel(path)}: {cls + '::' if cls else ''}{name} 在同一文件重复定义 {n} 次，仅最后一次会执行（其余为死用例）"
                 )
     # Test* 类带 __init__
     for path, tree in modules.items():
@@ -333,7 +327,7 @@ def check_dead_tests(cases: list[TestCase], modules: dict[Path, ast.Module]) -> 
             )
             if has_init and n_tests:
                 findings.append(
-                    f"{_rel(path)}: Test 类 {cls.name} 定义了 __init__，pytest 整类跳过（{n_tests} 个用例为死用例）"
+                    f"{rel(path)}: Test 类 {cls.name} 定义了 __init__，pytest 整类跳过（{n_tests} 个用例为死用例）"
                 )
     return findings
 
@@ -349,7 +343,7 @@ def check_assertion_free(cases: list[TestCase]) -> list[str]:
         has_assert, _ = _assertions(case)
         if not has_assert:
             findings.append(
-                f"{_rel(case.path)}:{case.lineno}: 用例 {case.name} 无任何断言（assert / pytest.raises / mock 断言均无）"
+                f"{rel(case.path)}:{case.lineno}: 用例 {case.name} 无任何断言（assert / pytest.raises / mock 断言均无）"
             )
     return findings
 
@@ -390,9 +384,9 @@ def check_duplicate_bodies(cases: list[TestCase]) -> tuple[list[str], int]:
         if len(members) < 2:
             continue
         head = members[0]
-        others = "、".join(f"{_rel(m.path)}:{m.lineno} {m.name}" for m in members[1:])
+        others = "、".join(f"{rel(m.path)}:{m.lineno} {m.name}" for m in members[1:])
         findings.append(
-            f"{_rel(head.path)}:{head.lineno}: 用例 {head.name} 与 {len(members) - 1} 个用例完全重复（函数体/参数/装饰器归一化后一致）：{others}"
+            f"{rel(head.path)}:{head.lineno}: 用例 {head.name} 与 {len(members) - 1} 个用例完全重复（函数体/参数/装饰器归一化后一致）：{others}"
         )
     return findings, skipped
 
@@ -416,7 +410,7 @@ def check_self_fulfilling(cases: list[TestCase]) -> list[str]:
             mock_returns = _mock_return_literals(case.node, mock_name) if mock_name else set()
             if mock_returns & asserted:
                 findings.append(
-                    f"{_rel(case.path)}:{case.lineno}: 用例 {case.name} patch 了被测函数 {target} 又把其 return_value 断言回原值（{sorted(mock_returns & asserted)}），断言恒真"
+                    f"{rel(case.path)}:{case.lineno}: 用例 {case.name} patch 了被测函数 {target} 又把其 return_value 断言回原值（{sorted(mock_returns & asserted)}），断言恒真"
                 )
     return findings
 
@@ -447,8 +441,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例）",
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="详细输出（打印扫描规模与各类计数）")
-    parser.add_argument("--ci", action="store_true", help="CI 模式：仅输出 文件:描述，退出码 2")
+    add_common_args(parser)
     parser.add_argument("--include-live", action="store_true", help="连带扫描 src/test/live/（默认按 pytest.ini 排除）")
     args = parser.parse_args()
 
@@ -465,14 +458,14 @@ def main() -> None:
         )
         print(f"  因不可解析的 self 间接调用而跳过重复比对的用例：{stats['duplicate_skipped']}")
 
-    if not findings:
-        print("[OK] 测试用例冗余与无效检查通过（无死用例 / 无断言 / 完全重复 / 自证用例）")
-        sys.exit(0)
-
-    for finding in findings:
-        print(finding if args.ci else f"[ERR] {finding}")
-    print(f"[!] 发现 {len(findings)} 处测试用例问题，须修正后提交")
-    sys.exit(2)
+    sys.exit(
+        report(
+            findings,
+            "[OK] 测试用例冗余与无效检查通过（无死用例 / 无断言 / 完全重复 / 自证用例）",
+            ci=args.ci,
+            fail_message="[!] 发现 {n} 处测试用例问题，须修正后提交",
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -732,9 +732,10 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `perf-view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
 | `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（风格因子回归前置决策闸门） |
 | `probe-push2.py` | 诊断 | 东方财富 push2 连通性探测（区分程序缺陷与网络环境拦截，熔断降级前置排障） |
-| `check-svg-geom.py` | 诊断 | README SVG 架构图几何审查（文本越界/重叠/矩形对齐） |
-| `check-svg-pixel.py` | 诊断 | README SVG 架构图像素检查（检测文本越出卡片右缘） |
-| `check-svg-text-overflow.py` | 诊断 | README SVG 架构图文字色像素越界精确检测 |
+| `check-svg.py` | 诊断 | README SVG 架构图检查（子命令 `geom` 几何 / `pixel` 像素 / `text-overflow` 文字色越界；像素子命令需 Pillow） |
+| `_checklib.py` | 内部 | 检查脚本共享设施（统一 `-v/--ci` 契约与 `[OK]`/`[ERR]` 输出、`rel()`、`report()`、文档区间与表格解析） |
+| `_traces_common.py` | 内部 | 历史痕迹检查共享排除模式（两个 trace 检查脚本共用章节计数 / 迭代轮次豁免） |
+| `_test_runner/` | 内部 | 测试驱动内部实现包（paths / modes / pytest_env / machine_info / doc_writer / report_html / runner） |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本（无参数启动 TUI；`web` 子命令启动 Web 浏览器模式） |
 | `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
 | `llm.sh` / `llm.ps1` | 启动 | Linux/macOS / Windows 完整报告快捷入口（固定 `report --type full`，等价 TUI「生成完整报告」） |
@@ -886,6 +887,17 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 .venv/bin/python scripts/check-semantic-index.py -v    # 详细输出（打印每项解析结果）
 .venv/bin/python scripts/check-semantic-index.py --ci  # CI 模式（只输出错误，退出码 2）
 ```
+
+**检查脚本的共享设施与统一契约（`_checklib.py` / `_traces_common.py` / `_test_runner/`）**
+
+`scripts/` 下的检查脚本共用一套 CLI 契约与设施，避免每个脚本各写一份：
+
+- **统一契约**（`_checklib.add_common_args()` / `report()`）：`-v/--verbose` 详细输出、`--ci` 仅输出 `文件:描述`；**通过退出 0，发现 finding 退出 2**（`check-code-traces.py` 另有 HIGH=1 / LOW=3 的分级语义，属其自身约定）；通过打印 `[OK] …`，失败逐条 `[ERR] file:desc`（`--ci` 下为裸行）+ 汇总行
+- **共享原语**：`REPO_ROOT` / `rel()`（仓库相对路径，非仓库内路径原样返回）、`extract_region()` / `replace_region()`（标记区间）、`extract_table_region()` / `replace_table_region()`（表区域，带结构校验）
+- **`_traces_common.py`**：两个历史痕迹检查脚本共用的「章节计数豁免」与「迭代轮次豁免」模式（此前各维护一份，改动易漏同步）；两个脚本以原面 re-export 暴露这些名字，既有测试与调用方无需改动
+- **`_test_runner/`**：`test-runner.py` 的内部实现包（paths / modes / pytest_env / machine_info / doc_writer / report_html / runner），入口仅保留 CLI 与主流程并原面 re-export —— 既有测试访问 `test_runner._env_value` 等名字仍有效；**注意**：monkeypatch 内部状态（如 `_LATEST_DIR` / `_DOC_COVERAGE_PATH`）须指向持有它的子模块（`_test_runner.report_html` / `_test_runner.doc_writer`）
+
+> 新增检查脚本时直接复用 `_checklib`，不要自建 argparse/输出/退出样板；新增共享模式放 `_traces_common.py`。
 
 **`check-doc-drift.py` — 文档与实现一致性检查**
 
@@ -1075,22 +1087,24 @@ CSI 风格指数可用性探测（风格因子回归前置决策闸门），决�
 
 curl 对照命令：`curl -s "https://push2.eastmoney.com/api/qt/stock/get?secid=1.000001&fields=f58"`。纯只读探测，不写缓存/熔断/降级记录，无副作用。
 
-**`check-svg-geom.py` / `check-svg-pixel.py` / `check-svg-text-overflow.py` — README SVG 架构图检查三件套**
+**`check-svg.py` — README SVG 架构图检查（三合一）**
 
-README 首屏架构图（`src/static/architecture.svg` / `llm-chain.svg` / `capabilities.svg`）的渲染质量检查，改图后用于验证文本不越界/重叠。
+README 首屏架构图（`src/static/architecture.svg` / `llm-chain.svg` / `capabilities.svg`）的渲染质量检查，改图后用于验证文本不越界/重叠。三个渲染质量检查（几何/像素越界/文字色越界）合并为一个带子命令的统一入口（注意：**均带 `--ci` 与退出码语义**，0=通过 / 1=缺 Pillow / 2=发现越界）。
 
 ```bash
-# 几何审查：文本越界 / 文本重叠 / 矩形对齐（估算字体宽度）
-.venv/bin/python scripts/check-svg-geom.py <svg路径>
+# 几何审查：文本越界 / 贴边 / 文本重叠（估算字体宽度；矩形底部不齐仅作提示，不计入退出码）
+.venv/bin/python scripts/check-svg.py geom <svg路径…>
 
-# 像素检查：检测文本是否越出卡片右缘（副标题行区域找亮色像素）
-.venv/bin/python scripts/check-svg-pixel.py <png路径>
+# 像素审查：副标题行区域亮色像素是否越出卡片右缘（需 Pillow）
+.venv/bin/python scripts/check-svg.py pixel <png> <scale> <card_r> <row_y0> <row_y1> <margin>
 
-# 精确检测文字色像素是否越出卡片右缘
-.venv/bin/python scripts/check-svg-text-overflow.py <png路径>
+# 像素审查：精确匹配文字色像素越界（需 Pillow）
+.venv/bin/python scripts/check-svg.py text-overflow <png> <scale> <card_r> <y0> <y1> <margin>
 ```
 
-三个脚本均接受图片路径参数，配合 `src/static/` 下 SVG 渲染出的 PNG 使用。
+参数含义：`scale` = px per svg unit；`card_r` = 卡片右缘 x（svg 单位）；`row_y*/y*` = 检测区 y 范围（svg 单位）；`margin` = 检测范围到卡片右缘的右扩量（svg 单位）。几何审查纯标准库；两个像素子命令需 Pillow（`pip install -e '.[svg]'`，缺失时给出可读指引并以退出码 1 结束）。
+
+> **已知项**：`geom` 对现有三张 SVG 报出 4 处「文本贴边」（右余量 1~4px，估宽模型的边界值）——属**既有版式提示**，未纳入门禁（本脚本不在 P0/P2 清单内，按需运行）。
 
 ### 启动脚本
 

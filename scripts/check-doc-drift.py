@@ -41,7 +41,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_checklib）
+from _checklib import REPO_ROOT, add_common_args, rel, report  # noqa: E402
+
 if str(REPO_ROOT) not in sys.path:  # 允许任意 cwd 下运行
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -101,14 +103,6 @@ def _is_generated(rel: str) -> bool:
     return any(p in _GENERATED_DIRS or p.endswith(_GENERATED_SUFFIXES) for p in Path(rel).parts)
 
 
-def _rel(path: Path) -> str:
-    """仓库相对路径（非仓库内路径原样返回，供单元测试传合成路径）。"""
-    try:
-        return str(Path(path).resolve().relative_to(REPO_ROOT))
-    except ValueError:
-        return str(path)
-
-
 def _scan_docs() -> dict[Path, str]:
     """返回参与断言扫描的文档集合（README + 手册 + 管理文档，排除历史记录类）。"""
     docs: list[Path] = [_README]
@@ -133,14 +127,14 @@ def check_section_table(doc_text: str) -> list[str]:
     rows = parse_section_rows(doc_text)
     expected = _REPORT_SECTION_DEFAULT
     if len(rows) != len(expected):
-        findings.append(f"{_rel(_REPORTS_MD)}: 章节表 {len(rows)} 行，注册表 {len(expected)} 章")
+        findings.append(f"{rel(_REPORTS_MD)}: 章节表 {len(rows)} 行，注册表 {len(expected)} 章")
     for i, (_, num, name) in enumerate(rows):
         if i >= len(expected):
             break
         exp = expected[i]
         if num != exp["number"] or name != exp["name"]:
             findings.append(
-                f"{_rel(_REPORTS_MD)}: 章节表第 {i + 1} 行 `{num}.{name}` 与注册表 "
+                f"{rel(_REPORTS_MD)}: 章节表第 {i + 1} 行 `{num}.{name}` 与注册表 "
                 f"`{exp['number']}.{exp['name']}` 不一致"
             )
     return findings
@@ -163,9 +157,7 @@ def check_section_counts(docs: dict[Path, str]) -> list[str]:
             for pat in _SECTION_COUNT_PATTERNS:
                 for m in pat.finditer(line):
                     if int(m.group(1)) != total:
-                        findings.append(
-                            f"{_rel(path)}:{line_no}: 章节数量断言「{m.group(0)}」与注册表 {total} 章不一致"
-                        )
+                        findings.append(f"{rel(path)}:{line_no}: 章节数量断言「{m.group(0)}」与注册表 {total} 章不一致")
     return findings
 
 
@@ -198,17 +190,17 @@ def check_switch_table(doc_text: str) -> list[str]:
     findings: list[str] = []
     table = extract_switch_table(doc_text)
     if not table:
-        return [f"{_rel(_HOW_TO_CONFIG_MD)}: 未找到功能开关表区段（起点 `{_SWITCH_TABLE_START}`）"]
+        return [f"{rel(_HOW_TO_CONFIG_MD)}: 未找到功能开关表区段（起点 `{_SWITCH_TABLE_START}`）"]
     for flag, definition in feature_switch_registry.items():
         if flag not in table:
-            findings.append(f"{_rel(_HOW_TO_CONFIG_MD)}: 功能开关 `{flag}` 未列入开关表")
+            findings.append(f"{rel(_HOW_TO_CONFIG_MD)}: 功能开关 `{flag}` 未列入开关表")
         elif table[flag] != definition.default:
             findings.append(
-                f"{_rel(_HOW_TO_CONFIG_MD)}: 开关 `{flag}` 表中默认值 {table[flag]} 与注册表 {definition.default} 不一致"
+                f"{rel(_HOW_TO_CONFIG_MD)}: 开关 `{flag}` 表中默认值 {table[flag]} 与注册表 {definition.default} 不一致"
             )
     for flag in table:
         if flag not in feature_switch_registry:
-            findings.append(f"{_rel(_HOW_TO_CONFIG_MD)}: 开关表出现未登记开关 `{flag}`")
+            findings.append(f"{rel(_HOW_TO_CONFIG_MD)}: 开关表出现未登记开关 `{flag}`")
     return findings
 
 
@@ -232,7 +224,7 @@ _TOTAL_COUNT = re.compile(r"(?:共|全部)\s*(\d+)\s*项(?:功能)?开关|\*\*(\
 
 
 def _count_finding(path: Path, line_no: int, shown: str, expected: int) -> str:
-    return f"{_rel(path)}:{line_no}: 开关分组计数「{shown}」与注册表 {expected} 不一致"
+    return f"{rel(path)}:{line_no}: 开关分组计数「{shown}」与注册表 {expected} 不一致"
 
 
 def check_switch_counts(docs: dict[Path, str]) -> list[str]:
@@ -247,7 +239,7 @@ def check_switch_counts(docs: dict[Path, str]) -> list[str]:
                 exp = [counts["experimental"], counts["standard"], counts["report"]]
                 if got != exp:
                     findings.append(
-                        f"{_rel(path)}:{line_no}: 开关分组计数「{m.group(0)}」与注册表 "
+                        f"{rel(path)}:{line_no}: 开关分组计数「{m.group(0)}」与注册表 "
                         f"{'/'.join(str(v) for v in exp)} 不一致"
                     )
             for m in _GROUPED_COUNT.finditer(line):
@@ -278,7 +270,7 @@ def check_switch_default_claims(docs: dict[Path, str]) -> list[str]:
                 claim_bool = claim in ("开", "true")
                 if claim_bool != feature_switch_registry[flag].default:
                     findings.append(
-                        f"{_rel(path)}:{line_no}: `{flag}` 文档写「默认{claim}」而注册表默认 "
+                        f"{rel(path)}:{line_no}: `{flag}` 文档写「默认{claim}」而注册表默认 "
                         f"{'开' if feature_switch_registry[flag].default else '关'}"
                     )
     return findings
@@ -325,7 +317,7 @@ def check_config_defaults(doc_text: str) -> list[str]:
             continue  # 结构型默认值在文档中以「见下节」描述，不做逐值比对
         if not _values_equal(shown, default):
             findings.append(
-                f"{_rel(_HOW_TO_CONFIG_MD)}:{line_no}: 配置项 `{key}` 文档默认值 `{shown}` 与代码 "
+                f"{rel(_HOW_TO_CONFIG_MD)}:{line_no}: 配置项 `{key}` 文档默认值 `{shown}` 与代码 "
                 f"`{_DEFAULT_CONFIG[key]!r}` 不一致"
             )
     return findings
@@ -363,29 +355,29 @@ def check_llm_defaults(doc_text: str) -> list[str]:
         exp_timeout = _DEFAULT_LLM_SETTINGS.get(f"timeout_{module}")
         if exp_max is not None and max_tokens != exp_max:
             findings.append(
-                f"{_rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` max_tokens 文档 {max_tokens} 与代码 {exp_max} 不一致"
+                f"{rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` max_tokens 文档 {max_tokens} 与代码 {exp_max} 不一致"
             )
         if exp_timeout is not None and timeout != exp_timeout:
             findings.append(
-                f"{_rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` timeout 文档 {timeout}s 与代码 {exp_timeout}s 不一致"
+                f"{rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` timeout 文档 {timeout}s 与代码 {exp_timeout}s 不一致"
             )
         ttl_hours = re.search(r"(\d+)h", ttl_text)
         ttl_secs = re.search(r"(\d+)s", ttl_text)
         exp_ttl = _ttl_default(module)
         if exp_ttl is not None and ttl_secs and int(ttl_secs.group(1)) != int(exp_ttl):
             findings.append(
-                f"{_rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` TTL 文档 {ttl_secs.group(1)}s 与缓存注册表 {int(exp_ttl)}s 不一致"
+                f"{rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` TTL 文档 {ttl_secs.group(1)}s 与缓存注册表 {int(exp_ttl)}s 不一致"
             )
         elif exp_ttl is not None and ttl_hours and int(ttl_hours.group(1)) * 3600 != int(exp_ttl):
             findings.append(
-                f"{_rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` TTL 文档 {ttl_hours.group(1)}h 与缓存注册表 {int(exp_ttl)}s 不一致"
+                f"{rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` TTL 文档 {ttl_hours.group(1)}h 与缓存注册表 {int(exp_ttl)}s 不一致"
             )
     for m in _TTL_TABLE_ROW.finditer(doc_text):
         module, ttl = m.group(1), int(m.group(2))
         exp_ttl = _ttl_default(module)
         if exp_ttl is not None and ttl != int(exp_ttl):
             findings.append(
-                f"{_rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` TTL 表 {ttl}s 与缓存注册表 {int(exp_ttl)}s 不一致"
+                f"{rel(_LLM_TECHNICAL_MD)}: 模块 `{module}` TTL 表 {ttl}s 与缓存注册表 {int(exp_ttl)}s 不一致"
             )
     return findings
 
@@ -408,7 +400,7 @@ def check_panel_numbering(doc_text: str) -> list[str]:
     start = next((i for i, ln in enumerate(lines) if ln.startswith(_PANEL_SECTION_START)), None)
     end = next((i for i, ln in enumerate(lines) if ln.startswith(_PANEL_SECTION_END)), None)
     if start is None or end is None or end <= start:
-        return [f"{_rel(_TUI_MENU_MD)}: 未找到 [S] 面板编号表区段"]
+        return [f"{rel(_TUI_MENU_MD)}: 未找到 [S] 面板编号表区段"]
 
     numbers: list[int] = []
     for line in lines[start:end]:
@@ -426,7 +418,7 @@ def check_panel_numbering(doc_text: str) -> list[str]:
     expect = list(range(llm_visible + 1, table_last + 1))
     if numbers != expect:
         findings.append(
-            f"{_rel(_TUI_MENU_MD)}: 功能开关编号序列 {numbers or '空'} 与派生编号 "
+            f"{rel(_TUI_MENU_MD)}: 功能开关编号序列 {numbers or '空'} 与派生编号 "
             f"{expect[0]}~{expect[-1]}（LLM 菜单模块 {llm_visible} 项 + 实验 {counts['experimental']} + 常规 {counts['standard']}，连续无缺）不一致"
         )
     # 组边界：实验组末号 / 常规组起号必须与分组计数一致
@@ -435,29 +427,27 @@ def check_panel_numbering(doc_text: str) -> list[str]:
     std_first = exp_last + 1
     std_last = std_first + counts["standard"] - 1
     if numbers[: counts["experimental"]] != list(range(exp_first, exp_last + 1)):
-        findings.append(
-            f"{_rel(_TUI_MENU_MD)}: 实验组编号应为 {exp_first}~{exp_last}（共 {counts['experimental']} 项）"
-        )
+        findings.append(f"{rel(_TUI_MENU_MD)}: 实验组编号应为 {exp_first}~{exp_last}（共 {counts['experimental']} 项）")
     if numbers[counts["experimental"] : counts["experimental"] + counts["standard"]] != list(
         range(std_first, std_last + 1)
     ):
-        findings.append(f"{_rel(_TUI_MENU_MD)}: 常规组编号应为 {std_first}~{std_last}（共 {counts['standard']} 项）")
+        findings.append(f"{rel(_TUI_MENU_MD)}: 常规组编号应为 {std_first}~{std_last}（共 {counts['standard']} 项）")
 
     m = _REPORT_RANGE.search(doc_text)
     rep_first = std_last + 1
     rep_last = rep_first + counts["report"] - 1
     if not m:
-        findings.append(f"{_rel(_TUI_MENU_MD)}: 报告块未标注「报告章节与增强（面板编号 {rep_first}-{rep_last}）」")
+        findings.append(f"{rel(_TUI_MENU_MD)}: 报告块未标注「报告章节与增强（面板编号 {rep_first}-{rep_last}）」")
     elif (int(m.group(1)), int(m.group(2))) != (rep_first, rep_last):
         findings.append(
-            f"{_rel(_TUI_MENU_MD)}: 报告块编号区间 {m.group(1)}-{m.group(2)} 与派生区间 {rep_first}-{rep_last} 不一致"
+            f"{rel(_TUI_MENU_MD)}: 报告块编号区间 {m.group(1)}-{m.group(2)} 与派生区间 {rep_first}-{rep_last} 不一致"
         )
     else:
         pairs = _REPORT_ITEM.findall(doc_text[m.start() :])
         exp_pairs = [(str(rep_first + i), flag) for i, (flag, _d) in enumerate(switches_in_group("report"))]
         got_pairs = [(num, flag) for num, flag in pairs if flag in feature_switch_registry]
         if got_pairs != exp_pairs:
-            findings.append(f"{_rel(_TUI_MENU_MD)}: 报告块开关编号/顺序 {got_pairs} 与注册表 {exp_pairs} 不一致")
+            findings.append(f"{rel(_TUI_MENU_MD)}: 报告块开关编号/顺序 {got_pairs} 与注册表 {exp_pairs} 不一致")
     return findings
 
 
@@ -500,10 +490,10 @@ def _actual_files() -> set[str]:
         for p in (REPO_ROOT / root).rglob("*"):
             if not p.is_file():
                 continue
-            rel = _rel(p)
-            if _is_generated(rel):
+            rel_path = rel(p)
+            if _is_generated(rel_path):
                 continue
-            files.add(rel)
+            files.add(rel_path)
     return files
 
 
@@ -511,11 +501,11 @@ def check_dir_tree(doc_text: str) -> list[str]:
     findings: list[str] = []
     tree = parse_tree_paths(doc_text)
     actual = _actual_files()
-    for rel in sorted(actual - tree):
-        findings.append(f"{_rel(_FOLDERS_MD)}: 目录树缺少 `{rel}`（实际存在，须补条目）")
-    for rel in sorted(tree - actual):
-        if any(rel == root or rel.startswith(root + "/") for root in _TREE_ROOTS):
-            findings.append(f"{_rel(_FOLDERS_MD)}: 目录树条目 `{rel}` 在磁盘上不存在")
+    for path_text in sorted(actual - tree):
+        findings.append(f"{rel(_FOLDERS_MD)}: 目录树缺少 `{path_text}`（实际存在，须补条目）")
+    for path_text in sorted(tree - actual):
+        if any(path_text == root or path_text.startswith(root + "/") for root in _TREE_ROOTS):
+            findings.append(f"{rel(_FOLDERS_MD)}: 目录树条目 `{path_text}` 在磁盘上不存在")
     return findings
 
 
@@ -541,15 +531,16 @@ def _first_number(cell: str) -> str | None:
 
 
 def _count(files: list[Path]) -> tuple[int, int]:
-    kept = [p for p in files if not _is_generated(_rel(p))]
+    kept = [p for p in files if not _is_generated(rel(p))]
     return len(kept), sum(len(p.read_text(encoding="utf-8", errors="ignore").splitlines()) for p in kept)
 
 
 def _stats_actual() -> dict[str, tuple[int, int]]:
     """各统计行的实测 ``(文件数, 行数)``（键与 folders.md 行标签一致）。"""
-    main = [p for p in (REPO_ROOT / "src").rglob("*.py") if "src/test/" not in _rel(p)]
+    main = [p for p in (REPO_ROOT / "src").rglob("*.py") if "src/test/" not in rel(p)]
     tests = list((REPO_ROOT / "src" / "test").rglob("*.py"))
-    scripts = sorted((REPO_ROOT / "scripts").glob("*.py"))
+    # scripts/ 含 _test_runner 内部实现包：统计递归计入（与 folders.md「辅助脚本」口径一致）
+    scripts = sorted((REPO_ROOT / "scripts").rglob("*.py"))
     tmpl = list((REPO_ROOT / "src" / "static" / "tmpl").rglob("*.html"))
     svg = sorted((REPO_ROOT / "src" / "static").glob("*.svg"))
     manuals = sorted(_MANUALS.glob("*.md"))
@@ -625,16 +616,16 @@ def check_project_stats(
                 continue
             if got_lines != str(test_count):
                 findings.append(
-                    f"{_rel(_FOLDERS_MD)}:{line_no}: 测试用例数 {got_lines} 与 collect-test-coverage 快照 {test_count} 不一致"
+                    f"{rel(_FOLDERS_MD)}:{line_no}: 测试用例数 {got_lines} 与 collect-test-coverage 快照 {test_count} 不一致"
                 )
             continue
         if label not in actual:
             continue
         exp_files, exp_lines = actual[label]
         if got_files is not None and got_files != str(exp_files):
-            findings.append(f"{_rel(_FOLDERS_MD)}:{line_no}: 「{label}」文件数 {got_files} 与实测 {exp_files} 不一致")
+            findings.append(f"{rel(_FOLDERS_MD)}:{line_no}: 「{label}」文件数 {got_files} 与实测 {exp_files} 不一致")
         if got_lines is not None and got_lines != str(exp_lines):
-            findings.append(f"{_rel(_FOLDERS_MD)}:{line_no}: 「{label}」行数 {got_lines} 与实测 {exp_lines} 不一致")
+            findings.append(f"{rel(_FOLDERS_MD)}:{line_no}: 「{label}」行数 {got_lines} 与实测 {exp_lines} 不一致")
     return findings
 
 
@@ -668,7 +659,7 @@ def check_test_coverage_counts(doc_text: str, snapshot: dict[str, int]) -> list[
                 break
         if got is not None and got != snapshot[name]:
             findings.append(
-                f"{_rel(_TEST_COVERAGE_MD)}:{line_no}: 标记 `{name}` 覆盖项数 {got} 与 collect-test-coverage 快照 {snapshot[name]} 不一致"
+                f"{rel(_TEST_COVERAGE_MD)}:{line_no}: 标记 `{name}` 覆盖项数 {got} 与 collect-test-coverage 快照 {snapshot[name]} 不一致"
             )
     return findings
 
@@ -702,8 +693,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="校验文档中的章节/开关/默认值/目录树/统计断言与代码、配置文件、文件系统的一致性",
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="详细输出（打印解析结果与受检文档）")
-    parser.add_argument("--ci", action="store_true", help="CI 模式：仅输出 文件:描述，退出码 2")
+    add_common_args(parser)
     parser.add_argument(
         "--with-test-count",
         action="store_true",
@@ -725,14 +715,14 @@ def main() -> None:
         for label, (files, lines) in actual.items():
             print(f"    {label}: {files} 文件 / {lines} 行")
 
-    if not findings:
-        print("[OK] 文档与实现一致性校验通过（章节/开关/默认值/面板编号/目录树/统计表均与代码一致）")
-        sys.exit(0)
-
-    for f in findings:
-        print(f if args.ci else f"[ERR] {f}")
-    print(f"[!] 发现 {len(findings)} 处文档与实现不一致，须修正后提交")
-    sys.exit(2)
+    sys.exit(
+        report(
+            findings,
+            "[OK] 文档与实现一致性校验通过（章节/开关/默认值/面板编号/目录树/统计表均与代码一致）",
+            ci=args.ci,
+            fail_message="[!] 发现 {n} 处文档与实现不一致，须修正后提交",
+        )
+    )
 
 
 if __name__ == "__main__":
