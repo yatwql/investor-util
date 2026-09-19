@@ -1104,7 +1104,7 @@ README 首屏架构图（`src/static/architecture.svg` / `llm-chain.svg` / `capa
 
 参数含义：`scale` = px per svg unit；`card_r` = 卡片右缘 x（svg 单位）；`row_y*/y*` = 检测区 y 范围（svg 单位）；`margin` = 检测范围到卡片右缘的右扩量（svg 单位）。几何审查纯标准库；两个像素子命令需 Pillow（`pip install -e '.[svg]'`，缺失时给出可读指引并以退出码 1 结束）。
 
-> **已知项**：`geom` 对现有三张 SVG 报出 4 处「文本贴边」（右余量 1~4px，估宽模型的边界值）——属**既有版式提示**，未纳入门禁（本脚本不在 P0/P2 清单内，按需运行）。
+> **当前状态**：三张 SVG 均通过 `geom`——卡片内文本按估宽模型的右余量 ≥10px（`capabilities.svg` ≥19px）。贴边阈值由 `_PADDING_WARN`（6px）定义，矩形底部不齐仅作提示项（流程图同列卡片高度本就允许不同）。**改图后请重跑本脚本**；本脚本不在提交前/发布前门禁清单内，按需运行。
 
 ### 启动脚本
 

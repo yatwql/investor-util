@@ -126,7 +126,7 @@
 
 **⑥ 顺带修正 rf-413**：`check-svg` 的像素子命令依赖 Pillow 但依赖清单未声明（干净环境必 `ModuleNotFoundError`）→ 改为按需导入 + 可读指引 + `[svg]` 可选依赖组（`pyproject.toml` / `requirements.txt` 同步）
 
-**已知项（未纳入门禁）**：`check-svg.py geom` 对现有三张 SVG 报出 4 处「文本贴边」（右余量 1~4px，估宽模型边界值），已记入 `developer-guide.md` 作为版式提示；矩形底部对齐降为提示项（流程图同列卡片高度本就允许不同）。
+**顺带修版式**：`geom` 报出的 4 处「文本贴边」（右余量 1~4px）已通过加宽卡片消除——`architecture.svg` 左侧渠道列 +10px、中间双列卡片统一 +8px，`llm-chain.svg` 四个 Provider 卡片统一 +10px；三张 SVG 现均通过 `geom`（卡片内文本右余量 ≥10px，`capabilities.svg` ≥19px）。矩形底部对齐降为提示项（流程图同列卡片高度本就允许不同）。
 
 **验证**：`check-semantic-index --ci` / `check-code-traces --ci` / `check-doc-drift --ci`（含 `--with-test-count`）/ `check-test-redundancy --ci` 全 [OK]；`dev-verify` 3098 passed / 0 failed；`ruff check` + `format --check` 全绿；统计快照（folders.md / test-coverage.md）同步刷新。
 

@@ -26,19 +26,19 @@
 
   <!-- 左列：三渠道入口 -->
   <!-- TUI -->
-  <rect x="30" y="100" width="210" height="96" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="30" y="100" width="220" height="96" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
   <text x="46" y="142" font-size="26">⌨️</text>
   <text x="86" y="138" font-size="18" font-weight="700" fill="#e8f1fb">TUI 交互模式</text>
   <text x="86" y="162" font-size="13" fill="#9fb6d0">全键盘菜单 · 方向键+字母</text>
 
   <!-- CLI -->
-  <rect x="30" y="216" width="210" height="96" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="30" y="216" width="220" height="96" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
   <text x="46" y="258" font-size="26">⚙️</text>
   <text x="86" y="254" font-size="18" font-weight="700" fill="#e8f1fb">CLI 命令行模式</text>
   <text x="86" y="278" font-size="13" fill="#9fb6d0">定时任务 · 无人值守</text>
 
   <!-- Web -->
-  <rect x="30" y="332" width="210" height="96" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
+  <rect x="30" y="332" width="220" height="96" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
   <text x="46" y="374" font-size="26">🌐</text>
   <text x="86" y="370" font-size="18" font-weight="700" fill="#e8f1fb">Web 浏览器模式</text>
   <text x="86" y="394" font-size="13" fill="#9fb6d0">上传即生成 · 实时进度</text>
@@ -55,26 +55,26 @@
 
   <!-- 引擎内部 6 能力标签（2列×3行） -->
   <!-- 行1 -->
-  <rect x="318" y="184" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <rect x="318" y="184" width="180" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
   <circle cx="336" cy="210" r="4" fill="#22d3ee"/>
   <text x="350" y="215" font-size="15" fill="#e8f1fb">实时行情 · 多源回退</text>
-  <rect x="506" y="184" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <rect x="506" y="184" width="180" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
   <circle cx="524" cy="210" r="4" fill="#60a5fa"/>
   <text x="538" y="215" font-size="15" fill="#e8f1fb">资产穿透 TOP10</text>
 
   <!-- 行2 -->
-  <rect x="318" y="252" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <rect x="318" y="252" width="180" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
   <circle cx="336" cy="278" r="4" fill="#34d399"/>
   <text x="350" y="283" font-size="15" fill="#e8f1fb">基金业绩评级</text>
-  <rect x="506" y="252" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <rect x="506" y="252" width="180" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
   <circle cx="524" cy="278" r="4" fill="#a78bfa"/>
   <text x="538" y="283" font-size="15" fill="#e8f1fb">新闻热点关联</text>
 
   <!-- 行3 -->
-  <rect x="318" y="320" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <rect x="318" y="320" width="180" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
   <circle cx="336" cy="346" r="4" fill="#fbbf24"/>
   <text x="350" y="351" font-size="15" fill="#e8f1fb">LLM 智囊团复盘</text>
-  <rect x="506" y="320" width="172" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
+  <rect x="506" y="320" width="180" height="52" rx="10" fill="#20375a" stroke="#33608c"/>
   <circle cx="524" cy="346" r="4" fill="#f87171"/>
   <text x="538" y="351" font-size="15" fill="#e8f1fb">风险 · 情景 · 再平衡</text>
 
