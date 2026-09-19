@@ -81,7 +81,10 @@ MODES: dict[str, dict] = {
     "dev-verify": {
         "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景；耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）",
         "order": 5,
-        "preflight": [[sys.executable, "scripts/check-task-numbering.py", "--ci"]],
+        "preflight": [
+            [sys.executable, "scripts/check-task-numbering.py", "--ci"],
+            [sys.executable, "scripts/check-doc-drift.py", "--ci"],
+        ],
         "phases": [
             {
                 "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web) and not (edge or data)",

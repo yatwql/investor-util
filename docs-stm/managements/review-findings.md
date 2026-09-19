@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.2-dev
-> **编号源**：`rf-next = 409`（新增问题取此编号，完成后更新为 +1；已用最大 rf-408，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 410`（新增问题取此编号，完成后更新为 +1；已用最大 rf-409，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -57,6 +57,7 @@
 | **rf-406** | **目录树漏登 9 个文件**（违反「目录结构同步」约定）：`fetcher/financial_indicator.py`、`scenario/basic/test_scenario_prosperity_framework.py`、`unit/analysis/test_financial_statement_derive.py`、`unit/analysis/test_market_sentiment.py`、`unit/fetcher/test_financial_indicator_hithink.py`、`unit/fetcher/test_quote_adapter_hithink.py`、`unit/report/test_market_sentiment.py`、`unit/report/test_market_sentiment_wiring.py`、`unit/scripts/test_test_runner_reports.py`——新增时未同步 `folders.md`（鲸鱼效应：反向检查无幽灵条目、10 份手册/管理文档其它目录一致） | 9 个文件按所属子包位置补入目录树，每个附简短职责说明（说明取自文件 docstring）；补后重核：实际有而树内缺 0、树内有而磁盘无 0 |
 | **rf-407** | **TUI `[S]` 面板编号表整体过期**：实验块只列 6~9（缺 ⚗ 景气度框架诊断，实况已转实验组后共 5 项）；常规块编号 10~25 未随实验组扩容后移（实况 11~26）；报告块完全未编号（实况 27~35）；`how-to-use-tui-menu.md` 的「系统自检（第 23 项）」引用随之失准（实况第 24 项）；`how-to-use-web-mode.md` 的实验性功能清单同样只列 4 项、标 `[S]` 实验块（6-9）。根源：编号由 `handlers_config.py` 从分组与注册表顺序**派生**（设计上就为非硬编码），而文档抄的是旧快照 | 编号表按实况重编（实验 6-10 / 常规 11-26 / 报告 27-35）并补景气度框架诊断行；报告块改为带序号枚举（便于以后与面板逐项对得上）；两处位置引用改为第 24 项；web-mode 清单补项并改（6-10）。面板编号口径：LLM 模块（辩论三模块被 `filter_menu_llm_modules` 隐藏）1-5 → 实验组 → 常规组 → 报告组连续编号 |
 | **rf-408** | **三处零星数值/表述与实况不符**：① `requirements.md` R-OUT-05/R-OUT-07 仍写「页签编号 1~19」「默认顺序（19 项）」，而章节注册表实况为 17 个报告章节（`how-to-config.md` / `technical.md` 已写 17，仅这两处漏改）；② `technical.md` 功能语义命名表的 `market_temperature` 行写「（默认关）」而注册表默认 `True`；③ `testplan.md` 写「配置面板 8 块可编辑项（白名单 7 组…）」——白名单是 45 个扁平键无分组，7 是 `/api/config/edit` 的可编辑面数（`technical.md` 已准确表述） | 三处按实况改正（19→17；默认关→默认开；改为「7 个可编辑面，功能开关面拆成「实验性功能」「常规开关」两块」）；同轮核对中另两类报警经核实为误报（`market_temperature_data` 契约名被前缀匹配、`how-to-config.md` 中非开关表被当成开关表），未改 |
+| **rf-409** | **章节数/开关默认值两处漏网**（把审计脚本常驻化时由脚本自身报出）：① `technical.md` 章节渲染流程末尾仍写「返回 result（19 项，key/number/type/data_flag）」，实况 17 项——上轮手工核对只覆盖了「页签编号 1~N」「默认顺序（N 项）」两种写法，漏了「返回 result（N 项）」；② 同文档 `market_temperature_data` 契约段写「功能开关 `market_temperature` 默认关」，实况默认开（`how-to-config.md` 已写 true）——上轮扫到的这条因同行有 `market_temperature_data` 而被整行误判为「前缀匹配误报」放过（误报过滤粒度过粗：应逐 token 判定而非逐行） | 两处按实况改正（19→17；默认关→默认开）；并把四类断言（章节表/章节数量/开关表与分组计数/开关默认值）连同目录树与项目统计表做成脚本 `scripts/check-doc-drift.py`，纳入 P0/P2 门禁与 dev-verify preflight，不再依赖人工穷举写法 |
 
 ### 归档档案
 

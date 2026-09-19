@@ -1783,7 +1783,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（19 项，key/number/type/data_flag）
+返回 result（17 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -3472,6 +3472,8 @@ web/ (Web 服务层，薄入口)
 
 > **约束外参照（语义命名纪律）**：除上表 C1~C25 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
 
+> **约束外参照（文档与实现一致性纪律）**：除上表 C1~C25 编号约束外，**文档中的事实断言**（章节表与数量、功能开关表与分组计数、默认值表、TUI 面板编号、目录树、项目统计表）必须与代码/配置文件/文件系统一致，由 `scripts/check-doc-drift.py --ci` 强制（十项逐条对账，`changelog.md`/`review-findings.md` 与版本快照类文档按设计豁免）；历史痕迹类约束另由 `scripts/check-doc-traces.py --ci` 强制。
+
 ### 8.1 数据获取层约束
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
@@ -3786,7 +3788,7 @@ investor-util/
 
 > `valuation_data`（估值分位，C19 契约，3 键 + 内嵌 `by_code` 子键）：`{"available": bool, "status": str, "by_code": {code: {"pe": float\|None, "pb": float\|None, "price_percentile": float\|None, "tier": str\|None, "sample_count": int, "percentile_available": bool}}}`。当前 PE/PB 由 `fetcher/industry.py::fetch_valuation_fields`（网关入口；东财 push2 扩展字段 f9/f23 与行业分类同属一次请求，经 Provider Chain + 文件/会话缓存取用，报告层不得直连 provider）；`price_percentile` 为历史 K 线价格分位代理（0~100，`analysis/valuation_percentile.py`，MIN_SAMPLES=60），非真实历史估值分位（盈利增长未纳入，渲染层必须展示 `DISCLAIMER`"价格分位代理，非真实历史估值分位"）。由 `report/orchestrator.py::compute_valuation_data` 计算（开关 功能开关 `valuation_percentile` 默认关；关闭 → None → 「资产穿透TOP10」估值列隐藏；PE/PB 与 K 线皆不可得 → available=False 落 §1.4.5 占位）。消费方：穿透 TOP10 Excel `penetration_sheet` 估值分位列（ncols 10→11 + 表尾免责）与 HTML `report_template.html` 条件列（`valuation_enabled`）。**真实历史估值分位（TTM 口径，后续增强）**：`by_code` 另含 `real`（子契约：`available`/`pe_ttm`/`pb`/`pe_percentile`/`pb_percentile`/`tier`/`basis`/`sample_count`/`report_period`/`reason`）与 `real_available`，由 `analysis/valuation_percentile.py::compute_real_valuation` 用「多期 TTM 每股收益（年报直取、季报累计差分）× 该日已生效最新一期基本面 × 历史收盘价」构造历史 PE/PB 序列后取当前值分位（生效日取法定披露截止日以避免前视偏差；PE 优先、PB 兜底；样本下限 60）。多期基本面来自 `fetcher/financial_indicator.py::fetch_indicator_series`；渲染层**优先展示真实分位并标注 basis，无基本面覆盖时回落价格分位代理**（分别对应 `DISCLAIMER_REAL` / `DISCLAIMER_PROXY`，两者不得混口径展示）。**数据底座门禁**：真实分位以 `config.datasink_feature_ready`（`datasink.enabled` 开启 且 凭据就绪，纯本地判定）为前提——未就绪时 `_fetch_valuation_for_code` 不做任何取数与计算，`compute_valuation_data` 置 `basis_mode="proxy_only"`，估值列文案与免责语**逐字回退到引入前的原样**（Excel `penetration_sheet.valuation_footer_note` / HTML `valuation_real_basis` 同一判据）；就绪时为 `basis_mode="real_ttm"`。
 
-> `market_temperature_data`（市场温度，C19 契约，9 键）：`{"available": bool, "status": str, "index_code": str, "index_name": str, "price_percentile": float\|None, "ma_deviation": float\|None, "volatility": float\|None, "score": float\|None, "tier": str\|None, "disclaimer": str}`。价格分位（复用估值分位的价格分位机制）+ 均线偏离 + 年化波动率三因子合成温度分（0~100，`analysis/market_temperature.py`，权重 0.5/0.3/0.2，各分量 clamp）；**温度计只给刻度、无仓位指令**（`TEMPERATURE_DISCLAIMER` 渲染层必须展示）。`ma_deviation`/`volatility` 为小数比例（0.032=3.2%），渲染层须 ×100 转百分数展示。由 `report/orchestrator.py::compute_market_temperature_data` 计算（指数 K 线 `fetch_index_history` 沪深300 走 Chain + session_cache；开关 功能开关 `market_temperature` 默认关；关闭 → None → 「投资分析汇总」温度行隐藏；K 线不足 → `insufficient` 占位）。消费方：汇总 Excel `summary._write_market_temperature`（「市场指数」后刻度行）与 HTML kv-table（`market_temperature` 展示映射）。
+> `market_temperature_data`（市场温度，C19 契约，9 键）：`{"available": bool, "status": str, "index_code": str, "index_name": str, "price_percentile": float\|None, "ma_deviation": float\|None, "volatility": float\|None, "score": float\|None, "tier": str\|None, "disclaimer": str}`。价格分位（复用估值分位的价格分位机制）+ 均线偏离 + 年化波动率三因子合成温度分（0~100，`analysis/market_temperature.py`，权重 0.5/0.3/0.2，各分量 clamp）；**温度计只给刻度、无仓位指令**（`TEMPERATURE_DISCLAIMER` 渲染层必须展示）。`ma_deviation`/`volatility` 为小数比例（0.032=3.2%），渲染层须 ×100 转百分数展示。由 `report/orchestrator.py::compute_market_temperature_data` 计算（指数 K 线 `fetch_index_history` 沪深300 走 Chain + session_cache；开关 功能开关 `market_temperature` 默认开；关闭 → None → 「投资分析汇总」温度行隐藏；K 线不足 → `insufficient` 占位）。消费方：汇总 Excel `summary._write_market_temperature`（「市场指数」后刻度行）与 HTML kv-table（`market_temperature` 展示映射）。
 
 > `financial_report_digest_data`（持仓个股财报摘要，C19 契约，5 键）：`{"available": bool, "reason": str, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`symbol`/`report_period`/`doc_type`（中文标签）/`title`/`announcement_date`/`summary`/`source`/`adjunct_url`；`failures` 每项含 `code`/`name`/`reason`。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）的目标章节正文并按 `datasink.max_chars` 截断，由 `report/financial_report_digest.py::build_financial_report_digest` 装配（数据源 `providers/datasink.py`，取数编排 `fetcher/financial_report.py`）。开关 功能开关 `financial_report_digest` 默认关（关闭 → None → 章节隐藏）；缺凭据/无 A 股标的/全部无覆盖 → `available=False` 降级。合规：`source` 为披露平台归属，渲染层须保留。C7 注册：该契约并入合并章 `fundamental_snapshot` 的 `data_flag_any`（无独立 type）。消费方：Excel `report/fundamental_snapshot_sheet.py::_write_digest_block` 与 HTML `partials/fundamental_snapshot_section.html`（区块二）。
 >

@@ -53,6 +53,26 @@
 
 **验证**：`.venv/bin/python scripts/test-runner.py --mode dev-verify` → 2971 passed / 0 failed；`ruff check` + `ruff format --check` 全绿；四个 `--ci` 脚本全 [OK]。
 
+### 新增文档与实现一致性检查脚本（check-doc-drift.py）并纳入门禁（2026-09-19，rf-409）
+
+**背景**：前一条全量核对用的是临时脚本（`docs-stm/tmp/audit_phase*.py`），用户问「是否有价值留存」。结论：值得——这类「文档里写死的事实」属**易漂移断言**，人工穷举写法必定漏检（本次就把「返回 result（N 项）」与「`market_temperature_data` 同行内的开关默认值」漏掉了，见 rf-409），而每次漂移都直接误导读者。故常驻化为门禁脚本。
+
+**新增 `scripts/check-doc-drift.py`（十一项检查，权威源 → 受检文档）**：
+- 章节：报告章节表（`reports-instruction.md` ↔ 章节注册表，行数/序号/名称）+ 章节数量断言（`页签编号 1~N` / `默认顺序（N 项` / `返回 result（N 项` / `N 个报告章节`）
+- 开关：功能开关表（`how-to-config.md` 三组区段 ↔ 注册表，含表外键与缺项）+ 分组计数断言（三组连写/单组/合计三种写法）+ 默认值断言（`` `flag` `` 后紧随「默认开/关」，不跨到相邻开关、不误匹配 `xxx_data` 形态）
+- 默认值：配置标量默认值表（↔ `_DEFAULT_CONFIG`，含 bool/None/数字/路径/引号归一）+ LLM 默认参数表（↔ `_DEFAULT_LLM_SETTINGS` 与缓存 TTL 注册表）
+- 结构：TUI `[S]` 面板编号连续性与分组边界（↔ `handlers_config.py` 的派生规则）+ 目录树双向比对（↔ 文件系统）+ 项目统计表（↔ 实测文件数/行数，`--with-test-count` 时再核「测试用例」行）+ 测试覆盖计数表（`test-coverage.md` ↔ collect-test-coverage 快照，同一开关）
+
+**集成**：纳入 P0 提交前门禁与 P2 发布门禁（`CLAUDE.md` / `developer-guide.md` / `testplan.md` §6.3 同步）、`test-runner.py` 的 dev-verify preflight（与编号校验并列，约 1s）；`pyproject.toml` 补 E402 豁免（先注入项目根到 `sys.path`）；`technical.md` 的「约束外参照」新增「文档与实现一致性纪律」条；`folders.md` 目录树与统计表同步。
+
+**测试**：`src/test/unit/scripts/test_check_doc_drift.py`（55 例，`unit_scripts`）——逐项纯函数单测（含误报守卫：相邻开关不串号、`xxx_data` 不误匹配、历史记录类文档豁免）+ 真实仓库冒烟（`run_checks()` 为空）。
+
+**豁免面（设计声明）**：`changelog.md` / `review-findings.md`（如实引用旧数字作为变更记录）与 `docs-stm/archive/**`（版本快照）不参与计数与默认值扫描；结构型默认值（dict/list）与菜单类位置引用（「第 N 项」）不比对（前者文档以「见下节」描述，后者随分组变动属预期）。
+
+**修正**：rf-409 两处（`technical.md` 19→17 项、`market_temperature` 默认关→默认开）；`folders.md` 新增脚本与测试文件树条目与统计刷新。
+
+**验证**：`.venv/bin/python scripts/check-doc-drift.py --ci` → [OK]（`--with-test-count` 连 test-coverage.md 计数一并核对）；`.venv/bin/python scripts/test-runner.py --mode dev-verify` → 3026 passed / 0 failed（较上次 +55，即本脚本的用例数）；`ruff check` + `ruff format --check` 全绿；`check-code-traces` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` 全 [OK]。
+
 ## 归档
 
 - [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0 ~ v0.11.1（2026-09-15 ~ 2026-09-18）

@@ -59,6 +59,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-doc-traces.py --ci           # 文档历史痕迹检查
 .venv/bin/python scripts/check-task-numbering.py --ci       # 任务编号全局一致性检查
 .venv/bin/python scripts/check-semantic-index.py --ci       # 语义命名索引正反向校验
+.venv/bin/python scripts/check-doc-drift.py --ci            # 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表）
 ```
 
 **P1 合入门禁**：`test-runner.py --mode verify`（核心模块单元测试），否则不得 merge。
@@ -71,6 +72,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-doc-traces.py --ci
 .venv/bin/python scripts/check-task-numbering.py --ci
 .venv/bin/python scripts/check-semantic-index.py --ci
+.venv/bin/python scripts/check-doc-drift.py --ci
 ```
 
 **辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
@@ -716,6 +718,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
+| `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
@@ -880,6 +883,37 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 .venv/bin/python scripts/check-semantic-index.py -v    # 详细输出（打印每项解析结果）
 .venv/bin/python scripts/check-semantic-index.py --ci  # CI 模式（只输出错误，退出码 2）
 ```
+
+**`check-doc-drift.py` — 文档与实现一致性检查**
+
+把文档里的「事实断言」（计数、清单、默认值、面板编号、目录树、统计表）与权威源逐条对账，
+使漂移在提交前暴露。与 `check-doc-traces.py` 互补：那边管「不该写的内容」（历史痕迹），这边管
+「写了但与实现不符的内容」。
+
+十一项检查（权威源 → 受检文档）：
+
+1. 报告章节表（`reports-instruction.md`）↔ 章节注册表 `_REPORT_SECTION_DEFAULT`（行数/序号/名称）
+2. 章节数量断言（`页签编号 1~N` / `默认顺序（N 项` / `返回 result（N 项` / `N 个报告章节`）↔ 注册表章节数
+3. 功能开关表（`how-to-config.md` 三组区段）↔ `feature_switch_registry`（成员/默认值/无表外键）
+4. 开关分组计数断言（`⚗实验 A / 常规 B / 报告章节与增强 C`、`实验组（N 项`、`共 N 项开关`）↔ 分组计数
+5. 开关默认值断言（`` `flag` `` 后紧随「默认开/关」）↔ 注册表默认值
+6. 配置标量默认值表（`how-to-config.md`）↔ `_DEFAULT_CONFIG`
+7. LLM 默认参数表（`llm-technical.md`）↔ `_DEFAULT_LLM_SETTINGS` + 缓存 TTL 注册表
+8. TUI `[S]` 面板编号连续性与分组边界（`how-to-use-tui-menu.md`）↔ `handlers_config.py` 的派生编号规则
+9. 目录树（`folders.md`）↔ 文件系统实测（`src/`、`scripts/`、`docs-stm/{managements,manuals,plan}`）
+10. 项目统计表（`folders.md`）↔ 实测文件数/行数（加 `--with-test-count` 再核「测试用例」行）
+11. 测试覆盖计数表（`test-coverage.md`）↔ `scripts/collect-test-coverage.py` 快照（仅 `--with-test-count`）
+
+```bash
+.venv/bin/python scripts/check-doc-drift.py                   # 十项全查
+.venv/bin/python scripts/check-doc-drift.py -v                # 详细输出（打印解析结果与实测统计）
+.venv/bin/python scripts/check-doc-drift.py --ci              # CI 模式（只输出 文件:描述，退出码 2）
+.venv/bin/python scripts/check-doc-drift.py --with-test-count # 附带 pytest 收集，核对「测试用例」与 test-coverage.md 计数表
+```
+
+> 按设计豁免的文档：`changelog.md` / `review-findings.md`（如实引用旧数字作为变更记录）与
+> 版本快照类文档（历次发布的归档快照）不参与计数与默认值断言扫描。修正提示：报告里的数字就是
+> 实测值，直接按提示改文档即可；目录树缺条目时按所属子包位置补一行（含简短职责说明）。
 
 **`check-task-numbering-hook.py` — Claude Code PostToolUse hook**
 
