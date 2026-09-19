@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.2-dev
-> **编号源**：`rf-next = 403`（新增问题取此编号，完成后更新为 +1；已用最大 rf-402，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 405`（新增问题取此编号，完成后更新为 +1；已用最大 rf-404，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -51,6 +51,8 @@
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
 | **rf-402** | **full 路径 HTML 漏接市场情绪契约 → 同一次运行两端产物自相矛盾**（用户问询「同花顺，市场情绪没开启么？我看数据可用性矩阵没提到它」曝光）：`_generate_report_full` 未注入 `market_sentiment_data`，且 `_generate_full_html_report` 无该形参、其 `write_html_report` 调用未传参——HTML 侧因此（a）行动建议章情绪区块不渲染（b）「数据源可用性矩阵」缺「市场情绪」行（矩阵只列本次取用过的类别，非源清单）（c）说明表记「○ 未使用」；而 Excel 侧靠 `excel_generator` 就地兜底在 HTML 落盘**之后**才取数 → 同一份运行里 xlsx 有「同花顺金融数据 ×2」行、HTML 没有（实测 2026-09-18 21:54；`logs/app.log` 三行时间戳 HTML 20.126 → 情绪取数 20.419/20.799 → Excel 21.032）。开关与凭据本无问题（`features.json` 已开 `market_sentiment`、hithink key 已就绪），属接线遗漏而非功能未开启 | 编排层在写 HTML 之前取数并注入 `pipeline_data`（与 both 路径同位：`record_prosperity_diagnosis` 之后、`# ── 6. HTML 报告 ──` 之前，透传 `prep` 以带出穿透标的），`_generate_full_html_report` 新增形参并透传 `write_html_report`；回归用例 2 例（编排注入 / HTML 生成器透传，已验证对修复前代码两者均失败）；Excel 就地兜底保留（basic 路径不经编排层） |
+| **rf-403** | **市场情绪块的三处描述与实现不符**（用户追问「情绪价值会出现在报告哪个部分？我没看到」时发现）：“位置”写错——`features.py` 开关描述写「**新增独立章**」，实际是行动建议章内嵌块（归档设计文档已记该偏离：初稿「独立章节」→ 实现「章内区块」）；“空命中行为”写反——`data_source_matrix.py` 说明表、`how-to-config.md`、`datasource.md` 三处写「**无命中时该区块不显示/不渲染**」，而实现是**零命中仍渲染**（HTML `action_section.html` / Excel `action_sheet.py` 均写 `reason or "当日无命中事件"` + 市场概览，并有专测锁定）。两句叠加使用户把“区块正常但零命中”误判为功能未开启/未接入 | 四处按实现改正：开关描述改为「行动建议章内嵌块「市场情绪与持仓热点」…（零命中时写市场概览与说明行）」；三处空命中口径改为「零命中时写市场概览与「当日无持仓/穿透标的命中」说明行（区块仍渲染，便于区分「无事件」与「取数失败」）」，并将排查路径（矩阵「市场情绪」行 / 说明表「本次使用」/ `[market_sentiment] 命中 N 条`）写入手册 |
+| **rf-404** | **报告组开关计数与清单在 4 处漏数**（rf-400 同类漏改，本次文案核对时发现）：`how-to-use-tui-menu.md` 仍写「功能开关共 29 项（⚗5 / 常规 16 / 报告组 8）」、「报告组 8 项」且清单漏 `market_sentiment`（两处列举）、`how-to-config.md` 报告子模块枚举漏 `market_sentiment`、`folders.md` 仍写「features.py 28 项声明…报告组 8 项」——实况为 **30 项（5/16/9）** | 四处按注册表实况更正（29→30、8→9）并在三份清单中补 `market_sentiment`（按注册表顺序置于 `financial_report_digest` 与 `financial_indicator` 之间）；核对方式：以 `feature_switch_registry` 按 `GROUP_ORDER` 重算分组计数与成员顺序逐项比对 |
 
 ### 归档档案
 
