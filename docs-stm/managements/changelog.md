@@ -126,9 +126,21 @@
 
 **⑥ 顺带修正 rf-413**：`check-svg` 的像素子命令依赖 Pillow 但依赖清单未声明（干净环境必 `ModuleNotFoundError`）→ 改为按需导入 + 可读指引 + `[svg]` 可选依赖组（`pyproject.toml` / `requirements.txt` 同步）
 
-**顺带修版式**：`geom` 报出的 4 处「文本贴边」（右余量 1~4px）已通过加宽卡片消除——`architecture.svg` 左侧渠道列 +10px、中间双列卡片统一 +8px，`llm-chain.svg` 四个 Provider 卡片统一 +10px；三张 SVG 现均通过 `geom`（卡片内文本右余量 ≥10px，`capabilities.svg` ≥19px）。矩形底部对齐降为提示项（流程图同列卡片高度本就允许不同）。
-
 **验证**：`check-semantic-index --ci` / `check-code-traces --ci` / `check-doc-drift --ci`（含 `--with-test-count`）/ `check-test-redundancy --ci` 全 [OK]；`dev-verify` 3098 passed / 0 failed；`ruff check` + `format --check` 全绿；统计快照（folders.md / test-coverage.md）同步刷新。
+
+### README 架构图卡片加宽：消除 4 处文本贴边（2026-09-19，rf-412 收尾，commit `32b3766c`）
+
+**触发**：`check-svg.py` 三合一后首次具备退出码（0/1/2），随即暴露 4 处「文本贴边」——卡片内文本右余量仅 1~4px（`_PADDING_WARN = 6px` 阈值，按字符宽度估算模型）。此前三个 svg 脚本各自无退出码、恒为"通过"，这类版式风险不会出现在任何门禁输出里。
+
+**变更（只加宽卡片，不位移任何元素）**：
+- `src/static/architecture.svg`：左侧渠道列三卡 210 → **220**（+10px）——`全键盘菜单 · 方向键+字母` 右余量 1.9 → 11.9px；中间双列六卡统一 172 → **180**（+8px）——`实时行情 · 多源回退` 3.5 → 11.5px、`风险 · 情景 · 再平衡` 2.0 → 10.0px（两列保持等宽，列间距 16 → 8px；右列右缘 686 仍在引擎面板 700 内）
+- `src/static/llm-chain.svg`：顶部四个 Provider 卡片统一 200 → **210**（+10px）——`Anthropic · Opus/Sonnet` 右余量 1.4 → 11.4px（右缘 934 距容器 960 仍余 26px）
+- **安全性核对**：卡片右缘（240/490/678/276）**零引用**（无连接线/箭头锚定其上），卡内文本均为左锚定或 middle 锚定在卡片外的坐标 → 仅变宽、不移动任何元素
+- 矩形底部不齐降为**提示项**（流程图同列卡片高度本就允许不同，原判定会误报），已在 `developer-guide.md` 记明
+
+**结果**：三张 SVG 均通过 `geom`，卡片内文本右余量 ≥10px（`capabilities.svg` ≥19px）。
+
+**验证**：`check-svg.py --ci geom src/static/*.svg` → [OK]；`dev-verify` 3098 passed / 0 failed；`ruff check` + `format --check` 全绿；八个 `--ci` 检查脚本 + `check-doc-drift --with-test-count` 全 [OK]；folders.md 统计同步刷新。
 
 ## 归档
 
