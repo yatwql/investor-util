@@ -174,16 +174,7 @@ class TestDeterminePriceTypeSessionSwitch(unittest.TestCase):
         result = _determine_price_type("tencent", self.td, self.td)
         self.assertEqual(result, "场内午市收盘(T)")
 
-    # ── 14:59:59 → 15:00:00 ─────────────────────────────
-
-    @patch("src.python.report.market_value.is_market_open", return_value=False)
-    @patch("src.python.report.market_value.is_midday_break", return_value=True)
-    def test_midday_145959_still_midday(self, _, __):
-        """14:59:59 仍在午间休市（未开盘）→ 场内午市收盘(T)。"""
-        from src.python.report.market_value import _determine_price_type
-
-        result = _determine_price_type("tencent", self.td, self.td)
-        self.assertEqual(result, "场内午市收盘(T)")
+    # ── 15:00:00 收盘 ─────────────────────────────────
 
     @patch("src.python.report.market_value.is_market_open", return_value=False)
     @patch("src.python.report.market_value.is_midday_break", return_value=False)

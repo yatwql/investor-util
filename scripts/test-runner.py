@@ -84,6 +84,7 @@ MODES: dict[str, dict] = {
         "preflight": [
             [sys.executable, "scripts/check-task-numbering.py", "--ci"],
             [sys.executable, "scripts/check-doc-drift.py", "--ci"],
+            [sys.executable, "scripts/check-test-redundancy.py", "--ci"],
         ],
         "phases": [
             {

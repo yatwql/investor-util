@@ -87,6 +87,24 @@
 
 **验证**：`check-doc-drift --ci` → [OK]（`--with-test-count` 连 test-coverage.md 计数一并核对）；`dev-verify` → 3037 passed / 0 failed；`ruff check` + `ruff format --check` 全绿；五个 `--ci` 脚本全 [OK]；统计快照同步刷新（folders.md / test-coverage.md）。
 
+### 测试用例冗余与有效性整备 + 新增 check-test-redundancy.py（2026-09-19，rf-411）
+
+**触发**：用户问询「有没有冗余的测试用例，无效的测试用例」。对 381 个测试文件 / 7,245 个用例做 AST 静态审计（并与 `pytest --collect-only` 节点比对），结论与处置：
+
+**四类问题**：
+- **完全重复 20 组**：14 组为同一被测对象同一断言（跨文件或同文件），6 组是不同 provider 解析器（`_safe_float` vs `_parse_float` 等）的**并行覆盖，保留**
+- **自证用例 6 个**：`test_cache_edge.py` 的 `get_ttl` 系列把被测函数本身 patch 掉，再断言自己设的 `return_value`——断言恒真、等于没测
+- **名实不符 7 例**：`test_default_true`（实际设了 `SSL_VERIFY=true`，默认分支从未被测）、`test_none_content`（传 `""`）、`test_none_returns_low`（传 `[]`）、`test_midday_145959_still_midday`（时间由 patch 决定，与 11:30 用例完全同分支）、`test_afternoon_closed_uses_long_ttl`（与午休同义）、`test_capture_snapshot_first_run`/`holding_mapping`（两者同体同断言，且后者名字声称验字段映射却只断言返回 `None`）
+- **无断言 16 个**：仅「调用不抛异常」，未断言任何可观测结果
+
+**负面结论（同样是有效信息）**：**无死用例**（无同名覆盖 / 无非 `Test` 类的 `test_*` / 无 `Test` 类 `__init__`）、**无空测试体**（既有守护生效）、**parametrize 无重复参数集**、20 个 `test/live/*` 是 `pytest.ini` 刻意排除的 opt-in 套件（非死用例）。
+
+**处置**：跨文件重复删其一；同文件重复合并（`test_html_builders_edge` 价格变体 4→1 用 `subTest`、`test_cache_edge` 午休/收盘合并、`test_market_hours` 09:30 重复删一、`test_news_sources` 字母 token 重复删一）；6 个自证用例改为真实断言（patch 依赖、断言真 `get_ttl`）；7 例名实不符改为真跑其声称场景（含 `capture_snapshot` 映射用例改为断言传给 `save()` 的快照字段）；16 处补可观测断言（stdout 静默、错误列表、删除尝试次数、`assert_not_called`、产出文件存在等）。
+
+**新增 `scripts/check-test-redundancy.py`（四类检查 + 误报守卫）**：死用例（不可收集/被覆盖）／无断言（含「断言落在同类辅助方法」的解析）／完全重复（去 docstring 后函数体+参数+装饰器 AST 归一化；**无法解析的 `self.<attr>` 间接调用跳过比对**，避免把并行覆盖误判为重复）／自证用例（patch 被测函数 + `return_value` 断言回原值）。纳入 P0/P2 门禁与 `test-runner.py` 的 dev-verify preflight；`developer-guide.md`（工具表 + 专门章节）、`testplan.md` §6.3、`technical.md`「约束外参照（测试有效性纪律）」、`CLAUDE.md`（P0/P2 + 独立性条目）同步；`folders.md` 目录树与统计刷新。
+
+**验证**：`check-test-redundancy --ci` → [OK]（0 死用例 / 0 无断言 / 0 完全重复 / 0 自证）；`dev-verify` 全绿；`ruff check` + `ruff format --check` 全绿；`check-doc-drift --with-test-count` 连计数一并核对通过。
+
 ## 归档
 
 - [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0 ~ v0.11.1（2026-09-15 ~ 2026-09-18）

@@ -24,8 +24,8 @@ class TestShouldVerify(unittest.TestCase):
 
     @patch("src.python.core.http_client.os.getenv")
     def test_default_true(self, mock_getenv):
-        """默认值：SSL_VERIFY 未设置 → True。"""
-        mock_getenv.return_value = "true"
+        """默认值：SSL_VERIFY 未设置（走 getenv 的 default 分支）→ True。"""
+        mock_getenv.side_effect = lambda _key, default=None: default
         self.assertTrue(_should_verify())
 
     @patch("src.python.core.http_client.os.getenv")

@@ -483,7 +483,10 @@ class TestExcelSummaryFallbackNotice(unittest.TestCase):
 
         set_feature_enabled("signal_ledger", True)
 
-        self._write({})  # 不抛异常即通过
+        sheets: dict = {}
+        self._write(sheets)
+        # 无汇总页签时静默跳过，不改动传入的页签集合
+        self.assertEqual(sheets, {})
 
 
 class TestExcelModuleSheets(unittest.TestCase):

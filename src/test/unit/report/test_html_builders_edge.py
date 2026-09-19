@@ -29,31 +29,21 @@ class TestCalcYieldTextEdge(unittest.TestCase):
 
         self.fn = calc_yield_text
 
-    def test_price_zero(self):
-        """最新价为 0 → "--"。"""
-        d = MagicMock(spec=DetailRow)
-        d.price = 0.0
-        result = self.fn("600900", d, {"600900": {"avg_dividend": 0.85}})
-        self.assertEqual(result, "--")
-
-    def test_price_negative(self):
-        """最新价为负 → "--"。"""
-        d = MagicMock(spec=DetailRow)
-        d.price = -1.0
-        result = self.fn("600900", d, {"600900": {"avg_dividend": 0.85}})
-        self.assertEqual(result, "--")
-
-    def test_detail_none(self):
-        """detail 对象为 None → price=0 → "--"。"""
-        result = self.fn("600900", None, {"600900": {"avg_dividend": 0.85}})
-        self.assertEqual(result, "--")
-
-    def test_division_by_zero_safe(self):
-        """price=0 不会触发除零错误。"""
-        d = MagicMock(spec=DetailRow)
-        d.price = 0.0
-        result = self.fn("600900", d, {"600900": {"avg_dividend": 0.85}})
-        self.assertEqual(result, "--")
+    def test_invalid_price_variants_return_dash(self):
+        """价格为 0 / 负值 / detail 为 None → 均返回 "--"（price=0 同时覆盖除零防护）。"""
+        info = {"600900": {"avg_dividend": 0.85}}
+        zero = MagicMock(spec=DetailRow)
+        zero.price = 0.0
+        negative = MagicMock(spec=DetailRow)
+        negative.price = -1.0
+        cases = [
+            ("price=0（含除零防护）", zero),
+            ("price<0", negative),
+            ("detail=None", None),
+        ]
+        for label, detail in cases:
+            with self.subTest(scenario=label):
+                self.assertEqual(self.fn("600900", detail, info), "--")
 
     def test_info_value_error_handled(self):
         """avg_dividend 为非数值类型 → try/except 兜底返回 "--"。"""

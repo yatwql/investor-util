@@ -819,9 +819,9 @@ class TestRunFactCheck:
         assert summ == ""
 
     def test_none_content(self, sample_holdings):
-        """None 内容（空字符串） → 返回(原内容, 空字符串)。"""
-        corr, summ = run_fact_check("", sample_holdings, "测试模块")
-        assert corr == ""
+        """None 内容 → 原样返回 None，摘要为空（早退分支不触碰内容）。"""
+        corr, summ = run_fact_check(None, sample_holdings, "测试模块")
+        assert corr is None
         assert summ == ""
 
     def test_all_checks_pass(self, sample_holdings):

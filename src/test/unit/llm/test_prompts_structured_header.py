@@ -85,10 +85,6 @@ class TestPromptContractWhenOn:
 class TestGeneratorFingerprintSuffix:
     """生成器指纹后缀随开关换键（预检键 = 读写键）。"""
 
-    def test_suffix_off_is_empty(self):
-        set_feature_enabled(dh.STRUCTURED_HEADER_FLAG, False)  # 转正后默认开，基准须显式关
-        assert dh.structured_header_cache_suffix() == ""
-
     def test_suffix_on_changes_key(self):
         set_feature_enabled(dh.STRUCTURED_HEADER_FLAG, True)
         assert dh.structured_header_cache_suffix() != ""

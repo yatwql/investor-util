@@ -247,14 +247,14 @@ class TestDatasinkGate:
 
 
 class TestSwitchAndWiring:
-    def test_switch_accessor_follows_registry(self):
-        """取值来自功能开关注册表（config 形参已不参与取值）。"""
+    def test_switch_accessor_ignores_config_arg(self):
+        """config 形参仅为兼容保留：取值只认功能开关注册表，传什么都不参与判定。"""
         from src.python.config import is_enable_financial_indicator
         from src.python.config.features import set_feature_enabled
 
-        assert is_enable_financial_indicator() is False
+        assert is_enable_financial_indicator({"financial_indicator": True}) is False
         set_feature_enabled("financial_indicator", True)
-        assert is_enable_financial_indicator() is True
+        assert is_enable_financial_indicator({"financial_indicator": False}) is True
 
     def test_default_config_has_switch_off(self):
         """默认关的事实来源 = 功能开关注册表（GROUP_REPORT）。"""

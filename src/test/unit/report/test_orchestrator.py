@@ -1544,14 +1544,18 @@ class TestCaptureSnapshot:
         return h
 
     def test_capture_snapshot_holding_mapping(self):
-        """从 details → SnapshotHolding 字段映射正确。"""
+        """从 details → SnapshotHolding 字段映射正确（份额/成本由持仓对象回填）。
+
+        断言落在传给 save() 的快照对象上，而不是仅看返回值——
+        首次运行返回值本就是 None，看不出字段映射是否正确。
+        """
         mock_reporter = MagicMock()
         detail = self._make_mock_detail()
         config = {"history": {"snapshot_retention_days": 60, "snapshot_max_count": 365}}
 
         with (
             patch("src.python.report.history_snapshot.load_latest", return_value=None),
-            patch("src.python.report.history_snapshot.save"),
+            patch("src.python.report.history_snapshot.save") as mock_save,
             patch("src.python.fetcher.history_diff.HistoryDiff") as mock_hd,
             patch("src.python.report.history_snapshot.prune"),
         ):
@@ -1559,15 +1563,29 @@ class TestCaptureSnapshot:
             mock_diff.is_first_check = True
             mock_hd.compute.return_value = mock_diff
 
-            result = capture_snapshot(
-                [self._make_mock_holding()],
+            capture_snapshot(
+                [self._make_mock_holding(code="SH600001", name="测试", shares=200, cost_price=12.0)],
                 [detail],
                 config,
                 mock_reporter,
             )
 
-        # 首次运行返回 None
-        assert result is None
+        snapshot = mock_save.call_args.args[0]
+        holding = snapshot.accounts[0].holdings[0]
+        # 行情侧字段（来自 detail）
+        assert holding.code == "SH600001"
+        assert holding.market_value == 1200.0
+        assert holding.total_pnl == 200.0
+        assert holding.cost_total == 1000.0
+        # 持仓侧字段（按 code 从 holdings 回填：detail 本身无份额/成本）
+        assert holding.name == "测试"
+        assert holding.shares == 200
+        assert holding.cost_price == 12.0
+        # 汇总字段与账户名
+        assert snapshot.accounts[0].account_name == "全部"
+        assert snapshot.total_value == 1200.0
+        assert snapshot.total_cost == 1000.0
+        assert snapshot.total_pnl == 200.0
 
     def test_capture_snapshot_holdings_lookup(self):
         """holdings 回查补充 shares/cost_price；无匹配时默认 0.0。"""

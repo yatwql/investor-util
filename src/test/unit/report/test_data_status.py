@@ -790,5 +790,10 @@ class TestMarkDataUsed:
             def record(self, *a, **k):
                 raise RuntimeError("boom")
 
+        tracker = ds.get_tracker()
+        log_before = len(tracker.get_log())
         monkeypatch.setattr(ds, "get_tracker", lambda *a, **k: _Boom())
         ds.mark_data_used("report_datasink_doc")  # 不应抛出
+
+        # 异常被吞掉且未写入任何观测事件（观测失败不影响取数）
+        assert len(tracker.get_log()) == log_before

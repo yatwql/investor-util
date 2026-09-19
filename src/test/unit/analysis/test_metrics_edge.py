@@ -448,12 +448,11 @@ class TestTruncateExtremeValuesEdge:
 class TestCheckDataSufficiencyEdge:
     """数据充分性 — 边界输入。"""
 
-    def test_none_returns_low(self):
-        """None 输入 → 返回 0。"""
+    def test_none_returns_insufficient(self):
+        """None 输入 → 返回 0（不足）——签名声明为 list，None 走 truthiness 防御分支。"""
         from src.python.analysis.metrics import check_data_sufficiency
 
-        # 函数签名不接受 None，但防御性处理
-        assert check_data_sufficiency([]) == 0
+        assert check_data_sufficiency(None) == 0
 
 
 class TestGetConfidenceLevelEdge:
@@ -534,12 +533,6 @@ class TestComputeAllMetricsEdge:
 
 class TestBetaAnalysisEdge:
     """Beta 置信区间分析 — 边界路径。"""
-
-    def test_no_variance_benchmark_returns_none(self):
-        """基准全零 → beta None → analysis None。"""
-        from src.python.analysis.metrics import portfolio_beta_analysis
-
-        assert portfolio_beta_analysis([0.001] * 252, [0.0] * 252) is None
 
     def test_low_df_critical_value(self):
         """小自由度 → 查表给出界内值。"""

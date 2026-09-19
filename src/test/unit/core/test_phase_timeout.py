@@ -61,7 +61,8 @@ class TestPhaseTimeout:
     def test_check_before_timeout_ok(self):
         """超时前 check 不抛出异常。"""
         with phase_timeout(seconds=5.0, phase_name="test_check_ok") as ctx:
-            ctx.check()  # should not raise
+            ctx.check()  # 超时前不应抛异常
+            assert ctx.remaining > 0
 
     def test_separate_context_non_overlapping(self):
         """前后不重叠的两个 phase_timeout 正常。"""

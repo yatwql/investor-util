@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
@@ -92,6 +93,10 @@ class TestGlobalDegradationSmoke(unittest.TestCase):
             output_dir=_tmp.name,
             progress=self.progress,
         )
+
+        # 降级也要产出报告文件（不因外部 API 全失败而无报告）
+        produced = [f for f in os.listdir(_tmp.name) if f.endswith(".xlsx")]
+        self.assertTrue(produced, f"降级路径未产出 Excel：{os.listdir(_tmp.name)}")
 
     def test_global_degradation_fund_deep_analysis_placeholder_logged(self):
         """所有外部 API 失败 → 基金深度分析模块写入占位文本（而非报错）。"""
