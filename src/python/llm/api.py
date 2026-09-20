@@ -68,7 +68,14 @@ def _calm_retry(system_prompt: str, user_prompt: str, name: str, do_retry) -> tu
 
 
 def _resolve_thinking_budget(llm_config: dict, config_field: str, max_tokens: int) -> int:
-    """从 llm_config 解析 Extended Thinking budget_tokens，失败时自动兜底。
+    """从 llm_config 解析 Extended Thinking budget_tokens，无效时自动兜底。
+
+    Anthropic / Gemini 官方约束：budget_tokens（thinkingBudget）须**小于**
+    max_tokens（maxOutputTokens）——思考 token 计入 max_tokens 共享预算，
+    须为其后的正文留余量。故兜底取值保证：
+      - 下限 ≥ 1024（Anthropic 对 budget_tokens 的最小值硬约束）
+      - 上限 < max_tokens（正文至少留 2048 token 余量，max_tokens 较小时
+        让位于 1024 下限——但正常模块 max_tokens 均远超该值）
 
     Args:
         llm_config: LLM 配置字典
@@ -81,8 +88,8 @@ def _resolve_thinking_budget(llm_config: dict, config_field: str, max_tokens: in
     module_suffix = config_field.replace("max_tokens_", "")
     budget_key = f"thinking_budget_{module_suffix}"
     budget = llm_config.get(budget_key)
-    if not budget or budget < max_tokens + 1024:
-        budget = max_tokens + 4096  # 自动兜底
+    if not budget or budget >= max_tokens:
+        budget = max(1024, max_tokens - 2048)  # 自动兜底：budget < max_tokens
     return budget
 
 

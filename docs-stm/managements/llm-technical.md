@@ -554,7 +554,7 @@ _configure_extended_thinking(payload, llm_config, config_field, model, max_token
     └─ budget_tokens 模型 (Claude Sonnet 4 / Opus 4 / Gemini 2.5) →
            payload["thinking"]["budget_tokens"] = budget
            budget 从 thinking_budget_{module_suffix} 读取
-           不足 max_tokens + 1024 时自动兜底到 max_tokens + 4096
+           缺失或 ≥ max_tokens 时自动兜底到 max(1024, max_tokens − 2048)
            Gemini 使用 generationConfig.thinkingConfig.thinkingBudget，效果等价
 ```
 
@@ -613,7 +613,7 @@ call_gemini() Extended Thinking 注入
     └─ 启用 Thinking →
            payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
            budget 从 thinking_budget_{module_suffix} 读取
-           不足 max_tokens + 1024 时自动兜底到 max_tokens + 4096
+           缺失或 ≥ max_tokens 时自动兜底到 max(1024, max_tokens − 2048)
            payload["generationConfig"].pop("temperature", None)  ← 与 temperature 互斥
 ```
 

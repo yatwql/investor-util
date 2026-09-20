@@ -20,6 +20,7 @@ import pytest
 
 from src.python.llm.api import (
     call_claude,
+    call_gemini,
     call_llm,
 )
 from src.python.llm.api_base import (
@@ -142,8 +143,8 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
 
     @patch("src.python.llm._api_claude.call_llm_with_retry")
     def test_budget_auto_padding(self, mock_retry: MagicMock) -> None:
-        """budget 小于 max_tokens + 1024 时自动补足到 max_tokens + 4096。"""
-        cfg = {"thinking_enabled_global_macro": True, "thinking_budget_global_macro": 100}
+        """budget 缺失或 ≥ max_tokens 时自动兜底为 max_tokens - 2048（须 < max_tokens）。"""
+        cfg = {"thinking_enabled_global_macro": True}
         call_claude(
             **self.base_kw,
             model="claude-sonnet-4-20250514",
@@ -151,8 +152,35 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
             llm_config=cfg,
         )
         _payload = mock_retry.call_args[1]["payload"]
-        # max_tokens=800 → auto_pad=800+4096=4896
-        self.assertEqual(_payload["thinking"]["budget_tokens"], 4896)
+        # max_tokens=800 → auto_pad=800-2048 为负，取 1024 下限
+        self.assertEqual(_payload["thinking"]["budget_tokens"], 1024)
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    def test_budget_ge_max_tokens_padded_down(self, mock_retry: MagicMock) -> None:
+        """budget ≥ max_tokens（如 6000 > 800）时自动带回 max_tokens - 2048，杜绝 budget ≥ max_tokens。"""
+        cfg = {"thinking_enabled_global_macro": True, "thinking_budget_global_macro": 6000}
+        call_claude(
+            **self.base_kw,
+            model="claude-sonnet-4-20250514",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        # max_tokens=800 → auto_pad=800-2048 为负，取 1024 下限
+        self.assertEqual(_payload["thinking"]["budget_tokens"], 1024)
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    def test_budget_kept_when_below_max_tokens(self, mock_retry: MagicMock) -> None:
+        """合法 budget（< max_tokens）应原样保留，不触发兜底。"""
+        cfg = {"thinking_enabled_global_macro": True, "thinking_budget_global_macro": 700}
+        call_claude(
+            **self.base_kw,
+            model="claude-sonnet-4-20250514",
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertEqual(_payload["thinking"]["budget_tokens"], 700)
 
     @patch("src.python.llm._api_claude.call_llm_with_retry")
     def test_deepseek_uses_effort_not_budget(self, mock_retry: MagicMock) -> None:
@@ -568,3 +596,60 @@ class TestContentFilterRecovery(unittest.TestCase):
         self.assertIsNone(content)
         # 只调 1 次（主 provider），没有安抚重试也没有 fallback
         self.assertEqual(mock_call.call_count, 1)
+
+
+# ═══════════════════════════════════════════════════════════
+#  call_gemini Extended Thinking budget 方向
+# ═══════════════════════════════════════════════════════════
+
+
+class TestCallGeminiThinkingBudget(unittest.TestCase):
+    """验证 call_gemini 注入的 thinkingBudget 遵循 budget < maxOutputTokens 约束。
+
+    Gemini 的 thinkingBudget 为软上限，但 maxOutputTokens（= max_tokens）是硬截止，
+    思考 token 计入其中。若 thinkingBudget ≥ maxOutputTokens，推理时会触发
+    finish_reason=MAX_TOKENS 且正文为空，与 Claude 的 budget_tokens < max_tokens
+    约束方向一致（思考预算须小于输出总预算）。
+    """
+
+    def setUp(self) -> None:
+        self.base_kw = dict(
+            system="system",
+            user="user",
+            api_key="sk-test",
+            model="gemini-2.5-flash",
+            endpoint="",
+            max_tokens=800,
+            http_client=MagicMock(),
+        )
+
+    @patch("src.python.llm._api_gemini.call_llm_with_retry")
+    def test_budget_ge_max_tokens_padded_down(self, mock_retry: MagicMock) -> None:
+        """thinking_budget ≥ max_tokens（6000 > 800）时自动带回 max_tokens - 2048。"""
+        cfg = {"thinking_enabled_global_macro": True, "thinking_budget_global_macro": 6000}
+        call_gemini(
+            **self.base_kw,
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertIn("generationConfig", _payload)
+        self.assertEqual(
+            _payload["generationConfig"]["thinkingConfig"]["thinkingBudget"],
+            1024,  # max(1024, 800 - 2048)
+        )
+
+    @patch("src.python.llm._api_gemini.call_llm_with_retry")
+    def test_budget_kept_when_below_max_tokens(self, mock_retry: MagicMock) -> None:
+        """合法 budget（< max_tokens）应原样保留。"""
+        cfg = {"thinking_enabled_global_macro": True, "thinking_budget_global_macro": 700}
+        call_gemini(
+            **self.base_kw,
+            config_field="max_tokens_global_macro",
+            llm_config=cfg,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertEqual(
+            _payload["generationConfig"]["thinkingConfig"]["thinkingBudget"],
+            700,
+        )

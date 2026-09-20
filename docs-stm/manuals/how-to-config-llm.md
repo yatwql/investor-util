@@ -316,7 +316,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
 | `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式（news_correlation）不支持** |
 | `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude / DeepSeek / Gemini 2.5） |
-| `thinking_budget_{module}` | int | 6000~24000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
+| `thinking_budget_{module}` | int | 6000~24000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。须小于对应 `max_tokens`（思考计入总输出预算，须为正文留余量），非法值代码自动修正 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
 > 各模块默认值差异详见下方「各模块推荐参数值」表。
@@ -603,7 +603,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 36000 |
 | `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 24000 |
 
-**API 硬性约束（仅 Claude / Gemini）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。代码自动保护：若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。若配置开启但模型不支持，自动跳过并记录 WARNING。
+**API 硬性约束（仅 Claude / Gemini）：** `thinking_budget_{模块}` 的值**必须小于**对应的 `max_tokens_{模块}`（思考 token 计入 max_tokens 共享预算，须为其后的正文留余量）。代码自动保护：若 `thinking_budget` 缺失或 ≥ `max_tokens`，自动修正为 `max(1024, max_tokens − 2048)`（1024 为 Anthropic `budget_tokens` 的最小值硬限制；`max_tokens − 2048` 保证正文至少留 2048 token 余量）。若配置开启但模型不支持，自动跳过并记录 WARNING。
 
 **一句话总结（Claude / Gemini）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
 **一句话总结（DeepSeek）：** `reasoning_effort` 管"想多深"，`"max"` 对应深度分析的极致模式。
