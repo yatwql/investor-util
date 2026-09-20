@@ -8,6 +8,20 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 跟进 DeepSeek 计费规则调整：法定节假日全天闲时 + V4 Pro 继续服务（2026-09-20）
+
+**背景**（外部规则变化）：DeepSeek 官方 2026-09-10 定价页更新峰谷计价口径——高峰时段为北京时间周一至周五（**不含中国法定节假日**）9:00–12:00、14:00–18:00；其余时段（含周末与**法定节假日全天**）均为空闲时段。同批 change log 还宣布 V4 Pro 在 2026-09-14 之后**继续提供 API 服务**（此前曾计划下线）。项目原先只实现了「周末全天闲时」，且注释误记 V4 Pro 下线。
+
+**变更**：
+- `core/constants.py`：新增 `PRICING_HOLIDAY_ALWAYS_IDLE`（默认 True）；峰谷时段注释更新为「高峰日 = 周一至周五且非法定节假日」；更正 V4 Pro 注释为继续服务、计费不变
+- `llm/pricing.py`：新增 `_is_holiday`（复用 `core/trading_calendar._is_trading_day` 判定工作日但非 A 股交易日）、`_is_idle_day`（周末/法定节假日，各受 `weekend_always_idle` / `holiday_always_idle` 开关控制）；`_is_peak_minute` 参数由 `weekend` 改为 `idle_day`；`reload_pricing` 增加 `holiday_always_idle` 解析
+- `config/_llm_settings_defaults.py`：pricing 段新增 `holiday_always_idle: true` 及注释
+- 文档同步：`llm-technical.md`（§10.4 峰谷定价 + 附录 B 定价表与说明）、`how-to-config-llm.md`（pricing 字段说明 + DeepSeek 注意事项 + 峰谷定价说明 + 费用估算示例）
+
+**回归测试 +5**（`test_llm_utils.py::TestPricing`）：法定节假日闲时默认开 / 高峰钟点按闲时价 / 缓存命中按闲时价 / 普通工作日（交易日）仍按高峰价 / `holiday_always_idle=false` 恢复峰谷——法定节假日判定 mock `trading_calendar._is_trading_day`，不触发真实网络。
+
+**验证**：`.venv/bin/python -m pytest src/test/unit/llm/test_llm_utils.py::TestPricing` → 28 passed / 0 failed；`check-code-traces` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` / `check-doc-drift` / `check-test-redundancy` 六个 `--ci` 脚本全 [OK]；`ruff check` + `ruff format --check` 全绿。
+
 ### 修复 LLM thinking 预算兜底方向写反（2026-09-20，rf-379）
 
 **背景（自审待核类问题，已解决）**：`_resolve_thinking_budget` 的兜底方向存疑——旧实现把「budget 不足 `max_tokens + 1024`」视为不足并**提升到 `max_tokens + 4096`**，导致实际发送 `budget_tokens > max_tokens`。本次查证 Anthropic / Gemini 官方约束后确认方向写反。

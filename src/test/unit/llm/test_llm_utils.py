@@ -407,6 +407,7 @@ class TestPricing(unittest.TestCase):
     _PEAK_TIME = datetime(2026, 8, 21, 10, 0)
     _WEEKEND_PEAK_HOUR_TIME = datetime(2026, 8, 15, 10, 0)
     _WEEKEND_IDLE_HOUR_TIME = datetime(2026, 8, 15, 20, 0)
+    _HOLIDAY_PEAK_HOUR_TIME = datetime(2026, 10, 1, 10, 0)  # 2026-10-01 周四（国庆法定节假日）
 
     def testestimate_cost_known_model(self) -> None:
         """已知模型闲时按 base 价（闲时价）估算。"""
@@ -610,6 +611,53 @@ class TestPricing(unittest.TestCase):
             self.assertEqual(cost_peak, "¥10.000")  # 周末高峰按高峰价
         finally:
             _pricing_mod.PRICING_WEEKEND_ALWAYS_IDLE = orig_flag
+
+    # ── 法定节假日全天闲时规则（DeepSeek 官方 2026-09-10 定价页起） ──────────
+
+    def test_holiday_always_idle_default_on(self) -> None:
+        """默认法定节假日全天按闲时价计费（PRICING_HOLIDAY_ALWAYS_IDLE 默认 True）。"""
+        self.assertTrue(_pricing_mod.PRICING_HOLIDAY_ALWAYS_IDLE)
+
+    def test_holiday_peak_hour_bills_idle_rate(self) -> None:
+        """法定节假日（工作日但非 A 股交易日）高峰钟点（10:00）也按闲时价计费。"""
+        with patch("src.python.core.trading_calendar._is_trading_day", return_value=False):
+            cost_holiday = estimate_cost(
+                "deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._HOLIDAY_PEAK_HOUR_TIME
+            )
+        self.assertEqual(cost_holiday, "¥5.000")  # (1+4) 闲时价
+
+    def test_holiday_cache_hit_bills_idle_rate(self) -> None:
+        """法定节假日缓存命中输入按闲时 input_cache_hit（0.02）而非高峰价（0.04）计费。"""
+        with patch("src.python.core.trading_calendar._is_trading_day", return_value=False):
+            cost_holiday = estimate_cost(
+                "deepseek-v4-flash",
+                1_000_000,
+                0,
+                cache_hit_input_tokens=1_000_000,
+                at_time=self._HOLIDAY_PEAK_HOUR_TIME,
+            )
+        self.assertEqual(cost_holiday, "¥0.020")
+
+    def test_holiday_workday_trading_day_bills_peak(self) -> None:
+        """普通工作日（交易日）不受节假日判定影响，仍按高峰价计费。"""
+        with patch("src.python.core.trading_calendar._is_trading_day", return_value=True):
+            cost_workday = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
+        self.assertEqual(cost_workday, "¥10.000")  # (2+8) 高峰价
+
+    def test_holiday_flag_disabled_restores_peak(self) -> None:
+        """holiday_always_idle=False 时法定节假日恢复按钟点区分峰谷。"""
+        orig_flag = _pricing_mod.PRICING_HOLIDAY_ALWAYS_IDLE
+        try:
+            with patch("src.python.config.get_llm_config", return_value={"pricing": {"holiday_always_idle": False}}):
+                reload_pricing()
+            self.assertFalse(_pricing_mod.PRICING_HOLIDAY_ALWAYS_IDLE)
+            with patch("src.python.core.trading_calendar._is_trading_day", return_value=False):
+                cost_peak = estimate_cost(
+                    "deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._HOLIDAY_PEAK_HOUR_TIME
+                )
+            self.assertEqual(cost_peak, "¥10.000")  # 法定节假日高峰钟点按高峰价
+        finally:
+            _pricing_mod.PRICING_HOLIDAY_ALWAYS_IDLE = orig_flag
 
     def test_peak_pricing_custom_periods_from_config(self) -> None:
         """llm_settings.json 自定义峰谷时段与模型价格后应生效（工作日）。"""

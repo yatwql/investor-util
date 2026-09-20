@@ -300,7 +300,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `llm_max_thinking_concurrency`（int，默认 `1`）：开启 Extended Thinking 的模块（health_check / expert_review 等 `thinking_enabled_{module}=true`）并发的最大请求数。多 thinking 模块同时涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），此信号量将 thinking 请求串行化（同时最多 N 个，默认 1），非 thinking 模块不受此限。设大可提升 thinking 并发速度，但可能提高偶发空响应概率，建议保持默认 1
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
-- `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: [], weekend_always_idle: true}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）、`weekend_always_idle`（周末全天闲时开关，默认 `true`）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节
+- `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: [], weekend_always_idle: true, holiday_always_idle: true}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）、`weekend_always_idle`（周末全天闲时开关，默认 `true`）、`holiday_always_idle`（法定节假日全天闲时开关，默认 `true`）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
 - `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，默认 18432（null 时按代码兜底同值））、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 72000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**本段仅控制辩论行为的参数，启停由 Feature Flag（`llm_debate_*`）决定，非配置直接启用**；决策跨期反思闭环（`decision_reflection`）同样由 Feature Flag 启停，无独立配置段
 
@@ -686,7 +686,7 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
 - 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-flash`（DeepSeek-V4.1-Flash 正式模型名，2026-09-10 发布，与前者同价）
 - **已停用模型名**：`deepseek-chat` / `deepseek-reasoner` 是 flash 系列非思考 / 思考模式的兼容别名（**不是**独立的 V3 模型），已于 2026-07-24 下线，端点不再接受——新配置请改用 `deepseek-flash`。旧名仍留在 `MODEL_PRICING` 中仅为让停用前产生的历史调用能算出费用
-- **注意**：`deepseek-v4-pro` 于 2026-09-14 12:00（北京时间）下线，在此之前请求自动路由到 V4.1-Flash 并按 V4.1-Flash 单价计费；`deepseek-v4-flash` 与 `deepseek-v4-flash-vision-exp` 底层模型同样由 V4.1-Flash 接管，价格不变。费用估算以 `core/constants.py` 的 `MODEL_PRICING` 为准
+- **注意**：`deepseek-v4-pro` 官方 2026-09-10 公告继续提供 API 服务（2026-09-14 之后不下线），计费方式不变；`deepseek-v4-flash` 与 `deepseek-v4-flash-vision-exp` 底层模型同样由 V4.1-Flash 接管，价格不变。费用估算以 `core/constants.py` 的 `MODEL_PRICING` 为准
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
 </details>
 
@@ -776,7 +776,7 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 
 ## Token 消耗参考
 
-以下费用按 **DeepSeek-V4-Flash 闲时价**（¥1.0/M 输入、¥4.0/M 输出，2026-09-10 官方降价后）估算，工作日高峰时段约翻倍、周末全天按闲时价，各模型单价详见「完整模型定价表」。
+以下费用按 **DeepSeek-V4-Flash 闲时价**（¥1.0/M 输入、¥4.0/M 输出，2026-09-10 官方降价后）估算，工作日高峰时段约翻倍、周末与法定节假日全天按闲时价，各模型单价详见「完整模型定价表」。
 
 | 模块 | 输入 token | 输出 token | 单次费用参考 |
 |------|-----------|-----------|-------------|
@@ -816,9 +816,9 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
 | `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
 
-> **峰谷定价（DeepSeek）**：`deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` / `deepseek-reasoner` 采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 flash 系列降价），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在工作日（周一至周五）生效**，为**北京时间 09:00–12:00、14:00–18:00**；工作日其余时间为闲时、**周末（周六/周日）全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` 中覆盖；含 `"peak"` 子段的模型工作日高峰时段按 `peak` 价计费，其余时段（含周末全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
+> **峰谷定价（DeepSeek）**：`deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` / `deepseek-reasoner` 采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 flash 系列降价并补充法定节假日规则），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在高峰日（周一至周五，不含中国法定节假日）生效**，为**北京时间 09:00–12:00、14:00–18:00**；高峰日其余时间为闲时、**周末（周六/周日）与法定节假日全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末/法定节假日规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` / `holiday_always_idle` 中覆盖；含 `"peak"` 子段的模型高峰日高峰时段按 `peak` 价计费，其余时段（含周末与法定节假日全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
 >
-> **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash 工作日闲时/周末：输入 3000 tokens × ¥1.0 + 输出 2000 tokens × ¥4.0 = ¥0.011/次（工作日高峰时段则 ×2、×8）。缓存命中时输入部分按 `input_cache_hit` 计费。
+> **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash 高峰日闲时/周末/法定节假日：输入 3000 tokens × ¥1.0 + 输出 2000 tokens × ¥4.0 = ¥0.011/次（高峰日高峰时段则 ×2、×8）。缓存命中时输入部分按 `input_cache_hit` 计费。
 >
 > **覆盖方式**：在 `llm_settings.json` 中添加 `pricing` 段即可覆盖任意模型的定价，未覆盖的模型自动使用上方内置价格；含峰谷时段的模型可一并覆盖 `peak` 子段：
 > ```json

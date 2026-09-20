@@ -1077,16 +1077,20 @@ reload_pricing() → 合并 llm_settings.json → pricing
 ### 10.4 峰谷定价（DeepSeek）
 
 `MODEL_PRICING` 中含 `"peak"` 高峰价子段的模型（`deepseek-flash` / `deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat` / `deepseek-reasoner`）
-采用峰谷定价：工作日高峰时段按 `peak` 子段单价计费，其余时段（闲时，含周末全天）按 base 单价计费。
+采用峰谷定价：高峰日（周一至周五，不含中国法定节假日）的高峰时段按 `peak` 子段单价计费，
+其余时段（闲时，含周末与法定节假日全天）按 base 单价计费。
 
-- **高峰时段**（默认，**仅工作日**生效）：北京时间 09:00–12:00、14:00–18:00；工作日其余时间与
-  **周末（周六/周日）全天**均为闲时（2026-08-23 起 DeepSeek 官方周末统一低谷价，闲时价 = 高峰价的一半）
+- **高峰时段**（默认，仅高峰日生效）：北京时间 09:00–12:00、14:00–18:00；高峰日其余时间、
+  **周末（周六/周日）全天**与**法定节假日全天**均为闲时（官方 2026-09-10 定价页口径：
+  周末及中国法定节假日全天均为空闲时段，闲时价 = 高峰价的一半）
 - **配置覆盖**：`llm_settings.json → pricing` 段的 `timezone`（IANA 时区名）、
   `peak_periods` / `idle_periods`（`"HH:MM-HH:MM"` 闭区间列表）可调整时段与时区；
-  `weekend_always_idle`（bool，默认 `true`）设为 `false` 时周末恢复按钟点区分峰谷
+  `weekend_always_idle`（bool，默认 `true`）设为 `false` 时周末恢复按钟点区分峰谷；
+  `holiday_always_idle`（bool，默认 `true`）设为 `false` 时法定节假日恢复按钟点区分峰谷
 - **判定逻辑**：`peak_periods` 非空时高峰 = 这些时段、闲时 = 其余时间；`peak_periods`
   为空且 `idle_periods` 非空时闲时 = 这些时段、高峰 = 其余时间；两者均空 → 无峰谷；
-  `weekend_always_idle` 为真且为周末时，无论时段一律按闲时价
+  周末/法定节假日为「全天闲时日」时无论时段一律按闲时价（法定节假日复用
+  `core/trading_calendar._is_trading_day` 判定：工作日但非 A 股交易日即法定节假日）
 - **无 `"peak"` 的模型**不受时段影响，始终按 base 价计费
 - **计费时刻**：`estimate_cost(..., at_time=...)` 可显式传入判定时刻（naive 视为已在
   定价时区，便于测试）；缺省取当前时间并按定价时区换算
@@ -1341,7 +1345,7 @@ LLM 集成层与系统其他组件的接口：
 | deepseek-flash | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；DeepSeek-V4.1-Flash 正式模型名（2026-09-10 发布） |
 | deepseek-reasoner | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；**已停用别名**（flash 系列思考模式的兼容名，2026-07-24 下线，条目保留供历史记录计费） |
 | deepseek-v4-flash | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；别名，端点仍接受、底层由 V4.1-Flash 接管并按同价计费 |
-| deepseek-v4-pro | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | 峰谷定价（闲时/高峰）；2026-09-14 12:00 起下线，之前请求路由到 V4.1-Flash 并按其单价计费 |
+| deepseek-v4-pro | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | 峰谷定价（闲时/高峰）；官方 2026-09-10 公告继续提供 API 服务，计费方式不变 |
 | gemini-2.0-flash | 0.10 | 0.40 | 0.01 | |
 | gemini-2.5-flash | 0.15 | 0.60 | 0.015 | |
 | gemini-2.5-pro | 1.25 | 5.00 | 0.125 | |
@@ -1351,7 +1355,7 @@ LLM 集成层与系统其他组件的接口：
 
 > 上表为具名模型定价；`MODEL_PRICING` 另有 6 个前缀回退键（`claude-sonnet-4-`/`claude-opus-4-`/`claude-haiku-4-`/`gemini-3.5-`/`gemini-2.5-`/`gemini-2.0-`）用于 startswith 回退匹配日期戳变体，未逐行列示。
 >
-> 峰谷定价模型的「闲时/高峰」两列为非高峰与高峰时段单价（高峰时段为北京时间 09:00–12:00、14:00–18:00，**仅工作日生效**；闲时为其外全部时间，**周末全天按闲时价**）；模型条目含 `"peak"` 高峰价子段，时段可经 `pricing` 段 `peak_periods`/`idle_periods`/`timezone`/`weekend_always_idle` 覆盖。
+> 峰谷定价模型的「闲时/高峰」两列为非高峰与高峰时段单价（高峰时段为北京时间 09:00–12:00、14:00–18:00，**仅高峰日（周一至周五，不含中国法定节假日）生效**；闲时为其外全部时间，**周末与法定节假日全天按闲时价**）；模型条目含 `"peak"` 高峰价子段，时段可经 `pricing` 段 `peak_periods`/`idle_periods`/`timezone`/`weekend_always_idle`/`holiday_always_idle` 覆盖。
 
 费用按 `(input_tokens × 输入单价 + output_tokens × 输出单价 + cache_hit_tokens × 缓存命中单价) / 1_000_000` 计算。
 
