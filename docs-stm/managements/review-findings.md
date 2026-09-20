@@ -34,15 +34,7 @@
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
-| **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui.md` 验收标准），完成后回填 changelog、本表移至已修复。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
-
-#### P2C — LLM Thinking 预算与 max_tokens 约束（2026-09-16）
-
-> 处理「思考耗尽 max_tokens」日志时发现；本次修复只做 +50% 上调上限，未改动此逻辑。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-379** | `llm/api.py::_resolve_thinking_budget` 兜底方向可疑：配置的 `thinking_budget_{module}` 小于 `max_tokens + 1024` 时被判「不足」并**提升到 `max_tokens + 4096`** → 实际发送 `budget_tokens > max_tokens`。但 Anthropic 官方约束是 `budget_tokens < max_tokens`（Gemini 2.5 亦要求 thinkingBudget 小于 maxOutputTokens），方向相反 → Claude/Gemini 原生模型 + 开启 thinking 时可能被 API 拒绝（日志表现：「Claude API 响应格式异常」后关闭 thinking 重试）。手册 `how-to-config-llm.md`「thinking_budget 与 max_tokens 的关系」将该方向写为「API 硬约束须 ≥ max_tokens + 1024」，同样待核实 | ① 查证 Anthropic / Gemini 真实约束并构造复现（两者是否都要求 budget < max_tokens）；② 若方向确认写反，改为「budget 上限 = max_tokens − 正文余量（如 −2048 或 −20%）」；③ 同步更新手册与 `llm-technical.md`；④ 补 payload 级回归测试（Claude / Gemini 两条路径各一） |
+| **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui-implementation.md` §10 三阶段验收标准 + §6.5/§6.6 样式/响应式）。**勾选清单已备齐（2026-09-20）**：`docs-stm/archive/v0.10.x/web-ui/web-ui-verification-checklist.md`（从实际 `index.html` 七卡结构 + `how-to-use-web-mode.md` 手册导出 ①~⑤ 五类 UX 项，含逐步操作步骤与判定标准）。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
 ## 已解决问题
 
@@ -50,6 +42,7 @@
 
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
+| **rf-379** | **LLM thinking 预算兜底方向写反**（此前自审发现待核实），本次查证 Anthropic / Gemini 官方约束后确认：`budget_tokens`（Anthropic）/ `thinkingBudget`（Gemini）应**小于** `max_tokens` / `maxOutputTokens`（思考 token 计入该共享总预算，须为正文留余量；Anthropic 另有最小值 1024 硬约束）。而 `_resolve_thinking_budget` 旧实现把「不足 `max_tokens + 1024`」视为不足并**提升到 `max_tokens + 4096`**（预算 > 总预算），Claude/Gemini 原生 + 开启 thinking 时会被 API 拒绝或正文为空。**该缺陷不影响 DeepSeek 主路径**（DeepSeek 走 `reasoning_effort` effort 档，不发送 budget_tokens） | ① 查证 Anthropic 官方（`budget_tokens` 须 `< max_tokens`，最小 1024）与 Gemini（`thinkingBudget` 软上限但 `maxOutputTokens` 硬截止，须留正文余量）已确认方向写反；② `llm/api.py::_resolve_thinking_budget` 改为：缺失或 `budget ≥ max_tokens` 时兜底 `max(1024, max_tokens − 2048)`（保证 ≥1024 且留 ≥2048 正文余量）；③ 同步 `how-to-config-llm.md` 参数表/关系章节与 `llm-technical.md` 两处注入流程（均改「须 < max_tokens / max(1024, max_tokens−2048)」）；④ 回归测试 +5（Claude 3 例：兜底为 1024 / ≥max_tokens 回落 / 合法值保留；Gemini 2 例：≥max_tokens 回落 / 合法值保留） |
 | **rf-402** | **full 路径 HTML 漏接市场情绪契约 → 同一次运行两端产物自相矛盾**（用户问询「同花顺，市场情绪没开启么？我看数据可用性矩阵没提到它」曝光）：`_generate_report_full` 未注入 `market_sentiment_data`，且 `_generate_full_html_report` 无该形参、其 `write_html_report` 调用未传参——HTML 侧因此（a）行动建议章情绪区块不渲染（b）「数据源可用性矩阵」缺「市场情绪」行（矩阵只列本次取用过的类别，非源清单）（c）说明表记「○ 未使用」；而 Excel 侧靠 `excel_generator` 就地兜底在 HTML 落盘**之后**才取数 → 同一份运行里 xlsx 有「同花顺金融数据 ×2」行、HTML 没有（实测 2026-09-18 21:54；`logs/app.log` 三行时间戳 HTML 20.126 → 情绪取数 20.419/20.799 → Excel 21.032）。开关与凭据本无问题（`features.json` 已开 `market_sentiment`、hithink key 已就绪），属接线遗漏而非功能未开启 | 编排层在写 HTML 之前取数并注入 `pipeline_data`（与 both 路径同位：`record_prosperity_diagnosis` 之后、`# ── 6. HTML 报告 ──` 之前，透传 `prep` 以带出穿透标的），`_generate_full_html_report` 新增形参并透传 `write_html_report`；回归用例 2 例（编排注入 / HTML 生成器透传，已验证对修复前代码两者均失败）；Excel 就地兜底保留（basic 路径不经编排层） |
 | **rf-403** | **市场情绪块的三处描述与实现不符**（用户追问「情绪价值会出现在报告哪个部分？我没看到」时发现）：“位置”写错——`features.py` 开关描述写「**新增独立章**」，实际是行动建议章内嵌块（归档设计文档已记该偏离：初稿「独立章节」→ 实现「章内区块」）；“空命中行为”写反——`data_source_matrix.py` 说明表、`how-to-config.md`、`datasource.md` 三处写「**无命中时该区块不显示/不渲染**」，而实现是**零命中仍渲染**（HTML `action_section.html` / Excel `action_sheet.py` 均写 `reason or "当日无命中事件"` + 市场概览，并有专测锁定）。两句叠加使用户把“区块正常但零命中”误判为功能未开启/未接入 | 四处按实现改正：开关描述改为「行动建议章内嵌块「市场情绪与持仓热点」…（零命中时写市场概览与说明行）」；三处空命中口径改为「零命中时写市场概览与「当日无持仓/穿透标的命中」说明行（区块仍渲染，便于区分「无事件」与「取数失败」）」，并将排查路径（矩阵「市场情绪」行 / 说明表「本次使用」/ `[market_sentiment] 命中 N 条`）写入手册 |
 | **rf-404** | **报告组开关计数与清单在 4 处漏数**（rf-400 同类漏改，本次文案核对时发现）：`how-to-use-tui-menu.md` 仍写「功能开关共 29 项（⚗5 / 常规 16 / 报告组 8）」、「报告组 8 项」且清单漏 `market_sentiment`（两处列举）、`how-to-config.md` 报告子模块枚举漏 `market_sentiment`、`folders.md` 仍写「features.py 28 项声明…报告组 8 项」——实况为 **30 项（5/16/9）** | 四处按注册表实况更正（29→30、8→9）并在三份清单中补 `market_sentiment`（按注册表顺序置于 `financial_report_digest` 与 `financial_indicator` 之间）；核对方式：以 `feature_switch_registry` 按 `GROUP_ORDER` 重算分组计数与成员顺序逐项比对 |

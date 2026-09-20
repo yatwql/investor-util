@@ -8,6 +8,32 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 修复 LLM thinking 预算兜底方向写反（2026-09-20，rf-379）
+
+**背景（自审待核类问题，已解决）**：`_resolve_thinking_budget` 的兜底方向存疑——旧实现把「budget 不足 `max_tokens + 1024`」视为不足并**提升到 `max_tokens + 4096`**，导致实际发送 `budget_tokens > max_tokens`。本次查证 Anthropic / Gemini 官方约束后确认方向写反。
+
+**官方约束**：
+- **Anthropic**：`budget_tokens` 须 **< `max_tokens`**（思考 token 计入 max_tokens 共享预算，须为最终回答留空间），且最小值 1024（仅 interleaved thinking 可例外，本项目不用）。
+- **Gemini**：`thinkingBudget` 为软上限，但 `maxOutputTokens`（= max_tokens）是硬截止，思考 token 计入；若 `thinkingBudget ≥ maxOutputTokens`，推理时触发 `finish_reason=MAX_TOKENS` 且正文为空。
+- **DeepSeek（主用）**：走 `reasoning_effort` effort 档（`deepseek-flash` / `deepseek-v4-` / `deepseek-chat` 命中 `_THINKING_EFFORT_MODEL_PREFIXES`），**不发送 budget_tokens**，故本缺陷不影响 DeepSeek 主路径。
+
+**变更**：
+- `src/python/llm/api.py::_resolve_thinking_budget`：兜底条件由 `budget < max_tokens + 1024` 改为 `budget ≥ max_tokens`（含缺失），兜底值由 `max_tokens + 4096` 改为 `max(1024, max_tokens − 2048)`（保证 ≥1024 且 ≤ max_tokens − 2048，正文留 2048 余量）
+- 同步 `docs-stm/manuals/how-to-config-llm.md`（参数表 + 「thinking_budget 与 max_tokens 的关系」章节）与 `docs-stm/managements/llm-technical.md`（Claude/Gemini 两处注入流程）
+- 回归测试 +5：`test_llm_api.py` Claude 3 例（兜底 1024 / ≥max_tokens 回落 / 合法值保留）+ Gemini 2 例（≥max_tokens 回落 / 合法值保留）
+
+**验证**：`.venv/bin/python -m pytest src/test/unit/llm/test_llm_api.py` → 32 passed / 0 failed。
+
+### 补充 rf-113 / rf-257 浏览器人工验收清单（2026-09-20）
+
+**背景**：rf-113（Chart.js 图表浏览器验证）与 rf-257（Web 模式浏览器验收）是两项**只能真实浏览器/真机人工走查**的遗留待办（均无法用自动化脚本替代）。rf-113 已有旧清单但存在与当前实现的偏差；rf-257 长期只有模糊的「对照 plan-web-ui.md 验收标准」而无落地勾选清单。本次补齐二者载体并勘误。
+
+**变更**：
+- **rf-257 新增勾选清单**：`docs-stm/archive/v0.10.x/web-ui/web-ui-verification-checklist.md`——从实际 `index.html` 七卡结构（①上传 ②生成 ③配置编辑 ④进度 ⑤结果 ⑥运行状态 ⑦日志）+ `how-to-use-web-mode.md` 手册 + `plan-web-ui-implementation.md` §10/§6.5/§6.6 验收标准导出 ①~⑤ 五类 UX 项（页面渲染 / 上传表单 / 进度可视化 / 375px 响应式 / 按钮态），每项含可勾选细项 + 逐步操作步骤 + 明确判定标准；`review-findings.md` rf-257 条目补指向该清单的引用，验收标准源由笼统的 `plan-web-ui.md` 修正为 `plan-web-ui-implementation.md`
+- **rf-113 清单勘误**：`iter7-verification-checklist.md` 的 5 处场景参数名错误——`test-chart.html?场景=ok` / `?场景=离线` 修正为 `?s=ok` / `?s=offline`。根因：`test-chart.html` 的 `getScenario()` 只读 `?s=` 参数（合法值 ok/degraded/empty/offline），中文字参数不报错但实际无效（非法值 fallback 到 ok），其中 `?场景=离线` 会让用户验证不到离线守卫逻辑，属必须修复的误导
+
+**其余核对**：rf-113 清单的其它断言仍与当前实现一致——`enable_interactive_charts` 默认开（`True`）、6 图清单（`portfolio_line/drawdown/category_doughnut/industry_bar/penetration_bar/radar`）、回撤图 span ≥ 60 交易日（`DRAW_DOWN_MIN_SPAN`=60）才渲染、7 JS 资产 + chart-common.js 依赖、`drawSimpleChart` + Canvas 回退路径仍在（对应 rf-114「先验 rf-113 再删旧路径」的待办）。
+
 ### 修复 full 路径 HTML 漏接市场情绪契约（2026-09-18，rf-402）
 
 **背景**（用户反馈）：「同花顺，市场情绪没开启么？我看数据可用性矩阵没提到它」。排查确认**开关与 key 均无问题**（`features.json` 已开 `market_sentiment`、hithink key 就绪、`data/cache/sentiment_*` 本次已由同花顺接口刷新），而是 full 路径的 HTML 端接线遗漏。
