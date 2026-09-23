@@ -3382,6 +3382,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `prosperity_framework_data` | 景气度框架诊断数据契约（available/reason/六维明细/持仓视角/未验证清单；类型 dict） | 行动建议（章内嵌块） | 报告输出 | 无（契约） |
 | `estimate_fund_roe_batch` | 基金重仓股 ROE 加权估算入口（取数编排：基金持仓批量 + 个股 ROE 补齐 → 推演值；报告期陈旧闸门与穿透层同口径；任一基金失败只缺席该基金） | 行动建议（章内嵌块） | 数据获取 | 随 `prosperity_framework` |
 | `fund_roe_estimates` | 基金 ROE 推演值映射（{基金代码: {roe/covered_pct/top_n/basis/report_period}}；`basis=top10_holdings` 为阶段一前十大重仓口径，全量持仓口径落地后新增取值） | 行动建议（章内嵌块） | 报告输出 | 无（契约） |
+| `roe_by_code_from_rows` | ROE 行解析唯一事实来源（财务指标契约行 → {代码: ROE}，含非数值过滤；评分维度/推演集合判定/编排层免重取三处共用） | 行动建议（章内嵌块） | 分析计算 | 无 |
+| `estimated_fund_codes` | 推演集合判定唯一事实来源（有可用推演值且无直接 ROE 的基金代码集；评分侧与契约说明/持仓视角标注侧共用，两侧不得各自实现） | 行动建议（章内嵌块） | 分析计算 | 无 |
+| `otc_redemption_days_default` | 场外基金赎回天数类型默认档（货币/短债 T+1、纯债 T+2、其他场外 T+3、QDII T+7；非实测口径，未识别返回 None；供流动性维与场外赎回标签共用） | 行动建议（章内嵌块）/ 流动性风险 | 分析计算 | 无 |
 > **合并章代码标识符**：合并章 sheet key 统一为语义名——`holdings_detail`（持仓明细与分类，合并 `market_value` + `category`）、`position_structure`（持仓结构与集中度，合并 `position_relationship` + `fund_concentration`）、`fundamental_snapshot`（持仓基本面，合并 `financial_indicator` + `financial_report_digest`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号命名。
 <!-- semantic-index:end -->
 

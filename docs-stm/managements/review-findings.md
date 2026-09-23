@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.2-dev
-> **编号源**：`rf-next = 422`（新增问题取此编号，完成后更新为 +1；已用最大 rf-421，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 423`（新增问题取此编号，完成后更新为 +1；已用最大 rf-422，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -46,6 +46,7 @@
 
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
+| **rf-422** | **文档核对（第三轮）：语义命名表漏登本轮收敛出的 3 个跨模块原语**——`roe_by_code_from_rows`（ROE 行解析唯一事实来源）、`estimated_fund_codes`（推演集合判定唯一事实来源）、`otc_redemption_days_default`（场外赎回天数类型默认档）均被两个以上模块共用，但未入「功能语义命名表」——不入表则「代码标识符 = 文档中文描述」一致性链在收敛原语层断开（内部助手入表已有先例，如 `_normalize_hold_payload`） | 三行补入 `technical.md` 功能语义命名表（含落点/层/开关列），口径与 ④维描述/需求行 R-LIQ-03/R-PF-09 对齐 |
 | **rf-420** | **`batch.akshare_workers` 被代码引用但未入配置模板与文档**：`report/financial_indicator.py` 与 `report/fund_roe_estimate.py` 均调 `get_batch_worker_count("akshare_workers", 2)`，但 `_config_defaults.py` 的 `batch` 段只声明 `fund_workers`/`industry_workers`/`datasink_workers`——用户无法通过配置调整 akshare 财务指标取数并发，只能吃代码兜底值；且现有模板回归用例只校验「模板 ≡ 默认值」，对「代码引用 ⊆ 默认值」无覆盖，漏声明不会被任何用例拦住 | 按语义归属选择「补键」：`batch.akshare_workers: 2` 入 `_DEFAULT_CONFIG` + 模板注释（取数域与 fund/industry/datasink 并列，`datasink_workers` 已有同模式先例）；`how-to-config.md` 字段表与两处示例 JSON 同步补齐（连带补上原本也漏列的 `batch.datasink_workers`）；**新增不变式用例**：扫描 `src/python` 下全部 `get_batch_worker_count("<key>")` 引用，断言 ⊆ `_DEFAULT_CONFIG["batch"]`（含正则失效的防假通过断言），已实证移除该键即报错 |
 | **rf-421** | **全量文档审计（用户要求「核对所有管理/用户文档的组织顺序与内容」，共 5 项）**：① `reports-instruction.md` 的 FAQ 跳转锚点失效——目标 `faq.md` 的问答是 `**Q: …**` 粗体行（非标题）且无显式 id，该锚点永不可达；② 自审自身失误：将待处理项 `rf-420` 误置于「已解决待归档」表，混淆待办/已完成分区；③ `requirements.md` §5.11 未反映本轮两项扩展（②维基金层 ROE 重仓加权推演、④维场外赎回类型默认档）的口径与标注义务；④ `llm-technical.md` §5.3 未登记新增公开入口 `resolve_provider_endpoint`（外部模块应复用它而非重写凭据→端点遍历）；⑤ `how-to-config.md` 开关表关于景气度框架的描述未体现「推演/默认档」上屏标识，用户看到「非实测」标识时无法从手册得到解释。另本轮新增 R-PF-09 初稿误用任务编号 `plan-51` 被文档痕迹检查报出（自审当场修正） | ① `faq.md` 该 Q 行前加显式 `<a id="…">`（与报表文档既有做法一致，保留精确跳转）；② `rf-420` 移入新建的待处理分区「P2C — 文档与配置口径」；③ 新增需求行 R-PF-09（两项扩展必标口径：推演/非实测，不得冒充披露/实测）并将 `plan-51` 改为语义表述；④ §5.3 补「公开入口」引用框；⑤ 开关描述补括注说明两类标识来源。**审计旁证清白项**：368 条内部链接 0 断链、README 手册索引 10 份完整且顺序合理、标题层级无异常、流动性旧口径仅存于 changelog 历史记录（合理） |
 | **rf-419** | **最近 48 小时实施的技术债（用户要求审计）：共 6 项**——① ROE 行解析规则三处各写一份（`_score_roe` / `prosperity_framework` 直接 ROE 集合 / `_report_aux_metrics` 的 `known_roe`），带同样的数值守卫，改一处易漏另两处；② 「哪些代码属于推演值」规则两处独立实现（评分侧与契约说明/持仓视角侧），存在漂移风险；③ `estimate_fund_roe_batch` 与 `_fetch_stock_roe_batch` 的 `dispatcher` 形参无任何外部调用方（预留参数 = YAGNI 债务）；④ 股票 ROE 批量取数误用 `batch.fund_workers`（语义错配，且与财务指标章用 `akshare_workers` 不一致）；⑤ 穿透占比兼容兜底 `a.get("ratio_pct", a.get("ratio", 0))` 会在契约漂移时**静默归零**（与 rf-415 同型：静默掩盖上游形状变化）；⑥ `_score_liquidity` 场外计入/未计入判定为长内联布尔式（可读性差，易误改） | ① 新增 `roe_by_code_from_rows`（ROE 解析唯一事实来源），三处复用；② 新增 `estimated_fund_codes`（推演集合判定唯一事实来源），评分侧与标注侧共用；③ 删除两处未使用 `dispatcher` 形参，内部统一自建；④ 改用 `akshare_workers`（与财务指标章同口径）；⑤ 两处改严格读 `ratio_pct`（不再兼容遗留 `ratio`），提示词侧缺失时记一次契约漂移告警（不静默）；⑥ 抽出 `_is_scored_otc` / `_is_otc_default_tier` 语义助手；⑦ 另发现既有重复：报告层曾自行重写 `credentials_ref → endpoint` 遍历 → 新增 `llm/api.py::resolve_provider_endpoint` 公开入口并改为复用。回归用例 +4（ROE 解析过滤 / 推演集合除直接 ROE / 提示词契约漂移告警 / 指纹不兼容遗留键） |

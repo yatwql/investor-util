@@ -8,6 +8,14 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 文档核对（第三轮）：语义命名表补登 3 项（2026-09-24，rf-422）
+
+**背景**（用户要求核对全部管理/用户文档）：结构层全清白（368+ 条内部链接 0 断链、0 失效锚点、README 手册索引 10 份完整、管理文档互引无悬空、分组配置项均有专节），但**语义命名表漏登本轮收敛出的 3 个原语**。
+
+**变更**（`technical.md` 功能语义命名表）：补登 `roe_by_code_from_rows`（ROE 行解析唯一事实来源）/ `estimated_fund_codes`（推演集合判定唯一事实来源）/ `otc_redemption_days_default`（场外赎回天数类型默认档）——三者均为跨模块共用的收敛原语（内部助手确有入表先例，如 `_normalize_hold_payload`），不入表则「代码标识符 = 文档中文描述」一致性链断开。
+
+**验证**：`check-semantic-index --ci` 正反向校验通过；六个 `--ci` + ruff + dev-verify 全绿。
+
 ### 修复配置漏声明：`batch.akshare_workers` 补入默认值与文档（2026-09-24，rf-420）
 
 **背景**（文档审计中发现）：`report/financial_indicator.py`（财务指标章多期取数）与 `report/fund_roe_estimate.py`（景气度框架②维基金重仓 ROE 推演）均调 `get_batch_worker_count("akshare_workers", 2)`，但 `_config_defaults.py` 的 `batch` 段未声明该键（模板与 `how-to-config.md` 字段表也无）——用户无法通过配置调整 akshare 财务指标取数并发，只能吃代码兜底值 2。
