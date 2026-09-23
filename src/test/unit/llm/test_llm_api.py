@@ -105,6 +105,35 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
         self.assertNotIn("temperature", _payload)
 
     @patch("src.python.llm._api_claude.call_llm_with_retry")
+    def test_kimi_thinking_enabled_uses_budget_tokens(self, mock_retry: MagicMock) -> None:
+        """Kimi（Anthropic 兼容端点）开启 thinking：注入 budget_tokens，不发 output_config.effort。"""
+        kw = {**self.base_kw, "max_tokens": 8000}
+        call_claude(
+            **kw,
+            model="kimi-k2.6",
+            config_field="max_tokens_global_macro",
+            llm_config=self.llm_config,
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertEqual(_payload["thinking"]["type"], "enabled")
+        self.assertEqual(_payload["thinking"]["budget_tokens"], 4000)
+        self.assertNotIn("output_config", _payload)
+        self.assertNotIn("temperature", _payload)
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    def test_kimi_thinking_off_explicitly_disabled(self, mock_retry: MagicMock) -> None:
+        """Kimi 端点默认开思考：未开启 thinking 时必须显式注入 disabled，
+        否则思考 token 会占满 max_tokens 而无正文。"""
+        call_claude(
+            **self.base_kw,
+            model="kimi-k2.6",
+            config_field="max_tokens_global_macro",
+            llm_config={"thinking_enabled_global_macro": False},
+        )
+        _payload = mock_retry.call_args[1]["payload"]
+        self.assertEqual(_payload.get("thinking", {}).get("type"), "disabled")
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
     def test_thinking_skipped_for_unsupported_model(self, mock_retry: MagicMock) -> None:
         """Sonnet-3.5 不支持 Extended Thinking，应降级跳过。"""
         call_claude(

@@ -46,8 +46,10 @@ __all__ = [
     "_MODEL_LINE_RE",
     "_THINKING_SUPPORTED_PREFIXES",
     "_THINKING_EFFORT_MODEL_PREFIXES",
+    "_THINKING_DEFAULT_ON_PREFIXES",
     "_supports_extended_thinking",
     "_is_effort_model",
+    "_is_default_thinking_on",
     "_truncation_warning",
     "_check_claude_truncation",
     "_check_openai_truncation",
@@ -194,6 +196,7 @@ _THINKING_SUPPORTED_PREFIXES = (
     "deepseek-chat",
     "gemini-3.5-",
     "gemini-2.5-",
+    "kimi-",
 )
 
 # 使用 output_config.effort（而非 thinking.budget_tokens）控制思考深度的模型。
@@ -205,6 +208,15 @@ _THINKING_SUPPORTED_PREFIXES = (
 # 命中名单才能照旧施加「显式禁用思考」安全网，而不是让其落入默认思考模式。
 _THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-flash", "deepseek-v4-", "deepseek-chat")
 
+# 默认开启思考模式的模型（不传任何思考参数即自动思考）。
+# 这是独立于「控制方式」（budget_tokens / effort）的第二个维度：未显式开启 thinking
+# 时必须显式发送 thinking.disabled，否则思考 token 会占满 max_tokens 导致无正文。
+# DeepSeek 推理族（effort 控制）与 Kimi（budget_tokens 控制）均为默认开思考；
+# Anthropic 原生模型默认不思考，不在此列。
+# Kimi Anthropic 兼容端点行为：默认返回 thinking 块；thinking.enabled+budget_tokens
+# 与 thinking.disabled 均接受。
+_THINKING_DEFAULT_ON_PREFIXES = ("deepseek-flash", "deepseek-v4-", "deepseek-chat", "kimi-")
+
 
 def _supports_extended_thinking(model: str) -> bool:
     """检查模型是否支持 Extended Thinking。"""
@@ -214,6 +226,11 @@ def _supports_extended_thinking(model: str) -> bool:
 def _is_effort_model(model: str) -> bool:
     """检查模型是否使用 effort（而非 budget_tokens）控制思考深度。"""
     return any(model.lower().startswith(p) for p in _THINKING_EFFORT_MODEL_PREFIXES)
+
+
+def _is_default_thinking_on(model: str) -> bool:
+    """检查模型是否默认开启思考（未显式禁用时思考 token 会占用 max_tokens）。"""
+    return any(model.lower().startswith(p) for p in _THINKING_DEFAULT_ON_PREFIXES)
 
 
 def _truncation_warning(config_field: str) -> str:

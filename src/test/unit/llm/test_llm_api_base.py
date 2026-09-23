@@ -164,6 +164,7 @@ class TestSupportsExtendedThinking(unittest.TestCase):
         self.assertTrue(_supports_extended_thinking("claude-opus-4-20250514"))
         self.assertTrue(_supports_extended_thinking("deepseek-v4-1234"))
         self.assertTrue(_supports_extended_thinking("deepseek-chat"))
+        self.assertTrue(_supports_extended_thinking("kimi-k2.6"))
 
     def test_unsupported_model(self) -> None:
         """不支持的前缀 → False。"""
@@ -190,11 +191,12 @@ class TestIsEffortModel(unittest.TestCase):
         self.assertTrue(_is_effort_model("deepseek-chat"))
 
     def test_claude_models(self) -> None:
-        """Claude 前缀 → False。"""
+        """Claude / Kimi 前缀 → False（Kimi 走 budget_tokens，非 effort）。"""
         from src.python.llm.api_base import _is_effort_model
 
         self.assertFalse(_is_effort_model("claude-sonnet-4-20250514"))
         self.assertFalse(_is_effort_model("claude-opus-4"))
+        self.assertFalse(_is_effort_model("kimi-k2.6"))
 
 
 class TestSanitizeEndpoint(unittest.TestCase):

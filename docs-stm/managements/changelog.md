@@ -8,6 +8,20 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### Kimi Extended Thinking 支持 + Kimi 文档全链同步（2026-09-23，rf-417 / rf-418）
+
+**背景**（文档审计暴露）：接入 Kimi 后审计发现两层缺口——① thinking 模型名单未覆盖 Kimi：`_THINKING_SUPPORTED_PREFIXES` 无 `kimi-` 前缀，配置开启 thinking 的模块走 Kimi 时静默降级；且 Kimi K2.6 Anthropic 兼容端点**默认开思考**（实测不传参即返回 thinking 块），而「未开启时显式禁用」安全网只看 DeepSeek effort 族名单，Kimi 不在其中——关闭 thinking 的模块会白烧思考 token，极端时占满 max_tokens 无正文；② Kimi 定价/接入文档未随计价代码同步。
+
+**变更**：
+- `llm/api_base.py`：把「控制方式」（budget_tokens/effort）与「默认行为」（默认开/关思考）两个维度拆开——新增 `_THINKING_DEFAULT_ON_PREFIXES`（独立于 effort 名单显式声明）+ `_is_default_thinking_on()`；`_THINKING_SUPPORTED_PREFIXES` 加 `kimi-`
+- `llm/api.py`：禁用安全网改按 default-on 判定（Kimi 开启时走 budget_tokens 路径，不进 effort 族）
+- Kimi 端点三态实测验证：默认（thinking 块）/ 显式 `disabled`（HTTP 200 纯正文）/ `enabled+budget_tokens`（HTTP 200 生效）
+- 文档同步五处：`llm-technical.md` 附录 B 定价表 + thinking 注入流程图（补默认开思考禁用分支与 Kimi budget 归属）、`how-to-config-llm.md` 定价表 + thinking 支持矩阵 + 新增 Kimi 接入示例（含与 Kimi Code 订阅 Key 不通用的警示）、`faq.md`/`README.md` 支持列表
+
+**回归测试 +7**：`test_llm_utils.py`（kimi 支持判定 / kimi 非 effort / 新增 `TestIsDefaultThinkingOn` 三例）、`test_llm_api.py`（payload 级：kimi 开启注入 budget_tokens 且不发 effort / 未开启显式 disabled）、`test_llm_api_base.py`（支持名单/effort 名单 kimi 断言）。
+
+**验证**：`pytest test_llm_utils.py test_llm_api.py test_llm_api_base.py` → 189 passed；`ruff check` + `ruff format --check` 零告警。
+
 ### LLM 用量汇总 Endpoint 主备混用标注（2026-09-23，rf-416）
 
 **背景**（用户反馈）：切换 Kimi 为主节点后，报告「LLM API 用量」汇总的 Endpoint 仍显示 DeepSeek 端点，疑似配置未生效。排查确认配置已生效（模型列表含 kimi-k2.6），但缓存模块保留了切换前 DeepSeek 时代的调用元数据，而汇总行只显示**第一个**有值模块的端点——主备混用时无法看出谁是主。

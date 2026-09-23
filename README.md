@@ -13,7 +13,7 @@
 | **三种交互渠道** | **TUI**（全键盘菜单，方向键+字母快捷键，交互友好）· **CLI**（命令行驱动，Windows 任务计划 / Linux cron 定时无人值守）· **Web**（浏览器即开即用，上传持仓 → 选择格式 → 实时看进度 → 预览/下载）——同一套分析引擎，覆盖所有使用场景 |
 | **图表丰富的 HTML 报告** | 单页自包含（移动/单发不失效）· 响应式布局 · **9 张 Chart.js 交互图表**（净值趋势/回撤/资产构成/行业分布/穿透 TOP10/量化雷达 + 组合演进 3 图），悬停看精确值、可缩放、一键导出 PNG · 深/浅色主题一键切换 |
 | **专业的 Excel 报告** | 最多 **17 个条件页签**分八组：投资分析汇总、持仓明细与分类、资产穿透 TOP10、基金业绩 5 级评级（含基金经理变更监控块）、持仓结构与集中度、风格与因子分析、财经新闻热点关联、组合历史走势与回撤、行动建议，以及可选的持仓基本面（财务指标 + 财报摘要），与 LLM 全球政经局势 / 智囊团深度复盘 / 持仓体检 / 穿透深度分析 |
-| **LLM 智囊团** | 支持 Claude / OpenAI / DeepSeek / Gemini，多 Provider 链式分发（优先级/加权随机/成本优先/仅降级），任一 Provider 失败自动递补；持仓变更经缓存指纹自动失效，结果按策略缓存省费用 |
+| **LLM 智囊团** | 支持 Claude / OpenAI / DeepSeek / Kimi / Gemini，多 Provider 链式分发（优先级/加权随机/成本优先/仅降级），任一 Provider 失败自动递补；持仓变更经缓存指纹自动失效，结果按策略缓存省费用 |
 | **调仓 What-if 模拟** | 双持仓 diff 对比 + 指定生效日时序回测，独立生成 `调仓模拟.xlsx` / `调仓模拟.html`，决策前先推演 |
 
 ## 环境要求
@@ -104,9 +104,9 @@
 
 ### 🤖 LLM 分析
 
-- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek / Google Gemini API，结果按策略缓存（1h~24h），持仓变更时通过缓存指纹自动失效
+- **LLM 智能分析** — 支持 Claude / OpenAI / DeepSeek / Kimi / Google Gemini API，结果按策略缓存（1h~24h），持仓变更时通过缓存指纹自动失效
 - **多 Provider 链式分发** — `llm_providers.json` 支持 priority（顺序递补）/ weighted（加权随机）/ cost_first（低成本优先）/ fallback_only（仅故障降级）四种策略，任一 Provider 失败自动递补
-- **Extended Thinking** — 支持 Claude、DeepSeek（Anthropic 兼容端点）和 Gemini 2.5 的扩展思考模式，按模块独立开启
+- **Extended Thinking** — 支持 Claude、DeepSeek（Anthropic 兼容端点）、Kimi（Anthropic 兼容端点）和 Gemini 2.5 的扩展思考模式，按模块独立开启
 - **每模块独立控制** — 菜单 `S` 交互切换 5 个 LLM 模块的启停，立即生效无需重启
 - **模块级质量分级**（常规开关，默认开，`module_quality_gate`）— 对 4 个 LLM 生成模块输出按**完整性 + 篇幅**评 A~F 级；评到 C/D/F 且「内容在但存在缺陷」（缺提示词规定的固定章节、篇幅显著偏薄）者，章节头部自动追加 `【内容质量提示】` 横幅提示降级参考。**只标注、不阻断、不重试、不写回缓存**（内容缺失/占位符本身已有醒目提示，不叠加）。三个入口均可切换：TUI 菜单 **[S]** 常规块 / Web 配置面板「常规开关」/ CLI `--feature module_quality_gate=off`（关闭）
 - **决策头结构化**（常规开关，默认开，`decision_header_parse`）— 专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读结构化头、失败回落确定性表格解析。两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），「不建议加仓」「加仓或减仓」不再被判成相反方向写入决策账本；关闭时提示词逐字节不变、不扰动缓存。三个入口均可切换：TUI 菜单 **[S]** 常规块 / Web 配置面板「常规开关」/ CLI `--feature decision_header_parse=off`（关闭）

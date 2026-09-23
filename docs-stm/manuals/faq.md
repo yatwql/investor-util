@@ -391,7 +391,7 @@ A: 编辑 `data/config/llm_key.json`，修改 `provider` 字段为 `"claude"` �
 
 **Q: 如何开启/关闭 Extended Thinking？**
 
-A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled_{模块键}` 设为 `true`/`false`（如 `"thinking_enabled_expert_review": true`）。目前支持 Claude、DeepSeek（Anthropic 兼容端点）和 Gemini 2.5。推荐仅在智囊团深度复盘模块开启，其他模块收益不大且会增加响应时间。
+A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled_{模块键}` 设为 `true`/`false`（如 `"thinking_enabled_expert_review": true`）。目前支持 Claude、DeepSeek（Anthropic 兼容端点）、Kimi（Anthropic 兼容端点）和 Gemini 2.5。推荐仅在智囊团深度复盘模块开启，其他模块收益不大且会增加响应时间。
 
 **Q: 如何开启财经新闻热点与持仓关联分析？**
 

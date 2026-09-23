@@ -15,6 +15,7 @@ from src.python.llm.api_base import (
     _check_claude_truncation,
     _check_openai_truncation,
     _extract_content,
+    _is_default_thinking_on,
     _is_effort_model,
     _supports_extended_thinking,
 )
@@ -213,6 +214,11 @@ class TestSupportsExtendedThinking(unittest.TestCase):
     def test_deepseek_v3_not_supported(self) -> None:
         self.assertFalse(_supports_extended_thinking("deepseek-v3"))
 
+    def test_kimi_supported(self) -> None:
+        """Kimi（Anthropic 兼容端点，budget_tokens 控制）支持 Extended Thinking。"""
+        self.assertTrue(_supports_extended_thinking("kimi-k2.6"))
+        self.assertTrue(_supports_extended_thinking("Kimi-K3"))
+
 
 # ═══════════════════════════════════════════════════════════
 #  _is_effort_model
@@ -246,8 +252,45 @@ class TestIsEffortModel(unittest.TestCase):
         self.assertTrue(_is_effort_model("deepseek-flash"))
         self.assertTrue(_is_effort_model("DeepSeek-Flash"))
 
+    def test_kimi_is_not_effort(self) -> None:
+        """Kimi 用 budget_tokens（而非 output_config.effort）控制思考深度。"""
+        self.assertFalse(_is_effort_model("kimi-k2.6"))
+        self.assertFalse(_is_effort_model("kimi-k3"))
+
     def test_empty_is_not_effort(self) -> None:
         self.assertFalse(_is_effort_model(""))
+
+
+# ═══════════════════════════════════════════════════════════
+#  _is_default_thinking_on
+# ═════════════════════════════════════════════════════════
+
+
+class TestIsDefaultThinkingOn(unittest.TestCase):
+    """_is_default_thinking_on — 默认开思考模型判定。
+
+    该判定决定「未开启 thinking 时是否显式注入 thinking.disabled」安全网——
+    默认开思考的模型（DeepSeek 推理族 / Kimi）漏登记会让思考 token 占满
+    max_tokens 而无正文；默认不思考的模型（Anthropic 原生）误登记会多发一个
+    无害但冗余的 disabled 参数。
+    """
+
+    def test_kimi_default_on(self) -> None:
+        """Kimi 端点不传思考参数即返回 thinking 块（默认开思考）。"""
+        self.assertTrue(_is_default_thinking_on("kimi-k2.6"))
+        self.assertTrue(_is_default_thinking_on("Kimi-K3"))
+
+    def test_deepseek_default_on(self) -> None:
+        """DeepSeek 推理族默认开思考（effort=high）。"""
+        self.assertTrue(_is_default_thinking_on("deepseek-flash"))
+        self.assertTrue(_is_default_thinking_on("deepseek-v4-flash"))
+        self.assertTrue(_is_default_thinking_on("deepseek-chat"))
+
+    def test_claude_gemini_not_default_on(self) -> None:
+        """Anthropic 原生 / Gemini 默认不思考，不注入 disabled。"""
+        self.assertFalse(_is_default_thinking_on("claude-sonnet-4-6"))
+        self.assertFalse(_is_default_thinking_on("gemini-2.5-flash"))
+        self.assertFalse(_is_default_thinking_on(""))
 
 
 # ═══════════════════════════════════════════════════════════

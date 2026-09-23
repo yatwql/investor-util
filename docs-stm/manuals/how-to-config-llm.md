@@ -561,6 +561,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 >
 > **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"low"` / `"medium"` / `"high"` / `"max"`）。
 >
+> **Kimi（月之暗面）**（provider: `"claude"` + endpoint `api.moonshot.cn/anthropic`）：模型 `kimi-*`（如 `kimi-k2.6`）时生效，用 `thinking.budget_tokens` 控制思考 token 预算（与 Claude 同机制）。**注意 Kimi 端点默认开思考**：模块未开启 thinking 时本工具会自动显式发送 `disabled`，避免思考 token 白烧 max_tokens 预算。
+>
 > **Gemini**（provider: `"gemini"`）：模型 `gemini-2.5-*` 时生效，用 `generationConfig.thinkingConfig.thinkingBudget` 控制思考 token 预算。
 
 **[Extended Thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking)** 让模型在回答前进行深度推理，大幅提升复杂分析的深度和逻辑严谨性。代价是输出 token 大幅增加（约 2~4 倍），费用相应上升。
@@ -691,6 +693,25 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 </details>
 
 <details>
+<summary><b>Kimi（月之暗面开放平台，Anthropic 兼容端点）</b></summary>
+
+Kimi 开放平台提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 即可调用。
+
+```json
+{
+  "provider": "claude",
+  "api_key": "sk-your-kimi-key",
+  "model": "kimi-k2.6",
+  "endpoint": "https://api.moonshot.cn/anthropic/v1/messages"
+}
+```
+
+- API Key 在 [Kimi 开放平台](https://platform.moonshot.cn)控制台创建（按量付费）。注意与 **Kimi Code 订阅的 Key 不通用**——后者仅限编程工具的交互式场景，用于本工具的批量报告生成会触发限流
+- 可用模型：`kimi-k2.6`（推荐，256k 上下文，支持思考/非思考模式）、`kimi-k3`（旗舰，1M 上下文）
+- Extended Thinking 走 `thinking.budget_tokens`（与 Claude 同机制）；端点默认开思考，模块未开启时本工具会显式发送 `disabled`
+</details>
+
+<details>
 <summary><b>DeepSeek（OpenAI 兼容格式）</b></summary>
 
 ```json
@@ -815,6 +836,8 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 | `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比（代码默认） |
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
 | `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
+| `kimi-k2.6` | 6.50 | 27.00 | 1.10 | Kimi 通用主力（256k 上下文，支持思考模式） |
+| `kimi-k3` | 20.00 | 100.00 | 2.00 | Kimi 旗舰（1M 上下文） |
 
 > **峰谷定价（DeepSeek）**：`deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` / `deepseek-reasoner` 采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 flash 系列降价并补充法定节假日规则），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在高峰日（周一至周五，不含中国法定节假日）生效**，为**北京时间 09:00–12:00、14:00–18:00**；高峰日其余时间为闲时、**周末（周六/周日）与法定节假日全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末/法定节假日规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` / `holiday_always_idle` 中覆盖；含 `"peak"` 子段的模型高峰日高峰时段按 `peak` 价计费，其余时段（含周末与法定节假日全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
 >

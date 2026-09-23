@@ -538,7 +538,9 @@ call_llm(system_prompt, user_prompt, llm_config, ...)
 _configure_extended_thinking(payload, llm_config, config_field, model, max_tokens)
     │
     ├─ 读取 thinking_enabled_{module_suffix}
-    │      False → 无操作返回
+    │      False → 默认开思考模型（DeepSeek 推理族 / Kimi）显式注入
+    │             thinking.disabled（防思考 token 占满 max_tokens 而无正文）；
+    │             默认不思考模型（Anthropic 原生）无操作返回
     │
     ├─ 验证模型兼容性 (_supports_extended_thinking)
     │      不兼容 → 自动降级跳过，记录 WARNING
@@ -551,7 +553,7 @@ _configure_extended_thinking(payload, llm_config, config_field, model, max_token
     │      effort 从 reasoning_effort_{module_suffix} 读取
     │      配置缺失时兜底 "high"（模板默认：expert_review / health_check 为 medium）
     │
-    └─ budget_tokens 模型 (Claude Sonnet 4 / Opus 4 / Gemini 2.5) →
+    └─ budget_tokens 模型 (Claude Sonnet 4 / Opus 4 / Kimi K2.6+ / Gemini 2.5) →
            payload["thinking"]["budget_tokens"] = budget
            budget 从 thinking_budget_{module_suffix} 读取
            缺失或 ≥ max_tokens 时自动兜底到 max(1024, max_tokens − 2048)
@@ -1352,6 +1354,8 @@ LLM 集成层与系统其他组件的接口：
 | gemini-3.5-flash | 0.15 | 0.60 | 0.015 | |
 | gpt-4o | 2.50 | 10.00 | 2.50 | |
 | gpt-4o-mini | 0.15 | 0.60 | 0.15 | |
+| kimi-k2.6 | 6.50 | 27.00 | 1.10 | Kimi 通用主力（256k 上下文），Anthropic 兼容端点默认开思考（未开启 thinking 时显式禁用） |
+| kimi-k3 | 20.00 | 100.00 | 2.00 | Kimi 旗舰（1M 上下文） |
 
 > 上表为具名模型定价；`MODEL_PRICING` 另有 6 个前缀回退键（`claude-sonnet-4-`/`claude-opus-4-`/`claude-haiku-4-`/`gemini-3.5-`/`gemini-2.5-`/`gemini-2.0-`）用于 startswith 回退匹配日期戳变体，未逐行列示。
 >
