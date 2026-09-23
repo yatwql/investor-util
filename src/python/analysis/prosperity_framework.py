@@ -103,6 +103,7 @@ def _holdings_view(
     roe_by_code: dict[str, float],
     cfg: dict[str, Any],
     limit: int = 20,
+    estimated_codes: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     from src.python.report.penetration import classify_sector
 
@@ -121,6 +122,10 @@ def _holdings_view(
         roe = roe_by_code.get(code)
         if roe is None:
             pass  # ROE 缺失由渲染层在 ROE 列标「需核实」，此处不再重复成备注
+        elif estimated_codes and code in estimated_codes:
+            notes.append(f"ROE {roe:.1%} 为基金重仓股加权推演值（按框架推演）")
+            if roe < _LOW_ROE_THRESHOLD:
+                notes.append("低 ROE → 存在修复弹性")
         elif roe < _LOW_ROE_THRESHOLD:
             notes.append(f"低 ROE（{roe:.1%}）→ 存在修复弹性")
         view.append(
@@ -140,10 +145,11 @@ def _safe_holdings_view(
     holdings_details: list[dict[str, Any]],
     roe_by_code: dict[str, float],
     cfg: dict[str, Any],
+    estimated_codes: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """持仓视角清单（异常时返回空清单，不影响契约其余部分）。"""
     try:
-        return _holdings_view(holdings_details, roe_by_code, cfg)
+        return _holdings_view(holdings_details, roe_by_code, cfg, estimated_codes=estimated_codes)
     except Exception:
         logger.warning("[prosperity_framework] 持仓视角清单构建异常，已置空", exc_info=True)
         return []
@@ -157,6 +163,7 @@ def build_prosperity_framework_data(
     *,
     penetration_data: dict[str, Any] | None = None,
     financial_indicator_data: dict[str, Any] | None = None,
+    fund_roe_estimates: dict[str, dict[str, Any]] | None = None,
     liquidity_signals: list[dict[str, Any]] | None = None,
     snapshots: list[Any] | None = None,
     history_data: dict[str, Any] | None = None,
@@ -168,6 +175,8 @@ def build_prosperity_framework_data(
         holdings_details: 市值明细行（`DetailRow`，含 code/name/market_value）。
         penetration_data: `compute_penetration_top10()` 结果（提供穿透后板块与占比；可为 None）。
         financial_indicator_data: `financial_indicator_data` 契约（提供个股 ROE 与年度趋势）。
+        fund_roe_estimates: 基金重仓股 ROE 加权推演值（`estimate_fund_roe_batch` 产出；
+            仅对无直接 ROE 的基金持仓生效，证据与持仓视角均标注「按框架推演」）。
         liquidity_signals: `check_liquidity()` 结果（提供场内变现天数）。
         snapshots: 历史快照序列（`SnapshotData` 对象或 dict；最近两期用于换手代理）。
         history_data: 组合历史走势数据（提供区间收益与最大回撤）。
@@ -200,7 +209,7 @@ def build_prosperity_framework_data(
     roe_dim: dict[str, Any]
     roe_by_code: dict[str, float] = {}
     try:
-        roe_dim, roe_by_code = _score_roe(details, financial_indicator_data)
+        roe_dim, roe_by_code = _score_roe(details, financial_indicator_data, fund_roe_estimates)
     except Exception:
         logger.warning("[prosperity_framework] 维度「ROE 低位弹性」计算异常，已降级为未验证", exc_info=True)
         roe_dim = _unverified_dimension("roe_elasticity", "ROE 低位弹性", _W_ROE, "该维计算异常，已跳过（详见日志）")
@@ -214,6 +223,18 @@ def build_prosperity_framework_data(
         concentration_dim = _unverified_dimension(
             "concentration_cycle", "集中度与周期拼接", _W_CONCENTRATION, "该维计算异常，已跳过（详见日志）"
         )
+
+    # 持仓视角标注所需的推演集合：直接 ROE 缺失、由基金重仓加权推演补上的品种
+    direct_roe_codes = {
+        str(r.get("code") or "")
+        for r in ((financial_indicator_data or {}).get("rows") or [])
+        if isinstance(r.get("roe"), (int, float))
+    }
+    estimated_codes = {
+        code for code, est in (fund_roe_estimates or {}).items() if est.get("roe") is not None
+    } - direct_roe_codes
+    if estimated_codes:
+        notes.append("② 维基金 ROE 为重仓股加权推演值（阶段一：前十大重仓口径），非基金披露口径。")
 
     dimensions = [boom, roe_dim, global_dim, liquidity_dim, concentration_dim, performance_dim]
     scored = [d for d in dimensions if d["status"] != "unverified"]
@@ -245,7 +266,7 @@ def build_prosperity_framework_data(
         "rating": rating,
         "rating_label": rating_label,
         "dimensions": dimensions,
-        "holdings_view": _safe_holdings_view(details, roe_by_code, cfg),
+        "holdings_view": _safe_holdings_view(details, roe_by_code, cfg, estimated_codes=estimated_codes),
         "concentration_pct": concentration,
         "turnover_proxy_pct": turnover,
         "unverified": unverified,

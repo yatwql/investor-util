@@ -273,11 +273,33 @@ def compute_prosperity_framework_data(
     if financial_indicator_data is None and pipeline_data:
         financial_indicator_data = pipeline_data.get("financial_indicator_data")
 
+    # 基金重仓股 ROE 加权推演（②维基金层扩展）：仅权益类基金、直接 ROE 缺失时生效；
+    # 估算失败降级为 None → ②维退回个股口径（不拖垮其余维度）
+    fund_roe_estimates = None
+    try:
+        from src.python.report.fund_roe_estimate import estimate_fund_roe_batch
+        from src.python.report.penetration import ACTIVE_EQUITY, ETF, INDEX_LINK, QDII, classify_penetration
+
+        _equity_fund_types = {QDII, ETF, INDEX_LINK, ACTIVE_EQUITY}
+        fund_items = [
+            {"code": h.code, "name": h.name} for h in (holdings or []) if classify_penetration(h) in _equity_fund_types
+        ]
+        if fund_items:
+            known_roe = {
+                str(r.get("code") or ""): float(r["roe"])
+                for r in ((financial_indicator_data or {}).get("rows") or [])
+                if isinstance(r.get("roe"), (int, float))
+            }
+            fund_roe_estimates = estimate_fund_roe_batch(fund_items, known_roe=known_roe) or None
+    except Exception:  # 估算失败不影响诊断其余维度
+        logger.debug("[prosperity_framework] 基金重仓 ROE 估算不可用，②维退回个股口径", exc_info=True)
+
     try:
         data = build_prosperity_framework_data(
             details,
             penetration_data=penetration_data,
             financial_indicator_data=financial_indicator_data,
+            fund_roe_estimates=fund_roe_estimates,
             liquidity_signals=liquidity_signals,
             snapshots=snapshots,
             history_data=history_data,

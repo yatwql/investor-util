@@ -219,6 +219,65 @@ class TestRoeDimension:
         assert roe["status"] == "partial"
         assert any("未取到 ROE" in u for u in roe["unverified"])
 
+    def test_fund_estimate_fills_missing_roe_with_inference_label(self):
+        """基金重仓股加权推演值补上基金层 ROE：计分生效且证据/持仓视角/契约说明均标「推演」。"""
+        details = _details() + [_row("110022", "易方达消费行业", 200_000.0)]
+        estimates = {
+            "110022": {
+                "roe": 0.08,
+                "covered_pct": 55.0,
+                "top_n": 10,
+                "basis": "top10_holdings",
+                "report_period": "2026-06-30",
+            }
+        }
+        data = build_prosperity_framework_data(
+            details,
+            penetration_data=_penetration(),
+            financial_indicator_data=_indicator_data(),
+            fund_roe_estimates=estimates,
+        )
+        roe = next(d for d in data["dimensions"] if d["key"] == "roe_elasticity")
+        # 推演值（0.08 < 10% 阈值）计入低 ROE 权重，基金不再进 missing 清单
+        assert any("推演" in e for e in roe["evidence"])
+        assert not any("110022" in u for u in roe["unverified"])
+        # 低 ROE 权重 = 300308(25%) + 688981(25%) + 110022(200k/1200k≈16.67%)
+        assert any("66.67%" in e for e in roe["evidence"])
+        # 持仓视角：基金行展示推演值并标注
+        view = next(v for v in data["holdings_view"] if v["code"] == "110022")
+        assert view["roe"] == 0.08
+        assert any("推演" in n for n in view["notes"])
+        # 契约级说明含推演口径标注
+        assert any("推演" in n for n in data["notes"])
+
+    def test_fund_estimate_does_not_override_direct_roe(self):
+        """直接 ROE 存在的标的不被推演值覆盖（直接口径优先）。"""
+        estimates = {
+            "300308": {"roe": 0.99, "covered_pct": 60.0, "top_n": 10, "basis": "top10_holdings", "report_period": ""}
+        }
+        data = build_prosperity_framework_data(
+            _details(),
+            penetration_data=_penetration(),
+            financial_indicator_data=_indicator_data(),
+            fund_roe_estimates=estimates,
+        )
+        view = next(v for v in data["holdings_view"] if v["code"] == "300308")
+        assert view["roe"] == 0.06
+        assert not any("推演" in n for n in view["notes"])
+
+    def test_fund_without_estimate_still_missing(self):
+        """无推演值的基金仍进未取到 ROE 清单（估算缺席不影响既有降级口径）。"""
+        details = _details() + [_row("110022", "易方达消费行业", 200_000.0)]
+        data = build_prosperity_framework_data(
+            details,
+            penetration_data=_penetration(),
+            financial_indicator_data=_indicator_data(),
+            fund_roe_estimates={},
+        )
+        roe = next(d for d in data["dimensions"] if d["key"] == "roe_elasticity")
+        assert any("110022" in u for u in roe["unverified"])
+        assert not any("推演" in e for e in roe["evidence"])
+
 
 class TestGlobalEdgeDimension:
     def test_edge_and_offshore_bonus(self):

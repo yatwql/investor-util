@@ -1,6 +1,6 @@
 # 实现计划归档 — v0.11.x
 
-> 归档时间：2026-09-15（v0.11.0 发布当日并入，plan-44）；2026-09-16 增补（plan-45、plan-46）；2026-09-18 增补（plan-52、plan-53、plan-54，v0.11.1 发布当日并入）
+> 归档时间：2026-09-15（v0.11.0 发布当日并入，plan-44）；2026-09-16 增补（plan-45、plan-46）；2026-09-18 增补（plan-52、plan-53、plan-54，v0.11.1 发布当日并入）；2026-09-23 增补（plan-47，v0.11.2-dev 迭代内完成）
 > 原始文件：`docs-stm/managements/plan.md（当前迭代部分）`
 > 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1（2026-09-18：plan-52 矩阵命中源列 / plan-53 去重校准体系修整 / plan-54 48 小时技术债整改）
 > 归档内容：本迭代已实现的计划项完成态记录（plan-44 报告增强子模块并入功能开关注册表；plan-45 报告章节整合；plan-46 景气度框架诊断；plan-51 同花顺官方金融数据接入五阶段）；
@@ -158,3 +158,13 @@
 | 判据重复 | `analysis/financial_indicator._num` 与 `core.num_utils.safe_num` 各自实现「解析 + 有限性校验」 | `_num` 改为 `safe_num(value, default=None)` 的 float 投影，删除已无用的 `import math`（rf-401） |
 
 **未列入本次整改（已登记、非阻塞）**：rf-395 的遗留面——其余 `data/state/*` 写入方（perf/health/silence）同样面临「后台线程越过用例级补丁」，当前无实测泄露，彻底治本需把状态目录改为可注入的单一来源。
+
+### P1 — 已完成（plan-47 完成态，2026-09-23 归档）
+
+#### ✅ `plan-47` 景气度框架诊断：基金持仓 ROE 加权（② 维基金层扩展，阶段一）— 已完成（2026-09-23）
+
+**范围决策（2026-09-23 用户确认）**：两阶段方案——阶段一按基金**前十大重仓股** ROE 加权（本项），阶段二（全量持仓口径）待 plan-51 阶段 3（同花顺历史持仓接口）收尾后升级；估算记录契约以 `basis` 字段区分口径（`top10_holdings`），阶段二落地时替换取数来源、契约不变。
+
+**实施摘要**：新增 `report/fund_roe_estimate.py::estimate_fund_roe_batch`（复用 `fetch_fund_holdings_batch` 基金持仓链路 + `fetch_latest_indicator` 个股财务指标链路，不新增 HTTP 通道；报告期陈旧闸门与穿透层同口径；`known_roe` 命中免取数）；`analysis/prosperity_scoring._score_roe` 新增可选入参 `fund_roe_estimates`——无直接 ROE 的权益类基金（QDII/ETF/联接/主动权益，类型判定走 `classify_penetration`）以推演值计分，证据/持仓视角/契约 notes 三处均标「按框架推演」（红线②）；直接 ROE 优先、推演值不覆盖；开关关闭时零变化（红线③）。新语义名 `estimate_fund_roe_batch` / `fund_roe_estimates` 已入语义命名表，契约口径已入附录 H。
+
+**实施记录**：见 `../../managements/changelog.md`「plan-47 基金重仓股 ROE 加权（② 维基金层扩展，阶段一）」条。

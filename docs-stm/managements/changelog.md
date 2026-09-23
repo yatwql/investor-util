@@ -8,6 +8,21 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### plan-47 基金重仓股 ROE 加权（景气度框架②维基金层扩展，阶段一）（2026-09-23）
+
+**背景**：② ROE 低位弹性此前只覆盖 A 股直接持仓，基金/ETF/QDII 无个股 ROE 只能标「需核实」不计分（用户组合实测仅 ~22% 权重被覆盖）。按用户确认的两阶段方案，本项交付阶段一（前十大重仓口径）；阶段二（全量持仓）待 plan-51 阶段 3 收尾后升级，契约以 `basis` 字段区分口径。
+
+**变更**：
+- 新增 `report/fund_roe_estimate.py`：`estimate_fund_roe_batch`（基金持仓批量取数复用 `fetch_fund_holdings_batch`、个股 ROE 复用 `fetch_latest_indicator` 链路含缓存/降级，不新增 HTTP 通道；报告期陈旧闸门与穿透层同口径）+ `weighted_roe` 纯计算；`known_roe` 命中免取数
+- `analysis/prosperity_scoring._score_roe`：新增可选入参 `fund_roe_estimates`，无直接 ROE 的权益类基金以推演值计分；证据/持仓视角备注/契约 notes 三处标「按框架推演」（红线②）；直接 ROE 优先不被覆盖
+- `analysis/prosperity_framework.build_prosperity_framework_data`：新增 `fund_roe_estimates` 关键字入参与持仓视角推演标注（`_holdings_view` 增 `estimated_codes`）
+- `report/_report_aux_metrics.compute_prosperity_framework_data`：编排层按 `classify_penetration` 预筛权益类基金后估算，失败降级为 None（②维退回个股口径）
+- 文档：`technical.md`（§4.20 维度表与数据流 + 附录 H 契约 + 语义命名表新增 `estimate_fund_roe_batch`/`fund_roe_estimates`）、`folders.md` 目录树
+
+**回归测试 +14**：`unit/report/test_fund_roe_estimate.py`（11 例：加权纯计算 3 + 编排 8——正常估算/known_roe 免取数/陈旧闸门/持仓缺失/非 A 股过滤/无效占比过滤/ROE 全缺不臆造/空清单）+ `test_prosperity_framework.py::TestRoeDimension` +3 例（推演值补上基金 ROE 且三处标注推演/直接 ROE 不被覆盖/无推演值仍按缺失降级）。
+
+**验证**：景气度相关 91 用例全过；`ruff check` + `ruff format` 干净。
+
 ### Kimi Extended Thinking 支持 + Kimi 文档全链同步（2026-09-23，rf-417 / rf-418）
 
 **背景**（文档审计暴露）：接入 Kimi 后审计发现两层缺口——① thinking 模型名单未覆盖 Kimi：`_THINKING_SUPPORTED_PREFIXES` 无 `kimi-` 前缀，配置开启 thinking 的模块走 Kimi 时静默降级；且 Kimi K2.6 Anthropic 兼容端点**默认开思考**（实测不传参即返回 thinking 块），而「未开启时显式禁用」安全网只看 DeepSeek effort 族名单，Kimi 不在其中——关闭 thinking 的模块会白烧思考 token，极端时占满 max_tokens 无正文；② Kimi 定价/接入文档未随计价代码同步。

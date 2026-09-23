@@ -334,8 +334,14 @@ def _score_boom(
 def _score_roe(
     holdings_details: list[dict[str, Any]],
     financial_indicator_data: dict[str, Any] | None,
+    fund_roe_estimates: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, float]]:
-    """返回 (维度结果, {code: roe})。契约缺失 → unverified（不给分）。"""
+    """返回 (维度结果, {code: roe})。契约缺失 → unverified（不给分）。
+
+    fund_roe_estimates：基金重仓股 ROE 加权推演值（`estimate_fund_roe_batch` 产出），
+    仅对无直接 ROE 的基金持仓生效；推演值计入评分但在证据中标注「按框架推演」，
+    并合并进返回的 roe_by_code 供持仓视角展示（渲染侧据 estimated 集合标注）。
+    """
     rows = ((financial_indicator_data or {}).get("rows") or []) if financial_indicator_data else []
     if not rows:
         return (
@@ -362,16 +368,28 @@ def _score_roe(
             improving.add(code)
 
     total = sum(finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details)
+    estimates = fund_roe_estimates or {}
+    estimated: list[tuple[str, str, float]] = []  # (name, code, covered_pct)
     low_roe_weight = 0.0
     high_roe_weight = 0.0
     missing: list[str] = []
     for d in holdings_details:
         code = getattr(d, "code", "")
+        name = getattr(d, "name", code)
         weight = _pct(finite_or(getattr(d, "market_value", 0.0)), total)
         roe = roe_by_code.get(code)
         if roe is None:
-            missing.append(f"{getattr(d, 'name', code)}（{code}）")
-        elif roe < _LOW_ROE_THRESHOLD:
+            est = estimates.get(code)
+            est_roe = (est or {}).get("roe")
+            if isinstance(est_roe, (int, float)):
+                # 基金重仓股加权推演值：计入评分，证据标注推演属性
+                roe = float(est_roe)
+                roe_by_code[code] = roe
+                estimated.append((name, code, float((est or {}).get("covered_pct") or 0.0)))
+            else:
+                missing.append(f"{name}（{code}）")
+                continue
+        if roe < _LOW_ROE_THRESHOLD:
             low_roe_weight += weight
             if code in improving:
                 low_roe_weight += 0.0  # 改善趋势已在证据中标注，计分见下
@@ -392,6 +410,17 @@ def _score_roe(
     ]
     if high_roe_weight:
         evidence.append(f"已处高位 ROE 的持仓权重 {high_roe_weight:.2f}%（框架偏好低位修复，故不加分）")
+    if estimated:
+        est_weight = sum(
+            _pct(finite_or(getattr(d, "market_value", 0.0)), total)
+            for d in holdings_details
+            if getattr(d, "code", "") in {c for _, c, _ in estimated}
+        )
+        basis = estimates.get(estimated[0][1], {}).get("basis", "")
+        basis_label = "前十大重仓" if basis == "top10_holdings" else basis
+        evidence.append(
+            f"基金 ROE 按重仓股加权推演：{len(estimated)} 只基金（组合权重 {est_weight:.2f}%，{basis_label}口径）——按框架推演，非基金披露口径"
+        )
     unverified = []
     if missing:
         unverified.append(
