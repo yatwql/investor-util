@@ -650,6 +650,8 @@ call_gemini() Extended Thinking 注入
 
 **解析优先级**（`_resolve_entry_credentials()`）：
 
+> **公开入口**：外部模块（如报告层的 LLM 用量汇总，需按链优先级展示 Endpoint 主/备）应调 `llm/api.py::resolve_provider_endpoint(entry, llm_config)`，不自行重写 `credentials_ref → endpoint` 的遍历规则。
+
 1. **`credentials_ref` 查表**：从 `llm_config["_llm_credentials"]` 中查找对应键名的凭据块
 2. **entry 级路由覆盖**：entry 自带的 `model`/`endpoint`（非敏感路由字段）覆盖凭据块中的同名值
 3. **`api_key` 只来自凭据块**：经配置文件解析出的 entry 内联 `api_key` 不参与解析——它在 `_validate_provider_entry()` 阶段即被拒，该条目被整条跳过，根本走不到这里。函数内仍保留 `entry["api_key"]` 分支，服务于**运行期直接构造的内存条目**（调用方自行组装 dict 时不受配置校验约束）；该分支对配置来源的条目永不生效

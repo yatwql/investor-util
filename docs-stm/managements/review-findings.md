@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.2-dev
-> **编号源**：`rf-next = 421`（新增问题取此编号，完成后更新为 +1；已用最大 rf-420，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 422`（新增问题取此编号，完成后更新为 +1；已用最大 rf-421，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -36,14 +36,20 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui-implementation.md` §10 三阶段验收标准 + §6.5/§6.6 样式/响应式）。**勾选清单已备齐（2026-09-20）**：`docs-stm/archive/v0.10.x/web-ui/web-ui-verification-checklist.md`（从实际 `index.html` 七卡结构 + `how-to-use-web-mode.md` 手册导出 ①~⑤ 五类 UX 项，含逐步操作步骤与判定标准）。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
+#### P2C — 文档与配置口径（2026-09-24）
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-420** | `batch.akshare_workers` **被代码引用但未入配置模板与文档**：`report/financial_indicator.py` 与 `report/fund_roe_estimate.py` 均调 `get_batch_worker_count("akshare_workers", 2)`，但 `config/_config_defaults.py` 的 `batch` 段只声明 `fund_workers`/`industry_workers`/`datasink_workers`（模板与 `how-to-config.md` 字段表均无该键）——用户无法通过配置调整财务指标取数并发，只能吃代码缺省值 2 | 评估将 `akshare_workers` 补入 `batch` 段默认值 + 模板注释 + `how-to-config.md` 字段表（需同步 config 模板回归用例与文档盘核）；或反之将代码改回已声明键（需先确认语义归属） |
+
 ## 已解决问题
 
 ### 已解决待归档（v0.11.2-dev）
 
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
+| **rf-421** | **全量文档审计（用户要求「核对所有管理/用户文档的组织顺序与内容」，共 5 项）**：① `reports-instruction.md` 的 FAQ 跳转锚点失效——目标 `faq.md` 的问答是 `**Q: …**` 粗体行（非标题）且无显式 id，该锚点永不可达；② 自审自身失误：将待处理项 `rf-420` 误置于「已解决待归档」表，混淆待办/已完成分区；③ `requirements.md` §5.11 未反映本轮两项扩展（②维基金层 ROE 重仓加权推演、④维场外赎回类型默认档）的口径与标注义务；④ `llm-technical.md` §5.3 未登记新增公开入口 `resolve_provider_endpoint`（外部模块应复用它而非重写凭据→端点遍历）；⑤ `how-to-config.md` 开关表关于景气度框架的描述未体现「推演/默认档」上屏标识，用户看到「非实测」标识时无法从手册得到解释。另本轮新增 R-PF-09 初稿误用任务编号 `plan-51` 被文档痕迹检查报出（自审当场修正） | ① `faq.md` 该 Q 行前加显式 `<a id="…">`（与报表文档既有做法一致，保留精确跳转）；② `rf-420` 移入新建的待处理分区「P2C — 文档与配置口径」；③ 新增需求行 R-PF-09（两项扩展必标口径：推演/非实测，不得冒充披露/实测）并将 `plan-51` 改为语义表述；④ §5.3 补「公开入口」引用框；⑤ 开关描述补括注说明两类标识来源。**审计旁证清白项**：368 条内部链接 0 断链、README 手册索引 10 份完整且顺序合理、标题层级无异常、流动性旧口径仅存于 changelog 历史记录（合理） |
 | **rf-419** | **最近 48 小时实施的技术债（用户要求审计）：共 6 项**——① ROE 行解析规则三处各写一份（`_score_roe` / `prosperity_framework` 直接 ROE 集合 / `_report_aux_metrics` 的 `known_roe`），带同样的数值守卫，改一处易漏另两处；② 「哪些代码属于推演值」规则两处独立实现（评分侧与契约说明/持仓视角侧），存在漂移风险；③ `estimate_fund_roe_batch` 与 `_fetch_stock_roe_batch` 的 `dispatcher` 形参无任何外部调用方（预留参数 = YAGNI 债务）；④ 股票 ROE 批量取数误用 `batch.fund_workers`（语义错配，且与财务指标章用 `akshare_workers` 不一致）；⑤ 穿透占比兼容兜底 `a.get("ratio_pct", a.get("ratio", 0))` 会在契约漂移时**静默归零**（与 rf-415 同型：静默掩盖上游形状变化）；⑥ `_score_liquidity` 场外计入/未计入判定为长内联布尔式（可读性差，易误改） | ① 新增 `roe_by_code_from_rows`（ROE 解析唯一事实来源），三处复用；② 新增 `estimated_fund_codes`（推演集合判定唯一事实来源），评分侧与标注侧共用；③ 删除两处未使用 `dispatcher` 形参，内部统一自建；④ 改用 `akshare_workers`（与财务指标章同口径）；⑤ 两处改严格读 `ratio_pct`（不再兼容遗留 `ratio`），提示词侧缺失时记一次契约漂移告警（不静默）；⑥ 抽出 `_is_scored_otc` / `_is_otc_default_tier` 语义助手；⑦ 另发现既有重复：报告层曾自行重写 `credentials_ref → endpoint` 遍历 → 新增 `llm/api.py::resolve_provider_endpoint` 公开入口并改为复用。回归用例 +4（ROE 解析过滤 / 推演集合除直接 ROE / 提示词契约漂移告警 / 指纹不兼容遗留键） |
-| **rf-420** | **`batch.akshare_workers` 被代码引用但未入配置模板与文档**（审计中发现的窗口外既有缺口）：`report/financial_indicator.py` 与本次新增的基金 ROE 推演均调 `get_batch_worker_count("akshare_workers", 2)`，但 `config/_config_defaults.py` 的 `batch` 段只声明 `fund_workers`/`industry_workers`/`datasink_workers`（模板与 `how-to-config.md` 均无该键）——用户无法通过配置调整财务指标取数并发，只能吃代码缺省值 2 | 待处理：评估将 `akshare_workers` 补入 `batch` 段默认值 + 模板注释 + `how-to-config.md` 字段表（需同步 config 模板回归用例与文档盘核）；或反之将代码改回已声明的键（需确认语义归属） |
 | **rf-417** | **Extended Thinking 模型名单未覆盖 Kimi——「支持判定」与「默认开思考安全网」双双缺失**（文档审计中发现）：`_THINKING_SUPPORTED_PREFIXES` 无 `kimi-` 前缀，配置 `thinking_enabled_*=true` 走 Kimi 时被判定「不支持」静默降级为非思考模式；更深一层，Kimi K2.6 Anthropic 兼容端点**默认开思考**（实测：不传思考参数即返回 thinking 块），与 DeepSeek 推理族同类——「未开启 thinking 时显式注入 disabled」的安全网只看 effort 族名单，Kimi 不在其中，关闭 thinking 的模块会白烧思考 token 甚至占满 max_tokens 无正文。根因是原实现把「控制方式」（budget/effort）与「默认行为」（默认开/关）两个独立维度隐式耦合在 effort 名单里 | 双维度拆开显式声明：新增 `_THINKING_DEFAULT_ON_PREFIXES`（deepseek 推理族 + kimi-，独立于 effort 名单）与 `_is_default_thinking_on()`；`_THINKING_SUPPORTED_PREFIXES` 加 `kimi-`；`configure_extended_thinking` 禁用安全网改按 default-on 判定（payload 同为 thinking.disabled，Kimi 实测接受）；Kimi 开启时走 budget_tokens 路径（实测 `thinking.enabled+budget_tokens` HTTP 200 生效），不进 effort 族。实测三态验证：默认/显式禁用/budget 注入。回归用例 +7（支持判定/非 effort/default-on 三态/payload 级 budget 注入与显式禁用） |
 | **rf-418** | **Kimi 定价与接入文档未随计价代码同步**（文档审计中发现）：`llm-technical.md` 附录 B 定价表与 `how-to-config-llm.md`「完整模型定价表」缺 `kimi-k2.6`/`kimi-k3` 行；「支持的 provider 及配置示例」章节无 Kimi 接入示例；`faq.md`/`README.md` 的 thinking 支持与 provider 列表未含 Kimi（check-doc-drift 不覆盖定价表内容，未拦住） | 五处文档同步：两份定价表补 kimi 行；手册新增 Kimi 接入示例折叠块（含与 Kimi Code 订阅 Key 不通用、默认开思考的注意事项）；faq/README 的支持列表补 Kimi；`llm-technical.md` thinking 注入流程图补「False → 默认开思考模型显式禁用」分支与 budget 模型名单 |
 | **rf-416** | **LLM 用量汇总的 Endpoint 只取第一个有值的模块端点，主备混用时无法区分主备**（用户报告「设了 Kimi 为主但 Endpoint 还是 DeepSeek」排查后发现：配置实际已生效，是缓存模块保留了 DeepSeek 时代的调用元数据，而汇总展示单一端点造成误导）——`html_renderers._render_llm_module_info` 与 `excel_llm_usage` 各自用 `next(...)` 取首个非空 endpoint | 新增共享函数 `report/llm_module_info.py::build_llm_endpoint_display`：多端点按 provider 链 priority 升序、主在前并标注「主/备」（如 `https://…moonshot…（主） / https://…deepseek…（备）`）；端点无法映射链路时保持原顺序不标注（防误标）；两处调用点改为复用；`reports-instruction.md` 用量页签字段表同步；回归用例 +7（空/单端点/主备标注/模块乱序仍主在前/未映射不标注/惰性加载不崩/去重） |
