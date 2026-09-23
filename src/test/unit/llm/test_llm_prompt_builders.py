@@ -146,11 +146,12 @@ class TestBuildPenetrationDeepPrompt(unittest.TestCase):
         self.assertIn("品种集中度", result)
 
     def test_with_penetrated_assets(self):
-        """穿透 TOP10 明细嵌入。"""
+        """穿透 TOP10 明细嵌入——夹具用生产数据契约键 ratio_pct（report/penetration.py top10 产出形状），
+        误读其它键会让提示词中占比恒为 0.0% 而本用例照常通过。"""
         from src.python.llm.prompts import _build_penetration_deep_prompt
 
         assets = [
-            {"name": "贵州茅台", "codes": ["600519"], "mv": 50_000, "ratio": 25.0, "sector": "白酒"},
+            {"name": "贵州茅台", "codes": ["600519"], "mv": 50_000, "ratio_pct": 25.0, "sector": "白酒"},
         ]
         result = _build_penetration_deep_prompt(
             total_mv=200_000,
@@ -161,7 +162,7 @@ class TestBuildPenetrationDeepPrompt(unittest.TestCase):
             penetrated_assets=assets,
         )
         self.assertIn("贵州茅台", result)
-        self.assertIn("25.0%", result)
+        self.assertIn("占比25.0%", result)
 
     def test_calc_country_exposure_included(self):
         """国别/币种分布嵌入（含交易所前缀代码分类为 A 股）。"""

@@ -8,6 +8,22 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 修复穿透 TOP10 占比字段名不一致导致穿透深度分析误判「占比为 0%」（2026-09-23，rf-415）
+
+**背景**（用户报告）：报告中「资产穿透 TOP10」表格数据正常，但「穿透深度分析」章节的 LLM 文本称穿透占比为 0%。
+
+**根因**：`report/penetration.py::_build_penetration_result` 的 top10 产出字段为 `ratio_pct`，而两处消费方误读 `ratio`（`.get("ratio", 0)` 恒为 0）：
+- `llm/prompts_action.py::_build_penetration_deep_prompt`——提示词中每条穿透资产「占比0.0%」，LLM 忠实复述为穿透占比 0%（用户可见症状）
+- `llm/fingerprint.py::extract_stable_penetration`——full 模式指纹的占比分量恒为 0，缓存指纹对穿透占比变化不敏感（隐性缺陷）
+
+Excel 穿透页签与景气度评分读 `ratio_pct`，不受影响。既有测试夹具恰好也传 `ratio` 键，形成自证掩盖。
+
+**修复**：两处改为 `a.get("ratio_pct", a.get("ratio", 0))`（契约字段优先，`ratio` 作兼容兜底）。
+
+**回归测试 +2**（净增）：`test_llm_prompt_builders.py` 穿透明细用例夹具改为生产形状 `ratio_pct` 并断言「占比25.0%」（对修复前代码必失败）；`test_fingerprint.py` 新增 2 例——full 模式按 `ratio_pct` 提取契约 / 占比变化必须改变提取结果。
+
+**验证**：`pytest test_llm_prompt_builders.py test_fingerprint.py` → 54 passed；`ruff check` + `ruff format --check` 零告警。
+
 ### 接入 Kimi（月之暗面）开放平台为 LLM 主节点，下架 Gemini（2026-09-23）
 
 **背景**（部署调整）：本机部署的 LLM provider 链从「DeepSeek 主 + Gemini 辅」切换为「Kimi K2.6 主 + DeepSeek 备」，不再使用 Gemini。Kimi 走开放平台按量付费 + Anthropic 兼容端点（与 DeepSeek 主节点同一套调用路径），代码零改动即可接入；仅计价表需补充新模型费率。
