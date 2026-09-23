@@ -118,7 +118,9 @@
   "batch": {
     "max_total_workers": 15,
     "fund_workers": 3,
-    "industry_workers": 8
+    "industry_workers": 8,
+    "datasink_workers": 2,
+    "akshare_workers": 2
   },
   "batch_rate_limit": {
     "tencent": 0.0,
@@ -658,12 +660,16 @@
 | `batch.max_total_workers` | `15` | 全局 batch 线程硬上限，超过时自动钳位 |
 | `batch.fund_workers` | `3` | 基金排名/持仓批量并发数 |
 | `batch.industry_workers` | `8` | 行业分类批量并发数 |
+| `batch.datasink_workers` | `2` | 财报全文取数并发数（DataSinking 免费档批量上限 ≤3） |
+| `batch.akshare_workers` | `2` | akshare 财务指标取数并发数（财务指标章 + 景气度框架②维基金重仓 ROE 推演共用） |
 
 ```json
 "batch": {
   "max_total_workers": 15,
   "fund_workers": 3,
-  "industry_workers": 8
+  "industry_workers": 8,
+  "datasink_workers": 2,
+  "akshare_workers": 2
 }
 ```
 

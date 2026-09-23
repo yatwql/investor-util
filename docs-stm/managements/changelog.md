@@ -8,6 +8,17 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 修复配置漏声明：`batch.akshare_workers` 补入默认值与文档（2026-09-24，rf-420）
+
+**背景**（文档审计中发现）：`report/financial_indicator.py`（财务指标章多期取数）与 `report/fund_roe_estimate.py`（景气度框架②维基金重仓 ROE 推演）均调 `get_batch_worker_count("akshare_workers", 2)`，但 `_config_defaults.py` 的 `batch` 段未声明该键（模板与 `how-to-config.md` 字段表也无）——用户无法通过配置调整 akshare 财务指标取数并发，只能吃代码兜底值 2。
+
+**变更**：
+- `config/_config_defaults.py`：`batch` 段新增 `akshare_workers: 2`（注释标明服务对象：财务指标章 + 基金重仓 ROE 推演）+ 模板生成同步（尾项逗号重排）
+- `how-to-config.md`：`batch` 字段表与两处示例 JSON 补齐（连带补上原本也漏列的 `batch.datasink_workers`，字段表现含 5 键）
+- `test_config.py`：新增不变式用例 `TestBatchWorkerKeysDeclared`——扫描 `src/python` 下全部 `get_batch_worker_count("<key>")` 引用并断言 ⊆ `_DEFAULT_CONFIG["batch"]`，堵住「代码引用但未声明」这一类漏洞（既有模板用例只覆盖「模板 ≡ 默认值」）；含防正则失效的断言，已实证移除该键即报错
+
+**验证**：`pytest src/test/unit/config/test_config.py` → 89 passed；全量门禁（dev-verify + 6 个 `--ci` + ruff）全绿。
+
 ### 全量文档审计与 5 处组织/内容修正（2026-09-24，rf-421）
 
 **背景**（用户要求）：对 10 份管理文档 + 11 份用户手册 + README 做组织顺序与内容核对。
