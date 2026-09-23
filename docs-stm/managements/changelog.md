@@ -8,6 +8,20 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### plan-48 景气度框架④维场外流动性补齐（类型默认档）（2026-09-23）
+
+**背景**：④ 流动性此前只算场内变现天数——场外品种未配置 `redemption_limits` 时一律标「需手动确认赎回上限」不计分（用户组合 4 只场外 + 6 只数据缺失），场外为主的组合该维无区分度。
+
+**变更**：
+- `core/code_utils.py`：新增 `otc_redemption_days_default`（走类型判定中心化，满足约束「类型分级须走 code_utils」）与四档常量——货币/短债 T+1、纯债 T+2、其他场外基金（主动权益/混合/指数/联接）T+3、QDII T+7（保守上沿）；无法识别返回 None
+- `analysis/liquidity.py`：场外未配置赎回上限时改落类型默认档，输出新增 `estimate_basis="type_default"` 与标签「约 T+N 日赎回（类型默认档，非实测）」；配置口径优先，类型未识别才保留「需手动确认赎回上限」降级
+- `analysis/prosperity_scoring._score_liquidity`：计分池扩为「场内 + 场外配置赎回上限（用户口径）+ 场外类型默认档（非实测）」，最差天数统一分档；默认档参与时 status=partial 且证据明标非实测；配置/默认档/未计入三类计数分列证据
+- 文档：`technical.md`（§4.20 ④维口径）、`requirements.md`（R-LIQ-03 按实现更新）、`how-to-config.md`（字段表 + J 节）、`faq.md`（流动性问答）
+
+**回归测试 +13**：`test_code_utils.py::TestOtcRedemptionDaysDefault`（6 例：货币/短债先于纯债/纯债/QDII/通用场外/未识别返回 None）、`test_liquidity_otc.py`（新增 `TestLiquidityOtcTypeDefaultTier` 4 例 + 既有 3 例改按新行为断言）、`test_liquidity.py` 与 `test_liquidity_otc_edge.py` 旧行为断言更新、`test_prosperity_framework.py::TestLiquidityDimension`（+3 例：默认档计入并标非实测/配置口径计入/无天数仍不计分）。
+
+**验证**：`pytest src/test/unit/analysis src/test/unit/core/test_code_utils*.py src/test/unit/report/test_prosperity_framework_wiring.py src/test/scenario/basic/test_scenario_prosperity_framework.py` → 1011 passed。
+
 ### plan-47 基金重仓股 ROE 加权（景气度框架②维基金层扩展，阶段一）（2026-09-23）
 
 **背景**：② ROE 低位弹性此前只覆盖 A 股直接持仓，基金/ETF/QDII 无个股 ROE 只能标「需核实」不计分（用户组合实测仅 ~22% 权重被覆盖）。按用户确认的两阶段方案，本项交付阶段一（前十大重仓口径）；阶段二（全量持仓）待 plan-51 阶段 3 收尾后升级，契约以 `basis` 字段区分口径。

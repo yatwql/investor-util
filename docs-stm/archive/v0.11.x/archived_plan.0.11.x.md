@@ -1,9 +1,9 @@
 # 实现计划归档 — v0.11.x
 
-> 归档时间：2026-09-15（v0.11.0 发布当日并入，plan-44）；2026-09-16 增补（plan-45、plan-46）；2026-09-18 增补（plan-52、plan-53、plan-54，v0.11.1 发布当日并入）；2026-09-23 增补（plan-47，v0.11.2-dev 迭代内完成）
+> 归档时间：2026-09-15（v0.11.0 发布当日并入，plan-44）；2026-09-16 增补（plan-45、plan-46）；2026-09-18 增补（plan-52、plan-53、plan-54，v0.11.1 发布当日并入）；2026-09-23 增补（plan-47、plan-48，v0.11.2-dev 迭代内完成）
 > 原始文件：`docs-stm/managements/plan.md（当前迭代部分）`
 > 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1（2026-09-18：plan-52 矩阵命中源列 / plan-53 去重校准体系修整 / plan-54 48 小时技术债整改）
-> 归档内容：本迭代已实现的计划项完成态记录（plan-44 报告增强子模块并入功能开关注册表；plan-45 报告章节整合；plan-46 景气度框架诊断；plan-51 同花顺官方金融数据接入五阶段）；
+> 归档内容：本迭代已实现的计划项完成态记录（plan-44 报告增强子模块并入功能开关注册表；plan-45 报告章节整合；plan-46 景气度框架诊断；plan-51 同花顺官方金融数据接入五阶段；plan-47 景气度框架②维基金 ROE 加权 / plan-48 ④维场外流动性类型默认档）；
 > plan-42 / plan-43 摘要见 `../v0.10.x/archived_plan.0.10.x.md`
 > 设计文档索引：plan-45 的设计层与实施层文档归档于 `section-consolidation/`；plan-46 的设计文档归档于 `prosperity-framework/`；plan-51 的设计文档归档于 `hithink-data-source/`（均见文末）
 
@@ -168,3 +168,11 @@
 **实施摘要**：新增 `report/fund_roe_estimate.py::estimate_fund_roe_batch`（复用 `fetch_fund_holdings_batch` 基金持仓链路 + `fetch_latest_indicator` 个股财务指标链路，不新增 HTTP 通道；报告期陈旧闸门与穿透层同口径；`known_roe` 命中免取数）；`analysis/prosperity_scoring._score_roe` 新增可选入参 `fund_roe_estimates`——无直接 ROE 的权益类基金（QDII/ETF/联接/主动权益，类型判定走 `classify_penetration`）以推演值计分，证据/持仓视角/契约 notes 三处均标「按框架推演」（红线②）；直接 ROE 优先、推演值不覆盖；开关关闭时零变化（红线③）。新语义名 `estimate_fund_roe_batch` / `fund_roe_estimates` 已入语义命名表，契约口径已入附录 H。
 
 **实施记录**：见 `../../managements/changelog.md`「plan-47 基金重仓股 ROE 加权（② 维基金层扩展，阶段一）」条。
+
+#### ✅ `plan-48` 景气度框架诊断：场外流动性补齐（④ 维，类型默认档）— 已完成（2026-09-23）
+
+**方案选择（2026-09-23）**：采用 plan 内的方案②（类型分级默认档），配置项 `redemption_limits`（方案①）优先；类型判定按约束走 `core/code_utils`（C1 类型判定中心化）。
+
+**实施摘要**：`core/code_utils.otc_redemption_days_default` 四档——货币/短债 T+1、纯债 T+2、其他场外基金（主动权益/混合/指数/联接）T+3、QDII T+7（保守上沿），无法识别返回 None；`analysis/liquidity.check_liquidity` 场外未配置赎回上限时落默认档并输出 `estimate_basis="type_default"` + 「约 T+N 日赎回（类型默认档，非实测）」标签；`_score_liquidity` 计分池扩为「场内 + 场外配置口径 + 场外默认档（非实测）」，默认档参与时 `status=partial` 且证据明标非实测（满足约束「默认档须标注非实测」）。
+
+**实施记录**：见 `../../managements/changelog.md`「plan-48 景气度框架④维场外流动性补齐（类型默认档）」条。

@@ -2878,7 +2878,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 | ① 景气方向 / 通胀属性 | 25 | **两视角叠加 + 归一 + 类型兜底**（`_sector_weight_items`）：视角一 = 穿透底层（按 `ratio_pct`）；视角二 = 每个直接持仓按自身权重（`classify_sector` 板块；识别失败用 `_fund_type_fallback_label` 类型标签兜底：固收→防御侧、境外/宽基/主动权益→中性且只按标签参与判定）；直接持有的证券视角二跳过；命中 `boom_keywords` 按 60% 满分档折算、`defensive_keywords` 反向扣减（防御优先互斥）；证据披露叠加合计与兜底只数 | 不依赖外部数据 |
 | ② ROE 低位弹性 | 20 | `financial_indicator_data` 的 ROE 分布：低 ROE（<10%）权重按 50% 满分档折算，年度趋势改善加分；**基金层扩展（阶段一）**：无直接 ROE 的权益类基金按 `fund_roe_estimates`（前十大重仓股 ROE 加权推演值，`report/fund_roe_estimate.py`）补入计分，证据与持仓视角均标注「按框架推演」（框架原意是选股层 ROE 弹性，基金层为推演口径） | `unverified`（提示开启 `financial_indicator`） |
 | ③ 全球视野 / 中国比较优势 | 15 | 命中 `global_edge_keywords` 的权重（口径同维度①并集归一，40% 满分档）+ 非 A 股/港股等境外资产占比加分（上限 5 分） | 不依赖外部数据 |
-| ④ 流动性 | 10 | `analysis/liquidity.py::check_liquidity` 的最差场内变现天数分档（<1 日 10 / <3 日 7 / <5 日 4 / 否则 2） | 全为场外或数据缺失 → `unverified` |
+| ④ 流动性 | 10 | `analysis/liquidity.py::check_liquidity` 的最差变现/赎回天数分档（<1 日 10 / <3 日 7 / <5 日 4 / 否则 2）；计入池 = 场内（近 20 日成交额推算）+ 场外配置赎回上限（用户口径）+ 场外类型默认档（`core/code_utils.otc_redemption_days_default`：货币/短债 T+1、纯债 T+2、其他场外 T+3、QDII T+7；非实测，证据标注） | 全无可计算项或数据缺失 → `unverified` |
 | ⑤ 集中度与周期拼接 | 15 | 前十大集中度（`concentration_target_pct` 目标档）+ 换手代理（最近两期历史快照持仓集合变动率 1−Jaccard；高换手为加分项） | 无第二期快照 → 换手子项 `unverified`（`partial`） |
 | ⑥ 业绩与回撤印证 | 15 | `history_data` 区间收益与最大回撤（正收益 8 分 / 跑赢最强基准 +4 / 回撤 ≤15% +3、≤25% +1）；`benchmarks` 兼容 `list[dict]`（生产）与 `dict[str, dict]`（注入），无法解析的基准跳过不计 | `status=unavailable` / 无收益字段 → `unverified`；仅回撤样本不足 → `partial` |
 

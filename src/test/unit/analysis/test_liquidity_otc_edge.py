@@ -42,12 +42,13 @@ class TestLiquidityOTCEdge:
         result = check_liquidity(holdings, 6_500_000, redemption_limits=limits)
         assert len(result) == 4
 
-        configured = [r for r in result if r["liquidation_days"] is not None]
-        unconfigured = [r for r in result if r["liquidation_days"] is None]
+        configured = [r for r in result if r["daily_redemption_limit"]]
+        default_tier = [r for r in result if r.get("estimate_basis") == "type_default"]
         assert len(configured) == 2
-        assert len(unconfigured) == 2
-        for r in unconfigured:
-            assert r["tag"] == "需手动确认赎回上限"
+        assert len(default_tier) == 2
+        for r in default_tier:
+            assert r["liquidation_days"] == 3.0
+            assert "非实测" in r["tag"]
 
     def test_zero_market_value_with_limit(self):
         """零市值品种即使配置了上限也跳过。"""

@@ -488,9 +488,21 @@ def _score_liquidity(liquidity_signals: list[dict[str, Any]] | None) -> dict[str
         }
 
     measurable = [s for s in liquidity_signals if s.get("type") == "stock" and s.get("liquidation_days") is not None]
-    otc = [s for s in liquidity_signals if s.get("type") == "otc"]
+    otc_all = [s for s in liquidity_signals if s.get("type") == "otc"]
+    # 场外计入两档：配置赎回上限（用户实测口径）与类型默认档（推演口径，标非实测）
+    otc_configured = [s for s in otc_all if s.get("daily_redemption_limit") and s.get("liquidation_days") is not None]
+    otc_default_tier = [
+        s for s in otc_all if s.get("estimate_basis") == "type_default" and s.get("liquidation_days") is not None
+    ]
+    otc_unscored = [
+        s
+        for s in otc_all
+        if s.get("liquidation_days") is None
+        or (not s.get("daily_redemption_limit") and s.get("estimate_basis") != "type_default")
+    ]
     assumed = [s for s in liquidity_signals if s.get("type") == "assumed_liquid"]
-    if not measurable:
+    scored_pool = measurable + otc_configured + otc_default_tier
+    if not scored_pool:
         return {
             "key": "liquidity",
             "name": "流动性",
@@ -499,31 +511,37 @@ def _score_liquidity(liquidity_signals: list[dict[str, Any]] | None) -> dict[str
             "status": "unverified",
             "evidence": [],
             "unverified": [
-                f"无可计算的场内变现天数（场外 {len(otc)} 只 / 数据缺失按充足处理 {len(assumed)} 只）→ 该维不计分"
+                f"无可计算的变现/赎回天数（场外 {len(otc_all)} 只 / 数据缺失按充足处理 {len(assumed)} 只）→ 该维不计分"
             ],
         }
 
-    worst_days = max(finite_or(s.get("liquidation_days")) for s in measurable)
+    worst_days = max(finite_or(s.get("liquidation_days")) for s in scored_pool)
     score = _LIQUIDITY_FLOOR
     for limit, tier_score in _LIQUIDITY_TIERS:
         if worst_days < limit:
             score = tier_score
             break
     unverified = []
-    if otc:
-        unverified.append(f"场外品种 {len(otc)} 只（无赎回上限，场内变现天数口径不适用）")
+    if otc_unscored:
+        unverified.append(f"场外品种 {len(otc_unscored)} 只（无赎回上限且类型未识别，未计入）")
     if assumed:
         unverified.append(f"成交额数据缺失、按「流动性充足」假设计算的品种 {len(assumed)} 只")
+    evidence = [
+        f"最差品种全额变现/赎回天数 {worst_days:.1f} 日（<1 日 → 10 分，<3 日 → 7 分，<5 日 → 4 分，否则 2 分）",
+        f"可计算场内品种 {len(measurable)} 只",
+    ]
+    if otc_configured or otc_default_tier:
+        evidence.append(
+            f"场外品种计入 {len(otc_configured) + len(otc_default_tier)} 只"
+            f"（配置赎回上限 {len(otc_configured)} 只 / 类型默认档 {len(otc_default_tier)} 只——类型默认档为非实测口径）"
+        )
     return {
         "key": "liquidity",
         "name": "流动性",
         "score": score,
         "max_score": _W_LIQUIDITY,
-        "status": "partial" if (otc or assumed) else "scored",
-        "evidence": [
-            f"最差场内品种全额变现天数 {worst_days:.1f} 日（<1 日 → 10 分，<3 日 → 7 分，<5 日 → 4 分，否则 2 分）",
-            f"可计算场内品种 {len(measurable)} 只",
-        ],
+        "status": "partial" if (otc_unscored or assumed or otc_default_tier) else "scored",
+        "evidence": evidence,
         "unverified": unverified,
     }
 

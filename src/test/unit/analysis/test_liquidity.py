@@ -49,15 +49,16 @@ class TestLiquidityOTC:
         ]
 
     def test_all_otc_marked_as_otc(self):
-        """全部场外基金标记为 otc。"""
+        """全部场外基金标记为 otc，未配置赎回上限时按类型默认档估算（非实测）。"""
         from src.python.analysis.liquidity import check_liquidity
 
         result = check_liquidity(self._otc_holdings(), 800_000)
         assert len(result) == 2
         for r in result:
             assert r["type"] == "otc"
-            assert r["tag"] == "需手动确认赎回上限"
-            assert r["liquidation_days"] is None
+            assert r["liquidation_days"] == 3.0  # 混合型场外基金通用档 T+3
+            assert r["estimate_basis"] == "type_default"
+            assert "非实测" in r["tag"]
 
     def test_otc_no_kline_call(self):
         """场外基金不触发 K 线请求。"""

@@ -15,6 +15,7 @@ from src.python.core.code_utils import (
     is_index_code,
     is_otc_fund_by_name,
     is_us_index_code,
+    otc_redemption_days_default,
     to_fmp_symbol,
 )
 
@@ -138,6 +139,33 @@ class TestIsOtcFundByName:
         """名称或代码缺失 → 非场外基金（防御性，不抛异常）。"""
         assert is_otc_fund_by_name("", "000311") is False
         assert is_otc_fund_by_name("景顺长城景颐双利债券A", "") is False
+
+
+class TestOtcRedemptionDaysDefault:
+    """otc_redemption_days_default 场外基金赎回天数类型默认档（非实测）。"""
+
+    def test_money_fund_tier1(self) -> None:
+        assert otc_redemption_days_default("天弘余额宝货币", "000198") == 1
+
+    def test_short_bond_tier1_before_pure_bond(self) -> None:
+        """短债先于纯债档命中（短债名称同时含债类关键词）。"""
+        assert otc_redemption_days_default("某某短债债券A", "000012") == 1
+
+    def test_pure_bond_tier2(self) -> None:
+        assert otc_redemption_days_default("某某纯债债券A", "000013") == 2
+
+    def test_qdii_tier7(self) -> None:
+        assert otc_redemption_days_default("某某纳斯达克QDII", "000041") == 7
+
+    def test_generic_equity_otc_tier3(self) -> None:
+        """主动权益/混合/指数等场外基金 → T+3 通用档。"""
+        assert otc_redemption_days_default("华夏成长混合", "000001") == 3
+        assert otc_redemption_days_default("招商中证白酒指数A", "161725") == 3
+
+    def test_unrecognized_returns_none(self) -> None:
+        """非场外基金（A 股股票/空名称）→ None，调用方保持「需手动确认」降级。"""
+        assert otc_redemption_days_default("格力电器", "000651") is None
+        assert otc_redemption_days_default("", "") is None
 
 
 class TestIsAShareCode:
