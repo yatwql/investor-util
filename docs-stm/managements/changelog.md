@@ -8,6 +8,19 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### LLM 用量汇总 Endpoint 主备混用标注（2026-09-23，rf-416）
+
+**背景**（用户反馈）：切换 Kimi 为主节点后，报告「LLM API 用量」汇总的 Endpoint 仍显示 DeepSeek 端点，疑似配置未生效。排查确认配置已生效（模型列表含 kimi-k2.6），但缓存模块保留了切换前 DeepSeek 时代的调用元数据，而汇总行只显示**第一个**有值模块的端点——主备混用时无法看出谁是主。
+
+**变更**：
+- `report/llm_module_info.py`：新增 `build_llm_endpoint_display`——多端点时按 provider 链 priority 升序、主在前并标注（`https://主端点（主） / https://备端点（备）`）；端点无法映射链路时保持模块出现顺序且不标注（防误标）；`llm_config=None` 时惰性加载全局配置
+- `html_renderers.py` / `excel_llm_usage.py`：两处 `next(...)` 取首端点改为复用该函数（HTML/Excel 口径一致）
+- `reports-instruction.md`：用量页签 Endpoint 字段说明同步主备标注行为
+
+**回归测试 +7**（新增 `unit/report/test_llm_module_info.py`）：空/单端点原样、主备标注、模块乱序仍主在前、未映射不标注、惰性加载不崩、重复端点去重。
+
+**验证**：`pytest test_llm_module_info.py test_html_writer.py test_llm_session_usage.py` → 122 passed；`ruff check` + `ruff format --check` 零告警。
+
 ### 修复穿透 TOP10 占比字段名不一致导致穿透深度分析误判「占比为 0%」（2026-09-23，rf-415）
 
 **背景**（用户报告）：报告中「资产穿透 TOP10」表格数据正常，但「穿透深度分析」章节的 LLM 文本称穿透占比为 0%。

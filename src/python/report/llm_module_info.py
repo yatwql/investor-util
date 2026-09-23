@@ -51,6 +51,54 @@ def get_llm_module_failure_reason(module_failure: dict, module_key: str) -> str 
     return reason
 
 
+def _endpoint_priority_map(llm_config: dict | None) -> dict[str, float]:
+    """从 llm_config 的 provider 链构建 endpoint → priority 映射。"""
+    mapping: dict[str, float] = {}
+    if not llm_config:
+        return mapping
+    creds = llm_config.get("_llm_credentials") or {}
+    for provider in llm_config.get("_provider_list") or []:
+        ref = provider.get("credentials_ref")
+        endpoint = (creds.get(ref) or {}).get("endpoint") if ref else None
+        if endpoint and endpoint not in mapping:
+            mapping[endpoint] = float(provider.get("priority", 999))
+    return mapping
+
+
+def build_llm_endpoint_display(module_info: list[dict[str, Any]], llm_config: dict | None = None) -> str:
+    """构建 Endpoint 汇总展示（HTML / Excel 两端共用）。
+
+    - 无端点 → ""
+    - 单一端点 → 原样返回
+    - 多端点（主备混用）→ 按 provider 链 priority 升序排列，主在前并标注，
+      形如 ``"https://主端点（主） / https://备端点（备）"``；
+      任一端点无法映射到链路时保持模块出现顺序、不标注（避免误标主备）
+
+    llm_config 为 None 时惰性加载全局 LLM 配置；加载失败降级为无标注拼接。
+    """
+    seen: list[str] = []
+    for mi in module_info:
+        ep = mi.get("endpoint")
+        if ep and ep not in seen:
+            seen.append(ep)
+    if not seen:
+        return ""
+    if len(seen) == 1:
+        return seen[0]
+    if llm_config is None:
+        try:
+            from src.python.config import get_llm_config
+
+            llm_config = get_llm_config()
+        except Exception:  # 配置不可用时降级为无标注拼接
+            llm_config = {}
+    pmap = _endpoint_priority_map(llm_config)
+    if not pmap or any(ep not in pmap for ep in seen):
+        return " / ".join(seen)
+    ordered = sorted(seen, key=lambda ep: pmap[ep])
+    return " / ".join(f"{ep}（{'主' if i == 0 else '备'}）" for i, ep in enumerate(ordered))
+
+
 def build_llm_module_info(
     llm_failure: dict,
     per_module: dict,

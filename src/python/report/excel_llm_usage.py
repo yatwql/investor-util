@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.python.core.logger import setup_logger
-from src.python.report.llm_module_info import build_llm_module_info
+from src.python.report.llm_module_info import build_llm_endpoint_display, build_llm_module_info
 from src.python.report.progress import ProgressReporter, Timer
 
 logger = setup_logger()
@@ -101,7 +101,7 @@ def build_llm_usage_sheet(
     if ws is None:
         logger.debug("llm_usage 页签未被创建，跳过 API 用量写入")
         return
-    glb_endpoint = next((mi["endpoint"] for mi in excel_module_info if mi.get("endpoint")), "")
+    glb_endpoint = build_llm_endpoint_display(excel_module_info)
     try:
         write_llm_usage_sheet(ws, formatted, excel_module_info, llm_endpoint=glb_endpoint)
     except Exception as e:

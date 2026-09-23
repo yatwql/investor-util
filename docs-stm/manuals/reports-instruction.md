@@ -371,7 +371,7 @@ LLM API 用量页签/章节被动跟踪以下 5 个子模块（1 个可选）的
 |------|------|------|
 | API 调用次数 | 本次生成实际发起的 API 请求次数（缓存命中不计入） | `4 次` |
 | 模型 | 使用的模型名称（多个模型 `/` 分隔） | `deepseek-v4-flash` |
-| Endpoint | API 端点地址 | `https://api.anthropic.com/v1/messages` |
+| Endpoint | API 端点地址；主备混用时按 provider 链优先级排序并标注「主/备」（主在前），无法映射链路的端点不标注 | `https://api.moonshot.cn/anthropic/v1/messages（主） / https://api.deepseek.com/anthropic/v1/messages（备）` |
 | 输入 Token | 所有请求的输入 Token 总和 | `12,345` |
 | 输出 Token | 所有请求的输出 Token 总和 | `5,678` |
 | 总 Token | 输入+输出合计 | `18,023` |
