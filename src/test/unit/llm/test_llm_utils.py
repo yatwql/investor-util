@@ -497,6 +497,32 @@ class TestPricing(unittest.TestCase):
                 "¥0.020",
             )
 
+    def test_kimi_pricing_locked(self) -> None:
+        """Kimi 条目锁定官方单价（元/百万 token）：k2.6 输入 6.5 / 输出 27.0，k3 输入 20.0 / 输出 100.0。
+
+        单价误改会让报告费用估算整体偏移，故按 1M 输入 + 1M 输出锁死金额。
+        """
+        self.assertEqual(estimate_cost("kimi-k2.6", 1_000_000, 1_000_000, at_time=self._IDLE_TIME), "¥33.500")
+        self.assertEqual(estimate_cost("kimi-k3", 1_000_000, 1_000_000, at_time=self._IDLE_TIME), "¥120.000")
+
+    def test_kimi_cache_hit_rate(self) -> None:
+        """Kimi 缓存命中价：k2.6 为 1.10 / k3 为 2.00（元/百万 token），缺该字段会回落为 input 价。"""
+        self.assertEqual(
+            estimate_cost("kimi-k2.6", 1_000_000, 0, cache_hit_input_tokens=1_000_000, at_time=self._IDLE_TIME),
+            "¥1.100",
+        )
+        self.assertEqual(
+            estimate_cost("kimi-k3", 1_000_000, 0, cache_hit_input_tokens=1_000_000, at_time=self._IDLE_TIME),
+            "¥2.000",
+        )
+
+    def test_kimi_no_peak_valley(self) -> None:
+        """Kimi 条目无 peak 子段——高峰钟点不得按峰谷价加成（与 DeepSeek 行为区分）。"""
+        self.assertEqual(
+            estimate_cost("kimi-k2.6", 1_000_000, 1_000_000, at_time=self._PEAK_TIME),
+            estimate_cost("kimi-k2.6", 1_000_000, 1_000_000, at_time=self._IDLE_TIME),
+        )
+
     def test_pricing_merged_has_defaults(self) -> None:
         """PRICING_MERGED 应包含所有内置模型。"""
         for model in (
@@ -506,6 +532,8 @@ class TestPricing(unittest.TestCase):
             "deepseek-reasoner",
             "claude-sonnet-4-6",
             "gpt-4o",
+            "kimi-k2.6",
+            "kimi-k3",
         ):
             self.assertIn(model, PRICING_MERGED)
 

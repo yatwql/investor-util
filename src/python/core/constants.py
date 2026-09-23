@@ -138,6 +138,11 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
         "input_cache_hit": 0.02,
         "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04},
     },
+    # ── Kimi（月之暗面开放平台，元/百万 token，platform.kimi.com 官方价）──
+    # kimi-k2.6：通用模型（256k 上下文，支持思考/非思考模式）
+    "kimi-k2.6": {"input": 6.5, "output": 27.0, "input_cache_hit": 1.10},
+    # kimi-k3：旗舰模型（1M 上下文）
+    "kimi-k3": {"input": 20.0, "output": 100.0, "input_cache_hit": 2.00},
     # Gemini
     "gemini-3.5-flash": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
     "gemini-3.5-": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},

@@ -8,6 +8,21 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 接入 Kimi（月之暗面）开放平台为 LLM 主节点，下架 Gemini（2026-09-23）
+
+**背景**（部署调整）：本机部署的 LLM provider 链从「DeepSeek 主 + Gemini 辅」切换为「Kimi K2.6 主 + DeepSeek 备」，不再使用 Gemini。Kimi 走开放平台按量付费 + Anthropic 兼容端点（与 DeepSeek 主节点同一套调用路径），代码零改动即可接入；仅计价表需补充新模型费率。
+
+**变更**：
+- `core/constants.py`：`MODEL_PRICING` 新增 `kimi-k2.6`（输入 ¥6.5 / 输出 ¥27.0 / 缓存命中 ¥1.10 每百万 token）与 `kimi-k3`（¥20.0 / ¥100.0 / ¥2.00）官方费率，无峰谷子段
+- `data/config/llm_providers.json`（本机部署配置）：`kimi-main`（priority 10，主）→ `deepseek-main`（priority 20，备）；移除 `gemini-fallback`
+- `data/config/llm_key.json`（gitignore 不入库）：新增 `kimi-main` 凭据（endpoint `https://api.moonshot.cn/anthropic/v1/messages`），移除 `gemini-fb`
+- Gemini 的 `MODEL_PRICING` 条目保留——历史报告成本渲染仍依赖其为旧调用记录估价
+- 文档同步：`test-coverage.md`（unit_llm 计数与覆盖描述）、`folders.md`（统计表）
+
+**回归测试 +3**（`test_llm_utils.py::TestPricing`）：Kimi k2.6/k3 单价锁定（1M 输入 + 1M 输出金额断言）/ 缓存命中价锁定（防止缺 `input_cache_hit` 字段回落为 input 价）/ 无峰谷加成（高峰钟点与闲时同价，与 DeepSeek 行为区分）。
+
+**验证**：`pytest src/test/unit/llm/test_llm_utils.py::TestPricing` → 31 passed；`get_llm_config()` 链解析 `kimi-main → deepseek-main` 凭据全部可解析零告警；Kimi 端点实测 HTTP 200（`kimi-k2.6` 正常返回，thinking 模式可用）；费用估算冒烟（10 万输入 + 1.5 万输出 → ¥1.055）。
+
 ### 新增 Jev 新闻关联判定评测方案与接入设计草案（2026-09-22，plan-55）
 
 **背景**（能力评估）：TypeSafe 发布 System One 评估模型 Jev——与语言模型不同，它不生成文本，而是接收 `state` + 类型化问项（是否概率 / 单选带分布 / 档位打分）并回结构化答案与校准置信度。经查证，其四条对外路由均无对话补全兼容面，故**不可作为对话模型接入**，仅适用于「窄判断」场景；本项目的新闻关联判定正是此类场景。

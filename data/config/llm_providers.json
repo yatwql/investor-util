@@ -1,24 +1,23 @@
 {
   // LLM Provider 多链配置
-  // 主：DeepSeek（通过 claude 兼容端点）/ 辅：Gemini
+  // 主：Kimi K2.6（开放平台 Anthropic 兼容端点）/ 备：DeepSeek
 
   "strategy": "priority",
   "preferred_providers": {},
   "providers": [
     {
-      "name": "deepseek-main",
+      "name": "kimi-main",
       "provider": "claude",
-      "credentials_ref": "deepseek-main",
+      "credentials_ref": "kimi-main",
       "priority": 10,
       "timeout": 120
     },
     {
-      "name": "gemini-fallback",
-      "provider": "gemini",
-      "credentials_ref": "gemini-fb",
+      "name": "deepseek-main",
+      "provider": "claude",
+      "credentials_ref": "deepseek-main",
       "priority": 20,
-      "timeout": 60,
-      "proxy_preferred": true
+      "timeout": 120
     }
   ]
 }
