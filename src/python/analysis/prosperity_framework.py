@@ -38,6 +38,8 @@ from src.python.analysis.prosperity_scoring import (  # noqa: F401
     # 全部迁移名逐一再导出：既有测试与报告层的 import 面保持不变（含私有常量/打分器）
     DEFAULT_CONFIG,
     RATING_THRESHOLDS,
+    estimated_fund_codes,
+    roe_by_code_from_rows,
     _FALLBACK_CONFIG,
     _LIQUIDITY_FLOOR,
     _LIQUIDITY_TIERS,
@@ -225,14 +227,9 @@ def build_prosperity_framework_data(
         )
 
     # 持仓视角标注所需的推演集合：直接 ROE 缺失、由基金重仓加权推演补上的品种
-    direct_roe_codes = {
-        str(r.get("code") or "")
-        for r in ((financial_indicator_data or {}).get("rows") or [])
-        if isinstance(r.get("roe"), (int, float))
-    }
-    estimated_codes = {
-        code for code, est in (fund_roe_estimates or {}).items() if est.get("roe") is not None
-    } - direct_roe_codes
+    # （与 _score_roe 共用同一判定原语，两侧不得各自实现规则）
+    direct_roe_codes = set(roe_by_code_from_rows((financial_indicator_data or {}).get("rows")))
+    estimated_codes = estimated_fund_codes(fund_roe_estimates, direct_roe_codes)
     if estimated_codes:
         notes.append("② 维基金 ROE 为重仓股加权推演值（阶段一：前十大重仓口径），非基金披露口径。")
 

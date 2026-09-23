@@ -133,6 +133,15 @@ def _resolve_entry_credentials(
     return (api_key, model, endpoint)
 
 
+def resolve_provider_endpoint(entry: dict, llm_config: dict | None = None) -> str:
+    """解析 provider entry 的最终 endpoint（entry 级优先，否则取 credentials_ref 凭据块）。
+
+    本函数是「链条目 → endpoint」解析的唯一公开入口，供报告层等外部模块复用，
+    避免各处自行重写 credentials_ref → endpoint 的遍历规则而漂移。
+    """
+    return _resolve_entry_credentials(entry, llm_config)[2]
+
+
 def _resolve_first_provider_model_endpoint(
     llm_config: dict,
     module_key: str,
@@ -523,4 +532,5 @@ __all__ = [
     "call_openai",
     "call_gemini",
     "configure_extended_thinking",
+    "resolve_provider_endpoint",
 ]

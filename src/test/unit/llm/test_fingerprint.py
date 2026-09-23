@@ -69,16 +69,16 @@ class TestExtractStablePenetration(unittest.TestCase):
     def test_default_mode_excludes_mv_sector(self):
         """默认模式（full=False）只保留 name/codes。"""
         assets = [
-            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio": 15.0},
+            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio_pct": 15.0},
         ]
         result = extract_stable_penetration(assets)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0], {"name": "茅台", "codes": ["600519"]})
 
     def test_full_mode_includes_mv_sector_ratio(self):
-        """full=True 时包含 mv/sector/ratio。"""
+        """full=True 时包含 mv/sector/ratio（夹具用生产契约键 ratio_pct）。"""
         assets = [
-            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio": 15.0},
+            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio_pct": 15.0},
         ]
         result = extract_stable_penetration(assets, full=True)
         self.assertEqual(len(result), 1)
@@ -96,6 +96,17 @@ class TestExtractStablePenetration(unittest.TestCase):
         ]
         result = extract_stable_penetration(assets, full=True)
         self.assertEqual(result[0]["ratio"], 15.0)
+
+    def test_full_mode_ignores_legacy_ratio_key(self):
+        """严格读契约字段：遗留 `ratio` 键不再兼容（占比按 0）。
+
+        历史缺陷正是「静默读错键 → 指纹/提示词占比恒为 0」，故不保留兼容分支。
+        """
+        assets = [
+            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio": 15.0},
+        ]
+        result = extract_stable_penetration(assets, full=True)
+        self.assertEqual(result[0]["ratio"], 0.0)
 
     def test_full_mode_ratio_pct_changes_fingerprint_input(self):
         """ratio_pct 不同的同一资产，full 提取结果必须不同（缓存指纹须对占比变化敏感）。"""

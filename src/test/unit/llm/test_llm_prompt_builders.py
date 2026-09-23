@@ -164,6 +164,23 @@ class TestBuildPenetrationDeepPrompt(unittest.TestCase):
         self.assertIn("贵州茅台", result)
         self.assertIn("占比25.0%", result)
 
+    def test_penetrated_assets_contract_drift_warns(self) -> None:
+        """缺失生产契约字段 ratio_pct 时不静默归零：按 0 上屏 + 记告警（契约漂移信号）。"""
+        from src.python.llm.prompts import _build_penetration_deep_prompt
+
+        assets = [{"name": "贵州茅台", "codes": ["600519"], "mv": 50_000, "ratio": 25.0, "sector": "白酒"}]
+        with self.assertLogs("invest", level="WARNING") as cm:
+            result = _build_penetration_deep_prompt(
+                total_mv=200_000,
+                total_cost=180_000,
+                total_profit=20_000,
+                holdings_count=5,
+                categories={},
+                penetrated_assets=assets,
+            )
+        self.assertIn("占比0.0%", result)
+        self.assertTrue(any("ratio_pct" in line for line in cm.output))
+
     def test_calc_country_exposure_included(self):
         """国别/币种分布嵌入（含交易所前缀代码分类为 A 股）。"""
         from src.python.llm.prompts import _build_penetration_deep_prompt

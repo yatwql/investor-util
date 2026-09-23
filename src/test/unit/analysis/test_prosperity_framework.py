@@ -279,6 +279,35 @@ class TestRoeDimension:
         assert not any("推演" in e for e in roe["evidence"])
 
 
+class TestRoeHelperPrimitives:
+    """ROE 解析与推演集合判定的共用原语（唯一事实来源，防止多处各写一份而漂移）。"""
+
+    def test_roe_by_code_from_rows_filters_invalid(self):
+        from src.python.analysis.prosperity_scoring import roe_by_code_from_rows
+
+        rows = [
+            {"code": "300308", "roe": 0.06},
+            {"code": "688981", "roe": None},
+            {"code": "", "roe": 0.2},
+            {"code": "600519", "roe": "0.31"},
+            {"code": "601398", "roe": 0.11},
+        ]
+        assert roe_by_code_from_rows(rows) == {"300308": 0.06, "601398": 0.11}
+        assert roe_by_code_from_rows(None) == {}
+
+    def test_estimated_fund_codes_excludes_direct_roe(self):
+        from src.python.analysis.prosperity_scoring import estimated_fund_codes
+
+        estimates = {
+            "110022": {"roe": 0.08},
+            "300308": {"roe": 0.99},
+            "519066": {"roe": None},
+        }
+        # 直接 ROE 存在（300308）与推演值缺失（519066）均不属于推演集合
+        assert estimated_fund_codes(estimates, {"300308"}) == {"110022"}
+        assert estimated_fund_codes(None, {"300308"}) == set()
+
+
 class TestGlobalEdgeDimension:
     def test_edge_and_offshore_bonus(self):
         details = _details() + [_row("AAPL", "苹果", 100_000.0)]

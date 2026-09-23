@@ -331,6 +331,39 @@ def _score_boom(
     }
 
 
+def roe_by_code_from_rows(rows: list[dict[str, Any]] | None) -> dict[str, float]:
+    """从财务指标契约行提取 {代码: ROE}（ROE 解析的唯一事实来源）。
+
+    `_score_roe` / 推演集合判定 / 编排层补取免重取的 `known_roe` 三处共用本函数，
+    避免同一解析规则多处各写一份而漂移（含非数值 ROE 的过滤）。
+    """
+    result: dict[str, float] = {}
+    for row in rows or []:
+        code = str(row.get("code") or "")
+        roe = row.get("roe")
+        if code and isinstance(roe, (int, float)):
+            result[code] = float(roe)
+    return result
+
+
+def estimated_fund_codes(
+    fund_roe_estimates: dict[str, dict[str, Any]] | None,
+    direct_roe_codes: set[str] | None = None,
+) -> set[str]:
+    """推演值实际生效的基金代码集合（推演集合判定的唯一事实来源）。
+
+    规则：有可用推演 roe 且**无直接 ROE**（直接口径优先）。
+    评分侧（按缺直接 ROE 的持仓取用推演值）与契约说明/持仓视角标注侧共用本函数，
+    避免两边各自判定“哪些是推演值”而漂移。
+    """
+    direct = direct_roe_codes or set()
+    return {
+        code
+        for code, est in (fund_roe_estimates or {}).items()
+        if isinstance((est or {}).get("roe"), (int, float)) and code not in direct
+    }
+
+
 def _score_roe(
     holdings_details: list[dict[str, Any]],
     financial_indicator_data: dict[str, Any] | None,
@@ -357,13 +390,11 @@ def _score_roe(
             {},
         )
 
-    roe_by_code: dict[str, float] = {}
+    roe_by_code = roe_by_code_from_rows(rows)
+    estimable = estimated_fund_codes(fund_roe_estimates, set(roe_by_code))
     improving: set[str] = set()
     for row in rows:
         code = str(row.get("code") or "")
-        roe = row.get("roe")
-        if code and isinstance(roe, (int, float)):
-            roe_by_code[code] = float(roe)
         if code and str(row.get("trend") or "").startswith("改善"):
             improving.add(code)
 
@@ -378,17 +409,15 @@ def _score_roe(
         name = getattr(d, "name", code)
         weight = _pct(finite_or(getattr(d, "market_value", 0.0)), total)
         roe = roe_by_code.get(code)
+        if roe is None and code in estimable:
+            # 基金重仓股加权推演值：计入评分，证据标注推演属性
+            est = estimates.get(code) or {}
+            roe = float(est["roe"])
+            roe_by_code[code] = roe
+            estimated.append((name, code, float(est.get("covered_pct") or 0.0)))
         if roe is None:
-            est = estimates.get(code)
-            est_roe = (est or {}).get("roe")
-            if isinstance(est_roe, (int, float)):
-                # 基金重仓股加权推演值：计入评分，证据标注推演属性
-                roe = float(est_roe)
-                roe_by_code[code] = roe
-                estimated.append((name, code, float((est or {}).get("covered_pct") or 0.0)))
-            else:
-                missing.append(f"{name}（{code}）")
-                continue
+            missing.append(f"{name}（{code}）")
+            continue
         if roe < _LOW_ROE_THRESHOLD:
             low_roe_weight += weight
             if code in improving:
@@ -475,6 +504,18 @@ def _score_global_edge(
     }
 
 
+def _is_scored_otc(signal: dict[str, Any]) -> bool:
+    """场外信号是否计入④维计分池：有天数，且来源为配置上限（用户口径）或类型默认档（推演）。"""
+    if signal.get("liquidation_days") is None:
+        return False
+    return bool(signal.get("daily_redemption_limit")) or signal.get("estimate_basis") == "type_default"
+
+
+def _is_otc_default_tier(signal: dict[str, Any]) -> bool:
+    """是否为类型默认档（非实测口径）的场外信号。"""
+    return signal.get("estimate_basis") == "type_default" and signal.get("liquidation_days") is not None
+
+
 def _score_liquidity(liquidity_signals: list[dict[str, Any]] | None) -> dict[str, Any]:
     if not liquidity_signals:
         return {
@@ -490,18 +531,12 @@ def _score_liquidity(liquidity_signals: list[dict[str, Any]] | None) -> dict[str
     measurable = [s for s in liquidity_signals if s.get("type") == "stock" and s.get("liquidation_days") is not None]
     otc_all = [s for s in liquidity_signals if s.get("type") == "otc"]
     # 场外计入两档：配置赎回上限（用户实测口径）与类型默认档（推演口径，标非实测）
-    otc_configured = [s for s in otc_all if s.get("daily_redemption_limit") and s.get("liquidation_days") is not None]
-    otc_default_tier = [
-        s for s in otc_all if s.get("estimate_basis") == "type_default" and s.get("liquidation_days") is not None
-    ]
-    otc_unscored = [
-        s
-        for s in otc_all
-        if s.get("liquidation_days") is None
-        or (not s.get("daily_redemption_limit") and s.get("estimate_basis") != "type_default")
-    ]
+    otc_scored = [s for s in otc_all if _is_scored_otc(s)]
+    otc_default_tier = [s for s in otc_all if _is_otc_default_tier(s)]
+    otc_configured = [s for s in otc_scored if s not in otc_default_tier]
+    otc_unscored = [s for s in otc_all if not _is_scored_otc(s)]
     assumed = [s for s in liquidity_signals if s.get("type") == "assumed_liquid"]
-    scored_pool = measurable + otc_configured + otc_default_tier
+    scored_pool = measurable + otc_scored
     if not scored_pool:
         return {
             "key": "liquidity",
@@ -532,7 +567,7 @@ def _score_liquidity(liquidity_signals: list[dict[str, Any]] | None) -> dict[str
     ]
     if otc_configured or otc_default_tier:
         evidence.append(
-            f"场外品种计入 {len(otc_configured) + len(otc_default_tier)} 只"
+            f"场外品种计入 {len(otc_scored)} 只"
             f"（配置赎回上限 {len(otc_configured)} 只 / 类型默认档 {len(otc_default_tier)} 只——类型默认档为非实测口径）"
         )
     return {

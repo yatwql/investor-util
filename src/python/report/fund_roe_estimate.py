@@ -47,27 +47,26 @@ def weighted_roe(items: list[tuple[float, float]]) -> float | None:
     return sum(r * roe for r, roe in valid) / total_ratio
 
 
-def _fetch_stock_roe_batch(codes: list[str], dispatcher: Any) -> dict[str, float]:
-    """批量取 A 股个股最新 ROE（复用财务指标链路，含缓存与降级）。"""
+def _fetch_stock_roe_batch(codes: list[str]) -> dict[str, float]:
+    """批量取 A 股个股最新 ROE（复用财务指标链路，含缓存与降级）。
+
+    并发数与限速口径对齐财务指标章（同为 akshare 指标取数）。
+    """
     if not codes:
         return {}
+    from src.python.fetcher.batch import BatchDispatcher, get_batch_worker_count
     from src.python.fetcher.financial_indicator import fetch_latest_indicator
 
-    own = dispatcher is None
-    if own:
-        from src.python.fetcher.batch import BatchDispatcher, get_batch_worker_count
-
-        dispatcher = BatchDispatcher(
-            max_workers=get_batch_worker_count("fund_workers", 3),
-            thread_name_prefix="batch_stock_roe",
-            # 财务指标主源经 akshare 访问东方财富后端，复用其限速档
-            rate_limit_provider="eastmoney",
-        )
+    dispatcher = BatchDispatcher(
+        max_workers=get_batch_worker_count("akshare_workers", 2),
+        thread_name_prefix="batch_stock_roe",
+        # 财务指标主源经 akshare 访问东方财富后端，复用其限速档
+        rate_limit_provider="eastmoney",
+    )
     try:
         results = dispatcher.execute([partial(fetch_latest_indicator, code) for code in codes])
     finally:
-        if own:
-            dispatcher.shutdown()
+        dispatcher.shutdown()
     roe_map: dict[str, float] = {}
     for code, r in zip(codes, results):
         record = r.result if r.success else None
@@ -81,14 +80,12 @@ def estimate_fund_roe_batch(
     fund_items: list[dict[str, Any]],
     *,
     known_roe: dict[str, float] | None = None,
-    dispatcher: Any = None,
 ) -> dict[str, dict[str, Any]]:
     """对若干基金按重仓股 ROE 加权，估算基金层 ROE（阶段一：前十大重仓口径）。
 
     Args:
         fund_items: [{"code", "name"}] 基金清单（调用方按权益类基金类型预筛）。
         known_roe: 已有股票 ROE 映射（如 `financial_indicator_data` 行），命中不再取数。
-        dispatcher: 可选 BatchDispatcher 复用（None 时内部新建）。
 
     Returns:
         {fund_code: 估算记录} 映射；持仓缺失/陈旧/无覆盖的基金不出现在结果中。
@@ -101,7 +98,7 @@ def estimate_fund_roe_batch(
 
     known_roe = dict(known_roe or {})
     codes = [str(f.get("code") or "") for f in fund_items]
-    holdings_batch = fetch_fund_holdings_batch(codes, dispatcher=dispatcher)
+    holdings_batch = fetch_fund_holdings_batch(codes)
 
     # ── 第一遍：筛出有效重仓股，收集需补取 ROE 的代码 ──
     per_fund: dict[str, list[tuple[str, float]]] = {}
@@ -134,7 +131,7 @@ def estimate_fund_roe_batch(
     # ── 补齐缺失的股票 ROE（known_roe 命中不取数） ──
     all_codes = sorted({c for items in per_fund.values() for c, _ in items})
     missing_codes = [c for c in all_codes if c not in known_roe]
-    fetched = _fetch_stock_roe_batch(missing_codes, dispatcher)
+    fetched = _fetch_stock_roe_batch(missing_codes)
     roe_map = {**fetched, **known_roe}
 
     # ── 第二遍：逐基金加权 ──

@@ -8,6 +8,21 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 过去 48 小时实施技术债清理（2026-09-24，rf-419）
+
+**背景**（用户要求）：对最近 48 小时提交（Kimi 接入 / 穿透占比修复 / Endpoint 主备 / plan-47 / plan-48）做技术债审计，逐 diff 核查后确认 6 项并修复。
+
+**变更**：
+- `analysis/prosperity_scoring.py`：新增 `roe_by_code_from_rows`（ROE 行解析唯一事实来源，三处复用：`_score_roe` / 直接 ROE 集合 / 编排层 `known_roe`）与 `estimated_fund_codes`（推演集合判定唯一事实来源，评分侧与标注侧共用）；抽出 `_is_scored_otc` / `_is_otc_default_tier` 助手替代长内联布尔式
+- `report/fund_roe_estimate.py`：删除无外部调用方的 `dispatcher` 形参（公开函数与私有批取助手各一处）；股票 ROE 并发改用 `batch.akshare_workers`（与财务指标章同口径，原 `fund_workers` 为语义错配）
+- `llm/prompts_action.py` / `llm/fingerprint.py`：穿透占比严格读契约字段 `ratio_pct`，不再兼容遗留 `ratio`；提示词侧缺失时按 0 上屏并**记一次契约漂移告警**（消除「静默归零」——与 rf-415 同型风险）
+- `llm/api.py`：新增公开入口 `resolve_provider_endpoint`（链条目 → endpoint 解析唯一入口），`report/llm_module_info.py` 的端点优先级映射改为复用，不再重写 `credentials_ref → endpoint` 遍历
+- `technical.md`：§4.20 数据流补首次取数成本与缓存口径说明
+
+**回归测试 +4**（净增）：`test_prosperity_framework.py::TestRoeHelperPrimitives`（ROE 解析过滤非法值 / 推演集合排除直接 ROE）、`test_llm_prompt_builders.py`（契约漂移告警 + 占比按 0 上屏）、`test_fingerprint.py`（遗留 `ratio` 键不再被兼容），另有 2 处旧夹具按生产契约键更正。
+
+**验证**：受影响套件 226 passed；全量门禁（dev-verify + 6 个 `--ci` + ruff）全绿。
+
 ### plan-48 景气度框架④维场外流动性补齐（类型默认档）（2026-09-23）
 
 **背景**：④ 流动性此前只算场内变现天数——场外品种未配置 `redemption_limits` 时一律标「需手动确认赎回上限」不计分（用户组合 4 只场外 + 6 只数据缺失），场外为主的组合该维无区分度。

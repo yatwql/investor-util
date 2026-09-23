@@ -52,14 +52,18 @@ def get_llm_module_failure_reason(module_failure: dict, module_key: str) -> str 
 
 
 def _endpoint_priority_map(llm_config: dict | None) -> dict[str, float]:
-    """从 llm_config 的 provider 链构建 endpoint → priority 映射。"""
+    """从 llm_config 的 provider 链构建 endpoint → priority 映射。
+
+    endpoint 解析复用 `llm/api.py::resolve_provider_endpoint`（唯一解析入口），
+    不在报告层重写 credentials_ref → endpoint 的遍历规则。
+    """
     mapping: dict[str, float] = {}
     if not llm_config:
         return mapping
-    creds = llm_config.get("_llm_credentials") or {}
+    from src.python.llm.api import resolve_provider_endpoint
+
     for provider in llm_config.get("_provider_list") or []:
-        ref = provider.get("credentials_ref")
-        endpoint = (creds.get(ref) or {}).get("endpoint") if ref else None
+        endpoint = resolve_provider_endpoint(provider, llm_config)
         if endpoint and endpoint not in mapping:
             mapping[endpoint] = float(provider.get("priority", 999))
     return mapping

@@ -469,15 +469,24 @@ def _build_penetration_deep_prompt(
     pen_list = ""
     if penetrated_assets:
         items = []
+        contract_drift = False
         for a in penetrated_assets[:10]:
             name = a.get("name", "")
             codes = ",".join(a.get("codes", []))
             mv = a.get("mv", 0)
             # 数据契约字段为 ratio_pct（report/penetration.py top10 产出）；
-            # ratio 为兼容兜底，防外部调用方传旧形状时静默归零
-            ratio = a.get("ratio_pct", a.get("ratio", 0))
+            # 缺失时按 0 处理但**不静默**——记一次契约漂移告警，避免占比恒为 0 再次隐身
+            ratio = a.get("ratio_pct")
+            if not isinstance(ratio, (int, float)):
+                ratio = 0.0
+                contract_drift = True
             sector = a.get("sector", "--")
             items.append(f"{name}({codes}) 市值{_fmt_wan(mv)} 占比{ratio:.1f}% 行业:{sector}")
+        if contract_drift:
+            logger.warning(
+                "[penetration_deep] 穿透资产条目缺少占比数据契约字段 ratio_pct，已按 0 处理并上屏；"
+                "请检查上游 penetration 数据形状（占比恒为 0 会误导穿透分析）"
+            )
         pen_list = "\n".join(items)
 
     # 根据代码前缀推断国别/币种
