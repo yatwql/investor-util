@@ -8,6 +8,26 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 四文档一致性核对：修正 2 处冲突 + 补齐 2 处缺口 + 建需求追溯任务（2026-09-24，rf-426）
+
+**背景**（用户要求）：交叉比对 `requirements.md` / `technical.md` / `llm-technical.md` / `testplan.md`，冲突处回查代码，形成待决策清单（Q1~Q4，用户已定调）。
+
+**判定为冲突（已修）**：
+- **`datasink_workers` 默认值**：`technical.md` 写「默认 3」，代码与默认模板均为 **2**（`_config_defaults.py`、`financial_report_digest.py` 同值），且原句把「请求速率 3 请求/秒」与「并发 worker 数」混为一谈 → 改为「默认 2，免费档批量上限 ≤3」
+- **Provider 厂商枚举未含 Kimi**：`requirements.md` R-LLM-03 与 `technical.md` 模块表仍按「Claude/OpenAI/Gemini 三厂商 + claude 兼容端点只归 DeepSeek」表述，而 `llm-technical.md`（定价表/thinking 名单）与代码均已含 Kimi → 按用户决策 **A 改枚举范式**：协议层固定三类（claude / openai / gemini），**厂商与模型由 `model` 指定**并显式列举兼容端点厂商（DeepSeek、Kimi），新增厂商零代码接入
+
+**判定为缺口（已补）**：
+- **testplan 覆盖表未随 v0.11.2 扩展更新**：景气度框架行补挂本轮新载体（`test_fund_roe_estimate.py` ②维 ROE 推演；`test_liquidity_otc.py` 与 `test_code_utils.py::TestOtcRedemptionDaysDefault` ④维场外默认档）
+- **口径重复维护点**：R-PF-09 的④维档位串与 `R-LIQ-03` 逐字重复 → R-PF-09 改为引用 `R-LIQ-03`（单一维护点），仅保留②维推演口径原文
+
+**新建待办任务（用户决策 Q3-B：分批映射）**：`review-findings.md` 新增 **rf-426**「需求 ID 追溯链断裂」——277 个需求 ID 在 testplan/technical/llm-technical 中引用数为 0；按 6 批（38/39/37/57/25/61 条）分批建立「需求 ID → 验证载体」映射，批 1 启动时先定稿交付形态（testplan 加列 vs requirements 加列），配套双向断言脚本入 `--ci`。
+
+**另修**：`testplan.md` 两处 `管理文档分区纪律)）` 括号错配（上轮批量替换枚举时引入的笔误）。
+
+**判定一致、无需改动**（已回查代码）：报告章节 17 项 / 开关 30 项（实验 5·常规 16·报告 9）/ P 面板 5 个章节 / LLM 模块 5 个 / datasink 速率配额（3·31 请求/秒、8191·131071 篇/日）/ thinking 兜底 `max(1024, max_tokens−2048)` / plan-47·48 档位三方一致。
+
+**验证**：六项 `--ci` + ruff + 版本一致性全绿（本轮为纯文档修正，无代码变更）。
+
 ### 测试用例全量审计：去冗余 + 26 处名实相符重命名 + 弱断言强化（2026-09-24，rf-425）
 
 **背景**（用户要求）：核对全部测试用例的冗余、无效与命名语义。门禁 `check-test-redundancy`（死用例/无断言/完全重复/自证）零告警；另建 AST 级增强扫描（7,378 用例）核查门禁未覆盖的三类。

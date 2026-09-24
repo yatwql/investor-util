@@ -833,7 +833,7 @@ LLM 五维度量化评分，每项满分 100：
 | R-PF-01 | **实验性开关**：`prosperity_framework` 默认关（`GROUP_EXPERIMENTAL`、`affects_report=True`）；关闭时报告与未引入时**逐字节一致**（零行为变化） |
 | R-PF-02 | **六维评分卡**：景气方向/通胀属性 25 + ROE 低位弹性 20 + 全球视野/中国比较优势 15 + 流动性 10 + 集中度与周期拼接 15 + 业绩与回撤印证 15 = 满分 100 |
 | R-PF-03 | **客观化口径**：全部输入取自既有能力（穿透重仓的板块/概念、`financial_indicator_data` 的 ROE、`check_liquidity` 的变现天数、历史快照的换手代理、`history_data` 的区间收益与最大回撤）；不新增外部数据源、不新增 LLM 调用 |
-| R-PF-09 | **两项扩展必标口径（阶段一）**：②维基金层 ROE 按**前十大重仓股加权推演**（阶段一；全量持仓口径待同花顺历史持仓接口收尾后升级，记录以 `basis` 区分），证据/持仓视角/契约说明三处均标「按框架推演」；④维未配置赎回上限的场外品种按**类型默认档**估算（货币/短债 T+1、纯债 T+2、其他场外 T+3、QDII T+7），标记与证据一律标「类型默认档（非实测）」；两者均不得冒充披露/实测口径 |
+| R-PF-09 | **两项扩展必标口径（阶段一）**：②维基金层 ROE 按**前十大重仓股加权推演**（阶段一；全量持仓口径待同花顺历史持仓接口收尾后升级，记录以 `basis` 区分），证据/持仓视角/契约说明三处均标「按框架推演」；④维场外赎回天数一律按 `R-LIQ-03` 的类型默认档口径（**单一维护点，不在此重复档位串**），并在证据中标「类型默认档（非实测）」；两者均不得冒充披露/实测口径 |
 | R-PF-04 | **数据缺失不臆造**：维度数据缺失一律标 `unverified`，**不计分**并给出可读原因；总分只按已计分维度折算（`scored_weight` / `total_score_pct`），界面同时显示未验证清单 |
 | R-PF-05 | **评级口径**：≥80 高度契合 / 60–79 较契合 / 40–59 部分契合 / <40 不契合；渲染固定带免责句（衡量「组合与框架的契合度」，非组合优劣，非投资建议） |
 | R-PF-06 | **呈现位置**：行动建议章内嵌块（HTML ⑥ 块 + Excel `_write_prosperity_block`），不新增报告章节、不改注册表条目与序号 |
@@ -928,7 +928,7 @@ LLM 五维度量化评分，每项满分 100：
 |:---------|:---------|
 | R-LLM-01 | LLM 分析是可选增强内容，仅在菜单 L 中触发 |
 | R-LLM-02 | 每个 LLM 模块可通过配置独立启停（enabled_llm.x） |
-| R-LLM-03 | 支持 Claude / OpenAI / Gemini 三种 Provider（DeepSeek 支持 Claude 兼容端点与 OpenAI 兼容端点两种接入），可通过 Multi-Provider Chain 配置多个备选 Provider 按策略自动切换 |
+| R-LLM-03 | **三类协议 + 厂商模型路由**：Provider 按协议分三类——`claude`（Anthropic 兼容消息端点）/ `openai`（Chat Completions 端点）/ `gemini`（generateContent 端点）；**厂商与模型由 `model` 字段指定**，包括 Anthropic、OpenAI、Google 以及**走兼容端点的第三方厂商**（DeepSeek 走 `claude` 或 `openai` 端点、Kimi（月之暗面）走 `claude` 兼容端点）。新增厂商只要提供兼容端点即接入，无需改代码。可通过 Multi-Provider Chain 配置多个备选 Provider 按策略自动切换 |
 | R-LLM-04 | Provider 不可用时自动按策略递补下一备选 Provider，全链失败时降级占位文本 |
 | R-LLM-05 | 所有 LLM 模块的 API 调用量（Token、费用、模块明细）需在报告中统计展示 |
 | R-LLM-06 | Multi-Provider Chain 支持 4 种切换策略：priority（优先级排序）、weighted（加权随机）、cost_first（价格最低优先）、fallback_only（仅主 provider 失败时切换，等价于 priority）。`proxy_preferred` 为 per-provider 后处理标记，不属策略 |
