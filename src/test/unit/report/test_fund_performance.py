@@ -237,7 +237,7 @@ class TestFormatReturn(unittest.TestCase):
 class TestFormatRank(unittest.TestCase):
     """测试 _format_rank 排名格式化。"""
 
-    def test_normal(self):
+    def test_formats_rank_over_total(self):
         """正常排名 -> 'rank/total'"""
         self.assertEqual(fp._format_rank({"rank": 1, "total": 100}), "1/100")
 

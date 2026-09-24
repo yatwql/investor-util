@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.3-dev
-> **编号源**：`rf-next = 425`（新增问题取此编号，完成后更新为 +1；已用最大 rf-424，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 426`（新增问题取此编号，完成后更新为 +1；已用最大 rf-425，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -48,6 +48,7 @@
 
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
+| **rf-425** | **测试用例全量审计（用户要求：查冗余用例 / 无效用例 / 命名与内容语义相关）**：门禁 `check-test-redundancy`（死用例/无断言/完全重复/自证）零告警；增强扫描（7,378 用例 AST 级）发现三类问题——① **真冗余**：`TestSupportsExtendedThinking` / `TestIsEffortModel` 两个类在 `test_llm_utils.py` 与 `test_llm_api_base.py` **重复存在**，且后者为前者严格子集（唯一独有断言：`gpt-4o → False`）；② **粗命名 26 处**：`test_success` / `test_normal` / `test_basic` 类命名不承载内容（如 `TestFetchNav::test_success`）；③ **弱断言 1 处**：`test_missing_code_still_processes` 对 `float \| None` 返回值仅断言「非空」——虽仍有判别力，但实现假化为恒返非空值时仍通过。**判定无问题**：跨文件同体对 1 组（`test_no_quotes`，sina/tencent 两家解析器的并行覆盖，符合 rf-411 既定口径）；输入条件式命名 26 处（`TestParseFloat::test_zero` 等，类上下文已带语义，属合规模式） | ① **去冗余**：`gpt-4o` 独有用例迁入 utils 版（新增 `test_non_llm_family_not_supported`），删除 `test_llm_api_base.py` 的两个子集类（-5 例，覆盖零损失）；② **重命名 26 处**为名实相符的描述性命名（逐个读函数体后按 docstring 语义定名，如 `test_returns_standard_quote_record`、`test_parses_roll_data_items`、`test_formats_dividend_yield_percent`）——避免 rf-411 那类「名实不符」新缺陷；③ **强化弱断言**：`turnover_rate` 用例改为精确断言 `== 1.0`（两期权重不相交，语义可推导）。净用例数 -4（7,764 → 7,760） |
 | **rf-424** | **管理文档分区纪律无断言覆盖**（承接 rf-423 同类根因，用户同意后实施）：本轮两次自审失误同源——① 待处理项 `rf-420` 被误置「已解决待归档」表（rf-421 记录）；② 发布时误删 changelog 归档索引（rf-423）。二者本质都是「管理文档的分区/索引纪律只靠人工遵守，无机器断言」，门禁全绿也拦不住 | ① `check-doc-drift.py` 新增第 12 项 `audit_management_partitions`（纯函数，便于直测）：**A** review-findings 同一 rf 不得同时出现在待处理与已解决分区；**且已解决项必须在 changelog（现行 + 归档）有修复记录**——待处理项被误置已解决区时必然不满足（即 rf-421 类失误的可检特征）；**B** plan 待办区不得出现 ✅ 已完成项、不得列已归档项（已归档项只认 `#### ✅ `plan-N`` 条目标题，归档文件正文提及不误判）；**C** 现行 changelog 只允许一个版本段头且必须为 `-dev` 段（已发布段须随发布移入归档）；② 回归 +10 例（真实仓库一致 / 三类失误各自检出 / 归档 changelog 记录不误报 / 归档正文提及不误报 / 空文件不崩）；③ 检查项枚举同步 6 处（脚本 OK 文案与 argparse、folders.md ×2、developer-guide.md、testplan.md ×2、CLAUDE.md ×2） |
 | **rf-423** | **发布 v0.11.2 时误删 changelog 的「## 归档」索引段**（用户指出）：切换开发版本时把「已发布段到文件末尾」整段重写，而归档索引恰在文件末尾 → 11 条历史归档索引（v0.1.x ~ v0.11.x 的 `archived_changelog.*`）被一并删除；当时**无任何断言覆盖「管理文档归档索引 ↔ docs-stm/archive/ 实际文件」的一致性**，故未被任何门禁拦住（同类索引段在 plan.md / review-findings.md 同样无守卫） | ① 自发布前版本 `git show` 取回索引段并恢复（0.11.x 条目更新为 v0.11.0 ~ v0.11.2），移除临时单条指针；② `check-doc-drift.py` 新增第 11 项**归档索引完整性**检查（`check_archive_index`）：三份管理文档（changelog/plan/review-findings）须**双向**对齐磁盘归档文件——漏列报「缺少」、幽灵引用报「不存在」；**直接读文件而非 `_scan_docs()`**（changelog 属历史记录类被该扫描面排除，正是本次缺口根源）；③ 回归 +5 例（真实仓库一致 / 删条目即报 / 幽灵引用即报 / 被检面覆盖三份文档 / 端到端检出真实仓库违规） |
 ### 归档档案

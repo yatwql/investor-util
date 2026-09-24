@@ -82,7 +82,7 @@ class TestFetchUsIndices(unittest.TestCase):
         return "\n".join(lines)
 
     @patch("src.python.providers.sina.make_http_client")
-    def test_success(self, mock_factory):
+    def test_parses_three_us_indices(self, mock_factory):
         """正常返回 → 正确解析美股三大指数。"""
         text = self._make_response_text(
             {

@@ -252,7 +252,7 @@ class TestBuildHoldingsSummary(unittest.TestCase):
             {"name": "宁德时代", "codes": ["300750"]},
         ]
 
-    def test_basic(self) -> None:
+    def test_includes_name_and_code_per_holding(self) -> None:
         result = _build_holdings_summary(self.holdings)
         self.assertIn("长江电力", result)
         self.assertIn("600900", result)
@@ -297,7 +297,7 @@ class TestBuildHoldingsSummary(unittest.TestCase):
 class TestBuildNewsSummary(unittest.TestCase):
     """测试 _build_news_correlation_summary 的格式和内容。"""
 
-    def test_basic(self) -> None:
+    def test_includes_title_and_matched_keywords(self) -> None:
         news = [
             {"title": "能源改革新方案", "intro": "国家能源局发布电力改革方案...", "matched_keywords": ["长江电力"]},
         ]

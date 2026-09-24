@@ -30,7 +30,7 @@ class TestIndustryTransform(unittest.TestCase):
 
         return _industry_transform(raw, source)
 
-    def test_normal(self):
+    def test_transforms_industry_payload(self):
         """正常数据 → 正确转换。"""
         raw = {
             "code": "000001",
@@ -95,7 +95,7 @@ class TestFetchIndustryData(unittest.TestCase):
     """fetch_industry_data 测试。"""
 
     @patch("src.python.fetcher.industry.fetch_with_fallback")
-    def test_success(self, mock_fallback):
+    def test_returns_industry_data_from_chain(self, mock_fallback):
         """正常返回 → 返回行业数据。"""
         mock_fallback.return_value = {
             "code": "000001",

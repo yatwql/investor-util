@@ -57,7 +57,7 @@ class TestRestExtractQuotedata(unittest.TestCase):
 
         return _extract_quotedata(html)
 
-    def test_normal(self):
+    def test_parses_quotedata_script_block(self):
         """正常 HTML 含 quotedata → 正确解析。"""
         html = (
             "<html><body><script>"
@@ -98,7 +98,7 @@ class TestRestFetchIndustryAndConcepts(unittest.TestCase):
         get_registry().session_cache_clear("industry_rest")
 
     @patch("src.python.providers.eastmoney_industry_rest.make_http_client")
-    def test_success(self, mock_client_factory):
+    def test_returns_industry_with_empty_concepts(self, mock_client_factory):
         """正常返回 → 返回行业数据，概念列表为空。"""
         from src.python.providers.eastmoney_industry_rest import fetch_industry_and_concepts
 

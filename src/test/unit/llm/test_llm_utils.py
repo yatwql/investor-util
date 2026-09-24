@@ -214,6 +214,10 @@ class TestSupportsExtendedThinking(unittest.TestCase):
     def test_deepseek_v3_not_supported(self) -> None:
         self.assertFalse(_supports_extended_thinking("deepseek-v3"))
 
+    def test_non_llm_family_not_supported(self) -> None:
+        """非 Claude/DeepSeek/Gemini/Kimi 家族（如 OpenAI）不判定为支持。"""
+        self.assertFalse(_supports_extended_thinking("gpt-4o"))
+
     def test_kimi_supported(self) -> None:
         """Kimi（Anthropic 兼容端点，budget_tokens 控制）支持 Extended Thinking。"""
         self.assertTrue(_supports_extended_thinking("kimi-k2.6"))

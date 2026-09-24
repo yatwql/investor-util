@@ -854,7 +854,7 @@ class TestLogsEndpoint:
 class TestHealthHistoryEndpoint:
     """/api/health/history 数据源健康历史摘要。"""
 
-    def test_success(self, app_client):
+    def test_returns_summaries_on_200(self, app_client):
         """有历史 → 200 + 摘要列表。"""
         summaries = [
             {

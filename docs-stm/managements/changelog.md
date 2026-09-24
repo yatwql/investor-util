@@ -8,6 +8,20 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 测试用例全量审计：去冗余 + 26 处名实相符重命名 + 弱断言强化（2026-09-24，rf-425）
+
+**背景**（用户要求）：核对全部测试用例的冗余、无效与命名语义。门禁 `check-test-redundancy`（死用例/无断言/完全重复/自证）零告警；另建 AST 级增强扫描（7,378 用例）核查门禁未覆盖的三类。
+
+**变更**：
+- **去冗余**：`TestSupportsExtendedThinking` / `TestIsEffortModel` 在 `test_llm_utils.py` 与 `test_llm_api_base.py` 重复存在且后者为严格子集——唯一独有断言（`gpt-4o → False`）迁入 utils 版新增 `test_non_llm_family_not_supported`，删除两个子集类（-5 例，零覆盖损失）
+- **重命名 26 处**：`test_success` / `test_normal` / `test_basic` 等不承载内容的命名，逐例读函数体后按 docstring 语义改为描述性命名（`test_returns_standard_quote_record` / `test_parses_roll_data_items` / `test_parses_three_us_indices` / `test_formats_dividend_yield_percent` 等）
+- **弱断言强化 1 处**：`test_missing_code_still_processes` 改为精确断言（`turnover_rate == 1.0`，由两期权重不相交可推导），消除「仅非空」在实现假化时仍通过的空间
+- 数据快照同步：`test-coverage.md`（unit/standard/verify/all/unit_llm）、`folders.md`（测试用例 7,760、行数）
+
+**判定为合规、不改的部分**（避免制造「名实不符」新缺陷）：跨文件同体对 1 组（`test_no_quotes` —— sina/tencent 两家解析器并行覆盖，符合既定口径）；输入条件式命名 26 处（`TestParseFloat::test_zero` 等，类上下文已带语义）；抽样 7 例「仅非空断言」中 6 例判别性充分（warning 字段被填充 / lookup 命中 / 映射存在 / 回调已绑定）。
+
+**验证**：受影响模块 4,632 passed；`check-test-redundancy --ci` 零告警；六项 `--ci` + ruff + 版本一致性全绿。
+
 ### 新增管理文档分区纪律断言（2026-09-24，rf-424）
 
 **背景**：本轮两次自审失误同源——待处理项被误置已解决区（rf-421）、发布时误删归档索引（rf-423），本质都是「管理文档分区/索引纪律无机器断言」，门禁全绿也拦不住。在 rf-423 已补「归档索引完整性」之后，本轮补齐「分区纪律」。

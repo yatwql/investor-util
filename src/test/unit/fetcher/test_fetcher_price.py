@@ -86,7 +86,7 @@ class TestPriceTransformTencent(unittest.TestCase):
 
         return _price_transform_tencent(raw, source)
 
-    def test_normal(self):
+    def test_transforms_tencent_quote_to_standard(self):
         """正常数据 → 统一格式。"""
         raw = {
             "name": "长江电力",
@@ -116,7 +116,7 @@ class TestPriceTransformEastmoney(unittest.TestCase):
 
         return _price_transform_eastmoney(raw, source)
 
-    def test_normal(self):
+    def test_transforms_eastmoney_nav_to_standard(self):
         """正常数据 → 统一格式。"""
         raw = {
             "name": "测试基金",
@@ -148,7 +148,7 @@ class TestFetchMarketData(unittest.TestCase):
     """fetch_market_data 测试（mock chain）。"""
 
     @patch("src.python.fetcher.price.fetch_with_fallback")
-    def test_success(self, mock_fallback):
+    def test_returns_standard_quote_record(self, mock_fallback):
         """正常返回。"""
         mock_fallback.return_value = {
             "name": "长江电力",

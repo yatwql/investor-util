@@ -153,52 +153,6 @@ class TestCheckOpenaiTruncation(unittest.TestCase):
         self.assertFalse(result)
 
 
-class TestSupportsExtendedThinking(unittest.TestCase):
-    """_supports_extended_thinking — Thinking 兼容性检查。"""
-
-    def test_supported_model(self) -> None:
-        """支持的前缀 → True。"""
-        from src.python.llm.api_base import _supports_extended_thinking
-
-        self.assertTrue(_supports_extended_thinking("claude-sonnet-4-20250514"))
-        self.assertTrue(_supports_extended_thinking("claude-opus-4-20250514"))
-        self.assertTrue(_supports_extended_thinking("deepseek-v4-1234"))
-        self.assertTrue(_supports_extended_thinking("deepseek-chat"))
-        self.assertTrue(_supports_extended_thinking("kimi-k2.6"))
-
-    def test_unsupported_model(self) -> None:
-        """不支持的前缀 → False。"""
-        from src.python.llm.api_base import _supports_extended_thinking
-
-        self.assertFalse(_supports_extended_thinking("claude-sonnet-3-5"))
-        self.assertFalse(_supports_extended_thinking("gpt-4o"))
-
-    def test_empty_string(self) -> None:
-        """空字符串 → False。"""
-        from src.python.llm.api_base import _supports_extended_thinking
-
-        self.assertFalse(_supports_extended_thinking(""))
-
-
-class TestIsEffortModel(unittest.TestCase):
-    """_is_effort_model — effort 模型判断。"""
-
-    def test_deepseek_models(self) -> None:
-        """DeepSeek 前缀 → True。"""
-        from src.python.llm.api_base import _is_effort_model
-
-        self.assertTrue(_is_effort_model("deepseek-v4-20250301"))
-        self.assertTrue(_is_effort_model("deepseek-chat"))
-
-    def test_claude_models(self) -> None:
-        """Claude / Kimi 前缀 → False（Kimi 走 budget_tokens，非 effort）。"""
-        from src.python.llm.api_base import _is_effort_model
-
-        self.assertFalse(_is_effort_model("claude-sonnet-4-20250514"))
-        self.assertFalse(_is_effort_model("claude-opus-4"))
-        self.assertFalse(_is_effort_model("kimi-k2.6"))
-
-
 class TestSanitizeEndpoint(unittest.TestCase):
     """_sanitize_endpoint — URL 域名提取。"""
 
@@ -269,7 +223,7 @@ class TestAttemptApiCall(unittest.TestCase):
 
         self._attempt_api_call = _attempt_api_call
 
-    def test_success(self) -> None:
+    def test_returns_success_status_and_payload_on_200(self) -> None:
         """200 OK → ('success', data)。"""
         mock_client = MagicMock(spec=httpx.Client)
         mock_response = MagicMock()

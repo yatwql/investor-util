@@ -166,7 +166,7 @@ class TestFetchNews(unittest.TestCase):
     # ── 正常路径 ──────────────────────────────────────────
 
     @patch("src.python.providers.wallstreetcn_news.make_http_client")
-    def test_success(self, mock_factory):
+    def test_parses_live_items(self, mock_factory):
         """正常返回 → 正确解析新闻列表。"""
         mock_resp = self._mock_response(
             {
