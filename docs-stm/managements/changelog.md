@@ -8,6 +8,19 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 需求 ID 追溯链（rf-426）：批 1 R-CCH 缓存域完成 + 新增追溯断言脚本并入门禁（2026-09-24）
+
+**背景**：`requirements.md` 定义 277 个需求 ID（35 域），但 testplan / technical / llm-technical 对其引用数为 0——无法机器回答「某需求是否有测试覆盖」。交付形态定稿为「映射表落 `testplan.md` §2.1」（按需求 ID 组织、含验证载体列、`<!-- requirement-trace:start/end -->` 标记区间）。
+
+**批 1（R-CCH 缓存域 38 条）**：
+- §2.1 新增 38 行映射，覆盖：缓存机制（01 磁盘缓存 / 02 gzip 100KB 阈值 / 03 目录穿越防护 / 04 原子写 / 05 损坏自愈）、缓存键清单（06~33 各数据域 TTL 与前缀分组）、输入摘要与依赖失效（34 确定性摘要 / 35 指数行情→预测与资金流向 / 36 持仓+穿透代码→分红 / 37 新闻源+关键词→新闻 / 38 持仓份额成本→LLM）
+- 载体精确到用例级（如 `test_cache_format.py::test_large_file_auto_gzipped`、`test_holdings_tracker.py::test_different_shares_different_fingerprint`）
+
+**新增 `scripts/check-requirement-trace.py`（复用 `_checklib`）**：五项断言——① 映射表标记与表头齐备（防整表误删）；② 映射 ID 均存在于 requirements.md（防臆造/拼错）；③ ID 唯一（防两行矛盾）；④ 已补全域 ID 全覆盖（防「补了 37 条漏 1 条」）；⑤ 载体列中的 `src/test/**/*.py` 路径真实存在（防测试改名后文档悬空）。**分批推进**：常量 `_COVERED_DOMAINS` 记录已补全域，每批追加一项即扩大断言范围；`_ALL_DOMAINS`（35 域）用于进度显示。已并入 P0 + P2 门禁（CLAUDE.md / testplan §6 / developer-guide）。
+
+**测试**：`src/test/unit/scripts/test_check_requirement_trace.py` +16 例（解析 4 / 断言 8 / 真实仓库 3 / 空输入）；真实仓库冒烟断言 38/38 已映射且载体文件全部存在。
+**顺带修正**：testplan §6 门禁行早前追加枚举时多出一个右括号。
+
 ### 用户文档 vs 管理文档比对：修手册 thinking 章节漏 Kimi + 新增矩阵守卫（2026-09-24，rf-427）
 
 **背景**（用户要求）：比对 `requirements.md` + `technical.md` + `llm-technical.md` 与用户文档（README + 10 份手册），冲突处回查代码。

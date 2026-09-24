@@ -321,6 +321,54 @@
 
 ---
 
+### 2.1 需求 ID ↔ 验证载体映射
+
+`requirements.md` 的每条需求 ID 在测试侧均应有确定载体。本表按需求域**分批补全**：每批把该域全部 ID 落入表内，由 `scripts/check-requirement-trace.py --ci` 断言「已补域全覆盖 + 载体文件存在 + ID 双向一致」。
+
+| 需求 ID | 验证载体（`测试文件::用例`，粗粒度时仅列文件） | 补全批次 |
+|:--|:--|:--:|
+<!-- requirement-trace:start -->
+| R-CCH-01 | `src/test/unit/core/test_cache_core.py` + `src/test/unit/cache/test_cache_io.py` | 批 1 |
+| R-CCH-02 | `src/test/unit/core/test_cache_format.py::test_small_file_not_gzipped` / `::test_large_file_auto_gzipped` / `::test_read_gzipped_file`；边界 `test_cache_edge.py::test_exact_100kb_boundary_not_gzip` | 批 1 |
+| R-CCH-03 | `src/test/unit/core/test_cache_core.py::test_key_with_slash_replaced` / `::test_key_with_backslash_replaced` / `::test_key_with_dotdot_replaced` | 批 1 |
+| R-CCH-04 | `src/test/unit/core/test_atomic_write.py` + `src/test/unit/cache/test_cache_io.py::test_write_atomic_json` / `::test_write_atomic_gzip` | 批 1 |
+| R-CCH-05 | `src/test/unit/core/test_cache_core.py::test_corrupted_json_deletes_file` / `::test_corrupted_json_io_error_returns_none`；`test_cache_edge.py::test_gz_corrupted_file_deleted_on_read`；`test_cache_cleanup.py::test_corrupted_file_deleted_in_cleanup` | 批 1 |
+| R-CCH-06 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/core/test_provider_registry.py` | 批 1 |
+| R-CCH-07 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/core/test_data_freshness.py` | 批 1 |
+| R-CCH-08 | `src/test/unit/news/test_news_aggregator.py` + `src/test/integration/test_news_pipeline.py` | 批 1 |
+| R-CCH-09 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_eastmoney_industry.py` | 批 1 |
+| R-CCH-10 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_tiantian.py` | 批 1 |
+| R-CCH-11 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_eastmoney.py` | 批 1 |
+| R-CCH-12 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_tiantian_holdings_edge.py` | 批 1 |
+| R-CCH-13 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_eastmoney_industry.py` | 批 1 |
+| R-CCH-14 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/handlers/test_handlers_cache.py::test_with_valid_codes` | 批 1 |
+| R-CCH-15 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/core/test_data_freshness.py` | 批 1 |
+| R-CCH-16 | `src/test/unit/llm/test_llm_api.py`（缓存命中/未命中）+ `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` | 批 1 |
+| R-CCH-17 | 同 R-CCH-16（LLM 新闻关联分析走同一缓存层） | 批 1 |
+| R-CCH-18 | 同 R-CCH-16（LLM 全球政经局势走同一缓存层） | 批 1 |
+| R-CCH-19 | 同 R-CCH-16（LLM 持仓体检走同一缓存层） | 批 1 |
+| R-CCH-20 | 同 R-CCH-16（LLM 穿透深度分析走同一缓存层） | 批 1 |
+| R-CCH-21 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_tiantian.py` | 批 1 |
+| R-CCH-22 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_akshare_extras.py` | 批 1 |
+| R-CCH-23 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_akshare_extras.py` | 批 1 |
+| R-CCH-24 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_tiantian.py` | 批 1 |
+| R-CCH-25 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/providers/test_akshare_extras.py` | 批 1 |
+| R-CCH-26 | `src/test/unit/cache/test_holdings_tracker.py` + `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` | 批 1 |
+| R-CCH-27 | `src/test/unit/core/test_market_hours.py` + `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` | 批 1 |
+| R-CCH-28 | `src/test/unit/llm/test_debate_generators.py`（pro 阶段生成流程） | 批 1 |
+| R-CCH-29 | `src/test/unit/llm/test_debate_generators.py`（con 阶段生成流程） | 批 1 |
+| R-CCH-30 | `src/test/unit/llm/test_debate_generators.py`（synthesis 阶段生成流程） | 批 1 |
+| R-CCH-31 | `src/test/unit/core/test_registry.py::test_cache_groups_known_values` / `::test_cache_prefix_modules_have_groups` + `src/test/unit/core/test_cache_cleanup.py::test_prefix_grouping` | 批 1 |
+| R-CCH-32 | `src/test/unit/core/test_registry.py::test_cache_groups_known_values` / `::test_cache_prefix_modules_have_groups` + `src/test/unit/core/test_cache_cleanup.py::test_multiple_prefixes_use_different_ttl` | 批 1 |
+| R-CCH-33 | `src/test/unit/core/test_registry.py::test_cache_groups_known_values` / `::test_cache_prefix_modules_have_groups` + `src/test/unit/core/test_cache_cleanup.py::test_unknown_prefix_uses_default_ttl` | 批 1 |
+| R-CCH-34 | `src/test/unit/llm/test_fingerprint.py` + `src/test/unit/cache/test_holdings_tracker.py::test_same_holdings_same_fingerprint` / `::test_different_code_different_fingerprint` | 批 1 |
+| R-CCH-35 | `src/test/unit/core/test_cache_edge.py::test_market_open_uses_short_ttl` / `::test_market_closed_uses_static_ttl` / `::test_market_open_clamps_min_30`（交易时段感知短 TTL + 指数指纹缓存键） | 批 1 |
+| R-CCH-36 | `src/test/unit/handlers/test_handlers_cache.py::test_with_valid_codes` + `src/test/unit/core/test_cache_cleanup.py`（分红前缀清理） | 批 1 |
+| R-CCH-37 | `src/test/unit/news/test_news_aggregator.py::test_cache_hit` / `::test_cache_miss` / `::test_default_sources`（缓存键含源+关键词摘要） | 批 1 |
+| R-CCH-38 | `src/test/unit/cache/test_holdings_tracker.py::test_different_shares_different_fingerprint` / `::test_different_cost_different_fingerprint` / `::test_different_account_different_fingerprint` / `::test_fingerprint_mismatch_new_codes` | 批 1 |
+<!-- requirement-trace:end -->
+---
+
 ## 3. UI/UX 验证
 
 | 验证项 | 标准 | 现有测试 |
@@ -524,9 +572,9 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **P0 全通** — 不可提交代码：`.venv/bin/python scripts/test-runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵）)+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）+ Bug 回归用例 + 测试隔离验证（`.venv/bin/python -m pytest --co`）
+9. **P0 全通** — 不可提交代码：`.venv/bin/python scripts/test-runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵）+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）+ `.venv/bin/python scripts/check-requirement-trace.py --ci`（需求 ID ↔ 验证载体追溯）+ Bug 回归用例 + 测试隔离验证（`.venv/bin/python -m pytest --co`）
 10. **P1 全通** — 不可合并 master：`.venv/bin/python scripts/test-runner.py --mode verify` + §4 中 P1 级各自动化回归项全部通过（报告完整性 / Excel 视觉 / HTML 渲染 / 缓存刷新 / Provider 降级）
-11. **P2 已执行** — 可合入但不可发布：`.venv/bin/python scripts/test-runner.py --mode verify,regression` + `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵）)+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`.venv/bin/python scripts/test-runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行）
+11. **P2 已执行** — 可合入但不可发布：`.venv/bin/python scripts/test-runner.py --mode verify,regression` + `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵）+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）+ `.venv/bin/python scripts/check-requirement-trace.py --ci`（需求 ID ↔ 验证载体追溯）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`.venv/bin/python scripts/test-runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行）
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
 ### 6.4 补充自动化门禁

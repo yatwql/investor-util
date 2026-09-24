@@ -44,7 +44,7 @@
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
-| **rf-426** | **需求 ID 追溯链断裂**：`requirements.md` 定义 **277 个**需求 ID（35 个域），而 `testplan.md` / `technical.md` / `llm-technical.md` 对需求 ID 的引用数均为 **0**，requirements 亦不引用 testplan——无法机器回答「某需求是否有测试覆盖」 | 分批建立逐条映射（见下表 6 批；批 1 启动时先定稿交付形态），完成一批登记一批；配套新增「需求 ID ↔ 映射」双向断言脚本并入 `--ci` |
+| **rf-426** | **需求 ID 追溯链断裂**：`requirements.md` 定义 **277 个**需求 ID（35 个域），而 `testplan.md` / `technical.md` / `llm-technical.md` 对需求 ID 的引用数均为 **0**，requirements 亦不引用 testplan——无法机器回答「某需求是否有测试覆盖」 | 分批建立逐条映射（6 批）。**交付形态已定稿**：映射表落在 `testplan.md` §2.1「需求 ID ↔ 验证载体映射」（`<!-- requirement-trace:start/end -->` 标记区间）。**批 1（R-CCH 缓存域 38 条）已完成**：38 行映射全部落入 §2.1；配套断言脚本 `scripts/check-requirement-trace.py` 已建（五项断言：表格式/ID 合法/ID 唯一/已补全域全覆盖/载体文件存在），已并入 P0+P2 门禁；+16 例测试。剩余批 2~6（域前缀见脚本 `_ALL_DOMAINS`）待续——每完成一批把该域追加进脚本 `_COVERED_DOMAINS` 并补 §2.1 行 |
 
 > 来源：四文档一致性比对（用户要求）。**缺口**：`requirements.md` 定义 **277 个**需求 ID（35 个域），而 `testplan.md` / `technical.md` / `llm-technical.md` 对需求 ID 的引用数均为 **0**，requirements 亦不引用 testplan——「需求 → 设计 → 测试」的 ID 级追溯链断裂，无法机器回答「某需求是否有测试覆盖」。用户决策：**分批建立逐条映射**（本项即该批次任务的总登记）。
 
