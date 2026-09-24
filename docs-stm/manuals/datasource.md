@@ -5,7 +5,7 @@
 | 用途 | 主链路 | 备用链路 | 缓存前缀 | 分组 |
 |:-----|:-------|:---------|:---------|:-----|
 | 场内 A 股/ETF 实时价 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` → **同花顺金融数据**（官方快照，需 key；带官方 `pe_ttm`） | `price_` | 持仓类 |
-| 场外基金净值 | 东方财富 `api.fund.eastmoney.com` | 天天基金 `fundf10.eastmoney.com` | `price_` | 持仓类 |
+| 场外基金净值 | 东方财富 `api.fund.eastmoney.com` | 新浪财经 `hq.sinajs.cn`（场外净值，跨厂商备源）；东财内部另有 `fundf10.eastmoney.com` 兜底 | `price_` | 持仓类 |
 | A 股指数行情 | 腾讯财经 `qt.gtimg.cn` | 新浪财经 `hq.sinajs.cn` | `index_` | 持仓类 |
 | 美股指数行情 | 新浪财经 `hq.sinajs.cn`（gb_* 前缀） | 腾讯财经 `qt.gtimg.cn` | `index_` | 持仓类 |
 | 基金业绩排名 | 天天基金 `fund.eastmoney.com`（`pingzhongdata/{code}.js` JS 变量解析） | — | `fund_perf_` | 基础类 |
@@ -31,7 +31,7 @@
 > 表中仅含具有 `cache_prefixes` 或 `exact_cache_keys` 的数据模块。此外还有少数 `exact_cache_keys` 模块，使用具体键名而非前缀匹配，不受 TTL 扫描清除影响（如 `trading_calendar`、`fund_benchmarks`、`holdings_tracking`、`fund_concentration_snapshot`、`fund_style_snapshot`、`fund_manager_snapshot`）。其中 `fund_benchmarks`、`fund_manager_snapshot` 等仍归属于缓存分组，可通过菜单 `[1]` 刷新。
 > **分组**列对应菜单 `[1]`（基础类）/ `[2]`（持仓类）的缓存刷新范围。历史走势类不受菜单缓存命令影响，仅按 TTL 过期。
 > **行业名归一化**：行业分类数据在入库时剥离行业名末尾的申万层级后缀（Ⅰ/Ⅱ/Ⅲ/Ⅳ，如「银行Ⅱ」「白酒Ⅱ」）——该后缀是申万分层命名标记，对零售报告读者是纯噪声，报告展示统一用剥离后的行业名（如「银行」「白酒」）。
-> **财报全文两级缓存**：索引（`report_datasink_index_` 主源 / `report_cninfo_index_` 备源；TTL 两周）/ 正文（`report_datasink_doc_` / `report_cninfo_text_`；TTL 一月）；两者均归「基础类」，随菜单 `[1]` 与 TTL 管理。备源另有 orgId 缓存 `report_cninfo_orgid_`（两周）。
+> **财报全文两级缓存**：索引（`report_datasink_index_` 主源 / `report_cninfo_index_` 备源；TTL 一月）/ 正文（`report_datasink_doc_` / `report_cninfo_text_`；TTL 一月）；两者均归「基础类」，随菜单 `[1]` 与 TTL 管理。备源另有 orgId 缓存 `report_cninfo_orgid_`（两周）。
 
 > **财报全文主备接管**：**主源（DataSinking）索引为空/失败时**，自动切**巨潮资讯网**备源——按证券代码查公告列表 → 归类年报/半年报/季报 → 下载公告 PDF（pdfplumber 解析）→ 关键词定位章节（与主源同一偏好串与目录行跳过规则）。主源可用时备源**完全不被调用**（输出逐字不变）。备源无需凭据、限速为固定礼貌间隔（1 秒/请求），读取经既有 Provider Chain 财报域两槽（缓存/熔断/降级复用）。
 

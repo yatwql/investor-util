@@ -376,6 +376,47 @@ def _locate_from_fulltext(
     return content[:max_chars], ""
 
 
+def _attempt_candidates(
+    candidates: list[dict[str, Any]],
+    symbol: str,
+    preferences: list[str],
+    max_chars: int,
+    tried: list[str],
+) -> dict[str, Any] | None:
+    """按候选列表走「章节阶 → 全文阶」两阶取数；命中即返回记录，全失败返回 None。
+
+    Args:
+        tried: 已试报告期累加器（供调用方拼写失败原因文案）
+    """
+    for meta in candidates:
+        doc_id = meta.get("id")
+        source = str(meta.get("source") or datasink.SOURCE_ID)
+        tried.append(str(meta.get("report_period") or meta.get("title") or doc_id))
+        record, contents = _collect_doc_sections(doc_id, preferences, source=source, meta=meta)
+        if record is None or not contents:
+            continue
+        return _assemble_record(record, meta, symbol, "\n\n".join(contents), max_chars)
+
+    # ② 全文阶：源侧章节未解析出来时，整篇下载后按关键词定位片段
+    for meta in candidates[:_FULLTEXT_FALLBACK_LIMIT]:
+        doc_id = meta.get("id")
+        source = str(meta.get("source") or datasink.SOURCE_ID)
+        excerpt, matched = _locate_from_fulltext(doc_id, preferences, max_chars, source=source, meta=meta)
+        if not excerpt.strip():
+            continue
+        logger.info("[financial_report] %s 走全文兜底（doc=%s，命中关键词=%s）", symbol, doc_id, matched or "无")
+        full_record = _fetch_document(doc_id, "") or meta
+        return _assemble_record(full_record, meta, symbol, excerpt, max_chars, section_source=SECTION_SOURCE_FULLTEXT)
+    return None
+
+
+def _backup_candidates(symbol: str, max_candidates: int) -> list[dict[str, Any]]:
+    """巨潮备源候选（与主源同一排序规则）；索引不可得时返回空列表。"""
+    code = symbol.split(".", 1)[0]
+    items = cninfo.fetch_report_listings(code) or []
+    return _order_report_candidates(items, max_candidates)
+
+
 def fetch_symbol_report_detailed(
     symbol: str,
     doc_types: tuple[str, ...] = DEFAULT_DOC_TYPES,
@@ -404,28 +445,20 @@ def fetch_symbol_report_detailed(
     preferences = [str(p).strip() for p in sections if str(p).strip()]
     candidates = _order_report_candidates(items, max_candidates)
     tried: list[str] = []
-    for meta in candidates:
-        doc_id = meta.get("id")
-        source = str(meta.get("source") or datasink.SOURCE_ID)
-        tried.append(str(meta.get("report_period") or meta.get("title") or doc_id))
-        record, contents = _collect_doc_sections(doc_id, preferences, source=source, meta=meta)
-        if record is None or not contents:
-            continue
-        return _assemble_record(record, meta, symbol, "\n\n".join(contents), max_chars), ""
+    record = _attempt_candidates(candidates, symbol, preferences, max_chars, tried)
+    if record is not None:
+        return record, ""
 
-    # ② 全文阶：源侧章节未解析出来时，整篇下载后按关键词定位片段
-    for meta in candidates[:_FULLTEXT_FALLBACK_LIMIT]:
-        doc_id = meta.get("id")
-        source = str(meta.get("source") or datasink.SOURCE_ID)
-        excerpt, matched = _locate_from_fulltext(doc_id, preferences, max_chars, source=source, meta=meta)
-        if not excerpt.strip():
-            continue
-        logger.info("[financial_report] %s 走全文兜底（doc=%s，命中关键词=%s）", symbol, doc_id, matched or "无")
-        full_record = _fetch_document(doc_id, "") or meta
-        return (
-            _assemble_record(full_record, meta, symbol, excerpt, max_chars, section_source=SECTION_SOURCE_FULLTEXT),
-            "",
-        )
+    # ③ 备源接管：主源**正文**不可得（断连/配额耗尽/章节残缺）而索引正常时，
+    #    用巨潮公告按同一符号 + 同一报告期偏好重走两阶。仅在前两阶全失败时触发
+    #    ——主源可用时零额外请求；索引本就来自巨潮（_fetch_index 备源分支）时，
+    #    此处候选与主流程重复但命中缓存，不产生新请求。
+    backup = _backup_candidates(symbol, max_candidates)
+    if backup:
+        logger.info("[financial_report] %s 主源正文不可得，切换巨潮备源（%d 篇候选）", symbol, len(backup))
+        record = _attempt_candidates(backup, symbol, preferences, max_chars, tried)
+        if record is not None:
+            return record, ""
 
     return None, REASON_SECTIONS_MISSING.format(periods="、".join(tried) or "无")
 

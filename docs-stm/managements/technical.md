@@ -692,7 +692,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
                            Provider Chain 结构
  ┌──────────────────────────────────────────────────────────────────┐
  │  price_stock:   腾讯财经 (qt.gtimg.cn)  →  新浪财经 (hq.sinajs.cn)│
- │  price_fund_otc: api.fund.eastmoney.com → fundf10（回退）           │
+ │  price_fund_otc: api.fund.eastmoney.com → 新浪场外净值（跨厂商标）  │
  │  price:         腾讯财经 → 东方财富（行情策略链：开盘状态判断）      │
  │  history_stock:  腾讯财经 K 线          →  新浪财经 K 线          │
  │  history_index:  腾讯财经 K 线          →  新浪财经 K 线          │
@@ -791,6 +791,14 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 ```
 
 **消费方透明设计**：市场行情批量请求时（如 `report/market_value.py`），每个代码独立触发 Chain，失败资产在汇总日志中列出，不影响其他资产获取。
+
+### 2.2.1 传输级瞬时失败的同源重试
+
+`fetcher/chain.fetch_with_fallback` 在**落到下一槽之前**，对**传输级**失败（超时 / 连接错误 / 远端断开「Server disconnected」）做一次**同源退避重试**（`_TRANSIENT_RETRY_ATTEMPTS = 1`，基础退避 `_TRANSIENT_RETRY_BACKOFF = 0.6s` 指数增长 + 抖动）。
+
+- **只重试传输级**：这类错误多为瞬时抖动，同源重试常即成功，避免过早降级到质量更低的槽位、也避免把偶发抖动累计成熔断（行业分类 push2 的 `Server disconnected`、DataSinking 的偶发断连即属此类）
+- **不重试代码级空结果**：Provider 正常返回但无该代码数据（`None`）时重试毫无意义（同一请求同一答案），且会白耗第三方日配额（DataSinking 免费档 8191 篇/日）
+- **次数有界**：每个 Provider 每次调用最多 1 + 1 次请求；仍失败才计入熔断计数器并落下一槽
 
 ### 2.2 三层熔断架构
 
@@ -2857,7 +2865,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **降级与合规**：401/403/429/非 200/网络不可达均返回空并按代码级降级（不计传输级熔断）；单标的失败进失败清单；`available=False` 时写占位。返回对象含披露平台归属字段 `source`，报告逐行标注（再分发时保留）。
 
-**缓存**：报告元数据两周（`report_datasink_index_`）、章节正文一月（`report_datasink_doc_`），随菜单缓存命令与 TTL 管理。**数据契约** `financial_report_digest_data`（附录 H）；语义命名行见 §6.7。
+**缓存**：报告元数据与章节正文均按月（30 天；`report_datasink_index_` / `report_datasink_doc_`），随菜单缓存命令与 TTL 管理。**数据契约** `financial_report_digest_data`（附录 H）；语义命名行见 §6.7。
 
 **数据源说明表**：「数据源可用性矩阵」章在健康度表后附「数据源说明（实际使用清单）」表——逐数据类别列实际链路、用途、计费（财报全文随 `datasink.plan` 动态展示免费/付费档）与凭据要求（是否需 key + 就绪状态），并标本次运行是否实际使用（`report/data_source_matrix.py::build_data_source_catalog`，前缀取自 `_SOURCE_CATEGORIES`、计费取自 provider 套餐表，单一事实来源）。**「本次使用」判定口径**：该类别的取数链路在**取得数据时**（含命中缓存的返回）经 `report/data_status.py::mark_data_used()` 记一条成功事件，说明表据事件前缀判定 `used`；**只记成功、不记降级**——章节名 fuzzy 未命中、标的不在源覆盖范围等预期内空结果不计入 T2 连续失败阈值（否则会把预期内空结果误报为源故障），失败与降级仍由 provider 日志、章节失败清单与链路 FailureDiagnostics 披露。因此 `未使用` 的含义是「本次未取到该类数据」，**不等于**源故障；对 DataSinking 类源另注明「需开启哪些功能开关才会取用」。类别清单含 `financial_report`（`report_datasink_`）与 `financial_indicator`（`fin_indicator_`），两者同时进入可用性矩阵与说明表；含同花顺兜底槽位的类别（`price` / `fund_hold` / `history` / `financial_indicator`）在「实际数据源（链路）」列显式列出「→ 同花顺金融数据（…，需 key）」，市场情绪（`sentiment`，同花顺**唯一源**）单列一行并附 key 就绪态。
 

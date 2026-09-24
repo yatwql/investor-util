@@ -42,10 +42,11 @@ class TestAdapterRegistry(unittest.TestCase):
     """注册表与自检报告。"""
 
     def test_quote_domain_adapters_registered(self):
-        """行情域已登记腾讯/新浪/东方财富三个适配器。"""
+        """行情域已登记腾讯/新浪/东方财富/新浪场外净值/同花顺五个适配器。"""
         adapters = sa.get_adapters(DOMAIN_QUOTE)
-        self.assertEqual(sorted(adapters), ["eastmoney", "hithink", "sina", "tencent"])
+        self.assertEqual(sorted(adapters), ["eastmoney", "hithink", "sina", "sina_fund", "tencent"])
         self.assertEqual(adapters["tencent"].display_name, "腾讯财经")
+        self.assertEqual(adapters["sina_fund"].display_name, "新浪财经（场外净值）")
 
     def test_unknown_domain_returns_empty(self):
         """未知数据域返回空映射而非抛异常。"""
@@ -65,12 +66,12 @@ class TestAdapterRegistry(unittest.TestCase):
         """已登记适配器全部通过契约自检。"""
         reports = sa.survey_adapters()
         self.assertTrue(all(r["ok"] for r in reports), [r for r in reports if not r["ok"]])
-        # 行情域四源（腾讯/新浪/东方财富/同花顺）+ 财报全文域等；断言域覆盖而非写死总数
+        # 行情域五源（腾讯/新浪/东方财富/新浪场外净值/同花顺）+ 财报全文域等；断言域覆盖而非写死总数
         # （新增数据域或新增同域源时，本用例只按域计数，需同步更新该域的期望数）
         by_domain: dict[str, int] = {}
         for r in reports:
             by_domain[r["domain"]] = by_domain.get(r["domain"], 0) + 1
-        self.assertEqual(by_domain.get(DOMAIN_QUOTE), 4)
+        self.assertEqual(by_domain.get(DOMAIN_QUOTE), 5)
         self.assertIn(DOMAIN_FINANCIAL_REPORT, by_domain)
 
     def test_survey_detects_alias_to_unknown_field(self):

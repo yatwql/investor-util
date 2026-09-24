@@ -1,4 +1,4 @@
-"""行情域适配器 — 腾讯财经 / 新浪财经 / 东方财富。
+"""行情域适配器 — 腾讯财经 / 新浪财经 / 东方财富（含场外净值备源）。
 
 这三个适配器是「数据源适配契约」的首个试点：它们与 ``fetcher/price.py`` 中既有的
 手写转换函数 ``_price_transform_*`` **等价**（由 ``test_quote_adapter_parity.py``
@@ -73,6 +73,32 @@ class EastMoneyQuoteAdapter(SourceAdapter):
         return super().transform_data(raw, source)
 
 
+class SinaFundQuoteAdapter(SourceAdapter):
+    """新浪财经场外基金净值适配器（`price_fund_otc` 链第二槽，跨厂商备源）。
+
+    与 ``EastMoneyQuoteAdapter`` 同口径：``nav → price``、``yesterday_nav →
+    yesterday_close``、``nav_date → price_date``；净值无效（<= 0）视为无数据。
+    """
+
+    domain: ClassVar[str] = DOMAIN_QUOTE
+    source_id: ClassVar[str] = "sina_fund"
+    display_name: ClassVar[str] = "新浪财经（场外净值）"
+    aliases: ClassVar[dict[str, str]] = {
+        "nav": "price",
+        "yesterday_nav": "yesterday_close",
+        "nav_date": "price_date",
+    }
+
+    def extract_data(self, query: dict[str, Any]) -> Any:
+        return sina_provider.fetch_fund_nav(**query)
+
+    def transform_data(self, raw: Any, source: str = "") -> dict[str, Any] | None:
+        """净值无效（缺失或 <= 0）视为无数据，交由链路尝试下一个源。"""
+        if not isinstance(raw, dict) or safe_num(raw.get("nav"), default=0.0) <= 0:
+            return None
+        return super().transform_data(raw, source)
+
+
 class HithinkQuoteAdapter(SourceAdapter):
     """同花顺官方行情适配器（行情域第三槽，需凭据）。
 
@@ -95,4 +121,5 @@ class HithinkQuoteAdapter(SourceAdapter):
 register_adapter(TencentQuoteAdapter())
 register_adapter(SinaQuoteAdapter())
 register_adapter(EastMoneyQuoteAdapter())
+register_adapter(SinaFundQuoteAdapter())
 register_adapter(HithinkQuoteAdapter())

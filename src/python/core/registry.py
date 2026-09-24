@@ -107,6 +107,10 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     # ── 市场情绪（同花顺官方：龙虎榜 + 连板梯队；盘中变化 → 短 TTL）──
     DataModuleDef("市场情绪", "sentiment", cache_prefixes=("sentiment_",), cache_ttl=3600.0, cache_groups=("refresh",)),
     # ── 全文本财报（DataSinking 主源 + 巨潮备源；索引与正文分级 TTL）──
+    # 索引/章节清单 TTL 与正文同档（月度）：财报披露是低频事件（年报/半年报/季报），
+    # 索引两周过期会频繁重取 DataSinking（免费档日配额 8191 篇、还受 3 请求/秒限制），
+    # 正是「连接失败」高发的一类场景；月度窗口不损失语义（新报告期出现时按报告期排序
+    # 自然优先，且正文取数另走正文级 TTL）。
     DataModuleDef(
         "财报索引",
         "report",
@@ -117,7 +121,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
             "report_cninfo_orgid_",
             "report_cninfo_text_",
         ),
-        cache_ttl=CACHE_TWO_WEEKS,
+        cache_ttl=CACHE_MONTHLY,
         cache_groups=("refresh",),
     ),
     DataModuleDef(

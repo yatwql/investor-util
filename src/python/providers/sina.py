@@ -12,6 +12,7 @@ Endpoint（个股）: https://hq.sinajs.cn/list=sh600900
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -156,6 +157,71 @@ def fetch_price(code: str) -> dict[str, Any] | None:
 
 
 # ── A 股指数行情（Tencent 备用链路）─────────────────────────
+
+
+# ── 场外基金净值（`f_` 前缀，跨厂商备用通道）──────────────────────
+# 新浪基金接口与东方财富 `api.fund.eastmoney.com` 完全独立（不同厂商/域名/故障域）：
+# 东财基金 API 不可用时本接口仍常可用，作为 `price_fund_otc` 链的第二槽。
+# 响应为 GBK 文本（需 gb18030 解码）：
+#   var hq_str_f_011506="建信高端装备股票A,1.8384,1.8384,1.8828,2026-09-24,2.25622";
+# 字段：名称、单位净值、累计净值、前一日单位净值、净值日期、基金规模（亿份）。
+_FUND_BASE_URL = _BASE_URL + "f_"
+_FUND_RE = re.compile(r'hq_str_f_(\w+)="([^"]*)"')
+
+
+def fetch_fund_nav(code: str) -> dict[str, Any] | None:
+    """获取场外基金最新净值（新浪基金接口）。
+
+    Args:
+        code: 6 位基金代码（如 "011506"）
+
+    Returns:
+        dict: {name, code, nav, acc_nav, nav_date, yesterday_nav, source}
+        与 `eastmoney.fetch_nav` 同形状（下游转换/适配器零分支）
+        None: 网络异常 / 响应缺失 / 净值无效（<= 0）
+    """
+    clean = code.strip()
+    url = _FUND_BASE_URL + clean
+    logger.debug("新浪场外基金净值请求: %s", clean)
+
+    try:
+        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+            resp = client.get(url, headers={"Referer": "https://finance.sina.com.cn"})
+            resp.encoding = "gb18030"
+            text = resp.text
+    except httpx.TimeoutException:
+        logger.warning("新浪场外基金净值超时: %s", clean)
+        return None
+    except httpx.RequestError as e:
+        logger.warning("新浪场外基金净值请求失败: %s（%s）", clean, e)
+        return None
+
+    return _parse_fund_nav_response(text, clean)
+
+
+def _parse_fund_nav_response(text: str, code: str) -> dict[str, Any] | None:
+    """解析新浪基金接口响应；净值缺失或 <= 0 视为无数据（交由链路下一槽）。"""
+    match = _FUND_RE.search(text or "")
+    if not match:
+        logger.debug("新浪场外基金净值响应格式异常: %s", code)
+        return None
+    parts = match.group(2).split(",")
+    if len(parts) < 5:
+        logger.debug("新浪场外基金净值字段不足: %s", code)
+        return None
+    nav = _pf(parts, 1)
+    if nav <= 0:
+        logger.debug("新浪场外基金净值无效: %s（nav=%s）", code, nav)
+        return None
+    return {
+        "name": parts[0].strip(),
+        "code": code,
+        "nav": nav,
+        "acc_nav": _pf(parts, 2),
+        "nav_date": parts[4].strip(),
+        "yesterday_nav": _pf(parts, 3),
+        "source": "新浪财经（场外净值）",
+    }
 
 
 def _parse_a_index(text: str) -> dict[str, Any] | None:

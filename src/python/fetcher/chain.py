@@ -8,6 +8,8 @@ chain 中按优先级列出 provider，主链路失败后自动递补。
 from __future__ import annotations
 
 import logging
+import random
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -21,19 +23,30 @@ from src.python.core.datasource_credential import credential_hint, credential_re
 from src.python.core.provider_registry import TRANSPORT_FAILURE, get_registry
 from src.python.core.trading_calendar import count_trading_days_elapsed
 
+# ── 传输级瞬时失败的同源重试 ────────────────────────────────
+# 仅对**传输级**失败（超时/断连/远端断开/5xx）重试：这类错误多为瞬时抖动，
+# 同源重试一次往往即成功，可避免过早落到下一槽或触发熔断（行业分类 push2
+# 的 `Server disconnected` 与 DataSinking 的偶发断连即属此类）。代码级空结果
+# （API 不识别该代码）不重试——同一请求会得到同一答案，且会白耗配额
+# （DataSinking 免费档日配额仅 8191 篇）。
+_TRANSIENT_RETRY_ATTEMPTS = 1  # 同源额外重试次数
+_TRANSIENT_RETRY_BACKOFF = 0.6  # 首次重试基础退避（秒），指数增长 + 抖动
+
 logger = logging.getLogger("invest")
 
 # ── Provider Chain 定义 ──────────────────────────────────────
 
 _DEFAULT_CHAINS: dict[str, list[str]] = {
+    # 行情：腾讯 → 新浪 → 同花顺（需 key）
     "price_stock": ["tencent", "sina", "hithink"],
-    "price_fund_otc": ["eastmoney"],
+    # 场外基金净值：东财基金 API 主源 → 新浪基金接口备源（跨厂商，故障域独立）
+    "price_fund_otc": ["eastmoney", "sina_fund"],
     "price": ["tencent", "eastmoney"],
     "fund_rank": ["tiantian"],
     # 基金披露持仓：天天基金为主，同花顺官方源为备（官方源需 key，未配置时链路自动跳过）
     "fund_hold": ["tiantian", "hithink"],
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
-    # 全文本财报（DataSinking，仅 A 股；需用户自备 key）
+    # 全文本财报（DataSinking，仅 A 股；需用户自备 key；巨潮备源在 fetcher 层接管）
     "financial_report": ["datasink"],
     # 结构化财务指标（akshare 主源；备用支路 datasink_indicator 从财报全文解析）
     # 财务指标：akshare 主源 → DataSinking 章节解析支路 → 同花顺官方报表派生（需 key）
@@ -288,6 +301,31 @@ def fetch_with_fallback(
         result, reason = _try_provider_fetch(
             data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform
         )
+
+        # 传输级瞬时失败 → 同源退避重试（仍失败才落下一槽）
+        for retry_index in range(_TRANSIENT_RETRY_ATTEMPTS):
+            if result is not TRANSPORT_FAILURE:
+                break
+            # 退避为 0 时不睡（测试将退避置 0 以保持快速）
+            delay = 0.0
+            if _TRANSIENT_RETRY_BACKOFF > 0:
+                delay = _TRANSIENT_RETRY_BACKOFF * (2**retry_index) + random.uniform(0, 0.2)
+            logger.info(
+                "[%s]%s %s 传输级失败（%s），%.1fs 后同源重试 %d/%d",
+                data_type,
+                _code_tag,
+                source_label,
+                reason,
+                delay,
+                retry_index + 1,
+                _TRANSIENT_RETRY_ATTEMPTS,
+            )
+            if delay > 0:
+                time.sleep(delay)
+            result, reason = _try_provider_fetch(
+                data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform
+            )
+
         if result is not None and result is not TRANSPORT_FAILURE:
             # 成功 → 恢复熔断计数器 + 登记 provider 级归属（矩阵「命中源」列的数据来源）
             reg.record_success(provider_name)

@@ -56,6 +56,7 @@ _PRICE_PROVIDERS: dict[str, tuple[str, _ProviderFunc]] = {
     "tencent": ("腾讯财经", tencent.fetch_price),
     "sina": ("新浪财经", sina_provider.fetch_price),
     "eastmoney": ("东方财富", eastmoney.fetch_nav),
+    "sina_fund": ("新浪财经（场外净值）", sina_provider.fetch_fund_nav),
 }
 
 
@@ -107,10 +108,27 @@ def _price_transform_eastmoney(raw: dict, source: str) -> dict | None:
     }
 
 
+def _price_transform_sina_fund(raw: dict, source: str) -> dict | None:
+    """新浪场外净值原始数据 → 统一价格格式（与东财同口径：净值即价格）。"""
+    nav = raw.get("nav", 0.0)
+    if nav <= 0:
+        return None
+    return {
+        "name": raw.get("name", ""),
+        "code": raw.get("code", ""),
+        "price": nav,
+        "yesterday_close": raw.get("yesterday_nav", 0.0),
+        "price_date": raw.get("nav_date", ""),
+        "source_api": "sina_fund",
+        "source": source,
+    }
+
+
 _PRICE_TRANSFORMS: dict[str, Callable] = {
     "tencent": _price_transform_tencent,
     "sina": _price_transform_sina,
     "eastmoney": _price_transform_eastmoney,
+    "sina_fund": _price_transform_sina_fund,
 }
 
 

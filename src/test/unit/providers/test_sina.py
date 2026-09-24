@@ -17,6 +17,70 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
 
+class TestFetchFundNav(unittest.TestCase):
+    """场外基金净值（`f_` 前缀）获取与解析 —— 跨厂商备源（回归：单源无备）。"""
+
+    _LINE = 'var hq_str_f_011506="建信高端装备股票A,1.8384,1.8384,1.8828,2026-09-24,2.25622";'
+
+    def _mock_client(self, text: str):
+        resp = MagicMock()
+        resp.text = text
+        resp.encoding = "utf-8"
+        client = MagicMock()
+        client.get.return_value = resp
+        client.__enter__ = MagicMock(return_value=client)
+        client.__exit__ = MagicMock(return_value=False)
+        return client
+
+    def test_parses_nav_fields(self):
+        """正常响应 → 与 eastmoney.fetch_nav 同形状的原始字典。"""
+        from src.python.providers import sina
+
+        with patch.object(sina, "make_http_client", return_value=self._mock_client(self._LINE)):
+            out = sina.fetch_fund_nav("011506")
+        assert out is not None
+        assert out["name"] == "建信高端装备股票A"
+        assert out["code"] == "011506"
+        assert out["nav"] == 1.8384
+        assert out["acc_nav"] == 1.8384
+        assert out["yesterday_nav"] == 1.8828
+        assert out["nav_date"] == "2026-09-24"
+        assert out["source"] == "新浪财经（场外净值）"
+
+    def test_request_uses_fund_prefix_and_referer(self):
+        """URL 使用 f_ 前缀 + Referer（防端点被误指向股票行情接口而静默失效）。"""
+        from src.python.providers import sina
+
+        client = self._mock_client(self._LINE)
+        with patch.object(sina, "make_http_client", return_value=client):
+            sina.fetch_fund_nav("011506")
+        url = client.get.call_args.args[0]
+        assert url.endswith("list=f_011506"), url
+        assert "Referer" in (client.get.call_args.kwargs.get("headers") or {})
+
+    def test_invalid_or_empty_response_returns_none(self):
+        """响应缺失 / 字段不足 / 净值 <= 0 → None（交由链路下一槽）。"""
+        from src.python.providers import sina
+
+        for text in (
+            "",
+            'var hq_str_f_011506="";',
+            'var hq_str_f_011506="名称,1.2";',
+            'var hq_str_f_011506="名称,0,0,0,2026-09-24,0";',
+            'var hq_str_sh000001="1,2,3";',
+        ):
+            assert sina._parse_fund_nav_response(text, "011506") is None, text
+
+    def test_network_error_returns_none(self):
+        """网络异常不抛异常，返回 None。"""
+        import httpx
+
+        from src.python.providers import sina
+
+        with patch.object(sina, "make_http_client", side_effect=httpx.ConnectError("boom")):
+            assert sina.fetch_fund_nav("011506") is None
+
+
 class TestParseUsIndex(unittest.TestCase):
     """_parse_us_index 纯函数测试。"""
 

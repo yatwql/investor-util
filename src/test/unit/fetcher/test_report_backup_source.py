@@ -200,6 +200,109 @@ class TestOrchestrationTakeover:
         assert kwargs["source_hint"] == cninfo.SOURCE_ID
         assert kwargs["meta"]["adjunct_url"] == "a.PDF"
 
+    def test_primary_document_failure_triggers_cninfo_body_takeover(self, monkeypatch):
+        """主源**索引正常但正文不可得** → 巨潮备源按同一符号取正文（回归：正文无备源）。
+
+        回归背景：备源原本只在「索引为空」时接管；主源索引正常而正文取数失败
+        （断连/配额耗尽/章节残缺）时无任何退路。
+        """
+        self._isolate_cache(monkeypatch)
+        monkeypatch.setattr(
+            fr.datasink,
+            "fetch_report_documents",
+            lambda *a, **k: [{"id": 7, "doc_type": "annual", "report_period": "2025-12-31", "title": "主源"}],
+        )
+        cn_calls: list = []
+        monkeypatch.setattr(
+            fr.cninfo,
+            "fetch_report_listings",
+            lambda code: (
+                cn_calls.append(code)
+                or [
+                    {
+                        "id": "1001",
+                        "doc_type": "annual",
+                        "report_period": "2025-12-31",
+                        "title": "巨潮",
+                        "source": cninfo.SOURCE_ID,
+                    }
+                ]
+            ),
+        )
+
+        # 主源文档取数全失败（源侧章节残缺）；巨潮候选命中正文
+        def _fake_chain(data_type, provider_map, cache_key, ttl, fn_kwargs=None, transform=None):
+            if fn_kwargs and fn_kwargs.get("source_hint") == cninfo.SOURCE_ID:
+                return {
+                    "doc_id": "1001",
+                    "content": "第三节 管理层讨论与分析\n报告期内经营稳健。",
+                    "report_period": "2025-12-31",
+                    "doc_type": "annual",
+                }
+            return None
+
+        monkeypatch.setattr("src.python.fetcher.chain.fetch_with_fallback", _fake_chain)
+        monkeypatch.setattr(fr, "_fetch_sections", lambda *a, **k: None)
+
+        record, reason = fr.fetch_symbol_report_detailed("601398.SS")
+        assert cn_calls == ["601398"], "主源正文失败后应调用巨潮备源"
+        assert record is not None and reason == ""
+        assert record["doc_id"] == "1001", "应由巨潮备源交付"
+        assert "管理层讨论与分析" in record["content"]
+
+    def test_primary_document_ok_means_cninfo_untouched(self, monkeypatch):
+        """主源正文可得时巨潮零调用（主源可用 → 各源零影响的强约束）。"""
+        self._isolate_cache(monkeypatch)
+        monkeypatch.setattr(
+            fr.datasink,
+            "fetch_report_documents",
+            lambda *a, **k: [{"id": 7, "doc_type": "annual", "report_period": "2025-12-31", "title": "主源"}],
+        )
+        cn_calls: list = []
+        monkeypatch.setattr(fr.cninfo, "fetch_report_listings", lambda code: cn_calls.append(code) or [])
+
+        def _fake_chain(data_type, provider_map, cache_key, ttl, fn_kwargs=None, transform=None):
+            return {
+                "doc_id": 7,
+                "content": "第三节 管理层讨论与分析\n报告期内经营稳健。",
+                "report_period": "2025-12-31",
+                "doc_type": "annual",
+            }
+
+        monkeypatch.setattr("src.python.fetcher.chain.fetch_with_fallback", _fake_chain)
+        monkeypatch.setattr(fr, "_fetch_sections", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "_fetch_document", lambda *a, **k: _fake_chain(None, None, None, None))
+
+        record, reason = fr.fetch_symbol_report_detailed("601398.SS")
+        assert record is not None and reason == ""
+        assert cn_calls == [], "主源正文可用时不得调用备源"
+
+    def test_both_sources_failing_reports_periods(self, monkeypatch):
+        """主备正文均不可得 → 原因文案含已试报告期，不静默失败。"""
+        self._isolate_cache(monkeypatch)
+        monkeypatch.setattr(
+            fr.datasink,
+            "fetch_report_documents",
+            lambda *a, **k: [{"id": 7, "doc_type": "annual", "report_period": "2025-12-31", "title": "主源"}],
+        )
+        monkeypatch.setattr(
+            fr.cninfo,
+            "fetch_report_listings",
+            lambda code: [
+                {
+                    "id": "1001",
+                    "doc_type": "annual",
+                    "report_period": "2024-12-31",
+                    "title": "巨潮",
+                    "source": cninfo.SOURCE_ID,
+                }
+            ],
+        )
+        monkeypatch.setattr("src.python.fetcher.chain.fetch_with_fallback", lambda *a, **k: None)
+        record, reason = fr.fetch_symbol_report_detailed("601398.SS")
+        assert record is None
+        assert "2025-12-31" in reason and "2024-12-31" in reason
+
     def test_primary_document_cache_key_unchanged(self, monkeypatch):
         """主源候选仍用原缓存键（不因接入备源而使既有缓存失效）。"""
         self._isolate_cache(monkeypatch)

@@ -177,6 +177,24 @@
 
 **实施记录**：见 `../../managements/changelog.md`「plan-48 景气度框架④维场外流动性补齐（类型默认档）」条。
 
+### P1 — 已完成（plan-56 数据源健壮性加固，2026-09-24）
+
+**触发**：用户报「`price_price_fund_otc` 与 `report_datasink` 高频连接失败」，建议增加备用通道 / 优化重试 / 延长刷新窗口。
+
+**诊断**（实测）：高发「失败」主要是**健康探针误报**（见 `archived_review-findings` 的 rf-428）；另有结构性单源风险与第三方配额压力。
+
+**实施**：
+- **场外净值跨厂商备源**：`providers/sina.py::fetch_fund_nav`（`hq.sinajs.cn/list=f_{code}` 解析 名称/单位净值/累计净值/前一日净值/净值日期）+ `quote_adapters.SinaFundQuoteAdapter` + 手写转换 `_price_transform_sina_fund`；链路 `price_fund_otc` 由**单源 `["eastmoney"]` → `["eastmoney", "sina_fund"]`**（故障域独立，非东财系）；适配器开关两条路径同时接线，回归锁定「主源可用时备源零调用」
+- **传输级同源重试**：`fetcher/chain.fetch_with_fallback` 落槽前对传输级失败（超时/断连/远端断开）同源退避重试一次（0.6s 指数退避 + 抖动），**不重试代码级空结果**（防白耗 DataSinking 日配额 8191 篇）
+- **财报正文备源**：`fetcher/financial_report.py` 抽出 `_attempt_candidates`（章节阶 → 全文阶）并把**正文级**巨潮接管接入（`_backup_candidates`）——此前备源只在「索引为空」时触发；主源可用时备源仍零调用
+- **延长刷新窗口**：财报索引/章节清单 TTL 两周 → **30 天**（与正文同档），降低第三方配额与限速压力（R-FRD-07 语义同步）
+
+**测试**：+26 例（探针 9 / 新浪 provider 4 / 适配器等价 2 / 链路重试 3 / 场外备源端到端 5 / 正文备源接管 3）
+
+**验证**：健康检查实测 10/10 可用；场外净值主源故障时由新浪交付（数值与东财一致）；行业分类主源不可达时由行情页备源交付
+
+---
+
 ### P1 — 已完成（plan-50 完成态，2026-09-24 归档）
 
 #### ✅ `plan-50` 财报取数第二数据源（巨潮 cninfo 备用链路）— 已完成（2026-09-24）
