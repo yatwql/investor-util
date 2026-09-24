@@ -8,6 +8,22 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 用户文档 vs 管理文档比对：修手册 thinking 章节漏 Kimi + 新增矩阵守卫（2026-09-24，rf-427）
+
+**背景**（用户要求）：比对 `requirements.md` + `technical.md` + `llm-technical.md` 与用户文档（README + 10 份手册），冲突处回查代码。
+
+**判定为冲突（已修）**：`how-to-config-llm.md` 的 Extended Thinking 章节**内部自相矛盾**——支持矩阵 bullet 已含 Kimi，但「模型差异」对比表只有 3 列、且 601/608 行写「**仅**在使用 Claude 或 Gemini 模型时 `thinking_budget` 有意义」；而代码（`_THINKING_SUPPORTED_PREFIXES` 含 `kimi-`，且 kimi 不在 effort 族 → 走 `budget_tokens`）与 `llm-technical.md` 均确认 Kimi 属 budget 族。
+
+**变更**：
+- 对比表补 **Kimi 列**（控制参数 `thinking.budget_tokens` / 与 temperature 互斥 / 兼容端点 `api.moonshot.cn/anthropic` / 推荐场景），并新增「**默认思考行为**」行（DeepSeek 与 Kimi 默认开思考）
+- 601/608/610 行措辞改为「Claude / Gemini / Kimi（`budget_tokens` 族）」
+- 新增「默认开思考的厂商需注意（DeepSeek / Kimi）」说明段：未开启 thinking 时工具自动显式发 `disabled` 兜底，避免思考占满 `max_tokens` 致正文为空
+- **新增断言（check-doc-drift 第 13 项）** `check_thinking_support_matrix()`：从 `api_base` 前缀名单派生「支持族 / effort 族 / 默认开思考族」，三项校验——① 对比表列须覆盖全部支持族；② 含「仅」且带 budget 概念词的句子须枚举全部 budget 族（防「仅 A / B」式漏族）；③ 默认开思考族须在手册中有「默认开思考」提示。**实现上先过滤掉无 budget 概念词的「仅」句**（如实测 /定价行），避免误报——已在真实仓库验证零误报
+- 回归测试 +7（真实仓库一致 / 缺厂商列 / 封闭枚举漏族 / 无关「仅」句不误报 / 整表缺失 / 默认开思考缺提示 / 空文本）
+- 检查项枚举同步 6 处
+
+**判定一致、无冲突（已回查代码）**：17 章节 / 8 个 type 组；定价表 18 行逐值一致；缓存 TTL 可映射 19 条零不一致；datasink 速率与配额（3/31 请求每秒、8,191/131,071 篇每日）；batch 键含 `akshare_workers`；provider 类型定义（协议三类）；场外默认档 T+1/T+2/T+3/T+7；LLM 用量 Endpoint 主备标注；巨潮备源描述；thinking 兜底公式。
+
 ### 四文档一致性核对：修正 2 处冲突 + 补齐 2 处缺口 + 建需求追溯任务（2026-09-24，rf-426）
 
 **背景**（用户要求）：交叉比对 `requirements.md` / `technical.md` / `llm-technical.md` / `testplan.md`，冲突处回查代码，形成待决策清单（Q1~Q4，用户已定调）。

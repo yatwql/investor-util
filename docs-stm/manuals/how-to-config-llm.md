@@ -589,26 +589,29 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 ### 模型差异
 
-| 维度 | Anthropic Claude | DeepSeek V4+ | Google Gemini 2.5 |
-|------|------------------|-------------|-------------------|
-| 控制参数 | `thinking.budget_tokens`（token 数量预算） | `output_config.effort`（"high"/"max" 定性控制） | `generationConfig.thinkingConfig.thinkingBudget`（token 数量预算） |
-| 与 temperature 关系 | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） |
-| 兼容端点 | `api.anthropic.com` | `api.deepseek.com/anthropic`（Anthropic 兼容端点） | `generativelanguage.googleapis.com` |
-| 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` | 低成本备选，适合轻量推理 |
+| 维度 | Anthropic Claude | DeepSeek V4+ | Google Gemini 2.5 | Kimi（月之暗面） |
+|------|------------------|-------------|-------------------|-------------------|
+| 控制参数 | `thinking.budget_tokens`（token 数量预算） | `output_config.effort`（"high"/"max" 定性控制） | `generationConfig.thinkingConfig.thinkingBudget`（token 数量预算） | `thinking.budget_tokens`（token 数量预算，与 Claude 同机制） |
+| 与 temperature 关系 | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） |
+| 兼容端点 | `api.anthropic.com` | `api.deepseek.com/anthropic`（Anthropic 兼容端点） | `generativelanguage.googleapis.com` | `api.moonshot.cn/anthropic`（Anthropic 兼容端点） |
+| 默认思考行为 | 默认不思考 | **默认开思考**（effort 族） | 默认不思考 | **默认开思考**（未开启时工具自动发 `disabled` 兜底） |
+| 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` | 低成本备选，适合轻量推理 | 通用主力（256k 上下文），预算可控 |
 
 ### `thinking_budget` 与 `max_tokens` 的关系
 
-**仅在使用 Claude 或 Gemini 模型时 `thinking_budget_{模块}` 有意义。** DeepSeek 使用 `reasoning_effort`（`"high"` / `"max"`）定性控制思考深度，不涉及 token 预算概念。
+**仅在使用 Claude / Gemini / Kimi 模型时 `thinking_budget_{模块}` 有意义**（三者同属 `budget_tokens` 族）。DeepSeek 使用 `reasoning_effort`（`"high"` / `"max"`）定性控制思考深度，不涉及 token 预算概念。
 
 | 配置项 | 管什么 | expert 默认值 |
 |--------|--------|:------------:|
 | `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 36000 |
 | `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 24000 |
 
-**API 硬性约束（仅 Claude / Gemini）：** `thinking_budget_{模块}` 的值**必须小于**对应的 `max_tokens_{模块}`（思考 token 计入 max_tokens 共享预算，须为其后的正文留余量）。代码自动保护：若 `thinking_budget` 缺失或 ≥ `max_tokens`，自动修正为 `max(1024, max_tokens − 2048)`（1024 为 Anthropic `budget_tokens` 的最小值硬限制；`max_tokens − 2048` 保证正文至少留 2048 token 余量）。若配置开启但模型不支持，自动跳过并记录 WARNING。
+**API 硬性约束（仅 `budget_tokens` 族：Claude / Gemini / Kimi）：** `thinking_budget_{模块}` 的值**必须小于**对应的 `max_tokens_{模块}`（思考 token 计入 max_tokens 共享预算，须为其后的正文留余量）。代码自动保护：若 `thinking_budget` 缺失或 ≥ `max_tokens`，自动修正为 `max(1024, max_tokens − 2048)`（1024 为 Anthropic `budget_tokens` 的最小值硬限制；`max_tokens − 2048` 保证正文至少留 2048 token 余量）。若配置开启但模型不支持，自动跳过并记录 WARNING。
 
-**一句话总结（Claude / Gemini）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
+**一句话总结（Claude / Gemini / Kimi）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
 **一句话总结（DeepSeek）：** `reasoning_effort` 管"想多深"，`"max"` 对应深度分析的极致模式。
+
+> **默认开思考的厂商需注意（DeepSeek / Kimi）**：两家端点在不传思考参数时**默认开启思考**（思考 token 计入 `max_tokens` 共享预算）。模块**未**开启 thinking 时，程序会自动显式发送 `disabled` 兜底，避免思考占满预算而正文为空；但若你手动改小 `max_tokens`，仍建议同步核对 `thinking_budget` 与模块开关。
 
 **DeepSeek V4 强制推理说明**：DeepSeek V4 系列为**强制推理模型**，即使 `thinking_enabled` 关闭也会返回 `thinking` block；且 `max_tokens` 是 **thinking + 最终文本的共享预算**（而非仅最终输出）。当思考部分耗尽预算时，响应只含 thinking block、无最终文本（即"返回空内容"场景）。
 

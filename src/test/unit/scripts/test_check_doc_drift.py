@@ -13,6 +13,7 @@
   - 项目统计表比对（文件数 / 行数）
   - 归档索引完整性（管理文档 ↔ `docs-stm/archive/` 双向对齐）
   - 管理文档分区纪律（未完成/已解决/已归档错置、现行 changelog 只允许开发段头）
+  - Extended Thinking 支持矩阵（手册对比表/「仅」式措辞/默认开思考提示 ↔ 代码前缀名单）
   - 真实仓库冒烟：当前文档与代码一致（run_checks() 为空）
 
 测试通过脚本 import 方式直接复用解析/校验函数，不运行真实 CLI（`run_checks` 的 pytest 收集项
@@ -496,6 +497,65 @@ class TestManagementPartitions:
     def test_missing_files_do_not_crash(self, drift):
         """空文本（文件缺失）不抛异常，也不臆造 finding。"""
         assert drift.audit_management_partitions(review_findings="", plan="", changelog="") == []
+
+
+# ═══ Thinking 支持矩阵 ═══
+
+
+class TestThinkingSupportMatrix:
+    """手册 Extended Thinking 矩阵与代码前缀名单一致。
+
+    历史缺口：手册支持 bullet 已含 Kimi，但「模型差异」对比表与「仅 Claude / Gemini」
+    措辞未同步 → 同一章节自相矛盾（无断言覆盖）；本类即该缺口的回归守卫。
+    """
+
+    _TABLE_OK = (
+        "| 维度 | Anthropic Claude | DeepSeek V4+ | Google Gemini 2.5 | Kimi（月之暗面） |\n"
+        "|------|------|------|------|------|\n"
+        "| 控制参数 | `thinking.budget_tokens` | `output_config.effort` | `thinkingBudget` | `thinking.budget_tokens` |\n"
+        "**仅在使用 Claude / Gemini / Kimi 模型时 `thinking_budget_{模块}` 有意义**。\n"
+        "**DeepSeek 默认开思考**；**Kimi 默认开思考**。\n"
+    )
+
+    def test_passes_on_real_repo(self, drift):
+        assert drift.check_thinking_support_matrix() == []
+
+    def test_detects_missing_family_column(self, drift):
+        """对比表缺厂商列 → 报 finding（捕获「矩阵漏族」类缺口）。"""
+        broken = self._TABLE_OK.replace("| Kimi（月之暗面） |", "|")
+        findings = drift.check_thinking_support_matrix(broken)
+        assert any("缺少厂商列 `kimi`" in f for f in findings)
+
+    def test_detects_closed_enumeration_missing_family(self, drift):
+        """「仅 A / B」式措辞漏族 → 报 finding。"""
+        broken = self._TABLE_OK.replace(
+            "**仅在使用 Claude / Gemini / Kimi 模型时 `thinking_budget_{模块}` 有意义**。",
+            "**仅在使用 Claude 或 Gemini 模型时 `thinking_budget_{模块}` 有意义**。",
+        )
+        findings = drift.check_thinking_support_matrix(broken)
+        assert any("budget_tokens 族厂商" in f and "kimi" in f for f in findings)
+
+    def test_ignores_unrelated_jinyi_lines(self, drift):
+        """无 budget 概念词的「仅」句（如强制推理说明/定价行）不误报。"""
+        text = (
+            self._TABLE_OK
+            + "**DeepSeek V4 强制推理说明**：`max_tokens` 是 thinking + 最终文本的共享预算（而非仅最终输出）。\n"
+            + "- **已停用模型名**：`deepseek-chat` 是 flash 系列非思考模式的兼容别名。\n"
+        )
+        assert drift.check_thinking_support_matrix(text) == []
+
+    def test_missing_table_reports(self, drift):
+        findings = drift.check_thinking_support_matrix("# 无表章节\n正文\n")
+        assert any("未找到" in f for f in findings)
+
+    def test_default_on_family_requires_hint(self, drift):
+        """默认开思考族缺提示 → 报 finding。"""
+        text = self._TABLE_OK.replace("**DeepSeek 默认开思考**；**Kimi 默认开思考**。\n", "")
+        findings = drift.check_thinking_support_matrix(text)
+        assert any("默认开思考族" in f for f in findings)
+
+    def test_empty_text_is_noop(self, drift):
+        assert drift.check_thinking_support_matrix("") == []
 
 
 class TestGeneratedArtifacts:

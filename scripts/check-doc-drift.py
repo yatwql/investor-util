@@ -810,6 +810,114 @@ def check_management_partitions() -> list[str]:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  13. Extended Thinking 支持矩阵（手册 ↔ 代码前缀名单）
+# ═══════════════════════════════════════════════════════════════
+
+_THINKING_MANUAL = _MANUALS / "how-to-config-llm.md"
+
+#: 厂商家族 → 代码前缀特征（新增家族时此处与 `llm/api_base.py` 同步扩展）
+_THINKING_FAMILY_PREFIXES: dict[str, tuple[str, ...]] = {
+    "claude": ("claude-",),
+    "deepseek": ("deepseek-",),
+    "gemini": ("gemini-",),
+    "kimi": ("kimi-",),
+}
+#: 家族在手册中的称呼变体（用于表头/句子匹配）
+_THINKING_FAMILY_LABELS: dict[str, tuple[str, ...]] = {
+    "claude": ("claude", "anthropic"),
+    "deepseek": ("deepseek",),
+    "gemini": ("gemini",),
+    "kimi": ("kimi", "月之暗面"),
+}
+
+
+def _thinking_families() -> tuple[set[str], set[str], set[str]]:
+    """从代码前缀名单派生 ``(支持族, effort 族, 默认开思考族)``。"""
+    from src.python.llm.api_base import (
+        _THINKING_DEFAULT_ON_PREFIXES,
+        _THINKING_EFFORT_MODEL_PREFIXES,
+        _THINKING_SUPPORTED_PREFIXES,
+    )
+
+    def _families(prefixes: tuple[str, ...]) -> set[str]:
+        return {
+            family
+            for family, pats in _THINKING_FAMILY_PREFIXES.items()
+            if any(str(p).startswith(pat) for p in prefixes for pat in pats)
+        }
+
+    return (
+        _families(tuple(_THINKING_SUPPORTED_PREFIXES)),
+        _families(tuple(_THINKING_EFFORT_MODEL_PREFIXES)),
+        _families(tuple(_THINKING_DEFAULT_ON_PREFIXES)),
+    )
+
+
+def check_thinking_support_matrix(doc_text: str | None = None) -> list[str]:
+    """校验手册 Extended Thinking 章节的矩阵与措辞覆盖代码支持的全部厂商族。
+
+    历史缺口：手册支持 bullet 列表已含 Kimi，但下方「模型差异」对比表与「仅 Claude /
+    Gemini」式措辞未同步——同一章节自相矛盾，且无任何断言覆盖。本项三项断言：
+      ① 对比表（表头 `| 维度 |`）须列全代码支持族；
+      ② 含「仅」且提到 thinking/思考的句子，若枚举了厂商则须包含全部 **budget_tokens 族**
+         （支持族减 effort 族）——防「仅 A / B」式封闭枚举漏族；
+      ③ 默认开思考族须在手册该章节出现「默认开思考」（或「默认开启思考」）提示。
+    """
+    findings: list[str] = []
+    text = doc_text
+    if text is None:
+        text = _THINKING_MANUAL.read_text(encoding="utf-8") if _THINKING_MANUAL.exists() else ""
+    if not text:
+        return findings
+
+    supported, effort, default_on = _thinking_families()
+    if not supported:
+        return findings  # 名单未登记则不判定（防误报）
+
+    header = next((line for line in text.splitlines() if line.startswith("| 维度 |")), "")
+    if not header:
+        findings.append(f"{rel(_THINKING_MANUAL)}: 未找到 Extended Thinking「模型差异」对比表（表头 `| 维度 |`）")
+        return findings
+    low_header = header.lower()
+    for family in sorted(supported):
+        if not any(label in low_header for label in _THINKING_FAMILY_LABELS[family]):
+            findings.append(
+                f"{rel(_THINKING_MANUAL)}: 「模型差异」对比表缺少厂商列 `{family}`（代码支持名单含该族，矩阵须列全）"
+            )
+
+    budget_families = supported - effort
+    for lineno, line in enumerate(text.splitlines(), 1):
+        # 只判「预算族枚举」类句子：含「仅」且命中 budget 概念词
+        # （否则会把「DeepSeek 强制推理说明」「已停用别名」等无关行误当枚举句）
+        if "仅" not in line or not any(k in line for k in ("thinking_budget", "budget_tokens", "硬性约束")):
+            continue
+        mentioned = {
+            family
+            for family in supported
+            if any(label in line.lower() or label in line for label in _THINKING_FAMILY_LABELS[family])
+        }
+        if mentioned and not budget_families <= mentioned:
+            findings.append(
+                f"{rel(_THINKING_MANUAL)}:{lineno}: 「仅」式措辞遗漏 budget_tokens 族厂商 "
+                f"{sorted(budget_families - mentioned)}（该句枚举须与代码一致）"
+            )
+
+    for family in sorted(default_on):
+        labels = _THINKING_FAMILY_LABELS[family]
+        has_hint = any(
+            ("默认开思考" in line or "默认开启思考" in line)
+            and any(label in line or label in line.lower() for label in labels)
+            for line in text.splitlines()
+        )
+        if not has_hint:
+            findings.append(
+                f"{rel(_THINKING_MANUAL)}: 默认开思考族 `{family}` 缺少「默认开思考」提示"
+                "（该族未传思考参数会自动思考，须告知用户）"
+            )
+    return findings
+
+
+# ═══════════════════════════════════════════════════════════════
 #  编排
 # ═══════════════════════════════════════════════════════════════
 
@@ -830,6 +938,7 @@ def run_checks(with_test_count: bool = False) -> list[str]:
     findings += check_dir_tree(docs[_FOLDERS_MD])
     findings += check_archive_index()
     findings += check_management_partitions()
+    findings += check_thinking_support_matrix(docs.get(_THINKING_MANUAL))
     findings += check_project_stats(docs[_FOLDERS_MD], with_test_count=with_test_count, snapshot=snapshot)
     if with_test_count:
         findings += check_test_coverage_counts(docs[_TEST_COVERAGE_MD], snapshot)
@@ -838,7 +947,7 @@ def run_checks(with_test_count: bool = False) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="校验文档中的章节/开关/默认值/目录树/统计断言/归档索引/分区纪律与代码、配置文件、文件系统的一致性",
+        description="校验文档中的章节/开关/默认值/目录树/统计断言/归档索引/分区纪律/Thinking 支持矩阵与代码、配置文件、文件系统的一致性",
     )
     add_common_args(parser)
     parser.add_argument(
@@ -865,7 +974,7 @@ def main() -> None:
     sys.exit(
         report(
             findings,
-            "[OK] 文档与实现一致性校验通过（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律均与代码一致）",
+            "[OK] 文档与实现一致性校验通过（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵均与代码一致）",
             ci=args.ci,
             fail_message="[!] 发现 {n} 处文档与实现不一致，须修正后提交",
         )
