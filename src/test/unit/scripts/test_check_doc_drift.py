@@ -361,6 +361,58 @@ class TestTestCoverageCounts:
 # ═══ 构建产物排除 ═══
 
 
+# ═══ 归档索引 ═══
+
+
+class TestArchiveIndex:
+    """归档索引完整性：管理文档须列全 ``docs-stm/archive/`` 下对应归档文件。
+
+    历史缺口：changelog 的 `## 归档` 索引曾因「发布切换时整段重写已发布段」被一并删除，
+    当时无任何断言拦住；本类即该缺口的回归守卫。
+    """
+
+    def test_passes_on_real_repo(self, drift):
+        """真实仓库：当前三份管理文档的归档索引与磁盘双向一致。"""
+        assert drift.check_archive_index() == []
+
+    def test_detects_real_repo_violation(self, drift, tmp_path, monkeypatch):
+        """回归：索引被删时能报出（不依赖 `_scan_docs`——changelog 属历史记录类被其排除）。"""
+        doc = drift._MANAGEMENTS / "changelog.md"
+        broken = tmp_path / "changelog.md"
+        broken.write_text(
+            doc.read_text(encoding="utf-8").replace("archived_changelog.0.10.x.md", "（已删）"), encoding="utf-8"
+        )
+        monkeypatch.setattr(drift, "_ARCHIVE_INDEX_PAIRS", ((broken, "archived_changelog."),))
+        findings = drift.check_archive_index()
+        assert any("archived_changelog.0.10.x.md" in f and "缺少" in f for f in findings)
+
+    def test_reports_missing_index_entry(self, drift, tmp_path, monkeypatch):
+        """索引缺失某归档文件 → 报 finding（正向）。"""
+        doc = drift._MANAGEMENTS / "changelog.md"
+        broken = tmp_path / "changelog.md"
+        broken.write_text(
+            doc.read_text(encoding="utf-8").replace("archived_changelog.0.10.x.md", "（已删）"), encoding="utf-8"
+        )
+        monkeypatch.setattr(drift, "_ARCHIVE_INDEX_PAIRS", ((broken, "archived_changelog."),))
+        assert any("缺少" in f for f in drift.check_archive_index())
+
+    def test_reports_ghost_index_entry(self, drift, tmp_path, monkeypatch):
+        """索引引用了不存在的归档文件 → 报 finding（反向）。"""
+        doc = drift._MANAGEMENTS / "changelog.md"
+        ghost = tmp_path / "changelog.md"
+        ghost.write_text(
+            doc.read_text(encoding="utf-8") + "\n[x](docs-stm/archive/v9.9.x/archived_changelog.9.9.x.md)\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(drift, "_ARCHIVE_INDEX_PAIRS", ((ghost, "archived_changelog."),))
+        assert any("archived_changelog.9.9.x.md" in f and "不存在" in f for f in drift.check_archive_index())
+
+    def test_covers_three_management_docs(self, drift):
+        """三份带归档的管理文档均在被检面内（changelog / plan / review-findings）。"""
+        names = {p.name for p, _ in drift._ARCHIVE_INDEX_PAIRS}
+        assert names == {"changelog.md", "plan.md", "review-findings.md"}
+
+
 class TestGeneratedArtifacts:
     """构建/缓存产物不得触发目录树误报（CI 的 `pip install -e` 会在 src/ 下生成 *.egg-info）。"""
 

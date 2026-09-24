@@ -668,6 +668,44 @@ def check_test_coverage_counts(doc_text: str, snapshot: dict[str, int]) -> list[
 
 
 # ═══════════════════════════════════════════════════════════════
+#  11. 归档索引完整性（管理文档 ↔ docs-stm/archive/）
+# ═══════════════════════════════════════════════════════════════
+
+#: (现行文档, 归档文件名前缀)——归档索引须**双向**对齐：
+#: 磁盘上的每个归档文件须被现行文档索引列出；索引引用须真实存在。
+#: 历史缺口：changelog 的 `## 归档` 索引段曾因「发布切换时整段重写已发布段」被一并删除，
+#: 而当时无任何断言拦住——本项即为该缺口的守卫。
+_ARCHIVE_INDEX_PAIRS: tuple[tuple[Path, str], ...] = (
+    (_MANAGEMENTS / "changelog.md", "archived_changelog."),
+    (_MANAGEMENTS / "plan.md", "archived_plan."),
+    (_MANAGEMENTS / "review-findings.md", "archived_review-findings."),
+)
+
+
+def check_archive_index(docs: dict[Path, str] | None = None) -> list[str]:
+    """校验管理文档的归档索引与 ``docs-stm/archive/`` 实际文件双向一致。
+
+    **不读传入的 docs 映射**：历史记录类（如 changelog）不在 `_scan_docs()` 的扫描面内
+    （正是本次缺口所在），故本项直接读文件；``docs`` 参数仅作兼容占位（传入亦被忽略）。
+    """
+    findings: list[str] = []
+    archive_root = REPO_ROOT / "docs-stm" / "archive"
+    for doc_path, prefix in _ARCHIVE_INDEX_PAIRS:
+        if not doc_path.exists():
+            continue
+        text = doc_path.read_text(encoding="utf-8")
+        on_disk = {p.name for p in archive_root.rglob("*.md") if p.name.startswith(prefix)}
+        referenced = {name for name in on_disk if name in text}
+        for name in sorted(on_disk - referenced):
+            findings.append(f"{rel(doc_path)}: 归档索引缺少 `{name}`（该归档文件实际存在，须补索引条目）")
+        # 反向：索引引用了不存在的归档文件名
+        for name in sorted(re.findall(rf"{re.escape(prefix)}[0-9a-z.]+\.md", text)):
+            if name not in on_disk:
+                findings.append(f"{rel(doc_path)}: 归档索引引用的 `{name}` 在 docs-stm/archive/ 下不存在")
+    return findings
+
+
+# ═══════════════════════════════════════════════════════════════
 #  编排
 # ═══════════════════════════════════════════════════════════════
 
@@ -686,6 +724,7 @@ def run_checks(with_test_count: bool = False) -> list[str]:
     findings += check_llm_defaults(docs[_LLM_TECHNICAL_MD])
     findings += check_panel_numbering(docs[_TUI_MENU_MD])
     findings += check_dir_tree(docs[_FOLDERS_MD])
+    findings += check_archive_index()
     findings += check_project_stats(docs[_FOLDERS_MD], with_test_count=with_test_count, snapshot=snapshot)
     if with_test_count:
         findings += check_test_coverage_counts(docs[_TEST_COVERAGE_MD], snapshot)
