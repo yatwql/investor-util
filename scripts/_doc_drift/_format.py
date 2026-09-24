@@ -11,7 +11,9 @@ from src.python.config.features import feature_switch_registry, switches_in_grou
 from src.python.core.registry import _REPORT_SECTION_DEFAULT, get_cache_ttl_defaults, get_llm_module_names
 from src.python.tui.tui_menu import filter_menu_llm_modules
 
+from src.python.fetcher.chain import _DEFAULT_CHAINS  # noqa: E402
 from _doc_drift._shared import (
+    _RELIABILITY_MD,
     _HOW_TO_CONFIG_MD,
     _LLM_TECHNICAL_MD,
     _REPORTS_MD,
@@ -20,6 +22,8 @@ from _doc_drift._shared import (
     _values_equal,
 )
 
+
+_CHAIN_TABLE_ROW = re.compile(r"^\|\s*`([a-z_]+)`\s*\|")
 
 _SECTION_COUNT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"页签编号\s*1\s*[~～-]\s*(\d+)"),
@@ -364,4 +368,29 @@ def check_test_coverage_counts(doc_text: str, snapshot: dict[str, int]) -> list[
             findings.append(
                 f"{rel(_TEST_COVERAGE_MD)}:{line_no}: 标记 `{name}` 覆盖项数 {got} 与 collect-test-coverage 快照 {snapshot[name]} 不一致"
             )
+    return findings
+
+
+def check_chain_table(doc_text: str) -> list[str]:
+    """校验可靠性手册 §4.2「Provider Chain 降级路径」表与 `_DEFAULT_CHAINS` 逐链一致。
+
+    历史缺口：该表声称枚举全部链路，实际只有 5 行——`financial_report`
+    在接入巨潮备源后仍缺席，`price` / `fund_rank` / `fund_hold` /
+    `financial_indicator` / `history_fund_otc` / `history_index` / `bond_yield`
+    同样未列。表与代码无任何断言绑定，故漂移长期无人发现。
+    """
+    findings: list[str] = []
+    documented: set[str] = set()
+    for line in doc_text.splitlines():
+        m = _CHAIN_TABLE_ROW.match(line)
+        if m:
+            documented.add(m.group(1))
+    if not documented:
+        findings.append(f"{rel(_RELIABILITY_MD)}: 未找到 §4.2 Provider Chain 降级路径表（表行须以 | `链路名` | 开头）")
+        return findings
+    expected = set(_DEFAULT_CHAINS)
+    for chain in sorted(expected - documented):
+        findings.append(f"{rel(_RELIABILITY_MD)}: §4.2 表缺少链路 `{chain}`（`_DEFAULT_CHAINS` 有定义，须补行）")
+    for chain in sorted(documented - expected):
+        findings.append(f"{rel(_RELIABILITY_MD)}: §4.2 表列出链路 `{chain}` 但 `_DEFAULT_CHAINS` 无此链（幽灵行）")
     return findings

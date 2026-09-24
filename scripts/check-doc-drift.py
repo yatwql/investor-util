@@ -6,7 +6,7 @@
 逐条比对，使漂移在提交前暴露（与 check-doc-traces 的「历史痕迹」检查互补：
 那边管「不该写的内容」，这边管「写了但与实现不符的内容」）。
 
-十四项检查（权威源 → 受检文档）：
+十五项检查（权威源 → 受检文档）：
   1.  报告章节表        core/registry.py `_REPORT_SECTION_DEFAULT`      → manuals/reports-instruction.md
   2.  章节数量断言      同上（`页签编号 1~N` / `默认顺序（N 项` / `返回 result（N 项` / `N 个报告章节`）→ 全库文档
   3.  功能开关表        config/features.py `feature_switch_registry`    → manuals/how-to-config.md
@@ -20,13 +20,14 @@
   11. 测试覆盖计数表    `scripts/collect-test-coverage.py` 快照 → managements/test-coverage.md（仅 `--with-test-count`）
   12. 归档索引完整性    changelog / plan / review-findings 的「归档」索引 ↔ 归档目录 `archived_*` 文件（双向）
   13. 管理文档分区纪律  未完成/已解决/已归档三分区互斥；现行 changelog 只允许一个 `-dev` 段头
+  15. Provider Chain 降级表  `fetcher/chain.py` `_DEFAULT_CHAINS` → manuals/datasource-reliability.md（逐链双向）
   14. Extended Thinking 支持矩阵  手册对比表/「仅」式枚举/默认开思考提示 ↔ `llm/api_base` 前缀名单
 
 按设计豁免的历史记录文档：`changelog.md` / `review-findings.md`（会如实引用旧数字作为变更记录）
 与 `docs-stm/archive/**`（版本快照）不参与第 2/4/5 项扫描。
 
 用法：
-  python scripts/check-doc-drift.py                  # 十四项全查
+  python scripts/check-doc-drift.py                  # 十五项全查
   python scripts/check-doc-drift.py -v               # 详细输出（打印解析明细）
   python scripts/check-doc-drift.py --ci             # CI 模式：仅输出 文件:描述，退出码 2
   python scripts/check-doc-drift.py --with-test-count # 附带 pytest 收集，核对「测试用例数」与 test-coverage.md 计数表
@@ -58,6 +59,8 @@ from src.python.config.features import feature_switch_registry, switches_in_grou
 from src.python.core.registry import _REPORT_SECTION_DEFAULT, get_llm_module_names  # noqa: E402,F401
 from src.python.tui.tui_menu import filter_menu_llm_modules  # noqa: E402,F401
 from _doc_drift import (  # noqa: E402,F401  # 原面 re-export（实现见 _doc_drift/）
+    _RELIABILITY_MD,
+    check_chain_table,
     _README,
     _MANUALS,
     _MANAGEMENTS,
@@ -159,6 +162,7 @@ def run_checks(with_test_count: bool = False) -> list[str]:
     findings += check_llm_defaults(docs[_LLM_TECHNICAL_MD])
     findings += check_panel_numbering(docs[_TUI_MENU_MD])
     findings += check_dir_tree(docs[_FOLDERS_MD])
+    findings += check_chain_table(docs[_RELIABILITY_MD])
     findings += check_archive_index()
     findings += check_management_partitions()
     findings += check_thinking_support_matrix(docs.get(_THINKING_MANUAL))

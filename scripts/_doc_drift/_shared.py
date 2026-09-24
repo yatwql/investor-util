@@ -34,6 +34,7 @@ _TUI_MENU_MD = _MANUALS / "how-to-use-tui-menu.md"
 
 
 _LLM_TECHNICAL_MD = _MANAGEMENTS / "llm-technical.md"
+_RELIABILITY_MD = _MANUALS / "datasource-reliability.md"
 
 
 _TEST_COVERAGE_MD = _MANAGEMENTS / "test-coverage.md"

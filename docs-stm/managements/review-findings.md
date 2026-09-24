@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.4-dev
-> **编号源**：`rf-next = 430`（新增问题取此编号，完成后更新为 +1；已用最大 rf-429，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 431`（新增问题取此编号，完成后更新为 +1；已用最大 rf-430，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -50,6 +50,9 @@
 
 
 | **rf-429** | **过去 24 小时改动的技术债 5 项**（用户要求「过去24小时的修改有技术债务么，有就修复它们」）：① `scripts/check-doc-drift.py` 因新增 3 项检查由 732 → **985 行**（越过 800 行上限，违反项由 rf-390/rf-399 先例确立）；② `analysis/prosperity_scoring.py` 731 → **813 行**同越限；③ **重复实现**：`_price_transform_sina_fund` 与 `_price_transform_eastmoney` 逐键相同、`SinaFundQuoteAdapter` 与 `EastMoneyQuoteAdapter` 映射与有效性判据全同（两处重复维护点）；④ **文档未同步**：`requirements.md` 数据源表与 `technical.md` 链路表仍写场外净值单源，`developer-guide.md` 的检查项清单滞后（写「十一项」而实为 14 项），入口 docstring 同样滞后；⑤ **冗余形参**：`_check_http(expect_status=...)` 无任何调用方传参（连同签名内二次分支） | ① `check-doc-drift.py` 拆为 `scripts/_doc_drift/` 包（`_shared` / `_format` / `_tree` / `_ledger`，入口 198 行仅留 CLI + 编排 + **原面 re-export**，镜像 `_test_runner/` 先例）；② 抽出 `analysis/prosperity_signals.py`（127 行，本地信号提取原语；评分内核 711 行），迁移名在 `prosperity_scoring` 原面 re-export；③ 收敛为 `_otc_nav_to_standard()` 单一转换实现 + `_OtcNavQuoteAdapter` 共用基类（两源仅余 `source_api`/`source_id` 差异）；④ 四处文档同步（含 `developer-guide` 补齐第 12~14 项 + 「十四项」计数）；⑤ 删除冗余形参，3xx 判定合并为单分支。**回归**：`test_check_doc_drift.py` 补丁目标改为指向持有子模块（`drift_parts` fixture）；新增 `test_sina_fund_*`/`_otc_nav` 等价与端到端断言；**全量 90 + 75 + 83 例通过**，folders.md 目录树与统计已补 |
+
+
+| **rf-430** | **Provider Chain 降级路径表长期缺链**（48h 技术债审计发现）：`datasource-reliability.md` §4.2 表声称枚举全部链路，实际仅 5 行（13 条链缺 8 条）——其中 `financial_report` 是**本轮窗口内**（plan-50 接入巨潮备源）新增双源行为却未入表；`price`/`fund_rank`/`fund_hold`/`financial_indicator`/`history_fund_otc`/`history_index`/`bond_yield` 亦从未登记。表与代码无任何断言绑定 → 漂移无人发现 | ① 表补齐为 **13 条链**（主/备/回退条件，与 `_DEFAULT_CHAINS` 逐链对应）；② **新增第 15 项断言** `check_chain_table()`：解析该表链名并与 `_DEFAULT_CHAINS` **双向**比对（漏链 → 「缺少链路」；幽灵行 → 「无此链」），表缺失亦报错；③ 项数枚举同步「十四项 → 十五项」（入口 docstring + CLI 用法 + developer-guide 项单）；④ 回归 +4 例（真实仓库一致 / 漏链 / 幽灵行 / 表缺失）。**附**：核实 `cninfo` 端点 https 不可达（超时）而 http 可达 → 保留 http + `follow_redirects`，非债务 |
 
 ### 归档档案
 

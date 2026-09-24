@@ -510,6 +510,33 @@ class TestManagementPartitions:
 # ═══ Thinking 支持矩阵 ═══
 
 
+class TestChainTable:
+    """§4.2 Provider Chain 降级表 ↔ `_DEFAULT_CHAINS` 逐链双向一致（「降级表缺链」类缺口守卫）。
+
+    历史缺口：该表声称枚举全部链路，实际只列 5 行——`financial_report` 接入巨潮
+    备源后仍缺席，另有 7 条链从未登记；表与代码无断言绑定，漂移长期无人发现。
+    """
+
+    def test_real_repo_consistent(self, drift):
+        assert drift.check_chain_table(drift._RELIABILITY_MD.read_text(encoding="utf-8")) == []
+
+    def test_missing_chain_reported(self, drift):
+        text = drift._RELIABILITY_MD.read_text(encoding="utf-8")
+        broken = text.replace("| `fund_hold` |", "| `不是链` |", 1)
+        findings = drift.check_chain_table(broken)
+        assert any("缺少链路 `fund_hold`" in f for f in findings)
+
+    def test_ghost_chain_reported(self, drift):
+        text = drift._RELIABILITY_MD.read_text(encoding="utf-8")
+        broken = text + "\n| `ghost_chain` | 主 | 备 | 条件 |\n"
+        findings = drift.check_chain_table(broken)
+        assert any("幽灵行" in f and "ghost_chain" in f for f in findings)
+
+    def test_missing_table_reported(self, drift):
+        findings = drift.check_chain_table("# 无表文档\n")
+        assert any("未找到 §4.2" in f for f in findings)
+
+
 class TestThinkingSupportMatrix:
     """手册 Extended Thinking 矩阵与代码前缀名单一致。
 

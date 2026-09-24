@@ -10,6 +10,16 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 48 小时技术债审计：补齐并锁定 Provider Chain 降级路径表（2026-09-24，rf-430）
+
+**审计面**：最近 48 小时（25 commits / 96 文件 / +6071−1403）。**自动扫描全清**：无文件超 800 行、无 TODO/FIXME/HACK、无新增静默吞异常、无未被引用定义、无同形重复函数体。
+
+**发现并修复**：`datasource-reliability.md` §4.2「Provider Chain 降级路径」表声称枚举全部链路，**实际仅 5 行（13 条链缺 8 条）**；其中 `financial_report` 是窗口内 plan-50 新增双源行为（DataSinking 主 + 巨潮备源）却缺席。
+
+- 表补齐为 **13 条链**（含 `price` / `fund_rank` / `fund_hold` / `financial_report` / `financial_indicator` / `history_fund_otc` / `history_index` / `bond_yield`），逐条给出主链路 / 备用链路 / 回退条件
+- **新增 `check-doc-drift.py` 第 15 项** `check_chain_table()`：表链名 ↔ `_DEFAULT_CHAINS` **双向**比对（漏链 / 幽灵行 / 表缺失均报错），项数枚举同步「十五项」；回归 +4 例
+- **核实未修（非债务）**：`cninfo` 端点 `https` 不可达（ConnectTimeout）、`http` 可达 → 保留 `http` + `follow_redirects=True`；`price_fund_otc` / `industry` 双源已在表中且与代码一致；Gemini 仍为受支持协议（代码保留 `gemini` provider 类型 + 计价 + 模板备选，文档同步）——「下架 Gemini」仅指主节点切换为 Kimi
+
 ### 过去 24 小时改动的技术债整改 5 项（2026-09-24，rf-429）
 
 **触发**：用户要求审计并修复最近 24 小时（20 commits / 83 文件 / +4580 行）引入的技术债。

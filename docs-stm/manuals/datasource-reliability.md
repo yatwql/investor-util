@@ -226,13 +226,23 @@
 
 ### 4.2 Provider Chain 降级路径
 
+> 本表与 `fetcher/chain.py::_DEFAULT_CHAINS` **逐链对应**（13 条），由 `check-doc-drift.py` 第 15 项断言双向一致（漏链/幽灵链均报错）。
+
 | 数据类型 | 主链路 | 备用链路 | 回退条件 |
 |:---------|:-------|:---------|:---------|
-| `price_stock` | 腾讯财经 | 新浪财经 | 腾讯超时/熔断 |
+| `price_stock` | 腾讯财经 | 新浪财经 → 同花顺（前复权，需 key） | 腾讯超时/熔断 |
 | `price_fund_otc` | 东方财富 JSONP | 新浪财经场外净值（`hq.sinajs.cn/list=f_{code}`） | 请求超时 / 连接错误 / JSONP 或 CSV 解析失败 / 无净值记录 |
+| `price` | 腾讯财经 | 东方财富 | 腾讯不可用（持仓分类路由的兼容链） |
+| `fund_rank` | 天天基金 | —（单源） | 不可用时基金业绩排名域标记降级 |
+| `fund_hold` | 天天基金 | 同花顺官方（需 key，未配置时链路自动跳过） | 天天基金取不到披露持仓 |
 | `industry` | 东方财富 push2 | REST 行情页 | push2 超时/熔断 |
-| `history_stock` | 腾讯 K 线 | 新浪 K 线 | 腾讯不可用 |
+| `financial_report` | DataSinking（需用户自备 key） | 巨潮资讯网（公开无需凭据） | 主源索引为空/失败，或索引正常但**正文不可得** |
+| `financial_indicator` | akshare | DataSinking 章节解析 → 同花顺官方合并报表派生（需 key） | 上游不可用/解析无命中（逐槽递补） |
+| `history_stock` | 腾讯 K 线 | 新浪 K 线 → 同花顺官方（需 key） | 腾讯不可用 |
+| `history_fund_otc` | 天天基金净值 | 东方财富净值 | 天天基金不可用 |
+| `history_index` | 腾讯 | 新浪 | 腾讯不可用 |
 | `history_index_us` | 新浪 K 线（实现存在，但端点对全部代码返回 404/空） | 腾讯 K 线（`gb_*` 代码支持有限，实际取数通常由此承担） | 两源均返回空 → 该链路整体取空 |
+| `bond_yield` | akshare | —（配置兵底） | akshare 不可用时回落配置值 |
 
 链路失败时逐段采集失败原因（`fetcher/chain.py` 的 `FailureDiagnostics`），以「展示名(原因)」形式随降级事件透传到报告的**数据源可用性矩阵**降级明细，例如 `腾讯财经(连接超时)；新浪财经(返回空)`——用户可直接看出是哪个源、为什么失败，不必翻日志。未采集到可读原因时回落原有的短标识（如 `transport`、`empty`），输出与既往一致。
 

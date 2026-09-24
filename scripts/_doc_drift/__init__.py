@@ -14,6 +14,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from _doc_drift._format import (  # noqa: F401
+    check_chain_table,
     _SECTION_COUNT_PATTERNS,
     parse_section_rows,
     check_section_table,
@@ -77,6 +78,7 @@ from _doc_drift._ledger import (  # noqa: F401
     check_thinking_support_matrix,
 )
 from _doc_drift._shared import (  # noqa: F401
+    _RELIABILITY_MD,
     _README,
     _MANUALS,
     _MANAGEMENTS,
@@ -134,7 +136,9 @@ __all__ = [
     "_values_equal",
     "_collect_test_count",
     "_collect_test_snapshot",
+    "_RELIABILITY_MD",
     "_SECTION_COUNT_PATTERNS",
+    "check_chain_table",
     "parse_section_rows",
     "check_section_table",
     "check_section_counts",
