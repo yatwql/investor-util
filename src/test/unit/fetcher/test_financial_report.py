@@ -104,7 +104,7 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(
             fr,
             "_fetch_document",
-            lambda doc_id, section: {
+            lambda doc_id, section, **_kw: {
                 "doc_id": 7,
                 "symbol": "600519.SS",
                 "report_period": "2025-12-31",
@@ -129,7 +129,7 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(fr, "cache_get", lambda *a, **k: [{"id": 9}])
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: calls.append(1) or None)
         monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: None)
-        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "x"})
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": "x"})
         rec = fr.fetch_symbol_report("600519.SS")
         assert rec is not None and rec["doc_id"] == 9
         assert calls == []
@@ -138,7 +138,7 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
         monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
-        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: None)
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: None)
         assert fr.fetch_symbol_report("600519.SS") is None
 
     def test_multi_section_concatenation_order(self, monkeypatch):
@@ -148,7 +148,7 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
         parts = {"管理层讨论与分析": "A段", "财务报告": "B段"}
         monkeypatch.setattr(
-            fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": parts.get(section, "")}
+            fr, "_fetch_document", lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": parts.get(section, "")}
         )
         rec = fr.fetch_symbol_report("600519.SS", sections=("管理层讨论与分析", "财务报告"), max_chars=100)
         assert rec is not None
@@ -163,7 +163,7 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
         parts = {"管理层讨论与分析": "A段", "财务报告": ""}
         monkeypatch.setattr(
-            fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": parts.get(section, "")}
+            fr, "_fetch_document", lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": parts.get(section, "")}
         )
         rec = fr.fetch_symbol_report("600519.SS", sections=("管理层讨论与分析", "财务报告"), max_chars=100)
         assert rec["content"] == "A段"
@@ -172,7 +172,7 @@ class TestFetchSymbolReport:
         monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
         monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: [{"id": 7}])
-        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "  "})
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": "  "})
         assert fr.fetch_symbol_report("600519.SS", sections=("管理层讨论与分析", "财务报告")) is None
 
 
@@ -197,7 +197,7 @@ class TestReportPeriodBacktrack:
         monkeypatch.setattr(
             fr,
             "_fetch_document",
-            lambda doc_id, section: (
+            lambda doc_id, section, **_kw: (
                 {"doc_id": 3, "report_period": "2025-12-31", "doc_type": "annual", "content": "年报正文"}
                 if doc_id == 3
                 else None
@@ -215,7 +215,7 @@ class TestReportPeriodBacktrack:
         monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["一、有限售条件股份", "二、无限售条件股份"])
         seen: list[str] = []
 
-        def _doc(doc_id, section):
+        def _doc(doc_id, section, **_kw):
             seen.append(section)
             return {"doc_id": doc_id, "content": "正文"} if section == "管理层讨论与分析" else None
 
@@ -238,7 +238,7 @@ class TestReportPeriodBacktrack:
         monkeypatch.setattr(
             fr,
             "_fetch_document",
-            lambda doc_id, section: {"doc_id": doc_id, "report_period": str(doc_id), "content": f"doc{doc_id}"},
+            lambda doc_id, section, **_kw: {"doc_id": doc_id, "report_period": str(doc_id), "content": f"doc{doc_id}"},
         )
         rec = fr.fetch_symbol_report("601939.SS")
         assert rec["doc_id"] == 2  # 年报先试（即便一季报更新）
@@ -258,7 +258,7 @@ class TestReportPeriodBacktrack:
             ],
         )
         monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
-        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "正文"})
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": "正文"})
         rec = fr.fetch_symbol_report("601939.SS")
         assert rec["doc_id"] == 2
 
@@ -270,7 +270,7 @@ class TestReportPeriodBacktrack:
         monkeypatch.setattr(
             fr,
             "_fetch_document",
-            lambda doc_id, section: {"doc_id": doc_id, "content": full} if section == "" else None,
+            lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": full} if section == "" else None,
         )
         rec = fr.fetch_symbol_report("601398.SS", max_chars=40)
         assert rec is not None
@@ -289,7 +289,7 @@ class TestReportPeriodBacktrack:
         monkeypatch.setattr(
             fr,
             "_fetch_document",
-            lambda doc_id, section: {"doc_id": doc_id, "content": full} if section == "" else None,
+            lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": full} if section == "" else None,
         )
         rec = fr.fetch_symbol_report("601398.SS", max_chars=30)
         assert rec["summary"].startswith("董事会报告\n主要业务")
@@ -302,7 +302,7 @@ class TestReportPeriodBacktrack:
         monkeypatch.setattr(
             fr,
             "_fetch_document",
-            lambda doc_id, section: {"doc_id": doc_id, "content": "公司简介正文"} if section == "" else None,
+            lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": "公司简介正文"} if section == "" else None,
         )
         rec = fr.fetch_symbol_report("601398.SS", max_chars=10)
         assert rec["summary"] == "公司简介正文"
@@ -312,7 +312,7 @@ class TestReportPeriodBacktrack:
         """章节阶命中时标记取用方式为 sections（排查时区分两阶）。"""
         self._patch_index(monkeypatch, [{"id": 1, "report_period": "2025-12-31", "doc_type": "annual"}])
         monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
-        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: {"doc_id": doc_id, "content": "正文"})
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": "正文"})
         rec = fr.fetch_symbol_report("600900.SS")
         assert rec["section_source"] == fr.SECTION_SOURCE_SECTIONS
 
@@ -324,7 +324,7 @@ class TestReportPeriodBacktrack:
 
         self._patch_index(monkeypatch, [{"id": 1, "report_period": "2026-06-30"}])
         monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["一、股份变动情况"])
-        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section: None)
+        monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: None)
         rec, reason = fr.fetch_symbol_report_detailed("601398.SS")
         assert rec is None
         assert "2026-06-30" in reason
@@ -463,7 +463,7 @@ class TestLatestPeriodAndSectionResolution:
         monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节管理层讨论与分析"])
         seen: list[str] = []
 
-        def _doc(doc_id, section):
+        def _doc(doc_id, section, **_kw):
             seen.append(section)
             return {"doc_id": doc_id, "content": "正文", "report_period": "2025-12-31", "doc_type": "annual"}
 
@@ -478,7 +478,7 @@ class TestLatestPeriodAndSectionResolution:
             fr, "_fetch_sections", lambda doc_id: ["第三节管理层讨论与分析", "五、主要会计数据和财务指标"]
         )
 
-        def _doc(doc_id, section):
+        def _doc(doc_id, section, **_kw):
             if section == "第三节管理层讨论与分析":
                 return None  # 模拟 404
             return {"doc_id": doc_id, "content": "财务数据", "report_period": "2025-12-31", "doc_type": "annual"}

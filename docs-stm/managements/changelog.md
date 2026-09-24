@@ -40,6 +40,22 @@
 
 **验证**：`check-semantic-index --ci` 正反向校验通过；六个 `--ci` + ruff + dev-verify 全绿。
 
+### plan-50 财报取数第二数据源（巨潮 cninfo 备用链路）（2026-09-24）
+
+**背景**：区块② 财报摘要单一依赖 DataSinking，报告完整性受该源「收录 + 章节解析」质量决定——实测工行 2026 半年报**未被收录**（源侧没有的报告无法用季报替代经营讨论内容）。
+
+**变更**：
+- 新增 `providers/cninfo.py`（公开免费无需凭据）：`topSearch` 解析 orgId → `hisAnnouncement` 公告列表 → `static` 站 PDF 下载 + pdfplumber 解析；公告元数据归一为与主源索引**同一形状**；文种归类（半年度先于年度、剔除摘要/英文版）+ 报告期推导；固定 1 秒礼貌限速 + 429 退避重试一次；失败返回空不抛异常
+- `fetcher/report_adapters.py`：新增 `CninfoReportAdapter` 作财报域**第二槽**；两源以 `source_hint` **命名空间隔离**（异源 doc_id 互不服务、备源独立缓存键段），缓存/熔断/降级复用 `fetch_with_fallback`
+- `fetcher/financial_report.py`：**主源索引为空时**切备源重建索引（候选回溯零改动）；源/元数据随查询透传；新增 `fetcher/report_locate.py`（目录行判定与关键词定位**收敛为单一实现**，全文兜底与备源切片共用）
+- `core/registry.py`：登记备源缓存前缀（`report_cninfo_index_` / `report_cninfo_text_` / `report_cninfo_orgid_`）
+- 依赖：新增 `pdfplumber`（主依赖；镜像实测最新 0.11.10，取 `>=0.11,<1.0`）；**惰性导入**，缺库时该源解析环节降级为空文本
+- 文档：`datasource.md`（源清单/两级缓存/主备接管说明）、`datasource-reliability.md`（可靠度表由「唯一链路」改为主备、新增备源接管小节）、`technical.md`（取数链路 + 语义命名表 4 行）、`folders.md`
+
+**回归测试 +47**：新增 `unit/providers/test_cninfo.py`（20 例：orgId 解析与缓存/文种归类与报告期推导/摘要剔除/列表缓存/PDF 解析接缝与缺库降级/限速与 429 退避/非 JSON 与网络异常分支）+ `unit/fetcher/test_report_backup_source.py`（16 例：适配器登记与契约自检/命名空间双向隔离/备源章节定位与目录行跳过/全文中止降级/主源空→备源接管/**主源可用时备源零调用**/主源缓存键不变）；另既有财报夹具适配新签名（14 例）。
+
+**验证**：财报域相关 91 例全过；全量门禁（dev-verify + 六 `--ci` + ruff）全绿。
+
 ### 修复配置漏声明：`batch.akshare_workers` 补入默认值与文档（2026-09-24，rf-420）
 
 **背景**（文档审计中发现）：`report/financial_indicator.py`（财务指标章多期取数）与 `report/fund_roe_estimate.py`（景气度框架②维基金重仓 ROE 推演）均调 `get_batch_worker_count("akshare_workers", 2)`，但 `_config_defaults.py` 的 `batch` 段未声明该键（模板与 `how-to-config.md` 字段表也无）——用户无法通过配置调整 akshare 财务指标取数并发，只能吃代码兜底值 2。

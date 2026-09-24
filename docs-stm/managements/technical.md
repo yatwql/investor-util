@@ -2851,7 +2851,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **数据源与鉴权**：DataSinking（`https://api.datasink.ing`）提供全文本财报 Markdown，仅覆盖 A 股（SSE/SZSE/BSE，代码经 `core/code_utils.py::to_fmp_symbol` 映射为 FMP 风格）。**需用户自备 API key**：凭据取通用密钥文件 `data/config/data_key.json` 的 `datasink` 节（`{"datasink": {"api_key": "..."}}`），环境变量 `DATASINK_API_KEY` 可覆盖；缺 key 时链路主动跳过并给申请指引，章节写占位。
 
-**取数链路**：`fetcher/financial_report.py` 逐标的取元数据（`/documents`，**不带文种过滤**取最近若干篇后本地按「报告期 → 披露时间」倒序取最新一篇，故半年报/季报优先于年报；`doc_types` 非空时作白名单）→ 取该文档**实际章节名清单**（`/documents/{id}/sections`，缓存于 `report_datasink_sections_`）→ 按 `sections` 偏好子串匹配出**精确章节名**逐个取正文（每节独立缓存、命中者按声明顺序以空行拼接；首选项 404 时继续试下一候选；清单不可得**或非空但残缺**时回退偏好名直取）→ 仍无正文则**按报告期回溯上一份报告**（`_REPORT_CANDIDATE_LIMIT=3`，**年报/半年报优先于季报**：`_order_report_candidates` 稳定分组，季报无「管理层讨论与分析」只作最后兜底；标题含「公告」的信息披露条目跳过；命中即止，报告期/文种如实写入）→ **全文阶**：章节阶全失败时整篇下载后按偏好关键词定位片段（`_locate_from_fulltext`，跳过目录点线行/行内省略号，最多 `_FULLTEXT_FALLBACK_LIMIT=2` 篇，记录标 `section_source=fulltext`）→ 按 `datasink.max_chars` 截断为摘要。单篇正文经 `fetch_with_fallback` + 财报域适配器两槽，复用缓存/熔断/降级。**标的清单**由 `collect_a_share_targets(holdings, penetrated)` 生成：持仓场外基金经 `is_otc_fund_by_name` 剔除（`00` 重叠区），穿透标的带 `name`/`sources`（来源基金）用于展示层回填与来源标注；失败原因由 `fetch_symbol_report_detailed` 返回（索引无报告 / 目标章节缺失 + 已试报告期）。
+**取数链路**：`fetcher/financial_report.py` 逐标的取元数据（`/documents`，**不带文种过滤**取最近若干篇后本地按「报告期 → 披露时间」倒序取最新一篇，故半年报/季报优先于年报；`doc_types` 非空时作白名单；**主源索引为空时切巨潮备源**，同一元数据形状）→ 取该文档**实际章节名清单**（`/documents/{id}/sections`，缓存于 `report_datasink_sections_`；备源无章节清单，直接落偏好名直取）→ 按 `sections` 偏好子串匹配出**精确章节名**逐个取正文（每节独立缓存、命中者按声明顺序以空行拼接；首选项 404 时继续试下一候选；清单不可得**或非空但残缺**时回退偏好名直取）→ 仍无正文则**按报告期回溯上一份报告**（`_REPORT_CANDIDATE_LIMIT=3`，**年报/半年报优先于季报**：`_order_report_candidates` 稳定分组，季报无「管理层讨论与分析」只作最后兜底；标题含「公告」的信息披露条目跳过；命中即止，报告期/文种如实写入）→ **全文阶**：章节阶全失败时整篇下载后按偏好关键词定位片段（`_locate_from_fulltext`，跳过目录点线行/行内省略号，最多 `_FULLTEXT_FALLBACK_LIMIT=2` 篇，记录标 `section_source=fulltext`）→ 按 `datasink.max_chars` 截断为摘要。单篇正文经 `fetch_with_fallback` + 财报域适配器两槽（主：DataSinking；备：巨潮资讯网），复用缓存/熔断/降级；两源以 `source_hint` 做命名空间隔离（异源 doc_id 互不服务，备源候选进独立缓存键段），主源可用时备源零调用。关键词定位（目录行跳过）收敛于 `fetcher/report_locate.py`（全文兜底与备源切片共用同一规则）。**标的清单**由 `collect_a_share_targets(holdings, penetrated)` 生成：持仓场外基金经 `is_otc_fund_by_name` 剔除（`00` 重叠区），穿透标的带 `name`/`sources`（来源基金）用于展示层回填与来源标注；失败原因由 `fetch_symbol_report_detailed` 返回（索引无报告 / 目标章节缺失 + 已试报告期）。
 
 **限速与配额护栏**：每次 HTTP 请求前经 `RateLimiter` 以「间隔 = 1/每秒上限」限速（免费档 3 请求/秒；付费档 31）；日配额计数存 `data/state/datasink_quota.json`，超限即停并告警。**免费档无批量端点、必然逐篇请求**，故限速必须落在 provider 每次请求前（批量调度器层挡不住单条调用）。并发取数由 `batch.datasink_workers` 控制（默认 3），速率仍由 provider 兜底。
 
@@ -3381,6 +3381,10 @@ make_http_client(timeout=10.0) → httpx.Client
 | `build_prosperity_framework_data` | 景气度框架诊断装配入口（纯计算；输入市值明细/穿透/基本面/流动性/快照/历史走势 → 契约） | 行动建议（章内嵌块） | 分析计算 | 随 `prosperity_framework` |
 | `prosperity_framework_data` | 景气度框架诊断数据契约（available/reason/六维明细/持仓视角/未验证清单；类型 dict） | 行动建议（章内嵌块） | 报告输出 | 无（契约） |
 | `estimate_fund_roe_batch` | 基金重仓股 ROE 加权估算入口（取数编排：基金持仓批量 + 个股 ROE 补齐 → 推演值；报告期陈旧闸门与穿透层同口径；任一基金失败只缺席该基金） | 行动建议（章内嵌块） | 数据获取 | 随 `prosperity_framework` |
+| `cninfo` | 巨潮资讯网财报备源（公开免费无需凭据；公告列表 → 文种归类 → PDF 解析 → 章节切片；固定礼貌限速 + 429 退避；缺 pdfplumber 时降级为空文本） | 持仓基本面（区块②） | 数据获取 | 随 `financial_report_digest`（仅主源无该标的时接管） |
+| `fetch_report_listings` | 巨潮公告列表归一入口（元数据形状对齐主源索引，供编排层候选排序/报告期回溯零改动复用） | 持仓基本面（区块②） | 数据获取 | 随 `financial_report_digest` |
+| `CninfoReportAdapter` | 财报域备源适配器（`source_hint` 命名空间隔离；章节关键词切片走共用定位规则） | 持仓基本面（区块②） | 数据获取 | 随 `financial_report_digest` |
+| `locate_keyword_excerpt` | 财报正文关键词定位（跳过目录行；全文兜底与备源切片共用，单一实现） | 持仓基本面（区块②） | 分析计算 | 无 |
 | `fund_roe_estimates` | 基金 ROE 推演值映射（{基金代码: {roe/covered_pct/top_n/basis/report_period}}；`basis=top10_holdings` 为阶段一前十大重仓口径，全量持仓口径落地后新增取值） | 行动建议（章内嵌块） | 报告输出 | 无（契约） |
 | `roe_by_code_from_rows` | ROE 行解析唯一事实来源（财务指标契约行 → {代码: ROE}，含非数值过滤；评分维度/推演集合判定/编排层免重取三处共用） | 行动建议（章内嵌块） | 分析计算 | 无 |
 | `estimated_fund_codes` | 推演集合判定唯一事实来源（有可用推演值且无直接 ROE 的基金代码集；评分侧与契约说明/持仓视角标注侧共用，两侧不得各自实现） | 行动建议（章内嵌块） | 分析计算 | 无 |

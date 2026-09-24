@@ -11,6 +11,8 @@ itsdangerous==2.2.0
 click==8.4.2
 blinker==1.9.0
 
+pdfplumber>=0.11,<1.0  # 巨潮公告 PDF 解析（plan-50，providers/cninfo.py）；惰性导入，缺库时该源优雅降级
+
 Pillow>=10  # SVG 像素审查（scripts/check-svg.py pixel|text-overflow）需要
 
 pytest>=8.0

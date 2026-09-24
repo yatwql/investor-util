@@ -106,11 +106,17 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     ),
     # ── 市场情绪（同花顺官方：龙虎榜 + 连板梯队；盘中变化 → 短 TTL）──
     DataModuleDef("市场情绪", "sentiment", cache_prefixes=("sentiment_",), cache_ttl=3600.0, cache_groups=("refresh",)),
-    # ── 全文本财报（DataSinking；索引与正文分级 TTL）──
+    # ── 全文本财报（DataSinking 主源 + 巨潮备源；索引与正文分级 TTL）──
     DataModuleDef(
         "财报索引",
         "report",
-        cache_prefixes=("report_datasink_index_", "report_datasink_sections_"),
+        cache_prefixes=(
+            "report_datasink_index_",
+            "report_datasink_sections_",
+            "report_cninfo_index_",
+            "report_cninfo_orgid_",
+            "report_cninfo_text_",
+        ),
         cache_ttl=CACHE_TWO_WEEKS,
         cache_groups=("refresh",),
     ),
