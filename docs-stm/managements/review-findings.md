@@ -40,31 +40,6 @@
 
 > 无待处理项（`rf-420` 已修复，见「已解决问题」区）。
 
-#### P2D — 需求追溯映射（2026-09-24）
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-426** | **需求 ID 追溯链断裂**：`requirements.md` 定义 **277 个**需求 ID（35 个域），而 `testplan.md` / `technical.md` / `llm-technical.md` 对需求 ID 的引用数均为 **0**，requirements 亦不引用 testplan——无法机器回答「某需求是否有测试覆盖」 | 分批建立逐条映射（6 批）。**交付形态已定稿**：映射表落在 `testplan.md` §2.1「需求 ID ↔ 验证载体映射」（`<!-- requirement-trace:start/end -->` 标记区间）。**批 1（R-CCH 缓存域 38 条）已完成**：38 行映射全部落入 §2.1；配套断言脚本 `scripts/check-requirement-trace.py` 已建（五项断言：表格式/ID 合法/ID 唯一/已补全域全覆盖/载体文件存在），已并入 P0+P2 门禁；+16 例测试。剩余批 2~6（域前缀见脚本 `_ALL_DOMAINS`）待续——每完成一批把该域追加进脚本 `_COVERED_DOMAINS` 并补 §2.1 行 |
-
-> 来源：四文档一致性比对（用户要求）。**缺口**：`requirements.md` 定义 **277 个**需求 ID（35 个域），而 `testplan.md` / `technical.md` / `llm-technical.md` 对需求 ID 的引用数均为 **0**，requirements 亦不引用 testplan——「需求 → 设计 → 测试」的 ID 级追溯链断裂，无法机器回答「某需求是否有测试覆盖」。用户决策：**分批建立逐条映射**（本项即该批次任务的总登记）。
-
-**目标**：为 277 个需求 ID 逐条建立「验证载体」映射，使每条需求可追溯到具体测试文件/用例（无覆盖者显式标注「缺覆盖」并转入待办）。
-
-**分批计划**（按域条目数降序，每批以「域的语义内聚性 + 条目数 ≤20」为界）：
-
-| 批次 | 覆盖域 | ID 数 | 状态 |
-|---|---|---|---|
-| 批 1 | `R-CCH`（缓存） | 38 | 待办（可再拆为缓存键/TTL/清理三小组） |
-| 批 2 | `R-ERR`、`R-DIAG`、`R-BRK`、`R-CRD` | 39 | 待办（错误与降级治理域，语义同族） |
-| 批 3 | `R-FIN`、`R-FRD`、`R-NWS`、`R-DATA`、`R-IDX` | 37 | 待办（数据取数与财报域） |
-| 批 4 | `R-OUT`、`R-PERF`、`R-WIF`、`R-ACT`、`R-RBL`、`R-VAL`、`R-TAIL`、`R-EVO`、`R-SNP`、`R-CFL`、`R-DIFF`、`R-PEN` | 57 | 待办（报告输出与分析域） |
-| 批 5 | `R-LLM`、`R-PF`、`R-CTX` | 25 | 待办（LLM 域；含本轮 plan-47/48 口径） |
-| 批 6 | `R-WEB`、`R-TUI`、`R-ENV`、`R-HLD`、`R-DIS`、`R-LIQ`、`R-FX`、`R-CON`、`R-ADP`、`R-HST` | 61 | 待办（渠道/输入/分析杂项域） |
-
-**交付形态**（每批完成时）：在 `testplan.md` §2 覆盖表新增一列「验证载体（需求 ID）」，或在 `requirements.md` 各需求行加「验证位置」列——**二选一需在批 1 启动时定稿**（避免中途换形态导致返工）；配套新增断言脚本（复用 `_checklib`）校验「需求 ID ↔ 映射」双向一致，纳入 `--ci`。
-
-**口径要点**：映射粒度以「可机器校验」为准（ID → 文件/用例名），不追求逐条等价；一条需求允许多载体；无覆盖者必须显式登记而非留空（空值即漏检）。
-
 ## 已解决问题
 
 ### 已解决待归档（v0.11.3-dev）
@@ -73,6 +48,7 @@
 
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
+| **rf-426** | **需求 ID 追溯链断裂**（用户要求四文档一致性比对时发现）：`requirements.md` 定义 **276 个**需求 ID（34 个域），而 `testplan.md` / `technical.md` / `llm-technical.md` 对需求 ID 的引用数均为 **0**——无法机器回答「某需求是否有测试覆盖」 | 六批全部完成：`testplan.md` §2.1 建立 **276 行**「需求 ID ↔ 验证载体映射」（`<!-- requirement-trace:start/end -->` 标记区间，载体精确到 `文件::用例`）；新增 `scripts/check-requirement-trace.py`（五项断言：表格式/ID 合法/ID 唯一/**全域全覆盖**/载体文件存在）+ 已并入 P0+P2 门禁；测试 `test_check_requirement_trace.py` 覆盖解析/断言/真实仓库全量对照。详见 changelog |
 | **rf-427** | **手册 Extended Thinking 章节遗漏 Kimi 且章节内自相矛盾**（用户要求「三份管理文档 vs 用户文档」比对时发现）：`how-to-config-llm.md` 的支持矩阵 bullet（564 行）已含 Kimi，但「模型差异」对比表（592-597）仅 3 列（Claude/DeepSeek/Gemini）、关系段（601/608 行）写「**仅在使用 Claude 或 Gemini 模型时** `thinking_budget` 有意义」「API 硬性约束（仅 Claude / Gemini）」——与代码（`_THINKING_SUPPORTED_PREFIXES` 含 `kimi-`、`_THINKING_EFFORT_MODEL_PREFIXES` 不含 kimi → Kimi 走 budget_tokens）及 `llm-technical.md:556`（已列 Kimi）**双双矛盾**；读者会误以为 Kimi 的 thinking 配置无效。且此类「手册章节内自相矛盾」当时无任何断言覆盖 | ① 对比表补 **Kimi 列**（控制参数/互斥关系/兼容端点/推荐场景）并新增「默认思考行为」行；② 601/608/610 行措辞改为「Claude / Gemini / Kimi（`budget_tokens` 族）」；③ 补「默认开思考厂商（DeepSeek / Kimi）需注意」说明段（未开启 thinking 时工具自动发 `disabled` 兜底）；④ **新增断言（check-doc-drift 第 13 项）** `check_thinking_support_matrix`：从代码前缀名单派生「支持族/effort 族/默认开思考族」，校验手册对比表列覆盖全部支持族、「仅」式预算枚举句须含全部 budget 族、默认开思考族须有提示；⑤ 回归 +7 例；⑥ 检查项枚举同步 6 处（脚本 OK 文案/argparse、folders.md ×2、developer-guide.md、testplan.md ×2、CLAUDE.md ×2） |
 | **rf-425** | **测试用例全量审计（用户要求：查冗余用例 / 无效用例 / 命名与内容语义相关）**：门禁 `check-test-redundancy`（死用例/无断言/完全重复/自证）零告警；增强扫描（7,378 用例 AST 级）发现三类问题——① **真冗余**：`TestSupportsExtendedThinking` / `TestIsEffortModel` 两个类在 `test_llm_utils.py` 与 `test_llm_api_base.py` **重复存在**，且后者为前者严格子集（唯一独有断言：`gpt-4o → False`）；② **粗命名 26 处**：`test_success` / `test_normal` / `test_basic` 类命名不承载内容（如 `TestFetchNav::test_success`）；③ **弱断言 1 处**：`test_missing_code_still_processes` 对 `float \| None` 返回值仅断言「非空」——虽仍有判别力，但实现假化为恒返非空值时仍通过。**判定无问题**：跨文件同体对 1 组（`test_no_quotes`，sina/tencent 两家解析器的并行覆盖，符合 rf-411 既定口径）；输入条件式命名 26 处（`TestParseFloat::test_zero` 等，类上下文已带语义，属合规模式） | ① **去冗余**：`gpt-4o` 独有用例迁入 utils 版（新增 `test_non_llm_family_not_supported`），删除 `test_llm_api_base.py` 的两个子集类（-5 例，覆盖零损失）；② **重命名 26 处**为名实相符的描述性命名（逐个读函数体后按 docstring 语义定名，如 `test_returns_standard_quote_record`、`test_parses_roll_data_items`、`test_formats_dividend_yield_percent`）——避免 rf-411 那类「名实不符」新缺陷；③ **强化弱断言**：`turnover_rate` 用例改为精确断言 `== 1.0`（两期权重不相交，语义可推导）。净用例数 -4（7,764 → 7,760） |
 | **rf-424** | **管理文档分区纪律无断言覆盖**（承接 rf-423 同类根因，用户同意后实施）：本轮两次自审失误同源——① 待处理项 `rf-420` 被误置「已解决待归档」表（rf-421 记录）；② 发布时误删 changelog 归档索引（rf-423）。二者本质都是「管理文档的分区/索引纪律只靠人工遵守，无机器断言」，门禁全绿也拦不住 | ① `check-doc-drift.py` 新增第 12 项 `audit_management_partitions`（纯函数，便于直测）：**A** review-findings 同一 rf 不得同时出现在待处理与已解决分区；**且已解决项必须在 changelog（现行 + 归档）有修复记录**——待处理项被误置已解决区时必然不满足（即 rf-421 类失误的可检特征）；**B** plan 待办区不得出现 ✅ 已完成项、不得列已归档项（已归档项只认 `#### ✅ `plan-N`` 条目标题，归档文件正文提及不误判）；**C** 现行 changelog 只允许一个版本段头且必须为 `-dev` 段（已发布段须随发布移入归档）；② 回归 +10 例（真实仓库一致 / 三类失误各自检出 / 归档 changelog 记录不误报 / 归档正文提及不误报 / 空文件不崩）；③ 检查项枚举同步 6 处（脚本 OK 文案与 argparse、folders.md ×2、developer-guide.md、testplan.md ×2、CLAUDE.md ×2） |

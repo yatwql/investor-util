@@ -323,7 +323,7 @@
 
 ### 2.1 需求 ID ↔ 验证载体映射
 
-`requirements.md` 的每条需求 ID 在测试侧均应有确定载体。本表按需求域**分批补全**：每批把该域全部 ID 落入表内，由 `scripts/check-requirement-trace.py --ci` 断言「已补域全覆盖 + 载体文件存在 + ID 双向一致」。
+`requirements.md` 的**每条需求 ID**（34 域 / 276 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。
 
 | 需求 ID | 验证载体（`测试文件::用例`，粗粒度时仅列文件） | 补全批次 |
 |:--|:--|:--:|
@@ -366,6 +366,244 @@
 | R-CCH-36 | `src/test/unit/handlers/test_handlers_cache.py::test_with_valid_codes` + `src/test/unit/core/test_cache_cleanup.py`（分红前缀清理） | 批 1 |
 | R-CCH-37 | `src/test/unit/news/test_news_aggregator.py::test_cache_hit` / `::test_cache_miss` / `::test_default_sources`（缓存键含源+关键词摘要） | 批 1 |
 | R-CCH-38 | `src/test/unit/cache/test_holdings_tracker.py::test_different_shares_different_fingerprint` / `::test_different_cost_different_fingerprint` / `::test_different_account_different_fingerprint` / `::test_fingerprint_mismatch_new_codes` | 批 1 |
+| R-ERR-01 | `src/test/unit/fetcher/test_chain.py` + `src/test/scenario/resilience/test_scenario_resilience_flows.py` | 批 2 |
+| R-ERR-02 | `src/test/unit/core/test_cache_core.py::test_corrupted_json_deletes_file`（同 R-CCH-05） | 批 2 |
+| R-ERR-03 | `src/test/unit/config/test_config.py` + `src/test/unit/core/test_data_freshness.py` | 批 2 |
+| R-ERR-04 | `src/test/unit/fetcher/test_batch.py` | 批 2 |
+| R-ERR-05 | `src/test/unit/report/test_data_status.py` | 批 2 |
+| R-ERR-06 | `src/test/unit/config/test_local_state.py` | 批 2 |
+| R-ERR-07 | `src/test/scenario/llm/test_llm_disabled.py` + `src/test/unit/report/test_llm_module_info.py` | 批 2 |
+| R-ERR-08 | `src/test/scenario/llm/test_llm_disabled.py` + `src/test/unit/report/test_section_visibility.py` | 批 2 |
+| R-ERR-09 | `src/test/unit/llm/test_llm_placeholder.py` + `src/test/unit/llm/test_llm_placeholder_distinction_edge.py` | 批 2 |
+| R-ERR-10 | `src/test/unit/report/test_html_fund_deep_renderers.py` + `src/test/unit/report/test_excel_fund_deep_analysis.py` | 批 2 |
+| R-ERR-11 | `src/test/unit/report/test_news_degradation_edge.py` | 批 2 |
+| R-ERR-12 | `src/test/unit/report/test_portfolio_history.py` | 批 2 |
+| R-ERR-13 | `src/test/unit/report/test_portfolio_history.py` | 批 2 |
+| R-ERR-14 | `src/test/unit/report/test_portfolio_history.py` + `src/test/unit/config/test_config.py` | 批 2 |
+| R-ERR-15 | `src/test/unit/analysis/test_snapshot_diff_edge.py` | 批 2 |
+| R-ERR-16 | `src/test/unit/analysis/test_snapshot_diff_edge.py` | 批 2 |
+| R-DIAG-01 | `src/test/unit/cli/test_cli.py` + `src/test/unit/core/test_log_reader.py` | 批 2 |
+| R-DIAG-02 | `src/test/unit/ui/test_handlers_log.py` + `src/test/unit/ui/test_tui_menu.py` | 批 2 |
+| R-DIAG-03 | `src/test/unit/web/test_handlers.py` + `src/test/unit/web/test_health_credential.py` | 批 2 |
+| R-DIAG-04 | `src/test/unit/cli/test_cli.py` + `src/test/unit/core/test_doctor.py` | 批 2 |
+| R-DIAG-05 | `src/test/unit/ui/test_tui_menu.py` + `src/test/unit/config/test_features.py` | 批 2 |
+| R-DIAG-06 | `src/test/unit/web/test_handlers.py` + `src/test/unit/core/test_doctor.py` | 批 2 |
+| R-DIAG-07 | `src/test/unit/core/test_doctor.py` + `src/test/unit/config/test_features.py` | 批 2 |
+| R-BRK-01 | `src/test/unit/core/test_provider_registry.py` | 批 2 |
+| R-BRK-02 | `src/test/unit/core/test_provider_registry.py` + `src/test/unit/fetcher/test_fetcher_industry.py` | 批 2 |
+| R-BRK-03 | `src/test/unit/core/test_provider_registry.py` | 批 2 |
+| R-BRK-04 | `src/test/unit/llm/test_circuit_breaker_recovery.py` + `src/test/unit/llm/test_circuit_breaker_edge.py` | 批 2 |
+| R-BRK-05 | `src/test/unit/core/test_provider_registry.py` | 批 2 |
+| R-BRK-06 | `src/test/unit/core/test_circuit_breaker_gateway.py` + `src/test/unit/llm/test_circuit_breaker_recovery.py` | 批 2 |
+| R-BRK-07 | `src/test/unit/core/test_circuit_breaker_gateway.py` + `src/test/unit/config/test_local_state.py` | 批 2 |
+| R-BRK-08 | `src/test/unit/core/test_circuit_breaker_gateway.py`（网关统一双熔断器）+ `src/test/unit/core/test_provider_registry.py` | 批 2 |
+| R-CRD-01 | `src/test/unit/core/test_datasource_credential.py` | 批 2 |
+| R-CRD-02 | `src/test/unit/core/test_datasource_credential.py` + `src/test/unit/core/test_datasource_credential_edge.py` | 批 2 |
+| R-CRD-03 | `src/test/unit/core/test_datasource_credential.py` | 批 2 |
+| R-CRD-04 | `src/test/unit/fetcher/test_credential_gate.py` | 批 2 |
+| R-CRD-05 | `src/test/unit/core/test_check_sources_credential.py` | 批 2 |
+| R-CRD-06 | `src/test/unit/core/test_doctor_credential.py` | 批 2 |
+| R-CRD-07 | `src/test/unit/core/test_datasource_credential.py` + `src/test/unit/llm/test_log_sanitize.py` | 批 2 |
+| R-CRD-08 | `src/test/unit/config/test_features.py` + `src/test/unit/core/test_datasource_credential.py` | 批 2 |
+| R-FIN-01 | `src/test/unit/report/test_financial_indicator.py` + `src/test/unit/fetcher/test_financial_indicator.py` | 批 3 |
+| R-FIN-02 | `src/test/unit/providers/test_akshare_financial.py` | 批 3 |
+| R-FIN-03 | `src/test/unit/fetcher/test_financial_indicator.py` + `src/test/unit/fetcher/test_chain.py` | 批 3 |
+| R-FIN-04 | `src/test/unit/core/test_code_utils.py` | 批 3 |
+| R-FIN-13 | `src/test/unit/report/test_financial_indicator.py` | 批 3 |
+| R-FIN-05 | `src/test/unit/analysis/test_financial_indicator_edge.py` + `src/test/unit/fetcher/test_financial_indicator.py` | 批 3 |
+| R-FIN-15 | `src/test/unit/analysis/test_financial_indicator.py` | 批 3 |
+| R-FIN-14 | `src/test/unit/analysis/test_financial_statement_derive.py` | 批 3 |
+| R-FIN-06 | `src/test/unit/fetcher/test_financial_indicator.py` + `src/test/unit/providers/test_datasink.py` | 批 3 |
+| R-FIN-07 | `src/test/unit/analysis/test_financial_indicator_extract.py` + `src/test/unit/analysis/test_financial_indicator_extract_edge.py` | 批 3 |
+| R-FIN-09 | `src/test/unit/report/test_financial_indicator.py` + `src/test/unit/report/test_html_report_structure.py` | 批 3 |
+| R-FIN-10 | `src/test/unit/report/test_financial_indicator.py` | 批 3 |
+| R-FIN-11 | `src/test/unit/fetcher/test_financial_indicator.py` | 批 3 |
+| R-FIN-12 | `src/test/integration/test_module_contract.py` + `src/test/unit/report/test_pipeline_data_builder.py` | 批 3 |
+| R-FIN-08 | `src/test/unit/fetcher/test_financial_report.py` + `src/test/unit/analysis/test_financial_indicator_extract.py` | 批 3 |
+| R-FRD-01 | `src/test/unit/report/test_financial_report_digest.py` | 批 3 |
+| R-FRD-02 | `src/test/unit/core/test_datasource_credential.py` + `src/test/unit/providers/test_datasink.py` | 批 3 |
+| R-FRD-03 | `src/test/unit/fetcher/test_financial_report.py` | 批 3 |
+| R-FRD-04 | `src/test/unit/providers/test_datasink.py` | 批 3 |
+| R-FRD-05 | `src/test/unit/report/test_financial_report_digest.py` + `src/test/unit/fetcher/test_report_backup_source.py` | 批 3 |
+| R-FRD-06 | `src/test/unit/fetcher/test_financial_report.py` | 批 3 |
+| R-FRD-07 | `src/test/unit/core/test_registry.py::test_cache_ttl_defaults_known_values` + `src/test/unit/fetcher/test_report_backup_source.py` | 批 3 |
+| R-NWS-01 | `src/test/unit/news/test_news_aggregator.py` | 批 3 |
+| R-NWS-02 | `src/test/unit/news/test_news_correlator.py` | 批 3 |
+| R-NWS-03 | `src/test/unit/news/test_news_keywords.py` | 批 3 |
+| R-NWS-04 | `src/test/unit/report/test_news_correlation.py` | 批 3 |
+| R-NWS-05 | `src/test/unit/news/test_news_sources.py` | 批 3 |
+| R-NWS-06 | `src/test/unit/news/test_news_correlator.py` + `src/test/unit/report/test_news_correlation.py` | 批 3 |
+| R-DATA-01 | `src/test/unit/fetcher/test_chain.py` + `src/test/scenario/resilience/test_scenario_resilience_flows.py` | 批 3 |
+| R-DATA-02 | `src/test/unit/fetcher/test_batch.py` | 批 3 |
+| R-DATA-03 | `src/test/unit/core/test_provider_registry.py` | 批 3 |
+| R-DATA-04 | `src/test/unit/core/test_cache_edge.py::test_market_open_uses_short_ttl` / `::test_market_closed_uses_static_ttl` | 批 3 |
+| R-DATA-05 | `src/test/unit/core/test_data_freshness.py` | 批 3 |
+| R-DATA-06 | `src/test/unit/core/test_code_utils_classification.py` + `src/test/unit/fetcher/test_fund.py` | 批 3 |
+| R-IDX-01 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_tencent.py` | 批 3 |
+| R-IDX-02 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_sina.py` | 批 3 |
+| R-IDX-03 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/fetcher/test_chain.py` | 批 3 |
+| R-OUT-01 | `src/test/unit/report/test_orchestrator.py` | 批 4 |
+| R-OUT-02 | `src/test/unit/report/test_excel_writer.py` | 批 4 |
+| R-OUT-03 | `src/test/unit/report/test_excel_generator.py` | 批 4 |
+| R-OUT-04 | `src/test/unit/report/test_html_writer.py` | 批 4 |
+| R-OUT-05 | `src/test/unit/report/test_excel_report_structure.py` | 批 4 |
+| R-OUT-06 | `src/test/unit/report/test_html_report_structure.py` | 批 4 |
+| R-OUT-07 | `src/test/unit/report/test_orchestrator.py` + `src/test/unit/config/test_config.py` | 批 4 |
+| R-OUT-08 | `src/test/unit/report/test_excel_report_structure.py` | 批 4 |
+| R-OUT-09 | `src/test/unit/report/test_section_visibility.py` | 批 4 |
+| R-OUT-10 | `src/test/unit/report/test_html_report_structure.py` + `src/test/unit/report/test_feature_interactive.py` | 批 4 |
+| R-OUT-11 | `src/test/unit/report/test_theme_js.py` + `src/test/unit/report/test_feature_interactive.py` | 批 4 |
+| R-PERF-01 | `src/test/unit/news/test_news_aggregator.py` | 批 4 |
+| R-PERF-02 | `src/test/unit/llm/test_generate_all_llm.py` | 批 4 |
+| R-PERF-03 | `src/test/unit/fetcher/test_batch.py` | 批 4 |
+| R-PERF-04 | `src/test/unit/config/test_config.py` | 批 4 |
+| R-PERF-05 | `src/test/unit/llm/test_llm_prompt_builders.py` | 批 4 |
+| R-PERF-06 | `src/test/unit/core/test_provider_registry.py` | 批 4 |
+| R-PERF-07 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/report/test_portfolio_history.py` | 批 4 |
+| R-PERF-08 | `src/test/unit/core/test_phase_timeout.py` | 批 4 |
+| R-PERF-09 | `src/test/unit/report/test_progress.py` + `src/test/unit/config/test_local_state.py` | 批 4 |
+| R-PERF-10 | `src/test/unit/core/test_check_sources.py` + `src/test/unit/config/test_local_state.py` | 批 4 |
+| R-WIF-01 | `src/test/unit/cli/test_cli.py` + `src/test/integration/test_cli_integration.py` | 批 4 |
+| R-WIF-02 | `src/test/unit/analysis/test_whatif.py` | 批 4 |
+| R-WIF-03 | `src/test/unit/analysis/test_whatif.py` | 批 4 |
+| R-WIF-04 | `src/test/unit/analysis/test_whatif.py` | 批 4 |
+| R-WIF-05 | `src/test/unit/report/test_whatif_writer.py` + `src/test/unit/report/test_whatif_sheet.py` + `src/test/unit/report/test_whatif_html.py` | 批 4 |
+| R-WIF-06 | `src/test/unit/analysis/test_whatif.py` + `src/test/unit/report/test_whatif_operations.py` | 批 4 |
+| R-WIF-07 | `src/test/unit/report/test_whatif_sheet.py` + `src/test/unit/cli/test_cli_edge.py` | 批 4 |
+| R-WIF-08 | `src/test/unit/handlers/test_handlers_whatif.py` | 批 4 |
+| R-WIF-09 | `src/test/unit/analysis/test_whatif_backtest.py` | 批 4 |
+| R-WIF-10 | `src/test/unit/analysis/test_whatif_backtest.py` | 批 4 |
+| R-WIF-11 | `src/test/unit/analysis/test_whatif_backtest_edge.py` + `src/test/unit/report/test_whatif_sheet.py` | 批 4 |
+| R-ACT-01 | `src/test/unit/report/test_action_sheet.py` + `src/test/unit/config/test_features.py` | 批 4 |
+| R-ACT-02 | `src/test/unit/report/test_action_sheet.py` + `src/test/integration/test_module_contract.py` | 批 4 |
+| R-ACT-03 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |
+| R-ACT-04 | `src/test/unit/report/test_action_sheet.py` + `src/test/unit/analysis/test_return_attribution.py` | 批 4 |
+| R-ACT-05 | `src/test/unit/report/test_action_html.py` + `src/test/unit/report/test_section_visibility.py` | 批 4 |
+| R-RBL-01 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |
+| R-RBL-02 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |
+| R-RBL-03 | `src/test/unit/analysis/test_rebalance.py` + `src/test/unit/config/test_config.py` | 批 4 |
+| R-RBL-04 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |
+| R-RBL-05 | `src/test/unit/analysis/test_rebalance_edge.py` + `src/test/unit/config/test_local_state.py` | 批 4 |
+| R-RBL-06 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |
+| R-RBL-07 | `src/test/unit/analysis/test_rebalance.py` + `src/test/unit/analysis/test_rebalance_edge.py` | 批 4 |
+| R-RBL-08 | `src/test/unit/analysis/test_rebalance_advisor.py` | 批 4 |
+| R-VAL-01 | `src/test/unit/analysis/test_valuation_percentile.py` | 批 4 |
+| R-VAL-02 | `src/test/unit/analysis/test_valuation_percentile.py` | 批 4 |
+| R-VAL-04 | `src/test/unit/analysis/test_valuation_percentile.py` + `src/test/unit/report/test_valuation_temperature_wiring.py` | 批 4 |
+| R-VAL-03 | `src/test/unit/analysis/test_valuation_percentile.py` + `src/test/unit/analysis/test_valuation_percentile_edge.py` | 批 4 |
+| R-TAIL-01 | `src/test/unit/analysis/test_tail_risk.py` | 批 4 |
+| R-TAIL-02 | `src/test/unit/analysis/test_tail_risk.py` | 批 4 |
+| R-TAIL-03 | `src/test/unit/analysis/test_tail_risk_edge.py` | 批 4 |
+| R-TAIL-04 | `src/test/unit/report/test_tail_risk_wiring.py` | 批 4 |
+| R-EVO-01 | `src/test/unit/analysis/test_portfolio_evolution.py` | 批 4 |
+| R-EVO-02 | `src/test/unit/analysis/test_portfolio_evolution.py` | 批 4 |
+| R-EVO-03 | `src/test/unit/report/test_evolution_sheet.py` + `src/test/unit/report/test_evolution_html.py` | 批 4 |
+| R-EVO-04 | `src/test/unit/config/test_features.py` + `src/test/unit/report/test_section_visibility.py` | 批 4 |
+| R-SNP-01 | `src/test/unit/report/test_history_snapshot_namespace.py` | 批 4 |
+| R-SNP-02 | `src/test/unit/handlers/test_handlers_cache.py` + `src/test/unit/report/test_history_snapshot_namespace.py` | 批 4 |
+| R-SNP-03 | `src/test/unit/report/test_history_snapshot_namespace.py` | 批 4 |
+| R-SNP-04 | `src/test/unit/report/test_history_snapshot_namespace.py` | 批 4 |
+| R-SNP-05 | `src/test/unit/analysis/test_snapshot_diff.py` | 批 4 |
+| R-SNP-06 | `src/test/unit/analysis/test_snapshot_diff_edge.py` | 批 4 |
+| R-CFL-01 | `src/test/unit/analysis/test_cost_flow.py` | 批 4 |
+| R-CFL-02 | `src/test/unit/analysis/test_cost_flow.py` | 批 4 |
+| R-CFL-03 | `src/test/unit/analysis/test_cost_flow.py` + `src/test/unit/config/test_features.py` | 批 4 |
+| R-CFL-04 | `src/test/unit/report/test_category.py` + `src/test/unit/analysis/test_cost_flow.py` | 批 4 |
+| R-DIFF-01 | `src/test/unit/analysis/test_snapshot_diff.py` | 批 4 |
+| R-DIFF-02 | `src/test/unit/analysis/test_snapshot_diff.py` | 批 4 |
+| R-DIFF-03 | `src/test/unit/analysis/test_snapshot_diff_edge.py` | 批 4 |
+| R-DIFF-04 | `src/test/unit/report/test_evolution_sheet.py` + `src/test/unit/report/test_evolution_html.py` | 批 4 |
+| R-LLM-01 | `src/test/unit/ui/test_tui_menu.py` | 批 5 |
+| R-LLM-02 | `src/test/unit/config/test_features.py` + `src/test/unit/llm/test_generate_all_llm.py` | 批 5 |
+| R-LLM-03 | `src/test/unit/llm/test_llm_api_multi.py` + `src/test/unit/llm/test_llm_utils.py` | 批 5 |
+| R-LLM-04 | `src/test/unit/llm/test_llm_fallback.py` | 批 5 |
+| R-LLM-05 | `src/test/unit/report/test_llm_module_info.py` + `src/test/unit/llm/test_cost_tracker.py` | 批 5 |
+| R-LLM-06 | `src/test/unit/llm/test_llm_chain_strategies.py` + `src/test/unit/llm/test_strategy.py` | 批 5 |
+| R-LLM-07 | `src/test/unit/config/test_llm_settings.py` + `src/test/unit/config/test_config_llm_multi.py` | 批 5 |
+| R-LLM-09 | `src/test/unit/llm/test_prompts_signals.py` | 批 5 |
+| R-LLM-08 | `src/test/unit/llm/test_llm_api.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
+| R-PF-01 | `src/test/unit/config/test_features.py` + `src/test/unit/report/test_section_visibility.py` | 批 5 |
+| R-PF-02 | `src/test/unit/analysis/test_prosperity_framework.py` | 批 5 |
+| R-PF-03 | `src/test/unit/analysis/test_prosperity_framework.py` | 批 5 |
+| R-PF-09 | `src/test/unit/report/test_fund_roe_estimate.py` + `src/test/unit/analysis/test_prosperity_framework.py` | 批 5 |
+| R-PF-04 | `src/test/unit/analysis/test_prosperity_framework.py` + `src/test/unit/analysis/test_prosperity_framework_edge.py` | 批 5 |
+| R-PF-05 | `src/test/unit/analysis/test_prosperity_framework.py` | 批 5 |
+| R-PF-06 | `src/test/unit/report/test_prosperity_framework_wiring.py` | 批 5 |
+| R-PF-07 | `src/test/unit/analysis/test_prosperity_framework.py` | 批 5 |
+| R-PF-08 | `src/test/unit/config/test_config.py` + `src/test/scenario/basic/test_scenario_prosperity_framework.py` | 批 5 |
+| R-CTX-01 | `src/test/unit/config/test_config.py` + `src/test/unit/report/test_benchmark.py` | 批 5 |
+| R-CTX-02 | `src/test/unit/report/test_benchmark.py` | 批 5 |
+| R-CTX-03 | `src/test/unit/report/test_benchmark.py` | 批 5 |
+| R-CTX-04 | `src/test/unit/report/test_benchmark.py` | 批 5 |
+| R-CTX-05 | `src/test/unit/llm/test_llm_prompt_builders.py` + `src/test/unit/report/test_benchmark_edge.py` | 批 5 |
+| R-CTX-06 | `src/test/unit/llm/test_prompts_core.py` | 批 5 |
+| R-CTX-07 | `src/test/unit/ui/test_tui_handlers.py` + `src/test/unit/handlers/test_handlers_config.py` | 批 5 |
+| R-WEB-01 | `src/test/unit/web/test_server.py` | 批 6 |
+| R-WEB-02 | `src/test/unit/web/test_upload.py` + `src/test/unit/web/test_upload_edge.py` | 批 6 |
+| R-WEB-03 | `src/test/unit/web/test_handlers.py` | 批 6 |
+| R-WEB-04 | `src/test/unit/web/test_progress.py` | 批 6 |
+| R-WEB-05 | `src/test/unit/web/test_handlers.py` + `src/test/unit/web/test_web_static_serving.py` | 批 6 |
+| R-WEB-06 | `src/test/unit/web/test_runs.py` | 批 6 |
+| R-WEB-07 | `src/test/unit/web/test_upload.py` + `src/test/unit/web/test_runs.py` | 批 6 |
+| R-WEB-08 | `src/test/unit/web/test_config_edit.py` + `src/test/unit/web/test_config_edit_edge.py` | 批 6 |
+| R-WEB-09 | `src/test/unit/web/test_holdings_update.py` + `src/test/unit/web/test_holdings_update_edge.py` | 批 6 |
+| R-TUI-01 | `src/test/unit/ui/test_tui_menu.py` | 批 6 |
+| R-TUI-02 | `src/test/unit/ui/test_tui_menu.py` + `src/test/unit/ui/test_tui_keys.py` | 批 6 |
+| R-TUI-06 | `src/test/unit/ui/test_tui_menu.py` + `src/test/unit/config/test_config.py` | 批 6 |
+| R-TUI-03 | `src/test/unit/ui/test_tui_handlers.py` | 批 6 |
+| R-TUI-04 | `src/test/unit/ui/test_tui_handlers.py` + `src/test/unit/ui/test_tui_edge.py` | 批 6 |
+| R-TUI-05 | `src/test/unit/report/test_progress.py` | 批 6 |
+| R-ENV-01 | `src/test/unit/cli/test_cli.py`（CLI 入口）+ 手工验收（testplan §4 环境项） | 批 6 |
+| R-ENV-02 | `src/test/unit/scripts/test_script_encoding.py`（脚本编码）+ 手工验收（testplan §4 启动脚本项） | 批 6 |
+| R-ENV-03 | `src/test/unit/scripts/test_script_encoding.py` + 手工验收（testplan §4 启动脚本项） | 批 6 |
+| R-ENV-04 | `src/test/unit/web/test_smoke_web.py` + 手工验收（testplan §4 Web 启动项） | 批 6 |
+| R-ENV-05 | `src/test/unit/scripts/test_script_encoding.py` + `src/test/unit/cli/test_cli.py` | 批 6 |
+| R-HLD-01 | `src/test/unit/core/test_reader.py` | 批 6 |
+| R-HLD-02 | `src/test/unit/core/test_reader.py` + `src/test/unit/core/test_models.py` | 批 6 |
+| R-HLD-03 | `src/test/unit/core/test_reader.py` | 批 6 |
+| R-HLD-04 | `src/test/unit/core/test_reader.py` | 批 6 |
+| R-HLD-05 | `src/test/unit/core/test_code_utils.py` | 批 6 |
+| R-DIS-01 | `src/test/unit/analysis/test_trade_discipline.py` | 批 6 |
+| R-DIS-02 | `src/test/unit/analysis/test_trade_discipline.py` | 批 6 |
+| R-DIS-03 | `src/test/unit/analysis/test_trade_discipline.py` | 批 6 |
+| R-DIS-04 | `src/test/unit/analysis/test_trade_discipline.py` | 批 6 |
+| R-DIS-05 | `src/test/unit/analysis/test_trade_discipline.py` + `src/test/unit/config/test_config.py` | 批 6 |
+| R-LIQ-01 | `src/test/unit/analysis/test_liquidity.py` | 批 6 |
+| R-LIQ-02 | `src/test/unit/analysis/test_liquidity_otc.py` | 批 6 |
+| R-LIQ-03 | `src/test/unit/analysis/test_liquidity_otc.py` + `src/test/unit/core/test_code_utils.py` | 批 6 |
+| R-LIQ-04 | `src/test/unit/analysis/test_liquidity.py` | 批 6 |
+| R-LIQ-05 | `src/test/unit/llm/test_llm_prompt_builders.py` | 批 6 |
+| R-LIQ-06 | `src/test/unit/analysis/test_liquidity.py` | 批 6 |
+| R-LIQ-07 | `src/test/unit/analysis/test_liquidity_otc.py` | 批 6 |
+| R-LIQ-08 | `src/test/unit/analysis/test_liquidity.py` + `src/test/unit/analysis/test_liquidity_edge.py` | 批 6 |
+| R-FX-01 | `src/test/unit/analysis/test_fx_exposure.py` | 批 6 |
+| R-FX-02 | `src/test/unit/analysis/test_fx_exposure.py` | 批 6 |
+| R-FX-03 | `src/test/unit/analysis/test_fx_exposure.py` | 批 6 |
+| R-FX-04 | `src/test/unit/analysis/test_fx_exposure.py` | 批 6 |
+| R-FX-05 | `src/test/unit/llm/test_llm_prompt_builders.py` | 批 6 |
+| R-CON-01 | `src/test/scenario/llm/test_llm_disabled.py` | 批 6 |
+| R-CON-02 | `src/test/unit/config/test_config_edge.py` | 批 6 |
+| R-CON-03 | `src/test/unit/core/test_reader.py` | 批 6 |
+| R-CON-04 | `src/test/unit/core/test_filesystem_edge.py` | 批 6 |
+| R-CON-05 | `src/test/scenario/basic/test_scenario_basic_flows.py` | 批 6 |
+| R-CON-06 | `src/test/integration/test_error_isolation.py` | 批 6 |
+| R-CON-07 | `src/test/unit/fetcher/test_chain.py` + `src/test/scenario/resilience/test_chain_resilience.py` | 批 6 |
+| R-CON-08 | `src/test/unit/report/test_data_status.py` | 批 6 |
+| R-ADP-01 | `src/test/unit/fetcher/test_source_adapter.py` | 批 6 |
+| R-ADP-02 | `src/test/unit/fetcher/test_source_adapter.py` | 批 6 |
+| R-ADP-03 | `src/test/unit/fetcher/test_source_adapter.py` + `src/test/unit/fetcher/test_quote_adapter_parity.py` | 批 6 |
+| R-ADP-04 | `src/test/unit/fetcher/test_chain.py` + `src/test/unit/fetcher/test_quote_adapter_parity.py` | 批 6 |
+| R-ADP-05 | `src/test/unit/fetcher/test_quote_adapter_parity.py` | 批 6 |
+| R-ADP-06 | `src/test/unit/fetcher/test_source_adapter_edge.py` + `src/test/unit/config/test_features.py` | 批 6 |
+| R-ADP-07 | `src/test/unit/fetcher/test_source_adapter.py` | 批 6 |
+| R-ADP-08 | `src/test/unit/config/test_features.py` | 批 6 |
+| R-HST-01 | `src/test/unit/fetcher/test_fetcher_price.py` + `src/test/unit/providers/test_tencent.py` | 批 6 |
+| R-HST-02 | `src/test/unit/providers/test_tiantian.py` + `src/test/unit/providers/test_eastmoney.py` | 批 6 |
+| R-HST-03 | `src/test/unit/fetcher/test_fetcher_index.py` | 批 6 |
+| R-HST-04 | `src/test/unit/fetcher/test_fetcher_index.py` | 批 6 |
+| R-HST-05 | `src/test/unit/config/test_config.py` + `src/test/unit/report/test_portfolio_history.py` | 批 6 |
+| R-HST-06 | `src/test/unit/fetcher/test_fund.py` | 批 6 |
+| R-HST-07 | `src/test/unit/fetcher/test_fetcher_index.py` | 批 6 |
 <!-- requirement-trace:end -->
 ---
 

@@ -117,6 +117,17 @@ class TestRealRepo:
         """已补全域必须都在 _ALL_DOMAINS 之内（防域前缀写错）。"""
         assert set(trace._COVERED_DOMAINS) <= set(trace._ALL_DOMAINS)
 
+    def test_all_domains_covered(self, trace):
+        """六批已完成：已补全域 == 全部域（分批机制已收敛为全量断言）。"""
+        assert set(trace._COVERED_DOMAINS) == set(trace._ALL_DOMAINS)
+
+    def test_every_requirement_id_mapped(self, trace):
+        """全量对照：requirements.md 的每个 ID 均在映射表内（双向相等）。"""
+        req_ids = set(trace.requirement_ids(trace._REQUIREMENTS_MD.read_text(encoding="utf-8")))
+        mapped = {row[0] for row in trace.trace_rows(trace._TESTPLAN_MD.read_text(encoding="utf-8"))}
+        assert req_ids == mapped
+        assert len(req_ids) == 276
+
     def test_real_repo_passes(self, trace):
         """真实仓库：R-CCH 域 38 条需求全部映射且载体文件存在。"""
         assert trace.check_requirement_trace() == []
@@ -127,6 +138,10 @@ class TestRealRepo:
             for r in trace.requirement_ids(trace._REQUIREMENTS_MD.read_text(encoding="utf-8"))
             if r.startswith("R-CCH-")
         ]
-        mapped = {row[0] for row in trace.trace_rows(trace._TESTPLAN_MD.read_text(encoding="utf-8"))}
+        mapped = {
+            row[0]
+            for row in trace.trace_rows(trace._TESTPLAN_MD.read_text(encoding="utf-8"))
+            if row[0].startswith("R-CCH-")
+        }
         assert len(req_ids) == 38
         assert set(req_ids) == mapped

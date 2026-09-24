@@ -13,9 +13,8 @@
   5. 载体真实性：映射表载体列中出现的 `src/test/**/*.py` 路径必须真实存在于磁盘
      （防测试文件改名/删除后文档留悬空引用）
 
-**分批推进方式**：每完成一批需求域（见 testplan.md §2.1 的「补全批次」列），
-把该域前缀追加进 `_COVERED_DOMAINS`——脚本随即开始断言该域全覆盖。全部域补完后该
-常量即为 `_ALL_DOMAINS`，脚本转为全量断言。
+**覆盖进度**：六批已全部完成，`_COVERED_DOMAINS` == `_ALL_DOMAINS`（34 域 / 276 条
+需求 ID 全量断言）。后续新增需求域时，把域前缀同时加入两个常量即可。
 
 用法：
   python scripts/check-requirement-trace.py       # 检查全部已补域
@@ -47,10 +46,45 @@ _ID_RE = re.compile(r"^\|\s*(R-[A-Z]+-\d+)\s*\|")
 #: 载体列中的测试文件路径（反引号内以 src/test/ 开头、.py 结尾）
 _CARRIER_PATH_RE = re.compile(r"`(src/test/[\w/\-]+\.py)(?:::[\w\[\]:\- ,]+)?`")
 
-#: 已完成「需求 ID → 验证载体」映射的域前缀（每补完一批在此追加一项）
-_COVERED_DOMAINS: tuple[str, ...] = ("R-CCH",)
+#: 已完成「需求 ID → 验证载体」映射的域前缀（六批已完成，与 `_ALL_DOMAINS` 一致）
+_COVERED_DOMAINS: tuple[str, ...] = (
+    "R-CCH",
+    "R-ERR",
+    "R-DIAG",
+    "R-BRK",
+    "R-CRD",
+    "R-FIN",
+    "R-FRD",
+    "R-NWS",
+    "R-DATA",
+    "R-IDX",
+    "R-OUT",
+    "R-PERF",
+    "R-WIF",
+    "R-ACT",
+    "R-RBL",
+    "R-VAL",
+    "R-TAIL",
+    "R-EVO",
+    "R-SNP",
+    "R-CFL",
+    "R-DIFF",
+    "R-LLM",
+    "R-PF",
+    "R-CTX",
+    "R-WEB",
+    "R-TUI",
+    "R-ENV",
+    "R-HLD",
+    "R-DIS",
+    "R-LIQ",
+    "R-FX",
+    "R-CON",
+    "R-ADP",
+    "R-HST",
+)
 
-#: requirements.md 中全部需求域前缀（用于全量断言；与 _COVERED_DOMAINS 比对即得进度）
+#: requirements.md 中全部需求域前缀（真值来源；与 `_COVERED_DOMAINS` 比对即得覆盖进度）
 _ALL_DOMAINS: tuple[str, ...] = (
     "R-CCH",
     "R-ERR",
@@ -73,7 +107,6 @@ _ALL_DOMAINS: tuple[str, ...] = (
     "R-SNP",
     "R-CFL",
     "R-DIFF",
-    "R-PEN",
     "R-LLM",
     "R-PF",
     "R-CTX",

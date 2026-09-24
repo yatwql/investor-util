@@ -8,15 +8,29 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 需求 ID 追溯链（rf-426）：批 2~6 完成 —— 276 条需求全量映射 + 门禁转全量断言（2026-09-24）
+
+**批 2（38 条）**：`R-ERR` 错误与降级可视化（备用链路/过期缓存/占位文本两态区分/快照无历史）、`R-DIAG` 诊断三面（CLI `view-logs`+`doctor` / TUI `[V]`/`[H]`/`[D]` / Web `/api/logs`+`/api/health/history`+`/api/doctor`）、`R-BRK` 熔断治理（单股 3 次/批量 6 次·120s、空数据不计、LLM 独立熔断、会话缓存 2000、指数退避、`data/state` 持久化、网关统一双熔断器）、`R-CRD` 凭据声明式（`CredentialSpec`/就绪判定/可读指引/链路跳过不进熔断/跳过态/体检分组/值不外泄/开关逐字节等价）
+
+**批 3（37 条）**：`R-FIN` 财务指标域（标准字段契约/akshare 主源/链路接入/`to_fmp_symbol` 收敛/底座门禁/降级不阻断/PE-PB 官方口径/报表派生/全文解析支路/解析护栏/双端区块/多期序列/管线契约/真实形态夹具）、`R-FRD` 财报摘要（开关/密钥文件/最新报告期/限速与日配额/占位与失败清单/合规来源/缓存分级）、`R-NWS` 新闻（5 源独立取数/关联度排序/关键词来源/颜色分型/独立启停/LLM 二次关联）、`R-DATA` 数据治理（备用链路/静默降级/会话复用/盘中 30s TTL/收盘 `price_date` 校验/00 代码判定）、`R-IDX` 指数双链路（A 股腾讯→新浪、美股新浪→腾讯、降级过期缓存）
+
+**批 4（71 条）**：`R-OUT` 产物路径与格式（根/存档目录、文件名、页签 1~17、单页 HTML+TOC、`report_section_order`、LLM 用量页签固定末位、条件渲染两层、深浅主题）、`R-PERF` 性能（5 源并行、LLM 并发、批量异步取价、配置 mtime 缓存、提示词精简、会话复用、历史增量、阶段超时、耗时记录、后台健康检查）、`R-WIF` 调仓模拟（CLI/TUI 入口、变动类型、成本截面、分类对比、双产物、零网络默认、生效日回测 5 指标、降级）、`R-ACT` 行动建议（章节与开关、`action_data` 契约、再平衡信号、占位、关闭不渲染）、`R-RBL` 再平衡（阈值与预设、静默期持久化、置信度、三类误报防护、注入 LLM）、`R-VAL` 估值分位（TTM EPS 构造、披露截止日、分位口径、底座门禁）、`R-TAIL` 尾部风险、`R-EVO` 组合演进、`R-SNP` 快照（自动创建/隔离/保留策略/对比）、`R-CFL` 成本流水（XIRR/快照近似/开关/列）、`R-DIFF` 快照差异摘要
+
+**批 5（25 条）**：`R-LLM`（L 菜单触发、模块独立启停、三类协议 + 厂商路由、递补降级、用量统计、4 切换策略、凭据分离、失败原因追踪、信号预消化含叙事-数字背离）、`R-PF` 景气度框架（实验开关逐字节等价、六维评分卡、客观化口径、两项扩展标口径、缺失标 `unverified`、评级口径、双端呈现位置、`evidence` 可核对、配置）、`R-CTX` 竞争语境（`comparison_indices`、收益/风险对比、口径脚注、幸存者偏差提示、LLM 仅陈述、基金池 TUI 管理）
+
+**批 6（66 条）**：`R-WEB`（回环启动、上传校验、格式选择、事件流进度、预览下载、单 worker 队列、生命周期、配置编辑面板、试算/正式隔离）、`R-TUI`（标题、20 选项、缺省选中 `[L]`、选择器、进度提示）、`R-ENV`（Python 实现、双平台启动脚本、双平台 Web、`cli.sh`/`cli.ps1`——启动脚本项含手工验收）、`R-HLD` 持仓格式（页签=账户、4 列、列名/顺序固定、代码去前缀）、`R-DIS` 交易纪律（止盈/止损/回撤三线、静默期复用、配置段）、`R-LIQ` 流动性（变现天数、场外赎回上限与类型默认档、数据缺失默认充足、注入 LLM、场内分级、OTC/非 A 股标记）、`R-FX` 汇率敞口、`R-CON` 健壮性（key 未配置/config 损坏/格式异常/无权限/空持仓/模块独立降级/断网降级/降级可视化）、`R-ADP` 适配器三段式契约（声明式归一、输出恒为全字段、链路接入、试点等价性、开关逐字节、离线自检）、`R-HST` 历史数据（双链路、增量合并、修正全量刷新、模式 off/prompt/auto、00 代码降级、基准指数链）
+
+**收尾**：`_COVERED_DOMAINS` 扩至 **34 域**（与 `_ALL_DOMAINS` 一致，R-PEN 为不存在的域已移除），门禁由「已补域全覆盖」转为**全量断言**；测试新增真实仓库全量对照（需求侧 276 条 ID ↔ 映射表 276 行逐条相等）；`review-findings.md` 的 rf-426 由「待处理」迁入「已解决」。
+
 ### 需求 ID 追溯链（rf-426）：批 1 R-CCH 缓存域完成 + 新增追溯断言脚本并入门禁（2026-09-24）
 
-**背景**：`requirements.md` 定义 277 个需求 ID（35 域），但 testplan / technical / llm-technical 对其引用数为 0——无法机器回答「某需求是否有测试覆盖」。交付形态定稿为「映射表落 `testplan.md` §2.1」（按需求 ID 组织、含验证载体列、`<!-- requirement-trace:start/end -->` 标记区间）。
+**背景**：`requirements.md` 定义 276 个需求 ID（34 域），但 testplan / technical / llm-technical 对其引用数为 0——无法机器回答「某需求是否有测试覆盖」。交付形态定稿为「映射表落 `testplan.md` §2.1」（按需求 ID 组织、含验证载体列、`<!-- requirement-trace:start/end -->` 标记区间）。
 
 **批 1（R-CCH 缓存域 38 条）**：
 - §2.1 新增 38 行映射，覆盖：缓存机制（01 磁盘缓存 / 02 gzip 100KB 阈值 / 03 目录穿越防护 / 04 原子写 / 05 损坏自愈）、缓存键清单（06~33 各数据域 TTL 与前缀分组）、输入摘要与依赖失效（34 确定性摘要 / 35 指数行情→预测与资金流向 / 36 持仓+穿透代码→分红 / 37 新闻源+关键词→新闻 / 38 持仓份额成本→LLM）
 - 载体精确到用例级（如 `test_cache_format.py::test_large_file_auto_gzipped`、`test_holdings_tracker.py::test_different_shares_different_fingerprint`）
 
-**新增 `scripts/check-requirement-trace.py`（复用 `_checklib`）**：五项断言——① 映射表标记与表头齐备（防整表误删）；② 映射 ID 均存在于 requirements.md（防臆造/拼错）；③ ID 唯一（防两行矛盾）；④ 已补全域 ID 全覆盖（防「补了 37 条漏 1 条」）；⑤ 载体列中的 `src/test/**/*.py` 路径真实存在（防测试改名后文档悬空）。**分批推进**：常量 `_COVERED_DOMAINS` 记录已补全域，每批追加一项即扩大断言范围；`_ALL_DOMAINS`（35 域）用于进度显示。已并入 P0 + P2 门禁（CLAUDE.md / testplan §6 / developer-guide）。
+**新增 `scripts/check-requirement-trace.py`（复用 `_checklib`）**：五项断言——① 映射表标记与表头齐备（防整表误删）；② 映射 ID 均存在于 requirements.md（防臆造/拼错）；③ ID 唯一（防两行矛盾）；④ 已补全域 ID 全覆盖（防「补了 37 条漏 1 条」）；⑤ 载体列中的 `src/test/**/*.py` 路径真实存在（防测试改名后文档悬空）。**分批推进**：常量 `_COVERED_DOMAINS` 记录已补全域，每批追加一项即扩大断言范围；`_ALL_DOMAINS`（34 域）用于进度显示。已并入 P0 + P2 门禁（CLAUDE.md / testplan §6 / developer-guide）。
 
 **测试**：`src/test/unit/scripts/test_check_requirement_trace.py` +16 例（解析 4 / 断言 8 / 真实仓库 3 / 空输入）；真实仓库冒烟断言 38/38 已映射且载体文件全部存在。
 **顺带修正**：testplan §6 门禁行早前追加枚举时多出一个右括号。
@@ -49,7 +63,7 @@
 - **testplan 覆盖表未随 v0.11.2 扩展更新**：景气度框架行补挂本轮新载体（`test_fund_roe_estimate.py` ②维 ROE 推演；`test_liquidity_otc.py` 与 `test_code_utils.py::TestOtcRedemptionDaysDefault` ④维场外默认档）
 - **口径重复维护点**：R-PF-09 的④维档位串与 `R-LIQ-03` 逐字重复 → R-PF-09 改为引用 `R-LIQ-03`（单一维护点），仅保留②维推演口径原文
 
-**新建待办任务（用户决策 Q3-B：分批映射）**：`review-findings.md` 新增 **rf-426**「需求 ID 追溯链断裂」——277 个需求 ID 在 testplan/technical/llm-technical 中引用数为 0；按 6 批（38/39/37/57/25/61 条）分批建立「需求 ID → 验证载体」映射，批 1 启动时先定稿交付形态（testplan 加列 vs requirements 加列），配套双向断言脚本入 `--ci`。
+**新建待办任务（用户决策 Q3-B：分批映射）**：`review-findings.md` 新增 **rf-426**「需求 ID 追溯链断裂」——276 个需求 ID 在 testplan/technical/llm-technical 中引用数为 0；按 6 批（38/39/37/57/25/61 条）分批建立「需求 ID → 验证载体」映射，批 1 启动时先定稿交付形态（testplan 加列 vs requirements 加列），配套双向断言脚本入 `--ci`。
 
 **另修**：`testplan.md` 两处 `管理文档分区纪律)）` 括号错配（上轮批量替换枚举时引入的笔误）。
 
