@@ -3637,7 +3637,7 @@ investor-util/
 | 用途 | 链路方案 | Provider 文件 |
 |:-----|:---------|:-------------|
 | 场内 A 股/ETF 实时价 | 腾讯财经 → 新浪财经（双链路 fallback） | `tencent.py` / `sina.py` |
-| 场外基金净值 | 东方财富 `api.fund.eastmoney.com`（主）→ 天天基金 `fundf10.eastmoney.com`（Provider 内回退） | `eastmoney.py` |
+| 场外基金净值 | 东方财富 `api.fund.eastmoney.com`（主）→ 新浪财经 `hq.sinajs.cn/list=f_{code}`（跨厂商备源；东财内部另有 `fundf10.eastmoney.com` 兜底） | `eastmoney.py` / `sina.py` |
 | 基金业绩排名 | 天天基金 JS 变量解析（直达） | `tiantian_ranking.py` |
 | 基金持仓数据 | 天天基金 HTML 解析（直达） | `tiantian_holdings.py` |
 | A 股指数 | 腾讯财经 → 新浪财经（双链路 fallback） | `tencent.py` / `sina.py` |

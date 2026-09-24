@@ -47,6 +47,14 @@ def drift():
     return _load_script("check-doc-drift.py")
 
 
+@pytest.fixture(scope="module")
+def drift_parts():
+    """实现包各子模块（补丁须打到**持有被替换符号的模块**，见 CLAUDE.md「scripts 共享设施」条）。"""
+    import _doc_drift
+
+    return _doc_drift
+
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.unit_scripts,
@@ -65,10 +73,10 @@ class TestSectionTable:
         findings = drift.check_section_table("| 1 | **1.投资分析汇总** |\n")
         assert any("章节表 1 行" in f for f in findings)
 
-    def test_name_drift_detected(self, drift, monkeypatch):
+    def test_name_drift_detected(self, drift, monkeypatch, drift_parts):
         doc = "| 1 | **1.投资分析汇总** |\n| 2 | **2.持仓明细** |\n"
         full = [dict(s) for s in drift._REPORT_SECTION_DEFAULT[:2]]
-        monkeypatch.setattr(drift, "_REPORT_SECTION_DEFAULT", full)
+        monkeypatch.setattr(drift_parts._format, "_REPORT_SECTION_DEFAULT", full)
         findings = drift.check_section_table(doc)
         assert any("`2.持仓明细`" in f for f in findings)
 
@@ -114,17 +122,17 @@ class TestSwitchTable:
         findings = drift.check_switch_table("没有开关表\n")
         assert len(findings) == 1 and "未找到功能开关表区段" in findings[0]
 
-    def test_missing_flag_and_unknown_flag_reported(self, drift, monkeypatch):
+    def test_missing_flag_and_unknown_flag_reported(self, drift, monkeypatch, drift_parts):
         registry = {"data_quality": drift.feature_switch_registry["data_quality"]}
-        monkeypatch.setattr(drift, "feature_switch_registry", registry)
+        monkeypatch.setattr(drift_parts._format, "feature_switch_registry", registry)
         doc = drift_marker() + "\n| `ghost_switch` | `true` | 说明 |\n"
         findings = drift.check_switch_table(doc)
         assert any("`data_quality` 未列入开关表" in f for f in findings)
         assert any("未登记开关 `ghost_switch`" in f for f in findings)
 
-    def test_default_mismatch_reported(self, drift, monkeypatch):
+    def test_default_mismatch_reported(self, drift, monkeypatch, drift_parts):
         registry = {"data_quality": drift.feature_switch_registry["data_quality"]}
-        monkeypatch.setattr(drift, "feature_switch_registry", registry)
+        monkeypatch.setattr(drift_parts._format, "feature_switch_registry", registry)
         doc = drift_marker() + "\n| `data_quality` | `false` | 说明 |\n"
         findings = drift.check_switch_table(doc)
         assert any("默认值 False 与注册表 True" in f for f in findings)
@@ -319,9 +327,9 @@ class TestProjectStats:
         findings = drift.check_project_stats("| **测试代码** | Python | 1 | 2 | 说明 |\n")
         assert any("「测试代码」" in f for f in findings)
 
-    def test_test_count_row_parsed(self, drift, monkeypatch):
+    def test_test_count_row_parsed(self, drift, monkeypatch, drift_parts):
         """「测试用例」行的形状（`| — | — | **N 个** |`）须能解析并核对。"""
-        monkeypatch.setattr(drift, "_collect_test_count", lambda: 12345)
+        monkeypatch.setattr(drift_parts._tree, "_collect_test_count", lambda: 12345)
         findings = drift.check_project_stats("| **测试用例** | — | — | **7,579 个** | 说明 |", with_test_count=True)
         assert any("测试用例数 7579 与 collect-test-coverage 快照 12345" in f for f in findings)
 
@@ -378,28 +386,28 @@ class TestArchiveIndex:
         """真实仓库：当前三份管理文档的归档索引与磁盘双向一致。"""
         assert drift.check_archive_index() == []
 
-    def test_detects_real_repo_violation(self, drift, tmp_path, monkeypatch):
+    def test_detects_real_repo_violation(self, drift, tmp_path, monkeypatch, drift_parts):
         """回归：索引被删时能报出（不依赖 `_scan_docs`——changelog 属历史记录类被其排除）。"""
         doc = drift._MANAGEMENTS / "changelog.md"
         broken = tmp_path / "changelog.md"
         broken.write_text(
             doc.read_text(encoding="utf-8").replace("archived_changelog.0.10.x.md", "（已删）"), encoding="utf-8"
         )
-        monkeypatch.setattr(drift, "_ARCHIVE_INDEX_PAIRS", ((broken, "archived_changelog."),))
+        monkeypatch.setattr(drift_parts._ledger, "_ARCHIVE_INDEX_PAIRS", ((broken, "archived_changelog."),))
         findings = drift.check_archive_index()
         assert any("archived_changelog.0.10.x.md" in f and "缺少" in f for f in findings)
 
-    def test_reports_missing_index_entry(self, drift, tmp_path, monkeypatch):
+    def test_reports_missing_index_entry(self, drift, tmp_path, monkeypatch, drift_parts):
         """索引缺失某归档文件 → 报 finding（正向）。"""
         doc = drift._MANAGEMENTS / "changelog.md"
         broken = tmp_path / "changelog.md"
         broken.write_text(
             doc.read_text(encoding="utf-8").replace("archived_changelog.0.10.x.md", "（已删）"), encoding="utf-8"
         )
-        monkeypatch.setattr(drift, "_ARCHIVE_INDEX_PAIRS", ((broken, "archived_changelog."),))
+        monkeypatch.setattr(drift_parts._ledger, "_ARCHIVE_INDEX_PAIRS", ((broken, "archived_changelog."),))
         assert any("缺少" in f for f in drift.check_archive_index())
 
-    def test_reports_ghost_index_entry(self, drift, tmp_path, monkeypatch):
+    def test_reports_ghost_index_entry(self, drift, tmp_path, monkeypatch, drift_parts):
         """索引引用了不存在的归档文件 → 报 finding（反向）。"""
         doc = drift._MANAGEMENTS / "changelog.md"
         ghost = tmp_path / "changelog.md"
@@ -407,7 +415,7 @@ class TestArchiveIndex:
             doc.read_text(encoding="utf-8") + "\n[x](docs-stm/archive/v9.9.x/archived_changelog.9.9.x.md)\n",
             encoding="utf-8",
         )
-        monkeypatch.setattr(drift, "_ARCHIVE_INDEX_PAIRS", ((ghost, "archived_changelog."),))
+        monkeypatch.setattr(drift_parts._ledger, "_ARCHIVE_INDEX_PAIRS", ((ghost, "archived_changelog."),))
         assert any("archived_changelog.9.9.x.md" in f and "不存在" in f for f in drift.check_archive_index())
 
     def test_covers_three_management_docs(self, drift):
@@ -581,7 +589,7 @@ class TestGeneratedArtifacts:
     def test_is_generated(self, drift, rel, expected):
         assert drift._is_generated(rel) is expected
 
-    def test_misplaced_test_reports_reported(self, drift, monkeypatch, tmp_path):
+    def test_misplaced_test_reports_reported(self, drift, monkeypatch, tmp_path, drift_parts):
         """受检目录下出现 test-reports/（入口把项目根算错等误落）→ 必须报「目录树缺少」。"""
         (tmp_path / "scripts/test-reports").mkdir(parents=True)
         (tmp_path / "scripts/test-reports/index.html").write_text("<html/>", encoding="utf-8")
@@ -593,19 +601,19 @@ class TestGeneratedArtifacts:
             except ValueError:
                 return real_rel(path)
 
-        monkeypatch.setattr(drift, "REPO_ROOT", tmp_path)
-        monkeypatch.setattr(drift, "rel", _fake_rel)
-        monkeypatch.setattr(drift, "_TREE_ROOTS", ("scripts",))
+        monkeypatch.setattr(drift_parts._tree, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(drift_parts._tree, "rel", _fake_rel)
+        monkeypatch.setattr(drift_parts._tree, "_TREE_ROOTS", ("scripts",))
         findings = drift.check_dir_tree("```\ninvestor-util/\n```\n")
         assert len(findings) == 1 and "scripts/test-reports/index.html" in findings[0]
 
-    def test_tree_check_ignores_generated(self, drift, monkeypatch, tmp_path):
+    def test_tree_check_ignores_generated(self, drift, monkeypatch, tmp_path, drift_parts):
         """忽略产物后：真实文件缺条目仍要报，产物不报。"""
         (tmp_path / "src/pkg").mkdir(parents=True)
         (tmp_path / "src/pkg/mod.py").write_text("x = 1\n", encoding="utf-8")
         (tmp_path / "src/pkg/mod.egg-info").mkdir()
         (tmp_path / "src/pkg/mod.egg-info/PKG-INFO").write_text("x\n", encoding="utf-8")
-        monkeypatch.setattr(drift, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(drift_parts._tree, "REPO_ROOT", tmp_path)
         # rel() 来自共享模块 _checklib，须一并替身到临时仓库根
         real_rel = drift.rel
 
@@ -615,8 +623,8 @@ class TestGeneratedArtifacts:
             except ValueError:
                 return real_rel(path)
 
-        monkeypatch.setattr(drift, "rel", _fake_rel)
-        monkeypatch.setattr(drift, "_TREE_ROOTS", ("src",))
+        monkeypatch.setattr(drift_parts._tree, "rel", _fake_rel)
+        monkeypatch.setattr(drift_parts._tree, "_TREE_ROOTS", ("src",))
         doc = "```\ninvestor-util/\n├── src/              # 源代码\n│   └── pkg/\n│       └── mod.py  # 模块\n```\n"
         assert drift.check_dir_tree(doc) == []
 

@@ -10,6 +10,21 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 过去 24 小时改动的技术债整改 5 项（2026-09-24，rf-429）
+
+**触发**：用户要求审计并修复最近 24 小时（20 commits / 83 文件 / +4580 行）引入的技术债。
+
+**扫描口径**（沿用既有审计）：体积硬上限 / 静默吞异常 / 债务标记（TODO/FIXME/HACK）/ 无引用定义 / 重复实现 / 文档同步 / 约束合规。**未命中**：债务标记 0、新增静默吞异常 0。
+
+**修复**：
+- **① 脚本超限**：`check-doc-drift.py` 732 → 985 行 → 拆为 `scripts/_doc_drift/` 包（`_shared` 共享设施 175 / `_format` 文档格式族 367 / `_tree` 目录树与统计 142 / `_ledger` 台账族 245），入口 198 行仅保留 CLI、编排与原面 re-export（镜像 `_test_runner/` 先例）
+- **② 主程序超限**：`analysis/prosperity_scoring.py` 731 → 813 行 → 抽出 `analysis/prosperity_signals.py`（本地信号提取原语：集中度/换手代理/基准收益，零网络；评分内核 711 行），迁移名在 `prosperity_scoring` 原面 re-export（rf-390 同款口径）
+- **③ 重复实现收敛**：场外净值两源（东财/新浪）的转换与适配器原本各写一份 → 收敛为 `_otc_nav_to_standard()` 单一转换 + `_OtcNavQuoteAdapter` 共用基类，两源仅余 `source_api` / `source_id` / `display_name` / `extract_data` 差异
+- **④ 文档同步四处**：`requirements.md` 数据源表、`technical.md` 链路表（场外净值补新浪备源与 `sina.py`）、`developer-guide.md` 检查项清单（「十一项」→「十四项」，补齐归档索引/分区纪律/Thinking 矩阵）、入口 docstring 项单与用法计数
+- **⑤ 冗余形参**：`_check_http(expect_status=...)` 无调用方传参 → 删除，3xx 判定合并为单分支
+
+**测试**：`test_check_doc_drift.py` 的补丁目标改为指向**持有被替换符号的子模块**（新增 `drift_parts` fixture，9 处用例签名同步）；`folders.md` 目录树新增 `_doc_drift/` 五条与 `prosperity_signals.py` 条目并收敛统计。
+
 ### 数据源健壮性加固：修健康探针误报 + 场外净值跨厂商备源 + 传输级重试 + 财报正文备源（2026-09-24，rf-428 / plan-56）
 
 **触发**：用户报「`price_price_fund_otc` 与 `report_datasink` 高频连接失败」，建议增加备用通道 / 优化重试 / 延长刷新窗口。

@@ -68,7 +68,6 @@ def _check_http(
     url: str,
     *,
     timeout: float = 15.0,
-    expect_status: int = 200,
     follow_redirects: bool = True,
     **kwargs,
 ) -> tuple[str, float, str]:
@@ -85,9 +84,9 @@ def _check_http(
         with make_http_client(timeout=timeout, follow_redirects=follow_redirects, **kwargs) as client:
             resp = client.get(url)
         elapsed = (time.perf_counter() - start) * 1000
-        if resp.status_code == expect_status:
-            return _OK, elapsed, f"{elapsed:.0f}ms 正常"
-        if 300 <= resp.status_code < 400:
+        if 200 <= resp.status_code < 400:
+            if resp.status_code == 200:
+                return _OK, elapsed, f"{elapsed:.0f}ms 正常"
             return _OK, elapsed, f"{elapsed:.0f}ms 重定向可达（HTTP {resp.status_code}）"
         return _WARN, elapsed, f"{elapsed:.0f}ms HTTP {resp.status_code}"
     except Exception as e:

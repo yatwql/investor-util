@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.4-dev
-> **编号源**：`rf-next = 429`（新增问题取此编号，完成后更新为 +1；已用最大 rf-428，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 430`（新增问题取此编号，完成后更新为 +1；已用最大 rf-429，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -47,6 +47,9 @@
 | # | 问题（违反的约束用语义描述） | 处置 |
 |---|------|------|
 | **rf-428** | **数据源健康检查探针误报「连接失败」**（用户报「`price_price_fund_otc` / `report_datasink` 高频连接失败」）：`core/check_sources.py` 的 9 个探针**全部用 `http://` 端点且不跟随重定向**，上游迁 https 后回 301/302 → 3xx 被计为告警（`ok=false`），健康历史里天天基金/腾讯K线/财联社长期 ok=0/fail=10；东方财富行业探针缺 headers 且指向本环境不可达的 push2 ——**4 个源被误报，而生产取数路径（https + `follow_redirects`）一直正常**（实测行业分类 3/3 命中、场外净值正常） | ① 9 个探针 URL 全部改 https；② `_check_http` 默认 `follow_redirects=True` 且 **3xx 计「可达（带备注）」**；③ 新增 `_check_any()` 多端点探针，行业分类改「push2 主源 → 行情页备源」，任一可达即判可用并标注「主源不可达，由备源接管」；④ 回归 +9 例（3xx 可达 / follow_redirects 透传 / 4xx-5xx 仍告警 / 备源接管与全失败标注 / 静态守卫「探针不得出现 `http://`」 / 行业探针双端点）。**实测健康检查 10/10 可用（此前 6/10）** |
+
+
+| **rf-429** | **过去 24 小时改动的技术债 5 项**（用户要求「过去24小时的修改有技术债务么，有就修复它们」）：① `scripts/check-doc-drift.py` 因新增 3 项检查由 732 → **985 行**（越过 800 行上限，违反项由 rf-390/rf-399 先例确立）；② `analysis/prosperity_scoring.py` 731 → **813 行**同越限；③ **重复实现**：`_price_transform_sina_fund` 与 `_price_transform_eastmoney` 逐键相同、`SinaFundQuoteAdapter` 与 `EastMoneyQuoteAdapter` 映射与有效性判据全同（两处重复维护点）；④ **文档未同步**：`requirements.md` 数据源表与 `technical.md` 链路表仍写场外净值单源，`developer-guide.md` 的检查项清单滞后（写「十一项」而实为 14 项），入口 docstring 同样滞后；⑤ **冗余形参**：`_check_http(expect_status=...)` 无任何调用方传参（连同签名内二次分支） | ① `check-doc-drift.py` 拆为 `scripts/_doc_drift/` 包（`_shared` / `_format` / `_tree` / `_ledger`，入口 198 行仅留 CLI + 编排 + **原面 re-export**，镜像 `_test_runner/` 先例）；② 抽出 `analysis/prosperity_signals.py`（127 行，本地信号提取原语；评分内核 711 行），迁移名在 `prosperity_scoring` 原面 re-export；③ 收敛为 `_otc_nav_to_standard()` 单一转换实现 + `_OtcNavQuoteAdapter` 共用基类（两源仅余 `source_api`/`source_id` 差异）；④ 四处文档同步（含 `developer-guide` 补齐第 12~14 项 + 「十四项」计数）；⑤ 删除冗余形参，3xx 判定合并为单分支。**回归**：`test_check_doc_drift.py` 补丁目标改为指向持有子模块（`drift_parts` fixture）；新增 `test_sina_fund_*`/`_otc_nav` 等价与端到端断言；**全量 90 + 75 + 83 例通过**，folders.md 目录树与统计已补 |
 
 ### 归档档案
 
