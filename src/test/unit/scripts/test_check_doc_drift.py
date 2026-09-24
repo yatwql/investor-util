@@ -11,6 +11,8 @@
   - TUI [S] 面板编号连续性、分组边界与报告块编号枚举
   - 目录树解析（按缩进还原仓库相对路径）
   - 项目统计表比对（文件数 / 行数）
+  - 归档索引完整性（管理文档 ↔ `docs-stm/archive/` 双向对齐）
+  - 管理文档分区纪律（未完成/已解决/已归档错置、现行 changelog 只允许开发段头）
   - 真实仓库冒烟：当前文档与代码一致（run_checks() 为空）
 
 测试通过脚本 import 方式直接复用解析/校验函数，不运行真实 CLI（`run_checks` 的 pytest 收集项
@@ -411,6 +413,89 @@ class TestArchiveIndex:
         """三份带归档的管理文档均在被检面内（changelog / plan / review-findings）。"""
         names = {p.name for p, _ in drift._ARCHIVE_INDEX_PAIRS}
         assert names == {"changelog.md", "plan.md", "review-findings.md"}
+
+
+class TestManagementPartitions:
+    """管理文档分区纪律：未完成/已解决/已归档不得错置（含历史失误的可检特征）。"""
+
+    _CHANGELOG_OK = "## [0.11.3-dev] - 开发中（未发布）\n"
+
+    def test_passes_on_real_repo(self, drift):
+        """真实仓库：三份管理文档分区纪律无违规。"""
+        assert drift.check_management_partitions() == []
+
+    def test_pending_item_in_resolved_section(self, drift):
+        """未完成项被误置已解决区（无 changelog 修复记录）→ 报 finding。"""
+        rf = (
+            "## 当前待处理问题\n\n### P2C\n\n| # | 问题 |\n| **rf-999** | x |\n\n"
+            "## 已解决问题\n\n| # | 问题 |\n| **rf-999** | y |\n\n### 归档档案\n"
+        )
+        findings = drift.audit_management_partitions(review_findings=rf, plan="", changelog=self._CHANGELOG_OK)
+        assert any("分区互斥" in f for f in findings)
+        assert any("无修复记录" in f for f in findings)
+
+    def test_resolved_item_without_changelog_record(self, drift):
+        """仅已解决区一条、但 changelog 无记录 → 报 finding（对应「未完成项误置已解决区」类失误）。"""
+        rf = "## 已解决问题\n\n| # | 问题 |\n| **rf-998** | y |\n\n### 归档档案\n"
+        findings = drift.audit_management_partitions(review_findings=rf, plan="", changelog=self._CHANGELOG_OK)
+        assert any("rf-998" in f and "无修复记录" in f for f in findings)
+
+    def test_resolved_item_backed_by_archived_changelog(self, drift):
+        """修复记录在归档 changelog 中亦算有记录（不误报）。"""
+        rf = "## 已解决问题\n\n| # | 问题 |\n| **rf-997** | y |\n\n### 归档档案\n"
+        findings = drift.audit_management_partitions(
+            review_findings=rf,
+            plan="",
+            changelog=self._CHANGELOG_OK,
+            archived_changelogs=["### 修复 rf-997\n"],
+        )
+        assert findings == []
+
+    def test_completed_plan_left_in_todo(self, drift):
+        """未完成区出现 ✅ 已完成项 → 报 finding。"""
+        plan = "## 当前迭代待办\n\n#### ✅ `plan-9` 已做完\n\n## 归档\n"
+        findings = drift.audit_management_partitions(review_findings="", plan=plan, changelog=self._CHANGELOG_OK)
+        assert any("plan-9" in f and "已完成项须移入归档" in f for f in findings)
+
+    def test_archived_plan_still_in_todo(self, drift):
+        """已归档项仍在未完成区 → 报 finding（分区互斥）。"""
+        plan = "## 当前迭代待办\n\n#### 🔲 `plan-9` 待做\n\n## 归档\n"
+        findings = drift.audit_management_partitions(
+            review_findings="",
+            plan=plan,
+            changelog=self._CHANGELOG_OK,
+            archived_plans=["#### ✅ `plan-9` 已完成\n"],
+        )
+        assert any("分区互斥" in f for f in findings)
+
+    def test_archive_prose_mention_is_not_archived_item(self, drift):
+        """归档文件正文里的提及不算已归档项（防误报：如「后续项：某某计划项 …」）。"""
+        plan = "## 当前迭代待办\n\n#### 🔲 `plan-49` 待做\n\n## 归档\n"
+        findings = drift.audit_management_partitions(
+            review_findings="",
+            plan=plan,
+            changelog=self._CHANGELOG_OK,
+            archived_plans=["**后续项（另行登记）**：`plan-47`、`plan-49` 转正评估。\n"],
+        )
+        assert findings == []
+
+    def test_released_section_still_in_live_changelog(self, drift):
+        """现行 changelog 段头非开发版本 → 报 finding（已发布段须归归档）。"""
+        findings = drift.audit_management_partitions(
+            review_findings="", plan="", changelog="## [0.11.2] - 2026-09-24\n"
+        )
+        assert any("非开发版本" in f for f in findings)
+
+    def test_multiple_version_headers_in_live_changelog(self, drift):
+        """现行 changelog 含多个版本段头 → 报 finding。"""
+        findings = drift.audit_management_partitions(
+            review_findings="", plan="", changelog="## [0.11.3-dev] - x\n\n## [0.11.2] - 2026-09-24\n"
+        )
+        assert any("个版本段头" in f for f in findings)
+
+    def test_missing_files_do_not_crash(self, drift):
+        """空文本（文件缺失）不抛异常，也不臆造 finding。"""
+        assert drift.audit_management_partitions(review_findings="", plan="", changelog="") == []
 
 
 class TestGeneratedArtifacts:

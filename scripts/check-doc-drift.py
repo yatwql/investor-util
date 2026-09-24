@@ -66,6 +66,9 @@ _REPORTS_MD = _MANUALS / "reports-instruction.md"
 _TUI_MENU_MD = _MANUALS / "how-to-use-tui-menu.md"
 _LLM_TECHNICAL_MD = _MANAGEMENTS / "llm-technical.md"
 _TEST_COVERAGE_MD = _MANAGEMENTS / "test-coverage.md"
+_PLAN_MD = _MANAGEMENTS / "plan.md"
+_CHANGELOG_MD = _MANAGEMENTS / "changelog.md"
+_REVIEW_FINDINGS_MD = _MANAGEMENTS / "review-findings.md"
 
 #: 按设计保留历史数字的文档（变更记录/自审记录），不参与计数与默认值断言扫描
 _HISTORY_DOCS = {_MANAGEMENTS / "changelog.md", _MANAGEMENTS / "review-findings.md"}
@@ -706,6 +709,107 @@ def check_archive_index(docs: dict[Path, str] | None = None) -> list[str]:
 
 
 # ═══════════════════════════════════════════════════════════════
+#  12. 管理文档分区纪律（未完成/已解决/已归档不得错置）
+# ═══════════════════════════════════════════════════════════════
+
+_RF_ID = re.compile(r"\brf-(\d+)\b")
+_PLAN_ID = re.compile(r"\bplan-(\d+)\b")
+_CHANGELOG_HEADER = re.compile(r"^## \[([^\]]+)\]", re.M)
+#: 条目识别（只认**表行首列**与**条目标题**，不认正文提及——否则「某行说明里提到另一编号」
+#: 会被误判为两处登记；changelog 检查仍用宽松的 `_RF_ID` 子串匹配，因为修复记录以文字形式出现）
+_RF_ROW_ID = re.compile(r"^\|\s*\*\*(rf-\d+)\*\*", re.M)
+_PLAN_HEADING_ID = re.compile(r"^\s*#{2,4}\s*(?:🔲|✅)\s*`?(plan-\d+)", re.M)
+_PLAN_DONE_HEADING_ID = re.compile(r"^\s*#{2,4}\s*✅\s*`?(plan-\d+)", re.M)
+
+
+def _doc_section(text: str, start: str, end: str | None) -> str:
+    """取 ``start`` 起、到 ``end``（不含）的区段；起点缺失返回空串。"""
+    idx = text.find(start)
+    if idx < 0:
+        return ""
+    if end is None:
+        return text[idx:]
+    stop = text.find(end, idx + len(start))
+    return text[idx:] if stop < 0 else text[idx:stop]
+
+
+def audit_management_partitions(
+    *,
+    review_findings: str,
+    plan: str,
+    changelog: str,
+    archived_changelogs: list[str] | None = None,
+    archived_plans: list[str] | None = None,
+) -> list[str]:
+    """审计管理文档的未完成/已解决/已归档分区纪律（纯函数，便于用例直测）。
+
+    规则（对应两类历史失误）：
+      A. review-findings：同一 rf 不得同时出现在「未完成」与「已解决」分区（**只认表行首列的条目标识**，
+         正文里提及别的编号不算登记）；**已解决项必须在 changelog（现行 + 归档）有修复记录**——
+         未完成项被误置已解决区时必然不满足此条（这正是「误将未完成项放入已解决表」类失误的可检特征）。
+      B. plan：未完成区不得出现 ✅ 已完成项，也不得列已归档项（已完成项须移入归档）；
+         未完成/已归档条目均只认**条目标题**，正文提及不算。
+      C. changelog：现行文件只允许一个版本段头且必须为开发段
+         （正式版本段落须归档至 `archived_changelog.*.md`）。
+    """
+    findings: list[str] = []
+
+    pending = _doc_section(review_findings, "## 当前待处理问题", "## 已解决问题")
+    resolved = _doc_section(review_findings, "## 已解决问题", "### 归档档案")
+    pending_ids = set(_RF_ROW_ID.findall(pending))
+    resolved_ids = set(_RF_ROW_ID.findall(resolved))
+    for rid in sorted(pending_ids & resolved_ids):
+        findings.append(f"{rel(_REVIEW_FINDINGS_MD)}: `{rid}` 同时列在「待处理」与「已解决」分区（分区互斥）")
+    changelog_all = changelog + "".join(archived_changelogs or [])
+    for rid in sorted(resolved_ids):
+        if rid not in changelog_all:
+            findings.append(
+                f"{rel(_REVIEW_FINDINGS_MD)}: 已解决项 `{rid}` 在 changelog（现行 + 归档）无修复记录"
+                "——未完成项不得置于已解决区"
+            )
+
+    todo = _doc_section(plan, "## 当前迭代待办", "## 归档")
+    for pid in _PLAN_DONE_HEADING_ID.findall(todo):
+        findings.append(f"{rel(_PLAN_MD)}: 未完成区出现已完成项 `{pid}`（已完成项须移入归档）")
+    todo_ids = set(_PLAN_HEADING_ID.findall(todo))
+    archived_plan_ids: set[str] = set()
+    for text in archived_plans or []:
+        archived_plan_ids |= set(_PLAN_DONE_HEADING_ID.findall(text))
+    for pid in sorted(todo_ids & archived_plan_ids):
+        findings.append(f"{rel(_PLAN_MD)}: `{pid}` 已归档却仍列在未完成区（分区互斥）")
+
+    if changelog:
+        headers = _CHANGELOG_HEADER.findall(changelog)
+        if not headers:
+            findings.append(f"{rel(_CHANGELOG_MD)}: 缺少版本段头（`## [x.y.z] - ...`）")
+        elif len(headers) > 1:
+            findings.append(
+                f"{rel(_CHANGELOG_MD)}: 现行 changelog 含 {len(headers)} 个版本段头（已发布版本段须随发布移入归档）"
+            )
+        elif not headers[0].endswith("-dev"):
+            findings.append(
+                f"{rel(_CHANGELOG_MD)}: 现行 changelog 段头 `{headers[0]}` 非开发版本（正式版本段落须归档）"
+            )
+    return findings
+
+
+def check_management_partitions() -> list[str]:
+    """读三份管理文档 + 归档文件后执行分区纪律审计（文件缺失按空串参与，不抛异常）。"""
+
+    def _read(path: Path) -> str:
+        return path.read_text(encoding="utf-8") if path.exists() else ""
+
+    archive_root = REPO_ROOT / "docs-stm" / "archive"
+    return audit_management_partitions(
+        review_findings=_read(_REVIEW_FINDINGS_MD),
+        plan=_read(_PLAN_MD),
+        changelog=_read(_CHANGELOG_MD),
+        archived_changelogs=[_read(p) for p in sorted(archive_root.rglob("archived_changelog.*.md"))],
+        archived_plans=[_read(p) for p in sorted(archive_root.rglob("archived_plan.*.md"))],
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
 #  编排
 # ═══════════════════════════════════════════════════════════════
 
@@ -725,6 +829,7 @@ def run_checks(with_test_count: bool = False) -> list[str]:
     findings += check_panel_numbering(docs[_TUI_MENU_MD])
     findings += check_dir_tree(docs[_FOLDERS_MD])
     findings += check_archive_index()
+    findings += check_management_partitions()
     findings += check_project_stats(docs[_FOLDERS_MD], with_test_count=with_test_count, snapshot=snapshot)
     if with_test_count:
         findings += check_test_coverage_counts(docs[_TEST_COVERAGE_MD], snapshot)
@@ -733,7 +838,7 @@ def run_checks(with_test_count: bool = False) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="校验文档中的章节/开关/默认值/目录树/统计断言与代码、配置文件、文件系统的一致性",
+        description="校验文档中的章节/开关/默认值/目录树/统计断言/归档索引/分区纪律与代码、配置文件、文件系统的一致性",
     )
     add_common_args(parser)
     parser.add_argument(
@@ -760,7 +865,7 @@ def main() -> None:
     sys.exit(
         report(
             findings,
-            "[OK] 文档与实现一致性校验通过（章节/开关/默认值/面板编号/目录树/统计表均与代码一致）",
+            "[OK] 文档与实现一致性校验通过（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律均与代码一致）",
             ci=args.ci,
             fail_message="[!] 发现 {n} 处文档与实现不一致，须修正后提交",
         )
