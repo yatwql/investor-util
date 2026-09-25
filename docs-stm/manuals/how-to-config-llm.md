@@ -147,8 +147,43 @@ LLM 配置由三个独立文件管理：
 | `weight` | ❌ | int | 加权随机权重，仅 `weighted` 策略有效，默认 1 |
 | `timeout` | ❌ | int | 超时秒数，覆盖全局 timeout，默认 60 |
 | `proxy_preferred` | ❌ | bool | `true` 时优先使用代理直连（而非自动路由），默认 `false` |
+| `pacing` | ❌ | object | **端点级节流/并发约束**（仅作用于本条目对应的端点）；缺省 = 无额外约束。字段见下方「端点级节流」 |
 
 > **不得内联 `api_key`**：本文件可提交仓库（团队共享调优参数），因此**只放路由字段**——写入 `api_key` 等于把密钥随配置入库。校验器遇到非空内联 `api_key` 会记 WARNING 并**跳过整条 provider**（不是仅告警后放行）。密钥一律写在 `llm_key.json` 的凭据块里，本文件用 `credentials_ref` 引用。`model` / `endpoint` 属非敏感路由字段，可留在本文件按条目覆盖凭据块同名值。
+
+### 端点级节流（`pacing`）
+
+**为什么需要它**：同一次报告生成的 LLM 调用会落在不同端点上，而各端点背后的服务约束截然不同——
+
+- **订阅制编码端点**（如 Kimi Code，`https://api.kimi.com/coding/`）：按会员额度计费，带滚动频率窗口与风控型并发上限；其服务条款要求**交互式**使用，批量调用应低频串行。
+- **按量付费端点**（如开放平台 `api.moonshot.cn/v1`）：有明确的分级 RPM / TPM 与按量账单，可放心用较高并发。
+
+全局键 `llm_max_concurrency` 无法表达「同一程序、不同端点不同策略」，因此把约束**声明到 provider 条目**上：
+
+```jsonc
+"providers": [
+  {
+    "name": "kimi-code",
+    "provider": "claude",
+    "credentials_ref": "kimi-code",
+    "priority": 10,
+    "pacing": { "min_interval": 20, "jitter": 0.2, "max_concurrency": 1 }
+  }
+]
+```
+
+| `pacing` 字段 | 类型 | 默认 | 含义 |
+|------|:----:|:----:|------|
+| `min_interval` | float | 0 | 同一端点上两次请求的**最小间隔**（秒）；0 = 不限 |
+| `jitter` | float | 0 | 在主间隔上叠加的随机抖动**比例**（0~1）；避免固定节奏的机器特征 |
+| `max_concurrency` | int | 0 | 该端点**同时在途**请求上限；0 = 不限 |
+
+**关键性质**：
+
+- **缺省即无约束**：不写 `pacing` 的 provider 行为与未引入本机制时**逐字节一致**（零开销直通）。因此同一份配置里，可以把订阅制端点收紧、把按量端点放开。
+- **与全局并发叠加**：`llm_max_concurrency` 仍限制总线程数（默认 3）；`pacing.max_concurrency` 是**额外**的每端点上限，两者同时生效。例如全局 3 线程 + 订阅制端点 `max_concurrency: 1` ⇒ 该端点始终串行，其余端点可达 3 路并行。
+- **失败分类与重试**：端点返回 **403**（配额/风控拒绝，如 `You've reached your 5-hour usage limit` / `concurrent request limit`）时**不重试**——这类限制按时间窗口滚动、重试无益且会加剧风控画像；报告将显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**429 / 503** 仍按 `max_retries` 重试。
+- **抖动与间隔的线程安全**：同一端点的间隔串行与在途计数均为线程安全（per-端点锁 + 信号量），不同端点互不阻塞。
 
 ### 切换策略
 
@@ -298,6 +333,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
 - `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
 - `llm_max_thinking_concurrency`（int，默认 `1`）：开启 Extended Thinking 的模块（health_check / expert_review 等 `thinking_enabled_{module}=true`）并发的最大请求数。多 thinking 模块同时涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），此信号量将 thinking 请求串行化（同时最多 N 个，默认 1），非 thinking 模块不受此限。设大可提升 thinking 并发速度，但可能提高偶发空响应概率，建议保持默认 1
+
+> **全局并发 vs 端点级节流**：`llm_max_concurrency` 是**全局**上限（所有模块合起来最多几个线程）；若需对**某个具体端点**单独限速/限并发（例如同一个程序里，订阅制编码端点要低频串行、按量付费端点可以放开），用 `llm_providers.json` 各 provider 条目内的 `pacing` 段——两者叠加生效，见下方「端点级节流」。
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: [], weekend_always_idle: true, holiday_always_idle: true}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）、`weekend_always_idle`（周末全天闲时开关，默认 `true`）、`holiday_always_idle`（法定节假日全天闲时开关，默认 `true`）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节

@@ -19,6 +19,7 @@ from src.python.llm import (
     FAIL_REASON_DISABLED,
     FAIL_REASON_NETWORK_ERROR,
     FAIL_REASON_NOT_CONFIGURED,
+    FAIL_REASON_QUOTA_EXCEEDED,
     FAIL_REASON_TIMEOUT,
 )
 from src.python.llm.prompts import LLM_MODULE_FAILURE
@@ -200,6 +201,7 @@ _PLACEHOLDER_BY_REASON: dict[str, str] = {
     FAIL_REASON_API_ERROR: "本节内容待生成 — LLM API 调用失败（请检查 API Key 和网络连接后重新生成）",
     FAIL_REASON_TIMEOUT: "本节内容待生成 — LLM API 请求超时（可尝试在 llm_settings.json 中增大 timeout 配置）",
     FAIL_REASON_NETWORK_ERROR: "本节内容待生成 — LLM API 网络连接失败（请检查网络后重新生成）",
+    FAIL_REASON_QUOTA_EXCEEDED: "本节内容待生成 — LLM 端点配额或风控限制已触发（订阅额度窗口/并发上限；请稍后重试或改用按量付费端点）",
     FAIL_REASON_CIRCUIT_OPEN: "本节内容待生成 — LLM API 暂时不可用（熔断冷却中，请稍后重试）",
 }
 

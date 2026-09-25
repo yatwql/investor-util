@@ -108,6 +108,38 @@ class TestParseProvidersList(unittest.TestCase):
         self.assertEqual(result[0]["name"], "p1")
         self.assertEqual(result[1]["name"], "p2")
 
+    # ── 端点级节流（pacing）声明 ──
+
+    def test_pacing_declared_is_preserved(self):
+        """provider 条目声明 pacing 时须透传到解析结果（供端点节流装载）。"""
+        raw = {
+            "providers": [
+                {
+                    "name": "kimi-code",
+                    "provider": "claude",
+                    "credentials_ref": "ref-kimi",
+                    "pacing": {"min_interval": 20, "jitter": 0.2, "max_concurrency": 1},
+                }
+            ]
+        }
+        result = _parse_providers_list(raw)
+        assert result is not None
+        assert result[0]["pacing"]["min_interval"] == 20
+        assert result[0]["pacing"]["max_concurrency"] == 1
+
+    def test_pacing_absent_not_injected(self):
+        """未声明 pacing 时不写入该键（缺省 = 无约束，行为与未引入时一致）。"""
+        raw = {"providers": [{"name": "p1", "provider": "claude", "credentials_ref": "ref-1"}]}
+        result = _parse_providers_list(raw)
+        assert result is not None
+        assert "pacing" not in result[0]
+
+    def test_pacing_non_dict_ignored(self):
+        """pacing 为非对象（如字符串）时忽略，不影响该 provider 可用性。"""
+        raw = {"providers": [{"name": "p1", "provider": "claude", "credentials_ref": "ref-1", "pacing": "fast"}]}
+        result = _parse_providers_list(raw)
+        assert result is not None and "pacing" not in result[0]
+
     # ── 空/缺 providers ──
 
     def test_empty_providers_array(self):

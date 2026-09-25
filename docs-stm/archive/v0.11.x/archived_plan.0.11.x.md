@@ -177,6 +177,24 @@
 
 **实施记录**：见 `../../managements/changelog.md`「plan-48 景气度框架④维场外流动性补齐（类型默认档）」条。
 
+### P1 — 已完成（plan-57 LLM 端点级节流与并发治理，2026-09-25）
+
+**触发**：用户计划将订阅制编码端点（Kimi Code）接入程序，要求「从整体架构出发、考虑架构约束、不留技术债务」，并质疑「非该端点时并发约束能否放开」。
+
+**背景（实测）**：每次报告生成 8~9 次 LLM 调用、41k~56k token，集中在 2~8 分钟内以 3 路并发发出——对「要求交互式使用」的订阅制端点属高风险形态。全局键 `llm_max_concurrency` 无法表达「同一程序、不同端点不同策略」。
+
+**实施**：
+- 新增 `llm/pacing.py`：`PacingPolicy` / `parse_policy` / `register_policies` / `PacingGate`——把节流与并发**声明化到 provider 条目**（`llm_providers.json` 的 `pacing` 段：`min_interval` / `jitter` / `max_concurrency`），缺省即无约束（零开销直通，行为与未引入时逐字节一致）
+- 配置层接入：`_parse_providers_list` 透传 `pacing`；`_inject_provider_chain_data` 装载策略（配置为唯一事实来源）；模板补注释
+- 调用链接线：`endpoint_key` 由 provider 条目名逐层透传（`api.py` → `call_single_provider` → 三协议 `call_claude/openai/gemini` → `call_llm_with_retry`），在**唯一调用缝**施加 `PacingGate`（先取并发许可再等间隔，使间隔真正约束请求发出时刻）
+- 复用既有原语：`fetcher/batch.py::RateLimiter` 新增 `acquire_interval(key, interval)`（逐次显式间隔），不重复实现限速器
+- **403 配额/风控不重试**：新增 `FAIL_REASON_QUOTA_EXCEEDED`，`_attempt_api_call` 将 403 归为 `("quota", 403)`，重试骨架直接降级到下一 provider（窗口按时间滚动，重试无益且加剧风控画像）；429/503 仍按 `max_retries` 重试。报告侧差异化文案同步（`llm_content` / `llm_module_info`）
+- 文档：手册新增「端点级节流（`pacing`）」章节（与全局并发的关系、403 语义）；技术设计新增 §4.2.1（含调用链图与性质表）
+
+**测试**：+19 例（`test_llm_pacing.py` 16：解析/容错/注册/零开销/间隔/抖动/并发上限/异常释放/失败原因；`test_config_llm_multi.py` +3：pacing 透传/缺省不注入/非对象忽略）。真实调用路径实测：无约束端点 3 次调用 0.002s；`min_interval=0.2` 端点间隔稳定 0.200s；403 在 `max_retries=2` 下仅 1 次请求且失败原因 `quota_exceeded`
+
+---
+
 ### P1 — 已完成（plan-56 数据源健壮性加固，2026-09-24）
 
 **触发**：用户报「`price_price_fund_otc` 与 `report_datasink` 高频连接失败」，建议增加备用通道 / 优化重试 / 延长刷新窗口。

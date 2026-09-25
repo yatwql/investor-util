@@ -17,6 +17,7 @@ try:
         FAIL_REASON_DISABLED,
         FAIL_REASON_NETWORK_ERROR,
         FAIL_REASON_NOT_CONFIGURED,
+        FAIL_REASON_QUOTA_EXCEEDED,
         FAIL_REASON_TIMEOUT,
     )
 except ImportError:
@@ -31,6 +32,7 @@ _DISPLAY_REASON: dict[str, str] = {
     FAIL_REASON_NETWORK_ERROR: "LLM API 网络连接失败",
     FAIL_REASON_TIMEOUT: "LLM API 请求超时",
     FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
+    FAIL_REASON_QUOTA_EXCEEDED: "LLM 端点配额/风控限制已触发（稍后重试或改用按量付费端点）",
 }
 
 

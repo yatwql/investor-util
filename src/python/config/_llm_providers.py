@@ -201,6 +201,11 @@ def _parse_providers_list(raw_config: dict) -> list[dict] | None:
             "timeout": float(entry.get("timeout", 60.0)),
             "proxy_preferred": entry.get("proxy_preferred", False),
         }
+        # 端点级节流/并发策略（可选）：订阅制端点需要低频串行、按量端点可放开——
+        # 由配置逐端点声明，缺省不写入（= 无额外约束，行为与未引入时一致）。
+        pacing = entry.get("pacing")
+        if isinstance(pacing, dict):
+            entry_dict["pacing"] = pacing
         # 凭据唯一来源：credentials_ref → llm_key.json 凭据块（凭据分离）
         entry_dict["credentials_ref"] = entry["credentials_ref"]
         # model 为非敏感路由覆盖（模板注释邀请按需修改）；缺省时由凭据块提供。
@@ -235,6 +240,12 @@ def _inject_provider_chain_data(config: dict) -> dict:
 
     provider_list = _parse_providers_list(raw_providers)
     config["_provider_list"] = provider_list
+
+    # 端点级节流/并发策略：由 provider 条目自带的 pacing 段驱动（配置为唯一事实来源）。
+    # 无声明 → 无约束（行为与未引入本机制时逐字节一致）。
+    from src.python.llm.pacing import register_policies
+
+    register_policies(provider_list)
 
     # strategy
     strategy = raw_providers.get("strategy", "priority")

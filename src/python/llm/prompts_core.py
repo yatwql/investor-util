@@ -28,6 +28,8 @@ FAIL_REASON_API_ERROR = "api_error"
 FAIL_REASON_NETWORK_ERROR = "network_error"
 FAIL_REASON_TIMEOUT = "timeout"
 FAIL_REASON_CIRCUIT_OPEN = "circuit_open"
+# 端点配额/风控类拒绝（如订阅制端点的 5 小时窗口、并发上限）——重试无益且会加剧风控画像
+FAIL_REASON_QUOTA_EXCEEDED = "quota_exceeded"
 FAIL_REASON_DISABLED = "disabled"
 
 LLM_MODULE_FAILURE: dict[str, str | dict] = {}

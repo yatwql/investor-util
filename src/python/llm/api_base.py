@@ -25,6 +25,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
     FAIL_REASON_CIRCUIT_OPEN,
     FAIL_REASON_NETWORK_ERROR,
+    FAIL_REASON_QUOTA_EXCEEDED,
     FAIL_REASON_TIMEOUT,
 )
 from src.python.llm.session import record_per_module, track_session_usage
@@ -539,6 +540,16 @@ def _attempt_api_call(
                     _sanitize_endpoint(url),
                 )
             return ("retryable", resp.status_code)
+        if resp.status_code == 403:
+            # 端点配额/风控拒绝（订阅制端点的 5 小时窗口、并发上限、月度额度等）：
+            # 重试无益（窗口按时间滚动，非瞬时故障），且高频重试会加剧风控画像，
+            # 故标记为不可重试，交由上层链降级到下一 provider。
+            logger.warning(
+                "%s API 返回 403（端点配额/风控拒绝，重试无益）：%s",
+                _sanitize_endpoint(url),
+                (resp.text or "")[:160],
+            )
+            return ("quota", resp.status_code)
         resp.raise_for_status()
         return ("success", resp.json())
     except httpx.TimeoutException:
@@ -585,6 +596,7 @@ def call_llm_with_retry(
     check_truncation_fn: Callable[[dict, int], bool],
     provider: str,
     model_name: str = "",
+    endpoint_key: str = "",
 ) -> tuple[str | None, dict | None]:
     """LLM API 调用通用重试骨架。
 
@@ -605,6 +617,9 @@ def call_llm_with_retry(
         check_truncation_fn: 检查是否被截断的回调
         provider: 日志中的 provider 标识（"claude" / "openai"）
         model_name: 模型名称（用于费用估算，可空）
+        endpoint_key: 端点策略键（provider 条目名）；非空且该端点声明了 ``pacing``
+            时，每次请求前经 :class:`llm.pacing.PacingGate` 施加间隔与在途并发约束。
+            空串 = 无约束（与未引入端点节流时逐字节一致）。
 
     Returns:
         (content, usage) — content 为文本，usage 为 API 用量字典，失败时均为 None
@@ -614,8 +629,12 @@ def call_llm_with_retry(
         _last_llm_failure_reason = FAIL_REASON_CIRCUIT_OPEN
         return (None, None)
 
+    from src.python.llm.pacing import PacingGate
+
     for attempt in range(max_retries + 1):
-        kind, info = _attempt_api_call(client, url, headers, payload, timeout)
+        # 端点级节流：仅在配置声明了 pacing 时生效（无声明 → 零开销直通）
+        with PacingGate(endpoint_key):
+            kind, info = _attempt_api_call(client, url, headers, payload, timeout)
 
         if kind == "success":
             clear_last_llm_failure()
@@ -631,6 +650,12 @@ def call_llm_with_retry(
                 label,
                 url,
             )
+
+        if kind == "quota":
+            # 配额/风控拒绝：不重试（窗口按时间滚动），直接降级到下一 provider
+            _cb_record_failure(url)
+            _last_llm_failure_reason = FAIL_REASON_QUOTA_EXCEEDED
+            return (None, None)
 
         if kind == "retryable":
             detail = "超时" if info is None else (f"{info}" if isinstance(info, int) else f"网络错误 ({info})")

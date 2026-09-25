@@ -439,6 +439,42 @@ _LLM_CLIENT_SETTINGS = {
 
 `max_workers=llm_config.llm_max_concurrency`（config 默认 3）控制并行调用数。开启 Extended Thinking 的模块（`thinking_enabled_{suffix}=true`）受独立信号量 `llm_max_thinking_concurrency`（默认 1）串行化约束——多 thinking 模块并发涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），该信号量从源头降低并发（thinking 请求同时最多 N 个），非 thinking 模块不受此限。
 
+### 4.2.1 端点级节流与并发治理（`llm/pacing.py`）
+
+**问题**：全局键 `llm_max_concurrency` 只能表达「所有模块合起来最多几个线程」，无法表达「同一程序、不同端点不同策略」。而同一次报告生成的调用会落在约束截然不同的端点上：订阅制编码端点在服务条款上要求**交互式**使用、带滚动频率窗口与风控型并发上限；按量付费端点有明确的分级 RPM/TPM，可放心高并发。
+
+**设计**：把约束**声明化到 provider 条目**（配置为唯一事实来源），运行时由 `PacingGate` 在**唯一调用缝**上施加。
+
+```
+llm_providers.json
+  providers[i].pacing = { min_interval, jitter, max_concurrency }   （可选）
+        │  _parse_providers_list() 解析
+        ▼
+  _inject_provider_chain_data() ──► register_policies()  （装载到模块级注册表）
+        │
+        ▼  调用链
+  api.py::_call_provider_entry(entry)  ── endpoint_key = entry.name
+        └─► call_single_provider(endpoint_key=…)
+             └─► call_claude / call_openai / call_gemini(endpoint_key=…)
+                  └─► call_llm_with_retry(endpoint_key=…)
+                       └─► with PacingGate(endpoint_key):   ◄── 唯一施加点
+                              _attempt_api_call(...)
+```
+
+**关键性质**：
+
+| 性质 | 实现要点 |
+|:-----|:---------|
+| **缺省零影响** | 无 `pacing` 声明的端点，`PacingGate` 的 `__enter__` 仅一次 dict 查空即返回（无锁、无 sleep）；行为与未引入本机制时逐字节一致 |
+| **与全局并发叠加** | `llm_max_concurrency`（线程池）与 `pacing.max_concurrency`（每端点信号量）是**两级**约束，同时生效 |
+| **间隔在并发许可之后取得** | 先 `semaphore.acquire()` 再等间隔，使 `min_interval` 真正约束「请求发出」时刻（否则排队线程会同时放行） |
+| **抖动** | `jitter` 按比例叠加到 `min_interval` 上（`min_interval × (1 + U(0, jitter))`），避免固定节奏的机器特征 |
+| **复用既有原语** | 间隔控制复用 `fetcher/batch.py::RateLimiter`（新增 `acquire_interval(key, interval)` 方法支持逐次显式间隔），不重复实现限速器 |
+| **异常必释放** | `PacingGate` 以 context manager 实现，`__exit__` 无条件 release，避免异常路径把端点占死 |
+| **配置容错** | `pacing` 字段类型错误**逐字段忽略**（记 WARNING），不因单个笔误使整条 provider 校验失败 |
+
+**与 403 的配合**：端点返回 403（配额/风控，如 5 小时窗口用尽、并发上限）时**不重试**——这类限制按时间窗口滚动而非瞬时故障，重试无益且高频重试会加剧风控画像。`_attempt_api_call` 将其归为 `("quota", 403)`，重试骨架直接返回并记 `FAIL_REASON_QUOTA_EXCEEDED`，报告显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**429 / 503 仍按 `max_retries` 重试**（真正的瞬时限制）。
+
 ### 4.3 缓存预检查优化
 
 `_dispatch_llm_workers()` 仅对缓存**未命中**的模块提交线程池任务。缓存命中的模块直接读取内容，节省线程开销。

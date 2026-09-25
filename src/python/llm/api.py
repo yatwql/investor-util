@@ -251,6 +251,7 @@ def call_single_provider(
     config_field: str,
     temperature: float | None,
     llm_config: dict | None,
+    endpoint_key: str = "",
 ) -> tuple[str | None, dict | None]:
     """调用单个 LLM provider。"""
     if provider == "claude":
@@ -267,6 +268,7 @@ def call_single_provider(
             config_field=config_field,
             temperature=temperature,
             llm_config=llm_config,
+            endpoint_key=endpoint_key,
         )
     elif provider == "openai":
         return call_openai(
@@ -281,6 +283,7 @@ def call_single_provider(
             http_client=http_client,
             config_field=config_field,
             temperature=temperature,
+            endpoint_key=endpoint_key,
         )
     elif provider == "gemini":
         return call_gemini(
@@ -296,6 +299,7 @@ def call_single_provider(
             config_field=config_field,
             temperature=temperature,
             llm_config=llm_config,
+            endpoint_key=endpoint_key,
         )
     else:
         logger.warning("不支持的 LLM provider: %s", provider)

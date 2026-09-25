@@ -420,6 +420,20 @@ class RateLimiter:
         interval = self._limits.get(provider, 0.0)
         if interval <= 0:
             return
+        self.acquire_interval(provider, interval)
+
+    def acquire_interval(self, provider: str, interval: float) -> None:
+        """按**显式间隔**获取许可（不受构造时配置约束）。
+
+        与 :meth:`acquire` 的区别：间隔由调用方逐次给出而非构造时固定——LLM 端点
+        节流需要按策略动态计算（含随机抖动），且同一 provider 的策略可在运行期刷新。
+
+        Args:
+            provider: 端点/源标识（作为间隔计量的键）
+            interval: 本次要求的最小间隔（秒）；<= 0 不等待
+        """
+        if interval <= 0:
+            return
 
         # per-provider 锁，不同 provider 不互相阻塞
         if provider not in self._locks:
