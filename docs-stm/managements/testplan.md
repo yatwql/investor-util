@@ -521,6 +521,7 @@
 | R-LLM-06 | `src/test/unit/llm/test_llm_chain_strategies.py` + `src/test/unit/llm/test_strategy.py` | 批 5 |
 | R-LLM-07 | `src/test/unit/config/test_llm_settings.py` + `src/test/unit/config/test_config_llm_multi.py` | 批 5 |
 | R-LLM-09 | `src/test/unit/llm/test_prompts_signals.py` | 批 5 |
+| R-LLM-10 | `src/test/unit/llm/test_llm_pacing.py`（策略解析/容错/注册/零开销直通/间隔/抖动/并发上限/异常释放/403 不重试）+ `src/test/unit/config/test_config_llm_multi.py`（pacing 透传/缺省不注入/非对象忽略） | 批 5 |
 | R-LLM-08 | `src/test/unit/llm/test_llm_api.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
 | R-PF-01 | `src/test/unit/config/test_features.py` + `src/test/unit/report/test_section_visibility.py` | 批 5 |
 | R-PF-02 | `src/test/unit/analysis/test_prosperity_framework.py` | 批 5 |

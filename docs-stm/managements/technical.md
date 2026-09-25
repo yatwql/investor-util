@@ -2989,6 +2989,8 @@ LLM API 调用支持多 Provider 链式容错，与数据获取层的 Provider C
 - **逐链尝试**：`api.call_provider_entry()` 按策略排序后逐链调用，成功即返回，全链失败后降级为占位文本
 - **Provider 感知缓存**：缓存键格式 `llm_{module}_{provider_name}_{fingerprint}`，不同 Provider 的缓存互不冲突
 - **失败追踪**：`LLM_MODULE_FAILURE` 字典记录每个模块的 attempted Provider 列表及 final_status，供报告展示
+- **端点级节流**：每个 provider 条目可声明 `pacing`（`min_interval` / `jitter` / `max_concurrency`）对该端点单独限速与限并发；缺省即无约束（零开销直通）。与全局 `llm_max_concurrency`（线程池）两级叠加，见 `llm-technical.md` §4.2.1
+- **配额/风控拒绝不重试**：端点返回 403（如订阅制端点的 5 小时窗口、并发上限）时取 `quota` 分支直接降级到下一 provider，失败原因记 `FAIL_REASON_QUOTA_EXCEEDED`——这类限制按时间窗口滚动，重试无益且会加剧风控画像；429 / 503 仍按 `max_retries` 重试
 
 4 种策略的详细排序逻辑和 credentials_ref 解析流程见 `llm-technical.md` §5（API 调用层）。
 
