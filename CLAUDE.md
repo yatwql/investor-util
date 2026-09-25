@@ -23,7 +23,7 @@
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退。新增功能时，**必须**同步编写测试用例覆盖。测试用例应直接验证缺陷场景的具体断言，而非仅测正常路径。
 - **测试标记强制**：所有新增/修改的测试用例（测试类或测试方法）**必须**标注对应的 pytest marker（如 `@pytest.mark.unit_providers`、`@pytest.mark.scenario_basic` 等），marker 定义见 `src/test/conftest.py` 的 `pytest_configure`。新增 marker 需同步注册到 `conftest.py` 和维护文档。
 - **边缘测试文件隔离**：edge 场景测试（`@pytest.mark.edge`）**必须**放置在 `*_edge.py` 文件中，不得与普通测试混搭在同一文件。`conftest.py` 的 `pytest_collection_modifyitems` 会在收集期自动校验此约束。
-- **测试冗余与有效性**：新增/修改测试后**必须**通过 `.venv/bin/python scripts/check-test-redundancy.py --ci`——四类问题为硬禁止：**死用例**（同名覆盖/非 `Test` 类里的 `test_*`/`Test` 类带 `__init__`）、**无断言用例**（无 `assert`、无 `pytest.raises/warns/fail`、无 mock 断言，也不经同类辅助方法断言）、**完全重复用例**（函数体+参数+装饰器 AST 归一化一致）、**自证用例**（patch 了被测函数又把其 `return_value` 断言回原值）。重复比对会跳过「`self.<attr>` 间接调用无法解析」的用例（避免把并行覆盖误判为重复）；删除/合并用例后须同步刷新 `test-coverage.md` 与 `folders.md` 的用例计数
+- **测试冗余与有效性**：新增/修改测试后**必须**通过 `.venv/bin/python scripts/check-test-redundancy.py --ci`——五类问题为硬禁止：**死用例**（同名覆盖/非 `Test` 类里的 `test_*`/`Test` 类带 `__init__`）、**无断言用例**（无 `assert`、无 `pytest.raises/warns/fail`、无 mock 断言，也不经同类辅助方法断言）、**完全重复用例**（函数体+参数+装饰器 AST 归一化一致）、**自证用例**（patch 了被测函数又把其 `return_value` 断言回原值）、**硬编码演进总数**（把需求/章节/开关等可增长集合的条数写死进断言——良性新增必红且与门禁职责重复，应改结构关系断言）。重复比对会跳过「`self.<attr>` 间接调用无法解析」的用例（避免把并行覆盖误判为重复）；删除/合并用例后须同步刷新 `test-coverage.md` 与 `folders.md` 的用例计数
 - **测试隔离**：运行测试时**不得**修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据。`src/test/conftest.py` 中的 `_isolate_sensitive_paths` autouse fixture 会自动将 `config.json` 和缓存目录重定向到临时目录。测试用例应使用 mock 或临时文件隔离，避免污染真实数据。
 - **新增测试隔离要求**：
   - **单例状态重置**：新增模块级单例（如 `get_tracker()`）时，**必须**在 conftest.py 中增加 `autouse` fixture 重置该单例（参考 `_auto_reset_provider_registry` 模式），避免测试间状态污染

@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.5-dev
-> **编号源**：`rf-next = 431`（新增问题取此编号，完成后更新为 +1；已用最大 rf-430，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 432`（新增问题取此编号，完成后更新为 +1；已用最大 rf-431，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -45,6 +45,9 @@
 ### 已解决待归档（v0.11.5-dev）
 
 > 暂无（v0.11.4 批次 rf-428 ~ rf-430 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）。
+
+
+| **rf-431** | **测试断言硬编码「会演进的总数」，阻塞正常需求演进并导致 CI 全红**：`test_check_requirement_trace.py::test_every_requirement_id_mapped` 写死 `assert len(req_ids) == 276`，而需求条数的真值来源是 `requirements.md`——新增一条需求（`R-LLM-10`）后该断言必红。实测后果：commit `225ad00f` 的 GitHub CI **run #800 三个 Python 版本（3.11/3.12/3.13）全部 P0 失败**（映射表本身完全正确）。同类写法在 `test_registry.py` 另有 4 处（`len(keys)==87`、`len(etm)==7`、`len(_REPORT_SECTION_DEFAULT)==17`、`len(reg)==7`，其中一处注释自述「新增模块时同步更新此值」） | ① 该断言去掉硬编码总数，改为**结构不变量**：ID 集合双向相等 + 域覆盖 == `_ALL_DOMAINS` + **域内序号从 1 连续无跳号**（比总数更强，能发现跳号/重号）+ 非空守卫；② `test_registry.py` 4 处同类改写（章节改为「编号连续 + key 唯一」、模块表改为「module_key 非空且唯一」、精确键改为「已知键集合 ⊆ 实测」、LLM 键改为「逐模块必备键齐全」）；③ **新增第 5 类静态检查** `check_hardcoded_evolving_totals`（`check-test-redundancy.py`）：检出 `assert len(<可增长集合>) ==/> 数字`，判定保守（需语义关键词或路径提示，忽略 ≤3 的小数字）；④ 回归：traceability +4 例（含「新增需求不再打红」反证与「跳号检测」）、redundancy +7 例；⑤ 文档同步「四类→五类」（CLAUDE.md / developer-guide / folders.md） |
 
 ### 归档档案
 

@@ -60,7 +60,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-task-numbering.py --ci       # 任务编号全局一致性检查
 .venv/bin/python scripts/check-semantic-index.py --ci       # 语义命名索引正反向校验
 .venv/bin/python scripts/check-doc-drift.py --ci            # 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵）
-.venv/bin/python scripts/check-test-redundancy.py --ci      # 测试用例冗余与无效（死用例/无断言/完全重复/自证用例）
+.venv/bin/python scripts/check-test-redundancy.py --ci      # 测试用例冗余与无效（死用例/无断言/完全重复/自证用例/硬编码演进总数）
 .venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）（死用例/无断言/完全重复/自证用例）
 ```
 
@@ -723,7 +723,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表） |
-| `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例） |
+| `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
@@ -942,15 +942,19 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 
 **`check-test-redundancy.py` — 测试用例冗余与无效检查**
 
-静态分析 `src/test/`（默认跳过 `pytest.ini` 刻意排除的 `live/` 真网套件），抓四类「看着有测试其实没测住」的问题：
+静态分析 `src/test/`（默认跳过 `pytest.ini` 刻意排除的 `live/` 真网套件），抓五类「看着有测试其实没测住」的问题：
 
 1. **死用例**：同文件同类同名重复定义（后者覆盖前者）、类名不以 `Test` 开头的方法形式 `test_*`、`Test*` 类定义了 `__init__`（pytest 整类跳过）
 2. **无断言用例**：既无 `assert`、也无 `pytest.raises/warns/fail`、也无 `assertEqual` 等 `assert*` / `assert_called*`，且不经同类辅助方法（如 `self._assert_pairs_contain(...)`，其内部含断言）——断言落在辅助方法里同样算数
 3. **完全重复用例**：去 docstring 后「函数体 + 参数 + 装饰器」AST 归一化一致（同一被测对象同一断言）。凡函数体内出现**无法解析**的 `self.<attr>` 间接调用（目标来自 `setUp` / 跨模块基类）一律跳过比对——避免把「同名方法绑定不同被测对象」的并行覆盖误判为重复
 4. **自证用例**：同一用例内既 `@patch("<mod>.<fn>")` 又直接调用同名函数，且把该 mock 的 `.return_value` 设成某字面量、再用断言与该字面量比较（断言恒真，等于没测）
+5. **硬编码「会演进的总数」**：把**可增长集合的条数**写死进断言（如 `assert len(req_ids) == 276`、`assert len(sections) == 17`）。
+   这类总数是文档真值来源的派生量，**新增一条需求/章节/开关就会把测试打红**——良性变更被误判为回归，而它捕捉不到任何真实缺陷；且与门禁脚本（如 `check-requirement-trace` 的全域覆盖断言）**职责重复**。
+   正确写法是断言**结构关系**：集合双向相等（`set(a) == set(b)`）、子集/覆盖（`expected <= set(a)`）、序号连续（`numbers == list(range(1, n+1))`）、唯一性（`len(keys) == len(set(keys))`）。
+   判定保守（宁少报不误报）：仅看 `assert` 中的 `len(x) ==/> 数字`；实参名需含语义关键词（`requirement`/`section`/`switch`/`module`/`domain`/…）**或**文件路径含 `requirement`/`registry`；忽略 `<= 3` 的小数字（常为有意断言）。
 
 ```bash
-.venv/bin/python scripts/check-test-redundancy.py                 # 四类全查
+.venv/bin/python scripts/check-test-redundancy.py                 # 五类全查
 .venv/bin/python scripts/check-test-redundancy.py -v              # 详细输出（扫描规模 + 各类计数 + 跳过的间接调用用例数）
 .venv/bin/python scripts/check-test-redundancy.py --ci            # CI 模式（只输出 文件:描述，退出码 2）
 .venv/bin/python scripts/check-test-redundancy.py --include-live  # 连带扫描 src/test/live/

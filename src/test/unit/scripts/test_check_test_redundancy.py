@@ -216,6 +216,58 @@ class TestSelfFulfilling:
         assert redundancy.check_self_fulfilling(_cases(redundancy, src)) == []
 
 
+# ═══ 硬编码「会演进的总数」（E）═══
+
+
+class TestHardcodedEvolvingTotals:
+    """E 类：把可增长集合的条数写死进断言 → 良性变更（新增条目）也会把测试打红。"""
+
+    def _findings(self, redundancy, src: str, path: str = "src/test/unit/scripts/test_x.py"):
+        tree = ast.parse(src)
+        cases = redundancy.cases_in_module(Path(path), tree)
+        return redundancy.check_hardcoded_evolving_totals(cases)
+
+    def test_flags_hardcoded_requirement_total(self, redundancy):
+        src = "def test_a(req_ids):\n    req_ids = load()\n    assert len(req_ids) == 276\n"
+        findings = self._findings(redundancy, src)
+        assert len(findings) == 1 and "硬编码会演进的总数" in findings[0]
+
+    def test_flags_hardcoded_section_total(self, redundancy):
+        """实参名含语义关键词（sections）时报告——与真实缺陷写法一致。"""
+        src = "def test_a(sections):\n    assert len(sections) == 17\n"
+        assert self._findings(redundancy, src)
+
+    def test_ignores_small_totals(self, redundancy):
+        """小数字（<= 3）常为有意断言，不报。"""
+        src = "def test_a(xs):\n    assert len(xs) == 2\n"
+        assert self._findings(redundancy, src) == []
+
+    def test_ignores_unrelated_len(self, redundancy):
+        """与可演进集合无关的 len 断言（如实参名无关键词且路径无提示）不报。"""
+        src = "def test_a(values):\n    assert len(values) == 99\n"
+        assert self._findings(redundancy, src, path="src/test/unit/misc/test_y.py") == []
+
+    def test_path_hint_alone_is_enough(self, redundancy):
+        """路径含 requirement/registry 提示时，即使实参名无关键词也报（真实缺陷常如此）。"""
+        src = "def test_a(reg):\n    assert len(reg) == 17\n"
+        assert self._findings(redundancy, src, path="src/test/unit/core/test_registry.py")
+
+    def test_ignores_structural_assertions(self, redundancy):
+        """结构关系断言（集合相等 / 子集 / 逐项遍历）不应被误报。"""
+        src = (
+            "def test_a(req_ids, mapped):\n"
+            "    assert set(req_ids) == set(mapped)\n"
+            "    assert expected <= set(req_ids)\n"
+            "    for x in req_ids:\n        assert x\n"
+        )
+        assert self._findings(redundancy, src) == []
+
+    def test_ignores_non_assert_usage(self, redundancy):
+        """非断言位置的长度比较（如日志/计算）不报。"""
+        src = "def test_a(req_ids):\n    n = len(req_ids) == 276\n    assert n is not None\n"
+        assert self._findings(redundancy, src) == []
+
+
 # ═══ 真实仓库冒烟 ═══
 
 

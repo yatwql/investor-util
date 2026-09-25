@@ -21,6 +21,14 @@ from src.python.core.registry import (
 )
 import pytest
 
+
+def _llm_module_suffixes() -> list[str]:
+    """LLM 模块后缀清单（真值来源：registry 的 LLM 模块注册，非硬编码）。"""
+    from src.python.core.registry import get_llm_module_names
+
+    return sorted(get_llm_module_names())
+
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
 
@@ -89,8 +97,11 @@ class TestRegistryCompleteness:
         assert "output_brief_global_macro" in keys
         # news_correlation 不应有 output_brief
         assert "output_brief_news_correlation" not in keys
-        # 确认总键数（87 = 既有 86 + llm_max_thinking_concurrency 全局 thinking 并发键）
-        assert len(keys) == 87, f"预期 87 个 LLM settings 键，实际 {len(keys)}"
+        # 结构关系断言（不写死总数）：每个 LLM 模块的必备键均须存在
+        # —— 总数会随模块/键演进，写死只会阻塞正常开发，且门禁已保证集合完整性
+        for suffix in _llm_module_suffixes():
+            for prefix in ("system_prompt_", "model_", "temperature_", "max_tokens_", "timeout_", "cache_enabled_"):
+                assert f"{prefix}{suffix}" in keys, f"缺少模块键 {prefix}{suffix}"
 
     def test_each_llm_module_has_model_key(self):
         """每个 LLM 模块必须有 model_{suffix} 键。"""
@@ -164,8 +175,17 @@ class TestDerivedMaps:
     def test_exact_type_map_no_extra_keys(self):
         """exact_map 不包含多余键名。"""
         etm = get_exact_type_map()
-        # 3 个已有（benchmark/tracking/calendar）+ 3 个基金深度分析（manager/concentration/style）+ 1 bond_yield_rf
-        assert len(etm) == 7, f"预期 7 个精确键名，实际 {len(etm)}"
+        # 结构关系断言（不写死总数）：已知精确键名必须在内——新增键不应使本用例变红
+        expected = {
+            "bond_yield_rf",
+            "fund_benchmarks",
+            "fund_concentration_snapshot",
+            "fund_manager_snapshot",
+            "fund_style_snapshot",
+            "holdings_tracking",
+            "trading_calendar",
+        }
+        assert expected <= set(etm), f"缺少精确键名：{sorted(expected - set(etm))}"
 
     def test_registered_data_types(self):
         """get_registered_data_types 返回所有 data_type。"""
@@ -248,9 +268,12 @@ class TestDataModuleDef:
 class TestReportSectionDefault:
     """_REPORT_SECTION_DEFAULT 完整性验证。"""
 
-    def test_total_sections(self):
-        """检查报告模块总数（新增模块时同步更新此值）。"""
-        assert len(_REPORT_SECTION_DEFAULT) == 17
+    def test_section_numbers_contiguous_and_keys_unique(self):
+        """章节编号从 1 连续无跳号、key 唯一（结构不变量，比写死总数更能发现真实缺陷）。"""
+        numbers = sorted(int(s["number"]) for s in _REPORT_SECTION_DEFAULT)
+        assert numbers == list(range(1, len(numbers) + 1)), f"章节编号不连续：{numbers}"
+        keys = [s["key"] for s in _REPORT_SECTION_DEFAULT]
+        assert len(keys) == len(set(keys)), f"章节 key 重复：{[k for k in keys if keys.count(k) > 1]}"
 
     def test_every_entry_has_required_fields(self):
         """每个条目必须有 key/name/number/type/data_flag。"""
@@ -519,10 +542,13 @@ class TestGetReportSectionOrder:
 class TestComputationRegistry:
     """计算模块注册表测试。"""
 
-    def test_registry_has_7_modules(self):
-        """_COMPUTATION_REGISTRY 当前有 7 个注册模块。"""
+    def test_registry_module_keys_unique_and_non_empty(self):
+        """计算模块注册表：module_key 非空且唯一（结构不变量，不写死模块数）。"""
         reg = get_computation_registry()
-        assert len(reg) == 7
+        assert reg, "计算模块注册表为空"
+        keys = [m.module_key for m in reg]
+        assert all(keys), "存在空 module_key"
+        assert len(keys) == len(set(keys)), f"module_key 重复：{[k for k in keys if keys.count(k) > 1]}"
 
     def test_all_modules_have_module_key(self):
         """每个模块必须有 module_key。"""

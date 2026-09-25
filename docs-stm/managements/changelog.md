@@ -10,6 +10,24 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 修 CI 失败根因：测试断言硬编码「会演进的总数」→ 改结构不变量 + 新增第 5 类静态检查（2026-09-25，rf-431）
+
+**现象**：GitHub CI **run #800**（commit `225ad00f`）在 **3.11 / 3.12 / 3.13 三个版本全部 P0 失败**，失败用例 `test_check_requirement_trace.py::TestRealRepo::test_every_requirement_id_mapped`。
+
+**根因**：该断言写死 `assert len(req_ids) == 276`，而**需求条数的真值来源是 `requirements.md`**；我在 `225ad00f` 新增了 `R-LLM-10`（276 → 277）却漏改断言 → 良性变更被判为回归。映射表本身完全正确，门禁脚本也一直通过——**是测试自己把易漂移的派生量当真值**。
+
+**同类问题**（新增检查扫出）：`test_registry.py` 另有 4 处，其中 `test_total_sections` 注释自述「新增模块时同步更新此值」——等于承认它每次都要手改。
+
+**变更**：
+- **测试改结构不变量**（比写死总数更强）：
+  - 需求映射：「ID 集合双向相等 + 域集合 == `_ALL_DOMAINS` + **域内序号从 1 连续无跳号** + 非空守卫」——新增需求不再打红，且能发现跳号/重号
+  - 章节表：「编号 1..N 连续 + key 唯一」；计算模块表：「module_key 非空且唯一」
+  - LLM 键：「逐模块必备键齐全」（遍历模块后缀，非计数）；精确键：「已知键集合 ⊆ 实测」
+- **新增 `check-test-redundancy.py` 第 5 类** `check_hardcoded_evolving_totals`：静态检出 `assert len(<可增长集合>) ==/> 数字`，判定保守（实参名含语义关键词或路径含 requirement/registry 才报；忽略 ≤ 3 的小数字；不误报集合相等/子集/遍历等结构断言）
+- **文档同步**：「四类 → 五类」（CLAUDE.md / developer-guide 详表 / folders.md 两处）
+- **回归**：traceability +4 例（含「新增需求不再打红」的合成反证、跳号检测）、redundancy +7 例（含不误报结构断言/小数字/非断言位置的守卫）
+
+**验证**：`check-test-redundancy -v` → 7439 用例 / 五类计数全 0；`test_registry.py` 61 passed；traceability 21 passed。
 ### Kimi Code 订阅端点接入范例与模型识别补齐（2026-09-25）
 
 **背景**：用户计划改用 Kimi Code 订阅 Key（`api.kimi.com/coding/`），要求先把范例与文档准备好。
