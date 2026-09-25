@@ -1,9 +1,9 @@
 # 变更日志归档 — v0.11.x
 
-> 归档时间：2026-09-15（v0.11.0 发布当日并入）；2026-09-18 增补（v0.11.1 发布当日并入）；2026-09-24 增补（v0.11.2、v0.11.3 发布当日并入）
+> 归档时间：2026-09-15（v0.11.0 发布当日并入）；2026-09-18 增补（v0.11.1 发布当日并入）；2026-09-24 增补（v0.11.2、v0.11.3、v0.11.4 发布当日并入）
 > 原始文件：`docs-stm/managements/changelog.md`
-> 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1（2026-09-18）/ v0.11.2（2026-09-24）/ v0.11.3（2026-09-24）
-> 归档内容：v0.11.x 已发布版本变更记录（含 v0.11.3：需求 ID 追溯链全量打通（276 条/34 域映射表 + 门禁脚本）、手册 thinking 章节补 Kimi 与矩阵守卫、测试全量审计、归档索引与分区纪律断言；含 v0.11.2：Kimi 主节点接入与 Extended Thinking、穿透占比与 Endpoint 主备两处缺陷修复、景气度框架②④维扩展、巨潮财报备源、两轮技术债与文档审计；含 v0.11.1：同花顺 key 在报告中的可见性、新闻去重校准体系修整、48 小时技术债整改；开发版本记录仍保留在原文件 changelog.md 的 [0.11.2-dev] 段）
+> 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1（2026-09-18）/ v0.11.2（2026-09-24）/ v0.11.3（2026-09-24）/ v0.11.4（2026-09-25）
+> 归档内容：v0.11.x 已发布版本变更记录（含 v0.11.4：数据源健壮性加固（健康探针修正/场外净值跨厂商备源/传输级重试/正文备源/刷新窗口延长）、需求 ID 追溯链全量打通（276 条/34 域 + 门禁脚本）、手册 thinking 补 Kimi 与矩阵守卫、测试全量审计与两轮技术债整改、24h/48h 债务审计；含 v0.11.3：需求 ID 追溯链全量打通（276 条/34 域映射表 + 门禁脚本）、手册 thinking 章节补 Kimi 与矩阵守卫、测试全量审计、归档索引与分区纪律断言；含 v0.11.2：Kimi 主节点接入与 Extended Thinking、穿透占比与 Endpoint 主备两处缺陷修复、景气度框架②④维扩展、巨潮财报备源、两轮技术债与文档审计；含 v0.11.1：同花顺 key 在报告中的可见性、新闻去重校准体系修整、48 小时技术债整改；开发版本记录仍保留在原文件 changelog.md 的 [0.11.2-dev] 段）
 
 ---
 ## [0.11.1] - 2026-09-18
@@ -1443,3 +1443,48 @@ Excel 穿透页签与景气度评分读 `ratio_pct`，不受影响。既有测�
 - 回归测试 +5：真实仓库一致、正反两向检出、被检面覆盖三份文档、以及一条端到端「真实仓库索引被删即报」用例
 
 **验证**：`pytest src/test/unit/scripts/test_check_doc_drift.py` 73 passed；六项 `--ci` + ruff + 版本一致性全绿。
+
+---
+
+## [0.11.4] - 2026-09-25
+
+### 48 小时技术债审计：补齐并锁定 Provider Chain 降级路径表（2026-09-24，rf-430）
+
+**审计面**：最近 48 小时（25 commits / 96 文件 / +6071−1403）。**自动扫描全清**：无文件超 800 行、无 TODO/FIXME/HACK、无新增静默吞异常、无未被引用定义、无同形重复函数体。
+
+**发现并修复**：`datasource-reliability.md` §4.2「Provider Chain 降级路径」表声称枚举全部链路，**实际仅 5 行（13 条链缺 8 条）**；其中 `financial_report` 是窗口内 plan-50 新增双源行为（DataSinking 主 + 巨潮备源）却缺席。
+
+- 表补齐为 **13 条链**（含 `price` / `fund_rank` / `fund_hold` / `financial_report` / `financial_indicator` / `history_fund_otc` / `history_index` / `bond_yield`），逐条给出主链路 / 备用链路 / 回退条件
+- **新增 `check-doc-drift.py` 第 15 项** `check_chain_table()`：表链名 ↔ `_DEFAULT_CHAINS` **双向**比对（漏链 / 幽灵行 / 表缺失均报错），项数枚举同步「十五项」；回归 +4 例
+- **核实未修（非债务）**：`cninfo` 端点 `https` 不可达（ConnectTimeout）、`http` 可达 → 保留 `http` + `follow_redirects=True`；`price_fund_otc` / `industry` 双源已在表中且与代码一致；Gemini 仍为受支持协议（代码保留 `gemini` provider 类型 + 计价 + 模板备选，文档同步）——「下架 Gemini」仅指主节点切换为 Kimi
+
+### 过去 24 小时改动的技术债整改 5 项（2026-09-24，rf-429）
+
+**触发**：用户要求审计并修复最近 24 小时（20 commits / 83 文件 / +4580 行）引入的技术债。
+
+**扫描口径**（沿用既有审计）：体积硬上限 / 静默吞异常 / 债务标记（TODO/FIXME/HACK）/ 无引用定义 / 重复实现 / 文档同步 / 约束合规。**未命中**：债务标记 0、新增静默吞异常 0。
+
+**修复**：
+- **① 脚本超限**：`check-doc-drift.py` 732 → 985 行 → 拆为 `scripts/_doc_drift/` 包（`_shared` 共享设施 175 / `_format` 文档格式族 367 / `_tree` 目录树与统计 142 / `_ledger` 台账族 245），入口 198 行仅保留 CLI、编排与原面 re-export（镜像 `_test_runner/` 先例）
+- **② 主程序超限**：`analysis/prosperity_scoring.py` 731 → 813 行 → 抽出 `analysis/prosperity_signals.py`（本地信号提取原语：集中度/换手代理/基准收益，零网络；评分内核 711 行），迁移名在 `prosperity_scoring` 原面 re-export（rf-390 同款口径）
+- **③ 重复实现收敛**：场外净值两源（东财/新浪）的转换与适配器原本各写一份 → 收敛为 `_otc_nav_to_standard()` 单一转换 + `_OtcNavQuoteAdapter` 共用基类，两源仅余 `source_api` / `source_id` / `display_name` / `extract_data` 差异
+- **④ 文档同步四处**：`requirements.md` 数据源表、`technical.md` 链路表（场外净值补新浪备源与 `sina.py`）、`developer-guide.md` 检查项清单（「十一项」→「十四项」，补齐归档索引/分区纪律/Thinking 矩阵）、入口 docstring 项单与用法计数
+- **⑤ 冗余形参**：`_check_http(expect_status=...)` 无调用方传参 → 删除，3xx 判定合并为单分支
+
+**测试**：`test_check_doc_drift.py` 的补丁目标改为指向**持有被替换符号的子模块**（新增 `drift_parts` fixture，9 处用例签名同步）；`folders.md` 目录树新增 `_doc_drift/` 五条与 `prosperity_signals.py` 条目并收敛统计。
+
+### 数据源健壮性加固：修健康探针误报 + 场外净值跨厂商备源 + 传输级重试 + 财报正文备源（2026-09-24，rf-428 / plan-56）
+
+**触发**：用户报「`price_price_fund_otc` 与 `report_datasink` 高频连接失败」，建议增加备用通道 / 优化重试 / 延长刷新窗口。
+
+**诊断结论（实测证据）**：主要「失败」是**探针自身缺陷**——`core/check_sources.py` 的 9 个探针全部使用 `http://` 端点且不跟随重定向；上游迁 https 后返回 301/302，探针把 3xx 记成告警（`ok=false`），健康历史里天天基金 / 腾讯K线 / 财联社长期 `ok=0/fail=10`；东方财富行业探针缺 headers 且指向本环境不可达的 push2。**生产取数路径（https + `follow_redirects=True`）一直正常**：实测行业分类批量 3/3 命中（1.1s，备源接管）、场外净值正常返回。真实风险另有两条：`price_fund_otc` **单源无备**；DataSinking 索引 TTL 仅两周、配额压力大。
+
+**变更**：
+- **探针修正**（rf-428）：9 个 URL 全部 https；`_check_http` 默认跟随重定向且 **3xx 计「可达（带备注）」**；新增 `_check_any()` 多端点探针，行业分类改「push2 主源 → 行情页备源」，任一可达即判可用并标注「主源不可达，由备源接管」。**实测健康检查 10/10 可用（此前 6/10）**
+- **场外净值跨厂商备源**（plan-56）：新增 `providers/sina.py::fetch_fund_nav`（`hq.sinajs.cn/list=f_{code}` → 名称/单位净值/累计净值/前一日净值/净值日期）与 `quote_adapters.SinaFundQuoteAdapter`、手写转换 `_price_transform_sina_fund`；链路 `price_fund_otc` 由单源 `["eastmoney"]` → `["eastmoney", "sina_fund"]`。适配器开关**两条路径同时接线**（否则开关开启时备源会静默失效）；实测主源故障时新浪交付且数值一致
+- **传输级同源重试**：`fetcher/chain.fetch_with_fallback` 落槽前对传输级失败（超时/断连/远端断开）同源退避重试一次（0.6s 指数退避 + 抖动）；**不重试代码级空结果**（同一请求同一答案，且白耗 DataSinking 日配额）
+- **财报正文备源**：`fetcher/financial_report.py` 抽出 `_attempt_candidates`（章节阶 → 全文阶）并接入**正文级**巨潮接管——此前备源只在「索引为空」时触发，主源索引正常而正文不可得时无退路
+- **延长刷新窗口**：财报索引/章节清单 TTL **两周 → 30 天**（与正文同档），降低第三方配额与限速压力；R-FRD-07 语义同步
+- **文档同步**：`datasource.md`（场外净值路由 + TTL）、`datasource-reliability.md`（探针语义 + 链路备源表）、`technical.md`（新增 §2.2.1 同源重试 + 链路图 + 缓存说明）、`requirements.md`（R-FRD-07）
+
+**测试**：+26 例（探针 9 / 新浪 provider 4 / 适配器等价 2 / 链路重试 3 / 场外备源端到端 5 / 正文备源接管 3），含静态守卫「探针不得出现 `http://`」与「主源可用时备源零调用」红线断言。
