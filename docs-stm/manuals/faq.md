@@ -451,7 +451,7 @@ A: **技术上可以，但官方条款有明确风险，不推荐用于批量报
 - **两套系统互不通用**：Kimi Code 订阅端点是 `https://api.kimi.com/coding/`、模型名 `kimi-for-coding`；开放平台是 `https://api.moonshot.cn`、模型名 `kimi-k2.6`。Key 与 Base URL 必须配套，混用会 401 `Invalid Authentication`。
 - **条款限制**：Kimi Code 官方社区准则明确 **"Don't use Kimi Code for non-interactive automation"**（订阅仅限个人交互式使用，脚本化批量执行属超范围）。本工具的批量报告生成属非交互式自动化，违规处置可能是 **403 并发/风控限制**（只能申诉）。
 - **建议**：程序跑自动化用**开放平台按量付费 Key**（成本很低，约每次报告 ¥0.3~0.5）；订阅 Key 留给 Claude Code / CLI 等交互式编码场景。
-- **确实要用**：完整改法与降风险措施（`pacing` 端点级节流、403 不重试语义）见 [Kimi Code 订阅端点接入范例](how-to-use-kimi-code.md)。
+- **确实要用**：完整改法与降风险措施（两个文件的改法、`pacing` 端点级节流、403 不重试语义）见 [LLM 配置指引](how-to-config-llm.md) → 「支持的 provider 及配置示例」→ **Kimi Code（订阅会员）** 折叠块。
 
 **Q: LLM API 返回 429（请求过多）怎么办？**
 

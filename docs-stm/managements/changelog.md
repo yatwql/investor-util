@@ -32,13 +32,13 @@
 
 **背景**：用户计划改用 Kimi Code 订阅 Key（`api.kimi.com/coding/`），要求先把范例与文档准备好。
 
-**新增文档**（`docs-stm/manuals/how-to-use-kimi-code.md`）：
+**新增文档章节**（`how-to-config-llm.md` → 「支持的 provider 及配置示例」→ **Kimi Code（订阅会员）** 折叠块）：
 - 两套系统差异对照表（Base URL / Key 来源 / **模型名** / 计费方式 / 互不通用）
 - 启用步骤（改 `llm_key.json` + `llm_providers.json` 两个文件，**无需改代码**）+ 验证命令
 - `pacing` 推荐值表（订阅端点 20s/0.2/1）与「想更保守 / 想恢复放开」调法
 - 403 配额风控语义对照表（403 不重试、429/503 重试、401 表示两套系统混用）
 - **风险提示**（官方条款原文引用：订阅仅限交互式，脚本化批量执行属超范围；`pacing` 只能降低检出概率）
-- 交叉链接：README 文档索引新增第 11 篇；`how-to-config-llm.md` Kimi 段与 `faq.md` 新增 FAQ 均指向本文
+- 交叉链接：`how-to-config-llm.md` 开放平台 Kimi 段指向本折叠块；`faq.md` 新增 FAQ 指向该折叠块（内容归属 LLM 配置手册，不另立文件）
 
 **代码补齐 2 处模型识别缺口**（换 Key 时才会暴露）：
 - `_THINKING_SUPPORTED_PREFIXES` / `_THINKING_DEFAULT_ON_PREFIXES` 补 `k3`：Kimi Code 旗舰模型名为 `k3` / `k3-256k`，**不以 `kimi-` 开头**——漏登记会让「未开启 thinking 时显式禁用」的安全网失效
