@@ -444,6 +444,15 @@ A: 支持。通过 `llm_providers.json` 的 `strategy` 字段切换分发策略�
 
 任一 Provider 失败均自动递补下一可用 Provider，无需手动切换。详见 [LLM 配置指引](how-to-config-llm.md)。
 
+**Q: 我能用 Kimi Code（订阅会员）的 API Key 吗？和开放平台的 Key 有什么区别？**
+
+A: **技术上可以，但官方条款有明确风险，不推荐用于批量报告生成。**
+
+- **两套系统互不通用**：Kimi Code 订阅端点是 `https://api.kimi.com/coding/`、模型名 `kimi-for-coding`；开放平台是 `https://api.moonshot.cn`、模型名 `kimi-k2.6`。Key 与 Base URL 必须配套，混用会 401 `Invalid Authentication`。
+- **条款限制**：Kimi Code 官方社区准则明确 **"Don't use Kimi Code for non-interactive automation"**（订阅仅限个人交互式使用，脚本化批量执行属超范围）。本工具的批量报告生成属非交互式自动化，违规处置可能是 **403 并发/风控限制**（只能申诉）。
+- **建议**：程序跑自动化用**开放平台按量付费 Key**（成本很低，约每次报告 ¥0.3~0.5）；订阅 Key 留给 Claude Code / CLI 等交互式编码场景。
+- **确实要用**：完整改法与降风险措施（`pacing` 端点级节流、403 不重试语义）见 [Kimi Code 订阅端点接入范例](how-to-use-kimi-code.md)。
+
 **Q: LLM API 返回 429（请求过多）怎么办？**
 
 A: 说明触发了 API 速率限制。程序内置重试机制（最多 2 次），重试间隔自动递增。如果持续遇到 429，可在 `llm_settings.json` 中增大 `timeout_{模块键}` 值（如从 60 改为 120），或降低 `max_tokens_{模块键}` 减少单次请求负载。如使用免费/低配额套餐，建议升级套餐或切换到 fallback provider。

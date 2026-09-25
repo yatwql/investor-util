@@ -177,11 +177,12 @@
 | 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、全局参数（含 `--experiment` 实验组简写与 `--feature NAME=VALUE` 全域开关）、report/cache/whatif/check-sources/view-logs/doctor 子命令、使用示例、退出码、定时任务 |
 | 4 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 模式完整操作流程：上传→生成→预览/下载 + 配置编辑面板 |
 | 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | config.json 字段说明、数据源、缓存 TTL、章节可见性 |
-| 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、定价 |
+| 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、provider 选择、端点级节流、定价 |
 | 7 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告说明、基金业绩评价、投资知识点 |
 | 8 | [数据源一览](docs-stm/manuals/datasource.md) | 数据源、缓存前缀、数据质量与常见问题 |
 | 9 | [数据源可靠性文档](docs-stm/manuals/datasource-reliability.md) | 运维视角：可靠度评级、降级策略、限流规则、已知问题 |
 | 10 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
+| 11 | [Kimi Code 订阅端点接入范例](docs-stm/manuals/how-to-use-kimi-code.md) | 备用：用 Kimi Code 订阅 Key 的完整改法（模型名/端点差异、`pacing` 推荐值、403 语义、风险提示） |
 
 ## 🔧 开发者参考
 

@@ -749,6 +749,10 @@ Kimi 开放平台提供 Anthropic API 兼容端点，`provider` 设为 `"claude"
 - API Key 在 [Kimi 开放平台](https://platform.moonshot.cn)控制台创建（按量付费）。注意与 **Kimi Code 订阅的 Key 不通用**——后者仅限编程工具的交互式场景，用于本工具的批量报告生成会触发限流
 - 可用模型：`kimi-k2.6`（推荐，256k 上下文，支持思考/非思考模式）、`kimi-k3`（旗舰，1M 上下文）
 - Extended Thinking 走 `thinking.budget_tokens`（与 Claude 同机制）；端点默认开思考，模块未开启时本工具会显式发送 `disabled`
+
+> **想改用 Kimi Code 订阅 Key？** 两套系统的端点与模型名不同（Code 为 `api.kimi.com/coding/` + `kimi-for-coding`），
+> 直接照抄本段会 401。完整范例（含两个文件的改法、`pacing` 推荐值、403 语义、风险提示）见
+> [`how-to-use-kimi-code.md`](./how-to-use-kimi-code.md)。
 </details>
 
 <details>

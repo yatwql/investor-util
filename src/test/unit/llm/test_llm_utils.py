@@ -214,6 +214,25 @@ class TestSupportsExtendedThinking(unittest.TestCase):
     def test_deepseek_v3_not_supported(self) -> None:
         self.assertFalse(_supports_extended_thinking("deepseek-v3"))
 
+    def test_kimi_code_model_ids_supported(self) -> None:
+        """Kimi Code 订阅端点的模型名须识别为支持 thinking。
+
+        `kimi-for-coding*` 命中 `kimi-` 前缀；旗舰 `k3` / `k3-256k` 不以 `kimi-` 开头，
+        单独登记——漏登记会让「未开启 thinking 时显式禁用」的安全网失效。
+        """
+        for model in ("kimi-for-coding", "kimi-for-coding-highspeed", "k3", "k3-256k", "kimi-k2.6"):
+            self.assertTrue(_supports_extended_thinking(model), model)
+
+    def test_kimi_code_models_default_thinking_on(self) -> None:
+        """Kimi Code 端点默认开思考：须列入默认开思考族（含 k3 前缀）。"""
+        for model in ("kimi-for-coding", "kimi-for-coding-highspeed", "k3", "k3-256k"):
+            self.assertTrue(_is_default_thinking_on(model), model)
+
+    def test_kimi_code_models_not_effort_family(self) -> None:
+        """Kimi 系走 budget_tokens 而非 effort（控制方式不得误判）。"""
+        for model in ("kimi-for-coding", "k3", "kimi-k2.6"):
+            self.assertFalse(_is_effort_model(model), model)
+
     def test_non_llm_family_not_supported(self) -> None:
         """非 Claude/DeepSeek/Gemini/Kimi 家族（如 OpenAI）不判定为支持。"""
         self.assertFalse(_supports_extended_thinking("gpt-4o"))

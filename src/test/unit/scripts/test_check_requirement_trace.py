@@ -126,7 +126,7 @@ class TestRealRepo:
         req_ids = set(trace.requirement_ids(trace._REQUIREMENTS_MD.read_text(encoding="utf-8")))
         mapped = {row[0] for row in trace.trace_rows(trace._TESTPLAN_MD.read_text(encoding="utf-8"))}
         assert req_ids == mapped
-        assert len(req_ids) == 276
+        assert len(req_ids) == 277
 
     def test_real_repo_passes(self, trace):
         """真实仓库：R-CCH 域 38 条需求全部映射且载体文件存在。"""

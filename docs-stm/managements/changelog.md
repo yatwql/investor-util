@@ -10,6 +10,24 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### Kimi Code 订阅端点接入范例与模型识别补齐（2026-09-25）
+
+**背景**：用户计划改用 Kimi Code 订阅 Key（`api.kimi.com/coding/`），要求先把范例与文档准备好。
+
+**新增文档**（`docs-stm/manuals/how-to-use-kimi-code.md`）：
+- 两套系统差异对照表（Base URL / Key 来源 / **模型名** / 计费方式 / 互不通用）
+- 启用步骤（改 `llm_key.json` + `llm_providers.json` 两个文件，**无需改代码**）+ 验证命令
+- `pacing` 推荐值表（订阅端点 20s/0.2/1）与「想更保守 / 想恢复放开」调法
+- 403 配额风控语义对照表（403 不重试、429/503 重试、401 表示两套系统混用）
+- **风险提示**（官方条款原文引用：订阅仅限交互式，脚本化批量执行属超范围；`pacing` 只能降低检出概率）
+- 交叉链接：README 文档索引新增第 11 篇；`how-to-config-llm.md` Kimi 段与 `faq.md` 新增 FAQ 均指向本文
+
+**代码补齐 2 处模型识别缺口**（换 Key 时才会暴露）：
+- `_THINKING_SUPPORTED_PREFIXES` / `_THINKING_DEFAULT_ON_PREFIXES` 补 `k3`：Kimi Code 旗舰模型名为 `k3` / `k3-256k`，**不以 `kimi-` 开头**——漏登记会让「未开启 thinking 时显式禁用」的安全网失效
+- 回归 +3 例（Kimi Code 模型 ID 支持 thinking / 默认开思考 / 不属 effort 族）
+
+**未改动**：`data/config/llm_providers.json` 与 `llm_key.json` 保持现状（仍走开放平台按量付费端点），等用户换 Key 时按范例操作。
+
 ### LLM 端点级节流与并发治理：把速率/并发约束声明化到 provider 条目（2026-09-25，plan-57）
 
 **背景**：用户计划把订阅制编码端点（Kimi Code，`api.kimi.com/coding/`）接入程序，要求从整体架构出发、不留技术债，并提出「非该端点时并发约束能否放开」。

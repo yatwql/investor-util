@@ -198,6 +198,9 @@ _THINKING_SUPPORTED_PREFIXES = (
     "gemini-3.5-",
     "gemini-2.5-",
     "kimi-",
+    # Kimi Code 订阅端点的旗舰模型以 `k3` 命名（不属 `kimi-` 前缀）：漏登记会让
+    # 「未开启 thinking 时显式禁用」的安全网失效，请求落入默认思考模式。
+    "k3",
 )
 
 # 使用 output_config.effort（而非 thinking.budget_tokens）控制思考深度的模型。
@@ -216,7 +219,7 @@ _THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-flash", "deepseek-v4-", "deepseek-c
 # Anthropic 原生模型默认不思考，不在此列。
 # Kimi Anthropic 兼容端点行为：默认返回 thinking 块；thinking.enabled+budget_tokens
 # 与 thinking.disabled 均接受。
-_THINKING_DEFAULT_ON_PREFIXES = ("deepseek-flash", "deepseek-v4-", "deepseek-chat", "kimi-")
+_THINKING_DEFAULT_ON_PREFIXES = ("deepseek-flash", "deepseek-v4-", "deepseek-chat", "kimi-", "k3")
 
 
 def _supports_extended_thinking(model: str) -> bool:
