@@ -622,6 +622,11 @@ test-reports/latest/
 - **方法**：`test_<场景>`
 - **单文件上限**：≤ 800 行 / ≤ 80 测试项 / ≤ 15 方法每类
 - **标记规则**：单元测试用 `pytestmark` 模块级列表（`[pytest.mark.unit, pytest.mark.<子组>]`），场景测试用类级 `@pytest.mark.scenario + @pytest.mark.<子组>`，edge 测试在 `pytestmark` 中追加 `pytest.mark.edge`
+- **真值单一来源**：断言中的「事实」必须从真值来源**动态派生**，禁止写死会随开发演进的派生量（需求/章节/开关/注册表/枚举的**条数**与**逐条清单**）。写死后新增一条需求/章节就会把测试打红（良性变更误判为回归），且与门禁脚本职责重复。
+  - ✅ 结构关系断言：`set(a) == set(b)`（双向相等）、`expected <= set(a)`（覆盖）、`numbers == list(range(1, n+1))`（序号连续）、`len(keys) == len(set(keys))`（唯一性）、逐项遍历
+  - ❌ 硬编码总数：`assert len(req_ids) == 276`、`assert len(sections) == 17`
+  - 需要「条数」语义时用「域覆盖 + 序号连续」等价表达（强度不低于写死条数，且能发现跳号/重号）
+  - 由此守：`scripts/check-test-redundancy.py` 第 5 类 `check_hardcoded_evolving_totals`
 - 新增文件后运行 `.venv/bin/python scripts/check-test-markers.py` 验证标记合规性
 
 ### 新增测试指南

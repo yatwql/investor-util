@@ -24,7 +24,7 @@
   - 章节表：「编号 1..N 连续 + key 唯一」；计算模块表：「module_key 非空且唯一」
   - LLM 键：「逐模块必备键齐全」（遍历模块后缀，非计数）；精确键：「已知键集合 ⊆ 实测」
 - **新增 `check-test-redundancy.py` 第 5 类** `check_hardcoded_evolving_totals`：静态检出 `assert len(<可增长集合>) ==/> 数字`，判定保守（实参名含语义关键词或路径含 requirement/registry 才报；忽略 ≤ 3 的小数字；不误报集合相等/子集/遍历等结构断言）
-- **文档同步**：「四类 → 五类」（CLAUDE.md / developer-guide 详表 / folders.md 两处）
+- **文档同步**：「四类 → 五类」（CLAUDE.md / developer-guide 详表 / folders.md 两处）；并在 CLAUDE.md 与 developer-guide 新增**「测试真值单一来源」纪律**条目（禁止写死会随开发演进的派生量，给出结构关系断言写法与反例，指向第 5 类检查）——把本次教训固化为显式约束
 - **回归**：traceability +4 例（含「新增需求不再打红」的合成反证、跳号检测）、redundancy +7 例（含不误报结构断言/小数字/非断言位置的守卫）
 
 **验证**：`check-test-redundancy -v` → 7439 用例 / 五类计数全 0；`test_registry.py` 61 passed；traceability 21 passed。
