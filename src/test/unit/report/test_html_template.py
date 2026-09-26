@@ -86,9 +86,9 @@ class TestFundamentalSnapshotPlaceholderGuidance(unittest.TestCase):
     """持仓基本面章降级占位文案（真实模板渲染）。
 
     回归背景（两处曾同时出现）：
-      1. 占位指引引用**已废弃的配置路径** ``report_submodules.financial_report_digest`` /
-         ``.financial_indicator``——该路径在功能开关迁入 ``features.json`` 时已被移除
-         （config.json 不再承载，Web/CLI 白名单亦不含），照着改配置**不生效**。
+      1. 占位指引引用**早前版本的配置路径** ``report_submodules.financial_report_digest`` /
+         ``.financial_indicator``——该路径已不生效（开关现取 ``features.json``，
+         config.json 不再承载，Web/CLI 白名单亦不含），照着改配置**不生效**。
       2. 指引把“本次无数据”**归因成“需配置 key”**：即便用户已配好 DataSinking key
          （且能正常读取），也照旧显示“需在 … 配置 DataSinking API key”，让人以为配置丢了。
          占位应只呈现**真实原因**（契约 reason）+ 当前开关入口 + 取数所需条件的客观说明。
@@ -140,7 +140,7 @@ class TestFundamentalSnapshotPlaceholderGuidance(unittest.TestCase):
         assert "report_submodules." not in html
 
     def test_no_legacy_report_submodules_path_anywhere_in_templates(self):
-        """全模板树不得出现已废弃的 ``report_submodules.*`` 配置路径（含注释）。"""
+        """全模板树不得出现早前版本的 ``report_submodules.*`` 配置路径（含注释）。"""
         offenders = [
             os.path.relpath(str(p), _TMPL_DIR)
             for p in sorted(pathlib.Path(_TMPL_DIR).rglob("*.html"))

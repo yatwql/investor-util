@@ -347,11 +347,12 @@ class TestOrchestrationTakeover:
 class TestChainSlotCoverage:
     """回归：财报域链的槽位必须覆盖全部已登记适配器源。
 
-    缺陷背景：plan-50 加入巨潮备源**适配器**后，``_DEFAULT_CHAINS["financial_report"]``
-    仍是单槽 ``["datasink"]``。而 ``fetch_with_fallback`` 的**遍历列表**取自
-    ``_get_chain(data_type)``（provider 映射则来自适配器注册表）——链上缺 cninfo 槽时，
-    带 ``source_hint=cninfo`` 的备源候选在主源槽上被适配器按命名空间拒服务（零请求、
-    零日志）后无处可去 → 必落“全链路失败”，备源正文实际永远取不到。
+    背景：巨潮备源**适配器**已登记（``report_adapters``），而
+    ``_DEFAULT_CHAINS["financial_report"]`` 只列了主源槽 ``["datasink"]``。
+    ``fetch_with_fallback`` 的**遍历列表**取自 ``_get_chain(data_type)``（provider 映射
+    则来自适配器注册表）——链上缺 cninfo 槽时，带 ``source_hint=cninfo`` 的备源候选
+    在主源槽上被适配器按命名空间拒服务（零请求、零日志）后无处可去 → 必落
+    “全链路失败”，备源正文永远取不到。
     日志表现：反复的“尝试 DataSinking 财报 → datasink 返回空 → 全链路失败”三连，
     且整个日志里**没有任何 ``[datasink]`` 请求日志**（根本没发出过请求）。
     """

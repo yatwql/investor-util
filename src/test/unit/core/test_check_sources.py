@@ -247,9 +247,9 @@ class TestProxyHint:
 
 
 class TestFinancialReportProbes:
-    """财报域两个源纳入健康检查（rf-439）。
+    """财报域两个源纳入健康检查。
 
-    回归背景：`_checks` 原先只探 10 个源（行情/基金/行业/新闻/K 线），**DataSinking 与
+    背景：`_checks` 原先只探 10 个源（行情/基金/行业/新闻/K 线），**DataSinking 与
     巨潮资讯都不探测**——财报域整链失败时用户跑 `check-sources` 得到「10/10 全绿」，
     实际两个源都不可用，故障现场无可见线索（只能翻 logs/app.log）。
     """

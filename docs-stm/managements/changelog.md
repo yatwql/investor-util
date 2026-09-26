@@ -10,6 +10,17 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### CI 补齐守护 job + 门禁数字与注释痕迹整改（2026-09-26，rf-444、rf-445、rf-446）
+
+**起因**：核对「git hook 包含哪些任务 / 守护包含哪些脚本」时发现三处不一致——门禁表数字少于实际、CI 未跑守护脚本、以及本地扫描循环漏跑 `check-code-traces`（导致本会话写入的 7 处任务编号引用/历史叙述一直未被拦下）。
+
+**变更**：
+- **CI 补全（`.github/workflows/ci.yml`）**：新增 **`guards` job（阻塞型）** 逐个 step 跑 7 个 `--ci` 守护脚本（`check-code-traces` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` / `check-doc-drift` / `check-test-redundancy` / `check-requirement-trace`）；`format` job（仍为非阻塞 `continue-on-error`）补 `ruff check` 步骤；`test` job 与三档分流规则不变（并在文件头注释补「P2 → verify,regression」的准确模式名与新增 job 说明）
+- **注释痕迹整改**：7 处改写为语义化描述——`core/check_sources.py`、`src/test/conftest.py`、`test_check_sources.py`、`test_report_backup_source.py`、`test_html_template.py`、`scripts/_doc_drift/_format.py`；`check-code-traces --ci` 恢复“未发现历史变更痕迹，注释干净”
+- **文档同步**：开发者指南三级门禁表「4 个 check 脚本」→「**7 个**」并新增「**CI 同步执行**」段（分流/矩阵/两 job 职责与阻塞性）；编号保障表新增 `CI guards job` 行（“四层→五层”）；`CLAUDE.md` 的 CI 条目改为描述实际流水线（三档测试矩阵 + `guards` 阻塞 job + `format` 非阻塞 job）
+
+**验证**：`check-code-traces` 由 7 处 finding 回落为 0；7 个 `--ci` 脚本 + `ruff check` + `ruff format --check` 全部 exit 0（本地等价演练 CI `guards`/`format` job 命令）；`ci.yml` YAML 解析通过（jobs: test / format / guards）。
+
 ---
 
 ## 归档

@@ -47,9 +47,9 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 | 门禁 | 触发点 | 命令 | 说明 |
 |:-----|:-------|:-----|:-----|
-| **P0** | 提交前 | `.venv/bin/python scripts/test-runner.py --mode dev-verify` + 4 个 check 脚本 | 阻塞提交，不得 commit |
+| **P0** | 提交前 | `.venv/bin/python scripts/test-runner.py --mode dev-verify` + 7 个 check 脚本 | 阻塞提交，不得 commit |
 | **P1** | 合入 master 前 | `.venv/bin/python scripts/test-runner.py --mode verify` | 阻塞合入，不得 merge |
-| **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode verify,regression` + 4 个 check 脚本 | 阻塞发布，不得 release |
+| **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode verify,regression` + 7 个 check 脚本 | 阻塞发布，不得 release |
 
 **P0 提交前门禁**（全部通过才可 commit）：
 
@@ -81,6 +81,8 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 **辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
 
+**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有两个独立 job：`guards`（**阻塞**，7 个 `--ci` 守护脚本，即上方 P0/P2 清单全量）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
+
 > P1/P2 的完整要求（含手动验证项）见 [testplan.md](testplan.md) → 回归测试清单 / 门禁章节。
 
 ## 任务编号规范与自动保障
@@ -102,7 +104,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 ### 自动保障机制
 
-任务编号全局单调递增、归档不回收，由 `check-task-numbering.py` 校验，防止新增编号与历史归档冲突。四层自动保障：
+任务编号全局单调递增、归档不回收，由 `check-task-numbering.py` 校验，防止新增编号与历史归档冲突。五层自动保障：
 
 | 机制 | 触发 | 跨机器 |
 |:-----|:-----|:------|
@@ -110,6 +112,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 | **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
 | **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
 | **git pre-commit** | `git commit` 涉及编号文档时自动校验 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
+| **CI guards job** | push / PR / tag 时自动校验（7 个 `--ci` 脚本之一） | ✅ 零配置 |
 
 > `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
 

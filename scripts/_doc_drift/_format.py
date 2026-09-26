@@ -384,9 +384,9 @@ def check_chain_table(doc_text: str) -> list[str]:
          ``source_id``）必须与 ``_DEFAULT_CHAINS[chain]`` **逐项同序**相等——覆盖
          「文档写主源+备源、代码只注册一个槽」这类漂移（漏槽 / 多槽 / 顺序错）。
 
-    历史缺口：早期只比对链路名，槽位漂移无人发现——巨潮备源适配器已注册而
-    ``_DEFAULT_CHAINS['financial_report']`` 仍为单槽，备源正文路径实际不可用数月
-    （见 rf-437）；另该表曾只列 5 行而声称枚举全部链路（rf 早期记录）。
+    缺口：只比对链路名时槽位漂移无人发现——巨潮备源适配器已登记而
+    ``_DEFAULT_CHAINS['financial_report']`` 只列主源槽，备源正文路径实际不可用；
+    另该表曾只列 5 行却声称枚举全部链路。故本检查同时做槽位级同序比对。
     """
     findings: list[str] = []
     documented: set[str] = set()

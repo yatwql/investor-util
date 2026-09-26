@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.6-dev
-> **编号源**：`rf-next = 444`（新增问题取此编号，完成后更新为 +1；已用最大 rf-443，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 447`（新增问题取此编号，完成后更新为 +1；已用最大 rf-446，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -53,6 +53,10 @@
 
 
 
+
+| **rf-446** | **本会话写入的注释/docstring 引用任务编号与历史叙述，违反语义命名纪律**：`check_sources.py`（`rf-439`）、`conftest.py`（“把它们改成…”命中 HIGH 历史变更叙述）、`test_check_sources.py`（`rf-439`）、`test_report_backup_source.py`（`plan-50`）、`_doc_drift/_format.py`（`rf-437`）共 7 处被 `check-code-traces` 报出（CODE=4 / DEPR=2 / HIGH=1）。**根因**：本会话收尾的本地门禁扫描循环里**漏掉了 `check-code-traces`**（只跑其余 6 个），该脚本直到本次才第一次被执行——也正是本次给 CI 补 `guards` job 的直接证据 | 已修复（2026-09-26）：① 7 处改写为**语义化描述**（去掉 `rf-`/`plan-` 引用、「已废弃」标注与历史变更叙述），`check-code-traces --ci` 回到「未发现历史变更痕迹，注释干净」；② 根因层：本地与 CI 守护清单**以 CI `guards` job 统一**（7 个 `--ci` 脚本一条不漏），不再依赖人工记得「还有哪个脚本没跑」（见 rf-445） |
+| **rf-445** | **CI 覆盖面缺口：未执行 7 个 `--ci` 守护脚本，也未执行 `ruff check`**：`.github/workflows/ci.yml` 原先只有 `test` job（三档测试模式）与 `format` job（`ruff format --check src/python/ scripts/`），故**纯文档/编号/痕迹类漂移在 CI 上不会被拦**（如归档索引缺失、文档与实现口径冲突、注释里的任务编号——后者本会话真实漏检 7 处，见 rf-446）；且与 `CLAUDE.md` 的「CI 辅助检查：`ruff check` + `ruff format --check`」表述不符（实际未跑 `ruff check`） | 已修复（2026-09-26）：① 新增 **`guards` job（阻塞型）**，逐个 step 跑 7 个 `--ci` 守护脚本（`check-code-traces` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` / `check-doc-drift` / `check-test-redundancy` / `check-requirement-trace`），任一失败即红；② `format` job（保留 `continue-on-error`）补 **`ruff check`** 步骤；③ YAML 解析校验通过（jobs: test / format / guards）；④ 本地等价演练：7 脚本 + `ruff check` + `ruff format --check` 全部 exit 0；⑤ 文档同步（CLAUDE.md CI 条目；开发者指南新增「CI 同步执行」段 + 编号保障表新增 CI 行并改「四层→五层」） |
+| **rf-444** | **开发者指南三级门禁表数字过期**：§三级门禁表写「P0 / P2 = `test-runner …` + **4 个** check 脚本」，但同章 P0/P2 命令块实际列出 **7 个**（`check-code-traces` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` / `check-doc-drift` / `check-test-redundancy` / `check-requirement-trace`），`CLAUDE.md` 亦为 7 个——数字少了 3 个，容易让人误以为只跑 4 个即过门禁（本会话扫描循环恰好就漏了 `check-code-traces`，见 rf-446） | 已修复（2026-09-26）：两处「4 个」→「**7 个**」，并在同章新增「**CI 同步执行**」段（分流规则 / 矩阵 / `guards` 与 `format` 两 job 的职责与阻塞性） |
 
 ### 归档档案
 

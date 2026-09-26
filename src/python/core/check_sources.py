@@ -266,8 +266,9 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
             timeout=30,
         ),
     ),
-    # ── 财报域（持仓基本面章·区块②）：主源 + 备源一起探，避免“整链静默失败但
-    # 健康检查全绿”的诊断盲区（rf-439）；datasink 缺 key 时自动产出 ⏭️ 跳过态。
+    # ── 财报域（持仓基本面章·区块②）：主源 + 备源一起探。仅探行情/基金/行业/
+    # 新闻/K 线时，财报域整链失败仍会显示“全绿”，故障现场无可见线索；datasink 缺 key
+    # 时由 run_health_checks 的凭据预检自动产出 ⏭️ 跳过态。
     (
         "datasink",
         "DataSinking 财报",
