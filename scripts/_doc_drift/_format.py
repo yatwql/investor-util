@@ -26,8 +26,25 @@ from _doc_drift._shared import (
 _CHAIN_TABLE_ROW = re.compile(r"^\|\s*`([a-z_]+)`\s*\|")
 #: 链表格内 ``provider id`` 单元格里的反引号 id（与 ``_DEFAULT_CHAINS`` 同序）
 _CHAIN_ID_CELL = re.compile(r"`([a-z_0-9]+)`")
-#: §4.2 表的列数（名称 / 主链路 / 备用链路 / provider id / 回退条件）
-_CHAIN_TABLE_COLUMNS = 5
+#: §4.2 表的 provider id 列表头关键字（列位置按表头文本定位，不依赖列序）
+_CHAIN_ID_HEADER = "provider id"
+
+
+def _chain_id_column_index(doc_text: str) -> tuple[int, int] | None:
+    """定位 §4.2 表中「provider id」列：返回 ``(列下标, 表头单元格数)``；未找到返回 None。
+
+    按**表头文本**定位而非硬编码列号：文档调整列顺序时不会误判；同时返回表头单元格数，
+    供调用方判断「行内单元格数少于表头」的缺列情形（给出可读 finding，而非静默错位解析）。
+    """
+    for line in doc_text.splitlines():
+        if not line.startswith("|") or _CHAIN_ID_HEADER not in line:
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        for idx, cell in enumerate(cells):
+            if _CHAIN_ID_HEADER in cell:
+                return idx, len(cells)
+    return None
+
 
 _SECTION_COUNT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"页签编号\s*1\s*[~～-]\s*(\d+)"),
@@ -389,6 +406,8 @@ def check_chain_table(doc_text: str) -> list[str]:
     另该表曾只列 5 行却声称枚举全部链路。故本检查同时做槽位级同序比对。
     """
     findings: list[str] = []
+    header = _chain_id_column_index(doc_text)
+    id_col, header_cells = header if header is not None else (None, 0)
     documented: set[str] = set()
     documented_slots: dict[str, list[str]] = {}
     missing_id_column: list[str] = []
@@ -399,11 +418,14 @@ def check_chain_table(doc_text: str) -> list[str]:
         chain = m.group(1)
         documented.add(chain)
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) < _CHAIN_TABLE_COLUMNS:
+        # 列位置按**表头文本**定位（而非硬编码下标）：列序调整不会造成误判
+        if id_col is None or len(cells) < header_cells:
             missing_id_column.append(chain)
             documented_slots[chain] = []
             continue
-        documented_slots[chain] = _CHAIN_ID_CELL.findall(cells[3])
+        documented_slots[chain] = _CHAIN_ID_CELL.findall(cells[id_col])
+    if id_col is None and documented:
+        findings.append(f"{rel(_RELIABILITY_MD)}: §4.2 表未找到「provider id」列表头（槽位级校验须据此定位列）")
     if not documented:
         findings.append(f"{rel(_RELIABILITY_MD)}: 未找到 §4.2 Provider Chain 降级路径表（表行须以 | `链路名` | 开头）")
         return findings
@@ -416,7 +438,7 @@ def check_chain_table(doc_text: str) -> list[str]:
         if chain in missing_id_column:
             findings.append(
                 f"{rel(_RELIABILITY_MD)}: §4.2 链路 `{chain}` 行缺 provider id 列"
-                f"（须为 {_CHAIN_TABLE_COLUMNS} 列：名称/主链路/备用链路/provider id/回退条件）"
+                "（该列承载槽位清单，须保留；表头与其它列可按需调整顺序）"
             )
             continue
         doc_slots = documented_slots[chain]

@@ -133,3 +133,26 @@ class TestOfflineFixtureIsOptIn:
         import httpx
 
         assert httpx.Client is not OfflineHTTPClient
+
+
+class TestOfflineStubTargets:
+    """桩清单完整性：被 monkeypatch 的模块/属性必须仍然存在。
+
+    桩以「模块路径字符串」写死（``httpx.Client`` / ``trading_calendar._get_trading_calendar`` /
+    ``chain._TRANSIENT_RETRY_BACKOFF`` / ``akshare_extras.ak``）；上游重命名或搬迁会让
+    ``monkeypatch.setattr`` 在用例运行时直接报 AttributeError（不会静默失效）。本用例把
+    这一层提前为可独立发现的断言，避免"改一处名字、跑全套才炸"。
+    """
+
+    def test_stub_targets_exist(self) -> None:
+        import httpx
+
+        from src.python.core import trading_calendar
+        from src.python.fetcher import chain
+        from src.python.providers import akshare_extras
+
+        assert callable(getattr(httpx, "Client", None))
+        assert callable(getattr(httpx, "AsyncClient", None))
+        assert callable(getattr(trading_calendar, "_get_trading_calendar", None))
+        assert isinstance(getattr(chain, "_TRANSIENT_RETRY_BACKOFF", None), float)
+        assert hasattr(akshare_extras, "ak")

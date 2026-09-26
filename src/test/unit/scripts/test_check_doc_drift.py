@@ -558,6 +558,17 @@ class TestChainTable:
         findings = drift.check_chain_table(broken)
         assert any("顺序不一致" in f for f in findings)
 
+    def test_column_reorder_still_parsed(self, drift):
+        """列序调整（provider id 换到第 2 列）仍能正确解析——按表头定位而非硬编码下标。"""
+        text = drift._RELIABILITY_MD.read_text(encoding="utf-8")
+        out = []
+        for line in text.splitlines():
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if line.startswith("|") and len(cells) == 5:
+                line = "| " + " | ".join([cells[0], cells[3], cells[1], cells[2], cells[4]]) + " |"
+            out.append(line)
+        assert drift.check_chain_table(chr(10).join(out)) == []
+
     def test_missing_id_column_reported(self, drift):
         """旧格式（无 id 列）必须报缺列，否则门禁会静默放过槽位漂移。"""
         text = drift._RELIABILITY_MD.read_text(encoding="utf-8")
