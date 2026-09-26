@@ -36,6 +36,25 @@
 
 ---
 
+### 36 小时实现技术债审计（2026-09-26，rf-448、rf-449、rf-450、rf-451、rf-452）
+
+**范围**：过去 36 小时 12 个提交——v0.11.4 / v0.11.5 两次发布、plan-57 端点级节流、财报域备源链路修复、测试外部网络隔离、文档门禁槽位级校验、健康检查覆盖财报域、CI `guards` job、hooks 清理。
+
+**已修 5 项**：
+- **rf-448（突破硬上限）**：`src/test/conftest.py` 872 行 > 800 硬上限 → 两个 autouse 隔离 fixture 的**实现体**外移到新模块 `src/test/_path_isolation.py`（225 行：`seed_sensitive_path_isolation` + `apply_report_output_isolation` + 专用常量），conftest 保留 fixture 本体/装饰器/文档串（**pytest 发现语义不变**），降至 **672 行**；全量非 live 套件 0 失败（行为等价）
+- **rf-449（台账失真）**：「文件过长」（P2A）8 行登记值全部过期 → 逐行按 2026-09-26 实测刷新（`registry.py` 666→**704**、`batch.py` 564→**578**、`code_utils.py` 542→**605**、`data_status.py` 544→**621**、`html_renderers.py` 521→**556**、`cache/operations.py` 633 持平），并把**已跨 500 线**的 `fund.py`（405→**551**）与 `excel_generator.py`（427→**574**）状态更新为「已跨入 500-800 可选优化区间」
+- **rf-450（脆弱点）**：`check_chain_table` 硬编码 `cells[3]` 取槽位列 → **按表头文本定位**（`_chain_id_column_index()` 返回列下标 + 表头列数）；缺表头、行内单元格数少于表头分别给出可读 finding。验证：临时把 provider id 列调到第 2 列后门禁仍 0 finding；新增回归测试 `test_column_reorder_still_parsed`
+- **rf-451（桩清单完备性）**：离线桩的 4 个目标新增存在性断言（`TestOfflineStubTargets`），上游重命名/搬迁不再只靠「用到该 fixture 时才炸」
+- **rf-452（配额未提示）**：`check-sources` 的 DataSinking 探针每次消耗 1 次源配额，已在 `datasource-reliability.md` §5.2 补「配额提示」（并注明巨潮探针无凭据、无配额）
+
+**当轮登记为待处理的 2 项（原登记于「当前待处理问题」P3）**：
+- **rf-453**：重试/退避实现散落 5 处且口径不一（chain 同源瞬时 / cninfo 连接级 / datasink 429 / eastmoney_industry / tencent；既有 `providers/_utils.run_with_timeout` 仅覆盖 akshare）→ 建议抽 `core/retry.py` 统一原语并按源逐个迁移
+- **rf-454（观察项）**：`llm/pacing.py` 与 `fetcher/batch.RateLimiter` 在「最小间隔 + 等待 + jitter」上部分重叠（作用域不同：LLM 端点级 vs 数据源请求），暂不抽象合并以免过度设计
+
+> **进展**：上列两项已在本版本周期内先后处理完毕（见下节 rf-453、rf-454）；原 P3 登记位随后由新发现的 LLM 调用链重试项（rf-455）占用。
+
+**验证**：`ruff check` / `ruff format --check` 干净；7 个 `--ci` 门禁 + `--mode dev-verify`（3,271 通过）全绿；非 live 全量 **7,871 通过 / 0 失败**；测试收集数 7,885。
+
 ### rf-453、rf-454：重试/退避与间隔节流收敛为唯一原语（2026-09-26）
 
 **动因**：审计发现「退避算式与瞬时判据在 6 处各自实现」，且通用「按名间隔」原语错住数据层模块、被 LLM 层与 providers 反向依赖（层次倒置）。两类问题都属「实现未收敛」（对齐既有「实现收敛到唯一原语」的先例，如原子写入），故以**新增架构约束 + 新公共原语 + 逐处迁移**处理。
@@ -62,23 +81,6 @@
 - **rf-456④**：本文件新增的架构原语小节（P3）层级与顺序错误（四级标题、落在 P1 表尾）→ 改为三级标题并移至 P2C 之后
 
 核对结论：其余「共 N 个模块」类声明（报告章节模块数、TUI 页签数、数据源探针数、STATUS_MESSAGES 24 条、熔断退避阶梯等）经代码实况逐项复核**均一致**；标题编号序列无重复/断号；目录锚点 0 失配。用户文档本轮仅确认无新增偏差，未作改动。
-
-### 36 小时实现技术债审计（2026-09-26，rf-448、rf-449、rf-450、rf-451、rf-452）
-
-**范围**：过去 36 小时 12 个提交——v0.11.4 / v0.11.5 两次发布、plan-57 端点级节流、财报域备源链路修复、测试外部网络隔离、文档门禁槽位级校验、健康检查覆盖财报域、CI `guards` job、hooks 清理。
-
-**已修 5 项**：
-- **rf-448（突破硬上限）**：`src/test/conftest.py` 872 行 > 800 硬上限 → 两个 autouse 隔离 fixture 的**实现体**外移到新模块 `src/test/_path_isolation.py`（225 行：`seed_sensitive_path_isolation` + `apply_report_output_isolation` + 专用常量），conftest 保留 fixture 本体/装饰器/文档串（**pytest 发现语义不变**），降至 **672 行**；全量非 live 套件 0 失败（行为等价）
-- **rf-449（台账失真）**：「文件过长」（P2A）8 行登记值全部过期 → 逐行按 2026-09-26 实测刷新（`registry.py` 666→**704**、`batch.py` 564→**578**、`code_utils.py` 542→**605**、`data_status.py` 544→**621**、`html_renderers.py` 521→**556**、`cache/operations.py` 633 持平），并把**已跨 500 线**的 `fund.py`（405→**551**）与 `excel_generator.py`（427→**574**）状态更新为「已跨入 500-800 可选优化区间」
-- **rf-450（脆弱点）**：`check_chain_table` 硬编码 `cells[3]` 取槽位列 → **按表头文本定位**（`_chain_id_column_index()` 返回列下标 + 表头列数）；缺表头、行内单元格数少于表头分别给出可读 finding。验证：临时把 provider id 列调到第 2 列后门禁仍 0 finding；新增回归测试 `test_column_reorder_still_parsed`
-- **rf-451（桩清单完备性）**：离线桩的 4 个目标新增存在性断言（`TestOfflineStubTargets`），上游重命名/搬迁不再只靠「用到该 fixture 时才炸」
-- **rf-452（配额未提示）**：`check-sources` 的 DataSinking 探针每次消耗 1 次源配额，已在 `datasource-reliability.md` §5.2 补「配额提示」（并注明巨潮探针无凭据、无配额）
-
-**待处理 2 项（登记于「当前待处理问题」P3，建议单独立项）**：
-- **rf-453**：重试/退避实现散落 5 处且口径不一（chain 同源瞬时 / cninfo 连接级 / datasink 429 / eastmoney_industry / tencent；既有 `providers/_utils.run_with_timeout` 仅覆盖 akshare）→ 建议抽 `core/retry.py` 统一原语并按源逐个迁移
-- **rf-454（观察项）**：`llm/pacing.py` 与 `fetcher/batch.RateLimiter` 在「最小间隔 + 等待 + jitter」上部分重叠（作用域不同：LLM 端点级 vs 数据源请求），暂不抽象合并以免过度设计
-
-**验证**：`ruff check` / `ruff format --check` 干净；7 个 `--ci` 门禁 + `--mode dev-verify`（3,271 通过）全绿；非 live 全量 **7,871 通过 / 0 失败**；测试收集数 7,885。
 
 ## 归档
 
