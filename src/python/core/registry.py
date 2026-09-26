@@ -557,7 +557,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     },
     # ── action 类型（独立顶层开关 enable_action 控制，默认开，菜单 P 可切换） ──
     # 行动建议：再平衡信号 + 交易纪律 + 调仓建议 + 收益归因（纯算法，basic/both/full 均可见）
-    # 出厂序号 10，与仓库 config.json 的 report_section_order 取值相同——该配置清空为 {}
+    # 出厂序号 7，与仓库 config.json 的 report_section_order 取值相同——该配置清空为 {}
     # 时即回到本默认顺序，故两者必须同序，改动其一须同步另一处
     {
         "key": "action",

@@ -21,7 +21,12 @@ import pytest
 from src.python.report.data_status import STATUS_MESSAGES, TIER_PREFIX
 from src.python.report.progress import SilentProgressReporter
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.unit_report,
+    pytest.mark.edge,
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 
 # ============================================================

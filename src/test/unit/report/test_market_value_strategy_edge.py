@@ -19,7 +19,12 @@ from src.python.core.models import Holding
 from src.python.core.provider_registry import get_registry
 from src.python.report import market_value as mv
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.unit_report,
+    pytest.mark.edge,
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 # ── 测试数据 ────────────────────────────────────────────────
 

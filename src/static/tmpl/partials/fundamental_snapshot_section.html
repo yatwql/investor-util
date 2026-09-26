@@ -108,8 +108,10 @@
                 {{ _fi.get("reason") or "暂无 A 股标的或未取到指标" }}。
             </p>
             <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
-                指标主源为 akshare（需本地安装，无需凭据）；备用支路需 DataSinking key。
-                开启开关 report_submodules.financial_indicator 后生效。
+                指标主源为 akshare（需本地安装，无需凭据）；备用支路（DataSinking 财报章节解析）需 DataSinking key
+                （配于 data/config/data_key.json 的 datasink 节，或环境变量 DATASINK_API_KEY）。
+                该块由功能开关 <code>financial_indicator</code> 控制——TUI 菜单 <code>[S]</code> →「报告章节与增强」/
+                Web 配置面板同名区块，开启后生效。
             </p>
         </div>
     </div>
@@ -179,9 +181,10 @@
                 {{ _frd.get("reason") or "暂无 A 股标的或未取到财报" }}。
             </p>
             <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
-                需在 data/config/data_key.json 中以 provider 名为节配置 DataSinking API key
-                （如 {"datasink": {"api_key": "..."}}；免费 key 可在 datasink.ing 领取）；
-                开启开关 report_submodules.financial_report_digest 后生效。
+                该块由功能开关 <code>financial_report_digest</code> 控制——TUI 菜单 <code>[S]</code> →「报告章节与增强」/
+                Web 配置面板同名区块，开启后生效。取数需 DataSinking key
+                （配于 data/config/data_key.json 的 datasink 节，或环境变量 DATASINK_API_KEY；免费 key 可在 datasink.ing 领取）；
+                主源缺目标章节时由巨潮资讯网备源接管（公开数据，无需凭据）。
             </p>
         </div>
     </div>

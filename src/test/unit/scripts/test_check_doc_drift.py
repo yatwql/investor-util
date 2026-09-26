@@ -58,6 +58,7 @@ def drift_parts():
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.unit_scripts,
+    pytest.mark.usefixtures("offline_external_sources"),
 ]
 
 
@@ -535,6 +536,38 @@ class TestChainTable:
     def test_missing_table_reported(self, drift):
         findings = drift.check_chain_table("# 无表文档\n")
         assert any("未找到 §4.2" in f for f in findings)
+
+    def test_slot_missing_reported(self, drift):
+        """槽位漏登记（本轮真实缺陷形态）：文档 id 列少一个槽即报。"""
+        text = drift._RELIABILITY_MD.read_text(encoding="utf-8")
+        broken = text.replace("| `datasink` → `cninfo` |", "| `datasink` |", 1)
+        findings = drift.check_chain_table(broken)
+        assert any("`financial_report`" in f and "漏槽" in f and "cninfo" in f for f in findings)
+
+    def test_slot_extra_reported(self, drift):
+        """文档多写一个槽（代码没有）同样报。"""
+        text = drift._RELIABILITY_MD.read_text(encoding="utf-8")
+        broken = text.replace("| `datasink` → `cninfo` |", "| `datasink` → `cninfo` → `sina` |", 1)
+        findings = drift.check_chain_table(broken)
+        assert any("多槽" in f and "sina" in f for f in findings)
+
+    def test_slot_order_mismatch_reported(self, drift):
+        """槽位顺序即回退优先级：顺序不一致要报（不是只看集合相等）。"""
+        text = drift._RELIABILITY_MD.read_text(encoding="utf-8")
+        broken = text.replace("| `datasink` → `cninfo` |", "| `cninfo` → `datasink` |", 1)
+        findings = drift.check_chain_table(broken)
+        assert any("顺序不一致" in f for f in findings)
+
+    def test_missing_id_column_reported(self, drift):
+        """旧格式（无 id 列）必须报缺列，否则门禁会静默放过槽位漂移。"""
+        text = drift._RELIABILITY_MD.read_text(encoding="utf-8")
+        broken = text.replace(
+            "| `fund_rank` | 天天基金 | —（单源） | `tiantian` | 不可用时基金业绩排名域标记降级 |",
+            "| `fund_rank` | 天天基金 | —（单源） | 不可用时基金业绩排名域标记降级 |",
+            1,
+        )
+        findings = drift.check_chain_table(broken)
+        assert any("`fund_rank`" in f and "provider id 列" in f for f in findings)
 
 
 class TestThinkingSupportMatrix:

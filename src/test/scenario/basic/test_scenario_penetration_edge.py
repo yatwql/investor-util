@@ -18,7 +18,12 @@ from src.python.core.models import Holding
 from src.python.report.market_value import DetailRow
 from src.python.report import penetration as pene
 
-pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic, pytest.mark.edge]
+pytestmark = [
+    pytest.mark.scenario,
+    pytest.mark.scenario_basic,
+    pytest.mark.edge,
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -25,7 +25,7 @@ from src.python.report import penetration as pene
 from src.python.report.styles import BLUE_FONT, GREEN_FONT, RED_FONT
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 
 # ============================================================

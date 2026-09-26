@@ -1068,7 +1068,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 </div>
             </div>
 
-            {# 市场温度（report_submodules.market_temperature，默认开）：不可用时整块静默省略，
+            {# 市场温度（功能开关 market_temperature，features.json；默认开）：不可用时整块静默省略，
                避免在用户未主动要求的功能上出现降级痕迹（与 Excel 同判据） #}
             {% if market_temperature and market_temperature.available %}
             <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【市场温度】</h3>
@@ -2746,7 +2746,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
             {% endif %}
             {% if data_quality_enabled %}
-            <!-- 品种覆盖区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
+            <!-- 品种覆盖区块（数据质量仪表盘子模块，功能开关 data_quality 开启时显示） -->
             <div class="data-status" style="margin-top:12px;">
                 <div class="data-status-title">品种覆盖（逐品种数据状态）</div>
                 {% if position_status and position_status.available and position_status.get("items") %}
@@ -2778,7 +2778,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <div class="data-status-info">&#8505; 未获取行情数据，品种覆盖无法判定</div>
                 {% endif %}
             </div>
-            <!-- 可信度区块（数据质量仪表盘子模块，report_submodules.data_quality 开启时显示） -->
+            <!-- 可信度区块（数据质量仪表盘子模块，功能开关 data_quality 开启时显示） -->
             <div class="data-status" style="margin-top:12px;">
                 <div class="data-status-title">可信度（数据新鲜度 + 单日跳变）</div>
                 {% if data_freshness and data_freshness.available and data_freshness.get("items") %}

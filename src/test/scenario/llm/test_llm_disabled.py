@@ -17,6 +17,9 @@ from unittest.mock import MagicMock, patch
 from src.python.llm import FAIL_REASON_API_ERROR, FAIL_REASON_DISABLED
 
 
+pytestmark = [pytest.mark.usefixtures("offline_external_sources")]
+
+
 @pytest.mark.llm
 @pytest.mark.scenario_llm
 @pytest.mark.scenario

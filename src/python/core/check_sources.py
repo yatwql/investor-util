@@ -122,6 +122,49 @@ def _check_any(
     return last
 
 
+#: 财报域探针使用的 A 股标的（固定、不依赖持仓）——长江电力
+_CRED_PROBE_SYMBOL = "600900"
+_CRED_PROBE_FMP_SYMBOL = "600900.SS"
+
+
+def _check_datasink() -> tuple[str, float, str]:
+    """DataSinking 财报探针：取 1 条元数据（轻量、幂等，命中缓存时近乎零成本）。
+
+    缺 key 的情形由 ``run_health_checks`` 的凭据预检拦下（产出 ``⏭️`` 跳过态），
+    只有凭据就绪时本探针才会被调用。取数失败原因（凭据无效/配额/网络）由 provider
+    记入 ``logs/app.log``，此处不区分，只给可行动提示。
+    """
+    start = time.perf_counter()
+    try:
+        from src.python.providers import datasink
+
+        items = datasink.fetch_report_documents(_CRED_PROBE_FMP_SYMBOL, size=1)
+    except Exception as e:  # 探针自身异常不得中断体检
+        return _ERR, (time.perf_counter() - start) * 1000, str(e).split("\n")[0][:60]
+    elapsed = (time.perf_counter() - start) * 1000
+    if items:
+        return _OK, elapsed, f"{elapsed:.0f}ms 正常（{len(items)} 篇财报元数据）"
+    return _WARN, elapsed, "未取到元数据（未收录该标的 / 凭据失效 / 配额受限 / 网络异常，详见 logs/app.log）"
+
+
+def _check_cninfo() -> tuple[str, float, str]:
+    """巨潮资讯探针：解析 orgId（公告列表查询的必需参数；结果按月缓存）。
+
+    选 orgId 而非下载 PDF：它是备源链路的入口，且成本最低（一次搜索请求，月级缓存）。
+    """
+    start = time.perf_counter()
+    try:
+        from src.python.providers import cninfo
+
+        org_id = cninfo.resolve_org_id(_CRED_PROBE_SYMBOL)
+    except Exception as e:
+        return _ERR, (time.perf_counter() - start) * 1000, str(e).split("\n")[0][:60]
+    elapsed = (time.perf_counter() - start) * 1000
+    if org_id:
+        return _OK, elapsed, f"{elapsed:.0f}ms 正常（orgId 已解析）"
+    return _WARN, elapsed, "未解析到 orgId（搜索接口变动 / 网络异常，详见 logs/app.log）"
+
+
 # ── 检查项定义 ──────────────────────────────────────────
 # 四元组 (source_id, 显示名, 用途, 探测函数)：source_id 用于凭据就绪预检
 # （见 core/datasource_credential.py），与 fetcher/chain.py 的 provider 名对齐。
@@ -222,6 +265,20 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
             "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh000001,day,,,1",
             timeout=30,
         ),
+    ),
+    # ── 财报域（持仓基本面章·区块②）：主源 + 备源一起探，避免“整链静默失败但
+    # 健康检查全绿”的诊断盲区（rf-439）；datasink 缺 key 时自动产出 ⏭️ 跳过态。
+    (
+        "datasink",
+        "DataSinking 财报",
+        "财报全文",
+        _check_datasink,
+    ),
+    (
+        "cninfo",
+        "巨潮资讯",
+        "财报备源",
+        _check_cninfo,
     ),
 ]
 

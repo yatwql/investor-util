@@ -2,7 +2,7 @@
 
 覆盖：orgId 解析与缓存、公告列表取数与文种归类（年报/半年报/季报、摘要剔除、
 报告期推导）、列表缓存、PDF 正文下载解析与缓存、缺 pdfplumber 的优雅降级、
-HTTP 异常/非 200/非 JSON/429 退避分支、限速器调用。
+HTTP 异常/非 200/非 JSON/429 退避分支、限速器调用、**连接级瞬时失败重试一次**。
 
 HTTP 一律 mock（``monkeypatch.setattr(cn, "make_http_client", ...)``，与
 ``test_datasink.py`` 同模式）；PDF 解析打桩在 ``_parse_pdf_text`` 接缝
@@ -13,6 +13,7 @@ HTTP 一律 mock（``monkeypatch.setattr(cn, "make_http_client", ...)``，与
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from src.python.providers import cninfo as cn
@@ -152,6 +153,22 @@ class TestFetchReportListings:
         assert by_id["1002"]["doc_type"] == "semiannual" and by_id["1002"]["report_period"] == "2026-06-30"
         assert by_id["1003"]["doc_type"] == "q1" and by_id["1003"]["report_period"] == "2026-03-31"
         assert by_id["1004"]["doc_type"] == "q3" and by_id["1004"]["report_period"] == "2025-09-30"
+
+    def test_requests_only_financial_categories(self, monkeypatch, _isolate):
+        """列表查询只查财报类目。
+
+        回归背景：按全部类目（``category_szsh;``）查时第 1 页 30 条可能全是普通公告
+        （实测工商银行），而列表只取第 1 页 → 候选为空 → 巨潮备源对该标的静默失效。
+        """
+        client = self._client([])
+        _patch_client(monkeypatch, client)
+        cn.fetch_report_listings("600900")
+
+        listing_payloads = [payload for url, payload in client.posts if "hisAnnouncement" in url]
+        assert listing_payloads
+        assert all(p.get("category") == cn._FINANCIAL_CATEGORIES for p in listing_payloads)
+        assert "category_ndbg_szsh;" in cn._FINANCIAL_CATEGORIES
+        assert "category_bndbg_szsh;" in cn._FINANCIAL_CATEGORIES
 
     def test_skips_abstract_and_missing_fields(self, monkeypatch, _isolate):
         client = self._client(
@@ -310,3 +327,149 @@ class TestGuards:
 
         monkeypatch.setattr(cn, "make_http_client", _boom)
         assert cn.resolve_org_id("601398") is None
+
+
+class _FlakyClient:
+    """可编程假客户端：前 ``fail_times`` 次调用抛异常，之后返回给定响应。
+
+    ``fail_times=None`` 表示始终抛异常（用于验证重试有界）。
+    """
+
+    def __init__(
+        self,
+        resp: _FakeResp | None = None,
+        *,
+        exc: Exception | None = None,
+        fail_times: int | None = 1,
+    ) -> None:
+        self._resp = resp if resp is not None else _FakeResp(payload={"keyBoardList": []})
+        self._exc = exc if exc is not None else httpx.ConnectTimeout("timed out")
+        self._fail_times = fail_times
+        self.calls = 0
+
+    def _do(self) -> _FakeResp:
+        self.calls += 1
+        if self._fail_times is None or self.calls <= self._fail_times:
+            raise self._exc
+        return self._resp
+
+    def post(self, url, data=None, headers=None) -> _FakeResp:
+        return self._do()
+
+    def get(self, url, headers=None) -> _FakeResp:
+        return self._do()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class TestTransientConnectRetry:
+    """连接级瞬时失败退避重试一次。
+
+    回归背景（本机实测）：到 cninfo 的**首个连接**常被丢弃（http/https 均见 8s 超时，
+    随后立即 200）。而 orgId 解析、公告列表、PDF 下载三条路径都**不经 Provider Chain**，
+    拿不到链路的同源重试——不补重试时，冷启动抖动即让整只标的丢掉备源候选
+    （orgId 解析失败 → 公告列表为空 → 备源不可用）。
+    """
+
+    def _patch_flaky(self, monkeypatch, client) -> list[float]:
+        sleeps: list[float] = []
+        monkeypatch.setattr(cn, "make_http_client", lambda **_kw: client)
+        monkeypatch.setattr(cn.time, "sleep", sleeps.append)
+        return sleeps
+
+    def test_post_json_retries_once_then_succeeds(self, monkeypatch, _isolate):
+        """首次连接失败 → 退避一次后成功返回 JSON。"""
+        client = _FlakyClient(resp=_FakeResp(payload={"keyBoardList": [{"code": "600900", "orgId": "gssh0600900"}]}))
+        sleeps = self._patch_flaky(monkeypatch, client)
+
+        payload = cn._post_json("/new/information/topSearch/query", {"keyWord": "600900"})
+
+        assert payload == {"keyBoardList": [{"code": "600900", "orgId": "gssh0600900"}]}
+        assert client.calls == 2
+        assert sleeps == [cn._CONNECT_RETRY_BACKOFF]
+
+    def test_post_json_gives_up_after_one_retry(self, monkeypatch, _isolate):
+        """始终失败 → 返回 None，且尝试次数有界（不无限重试）。"""
+        client = _FlakyClient(fail_times=None)
+        sleeps = self._patch_flaky(monkeypatch, client)
+
+        assert cn._post_json("/x", {}) is None
+        assert client.calls == cn._CONNECT_RETRY_ATTEMPTS
+        assert sleeps == [cn._CONNECT_RETRY_BACKOFF * i for i in range(1, cn._CONNECT_RETRY_ATTEMPTS)]
+
+    def test_get_bytes_retries_once_then_succeeds(self, monkeypatch, _isolate):
+        """公告 PDF 下载同样退避重试一次。"""
+        client = _FlakyClient(resp=_FakeResp(content=b"%PDF-1.4 fake"))
+        sleeps = self._patch_flaky(monkeypatch, client)
+
+        assert cn._get_bytes("http://static.cninfo.com.cn/a.PDF") == b"%PDF-1.4 fake"
+        assert client.calls == 2
+        assert sleeps == [cn._CONNECT_RETRY_BACKOFF]
+
+    def test_non_transient_error_is_not_retried(self, monkeypatch, _isolate):
+        """确定性失败（非传输级异常）只调一次，不浪费退避等待。"""
+        client = _FlakyClient(exc=ValueError("bad params"), fail_times=None)
+        sleeps = self._patch_flaky(monkeypatch, client)
+
+        assert cn._post_json("/x", {}) is None
+        assert client.calls == 1
+        assert sleeps == []
+
+    def test_retries_survive_two_consecutive_cold_start_failures(self, monkeypatch, _isolate):
+        """连续两次冷启动失败后第 3 次成功（实测工况：首个连接常被丢弃）。"""
+        client = _FlakyClient(
+            resp=_FakeResp(payload=[{"code": "600900", "orgId": "gssh0600900"}]),
+            fail_times=2,
+        )
+        sleeps = self._patch_flaky(monkeypatch, client)
+
+        payload = cn._post_json("/new/information/topSearch/query", {"keyWord": "600900"})
+
+        assert payload == [{"code": "600900", "orgId": "gssh0600900"}]
+        assert client.calls == 3
+        assert sleeps == [cn._CONNECT_RETRY_BACKOFF, cn._CONNECT_RETRY_BACKOFF * 2]
+
+
+class TestTopSearchListShape:
+    """topSearch 返回**数组**（实测），而 hisAnnouncement/query 返回 dict——两种都要放行。
+
+    回归背景：``_post_json`` 早期只放行 dict（``isinstance(payload, dict)``），
+    而 topSearch 实际返回 ``[{"code": "600900", "orgId": "gssh0600900", ...}]``
+    → orgId 解析恒为 None → 公告列表为空 → 巨潮备源整条路径不可用。
+    """
+
+    def test_post_json_passes_list_payload_through(self, monkeypatch, _isolate):
+        items = [{"code": "600900", "orgId": "gssh0600900", "zwjc": "长江电力"}]
+        _patch_client(monkeypatch, _FakeClient(post_map={"/topSearch/query": _FakeResp(payload=items)}))
+        assert cn._post_json("/new/information/topSearch/query", {"keyWord": "600900"}) == items
+
+    def test_resolve_org_id_from_list_response(self, monkeypatch, _isolate):
+        _patch_client(
+            monkeypatch,
+            _FakeClient(
+                post_map={
+                    "/topSearch/query": _FakeResp(
+                        payload=[{"code": "600900", "orgId": "gssh0600900", "zwjc": "长江电力"}]
+                    )
+                }
+            ),
+        )
+        assert cn.resolve_org_id("600900") == "600900,gssh0600900"
+
+    def test_resolve_org_id_still_accepts_dict_wrapped_shape(self, monkeypatch, _isolate):
+        """历史/其他部署可能包一层 dict（keyBoardList）——保持兼容。"""
+        _patch_client(
+            monkeypatch,
+            _FakeClient(
+                post_map={
+                    "/topSearch/query": _FakeResp(
+                        payload={"keyBoardList": [{"code": "600900", "orgId": "gssh0600900"}]}
+                    )
+                }
+            ),
+        )
+        assert cn.resolve_org_id("600900") == "600900,gssh0600900"

@@ -38,10 +38,9 @@
     "plan": "free",                 // free / yearly；决定限速与日配额的默认值
     "requests_per_second": 0,       // 0=按 plan 自动（free=3，yearly=31）
     "daily_quota": 0,               // 0=按 plan 自动（free=8191，yearly=131071）
-    "sections": ["管理层讨论与分析"],  // 取用的财报章节（fuzzy 标题匹配）
+    "sections": ["管理层讨论与分析"],  // 取用章节：按顺序在文档实际章节名中子串匹配（fuzzy 标题匹配），命中即取
     "max_chars": 2000,             // 单股摘要截断长度
-    "doc_types": [],               // 文种白名单：空 = 不限文种（取最新报告期，半年报/季报通常比年报新）
-    "sections": ["管理层讨论与分析"]  // 章节偏好（按顺序在文档实际章节名中子串匹配，命中即取）
+    "doc_types": []               // 文种白名单：空 = 不限文种（取最新报告期，半年报/季报通常比年报新）
   },
 
   // ── D. 市场时段与缓存 ──
@@ -98,7 +97,7 @@
     "equity_fixed_income": {}
   },
 
-  // ── 交易纪律配置 ──
+  // ── J. 交易纪律配置 ──
   "discipline": {
     "take_profit_pct": 20.0,
     "stop_loss_pct": -15.0,
@@ -106,15 +105,15 @@
     "silence_days": 30
   },
 
-  // ── J. 流动性配置 ──
+  // ── K. 流动性配置 ──
   "redemption_limits": {},
 
-  // ── K. 匿名化配置 ──
+  // ── L. 匿名化配置 ──
   "anonymization": {
     "mode": "off"
   },
 
-  // ── L. 批量并行调度 ──
+  // ── M. 批量并行调度 ──
   "batch": {
     "max_total_workers": 15,
     "fund_workers": 3,
@@ -136,9 +135,9 @@
 
 - [A. 路径与文件](#a-路径与文件) · [B. 报告章节可见性](#b-报告章节可见性) · [C. 数据源与提供商](#c-数据源与提供商)
 - [D. 市场时段与缓存](#d-市场时段与缓存) · [E. 行为调优](#e-行为调优) · [F. 业绩基准与无风险利率](#f-业绩基准与无风险利率)
-- [G. 组合历史走势与持仓快照](#g-组合历史走势与持仓快照) · [H. 业绩评价配置](#h-业绩评价配置) · [I. 再平衡配置](#i-再平衡配置)
-- [J. 流动性配置](#j-流动性配置) · [K. 匿名化配置](#k-匿名化配置) · [L. 批量并行调度](#l-批量并行调度)
-- [M. 功能开关（features.json）](#m-功能开关featuresjson) · [N. 缓存分组](#n-缓存分组) · [O. 机器本地状态（非 config.json）](#o-机器本地状态非-configjson) · [P. Web 模式配置编辑](#p-web-模式配置编辑)
+- [G. 组合历史走势与持仓快照](#g-组合历史走势与持仓快照) · [H. 业绩评价配置](#h-业绩评价配置) · [I. 再平衡配置](#i-再平衡配置) · [J. 交易纪律配置](#j-交易纪律配置)
+- [K. 流动性配置](#k-流动性配置) · [L. 匿名化配置](#l-匿名化配置) · [M. 批量并行调度](#m-批量并行调度)
+- [N. 功能开关（features.json）](#n-功能开关featuresjson) · [O. 缓存分组](#o-缓存分组) · [P. 机器本地状态（非 config.json）](#p-机器本地状态非-configjson) · [Q. Web 模式配置编辑](#q-web-模式配置编辑)
 - [与菜单命令的对应关系](#与菜单命令的对应关系)
 
 ## 字段说明
@@ -158,7 +157,7 @@
 | `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量 = max(500, news_top_count × 2)，华尔街见闻硬上限 100 条除外） | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
-| `datasink.*` | `{enabled: true, plan: "free", ...}` | DataSinking 数据底座配置：`enabled`（**总开关，默认开**；关闭后所有依赖该底座的分析——财务指标章、真实历史估值分位——**静默回到引入前的报告形态**，不产生任何可感知变化）、`plan`（free/yearly，决定限速与日配额默认值）、`requests_per_second` / `daily_quota`（0=按 plan 自动）、`sections`（取用章节）、`max_chars`（摘要截断）、`doc_types`（**文种白名单，空数组 = 不限文种**，默认取最新报告期——半年报/季报通常比年报新）、`sections`（章节**偏好**列表，按顺序在文档实际章节名中子串匹配，季报会自动落到「主要财务数据/主要会计数据」）。免费档 3 请求/秒（触发 429 时自动退避重试一次）、8191 篇/日；仅覆盖 A 股 | 手动编辑 |
+| `datasink.*` | `{enabled: true, plan: "free", ...}` | DataSinking 数据底座配置：`enabled`（**总开关，默认开**；关闭后所有依赖该底座的分析——财务指标章、真实历史估值分位——**静默回到引入前的报告形态**，不产生任何可感知变化）、`plan`（free/yearly，决定限速与日配额默认值）、`requests_per_second` / `daily_quota`（0=按 plan 自动）、`sections`（取用章节偏好：按顺序在文档实际章节名中子串匹配，命中即取；季报会自动落到「主要财务数据/主要会计数据」）、`max_chars`（摘要截断）、`doc_types`（**文种白名单，空数组 = 不限文种**，默认取最新报告期——半年报/季报通常比年报新）。免费档 3 请求/秒（触发 429 时自动退避重试一次）、8191 篇/日；仅覆盖 A 股 | 手动编辑 |
 | `market_hour_aware` | `["price", "index"]` | 交易时段内使用短 TTL 的数据类型列表 | 手动编辑 |
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s。低于 30s 的值在配置校验时告警，运行时自动钳制到 30s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
@@ -213,7 +212,7 @@
 
 通过 TUI 主菜单 `[P]` 配置报告可选章节进入交互式子菜单，可逐个切换基金深度分析/市场新闻/历史走势/组合演进/行动建议 5 个章节组的可见性。
 
-> **报告章节与增强子模块（数据质量仪表盘/市场温度/行业Beta子表/候选基金比较/成本流水/估值分位/持仓基本面区块①财务指标与区块②财报摘要/市场情绪）不在 `[P]`**——它们已并入功能开关注册表的「报告章节与增强」组，统一在菜单 `[S]` 的报告块配置（见 [M. 功能开关](#m-功能开关featuresjson)）。
+> **报告章节与增强子模块（数据质量仪表盘/市场温度/行业Beta子表/候选基金比较/成本流水/估值分位/持仓基本面区块①财务指标与区块②财报摘要/市场情绪）不在 `[P]`**——它们已并入功能开关注册表的「报告章节与增强」组，统一在菜单 `[S]` 的报告块配置（见 [N. 功能开关](#n-功能开关featuresjson)）。
 
 | 字段 | 默认值 | 配置来源 | 控制章节 | 说明 |
 |:-----|:------:|:---------|:---------|:-----|
@@ -321,6 +320,10 @@
 | `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | A股+美股指数 | 机构盈利预测全量数据 |
 | `hold` | `fund_hold_{code}.json` | 7 天 | — | 基金前 10 持仓明细 |
 | `industry` | `industry_{code}.json` | 14 天 | — | 行业分类/概念板块 |
+| `sentiment` | `sentiment_dragon_tiger.json` + `sentiment_ladder.json` | 1h | — | 市场情绪（龙虎榜 + 连板天梯，同花顺唯一源） |
+| `report` | `report_datasink_index_{symbol}.json` + `report_datasink_sections_{doc_id}.json` + `report_cninfo_index_*` | 30 天 | — | 财报索引/章节清单（DataSinking 主源 + 巨潮备源） |
+| `report_doc` | `report_datasink_doc_{doc_id}_{section}.json`（备源 `report_cninfo_text_*`） | 30 天 | — | 财报正文（主源全文 / 备源 PDF 解析） |
+| `fin_indicator` | `fin_indicator_{code}.json` + `fin_indicator_hist_{code}.json` | 30 天 | — | 结构化财务指标（akshare 主源 + 同花顺合并报表兜底） |
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
 | `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
 
@@ -333,6 +336,9 @@
 | `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | A股/美股指数 + 持仓汇总 | 全球政经局势 |
 | `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 |
 | `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 |
+| `llm_debate_pro` | `llm_debate_pro_{fingerprint}.json` | 24h | 复用 expert_review 持仓指纹（排除行情波动） | 辩论白脸（实验功能） |
+| `llm_debate_con` | `llm_debate_con_{fingerprint}.json` | 24h | 复用 expert_review 持仓指纹（排除行情波动） | 辩论黑脸（实验功能） |
+| `llm_debate_synthesis` | `llm_debate_synthesis_{fingerprint}.json` | 24h | 复用 expert_review 持仓指纹（排除行情波动） | 辩论综合（实验功能） |
 
 #### 基金深度分析类
 
@@ -349,6 +355,7 @@
 |------|-----------|:--------:|----------|------|
 | `tracking` | `holdings_tracking.json` | 30 天 | — | 持仓跟踪数据（精确键名，无指纹） |
 | `calendar` | `trading_calendar.json` | 14 天 | — | A 股交易日历（精确键名，无指纹） |
+| `bond_yield` | `bond_yield_rf` | 24h | — | 无风险利率（国债收益率；精确键名，无指纹） |
 
 #### 历史走势类
 
@@ -615,7 +622,14 @@
 空对象 `{}` 表示不启用此项检查。
 
 ---
-### J. 流动性配置
+
+### J. 交易纪律配置
+
+交易纪律信号（止盈 / 止损 / 控回撤）的触发阈值与静默期共四个 `discipline.*` 字段，见上方字段总表；无 TUI 菜单入口，需手动编辑。触发信号作用于报告「行动建议」章的交易纪律板块。
+
+---
+
+### K. 流动性配置
 
 #### redemption_limits 场外基金赎回上限
 
@@ -633,7 +647,7 @@
 配置后程序可计算场外品种全量赎回所需天数（**用户配置口径优先**）。未配置的品种按**类型默认档**估算：货币/短债 T+1、纯债 T+2、其他场外基金（主动权益/混合/指数/联接等）T+3、QDII T+7；此类估算在报告与评分中一律标注「类型默认档（非实测）」。仅当基金类型无法识别时才标记"需手动确认赎回上限"。
 
 ---
-### K. 匿名化配置
+### L. 匿名化配置
 
 #### anonymization.mode 匿名化模式
 
@@ -649,7 +663,7 @@
 通过 TUI 主菜单 `[A]` 配置持仓匿名化可交互切换。
 
 ---
-### L. 批量并行调度
+### M. 批量并行调度
 
 #### batch 池配置
 
@@ -688,7 +702,7 @@
 值为 0 表示不限速。配置后可通过菜单 `R` 刷新配置立即生效，无需重启程序。
 
 ---
-### M. 功能开关（features.json）
+### N. 功能开关（features.json）
 
 `data/config/features.json` 提供 **30 项功能开关**的运行时覆写（含「报告章节与增强」9 项，统一登记于功能开关注册表）。文件仅需列出需覆写的开关，未列出的保持代码内置默认值：
 
@@ -754,18 +768,18 @@
 > 该文件不包含敏感信息，可安全纳入版本控制。
 
 ---
-### N. 缓存分组
+### O. 缓存分组
 
 所有缓存模块归入两个分组，控制菜单命令的缓存清除范围：
 
 | 分组 | 包含模块 | 使用场景 |
 |------|---------|----------|
-| `preload` | 股票价格、市场指数、LLM 全球政经局势、LLM 智囊团深度复盘、LLM 持仓体检报告、LLM 穿透深度分析 | **切换持仓文件后必须重取的数据。** 价格/指数随持仓变动，LLM 基础分析依赖持仓内容，切换到新持仓文件时必须清除旧缓存 |
-| `refresh` | 基金业绩排名、基金持仓、行业分类、新闻聚合、LLM 新闻关联分析、机构盈利预测、行业资金流向、股票历史分红、基金业绩基准、基金经理数据、持仓重合度、基金风格扩展数据、无风险利率 | **可随时独立刷新的补充数据。** 不依赖持仓文件切换，任何时候都可以主动刷新 — 如盘中更新行业资金流向、拉取最新基金排名 |
+| `preload` | 股票价格、市场指数、LLM 全球政经局势、LLM 智囊团深度复盘、LLM 持仓体检报告、LLM 穿透深度分析、LLM 辩论三段（正/反/综合） | **切换持仓文件后必须重取的数据。** 价格/指数随持仓变动，LLM 基础分析依赖持仓内容，切换到新持仓文件时必须清除旧缓存 |
+| `refresh` | 基金业绩排名、基金持仓、行业分类、市场情绪、财报索引、财报正文、财务指标、新闻聚合、LLM 新闻关联分析、机构盈利预测、行业资金流向、股票历史分红、基金业绩基准、基金经理数据、基金风格扩展数据、无风险利率（持仓重合度复用基金持仓缓存，随其一并清除，无独立缓存键） | **可随时独立刷新的补充数据。** 不依赖持仓文件切换，任何时候都可以主动刷新 — 如盘中更新行业资金流向、拉取最新基金排名 |
 
 **无分组的模块**（`tracking` 持仓跟踪、`calendar` 交易日历、`fund_concentration` 集中度历史快照、`fund_style_snapshot` 风格快照、`history_stock` 历史 K 线、`history_fund_otc` 历史净值、`history_index` 指数历史日线）：未被任何分组覆盖，不会被菜单缓存命令误删。对应 TTL 可通过 `cache_ttl.{key}` 自行调整。
 
-### O. 机器本地状态（非 config.json）
+### P. 机器本地状态（非 config.json）
 
 以下状态**不存放于 config.json**，而是存于 `data/state/local_state.json`（git 忽略，仅本机可见）：
 
@@ -778,7 +792,7 @@
 
 ---
 
-### P. Web 模式配置编辑
+### Q. Web 模式配置编辑
 
 Web 模式（浏览器界面）提供「配置编辑」面板，可修改的配置项与 TUI 主菜单**完全一致**（完整镜像），共 8 组（其中「实验性功能」与「常规开关」为同一功能开关组的上下两块，合起来对应 TUI 菜单 `[S]` 的两块）：
 
@@ -792,7 +806,6 @@ Web 模式（浏览器界面）提供「配置编辑」面板，可修改的配�
 | LLM 分析章节 | `enabled_llm.global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation` | `[S]` 标准模块 |
 | 实验性功能 | `llm_debate_procon` / `llm_debate_qa_concentration` / `decision_reflection` / `signal_ledger` / `prosperity_framework` | `[S]` 实验块（6-10） |
 | 常规开关 | `signal_pre_digest` / `module_quality_gate` / `decision_header_parse` / `llm_debate_conditional` / `datasource_credential_ready` / `metrics_*`（6 项）/ `enable_interactive_charts` / `doctor_check` / `datasource_adapter` / `feeder_penetration` | `[S]` 常规块 |
-| 报告章节与增强 | `data_quality`（默认开）/ `market_temperature`（默认开）/ `industry_beta` / `candidate_compare` / `cost_lots` / `valuation_percentile` / `financial_report_digest` / `financial_indicator` | `[S]` 报告块 |
 
 **写入行为**：
 - 面板修改**立即写入**共享配置文件（`config.json` / `llm_settings.json` / `features.json`），TUI / CLI 下次读取即生效（缓存按文件修改时间自动失效，无需手动刷新）。
@@ -803,7 +816,7 @@ Web 模式（浏览器界面）提供「配置编辑」面板，可修改的配�
 ### 与菜单命令的对应关系
 
 - **菜单 `[1]` 更新基础类缓存** → 清除 `refresh` 组全部缓存，然后重新拉取。适合：启动后先刷新补充数据，再生成报告。纯股票组合时自动跳过基金排名/持仓/基准刷新，仍主动重拉行业分类、分红、盈利预测、资金流向。新闻缓存清除后由后续报告生成按需重建。
-- **菜单 `[2]` 更新持仓类缓存** → 清除 `preload` 组全部缓存，然后并行拉取新持仓的价格和指数。适合：切换到另一份持仓文件时一键清理依赖旧持仓的缓存。
+- **菜单 `[2]` 更新行情类缓存** → 清除 `preload` 组全部缓存，然后并行拉取新持仓的价格和指数。适合：切换到另一份持仓文件时一键清理依赖旧持仓的缓存。
 
 两组互不重叠：`[1]` 不会误删价格/指数缓存，`[2]` 不会误删基金排名/行业分类缓存。
 

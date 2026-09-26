@@ -27,8 +27,11 @@ import logging
 import re
 import threading
 import time
+from collections.abc import Callable
 from datetime import date, timedelta
 from typing import Any
+
+import httpx
 
 from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
@@ -48,6 +51,11 @@ _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 _MIN_INTERVAL = 1.0
 #: 429 限速退避秒数（重试一次）
 _RATE_LIMIT_BACKOFF = 2.0
+#: 连接级瞬时失败（冷启动握手被丢弃 / DNS 抖动）的**总尝试次数**与基础退避（秒）。
+#: 实测：本机到 cninfo 的**首个连接**常被丢弃（http/https 均见 8s 超时，随后立即 200）；
+#: 故留 3 次尝试（1 次原始 + 2 次重试），退避按尝试次数递增（1s、2s）。
+_CONNECT_RETRY_ATTEMPTS = 3
+_CONNECT_RETRY_BACKOFF = 1.0
 
 INDEX_PREFIX = "report_cninfo_index_"
 ORGID_PREFIX = "report_cninfo_orgid_"
@@ -55,6 +63,16 @@ TEXT_PREFIX = "report_cninfo_text_"
 
 #: 列表一次取回的公告条数（本地归类/过滤后由编排层再按报告期排序回溯）
 _LIST_PAGE_SIZE = 30
+#: 财报类目白名单（年度报告/半年度报告/一季报/三季报）。**必须只查财报类目**：
+#: 按全部类目（``category_szsh;``）查时第 1 页（30 条）可能全是普通公告——实测
+#: 工商银行即如此，而本函数只取第 1 页 → 候选为空 → 巨潮备源对该标的**静默失效**
+#: （其余标的因财报恰好在首页而看不出问题）。与 ``_DOC_TYPE_RULES`` 一一对应。
+_FINANCIAL_CATEGORIES = (
+    "category_ndbg_szsh;"  # 年度报告
+    "category_bndbg_szsh;"  # 半年度报告
+    "category_yjdbg_szsh;"  # 第一季度报告
+    "category_sjdbg_szsh;"  # 第三季度报告
+)
 #: 列表查询的披露日期窗口：覆盖候选回溯（最新 → 半年报 → 上年年报）
 _LIST_WINDOW_DAYS = 900
 #: PDF 解析页数上限（防异常超大文件撑爆内存；年报通常 < 300 页）
@@ -105,25 +123,70 @@ def reset_cninfo_limiter() -> None:
 # ═══════════════════════════════════════════════════════════════
 
 
-def _post_json(path: str, data: dict[str, Any]) -> dict[str, Any] | None:
-    """限速 POST 取 JSON；失败返回 None（不计熔断，交链路/编排降级）。"""
+def _with_transient_retry(label: str, do_request: Callable[[], Any]) -> Any:
+    """执行一次 HTTP 请求；**连接级瞬时失败**退避后重试一次。
+
+    背景（本机实测）：到 cninfo 的**首个连接**常被丢弃（http/https 均见 8s 超时，
+    随后立即 200）——若直连取数不做重试，冷启动抖动即让整只标的丢掉备源候选
+    （orgId 解析失败 → 公告列表为空 → 备源不可用）；而这三条直接调用路径
+    （orgId / 公告列表 / PDF 下载）都**不经 Provider Chain**，拿不到链路的同源重试。
+
+    仅对 ``httpx.TimeoutException`` / ``httpx.RequestError`` 重试（共
+    ``_CONNECT_RETRY_ATTEMPTS`` 次尝试，退避递增）；其余异常（如参数/解析错误）
+    属确定性失败，直接降级不重试。
+    """
     limiter = _get_limiter()
-    limiter.acquire(SOURCE_ID)
-    try:
-        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
-            resp = client.post(f"{_BASE}{path}", data=data, headers=_HEADERS)
-    except Exception as e:  # 网络不可达：返回空，交由编排降级
-        logger.warning("[cninfo] 请求失败 %s: %s", path, e)
+    for attempt in range(1, _CONNECT_RETRY_ATTEMPTS + 1):
+        limiter.acquire(SOURCE_ID)
+        try:
+            return do_request()
+        except (httpx.TimeoutException, httpx.RequestError) as e:
+            if attempt < _CONNECT_RETRY_ATTEMPTS:
+                backoff = _CONNECT_RETRY_BACKOFF * attempt
+                logger.warning(
+                    "[cninfo] 连接失败 %s（%s），%.1fs 后重试（第 %d/%d 次尝试）",
+                    label,
+                    e,
+                    backoff,
+                    attempt,
+                    _CONNECT_RETRY_ATTEMPTS,
+                )
+                time.sleep(backoff)
+                continue
+            logger.warning("[cninfo] 请求失败 %s: %s（已试 %d 次）", label, e, _CONNECT_RETRY_ATTEMPTS)
+            return None
+        except Exception as e:  # 非瞬时：直接降级（不计熔断）
+            logger.warning("[cninfo] 请求失败 %s: %s", label, e)
+            return None
+    return None
+
+
+def _post_once(url: str, data: dict[str, Any]) -> Any:
+    """单次限速 POST（限速在调用方统一获取）。"""
+    with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+        return client.post(url, data=data, headers=_HEADERS)
+
+
+def _get_once(url: str) -> Any:
+    """单次限速 GET（限速在调用方统一获取）。"""
+    with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+        return client.get(url, headers=_HEADERS)
+
+
+def _post_json(path: str, data: dict[str, Any]) -> dict[str, Any] | None:
+    """限速 POST 取 JSON；失败返回 None（不计熔断，交链路/编排降级）。
+
+    连接级瞬时失败由 ``_with_transient_retry`` 退避重试一次；HTTP 429 另有自己的退避分支。
+    """
+    url = f"{_BASE}{path}"
+    resp = _with_transient_retry(path, lambda: _post_once(url, data))
+    if resp is None:
         return None
     if resp.status_code == 429:
         logger.warning("[cninfo] 触发限速（HTTP 429），%.1fs 后重试一次", _RATE_LIMIT_BACKOFF)
         time.sleep(_RATE_LIMIT_BACKOFF)
-        limiter.acquire(SOURCE_ID)
-        try:
-            with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
-                resp = client.post(f"{_BASE}{path}", data=data, headers=_HEADERS)
-        except Exception as e:
-            logger.warning("[cninfo] 重试失败 %s: %s", path, e)
+        resp = _with_transient_retry(path, lambda: _post_once(url, data))
+        if resp is None:
             return None
     if resp.status_code != 200:
         logger.warning("[cninfo] 请求 %s 返回 HTTP %d", path, resp.status_code)
@@ -133,18 +196,16 @@ def _post_json(path: str, data: dict[str, Any]) -> dict[str, Any] | None:
     except ValueError:
         logger.warning("[cninfo] 响应非 JSON（%s）", path)
         return None
-    return payload if isinstance(payload, dict) else None
+    # 同一接口的两种合法形状都放行：``hisAnnouncement/query`` 返回 dict
+    # （``announcements``），而 ``information/topSearch/query`` 返回**数组**
+    # （[{"code", "orgId", ...}]）——早期只放行 dict，导致 orgId 解析恒失败。
+    return payload if isinstance(payload, (dict, list)) else None
 
 
 def _get_bytes(url: str) -> bytes | None:
     """限速 GET 取二进制（公告 PDF）；失败返回 None。"""
-    limiter = _get_limiter()
-    limiter.acquire(SOURCE_ID)
-    try:
-        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
-            resp = client.get(url, headers=_HEADERS)
-    except Exception as e:
-        logger.warning("[cninfo] 下载失败 %s: %s", url, e)
+    resp = _with_transient_retry(url, lambda: _get_once(url))
+    if resp is None:
         return None
     if resp.status_code != 200:
         logger.warning("[cninfo] 下载 %s 返回 HTTP %d", url, resp.status_code)
@@ -184,7 +245,12 @@ def resolve_org_id(code: str) -> str | None:
         "/new/information/topSearch/query",
         {"keyWord": code, "maxSecNum": 10, "maxListNum": 10},
     )
-    items = (payload or {}).get("keyBoardList") or (payload or {}).get("list") or []
+    # 该接口返回**数组**（实测：[{"code": "600900", "orgId": "gssh0600900", ...}]）；
+    # 保留 dict 形状兼容（历史/其他部署可能包一层）。
+    if isinstance(payload, list):
+        items: Any = payload
+    else:
+        items = (payload or {}).get("keyBoardList") or (payload or {}).get("list") or []
     org_id = ""
     for item in items if isinstance(items, list) else []:
         if str(item.get("code") or "") != code:
@@ -245,7 +311,7 @@ def fetch_report_listings(code: str) -> list[dict[str, Any]] | None:
             "stock": stock,
             "searchkey": "",
             "secid": "",
-            "category": "category_szsh;",
+            "category": _FINANCIAL_CATEGORIES,
             "trade": "",
             "seDate": f"{start.isoformat()}~{end.isoformat()}",
             "sortName": "",

@@ -1,9 +1,9 @@
 # 变更日志归档 — v0.11.x
 
-> 归档时间：2026-09-15（v0.11.0 发布当日并入）；2026-09-18 增补（v0.11.1 发布当日并入）；2026-09-24 增补（v0.11.2、v0.11.3、v0.11.4 发布当日并入）
+> 归档时间：2026-09-15（v0.11.0 发布当日并入）；2026-09-18 增补（v0.11.1 发布当日并入）；2026-09-24 增补（v0.11.2、v0.11.3、v0.11.4 发布当日并入）；2026-09-26 增补（v0.11.5 发布当日并入）
 > 原始文件：`docs-stm/managements/changelog.md`
-> 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1（2026-09-18）/ v0.11.2（2026-09-24）/ v0.11.3（2026-09-24）/ v0.11.4（2026-09-25）
-> 归档内容：v0.11.x 已发布版本变更记录（含 v0.11.4：数据源健壮性加固（健康探针修正/场外净值跨厂商备源/传输级重试/正文备源/刷新窗口延长）、需求 ID 追溯链全量打通（276 条/34 域 + 门禁脚本）、手册 thinking 补 Kimi 与矩阵守卫、测试全量审计与两轮技术债整改、24h/48h 债务审计；含 v0.11.3：需求 ID 追溯链全量打通（276 条/34 域映射表 + 门禁脚本）、手册 thinking 章节补 Kimi 与矩阵守卫、测试全量审计、归档索引与分区纪律断言；含 v0.11.2：Kimi 主节点接入与 Extended Thinking、穿透占比与 Endpoint 主备两处缺陷修复、景气度框架②④维扩展、巨潮财报备源、两轮技术债与文档审计；含 v0.11.1：同花顺 key 在报告中的可见性、新闻去重校准体系修整、48 小时技术债整改；开发版本记录仍保留在原文件 changelog.md 的 [0.11.2-dev] 段）
+> 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1（2026-09-18）/ v0.11.2（2026-09-24）/ v0.11.3（2026-09-24）/ v0.11.4（2026-09-25）/ v0.11.5（2026-09-26）
+> 归档内容：v0.11.x 已发布版本变更记录（含 v0.11.5：测试外部网络隔离（守卫硬化 + offline_external_sources 离线桩）、财报域备源链路四处缺陷修复（链槽/数组响应/连接重试/财报类目）、持仓基本面占位文案与废弃配置路径清理、文档门禁槽位级校验、健康检查覆盖财报域（10→12 源）；含 v0.11.4：数据源健壮性加固（健康探针修正/场外净值跨厂商备源/传输级重试/正文备源/刷新窗口延长）、需求 ID 追溯链全量打通（276 条/34 域 + 门禁脚本）、手册 thinking 补 Kimi 与矩阵守卫、测试全量审计与两轮技术债整改、24h/48h 债务审计；含 v0.11.3：需求 ID 追溯链全量打通（276 条/34 域映射表 + 门禁脚本）、手册 thinking 章节补 Kimi 与矩阵守卫、测试全量审计、归档索引与分区纪律断言；含 v0.11.2：Kimi 主节点接入与 Extended Thinking、穿透占比与 Endpoint 主备两处缺陷修复、景气度框架②④维扩展、巨潮财报备源、两轮技术债与文档审计；含 v0.11.1：同花顺 key 在报告中的可见性、新闻去重校准体系修整、48 小时技术债整改；开发版本记录仍保留在原文件 changelog.md 的 [0.11.2-dev] 段）
 
 ---
 ## [0.11.1] - 2026-09-18
@@ -1488,3 +1488,203 @@ Excel 穿透页签与景气度评分读 `ratio_pct`，不受影响。既有测�
 - **文档同步**：`datasource.md`（场外净值路由 + TTL）、`datasource-reliability.md`（探针语义 + 链路备源表）、`technical.md`（新增 §2.2.1 同源重试 + 链路图 + 缓存说明）、`requirements.md`（R-FRD-07）
 
 **测试**：+26 例（探针 9 / 新浪 provider 4 / 适配器等价 2 / 链路重试 3 / 场外备源端到端 5 / 正文备源接管 3），含静态守卫「探针不得出现 `http://`」与「主源可用时备源零调用」红线断言。
+
+---
+
+## [0.11.5] - 2026-09-26
+
+> 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
+
+### 诊断能力补强：文档门禁槽位级校验 + 健康检查覆盖财报域（2026-09-26，rf-438/439）
+
+**背景**：本轮财报域排查（rf-437/441/442/443）拖了很久，根因是**两个“看不见”的缺口**——一个让代码/文档漂移长期绿灯，一个让故障现场无可见线索。
+
+**rf-438 文档门禁只比“链路名”不比“槽位”**：
+- `scripts/_doc_drift/_format.py::check_chain_table` 原先只校验 §4.2 表的链路名集合 == `_DEFAULT_CHAINS` 键集合；「文档写主源+备源、代码单槽」这类漂移（即 rf-437）能长期通过。
+- 现在：§4.2 表新增 **`provider id（机器可读，与 _DEFAULT_CHAINS 同序）` 列**（id 由代码派生写入，读者也能看到真实 `source_id`），门禁改为**槽位级双向同序比对**：漏槽/多槽/顺序不一致各自报 finding，且**缺 id 列（旧 4 列表格）必报**（防门禁静默放行）；补 4 条单测。
+- 实测：把文档 id 列里的 `cninfo` 删掉，门禁立刻报「§4.2 链路 `financial_report` 槽位不一致（漏槽 ['cninfo']）——文档 ['datasink'] vs 代码 ['datasink', 'cninfo']」。
+
+**rf-439 财报域两源不在健康检查覆盖面内**：
+- `core/check_sources.py::_checks` 原先只列 10 个源，DataSinking/巨潮都不探测 → 财报域整链失败时 `check-sources` 仍报「10/10 全绿」。
+- 现在：新增 `_check_datasink`（取 1 条财报元数据，需 key）与 `_check_cninfo`（解析 orgId，无需凭据）两个探针（清单 → 12）；**未改既有机制**——缺 key 由现成的凭据预检产出 `⏭️` 跳过态（不探测、不计退出码），整体受现成的 `max_timeout` 预算保护；文档 §5.2 检查内容与 CLI 手册 `check-sources` 段同步；补 8 条测试。
+- 实测：`check-sources` 输出 12 个源——`DataSinking 财报 1486ms ✅`、`巨潮资讯 26ms ✅`，并显示「1 个数据源需凭据，1 个已就绪」。
+
+**验证**：6 个 `-ci` 文档/一致性检查全绿；`dev-verify` 3269 通过；非 live 全量 7860 通过。（文档门禁单测 97 例含新增 4 例；check-sources 23 例含新增 8 例。）
+
+### 修复：巨潮备源链路的三个缺陷（2026-09-26，rf-441/442/443）
+
+**背景**：前一条修复（rf-437 补链槽）后运行时日志首次出现 `尝试 巨潮资讯 (cninfo)`，但取数仍全部失败。逐层实测（orgId → 公告列表 → PDF 正文 → 章节定位）后发现三个叠加缺陷，均已修复并端到端验证。
+
+**① rf-441 topSearch 返回数组，而 `_post_json` 只放行 dict**：`/new/information/topSearch/query` 实测返回 `[{"code":"600900","orgId":"gssh0600900","zwjc":"长江电力"}]`（139 字节），而 `_post_json` 末尾 `isinstance(payload, dict)` → 非 dict 一律返回 None → **orgId 解析恒失败**（`未解析到 orgId`）→ 公告列表为空 → 备源断头。
+
+**② rf-442 三条直连取数路径无连接级重试**：orgId / 公告列表 / PDF 下载均不经 Provider Chain，拿不到链路的同源重试；而本机到 cninfo 的**首个连接常被丢弃**（实测 http/https 均 8s 超时、随后立即 200，curl 与 httpx 均复现）→ 一次抖动即丢掉整只标的。
+
+**③ rf-443 公告列表按“全部类目”查且只取第 1 页**：财报与普通公告混排，公告频繁的标的（工商银行）第 1 页 30 条**无一财报** → 本地归类后候选为空 → 该标的备源**静默失效**；而财报恰好在首页的标的看不出问题。
+
+**变更**：
+- `providers/cninfo.py`：① `_post_json` 放行 `(dict, list)`，`resolve_org_id` 兼容数组与 dict 两种形状；② 新增 `_with_transient_retry`（仅对 `httpx.TimeoutException`/`RequestError` 重试，共 3 次尝试、退避递增 1s/2s，非瞬时异常不重试），`_post_json`/`_get_bytes` 统一走它（429 分支保留）；③ 列表查询改用**财报类目白名单** `_FINANCIAL_CATEGORIES`（年度报告/半年度报告/一季报/三季报，与 `_DOC_TYPE_RULES` 一一对应），替代 `category_szsh;` 全部类目
+- 回归测试 +9（`test_cninfo.py`：数组透传/由数组解析 orgId/dict 形状兼容/重试后成功/有界放弃/连续两次失败后成功/GET 路径/非瞬时不重试/列表只查财报类目）
+
+**端到端复验（真实取数，清缓存后）**：**5/5 标的均取到财报**——601398 工行 2025 年报 3.0 万字、600900 长江电力 2026 半年报 6.0 万字、601939 建设银行 3.0 万、000858 五粮液 9.0 万、600519 贵州茅台 6.0 万（均来源巨潮资讯）。
+
+**环境侧同步完成（非代码）**：工程 venv 归属已修正（可写）→ `pdfplumber 0.11.10`/`pdfminer.six`/`pypdfium2` 安装完毕（`pip check` 干净）；巨潮域名恢复可达（首页/topSearch 均 200）。
+
+### 修复：“持仓基本面”章占位文案引用已废弃配置路径 + 误导性归因（2026-09-26，rf-440）
+
+**用户现象**：报告里「持仓个股财报摘要暂不可用 / 全部标的未取到财报」，并附言“需在 data/config/data_key.json 中以 provider 名为节配置 DataSinking API key…；开启开关 **report_submodules.financial_report_digest** 后生效”——用户因此怀疑“以前配过的 key 丢了”。
+
+**排查结论**：
+- **key 未丢也未失效**：`data/config/data_key.json`（mtime 2026-09-17）含 `datasink.api_key`（32 字符）与 `hithink.api_key`（41 字符）；导入 provider 模块（注册凭据声明）后 `credential_value("datasink")` 正常解析、`missing_credential("datasink")` 为 None。首次探针报“长度 0”系**未先导入 provider**（凭据 spec 未注册）导致的探针失真，非代码缺陷。
+- **文案才是问题**：该提示引用**已废弃的配置路径** `report_submodules.*`（开关已迁入 `features.json`，config.json 不再承载、Web/CLI 白名单亦不含），照此改配置**不生效**；且它以“需配置 key”开头，把“本次无数据”归因为“缺 key”——而真实原因（主源缺目标章节 + 巨潮备源不可用）就写在同一占位块的 `reason` 行上，被该指引淹没。
+
+**变更**：
+- `src/static/tmpl/partials/fundamental_snapshot_section.html`：区块①（财务指标）与区块②（财报摘要）两处占位指引改写——**当前开关名 + 入口**（`financial_indicator` / `financial_report_digest`；TUI 菜单 `[S]` →「报告章节与增强」/ Web 配置面板同名区块），并把“需配置 key”改为**条件式客观说明**（key 位置与环境变量；主源缺目标章节时由巨潮备源接管、公开数据无需凭据）
+- `src/static/tmpl/report_template.html`：清理三处注释中的旧路径（`report_submodules.market_temperature` / `.data_quality`）→ 当前开关名；`grep report_submodules src/static/` 已为空
+- 回归测试 3 条（`src/test/unit/report/test_html_template.py::TestFundamentalSnapshotPlaceholderGuidance`）：用**真实 Jinja 环境渲染真实 partial**，断言两区块均透传契约 `reason`、含当前开关名、不含废弃路径；另有全模板树 `report_submodules.*` 扫描（含注释）
+- Excel 侧无需改：`fundamental_snapshot_sheet.py` 只写契约 `reason` 与失败清单，本就不含旧路径
+
+**环境侧遗留（非本次改动）**：① 巨潮 `cninfo.com.cn` 从本机不可达（实测 12s 超时 ×3）；② `pdfplumber` 未安装（受工程 venv 归属导致的 pip 权限阻塞）——两者共同使备源仍无法出数据，见 rf-437 条目与 rf-438/rf-439 待办。
+
+### 修复：财报域链漏注册巨潮备源槽（备源正文路径不可用）（2026-09-26，rf-437）
+
+**现象**：运行日志反复出现
+`[financial_report] 尝试 DataSinking 财报 (datasink)` → `datasink 返回空，尝试下一链路` → `全链路失败（无过期缓存可用），数据不可用`，且**整个日志中 `[datasink]` 请求日志为 0 条**（根本没发出请求）；「持仓基本面」章的区块②（持仓个股财报摘要）章章不可用。
+
+**根因**：计划 50 为财报域新增了**巨潮备源适配器**（`fetcher/report_adapters.py`，两源经 `source_hint` 命名空间隔离），但 **`_DEFAULT_CHAINS["financial_report"]` 仍是单槽 `["datasink"]`**。`fetch_with_fallback` 的遍历列表来自 `_get_chain(data_type)`（provider 映射则来自适配器注册表）→ 链上缺 cninfo 槽时：编排层从巨潮索引/备源列表构造的候选（`source_hint=cninfo`）在主源槽上被适配器按命名空间**立即拒服务**（零请求、零日志）后无处可去 → 必落“全链路失败”。
+
+**变更**：
+- `src/python/fetcher/chain.py`：`"financial_report": ["datasink", "cninfo"]`，并加注释说明为何两个槽都必须在链上（命名空间隔离下，异源候选只能在自己的槽被服务）
+- 防回归测试（`src/test/unit/fetcher/test_report_backup_source.py::TestChainSlotCoverage`，+4 例）：① 财报域适配器源 ⊆ 链槽；② 通用不变式：凡“域名即链名”的域，适配器源均须被本链槽位覆盖（`quote` 域因服务三条 `price_*` 链而豁免，已注明）；③ **备源候选经真实链路**（不 mock `fetch_with_fallback`）能被 cninfo 适配器服务；④ 主源槽仍在备源候选上按命名空间拒服务
+- 验证：把链回退为单槽时，上述 3 例失败并**复现出与现场逐字相同**的“全链路失败”日志；恢复后全绿
+- **另记两个可诊断性缺口**（本轮仅登记，未修）：rf-438 文档门禁 `check_chain_table` 只比链路名不比槽位（本次漂移长期通过的原因）；rf-439 `check-sources` 只探 10 个源、**不含 DataSinking 与巨潮**，故障现场无可见线索
+
+**环境侧（非代码，需用户侧处理）**：
+- 巨潮 `cninfo.com.cn` 从本机**完全不可达**（实测首页/topSearch 均 12s 超时、http=000）→ 即便槽位修好，备源仍取不到公告（日志「未解析到 orgId」）
+- `pdfplumber` 未安装（工程 venv 归属导致的 pip 权限问题）→ 即便拿到 PDF 也解析不出正文；两解均在则备源才真正可用
+
+### 测试外部网络隔离：守卫硬化 + 离线外部数据桩（2026-09-26，rf-436）
+
+**背景**：bench 显示同机同模式耗时较 09-15 翻倍（`unit` ~17s → ~37s）。排查发现不是 fixture 开销（setup 仅 0.3%）也不是真实网络（守卫已拦），而是**守卫错误被降级吞掉 + 链路退避真等**。
+
+**根因**：① 守卫抛 `RuntimeError`（`Exception` 子类），被 provider/fetcher 的 `except Exception` 降级默默吞掉 → 漏 mock 不报错、用例退化成“验证断网降级”；② 链路同源瞬时重试退避（`_TRANSIENT_RETRY_BACKOFF=0.6s`）被真实触发。实测 **1072 次**未 mock 网络尝试 / **33 个文件**、退避睡眠 **300 次 / 149.3s**；收紧为不可吞错误后暴露 **168 个用例**依赖“断网降级”通过。
+
+**变更**：
+- **守卫硬化**：抛 `NetworkBlockedInTests`（继承 `BaseException`）→ 不可被 `except Exception` 吞、漏 mock 瞬时硬失败
+- **守卫边界修正**：只阻**建连**（`socket.socket.connect`/`connect_ex`、`create_connection`、`getaddrinfo`），不阻 `socket.socket()` 构造——否则误伤 urllib3 等库的导入期探测（仅被 `except Exception` 包住，硬化后直接使导入失败）
+- **新增显式离线桩 `offline_external_sources`**（`src/test/_network_guard.py::apply_offline_stubs`）：`httpx.Client`/`AsyncClient` 即时失败、`trading_calendar._get_trading_calendar` 回空集、`chain._TRANSIENT_RETRY_BACKOFF=0`（仓内既有测试惯例）、akshare 经 `sys.modules` 换空桩（覆盖函数内惰性导入）——链路口径仍为“源不可用→降级”，但零网络、零等待
+- **应用范围**：33 个 unit 文件 + 16 个 scenario/integration 文件（模块级 `pytest.mark.usefixtures(...)`）
+- **测试缺陷修正**：`test_news_pipeline` 把 `aggregate_news`/`build_holding_keywords` patch 到上游 provider 模块，而生产从 `fetcher.news` 导入（名字导入时已绑定）→ patch 无效、实际走真实链路；改为 patch 调用点模块
+- **新增回归测试**：`src/test/unit/core/test_network_guard.py` 11 条（错误不可被宽泛 except 吞 / 建连被阻且 <1s 不等待 / DNS 被阻 / 构造可用 / 离线桩四类覆盖面 / opt-in 不污染默认行为）
+- **文档**：CLAUDE.md 新增「外网 mock 强制（机制保障）」与「不依赖外部数据的用例显式声明离线」两条纪律 + 「测试目标源要 patch 对模块」；developer-guide 补充断网机制与离线桩惯例
+
+**效果**：非 live 全量 **7844 passed / 0 failed，墙钟 21.3s**（修改前仅 unit 模式即 38s）。
+
+### 测试覆盖统计刷新（test-coverage.md + benchmark 实测回填）（2026-09-26，rf-435）
+
+**背景**：发布数据文档刷新——按实时收集结果核对 `test-coverage.md` 与 `folders.md` 的数据快照，并用 `--mode bench --update-docs` 实测回填基准表。
+
+**采集**：`collect-test-coverage.py` → 总收集 **7,845** 项；`test-runner --mode bench --update-docs` → 全模式 **34,465 通过 / 0 失败**（总耗时 437.0s），主机 dragonball，采集日期 2026-09-26。
+
+**变更**：
+- **模式对应测试量 + 环境耗时对照表（自动回填）**：`all` 7,813 → **7,845**、`dev-verify` 3,102 → **3,234**，其余模式计数不变；全部模式耗时按本次实测刷新（`unit` ~37s / `all` ~59s / `dev-verify` ~36s / `edge` ~40s 等），环境属性表采集日期 → 2026-09-26
+- **功能域 / scenario / unit / 跨类子表（按实时收集核对）**：`unit` 父标记 7,345 → **7,528**；数据源 Provider 405→**409**、数据获取调度 445→**474**、LLM 智能分析 990→**1,005**、配置管理 361→**365**、核心基础设施 1,230→**1,237**、分析计算 905→**917**、unit_fetcher 461→**474**、unit_llm 986→**1,005**、unit_config 362→**365**、unit_core 1,230→**1,237**、unit_scripts 358→**412**；跨类 `llm` 757→**769**（复核日期同步为 2026-09-25）；scenario 含全部子标记与 `perf` 5 / `security` 9 经核对无变化
+- **表格结构修复**：`unit_scripts` 行尾多余的 `| 380 | 396 | 398 |` 三个单元格删除，该表恢复统一 3 列（管道符计数校验）
+- **叙述与日期同步**：模式表注与两机对照说明的采集日期 2026-09-15 → **2026-09-26**；倍率叙述由「快 10~20 倍（unit ~17s / all ~25s / edge ~14s）」重算为「多数模式快 **2~7 倍**（unit ~37s vs ~4min、all ~59s vs ~3min、data ~3s vs ~14s），`edge` 反而慢 ~1.25 倍（~40s vs ~32s）」，并新增同机跨批次差异提示（09-15 vs 09-26 整体相差约 2 倍，数值宜作同批次内相对量级参考）
+- **`folders.md`**：项目统计表「测试用例」**7,760 → 7,845 个**
+
+**验证**：`check-doc-drift` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` / `check-requirement-trace` 均通过；`bench` 模式全量执行 0 失败。
+
+### 代码 × 用户文档一致性修复（2026-09-25，rf-434）
+
+**背景**：逐项核对 `src/python/`（CLI argparse / TUI 菜单 / Web 路由与前端 JS / config 默认值 / registry / features / llm settings / providers / constants）与 `README.md` + `docs-stm/manuals/` 10 份用户文档。
+
+**修复**：
+- **数值/口径冲突**：① `faq.md` 智囊团 `max_tokens` 24000 → **36000**（24000 实为 health_check）；② `faq.md` 「默认基准是沪深300」→「默认取基金自身业绩比较基准（页面解析 → `user_fund_benchmarks` 覆盖内置知识库），无则 `--`」；③ `faq.md` 「6 个核心模块」→ **5**（always 类型）、「全量（1~19）」→ **（1~17）**；④ `faq.md` + `how-to-use-web-mode.md` 的 `doctor_check` 面板项「第 23 项」→ **第 24 项**（23 为 `enable_interactive_charts`）；⑤ `how-to-use-web-mode.md` 「最近 10 条（类型/耗时/退出码）」→ **最新一次运行的单行摘要（时间/成功·有异常/耗时）**（前端仅渲染 `records[0]`）；⑥ `datasource.md` orgId 缓存「两周」→ **一月**（`report_cninfo_orgid_` 属 `report` 模块 = CACHE_MONTHLY）；⑦ `reports-instruction.md` 脚注 report_section_order 示例值 9/10/15/16 → **7/8/13/14**
+- **结构/行为描述**：⑧ `how-to-start.md` 菜单速览光标由 `[E]` 改到 **`[L]`**、补 **`[D]` 系统自检** 行，并加注缺省光标来源（`default_menu_key`）与 `[D]` 的门控开关；⑨ `README.md` / `reports-instruction.md` 的历史走势章「始终可见」→ **由 `enable_history` 控制（默认开启，关闭时整章隐藏），数据不可用时占位**
+- **文档遗漏补齐**：`how-to-config.md` cache_ttl 参考表补 8 行（`sentiment` 1h、`report`/`report_doc`/`fin_indicator` 30 天、`bond_yield` 24h、`llm_debate_pro`/`con`/`synthesis` 24h，含文件名模式与指纹说明）；`datasource.md` 缓存对照表补「市场情绪」独立行（`sentiment_` 前缀、refresh 组）
+- **代码注释**：`core/registry.py` 行动建议条目「出厂序号 10」→ **7**（同条 `"number": 7`，注释与配置表一致）
+
+**验证**：`check-doc-drift` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` / `check-requirement-trace` 均通过；`ruff check` + `ruff format --check` 无告警；`test-runner --mode dev-verify` 全绿。
+
+### 需求→技术设计→代码三层延续性修复（2026-09-25，rf-433）
+
+**背景**：对「需求（286 条 ID / 37 域）→ 技术设计（technical.md + llm-technical.md）→ 代码（registry / config / features / llm-settings / data-status 真值源）」三层逐项比对，验证数值口径与覆盖延续性。
+
+**修复**：
+- **T4 缓存陈旧阈值冲突**：technical.md §4.11「DegradationTracker 双信号降级」表 + 附录 D 的 T4 由 **7 天 → 14 天**（与需求配置默认值表、`_config_defaults.py` 一致），并加脚注说明代码兜底常量 `_DEFAULT_STALE_DAYS`（T4=7）仅在配置缺键时生效、不作为默认值口径
+- **技术设计附录 C 补 4 行**：`sentiment`（1h，refresh）、`report`（财报索引，30 天）、`report_doc`（财报正文，30 天）、`fin_indicator`（财务指标，30 天）——据 registry 声明与取数代码的文件名模式/分组填写
+- **技术设计 §3.5 缓存分组**：原 ASCII 图缺 5 个模块（refresh 缺市场情绪/财报索引/财报正文/财务指标，无分组缺指数历史日线）→ 改为「分组 × 包含模块 × 触发」表，并标注**分组归属以 registry `cache_groups` 为唯一事实来源**（消除重复清单漂移）
+- **分组清单口径统一**：how-to-config.md O 表 preload 补「LLM 辩论三段」、refresh 补市场情绪/财报索引/财报正文/财务指标（重合度改标注「复用基金持仓缓存，随其一并清除，无独立缓存键」）；需求 R-CCH-32 同步
+- **TUI 面板编号散文同步**（代码实派发：1-5 LLM 模块 / 6-10 实验块 5 项 / 11-26 常规块 16 项 / 27-35 报告块 9 项，注册表共 30 项开关）：tui-menu.md 散文「6~9」→「6~10」并补景气度(10)，常规项 (10)~(14) → (11)~(15)；示例表补 `prosperity_framework`(10)、常规编号 10-14 → 11-15、计数 29 → 30 项；how-to-config-llm.md「实验(6-9)/常规(10-25)」→「(6-10)/(11-26)」；how-to-use-web-mode.md 常规块（10-25）→（11-26）
+
+**核实一致（未改动）**：熔断阈值（默认 3 次/300s、行业 6 次/120s）、降级 T2(2次/3天)/T3(2次/14天)、附录 C 已列 28 行 TTL、LLM 5 模块默认 max_tokens/timeout/TTL（llm-technical §2.2）、需求默认值 40+ 项（news 300、盘中 TTL 30s、快照 60/365、lookback 90、止盈 20/止损 -15/回撤 -10、再平衡 15%/5%、评级 80/40、赎回 T+1~T+7、token 预算 8K/72000、集中度 0.20、情景 ±20%/±5%、并发 3 等）。
+
+### 用户文档全面核对：序号/章节顺序/内容一致性修复 7 项（2026-09-25，rf-432）
+
+**背景**：对用户文档（README + `docs-stm/manuals/` 10 份）做章节编号、目录锚点、标题层级、编号列表、跨文档命名一致性全面核对，脚本化验证（标题序列提取、锚点反查、链接存在性、有序列表连续性）+ 人工复核。
+
+**修复**：
+- **how-to-config.md**：① 示例 JSON `datasink` 块 `"sections"` 键重复（实际仅一个键，见 `_config_defaults.py`）→ 合并单键 + 字段总表描述同步去重；② §P「Web 模式配置编辑」8 组表格中「报告章节与增强」重复行删除；③ 示例「交易纪律配置」分组补对应详解章节「J. 交易纪律配置」，原 J~P 顺延为 K~Q（正文标题 + 目录 + 示例注释 + 内部引用 `[M. 功能开关]`→`[N. 功能开关]` 同步）；④ 菜单 `[2]` 名称统一为 TUI 规范名「更新行情类缓存」（原误写「更新持仓类缓存」）
+- **跨文档引用同步**：§M→§N 顺延涉及 5 处锚点/文字（faq ×2、cli-mode ×1、tui-menu ×1、config-llm ×2）
+- **how-to-start.md**：「CLI 使用指南」H3 误嵌于「方式四：Web 浏览器模式」之下 → 升为 H2 独立章节
+- **datasource-reliability.md**：目录补 3.9/3.10 两条（原缺，含显式 `<a id>` 锚点防渲染器差异）；§5 子标题「输出示例/检查内容」补编号 5.1/5.2（与 4.x/6.x 惯例一致）
+- **reports-instruction.md**：目录补 ⑧ 基本面分析条目 + 标题补显式锚点（原 ①~⑦ 均有 `<a id>`、⑧ 独缺）
+- **how-to-config-llm.md**：全文 1029 行原无目录 → 新增「目录」（15 个主章节 + 关键子节锚点）；「支持的 provider」章 Kimi Code 块 5 个 H4 小标题改粗体段（同级 provider 均用 `<summary>`，且 H2 直跳 H4 缺 H3 层）
+
+**验证**：修复后重跑锚点/链接/列表连续性脚本全绿；`check-doc-traces.py` / `check-doc-drift.py` / `check-task-numbering.py` 等文档门禁通过。
+
+### 修 CI 失败根因：测试断言硬编码「会演进的总数」→ 改结构不变量 + 新增第 5 类静态检查（2026-09-25，rf-431）
+
+**现象**：GitHub CI **run #800**（commit `225ad00f`）在 **3.11 / 3.12 / 3.13 三个版本全部 P0 失败**，失败用例 `test_check_requirement_trace.py::TestRealRepo::test_every_requirement_id_mapped`。
+
+**根因**：该断言写死 `assert len(req_ids) == 276`，而**需求条数的真值来源是 `requirements.md`**；我在 `225ad00f` 新增了 `R-LLM-10`（276 → 277）却漏改断言 → 良性变更被判为回归。映射表本身完全正确，门禁脚本也一直通过——**是测试自己把易漂移的派生量当真值**。
+
+**同类问题**（新增检查扫出）：`test_registry.py` 另有 4 处，其中 `test_total_sections` 注释自述「新增模块时同步更新此值」——等于承认它每次都要手改。
+
+**变更**：
+- **测试改结构不变量**（比写死总数更强）：
+  - 需求映射：「ID 集合双向相等 + 域集合 == `_ALL_DOMAINS` + **域内序号从 1 连续无跳号** + 非空守卫」——新增需求不再打红，且能发现跳号/重号
+  - 章节表：「编号 1..N 连续 + key 唯一」；计算模块表：「module_key 非空且唯一」
+  - LLM 键：「逐模块必备键齐全」（遍历模块后缀，非计数）；精确键：「已知键集合 ⊆ 实测」
+- **新增 `check-test-redundancy.py` 第 5 类** `check_hardcoded_evolving_totals`：静态检出 `assert len(<可增长集合>) ==/> 数字`，判定保守（实参名含语义关键词或路径含 requirement/registry 才报；忽略 ≤ 3 的小数字；不误报集合相等/子集/遍历等结构断言）
+- **文档同步**：「四类 → 五类」（CLAUDE.md / developer-guide 详表 / folders.md 两处）；并在 CLAUDE.md 与 developer-guide 新增**「测试真值单一来源」纪律**条目（禁止写死会随开发演进的派生量，给出结构关系断言写法与反例，指向第 5 类检查）——把本次教训固化为显式约束
+- **回归**：traceability +4 例（含「新增需求不再打红」的合成反证、跳号检测）、redundancy +7 例（含不误报结构断言/小数字/非断言位置的守卫）
+
+**验证**：`check-test-redundancy -v` → 7439 用例 / 五类计数全 0；`test_registry.py` 61 passed；traceability 21 passed。
+### Kimi Code 订阅端点接入范例与模型识别补齐（2026-09-25）
+
+**背景**：用户计划改用 Kimi Code 订阅 Key（`api.kimi.com/coding/`），要求先把范例与文档准备好。
+
+**新增文档章节**（`how-to-config-llm.md` → 「支持的 provider 及配置示例」→ **Kimi Code（订阅会员）** 折叠块）：
+- 两套系统差异对照表（Base URL / Key 来源 / **模型名** / 计费方式 / 互不通用）
+- 启用步骤（改 `llm_key.json` + `llm_providers.json` 两个文件，**无需改代码**）+ 验证命令
+- `pacing` 推荐值表（订阅端点 20s/0.2/1）与「想更保守 / 想恢复放开」调法
+- 403 配额风控语义对照表（403 不重试、429/503 重试、401 表示两套系统混用）
+- **风险提示**（官方条款原文引用：订阅仅限交互式，脚本化批量执行属超范围；`pacing` 只能降低检出概率）
+- 交叉链接：`how-to-config-llm.md` 开放平台 Kimi 段指向本折叠块；`faq.md` 新增 FAQ 指向该折叠块（内容归属 LLM 配置手册，不另立文件）
+
+**代码补齐 2 处模型识别缺口**（换 Key 时才会暴露）：
+- `_THINKING_SUPPORTED_PREFIXES` / `_THINKING_DEFAULT_ON_PREFIXES` 补 `k3`：Kimi Code 旗舰模型名为 `k3` / `k3-256k`，**不以 `kimi-` 开头**——漏登记会让「未开启 thinking 时显式禁用」的安全网失效
+- 回归 +3 例（Kimi Code 模型 ID 支持 thinking / 默认开思考 / 不属 effort 族）
+
+**未改动**：`data/config/llm_providers.json` 与 `llm_key.json` 保持现状（仍走开放平台按量付费端点），等用户换 Key 时按范例操作。
+
+### LLM 端点级节流与并发治理：把速率/并发约束声明化到 provider 条目（2026-09-25，plan-57）
+
+**背景**：用户计划把订阅制编码端点（Kimi Code，`api.kimi.com/coding/`）接入程序，要求从整体架构出发、不留技术债，并提出「非该端点时并发约束能否放开」。
+
+**实测现状**（日志统计 10 次运行）：每次报告 **8~9 次 LLM 调用**、输入 22~27k + 输出 19~34k = **41k~56k token**，在 **2~8 分钟**内以 3 路并发发出。全局键 `llm_max_concurrency` 只能表达「所有模块合起来最多几个线程」，**无法表达「同一程序、不同端点不同策略」**——这正是「想收紧订阅制端点、同时放开按量端点」的架构缺口。
+
+**变更**：
+- **新增 `llm/pacing.py`**：把节流与并发**声明化到 provider 条目**（`llm_providers.json` 的 `pacing` 段）——
+  - `min_interval`（两次请求最小间隔秒）、`jitter`（间隔随机抖动比例，避免固定节奏的机器特征）、`max_concurrency`（该端点同时在途上限）
+  - **缺省即无约束**：不写 `pacing` 的端点零开销直通，行为与未引入本机制时**逐字节一致**；因此同一份配置可对订阅制端点收紧、对按量端点放开
+  - 与全局 `llm_max_concurrency` **两级叠加**（全局线程池 + 每端点信号量）
+  - 先取并发许可再等间隔，使间隔真正约束「请求发出」时刻；`PacingGate` 为 context manager，异常路径无条件释放
+- **配置层**：`_parse_providers_list` 透传 `pacing`（坏字段逐字段忽略，不因笔误使整条 provider 失效）；`_inject_provider_chain_data` 装载策略（配置为唯一事实来源）；默认模板补注释
+- **调用链接线**：`endpoint_key`（provider 条目名）逐层透传 `api.py` → `call_single_provider` → `call_claude`/`call_openai`/`call_gemini` → `call_llm_with_retry`，在**唯一调用缝**施加 `PacingGate`
+- **复用既有原语**：`fetcher/batch.py::RateLimiter` 新增 `acquire_interval(key, interval)`（逐次显式间隔），不重复实现限速器
+- **403 配额/风控拒绝改为不重试**：新增 `FAIL_REASON_QUOTA_EXCEEDED`；`_attempt_api_call` 将 403 归为 `("quota", 403)`，重试骨架直接降级到下一 provider——这类限制按时间窗口滚动（如 5 小时窗口、并发上限），**重试无益且高频重试会加剧风控画像**；**429 / 503 仍按 `max_retries` 重试**。报告侧差异化文案同步（`llm_content` / `llm_module_info`）
+- **文档**：手册新增「端点级节流（`pacing`）」章节（字段表、与全局并发的关系、403 语义）；技术设计新增 §4.2.1（调用链图 + 性质表）
+
+**测试**：+19 例（`test_llm_pacing.py` 16 + `test_config_llm_multi.py` 3）。**真实调用路径实测**（MockTransport）：无约束端点 3 次调用 0.002s；`min_interval=0.2` 端点相邻间隔稳定 0.200s；`max_retries=2` 下 403 仅发 1 次请求且失败原因 `quota_exceeded`。

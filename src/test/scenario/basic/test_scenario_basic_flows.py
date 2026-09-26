@@ -20,7 +20,7 @@ from src.test.helpers import recent_holdings_period
 from src.python.report.excel_generator import generate_excel_report as _generate_excel_report
 
 # 基础业务场景（S1-S5）标记
-pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
+pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic, pytest.mark.usefixtures("offline_external_sources")]
 
 
 class MockDetail:

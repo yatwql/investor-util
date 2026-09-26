@@ -15,7 +15,7 @@ import pytest
 from src.python.core.models import Holding
 from src.python.report.market_value import _compute_detail_row
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 
 def _row(price, yclose, *, shares=100, cost=10.0, source_api="tencent"):

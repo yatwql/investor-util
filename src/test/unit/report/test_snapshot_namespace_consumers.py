@@ -25,7 +25,7 @@ from src.python.report._snapshot import capture_snapshot
 from src.python.report.orchestrator import generate_report
 from src.python.schemas.history import AccountSnapshot, SnapshotData, SnapshotHolding
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 
 def _holding(code: str, name: str, mv: float, cost: float) -> SnapshotHolding:

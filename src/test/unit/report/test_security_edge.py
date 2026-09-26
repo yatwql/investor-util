@@ -18,7 +18,12 @@ from unittest.mock import patch
 from src.python.core.constants import PROJECT_ROOT
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.unit_report,
+    pytest.mark.edge,
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 
 # ═══════════════════════════════════════════════════════════

@@ -56,7 +56,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 > .venv/bin/python -m src.python.cli --experiment all report --type full
 > ```
 >
-> 取值写错会立即报错并列出全部可选值，不会静默忽略。当前可选实验功能清单见[配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)（与 TUI 菜单 [S] 实验块同源，由 `features.feature_switch_registry` 注册表驱动）。
+> 取值写错会立即报错并列出全部可选值，不会静默忽略。当前可选实验功能清单见[配置指引-功能开关 §N](how-to-config.md#n-功能开关featuresjson)（与 TUI 菜单 [S] 实验块同源，由 `features.feature_switch_registry` 注册表驱动）。
 
 > **`--feature` 说明**：`--experiment` 的补集——它面向**全部**开关而非仅实验组，且**双向**（既能开也能关）。常用来在不动持久化配置的前提下临时关闭某个默认开启的常规开关，或复现「关掉某开关后报告长什么样」：
 >
@@ -108,7 +108,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 
 ## 6. `check-sources` 子命令（数据源健康检查）
 
-测试各行情数据源联通性并报告延迟，无需生成报告：
+测试各行情数据源联通性并报告延迟（**含财报域两源**：DataSinking 财报取数 + 巨潮资讯 orgId 解析；缺 key 的源显示 ⏭️ 跳过态），无需生成报告：
 
 ```bash
 .venv/bin/python -m src.python.cli check-sources

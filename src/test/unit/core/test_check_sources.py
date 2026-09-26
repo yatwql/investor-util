@@ -244,3 +244,80 @@ class TestProxyHint:
             results = cs.run_health_checks(max_timeout=5.0)
         assert not any(r.get("hint") for r in results)
         assert results[0]["message"].startswith("超时")
+
+
+class TestFinancialReportProbes:
+    """财报域两个源纳入健康检查（rf-439）。
+
+    回归背景：`_checks` 原先只探 10 个源（行情/基金/行业/新闻/K 线），**DataSinking 与
+    巨潮资讯都不探测**——财报域整链失败时用户跑 `check-sources` 得到「10/10 全绿」，
+    实际两个源都不可用，故障现场无可见线索（只能翻 logs/app.log）。
+    """
+
+    def test_both_report_sources_registered(self):
+        ids = {source_id for source_id, _name, _label, _fn in cs._checks}
+        assert {"datasink", "cninfo"} <= ids
+
+    def test_datasink_probe_ok_with_metadata(self, monkeypatch):
+        from src.python.providers import datasink
+
+        monkeypatch.setattr(datasink, "fetch_report_documents", lambda *_a, **_k: [{"id": 1}])
+        symbol, _latency, message = cs._check_datasink()
+        assert symbol == cs._OK
+        assert "1 篇" in message
+
+    def test_datasink_probe_warns_when_metadata_empty(self, monkeypatch):
+        from src.python.providers import datasink
+
+        monkeypatch.setattr(datasink, "fetch_report_documents", lambda *_a, **_k: None)
+        symbol, _latency, message = cs._check_datasink()
+        assert symbol == cs._WARN
+        assert "未取到元数据" in message
+
+    def test_probe_exception_is_err_and_does_not_raise(self, monkeypatch):
+        from src.python.providers import datasink
+
+        def _boom(*_a, **_k):
+            raise RuntimeError("probe exploded")
+
+        monkeypatch.setattr(datasink, "fetch_report_documents", _boom)
+        symbol, _latency, message = cs._check_datasink()
+        assert symbol == cs._ERR
+        assert "probe exploded" in message
+
+    def test_cninfo_probe_ok_when_orgid_resolved(self, monkeypatch):
+        from src.python.providers import cninfo
+
+        monkeypatch.setattr(cninfo, "resolve_org_id", lambda code: f"{code},gssh0600900")
+        symbol, _latency, message = cs._check_cninfo()
+        assert symbol == cs._OK
+        assert "orgId" in message
+
+    def test_cninfo_probe_warns_when_orgid_missing(self, monkeypatch):
+        from src.python.providers import cninfo
+
+        monkeypatch.setattr(cninfo, "resolve_org_id", lambda _code: None)
+        symbol, _latency, message = cs._check_cninfo()
+        assert symbol == cs._WARN
+        assert "未解析到 orgId" in message
+
+    def test_missing_credential_marks_skip_without_probing(self, monkeypatch):
+        """缺 key 的源产出 ⏭️ 跳过态，且**不发起探测**（配置级问题不是源故障）。"""
+        probed: list[int] = []
+
+        def _probe():
+            probed.append(1)
+            return cs._OK, 1.0, "不应被调用"
+
+        monkeypatch.setattr(cs, "_checks", [("datasink", "DataSinking 财报", "财报全文", _probe)])
+        monkeypatch.setattr(cs, "credential_ready_enabled", lambda: True)
+        monkeypatch.setattr(cs, "missing_credential", lambda sid: object() if sid == "datasink" else None)
+        monkeypatch.setattr(cs, "credential_hint", lambda _spec: "缺凭据：请设置 DATASINK_API_KEY")
+
+        results = cs.run_health_checks(max_timeout=2.0)
+
+        assert probed == []
+        assert len(results) == 1
+        assert results[0]["skipped"] is True
+        assert results[0]["ok"] is False
+        assert "DATASINK_API_KEY" in results[0]["message"]

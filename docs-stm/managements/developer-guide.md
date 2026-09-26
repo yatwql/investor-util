@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.11.5-dev
+> 文档版本：0.11.5
 
 ## 概述
 
@@ -332,6 +332,8 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
   1. `pytest.ini` 的 `addopts = -m "not live"` 在收集期直接排除；
   2. `conftest.py` 的 `_skip_live_unless_requested` autouse fixture 默认跳过（`-m live` 收集到也 skip）；
   3. `_block_external_network` 阻断 fixture 对非 live 项一律拦死真实网络。
+- **非 live 用例的断网机制（2026-09-26 收紧）**：守卫只阻断**建连**（`socket.socket.connect`/`connect_ex`、`create_connection`、`getaddrinfo`），**不阻断 `socket.socket()` 构造**——否则会误伤第三方库的**导入期**探测（urllib3 导入期构造 socket 且仅被 `except Exception` 包住，硬化后会直接使库导入失败）。抛出的 `NetworkBlockedInTests` 继承 `BaseException`（而非 `RuntimeError`）：provider/fetcher 普遍用 `except Exception` 降级，用 `Exception` 子类会被静静吞掉，使漏 mock 退化成“验证网络被阻断后的降级”并白等链路瞬时重试退避（实测 unit 模式 1072 次未 mock 尝试 / 300 次退避睡眠 / 累计 149.3s 空等）。
+- **不依赖外部数据的文件写 `offline_external_sources`**：报告/编排/集成类用例的**附带依赖**（交易日历/行业数据/行情/健康探针/akshare 直连路径）常在未被 mock 时被真实访问。这类文件在模块级加 `pytest.mark.usefixtures("offline_external_sources")`，由 `src/test/_network_guard.py::apply_offline_stubs` 把仓内 HTTP 出口（`httpx.Client`）、交易日历、akshare（`sys.modules` 级）换成“即时取不到”，并把 `fetcher.chain._TRANSIENT_RETRY_BACKOFF` 置 0（仓内既有测试惯例）——链路口径仍为“源不可用→降级”，但零网络、零等待。需要验证某源真实行为的用例**必须自行 mock**，不得用本 fixture 遮掩。
 - **内容**：覆盖行情（A 股/ETF/场外基金/中美指数）、新闻源（东方财富/财联社/新浪/华尔街见闻）、基金（历史净值/排名/基准）、akshare 交易日历共 14 项。
 - **断言原则**：只校验返回「结构」（字段存在、类型、非空），**不校验具体数值**，容忍真实行情波动（休市、涨跌、数据源改字段）。
 - **不含 LLM 真实调用**（防费用）——LLM 连通性由运行时数据源健康检查覆盖。

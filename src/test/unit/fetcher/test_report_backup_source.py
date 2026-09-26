@@ -8,6 +8,7 @@
   - 标准字段归一（源身份由适配器提供，不受上游自报影响）
   - **编排层接管**：主源索引空 → 巨潮索引；**主源可用时巨潮完全不被调用**（红线）
   - 主源可用时输出逐字不变（同一夹具下与不接入备源时的记录等价）
+  - **链槽位覆盖**（回归）：财报域链上必须同时含主源与备源槽，备源候选经**真实链路**可被服务
 
 运行：pytest src/test/unit/fetcher/test_report_backup_source.py -v
 """
@@ -17,13 +18,28 @@ from __future__ import annotations
 import pytest
 
 import src.python.fetcher.financial_report as fr
+from src.python.fetcher.financial_report import DOC_PREFIX
+from src.python.fetcher.chain import _DEFAULT_CHAINS, _get_chain, fetch_with_fallback
 from src.python.fetcher.report_adapters import CninfoReportAdapter, DataSinkReportAdapter
 from src.python.fetcher.report_locate import is_toc_line as _is_toc_line
-from src.python.fetcher.source_adapter import get_adapters
+from src.python.fetcher.source_adapter import (
+    ADAPTER_REGISTRY,
+    adapter_chain_slots,
+    get_adapters,
+)
 from src.python.providers import cninfo, datasink
 from src.python.schemas.datasource_fields import DOMAIN_FINANCIAL_REPORT
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
+
+#: 链名集合（取自链注册表，不写死清单）
+_CHAIN_KEYS = frozenset(_DEFAULT_CHAINS)
+
+
+def get_adapters_all_domains() -> list[str]:
+    """全部已登记适配器的域名（不写死清单）。"""
+    return list(ADAPTER_REGISTRY)
+
 
 _TEXT = (
     "第一节 重要提示\n"
@@ -326,3 +342,68 @@ class TestOrchestrationTakeover:
         monkeypatch.setattr(fr, "_fetch_document", _fake_fetch)
         record, contents = fr._collect_doc_sections(1001, ["董事会报告"], source="cninfo", meta={"id": "1001"})
         assert contents and seen[0][1] == "cninfo"
+
+
+class TestChainSlotCoverage:
+    """回归：财报域链的槽位必须覆盖全部已登记适配器源。
+
+    缺陷背景：plan-50 加入巨潮备源**适配器**后，``_DEFAULT_CHAINS["financial_report"]``
+    仍是单槽 ``["datasink"]``。而 ``fetch_with_fallback`` 的**遍历列表**取自
+    ``_get_chain(data_type)``（provider 映射则来自适配器注册表）——链上缺 cninfo 槽时，
+    带 ``source_hint=cninfo`` 的备源候选在主源槽上被适配器按命名空间拒服务（零请求、
+    零日志）后无处可去 → 必落“全链路失败”，备源正文实际永远取不到。
+    日志表现：反复的“尝试 DataSinking 财报 → datasink 返回空 → 全链路失败”三连，
+    且整个日志里**没有任何 ``[datasink]`` 请求日志**（根本没发出过请求）。
+    """
+
+    def test_all_report_adapter_sources_are_chain_slots(self):
+        """财报域：适配器注册的每个源都必须在链上（含备源 cninfo）。"""
+        assert set(get_adapters(DOMAIN_FINANCIAL_REPORT)) <= set(_get_chain("financial_report"))
+
+    def test_single_chain_domains_cover_their_adapters(self):
+        """通用不变式：凡“域名即链名”的域，其适配器源必须被本链槽位覆盖。
+
+        ``quote`` 例外——它的适配器服务 ``price_stock`` / ``price_fund_otc`` / ``price``
+        三条链（域名与链名不同），故不适用本不变式；其覆盖由行情域测试单独保证。
+        """
+        loaded = {domain for domain in get_adapters_all_domains() if domain in _CHAIN_KEYS}
+        assert loaded, "适配器域与链名的交集不应为空"
+        for domain in sorted(loaded):
+            missing = set(get_adapters(domain)) - set(_get_chain(domain))
+            assert not missing, f"{domain} 链上缺槽：{sorted(missing)}"
+
+    def test_backup_candidate_served_through_real_chain(self, monkeypatch):
+        """备源候选经**真实链路**（不 mock fetch_with_fallback）能被服务。"""
+        monkeypatch.setattr(cninfo, "fetch_report_text", lambda *_a, **_k: _TEXT)
+        monkeypatch.setattr("src.python.fetcher.chain.cache_get", lambda *_a, **_k: None)
+        monkeypatch.setattr("src.python.fetcher.chain.cache_set", lambda *_a, **_k: None)
+        provider_map, transform_map = adapter_chain_slots(DOMAIN_FINANCIAL_REPORT)
+
+        record = fetch_with_fallback(
+            "financial_report",
+            provider_map,
+            f"{DOC_PREFIX}cninfo_1001_管理层讨论与分析",
+            3600,
+            fn_kwargs={
+                "doc_id": "1001",
+                "section": "管理层讨论与分析",
+                "source_hint": cninfo.SOURCE_ID,
+                "meta": {"symbol": "600900.SS", "stock_name": "长江电力", "title": "2025年年度报告"},
+            },
+            transform=transform_map,
+        )
+
+        assert record is not None, "备源候选应经链路被 cninfo 适配器服务"
+        assert record["source_api"] == cninfo.SOURCE_ID
+        assert "报告期内公司经营稳健" in record["content"]
+
+    def test_foreign_hint_still_rejected_by_primary_slot(self, monkeypatch):
+        """主源槽仍在备源候选上按命名空间拒服务（不发起无效请求）。"""
+        called: list = []
+        monkeypatch.setattr(
+            datasink,
+            "fetch_report_document",
+            lambda *a, **k: called.append(a) or {"content": "不应被调用"},
+        )
+        assert DataSinkReportAdapter().extract_data({"doc_id": "1001", "source_hint": cninfo.SOURCE_ID}) is None
+        assert called == []

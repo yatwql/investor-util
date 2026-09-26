@@ -24,6 +24,10 @@ from _doc_drift._shared import (
 
 
 _CHAIN_TABLE_ROW = re.compile(r"^\|\s*`([a-z_]+)`\s*\|")
+#: 链表格内 ``provider id`` 单元格里的反引号 id（与 ``_DEFAULT_CHAINS`` 同序）
+_CHAIN_ID_CELL = re.compile(r"`([a-z_0-9]+)`")
+#: §4.2 表的列数（名称 / 主链路 / 备用链路 / provider id / 回退条件）
+_CHAIN_TABLE_COLUMNS = 5
 
 _SECTION_COUNT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"页签编号\s*1\s*[~～-]\s*(\d+)"),
@@ -374,17 +378,32 @@ def check_test_coverage_counts(doc_text: str, snapshot: dict[str, int]) -> list[
 def check_chain_table(doc_text: str) -> list[str]:
     """校验可靠性手册 §4.2「Provider Chain 降级路径」表与 `_DEFAULT_CHAINS` 逐链一致。
 
-    历史缺口：该表声称枚举全部链路，实际只有 5 行——`financial_report`
-    在接入巨潮备源后仍缺席，`price` / `fund_rank` / `fund_hold` /
-    `financial_indicator` / `history_fund_otc` / `history_index` / `bond_yield`
-    同样未列。表与代码无任何断言绑定，故漂移长期无人发现。
+    两层比对：
+      1. **链路名集合**双向一致（漏链 / 幽灵行）；
+      2. **槽位级**双向一致：表的「provider id（机器可读）」列（按 ``→`` 顺序列出的
+         ``source_id``）必须与 ``_DEFAULT_CHAINS[chain]`` **逐项同序**相等——覆盖
+         「文档写主源+备源、代码只注册一个槽」这类漂移（漏槽 / 多槽 / 顺序错）。
+
+    历史缺口：早期只比对链路名，槽位漂移无人发现——巨潮备源适配器已注册而
+    ``_DEFAULT_CHAINS['financial_report']`` 仍为单槽，备源正文路径实际不可用数月
+    （见 rf-437）；另该表曾只列 5 行而声称枚举全部链路（rf 早期记录）。
     """
     findings: list[str] = []
     documented: set[str] = set()
+    documented_slots: dict[str, list[str]] = {}
+    missing_id_column: list[str] = []
     for line in doc_text.splitlines():
         m = _CHAIN_TABLE_ROW.match(line)
-        if m:
-            documented.add(m.group(1))
+        if not m:
+            continue
+        chain = m.group(1)
+        documented.add(chain)
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < _CHAIN_TABLE_COLUMNS:
+            missing_id_column.append(chain)
+            documented_slots[chain] = []
+            continue
+        documented_slots[chain] = _CHAIN_ID_CELL.findall(cells[3])
     if not documented:
         findings.append(f"{rel(_RELIABILITY_MD)}: 未找到 §4.2 Provider Chain 降级路径表（表行须以 | `链路名` | 开头）")
         return findings
@@ -393,4 +412,28 @@ def check_chain_table(doc_text: str) -> list[str]:
         findings.append(f"{rel(_RELIABILITY_MD)}: §4.2 表缺少链路 `{chain}`（`_DEFAULT_CHAINS` 有定义，须补行）")
     for chain in sorted(documented - expected):
         findings.append(f"{rel(_RELIABILITY_MD)}: §4.2 表列出链路 `{chain}` 但 `_DEFAULT_CHAINS` 无此链（幽灵行）")
+    for chain in sorted(documented & expected):
+        if chain in missing_id_column:
+            findings.append(
+                f"{rel(_RELIABILITY_MD)}: §4.2 链路 `{chain}` 行缺 provider id 列"
+                f"（须为 {_CHAIN_TABLE_COLUMNS} 列：名称/主链路/备用链路/provider id/回退条件）"
+            )
+            continue
+        doc_slots = documented_slots[chain]
+        code_slots = list(_DEFAULT_CHAINS[chain])
+        if doc_slots == code_slots:
+            continue
+        missing = [s for s in code_slots if s not in doc_slots]
+        extra = [s for s in doc_slots if s not in code_slots]
+        detail = []
+        if missing:
+            detail.append(f"漏槽 {missing}")
+        if extra:
+            detail.append(f"多槽 {extra}")
+        if not detail:
+            detail.append("顺序不一致")
+        findings.append(
+            f"{rel(_RELIABILITY_MD)}: §4.2 链路 `{chain}` 槽位不一致（{'；'.join(detail)}）"
+            f"——文档 {doc_slots} vs 代码 {code_slots}"
+        )
     return findings

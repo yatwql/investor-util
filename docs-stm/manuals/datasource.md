@@ -24,6 +24,7 @@
 | 基金风格扩展数据（市值/PE） | 东方财富 + 天天基金（基金持仓市值风格 + 市盈率/市净率数据） | — | `extended_` | 基础类 |
 | 个股财报全文（持仓基本面章·区块②） | DataSinking `api.datasink.ing`（全文本财报 Markdown，仅 A 股，**需用户自备 key**）；**备源**：巨潮资讯网 `cninfo.com.cn`（公开免费、**无需 key**，公告 PDF 解析；主源无该标的时接管） | — | `report_datasink_index_` / `report_datasink_doc_` / `report_cninfo_index_` / `report_cninfo_text_` / `report_cninfo_orgid_` | 基础类 |
 | 个股财务指标（持仓基本面章·区块①） | akshare `stock_financial_abstract`（东方财富关键指标，宽表） | DataSinking「公司简介和主要财务指标」章节解析（`datasink_indicator`）→ **同花顺官方合并报表派生**（利润表/资产负债表/现金流量表，需 key；一次给多期） | `fin_indicator_` | 基础类 |
+| 市场情绪（龙虎榜 / 连板梯队） | 同花顺金融数据服务（官方源，**需用户自备 key**；本类别**唯一源**） | — | `sentiment_` | 基础类 |
 | A 股行情 / 财务 / 基金 / **市场情绪** | 同花顺金融数据服务 `fuyao.aicubes.cn`（官方源，**需用户自备 key**） | — | 行情/持仓/情绪面各域前缀（其中龙虎榜与连板天梯为 `sentiment` 类别**唯一源**） | 基础类 / 分析类 |
 
 > **缓存前缀**列对应 `data/cache/` 目录下的文件名前缀，同一前缀的文件按 TTL 统一管理。持仓重合度为运行时推导模块（复用 `fund_hold_` 缓存），无独立缓存前缀。
@@ -31,7 +32,7 @@
 > 表中仅含具有 `cache_prefixes` 或 `exact_cache_keys` 的数据模块。此外还有少数 `exact_cache_keys` 模块，使用具体键名而非前缀匹配，不受 TTL 扫描清除影响（如 `trading_calendar`、`fund_benchmarks`、`holdings_tracking`、`fund_concentration_snapshot`、`fund_style_snapshot`、`fund_manager_snapshot`）。其中 `fund_benchmarks`、`fund_manager_snapshot` 等仍归属于缓存分组，可通过菜单 `[1]` 刷新。
 > **分组**列对应菜单 `[1]`（基础类）/ `[2]`（持仓类）的缓存刷新范围。历史走势类不受菜单缓存命令影响，仅按 TTL 过期。
 > **行业名归一化**：行业分类数据在入库时剥离行业名末尾的申万层级后缀（Ⅰ/Ⅱ/Ⅲ/Ⅳ，如「银行Ⅱ」「白酒Ⅱ」）——该后缀是申万分层命名标记，对零售报告读者是纯噪声，报告展示统一用剥离后的行业名（如「银行」「白酒」）。
-> **财报全文两级缓存**：索引（`report_datasink_index_` 主源 / `report_cninfo_index_` 备源；TTL 一月）/ 正文（`report_datasink_doc_` / `report_cninfo_text_`；TTL 一月）；两者均归「基础类」，随菜单 `[1]` 与 TTL 管理。备源另有 orgId 缓存 `report_cninfo_orgid_`（两周）。
+> **财报全文两级缓存**：索引（`report_datasink_index_` 主源 / `report_cninfo_index_` 备源；TTL 一月）/ 正文（`report_datasink_doc_` / `report_cninfo_text_`；TTL 一月）；两者均归「基础类」，随菜单 `[1]` 与 TTL 管理。备源另有 orgId 缓存 `report_cninfo_orgid_`（与正文同档，TTL 一月）。
 
 > **财报全文主备接管**：**主源（DataSinking）索引为空/失败时**，自动切**巨潮资讯网**备源——按证券代码查公告列表 → 归类年报/半年报/季报 → 下载公告 PDF（pdfplumber 解析）→ 关键词定位章节（与主源同一偏好串与目录行跳过规则）。主源可用时备源**完全不被调用**（输出逐字不变）。备源无需凭据、限速为固定礼貌间隔（1 秒/请求），读取经既有 Provider Chain 财报域两槽（缓存/熔断/降级复用）。
 

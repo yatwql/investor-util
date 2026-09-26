@@ -23,7 +23,7 @@ import pytest
 from src.python.core.models import Holding
 from src.test.helpers import recent_holdings_period
 
-pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
+pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic, pytest.mark.usefixtures("offline_external_sources")]
 
 
 # ═══════════════════════════════════════════════════════════════

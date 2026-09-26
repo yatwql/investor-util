@@ -46,8 +46,13 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     # 基金披露持仓：天天基金为主，同花顺官方源为备（官方源需 key，未配置时链路自动跳过）
     "fund_hold": ["tiantian", "hithink"],
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
-    # 全文本财报（DataSinking，仅 A 股；需用户自备 key；巨潮备源在 fetcher 层接管）
-    "financial_report": ["datasink"],
+    # 全文本财报（持仓基本面章·区块②）：DataSinking 主源 + 巨潮资讯网备源。
+    # 两源经财报域适配器注册（fetcher/report_adapters.py），以 ``source_hint`` 做命名空间
+    # 隔离（异源候选被异源适配器立即拒服务）——因此**两个源都必须在本链的槽位里**：
+    # 编排层从巨潮索引/备源列表构造的候选带 ``source_hint=cninfo``，若链上只有主源槽，
+    # 它们会被主源适配器拒后无处可去 → 备源正文永远取不到（日志表现为“尝试 DataSinking
+    # 财报 → datasink 返回空 → 全链路失败”且无任何 `[datasink]` 请求日志）。
+    "financial_report": ["datasink", "cninfo"],
     # 结构化财务指标（akshare 主源；备用支路 datasink_indicator 从财报全文解析）
     # 财务指标：akshare 主源 → DataSinking 章节解析支路 → 同花顺官方报表派生（需 key）
     "financial_indicator": ["akshare_financial", "datasink_indicator", "hithink"],

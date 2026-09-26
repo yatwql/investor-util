@@ -27,7 +27,7 @@ from src.python.fetcher.quote_adapters import (
 )
 from src.python.providers import eastmoney, tencent
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.usefixtures("offline_external_sources")]
 
 # 真实响应形状的行情原始数据（腾讯含市值/市盈率与量价扩展字段，新浪不含市值）
 _TENCENT_RAW = {

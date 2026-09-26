@@ -17,7 +17,7 @@ from src.python.core import signal_ledger as sl
 from src.python.core.decision_ledger import DIRECTION_FLAT, DIRECTION_LONG, DIRECTION_SHORT
 from src.python.report import signal_record
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 REPORT_DATE = "2026-09-10"
 

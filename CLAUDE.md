@@ -36,6 +36,9 @@
   - **LLM 调用 mock 强制**：任何触发 `generate_all_llm()` 或 `call_llm()` 的测试**必须** mock LLM API 调用（使用 `unittest.mock.patch` 或 `monkeypatch`），禁止真实调用（防费用、防 API 依赖、防测试不稳定）
   - **输入数据隔离**：管线集成测试（同上——`test_pipeline_smoke.py`、`test_pipeline_metrics_injection.py` 等）**不得**依赖真实持仓文件，必须使用 fixture 构造最小持仓（2-5 品种）或 mock 持仓数据。`data/holdings/` 的真实文件在测试中应视为只读
   - **C12 边缘文件隔离**：极端值/异常场景测试（如 `unit/analysis/test_liquidity_edge.py`、`unit/analysis/test_liquidity_otc_edge.py`）**必须**使用 `@pytest.mark.edge` 标记并放入 `*_edge.py` 文件，conftest.py 的 `pytest_collection_modifyitems` 会自动校验
+  - **外网 mock 强制（机制保障）**：任何测试都**不得**发起真实外部网络请求。`conftest.py` 的 `_block_external_network`（autouse）在 socket 层阻断建连（`connect`/`connect_ex`/`create_connection`/`getaddrinfo`，**只阻建连不阻构造**），抛 `src.test._network_guard.NetworkBlockedInTests`（继承 `BaseException`，**不可被 provider 的 `except Exception` 降级吞掉**）→ 漏 mock 即**瞬时硬失败**，不会静默降级也不白等重试退避。注意测试**不得**依赖“守卫拦下 + 链路降级”来通过：那既不是 mock，也会掩盖真实依赖
+  - **不依赖外部数据的用例显式声明离线**：报告/编排/集成类用例的**附带依赖**（交易日历、行业数据、行情、健康检查探针、akshare 直连路径等）并非其测试目标——这类文件在模块级加一行 `pytest.mark.usefixtures("offline_external_sources")`（`src/test/_network_guard.py::apply_offline_stubs`）即可：HTTP 出口换成即时失败的离线桩、交易日历回空集、链路瞬时重试退避置 0（不再等待）、akshare 换空桩。**需要验证某源真实行为的用例必须自行 mock 该源**，不得用本 fixture 遮掩
+  - **测试目标源要 patch 对模块**：生产代码常在函数内 `from ... import`（如 `report/news_correlation.py` 从 `fetcher.news` 导入）——patch 必须指向**调用点所在模块**的属性，patch 上游 provider 模块的同名函数**不会**生效（该名字已在导入时绑定），否则用例会静默走真实链路
 - **调试失败用例流程**：测试失败后**禁止**重新跑全量测试套件。先用 `.venv/bin/python scripts/extract-test-failures.py` 提取失败用例名，修复后只跑该单个用例验证（`.venv/bin/python -m pytest <test_file>::<test_name> -v --tb=short`）。仅提交/发布前才需跑完整门禁。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
 - **任务编号规范**：

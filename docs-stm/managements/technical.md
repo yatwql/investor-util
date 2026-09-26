@@ -1,5 +1,5 @@
 # 投资复盘助手 — 技术设计
-> 文档版本：0.11.5-dev
+> 文档版本：0.11.5
 
 ## 目录
 
@@ -1400,34 +1400,13 @@ _write_atomic(fd, tmp_path, final_path)
 
 ### 3.5 缓存分组
 
-通过 `core/registry.py` 的 `cache_groups` 字段定义分组，由 `clear_by_group()` 统一管理：
+通过 `core/registry.py` 的 `cache_groups` 字段定义分组，由 `clear_by_group()` 统一管理（分组归属以注册表为唯一事实来源）：
 
-```
-                   缓存分组体系
-                         │
-        ┌────────────────┼────────────────┐
-        │                │                 │
-        ▼                ▼                 ▼
-   ┌─────────┐     ┌──────────┐     ┌──────────┐
-   │ preload  │     │ refresh  │     │ 无分组    │
-   ├─────────┤     ├──────────┤     ├──────────┤
-   │ 价格    │     │ 基金业绩  │     │ 历史股票  │
-   │ 指数    │     │ 基金持仓  │     │ 日线     │
-   │ LLM 全  │     │ 行业分类  │     │ 历史基金  │
-   │ 球宏观  │     │ 新闻聚合  │     │ 净值     │
-   │ LLM 智  │     │ 新闻二次  │     │ 集中度   │
-   │ 囊团    │     │ 关联     │     │ 快照     │
-   │ LLM 体  │     │ 盈利预测  │     │ 风格快照 │
-   │ 检报告  │     │ 资金流向  │     │ 追踪     │
-   │ LLM 穿  │     │ 基金经理  │     │ 日历     │
-   │ 透分析  │     │ 基金风格  │     └──────────┘
-   │ LLM 辩  │     │ 分红数据  │     （不被菜单
-   │ 论三段  │     │ 业绩基准  │     命令误删）
-   │         │     │ 无风险利  │
-   │         │     │ 率       │
-   └─────────┘     └──────────┘
-   菜单 [2] 触发    菜单 [1] 触发
-```
+| 分组 | 包含模块（registry 注册名） | 触发 |
+|:-----|:---------------------------|:-----|
+| `preload` | 股票价格、市场指数、LLM 全球政经局势、LLM 智囊团深度复盘、LLM 持仓体检报告、LLM 穿透深度分析、LLM 辩论三段（白脸 pro / 黑脸 con / 综合 synthesis） | 菜单 `[2]` |
+| `refresh` | 基金业绩排名、基金持仓、行业分类、市场情绪、财报索引、财报正文、财务指标、新闻聚合、LLM 新闻关联分析、机构盈利预测、行业资金流向、股票历史分红、基金业绩基准、基金经理、基金风格扩展数据、无风险利率 | 菜单 `[1]` |
+| 无分组 | 历史股票日线、历史基金净值、指数历史日线、集中度快照、风格快照、持仓跟踪、交易日历 | 不被菜单缓存命令误删（仅菜单 `[3]` 过期清理） |
 
 **缓存分组设计原则**：
 - **preload 组**：换持仓文件后应重取的基础行情和 LLM 分析
@@ -2503,7 +2482,9 @@ _dedup_by_title(items)
 | 信号 | 默认阈值 | 说明 |
 |:-----|:---------|:------|
 | 连续失败计数 | T2: 2 次 / T3: 2 次 / T4: 1 次 | 累计失败次数达阈值后触发降级 |
-| 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 7 天 | 距上次成功获取的天数超阈值后触发降级 |
+| 缓存陈旧天数 | T2: 3 天 / T3: 14 天 / T4: 14 天 | 距上次成功获取的天数超阈值后触发降级 |
+
+> **注**：以上为 `config.json` 的 `degradation` 出厂默认值（T4 为 14 天）。代码内兜底常量 `report/data_status.py::_DEFAULT_STALE_DAYS`（T4=7 天）仅在用户配置缺少该键时生效，不作为默认值口径。
 
 可配置于 `config.json` 的 `degradation` 字段。支持跨会话持久化到 `data/state/.degradation_state.json`。
 
@@ -3672,6 +3653,10 @@ investor-util/
 | `profit_forecast` | `profit_forecast_{fingerprint}.json` | 24h | — | A 股+美股指数 | refresh |
 | `hold` | `fund_hold_{code}.json` | 7 天 | — | — | refresh |
 | `industry` | `industry_{code}.json` | 14 天 | — | — | refresh |
+| `sentiment` | `sentiment_dragon_tiger.json` + `sentiment_ladder.json` | 1h | — | — | refresh |
+| `report` | `report_datasink_index_{symbol}.json` + `report_datasink_sections_{doc_id}.json` + `report_cninfo_index_*` | 30 天 | — | — | refresh |
+| `report_doc` | `report_datasink_doc_{doc_id}_{section}.json` | 30 天 | — | — | refresh |
+| `fin_indicator` | `fin_indicator_{code}.json` + `fin_indicator_hist_{code}.json` | 30 天 | — | — | refresh |
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | — | 持仓+穿透 A 股代码 | refresh |
 | `benchmark` | `fund_benchmarks.json` | 30 天 | — | — | refresh |
 
@@ -3722,9 +3707,9 @@ investor-util/
 |:-----|:------|:---------|:------------|:------------|
 | T2 | 数据不可用 | ⚠ | 2 次 | 3 天 |
 | T3 | 数据部分可用 | ℹ | 2 次 | 14 天 |
-| T4 | 数据临时不可用 | ℹ | 1 次 | 7 天 |
+| T4 | 数据临时不可用 | ℹ | 1 次 | 14 天 |
 
-降级配置位于 `config.json` 的 `degradation` 字段，支持 per-source 覆盖。
+降级配置位于 `config.json` 的 `degradation` 字段，支持 per-source 覆盖。表中为出厂默认值；代码内兜底常量（`report/data_status.py::_DEFAULT_STALE_DAYS`，T4=7 天）仅在配置缺键时生效。
 
 ### 附录 E：线程池分布
 

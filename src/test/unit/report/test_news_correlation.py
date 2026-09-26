@@ -18,7 +18,7 @@ from src.python.core.models import Holding
 from src.python.report import news_correlation as nc
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 
 class TestBuildNewsData(unittest.TestCase):

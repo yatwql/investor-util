@@ -18,7 +18,7 @@ import pytest
 
 from src.python.report import fund_candidate as fc
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 
 def _fh(holdings: list[dict], date: str | None = None, name: str | None = None) -> dict:

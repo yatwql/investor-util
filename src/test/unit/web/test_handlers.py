@@ -26,7 +26,7 @@ from src.python.web.app import create_app
 from src.python.web.handlers import _build_artifacts, _build_system_info, _health_cache, _run_generation
 from src.python.web.runs import RunManager, RunState
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_web]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_web, pytest.mark.usefixtures("offline_external_sources")]
 
 
 def _make_holdings_xlsx() -> bytes:

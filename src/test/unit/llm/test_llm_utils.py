@@ -31,7 +31,12 @@ from src.python.llm.pricing import (
 )
 from src.python.llm.prompts import _SYSTEM_EXPERT_REVIEW, _SYSTEM_GLOBAL_MACRO
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.unit_llm,
+    pytest.mark.llm,
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 
 # ═══════════════════════════════════════════════════════════

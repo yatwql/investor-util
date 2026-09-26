@@ -17,7 +17,7 @@ import unittest
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 # 标准注册表（精简版：仅保留结构测试所需字段，省略 action / portfolio_evolution 两个扩展模块）。
 # 本表只作 create_sheets 的输入数据使用，序号仅在本表内自洽，不对照 registry.py 的真实序号——

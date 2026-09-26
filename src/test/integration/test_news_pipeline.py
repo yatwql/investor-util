@@ -128,8 +128,8 @@ class TestNewsPipeline(unittest.TestCase):
         ]
 
         with (
-            patch("src.python.providers.news_aggregator.aggregate_news", return_value=mock_news),
-            patch("src.python.providers.news_keywords.build_holding_keywords", return_value=["茅台", "易方达"]),
+            patch("src.python.fetcher.news.aggregate_news", return_value=mock_news),
+            patch("src.python.fetcher.news.build_holding_keywords", return_value=["茅台", "易方达"]),
             patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={}),
         ):
             news_result, news_meta = build_news_data(holdings, top_n=10)

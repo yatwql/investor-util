@@ -23,7 +23,7 @@ from src.python.report.market_value import DetailRow
 from src.test.helpers import recent_holdings_period
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 
 # ═══════════════════════════════════════════════════════════

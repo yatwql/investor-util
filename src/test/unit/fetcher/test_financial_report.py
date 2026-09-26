@@ -15,7 +15,7 @@ import pytest
 
 from src.python.fetcher import financial_report as fr
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.usefixtures("offline_external_sources")]
 
 
 class TestCollectTargets:

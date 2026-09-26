@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.usefixtures("offline_external_sources")]
 
 
 class TestNameMatches(unittest.TestCase):

@@ -24,6 +24,9 @@ from src.python.report.penetration import classify_penetration
 from src.test.helpers import recent_holdings_period
 
 
+pytestmark = [pytest.mark.usefixtures("offline_external_sources")]
+
+
 @pytest.mark.scenario_resilience
 @pytest.mark.scenario
 class ScenarioTestBase(unittest.TestCase):

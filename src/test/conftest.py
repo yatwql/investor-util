@@ -21,6 +21,8 @@ import warnings
 
 import pytest
 
+from src.test._network_guard import BLOCKED_NETWORK_MSG, NetworkBlockedInTests, apply_offline_stubs
+
 # ── 项目自定义标记全集（与 pytest_configure 注册的标记保持一致）──
 
 _KNOWN_MARKERS: set[str] = {
@@ -751,20 +753,34 @@ def _block_external_network(monkeypatch, request):
     """全局阻断测试运行时真实外部网络连接。
 
     任何未 mock 的 socket 建连（数据源 API / LLM API / akshare 交易日历 /
-    后台数据源健康检查等）立即抛 RuntimeError 使测试失败 —— 从机制上保证
-    测试用例运行时无外部网络依赖。
+    后台数据源健康检查等）立即抛 :class:`NetworkBlockedInTests` 使测试
+    **立即失败** —— 从机制上保证测试用例运行时无外部网络依赖。
+
+    异常选择 ``BaseException`` 子类（而非 ``RuntimeError``）的原因：数据源
+    provider 与 fetcher 链路普遍用 ``except Exception`` 做降级，用 ``Exception``
+    子类会被静静吞掉 → 用例变成“验证网络被阻断后的降级路径”而非按 mock 数据
+    验证业务，且触发链路瞬时重试退避（0.6~1.2s/槽）白等。改用 ``BaseException``
+    后：漏 mock 即**瞬时硬失败**并提示补 mock，既不会被吞也不消耗退避等待。
 
     已 mock HTTP 层（httpx.Client / requests / provider 函数 / _fetch_* 等）
-    的测试不创建真实 socket，不受影响；真实建连仅发生在「应 mock 却未 mock」
-    时，此时测试立即失败并提示开发者补 mock，而非静默发起外网请求。
+    的测试不创建真实 socket，不受影响。
+
+    替代方案（本文件不依赖外部数据时的推荐写法）：
+    ``pytestmark = pytest.mark.usefixtures("offline_external_sources")`` ——
+    显式声明无需真实数据源，由 ``offline_external_sources`` 把仓内 HTTP 出口
+    换成即时失败的离线桩（保留链路“源不可用→降级”口径，但零网络、零等待）。
 
     例外：带 @pytest.mark.live 的 opt-in 真实网络套件放行（仅当 `--run-live`
     或 `-m live` 显式运行时），允许其发起真实数据源/LLM 连通性探测。
 
-    实现要点：
-    - socket.socket 用「类」替换（ssl 模块顶层 `class SSLSocket(socket)`
-      继承它，用函数替换会破坏 ssl 模块的类继承）；实例化时抛异常。
-    - socket.create_connection / socket.getaddrinfo 用函数替换（建连入口）。
+    实现要点：**只阻建连，不阻构造**。
+    - 只替换 ``socket.socket.connect`` / ``connect_ex``、``socket.create_connection`` 与
+      ``socket.getaddrinfo``（建连 / DNS 入口）。若连 ``socket.socket()`` 构造也阻，
+      会误伤第三方库的**导入期**探测（如 urllib3 导入期构造 socket，且仅被 ``except
+      Exception`` 包住）→ 硬化成 ``BaseException`` 后会使库导入失败：那是库自身行为，
+      不是未 mock 的外网请求。
+    - ``socket.socket`` 在 ``socket.py`` 中是 Python 类（继承 ``_socket.socket``），
+      其 ``connect`` / ``connect_ex`` 可被 monkeypatch。
     """
     import socket as _socket
 
@@ -775,19 +791,31 @@ def _block_external_network(monkeypatch, request):
         return
 
     def _raise(*args, **kwargs):
-        raise RuntimeError(
-            "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，请 mock 对应的数据源/LLM API 调用。"
-        )
+        raise NetworkBlockedInTests(BLOCKED_NETWORK_MSG)
 
-    class _BlockedSocket(_socket.socket):  # type: ignore[misc]
-        def __init__(self, *args, **kwargs):
-            raise RuntimeError(
-                "[ERR] 外部网络访问被阻断：测试用例不得发起真实网络连接，请 mock 对应的数据源/LLM API 调用。"
-            )
-
-    monkeypatch.setattr(_socket, "socket", _BlockedSocket)
+    monkeypatch.setattr(_socket.socket, "connect", _raise)
+    monkeypatch.setattr(_socket.socket, "connect_ex", _raise)
     monkeypatch.setattr(_socket, "create_connection", _raise)
     monkeypatch.setattr(_socket, "getaddrinfo", _raise)
+
+
+@pytest.fixture
+def offline_external_sources(monkeypatch):
+    """显式声明：本测试文件不依赖任何外部数据源（opt-in，非 autouse）。
+
+    用法（文件级一行）：
+        pytestmark = [pytest.mark.unit, pytest.mark.usefixtures("offline_external_sources")]
+
+    作用：把“附带依赖”的外部数据入口置为**离线**，而不再依赖全局网络守卫兜底——
+    报告/编排类用例往往已 mock 了自己关注的数据（持仓/新闻/LLM），但生产链路
+    还会顺带查询交易日历、行业数据、行情、健康检查探针等；这些附带依赖过去靠
+    守卫抛错 + 链路退避硬撑（每个 provider 槽白等 0.6~1.2s），本 fixture 把它们改成
+    “即时取不到”：降级/可用性口径不变，但零网络、零等待。
+
+    桩清单与实现见 ``src/test/_network_guard.py::apply_offline_stubs``。
+    本文件无需真实数据源时优先用它；需要验证某源真实行为时，请在用例内显式 mock。
+    """
+    apply_offline_stubs(monkeypatch)
 
 
 def pytest_collection_modifyitems(config, items):

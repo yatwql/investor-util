@@ -29,7 +29,7 @@ from src.python.analysis.style_factor_regression import (
     unavailable_result,
 )
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.usefixtures("offline_external_sources")]
 
 _MIN_SAMPLES = 36
 

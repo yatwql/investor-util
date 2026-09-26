@@ -20,7 +20,7 @@ import pytest
 
 from src.python.core.models import Holding
 
-pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
+pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic, pytest.mark.usefixtures("offline_external_sources")]
 
 # generate_all_llm 返回 4 个分析结果 + 4 个缓存标志（无辩论模式）
 _LLM_OUTPUT_TUPLE_LEN = 8
