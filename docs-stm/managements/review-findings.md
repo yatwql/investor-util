@@ -42,15 +42,6 @@
 #### P2C — 文档与配置口径（2026-09-24）
 
 > 无待处理项（`rf-420` 已修复，见「已解决问题」区）。
-### P3 — 架构原语收敛后续项（2026-09-26）
-
-> 本轮重试/节流原语收敛（见「已解决」区）后仍存的同类项：语义差异较大，需先扩展原语能力再迁移。
-
-| 编号 | 问题 | 说明 |
-|:-----|:-----|:-----|
-| **rf-455** | **LLM 调用链的重试/退避未纳入公共原语**：`llm/api_base.py::call_llm_with_retry` 仍自带 `for attempt` 循环 + 显式退避表 `_RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]` + 自定义可重试判据（429/503/超时/网络可重试，403 配额/风控判为不可重试） | 待处理：迁移前需为 `RetryPolicy` 扩展「显式退避序列」策略（固定/线性/指数三种算式表达不了该手工调优的表），并把环体「多终态 + 副作用」（断路器计数、失败原因码、每次尝试先经端点节流门）在 `retry_if_result` / `on_retry` 上逐条对齐 |
-
-
 ## 已解决问题
 
 ### 已解决待归档（v0.11.6-dev）
@@ -66,6 +57,8 @@
 
 
 | **rf-456** | **原语收敛后的文档口径核对发现 4 处偏差**：① technical.md §5.1 的 LLM 子模块计数仍为 35（新增 `pacing.py` 后实为 36）；② LLM 重试退避被称作「指数退避」，而实现是手工调优的递增表（1/3/5/10/15，代码注释同样误称）；③ live 套件覆盖描述「共 14 项」未说明构成；④ 新增的架构原语小节在本文档中以四级标题落在 P1 表尾（层级与顺序错误） | 已修复（2026-09-26）：① 计数改 **36**（27 顶层 + `fact_checker/` 9）；② llm-technical §6.2 与 `_RETRY_DELAYS` 注释改为「递增退避表（非等比）」；③ developer-guide 明确为「**14 个用例**（行情 5 / 新闻 4 / 基金 3 / 交易日历 2）」；④ 该小节改为三级标题并移至 P2C 之后。核对方式：标题编号序列 / 目录锚点有效性（按 GitHub slug 规则，含连续连字符不折叠）/ 「共 N 个」类计数声明 ↔ 代码实况逐项对照 |
+
+| **rf-455** | **LLM 调用链的重试/退避未纳入公共原语（上一轮收敛的遗留项）**：`llm/api_base.py::call_llm_with_retry` 自带 `for attempt` 循环 + 显式退避表 `_RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]` + 自定义可重试判据（`_is_retry_available` 兼做「判预算 + 取退避 + 日志 + 睡眠」四件事）；且 `max_retries` 配到大于表长（> 5）时 `_RETRY_DELAYS[attempt]` 会 **IndexError**（配置项无上界校验，属真实缺陷） | 已修复（2026-09-26）：① **原语补能力**：`RetryPolicy` 新增 `table` 算式（`delays` 显式序列，**超出末位锁定末位**、空序列回退指数并告警、list 归一为 tuple），该能力同时消掉上面那个越界缺陷；② **迁移骨架**：`call_llm_with_retry` 的循环/退避/判据全部委托 `retry_transient`（策略 `_RETRY_POLICY` + `replace(_RETRY_POLICY, attempts=max_retries+1)`），本层只保留「每次尝试前经 `PacingGate` 节流门」「失败分类（success / quota / retryable / fatal）与终态副作用（断路器计数、失败原因码）」；`_is_retry_available` 删除、新增 `_retry_policy` / `_retry_detail`，`retry_on` 恒假以确保异常路径语义不变；③ **行为等价**：日志文案（`(尝试 N/M)，Xs 后重试...` / `（已重试 N 次）`）、`client.post` 调用次数（`max_retries+1`）、403 不重试、`time.sleep` 可打桩均保持一致；④ **测试**：`test_llm_api_base.py` 的 `TestIsRetryAvailable` 改为 `TestRetryPolicyFactory`（尝试次数/序列逐项/超表长锁定），两处 `_is_retry_available` 补丁改为打桩睡眠，新增「两次重试分别等待 1s、3s」与「`max_retries` 超表长不越界」回归用例；`test_retry.py` 补 `TestExplicitDelayTable`（5 例）与 `TestLlmSkeletonDelegation`（2 例归属断言）；⑤ **文档**：架构约束「重试与退避唯一原语」适用范围纳入 LLM 调用链、§5.4、§6.7、llm-technical §6.2、R-DATA-07 与 testplan 载体同步 |
 
 | **rf-454** | **间隔节流原语住在数据层模块，被 LLM 层与 providers 反向依赖（层次倒置），且抖动算式外泄**：`fetcher/batch.py::RateLimiter` 是通用「按名最小间隔」原语（数据源 qps 限速 / `batch_rate_limit` / LLM 端点节流三层共用），却定义在批量调度模块里——`llm/pacing.py`、`providers/{datasink,hithink,cninfo}` 均需 `from src.python.fetcher.batch import RateLimiter`（上层/同层反向依赖）；且 pacing 自行计算 `min_interval + uniform(0, min_interval × jitter)`，抖动算式有两份 | 已修复（2026-09-26）：① **原语下沉**：`RateLimiter` 迁至 `src/python/core/throttle.py`（唯一实现），并新增 `interval_delay(interval, jitter_ratio)` 作为**抖动算式唯一来源**（`acquire_interval(..., jitter_ratio=)` 返回实际等待秒数）；② `fetcher/batch.py` 改为从 core 引入（既有 `from ...fetcher.batch import RateLimiter` 路径继续可用，`is` 同一类）；③ `llm/pacing.py` 与三个 provider 的依赖改指 `core.throttle`（消除反向依赖），pacing 的抖动算式删除、只保留声明解析与在途并发上限；④ 新增「间隔节流唯一原语」架构约束并同步 §6.7 命名表 `throttle` 行、附录 A 目录树、llm-technical §4.2.1；⑤ 新增 `test_throttle.py`（13 例：抖动算式边界/等待量/短路/按名互不阻塞 + **归属断言**：数据层再导出同一类、pacing 不再依赖 fetcher、providers 依赖 core），并修 2 处随之过期的文档串（pacing 模块说明与 `_get_limiter` docstring）；⑥ 顺带把 26 处测试补丁由「patch provider 的 httpx 引用」改指**统一 HTTP 出口** `core.http_client.httpx.Client`（对齐「patch 调用点模块」原则） |
 | **rf-453** | **重试/退避实现散落 5 处、口径互不一致**：`fetcher/chain.py` 同源瞬时重试（0.6·2ⁿ + jitter 0.2）、`providers/cninfo.py` 连接级重试（3 次、1s/2s 线性）、`providers/datasink.py` 429 退避（1s×1）、`providers/eastmoney_industry.py`（0.5·2ⁿ + jitter 0.3）、`providers/tencent.py`（超时×2、无等待），另有 `providers/_utils.py::run_with_timeout`（akshare 超时×2、固定 1s）——「哪些异常算瞬时」逐处自定义、最坏时延无法估算、策略调整需改 6 处；本轮新增的 cninfo 连接级重试是第 6 处 | 已修复（2026-09-26）：① 新建 **`src/python/core/retry.py`** 三件套——`RetryPolicy`（attempts/固定·线性·指数算式/jitter/max_backoff + 边界钳制）、`is_transient_exception`（传输级瞬时判据唯一定义）、`retry_transient`（异常触发 + **结果哨兵触发**两类条件、`on_retry` 回调保留各源日志文案、`sleep` 可注入便于测试零等待）；② **6 处迁移**并保持行为等价：chain（哨兵 `TRANSPORT_FAILURE`，策略 attempts=2/指数/0.6/2.0/jitter 0.2，保留 `_TRANSIENT_RETRY_BACKOFF` 以兼容测试与离线桩置 0）、cninfo（3 次线性 1s/2s + 429 策略）、datasink（429 策略）、eastmoney_industry（retries+1 指数 0.5/2.0/jitter 0.3）、tencent（2 次固定、无等待）、`providers/_utils`（akshare：attempts=1+retries、固定 1s、`retry_on=恒真` 保持原语义）；③ 新增「重试与退避唯一原语」架构约束，并同步 §2.2.1 口径说明、§6.7 命名表 `retry` 行、附录 A 目录树、CLAUDE.md 的约束编号范围同步扩展；④ 需求层补 **R-DATA-07（重试与节流口径统一）** + testplan 载体映射（`test_retry.py` / `test_throttle.py` / `test_cninfo.py`）；⑤ 新增 `test_retry.py`（15 例：三种算式/抖动边界/上限/钳制/瞬时判据/异常与哨兵重试/有界/非瞬时不重试/回调契约）；⑥ 顺带修正 `eastmoney_industry` docstring 与实际不符的「默认 3 次」（常量 `_MAX_RETRIES = 1`） |

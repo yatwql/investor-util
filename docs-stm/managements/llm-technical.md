@@ -715,7 +715,7 @@ call_gemini() Extended Thinking 注入
 第 2 层：重试骨架（api_base.py）
     ── 可重试错误 (429/503/超时/网络异常) → 递增退避重试（1s/3s/5s/10s/15s）
     ── 致命错误 (JSON 解析失败) → 不重试
-    ── max_retries 默认 2（可通过 llm_settings.json 配置）
+    ── max_retries 默认 2（可通过 llm_settings.json 配置）；退避序列超出末位锁定末位
 
 第 3 层：截断自动重试（skeleton.py）
     ── 检测输出含 _TRUNCATION_MARKER
@@ -735,10 +735,15 @@ call_gemini() Extended Thinking 注入
 ### 6.2 退避延迟表（递增，非等比）
 
 ```python
-_RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]
+_RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]           # LLM 层的退避数值来源
+_RETRY_POLICY = RetryPolicy(strategy=STRATEGY_TABLE, delays=tuple(_RETRY_DELAYS))
+policy = replace(_RETRY_POLICY, attempts=max(1, max_retries + 1))   # 尝试次数 = max_retries + 1
 ```
 
-第 0 次重试等待 1s，第 1 次 3s，依此类推（**手工调优的递增表**，非等比指数：1→3 为 ×3、3→5 为 ×1.67）。超出 `max_retries` 后记录失败原因并返回 None。
+第 1 次重试等待 1s，第 2 次 3s，依此类推（**手工调优的递增表**，非等比指数：1→3 为 ×3、3→5 为 ×1.67）；
+**`max_retries` 超过表长时锁定末位值**（`15s`）而非越界。退避数值与重试循环由 `core/retry.py`
+统一提供（显式序列策略，见架构约束「重试与退避唯一原语」），本层只负责失败分类与终态副作用；
+尝试耗尽后记录失败原因并返回 None。
 
 ### 6.3 失败追踪
 

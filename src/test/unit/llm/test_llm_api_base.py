@@ -288,22 +288,29 @@ class TestAttemptApiCall(unittest.TestCase):
         self.assertIsInstance(info, str)
 
 
-class TestIsRetryAvailable(unittest.TestCase):
-    """_is_retry_available — 重试可用性判断。"""
+class TestRetryPolicyFactory(unittest.TestCase):
+    """_retry_policy — LLM 重试策略（显式退避序列）契约。"""
 
-    def test_attempt_available(self) -> None:
-        """attempt < max_retries → True。"""
-        from src.python.llm.api_base import _is_retry_available
+    def test_attempts_follow_max_retries(self) -> None:
+        """总尝试次数 = max_retries + 1。"""
+        from src.python.llm.api_base import _retry_policy
 
-        result = _is_retry_available("Test", 0, 2, "超时", "https://api.test.com")
-        self.assertTrue(result)
+        self.assertEqual(_retry_policy(2).attempts, 3)
+        self.assertEqual(_retry_policy(0).attempts, 1)
 
-    def test_attempt_exhausted(self) -> None:
-        """attempt >= max_retries → False。"""
-        from src.python.llm.api_base import _is_retry_available
+    def test_delays_match_hand_tuned_table(self) -> None:
+        """退避序列与手工调优表逐项一致。"""
+        from src.python.llm.api_base import _RETRY_DELAYS, _retry_policy
 
-        result = _is_retry_available("Test", 2, 2, "超时", "https://api.test.com")
-        self.assertFalse(result)
+        policy = _retry_policy(len(_RETRY_DELAYS))
+        self.assertEqual([policy.delay_for(i) for i in range(1, len(_RETRY_DELAYS) + 1)], list(_RETRY_DELAYS))
+
+    def test_delay_clamped_beyond_table(self) -> None:
+        """max_retries 超出表长时锁定末位值（不越界）。"""
+        from src.python.llm.api_base import _RETRY_DELAYS, _retry_policy
+
+        policy = _retry_policy(len(_RETRY_DELAYS) + 3)
+        self.assertEqual(policy.delay_for(len(_RETRY_DELAYS) + 3), _RETRY_DELAYS[-1])
 
 
 class TestCallLlmWithRetry(unittest.TestCase):
@@ -384,7 +391,7 @@ class TestCallLlmWithRetry(unittest.TestCase):
         # Need a client for the call but attempt is patched, so client isn't actually used
         mock_client = MagicMock()
 
-        with patch("src.python.llm.api_base._is_retry_available", return_value=True):
+        with patch("time.sleep"):
             result, usage = call_llm_with_retry(
                 "Test",
                 mock_client,
@@ -416,7 +423,7 @@ class TestCallLlmWithRetry(unittest.TestCase):
 
         # Make sure max_retries is 0 so only 1 attempt
 
-        with patch("src.python.llm.api_base._is_retry_available", return_value=False):
+        with patch("time.sleep"):
             result, usage = call_llm_with_retry(
                 "Test",
                 mock_client,
@@ -678,6 +685,32 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         self.assertEqual(result, "OK")
         self.assertEqual(self.client.post.call_count, 2)
         mock_success.assert_called_once()
+
+    @patch("src.python.llm.api_base._cb_record_success")
+    @patch("time.sleep")
+    def test_retry_delays_come_from_policy_table(self, mock_sleep, mock_success):
+        """两次重试分别等待 1s、3s（退避数值来自统一策略，而非本模块自算）。"""
+        from src.python.llm.api_base import call_llm_with_retry
+
+        succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
+        self.client.post.side_effect = [_make_mock_response(429), _make_mock_response(429), succeed]
+        result, _usage = call_llm_with_retry(**self.base_kw)
+        self.assertEqual(result, "OK")
+        self.assertEqual([c.args[0] for c in mock_sleep.call_args_list], [1.0, 3.0])
+
+    @patch("src.python.llm.api_base._cb_record_failure")
+    @patch("time.sleep")
+    def test_retry_beyond_table_locks_last_delay(self, mock_sleep, mock_failure):
+        """max_retries 超过退避表长度时不越界，末位值重复使用。"""
+        from src.python.llm.api_base import _RETRY_DELAYS, call_llm_with_retry
+
+        self.client.post.return_value = _make_mock_response(429)
+        kw = dict(self.base_kw, max_retries=len(_RETRY_DELAYS) + 2)
+        result, usage = call_llm_with_retry(**kw)
+        self.assertIsNone(result)
+        self.assertIsNone(usage)
+        self.assertEqual(self.client.post.call_count, len(_RETRY_DELAYS) + 3)
+        self.assertEqual(mock_sleep.call_args_list[-1].args[0], _RETRY_DELAYS[-1])
 
     @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")

@@ -81,6 +81,21 @@
 - **rf-456④**：本文件新增的架构原语小节（P3）层级与顺序错误（四级标题、落在 P1 表尾）→ 改为三级标题并移至 P2C 之后
 
 核对结论：其余「共 N 个模块」类声明（报告章节模块数、TUI 页签数、数据源探针数、STATUS_MESSAGES 24 条、熔断退避阶梯等）经代码实况逐项复核**均一致**；标题编号序列无重复/断号；目录锚点 0 失配。用户文档本轮仅确认无新增偏差，未作改动。
+### rf-455：LLM 调用链重试并入统一原语（2026-09-26）
+
+**动因**：上一轮重试收敛（rf-453）时如实把 LLM 调用链排除在外并登记为遗留项；本轮补齐，使「凡失败后重试」在数据获取层与 LLM 层**口径同源**。
+
+**代码变更**：
+- **原语补能力**：`core/retry.py` 的 `RetryPolicy` 新增 `table` 算式（`delays` 显式序列）——第 N 次失败取第 N 项，**超出末位锁定末位值**；空序列回退指数并告警；list 传入归一为 tuple；序列项同样受 `max_backoff` 与 `jitter` 约束
+- **迁移 `llm/api_base.py::call_llm_with_retry`**：重试循环与退避数值改由 `retry_transient` + `_retry_policy(max_retries)`（= 显式序列表策略，尝试次数 `max_retries + 1`）承担；本层只保留每次尝试前的 `PacingGate` 节流门、失败分类（success / quota / retryable / fatal）与终态副作用（断路器计数、失败原因码）；`_is_retry_available`（判预算 + 取退避 + 日志 + 睡眠四合一）删除，新增 `_retry_policy` / `_retry_detail`
+- **顺带修一处真实缺陷**：`max_retries` 配到超过退避表长（> 5）时原实现 `_RETRY_DELAYS[attempt]` 会 **IndexError**（该配置项无上界校验）；新策略锁定末位值，不再越界
+
+**行为等价验证**：日志文案、`client.post` 调用次数（`max_retries + 1`）、403 配额不重试、`time.sleep` 可打桩、异常原样上抛——逐条对照保持一致。
+
+**测试**：`test_retry.py` 新增 `TestExplicitDelayTable`（5 例：序列取值/超末位锁定/空序列回退/list 归一/上限与抖动）与 `TestLlmSkeletonDelegation`（2 例归属断言：骨架绑定统一执行器、策略取自显式表）；`test_llm_api_base.py` 的 `TestIsRetryAvailable` → `TestRetryPolicyFactory`，并新增「两次重试分别等待 1s、3s」「`max_retries` 超表长不越界」回归用例；`src/test/unit/llm` + `src/test/unit/core` 共 2,189 通过。
+
+**架构与需求层**：架构约束「重试与退避唯一原语」适用范围纳入 LLM 调用链——移除上一轮的排除说明；§5.4 补「重试与退避委托统一原语」、§6.7 命名表 `retry` 行补显式序列能力与 LLM 骨架共用、llm-technical §6.2 改写为策略式表达（含末位锁定）；requirements R-DATA-07 的重试路径枚举加入 LLM 调用链，testplan 载体补 `test_llm_api_base.py`。
+
 
 ## 归档
 

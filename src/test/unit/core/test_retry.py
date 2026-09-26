@@ -2,7 +2,8 @@
 
 覆盖：三种退避算式与抖动/上限、边界钳制（attempts<1、未知算式、base=0 不等待）、
 异常触发与结果哨兵触发、重试次数有界、非瞬时异常不重试、睡眠可注入（零等待）、
-以及 ``on_retry`` 回调契约。
+以及 ``on_retry`` 回调契约；显式退避序列表（含超末位锁定）；
+LLM 调用骨架委托本原语的归属断言。
 """
 
 from __future__ import annotations
@@ -143,3 +144,53 @@ class TestExecutor:
         with pytest.raises(httpx.ConnectTimeout):
             rt.retry_transient(fn, policy=rt.RetryPolicy(attempts=1), sleep=lambda _s: None)
         assert calls["n"] == 1
+
+
+class TestExplicitDelayTable:
+    """显式退避序列表策略（供手工调优的非等比退避表使用）。"""
+
+    def test_sequence_taken_in_order(self):
+        """第 N 次失败取序列第 N 项。"""
+        policy = rt.RetryPolicy(strategy=rt.STRATEGY_TABLE, delays=(1.0, 3.0, 5.0))
+        assert [policy.delay_for(i) for i in (1, 2, 3)] == [1.0, 3.0, 5.0]
+
+    def test_beyond_table_locks_last_value(self):
+        """超出序列末位锁定末位值（不越界、不退化为 0）。"""
+        policy = rt.RetryPolicy(strategy=rt.STRATEGY_TABLE, delays=(1.0, 3.0))
+        assert [policy.delay_for(i) for i in (3, 6, 99)] == [3.0, 3.0, 3.0]
+
+    def test_empty_table_falls_back_to_exponential(self):
+        """序列为空 → 回退指数算式（不抛错）。"""
+        policy = rt.RetryPolicy(strategy=rt.STRATEGY_TABLE, base_backoff=0.5)
+        assert policy.strategy == rt.STRATEGY_EXPONENTIAL
+        assert policy.delay_for(1) == 0.5
+
+    def test_list_input_normalized_to_tuple(self):
+        """容忍 list 传入并归一为 tuple（frozen dataclass 幂等）。"""
+        policy = rt.RetryPolicy(strategy=rt.STRATEGY_TABLE, delays=[2.0, 4.0])
+        assert policy.delays == (2.0, 4.0)
+
+    def test_table_respects_cap_and_jitter(self, monkeypatch):
+        """序列项同样受上限与抖动约束。"""
+        monkeypatch.setattr(rt.random, "uniform", lambda _a, _b: 0.25)
+        policy = rt.RetryPolicy(strategy=rt.STRATEGY_TABLE, delays=(99.0,), max_backoff=10.0, jitter=0.5)
+        assert policy.delay_for(1) == 10.25
+
+
+class TestLlmSkeletonDelegation:
+    """LLM 调用骨架把重试委托给本原语（而非自建循环与退避表）。"""
+
+    def test_skeleton_uses_shared_executor(self):
+        """骨架命名空间中绑定的是本模块的执行器本体。"""
+        import src.python.llm.api_base as api_base
+
+        assert api_base.call_llm_with_retry.__globals__["retry_transient"] is rt.retry_transient
+
+    def test_skeleton_policy_is_explicit_table(self):
+        """骨架策略取自显式退避表，且尝试次数随 max_retries 变化。"""
+        import src.python.llm.api_base as api_base
+
+        policy = api_base._retry_policy(2)
+        assert policy.strategy == rt.STRATEGY_TABLE
+        assert policy.delays == tuple(api_base._RETRY_DELAYS)
+        assert policy.attempts == 3

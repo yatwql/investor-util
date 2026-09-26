@@ -8,11 +8,13 @@ from __future__ import annotations
 import logging
 import re
 import threading
-import time
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import httpx
+
+from src.python.core.retry import STRATEGY_TABLE, RetryPolicy, retry_transient
 
 from src.python.llm.circuit_breaker import (
     _cb_endpoint,
@@ -64,7 +66,8 @@ __all__ = [
     "_check_circuit_breaker",
     "_process_success_response",
     "_attempt_api_call",
-    "_is_retry_available",
+    "_retry_policy",
+    "_retry_detail",
     "call_llm_with_retry",
 ]
 
@@ -120,6 +123,23 @@ LLM_TIMEOUT = 120.0
 # ── 重试配置 ─────────────────────────────────────────────────
 
 _RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]  # 递增退避表：第 1~5 次依次等待（手工调优，非等比）
+_RETRY_POLICY = RetryPolicy(strategy=STRATEGY_TABLE, delays=tuple(_RETRY_DELAYS))
+"""LLM 重试策略模板：显式退避序列（超出末位锁定末位）；尝试次数由配置补齐。"""
+
+
+def _retry_policy(max_retries: int) -> RetryPolicy:
+    """按 ``max_retries`` 生成重试策略（总尝试次数 = max_retries + 1，下限 1）。"""
+    return replace(_RETRY_POLICY, attempts=max(1, max_retries + 1))
+
+
+def _retry_detail(info: Any) -> str:
+    """把「可重试」结果的状态码/描述转成日志可读文本。"""
+    if info is None:
+        return "超时"
+    if isinstance(info, int):
+        return f"{info}"
+    return f"网络错误 ({info})"
+
 
 # ── 输出截断自适应重试 ────────────────────────────────
 
@@ -567,24 +587,6 @@ def _attempt_api_call(
         return ("fatal", str(e))
 
 
-def _is_retry_available(label: str, attempt: int, max_retries: int, detail: str, _url: str) -> bool:
-    """判断是否可重试；若可则等待后返回 True，否则 False。"""
-    if attempt < max_retries:
-        delay = _RETRY_DELAYS[attempt]
-        logger.warning(
-            "%s API %s (尝试 %d/%d)，%.1fs 后重试...",
-            label,
-            detail,
-            attempt + 1,
-            max_retries + 1,
-            delay,
-        )
-        time.sleep(delay)
-        return True
-    logger.warning("%s API %s（已重试 %d 次）", label, detail, max_retries)
-    return False
-
-
 def call_llm_with_retry(
     label: str,
     client: httpx.Client,
@@ -603,8 +605,9 @@ def call_llm_with_retry(
 ) -> tuple[str | None, dict | None]:
     """LLM API 调用通用重试骨架。
 
-    retry/超时/错误处理逻辑在单 Provider 调用间统一复用；
-    API 特有的部分（payload 构造、响应提取、截断检测）通过回调参数注入。
+    重试/退避/超时/错误处理**全部委托** :mod:`core.retry`（策略：显式退避序列，
+    见 :data:`_RETRY_POLICY`），本函数只负责 LLM 特有的部分：每次尝试前的端点
+    节流门、失败分类的终态处理（断路器/失败原因码/响应提取）。
 
     Args:
         label: 显示名称（"Claude" / "OpenAI"），用于日志
@@ -634,46 +637,63 @@ def call_llm_with_retry(
 
     from src.python.llm.pacing import PacingGate
 
-    for attempt in range(max_retries + 1):
+    policy = _retry_policy(max_retries)
+    last: dict[str, tuple[str, Any]] = {}
+
+    def _attempt() -> tuple[str, Any]:
         # 端点级节流：仅在配置声明了 pacing 时生效（无声明 → 零开销直通）
         with PacingGate(endpoint_key):
-            kind, info = _attempt_api_call(client, url, headers, payload, timeout)
+            result = _attempt_api_call(client, url, headers, payload, timeout)
+        last["result"] = result
+        return result
 
-        if kind == "success":
-            clear_last_llm_failure()
-            _cb_record_success(url)
-            return _process_success_response(
-                info,
-                extract_fn,
-                check_truncation_fn,
-                max_tokens,
-                config_field,
-                provider,
-                model_name,
-                label,
-                url,
-            )
+    def _on_retry(failed_attempt: int, delay: float, _exc: BaseException | None) -> None:
+        logger.warning(
+            "%s API %s (尝试 %d/%d)，%.1fs 后重试...",
+            label,
+            _retry_detail(last["result"][1]),
+            failed_attempt,
+            policy.attempts,
+            delay,
+        )
 
-        if kind == "quota":
-            # 配额/风控拒绝：不重试（窗口按时间滚动），直接降级到下一 provider
-            _cb_record_failure(url)
-            _last_llm_failure_reason = FAIL_REASON_QUOTA_EXCEEDED
-            return (None, None)
+    kind, info = retry_transient(
+        _attempt,
+        policy=policy,
+        retry_on=lambda _exc: False,  # 异常已由 _attempt_api_call 归一为结果，不重复按异常重试
+        retry_if_result=lambda result: result[0] == "retryable",
+        on_retry=_on_retry,
+    )
 
-        if kind == "retryable":
-            detail = "超时" if info is None else (f"{info}" if isinstance(info, int) else f"网络错误 ({info})")
-            if _is_retry_available(label, attempt, max_retries, detail, url):
-                continue
-            _cb_record_failure(url)
-            _last_llm_failure_reason = FAIL_REASON_TIMEOUT if info is None else FAIL_REASON_NETWORK_ERROR
-            return (None, None)
+    if kind == "success":
+        clear_last_llm_failure()
+        _cb_record_success(url)
+        return _process_success_response(
+            info,
+            extract_fn,
+            check_truncation_fn,
+            max_tokens,
+            config_field,
+            provider,
+            model_name,
+            label,
+            url,
+        )
 
-        # kind == "fatal"
-        logger.warning("%s API 响应解析失败: %s", label, info)
+    if kind == "quota":
+        # 配额/风控拒绝：不重试（窗口按时间滚动），直接降级到下一 provider
         _cb_record_failure(url)
-        _last_llm_failure_reason = FAIL_REASON_API_ERROR
+        _last_llm_failure_reason = FAIL_REASON_QUOTA_EXCEEDED
         return (None, None)
 
+    if kind == "retryable":
+        logger.warning("%s API %s（已重试 %d 次）", label, _retry_detail(info), max_retries)
+        _cb_record_failure(url)
+        _last_llm_failure_reason = FAIL_REASON_TIMEOUT if info is None else FAIL_REASON_NETWORK_ERROR
+        return (None, None)
+
+    # kind == "fatal"
+    logger.warning("%s API 响应解析失败: %s", label, info)
     _cb_record_failure(url)
     _last_llm_failure_reason = FAIL_REASON_API_ERROR
     return (None, None)

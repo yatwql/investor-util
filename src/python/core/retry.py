@@ -2,7 +2,8 @@
 
 三件套（缺一不可，避免退避算式与瞬时判据在 N 处各自实现）：
 
-1. :class:`RetryPolicy` —— **策略**：总尝试次数、退避算式（固定 / 线性 / 指数）、抖动、上限；
+1. :class:`RetryPolicy` —— **策略**：总尝试次数、退避算式（固定 / 线性 / 指数 / 显式序列）、
+   抖动、上限；
    :meth:`RetryPolicy.delay_for` 是退避数值的**唯一算式来源**。
 2. :func:`is_transient_exception` —— **判据**：「值得重试」的传输级瞬时失败
    （连接超时 / 连接错误等）统一定义在此，语义为「换一次时机可能成功」。
@@ -37,7 +38,8 @@ TRANSIENT_EXCEPTIONS: tuple[type[BaseException], ...] = (
 STRATEGY_FIXED = "fixed"
 STRATEGY_LINEAR = "linear"
 STRATEGY_EXPONENTIAL = "exponential"
-_STRATEGIES = frozenset({STRATEGY_FIXED, STRATEGY_LINEAR, STRATEGY_EXPONENTIAL})
+STRATEGY_TABLE = "table"
+_STRATEGIES = frozenset({STRATEGY_FIXED, STRATEGY_LINEAR, STRATEGY_EXPONENTIAL, STRATEGY_TABLE})
 
 
 def is_transient_exception(exc: BaseException) -> bool:
@@ -52,11 +54,15 @@ class RetryPolicy:
     Attributes:
         attempts: **总尝试次数**（含首次）；``1`` 表示不重试。``<1`` 时按 1 处理。
         strategy: 退避算式——``fixed``（每次相同）/ ``linear``（基础值 × 第几次）/
-            ``exponential``（基础值 × factor^(第几次-1)）。
-        base_backoff: 退避基础值（秒）。``<= 0`` 表示**不等待**（立即重试）。
+            ``exponential``（基础值 × factor^(第几次-1)）/ ``table``（显式序列，见 ``delays``）。
+        base_backoff: 退避基础值（秒）。``<= 0`` 表示**不等待**（立即重试）；
+            ``table`` 算式不使用本项。
         factor: 指数算式的倍率。
         jitter: 抖动上界（秒），每次退避叠加 ``uniform(0, jitter)``。
         max_backoff: 单次退避上限（秒）；None 表示不设上限。
+        delays: ``table`` 算式的显式退避序列（秒）：第 N 次失败取第 N 项，**超出序列末位
+            锁定末位值**（不报错、不退化为 0）。供「手工调优的非等比退避表」使用——
+            固定/线性/指数三种算式表达不了这类序列。
     """
 
     attempts: int = 2
@@ -65,12 +71,18 @@ class RetryPolicy:
     factor: float = 2.0
     jitter: float = 0.0
     max_backoff: float | None = None
+    delays: tuple[float, ...] = ()
 
     def __post_init__(self) -> None:
         if self.attempts < 1:
             object.__setattr__(self, "attempts", 1)
+        if self.delays and not isinstance(self.delays, tuple):
+            object.__setattr__(self, "delays", tuple(self.delays))
         if self.strategy not in _STRATEGIES:
             logger.warning("[retry] 未知退避算式 %r，按指数处理", self.strategy)
+            object.__setattr__(self, "strategy", STRATEGY_EXPONENTIAL)
+        elif self.strategy == STRATEGY_TABLE and not self.delays:
+            logger.warning("[retry] 显式退避序列为空，按指数处理")
             object.__setattr__(self, "strategy", STRATEGY_EXPONENTIAL)
 
     @property
@@ -80,6 +92,13 @@ class RetryPolicy:
 
     def delay_for(self, failed_attempt: int) -> float:
         """第 ``failed_attempt`` 次尝试失败后应等待的秒数（1-based）；0 表示不等待。"""
+        if self.strategy == STRATEGY_TABLE and self.delays:
+            base = self.delays[min(max(failed_attempt, 1), len(self.delays)) - 1]
+            if self.max_backoff is not None:
+                base = min(base, self.max_backoff)
+            if base <= 0:
+                return 0.0
+            return base + (random.uniform(0, self.jitter) if self.jitter > 0 else 0.0)
         if self.base_backoff <= 0:
             return 0.0
         if self.strategy == STRATEGY_LINEAR:
