@@ -2886,7 +2886,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 ### 5.1 架构总览
 
-`src/python/llm/` 包按调用层次分为四层，共 35 个子模块（含 fact_checker/ 子包 9 模块 / fallback.py / `_hallucination_filter.py`；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action/signals 4 文件中）：
+`src/python/llm/` 包按调用层次分为四层，共 36 个子模块（含 fact_checker/ 子包 9 模块 / fallback.py / `_hallucination_filter.py`；`prompts.py` 为统一导出入口，实际逻辑在 core/tables/action/signals 4 文件中）：
 
 ```
 入口层         generators_orchestrator.py    4+1 模块并行编排
