@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.6-dev
-> **编号源**：`rf-next = 447`（新增问题取此编号，完成后更新为 +1；已用最大 rf-446，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 448`（新增问题取此编号，完成后更新为 +1；已用最大 rf-447，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -53,6 +53,8 @@
 
 
 
+
+| **rf-447** | **`.git/hooks/` 残留三个无效 pre-push 桩文件，且 `install-hooks.sh --off` 提示语未说明“回退默认路径不会有任何 hook”**：`pre-push`、`pre-push(1)`、`pre-push(1)(1)` 均为 17 字节 `#!/bin/sh` + `exit 0`（mode 644、mtime 相隔 3 秒——云同步冲突副本形态）。因 `core.hooksPath=.githooks`（仓库本地配置）被旁路，且本身非可执行，**双层失效**；但会被误读为“存在 pre-push 校验”，且一旦执行 `--off` 回退默认路径，Git 会在每次 push 打印 `hint: The '.git/hooks/pre-push' hook was ignored because it's not set as executable.`（纯噪音） | 已验证并修复（2026-09-26）：① 用 `git hook run`（Git 2.47.3）拿证据——`git hook run pre-push` 在 `.git/hooks/pre-push` 存在的情况下报 `cannot find a hook named pre-push`（路径旁路）；`git -c core.hooksPath=.git/hooks hook run pre-push` 报 not executable hint（权限层拦截）；三者字节一致、`git ls-files .git/hooks/` 为 0（不跟踪、不跨机器）、全仓无引用；② 删除三个本地残留（原件留档以便回滚）；③ `.githooks/install-hooks.sh --off` 增两行说明“Git 回退到 .git/hooks 后本脚本不会在其中安装任何 hook，该目录内容不随仓库同步”；④ 验证：`sh -n` 通过，`--off`/启用往返使 hooksPath 正确变化（未设置 → `.githooks`），启用态下 `pre-push` 仍不可解析（期望：无 pre-push 校验）、`pre-commit` exit 0 |
 
 | **rf-446** | **本会话写入的注释/docstring 引用任务编号与历史叙述，违反语义命名纪律**：`check_sources.py`（`rf-439`）、`conftest.py`（“把它们改成…”命中 HIGH 历史变更叙述）、`test_check_sources.py`（`rf-439`）、`test_report_backup_source.py`（`plan-50`）、`_doc_drift/_format.py`（`rf-437`）共 7 处被 `check-code-traces` 报出（CODE=4 / DEPR=2 / HIGH=1）。**根因**：本会话收尾的本地门禁扫描循环里**漏掉了 `check-code-traces`**（只跑其余 6 个），该脚本直到本次才第一次被执行——也正是本次给 CI 补 `guards` job 的直接证据 | 已修复（2026-09-26）：① 7 处改写为**语义化描述**（去掉 `rf-`/`plan-` 引用、「已废弃」标注与历史变更叙述），`check-code-traces --ci` 回到「未发现历史变更痕迹，注释干净」；② 根因层：本地与 CI 守护清单**以 CI `guards` job 统一**（7 个 `--ci` 脚本一条不漏），不再依赖人工记得「还有哪个脚本没跑」（见 rf-445） |
 | **rf-445** | **CI 覆盖面缺口：未执行 7 个 `--ci` 守护脚本，也未执行 `ruff check`**：`.github/workflows/ci.yml` 原先只有 `test` job（三档测试模式）与 `format` job（`ruff format --check src/python/ scripts/`），故**纯文档/编号/痕迹类漂移在 CI 上不会被拦**（如归档索引缺失、文档与实现口径冲突、注释里的任务编号——后者本会话真实漏检 7 处，见 rf-446）；且与 `CLAUDE.md` 的「CI 辅助检查：`ruff check` + `ruff format --check`」表述不符（实际未跑 `ruff check`） | 已修复（2026-09-26）：① 新增 **`guards` job（阻塞型）**，逐个 step 跑 7 个 `--ci` 守护脚本（`check-code-traces` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` / `check-doc-drift` / `check-test-redundancy` / `check-requirement-trace`），任一失败即红；② `format` job（保留 `continue-on-error`）补 **`ruff check`** 步骤；③ YAML 解析校验通过（jobs: test / format / guards）；④ 本地等价演练：7 脚本 + `ruff check` + `ruff format --check` 全部 exit 0；⑤ 文档同步（CLAUDE.md CI 条目；开发者指南新增「CI 同步执行」段 + 编号保障表新增 CI 行并改「四层→五层」） |

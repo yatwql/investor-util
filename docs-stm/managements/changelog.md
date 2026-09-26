@@ -21,6 +21,19 @@
 
 **验证**：`check-code-traces` 由 7 处 finding 回落为 0；7 个 `--ci` 脚本 + `ruff check` + `ruff format --check` 全部 exit 0（本地等价演练 CI `guards`/`format` job 命令）；`ci.yml` YAML 解析通过（jobs: test / format / guards）。
 
+### 清理无效 pre-push 桩 + 补 `--off` 提示（2026-09-26，rf-447）
+
+**结论（先验证后动手）**：`.git/hooks/` 下三个 `pre-push` / `pre-push(1)` / `pre-push(1)(1)` 确实是**无效残留**，两层独立原因：
+- **路径旁路**：`core.hooksPath = .githooks`（仅仓库本地 `.git/config`）——`git hook run pre-push` 在 `.git/hooks/pre-push` 存在的情况下报 `error: cannot find a hook named pre-push`，证明 Git 根本不查 `.git/hooks/`；
+- **权限拦截**：三者均为 mode 644（非可执行）——`git -c core.hooksPath=.git/hooks hook run pre-push` 直接给 `hint: … ignored because it's not set as executable.`；
+- 内容为 17 字节 `#!/bin/sh` + `exit 0`（无逻辑），mtime 相隔 3 秒，属云同步冲突副本；`git ls-files .git/hooks/` 为 0（不跟踪、不跨机器），全仓无脚本/文档引用。
+
+**变更**：
+- 删除三个本地残留（原件备份至 `/tmp/pre-push.bak` 以便回滚）——删除后可消除「回退默认路径时 Git 每次 push 的 not-executable 警告噪音」；
+- `.githooks/install-hooks.sh` 的 `--off` 分支增两行说明：Git 回退到 `.git/hooks` 后本脚本**不会**在其中安装任何 hook，该目录内容也不随仓库同步（避免误以为回退默认路径会启用某些校验）。
+
+**验证**：`sh -n` 语法通过；`--off` → `hooksPath` 未设置，再启用 → `.githooks`（往返正确）；启用态下 `git hook run pre-push` 仍为 not found（即确实不存在 pre-push 校验）、`git hook run pre-commit` exit 0。
+
 ---
 
 ## 归档
