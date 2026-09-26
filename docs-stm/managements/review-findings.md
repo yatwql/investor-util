@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.6-dev
-> **编号源**：`rf-next = 455`（新增问题取此编号，完成后更新为 +1；已用最大 rf-454，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 457`（新增问题取此编号，完成后更新为 +1；已用最大 rf-456，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -14,15 +14,6 @@
 |---|------|----------|
 | **rf-113** | plan-1 **Iter 7 全链路浏览器人工验证 6 项全程未实测**（设计文档验收标准 2/3/4/6 标 ⏳）：① 6 图 Chrome/Edge 90+ 真实渲染+交互（Firefox 90+/Safari 14+ 抽验，R17）② 打印 2x DPI 快照 + 浅色强制 + 不跨页 ③ 离线验证（删除/改名 chart.min.js → `typeof Chart` 守卫应跳过、无 JS 报错、回退 Canvas/表格）④ 微信内置浏览器链接 + file:// 两种打开方式实测（R22）⑤ 移动端 375px 图表不溢出（A4）⑥ 禁用 Canvas 后 6 图区域显示 fallback 文本而非空白（A1） | **载体已备齐（2026-08-03）**：①③⑤ 用 `src/static/test-chart.html` 调试页自检（TD8 rf-112 载体；本次修复 rf-159 回归——注入列表补 `chart-common.js`，否则 0/6 全跳过）；②④⑥ 用完整报告（菜单 L/B，`enable_interactive_charts` 默认开）。**勾选清单**：`docs-stm/archive/v0.9.x/chartjs-upgrade/iter7-verification-checklist.md`（已更新至 7 JS 资产 + chart-common.js 依赖说明 + 回撤图数据 span≥60 交易日才渲染的说明），用户另机手工勾选完成后回填 changelog、本表移至已修复。**验证进度（2026-08-06 另机）**：① 全过（ok/degraded 6/6 图渲染 + tooltip、empty 4/6 渲染 + 2 占位、offline 守卫生效，Windows Chrome+Firefox；期间修复 rf-248/249/251）；② 2.1~2.3 过（2x DPI 清晰/浅色主题/不跨页），2.4 afterprint 待补验；③ 3.2~3.4 过（引擎缺失守卫：无 JS 报错、chart-config/chart-init 静默跳过；现代浏览器不渲染 `<canvas>` fallback 文本，图表区域空白，真实报告回退明细表格，见 rf-249 修正）；待补验：② 2.4、③ 3.1（断网渲染）、④ 微信、⑤ 375px、⑥ 禁用 Canvas |
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器。**2026-08-05 决策：先完成 rf-113 人工验证（确认 Chart.js 真机渲染可靠）后再执行删除** |
-
-### P3 — 近期实现的可维护性项（2026-09-26 审计）
-
-> 36 小时实现（v0.11.4/v0.11.5 发布 + plan-57 端点节流 + 本会话财报域/测试隔离/CI 守护）审计发现，已修复 5 项见「已解决问题」，下列 2 项建议单独立项。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-453** | **重试/退避实现已散落 5 处、口径互不一致**：① `fetcher/chain.py` 同源瞬时重试（0.6·2ⁿ + jitter 0.2）；② `providers/cninfo.py` 连接级重试（3 次、1s/2s 线性）；③ `providers/datasink.py` 429 退避（2s×1）；④ `providers/eastmoney_industry.py`（0.5·2ⁿ + jitter 0.3）；⑤ `providers/tencent.py`（超时×2）；另有既有共享原语 `providers/_utils.py::run_with_timeout(retries=1, 1s)` 仅覆盖 akshare 路径。**风险**：①“哪些异常算瞬时”逐处自定义（tencent 只重超时、eastmoney 只重 RequestError、cninfo 两者都重）；②最坏时延无法一眼估算（调用方无法预判一次取数最坏耗时）；③策略调整需改 5 处，易漏 | **待处理**（建议单独立项实施）：抽 `core/retry.py`（或扩展现有 `providers/_utils`）为统一原语——`retry_transient(fn, *, attempts, base_backoff, jitter, retry_on=(TimeoutException, RequestError))`，5 处迁移并在技术设计「数据获取层」登记单一事实来源；迁移须逐源跑 `--mode verify` + 对应 provider 用例（含“重试次数有界/非瞬时不重试/退避可置 0”三类断言），并核对最坏时延不超各源 `timeout` 预算 |
-| **rf-454** | **`llm/pacing.py`（本周期新增，LLM 端点级节流）与 `fetcher/batch.py::RateLimiter`（数据源请求间隔）存在部分重叠**：两者都实现「最小请求间隔 + 等待 + jitter」；差异在 pacing 另有**在途并发上限**（`max_concurrency`）与声明化配置（provider 条目），RateLimiter 仅间隔。属**低优先观察项**：作用域不同（LLM 端点 vs 数据源请求），当前不做抽象合并以免过度设计 | **待处理（观察）**：若后续再出现第三处“间隔+等待”需求，再评估抽公共基元；届时须同时核对两处的日志/错误语义差异（pacing 与 403 风控不重试策略耦合） |
 
 #### P2A — 文件过长（>500 行，可选优化；**>800 行为硬上限必须拆分**）
 
@@ -65,6 +56,9 @@
 
 
 
+
+| **rf-454** | **间隔节流原语住在数据层模块，被 LLM 层与 providers 反向依赖（层次倒置），且抖动算式外泄**：`fetcher/batch.py::RateLimiter` 是通用「按名最小间隔」原语（数据源 qps 限速 / `batch_rate_limit` / LLM 端点节流三层共用），却定义在批量调度模块里——`llm/pacing.py`、`providers/{datasink,hithink,cninfo}` 均需 `from src.python.fetcher.batch import RateLimiter`（上层/同层反向依赖）；且 pacing 自行计算 `min_interval + uniform(0, min_interval × jitter)`，抖动算式有两份 | 已修复（2026-09-26）：① **原语下沉**：`RateLimiter` 迁至 `src/python/core/throttle.py`（唯一实现），并新增 `interval_delay(interval, jitter_ratio)` 作为**抖动算式唯一来源**（`acquire_interval(..., jitter_ratio=)` 返回实际等待秒数）；② `fetcher/batch.py` 改为从 core 引入（既有 `from ...fetcher.batch import RateLimiter` 路径继续可用，`is` 同一类）；③ `llm/pacing.py` 与三个 provider 的依赖改指 `core.throttle`（消除反向依赖），pacing 的抖动算式删除、只保留声明解析与在途并发上限；④ 新增「间隔节流唯一原语」架构约束并同步 §6.7 命名表 `throttle` 行、附录 A 目录树、llm-technical §4.2.1；⑤ 新增 `test_throttle.py`（13 例：抖动算式边界/等待量/短路/按名互不阻塞 + **归属断言**：数据层再导出同一类、pacing 不再依赖 fetcher、providers 依赖 core），并修 2 处随之过期的文档串（pacing 模块说明与 `_get_limiter` docstring）；⑥ 顺带把 26 处测试补丁由「patch provider 的 httpx 引用」改指**统一 HTTP 出口** `core.http_client.httpx.Client`（对齐「patch 调用点模块」原则） |
+| **rf-453** | **重试/退避实现散落 5 处、口径互不一致**：`fetcher/chain.py` 同源瞬时重试（0.6·2ⁿ + jitter 0.2）、`providers/cninfo.py` 连接级重试（3 次、1s/2s 线性）、`providers/datasink.py` 429 退避（1s×1）、`providers/eastmoney_industry.py`（0.5·2ⁿ + jitter 0.3）、`providers/tencent.py`（超时×2、无等待），另有 `providers/_utils.py::run_with_timeout`（akshare 超时×2、固定 1s）——「哪些异常算瞬时」逐处自定义、最坏时延无法估算、策略调整需改 6 处；本轮新增的 cninfo 连接级重试是第 6 处 | 已修复（2026-09-26）：① 新建 **`src/python/core/retry.py`** 三件套——`RetryPolicy`（attempts/固定·线性·指数算式/jitter/max_backoff + 边界钳制）、`is_transient_exception`（传输级瞬时判据唯一定义）、`retry_transient`（异常触发 + **结果哨兵触发**两类条件、`on_retry` 回调保留各源日志文案、`sleep` 可注入便于测试零等待）；② **6 处迁移**并保持行为等价：chain（哨兵 `TRANSPORT_FAILURE`，策略 attempts=2/指数/0.6/2.0/jitter 0.2，保留 `_TRANSIENT_RETRY_BACKOFF` 以兼容测试与离线桩置 0）、cninfo（3 次线性 1s/2s + 429 策略）、datasink（429 策略）、eastmoney_industry（retries+1 指数 0.5/2.0/jitter 0.3）、tencent（2 次固定、无等待）、`providers/_utils`（akshare：attempts=1+retries、固定 1s、`retry_on=恒真` 保持原语义）；③ 新增「重试与退避唯一原语」架构约束，并同步 §2.2.1 口径说明、§6.7 命名表 `retry` 行、附录 A 目录树、CLAUDE.md 的约束编号范围同步扩展；④ 需求层补 **R-DATA-07（重试与节流口径统一）** + testplan 载体映射（`test_retry.py` / `test_throttle.py` / `test_cninfo.py`）；⑤ 新增 `test_retry.py`（15 例：三种算式/抖动边界/上限/钳制/瞬时判据/异常与哨兵重试/有界/非瞬时不重试/回调契约）；⑥ 顺带修正 `eastmoney_industry` docstring 与实际不符的「默认 3 次」（常量 `_MAX_RETRIES = 1`） |
 
 | **rf-452** | **`check-sources` 新增的 DataSinking 探针会消耗源配额，但文档未提示**：探针为一次轻量元数据查询（`600900.SS`，size=1），每次 `check-sources` 消耗 **1 次 DataSinking 配额**（免费档 8191 篇/日）；用户可能以为“健康检查零成本”而频繁运行 | 已修复（2026-09-26）：`datasource-reliability.md` §5.2 补「配额提示」——DataSinking 探针每次消耗 1 次配额（命中月级缓存时近乎零成本），巨潮探针仅解析 orgId（无凭据、无配额） |
 | **rf-451** | **离线桩清单缺完整性断言**：`src/test/_network_guard.py::apply_offline_stubs` 以「模块路径字符串」写死 4 个桩目标（`httpx.Client`/`AsyncClient`、`trading_calendar._get_trading_calendar`、`chain._TRANSIENT_RETRY_BACKOFF`、`akshare_extras.ak`）；上游重命名/搬迁后 `monkeypatch.setattr` 会抛 AttributeError（不会静默失效，但只有在用到该 fixture 的用例运行时才暴露） | 已修复（2026-09-26）：`test_network_guard.py` 新增 `TestOfflineStubTargets::test_stub_targets_exist`——把「桩目标存在且类型正确」提前为可独立发现的断言（httpx 两个类可调用、trading_calendar 取数函数可调用、chain 退避常量为 float、akshare_extras 有 `ak` 属性） |

@@ -439,6 +439,7 @@
 | R-DATA-04 | `src/test/unit/core/test_cache_edge.py::test_market_open_uses_short_ttl` / `::test_market_closed_uses_static_ttl` | 批 3 |
 | R-DATA-05 | `src/test/unit/core/test_data_freshness.py` | 批 3 |
 | R-DATA-06 | `src/test/unit/core/test_code_utils_classification.py` + `src/test/unit/fetcher/test_fund.py` | 批 3 |
+| R-DATA-07 | `src/test/unit/core/test_retry.py` + `src/test/unit/core/test_throttle.py` + `src/test/unit/providers/test_cninfo.py` | 批 4 |
 | R-IDX-01 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_tencent.py` | 批 3 |
 | R-IDX-02 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_sina.py` | 批 3 |
 | R-IDX-03 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/fetcher/test_chain.py` | 批 3 |

@@ -98,7 +98,7 @@ def _get_limiter() -> Any:
     if _limiter is None:
         with _limiter_lock:
             if _limiter is None:
-                from src.python.fetcher.batch import RateLimiter
+                from src.python.core.throttle import RateLimiter
 
                 from src.python.config import get_config
 

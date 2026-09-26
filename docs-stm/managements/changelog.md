@@ -36,6 +36,20 @@
 
 ---
 
+### rf-453、rf-454：重试/退避与间隔节流收敛为唯一原语（2026-09-26）
+
+**动因**：审计发现「退避算式与瞬时判据在 6 处各自实现」，且通用「按名间隔」原语错住数据层模块、被 LLM 层与 providers 反向依赖（层次倒置）。两类问题都属「实现未收敛」（对齐既有「实现收敛到唯一原语」的先例，如原子写入），故以**新增架构约束 + 新公共原语 + 逐处迁移**处理。
+
+**代码变更**：
+- **新增 `src/python/core/retry.py`**（rf-453）：`RetryPolicy`（attempts + 固定/线性/指数算式 + jitter + max_backoff，含 attempts<1 / 未知算式 / base=0 不等待等边界钳制）、`is_transient_exception`（传输级瞬时判据唯一定义）、`retry_transient`（**异常触发**与**结果哨兵触发**两类条件、`on_retry` 回调保留各源日志文案、`sleep` 可注入）
+- **6 处迁移（行为等价）**：Provider Chain 同源重试（哨兵 `TRANSPORT_FAILURE`，策略 attempts=2 / 指数 / 0.6 / ×2 / jitter 0.2；保留 `_TRANSIENT_RETRY_BACKOFF` 以兼容既有测试与离线桩置 0）、巨潮连接级重试（3 次线性 1s/2s）、DataSinking 429 退避、东财 push2（retries+1 指数 0.5 / ×2 / jitter 0.3）、腾讯行情（2 次固定、无等待）、akshare 超时（attempts=1+retries / 固定 1s / `retry_on` 恒真以保持原「一律重试」语义）
+- **原语下沉（rf-454）**：`RateLimiter` 由 `fetcher/batch.py` 迁至 **`src/python/core/throttle.py`**（唯一实现），新增 `interval_delay(interval, jitter_ratio)` 作为**抖动算式唯一来源**（`acquire_interval` 返回实际等待秒数）；`fetcher/batch.py` 改为从 core 引入（既有 import 路径仍指向同一类）；`llm/pacing.py` 与 `providers/{datasink,hithink,cninfo}` 依赖改指 core.throttle；pacing 只保留声明解析 + 在途并发上限
+- **顺带**：修 `eastmoney_industry` docstring 与实际不符的「默认 3 次」（常量为 1）；26 处测试补丁由「patch provider 的 httpx 引用」改指统一 HTTP 出口 `core.http_client.httpx.Client`（对齐 patch 调用点原则）
+
+**架构与需求层同步**：technical.md 新增「重试与退避唯一原语」与「间隔节流唯一原语」两条架构约束（§8.5，含违反后果与适用范围），§2.2.1 补「口径单一来源」说明、§6.7 命名表补 `retry` / `throttle` 行、附录 A 目录树补两模块；CLAUDE.md 的约束编号范围同步扩展；requirements.md 新增 **R-DATA-07（重试与节流口径统一）** 并在 testplan.md 映射表补载体；llm-technical §4.2.1 更新间隔原语归属；用户文档 `datasource-reliability.md` §3.9 补「重试（备源巨潮）」与 429 退避口径
+
+**测试**：新增 `test_retry.py`（15 例）与 `test_throttle.py`（13 例，含**归属断言**：数据层再导出同一类、pacing 不再依赖 fetcher、providers 依赖 core）；迁移后全量非 live 套件 0 失败（行为等价）；收集数 7,885 → **7,913**。
+
 ### 36 小时实现技术债审计（2026-09-26，rf-448、rf-449、rf-450、rf-451、rf-452）
 
 **范围**：过去 36 小时 12 个提交——v0.11.4 / v0.11.5 两次发布、plan-57 端点级节流、财报域备源链路修复、测试外部网络隔离、文档门禁槽位级校验、健康检查覆盖财报域、CI `guards` job、hooks 清理。

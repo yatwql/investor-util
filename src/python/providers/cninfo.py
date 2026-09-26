@@ -31,12 +31,12 @@ from collections.abc import Callable
 from datetime import date, timedelta
 from typing import Any
 
-import httpx
 
 from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.core.http_client import make_http_client
+from src.python.core.retry import STRATEGY_FIXED, STRATEGY_LINEAR, RetryPolicy, retry_transient
 
 logger = logging.getLogger("invest")
 
@@ -49,13 +49,10 @@ _TIMEOUT = 20.0
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 #: 公开 API 礼貌间隔（秒）：限速器单例的固定档（数据源免费且无配置套餐，不引入配置键）
 _MIN_INTERVAL = 1.0
-#: 429 限速退避秒数（重试一次）
-_RATE_LIMIT_BACKOFF = 2.0
-#: 连接级瞬时失败（冷启动握手被丢弃 / DNS 抖动）的**总尝试次数**与基础退避（秒）。
-#: 实测：本机到 cninfo 的**首个连接**常被丢弃（http/https 均见 8s 超时，随后立即 200）；
-#: 故留 3 次尝试（1 次原始 + 2 次重试），退避按尝试次数递增（1s、2s）。
-_CONNECT_RETRY_ATTEMPTS = 3
-_CONNECT_RETRY_BACKOFF = 1.0
+#: 429 限速退避策略（重试一次）
+_RATE_LIMIT_POLICY = RetryPolicy(attempts=2, strategy=STRATEGY_FIXED, base_backoff=2.0)
+#: 连接级瞬时失败重试策略（线性退避 1s、2s；总尝试 3 次）
+_CONNECT_RETRY_POLICY = RetryPolicy(attempts=3, strategy=STRATEGY_LINEAR, base_backoff=1.0)
 
 INDEX_PREFIX = "report_cninfo_index_"
 ORGID_PREFIX = "report_cninfo_orgid_"
@@ -105,7 +102,7 @@ def _get_limiter() -> Any:
     if _limiter is None:
         with _limiter_lock:
             if _limiter is None:
-                from src.python.fetcher.batch import RateLimiter
+                from src.python.core.throttle import RateLimiter
 
                 _limiter = RateLimiter({SOURCE_ID: _MIN_INTERVAL})
     return _limiter
@@ -124,41 +121,45 @@ def reset_cninfo_limiter() -> None:
 
 
 def _with_transient_retry(label: str, do_request: Callable[[], Any]) -> Any:
-    """执行一次 HTTP 请求；**连接级瞬时失败**退避后重试一次。
+    """执行一次 HTTP 请求；**连接级瞬时失败**按策略退避重试（限速每次尝试前生效）。
 
     背景（本机实测）：到 cninfo 的**首个连接**常被丢弃（http/https 均见 8s 超时，
     随后立即 200）——若直连取数不做重试，冷启动抖动即让整只标的丢掉备源候选
     （orgId 解析失败 → 公告列表为空 → 备源不可用）；而这三条直接调用路径
     （orgId / 公告列表 / PDF 下载）都**不经 Provider Chain**，拿不到链路的同源重试。
 
-    仅对 ``httpx.TimeoutException`` / ``httpx.RequestError`` 重试（共
-    ``_CONNECT_RETRY_ATTEMPTS`` 次尝试，退避递增）；其余异常（如参数/解析错误）
+    重试策略与瞬时判据由 ``core/retry.py`` 统一提供；其余异常（如参数/解析错误）
     属确定性失败，直接降级不重试。
     """
     limiter = _get_limiter()
-    for attempt in range(1, _CONNECT_RETRY_ATTEMPTS + 1):
+    tried = {"n": 0}
+
+    def _attempt() -> Any:
+        tried["n"] += 1
         limiter.acquire(SOURCE_ID)
-        try:
-            return do_request()
-        except (httpx.TimeoutException, httpx.RequestError) as e:
-            if attempt < _CONNECT_RETRY_ATTEMPTS:
-                backoff = _CONNECT_RETRY_BACKOFF * attempt
-                logger.warning(
-                    "[cninfo] 连接失败 %s（%s），%.1fs 后重试（第 %d/%d 次尝试）",
-                    label,
-                    e,
-                    backoff,
-                    attempt,
-                    _CONNECT_RETRY_ATTEMPTS,
-                )
-                time.sleep(backoff)
-                continue
-            logger.warning("[cninfo] 请求失败 %s: %s（已试 %d 次）", label, e, _CONNECT_RETRY_ATTEMPTS)
-            return None
-        except Exception as e:  # 非瞬时：直接降级（不计熔断）
-            logger.warning("[cninfo] 请求失败 %s: %s", label, e)
-            return None
-    return None
+        return do_request()
+
+    def _on_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
+        logger.warning(
+            "[cninfo] 连接失败 %s（%s），%.1fs 后重试（第 %d/%d 次尝试）",
+            label,
+            exc,
+            delay,
+            failed_attempt,
+            _CONNECT_RETRY_POLICY.attempts,
+        )
+
+    try:
+        return retry_transient(
+            _attempt,
+            policy=_CONNECT_RETRY_POLICY,
+            on_retry=_on_retry,
+            sleep=time.sleep,
+        )
+    except Exception as e:  # 瞬时重试耗尽 / 非瞬时失败：降级为 None（不计熔断）
+        suffix = f"（已试 {tried['n']} 次）" if tried["n"] > 1 else ""
+        logger.warning("[cninfo] 请求失败 %s: %s%s", label, e, suffix)
+        return None
 
 
 def _post_once(url: str, data: dict[str, Any]) -> Any:
@@ -183,8 +184,9 @@ def _post_json(path: str, data: dict[str, Any]) -> dict[str, Any] | None:
     if resp is None:
         return None
     if resp.status_code == 429:
-        logger.warning("[cninfo] 触发限速（HTTP 429），%.1fs 后重试一次", _RATE_LIMIT_BACKOFF)
-        time.sleep(_RATE_LIMIT_BACKOFF)
+        delay = _RATE_LIMIT_POLICY.delay_for(1)
+        logger.warning("[cninfo] 触发限速（HTTP 429），%.1fs 后重试一次", delay)
+        time.sleep(delay)
         resp = _with_transient_retry(path, lambda: _post_once(url, data))
         if resp is None:
             return None

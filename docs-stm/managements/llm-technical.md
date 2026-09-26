@@ -469,7 +469,7 @@ llm_providers.json
 | **与全局并发叠加** | `llm_max_concurrency`（线程池）与 `pacing.max_concurrency`（每端点信号量）是**两级**约束，同时生效 |
 | **间隔在并发许可之后取得** | 先 `semaphore.acquire()` 再等间隔，使 `min_interval` 真正约束「请求发出」时刻（否则排队线程会同时放行） |
 | **抖动** | `jitter` 按比例叠加到 `min_interval` 上（`min_interval × (1 + U(0, jitter))`），避免固定节奏的机器特征 |
-| **复用既有原语** | 间隔控制复用 `fetcher/batch.py::RateLimiter`（新增 `acquire_interval(key, interval)` 方法支持逐次显式间隔），不重复实现限速器 |
+| **复用既有原语** | 间隔与抖动等待由 `core/throttle.py::RateLimiter` 提供（`acquire_interval(key, interval, jitter_ratio)`；抖动算式 `interval_delay` 为唯一来源）——与数据层 qps 限速、`batch_rate_limit` 共用同一实现，`pacing` 只负责声明解析与在途并发上限 |
 | **异常必释放** | `PacingGate` 以 context manager 实现，`__exit__` 无条件 release，避免异常路径把端点占死 |
 | **配置容错** | `pacing` 字段类型错误**逐字段忽略**（记 WARNING），不因单个笔误使整条 provider 校验失败 |
 

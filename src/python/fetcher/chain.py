@@ -8,8 +8,6 @@ chain 中按优先级列出 provider，主链路失败后自动递补。
 from __future__ import annotations
 
 import logging
-import random
-import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
@@ -19,6 +17,7 @@ from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.config import get_config
 from src.python.core.constants import CACHE_WEEKLY
+from src.python.core.retry import STRATEGY_EXPONENTIAL, RetryPolicy, retry_transient
 from src.python.core.datasource_credential import credential_hint, credential_ready_enabled, missing_credential
 from src.python.core.provider_registry import TRANSPORT_FAILURE, get_registry
 from src.python.core.trading_calendar import count_trading_days_elapsed
@@ -303,33 +302,40 @@ def fetch_with_fallback(
                 diagnostics.add(source_label or provider_name, "无 fetch 函数")
             continue
 
-        result, reason = _try_provider_fetch(
-            data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform
-        )
+        reason_box: dict[str, str] = {"reason": ""}
 
-        # 传输级瞬时失败 → 同源退避重试（仍失败才落下一槽）
-        for retry_index in range(_TRANSIENT_RETRY_ATTEMPTS):
-            if result is not TRANSPORT_FAILURE:
-                break
-            # 退避为 0 时不睡（测试将退避置 0 以保持快速）
-            delay = 0.0
-            if _TRANSIENT_RETRY_BACKOFF > 0:
-                delay = _TRANSIENT_RETRY_BACKOFF * (2**retry_index) + random.uniform(0, 0.2)
+        def _attempt() -> Any:
+            result, reason_box["reason"] = _try_provider_fetch(
+                data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform
+            )
+            return result
+
+        def _on_transient_retry(failed_attempt: int, delay: float, _exc: BaseException | None) -> None:
             logger.info(
                 "[%s]%s %s 传输级失败（%s），%.1fs 后同源重试 %d/%d",
                 data_type,
                 _code_tag,
                 source_label,
-                reason,
+                reason_box["reason"],
                 delay,
-                retry_index + 1,
+                failed_attempt,
                 _TRANSIENT_RETRY_ATTEMPTS,
             )
-            if delay > 0:
-                time.sleep(delay)
-            result, reason = _try_provider_fetch(
-                data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform
-            )
+
+        # 传输级瞬时失败 → 同源退避重试（仍失败才落下一槽）；退避算式与次数由 core/retry 统一
+        result = retry_transient(
+            _attempt,
+            policy=RetryPolicy(
+                attempts=1 + _TRANSIENT_RETRY_ATTEMPTS,
+                strategy=STRATEGY_EXPONENTIAL,
+                base_backoff=_TRANSIENT_RETRY_BACKOFF,
+                factor=2.0,
+                jitter=0.2,
+            ),
+            retry_if_result=lambda r: r is TRANSPORT_FAILURE,
+            on_retry=_on_transient_retry,
+        )
+        reason = reason_box["reason"]
 
         if result is not None and result is not TRANSPORT_FAILURE:
             # 成功 → 恢复熔断计数器 + 登记 provider 级归属（矩阵「命中源」列的数据来源）

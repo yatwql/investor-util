@@ -28,6 +28,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from src.python.core.throttle import RateLimiter  # 实现见 core/throttle.py（数据/调度/LLM 三层共用）
+
 logger = logging.getLogger("invest")
 
 
@@ -257,7 +259,6 @@ class BatchDispatcher:
           - self._executor 已 shutdown 时抛 RuntimeError
         """
         import random
-        import time
 
         failed_indices = [r.index for r in results if not r.success and not r.skipped]
         if not failed_indices:
@@ -386,69 +387,6 @@ class BatchDispatcher:
                     r.error = "task returned None"
 
         return results  # type: ignore[return-value]
-
-
-class RateLimiter:
-    """Provider 级别请求间隔控制器。
-
-    防止并发批量操作对同一 Provider 造成请求压力（反爬/限频）。
-    不同 Provider 配置独立的请求间隔。
-    相同 Provider 的所有请求间隔确保 ≥ 配置值。
-
-    线程安全：使用 per-provider 锁，不同 provider 互不阻塞。
-
-    Usage:
-        limiter = RateLimiter({"tiantian": 0.5, "eastmoney": 0.1})
-        limiter.acquire("tiantian")
-        # 发起 HTTP 请求...
-    """
-
-    def __init__(self, config: dict | None = None) -> None:
-        self._limits: dict[str, float] = {}
-        self._last_call: dict[str, float] = {}
-        self._locks: dict[str, threading.Lock] = {}
-        self._load_config(config or {})
-
-    def _load_config(self, config: dict) -> None:
-        """从配置字典加载限速规则。"""
-        for provider, interval in config.items():
-            if isinstance(interval, (int, float)) and interval > 0:
-                self._limits[provider] = float(interval)
-
-    def acquire(self, provider: str) -> None:
-        """获取请求许可，必要时阻塞直到间隔满足。"""
-        interval = self._limits.get(provider, 0.0)
-        if interval <= 0:
-            return
-        self.acquire_interval(provider, interval)
-
-    def acquire_interval(self, provider: str, interval: float) -> None:
-        """按**显式间隔**获取许可（不受构造时配置约束）。
-
-        与 :meth:`acquire` 的区别：间隔由调用方逐次给出而非构造时固定——LLM 端点
-        节流需要按策略动态计算（含随机抖动），且同一 provider 的策略可在运行期刷新。
-
-        Args:
-            provider: 端点/源标识（作为间隔计量的键）
-            interval: 本次要求的最小间隔（秒）；<= 0 不等待
-        """
-        if interval <= 0:
-            return
-
-        # per-provider 锁，不同 provider 不互相阻塞
-        if provider not in self._locks:
-            self._locks[provider] = threading.Lock()
-
-        with self._locks[provider]:
-            last = self._last_call.get(provider, 0.0)
-            elapsed = time.monotonic() - last
-            if elapsed < interval:
-                time.sleep(interval - elapsed)
-            self._last_call[provider] = time.monotonic()
-
-    def reset(self, provider: str) -> None:
-        """重置 Provider 的最后调用时间。"""
-        self._last_call.pop(provider, None)
 
 
 def get_batch_worker_count(config_key: str, default: int = 3) -> int:

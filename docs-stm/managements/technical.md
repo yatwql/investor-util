@@ -799,6 +799,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 - **只重试传输级**：这类错误多为瞬时抖动，同源重试常即成功，避免过早降级到质量更低的槽位、也避免把偶发抖动累计成熔断（行业分类 push2 的 `Server disconnected`、DataSinking 的偶发断连即属此类）
 - **不重试代码级空结果**：Provider 正常返回但无该代码数据（`None`）时重试毫无意义（同一请求同一答案），且会白耗第三方日配额（DataSinking 免费档 8191 篇/日）
 - **次数有界**：每个 Provider 每次调用最多 1 + 1 次请求；仍失败才计入熔断计数器并落下一槽
+- **口径单一来源**：退避算式（固定/线性/指数 + 抖动 + 上限）、尝试次数与「哪些异常算瞬时」由 `core/retry.py` 统一提供（`RetryPolicy` / `is_transient_exception` / `retry_transient`）——链路、各 provider 的连接级重试、akshare 超时重试与 HTTP 429 退避共用同一执行器，差异只用策略参数表达（约束 C26）；「两次请求至少间隔多久」见 `core/throttle.py`（约束 C27）
 
 ### 2.2 三层熔断架构
 
@@ -958,7 +959,7 @@ fetcher/
 ├── fund_manager.py     基金经理数据（天天基金 HTML 解析）
 ├── industry.py         行业分类+概念板块（push2 双链路）
 ├── chain.py            Provider 优先链定义 + fallback 路由 + 增量合并
-├── batch.py            批量并行调度（BatchDispatcher + RateLimiter）
+├── batch.py            批量并行调度（BatchDispatcher；间隔限速实现见 core/throttle.py）
 ├── akshare.py          AKShare 数据获取（备用数据源）
 ├── bond_yield.py       债券收益率数据
 ├── news.py             新闻数据获取
@@ -3328,6 +3329,8 @@ make_http_client(timeout=10.0) → httpx.Client
 | `health_history` | 数据源健康历史（load_health_history/summarize_health_history） | 日志可视化 | 监控 | data/state/datasource_health.jsonl |
 | `jsonl_store` | JSONL 原子追加原语（`perf`/`decision_ledger`/`signal_ledger` 共同委托的唯一拷贝） | 诊断 | 监控 | 无（模块级） |
 | `num_utils` | 数值归一原语（`safe_num` 显式拦下 NaN/±inf，替代失效的 `try: float()` 兜底） | 诊断 | 数据获取 | 无（模块级，A 通道无开关） |
+| `retry` | 重试与退避唯一原语（`RetryPolicy` 策略算式 / `is_transient_exception` 瞬时判据 / `retry_transient` 执行器；链路与各 provider 共用） | 诊断 | 数据获取 | 无（模块级） |
+| `throttle` | 按名最小间隔节流唯一原语（`RateLimiter` + `interval_delay` 抖动算式；数据层限速/批量调度/LLM 端点节流三层共用） | 诊断 | 数据获取 | 无（模块级） |
 | `doctor` | 系统自检（环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，失败项附可执行建议，自身永不抛异常） | 诊断 | 诊断 | 开关 `doctor_check`（默认开；CLI `doctor` 子命令不受开关约束） |
 | `doctor_check` | 自检功能上屏门控（TUI 菜单 [D] 与 Web 状态区自检卡片可见性） | 诊断 | 诊断 | 开关 `doctor_check`（默认开，非实验项） |
 | `datasource_fields` | 数据域标准字段记录（`schemas/datasource_fields.py`，类型注解即缺省语义） | 数据源适配 | 数据获取 | 随 `datasource_adapter` |
@@ -3470,9 +3473,9 @@ web/ (Web 服务层，薄入口)
 本节定义系统架构层面的**设计约束**。所有新增或修改的代码必须遵守，违反即视为架构违规。
 约束按职责域分组，每个约束包含：设计目的（为何存在）、违反后果（不遵守的影响）、适用范围（哪些模块/场景受约束）。
 
-> **约束外参照（语义命名纪律）**：除上表 C1~C25 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
+> **约束外参照（语义命名纪律）**：除上表 C1~C27 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
 
-> **约束外参照（文档与实现一致性纪律）**：除上表 C1~C25 编号约束外，**文档中的事实断言**（章节表与数量、功能开关表与分组计数、默认值表、TUI 面板编号、目录树、项目统计表）必须与代码/配置文件/文件系统一致，由 `scripts/check-doc-drift.py --ci` 强制（十项逐条对账，`changelog.md`/`review-findings.md` 与版本快照类文档按设计豁免）；历史痕迹类约束另由 `scripts/check-doc-traces.py --ci` 强制。
+> **约束外参照（文档与实现一致性纪律）**：除上表 C1~C27 编号约束外，**文档中的事实断言**（章节表与数量、功能开关表与分组计数、默认值表、TUI 面板编号、目录树、项目统计表）必须与代码/配置文件/文件系统一致，由 `scripts/check-doc-drift.py --ci` 强制（十项逐条对账，`changelog.md`/`review-findings.md` 与版本快照类文档按设计豁免）；历史痕迹类约束另由 `scripts/check-doc-traces.py --ci` 强制。
 
 > **约束外参照（脚本 CLI 契约）**：`scripts/` 下的检查脚本统一 `-v/--verbose` + `--ci`（仅输出 `文件:描述`）与退出码语义（0=通过 / 2=发现 finding，`check-code-traces.py` 保留 HIGH=1、LOW=3 分级）；共享设施集中在 `scripts/_checklib.py`（CLI/输出/路径/文档区间解析）与 `scripts/_traces_common.py`（历史痕迹共享排除模式），测试驱动内部实现拆在 `scripts/_test_runner/` 包内（入口 `test-runner.py` 原面 re-export）。
 
@@ -3526,6 +3529,8 @@ web/ (Web 服务层，薄入口)
 | **C15** | **控制台日志着色** — WARNING 级别使用黄色输出、ERROR 级别使用红色输出；当 `NO_COLOR` 环境变量设置或输出非 TTY 时自动降级为无颜色 | 着色提升控制台日志的辨识度，便于快速定位告警和错误；降级保证日志导出、管道重定向时无转义字符污染输出 | 日志可读性降低、非 TTY 环境下转义字符污染 | `core/logger.py`（_ColoredFormatter） |
 | **C23** | **功能开关注册表唯一事实来源** — **全部**功能开关的枚举、显示名、说明、分组、默认值与产物影响必须来自 `config/features.py` 的 `feature_switch_registry`（`_FEATURE_FLAGS_DEFAULT` 是它的派生投影，非独立登记点）；TUI 功能开关面板、Web 配置面板、CLI `--experiment` / `--feature` 取值校验与提示文案、用户文档与管理文档的开关清单**一律由该注册表驱动**，禁止任何渠道层另写一份清单 | 渠道各写清单时，新增/改名/删除开关必漏改某渠道——用户在该渠道看不到、改不了，或文档与实际开关对不上；清单是静态字面量，编译期与运行期均无任何提示，只会在用户报障时暴露。**可见性若与「是否实验项」绑定**，则转正（默认值改 `true`）会连带摘掉面板入口，关闭途径只剩手改 `features.json`——可见性由**分组属性**表达，与默认值解耦 | 开关在部分渠道缺失或名称不一致；文档承诺的开关在界面中不存在（或反之）；新增开关的接入成本从「改一处」膨胀为「逐个渠道找清单」；转正即失去界面入口 | `config/features.py`（唯一注册点）、`tui/`（功能开关面板）、`web/`（配置面板）、`cli/`（`--experiment` / `--feature` 校验与报错提示）、`docs-stm/manuals/` 与 `docs-stm/managements/` 的开关清单 |
 | **C16** | **路径绝对化** — 配置层输出的路径型键（`holdings_dir`、`output_dir`、`llm_key_file`、`llm_providers_file`、`llm_settings_file`）必须为绝对路径，在 `get_config()` 返回前经 `_absolutize_paths()` 统一转换；下游消费者不得依赖 CWD | `tui/tui.py`/`cli/cli.py` 去掉了 `os.chdir`，相对路径无法被正确解析 | 路径查找失败、配置文件/持仓文件/报告输出找不到 | `config/_core.py`（转换点），所有消费路径型配置的模块 |
+| **C26** | **重试与退避唯一原语** — 凡「失败后重试」必须经 `core/retry.py`（`RetryPolicy` 策略 / `is_transient_exception` 瞬时判据 / `retry_transient` 执行器），禁止各模块自建重试循环与退避算式；各来源差异只用策略参数表达 | 退避数值与「可重试」口径各写一处必然漂移：最坏时延无法估算、策略调整需改 N 处、测试钉住的次数与等待量随之失真 | 全部取数路径（Provider Chain 同源重试、provider 连接级重试、akshare 超时重试、HTTP 429 退避） |
+| **C27** | **间隔节流唯一原语** — 凡「两次请求至少间隔多久」必须经 `core/throttle.py`（`RateLimiter` + `interval_delay`），禁止自建「间隔 + 睡眠」与抖动算式 | 同一约束在数据层/调度层/LLM 层各写一份 → 抖动幅度与等待语义不一致；通用原语若住在某一上层模块，会被其他层反向依赖（层次倒置） | 数据源 qps 限速、`batch_rate_limit`、LLM 端点级节流（`pacing`） |
 
 ### 8.6 测试约束
 
@@ -3565,6 +3570,8 @@ investor-util/
 │   │   │   ├── code_utils.py    #   代码类型判定中心化
 │   │   │   ├── constants.py     #   共享常量 + 项目根路径
 │   │   │   ├── http_client.py   #   HTTP 客户端工厂
+│   │   │   ├── retry.py         #   重试与退避唯一原语（策略/瞬时判据/执行器）
+│   │   │   ├── throttle.py      #   按名最小间隔节流唯一原语（含抖动算式）
 │   │   │   ├── logger.py        #   日志模块
 │   │   │   ├── market_hours.py  #   交易时段判断
 │   │   │   ├── models.py        #   数据模型

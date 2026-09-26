@@ -30,14 +30,13 @@ provider 条目自带 ``pacing`` 段，缺省即表示「无额外约束」（�
 
 字段全部可选：``pacing`` 缺失 / 为 null / 全零 ⇒ 该端点不受本机制约束。
 
-线程安全：间隔控制复用 ``fetcher.batch.RateLimiter``（per-key 锁，不同端点互不阻塞）；
+线程安全：间隔控制复用 ``core.throttle.RateLimiter``（per-key 锁，不同端点互不阻塞）；
 在途并发用 per-endpoint ``BoundedSemaphore``。
 """
 
 from __future__ import annotations
 
 import logging
-import random
 import threading
 from typing import Any
 
@@ -203,25 +202,20 @@ _SEMS: dict[str, threading.BoundedSemaphore] = {}
 
 
 def _get_limiter() -> Any:
-    """惰性构造共享 RateLimiter（复用 fetcher.batch 的既有实现，避免重复造）。"""
+    """惰性构造共享 RateLimiter（唯一实现见 core/throttle.py，此处只做单例缓存）。"""
     global _LIMITER
     if _LIMITER is None:
         with _LIMITER_LOCK:
             if _LIMITER is None:
-                from src.python.fetcher.batch import RateLimiter
+                from src.python.core.throttle import RateLimiter
 
                 _LIMITER = RateLimiter()
     return _LIMITER
 
 
 def _acquire_interval(endpoint_key: str, policy: PacingPolicy) -> None:
-    """按策略等待到允许发请求的时刻（带抖动）。"""
-    limiter = _get_limiter()
-    if policy.jitter > 0:
-        spread = policy.min_interval * policy.jitter
-        limiter.acquire_interval(endpoint_key, policy.min_interval + random.uniform(0, spread))
-    else:
-        limiter.acquire_interval(endpoint_key, policy.min_interval)
+    """按策略等待到允许发请求的时刻（间隔 + 抖动算式由 core.throttle 统一提供）。"""
+    _get_limiter().acquire_interval(endpoint_key, policy.min_interval, jitter_ratio=policy.jitter)
 
 
 def _get_semaphore(endpoint_key: str, limit: int) -> threading.BoundedSemaphore:

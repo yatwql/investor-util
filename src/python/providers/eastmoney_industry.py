@@ -16,15 +16,18 @@ from __future__ import annotations
 
 import json
 import logging
-import random
-import time
 from typing import Any
 
-import httpx
 
 from src.python.core.code_utils import get_push2_secid
 from src.python.core.http_client import make_http_client
 from src.python.core.num_utils import safe_num
+from src.python.core.retry import (
+    STRATEGY_EXPONENTIAL,
+    TRANSIENT_EXCEPTIONS,
+    RetryPolicy,
+    retry_transient,
+)
 
 logger = logging.getLogger("invest")
 
@@ -64,7 +67,7 @@ def make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
 
     Args:
         code: 6 位证券代码
-        retries: 失败重试次数（默认 3 次，总请求数 = retries + 1）
+        retries: 失败重试次数（默认 1 次，总请求数 = retries + 1）
 
     Returns:
         data 内层字典；全部失败返回 None
@@ -82,36 +85,50 @@ def make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
     }
     logger.debug("东方财富 push2 请求: %s", code)
 
-    for attempt in range(retries + 1):
-        try:
-            with make_http_client(timeout=_TIMEOUT) as client:
-                resp = client.get(_PUSH2_BASE, params=params, headers=_HEADERS)
-                text = resp.text
-        except (httpx.TimeoutException, httpx.RequestError) as e:
-            if attempt < retries:
-                delay = (0.5 * (2**attempt)) + random.uniform(0, 0.3)
-                logger.debug("东方财富 push2 请求失败 [%s]（第 %d 次重试，%.1fs 后）: %s", code, attempt + 1, delay, e)
-                time.sleep(delay)
-                continue
-            logger.warning("东方财富 push2 请求失败 [%s]: %s", code, e)
-            reg.record_failure("eastmoney_industry", f"push2:{code}")
-            return None
+    def _attempt() -> str:
+        with make_http_client(timeout=_TIMEOUT) as client:
+            resp = client.get(_PUSH2_BASE, params=params, headers=_HEADERS)
+            return resp.text
 
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError as e:
-            logger.warning("东方财富 push2 JSON 解析失败 [%s]: %s", code, e)
-            return None
+    def _on_transient_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
+        logger.debug(
+            "东方财富 push2 请求失败 [%s]（第 %d 次重试，%.1fs 后）: %s",
+            code,
+            failed_attempt,
+            delay,
+            exc,
+        )
 
-        inner = data.get("data")
-        if not inner or not isinstance(inner, dict):
-            logger.warning("东方财富 push2 返回空数据 [%s]", code)
-            return None
+    try:
+        text = retry_transient(
+            _attempt,
+            policy=RetryPolicy(
+                attempts=retries + 1,
+                strategy=STRATEGY_EXPONENTIAL,
+                base_backoff=0.5,
+                factor=2.0,
+                jitter=0.3,
+            ),
+            on_retry=_on_transient_retry,
+        )
+    except TRANSIENT_EXCEPTIONS as e:
+        logger.warning("东方财富 push2 请求失败 [%s]: %s", code, e)
+        reg.record_failure("eastmoney_industry", f"push2:{code}")
+        return None
 
-        reg.record_success("eastmoney_industry")
-        return inner
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as e:
+        logger.warning("东方财富 push2 JSON 解析失败 [%s]: %s", code, e)
+        return None
 
-    return None  # 所有重试耗尽（理论上不会执行到）
+    inner = data.get("data")
+    if not inner or not isinstance(inner, dict):
+        logger.warning("东方财富 push2 返回空数据 [%s]", code)
+        return None
+
+    reg.record_success("eastmoney_industry")
+    return inner
 
 
 def _extract_concept_list(inner: dict) -> list[str]:
