@@ -40,6 +40,7 @@ def call_claude(
     config_field: str = "max_tokens",
     temperature: float | None = None,
     llm_config: dict | None = None,
+    endpoint_key: str = "",
 ) -> tuple[str | None, dict | None]:
     """调用 Claude API (Messages API)，带重试 + 用量日志。
 
@@ -95,6 +96,7 @@ def call_claude(
             check_truncation_fn=lambda d, mt: _check_claude_truncation(d, mt, "Claude", config_field),
             provider="claude",
             model_name=model,
+            endpoint_key=endpoint_key,
         )
 
     # ── 空响应安全网：DeepSeek 等强制推理模型在以下场景返回无正文时，

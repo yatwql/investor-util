@@ -190,7 +190,7 @@ A: 编辑 `data/config/config.json`，将对应新闻源的值设为 `false` 即
 
 **Q: 如何使用自定义业绩基准？**
 
-A: 编辑 `data/config/config.json` 的 `user_fund_benchmarks` 字段，可指定指数代码作为基金业绩基准。默认基准是沪深300（000300）。自定义基准会替换报告中基金业绩分析的基准对比列。
+A: 编辑 `data/config/config.json` 的 `user_fund_benchmarks` 字段，可指定指数代码作为基金业绩基准。**默认取该基金自身的业绩比较基准**——优先解析天天基金页面，未命中时查对照表（`user_fund_benchmarks` 覆盖内置知识库 `data/knowledge/fund_benchmarks.json`）；两者均无时该列显示 `--`。自定义基准会替换报告中基金业绩分析的基准对比列。
 
 **Q: 如何调整报告模块的显示顺序和编号？**
 
@@ -391,7 +391,7 @@ A: 编辑 `data/config/llm_key.json`，修改 `provider` 字段为 `"claude"` �
 
 **Q: 如何开启/关闭 Extended Thinking？**
 
-A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled_{模块键}` 设为 `true`/`false`（如 `"thinking_enabled_expert_review": true`）。目前支持 Claude、DeepSeek（Anthropic 兼容端点）和 Gemini 2.5。推荐仅在智囊团深度复盘模块开启，其他模块收益不大且会增加响应时间。
+A: 编辑 `data/config/llm_settings.json`，将对应模块的 `thinking_enabled_{模块键}` 设为 `true`/`false`（如 `"thinking_enabled_expert_review": true`）。目前支持 Claude、DeepSeek（Anthropic 兼容端点）、Kimi（Anthropic 兼容端点）和 Gemini 2.5。推荐仅在智囊团深度复盘模块开启，其他模块收益不大且会增加响应时间。
 
 **Q: 如何开启财经新闻热点与持仓关联分析？**
 
@@ -420,7 +420,7 @@ A: 首先检查菜单 `S` 中各 LLM 模块是否已开启；其次确认 LLM AP
 **Q: LLM 章节开头出现「【内容质量提示】本模块输出评级 X：…」是什么意思？**
 
 A: 这是常规开关 `module_quality_gate`（默认开启）注入的**采信度提示**。开启后程序会在渲染前对 4 个 LLM 生成模块（全球政经局势 / 智囊团深度复盘 / 持仓体检报告 / 穿透深度分析）的输出按**完整性 + 篇幅**评 A~F 级；评到 C/D/F 且内容「在但存在缺陷」（缺提示词规定的固定章节、篇幅明显短于同类输出）时，章节头部追加该横幅，标明评级与原因（如"缺少必需章节"）。
-**它只标注、不阻断生成、不触发重试、不写回 LLM 缓存**——报告照常产出，横幅仅提示该段输出建议降级参考。A/B 级健康输出不会出现该横幅；内容完全缺失或为降级占位符时也不叠加（此时章节本身已有醒目占位提示，无需重复）。开启/关闭见[配置指引 §M](how-to-config.md#m-功能开关featuresjson) 或 TUI 菜单 `[S]` 实验块。
+**它只标注、不阻断生成、不触发重试、不写回 LLM 缓存**——报告照常产出，横幅仅提示该段输出建议降级参考。A/B 级健康输出不会出现该横幅；内容完全缺失或为降级占位符时也不叠加（此时章节本身已有醒目占位提示，无需重复）。开启/关闭见[配置指引 §N](how-to-config.md#n-功能开关featuresjson) 或 TUI 菜单 `[S]` 实验块。
 
 **Q: 如何强制刷新 LLM 内容？**
 
@@ -428,7 +428,7 @@ A: 菜单 `L` 会先检查缓存，缓存过期（默认全球政经局势/持�
 
 **Q: LLM 返回内容被截断了怎么办？**
 
-A: 程序内置自动增大 `max_tokens` 1.5 倍重试机制。如果仍被截断，可在 `llm_settings.json` 中手动调大对应模块的 `max_tokens_{模块键}` 值（各模块默认值不同，见[配置指引](how-to-config-llm.md)，如智囊团深度复盘 24000）。调整后菜单 `R` 刷新配置，再重新生成即可。
+A: 程序内置自动增大 `max_tokens` 1.5 倍重试机制。如果仍被截断，可在 `llm_settings.json` 中手动调大对应模块的 `max_tokens_{模块键}` 值（各模块默认值不同，见[配置指引](how-to-config-llm.md)，如智囊团深度复盘 36000）。调整后菜单 `R` 刷新配置，再重新生成即可。
 
 **Q: 如何配置多个 LLM Provider 做链式服务？**
 
@@ -443,6 +443,15 @@ A: 支持。通过 `llm_providers.json` 的 `strategy` 字段切换分发策略�
 - `fallback_only` — 仅当首选 Provider 失败时使用后续 Provider
 
 任一 Provider 失败均自动递补下一可用 Provider，无需手动切换。详见 [LLM 配置指引](how-to-config-llm.md)。
+
+**Q: 我能用 Kimi Code（订阅会员）的 API Key 吗？和开放平台的 Key 有什么区别？**
+
+A: **技术上可以，但官方条款有明确风险，不推荐用于批量报告生成。**
+
+- **两套系统互不通用**：Kimi Code 订阅端点是 `https://api.kimi.com/coding/`、模型名 `kimi-for-coding`；开放平台是 `https://api.moonshot.cn`、模型名 `kimi-k2.6`。Key 与 Base URL 必须配套，混用会 401 `Invalid Authentication`。
+- **条款限制**：Kimi Code 官方社区准则明确 **"Don't use Kimi Code for non-interactive automation"**（订阅仅限个人交互式使用，脚本化批量执行属超范围）。本工具的批量报告生成属非交互式自动化，违规处置可能是 **403 并发/风控限制**（只能申诉）。
+- **建议**：程序跑自动化用**开放平台按量付费 Key**（成本很低，约每次报告 ¥0.3~0.5）；订阅 Key 留给 Claude Code / CLI 等交互式编码场景。
+- **确实要用**：完整改法与降风险措施（两个文件的改法、`pacing` 端点级节流、403 不重试语义）见 [LLM 配置指引](how-to-config-llm.md) → 「支持的 provider 及配置示例」→ **Kimi Code（订阅会员）** 折叠块。
 
 **Q: LLM API 返回 429（请求过多）怎么办？**
 
@@ -470,7 +479,7 @@ A: **默认是**。默认配置下（`enable_interactive_charts` 开启），生
 
 但有一个**重要例外**：如果你在 `data/config/features.json` 里手动把 `enable_interactive_charts` 设为 `false`（关闭交互图表），HTML 就不再内嵌 JS，会退回外链 `reports/` 目录下的 `.js` 文件。此时**必须让 .html 和那些 .js 文件待在同一个目录**，否则图表区域空白——所以关闭该开关后，单独把 .html 移走/发送会看不到图表。
 
-> **结论**：想随手把 HTML 报告单独发出去看，请保持 `enable_interactive_charts` 默认开启（除非你不需要交互图表，且能接受"HTML 必须和 JS 同目录"的限制）。开关位置见[配置指南 §M 功能开关](how-to-config.md#m-功能开关featuresjson)。
+> **结论**：想随手把 HTML 报告单独发出去看，请保持 `enable_interactive_charts` 默认开启（除非你不需要交互图表，且能接受"HTML 必须和 JS 同目录"的限制）。开关位置见[配置指南 §N 功能开关](how-to-config.md#n-功能开关featuresjson)。
 
 **Q: 报告中"环比对比"和"快照对比"是什么？**
 
@@ -488,7 +497,7 @@ A: 先试菜单 `[1]` 更新基础缓存，再试 `[2]` 更新持仓缓存，最
 
 A: 默认使用固定顺序（投资分析汇总 → LLM API 用量），但可通过 `config.json` 的 `report_section_order` 字段自定义各模块的序号和排列顺序。未配置时保持默认行为。详见[配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
-菜单 E/B/L 生成范围不同：E 为基础页签（始终显示的 6 个核心模块，另含组合演进页签——开启 `enable_portfolio_evolution` 时显示；行动建议页签——`enable_action`（默认开启）控制时显示；不含基金深度分析、不含新闻、不含历史走势），B 在 E 基础上加基金深度分析+新闻+历史走势（不含 LLM 分析模块），L 为全量（1~19）。各菜单对应的页签范围详见[TUI 菜单操作手册](how-to-use-tui-menu.md#报告内容对照)。
+菜单 E/B/L 生成范围不同：E 为基础页签（始终显示的 5 个核心模块，另含组合演进页签——开启 `enable_portfolio_evolution` 时显示；行动建议页签——`enable_action`（默认开启）控制时显示；不含基金深度分析、不含新闻、不含历史走势），B 在 E 基础上加基金深度分析+新闻+历史走势（不含 LLM 分析模块），L 为全量（1~17）。各菜单对应的页签范围详见[TUI 菜单操作手册](how-to-use-tui-menu.md#报告内容对照)。
 
 **Q: 为什么总市值和各账户小计之和有时对不上？**
 
@@ -532,6 +541,7 @@ A: 暂不支持单独页签输出。菜单 E/B/L 均生成完整的报告文件�
 
 A: 如需结构化 diff，使用菜单 `W` 或 CLI `whatif` 对比基准/目标两份持仓 xlsx，生成调仓摘要、分类配置对比、持仓变动明细（新增/清仓/加仓/减仓/不变）的独立 diff 报告（详见[快速开始](how-to-start.md)）。如需沿用主报告路径，可先后生成两份报告，对比「持仓明细与分类」页签中市值明细区块的盈亏和市值列。
 
+<a id="报告里的-as-if-和单独做的-what-if-有什么不同"></a>
 **Q: 报告里的 as-if 和单独做的 What-if 有什么不同？**
 
 A: 两者不是一回事，只是名字里都有"假如/如果"容易混淆：
@@ -615,7 +625,7 @@ A: 机构盈利预测、行业资金流向、股票历史分红数据来自 aksh
 
 A: 流动性分析分为两类：
 - **场内品种**（股票/ETF）：自动获取近 20 日日均成交额，按"持仓市值 ÷ 日均成交额"计算变现天数。少于 1 天标注"当日可卖出"，超过标注"需多日卖出"。
-- **场外基金**（OTC）：需在 `config.json` 的 `redemption_limits` 中配置单日赎回上限。配置后自动计算全量赎回所需天数；未配置的品种显示"需手动确认赎回上限"。
+- **场外基金**（OTC）：在 `config.json` 的 `redemption_limits` 中配置单日赎回上限后自动计算全量赎回所需天数（配置口径优先）；未配置的品种按类型默认档估算——货币/短债 T+1、纯债 T+2、其他场外 T+3、QDII T+7，均标注「类型默认档（非实测）」，类型无法识别时才显示"需手动确认赎回上限"。
 
 K 线数据不可用时默认假设流动性充足，不产生告警。
 
@@ -808,7 +818,7 @@ A: 有——**系统自检**。命令行直接跑：
 
 **Q: TUI 主菜单里找不到 `[D]` 系统自检项？**
 
-A: `[D]` 系统自检**默认出现在主菜单中**（开关 `doctor_check` 默认开启）。若确实看不到，多半是 `data/config/features.json` 里被显式置成了 `"doctor_check": false`——该开关置 `false` 时菜单项**整体不出现在主菜单中**（是就地裁剪，不是置灰），Web 运行状态区的「系统自检」卡片也一并消失。恢复方式是在菜单 **[S]** 的**常规开关块**（第 23 项）把它切回来，或删掉该键 / 改为 `"doctor_check": true`（该开关默认开启，故归常规块而非实验块）。
+A: `[D]` 系统自检**默认出现在主菜单中**（开关 `doctor_check` 默认开启）。若确实看不到，多半是 `data/config/features.json` 里被显式置成了 `"doctor_check": false`——该开关置 `false` 时菜单项**整体不出现在主菜单中**（是就地裁剪，不是置灰），Web 运行状态区的「系统自检」卡片也一并消失。恢复方式是在菜单 **[S]** 的**常规开关块**（第 24 项）把它切回来，或删掉该键 / 改为 `"doctor_check": true`（该开关默认开启，故归常规块而非实验块）。
 
 注意：**开关只控制 TUI 菜单项与 Web 卡片的可见性**，不影响 `doctor` CLI 子命令——命令行侧始终可用，无需任何开关。
 

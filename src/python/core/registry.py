@@ -106,12 +106,22 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     ),
     # ── 市场情绪（同花顺官方：龙虎榜 + 连板梯队；盘中变化 → 短 TTL）──
     DataModuleDef("市场情绪", "sentiment", cache_prefixes=("sentiment_",), cache_ttl=3600.0, cache_groups=("refresh",)),
-    # ── 全文本财报（DataSinking；索引与正文分级 TTL）──
+    # ── 全文本财报（DataSinking 主源 + 巨潮备源；索引与正文分级 TTL）──
+    # 索引/章节清单 TTL 与正文同档（月度）：财报披露是低频事件（年报/半年报/季报），
+    # 索引两周过期会频繁重取 DataSinking（免费档日配额 8191 篇、还受 3 请求/秒限制），
+    # 正是「连接失败」高发的一类场景；月度窗口不损失语义（新报告期出现时按报告期排序
+    # 自然优先，且正文取数另走正文级 TTL）。
     DataModuleDef(
         "财报索引",
         "report",
-        cache_prefixes=("report_datasink_index_", "report_datasink_sections_"),
-        cache_ttl=CACHE_TWO_WEEKS,
+        cache_prefixes=(
+            "report_datasink_index_",
+            "report_datasink_sections_",
+            "report_cninfo_index_",
+            "report_cninfo_orgid_",
+            "report_cninfo_text_",
+        ),
+        cache_ttl=CACHE_MONTHLY,
         cache_groups=("refresh",),
     ),
     DataModuleDef(
@@ -547,7 +557,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     },
     # ── action 类型（独立顶层开关 enable_action 控制，默认开，菜单 P 可切换） ──
     # 行动建议：再平衡信号 + 交易纪律 + 调仓建议 + 收益归因（纯算法，basic/both/full 均可见）
-    # 出厂序号 10，与仓库 config.json 的 report_section_order 取值相同——该配置清空为 {}
+    # 出厂序号 7，与仓库 config.json 的 report_section_order 取值相同——该配置清空为 {}
     # 时即回到本默认顺序，故两者必须同序，改动其一须同步另一处
     {
         "key": "action",

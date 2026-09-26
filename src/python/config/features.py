@@ -257,7 +257,7 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
     ),
     "market_sentiment": FeatureSwitchDef(
         "市场情绪与资金热点",
-        "新增独立章：持仓/穿透标的当日上榜龙虎榜与进入连板梯队的事件行（需同花顺 key）",
+        "行动建议章内嵌块「市场情绪与持仓热点」：持仓/穿透标的当日上榜龙虎榜与进入连板梯队的事件行（需同花顺 key；零命中时写市场概览与说明行）",
         GROUP_REPORT,
         False,
         True,

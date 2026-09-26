@@ -353,6 +353,41 @@ def is_otc_fund_by_name(name: str, code: str) -> bool:
     return any(kw in name for kw in _OTC_FUND_NAME_KW)
 
 
+# ── 场外基金赎回天数类型默认档（非实测）──
+# 供流动性维在场外品种未配置单日赎回上限（config.json `redemption_limits`）时给出
+# 类型分级默认档，使场外为主的组合在流动性维有区分度。档位为经验口径而非实测：
+# 证据/标签一律标注「类型默认档（非实测）」，用户配置实测上限后优先采用配置值。
+OTC_REDEMPTION_TIER_MONEY = 1  # 货币基金/短债基金：T+0~T+1
+OTC_REDEMPTION_TIER_BOND = 2  # 纯债基金：T+2
+OTC_REDEMPTION_TIER_EQUITY = 3  # 其他场外基金（主动权益/混合/指数/联接等）：T+3
+OTC_REDEMPTION_TIER_QDII = 7  # QDII/海外基金：T+3~T+7，取保守上沿
+
+
+def otc_redemption_days_default(name: str, code: str = "") -> int | None:
+    """场外基金赎回天数的类型默认档（非实测）。
+
+    分级（命中即返回）：货币基金/短债 → T+1；纯债 → T+2；QDII/海外 → T+7；
+    其余可识别场外基金（主动权益/混合/指数/联接等）→ T+3。
+    无法识别为场外基金时返回 None（调用方保持「需手动确认」降级）。
+
+    Args:
+        name: 基金名称
+        code: 证券代码（可选，用于 00 重叠区辅助判定）
+
+    Returns:
+        赎回天数默认档（整数）；无法识别返回 None。
+    """
+    if is_money_fund_by_name(name) or "短债" in name:
+        return OTC_REDEMPTION_TIER_MONEY
+    if is_bond_fund_by_name(name):
+        return OTC_REDEMPTION_TIER_BOND
+    if is_qdii_extended(name):
+        return OTC_REDEMPTION_TIER_QDII
+    if is_index_link_by_name(name) or is_index_fund_by_name(name) or is_otc_fund_by_name(name, code):
+        return OTC_REDEMPTION_TIER_EQUITY
+    return None
+
+
 def is_otc_code_overlap(code: str) -> bool:
     """判断 6 位代码是否处于 A 股/OTC 基金代码重叠区（00 开头）。
 

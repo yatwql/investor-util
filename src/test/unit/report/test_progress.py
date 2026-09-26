@@ -35,25 +35,36 @@ class TestProgressReporter(unittest.TestCase):
     def setUp(self):
         self.r = ProgressReporter()
 
+    def _assert_silent_noop(self, method_name: str) -> None:
+        """基类同名方法须为静默空实现：不输出、不抛异常。"""
+        captured = io.StringIO()
+        sys.stdout = captured
+        try:
+            getattr(self.r, method_name)("test")
+            self.assertEqual(captured.getvalue(), "", f"{method_name} 基类不应输出")
+        finally:
+            sys.stdout = sys.__stdout__
+
     def test_info_no_op(self) -> None:
-        """info 不应抛出异常。"""
-        self.r.info("test")
+        """info 基类空实现：静默且不抛异常。"""
+        self._assert_silent_noop("info")
 
     def test_ok_no_op(self) -> None:
-        """ok 不应抛出异常。"""
-        self.r.ok("test")
+        """ok 基类空实现：静默且不抛异常。"""
+        self._assert_silent_noop("ok")
 
     def test_warn_no_op(self) -> None:
-        """warn 不应抛出异常。"""
-        self.r.warn("test")
+        """warn 基类空实现：静默且不抛异常。"""
+        self._assert_silent_noop("warn")
 
     def test_error_no_op(self) -> None:
-        """error 不应抛出异常。"""
-        self.r.error("test")
+        """error 基类空实现：静默且不抛异常。"""
+        self._assert_silent_noop("error")
 
-    def test_add_error_no_op(self) -> None:
-        """add_error 不应抛出异常。"""
+    def test_add_error_records_without_raising(self) -> None:
+        """add_error 记入错误列表且不抛异常。"""
         self.r.add_error("test error")
+        self.assertEqual(self.r.get_errors(), ["test error"])
 
     def test_get_errors_empty(self) -> None:
         """get_errors 默认返回空列表。"""
@@ -139,9 +150,16 @@ class TestSilentProgressReporter(unittest.TestCase):
         finally:
             sys.stdout = sys.__stdout__
 
-    def test_add_error_no_side_effect(self) -> None:
-        """add_error 不报错（logger 调用但不应抛出）。"""
-        self.r.add_error("test error")
+    def test_add_error_no_stdout_and_recorded(self) -> None:
+        """add_error 不产生 stdout，但仍记入错误列表（静默仅针对输出）。"""
+        captured = io.StringIO()
+        sys.stdout = captured
+        try:
+            self.r.add_error("test error")
+        finally:
+            sys.stdout = sys.__stdout__
+        self.assertEqual(captured.getvalue(), "")
+        self.assertEqual(self.r.get_errors(), ["test error"])
 
     def test_get_errors_empty_list(self) -> None:
         """get_errors 从基类继承返回空列表。"""

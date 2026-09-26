@@ -15,6 +15,7 @@ from src.python.llm.api_base import (
     _check_claude_truncation,
     _check_openai_truncation,
     _extract_content,
+    _is_default_thinking_on,
     _is_effort_model,
     _supports_extended_thinking,
 )
@@ -30,7 +31,12 @@ from src.python.llm.pricing import (
 )
 from src.python.llm.prompts import _SYSTEM_EXPERT_REVIEW, _SYSTEM_GLOBAL_MACRO
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.unit_llm,
+    pytest.mark.llm,
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -213,6 +219,34 @@ class TestSupportsExtendedThinking(unittest.TestCase):
     def test_deepseek_v3_not_supported(self) -> None:
         self.assertFalse(_supports_extended_thinking("deepseek-v3"))
 
+    def test_kimi_code_model_ids_supported(self) -> None:
+        """Kimi Code 订阅端点的模型名须识别为支持 thinking。
+
+        `kimi-for-coding*` 命中 `kimi-` 前缀；旗舰 `k3` / `k3-256k` 不以 `kimi-` 开头，
+        单独登记——漏登记会让「未开启 thinking 时显式禁用」的安全网失效。
+        """
+        for model in ("kimi-for-coding", "kimi-for-coding-highspeed", "k3", "k3-256k", "kimi-k2.6"):
+            self.assertTrue(_supports_extended_thinking(model), model)
+
+    def test_kimi_code_models_default_thinking_on(self) -> None:
+        """Kimi Code 端点默认开思考：须列入默认开思考族（含 k3 前缀）。"""
+        for model in ("kimi-for-coding", "kimi-for-coding-highspeed", "k3", "k3-256k"):
+            self.assertTrue(_is_default_thinking_on(model), model)
+
+    def test_kimi_code_models_not_effort_family(self) -> None:
+        """Kimi 系走 budget_tokens 而非 effort（控制方式不得误判）。"""
+        for model in ("kimi-for-coding", "k3", "kimi-k2.6"):
+            self.assertFalse(_is_effort_model(model), model)
+
+    def test_non_llm_family_not_supported(self) -> None:
+        """非 Claude/DeepSeek/Gemini/Kimi 家族（如 OpenAI）不判定为支持。"""
+        self.assertFalse(_supports_extended_thinking("gpt-4o"))
+
+    def test_kimi_supported(self) -> None:
+        """Kimi（Anthropic 兼容端点，budget_tokens 控制）支持 Extended Thinking。"""
+        self.assertTrue(_supports_extended_thinking("kimi-k2.6"))
+        self.assertTrue(_supports_extended_thinking("Kimi-K3"))
+
 
 # ═══════════════════════════════════════════════════════════
 #  _is_effort_model
@@ -246,8 +280,45 @@ class TestIsEffortModel(unittest.TestCase):
         self.assertTrue(_is_effort_model("deepseek-flash"))
         self.assertTrue(_is_effort_model("DeepSeek-Flash"))
 
+    def test_kimi_is_not_effort(self) -> None:
+        """Kimi 用 budget_tokens（而非 output_config.effort）控制思考深度。"""
+        self.assertFalse(_is_effort_model("kimi-k2.6"))
+        self.assertFalse(_is_effort_model("kimi-k3"))
+
     def test_empty_is_not_effort(self) -> None:
         self.assertFalse(_is_effort_model(""))
+
+
+# ═══════════════════════════════════════════════════════════
+#  _is_default_thinking_on
+# ═════════════════════════════════════════════════════════
+
+
+class TestIsDefaultThinkingOn(unittest.TestCase):
+    """_is_default_thinking_on — 默认开思考模型判定。
+
+    该判定决定「未开启 thinking 时是否显式注入 thinking.disabled」安全网——
+    默认开思考的模型（DeepSeek 推理族 / Kimi）漏登记会让思考 token 占满
+    max_tokens 而无正文；默认不思考的模型（Anthropic 原生）误登记会多发一个
+    无害但冗余的 disabled 参数。
+    """
+
+    def test_kimi_default_on(self) -> None:
+        """Kimi 端点不传思考参数即返回 thinking 块（默认开思考）。"""
+        self.assertTrue(_is_default_thinking_on("kimi-k2.6"))
+        self.assertTrue(_is_default_thinking_on("Kimi-K3"))
+
+    def test_deepseek_default_on(self) -> None:
+        """DeepSeek 推理族默认开思考（effort=high）。"""
+        self.assertTrue(_is_default_thinking_on("deepseek-flash"))
+        self.assertTrue(_is_default_thinking_on("deepseek-v4-flash"))
+        self.assertTrue(_is_default_thinking_on("deepseek-chat"))
+
+    def test_claude_gemini_not_default_on(self) -> None:
+        """Anthropic 原生 / Gemini 默认不思考，不注入 disabled。"""
+        self.assertFalse(_is_default_thinking_on("claude-sonnet-4-6"))
+        self.assertFalse(_is_default_thinking_on("gemini-2.5-flash"))
+        self.assertFalse(_is_default_thinking_on(""))
 
 
 # ═══════════════════════════════════════════════════════════
@@ -407,6 +478,7 @@ class TestPricing(unittest.TestCase):
     _PEAK_TIME = datetime(2026, 8, 21, 10, 0)
     _WEEKEND_PEAK_HOUR_TIME = datetime(2026, 8, 15, 10, 0)
     _WEEKEND_IDLE_HOUR_TIME = datetime(2026, 8, 15, 20, 0)
+    _HOLIDAY_PEAK_HOUR_TIME = datetime(2026, 10, 1, 10, 0)  # 2026-10-01 周四（国庆法定节假日）
 
     def testestimate_cost_known_model(self) -> None:
         """已知模型闲时按 base 价（闲时价）估算。"""
@@ -496,6 +568,32 @@ class TestPricing(unittest.TestCase):
                 "¥0.020",
             )
 
+    def test_kimi_pricing_locked(self) -> None:
+        """Kimi 条目锁定官方单价（元/百万 token）：k2.6 输入 6.5 / 输出 27.0，k3 输入 20.0 / 输出 100.0。
+
+        单价误改会让报告费用估算整体偏移，故按 1M 输入 + 1M 输出锁死金额。
+        """
+        self.assertEqual(estimate_cost("kimi-k2.6", 1_000_000, 1_000_000, at_time=self._IDLE_TIME), "¥33.500")
+        self.assertEqual(estimate_cost("kimi-k3", 1_000_000, 1_000_000, at_time=self._IDLE_TIME), "¥120.000")
+
+    def test_kimi_cache_hit_rate(self) -> None:
+        """Kimi 缓存命中价：k2.6 为 1.10 / k3 为 2.00（元/百万 token），缺该字段会回落为 input 价。"""
+        self.assertEqual(
+            estimate_cost("kimi-k2.6", 1_000_000, 0, cache_hit_input_tokens=1_000_000, at_time=self._IDLE_TIME),
+            "¥1.100",
+        )
+        self.assertEqual(
+            estimate_cost("kimi-k3", 1_000_000, 0, cache_hit_input_tokens=1_000_000, at_time=self._IDLE_TIME),
+            "¥2.000",
+        )
+
+    def test_kimi_no_peak_valley(self) -> None:
+        """Kimi 条目无 peak 子段——高峰钟点不得按峰谷价加成（与 DeepSeek 行为区分）。"""
+        self.assertEqual(
+            estimate_cost("kimi-k2.6", 1_000_000, 1_000_000, at_time=self._PEAK_TIME),
+            estimate_cost("kimi-k2.6", 1_000_000, 1_000_000, at_time=self._IDLE_TIME),
+        )
+
     def test_pricing_merged_has_defaults(self) -> None:
         """PRICING_MERGED 应包含所有内置模型。"""
         for model in (
@@ -505,6 +603,8 @@ class TestPricing(unittest.TestCase):
             "deepseek-reasoner",
             "claude-sonnet-4-6",
             "gpt-4o",
+            "kimi-k2.6",
+            "kimi-k3",
         ):
             self.assertIn(model, PRICING_MERGED)
 
@@ -610,6 +710,53 @@ class TestPricing(unittest.TestCase):
             self.assertEqual(cost_peak, "¥10.000")  # 周末高峰按高峰价
         finally:
             _pricing_mod.PRICING_WEEKEND_ALWAYS_IDLE = orig_flag
+
+    # ── 法定节假日全天闲时规则（DeepSeek 官方 2026-09-10 定价页起） ──────────
+
+    def test_holiday_always_idle_default_on(self) -> None:
+        """默认法定节假日全天按闲时价计费（PRICING_HOLIDAY_ALWAYS_IDLE 默认 True）。"""
+        self.assertTrue(_pricing_mod.PRICING_HOLIDAY_ALWAYS_IDLE)
+
+    def test_holiday_peak_hour_bills_idle_rate(self) -> None:
+        """法定节假日（工作日但非 A 股交易日）高峰钟点（10:00）也按闲时价计费。"""
+        with patch("src.python.core.trading_calendar._is_trading_day", return_value=False):
+            cost_holiday = estimate_cost(
+                "deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._HOLIDAY_PEAK_HOUR_TIME
+            )
+        self.assertEqual(cost_holiday, "¥5.000")  # (1+4) 闲时价
+
+    def test_holiday_cache_hit_bills_idle_rate(self) -> None:
+        """法定节假日缓存命中输入按闲时 input_cache_hit（0.02）而非高峰价（0.04）计费。"""
+        with patch("src.python.core.trading_calendar._is_trading_day", return_value=False):
+            cost_holiday = estimate_cost(
+                "deepseek-v4-flash",
+                1_000_000,
+                0,
+                cache_hit_input_tokens=1_000_000,
+                at_time=self._HOLIDAY_PEAK_HOUR_TIME,
+            )
+        self.assertEqual(cost_holiday, "¥0.020")
+
+    def test_holiday_workday_trading_day_bills_peak(self) -> None:
+        """普通工作日（交易日）不受节假日判定影响，仍按高峰价计费。"""
+        with patch("src.python.core.trading_calendar._is_trading_day", return_value=True):
+            cost_workday = estimate_cost("deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._PEAK_TIME)
+        self.assertEqual(cost_workday, "¥10.000")  # (2+8) 高峰价
+
+    def test_holiday_flag_disabled_restores_peak(self) -> None:
+        """holiday_always_idle=False 时法定节假日恢复按钟点区分峰谷。"""
+        orig_flag = _pricing_mod.PRICING_HOLIDAY_ALWAYS_IDLE
+        try:
+            with patch("src.python.config.get_llm_config", return_value={"pricing": {"holiday_always_idle": False}}):
+                reload_pricing()
+            self.assertFalse(_pricing_mod.PRICING_HOLIDAY_ALWAYS_IDLE)
+            with patch("src.python.core.trading_calendar._is_trading_day", return_value=False):
+                cost_peak = estimate_cost(
+                    "deepseek-v4-flash", 1_000_000, 1_000_000, at_time=self._HOLIDAY_PEAK_HOUR_TIME
+                )
+            self.assertEqual(cost_peak, "¥10.000")  # 法定节假日高峰钟点按高峰价
+        finally:
+            _pricing_mod.PRICING_HOLIDAY_ALWAYS_IDLE = orig_flag
 
     def test_peak_pricing_custom_periods_from_config(self) -> None:
         """llm_settings.json 自定义峰谷时段与模型价格后应生效（工作日）。"""

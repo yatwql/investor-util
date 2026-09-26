@@ -29,6 +29,9 @@ _EXTREME_HOLDINGS_COUNT = 500
 # ═══════════════════════════════════════════════════════════════
 
 
+pytestmark = [pytest.mark.usefixtures("offline_external_sources")]
+
+
 @pytest.mark.scenario_extreme
 class TestS0cLargeHoldings(unittest.TestCase):
     """S0c: 超多持仓（200+ 条）— 极限持仓量下的正确性。"""

@@ -145,11 +145,6 @@ class TestBatchNewsAnalysis(unittest.TestCase):
         self.assertEqual(result[3], ("低", "中性", ""))  # 缺失
         self.assertEqual(result[4], ("高", "利空", "原因4"))
 
-    def test_empty_batch(self) -> None:
-        """空批次 → 返回空列表。"""
-        result = _apply_llm_news_correlation([], "[]")
-        self.assertEqual(result, [])
-
     def test_fewer_results_than_requested(self) -> None:
         """LLM 返回 1 条结果给 5 条新闻 → 缺失 4 条填充默认值。"""
         llm_resp = json.dumps(

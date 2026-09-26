@@ -38,6 +38,7 @@ def call_gemini(
     config_field: str = "max_tokens",
     temperature: float | None = None,
     llm_config: dict | None = None,
+    endpoint_key: str = "",
 ) -> tuple[str | None, dict | None]:
     """调用 Google Gemini API (generateContent)，带重试 + 用量日志。
 
@@ -102,4 +103,5 @@ def call_gemini(
         check_truncation_fn=lambda d, mt: _check_gemini_truncation(d, mt, "Gemini", config_field),
         provider="gemini",
         model_name=model,
+        endpoint_key=endpoint_key,
     )

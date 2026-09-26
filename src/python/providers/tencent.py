@@ -19,11 +19,14 @@ from src.python.core.code_utils import (
 )
 from src.python.core.http_client import make_http_client
 from src.python.core.num_utils import safe_num
+from src.python.core.retry import STRATEGY_FIXED, TRANSIENT_EXCEPTIONS, RetryPolicy, retry_transient
 
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://qt.gtimg.cn/q="
 _TIMEOUT = 15.0  # 普通行情超时
+#: 行情取数重试策略：总尝试 2 次、无退避（末次失败立即交下一链路）
+_PRICE_RETRY_POLICY = RetryPolicy(attempts=2, strategy=STRATEGY_FIXED, base_backoff=0.0)
 _KLINE_TIMEOUT = 30.0  # K 线超时（需等待更多数据）
 
 
@@ -152,24 +155,25 @@ def fetch_price(code: str) -> dict[str, Any] | None:
 
     logger.debug("Tencent API 请求: %s", full_code)
 
-    # 超时/网络错误自动重试一次
-    for attempt in (1, 2):
-        try:
-            with make_http_client(timeout=_TIMEOUT) as client:
-                resp = client.get(url)
-                resp.encoding = "gbk"  # qt.gtimg.cn 返回 GBK 编码
-                text = resp.text
-        except httpx.TimeoutException:
-            logger.warning("Tencent API 超时: %s（第 %d 次）", full_code, attempt)
-            if attempt == 1:
-                continue
-            return None
-        except httpx.RequestError as e:
-            logger.warning("Tencent API 请求失败: %s（第 %d 次）", e, attempt)
-            if attempt == 1:
-                continue
-            return None
-        break  # 成功 → 跳出重试循环
+    # 超时/网络错误自动重试一次（无退避等待：末次立即失败交给下一链路）
+    def _attempt() -> str:
+        with make_http_client(timeout=_TIMEOUT) as client:
+            resp = client.get(url)
+            resp.encoding = "gbk"  # qt.gtimg.cn 返回 GBK 编码
+            return resp.text
+
+    def _on_transient_retry(failed_attempt: int, _delay: float, exc: BaseException | None) -> None:
+        logger.warning(
+            "Tencent API %s: %s（第 %d 次）",
+            "超时" if isinstance(exc, httpx.TimeoutException) else f"请求失败（{exc}）",
+            full_code,
+            failed_attempt,
+        )
+
+    try:
+        text = retry_transient(_attempt, policy=_PRICE_RETRY_POLICY, on_retry=_on_transient_retry)
+    except TRANSIENT_EXCEPTIONS:
+        return None
 
     result = _parse_response(text)
     if result is None:

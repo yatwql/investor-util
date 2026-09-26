@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from src.python.core.constants import BEIJING_TZ
+from src.python.core.retry import STRATEGY_FIXED, RetryPolicy, retry_transient
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import datetime
 from typing import Any, Callable
@@ -31,31 +33,36 @@ def run_with_timeout(fn: Callable[[], Any], timeout: float = 15.0, retries: int 
     Returns:
         函数返回值；每次均超时/异常时返回 None
     """
-    for attempt in range(1 + retries):
+    policy = RetryPolicy(attempts=1 + retries, strategy=STRATEGY_FIXED, base_backoff=1.0)
+
+    def _attempt() -> Any:
         pool = ThreadPoolExecutor(max_workers=1)
         try:
             fut = pool.submit(fn)
             try:
                 return fut.result(timeout=timeout)
-            except TimeoutError:
-                logger.warning("akshare 调用超时 (%.1fs, 第 %d/%d 次)", timeout, attempt + 1, 1 + retries)
+            except BaseException:
                 fut.cancel()
-                if attempt < retries:
-                    import time as _time
-
-                    _time.sleep(1)
-                continue
-            except Exception as e:
-                logger.warning("akshare 调用异常 (第 %d/%d 次): %s", attempt + 1, 1 + retries, e)
-                fut.cancel()
-                if attempt < retries:
-                    import time as _time
-
-                    _time.sleep(1)
-                continue
+                raise
         finally:
             pool.shutdown(wait=False)
-    return None
+
+    def _on_retry(failed_attempt: int, _delay: float, exc: BaseException | None) -> None:
+        if isinstance(exc, TimeoutError):
+            logger.warning("akshare 调用超时 (%.1fs, 第 %d/%d 次)", timeout, failed_attempt, policy.attempts)
+        else:
+            logger.warning("akshare 调用异常 (第 %d/%d 次): %s", failed_attempt, policy.attempts, exc)
+
+    try:
+        return retry_transient(
+            _attempt,
+            policy=policy,
+            retry_on=lambda _e: True,  # akshare 异常种类不可枚举：一律重试（与原行为一致）
+            on_retry=_on_retry,
+            sleep=time.sleep,
+        )
+    except BaseException:  # noqa: BLE001 — 每次均超时/异常时返回 None（与原行为一致）
+        return None
 
 
 def ts_to_str(ts: int) -> str:

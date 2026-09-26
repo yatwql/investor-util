@@ -45,22 +45,22 @@
   <text x="500" y="248" text-anchor="middle" font-size="13" fill="#9fb6d0">任一 Provider 失败 → 自动递补下一个</text>
 
   <!-- 4 个 Provider 卡 -->
-  <rect x="76" y="262" width="200" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
+  <rect x="76" y="262" width="210" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
   <text x="96" y="302" font-size="22">🤖</text>
   <text x="126" y="294" font-size="17" font-weight="700" fill="#e8f1fb">Claude</text>
   <text x="126" y="316" font-size="12" fill="#9fb6d0">Anthropic · Opus/Sonnet</text>
 
-  <rect x="292" y="262" width="200" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
+  <rect x="292" y="262" width="210" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
   <text x="312" y="302" font-size="22">🟢</text>
   <text x="342" y="294" font-size="17" font-weight="700" fill="#e8f1fb">OpenAI</text>
   <text x="342" y="316" font-size="12" fill="#9fb6d0">GPT 系列</text>
 
-  <rect x="508" y="262" width="200" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
+  <rect x="508" y="262" width="210" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
   <text x="528" y="302" font-size="22">🐋</text>
   <text x="558" y="294" font-size="17" font-weight="700" fill="#e8f1fb">DeepSeek</text>
   <text x="558" y="316" font-size="12" fill="#9fb6d0">DeepSeek 系列</text>
 
-  <rect x="724" y="262" width="200" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
+  <rect x="724" y="262" width="210" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
   <text x="744" y="302" font-size="22">✨</text>
   <text x="774" y="294" font-size="17" font-weight="700" fill="#e8f1fb">Gemini</text>
   <text x="774" y="316" font-size="12" fill="#9fb6d0">Google · 2.5 系列</text>

@@ -69,22 +69,51 @@ class TestExtractStablePenetration(unittest.TestCase):
     def test_default_mode_excludes_mv_sector(self):
         """默认模式（full=False）只保留 name/codes。"""
         assets = [
-            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio": 15.0},
+            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio_pct": 15.0},
         ]
         result = extract_stable_penetration(assets)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0], {"name": "茅台", "codes": ["600519"]})
 
     def test_full_mode_includes_mv_sector_ratio(self):
-        """full=True 时包含 mv/sector/ratio。"""
+        """full=True 时包含 mv/sector/ratio（夹具用生产契约键 ratio_pct）。"""
         assets = [
-            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio": 15.0},
+            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio_pct": 15.0},
         ]
         result = extract_stable_penetration(assets, full=True)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["mv"], 100000)
         self.assertEqual(result[0]["sector"], "白酒")
         self.assertEqual(result[0]["ratio"], 15.0)
+
+    def test_full_mode_reads_ratio_pct_contract(self):
+        """full=True 按生产数据契约键 ratio_pct 提取占比（report/penetration.py top10 产出形状）。
+
+        误读其它键会让指纹的占比分量恒为 0，缓存对穿透占比变化不敏感。
+        """
+        assets = [
+            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio_pct": 15.0},
+        ]
+        result = extract_stable_penetration(assets, full=True)
+        self.assertEqual(result[0]["ratio"], 15.0)
+
+    def test_full_mode_ignores_legacy_ratio_key(self):
+        """严格读契约字段：遗留 `ratio` 键不再兼容（占比按 0）。
+
+        历史缺陷正是「静默读错键 → 指纹/提示词占比恒为 0」，故不保留兼容分支。
+        """
+        assets = [
+            {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒", "ratio": 15.0},
+        ]
+        result = extract_stable_penetration(assets, full=True)
+        self.assertEqual(result[0]["ratio"], 0.0)
+
+    def test_full_mode_ratio_pct_changes_fingerprint_input(self):
+        """ratio_pct 不同的同一资产，full 提取结果必须不同（缓存指纹须对占比变化敏感）。"""
+        base = {"name": "茅台", "codes": ["600519"], "mv": 100000, "sector": "白酒"}
+        result_a = extract_stable_penetration([{**base, "ratio_pct": 15.0}], full=True)
+        result_b = extract_stable_penetration([{**base, "ratio_pct": 20.0}], full=True)
+        self.assertNotEqual(result_a, result_b)
 
     def test_missing_codes_field(self):
         """codes 缺失时兜底为空列表。"""

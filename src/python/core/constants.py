@@ -37,7 +37,7 @@ PROJECT_ROOT = _find_project_root()
 # 应用名称（单一来源，TUI 首页 / 启动日志 / Web 首页 / HTML 报告首页 / Excel 首页统一引用）
 APP_NAME = "投资复盘助手"
 
-APP_VERSION = "0.11.1"
+APP_VERSION = "0.11.7-dev"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
@@ -71,10 +71,11 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
     #   input: 标准输入（缓存未命中）——含 "peak" 子段的模型即闲时价（默认价）
     #   output: 输出
     #   input_cache_hit: 缓存命中输入（可选，默认等于 input 即无折扣）
-    #   peak: 高峰价子段（可选，仅 DeepSeek 峰谷定价模型有）——工作日高峰时段按此
-    #         计费，其余时段按 base 价（input/output/input_cache_hit）。时段见下方
-    #         PRICING_PEAK_PERIODS / PRICING_IDLE_PERIODS；周末全天按闲时价（2026-08-23
-    #         起 DeepSeek 官方周末统一低谷价），见 PRICING_WEEKEND_ALWAYS_IDLE。
+    #   peak: 高峰价子段（可选，仅 DeepSeek 峰谷定价模型有）——高峰日（工作日且非法
+    #         定节假日）高峰时段按此计费，其余时段按 base 价（input/output/input_cache_hit）。
+    #         时段见下方 PRICING_PEAK_PERIODS / PRICING_IDLE_PERIODS；周末与法定节假日
+    #         全天按闲时价（2026-08-23 起周末统一低谷价、2026-09-10 起含法定节假日），
+    #         见 PRICING_WEEKEND_ALWAYS_IDLE / PRICING_HOLIDAY_ALWAYS_IDLE。
     #         均可经 llm_settings.json → pricing 段覆盖。
     # 通用前缀（如 "claude-sonnet-4-"）用作 startswith() 回退匹配，
     # 覆盖所有日期戳变体（如 claude-sonnet-4-20250514），避免费用显示 "-"。
@@ -90,8 +91,9 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
     "gpt-4o": {"input": 2.5, "output": 10.0, "input_cache_hit": 2.5},
     "gpt-4o-mini": {"input": 0.15, "output": 0.6, "input_cache_hit": 0.15},
     # ── DeepSeek 峰谷定价（元/百万 token）──
-    # base 为闲时价；peak 为高峰价（高峰时段为闲时的 2 倍）。峰谷时段与周末规则
-    # 见下方 PRICING_PEAK_PERIODS / PRICING_WEEKEND_ALWAYS_IDLE。
+    # base 为闲时价；peak 为高峰价（高峰时段为闲时的 2 倍）。峰谷时段、周末与法定
+    # 节假日规则见下方 PRICING_PEAK_PERIODS / PRICING_WEEKEND_ALWAYS_IDLE /
+    # PRICING_HOLIDAY_ALWAYS_IDLE。
     #
     # deepseek-flash（DeepSeek 新一代 Flash 正式模型名，2026-09-10 发布）沿用
     # flash 系列定价：闲时 输入 1.0/输出 4.0/缓存命中 0.02，高峰翻倍
@@ -110,9 +112,9 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
         "input_cache_hit": 0.02,
         "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04},
     },
-    # deepseek-v4-pro 单价未随本轮 flash 调价变动。注意其服务于 2026-09-14 12:00
-    # （北京时间）下线，在该时刻至新一代 Pro 上线前，请求自动路由到 deepseek-flash
-    # 并按其单价计费——本表按模型自身单价记录，路由期实际费用低于此估算值。
+    # deepseek-v4-pro 单价未随本轮 flash 调价变动。官方 2026-09-10 公告：响应用户
+    # 需求，deepseek-v4-pro 在 2026-09-14 之后继续提供 API 服务，计费方式保持不变
+    # （后续如有调整另行通知）。
     "deepseek-v4-pro": {
         "input": 4.5,
         "output": 13.5,
@@ -136,6 +138,11 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
         "input_cache_hit": 0.02,
         "peak": {"input": 2.0, "output": 8.0, "input_cache_hit": 0.04},
     },
+    # ── Kimi（月之暗面开放平台，元/百万 token，platform.kimi.com 官方价）──
+    # kimi-k2.6：通用模型（256k 上下文，支持思考/非思考模式）
+    "kimi-k2.6": {"input": 6.5, "output": 27.0, "input_cache_hit": 1.10},
+    # kimi-k3：旗舰模型（1M 上下文）
+    "kimi-k3": {"input": 20.0, "output": 100.0, "input_cache_hit": 2.00},
     # Gemini
     "gemini-3.5-flash": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
     "gemini-3.5-": {"input": 0.15, "output": 0.60, "input_cache_hit": 0.015},
@@ -147,10 +154,12 @@ MODEL_PRICING: dict[str, dict[str, float | dict[str, float]]] = {
 }
 
 # ── LLM 峰谷定价时段（DeepSeek 官方方案，北京时间）══ 唯一默认源 ══
-# 工作日高峰时段为 9:00–12:00、14:00–18:00；闲时为其余时间（闲时价 = MODEL_PRICING
-# 中含 "peak" 子段模型的 base 价）。周末（周六/周日）全天按闲时价计费，不区分峰谷
-# （2026-08-23 起生效）。pricing.py 以此为基，可从 llm_settings.json → pricing 段
-# （peak_periods / idle_periods / timezone / weekend_always_idle）覆盖。
+# 高峰时段为北京时间周一至周五（不含中国法定节假日）9:00–12:00、14:00–18:00；
+# 闲时为其余时间（闲时价 = MODEL_PRICING 中含 "peak" 子段模型的 base 价）。周末
+# （周六/周日）全天与法定节假日全天按闲时价计费，不区分峰谷（官方 2026-09-10
+# 定价页口径：周末及中国法定节假日全天均为空闲时段）。pricing.py 以此为基，可从
+# llm_settings.json → pricing 段（peak_periods / idle_periods / timezone /
+# weekend_always_idle / holiday_always_idle）覆盖。
 # 单位：当日 00:00 起算的分钟数（闭区间 [start, end]）。
 
 # 高峰时段（分钟）——9:00–12:00、14:00–18:00（仅工作日生效）
@@ -161,6 +170,10 @@ PRICING_IDLE_PERIODS: list[tuple[int, int]] = []
 
 # 周末全天按闲时价计费（周六/周日不再区分峰谷，2026-08-23 起 DeepSeek 官方方案）
 PRICING_WEEKEND_ALWAYS_IDLE: bool = True
+
+# 法定节假日全天按闲时价计费（工作日但非 A 股交易日；复用 core.trading_calendar
+# 判定，2026-09-10 起 DeepSeek 官方定价页口径）
+PRICING_HOLIDAY_ALWAYS_IDLE: bool = True
 
 # 峰谷时段判定所用 IANA 时区（默认北京时间）
 PRICING_TIMEZONE: str = "Asia/Shanghai"

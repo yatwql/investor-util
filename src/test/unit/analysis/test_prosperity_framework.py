@@ -219,6 +219,94 @@ class TestRoeDimension:
         assert roe["status"] == "partial"
         assert any("未取到 ROE" in u for u in roe["unverified"])
 
+    def test_fund_estimate_fills_missing_roe_with_inference_label(self):
+        """基金重仓股加权推演值补上基金层 ROE：计分生效且证据/持仓视角/契约说明均标「推演」。"""
+        details = _details() + [_row("110022", "易方达消费行业", 200_000.0)]
+        estimates = {
+            "110022": {
+                "roe": 0.08,
+                "covered_pct": 55.0,
+                "top_n": 10,
+                "basis": "top10_holdings",
+                "report_period": "2026-06-30",
+            }
+        }
+        data = build_prosperity_framework_data(
+            details,
+            penetration_data=_penetration(),
+            financial_indicator_data=_indicator_data(),
+            fund_roe_estimates=estimates,
+        )
+        roe = next(d for d in data["dimensions"] if d["key"] == "roe_elasticity")
+        # 推演值（0.08 < 10% 阈值）计入低 ROE 权重，基金不再进 missing 清单
+        assert any("推演" in e for e in roe["evidence"])
+        assert not any("110022" in u for u in roe["unverified"])
+        # 低 ROE 权重 = 300308(25%) + 688981(25%) + 110022(200k/1200k≈16.67%)
+        assert any("66.67%" in e for e in roe["evidence"])
+        # 持仓视角：基金行展示推演值并标注
+        view = next(v for v in data["holdings_view"] if v["code"] == "110022")
+        assert view["roe"] == 0.08
+        assert any("推演" in n for n in view["notes"])
+        # 契约级说明含推演口径标注
+        assert any("推演" in n for n in data["notes"])
+
+    def test_fund_estimate_does_not_override_direct_roe(self):
+        """直接 ROE 存在的标的不被推演值覆盖（直接口径优先）。"""
+        estimates = {
+            "300308": {"roe": 0.99, "covered_pct": 60.0, "top_n": 10, "basis": "top10_holdings", "report_period": ""}
+        }
+        data = build_prosperity_framework_data(
+            _details(),
+            penetration_data=_penetration(),
+            financial_indicator_data=_indicator_data(),
+            fund_roe_estimates=estimates,
+        )
+        view = next(v for v in data["holdings_view"] if v["code"] == "300308")
+        assert view["roe"] == 0.06
+        assert not any("推演" in n for n in view["notes"])
+
+    def test_fund_without_estimate_still_missing(self):
+        """无推演值的基金仍进未取到 ROE 清单（估算缺席不影响既有降级口径）。"""
+        details = _details() + [_row("110022", "易方达消费行业", 200_000.0)]
+        data = build_prosperity_framework_data(
+            details,
+            penetration_data=_penetration(),
+            financial_indicator_data=_indicator_data(),
+            fund_roe_estimates={},
+        )
+        roe = next(d for d in data["dimensions"] if d["key"] == "roe_elasticity")
+        assert any("110022" in u for u in roe["unverified"])
+        assert not any("推演" in e for e in roe["evidence"])
+
+
+class TestRoeHelperPrimitives:
+    """ROE 解析与推演集合判定的共用原语（唯一事实来源，防止多处各写一份而漂移）。"""
+
+    def test_roe_by_code_from_rows_filters_invalid(self):
+        from src.python.analysis.prosperity_scoring import roe_by_code_from_rows
+
+        rows = [
+            {"code": "300308", "roe": 0.06},
+            {"code": "688981", "roe": None},
+            {"code": "", "roe": 0.2},
+            {"code": "600519", "roe": "0.31"},
+            {"code": "601398", "roe": 0.11},
+        ]
+        assert roe_by_code_from_rows(rows) == {"300308": 0.06, "601398": 0.11}
+        assert roe_by_code_from_rows(None) == {}
+
+    def test_estimated_fund_codes_excludes_direct_roe(self):
+        from src.python.analysis.prosperity_scoring import estimated_fund_codes
+
+        estimates = {
+            "110022": {"roe": 0.08},
+            "300308": {"roe": 0.99},
+            "519066": {"roe": None},
+        }
+        # 直接 ROE 存在（300308）与推演值缺失（519066）均不属于推演集合
+        assert estimated_fund_codes(estimates, {"300308"}) == {"110022"}
+        assert estimated_fund_codes(None, {"300308"}) == set()
+
 
 class TestGlobalEdgeDimension:
     def test_edge_and_offshore_bonus(self):
@@ -248,6 +336,44 @@ class TestLiquidityDimension:
         data = build_prosperity_framework_data(_details())
         dim = next(d for d in data["dimensions"] if d["key"] == "liquidity")
         assert dim["status"] == "unverified"
+
+    def test_otc_default_tier_counted_with_non_measured_label(self):
+        """场外类型默认档计入④维计分池，证据标注「类型默认档（非实测）」，status=partial。"""
+        signals = [
+            {"code": "300308", "type": "stock", "liquidation_days": 0.5},
+            {"code": "000198", "type": "otc", "liquidation_days": 2.0, "estimate_basis": "type_default"},
+        ]
+        data = build_prosperity_framework_data(_details(), liquidity_signals=signals)
+        dim = next(d for d in data["dimensions"] if d["key"] == "liquidity")
+        # 最差 2.0 日 → <3 日档 7 分；默认档（非实测）参与 → partial
+        assert dim["score"] == 7
+        assert dim["status"] == "partial"
+        assert any("类型默认档" in e and "非实测" in e for e in dim["evidence"])
+
+    def test_otc_configured_limit_counted(self):
+        """配置赎回上限的场外品种计入④维（用户配置口径，区别于类型默认档）。"""
+        signals = [
+            {"code": "300308", "type": "stock", "liquidation_days": 0.5},
+            {"code": "000001", "type": "otc", "liquidation_days": 10.0, "daily_redemption_limit": 100_000},
+        ]
+        data = build_prosperity_framework_data(_details(), liquidity_signals=signals)
+        dim = next(d for d in data["dimensions"] if d["key"] == "liquidity")
+        # 最差 10.0 日 → 否则档 2 分
+        assert dim["score"] == 2
+        assert any("配置赎回上限 1 只" in e for e in dim["evidence"])
+        assert dim["status"] == "scored"
+
+    def test_otc_unscored_without_days_still_unverified(self):
+        """场外品种无天数（无配置且类型未识别）仍不计分。"""
+        signals = [
+            {"code": "300308", "type": "stock", "liquidation_days": 0.5},
+            {"code": "040046", "type": "otc", "liquidation_days": None},
+        ]
+        data = build_prosperity_framework_data(_details(), liquidity_signals=signals)
+        dim = next(d for d in data["dimensions"] if d["key"] == "liquidity")
+        assert dim["score"] == 10  # 仅场内 0.5 日 → <1 日档
+        assert dim["status"] == "partial"
+        assert any("未计入" in u for u in dim["unverified"])
 
 
 class TestConcentrationDimension:

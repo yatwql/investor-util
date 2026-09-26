@@ -1,4 +1,4 @@
-"""行情域适配器 — 腾讯财经 / 新浪财经 / 东方财富。
+"""行情域适配器 — 腾讯财经 / 新浪财经 / 东方财富（含场外净值备源）。
 
 这三个适配器是「数据源适配契约」的首个试点：它们与 ``fetcher/price.py`` 中既有的
 手写转换函数 ``_price_transform_*`` **等价**（由 ``test_quote_adapter_parity.py``
@@ -47,30 +47,46 @@ class SinaQuoteAdapter(SourceAdapter):
         return sina_provider.fetch_price(**query)
 
 
-class EastMoneyQuoteAdapter(SourceAdapter):
-    """东方财富（场外基金净值）适配器。
+class _OtcNavQuoteAdapter(SourceAdapter):
+    """场外净值源适配器共用基类（净值即价格；净值 <= 0 视为无数据）。
 
-    净值源以「净值即价格」的换算接入标准字段：``nav → price``、
-    ``yesterday_nav → yesterday_close``、``nav_date → price_date``。
+    东财与新浪场外净值同口径，字段映射与有效性判据完全一致——两源仅在
+    ``source_id`` / ``display_name`` / ``extract_data`` 上区分。新增净值源只需
+    继承本基类并实现 ``extract_data``，不得复制映射声明或有效性判据。
     """
 
     domain: ClassVar[str] = DOMAIN_QUOTE
-    source_id: ClassVar[str] = "eastmoney"
-    display_name: ClassVar[str] = "东方财富"
     aliases: ClassVar[dict[str, str]] = {
         "nav": "price",
         "yesterday_nav": "yesterday_close",
         "nav_date": "price_date",
     }
 
-    def extract_data(self, query: dict[str, Any]) -> Any:
-        return eastmoney.fetch_nav(**query)
-
     def transform_data(self, raw: Any, source: str = "") -> dict[str, Any] | None:
         """净值无效（缺失或 <= 0）视为无数据，交由链路尝试下一个源。"""
         if not isinstance(raw, dict) or safe_num(raw.get("nav"), default=0.0) <= 0:
             return None
         return super().transform_data(raw, source)
+
+
+class EastMoneyQuoteAdapter(_OtcNavQuoteAdapter):
+    """东方财富（场外基金净值）适配器。"""
+
+    source_id: ClassVar[str] = "eastmoney"
+    display_name: ClassVar[str] = "东方财富"
+
+    def extract_data(self, query: dict[str, Any]) -> Any:
+        return eastmoney.fetch_nav(**query)
+
+
+class SinaFundQuoteAdapter(_OtcNavQuoteAdapter):
+    """新浪财经场外基金净值适配器（`price_fund_otc` 链第二槽，跨厂商备源）。"""
+
+    source_id: ClassVar[str] = "sina_fund"
+    display_name: ClassVar[str] = "新浪财经（场外净值）"
+
+    def extract_data(self, query: dict[str, Any]) -> Any:
+        return sina_provider.fetch_fund_nav(**query)
 
 
 class HithinkQuoteAdapter(SourceAdapter):
@@ -95,4 +111,5 @@ class HithinkQuoteAdapter(SourceAdapter):
 register_adapter(TencentQuoteAdapter())
 register_adapter(SinaQuoteAdapter())
 register_adapter(EastMoneyQuoteAdapter())
+register_adapter(SinaFundQuoteAdapter())
 register_adapter(HithinkQuoteAdapter())

@@ -20,7 +20,7 @@ from src.python.report.market_value import DetailRow
 from src.python.report import penetration as pene
 from src.test.helpers import recent_holdings_period
 
-pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
+pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic, pytest.mark.usefixtures("offline_external_sources")]
 
 
 # ═══════════════════════════════════════════════════════════════

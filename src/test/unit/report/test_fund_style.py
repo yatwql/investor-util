@@ -50,7 +50,7 @@ from src.python.report.fund_style_report import (
 from src.python.report.holdings_freshness import evaluate_report_period
 from src.test.helpers import recent_holdings_period
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 
 # ── _market_cap_to_size 测试 ────────────────────────────────

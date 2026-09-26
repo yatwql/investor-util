@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 from src.python.llm.api_base import (
     _get_last_llm_failure,
     _get_retry_max,
+    _is_default_thinking_on,
     _is_effort_model,
     _supports_extended_thinking,
 )
@@ -68,7 +69,14 @@ def _calm_retry(system_prompt: str, user_prompt: str, name: str, do_retry) -> tu
 
 
 def _resolve_thinking_budget(llm_config: dict, config_field: str, max_tokens: int) -> int:
-    """从 llm_config 解析 Extended Thinking budget_tokens，失败时自动兜底。
+    """从 llm_config 解析 Extended Thinking budget_tokens，无效时自动兜底。
+
+    Anthropic / Gemini 官方约束：budget_tokens（thinkingBudget）须**小于**
+    max_tokens（maxOutputTokens）——思考 token 计入 max_tokens 共享预算，
+    须为其后的正文留余量。故兜底取值保证：
+      - 下限 ≥ 1024（Anthropic 对 budget_tokens 的最小值硬约束）
+      - 上限 < max_tokens（正文至少留 2048 token 余量，max_tokens 较小时
+        让位于 1024 下限——但正常模块 max_tokens 均远超该值）
 
     Args:
         llm_config: LLM 配置字典
@@ -81,8 +89,8 @@ def _resolve_thinking_budget(llm_config: dict, config_field: str, max_tokens: in
     module_suffix = config_field.replace("max_tokens_", "")
     budget_key = f"thinking_budget_{module_suffix}"
     budget = llm_config.get(budget_key)
-    if not budget or budget < max_tokens + 1024:
-        budget = max_tokens + 4096  # 自动兜底
+    if not budget or budget >= max_tokens:
+        budget = max(1024, max_tokens - 2048)  # 自动兜底：budget < max_tokens
     return budget
 
 
@@ -123,6 +131,15 @@ def _resolve_entry_credentials(
                 endpoint = ref_creds.get("endpoint", "") or ""
 
     return (api_key, model, endpoint)
+
+
+def resolve_provider_endpoint(entry: dict, llm_config: dict | None = None) -> str:
+    """解析 provider entry 的最终 endpoint（entry 级优先，否则取 credentials_ref 凭据块）。
+
+    本函数是「链条目 → endpoint」解析的唯一公开入口，供报告层等外部模块复用，
+    避免各处自行重写 credentials_ref → endpoint 的遍历规则而漂移。
+    """
+    return _resolve_entry_credentials(entry, llm_config)[2]
 
 
 def _resolve_first_provider_model_endpoint(
@@ -234,6 +251,7 @@ def call_single_provider(
     config_field: str,
     temperature: float | None,
     llm_config: dict | None,
+    endpoint_key: str = "",
 ) -> tuple[str | None, dict | None]:
     """调用单个 LLM provider。"""
     if provider == "claude":
@@ -250,6 +268,7 @@ def call_single_provider(
             config_field=config_field,
             temperature=temperature,
             llm_config=llm_config,
+            endpoint_key=endpoint_key,
         )
     elif provider == "openai":
         return call_openai(
@@ -264,6 +283,7 @@ def call_single_provider(
             http_client=http_client,
             config_field=config_field,
             temperature=temperature,
+            endpoint_key=endpoint_key,
         )
     elif provider == "gemini":
         return call_gemini(
@@ -279,6 +299,7 @@ def call_single_provider(
             config_field=config_field,
             temperature=temperature,
             llm_config=llm_config,
+            endpoint_key=endpoint_key,
         )
     else:
         logger.warning("不支持的 LLM provider: %s", provider)
@@ -463,7 +484,7 @@ def configure_extended_thinking(
 ) -> None:
     """如果开启，在 payload 中注入 Extended Thinking 参数（原地修改）。
 
-    根据模型类型选择 effort（DeepSeek）或 budget_tokens（Anthropic）控制思考深度。
+    根据模型类型选择 effort（DeepSeek）或 budget_tokens（Anthropic / Kimi）控制思考深度。
     若模型不支持则自动降级跳过。
     """
     if not llm_config:
@@ -472,11 +493,11 @@ def configure_extended_thinking(
     module_suffix = config_field.replace("max_tokens_", "")
     thinking_key = f"thinking_enabled_{module_suffix}"
     if not llm_config.get(thinking_key, False):
-        # DeepSeek 等强制推理模型：未显式开启 thinking 时不传任何思考参数会落入默认
-        # 思考模式（effort=high），思考占满 max_tokens 导致无正文（耗尽 max_tokens 预算）。
-        # 显式 disabled 才能真正关闭思考，从源头避免耗尽。非 effort 模型（Anthropic 原生
-        # 默认不思考）保持原样不注入。
-        if model and _is_effort_model(model):
+        # 默认开思考的模型（DeepSeek 推理族 / Kimi）：未显式开启 thinking 时不传任何思考
+        # 参数会落入默认思考模式，思考占满 max_tokens 导致无正文（耗尽 max_tokens 预算）。
+        # 显式 disabled 才能真正关闭思考，从源头避免耗尽。默认不思考的模型（Anthropic 原生）
+        # 保持原样不注入。
+        if model and _is_default_thinking_on(model):
             payload["thinking"] = {"type": "disabled"}
         return
 
@@ -515,4 +536,5 @@ __all__ = [
     "call_openai",
     "call_gemini",
     "configure_extended_thinking",
+    "resolve_provider_endpoint",
 ]

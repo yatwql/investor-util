@@ -34,6 +34,7 @@ def call_openai(
     http_client: httpx.Client | None = None,
     config_field: str = "max_tokens",
     temperature: float | None = None,
+    endpoint_key: str = "",
 ) -> tuple[str | None, dict | None]:
     """调用 OpenAI API (Chat Completions)，带重试 + 用量日志。
 
@@ -84,4 +85,5 @@ def call_openai(
         check_truncation_fn=lambda d, mt: _check_openai_truncation(d, mt, "OpenAI", config_field),
         provider="openai",
         model_name=model,
+        endpoint_key=endpoint_key,
     )

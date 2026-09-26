@@ -77,7 +77,7 @@ class TestParseFloat(unittest.TestCase):
     def _call(self, s: str) -> float:
         return _parse_float(s)
 
-    def test_normal(self):
+    def test_parses_numeric_string(self):
         self.assertEqual(self._call("1.234"), 1.234)
 
     def test_zero(self):
@@ -104,7 +104,7 @@ class TestParseResponse(unittest.TestCase):
         body = _make_tx_body(fields)
         return f'v_sh561910="{body}";'
 
-    def test_normal(self):
+    def test_parses_all_fields_from_payload(self):
         """正常数据 → 正确解析所有字段。"""
         fields = [""] * 35
         fields[0] = "1"
@@ -171,7 +171,7 @@ class TestFetchPrice(unittest.TestCase):
     """fetch_price HTTP 测试。"""
 
     @patch("src.python.providers.tencent.make_http_client")
-    def test_success(self, mock_factory):
+    def test_parses_price_from_quote_line(self, mock_factory):
         """正常返回 → 正确解析。"""
         fields = [""] * 35
         fields[0] = "1"

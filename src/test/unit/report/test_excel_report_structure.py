@@ -17,7 +17,7 @@ import unittest
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 # 标准注册表（精简版：仅保留结构测试所需字段，省略 action / portfolio_evolution 两个扩展模块）。
 # 本表只作 create_sheets 的输入数据使用，序号仅在本表内自洽，不对照 registry.py 的真实序号——
@@ -483,7 +483,10 @@ class TestExcelSummaryFallbackNotice(unittest.TestCase):
 
         set_feature_enabled("signal_ledger", True)
 
-        self._write({})  # 不抛异常即通过
+        sheets: dict = {}
+        self._write(sheets)
+        # 无汇总页签时静默跳过，不改动传入的页签集合
+        self.assertEqual(sheets, {})
 
 
 class TestExcelModuleSheets(unittest.TestCase):

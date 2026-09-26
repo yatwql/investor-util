@@ -382,7 +382,7 @@ _SOURCE_CATALOG: list[dict[str, Any]] = [
         "auth": "需 key",
         "credential_source_id": "hithink",
         "billing": "免费（key 免费申领，官方不限累计调用次数）",
-        "note": "需开启 功能开关 `market_sentiment`；只保留命中持仓/穿透标的代码的事件行，无命中时该区块不显示",
+        "note": "需开启 功能开关 `market_sentiment`；只保留命中持仓/穿透标的代码的事件行，零命中时写市场概览与说明行（区块仍渲染）",
     },
 ]
 

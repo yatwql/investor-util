@@ -21,12 +21,13 @@ from src.python.config.features import set_feature_enabled
 from src.python.fetcher import price as price_module
 from src.python.fetcher.quote_adapters import (
     EastMoneyQuoteAdapter,
+    SinaFundQuoteAdapter,
     SinaQuoteAdapter,
     TencentQuoteAdapter,
 )
 from src.python.providers import eastmoney, tencent
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.usefixtures("offline_external_sources")]
 
 # 真实响应形状的行情原始数据（腾讯含市值/市盈率与量价扩展字段，新浪不含市值）
 _TENCENT_RAW = {
@@ -69,6 +70,16 @@ _EASTMONEY_RAW = {
     "source": "东方财富",
 }
 
+_SINA_FUND_RAW = {
+    "name": "建信高端装备股票A",
+    "code": "011506",
+    "nav": 1.8384,
+    "acc_nav": 1.8384,
+    "nav_date": "2026-09-24",
+    "yesterday_nav": 1.8828,
+    "source": "新浪财经（场外净值）",
+}
+
 
 class TestTransformParity(unittest.TestCase):
     """转换槽与既有手写转换函数逐源等价。"""
@@ -103,6 +114,22 @@ class TestTransformParity(unittest.TestCase):
             self.assertIsNone(EastMoneyQuoteAdapter().transform_record(raw, "东方财富"))
             self.assertIsNone(price_module._price_transform_eastmoney(raw, "东方财富"))
 
+    def test_sina_fund_parity_except_uniform_optional_fields(self):
+        """新浪场外净值备源：适配器与手写转换函数除 market_cap/pe 外逐键等价。"""
+        out = SinaFundQuoteAdapter().transform_record(_SINA_FUND_RAW, "新浪财经（场外净值）")
+        legacy = price_module._price_transform_sina_fund(_SINA_FUND_RAW, "新浪财经（场外净值）")
+        self.assertEqual({k: v for k, v in out.items() if k not in ("market_cap", "pe")}, legacy)
+        self.assertEqual(out["price"], 1.8384)
+        self.assertEqual(out["yesterday_close"], 1.8828)
+        self.assertEqual(out["price_date"], "2026-09-24")
+        self.assertEqual(out["source_api"], "sina_fund")
+
+    def test_sina_fund_invalid_nav_parity(self):
+        """新浪场外净值无效（<= 0 / 缺失）时两者同样判为无数据。"""
+        for raw in ({"nav": 0.0, "code": "011506"}, {"name": "空净值", "code": "011506"}):
+            self.assertIsNone(SinaFundQuoteAdapter().transform_record(raw, "新浪财经（场外净值）"))
+            self.assertIsNone(price_module._price_transform_sina_fund(raw, "新浪财经（场外净值）"))
+
 
 class TestChainSlotSelection(unittest.TestCase):
     """开关决定链路取哪套映射（结构断言，不依赖数值）。"""
@@ -115,12 +142,14 @@ class TestChainSlotSelection(unittest.TestCase):
         self.assertIs(transforms, price_module._PRICE_TRANSFORMS)
 
     def test_flag_on_uses_adapters(self):
-        """开关开启时改用适配器映射（源集合不变）。"""
+        """开关开启时改用适配器映射（源集合含场外净值备源）。"""
         set_feature_enabled("datasource_adapter", True)
         providers, transforms = price_module._price_chain_slots()
-        self.assertEqual(set(providers), {"tencent", "sina", "eastmoney", "hithink"})
-        self.assertEqual(set(transforms), {"tencent", "sina", "eastmoney", "hithink"})
+        expected = {"tencent", "sina", "eastmoney", "sina_fund", "hithink"}
+        self.assertEqual(set(providers), expected)
+        self.assertEqual(set(transforms), expected)
         self.assertEqual(providers["tencent"][0], "腾讯财经")
+        self.assertEqual(providers["sina_fund"][0], "新浪财经（场外净值）")
 
 
 class TestEndToEndParity(unittest.TestCase):

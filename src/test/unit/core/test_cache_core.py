@@ -374,18 +374,23 @@ class TestCacheClear(CacheTestBase):
         self.assertFalse(os.path.exists(path))
 
     def test_clear_nonexistent_no_error(self):
-        """清除不存在的文件 → 不抛异常。"""
-        from src.python.cache import clear
+        """清除不存在的文件 → 不抛异常，且不留下缓存文件。"""
+        from src.python.cache import _cache_path, clear
 
         clear("ghost")
+        self.assertFalse(os.path.exists(_cache_path("ghost")))
 
     def test_clear_os_error_swallowed(self):
-        """os.remove 抛出 OSError → 被静默吞掉。"""
+        """os.remove 抛出 OSError → 被静默吞掉（不向上抛，也不中断后续清理）。"""
+        self._write_cache("somekey", "x", ts=100.0)
         from src.python.cache import clear as real_clear
 
         with patch("src.python.cache._store.os.remove") as mock_remove:
             mock_remove.side_effect = OSError("permission denied")
             real_clear("somekey")
+
+        # 确实尝试过删除（随后 OSError 被吞掉，未向上抛）
+        mock_remove.assert_called_once()
 
 
 # ═══════════════════════════════════════════════════════════

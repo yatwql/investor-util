@@ -65,8 +65,10 @@ class TestAcquireRelease:
         assert not os.path.exists(lock_path)
 
     def test_release_missing_file_is_noop(self, tmp_path):
-        # 删除不存在的锁文件不抛异常（崩溃残留/已手动清理场景）
-        server._release_output_dir_lock(str(tmp_path / server.OUTPUT_DIR_LOCK_FILE))
+        # 删除不存在的锁文件不抛异常（崩溃残留/已手动清理场景），且不误建文件
+        lock_path = tmp_path / server.OUTPUT_DIR_LOCK_FILE
+        server._release_output_dir_lock(str(lock_path))
+        assert not lock_path.exists()
 
     def test_acquire_blocked_by_undir_file_returns_none(self, tmp_path):
         # output_dir 位置被普通文件占据（os.makedirs 抛 FileExistsError）→ 返回 None 不抛

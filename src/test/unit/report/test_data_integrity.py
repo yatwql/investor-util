@@ -26,6 +26,8 @@ import pytest
 
 from src.python.core.models import Holding
 
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
+
 
 # ═══════════════════════════════════════════════════════════════
 # 1. 三维度分类聚合一致

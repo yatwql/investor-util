@@ -168,7 +168,7 @@ class TestYieldText(unittest.TestCase):
         self.d.profit_rate = 0.10
         self.d.today_profit = 10.0
 
-    def test_normal(self):
+    def test_formats_dividend_yield_percent(self):
         """正常数据 → 正确的股息率百分比。"""
         result = cat.calc_yield_text("600900", self.d, {"600900": {"avg_dividend": 0.85}})
         self.assertEqual(result, "1.70%")

@@ -294,14 +294,6 @@ def report(records: list[dict[str, Any]], *, summary_only: bool = False, sample:
     _print_current_rules()
 
 
-def _ratio_band(ratio: float) -> str:
-    if ratio < _CROSS_BG2_RATIO:
-        return f"{_CROSS_CANDIDATE_RATIO:.3f}~{_CROSS_BG2_RATIO:.3f}"
-    if ratio < 0.40:
-        return "0.375~0.400"
-    return "0.400+"
-
-
 def _report_skip_edges(skips: list[dict[str, Any]], summary_only: bool, sample: int) -> None:
     """cross_skip：进候选区但未合并 —— 关注「有实体重叠却没过线」的漏判候选。"""
     print(f"=== cross_skip（进候选区但未合并，当前阈值 {_CROSS_CANDIDATE_RATIO}）===")

@@ -25,7 +25,7 @@ class TestRefreshProfitForecastCache(unittest.TestCase):
         return _refresh_profit_forecast_cache()
 
     @patch("src.python.fetcher.akshare.get_profit_forecast")
-    def test_success(self, mock_get):
+    def test_returns_name_and_covered_count(self, mock_get):
         """成功获取 → 返回 (profit_forecast, 覆盖数)。"""
         mock_get.return_value = {"600900": {}, "600519": {}}
         name, count = self._call()
@@ -57,7 +57,7 @@ class TestRefreshSectorFlowCache(unittest.TestCase):
         return _refresh_sector_flow_cache()
 
     @patch("src.python.fetcher.akshare.get_sector_fund_flow")
-    def test_success(self, mock_get):
+    def test_returns_name_and_sector_count(self, mock_get):
         """成功获取 → 返回 (sector_flow, 行业数)。"""
         mock_get.return_value = [{"name": "电力"}, {"name": "银行"}]
         name, count = self._call()
@@ -336,7 +336,7 @@ class TestRefreshNewsCache(unittest.TestCase):
     @patch("src.python.report.news_correlation._expand_industry_keywords")
     @patch("src.python.fetcher.news.build_holding_keywords")
     @patch("src.python.fetcher.news.aggregate_news")
-    def test_success(self, mock_agg, mock_build, mock_expand, mock_top):
+    def test_reuses_pipeline_and_returns_match_count(self, mock_agg, mock_build, mock_expand, mock_top):
         """有持仓且有关键词 → 复用报告管线并返回关联条数。"""
         from src.python.core.models import Holding
 

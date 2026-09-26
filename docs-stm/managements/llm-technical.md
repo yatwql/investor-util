@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.11.1
+> 文档版本：0.11.7-dev
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -439,6 +439,42 @@ _LLM_CLIENT_SETTINGS = {
 
 `max_workers=llm_config.llm_max_concurrency`（config 默认 3）控制并行调用数。开启 Extended Thinking 的模块（`thinking_enabled_{suffix}=true`）受独立信号量 `llm_max_thinking_concurrency`（默认 1）串行化约束——多 thinking 模块并发涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），该信号量从源头降低并发（thinking 请求同时最多 N 个），非 thinking 模块不受此限。
 
+### 4.2.1 端点级节流与并发治理（`llm/pacing.py`）
+
+**问题**：全局键 `llm_max_concurrency` 只能表达「所有模块合起来最多几个线程」，无法表达「同一程序、不同端点不同策略」。而同一次报告生成的调用会落在约束截然不同的端点上：订阅制编码端点在服务条款上要求**交互式**使用、带滚动频率窗口与风控型并发上限；按量付费端点有明确的分级 RPM/TPM，可放心高并发。
+
+**设计**：把约束**声明化到 provider 条目**（配置为唯一事实来源），运行时由 `PacingGate` 在**唯一调用缝**上施加。
+
+```
+llm_providers.json
+  providers[i].pacing = { min_interval, jitter, max_concurrency }   （可选）
+        │  _parse_providers_list() 解析
+        ▼
+  _inject_provider_chain_data() ──► register_policies()  （装载到模块级注册表）
+        │
+        ▼  调用链
+  api.py::_call_provider_entry(entry)  ── endpoint_key = entry.name
+        └─► call_single_provider(endpoint_key=…)
+             └─► call_claude / call_openai / call_gemini(endpoint_key=…)
+                  └─► call_llm_with_retry(endpoint_key=…)
+                       └─► with PacingGate(endpoint_key):   ◄── 唯一施加点
+                              _attempt_api_call(...)
+```
+
+**关键性质**：
+
+| 性质 | 实现要点 |
+|:-----|:---------|
+| **缺省零影响** | 无 `pacing` 声明的端点，`PacingGate` 的 `__enter__` 仅一次 dict 查空即返回（无锁、无 sleep）；行为与未引入本机制时逐字节一致 |
+| **与全局并发叠加** | `llm_max_concurrency`（线程池）与 `pacing.max_concurrency`（每端点信号量）是**两级**约束，同时生效 |
+| **间隔在并发许可之后取得** | 先 `semaphore.acquire()` 再等间隔，使 `min_interval` 真正约束「请求发出」时刻（否则排队线程会同时放行） |
+| **抖动** | `jitter` 按比例叠加到 `min_interval` 上（`min_interval × (1 + U(0, jitter))`），避免固定节奏的机器特征 |
+| **复用既有原语** | 间隔与抖动等待由 `core/throttle.py::RateLimiter` 提供（`acquire_interval(key, interval, jitter_ratio)`；抖动算式 `interval_delay` 为唯一来源）——与数据层 qps 限速、`batch_rate_limit` 共用同一实现，`pacing` 只负责声明解析与在途并发上限 |
+| **异常必释放** | `PacingGate` 以 context manager 实现，`__exit__` 无条件 release，避免异常路径把端点占死 |
+| **配置容错** | `pacing` 字段类型错误**逐字段忽略**（记 WARNING），不因单个笔误使整条 provider 校验失败 |
+
+**与 403 的配合**：端点返回 403（配额/风控，如 5 小时窗口用尽、并发上限）时**不重试**——这类限制按时间窗口滚动而非瞬时故障，重试无益且高频重试会加剧风控画像。`_attempt_api_call` 将其归为 `("quota", 403)`，重试骨架直接返回并记 `FAIL_REASON_QUOTA_EXCEEDED`，报告显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**429 / 503 仍按 `max_retries` 重试**（真正的瞬时限制）。
+
 ### 4.3 缓存预检查优化
 
 `_dispatch_llm_workers()` 仅对缓存**未命中**的模块提交线程池任务。缓存命中的模块直接读取内容，节省线程开销。
@@ -538,7 +574,9 @@ call_llm(system_prompt, user_prompt, llm_config, ...)
 _configure_extended_thinking(payload, llm_config, config_field, model, max_tokens)
     │
     ├─ 读取 thinking_enabled_{module_suffix}
-    │      False → 无操作返回
+    │      False → 默认开思考模型（DeepSeek 推理族 / Kimi）显式注入
+    │             thinking.disabled（防思考 token 占满 max_tokens 而无正文）；
+    │             默认不思考模型（Anthropic 原生）无操作返回
     │
     ├─ 验证模型兼容性 (_supports_extended_thinking)
     │      不兼容 → 自动降级跳过，记录 WARNING
@@ -551,10 +589,10 @@ _configure_extended_thinking(payload, llm_config, config_field, model, max_token
     │      effort 从 reasoning_effort_{module_suffix} 读取
     │      配置缺失时兜底 "high"（模板默认：expert_review / health_check 为 medium）
     │
-    └─ budget_tokens 模型 (Claude Sonnet 4 / Opus 4 / Gemini 2.5) →
+    └─ budget_tokens 模型 (Claude Sonnet 4 / Opus 4 / Kimi K2.6+ / Gemini 2.5) →
            payload["thinking"]["budget_tokens"] = budget
            budget 从 thinking_budget_{module_suffix} 读取
-           不足 max_tokens + 1024 时自动兜底到 max_tokens + 4096
+           缺失或 ≥ max_tokens 时自动兜底到 max(1024, max_tokens − 2048)
            Gemini 使用 generationConfig.thinkingConfig.thinkingBudget，效果等价
 ```
 
@@ -613,7 +651,7 @@ call_gemini() Extended Thinking 注入
     └─ 启用 Thinking →
            payload["generationConfig"]["thinkingConfig"] = {"thinkingBudget": budget}
            budget 从 thinking_budget_{module_suffix} 读取
-           不足 max_tokens + 1024 时自动兜底到 max_tokens + 4096
+           缺失或 ≥ max_tokens 时自动兜底到 max(1024, max_tokens − 2048)
            payload["generationConfig"].pop("temperature", None)  ← 与 temperature 互斥
 ```
 
@@ -648,6 +686,8 @@ call_gemini() Extended Thinking 注入
 
 **解析优先级**（`_resolve_entry_credentials()`）：
 
+> **公开入口**：外部模块（如报告层的 LLM 用量汇总，需按链优先级展示 Endpoint 主/备）应调 `llm/api.py::resolve_provider_endpoint(entry, llm_config)`，不自行重写 `credentials_ref → endpoint` 的遍历规则。
+
 1. **`credentials_ref` 查表**：从 `llm_config["_llm_credentials"]` 中查找对应键名的凭据块
 2. **entry 级路由覆盖**：entry 自带的 `model`/`endpoint`（非敏感路由字段）覆盖凭据块中的同名值
 3. **`api_key` 只来自凭据块**：经配置文件解析出的 entry 内联 `api_key` 不参与解析——它在 `_validate_provider_entry()` 阶段即被拒，该条目被整条跳过，根本走不到这里。函数内仍保留 `entry["api_key"]` 分支，服务于**运行期直接构造的内存条目**（调用方自行组装 dict 时不受配置校验约束）；该分支对配置来源的条目永不生效
@@ -673,9 +713,9 @@ call_gemini() Extended Thinking 注入
     ── 熔断中直接跳过，不发起 HTTP
 
 第 2 层：重试骨架（api_base.py）
-    ── 可重试错误 (429/503/超时/网络异常) → 指数退避重试
+    ── 可重试错误 (429/503/超时/网络异常) → 递增退避重试（1s/3s/5s/10s/15s）
     ── 致命错误 (JSON 解析失败) → 不重试
-    ── max_retries 默认 2（可通过 llm_settings.json 配置）
+    ── max_retries 默认 2（可通过 llm_settings.json 配置）；退避序列超出末位锁定末位
 
 第 3 层：截断自动重试（skeleton.py）
     ── 检测输出含 _TRUNCATION_MARKER
@@ -692,13 +732,18 @@ call_gemini() Extended Thinking 注入
     ── 安抚失败 → 切换 provider
 ```
 
-### 6.2 指数退避延迟
+### 6.2 退避延迟表（递增，非等比）
 
 ```python
-_RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]
+_RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]           # LLM 层的退避数值来源
+_RETRY_POLICY = RetryPolicy(strategy=STRATEGY_TABLE, delays=tuple(_RETRY_DELAYS))
+policy = replace(_RETRY_POLICY, attempts=max(1, max_retries + 1))   # 尝试次数 = max_retries + 1
 ```
 
-第 0 次重试等待 1s，第 1 次 3s，依此类推。超出 `max_retries` 后记录失败原因并返回 None。
+第 1 次重试等待 1s，第 2 次 3s，依此类推（**手工调优的递增表**，非等比指数：1→3 为 ×3、3→5 为 ×1.67）；
+**`max_retries` 超过表长时锁定末位值**（`15s`）而非越界。退避数值与重试循环由 `core/retry.py`
+统一提供（显式序列策略，见架构约束「重试与退避唯一原语」），本层只负责失败分类与终态副作用；
+尝试耗尽后记录失败原因并返回 None。
 
 ### 6.3 失败追踪
 
@@ -1077,16 +1122,20 @@ reload_pricing() → 合并 llm_settings.json → pricing
 ### 10.4 峰谷定价（DeepSeek）
 
 `MODEL_PRICING` 中含 `"peak"` 高峰价子段的模型（`deepseek-flash` / `deepseek-v4-flash` / `deepseek-v4-pro` / `deepseek-chat` / `deepseek-reasoner`）
-采用峰谷定价：工作日高峰时段按 `peak` 子段单价计费，其余时段（闲时，含周末全天）按 base 单价计费。
+采用峰谷定价：高峰日（周一至周五，不含中国法定节假日）的高峰时段按 `peak` 子段单价计费，
+其余时段（闲时，含周末与法定节假日全天）按 base 单价计费。
 
-- **高峰时段**（默认，**仅工作日**生效）：北京时间 09:00–12:00、14:00–18:00；工作日其余时间与
-  **周末（周六/周日）全天**均为闲时（2026-08-23 起 DeepSeek 官方周末统一低谷价，闲时价 = 高峰价的一半）
+- **高峰时段**（默认，仅高峰日生效）：北京时间 09:00–12:00、14:00–18:00；高峰日其余时间、
+  **周末（周六/周日）全天**与**法定节假日全天**均为闲时（官方 2026-09-10 定价页口径：
+  周末及中国法定节假日全天均为空闲时段，闲时价 = 高峰价的一半）
 - **配置覆盖**：`llm_settings.json → pricing` 段的 `timezone`（IANA 时区名）、
   `peak_periods` / `idle_periods`（`"HH:MM-HH:MM"` 闭区间列表）可调整时段与时区；
-  `weekend_always_idle`（bool，默认 `true`）设为 `false` 时周末恢复按钟点区分峰谷
+  `weekend_always_idle`（bool，默认 `true`）设为 `false` 时周末恢复按钟点区分峰谷；
+  `holiday_always_idle`（bool，默认 `true`）设为 `false` 时法定节假日恢复按钟点区分峰谷
 - **判定逻辑**：`peak_periods` 非空时高峰 = 这些时段、闲时 = 其余时间；`peak_periods`
   为空且 `idle_periods` 非空时闲时 = 这些时段、高峰 = 其余时间；两者均空 → 无峰谷；
-  `weekend_always_idle` 为真且为周末时，无论时段一律按闲时价
+  周末/法定节假日为「全天闲时日」时无论时段一律按闲时价（法定节假日复用
+  `core/trading_calendar._is_trading_day` 判定：工作日但非 A 股交易日即法定节假日）
 - **无 `"peak"` 的模型**不受时段影响，始终按 base 价计费
 - **计费时刻**：`estimate_cost(..., at_time=...)` 可显式传入判定时刻（naive 视为已在
   定价时区，便于测试）；缺省取当前时间并按定价时区换算
@@ -1341,17 +1390,19 @@ LLM 集成层与系统其他组件的接口：
 | deepseek-flash | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；DeepSeek-V4.1-Flash 正式模型名（2026-09-10 发布） |
 | deepseek-reasoner | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；**已停用别名**（flash 系列思考模式的兼容名，2026-07-24 下线，条目保留供历史记录计费） |
 | deepseek-v4-flash | 1.00 / 2.00 | 4.00 / 8.00 | 0.02 / 0.04 | 峰谷定价（闲时/高峰）；别名，端点仍接受、底层由 V4.1-Flash 接管并按同价计费 |
-| deepseek-v4-pro | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | 峰谷定价（闲时/高峰）；2026-09-14 12:00 起下线，之前请求路由到 V4.1-Flash 并按其单价计费 |
+| deepseek-v4-pro | 4.50 / 9.00 | 13.50 / 27.00 | 0.15 / 0.30 | 峰谷定价（闲时/高峰）；官方 2026-09-10 公告继续提供 API 服务，计费方式不变 |
 | gemini-2.0-flash | 0.10 | 0.40 | 0.01 | |
 | gemini-2.5-flash | 0.15 | 0.60 | 0.015 | |
 | gemini-2.5-pro | 1.25 | 5.00 | 0.125 | |
 | gemini-3.5-flash | 0.15 | 0.60 | 0.015 | |
 | gpt-4o | 2.50 | 10.00 | 2.50 | |
 | gpt-4o-mini | 0.15 | 0.60 | 0.15 | |
+| kimi-k2.6 | 6.50 | 27.00 | 1.10 | Kimi 通用主力（256k 上下文），Anthropic 兼容端点默认开思考（未开启 thinking 时显式禁用） |
+| kimi-k3 | 20.00 | 100.00 | 2.00 | Kimi 旗舰（1M 上下文） |
 
 > 上表为具名模型定价；`MODEL_PRICING` 另有 6 个前缀回退键（`claude-sonnet-4-`/`claude-opus-4-`/`claude-haiku-4-`/`gemini-3.5-`/`gemini-2.5-`/`gemini-2.0-`）用于 startswith 回退匹配日期戳变体，未逐行列示。
 >
-> 峰谷定价模型的「闲时/高峰」两列为非高峰与高峰时段单价（高峰时段为北京时间 09:00–12:00、14:00–18:00，**仅工作日生效**；闲时为其外全部时间，**周末全天按闲时价**）；模型条目含 `"peak"` 高峰价子段，时段可经 `pricing` 段 `peak_periods`/`idle_periods`/`timezone`/`weekend_always_idle` 覆盖。
+> 峰谷定价模型的「闲时/高峰」两列为非高峰与高峰时段单价（高峰时段为北京时间 09:00–12:00、14:00–18:00，**仅高峰日（周一至周五，不含中国法定节假日）生效**；闲时为其外全部时间，**周末与法定节假日全天按闲时价**）；模型条目含 `"peak"` 高峰价子段，时段可经 `pricing` 段 `peak_periods`/`idle_periods`/`timezone`/`weekend_always_idle`/`holiday_always_idle` 覆盖。
 
 费用按 `(input_tokens × 输入单价 + output_tokens × 输出单价 + cache_hit_tokens × 缓存命中单价) / 1_000_000` 计算。
 

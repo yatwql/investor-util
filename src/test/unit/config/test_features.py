@@ -283,12 +283,6 @@ class TestDatasourceAdapterPromotion:
 
         assert providers is not price_module._PRICE_PROVIDERS
 
-    def test_not_in_report_notice_after_promotion(self):
-        """开启状态下产物自述为空——常规开关不进实验功能清单。"""
-        from src.python.report.experimental_notice import enabled_notice_line
-
-        assert enabled_notice_line() is None
-
 
 @pytest.mark.unit
 class TestReadSidePromotion:

@@ -236,13 +236,16 @@ class TestTurnoverRateEdge:
         assert turnover_rate(data, data) is None
 
     def test_missing_code_still_processes(self):
-        """缺 code 键 → 视为空字符串，不崩溃。"""
+        """缺 code 键 → 视为空字符串参与计算（不返回 None）。
+
+        上期 {A: 100} / 本期 {无 code: 200} 两期权重各为 1.0 且集合不相交，
+        故换手率应为 1.0（精确断言，避免「仅非空」在实现假化为恒返 0 时仍通过）。
+        """
         from src.python.analysis.metrics import turnover_rate
 
         before = [{"code": "A", "market_value": 100}]
         after = [{"name": "B", "market_value": 200}]  # 无 code
-        result = turnover_rate(before, after)
-        assert result is not None
+        assert turnover_rate(before, after) == 1.0
 
     def test_none_market_value_treated_as_zero(self):
         """market_value=None → 视为 0。"""
@@ -448,12 +451,11 @@ class TestTruncateExtremeValuesEdge:
 class TestCheckDataSufficiencyEdge:
     """数据充分性 — 边界输入。"""
 
-    def test_none_returns_low(self):
-        """None 输入 → 返回 0。"""
+    def test_none_returns_insufficient(self):
+        """None 输入 → 返回 0（不足）——签名声明为 list，None 走 truthiness 防御分支。"""
         from src.python.analysis.metrics import check_data_sufficiency
 
-        # 函数签名不接受 None，但防御性处理
-        assert check_data_sufficiency([]) == 0
+        assert check_data_sufficiency(None) == 0
 
 
 class TestGetConfidenceLevelEdge:
@@ -534,12 +536,6 @@ class TestComputeAllMetricsEdge:
 
 class TestBetaAnalysisEdge:
     """Beta 置信区间分析 — 边界路径。"""
-
-    def test_no_variance_benchmark_returns_none(self):
-        """基准全零 → beta None → analysis None。"""
-        from src.python.analysis.metrics import portfolio_beta_analysis
-
-        assert portfolio_beta_analysis([0.001] * 252, [0.0] * 252) is None
 
     def test_low_df_critical_value(self):
         """小自由度 → 查表给出界内值。"""

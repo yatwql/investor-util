@@ -54,7 +54,7 @@ class TestSafeFloat(unittest.TestCase):
         return _safe_float(s)
 
     @pytest.mark.smoke
-    def test_normal(self):
+    def test_parses_numeric_string(self):
         self.assertEqual(self._call("1.2345"), 1.2345)
 
     @pytest.mark.smoke
@@ -72,7 +72,7 @@ class TestFallbackFundf10(unittest.TestCase):
     """_fallback_fundf10 备用链路测试。"""
 
     @patch("src.python.providers.eastmoney.make_http_client")
-    def test_success(self, mock_factory):
+    def test_parses_nav_from_f10_table(self, mock_factory):
         """正常返回 → 解析出净值。"""
         mock_client = MagicMock()
         mock_client.__enter__.return_value = mock_client
@@ -133,7 +133,7 @@ class TestFetchNav(unittest.TestCase):
     # ── 主链路正常 ──────────────────────────────────────
 
     @patch("src.python.providers.eastmoney.make_http_client")
-    def test_success(self, mock_factory):
+    def test_returns_nav_rows_from_primary_chain(self, mock_factory):
         """主链路正常 → 返回净值数据。"""
         jsonp = 'jQuery({"Data": {"LSJZList": [{"DWJZ":"1.2345","LJJZ":"2.3456","FSRQ":"2026-07-01"}], "FundName":"测试基金"}})'
         self._make_mock_client(mock_factory, jsonp)

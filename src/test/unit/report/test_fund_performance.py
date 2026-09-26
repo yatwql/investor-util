@@ -25,7 +25,7 @@ from src.python.report import penetration as pene
 from src.python.report.styles import BLUE_FONT, GREEN_FONT, RED_FONT
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 
 # ============================================================
@@ -237,7 +237,7 @@ class TestFormatReturn(unittest.TestCase):
 class TestFormatRank(unittest.TestCase):
     """测试 _format_rank 排名格式化。"""
 
-    def test_normal(self):
+    def test_formats_rank_over_total(self):
         """正常排名 -> 'rank/total'"""
         self.assertEqual(fp._format_rank({"rank": 1, "total": 100}), "1/100")
 

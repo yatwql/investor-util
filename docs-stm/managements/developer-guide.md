@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.11.1
+> 文档版本：0.11.7-dev
 
 ## 概述
 
@@ -47,9 +47,9 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 | 门禁 | 触发点 | 命令 | 说明 |
 |:-----|:-------|:-----|:-----|
-| **P0** | 提交前 | `.venv/bin/python scripts/test-runner.py --mode dev-verify` + 4 个 check 脚本 | 阻塞提交，不得 commit |
+| **P0** | 提交前 | `.venv/bin/python scripts/test-runner.py --mode dev-verify` + 7 个 check 脚本 | 阻塞提交，不得 commit |
 | **P1** | 合入 master 前 | `.venv/bin/python scripts/test-runner.py --mode verify` | 阻塞合入，不得 merge |
-| **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode verify,regression` + 4 个 check 脚本 | 阻塞发布，不得 release |
+| **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode verify,regression` + 7 个 check 脚本 | 阻塞发布，不得 release |
 
 **P0 提交前门禁**（全部通过才可 commit）：
 
@@ -59,6 +59,9 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-doc-traces.py --ci           # 文档历史痕迹检查
 .venv/bin/python scripts/check-task-numbering.py --ci       # 任务编号全局一致性检查
 .venv/bin/python scripts/check-semantic-index.py --ci       # 语义命名索引正反向校验
+.venv/bin/python scripts/check-doc-drift.py --ci            # 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵）
+.venv/bin/python scripts/check-test-redundancy.py --ci      # 测试用例冗余与无效（死用例/无断言/完全重复/自证用例/硬编码演进总数）
+.venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）（死用例/无断言/完全重复/自证用例）
 ```
 
 **P1 合入门禁**：`test-runner.py --mode verify`（核心模块单元测试），否则不得 merge。
@@ -71,9 +74,14 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-doc-traces.py --ci
 .venv/bin/python scripts/check-task-numbering.py --ci
 .venv/bin/python scripts/check-semantic-index.py --ci
+.venv/bin/python scripts/check-doc-drift.py --ci
+.venv/bin/python scripts/check-test-redundancy.py --ci
+.venv/bin/python scripts/check-requirement-trace.py --ci
 ```
 
 **辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
+
+**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有两个独立 job：`guards`（**阻塞**，7 个 `--ci` 守护脚本，即上方 P0/P2 清单全量）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
 
 > P1/P2 的完整要求（含手动验证项）见 [testplan.md](testplan.md) → 回归测试清单 / 门禁章节。
 
@@ -96,7 +104,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 ### 自动保障机制
 
-任务编号全局单调递增、归档不回收，由 `check-task-numbering.py` 校验，防止新增编号与历史归档冲突。四层自动保障：
+任务编号全局单调递增、归档不回收，由 `check-task-numbering.py` 校验，防止新增编号与历史归档冲突。五层自动保障：
 
 | 机制 | 触发 | 跨机器 |
 |:-----|:-----|:------|
@@ -104,6 +112,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 | **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
 | **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
 | **git pre-commit** | `git commit` 涉及编号文档时自动校验 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
+| **CI guards job** | push / PR / tag 时自动校验（7 个 `--ci` 脚本之一） | ✅ 零配置 |
 
 > `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
 
@@ -326,7 +335,9 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
   1. `pytest.ini` 的 `addopts = -m "not live"` 在收集期直接排除；
   2. `conftest.py` 的 `_skip_live_unless_requested` autouse fixture 默认跳过（`-m live` 收集到也 skip）；
   3. `_block_external_network` 阻断 fixture 对非 live 项一律拦死真实网络。
-- **内容**：覆盖行情（A 股/ETF/场外基金/中美指数）、新闻源（东方财富/财联社/新浪/华尔街见闻）、基金（历史净值/排名/基准）、akshare 交易日历共 14 项。
+- **非 live 用例的断网机制（2026-09-26 收紧）**：守卫只阻断**建连**（`socket.socket.connect`/`connect_ex`、`create_connection`、`getaddrinfo`），**不阻断 `socket.socket()` 构造**——否则会误伤第三方库的**导入期**探测（urllib3 导入期构造 socket 且仅被 `except Exception` 包住，硬化后会直接使库导入失败）。抛出的 `NetworkBlockedInTests` 继承 `BaseException`（而非 `RuntimeError`）：provider/fetcher 普遍用 `except Exception` 降级，用 `Exception` 子类会被静静吞掉，使漏 mock 退化成“验证网络被阻断后的降级”并白等链路瞬时重试退避（实测 unit 模式 1072 次未 mock 尝试 / 300 次退避睡眠 / 累计 149.3s 空等）。
+- **不依赖外部数据的文件写 `offline_external_sources`**：报告/编排/集成类用例的**附带依赖**（交易日历/行业数据/行情/健康探针/akshare 直连路径）常在未被 mock 时被真实访问。这类文件在模块级加 `pytest.mark.usefixtures("offline_external_sources")`，由 `src/test/_network_guard.py::apply_offline_stubs` 把仓内 HTTP 出口（`httpx.Client`）、交易日历、akshare（`sys.modules` 级）换成“即时取不到”，并把 `fetcher.chain._TRANSIENT_RETRY_BACKOFF` 置 0（仓内既有测试惯例）——链路口径仍为“源不可用→降级”，但零网络、零等待。需要验证某源真实行为的用例**必须自行 mock**，不得用本 fixture 遮掩。
+- **内容**：覆盖行情（A 股/ETF/场外基金/中美指数）、新闻源（东方财富/财联社/新浪/华尔街见闻）、基金（历史净值/排名/基准）、akshare 交易日历共 **14 个用例**（行情 5 / 新闻 4 / 基金 3 / 交易日历 2）。
 - **断言原则**：只校验返回「结构」（字段存在、类型、非空），**不校验具体数值**，容忍真实行情波动（休市、涨跌、数据源改字段）。
 - **不含 LLM 真实调用**（防费用）——LLM 连通性由运行时数据源健康检查覆盖。
 - 触发方式：`.venv/bin/python scripts/test-runner.py --mode live` 或 `.venv/bin/python -m pytest --run-live -m live`。
@@ -616,6 +627,11 @@ test-reports/latest/
 - **方法**：`test_<场景>`
 - **单文件上限**：≤ 800 行 / ≤ 80 测试项 / ≤ 15 方法每类
 - **标记规则**：单元测试用 `pytestmark` 模块级列表（`[pytest.mark.unit, pytest.mark.<子组>]`），场景测试用类级 `@pytest.mark.scenario + @pytest.mark.<子组>`，edge 测试在 `pytestmark` 中追加 `pytest.mark.edge`
+- **真值单一来源**：断言中的「事实」必须从真值来源**动态派生**，禁止写死会随开发演进的派生量（需求/章节/开关/注册表/枚举的**条数**与**逐条清单**）。写死后新增一条需求/章节就会把测试打红（良性变更误判为回归），且与门禁脚本职责重复。
+  - ✅ 结构关系断言：`set(a) == set(b)`（双向相等）、`expected <= set(a)`（覆盖）、`numbers == list(range(1, n+1))`（序号连续）、`len(keys) == len(set(keys))`（唯一性）、逐项遍历
+  - ❌ 硬编码总数：`assert len(req_ids) == 276`、`assert len(sections) == 17`
+  - 需要「条数」语义时用「域覆盖 + 序号连续」等价表达（强度不低于写死条数，且能发现跳号/重号）
+  - 由此守：`scripts/check-test-redundancy.py` 第 5 类 `check_hardcoded_evolving_totals`
 - 新增文件后运行 `.venv/bin/python scripts/check-test-markers.py` 验证标记合规性
 
 ### 新增测试指南
@@ -716,6 +732,8 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
+| `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表） |
+| `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
@@ -726,9 +744,10 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `perf-view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
 | `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（风格因子回归前置决策闸门） |
 | `probe-push2.py` | 诊断 | 东方财富 push2 连通性探测（区分程序缺陷与网络环境拦截，熔断降级前置排障） |
-| `check-svg-geom.py` | 诊断 | README SVG 架构图几何审查（文本越界/重叠/矩形对齐） |
-| `check-svg-pixel.py` | 诊断 | README SVG 架构图像素检查（检测文本越出卡片右缘） |
-| `check-svg-text-overflow.py` | 诊断 | README SVG 架构图文字色像素越界精确检测 |
+| `check-svg.py` | 诊断 | README SVG 架构图检查（子命令 `geom` 几何 / `pixel` 像素 / `text-overflow` 文字色越界；像素子命令需 Pillow） |
+| `_checklib.py` | 内部 | 检查脚本共享设施（统一 `-v/--ci` 契约与 `[OK]`/`[ERR]` 输出、`rel()`、`report()`、文档区间与表格解析） |
+| `_traces_common.py` | 内部 | 历史痕迹检查共享排除模式（两个 trace 检查脚本共用章节计数 / 迭代轮次豁免） |
+| `_test_runner/` | 内部 | 测试驱动内部实现包（paths / modes / pytest_env / machine_info / doc_writer / report_html / runner） |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本（无参数启动 TUI；`web` 子命令启动 Web 浏览器模式） |
 | `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
 | `llm.sh` / `llm.ps1` | 启动 | Linux/macOS / Windows 完整报告快捷入口（固定 `report --type full`，等价 TUI「生成完整报告」） |
@@ -881,6 +900,80 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 .venv/bin/python scripts/check-semantic-index.py --ci  # CI 模式（只输出错误，退出码 2）
 ```
 
+**检查脚本的共享设施与统一契约（`_checklib.py` / `_traces_common.py` / `_test_runner/`）**
+
+`scripts/` 下的检查脚本共用一套 CLI 契约与设施，避免每个脚本各写一份：
+
+- **统一契约**（`_checklib.add_common_args()` / `report()`）：`-v/--verbose` 详细输出、`--ci` 仅输出 `文件:描述`；**通过退出 0，发现 finding 退出 2**（`check-code-traces.py` 另有 HIGH=1 / LOW=3 的分级语义，属其自身约定）；通过打印 `[OK] …`，失败逐条 `[ERR] file:desc`（`--ci` 下为裸行）+ 汇总行
+- **共享原语**：`REPO_ROOT` / `rel()`（仓库相对路径，非仓库内路径原样返回）、`extract_region()` / `replace_region()`（标记区间）、`extract_table_region()` / `replace_table_region()`（表区域，带结构校验）
+- **`_traces_common.py`**：两个历史痕迹检查脚本共用的「章节计数豁免」与「迭代轮次豁免」模式（此前各维护一份，改动易漏同步）；两个脚本以原面 re-export 暴露这些名字，既有测试与调用方无需改动
+- **`_test_runner/`**：`test-runner.py` 的内部实现包（paths / modes / pytest_env / machine_info / doc_writer / report_html / runner），入口仅保留 CLI 与主流程并原面 re-export —— 既有测试访问 `test_runner._env_value` 等名字仍有效；**注意**：monkeypatch 内部状态（如 `_LATEST_DIR` / `_DOC_COVERAGE_PATH`）须指向持有它的子模块（`_test_runner.report_html` / `_test_runner.doc_writer`）
+
+> 新增检查脚本时直接复用 `_checklib`，不要自建 argparse/输出/退出样板；新增共享模式放 `_traces_common.py`。
+
+**`check-doc-drift.py` — 文档与实现一致性检查**
+
+把文档里的「事实断言」（计数、清单、默认值、面板编号、目录树、统计表）与权威源逐条对账，
+使漂移在提交前暴露。与 `check-doc-traces.py` 互补：那边管「不该写的内容」（历史痕迹），这边管
+「写了但与实现不符的内容」。
+
+十五项检查（权威源 → 受检文档）：
+
+1. 报告章节表（`reports-instruction.md`）↔ 章节注册表 `_REPORT_SECTION_DEFAULT`（行数/序号/名称）
+2. 章节数量断言（`页签编号 1~N` / `默认顺序（N 项` / `返回 result（N 项` / `N 个报告章节`）↔ 注册表章节数
+3. 功能开关表（`how-to-config.md` 三组区段）↔ `feature_switch_registry`（成员/默认值/无表外键）
+4. 开关分组计数断言（`⚗实验 A / 常规 B / 报告章节与增强 C`、`实验组（N 项`、`共 N 项开关`）↔ 分组计数
+5. 开关默认值断言（`` `flag` `` 后紧随「默认开/关」）↔ 注册表默认值
+6. 配置标量默认值表（`how-to-config.md`）↔ `_DEFAULT_CONFIG`
+7. LLM 默认参数表（`llm-technical.md`）↔ `_DEFAULT_LLM_SETTINGS` + 缓存 TTL 注册表
+8. TUI `[S]` 面板编号连续性与分组边界（`how-to-use-tui-menu.md`）↔ `handlers_config.py` 的派生编号规则
+9. 目录树（`folders.md`）↔ 文件系统实测（`src/`、`scripts/`、`docs-stm/{managements,manuals,plan}`）
+10. 项目统计表（`folders.md`）↔ 实测文件数/行数（加 `--with-test-count` 再核「测试用例」行）
+11. 测试覆盖计数表（`test-coverage.md`）↔ `scripts/collect-test-coverage.py` 快照（仅 `--with-test-count`）
+12. 归档索引完整性：changelog / plan / review-findings 三份管理文档的「归档」索引 ↔ 归档目录下
+    `archived_*` 文件**双向**比对（漏列 → 「缺少」；幽灵引用 → 「不存在」）
+13. 管理文档分区纪律：review-findings 未完成/已解决分区互斥且已解决项须在 changelog 有修复记录；
+    plan 未完成区不得含 ✅/已归档项；现行 changelog 只允许一个 `-dev` 段头
+15. Provider Chain 降级表：`fetcher/chain.py::_DEFAULT_CHAINS` 的 13 条链 ↔
+    `datasource-reliability.md` §4.2 表逐链**双向**比对（漏链 → 「缺少链路」；幽灵行 → 「无此链」）
+14. Extended Thinking 支持矩阵：手册对比表须覆盖代码支持的全部厂商族、「仅」式预算枚举句须列全、
+    默认开思考族须有提示（权威源为 `llm/api_base.py` 的前缀名单）
+
+```bash
+.venv/bin/python scripts/check-doc-drift.py                   # 十五项全查
+.venv/bin/python scripts/check-doc-drift.py -v                # 详细输出（打印解析结果与实测统计）
+.venv/bin/python scripts/check-doc-drift.py --ci              # CI 模式（只输出 文件:描述，退出码 2）
+.venv/bin/python scripts/check-doc-drift.py --with-test-count # 附带 pytest 收集，核对「测试用例」与 test-coverage.md 计数表
+```
+
+> 按设计豁免的文档：`changelog.md` / `review-findings.md`（如实引用旧数字作为变更记录）与
+> 版本快照类文档（历次发布的归档快照）不参与计数与默认值断言扫描。修正提示：报告里的数字就是
+> 实测值，直接按提示改文档即可；目录树缺条目时按所属子包位置补一行（含简短职责说明）。
+
+**`check-test-redundancy.py` — 测试用例冗余与无效检查**
+
+静态分析 `src/test/`（默认跳过 `pytest.ini` 刻意排除的 `live/` 真网套件），抓五类「看着有测试其实没测住」的问题：
+
+1. **死用例**：同文件同类同名重复定义（后者覆盖前者）、类名不以 `Test` 开头的方法形式 `test_*`、`Test*` 类定义了 `__init__`（pytest 整类跳过）
+2. **无断言用例**：既无 `assert`、也无 `pytest.raises/warns/fail`、也无 `assertEqual` 等 `assert*` / `assert_called*`，且不经同类辅助方法（如 `self._assert_pairs_contain(...)`，其内部含断言）——断言落在辅助方法里同样算数
+3. **完全重复用例**：去 docstring 后「函数体 + 参数 + 装饰器」AST 归一化一致（同一被测对象同一断言）。凡函数体内出现**无法解析**的 `self.<attr>` 间接调用（目标来自 `setUp` / 跨模块基类）一律跳过比对——避免把「同名方法绑定不同被测对象」的并行覆盖误判为重复
+4. **自证用例**：同一用例内既 `@patch("<mod>.<fn>")` 又直接调用同名函数，且把该 mock 的 `.return_value` 设成某字面量、再用断言与该字面量比较（断言恒真，等于没测）
+5. **硬编码「会演进的总数」**：把**可增长集合的条数**写死进断言（如 `assert len(req_ids) == 276`、`assert len(sections) == 17`）。
+   这类总数是文档真值来源的派生量，**新增一条需求/章节/开关就会把测试打红**——良性变更被误判为回归，而它捕捉不到任何真实缺陷；且与门禁脚本（如 `check-requirement-trace` 的全域覆盖断言）**职责重复**。
+   正确写法是断言**结构关系**：集合双向相等（`set(a) == set(b)`）、子集/覆盖（`expected <= set(a)`）、序号连续（`numbers == list(range(1, n+1))`）、唯一性（`len(keys) == len(set(keys))`）。
+   判定保守（宁少报不误报）：仅看 `assert` 中的 `len(x) ==/> 数字`；实参名需含语义关键词（`requirement`/`section`/`switch`/`module`/`domain`/…）**或**文件路径含 `requirement`/`registry`；忽略 `<= 3` 的小数字（常为有意断言）。
+
+```bash
+.venv/bin/python scripts/check-test-redundancy.py                 # 五类全查
+.venv/bin/python scripts/check-test-redundancy.py -v              # 详细输出（扫描规模 + 各类计数 + 跳过的间接调用用例数）
+.venv/bin/python scripts/check-test-redundancy.py --ci            # CI 模式（只输出 文件:描述，退出码 2）
+.venv/bin/python scripts/check-test-redundancy.py --include-live  # 连带扫描 src/test/live/
+```
+
+> 删除/合并用例后须同步刷新 `test-coverage.md`（模式/子标记计数）与 `folders.md`（测试文件数/行数/用例数），
+> 两处由 `check-doc-drift.py --with-test-count` 兜底核对。**修法优先级**：名实不符的用例应改成真正跑它名字
+> 声称的场景（补上原本空白的覆盖），而不是改名了事。
+
 **`check-task-numbering-hook.py` — Claude Code PostToolUse hook**
 
 Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验，失败返回非零退出码中断编辑。读取 `__INJECTED_OBJECT__`（环境变量或命令行参数）识别目标文件；无 hook 上下文或非编号文档时放行。由 `.claude/settings.json` 的 PostToolUse 钩子调用（不随仓库同步，需 `install-claude-hook.py` 接线）。
@@ -1018,22 +1111,24 @@ CSI 风格指数可用性探测（风格因子回归前置决策闸门），决�
 
 curl 对照命令：`curl -s "https://push2.eastmoney.com/api/qt/stock/get?secid=1.000001&fields=f58"`。纯只读探测，不写缓存/熔断/降级记录，无副作用。
 
-**`check-svg-geom.py` / `check-svg-pixel.py` / `check-svg-text-overflow.py` — README SVG 架构图检查三件套**
+**`check-svg.py` — README SVG 架构图检查（三合一）**
 
-README 首屏架构图（`src/static/architecture.svg` / `llm-chain.svg` / `capabilities.svg`）的渲染质量检查，改图后用于验证文本不越界/重叠。
+README 首屏架构图（`src/static/architecture.svg` / `llm-chain.svg` / `capabilities.svg`）的渲染质量检查，改图后用于验证文本不越界/重叠。三个渲染质量检查（几何/像素越界/文字色越界）合并为一个带子命令的统一入口（注意：**均带 `--ci` 与退出码语义**，0=通过 / 1=缺 Pillow / 2=发现越界）。
 
 ```bash
-# 几何审查：文本越界 / 文本重叠 / 矩形对齐（估算字体宽度）
-.venv/bin/python scripts/check-svg-geom.py <svg路径>
+# 几何审查：文本越界 / 贴边 / 文本重叠（估算字体宽度；矩形底部不齐仅作提示，不计入退出码）
+.venv/bin/python scripts/check-svg.py geom <svg路径…>
 
-# 像素检查：检测文本是否越出卡片右缘（副标题行区域找亮色像素）
-.venv/bin/python scripts/check-svg-pixel.py <png路径>
+# 像素审查：副标题行区域亮色像素是否越出卡片右缘（需 Pillow）
+.venv/bin/python scripts/check-svg.py pixel <png> <scale> <card_r> <row_y0> <row_y1> <margin>
 
-# 精确检测文字色像素是否越出卡片右缘
-.venv/bin/python scripts/check-svg-text-overflow.py <png路径>
+# 像素审查：精确匹配文字色像素越界（需 Pillow）
+.venv/bin/python scripts/check-svg.py text-overflow <png> <scale> <card_r> <y0> <y1> <margin>
 ```
 
-三个脚本均接受图片路径参数，配合 `src/static/` 下 SVG 渲染出的 PNG 使用。
+参数含义：`scale` = px per svg unit；`card_r` = 卡片右缘 x（svg 单位）；`row_y*/y*` = 检测区 y 范围（svg 单位）；`margin` = 检测范围到卡片右缘的右扩量（svg 单位）。几何审查纯标准库；两个像素子命令需 Pillow（`pip install -e '.[svg]'`，缺失时给出可读指引并以退出码 1 结束）。
+
+> **当前状态**：三张 SVG 均通过 `geom`——卡片内文本按估宽模型的右余量 ≥10px（`capabilities.svg` ≥19px）。贴边阈值由 `_PADDING_WARN`（6px）定义，矩形底部不齐仅作提示项（流程图同列卡片高度本就允许不同）。**改图后请重跑本脚本**；本脚本不在提交前/发布前门禁清单内，按需运行。
 
 ### 启动脚本
 
@@ -1493,7 +1588,7 @@ registry 的测试在 `src/test/unit/core/test_registry.py`，验证 TTL 默认�
 
 ## 版本发布流程
 
-发布版本时，按以下四步顺序执行：
+发布版本时，按以下五步顺序执行：
 
 **① 版本号一致**
 
@@ -1534,6 +1629,18 @@ git push origin --tags
 **④ 开发版本切换**
 
 发布版本并打 tag 后，**立即**将 `APP_VERSION` 和所有管理文档版本头改为**下一个版本的 `-dev`**（如发布 v0.6.8 后即改为 v0.6.9-dev），运行 `check-version-consistency.py` 验证全链 `[OK]` 后提交，然后继续开发。开发期间版本号始终标识为下一个预期发布版本的 `-dev`。
+
+**⑤ 合并入 master**
+
+发布并打 tag 后，**必须**把 `dev` 合并入 `master` 并推送（`master` 是发布分支，只存放已发布状态；不得只打 tag 而不更新 master）：
+
+```bash
+.venv/bin/python scripts/test-runner.py --mode verify   # P1 合入门禁，必须先通过
+git checkout master && git merge --no-ff dev -m "Merge branch 'dev' — v{x.y.z} 发布" && git push origin master
+git checkout dev
+```
+
+合入后确认 tag 所指提交已在 `master` 可达（`git merge-base --is-ancestor v{x.y.z} origin/master`）；`master` 推送会触发 CI 的 P1（`verify`）档。本步与步骤④互不替代：④ 是让 dev 进入下一个开发周期，⑤ 是把已发布状态同步到发布分支。
 
 ## 关键纪律来源
 

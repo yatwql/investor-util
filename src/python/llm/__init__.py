@@ -36,6 +36,7 @@ from src.python.llm.prompts import (  # noqa: F401
     FAIL_REASON_DISABLED,
     FAIL_REASON_NETWORK_ERROR,
     FAIL_REASON_NOT_CONFIGURED,
+    FAIL_REASON_QUOTA_EXCEEDED,
     FAIL_REASON_TIMEOUT,
 )
 from src.python.llm.session import (  # noqa: F401

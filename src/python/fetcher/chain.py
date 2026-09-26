@@ -17,24 +17,41 @@ from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.config import get_config
 from src.python.core.constants import CACHE_WEEKLY
+from src.python.core.retry import STRATEGY_EXPONENTIAL, RetryPolicy, retry_transient
 from src.python.core.datasource_credential import credential_hint, credential_ready_enabled, missing_credential
 from src.python.core.provider_registry import TRANSPORT_FAILURE, get_registry
 from src.python.core.trading_calendar import count_trading_days_elapsed
+
+# ── 传输级瞬时失败的同源重试 ────────────────────────────────
+# 仅对**传输级**失败（超时/断连/远端断开/5xx）重试：这类错误多为瞬时抖动，
+# 同源重试一次往往即成功，可避免过早落到下一槽或触发熔断（行业分类 push2
+# 的 `Server disconnected` 与 DataSinking 的偶发断连即属此类）。代码级空结果
+# （API 不识别该代码）不重试——同一请求会得到同一答案，且会白耗配额
+# （DataSinking 免费档日配额仅 8191 篇）。
+_TRANSIENT_RETRY_ATTEMPTS = 1  # 同源额外重试次数
+_TRANSIENT_RETRY_BACKOFF = 0.6  # 首次重试基础退避（秒），指数增长 + 抖动
 
 logger = logging.getLogger("invest")
 
 # ── Provider Chain 定义 ──────────────────────────────────────
 
 _DEFAULT_CHAINS: dict[str, list[str]] = {
+    # 行情：腾讯 → 新浪 → 同花顺（需 key）
     "price_stock": ["tencent", "sina", "hithink"],
-    "price_fund_otc": ["eastmoney"],
+    # 场外基金净值：东财基金 API 主源 → 新浪基金接口备源（跨厂商，故障域独立）
+    "price_fund_otc": ["eastmoney", "sina_fund"],
     "price": ["tencent", "eastmoney"],
     "fund_rank": ["tiantian"],
     # 基金披露持仓：天天基金为主，同花顺官方源为备（官方源需 key，未配置时链路自动跳过）
     "fund_hold": ["tiantian", "hithink"],
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
-    # 全文本财报（DataSinking，仅 A 股；需用户自备 key）
-    "financial_report": ["datasink"],
+    # 全文本财报（持仓基本面章·区块②）：DataSinking 主源 + 巨潮资讯网备源。
+    # 两源经财报域适配器注册（fetcher/report_adapters.py），以 ``source_hint`` 做命名空间
+    # 隔离（异源候选被异源适配器立即拒服务）——因此**两个源都必须在本链的槽位里**：
+    # 编排层从巨潮索引/备源列表构造的候选带 ``source_hint=cninfo``，若链上只有主源槽，
+    # 它们会被主源适配器拒后无处可去 → 备源正文永远取不到（日志表现为“尝试 DataSinking
+    # 财报 → datasink 返回空 → 全链路失败”且无任何 `[datasink]` 请求日志）。
+    "financial_report": ["datasink", "cninfo"],
     # 结构化财务指标（akshare 主源；备用支路 datasink_indicator 从财报全文解析）
     # 财务指标：akshare 主源 → DataSinking 章节解析支路 → 同花顺官方报表派生（需 key）
     "financial_indicator": ["akshare_financial", "datasink_indicator", "hithink"],
@@ -285,9 +302,41 @@ def fetch_with_fallback(
                 diagnostics.add(source_label or provider_name, "无 fetch 函数")
             continue
 
-        result, reason = _try_provider_fetch(
-            data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform
+        reason_box: dict[str, str] = {"reason": ""}
+
+        def _attempt() -> Any:
+            result, reason_box["reason"] = _try_provider_fetch(
+                data_type, provider_name, source_label, fetch_fn, kwargs, validate, transform
+            )
+            return result
+
+        def _on_transient_retry(failed_attempt: int, delay: float, _exc: BaseException | None) -> None:
+            logger.info(
+                "[%s]%s %s 传输级失败（%s），%.1fs 后同源重试 %d/%d",
+                data_type,
+                _code_tag,
+                source_label,
+                reason_box["reason"],
+                delay,
+                failed_attempt,
+                _TRANSIENT_RETRY_ATTEMPTS,
+            )
+
+        # 传输级瞬时失败 → 同源退避重试（仍失败才落下一槽）；退避算式与次数由 core/retry 统一
+        result = retry_transient(
+            _attempt,
+            policy=RetryPolicy(
+                attempts=1 + _TRANSIENT_RETRY_ATTEMPTS,
+                strategy=STRATEGY_EXPONENTIAL,
+                base_backoff=_TRANSIENT_RETRY_BACKOFF,
+                factor=2.0,
+                jitter=0.2,
+            ),
+            retry_if_result=lambda r: r is TRANSPORT_FAILURE,
+            on_retry=_on_transient_retry,
         )
+        reason = reason_box["reason"]
+
         if result is not None and result is not TRANSPORT_FAILURE:
             # 成功 → 恢复熔断计数器 + 登记 provider 级归属（矩阵「命中源」列的数据来源）
             reg.record_success(provider_name)

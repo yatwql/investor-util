@@ -8,11 +8,13 @@ from __future__ import annotations
 import logging
 import re
 import threading
-import time
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import httpx
+
+from src.python.core.retry import STRATEGY_TABLE, RetryPolicy, retry_transient
 
 from src.python.llm.circuit_breaker import (
     _cb_endpoint,
@@ -25,6 +27,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
     FAIL_REASON_CIRCUIT_OPEN,
     FAIL_REASON_NETWORK_ERROR,
+    FAIL_REASON_QUOTA_EXCEEDED,
     FAIL_REASON_TIMEOUT,
 )
 from src.python.llm.session import record_per_module, track_session_usage
@@ -46,8 +49,10 @@ __all__ = [
     "_MODEL_LINE_RE",
     "_THINKING_SUPPORTED_PREFIXES",
     "_THINKING_EFFORT_MODEL_PREFIXES",
+    "_THINKING_DEFAULT_ON_PREFIXES",
     "_supports_extended_thinking",
     "_is_effort_model",
+    "_is_default_thinking_on",
     "_truncation_warning",
     "_check_claude_truncation",
     "_check_openai_truncation",
@@ -61,7 +66,8 @@ __all__ = [
     "_check_circuit_breaker",
     "_process_success_response",
     "_attempt_api_call",
-    "_is_retry_available",
+    "_retry_policy",
+    "_retry_detail",
     "call_llm_with_retry",
 ]
 
@@ -116,7 +122,24 @@ LLM_TIMEOUT = 120.0
 
 # ── 重试配置 ─────────────────────────────────────────────────
 
-_RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]  # 指数退避：第 1~5 次依次等待
+_RETRY_DELAYS = [1.0, 3.0, 5.0, 10.0, 15.0]  # 递增退避表：第 1~5 次依次等待（手工调优，非等比）
+_RETRY_POLICY = RetryPolicy(strategy=STRATEGY_TABLE, delays=tuple(_RETRY_DELAYS))
+"""LLM 重试策略模板：显式退避序列（超出末位锁定末位）；尝试次数由配置补齐。"""
+
+
+def _retry_policy(max_retries: int) -> RetryPolicy:
+    """按 ``max_retries`` 生成重试策略（总尝试次数 = max_retries + 1，下限 1）。"""
+    return replace(_RETRY_POLICY, attempts=max(1, max_retries + 1))
+
+
+def _retry_detail(info: Any) -> str:
+    """把「可重试」结果的状态码/描述转成日志可读文本。"""
+    if info is None:
+        return "超时"
+    if isinstance(info, int):
+        return f"{info}"
+    return f"网络错误 ({info})"
+
 
 # ── 输出截断自适应重试 ────────────────────────────────
 
@@ -194,6 +217,10 @@ _THINKING_SUPPORTED_PREFIXES = (
     "deepseek-chat",
     "gemini-3.5-",
     "gemini-2.5-",
+    "kimi-",
+    # Kimi Code 订阅端点的旗舰模型以 `k3` 命名（不属 `kimi-` 前缀）：漏登记会让
+    # 「未开启 thinking 时显式禁用」的安全网失效，请求落入默认思考模式。
+    "k3",
 )
 
 # 使用 output_config.effort（而非 thinking.budget_tokens）控制思考深度的模型。
@@ -205,6 +232,15 @@ _THINKING_SUPPORTED_PREFIXES = (
 # 命中名单才能照旧施加「显式禁用思考」安全网，而不是让其落入默认思考模式。
 _THINKING_EFFORT_MODEL_PREFIXES = ("deepseek-flash", "deepseek-v4-", "deepseek-chat")
 
+# 默认开启思考模式的模型（不传任何思考参数即自动思考）。
+# 这是独立于「控制方式」（budget_tokens / effort）的第二个维度：未显式开启 thinking
+# 时必须显式发送 thinking.disabled，否则思考 token 会占满 max_tokens 导致无正文。
+# DeepSeek 推理族（effort 控制）与 Kimi（budget_tokens 控制）均为默认开思考；
+# Anthropic 原生模型默认不思考，不在此列。
+# Kimi Anthropic 兼容端点行为：默认返回 thinking 块；thinking.enabled+budget_tokens
+# 与 thinking.disabled 均接受。
+_THINKING_DEFAULT_ON_PREFIXES = ("deepseek-flash", "deepseek-v4-", "deepseek-chat", "kimi-", "k3")
+
 
 def _supports_extended_thinking(model: str) -> bool:
     """检查模型是否支持 Extended Thinking。"""
@@ -214,6 +250,11 @@ def _supports_extended_thinking(model: str) -> bool:
 def _is_effort_model(model: str) -> bool:
     """检查模型是否使用 effort（而非 budget_tokens）控制思考深度。"""
     return any(model.lower().startswith(p) for p in _THINKING_EFFORT_MODEL_PREFIXES)
+
+
+def _is_default_thinking_on(model: str) -> bool:
+    """检查模型是否默认开启思考（未显式禁用时思考 token 会占用 max_tokens）。"""
+    return any(model.lower().startswith(p) for p in _THINKING_DEFAULT_ON_PREFIXES)
 
 
 def _truncation_warning(config_field: str) -> str:
@@ -522,6 +563,16 @@ def _attempt_api_call(
                     _sanitize_endpoint(url),
                 )
             return ("retryable", resp.status_code)
+        if resp.status_code == 403:
+            # 端点配额/风控拒绝（订阅制端点的 5 小时窗口、并发上限、月度额度等）：
+            # 重试无益（窗口按时间滚动，非瞬时故障），且高频重试会加剧风控画像，
+            # 故标记为不可重试，交由上层链降级到下一 provider。
+            logger.warning(
+                "%s API 返回 403（端点配额/风控拒绝，重试无益）：%s",
+                _sanitize_endpoint(url),
+                (resp.text or "")[:160],
+            )
+            return ("quota", resp.status_code)
         resp.raise_for_status()
         return ("success", resp.json())
     except httpx.TimeoutException:
@@ -534,24 +585,6 @@ def _attempt_api_call(
     except (ValueError, KeyError) as e:
         logger.warning("[llm/api] 响应解析失败: %s", e)
         return ("fatal", str(e))
-
-
-def _is_retry_available(label: str, attempt: int, max_retries: int, detail: str, _url: str) -> bool:
-    """判断是否可重试；若可则等待后返回 True，否则 False。"""
-    if attempt < max_retries:
-        delay = _RETRY_DELAYS[attempt]
-        logger.warning(
-            "%s API %s (尝试 %d/%d)，%.1fs 后重试...",
-            label,
-            detail,
-            attempt + 1,
-            max_retries + 1,
-            delay,
-        )
-        time.sleep(delay)
-        return True
-    logger.warning("%s API %s（已重试 %d 次）", label, detail, max_retries)
-    return False
 
 
 def call_llm_with_retry(
@@ -568,11 +601,13 @@ def call_llm_with_retry(
     check_truncation_fn: Callable[[dict, int], bool],
     provider: str,
     model_name: str = "",
+    endpoint_key: str = "",
 ) -> tuple[str | None, dict | None]:
     """LLM API 调用通用重试骨架。
 
-    retry/超时/错误处理逻辑在单 Provider 调用间统一复用；
-    API 特有的部分（payload 构造、响应提取、截断检测）通过回调参数注入。
+    重试/退避/超时/错误处理**全部委托** :mod:`core.retry`（策略：显式退避序列，
+    见 :data:`_RETRY_POLICY`），本函数只负责 LLM 特有的部分：每次尝试前的端点
+    节流门、失败分类的终态处理（断路器/失败原因码/响应提取）。
 
     Args:
         label: 显示名称（"Claude" / "OpenAI"），用于日志
@@ -588,6 +623,9 @@ def call_llm_with_retry(
         check_truncation_fn: 检查是否被截断的回调
         provider: 日志中的 provider 标识（"claude" / "openai"）
         model_name: 模型名称（用于费用估算，可空）
+        endpoint_key: 端点策略键（provider 条目名）；非空且该端点声明了 ``pacing``
+            时，每次请求前经 :class:`llm.pacing.PacingGate` 施加间隔与在途并发约束。
+            空串 = 无约束（与未引入端点节流时逐字节一致）。
 
     Returns:
         (content, usage) — content 为文本，usage 为 API 用量字典，失败时均为 None
@@ -597,38 +635,65 @@ def call_llm_with_retry(
         _last_llm_failure_reason = FAIL_REASON_CIRCUIT_OPEN
         return (None, None)
 
-    for attempt in range(max_retries + 1):
-        kind, info = _attempt_api_call(client, url, headers, payload, timeout)
+    from src.python.llm.pacing import PacingGate
 
-        if kind == "success":
-            clear_last_llm_failure()
-            _cb_record_success(url)
-            return _process_success_response(
-                info,
-                extract_fn,
-                check_truncation_fn,
-                max_tokens,
-                config_field,
-                provider,
-                model_name,
-                label,
-                url,
-            )
+    policy = _retry_policy(max_retries)
+    last: dict[str, tuple[str, Any]] = {}
 
-        if kind == "retryable":
-            detail = "超时" if info is None else (f"{info}" if isinstance(info, int) else f"网络错误 ({info})")
-            if _is_retry_available(label, attempt, max_retries, detail, url):
-                continue
-            _cb_record_failure(url)
-            _last_llm_failure_reason = FAIL_REASON_TIMEOUT if info is None else FAIL_REASON_NETWORK_ERROR
-            return (None, None)
+    def _attempt() -> tuple[str, Any]:
+        # 端点级节流：仅在配置声明了 pacing 时生效（无声明 → 零开销直通）
+        with PacingGate(endpoint_key):
+            result = _attempt_api_call(client, url, headers, payload, timeout)
+        last["result"] = result
+        return result
 
-        # kind == "fatal"
-        logger.warning("%s API 响应解析失败: %s", label, info)
+    def _on_retry(failed_attempt: int, delay: float, _exc: BaseException | None) -> None:
+        logger.warning(
+            "%s API %s (尝试 %d/%d)，%.1fs 后重试...",
+            label,
+            _retry_detail(last["result"][1]),
+            failed_attempt,
+            policy.attempts,
+            delay,
+        )
+
+    kind, info = retry_transient(
+        _attempt,
+        policy=policy,
+        retry_on=lambda _exc: False,  # 异常已由 _attempt_api_call 归一为结果，不重复按异常重试
+        retry_if_result=lambda result: result[0] == "retryable",
+        on_retry=_on_retry,
+    )
+
+    if kind == "success":
+        clear_last_llm_failure()
+        _cb_record_success(url)
+        return _process_success_response(
+            info,
+            extract_fn,
+            check_truncation_fn,
+            max_tokens,
+            config_field,
+            provider,
+            model_name,
+            label,
+            url,
+        )
+
+    if kind == "quota":
+        # 配额/风控拒绝：不重试（窗口按时间滚动），直接降级到下一 provider
         _cb_record_failure(url)
-        _last_llm_failure_reason = FAIL_REASON_API_ERROR
+        _last_llm_failure_reason = FAIL_REASON_QUOTA_EXCEEDED
         return (None, None)
 
+    if kind == "retryable":
+        logger.warning("%s API %s（已重试 %d 次）", label, _retry_detail(info), max_retries)
+        _cb_record_failure(url)
+        _last_llm_failure_reason = FAIL_REASON_TIMEOUT if info is None else FAIL_REASON_NETWORK_ERROR
+        return (None, None)
+
+    # kind == "fatal"
+    logger.warning("%s API 响应解析失败: %s", label, info)
     _cb_record_failure(url)
     _last_llm_failure_reason = FAIL_REASON_API_ERROR
     return (None, None)

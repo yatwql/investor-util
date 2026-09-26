@@ -21,7 +21,12 @@ import pytest
 from src.python.core.models import Holding
 from src.python.report.data_status import DataStatusItem, STATUS_MESSAGES
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.unit_report,
+    pytest.mark.edge,
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 
 class TestRenderPenetrationSection(unittest.TestCase):

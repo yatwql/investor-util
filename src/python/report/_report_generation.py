@@ -78,6 +78,7 @@ def _generate_full_html_report(
     enable_fundamental_snapshot: bool = False,
     financial_report_digest_data: dict | None = None,
     financial_indicator_data: dict | None = None,
+    market_sentiment_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -106,6 +107,10 @@ def _generate_full_html_report(
             开关关闭或传入 None 时模板保持既有输出）。
         market_temperature_data: 市场温度数据契约 dict
             （「投资分析汇总」市场温度刻度行数据源，开关关闭或传入 None 时保持既有输出）。
+        market_sentiment_data: 市场情绪与持仓热点契约 dict（报告增强开关 `market_sentiment`，
+            行动建议章内嵌区块数据源，开关关闭或传入 None 时保持既有输出）。
+            与 Excel 侧同源，由编排层 `_generate_report_full` 注入——须在写 HTML 之前完成
+            取数，否则本类别既不出现在矩阵、说明表也记「未使用」（与 Excel 自相矛盾）。
     """
     from src.python.config.features import is_feature_enabled
     from src.python.report.html_writer import write_html_report
@@ -159,6 +164,7 @@ def _generate_full_html_report(
             valuation_data=valuation_data,
             market_temperature_data=market_temperature_data,
             decision_review_data=decision_review_data,
+            market_sentiment_data=market_sentiment_data,
             enable_fundamental_snapshot=enable_fundamental_snapshot,
             financial_report_digest_data=financial_report_digest_data,
             financial_indicator_data=financial_indicator_data,
@@ -672,6 +678,16 @@ def _generate_report_full(
         pipeline_data=pipeline_data,
     )
 
+    # 市场情绪与持仓热点（报告增强开关 market_sentiment）：开关关闭返回 None（零行为变化）。
+    # 须在写 HTML 之前取数——本契约既是行动建议章内嵌区块的数据源，也是「数据源可用性矩阵」
+    # 「市场情绪」行与说明表「本次使用」的登记时机（mark_data_used/mark_provider_used 在此
+    # 链路内触发）；置于 HTML 之后会让两端产物口径不一致。
+    from src.python.report._report_aux_metrics import compute_market_sentiment_data
+
+    _ms_data = compute_market_sentiment_data(holdings, prep, config, reporter)
+    if _ms_data is not None and pipeline_data is not None:
+        pipeline_data["market_sentiment_data"] = _ms_data
+
     # ── 6. HTML 报告 ──
     # 成本流水数据（fund_flow_data）：复用 excel_market_data 组装逻辑，
     # 开关关闭返回 None（HTML 模板保持既有输出）。
@@ -716,6 +732,7 @@ def _generate_report_full(
         enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
         financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
         financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
+        market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
     )
 
     # ── 7. Excel 报告 ──

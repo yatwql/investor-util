@@ -766,6 +766,36 @@ class TestValidateReportSectionOrder(unittest.TestCase):
         self.assertEqual(n, 3)
 
 
+# ═══════════════════════════════════════════════════════════
+#  batch 子键声明完整性（代码引用 ⊆ 默认值）
+# ═══════════════════════════════════════════════════════════
+
+
+class TestBatchWorkerKeysDeclared:
+    """代码中 `get_batch_worker_count()` 引用的 batch 子键必须在 `_DEFAULT_CONFIG` 声明。
+
+    历史缺口：`akshare_workers` 被财务指标章与基金重仓 ROE 推演引用，却未进默认值与模板——
+    用户无法通过配置调整该域并发，只能吃代码兜底值，而模板一致性用例只校验「模板 ≡ 默认值」，
+    对「代码引用 ⊆ 默认值」无覆盖，漏声明不会被任何用例拦住。
+    """
+
+    @pytest.mark.unit_config
+    def test_referenced_worker_keys_are_declared(self):
+        """扫描 src/python 下所有 get_batch_worker_count("<key>") 调用，键必须已声明。"""
+        import re
+        from pathlib import Path
+
+        declared = set(cfg._config_defaults._DEFAULT_CONFIG["batch"])
+        referenced: set[str] = set()
+        for path in (Path(PROJECT_ROOT) / "src" / "python").rglob("*.py"):
+            referenced |= set(re.findall(r'get_batch_worker_count\(\s*"([a-z_]+)"', path.read_text(encoding="utf-8")))
+
+        # 防正则失效导致空集假通过：底层至少应有基金/行业取数两处引用
+        assert {"fund_workers", "industry_workers"} <= referenced
+        undeclared = sorted(referenced - declared)
+        assert not undeclared, f"batch 子键被代码引用但未在 _DEFAULT_CONFIG 声明（用户无法配置）: {undeclared}"
+
+
 # ═══════════════════════════════════════════════════════════════
 #  _get_default_config_template() 与 _DEFAULT_CONFIG 一致性
 # ═══════════════════════════════════════════════════════════════

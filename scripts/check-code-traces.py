@@ -59,6 +59,26 @@ import tokenize
 from collections.abc import Iterator
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_traces_common）
+from _traces_common import (  # noqa: E402
+    _COMPILED_CHAPTER_EXCLUDE,
+    _COMPILED_ROUND_EXCLUDE,
+    _chapter_excludes,
+    _is_chapter_excluded,
+    _is_round_excluded,
+    _round_excludes,
+)
+
+#: 共享排除模式原面 re-export：测试与调用方仍按原脚本名访问（实现见 _traces_common）
+__all__ = [
+    "_COMPILED_CHAPTER_EXCLUDE",
+    "_COMPILED_ROUND_EXCLUDE",
+    "_chapter_excludes",
+    "_is_chapter_excluded",
+    "_is_round_excluded",
+    "_round_excludes",
+]
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCAN_DIRS = [
     REPO_ROOT / "src" / "python",
@@ -319,6 +339,13 @@ PATTERNS: list[tuple[str, str, str]] = [
     (r"后续\s*(?:版本|迭代|优化|需要|再处理)", "TODO", "后续版本/迭代（需加 issue 跟踪）"),
 ]
 
+#: 编译一次（89 个模式，避免逐行 re.search 反复查编译缓存）
+_COMPILED_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [(re.compile(p), c, d) for p, c, d in PATTERNS]
+#: 并集预筛：单次扫描即可判定「该行是否可能命中任一模式」——不命中的行跳过 89 次逐一匹配。
+#: 注释行数量级为 3.8 万，逐一匹配是扫描耗时的主要来源；并集仅作预筛，命中后仍走精确分支，
+#: 故不改变判定结果（仅跳过必然无命中的行）。
+_PATTERNS_PREFILTER: re.Pattern[str] = re.compile("|".join(f"(?:{p})" for p, _c, _d in PATTERNS))
+
 # ═══ IDENT：标识符任务代号（语义命名纪律） ═══
 # 匹配**完整标识符 token**——变量/函数/类名不得使用任务编号或系列代号。
 # 捕获形状（全仓实证 0 误报）：
@@ -336,6 +363,11 @@ IDENTIFIER_PATTERNS: list[tuple[str, str, str]] = [
     (r"^[A-Za-z]系列$", "IDENT", "单字母+系列 标识符（如 G系列）"),
     (r"rf[_-]?\d+", "IDENT", "任务编号嵌入标识符（如 rf_205_fix）"),
     (r"plan[_-]?\d+", "IDENT", "任务编号嵌入标识符（如 plan18_hack）"),
+]
+
+#: 编译一次（标识符数量级为 8.7 万）
+_COMPILED_IDENTIFIER_PATTERNS: list[tuple[re.Pattern[str], str, str]] = [
+    (re.compile(p), c, d) for p, c, d in IDENTIFIER_PATTERNS
 ]
 
 # 行内排除模式：即使行命中 PATTERNS，若匹配以下任意模式则跳过
@@ -443,80 +475,6 @@ _TEST_META_COMPILED = [re.compile(p) for p in TEST_META_EXCLUDE]
 #: 任务编号硬禁止：注释/docstring 中出现 rf-/plan-/R- 编号一律检出，
 #: **不受**任何整行豁免（测试元描述/工具说明）放行——任务代号只属内部计划表。
 _TASK_ID_RE = re.compile(r"(?:rf|plan|R)-\d+")
-
-
-def _chapter_excludes() -> list[re.Pattern]:
-    """章节数量/序数表述豁免（"N 章"为计数/基线/第 N 个章节，非具体章节引用）。
-
-    与 check-doc-traces.py 的 _chapter_excludes() 保持一致：这些是合法计数
-    表述，命中的行跳过 CHAPTER 分类检查（不影响其他痕迹检查）：
-      - 共/目标/总数/合计/合并后 N 章        —— 章节总数
-      - N 章 总数/内容/正文/结构/基线/篇幅/布局/表格 —— N 章的结构性指代
-      - 减至/降至/精简至/重排为/缩至 N 章    —— 章节数缩减
-      - N→M 章 / N 至 M 章                   —— 章节数过渡
-      - 「N 章」                             —— 引号内计数
-      - 出现/新增/开启才出现 第 N 章          —— 序数（出现第 N 个章节）
-    """
-    return [
-        re.compile(r"(?:共|总共|合计|目标|总数|章节数|合并后)\s*[1-9]\d?\s*章"),
-        re.compile(r"[1-9]\d?\s*章\s*(?:总数|内容|正文|结构|基线|篇幅|布局|表格)"),
-        re.compile(r"(?:减至|降至|精简至|重排(?:为|成)?|缩至)\s*[1-9]\d?\s*章"),
-        re.compile(r"[1-9]\d?\s*章\s*总数减至\s*[1-9]\d?"),
-        re.compile(r"[1-9]\d?\s*(?:→|至)\s*[1-9]\d?\s*章"),
-        re.compile(r"「[1-9]\d?\s*章」"),
-        re.compile(r"(?:出现|新增|开启才出现|才出现)\s*第\s*[1-9]\d?\s*章"),
-        # 中文数字对应（限 1~20；裸"一章"计数如"一章三区块"不在 CHAPTER 模式内，
-        # 无需豁免——模式仅含 二~十，第一章由"第X章"模式覆盖）
-        re.compile(r"(?:共|总共|合计|目标|总数|章节数|合并后)\s*[一二三四五六七八九十]{1,2}\s*章"),
-        re.compile(r"[一二三四五六七八九十]{1,2}\s*章\s*(?:总数|内容|正文|结构|基线|篇幅|布局|表格)"),
-        re.compile(r"(?:减至|降至|精简至|重排(?:为|成)?|缩至)\s*[一二三四五六七八九十]{1,2}\s*章"),
-        re.compile(r"[一二三四五六七八九十]{1,2}\s*章\s*总数减至\s*[一二三四五六七八九十]{1,2}"),
-        re.compile(r"[一二三四五六七八九十]{1,2}\s*(?:→|至)\s*[一二三四五六七八九十]{1,2}\s*章"),
-        re.compile(r"「[一二三四五六七八九十]{1,2}\s*章」"),
-        re.compile(r"(?:出现|新增|开启才出现|才出现)\s*第\s*[一二三四五六七八九十]{1,2}\s*章"),
-    ]
-
-
-_COMPILED_CHAPTER_EXCLUDE = [re.compile(p) for p in _chapter_excludes()]
-
-
-def _is_chapter_excluded(line: str) -> bool:
-    """检查该行是否命中章节计数/序数豁免（"N 章"为数量而非具体章节引用）。"""
-    return any(p.search(line) for p in _COMPILED_CHAPTER_EXCLUDE)
-
-
-def _round_excludes() -> list[re.Pattern]:
-    """迭代轮次计数/运行时表述豁免（"N 轮"为数量或业务/运行时概念，非迭代痕迹）。
-
-    与 _chapter_excludes() 同理——这些是合法表述，命中的行跳过 ROUND 分类检查
-    （不影响其他痕迹检查）：
-      - 共/目标/计划/预计/规划 N 轮       —— 轮次总数
-      - N 轮 每轮 …                       —— 每轮计数（如"21 轮每轮量化验收"）
-      - 轮询                               —— 轮询是运行时技术概念（轮询超时/循环轮询）
-      - 轮动/轮换/轮番/轮涨/轮跌           —— 行业轮动等投资业务术语
-      - 第 N 轮 + 循环/遍历/扫描/筛选      —— 运行时处理轮次（第 N 轮循环）
-    """
-    return [
-        re.compile(r"(?:共|总共|合计|总数|目标|设定|预计|规划)\s*[1-9]\d?\s*轮"),
-        re.compile(r"计划(?:分|为|约|共)?\s*[1-9]\d?\s*轮"),
-        re.compile(r"[1-9]\d?\s*轮\s*每轮"),
-        re.compile(r"轮询"),
-        re.compile(r"轮动|轮换|轮番|轮涨|轮跌"),
-        re.compile(r"第\s*[1-9]\d?\s*轮\s*(?:循环|遍历|扫描|筛选)"),
-        # 中文数字对应（限 1~20）：计数/运行时序数豁免
-        re.compile(r"(?:共|总共|合计|总数|目标|设定|预计|规划)\s*[一二三四五六七八九十]{1,2}\s*轮"),
-        re.compile(r"计划(?:分|为|约|共)?\s*[一二三四五六七八九十]{1,2}\s*轮"),
-        re.compile(r"[一二三四五六七八九十]{1,2}\s*轮\s*每轮"),
-        re.compile(r"第\s*[一二三四五六七八九十]{1,2}\s*轮\s*(?:循环|遍历|扫描|筛选)"),
-    ]
-
-
-_COMPILED_ROUND_EXCLUDE = [re.compile(p) for p in _round_excludes()]
-
-
-def _is_round_excluded(line: str) -> bool:
-    """检查该行是否命中迭代轮次计数/运行时表述豁免（"N 轮"为数量而非迭代痕迹）。"""
-    return any(p.search(line) for p in _COMPILED_ROUND_EXCLUDE)
 
 
 def _magic_excludes() -> list[re.Pattern]:
@@ -657,7 +615,10 @@ def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
                 print(f"    (excluded) L{lineno}: {ctext[:80]}")
             continue
 
-        for pat, cat, desc in PATTERNS:
+        if not _PATTERNS_PREFILTER.search(ctext):
+            continue  # 并集预筛未命中：必然无 finding，跳过 89 次逐一匹配
+
+        for pat, cat, desc in _COMPILED_PATTERNS:
             if cat == "CHAPTER" and _is_chapter_excluded(ctext):
                 continue  # 章节计数/序数表述豁免，不影响其他模式
             if cat == "ROUND" and _is_round_excluded(ctext):
@@ -690,8 +651,8 @@ def _scan_identifiers(fpath: Path) -> list[tuple[int, str, str, str]]:
     """扫描单个文件的代码标识符，返回 [(行号, 分类, 模式说明, 标识符), ...]"""
     hits: list[tuple[int, str, str, str]] = []
     for lineno, ident in _iter_identifiers(fpath):
-        for pat, cat, desc in IDENTIFIER_PATTERNS:
-            if re.search(pat, ident):
+        for pat, cat, desc in _COMPILED_IDENTIFIER_PATTERNS:
+            if pat.search(ident):
                 hits.append((lineno, cat, desc, ident))
                 break  # first match only per identifier
     return hits

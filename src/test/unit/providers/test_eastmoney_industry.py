@@ -204,7 +204,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         get_registry().session_cache_clear("industry")
         get_registry().reset()
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_success_with_concepts(self, mock_client_cls):
         """正常返回：正确解析行业和概念。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_SUCCESS_RESPONSE))
@@ -216,7 +216,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         self.assertEqual(result["concepts"], ["创投", "参股银行", "核能核电", "风能", "水利建设"])
         self.assertEqual(result["concept_ids"], [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_success_no_concepts(self, mock_client_cls):
         """API 返回空概念列表 → 正确返回空列表。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_NO_CONCEPT_RESPONSE))
@@ -226,21 +226,21 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         self.assertEqual(result["concepts"], [])
         self.assertEqual(result["concept_ids"], [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_no_data_field(self, mock_client_cls):
         """API 返回 data 为 None → 返回 None。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_NO_DATA_RESPONSE))
         result = fetch_industry_and_concepts("600900")
         self.assertIsNone(result)
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_empty_response(self, mock_client_cls):
         """API 返回空对象 → 返回 None。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_EMPTY_RESPONSE))
         result = fetch_industry_and_concepts("600900")
         self.assertIsNone(result)
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_timeout_returns_none(self, mock_client_cls):
         """API 超时异常 → 返回 None。"""
         import httpx
@@ -249,7 +249,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         result = fetch_industry_and_concepts("600900")
         self.assertIsNone(result)
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_timeout_triggers_registry_failure(self, mock_client_cls):
         """连续 3 次 API 超时 → registry 熔断打开。"""
         import httpx
@@ -266,7 +266,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         result = fetch_industry_and_concepts("600601")
         self.assertIsNone(result)
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_industry_with_fund_code(self, mock_client_cls):
         """基金代码也正常处理。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_SUCCESS_RESPONSE))
@@ -275,7 +275,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         self.assertEqual(result["code"], "000961")
         self.assertEqual(result["industry"], "电力")
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_concepts_field_is_number(self, mock_client_cls):
         """概念字段 API 返回数字 → 概念为空列表。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_CONCEPTS_IS_NUMBER_RESPONSE))
@@ -285,7 +285,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         self.assertEqual(result["concepts"], [])
         self.assertEqual(result["concept_ids"], [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_concepts_field_is_none(self, mock_client_cls):
         """概念字段 API 返回 None → 概念为空列表。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_CONCEPTS_IS_NONE_RESPONSE))
@@ -295,7 +295,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         self.assertEqual(result["concepts"], [])
         self.assertEqual(result["concept_ids"], [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_concepts_field_is_dash(self, mock_client_cls):
         """概念字段 API 返回 '-' → 概念为空列表。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_CONCEPTS_IS_DASH_RESPONSE))
@@ -305,7 +305,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         self.assertEqual(result["concepts"], [])
         self.assertEqual(result["concept_ids"], [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_industry_field_is_dash(self, mock_client_cls):
         """行业字段 API 返回 '-' → 行业/ID 均为空字符串。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_INDUSTRY_IS_DASH_RESPONSE))
@@ -317,7 +317,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         self.assertEqual(result["concepts"], ["创投", "参股银行", "核能核电", "风能", "水利建设"])
         self.assertEqual(result["concept_ids"], [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_industry_field_is_number(self, mock_client_cls):
         """行业字段 API 返回数字 → 行业/ID 均为空字符串。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_INDUSTRY_IS_NUMBER_RESPONSE))
@@ -329,7 +329,7 @@ class TestFetchIndustryAndConcepts(unittest.TestCase):
         self.assertEqual(result["concepts"], ["创投", "参股银行", "核能核电", "风能", "水利建设"])
         self.assertEqual(result["concept_ids"], [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_etf_no_industry(self, mock_client_cls):
         """ETF (518880 黄金ETF) 无行业/概念数据 → 正确返回空值。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_ETF_NO_INDUSTRY_RESPONSE))
@@ -350,28 +350,28 @@ class TestFetchIndustry(unittest.TestCase):
 
         get_registry().session_cache_clear("industry")
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_industry_found(self, mock_client_cls):
         """有行业数据时返回行业名称。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_SUCCESS_RESPONSE))
         result = fetch_industry("600900")
         self.assertEqual(result, "电力")
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_industry_not_found(self, mock_client_cls):
         """无行业数据时返回 None。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_EMPTY_RESPONSE))
         result = fetch_industry("600900")
         self.assertIsNone(result)
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_industry_dash_returned(self, mock_client_cls):
         """行业字段为 '-' 时 fetch_industry 返回 None。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_INDUSTRY_IS_DASH_RESPONSE))
         result = fetch_industry("600900")
         self.assertIsNone(result)
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_industry_number_returned(self, mock_client_cls):
         """行业字段为数字时 fetch_industry 返回 None。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_INDUSTRY_IS_NUMBER_RESPONSE))
@@ -387,35 +387,35 @@ class TestFetchConcepts(unittest.TestCase):
 
         get_registry().session_cache_clear("industry")
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_concepts_found(self, mock_client_cls):
         """有概念板块时返回列表。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_SUCCESS_RESPONSE))
         result = fetch_concepts("600900")
         self.assertEqual(result, ["创投", "参股银行", "核能核电", "风能", "水利建设"])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_concepts_empty(self, mock_client_cls):
         """无概念板块时返回空列表。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_NO_CONCEPT_RESPONSE))
         result = fetch_concepts("600900")
         self.assertEqual(result, [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_concepts_number(self, mock_client_cls):
         """概念字段为数字时 fetch_concepts 返回空列表。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_CONCEPTS_IS_NUMBER_RESPONSE))
         result = fetch_concepts("600900")
         self.assertEqual(result, [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_concepts_dash(self, mock_client_cls):
         """概念字段为 '-' 时 fetch_concepts 返回空列表。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_CONCEPTS_IS_DASH_RESPONSE))
         result = fetch_concepts("600900")
         self.assertEqual(result, [])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_concepts_etf_empty(self, mock_client_cls):
         """ETF 无概念时返回空列表。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_ETF_NO_INDUSTRY_RESPONSE))
@@ -437,7 +437,7 @@ class TestIndustryExtendedFields(unittest.TestCase):
         get_registry().session_cache_clear("industry")
         get_registry().reset()
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_industry_result_contains_pe_pb(self, mock_client_cls):
         """行业结果字典带出 pe/pb/market_cap（同一请求，无重复请求）。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_SUCCESS_RESPONSE))
@@ -447,7 +447,7 @@ class TestIndustryExtendedFields(unittest.TestCase):
         self.assertEqual(result["pb"], 1.56)
         self.assertIn("market_cap", result)
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_missing_fields_return_none(self, mock_client_cls):
         """字段缺失（无 f9/f23）→ pe/pb 为 None（不因缺字段而整条失败）。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_NO_CONCEPT_RESPONSE))
@@ -456,13 +456,13 @@ class TestIndustryExtendedFields(unittest.TestCase):
         self.assertIsNone(result["pe"])
         self.assertIsNone(result["pb"])
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_data_none_returns_none(self, mock_client_cls):
         """data 为 None → 返回 None。"""
         mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_NO_DATA_RESPONSE))
         self.assertIsNone(fetch_industry_and_concepts("600900"))
 
-    @patch("src.python.providers.eastmoney_industry.httpx.Client")
+    @patch("src.python.core.http_client.httpx.Client")
     def test_reuses_make_push2_request_channel(self, mock_client_cls):
         """复用既有 push2 请求通道：经 make_push2_request 发起，同会话同代码不重复请求。"""
         with patch("src.python.providers.eastmoney_industry.make_push2_request") as mock_push2:

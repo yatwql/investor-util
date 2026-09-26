@@ -61,6 +61,11 @@ def _get_default_llm_providers_template() -> str:
     lines.append("  //")
     lines.append("  // 使用前请先在 llm_key.json 中配置对应的 credentials_ref 凭据块，")
     lines.append("  // 并按需修改 model / endpoint 为实际使用的模型与 API 端点。")
+    lines.append("  //")
+    lines.append('  // 端点级节流（可选）：provider 内加 "pacing" 段可对**该端点**单独限速/限并发，')
+    lines.append("  // 未声明则无额外约束（行为与未引入时一致）。适合订阅制编码端点等需低频串行的场景：")
+    lines.append('  //   "pacing": { "min_interval": 20, "jitter": 0.2, "max_concurrency": 1 }')
+    lines.append("  //   min_interval=两次请求最小间隔秒；jitter=间隔随机抖动比例(0~1)；max_concurrency=在途上限")
     lines.append("")
 
     # ── strategy / preferred_providers ──

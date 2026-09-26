@@ -15,6 +15,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 import pytest
+from src.python.fetcher import chain
 from src.python.fetcher.chain import reset_provider_skip
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.edge]
@@ -34,7 +35,8 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
     @patch("src.python.fetcher.chain.cache_set")
     @patch("src.python.fetcher.chain._get_chain")
     def test_http_timeout_triggers_fallback(self, mock_chain, mock_set, mock_get):
-        """Provider 超时 → 回退到下一链路。"""
+        """Provider 超时 → 同源重试一次 → 仍失败 → 回退到下一链路。"""
+        from src.python.fetcher import chain
         from src.python.fetcher.chain import fetch_with_fallback
         import httpx
 
@@ -44,10 +46,11 @@ class TestFetchWithFallbackEdge(unittest.TestCase):
         fn2 = MagicMock(return_value={"data": "fallback_ok"})
         provider_map = {"p1": ("P1", fn1), "p2": ("P2", fn2)}
 
-        result = fetch_with_fallback("price", provider_map, "test_key", 3600)
+        with patch.object(chain, "_TRANSIENT_RETRY_BACKOFF", 0.0):
+            result = fetch_with_fallback("price", provider_map, "test_key", 3600)
 
         self.assertEqual(result, {"data": "fallback_ok"})
-        fn1.assert_called_once()
+        self.assertEqual(fn1.call_count, 2, "传输级失败应同源重试一次（1+1）")
         fn2.assert_called_once()
 
     @patch("src.python.fetcher.chain.cache_get")
@@ -175,13 +178,16 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
         p1_fn = MagicMock(side_effect=RuntimeError("transport error"))
         self.provider_map["p1"] = ("P1", p1_fn)
 
-        with patch("src.python.core.provider_registry.time.time", return_value=1001.0):
+        with (
+            patch("src.python.core.provider_registry.time.time", return_value=1001.0),
+            patch.object(chain, "_TRANSIENT_RETRY_BACKOFF", 0.0),
+        ):
             from src.python.fetcher.chain import fetch_with_fallback
 
-            # 第1次：探头失败 → p2 兜底 → p1 计数器 = 1，尚未重新熔断
+            # 第1次：探头失败（含同源重试 1 次，共 2 次调用）→ p2 兜底 → p1 计数器 = 1，尚未重新熔断
             result = fetch_with_fallback("price", self.provider_map, "k2a", 3600)
             self.assertEqual(result, {"data": "fallback"})
-            p1_fn.assert_called_once()
+            self.assertEqual(p1_fn.call_count, 2, "探头失败应含同源重试（1+1）")
             from src.python.core.provider_registry import get_registry
 
             self.assertFalse(get_registry().is_circuit_broken("p1"))  # 未重新熔断
@@ -190,12 +196,14 @@ class TestCircuitBreakerCooldownProbe(unittest.TestCase):
             p1_fn.reset_mock()
             result = fetch_with_fallback("price", self.provider_map, "k2b", 3600)
             self.assertEqual(result, {"data": "fallback"})
+            self.assertEqual(p1_fn.call_count, 2)
             self.assertFalse(get_registry().is_circuit_broken("p1"))
 
             # 第3次：p1 计数器 = 3，重新熔断
             p1_fn.reset_mock()
             result = fetch_with_fallback("price", self.provider_map, "k2c", 3600)
             self.assertEqual(result, {"data": "fallback"})
+            self.assertEqual(p1_fn.call_count, 2)
             self.assertTrue(get_registry().is_circuit_broken("p1"))  # 重新熔断
 
     @patch("src.python.fetcher.chain.cache_get")

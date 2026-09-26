@@ -17,6 +17,7 @@ try:
         FAIL_REASON_DISABLED,
         FAIL_REASON_NETWORK_ERROR,
         FAIL_REASON_NOT_CONFIGURED,
+        FAIL_REASON_QUOTA_EXCEEDED,
         FAIL_REASON_TIMEOUT,
     )
 except ImportError:
@@ -31,6 +32,7 @@ _DISPLAY_REASON: dict[str, str] = {
     FAIL_REASON_NETWORK_ERROR: "LLM API 网络连接失败",
     FAIL_REASON_TIMEOUT: "LLM API 请求超时",
     FAIL_REASON_CIRCUIT_OPEN: "LLM API 暂时不可用（熔断冷却中）",
+    FAIL_REASON_QUOTA_EXCEEDED: "LLM 端点配额/风控限制已触发（稍后重试或改用按量付费端点）",
 }
 
 
@@ -49,6 +51,58 @@ def get_llm_module_failure_reason(module_failure: dict, module_key: str) -> str 
         final_status = reason.get("final_status", "")
         return None if final_status == "success" else final_status
     return reason
+
+
+def _endpoint_priority_map(llm_config: dict | None) -> dict[str, float]:
+    """从 llm_config 的 provider 链构建 endpoint → priority 映射。
+
+    endpoint 解析复用 `llm/api.py::resolve_provider_endpoint`（唯一解析入口），
+    不在报告层重写 credentials_ref → endpoint 的遍历规则。
+    """
+    mapping: dict[str, float] = {}
+    if not llm_config:
+        return mapping
+    from src.python.llm.api import resolve_provider_endpoint
+
+    for provider in llm_config.get("_provider_list") or []:
+        endpoint = resolve_provider_endpoint(provider, llm_config)
+        if endpoint and endpoint not in mapping:
+            mapping[endpoint] = float(provider.get("priority", 999))
+    return mapping
+
+
+def build_llm_endpoint_display(module_info: list[dict[str, Any]], llm_config: dict | None = None) -> str:
+    """构建 Endpoint 汇总展示（HTML / Excel 两端共用）。
+
+    - 无端点 → ""
+    - 单一端点 → 原样返回
+    - 多端点（主备混用）→ 按 provider 链 priority 升序排列，主在前并标注，
+      形如 ``"https://主端点（主） / https://备端点（备）"``；
+      任一端点无法映射到链路时保持模块出现顺序、不标注（避免误标主备）
+
+    llm_config 为 None 时惰性加载全局 LLM 配置；加载失败降级为无标注拼接。
+    """
+    seen: list[str] = []
+    for mi in module_info:
+        ep = mi.get("endpoint")
+        if ep and ep not in seen:
+            seen.append(ep)
+    if not seen:
+        return ""
+    if len(seen) == 1:
+        return seen[0]
+    if llm_config is None:
+        try:
+            from src.python.config import get_llm_config
+
+            llm_config = get_llm_config()
+        except Exception:  # 配置不可用时降级为无标注拼接
+            llm_config = {}
+    pmap = _endpoint_priority_map(llm_config)
+    if not pmap or any(ep not in pmap for ep in seen):
+        return " / ".join(seen)
+    ordered = sorted(seen, key=lambda ep: pmap[ep])
+    return " / ".join(f"{ep}（{'主' if i == 0 else '备'}）" for i, ep in enumerate(ordered))
 
 
 def build_llm_module_info(

@@ -1,9 +1,9 @@
 # 实现计划归档 — v0.11.x
 
-> 归档时间：2026-09-15（v0.11.0 发布当日并入，plan-44）；2026-09-16 增补（plan-45、plan-46，v0.11.1-dev 开发期）
+> 归档时间：2026-09-15（v0.11.0 发布当日并入，plan-44）；2026-09-16 增补（plan-45、plan-46）；2026-09-18 增补（plan-52、plan-53、plan-54，v0.11.1 发布当日并入）；2026-09-23 增补（plan-47、plan-48）；2026-09-24 增补（plan-50，v0.11.3 发布当日并入）；2026-09-24 增补（plan-50，v0.11.2-dev 迭代内完成）
 > 原始文件：`docs-stm/managements/plan.md（当前迭代部分）`
-> 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1-dev（plan-45 完成态）
-> 归档内容：本迭代已实现的计划项完成态记录（plan-44 报告增强子模块并入功能开关注册表；plan-45 报告章节整合；plan-46 景气度框架诊断；plan-51 同花顺官方金融数据接入五阶段）；
+> 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1（2026-09-18：plan-52 矩阵命中源列 / plan-53 去重校准体系修整 / plan-54 48 小时技术债整改）/ v0.11.2（2026-09-24：plan-47 基金重仓 ROE 加权 / plan-48 场外流动性类型默认档）/ v0.11.3（2026-09-24：plan-50 巨潮 cninfo 财报备源）
+> 归档内容：本迭代已实现的计划项完成态记录（plan-44 报告增强子模块并入功能开关注册表；plan-45 报告章节整合；plan-46 景气度框架诊断；plan-51 同花顺官方金融数据接入五阶段；plan-47 景气度框架②维基金 ROE 加权 / plan-48 ④维场外流动性类型默认档 / plan-50 财报域巨潮备源）；
 > plan-42 / plan-43 摘要见 `../v0.10.x/archived_plan.0.10.x.md`
 > 设计文档索引：plan-45 的设计层与实施层文档归档于 `section-consolidation/`；plan-46 的设计文档归档于 `prosperity-framework/`；plan-51 的设计文档归档于 `hithink-data-source/`（均见文末）
 
@@ -125,3 +125,108 @@
 **约束与红线**：① provider 只取原始响应，字段归一交 `source_adapter`、缓存/熔断/降级交 `fetch_with_fallback`（不新造取数路径）；② 新数据域须登记 `DOMAIN_RECORDS` + 附录 H + 双端一致性测试；③ 新章节挂 Feature Flag 且默认关（关闭时输出逐字节一致）；④ 凭据值永不落日志/报告/缓存。
 
 **预估成本**：阶段 2 低、阶段 3 中、阶段 4 中、阶段 5 中高；**价值**：高（把三条爬虫主源换成/补上官方源，并新增情绪面能力）。
+
+### P1 — 已完成（plan-52 / plan-53 / plan-54 完成态，2026-09-18 归档）
+
+#### ✅ `plan-52` 数据源可用性矩阵：provider 级「命中源」列（已完成 2026-09-18）
+
+> 用户反馈触发：「已提供同花顺 key，但报告的数据源可用性矩阵没提到用了这个数据源」。排查确认**属于报告口径缺失，而非 key 未生效**——同一次运行的 `data/cache/sentiment_*` 由同花顺接口刷新（`logs/app.log` 有 `正在获取市场情绪…` → `[market_sentiment] 命中 0 条`），证明 key 在用。
+
+**根因三条**：① 矩阵只按**数据类别**聚合，其 tracker 事件键（`price_price_stock_600900`）只含代码不含 provider → 从未、也无法点名某个源；② 说明表「实际数据源（链路）」是硬编码文案，未随同花顺接入同步（`datasource.md` 已登记、`data_source_matrix.py` 未更新）；③ 市场情绪（同花顺**唯一源**）的取用标记键 `sentiment` 不匹配任何类别前缀 → 落入「其他数据源」桶，连类别名都不显示。
+
+**交付**：`report/data_status.py` 新增 provider 级归属登记（`mark_provider_used` / `get_provider_usage` / `reset_provider_usage`；模块级登记表，不参与降级计数、不在 `.degradation_state.json` 堆积 provider 键）；`fetcher/chain.py` 两处成功分支 + `report/market_sentiment.py` + `fetcher/financial_indicator.py` 多期序列支路登记归属；矩阵新增「命中源（本次取数）」列（HTML + Excel 两处渲染）与 `history`（历史走势）/ `sentiment`（市场情绪）两个类别及 `data_types` 映射（链路 data_type 全覆盖由不变式用例强制，`UNMAPPED_CHAIN_DATA_TYPES` 登记有意缺席者）；说明表补齐同花顺兜底槽位与市场情绪行（含 key 就绪态与所需开关），计费解析泛化为「行内显式 → provider 动态套餐 → 免费」。详细变更见 `changelog.md`。
+
+#### ✅ `plan-53` 新闻去重锚点校准体系修整（已完成 2026-09-18）
+
+> 用户贴回 `scripts/calibrate-dedup-threshold.py` 输出触发复核。结论：原「校准建议」不可照做——两条已实现/已过时，且报告数字混了规则时代。复核证据、修正后分布与逐条结论见 [`../plan/dedup-anchor-calibration.md`](../plan/dedup-anchor-calibration.md)。
+
+**根因**：① 锚点文件 append-only 且**无规则版本字段**，收紧前的旧样本与新样本混在一起（实测 `cross_skip` 中 46% 的 ratio 低于当前候选区入口、`cross_safe` 中 508 条 `merged` 但 `bg=0`），使「需审查 N 条」类结论失真；② 工具**自写一份硬编码阈值**（正文 0.30 vs 代码 0.35）且建议文本引用了早已实现的年份剥离，输出误导性动作；③ `_TOKEN_LIKE` 把纯数字当专名证据（24 对共享数字的无关标题被 bg=2 梯度误合并）；④ 锚点文件 152 MB / 456,546 行中仅 51,718 个唯一对（重复行 89%），而 flush 与加载都是全文成本。
+
+**交付**：新校准工具（阈值与相似度口径均取自 `news_dedup`：`_pair_similarity` / `_CROSS_*` 常量；用当前代码重算并按当前阈值重判分支；历史时代单列；`--compact` 压缩 152 MB → 17 MB）；锚点新增 `anchor_rules_version`（`_rules_fingerprint()` 自动派生）+ 超 32 MB 加载告警；`_TOKEN_LIKE` 收紧 + 5 组价格方向对；回归用例 24 例（含 scripts 工具新测试文件）。
+
+#### ✅ `plan-54` 过去 48 小时实现的技术债整改（已完成 2026-09-18）
+
+> 触发：用户提出「过去 48 小时的实现有没有技术债，有就修」。扫描范围：`git log --since=50h`（22 commit）+ 未提交工作区；判据含体积硬上限/静默吞异常/债务标记/无引用定义/重复实现/文档与代码同步。
+
+**发现的四类债务与处置**（逐条见 `review-findings.md` rf-393 / rf-399~rf-401）：
+
+| 类别 | 实况 | 处置 |
+|:--|:--|:--|
+| 文件超 800 行硬上限 | `providers/news_dedup.py` 改动后 931 行（规则数据 + 主流程混居） | 拆为 `news_dedup_rules.py`（650 行，规则原语）+ `news_dedup.py`（327 行，锚点与主循环，原面 re-export）；拆分后同批样标题 ratio/overlap/掩码/指纹**逐值一致** |
+| 实验挂载点约束不一致 | 景气度框架诊断两条生成路径内联 try/except（full 路径双重守护），未过实验挂载点 | 新增 `_experimental_seams.record_prosperity_diagnosis`，两路径改调挂载点并删内联守护；该约束的适用面与工序顺序同步；新增 4 例挂载点用例（rf-393 收敛） |
+| 文档与代码脱钩 | 功能开关计数 4 份文档停在 29/8/4（实为 30/9/5）且报告组漏列市场情绪；`technical.md` 目录 2.7 锚点失效；新增文档相对链接少一层 | 4 份文档计数按注册表更正 + 补列表项；锚点补连字符；相对链接改 `../plan/…`（rf-400） |
+| 判据重复 | `analysis/financial_indicator._num` 与 `core.num_utils.safe_num` 各自实现「解析 + 有限性校验」 | `_num` 改为 `safe_num(value, default=None)` 的 float 投影，删除已无用的 `import math`（rf-401） |
+
+**未列入本次整改（已登记、非阻塞）**：rf-395 的遗留面——其余 `data/state/*` 写入方（perf/health/silence）同样面临「后台线程越过用例级补丁」，当前无实测泄露，彻底治本需把状态目录改为可注入的单一来源。
+
+### P1 — 已完成（plan-47 完成态，2026-09-23 归档）
+
+#### ✅ `plan-47` 景气度框架诊断：基金持仓 ROE 加权（② 维基金层扩展，阶段一）— 已完成（2026-09-23）
+
+**范围决策（2026-09-23 用户确认）**：两阶段方案——阶段一按基金**前十大重仓股** ROE 加权（本项），阶段二（全量持仓口径）待 plan-51 阶段 3（同花顺历史持仓接口）收尾后升级；估算记录契约以 `basis` 字段区分口径（`top10_holdings`），阶段二落地时替换取数来源、契约不变。
+
+**实施摘要**：新增 `report/fund_roe_estimate.py::estimate_fund_roe_batch`（复用 `fetch_fund_holdings_batch` 基金持仓链路 + `fetch_latest_indicator` 个股财务指标链路，不新增 HTTP 通道；报告期陈旧闸门与穿透层同口径；`known_roe` 命中免取数）；`analysis/prosperity_scoring._score_roe` 新增可选入参 `fund_roe_estimates`——无直接 ROE 的权益类基金（QDII/ETF/联接/主动权益，类型判定走 `classify_penetration`）以推演值计分，证据/持仓视角/契约 notes 三处均标「按框架推演」（红线②）；直接 ROE 优先、推演值不覆盖；开关关闭时零变化（红线③）。新语义名 `estimate_fund_roe_batch` / `fund_roe_estimates` 已入语义命名表，契约口径已入附录 H。
+
+**实施记录**：见 `../../managements/changelog.md`「plan-47 基金重仓股 ROE 加权（② 维基金层扩展，阶段一）」条。
+
+#### ✅ `plan-48` 景气度框架诊断：场外流动性补齐（④ 维，类型默认档）— 已完成（2026-09-23）
+
+**方案选择（2026-09-23）**：采用 plan 内的方案②（类型分级默认档），配置项 `redemption_limits`（方案①）优先；类型判定按约束走 `core/code_utils`（C1 类型判定中心化）。
+
+**实施摘要**：`core/code_utils.otc_redemption_days_default` 四档——货币/短债 T+1、纯债 T+2、其他场外基金（主动权益/混合/指数/联接）T+3、QDII T+7（保守上沿），无法识别返回 None；`analysis/liquidity.check_liquidity` 场外未配置赎回上限时落默认档并输出 `estimate_basis="type_default"` + 「约 T+N 日赎回（类型默认档，非实测）」标签；`_score_liquidity` 计分池扩为「场内 + 场外配置口径 + 场外默认档（非实测）」，默认档参与时 `status=partial` 且证据明标非实测（满足约束「默认档须标注非实测」）。
+
+**实施记录**：见 `../../managements/changelog.md`「plan-48 景气度框架④维场外流动性补齐（类型默认档）」条。
+
+### P1 — 已完成（plan-57 LLM 端点级节流与并发治理，2026-09-25）
+
+**触发**：用户计划将订阅制编码端点（Kimi Code）接入程序，要求「从整体架构出发、考虑架构约束、不留技术债务」，并质疑「非该端点时并发约束能否放开」。
+
+**背景（实测）**：每次报告生成 8~9 次 LLM 调用、41k~56k token，集中在 2~8 分钟内以 3 路并发发出——对「要求交互式使用」的订阅制端点属高风险形态。全局键 `llm_max_concurrency` 无法表达「同一程序、不同端点不同策略」。
+
+**实施**：
+- 新增 `llm/pacing.py`：`PacingPolicy` / `parse_policy` / `register_policies` / `PacingGate`——把节流与并发**声明化到 provider 条目**（`llm_providers.json` 的 `pacing` 段：`min_interval` / `jitter` / `max_concurrency`），缺省即无约束（零开销直通，行为与未引入时逐字节一致）
+- 配置层接入：`_parse_providers_list` 透传 `pacing`；`_inject_provider_chain_data` 装载策略（配置为唯一事实来源）；模板补注释
+- 调用链接线：`endpoint_key` 由 provider 条目名逐层透传（`api.py` → `call_single_provider` → 三协议 `call_claude/openai/gemini` → `call_llm_with_retry`），在**唯一调用缝**施加 `PacingGate`（先取并发许可再等间隔，使间隔真正约束请求发出时刻）
+- 复用既有原语：`fetcher/batch.py::RateLimiter` 新增 `acquire_interval(key, interval)`（逐次显式间隔），不重复实现限速器
+- **403 配额/风控不重试**：新增 `FAIL_REASON_QUOTA_EXCEEDED`，`_attempt_api_call` 将 403 归为 `("quota", 403)`，重试骨架直接降级到下一 provider（窗口按时间滚动，重试无益且加剧风控画像）；429/503 仍按 `max_retries` 重试。报告侧差异化文案同步（`llm_content` / `llm_module_info`）
+- 文档：手册新增「端点级节流（`pacing`）」章节（与全局并发的关系、403 语义）；技术设计新增 §4.2.1（含调用链图与性质表）
+
+**测试**：+19 例（`test_llm_pacing.py` 16：解析/容错/注册/零开销/间隔/抖动/并发上限/异常释放/失败原因；`test_config_llm_multi.py` +3：pacing 透传/缺省不注入/非对象忽略）。真实调用路径实测：无约束端点 3 次调用 0.002s；`min_interval=0.2` 端点间隔稳定 0.200s；403 在 `max_retries=2` 下仅 1 次请求且失败原因 `quota_exceeded`
+
+---
+
+### P1 — 已完成（plan-56 数据源健壮性加固，2026-09-24）
+
+**触发**：用户报「`price_price_fund_otc` 与 `report_datasink` 高频连接失败」，建议增加备用通道 / 优化重试 / 延长刷新窗口。
+
+**诊断**（实测）：高发「失败」主要是**健康探针误报**（见 `archived_review-findings` 的 rf-428）；另有结构性单源风险与第三方配额压力。
+
+**实施**：
+- **场外净值跨厂商备源**：`providers/sina.py::fetch_fund_nav`（`hq.sinajs.cn/list=f_{code}` 解析 名称/单位净值/累计净值/前一日净值/净值日期）+ `quote_adapters.SinaFundQuoteAdapter` + 手写转换 `_price_transform_sina_fund`；链路 `price_fund_otc` 由**单源 `["eastmoney"]` → `["eastmoney", "sina_fund"]`**（故障域独立，非东财系）；适配器开关两条路径同时接线，回归锁定「主源可用时备源零调用」
+- **传输级同源重试**：`fetcher/chain.fetch_with_fallback` 落槽前对传输级失败（超时/断连/远端断开）同源退避重试一次（0.6s 指数退避 + 抖动），**不重试代码级空结果**（防白耗 DataSinking 日配额 8191 篇）
+- **财报正文备源**：`fetcher/financial_report.py` 抽出 `_attempt_candidates`（章节阶 → 全文阶）并把**正文级**巨潮接管接入（`_backup_candidates`）——此前备源只在「索引为空」时触发；主源可用时备源仍零调用
+- **延长刷新窗口**：财报索引/章节清单 TTL 两周 → **30 天**（与正文同档），降低第三方配额与限速压力（R-FRD-07 语义同步）
+
+**测试**：+26 例（探针 9 / 新浪 provider 4 / 适配器等价 2 / 链路重试 3 / 场外备源端到端 5 / 正文备源接管 3）
+
+**验证**：健康检查实测 10/10 可用；场外净值主源故障时由新浪交付（数值与东财一致）；行业分类主源不可达时由行情页备源交付
+
+---
+
+### P1 — 已完成（plan-50 完成态，2026-09-24 归档）
+
+#### ✅ `plan-50` 财报取数第二数据源（巨潮 cninfo 备用链路）— 已完成（2026-09-24）
+
+**背景**：区块② 财报摘要此前单一依赖 DataSinking，报告完整性受该源「收录 + 章节解析」质量决定——实测工商银行 `601398` 的 2026 半年报未被收录（源侧根本没有的报告无法用季报替代经营讨论内容）。
+
+**实施摘要**：
+- 新增 `providers/cninfo.py`：公开免费无需凭据；三段取数（`topSearch` 解析 orgId → `hisAnnouncement` 公告列表 → `static` 站 PDF 下载 + pdfplumber 解析），公告元数据**归一为与主源索引同一形状**（`id/doc_type/report_period/title/announcement_time/adjunct_url/source`），文种归类含「半年度先于年度」的判定顺序与摘要/英文版剔除；护栏为固定 1 秒/请求礼貌限速 + 429 退避重试一次，全部失败路径返回空（不抛异常）
+- `fetcher/report_adapters.py`：新增 `CninfoReportAdapter` 作财报域**第二槽**（备源）；主源适配器与备源适配器以 `source_hint` 做**命名空间隔离**（异源 doc_id 互不服务、备源进独立缓存键段），缓存/熔断/降级全部复用既有 `fetch_with_fallback`
+- `fetcher/financial_report.py`：主源索引为空/失败时切备源重建索引（候选回溯逻辑零改动复用）；源与元数据随查询透传
+- `fetcher/report_locate.py`（新增）：目录行判定与关键词定位收敛为单一实现，**全文兜底与备源章节切片共用**（消除重复）
+- `core/registry.py`：登记备源缓存前缀（索引/正文/orgId）
+- 依赖：`pdfplumber`（主依赖；实测镜像最新为 0.11.10，故取 `>=0.11,<1.0` 而非计划书中的 `>=1.0`——该版本号尚不存在）；**惰性导入**，缺失时解析环节降级为空文本（仅该源失效）
+
+**红线达成**：① 未新造取数路径（备源走既有域适配器两槽 + 既有缓存/熔断）；② 限速与失败处理在 provider 层护栏；③ 记录契约字段不变（适配器归一为标准字段）；④ **主源可用时备源零调用**（有专项用例锁定），主源候选的缓存键与输出逐字不变。
+
+**实施记录**：见 `../../managements/changelog.md`「plan-50 财报取数第二数据源（巨潮 cninfo 备用链路）」条。

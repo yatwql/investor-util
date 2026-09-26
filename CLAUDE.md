@@ -7,19 +7,27 @@
 ## Conventions
 
 - **默认工作分支**：`dev`（日常开发、提交均在此分支）
-- **发布分支**：`master`（仅从 dev 合并，打版本标签后发布）
+- **发布分支**：`master`（仅从 dev 合并，打版本标签后发布）；**每次正式发布（打 tag）都必须把 dev 合并入 master 并推送**（合入前跑 P1 门禁），不得只打 tag 而不更新 master
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **Python 环境**：所有 Python 命令一律使用项目虚拟环境解释器——Linux/macOS 用 `.venv/bin/python`，Windows 用 `.venv\Scripts\python.exe`；**禁止**裸 `python3`/`python`/`pytest`（会命中系统解释器，缺失 pandas 等依赖，报 `No module named 'pandas'`）。运行测试、脚本、CLI 均同；本文件内所有 `python ...`/`pytest ...` 示例均已按此改写。
 - **测试**：`src/test/test_*.py`，执行 `.venv/bin/python -m pytest src/test/`
-  - **提交前门禁（P0）**：必须通过 `.venv/bin/python scripts/test-runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 commit
+  - **提交前门禁（P0）**：必须通过 `.venv/bin/python scripts/test-runner.py --mode dev-verify`（核心单元+基础场景快速验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵)）+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）
+  - `.venv/bin/python scripts/check-requirement-trace.py --ci`（需求 ID ↔ 验证载体追溯：已补全域全覆盖 + 载体文件存在 + ID 双向一致），否则不得 commit
   - **合入门禁（P1）**：合并到 master 前必须通过 `.venv/bin/python scripts/test-runner.py --mode verify`（核心模块单元测试），否则不得 merge
-  - **发布门禁（P2）**：发布版本前必须通过 `.venv/bin/python scripts/test-runner.py --mode verify,regression`（单元+场景验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验），否则不得 release
+  - **发布门禁（P2）**：发布版本前必须通过 `.venv/bin/python scripts/test-runner.py --mode verify,regression`（单元+场景验证）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹 + 任务编号标识符检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵)）+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）
+  - `.venv/bin/python scripts/check-requirement-trace.py --ci`（需求 ID ↔ 验证载体追溯：已补全域全覆盖 + 载体文件存在 + ID 双向一致），否则不得 release
   > P1/P2 的完整要求（含手动验证项）见 `testplan.md` → §4 回归测试清单 / §6.3 门禁
-- **CI 辅助检查**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性），非阻塞门禁——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码须在提交前保持干净
+- **CI**：`.github/workflows/ci.yml` 三档测试按分支/标签分流（`dev` 推送 → P0 `dev-verify`；`master` 推送/PR → P1 `verify`；`v*` tag → P2 `verify,regression`），矩阵 Python 3.11/3.12/3.13；另有 **`guards` job**（阻塞，7 个 `--ci` 守护脚本：`check-code-traces` / `check-doc-traces` / `check-task-numbering` / `check-semantic-index` / `check-doc-drift` / `check-test-redundancy` / `check-requirement-trace`）与 **`format` job**（非阻塞，`ruff format --check` + `ruff check`，选择项与刻意豁免在 `pyproject.toml` 显式声明）——lint/格式问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻断合并/发布合并/发布。当前两者均为零告警基线，新增代码须在提交前保持干净
+- **scripts 共享设施与契约**：检查脚本统一 `-v/--verbose` + `--ci`，**通过退出 0 / 发现 finding 退出 2**（`check-code-traces.py` 另有 HIGH=1、LOW=3 分级）；公共设施集中在 `scripts/_checklib.py`（CLI 契约与输出、`rel()`/`report()`、文档标记与表格区间解析），历史痕迹共享排除模式在 `scripts/_traces_common.py`，`test-runner.py` 的内部实现拆在 `scripts/_test_runner/` 包内（入口保留 CLI 与原面 re-export）。新增检查脚本**必须**复用 `_checklib`，不得自建样板；改动内部实现后，访问/替换被搬走符号的测试须指向持有它的子模块
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退。新增功能时，**必须**同步编写测试用例覆盖。测试用例应直接验证缺陷场景的具体断言，而非仅测正常路径。
 - **测试标记强制**：所有新增/修改的测试用例（测试类或测试方法）**必须**标注对应的 pytest marker（如 `@pytest.mark.unit_providers`、`@pytest.mark.scenario_basic` 等），marker 定义见 `src/test/conftest.py` 的 `pytest_configure`。新增 marker 需同步注册到 `conftest.py` 和维护文档。
 - **边缘测试文件隔离**：edge 场景测试（`@pytest.mark.edge`）**必须**放置在 `*_edge.py` 文件中，不得与普通测试混搭在同一文件。`conftest.py` 的 `pytest_collection_modifyitems` 会在收集期自动校验此约束。
+- **测试冗余与有效性**：新增/修改测试后**必须**通过 `.venv/bin/python scripts/check-test-redundancy.py --ci`——五类问题为硬禁止：**死用例**（同名覆盖/非 `Test` 类里的 `test_*`/`Test` 类带 `__init__`）、**无断言用例**（无 `assert`、无 `pytest.raises/warns/fail`、无 mock 断言，也不经同类辅助方法断言）、**完全重复用例**（函数体+参数+装饰器 AST 归一化一致）、**自证用例**（patch 了被测函数又把其 `return_value` 断言回原值）、**硬编码演进总数**（把需求/章节/开关等可增长集合的条数写死进断言——良性新增必红且与门禁职责重复，应改结构关系断言）。重复比对会跳过「`self.<attr>` 间接调用无法解析」的用例（避免把并行覆盖误判为重复）；删除/合并用例后须同步刷新 `test-coverage.md` 与 `folders.md` 的用例计数
+- **测试真值单一来源**：测试断言中的「事实」必须从**真值来源**动态派生，**禁止写死会随开发演进的派生量**（需求/章节/开关/注册表/枚举等的**条数**与**逐条清单**）。
+  - **为何是硬纪律**：这类数字不是测试要验的东西，而是文档/注册表的派生量——写死后**新增一条需求/章节/开关就会把测试打红**，把良性变更误判成回归（实测已导致 GitHub CI 三个 Python 版本全红），且与门禁脚本（如 `check-requirement-trace` 的全域覆盖断言）**职责重复**。
+  - **正确写法**（断言**结构关系**，强度不低于甚至高于写死条数）：集合双向相等（`set(a) == set(b)`）、覆盖/子集（`expected <= set(a)`）、**序号连续**（`numbers == list(range(1, n+1))`）、唯一性（`len(keys) == len(set(keys))`）、逐项遍历断言；条数本身需要时用「域覆盖 + 序号连续」等价表达。
+  - 由此守：`check-test-redundancy.py` 第 5 类 `check_hardcoded_evolving_totals`（检出 `assert len(<可增长集合>) ==/> 数字`）。
 - **测试隔离**：运行测试时**不得**修改用户的配置文件（`data/config/`）、持仓文件（`data/holdings/`）等敏感数据。`src/test/conftest.py` 中的 `_isolate_sensitive_paths` autouse fixture 会自动将 `config.json` 和缓存目录重定向到临时目录。测试用例应使用 mock 或临时文件隔离，避免污染真实数据。
 - **新增测试隔离要求**：
   - **单例状态重置**：新增模块级单例（如 `get_tracker()`）时，**必须**在 conftest.py 中增加 `autouse` fixture 重置该单例（参考 `_auto_reset_provider_registry` 模式），避免测试间状态污染
@@ -28,6 +36,9 @@
   - **LLM 调用 mock 强制**：任何触发 `generate_all_llm()` 或 `call_llm()` 的测试**必须** mock LLM API 调用（使用 `unittest.mock.patch` 或 `monkeypatch`），禁止真实调用（防费用、防 API 依赖、防测试不稳定）
   - **输入数据隔离**：管线集成测试（同上——`test_pipeline_smoke.py`、`test_pipeline_metrics_injection.py` 等）**不得**依赖真实持仓文件，必须使用 fixture 构造最小持仓（2-5 品种）或 mock 持仓数据。`data/holdings/` 的真实文件在测试中应视为只读
   - **C12 边缘文件隔离**：极端值/异常场景测试（如 `unit/analysis/test_liquidity_edge.py`、`unit/analysis/test_liquidity_otc_edge.py`）**必须**使用 `@pytest.mark.edge` 标记并放入 `*_edge.py` 文件，conftest.py 的 `pytest_collection_modifyitems` 会自动校验
+  - **外网 mock 强制（机制保障）**：任何测试都**不得**发起真实外部网络请求。`conftest.py` 的 `_block_external_network`（autouse）在 socket 层阻断建连（`connect`/`connect_ex`/`create_connection`/`getaddrinfo`，**只阻建连不阻构造**），抛 `src.test._network_guard.NetworkBlockedInTests`（继承 `BaseException`，**不可被 provider 的 `except Exception` 降级吞掉**）→ 漏 mock 即**瞬时硬失败**，不会静默降级也不白等重试退避。注意测试**不得**依赖“守卫拦下 + 链路降级”来通过：那既不是 mock，也会掩盖真实依赖
+  - **不依赖外部数据的用例显式声明离线**：报告/编排/集成类用例的**附带依赖**（交易日历、行业数据、行情、健康检查探针、akshare 直连路径等）并非其测试目标——这类文件在模块级加一行 `pytest.mark.usefixtures("offline_external_sources")`（`src/test/_network_guard.py::apply_offline_stubs`）即可：HTTP 出口换成即时失败的离线桩、交易日历回空集、链路瞬时重试退避置 0（不再等待）、akshare 换空桩。**需要验证某源真实行为的用例必须自行 mock 该源**，不得用本 fixture 遮掩
+  - **测试目标源要 patch 对模块**：生产代码常在函数内 `from ... import`（如 `report/news_correlation.py` 从 `fetcher.news` 导入）——patch 必须指向**调用点所在模块**的属性，patch 上游 provider 模块的同名函数**不会**生效（该名字已在导入时绑定），否则用例会静默走真实链路
 - **调试失败用例流程**：测试失败后**禁止**重新跑全量测试套件。先用 `.venv/bin/python scripts/extract-test-failures.py` 提取失败用例名，修复后只跑该单个用例验证（`.venv/bin/python -m pytest <test_file>::<test_name> -v --tb=short`）。仅提交/发布前才需跑完整门禁。
 - **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
 - **任务编号规范**：
@@ -38,7 +49,7 @@
   - 历史数据保持原名（如 `P3-09`、`P4-91`），不追溯重命名
   - **编号源标记**：各管理文档头部维护「编号源」标记记录**下一个可用编号**——`plan.md` → `plan-next`、`review-findings.md` → `rf-next`。新增任务时**取当前值**作为编号，完成后**递增更新标记**（+1）。标记单调递增、绝不回退，保证与历史归档（含 `docs-stm/archive/*/`）编号不冲突。若标记遗漏递增或初值异常，`scripts/check-task-numbering.py --ci` 会扫描当前文档+全部归档报错并提示修正值（已用最大+1）
 - **语义化命名**：代码标识符（函数/变量/类/模块/config 键）与文档正文一律用**语义名**，**禁止用任务代号**（`plan-N`/`rf-N`/B 系列/F 系列等）。任务代号仅存在于内部计划表（`plan.md`/`review-findings.md`）作链接锚点，不扩散到实现层。新增功能**先定语义名再设计**（语义名即代码名），已实现功能的语义命名索引见技术设计文档（`docs-stm/managements/technical.md`）「功能语义命名表」章节（活索引；各轮设计文档中的原始表为历史快照，如归档 `docs-stm/archive/v0.10.x/investment-features/plan-investment-features.md` 的原始语义命名表），保证「代码标识符 = 文档中文描述」一致。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止：注释/标识符中出现任务编号、系列代号（`b_series`/`G系列`/`F4`/`B6`）、嵌入 `rf/plan`+数字 的命名均会被检出（IDENT/CODE，退出码 2））+ `scripts/check-semantic-index.py --ci`（正面校验「功能语义命名表」与代码正反向一致），已纳入技术设计文档「架构设计约束」章节的约束外参照。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（`C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。**测试文件的回归元描述豁免（旧实现/修复前等）不适用于任务编号**——注释/docstring 中残留 `rf-N`/`plan-N`/`R-N` 一律检出（`check-code-traces.py` 的任务编号硬禁止分支先于整行豁免判定）。
-- **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。
+- **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。该纪律由 `scripts/check-doc-drift.py --ci` 强制（目录树条目与实测文件双向比对 + 项目统计表数字核对）。`test-reports/` **只应出现在仓库根**——受检目录（`src/`、`scripts/`、`docs-stm/{managements,manuals,plan}`）下出现同名目录即为误落（典型成因：工具把「项目根」算成了 `scripts/`），目录树检查会报出
 - **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, llm-technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md, folders.md, developer-guide.md）
 - **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-use-web-mode.md, how-to-use-tui-menu.md, how-to-use-cli-mode.md, how-to-config.md, how-to-config-llm.md, reports-instruction.md, datasource.md, datasource-reliability.md, faq.md）
 - **文件归属三原则**：
@@ -61,7 +72,7 @@
 - **版本标签**：发布版本时，完成版本号更新并提交后，**必须**执行 `git tag v{版本号}` 打标签并 `git push origin --tags`，确保每次发布都可追溯。
 - **开发版本切换**：发布版本并打 tag 后，**立即**将 `APP_VERSION` 和所有管理文档版本头改为**下一个版本的 `-dev`**（如发布 v0.6.8 后即改为 v0.6.9-dev），运行 `check-version-consistency.py` 验证全链 [OK] 后提交，然后继续开发。开发期间版本号始终标识为下一个预期发布版本的 `-dev`。
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功，绿色）、`[!]`（部分失败/告警，黄色）、`[ERR]`（错误，红色）。终端不支持颜色时自动降级。
-- **架构遵从**：所有模块必须遵守 `docs-stm/managements/technical.md` 中 `## 架构设计约束`（表格含 C1~C25 的设计目的/违反后果/适用范围）和 `## 概要设计--核心架构决策`（含数据降级治理体系补充说明）。**优先对照架构设计约束的表格逐条自检**——表格更完整（25 条约束 vs. 概要设计仅 5 项），且每项附带违反后果便于判断违规与否。当涉及数据降级/熔断相关逻辑时，需额外参考概要设计 1.4.5 节理解双重降级治理体系设计意图。新增/修改代码不得违反。
+- **架构遵从**：所有模块必须遵守 `docs-stm/managements/technical.md` 中 `## 架构设计约束`（表格含 C1~C27 的设计目的/违反后果/适用范围）和 `## 概要设计--核心架构决策`（含数据降级治理体系补充说明）。**优先对照架构设计约束的表格逐条自检**——表格更完整（27 条约束 vs. 概要设计仅 5 项），且每项附带违反后果便于判断违规与否。当涉及数据降级/熔断相关逻辑时，需额外参考概要设计 1.4.5 节理解双重降级治理体系设计意图。新增/修改代码不得违反。
 - **执行效率（合并往返）**：凡「读多份」或「改多处」的操作**合并为少量往返**——需要读多份文件时一次并行读完；同类修改合并（一次多行替换或脚本批量应用），不做逐条 Edit。门禁分层跑：便宜检查（`.venv/bin/ruff`、四个 `--ci` 脚本）随改随跑，`dev-verify` 等完整门禁仅在收尾跑一次（与「调试失败用例流程」一致，不在小修小改后重复整套重跑）。**理由**：单轮墙钟主要由「往返次数」而非单次工具耗时决定，逐条操作会把 N 处小改放大成 N 轮完整生成。
 
 ## 持仓文件格式

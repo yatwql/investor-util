@@ -15,7 +15,11 @@ import pytest
 
 from src.python.core.models import Holding
 
-pytestmark = [pytest.mark.integration, pytest.mark.integration_isolation]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.integration_isolation,
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 
 @pytest.mark.integration

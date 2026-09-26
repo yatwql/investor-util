@@ -35,6 +35,7 @@ from typing import Any
 
 from src.python.core.atomic_write import write_json_atomic
 from src.python.core.constants import PROJECT_ROOT
+from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
 from src.python.core.datasource_credential import (
     DEFAULT_DATA_KEY_FILE,
     CredentialSpec,
@@ -47,8 +48,8 @@ from src.python.core.http_client import make_http_client
 logger = logging.getLogger("invest")
 
 _BASE_URL = "https://api.datasink.ing"
-#: 429 限速后的退避秒数（重试一次；免费档 3 请求/秒）
-_RATE_LIMIT_BACKOFF = 1.0
+#: 429 限速退避策略（重试一次；免费档 3 请求/秒）
+_RATE_LIMIT_POLICY = RetryPolicy(attempts=2, strategy=STRATEGY_FIXED, base_backoff=1.0)
 _TIMEOUT = 20.0
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 
@@ -148,7 +149,7 @@ def _get_limiter() -> Any:
     if _limiter is None:
         with _limiter_lock:
             if _limiter is None:
-                from src.python.fetcher.batch import RateLimiter
+                from src.python.core.throttle import RateLimiter
 
                 interval = 1.0 / resolve_requests_per_second()
                 _limiter = RateLimiter({SOURCE_ID: interval})
@@ -228,8 +229,9 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if resp.status_code == 429:
         # 限速：等待一个限速窗口后**重试一次**（免费档 3 请求/秒，并发路径下仍可能触顶）
-        logger.warning("[datasink] 触发限速（HTTP 429），%.1fs 后重试一次", _RATE_LIMIT_BACKOFF)
-        time.sleep(_RATE_LIMIT_BACKOFF)
+        delay = _RATE_LIMIT_POLICY.delay_for(1)
+        logger.warning("[datasink] 触发限速（HTTP 429），%.1fs 后重试一次", delay)
+        time.sleep(delay)
         _get_limiter().acquire(SOURCE_ID)
         try:
             with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:

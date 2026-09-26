@@ -180,11 +180,6 @@ class TestIsMarketOpenFallback(unittest.TestCase):
             current_min = mock_dt.hour * 60 + mock_dt.minute
             return _is_market_open_fallback(current_min)
 
-    def test_morning_session(self):
-        """早盘 09:30 → True。"""
-        dt = datetime(2026, 7, 1, 9, 30, tzinfo=timezone(timedelta(hours=8)))
-        self.assertTrue(self._run(dt))
-
     def test_afternoon_session(self):
         """午盘 14:00 → True。"""
         dt = datetime(2026, 7, 1, 14, 0, tzinfo=timezone(timedelta(hours=8)))

@@ -14,6 +14,8 @@ TARGET=".githooks"
 if [ "$1" = "--off" ]; then
     git config --unset core.hooksPath 2>/dev/null || true
     echo "[OK] 已停用自定义 hooks 路径（恢复 .git/hooks 默认）"
+    echo "    注意：Git 回退到 .git/hooks 后，本脚本不会在其中安装任何 hook——"
+    echo "    该目录下的校验需自行准备（.git/hooks 内容不随仓库同步）。"
     exit 0
 fi
 

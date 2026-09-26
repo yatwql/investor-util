@@ -68,26 +68,101 @@ def _check_http(
     url: str,
     *,
     timeout: float = 15.0,
-    expect_status: int = 200,
+    follow_redirects: bool = True,
     **kwargs,
 ) -> tuple[str, float, str]:
     """通用 HTTP 健康检查。
+
+    默认**跟随重定向**并把 3xx 视为「可达」（带备注）——上游端点从 http 迁到 https
+    后会先回 301/302；若既不跟随又把 3xx 计失败，探针会长期误报「HTTP 301」。
 
     Returns:
         (符号, 延迟(ms), 状态说明)
     """
     start = time.perf_counter()
     try:
-        client = make_http_client(timeout=timeout, **kwargs)
-        resp = client.get(url)
+        with make_http_client(timeout=timeout, follow_redirects=follow_redirects, **kwargs) as client:
+            resp = client.get(url)
         elapsed = (time.perf_counter() - start) * 1000
-        if resp.status_code == expect_status:
-            return _OK, elapsed, f"{elapsed:.0f}ms 正常"
+        if 200 <= resp.status_code < 400:
+            if resp.status_code == 200:
+                return _OK, elapsed, f"{elapsed:.0f}ms 正常"
+            return _OK, elapsed, f"{elapsed:.0f}ms 重定向可达（HTTP {resp.status_code}）"
         return _WARN, elapsed, f"{elapsed:.0f}ms HTTP {resp.status_code}"
     except Exception as e:
         elapsed = (time.perf_counter() - start) * 1000
         err_msg = str(e).split("\n")[0][:60]
         return _ERR, elapsed, "超时" if "timeout" in str(e).lower() else err_msg
+
+
+def _check_any(
+    candidates: list[tuple[str, str]],
+    *,
+    timeout: float = 15.0,
+    **kwargs,
+) -> tuple[str, float, str]:
+    """按顺序探测多个端点，**任一可达即视为该数据源可用**。
+
+    用于「同一数据源存在主/备两个端点」的场景（如行业分类：push2 主源 +
+    行情页备源）。全部不可达才计失败；命中备源时在状态说明中标注，保留
+    「主源降级」这一可观测信号，而不是让整行看起来像彻底挂了。
+
+    Args:
+        candidates: ``[(标签, URL), ...]``，按主 → 备顺序
+    """
+    last: tuple[str, float, str] = (_ERR, 0.0, "无候选端点")
+    for index, (label, url) in enumerate(candidates):
+        symbol, elapsed, message = _check_http(url, timeout=timeout, **kwargs)
+        if symbol == _OK:
+            note = f"（{label}）" if len(candidates) > 1 else ""
+            if index > 0:
+                return _OK, elapsed, f"{message} — 主源不可达，由{label}接管"
+            return _OK, elapsed, f"{message}{note}"
+        last = (symbol, elapsed, f"{label} {message}")
+    return last
+
+
+#: 财报域探针使用的 A 股标的（固定、不依赖持仓）——长江电力
+_CRED_PROBE_SYMBOL = "600900"
+_CRED_PROBE_FMP_SYMBOL = "600900.SS"
+
+
+def _check_datasink() -> tuple[str, float, str]:
+    """DataSinking 财报探针：取 1 条元数据（轻量、幂等，命中缓存时近乎零成本）。
+
+    缺 key 的情形由 ``run_health_checks`` 的凭据预检拦下（产出 ``⏭️`` 跳过态），
+    只有凭据就绪时本探针才会被调用。取数失败原因（凭据无效/配额/网络）由 provider
+    记入 ``logs/app.log``，此处不区分，只给可行动提示。
+    """
+    start = time.perf_counter()
+    try:
+        from src.python.providers import datasink
+
+        items = datasink.fetch_report_documents(_CRED_PROBE_FMP_SYMBOL, size=1)
+    except Exception as e:  # 探针自身异常不得中断体检
+        return _ERR, (time.perf_counter() - start) * 1000, str(e).split("\n")[0][:60]
+    elapsed = (time.perf_counter() - start) * 1000
+    if items:
+        return _OK, elapsed, f"{elapsed:.0f}ms 正常（{len(items)} 篇财报元数据）"
+    return _WARN, elapsed, "未取到元数据（未收录该标的 / 凭据失效 / 配额受限 / 网络异常，详见 logs/app.log）"
+
+
+def _check_cninfo() -> tuple[str, float, str]:
+    """巨潮资讯探针：解析 orgId（公告列表查询的必需参数；结果按月缓存）。
+
+    选 orgId 而非下载 PDF：它是备源链路的入口，且成本最低（一次搜索请求，月级缓存）。
+    """
+    start = time.perf_counter()
+    try:
+        from src.python.providers import cninfo
+
+        org_id = cninfo.resolve_org_id(_CRED_PROBE_SYMBOL)
+    except Exception as e:
+        return _ERR, (time.perf_counter() - start) * 1000, str(e).split("\n")[0][:60]
+    elapsed = (time.perf_counter() - start) * 1000
+    if org_id:
+        return _OK, elapsed, f"{elapsed:.0f}ms 正常（orgId 已解析）"
+    return _WARN, elapsed, "未解析到 orgId（搜索接口变动 / 网络异常，详见 logs/app.log）"
 
 
 # ── 检查项定义 ──────────────────────────────────────────
@@ -101,14 +176,14 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
         "tencent",
         "腾讯财经",
         "行情",
-        lambda: _check_http("http://qt.gtimg.cn/q=sz000001", timeout=15),
+        lambda: _check_http("https://qt.gtimg.cn/q=sz000001", timeout=15),
     ),
     (
         "sina",
         "新浪财经",
         "行情",
         lambda: _check_http(
-            "http://hq.sinajs.cn/list=sh000001",
+            "https://hq.sinajs.cn/list=sh000001",
             timeout=15,
             headers={"Referer": "https://finance.sina.com.cn"},
         ),
@@ -118,7 +193,7 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
         "东方财富",
         "基金净值",
         lambda: _check_http(
-            "http://api.fund.eastmoney.com/f10/lsjz?callback=jQuery&fundCode=000001&pageIndex=1&pageSize=1",
+            "https://api.fund.eastmoney.com/f10/lsjz?callback=jQuery&fundCode=000001&pageIndex=1&pageSize=1",
             timeout=15,
         ),
     ),
@@ -127,7 +202,7 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
         "天天基金",
         "持仓/排名",
         lambda: _check_http(
-            "http://fund.eastmoney.com/pingzhongdata/000001.js",
+            "https://fund.eastmoney.com/pingzhongdata/000001.js",
             timeout=15,
         ),
     ),
@@ -135,8 +210,14 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
         "eastmoney_industry",
         "东方财富行业",
         "行业分类",
-        lambda: _check_http(
-            "http://push2.eastmoney.com/api/qt/stock/get?secid=1.000001&fields=f12,f14,f137,f138",
+        lambda: _check_any(
+            [
+                (
+                    "push2 主源",
+                    "https://push2.eastmoney.com/api/qt/stock/get?secid=1.000001&fields=f12,f14,f137,f138",
+                ),
+                ("行情页备源", "https://quote.eastmoney.com/sh600900.html"),
+            ],
             timeout=5,
         ),
     ),
@@ -145,7 +226,7 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
         "新浪新闻",
         "财经新闻",
         lambda: _check_http(
-            "http://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=1",
+            "https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=1",
             timeout=15,
         ),
     ),
@@ -154,7 +235,7 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
         "东方财富新闻",
         "财经新闻",
         lambda: _check_http(
-            "http://np-weblist.eastmoney.com/comm/web/getFastNewsList?pageSize=1",
+            "https://np-weblist.eastmoney.com/comm/web/getFastNewsList?pageSize=1",
             timeout=15,
         ),
     ),
@@ -163,7 +244,7 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
         "华尔街见闻",
         "财经新闻",
         lambda: _check_http(
-            "http://api-one.wallstcn.com/apiv1/content/lives?limit=1",
+            "https://api-one.wallstcn.com/apiv1/content/lives?limit=1",
             timeout=15,
         ),
     ),
@@ -172,7 +253,7 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
         "财联社",
         "财经新闻",
         lambda: _check_http(
-            "http://www.cls.cn/v1/roll/get_roll_list?rn=1",
+            "https://www.cls.cn/v1/roll/get_roll_list?rn=1",
             timeout=15,
         ),
     ),
@@ -181,9 +262,24 @@ _checks: list[tuple[str, str, str, Callable[[], tuple[str, float, str]]]] = [
         "腾讯K线",
         "历史行情",
         lambda: _check_http(
-            "http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh000001,day,,,1",
+            "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh000001,day,,,1",
             timeout=30,
         ),
+    ),
+    # ── 财报域（持仓基本面章·区块②）：主源 + 备源一起探。仅探行情/基金/行业/
+    # 新闻/K 线时，财报域整链失败仍会显示“全绿”，故障现场无可见线索；datasink 缺 key
+    # 时由 run_health_checks 的凭据预检自动产出 ⏭️ 跳过态。
+    (
+        "datasink",
+        "DataSinking 财报",
+        "财报全文",
+        _check_datasink,
+    ),
+    (
+        "cninfo",
+        "巨潮资讯",
+        "财报备源",
+        _check_cninfo,
     ),
 ]
 

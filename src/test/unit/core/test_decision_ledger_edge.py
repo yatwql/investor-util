@@ -167,8 +167,9 @@ class TestMalformedLedger:
             raise OSError("disk full")
 
         monkeypatch.setattr("os.replace", boom)
-        # 不抛异常即通过
+        # 不抛异常，且失败时未留下半截文件
         dl.append_decision(code="600000", name="x", direction=dl.DIRECTION_LONG, path=lp)
+        assert not os.path.exists(lp)
         monkeypatch.undo()
 
 

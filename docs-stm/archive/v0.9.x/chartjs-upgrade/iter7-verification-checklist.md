@@ -55,8 +55,8 @@
 
 > **判定**：2.1~2.4 全过 → ② 通过。
 > **验证（2026-08-06 Windows，另机）**：打印预览图表文字/刻度/数据线清晰（2x DPI 生效）、浅色主题（文字黑/背景白）、单图不跨页（break-inside: avoid）。✅ 2.1~2.3 通过；2.4（afterprint 恢复交互）未测，S2 升级时顺带补验。
-> **操作步骤（2.4，用 `test-chart.html?场景=ok`）**：
-> 1. 打开 `test-chart.html?场景=ok`，确认 6 图正常渲染
+> **操作步骤（2.4，用 `test-chart.html?s=ok`）**：
+> 1. 打开 `test-chart.html?s=ok`，确认 6 图正常渲染
 > 2. `Ctrl+P` 打开打印预览 → **关闭**预览（`Esc` / 取消）
 > 3. 回到页面**悬停任意图**，tooltip 恢复可用（`afterprint` 事件把 canvas 从 2x DPI 快照恢复为交互式）→ ✅
 > 4. 补测真实报告（生成报告 → `Ctrl+P` → 关闭 → 悬停图）更贴近实际
@@ -74,12 +74,12 @@
 | 3.4 | 引擎缺失时图表区域空白、页面无 JS 报错（现代浏览器不渲染 `<canvas>` fallback 文本，A1 仅对不支持 Canvas 的浏览器生效，属 ⑥ 场景），真实报告回退明细表格 | ✅（另机 2026-08-06，守卫静默跳过确认；原「canvas 保留 fallback 文本」断言已按实测修正，rf-249） |
 
 > **判定**：3.1 通过（离线自包含成立）；3.2~3.4 通过（防御性守卫成立）→ ③ 通过。
-> 💡 也可用 `test-chart.html?场景=离线` 先行验证守卫逻辑（`typeof Chart` 检测 → 静默跳过 → banner 显示 err）。
+> 💡 也可用 `test-chart.html?s=offline` 先行验证守卫逻辑（`typeof Chart` 检测 → 静默跳过 → banner 显示 err）。
 > **验证进度（2026-08-06 另机）**：3.2~3.4 已实测——删除 chart.min.js 后 `typeof Chart === undefined` → chart-config/chart-init 静默跳过，页面无 JS 报错，守卫逻辑符合预期（R21）。**修正（2026-08-06 测试页复核）**：现代浏览器不渲染 `<canvas>` fallback 文本，引擎缺失时图表区域为空白，真实报告回退到明细表格；`<canvas>` fallback 文本仅对不支持 Canvas 的浏览器（⑥ 场景）生效，原「canvas 保留 fallback 文本」表述为误解，已按实测修正（rf-249）。**3.1（断网 6 图正常渲染）待补验**。
 > **操作步骤（3.1，用真实报告更贴近实际；test-chart.html 亦可）**：
 > 1. 生成一份完整报告（菜单 L/B），把**报告目录复制到无网环境**（或本机 `F12` → **Network** 面板 → 勾选 **Offline**）
 > 2. 打开报告 `.html` → 6 图应**照常渲染** + tooltip 可用（chart.min.js 等 JS 是本地文件，不依赖网络，离线自包含）
-> 3. 用 test-chart.html 快速验证：正常网速打开 `test-chart.html?场景=ok` → Network → Offline → `Ctrl+F5` 刷新 → 6 图照常渲染
+> 3. 用 test-chart.html 快速验证：正常网速打开 `test-chart.html?s=ok` → Network → Offline → `Ctrl+F5` 刷新 → 6 图照常渲染
 > 4. 测完取消 Offline → ✅
 
 ## ④ 微信内置浏览器实测（Iter 7 验收标准 6，R22）
@@ -114,7 +114,7 @@
 
 > **判定**：5.1~5.3 全过 → ⑤ 通过。
 > **操作步骤（用 `test-chart.html`，ok 场景）**：
-> 1. 打开 `test-chart.html?场景=ok`
+> 1. 打开 `test-chart.html?s=ok`
 > 2. `F12` → 点**设备图标**（Device toolbar，`Ctrl+Shift+M`）→ 顶部设备列表选 **iPhone SE**（或手动输入 375px 宽）
 > 3. 检查 5.1：6 图不超容器、**无横向滚动条**（`responsive + maintainAspectRatio`）
 > 4. 检查 5.2：柱状图横轴标签不重叠（`maxRotation: 45` 生效）

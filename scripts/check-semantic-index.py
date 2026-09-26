@@ -37,7 +37,9 @@ import sys
 import tokenize
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_checklib）
+from _checklib import REPO_ROOT, add_common_args, extract_region, rel, report  # noqa: E402
+
 _TECHNICAL_MD = REPO_ROOT / "docs-stm" / "managements" / "technical.md"
 _FEATURES_PY = REPO_ROOT / "src/python/config/features.py"
 _CONFIG_DEFAULTS = REPO_ROOT / "src" / "python" / "config" / "_config_defaults.py"
@@ -64,14 +66,7 @@ _SKIP_REL_PARTS = {"__pycache__"}
 
 def extract_marker_region(doc_text: str) -> str | None:
     """返回功能语义命名表标记区间内的正文；start/end 任一标记缺失返回 None。"""
-    start = doc_text.find(_MARKER_START)
-    if start == -1:
-        return None
-    body = doc_text[start + len(_MARKER_START) :]
-    end = body.find(_MARKER_END)
-    if end == -1:
-        return None
-    return body[:end]
+    return extract_region(doc_text, _MARKER_START, _MARKER_END)
 
 
 def parse_table_slugs(doc_text: str) -> list[str]:
@@ -175,10 +170,16 @@ def _code_without_comments(source: str) -> str:
     return " ".join(tokens)
 
 
-def slug_exists_in_code(code_root: Path, slug: str) -> bool:
-    """slug 在 code_root 下任一 .py 文件的非注释代码中出现即视为存在。"""
+def collect_code_texts(code_root: Path) -> list[tuple[Path, str]]:
+    """一次性读取 code_root 下全部 `.py` 并剔除注释，返回 ``[(路径, 代码文本), …]``。
+
+    **性能关键**：`_code_without_comments()` 要跑一遍 tokenize，成本远高于字符串包含判断。
+    若按 slug 逐个重读，规模会放大成 116 slug × ~88 文件 ≈ 10,176 次全文件 tokenize
+    （约占本脚本 95% 耗时）；故每次检查只收集一次，所有 slug 复用同一份结果。
+    """
+    collected: list[tuple[Path, str]] = []
     if not code_root.exists():
-        return False
+        return collected
     for fpath in sorted(code_root.rglob("*.py")):
         if any(part in _SKIP_REL_PARTS for part in fpath.parts):
             continue
@@ -186,9 +187,24 @@ def slug_exists_in_code(code_root: Path, slug: str) -> bool:
             text = fpath.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if slug in _code_without_comments(text):
-            return True
-    return False
+        collected.append((fpath, _code_without_comments(text)))
+    return collected
+
+
+def slug_exists_in_code(
+    code_root: Path,
+    slug: str,
+    code_texts: list[tuple[Path, str]] | None = None,
+) -> bool:
+    """slug 在 code_root 下任一 `.py` 的非注释代码中出现即视为存在。
+
+    Args:
+        code_root: 代码根目录（`code_texts` 缺省时按它现算）
+        slug: 语义 slug
+        code_texts: 预先收集的 ``[(路径, 代码文本), …]``（批量检查时传入以复用 tokenize 结果）
+    """
+    texts = code_texts if code_texts is not None else collect_code_texts(code_root)
+    return any(slug in text for _fpath, text in texts)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -206,31 +222,33 @@ def run_checks(
     findings: list[str] = []
 
     if extract_marker_region(doc_text) is None:
-        findings.append(f"{_TECHNICAL_MD.relative_to(REPO_ROOT)}: 「功能语义命名表」缺少 semantic-index:start/end 标记")
+        findings.append(f"{rel(_TECHNICAL_MD)}: 「功能语义命名表」缺少 semantic-index:start/end 标记")
         return findings
 
     table_slugs = parse_table_slugs(doc_text)
     merged_keys = parse_merged_sheet_keys(doc_text)
     switch_keys = feature_switch_keys(features_source)
     registry_keys = registry_section_keys(registry_source)
+    # 代码文本只收集一次（tokenize 是热点），所有 slug 复用同一份结果
+    code_texts = collect_code_texts(code_root)
 
     # 正向：功能开关注册表键必须在表中登记
     for key in switch_keys:
         if key not in table_slugs:
-            findings.append(f"{_FEATURES_PY.relative_to(REPO_ROOT)}: 功能开关 {key} 未在「功能语义命名表」登记")
+            findings.append(f"{rel(_FEATURES_PY)}: 功能开关 {key} 未在「功能语义命名表」登记")
 
     # 反向：表中 slug 必须在代码中存在（防僵尸条目）
     for slug in table_slugs:
-        if not slug_exists_in_code(code_root, slug):
+        if not slug_exists_in_code(code_root, slug, code_texts):
             findings.append(
-                f"{_TECHNICAL_MD.relative_to(REPO_ROOT)}: 语义 slug `{slug}` 在 src/python/ 无代码引用（「功能语义命名表」僵尸条目）"
+                f"{rel(_TECHNICAL_MD)}: 语义 slug `{slug}` 在 src/python/ 无代码引用（「功能语义命名表」僵尸条目）"
             )
 
     # 合并章：sheet key 必须在 registry 中存在
     for key in merged_keys:
         if key not in registry_keys:
             findings.append(
-                f"{_TECHNICAL_MD.relative_to(REPO_ROOT)}: 「功能语义命名表」合并章: sheet key `{key}` 不在 registry._REPORT_SECTION_DEFAULT"
+                f"{rel(_TECHNICAL_MD)}: 「功能语义命名表」合并章: sheet key `{key}` 不在 registry._REPORT_SECTION_DEFAULT"
             )
 
     return findings
@@ -240,8 +258,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="校验「功能语义命名表」与代码的正反向一致性（正面校验，与 check-code-traces 负面禁止互补）",
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="详细输出（打印每项解析结果）")
-    parser.add_argument("--ci", action="store_true", help="CI 模式：仅输出 文件名:描述，退出码 2")
+    add_common_args(parser)
     args = parser.parse_args()
 
     doc_text = _TECHNICAL_MD.read_text(encoding="utf-8")
@@ -260,17 +277,14 @@ def main() -> None:
         print(f"  合并章 sheet key（{len(merged_keys)}）：{', '.join(merged_keys)}")
         print(f"  registry 章节 key（{len(registry_keys)}）：{', '.join(registry_keys)}")
 
-    if not findings:
-        print("[OK] 语义命名索引正反向校验通过（表内 slug 均存在、功能开关均登记、合并章 key 均在 registry）")
-        sys.exit(0)
-
-    for f in findings:
-        if args.ci:
-            print(f)
-        else:
-            print(f"[ERR] {f}")
-    print(f"[!] 发现 {len(findings)} 处语义命名索引不一致，须修正后提交")
-    sys.exit(2)
+    sys.exit(
+        report(
+            findings,
+            "[OK] 语义命名索引正反向校验通过（表内 slug 均存在、功能开关均登记、合并章 key 均在 registry）",
+            ci=args.ci,
+            fail_message="[!] 发现 {n} 处语义命名索引不一致，须修正后提交",
+        )
+    )
 
 
 if __name__ == "__main__":

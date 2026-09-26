@@ -22,7 +22,7 @@ from src.python.fetcher.index import fetch_us_indices
 from src.python.fetcher.fund import fetch_fund_benchmark
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.usefixtures("offline_external_sources")]
 
 
 class TestProviderChain(unittest.TestCase):

@@ -52,7 +52,10 @@ def extract_stable_penetration(penetrated_assets: list[dict] | None, full: bool 
             if full:
                 entry["mv"] = a.get("mv", 0)
                 entry["sector"] = a.get("sector", "")
-                entry["ratio"] = a.get("ratio", 0)
+                # 数据契约字段为 ratio_pct（report/penetration.py top10 产出），严格读取；
+                # 缺失即 0（契约漂移由提示词构建侧告警，避免两处各自兼容）
+                ratio_val = a.get("ratio_pct")
+                entry["ratio"] = float(ratio_val) if isinstance(ratio_val, (int, float)) else 0.0
             result.append(entry)
     return result
 

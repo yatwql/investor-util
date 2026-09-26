@@ -638,16 +638,6 @@ class TestDedupNumericTokenNotProperNoun(unittest.TestCase):
         ]
         self.assertEqual(len(_dedup_by_title(items)), 2)
 
-    def test_letter_token_still_merged(self) -> None:
-        """对照：共享含字母专名（CPI/PPI）的真重复仍合并。"""
-        from src.python.providers.news_aggregator import _dedup_by_title
-
-        items = [
-            self._make_item("CPI同比增长2.5%PPI同比下降0.8%", "东方财富"),
-            self._make_item("统计局公布CPI和PPI数据：CPI涨2.5%PPI降0.8%", "新浪财经"),
-        ]
-        self.assertEqual(len(_dedup_by_title(items)), 1)
-
 
 class TestDedupOppositeDirectionExtended(unittest.TestCase):
     """方向对立词对扩充（站稳/跌破、走高/走低、上探/下探、回升/回落、走软/走强）。

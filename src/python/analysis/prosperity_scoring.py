@@ -12,6 +12,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.python.analysis.prosperity_signals import (
+    _benchmark_returns,
+    _pct,
+    _snapshot_holding_codes,  # noqa: F401  # re-export：迁移名保持 import 面不变
+    _top10_concentration_pct,
+    _turnover_proxy_pct,
+)
 from src.python.core.num_utils import finite_or
 
 logger = logging.getLogger("invest")
@@ -140,10 +147,6 @@ def _matches(text: str, keywords: list[str]) -> bool:
     """关键词命中（大小写不敏感的子串匹配）。"""
     lowered = str(text or "").lower()
     return any(str(k).lower() in lowered for k in keywords)
-
-
-def _pct(part: float, whole: float) -> float:
-    return round(part / whole * 100, 2) if whole > 0 else 0.0
 
 
 def _rating(score_pct: int) -> tuple[str, str]:
@@ -331,11 +334,50 @@ def _score_boom(
     }
 
 
+def roe_by_code_from_rows(rows: list[dict[str, Any]] | None) -> dict[str, float]:
+    """从财务指标契约行提取 {代码: ROE}（ROE 解析的唯一事实来源）。
+
+    `_score_roe` / 推演集合判定 / 编排层补取免重取的 `known_roe` 三处共用本函数，
+    避免同一解析规则多处各写一份而漂移（含非数值 ROE 的过滤）。
+    """
+    result: dict[str, float] = {}
+    for row in rows or []:
+        code = str(row.get("code") or "")
+        roe = row.get("roe")
+        if code and isinstance(roe, (int, float)):
+            result[code] = float(roe)
+    return result
+
+
+def estimated_fund_codes(
+    fund_roe_estimates: dict[str, dict[str, Any]] | None,
+    direct_roe_codes: set[str] | None = None,
+) -> set[str]:
+    """推演值实际生效的基金代码集合（推演集合判定的唯一事实来源）。
+
+    规则：有可用推演 roe 且**无直接 ROE**（直接口径优先）。
+    评分侧（按缺直接 ROE 的持仓取用推演值）与契约说明/持仓视角标注侧共用本函数，
+    避免两边各自判定“哪些是推演值”而漂移。
+    """
+    direct = direct_roe_codes or set()
+    return {
+        code
+        for code, est in (fund_roe_estimates or {}).items()
+        if isinstance((est or {}).get("roe"), (int, float)) and code not in direct
+    }
+
+
 def _score_roe(
     holdings_details: list[dict[str, Any]],
     financial_indicator_data: dict[str, Any] | None,
+    fund_roe_estimates: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, float]]:
-    """返回 (维度结果, {code: roe})。契约缺失 → unverified（不给分）。"""
+    """返回 (维度结果, {code: roe})。契约缺失 → unverified（不给分）。
+
+    fund_roe_estimates：基金重仓股 ROE 加权推演值（`estimate_fund_roe_batch` 产出），
+    仅对无直接 ROE 的基金持仓生效；推演值计入评分但在证据中标注「按框架推演」，
+    并合并进返回的 roe_by_code 供持仓视角展示（渲染侧据 estimated 集合标注）。
+    """
     rows = ((financial_indicator_data or {}).get("rows") or []) if financial_indicator_data else []
     if not rows:
         return (
@@ -351,27 +393,35 @@ def _score_roe(
             {},
         )
 
-    roe_by_code: dict[str, float] = {}
+    roe_by_code = roe_by_code_from_rows(rows)
+    estimable = estimated_fund_codes(fund_roe_estimates, set(roe_by_code))
     improving: set[str] = set()
     for row in rows:
         code = str(row.get("code") or "")
-        roe = row.get("roe")
-        if code and isinstance(roe, (int, float)):
-            roe_by_code[code] = float(roe)
         if code and str(row.get("trend") or "").startswith("改善"):
             improving.add(code)
 
     total = sum(finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details)
+    estimates = fund_roe_estimates or {}
+    estimated: list[tuple[str, str, float]] = []  # (name, code, covered_pct)
     low_roe_weight = 0.0
     high_roe_weight = 0.0
     missing: list[str] = []
     for d in holdings_details:
         code = getattr(d, "code", "")
+        name = getattr(d, "name", code)
         weight = _pct(finite_or(getattr(d, "market_value", 0.0)), total)
         roe = roe_by_code.get(code)
+        if roe is None and code in estimable:
+            # 基金重仓股加权推演值：计入评分，证据标注推演属性
+            est = estimates.get(code) or {}
+            roe = float(est["roe"])
+            roe_by_code[code] = roe
+            estimated.append((name, code, float(est.get("covered_pct") or 0.0)))
         if roe is None:
-            missing.append(f"{getattr(d, 'name', code)}（{code}）")
-        elif roe < _LOW_ROE_THRESHOLD:
+            missing.append(f"{name}（{code}）")
+            continue
+        if roe < _LOW_ROE_THRESHOLD:
             low_roe_weight += weight
             if code in improving:
                 low_roe_weight += 0.0  # 改善趋势已在证据中标注，计分见下
@@ -392,6 +442,17 @@ def _score_roe(
     ]
     if high_roe_weight:
         evidence.append(f"已处高位 ROE 的持仓权重 {high_roe_weight:.2f}%（框架偏好低位修复，故不加分）")
+    if estimated:
+        est_weight = sum(
+            _pct(finite_or(getattr(d, "market_value", 0.0)), total)
+            for d in holdings_details
+            if getattr(d, "code", "") in {c for _, c, _ in estimated}
+        )
+        basis = estimates.get(estimated[0][1], {}).get("basis", "")
+        basis_label = "前十大重仓" if basis == "top10_holdings" else basis
+        evidence.append(
+            f"基金 ROE 按重仓股加权推演：{len(estimated)} 只基金（组合权重 {est_weight:.2f}%，{basis_label}口径）——按框架推演，非基金披露口径"
+        )
     unverified = []
     if missing:
         unverified.append(
@@ -446,6 +507,18 @@ def _score_global_edge(
     }
 
 
+def _is_scored_otc(signal: dict[str, Any]) -> bool:
+    """场外信号是否计入④维计分池：有天数，且来源为配置上限（用户口径）或类型默认档（推演）。"""
+    if signal.get("liquidation_days") is None:
+        return False
+    return bool(signal.get("daily_redemption_limit")) or signal.get("estimate_basis") == "type_default"
+
+
+def _is_otc_default_tier(signal: dict[str, Any]) -> bool:
+    """是否为类型默认档（非实测口径）的场外信号。"""
+    return signal.get("estimate_basis") == "type_default" and signal.get("liquidation_days") is not None
+
+
 def _score_liquidity(liquidity_signals: list[dict[str, Any]] | None) -> dict[str, Any]:
     if not liquidity_signals:
         return {
@@ -459,9 +532,15 @@ def _score_liquidity(liquidity_signals: list[dict[str, Any]] | None) -> dict[str
         }
 
     measurable = [s for s in liquidity_signals if s.get("type") == "stock" and s.get("liquidation_days") is not None]
-    otc = [s for s in liquidity_signals if s.get("type") == "otc"]
+    otc_all = [s for s in liquidity_signals if s.get("type") == "otc"]
+    # 场外计入两档：配置赎回上限（用户实测口径）与类型默认档（推演口径，标非实测）
+    otc_scored = [s for s in otc_all if _is_scored_otc(s)]
+    otc_default_tier = [s for s in otc_all if _is_otc_default_tier(s)]
+    otc_configured = [s for s in otc_scored if s not in otc_default_tier]
+    otc_unscored = [s for s in otc_all if not _is_scored_otc(s)]
     assumed = [s for s in liquidity_signals if s.get("type") == "assumed_liquid"]
-    if not measurable:
+    scored_pool = measurable + otc_scored
+    if not scored_pool:
         return {
             "key": "liquidity",
             "name": "流动性",
@@ -470,103 +549,39 @@ def _score_liquidity(liquidity_signals: list[dict[str, Any]] | None) -> dict[str
             "status": "unverified",
             "evidence": [],
             "unverified": [
-                f"无可计算的场内变现天数（场外 {len(otc)} 只 / 数据缺失按充足处理 {len(assumed)} 只）→ 该维不计分"
+                f"无可计算的变现/赎回天数（场外 {len(otc_all)} 只 / 数据缺失按充足处理 {len(assumed)} 只）→ 该维不计分"
             ],
         }
 
-    worst_days = max(finite_or(s.get("liquidation_days")) for s in measurable)
+    worst_days = max(finite_or(s.get("liquidation_days")) for s in scored_pool)
     score = _LIQUIDITY_FLOOR
     for limit, tier_score in _LIQUIDITY_TIERS:
         if worst_days < limit:
             score = tier_score
             break
     unverified = []
-    if otc:
-        unverified.append(f"场外品种 {len(otc)} 只（无赎回上限，场内变现天数口径不适用）")
+    if otc_unscored:
+        unverified.append(f"场外品种 {len(otc_unscored)} 只（无赎回上限且类型未识别，未计入）")
     if assumed:
         unverified.append(f"成交额数据缺失、按「流动性充足」假设计算的品种 {len(assumed)} 只")
+    evidence = [
+        f"最差品种全额变现/赎回天数 {worst_days:.1f} 日（<1 日 → 10 分，<3 日 → 7 分，<5 日 → 4 分，否则 2 分）",
+        f"可计算场内品种 {len(measurable)} 只",
+    ]
+    if otc_configured or otc_default_tier:
+        evidence.append(
+            f"场外品种计入 {len(otc_scored)} 只"
+            f"（配置赎回上限 {len(otc_configured)} 只 / 类型默认档 {len(otc_default_tier)} 只——类型默认档为非实测口径）"
+        )
     return {
         "key": "liquidity",
         "name": "流动性",
         "score": score,
         "max_score": _W_LIQUIDITY,
-        "status": "partial" if (otc or assumed) else "scored",
-        "evidence": [
-            f"最差场内品种全额变现天数 {worst_days:.1f} 日（<1 日 → 10 分，<3 日 → 7 分，<5 日 → 4 分，否则 2 分）",
-            f"可计算场内品种 {len(measurable)} 只",
-        ],
+        "status": "partial" if (otc_unscored or assumed or otc_default_tier) else "scored",
+        "evidence": evidence,
         "unverified": unverified,
     }
-
-
-def _top10_concentration_pct(holdings_details: list[dict[str, Any]]) -> float | None:
-    total = sum(finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details)
-    if total <= 0:
-        return None
-    values = sorted((finite_or(getattr(d, "market_value", 0.0)) for d in holdings_details), reverse=True)
-    return _pct(sum(values[:10]), total)
-
-
-def _snapshot_holding_codes(snap: Any) -> set[str]:
-    """从一期快照中提取持仓代码集合。
-
-    兼容两种形态（快照来源经 `history_snapshot.load_all()`，返回**冻结 dataclass**）：
-
-      - `SnapshotData` 对象：`snap.accounts[*].holdings[*].code`（生产形态）
-      - dict 形态：`{"accounts": [{"holdings": [{"code": ...}]}]}` 或
-        `{"holdings"/"details": [{"code": ...}]}`（测试/外部注入形态）
-
-    任何字段缺失/类型异常一律按「无该字段」处理（返回值可能为空集），
-    由调用方判定该期不可用 —— 本函数**不得抛异常**（诊断功能不拖垮主报告）。
-    """
-    codes: set[str] = set()
-
-    def _harvest(items: Any) -> None:
-        for item in items or []:
-            if isinstance(item, dict):
-                code = item.get("code")
-            else:
-                code = getattr(item, "code", None)
-            if code:
-                codes.add(str(code))
-
-    accounts = getattr(snap, "accounts", None)
-    if accounts is None and isinstance(snap, dict):
-        accounts = snap.get("accounts")
-    for account in accounts or []:
-        holdings = getattr(account, "holdings", None)
-        if holdings is None and isinstance(account, dict):
-            holdings = account.get("holdings")
-        _harvest(holdings)
-
-    if not codes and isinstance(snap, dict):
-        _harvest(snap.get("holdings") or snap.get("details"))
-    return codes
-
-
-def _turnover_proxy_pct(snapshots: list[Any] | None) -> float | None:
-    """换手代理（周期拼接）：最近两期快照持仓集合的变动率（1 - Jaccard）。
-
-    Args:
-        snapshots: 按时间升序的快照序列（`SnapshotData` 对象或 dict 形态）。
-
-    Returns:
-        变动率百分比；不足两期 / 任一期无持仓 / 形态不可解析时返回 None
-        （该子项标记未验证，不计分）。
-    """
-    if not snapshots or len(snapshots) < 2:
-        return None
-    try:
-        prev, cur = _snapshot_holding_codes(snapshots[-2]), _snapshot_holding_codes(snapshots[-1])
-    except Exception:  # 形态异常 → 该子项未验证（不得冒泡）
-        logger.warning("[prosperity_framework] 快照形态不可解析，换手代理标记未验证", exc_info=True)
-        return None
-    if not prev or not cur:
-        return None
-    union = prev | cur
-    if not union:
-        return None
-    return round((1 - len(prev & cur) / len(union)) * 100, 2)
 
 
 def _score_concentration(
@@ -634,41 +649,6 @@ def _score_concentration(
         concentration,
         turnover,
     )
-
-
-def _benchmark_returns(benchmarks: Any) -> list[tuple[str, float]]:
-    """提取对比基准的区间收益率，返回 [(名称, 收益率%), ...]。
-
-    兼容两种形态（**生产为 list**，见 `PortfolioHistoryCalculator.get_combined_timeseries`
-    的 `benchmarks` 契约：`[{code, name, bars, total_return_pct, ...}, ...]`）：
-
-      - list/tuple[dict]：生产形态
-      - dict[str, dict]：测试/外部注入形态
-
-    非 dict 元素、缺 `total_return_pct`、非有限数值一律跳过（**不得抛异常**）。
-    """
-    if isinstance(benchmarks, dict):
-        items: list[Any] = list(benchmarks.values())
-    elif isinstance(benchmarks, (list, tuple)):
-        items = list(benchmarks)
-    else:
-        return []
-
-    out: list[tuple[str, float]] = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        raw = item.get("total_return_pct")
-        # bool 是 int 子类但语义上不是收益率；仅接受 int/float（字符串一律跳过，
-        # 且不可用 finite_or(None) —— 其内部 float(None) 会抛 TypeError）
-        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
-            continue
-        value = finite_or(raw, None)
-        if value is None:
-            continue
-        name = str(item.get("name") or item.get("code") or "基准")
-        out.append((name, float(value)))
-    return out
 
 
 def _score_performance(history_data: dict[str, Any] | None) -> dict[str, Any]:

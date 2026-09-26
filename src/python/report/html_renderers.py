@@ -22,7 +22,7 @@ from src.python.report.holdings_freshness import (
     fund_period_label,
 )
 from src.python.report.html_builders import _build_category_data, _build_perf_data
-from src.python.report.llm_module_info import build_llm_module_info
+from src.python.report.llm_module_info import build_llm_endpoint_display, build_llm_module_info
 from src.python.report.market_value import (
     DetailRow,
     _generate_details,
@@ -552,5 +552,5 @@ def _render_llm_module_info(
 
     llm_module_info = build_llm_module_info(_llm_failure, _per_module)
 
-    _llm_endpoint = next((mi["endpoint"] for mi in llm_module_info if mi.get("endpoint")), "")
+    _llm_endpoint = build_llm_endpoint_display(llm_module_info)
     return llm_module_info, _llm_endpoint, module_disabled, _llm_session_usage

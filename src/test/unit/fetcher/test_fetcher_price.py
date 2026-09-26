@@ -17,7 +17,7 @@ import unittest
 from unittest.mock import patch
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.usefixtures("offline_external_sources")]
 
 
 class TestNameMatches(unittest.TestCase):
@@ -86,7 +86,7 @@ class TestPriceTransformTencent(unittest.TestCase):
 
         return _price_transform_tencent(raw, source)
 
-    def test_normal(self):
+    def test_transforms_tencent_quote_to_standard(self):
         """正常数据 → 统一格式。"""
         raw = {
             "name": "长江电力",
@@ -116,7 +116,7 @@ class TestPriceTransformEastmoney(unittest.TestCase):
 
         return _price_transform_eastmoney(raw, source)
 
-    def test_normal(self):
+    def test_transforms_eastmoney_nav_to_standard(self):
         """正常数据 → 统一格式。"""
         raw = {
             "name": "测试基金",
@@ -148,7 +148,7 @@ class TestFetchMarketData(unittest.TestCase):
     """fetch_market_data 测试（mock chain）。"""
 
     @patch("src.python.fetcher.price.fetch_with_fallback")
-    def test_success(self, mock_fallback):
+    def test_returns_standard_quote_record(self, mock_fallback):
         """正常返回。"""
         mock_fallback.return_value = {
             "name": "长江电力",
@@ -314,6 +314,99 @@ class TestFetchMarketData(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result["source_api"], "tencent")
         self.assertEqual(mock_fallback.call_count, 1)
+
+
+class TestOtcNavBackupSource(unittest.TestCase):
+    """场外基金净值备源回归（原缺陷：`price_fund_otc` 单源无备）。
+
+    回归背景：链路曾只有 `["eastmoney"]`，东财基金 API 故障即整域无净值；
+    现为 `["eastmoney", "sina_fund"]`，主源不可用时由新浪基金接口交付。
+    本类不走 mock 的 fetch_with_fallback，而是走**真实链路**（仅把两个 provider
+    函数打桩），确保链路定义/适配器槽位/转换真实生效。
+    """
+
+    def _run(self, code: str, name: str = "建信高端装备股票A"):
+        from src.python.cache import clear as cache_clear
+        from src.python.fetcher import price as price_module
+
+        cache_clear(price_module._price_cache_key(code))
+        return price_module.fetch_market_data(code, name)
+
+    def test_chain_declares_two_slots(self):
+        from src.python.fetcher.chain import _get_chain
+
+        assert _get_chain("price_fund_otc") == ["eastmoney", "sina_fund"]
+
+    def test_primary_ok_keeps_eastmoney_source(self):
+        """主源可用时不消耗备源，source_api 保持 eastmoney。"""
+        from src.python.providers import eastmoney, sina
+
+        primary = {
+            "name": "建信高端装备股票A",
+            "code": "011506",
+            "nav": 1.8384,
+            "acc_nav": 1.8384,
+            "nav_date": "2026-09-24",
+            "yesterday_nav": 1.8828,
+            "source": "东方财富",
+        }
+        with (
+            patch.object(eastmoney, "fetch_nav", return_value=primary),
+            patch.object(sina, "fetch_fund_nav", side_effect=AssertionError("主源可用时不应调用备源")),
+        ):
+            result = self._run("011506")
+        assert result is not None
+        assert result["source_api"] == "eastmoney"
+        assert result["price"] == 1.8384
+
+    def test_primary_failure_falls_back_to_sina(self):
+        """主源失败 → 备源接管，数值与日期同口径。"""
+        from src.python.providers import eastmoney, sina
+
+        backup = {
+            "name": "建信高端装备股票A",
+            "code": "011506",
+            "nav": 1.8384,
+            "acc_nav": 1.8384,
+            "nav_date": "2026-09-24",
+            "yesterday_nav": 1.8828,
+            "source": "新浪财经（场外净值）",
+        }
+        with (
+            patch.object(eastmoney, "fetch_nav", return_value=None),
+            patch.object(eastmoney, "_fallback_fundf10", return_value=None),
+            patch.object(sina, "fetch_fund_nav", return_value=backup),
+        ):
+            result = self._run("011506")
+        assert result is not None
+        assert result["source_api"] == "sina_fund"
+        assert result["source"] == "新浪财经（场外净值）"
+        assert result["price"] == 1.8384
+        assert result["yesterday_close"] == 1.8828
+        assert result["price_date"] == "2026-09-24"
+
+    def test_both_sources_fail_returns_none(self):
+        """主备均失败 → None（不伪造数据）。"""
+        from src.python.providers import eastmoney, sina
+
+        with (
+            patch.object(eastmoney, "fetch_nav", return_value=None),
+            patch.object(eastmoney, "_fallback_fundf10", return_value=None),
+            patch.object(sina, "fetch_fund_nav", return_value=None),
+        ):
+            assert self._run("011506") is None
+
+    def test_backup_invalid_nav_treated_as_no_data(self):
+        """备源净值 <= 0 视为无数据（不应写回零价格缓存）。"""
+        from src.python.providers import eastmoney, sina
+
+        bad = {"name": "建信高端装备股票A", "code": "011506", "nav": 0.0, "nav_date": "2026-09-24"}
+        with (
+            patch.object(eastmoney, "fetch_nav", return_value=None),
+            patch.object(eastmoney, "_fallback_fundf10", return_value=None),
+            patch.object(sina, "fetch_fund_nav", return_value=bad),
+        ):
+            assert self._run("011506") is None
 
 
 class TestPriceCacheFresh(unittest.TestCase):

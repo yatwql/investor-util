@@ -24,7 +24,7 @@ from src.python.report import holdings_detail_sheet as hds
 from src.python.report.market_value import DetailRow
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.usefixtures("offline_external_sources")]
 
 
 # ═══════════════════════════════════════════════════════════
@@ -239,10 +239,11 @@ class TestApplyProfitColors(unittest.TestCase):
             mock_pf.assert_not_called()
 
     def test_empty_range_no_crash(self):
-        """空范围（start > end）→ 不报错。"""
+        """空范围（start > end）→ 不报错，且不访问任何单元格。"""
         with patch("src.python.report.holdings_detail_sheet.profit_font"):
             ws = MagicMock()
             hds._apply_profit_colors(ws, 100, 50, profit_col=12, rate_col=13, today_col=14)
+            ws.cell.assert_not_called()
 
 
 # ═══════════════════════════════════════════════════════════
@@ -299,8 +300,10 @@ class TestApplyPriceTypeColors(unittest.TestCase):
             self.fail("\n".join(errors))
 
     def test_empty_range_no_error(self):
-        """空范围（start > end）→ 不报错。"""
-        hds._apply_price_type_colors(self.ws, 100, 50)
+        """空范围（start > end）→ 不报错，且不访问任何单元格。"""
+        ws = MagicMock()
+        hds._apply_price_type_colors(ws, 100, 50)
+        ws.cell.assert_not_called()
 
     def test_single_row(self):
         """单行范围。"""

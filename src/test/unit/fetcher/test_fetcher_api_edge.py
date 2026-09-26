@@ -16,7 +16,12 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.edge]
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.unit_fetcher,
+    pytest.mark.edge,
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 
 # ═══════════════════════════════════════════════════════════════

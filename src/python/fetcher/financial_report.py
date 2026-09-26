@@ -19,8 +19,9 @@ from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.core.code_utils import is_otc_fund_by_name, to_fmp_symbol
+from src.python.fetcher.report_locate import locate_keyword_excerpt
 from src.python.fetcher.source_adapter import adapter_chain_slots
-from src.python.providers import datasink
+from src.python.providers import cninfo, datasink
 from src.python.schemas.datasource_fields import DOMAIN_FINANCIAL_REPORT
 
 logger = logging.getLogger("invest")
@@ -162,6 +163,10 @@ def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str,
     一次请求取回最近若干篇（不带 ``doc_type`` 过滤），本地按「报告期 → 披露时间」
     倒序，故半年报/季报（通常比年报新）自然排在年报之前；``doc_types`` 非空时仅作为
     文种白名单过滤。
+
+    主备接管：主源（DataSinking）索引为空/失败时，切巨潮备源按**同一
+    元数据形状**重建索引（条目带 ``source`` 字段标识来源，下游候选回溯零改动）——
+    主源可用时本函数行为与输出逐字不变。
     """
     cache_key = f"{INDEX_PREFIX}{symbol}"
     cached = cache_get(cache_key, get_ttl("report", cache_key))
@@ -170,6 +175,12 @@ def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str,
         return cached if isinstance(cached, list) else None
 
     items = datasink.fetch_report_documents(symbol, order="desc", size=_INDEX_SCAN_SIZE)
+    if not items:
+        # 主源无该标的 → 巨潮备源接管（仅在此分支，主源可用时零影响）
+        code = symbol.split(".", 1)[0]
+        cn_items = cninfo.fetch_report_listings(code)
+        if cn_items:
+            items = cn_items
     if not items:
         return None
     wanted = {str(t).strip().lower() for t in (doc_types or ()) if str(t).strip()}
@@ -218,18 +229,34 @@ def _pick_sections(available: list[str] | None, preferences: tuple[str, ...]) ->
     return picked
 
 
-def _fetch_document(doc_id: int | str, section: str) -> dict[str, Any] | None:
-    """取单篇正文（经链路缓存/熔断/降级 + 财报域适配器归一）。"""
+def _fetch_document(
+    doc_id: int | str,
+    section: str,
+    source: str | None = None,
+    meta: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """取单篇正文（经链路缓存/熔断/降级 + 财报域适配器归一）。
+
+    Args:
+        doc_id: 文档号（主源文档 ID 或巨潮公告 ID，由 ``source`` 区分命名空间）。
+        section: 章节偏好串（空 = 全文）。
+        source: 候选来源（``datasink`` / ``cninfo``）；None 按主源处理。
+            异源 doc_id 进独立缓存键段（两源文档号均为数字串，防跨源碰撞），
+            并以 ``source_hint`` 注入查询，令异源适配器立即拒服务（不发起无效请求）。
+        meta: 候选元数据（巨潮适配器取标题/报告期/下载路径等，随查询透传）。
+    """
     from src.python.fetcher.chain import fetch_with_fallback
 
     provider_map, transform_map = adapter_chain_slots(DOMAIN_FINANCIAL_REPORT)
-    cache_key = f"{DOC_PREFIX}{doc_id}_{section or 'full'}"
+    src = source or datasink.SOURCE_ID
+    ns = f"{cninfo.SOURCE_ID}_" if src == cninfo.SOURCE_ID else ""
+    cache_key = f"{DOC_PREFIX}{ns}{doc_id}_{section or 'full'}"
     record = fetch_with_fallback(
         "financial_report",
         provider_map,
         cache_key,
         get_ttl("report_doc", cache_key),
-        fn_kwargs={"doc_id": doc_id, "section": section or None},
+        fn_kwargs={"doc_id": doc_id, "section": section or None, "source_hint": src, "meta": meta or {}},
         transform=transform_map,
     )
     if record:
@@ -237,7 +264,12 @@ def _fetch_document(doc_id: int | str, section: str) -> dict[str, Any] | None:
     return record
 
 
-def _collect_doc_sections(doc_id: int | str, preferences: list[str]) -> tuple[dict[str, Any] | None, list[str]]:
+def _collect_doc_sections(
+    doc_id: int | str,
+    preferences: list[str],
+    source: str | None = None,
+    meta: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
     """取单篇文档的目标章节正文（多节按偏好顺序拼接）。
 
     先取该文档的实际章节名清单（1 次请求，带缓存），按偏好做**精确章节名**匹配；
@@ -254,7 +286,7 @@ def _collect_doc_sections(doc_id: int | str, preferences: list[str]) -> tuple[di
     record: dict[str, Any] | None = None
     contents: list[str] = []
     for section in resolved:
-        got = _fetch_document(doc_id, section)
+        got = _fetch_document(doc_id, section, source=source, meta=meta)
         if not got:
             continue
         if record is None:
@@ -310,22 +342,17 @@ def _order_report_candidates(items: list[dict[str, Any]], limit: int) -> list[di
     return (preferred + others)[: max(1, int(limit))]
 
 
-#: 判定「目录行」的探测窗口与点线特征：目录条目形如「董事会报告 ......」，
-#: 关键词首个命中常落在目录里，取到目录行等于摘要无内容
-_TOC_PROBE_CHARS = 90
+# 目录行判定与关键词定位已收敛至 ``fetcher/report_locate.py``（与巨潮备源的章节切片
+# 共用同一规则）；本模块仅保留调用，不再自留一份实现。
 
 
-def _is_toc_line(content: str, pos: int) -> bool:
-    """该位置是否是目录行（**同一行内**出现点线引导/省略号）。
-
-    只看关键词到行尾这一行：正文段落里出现省略号（「利润及股息分配……」）不应被误判为目录。
-    """
-    line_end = content.find("\n", pos)
-    line = content[pos : line_end if line_end >= 0 else pos + _TOC_PROBE_CHARS][:_TOC_PROBE_CHARS]
-    return ("...." in line) or ("…" in line) or (".." in line)
-
-
-def _locate_from_fulltext(doc_id: int | str, preferences: list[str], max_chars: int) -> tuple[str, str]:
+def _locate_from_fulltext(
+    doc_id: int | str,
+    preferences: list[str],
+    max_chars: int,
+    source: str | None = None,
+    meta: dict[str, Any] | None = None,
+) -> tuple[str, str]:
     """整篇正文中按偏好关键词**定位片段**（章节接口与偏好名直取都失败时的兜底）。
 
     部分标的（如银行股）在源侧章节未被解析出来（``/sections`` 残缺 + 裸章节名 404），
@@ -338,17 +365,56 @@ def _locate_from_fulltext(doc_id: int | str, preferences: list[str], max_chars: 
         ``(片段, 命中的偏好关键词)``；未取到全文时 ``("", "")``；
         全文里没有任一偏好关键词时退化为正文开头片段（关键词为空串）。
     """
-    doc = _fetch_document(doc_id, "")
+    doc = _fetch_document(doc_id, "", source=source, meta=meta)
     content = str((doc or {}).get("content") or "")
     if not content.strip():
         return "", ""
-    for pref in preferences:
-        pos = content.find(pref)
-        while pos >= 0 and _is_toc_line(content, pos):
-            pos = content.find(pref, pos + 1)  # 跳过目录行，找正文里那一次
-        if pos >= 0:
-            return content[pos : pos + max_chars], pref
+    excerpt, matched = locate_keyword_excerpt(content, preferences, max_chars)
+    if excerpt:
+        return excerpt, matched
+    # 全文里没有任一偏好关键词时退化为正文开头片段（关键词为空串）
     return content[:max_chars], ""
+
+
+def _attempt_candidates(
+    candidates: list[dict[str, Any]],
+    symbol: str,
+    preferences: list[str],
+    max_chars: int,
+    tried: list[str],
+) -> dict[str, Any] | None:
+    """按候选列表走「章节阶 → 全文阶」两阶取数；命中即返回记录，全失败返回 None。
+
+    Args:
+        tried: 已试报告期累加器（供调用方拼写失败原因文案）
+    """
+    for meta in candidates:
+        doc_id = meta.get("id")
+        source = str(meta.get("source") or datasink.SOURCE_ID)
+        tried.append(str(meta.get("report_period") or meta.get("title") or doc_id))
+        record, contents = _collect_doc_sections(doc_id, preferences, source=source, meta=meta)
+        if record is None or not contents:
+            continue
+        return _assemble_record(record, meta, symbol, "\n\n".join(contents), max_chars)
+
+    # ② 全文阶：源侧章节未解析出来时，整篇下载后按关键词定位片段
+    for meta in candidates[:_FULLTEXT_FALLBACK_LIMIT]:
+        doc_id = meta.get("id")
+        source = str(meta.get("source") or datasink.SOURCE_ID)
+        excerpt, matched = _locate_from_fulltext(doc_id, preferences, max_chars, source=source, meta=meta)
+        if not excerpt.strip():
+            continue
+        logger.info("[financial_report] %s 走全文兜底（doc=%s，命中关键词=%s）", symbol, doc_id, matched or "无")
+        full_record = _fetch_document(doc_id, "") or meta
+        return _assemble_record(full_record, meta, symbol, excerpt, max_chars, section_source=SECTION_SOURCE_FULLTEXT)
+    return None
+
+
+def _backup_candidates(symbol: str, max_candidates: int) -> list[dict[str, Any]]:
+    """巨潮备源候选（与主源同一排序规则）；索引不可得时返回空列表。"""
+    code = symbol.split(".", 1)[0]
+    items = cninfo.fetch_report_listings(code) or []
+    return _order_report_candidates(items, max_candidates)
 
 
 def fetch_symbol_report_detailed(
@@ -379,26 +445,20 @@ def fetch_symbol_report_detailed(
     preferences = [str(p).strip() for p in sections if str(p).strip()]
     candidates = _order_report_candidates(items, max_candidates)
     tried: list[str] = []
-    for meta in candidates:
-        doc_id = meta.get("id")
-        tried.append(str(meta.get("report_period") or meta.get("title") or doc_id))
-        record, contents = _collect_doc_sections(doc_id, preferences)
-        if record is None or not contents:
-            continue
-        return _assemble_record(record, meta, symbol, "\n\n".join(contents), max_chars), ""
+    record = _attempt_candidates(candidates, symbol, preferences, max_chars, tried)
+    if record is not None:
+        return record, ""
 
-    # ② 全文阶：源侧章节未解析出来时，整篇下载后按关键词定位片段
-    for meta in candidates[:_FULLTEXT_FALLBACK_LIMIT]:
-        doc_id = meta.get("id")
-        excerpt, matched = _locate_from_fulltext(doc_id, preferences, max_chars)
-        if not excerpt.strip():
-            continue
-        logger.info("[financial_report] %s 走全文兜底（doc=%s，命中关键词=%s）", symbol, doc_id, matched or "无")
-        full_record = _fetch_document(doc_id, "") or meta
-        return (
-            _assemble_record(full_record, meta, symbol, excerpt, max_chars, section_source=SECTION_SOURCE_FULLTEXT),
-            "",
-        )
+    # ③ 备源接管：主源**正文**不可得（断连/配额耗尽/章节残缺）而索引正常时，
+    #    用巨潮公告按同一符号 + 同一报告期偏好重走两阶。仅在前两阶全失败时触发
+    #    ——主源可用时零额外请求；索引本就来自巨潮（_fetch_index 备源分支）时，
+    #    此处候选与主流程重复但命中缓存，不产生新请求。
+    backup = _backup_candidates(symbol, max_candidates)
+    if backup:
+        logger.info("[financial_report] %s 主源正文不可得，切换巨潮备源（%d 篇候选）", symbol, len(backup))
+        record = _attempt_candidates(backup, symbol, preferences, max_chars, tried)
+        if record is not None:
+            return record, ""
 
     return None, REASON_SECTIONS_MISSING.format(periods="、".join(tried) or "无")
 

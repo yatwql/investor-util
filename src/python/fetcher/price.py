@@ -56,6 +56,7 @@ _PRICE_PROVIDERS: dict[str, tuple[str, _ProviderFunc]] = {
     "tencent": ("腾讯财经", tencent.fetch_price),
     "sina": ("新浪财经", sina_provider.fetch_price),
     "eastmoney": ("东方财富", eastmoney.fetch_nav),
+    "sina_fund": ("新浪财经（场外净值）", sina_provider.fetch_fund_nav),
 }
 
 
@@ -91,8 +92,13 @@ def _price_transform_sina(raw: dict, source: str) -> dict | None:
     }
 
 
-def _price_transform_eastmoney(raw: dict, source: str) -> dict | None:
-    """东方财富原始数据 → 统一价格格式。"""
+def _otc_nav_to_standard(raw: dict, source: str, source_api: str) -> dict | None:
+    """场外净值原始数据 → 统一价格格式（净值即价格；净值无效视为无数据）。
+
+    东财与新浪场外净值同口径（均为「净值即价格」），故共用本实现——两源仅在
+    ``source_api`` 上区分。新增净值源只需在 ``_PRICE_TRANSFORMS`` 里挂一个
+    绑定了 ``source_api`` 的薄包装，不得复制转换体。
+    """
     nav = raw.get("nav", 0.0)
     if nav <= 0:
         return None
@@ -102,15 +108,26 @@ def _price_transform_eastmoney(raw: dict, source: str) -> dict | None:
         "price": nav,
         "yesterday_close": raw.get("yesterday_nav", 0.0),
         "price_date": raw.get("nav_date", ""),
-        "source_api": "eastmoney",
+        "source_api": source_api,
         "source": source,
     }
+
+
+def _price_transform_eastmoney(raw: dict, source: str) -> dict | None:
+    """东方财富原始数据 → 统一价格格式。"""
+    return _otc_nav_to_standard(raw, source, "eastmoney")
+
+
+def _price_transform_sina_fund(raw: dict, source: str) -> dict | None:
+    """新浪场外净值原始数据 → 统一价格格式（与东财同口径）。"""
+    return _otc_nav_to_standard(raw, source, "sina_fund")
 
 
 _PRICE_TRANSFORMS: dict[str, Callable] = {
     "tencent": _price_transform_tencent,
     "sina": _price_transform_sina,
     "eastmoney": _price_transform_eastmoney,
+    "sina_fund": _price_transform_sina_fund,
 }
 
 
@@ -120,7 +137,7 @@ def _price_chain_slots() -> tuple[dict[str, tuple[str, _ProviderFunc]], dict[str
     开关「数据源适配契约」默认开启，改用适配器实现同一映射（三段式 + 声明式
     alias 归一）；在 features.json / 面板中置 false 则回退既有手写转换函数。
     两者由等价性回归测试逐源锁定，链路顺序/缓存键/熔断/降级均不受影响
-    （映射内容除「东财源补 market_cap/pe 两个 None 键」外逐键等价，见
+    （映射内容除「净值源补 market_cap/pe 两个 None 键」外逐键等价，见
     test_quote_adapter_parity.py）。
     """
     from src.python.config.features import is_feature_enabled

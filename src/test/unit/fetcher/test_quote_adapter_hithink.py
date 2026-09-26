@@ -56,8 +56,13 @@ class TestChainOrder:
 
         assert _HISTORY_PROVIDER_MAP["hithink"] == "src.python.providers.hithink"
 
-    def test_otc_chain_unchanged(self):
-        """场外基金链不受影响（同花顺在 price_stock/history_stock，不接管场外净值）。"""
+    def test_otc_chain_has_cross_vendor_backup(self):
+        """场外基金链：东财主源 + 新浪备源（跨厂商；同花顺不接管场外净值）。
+
+        回归背景：`price_fund_otc` 曾是单源 `["eastmoney"]`——东财基金 API
+        故障即整域无净值数据（用户报「高频连接失败」）。
+        """
         from src.python.fetcher.chain import _get_chain
 
-        assert _get_chain("price_fund_otc") == ["eastmoney"]
+        assert _get_chain("price_fund_otc") == ["eastmoney", "sina_fund"]
+        assert "hithink" not in _get_chain("price_fund_otc")

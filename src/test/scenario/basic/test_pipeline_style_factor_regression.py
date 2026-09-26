@@ -22,7 +22,7 @@ import pytest
 from src.python.core.models import Holding
 from src.python.report.orchestrator import compute_factor_exposure_data
 
-pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic]
+pytestmark = [pytest.mark.scenario, pytest.mark.scenario_basic, pytest.mark.usefixtures("offline_external_sources")]
 
 _SAMPLE_HOLDINGS = [
     Holding(account="证券", name="长江电力", code="600900", shares=100, cost_price=10.0),

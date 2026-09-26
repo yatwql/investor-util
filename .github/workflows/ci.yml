@@ -3,7 +3,8 @@
 # 门禁等级（与 CLAUDE.md 一致）：
 #   P0（提交前）→ dev-verify 模式 — dev 分支每次推送
 #   P1（合入前）→ verify 模式   — master 分支 PR/推送
-#   P2（发布前）→ all 模式       — 版本标签推送
+#   P2（发布前）→ verify,regression 模式 — 版本标签推送
+#   guards      → 7 个 --ci 守护脚本（P0/P2 同源），阻塞；lint（ruff）非阻塞
 
 name: CI
 
@@ -61,7 +62,7 @@ jobs:
 
   format:
     runs-on: ubuntu-latest
-    continue-on-error: true  # 格式问题不阻断 CI（非阻塞门禁，可后续修复）
+    continue-on-error: true  # lint/格式问题不阻断 CI（非阻塞门禁，可后续修复）
     steps:
       - uses: actions/checkout@v4
 
@@ -79,3 +80,47 @@ jobs:
 
       - name: Ruff 格式检查
         run: python -m ruff format --check src/python/ scripts/
+
+      - name: Ruff Lint 检查
+        run: python -m ruff check
+
+  guards:
+    # 7 个 --ci 守护脚本（与 P0/P2 门禁同源）：文档/编号/语义命名/需求追溯等一致性。
+    # 阻塞型（无 continue-on-error）——这些漂移必须当场修掉，否则会像“财报域备源静默失效”
+    # 那样拖到线上才被发现。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: 代码历史痕迹 + 任务编号标识符（check-code-traces）
+        run: python scripts/check-code-traces.py --ci
+
+      - name: 文档历史痕迹（check-doc-traces）
+        run: python scripts/check-doc-traces.py --ci
+
+      - name: 任务编号全局一致性（check-task-numbering）
+        run: python scripts/check-task-numbering.py --ci
+
+      - name: 语义命名索引正反向（check-semantic-index）
+        run: python scripts/check-semantic-index.py --ci
+
+      - name: 文档与实现一致性（check-doc-drift）
+        run: python scripts/check-doc-drift.py --ci
+
+      - name: 测试用例冗余与无效（check-test-redundancy）
+        run: python scripts/check-test-redundancy.py --ci
+
+      - name: 需求 ID 追溯（check-requirement-trace）
+        run: python scripts/check-requirement-trace.py --ci

@@ -24,6 +24,19 @@ LLM 配置由三个独立文件管理：
 > | 熔断冷却中 | 本节内容待生成 — LLM API 暂时不可用（熔断冷却中，请稍后重试） |
 > | 模块已禁用 | （直接跳过，无占位文本，报告中不出现该页签） |
 
+## 目录
+
+- [快速配置](#快速配置)
+- [多 Provider 链式服务（进阶）](#多-provider-链式服务进阶)（[文件分工](#文件分工) · [配置步骤](#配置步骤) · [Provider 条目字段](#provider-条目字段) · [端点级节流（`pacing`）](#端点级节流pacing) · [切换策略](#切换策略) · [模块级 Provider 偏好](#模块级-provider-偏好) · [配置检查](#配置检查) · [兼容性](#兼容性)）
+- [模块启停](#模块启停) · [缓存机制](#缓存机制) · [失败降级与占位](#失败降级与占位) · [`system_prompt` 配置覆盖链](#system_prompt-配置覆盖链)
+- [配置项总览](#配置项总览)（[模块级配置](#模块级配置) · [事实校验容差配置](#事实校验容差配置)）
+- [各模块推荐参数值](#各模块推荐参数值)
+- [Extended Thinking](#extended-thinking)（[配置方式](#配置方式) · [模型差异](#模型差异) · [`thinking_budget` 与 `max_tokens` 的关系](#thinking_budget-与-max_tokens-的关系) · [效果参考](#效果参考)）
+- [Prompt Caching（Anthropic 专属）](#prompt-cachinganthropic-专属)
+- [支持的 provider 及配置示例](#支持的-provider-及配置示例)
+- [HTTP 代理配置](#http-代理配置)（[Linux / macOS](#linux--macos) · [Windows PowerShell](#windows-powershell) · [注意事项](#注意事项)）
+- [Token 消耗参考](#token-消耗参考) · [完整模型定价表](#完整模型定价表) · [Token 用量统计](#token-用量统计)
+
 ---
 
 ## 快速配置
@@ -147,8 +160,43 @@ LLM 配置由三个独立文件管理：
 | `weight` | ❌ | int | 加权随机权重，仅 `weighted` 策略有效，默认 1 |
 | `timeout` | ❌ | int | 超时秒数，覆盖全局 timeout，默认 60 |
 | `proxy_preferred` | ❌ | bool | `true` 时优先使用代理直连（而非自动路由），默认 `false` |
+| `pacing` | ❌ | object | **端点级节流/并发约束**（仅作用于本条目对应的端点）；缺省 = 无额外约束。字段见下方「端点级节流」 |
 
 > **不得内联 `api_key`**：本文件可提交仓库（团队共享调优参数），因此**只放路由字段**——写入 `api_key` 等于把密钥随配置入库。校验器遇到非空内联 `api_key` 会记 WARNING 并**跳过整条 provider**（不是仅告警后放行）。密钥一律写在 `llm_key.json` 的凭据块里，本文件用 `credentials_ref` 引用。`model` / `endpoint` 属非敏感路由字段，可留在本文件按条目覆盖凭据块同名值。
+
+### 端点级节流（`pacing`）
+
+**为什么需要它**：同一次报告生成的 LLM 调用会落在不同端点上，而各端点背后的服务约束截然不同——
+
+- **订阅制编码端点**（如 Kimi Code，`https://api.kimi.com/coding/`）：按会员额度计费，带滚动频率窗口与风控型并发上限；其服务条款要求**交互式**使用，批量调用应低频串行。
+- **按量付费端点**（如开放平台 `api.moonshot.cn/v1`）：有明确的分级 RPM / TPM 与按量账单，可放心用较高并发。
+
+全局键 `llm_max_concurrency` 无法表达「同一程序、不同端点不同策略」，因此把约束**声明到 provider 条目**上：
+
+```jsonc
+"providers": [
+  {
+    "name": "kimi-code",
+    "provider": "claude",
+    "credentials_ref": "kimi-code",
+    "priority": 10,
+    "pacing": { "min_interval": 20, "jitter": 0.2, "max_concurrency": 1 }
+  }
+]
+```
+
+| `pacing` 字段 | 类型 | 默认 | 含义 |
+|------|:----:|:----:|------|
+| `min_interval` | float | 0 | 同一端点上两次请求的**最小间隔**（秒）；0 = 不限 |
+| `jitter` | float | 0 | 在主间隔上叠加的随机抖动**比例**（0~1）；避免固定节奏的机器特征 |
+| `max_concurrency` | int | 0 | 该端点**同时在途**请求上限；0 = 不限 |
+
+**关键性质**：
+
+- **缺省即无约束**：不写 `pacing` 的 provider 行为与未引入本机制时**逐字节一致**（零开销直通）。因此同一份配置里，可以把订阅制端点收紧、把按量端点放开。
+- **与全局并发叠加**：`llm_max_concurrency` 仍限制总线程数（默认 3）；`pacing.max_concurrency` 是**额外**的每端点上限，两者同时生效。例如全局 3 线程 + 订阅制端点 `max_concurrency: 1` ⇒ 该端点始终串行，其余端点可达 3 路并行。
+- **失败分类与重试**：端点返回 **403**（配额/风控拒绝，如 `You've reached your 5-hour usage limit` / `concurrent request limit`）时**不重试**——这类限制按时间窗口滚动、重试无益且会加剧风控画像；报告将显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**429 / 503** 仍按 `max_retries` 重试。
+- **抖动与间隔的线程安全**：同一端点的间隔串行与在途计数均为线程安全（per-端点锁 + 信号量），不同端点互不阻塞。
 
 ### 切换策略
 
@@ -236,7 +284,7 @@ LLM Provider 状态
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
-- 菜单 **[S]** 面板分三块：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）、⚗ 实验性功能（6-9，由 `features.json` 的 Feature Flag 控制，见下方 `debate` 配置段）与常规开关（10-25，默认开启的常驻开关，与 LLM 无关，详见 [配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)）。实验开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**登记决策并用真实行情结算命中率，再将教训回灌专家复盘提示词（行动建议章内嵌「历史决策复盘」块）；**信号预消化（`signal_pre_digest`）**把市场温度档位/持仓估值分位分布/尾部风险幅度预消化为 `信号：{指标} {结论}（{依据}）` 的方向行，置于智囊团复盘与持仓体检提示词的结论位置，降低模型读裸数值自行推断方向的误判率；**模块级质量分级（`module_quality_gate`）**对 4 个 LLM 模块输出按完整性与篇幅评 A~F，低评级中「内容在但存在缺陷」者（缺必需章节/篇幅明显偏短）在模块内容头部注入 `【内容质量提示】` 横幅（评级 + 具体原因 + 降级参考提示），**只标注、不阻断生成、不触发重试、不写回缓存**——A/B 级健康输出零噪音，内容缺失型（空内容/降级占位）已有各自醒目提示故不叠加横幅；**决策头结构化（`decision_header_parse`）**在专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读结构化头、失败回落确定性表格解析——两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），防「不建议加仓」「加仓或减仓」这类表述被判成相反方向写入决策账本；**关闭时该段不追加**，提示词与缓存指纹逐字节不变；**确定性信号沉淀（`signal_ledger`）**把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类确定性算法评级沉淀为账本 `data/state/signal_ledger.jsonl`，每条记录附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施：逐品种行情新鲜度 + 数据源降级事件，非实时即本次由降级/缓存行情算出），并把摘要注入智囊团复盘提示词——**统计与摘要默认只算实时记录**，防止降级数据算出的评级冒充真实战绩；关闭时账本不写盘、提示词与缓存指纹逐字节不变；**系统自检（`doctor_check`）**不在实验块而在**常规块**（默认开启、只读、不改报告产物），提供 TUI 菜单 `[D]` 与 Web「系统自检」卡片，一键盘点环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，其中「配置」组会校验本文件的 LLM 凭据是否可读——**自检只读、自身永不抛异常**，且 CLI 的 `doctor` 子命令不受该开关约束；本段未展开的**数据源凭据就绪（`datasource_credential_ready`）**属数据层、与 LLM 无关（详见 [配置指引-功能开关 §M](how-to-config.md#m-功能开关featuresjson)）。以上开关均可用 CLI 全局参数 `--experiment`（实验组简写，只开）或 `--feature NAME=VALUE`（全部开关、双向）单次切换（不写盘）
+- 菜单 **[S]** 面板分三块：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）、⚗ 实验性功能（6-10，由 `features.json` 的 Feature Flag 控制，见下方 `debate` 配置段）与常规开关（11-26，默认开启的常驻开关，与 LLM 无关，详见 [配置指引-功能开关 §N](how-to-config.md#n-功能开关featuresjson)）。实验开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**登记决策并用真实行情结算命中率，再将教训回灌专家复盘提示词（行动建议章内嵌「历史决策复盘」块）；**信号预消化（`signal_pre_digest`）**把市场温度档位/持仓估值分位分布/尾部风险幅度预消化为 `信号：{指标} {结论}（{依据}）` 的方向行，置于智囊团复盘与持仓体检提示词的结论位置，降低模型读裸数值自行推断方向的误判率；**模块级质量分级（`module_quality_gate`）**对 4 个 LLM 模块输出按完整性与篇幅评 A~F，低评级中「内容在但存在缺陷」者（缺必需章节/篇幅明显偏短）在模块内容头部注入 `【内容质量提示】` 横幅（评级 + 具体原因 + 降级参考提示），**只标注、不阻断生成、不触发重试、不写回缓存**——A/B 级健康输出零噪音，内容缺失型（空内容/降级占位）已有各自醒目提示故不叠加横幅；**决策头结构化（`decision_header_parse`）**在专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读结构化头、失败回落确定性表格解析——两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），防「不建议加仓」「加仓或减仓」这类表述被判成相反方向写入决策账本；**关闭时该段不追加**，提示词与缓存指纹逐字节不变；**确定性信号沉淀（`signal_ledger`）**把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类确定性算法评级沉淀为账本 `data/state/signal_ledger.jsonl`，每条记录附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施：逐品种行情新鲜度 + 数据源降级事件，非实时即本次由降级/缓存行情算出），并把摘要注入智囊团复盘提示词——**统计与摘要默认只算实时记录**，防止降级数据算出的评级冒充真实战绩；关闭时账本不写盘、提示词与缓存指纹逐字节不变；**系统自检（`doctor_check`）**不在实验块而在**常规块**（默认开启、只读、不改报告产物），提供 TUI 菜单 `[D]` 与 Web「系统自检」卡片，一键盘点环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，其中「配置」组会校验本文件的 LLM 凭据是否可读——**自检只读、自身永不抛异常**，且 CLI 的 `doctor` 子命令不受该开关约束；本段未展开的**数据源凭据就绪（`datasource_credential_ready`）**属数据层、与 LLM 无关（详见 [配置指引-功能开关 §N](how-to-config.md#n-功能开关featuresjson)）。以上开关均可用 CLI 全局参数 `--experiment`（实验组简写，只开）或 `--feature NAME=VALUE`（全部开关、双向）单次切换（不写盘）
 - 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
 - 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
 
@@ -298,9 +346,11 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
 - `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
 - `llm_max_thinking_concurrency`（int，默认 `1`）：开启 Extended Thinking 的模块（health_check / expert_review 等 `thinking_enabled_{module}=true`）并发的最大请求数。多 thinking 模块同时涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），此信号量将 thinking 请求串行化（同时最多 N 个，默认 1），非 thinking 模块不受此限。设大可提升 thinking 并发速度，但可能提高偶发空响应概率，建议保持默认 1
+
+> **全局并发 vs 端点级节流**：`llm_max_concurrency` 是**全局**上限（所有模块合起来最多几个线程）；若需对**某个具体端点**单独限速/限并发（例如同一个程序里，订阅制编码端点要低频串行、按量付费端点可以放开），用 `llm_providers.json` 各 provider 条目内的 `pacing` 段——两者叠加生效，见下方「端点级节流」。
 - `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
-- `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: [], weekend_always_idle: true}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）、`weekend_always_idle`（周末全天闲时开关，默认 `true`）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节
+- `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: [], weekend_always_idle: true, holiday_always_idle: true}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）、`weekend_always_idle`（周末全天闲时开关，默认 `true`）、`holiday_always_idle`（法定节假日全天闲时开关，默认 `true`）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
 - `debate`（dict，可选实验功能）：辩论模式配置。含 procon（三段式正反辩论，`per_call_max_tokens` 限定每阶段输出上限，默认 18432（null 时按代码兜底同值））、conditional（条件情景推理）、qa_concentration（集中度问答），以及 `max_total_tokens_per_report`（单次报告辩论总 Token 预算上限，默认 72000，覆盖三段式真实成本）和 `per_call_timeout_override`（辩论单次 API 超时覆盖）。**本段仅控制辩论行为的参数，启停由 Feature Flag（`llm_debate_*`）决定，非配置直接启用**；决策跨期反思闭环（`decision_reflection`）同样由 Feature Flag 启停，无独立配置段
 
@@ -316,7 +366,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 | `cache_enabled_{module}` | bool | `true` | 是否启用缓存。关闭后每次生成都重新调用 API |
 | `output_brief_{module}` | bool | `false` | 精简模式：`true` 时输出 ≤200 字（global_macro）或 ≤300 字（其余模块）。**批量模式（news_correlation）不支持** |
 | `thinking_enabled_{module}` | bool | 模块差异 | 是否开启 Extended Thinking（Claude / DeepSeek / Gemini 2.5） |
-| `thinking_budget_{module}` | int | 6000~24000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。API 硬约束须 ≥ `max_tokens` + 1024，代码自动补足 |
+| `thinking_budget_{module}` | int | 6000~24000（模块差异） | **Claude / Gemini 2.5** Thinking token 预算。须小于对应 `max_tokens`（思考计入总输出预算，须为正文留余量），非法值代码自动修正 |
 | `reasoning_effort_{module}` | string / null | `"high"` | **仅 DeepSeek** 推理深度：`"low"` / `"medium"` / `"high"` / `"max"` |
 
 > 各模块默认值差异详见下方「各模块推荐参数值」表。
@@ -561,6 +611,8 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 >
 > **DeepSeek**（provider: `"claude"` + endpoint `api.deepseek.com/anthropic`）：模型 `deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` 时生效，用 `output_config.effort` 控制思考深度（`"low"` / `"medium"` / `"high"` / `"max"`）。
 >
+> **Kimi（月之暗面）**（provider: `"claude"` + endpoint `api.moonshot.cn/anthropic`）：模型 `kimi-*`（如 `kimi-k2.6`）时生效，用 `thinking.budget_tokens` 控制思考 token 预算（与 Claude 同机制）。**注意 Kimi 端点默认开思考**：模块未开启 thinking 时本工具会自动显式发送 `disabled`，避免思考 token 白烧 max_tokens 预算。
+>
 > **Gemini**（provider: `"gemini"`）：模型 `gemini-2.5-*` 时生效，用 `generationConfig.thinkingConfig.thinkingBudget` 控制思考 token 预算。
 
 **[Extended Thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking)** 让模型在回答前进行深度推理，大幅提升复杂分析的深度和逻辑严谨性。代价是输出 token 大幅增加（约 2~4 倍），费用相应上升。
@@ -587,26 +639,29 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 ### 模型差异
 
-| 维度 | Anthropic Claude | DeepSeek V4+ | Google Gemini 2.5 |
-|------|------------------|-------------|-------------------|
-| 控制参数 | `thinking.budget_tokens`（token 数量预算） | `output_config.effort`（"high"/"max" 定性控制） | `generationConfig.thinkingConfig.thinkingBudget`（token 数量预算） |
-| 与 temperature 关系 | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） |
-| 兼容端点 | `api.anthropic.com` | `api.deepseek.com/anthropic`（Anthropic 兼容端点） | `generativelanguage.googleapis.com` |
-| 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` | 低成本备选，适合轻量推理 |
+| 维度 | Anthropic Claude | DeepSeek V4+ | Google Gemini 2.5 | Kimi（月之暗面） |
+|------|------------------|-------------|-------------------|-------------------|
+| 控制参数 | `thinking.budget_tokens`（token 数量预算） | `output_config.effort`（"high"/"max" 定性控制） | `generationConfig.thinkingConfig.thinkingBudget`（token 数量预算） | `thinking.budget_tokens`（token 数量预算，与 Claude 同机制） |
+| 与 temperature 关系 | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） | **互斥**（开启后 temperature 参数被忽略） |
+| 兼容端点 | `api.anthropic.com` | `api.deepseek.com/anthropic`（Anthropic 兼容端点） | `generativelanguage.googleapis.com` | `api.moonshot.cn/anthropic`（Anthropic 兼容端点） |
+| 默认思考行为 | 默认不思考 | **默认开思考**（effort 族） | 默认不思考 | **默认开思考**（未开启时工具自动发 `disabled` 兜底） |
+| 推荐场景 | 预算可控，适合所有模型 | `max` 深度推荐仅用于智囊团；宏观/新闻保持 `high` | 低成本备选，适合轻量推理 | 通用主力（256k 上下文），预算可控 |
 
 ### `thinking_budget` 与 `max_tokens` 的关系
 
-**仅在使用 Claude 或 Gemini 模型时 `thinking_budget_{模块}` 有意义。** DeepSeek 使用 `reasoning_effort`（`"high"` / `"max"`）定性控制思考深度，不涉及 token 预算概念。
+**仅在使用 Claude / Gemini / Kimi 模型时 `thinking_budget_{模块}` 有意义**（三者同属 `budget_tokens` 族）。DeepSeek 使用 `reasoning_effort`（`"high"` / `"max"`）定性控制思考深度，不涉及 token 预算概念。
 
 | 配置项 | 管什么 | expert 默认值 |
 |--------|--------|:------------:|
 | `max_tokens_expert_review` | **最终输出文本**的最大 token 数（DeepSeek 为 thinking + 正文共享预算） | 36000 |
 | `thinking_budget_expert_review` | **内部思考过程**分配的 token 预算 | 24000 |
 
-**API 硬性约束（仅 Claude / Gemini）：** `thinking_budget_{模块}` 的值**必须 ≥ 对应的 `max_tokens_{模块}` + 1024**。代码自动保护：若 `thinking_budget` 小于 `max_tokens + 1024`，自动补足到 `max_tokens + 4096`。若配置开启但模型不支持，自动跳过并记录 WARNING。
+**API 硬性约束（仅 `budget_tokens` 族：Claude / Gemini / Kimi）：** `thinking_budget_{模块}` 的值**必须小于**对应的 `max_tokens_{模块}`（思考 token 计入 max_tokens 共享预算，须为其后的正文留余量）。代码自动保护：若 `thinking_budget` 缺失或 ≥ `max_tokens`，自动修正为 `max(1024, max_tokens − 2048)`（1024 为 Anthropic `budget_tokens` 的最小值硬限制；`max_tokens − 2048` 保证正文至少留 2048 token 余量）。若配置开启但模型不支持，自动跳过并记录 WARNING。
 
-**一句话总结（Claude / Gemini）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
+**一句话总结（Claude / Gemini / Kimi）：** `max_tokens` 管"最终说多少"，`thinking_budget` 管"允许想多久"。
 **一句话总结（DeepSeek）：** `reasoning_effort` 管"想多深"，`"max"` 对应深度分析的极致模式。
+
+> **默认开思考的厂商需注意（DeepSeek / Kimi）**：两家端点在不传思考参数时**默认开启思考**（思考 token 计入 `max_tokens` 共享预算）。模块**未**开启 thinking 时，程序会自动显式发送 `disabled` 兜底，避免思考占满预算而正文为空；但若你手动改小 `max_tokens`，仍建议同步核对 `thinking_budget` 与模块开关。
 
 **DeepSeek V4 强制推理说明**：DeepSeek V4 系列为**强制推理模型**，即使 `thinking_enabled` 关闭也会返回 `thinking` block；且 `max_tokens` 是 **thinking + 最终文本的共享预算**（而非仅最终输出）。当思考部分耗尽预算时，响应只含 thinking block、无最终文本（即"返回空内容"场景）。
 
@@ -686,8 +741,139 @@ DeepSeek 官方提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 
 - API Key 使用 DeepSeek 官方 Key（带 `sk-` 前缀）
 - 模型：`deepseek-v4-flash`（推荐，**注意全小写**）、`deepseek-flash`（DeepSeek-V4.1-Flash 正式模型名，2026-09-10 发布，与前者同价）
 - **已停用模型名**：`deepseek-chat` / `deepseek-reasoner` 是 flash 系列非思考 / 思考模式的兼容别名（**不是**独立的 V3 模型），已于 2026-07-24 下线，端点不再接受——新配置请改用 `deepseek-flash`。旧名仍留在 `MODEL_PRICING` 中仅为让停用前产生的历史调用能算出费用
-- **注意**：`deepseek-v4-pro` 于 2026-09-14 12:00（北京时间）下线，在此之前请求自动路由到 V4.1-Flash 并按 V4.1-Flash 单价计费；`deepseek-v4-flash` 与 `deepseek-v4-flash-vision-exp` 底层模型同样由 V4.1-Flash 接管，价格不变。费用估算以 `core/constants.py` 的 `MODEL_PRICING` 为准
+- **注意**：`deepseek-v4-pro` 官方 2026-09-10 公告继续提供 API 服务（2026-09-14 之后不下线），计费方式不变；`deepseek-v4-flash` 与 `deepseek-v4-flash-vision-exp` 底层模型同样由 V4.1-Flash 接管，价格不变。费用估算以 `core/constants.py` 的 `MODEL_PRICING` 为准
 - 官方文档：https://api-docs.deepseek.com/guides/anthropic_api
+</details>
+
+<details>
+<summary><b>Kimi（月之暗面开放平台，Anthropic 兼容端点）</b></summary>
+
+Kimi 开放平台提供 Anthropic API 兼容端点，`provider` 设为 `"claude"` 即可调用。
+
+```json
+{
+  "provider": "claude",
+  "api_key": "sk-your-kimi-key",
+  "model": "kimi-k2.6",
+  "endpoint": "https://api.moonshot.cn/anthropic/v1/messages"
+}
+```
+
+- API Key 在 [Kimi 开放平台](https://platform.moonshot.cn)控制台创建（按量付费）。注意与 **Kimi Code 订阅的 Key 不通用**——后者仅限编程工具的交互式场景，用于本工具的批量报告生成会触发限流
+- 可用模型：`kimi-k2.6`（推荐，256k 上下文，支持思考/非思考模式）、`kimi-k3`（旗舰，1M 上下文）
+- Extended Thinking 走 `thinking.budget_tokens`（与 Claude 同机制）；端点默认开思考，模块未开启时本工具会显式发送 `disabled`
+
+> **想改用 Kimi Code 订阅 Key？** 两套系统的端点与模型名不同（Code 为 `api.kimi.com/coding/` + `kimi-for-coding`），
+> 直接照抄本段会 401。完整改法见下个折叠块「Kimi Code（订阅会员）」——包含两个文件的改法、`pacing` 推荐值、403 语义与**风险提示**。
+</details>
+
+<details>
+<summary><b>Kimi Code（订阅会员，Anthropic 兼容端点）</b></summary>
+
+> ⚠️ **先读风险提示**：Kimi Code 官方社区准则明确 **“Don't use Kimi Code for non-interactive automation”**
+> （“订阅仅限个人交互式使用；脚本化批量执行、数据标注流水线等非交互用途超出正常使用范围”）。
+> 本工具的批量报告生成属于**非交互式自动化**，因此：
+> - 用 Kimi Code Key 跑本工具**在合规性上有风险**，`pacing` 只能降低被风控检出的概率，**不能消除风险**；
+> - 违规处置可能是 **403 `You've reached your concurrent request limit`**（风控触发，只能申诉）；
+> - **长期稳定跑自动化建议用开放平台按量付费 Key**（无此条款）；订阅 Key 更适合留给 Claude Code / CLI 等交互式编码场景。
+
+**与开放平台的关键差异（最容易踩的三个坑）**
+
+| 项 | 开放平台 | **Kimi Code 订阅** |
+|---|---|---|
+| Base URL | `https://api.moonshot.cn/anthropic/v1/messages` | **`https://api.kimi.com/coding/v1/messages`** |
+| Key 来源 | platform.moonshot.cn 控制台 | **Kimi Code 控制台**（kimi.com/code/console） |
+| 模型名 | `kimi-k2.6` / `kimi-k3` | **`kimi-for-coding`**（标准）/ `kimi-for-coding-highspeed`（高速）/ `k3` |
+| 计费 | 按量付费（token 计费） | 会员订阅额度（**不按 token 计费**） |
+
+两套系统的 **Key 与端点互不通用**——混用会 401 `Invalid Authentication`。
+**模型名务必改**：保留 `kimi-k2.6` 去请求 Code 端点会报 `Your model id does not exist, recognized as other:`。
+
+**启用步骤（改两个文件，不改代码）**
+
+**步骤 1** — `data/config/llm_key.json`（本地密钥文件，**不入库**）追加凭据块，保留原有按量付费块便于切回：
+
+```jsonc
+{
+  // …原有 kimi-main / deepseek-main 保持不变…
+
+  // Kimi Code 订阅（Anthropic 兼容端点；模型名与开放平台不同！）
+  "kimi-code": {
+    "api_key": "sk-替换为 Kimi Code 控制台新建的 Key",
+    "model": "kimi-for-coding",
+    "endpoint": "https://api.kimi.com/coding/v1/messages"
+  }
+}
+```
+
+**步骤 2** — `data/config/llm_providers.json`（路由配置，**已入库**，无密钥）把主 Provider 换成 `kimi-code` 并收紧节流：
+
+```jsonc
+{
+  "strategy": "priority",
+  "preferred_providers": {},
+  "providers": [
+    {
+      "name": "kimi-code",
+      "provider": "claude",
+      "credentials_ref": "kimi-code",
+      "priority": 10,
+      "timeout": 120,
+      // 订阅制端点：低频串行，降低风控风险（见上文「端点级节流」）
+      "pacing": { "min_interval": 20, "jitter": 0.2, "max_concurrency": 1 }
+    },
+    {
+      "name": "deepseek-main",
+      "provider": "claude",
+      "credentials_ref": "deepseek-main",
+      "priority": 20,
+      "timeout": 120
+    }
+  ]
+}
+```
+
+> **备选 Provider 建议保留**：一旦 Code 端点返回 403（配额/风控），程序会自动降级到 `deepseek-main`，报告不会因端点被限流而空白。
+
+**步骤 3** — 验证：
+
+```bash
+.venv/bin/python -m src.python.cli doctor --offline      # 配置合法性自检（不发起 LLM 调用）
+.venv/bin/python -m src.python.cli report --type full    # 跑一次含 LLM 的报告
+.venv/bin/python -m src.python.cli view-logs --level INFO   # 观察 provider 尝试与节流
+# 日志应出现：尝试 provider: kimi-code(claude/kimi-for-coding) [https://api.kimi.com/coding/v1/messages]
+# 已声明 pacing 时，相邻两次 API 请求的日志时间戳间隔应 ≥ min_interval
+```
+
+**`pacing` 推荐值**
+
+| 参数 | 推荐值 | 说明 |
+|---|:---:|---|
+| `min_interval` | `20` | 两次请求最小间隔（秒）。按「每次报告约 9 次调用」估算，串行 + 20s ≈ 3 分钟额外等待，换来最低频次 |
+| `jitter` | `0.2` | 间隔随机抖动 ±20%，避免固定节奏的机器特征 |
+| `max_concurrency` | `1` | 该端点**在途**请求上限 1（配合全局 `llm_max_concurrency` 3，只有本端点被串行化） |
+
+**想更保守**：`min_interval` 提到 `30~60`，并把 `llm_settings.json` 的 `llm_max_concurrency` 降到 `1~2`（全局串行）。
+**想恢复放开**：删掉 `pacing` 段即可——无 `pacing` 声明的端点零约束（这对按量付费端点也适用，它有明确的分级 RPM/TPM）。
+
+**与「403 配额/风控」的交互**
+
+程序已按订阅端点语义区分状态码：
+
+| 状态码 | 含义 | 程序行为 |
+|---|---|---|
+| **403** | 配额/风控拒绝（5 小时窗口、并发上限、月度额度） | **不重试**，直接降级下一 Provider；报告显示「LLM 端点配额/风控限制已触发」 |
+| **429 / 503** | 瞬时限流 / 服务端过载 | 按 `max_retries`（默认 2）退避重试 |
+| **401** | Key 与 Base URL 不配套 | 认证失败，不重试；核对步骤 1/2 |
+
+> 403 **不重试**是刻意设计：配额窗口按时间滚动（非瞬时故障），重试无益且高频重试会加剧风控画像。
+
+**换 Key 后仍会看到的两处「无害提示」**
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| 报告「LLM 用量」页签费用显示 **`-`** | `kimi-for-coding` 不在内置计价表，且订阅制**不按 token 计费**，费用无意义 | 可不处理（`-` 即「未计价」）。若要显示参考值，在 `llm_settings.json` 的 `pricing` 段自填等效单价 |
+| 请求偶发较慢 | 订阅端点高峰时段（工作日 14:00–17:00）偶发 `429 The engine is currently overloaded`（服务端容量，与账号无关） | 程序按 `max_retries` 重试；避开高峰更稳 |
 </details>
 
 <details>
@@ -776,7 +962,7 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 
 ## Token 消耗参考
 
-以下费用按 **DeepSeek-V4-Flash 闲时价**（¥1.0/M 输入、¥4.0/M 输出，2026-09-10 官方降价后）估算，工作日高峰时段约翻倍、周末全天按闲时价，各模型单价详见「完整模型定价表」。
+以下费用按 **DeepSeek-V4-Flash 闲时价**（¥1.0/M 输入、¥4.0/M 输出，2026-09-10 官方降价后）估算，工作日高峰时段约翻倍、周末与法定节假日全天按闲时价，各模型单价详见「完整模型定价表」。
 
 | 模块 | 输入 token | 输出 token | 单次费用参考 |
 |------|-----------|-----------|-------------|
@@ -815,10 +1001,12 @@ $env:HTTPS_PROXY = "http://127.0.0.1:7890"
 | `gemini-2.5-flash` | 0.15 | 0.60 | 0.015 | Gemini 主力，高性价比（代码默认） |
 | `gemini-2.5-pro` | 1.25 | 5.00 | 0.125 | Gemini 强推理 |
 | `gemini-2.0-flash` | 0.10 | 0.40 | 0.01 | Gemini 2.0 轻量（较早系列） |
+| `kimi-k2.6` | 6.50 | 27.00 | 1.10 | Kimi 通用主力（256k 上下文，支持思考模式） |
+| `kimi-k3` | 20.00 | 100.00 | 2.00 | Kimi 旗舰（1M 上下文） |
 
-> **峰谷定价（DeepSeek）**：`deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` / `deepseek-reasoner` 采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 flash 系列降价），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在工作日（周一至周五）生效**，为**北京时间 09:00–12:00、14:00–18:00**；工作日其余时间为闲时、**周末（周六/周日）全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` 中覆盖；含 `"peak"` 子段的模型工作日高峰时段按 `peak` 价计费，其余时段（含周末全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
+> **峰谷定价（DeepSeek）**：`deepseek-flash` / `deepseek-v4-*` / `deepseek-chat` / `deepseek-reasoner` 采用 DeepSeek 官方峰谷定价（2026-08-17 起生效，2026-08-23 起优化周末规则，2026-09-10 起 flash 系列降价并补充法定节假日规则），表中「闲时/高峰」两列分别为非高峰与高峰时段的每百万 Token 单价。**高峰时段仅在高峰日（周一至周五，不含中国法定节假日）生效**，为**北京时间 09:00–12:00、14:00–18:00**；高峰日其余时间为闲时、**周末（周六/周日）与法定节假日全天一律按闲时价计费**（不区分峰谷，闲时价 = 高峰价的一半）。时段、判定时区与周末/法定节假日规则可在 `pricing` 段的 `peak_periods` / `idle_periods` / `timezone` / `weekend_always_idle` / `holiday_always_idle` 中覆盖；含 `"peak"` 子段的模型高峰日高峰时段按 `peak` 价计费，其余时段（含周末与法定节假日全天）按 base 价，无 `"peak"` 的模型始终按 base 价计费。
 >
-> **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash 工作日闲时/周末：输入 3000 tokens × ¥1.0 + 输出 2000 tokens × ¥4.0 = ¥0.011/次（工作日高峰时段则 ×2、×8）。缓存命中时输入部分按 `input_cache_hit` 计费。
+> **计算方式**：单次调用费用 = `(输入 token × 输入单价 + 输出 token × 输出单价) / 1,000,000`。例如 DeepSeek-V4-Flash 高峰日闲时/周末/法定节假日：输入 3000 tokens × ¥1.0 + 输出 2000 tokens × ¥4.0 = ¥0.011/次（高峰日高峰时段则 ×2、×8）。缓存命中时输入部分按 `input_cache_hit` 计费。
 >
 > **覆盖方式**：在 `llm_settings.json` 中添加 `pricing` 段即可覆盖任意模型的定价，未覆盖的模型自动使用上方内置价格；含峰谷时段的模型可一并覆盖 `peak` 子段：
 > ```json
