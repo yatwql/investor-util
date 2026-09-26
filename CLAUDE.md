@@ -7,7 +7,7 @@
 ## Conventions
 
 - **默认工作分支**：`dev`（日常开发、提交均在此分支）
-- **发布分支**：`master`（仅从 dev 合并，打版本标签后发布）
+- **发布分支**：`master`（仅从 dev 合并，打版本标签后发布）；**每次正式发布（打 tag）都必须把 dev 合并入 master 并推送**（合入前跑 P1 门禁），不得只打 tag 而不更新 master
 - **语言**：中文（UI、报错、报告内容）
 - **日志**：`logging` → `logs/app.log` + console（INFO / WARNING / ERROR）
 - **Python 环境**：所有 Python 命令一律使用项目虚拟环境解释器——Linux/macOS 用 `.venv/bin/python`，Windows 用 `.venv\Scripts\python.exe`；**禁止**裸 `python3`/`python`/`pytest`（会命中系统解释器，缺失 pandas 等依赖，报 `No module named 'pandas'`）。运行测试、脚本、CLI 均同；本文件内所有 `python ...`/`pytest ...` 示例均已按此改写。

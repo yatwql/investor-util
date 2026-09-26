@@ -1588,7 +1588,7 @@ registry 的测试在 `src/test/unit/core/test_registry.py`，验证 TTL 默认�
 
 ## 版本发布流程
 
-发布版本时，按以下四步顺序执行：
+发布版本时，按以下五步顺序执行：
 
 **① 版本号一致**
 
@@ -1629,6 +1629,18 @@ git push origin --tags
 **④ 开发版本切换**
 
 发布版本并打 tag 后，**立即**将 `APP_VERSION` 和所有管理文档版本头改为**下一个版本的 `-dev`**（如发布 v0.6.8 后即改为 v0.6.9-dev），运行 `check-version-consistency.py` 验证全链 `[OK]` 后提交，然后继续开发。开发期间版本号始终标识为下一个预期发布版本的 `-dev`。
+
+**⑤ 合并入 master**
+
+发布并打 tag 后，**必须**把 `dev` 合并入 `master` 并推送（`master` 是发布分支，只存放已发布状态；不得只打 tag 而不更新 master）：
+
+```bash
+.venv/bin/python scripts/test-runner.py --mode verify   # P1 合入门禁，必须先通过
+git checkout master && git merge --no-ff dev -m "Merge branch 'dev' — v{x.y.z} 发布" && git push origin master
+git checkout dev
+```
+
+合入后确认 tag 所指提交已在 `master` 可达（`git merge-base --is-ancestor v{x.y.z} origin/master`）；`master` 推送会触发 CI 的 P1（`verify`）档。本步与步骤④互不替代：④ 是让 dev 进入下一个开发周期，⑤ 是把已发布状态同步到发布分支。
 
 ## 关键纪律来源
 
