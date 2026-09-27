@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.7-dev
-> **编号源**：`rf-next = 457`（新增问题取此编号，完成后更新为 +1；已用最大 rf-456，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 459`（新增问题取此编号，完成后更新为 +1；已用最大 rf-458，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -46,7 +46,13 @@
 
 ### 已解决待归档（v0.11.7-dev）
 
-> 暂无（v0.11.6 批次 rf-444 ~ rf-456 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）
+| **rf-458** | **「本机/CI 只有 UTF-8 locale」使 locale 回退类缺陷结构性不可见**（用户质问「两个系统的基本要求不是会覆盖的吗」）：rf-457 那条缺陷在仓库测试面上**无法暴露**——本机 `locale.getpreferredencoding()=UTF-8`、CI 三个 job 全为 `ubuntu-latest`（矩阵仅 Python 3.11/3.12/3.13，无 Windows、无非 UTF-8 locale），而 UTF-8 locale 下 pip 的最后一档回退恰好就是 UTF-8，故 3309 条 `dev-verify` 全绿也拦不住。同源暴露面：生产代码 `src/python/report/excel_writer.py` 输出目录可写性探针 `open(..., "a")` 与 8 个测试文件 24 处 `open(..., "w")` / `write_text()` / `subprocess.run(text=True)` 未显式 `encoding=`（cp936 上静默写 GBK / 直接报错） | ① CI 新增阻塞 job `portability`：固定 `pip==24.3.1`（最后一版按「BOM → PEP263 cookie → locale 编码」解码）+ `LC_ALL=C`/`PYTHONCOERCECLOCALE=0`/`PYTHONUTF8=0` 真实解析 `requirements.txt`（本地已双向验证：带 BOM 正常、去 BOM 即复现报错），并在 `PYTHONWARNDEFAULTENCODING=1` 下跑 `src/test/unit` 全量；② `pytest.ini` 置 `filterwarnings = error::EncodingWarning` + `openpyxl.worksheet._writer` 上游豁免（该模块内部 `NamedTemporaryFile(mode='w+')` 无 encoding；写/读共用同一 codec、zip 条目仍为 UTF-8，实测无用户可见影响）；③ 生产 1 处改为二进制可写性探针（`open(..., "ab")`），测试 8 文件 24 处补 `encoding="utf-8"`（含 2 处 `subprocess.run(..., text=True)`）；④ 文档：`CLAUDE.md` 编码纪律从「Windows 脚本」泛化为按消费方表达（非 ASCII + 被 locale 回退型工具读 ⇒ 必须 BOM）并禁止隐式编码，`developer-guide.md` 新增「编码/locale 自检」段（含不采用 Windows runner 与 GB18030 全套件探针的理由），`testplan.md` §6.4 新增第 17 项门禁，`folders.md` 同步 `pytest.ini` 说明 |
+
+> **探测方法纠偏（留证）**：`LC_ALL=C` 全套件初跑报 47 处失败，逐条定位后确认其中 18 处为 POSIX `fsencoding=ascii` 无法编码中文**文件名**的伪影（cp936 Windows 侧正常），另有 31 处来自 openpyxl 内部 tempfile——最终改用「精确模拟消费方」的两道探针，而非「换整套 locale 跑全套件」。
+
+| # | 问题 | 修复 |
+|---|------|------|
+| **rf-457** | **`requirements.txt` 含中文注释但无 UTF-8 BOM → 中文 Windows 上装依赖中断**（另一台 Windows 机实测报障）：plan-50 给 `requirements.txt` 的 `pdfplumber` / `Pillow` 两行追加中文注释，而文件仍为 UTF-8 **无 BOM**；中文 Windows 的 locale 是 cp936，该机 venv 的 pip ≤24.x 按「BOM → PEP263 cookie → locale 编码」次序解码，前两档均无 → 回退 cp936 解码 UTF-8 字节，`launch.ps1` 「正在安装依赖 ...」瞬间抛 `UnicodeDecodeError: 'gbk' codec can't decode byte 0xac in position 225`，依赖装不上、启动中断。本机 Linux 与 CI 均为 UTF-8 locale，pip ≥25 起更已默认 UTF-8（新版连 `auto_decode` 模块都已移除），故该缺陷只在「旧 pip + 非 UTF-8 locale」组合上暴露，全绿门禁拦不住 | ① `requirements.txt` 加 UTF-8 BOM（`EF BB BF`）——pip 任意版本的 `BOMS` 判定优先于 locale 回退；实测 pip 25.1.1 `_decode_req_file` 与 pip 24.3.1 `auto_decode`（强制 cp936）均正常解析、BOM 不污染首行、中文注释保留；② `.editorconfig` 新增 `[requirements.txt] charset = utf-8-bom`（默认 `[*] charset = utf-8` 会让编辑器保存时剥掉 BOM，必须显式覆盖）；③ `CLAUDE.md` 编码/BOM 约定补该条与成因；④ 回归用例 +3（`src/test/unit/scripts/test_script_encoding.py::TestRequirementsFileEncoding`）：非 ASCII 内容必须带 BOM、复刻 pip ≤24 解码次序并在强制 cp936 下断言与 UTF-8 直读一致（**去 BOM 即复现 `'gbk' codec can't decode byte 0xac`**，已验证）、BOM 仅允许作文件头；⑤ `folders.md` 的 `.editorconfig` 与 `test_script_encoding.py` 两处说明同步 |
 
 ### 归档档案
 

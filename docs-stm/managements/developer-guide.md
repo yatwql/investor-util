@@ -81,7 +81,24 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 **辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
 
-**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有两个独立 job：`guards`（**阻塞**，7 个 `--ci` 守护脚本，即上方 P0/P2 清单全量）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
+**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有三个独立 job：`guards`（**阻塞**，7 个 `--ci` 守护脚本，即上方 P0/P2 清单全量）、`portability`（**阻塞**，非 UTF-8 locale + 隐式编码双探针，见下方「编码/locale 自检」）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
+
+### 编码/locale 自检（旧 pip 回退解码 / 隐式编码）
+
+本机与 CI 的常规三道测试全跑在 **UTF-8 locale** 上，因此「旧 pip 对含非 ASCII 的需求文件回退 locale 解码」与「未显式 `encoding=` 的文本 I/O」这两类缺陷在常规门禁上**结构性不可见**（中文 Windows cp936 用户首启就装不上依赖、报告写盘时静默变 GBK）。两道精确探针已入 CI `portability` job（阻塞），且都能在任意平台本地复现：
+
+```bash
+# ① 旧 pip（最后一版按「BOM → PEP263 cookie → locale 编码」解码）在非 UTF-8 locale 下真实解析需求文件：
+#    LC_ALL=C 是同类 locale 回退的最严档（ASCII 单字节，任何非 ASCII 字节必炸）；
+#    去掉 requirements.txt 的 BOM 可复现原缺陷（UnicodeDecodeError）
+python -m pip install -q "pip==24.3.1"
+LC_ALL=C PYTHONCOERCECLOCALE=0 PYTHONUTF8=0 python -m pip install --dry-run --no-deps -r requirements.txt
+
+# ② PEP 597 隐式编码严格档：任何未显式 encoding= 的文本 I/O 立即失败（豁免项见 pytest.ini）
+PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
+```
+
+> 为何不直接跑 Windows runner：GitHub 的 `windows-latest` 是 en-US/cp1252（单字节，只会乱码不会报错），装不住 GBK 类 locale 回退；为何不在 ubuntu 上装 GB18030 跑全套件：中文**文件名**在 POSIX `fsencoding=ascii` 下会失败（18 处中文报表文件名），而 cp936 Windows 反而正常——那是探测方法的伪影，不是缺陷。两道探针因此取「精确模拟消费方」而非「换整个 locale 跑全套件」。
 
 > P1/P2 的完整要求（含手动验证项）见 [testplan.md](testplan.md) → 回归测试清单 / 门禁章节。
 

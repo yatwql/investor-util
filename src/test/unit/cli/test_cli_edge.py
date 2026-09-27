@@ -84,8 +84,8 @@ class TestCliEdge:
         holdings_dir.mkdir()
         f1 = holdings_dir / "持仓1.xlsx"
         f2 = holdings_dir / "持仓2.xlsx"
-        f1.write_text("dummy")
-        f2.write_text("dummy")
+        f1.write_text("dummy", encoding="utf-8")
+        f2.write_text("dummy", encoding="utf-8")
 
         # f2 修改时间更新
         import time

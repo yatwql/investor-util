@@ -5,6 +5,7 @@
 #   P1（合入前）→ verify 模式   — master 分支 PR/推送
 #   P2（发布前）→ verify,regression 模式 — 版本标签推送
 #   guards      → 7 个 --ci 守护脚本（P0/P2 同源），阻塞；lint（ruff）非阻塞
+#   portability → 非 UTF-8 locale + 隐式编码探针（PEP 597），阻塞
 
 name: CI
 
@@ -124,3 +125,39 @@ jobs:
 
       - name: 需求 ID 追溯（check-requirement-trace）
         run: python scripts/check-requirement-trace.py --ci
+
+  portability:
+    # 非 UTF-8 locale / 隐式编码门禁（阻塞）。test / format / guards 三个 job 全在 UTF-8 locale
+    # 上跑，以下两类缺陷在它们上面结构性不可见（中文 Windows cp936 用户首启即装不上依赖）：
+    #   ① 旧 pip（≤24.x）对含非 ASCII 的需求文件回退 locale 解码
+    #   ② 未显式 encoding= 的文本 I/O（在 cp936 上静默写成 GBK、读回时乱码或报错）
+    # 两道探针都可在任意平台本地复现（见 developer-guide.md「编码/locale 自检」），
+    # 不依赖安装 GB18030 locale、也不依赖 Windows runner（GitHub 的 Windows runner 是 en-US
+    # cp1252，单字节不会报错，挡不住 GBK 类 locale 回退）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      # ① 固定装回 pip==24.3.1（最后一版仍按「BOM → PEP263 cookie → locale 编码」解码需求文件），
+      #    在 LC_ALL=C 下真实解析 requirements.txt。LC_ALL=C 是同类 locale 回退的最严档：
+      #    ASCII 单字节，任何非 ASCII 字节必炸（cp936 是「偶尔能解码、必须报 0xac」的窄带）。
+      - name: 旧 pip 在非 UTF-8 locale 下解析 requirements.txt
+        run: |
+          python -m pip install -q "pip==24.3.1"
+          LC_ALL=C PYTHONCOERCECLOCALE=0 PYTHONUTF8=0 python -m pip install --dry-run --no-deps -r requirements.txt
+
+      # ② PEP 597 隐式编码严格档：任何未显式 encoding= 的文本 I/O 立即失败（豁免项在 pytest.ini 声明）
+      - name: 隐式编码严格档 — 单元套件
+        run: PYTHONWARNDEFAULTENCODING=1 python -m pytest src/test/unit -q

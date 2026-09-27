@@ -12,3 +12,11 @@ charset = utf-8
 [*.ps1]
 charset = utf-8-bom
 end_of_line = crlf
+
+# requirements.txt 含中文注释时必须 UTF-8 with BOM：
+# 无 BOM 时中文 Windows（cp936 locale）上 pip <= 24.x 的 auto_decode 按「BOM →
+# PEP263 cookie → locale 编码」次序解码，最后一档回退 cp936 并报 UnicodeDecodeError
+# （'gbk' codec can't decode byte 0xac），启动脚本装依赖中断（pip >= 25 起默认 UTF-8，
+# 故该缺陷只在旧 pip 上暴露）。编辑后必须保留 BOM。
+[requirements.txt]
+charset = utf-8-bom

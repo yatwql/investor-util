@@ -190,8 +190,8 @@ class TestListXlsxFiles(unittest.TestCase):
         """目录中只有 .xlsx 文件 -> 返回这些文件。"""
         f1 = os.path.join(self.dir_path, "a.xlsx")
         f2 = os.path.join(self.dir_path, "b.xlsx")
-        open(f1, "w").close()
-        open(f2, "w").close()
+        open(f1, "w", encoding="utf-8").close()
+        open(f2, "w", encoding="utf-8").close()
         result = reader.list_xlsx_files(self.dir_path)
         self.assertEqual(len(result), 2)
         self.assertIn(f1, result)
@@ -199,33 +199,33 @@ class TestListXlsxFiles(unittest.TestCase):
 
     def test_skip_non_xlsx(self):
         """非 .xlsx 文件被过滤。"""
-        open(os.path.join(self.dir_path, "a.xlsx"), "w").close()
-        open(os.path.join(self.dir_path, "b.csv"), "w").close()
-        open(os.path.join(self.dir_path, "c.txt"), "w").close()
+        open(os.path.join(self.dir_path, "a.xlsx"), "w", encoding="utf-8").close()
+        open(os.path.join(self.dir_path, "b.csv"), "w", encoding="utf-8").close()
+        open(os.path.join(self.dir_path, "c.txt"), "w", encoding="utf-8").close()
         result = reader.list_xlsx_files(self.dir_path)
         self.assertEqual(len(result), 1)
         self.assertTrue(result[0].endswith("a.xlsx"))
 
     def test_skip_temp_files(self):
         """跳过 ~$ 开头的临时文件。"""
-        open(os.path.join(self.dir_path, "~$工作簿1.xlsx"), "w").close()
-        open(os.path.join(self.dir_path, "工作簿1.xlsx"), "w").close()
+        open(os.path.join(self.dir_path, "~$工作簿1.xlsx"), "w", encoding="utf-8").close()
+        open(os.path.join(self.dir_path, "工作簿1.xlsx"), "w", encoding="utf-8").close()
         result = reader.list_xlsx_files(self.dir_path)
         self.assertEqual(len(result), 1)
         self.assertTrue(result[0].endswith("工作簿1.xlsx"))
 
     def test_all_temp_files_skipped(self):
         """全是 ~$ 临时文件 -> 返回空列表。"""
-        open(os.path.join(self.dir_path, "~$a.xlsx"), "w").close()
-        open(os.path.join(self.dir_path, "~$b.xlsx"), "w").close()
+        open(os.path.join(self.dir_path, "~$a.xlsx"), "w", encoding="utf-8").close()
+        open(os.path.join(self.dir_path, "~$b.xlsx"), "w", encoding="utf-8").close()
         result = reader.list_xlsx_files(self.dir_path)
         self.assertEqual(result, [])
 
     def test_case_insensitive_extension(self):
         """不区分 .xlsx 大小写。"""
-        open(os.path.join(self.dir_path, "a.XLSX"), "w").close()
-        open(os.path.join(self.dir_path, "b.Xlsx"), "w").close()
-        open(os.path.join(self.dir_path, "c.xlsX"), "w").close()
+        open(os.path.join(self.dir_path, "a.XLSX"), "w", encoding="utf-8").close()
+        open(os.path.join(self.dir_path, "b.Xlsx"), "w", encoding="utf-8").close()
+        open(os.path.join(self.dir_path, "c.xlsX"), "w", encoding="utf-8").close()
         result = reader.list_xlsx_files(self.dir_path)
         self.assertEqual(len(result), 3)
 
@@ -233,8 +233,8 @@ class TestListXlsxFiles(unittest.TestCase):
         """按修改时间降序排列。"""
         f1 = os.path.join(self.dir_path, "older.xlsx")
         f2 = os.path.join(self.dir_path, "newer.xlsx")
-        open(f1, "w").close()
-        open(f2, "w").close()
+        open(f1, "w", encoding="utf-8").close()
+        open(f2, "w", encoding="utf-8").close()
         now = time.time()
         os.utime(f1, (now, now - 100))
         os.utime(f2, (now, now))
@@ -244,14 +244,14 @@ class TestListXlsxFiles(unittest.TestCase):
 
     def test_absolute_paths_returned(self):
         """返回绝对路径。"""
-        open(os.path.join(self.dir_path, "a.xlsx"), "w").close()
+        open(os.path.join(self.dir_path, "a.xlsx"), "w", encoding="utf-8").close()
         result = reader.list_xlsx_files(self.dir_path)
         self.assertTrue(os.path.isabs(result[0]))
 
     def test_mixed_files_with_xlsx(self):
         """混合各种类型的文件，只保留 .xlsx（不含 ~$）。"""
         for name in ["a.xlsx", "b.xlsx", "c.csv", "d.txt", "~$e.xlsx", "f.xlsx"]:
-            open(os.path.join(self.dir_path, name), "w").close()
+            open(os.path.join(self.dir_path, name), "w", encoding="utf-8").close()
         result = reader.list_xlsx_files(self.dir_path)
         basenames = {os.path.basename(p) for p in result}
         self.assertEqual(basenames, {"a.xlsx", "b.xlsx", "f.xlsx"})

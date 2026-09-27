@@ -41,14 +41,14 @@ def _ensure_reports_dir(output_dir: str) -> None:
     # 验证 output_dir 可写
     test_file = os.path.join(output_dir, ".write_test")
     try:
-        open(test_file, "a").close()
+        open(test_file, "ab").close()
         os.remove(test_file)
     except (PermissionError, OSError) as e:
         raise PermissionError(f"输出目录 '{output_dir}' 无写入权限") from e
     # 验证存档子目录可写
     archive_test_file = os.path.join(date_dir, ".write_test")
     try:
-        open(archive_test_file, "a").close()
+        open(archive_test_file, "ab").close()
         os.remove(archive_test_file)
     except (PermissionError, OSError) as e:
         raise PermissionError(f"存档子目录 '{date_dir}' 无写入权限") from e

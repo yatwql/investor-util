@@ -1359,6 +1359,7 @@ class TestModuleEntryPoint:
             cwd=PROJECT_ROOT,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             timeout=60,
         )
 
