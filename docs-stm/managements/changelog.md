@@ -41,6 +41,18 @@
 
 **验证**：严格档单元套件 7597 passed / 0 failed（修复前 78 failed）；`dev-verify` 3309 passed / 0 failed；7 个 `--ci` 守护脚本全 `[OK]`；`ruff check` + `ruff format --check` 零告警。
 
+### CI 首次运行暴露的既存测试隔离缺陷（rf-459）
+
+**现象**：新增 `portability` job 首轮（e083c1cc）与第二轮（b61a7a5f）均在「隐式编码严格档」步失败（其余 5 个 job 与旧 pip 探针均绿），而本机同命令全绿。借助新增的 workflow annotation 机制从 checks API 取到失败用例（日志端点需授权）：`test_cli_edge.py::TestCliEdge::test_no_input_in_report_path`（`generate_report` 未被调用）与 `test_cli.py::TestHandleWhatif::test_effective_date_passthrough`（`assert 2 == 0`）。
+
+**根因（与编码无关，为既存隔离泄漏被新 job 翻出）**：
+- **mock 打错调用点**：前者的 `patch("...cli._cli_read_holdings")` 与实际被调用的 `_cli_read_holdings_with_flows` 不是同一个函数；后者只 stub 了目标持仓的 `read_holdings`，基准持仓走未 stub 的 `_cli_read_holdings`。二者双双静默回退到**真实文件读取**，仅当开发机存在 `data/holdings/个人投资持仓信息.xlsx` 时才「恰好绿」——把该目录临时移走后**不带严格档也失败**（已实测），干净 clone 下日志即 `cli.py:323 持仓文件不存在`
+- **CI 选择口径缺席**：`dev-verify` 的 marker 表达式为 `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web) and not (edge or data)`，`verify` 亦不含 `unit_cli` → 这两条在 CI 上**从未运行过**；新 job 无过滤跑完整 `src/test/unit`，首次在清洁树上暴露
+
+**变更**：两条用例改为 patch 真实调用点（`_cli_read_holdings_with_flows` 返回 `(holdings, [], [])`；whatif 用例补 `_cli_read_holdings` stub）并就地注释该陷阱；`ci.yml` 的严格档步骤对调至 pip 降级之前，并在失败时输出 `::error::` workflow annotation（annotations 可免授权从 checks API 读取，无日志权限也能定位）。
+
+**验证**：本机（有真实 `data/holdings/`）与临时移走该目录后均全绿；清洁树（`git archive HEAD` + 修复后的两份测试，无 `data/holdings/`）严格档整轮单元套件仅剩 `folders.md` 统计自洽项（同步后消失）。**副产物**：`portability` job 自此实际承担「清洁树 + 全量单元（含 `unit_cli` / `edge`）」的隔离回归。
+
 ---
 
 ## 归档

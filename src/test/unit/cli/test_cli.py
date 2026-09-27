@@ -699,6 +699,9 @@ class TestHandleWhatif:
     def test_effective_date_passthrough(self):
         """--effective-date → 透传到 run_whatif_simulation kwargs。"""
         with (
+            # 基准持仓（未传 --base）走 _cli_read_holdings，目标持仓走 read_holdings；
+            # 两者都要 stub，否则会真读 data/holdings/ 而依赖开发机本地文件
+            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.core.reader.read_holdings", side_effect=[[MagicMock()], [MagicMock()]]),
             patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
         ):
