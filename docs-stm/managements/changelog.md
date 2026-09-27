@@ -53,6 +53,18 @@
 
 **验证**：本机（有真实 `data/holdings/`）与临时移走该目录后均全绿；清洁树（`git archive HEAD` + 修复后的两份测试，无 `data/holdings/`）严格档整轮单元套件仅剩 `folders.md` 统计自洽项（同步后消失）。**副产物**：`portability` job 自此实际承担「清洁树 + 全量单元（含 `unit_cli` / `edge`）」的隔离回归。
 
+### 文档核对：FAQ/自检段/描述同步（rf-460）
+
+**背景**（用户要求核对管理文档与用户文档）：rf-457~rf-459 三批变更落地后，逐份比对 10 份管理文档 + 11 份用户文档 + `CLAUDE.md`，发现 4 处未同步：
+
+**变更**：
+- `faq.md`「启动与安装」新增问答：中文 Windows 装依赖报 `UnicodeDecodeError: 'gbk' codec can't decode byte 0xac ...`（根因：旧版 `requirements.txt` 中文注释无 BOM + pip ≤24.x + cp936）——三档解法（首选 `git pull` 拉 BOM 修复版 / `pip install -U pip` 升 ≥25 / 临时 `$env:PYTHONUTF8=1`）+ 预防说明（CI `portability` 门禁）
+- `developer-guide.md`「编码/locale 自检」补 PEP 668 注意：①号命令在系统级管理解释器上会被拒，本机复现请装进临时 venv 或追加 `--break-system-packages`（`--dry-run` 无实际安装风险）
+- `test-coverage.md`：`unit_scripts` 标记描述补「编码与 locale 自检（requirements.txt BOM 约定 + 复刻旧 pip 解码次序 + PEP 597 严格档豁免）」
+- `folders.md`：目录树 `ci.yml` 描述补「P0/P1/P2 三级门禁 + guards/portability/format 三个独立 job」
+
+**核对无偏差项**（顺带确认）：CI job 计数表述（`guards`/`portability`/`format` 三处一致）、版本一致性 13/13、pytest.ini 引用、`requirements.txt` BOM 引用口径、review-findings 编号源与待办/已解决分区、dev-verify 验证记录。
+
 ---
 
 ## 归档

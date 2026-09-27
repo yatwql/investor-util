@@ -98,6 +98,8 @@ LC_ALL=C PYTHONCOERCECLOCALE=0 PYTHONUTF8=0 python -m pip install --dry-run --no
 PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 ```
 
+> ①号命令在受 PEP 668（externally-managed-environment）系统级管理的解释器上会被拒：装进临时 venv 复现，或追加 `--break-system-packages`（`--dry-run` 不做实际安装，无风险）；CI 的 setup-python 环境不受此限。
+
 > 为何不直接跑 Windows runner：GitHub 的 `windows-latest` 是 en-US/cp1252（单字节，只会乱码不会报错），装不住 GBK 类 locale 回退；为何不在 ubuntu 上装 GB18030 跑全套件：中文**文件名**在 POSIX `fsencoding=ascii` 下会失败（18 处中文报表文件名），而 cp936 Windows 反而正常——那是探测方法的伪影，不是缺陷。两道探针因此取「精确模拟消费方」而非「换整个 locale 跑全套件」。
 
 > P1/P2 的完整要求（含手动验证项）见 [testplan.md](testplan.md) → 回归测试清单 / 门禁章节。

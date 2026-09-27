@@ -164,6 +164,16 @@ A: 项目内置 CLI 命令行模式（`.venv/bin/python -m src.python.cli`），
 
 详细配置步骤见[CLI 命令行模式使用指南](how-to-use-cli-mode.md) §13「定时任务」。
 
+**Q: 中文 Windows 启动时在「安装依赖」阶段报 `UnicodeDecodeError: 'gbk' codec can't decode byte 0xac ...`，怎么办？**
+
+A: 这是**修复后的已知问题**：`requirements.txt` 含中文注释但无 UTF-8 BOM，在中文 Windows（cp936 locale）+ pip ≤24.x 上，pip 按「BOM → 编码声明 → 系统区域编码」次序解码需求文件时回退到 GBK 导致。按优先级任选其一：
+
+1. **首选**：`git pull` 拉取最新代码后重跑 `launch.ps1`——BOM 已修复，且 `requirements.txt` 内容变化会自动触发重装依赖；
+2. **升级 pip**：`.venv\Scripts\python.exe -m pip install -U pip`（pip ≥25 起默认按 UTF-8 解析需求清单，不受系统 locale 影响，修复前拉取的代码也不再受影响）；
+3. **临时应急**：PowerShell 先执行 `$env:PYTHONUTF8=1` 再运行 `launch.ps1`（仅当前窗口生效）。
+
+补充：仓库已新增 CI `portability` 门禁（旧 pip + 非 UTF-8 locale 真实解析 `requirements.txt`，以及「任何未显式指定 `encoding=` 的读写立即失败」的 PEP 597 严格档），同类缺陷不会再进入代码库。
+
 ---
 
 ## 配置相关

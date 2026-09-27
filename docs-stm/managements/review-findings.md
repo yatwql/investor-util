@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.7-dev
-> **编号源**：`rf-next = 460`（新增问题取此编号，完成后更新为 +1；已用最大 rf-459，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 461`（新增问题取此编号，完成后更新为 +1；已用最大 rf-460，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -51,6 +51,8 @@
 > **探测方法纠偏（留证）**：`LC_ALL=C` 全套件初跑报 47 处失败，逐条定位后确认其中 18 处为 POSIX `fsencoding=ascii` 无法编码中文**文件名**的伪影（cp936 Windows 侧正常），另有 31 处来自 openpyxl 内部 tempfile——最终改用「精确模拟消费方」的两道探针，而非「换整套 locale 跑全套件」。
 
 | **rf-459** | **CI 首次运行暴露的既存测试隔离泄漏 + CI 选择口径遗漏**（用户报「github ci 报错」）：新增 `portability` job 的严格档在清洁树上失败，含两条*与编码无关*的用例——`test_cli_edge.py::TestCliEdge::test_no_input_in_report_path` 与 `test_cli.py::TestHandleWhatif::test_effective_date_passthrough`。根因两重：**① mock 打错调用点** —— 前者 patch `_cli_read_holdings`，而 `_handle_report` 实际调 `_cli_read_holdings_with_flows`；后者只 stub 目标持仓的 `read_holdings`，未 stub 基准持仓的 `_cli_read_holdings` → 二者双双静默回退到**真实文件读取**，只在开发机存在 `data/holdings/个人投资持仓信息.xlsx` 时「恰好绿」（实测：将 `data/holdings/` 移走后**不带严格档也红**；干净 clone 下日志即 `cli.py:323 持仓文件不存在`）；**② CI 选择口径缺席** —— `dev-verify` 的 marker 表达式为 `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web) and not (edge or data)`、`verify` 亦不含 `unit_cli`，故这两条在 CI 上**从未运行过**，新 job 无过滤跑完整 `src/test/unit` 时首次暴露 | ① 两条用例改为 patch 真实调用点（`_cli_read_holdings_with_flows` 返回 `(holdings, [], [])`；whatif 用例补 `_cli_read_holdings` stub），并在原位置以注释说明「只 patch 另一个名字会静默回退到真实文件」；② 验证：`data/holdings/` 临时移走后上述用例仍全绿（已恢复现场）；③ 收益：`portability` job 从此实际承担「**清洁树 + 全量单元（含 `unit_cli` / `edge`）**」的隔离回归——CI 选择口径的空白由它兜住（是否需要把 `unit_cli` 正式并入 P0/P1 模式选择另议） |
+
+| **rf-460** | **rf-457~rf-459 三批变更后的文档核对缺口**（用户要求「核对管理文档、用户文档」）：① FAQ 无「中文 Windows 装依赖报 `'gbk' codec can't decode byte 0xac`」的问答——用户另一台机器实测踩过的坑，报错文案与解法应沉淀进用户手册；② `developer-guide.md`「编码/locale 自检」①号命令在受 PEP 668 系统级管理的解释器上会被拒（本机复现即撞 externally-managed-environment），无任何提示；③ `test-coverage.md` 的 `unit_scripts` 描述未反映新增的编码/locale 自检覆盖；④ `folders.md` 目录树 `ci.yml` 描述未体现新增的 `portability` job | ① `faq.md`「启动与安装」新增该问答（首选 `git pull` 修复版 BOM / 升级 pip ≥25 / 临时 `$env:PYTHONUTF8=1` 三档解法 + `portability` 门禁说明）；② 自检段补 PEP 668 注意（临时 venv 或 `--break-system-packages`，`--dry-run` 无实际安装风险）；③ `unit_scripts` 描述补「编码与 locale 自检」；④ 目录树描述补「P0/P1/P2 + guards/portability/format 三个独立 job」 |
 
 | # | 问题 | 修复 |
 |---|------|------|
