@@ -1,5 +1,5 @@
 # 目录结构与项目统计
-> 文档版本：0.11.7-dev
+> 文档版本：0.11.7
 >
 > 项目目录树 — 新增/重命名任何非排除文件或目录时，必须同步更新此文档。
 >
@@ -14,13 +14,13 @@
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 37 | 9,975 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
 | **源代码合计** | — | **340** | **90,654** | 主程序 + 模板 + 脚本 + SVG |
-| **测试代码** | Python | **401** | **118,707** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
-| **测试用例** | — | — | **7,923 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
-| **用户文档** | Markdown | **11** | **5,438** | 含 README.md（207 行）；行数为 README + manuals 之和 |
-| ├ manuals/ | 用户手册分册 | 10 | 5,231 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **145** | **55,817** | 含 CLAUDE.md（75 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 2 + archive md 132），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,615 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 132 | 44,753 | 各版本 changelog/plan/review-findings 与设计文档归档（132 md 44,643 行） |
+| **测试代码** | Python | **401** | **118,787** | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| **测试用例** | — | — | **7,926 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| **用户文档** | Markdown | **11** | **5,448** | 含 README.md（207 行）；行数为 README + manuals 之和 |
+| ├ manuals/ | 用户手册分册 | 10 | 5,241 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
+| **项目文档** | Markdown | **145** | **55,905** | 含 CLAUDE.md（75 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 2 + archive md 132），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,635 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 132 | 44,821 | 各版本 changelog/plan/review-findings 与设计文档归档（132 md 44,711 行） |
 | ├ plan/ | 中间设计文件 | 2 | 363 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档——对照评测方案（171 行）+ 类型化判定通道接入设计（192 行） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -720,7 +720,7 @@ investor-util/
 │       │   │   ├── test_test_runner_reports.py  #   test_runner 分阶段报告路径与汇总页链接（防两阶段同名覆盖）
 │       │   │   ├── test_extract_test_failures.py #   失败用例提取 data-jsonblob 解析（HTML 实体引号回归）
 │       │   │   ├── test_calibrate_dedup_threshold.py # 去重校准工具：分支重判/锚点压缩幂等/报告口径与过时建议回归
-│       │   │   ├── test_script_encoding.py  #   scripts/*.ps1 BOM+CRLF 与 scripts/*.sh 可执行位约定回归
+│       │   │   ├── test_script_encoding.py  #   *.ps1/requirements.txt 编码与 *.sh 可执行位约定回归
 │       │   │   ├── test_check_semantic_index.py  #   语义命名索引正反向校验脚本测试
 │       │   │   ├── test_check_doc_drift.py  #   文档与实现一致性检查脚本测试（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵）
 │       │   │   ├── test_check_requirement_trace.py  #   需求 ID ↔ 验证载体追溯检查脚本测试（解析/五项断言/真实仓库冒烟）
@@ -834,8 +834,8 @@ investor-util/
 │   └── install-hooks.sh              #   hooks 激活脚本（clone 后运行一次启用 core.hooksPath）
 ├── .github/                         # GitHub 配置
 │   └── workflows/                      #   CI/CD 配置文件
-│       └── ci.yml                   #   CI/CD 流水线（P0/P1/P2 三级门禁）
-├── pytest.ini                       # pytest 全局配置
+│       └── ci.yml                   #   CI/CD 流水线（P0/P1/P2 三级门禁 + guards/portability/format 三个独立 job）
+├── pytest.ini                       # pytest 全局配置（含 PEP 597 隐式编码严格档 error::EncodingWarning）
 ├── reason.bat                       # Reasonix AI code editor 启动（`reasonix code`）
 ├── scripts/                          # 启动脚本 + 测试工具
 │   ├── cli.ps1                      #   Windows PowerShell CLI 命令行包装（无参数默认生成报告 --type both）
@@ -1124,7 +1124,7 @@ investor-util/
 ├── .pi/                              # pi 编程助手项目配置（项目级设置，随仓库发布）
 │   └── settings.json                 #   项目级设置：changelog 折叠 / 静默启动 / fullscreen
 │   └── models.json                   #   pi 模型配置（DeepSeek 编程档：temperature 0.0 + maxTokens 收窄；需软链到 ~/.pi/agent/ 生效）
-├── .editorconfig                     # 编辑器编码规则（*.ps1 强制 UTF-8 BOM+CRLF）
+├── .editorconfig                     # 编辑器编码规则（*.ps1 + requirements.txt 强制 UTF-8 BOM）
 └── .gitignore                        # Git 忽略规则
 ```
 

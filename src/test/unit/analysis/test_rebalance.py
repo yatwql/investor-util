@@ -970,7 +970,7 @@ class TestSilencePeriod:
     def test_save_corrupted_file_returns_empty(self, tmp_path):
         """损坏的 JSON 文件返回空字典。"""
         f = str(tmp_path / "rebalance_silence.json")
-        with open(f, "w") as fh:
+        with open(f, "w", encoding="utf-8") as fh:
             fh.write("not json")
         state = _load_silence_state(f)
         assert state == {}

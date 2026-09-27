@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.11.7-dev
+> 文档版本：0.11.7
 
 ---
 
@@ -824,6 +824,7 @@ def test_get_ttl_closed(self, mock_open):
 14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[V]/[H]/[D]/[X]，其中 [D] 系统自检受 `doctor_check` 开关门控）响应正确、无崩溃 → `test_tui_menu.py`（20 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
 15. **whatif CLI**：`--candidate` 必填、`--base` 可选、缺失报参数错误、`--effective-date` 解析，生成/归档行为 → `test_cli.py::test_whatif_*` + `test_whatif_operations.py` / `test_whatif_sheet.py` / `test_whatif_html.py` / `test_whatif_writer.py`
 16. **whatif 生效日时序回测**：① 过去生效日→出「时序回测」页签/区 → `test_effective_date_merges_backtest` + `test_backtest_sheet_full` + `test_backtest_section_rendered`；② 缺省→维持现状（无回测）→ `test_no_effective_date_no_backtest_call` + `test_full_rendering_sections_without_backtest`；③ 未来/非法日期→降级占位、主报告正常 → `test_compute_backtest_days_invalid_format` / `test_compute_backtest_days_future_or_today_none` + `test_effective_date_exception_degrades` + `test_backtest_sheet_unavailable_reason_placeholder`；④ 断网/空缓存→回测不可用但报告仍生成 → `test_unavailable_returns_reason` / `test_unavailable_without_reason_falls_back` + `test_effective_date_bt_none_no_key`
+17. **编码/locale 可移植性**（CI `portability` job，阻塞；常规三道测试均跑在 UTF-8 locale 上，该类缺陷在它们上面结构性不可见）：① 需求文件与 locale 无关——固定 `pip==24.3.1`（最后一版按「BOM → PEP263 cookie → locale 编码」解码）在 `LC_ALL=C` 下真实解析 `requirements.txt`，由 `test_script_encoding.py::TestRequirementsFileEncoding` 在本机同源守护（复刻旧 pip 解码次序 + 强制 cp936）；② 隐式编码严格档 —— `PYTHONWARNDEFAULTENCODING=1` 下任何未显式 `encoding=` 的文本 I/O 立即失败（`pytest.ini` 置 `error::EncodingWarning`，`openpyxl.worksheet._writer` 上游豁免就地声明），验载体为 `src/test/unit/` 全量（禁止 `open`/`Path.read_text`/`write_text`/`NamedTemporaryFile`/`subprocess.run(text=True)` 等隐式编码调用）；本地复现命令见 `developer-guide.md` → 编码/locale 自检
 
 ---
 

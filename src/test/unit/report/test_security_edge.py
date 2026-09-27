@@ -195,7 +195,7 @@ class TestSymlink(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             # 创建一个命名管道（模拟特殊文件类型），Windows 用普通文件代替
             fpath = os.path.join(tmpdir, "not_a_real.xlsx")
-            with open(fpath, "w") as f:
+            with open(fpath, "w", encoding="utf-8") as f:
                 f.write("")
             result = list_xlsx_files(tmpdir)
             self.assertEqual(len(result), 1)

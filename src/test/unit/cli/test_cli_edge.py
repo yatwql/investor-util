@@ -29,7 +29,12 @@ class TestCliEdge:
         """report 路径无 input() 调用。"""
         mock_holdings = [MagicMock()]
         with (
-            patch("src.python.cli.cli._cli_read_holdings", return_value=mock_holdings),
+            # 必须打在真实调用点：_handle_report 走的是 _cli_read_holdings_with_flows；
+            # 只 patch _cli_read_holdings 会静默回退到真实文件读取，依赖开发机 data/holdings/
+            patch(
+                "src.python.cli.cli._cli_read_holdings_with_flows",
+                return_value=(mock_holdings, [], []),
+            ),
             patch("src.python.report.orchestrator.generate_report") as mock_gen,
         ):
             from src.python.cli import _handle_report
@@ -84,8 +89,8 @@ class TestCliEdge:
         holdings_dir.mkdir()
         f1 = holdings_dir / "持仓1.xlsx"
         f2 = holdings_dir / "持仓2.xlsx"
-        f1.write_text("dummy")
-        f2.write_text("dummy")
+        f1.write_text("dummy", encoding="utf-8")
+        f2.write_text("dummy", encoding="utf-8")
 
         # f2 修改时间更新
         import time

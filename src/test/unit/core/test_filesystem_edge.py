@@ -46,7 +46,7 @@ class TestEncryptedExcel(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "macro.xlsm")
-            with open(fpath, "w"):
+            with open(fpath, "w", encoding="utf-8"):
                 pass
             result = list_xlsx_files(tmpdir)
             self.assertEqual(len(result), 0)
@@ -106,7 +106,7 @@ class TestCorruptedXlsx(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fpath = os.path.join(tmpdir, "bad.xlsx")
-            with open(fpath, "w") as f:
+            with open(fpath, "w", encoding="utf-8") as f:
                 f.write("this is not a valid xlsx file")
             with self.assertRaises(ValueError) as ctx:
                 read_holdings(fpath)

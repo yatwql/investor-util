@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
-> 文档版本：0.11.7-dev
-> **编号源**：`rf-next = 457`（新增问题取此编号，完成后更新为 +1；已用最大 rf-456，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.11.7
+> **编号源**：`rf-next = 461`（新增问题取此编号，完成后更新为 +1；已用最大 rf-460，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -46,7 +46,7 @@
 
 ### 已解决待归档（v0.11.7-dev）
 
-> 暂无（v0.11.6 批次 rf-444 ~ rf-456 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）
+> 暂无（v0.11.7 批次 rf-457 ~ rf-460 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）
 
 ### 归档档案
 
