@@ -976,7 +976,7 @@ fetcher/
 
 #### 2.4.1 00 代码降级
 
-**问题**：OTC 基金代码与 A 股代码前缀重叠（均以 `00` 开头），`is_a_share_code()` 无法区分。`price.py` 和 `portfolio_history.py` 需要"先股票链路，失败后基金链路"的双阶段降级。
+**问题**：OTC 基金代码与 A 股代码前缀重叠（均以 `00` 开头），`is_a_share_code()` 无法区分。`price.py` 和 `portfolio_history.py` 需要「先按名称消歧，再降级」。
 
 **判定支持函数**（`core/code_utils.py`）：
 
@@ -984,8 +984,9 @@ fetcher/
 |:-----|:------|:------|
 | `is_otc_code_overlap(code)` | 仅前缀检测（00 开头） | 快速预筛——是否值得尝试基金净值 API |
 | `is_otc_fund_by_name(name, code)` | 名称+代码双维度 | 00 代码+名称含基金关键词→确认为场外基金 |
+| `is_a_share_stock(name, code)` | 名称+代码双维度 | **持仓路由统一入口**：A 股个股（排除 00 重叠区场外基金），历史/分红/行业/估值/扩展数据均以此过滤，禁止只用 `is_a_share_code(code)` |
 
-`_OTC_FUND_NAME_KW = ("混合", "纯债", "短债", "中短债", "利率债", "信用债", "货币", "联接", "增利")`
+`_OTC_FUND_NAME_KW = ("混合", "纯债", "短债", "中短债", "利率债", "信用债", "债券", "指数", "股票", "货币", "联接", "增利")`
 
 **price.py 降级流程**：
 
@@ -994,11 +995,14 @@ fetch_market_data(code, expected_name)
     │
     ▼
 ┌──────────────────────────────────────┐
-│ 代码类型路由                          │
-│ if is_exchange_fund or is_a_share:   │
+│ 代码类型路由（名称优先消歧）           │
+│ if is_otc_code_overlap(code) and     │
+│    is_otc_fund_by_name(name, code):  │
+│   data_type = "price_fund_otc"       │←── 直达: eastmoney → sina_fund
+│ elif is_exchange_fund or is_a_share: │
 │   data_type = "price_stock"          │←── 主链路: tencent → sina
 │ else:                                │
-│   data_type = "price_fund_otc"       │←── 直达: eastmoney
+│   data_type = "price_fund_otc"       │
 │                                      │
 │ _needs_degrade = (data_type=="price_stock" AND code.startswith("00"))
 └────────────┬─────────────────────────┘
@@ -1029,6 +1033,8 @@ fetch_market_data(code, expected_name)
 ```
 
 **关键设计保障**：
+- **价格缓存键按路由分域**：`price_stock_{code}` / `price_fund_otc_{code}`。00 重叠区同一代码可能是两只不同证券（`002943` 既是深市股票「宇晶股份」也是场外基金「广发多因子」），共用键会让先取到的路由污染另一路由；而收市后基金走 CACHE_ONLY 只读缓存，一旦串味即成持久错误值（实测：基金成分股取扩展数据时把宇晶股份 28.98 写进共享键，基金被读成 28.98）。
+- **持仓路由统一以名称消歧**：历史 K 线（`portfolio_history` / `_report_factor_metrics`）、分红（`category` / `html_builders` / `cache.operations`）、行业关键词（`news_correlation`）、估值分位（`orchestrator`）、风格扩展数据（`fund_style_classify`）、资产构成图兜底（`chart_data_builder`）一律用 `is_a_share_stock(name, code)` 过滤，不再只用代码前缀。
 - 主链路成功时永不触达降级，零误判风险
 - 降级成功/失败均有日志区分（含资产名称和期望名称）
 - `portfolio_history.py` 中 `fetch_with_incremental_fallback()` 对返回空列表的首个 provider 同样执行递补，非简单返回
@@ -3218,6 +3224,7 @@ load_holdings(filepath)
 | | `is_index_fund_by_name(name)` | 指数/ETF 联接/中证/沪深 300 等 | 场外指数基金 |
 | | `is_index_link_by_name(name)` | ETF 联接/联接/链接 | 指数联接基金 |
 | 复合 | `is_etf_by_name_or_code(name, code)` | 名称+代码双维度 | ETF 增强识别 |
+| | `is_a_share_stock(name, code)` | 名称+代码双维度（`is_a_share_code` 且非 00 重叠区场外基金） | 持仓路由「按 A 股个股处理」统一入口 |
 | | `is_otc_fund_by_name(name, code)` | 00 代码+名称含基金关键词 | 00 代码重叠区→场外基金 |
 | | `is_offsite_fund(account)` | 关键词匹配 | 场外基金账户 |
 | | `is_fund_holding(name, code, account)` | 三者联合 | 持仓是否需要基金业绩分析 |
@@ -3655,7 +3662,7 @@ investor-util/
 
 | 键名 | 文件名模式 | TTL | 盘中特殊 | 指纹 | 分组 |
 |:-----|:----------|:---:|:--------:|:----|:-----|
-| `price` | `price_{code}.json` | 24h | 交易时段 30s | — | preload |
+| `price` | `price_{route}_{code}.json` | 24h | 交易时段 30s | — | preload |
 | `index` | `index_{code}.json` | 24h | 交易时段 30s | — | preload |
 | `news` | `news_{md5}.json` | 15 分钟 | — | 新闻源参数+关键词 | refresh |
 | `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | — | A 股+美股指数 | refresh |

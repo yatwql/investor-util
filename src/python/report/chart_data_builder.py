@@ -15,7 +15,7 @@ import logging
 from typing import Any
 
 from src.python.analysis.crisis_annotation import CRISIS_INTERVALS
-from src.python.core.code_utils import is_a_share_code, is_exchange_fund_code
+from src.python.core.code_utils import is_a_share_stock, is_exchange_fund_code
 from src.python.core.num_utils import finite_or
 from src.python.report.downsample import downsample_bars
 
@@ -321,7 +321,7 @@ def _infer_property(d: Any) -> str:
     首字符判前缀——自建前缀表会漏掉科创板 68、北交所 8 与场内基金各段。
     """
     code = str(getattr(d, "code", "") or "").strip()
-    if is_a_share_code(code):
+    if is_a_share_stock(str(getattr(d, "name", "") or ""), code):
         return "股票"
     if is_exchange_fund_code(code):
         return "基金"

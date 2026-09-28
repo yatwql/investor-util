@@ -316,11 +316,11 @@ def _refresh_extended_cache(holdings: list) -> int:
     Returns:
         需预取的 A 股去重代码数（预取本身为填充 session_cache 的尽力而为操作）。
     """
-    from src.python.core.code_utils import is_a_share_code
+    from src.python.core.code_utils import is_a_share_stock
     from src.python.core.provider_registry import get_registry
     from src.python.report.fund_style_classify import _prefetch_extended_data
 
-    a_share_codes = [h.code.strip() for h in holdings if h.code and h.code.strip() and is_a_share_code(h.code.strip())]
+    a_share_codes = [h.code.strip() for h in holdings if h.code and h.code.strip() and is_a_share_stock(h.name, h.code.strip())]
     unique = list(dict.fromkeys(a_share_codes))
     if not unique:
         return 0

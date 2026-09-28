@@ -88,6 +88,26 @@
 - 回归 +1 例 `TestMockKlinesFreshness::test_klines_anchored_to_today_and_not_stale`（断言末根日期 == 今天且距今天数 ≤ 停更阈值）
 - 数据快照同步：`managements/folders.md`（测试代码行数 + 用例数 7,938→7,941）、`managements/test-coverage.md`（`scenario_basic` 152→153、报告生成/`unit_report` 1,983→1,985）
 
+### 缺陷修复：00 重叠区场外基金的价格串味（rf-466）
+
+**现象**（用户报「002943 你拿到了 28.98，官方净值应该是 4.7727」）：报告里持仓基金「广发多因子灵活配置混合(002943)」价格显示 28.98（深市股票「宇晶股份」的价格），收益率为 +697.80%；真值为 4.7727。
+
+**根因**：
+- `002943` 是股票/场外基金代码重叠；该基金的成分股（`fund_hold_002943`，98 只）含该代码（宇晶股份）。
+- 基金风格判定取成分股扩展数据时，`fetch_market_data(code)` **未传名称** → 名称消歧被跳过 → 路由判为股票 → 把宇晶股份价格写进**路由无关的共享缓存键** `price_{code}`。
+- 用户持仓该基金收盘后 CACHE_ONLY 只读缓存 → 读到股票价。
+- 同源缺陷：历史 K 线 / 分红 / 行业关键词 / 估值分位 / 风格扩展数据各域只按代码前缀判 A 股，绕过已有的 `is_otc_fund_by_name`。
+- **非代码回归**（窗口内相关文件零改动），潜伏缺陷被数据触发：09-26 前 push2 返回市值/PE 未触发腾讯降级，09-28 push2 对 002943 只回行业、pe/mcap 全为 null 触发降级。
+
+**变更**：
+- `core/code_utils.py` 新增 `is_a_share_stock(name, code)`，作「持仓按 A 股个股处理」唯一判据（代码类型判定中心化）
+- `fetcher/price.py`：缓存键按路由分域 `price_stock_{code}` / `price_fund_otc_{code}`，新增 `resolve_price_route`；`fetch_market_data` 首跳与降级各用其键，`fetch_market_data_cached` 会话域改按路由
+- 各域路由改用 `is_a_share_stock`：`portfolio_history`、`_report_factor_metrics`、`category`、`html_builders`、`cache/operations`、`news_correlation`、`orchestrator`、`fund_style_classify`、`chart_data_builder`
+- 回归 +8 例（判定函数、价格键分域与路由消歧、历史走净值链路、降级首跳键）
+- 文档同步：`technical.md` §2.4.1（路由/缓存分域）、§6.5 原语清单、附录 C 键名；`how-to-config.md`；`tui/handlers_cache.py` 文案
+
+**效果**：002943 等 00 重叠区场外基金不再被取到同代码股票的价格/历史/分红/行业/估值。
+
 ---
 
 ## 归档

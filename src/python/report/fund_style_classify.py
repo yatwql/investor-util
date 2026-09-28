@@ -11,7 +11,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
-from src.python.core.code_utils import is_a_share_code
+from src.python.core.code_utils import is_a_share_code, is_a_share_stock
 from src.python.report.fund_style_base import (
     _ensure_tencent_provider_registered,
     _get_size_from_code,
@@ -276,7 +276,11 @@ def _prefetch_extended_data(
     reg: Any,
 ) -> None:
     """预取各持仓股票的扩展数据（三级降级：push2 → Tencent → 代码段估算）。"""
-    _codes_to_fetch = [c for h in holdings if (c := (h.get("code") or "").strip()) and c and is_a_share_code(c)]
+    _codes_to_fetch = [
+        c
+        for h in holdings
+        if (c := (h.get("code") or "").strip()) and c and is_a_share_stock(h.get("name", "") or "", c)
+    ]
     # 去重：同一股票跨基金不重复请求
     _seen: set[str] = set()
     _unique_codes = [c for c in _codes_to_fetch if not (c in _seen or _seen.add(c))]
@@ -320,7 +324,7 @@ def _classify_stock_styles(
         if ratio <= 0:
             continue
 
-        _cached = reg.session_cache_get("extended", code) if code and is_a_share_code(code) else NOT_FOUND
+        _cached = reg.session_cache_get("extended", code) if code and is_a_share_stock(name, code) else NOT_FOUND
         ext_data = _cached if _cached is not NOT_FOUND else None
         industry_avg_pe = industry_avg_pe_map.get(code)
 

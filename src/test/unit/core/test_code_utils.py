@@ -1,7 +1,7 @@
 """code_utils 指数代码与符号映射判定函数单元测试。
 
 覆盖：is_index_code / is_us_index_code / get_index_exchange_prefix /
-      is_otc_fund_by_name / is_a_share_code（00 重叠区场外基金辅助判定与 A 股代码判定）/
+      is_otc_fund_by_name / is_a_share_stock / is_a_share_code（00 重叠区场外基金辅助判定与 A 股代码判定）/
       to_fmp_symbol（A 股代码 → FMP 风格符号）。
 """
 
@@ -12,6 +12,7 @@ import pytest
 from src.python.core.code_utils import (
     get_index_exchange_prefix,
     is_a_share_code,
+    is_a_share_stock,
     is_index_code,
     is_otc_fund_by_name,
     is_us_index_code,
@@ -139,6 +140,32 @@ class TestIsOtcFundByName:
         """名称或代码缺失 → 非场外基金（防御性，不抛异常）。"""
         assert is_otc_fund_by_name("", "000311") is False
         assert is_otc_fund_by_name("景顺长城景颐双利债券A", "") is False
+
+
+class TestIsAShareStock:
+    """is_a_share_stock 持仓「按 A 股个股处理」判定（排除 00 重叠区场外基金）。"""
+
+    def test_plain_a_share_is_stock(self) -> None:
+        """普通 A 股（含深市 00 前缀股票、沪市、创业板、北交所）→ True。"""
+        assert is_a_share_stock("长江电力", "600900") is True
+        assert is_a_share_stock("平安银行", "000001") is True
+        assert is_a_share_stock("宁德时代", "300750") is True
+        assert is_a_share_stock("宇晶股份", "002943") is True
+
+    def test_otc_fund_in_overlap_zone_is_not_stock(self) -> None:
+        """00 重叠区场外基金（名称命中基金特征词）→ False。
+
+        回归：002943 既是深市股票「宇晶股份」也是场外基金「广发多因子灵活配置混合」，
+        各域路由不得按个股处理该持仓。
+        """
+        assert is_a_share_stock("广发多因子灵活配置混合", "002943") is False
+        assert is_a_share_stock("景顺长城景颐双利债券A", "000311") is False
+
+    def test_non_a_share_code_is_not_stock(self) -> None:
+        """非 A 股代码（场内 ETF/场外基金/港股）→ False。"""
+        assert is_a_share_stock("招商中证电池主题ETF", "561910") is False
+        assert is_a_share_stock("建信高端装备股票A", "011506") is False
+        assert is_a_share_stock("腾讯控股", "00700") is False
 
 
 class TestOtcRedemptionDaysDefault:

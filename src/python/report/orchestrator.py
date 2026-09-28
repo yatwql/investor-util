@@ -375,13 +375,13 @@ def compute_valuation_data(
     from concurrent.futures import ThreadPoolExecutor
 
     from src.python.analysis.valuation_percentile import unavailable_valuation
-    from src.python.core.code_utils import is_a_share_code
+    from src.python.core.code_utils import is_a_share_stock
 
     try:
         reporter.info("正在计算估值分位...")
 
         # ── 1. 去重 A 股持仓（code+name，供 push2/K 线路由） ──
-        pairs = list(dict.fromkeys((d.code, d.name) for d in details if is_a_share_code(d.code)))
+        pairs = list(dict.fromkeys((d.code, d.name) for d in details if is_a_share_stock(d.name, d.code)))
 
         # ── 2. 并行拉取 PE/PB + 价格分位（复用 push2 请求通道 + 会话缓存） ──
         by_code: dict[str, dict] = {}

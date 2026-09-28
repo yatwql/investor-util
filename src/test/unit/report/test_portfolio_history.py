@@ -83,6 +83,21 @@ class TestCalculateForHolding(unittest.TestCase):
         self.assertIsNotNone(result)
         mock_fetch.assert_called_once_with("history_fund_otc", "012325", 30)
 
+    @patch("src.python.report.portfolio_history.fetch_with_incremental_fallback")
+    def test_otc_fund_name_routes_directly_to_fund(self, mock_fetch):
+        """002943 名称可识别为场外基金 → 直接走基金净值，不误取同代码股票 K 线。
+
+        回归：先前 00 前缀优先判 A 股，只要股票 K 线有数据就不降级，
+        以致取到同代码深市股票（宇晶股份）的历史而非基金净值。
+        """
+        fake_bars = [{"date": "2026-07-01", "nav": 4.77}]
+        mock_fetch.return_value = fake_bars
+
+        calc = self._make_calculator()
+        result = calc.calculate_for_holding("002943", "广发多因子灵活配置混合", 2000)
+        self.assertIsNotNone(result)
+        mock_fetch.assert_called_once_with("history_fund_otc", "002943", 30)
+
     def test_hk_stock_returns_none(self):
         """港股通代码 → None。"""
         calc = self._make_calculator()

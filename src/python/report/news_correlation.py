@@ -20,6 +20,7 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
+from src.python.core.code_utils import is_otc_fund_by_name
 from src.python.core.models import Holding
 from src.python.core.registry import get_llm_module_name
 from src.python.report.data_status import STATUS_MESSAGES
@@ -275,8 +276,11 @@ def _expand_industry_keywords(
     try:
         all_codes: set[str] = set()
         for h in holdings:
-            if h.code and h.code.strip():
-                all_codes.add(h.code.strip())
+            code = (h.code or "").strip()
+            # 00 重叠区场外基金（如 002943 广发多因子）不取个股行业/概念，
+            # 否则会把同代码深市股票（宇晶股份）的行业/概念当作基金标签
+            if code and not is_otc_fund_by_name(h.name or "", code):
+                all_codes.add(code)
         if penetrated_assets:
             for asset in penetrated_assets:
                 for ac in asset.get("codes") or []:

@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from src.python.core.code_utils import (
-    is_a_share_code,
+    is_a_share_stock,
     is_bond_fund_by_name,
     is_exchange_fund_code,
     is_hk_stock_code,
@@ -99,8 +99,9 @@ class PortfolioHistoryCalculator:
         name = (holding_name or "").strip()
         _tag = f"  [{code} {name}]" if name else f"  [{code}]"
 
-        # 路由：按代码类型确定数据源（使用 code_utils 统一入口）
-        if is_exchange_fund_code(code) or is_a_share_code(code):
+        # 路由：按代码类型确定数据源（使用 code_utils 统一入口）：
+        # 00 前缀与场外基金重叠区优先按名称判为场外基金，避免取到同代码股票历史
+        if is_exchange_fund_code(code) or is_a_share_stock(name, code):
             bars = self._get_stock_history(code, days)
             # 降级：A 股/OTC 基金代码重叠区（00 开头），股票历史全空时尝试基金历史
             if not bars and is_otc_code_overlap(code):

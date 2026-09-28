@@ -353,6 +353,24 @@ def is_otc_fund_by_name(name: str, code: str) -> bool:
     return any(kw in name for kw in _OTC_FUND_NAME_KW)
 
 
+def is_a_share_stock(name: str, code: str) -> bool:
+    """持仓是否应按「A 股个股」处理（排除 00 前缀重叠区的场外基金）。
+
+    A 股代码前缀与场外基金代码在 00 区间重叠；仅凭代码前缀会把
+    「广发多因子灵活配置混合(002943)」这类场外基金误当个股，进而取到
+    同代码深市股票（如「宇晶股份」）的行情/历史/分红/行业/估值数据。
+    本判据在代码前缀之外叠加名称维度，供报告各域路由统一复用。
+
+    Args:
+        name: 持仓名称
+        code: 6 位证券代码
+
+    Returns:
+        True 表示按 A 股个股处理；重叠区内名称命中基金特征词返回 False
+    """
+    return is_a_share_code(code) and not is_otc_fund_by_name(name, code)
+
+
 # ── 场外基金赎回天数类型默认档（非实测）──
 # 供流动性维在场外品种未配置单日赎回上限（config.json `redemption_limits`）时给出
 # 类型分级默认档，使场外为主的组合在流动性维有区分度。档位为经验口径而非实测：

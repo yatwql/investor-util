@@ -17,7 +17,12 @@ from src.python.core.code_utils import (
     is_otc_fund_by_name,
     is_qdii_extended,
 )
-from src.python.fetcher.price import fetch_market_data, _price_cache_fresh
+from src.python.fetcher.price import (
+    _price_cache_fresh,
+    _price_cache_key,
+    fetch_market_data,
+    resolve_price_route,
+)
 from src.python.core.market_hours import is_market_open as _mh_is_market_open
 from src.python.core.market_hours import is_midday_break as _mh_is_midday_break
 from src.python.core.num_utils import finite_or, is_finite_number
@@ -343,11 +348,6 @@ def _compute_detail_row(h: Holding, mkt: dict | None) -> DetailRow:
     )
 
 
-def _price_cache_key(code: str) -> str:
-    """文件缓存键生成：价格数据的缓存键。"""
-    return f"price_{code}"
-
-
 def _generate_details(holdings: list[Holding], today_str: str = "") -> list[DetailRow]:
     """获取所有持仓的行情数据并生成明细行（策略感知：非交易时段/全链熔断时只读缓存）。"""
     details: list[DetailRow] = []
@@ -383,7 +383,14 @@ def _generate_details(holdings: list[Holding], today_str: str = "") -> list[Deta
     # 3. 缓存路径：session cache → file cache（零 HTTP）
     result_map: dict[tuple[str, str], dict | None] = {}
     for h in cache_holdings:
-        mkt = registry.fetch_cached_only(h.code, "price", _price_cache_key)
+        # 缓存键/会话域按价格路由分域（price_stock / price_fund_otc）：
+        # 00 重叠区同一代码可能是股票与场外基金两只证券，共用键会串味
+        _route = resolve_price_route(h.code, h.name)
+        mkt = registry.fetch_cached_only(
+            h.code,
+            _route,
+            lambda c, _dt=_route: _price_cache_key(c, _dt),
+        )
         # 收市后校验 OTC 基金净值日期是否 ≥ 上一个交易日（跨日残留缓存 → 降级重取）
         if mkt is not None and not _price_cache_fresh(mkt):
             logger.debug(
