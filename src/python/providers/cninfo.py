@@ -37,6 +37,7 @@ from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.core.http_client import make_http_client
 from src.python.core.retry import STRATEGY_FIXED, STRATEGY_LINEAR, RetryPolicy, retry_transient
+from src.python.providers._utils import HANG_ELAPSED_RATIO, build_transient_retry_judge
 
 logger = logging.getLogger("invest")
 
@@ -133,11 +134,16 @@ def _with_transient_retry(label: str, do_request: Callable[[], Any]) -> Any:
     """
     limiter = _get_limiter()
     tried = {"n": 0}
+    elapsed = {"s": 0.0}
 
     def _attempt() -> Any:
         tried["n"] += 1
-        limiter.acquire(SOURCE_ID)
-        return do_request()
+        started = time.monotonic()
+        try:
+            limiter.acquire(SOURCE_ID)
+            return do_request()
+        finally:
+            elapsed["s"] = time.monotonic() - started
 
     def _on_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
         logger.warning(
@@ -149,10 +155,23 @@ def _with_transient_retry(label: str, do_request: Callable[[], Any]) -> Any:
             _CONNECT_RETRY_POLICY.attempts,
         )
 
+    def _should_retry(exc: BaseException) -> bool:
+        """挂起型（耗时接近超时预算）不重试：再试只会线性放大等待。"""
+        if not build_transient_retry_judge(elapsed["s"], _TIMEOUT)(exc):
+            if elapsed["s"] >= _TIMEOUT * HANG_ELAPSED_RATIO:
+                logger.warning(
+                    "[cninfo] 连接挂起 %.1fs（≥超时预算一半），判定主机不可达，不再重试：%s",
+                    elapsed["s"],
+                    label,
+                )
+            return False
+        return True
+
     try:
         return retry_transient(
             _attempt,
             policy=_CONNECT_RETRY_POLICY,
+            retry_on=_should_retry,
             on_retry=_on_retry,
             sleep=time.sleep,
         )

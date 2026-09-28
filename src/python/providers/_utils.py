@@ -9,7 +9,7 @@ import logging
 import time
 
 from src.python.core.constants import BEIJING_TZ
-from src.python.core.retry import STRATEGY_FIXED, RetryPolicy, retry_transient
+from src.python.core.retry import STRATEGY_FIXED, RetryPolicy, is_transient_exception, retry_transient
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import datetime
 from typing import Any, Callable
@@ -17,6 +17,30 @@ from typing import Any, Callable
 from src.python.core.num_utils import safe_num
 
 logger = logging.getLogger("invest")
+
+#: 「挂起型」失败判定比例：单次尝试耗时 ≥ 超时预算 × 该比例，视为**主机不可达/连接被丢**
+#: （而非瞬时抖动）——此时重试只会把等待放大成 N × 超时（实测：20s 预算 × 3 次 = 63s），
+#: 故不再重试、直接上抛，由链路计入熔断并让后续请求快速跳过。
+#: 「快速失败」（连接被拒/重置/DNS 立即失败）仍按策略正常重试。
+HANG_ELAPSED_RATIO = 0.5
+
+
+def build_transient_retry_judge(elapsed: float, timeout: float) -> Callable[[BaseException], bool]:
+    """构造「瞬时 **且非挂起**」的重试判据（供各 provider 的连接级重试共用）。
+
+    Args:
+        elapsed: 本次（刚失败的）尝试耗时秒数。
+        timeout: 该请求的超时预算秒数（比例阈值为 ``timeout * HANG_ELAPSED_RATIO``）。
+
+    Returns:
+        判据函数：瞬时异常且未挂起→True（可重试）；否则 False（不再重试）。
+    """
+    threshold = timeout * HANG_ELAPSED_RATIO
+
+    def _judge(exc: BaseException) -> bool:
+        return is_transient_exception(exc) and elapsed < threshold
+
+    return _judge
 
 
 def run_with_timeout(

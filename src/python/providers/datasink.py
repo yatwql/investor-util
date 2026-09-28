@@ -36,6 +36,7 @@ from typing import Any
 from src.python.core.atomic_write import write_json_atomic
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.retry import STRATEGY_FIXED, STRATEGY_LINEAR, RetryPolicy, retry_transient
+from src.python.providers._utils import HANG_ELAPSED_RATIO, build_transient_retry_judge
 from src.python.core.datasource_credential import (
     DEFAULT_DATA_KEY_FILE,
     CredentialSpec,
@@ -212,11 +213,16 @@ def _get_with_transient_retry(path: str, query: dict[str, Any]) -> Any:
     代码级结果（401/403/404/非 200/非 JSON）仍由 ``_request`` 返回 None，不上抛。
     """
     url = f"{_BASE_URL}{path}"
+    elapsed = {"s": 0.0}
 
     def _attempt() -> Any:
-        _get_limiter().acquire(SOURCE_ID)
-        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
-            return client.get(url, params=query, headers=_HEADERS)
+        started = time.monotonic()
+        try:
+            _get_limiter().acquire(SOURCE_ID)
+            with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+                return client.get(url, params=query, headers=_HEADERS)
+        finally:
+            elapsed["s"] = time.monotonic() - started
 
     def _on_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
         logger.warning(
@@ -228,7 +234,21 @@ def _get_with_transient_retry(path: str, query: dict[str, Any]) -> Any:
             _CONNECT_RETRY_POLICY.attempts,
         )
 
-    return retry_transient(_attempt, policy=_CONNECT_RETRY_POLICY, on_retry=_on_retry, sleep=time.sleep)
+    def _should_retry(exc: BaseException) -> bool:
+        """挂起型（耗时接近超时预算）不重试：再试只会线性放大等待。"""
+        if not build_transient_retry_judge(elapsed["s"], _TIMEOUT)(exc):
+            if elapsed["s"] >= _TIMEOUT * HANG_ELAPSED_RATIO:
+                logger.warning(
+                    "[datasink] 连接挂起 %.1fs（≥超时预算一半），判定主机不可达，不再重试：%s",
+                    elapsed["s"],
+                    path,
+                )
+            return False
+        return True
+
+    return retry_transient(
+        _attempt, policy=_CONNECT_RETRY_POLICY, retry_on=_should_retry, on_retry=_on_retry, sleep=time.sleep
+    )
 
 
 def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:

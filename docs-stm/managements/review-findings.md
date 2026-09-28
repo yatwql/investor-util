@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.8-dev
-> **编号源**：`rf-next = 462`（新增问题取此编号，完成后更新为 +1；已用最大 rf-461，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 463`（新增问题取此编号，完成后更新为 +1；已用最大 rf-462，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -53,6 +53,8 @@
 | **rf-461** | **provider 层把传输级失败降级成返回值，使链路的重试/熔断/文案全部失效**（用户贴日志报「备用也不好用」）：`providers/datasink.py::_request` 把**网络异常**（`_ssl.c:1012: The handshake operation timed out`）与「代码级空结果」一律 `return None`（docstring 还写明「不计熔断」），而链路的传输级判据**只认异常**（`chain._try_provider_fetch` 捕获异常 → `TRANSPORT_FAILURE`；返回值哨兵无判据分支）——实测后果：① **同源重试不触发**（`retry_if_result=lambda r: r is TRANSPORT_FAILURE` 永不命中）；② **熔断与可用性统计不计**（`record_failure` 仅在 TRANSPORT_FAILURE 路径）→ 主源持续不可用也不熔断，每篇文档白等 20s 超时且刷屏；③ **诊断文案误导**（SSL 握手超时报成「返回空」，本次排查即被误导）；④ datasink **连连接级重试都没有**（cninfo/tencent/eastmoney_industry 均有）——一次握手被丢即整篇丢失，而 cninfo 注释已实测「首个连接常被丢弃，重试即成功」。同源缺陷还有 `hithink._request`、`_utils.run_with_timeout`（akshare 路径） | ① `datasink._request` / `hithink._request` 抽出 `_get_with_transient_retry`：**每次尝试前**取限速许可 + `core/retry` 统一原语连接级重试（镜像 cninfo：3 次、线性 1s/2s），重试耗尽后**上抛**，代码级结果（401/403/404/非 200/非 JSON/业务 code≠0）仍返回 None 不计熔断；② 直连调用点补护栏（不因上抛中断报告）：`financial_report._fetch_index` → 转巨潮备源、`_fetch_sections` → 返回 None 回退偏好名直取、`financial_indicator.fetch_indicator_series` / `fetch_hithink_indicator_series` → 转下一兜底；③ `_utils.run_with_timeout` 新增 `raise_on_failure`（默认 False 维持既有 None 契约；链路消费方 `akshare_financial` 开启上抛）；④ 回归 +9 例（datasink/hithink：重试耗尽上抛且断言尝试次数与退避序列、首次握手失败重试即成功、非瞬时异常不重试；`run_with_timeout` 两种模式；`akshare_financial` 上抛且断言 `raise_on_failure=True`；编排层三处护栏）；⑤ 文档口径修正（`technical.md` §2.2.1 新增「传输级必须上抛」契约 + datasink 降级段落、`datasource-reliability.md` datasink/hithink 降级与重试条目、`requirements.md` R-DATA-07 补两类失败分界） |
 
 > **已评估未改（登记待办）**：`providers/cninfo.py::_with_transient_retry` 重试耗尽后仍 `return None`——同样是「传输级降级成返回值」，但其直连调用点有多处（`financial_report._backup_candidates` / `_fetch_index` 备源分支 / `check_sources` 探针），改动面比 datasink 大；且它已有连接级重试（本轮的可靠性收益已拿到），故本轮不动，待专项处理时连同上述调用点一次性加护栏。
+
+| **rf-462** | **连接级重试未区分「快速失败」与「挂起」，把失败等待放大 3 倍**（用户报「现在运行测试，怎么那么久了」）：rf-461 引入的连接级重试只按「是否瞬时异常」判据重试，未区分两类传输失败——**快速失败**（连接被拒/重置/DNS 立即失败，重试有效）与**挂起**（等到超时，重试只会线性放大等待）。实测（不可路由地址 + 2s 预算）：挂起型单请求 6.0s / 3 次尝试，按真实 20s 预算即 63s（+3s 退避），链路再同源重试 1 次 ≈ 83s；巨潮（cninfo）更早就有 3 次盲重试（63s/请求，既有问题）。实测确认**非取数路径不受影响**：单元套件 101s / `verify,regression` 31.3s（与改动前 30.5s 持平），变慢的是「主机不可达时的失败路径」。 | ① `providers/_utils.py` 新增共享判据 `build_transient_retry_judge(elapsed, timeout)` + `HANG_ELAPSED_RATIO = 0.5`：瞬时异常**且**本次尝试耗时 < 超时预算一半 → 可重试；否则判「主机不可达」不再重试，并记 WARNING「连接挂起 Ns（≥超时预算一半），判定主机不可达，不再重试」；② `datasink` / `hithink` / `cninfo` 三处连接级重试改用该判据（口径统一，判据单源）；③ 回归 +3 例（假时钟模拟挂起耗时：断言仅 1 次尝试、**无退避等待**（sleep 被换成 `pytest.fail`）、留下「连接挂起」日志）；④ 文档：`technical.md` §2.2.1 新增「挂起型不重试」条目，`datasource-reliability.md` datasink/hithink/cninfo 与 `datasource.md` 同步，`faq.md` 日志问答补「挂起即不再重试」解释。**效果**：挂起型单请求 63s → 20s（一次超时），且计入熔断 → 连续 3 次后本会话跳过，整轮报告不再逐篇白等 |
 
 ### 归档档案
 

@@ -44,6 +44,7 @@ from src.python.core.datasource_credential import (
 from src.python.core.http_client import make_http_client
 from src.python.core.num_utils import ms_to_date_str
 from src.python.core.retry import STRATEGY_LINEAR, RetryPolicy, retry_transient
+from src.python.providers._utils import HANG_ELAPSED_RATIO, build_transient_retry_judge
 
 logger = logging.getLogger("invest")
 
@@ -137,11 +138,16 @@ def _get_with_transient_retry(path: str, query: dict[str, Any], headers: dict[st
     代码级结果（429/非 200/非 JSON/业务 code≠0）仍由 ``_request`` 返回 None。
     """
     url = f"{_BASE_URL}{path}"
+    elapsed = {"s": 0.0}
 
     def _attempt() -> Any:
-        _get_limiter().acquire(SOURCE_ID)
-        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
-            return client.get(url, params=query, headers=headers)
+        started = time.monotonic()
+        try:
+            _get_limiter().acquire(SOURCE_ID)
+            with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+                return client.get(url, params=query, headers=headers)
+        finally:
+            elapsed["s"] = time.monotonic() - started
 
     def _on_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
         logger.warning(
@@ -153,7 +159,21 @@ def _get_with_transient_retry(path: str, query: dict[str, Any], headers: dict[st
             _CONNECT_RETRY_POLICY.attempts,
         )
 
-    return retry_transient(_attempt, policy=_CONNECT_RETRY_POLICY, on_retry=_on_retry, sleep=time.sleep)
+    def _should_retry(exc: BaseException) -> bool:
+        """挂起型（耗时接近超时预算）不重试：再试只会线性放大等待。"""
+        if not build_transient_retry_judge(elapsed["s"], _TIMEOUT)(exc):
+            if elapsed["s"] >= _TIMEOUT * HANG_ELAPSED_RATIO:
+                logger.warning(
+                    "[hithink] 连接挂起 %.1fs（≥超时预算一半），判定主机不可达，不再重试：%s",
+                    elapsed["s"],
+                    path,
+                )
+            return False
+        return True
+
+    return retry_transient(
+        _attempt, policy=_CONNECT_RETRY_POLICY, retry_on=_should_retry, on_retry=_on_retry, sleep=time.sleep
+    )
 
 
 def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:

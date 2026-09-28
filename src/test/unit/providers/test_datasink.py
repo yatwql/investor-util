@@ -188,6 +188,46 @@ class TestRequestStatus:
         assert attempts["n"] == 2
         assert sleeps == [ds._CONNECT_RETRY_POLICY.base_backoff]
 
+    def test_hang_failure_is_not_retried(self, monkeypatch, caplog):
+        """挂起型失败（单次尝试耗时 ≥ 超时预算一半）不重试。
+
+        重试挂起（主机不可达/连接被丢）只会把等待放大成 N × 超时（实测 20s 预算 × 3 次 = 63s），
+        故判为「主机不可达」直接上抛，由链路计熔断并让后续请求快速跳过。
+        """
+        import httpx
+        import types
+
+        attempts = {"n": 0}
+        clock = {"t": 0.0}
+
+        def _monotonic() -> float:
+            clock["t"] += 0.15  # 每次读时钟推进：进入 0.15 / 离开 0.30 → 本次尝试耗时 0.15s（预算 0.2s 的一半以上）
+            return clock["t"]
+
+        class _HangClient(_FakeClient):
+            def get(self, url, params=None, headers=None):
+                attempts["n"] += 1
+                raise httpx.ConnectTimeout("handshake operation timed out")
+
+        monkeypatch.setattr(ds, "_TIMEOUT", 0.2)
+        monkeypatch.setattr(ds, "make_http_client", lambda **_kw: _HangClient(_FakeResp()))
+        monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
+        monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(ds, "_get_limiter", lambda: type("L", (), {"acquire": lambda _s, _p: None})())
+        monkeypatch.setattr(
+            ds,
+            "time",
+            types.SimpleNamespace(
+                monotonic=_monotonic,
+                sleep=lambda _s: pytest.fail("挂起型失败不得重试（发生了退避等待）"),
+            ),
+        )
+
+        with pytest.raises(httpx.ConnectTimeout):
+            ds._request("/documents", {})
+        assert attempts["n"] == 1
+        assert any("连接挂起" in r.message for r in caplog.records)
+
     def test_non_transient_error_propagates_without_retry(self, monkeypatch):
         """非瞬时异常（如参数/编程错误）不上抛重试——原样抛回，不白等退避。"""
         sleeps: list[float] = []
