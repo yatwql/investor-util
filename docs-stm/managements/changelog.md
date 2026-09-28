@@ -77,6 +77,17 @@
 
 **说明**：17→12 章本身**非渲染缺陷**——CLI 包装脚本 `cli.sh`/`cli.ps1` 无参数默认 `report --type both`（Excel+HTML、不含 LLM）为既定行为，本次未改；需要全部章节（L 模式）请用 `report --type full` 或 `scripts/llm.sh`。
 
+### 测试修复：风格因子场景 fixture 不再写死绝对日期（rf-465）
+
+**现象**：`dev-verify` 出现 1 个既有失败 `test_pipeline_style_factor_regression.py::TestComputeFactorExposureData::test_contract_available_with_full_data`（`available=False`，日志「因子 价值/成长/质量已停更（末根 K 线距今 87 个交易日）」）。
+
+**根因**：**非网络/数据源问题**——该用例 mock 了全部外网（`fetch_index_history` 走合成 K 线 + `offline_external_sources` 离线桩）。真因是 fixture 的时间炸弹：`_klines()` 默认 `start="2026-03-01"`（末根 K 线 2026-05-29），而停更判定用真实 `datetime.now()`（2026-09-29），阈值 86 交易日；离线桩将交易日历置空 → `count_trading_days_elapsed` 回退「仅排周末」近似计数 = 87 > 86 → 三因子全被判停更剔除。真实交易日历口径为 85，仅差 1 个交易日，即该用例本就随时间必然变红。
+
+**变更**：
+- `_klines` 改为 `end: date | None = None`，默认以「今天」为末根（`last = end or date.today()`，向前推 `n-1` 天），合成 K 线始终新鲜
+- 回归 +1 例 `TestMockKlinesFreshness::test_klines_anchored_to_today_and_not_stale`（断言末根日期 == 今天且距今天数 ≤ 停更阈值）
+- 数据快照同步：`managements/folders.md`（测试代码行数 + 用例数 7,938→7,941）、`managements/test-coverage.md`（`scenario_basic` 152→153、报告生成/`unit_report` 1,983→1,985）
+
 ---
 
 ## 归档
