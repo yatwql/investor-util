@@ -36,8 +36,10 @@ jobs:
 
       - name: 安装依赖
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          # akshare 在 Linux 上的依赖 py-mini-racer / jsonpath 只有 sdist（需源码构建 V8/纯 Python），
+          # 下载/编译偶发失败会让整个 job 挂掉（实测 3.12 曾单独失败）——加下载重试与更长超时
+          python -m pip install --upgrade pip --retries 5 --timeout 60
+          pip install --retries 5 --timeout 60 -e ".[test]"
 
       - name: P0 — 快速验证（dev 提交门禁）
         if: github.ref_name == 'dev' && github.event_name == 'push'
@@ -76,8 +78,10 @@ jobs:
 
       - name: 安装依赖
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          # akshare 在 Linux 上的依赖 py-mini-racer / jsonpath 只有 sdist（需源码构建 V8/纯 Python），
+          # 下载/编译偶发失败会让整个 job 挂掉（实测 3.12 曾单独失败）——加下载重试与更长超时
+          python -m pip install --upgrade pip --retries 5 --timeout 60
+          pip install --retries 5 --timeout 60 -e ".[test]"
 
       - name: Ruff 格式检查
         run: python -m ruff format --check src/python/ scripts/
@@ -102,8 +106,10 @@ jobs:
 
       - name: 安装依赖
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          # akshare 在 Linux 上的依赖 py-mini-racer / jsonpath 只有 sdist（需源码构建 V8/纯 Python），
+          # 下载/编译偶发失败会让整个 job 挂掉（实测 3.12 曾单独失败）——加下载重试与更长超时
+          python -m pip install --upgrade pip --retries 5 --timeout 60
+          pip install --retries 5 --timeout 60 -e ".[test]"
 
       - name: 代码历史痕迹 + 任务编号标识符（check-code-traces）
         run: python scripts/check-code-traces.py --ci
@@ -147,8 +153,10 @@ jobs:
 
       - name: 安装依赖
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[test]"
+          # akshare 在 Linux 上的依赖 py-mini-racer / jsonpath 只有 sdist（需源码构建 V8/纯 Python），
+          # 下载/编译偶发失败会让整个 job 挂掉（实测 3.12 曾单独失败）——加下载重试与更长超时
+          python -m pip install --upgrade pip --retries 5 --timeout 60
+          pip install --retries 5 --timeout 60 -e ".[test]"
 
       # ① PEP 597 隐式编码严格档：任何未显式 encoding= 的文本 I/O 立即失败（豁免项在 pytest.ini 声明）。
       #    放在 pip 降级之前，避免「环境已被改过」影响判定；失败详情以 workflow annotation 回传
