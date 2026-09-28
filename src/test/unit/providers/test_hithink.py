@@ -139,14 +139,29 @@ class TestHttpStatus:
         assert ht.fetch_trading_days() is None
         assert len(client.calls) == 1
 
-    def test_network_error_returns_none(self, monkeypatch):
-        def _boom(**_kw):
-            raise OSError("unreachable")
+    def test_network_error_retries_then_raises(self, monkeypatch):
+        """传输级失败 → 连接级重试耗尽后**上抛**（不吞成 None，否则链路会记成「返回空」）。"""
+        import httpx
+
+        sleeps: list[float] = []
+        attempts = {"n": 0}
+
+        class _TimeoutClient(_FakeClient):
+            def get(self, url, params=None, headers=None):
+                attempts["n"] += 1
+                raise httpx.ConnectTimeout("handshake operation timed out")
 
         monkeypatch.setattr(ht, "missing_credential", lambda _sid: None)
         monkeypatch.setattr(ht, "credential_value", lambda _sid: "test-key")
-        monkeypatch.setattr(ht, "make_http_client", _boom)
-        assert ht.fetch_trading_days() is None
+        monkeypatch.setattr(ht, "make_http_client", lambda **_kw: _TimeoutClient(_FakeResp(payload={})))
+        # 限速器换零等待替身（否则其内部 sleep 会混入 sleeps 断言）
+        monkeypatch.setattr(ht, "_get_limiter", lambda: _NoopLimiter())
+        monkeypatch.setattr(ht.time, "sleep", sleeps.append)
+
+        with pytest.raises(httpx.ConnectTimeout):
+            ht.fetch_trading_days()
+        assert attempts["n"] == ht._CONNECT_RETRY_POLICY.attempts
+        assert sleeps == [ht._CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, ht._CONNECT_RETRY_POLICY.attempts)]
 
 
 class TestLimiter:

@@ -798,6 +798,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 - **只重试传输级**：这类错误多为瞬时抖动，同源重试常即成功，避免过早降级到质量更低的槽位、也避免把偶发抖动累计成熔断（行业分类 push2 的 `Server disconnected`、DataSinking 的偶发断连即属此类）
 - **不重试代码级空结果**：Provider 正常返回但无该代码数据（`None`）时重试毫无意义（同一请求同一答案），且会白耗第三方日配额（DataSinking 免费档 8191 篇/日）
+- **传输级失败必须上抛给链路（provider 层不得自行吞成返回值）**：链路的传输级判据**只认异常**（`_try_provider_fetch` 捕获异常 → `TRANSPORT_FAILURE`），若 provider 把超时/断连 `return None`，链路会当成「代码级空结果」——同源重试不触发、``record_failure`` 不计、诊断文案把「握手超时」报成「返回空」（实测事故：DataSinking SSL 握手超时被记为返回空，既不重试也不熔断，单标的每篇白等 20s）。故 provider 的代码级结果（401/403/404/非 200/非 JSON）返回 `None`，传输级失败**重试耗尽后上抛**；弱链路承装的直连调用方需自行试/except 降级（如 `fetcher/financial_report._fetch_index` → 转备源）
 - **次数有界**：每个 Provider 每次调用最多 1 + 1 次请求；仍失败才计入熔断计数器并落下一槽
 - **口径单一来源**：退避算式（固定/线性/指数 + 抖动 + 上限）、尝试次数与「哪些异常算瞬时」由 `core/retry.py` 统一提供（`RetryPolicy` / `is_transient_exception` / `retry_transient`）——链路、各 provider 的连接级重试、akshare 超时重试与 HTTP 429 退避共用同一执行器，差异只用策略参数表达（约束 C26）；「两次请求至少间隔多久」见 `core/throttle.py`（约束 C27）
 
@@ -2845,7 +2846,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **限速与配额护栏**：每次 HTTP 请求前经 `RateLimiter`（`core/throttle.py`）以「间隔 = 1/每秒上限」限速（免费档 3 请求/秒；付费档 31）；日配额计数存 `data/state/datasink_quota.json`，超限即停并告警。**免费档无批量端点、必然逐篇请求**，故限速必须落在 provider 每次请求前（批量调度器层挡不住单条调用）。并发取数由 `batch.datasink_workers` 控制（**默认 2**，免费档批量上限 ≤3），速率仍由 provider 兜底。
 
-**降级与合规**：401/403/429/非 200/网络不可达均返回空并按代码级降级（不计传输级熔断）；单标的失败进失败清单；`available=False` 时写占位。返回对象含披露平台归属字段 `source`，报告逐行标注（再分发时保留）。
+**降级与合规**：**传输级**失败（网络不可达/连接超时）经连接级重试（线性 1s/2s，共 3 次）后**上抛**，由链路计入同源重试与熔断；**代码级**结果（401/403/429 重试后仍非 200/非 JSON）返回空、不计传输级熔断。单标的失败进失败清单；`available=False` 时写占位。返回对象含披露平台归属字段 `source`，报告逐行标注（再分发时保留）。
 
 **缓存**：报告元数据与章节正文均按月（30 天；`report_datasink_index_` / `report_datasink_doc_`），随菜单缓存命令与 TTL 管理。**数据契约** `financial_report_digest_data`（附录 H）；语义命名行见 §6.7。
 

@@ -77,7 +77,11 @@ def fetch_indicator_series(code: str, limit: int = DEFAULT_PERIODS) -> list[dict
 
     from src.python.report.data_status import mark_data_used, mark_provider_used
 
-    records: list[dict[str, Any]] = list(akshare_financial.fetch_financial_indicator_history(code, limit=limit))
+    records: list[dict[str, Any]] = []
+    try:
+        records = list(akshare_financial.fetch_financial_indicator_history(code, limit=limit))
+    except Exception as e:  # 主源传输级失败（重试已耗尽）→ 不中断，走后续同花顺/链路兜底
+        logger.warning("[financial_indicator] 主源多期指标取数失败（%s），转同花顺/链路兜底", e)
     if records:
         mark_data_used(f"fin_indicator_{akshare_financial.SOURCE_ID}")
         mark_provider_used("financial_indicator", akshare_financial.SOURCE_ID, akshare_financial.DISPLAY_NAME)
@@ -108,14 +112,18 @@ def fetch_hithink_indicator_series(code: str, limit: int = DEFAULT_PERIODS) -> l
     symbol = hithink.to_thscode(code)
     if not symbol:
         return []
-    return derive_indicator_records(
-        hithink.fetch_income_statements(symbol, period="quarterly", limit=limit + 4),
-        hithink.fetch_balance_sheets(symbol, period="quarterly", limit=limit + 4),
-        hithink.fetch_cash_flow_statements(symbol, period="quarterly", limit=limit + 4),
-        code=code,
-        symbol=symbol,
-        limit=limit,
-    )
+    try:
+        return derive_indicator_records(
+            hithink.fetch_income_statements(symbol, period="quarterly", limit=limit + 4),
+            hithink.fetch_balance_sheets(symbol, period="quarterly", limit=limit + 4),
+            hithink.fetch_cash_flow_statements(symbol, period="quarterly", limit=limit + 4),
+            code=code,
+            symbol=symbol,
+            limit=limit,
+        )
+    except Exception as e:  # 传输级失败（连接级重试已耗尽而上抛）→ 返回空列表，由调用方继续降级
+        logger.warning("[financial_indicator] 同花顺多期报表取数失败（%s），返回空序列", e)
+        return []
 
 
 def collect_price_map(details: Any) -> dict[str, float]:

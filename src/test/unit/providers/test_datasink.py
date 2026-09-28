@@ -132,14 +132,82 @@ class TestRequestStatus:
         _prepare(monkeypatch, _FakeResp(payload=None, json_error=True))
         assert ds._request("/documents", {}) is None
 
-    def test_network_error_returns_none(self, monkeypatch):
-        def _boom(**_kw):
-            raise OSError("unreachable")
+    def test_network_error_retries_then_raises(self, monkeypatch):
+        """传输级失败（握手超时/连接错误）→ 连接级重试耗尽后**上抛**，不吞成 None。
 
-        monkeypatch.setattr(ds, "make_http_client", _boom)
+        上抛是链路识别传输级失败的唯一途径（``chain._try_provider_fetch`` 只把**异常**
+        判为 TRANSPORT_FAILURE）；若在此吞成 None，链路会记成「返回空」→ 同源重试不触发、
+        熔断与可用性统计不计、SSL 握手超时被误报为「代码级空结果」。
+        """
+        import httpx
+
+        sleeps: list[float] = []
+        attempts = {"n": 0}
+
+        class _TimeoutClient(_FakeClient):
+            def get(self, url, params=None, headers=None):
+                attempts["n"] += 1
+                client.calls.append({"url": url, "params": params or {}})
+                raise httpx.ConnectTimeout("handshake operation timed out")
+
+        client = _TimeoutClient(_FakeResp())
+        monkeypatch.setattr(ds, "make_http_client", lambda **_kw: client)
         monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
         monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
-        assert ds._request("/documents", {}) is None
+        monkeypatch.setattr(ds, "_get_limiter", lambda: type("L", (), {"acquire": lambda _s, _p: None})())
+        monkeypatch.setattr(ds.time, "sleep", sleeps.append)
+
+        with pytest.raises(httpx.ConnectTimeout):
+            ds._request("/documents", {})
+        assert attempts["n"] == ds._CONNECT_RETRY_POLICY.attempts
+        assert sleeps == [ds._CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, ds._CONNECT_RETRY_POLICY.attempts)]
+
+    def test_transient_failure_then_success(self, monkeypatch):
+        """首次握手被丢弃、重试即成功（cninfo 实测的同款抖动）→ 返回数据，不降级。"""
+        import httpx
+
+        sleeps: list[float] = []
+        attempts = {"n": 0}
+
+        class _FlakyClient(_FakeClient):
+            def get(self, url, params=None, headers=None):
+                attempts["n"] += 1
+                client.calls.append({"url": url, "params": params or {}})
+                if attempts["n"] == 1:
+                    raise httpx.ConnectTimeout("first handshake dropped")
+                return _FakeResp(payload={"items": [{"id": 1}]})
+
+        client = _FlakyClient(_FakeResp())
+        monkeypatch.setattr(ds, "make_http_client", lambda **_kw: client)
+        monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
+        monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(ds, "_get_limiter", lambda: type("L", (), {"acquire": lambda _s, _p: None})())
+        monkeypatch.setattr(ds.time, "sleep", sleeps.append)
+
+        assert ds.fetch_report_documents("600519.SS", size=1) == [{"id": 1}]
+        assert attempts["n"] == 2
+        assert sleeps == [ds._CONNECT_RETRY_POLICY.base_backoff]
+
+    def test_non_transient_error_propagates_without_retry(self, monkeypatch):
+        """非瞬时异常（如参数/编程错误）不上抛重试——原样抛回，不白等退避。"""
+        sleeps: list[float] = []
+        attempts = {"n": 0}
+
+        class _BadClient(_FakeClient):
+            def get(self, url, params=None, headers=None):
+                attempts["n"] += 1
+                raise ValueError("bad params")
+
+        monkeypatch.setattr(ds, "make_http_client", lambda **_kw: _BadClient(_FakeResp()))
+        monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
+        monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(ds, "_get_limiter", lambda: type("L", (), {"acquire": lambda _s, _p: None})())
+        monkeypatch.setattr(ds.time, "sleep", sleeps.append)
+
+        with pytest.raises(ValueError):
+            ds._request("/documents", {})
+        assert attempts["n"] == 1
+        assert sleeps == []
 
     def test_section_probe_404_logged_debug_not_warning(self, monkeypatch, caplog):
         """章节名探测 404（预期内落空）只记 DEBUG，不刷 WARNING 噪音。"""

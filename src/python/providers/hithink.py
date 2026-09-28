@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Any
 
 from src.python.core.code_utils import to_fmp_symbol
@@ -42,6 +43,7 @@ from src.python.core.datasource_credential import (
 )
 from src.python.core.http_client import make_http_client
 from src.python.core.num_utils import ms_to_date_str
+from src.python.core.retry import STRATEGY_LINEAR, RetryPolicy, retry_transient
 
 logger = logging.getLogger("invest")
 
@@ -51,6 +53,9 @@ DISPLAY_NAME = "同花顺金融数据"
 _BASE_URL = "https://fuyao.aicubes.cn"
 _TIMEOUT = 20.0
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
+#: 连接级瞬时失败重试策略（线性退避 1s、2s；总尝试 3 次）——与 ``providers/cninfo.py``、
+#: ``providers/datasink.py`` 同口径；退避算式取自 ``core/retry``（重试与退避唯一原语）。
+_CONNECT_RETRY_POLICY = RetryPolicy(attempts=3, strategy=STRATEGY_LINEAR, base_backoff=1.0)
 
 #: 通用数据源密钥文件默认相对路径——单一事实来源见 ``core/datasource_credential``
 #: （配置键 ``data_key_file`` 可覆盖为绝对路径）；本模块保留同名别名以维持既有引用面
@@ -124,11 +129,43 @@ def reset_hithink_limiter() -> None:
         _limiter = None
 
 
-def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
-    """带凭据 / 限速 / 信封解析的 GET；失败返回 None（不抛异常、不计熔断）。
+def _get_with_transient_retry(path: str, query: dict[str, Any], headers: dict[str, str]) -> Any:
+    """限速 GET（**每次尝试前**取限速许可）；连接级瞬时失败退避重试，耗尽后**上抛**。
 
-    返回 ``data`` 字段（业务数据容器）；``code != 0``、非 200、限流、网络不可达均返回 None
-    并记日志，由链路按空结果降级。
+    上抛是刻意设计：链路（``fetcher/chain``）的传输级判据**只认异常**，在此吞成 None 会
+    被当成「代码级空结果」——同源重试不触发、熔断与可用性统计不计、诊断文案误导。
+    代码级结果（429/非 200/非 JSON/业务 code≠0）仍由 ``_request`` 返回 None。
+    """
+    url = f"{_BASE_URL}{path}"
+
+    def _attempt() -> Any:
+        _get_limiter().acquire(SOURCE_ID)
+        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+            return client.get(url, params=query, headers=headers)
+
+    def _on_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
+        logger.warning(
+            "[hithink] 连接失败 %s（%s），%.1fs 后重试（第 %d/%d 次尝试）",
+            path,
+            exc,
+            delay,
+            failed_attempt,
+            _CONNECT_RETRY_POLICY.attempts,
+        )
+
+    return retry_transient(_attempt, policy=_CONNECT_RETRY_POLICY, on_retry=_on_retry, sleep=time.sleep)
+
+
+def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
+    """带凭据 / 限速 / 信封解析的 GET。
+
+    两类失败**分开处理**（降级治理口径）：
+      - **传输级**（连接超时/握手超时/断连等）：经 ``_CONNECT_RETRY_POLICY`` 同源退避重试，
+        仍失败则**上抛异常**——由链路计入熔断与同源重试，诊断文案如实展示原因；
+      - **代码级**（429 限流、非 200、非 JSON、业务 ``code != 0``）：返回 ``None``，
+        由链路按空结果降级，**不计入熔断**。
+
+    返回 ``data`` 字段（业务数据容器）。
     """
     if missing_credential(SOURCE_ID) is not None:
         logger.info("[hithink] 未配置凭据，跳过请求 %s", path)
@@ -138,15 +175,11 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
         logger.info("[hithink] 凭据为空，跳过请求 %s", path)
         return None
 
-    _get_limiter().acquire(SOURCE_ID)
     query = {k: v for k, v in params.items() if v is not None}
     headers = {**_HEADERS, "X-api-key": key}
-    try:
-        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
-            resp = client.get(f"{_BASE_URL}{path}", params=query, headers=headers)
-    except Exception as e:  # 网络不可达：返回空，交链路降级
-        logger.warning("[hithink] 请求失败 %s: %s", path, e)
-        return None
+    # 限速在 _get_with_transient_retry 内**每次尝试前**取许可（重试不绕过限速）
+    # 传输级失败由本函数上抛（连接级重试已耗尽）；调用方（链路/日历兜底等）各自降级
+    resp = _get_with_transient_retry(path, query, headers)
 
     if resp.status_code == 429:
         logger.warning("[hithink] 触发限流（HTTP 429），按官方指引降低频率后由链路重试：%s", path)

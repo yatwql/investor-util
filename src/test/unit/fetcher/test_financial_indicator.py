@@ -414,3 +414,32 @@ class TestIndicatorUsageMarking:
         monkeypatch.setattr(fi, "fetch_latest_indicator", lambda code: None)
         assert fi.fetch_indicator_series("600900") == []
         assert self._keys() == []
+
+
+@pytest.mark.unit
+@pytest.mark.unit_fetcher
+class TestTransportFailureGuard:
+    """主源传输级失败（重试耗尽上抛）在编排层的护栏。
+
+    取数 provider 现在会把传输级失败上抛（供链路识别 TRANSPORT_FAILURE + 熔断计数），
+    但**直连调用方不得因此中断**：抛异常须被就地接住并继续走同花顺/链路兜底。
+    """
+
+    def test_main_source_transport_failure_falls_back(self, monkeypatch, caplog):
+        import httpx
+
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        def _boom(code, limit=8):
+            raise httpx.ConnectTimeout("handshake operation timed out")
+
+        monkeypatch.setattr(fi, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fi, "cache_set", lambda *a, **k: None)
+        monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", _boom)
+        monkeypatch.setattr(
+            fi, "fetch_hithink_indicator_series", lambda code, limit: [{"report_period": "2025-12-31"}]
+        )
+        series = fi.fetch_indicator_series("600900")
+        assert [r["report_period"] for r in series] == ["2025-12-31"]
+        assert any("主源多期指标取数失败" in r.message for r in caplog.records)

@@ -19,8 +19,10 @@ from src.python.core.num_utils import safe_num
 logger = logging.getLogger("invest")
 
 
-def run_with_timeout(fn: Callable[[], Any], timeout: float = 15.0, retries: int = 1) -> Any:
-    """在线程中执行函数，超时或异常时重试，全部失败返回 None。
+def run_with_timeout(
+    fn: Callable[[], Any], timeout: float = 15.0, retries: int = 1, raise_on_failure: bool = False
+) -> Any:
+    """在线程中执行函数，超时或异常时重试，全部失败返回 None（或按需上抛）。
 
     供 akshare 等**同步且无超时参数**的第三方取数函数使用：在独立线程中执行
     并设上限，避免单个调用挂死整条报告链路。
@@ -29,9 +31,13 @@ def run_with_timeout(fn: Callable[[], Any], timeout: float = 15.0, retries: int 
         fn: 要执行的函数（无参，调用方用闭包传入参数）
         timeout: 每次调用的超时秒数
         retries: 失败后的重试次数（默认 1 次）
+        raise_on_failure: 重试耗尽后**上抛最后一次异常**而非返回 None。仅**链路消费方**
+            （``fetcher/chain`` 的 provider 槽）设为 True——链路的传输级判据只认异常，
+            上抛才能得到同源重试 + 熔断计数 + 诚实诊断文案；无链路承装的直连调用方
+            保持 False（维持 None 降级契约，不得让异常穿到报告层）。
 
     Returns:
-        函数返回值；每次均超时/异常时返回 None
+        函数返回值；每次均超时/异常时返回 None（``raise_on_failure=True`` 时上抛）
     """
     policy = RetryPolicy(attempts=1 + retries, strategy=STRATEGY_FIXED, base_backoff=1.0)
 
@@ -61,7 +67,9 @@ def run_with_timeout(fn: Callable[[], Any], timeout: float = 15.0, retries: int 
             on_retry=_on_retry,
             sleep=time.sleep,
         )
-    except BaseException:  # noqa: BLE001 — 每次均超时/异常时返回 None（与原行为一致）
+    except BaseException:  # noqa: BLE001 — 默认吞异常返回 None（与原行为一致）
+        if raise_on_failure:
+            raise  # 链路消费方：只有异常才能被识别为传输级失败（同源重试 + 熔断计数）
         return None
 
 

@@ -187,3 +187,58 @@ class TestDegradation:
         frame = _FakeFrame([_row("常用指标", "营业总收入")], columns=["选项", "指标"])
         _patch(monkeypatch, frame)
         assert af.fetch_financial_indicator_history("600519") == []
+
+    def test_transport_failure_propagates_for_chain(self, monkeypatch):
+        """链路消费方：取数传输级失败**上抛**，不得吞成空列表。
+
+        本函数是 ``financial_indicator`` 链的 provider 槽，而链路的传输级判据只认异常；
+        吞成 [] 会被记作「代码级空结果」（同源重试不触发、熔断不计数、文案误导）。
+        直连调用方的护栏见 ``fetcher/financial_indicator.fetch_indicator_series``。
+        """
+        import httpx
+
+        monkeypatch.setattr(af, "_import_akshare", lambda: _FakeAk(_full_frame()))
+        seen: dict = {}
+
+        def _boom(*_a, **_kw):
+            seen.update(_kw)
+            raise httpx.ConnectTimeout("handshake operation timed out")
+
+        monkeypatch.setattr(af, "run_with_timeout", _boom)
+        with pytest.raises(httpx.ConnectTimeout):
+            af.fetch_financial_indicator_history("600519")
+        # 链路消费方的关键契约：必须开启上抛（否则异常被吞成 None → 链记「返回空」）
+        assert seen.get("raise_on_failure") is True
+
+
+class TestRunWithTimeoutRaiseOnFailure:
+    """共享原语 ``providers/_utils.run_with_timeout`` 的 ``raise_on_failure`` 开关。
+
+    无链路承装的直连调用方保持默认（吞异常返回 None）；链路消费方（本文件的取数函数）
+    开启上抛，使传输级失败能被 ``fetcher/chain`` 识别为 TRANSPORT_FAILURE。
+    """
+
+    def test_default_swallows_after_retries(self):
+        from src.python.providers._utils import run_with_timeout
+
+        calls = {"n": 0}
+
+        def _boom():
+            calls["n"] += 1
+            raise TimeoutError("timed out")
+
+        assert run_with_timeout(_boom, timeout=1.0, retries=1) is None
+        assert calls["n"] == 2
+
+    def test_raise_on_failure_propagates_after_retries(self):
+        from src.python.providers._utils import run_with_timeout
+
+        calls = {"n": 0}
+
+        def _boom():
+            calls["n"] += 1
+            raise TimeoutError("timed out")
+
+        with pytest.raises(TimeoutError):
+            run_with_timeout(_boom, timeout=1.0, retries=1, raise_on_failure=True)
+        assert calls["n"] == 2

@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.8-dev
-> **编号源**：`rf-next = 461`（新增问题取此编号，完成后更新为 +1；已用最大 rf-460，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 462`（新增问题取此编号，完成后更新为 +1；已用最大 rf-461，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -47,6 +47,12 @@
 ### 已解决待归档（v0.11.8-dev）
 
 > 暂无（v0.11.7 批次 rf-457 ~ rf-460 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| **rf-461** | **provider 层把传输级失败降级成返回值，使链路的重试/熔断/文案全部失效**（用户贴日志报「备用也不好用」）：`providers/datasink.py::_request` 把**网络异常**（`_ssl.c:1012: The handshake operation timed out`）与「代码级空结果」一律 `return None`（docstring 还写明「不计熔断」），而链路的传输级判据**只认异常**（`chain._try_provider_fetch` 捕获异常 → `TRANSPORT_FAILURE`；返回值哨兵无判据分支）——实测后果：① **同源重试不触发**（`retry_if_result=lambda r: r is TRANSPORT_FAILURE` 永不命中）；② **熔断与可用性统计不计**（`record_failure` 仅在 TRANSPORT_FAILURE 路径）→ 主源持续不可用也不熔断，每篇文档白等 20s 超时且刷屏；③ **诊断文案误导**（SSL 握手超时报成「返回空」，本次排查即被误导）；④ datasink **连连接级重试都没有**（cninfo/tencent/eastmoney_industry 均有）——一次握手被丢即整篇丢失，而 cninfo 注释已实测「首个连接常被丢弃，重试即成功」。同源缺陷还有 `hithink._request`、`_utils.run_with_timeout`（akshare 路径） | ① `datasink._request` / `hithink._request` 抽出 `_get_with_transient_retry`：**每次尝试前**取限速许可 + `core/retry` 统一原语连接级重试（镜像 cninfo：3 次、线性 1s/2s），重试耗尽后**上抛**，代码级结果（401/403/404/非 200/非 JSON/业务 code≠0）仍返回 None 不计熔断；② 直连调用点补护栏（不因上抛中断报告）：`financial_report._fetch_index` → 转巨潮备源、`_fetch_sections` → 返回 None 回退偏好名直取、`financial_indicator.fetch_indicator_series` / `fetch_hithink_indicator_series` → 转下一兜底；③ `_utils.run_with_timeout` 新增 `raise_on_failure`（默认 False 维持既有 None 契约；链路消费方 `akshare_financial` 开启上抛）；④ 回归 +9 例（datasink/hithink：重试耗尽上抛且断言尝试次数与退避序列、首次握手失败重试即成功、非瞬时异常不重试；`run_with_timeout` 两种模式；`akshare_financial` 上抛且断言 `raise_on_failure=True`；编排层三处护栏）；⑤ 文档口径修正（`technical.md` §2.2.1 新增「传输级必须上抛」契约 + datasink 降级段落、`datasource-reliability.md` datasink/hithink 降级与重试条目、`requirements.md` R-DATA-07 补两类失败分界） |
+
+> **已评估未改（登记待办）**：`providers/cninfo.py::_with_transient_retry` 重试耗尽后仍 `return None`——同样是「传输级降级成返回值」，但其直连调用点有多处（`financial_report._backup_candidates` / `_fetch_index` 备源分支 / `check_sources` 探针），改动面比 datasink 大；且它已有连接级重试（本轮的可靠性收益已拿到），故本轮不动，待专项处理时连同上述调用点一次性加护栏。
 
 ### 归档档案
 

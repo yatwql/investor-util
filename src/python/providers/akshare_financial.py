@@ -141,7 +141,11 @@ def fetch_financial_indicator_history(code: str, limit: int = MAX_PERIODS) -> li
     if ak is None:
         return []
 
-    abstract = run_with_timeout(lambda: ak.stock_financial_abstract(symbol=code), timeout=_TIMEOUT)
+    # 链路消费方：传输级失败（超时/异常）**上抛**，由 chain 记 TRANSPORT_FAILURE
+    # （同源重试 + 熔断计数 + 诚实诊断文案）；直连调用方见 fetcher/financial_indicator 的护栏
+    abstract = run_with_timeout(
+        lambda: ak.stock_financial_abstract(symbol=code), timeout=_TIMEOUT, raise_on_failure=True
+    )
     if abstract is None or getattr(abstract, "empty", True):
         logger.info("[akshare_financial] %s 无财务指标数据", code)
         return []
