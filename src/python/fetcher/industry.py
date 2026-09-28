@@ -14,7 +14,7 @@ from typing import Any
 from src.python.cache import clear as cache_clear
 from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
-from src.python.core.code_utils import is_a_share_code
+from src.python.core.code_utils import is_a_share_code, is_a_share_stock
 from src.python.fetcher.chain import FailureDiagnostics, fetch_with_fallback, is_provider_chain_broken
 from src.python.providers import eastmoney_industry, eastmoney_industry_rest
 
@@ -170,7 +170,7 @@ def fetch_valuation_fields(code: str) -> dict[str, float | None] | None:
     return {"pe": data.get("pe"), "pb": data.get("pb")}
 
 
-def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
+def batch_fetch_industry_data(codes: list[str], names_by_code: dict[str, str] | None = None) -> dict[str, dict]:
     """批量获取多只证券的行业分类和概念板块归属。
 
     使用 BatchDispatcher 统一并行调度，支持缓存优先、熔断预检、通用重试。
@@ -179,6 +179,9 @@ def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
 
     Args:
         codes: 6 位证券代码列表
+        names_by_code: 可选的 ``{code: name}`` 映射。提供时按「A 股个股」判定
+            （排除 00 前缀重叠区的场外基金，避免取到同代码深市股票的行业/概念）；
+            不提供时回退纯代码前缀判定
 
     Returns:
         {code: {code, industry, concepts, ...}, ...}
@@ -187,8 +190,11 @@ def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
     if not valid_codes:
         return {}
 
-    # 过滤非 A 股代码，避免无效 API 调用
-    a_codes = [c for c in valid_codes if is_a_share_code(c)]
+    # 过滤非 A 股代码，避免无效 API 调用；提供名称时排除 00 重叠区场外基金
+    if names_by_code:
+        a_codes = [c for c in valid_codes if is_a_share_stock(names_by_code.get(c, ""), c)]
+    else:
+        a_codes = [c for c in valid_codes if is_a_share_code(c)]
     skipped = len(valid_codes) - len(a_codes)
     if skipped:
         logger.debug("跳过 %d 个非 A 股代码（行业数据仅支持 A 股）", skipped)

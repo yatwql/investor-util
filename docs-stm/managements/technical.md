@@ -1034,7 +1034,7 @@ fetch_market_data(code, expected_name)
 
 **关键设计保障**：
 - **价格缓存键按路由分域**：`price_stock_{code}` / `price_fund_otc_{code}`。00 重叠区同一代码可能是两只不同证券（`002943` 既是深市股票「宇晶股份」也是场外基金「广发多因子」），共用键会让先取到的路由污染另一路由；而收市后基金走 CACHE_ONLY 只读缓存，一旦串味即成持久错误值（实测：基金成分股取扩展数据时把宇晶股份 28.98 写进共享键，基金被读成 28.98）。
-- **持仓路由统一以名称消歧**：历史 K 线（`portfolio_history` / `_report_factor_metrics`）、分红（`category` / `html_builders` / `cache.operations`）、行业关键词（`news_correlation`）、估值分位（`orchestrator`）、风格扩展数据（`fund_style_classify`）、资产构成图兜底（`chart_data_builder`）一律用 `is_a_share_stock(name, code)` 过滤，不再只用代码前缀。
+- **持仓路由统一以名称消歧**：历史 K 线（`portfolio_history` / `_report_factor_metrics`）、分红（`category` / `html_builders` / `cache.operations`）、行业（`batch_fetch_industry_data(names_by_code=…)` / `_get_industry_avg_pe` / `news_correlation`）、估值分位（`orchestrator`）、风格扩展数据（`fund_style_classify`）、资产构成图兜底（`chart_data_builder`）一律用 `is_a_share_stock(name, code)` 过滤，不再只用代码前缀。
 - 主链路成功时永不触达降级，零误判风险
 - 降级成功/失败均有日志区分（含资产名称和期望名称）
 - `portfolio_history.py` 中 `fetch_with_incremental_fallback()` 对返回空列表的首个 provider 同样执行递补，非简单返回

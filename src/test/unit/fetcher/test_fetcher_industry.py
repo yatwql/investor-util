@@ -305,7 +305,22 @@ class TestBatchFetchIndustryData(unittest.TestCase):
 
         result = batch_fetch_industry_data(["600900", "AAPL", "00700", "PEP"])
         # AAPL/00700/PEP 被过滤，只调用了 600900（首次失败后重试一次）
+        self.assertEqual(result, {})
         self.assertEqual(mock_fetch.call_count, 2)
+
+    @patch("src.python.fetcher.industry.fetch_industry_data", return_value=None)
+    def test_otc_fund_filtered_out_when_names_provided(self, mock_fetch):
+        """提供名称时 00 重叠区场外基金被过滤，不作为 A 股取行业（002943 回归）。"""
+        from src.python.fetcher.industry import batch_fetch_industry_data
+
+        result = batch_fetch_industry_data(
+            ["600900", "002943"],
+            names_by_code={"600900": "长江电力", "002943": "广发多因子灵活配置混合"},
+        )
+        self.assertEqual(result, {})
+        # 仅 600900 发起取数（首次失败后重试一次）
+        called_codes = {c.kwargs.get("code") for c in mock_fetch.call_args_list}
+        self.assertEqual(called_codes, {"600900"})
         # 600900 两次均返回 None，全空
         self.assertEqual(result, {})
 

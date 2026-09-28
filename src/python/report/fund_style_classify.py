@@ -160,7 +160,7 @@ def _tencent_extended(code: str) -> dict[str, Any] | None:
         return None
 
 
-def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
+def _get_industry_avg_pe(codes: list[str], names_by_code: dict[str, str] | None = None) -> dict[str, float]:
     """获取每只股票对应行业的平均 PE。
 
     行业归属与 PE 取自**同一次** ``fetch_industry_data`` 请求（provider 的 push2
@@ -170,6 +170,8 @@ def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
 
     Args:
         codes: 6 位 A 股代码列表
+        names_by_code: 可选 ``{code: name}``；提供时按「A 股个股」判定，
+            排除 00 前缀重叠区场外基金（如基金成分股列表含场外基金代码时）
 
     Returns:
         {code: industry_avg_pe, ...} 映射；
@@ -191,7 +193,10 @@ def _get_industry_avg_pe(codes: list[str]) -> dict[str, float]:
         industry_pes: dict[str, list[float]] = {}
 
         for code in codes:
-            if not is_a_share_code(code):
+            if names_by_code is not None:
+                if not is_a_share_stock(names_by_code.get(code, ""), code):
+                    continue
+            elif not is_a_share_code(code):
                 continue
 
             # push2 行业分类 + 扩展行情（通过 fetcher → chain → provider 路径）。
@@ -413,9 +418,14 @@ def classify_fund_style(
     # 获取所有持仓股票代码
     stock_codes = [h.get("code", "").strip() for h in holdings if h.get("code")]
     stock_codes = [c for c in stock_codes if c]
+    names_by_code = {
+        str(h.get("code", "")).strip(): str(h.get("name", "") or "")
+        for h in holdings
+        if h.get("code")
+    }
 
     # 获取行业平均 PE
-    industry_avg_pe_map = _get_industry_avg_pe(stock_codes) if stock_codes else {}
+    industry_avg_pe_map = _get_industry_avg_pe(stock_codes, names_by_code) if stock_codes else {}
 
     # ── 预取阶段：并行填充 registry session_cache ──
     _prefetch_extended_data(holdings, reg)

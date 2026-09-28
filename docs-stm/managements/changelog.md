@@ -108,6 +108,16 @@
 
 **效果**：002943 等 00 重叠区场外基金不再被取到同代码股票的价格/历史/分红/行业/估值。
 
+### 补充修复：同源残留的代码前缀判定（rf-467）
+
+**问题**（rf-466 收尾登记）：① `fund_style_classify._get_industry_avg_pe` 按 `is_a_share_code` 过滤基金成分股代码；② `fetcher/industry.py::batch_fetch_industry_data` 内部只按代码前缀过滤，且 `cache/operations` 的 `_refresh_industry_cache` / `_refresh_dividend_cache` 直接把用户全部持仓代码传入（含场外基金 002943）——`cache --update position` 会把基金当股票取行业/分红。
+
+**变更**：
+- `batch_fetch_industry_data(codes, names_by_code=None)`：新增可选名称映射，提供时用 `is_a_share_stock` 判定（不提供维持旧行为）
+- `_get_industry_avg_pe(codes, names_by_code=None)`：同步支持，`classify_fund_style` 传入 `{code: name}`
+- `cache/operations._refresh_industry_cache` / `_refresh_dividend_cache` 改用 `is_a_share_stock(h.name, h.code)`
+- 回归 +5 例（industry 批量名称过滤、行业平均 PE 名称过滤、新建 `test_cache_refresh_routing.py` 三例）
+
 ---
 
 ## 归档
