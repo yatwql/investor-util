@@ -64,6 +64,19 @@
 
 **备注**：本轮 GitHub API 触发未授权限流，重跑结果待确认；若再现则评估 wheels 缓存或重依赖可选化。
 
+### 缺陷修复：LLM 关闭时「LLM API 用量」章不再渲染（rf-464）
+
+**现象**（用户报「章节数由 17 降至 12 章；llm api 用量还没有序号了，又摆在最前面」）：用 `scripts/cli.sh` 无参数跑报告，章节数降至 12 章；且「LLM API 用量」章标题序号为空、被排到所有章节之前。
+
+**根因**：`src/static/tmpl/report_template.html` 的 `sec-llm_usage` 容器**漏加可见性守卫**（其余 4 个 LLM 章由 `section_visible("global_macro")` 统一包住）。`both`/`basic`（LLM 关闭）下该章照样输出，但它不在 `_compute_section_visibility` 的 `visible_numbers` 中 → `section_numbers['llm_usage']` 为 Undefined，标题渲染成「、LLM API 用量」；容器 `.container{display:flex}` 靠 `style="order:N"` 排序，空值输出为非法的 `order: ;` 被 CSS 忽略 → `order` 回退 0 → 排到所有 `order:1..N` 之前。L 模式下该章有数据（编号 17、末位），故长期未暴露。
+
+**变更**：
+- `src/static/tmpl/report_template.html`：`sec-llm_usage` 补 `{% if section_visible("llm_usage") %} … {% endif %}` 守卫，LLM 关闭时整章不渲染（与其余 LLM 章口径一致）
+- 回归 +2 例（不可见时不渲染且无 `order: ;`；可见时渲染且 `order` 为末位序号），`test_all_invisible` 改写为「只渲染 4 个 always 章容器」的结构断言
+- `managements/folders.md` 统计表行数同步
+
+**说明**：17→12 章本身**非渲染缺陷**——CLI 包装脚本 `cli.sh`/`cli.ps1` 无参数默认 `report --type both`（Excel+HTML、不含 LLM）为既定行为，本次未改；需要全部章节（L 模式）请用 `report --type full` 或 `scripts/llm.sh`。
+
 ---
 
 ## 归档
