@@ -43,7 +43,17 @@ jobs:
 
       - name: P0 — 快速验证（dev 提交门禁）
         if: github.ref_name == 'dev' && github.event_name == 'push'
-        run: python scripts/test-runner.py --mode dev-verify --no-timeout
+        run: |
+          set +e
+          python scripts/test-runner.py --mode dev-verify --no-timeout > /tmp/p0.log 2>&1
+          rc=$?
+          tail -60 /tmp/p0.log
+          if [ "$rc" -ne 0 ]; then
+            grep -E '^(FAILED|ERROR) |预检失败|失败:|Traceback|E   ' /tmp/p0.log | head -40 | while IFS= read -r line; do
+              echo "::error title=P0-DIAG::$line"
+            done
+          fi
+          exit "$rc"
 
       - name: P1 — 合入验证（master 门禁）
         if: github.ref_name == 'master' || github.event_name == 'pull_request'
