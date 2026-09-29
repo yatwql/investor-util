@@ -358,3 +358,34 @@ class TestFetchReportSections:
         assert ds.fetch_report_sections(1) is None
         monkeypatch.setattr(ds, "_request", lambda path, params: None)
         assert ds.fetch_report_sections(1) is None
+
+
+class TestEmptyReasonSelfReport:
+    """datasink 在返回 None 时自陈原因（供链路替换笼统的「返回空」）。"""
+
+    def _reason(self):
+        from src.python.providers._utils import take_last_reason
+
+        return take_last_reason()
+
+    def test_section_404_reports_missing_section(self, monkeypatch):
+        """带 section 的 404（该文档没有这一节）→ 原因含章节名。"""
+        _prepare(monkeypatch, _FakeResp(status_code=404, payload={}))
+        assert ds._request("/documents/7", {"section": "管理层讨论与分析"}) is None
+        assert "管理层讨论与分析" in self._reason()
+
+    def test_sections_list_404_reports_unparsed(self, monkeypatch):
+        """/sections 清单 404（该文档章节未被源侧解析）→ 原因指明这一点。"""
+        _prepare(monkeypatch, _FakeResp(status_code=404, payload={}))
+        assert ds._request("/documents/7/sections", {}) is None
+        assert "章节清单" in self._reason()
+
+    def test_credential_missing_reports_reason(self, monkeypatch):
+        monkeypatch.setattr(ds, "missing_credential", lambda _sid: object())
+        assert ds._request("/documents", {}) is None
+        assert "凭据" in self._reason()
+
+    def test_document_level_http_error_reports_status(self, monkeypatch):
+        _prepare(monkeypatch, _FakeResp(status_code=500, payload={}))
+        assert ds._request("/documents", {}) is None
+        assert "500" in self._reason()

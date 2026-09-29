@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.9-dev
-> **编号源**：`rf-next = 472`（新增问题取此编号，完成后更新为 +1；已用最大 rf-471，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 474`（新增问题取此编号，完成后更新为 +1；已用最大 rf-473，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -48,6 +48,8 @@
 
 > 暂无（v0.11.8 批次 rf-461 ~ rf-470 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）
 | **rf-471** | **TUI 主菜单目录配置入口分散 + 与系统自检争用 `[D]`**（用户要求「增加 [D] 配置目录信息，把 [C]/[F]/[O] 变成其二级选项」）：持仓目录 / 持仓文件名 / 报告输出目录三个同属「路径配置」的入口平铺在主菜单（占 3 个键位），而系统自检占用 `[D]`，二者语义冲突 | ① `tui_menu.MENU_ITEMS`：三项合并为 `[D] 配置目录信息`（20 → 18 项），系统自检键 `D` → `T`（`FEATURE_GATED_ITEMS` 同步）；② `handlers_config._cmd_config_dir_info()`：独立子菜单循环（`[C]`/`[F]`/`[O]` + `[B]` 返回，大小写归一、无效输入重提示、EOF/Ctrl+C 安全返回），子项在调用时取 `handlers_config` 模块全局（可打桩）；③ `tui.py` 回调绑定与 `default_menu_key` 注释同步；④ 回归 +7 例（子菜单分发/大小写/返回/无效输入/EOF，菜单键集与路由 D→`_cmd_config_dir_info`、T→`_cmd_run_doctor`）；⑤ 文档同步：how-to-use-tui-menu / how-to-start / faq / how-to-config(-llm) / how-to-use-web-mode / how-to-use-cli-mode / requirements（R-TUI-02 18 项 + §3.2 菜单表 + R-DIAG-05）/ technical（菜单体系表）/ testplan / test-coverage / folders；代码内提示串（`handlers_log` docstring、`features.doctor_check` 说明）同步 |
+| **rf-472** | **巨潮备源（cninfo）的三处取数缺陷：PDF 用元数据超时、不可达主机反复白等、失败原因丢失**（用户贴日志问「所以其实是拿不到信息的么？」）：① `_get_bytes` 与元数据接口共用 `_TIMEOUT = 20.0`，而公告 PDF 是完整年报原文（几十 MB）→ 慢链路下必然「挂起 → 不重试 → 失败」，**从未下成功过**，每次白等一个超时预算；② `cninfo` 是**直连调用（不经 Provider Chain）**，没有会话级熔断——主机不可达时同一轮报告里**每篇文档都重新发起请求、重新白等**（实测 601939 连试 4 次共 160s）；③ provider 返回 `None` 时链路只记笼统的「返回空」，无法区分「源故障」（要排查网络/凭据）与「该文档确实没这一节」（正常业务结果）——本次排查即被误导，实际 DataSinking 主源**完全正常**（直连实测 HTTP 200、626044 篇索引、章节清单可取），是「该季报没有管理层讨论与分析」+ 备源网络不可达共同造成 | ① `cninfo` 新增独立 `_PDF_TIMEOUT = 60.0`，`_get_bytes` 用它（慢链路下年报能真正下下来）；② 新增「主机本会话不可达」短路 `_mark_host_unreachable` / `_is_host_unreachable`（挂起型失败后标记主机，后续请求不发 HTTP 直接失败，把 N × 超时降为 1 次；非超时失败不标记，避免误伤真实可达的主机；`reset_cninfo_unreachable` 支持手动/测试重置）；③ `providers/_utils` 新增**按线程隔离、消费即清**的失败原因载体 `set_last_reason` / `take_last_reason`，`chain._try_provider_fetch` 在 provider 返回 `None` 时读取并**替换笼统的「返回空」**（同时进 `FailureDiagnostics` → 报告数据源矩阵）；`datasink._request` 与 `cninfo` 各分支（无凭据/凭据为空/配额用尽/401-403/429/404 探测/非 200/非 JSON/orgId 未解析/主机不可达/连接超时）逐条自陈原因；④ 回归 +14 例（cninfo PDF 超时预算与会话短路 6、datasink 自陈原因 4、chain 原因透传 2、共享载体线程隔离与消费即清 5）；⑤ 文档：`technical.md` §2.2.1（自陈原因契约 + cninfo 额外护栏）、`datasource-reliability.md`（PDF 超时 / 会话短路 / 可达性取决于本机网络路径）、`testplan.md` R-DATA-07 载体 |
+| **rf-473** | **HTML 报告新闻表在手机窄屏下字段错位、信息易错过**（用户报「财经新闻热点与持仓关联分析里，摘要、关联关键词、LLM 关联分析挤在一起，有些地方错位」）：该表 7 列（有 LLM 分析时）且沿用全局 `table { min-width: 600px }`，手机上横向压缩后各列内容互相挤压换行、列边界肉眼难辨，「摘要 / 关联关键词 / LLM 关联分析」三块黏连在一起 | ① 新闻表加 `.news-table` 类作窄屏规则作用域；② `@media (max-width: 768px)` 下**改为卡片式堆叠**——隐去表头、每行化为一张卡片，单元格转块级并用 `td[data-label]::before { content: attr(data-label) }` 生成字段名，序号与标题作卡片头（不显示字段名前缀）、取消 `min-width`；③ 模板补 `news-table` / `news-seq` / `news-title` 类与各字段 `data-label`；④ 回归 +5 例（类名作用域、逐字段 data-label 齐备、窄屏隐表头与堆叠规则、取消 min-width、卡片头规则）；⑤ 文档：`reports-instruction.md` 补「新闻表窄屏卡片布局」说明 |
 
 ### 归档档案
 

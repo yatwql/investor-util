@@ -401,9 +401,7 @@ class TestTransientConnectRetry:
 
         assert cn._post_json("/x", {}) is None
         assert client.calls == pu.CONNECT_RETRY_POLICY.attempts
-        assert sleeps == [
-            pu.CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, pu.CONNECT_RETRY_POLICY.attempts)
-        ]
+        assert sleeps == [pu.CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, pu.CONNECT_RETRY_POLICY.attempts)]
 
     def test_get_bytes_retries_once_then_succeeds(self, monkeypatch, _isolate):
         """公告 PDF 下载同样退避重试一次。"""
@@ -478,6 +476,7 @@ class TestTopSearchListShape:
         )
         assert cn.resolve_org_id("600900") == "600900,gssh0600900"
 
+
 @pytest.mark.unit
 @pytest.mark.unit_providers
 class TestHangFailureNotRetried:
@@ -512,3 +511,89 @@ class TestHangFailureNotRetried:
         assert cn._with_transient_retry("/new/information/topSearch/query", _do_request) is None
         assert attempts["n"] == 1
         assert any("连接挂起" in r.message for r in caplog.records)
+
+
+class TestPdfTimeoutBudget:
+    """公告 PDF 使用独立的更宽超时预算（年原文几十 MB，与元数据接口共用 20s 必然失败）。"""
+
+    def test_pdf_timeout_larger_than_metadata_timeout(self):
+        assert cn._PDF_TIMEOUT > cn._TIMEOUT
+
+    def test_get_bytes_uses_pdf_timeout(self, monkeypatch):
+        """_get_bytes 传给重试脚手架的 timeout 是 PDF 预算（而非元数据预算）。"""
+        captured = {}
+
+        def _fake_retry(label, do_request, *, url="", timeout=None):
+            captured["timeout"] = timeout
+            captured["url"] = url
+            return None
+
+        monkeypatch.setattr(cn, "_with_transient_retry", _fake_retry)
+        assert cn._get_bytes("http://static.cninfo.com.cn/finalpage/x.PDF") is None
+        assert captured["timeout"] == cn._PDF_TIMEOUT
+
+
+class TestHostUnreachableShortCircuit:
+    """挂起型失败后，本会话同一主机直接短路——不再每篇文档白等一个超时预算。"""
+
+    @pytest.fixture(autouse=True)
+    def _clean_state(self):
+        cn.reset_cninfo_unreachable()
+        yield
+        cn.reset_cninfo_unreachable()
+
+    def test_hang_marks_host_unreachable(self, monkeypatch, caplog):
+
+        def _do_request():
+            raise httpx.ConnectTimeout("timed out")
+
+        with caplog.at_level("WARNING"):
+            assert (
+                cn._with_transient_retry(
+                    "http://static.cninfo.com.cn/finalpage/a.PDF",
+                    _do_request,
+                    url="http://static.cninfo.com.cn/finalpage/a.PDF",
+                )
+                is None
+            )
+        assert cn._is_host_unreachable("http://static.cninfo.com.cn/finalpage/b.PDF") is True
+        assert any("本会话判定不可达" in r.message for r in caplog.records)
+
+    def test_subsequent_request_short_circuits_without_http(self, monkeypatch):
+        """已标记不可达后，后续请求不发 HTTP、不计尝试次数。"""
+        cn._mark_host_unreachable("http://www.cninfo.com.cn/x")
+        attempts = {"n": 0}
+
+        def _do_request():
+            attempts["n"] += 1
+            return object()
+
+        assert (
+            cn._with_transient_retry(
+                "/new/information/topSearch/query",
+                _do_request,
+                url="http://www.cninfo.com.cn/new/information/topSearch/query",
+            )
+            is None
+        )
+        assert attempts["n"] == 0
+
+    def test_non_hang_failure_does_not_mark_unreachable(self, monkeypatch):
+        """非超时失败（如参数/解析错误）不判主机不可达——避免误伤真实可达的主机。"""
+
+        def _do_request():
+            raise ValueError("bad params")
+
+        assert (
+            cn._with_transient_retry("http://www.cninfo.com.cn/x", _do_request, url="http://www.cninfo.com.cn/x")
+            is None
+        )
+        assert cn._is_host_unreachable("http://www.cninfo.com.cn/x") is False
+
+    def test_netloc_extraction_and_reset(self):
+        assert cn._host_of("http://www.cninfo.com.cn/a/b") == "www.cninfo.com.cn"
+        assert cn._host_of("/relative/path") == ""
+        cn._mark_host_unreachable("http://static.cninfo.com.cn/a.PDF")
+        assert cn._is_host_unreachable("http://static.cninfo.com.cn/b.PDF") is True
+        cn.reset_cninfo_unreachable()
+        assert cn._is_host_unreachable("http://static.cninfo.com.cn/b.PDF") is False

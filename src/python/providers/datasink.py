@@ -36,7 +36,7 @@ from typing import Any
 from src.python.core.atomic_write import write_json_atomic
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
-from src.python.providers._utils import with_connect_retry
+from src.python.providers._utils import set_last_reason, with_connect_retry
 from src.python.core.datasource_credential import (
     DEFAULT_DATA_KEY_FILE,
     CredentialSpec,
@@ -236,12 +236,15 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
     """
     if missing_credential(SOURCE_ID) is not None:
         logger.info("[datasink] 未配置凭据，跳过请求 %s", path)
+        set_last_reason("未配置凭据")
         return None
     key = credential_value(SOURCE_ID)
     if not key:
         logger.info("[datasink] 凭据为空，跳过请求 %s", path)
+        set_last_reason("凭据为空")
         return None
     if not _consume_quota():
+        set_last_reason("日配额已用尽")
         return None
 
     query = {k: v for k, v in params.items() if v not in (None, "")}
@@ -251,6 +254,7 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
 
     if resp.status_code in (401, 403):
         logger.warning("[datasink] 凭据无效（HTTP %d），请检查 API key", resp.status_code)
+        set_last_reason(f"凭据无效(HTTP {resp.status_code})")
         return None
     if resp.status_code == 429:
         # 限速：等待一个限速窗口后**重试一次**（免费档 3 请求/秒，并发路径下仍可能触顶）
@@ -260,6 +264,7 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
         resp = _get_with_transient_retry(path, query)
         if resp.status_code != 200:
             logger.warning("[datasink] 重试仍失败（HTTP %d），跳过 %s", resp.status_code, path)
+            set_last_reason(f"限速重试仍失败(HTTP {resp.status_code})")
             return None
     if resp.status_code != 200:
         # 404 的两种语义分开记：**带 section 的探测**（章节名未命中，调用方本来就会
@@ -269,15 +274,25 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
         probing = bool(params.get("section")) or path.endswith("/sections")
         if resp.status_code == 404 and probing:
             logger.debug("[datasink] 探测未命中（HTTP 404，预期内，按降级路径继续）：%s", path)
+            # 区分两种成因：章节名不存在（文档有别的章节）vs 该文档章节清单未被源侧解析
+            if params.get("section"):
+                set_last_reason(f"该文档无「{params['section']}」章节")
+            else:
+                set_last_reason("该文档章节清单未被源侧解析")
         else:
             logger.warning("[datasink] 请求 %s 返回 HTTP %d", path, resp.status_code)
+            set_last_reason(f"HTTP {resp.status_code}")
         return None
     try:
         data = resp.json()
     except ValueError:
         logger.warning("[datasink] 响应非 JSON（%s）", path)
+        set_last_reason("响应非 JSON")
         return None
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        set_last_reason("响应结构异常")
+        return None
+    return data
 
 
 def fetch_report_documents(

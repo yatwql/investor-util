@@ -824,3 +824,77 @@ class TestExpandIndustryKeywords:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNewsTableMobileLayout(unittest.TestCase):
+    """新闻表窄屏（手机）卡片式堆叠布局：字段不再挤在一起、不依赖列宽。
+
+    新闻表 7 列 + `min-width: 600px`，手机上横向挤压会让「摘要 / 关联关键词 /
+    LLM 关联分析」互相错位、信息容易错过。窄屏下每行呈现为一张卡片，各字段用
+    `data-label` 生成「字段名 + 值」两段式。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from src.python.report.html_writer import _LLM_SUPPORTED_SECTIONS, _build_section_nav_groups
+        from src.python.report.html_jinja_env import _ENV
+        from src.test.unit.report.test_html_report_structure import (
+            _REPORT_SECTION_DEFAULT,
+            _build_minimal_render_data,
+        )
+
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: (sec["key"] == "news_correlation") for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["news_data"] = [
+            {
+                "title": "测试新闻标题",
+                "url": "https://example.com/a",
+                "intro": "摘要内容",
+                "media_name": "新浪财经",
+                "ctime": "2026-09-29 10:00",
+                "matched_keywords": ["600900"],
+                "enriched_keywords": [{"display": "长江电力", "type": "holding"}],
+                "llm_analysis": "强相关",
+            }
+        ]
+        data["has_llm_analysis"] = True
+
+        def _sv_fn(key, _d=sv_dict):
+            return bool(_d.get(key, False))
+
+        cls.html = _ENV.get_template("report_template.html").render(
+            **data,
+            section_visible=_sv_fn,
+            section_groups=_build_section_nav_groups(order, _sv_fn, numbers),
+            llm_supported_sections=_LLM_SUPPORTED_SECTIONS,
+        )
+        from bs4 import BeautifulSoup
+
+        cls.soup = BeautifulSoup(cls.html, "html.parser")
+
+    def test_table_carries_news_table_class(self):
+        """新闻表带 `.news-table` 类（窄屏规则的作用域选择器）。"""
+        assert self.soup.select_one("table.news-table") is not None
+
+    def test_every_field_has_data_label(self):
+        """除序号与标题（卡片头）外，每个字段单元格都带 `data-label`（窄屏字段名来源）。"""
+        table = self.soup.select_one("table.news-table")
+        labels = {td.get("data-label") for td in table.select("tbody td[data-label]")}
+        assert {"摘要", "来源", "发布时间", "关联关键词", "LLM 关联分析"} <= labels
+
+    def test_mobile_css_hides_header_and_stacks_cells(self):
+        """窄屏 CSS 就位：隐藏表头 + 单元格转块级 + 用 data-label 生成字段名。"""
+        assert ".news-table thead { display: none; }" in self.html
+        assert ".news-table, .news-table tbody, .news-table tr, .news-table td { display: block;" in self.html
+        assert 'content: attr(data-label) "："' in self.html
+
+    def test_mobile_css_removes_min_width(self):
+        """窄屏下取消 `min-width: 600px`（否则仍会横向溢出）。"""
+        assert ".news-table { min-width: 0; }" in self.html
+
+    def test_title_and_seq_act_as_card_header(self):
+        """序号与标题作卡片头：窄屏下不显示字段名前缀。"""
+        assert ".news-table td.news-title::before { display: none; }" in self.html
+        assert ".news-table td.news-seq::before { display: none; }" in self.html

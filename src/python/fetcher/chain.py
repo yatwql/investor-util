@@ -192,8 +192,14 @@ def _try_provider_fetch(
         return cast("dict[str, Any] | None", TRANSPORT_FAILURE), reason
 
     if raw is None:
-        logger.info("[%s]%s %s 返回空，尝试下一链路", data_type, _code_tag, provider_name)
-        return None, "返回空"
+        # provider 可把「为什么空」写在 _utils 的 last-reason 里（如「该文档无目标章节」）；
+        # 取到就用它替换笼统的「返回空」——「源故障」与「该文档确实没这一节」在运维上
+        # 是完全不同的信号（前者要排查网络/凭据）。
+        from src.python.providers._utils import take_last_reason
+
+        reason = take_last_reason("返回空")
+        logger.info("[%s]%s %s 返回空（%s），尝试下一链路", data_type, _code_tag, provider_name, reason)
+        return None, reason
 
     # 数据验证
     if validate:

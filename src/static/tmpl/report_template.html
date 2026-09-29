@@ -281,6 +281,44 @@
         .source-tag-industry { display: inline-block; background: var(--source-tag-ind-bg); border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: var(--source-tag-ind-text); }
         .source-tag-concept { display: inline-block; background: var(--source-tag-con-bg); border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; white-space: nowrap; color: var(--source-tag-con-text); }
 
+        /* ── 新闻表：窄屏（手机）卡片式堆叠布局 ─────────────────
+           该表 7 列 + 全局 min-width 600px，手机上横向挤压会让标题/摘要/关键词/LLM 分析
+           互相错位、信息容易错过。窄屏下隐去表头，每行转为一张卡片，各字段用
+           「字段名 + 值」两段式列出（字段名取 td 的 data-label），不再依赖列宽。 */
+        .news-table { min-width: 600px; }
+        @media (max-width: 768px) {
+            .news-table { min-width: 0; }
+            .news-table thead { display: none; }
+            .news-table, .news-table tbody, .news-table tr, .news-table td { display: block; width: 100%; }
+            .news-table tr {
+                border: 1px solid var(--border-light); border-radius: 6px;
+                margin: 0 0 12px; padding: 4px 0; background: var(--surface);
+            }
+            .news-table tr:nth-child(even) { background: var(--surface); }
+            .news-table td {
+                text-align: left; border: none; padding: 6px 12px;
+                max-width: none !important; font-size: 13px !important;
+            }
+            /* 字段名行：仅窄屏显示（宽屏下 td::before 不参与布局） */
+            .news-table td[data-label]::before {
+                content: attr(data-label) "：";
+                display: block; font-size: 11px; font-weight: 600;
+                color: var(--text-faint); margin-bottom: 2px;
+            }
+            /* 序号与标题合并为卡片头：序号小字前置，标题独占一行可点 */
+            .news-table td.news-seq {
+                display: inline-block; width: auto; padding: 8px 12px 2px;
+                font-size: 11px !important; color: var(--text-faint);
+            }
+            .news-table td.news-seq::before { display: none; }
+            .news-table td.news-title {
+                display: block; padding: 0 12px 8px;
+                font-size: 14px !important; font-weight: 600; line-height: 1.5;
+                border-bottom: 1px solid var(--border-light); margin-bottom: 4px;
+            }
+            .news-table td.news-title::before { display: none; }
+        }
+
         /* ── 章节快捷导航 ────────────────────── */
         .section-nav {
             display: flex; flex-wrap: wrap;
@@ -2044,7 +2082,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         <div class="section-title">{{ section_numbers['news_correlation'] }}、财经新闻热点与持仓关联分析</div>
         {% if news_data %}
         <div class="section-content" style="padding: 0;">
-            <table>
+            <table class="news-table">
                 <thead>
                     <tr>
                         <th>序号</th><th>新闻标题</th><th>摘要</th><th>来源</th><th>发布时间</th><th>关联关键词</th>
@@ -2054,14 +2092,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                 <tbody>
                     {% for item in news_data %}
                     <tr>
-                        <td>{{ loop.index }}</td>
-                        <td class="text-left">
+                        <td class="news-seq">{{ loop.index }}</td>
+                        <td class="text-left news-title" data-label="新闻标题">
                             <a href="{{ item.url }}" target="_blank" rel="noopener" style="color: #2E75B6; text-decoration: none;">{{ item.title }}</a>
                         </td>
-                        <td class="text-left" style="font-size: 12px; max-width: 300px;">{{ item.intro }}</td>
-                        <td>{{ item.media_name }}</td>
-                        <td style="font-size: 12px;">{{ item.ctime }}</td>
-                        <td class="text-left" style="font-size: 12px;">
+                        <td class="text-left" data-label="摘要" style="font-size: 12px; max-width: 300px;">{{ item.intro }}</td>
+                        <td data-label="来源">{{ item.media_name }}</td>
+                        <td data-label="发布时间" style="font-size: 12px;">{{ item.ctime }}</td>
+                        <td class="text-left" data-label="关联关键词" style="font-size: 12px;">
                             {% if item.enriched_keywords and item.enriched_keywords|length > 0 %}
                                 {% for ekw in item.enriched_keywords %}
                                 {# ⚠️ ekw.display 来自外部 API，依赖 autoescape 防 XSS —— 勿加 |safe 过滤器 #}
@@ -2074,7 +2112,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             {% endif %}
                         </td>
                         {% if has_llm_analysis %}
-                        <td class="text-left" style="font-size: 12px; max-width: 200px;">
+                        <td class="text-left" data-label="LLM 关联分析" style="font-size: 12px; max-width: 200px;">
                             {% if item.llm_analysis %}
                             <span>{{ item.llm_analysis | sentiment_colorize | safe }}</span>
                             {% else %}

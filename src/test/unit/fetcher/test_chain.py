@@ -777,3 +777,49 @@ class TestMissingTradingDays(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ============================================================
+#  provider 自陈失败原因（「返回空」不再笼统）
+# ============================================================
+
+
+class TestProviderEmptyReasonSurfaced(unittest.TestCase):
+    """provider 通过 ``_utils.set_last_reason`` 自陈原因时，链路日志与诊断原因如实透传。
+
+    回归：``返回空`` 把「源故障」与「该文档确实没这一节」混为一谈——前者要排查网络/凭据，
+    后者是正常业务结果（实测：DataSinking 对没有「管理层讨论与分析」的季报返回 404，
+    日志只记「返回空」，排查时被误读为源不可用）。
+    """
+
+    def tearDown(self):
+        from src.python.providers._utils import take_last_reason
+
+        take_last_reason()  # 清残留，避免污染同进程其他用例
+
+    def test_custom_reason_used_in_log_and_diag(self):
+        from src.python.providers._utils import set_last_reason
+
+        def _fn(**_kw):
+            set_last_reason("该文档无「管理层讨论与分析」章节")
+            return None
+
+        with patch.object(chain.logger, "info") as mock_info:
+            result, reason = chain._try_provider_fetch(
+                "financial_report", "datasink", "DataSinking", _fn, {}, None, None
+            )
+        self.assertIsNone(result)
+        self.assertEqual(reason, "该文档无「管理层讨论与分析」章节")
+        self.assertTrue(
+            any("该文档无「管理层讨论与分析」章节" in str(c.args) for c in mock_info.call_args_list),
+            "链路日志须带上 provider 自陈的原因",
+        )
+
+    def test_default_reason_when_provider_silent(self):
+        """provider 未自陈原因 → 保持既有「返回空」措辞（行为逐字不变）。"""
+        with patch.object(chain.logger, "info"):
+            result, reason = chain._try_provider_fetch(
+                "financial_report", "datasink", "DataSinking", lambda **_kw: None, {}, None, None
+            )
+        self.assertIsNone(result)
+        self.assertEqual(reason, "返回空")

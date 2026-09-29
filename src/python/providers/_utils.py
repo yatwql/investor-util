@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 
 from src.python.core.constants import BEIJING_TZ
@@ -47,6 +48,26 @@ def build_transient_retry_judge(elapsed: float, timeout: float) -> Callable[[Bas
         return is_transient_exception(exc) and elapsed < threshold
 
     return _judge
+
+
+#: 本线程最近一次 provider 取数的「失败原因短句」（供链路在 provider 返回 None 时
+#: 如实上屏）。provider 把「为什么空」写在这里（如「该文档无目标章节」），链路的
+#: `_try_provider_fetch` 读到后替换笼统的「返回空」——两者在运维上是完全不同的信号：
+#: 「源故障」要排查网络/凭据，而「该文档确实没这一节」是正常业务结果。
+#: 按线程隔离（批量取数是多线程），消费后即清，无效匹配不影响其他调用。
+_last_reason = threading.local()
+
+
+def set_last_reason(reason: str) -> None:
+    """provider 设置本次取数的可读失败原因（返回 None 前调用）。"""
+    _last_reason.value = reason
+
+
+def take_last_reason(default: str = "") -> str:
+    """取出并清除本线程的失败原因（无则返回 ``default``）。"""
+    reason = getattr(_last_reason, "value", "")
+    _last_reason.value = ""
+    return reason or default
 
 
 def with_connect_retry(
