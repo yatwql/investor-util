@@ -9,7 +9,7 @@ import logging
 import time
 
 from src.python.core.constants import BEIJING_TZ
-from src.python.core.retry import STRATEGY_FIXED, RetryPolicy, is_transient_exception, retry_transient
+from src.python.core.retry import STRATEGY_FIXED, STRATEGY_LINEAR, RetryPolicy, is_transient_exception, retry_transient
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import datetime
 from typing import Any, Callable
@@ -23,6 +23,12 @@ logger = logging.getLogger("invest")
 #: 故不再重试、直接上抛，由链路计入熔断并让后续请求快速跳过。
 #: 「快速失败」（连接被拒/重置/DNS 立即失败）仍按策略正常重试。
 HANG_ELAPSED_RATIO = 0.5
+
+
+#: 连接级瞬时失败重试策略（线性退避 1s、2s；总尝试 3 次）—— datasink / hithink / cninfo
+#: 三处连接级重试**共用同一策略实例**（差异只用 ``with_connect_retry`` 的 log_tag/label 表达）。
+#: 瞬时常量判据与退避算式取自 ``core/retry``（重试与退避唯一原语）。
+CONNECT_RETRY_POLICY = RetryPolicy(attempts=3, strategy=STRATEGY_LINEAR, base_backoff=1.0)
 
 
 def build_transient_retry_judge(elapsed: float, timeout: float) -> Callable[[BaseException], bool]:
@@ -41,6 +47,78 @@ def build_transient_retry_judge(elapsed: float, timeout: float) -> Callable[[Bas
         return is_transient_exception(exc) and elapsed < threshold
 
     return _judge
+
+
+def with_connect_retry(
+    request_fn: Callable[[], Any],
+    *,
+    timeout: float,
+    log_tag: str,
+    label: str,
+    before_attempt: Callable[[], None] | None = None,
+) -> Any:
+    """执行一次请求；连接级瞬时失败按 ``CONNECT_RETRY_POLICY`` 退避重试，**耗尽后上抛**。
+
+    统一 datasink / hithink / cninfo 三处的连接级重试**脚手架**（策略、耗时统计、挂起判据、
+    重试/挂起日志、每次尝试前的限速许可）—— 各来源差异只用 ``log_tag`` / ``label`` /
+    ``before_attempt`` 表达，避免同一约束各写一份（改一处漏两处）。
+
+    上抛是刻意设计：链路（``fetcher/chain``）的传输级判据**只认异常**，若在此吞成 None，
+    链路会把它当成「代码级空结果」——同源重试不触发、熔断与可用性统计不计、诊断文案误导。
+    经链路的 provider 槽由链路承接上抛；**不经链路的直连调用方自行决定降级**（见 cninfo）。
+
+    Args:
+        request_fn: 实际执行一次的请求（无参闭包，返回响应对象）。
+        timeout: 单次请求超时预算（挂起判据阈值 = ``timeout * HANG_ELAPSED_RATIO``）。
+        log_tag: 日志来源标识（如 ``"datasink"``，输出形如 ``[datasink] 连接挂起 …``）。
+        label: 日志中的请求标识（路径 / URL）。
+        before_attempt: 每次尝试前的钩子（如获取限速许可）；None 表示无需。
+
+    Returns:
+        最后一次尝试的返回值；失败按策略上抛。
+    """
+    elapsed = {"s": 0.0}
+
+    def _attempt() -> Any:
+        started = time.monotonic()
+        try:
+            if before_attempt is not None:
+                before_attempt()
+            return request_fn()
+        finally:
+            elapsed["s"] = time.monotonic() - started
+
+    def _on_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
+        logger.warning(
+            "[%s] 连接失败 %s（%s），%.1fs 后重试（第 %d/%d 次尝试）",
+            log_tag,
+            label,
+            exc,
+            delay,
+            failed_attempt,
+            CONNECT_RETRY_POLICY.attempts,
+        )
+
+    def _should_retry(exc: BaseException) -> bool:
+        """挂起型（耗时接近超时预算）不重试：再试只会线性放大等待。"""
+        if not build_transient_retry_judge(elapsed["s"], timeout)(exc):
+            if elapsed["s"] >= timeout * HANG_ELAPSED_RATIO:
+                logger.warning(
+                    "[%s] 连接挂起 %.1fs（≥超时预算一半），判定主机不可达，不再重试：%s",
+                    log_tag,
+                    elapsed["s"],
+                    label,
+                )
+            return False
+        return True
+
+    return retry_transient(
+        _attempt,
+        policy=CONNECT_RETRY_POLICY,
+        retry_on=_should_retry,
+        on_retry=_on_retry,
+        sleep=time.sleep,
+    )
 
 
 def run_with_timeout(

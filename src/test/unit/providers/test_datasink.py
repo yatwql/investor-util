@@ -18,6 +18,7 @@ from datetime import date
 import pytest
 
 from src.python.providers import datasink as ds
+from src.python.providers import _utils as pu
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
@@ -155,12 +156,12 @@ class TestRequestStatus:
         monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
         monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
         monkeypatch.setattr(ds, "_get_limiter", lambda: type("L", (), {"acquire": lambda _s, _p: None})())
-        monkeypatch.setattr(ds.time, "sleep", sleeps.append)
+        monkeypatch.setattr(pu.time, "sleep", sleeps.append)
 
         with pytest.raises(httpx.ConnectTimeout):
             ds._request("/documents", {})
-        assert attempts["n"] == ds._CONNECT_RETRY_POLICY.attempts
-        assert sleeps == [ds._CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, ds._CONNECT_RETRY_POLICY.attempts)]
+        assert attempts["n"] == pu.CONNECT_RETRY_POLICY.attempts
+        assert sleeps == [pu.CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, pu.CONNECT_RETRY_POLICY.attempts)]
 
     def test_transient_failure_then_success(self, monkeypatch):
         """首次握手被丢弃、重试即成功（cninfo 实测的同款抖动）→ 返回数据，不降级。"""
@@ -182,11 +183,11 @@ class TestRequestStatus:
         monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
         monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
         monkeypatch.setattr(ds, "_get_limiter", lambda: type("L", (), {"acquire": lambda _s, _p: None})())
-        monkeypatch.setattr(ds.time, "sleep", sleeps.append)
+        monkeypatch.setattr(pu.time, "sleep", sleeps.append)
 
         assert ds.fetch_report_documents("600519.SS", size=1) == [{"id": 1}]
         assert attempts["n"] == 2
-        assert sleeps == [ds._CONNECT_RETRY_POLICY.base_backoff]
+        assert sleeps == [pu.CONNECT_RETRY_POLICY.base_backoff]
 
     def test_hang_failure_is_not_retried(self, monkeypatch, caplog):
         """挂起型失败（单次尝试耗时 ≥ 超时预算一半）不重试。
@@ -215,7 +216,7 @@ class TestRequestStatus:
         monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
         monkeypatch.setattr(ds, "_get_limiter", lambda: type("L", (), {"acquire": lambda _s, _p: None})())
         monkeypatch.setattr(
-            ds,
+            pu,
             "time",
             types.SimpleNamespace(
                 monotonic=_monotonic,
@@ -242,7 +243,7 @@ class TestRequestStatus:
         monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
         monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
         monkeypatch.setattr(ds, "_get_limiter", lambda: type("L", (), {"acquire": lambda _s, _p: None})())
-        monkeypatch.setattr(ds.time, "sleep", sleeps.append)
+        monkeypatch.setattr(pu.time, "sleep", sleeps.append)
 
         with pytest.raises(ValueError):
             ds._request("/documents", {})

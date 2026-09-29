@@ -18,6 +18,7 @@ import httpx
 import pytest
 
 from src.python.providers import cninfo as cn
+from src.python.providers import _utils as pu
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
@@ -318,7 +319,7 @@ class TestGuards:
 
         client = _SeqClient()
         _patch_client(monkeypatch, client)
-        monkeypatch.setattr(cn.time, "sleep", lambda _s: None)
+        monkeypatch.setattr(pu.time, "sleep", lambda _s: None)
         assert cn.resolve_org_id("601398") == "601398,ok"
         assert client.calls == 2
 
@@ -379,7 +380,7 @@ class TestTransientConnectRetry:
     def _patch_flaky(self, monkeypatch, client) -> list[float]:
         sleeps: list[float] = []
         monkeypatch.setattr(cn, "make_http_client", lambda **_kw: client)
-        monkeypatch.setattr(cn.time, "sleep", sleeps.append)
+        monkeypatch.setattr(pu.time, "sleep", sleeps.append)
         return sleeps
 
     def test_post_json_retries_once_then_succeeds(self, monkeypatch, _isolate):
@@ -391,7 +392,7 @@ class TestTransientConnectRetry:
 
         assert payload == {"keyBoardList": [{"code": "600900", "orgId": "gssh0600900"}]}
         assert client.calls == 2
-        assert sleeps == [cn._CONNECT_RETRY_POLICY.base_backoff]
+        assert sleeps == [pu.CONNECT_RETRY_POLICY.base_backoff]
 
     def test_post_json_gives_up_after_one_retry(self, monkeypatch, _isolate):
         """始终失败 → 返回 None，且尝试次数有界（不无限重试）。"""
@@ -399,9 +400,9 @@ class TestTransientConnectRetry:
         sleeps = self._patch_flaky(monkeypatch, client)
 
         assert cn._post_json("/x", {}) is None
-        assert client.calls == cn._CONNECT_RETRY_POLICY.attempts
+        assert client.calls == pu.CONNECT_RETRY_POLICY.attempts
         assert sleeps == [
-            cn._CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, cn._CONNECT_RETRY_POLICY.attempts)
+            pu.CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, pu.CONNECT_RETRY_POLICY.attempts)
         ]
 
     def test_get_bytes_retries_once_then_succeeds(self, monkeypatch, _isolate):
@@ -411,7 +412,7 @@ class TestTransientConnectRetry:
 
         assert cn._get_bytes("http://static.cninfo.com.cn/a.PDF") == b"%PDF-1.4 fake"
         assert client.calls == 2
-        assert sleeps == [cn._CONNECT_RETRY_POLICY.base_backoff]
+        assert sleeps == [pu.CONNECT_RETRY_POLICY.base_backoff]
 
     def test_non_transient_error_is_not_retried(self, monkeypatch, _isolate):
         """确定性失败（非传输级异常）只调一次，不浪费退避等待。"""
@@ -434,7 +435,7 @@ class TestTransientConnectRetry:
 
         assert payload == [{"code": "600900", "orgId": "gssh0600900"}]
         assert client.calls == 3
-        assert sleeps == [cn._CONNECT_RETRY_POLICY.base_backoff, cn._CONNECT_RETRY_POLICY.base_backoff * 2]
+        assert sleeps == [pu.CONNECT_RETRY_POLICY.base_backoff, pu.CONNECT_RETRY_POLICY.base_backoff * 2]
 
 
 class TestTopSearchListShape:
@@ -495,7 +496,7 @@ class TestHangFailureNotRetried:
 
         monkeypatch.setattr(cn, "_TIMEOUT", 0.2)
         monkeypatch.setattr(
-            cn,
+            pu,
             "time",
             types.SimpleNamespace(
                 monotonic=_monotonic,

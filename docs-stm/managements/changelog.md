@@ -118,6 +118,16 @@
 - `cache/operations._refresh_industry_cache` / `_refresh_dividend_cache` 改用 `is_a_share_stock(h.name, h.code)`
 - 回归 +5 例（industry 批量名称过滤、行业平均 PE 名称过滤、新建 `test_cache_refresh_routing.py` 三例）
 
+### 技术债整改：过去 24 小时的 3 项（rf-468）
+
+**背景**：审计 rf-461/462/466/467 的实现，发现三处复制/未用/私有耦合。
+
+**变更**：
+- `providers/_utils.py` 新增 `CONNECT_RETRY_POLICY` + `with_connect_retry(...)`：把 datasink / hithink / cninfo 三处复制的连接级重试脚手架（策略常量、耗时统计、挂起判据+警告、重试日志、限速许可前钩子）收敛为唯一实现；各来源差异只用 `log_tag` / `label` / `before_attempt` 表达；cninfo 保留「直连降级为 None」契约于调用点
+- `fetcher/industry.batch_fetch_industry_data`：移除 rf-467 新增但无生产调用方的 `names_by_code` 参数（调用方预过滤 + 网关前缀防御）
+- `fetcher/price.py` 新增公开 `price_cache_key(code, expected_name)`；`report/market_value.py` 改用公开入口，不再跨模块引用私有 `_price_cache_key`
+- 回归 +1 例（公开 `price_cache_key` 路由解析）；provider 测试改为 patch `providers/_utils.time` / `_utils.CONNECT_RETRY_POLICY`
+
 ---
 
 ## 归档

@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 from typing import Any
 
 from src.python.core.code_utils import to_fmp_symbol
@@ -43,8 +42,7 @@ from src.python.core.datasource_credential import (
 )
 from src.python.core.http_client import make_http_client
 from src.python.core.num_utils import ms_to_date_str
-from src.python.core.retry import STRATEGY_LINEAR, RetryPolicy, retry_transient
-from src.python.providers._utils import HANG_ELAPSED_RATIO, build_transient_retry_judge
+from src.python.providers._utils import with_connect_retry
 
 logger = logging.getLogger("invest")
 
@@ -54,9 +52,6 @@ DISPLAY_NAME = "同花顺金融数据"
 _BASE_URL = "https://fuyao.aicubes.cn"
 _TIMEOUT = 20.0
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
-#: 连接级瞬时失败重试策略（线性退避 1s、2s；总尝试 3 次）——与 ``providers/cninfo.py``、
-#: ``providers/datasink.py`` 同口径；退避算式取自 ``core/retry``（重试与退避唯一原语）。
-_CONNECT_RETRY_POLICY = RetryPolicy(attempts=3, strategy=STRATEGY_LINEAR, base_backoff=1.0)
 
 #: 通用数据源密钥文件默认相对路径——单一事实来源见 ``core/datasource_credential``
 #: （配置键 ``data_key_file`` 可覆盖为绝对路径）；本模块保留同名别名以维持既有引用面
@@ -136,43 +131,20 @@ def _get_with_transient_retry(path: str, query: dict[str, Any], headers: dict[st
     上抛是刻意设计：链路（``fetcher/chain``）的传输级判据**只认异常**，在此吞成 None 会
     被当成「代码级空结果」——同源重试不触发、熔断与可用性统计不计、诊断文案误导。
     代码级结果（429/非 200/非 JSON/业务 code≠0）仍由 ``_request`` 返回 None。
+    退避策略/挂起判据/限速许可收敛于 ``providers/_utils.with_connect_retry``。
     """
     url = f"{_BASE_URL}{path}"
-    elapsed = {"s": 0.0}
 
-    def _attempt() -> Any:
-        started = time.monotonic()
-        try:
-            _get_limiter().acquire(SOURCE_ID)
-            with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
-                return client.get(url, params=query, headers=headers)
-        finally:
-            elapsed["s"] = time.monotonic() - started
+    def _request_once() -> Any:
+        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+            return client.get(url, params=query, headers=headers)
 
-    def _on_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
-        logger.warning(
-            "[hithink] 连接失败 %s（%s），%.1fs 后重试（第 %d/%d 次尝试）",
-            path,
-            exc,
-            delay,
-            failed_attempt,
-            _CONNECT_RETRY_POLICY.attempts,
-        )
-
-    def _should_retry(exc: BaseException) -> bool:
-        """挂起型（耗时接近超时预算）不重试：再试只会线性放大等待。"""
-        if not build_transient_retry_judge(elapsed["s"], _TIMEOUT)(exc):
-            if elapsed["s"] >= _TIMEOUT * HANG_ELAPSED_RATIO:
-                logger.warning(
-                    "[hithink] 连接挂起 %.1fs（≥超时预算一半），判定主机不可达，不再重试：%s",
-                    elapsed["s"],
-                    path,
-                )
-            return False
-        return True
-
-    return retry_transient(
-        _attempt, policy=_CONNECT_RETRY_POLICY, retry_on=_should_retry, on_retry=_on_retry, sleep=time.sleep
+    return with_connect_retry(
+        _request_once,
+        timeout=_TIMEOUT,
+        log_tag="hithink",
+        label=path,
+        before_attempt=lambda: _get_limiter().acquire(SOURCE_ID),
     )
 
 
@@ -180,7 +152,7 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
     """带凭据 / 限速 / 信封解析的 GET。
 
     两类失败**分开处理**（降级治理口径）：
-      - **传输级**（连接超时/握手超时/断连等）：经 ``_CONNECT_RETRY_POLICY`` 同源退避重试，
+      - **传输级**（连接超时/握手超时/断连等）：经 ``providers/_utils.CONNECT_RETRY_POLICY`` 同源退避重试，
         仍失败则**上抛异常**——由链路计入熔断与同源重试，诊断文案如实展示原因；
       - **代码级**（429 限流、非 200、非 JSON、业务 ``code != 0``）：返回 ``None``，
         由链路按空结果降级，**不计入熔断**。

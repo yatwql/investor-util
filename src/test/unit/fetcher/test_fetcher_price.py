@@ -92,6 +92,14 @@ class TestPriceCacheKey(unittest.TestCase):
         self.assertEqual(resolve_price_route("002943", "广发多因子灵活配置混合"), "price_fund_otc")
         self.assertEqual(resolve_price_route("002943", "宇晶股份"), "price_stock")
 
+    def test_public_price_cache_key_resolves_route(self):
+        """公开入口 price_cache_key 按名称解析路由（供报告层 CACHE_ONLY 复用）。"""
+        from src.python.fetcher.price import price_cache_key
+
+        self.assertEqual(price_cache_key("600900", "长江电力"), "price_stock_600900")
+        self.assertEqual(price_cache_key("002943", "广发多因子灵活配置混合"), "price_fund_otc_002943")
+        self.assertEqual(price_cache_key("002943", "宇晶股份"), "price_stock_002943")
+
     def test_different_code(self):
         """不同代码 → 不同键。"""
         self.assertNotEqual(self._call("600900"), self._call("000001"))

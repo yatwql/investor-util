@@ -17,6 +17,7 @@ from __future__ import annotations
 import pytest
 
 from src.python.providers import hithink as ht
+from src.python.providers import _utils as pu
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
@@ -163,7 +164,7 @@ class TestHttpStatus:
         monkeypatch.setattr(ht, "make_http_client", lambda **_kw: _HangClient(_FakeResp(payload={})))
         monkeypatch.setattr(ht, "_get_limiter", lambda: _NoopLimiter())
         monkeypatch.setattr(
-            ht,
+            pu,
             "time",
             types.SimpleNamespace(
                 monotonic=_monotonic,
@@ -193,12 +194,12 @@ class TestHttpStatus:
         monkeypatch.setattr(ht, "make_http_client", lambda **_kw: _TimeoutClient(_FakeResp(payload={})))
         # 限速器换零等待替身（否则其内部 sleep 会混入 sleeps 断言）
         monkeypatch.setattr(ht, "_get_limiter", lambda: _NoopLimiter())
-        monkeypatch.setattr(ht.time, "sleep", sleeps.append)
+        monkeypatch.setattr(pu.time, "sleep", sleeps.append)
 
         with pytest.raises(httpx.ConnectTimeout):
             ht.fetch_trading_days()
-        assert attempts["n"] == ht._CONNECT_RETRY_POLICY.attempts
-        assert sleeps == [ht._CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, ht._CONNECT_RETRY_POLICY.attempts)]
+        assert attempts["n"] == pu.CONNECT_RETRY_POLICY.attempts
+        assert sleeps == [pu.CONNECT_RETRY_POLICY.base_backoff * i for i in range(1, pu.CONNECT_RETRY_POLICY.attempts)]
 
 
 class TestLimiter:

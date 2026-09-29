@@ -60,6 +60,15 @@ def resolve_price_route(code: str, expected_name: str = "") -> str:
     return _route_price_request(code.strip(), expected_name)[0]
 
 
+def price_cache_key(code: str, expected_name: str = "") -> str:
+    """按路由解析价格缓存键（``price_stock_<code>`` / ``price_fund_otc_<code>``）。
+
+    供报告层（``report/market_value.py`` 的 CACHE_ONLY 读取）复用的**公开入口**，
+    避免跨模块引用私有 ``_price_cache_key``。
+    """
+    return _price_cache_key(code, resolve_price_route(code, expected_name))
+
+
 # ── Provider 映射与 Transformer ──────────────────────────────
 
 _ProviderFunc = Callable[..., dict[str, Any] | None]

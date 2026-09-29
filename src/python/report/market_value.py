@@ -19,8 +19,8 @@ from src.python.core.code_utils import (
 )
 from src.python.fetcher.price import (
     _price_cache_fresh,
-    _price_cache_key,
     fetch_market_data,
+    price_cache_key,
     resolve_price_route,
 )
 from src.python.core.market_hours import is_market_open as _mh_is_market_open
@@ -389,7 +389,7 @@ def _generate_details(holdings: list[Holding], today_str: str = "") -> list[Deta
         mkt = registry.fetch_cached_only(
             h.code,
             _route,
-            lambda c, _dt=_route: _price_cache_key(c, _dt),
+            lambda c, _n=h.name: price_cache_key(c, _n),
         )
         # 收市后校验 OTC 基金净值日期是否 ≥ 上一个交易日（跨日残留缓存 → 降级重取）
         if mkt is not None and not _price_cache_fresh(mkt):
