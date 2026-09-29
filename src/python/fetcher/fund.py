@@ -50,6 +50,7 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
     Provider Chain（可配置）：天天基金
     """
     from src.python.report.data_status import get_tracker
+    from src.python.providers.tiantian_ranking import rank_payload_is_current
 
     code = code.strip()
     _t = get_tracker()
@@ -63,6 +64,9 @@ def fetch_fund_rankings(code: str) -> dict[str, Any] | None:
         get_ttl("rank", rank_cache_key),
         fn_kwargs={"code": code},
         diagnostics=diag,
+        # 载荷语义版本准入：旧缓存（无 rank_schema 的陈旧排名，如残留 155/253）自动作废重取，
+        # 不依赖 24h TTL 过期、也不需用户手动清缓存（与 fund_hold 的 hold_schema 同习语）。
+        cache_validate=rank_payload_is_current,
     )
     if result is not None:
         _t.record(_src_key, "T2", success=True)
