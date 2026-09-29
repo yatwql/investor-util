@@ -26,9 +26,7 @@ MENU_ITEMS: list[MenuItem] = [
     ("B", "生成标准报告(Excel+HTML) [按章节配置]", None, False),
     ("L", "生成完整报告(Excel+HTML) [含LLM，按章节配置]", None, False),
     ("W", "调仓 What-if 模拟（对比两份持仓，独立报告）", None, False),
-    ("C", "配置持仓信息目录", None, False),
-    ("F", "配置持仓信息文件名", None, False),
-    ("O", "配置报告输出目录", None, False),
+    ("D", "配置目录信息（持仓目录/文件名/输出目录）", None, False),
     ("1", "更新基础类缓存（含基金业绩/持仓/经理/基准等）", None, False),
     ("2", "更新行情类缓存（含价格/指数等）", None, False),
     ("3", "清理过期缓存文件", None, False),
@@ -40,14 +38,14 @@ MENU_ITEMS: list[MenuItem] = [
     ("R", "刷新配置", None, False),
     ("V", "查看最近运行日志（可按级别筛选）", None, False),
     ("H", "查看数据源健康历史（近期检查记录）", None, False),
-    ("D", "系统自检（环境/配置/目录/数据源一键体检）", None, False),
+    ("T", "系统自检（环境/配置/目录/数据源一键体检）", None, False),
     ("X", "退出", None, True),
 ]
 
 # 受功能开关约束的菜单项：{快捷键: 开关名}。
 # 开关关闭时该菜单项整体不出现（在 _apply_feature_gates 中裁剪），
 # 避免用户点进去只得到一句「功能未启用」。
-FEATURE_GATED_ITEMS: dict[str, str] = {"D": "doctor_check"}
+FEATURE_GATED_ITEMS: dict[str, str] = {"T": "doctor_check"}
 
 
 def _apply_feature_gates() -> None:
@@ -110,7 +108,7 @@ def print_header() -> None:
     holdings = os.path.join(config.get("holdings_dir", ""), config.get("holdings_filename", ""))
     _first_run_hints = []
     if not os.path.exists(holdings):
-        _first_run_hints.append("• 请先通过菜单 [C]/[F] 配置持仓文件路径，或放置文件到默认目录")
+        _first_run_hints.append("• 请先通过菜单 [D] 配置持仓目录/文件名，或放置文件到默认目录")
     llm_conf = get_llm_config()
     if llm_conf is None or not (llm_conf.get("api_key") or llm_conf.get("_provider_list")):
         _first_run_hints.append(

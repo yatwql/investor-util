@@ -1,12 +1,13 @@
 """TUI 配置管理命令处理器。
 
-所有配置管理相关的 TUI 命令处理函数（菜单 C/F/O/P/S/R/A/I）。
+所有配置管理相关的 TUI 命令处理函数（菜单 D（二级 C/F/O）/P/S/R/A/I）。
 """
 
 from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 
 from src.python.config import set_config
 from src.python.core.constants import PROJECT_ROOT
@@ -115,6 +116,39 @@ def _cmd_config_filename() -> None:
 def _cmd_config_output_dir() -> None:
     """配置报告输出目录。"""
     _edit_single_config("output_dir", "报告输出目录", default="reports")
+
+
+def _cmd_config_dir_info() -> None:
+    """配置目录信息子菜单 — 对应主菜单 [D] 及其二级选项 [C]/[F]/[O]/[B]。
+
+    持仓目录 / 持仓文件名 / 报告输出目录三项聚合到 [D] 之下（主菜单不再单列）；
+    子菜单循环直至 [B]（或空输入 / Ctrl+C）返回主菜单。
+    子项在调用时从模块全局取函数（便于测试打桩与后续替换）。
+    """
+    items = [
+        ("C", "持仓信息目录", _cmd_config_dir),
+        ("F", "持仓信息文件名", _cmd_config_filename),
+        ("O", "报告输出目录", _cmd_config_output_dir),
+    ]
+    while True:
+        print()
+        print("  ── 配置目录信息 ──")
+        for _key, _label, _fn in items:
+            print(f"   [{_key}] {_label}")
+        print("   [B] 返回主菜单")
+        print()
+        try:
+            choice = input("  选择 > ").strip().upper()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return
+        if not choice or choice == "B":
+            return
+        handler: Callable[[], None] | None = next((fn for _key, _label, fn in items if _key == choice), None)
+        if handler is None:
+            print("  [!] 无效选择，请输入 C/F/O/B")
+            continue
+        handler()
 
 
 def _cmd_config_llm_modules() -> None:

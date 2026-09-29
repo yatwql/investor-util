@@ -427,7 +427,7 @@ while True:
 
 #### 1.6.3 菜单体系
 
-`tui/tui_menu.py:MENU_ITEMS` —— 每项 `(快捷键, 显示标签, 回调, 是否退出)`，回调由 `_bind_callbacks()` 在**运行时**从 handlers 模块填入（定义时不直接 import，避免启动即加载全部处理器）。当前 19 项按功能域分组：
+`tui/tui_menu.py:MENU_ITEMS` —— 每项 `(快捷键, 显示标签, 回调, 是否退出)`，回调由 `_bind_callbacks()` 在**运行时**从 handlers 模块填入（定义时不直接 import，避免启动即加载全部处理器）。当前 18 项按功能域分组：
 
 | 分组 | 快捷键 | 功能 |
 |:-----|:------|:-----|
@@ -435,7 +435,7 @@ while True:
 | | `[B]` | 生成标准报告 Excel+HTML，不含 LLM（both） |
 | | `[L]` | 生成完整报告 Excel+HTML 含 LLM（full，默认菜单项） |
 | | `[W]` | 调仓 What-if 模拟（对比两份持仓） |
-| 配置管理 | `[C]`/`[F]`/`[O]` | 持仓目录 / 持仓文件名 / 报告输出目录 |
+| 配置管理 | `[D]` | 配置目录信息**子菜单**（`handlers_config.py::_cmd_config_dir_info`，二级选项 `[C]` 持仓目录 / `[F]` 持仓文件名 / `[O]` 报告输出目录 / `[B]` 返回主菜单；子菜单内循环直至返回） |
 | | `[P]` | 报告可选章节开关 |
 | | `[I]` | 对比指数池管理 |
 | | `[A]` | 持仓匿名化模式 |
@@ -445,7 +445,7 @@ while True:
 | | `[3]`/`[4]` | 清理过期缓存 / 查看缓存统计 |
 | 诊断 | `[V]` | 查看最近运行日志（可按级别筛选，`handlers_log.py::_cmd_view_logs`） |
 | | `[H]` | 查看数据源健康历史（近期检查记录，`handlers_log.py::_cmd_view_health_history`） |
-| | `[D]` | 系统自检（环境/配置/目录/数据源一键体检，`handlers_log.py::_cmd_run_doctor`）；**受开关 `doctor_check` 约束（默认开）**——开关关闭时该菜单项由 `tui_menu._apply_feature_gates()` 就地裁剪，不出现在菜单中 |
+| | `[T]` | 系统自检（环境/配置/目录/数据源一键体检，`handlers_log.py::_cmd_run_doctor`）；**受开关 `doctor_check` 约束（默认开）**——开关关闭时该菜单项由 `tui_menu._apply_feature_gates()` 就地裁剪，不出现在菜单中 |
 | 退出 | `[X]` | 退出程序 |
 
 菜单渲染层与状态面板：`print_header`（标题 + 首次运行指引：缺持仓文件/缺 LLM 配置提示）、`show_config`（持仓路径、输出目录、新闻抓取上限、文件就绪状态 `[OK]`/`[!!]`、匿名化状态、隐私声明、LLM 配置状态单链/多链两视图）。LLM 状态面板支持多 Provider 链式模式（策略、各 provider 后端/模型/优先级/熔断状态、模块级偏好）。
@@ -2791,12 +2791,12 @@ llm/skeleton.py            # 摘要注入 expert_review 提示词（开关门控
 | 面 | 入口 | 是否受开关约束 |
 |:---|:-----|:---------------|
 | CLI | `doctor` 子命令（`--offline` 跳过联网、`--timeout` 预算秒数） | **否**（见下） |
-| TUI | 菜单 `[D]` 系统自检（`tui_menu.FEATURE_GATED_ITEMS` 门控，默认出现） | 是 |
+| TUI | 菜单 `[T]` 系统自检（`tui_menu.FEATURE_GATED_ITEMS` 门控，默认出现） | 是 |
 | Web | 运行状态区「系统自检」卡片 + `GET /api/doctor`（`network=0` / `timeout`，上限 15s） | 是（`system_info["doctor_enabled"]` 控制卡片渲染，默认显示） |
 
 **开关默认开启**：本项是只读诊断，不改产物、不写文件，联网检查每次由调用方显式确认，开启对默认输出零代价；而默认关闭的代价是环境出故障的那批用户恰好看不到这条诊断路径。开关本身保留（`features.json` 置 `false` 即隐藏上述两个日常入口），但它不属于「实验性功能」——故不出现在实验面板，也**不进报告产物的生成条件自述**（自述只列可能改变报告内容的开关，列进一个不改报告任何字节的开关会误导读者）。
 
-**`doctor` 子命令不受开关约束**（有意为之）：它与 `view-logs` 同样在 `init_config` **之前**分派——配置损坏正是它要诊断的场景，若因开关未开而拒绝执行，用户就陷入「开开关要先读配置、读配置失败又要开开关」的死锁。开关只约束 TUI `[D]` 与 Web 卡片这两个「日常会看见」的入口。
+**`doctor` 子命令不受开关约束**（有意为之）：它与 `view-logs` 同样在 `init_config` **之前**分派——配置损坏正是它要诊断的场景，若因开关未开而拒绝执行，用户就陷入「开开关要先读配置、读配置失败又要开开关」的死锁。开关只约束 TUI `[T]` 与 Web 卡片这两个「日常会看见」的入口。
 
 **退出码语义**：`_EXIT_SUCCESS`=全部通过、`_EXIT_PARTIAL`=命令跑完但有失败项（**不是** `_EXIT_SEVERE`——命令本身没失败，只是结论不佳），供 CI/脚本判定环境是否可用——脚本据以区分「命令本身失败」与「命令跑完但检查未通过」。
 
@@ -2808,7 +2808,7 @@ llm/skeleton.py            # 摘要注入 expert_review 提示词（开关门控
 | 不重复实现（DRY） | 约 10 个分散的私有解析器收敛到本项新建的 `core/num_utils.py` 单一实现；网络检查复用既有 `check_sources.run_health_checks`，不另写探测 |
 | 无静默默认值 | 每个检查项都带 `message`；失败项额外带 `hint`；开关清单逐项回显 |
 | 向后兼容 | A1 合法输入行为不变、A2 `message=None` 时矩阵输出逐字不变，均有显式测试 |
-| 开关默认开 | `doctor_check` 缺省 `True`（只读诊断，无产物影响、无隐式网络代价）；置 `false` 时 TUI 无 `[D]` 项、Web 不渲染该卡片 |
+| 开关默认开 | `doctor_check` 缺省 `True`（只读诊断，无产物影响、无隐式网络代价）；置 `false` 时 TUI 无 `[T]` 项、Web 不渲染该卡片 |
 | 产物自述不含 | 不进 `enabled_experimental_features()`——它不改变报告任何字节，列进报告自述会误导读者 |
 | 三面同源 | 注册表 `feature_switch_registry` 一处新增即自动出现在 TUI 菜单 / Web 配置面板 / CLI `--experiment` / `--feature` |
 | 只读诊断 | 写探测哨兵文件后立即删除；自检不改任何配置或缓存 |
@@ -3343,7 +3343,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `retry` | 重试与退避唯一原语（`RetryPolicy` 策略算式——固定/线性/指数/**显式序列**、`is_transient_exception` 瞬时判据、`retry_transient` 执行器；取数链路、各 provider 与 LLM 调用骨架共用） | 诊断 | 数据获取 | 无（模块级） |
 | `throttle` | 按名最小间隔节流唯一原语（`RateLimiter` + `interval_delay` 抖动算式；数据层限速/批量调度/LLM 端点节流三层共用） | 诊断 | 数据获取 | 无（模块级） |
 | `doctor` | 系统自检（环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，失败项附可执行建议，自身永不抛异常） | 诊断 | 诊断 | 开关 `doctor_check`（默认开；CLI `doctor` 子命令不受开关约束） |
-| `doctor_check` | 自检功能上屏门控（TUI 菜单 [D] 与 Web 状态区自检卡片可见性） | 诊断 | 诊断 | 开关 `doctor_check`（默认开，非实验项） |
+| `doctor_check` | 自检功能上屏门控（TUI 菜单 [T] 与 Web 状态区自检卡片可见性） | 诊断 | 诊断 | 开关 `doctor_check`（默认开，非实验项） |
 | `datasource_fields` | 数据域标准字段记录（`schemas/datasource_fields.py`，类型注解即缺省语义） | 数据源适配 | 数据获取 | 随 `datasource_adapter` |
 | `source_adapter` | 数据源适配契约（`SourceAdapter` 基类 + 注册表 + 自检报告 `survey_adapters`） | 数据源适配 | 数据获取 | 开关 `datasource_adapter`（默认开，非实验项） |
 | `quote_adapters` | 行情域适配器（腾讯/新浪/东方财富三源） | 数据源适配 | 数据获取 | 开关 `datasource_adapter`（默认开，非实验项） |

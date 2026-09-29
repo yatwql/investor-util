@@ -35,7 +35,7 @@ class TestTuiRouting(unittest.TestCase):
                 )
 
     def test_menu_key_coverage(self):
-        """MENU_ITEMS 包含所有标准功能键（含日志可视化 V/H、系统自检 D）。"""
+        """MENU_ITEMS 包含所有标准功能键（C/F/O 已聚合到 D 子菜单；系统自检为 T）。"""
         from src.python.tui.tui_menu import MENU_ITEMS
 
         keys = {item[0] for item in MENU_ITEMS}
@@ -45,9 +45,7 @@ class TestTuiRouting(unittest.TestCase):
             "B",
             "L",
             "W",
-            "C",
-            "F",
-            "O",
+            "D",
             "I",
             "A",
             "1",
@@ -59,9 +57,29 @@ class TestTuiRouting(unittest.TestCase):
             "X",
             "V",
             "H",
-            "D",
+            "T",
         }
         self.assertSetEqual(keys, expected)
+
+    def test_config_dir_info_routes_to_submenu(self):
+        """D 键路由到配置目录信息子菜单处理器。"""
+        from src.python.tui.tui import _bind_callbacks
+        from src.python.tui.tui_menu import MENU_ITEMS
+
+        _bind_callbacks()
+        d_item = next(item for item in MENU_ITEMS if item[0] == "D")
+        cb_name = d_item[2].__name__ if d_item[2] else ""
+        self.assertEqual(cb_name, "_cmd_config_dir_info")
+
+    def test_doctor_key_routes_to_doctor(self):
+        """T 键路由到系统自检处理器。"""
+        from src.python.tui.tui import _bind_callbacks
+        from src.python.tui.tui_menu import MENU_ITEMS
+
+        _bind_callbacks()
+        t_item = next(item for item in MENU_ITEMS if item[0] == "T")
+        cb_name = t_item[2].__name__ if t_item[2] else ""
+        self.assertEqual(cb_name, "_cmd_run_doctor")
 
     def test_execute_item_dispatches_correct_handler(self):
         """_execute_item 根据选中项索引正确执行回调。

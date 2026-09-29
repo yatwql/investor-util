@@ -371,3 +371,71 @@ class TestReportGroupMovedToSwitchPanel:
         assert "GROUP_ORDER" in src
         assert "for group in GROUP_ORDER" in src
         assert "GROUP_EXPERIMENTAL, GROUP_STANDARD, GROUP_REPORT" not in src
+
+
+class TestConfigDirInfoSubmenu:
+    """[D] 配置目录信息子菜单：二级选项分发、返回与无效输入。"""
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_config._cmd_config_output_dir")
+    @patch("src.python.tui.handlers_config._cmd_config_filename")
+    @patch("src.python.tui.handlers_config._cmd_config_dir")
+    def test_dispatches_three_sub_options_then_returns(self, mock_dir, mock_filename, mock_out, mock_input):
+        """依次选 C/F/O 分别路由到三个处理器，B 返回。"""
+        mock_input.side_effect = ["C", "F", "O", "B"]
+
+        from src.python.tui.handlers_config import _cmd_config_dir_info
+
+        _cmd_config_dir_info()
+
+        mock_dir.assert_called_once_with()
+        mock_filename.assert_called_once_with()
+        mock_out.assert_called_once_with()
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_config._cmd_config_dir")
+    def test_lowercase_choice_accepted(self, mock_dir, mock_input):
+        """小写子键归一化为大写后分发。"""
+        mock_input.side_effect = ["c", "B"]
+
+        from src.python.tui.handlers_config import _cmd_config_dir_info
+
+        _cmd_config_dir_info()
+
+        mock_dir.assert_called_once_with()
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_config._cmd_config_dir")
+    def test_back_returns_without_dispatch(self, mock_dir, mock_input):
+        """选 B 直接返回，不触发任何处理器。"""
+        mock_input.side_effect = ["B"]
+
+        from src.python.tui.handlers_config import _cmd_config_dir_info
+
+        _cmd_config_dir_info()
+
+        mock_dir.assert_not_called()
+
+    @patch("builtins.input")
+    @patch("src.python.tui.handlers_config._cmd_config_dir")
+    def test_unknown_choice_reprompts(self, mock_dir, mock_input, capsys):
+        """无效子键提示后重新等待输入，不误触发处理器。"""
+        mock_input.side_effect = ["Z", "B"]
+
+        from src.python.tui.handlers_config import _cmd_config_dir_info
+
+        _cmd_config_dir_info()
+
+        mock_dir.assert_not_called()
+        assert "无效选择" in capsys.readouterr().out
+
+    @patch("src.python.tui.handlers_config._cmd_config_dir")
+    @patch("builtins.input", side_effect=EOFError)
+    def test_eof_returns_safely(self, mock_input, mock_dir):
+        """EOF（非交互输入）不抛异常：读取一次即返回，不触发任何处理器。"""
+        from src.python.tui.handlers_config import _cmd_config_dir_info
+
+        _cmd_config_dir_info()
+
+        mock_input.assert_called_once()
+        mock_dir.assert_not_called()

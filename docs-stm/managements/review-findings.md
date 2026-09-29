@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.9-dev
-> **编号源**：`rf-next = 471`（新增问题取此编号，完成后更新为 +1；已用最大 rf-470，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 472`（新增问题取此编号，完成后更新为 +1；已用最大 rf-471，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -47,6 +47,7 @@
 ### 已解决待归档（v0.11.9-dev）
 
 > 暂无（v0.11.8 批次 rf-461 ~ rf-470 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）
+| **rf-471** | **TUI 主菜单目录配置入口分散 + 与系统自检争用 `[D]`**（用户要求「增加 [D] 配置目录信息，把 [C]/[F]/[O] 变成其二级选项」）：持仓目录 / 持仓文件名 / 报告输出目录三个同属「路径配置」的入口平铺在主菜单（占 3 个键位），而系统自检占用 `[D]`，二者语义冲突 | ① `tui_menu.MENU_ITEMS`：三项合并为 `[D] 配置目录信息`（20 → 18 项），系统自检键 `D` → `T`（`FEATURE_GATED_ITEMS` 同步）；② `handlers_config._cmd_config_dir_info()`：独立子菜单循环（`[C]`/`[F]`/`[O]` + `[B]` 返回，大小写归一、无效输入重提示、EOF/Ctrl+C 安全返回），子项在调用时取 `handlers_config` 模块全局（可打桩）；③ `tui.py` 回调绑定与 `default_menu_key` 注释同步；④ 回归 +7 例（子菜单分发/大小写/返回/无效输入/EOF，菜单键集与路由 D→`_cmd_config_dir_info`、T→`_cmd_run_doctor`）；⑤ 文档同步：how-to-use-tui-menu / how-to-start / faq / how-to-config(-llm) / how-to-use-web-mode / how-to-use-cli-mode / requirements（R-TUI-02 18 项 + §3.2 菜单表 + R-DIAG-05）/ technical（菜单体系表）/ testplan / test-coverage / folders；代码内提示串（`handlers_log` docstring、`features.doctor_check` 说明）同步 |
 
 ### 归档档案
 
