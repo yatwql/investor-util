@@ -99,6 +99,8 @@ class TestPriceCacheKey(unittest.TestCase):
         self.assertEqual(price_cache_key("600900", "长江电力"), "price_stock_600900")
         self.assertEqual(price_cache_key("002943", "广发多因子灵活配置混合"), "price_fund_otc_002943")
         self.assertEqual(price_cache_key("002943", "宇晶股份"), "price_stock_002943")
+        # 首尾空白归一化（与 fetch_market_data 的 strip 口径一致）
+        self.assertEqual(price_cache_key("  600900  ", "长江电力"), "price_stock_600900")
 
     def test_different_code(self):
         """不同代码 → 不同键。"""

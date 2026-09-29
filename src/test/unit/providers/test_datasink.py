@@ -229,6 +229,45 @@ class TestRequestStatus:
         assert attempts["n"] == 1
         assert any("连接挂起" in r.message for r in caplog.records)
 
+    def test_limiter_wait_not_counted_as_hang(self, monkeypatch):
+        """限速许可等待不计入「挂起」判据：慢限速器不应使重试被跳过。
+
+        回归：「本次尝试耗时」只计请求本身，否则用户把 qps 调得很低时，
+        自限速等待会被误判为主机不可达而放弃同源重试。
+        """
+        import types
+
+        import httpx
+
+        from src.python.providers import _utils as pu
+
+        attempts = {"n": 0}
+        clock = {"t": 0.0}
+
+        def _monotonic() -> float:
+            clock["t"] += 0.01
+            return clock["t"]
+
+        class _FlakyClient(_FakeClient):
+            def get(self, url, params=None, headers=None):
+                attempts["n"] += 1
+                if attempts["n"] == 1:
+                    raise httpx.ConnectTimeout("first handshake dropped")
+                return _FakeResp(payload={"items": [{"id": 1}]})
+
+        class _SlowLimiter:
+            def acquire(self, _sid, _p=None):
+                clock["t"] += 100.0  # 远超超时预算：计入 elapsed 会误判挂起
+
+        monkeypatch.setattr(ds, "make_http_client", lambda **_kw: _FlakyClient(_FakeResp()))
+        monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
+        monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(ds, "_get_limiter", lambda: _SlowLimiter())
+        monkeypatch.setattr(pu, "time", types.SimpleNamespace(monotonic=_monotonic, sleep=lambda _s: None))
+
+        assert ds.fetch_report_documents("600519.SS", size=1) == [{"id": 1}]
+        assert attempts["n"] == 2
+
     def test_non_transient_error_propagates_without_retry(self, monkeypatch):
         """非瞬时异常（如参数/编程错误）不上抛重试——原样抛回，不白等退避。"""
         sleeps: list[float] = []

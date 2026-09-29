@@ -143,6 +143,15 @@
 
 **教训**：改动报告层缓存键/会话域后，本地须跑「全量 unit（含 `edge`）」而非仅 `dev-verify`（P0 不含 edge）后再推 CI。
 
+### 技术债整改：第二轮（rf-470）
+
+审计 rf-468/469 之后的实现，发现三处判据/口径不一致：
+
+- `providers/_utils.with_connect_retry`：把 `before_attempt`（限速许可等待）移到计时之外——只计**请求本身**耗时，避免低 qps 下自限速等待被误判为「挂起」而放弃同源重试
+- `fetcher.price_cache_key`：先 `code.strip()`，与 `fetch_market_data` 口径一致
+- `report/news_correlation._expand_industry_keywords`：改用 `is_a_share_stock` 统一判据（ETF/港股/场外基金均不传入行业链路）
+- 回归 +3 例（慢限速器不计入挂起、公开 `price_cache_key` 空白归一、行业关键词扩展仅收 A 股个股）
+
 ---
 
 ## 归档

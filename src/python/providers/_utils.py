@@ -80,10 +80,12 @@ def with_connect_retry(
     elapsed = {"s": 0.0}
 
     def _attempt() -> Any:
+        # 限速许可等待不计入「本次尝试耗时」——只有请求本身接近超时才算「挂起」
+        # （否则用户把 qps 调得很低时，等待会被误判为主机不可达而放弃重试）
+        if before_attempt is not None:
+            before_attempt()
         started = time.monotonic()
         try:
-            if before_attempt is not None:
-                before_attempt()
             return request_fn()
         finally:
             elapsed["s"] = time.monotonic() - started

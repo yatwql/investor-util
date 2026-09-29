@@ -66,6 +66,7 @@ def price_cache_key(code: str, expected_name: str = "") -> str:
     供报告层（``report/market_value.py`` 的 CACHE_ONLY 读取）复用的**公开入口**，
     避免跨模块引用私有 ``_price_cache_key``。
     """
+    code = code.strip()
     return _price_cache_key(code, resolve_price_route(code, expected_name))
 
 
