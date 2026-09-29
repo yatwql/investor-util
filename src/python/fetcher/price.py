@@ -178,12 +178,25 @@ def _price_chain_slots() -> tuple[dict[str, tuple[str, _ProviderFunc]], dict[str
 # ── 公开接口 ─────────────────────────────────────────────────
 
 
-def _price_cache_fresh(data: dict) -> bool:
+#: 场外/QDII 官方净值天然滞后一日的路由：其合法新鲜度阈值为「前一交易日」而非
+#: 「最近交易日」——海外市场时差与净值披露节奏决定 T-1 是正常态。按最近交易日判定
+#: 会把正常净值永远视为跨日残留 → 清缓存重取 → 重复请求并记 ``price_*_refresh`` 失败。
+_OTC_NAV_ROUTES = frozenset({"price_fund_otc"})
+
+
+def _price_cache_fresh(data: dict, data_type: str) -> bool:
     """收市后验证价格缓存数据是否来自当前交易日。
 
-    缓存命中的缓存若 price_date 早于最近交易日，说明是跨日残留的过时数据
-    （例如盘中 Tencent 降级到 EastMoney 写入的上一交易日净值），应强制刷新。
+    缓存命中的缓存若 price_date 早于**该路由允许的最新日期**，说明是跨日残留的过时
+    数据（例如盘中 Tencent 降级到 EastMoney 写入的上一交易日净值），应强制刷新。
     盘中不验证（短 TTL 已保证实时性）。
+
+    新鲜度阈值按路由分域：场内行情要求等于最近交易日；场外/QDII 官方净值合法为
+    T-1，以前一交易日为阈值（否则正常净值被误判为过时并反复刷新）。
+
+    Args:
+        data: 价格数据（含 ``price_date``）
+        data_type: 价格路由（``price_stock`` / ``price_fund_otc``）
     """
     try:
         from src.python.core.market_hours import is_market_open as _mh_open
@@ -195,9 +208,13 @@ def _price_cache_fresh(data: dict) -> bool:
         if not pd:
             return False
         td = _gtd()
+        if data_type in _OTC_NAV_ROUTES:
+            from src.python.report.market_value import get_prev_trading_day as _gp
+
+            td = _gp(td)
         return pd >= td
     except Exception:
-        logger.warning("[price] _is_cache_fresh 校验异常，保守视作新鲜", exc_info=True)
+        logger.warning("[price] _price_cache_fresh 校验异常，保守视作新鲜", exc_info=True)
         return True
 
 
@@ -260,7 +277,7 @@ def _fetch_price_with_cache_refresh(
     else:
         _t.record(_src_key, "T2", success=False, failure_type="unreachable", message=diag.summary())
 
-    if r is not None and not _price_cache_fresh(r):
+    if r is not None and not _price_cache_fresh(r, data_type):
         from src.python.cache import clear as _cache_clear
         from src.python.report.market_value import get_last_trading_day as _gtd
 

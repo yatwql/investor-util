@@ -437,9 +437,67 @@ class TestTransportFailureGuard:
         monkeypatch.setattr(fi, "cache_get", lambda *a, **k: None)
         monkeypatch.setattr(fi, "cache_set", lambda *a, **k: None)
         monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", _boom)
-        monkeypatch.setattr(
-            fi, "fetch_hithink_indicator_series", lambda code, limit: [{"report_period": "2025-12-31"}]
-        )
+        monkeypatch.setattr(fi, "fetch_hithink_indicator_series", lambda code, limit: [{"report_period": "2025-12-31"}])
         series = fi.fetch_indicator_series("600900")
         assert [r["report_period"] for r in series] == ["2025-12-31"]
         assert any("主源多期指标取数失败" in r.message for r in caplog.records)
+
+
+class TestSeriesTransientRetry:
+    """主源多期指标直连路径的传输级重试。
+
+    ``fetch_indicator_series`` 直连 provider（不经链路），链路的重试机制不覆盖它；
+    akshare 超时/断连属一过性抖动，没有重试就会把一次抖动当主源不可用。
+    """
+
+    def _isolate_cache(self, monkeypatch, fi):
+        monkeypatch.setattr(fi, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fi, "cache_set", lambda *a, **k: None)
+
+    def test_retry_then_success(self, monkeypatch):
+        from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        calls = {"n": 0}
+
+        def _hist(code, limit=8):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise TimeoutError("first attempt timed out")
+            return [{"report_period": "2025-12-31", "source_api": "akshare_financial"}]
+
+        self._isolate_cache(monkeypatch, fi)
+        monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", _hist)
+        monkeypatch.setattr(
+            fi, "_SERIES_RETRY_POLICY", RetryPolicy(attempts=2, strategy=STRATEGY_FIXED, base_backoff=0.0)
+        )
+        series = fi.fetch_indicator_series("600900")
+        assert calls["n"] == 2
+        assert [r["report_period"] for r in series] == ["2025-12-31"]
+
+    def test_retry_exhausted_then_fallback(self, monkeypatch):
+        """重试耗尽 → 不中断，继续走同花顺/链路兜底。"""
+        from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+        from src.python.fetcher import financial_indicator as fi
+        from src.python.providers import akshare_financial
+
+        calls = {"n": 0}
+
+        def _boom(code, limit=8):
+            calls["n"] += 1
+            raise TimeoutError("always")
+
+        self._isolate_cache(monkeypatch, fi)
+        monkeypatch.setattr(akshare_financial, "fetch_financial_indicator_history", _boom)
+        monkeypatch.setattr(
+            fi, "_SERIES_RETRY_POLICY", RetryPolicy(attempts=2, strategy=STRATEGY_FIXED, base_backoff=0.0)
+        )
+        monkeypatch.setattr(
+            fi,
+            "fetch_hithink_indicator_series",
+            lambda code, limit: [{"report_period": "2025-12-31", "source_api": "hithink"}],
+        )
+        series = fi.fetch_indicator_series("600900")
+        assert calls["n"] == 2  # 确实重试过（非仅一次即放弃）
+        assert [r["source_api"] for r in series] == ["hithink"]

@@ -2170,7 +2170,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 | 约束 | 适配方式 |
 |:-----|:---------|
 | **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定；因子指数**不作为 `_A_INDICES` 成员**（避免污染实时指数行情循环与报告"指数对比"章节噪声），代码集合定义为分析模块内部常量 |
-| **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "sina"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（降级接受），Tencent 故障时因子章节落 §1.4.5 数据不足分支 |
+| **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "eastmoney", "sina", "hithink"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（降级接受），故补东方财富 push2his 为实际可用的第二源；腾讯与东方财富均故障时因子章节落 §1.4.5 数据不足分支 |
 | **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 17 个模块序号连续（1~17），`style_factor` 为基金深度分析一章三区块（风格表 + 风格因子回归 + 行业 Beta 子表） |
 | **C14** (渲染期数据不可写入模块级全局变量) | 风格与因子数据通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
 | **C19** (pipeline_data Schema 契约) | 新增 `style_factor_data` 键（类型 `dict`，内嵌 `industry_beta` 子键），键结构见附录 H，先定义类型再使用 |
@@ -3267,6 +3267,8 @@ make_http_client(timeout=10.0) → httpx.Client
 | `HithinkQuoteAdapter` | 同花顺官方行情适配器（行情域第三槽；`last_price`→`price`、`prev_price`→`yesterday_close`，不提供总市值 → None） | 持仓明细 | 数据获取 | 需凭据源（`hithink` 节） |
 | `fetch_price` | 单只 A 股/场内基金官方行情快照（链路槽形态：`{name, code, price, yesterday_close, open, high, low, volume, turnover, price_date}`） | 持仓明细 | 数据获取 | 需凭据源 |
 | `fetch_kline` | 官方历史日 K（前复权；`date_ms` 字段、支持 `start_from` 增量，对齐既有 provider 形态） | 流动性分析 | 数据获取 | 需凭据源 |
+| `fetch_index_kline` | 指数历史日 K provider 槽（腾讯/新浪/东方财富 push2his/同花顺；前复权，对齐既有 provider 形态） | 数据源 | 数据获取 | 东方财富免 key；同花顺需凭据源（`hithink` 节） |
+| `to_index_thscode` | 指数代码 → 同花顺 thscode（`sh000300` → `000300.SH`，`sz399001` → `399001.SZ`；与 A 股 `to_thscode` 同后缀口径） | 数据源 | 数据获取 | 需凭据源（`hithink` 节） |
 | `_normalize_hold_payload` | 持仓载荷归一（provider 原始载荷 → 规范化持仓契约 `code/name/date/holdings` + `hold_schema`） | 基金业绩分析 | 数据获取 | 无 |
 | `holdings_detail` | 持仓明细与分类（合并章：市值核算明细区块 + 持仓分类汇总区块同页签呈现） | 持仓明细与分类 | 报告输出 | 始终显示（type=always） |
 | `holdings_detail_sheet` | 合并章 Excel 写入器（`write_holdings_detail_sheet`；区块写入器 `_write_market_value_block` / `_write_category_block`） | 持仓明细与分类 | 报告输出 | 无（渲染） |
@@ -3653,7 +3655,7 @@ investor-util/
 | 无风险利率（Rf） | akshare `bond_zh_us_rate`（Sina 国债收益率）→ 手动配置兜底 | `fetcher/bond_yield.py` |
 | 个股/ETF 历史 K 线 | 腾讯财经 K 线 → 新浪财经 K 线（双链路 fallback） | `fetcher/chain.py`（`tencent.py` / `sina.py`） |
 | 场外基金历史净值 | 天天基金 `pingzhongdata` → 东方财富净值分页 | `fetcher/chain.py` |
-| 指数历史 K 线（A 股指数） | 腾讯财经 K 线 → 新浪财经 K 线 | `fetcher/index.py` |
+| 指数历史 K 线（A 股指数） | 腾讯财经 K 线 → 东方财富 push2his 指数 K 线 → 新浪财经 K 线 → 同花顺官方（需 key） | `fetcher/index.py` |
 | 指数历史 K 线（美股指数） | 新浪财经 K 线 → 腾讯财经 K 线 | `fetcher/index.py` |
 
 新闻数据处理模块：`news_aggregator.py`（聚合去重）、`news_correlator.py`（关联分析）、`news_keywords.py`（关键词提取）、`news_sources.py`（源元数据定义），均位于 `providers/` 下。

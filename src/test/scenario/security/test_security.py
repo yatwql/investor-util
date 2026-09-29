@@ -81,19 +81,27 @@ _SAMPLE_DETAILS = [
 
 
 class TestSecurityBaseline:
-    """五项安全基线自动化验证。"""
+    """安全基线自动化验证（五项基线：密钥文件权限与内联密钥红线 / 缓存无明文密钥 /
+    匿名化不泄真实名称 / LLM 日志脱敏 / HTML 无路径泄露）。"""
 
-    # ── 基线 1: 密钥文件权限 ─────────────────────────────
+    # ── 基线 1: 密钥文件权限 + 入库配置无内联密钥 ────────────
+
+    #: 持有密钥本体的文件（不得 world-readable）。
+    #: 仅列**未跟踪的密钥文件**——`llm_providers.json` 名字虽含 llm，但它只存
+    #: `credentials_ref` 指针（真凭据在 `llm_key.json` 对应节），且**故意跟踪入仓**
+    #: （`.gitignore` 对它显式 `!` 放行）；纳入本断言必然失败——git 索引记录
+    #: `100644`，任何干净检出的权限都是 `644`。新增密钥文件时加到这里即可。
+    _SECRET_FILES = ("data/config/llm_key.json",)
 
     @pytest.mark.scenario_security
     @pytest.mark.skipif(sys.platform == "win32", reason="Windows 权限模型不同，此项为软检查")
     def test_key_file_permissions_unix(self):
-        """Unix: 密钥文件权限应不为 world-readable。"""
-        llm_key_paths = [
-            "data/config/llm_key.json",
-            "data/config/llm_providers.json",
-        ]
-        for rel_path in llm_key_paths:
+        """Unix: 持有密钥本体的文件权限应不为 world-readable。
+
+        仅覆盖**未跟踪**的密钥文件；跟踪入仓的配置（如 `llm_providers.json` 只存
+        `credentials_ref` 指针）不在本基线范围内（理由见 `_SECRET_FILES` 注释）。
+        """
+        for rel_path in self._SECRET_FILES:
             from src.python.core.constants import PROJECT_ROOT
 
             full_path = os.path.join(PROJECT_ROOT, rel_path)
@@ -104,6 +112,37 @@ class TestSecurityBaseline:
             # 检查其他用户是否可读
             assert not (mode & 0o004), f"{rel_path} 对 other 可读"
             logger.info("权限检查通过: %s (mode=%o)", rel_path, mode)
+
+    @pytest.mark.scenario_security
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows 权限模型不同，此项为软检查")
+    def test_providers_config_has_no_inline_secret(self):
+        """`llm_providers.json` 可入库的前提：它不得含内联密钥。
+
+        该文件被显式跟踪（`.gitignore` 放行），故「只存 `credentials_ref` 指针」
+        是它的红线——一旦写入内联 `api_key` 就会把密钥提交进仓。本断言即那份
+        不变量（与 `unit_config` 的内联 api_key 硬拒绝同一判据），也是上面
+        权限基线可以不含它的依据。
+        """
+        import json
+
+        from src.python.core.constants import PROJECT_ROOT
+
+        path = os.path.join(PROJECT_ROOT, "data/config/llm_providers.json")
+        if not os.path.exists(path):
+            logger.info("llm_providers.json 不存在，跳过")
+            return
+        with open(path, encoding="utf-8") as fh:
+            raw = fh.read()
+        # 该配置文件带 // 行注释，先剔除再解析
+        stripped = "\n".join(line for line in raw.splitlines() if not line.strip().startswith("//"))
+        data = json.loads(stripped)
+        for provider in data.get("providers") or []:
+            name = provider.get("name")
+            assert not provider.get("api_key"), (
+                f"llm_providers.json 的 {name} 含内联 api_key——该文件入库，"
+                "密钥必须放 llm_key.json 并用 credentials_ref 引用"
+            )
+            assert provider.get("credentials_ref"), f"llm_providers.json 的 {name} 缺少 credentials_ref"
 
     # ── 基线 2: 缓存无明文密钥 ───────────────────────────
 

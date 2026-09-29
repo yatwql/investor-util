@@ -184,5 +184,60 @@ class TestYieldText(unittest.TestCase):
         self.assertEqual(result, "--")
 
 
+class TestDividendStatusRecording:
+    """_load_dividend_data 登记分红数据源状态（数据源说明表 / 健康矩阵口径）。
+
+    用普通 pytest 类（非 ``unittest.TestCase``）——需 ``monkeypatch`` fixture。
+    """
+
+    def _holdings(self):
+        return [Holding(account="证券账户", name="长江电力", code="600900", shares=100, cost_price=10.0)]
+
+    def _events(self):
+        from src.python.report.data_status import get_tracker
+
+        return [e for e in get_tracker().get_log() if e["source_key"] == "dividend_data"]
+
+    def test_records_used_on_data(self, monkeypatch):
+        """取到分红数据 → 登记成功取用（说明表「本次使用」= 是）。"""
+        monkeypatch.setattr(
+            "src.python.fetcher.akshare.get_dividend_data",
+            lambda codes: {"600900": {"avg_dividend": 0.85}},
+        )
+        data, ok = cat._load_dividend_data(self._holdings())
+        assert ok is True
+        assert "600900" in data
+        events = self._events()
+        assert events and events[-1]["success"] is True
+
+    def test_records_failure_when_provider_reports_connection(self, monkeypatch):
+        """provider 上报连接失败且无数据 → 登记失败（附可读原因）。"""
+        import src.python.providers.akshare_extras as extras
+
+        monkeypatch.setattr("src.python.fetcher.akshare.get_dividend_data", lambda codes: {})
+        monkeypatch.setattr(extras, "_DIVIDEND_FAILURE", "connection")
+        cat._load_dividend_data(self._holdings())
+        events = self._events()
+        assert events and events[-1]["success"] is False
+        assert "连接失败" in (events[-1].get("detail") or {}).get("message", "")
+
+    def test_no_record_when_empty_without_failure(self, monkeypatch):
+        """无数据但 provider 未报故障（本无分红）→ 不登记，避免正常空结果被误报为源故障。"""
+        import src.python.providers.akshare_extras as extras
+
+        monkeypatch.setattr("src.python.fetcher.akshare.get_dividend_data", lambda codes: {})
+        monkeypatch.setattr(extras, "_DIVIDEND_FAILURE", "")
+        cat._load_dividend_data(self._holdings())
+        assert self._events() == []
+
+    def test_no_a_share_holdings_records_nothing(self, monkeypatch):
+        """无 A 股持仓 → 不取数也不登记（预期内空结果）。"""
+        holdings = [Holding(account="支付宝", name="招商鑫福中短债A", code="012325", shares=100, cost_price=1.0)]
+        data, ok = cat._load_dividend_data(holdings)
+        assert data == {}
+        assert ok is True
+        assert self._events() == []
+
+
 if __name__ == "__main__":
     unittest.main()

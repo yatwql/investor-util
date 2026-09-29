@@ -70,12 +70,17 @@ _SOURCE_CATEGORIES: list[dict[str, Any]] = [
         "prefixes": ["penetration_profit_forecast"],
         "data_types": ["profit_forecast"],
     },
-    {"key": "dividend", "name": "分红数据", "prefixes": ["penetration_dividend"], "data_types": ["dividend"]},
+    {
+        "key": "dividend",
+        "name": "分红数据",
+        "prefixes": ["dividend_", "penetration_dividend"],
+        "data_types": ["dividend"],
+    },
     {"key": "fund_flow", "name": "资金流向", "prefixes": ["ff_"], "data_types": ["fund_flow"]},
     {
         "key": "financial_report",
         "name": "财报全文",
-        "prefixes": ["report_datasink_"],
+        "prefixes": ["report_datasink_", "report_cninfo_"],
         "data_types": ["financial_report"],
     },
     {
@@ -312,8 +317,11 @@ _SOURCE_CATALOG: list[dict[str, Any]] = [
     {
         "id": "index",
         "category": "指数数据",
-        "provider": "腾讯财经 / 新浪财经（A 股）；新浪财经 / 腾讯财经（美股）",
-        "usage": "A 股与美股指数行情",
+        "provider": (
+            "腾讯财经 / 新浪财经（A 股实时）；东方财富 push2his / 新浪财经 / 同花顺（指数历史日 K）；"
+            "新浪财经 / 腾讯财经（美股）"
+        ),
+        "usage": "A 股与美股指数行情与指数历史日 K",
         "auth": "无需",
     },
     {

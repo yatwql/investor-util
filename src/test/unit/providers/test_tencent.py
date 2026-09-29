@@ -348,3 +348,62 @@ class TestFetchIndexKline(unittest.TestCase):
         with patch("src.python.providers.tencent.is_index_code", wraps=is_index_code) as spy:
             fetch_index_kline("sh000300", 30)
             spy.assert_called_with("sh000300")
+
+
+class TestKlineTransientRetry(unittest.TestCase):
+    """K 线传输级瞬时失败 → provider 内同源重试。
+
+    历史链路（``chain._try_providers``）**无链级重试**，provider 又把传输失败吞成
+    空列表；若不在 provider 内重试，单次抖动就会直接被判为「无数据」而落下一槽。
+    """
+
+    @patch("src.python.providers.tencent.make_http_client")
+    def test_retry_then_success(self, mock_factory):
+        """首次 RequestError → 重试成功，取到 K 线（不因单次抖动误判为空）。"""
+        import httpx
+
+        from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+        from src.python.providers import tencent
+
+        calls = {"n": 0}
+
+        def _get(*_a, **_k):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise httpx.RequestError("boom")
+            resp = MagicMock()
+            resp.json.return_value = {
+                "data": {"sh000300": {"qfqday": [["2026-07-01", "3990", "4000", "4010", "3980", "1000"]]}}
+            }
+            return resp
+
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        mock_client.get.side_effect = _get
+
+        with patch.object(
+            tencent, "_KLINE_RETRY_POLICY", RetryPolicy(attempts=3, strategy=STRATEGY_FIXED, base_backoff=0.0)
+        ):
+            result = fetch_index_kline("sh000300", 30)
+        self.assertEqual(calls["n"], 2)
+        self.assertEqual([b["date"] for b in result], ["2026-07-01"])
+
+    @patch("src.python.providers.tencent.make_http_client")
+    def test_invalid_json_not_retried(self, mock_factory):
+        """JSON 解析失败（ValueError）非瞬时 → 不重试，且返回空列表。"""
+        from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+        from src.python.providers import tencent
+
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_factory.return_value = mock_client
+        resp = MagicMock()
+        resp.json.side_effect = ValueError("not json")
+        mock_client.get.return_value = resp
+
+        with patch.object(
+            tencent, "_KLINE_RETRY_POLICY", RetryPolicy(attempts=3, strategy=STRATEGY_FIXED, base_backoff=0.0)
+        ):
+            self.assertEqual(fetch_index_kline("sh000300", 30), [])
+        self.assertEqual(mock_client.get.call_count, 1)

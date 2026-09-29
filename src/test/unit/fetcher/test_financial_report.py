@@ -539,3 +539,78 @@ class TestLatestPeriodAndSectionResolution:
         assert fr._fetch_sections(7) == ["第三节管理层讨论与分析"]
         assert fr._fetch_sections(7) == ["第三节管理层讨论与分析"]
         assert calls["n"] == 1
+
+
+class TestIndexSourceStatus:
+    """索引来源归属与「两源皆失败」的降级登记（report_datasink_index 状态）。"""
+
+    def _keys(self):
+        from src.python.report.data_status import get_tracker
+
+        return [e["source_key"] for e in get_tracker().get_log()]
+
+    def _last_event(self, key):
+        from src.python.report.data_status import get_tracker
+
+        events = [e for e in get_tracker().get_log() if e["source_key"] == key]
+        return events[-1] if events else None
+
+    def test_cninfo_backup_labels_cninfo_source(self, monkeypatch):
+        """主源空 → 巨潮备源接管时，「本次使用」如实记为巨潮。"""
+        from src.python.fetcher import financial_report as fr
+
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "datasink", type("D", (), {"fetch_report_documents": staticmethod(lambda *a, **k: [])}))
+        monkeypatch.setattr(
+            fr,
+            "cninfo",
+            type(
+                "C",
+                (),
+                {
+                    "fetch_report_listings": staticmethod(
+                        lambda code: [
+                            {
+                                "id": 9,
+                                "doc_type": "annual",
+                                "report_period": "2025-12-31",
+                                "source": "cninfo",
+                            }
+                        ]
+                    )
+                },
+            ),
+        )
+        picked = fr._fetch_index("600900.SS", ("annual",))
+        assert picked and picked[0]["source"] == "cninfo"
+        assert "report_cninfo_index" in self._keys()
+        assert "report_datasink_index" not in self._keys()
+
+    def test_index_cache_hit_labels_source_from_cache(self, monkeypatch):
+        """缓存命中（条目来自巨潮）→ 仍如实记为巨潮，不误记主源。"""
+        from src.python.fetcher import financial_report as fr
+
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: [{"id": 3, "source": "cninfo"}])
+        fr._fetch_index("600900.SS", ("annual",))
+        assert "report_cninfo_index" in self._keys()
+        assert "report_datasink_index" not in self._keys()
+
+    def test_both_sources_fail_records_degradation(self, monkeypatch):
+        """主源异常且备源无命中 → 登记 report_datasink_index 失败且健康矩阵可见（可观测）。"""
+        from src.python.fetcher import financial_report as fr
+        from src.python.report.data_source_matrix import build_data_source_matrix
+
+        def _boom(*a, **k):
+            raise RuntimeError("connection reset")
+
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "datasink", type("D", (), {"fetch_report_documents": staticmethod(_boom)}))
+        monkeypatch.setattr(fr, "cninfo", type("C", (), {"fetch_report_listings": staticmethod(lambda code: None)}))
+        assert fr._fetch_index("600900.SS", ("annual",)) is None
+        # ① 降级事件本身：source_key 正确、success=False（不再静默）
+        event = self._last_event("report_datasink_index")
+        assert event is not None and event["success"] is False
+        # ② 事件在「财报全文」类别的健康矩阵行中可见（无论计为 failed 还是 degraded）
+        row = next(r for r in build_data_source_matrix() if r["key"] == "financial_report")
+        assert row["failed"] + row["degraded"] >= 1

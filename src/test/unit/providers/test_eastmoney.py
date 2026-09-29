@@ -297,3 +297,72 @@ class TestQdiiNavRelationships(unittest.TestCase):
             dates = [r.get("NAVdate", "") for r in result if "NAVdate" in r]
             if len(dates) >= 2:
                 self.assertLessEqual(dates[0], dates[1], "净值日期应递增")
+
+
+class TestIndexSecid(unittest.TestCase):
+    """_index_secid — 指数代码 → 东方财富 secid 映射。"""
+
+    def _call(self, code: str) -> str:
+        from src.python.providers.eastmoney import _index_secid
+
+        return _index_secid(code)
+
+    def test_prefixed_codes(self):
+        """带交易所前缀的沪深指数 → 市场号 + 代码（大小写不敏感）。"""
+        self.assertEqual(self._call("sh000300"), "1.000300")
+        self.assertEqual(self._call("sz399001"), "0.399001")
+        self.assertEqual(self._call("SZ399006"), "0.399006")
+
+    def test_bare_codes(self):
+        """裸 6 位指数代码：000 系归沪市，399/932 系归深市（与 is_index_code 口径一致）。"""
+        self.assertEqual(self._call("000300"), "1.000300")
+        self.assertEqual(self._call("399001"), "0.399001")
+        self.assertEqual(self._call("932000"), "0.932000")
+
+    def test_non_index_and_us_return_empty(self):
+        """A 股个股代码与美股指数不映射（防误取个股日 K / 无 A 股口径）。"""
+        self.assertEqual(self._call("600900"), "")
+        self.assertEqual(self._call("gb_inx"), "")
+        self.assertEqual(self._call(""), "")
+
+
+class TestFetchIndexKline(unittest.TestCase):
+    """fetch_index_kline — push2his 指数日 K 解析与增量过滤。"""
+
+    _KLINES = {
+        "data": {
+            "klines": [
+                "2026-07-01,3990.0,4000.0,4010.0,3980.0,1000000,0,0",
+                "2026-07-02,4000.0,4010.0,4020.0,3990.0,1200000,0,0",
+            ]
+        }
+    }
+
+    @patch("src.python.providers.eastmoney._fetch_index_kline_json")
+    def test_parses_standard_bar_shape(self, mock_json):
+        """push2his 逗号分列行 → 标准 K 线字段（date/open/close/high/low/volume）。"""
+        from src.python.providers.eastmoney import fetch_index_kline
+
+        mock_json.return_value = self._KLINES
+        bars = fetch_index_kline("sh000300", 30)
+        self.assertEqual([b["date"] for b in bars], ["2026-07-01", "2026-07-02"])
+        self.assertEqual(set(bars[0]), {"date", "open", "close", "high", "low", "volume"})
+        self.assertEqual(bars[0]["close"], 4000.0)
+        self.assertEqual(bars[1]["volume"], 1200000.0)
+
+    @patch("src.python.providers.eastmoney._fetch_index_kline_json")
+    def test_start_from_filters_incremental(self, mock_json):
+        """start_from 只保留其后数据（增量取数契约）。"""
+        from src.python.providers.eastmoney import fetch_index_kline
+
+        mock_json.return_value = self._KLINES
+        bars = fetch_index_kline("sh000300", 30, start_from="2026-07-01")
+        self.assertEqual([b["date"] for b in bars], ["2026-07-02"])
+
+    @patch("src.python.providers.eastmoney._fetch_index_kline_json")
+    def test_us_index_skips_request(self, mock_json):
+        """美股指数无 A 股 secid 口径 → 空列表且不发请求。"""
+        from src.python.providers.eastmoney import fetch_index_kline
+
+        self.assertEqual(fetch_index_kline("gb_inx", 30), [])
+        mock_json.assert_not_called()

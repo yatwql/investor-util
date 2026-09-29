@@ -533,3 +533,58 @@ class TestCredentialSpec:
         assert spec.key_file == ht.DEFAULT_KEY_FILE
         assert spec.key_section == ht.SOURCE_ID
         assert "fuyao.aicubes.cn" in spec.apply_url
+
+
+class TestToIndexThscode:
+    """to_index_thscode — 指数代码 → 同花顺 thscode 映射。"""
+
+    def test_sh_sz_indices(self):
+        assert ht.to_index_thscode("sh000300") == "000300.SH"
+        assert ht.to_index_thscode("sz399001") == "399001.SZ"
+        assert ht.to_index_thscode("SH000905") == "000905.SH"
+
+    def test_bare_indices(self):
+        assert ht.to_index_thscode("000300") == "000300.SH"
+        assert ht.to_index_thscode("399006") == "399006.SZ"
+        assert ht.to_index_thscode("932000") == "932000.SZ"
+
+    def test_non_index_and_us_return_empty(self):
+        """个股代码 / 美股指数 / 空串 → 无 A 股口径映射。"""
+        assert ht.to_index_thscode("600900") == ""
+        assert ht.to_index_thscode("gb_inx") == ""
+        assert ht.to_index_thscode("") == ""
+
+
+class TestFetchIndexKline:
+    """fetch_index_kline — 与 fetch_kline 同上游，仅走指数 thscode 映射。"""
+
+    def test_uses_index_thscode_and_parses(self, monkeypatch):
+        seen: dict[str, str] = {}
+
+        def _hist(symbol, start_ms, end_ms, adjust="forward"):
+            seen["symbol"] = symbol
+            return {
+                "item": [
+                    {
+                        "date_ms": 1789056000000,
+                        "open_price": 3990.0,
+                        "close_price": 4000.0,
+                        "high_price": 4010.0,
+                        "low_price": 3980.0,
+                        "volume": 100,
+                    }
+                ]
+            }
+
+        monkeypatch.setattr(ht, "fetch_price_history", _hist)
+        bars = ht.fetch_index_kline("sh000300", days=30)
+        assert seen["symbol"] == "000300.SH"
+        assert bars[0]["close"] == 4000.0
+        assert set(bars[0]) == {"date", "open", "close", "high", "low", "volume"}
+
+    def test_us_index_returns_empty_without_request(self, monkeypatch):
+        def _forbid(*a, **k):
+            raise AssertionError("美股指数不应发起请求")
+
+        monkeypatch.setattr(ht, "fetch_price_history", _forbid)
+        assert ht.fetch_index_kline("gb_inx", days=30) == []

@@ -30,6 +30,10 @@ INDEX_PREFIX = "report_datasink_index_"
 DOC_PREFIX = "report_datasink_doc_"
 SECTIONS_PREFIX = "report_datasink_sections_"
 
+#: 索引来源的类别级取用标记（数据源说明表「本次使用」按前缀归属；两前缀同归「财报全文」类别）
+_SRC_INDEX_DATASINK = "report_datasink_index"
+_SRC_INDEX_CNINFO = "report_cninfo_index"
+
 #: 文种白名单（**空 = 不限文种**）：默认取**最新报告期**——半年报/季报通常比年报新，
 #: 故不再按「年报优先、命中即止」排序，而是跨文种按报告期取最新一篇。
 DEFAULT_DOC_TYPES: tuple[str, ...] = ()
@@ -147,7 +151,7 @@ def collect_a_share_targets(
 
 
 def _mark_used(source_key: str) -> None:
-    """标记「本次取用了 DataSinking 数据」——供数据源说明表的「本次使用」列。
+    """标记「本次取用了该源的财报数据」——供数据源说明表的「本次使用」列。
 
     只记成功事件（含缓存命中返回），不参与降级计数：章节名 fuzzy 未命中等
     预期内空结果不应被计为源故障（详见 ``data_status.mark_data_used``）。
@@ -155,6 +159,42 @@ def _mark_used(source_key: str) -> None:
     from src.python.report.data_status import mark_data_used
 
     mark_data_used(source_key)
+
+
+def _index_source_of(items: Any) -> str:
+    """已取回（或缓存命中）的索引条目 → 类别级取用标记的 source_key。
+
+    主源（DataSinking）条目无 ``source`` 字段；巨潮备源条目带 ``source=cninfo``
+    （见 ``providers/cninfo.fetch_report_listings``），据此如实归属，避免备源接管
+    时把「本次使用」错记到主源名下。
+    """
+    if isinstance(items, list):
+        for it in items:
+            label = str((it or {}).get("source") or "").lower()
+            if "cninfo" in label or "巨潮" in label:
+                return _SRC_INDEX_CNINFO
+    return _SRC_INDEX_DATASINK
+
+
+def _record_index_failure(symbol: str, reason: str) -> None:
+    """索引主源异常且备源亦无命中时登记降级事件——使「财报索引不可用」在健康矩阵中可见。
+
+    只在主源**异常**（连接级重试已耗尽）且巨潮备源亦无命中时登记；「该标的无财报」
+    这类预期内空结果不误报为源故障（与 ``mark_data_used`` 只记成功的口径一致）。
+    此处仅登记观测事件，不回写 provider 熔断器。
+    """
+    try:
+        from src.python.report.data_status import get_tracker
+
+        get_tracker().record(
+            _SRC_INDEX_DATASINK,
+            "T3",
+            success=False,
+            failure_type="unreachable",
+            message=f"索引主源异常且备源无命中：{reason}",
+        )
+    except Exception:  # 观测失败不影响主链路
+        logger.debug("[financial_report] 索引降级登记失败（非关键）", exc_info=True)
 
 
 def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str, Any]] | None:
@@ -171,12 +211,15 @@ def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str,
     cache_key = f"{INDEX_PREFIX}{symbol}"
     cached = cache_get(cache_key, get_ttl("report", cache_key))
     if cached is not None:
-        _mark_used(f"{INDEX_PREFIX.rstrip('_')}")
+        _mark_used(_index_source_of(cached))
         return cached if isinstance(cached, list) else None
 
+    source = _SRC_INDEX_DATASINK
+    primary_error = ""
     try:
         items = datasink.fetch_report_documents(symbol, order="desc", size=_INDEX_SCAN_SIZE)
     except Exception as e:  # 传输级失败（连接级重试已耗尽）→ 走巨潮备源接管
+        primary_error = f"{type(e).__name__}: {e}"
         logger.warning("[financial_report] %s 主源索引取数失败（%s），转巨潮备源", symbol, e)
         items = None
     if not items:
@@ -185,7 +228,10 @@ def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str,
         cn_items = cninfo.fetch_report_listings(code)
         if cn_items:
             items = cn_items
+            source = _SRC_INDEX_CNINFO
     if not items:
+        if primary_error:
+            _record_index_failure(symbol, primary_error)
         return None
     wanted = {str(t).strip().lower() for t in (doc_types or ()) if str(t).strip()}
     picked = [i for i in items if not wanted or str(i.get("doc_type") or "").lower() in wanted]
@@ -196,7 +242,7 @@ def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str,
         reverse=True,
     )
     cache_set(cache_key, picked)
-    _mark_used(f"{INDEX_PREFIX.rstrip('_')}")
+    _mark_used(source)
     return picked
 
 

@@ -144,15 +144,50 @@ def _load_dividend_data(holdings: list) -> tuple[dict, bool]:
     """
     try:
         from src.python.fetcher.akshare import get_dividend_data
+        from src.python.providers.akshare_extras import _DIVIDEND_FAILURE
 
         stock_codes = [h.code for h in holdings if is_a_share_stock(h.name, h.code.strip())]
         if not stock_codes:
             return {}, True
         data = get_dividend_data(stock_codes)
+        if data:
+            _record_dividend_status(True)
+        elif _DIVIDEND_FAILURE:
+            # 源不可达/无返回 → 登记失败，使「分红」在数据源说明表与健康矩阵中如实可见；
+            # 「本无分红」（``empty`` 且无故障）不登记，避免正常空结果被误报为源故障。
+            _record_dividend_status(False, _dividend_failure_hint(_DIVIDEND_FAILURE))
         return data, True
     except Exception:
         logger.warning("[category] 分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)
+        _record_dividend_status(False, "分红数据加载异常")
         return {}, False
+
+
+#: 分红数据类别级取用标记的 source_key（说明表「本次使用」按前缀 ``dividend_`` 归属）
+_DIVIDEND_SOURCE_KEY = "dividend_data"
+
+
+def _record_dividend_status(success: bool, message: str = "") -> None:
+    """登记分红数据的取用/失败状态（供数据源说明表与健康矩阵；观测失败不影响主链路）。
+
+    与 ``industry_*`` 的类别级事件同口径：取到数据记成功（「本次使用」= 是），
+    源不可达记失败（附可读原因）。
+    """
+    try:
+        from src.python.report.data_status import get_tracker
+
+        tracker = get_tracker()
+        if success:
+            tracker.record(_DIVIDEND_SOURCE_KEY, "T3", success=True)
+        else:
+            tracker.record(_DIVIDEND_SOURCE_KEY, "T3", success=False, failure_type="unreachable", message=message)
+    except Exception:  # 观测失败不影响主链路
+        logger.debug("[category] 分红状态登记失败（非关键）", exc_info=True)
+
+
+def _dividend_failure_hint(reason: str) -> str:
+    """分红失败类型 → 可读原因（与 ``cache/operations._sector_flow_hint`` 同文案口径）。"""
+    return "连接失败" if reason == "connection" else "暂无数据"
 
 
 def build_category_data_status(dividend_success: bool) -> DataStatus:

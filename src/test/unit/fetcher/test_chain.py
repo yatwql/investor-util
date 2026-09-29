@@ -628,9 +628,16 @@ class TestHistoryIndexChain(unittest.TestCase):
     """history_index Provider Chain 路由测试。"""
 
     def test_chain_defined(self):
-        """_DEFAULT_CHAINS 中包含 history_index 且 provider 顺序正确。"""
+        """_DEFAULT_CHAINS 中包含 history_index，且补入两个独立备源。
+
+        腾讯（主）→ 东方财富 push2his（免 key 独立厂商备源）→ 新浪（代码级备用）
+        → 同花顺官方（需 key）。新浪指数端点实测不可用，故东方财富是唯一可用的
+        第二源——防止整链退化为事实单源后「抖动即整链空」。
+        """
         chain = _get_chain("history_index")
-        self.assertEqual(chain, ["tencent", "sina"])
+        self.assertEqual(chain, ["tencent", "eastmoney", "sina", "hithink"])
+        # 结构性断言：两个免 key 源同列（腾讯 + 东方财富）——守住「非单源」不受链序变动影响
+        self.assertLessEqual({"tencent", "eastmoney"}, set(chain))
 
     def test_history_stock_unaffected(self):
         """history_stock 链固定为三段（腾讯 → 新浪 → 同花顺官方），不被指数链改动波及。"""

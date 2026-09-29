@@ -59,7 +59,11 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     # 历史日 K：腾讯（前复权）→ 新浪 → 同花顺官方（前复权，需 key）
     "history_stock": ["tencent", "sina", "hithink"],
     "history_fund_otc": ["tiantian", "eastmoney"],
-    "history_index": ["tencent", "sina"],
+    # 指数历史日 K：腾讯（前复权）→ 东方财富 push2his（免 key 的独立厂商备源）→
+    # 新浪（``getKLineData`` 端点实测不可用，留作代码级备用）→ 同花顺官方（需 key）。
+    # 新浪单靠不住，故补东方财富作为**可用**的第二源——避免整链退化为事实单源后
+    # 「抖动即整链空」（历史链无链级重试，重试在各 provider 内，见 tencent/eastmoney）。
+    "history_index": ["tencent", "eastmoney", "sina", "hithink"],
     # 美股指数历史日线：新浪实现 fetch_index_kline（providers/sina_kline.py，经
     # providers/sina.py 重导出），但其 getKLineData 端点对全部代码返回 404/空，
     # 故实际取数通常由腾讯完成；腾讯 K 线接口对 gb_* 代码支持有限，该链可能整链

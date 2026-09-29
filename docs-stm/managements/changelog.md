@@ -12,6 +12,64 @@
 
 ---
 
+### 工程修复：消除 `ruff format` 漂移残留（rf-474）
+
+**背景**：CLAUDE.md 声明「`ruff format --check` + `ruff check` 当前均为零告警基线」，但全仓复核发现
+`src/test/unit/report/test_market_value_strategy_edge.py` 存在两处格式漂移（`line-length = 120` 下有两行
+124 字符的 `session_cache_set(...)` 调用未按 ruff 规范化换行）。因 `.github/workflows/ci.yml` 的 `format`
+job 为**非阻塞**（只报告不阻断合并/发布），该漂移长期未被发现。
+
+**变更**：对该文件执行 `ruff format`（仅两处语句换行展开，+4 行）。
+
+**验证**：**AST 等价**（新旧 `ast.dump(ast.parse(...))` 全等）证明行为中性；该文件 8 例边缘用例全过；
+`ruff check` 干净；全仓 `ruff format --check src/ scripts/` **736 files 零漂移**；同步 `folders.md` 测试代码行数。
+
+### 工程修复：安全基线的密钥文件范围修正（rf-475）
+
+**背景**：bench 全量采集（`--mode bench`，含 `scenario_security`）暴露 `test_key_file_permissions_unix` 恒失败——该用例把 `data/config/llm_providers.json` 也当密钥文件断言不得 world-readable，而它是**故意跟踪入仓**的配置（`.gitignore` 显式 `!` 放行），git 索引记录 `100644`，任何干净检出的权限都是 `644`。因 `scenario_security` 不在 `dev-verify`/`verify` 模式内，该恒失败长期未被常规门禁发现。
+
+**变更**：
+- `src/test/scenario/security/test_security.py`：权限基线收窄为「仅**持有密钥本体**的文件」（类常量 `_SECRET_FILES = ("data/config/llm_key.json",)`），并就地注明为何不含 `llm_providers.json`；
+- **新增** `test_providers_config_has_no_inline_secret`：守住「该文件可入库」的真正红线——不得内联 `api_key`、`credentials_ref` 必填（与 `unit_config` 的内联 api_key 硬拒绝同一判据），使「移出权限断言」不以丢失防护为代价；
+- 修正类 docstring（原「五项安全基线」→ 明确列出五项基线含本项的两条禁令）。
+
+**验证**：`security` 模式 **10 passed / 0 failed**；反向核对——向 `llm_providers.json` 注入内联 `api_key` 则该用例失败、恢复即通过。
+
+### 数据源稳定性提升：指数历史双备源 + 重试补齐 + 状态补全（plan-58）
+
+**背景**（用户要求）：报告数据源降级表中 `report_datasink_index`、`fin_indicator_akshare_financial`、
+`index_history_history_index_sh000300` 与 QDII 价格刷新反复失败，且分红缺状态。
+
+**变更**：
+- **历史指数日 K（`index_history_*`）**：`history_index` 链原为 `tencent → sina`，而新浪 `getKLineData`
+  端点实测全 404 → 事实单源；且历史链路（`chain._try_providers`）**无链级重试**，provider 又把传输失败
+  吞成空列表 → 单次抖动即整链空。① `providers/tencent.py` 抽出 `_fetch_kline_json`（总尝试 3 次、指数退避）
+  供股票/指数 K 线共用；② 新增 `providers/eastmoney.py::fetch_index_kline`（push2his 日线，免 key 独立厂商）
+  + `providers/hithink.py::fetch_index_kline`（与 `fetch_kline` 同上游，走新增 `to_index_thscode` 指数映射）；
+  ③ `history_index` 链槽扩为 `["tencent", "eastmoney", "sina", "hithink"]`。
+- **财务指标多期（`fin_indicator_akshare_financial`）**：`fetch_indicator_series` 直连 provider（不经链路），
+  链路的传输级重试不覆盖它 → 补一层有界退避重试（`_SERIES_RETRY_POLICY`，重试耗尽仍落同花顺/链路兜底）。
+- **财报索引（`report_datasink_index`）**：主源索引异常且巨潮备源无命中时原先**静默** → 补降级登记
+  （`_record_index_failure`，仅主源异常时记，预期内空结果不误报）；并如实归属来源——巨潮接管与缓存命中
+  均按条目 `source` 字段记 `report_cninfo_index`（`_index_source_of`），类别前缀补 `report_cninfo_`。
+- **QDII / 场外净值价格刷新（`price_fund_otc_*_refresh`）**：`_price_cache_fresh` 按「最近交易日」判定，
+  而场外 / QDII 官方净值合法为 T-1 → 永远被判跨日残留、反复清缓存重取。改为新鲜度阈值**按路由分域**
+  （场外取前一交易日，场内仍取最近交易日）；**`report/market_value.py` 的 CACHE_ONLY 缓存校验同步传入路由**
+  （该处为同一函数的第二个调用点，早于本次改动即存在，首轮遗漏会在 `edge` 模式下抛 `TypeError`）。
+- **分红数据状态**：刷新原先只在控制台打印 → `report/category.py` 补类别级取用/失败登记
+  （`dividend_data`，失败原因读 `akshare_extras._DIVIDEND_FAILURE`；「本无分红」这类预期内空结果不登记），
+  类别前缀补 `dividend_`，与行业分类 / 盈利预测同口径。
+- 回归 +30 例：`test_eastmoney.py`（`_index_secid` 映射 + 解析/增量）、新增
+  `test_eastmoney_index_edge.py`（6 例边缘：无法映射/结构异常/重试耗尽/5xx 不重试）、`test_hithink.py`
+  （`to_index_thscode` + `fetch_index_kline`）、`test_tencent.py`（K 线重试）、`test_financial_indicator.py`
+  （多期重试/耗尽兜底）、`test_financial_report.py`（来源归属 + 静默失败登记 + 矩阵可见）、
+  `test_category.py`（分红状态四分支）、`test_fetcher_price.py`（场外 T-1 新鲜度 + 路由分域）。
+- `src/test/_network_guard.py::apply_offline_stubs` 同步将新增 provider 级重试策略退避置 0（离线用例零等待）。
+- 文档同步：`requirements.md`（R-HST-07）、`technical.md`（架构约束链槽 + 数据源表 + 功能语义命名表
+  补 `fetch_index_kline` / `to_index_thscode`）、`datasource.md` / `datasource-reliability.md`
+  （指数链槽 / 东方财富指数 K 线 / 净值新鲜度口径 / 分红状态）、`developer-guide.md`（离线退避口径）、
+  `folders.md`（目录树 + 统计表）、本变更日志。
+
 ### 交互优化：新增 [D] 配置目录信息子菜单（rf-471）
 
 **背景**（用户要求）：持仓目录 / 持仓文件名 / 报告输出目录三个同属「路径配置」的入口平铺在主菜单占 3 个键位，而 `[D]` 已被系统自检占用，语义冲突。

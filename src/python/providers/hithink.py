@@ -240,7 +240,25 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
     Returns:
         ``[{date, open, close, high, low, volume}, ...]`` 按日期升序；失败返回空列表。
     """
-    symbol = to_thscode(code)
+    return _kline_for_symbol(to_thscode(code), days, start_from)
+
+
+def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict[str, Any]]:
+    """指数历史日 K（**前复权**），形态对齐 ``providers/tencent.fetch_index_kline``。
+
+    与 :func:`fetch_kline` 共用同一条上游（``fetch_price_history``），仅**代码映射**不同：
+    指数代码带 ``sh``/``sz`` 前缀，不能被 A 股 :func:`to_thscode` 的 ``to_fmp_symbol``
+    判定覆盖，故走 :func:`to_index_thscode`。美股指数（``gb_*``）无 A 股口径映射，
+    返回空列表由链路继续降级。
+
+    Returns:
+        ``[{date, open, close, high, low, volume}, ...]`` 按日期升序；失败返回空列表。
+    """
+    return _kline_for_symbol(to_index_thscode(code), days, start_from)
+
+
+def _kline_for_symbol(symbol: str, days: int, start_from: str | None) -> list[dict[str, Any]]:
+    """按 thscode 取历史日 K（股票/指数共用实现，避免两份解析体）。"""
     if not symbol:
         return []
     days = min(max(days, 5), 365)
@@ -314,6 +332,32 @@ def to_thscode(code: str, *, is_fund: bool = False) -> str:
         if raw.startswith("1"):
             return f"{raw}.SZ"
     return ""
+
+
+def to_index_thscode(code: str) -> str:
+    """指数代码 → 同花顺 thscode（``000300.SH`` / ``399001.SZ``）。
+
+    与 :func:`to_thscode` 的差别：指数代码带 ``sh``/``sz`` 前缀（或裸 6 位 000/399/932），
+    走 A 股 ``to_fmp_symbol`` 判定会落空，故按指数口径单独映射。
+
+    Args:
+        code: 指数代码，如 ``sh000300`` / ``sz399001``
+
+    Returns:
+        thscode；无法映射（非指数代码 / 美股指数）返回空串。
+    """
+    from src.python.core.code_utils import get_index_exchange_prefix, is_index_code, is_us_index_code
+
+    raw = (code or "").strip().lower()
+    if not raw or is_us_index_code(raw) or not is_index_code(raw):
+        return ""
+    prefix = get_index_exchange_prefix(raw)
+    digits = raw[len(prefix) :] if prefix else raw
+    if not digits.isdigit() or len(digits) != 6:
+        return ""
+    if prefix == "sz" or (not prefix and digits.startswith(("399", "932"))):
+        return f"{digits}.SZ"
+    return f"{digits}.SH"
 
 
 # ── A 股：财务报表（三张合并报表；指标由报表派生，见 analysis/financial_statement_derive.py）──
