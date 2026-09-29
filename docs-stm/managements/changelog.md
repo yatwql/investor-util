@@ -128,6 +128,21 @@
 - `fetcher/price.py` 新增公开 `price_cache_key(code, expected_name)`；`report/market_value.py` 改用公开入口，不再跨模块引用私有 `_price_cache_key`
 - 回归 +1 例（公开 `price_cache_key` 路由解析）；provider 测试改为 patch `providers/_utils.time` / `_utils.CONNECT_RETRY_POLICY`
 
+### CI 修复：edge 用例会话域与 4 文件格式化（rf-469）
+
+**现象**（用户报「github ci 报错」）：本地 `dev-verify`（P0）全绿，GitHub CI 红。
+
+**根因**：
+- rf-466 把价格缓存/会话域改为按路由分域后，**4 条 `edge` 用例**（`test_market_value_strategy_edge.py`）仍按旧的路由无关会话域 `"price"` 预填缓存 → CACHE_ONLY 读 `price_stock` 域落空 → 降级 live → 失败；而 `dev-verify`（P0）**不含 `edge` 标记**，本地不复现，仅 CI `portability` job（跑全量 `src/test/unit`）暴露。
+- rf-466/467/468 编辑的 4 个源文件未跑 `ruff format` → CI `format` job 报「Would reformat」。
+
+**变更**：
+- `test_market_value_strategy_edge.py` 改用公开 `resolve_price_route(...)` 解析会话域（4 处，不硬编码路由名）
+- `ruff format` 4 个源文件（`cache/operations.py` / `fetcher/price.py` / `report/fund_style_classify.py` / `tui/handlers_cache.py`）
+- `folders.md` 行数快照同步
+
+**教训**：改动报告层缓存键/会话域后，本地须跑「全量 unit（含 `edge`）」而非仅 `dev-verify`（P0 不含 edge）后再推 CI。
+
 ---
 
 ## 归档

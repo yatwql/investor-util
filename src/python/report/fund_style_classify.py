@@ -418,11 +418,7 @@ def classify_fund_style(
     # 获取所有持仓股票代码
     stock_codes = [h.get("code", "").strip() for h in holdings if h.get("code")]
     stock_codes = [c for c in stock_codes if c]
-    names_by_code = {
-        str(h.get("code", "")).strip(): str(h.get("name", "") or "")
-        for h in holdings
-        if h.get("code")
-    }
+    names_by_code = {str(h.get("code", "")).strip(): str(h.get("name", "") or "") for h in holdings if h.get("code")}
 
     # 获取行业平均 PE
     industry_avg_pe_map = _get_industry_avg_pe(stock_codes, names_by_code) if stock_codes else {}

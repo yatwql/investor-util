@@ -132,7 +132,9 @@ def _print_position_result(result) -> None:
     print(f"  持仓缓存更新完成 — 共 {result.total} 条持仓")
     print()
     if price_fail == 0:
-        print(f"  {GREEN}[OK]{RESET} price_{{route}}_{{code}}.json          ({result.price_ok}/{result.total} 全部成功)")
+        print(
+            f"  {GREEN}[OK]{RESET} price_{{route}}_{{code}}.json          ({result.price_ok}/{result.total} 全部成功)"
+        )
     else:
         print(
             f"  {YELLOW}[!]{RESET} price_{{route}}_{{code}}.json          ({result.price_ok}/{result.total} 成功, {price_fail} 条失败)"

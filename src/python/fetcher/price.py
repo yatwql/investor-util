@@ -309,9 +309,7 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
     # 按代码类型选择数据路由（缓存键随路由分域，避免同代码跨路由串味）
     data_type, _needs_degrade = _route_price_request(code, expected_name)
 
-    result = _fetch_price_with_cache_refresh(
-        data_type, code, _price_cache_key(code, data_type), expected_name
-    )
+    result = _fetch_price_with_cache_refresh(data_type, code, _price_cache_key(code, data_type), expected_name)
 
     # ── 降级：00 代码在股票链路全失败 → 尝试场外基金链路 ──
     if result is None and _needs_degrade:
