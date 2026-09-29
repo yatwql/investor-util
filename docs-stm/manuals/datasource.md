@@ -19,7 +19,7 @@
 | 财经新闻（5 源聚合） | 新浪 + 东方财富 + 财联社 + 华尔街见闻 + akshare 并行获取，统一聚合去重 | — | `news_` | 基础类 |
 | 股票/ETF 历史日线 | 腾讯财经 K 线接口 | 新浪财经 K 线接口 → **同花顺官方日 K**（前复权，需 key；支持增量起点） | `history_stock_` | 历史走势 |
 | 场外基金历史净值 | 天天基金 `pingzhongdata/{code}.js` | 东方财富 `api.fund.eastmoney.com/f10/lsjz`（分页获取） | `history_fund_otc_` | 历史走势 |
-| 指数历史日线 | 腾讯财经 K 线接口 | 新浪财经 K 线接口 | `history_index_` | 历史走势 |
+| 指数历史日线 | 腾讯财经 K 线接口 | 东方财富 `push2his` 指数 K 线（免 key）→ 新浪财经 K 线接口 → 同花顺官方日 K（需 key） | `history_index_` | 历史走势 |
 | 持仓重合度 | 运行时推导（基于持仓基金前 10 大重仓股的 Jaccard 相似度） | — | —（复用 `fund_hold_`，无独立缓存前缀） | — |
 | 基金风格扩展数据（市值/PE） | 东方财富 + 天天基金（基金持仓市值风格 + 市盈率/市净率数据） | — | `extended_` | 基础类 |
 | 个股财报全文（持仓基本面章·区块②） | DataSinking `api.datasink.ing`（全文本财报 Markdown，仅 A 股，**需用户自备 key**）；**备源**：巨潮资讯网 `cninfo.com.cn`（公开免费、**无需 key**，公告 PDF 解析；主源无该标的时接管） | — | `report_datasink_index_` / `report_datasink_doc_` / `report_cninfo_index_` / `report_cninfo_text_` / `report_cninfo_orgid_` | 基础类 |
@@ -57,7 +57,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 
 由 `fetcher/index.py` 通过 Provider Chain 获取（`fetch_with_incremental_fallback`）：
 
-- **A 股指数** → `history_index` 通道：腾讯财经 → 新浪财经（备用）
+- **A 股指数** → `history_index` 通道：腾讯财经 → 东方财富 `push2his`（免 key 的独立厂商备源）→ 新浪财经 → 同花顺官方日 K（需 key）。新浪 `getKLineData` 端点实测不可用，故东方财富为实际第二可用源；各 provider 内置传输级退避重试（历史链无链级重试）
 - **美股指数** → `history_index_us` 通道：新浪财经 → 腾讯财经。两者共用指数 K 线函数（`fetch_index_kline`），新浪侧实现位于 `providers/sina_kline.py`，但其 `getKLineData` 端点对全部代码返回 404/空，实际取数通常由腾讯完成；而腾讯 K 线接口对 `gb_*` 代码支持有限，因此该通道可能整链取空——空结果按正常降级记录（成因与现状见 `datasource-reliability.md` §4.2）
 - **风格与因子分析·风格因子回归**（`analysis/style_factor_regression.py`，写入 `style_factor_data` 契约）复用 `history_index` 通道，并行拉取 CSI 风格因子指数 K 线（价值=sh000919、成长=sh000925、质量=sh000930）与基准指数（沪深300 sh000300）做 OLS 回归。因子指数不注册到 `_A_INDICES`（避免污染实时指数循环 fetch_indices），无专属缓存前缀，随 `history_index_` 统一按 TTL 管理
 - **风格与因子分析·行业 Beta 子表**（`analysis/industry_beta.py`，内嵌于 `style_factor_data.industry_beta`，开关 功能开关 `industry_beta` 默认关）复用 `history_index` 通道拉取中证行业指数 K 线（`INDUSTRY_INDEX_MAP`：银行=sh000986、证券=sz399975、白酒/食品饮料=sz399997、半导体/电子=sz399995、有色/贵金属=sz399996、煤炭=sz399998、医药=sz399989、钢铁=sz399994、房地产=sh000980、能源=sh000928、环保=sz399973、保险=sz399983）做单因子 OLS（复用 `compute_factor_exposure`，不重复实现）；行业分类复用 `batch_fetch_industry_data`（`industry_` 前缀缓存）

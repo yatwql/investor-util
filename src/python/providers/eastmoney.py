@@ -14,7 +14,9 @@ from typing import Any
 
 import httpx
 
+from src.python.core.code_utils import get_index_exchange_prefix, is_index_code, is_us_index_code
 from src.python.core.http_client import make_http_client
+from src.python.core.retry import STRATEGY_EXPONENTIAL, TRANSIENT_EXCEPTIONS, RetryPolicy, retry_transient
 from src.python.providers._utils import safe_float as _safe_float
 
 logger = logging.getLogger("invest")
@@ -250,3 +252,127 @@ def fetch_fund_nav_history(code: str) -> list[dict]:
     result.sort(key=lambda x: x["date"])
     logger.info("[eastmoney] 基金 %s 历史净值: %d 条（%d 页）", code, len(result), page_index)
     return result
+
+
+# ── 指数历史日 K（push2his；免 key 的独立厂商备源）────────────
+
+_INDEX_KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+#: 指数取数重试策略：总尝试 3 次、指数退避（与腾讯 K 线同一口径）；历史链无链级重试，
+#: 故重试必须落在 provider 内。
+_INDEX_RETRY_POLICY = RetryPolicy(attempts=3, strategy=STRATEGY_EXPONENTIAL, base_backoff=0.5, factor=2.0, jitter=0.2)
+#: 无交易所前缀的指数代码 → 东方财富市场号（0=深市 / 1=沪市）：399/932 系深市，其余按沪市
+_INDEX_BARE_MARKET: tuple[tuple[tuple[str, ...], str], ...] = ((("399", "932"), "0"),)
+
+
+def _index_secid(code: str) -> str:
+    """指数代码 → 东方财富 secid（``1.000300`` / ``0.399001``）；无法映射返回空串。
+
+    非指数/美股指数一律返回空串（``is_index_code`` 门禁防止把 A 股个股代码
+    映射成 ``1.6xxxxx`` 后误取个股日 K）。
+    """
+    raw = (code or "").strip().lower()
+    if not is_index_code(raw) or is_us_index_code(raw):
+        return ""
+    prefix = get_index_exchange_prefix(raw)
+    digits = raw[len(prefix) :] if prefix else raw
+    if not digits.isdigit() or len(digits) != 6:
+        return ""
+    if prefix == "sh":
+        market = "1"
+    elif prefix == "sz":
+        market = "0"
+    else:
+        market = next((m for heads, m in _INDEX_BARE_MARKET if digits.startswith(heads)), "1")
+    return f"{market}.{digits}"
+
+
+def _fetch_index_kline_json(secid: str, days: int) -> dict[str, Any] | None:
+    """带传输级退避重试的 push2his 指数 K 线 JSON 拉取；重试耗尽/解析失败返回 None。"""
+    params: dict[str, Any] = {
+        "secid": secid,
+        "fields1": "f1,f2,f3,f4,f5,f6",
+        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58",
+        "klt": "101",  # 日线
+        "fqt": "1",  # 前复权
+        "beg": "0",
+        "end": "20500101",
+        "lmt": days,
+    }
+
+    def _attempt() -> dict:
+        with make_http_client(timeout=_TIMEOUT) as client:
+            resp = client.get(_INDEX_KLINE_URL, params=params, headers=_HEADERS)
+            resp.raise_for_status()
+            return resp.json()
+
+    def _on_transient_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
+        logger.warning(
+            "[eastmoney] 指数 K 线 %s 传输级失败（%s），%.1fs 后同源重试 %d/%d",
+            secid,
+            type(exc).__name__ if exc is not None else "超时",
+            delay,
+            failed_attempt,
+            _INDEX_RETRY_POLICY.attempts - 1,
+        )
+
+    try:
+        return retry_transient(_attempt, policy=_INDEX_RETRY_POLICY, on_retry=_on_transient_retry)
+    except (*TRANSIENT_EXCEPTIONS, httpx.HTTPStatusError, ValueError) as e:
+        logger.warning("[eastmoney] 指数 K 线获取失败 %s（重试耗尽）: %s", secid, e)
+        return None
+
+
+def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) -> list[dict]:
+    """指数历史日 K（前复权），形态对齐 ``providers/tencent.fetch_index_kline``。
+
+    东方财富 push2his 日线接口：免 key、独立厂商，与腾讯/新浪故障域隔离，是
+    ``history_index`` 链的独立备源（新浪指数端点实测不可用）。
+
+    上游按请求窗口返回，``lmt`` 只是条数提示，故再由 ``days`` 截尾。美股指数
+    （``gb_*``）无 A 股 secid 口径，返回空列表由链路继续降级。
+
+    Args:
+        code: 指数代码，如 ``sh000300`` / ``sz399001``
+        days: 获取天数（默认 30，钳位 5~2000，与腾讯/新浪口径一致）
+        start_from: 起始日期（YYYY-MM-DD），增量获取只保留其后数据
+
+    Returns:
+        ``[{date, open, close, high, low, volume}, ...]`` 按日期升序；失败返回空列表。
+    """
+    if is_us_index_code(code):
+        return []
+    secid = _index_secid(code)
+    if not secid:
+        logger.debug("[eastmoney] 跳过无法映射的指数代码: %s", code)
+        return []
+    days = min(max(days, 5), 2000)
+    logger.debug("[eastmoney] 指数 K 线请求: %s, days=%d", secid, days)
+    data = _fetch_index_kline_json(secid, days)
+    klines = ((data or {}).get("data") or {}).get("klines") or []
+    if not isinstance(klines, list):
+        return []
+
+    bars: list[dict] = []
+    for row in klines:
+        parts = str(row).split(",")
+        if len(parts) < 6:
+            continue
+        date_str = parts[0].strip()
+        close = _safe_float(parts[2])
+        if not date_str or close <= 0:
+            continue  # 跳过无效/停牌数据
+        bars.append(
+            {
+                "date": date_str,
+                "open": _safe_float(parts[1]),
+                "close": close,
+                "high": _safe_float(parts[3]),
+                "low": _safe_float(parts[4]),
+                "volume": _safe_float(parts[5]),
+            }
+        )
+    bars.sort(key=lambda b: b["date"])
+    if start_from:
+        bars = [b for b in bars if b["date"] > str(start_from)]
+    logger.info("[eastmoney] 指数 %s 历史日 K: %d 条", code, len(bars))
+    return bars[-days:]

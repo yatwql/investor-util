@@ -41,33 +41,193 @@ def _parse_syl_returns(text: str) -> dict[str, dict[str, Any]]:
     return rankings
 
 
-def _parse_rank_entry(text: str) -> dict[str, Any]:
-    """解析同类排名（Data_rateInSimilarType）和百分位（Data_rateInSimilarPersent）。"""
-    rank_entry: dict[str, Any] = {"rank": "--", "total": "--", "percentile": "--"}
+#: 同类排名载荷的语义版本——写入缓存时随载荷同存，读侧以 :func:`rank_payload_is_current`
+#: 为准入判据：版本不符即视为未命中、丢弃重取（与 ``fetcher/fund.py`` 的 ``hold_schema`` 同习语），
+#: 使「改变载荷语义的修复」不再依赖用户手动清缓存、也不被 24h TTL 遮蔽。
+_RANK_SCHEMA_FIELD = "rank_schema"
+_RANK_SCHEMA = 2
 
+#: 排名日期与**同一文件内**的净值日期允许的最大偏差（天）。
+#: 为何以此为准：排名由净值派生，实测 13 只基金两侧尾部日期**完全相等**（Δ=0 天），
+#: 故这是一个**假阳性免疫**的陈旧判据——排名序列落后于净值序列即说明该次响应里的
+#: 排名数据是陈旧的（实测 040046 曾读到 2024-02-18 那期的 253 同类池，而净值同期）。
+_RANK_MAX_LAG_DAYS = 3
+
+#: 毫秒时间戳的合理性下限（2000-01-01 UTC）——小于此值视为「不是日期」（见 _sample_date）。
+_MIN_PLAUSIBLE_MS = 946_684_800_000
+
+
+def _sample_date(value: Any) -> str:
+    """位图日期（毫秒 Unix 或 ``YYYY-MM-DD``）→ ``YYYY-MM-DD``；无法解析返回空串。
+
+    合理性下限：只接受**毫秒时间戳**（2000-01-01 起）或显式日期字符串。
+    为何要设下限：旧格式/精简载荷里该字段可能是**序号**（实测存量测试夹具的
+    ``[[1, 6.25]]``——1 毫秒会解成 1970-01-01），当成日期会把附注写错。
+    """
+    if isinstance(value, str):
+        m = re.match(r"(\d{4})-(\d{2})-(\d{2})", value.strip())
+        return m.group(0) if m and int(m.group(1)) >= 2000 else ""
+    if isinstance(value, (int, float)) and float(value) >= _MIN_PLAUSIBLE_MS:
+        from datetime import datetime
+
+        from src.python.core.constants import BEIJING_TZ
+
+        try:
+            return datetime.fromtimestamp(float(value) / 1000.0, tz=BEIJING_TZ).strftime("%Y-%m-%d")
+        except (OSError, OverflowError, ValueError):
+            return ""
+    return ""
+
+
+def _parse_nav_date(text: str) -> str:
+    """同一 pingzhongdata 载荷内的**净值日期**（``Data_netWorthTrend`` 末位 ``x``）。
+
+    用于给排名做陈旧闸门：排名由净值派生，两者尾部日期应当同期（实测 Δ=0 天）。
+    解析不到时返回空串（调用方据此跳过闸门，不做无依据的置空）。
+    """
+    m = re.search(r"var Data_netWorthTrend\s*=\s*(\[.*?\]);", text, re.DOTALL)
+    if not m:
+        return ""
+    try:
+        series = json.loads(m.group(1))
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return ""
+    if not isinstance(series, list) or not series:
+        return ""
+    last = series[-1]
+    if isinstance(last, dict):
+        return _sample_date(last.get("x"))
+    if isinstance(last, list) and last:
+        return _sample_date(last[0])
+    return ""
+
+
+def _days_between(later: str, earlier: str) -> int | None:
+    """两个 ``YYYY-MM-DD`` 的相隔天数（later − earlier）；任一侧不可解析返回 None。"""
+    from datetime import datetime
+
+    try:
+        a = datetime.strptime(later, "%Y-%m-%d")
+        b = datetime.strptime(earlier, "%Y-%m-%d")
+    except (TypeError, ValueError):
+        return None
+    return (a - b).days
+
+
+def _parse_rank_entry(text: str) -> dict[str, Any]:
+    """解析同类排名（Data_rateInSimilarType）和百分位（Data_rateInSimilarPersent）。
+
+    排名载荷有**三个独立的上游时序**（排名数组、百分位数组、净值序列），各自可能滞后。
+    各取各的末位会拼出「不同期」或「陈旧」的记录且无任何提示，报告上表现为自相矛盾/
+    过时的排名（实测 040046 曾读到 2024-02-18 那期的 ``253`` 同类池，而同报告里另几只
+    纳指 100 联接均是 ``362``）。故本函数做两道校验：
+
+    1. **排名 / 百分位同期性**：两侧末位日期不一致时，以**较新者**为准，较旧项置 ``--``；
+    2. **排名 / 净值陈旧闸门**：排名尾部日期相对同一文件内的净值日期偏离超过
+       :data:`_RANK_MAX_LAG_DAYS` 天时，整条排名判为陈旧（全部置 ``--``）——实测两侧
+       尾部日期恒相等，故该判据假阳性免疫。
+
+    两者均只告警+置空，不抛异常（宁缺毋错：宁可显示 ``--`` 也不显示错期排名）。
+
+    Returns:
+        ``{"rank", "total", "percentile", "data_date", "rank_schema"}``；缺失项为 ``"--"``。
+    """
+    rank_entry: dict[str, Any] = {
+        "rank": "--",
+        "total": "--",
+        "percentile": "--",
+        "data_date": "--",
+        _RANK_SCHEMA_FIELD: _RANK_SCHEMA,
+    }
+
+    # ── 排名数组（y=rank, sc=同类池规模, x=日期）──
+    rank_series: list[dict[str, Any]] = []
     rank_match = re.search(r"var Data_rateInSimilarType\s*=\s*(\[.*?\]);", text, re.DOTALL)
     if rank_match:
         try:
-            rank_data = json.loads(rank_match.group(1))
-            if rank_data:
-                last = rank_data[-1]
-                rank_entry["rank"] = str(last.get("y", "--"))
-                rank_entry["total"] = str(last.get("sc", "--"))
+            parsed = json.loads(rank_match.group(1))
+            if isinstance(parsed, list):
+                rank_series = [e for e in parsed if isinstance(e, dict)]
         except (json.JSONDecodeError, IndexError, TypeError, AttributeError) as _e:
             logger.warning("解析同类排名数据失败: %s", _e)
 
+    # ── 百分位数组（[日期, 百分位]）──
+    pct_series: list[Any] = []
     pct_match = re.search(r"var Data_rateInSimilarPersent\s*=\s*(\[.*?\]);", text, re.DOTALL)
     if pct_match:
         try:
-            pct_data = json.loads(pct_match.group(1))
-            if pct_data:
-                last_pct = pct_data[-1]
-                if isinstance(last_pct, list) and len(last_pct) >= 2:
-                    rank_entry["percentile"] = str(round(last_pct[1], 2))
+            parsed_pct = json.loads(pct_match.group(1))
+            if isinstance(parsed_pct, list):
+                pct_series = parsed_pct
         except (json.JSONDecodeError, IndexError, TypeError, AttributeError) as _e:
             logger.warning("解析百分位排名数据失败: %s", _e)
 
+    rank_date = _sample_date(rank_series[-1].get("x")) if rank_series else ""
+    pct_last = pct_series[-1] if pct_series else None
+    pct_date = _sample_date(pct_last[0]) if isinstance(pct_last, list) and pct_last else ""
+
+    # ── 同期性校验：两侧**均有日期且确实不同**时才取新置旧 ──
+    # 为何要求「均有日期」：无日期只是「未知期次」（旧格式/精简载荷），不是
+    # 「期次不同」——把未知当不同会白丢掉可用数据（回归风险）。
+    use_rank, use_pct = bool(rank_series), isinstance(pct_last, list) and len(pct_last) >= 2
+    if rank_date and pct_date and rank_date != pct_date:
+        newer = max(rank_date, pct_date)
+        use_rank = rank_date == newer
+        use_pct = pct_date == newer
+        logger.warning(
+            "同类排名数据不同期（排名 %s / 百分位 %s）——以较新者 %s 为准，较旧项置空",
+            rank_date,
+            pct_date,
+            newer,
+        )
+    data_date = (rank_date if use_rank else "") or (pct_date if use_pct else "")
+
+    # ── 陈旧闸门：排名尾部日期 vs 同一文件内的净值日期 ──
+    # 排名由净值派生，实测两侧尾部日期恒相等（13 只基金 Δ=0 天）；偏离即说明该次响应里的
+    # 排名序列陈旧（实测读到过 2024-02-18 那期的同类池）。只在**两侧日期均可解析**时判定，
+    # 避免无依据地置空。
+    nav_date = _parse_nav_date(text)
+    if use_rank and rank_date and nav_date:
+        lag = _days_between(nav_date, rank_date)
+        if lag is None or abs(lag) > _RANK_MAX_LAG_DAYS:
+            logger.warning(
+                "同类排名数据陈旧：排名尾部 %s 与净值 %s 相差 %s 天（阈值 %d）——本条排名判为不可用",
+                rank_date,
+                nav_date,
+                lag,
+                _RANK_MAX_LAG_DAYS,
+            )
+            use_rank = use_pct = False
+            data_date = ""
+
+    if use_rank:
+        last = rank_series[-1]
+        rank_entry["rank"] = str(last.get("y", "--"))
+        rank_entry["total"] = str(last.get("sc", "--"))
+    if use_pct and isinstance(pct_last, list) and len(pct_last) >= 2:
+        with contextlib.suppress(TypeError, ValueError):
+            rank_entry["percentile"] = str(round(float(pct_last[1]), 2))
+
+    if data_date:
+        rank_entry["data_date"] = data_date
     return rank_entry
+
+
+def rank_payload_is_current(payload: object) -> bool:
+    """缓存载荷是否由**当前语义版本**的排名解析器写出（版本不符 → 视为未命中重取）。
+
+    为何需要：排名载荷的语义曾变更（新增日期附注、陈旧闸门），旧缓存条目**结构未变但
+    含义已变**——仅靠 24h TTL 会在过期前持续遮蔽修复（实测：旧条目里的 ``155/253``
+    在 TTL 内被重复上屏，用户看到问题依旧）。以版本戳作准入判据后，旧条目**自动作废**。
+
+    无排名数据的载荷（基金本身无同类排名）不拦——无东西可校验，拦了会无限重取。
+    """
+    if not isinstance(payload, dict):
+        return False
+    peer = (payload.get("rankings") or {}).get("同类排名")
+    if not isinstance(peer, dict):
+        return True
+    return peer.get(_RANK_SCHEMA_FIELD) == _RANK_SCHEMA
 
 
 # ── 评级计算（5 级 + 类型差异化阈值） ────────────────

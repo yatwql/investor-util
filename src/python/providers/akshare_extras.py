@@ -210,6 +210,10 @@ def get_profit_forecast_cache_key() -> str:
 # 行业资金流向最近失败类型: "" / "connection" / "empty"
 _SECTOR_FLOW_FAILURE: str = ""
 
+# 分红数据最近失败类型: "" / "connection" / "empty"——供报告层如实登记分红
+# 数据状态（与 _SECTOR_FLOW_FAILURE 同习语：区分「源不可达」与「本无分红」）。
+_DIVIDEND_FAILURE: str = ""
+
 
 def get_sector_fund_flow() -> list[dict[str, Any]]:
     """获取行业资金流向排名（今日）。
@@ -396,11 +400,14 @@ def get_dividend_data(codes: list[str]) -> dict[str, dict]:
         - 仅对 A 股（6/0/3 开头）有意义，基金/债券代码会跳过
         - akshare 未安装或 API 超时时自动降级返回空 dict
     """
+    global _DIVIDEND_FAILURE
+
     # ── 内存缓存 ──
     _codes_hash = hashlib.md5(json.dumps(sorted(codes), ensure_ascii=False).encode()).hexdigest()[:12]
     _memo_key_str = _memo_key("dividend", _codes_hash)
     _memo_val = _memo_get(_memo_key_str)
     if _memo_val is not None:
+        _DIVIDEND_FAILURE = ""  # 缓存命中不属故障（复位模块级状态）
         return _memo_val
 
     # ── 指纹 + 读文件缓存 ──
@@ -409,17 +416,20 @@ def get_dividend_data(codes: list[str]) -> dict[str, dict]:
     cached = cache_get(_key, _DIVIDEND_TTL)
     if cached is not None:
         _memo_set(_memo_key_str, cached)
+        _DIVIDEND_FAILURE = ""  # 缓存命中不属故障
         return cached
 
     # ── lazily import akshare ──
     if ak is None:
         logger.warning("akshare 模块未安装，跳过分红数据")
+        _DIVIDEND_FAILURE = "connection"
         return {}
 
     # ── 只处理 A 股代码 ──
     a_codes = [c for c in codes if is_a_share_code(c)]
     if not a_codes:
         logger.debug("分红数据: 无 A 股代码，跳过")
+        _DIVIDEND_FAILURE = ""  # 无标的属预期内空结果，不算源故障
         return {}
 
     logger.info("正在获取 %d 只股票的分红历史...", len(a_codes))
@@ -427,7 +437,14 @@ def get_dividend_data(codes: list[str]) -> dict[str, dict]:
     def _fetch_div():
         return _fetch_all_dividends(a_codes)
 
-    result = run_with_timeout(_fetch_div, timeout=60.0) or {}
+    raw = run_with_timeout(_fetch_div, timeout=60.0)
+    if raw is None:
+        _DIVIDEND_FAILURE = "connection"
+        logger.warning("分红数据获取失败（超时/异常）")
+        result: dict[str, dict] = {}
+    else:
+        result = raw
+        _DIVIDEND_FAILURE = "" if result else "empty"
     if result:
         cache_set(_key, result)
     _memo_set(_memo_key_str, result)

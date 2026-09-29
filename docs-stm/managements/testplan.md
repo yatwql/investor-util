@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.11.8
+> 文档版本：0.11.9
 
 ---
 
@@ -39,7 +39,7 @@
 | `core/market_hours.py` | 所有时段边界 | 开盘/收盘/午休/周末/节假日/UTC 时区、config 覆盖、API 掉线回退 |
 | `core/provider_registry.py` | 100% 熔断/缓存/策略 | Provider 注册/熔断（默认 3 次→冷却 300s→自动恢复，批量 API 如 eastmoney_industry 为 6 次→120s）、会话缓存 get/set/contains/clear/淘汰、策略选择(交易时段/熔断/QDII豁免)、链式熔断检测、并发安全、审计报告、phase_timeout 嵌套保护 |
 | `tui/handlers_*.py` | 各菜单命令入口 | 正常路径 + 配置缺失 + 异常日志 |
-| `tui/tui_menu.py` | 所有 20 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航、开关门控项 `[D]` 的裁剪与还原 |
+| `tui/tui_menu.py` | 所有 18 选项 | 合法/非法输入、Ctrl+C、空目录选择、多文件导航、开关门控项 `[T]` 的裁剪与还原、`[D]` 配置目录信息子菜单（二级 C/F/O/B） |
 | `analysis/correlation.py` | Pearson 相关矩阵计算+降级 | 已知答案（r=±1/缩放不变）、不显著配对、下三角布局、配对 |r| 降序、数据不足/单品种/无有效收益降级、名称回退、数据契约键、NaN/Inf/None 过滤、重复日期去重、日期缺口对齐、极大幅值钳位、多品种大矩阵 |
 | `report/position_structure_sheet.py` | 重合度/相关性/集中度三区块 Excel 呈现 | 矩阵/配对/说明三区齐全、下三角+对角+上三角空、N/A 格、available=False/None 占位、配对 |r| 降序 |
 | `report/report_template.html`（correlation 模块） | 相关性章节 HTML 呈现 | 汇总卡+相关度最高+热力矩阵+配对明细、单元格样式分支（强正/强负/不显著/N/A）、不足品种提示、available=False 降级占位、correlation_data=None 章节隐藏 |
@@ -439,7 +439,7 @@
 | R-DATA-04 | `src/test/unit/core/test_cache_edge.py::test_market_open_uses_short_ttl` / `::test_market_closed_uses_static_ttl` | 批 3 |
 | R-DATA-05 | `src/test/unit/core/test_data_freshness.py` | 批 3 |
 | R-DATA-06 | `src/test/unit/core/test_code_utils.py`（`TestIsOtcFundByName` + `TestIsAShareStock`） + `src/test/unit/core/test_code_utils_classification.py` + `src/test/unit/fetcher/test_fund.py` + `src/test/unit/fetcher/test_fetcher_price.py`（价格缓存按路由分域 / 名称消歧 / 降级首跳键） + `src/test/unit/report/test_portfolio_history.py`（OTC 名称直接走净值链路） + `src/test/integration/test_cache_consistency.py` | 批 3 |
-| R-DATA-07 | `src/test/unit/core/test_retry.py` + `src/test/unit/core/test_throttle.py` + `src/test/unit/providers/test_cninfo.py` + `src/test/unit/providers/test_datasink.py` + `src/test/unit/providers/test_hithink.py` + `src/test/unit/providers/test_akshare_financial.py` + `src/test/unit/fetcher/test_financial_report.py` + `src/test/unit/fetcher/test_financial_indicator.py` + `src/test/unit/fetcher/test_financial_indicator_hithink.py` + `src/test/unit/llm/test_llm_api_base.py` | 批 4 |
+| R-DATA-07 | `src/test/unit/core/test_retry.py` + `src/test/unit/core/test_throttle.py` + `src/test/unit/providers/test_provider_utils.py` + `src/test/unit/providers/test_cninfo.py` + `src/test/unit/providers/test_datasink.py` + `src/test/unit/providers/test_hithink.py` + `src/test/unit/providers/test_akshare_financial.py` + `src/test/unit/fetcher/test_financial_report.py` + `src/test/unit/fetcher/test_financial_indicator.py` + `src/test/unit/fetcher/test_financial_indicator_hithink.py` + `src/test/unit/llm/test_llm_api_base.py` | 批 4 |
 | R-IDX-01 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_tencent.py` | 批 3 |
 | R-IDX-02 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_sina.py` | 批 3 |
 | R-IDX-03 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/fetcher/test_chain.py` | 批 3 |
@@ -613,7 +613,7 @@
 
 | 验证项 | 标准 | 现有测试 |
 |:-------|:-----|:--------:|
-| **TUI 菜单** | 20 选项完整、中文字符正常、按键响应正确 | ✅ |
+| **TUI 菜单** | 18 选项完整、中文字符正常、按键响应正确 | ✅ |
 | **TUI 进度反馈** | 长时间操作有进度条/动画，不出现"假死"感 | ✅ |
 | **TUI Ctrl+C 中断** | 中断不留下半渲染状态，可安全重试 | ✅ |
 | **TUI 错误提示友好** | 异常堆栈不暴露给用户，包装为中文提示 | ✅ | `test_tui_edge.py` |
@@ -821,7 +821,7 @@ def test_get_ttl_closed(self, mock_open):
 
 12. **异常场景全覆盖**：§1.6 异常场景清单全部 ✅（每项异常场景均有对应自动化用例，edge/resilience 标记），不允许存在仅靠人工确认的 🔴/🟡 项
 13. **报告文件视觉结构**：Excel 和 HTML 输出无格式错乱（盈亏着色、评级色、冻结首行、中文不乱码）→ `test_excel_writer.py` / `test_summary.py` / `test_html_report_structure.py`
-14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[C]/[F]/[O]/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[V]/[H]/[D]/[X]，其中 [D] 系统自检受 `doctor_check` 开关门控）响应正确、无崩溃 → `test_tui_menu.py`（20 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
+14. **TUI 菜单功能**：所有菜单选项（[E]/[B]/[L]/[W]/[D]（二级 [C]/[F]/[O]）/[1]/[2]/[3]/[4]/[P]/[I]/[A]/[S]/[R]/[V]/[H]/[T]/[X]，其中 [T] 系统自检受 `doctor_check` 开关门控）响应正确、无崩溃 → `test_tui_menu.py`（18 项计数/键唯一/索引）+ `test_tui_handlers.py` + `test_handlers_*.py`
 15. **whatif CLI**：`--candidate` 必填、`--base` 可选、缺失报参数错误、`--effective-date` 解析，生成/归档行为 → `test_cli.py::test_whatif_*` + `test_whatif_operations.py` / `test_whatif_sheet.py` / `test_whatif_html.py` / `test_whatif_writer.py`
 16. **whatif 生效日时序回测**：① 过去生效日→出「时序回测」页签/区 → `test_effective_date_merges_backtest` + `test_backtest_sheet_full` + `test_backtest_section_rendered`；② 缺省→维持现状（无回测）→ `test_no_effective_date_no_backtest_call` + `test_full_rendering_sections_without_backtest`；③ 未来/非法日期→降级占位、主报告正常 → `test_compute_backtest_days_invalid_format` / `test_compute_backtest_days_future_or_today_none` + `test_effective_date_exception_degrades` + `test_backtest_sheet_unavailable_reason_placeholder`；④ 断网/空缓存→回测不可用但报告仍生成 → `test_unavailable_returns_reason` / `test_unavailable_without_reason_falls_back` + `test_effective_date_bt_none_no_key`
 17. **编码/locale 可移植性**（CI `portability` job，阻塞；常规三道测试均跑在 UTF-8 locale 上，该类缺陷在它们上面结构性不可见）：① 需求文件与 locale 无关——固定 `pip==24.3.1`（最后一版按「BOM → PEP263 cookie → locale 编码」解码）在 `LC_ALL=C` 下真实解析 `requirements.txt`，由 `test_script_encoding.py::TestRequirementsFileEncoding` 在本机同源守护（复刻旧 pip 解码次序 + 强制 cp936）；② 隐式编码严格档 —— `PYTHONWARNDEFAULTENCODING=1` 下任何未显式 `encoding=` 的文本 I/O 立即失败（`pytest.ini` 置 `error::EncodingWarning`，`openpyxl.worksheet._writer` 上游豁免就地声明），验载体为 `src/test/unit/` 全量（禁止 `open`/`Path.read_text`/`write_text`/`NamedTemporaryFile`/`subprocess.run(text=True)` 等隐式编码调用）；本地复现命令见 `developer-guide.md` → 编码/locale 自检

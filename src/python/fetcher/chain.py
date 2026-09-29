@@ -59,7 +59,11 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     # 历史日 K：腾讯（前复权）→ 新浪 → 同花顺官方（前复权，需 key）
     "history_stock": ["tencent", "sina", "hithink"],
     "history_fund_otc": ["tiantian", "eastmoney"],
-    "history_index": ["tencent", "sina"],
+    # 指数历史日 K：腾讯（前复权）→ 东方财富 push2his（免 key 的独立厂商备源）→
+    # 新浪（``getKLineData`` 端点实测不可用，留作代码级备用）→ 同花顺官方（需 key）。
+    # 新浪单靠不住，故补东方财富作为**可用**的第二源——避免整链退化为事实单源后
+    # 「抖动即整链空」（历史链无链级重试，重试在各 provider 内，见 tencent/eastmoney）。
+    "history_index": ["tencent", "eastmoney", "sina", "hithink"],
     # 美股指数历史日线：新浪实现 fetch_index_kline（providers/sina_kline.py，经
     # providers/sina.py 重导出），但其 getKLineData 端点对全部代码返回 404/空，
     # 故实际取数通常由腾讯完成；腾讯 K 线接口对 gb_* 代码支持有限，该链可能整链
@@ -178,6 +182,12 @@ def _try_provider_fetch(
         ``TRANSPORT_FAILURE``，原因是一行可读短句（供诊断上屏，不再只进日志）。
     """
     _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
+    # 尝试前先清「失败原因」载体：该载体只在 provider 返回 None 时被消费，若上一次
+    # 调用的原因未经消费就残留（直连调用/缓存命中直接返回），会把「上一条命令的失败
+    # 原因」串到本次诊断上。先清后调即保证本次读到的只可能是本次 provider 写的。
+    from src.python.providers._utils import clear_last_reason as _clear_reason
+
+    _clear_reason()
     try:
         raw = fetch_fn(**kwargs)
     except Exception as e:
@@ -192,8 +202,14 @@ def _try_provider_fetch(
         return cast("dict[str, Any] | None", TRANSPORT_FAILURE), reason
 
     if raw is None:
-        logger.info("[%s]%s %s 返回空，尝试下一链路", data_type, _code_tag, provider_name)
-        return None, "返回空"
+        # provider 可把「为什么空」写在 _utils 的 last-reason 里（如「该文档无目标章节」）；
+        # 取到就用它替换笼统的「返回空」——「源故障」与「该文档确实没这一节」在运维上
+        # 是完全不同的信号（前者要排查网络/凭据）。
+        from src.python.providers._utils import take_last_reason
+
+        reason = take_last_reason("返回空")
+        logger.info("[%s]%s %s 返回空（%s），尝试下一链路", data_type, _code_tag, provider_name, reason)
+        return None, reason
 
     # 数据验证
     if validate:

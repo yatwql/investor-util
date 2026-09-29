@@ -421,6 +421,92 @@ class TestParseRankEntry(unittest.TestCase):
         self.assertEqual(result["rank"], "--")
         self.assertEqual(result["total"], "--")
 
+    def test_same_period_keeps_both_and_reports_date(self):
+        """同期数据：rank/percentile 均保留，并带上数据日期供报告附注。"""
+        js = (
+            'var Data_rateInSimilarType = [{"x":1790524800000,"y":231,"sc":"362"}];\n'
+            "var Data_rateInSimilarPersent = [[1790524800000,36.19]];"
+        )
+        result = _parse_rank_entry(js)
+        self.assertEqual((result["rank"], result["total"], result["percentile"]), ("231", "362", "36.19"))
+        self.assertEqual(result["data_date"], "2026-09-28")
+
+    def test_mismatched_periods_prefers_newer_rank(self):
+        """回归（实测 040046）：rank 新 / 百分位旧 → 保留 rank，旧百分位置空 + 告警。
+
+        两个数组各自滞后是上游真实行为；各取末位会拼出「不同期」的记录且无提示。
+        """
+        js = (
+            'var Data_rateInSimilarType = [{"x":1790524800000,"y":231,"sc":"362"}];\n'
+            "var Data_rateInSimilarPersent = [[1790179200000,42.54]];"
+        )
+        with self.assertLogs("invest", level="WARNING") as cm:
+            result = _parse_rank_entry(js)
+        self.assertEqual((result["rank"], result["total"]), ("231", "362"))
+        self.assertEqual(result["percentile"], "--")
+        self.assertEqual(result["data_date"], "2026-09-28")
+        self.assertTrue(any("不同期" in m for m in cm.output))
+
+    def test_mismatched_periods_prefers_newer_percentile(self):
+        """rank 旧 / 百分位新 → 保留百分位，rank/total 置空（宁缺毋错）。"""
+        js = (
+            'var Data_rateInSimilarType = [{"x":1790179200000,"y":155,"sc":"253"}];\n'
+            "var Data_rateInSimilarPersent = [[1790524800000,36.19]];"
+        )
+        result = _parse_rank_entry(js)
+        self.assertEqual(result["rank"], "--")
+        self.assertEqual(result["total"], "--")
+        self.assertEqual(result["percentile"], "36.19")
+        self.assertEqual(result["data_date"], "2026-09-28")
+
+    def test_missing_dates_are_not_treated_as_mismatch(self):
+        """无日期（未知期次，旧格式/精简载荷）不得被当作「不同期」而丢弃数据。"""
+        js = 'var Data_rateInSimilarType = [{"y":"45","sc":"800"}];\nvar Data_rateInSimilarPersent = [[1, 6.25]];'
+        result = _parse_rank_entry(js)
+        self.assertEqual((result["rank"], result["total"], result["percentile"]), ("45", "800", "6.25"))
+        self.assertEqual(result["data_date"], "--")
+
+    def test_stale_rank_vs_nav_is_blanked(self):
+        """回归（实测 040046 的 155/253 残留）：排名尾部远落后于同一文件内的净值日期
+        → 整条排名判为陈旧、全部置 ``--``，宁缺毋错。"""
+        js = (
+            'var Data_rateInSimilarType = [{"x":1708214400000,"y":155,"sc":"253"}];\n'
+            "var Data_rateInSimilarPersent = [[1708214400000,38.74]];\n"
+            'var Data_netWorthTrend = [{"x":1790524800000,"y":1.23}];'
+        )
+        with self.assertLogs("invest", level="WARNING") as cm:
+            result = _parse_rank_entry(js)
+        self.assertEqual((result["rank"], result["total"], result["percentile"]), ("--", "--", "--"))
+        self.assertEqual(result["data_date"], "--")
+        self.assertTrue(any("数据陈旧" in m for m in cm.output))
+
+    def test_rank_within_lag_is_kept(self):
+        """排名与净值同日（实测 Δ=0 天）→ 保留数据（不得误拦）。"""
+        js = (
+            'var Data_rateInSimilarType = [{"x":1790524800000,"y":231,"sc":"362"}];\n'
+            "var Data_rateInSimilarPersent = [[1790524800000,36.19]];\n"
+            'var Data_netWorthTrend = [{"x":1790524800000,"y":1.23}];'
+        )
+        with self.assertNoLogs("invest", level="WARNING"):
+            result = _parse_rank_entry(js)
+        self.assertEqual((result["rank"], result["total"]), ("231", "362"))
+
+    def test_missing_nav_series_skips_stale_gate(self):
+        """无净值序列 → 无法判定陈旧，跳过闸门（不得无依据置空）。"""
+        js = (
+            'var Data_rateInSimilarType = [{"x":1790524800000,"y":231,"sc":"362"}];\n'
+            "var Data_rateInSimilarPersent = [[1790524800000,36.19]];"
+        )
+        result = _parse_rank_entry(js)
+        self.assertEqual((result["rank"], result["total"]), ("231", "362"))
+
+    def test_payload_carries_schema_version(self):
+        """载荷带语义版本戳（供缓存准入判据；旧缓存无此字段 → 自动作废重取）。"""
+        from src.python.providers.tiantian_ranking import _RANK_SCHEMA, _RANK_SCHEMA_FIELD
+
+        result = _parse_rank_entry("var nothing = 1;")
+        self.assertEqual(result[_RANK_SCHEMA_FIELD], _RANK_SCHEMA)
+
 
 class TestCalcRatingFromEntry(unittest.TestCase):
     """_calc_rating_from_entry — 5 级评级 + 类型差异化阈值。"""

@@ -23,6 +23,7 @@ from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.core.code_utils import is_a_share_code
+from src.python.core.retry import STRATEGY_EXPONENTIAL, RetryPolicy, retry_transient
 from src.python.providers import akshare_financial, hithink
 from src.python.schemas.datasource_fields import DOMAIN_FINANCIAL_INDICATOR
 
@@ -33,6 +34,21 @@ HISTORY_PREFIX = "fin_indicator_hist_"
 
 #: 默认取用期数（覆盖同比与多年趋势）
 DEFAULT_PERIODS = 8
+
+#: 多期指标**直连路径**的重试策略：provider 内 ``run_with_timeout`` 已重试一次，
+#: 直连路径不承装链路的传输级重试，故在此再补一层有界退避重试（总尝试 2 次）。
+_SERIES_RETRY_POLICY = RetryPolicy(attempts=2, strategy=STRATEGY_EXPONENTIAL, base_backoff=0.5, factor=2.0, jitter=0.2)
+
+
+def _on_series_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
+    """多期指标重试日志（与链路重试文案同习语）。"""
+    logger.warning(
+        "[financial_indicator] 主源多期指标传输级失败（%s），%.1fs 后同源重试 %d/%d",
+        type(exc).__name__ if exc is not None else "超时",
+        delay,
+        failed_attempt,
+        _SERIES_RETRY_POLICY.attempts - 1,
+    )
 
 
 def fetch_latest_indicator(code: str) -> dict[str, Any] | None:
@@ -79,8 +95,15 @@ def fetch_indicator_series(code: str, limit: int = DEFAULT_PERIODS) -> list[dict
 
     records: list[dict[str, Any]] = []
     try:
-        records = list(akshare_financial.fetch_financial_indicator_history(code, limit=limit))
-    except Exception as e:  # 主源传输级失败（重试已耗尽）→ 不中断，走后续同花顺/链路兜底
+        # 直连路径不承装链路的传输级重试：akshare 超时/断连多为一过性抖动，
+        # 补一层有界退避重试，避免一次抖动就把主源判为不可用而落到需 key 的兜底槽。
+        records = retry_transient(
+            lambda: list(akshare_financial.fetch_financial_indicator_history(code, limit=limit)),
+            policy=_SERIES_RETRY_POLICY,
+            retry_on=lambda _e: True,  # akshare 异常种类不可枚举：与 run_with_timeout 同口径
+            on_retry=_on_series_retry,
+        )
+    except Exception as e:  # 重试耗尽 → 不中断，走后续同花顺/链路兜底
         logger.warning("[financial_indicator] 主源多期指标取数失败（%s），转同花顺/链路兜底", e)
     if records:
         mark_data_used(f"fin_indicator_{akshare_financial.SOURCE_ID}")

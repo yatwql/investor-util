@@ -202,7 +202,10 @@ def _build_candidate_row(
     rk = rank_entry.get("rank")
     tot = rank_entry.get("total")
     if rk not in (None, "--") and tot not in (None, "--"):
-        row["rank_text"] = f"{rk}/{tot}"
+        # 复用同一格式化器：与基金业绩分析章同口径（含排名数据日期附注）
+        from src.python.report.fund_performance import _format_rank
+
+        row["rank_text"] = _format_rank(rank_entry)
 
     risk = rank.get("risk_analysis") or {}
     drawdown_raw = risk.get(_RISK_DRAWDOWN_KEY)

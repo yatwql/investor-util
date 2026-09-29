@@ -387,6 +387,57 @@ class TestFetchFundRankingsBatch(unittest.TestCase):
         mock_disp.shutdown.assert_not_called()
 
 
+class TestRankCacheAdmission(unittest.TestCase):
+    """排名缓存的语义版本准入（即 `rank_payload_is_current`）。
+
+    回归（实测 040046 残留 155/253）：旧缓存条目结构未变但含义已变，仅靠 24h TTL
+    会在过期前持续遮蔽修复；版本戳准入使旧条目自动作废重取。
+    """
+
+    def _check(self, payload):
+        from src.python.providers.tiantian_ranking import rank_payload_is_current
+
+        return rank_payload_is_current(payload)
+
+    def test_legacy_payload_without_schema_is_rejected(self):
+        """旧载荷（无 rank_schema，即残留 155/253 那一版）→ 拒绝（视为未命中）。"""
+        self.assertFalse(self._check({"rankings": {"同类排名": {"rank": "155", "total": "253"}}}))
+
+    def test_current_payload_is_accepted(self):
+        """当前解析器写出的载荷（带版本戳）→ 接受。"""
+        from src.python.providers.tiantian_ranking import _RANK_SCHEMA, _RANK_SCHEMA_FIELD
+
+        payload = {"rankings": {"同类排名": {"rank": "231", "total": "362", _RANK_SCHEMA_FIELD: _RANK_SCHEMA}}}
+        self.assertTrue(self._check(payload))
+
+    def test_payload_without_rank_data_is_accepted(self):
+        """基金本身无排名数据 → 不拦（拦了会无限重取）。"""
+        self.assertTrue(self._check({"rankings": {}}))
+        self.assertTrue(self._check({"rankings": {"同类排名": "不是 dict"}}))
+
+    def test_non_dict_payload_is_rejected(self):
+        """非 dict（异常缓存形态）→ 拒绝。"""
+        self.assertFalse(self._check(None))
+        self.assertFalse(self._check([1, 2, 3]))
+
+    def test_fetch_passes_validator_to_chain(self):
+        """接线：fetch_fund_rankings 必须把准入判据传给链路（否则版本戳形同虚设）。"""
+        from src.python.fetcher import fund as fund_mod
+        from src.python.providers.tiantian_ranking import rank_payload_is_current
+
+        captured = {}
+
+        def _fake_fetch_with_fallback(data_type, provider_map, cache_key, ttl, **kwargs):
+            captured["data_type"] = data_type
+            captured["cache_validate"] = kwargs.get("cache_validate")
+            return {"rankings": {"同类排名": {"rank": "231", "total": "362"}}}
+
+        with patch.object(fund_mod, "fetch_with_fallback", _fake_fetch_with_fallback):
+            fund_mod.fetch_fund_rankings("040046")
+        self.assertEqual(captured["data_type"], "fund_rank")
+        self.assertIs(captured["cache_validate"], rank_payload_is_current)
+
+
 class TestFetchFundHoldingsBatch(unittest.TestCase):
     """fetch_fund_holdings_batch 批量并行获取。"""
 

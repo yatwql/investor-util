@@ -258,6 +258,24 @@ def _auto_reset_provider_registry():
 
 
 @pytest.fixture(autouse=True)
+def _auto_reset_last_reason():
+    """自动清除「provider 失败原因」线程本地载体，防止测试间状态污染。
+
+    该载体（``providers/_utils`` 的 ``_last_reason``）是**消费即清**的：provider
+    写入后由链路在返回空时取用。但不少 provider 用例直接调 ``datasink``/``cninfo``
+    的取数函数只看返回值（不消费原因）——写入的原因便残留在该测试所在 worker 的
+    主线程槽位里，污染同 worker 中**下一个**读载体的用例（实测 CI 3.11：
+    ``test_reason_is_thread_local`` 读到 500 用例残留的 ``'HTTP 500'``）。
+
+    与 ``_auto_reset_provider_registry`` 同习语：模块级可变状态在每个测试前复位，
+    使用例不依赖执行顺序/worker 分配。
+    """
+    from src.python.providers import _utils
+
+    _utils.clear_last_reason()
+
+
+@pytest.fixture(autouse=True)
 def _auto_reset_adapter_registry():
     """自动重置数据源适配器注册表，防止测试间状态污染。
 

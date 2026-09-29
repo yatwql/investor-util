@@ -459,10 +459,10 @@ class TestOtcNavBackupSource(unittest.TestCase):
 class TestPriceCacheFresh(unittest.TestCase):
     """_price_cache_fresh 收市后新鲜度验证测试。"""
 
-    def _call(self, data: dict) -> bool:
+    def _call(self, data: dict, data_type: str = "price_stock") -> bool:
         from src.python.fetcher.price import _price_cache_fresh
 
-        return _price_cache_fresh(data)
+        return _price_cache_fresh(data, data_type)
 
     @patch("src.python.core.market_hours.is_market_open", return_value=True)
     def test_market_open_always_fresh(self, mock_open):
@@ -479,8 +479,12 @@ class TestPriceCacheFresh(unittest.TestCase):
     @patch("src.python.core.market_hours.is_market_open", return_value=False)
     @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-31")
     def test_after_close_stale(self, mock_td, mock_open):
-        """盘后 price_date < 最近交易日 → 跨日残留，判定不新鲜。"""
-        self.assertFalse(self._call({"price_date": "2026-07-30"}))
+        """盘后场内行情 price_date < 最近交易日 → 跨日残留，判定不新鲜（场内路由口径）。
+
+        与场外路由对照（场外 T-1 判新鲜）：同一 T-1 日期在场内仍视为过时——
+        新鲜度阈值按路由分域。
+        """
+        self.assertFalse(self._call({"price_date": "2026-07-30"}, "price_stock"))
 
     @patch("src.python.core.market_hours.is_market_open", return_value=False)
     @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-31")
@@ -493,6 +497,24 @@ class TestPriceCacheFresh(unittest.TestCase):
     def test_exception_conservative_fresh(self, mock_open):
         """校验异常 → 保守视为新鲜，不阻塞取价流程。"""
         self.assertTrue(self._call({"price_date": "2026-07-30"}))
+
+    @patch("src.python.core.market_hours.is_market_open", return_value=False)
+    @patch("src.python.report.market_value.get_prev_trading_day", return_value="2026-07-30")
+    @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-31")
+    def test_otc_nav_t_minus_one_is_fresh(self, mock_td, mock_prev, mock_open):
+        """场外/QDII 净值合法为 T-1：以前一交易日为阈值判新鲜。
+
+        回归：曾被按「最近交易日」判定 → 正常 T-1 净值永远被视为跨日残留 →
+        清缓存重取并记 ``price_fund_otc_*_refresh`` 失败（QDII 价格刷新失败根因）。
+        """
+        self.assertTrue(self._call({"price_date": "2026-07-30"}, "price_fund_otc"))
+
+    @patch("src.python.core.market_hours.is_market_open", return_value=False)
+    @patch("src.python.report.market_value.get_prev_trading_day", return_value="2026-07-30")
+    @patch("src.python.report.market_value.get_last_trading_day", return_value="2026-07-31")
+    def test_otc_nav_older_than_prev_day_stale(self, mock_td, mock_prev, mock_open):
+        """场外净值早于前一交易日 → 仍判跨日残留（不放过真正的过时数据）。"""
+        self.assertFalse(self._call({"price_date": "2026-07-29"}, "price_fund_otc"))
 
 
 class TestFetchPriceCacheRefresh(unittest.TestCase):

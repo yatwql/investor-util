@@ -183,7 +183,7 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
     # ── 常规开关：只读诊断（不改产物、不写文件，默认关的代价是环境出故障者看不到它） ──
     "doctor_check": FeatureSwitchDef(
         "系统自检上屏",
-        "TUI 菜单 [D] 与 Web「系统自检」卡片可见性；CLI doctor 子命令不受本开关约束",
+        "TUI 菜单 [T] 与 Web「系统自检」卡片可见性；CLI doctor 子命令不受本开关约束",
         GROUP_STANDARD,
         True,
         False,

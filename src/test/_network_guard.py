@@ -129,6 +129,18 @@ def apply_offline_stubs(monkeypatch: Any) -> None:
     monkeypatch.setattr(httpx, "AsyncClient", OfflineAsyncHTTPClient)
     monkeypatch.setattr(trading_calendar, "_get_trading_calendar", lambda: set())
     monkeypatch.setattr(chain, "_TRANSIENT_RETRY_BACKOFF", 0.0)
+    # provider 级重试策略（K 线 / 财务指标多期）同样置零退避：离线桩即时失败时重试
+    # 分支仍被覆盖，但不再白等退避（与 chain 同习语）。
+    from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+    from src.python.fetcher import financial_indicator
+    from src.python.providers import eastmoney, tencent
+
+    def _zero(attempts: int) -> RetryPolicy:
+        return RetryPolicy(attempts=attempts, strategy=STRATEGY_FIXED, base_backoff=0.0)
+
+    monkeypatch.setattr(tencent, "_KLINE_RETRY_POLICY", _zero(3))
+    monkeypatch.setattr(eastmoney, "_INDEX_RETRY_POLICY", _zero(3))
+    monkeypatch.setattr(financial_indicator, "_SERIES_RETRY_POLICY", _zero(2))
     monkeypatch.setitem(sys.modules, "akshare", akshare_stub)
     if getattr(akshare_extras, "ak", None) is not None:
         monkeypatch.setattr(akshare_extras, "ak", akshare_stub)

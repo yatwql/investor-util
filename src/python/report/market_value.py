@@ -391,8 +391,9 @@ def _generate_details(holdings: list[Holding], today_str: str = "") -> list[Deta
             _route,
             lambda c, _n=h.name: price_cache_key(c, _n),
         )
-        # 收市后校验 OTC 基金净值日期是否 ≥ 上一个交易日（跨日残留缓存 → 降级重取）
-        if mkt is not None and not _price_cache_fresh(mkt):
+        # 收市后校验价格缓存日期是否 ≥ 该路由允许的最新日期（跨日残留缓存 → 降级重取）。
+        # 阈值按路由分域：场外/QDII 官方净值合法为 T-1（以前一交易日为界），场内须等于最近交易日。
+        if mkt is not None and not _price_cache_fresh(mkt, _route):
             logger.debug(
                 "CACHE_ONLY 缓存过时: %s (%s) price_date=%s，降级到实时获取",
                 h.name,

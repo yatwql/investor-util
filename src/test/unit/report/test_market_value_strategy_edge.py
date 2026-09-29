@@ -85,7 +85,9 @@ class TestStrategyMarketClosed:
         """
         _setup_registry()
         # 预填 session cache
-        get_registry().session_cache_set(resolve_price_route("561910", "电池ETF"), "561910", _TENCENT_DATA, source="test")
+        get_registry().session_cache_set(
+            resolve_price_route("561910", "电池ETF"), "561910", _TENCENT_DATA, source="test"
+        )
 
         holdings = [Holding("证券账户", "电池ETF", "561910", 1000.0, 1.0)]
         details = mv._generate_details(holdings, "2026-06-26")
@@ -255,7 +257,9 @@ class TestStrategyLogging:
 
         caplog.set_level(logging.INFO)
         # 预填 session cache
-        get_registry().session_cache_set(resolve_price_route("561910", "电池ETF"), "561910", _TENCENT_DATA, source="test")
+        get_registry().session_cache_set(
+            resolve_price_route("561910", "电池ETF"), "561910", _TENCENT_DATA, source="test"
+        )
 
         holdings = [Holding("证券账户", "电池ETF", "561910", 1000.0, 1.0)]
         mv._generate_details(holdings, "2026-06-26")

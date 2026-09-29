@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 
 from src.python.core.constants import BEIJING_TZ
@@ -47,6 +48,43 @@ def build_transient_retry_judge(elapsed: float, timeout: float) -> Callable[[Bas
         return is_transient_exception(exc) and elapsed < threshold
 
     return _judge
+
+
+#: 本线程最近一次 provider 取数的「失败原因短句」（供链路在 provider 返回 None 时
+#: 如实上屏）。provider 把「为什么空」写在这里（如「该文档无目标章节」），链路的
+#: `_try_provider_fetch` 读到后替换笼统的「返回空」——两者在运维上是完全不同的信号：
+#: 「源故障」要排查网络/凭据，而「该文档确实没这一节」是正常业务结果。
+#: 按线程隔离（批量取数是多线程），消费后即清，无效匹配不影响其他调用。
+_last_reason = threading.local()
+
+
+def set_last_reason(reason: str) -> None:
+    """provider 设置本次取数的可读失败原因（返回 None 前调用）。"""
+    _last_reason.value = reason
+
+
+def clear_last_reason() -> None:
+    """清除本线程的失败原因（**链路在每次尝试 provider 之前调用**）。
+
+    为何需要显式清除：载体只在 provider 返回 ``None`` 时被消费（见
+    ``fetcher/chain._try_provider_fetch``）。但 provider 也可能把原因写好后
+    **未经链路消费**就返回非空/抛异常（例如被直连调用、或命中缓存直接返回），
+    此时残留值会污染本线程**下一次**与本调用无关的消费点（表现为「上一条命令
+    的失败原因串到下一条」）。链路在每个 provider 尝试前先清，使「本次原因」
+    与「上次残值」不可能混淆。
+    """
+    _last_reason.value = ""
+
+
+def take_last_reason(default: str = "") -> str:
+    """取出并清除本线程的失败原因（无则返回 ``default``）。
+
+    与 :func:`clear_last_reason` 的区别：本函数用于**消费方**（读到值即用，
+    消费后即清）；后者用于**生产前**（先清再调 provider，防上次残值混入）。
+    """
+    reason = getattr(_last_reason, "value", "")
+    _last_reason.value = ""
+    return reason or default
 
 
 def with_connect_retry(

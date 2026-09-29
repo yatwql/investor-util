@@ -40,8 +40,8 @@ class TestMenuItems(unittest.TestCase):
             _tm.MENU_ITEMS[i] = (key, label, None, is_exit)
 
     def test_item_count(self) -> None:
-        """菜单项应为 20 个（含受开关约束的 [D] 系统自检）。"""
-        self.assertEqual(len(MENU_ITEMS), 20)
+        """菜单项应为 18 个（含受开关约束的 [T] 系统自检；[C]/[F]/[O] 已聚合到 [D] 子菜单）。"""
+        self.assertEqual(len(MENU_ITEMS), 18)
 
     def test_whatif_item(self) -> None:
         """What-if 菜单项在报告生成组后（第 4 项，快捷键 W）。"""
@@ -61,7 +61,7 @@ class TestMenuItems(unittest.TestCase):
 
     def test_last_item_exit(self) -> None:
         """最后一项快捷键 X，is_exit=True。"""
-        key, label, cb, is_exit = MENU_ITEMS[19]
+        key, label, cb, is_exit = MENU_ITEMS[17]
         self.assertEqual(key, "X")
         self.assertIn("退出", label)
         self.assertIsNone(cb)
@@ -69,7 +69,7 @@ class TestMenuItems(unittest.TestCase):
 
     def test_view_logs_item(self) -> None:
         """日志查看项在退出前（快捷键 V）。"""
-        key, label, cb, is_exit = MENU_ITEMS[16]
+        key, label, cb, is_exit = MENU_ITEMS[14]
         self.assertEqual(key, "V")
         self.assertIn("运行日志", label)
         self.assertIsNone(cb)
@@ -77,16 +77,24 @@ class TestMenuItems(unittest.TestCase):
 
     def test_health_history_item(self) -> None:
         """健康历史项在日志查看后（快捷键 H）。"""
-        key, label, cb, is_exit = MENU_ITEMS[17]
+        key, label, cb, is_exit = MENU_ITEMS[15]
         self.assertEqual(key, "H")
         self.assertIn("健康历史", label)
         self.assertIsNone(cb)
         self.assertFalse(is_exit)
 
-    def test_doctor_item(self) -> None:
-        """系统自检项在健康历史后、退出前（快捷键 D）。"""
-        key, label, cb, is_exit = MENU_ITEMS[18]
+    def test_config_dir_info_item(self) -> None:
+        """配置目录信息项在 What-if 后（第 5 项，快捷键 D）。"""
+        key, label, cb, is_exit = MENU_ITEMS[4]
         self.assertEqual(key, "D")
+        self.assertIn("配置目录信息", label)
+        self.assertIsNone(cb)
+        self.assertFalse(is_exit)
+
+    def test_doctor_item(self) -> None:
+        """系统自检项在健康历史后、退出前（快捷键 T）。"""
+        key, label, cb, is_exit = MENU_ITEMS[16]
+        self.assertEqual(key, "T")
         self.assertIn("系统自检", label)
         self.assertIsNone(cb)
         self.assertFalse(is_exit)
@@ -122,16 +130,19 @@ class TestIndexByKey(unittest.TestCase):
         self.assertEqual(index_by_key("W"), 3)
 
     def test_find_X(self) -> None:
-        self.assertEqual(index_by_key("X"), 19)
+        self.assertEqual(index_by_key("X"), 17)
 
     def test_find_D(self) -> None:
-        self.assertEqual(index_by_key("D"), 18)
+        self.assertEqual(index_by_key("D"), 4)
+
+    def test_find_T(self) -> None:
+        self.assertEqual(index_by_key("T"), 16)
 
     def test_find_V(self) -> None:
-        self.assertEqual(index_by_key("V"), 16)
+        self.assertEqual(index_by_key("V"), 14)
 
     def test_find_H(self) -> None:
-        self.assertEqual(index_by_key("H"), 17)
+        self.assertEqual(index_by_key("H"), 15)
 
     def test_find_nonexistent(self) -> None:
         self.assertIsNone(index_by_key("Z"))
@@ -141,7 +152,7 @@ class TestIndexByKey(unittest.TestCase):
         self.assertIsNone(index_by_key("e"))
 
     def test_find_number(self) -> None:
-        self.assertEqual(index_by_key("1"), 7)
+        self.assertEqual(index_by_key("1"), 5)
 
     def test_find_empty(self) -> None:
         self.assertIsNone(index_by_key(""))
@@ -220,7 +231,7 @@ class TestFilterMenuLlmModules(unittest.TestCase):
 @pytest.mark.unit
 @pytest.mark.unit_ui
 class TestFeatureGatedMenuItems:
-    """受功能开关约束的菜单项（[D] 系统自检）。
+    """受功能开关约束的菜单项（[T] 系统自检）。
 
     `_apply_feature_gates` 就裁剪 `MENU_ITEMS`，故每个用例前后都必须快照/还原——
     否则会污染同进程内其它测试对菜单项数量的断言。
@@ -259,16 +270,16 @@ class TestFeatureGatedMenuItems:
         import src.python.tui.tui_menu as tm
 
         self._apply(enabled=False)
-        assert "D" not in {item[0] for item in tm.MENU_ITEMS}
+        assert "T" not in {item[0] for item in tm.MENU_ITEMS}
 
     def test_doctor_item_visible_when_flag_on(self):
         import src.python.tui.tui_menu as tm
 
         self._apply(enabled=True)
-        assert "D" in {item[0] for item in tm.MENU_ITEMS}
+        assert "T" in {item[0] for item in tm.MENU_ITEMS}
 
     def test_doctor_item_visible_under_defaults(self):
-        """默认配置下 [D] 即在菜单里（系统自检已转正为默认开启）。
+        """默认配置下 [T] 即在菜单里（系统自检已转正为默认开启）。
 
         上面两条都用 patch 覆盖取值，测不出默认值本身——默认值若改回关闭，
         它们仍全绿，而用户打开的菜单里会少一项。
@@ -277,6 +288,13 @@ class TestFeatureGatedMenuItems:
 
         tm._apply_feature_gates()
 
+        assert "T" in {item[0] for item in tm.MENU_ITEMS}
+
+    def test_config_dir_info_unaffected_by_doctor_gate(self):
+        """开关关闭只裁剪 [T] 自检，[D] 配置目录信息（无门控）仍在菜单中。"""
+        import src.python.tui.tui_menu as tm
+
+        self._apply(enabled=False)
         assert "D" in {item[0] for item in tm.MENU_ITEMS}
 
     def test_callback_binding_survives_gating(self):

@@ -1,7 +1,7 @@
 """TUI 运行状态诊断命令处理器。
 
 菜单 [V] 查看最近运行日志（可按级别筛选）、[H] 查看数据源健康历史、
-[D] 系统自检（默认开启，features.json 中 doctor_check 为 false 时该菜单项不出现）。
+[T] 系统自检（默认开启，features.json 中 doctor_check 为 false 时该菜单项不出现）。
 三者同属只读诊断面，故归于一模块。
 
 所有解析/聚合逻辑委托核心层（core/log_reader.py、core/perf.py、core/doctor.py），

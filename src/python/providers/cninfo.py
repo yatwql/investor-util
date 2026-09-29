@@ -37,7 +37,7 @@ from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.core.http_client import make_http_client
 from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
-from src.python.providers._utils import with_connect_retry
+from src.python.providers._utils import set_last_reason, with_connect_retry
 
 logger = logging.getLogger("invest")
 
@@ -46,7 +46,12 @@ DISPLAY_NAME = "巨潮资讯"
 
 _BASE = "http://www.cninfo.com.cn"
 _STATIC_BASE = "http://static.cninfo.com.cn"
+#: 元数据类接口（orgId 搜索 / 公告列表）的超时预算
 _TIMEOUT = 20.0
+#: 公告 PDF 下载的超时预算。年报原文动辄几十 MB，与元数据接口共用 20s 必然在
+#: 慢链路下触发「挂起 → 不重试 → 失败」，且**从未成功过**（白等 N × 超时）。
+#: 单独放宽到 60s，配合下方「本会话主机不可达短路」避免反复白等。
+_PDF_TIMEOUT = 60.0
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 #: 公开 API 礼貌间隔（秒）：限速器单例的固定档（数据源免费且无配置套餐，不引入配置键）
 _MIN_INTERVAL = 1.0
@@ -94,6 +99,47 @@ _YEAR_RE = re.compile(r"(20\d{2})\s*年")
 _limiter: Any = None
 _limiter_lock = threading.Lock()
 
+#: 本会话内判定为「主机不可达」的主机名集合（如本机到 cninfo 网络路径被阻断时）。
+#: 挂起型失败（单次尝试耗时 ≥ 超时预算一半）已被 ``with_connect_retry`` 判为不可达，
+#: 但 **cninfo 是直连调用（不经链路）**，没有会话级熔断——不短路的话，同一轮报告里
+#: 每篇文档都会重新发起请求、重新白等一个超时预算（实测 601939 连试 4 次共 160s）。
+#: 记下主机名后，后续请求**直接失败**（不发请求、不等超时），日志给出一次可读原因。
+_unreachable_hosts: set[str] = set()
+_unreachable_lock = threading.Lock()
+
+
+def _host_of(url: str) -> str:
+    """从 URL 取出主机名（无 scheme 时按路径处理，返回空串）。"""
+    if "://" not in url:
+        return ""
+    return url.split("://", 1)[1].split("/", 1)[0]
+
+
+def _mark_host_unreachable(url: str) -> None:
+    """标记本会话该主机不可达（挂起型失败后调用）。"""
+    host = _host_of(url)
+    if not host:
+        return
+    with _unreachable_lock:
+        if host not in _unreachable_hosts:
+            _unreachable_hosts.add(host)
+            logger.warning("[cninfo] 主机 %s 本会话判定不可达，后续请求直接跳过（不再逐次白等超时）", host)
+
+
+def _is_host_unreachable(url: str) -> bool:
+    """该主机是否已被本会话标记为不可达。"""
+    host = _host_of(url)
+    if not host:
+        return False
+    with _unreachable_lock:
+        return host in _unreachable_hosts
+
+
+def reset_cninfo_unreachable() -> None:
+    """清空「主机不可达」会话标记（测试隔离 / 用户手动重试用）。"""
+    with _unreachable_lock:
+        _unreachable_hosts.clear()
+
 
 def _get_limiter() -> Any:
     """模块级限速器（惰性构建单例）。"""
@@ -112,6 +158,7 @@ def reset_cninfo_limiter() -> None:
     global _limiter
     with _limiter_lock:
         _limiter = None
+    reset_cninfo_unreachable()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -119,7 +166,9 @@ def reset_cninfo_limiter() -> None:
 # ═══════════════════════════════════════════════════════════════
 
 
-def _with_transient_retry(label: str, do_request: Callable[[], Any]) -> Any:
+def _with_transient_retry(
+    label: str, do_request: Callable[[], Any], *, url: str = "", timeout: float | None = None
+) -> Any:
     """执行一次 HTTP 请求；**连接级瞬时失败**按策略退避重试（限速每次尝试前生效）。
 
     背景（本机实测）：到 cninfo 的**首个连接**常被丢弃（http/https 均见 8s 超时，
@@ -131,9 +180,22 @@ def _with_transient_retry(label: str, do_request: Callable[[], Any]) -> Any:
     ``providers/_utils.with_connect_retry``；本函数只保留**直连调用方的降级契约**：
     重试耗尽 / 挂起 / 非瞬时失败 → 记日志并返回 ``None``（cninfo 三条路径无链路承接上抛，
     故在此吞掉异常）。
+
+    Args:
+        label: 日志中的请求标识（路径或完整 URL）。
+        do_request: 实际执行一次的请求（无参闭包）。
+        url: 该请求的 URL；提供时参与「主机不可达短路」与挂起标记。
+        timeout: 单次请求超时预算；None 取 ``_TIMEOUT``（元数据类接口），
+            PDF 下载传入 ``_PDF_TIMEOUT``。
     """
+    if url and _is_host_unreachable(url):
+        logger.debug("[cninfo] 主机本会话不可达，跳过：%s", label)
+        set_last_reason("巨潮主机本会话不可达")
+        return None
+
     limiter = _get_limiter()
     tried = {"n": 0}
+    _timeout = _TIMEOUT if timeout is None else timeout
 
     def _before_attempt() -> None:
         tried["n"] += 1
@@ -142,7 +204,7 @@ def _with_transient_retry(label: str, do_request: Callable[[], Any]) -> Any:
     try:
         return with_connect_retry(
             do_request,
-            timeout=_TIMEOUT,
+            timeout=_timeout,
             log_tag="cninfo",
             label=label,
             before_attempt=_before_attempt,
@@ -150,7 +212,19 @@ def _with_transient_retry(label: str, do_request: Callable[[], Any]) -> Any:
     except Exception as e:  # 瞬时重试耗尽 / 非瞬时失败：降级为 None（不计熔断）
         suffix = f"（已试 {tried['n']} 次）" if tried["n"] > 1 else ""
         logger.warning("[cninfo] 请求失败 %s: %s%s", label, e, suffix)
+        if url and _looks_like_hang(e, _timeout):
+            _mark_host_unreachable(url)
+            set_last_reason("巨潮连接超时（主机不可达）")
         return None
+
+
+def _looks_like_hang(exc: BaseException, timeout: float) -> bool:
+    """该异常是否属「挂起型」：连接/读超时（与 ``with_connect_retry`` 的判据同源）。"""
+    from src.python.core.retry import is_transient_exception
+
+    if not is_transient_exception(exc):
+        return False
+    return "timeout" in type(exc).__name__.lower() or "timeout" in str(exc).lower()
 
 
 def _post_once(url: str, data: dict[str, Any]) -> Any:
@@ -159,9 +233,9 @@ def _post_once(url: str, data: dict[str, Any]) -> Any:
         return client.post(url, data=data, headers=_HEADERS)
 
 
-def _get_once(url: str) -> Any:
+def _get_once(url: str, timeout: float | None = None) -> Any:
     """单次限速 GET（限速在调用方统一获取）。"""
-    with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+    with make_http_client(timeout=_TIMEOUT if timeout is None else timeout, follow_redirects=True) as client:
         return client.get(url, headers=_HEADERS)
 
 
@@ -171,23 +245,25 @@ def _post_json(path: str, data: dict[str, Any]) -> dict[str, Any] | None:
     连接级瞬时失败由 ``_with_transient_retry`` 退避重试一次；HTTP 429 另有自己的退避分支。
     """
     url = f"{_BASE}{path}"
-    resp = _with_transient_retry(path, lambda: _post_once(url, data))
+    resp = _with_transient_retry(path, lambda: _post_once(url, data), url=url)
     if resp is None:
-        return None
+        return None  # 失败原因已由 _with_transient_retry 写入 last-reason
     if resp.status_code == 429:
         delay = _RATE_LIMIT_POLICY.delay_for(1)
         logger.warning("[cninfo] 触发限速（HTTP 429），%.1fs 后重试一次", delay)
         time.sleep(delay)
-        resp = _with_transient_retry(path, lambda: _post_once(url, data))
+        resp = _with_transient_retry(path, lambda: _post_once(url, data), url=url)
         if resp is None:
             return None
     if resp.status_code != 200:
         logger.warning("[cninfo] 请求 %s 返回 HTTP %d", path, resp.status_code)
+        set_last_reason(f"HTTP {resp.status_code}")
         return None
     try:
         payload = resp.json()
     except ValueError:
         logger.warning("[cninfo] 响应非 JSON（%s）", path)
+        set_last_reason("响应非 JSON")
         return None
     # 同一接口的两种合法形状都放行：``hisAnnouncement/query`` 返回 dict
     # （``announcements``），而 ``information/topSearch/query`` 返回**数组**
@@ -196,8 +272,12 @@ def _post_json(path: str, data: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _get_bytes(url: str) -> bytes | None:
-    """限速 GET 取二进制（公告 PDF）；失败返回 None。"""
-    resp = _with_transient_retry(url, lambda: _get_once(url))
+    """限速 GET 取二进制（公告 PDF）；失败返回 None。
+
+    PDF 原文动辄几十 MB，与元数据接口共用 20s 预算必然在慢链路下失败——单独用
+    ``_PDF_TIMEOUT``（60s），使「链路慢但仍可达」的年报能真正下下来。
+    """
+    resp = _with_transient_retry(url, lambda: _get_once(url, _PDF_TIMEOUT), url=url, timeout=_PDF_TIMEOUT)
     if resp is None:
         return None
     if resp.status_code != 200:
@@ -254,6 +334,7 @@ def resolve_org_id(code: str) -> str | None:
         org_id = str(items[0].get("orgId") or "")
     if not org_id:
         logger.info("[cninfo] 代码 %s 未解析到 orgId", code)
+        set_last_reason("未解析到 orgId（源侧无该代码档案或连接失败）")
         return None
     resolved = f"{code},{org_id}"
     cache_set(cache_key, resolved)

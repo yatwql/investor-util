@@ -19,7 +19,13 @@ from src.python.core.code_utils import (
 )
 from src.python.core.http_client import make_http_client
 from src.python.core.num_utils import safe_num
-from src.python.core.retry import STRATEGY_FIXED, TRANSIENT_EXCEPTIONS, RetryPolicy, retry_transient
+from src.python.core.retry import (
+    STRATEGY_EXPONENTIAL,
+    STRATEGY_FIXED,
+    TRANSIENT_EXCEPTIONS,
+    RetryPolicy,
+    retry_transient,
+)
 
 logger = logging.getLogger("invest")
 
@@ -28,6 +34,45 @@ _TIMEOUT = 15.0  # 普通行情超时
 #: 行情取数重试策略：总尝试 2 次、无退避（末次失败立即交下一链路）
 _PRICE_RETRY_POLICY = RetryPolicy(attempts=2, strategy=STRATEGY_FIXED, base_backoff=0.0)
 _KLINE_TIMEOUT = 30.0  # K 线超时（需等待更多数据）
+#: K 线取数重试策略：总尝试 3 次、指数退避——K 线请求较重，抖动多来自远端限流/瞬断。
+#: 历史链路（``fetcher/chain.py::_try_providers``）**无链级重试**，故重试必须落在
+#: provider 内：provider 把传输失败吞成空列表，链级无从判别，单源抖动会直接表现为整链空。
+_KLINE_RETRY_POLICY = RetryPolicy(attempts=3, strategy=STRATEGY_EXPONENTIAL, base_backoff=0.5, factor=2.0, jitter=0.2)
+
+
+def _fetch_kline_json(full_code: str, days: int, start_from: str | None) -> dict | None:
+    """带传输级退避重试的 K 线 JSON 拉取（股票/指数共用）。
+
+    传输级瞬时失败（超时/断连）多为抖动，同源再试往往即成功；重试耗尽或 JSON
+    解析失败返回 None，由调用方按既有「失败返回空列表」契约降级。
+    """
+    url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+    params: dict[str, str | int] = {"param": f"{full_code},day,{start_from or ''},,{days},qfq"}
+
+    def _attempt() -> dict:
+        with make_http_client(timeout=_KLINE_TIMEOUT) as client:
+            resp = client.get(url, params=params)
+            resp.encoding = "utf-8"
+            return resp.json()
+
+    def _on_transient_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
+        logger.warning(
+            "Tencent K 线 %s 传输级失败（%s），%.1fs 后同源重试 %d/%d",
+            full_code,
+            type(exc).__name__ if exc is not None else "超时",
+            delay,
+            failed_attempt,
+            _KLINE_RETRY_POLICY.attempts - 1,
+        )
+
+    try:
+        return retry_transient(_attempt, policy=_KLINE_RETRY_POLICY, on_retry=_on_transient_retry)
+    except TRANSIENT_EXCEPTIONS as e:
+        logger.warning("Tencent K 线获取失败 %s（重试耗尽）: %s", full_code, e)
+        return None
+    except ValueError as e:  # JSON 解析失败（非瞬时）——不重试
+        logger.warning("Tencent K 线响应解析失败 %s: %s", full_code, e)
+        return None
 
 
 # Tencent 实际返回格式（~ 分隔）：
@@ -247,21 +292,11 @@ def fetch_kline(code: str, days: int = 30, start_from: str | None = None) -> lis
 
     days = min(max(days, 5), 365)
     full_code = _add_prefix(code)
-    url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-
-    params: dict[str, str | int] = {
-        "param": f"{full_code},day,{start_from or ''},,{days},qfq",
-    }
 
     logger.debug("Tencent K 线请求: %s, days=%d", full_code, days)
 
-    try:
-        with make_http_client(timeout=_KLINE_TIMEOUT) as client:
-            resp = client.get(url, params=params)
-            resp.encoding = "utf-8"
-            data = resp.json()
-    except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
-        logger.warning("Tencent K 线获取失败 %s: %s", full_code, e)
+    data = _fetch_kline_json(full_code, days, start_from)
+    if data is None:
         return []
 
     return _parse_kline_response(data, full_code)
@@ -344,21 +379,11 @@ def fetch_index_kline(code: str, days: int = 30, start_from: str | None = None) 
 
     days = min(max(days, 5), 2000)  # 上限钳位到实测 2000 天
     full_code = code.strip()
-    url = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-
-    params: dict[str, str | int] = {
-        "param": f"{full_code},day,{start_from or ''},,{days},qfq",
-    }
 
     logger.debug("Tencent 指数 K 线请求: %s, days=%d", full_code, days)
 
-    try:
-        with make_http_client(timeout=_KLINE_TIMEOUT) as client:
-            resp = client.get(url, params=params)
-            resp.encoding = "utf-8"
-            data = resp.json()
-    except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
-        logger.warning("Tencent 指数 K 线获取失败 %s: %s", full_code, e)
+    data = _fetch_kline_json(full_code, days, start_from)
+    if data is None:
         return []
 
     return _parse_kline_response(data, full_code)
