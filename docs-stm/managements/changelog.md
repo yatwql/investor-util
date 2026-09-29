@@ -22,6 +22,16 @@
 - 回归 +7 例（子菜单分发/大小写/返回/无效输入/EOF + 菜单键集与路由 D→`_cmd_config_dir_info`、T→`_cmd_run_doctor`）
 - 文档同步：how-to-use-tui-menu / how-to-start / faq / how-to-config / how-to-config-llm / how-to-use-web-mode / how-to-use-cli-mode / requirements（R-TUI-02 18 项 + §3.2 菜单表 + R-DIAG-05）/ technical（§1.6.3 菜单体系）/ testplan / test-coverage / folders；代码内提示串（`handlers_log` docstring、`features.doctor_check` 说明）同步
 
+### 文档：README 核心亮点与功能特性重梳（v0.11.x 全部特性）
+
+**背景**（用户要求）：README 的亮点表与功能特性章节停留在较早版本，未覆盖 v0.11.x 落地的能力。
+
+**变更**（`README.md` 全文重写，207 → 221 行）：
+- 核心亮点表：7 条重排为「一次持仓三种用法 / 全量报告双格式 / 穿透到真实持仓 / 量化风控成体系 / 真正把 LLM 用成智囊团 / 数据可信度可追溯 / 决策闭环 / 调仓 What-if」
+- 功能特性重分组：报告与行情 / 新闻与数据增强 / LLM 分析 / 投资分析与风控 / 基金评价 / 持仓基本面 / 调仓 What-if / 运维与可观测性 / 隐私与安全
+- 补齐此前缺失：市场情绪、估值分位、市场温度、交易纪律、流动性、尾部风险、候选基金比较、财务指标与财报摘要、信号预消化、确定性信号沉淀、决策跨期反思闭环、正反辩论/条件推理/集中度问答、景气度框架诊断、系统自检、日志可视化、阶段计时、凭据不落产物、00 重叠区按名称消歧、ETF 联接穿透
+- 修正过期内容：图表数与页签分组口径、「17 章」章节编号表述、技术设计文档描述去约束代号
+
 ---
 
 ## 归档
