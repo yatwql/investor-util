@@ -1,5 +1,5 @@
 # 投资复盘助手 — 技术设计
-> 文档版本：0.11.7
+> 文档版本：0.11.8
 
 ## 目录
 
@@ -798,6 +798,9 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 - **只重试传输级**：这类错误多为瞬时抖动，同源重试常即成功，避免过早降级到质量更低的槽位、也避免把偶发抖动累计成熔断（行业分类 push2 的 `Server disconnected`、DataSinking 的偶发断连即属此类）
 - **不重试代码级空结果**：Provider 正常返回但无该代码数据（`None`）时重试毫无意义（同一请求同一答案），且会白耗第三方日配额（DataSinking 免费档 8191 篇/日）
+- **传输级失败必须上抛给链路（provider 层不得自行吞成返回值）**：链路的传输级判据**只认异常**（`_try_provider_fetch` 捕获异常 → `TRANSPORT_FAILURE`），若 provider 把超时/断连 `return None`，链路会当成「代码级空结果」——同源重试不触发、``record_failure`` 不计、诊断文案把「握手超时」报成「返回空」（实测事故：DataSinking SSL 握手超时被记为返回空，既不重试也不熔断，单标的每篇白等 20s）。故 provider 的代码级结果（401/403/404/非 200/非 JSON）返回 `None`，传输级失败**重试耗尽后上抛**；弱链路承装的直连调用方需自行试/except 降级（如 `fetcher/financial_report._fetch_index` → 转备源）
+- **挂起型不重试（避免放大等待）**：区分**快速失败**（连接被拒/重置/DNS 立即失败 → 重试有效）与**挂起**（等到超时 → 重试只会把等待放大成 N × 超时）。判据：本次尝试耗时 ≥ 超时预算 × `HANG_ELAPSED_RATIO`（0.5）即视为「主机不可达」，不再重试、直接交链路失败（计入熔断）；实测：20s 预算下挂起型单请求从 63s（3 次）降到 20s（1 次），持续不可用时靠熔断快速跳过。判据由 `providers/_utils.build_transient_retry_judge` 统一提供，`datasink` / `hithink` / `cninfo` 三者共用
+- **连接级重试脚手架单源**：`providers/_utils.with_connect_retry(request_fn, timeout=…, log_tag=…, label=…, before_attempt=…)` 收敛 `datasink` / `hithink` / `cninfo` 三处的连接级重试（共用 `providers/_utils.CONNECT_RETRY_POLICY`：线性 1s/2s、共 3 次尝试）——耗时统计、挂起判据与警告、重试日志、每次尝试前的限速许可统一在此，各来源差异只用 `log_tag` / `label` / `before_attempt` 表达（避免同一约束复制三份、改一处漏两处）。**无链路承装的直连调用方**在调用点吞异常返回 `None`（如 `cninfo` 三条直连路径）维持降级契约；经链路的 provider 槽由链路承接上抛
 - **次数有界**：每个 Provider 每次调用最多 1 + 1 次请求；仍失败才计入熔断计数器并落下一槽
 - **口径单一来源**：退避算式（固定/线性/指数 + 抖动 + 上限）、尝试次数与「哪些异常算瞬时」由 `core/retry.py` 统一提供（`RetryPolicy` / `is_transient_exception` / `retry_transient`）——链路、各 provider 的连接级重试、akshare 超时重试与 HTTP 429 退避共用同一执行器，差异只用策略参数表达（约束 C26）；「两次请求至少间隔多久」见 `core/throttle.py`（约束 C27）
 
@@ -974,7 +977,7 @@ fetcher/
 
 #### 2.4.1 00 代码降级
 
-**问题**：OTC 基金代码与 A 股代码前缀重叠（均以 `00` 开头），`is_a_share_code()` 无法区分。`price.py` 和 `portfolio_history.py` 需要"先股票链路，失败后基金链路"的双阶段降级。
+**问题**：OTC 基金代码与 A 股代码前缀重叠（均以 `00` 开头），`is_a_share_code()` 无法区分。`price.py` 和 `portfolio_history.py` 需要「先按名称消歧，再降级」。
 
 **判定支持函数**（`core/code_utils.py`）：
 
@@ -982,8 +985,9 @@ fetcher/
 |:-----|:------|:------|
 | `is_otc_code_overlap(code)` | 仅前缀检测（00 开头） | 快速预筛——是否值得尝试基金净值 API |
 | `is_otc_fund_by_name(name, code)` | 名称+代码双维度 | 00 代码+名称含基金关键词→确认为场外基金 |
+| `is_a_share_stock(name, code)` | 名称+代码双维度 | **持仓路由统一入口**：A 股个股（排除 00 重叠区场外基金），历史/分红/行业/估值/扩展数据均以此过滤，禁止只用 `is_a_share_code(code)` |
 
-`_OTC_FUND_NAME_KW = ("混合", "纯债", "短债", "中短债", "利率债", "信用债", "货币", "联接", "增利")`
+`_OTC_FUND_NAME_KW = ("混合", "纯债", "短债", "中短债", "利率债", "信用债", "债券", "指数", "股票", "货币", "联接", "增利")`
 
 **price.py 降级流程**：
 
@@ -992,11 +996,14 @@ fetch_market_data(code, expected_name)
     │
     ▼
 ┌──────────────────────────────────────┐
-│ 代码类型路由                          │
-│ if is_exchange_fund or is_a_share:   │
+│ 代码类型路由（名称优先消歧）           │
+│ if is_otc_code_overlap(code) and     │
+│    is_otc_fund_by_name(name, code):  │
+│   data_type = "price_fund_otc"       │←── 直达: eastmoney → sina_fund
+│ elif is_exchange_fund or is_a_share: │
 │   data_type = "price_stock"          │←── 主链路: tencent → sina
 │ else:                                │
-│   data_type = "price_fund_otc"       │←── 直达: eastmoney
+│   data_type = "price_fund_otc"       │
 │                                      │
 │ _needs_degrade = (data_type=="price_stock" AND code.startswith("00"))
 └────────────┬─────────────────────────┘
@@ -1027,6 +1034,8 @@ fetch_market_data(code, expected_name)
 ```
 
 **关键设计保障**：
+- **价格缓存键按路由分域**：`price_stock_{code}` / `price_fund_otc_{code}`。00 重叠区同一代码可能是两只不同证券（`002943` 既是深市股票「宇晶股份」也是场外基金「广发多因子」），共用键会让先取到的路由污染另一路由；而收市后基金走 CACHE_ONLY 只读缓存，一旦串味即成持久错误值（实测：基金成分股取扩展数据时把宇晶股份 28.98 写进共享键，基金被读成 28.98）。
+- **持仓路由统一以名称消歧**：历史 K 线（`portfolio_history` / `_report_factor_metrics`）、分红（`category` / `html_builders` / `cache.operations`）、行业（`batch_fetch_industry_data` 调用方预过滤 / `_get_industry_avg_pe` / `news_correlation`）、估值分位（`orchestrator`）、风格扩展数据（`fund_style_classify`）、资产构成图兜底（`chart_data_builder`）一律用 `is_a_share_stock(name, code)` 过滤，不再只用代码前缀。
 - 主链路成功时永不触达降级，零误判风险
 - 降级成功/失败均有日志区分（含资产名称和期望名称）
 - `portfolio_history.py` 中 `fetch_with_incremental_fallback()` 对返回空列表的首个 provider 同样执行递补，非简单返回
@@ -2845,7 +2854,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 **限速与配额护栏**：每次 HTTP 请求前经 `RateLimiter`（`core/throttle.py`）以「间隔 = 1/每秒上限」限速（免费档 3 请求/秒；付费档 31）；日配额计数存 `data/state/datasink_quota.json`，超限即停并告警。**免费档无批量端点、必然逐篇请求**，故限速必须落在 provider 每次请求前（批量调度器层挡不住单条调用）。并发取数由 `batch.datasink_workers` 控制（**默认 2**，免费档批量上限 ≤3），速率仍由 provider 兜底。
 
-**降级与合规**：401/403/429/非 200/网络不可达均返回空并按代码级降级（不计传输级熔断）；单标的失败进失败清单；`available=False` 时写占位。返回对象含披露平台归属字段 `source`，报告逐行标注（再分发时保留）。
+**降级与合规**：**传输级**失败（网络不可达/连接超时）经连接级重试（线性 1s/2s，共 3 次）后**上抛**，由链路计入同源重试与熔断；**代码级**结果（401/403/429 重试后仍非 200/非 JSON）返回空、不计传输级熔断。单标的失败进失败清单；`available=False` 时写占位。返回对象含披露平台归属字段 `source`，报告逐行标注（再分发时保留）。
 
 **缓存**：报告元数据与章节正文均按月（30 天；`report_datasink_index_` / `report_datasink_doc_`），随菜单缓存命令与 TTL 管理。**数据契约** `financial_report_digest_data`（附录 H）；语义命名行见 §6.7。
 
@@ -3216,6 +3225,7 @@ load_holdings(filepath)
 | | `is_index_fund_by_name(name)` | 指数/ETF 联接/中证/沪深 300 等 | 场外指数基金 |
 | | `is_index_link_by_name(name)` | ETF 联接/联接/链接 | 指数联接基金 |
 | 复合 | `is_etf_by_name_or_code(name, code)` | 名称+代码双维度 | ETF 增强识别 |
+| | `is_a_share_stock(name, code)` | 名称+代码双维度（`is_a_share_code` 且非 00 重叠区场外基金） | 持仓路由「按 A 股个股处理」统一入口 |
 | | `is_otc_fund_by_name(name, code)` | 00 代码+名称含基金关键词 | 00 代码重叠区→场外基金 |
 | | `is_offsite_fund(account)` | 关键词匹配 | 场外基金账户 |
 | | `is_fund_holding(name, code, account)` | 三者联合 | 持仓是否需要基金业绩分析 |
@@ -3653,7 +3663,7 @@ investor-util/
 
 | 键名 | 文件名模式 | TTL | 盘中特殊 | 指纹 | 分组 |
 |:-----|:----------|:---:|:--------:|:----|:-----|
-| `price` | `price_{code}.json` | 24h | 交易时段 30s | — | preload |
+| `price` | `price_{route}_{code}.json` | 24h | 交易时段 30s | — | preload |
 | `index` | `index_{code}.json` | 24h | 交易时段 30s | — | preload |
 | `news` | `news_{md5}.json` | 15 分钟 | — | 新闻源参数+关键词 | refresh |
 | `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | — | A 股+美股指数 | refresh |

@@ -305,6 +305,7 @@ class TestBatchFetchIndustryData(unittest.TestCase):
 
         result = batch_fetch_industry_data(["600900", "AAPL", "00700", "PEP"])
         # AAPL/00700/PEP 被过滤，只调用了 600900（首次失败后重试一次）
+        self.assertEqual(result, {})
         self.assertEqual(mock_fetch.call_count, 2)
         # 600900 两次均返回 None，全空
         self.assertEqual(result, {})

@@ -804,5 +804,23 @@ class TestEnrichKeywordsWithIndustryTags(unittest.TestCase):
         self.assertIn("互联网科技", display, "应包含行业名称")
 
 
+class TestExpandIndustryKeywords:
+    """_expand_industry_keywords 的持仓过滤：只把 A 股个股交给行业链路。"""
+
+    @patch("src.python.fetcher.industry.batch_fetch_industry_data", return_value={})
+    def test_only_a_share_stocks_fed_to_industry(self, mock_batch: MagicMock) -> None:
+        """00 重叠区场外基金 / ETF / 港股均不进入行业关键词扩展（002943 回归）。"""
+        holdings = [
+            Holding("证券", "长江电力", "600900", 100, 10.0),
+            Holding("支付宝-场外基金账户", "广发多因子灵活配置混合", "002943", 2000, 3.6),
+            Holding("证券", "电池ETF", "561910", 1000, 1.0),
+            Holding("证券", "腾讯控股", "00700", 100, 300.0),
+        ]
+
+        nc._expand_industry_keywords(holdings, None, [])
+
+        assert mock_batch.call_args.args[0] == ["600900"]
+
+
 if __name__ == "__main__":
     unittest.main()

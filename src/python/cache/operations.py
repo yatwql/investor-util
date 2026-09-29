@@ -128,10 +128,11 @@ def _refresh_one_fund_cache(fund) -> tuple:
 
 
 def _refresh_industry_cache(holdings: list) -> int:
-    """刷新行业分类缓存。"""
+    """刷新行业分类缓存（按「A 股个股」过滤，排除 00 重叠区场外基金）。"""
+    from src.python.core.code_utils import is_a_share_stock
     from src.python.fetcher.industry import batch_fetch_industry_data
 
-    codes = [h.code.strip() for h in holdings if h.code and h.code.strip()]
+    codes = [h.code.strip() for h in holdings if h.code and h.code.strip() and is_a_share_stock(h.name, h.code.strip())]
     if not codes:
         return 0
     result = batch_fetch_industry_data(codes)
@@ -139,10 +140,11 @@ def _refresh_industry_cache(holdings: list) -> int:
 
 
 def _refresh_dividend_cache(holdings: list) -> int:
-    """刷新股票历史分红缓存。"""
+    """刷新股票历史分红缓存（按「A 股个股」过滤，排除 00 重叠区场外基金）。"""
+    from src.python.core.code_utils import is_a_share_stock
     from src.python.fetcher.akshare import get_dividend_data
 
-    codes = [h.code.strip() for h in holdings if h.code and h.code.strip()]
+    codes = [h.code.strip() for h in holdings if h.code and h.code.strip() and is_a_share_stock(h.name, h.code.strip())]
     if not codes:
         return 0
     result = get_dividend_data(codes)
@@ -316,11 +318,13 @@ def _refresh_extended_cache(holdings: list) -> int:
     Returns:
         需预取的 A 股去重代码数（预取本身为填充 session_cache 的尽力而为操作）。
     """
-    from src.python.core.code_utils import is_a_share_code
+    from src.python.core.code_utils import is_a_share_stock
     from src.python.core.provider_registry import get_registry
     from src.python.report.fund_style_classify import _prefetch_extended_data
 
-    a_share_codes = [h.code.strip() for h in holdings if h.code and h.code.strip() and is_a_share_code(h.code.strip())]
+    a_share_codes = [
+        h.code.strip() for h in holdings if h.code and h.code.strip() and is_a_share_stock(h.name, h.code.strip())
+    ]
     unique = list(dict.fromkeys(a_share_codes))
     if not unique:
         return 0

@@ -11,6 +11,7 @@ import logging
 
 from src.python.core.code_utils import (
     is_a_share_code,
+    is_a_share_stock,
     is_bond_fund_by_name,
     is_etf_by_name_or_code,
     is_hk_stock_code,
@@ -144,7 +145,7 @@ def _load_dividend_data(holdings: list) -> tuple[dict, bool]:
     try:
         from src.python.fetcher.akshare import get_dividend_data
 
-        stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
+        stock_codes = [h.code for h in holdings if is_a_share_stock(h.name, h.code.strip())]
         if not stock_codes:
             return {}, True
         data = get_dividend_data(stock_codes)

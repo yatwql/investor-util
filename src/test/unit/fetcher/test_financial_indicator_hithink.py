@@ -190,3 +190,23 @@ class TestChainOrderAndSeriesFallback:
 
         with mock.patch("src.python.providers.hithink.to_thscode", return_value=""):
             assert fi.fetch_hithink_indicator_series("AAPL") == []
+
+
+@pytest.mark.unit
+@pytest.mark.unit_fetcher
+class TestHithinkTransportFailureGuard:
+    """同花顺多期报表传输级失败（连接级重试耗尽上抛）→ 返回空序列，不中断调用方。"""
+
+    def test_transport_failure_returns_empty(self, monkeypatch, caplog):
+        import httpx
+
+        from src.python.fetcher import financial_indicator as fi
+
+        monkeypatch.setattr(fi.hithink, "to_thscode", lambda code: "600900.SS")
+
+        def _boom(*_a, **_kw):
+            raise httpx.ConnectTimeout("handshake operation timed out")
+
+        monkeypatch.setattr(fi.hithink, "fetch_income_statements", _boom)
+        assert fi.fetch_hithink_indicator_series("600900") == []
+        assert any("同花顺多期报表取数失败" in r.message for r in caplog.records)

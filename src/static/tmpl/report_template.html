@@ -2821,6 +2821,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     </div>
     {% endif %}
 
+    {% if section_visible("llm_usage") %}
     <!-- ═══════════════════════════════════════════════════════ -->
     <!--  LLM API Usage -->
     <div class="section" id="sec-llm_usage" style="order: {{ section_numbers['llm_usage'] }};">
@@ -2940,6 +2941,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         </div>
         {{ render_back_to_top() }}
     </div>
+    {% endif %}
     <!--  FOOTER                                                -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="report-footer" style="text-align: center; padding: 14px 20px; color: var(--text-faint); font-size: 12px;">

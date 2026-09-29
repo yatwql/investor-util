@@ -312,7 +312,7 @@
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
-| `price` | `price_{code}.json` | 24h（交易时段 30s） | — | 股票/基金最新价、昨收 |
+| `price` | `price_{route}_{code}.json` | 24h（交易时段 30s） | — | 股票/基金最新价、昨收（route=stock/fund_otc） |
 | `index` | `index_{code}.json` | 24h（交易时段 30s） | — | 市场指数行情 |
 | `news` | `news_{md5}.json` | 15 分钟 | 新闻源参数 + 关键词 | 多源新闻聚合结果 |
 | `sector_flow` | `sector_flow_{fingerprint}.json` | 15 分钟 | A股+美股指数 | 行业资金流向排名 |

@@ -36,6 +36,7 @@ from typing import Any
 from src.python.core.atomic_write import write_json_atomic
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+from src.python.providers._utils import with_connect_retry
 from src.python.core.datasource_credential import (
     DEFAULT_DATA_KEY_FILE,
     CredentialSpec,
@@ -198,11 +199,40 @@ def _consume_quota() -> bool:
 # ═══════════════════════════════════════════════════════════════
 
 
-def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
-    """带凭据 / 限速 / 配额护栏的 GET；失败返回 None（不抛异常，不计熔断）。
+def _get_with_transient_retry(path: str, query: dict[str, Any]) -> Any:
+    """限速 GET（**每次尝试前**取限速许可）；连接级瞬时失败退避重试，耗尽后**上抛**。
 
-    401/403（凭据无效）、429（限速）、其他非 200 一律记日志并返回 None——
-    这些均属「源不可用」的代码级结果，交由链路按空结果降级，不计入传输级熔断。
+    上抛是刻意设计：链路（``fetcher/chain``）的传输级判据**只认异常**——返回值哨兵不参与
+    （见 ``chain._try_provider_fetch``），若在此吞成 None，链路会把它当成「代码级空结果」：
+    同源重试不触发、熔断与可用性统计不计、诊断文案把 SSL 握手超时说成「返回空」。
+
+    代码级结果（401/403/404/非 200/非 JSON）仍由 ``_request`` 返回 None，不上抛。
+    退避策略/挂起判据/限速许可收敛于 ``providers/_utils.with_connect_retry``（三处连接级
+    重试共用同一脚手架）。
+    """
+    url = f"{_BASE_URL}{path}"
+
+    def _request_once() -> Any:
+        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
+            return client.get(url, params=query, headers=_HEADERS)
+
+    return with_connect_retry(
+        _request_once,
+        timeout=_TIMEOUT,
+        log_tag="datasink",
+        label=path,
+        before_attempt=lambda: _get_limiter().acquire(SOURCE_ID),
+    )
+
+
+def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
+    """带凭据 / 限速 / 配额护栏的 GET。
+
+    两类失败**分开处理**（降级治理口径）：
+      - **传输级**（连接超时/握手超时/断连等）：经 ``providers/_utils.CONNECT_RETRY_POLICY`` 同源退避
+        重试，仍失败则**上抛异常**——由链路计入熔断与同源重试，诊断文案如实展示原因；
+      - **代码级**（凭据无效 401/403、429 重试后仍非 200、404 探测未命中、非 JSON、
+        结构异常）：返回 ``None``，由链路按空结果降级，**不计入熔断**。
     """
     if missing_credential(SOURCE_ID) is not None:
         logger.info("[datasink] 未配置凭据，跳过请求 %s", path)
@@ -213,16 +243,11 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if not _consume_quota():
         return None
-    _get_limiter().acquire(SOURCE_ID)
 
     query = {k: v for k, v in params.items() if v not in (None, "")}
     query["apikey"] = key
-    try:
-        with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
-            resp = client.get(f"{_BASE_URL}{path}", params=query, headers=_HEADERS)
-    except Exception as e:  # 网络不可达：返回空，交由链路降级
-        logger.warning("[datasink] 请求失败 %s: %s", path, e)
-        return None
+    # 传输级失败由本函数上抛（连接级重试已耗尽）；调用方（链路/探针/编排）各自降级
+    resp = _get_with_transient_retry(path, query)
 
     if resp.status_code in (401, 403):
         logger.warning("[datasink] 凭据无效（HTTP %d），请检查 API key", resp.status_code)
@@ -232,13 +257,7 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
         delay = _RATE_LIMIT_POLICY.delay_for(1)
         logger.warning("[datasink] 触发限速（HTTP 429），%.1fs 后重试一次", delay)
         time.sleep(delay)
-        _get_limiter().acquire(SOURCE_ID)
-        try:
-            with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
-                resp = client.get(f"{_BASE_URL}{path}", params=query, headers=_HEADERS)
-        except Exception as e:
-            logger.warning("[datasink] 重试失败 %s: %s", path, e)
-            return None
+        resp = _get_with_transient_retry(path, query)
         if resp.status_code != 200:
             logger.warning("[datasink] 重试仍失败（HTTP %d），跳过 %s", resp.status_code, path)
             return None

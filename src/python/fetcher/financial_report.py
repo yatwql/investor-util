@@ -174,7 +174,11 @@ def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str,
         _mark_used(f"{INDEX_PREFIX.rstrip('_')}")
         return cached if isinstance(cached, list) else None
 
-    items = datasink.fetch_report_documents(symbol, order="desc", size=_INDEX_SCAN_SIZE)
+    try:
+        items = datasink.fetch_report_documents(symbol, order="desc", size=_INDEX_SCAN_SIZE)
+    except Exception as e:  # 传输级失败（连接级重试已耗尽）→ 走巨潮备源接管
+        logger.warning("[financial_report] %s 主源索引取数失败（%s），转巨潮备源", symbol, e)
+        items = None
     if not items:
         # 主源无该标的 → 巨潮备源接管（仅在此分支，主源可用时零影响）
         code = symbol.split(".", 1)[0]
@@ -197,12 +201,20 @@ def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str,
 
 
 def _fetch_sections(doc_id: int | str) -> list[str] | None:
-    """取该文档的**实际章节名清单**（带缓存）；不可得时返回 None（调用方回退偏好名直取）。"""
+    """取该文档的**实际章节名清单**（带缓存）；不可得时返回 None（调用方回退偏好名直取）。
+
+    传输级失败（连接级重试已耗尽而上抛）同样归入「不可得」：章节清单只是**优选**路径，
+    拿不到就回退偏好名直取，不得因它中断整篇取数。
+    """
     cache_key = f"{SECTIONS_PREFIX}{doc_id}"
     cached = cache_get(cache_key, get_ttl("report", cache_key))
     if isinstance(cached, list):
         return cached
-    sections = datasink.fetch_report_sections(doc_id)
+    try:
+        sections = datasink.fetch_report_sections(doc_id)
+    except Exception as e:
+        logger.warning("[financial_report] 章节清单取数失败（doc=%s）：%s，回退偏好名直取", doc_id, e)
+        return None
     if sections:
         cache_set(cache_key, sections)
         return sections

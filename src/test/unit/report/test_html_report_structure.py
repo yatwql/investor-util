@@ -3,9 +3,9 @@
 覆盖场景：
   - 导航链接 ↔ section 容器一一对应（无断链/无悬空锚点）
   - 所有 section 的 CSS order 值唯一且与 section_numbers 一致
-  - 不可见模块不在导航中出现
+  - 不可见模块不在导航中出现，且其 section 容器不渲染（含 LLM 关闭时的 llm_usage）
   - 自定义 section_order 下的排序正确性
-  - llm_usage 始终强制末位
+  - llm_usage 可见时强制末位，不可见时整章不渲染
 
 边缘/异常测试见 test_html_report_structure_edge.py。
 
@@ -383,19 +383,39 @@ class TestHtmlSectionVisibility(unittest.TestCase):
         self.assertEqual(link_keys, visible)
 
     def test_all_invisible(self):
-        """所有模块不可见 → 导航为空但页面不崩溃。
+        """所有模块不可见 → 导航为空、只渲染无条件的 always 章。
 
-        注：仅 6 个始终显示模块（summary → fund_performance + llm_usage）
-        的 div 是无条件渲染的，其余 10 个模块 div 包裹在
-        {% if section_visible() %} 内，不可见时完全不输出。
+        注：仅 4 个 always 模块（summary / holdings_detail / penetration /
+        fund_performance）的 div 是无条件渲染的；其余章节（含 llm_usage）
+        均包裹在 {% if section_visible() %} 内，不可见时完全不输出。
         """
         soup = self._render_with_visibility(set())
         links = soup.select("nav.section-nav a")
         self.assertEqual(len(links), 0, "全部不可见时导航应为空")
-        # 无条件渲染的 section 容器
-        sections = soup.select("div.section")
-        self.assertGreaterEqual(len(sections), 5, "至少 5 个 always 模块应无条件渲染")
-        self.assertLess(len(sections), 16, "不可见模块的 div 不应渲染")
+        rendered_ids = {sec.get("id", "") for sec in soup.select("div.section")}
+        self.assertEqual(
+            rendered_ids,
+            {f"sec-{k}" for k in _ALWAYS_KEYS},
+            "全部不可见时应只渲染 always 模块的 section 容器",
+        )
+
+    def test_llm_usage_hidden_when_not_visible(self):
+        """llm_usage 不可见（LLM 关闭）时整章不渲染。
+
+        回归：该章曾漏加 {% if section_visible("llm_usage") %} 守卫，LLM 关闭时
+        仍渲染出「无序号标题 + style=\"order: ;\"」，而 order 空值被 CSS 忽略后
+        回退为 0，使该章跳到所有章节之前。
+        """
+        soup = self._render_with_visibility(_ALWAYS_KEYS)
+        self.assertIsNone(soup.find(id="sec-llm_usage"), "llm_usage 不可见时不应渲染 section 容器")
+        self.assertNotIn("order: ;", str(soup), "不应输出空的 CSS order 声明（该章会被排到最前）")
+
+    def test_llm_usage_rendered_last_when_visible(self):
+        """llm_usage 可见时正常渲染，且 order 为其末位序号。"""
+        soup = self._render_with_visibility(_ALWAYS_KEYS | {"llm_usage"})
+        sec = soup.find(id="sec-llm_usage")
+        self.assertIsNotNone(sec, "llm_usage 可见时应渲染 section 容器")
+        self.assertIn(f"order: {self.numbers['llm_usage']}", sec.get("style", ""))
 
 
 # ═══════════════════════════════════════════════════════════════

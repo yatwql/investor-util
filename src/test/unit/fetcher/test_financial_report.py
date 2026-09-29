@@ -176,6 +176,43 @@ class TestFetchSymbolReport:
         assert fr.fetch_symbol_report("600519.SS", sections=("管理层讨论与分析", "财务报告")) is None
 
 
+class TestTransportFailureDegradation:
+    """传输级失败（连接级重试已耗尽而上抛）在编排层的降级行为。
+
+    主源抛异常不得中断整只标的取数：索引失败 → 转巨潮备源；章节清单失败 → 回退偏好名直取。
+    """
+
+    def test_index_transport_failure_falls_back_to_cninfo(self, monkeypatch):
+        import httpx
+
+        def _boom(*_a, **_kw):
+            raise httpx.ConnectTimeout("handshake operation timed out")
+
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
+        monkeypatch.setattr(fr.datasink, "fetch_report_documents", _boom)
+        monkeypatch.setattr(
+            fr.cninfo,
+            "fetch_report_listings",
+            lambda code, **_kw: [{"id": 11, "report_period": "2026-06-30", "source": "cninfo"}],
+        )
+        items = fr._fetch_index("600519.SS")
+        assert items is not None
+        assert [i["id"] for i in items] == [11]
+
+    def test_sections_transport_failure_returns_none(self, monkeypatch, caplog):
+        import httpx
+
+        def _boom(*_a, **_kw):
+            raise httpx.ConnectTimeout("handshake operation timed out")
+
+        monkeypatch.setattr(fr, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(fr, "cache_set", lambda *a, **k: None)
+        monkeypatch.setattr(fr.datasink, "fetch_report_sections", _boom)
+        assert fr._fetch_sections(123) is None
+        assert any("章节清单取数失败" in r.message for r in caplog.records)
+
+
 class TestReportPeriodBacktrack:
     """最新报告缺目标章节时回溯上一份（银行股半年报缺「管理层讨论与分析」）。"""
 

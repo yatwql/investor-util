@@ -40,10 +40,10 @@ def _build_category_data(
     dividend_data: dict = {}
     dividend_success = True
     try:
-        from src.python.core.code_utils import is_a_share_code
+        from src.python.core.code_utils import is_a_share_stock
         from src.python.fetcher.akshare import get_dividend_data
 
-        stock_codes = [h.code for h in holdings if is_a_share_code(h.code.strip())]
+        stock_codes = [h.code for h in holdings if is_a_share_stock(h.name, h.code.strip())]
         dividend_data = get_dividend_data(stock_codes) if stock_codes else {}
         if not dividend_data and stock_codes:
             dividend_success = False

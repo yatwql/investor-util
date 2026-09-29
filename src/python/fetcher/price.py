@@ -44,8 +44,30 @@ def _name_matches(a: str, b: str) -> bool:
 # ── 缓存键 ───────────────────────────────────────────────────
 
 
-def _price_cache_key(code: str) -> str:
-    return f"price_{code}"
+def _price_cache_key(code: str, data_type: str) -> str:
+    """价格缓存键：按路由分域（``price_stock_<code>`` / ``price_fund_otc_<code>``）。
+
+    A 股代码与场外基金代码在 00 区间重叠，同一代码可能是两只不同证券
+    （如 002943 既是深市股票「宇晶股份」也是场外基金「广发多因子」）。
+    若共用一个缓存键，先取到的路由会把行情写进另一路由的缓存而被误用。
+    """
+    route = data_type[len("price_") :] if data_type.startswith("price_") else data_type
+    return f"price_{route}_{code}"
+
+
+def resolve_price_route(code: str, expected_name: str = "") -> str:
+    """返回代码的价格路由（price_stock / price_fund_otc），供缓存分域复用。"""
+    return _route_price_request(code.strip(), expected_name)[0]
+
+
+def price_cache_key(code: str, expected_name: str = "") -> str:
+    """按路由解析价格缓存键（``price_stock_<code>`` / ``price_fund_otc_<code>``）。
+
+    供报告层（``report/market_value.py`` 的 CACHE_ONLY 读取）复用的**公开入口**，
+    避免跨模块引用私有 ``_price_cache_key``。
+    """
+    code = code.strip()
+    return _price_cache_key(code, resolve_price_route(code, expected_name))
 
 
 # ── Provider 映射与 Transformer ──────────────────────────────
@@ -284,18 +306,19 @@ def fetch_market_data(code: str, expected_name: str = "") -> dict[str, Any] | No
         None: 全部接口失败
     """
     code = code.strip()
-    cache_key = _price_cache_key(code)
 
-    # 按代码类型选择数据路由
+    # 按代码类型选择数据路由（缓存键随路由分域，避免同代码跨路由串味）
     data_type, _needs_degrade = _route_price_request(code, expected_name)
 
-    result = _fetch_price_with_cache_refresh(data_type, code, cache_key, expected_name)
+    result = _fetch_price_with_cache_refresh(data_type, code, _price_cache_key(code, data_type), expected_name)
 
     # ── 降级：00 代码在股票链路全失败 → 尝试场外基金链路 ──
     if result is None and _needs_degrade:
         _tag = f"  [{code} {expected_name}]" if expected_name else f"  [{code}]"
         logger.info("[price]%s 股票链路全部失败（该代码可能为场外基金），降级尝试东方财富净值链路", _tag)
-        result = _fetch_price_with_cache_refresh("price_fund_otc", code, cache_key, expected_name)
+        result = _fetch_price_with_cache_refresh(
+            "price_fund_otc", code, _price_cache_key(code, "price_fund_otc"), expected_name
+        )
         if result is not None:
             logger.info("[price]%s 降级成功——通过场外基金链路获取到净值", _tag)
         else:
@@ -312,10 +335,12 @@ def fetch_market_data_cached(code: str, expected_name: str = "") -> dict[str, An
     from src.python.core.provider_registry import NOT_FOUND, get_registry
 
     registry = get_registry()
-    cached = registry.session_cache_get("price", code)
+    # 路由（price_stock / price_fund_otc）作为会话缓存域，避免同代码跨路由串味
+    data_type = resolve_price_route(code, expected_name)
+    cached = registry.session_cache_get(data_type, code)
     if cached is not NOT_FOUND:
         return cached
     result = fetch_market_data(code, expected_name)
     if result and result.get("price", 0) > 0:
-        registry.session_cache_set("price", code, result, source="api")
+        registry.session_cache_set(data_type, code, result, source="api")
     return result

@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from src.python.core.models import Holding
+from src.python.fetcher.price import resolve_price_route
 from src.python.core.provider_registry import get_registry
 from src.python.report import market_value as mv
 
@@ -84,7 +85,7 @@ class TestStrategyMarketClosed:
         """
         _setup_registry()
         # 预填 session cache
-        get_registry().session_cache_set("price", "561910", _TENCENT_DATA, source="test")
+        get_registry().session_cache_set(resolve_price_route("561910", "电池ETF"), "561910", _TENCENT_DATA, source="test")
 
         holdings = [Holding("证券账户", "电池ETF", "561910", 1000.0, 1.0)]
         details = mv._generate_details(holdings, "2026-06-26")
@@ -135,7 +136,7 @@ class TestStrategyCircuitBreaker:
             reg.record_failure(p, "timeout")
             reg.record_failure(p, "timeout")
         # 预填 session cache
-        reg.session_cache_set("price", "561910", _TENCENT_DATA, source="test")
+        reg.session_cache_set(resolve_price_route("561910", "电池ETF"), "561910", _TENCENT_DATA, source="test")
 
         holdings = [Holding("证券账户", "电池ETF", "561910", 1000.0, 1.0)]
         details = mv._generate_details(holdings, "2026-06-26")
@@ -197,7 +198,7 @@ class TestStrategyMixed:
         _setup_registry()
         reg = get_registry()
         # 预填 A 股缓存
-        reg.session_cache_set("price", "561910", _TENCENT_DATA, source="test")
+        reg.session_cache_set(resolve_price_route("561910", "电池ETF"), "561910", _TENCENT_DATA, source="test")
         mock_fetch.return_value = _QDII_DATA
 
         holdings = [
@@ -254,7 +255,7 @@ class TestStrategyLogging:
 
         caplog.set_level(logging.INFO)
         # 预填 session cache
-        get_registry().session_cache_set("price", "561910", _TENCENT_DATA, source="test")
+        get_registry().session_cache_set(resolve_price_route("561910", "电池ETF"), "561910", _TENCENT_DATA, source="test")
 
         holdings = [Holding("证券账户", "电池ETF", "561910", 1000.0, 1.0)]
         mv._generate_details(holdings, "2026-06-26")

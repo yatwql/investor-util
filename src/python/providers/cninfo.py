@@ -36,7 +36,8 @@ from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.core.http_client import make_http_client
-from src.python.core.retry import STRATEGY_FIXED, STRATEGY_LINEAR, RetryPolicy, retry_transient
+from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+from src.python.providers._utils import with_connect_retry
 
 logger = logging.getLogger("invest")
 
@@ -51,8 +52,6 @@ _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; investor-util)"}
 _MIN_INTERVAL = 1.0
 #: 429 限速退避策略（重试一次）
 _RATE_LIMIT_POLICY = RetryPolicy(attempts=2, strategy=STRATEGY_FIXED, base_backoff=2.0)
-#: 连接级瞬时失败重试策略（线性退避 1s、2s；总尝试 3 次）
-_CONNECT_RETRY_POLICY = RetryPolicy(attempts=3, strategy=STRATEGY_LINEAR, base_backoff=1.0)
 
 INDEX_PREFIX = "report_cninfo_index_"
 ORGID_PREFIX = "report_cninfo_orgid_"
@@ -128,33 +127,25 @@ def _with_transient_retry(label: str, do_request: Callable[[], Any]) -> Any:
     （orgId 解析失败 → 公告列表为空 → 备源不可用）；而这三条直接调用路径
     （orgId / 公告列表 / PDF 下载）都**不经 Provider Chain**，拿不到链路的同源重试。
 
-    重试策略与瞬时判据由 ``core/retry.py`` 统一提供；其余异常（如参数/解析错误）
-    属确定性失败，直接降级不重试。
+    连接级重试脚手架（策略/挂起判据/重试日志/尝试计数）收敛于
+    ``providers/_utils.with_connect_retry``；本函数只保留**直连调用方的降级契约**：
+    重试耗尽 / 挂起 / 非瞬时失败 → 记日志并返回 ``None``（cninfo 三条路径无链路承接上抛，
+    故在此吞掉异常）。
     """
     limiter = _get_limiter()
     tried = {"n": 0}
 
-    def _attempt() -> Any:
+    def _before_attempt() -> None:
         tried["n"] += 1
         limiter.acquire(SOURCE_ID)
-        return do_request()
-
-    def _on_retry(failed_attempt: int, delay: float, exc: BaseException | None) -> None:
-        logger.warning(
-            "[cninfo] 连接失败 %s（%s），%.1fs 后重试（第 %d/%d 次尝试）",
-            label,
-            exc,
-            delay,
-            failed_attempt,
-            _CONNECT_RETRY_POLICY.attempts,
-        )
 
     try:
-        return retry_transient(
-            _attempt,
-            policy=_CONNECT_RETRY_POLICY,
-            on_retry=_on_retry,
-            sleep=time.sleep,
+        return with_connect_retry(
+            do_request,
+            timeout=_TIMEOUT,
+            log_tag="cninfo",
+            label=label,
+            before_attempt=_before_attempt,
         )
     except Exception as e:  # 瞬时重试耗尽 / 非瞬时失败：降级为 None（不计熔断）
         suffix = f"（已试 {tried['n']} 次）" if tried["n"] > 1 else ""

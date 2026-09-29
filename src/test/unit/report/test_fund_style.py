@@ -268,6 +268,26 @@ class TestGetIndustryAvgPe(unittest.TestCase):
         self.assertEqual(result, {})
 
     @patch("src.python.fetcher.industry.fetch_industry_data")
+    def test_otc_fund_excluded_when_names_provided(self, mock_fetch_ind):
+        """提供名称时 00 重叠区场外基金不取行业 PE，同代码股票照常取（回归）。"""
+        mock_fetch_ind.side_effect = lambda c: {
+            "600519": {"industry": "白酒", "pe": 25.0},
+            "002943": {"industry": "通用设备", "pe": 30.0},
+        }.get(c)
+
+        # 场外基金名 → 排除
+        result = _get_industry_avg_pe(
+            ["600519", "002943"],
+            names_by_code={"600519": "贵州茅台", "002943": "广发多因子灵活配置混合"},
+        )
+        self.assertIn("600519", result)
+        self.assertNotIn("002943", result)
+
+        # 同代码股票名 → 正常取（不被误排除）
+        stock = _get_industry_avg_pe(["002943"], names_by_code={"002943": "宇晶股份"})
+        self.assertIn("002943", stock)
+
+    @patch("src.python.fetcher.industry.fetch_industry_data")
     def test_even_count_median(self, mock_fetch_ind):
         """偶数只股票 → 中位数取中间两数平均值"""
         mock_fetch_ind.side_effect = lambda c: {

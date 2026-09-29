@@ -46,9 +46,15 @@ _CONTRACT_KEYS = {
 }
 
 
-def _klines(n: int = 90, start: str = "2026-03-01", base: float = 100.0, step: float = 0.3) -> list[dict]:
-    """生成 n 根单调递增的日 K 线（date/close 升序）。"""
-    d = date.fromisoformat(start)
+def _klines(n: int = 90, end: date | None = None, base: float = 100.0, step: float = 0.3) -> list[dict]:
+    """生成 n 根单调递增的日 K 线（date/close 升序），默认以「今天」为末根。
+
+    必须锚定到真实今天：被测函数的停更判定用 ``datetime.now()``，若 fixture 写死
+    绝对起始日，合成 K 线会随执行日期推移而被 ``filter_stale_factor_klines`` 判
+    “停更”剔除，测试将随时间必然误红（时间炸弹）。
+    """
+    last = end or date.today()
+    d = last - timedelta(days=n - 1)
     out: list[dict] = []
     for i in range(n):
         out.append({"date": d.isoformat(), "close": round(base + i * step, 3)})
@@ -58,6 +64,23 @@ def _klines(n: int = 90, start: str = "2026-03-01", base: float = 100.0, step: f
 
 def _mock_reporter() -> MagicMock:
     return MagicMock()
+
+
+class TestMockKlinesFreshness:
+    """防回归：合成 K 线必须锚定「今天」，否则停更判定随执行日期误红（时间炸弹）。"""
+
+    def test_klines_anchored_to_today_and_not_stale(self):
+        """合成 K 线末根为今天，且不触发停更剔除（离线桩下日历回空集，回退排周末近似）。"""
+        from src.python.analysis.style_factor_regression import FACTOR_STALE_TRADING_DAYS
+        from src.python.core.trading_calendar import count_trading_days_elapsed
+
+        last = _klines(n=90)[-1]["date"]
+        assert last == date.today().isoformat(), f"fixture 末根 K 线发布日期应为今天，实际 {last}"
+        age = count_trading_days_elapsed(last, date.today().isoformat())
+        assert age is not None
+        assert age <= FACTOR_STALE_TRADING_DAYS, (
+            f"fixture 末根 K 线距今 {age} 个交易日 > 停更阈值 {FACTOR_STALE_TRADING_DAYS}，会被误剔除"
+        )
 
 
 class TestComputeFactorExposureData:

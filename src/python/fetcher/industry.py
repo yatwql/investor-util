@@ -177,6 +177,10 @@ def batch_fetch_industry_data(codes: list[str]) -> dict[str, dict]:
     非 A 股代码（美股/港股等）自动跳过，不调用 API。
     并发数由配置 `industry_workers` 控制（见 get_batch_worker_count）。
 
+    注：「持仓是否按 A 股个股处理」（排除 `00` 前缀重叠区场外基金）属**调用方路由决策**
+    ——有名称的调用方先用 `core.code_utils.is_a_share_stock(name, code)` 过滤后再传入；
+    本函数内的前缀过滤仅作防御（拦截美股/港股等非 A 股）。
+
     Args:
         codes: 6 位证券代码列表
 

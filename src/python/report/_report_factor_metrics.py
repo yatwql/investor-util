@@ -32,7 +32,7 @@ def _fetch_holding_bars(code: str, name: str, days: int) -> list[dict] | None:
         不支持的类型或全链路失败返回 None。
     """
     from src.python.core.code_utils import (
-        is_a_share_code,
+        is_a_share_stock,
         is_bond_fund_by_name,
         is_exchange_fund_code,
         is_hk_stock_code,
@@ -44,7 +44,7 @@ def _fetch_holding_bars(code: str, name: str, days: int) -> list[dict] | None:
 
     code = (code or "").strip()
     name = (name or "").strip()
-    if is_exchange_fund_code(code) or is_a_share_code(code):
+    if is_exchange_fund_code(code) or is_a_share_stock(name, code):
         bars = fetch_with_incremental_fallback("history_stock", code, days=days)
         # 降级：A 股/OTC 重叠区（00 开头）股票链路空时尝试基金净值链路
         if not bars and is_otc_code_overlap(code):
@@ -214,7 +214,7 @@ def compute_industry_beta_data(
         compute_industry_exposure,
         unavailable_result,
     )
-    from src.python.core.code_utils import is_a_share_code
+    from src.python.core.code_utils import is_a_share_stock
     from src.python.fetcher.index import fetch_index_history
     from src.python.fetcher.industry import batch_fetch_industry_data
 
@@ -224,7 +224,7 @@ def compute_industry_beta_data(
         reporter.info("正在计算行业 Beta 子表...")
 
         # ── 1. A 股持仓行业分类（push2；batch 并行 + 熔断预检） ──
-        a_codes = list(dict.fromkeys(d.code for d in details if is_a_share_code(d.code)))
+        a_codes = list(dict.fromkeys(d.code for d in details if is_a_share_stock(d.name, d.code)))
         industry_map = batch_fetch_industry_data(a_codes) if a_codes else {}
 
         # ── 2. 行业市值聚合（仅取分类成功且市值 > 0 的持仓） ──

@@ -62,16 +62,45 @@ class TestNameMatches(unittest.TestCase):
 
 
 class TestPriceCacheKey(unittest.TestCase):
-    """_price_cache_key 纯函数测试。"""
+    """_price_cache_key / resolve_price_route 纯函数测试。"""
 
-    def _call(self, code: str) -> str:
+    def _call(self, code: str, data_type: str = "price_stock") -> str:
         from src.python.fetcher.price import _price_cache_key
 
-        return _price_cache_key(code)
+        return _price_cache_key(code, data_type)
 
     def test_format(self):
-        """格式为 price_{code}。"""
-        self.assertEqual(self._call("600900"), "price_600900")
+        """格式为 price_{route}_{code}。"""
+        self.assertEqual(self._call("600900"), "price_stock_600900")
+
+    def test_otc_route_has_own_key(self):
+        """场外路由有独立键名。"""
+        self.assertEqual(self._call("011506", "price_fund_otc"), "price_fund_otc_011506")
+
+    def test_overlap_code_stock_and_otc_keys_differ(self):
+        """00 重叠区同一代码的股票/场外路由必须落到不同缓存键（002943 串味回归）。"""
+        stock = self._call("002943", "price_stock")
+        otc = self._call("002943", "price_fund_otc")
+        self.assertEqual(stock, "price_stock_002943")
+        self.assertEqual(otc, "price_fund_otc_002943")
+        self.assertNotEqual(stock, otc, "股票与场外路由不得共用缓存键")
+
+    def test_resolve_route_by_name_disambiguates_overlap_code(self):
+        """002943 名称决定路由：场外基金→price_fund_otc，股票→price_stock。"""
+        from src.python.fetcher.price import resolve_price_route
+
+        self.assertEqual(resolve_price_route("002943", "广发多因子灵活配置混合"), "price_fund_otc")
+        self.assertEqual(resolve_price_route("002943", "宇晶股份"), "price_stock")
+
+    def test_public_price_cache_key_resolves_route(self):
+        """公开入口 price_cache_key 按名称解析路由（供报告层 CACHE_ONLY 复用）。"""
+        from src.python.fetcher.price import price_cache_key
+
+        self.assertEqual(price_cache_key("600900", "长江电力"), "price_stock_600900")
+        self.assertEqual(price_cache_key("002943", "广发多因子灵活配置混合"), "price_fund_otc_002943")
+        self.assertEqual(price_cache_key("002943", "宇晶股份"), "price_stock_002943")
+        # 首尾空白归一化（与 fetch_market_data 的 strip 口径一致）
+        self.assertEqual(price_cache_key("  600900  ", "长江电力"), "price_stock_600900")
 
     def test_different_code(self):
         """不同代码 → 不同键。"""
@@ -181,6 +210,24 @@ class TestFetchMarketData(unittest.TestCase):
         self.assertIn("validate", kwargs)
 
     # ── OTC 三路路由（is_otc_fund_by_name 预判） ──────────────
+
+    @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
+    @patch("src.python.fetcher.price.fetch_with_fallback")
+    def test_cache_key_separated_by_route_for_overlap_code(self, mock_fallback, mock_fresh):
+        """002943 股票与场外路由使用不同缓存键（防串味回归）。
+
+        回归：股票链路（如基金成分股「宇晶股份」取扩展数据）曾把股票价写进
+        共享键 price_002943，随后场外基金 CACHE_ONLY 读到 28.98 而非净值。
+        """
+        from src.python.fetcher.price import fetch_market_data
+
+        mock_fallback.return_value = None
+        fetch_market_data("002943", "广发多因子灵活配置混合")
+        self.assertEqual(mock_fallback.call_args.kwargs["cache_key"], "price_fund_otc_002943")
+        mock_fallback.reset_mock()
+        fetch_market_data("002943", "宇晶股份")
+        # 股票路由失败后仍会降级到场外，但首跳必须是股票专属键
+        self.assertEqual(mock_fallback.call_args_list[0].kwargs["cache_key"], "price_stock_002943")
 
     @patch("src.python.fetcher.price._price_cache_fresh", return_value=True)
     @patch("src.python.fetcher.price.fetch_with_fallback")
@@ -329,7 +376,7 @@ class TestOtcNavBackupSource(unittest.TestCase):
         from src.python.cache import clear as cache_clear
         from src.python.fetcher import price as price_module
 
-        cache_clear(price_module._price_cache_key(code))
+        cache_clear(price_module._price_cache_key(code, price_module.resolve_price_route(code, name)))
         return price_module.fetch_market_data(code, name)
 
     def test_chain_declares_two_slots(self):

@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
-> 文档版本：0.11.7
-> **编号源**：`rf-next = 461`（新增问题取此编号，完成后更新为 +1；已用最大 rf-460，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.11.8
+> **编号源**：`rf-next = 471`（新增问题取此编号，完成后更新为 +1；已用最大 rf-470，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -44,13 +44,13 @@
 > 无待处理项（`rf-420` 已修复，见「已解决问题」区）。
 ## 已解决问题
 
-### 已解决待归档（v0.11.7-dev）
+### 已解决待归档（v0.11.9-dev）
 
-> 暂无（v0.11.7 批次 rf-457 ~ rf-460 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）
+> 暂无（v0.11.8 批次 rf-461 ~ rf-470 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）
 
 ### 归档档案
 
-- [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — rf-380 ~ rf-456（v0.11.0 ~ v0.11.6 批次：v0.11.1~v0.11.3 于 2026-09-18 / 2026-09-24 并入，v0.11.4~v0.11.6 批次（rf-428 ~ rf-456）于 2026-09-26 并入）
+- [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — rf-380 ~ rf-470（v0.11.0 ~ v0.11.8 批次：v0.11.1~v0.11.3 于 2026-09-18 / 2026-09-24 并入，v0.11.4~v0.11.6 批次（rf-428 ~ rf-456）于 2026-09-26 并入，v0.11.7 批次（rf-457 ~ rf-460）于 2026-09-27 并入，v0.11.8 批次（rf-461 ~ rf-470）于 2026-09-29 并入）
 - [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.20（2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
