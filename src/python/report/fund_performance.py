@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from openpyxl.styles import Font
@@ -145,12 +146,24 @@ def _format_return(val: Any) -> float | str:
 
 
 def _format_rank(entry: dict) -> str:
-    """格式化排名为 '排名/总数' 格式。"""
+    """格式化排名为 ``排名/总数``；带数据日期时附注期次以使其可追溯。
+
+    为何附注日期：同类排名与百分位是上游**独立数组**且会各自滞后（实测读到过落后
+    一个很早期次的 ``253`` 同类池），只报数字会让读者无法分辨「这是哪一天的排名」。
+    日期与数值同源（同一数组末位的 ``x``），故不存在额外取数成本。
+
+    Returns:
+        ``"155/362"``；带日期时 ``"155/362（09-27）"``；无数据 ``"--"``。
+    """
     rank = entry.get("rank", "--")
     total = entry.get("total", "--")
     if rank is None or rank == "--" or total is None or total == "--":
         return "--"
-    return f"{rank}/{total}"
+    text = f"{rank}/{total}"
+    data_date = str(entry.get("data_date", "") or "")
+    # 只取 M-D 附注（表格列宽有限；年份在报告「所属交易日」与净值新鲜度中已交代）
+    m = re.match(r"\d{4}-(\d{2})-(\d{2})", data_date)
+    return f"{text}（{m.group(1)}-{m.group(2)}）" if m else text
 
 
 def _calc_rating_comment(rating: str, perf_eval: dict | None, benchmark: str) -> str:

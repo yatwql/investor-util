@@ -383,10 +383,27 @@ class TestFundPerformanceReasonableness(unittest.TestCase):
         self.assertEqual(_format_return("--"), "--")
 
     def test_format_rank_normal(self):
-        """有效排名 → "排名/总数"。"""
+        """有效排名 → "排名/总数"（无数据日期时不附注）。"""
         from src.python.report.fund_performance import _format_rank
 
         self.assertEqual(_format_rank({"rank": 5, "total": 100}), "5/100")
+
+    def test_format_rank_appends_data_date(self):
+        """回归（实测 040046 的 253 快照）：带数据日期时附注期次，使排名可追溯。"""
+        from src.python.report.fund_performance import _format_rank
+
+        self.assertEqual(
+            _format_rank({"rank": 231, "total": 362, "data_date": "2026-09-28"}),
+            "231/362（09-28）",
+        )
+
+    def test_format_rank_ignores_unparsable_date(self):
+        """日期缺失/格式异常 → 只出排名（不得出现空括号或半截日期）。"""
+        from src.python.report.fund_performance import _format_rank
+
+        self.assertEqual(_format_rank({"rank": 5, "total": 100, "data_date": "--"}), "5/100")
+        self.assertEqual(_format_rank({"rank": 5, "total": 100, "data_date": ""}), "5/100")
+        self.assertEqual(_format_rank({"rank": 5, "total": 100, "data_date": "bad"}), "5/100")
 
     def test_format_rank_none(self):
         """None 排名 → "--"。"""
