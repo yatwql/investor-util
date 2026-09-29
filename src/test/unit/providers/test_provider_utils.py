@@ -4,6 +4,10 @@
 与「该文档确实没这一节」（正常业务结果）。载体必须**按线程隔离**（批量取数是多线程），
 且**消费即清**（避免上一次调用的原因串到下一次）。
 
+另有两条防串味护栏（实测 CI 3.11 暴露）：① 链路在每次尝试 provider 前先
+``clear_last_reason()``（防未经消费的残值串到本次诊断）；② conftest 的
+autouse fixture 在每个用例前复位载体（防测试间串味）。
+
 运行：
   pytest src/test/unit/providers/test_provider_utils.py -v
 """
@@ -57,3 +61,50 @@ class TestLastReasonCarrier:
 
         assert seen["child"] == "子线程原因"
         assert pu.take_last_reason() == "", "子线程的原因不得泄漏到主线程"
+
+    def test_clear_last_reason_discards_residue(self):
+        """`clear_last_reason` 丢弃残值（供链路「尝试前先清」使用）。"""
+        pu.set_last_reason("HTTP 500")
+        pu.clear_last_reason()
+        assert pu.take_last_reason() == ""
+
+    def test_stale_reason_does_not_leak_into_next_chain_attempt(self, monkeypatch):
+        """回归：**未消费的残值不得串到下一次链路尝试**（链路「尝试前先清」契约）。
+
+        实测故障：provider 把原因写好后未经链路消费（直连调用 / 命中缓存直接返回）
+        就结束，残值留在本线程载体里；当后续另一个 provider 返回 ``None`` 时，
+        链路读到的会是**上一条命令的失败原因**。
+        """
+        from src.python.fetcher import chain as ch
+
+        # 上一次调用留下的残值（模拟另一个 provider 未经消费的写入）
+        pu.set_last_reason("HTTP 500")
+
+        def _fetch_returns_none(**_kwargs):
+            return None  # 本次 provider 未写原因（真正的「返回空」）
+
+        monkeypatch.setattr(ch, "cache_get", lambda *a, **k: None)
+        monkeypatch.setattr(ch, "cache_set", lambda *a, **k: None)
+        diag = ch.FailureDiagnostics()
+        result = ch.fetch_with_fallback(
+            "price",
+            {"tencent": ("腾讯财经", _fetch_returns_none)},
+            "price_stock_000000",
+            60.0,
+            diagnostics=diag,
+        )
+        assert result is None
+        # 链路尝试前已清残值 → 诊断只反映本次（「返回空」），不带上一次的 HTTP 500
+        assert "HTTP 500" not in diag.summary()
+        assert pu.take_last_reason() == "", "上一条命令的失败原因不得残留到下一次尝试"
+
+    def test_residue_cannot_cross_tests(self):
+        """回归：**测试间不得串味**（conftest 的 ``_auto_reset_last_reason`` 兜底）。
+
+        实测故障：provider 用例直接调 ``datasink``/``cninfo`` 只看返回值、不消费原因，
+        残值留在 worker 主线程槽位，污染同 worker 中下一个读载体的用例（CI 3.11 上
+        ``test_reason_is_thread_local`` 读到 ``'HTTP 500'``）。本用例钉住「进入用例时
+        载体已是干净的」这一由 autouse fixture 保证的不变量。
+        """
+        assert getattr(pu._last_reason, "value", "") == ""
+        assert pu.take_last_reason() == ""

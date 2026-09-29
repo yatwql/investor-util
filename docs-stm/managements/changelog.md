@@ -12,6 +12,31 @@
 
 ---
 
+### 缺陷修复：provider 失败原因载体的残值串味（rf-476，CI 3.11 暴露）
+
+**背景**：GitHub CI 的 `test (3.11)` job 在本次提交后持续失败（3.12/3.13 均绿），失败断言为
+`assert 'HTTP 500' == ''` @ `test_reason_is_thread_local`。诊断方式：将 P0 失败详情输出为
+GitHub annotation（annotation 免授权可读，不必下载日志），定位到具体断言。
+
+**根因**（真产品缺陷，非测试问题）：provider 自陈失败原因的线程本地载体
+（`providers/_utils._last_reason`）**只在 provider 返回 `None` 时被链路消费**
+（`fetcher/chain._try_provider_fetch`）。但 `datasink`/`cninfo` 的用例直接调取数函数、
+只看返回值而不消费原因 → 写入的 `HTTP 500` 残留在该 xdist worker 的主线程槽位，
+污染同 worker 中**下一个**读该载体的用例。仅 3.11 暴露是因为各版本测试分布/顺序不同，
+使「写入方」与「读取方」恰好落到同一 worker（本机 3.11/3.13 均不可稳定重现）。
+
+**变更**：
+- `providers/_utils.py`：新增 `clear_last_reason()`（生产前清除，与消费方 `take_last_reason` 分工）；
+- `fetcher/chain.py::_try_provider_fetch`：**每次尝试 provider 之前**先 `clear_last_reason()`，
+  使「本次读到的原因」不可能是上次未经消费的残值；
+- `src/test/conftest.py`：新增 autouse fixture `_auto_reset_last_reason`（与 `_auto_reset_provider_registry`
+  同习语——模块级可变状态每用例前复位，使用例不依赖执行顺序/worker 分配）；
+- `test_provider_utils.py`：+2 回归（链级残值不串入诊断 / 测试间不串味）。
+
+**验证**：两处修复均验证为 load-bearing（分别移除后对应用例即失败）；`test_provider_utils` 8 passed、
+chain+datasink+cninfo 120 passed；本地 Python 3.11（`uv` 与 `pip` 两套独立环境）`dev-verify`
+3376 passed 连续 3 次稳定。
+
 ### 工程修复：消除 `ruff format` 漂移残留（rf-474）
 
 **背景**：CLAUDE.md 声明「`ruff format --check` + `ruff check` 当前均为零告警基线」，但全仓复核发现

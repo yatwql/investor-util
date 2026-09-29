@@ -182,6 +182,12 @@ def _try_provider_fetch(
         ``TRANSPORT_FAILURE``，原因是一行可读短句（供诊断上屏，不再只进日志）。
     """
     _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
+    # 尝试前先清「失败原因」载体：该载体只在 provider 返回 None 时被消费，若上一次
+    # 调用的原因未经消费就残留（直连调用/缓存命中直接返回），会把「上一条命令的失败
+    # 原因」串到本次诊断上。先清后调即保证本次读到的只可能是本次 provider 写的。
+    from src.python.providers._utils import clear_last_reason as _clear_reason
+
+    _clear_reason()
     try:
         raw = fetch_fn(**kwargs)
     except Exception as e:

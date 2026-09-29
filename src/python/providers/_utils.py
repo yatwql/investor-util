@@ -63,8 +63,25 @@ def set_last_reason(reason: str) -> None:
     _last_reason.value = reason
 
 
+def clear_last_reason() -> None:
+    """清除本线程的失败原因（**链路在每次尝试 provider 之前调用**）。
+
+    为何需要显式清除：载体只在 provider 返回 ``None`` 时被消费（见
+    ``fetcher/chain._try_provider_fetch``）。但 provider 也可能把原因写好后
+    **未经链路消费**就返回非空/抛异常（例如被直连调用、或命中缓存直接返回），
+    此时残留值会污染本线程**下一次**与本调用无关的消费点（表现为「上一条命令
+    的失败原因串到下一条」）。链路在每个 provider 尝试前先清，使「本次原因」
+    与「上次残值」不可能混淆。
+    """
+    _last_reason.value = ""
+
+
 def take_last_reason(default: str = "") -> str:
-    """取出并清除本线程的失败原因（无则返回 ``default``）。"""
+    """取出并清除本线程的失败原因（无则返回 ``default``）。
+
+    与 :func:`clear_last_reason` 的区别：本函数用于**消费方**（读到值即用，
+    消费后即清）；后者用于**生产前**（先清再调 provider，防上次残值混入）。
+    """
     reason = getattr(_last_reason, "value", "")
     _last_reason.value = ""
     return reason or default
