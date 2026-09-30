@@ -18,8 +18,8 @@
 | **测试用例** | — | — | **8,037 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,500** | 含 README.md（221 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 5,279 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **145** | **56,385** | 含 CLAUDE.md（75 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 2 + archive md 132），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,706 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| **项目文档** | Markdown | **145** | **56,414** | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 2 + archive md 132），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,735 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 132 | 45,230 | 各版本 changelog/plan/review-findings 与设计文档归档（132 md 45,230 行） |
 | ├ plan/ | 中间设计文件 | 2 | 363 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档——对照评测方案（171 行）+ 类型化判定通道接入设计（192 行） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -49,7 +49,7 @@ git grep -c "def test_" <rev> -- 'src/test'
 | 辅助脚本（`scripts/*.py`） | 0（当时仅 `launch.sh` / `launch.ps1`） | 37 文件 / 9,975 行 | 新增 |
 | HTML 报告模板（`src/static/tmpl/*.html`） | 0（当时为 `src/tmpl/`：1 个 / 469 行） | 5 文件 / 4,246 行 | 1 → 5 |
 | 架构图示（SVG） | 0 | 3 文件 / 315 行 | 新增 |
-| 文档（`.md`） | 7 文件 / 1,355 行 | 159 文件 / 62,012 行 | 22.7× |
+| 文档（`.md`） | 7 文件 / 1,355 行 | 159 文件 / 62,012 行 | 45.8× |
 | **代码文件合计**（前 5 项） | **43** | **744** | **17.3×** |
 | **代码行合计**（前 5 项） | **13,366** | **212,206** | **15.9×** |
 | **测试用例数**（`def test_` 定义数） | **491** | **7,682** | **15.6×** |
@@ -1101,15 +1101,15 @@ investor-util/
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   ├── v0.11.x/                         # v0.11.x 版本归档（0.11 系列首份）
-│   │   │   ├── archived_changelog.0.11.x.md # v0.11.0 ~ v0.11.5 已发布变更记录
-│   │   │   ├── archived_plan.0.11.x.md    # plan-42 ~ plan-57 完成态记录（含设计文档索引）
-│   │   │   ├── archived_review-findings.0.11.x.md # rf-379 ~ rf-443 已修复记录（v0.11.0 ~ v0.11.5 批次）
+│   │   │   ├── archived_changelog.0.11.x.md # v0.11.0 ~ v0.11.9 已发布变更记录
+│   │   │   ├── archived_plan.0.11.x.md    # plan-42 ~ plan-58 完成态记录（含设计文档索引）
+│   │   │   ├── archived_review-findings.0.11.x.md # rf-380 ~ rf-478 已修复记录（v0.11.0 ~ v0.11.9 批次）
 │   │   │   ├── section-consolidation/     # plan-45 报告章节整合设计归档（设计层 + 实施层）
 │   │   │   │   ├── section-consolidation-design.md    # 设计层：四项合并/可见性模型扩展/约束对照/验收标准
 │   │   │   │   └── section-consolidation-iteration.md # 实施层：命名统一总表/接缝地图/逐批施工单/十轮复盘记录
 │   │   │   ├── prosperity-framework/      # plan-46 景气度框架诊断设计归档（投资分析方法引入，实验性功能）
 │   │   │   │   └── prosperity-framework-design.md # 上游归属与许可/数据可得性映射/六维口径（含两轮修订）/契约/约束对照/验收
-│   │   │   └── hithink-data-source/       # plan-51 同花顺官方数据接入设计归档（五阶段完成态）
+│   │   │   ├── hithink-data-source/       # plan-51 同花顺官方数据接入设计归档（五阶段完成态）
 │   │   │       └── hithink-financial-data-design.md # 覆盖边界/四域接入方案/实测字段与限流/验证计划/架构约束自查标准
 │   │   │   └── dedup-anchor-calibration/  # plan-53 新闻去重锚点校准复核归档
 │   │   │       └── dedup-anchor-calibration.md # 锚点混代证据/当前规则重判分布/原建议逐条核对与处置
@@ -1128,7 +1128,8 @@ investor-util/
 │   │   │   │   └── plan-toc-llm-marking.md  #     TOC/横向导航 LLM 章节标记（复用 --orange-text）
 │   │   │   ├── web-ui/                      #   轻量 Web UI 实施归档（含日志可视化设计）
 │   │   │       ├── plan-web-ui.md              #     轻量 Web UI 计划
-│   │   │       └── plan-web-ui-implementation.md # Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
+│   │   │       ├── plan-web-ui-implementation.md # Web UI 实施拆分设计（评估/约束/拆分/安全/API/阶段）
+│   │   │       └── web-ui-verification-checklist.md # 浏览器人工走查勾选清单（渲染/上传/进度/响应式/按钮态五类 UX 项）
 │   │   │   ├── web-holdings-input-modes/    #   Web 持仓输入模式实施归档
 │   │   │   │   └── plan-web-holdings-input-modes.md # Web 持仓输入模式试算隔离/正式共享实现设计
 │   │   │   ├── web-config-edit/              #   Web 配置编辑实施归档
@@ -1176,7 +1177,7 @@ investor-util/
 ├── pyproject.toml                    # Python 项目元数据
 ├── requirements.txt                  # Python 依赖清单
 ├── .pi/                              # pi 编程助手项目配置（项目级设置，随仓库发布）
-│   └── settings.json                 #   项目级设置：changelog 折叠 / 静默启动 / fullscreen
+│   ├── settings.json                 #   项目级设置：changelog 折叠 / 静默启动 / fullscreen
 │   └── models.json                   #   pi 模型配置（DeepSeek 编程档：temperature 0.0 + maxTokens 收窄；需软链到 ~/.pi/agent/ 生效）
 ├── .editorconfig                     # 编辑器编码规则（*.ps1 + requirements.txt 强制 UTF-8 BOM）
 └── .gitignore                        # Git 忽略规则

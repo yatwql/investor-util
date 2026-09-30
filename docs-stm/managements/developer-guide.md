@@ -61,7 +61,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-semantic-index.py --ci       # 语义命名索引正反向校验
 .venv/bin/python scripts/check-doc-drift.py --ci            # 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵）
 .venv/bin/python scripts/check-test-redundancy.py --ci      # 测试用例冗余与无效（死用例/无断言/完全重复/自证用例/硬编码演进总数）
-.venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）（死用例/无断言/完全重复/自证用例）
+.venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）
 ```
 
 **P1 合入门禁**：`test-runner.py --mode verify`（核心模块单元测试），否则不得 merge。
@@ -754,6 +754,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表） |
 | `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
+| `check-requirement-trace.py` | 测试 | 需求 ID ↔ 验证载体追溯（单段 ID 全域覆盖 / 载体文件存在 / ID 双向一致） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
@@ -954,10 +955,10 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
     `archived_*` 文件**双向**比对（漏列 → 「缺少」；幽灵引用 → 「不存在」）
 13. 管理文档分区纪律：review-findings 未完成/已解决分区互斥且已解决项须在 changelog 有修复记录；
     plan 未完成区不得含 ✅/已归档项；现行 changelog 只允许一个 `-dev` 段头
-15. Provider Chain 降级表：`fetcher/chain.py::_DEFAULT_CHAINS` 的 13 条链 ↔
-    `datasource-reliability.md` §4.2 表逐链**双向**比对（漏链 → 「缺少链路」；幽灵行 → 「无此链」）
 14. Extended Thinking 支持矩阵：手册对比表须覆盖代码支持的全部厂商族、「仅」式预算枚举句须列全、
     默认开思考族须有提示（权威源为 `llm/api_base.py` 的前缀名单）
+15. Provider Chain 降级表：`fetcher/chain.py::_DEFAULT_CHAINS` 的 13 条链 ↔
+    `datasource-reliability.md` §4.2 表逐链**双向**比对（漏链 → 「缺少链路」；幽灵行 → 「无此链」）
 
 ```bash
 .venv/bin/python scripts/check-doc-drift.py                   # 十五项全查
@@ -993,6 +994,19 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 > 删除/合并用例后须同步刷新 `test-coverage.md`（模式/子标记计数）与 `folders.md`（测试文件数/行数/用例数），
 > 两处由 `check-doc-drift.py --with-test-count` 兜底核对。**修法优先级**：名实不符的用例应改成真正跑它名字
 > 声称的场景（补上原本空白的覆盖），而不是改名了事。
+
+**`check-requirement-trace.py` — 需求 ID ↔ 验证载体追溯**
+
+校验 `requirements.md` 的需求 ID 与 `testplan.md` §2.1 追溯表的双向一致：映射表格式齐备、ID 均存在于需求侧、ID 唯一、**已补全域全覆盖**（`_COVERED_DOMAINS` 中每个域的全部 ID 均有载体行）、载体文件真实存在于磁盘。
+
+```bash
+.venv/bin/python scripts/check-requirement-trace.py                 # 全量校验
+.venv/bin/python scripts/check-requirement-trace.py -v              # 详细输出（逐域覆盖进度）
+.venv/bin/python scripts/check-requirement-trace.py --ci            # CI 模式（只输出 文件:描述，退出码 2）
+```
+
+> 覆盖口径：仅识别 `R-<域>-<序号>` 形式的**单段**需求 ID；`requirements.md` §7.2–§7.8.4 的双段子域 ID（如 `R-LLM-GM-01`）
+> 不在本脚本与追溯表范围内。
 
 **`check-task-numbering-hook.py` — Claude Code PostToolUse hook**
 
