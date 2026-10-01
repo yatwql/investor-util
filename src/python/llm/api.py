@@ -19,6 +19,7 @@ from src.python.llm.api_base import (
     _is_effort_model,
     _supports_extended_thinking,
 )
+from src.python.llm.compliance import apply_compliance_guardrails
 from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
     FAIL_REASON_CIRCUIT_OPEN,
@@ -331,6 +332,8 @@ def call_llm(
           全部失败时为 None
     """
     provider_list = llm_config.get("_provider_list")
+    # 合规声明集中注入：单一漏斗覆盖全部 LLM 模块（幂等，见 llm.compliance）
+    system_prompt = apply_compliance_guardrails(system_prompt, role=_infer_module_key(config_field))
     if not provider_list:
         # 无多链配置，回退单 Provider 模式
         return _call_llm_legacy(

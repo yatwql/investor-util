@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import re
+from contextlib import contextmanager
 from datetime import datetime
 from typing import Any
 
@@ -33,6 +34,33 @@ from src.python.providers.tiantian_base import (
 logger = logging.getLogger("invest")
 
 _QUARTER_LOOKBACK = 4
+
+_quarter_walk_anchor: datetime | None = None
+"""季度回溯窗口的锚点时间；None = 当前时间（生产默认）。
+
+仅用于「数据源记录-回放」：录制内容固定在录制当日，而季报窗口按当前日期推进，
+跨季度后回放会先去命中未录制的季度而报 miss。把锚点固定为 cassette 的
+``recorded_at`` 后，**请求形状仍须与录制逐字一致**（漂移照样报 miss），
+只是不再因时间推移而失配。
+"""
+
+
+@contextmanager
+def quarter_walk_anchor(anchor: datetime | None):
+    """在上下文中把季报回溯窗口锚定到指定时间（回放校验用；生产勿用）。
+
+    Args:
+        anchor: 锚点时间；None 表示恢复「按当前时间」行为。
+    """
+    global _quarter_walk_anchor
+    previous = _quarter_walk_anchor
+    _quarter_walk_anchor = anchor
+    try:
+        yield
+    finally:
+        _quarter_walk_anchor = previous
+
+
 """季报年份域回溯的完整季度数。
 
 取值 4（约一年）：定期报告法定披露不晚于报告期结束后 15 个工作日，QDII 因
@@ -251,8 +279,11 @@ def _recent_quarters(n: int = 4) -> list[tuple[int, int]]:
 
     month 取季度末月（3/6/9/12），对应季报 API 参数要求。
     如当前为 2026-07（Q3），则最近完整季度为 2026-06（Q2）。
+
+    锚点优先取 ``_quarter_walk_anchor``（记录-回放时由 ``quarter_walk_anchor``
+    固定为录制时点），否则取当前时间。
     """
-    now = datetime.now()
+    now = _quarter_walk_anchor or datetime.now()
     qe = ((now.month - 1) // 3) * 3  # 0 → 12(prev year), 3, 6, 9
     quarters: list[tuple[int, int]] = []
     y, m = now.year, qe

@@ -173,21 +173,40 @@ def fetch_news(num: int = 100) -> list[dict[str, Any]]:
     all_items: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
 
-    # 1) 财新网（主要渠道）
-    caixin_items = _fetch_from_caixin(num)
+    # 源内接口降级契约：财新为主接口、CCTV 为补充接口，单接口故障不得拖垮整源。
+    # 两个接口内部已各自降级为「失败返回空列表」；此处再兜一层，防止将来编辑
+    # 移除内部兜底后故障向上传播（聚合点显式声明契约 + 降级日志可观测）。
+
+    # 1) 财新网（主接口）
+    try:
+        caixin_items = _fetch_from_caixin(num)
+    except Exception as e:  # noqa: BLE001 — 源内降级契约：主接口异常时降级到补充接口
+        logger.warning("财新接口异常，源内降级为仅 CCTV 渠道: %s", e)
+        caixin_items = []
     for item in caixin_items:
         url = item.get("url", "")
         if url and url not in seen_urls:
             seen_urls.add(url)
             all_items.append(item)
 
-    # 2) CCTV 新闻（补充渠道）
-    cctv_items = _fetch_cctv_news()
+    # 2) CCTV 新闻（补充接口）
+    try:
+        cctv_items = _fetch_cctv_news()
+    except Exception as e:  # noqa: BLE001 — 源内降级契约：补充接口异常不影响主接口结果
+        logger.warning("CCTV 接口异常，源内降级为仅财新渠道: %s", e)
+        cctv_items = []
     for item in cctv_items:
         title = item.get("title", "")
         if title and title not in seen_urls:
             seen_urls.add(title)
             all_items.append(item)
+
+    if not caixin_items or not cctv_items:
+        logger.info(
+            "akshare 新闻源内降级: 财新 %d 条 / CCTV %d 条（其一为 0 即发生了接口级降级）",
+            len(caixin_items),
+            len(cctv_items),
+        )
 
     logger.info("akshare 新闻汇总: 财新 %d 条 + CCTV %d 条 = %d 条", len(caixin_items), len(cctv_items), len(all_items))
 

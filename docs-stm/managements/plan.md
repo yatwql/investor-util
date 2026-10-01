@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.11.10-dev
-> **编号源**：`plan-next = 59`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-58，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 69`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-68，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -48,6 +48,38 @@
 **约束与红线**：① 不得作为用户可选的对话模型（该模型不生成文本）；② 不得做成「生成 + 判定」双供应商级联（无信息增量且多一个中间失败态）；③ 语料含真实持仓与新闻，冻结产物必须落 `docs-stm/tmp/`（git 忽略），仅脱敏样例可入库；④ 类型化通道故障不得拖垮生成链（熔断实例分离）；⑤ 新增配置键须按开关注册表统一纪律登记，默认值保持 `chat` 使缺省行为逐字节不变。
 
 **预估成本**：低（评测脚本 + 模板渲染 + 一个独立客户端模块）；**价值**：中（仅影响一个出厂默认关闭的模块，收益以「更稳的解析 + 可校准概率」为主，不以成本节约为卖点）。
+
+### P3 — 预期实施，有空时安排
+
+> 以下 plan-63 ~ plan-65 共 3 项源自 TradingAgents-CN 仓库研究（详细分析与参考文件见 [`tradingagents-cn-research.md`](../plan/tradingagents-cn-research.md)），均为候选评估非承诺；立项时先定语义名再设计，按开关注册表纪律登记，须补回归测试与 pytest marker，不引入其整体架构（FastAPI/Vue/MongoDB/LangGraph）。
+>
+> 同批的 plan-59（LLM token/成本记账）、plan-60（缓存命中率统计输出）、plan-61（合规免责声明集中注入）、plan-62（数据源自接口降级）已完成（2026-10-01），见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)。
+
+#### 🔲 `plan-63` 复盘报告深度档位
+
+**动机**：LLM 复盘模块成本与用户耐心不匹配，缺成本调节手段。**概要**：提供「简版/标准/深度」三档（实验组，默认关），按档位控制 LLM 调用轮数与输入新闻条数。研究对象实现：TradingAgents-CN 单股研究 5 级深度按参与角色数绑成本的思路。
+
+#### 🔲 `plan-64` LLM 输出后自检清单
+
+**动机**：LLM 复盘报告无生成后质检环节。**概要**：借鉴 `Reflector` 反思机制做简化版——生成后由模型对结论做一致性自检（如「判断与行情数据是否矛盾」），作为输出质检一步；与 plan-55 的确定性模板判定互补。研究对象实现：`tradingagents/graph/reflection.py`。
+
+#### 🔲 `plan-65` 方法级 fallback 显式 preferred/exclude 参数
+
+**动机**：现有备源切换由熔断自动决定，调试指定某源不便。**概要**：借鉴 `get_xxx_with_fallback(preferred_sources=, exclude_sources=)` 形态，调用点可显式指定优先源或排除已失败源。研究对象实现：`app/services/data_sources/manager.py`（价值偏低，随 plan-62 一并评估）。
+
+### P4 — 实验功能
+
+#### 🔲 `plan-66` 智囊团多空双视角辩论结构
+
+**动机**：LLM 复盘为单链生成，缺多空分歧呈现。**概要**：引入「乐观/审慎双视角 + 裁决」结构，报告新增「多空分歧点」小节；成本约翻倍，作为实验组可选开关。研究对象实现：TradingAgents-CN 辩论式工作流（bull/bear researcher → trader → risk → judge），见 [`tradingagents-cn-research.md`](../plan/tradingagents-cn-research.md)。
+
+#### 🔲 `plan-67` Prompt 模板外置与多语言
+
+**动机**：LLM prompt 硬编码在 `src/python/llm/` 各模块，迭代调优需改代码。**概要**：借鉴 `PromptManager`（加载/缓存/渲染 + `set_language`）将模板外置；改动面大、收益一般，低优先。研究对象实现：`core/prompts/manager.py`。
+
+#### 🔲 `plan-68` 多源新闻聚合交叉验证
+
+**动机**：财经新闻热点模块以单源为主，缺交叉验证。**概要**：远期评估多源新闻聚合与同主题交叉验证。研究对象实现：`tradingagents/dataflows/news/`（chinese_finance / realtime_news / google_news 多源聚合）。
 
 ### P4 — 实验功能
 

@@ -16,11 +16,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
 from typing import Any
 
+from src.python.core.cassette import list_cassettes
 from src.python.providers import eastmoney, tencent
 from src.python.providers import sina as sina_provider
 from src.python.providers import tiantian_holdings
+from src.python.providers.tiantian_holdings import quarter_walk_anchor
 
 # 录制中使用的标的（与 src/test/data/cassettes/ 内的实际请求一致）
 _STOCK_CODE = "600519"
@@ -35,13 +38,46 @@ _FEEDER_FUND_CODE = "016055"
 """
 _KLINE_DAYS = 5
 
+
+def _recording_anchor(name: str) -> datetime | None:
+    """取某 cassette 的录制时点（无 ``recorded_at`` 或格式非法返回 None）。"""
+    for entry in list_cassettes():
+        if entry.get("name") != name:
+            continue
+        raw = entry.get("recorded_at") or ""
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+    return None
+
+
+def _anchored_to_recording(name: str, parser: Callable[[], Any]) -> Callable[[], Any]:
+    """把季报回溯窗口锚定到该 cassette 的录制时点后再调解析器。
+
+    季度窗口按当前日期向前循环，而录制内容固定在录制当日：不锚定则跳过一个季度后
+    回放先去请求未录制的季度而报 miss（与上游是否漂移无关的假红）。锚定后请求形状
+    仍须与录制逐字一致，漂移照样报 miss——保留原信号，仅去掉时间依赖。
+    """
+
+    def _run() -> Any:
+        with quarter_walk_anchor(_recording_anchor(name)):
+            return parser()
+
+    return _run
+
+
 CASSETTE_CHECKS: dict[str, Callable[[], Any]] = {
     "tencent_quote": lambda: tencent.fetch_price(_STOCK_CODE),
     "sina_quote": lambda: sina_provider.fetch_price(_STOCK_CODE),
     "tencent_kline": lambda: tencent.fetch_kline(_STOCK_CODE, days=_KLINE_DAYS),
     "fund_nav": lambda: eastmoney.fetch_nav(_FUND_CODE),
-    "fund_holdings": lambda: tiantian_holdings.fetch_fund_holdings(_FEEDER_FUND_CODE),
-    "fund_quarterly_holdings": lambda: tiantian_holdings.fetch_quarterly_holdings(_FUND_CODE),
+    "fund_holdings": _anchored_to_recording(
+        "fund_holdings", lambda: tiantian_holdings.fetch_fund_holdings(_FEEDER_FUND_CODE)
+    ),
+    "fund_quarterly_holdings": _anchored_to_recording(
+        "fund_quarterly_holdings", lambda: tiantian_holdings.fetch_quarterly_holdings(_FUND_CODE)
+    ),
 }
 
 

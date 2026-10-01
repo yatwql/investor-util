@@ -3262,6 +3262,10 @@ make_http_client(timeout=10.0) → httpx.Client
 <!-- semantic-index:start -->
 | 语义 slug | 中文名（文档/UI） | 归入章节 | 决策链环节 | config 开关 |
 |:--|:--|:--|:--|:--|
+| `quarter_walk_anchor` | 季报回溯窗口的时间锚点上下文（记录-回放时固定为 cassette 录制时点，去时间依赖而保留请求形状漂移信号） | 数据源 | 数据获取 | 无 |
+| `apply_compliance_guardrails` | 合规声明集中注入（在 system prompt 尾部幂等叠加「仅供复盘参考、不构成投资建议」，窄判定角色可追加专属约束） | LLM 智能分析 | 内容生成 | 无 |
+| `print_llm_cost_summary` | CLI 收尾 LLM 成本摘要行（调用次数/输入输出 token/模型名，无调用时静默） | CLI 命令行 | 运行收尾 | 无 |
+| `print_cache_hit_summary` | CLI 收尾缓存命中率行（命中/总数/命中率，无缓存读写时静默，0% 亦输出） | CLI 命令行 | 运行收尾 | 无 |
 | `hithink` | 同花顺金融数据服务 provider（A 股行情/财务/基金/情绪面；凭据声明/qps 限速/信封错误码） | 数据源 | 数据获取 | 需凭据源（`data_key.json` 的 `hithink` 节或 `HITHINK_FINANCE_API_KEY`） |
 | `fund_thscode_candidates` | 基金代码 → thscode 候选（补零 + 场内/场外后缀，逐个试到命中） | 基金业绩分析 | 数据获取 | 无 |
 | `HithinkQuoteAdapter` | 同花顺官方行情适配器（行情域第三槽；`last_price`→`price`、`prev_price`→`yesterday_close`，不提供总市值 → None） | 持仓明细 | 数据获取 | 需凭据源（`hithink` 节） |

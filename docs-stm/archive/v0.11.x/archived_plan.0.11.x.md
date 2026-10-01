@@ -257,3 +257,47 @@
 **验收标准**：新增回归 30 例（含 `test_eastmoney_index_edge.py` 边缘文件隔离）；P0 门禁全绿。
 
 **实施记录**：见 `../../managements/changelog.md`「数据源稳定性提升：指数历史双备源 + 重试补齐 + 状态补全（plan-58）」条。
+
+## P3/P4 — 已完成（TradingAgents-CN 借鉴项首批，2026-10-01 归档）
+
+### ✅ `plan-59` LLM token 用量与成本记账 — 已完成（2026-10-01）
+
+**动机**：用户无法感知一次复盘的 LLM 开销。
+
+**缺口分析（关键）**：本仓库**已具备**完整链路——`llm/session.py`（会话级用量累计，区分 claude 风格 `input_tokens`/`cache_read_input_tokens` 与 openai 风格 `prompt_tokens`/`completion_tokens`）、`llm/pricing.py`（模型单价 + DeepSeek 峰谷定价）、`llm/cost_tracker.py`（预算告警与摘要格式化）、报告侧 `report/excel_llm_usage.py` / `report/summary_llm_usage.py` / `report/html_renderers.py` 双端展示。**真实缺口仅为 CLI 控制台无成本摘要行**。
+
+**实施**：新增 `CliProgressReporter.print_llm_cost_summary()`（调用次数 / 输入输出 token / 模型名，`--verbose` 同步 stderr），接入 `_handle_report` 报告完成点；无用量时静默。
+
+**验收**：回归 3 例（无调用静默 / 有用量输出 / `_handle_report` 接线）；P0 门禁全绿。
+
+### ✅ `plan-60` 缓存命中率统计输出 — 已完成（2026-10-01）
+
+**动机**：排查「报告数据为什么没变」需要可见性。
+
+**缺口分析**：`cache/_stats.py` 已有线程安全 hit/miss 计数与 `get_cache_hit_rate()`，且 Excel 用量页签（`summary_llm_usage.py`）与 TUI `cache --stats` 已展示命中率。**真实缺口同样是 CLI 报告完成点无此行**。
+
+**实施**：新增 `CliProgressReporter.print_cache_hit_summary()`（命中/总数/百分比；**0% 亦输出**——全未命中是诊断信号而非无观测），接入报告完成点；无缓存读写时静默。
+
+**验收**：回归 3 例（无观测静默 / 3-1 命中率 75% / 0% 仍输出）。
+
+### ✅ `plan-61` 合规免责声明集中注入 — 已完成（2026-10-01）
+
+**动机**：报告免责声明散落各处、LLM prompt 无统一合规注入点。
+
+**缺口分析**：确认为真实缺口——LLM prompt（`prompts_core.py` 等）无任何投资风险免责约束，而其他模块各自手写声明（`analysis/market_temperature.py`、`report/llm_content.py`、`core/doctor.py`）。
+
+**实施**：新增 `llm/compliance.py`——`COMPLIANCE_CLOSING`（统一声明文本）+ `apply_compliance_guardrails(system_prompt, role)`（幂等叠加 + 角色专属追加项，窄判定角色如 `news_correlation` 追加「不得引申为确定性因果」）；注入点为 `llm/api.py::call_llm` **单一漏斗**（`role` 由 `_infer_module_key(config_field)` 解析），覆盖全部 LLM 模块。缓存指纹由结构化数据计算、不含 prompt 文本 → 注入不改变缓存键（旧缓存产物仍由报告模板层免责声明兜底），故无需 bump 指纹版本。
+
+**验收**：回归 8 例（叠加位置 / 幂等 / 角色追加项 / 未知角色仅通用 / 空 prompt 保护 / 已含声明不重复 / call_llm 接线 / 经漏斗不重复叠加）。
+
+### ✅ `plan-62` 数据源自接口降级 — 已完成（2026-10-01）
+
+**动机**：降级粒度停在「源」层，源内单一接口失败即整源判败。
+
+**缺口分析（关键）**：本仓库**已具备**跨源与源内接口降级——`fetcher/chain.py` 的 Provider Chain（`price_stock: tencent→sina→hithink`、`history_index: tencent→eastmoney→sina→hithink`、`financial_report: datasink→cninfo` 等，含熔断、传输级重试、失败诊断）与 `providers/akshare_news.py` 双接口聚合（财新 + 央视，各自内部已降级为空列表）。**真实缺口**：`fetch_news` 聚合点缺少显式的接口隔离契约与降级日志——一旦将来编辑移除内部兜底，异常会向上传播并丢掉另一接口结果。
+
+**实施**：`fetch_news` 对财新（主）/央视（补充）两接口各自 try/except 隔离，单接口异常降级为仅另一接口结果并记 WARNING（可观测，非静默降级），双接口均失败返回空列表（由 `news_aggregator` 按源记失败），并新增「其一为 0 即发生接口级降级」的 info 日志。
+
+**验收**：回归 4 例（主接口异常降级 / 补充接口异常保留主结果 / 双失败空返回不抛 / 降级 WARNING 日志可观测）。
+
+**红线达成**：① 未新造取数路径与缓存键；② 降级日志可观测、不静默；③ 主接口正常时输出与行为逐字不变；④ 源间与源内降级职责分层清晰（聚合器管源间、provider 管源内）。

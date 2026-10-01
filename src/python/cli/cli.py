@@ -439,6 +439,9 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
     )
 
     reporter.print_timing_summary()
+    # 运行收尾资源摘要：LLM 成本 + 缓存命中率（无 LLM 调用/缓存读写时各自静默）
+    reporter.print_llm_cost_summary()
+    reporter.print_cache_hit_summary()
     return result.exit_code
 
 

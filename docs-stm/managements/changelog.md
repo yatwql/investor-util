@@ -10,6 +10,16 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 新增
+
+- **LLM 合规声明集中注入**：新增 `llm/compliance.py`（`apply_compliance_guardrails` / `COMPLIANCE_CLOSING`）——在 system prompt 尾部幂等叠加「仅供复盘参考、不构成投资建议」约束，窄判定角色（如新闻关联）可经 `role` 追加专属条目；注入点为 `llm.api.call_llm` 单一漏斗，覆盖全部 LLM 模块（新增模块无需各自声明），已含声明的 prompt 不重复叠加，空 prompt 原样返回。缓存指纹由结构化数据计算（不含 prompt 文本），注入不改变缓存键（旧缓存产物仍由报告模板层免责声明兜底）。回归 8 例（幂等/角色追加项/空保护/call_llm 接线）。
+- **CLI 收尾资源摘要行**：报告生成完成后输出两行运行资源摘要——LLM 成本（`print_llm_cost_summary`：调用次数 / 输入输出 token / 模型名）与缓存命中率（`print_cache_hit_summary`：命中/总数/百分比，0% 亦输出）。无 LLM 调用/无缓存读写时各自静默；常规模式进 logging，`--verbose` 同步到 stderr。二者为 `CliProgressReporter` 公开方法（与 `print_timing_summary` 同形），并在同一完成点接入；回归 6 例（含 0% 不静默、无观测静默、`_handle_report` 接线）。
+- **akshare 新闻源内接口降级**：`providers/akshare_news.py::fetch_news` 在聚合点对财新（主）/ 央视（补充）两个接口各自隔离异常——单接口异常降级为仅另一接口结果并记 WARNING 日志（可观测，非静默降级），双接口均失败返回空列表而非抛出，由新闻聚合器按源记录失败。回归 4 例（主接口降级 / 补充接口降级 / 双失败空返回 / 降级日志）。
+
+### 修复
+
+- **cassette 回放的日期时移假红（既有缺陷）**：季报取数的回溯窗口按「当前日期」向前循环（`_recent_quarters`），而 cassette 录制内容固定在录制当日——时间跨过一个季度后，回放会先去请求**未录制**的新季度并报 `CassetteMissError`，导致 `test_cassette_replay.py` 三项与 P0 门禁变红（与上游是否漂移无关）。修复：新增 `providers/tiantian_holdings.py::quarter_walk_anchor` 时间锚点上下文（回放时把窗口锚定到 cassette 的 `recorded_at`）——① pytest 侧由 `conftest.py::_install_cassette_replay` 统一施加（取所声明 cassette 中最新的录制时点）；② CLI `cassettes --verify` 侧由 `fetcher/cassette_checks.py` 的 `_anchored_to_recording` 施加。**锚定后请求形状仍须与录制逐字一致，上游漂移照样报 miss**（信号不弱化，仅去掉时间依赖）；新增回归用例（冻结模块时钟到下一年，断言回放仍解析出录制内容；已实测：去掉锚定即变红）。
+
 ### 文档
 
 - **管理/用户文档一致性核对（rf-479 ~ rf-509，31 项）**：全量核对 10 份管理文档 + 10 份用户手册 + `README.md` 的章节序号、层级、交叉引用与内容数字，逐项修复：

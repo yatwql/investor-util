@@ -57,6 +57,11 @@ class CliProgressReporter(ProgressReporter):
         super().__init__()
         self._verbose = verbose
 
+    @property
+    def verbose(self) -> bool:
+        """是否处于 --verbose 同步输出模式（供同模块辅助函数判断输出通道）。"""
+        return self._verbose
+
     # ── 基础消息输出 ───────────────────────────────────────
 
     def info(self, msg: str) -> None:
@@ -145,3 +150,51 @@ class CliProgressReporter(ProgressReporter):
                 print(line, file=sys.stderr)
 
         records.clear()
+
+    # ── 运行收尾资源摘要 ───────────────────────────────────
+
+    def print_llm_cost_summary(self) -> None:
+        """报告生成完成后输出本次 LLM 调用成本摘要（无可观测调用时不输出）。
+
+        数据来自 ``llm.session`` 会话级用量累计（``track_session_usage`` 在每次
+        provider 调用后写入），经 ``format_session_usage`` 格式化。输出同时进
+        logging（常规模式唯一通道）与 verbose stderr。
+        """
+        from src.python.llm.session import format_session_usage, get_session_usage
+
+        usage = format_session_usage(get_session_usage())
+        if not usage.get("has_usage"):
+            return
+        line = (
+            f"LLM 成本: {usage['cost_display']}"
+            f"（{usage['call_count']} 次调用，"
+            f"输入 {usage['input_tokens']} / 输出 {usage['output_tokens']} tokens"
+            f"，模型 {usage['model_display']}）"
+        )
+        _emit_summary_lines(self, [line])
+
+    def print_cache_hit_summary(self) -> None:
+        """报告生成完成后输出本次运行缓存命中率（无可观测读写时不输出）。
+
+        命中/未命中由缓存引擎在读写路径上累计（线程安全），此处只做格式化输出，
+        不触碰缓存目录。全命中与全未命中均输出——0% 同样是诊断信号。
+        """
+        from src.python.cache import get_cache_hit_rate
+
+        stats = get_cache_hit_rate()
+        total = stats.get("total", 0)
+        if total <= 0:
+            return
+        _emit_summary_lines(self, [f"缓存命中率: {stats['hits']}/{total}（{stats['rate'] * 100:.1f}%）"])
+
+
+# ── 运行收尾资源摘要（LLM 成本 / 缓存命中率） ─────────────────
+
+
+def _emit_summary_lines(reporter: CliProgressReporter, lines: list[str], color: str = _CYAN) -> None:
+    """将收尾摘要行写入 logging，verbose 时同步到 stderr（带颜色）。"""
+    for line in lines:
+        _logger.info(line)
+    if reporter.verbose:
+        for line in lines:
+            print(_clr(line, color), file=sys.stderr)
