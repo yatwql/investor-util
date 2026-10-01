@@ -54,6 +54,7 @@ __all__ = [
     "generate_expert_review",
     "generate_health_check",
     "generate_penetration_deep_analysis",
+    "generate_self_review",
     "generate_debate_procon",
     "_filter_hallucinated_codes",
 ]
@@ -664,3 +665,40 @@ def generate_debate_procon(
         return (pro_text, con_text, None)
 
     return (pro_text, con_text, synthesis_text)
+
+
+def generate_self_review(
+    module_outputs: dict[str, str | None],
+    holdings_details: list[dict] | None,
+    penetrated_assets: list[dict] | None,
+    force: bool = False,
+    http_client: Any = None,
+    llm_config: dict | None = None,
+) -> tuple[str | None, bool]:
+    """生成后自检：对本次各分析模块产出做一次模型层复核。
+
+    走与其余模块相同的骨架（``generate_llm_module``）——缓存键、TTL、尾部标识行、
+    失败原因登记全部复用既有机制；档位/开关判定在调用侧（``llm/self_review.py``）。
+    """
+    from src.python.llm.module_fingerprint import self_review_fingerprint
+    from src.python.llm.prompts import _SYSTEM_SELF_REVIEW, _build_self_review_prompt
+
+    def _fingerprint():
+        return self_review_fingerprint(module_outputs, holdings_details, penetrated_assets)
+
+    def _prompt():
+        return _build_self_review_prompt(module_outputs, holdings_details, penetrated_assets)
+
+    return generate_llm_module(
+        llm_config,
+        "self_review",
+        force=force,
+        http_client=http_client,
+        fingerprint_fn=_fingerprint,
+        system_prompt_default=_SYSTEM_SELF_REVIEW,
+        prompt_builder=_prompt,
+        max_tokens_default=2048,
+        timeout_default=90.0,
+        output_brief_limit=200,
+        holdings_details=holdings_details,
+    )

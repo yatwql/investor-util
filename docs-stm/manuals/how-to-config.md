@@ -25,6 +25,7 @@
 
   // ── C. 数据源与提供商 ──
   "news_top_count": 300,
+  "llm_report_depth": "standard",
   "news_sources": {
     "sina": true,
     "eastmoney": true,
@@ -155,6 +156,7 @@
 | `llm_providers_file` | `data/config/llm_providers.json` | LLM 多 Provider 链式服务配置文件路径，参见 [LLM 配置指引](how-to-config-llm.md) | 手动编辑 |
 | `data_key_file` | `data/config/data_key.json` | 数据源密钥文件路径（**通用**：以 provider 名为节，节内字段默认 `api_key`，如 `{"datasink": {"api_key": "..."}, "hithink": {"api_key": "..."}}`；一个文件容纳多个数据源的 key。各源申请地址见数据源可用性矩阵。环境变量如 `DATASINK_API_KEY` / `HITHINK_FINANCE_API_KEY` 可覆盖对应源） | 手动编辑 |
 | `news_top_count` | `300` | 财经新闻热点与持仓关联分析输出条目上限（各源原始获取量 = max(500, news_top_count × 2)，华尔街见闻硬上限 100 条除外） | 手动编辑 |
+| `llm_report_depth` | `"standard"` | 报告深度档位：`brief`（仅全球政经，采集与调用最少）/ `standard`（按各模块开关参与）/ `deep`（全模块 + 新闻采集不少于 500 条）。档位只**收窄**模块集合与新闻采集规模，**不得打开已关闭的模块**；`brief` 下若与开关交集为空则 LLM 章节以占位呈现。取值非法时按 `standard` 处理并告警 | 手动编辑 |
 | `news_sources` | 见下方 | 各新闻数据源启停开关 | 手动编辑 |
 | `preferred_provider` | `{}` | 各数据类型的首选提供商覆写 | 手动编辑 |
 | `datasink.*` | `{enabled: true, plan: "free", ...}` | DataSinking 数据底座配置：`enabled`（**总开关，默认开**；关闭后所有依赖该底座的分析——财务指标章、真实历史估值分位——**静默回到引入前的报告形态**，不产生任何可感知变化）、`plan`（free/yearly，决定限速与日配额默认值）、`requests_per_second` / `daily_quota`（0=按 plan 自动）、`sections`（取用章节偏好：按顺序在文档实际章节名中子串匹配，命中即取；季报会自动落到「主要财务数据/主要会计数据」）、`max_chars`（摘要截断）、`doc_types`（**文种白名单，空数组 = 不限文种**，默认取最新报告期——半年报/季报通常比年报新）。免费档 3 请求/秒（触发 429 时自动退避重试一次）、8191 篇/日；仅覆盖 A 股 | 手动编辑 |
@@ -162,7 +164,7 @@
 | `market_hour_ttl` | `30` | 交易时段内 market_hour_aware 类型的缓存有效期（秒），最短 30s，最长 86400s。低于 30s 的值在配置校验时告警，运行时自动钳制到 30s | 手动编辑 |
 | `market_hours` | `{start: "09:30", end: "15:00", official_source: true}` | 市场时段配置（见 §market_hours 章节） | 手动编辑 |
 | `cache_ttl.*` | 见下方 | 各缓存类型有效期（秒） | 手动编辑 |
-| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/W/C/F/O/1/2/3/4/P/I/A/S/R/V/H/D/X；其中 `D` 受 `doctor_check` 开关约束，该开关默认开启），启动后光标自动定位 | 手动编辑 |
+| `default_menu_key` | `L` | TUI 菜单缺省选项的快捷键（E/B/L/W/D/1/2/3/4/P/I/A/S/R/V/H/T/X；其中 `T`（系统自检）受 `doctor_check` 开关约束，该开关默认开启），启动后光标自动定位 | 手动编辑 |
 | `prosperity_framework` | 见默认值 | 景气度框架诊断（实验性功能 `prosperity_framework`）：`boom_keywords` / `global_edge_keywords` / `defensive_keywords`（板块与概念关键词表）+ `concentration_target_pct`（前十大集中度目标 %） | 手动编辑 |
 | `report_section_order` | `{}` | 报告模块序号配置。空对象使用默认顺序（17 项）。键=模块标识，值=序号；已配置模块按序号升序在前，未配置模块按默认顺序在后。`llm_usage` 强制末位 | 手动编辑 |
 | `degradation` | `{...}` | 数据降级策略（T2/T3/T4 各层的连续失败阈值、空数据阈值、缓存过期天数，见 §degradation 章节） | 手动编辑 |
@@ -221,7 +223,7 @@
 | `enable_history` | `true` | `config.json` | 组合历史走势与回撤 | 历史走势章节组（持仓快照不受影响，始终自动执行） |
 | `enable_portfolio_evolution` | `true` | `config.json` | 组合演进 | 组合演进章节组（持仓快照不受影响，始终自动执行） |
 | `enable_action` | `true` | `config.json` | 行动建议 | 行动建议章节组（再平衡信号/交易纪律/调仓建议/收益归因，纯算法） |
-| `enabled_llm`（4 个报告模块） | `true` | `llm_settings.json` | 全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析、LLM API 用量 | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
+| `enabled_llm`（4 个报告模块 + 1 个实验模块） | `true` | `llm_settings.json` | 全球政经局势、智囊团深度复盘、持仓体检报告、穿透深度分析、LLM API 用量；`self_review`（生成后自检，**出厂默认 `false`**，开启后每次报告额外调用一次 LLM，对四模块产出做一致性复核并输出【自检清单】附录） | LLM 分析章节组。任一报告模块启用即整体可见，仅 `news_correlation` 开启时不显示 |
 
 > **enable_news 与 news_sources 的区别：** `enable_news` 控制报告章节的可见性——是否在报告中显示新闻相关章节；`news_sources` 控制数据源的启停——报告生成时从哪些新闻提供商获取数据。两者独立配置：`enable_news: true` 并关闭所有 `news_sources` 时章节仍显示但无数据可用；反之开启数据源但 `enable_news: false` 时章节完全隐藏。
 
@@ -308,7 +310,7 @@
 
 快速定位：— [行情/数据类](#行情数据类) — [LLM 分析类](#llm-分析类) — [基金深度分析类](#基金深度分析类) — [系统类](#系统类) — [历史走势类](#历史走势类)
 
-#### 行情/数据类
+##### 行情/数据类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -327,7 +329,7 @@
 | `dividend` | `dividend_{fingerprint}.json` | 30 天 | 持仓+穿透 A 股代码列表 | 股票历史分红汇总 |
 | `benchmark` | `fund_benchmarks.json` | 30 天 | — | 业绩比较基准对照表 |
 
-#### LLM 分析类
+##### LLM 分析类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -336,11 +338,12 @@
 | `llm_global_macro` | `llm_global_macro_{fingerprint}.json` | 24h | A股/美股指数 + 持仓汇总 | 全球政经局势 |
 | `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 |
 | `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 |
+| `llm_self_review` | `llm_self_review_{fingerprint}.json` | 2h | 四个分析模块的产出文本摘要 + 持仓/穿透摘要（**内容寻址**：产出不变即命中） | 生成后自检（⚗ 默认关） |
 | `llm_debate_pro` | `llm_debate_pro_{fingerprint}.json` | 24h | 复用 expert_review 持仓指纹（排除行情波动） | 辩论白脸（实验功能） |
 | `llm_debate_con` | `llm_debate_con_{fingerprint}.json` | 24h | 复用 expert_review 持仓指纹（排除行情波动） | 辩论黑脸（实验功能） |
 | `llm_debate_synthesis` | `llm_debate_synthesis_{fingerprint}.json` | 24h | 复用 expert_review 持仓指纹（排除行情波动） | 辩论综合（实验功能） |
 
-#### 基金深度分析类
+##### 基金深度分析类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -349,7 +352,7 @@
 | `fund_style_snapshot` | `fund_style_snapshot.json` | 30 天 | — | 风格快照（精确键名，无分组） |
 | `extended` | `extended_{code}.json` | 24h | — | 基金风格扩展数据（市值/PE），refresh 组 |
 
-#### 系统类
+##### 系统类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|
@@ -357,7 +360,7 @@
 | `calendar` | `trading_calendar.json` | 14 天 | — | A 股交易日历（精确键名，无指纹） |
 | `bond_yield` | `bond_yield_rf` | 24h | — | 无风险利率（国债收益率；精确键名，无指纹） |
 
-#### 历史走势类
+##### 历史走势类
 
 | 键名 | 文件名模式 | 默认 TTL | 指纹来源 | 说明 |
 |------|-----------|:--------:|----------|------|

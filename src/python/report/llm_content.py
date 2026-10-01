@@ -83,6 +83,11 @@ def _strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text).strip()
 
 
+# 公开别名：同级报告模块（Excel 用量页签等）需从 HTML 取纯文本时统一调用本函数，
+# 不重写一份剥离逻辑（块级标签→换行的口径必须单源，否则两处分行行为漂移）。
+strip_html = _strip_html
+
+
 # 块级 HTML 标签（含自闭合 <br>/<hr>），用于将 LLM 内容分段写入 Excel 单元格
 _BLOCK_TAG_RE = re.compile(
     r"(<p\b[^>]*>.*?</p>|<li\b[^>]*>.*?</li>|<div\b[^>]*>.*?</div>|"

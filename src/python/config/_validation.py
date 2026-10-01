@@ -165,6 +165,25 @@ def _validate_news_top_count(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_llm_report_depth(config: dict, issues: int) -> int:
+    """校验报告深度档位取值（非法时运行时按 standard 档回落并告警，此处仅登记问题）。"""
+    raw = config.get("llm_report_depth")
+    if raw is None:
+        return issues
+    from src.python.llm.depth_profile import REPORT_DEPTH_DEFAULT, REPORT_DEPTH_LEVELS
+
+    valid = isinstance(raw, str) and raw.strip().lower() in REPORT_DEPTH_LEVELS
+    if not valid:
+        logger.warning(
+            "config.json llm_report_depth = %r 不是合法档位（可选 %s），将按 %s 档处理",
+            raw,
+            " / ".join(REPORT_DEPTH_LEVELS),
+            REPORT_DEPTH_DEFAULT,
+        )
+        issues += 1
+    return issues
+
+
 def _validate_cache_ttl(config: dict, issues: int) -> int:
     cache_ttl, issues = _section(config, "cache_ttl", dict, "所有缓存 TTL 将使用默认值", issues)
     if cache_ttl is _MISSING:
@@ -634,6 +653,7 @@ def validate_config(config: dict | None = None) -> int:
     issues = 0
     issues = _validate_string_configs(config, issues)
     issues = _validate_news_top_count(config, issues)
+    issues = _validate_llm_report_depth(config, issues)
     issues = _validate_cache_ttl(config, issues)
     issues = _validate_news_sources(config, issues)
     issues = _validate_preferred_provider(config, issues)

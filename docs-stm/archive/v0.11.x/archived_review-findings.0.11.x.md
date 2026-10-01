@@ -164,3 +164,25 @@
 | **rf-471** | **TUI 主菜单目录配置入口分散 + 与系统自检争用 `[D]`**（用户要求「增加 [D] 配置目录信息，把 [C]/[F]/[O] 变成其二级选项」）：持仓目录 / 持仓文件名 / 报告输出目录三个同属「路径配置」的入口平铺在主菜单（占 3 个键位），而系统自检占用 `[D]`，二者语义冲突 | ① `tui_menu.MENU_ITEMS`：三项合并为 `[D] 配置目录信息`（20 → 18 项），系统自检键 `D` → `T`（`FEATURE_GATED_ITEMS` 同步）；② `handlers_config._cmd_config_dir_info()`：独立子菜单循环（`[C]`/`[F]`/`[O]` + `[B]` 返回，大小写归一、无效输入重提示、EOF/Ctrl+C 安全返回），子项在调用时取 `handlers_config` 模块全局（可打桩）；③ `tui.py` 回调绑定与 `default_menu_key` 注释同步；④ 回归 +7 例（子菜单分发/大小写/返回/无效输入/EOF，菜单键集与路由 D→`_cmd_config_dir_info`、T→`_cmd_run_doctor`）；⑤ 文档同步：how-to-use-tui-menu / how-to-start / faq / how-to-config(-llm) / how-to-use-web-mode / how-to-use-cli-mode / requirements（R-TUI-02 18 项 + §3.2 菜单表 + R-DIAG-05）/ technical（菜单体系表）/ testplan / test-coverage / folders；代码内提示串（`handlers_log` docstring、`features.doctor_check` 说明）同步 |
 | **rf-472** | **巨潮备源（cninfo）的三处取数缺陷：PDF 用元数据超时、不可达主机反复白等、失败原因丢失**（用户贴日志问「所以其实是拿不到信息的么？」）：① `_get_bytes` 与元数据接口共用 `_TIMEOUT = 20.0`，而公告 PDF 是完整年报原文（几十 MB）→ 慢链路下必然「挂起 → 不重试 → 失败」，**从未下成功过**，每次白等一个超时预算；② `cninfo` 是**直连调用（不经 Provider Chain）**，没有会话级熔断——主机不可达时同一轮报告里**每篇文档都重新发起请求、重新白等**（实测 601939 连试 4 次共 160s）；③ provider 返回 `None` 时链路只记笼统的「返回空」，无法区分「源故障」（要排查网络/凭据）与「该文档确实没这一节」（正常业务结果）——本次排查即被误导，实际 DataSinking 主源**完全正常**（直连实测 HTTP 200、626044 篇索引、章节清单可取），是「该季报没有管理层讨论与分析」+ 备源网络不可达共同造成 | ① `cninfo` 新增独立 `_PDF_TIMEOUT = 60.0`，`_get_bytes` 用它（慢链路下年报能真正下下来）；② 新增「主机本会话不可达」短路 `_mark_host_unreachable` / `_is_host_unreachable`（挂起型失败后标记主机，后续请求不发 HTTP 直接失败，把 N × 超时降为 1 次；非超时失败不标记，避免误伤真实可达的主机；`reset_cninfo_unreachable` 支持手动/测试重置）；③ `providers/_utils` 新增**按线程隔离、消费即清**的失败原因载体 `set_last_reason` / `take_last_reason`，`chain._try_provider_fetch` 在 provider 返回 `None` 时读取并**替换笼统的「返回空」**（同时进 `FailureDiagnostics` → 报告数据源矩阵）；`datasink._request` 与 `cninfo` 各分支（无凭据/凭据为空/配额用尽/401-403/429/404 探测/非 200/非 JSON/orgId 未解析/主机不可达/连接超时）逐条自陈原因；④ 回归 +14 例（cninfo PDF 超时预算与会话短路 6、datasink 自陈原因 4、chain 原因透传 2、共享载体线程隔离与消费即清 5）；⑤ 文档：`technical.md` §2.2.1（自陈原因契约 + cninfo 额外护栏）、`datasource-reliability.md`（PDF 超时 / 会话短路 / 可达性取决于本机网络路径）、`testplan.md` R-DATA-07 载体 |
 | **rf-473** | **HTML 报告新闻表在手机窄屏下字段错位、信息易错过**（用户报「财经新闻热点与持仓关联分析里，摘要、关联关键词、LLM 关联分析挤在一起，有些地方错位」）：该表 7 列（有 LLM 分析时）且沿用全局 `table { min-width: 600px }`，手机上横向压缩后各列内容互相挤压换行、列边界肉眼难辨，「摘要 / 关联关键词 / LLM 关联分析」三块黏连在一起 | ① 新闻表加 `.news-table` 类作窄屏规则作用域；② `@media (max-width: 768px)` 下**改为卡片式堆叠**——隐去表头、每行化为一张卡片，单元格转块级并用 `td[data-label]::before { content: attr(data-label) }` 生成字段名，序号与标题作卡片头（不显示字段名前缀）、取消 `min-width`；③ 模板补 `news-table` / `news-seq` / `news-title` 类与各字段 `data-label`；④ 回归 +5 例（类名作用域、逐字段 data-label 齐备、窄屏隐表头与堆叠规则、取消 min-width、卡片头规则）；⑤ 文档：`reports-instruction.md` 补「新闻表窄屏卡片布局」说明 |
+
+### v0.11.10 批次（2026-10-01）
+
+> **rf-512**（2026-10-01，既有缺陷）：`test_cassette_replay.py` 的季报回放用例受**日期时移**影响而变红（窗口按当前日期回溯、录制内容固定在录制当日，跨季度即先请求未录制季度报 miss），阻断 P0 门禁。已修复：`quarter_walk_anchor` 时间锚点把窗口固定到 cassette 的 `recorded_at`（pytest fixture 与 CLI 校验两条路径均施加），并补日期时移回归用例（去掉锚定即变红）；请求形状漂移信号未弱化。
+>
+> **rf-519**（2026-10-01，`folders.md`「版本演进对照」两处数据与自述口径不符）：按该节自述的复现方法重跑，发现①最初版本「仓库总行数」记 15,357，而同口径复算为 **15,600**（同口径下最新发布列的 280,397 完全吻合，说明该格为历史上用另一工具写入的错值）；②最新发布列「测试用例数」记 7,682，按该节步骤③（`git grep -c "def test_"`）复算为 **7,678**。已修正，并新增「当前开发版」滚动列 + 口径说明（grep 行数口径 7,757 / 严格行首定义 7,730 / pytest 收集 8,119）。
+>
+> **rf-518**（2026-10-01，bench 文档回填把「未测到」写成 0）：`test-runner --mode bench --update-docs` 的计数表写入器把「0 项执行」也当实测值回填——分阶段模式（`dev-verify`）预检未通过时会跳过测试阶段并返回 0，该 0 被写进 `test-coverage.md`（实测把 `dev-verify` 的 3392 覆盖成 0）。已修：写入器对「0 项执行」保留原值（与「未实测/超时保留原值」同口径）并补回归用例；文档已按修复后实测回填。
+>
+> **rf-515 ~ rf-517**（2026-10-01，本批实现的自查债务）：① 生成后自检的成本明细行缺失（用量总计含它而明细不含 → 行合计与总计对不上），已改为条件追加行；② 自检端到端用例 mock 打在 `skeleton.call_llm`，绕过了 `api.call_llm` 的合规注入点导致断言失真，已下移到 provider 层；③ 私有跨模块导入（`_strip_html`）与 akshare 降级日志措辞不准，已分别改为公开别名与中性 debug 描述。详见 changelog「修复（实现自查发现的债务）」条。
+>
+> **rf-513**（2026-10-01，TUI 菜单测试写死逐条模块清单）：`test_filter_hides_legacy_debate_modules` 以字面量集合断言菜单模块清单，注册表新增一个 LLM 模块（生成后自检）即变红——属「测试真值不是单一来源」的同类问题。已改为结构导出断言（注册表全集 ⊖ 菜单隐藏集）并补结构约束，新增模块不再触发该用例。
+>
+> **rf-514**（2026-10-01，模板结构用例的既有写法）：`test_section_count` 把模板 `.section` 容器数写死为常量。本次为生成后自检加区块时触发；处置上**刻意不改该常量**——自检区块改为「附录区块」形态（不占 `section-title` 编号、不参与目录导航），既符合「自检是附录而非独立分析章」的语义，也避免把可增长的模板结构计数固化进断言。
+>
+> **rf-510**（2026-10-01，TradingAgents-CN 借鉴项落地）：外部仓库借鉴项立项时**未先核对本仓库现状**，导致 `plan-59`/`plan-60`/`plan-62` 声称的能力（LLM token/成本记账、缓存命中率统计、跨源与源内接口降级链）在本仓库已有成熟实现——已按「先做缺口分析、再补真实缺口 + 测试锁定」修正实施路径，三项均补齐各自剩余缺口并新增回归用例（详细变更见 [`changelog.md`](changelog.md)「新增」段）。教训：借鉴类计划项在立项前先做本仓库现状比对，避免重复造轮子。
+>
+> **rf-511**（2026-10-01）：CLI 收尾摘要初版实现为模块级函数并访问 `reporter._verbose`（外部访问私有属性；被测报告器为 `MagicMock` 时该属性为真值 → 测试中误触发 stderr 输出）——已改为 `CliProgressReporter` 公开方法 + `verbose` 只读属性（与 `print_timing_summary` 同形）。
+>
+> **rf-479 ~ rf-509**（2026-09-30，31 项）管理/用户文档一致性核对批次：章节序号与层级、交叉引用指错、内容数字口径、目录树/格式卫生——均已修复，详细变更见 [`changelog.md`](changelog.md)「文档一致性核对」条目。
+>
+> v0.11.9 批次 rf-471 ~ rf-478 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）

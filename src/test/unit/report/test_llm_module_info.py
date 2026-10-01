@@ -82,3 +82,45 @@ class TestBuildLlmEndpointDisplay(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── 生成后自检的明细行透明性 ────────────────────────────────
+
+
+def test_self_review_row_hidden_when_not_used():
+    """出厂默认关闭且未运行 → 明细表不留空行（零噪声）。"""
+    from src.python.report.llm_module_info import build_llm_module_info
+
+    rows = build_llm_module_info({}, {}, skip_unknown=True)
+    assert "self_review" not in [r["key"] for r in rows]
+
+
+def test_self_review_row_appears_when_it_ran():
+    """自检实际运行（有用量）→ 必须出现在明细表，否则行合计与用量总计对不上。"""
+    from src.python.report.llm_module_info import build_llm_module_info
+
+    per_module = {
+        "self_review": {
+            "model": "test-model",
+            "input_tokens": 100,
+            "output_tokens": 50,
+            "cost": 0.001,
+            "cached": False,
+            "thinking": False,
+            "endpoint": "",
+        }
+    }
+    rows = build_llm_module_info({}, per_module, skip_unknown=True)
+    entry = next(r for r in rows if r["key"] == "self_review")
+    assert entry["status"] == "success"
+    assert entry["total_tokens"] == 150
+    assert entry["cost"] == 0.001
+
+
+def test_self_review_row_appears_with_skip_reason():
+    """自检被跳过但留下原因（如无有效内容）→ 也要上屏，读者才知道它为何缺席。"""
+    from src.python.report.llm_module_info import build_llm_module_info
+
+    rows = build_llm_module_info({"self_review": "无有效内容可自检"}, {}, skip_unknown=True)
+    entry = next(r for r in rows if r["key"] == "self_review")
+    assert entry["status"] == "failed"

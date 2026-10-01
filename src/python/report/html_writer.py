@@ -73,6 +73,13 @@ from src.python.report.html_jinja_env import _ENV  # noqa: E402
 # ── 辅助函数 ──────────────────────────────────────────────
 
 
+def _self_review_block() -> str | None:
+    """取本轮生成后自检区块 HTML（零参 pull；无产出返回 None）。"""
+    from src.python.llm.self_review import get_self_review_block
+
+    return get_self_review_block()
+
+
 def _safe_build_data_status(builder, *args, label: str = "", **kwargs) -> DataStatus:
     """安全构建数据状态，异常时返回空字典并记录日志。
 
@@ -183,6 +190,8 @@ def _render_template(
     now_str: str,
     today_str: str,
     trading_day: str,
+    # 生成后自检区块 HTML（与其余 LLM 内容同层传入）
+    self_review_block: str | None = None,
     total_mv: float,
     total_cost: float,
     total_profit: float,
@@ -312,6 +321,9 @@ def _render_template(
         expert_review=expert_review_content,
         health_check=health_check_content,
         penetration_deep=penetration_deep_content,
+        # 生成后自检区块：零参 pull（产物由 llm/self_review 运行作用域载体承载），
+        # 开关关闭或无产出时为 None，模板整段不渲染（零噪声）
+        self_review_block=_self_review_block(),
         llm_session_usage=_llm_session_usage,
         module_labels=get_llm_module_names(),
         module_disabled=module_disabled,
@@ -624,6 +636,7 @@ def write_html_report(
         expert_review_content=expert_review_content,
         health_check_content=health_check_content,
         penetration_deep_content=penetration_deep_content,
+        self_review_block=_self_review_block(),
         _llm_session_usage=_llm_session_usage,
         _llm_module_info=llm_module_info,
         llm_endpoint=llm_endpoint,

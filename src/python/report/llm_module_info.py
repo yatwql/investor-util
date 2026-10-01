@@ -25,6 +25,32 @@ except ImportError:
     FAIL_REASON_API_ERROR = FAIL_REASON_NETWORK_ERROR = FAIL_REASON_TIMEOUT = FAIL_REASON_CIRCUIT_OPEN = "error"
 
 _MODULE_KEYS = ["global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"]
+"""明细行固定枚举的模块。
+
+刻意不直接从注册表枚举：辩论三键（pro/con/synthesis）在注册表中保留但**不应**
+占明细行（它们是智囊团模块的内部阶段）；生成后自检则由 :func:`_module_keys` 按
+「有数据或有状态」条件追加（见该函数）。
+"""
+
+
+def _module_keys(llm_failure: dict, per_module: dict) -> list[str]:
+    """明细行的模块枚举：固定五模块 + （条件）生成后自检。
+
+    生成后自检出厂默认关闭，无条件上屏会在每份报告留下一条空行噪声；但一旦它
+    实际运行（产生用量）或留下了跳过原因，就**必须**上屏——否则用量总计包含它、
+    而明细行不含它，行合计与总计对不上（成本不可追溯）。
+    """
+    from src.python.llm.self_review import SELF_REVIEW_MODULE_KEY
+
+    keys = list(_MODULE_KEYS)
+    if SELF_REVIEW_MODULE_KEY in keys:
+        return keys
+    has_data = SELF_REVIEW_MODULE_KEY in (per_module or {})
+    has_status = bool(get_llm_module_failure_reason(llm_failure or {}, SELF_REVIEW_MODULE_KEY))
+    if has_data or has_status:
+        keys.append(SELF_REVIEW_MODULE_KEY)
+    return keys
+
 
 _DISPLAY_REASON: dict[str, str] = {
     FAIL_REASON_NOT_CONFIGURED: "LLM 未配置",
@@ -124,7 +150,7 @@ def build_llm_module_info(
     """
     names = get_llm_module_names()
     result: list[dict[str, Any]] = []
-    for mk in _MODULE_KEYS:
+    for mk in _module_keys(llm_failure, per_module):
         entry: dict[str, Any] = {"key": mk, "name": names.get(mk, mk)}
         reason = get_llm_module_failure_reason(llm_failure, mk)
         pm = per_module.get(mk)

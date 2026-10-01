@@ -216,6 +216,9 @@ def prepare_report_data(
     # 使占位构建不读写纪律静默文件，保证最终构建为唯一静默写入方。
     action_data = build_action_data(holdings_details, total_mv, persist_silence=False)
 
+    # 深度档位：新闻采集条数按档位下界修正（延迟导入避免报告层与 LLM 层在导入期互相牵连）
+    from src.python.llm.depth_profile import effective_news_limit, resolve_depth_profile
+
     return {
         "details": details,
         "total_mv": total_mv,
@@ -229,7 +232,7 @@ def prepare_report_data(
         "holdings_details": holdings_details,
         "today_str": today_str,
         "output_dir": config.get("output_dir", "reports"),
-        "news_top_count": int(config.get("news_top_count", 300)),
+        "news_top_count": effective_news_limit(int(config.get("news_top_count", 300)), resolve_depth_profile(config)),
         # 组合风险指标（年化波动率/最大回撤/夏普比率等，需 history_data 计算后填充）
         "risk_metrics": {},
         # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键；

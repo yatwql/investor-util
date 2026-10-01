@@ -202,21 +202,20 @@ class TestFilterMenuLlmModules(unittest.TestCase):
     """菜单层隐藏辩论三模块（注册表条目保留）。"""
 
     def test_filter_hides_legacy_debate_modules(self):
-        """过滤后仅剩标准模块，不含辩论三模块。"""
-        from src.python.core.registry import get_llm_module_names
-        from src.python.tui.tui_menu import filter_menu_llm_modules
+        """过滤后仅剩标准模块，不含辩论三模块。
 
-        filtered = filter_menu_llm_modules(get_llm_module_names())
-        self.assertEqual(
-            set(filtered.keys()),
-            {
-                "global_macro",
-                "expert_review",
-                "news_correlation",
-                "health_check",
-                "penetration_deep",
-            },
-        )
+        期望集合由「注册表全集 ⊖ 菜单隐藏集」结构导出（不写死逐条清单）：
+        新增模块时本用例不需改，仅当**隐藏集**变化才应重审。
+        """
+        from src.python.core.registry import get_llm_module_names
+        from src.python.tui.tui_menu import LLM_MENU_HIDDEN_KEYS, filter_menu_llm_modules
+
+        module_names = get_llm_module_names()
+        filtered = filter_menu_llm_modules(module_names)
+        self.assertEqual(set(filtered.keys()), set(module_names) - set(LLM_MENU_HIDDEN_KEYS))
+        for hidden in LLM_MENU_HIDDEN_KEYS:
+            self.assertNotIn(hidden, filtered)
+            self.assertIn(hidden, module_names, "隐藏集成员必须仍在注册表内（缓存 TTL 依赖）")
 
     def test_registry_keeps_legacy_debate_modules(self):
         """注册表仍保留辩论三模块（缓存 TTL/前缀清理依赖），未被删除。"""

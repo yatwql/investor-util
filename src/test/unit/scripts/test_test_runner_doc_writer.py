@@ -382,6 +382,18 @@ class TestModeCountTableUpdate:
         assert "| `scenario` | 旧值 | ~30s |" in updated
         assert "| `all` | 旧值 | ~30s |" in updated
 
+    def test_count_zero_executed_preserves_original_value(self, runner_script):
+        """0 项执行（分阶段模式预检失败/跳过）不得写成「覆盖项数 0」。
+
+        缺陷场景：bench 序列里某分阶段模式（如 dev-verify）因预检未通过而跳过测试、
+        结果为 0 项——照写会把「这次没测到」静默固化成「覆盖项数 0」污染文档。
+        """
+        doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
+        results = [_res("dev-verify", 1.0, passed=0, failed=0, skipped=0, errors=0)]
+        updated = runner_script._update_test_coverage_doc(doc, _MACHINE_INFO, results)
+        assert "| `dev-verify` | 旧值 | ~30s |" in updated, "0 项执行必须保留原值"
+        assert "**0**" not in updated
+
     def test_count_table_missing_marker_raises(self, runner_script):
         doc = _sample_doc(_env_table(col2="旧值"), _duration_table(col2="旧值"))
         doc = doc.replace("<!-- mode-count-table:start -->", "")

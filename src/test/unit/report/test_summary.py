@@ -1302,3 +1302,43 @@ class TestWriteModuleDataRows(unittest.TestCase):
         self.assertIn("¥", str(rows[self.start_row + 1][8]))
         # 成功行 Thinking
         self.assertEqual(rows[self.start_row + 1][10], "✓")
+
+
+# ═══════════════════════════════════════════════════════════
+#  _init_llm_usage_sheet — 非默认深度档位自述
+# ═══════════════════════════════════════════════════════════
+
+
+class TestInitLlmUsageSheetDepthLine(unittest.TestCase):
+    """LLM 用量页签顶部：非默认深度档位须自述，默认档保持零噪声。"""
+
+    def setUp(self):
+        import openpyxl
+
+        self.wb = openpyxl.Workbook()
+        self.ws = self.wb.active
+
+    def _sheet_texts(self) -> list[str]:
+        return [str(c.value) for row in self.ws.iter_rows() for c in row if c.value]
+
+    def test_default_depth_writes_no_depth_line(self):
+        from src.python.report.summary_llm_usage import _init_llm_usage_sheet
+
+        _init_llm_usage_sheet(self.ws)
+        assert not [t for t in self._sheet_texts() if "深度档位" in t]
+
+    def test_non_default_depth_line_is_written(self):
+        """非默认档位（简版）→ 页签出现含档位显示名的自述行。"""
+        from unittest.mock import patch
+
+        from src.python.llm.depth_profile import DEPTH_PROFILES
+        from src.python.report.summary_llm_usage import _init_llm_usage_sheet
+
+        profile = DEPTH_PROFILES["brief"]
+        # 落点内为函数内延迟导入，故 patch 源模块属性（调用时重新绑定）
+        with patch("src.python.llm.depth_profile.resolve_depth_profile", return_value=profile):
+            _init_llm_usage_sheet(self.ws)
+
+        lines = [t for t in self._sheet_texts() if "深度档位" in t]
+        assert len(lines) == 1
+        assert profile.label in lines[0]

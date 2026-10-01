@@ -569,6 +569,30 @@ class TestHandleReport:
         assert code == _EXIT_SEVERE
         mock_gen.assert_not_called()
 
+    def test_prints_run_resource_summary(self):
+        """报告完成后调用 LLM 成本 + 缓存命中率摘要方法（无调用时各自自行静默）。"""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_reporter = MagicMock()
+        with (
+            patch(
+                "src.python.cli.cli._cli_read_holdings_with_flows",
+                return_value=([MagicMock()], [], []),
+            ),
+            patch("src.python.report.cli_progress.CliProgressReporter", return_value=mock_reporter),
+            patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
+        ):
+            args = MagicMock()
+            args.type = "basic"
+            args.history = "auto"
+            args.force_llm = False
+            args.output = None
+            args.verbose = False
+            code = _handle_report(args, {})
+        assert code == 0
+        mock_reporter.print_llm_cost_summary.assert_called_once()
+        mock_reporter.print_cache_hit_summary.assert_called_once()
+
 
 # ═══════════════════════════════════════════════════════════════
 # _handle_cache_update

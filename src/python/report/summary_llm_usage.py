@@ -16,6 +16,9 @@ from src.python.report.excel_writer import write_title_row
 
 logger = logging.getLogger("invest")
 
+_REVIEW_TITLE = "生成后自检清单"
+_NOTE_FONT = Font(size=9, bold=True, color="666666")
+
 
 def _init_llm_usage_sheet(ws: Any) -> int:
     """初始化 LLM 用量页签内容，返回当前行号。"""
@@ -27,7 +30,31 @@ def _init_llm_usage_sheet(ws: Any) -> int:
         row=row, column=1, value="以下展示本次 LLM 全量生成的 API 调用统计和模块明细，帮助了解 Token 消耗和费用构成。"
     )
     ws.cell(row=row, column=1).font = _SUB_FONT
-    row += 2
+    row += 1
+    # 非默认深度档位自述（默认档不写，保持零噪声）——报告是可脱离本机流转的文件，
+    # 读者须能判断内容是否为非默认档位下的产物。
+    from src.python.llm.depth_profile import non_default_depth_line, resolve_depth_profile
+
+    depth_line = non_default_depth_line(resolve_depth_profile())
+    if depth_line:
+        ws.cell(row=row, column=1, value=depth_line).font = _SUB_FONT
+        row += 1
+    # 生成后自检清单（开关关闭或无产出时不写，保持零噪声）——与实验功能清单同为
+    # 「零参 pull 的运行元信息」模式（产物由 llm/self_review 运行作用域载体承载）。
+    from src.python.llm.self_review import get_self_review_block
+
+    review_block = get_self_review_block()
+    if review_block:
+        ws.cell(row=row, column=1, value=_REVIEW_TITLE).font = _NOTE_FONT
+        row += 1
+        from src.python.report.llm_content import strip_html
+
+        for _line in strip_html(review_block).split("\n"):
+            if _line.strip():
+                ws.cell(row=row, column=1, value=_line.strip())
+                row += 1
+        row += 1
+    row += 1
     return row
 
 

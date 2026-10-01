@@ -445,8 +445,51 @@ def _install_cassette_replay(request):
     if not names or request.node.get_closest_marker("live") is not None:
         yield
         return
-    with cassette_replay(names):
+    # 季报窗口按当前日期向前循环，而录制内容固定在录制当日：把窗口锚定到 cassette
+    # 的 recorded_at，否则跨季度后回放会先去请求未录制的季度而报假 miss（上游是否漂移
+    # 无关）。锚定后请求形状仍须与录制逐字一致，漂移照样报 miss。
+    from src.python.providers.tiantian_holdings import quarter_walk_anchor
+
+    with cassette_replay(names), quarter_walk_anchor(_declared_recording_anchor(names)):
         yield
+
+
+def _declared_recording_anchor(names: list[str]):
+    """取所声明 cassette 中最新的录制时点（无法解析或缺失则 None = 按当前时间）。"""
+    from datetime import datetime
+
+    from src.python.core.cassette import list_cassettes
+
+    wanted = set(names)
+    anchors = []
+    for entry in list_cassettes():
+        if entry.get("name") not in wanted:
+            continue
+        try:
+            anchors.append(datetime.fromisoformat(entry.get("recorded_at") or ""))
+        except ValueError:
+            continue
+    return max(anchors) if anchors else None
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_chain_overrides():
+    """重置调用级数据源覆盖（进程级运行作用域状态，避免测试间污染）。"""
+    from src.python.fetcher.chain import reset_chain_overrides
+
+    reset_chain_overrides()
+    yield
+    reset_chain_overrides()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_self_review_carrier():
+    """重置生成后自检的运行作用域载体（模块级状态，避免测试间污染）。"""
+    from src.python.llm.self_review import reset_self_review
+
+    reset_self_review()
+    yield
+    reset_self_review()
 
 
 @pytest.fixture

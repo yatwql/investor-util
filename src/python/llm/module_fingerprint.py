@@ -40,7 +40,12 @@ from src.python.config.features import is_feature_enabled
 from src.python.core import decision_ledger
 from src.python.core import signal_ledger
 from src.python.core.decision_header import structured_header_cache_suffix
-from src.python.llm.fingerprint import build_llm_fingerprint, compute_fingerprint
+from src.python.llm.fingerprint import (
+    build_llm_fingerprint,
+    compute_fingerprint,
+    extract_stable_holdings,
+    extract_stable_penetration,
+)
 from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
 __all__ = [
@@ -52,6 +57,7 @@ __all__ = [
     "expert_review_fingerprint",
     "health_check_fingerprint",
     "penetration_deep_fingerprint",
+    "self_review_fingerprint",
     "MODULE_FINGERPRINT_BUILDERS",
 ]
 
@@ -302,6 +308,37 @@ def penetration_deep_fingerprint(inputs: ModuleFingerprintInputs) -> str:
         categories=inputs.categories,
         full_penetration=True,
         history_data=inputs.history_data,
+    )
+
+
+def self_review_fingerprint(
+    module_outputs: dict[str, str | None] | None,
+    holdings_details: list[dict] | None = None,
+    penetrated_assets: list[dict] | None = None,
+) -> str:
+    """生成后自检：**内容寻址**指纹——各模块产出文本 + 数据摘要。
+
+    **仅写侧使用**（与辩论三键同形）：自检是生成后一遍，输入是其余模块的产出，
+    不存在「预检侧提前算同一键」的需求，故不进 ``MODULE_FINGERPRINT_BUILDERS``
+    （该表供预检/写两侧共享同一构造，键形为 ``ModuleFingerprintInputs``）。
+
+    覆盖判据仍是「提示词是否真的含该段」：自检提示词由各模块产出正文 + 持仓/穿透
+    摘要构成，三者都进键；产出未变（含全部命中缓存）时键不变 → 自检同样命中缓存。
+
+    Args:
+        module_outputs: 模块名 → HTML 产出（None/空串按缺失处理）。
+        holdings_details: 持仓明细（仅取 name/code/市值稳定字段）。
+        penetrated_assets: 穿透资产列表。
+    """
+    normalized = {
+        key: (text or "")
+        for key, text in sorted((module_outputs or {}).items())
+        if isinstance(text, str) and text.strip()
+    }
+    return compute_fingerprint(
+        normalized,
+        extract_stable_holdings(holdings_details),
+        extract_stable_penetration(penetrated_assets),
     )
 
 

@@ -265,3 +265,66 @@ class TestFetchNews(unittest.TestCase):
 
         result = fetch_news(num=3)
         self.assertEqual(len(result), 3)
+
+
+class TestFetchNewsInterfaceDegradation(unittest.TestCase):
+    """fetch_news 源内接口降级契约：单接口故障不得拖垮整源。
+
+    财新为主接口、CCTV 为补充接口；任一接口抛异常时另一接口结果必须保留，
+    两个接口都失败时返回空列表而非异常（向上由新闻聚合器按源记失败）。
+    """
+
+    @patch("src.python.providers.akshare_news._fetch_cctv_news")
+    @patch("src.python.providers.akshare_news._fetch_from_caixin")
+    def test_primary_interface_failure_falls_back_to_secondary(self, mock_caixin, mock_cctv):
+        """主接口异常 → 降级为仅补充接口结果。"""
+        mock_caixin.side_effect = RuntimeError("财新接口 500")
+        mock_cctv.return_value = [
+            {"title": "央视新闻", "url": "", "ctime": "2026-07-01 11:00", "media_name": "央视新闻"},
+        ]
+        from src.python.providers.akshare_news import fetch_news
+
+        result = fetch_news(num=10)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["title"], "央视新闻")
+
+    @patch("src.python.providers.akshare_news._fetch_cctv_news")
+    @patch("src.python.providers.akshare_news._fetch_from_caixin")
+    def test_secondary_interface_failure_keeps_primary_results(self, mock_caixin, mock_cctv):
+        """补充接口异常 → 主接口结果完整保留。"""
+        mock_caixin.return_value = [
+            {"title": "财新新闻", "url": "http://caixin.com/1", "ctime": "2026-07-01 10:00", "media_name": "财新网"},
+        ]
+        mock_cctv.side_effect = RuntimeError("CCTV 接口超时")
+        from src.python.providers.akshare_news import fetch_news
+
+        result = fetch_news(num=10)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["title"], "财新新闻")
+
+    @patch("src.python.providers.akshare_news._fetch_cctv_news")
+    @patch("src.python.providers.akshare_news._fetch_from_caixin")
+    def test_both_interfaces_failure_returns_empty(self, mock_caixin, mock_cctv):
+        """两个接口都失败 → 返回空列表（不抛异常，交聚合器按源降级）。"""
+        mock_caixin.side_effect = RuntimeError("财新挂")
+        mock_cctv.side_effect = RuntimeError("CCTV 挂")
+        from src.python.providers.akshare_news import fetch_news
+
+        result = fetch_news(num=10)
+
+        self.assertEqual(result, [])
+
+    @patch("src.python.providers.akshare_news._fetch_cctv_news")
+    @patch("src.python.providers.akshare_news._fetch_from_caixin")
+    def test_degradation_is_logged(self, mock_caixin, mock_cctv):
+        """接口级降级必须留下 WARNING 日志（可观测性，非静默降级）。"""
+        mock_caixin.side_effect = RuntimeError("财新接口 500")
+        mock_cctv.return_value = []
+        from src.python.providers.akshare_news import fetch_news
+
+        with self.assertLogs("invest", level="WARNING") as ctx:
+            fetch_news(num=10)
+
+        self.assertTrue(any("源内降级" in line for line in ctx.output))

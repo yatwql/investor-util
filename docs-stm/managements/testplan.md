@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.11.9
+> 文档版本：0.11.10
 
 ---
 
@@ -89,13 +89,13 @@
 | `scenario/basic/test_scenario_holdings_quality.py` | S0a/S0b/S0d | 持仓质量：清仓/同名多份额/特殊字符 |
 | `scenario/basic/test_scenario_special_securities.py` | S21-S28 | 特殊品种：港股通/可转债/REITs/货币基金/科创板/北交所/商品ETF/跨境ETF/纯债 |
 | `scenario/basic/test_scenario_operational_behavior.py` | S29-S33 | 操作行为：分红送转除权/定投成本摊薄/部分调仓/跨账户转仓/新股中签待上市 |
-| `scenario/basic/test_scenario_penetration_basic.py` / `_advanced.py` / `_mixed.py` / `_edge.py` | SP1-SP10 | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
+| `scenario/basic/test_scenario_penetration_basic.py` / `_advanced.py` / `_mixed.py` / `_edge.py` | — | 穿透 TOP10 分类/合并/排序/交叉持股验证 |
 | `scenario/basic/test_scenario_section_order.py` | — | 报告序号可配置：自定义/部分配置/未知 key 合并场景 |
 | `scenario/basic/test_pipeline_smoke.py` / `test_pipeline_metrics_injection.py` / `test_pipeline_style_factor_regression.py` | — | 管线冒烟/指标注入/风格因子回归管线（数据契约 + 全失败 source_failed + 空持仓 insufficient） |
 | `scenario/datetime/test_datetime_scenarios.py` | T1-T21 | 日期/时间场景：市场状态×产品类型×边界×Long Tail |
 | `scenario/llm/test_llm_hallucination.py` | `scenario_llm` | LLM 幻觉率采样测试：10 组标准化持仓 × 事实校验器 × 幻觉率统计 |
 
-**业务场景规格（S0a-S0d、S1-S34、D1-D3、T1-T21）：**
+**业务场景规格（S0a-S0d、S1-S34、D1-D3；日期/时间场景 T1-T21 见 §1.7）：**
 
 | 场景 | 前置场景 | 所属文件 | 前置条件 | 操作 | 验证点 |
 |:-----|:---------|:---------|:---------|:-----|:-------|
@@ -323,7 +323,7 @@
 
 ### 2.1 需求 ID ↔ 验证载体映射
 
-`requirements.md` 的**每条需求 ID**（34 域 / 276 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。
+`requirements.md` 的**每条单段需求 ID**（34 域 / 281 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。**口径说明**：本表覆盖 `R-<域>-<序号>` 形式的单段 ID（脚本按此正则提取）；`requirements.md` §7.2–§7.8.4 另有一批双段子域 ID（如 `R-LLM-GM-01`、`R-LLM-DB-PROCON-01`，共 60 条），按现有约定不在本追溯表范围内、亦不参与门禁断言。
 
 | 需求 ID | 验证载体（`测试文件::用例`，粗粒度时仅列文件） | 补全批次 |
 |:--|:--|:--:|
@@ -522,6 +522,9 @@
 | R-LLM-06 | `src/test/unit/llm/test_llm_chain_strategies.py` + `src/test/unit/llm/test_strategy.py` | 批 5 |
 | R-LLM-07 | `src/test/unit/config/test_llm_settings.py` + `src/test/unit/config/test_config_llm_multi.py` | 批 5 |
 | R-LLM-09 | `src/test/unit/llm/test_prompts_signals.py` | 批 5 |
+| R-LLM-11 | `src/test/unit/llm/test_depth_profile.py` + `src/test/unit/report/test_summary.py` | 批 5 |
+| R-LLM-12 | `src/test/unit/llm/test_self_review.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
+| R-DATA-08 | `src/test/unit/fetcher/test_chain_overrides.py` | 批 5 |
 | R-LLM-10 | `src/test/unit/llm/test_llm_pacing.py`（策略解析/容错/注册/零开销直通/间隔/抖动/并发上限/异常释放/403 不重试）+ `src/test/unit/config/test_config_llm_multi.py`（pacing 透传/缺省不注入/非对象忽略） | 批 5 |
 | R-LLM-08 | `src/test/unit/llm/test_llm_api.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
 | R-PF-01 | `src/test/unit/config/test_features.py` + `src/test/unit/report/test_section_visibility.py` | 批 5 |

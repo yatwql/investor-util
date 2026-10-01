@@ -656,3 +656,99 @@ __all__ = [
     "_build_rebalance_block",
     "_build_competitive_context_block",
 ]
+
+
+_SYSTEM_SELF_REVIEW = """你是严格的投资复盘内容复核员。你会收到同一次报告中若干个分析模块的产出文本，
+以及持仓/穿透数据摘要。你的唯一任务是**复核这些产出与数据是否自洽**，而不是重新做一遍分析。
+
+## 必须输出的固定条目（缺一条即视为不合格输出）
+
+【自检清单】
+1. 结论与数据是否矛盾：逐条列出发现的矛盾（引用原文片段 + 说明与哪项数据冲突）；未发现时写「未发现」。
+2. 未标注的推测性表述：列出把推测当作事实陈述、或未标注不确定性的表述（引用原文片段）；未发现写「未发现」。
+3. 模块间结论是否互斥：指出相互冲突的结论对；未发现写「未发现」。
+
+## 硬性禁止（违反即为无效输出）
+
+- **禁止给出任何投资建议、买卖方向、目标价、仓位建议**——你只复核，不提供建议。
+- **禁止新增数据、数值或排名**：只能引用你收到的文本与摘要中的既有信息；不确定就写「无法核实」。
+- **禁止声称已"校验无误"或给出质量评分**：你只报告发现，不下结论性背书。
+- 不得复述原文全文，只引用必要片段（每条不超过 40 字）。
+
+输出为 Markdown，只输出上述清单，不要寒暄、不要总结段落。"""
+
+
+def _build_self_review_prompt(
+    module_outputs: dict | None,
+    holdings_details: list | None = None,
+    penetrated_assets: list | None = None,
+    per_module_limit: int = 4000,
+) -> str:
+    """构造自检 user prompt：各模块产出（截断）+ 数据摘要（比对基准）。
+
+    Args:
+        module_outputs: 模块名 → HTML 产出文本（None/空串跳过）。
+        holdings_details: 持仓明细。
+        penetrated_assets: 穿透资产列表。
+        per_module_limit: 单个模块文本的字符上限（防止 prompt 无限膨胀）。
+
+    Returns:
+        自检 user prompt。
+    """
+    lines: list[str] = ["以下是本次报告的各模块分析产出（已截断），请按系统提示要求复核。", ""]
+    for key, text in (module_outputs or {}).items():
+        if not isinstance(text, str) or not text.strip():
+            continue
+        plain = _strip_html_for_review(text)
+        if len(plain) > per_module_limit:
+            plain = plain[:per_module_limit] + "…（已截断）"
+        lines.append(f"### 模块：{key}")
+        lines.append(plain)
+        lines.append("")
+
+    lines.append("### 持仓数据摘要")
+    lines.append(_self_review_holdings_digest(holdings_details))
+    lines.append("")
+    lines.append("### 穿透资产摘要")
+    lines.append(_self_review_penetration_digest(penetrated_assets))
+    return "\n".join(lines)
+
+
+def _strip_html_for_review(text: str) -> str:
+    """粗略剥离 HTML 标签与实体，供自检比对（不追求完美，够用即可）。"""
+    import re
+
+    plain = re.sub(r"<[^>]+>", " ", text)
+    plain = plain.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    return re.sub(r"[ \t]+", " ", plain).strip()
+
+
+def _self_review_holdings_digest(holdings_details: list | None) -> str:
+    """持仓比对基准：名称/代码/市值/盈亏/占比（每行一条，截断至 40 行）。"""
+    if not holdings_details:
+        return "（无持仓明细）"
+    rows: list[str] = []
+    for d in holdings_details[:40]:
+        get = d.get if isinstance(d, dict) else lambda k, _d=d: getattr(_d, k, None)
+        rows.append(
+            "- {name}({code}) 市值 {mv} 盈亏 {profit} 占比 {ratio}".format(
+                name=get("name") or "?",
+                code=get("code") or "?",
+                mv=get("market_value") if get("market_value") is not None else get("mv"),
+                profit=get("profit"),
+                ratio=get("weight_pct") if get("weight_pct") is not None else get("ratio_pct"),
+            )
+        )
+    return "\n".join(rows)
+
+
+def _self_review_penetration_digest(penetrated_assets: list | None) -> str:
+    """穿透比对基准：资产名 + 占比（截断至 20 行）。"""
+    if not penetrated_assets:
+        return "（无穿透数据）"
+    rows: list[str] = []
+    for a in penetrated_assets[:20]:
+        if not isinstance(a, dict):
+            continue
+        rows.append(f"- {a.get('name', '?')} 占比 {a.get('ratio_pct', '?')}%")
+    return "\n".join(rows) or "（无穿透数据）"

@@ -257,3 +257,121 @@
 **验收标准**：新增回归 30 例（含 `test_eastmoney_index_edge.py` 边缘文件隔离）；P0 门禁全绿。
 
 **实施记录**：见 `../../managements/changelog.md`「数据源稳定性提升：指数历史双备源 + 重试补齐 + 状态补全（plan-58）」条。
+
+## P3/P4 — 已完成（TradingAgents-CN 借鉴项首批，2026-10-01 归档）
+
+### ✅ `plan-59` LLM token 用量与成本记账 — 已完成（2026-10-01）
+
+**动机**：用户无法感知一次复盘的 LLM 开销。
+
+**缺口分析（关键）**：本仓库**已具备**完整链路——`llm/session.py`（会话级用量累计，区分 claude 风格 `input_tokens`/`cache_read_input_tokens` 与 openai 风格 `prompt_tokens`/`completion_tokens`）、`llm/pricing.py`（模型单价 + DeepSeek 峰谷定价）、`llm/cost_tracker.py`（预算告警与摘要格式化）、报告侧 `report/excel_llm_usage.py` / `report/summary_llm_usage.py` / `report/html_renderers.py` 双端展示。**真实缺口仅为 CLI 控制台无成本摘要行**。
+
+**实施**：新增 `CliProgressReporter.print_llm_cost_summary()`（调用次数 / 输入输出 token / 模型名，`--verbose` 同步 stderr），接入 `_handle_report` 报告完成点；无用量时静默。
+
+**验收**：回归 3 例（无调用静默 / 有用量输出 / `_handle_report` 接线）；P0 门禁全绿。
+
+### ✅ `plan-60` 缓存命中率统计输出 — 已完成（2026-10-01）
+
+**动机**：排查「报告数据为什么没变」需要可见性。
+
+**缺口分析**：`cache/_stats.py` 已有线程安全 hit/miss 计数与 `get_cache_hit_rate()`，且 Excel 用量页签（`summary_llm_usage.py`）与 TUI `cache --stats` 已展示命中率。**真实缺口同样是 CLI 报告完成点无此行**。
+
+**实施**：新增 `CliProgressReporter.print_cache_hit_summary()`（命中/总数/百分比；**0% 亦输出**——全未命中是诊断信号而非无观测），接入报告完成点；无缓存读写时静默。
+
+**验收**：回归 3 例（无观测静默 / 3-1 命中率 75% / 0% 仍输出）。
+
+### ✅ `plan-61` 合规免责声明集中注入 — 已完成（2026-10-01）
+
+**动机**：报告免责声明散落各处、LLM prompt 无统一合规注入点。
+
+**缺口分析**：确认为真实缺口——LLM prompt（`prompts_core.py` 等）无任何投资风险免责约束，而其他模块各自手写声明（`analysis/market_temperature.py`、`report/llm_content.py`、`core/doctor.py`）。
+
+**实施**：新增 `llm/compliance.py`——`COMPLIANCE_CLOSING`（统一声明文本）+ `apply_compliance_guardrails(system_prompt, role)`（幂等叠加 + 角色专属追加项，窄判定角色如 `news_correlation` 追加「不得引申为确定性因果」）；注入点为 `llm/api.py::call_llm` **单一漏斗**（`role` 由 `_infer_module_key(config_field)` 解析），覆盖全部 LLM 模块。缓存指纹由结构化数据计算、不含 prompt 文本 → 注入不改变缓存键（旧缓存产物仍由报告模板层免责声明兜底），故无需 bump 指纹版本。
+
+**验收**：回归 8 例（叠加位置 / 幂等 / 角色追加项 / 未知角色仅通用 / 空 prompt 保护 / 已含声明不重复 / call_llm 接线 / 经漏斗不重复叠加）。
+
+### ✅ `plan-62` 数据源自接口降级 — 已完成（2026-10-01）
+
+**动机**：降级粒度停在「源」层，源内单一接口失败即整源判败。
+
+**缺口分析（关键）**：本仓库**已具备**跨源与源内接口降级——`fetcher/chain.py` 的 Provider Chain（`price_stock: tencent→sina→hithink`、`history_index: tencent→eastmoney→sina→hithink`、`financial_report: datasink→cninfo` 等，含熔断、传输级重试、失败诊断）与 `providers/akshare_news.py` 双接口聚合（财新 + 央视，各自内部已降级为空列表）。**真实缺口**：`fetch_news` 聚合点缺少显式的接口隔离契约与降级日志——一旦将来编辑移除内部兜底，异常会向上传播并丢掉另一接口结果。
+
+**实施**：`fetch_news` 对财新（主）/央视（补充）两接口各自 try/except 隔离，单接口异常降级为仅另一接口结果并记 WARNING（可观测，非静默降级），双接口均失败返回空列表（由 `news_aggregator` 按源记失败），并新增「其一为 0 即发生接口级降级」的 info 日志。
+
+**验收**：回归 4 例（主接口异常降级 / 补充接口异常保留主结果 / 双失败空返回不抛 / 降级 WARNING 日志可观测）。
+
+**红线达成**：① 未新造取数路径与缓存键；② 降级日志可观测、不静默；③ 主接口正常时输出与行为逐字不变；④ 源间与源内降级职责分层清晰（聚合器管源间、provider 管源内）。
+
+
+### ✅ `plan-63` 复盘报告深度档位 — 已完成（2026-10-01）
+
+**缺口分析**：仓库**无任何「档位/profile」概念**，`news_top_count` 等调节参数散在 config——确为真实缺口。
+
+**形态决策**：三值 config 键 `llm_report_depth`（`brief`/`standard`/`deep`，缺省 `standard`），**不用布尔开关**（注册表语义是布尔 + 分组表达生命周期，无法表达互斥三档）。
+
+**关键取舍——档位不进提示词正文**：只作用于「哪些模块参与」与「新闻采集规模」。若档位进入提示词正文，C21 的覆盖判据（提示词承载了哪些入参）要求四个模块的指纹构造同步并入档位值，写侧/预检侧一旦不同源即「预检永不命中（费用翻倍）」或「命中陈旧键（档位形同虚设）」；只改模块集合与采集规模则不改变既有提示词承载入参，**无需改动任何既有指纹构造**。
+
+**实施**：新增 `llm/depth_profile.py`（档位表唯一事实来源；模块集合从 `core/registry.py` 派生；`depth_gate()` 只收窄不放大；`effective_news_limit()` 仅 deep 设 500 下界）；消费点仅两处（编排层 `needs` 计算 + 报告层 `news_top_count` 解析）；config 默认值/模板/校验器同步；非默认档位在 LLM 用量页签自述（默认档零噪声）。
+
+**红线达成**：缺省档位下模块集合与新闻条数与改动前**逐字节一致**（专项用例锁定）；档位不得打开用户已关模块。
+
+**验收**：回归 23 例；P0/P1 门禁全绿。
+
+### ✅ `plan-64` LLM 输出后自检清单 — 已完成（2026-10-01）
+
+**缺口分析与重新定位**：`llm/fact_checker/run_fact_check` **已存在**（确定性：数值/品种/排名有据性 + 自动修正 + 摘要追加）——原立项动机「无生成后质检」被部分推翻。最终按**分层不重叠**定位：① 确定性校验（既有，始终生效）；② 模型层自检（新增）负责确定性算法做不到的「模糊表述/逻辑推演/模块间互斥」。
+
+**实施**：新增 `llm/self_review.py`（开关判定/输入存在性/失败隔离/运行作用域载体/固定非质量保证尾注）+ `generate_self_review`（复用骨架，缓存键/TTL/尾部标识/失败原因登记全自动）+ `self_review_fingerprint`（内容寻址，仅写侧）+ 提示词。
+
+**注册纪律（C9）**：在 `core/registry.py` 登记（显示名/缓存前缀/TTL/用量统计/失败载体自动获得），但**刻意不进 `_MODULE_FNS`**——输入是其余模块产出，必须串行在其后（C9 明文允许；有防注册漂移用例锁定）。
+
+**交付方式（设计修订）**：不扩宽 4 元组 `llm_content` 契约（报告层 10+ 处按位置解包），改「运行作用域载体 + 报告层零参 pull」（与 `report/experimental_notice` 同源模式），落点 Excel「LLM 用量」页签 + HTML「生成后自检（附录）」区块。
+
+**防线**：开关关闭**零调用**；异常/空产出不影响主内容；固定尾注由代码确定性补全；提示词硬禁投资建议（叠加合规声明）。
+
+**验收**：回归 15 例；P0/P1 门禁全绿。
+
+### ✅ `plan-65` 方法级 fallback 显式 preferred/exclude 参数 — 已完成（2026-10-01）
+
+**缺口分析**：`_get_chain` 已支持**配置级** `preferred_provider.<data_type>`；缺**调用级**覆盖，且当时无真实调用方（有变死代码风险）。
+
+**实施**：`fetcher/chain.py::chain_overrides()` 运行作用域覆盖（**进程级**：取数存在并行，线程局部不传播到工作线程）+ `known_provider_names()`（取值域由默认链并集派生）+ `reset_chain_overrides()`（测试隔离）+ `_apply_overrides()`（exclude 过滤 + preferred 前置）；CLI `report` 新增 `--prefer-source` / `--exclude-source`（可重复、仅本次运行、不写盘；未知名报错并列出可用源名），`_handle_report` 以 `with chain_overrides(...)` 包裹生成、退出即恢复。
+
+**不变量**：凭据未就绪源仍主动跳过且不计熔断（C24）；熔断语义不变（覆盖不绕过）；全排除 → 空链（与「链上全部失败」同语义）；缓存键与 `FailureDiagnostics` 不变。优先级：调用级 > 配置级 > 默认链。
+
+**验收**：回归 16 例；P0/P1 门禁全绿。
+
+**实施记录**：见 `../../managements/changelog.md`「报告深度档位 / 生成后自检 / 调用级数据源指定」条。
+
+
+### ⛔ `plan-66` 智囊团多空双视角辩论结构 — 已评估未采纳（2026-10-01 归档）
+
+**现状比对结论：能力已存在**。现有实验开关 `llm_debate_procon`（「辩论-正反辩论：三段式(白脸→黑脸→综合)」）即「乐观/审慎双视角 + 裁决」结构：
+- 三套提示词 `_SYSTEM_DEBATE_PRO` / `_SYSTEM_DEBATE_CON` / `_SYSTEM_DEBATE_SYNTHESIS`；
+- **分歧呈现已在**：`prompts_core.py` 综合阶段明确要求输出「**共识与分歧摘要** — 双方达成一致的领域（1-2句）和仍然分歧的关键问题（1-2句）」；
+- 报告以三色块呈现（pro 绿 / con 红 / synthesis 金）+ `debate_mode_label` 标注，另配 6 个专项测试文件。
+
+**未采纳理由**：原立项前提「LLM 复盘为单链生成、缺多空分歧呈现」为假；再加独立「多空分歧点」章节属与既有辩论模式重复建设。
+
+### ⛔ `plan-67` Prompt 模板外置与多语言 — 已评估未采纳（2026-10-01 归档）
+
+**现状比对结论：真实需求已满足、残余缺口价值低**。
+- 用户调 prompt 的**实际需求**已由 `llm_settings.json` 的 `system_prompt_{module}` 配置键满足——可整段覆盖各模块 system prompt（`skeleton._run_standard_mode` 优先读配置），无需改代码；
+- 残余缺口仅「提示词仍是 11 个代码常量块（改措辞需动代码）」，只对维护者有意义；
+- 多语言：全仓无 i18n，单用户中文工具无此需求。
+
+**未采纳理由**：成本/风险倒挂——迁移 11 个提示词块 + 全部 builder 属大改动，而 prompt 措辞漂移（含空白/换行）会影响**已校准的输出**与**缓存指纹**（与 plan-61 同一风险面）；收益仅「维护者改文案方便」。
+
+### ⛔ `plan-68` 多源新闻聚合交叉验证 — 已评估未采纳（2026-10-01 归档）
+
+**现状比对结论：前提失效**。
+- 已是 **5 源聚合**（新浪/东财/财联社/华尔街见闻/akshare），逐源隔离降级（`news_aggregator.py`）；
+- **去重已成熟**：`news_dedup.py` + `news_dedup_rules.py`（专名抽取、实体 bigram、停用词掩码、中英文长度占位等规则）；
+- **跨源冲突感知已在**：`_has_opposite_direction()` 使反向标题不合并（避免把利好/利空对立报道并成一条）。
+
+**未采纳理由**：原立项前提「财经新闻热点模块以单源为主」为假；残余缺口仅「同事件多源印证/权威度加权」，但该能力属**事实核查**范畴，超出新闻关联分析模块职责，且会引入去重口径与噪声双重成本。
+
+### 📌 TradingAgents-CN 借鉴批收口说明（2026-10-01）
+
+10 项候选终态：**6 项落地**（plan-59/60/61/62/63/64/65 中的 6 项功能项，其中 59/60/62 为补缺口、61/63/64/65 为新建）+ **3 项归档未采纳**（plan-66/67/68）+ **1 项转为纪律项**（比对清单，见 plan-69）。
+**共性教训**：外部借鉴项的立项前提必须对照本仓库现状（本轮 4 项被推翻），故新增纪律项 plan-69 固化比对清单。

@@ -158,3 +158,33 @@ def test_every_recorded_cassette_is_parseable_by_current_parser():
 
     problems = [f"{v['name']}: [{v['status']}] {v['detail']}" for v in verdicts if v["status"] != "ok"]
     assert not problems, "以下 cassette 未能通过当前解析器：\n  " + "\n  ".join(problems)
+
+
+# ── 季度窗口时间无关性（日期时移回归） ──────────────────
+
+
+@pytest.mark.cassette("fund_quarterly_holdings")
+def test_quarter_walk_replay_is_stable_when_clock_advances(monkeypatch):
+    """回归：系统时间推进到下一季度后，季报回放仍须命中录制内容。
+
+    季报窗口按「当前日期」向前循环（`_recent_quarters`），而录制内容固定在录制当日
+    ——不锚定则时间跨过一个季度后，回放会先去请求**未录制**的新季度并报
+    ``CassetteMissError``（与上游是否漂移无关的假红，实测已导致发布门禁变红）。
+    本用例把模块内 `datetime` 冻结到下一年，断言回放仍能解析出录制内容：
+    窗口锚定到 cassette 的 `recorded_at`，而请求形状仍须与录制逐字一致。
+    """
+    from datetime import datetime as _real_datetime
+
+    import src.python.providers.tiantian_holdings as holdings_module
+
+    class _FutureDatetime(_real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return _real_datetime(2027, 5, 1, tzinfo=tz) if tz else _real_datetime(2027, 5, 1)
+
+    monkeypatch.setattr(holdings_module, "datetime", _FutureDatetime)
+
+    data = holdings_module.fetch_quarterly_holdings("110022")
+
+    assert data is not None
+    assert data["date"], "报告期须取自录制内容（锚定后不因当前时间改变而失配）"

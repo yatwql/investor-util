@@ -602,14 +602,20 @@ def generate_all_llm(
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
 
     from src.python.config.features import is_feature_enabled
+    from src.python.llm.depth_profile import depth_gate, resolve_depth_profile
 
-    needs = {k: (v["result"] is None and is_llm_module_enabled(llm_config, k)) for k, v in precheck_results.items()}
+    # 深度档位：在逐模块开关之上**收窄**参与集合（brief ⊂ standard），不放大已关闭的模块
+    _depth = resolve_depth_profile()
+    needs = {
+        k: (v["result"] is None and depth_gate(is_llm_module_enabled(llm_config, k), k, _depth))
+        for k, v in precheck_results.items()
+    }
 
     # ── 辩论模式：强制不走标准 expert_review 缓存预检 ──────
     # 辩论路由使用独立缓存键（llm_debate_pro_/llm_debate_con_/llm_debate_synthesis_），
     # 与标准 expert_review 缓存键（llm_expert_review_）不同，需绕过标准缓存预检。
     if is_feature_enabled("llm_debate_procon"):
-        needs["expert_review"] = is_llm_module_enabled(llm_config, "expert_review")
+        needs["expert_review"] = depth_gate(is_llm_module_enabled(llm_config, "expert_review"), "expert_review", _depth)
 
     # ── 辩论模式容器（用于闭包捕获 debate_info） ────────
     _debate_info_container: list[dict | None] = [None]
@@ -716,6 +722,24 @@ def generate_all_llm(
                     hc_r = _result
                 elif _mk == "penetration_deep":
                     pd_r = _result
+
+    # ── 生成后自检（开关开启时执行；自检输入是上面四个模块的产出，必须在它们之后）──
+    # 不属线程池并行调度模块，故**不登记**进 _MODULE_FNS（注册纪律：无独立调度语义的
+    # 编排注册属注册漂移）；模块本身仍在 core/registry.py 登记以复用缓存/统计/失败载体。
+    from src.python.llm.self_review import run_self_review
+
+    run_self_review(
+        {
+            "global_macro": gm_r,
+            "expert_review": er_r,
+            "health_check": hc_r,
+            "penetration_deep": pd_r,
+        },
+        holdings_details,
+        penetrated_assets,
+        llm_config,
+        force=force,
+    )
 
     logger.info(
         "LLM 生成完成: %s=%s, %s=%s, %s=%s, %s=%s",
