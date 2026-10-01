@@ -18,9 +18,16 @@
 | **Python 环境** | 所有 Python 命令一律使用项目虚拟环境解释器——Linux/macOS 用 `.venv/bin/python`，Windows 用 `.venv\Scripts\python.exe`；**禁止**裸 `python3`/`python`/`pytest`（会命中系统解释器，缺失 pandas 等依赖）。运行测试、脚本、CLI 均同 |
 | **提交规范** | 约定式提交：`feat`/`fix`/`docs`/`refactor`/`test`/`chore`/`perf`/`ci` + 可选 scope；修复类可在标题标注对应任务编号 |
 | **日志** | `logging` → `logs/app.log` + console（INFO / WARNING / ERROR） |
-### pi 模型配置（编程档采样 + 订阅端点节流）
+### pi 模型与服务配置（编程档采样 + 订阅端点节流 + 缓存/思考调优）
 
-仓库内 `.pi/models.json` 是本项目**版本受控**的 pi 模型配置，两类覆盖：
+本项目**版本受控**的 pi 配置分两个文件，作用域机制不同：
+
+| 文件 | 作用域 | 生效条件 |
+|---|---|---|
+| `.pi/models.json` | 模型覆盖 | 软链到 `~/.pi/agent/models.json`（pi **不读**项目级 models.json） |
+| `.pi/settings.json` | 项目设置 | **pi 直接读项目级 settings.json**，但需 `~/.pi/agent/trust.json` 已授予该项目信任 |
+
+`.pi/models.json` 的覆盖分两类：
 
 **① 编程档采样（`deepseek` 按量端点）**
 
@@ -42,9 +49,30 @@
 
 **③ 思考档位（全局，不在本文件）**：`~/.pi/agent/settings.json` 的 `defaultThinkingLevel` 设为 `low`（原 `high`）。思考 token 计入 output，实测输出量≈输入量是其主因；需要时用 `/thinking` 临时提升。
 
+**④ 提示缓存保留（`PI_CACHE_RETENTION=long` + `promptCache` 声明）**
+
+缓存命中把重复前缀按缓存读价计费（DeepSeek 缓存读约为标准输入价的 1/10），所以要尽量让前缀「热着」。这条链需要**两个条件同时成立**，缺一即静默无效：
+
+| 环节 | 载体 | 作用 |
+|---|---|---|
+| 选择保留档 | shell 环境变量 `PI_CACHE_RETENTION=long`（`~/.bashrc`） | `getPromptCacheTtlMs` 按该值选 `long` 档；未设置则恒为 `short`。解析顺序：凭据块 `env` → `process.env` → Bun 沙箱回退 |
+| 声明生命周期 | `.pi/models.json` 覆盖项 `promptCache` | **目录里没有任何模型声明 `promptCache`**，未声明时 `getPromptCacheTtlMs` 返回 `undefined` → 该模型**无缓存保活资格**，环境变量设了也白设。故对 pi 实际使用的按量模型（`deepseek-flash`/`deepseek-v4-pro`）显式声明 `{short: 300, long: 3600}`（取已公布区间的保守端） |
+
+缓存保活本身**消耗额度但不占上下文**（保活请求以 1 token 输出重发，用量计入会话统计，不进模型上下文）；pi 仅在「模型声明了生命周期」且「估算避免的未命中成本 ≥ $0.05」时才保活，故不是盲目刷量。
+
+> **刻意不下发到订阅端点**：`kimi-coding`/`opencode-go` 按窗口计量，保活刷新会白吃窗口额度，而收益取决于端点是否真支持提示缓存（未实测）。这是**待测量项**，不在本配置内。
+
+**⑤ 思考预算（`thinkingBudgets`，`~/.pi/agent` 之外的 `.pi/settings.json`）**
+
+内置档位预算为 `minimal:1024 / low:2048 / medium:8192 / high:16384`（`xhigh`/`max` 亦 16384）。合并语义是 `{...内置默认, ...自定义}`（`thinkingBudgetForLevel`），**故只需写要改的档位**，未写档位继续用内置值。当前只压最低两档（`minimal:512`、`low:1024`），**`medium`/`high` 保持内置**——它们承担用 `/thinking` 提升后的复杂推理，压掉会让升档失效。
+
+**⑥ 诊断开关（`showCacheMissNotices: true`）**
+
+开启后上屏显著缓存未命中、缓存保活成功、**压缩用量**、provider 恢复四类通知。这是排查「额度去哪了」的主观测口：压缩一次要读整个上下文，其用量此前完全不可见。
+
 **未改动**：`thinkingLevelMap`（内置 `low/high/max` 已够用，用 `/thinking` 切档）、`compat`（`thinkingFormat` 等由 pi 内置目录提供）、`input`（flash 为纯文本，视觉实验版另有一个模型）、`samplingParams`（仅对 OpenAI 兼容传输生效；订阅端点走 Anthropic/兼容协议时该参数不适用，故未对它们下发）。
 
-**为什么放在 `.pi/` 而要软链生效**：pi CLI **只读** `~/.pi/agent/models.json`（`getModelsPath() = getAgentDir() + "/models.json"`，`getAgentDir()` 只认 `PI_AGENT_DIR` 或 `~/.pi/agent`），**不读项目级 `.pi/models.json`**；项目级 `.pi/` 仅支持 `settings.json`/扩展/技能/主题。因此仓库文件是**唯一事实来源**，用软链挂到全局路径生效：
+**为什么模型覆盖放在 `.pi/` 而要软链生效**：pi CLI **只读** `~/.pi/agent/models.json`（`getModelsPath() = getAgentDir() + "/models.json"`，`getAgentDir()` 只认 `PI_AGENT_DIR` 或 `~/.pi/agent`），**不读项目级 `.pi/models.json`**；项目级 `.pi/` 仅支持 `settings.json`/扩展/技能/主题。因此模型覆盖的仓库文件是**唯一事实来源**，用软链挂到全局路径生效（`settings.json` 走项目级路径，无需软链）：
 
 ```bash
 ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
@@ -54,7 +82,8 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 - **`timeout 90 pi --list-models | grep -E 'deepseek|kimi|opencode'`**：`deepseek-flash` 应显示 `65.5K`、`kimi-coding`/`opencode-go` 应显示 `262.1K / 65.5K`；仍是 `1M / 384K` 即**覆盖键名已失效**（目录改名），按上文修正键名
 - 出现 `Warning: errors loading models.json` 说明 JSON/schema 有问题
-- 订阅端点用量激增时的排查顺序：① `--list-models` 确认覆盖生效 → ② 会话是否超长（`/new` 分任务）→ ③ 思考档位是否被 `/thinking` 提升
+- **项目设置是否生效**：`.pi/settings.json` 依赖项目信任（`~/.pi/agent/trust.json` 里该项目为 `true`）；未授予信任时项目设置被整体忽略，而 `.pi/models.json` 因走软链不受影响——两者失效条件不同，排查时分开看
+- 订阅端点用量激增时的排查顺序：① `--list-models` 确认覆盖生效 → ② 会话是否超长（`/new` 分任务）→ ③ 思考档位是否被 `/thinking` 提升 → ④ 打开 `showCacheMissNotices` 看压缩用量与缓存命中
 - 若 `~/.pi/agent/models.json` 已是实体文件（例如以后 `/login` 或 `pi config` 写过），软链会失败：先备份再决定合并
 
 ## 三级门禁

@@ -6,12 +6,20 @@
           "maxTokens": 65536,
           "samplingParams": {
             "temperature": 0
+          },
+          "promptCache": {
+            "short": 300,
+            "long": 3600
           }
         },
         "deepseek-v4-pro": {
           "maxTokens": 65536,
           "samplingParams": {
             "temperature": 0
+          },
+          "promptCache": {
+            "short": 300,
+            "long": 3600
           }
         }
       }
