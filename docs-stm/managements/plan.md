@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.11.10-dev
-> **编号源**：`plan-next = 69`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-68，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 70`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-68，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：本文档当前在办 **plan-49 / plan-55**（plan-47 基金 ROE 加权、plan-48 场外流动性、plan-50 巨潮财报备源、plan-58 数据源稳定性提升均已完成并归档）。
+**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 仅余纪律项 **plan-69**（外部借鉴前置现状比对）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -57,21 +57,15 @@
 
 ### P4 — 实验功能
 
-#### 🔲 `plan-66` 智囊团多空双视角辩论结构
+> **本批 P4 已清空**：plan-66 / plan-67 / plan-68 经现状比对后**全部归档为「已评估未采纳」**（2026-10-01，见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)）——三项立项前提均被本仓库既有实现推翻（辩论模式已含「共识与分歧摘要」、prompt 已有 `system_prompt_*` 配置级整段覆盖、新闻已 5 源聚合 + 去重 + 反向标题检测）。TradingAgents-CN 借鉴批至此整体收口。
 
-**动机**：LLM 复盘为单链生成，缺多空分歧呈现。**概要**：引入「乐观/审慎双视角 + 裁决」结构，报告新增「多空分歧点」小节；成本约翻倍，作为实验组可选开关。研究对象实现：TradingAgents-CN 辩论式工作流（bull/bear researcher → trader → risk → judge），见 [`tradingagents-cn-research.md`](../plan/tradingagents-cn-research.md)。
+### P3 — 预期实施（纪律项）
 
-#### 🔲 `plan-67` Prompt 模板外置与多语言
+#### 🔲 `plan-69` 外部借鉴前置现状比对（纪律固化）
 
-**动机**：LLM prompt 硬编码在 `src/python/llm/` 各模块，迭代调优需改代码。**概要**：借鉴 `PromptManager`（加载/缓存/渲染 + `set_language`）将模板外置；改动面大、收益一般，低优先。研究对象实现：`core/prompts/manager.py`。
+**动机**：本轮 10 项借鉴中，plan-64/66/67/68 **四项**的立项前提均被「本仓库已有实现」推翻（勘察才发现），属可避免的往返成本。
 
-#### 🔲 `plan-68` 多源新闻聚合交叉验证
-
-**动机**：财经新闻热点模块以单源为主，缺交叉验证。**概要**：远期评估多源新闻聚合与同主题交叉验证。研究对象实现：`tradingagents/dataflows/news/`（chinese_finance / realtime_news / google_news 多源聚合）。
-
-### P4 — 实验功能
-
-> 无待办项。
+**动作**：把「立项前先比对现状」固化为可执行清单，避免下次重复——清单落 `developer-guide.md`「外部借鉴前置比对清单」节（5 条：能力是否已存在 / 部分存在时缺口的语义边界 / 是否已有配置级或开关级替代 / 改动是否触及缓存指纹与已校准输出 / 是否已有真实消费者或需要新消费者），并在 `docs-stm/plan/` 的设计文档开头填写比对结论。
 
 ## 归档
 

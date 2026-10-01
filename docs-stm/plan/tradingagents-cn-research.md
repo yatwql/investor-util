@@ -4,7 +4,7 @@
 > 研究对象：`TradingAgents-CN` 社区版 v3.0.0（commit 51060a7），克隆于 `docs-stm/tmp/TradingAgents-CN/`
 > 研究日期：2026-02（以会话日期为准）
 > 关联计划项：plan-59 ~ plan-68（10 项候选已各自独立立项于 `docs-stm/managements/plan.md`）
-> **实施状态**：plan-59/60/61/62 已完成（2026-10-01，实施记录见 `docs-stm/archive/v0.11.x/archived_plan.0.11.x.md`）——立项后核对本仓库现状发现 59/60/62 已有主体实现，实际按「补真实缺口 + 测试锁定」落地（详见归档各条缺口分析）；plan-63 ~ plan-68 仍为待办。
+> **实施状态（终态）**：plan-59/60/61/62/63/64/65 已完成；plan-66/67/68 已评估未采纳（理由见各条「已评估未采纳」与 `archived_plan.0.11.x.md`）；本批整体收口。
 
 ---
 
@@ -93,13 +93,15 @@ TradingAgents-CN 是基于多智能体协作的 A 股研究辅助系统：多个
 | 2 | 缓存命中率统计输出 | plan-60 | dataflows/cache | 低 | 中 | P3 ✅ 已完成（补 CLI 命中率行） |
 | 3 | 合规免责声明集中注入 | plan-61 | agents/utils | 低 | 低-中 | P3 ✅ 已完成（`llm/compliance.py`） |
 | 4 | 数据源自接口降级（源内东财→腾讯→新浪形态） | plan-62 | data_sources | 中 | 中 | P3 ✅ 已完成（akshare 新闻接口隔离） |
-| 5 | 复盘报告深度档位（简/标/深控成本） | plan-63 | graph | 中 | 中 | P3（可入实验组） |
-| 6 | LLM 输出后自检清单（反思机制简化版） | plan-64 | graph/reflection | 低 | 中 | P3 |
-| 7 | 智囊团多空双视角辩论结构 | plan-66 | graph | 高 | 中 | P4 实验 |
-| 8 | 方法级 fallback 显式 preferred/exclude 参数 | plan-65 | data_sources/manager | 低 | 低 | P3 |
-| 9 | Prompt 模板外置 + 多语言 | plan-67 | core/prompts | 高 | 低-中 | P4 |
-| 10 | 多源新闻聚合交叉验证 | plan-68 | dataflows/news | 中 | 低-中 | P4 |
+| 5 | 复盘报告深度档位（简/标/深控成本） | plan-63 | graph | 中 | 中 | P3 ✅ 已完成（`llm/depth_profile.py`，config 键 `llm_report_depth`） |
+| 6 | LLM 输出后自检清单（反思机制简化版） | plan-64 | graph/reflection | 低 | 中 | P3 ✅ 已完成（`llm/self_review.py`，与 `fact_checker` 分层不重叠） |
+| 7 | 智囊团多空双视角辩论结构 | plan-66 | graph | 高 | 中 | ⛔ 已评估未采纳（既有辩论模式已含「共识与分歧摘要」） |
+| 8 | 方法级 fallback 显式 preferred/exclude 参数 | plan-65 | data_sources/manager | 低 | 低 | P3 ✅ 已完成（`chain_overrides` + CLI `--prefer-source`/`--exclude-source`） |
+| 9 | Prompt 模板外置 + 多语言 | plan-67 | core/prompts | 高 | 低-中 | ⛔ 已评估未采纳（`system_prompt_*` 配置级整段覆盖已满足真实需求；改动风险倒挂） |
+| 10 | 多源新闻聚合交叉验证 | plan-68 | dataflows/news | 中 | 低-中 | ⛔ 已评估未采纳（已是 5 源聚合 + 去重 + 反向标题检测，前提失效） |
 
+> **终态（2026-10-01 收口）**：6 项落地（plan-59~65）+ 3 项归档未采纳（plan-66/67/68）+ 1 项转纪律项（plan-69 现状比对清单）。共性教训：**外部借鉴项的立项前提必须对照本仓库现状**（本轮 4 项前提被推翻），故比对清单已固化为纪律（`developer-guide.md`）。
+>
 > 以上均为候选评估，落地前须按本项目门禁纪律（语义命名、回归测试、marker 标注）实施；任何一项立项时先定语义名再设计。
 
 ## 5. 参考文件清单（被研究仓库内）
