@@ -90,7 +90,7 @@ def _update_machine_table(
 def _update_mode_count_table(table_lines: list[str], results: list[dict]) -> list[str]:
     """更新「模式对应测试量」表：覆盖项数=实测执行数，典型耗时=实测耗时。
 
-    未实测/超时模式保留原值；表结构与行集不做增删（模式增删走人工维护）。
+    未实测/超时模式保留原值；**0 项执行（预检失败/跳过）同样保留原值**（否则会把「没测到」写成「覆盖项数 0」）；表结构与行集不做增删（模式增删走人工维护）。
 
     Args:
         table_lines: 两 marker 之间的表格行（含表头/分隔行/数据行）
@@ -112,6 +112,11 @@ def _update_mode_count_table(table_lines: list[str], results: list[dict]) -> lis
         if res is None:
             continue
         cnt = res.get("passed", 0) + res.get("failed", 0) + res.get("skipped", 0) + res.get("errors", 0)
+        if cnt <= 0:
+            # 「0 项执行」不是实测覆盖项数：分阶段模式（如 dev-verify）预检未通过时会跳过
+            # 测试阶段并返回 0，若照写会把「预检失败」静默固化成「覆盖项数 0」污染文档。
+            # 与「未实测/超时保留原值」同口径——保留原值，如实反映「本次未测到」。
+            continue
         tokens[2] = f" **{cnt}** "
         tokens[3] = f" {_format_approx_duration(res.get('duration', 0.0) or 0.0)} "
     return ["|".join(tokens) for tokens in grid]

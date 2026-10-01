@@ -64,7 +64,8 @@ LLM 配置由三个独立文件管理：
     "expert_review": true,
     "health_check": true,
     "penetration_deep": true,
-    "news_correlation": false
+    "news_correlation": false,
+    "self_review": false
   },
   "temperature_global_macro": 0.3,
   "max_tokens_global_macro": 3072,
@@ -270,7 +271,7 @@ LLM Provider 状态
 
 ## 模块启停
 
-通过 `enabled_llm` 嵌套字典控制每个模块的开关，除 `news_correlation` 默认关闭外，其余默认开启：
+通过 `enabled_llm` 嵌套字典控制每个模块的开关。除 `news_correlation`（新闻 LLM 关联分析）与 `self_review`（生成后自检，实验能力）默认关闭外，其余默认开启：
 
 ```json
 "enabled_llm": {
@@ -278,15 +279,17 @@ LLM Provider 状态
   "expert_review": true,
   "health_check": true,
   "penetration_deep": true,
-  "news_correlation": false
+  "news_correlation": false,
+  "self_review": false
 }
 ```
 
 - 关闭的模块在报告中自动跳过，不消耗 Token
 - 可通过菜单 **S** 交互式开关各模块
-- 菜单 **[S]** 面板分三块：标准 LLM 模块（1-5，即上方 `enabled_llm` 字典）、⚗ 实验性功能（6-10，由 `features.json` 的 Feature Flag 控制，见下方 `debate` 配置段）与常规开关（11-26，默认开启的常驻开关，与 LLM 无关，详见 [配置指引-功能开关 §N](how-to-config.md#n-功能开关featuresjson)）。实验开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**登记决策并用真实行情结算命中率，再将教训回灌专家复盘提示词（行动建议章内嵌「历史决策复盘」块）；**信号预消化（`signal_pre_digest`）**把市场温度档位/持仓估值分位分布/尾部风险幅度预消化为 `信号：{指标} {结论}（{依据}）` 的方向行，置于智囊团复盘与持仓体检提示词的结论位置，降低模型读裸数值自行推断方向的误判率；**模块级质量分级（`module_quality_gate`）**对 4 个 LLM 模块输出按完整性与篇幅评 A~F，低评级中「内容在但存在缺陷」者（缺必需章节/篇幅明显偏短）在模块内容头部注入 `【内容质量提示】` 横幅（评级 + 具体原因 + 降级参考提示），**只标注、不阻断生成、不触发重试、不写回缓存**——A/B 级健康输出零噪音，内容缺失型（空内容/降级占位）已有各自醒目提示故不叠加横幅；**决策头结构化（`decision_header_parse`）**在专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读结构化头、失败回落确定性表格解析——两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），防「不建议加仓」「加仓或减仓」这类表述被判成相反方向写入决策账本；**关闭时该段不追加**，提示词与缓存指纹逐字节不变；**确定性信号沉淀（`signal_ledger`）**把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类确定性算法评级沉淀为账本 `data/state/signal_ledger.jsonl`，每条记录附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施：逐品种行情新鲜度 + 数据源降级事件，非实时即本次由降级/缓存行情算出），并把摘要注入智囊团复盘提示词——**统计与摘要默认只算实时记录**，防止降级数据算出的评级冒充真实战绩；关闭时账本不写盘、提示词与缓存指纹逐字节不变；**系统自检（`doctor_check`）**不在实验块而在**常规块**（默认开启、只读、不改报告产物），提供 TUI 菜单 `[T]` 与 Web「系统自检」卡片，一键盘点环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，其中「配置」组会校验本文件的 LLM 凭据是否可读——**自检只读、自身永不抛异常**，且 CLI 的 `doctor` 子命令不受该开关约束；本段未展开的**数据源凭据就绪（`datasource_credential_ready`）**属数据层、与 LLM 无关（详见 [配置指引-功能开关 §N](how-to-config.md#n-功能开关featuresjson)）。以上开关均可用 CLI 全局参数 `--experiment`（实验组简写，只开）或 `--feature NAME=VALUE`（全部开关、双向）单次切换（不写盘）
+- 菜单 **[S]** 面板分三块：标准 LLM 模块（1-6，即上方 `enabled_llm` 字典，含实验性的「生成后自检」）、⚗ 实验性功能（7-11，由 `features.json` 的 Feature Flag 控制，见下方 `debate` 配置段）与常规开关（12-27，默认开启的常驻开关，与 LLM 无关，详见 [配置指引-功能开关 §N](how-to-config.md#n-功能开关featuresjson)）。实验开关相互独立、可组合开启：**正反辩论（`llm_debate_procon`）**开启后智囊团复盘改为"看多 → 看空 → 收敛结论"三段式输出；**条件推理（`llm_debate_conditional`）**注入上涨/下跌/震荡情景；**集中度问答（`llm_debate_qa_concentration`）**在单品种占比≥20% 时自动附加集中度量化评估——标准模式嵌入专家复盘输出，辩论模式嵌入综合权衡输出（位于调仓建议之前），均要求输出量化评估/基准对比/调仓建议；**决策跨期反思闭环（`decision_reflection`）**登记决策并用真实行情结算命中率，再将教训回灌专家复盘提示词（行动建议章内嵌「历史决策复盘」块）；**信号预消化（`signal_pre_digest`）**把市场温度档位/持仓估值分位分布/尾部风险幅度预消化为 `信号：{指标} {结论}（{依据}）` 的方向行，置于智囊团复盘与持仓体检提示词的结论位置，降低模型读裸数值自行推断方向的误判率；**模块级质量分级（`module_quality_gate`）**对 4 个 LLM 模块输出按完整性与篇幅评 A~F，低评级中「内容在但存在缺陷」者（缺必需章节/篇幅明显偏短）在模块内容头部注入 `【内容质量提示】` 横幅（评级 + 具体原因 + 降级参考提示），**只标注、不阻断生成、不触发重试、不写回缓存**——A/B 级健康输出零噪音，内容缺失型（空内容/降级占位）已有各自醒目提示故不叠加横幅；**决策头结构化（`decision_header_parse`）**在专家复盘提示词末尾追加一行机器可读的 `决策头：{"decisions":[{"code","action","priority"}]}` 契约，抽取侧优先读结构化头、失败回落确定性表格解析——两路共用同一套**决策词归一**判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），防「不建议加仓」「加仓或减仓」这类表述被判成相反方向写入决策账本；**关闭时该段不追加**，提示词与缓存指纹逐字节不变；**确定性信号沉淀（`signal_ledger`）**把市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限五类确定性算法评级沉淀为账本 `data/state/signal_ledger.jsonl`，每条记录附**实时 / 非实时**来源标签（来源判定复用既有数据质量设施：逐品种行情新鲜度 + 数据源降级事件，非实时即本次由降级/缓存行情算出），并把摘要注入智囊团复盘提示词——**统计与摘要默认只算实时记录**，防止降级数据算出的评级冒充真实战绩；关闭时账本不写盘、提示词与缓存指纹逐字节不变；**系统自检（`doctor_check`）**不在实验块而在**常规块**（默认开启、只读、不改报告产物），提供 TUI 菜单 `[T]` 与 Web「系统自检」卡片，一键盘点环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，其中「配置」组会校验本文件的 LLM 凭据是否可读——**自检只读、自身永不抛异常**，且 CLI 的 `doctor` 子命令不受该开关约束；本段未展开的**数据源凭据就绪（`datasource_credential_ready`）**属数据层、与 LLM 无关（详见 [配置指引-功能开关 §N](how-to-config.md#n-功能开关featuresjson)）。以上开关均可用 CLI 全局参数 `--experiment`（实验组简写，只开）或 `--feature NAME=VALUE`（全部开关、双向）单次切换（不写盘）
 - 若 4 个 LLM 报告模块（global_macro / expert_review / health_check / penetration_deep）全部关闭，LLM 分析章节在报告中整体隐藏
 - 仅 `news_correlation` 开启时不影响 LLM 分析章节可见性
+- `self_review`（生成后自检）不是报告章节模块：它以**附录**形式附在 LLM 分析部分之后，不参与章节编号与目录导航，也不影响 LLM 分析章节的可见性
 
 ---
 
@@ -348,7 +351,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 - `llm_max_thinking_concurrency`（int，默认 `1`）：开启 Extended Thinking 的模块（health_check / expert_review 等 `thinking_enabled_{module}=true`）并发的最大请求数。多 thinking 模块同时涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），此信号量将 thinking 请求串行化（同时最多 N 个，默认 1），非 thinking 模块不受此限。设大可提升 thinking 并发速度，但可能提高偶发空响应概率，建议保持默认 1
 
 > **全局并发 vs 端点级节流**：`llm_max_concurrency` 是**全局**上限（所有模块合起来最多几个线程）；若需对**某个具体端点**单独限速/限并发（例如同一个程序里，订阅制编码端点要低频串行、按量付费端点可以放开），用 `llm_providers.json` 各 provider 条目内的 `pacing` 段——两者叠加生效，见下方「端点级节流」。
-- `enabled_llm`（dict，默认全部 `true`，仅 `news_correlation` 为 `false`）：各模块独立启停开关
+- `enabled_llm`（dict，默认除 `news_correlation` 与 `self_review` 为 `false` 外均为 `true`）：各模块独立启停开关。`self_review`（生成后自检）为实验能力：开启后每次报告额外调用一次 LLM，对四个分析模块产出做一致性复核并输出【自检清单】附录（与确定性事实校验分层不重叠，失败不影响主内容）
 - `fact_check`（dict，默认 `{tolerance: 1.0}`）：LLM 输出数值一致性检测配置。详见下节「事实校验容差配置」
 - `pricing`（dict，默认 `{currency: "CNY", timezone: "Asia/Shanghai", peak_periods: ["09:00-12:00", "14:00-18:00"], idle_periods: [], weekend_always_idle: true, holiday_always_idle: true}`）：模型 Token 定价表 + 峰谷时段配置，可省略（使用代码内置定价），仅需覆盖时添加。除 `currency`（货币符号）、`timezone`（峰谷判定时区，IANA 名称）、`peak_periods` / `idle_periods`（高峰/闲时段，`"HH:MM-HH:MM"` 列表）、`weekend_always_idle`（周末全天闲时开关，默认 `true`）、`holiday_always_idle`（法定节假日全天闲时开关，默认 `true`）外，其余键按模型名合并覆盖价格。详见下方「完整模型定价表」章节
 - `news_correlation_top_n`（int，默认 `30`）：送 LLM 分析的新闻条数。仅 news_correlation 模块有效，值越大 Token 消耗越高
@@ -579,7 +582,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 }
 ```
 
-> 此文件支持 `//` 和 `/* */` 注释，可直接复制后按需修改。`enabled_llm.news_correlation` 默认 `false`，如需新闻 LLM 分析可改为 `true`。
+> 此文件支持 `//` 和 `/* */` 注释，可直接复制后按需修改。`enabled_llm.news_correlation` 与 `enabled_llm.self_review` 默认 `false`；如需新闻 LLM 分析或生成后自检可改为 `true`。
 </details>
 
 ---

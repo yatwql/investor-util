@@ -1242,9 +1242,37 @@ reload_pricing() → 合并 llm_settings.json → pricing
 
 所有键名由 `get_known_llm_settings_keys()` 统一校验。新增 LLM 模块只需在 registry.py 注册表中添加一行 `DataModuleDef`，无需修改 config 校验逻辑。
 
-> **辩论模块派生**：3 个辩论模块（`debate_pro`/`debate_con`/`debate_synthesis`，`settings_suffix` 同规则）同样按每模块 9 键派生（如 `model_debate_pro`、`system_prompt_debate_con`），使 `enabled_llm` 合法子键共 **8** 个（5 标准 + 3 辩论）。辩论开关实际由 `features.json` 的实验性 Flag（`llm_debate_procon`/`llm_debate_conditional`/`llm_debate_qa_concentration`）控制，`enabled_llm` 辩论子键仅属校验层合法键，不在菜单 [S] 展示（由 `tui_menu.LLM_MENU_HIDDEN_KEYS` 隐藏），注册表保留以维持缓存 TTL/前缀清理。
+> **辩论模块派生**：3 个辩论模块（`debate_pro`/`debate_con`/`debate_synthesis`，`settings_suffix` 同规则）同样按每模块 9 键派生（如 `model_debate_pro`、`system_prompt_debate_con`），使 `enabled_llm` 合法子键共 **9** 个（6 标准 + 3 辩论）。辩论开关实际由 `features.json` 的实验性 Flag（`llm_debate_procon`/`llm_debate_conditional`/`llm_debate_qa_concentration`）控制，`enabled_llm` 辩论子键仅属校验层合法键，不在菜单 [S] 展示（由 `tui_menu.LLM_MENU_HIDDEN_KEYS` 隐藏），注册表保留以维持缓存 TTL/前缀清理。
 
-### 12.3 LLM 模块配置合并（get_llm_config）
+### 12.3 报告深度档位（`llm_report_depth`）
+
+`config.json` 的三值档位（`brief` / `standard` / `deep`，缺省 `standard`）由 `llm/depth_profile.py` 定义（档位表**唯一事实来源**，模块集合从 `core/registry.py` 派生，不另写清单）：
+
+| 档位 | 参与模块上界 | 新闻采集 | 语义 |
+|:-----|:-------------|:---------|:-----|
+| `brief` | 仅 `global_macro` | 不加下界（用用户配置） | 最快最省，只看大势 |
+| `standard`（缺省） | 全部模块 | 不加下界（用用户配置） | 与未引入档位时**逐字节一致** |
+| `deep` | 全部模块 | 不少于 500 条 | 输入更大，推演更充分 |
+
+**两条关键约束**：
+1. **只收窄不放大**——`depth_gate(enabled, module_key, profile)` 取「档位上界 ∩ 逐模块开关」交集，档位**不得打开**用户在 `enabled_llm` 中显式关闭的模块；`brief` 下若交集为空，LLM 章节以既有占位机制呈现（不新增降级路径）。
+2. **档位不进提示词正文**——只作用于「哪些模块参与」与「新闻采集规模」。若写进正文，按缓存指纹的覆盖判据（提示词承载了哪些入参）四个模块的指纹构造必须同步并入档位值，写侧/预检侧一旦不同源即「预检永不命中（费用翻倍）」或「命中陈旧键（档位形同虚设）」；只改模块集合与采集规模则不改变既有提示词承载入参，**无需改动任何既有指纹构造**。
+
+消费点仅两处：编排层 `needs` 计算（模块集合）与报告层 `news_top_count` 解析（采集规模）。非默认档位在 LLM 用量页签写入一行自述（`standard` 不写，保持零噪声）。
+
+### 12.4 生成后自检（`self_review`，出厂默认关）
+
+**分层定位（与确定性校验不重叠）**：① `llm/fact_checker` 确定性校验（数值/代码/排名有据性 + 自动修正，**始终生效**）；② `llm/self_review.py` 模型层复核（结论与数据是否矛盾 / 是否有未标注的推测性表述 / 模块间结论是否互斥），经 `enabled_llm.self_review` 开启。
+
+**注册形态**：在 `core/registry.py` 登记（显示名/缓存前缀/TTL/用量统计/失败原因载体自动获得），但**刻意不进 `generators_orchestrator._MODULE_FNS`**——其输入是其余模块的产出，必须串行在它们之后，属**生成后一遍**而非线程池并行调度模块（模块注册纪律明文允许该形态；`test_self_review.py` 有「不在并行表」的防注册漂移用例）。
+
+**产物交付**：不扩宽 4 元组 `llm_content` 契约（报告层多处按位置解包），改用**运行作用域载体 + 报告层零参 pull**（与 `report/experimental_notice` 同源模式）：`set_self_review_block()` 写入本轮区块，Excel 用量页签与 HTML「生成后自检（附录）」区块以零参函数取用。HTML 落点为附录区块（不占章节号、不参与目录导航）。
+
+**指纹**：`module_fingerprint.self_review_fingerprint()` 为**内容寻址**（各模块产出正文 + 持仓/穿透摘要），仅写侧使用、不进 `MODULE_FINGERPRINT_BUILDERS`（该表供预检/写两侧共享同一 `ModuleFingerprintInputs` 形状）——产出未变（含全部缓存命中）时键不变，自检同样命中缓存。
+
+**防线**：开关关闭时**零 LLM 调用**；生成器异常/空产出不影响主内容（仅登记失败原因）；固定尾注「自检为辅助信号，不构成质量保证」由代码在渲染前确定性补全（防把「自检通过」读作质量背书）；提示词硬禁投资建议（并经 `call_llm` 漏斗叠加合规声明）。
+
+### 12.5 LLM 模块配置合并（get_llm_config）
 
 `llm_settings.json`、`llm_key.json` 和 `llm_providers.json` 三层合并：
 
@@ -1377,7 +1405,7 @@ LLM 集成层与系统其他组件的接口：
 | `reasoning_effort_{module_key}` | DeepSeek 推理强度 | `low` / `medium` / `high` / `max` |
 | `thinking_budget_{module_key}` | Claude/Gemini Thinking 预算 token | `10240` |
 
-所有参数在 `llm_settings.json` 中配置，`{module_key}` 取值为 `global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation`。
+所有参数在 `llm_settings.json` 中配置，`{module_key}` 取值为 `global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation` / `self_review`。
 
 ### 附录 B：内置模型定价表
 

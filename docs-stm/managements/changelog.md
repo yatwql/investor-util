@@ -39,6 +39,13 @@
 - **TUI 菜单测试写死模块逐条清单**（既有测试写法问题）：`test_filter_hides_legacy_debate_modules` 原写死 5 个模块名集合，新增一个 LLM 模块即变红。已改为结构导出断言「注册表全集 ⊖ 菜单隐藏集」，并补「隐藏集成员必须仍在注册表内」的结构约束（新增模块不再需要改此用例）。
 - **模板结构回归在实现中发挥作用**：新增 HTML 自检区块时曾误加未闭合 Jinja `{% if %}`，被 `test_html_report_structure*` 整体报错捕获并修复；自检区块最终以「附录区块」形态落地（不占报告章节号、不参与目录导航），故既有章节结构约束与计数保持不变。
 
+### 文档（管理/用户文档全量对齐）
+
+- **新增需求条目 3 条**（`requirements.md`）：`R-LLM-11` 报告深度档位、`R-LLM-12` 生成后自检、`R-DATA-08` 调用级数据源指定；`testplan.md` 追溯表同步补 3 行载体（`test_depth_profile.py` + `test_summary.py` / `test_self_review.py` + `test_llm_module_info.py` / `test_chain_overrides.py`），口径计数 278 → 281 条。
+- **用户文档对齐本批能力**：`how-to-config-llm.md`（`enabled_llm` 示例与说明补 `self_review`、菜单 [S] 面板编号随新增模块位移为 1-6/7-11/12-27、补「自检为附录、不影响章节可见性」说明）、`how-to-config.md`（缓存 TTL 表补 `llm_self_review` 行）、`reports-instruction.md`（用量页签补「深度档位自述行 + 条件上屏的生成后自检行/清单」）、`README.md`（LLM 模块数 5 → 6、补深度档位/生成后自检/数据源排障开关三条）、`how-to-use-cli-mode.md` 与 `how-to-use-tui-menu.md`（编号与参数已随实现同步）。
+- **管理文档对齐**：`llm-technical.md` 新增 §12.3「报告深度档位」与 §12.4「生成后自检」（含「档位不进提示词正文」的取舍与指纹口径）、§12.5 顺延、附录 A 模块键补 `self_review`、`enabled_llm` 合法子键 8 → 9；`technical.md` 共享层函数数 4 → 5。
+- **数据快照刷新**：`test-coverage.md` 模式表与环境耗时表由 `test-runner --mode bench --update-docs` 实测回填（`all` 8119 / `dev-verify` 3410 / `verify` 5483）；`folders.md` 项目统计与测试用例数（`def test_` 7,756、收集 8,119）同步。
+
 ### 修复（实现自查发现的债务）
 
 - **生成后自检的成本明细行缺失**（rf-515）：模块已在注册表登记，但报告层模块明细表仍固定枚举 5 个模块 → 自检实际运行后，**用量总计包含它、明细行不含它**，行合计与总计对不上（成本不可追溯）。已改为「固定五模块 + 条件追加自检」（有数据或有跳过原因才上屏），既保证成本透明，又避免默认关闭时每份报告留空行噪声。

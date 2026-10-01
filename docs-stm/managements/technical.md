@@ -2907,7 +2907,7 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
                api_base.py   HTTP 调用 + 重试骨架
                strategy.py   多 Provider 切换策略引擎
                   │
-共享层         generators.py         4 个单例生成函数
+共享层         generators.py         5 个单例生成函数（含 generate_self_review）
                generators_news.py   新闻 LLM 批量关联分析
                _llm_news_correlation.py  新闻关联闭包/结果缓存/安全直调
                prompts.py           System/User Prompt 构建

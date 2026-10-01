@@ -323,7 +323,7 @@
 
 ### 2.1 需求 ID ↔ 验证载体映射
 
-`requirements.md` 的**每条单段需求 ID**（34 域 / 278 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。**口径说明**：本表覆盖 `R-<域>-<序号>` 形式的单段 ID（脚本按此正则提取）；`requirements.md` §7.2–§7.8.4 另有一批双段子域 ID（如 `R-LLM-GM-01`、`R-LLM-DB-PROCON-01`，共 60 条），按现有约定不在本追溯表范围内、亦不参与门禁断言。
+`requirements.md` 的**每条单段需求 ID**（34 域 / 281 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。**口径说明**：本表覆盖 `R-<域>-<序号>` 形式的单段 ID（脚本按此正则提取）；`requirements.md` §7.2–§7.8.4 另有一批双段子域 ID（如 `R-LLM-GM-01`、`R-LLM-DB-PROCON-01`，共 60 条），按现有约定不在本追溯表范围内、亦不参与门禁断言。
 
 | 需求 ID | 验证载体（`测试文件::用例`，粗粒度时仅列文件） | 补全批次 |
 |:--|:--|:--:|
@@ -522,6 +522,9 @@
 | R-LLM-06 | `src/test/unit/llm/test_llm_chain_strategies.py` + `src/test/unit/llm/test_strategy.py` | 批 5 |
 | R-LLM-07 | `src/test/unit/config/test_llm_settings.py` + `src/test/unit/config/test_config_llm_multi.py` | 批 5 |
 | R-LLM-09 | `src/test/unit/llm/test_prompts_signals.py` | 批 5 |
+| R-LLM-11 | `src/test/unit/llm/test_depth_profile.py` + `src/test/unit/report/test_summary.py` | 批 5 |
+| R-LLM-12 | `src/test/unit/llm/test_self_review.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
+| R-DATA-08 | `src/test/unit/fetcher/test_chain_overrides.py` | 批 5 |
 | R-LLM-10 | `src/test/unit/llm/test_llm_pacing.py`（策略解析/容错/注册/零开销直通/间隔/抖动/并发上限/异常释放/403 不重试）+ `src/test/unit/config/test_config_llm_multi.py`（pacing 透传/缺省不注入/非对象忽略） | 批 5 |
 | R-LLM-08 | `src/test/unit/llm/test_llm_api.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
 | R-PF-01 | `src/test/unit/config/test_features.py` + `src/test/unit/report/test_section_visibility.py` | 批 5 |
