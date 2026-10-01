@@ -113,6 +113,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "仅 --type both/full 时有效）",
     )
     report_p.add_argument("--force-llm", action="store_true", help="强制重新生成 LLM 内容（跳过缓存）")
+    report_p.add_argument(
+        "--prefer-source",
+        action="append",
+        default=None,
+        metavar="NAME",
+        help="本次运行优先使用的数据源（可重复；不写配置，仅排到链首，不绕过熔断）",
+    )
+    report_p.add_argument(
+        "--exclude-source",
+        action="append",
+        default=None,
+        metavar="NAME",
+        help="本次运行排除的数据源（可重复；用于排障复现，不写配置）",
+    )
 
     # ── cache 子命令 ──
     cache_p = sub.add_parser("cache", help="缓存管理")
@@ -410,6 +424,39 @@ def _cli_read_holdings_with_flows(config: dict) -> "tuple[list, list, list] | No
     return parsed.holdings, parsed.transactions, parsed.dividends
 
 
+def _resolve_source_overrides(args: argparse.Namespace) -> tuple[str | None, tuple[str, ...]]:
+    """解析 ``--prefer-source`` / ``--exclude-source``（未知源名即报错退出）。
+
+    取值域由 ``fetcher.chain.known_provider_names()`` 派生（不另写清单）；未知源名
+    报错而非静默忽略——否则用户会误以为已生效。multi 首选项取第一个（与
+    ``config.preferred_provider`` 的单一首选语义一致）。
+
+    Returns:
+        ``(preferred, exclude_tuple)``；未传参时为 ``(None, ())``。
+
+    Raises:
+        SystemExit: 传入未知源名时退出（退出码为用法错误）。
+    """
+    from src.python.fetcher.chain import known_provider_names
+
+    preferred_list = list(getattr(args, "prefer_source", None) or [])
+    exclude_list = list(getattr(args, "exclude_source", None) or [])
+    if not preferred_list and not exclude_list:
+        return None, ()
+
+    known = known_provider_names()
+    unknown = [n for n in [*preferred_list, *exclude_list] if n not in known]
+    if unknown:
+        raise SystemExit(
+            "[ERR] 未知数据源: "
+            + "、".join(unknown)
+            + "\n可用数据源: "
+            + "、".join(sorted(known))
+            + "\n提示: 源名与 config.json 的 preferred_provider / datasource 路由同名"
+        )
+    return preferred_list[0], tuple(exclude_list)
+
+
 def _handle_report(args: argparse.Namespace, config: dict) -> int:
     """处理 report 子命令——委托 orchestrator 共享层。
 
@@ -425,18 +472,24 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
 
     reporter = CliProgressReporter(verbose=args.verbose)
 
-    result = generate_report(
-        holdings=holdings,
-        config=config,
-        reporter=reporter,
-        report_type=args.type,
-        # None（未显式传 --history）→ generate_report 回退到配置层 history.fetch_mode 解析
-        fetch_history=args.history,
-        force_llm=args.force_llm,
-        output_dir=args.output,
-        transactions=transactions,
-        dividends=dividends,
-    )
+    # 调用级源覆盖（仅本次运行，不写配置）：排障/评测用（如「只用腾讯源复现」）
+    from src.python.fetcher.chain import chain_overrides
+
+    preferred_source, exclude_sources = _resolve_source_overrides(args)
+
+    with chain_overrides(preferred=preferred_source, exclude=exclude_sources):
+        result = generate_report(
+            holdings=holdings,
+            config=config,
+            reporter=reporter,
+            report_type=args.type,
+            # None（未显式传 --history）→ generate_report 回退到配置层 history.fetch_mode 解析
+            fetch_history=args.history,
+            force_llm=args.force_llm,
+            output_dir=args.output,
+            transactions=transactions,
+            dividends=dividends,
+        )
 
     reporter.print_timing_summary()
     # 运行收尾资源摘要：LLM 成本 + 缓存命中率（无 LLM 调用/缓存读写时各自静默）

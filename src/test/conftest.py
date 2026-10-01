@@ -472,6 +472,26 @@ def _declared_recording_anchor(names: list[str]):
     return max(anchors) if anchors else None
 
 
+@pytest.fixture(autouse=True)
+def _auto_reset_chain_overrides():
+    """重置调用级数据源覆盖（进程级运行作用域状态，避免测试间污染）。"""
+    from src.python.fetcher.chain import reset_chain_overrides
+
+    reset_chain_overrides()
+    yield
+    reset_chain_overrides()
+
+
+@pytest.fixture(autouse=True)
+def _auto_reset_self_review_carrier():
+    """重置生成后自检的运行作用域载体（模块级状态，避免测试间污染）。"""
+    from src.python.llm.self_review import reset_self_review
+
+    reset_self_review()
+    yield
+    reset_self_review()
+
+
 @pytest.fixture
 def cassette_recording(request):
     """录制会话 —— 需 ``--run-live`` + ``--record-cassettes`` 双开关，否则跳过。

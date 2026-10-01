@@ -182,6 +182,18 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         settings_suffix="penetration_deep",
         cache_groups=("preload",),
     ),
+    # ── 生成后自检（实验能力，出厂默认关；生成后一遍执行，不属并行调度模块）──
+    # 登记于此的目的：显示名/缓存前缀/TTL/用量统计/失败原因载体全部复用既有机制。
+    # **刻意不进 generators_orchestrator._MODULE_FNS**：其输入是其余模块的产出，
+    # 必须串行在它们之后，不属线程池并行调度（见 llm/self_review.py 模块说明）。
+    DataModuleDef(
+        "生成后自检",
+        "llm_self_review",
+        cache_prefixes=("llm_self_review_",),
+        cache_ttl=7200,
+        settings_suffix="self_review",
+        cache_groups=("preload",),
+    ),
     # ── 辩论模式（preload 组，实验功能）──
     DataModuleDef(
         "辩论白脸",

@@ -48,6 +48,9 @@ _DEFAULT_CONFIG = {
     "enable_action": True,  # 行动建议独立章（再平衡信号+交易纪律+调仓建议+收益归因，默认开，菜单 P 可切换）
     # ── C. 数据源与提供商 ──
     "news_top_count": 300,
+    # 报告深度档位（brief/standard/deep）：在模块开关之上收窄参与集合与新闻采集条数，
+    # 不得打开已关闭模块；standard 为缺省档，与未引入档位时逐字节一致。
+    "llm_report_depth": "standard",
     "news_sources": {
         "sina": True,
         "eastmoney": True,
@@ -261,6 +264,7 @@ def _build_template_from_defaults() -> str:
         # ── C ──
         "  // ── C. 数据源与提供商 ──",
         f'  "news_top_count": {json.dumps(d["news_top_count"])},',
+        f'  "llm_report_depth": {json.dumps(d["llm_report_depth"])},  // 报告深度档位 brief/standard/deep（收窄模块集合与新闻条数，不打开已关模块）',
         f'  "news_sources": {json.dumps(d["news_sources"], ensure_ascii=False)},',
         f'  "preferred_provider": {json.dumps(d["preferred_provider"])},',
         "  // DataSinking 全文本财报（仅 A 股；requests_per_second/daily_quota 为 0 时按 plan 自动）",

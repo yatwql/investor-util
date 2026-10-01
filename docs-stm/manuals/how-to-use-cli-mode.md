@@ -79,6 +79,8 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | `--type {basic,both,full}` | `basic`=仅 Excel 报告（约 1 分钟，默认）；`both`=Excel+HTML（不含 LLM，约 2 分钟）；`full`=全量含 LLM（约 5 分钟，需 LLM 配置） |
 | `--history {auto,off}` | 是否获取组合历史走势：`auto`=获取，`off`=跳过。未指定时按配置 `history.fetch_mode`（默认 `auto`）。仅 `--type both` / `full` 时有效 |
 | `--force-llm` | 强制重新调用 LLM API（忽略缓存），生成最新 LLM 内容 |
+| `--prefer-source NAME` | 本次运行优先使用某数据源（可重复；仅排到该数据源链首，**不绕过熔断与凭据就绪预检**，不写配置） |
+| `--exclude-source NAME` | 本次运行排除某数据源（可重复；用于排障复现，如「排除新浪看是否仍取到数据」）。未知名即报错并列出可用源名 |
 
 ---
 
@@ -179,6 +181,9 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 ```bash
 # 生成全量报告，强制重新调用 LLM
 .venv/bin/python -m src.python.cli --verbose report --type full --history auto --force-llm
+
+# 排障：本次运行只用腾讯源、并排除新浪源（不写配置，退出即恢复）
+.venv/bin/python -m src.python.cli report --prefer-source tencent --exclude-source sina
 
 # 基础 Excel 报告，输出到指定目录
 .venv/bin/python -m src.python.cli --output D:/my_reports report --type basic

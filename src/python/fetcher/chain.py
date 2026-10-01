@@ -8,7 +8,8 @@ chain 中按优先级列出 provider，主链路失败后自动递补。
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -75,9 +76,11 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
 
 
 def _get_chain(data_type: str) -> list[str]:
-    """获取指定数据类型的 Provider Chain（考虑用户配置）。
+    """获取指定数据类型的 Provider Chain（考虑用户配置与本次运行覆盖）。
 
-    用户可在 config.json 中通过 preferred_provider.<data_type> 指定首选。
+    优先级（高到低）：调用级覆盖（:func:`chain_overrides`）> 配置级
+    ``config.json → preferred_provider.<data_type>`` > 默认链。
+    两者都只是**排序/过滤**：既不新增链上源，也不绕过熔断与凭据就绪预检。
     """
     chain = list(_DEFAULT_CHAINS.get(data_type, []))
     try:
@@ -89,6 +92,72 @@ def _get_chain(data_type: str) -> list[str]:
             logger.info("%s Provider Chain: 根据配置首选 '%s'", data_type, preferred)
     except (KeyError, TypeError):
         logger.debug("[chain] preferred_provider 配置解析失败，使用默认链")
+    return _apply_overrides(chain, data_type)
+
+
+# ── 调用级源覆盖（本次运行作用域） ──────────────────────────
+#
+# 语义：进程内的一次报告运行 = 一个覆盖作用域（非线程局部——报告管线在取数阶段存在
+# 并行，线程局部变量不会传播到工作线程，会造成「同一次运行内部分请求生效」的隐式
+# 不一致）。生命周期由上下文管理器保证：退出即恢复，长驻进程（Web 模式）不留残留。
+_override_preferred: str | None = None
+_override_exclude: frozenset[str] = frozenset()
+
+
+def known_provider_names() -> set[str]:
+    """全部已登记 provider 名（由默认链并集派生，不另写清单）。"""
+    names: set[str] = set()
+    for chain in _DEFAULT_CHAINS.values():
+        names.update(chain)
+    return names
+
+
+@contextmanager
+def chain_overrides(
+    preferred: str | None = None,
+    exclude: Iterable[str] | None = None,
+):
+    """本次运行作用域内覆盖源链排序/过滤（可嵌套，退出即恢复）。
+
+    Args:
+        preferred: 首选源名；不在该数据类型链上或不是已知 provider 时仅告警、不生效。
+        exclude: 需排除的源名集合（仅本次运行）。
+    """
+    global _override_preferred, _override_exclude
+    previous = (_override_preferred, _override_exclude)
+    _override_preferred = preferred
+    _override_exclude = frozenset(exclude or ())
+    try:
+        yield
+    finally:
+        _override_preferred, _override_exclude = previous
+
+
+def reset_chain_overrides() -> None:
+    """清空调用级覆盖（测试隔离用；生产路径由上下文管理器负责恢复）。"""
+    global _override_preferred, _override_exclude
+    _override_preferred = None
+    _override_exclude = frozenset()
+
+
+def _apply_overrides(chain: list[str], data_type: str) -> list[str]:
+    """按调用级覆盖过滤/重排链（不改变链上源的集合，除显式 exclude）。"""
+    if _override_exclude:
+        filtered = [p for p in chain if p not in _override_exclude]
+        if filtered != chain:
+            logger.info("%s Provider Chain: 本次运行排除 %s", data_type, "、".join(sorted(_override_exclude)))
+        chain = filtered
+
+    preferred = _override_preferred
+    if preferred:
+        if preferred not in known_provider_names():
+            logger.warning("未知 provider 名 '%s'（本次运行首选不生效）", preferred)
+        elif preferred not in chain:
+            logger.warning("%s Provider Chain: 本次运行首选 '%s' 不在该链上，忽略", data_type, preferred)
+        elif chain[0] != preferred:
+            chain.remove(preferred)
+            chain.insert(0, preferred)
+            logger.info("%s Provider Chain: 本次运行首选 '%s'", data_type, preferred)
     return chain
 
 

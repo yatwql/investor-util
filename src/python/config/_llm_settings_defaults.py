@@ -24,6 +24,7 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
         "health_check": True,
         "penetration_deep": True,
         "news_correlation": False,
+        "self_review": False,
     },
     "system_prompt_global_macro": None,
     "model_global_macro": None,
@@ -65,6 +66,17 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     "thinking_enabled_penetration_deep": False,
     "thinking_budget_penetration_deep": 12000,
     "reasoning_effort_penetration_deep": "high",
+    # ── 生成后自检（出厂默认关：开启后每次报告额外调用一次 LLM）──
+    "system_prompt_self_review": None,
+    "model_self_review": None,
+    "temperature_self_review": 0.1,
+    "max_tokens_self_review": 2048,
+    "timeout_self_review": 90,
+    "cache_enabled_self_review": True,
+    "output_brief_self_review": False,
+    "thinking_enabled_self_review": False,
+    "thinking_budget_self_review": 6000,
+    "reasoning_effort_self_review": "low",
     "system_prompt_news_correlation": None,
     "model_news_correlation": None,
     "temperature_news_correlation": 0.1,
@@ -182,6 +194,8 @@ def _get_default_llm_settings_template() -> str:
     _module_block("expert_review")
     _module_block("health_check")
     _module_block("penetration_deep")
+    # 生成后自检：实验能力，出厂默认关（enabled_llm.self_review = false）
+    _module_block("self_review")
 
     # ── news_correlation ──
     # 该模块无 output_brief 键（llm_settings_keys 已按后缀自动排除），故不走

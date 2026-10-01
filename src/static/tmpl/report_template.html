@@ -2342,6 +2342,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
 {% endif %}
 
+    {# 生成后自检（附录区块：不占报告章节号，不参与目录导航；零产出时整段不出现） #}
+    {% if llm_enabled and self_review_block %}
+    <div class="llm-self-review" id="sec-self_review" style="order: {{ section_numbers['penetration_deep'] }};">
+        <div style="font-weight:600; font-size:15px; margin:18px 0 8px;">🔎 生成后自检（附录）</div>
+        {{ self_review_block | safe }}
+    </div>
+    {% endif %}
+
     <!-- ═══════════════════════════════════════════════════════ -->
     
     {% if section_visible("portfolio_history_drawdown") %}

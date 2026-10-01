@@ -215,6 +215,7 @@ def _generate_report_both(
     from src.python.config.features import is_feature_enabled
     from src.python.core.perf import PerfCollector
     from src.python.core.registry import get_report_section_order
+    from src.python.llm.depth_profile import effective_news_limit, resolve_depth_profile
     from src.python.report._snapshot import capture_snapshot, fetch_history_data
     from src.python.report.excel_generator import generate_excel_report
     from src.python.report.html_writer import write_html_report
@@ -239,7 +240,7 @@ def _generate_report_both(
     _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
     sec_order = get_report_section_order(config)
     output = output_dir or config.get("output_dir", "reports")
-    news_top_count = int(config.get("news_top_count", 300))
+    news_top_count = effective_news_limit(int(config.get("news_top_count", 300)), resolve_depth_profile(config))
 
     # ── 1. 行情获取（轻量级，无指数/穿透/分类） ──
     perf.start("行情获取")

@@ -51,21 +51,9 @@
 
 ### P3 — 预期实施，有空时安排
 
-> 以下 plan-63 ~ plan-65 共 3 项源自 TradingAgents-CN 仓库研究（详细分析与参考文件见 [`tradingagents-cn-research.md`](../plan/tradingagents-cn-research.md)），均为候选评估非承诺；立项时先定语义名再设计，按开关注册表纪律登记，须补回归测试与 pytest marker，不引入其整体架构（FastAPI/Vue/MongoDB/LangGraph）。
+> **本批 P3 已清空**。源 TradingAgents-CN 仓库研究的 10 项候选（详细分析见 [`tradingagents-cn-research.md`](../plan/tradingagents-cn-research.md)）中 plan-59 ~ plan-65 已完成（2026-10-01）：前四项见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-63/64/65 见同文档「LLM 成本调节 / 生成后自检 / 调用级源指定」段；整体设计见 [`llm-depth-selfreview-source-override-design.md`](../plan/llm-depth-selfreview-source-override-design.md)。
 >
-> 同批的 plan-59（LLM token/成本记账）、plan-60（缓存命中率统计输出）、plan-61（合规免责声明集中注入）、plan-62（数据源自接口降级）已完成（2026-10-01），见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)。
-
-#### 🔲 `plan-63` 复盘报告深度档位
-
-**动机**：LLM 复盘模块成本与用户耐心不匹配，缺成本调节手段。**概要**：提供「简版/标准/深度」三档（实验组，默认关），按档位控制 LLM 调用轮数与输入新闻条数。研究对象实现：TradingAgents-CN 单股研究 5 级深度按参与角色数绑成本的思路。
-
-#### 🔲 `plan-64` LLM 输出后自检清单
-
-**动机**：LLM 复盘报告无生成后质检环节。**概要**：借鉴 `Reflector` 反思机制做简化版——生成后由模型对结论做一致性自检（如「判断与行情数据是否矛盾」），作为输出质检一步；与 plan-55 的确定性模板判定互补。研究对象实现：`tradingagents/graph/reflection.py`。
-
-#### 🔲 `plan-65` 方法级 fallback 显式 preferred/exclude 参数
-
-**动机**：现有备源切换由熔断自动决定，调试指定某源不便。**概要**：借鉴 `get_xxx_with_fallback(preferred_sources=, exclude_sources=)` 形态，调用点可显式指定优先源或排除已失败源。研究对象实现：`app/services/data_sources/manager.py`（价值偏低，随 plan-62 一并评估）。
+> 剩余 P4 三项（plan-66 ~ plan-68）仍为候选；**立项前须先做本仓库现状比对**（rf-510 教训：plan-64 原立项前提「无生成后质检」即被 `llm/fact_checker` 既有实现部分推翻，最终按「分层不重叠」重新定位）。
 
 ### P4 — 实验功能
 
