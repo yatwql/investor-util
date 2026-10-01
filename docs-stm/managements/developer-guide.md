@@ -18,16 +18,31 @@
 | **Python 环境** | 所有 Python 命令一律使用项目虚拟环境解释器——Linux/macOS 用 `.venv/bin/python`，Windows 用 `.venv\Scripts\python.exe`；**禁止**裸 `python3`/`python`/`pytest`（会命中系统解释器，缺失 pandas 等依赖）。运行测试、脚本、CLI 均同 |
 | **提交规范** | 约定式提交：`feat`/`fix`/`docs`/`refactor`/`test`/`chore`/`perf`/`ci` + 可选 scope；修复类可在标题标注对应任务编号 |
 | **日志** | `logging` → `logs/app.log` + console（INFO / WARNING / ERROR） |
-### pi 模型采样配置（DeepSeek 编程档）
+### pi 模型配置（编程档采样 + 订阅端点节流）
 
-仓库内 `.pi/models.json` 是本项目**版本受控**的 pi 模型配置（DeepSeek 编程档）：
+仓库内 `.pi/models.json` 是本项目**版本受控**的 pi 模型配置，两类覆盖：
+
+**① 编程档采样（`deepseek` 按量端点）**
 
 | 覆盖项 | 值 | 为什么 |
 |---|---|---|
-| `samplingParams.temperature` | `0.0` | DeepSeek 官方参数建议：**代码生成/数学解题 用 0.0**（通用对话 1.3、创意写作 1.5）；低温让补丁/重构更确定、减少格式抖动。已实测该参数在 `deepseek-v4-flash` 的 OpenAI 兼容端点被接受（HTTP 200） |
-| `maxTokens` | `65536` | 内置目录值 384K 对编程偏大；收窄到 64K 仍远超常规补丁/文件写入需要，同时给单次响应设了成本上限。**注意思考（reasoning）与正文共享该预算**——预算被思考吃满时正文会被截断（与项目 LLM 层同一现象） |
+| `samplingParams.temperature` | `0.0` | DeepSeek 官方建议：**代码生成/数学解题用 0.0**（通用对话 1.3、创意写作 1.5）；低温让补丁/重构更确定、减少格式抖动 |
+| `maxTokens` | `65536` | 内置目录值 384K 对编程偏大；收窄到 64K 仍远超常规补丁/文件写入需要，同时给单次响应设成本上限。**注意思考（reasoning）与正文共享该预算**——预算被思考吃满时正文会被截断 |
 
-**未改动**：`thinkingLevelMap`（内置 `low/high/max` 已够用，用 `/thinking` 切档）、`compat`（`thinkingFormat: deepseek` 等由 pi 内置目录提供）、`contextWindow`（保持 1M 真实能力；若想更早触发压缩以降本，可自行下调，代价是上下文保留变少）、`input`（flash 为纯文本，视觉实验版另有一个模型）。
+> **覆盖键必须与目录当前模型 id 精确匹配**：id 不一致时该覆盖**不生效且无任何告警**（pi 侧按 `Unknown override IDs are ignored` 处理，静默忽略）。因此 **`pi --list-models` 是本文件的唯一验收手段**——JSON 已写入不等于生效；目录同步（内置目录升级、`/model` 重载）后须复核各覆盖仍命中，否则 `maxTokens`/`contextWindow` 会悄悄退回目录默认值。
+
+**② 订阅端点节流（`kimi-coding` / `opencode-go`）**
+
+订阅制端点（Kimi Code / OpenCode Go）按**滚动时间窗**计量，窗口额度按「交互式 agentic coding」标定；而 pi 的自动压缩阈值是 `contextTokens > contextWindow − reserveTokens(默认 16K)`，目录里这些端点 `contextWindow` 高达 1M——**压缩几乎不触发，每轮请求要把近百万 tokens 的上下文发出去**，几个轮次就吃掉一个窗口。故对这两类端点统一收窄（**只降不升**，已低于上限的模型不写覆盖）：
+
+| 覆盖项 | 值 | 为什么 |
+|---|---|---|
+| `maxTokens` | `65536` | 目录值 128K~384K（如 `grok-4.6` 500K）对编程无必要，且思考与正文共享该预算 |
+| `contextWindow` | `262144` | 把「压缩触发点」从 ~1M 拉到 ~246K → **单轮输入封顶**，这是降窗口消耗的最大单项；代价是压缩更频繁、跨轮记忆略少 |
+
+**③ 思考档位（全局，不在本文件）**：`~/.pi/agent/settings.json` 的 `defaultThinkingLevel` 设为 `low`（原 `high`）。思考 token 计入 output，实测输出量≈输入量是其主因；需要时用 `/thinking` 临时提升。
+
+**未改动**：`thinkingLevelMap`（内置 `low/high/max` 已够用，用 `/thinking` 切档）、`compat`（`thinkingFormat` 等由 pi 内置目录提供）、`input`（flash 为纯文本，视觉实验版另有一个模型）、`samplingParams`（仅对 OpenAI 兼容传输生效；订阅端点走 Anthropic/兼容协议时该参数不适用，故未对它们下发）。
 
 **为什么放在 `.pi/` 而要软链生效**：pi CLI **只读** `~/.pi/agent/models.json`（`getModelsPath() = getAgentDir() + "/models.json"`，`getAgentDir()` 只认 `PI_AGENT_DIR` 或 `~/.pi/agent`），**不读项目级 `.pi/models.json`**；项目级 `.pi/` 仅支持 `settings.json`/扩展/技能/主题。因此仓库文件是**唯一事实来源**，用软链挂到全局路径生效：
 
@@ -37,8 +52,9 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 验证与排查：
 
-- `pi --list-models | grep deepseek` → `max-out` 应显示 `65.5K`（覆盖已生效）；出现 `Warning: errors loading models.json` 说明 JSON/schema 有问题
-- `samplingParams` 只对 **OpenAI 兼容传输**生效（pi 内置 deepseek provider 即 `openai-completions`）✓
+- **`timeout 90 pi --list-models | grep -E 'deepseek|kimi|opencode'`**：`deepseek-flash` 应显示 `65.5K`、`kimi-coding`/`opencode-go` 应显示 `262.1K / 65.5K`；仍是 `1M / 384K` 即**覆盖键名已失效**（目录改名），按上文修正键名
+- 出现 `Warning: errors loading models.json` 说明 JSON/schema 有问题
+- 订阅端点用量激增时的排查顺序：① `--list-models` 确认覆盖生效 → ② 会话是否超长（`/new` 分任务）→ ③ 思考档位是否被 `/thinking` 提升
 - 若 `~/.pi/agent/models.json` 已是实体文件（例如以后 `/login` 或 `pi config` 写过），软链会失败：先备份再决定合并
 
 ## 三级门禁
