@@ -1,8 +1,10 @@
 {
   // LLM Provider 多链配置（顺序即 priority 升序）
   // 主：Kimi（开放平台 Anthropic 兼容端点）/ 备：DeepSeek
+  // 次备：Kimi Code 订阅（api.kimi.com/coding，Anthropic 兼容端点；凭据在 llm_key.json 的
+  //       kimi-code 块，未填时轮空失败不影响主/备）
   // 末备：Kimi K3（OpenCode Go 订阅中转，Anthropic 兼容端点；api_key 在 llm_key.json 的
-  //       kimi-opencode-go 块，未填时该条目轮空失败不影响前两源）
+  //       kimi-opencode-go 块，未填时该条目轮空失败不影响前几源）
 
   "strategy": "priority",
   "preferred_providers": {},
@@ -13,6 +15,15 @@
       "credentials_ref": "kimi-main",
       "priority": 10,
       "timeout": 120
+    },
+    {
+      "name": "kimi-code",
+      "provider": "claude",
+      "credentials_ref": "kimi-code",
+      "priority": 15,
+      "timeout": 120,
+      // 订阅制端点收紧节流（与按量端点放开相对）：最小间隔 1s + 在途并发 1
+      "pacing": { "min_interval": 1, "max_concurrency": 1 }
     },
     {
       "name": "deepseek-main",
