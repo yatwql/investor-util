@@ -47,9 +47,9 @@ def _init_llm_usage_sheet(ws: Any) -> int:
     if review_block:
         ws.cell(row=row, column=1, value=_REVIEW_TITLE).font = _NOTE_FONT
         row += 1
-        from src.python.report.llm_content import _strip_html
+        from src.python.report.llm_content import strip_html
 
-        for _line in _strip_html(review_block).split("\n"):
+        for _line in strip_html(review_block).split("\n"):
             if _line.strip():
                 ws.cell(row=row, column=1, value=_line.strip())
                 row += 1

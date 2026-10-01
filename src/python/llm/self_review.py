@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any
 
 logger = logging.getLogger("invest")
 
@@ -80,7 +79,6 @@ def run_self_review(
     penetrated_assets: list[dict] | None,
     llm_config: dict | None,
     force: bool = False,
-    http_client: Any = None,
 ) -> bool:
     """生成后一遍：按开关执行自检，产出写入运行作用域载体。
 
@@ -90,7 +88,6 @@ def run_self_review(
         penetrated_assets: 穿透资产列表（自检比对基准）。
         llm_config: llm_settings 配置字典。
         force: 强制重算（跳过缓存）。
-        http_client: 可复用 HTTP 客户端。
 
     Returns:
         是否产出了自检内容（开关关闭、无有效产出、调用失败均返回 ``False``）。
@@ -115,7 +112,6 @@ def run_self_review(
             holdings_details,
             penetrated_assets,
             force=force,
-            http_client=http_client,
             llm_config=llm_config,
         )
     except Exception as e:  # noqa: BLE001 — 自检失败不得影响主内容（报告照常产出）

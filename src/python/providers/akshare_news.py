@@ -202,8 +202,10 @@ def fetch_news(num: int = 100) -> list[dict[str, Any]]:
             all_items.append(item)
 
     if not caixin_items or not cctv_items:
-        logger.info(
-            "akshare 新闻源内降级: 财新 %d 条 / CCTV %d 条（其一为 0 即发生了接口级降级）",
+        # 0 条可能来自接口失败、也可能来自「该渠道当日确实无新内容」——不在此断言降级；
+        # 接口级失败由各接口自身的 WARNING 日志给出（此处只提供两接口条数对比）。
+        logger.debug(
+            "akshare 新闻两接口条数: 财新 %d / CCTV %d（任一为 0 请结合上方日志判断是否接口失败）",
             len(caixin_items),
             len(cctv_items),
         )
