@@ -56,7 +56,7 @@ from src.python.llm.prompts_action import (
     _build_global_macro_prompt,
     _build_health_check_prompt,
     _build_penetration_deep_prompt,
-    _build_qa_concentration_block,
+    _build_concentration_qa_block,
 )
 
 # ── 从 prompts_signals 导出 ───────────────────────────────
@@ -116,7 +116,7 @@ __all__ = [
     "_build_health_check_prompt",
     "_build_penetration_deep_prompt",
     "_build_debate_synthesis_prompt",
-    "_build_qa_concentration_block",
+    "_build_concentration_qa_block",
     "_build_self_review_prompt",
     # 新闻关联分析
     "_build_holdings_summary",

@@ -42,8 +42,8 @@ class TestResolveExperimentFlagsEdge:
     @pytest.mark.edge
     def test_surrounding_whitespace_tolerated(self):
         """首尾空白被容忍。"""
-        flags, unknown = resolve_experiment_flags(["  signal_ledger  "])
-        assert flags == {"signal_ledger"}
+        flags, unknown = resolve_experiment_flags(["  decision_reflection  "])
+        assert flags == {"decision_reflection"}
         assert unknown == []
 
     @pytest.mark.edge
@@ -124,7 +124,7 @@ class TestSaveFeatureOverridesEdge:
         """
         with (
             patch("src.python.config.features.write_json_atomic", return_value=False),
-            patch.dict(FEATURE_FLAGS, {"signal_pre_digest": True}, clear=False),
+            patch.dict(FEATURE_FLAGS, {"deterministic_signal": True}, clear=False),
         ):
-            save_feature_overrides({"signal_pre_digest": False}, merge=False)  # 不抛
-            assert FEATURE_FLAGS["signal_pre_digest"] is False
+            save_feature_overrides({"deterministic_signal": False}, merge=False)  # 不抛
+            assert FEATURE_FLAGS["deterministic_signal"] is False

@@ -100,7 +100,7 @@ def _build_global_macro_prompt(
 # ── 集中度反问引导 ──────────────────────────────────────────
 
 
-def _build_qa_concentration_block(
+def _build_concentration_qa_block(
     holdings_details: list[dict] | None,
     total_mv: float,
     threshold: float = 0.20,
@@ -176,8 +176,9 @@ def _build_qa_concentration_block(
     return "".join(lines)
 
 
-# ── 条件推理 + 反问引导 ─────────────────────────────────────
-# 通过 _build_expert_review_prompt 的 enable_conditional/enable_qa_concentration 参数控制
+# ── 条件推理 + 集中度问答 ─────────────────────────────────
+# 通过 _build_expert_review_prompt 的 enable_conditional/include_concentration_qa 参数控制
+# （集中度问答段为辩论流程内建段落，仅辩论路径传 True；阈值配置 debate.concentration_qa.threshold）
 
 
 def _build_expert_review_prompt(
@@ -194,7 +195,7 @@ def _build_expert_review_prompt(
     metrics: dict | None = None,
     *,  # 以下为实验模式参数
     enable_conditional: bool = False,
-    enable_qa_concentration: bool = False,
+    include_concentration_qa: bool = False,  # 辩论流程内建集中度问答段（非开关控制）
     industry_concentration: dict[str, float] | None = None,
     skip_scenarios: bool = False,  # 辩论模式跳过所有情景分析
     enable_signal_digest: bool = False,
@@ -213,7 +214,7 @@ def _build_expert_review_prompt(
         skip_scenarios: True 时跳过所有情景分析指令（辩论 pro/con 用，
             避免双重情景输出）。
         enable_signal_digest: 注入算法评级预消化信号块（开关
-            ``signal_pre_digest``；无可用信号时静默跳过）。
+            ``deterministic_signal``；无可用信号时静默跳过）。
         enable_structured_header: 追加受控 JSON 决策头契约（开关
             ``decision_header_parse``，默认开启）。关闭时提示词与未加此项前逐字节一致，
             不扰动既有缓存指纹。
@@ -337,16 +338,19 @@ def _build_expert_review_prompt(
                 "避免'视情况而定'这类模棱两可的表述。"
             )
 
-    # ── 集中度问答引导 ──────────────────────────────────
-    if enable_qa_concentration:
+    # ── 集中度问答引导（辩论流程内建段落，仅辩论路径注入） ──
+    if include_concentration_qa:
         try:
             from src.python.config._llm_settings import get_llm_config
 
             _cfg = get_llm_config()
-            _threshold = (_cfg or {}).get("debate", {}).get("qa_concentration", {}).get("threshold", 0.20)
+            _debate_cfg = (_cfg or {}).get("debate", {})
+            # 现行键 concentration_qa；遗留键 qa_concentration 兜底兼容
+            _qa_cfg = _debate_cfg.get("concentration_qa") or _debate_cfg.get("qa_concentration") or {}
+            _threshold = _qa_cfg.get("threshold", 0.20)
         except Exception:
             _threshold = 0.20
-        _qa_block = _build_qa_concentration_block(
+        _qa_block = _build_concentration_qa_block(
             holdings_details,
             total_mv,
             threshold=_threshold,
@@ -385,7 +389,7 @@ def _build_health_check_prompt(
             判据必须相同，否则指纹侧把 ``None`` 与 ``""`` 折叠成同一个空串、本函数
             却渲染出不同文本，会让两种提示词共用一份缓存。
         enable_signal_digest: 注入算法评级预消化信号块（实验项
-            ``signal_pre_digest``；无可用信号时静默跳过）。
+            ``deterministic_signal``；无可用信号时静默跳过）。
     """
     now_bj = datetime.now(BEIJING_TZ).strftime("%Y-%m-%d %H:%M")
     cat_parts = [f"{k}{v}只" for k, v in (categories or {}).items()]
@@ -522,7 +526,7 @@ def _build_debate_synthesis_prompt(
     pro_text: str,
     con_text: str,
     enable_conditional: bool = False,
-    enable_qa_concentration: bool = False,
+    include_concentration_qa: bool = False,  # 辩论流程内建集中度问答段（非开关控制）
     industry_concentration: dict[str, float] | None = None,
     holdings_details: list[dict] | None = None,
     total_mv: float = 0.0,
@@ -531,14 +535,14 @@ def _build_debate_synthesis_prompt(
 
     当 ``enable_conditional=True`` 时额外追加条件推理的情景分析指令，
     让指挥官在综合正反观点的基础上按涨/跌/震荡情景分别给出建议。
-    当 ``enable_qa_concentration=True`` 时额外追加集中度问答引导段，
+    ``include_concentration_qa=True``（辩论流程内建行为）时追加集中度问答引导段，
     要求综合权衡输出集中度风险的量化评估、基准对比与调仓建议。
 
     Args:
         pro_text: 白脸分析的完整文本。
         con_text: 黑脸分析的完整文本。
         enable_conditional: 是否追加条件推理情景分析指令。
-        enable_qa_concentration: 是否追加集中度问答引导段。
+        include_concentration_qa: 是否追加集中度问答引导段（辩论流程内建行为）。
         industry_concentration: 行业集中度字典 {行业名: 占比}，供集中度问答使用。
         holdings_details: 持仓明细列表，供集中度问答计算使用。
         total_mv: 持仓总市值，供集中度问答计算使用。
@@ -570,16 +574,19 @@ def _build_debate_synthesis_prompt(
         except Exception:
             logger.warning("[debate] 综合阶段条件推理情景追加失败，已跳过")
 
-    # ── 集中度问答（对齐需求 R-LLM-DB-QA-） ────
-    if enable_qa_concentration:
+    # ── 集中度问答（对齐需求 R-LLM-DB-QA-；辩论流程内建段落） ────
+    if include_concentration_qa:
         try:
             from src.python.config._llm_settings import get_llm_config
 
             _cfg = get_llm_config()
-            _threshold = (_cfg or {}).get("debate", {}).get("qa_concentration", {}).get("threshold", 0.20)
+            _debate_cfg = (_cfg or {}).get("debate", {})
+            # 现行键 concentration_qa；遗留键 qa_concentration 兜底兼容
+            _qa_cfg = _debate_cfg.get("concentration_qa") or _debate_cfg.get("qa_concentration") or {}
+            _threshold = _qa_cfg.get("threshold", 0.20)
         except Exception:
             _threshold = 0.20
-        _qa_block = _build_qa_concentration_block(
+        _qa_block = _build_concentration_qa_block(
             holdings_details,
             total_mv,
             threshold=_threshold,
@@ -600,5 +607,5 @@ __all__ = [
     "_build_health_check_prompt",
     "_build_penetration_deep_prompt",
     "_build_debate_synthesis_prompt",
-    "_build_qa_concentration_block",
+    "_build_concentration_qa_block",
 ]

@@ -591,7 +591,7 @@ _SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL = """你是投资智囊团首席指挥官�
 
 输出格式：行动建议用 bullet point 分优先级。"""
 
-# ── 集中度问答（qa_concentration）模式下的综合权衡追加段 ──────────
+# ── 集中度问答（concentration_qa，辩论流程内建段落）的综合权衡追加段 ──────────
 # qa 开启时，_build_debate_synthesis_prompt 会在 user prompt 追加
 # "### 集中度问答"引导段（要求回答版）。此处 system prompt 追加输出要求，
 # 确保 LLM 在综合权衡中按结构输出该章节。追加段不重写编号结构，
@@ -606,24 +606,24 @@ _SYSTEM_DEBATE_SYNTHESIS_QA_APPENDIX = """
 
 def _build_system_debate_synthesis(
     enable_conditional: bool = False,
-    enable_qa_concentration: bool = False,
+    include_concentration_qa: bool = False,
 ) -> str:
     """构建综合权衡阶段的 system prompt。
 
     conditional（条件推理）关闭时返回基线版本（禁止插入情景分析段落）；
     开启时返回强化版（允许按 user prompt 输出情景分析，但强化引用纪律，
-    避免重复复述白脸/黑脸观点）。集中度问答（qa_concentration）开启时，
-    在所选版本末尾追加集中度问答章节的输出要求。
+    避免重复复述白脸/黑脸观点）。``include_concentration_qa=True``（辩论流程
+    内建行为）时，在所选版本末尾追加集中度问答章节的输出要求。
 
     Args:
         enable_conditional: 是否启用 conditional（条件推理）模式。
-        enable_qa_concentration: 是否启用集中度问答模式。
+        include_concentration_qa: 是否追加集中度问答章节输出要求（辩论流程内建行为）。
 
     Returns:
         综合权衡阶段的 system prompt 字符串。
     """
     base = _SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL if enable_conditional else _SYSTEM_DEBATE_SYNTHESIS
-    if enable_qa_concentration:
+    if include_concentration_qa:
         base = base + _SYSTEM_DEBATE_SYNTHESIS_QA_APPENDIX
     return base
 

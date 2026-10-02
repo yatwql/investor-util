@@ -365,7 +365,7 @@
 | 7 | 行动建议 | E/B/L | 行动建议（enable_action 控制，**默认开**） | 再平衡信号/交易纪律/调仓建议/收益归因 |
 | 8 | 财经新闻热点与持仓关联分析 | B/L | 新闻 | 5 源新闻关键词匹配，可选 LLM 增强 |
 | 9 | 全球政经局势 | L | LLM | 基于指数+持仓结构生成 |
-| 10 | 智囊团深度复盘 | L | LLM | 三阶段圆桌会议；Feature Flag 开启辩论模式（正反辩论/条件推理/集中度问答）时输出含辩论内容并标注"🧪 辩论模式"/"🧪 实验模式"标签 |
+| 10 | 智囊团深度复盘 | L | LLM | 三阶段圆桌会议；Feature Flag 开启辩论模式（正反辩论/条件推理，集中度问答段内建于辩论流程）时输出含辩论内容并标注"🧪 辩论模式"/"🧪 实验模式"标签 |
 | 11 | 持仓体检报告 | L | LLM | 五维度量化评分 |
 | 12 | 穿透深度分析 | L | LLM | 行业集中度+国别暴露 |
 | 13 | 组合历史走势与回撤 | B/L | 历史 | 一章两区块：走势表（as-if 市值曲线+累计收益率+最大回撤+年化波动率+基准对比）+ 回撤矩阵（回撤面积图+独立回撤事件明细）+ 危机区间标注（2015/2018/2020/2022） |
@@ -660,7 +660,7 @@ LLM 生成章节：基于指数行情与持仓结构，输出全球政经局势�
 
 #### 6.4.10 智囊团深度复盘
 
-LLM 生成章节：三阶段圆桌会议式深度复盘。启用辩论模式 Feature Flag（正反辩论/条件推理/集中度问答）时，输出含辩论内容并标注"🧪 辩论模式"/"🧪 实验模式"标签。
+LLM 生成章节：三阶段圆桌会议式深度复盘。启用辩论模式 Feature Flag（正反辩论/条件推理，集中度问答段内建于辩论流程）时，输出含辩论内容并标注"🧪 辩论模式"/"🧪 实验模式"标签。
 
 #### 6.4.11 持仓体检报告
 LLM 五维度量化评分，每项满分 100：
@@ -932,7 +932,7 @@ LLM 五维度量化评分，每项满分 100：
 | R-LLM-05 | 所有 LLM 模块的 API 调用量（Token、费用、模块明细）需在报告中统计展示 |
 | R-LLM-06 | Multi-Provider Chain 支持 4 种切换策略：priority（优先级排序）、weighted（加权随机）、cost_first（价格最低优先）、fallback_only（仅主 provider 失败时切换，等价于 priority）。`proxy_preferred` 为 per-provider 后处理标记，不属策略 |
 | R-LLM-07 | 凭据（api_key）**只**存放于 `llm_key.json` 的凭据块，Provider 路由配置（`llm_providers.json`）必须经 `credentials_ref` 引用，不得内联 `api_key`——出现非空内联值时该条目校验不通过并被跳过并给出可执行修正提示；`model`/`endpoint` 作为非敏感路由字段可写在路由条目中并按条目优先覆盖凭据块同名值，条目缺省时取值于凭据块 |
-| R-LLM-09 | **确定性信号预消化（含叙事-数字背离）**：`signal_pre_digest`（默认开）把算法已算出的确定性结论预消化为带方向标注的 `信号：…` 行注入专家复盘与持仓体检提示词——五路信号：市场温度、持仓估值分位、尾部风险、**持仓基本面**（质量档与年度趋势同向才给方向）、**叙事与数字背离**（管理层讨论与分析摘要语气 × 指标趋势/同比方向，确定性比对，只列依据不下结论）。出现背离项时追加一行要求：请在结论中显式指出背离点并说明以哪一侧为准；**无背离时提示词与未引入该项时逐字节一致**。基本面与背离两路受 DataSinking 数据底座门禁控制（未就绪 → 数据契约缺席 → 信号自动缺席）。**不新增 LLM 调用**：读侧注入既有契约，信号文本进缓存指纹保证读写键同源 |
+| R-LLM-09 | **确定性信号预消化（含叙事-数字背离）**：`deterministic_signal`（默认开，读侧注入面）把算法已算出的确定性结论预消化为带方向标注的 `信号：…` 行注入专家复盘与持仓体检提示词——五路信号：市场温度、持仓估值分位、尾部风险、**持仓基本面**（质量档与年度趋势同向才给方向）、**叙事与数字背离**（管理层讨论与分析摘要语气 × 指标趋势/同比方向，确定性比对，只列依据不下结论）。出现背离项时追加一行要求：请在结论中显式指出背离点并说明以哪一侧为准；**无背离时提示词与未引入该项时逐字节一致**。基本面与背离两路受 DataSinking 数据底座门禁控制（未就绪 → 数据契约缺席 → 信号自动缺席）。**不新增 LLM 调用**：读侧注入既有契约，信号文本进缓存指纹保证读写键同源 |
 | R-LLM-11 | **报告深度档位**（`config.json` 的 `llm_report_depth`，取值 `brief` / `standard` / `deep`，默认 `standard`）：一次选择同时约束**参与模块集合**与**新闻采集规模**；档位只做**上界收窄**——不得打开用户在 `enabled_llm` 中显式关闭的模块（`brief` 下若交集为空则 LLM 章节以占位呈现）；`deep` 档新闻采集不少于 500 条（`standard`/`brief` 不改用户配置）；取值非法时回落 `standard` 并告警；**档位不写入提示词正文**，故既有四个模块的缓存指纹构造无需并入档位；缺省档位下模块集合与新闻条数与未引入档位时逐字节一致 |
 | R-LLM-12 | **生成后自检**（`llm_settings.json` 的 `enabled_llm.self_review`，出厂默认 `false`）：开启后每次报告在四个分析模块产出之后追加一次模型层复核，输出固定条目的【自检清单】（结论与数据是否矛盾 / 是否有未标注的推测性表述 / 模块间结论是否互斥）；**与确定性事实校验分层不重叠**（后者始终生效，本项只做模型层复核）；关闭时**零 LLM 调用**；自检失败或未产出不影响主内容（仅登记失败原因）；输出恒附「辅助信号、不构成质量保证」尾注；其用量在 LLM 用量页签按「有数据才上屏」参与明细（保证行合计与总计一致）|
 | R-LLM-10 | **端点级节流与并发治理**：Provider 路由条目可声明 `pacing`（`min_interval` 最小请求间隔秒 / `jitter` 间隔随机抖动比例 / `max_concurrency` 在途并发上限）对该端点单独限速限并发，与全局 `llm_max_concurrency` 两级叠加；**未声明即无约束**（零开销直通，行为与未引入时逐字节一致）——使同一程序可对订阅制端点收紧、对按量付费端点放开。端点返回 **403**（配额/风控，如订阅额度滚动窗口、并发上限）时**不重试**（窗口按时间滚动，重试无益且加剧风控画像），直接降级下一 Provider 并以 `quota_exceeded` 差异化提示；**429 / 503** 仍按 `max_retries` 重试 |
@@ -1007,7 +1007,7 @@ LLM 五维度量化评分，每项满分 100：
 | 需求标识 | 需求描述 |
 |:---------|:---------|
 | R-LLM-DB-01 | 辩论模式是智囊团深度复盘（`expert_review`）模块的可选增强通路，通过 Feature Flag 独立开关，默认关闭 |
-| R-LLM-DB-02 | 辩论模式支持三种增强形态：正反辩论（白脸/黑脸/综合）、条件推理、集中度问答 |
+| R-LLM-DB-02 | 辩论模式支持增强形态：正反辩论（白脸/黑脸/综合）、条件推理（Feature Flag）；集中度问答为辩论流程内建段（无开关） |
 | R-LLM-DB-03 | 辩论模式启用时，智囊团深度复盘的生成入口由标准模式切换为 debate 通路，输出内容包含辩论标识和分段数据 |
 | R-LLM-DB-04 | 辩论模式与标准模式互斥，同一报告周期内仅使用生效的一路（辩论优先于标准模式） |
 | R-LLM-DB-05 | 辩论模式使用独立于标准 expert_review 的三段缓存（pro/con/synthesis），指纹复用 expert_review 的持仓指纹（排除行情波动字段），默认 TTL 24h |
@@ -1047,12 +1047,12 @@ LLM 五维度量化评分，每项满分 100：
 
 | 需求标识 | 需求描述 |
 |:---------|:---------|
-| R-LLM-DB-QA-CONCENTRATION-01 | 集中度问答启用的标志是 Feature Flag `llm_debate_qa_concentration` 为 true |
-| R-LLM-DB-QA-CONCENTRATION-02 | 系统自动检测持仓集中度，当单品种市值占比 ≥ threshold（默认 0.20）时触发集中度问答块生成 |
+| R-LLM-DB-QA-CONCENTRATION-01 | 集中度问答段为辩论流程（`llm_debate_procon` / `llm_debate_conditional`）的内建段落，无独立 Feature Flag（原开关 `llm_debate_qa_concentration` 已撤销并入辩论流程） |
+| R-LLM-DB-QA-CONCENTRATION-02 | 系统自动检测持仓集中度，当单品种市值占比 ≥ threshold（默认 0.20，配置键 `debate.concentration_qa.threshold`，兼容更名前键名 `debate.qa_concentration.threshold`）时触发集中度问答块生成 |
 | R-LLM-DB-QA-CONCENTRATION-03 | 集中度问答块输出内容：集中度风险的量化评估、与分散化基准的定量对比、针对性的调仓建议 |
 | R-LLM-DB-QA-CONCENTRATION-04 | 集中度判定阈值通过 `llm_settings.json` 的 `debate.qa_concentration.threshold` 配置，类型 float，范围 (0, 1)，默认 0.20 |
 | R-LLM-DB-QA-CONCENTRATION-05 | 集中度问答块嵌入智囊团深度复盘输出中，位于辩论段落之后、调仓建议之前 |
-| R-LLM-DB-QA-CONCENTRATION-06 | 集中度问答不产生独立 LLM API 调用（内容由现有 prompt 模板的 `_build_qa_concentration_block()` 构建：标准模式嵌在 expert_review 的 user prompt 中，辩论模式嵌在综合权衡 synthesis 的 user prompt 中） |
+| R-LLM-DB-QA-CONCENTRATION-06 | 集中度问答不产生独立 LLM API 调用（内容由现有 prompt 模板的 `_build_concentration_qa_block()` 构建：辩论模式嵌在白脸/黑脸（expert_review prompt 复用）与综合权衡 synthesis 的 user prompt 中；标准模式不再注入） |
 
 ---
 
@@ -1275,7 +1275,7 @@ LLM 五维度量化评分，每项满分 100：
 | `debate.procon.synthesis_model` | str/null | null | 正反辩论综合阶段模型覆盖（null=使用 pro/con 相同的模型） |
 | `debate.procon.synthesis_temperature` | float | 0.5 | 正反辩论综合阶段 temperature（低于常规以保持客观，范围 [0.0, 2.0]） |
 | `debate.conditional.scenarios` | list[dict] | 上涨/下跌/震荡 三组 | 条件推理预设情景列表，每条含 `name`（情景名）/ `change`（涨跌幅）/ `desc`（描述）三个必填字段 |
-| `debate.qa_concentration.threshold` | float | 0.20 | 集中度问答触发阈值（单品种占比 ≥ 此值时触发），范围 (0, 1) |
+| `debate.concentration_qa.threshold` | float | 0.20 | 集中度问答触发阈值（单品种占比 ≥ 此值时触发），范围 (0, 1) |
 | `debate.max_total_tokens_per_report` | int | 72000 | 单次报告辩论模式总 token 预算上限（超出后跳过 debate 回退标准模式） |
 | `debate.per_call_timeout_override` | int | 90 | 辩论模式单次 API 调用超时覆盖秒数 |
 
@@ -1322,13 +1322,12 @@ LLM 五维度量化评分，每项满分 100：
 
 | 开关名 | 类型 | 默认值 | 说明 |
 |:-------|:----:|:------:|:-----|
-| `llm_debate_procon` / `llm_debate_qa_concentration` | bool | false（默认关闭） | 辩论模式两增强通路独立启停：正反辩论/集中度问答 |
+| `llm_debate_procon` | bool | false（默认关闭） | 辩论模式增强通路启停：正反辩论（集中度问答段内建于流程，阈值 `debate.concentration_qa.threshold`） |
 | `llm_debate_conditional` | bool | true（默认开启） | 辩论-条件推理启停：在既有分析调用内追加上涨/下跌/震荡情景段（**不增加调用次数**）。**默认开启**——情景段与既有输出在同一次调用内产出 |
 | `decision_reflection` | bool | false（默认关闭） | 决策跨期反思闭环启停：登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词 |
-| `signal_pre_digest` | bool | true（默认开启） | 信号预消化启停：市场温度/估值分位/尾部风险/**持仓基本面**/**叙事与数字背离**五路预消化为带方向标注的信号行（`信号：… 看多/看空/中性/风险高/中/低/需交叉核实`）注入专家复盘与持仓体检提示词（后两路需 DataSinking 数据底座就绪，未就绪自动缺席）。**默认开启**——读侧注入既有信号，不额外调用 LLM、不写盘；无可用信号时静默跳过、缓存键逐字节不变 |
+| `deterministic_signal` | bool | true（默认开启） | 确定性信号模块启停（读侧注入 + 跨期沉淀双面，原 `signal_pre_digest`/`signal_ledger` 两开关合并）。信号注入面：市场温度/估值分位/尾部风险/**持仓基本面**/**叙事与数字背离**五路预消化为带方向标注的信号行（`信号：… 看多/看空/中性/风险高/中/低/需交叉核实`）注入专家复盘与持仓体检提示词（后两路需 DataSinking 数据底座就绪，未就绪自动缺席）。**默认开启**——读侧注入既有信号，不额外调用 LLM、不写盘；无可用信号时静默跳过、缓存键逐字节不变 |
 | `module_quality_gate` | bool | true（默认开启） | 模块级质量分级启停：对 4 个 LLM 模块输出按完整性/篇幅评 A~F，低评级中「内容在但存在缺陷」者随内容头部注入 `【内容质量提示】` 横幅（只标注、不阻断、不重试、不写回缓存）。**默认开启**——纯只读分级，A/B 级健康输出零噪音 |
 | `decision_header_parse` | bool | true（默认开启） | 决策头结构化启停：专家复盘提示词追加一行受控 JSON 决策头（`决策头：{"decisions":[…]}`），抽取侧优先读结构化头、失败回落确定性表格解析（决策词归一，防写反方向）；关闭时提示词逐字节不变。**默认开启**——两路抽取口径同源，关闭只是去掉一层机器可读保障 |
-| `signal_ledger` | bool | false（默认关闭） | 确定性数值信号沉淀启停：把市场温度/估值分位/尾部风险/风格因子/再平衡超限五类确定性评级沉淀为 `data/state/signal_ledger.jsonl` 账本，每条附实时-非实时来源标签；统计与注入提示词的摘要默认只算实时记录，防非实时记录冒充真实战绩 |
 | `metrics_sharpe` / `metrics_calmar` / `metrics_hhi` / `metrics_winrate` / `metrics_turnover` / `metrics_risk_contribution` / `metrics_beta` | bool | true | 量化指标独立启停（夏普/卡玛/HHI/胜率/换手率/风险贡献/Beta） |
 | `enable_interactive_charts` | bool | true | 报告 HTML 交互图表（Chart.js）；关闭时回退基础 Canvas 图表 |
 | `doctor_check` | bool | true（默认开启） | 系统自检功能上屏：开启时 TUI 菜单显示 `[T]` 系统自检项、Web 运行状态区渲染「系统自检」卡片（`GET /api/doctor`）；置 false 则两处入口一并隐藏。**仅约束 TUI/Web 两个日常入口**——`doctor` CLI 子命令不受本开关约束（配置损坏正是它要诊断的场景，被开关拦住会形成死锁）。属**常规组**开关（TUI 菜单 `[S]` / Web 配置面板的「常规开关」块），只影响入口显隐、不进报告产物自述 |

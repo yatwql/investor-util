@@ -172,7 +172,7 @@ def generate_expert_review(
 
     辩论模式的附加功能通过 feature flag 注入 prompt：
       - conditional（条件推理）：追加涨/跌/震荡情景分析段
-      - qa_concentration（集中度问答）：追加集中度反问引导段
+      - 集中度问答段为辩论流程内建段落（阈值触发，见 _build_concentration_qa_block）
 
     Args:
         competitive_context: 竞争语境文本块（组合 vs 沪深300 收益对比），可选。
@@ -181,12 +181,10 @@ def generate_expert_review(
     """
     _fp_suffix = debate_feature_cache_suffix()
     _enable_conditional = "c" in _fp_suffix
-    _enable_qa_concentration = "q" in _fp_suffix
-    _enable_signal_digest = is_feature_enabled("signal_pre_digest")
+    _enable_signal_digest = is_feature_enabled("deterministic_signal")
     # 结构化决策头（decision_header_parse）：开关判定收敛在 suffix 函数内，
     # 关闭 → "" 且不追加提示词契约段；指纹侧由 module_fingerprint 同源现算。
     _structured_suffix = structured_header_cache_suffix()
-    _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
     # 指纹输入闭包与预检侧同构；后缀（辩论增强/教训/信号/决策头）统一在
     # module_fingerprint 内拼接，读写键同源由结构保证。
     # competitive_context / metrics 是其提示词正文段（对比块 + 指标表 + 情景分析），
@@ -222,8 +220,6 @@ def generate_expert_review(
             competitive_context=competitive_context,
             metrics=metrics,
             enable_conditional=_enable_conditional,
-            enable_qa_concentration=_enable_qa_concentration,
-            industry_concentration=_industry_conc,
             enable_signal_digest=_enable_signal_digest,
             enable_structured_header=bool(_structured_suffix),
         )
@@ -268,7 +264,7 @@ def generate_health_check(
     又进提示词（否则「源故障期间缓存、恢复后复用」会让报告陈述与此刻事实相反），
     本函数不自行渲染——见 ``llm/module_fingerprint.py`` 模块 docstring。
     """
-    _enable_signal_digest = is_feature_enabled("signal_pre_digest")
+    _enable_signal_digest = is_feature_enabled("deterministic_signal")
     # 指纹输入闭包与预检侧同构（见 generate_expert_review 同名注释）。
     _fingerprint_inputs = ModuleFingerprintInputs(
         total_mv=total_mv,
@@ -404,7 +400,7 @@ def generate_debate_procon(
 
     辩论模式下附加功能通过 feature flag 注入 pro/con/syn 的 prompt：
       - conditional（条件推理）：pro/con 各自含情景分析段
-      - qa_concentration（集中度问答）：pro/con 各自含集中度反问引导段
+      - 集中度问答段为辩论流程内建段落：pro/con/syn 各自含集中度反问引导段（阈值触发）
     组合后缀隔离所有缓存键，不同 feature 组合不串扰。
 
     pro 或 con 失败时返回 (None, None, None) — 由调用方决定是否回退普通模式。
@@ -419,8 +415,8 @@ def generate_debate_procon(
     # ── 辩论模式 feature 组合 ──────────────────────────
     _fp_suffix = debate_feature_cache_suffix()
     _enable_conditional = "c" in _fp_suffix
-    _enable_qa_concentration = "q" in _fp_suffix
-    _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv) if _enable_qa_concentration else None
+    # 集中度问答段为内建段落：只要触发阈值即进提示词，无需开关判定
+    _industry_conc = _compute_industry_concentration(penetrated_assets, total_mv)
 
     # ── 构建基础 user prompt（辩论模式跳过情景分析，避免双重输出） ──
     _user = _build_expert_review_prompt(
@@ -436,7 +432,7 @@ def generate_debate_procon(
         competitive_context=competitive_context,
         metrics=metrics,
         enable_conditional=_enable_conditional,
-        enable_qa_concentration=_enable_qa_concentration,
+        include_concentration_qa=True,  # 内建段落：辩论 pro/con 始终携带集中度问答段
         industry_concentration=_industry_conc,
         skip_scenarios=True,  # 辩论模式下 pro/con 不写情景分析，避免双重输出
     )
@@ -615,7 +611,7 @@ def generate_debate_procon(
         pro_text,
         con_text,
         enable_conditional=_enable_conditional,
-        enable_qa_concentration=_enable_qa_concentration,
+        include_concentration_qa=True,  # 内建段落：综合阶段始终携带集中度问答段
         industry_concentration=_industry_conc,
         holdings_details=holdings_details,
         total_mv=total_mv,
@@ -637,7 +633,7 @@ def generate_debate_procon(
         # "禁止插入情景分析" 直接冲突）。
         _synthesis_system = _build_system_debate_synthesis(
             _enable_conditional,
-            _enable_qa_concentration,
+            True,  # 内建段落：综合 system prompt 始终携带集中度问答输出要求
         )
         synthesis_result = generate_llm_module(
             _lc,

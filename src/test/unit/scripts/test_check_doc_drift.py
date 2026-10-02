@@ -144,10 +144,15 @@ class TestSwitchTable:
 
 class TestSwitchCounts:
     def test_triple_form_mismatch(self, drift):
-        findings = drift.check_switch_counts(
-            {Path("m.md"): "全部 30 项开关分三组（⚗实验 5 / 常规 16 / 报告章节与增强 8）"}
+        # 计数从注册表现算取值（禁写死演进总数）：仅报告组写错一位数
+        counts = drift._group_counts()
+        _wrong_report = counts["report"] + 1
+        _text = (
+            f"全部 {len(drift.feature_switch_registry)} 项开关分三组"
+            f"（⚗实验 {counts['experimental']} / 常规 {counts['standard']} / 报告章节与增强 {_wrong_report}）"
         )
-        assert len(findings) == 1 and "⚗实验 5 / 常规 16 / 报告章节与增强 8" in findings[0]
+        findings = drift.check_switch_counts({Path("m.md"): _text})
+        assert len(findings) == 1 and str(_wrong_report) in findings[0]
 
     def test_report_group_form_mismatch(self, drift):
         findings = drift.check_switch_counts({Path("m.md"): "报告组（后 8 项）= 报告块"})

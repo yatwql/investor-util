@@ -2924,7 +2924,7 @@ API 层         api.py        Provider 路由 + Multi-Provider Chain 遍历
 
 **LLM 模块配置化**：每个 LLM 模块（global_macro / expert_review / health_check / penetration_deep / news_correlation）在 `core/registry.py` 中通过 `settings_suffix` 注册，自动派生 `llm_settings.json` 的所有合法键名。
 
-**辩论模式（实验性路由）**：当 Feature Flag `llm_debate_procon` 启用时，`generators_orchestrator.py` 中的 `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`；`llm_debate_conditional` / `llm_debate_qa_concentration` 仅叠加模式组合，不触发路由。辩论模式与标准模式互斥（辩论优先），路由后 `skeleton.generate_llm_module()` 走辩论三段缓存（`llm_debate_pro_` / `llm_debate_con_` / `llm_debate_synthesis_`）而非标准 expert_review 缓存。三段独立的 `DataModuleDef` 注册在 `core/registry.py` 中（preload 组，24h TTL）。
+**辩论模式（实验性路由）**：当 Feature Flag `llm_debate_procon` 启用时，`generators_orchestrator.py` 中的 `_debate_wrapper` 闭包替换 `_MODULE_FNS["expert_review"]`；`llm_debate_conditional`（常规开关）仅叠加模式组合，不触发路由。辩论模式与标准模式互斥（辩论优先），路由后 `skeleton.generate_llm_module()` 走辩论三段缓存（`llm_debate_pro_` / `llm_debate_con_` / `llm_debate_synthesis_`）而非标准 expert_review 缓存。三段独立的 `DataModuleDef` 注册在 `core/registry.py` 中（preload 组，24h TTL）。
 
 各子模块的详细设计见 `llm-technical.md` §1~§4（架构总览、模块清单、骨架流程、并行编排）。
 
@@ -3297,8 +3297,8 @@ make_http_client(timeout=10.0) → httpx.Client
 | `fundamental_snapshot` | 持仓基本面（合并章：财务指标区块 + 财报摘要区块同页签/同章节呈现；可见性 `data_flag_any` OR，块级开关各控各的） | 持仓基本面 | 报告输出 | `enable_fundamental_snapshot`（= 两功能开关任一开启） |
 | `fundamental_snapshot_sheet` | 合并章 Excel 写入器（`write_fundamental_snapshot_sheet`；区块写入器 `_write_indicator_block` / `_write_digest_block`） | 持仓基本面 | 报告输出 | 无（渲染） |
 | `compute_real_valuation` | 真实历史估值分位（TTM 口径：多期每股收益差分 × 历史收盘价 → 历史 PE/PB 序列 → 当前值分位） | 资产穿透TOP10 | 分析计算 | 无（纯计算） |
-| `_fundamental_signal` | 持仓基本面信号（质量档与年度趋势同向才给方向，逐只指标聚合为分布） | LLM 提示词信号 | LLM 注入 | `signal_pre_digest`（默认开） |
-| `_narrative_divergence_signal` | 叙事与数字背离信号（摘要语气词频 × 指标趋势/同比确定性比对，只列依据不下结论） | LLM 提示词信号 | LLM 注入 | `signal_pre_digest`（默认开） |
+| `_fundamental_signal` | 持仓基本面信号（质量档与年度趋势同向才给方向，逐只指标聚合为分布） | LLM 提示词信号 | LLM 注入 | 随 `deterministic_signal`（默认开） |
+| `_narrative_divergence_signal` | 叙事与数字背离信号（摘要语气词频 × 指标趋势/同比确定性比对，只列依据不下结论） | LLM 提示词信号 | LLM 注入 | 随 `deterministic_signal`（默认开） |
 | `datasink_feature_ready` | DataSinking 数据底座就绪判定（配置位 `datasink.enabled` 开启 且 凭据就绪；纯本地、零请求）——门禁持仓基本面章区块二与真实历史估值分位 | 持仓基本面 | 数据获取 | `datasink.enabled`（默认开） |
 | `FinancialIndicatorFields` | 财务指标标准字段记录（金额单位元；比率为小数比例；可选数值缺失取 None） | 资产穿透TOP10 | 数据获取 | 无（契约） |
 | `akshare_financial` | akshare 财务指标（指标域主源，无需凭据；一条调用多股） | 资产穿透TOP10 | 数据获取 | 无（provider） |
@@ -3339,10 +3339,11 @@ make_http_client(timeout=10.0) → httpx.Client
 | `decision_review_block` | 「历史决策复盘」区块数据契约（结构稳定，HTML/Excel 双端消费） | 行动建议 | 监控 | 随 `decision_reflection` |
 | `decision_header_parse` | 决策头结构化 + 确定性解析兜底（词边界纪律归一解析器） | 行动建议 | 监控 | 开关 `decision_header_parse`（默认开，非实验项） |
 | `decision_header` | 决策词归一解析器（标签优先/长词优先/否定守卫/复合词左边界/二义不猜） | 行动建议 | 监控 | 随 `decision_header_parse`（A 通道无开关） |
-| `signal_pre_digest` | 信号预消化（资金流/温度/分位/尾部风险 → 带方向标注的一句话信号） | LLM 生成 | LLM 生成 | 开关 `signal_pre_digest`（默认开，非实验项） |
-| `prompts_signals` | 信号预消化提示词块（开关判定收敛于缓存后缀函数） | LLM 生成 | LLM 生成 | 随 `signal_pre_digest` |
-| `signal_ledger` | 确定性数值信号沉淀（五类评级登记 + live/demo 来源标签，排行榜默认 live_only） | LLM 生成 | 监控 | 实验开关 `signal_ledger`（默认关） |
-| `signal_record` | 确定性信号登记适配器（唯一持有语义词表映射，`core/` 不依赖 `analysis/`） | LLM 生成 | 监控 | 随 `signal_ledger` |
+| `deterministic_signal` | 确定性信号模块（实时注入 + 跨期沉淀双面：温度/分位/尾部风险预消化信号行 + 五类评级账本沉淀；原 `signal_pre_digest`/`signal_ledger` 两开关合并转正） | LLM 生成 | LLM 生成 | 开关 `deterministic_signal`（默认开，常规组） |
+| `prompts_signals` | 信号预消化提示词块（开关判定收敛于缓存后缀函数） | LLM 生成 | LLM 生成 | 随 `deterministic_signal` |
+| `signal_ledger` | 确定性数值信号沉淀（五类评级登记 + live/demo 来源标签，排行榜默认 live_only） | LLM 生成 | 监控 | 随 `deterministic_signal` |
+| `signal_record` | 确定性信号登记适配器（唯一持有语义词表映射，`core/` 不依赖 `analysis/`） | LLM 生成 | 监控 | 随 `deterministic_signal` |
+| `experiment_stats` | 实验功能使用统计（启用计数/最近启用日期，data/state/experiment_stats.json；报告入口自动记录，doctor 上屏；为转正/撤销决策提供客观数据） | 诊断 | 监控 | 无（观测设施） |
 | `module_quality_gate` | 模块级质量分级（4 个 LLM 模块按完整性/篇幅评 A~F，低评级注入质量横幅，只标注不阻断） | LLM 生成 | LLM 生成 | 开关 `module_quality_gate`（默认开，非实验项） |
 | `llm_quality` | 质量分级实现（口径判定 + 横幅注入 + Excel 载体契约） | LLM 生成 | LLM 生成 | 随 `module_quality_gate` |
 | `log_reader` | 日志读取（read_log/tail_log/parse_log） | 日志可视化 | 诊断 | 无（模块级） |
@@ -3375,9 +3376,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `reset_provider_usage` | 清空 provider 归属登记表（测试隔离） | 数据源可用性矩阵 | 监控 | 无 |
 | `enable_interactive_charts` | 报告图表交互（6 图 Chart.js 渲染，含离线/无引擎守卫与 Canvas 回退） | 投资分析汇总 / 资产穿透TOP10 / 持仓结构与集中度等图表区 | 报告输出 | 常规开关（默认开） |
 | `datasource_adapter` | 数据源适配契约（三段式适配 + 行情域三源等价性校验） | 数据源可用性矩阵 | 数据获取 | 常规开关（默认开；不改报告产物，只影响取数路径校验口径） |
-| `llm_debate_procon` | 辩论-正反辩论（三段式：白脸 → 黑脸 → 综合） | 智囊团深度复盘 | LLM 注入 | 实验开关（默认关） |
+| `llm_debate_procon` | 辩论-正反辩论（三段式：白脸 → 黑脸 → 综合；集中度问答段内建于流程） | 智囊团深度复盘 | LLM 注入 | 实验开关（默认关） |
 | `llm_debate_conditional` | 辩论-条件推理（上涨 / 下跌 / 震荡情景注入） | 智囊团深度复盘 | LLM 注入 | 常规开关（默认开） |
-| `llm_debate_qa_concentration` | 辩论-集中度问答（单品种占比 ≥20% 时附集中度量化评估） | 智囊团深度复盘 | LLM 注入 | 实验开关（默认关） |
+| `concentration_qa` | 集中度问答段（辩论流程内建：单品种占比超 `debate.concentration_qa.threshold` 时白脸/黑脸/综合各附集中度量化评估；原实验开关 `llm_debate_qa_concentration` 已撤销并入） | 智囊团深度复盘 | LLM 注入 | 无独立开关（随 `llm_debate_procon` 流程内建） |
 | `metrics_sharpe` | 量化指标-夏普比率 | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |
 | `metrics_calmar` | 量化指标-卡玛比率 | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |
 | `metrics_hhi` | 量化指标-HHI 集中度 | 智囊团深度复盘（量化指标表） | 分析计算 | 常规开关（默认开） |

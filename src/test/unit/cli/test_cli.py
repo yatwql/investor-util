@@ -119,20 +119,23 @@ class TestArgparse:
 
     def test_experiment_by_flag_name(self):
         """--experiment 接受开关名。"""
-        args = _build_parser().parse_args(["--experiment", "signal_ledger", "report"])
-        assert args.experiment == [("signal_ledger",)]
+        args = _build_parser().parse_args(["--experiment", "decision_reflection", "report"])
+        assert args.experiment == [("decision_reflection",)]
 
     def test_experiment_by_display_name(self):
         """--experiment 接受中文显示名（与 TUI 菜单 S 同源）。"""
-        args = _build_parser().parse_args(["--experiment", "确定性信号沉淀", "report"])
-        assert args.experiment == [("signal_ledger",)]
+        from src.python.config.features import feature_switch_registry
+
+        _label = feature_switch_registry["decision_reflection"].label
+        args = _build_parser().parse_args(["--experiment", _label, "report"])
+        assert args.experiment == [("decision_reflection",)]
 
     def test_experiment_repeatable(self):
         """--experiment 可重复指定，逐项独立解析。"""
         args = _build_parser().parse_args(
-            ["--experiment", "signal_ledger", "--experiment", "decision_reflection", "report"]
+            ["--experiment", "decision_reflection", "--experiment", "prosperity_framework", "report"]
         )
-        assert args.experiment == [("signal_ledger",), ("decision_reflection",)]
+        assert args.experiment == [("decision_reflection",), ("prosperity_framework",)]
 
     def test_experiment_all(self):
         """--experiment all 展开为全部实验功能。"""
@@ -202,8 +205,8 @@ class TestArgparseFeatureOverrides:
 
     def test_feature_on_experimental_switch(self):
         """实验开关同样可经 --feature 打开（与 --experiment 等价路径）。"""
-        args = _build_parser().parse_args(["--feature", "signal_ledger=on", "report"])
-        assert args.feature == [("signal_ledger", True)]
+        args = _build_parser().parse_args(["--feature", "deterministic_signal=on", "report"])
+        assert args.feature == [("deterministic_signal", True)]
 
     def test_feature_repeatable(self):
         """可重复指定，逐项独立解析并保留顺序。"""
@@ -236,36 +239,37 @@ class TestApplyCliExperiments:
         """未传 --experiment 时不改动任何开关。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "deterministic_signal", False)
         _apply_cli_experiments(None)
-        assert feat.FEATURE_FLAGS["signal_pre_digest"] is False
+        assert feat.FEATURE_FLAGS["deterministic_signal"] is False
 
     def test_empty_groups_is_noop(self, monkeypatch):
         """空列表同样不改动开关。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "decision_reflection", False)
         _apply_cli_experiments([])
-        assert feat.FEATURE_FLAGS["signal_pre_digest"] is False
+        assert feat.FEATURE_FLAGS["decision_reflection"] is False
 
     def test_enables_requested_flags(self, monkeypatch):
         """逐项启用命令行指定的实验功能。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "prosperity_framework", False)
         monkeypatch.setitem(feat.FEATURE_FLAGS, "decision_reflection", False)
-        _apply_cli_experiments([("signal_pre_digest",), ("decision_reflection",)])
-        assert feat.FEATURE_FLAGS["signal_pre_digest"] is True
+        _apply_cli_experiments([("prosperity_framework",), ("decision_reflection",)])
+        assert feat.FEATURE_FLAGS["prosperity_framework"] is True
         assert feat.FEATURE_FLAGS["decision_reflection"] is True
 
     def test_does_not_touch_other_flags(self, monkeypatch):
         """未指定的实验功能保持原值（不误开）。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "prosperity_framework", False)
         monkeypatch.setitem(feat.FEATURE_FLAGS, "llm_debate_conditional", False)
-        _apply_cli_experiments([("signal_pre_digest",)])
+        _apply_cli_experiments([("prosperity_framework",)])
         assert feat.FEATURE_FLAGS["llm_debate_conditional"] is False
+        assert feat.FEATURE_FLAGS["llm_debate_procon"] is False
 
     def test_not_persisted(self, monkeypatch):
         """命令行开关仅影响本次运行，不写 features.json。"""
@@ -273,7 +277,7 @@ class TestApplyCliExperiments:
 
         called: list[dict] = []
         monkeypatch.setattr(feat, "save_feature_overrides", lambda *a, **k: called.append({"a": a}))
-        _apply_cli_experiments([("signal_pre_digest",)])
+        _apply_cli_experiments([("decision_reflection",)])
         assert called == []
 
 
@@ -302,10 +306,10 @@ class TestApplyCliSwitches:
         from src.python.config import features as feat
 
         monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_hhi", True)
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_ledger", False)
-        _apply_cli_switches([("metrics_hhi", False), ("signal_ledger", True)])
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "deterministic_signal", False)
+        _apply_cli_switches([("metrics_hhi", False), ("deterministic_signal", True)])
         assert feat.FEATURE_FLAGS["metrics_hhi"] is False
-        assert feat.FEATURE_FLAGS["signal_ledger"] is True
+        assert feat.FEATURE_FLAGS["deterministic_signal"] is True
 
     def test_duplicate_key_last_wins(self, monkeypatch):
         """同名重复以最后一次为准（命令行从左到右覆盖）。"""
@@ -1115,11 +1119,11 @@ class TestMainEarlyExitExperiments:
     def test_experiment_flag_effective_on_early_exit_command(self, command, patch_target):
         """--experiment 指定的开关在该命令分派前已生效。"""
         seen = self._enabled_during_dispatch(
-            ["cli.py", "--experiment", "signal_ledger", command],
+            ["cli.py", "--experiment", "decision_reflection", command],
             patch_target,
         )
-        assert seen["signal_ledger"] is True
-        assert seen["decision_reflection"] is False  # 未指定的开关不受影响
+        assert seen["decision_reflection"] is True
+        assert seen["prosperity_framework"] is False  # 未指定的开关不受影响
 
     def test_without_experiment_flag_keeps_defaults(self):
         """不传开关参数 → 实验组保持默认关闭（对照组，防误判为恒真）。"""
@@ -1147,10 +1151,10 @@ class TestMainEarlyExitExperiments:
     def test_feature_flag_overrides_experiment_flag(self):
         """同名时显式取值覆盖 --experiment 的隐式「只开」（后者先应用）。"""
         seen = self._enabled_during_dispatch(
-            ["cli.py", "--experiment", "signal_ledger", "--feature", "signal_ledger=off", "doctor"],
+            ["cli.py", "--experiment", "decision_reflection", "--feature", "decision_reflection=off", "doctor"],
             "src.python.cli.cli._handle_doctor",
         )
-        assert seen["signal_ledger"] is False
+        assert seen["decision_reflection"] is False
 
     def test_features_json_overrides_loaded_before_cli_flags(self):
         """早返回路径同样先读 features.json 覆写，再叠加命令行增量。"""
@@ -1161,10 +1165,10 @@ class TestMainEarlyExitExperiments:
 
         os.makedirs(os.path.dirname(features._FEATURES_FILE), exist_ok=True)
         with open(features._FEATURES_FILE, "w", encoding="utf-8") as f:
-            json.dump({"signal_ledger": True}, f)
+            json.dump({"decision_reflection": True}, f)
 
         seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")
-        assert seen["signal_ledger"] is True
+        assert seen["decision_reflection"] is True
         # 常规开关（默认开、非实验项）不受 --experiment 取值域影响，保持默认
         from src.python.config.features import is_feature_enabled
 

@@ -190,13 +190,73 @@ class TestFeatureGateReporting:
 
     def test_enabled_experiments_listed_by_display_name(self):
         def _enabled(flag: str) -> bool:
-            return flag == "signal_ledger"
+            return flag == "decision_reflection"
 
         with patch("src.python.config.features.is_feature_enabled", side_effect=_enabled):
             items = doctor._check_experimental_features()
 
         assert items[0]["ok"] is True
-        assert "确定性信号沉淀" in items[0]["message"]
+        assert "决策跨期反思闭环" in items[0]["message"]
+
+
+@pytest.mark.unit
+@pytest.mark.unit_core
+class TestReviewLedgerOverview:
+    """复盘账本只读概览（实验功能转正/撤销决策的数据支撑）。"""
+
+    def test_empty_ledgers_reported_as_empty(self):
+        items = doctor._check_review_ledger_overview()
+
+        labels = [i["label"] for i in items]
+        assert "决策复盘账本" in labels
+        assert "确定性信号账本" in labels
+        assert "实验功能使用统计" in labels
+        for it in items:
+            assert it["ok"] is True
+        assert "账本为空" in next(i["message"] for i in items if i["label"] == "决策复盘账本")
+
+    def test_decision_ledger_counts_shown(self, tmp_path, monkeypatch):
+        """pending/settled 计数与方向命中率上屏。"""
+        from src.python.core import decision_ledger as dl
+
+        target = str(tmp_path / "decision_ledger.jsonl")
+        monkeypatch.setattr(dl, "_DECISION_LEDGER_FILE", target)
+        decision_id = dl.append_decision(
+            code="600000",
+            name="浦发银行",
+            direction=dl.DIRECTION_LONG,
+            carrier=dl.CARRIER_GENERIC,
+            report_date="2026-09-01",
+        )
+        dl.append_settlement(
+            decision_id=decision_id,
+            raw_return=0.03,
+            outcome=dl.OUTCOME_HIT,
+            direction_hit=True,
+            bench_return=0.01,
+        )
+
+        items = doctor._check_review_ledger_overview()
+        msg = next(i["message"] for i in items if i["label"] == "决策复盘账本")
+        assert "已结算 1 条" in msg
+        assert "命中率" in msg
+
+    def test_ledger_read_failure_not_ok(self, tmp_path, monkeypatch):
+        """账本读取失败 → 该行失败但不外抛（自检不抛异常的不变式）。"""
+        from src.python.core import decision_ledger as dl
+
+        monkeypatch.setattr(dl, "_DECISION_LEDGER_FILE", str(tmp_path / "no-such-dir" / "x.jsonl"))
+
+        # 模拟读取崩溃：把 fold 换成抛异常的假实现
+        def _boom(*_a, **_k):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(dl, "fold_ledger", _boom)
+
+        items = doctor._check_review_ledger_overview()
+        it = next(i for i in items if i["label"] == "决策复盘账本")
+        assert it["ok"] is False
+        assert "读取失败" in it["message"]
 
 
 @pytest.mark.unit

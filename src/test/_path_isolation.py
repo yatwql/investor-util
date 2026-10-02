@@ -106,6 +106,12 @@ def seed_sensitive_path_isolation(monkeypatch, tmp_path, _doctor_probe_targets) 
         "src.python.core.signal_ledger._SIGNAL_LEDGER_FILE",
         str(tmp_path / "data/state/signal_ledger.jsonl"),
     )
+    # experiment_stats.json 实验功能使用统计文件隔离（记录侧在报告入口，
+    # 路径隔离即状态隔离——load_experiment_usage 按需读档现算）
+    monkeypatch.setattr(
+        "src.python.core.experiment_stats.EXPERIMENT_STATS_FILE",
+        str(tmp_path / "data/state/experiment_stats.json"),
+    )
     # doctor 自检目录探针隔离：_check_writable 会**真实写盘**（写哨兵文件后删除），
     # 三个目标不重定向则每次自检测试都瞬写用户真实的 reports/、data/cache/、logs/，
     # 用例中途失败还会留下探针残留。目标目录取 session 级独立临时目录 —— 不落在

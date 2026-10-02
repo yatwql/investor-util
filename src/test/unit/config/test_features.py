@@ -58,15 +58,15 @@ class TestResolveExperimentFlags:
 
     def test_resolve_by_flag_name(self):
         """按开关名解析。"""
-        flags, unknown = resolve_experiment_flags(["signal_ledger"])
-        assert flags == {"signal_ledger"}
+        flags, unknown = resolve_experiment_flags(["decision_reflection"])
+        assert flags == {"decision_reflection"}
         assert unknown == []
 
     def test_resolve_by_display_name(self):
         """按中文显示名解析（注册表驱动，无需维护第二份清单）。"""
-        display_name = feature_switch_registry["signal_ledger"].label
+        display_name = feature_switch_registry["decision_reflection"].label
         flags, unknown = resolve_experiment_flags([display_name])
-        assert flags == {"signal_ledger"}
+        assert flags == {"decision_reflection"}
         assert unknown == []
 
     def test_promoted_flag_rejected_after_leaving_experiment_group(self):
@@ -76,7 +76,7 @@ class TestResolveExperimentFlags:
         改由 ``--feature NAME=VALUE``（全域双向）或 features.json 控制，若仍被
         ``--experiment`` 接受，用户会以为它还是实验开关。
         """
-        for promoted in ("signal_pre_digest", "module_quality_gate", "decision_header_parse"):
+        for promoted in ("deterministic_signal", "module_quality_gate", "decision_header_parse"):
             flags, unknown = resolve_experiment_flags([promoted])
             assert flags == set(), f"{promoted} 已转正，不应再被实验清单解析命中"
             assert unknown == [promoted]
@@ -92,8 +92,8 @@ class TestResolveExperimentFlags:
 
     def test_resolve_flag_name_case_insensitive(self):
         """开关名大小写不敏感。"""
-        flags, unknown = resolve_experiment_flags(["SIGNAL_LEDGER"])
-        assert flags == {"signal_ledger"}
+        flags, unknown = resolve_experiment_flags(["DECISION_REFLECTION"])
+        assert flags == {"decision_reflection"}
         assert unknown == []
 
     def test_resolve_all(self):
@@ -105,14 +105,14 @@ class TestResolveExperimentFlags:
     def test_resolve_mixed_and_dedup(self):
         """多种写法混用并去重。"""
         display_name = feature_switch_registry["decision_reflection"].label
-        flags, unknown = resolve_experiment_flags(["signal_ledger", "SIGNAL_LEDGER", display_name, "all"])
+        flags, unknown = resolve_experiment_flags(["decision_reflection", "DECISION_REFLECTION", display_name, "all"])
         assert flags == _experimental_flags()
         assert unknown == []
 
     def test_unknown_reported_but_hits_kept(self):
         """未识别项进入 unknown，已识别项仍正常解析。"""
-        flags, unknown = resolve_experiment_flags(["signal_ledger", "no_such_feature"])
-        assert flags == {"signal_ledger"}
+        flags, unknown = resolve_experiment_flags(["decision_reflection", "no_such_feature"])
+        assert flags == {"decision_reflection"}
         assert unknown == ["no_such_feature"]
 
     def test_describe_lists_all_entries(self):
@@ -129,7 +129,7 @@ class TestResolveExperimentFlags:
         assert "datasource_adapter" not in _experimental_flags()
         assert is_experimental_switch("metrics_hhi") is False
         # 转正入常规块的读侧增强同理：混进实验清单会被当成「非默认产物」写进自述
-        assert "signal_pre_digest" not in _experimental_flags()
+        assert "deterministic_signal" not in _experimental_flags()
         assert "decision_header_parse" not in _experimental_flags()
 
 
@@ -145,21 +145,23 @@ class TestEnabledExperimentalFeatures:
         """启用项返回 (开关名, 显示名)，显示名取自注册表而非另写一份。"""
         from src.python.config.features import set_feature_enabled
 
-        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("decision_reflection", True)
 
-        assert enabled_experimental_features() == [("signal_ledger", feature_switch_registry["signal_ledger"].label)]
+        assert enabled_experimental_features() == [
+            ("decision_reflection", feature_switch_registry["decision_reflection"].label)
+        ]
 
     def test_follows_registry_order(self):
         """多项启用时按注册表顺序返回，不随启用先后变化。"""
         from src.python.config.features import set_feature_enabled
 
-        # 故意逆注册表顺序启用：signal_ledger 在注册表第 8，llm_debate_procon 第 1
-        set_feature_enabled("signal_ledger", True)
+        # 故意逆注册表顺序启用：decision_reflection 在注册表第 2，llm_debate_procon 第 1
+        set_feature_enabled("decision_reflection", True)
         set_feature_enabled("llm_debate_procon", True)
 
         assert [flag for flag, _name in enabled_experimental_features()] == [
             "llm_debate_procon",
-            "signal_ledger",
+            "decision_reflection",
         ]
 
     def test_only_experimental_flags_listed(self):
@@ -195,11 +197,11 @@ class TestReportAffectingClassification:
             FeatureSwitchDef("仅入口探针", "只改面板显隐", GROUP_EXPERIMENTAL, False, False),
         )
         monkeypatch.setitem(features.FEATURE_FLAGS, "ui_only_probe", True)
-        monkeypatch.setitem(features.FEATURE_FLAGS, "signal_ledger", True)
+        monkeypatch.setitem(features.FEATURE_FLAGS, "decision_reflection", True)
 
         flags = [flag for flag, _name in features.enabled_experimental_features()]
 
-        assert flags == ["signal_ledger"]
+        assert flags == ["decision_reflection"]
 
     def test_doctor_check_never_in_report_notice(self):
         """系统自检开启时产物自述仍为空——它不改报告任何字节。"""
@@ -289,13 +291,14 @@ class TestReadSidePromotion:
     """读侧增强的转正：默认开、不在实验组、关门仍有效、默认路径真的走新实现。
 
     这批开关会改变产物内容，但代价面为零：只改提示词或加标注，**不增 LLM 调用
-    次数、不写盘**。写账本的 ``decision_reflection`` / ``signal_ledger`` 与换
-    调用次数的 ``llm_debate_procon`` 不在此列——前者引入默认写盘副作用、后者
-    把单次复盘调用放大，两者留在实验组由用户按需开启。
+    次数**。写账本的 ``decision_reflection`` 与换调用次数的 ``llm_debate_procon``
+    不在此列——后者把单次复盘调用放大，留在实验组由用户按需开启；信号沉淀账本
+    （原实验开关 ``signal_ledger``）已并入 ``deterministic_signal`` 并转正：账本有
+    真实数据积累验证，且写盘属幂等追加、开销可忽略。
     """
 
     PROMOTED = (
-        "signal_pre_digest",
+        "deterministic_signal",
         "module_quality_gate",
         "decision_header_parse",
         "llm_debate_conditional",
@@ -481,7 +484,7 @@ class TestSwitchOverrideParsing:
     def test_parse_off_and_on(self):
         """off/on 双向均可解析——这是与 ``--experiment``（只开）的关键差异。"""
         assert parse_switch_override("doctor_check=off") == ("doctor_check", False)
-        assert parse_switch_override("signal_ledger=on") == ("signal_ledger", True)
+        assert parse_switch_override("deterministic_signal=on") == ("deterministic_signal", True)
 
     def test_parse_value_case_insensitive(self):
         """取值大小写不敏感（开关名仍精确匹配）。"""
@@ -591,3 +594,55 @@ class TestUnknownOverrideWarning:
 
             assert warnings == []
             assert FEATURE_FLAGS["metrics_hhi"] is False, "已登记开关的覆写仍须正常生效"
+
+
+@pytest.mark.unit
+class TestLegacyOverrideMigration:
+    """features.json 遗留开关名的载入迁移（确定性信号合并的升级兼容）。
+
+    signal_pre_digest 与 signal_ledger 已合并为 deterministic_signal 一个开关：
+    旧配置载入时旧名归并到新名、撤销项丢弃，用户升级后不需要手改 features.json。
+    """
+
+    @pytest.mark.unit
+    def test_legacy_names_migrate_to_merged_switch(self, tmp_path):
+        """两个旧名归并到新名（false 集合内旧名不覆盖新名已有值）。"""
+        fpath = tmp_path / "features.json"
+        fpath.write_text(json.dumps({"signal_pre_digest": False, "signal_ledger": True}), encoding="utf-8")
+
+        with (
+            patch("src.python.config.features._FEATURES_FILE", str(fpath)),
+            patch.dict(FEATURE_FLAGS, {}),
+        ):
+            load_feature_overrides()
+
+            # 新名尚未有值 → 先到的旧名生效；后到的旧名不再覆盖
+            assert FEATURE_FLAGS["deterministic_signal"] is False
+            # 旧名不再作为独立开关存在
+            assert "signal_pre_digest" not in FEATURE_FLAGS
+            assert "signal_ledger" not in FEATURE_FLAGS
+
+    @pytest.mark.unit
+    def test_dropped_switch_ignored_silently(self, tmp_path):
+        """已撤销开关（集中度问答独立开关）被丢弃，不落入无消费者告警。"""
+        fpath = tmp_path / "features.json"
+        fpath.write_text(json.dumps({"llm_debate_qa_concentration": True}), encoding="utf-8")
+
+        with (
+            patch("src.python.config.features._FEATURES_FILE", str(fpath)),
+            patch("src.python.config.features.logger") as mock_logger,
+            patch.dict(FEATURE_FLAGS, {}),
+        ):
+            load_feature_overrides()
+            warnings = [
+                text for text in TestUnknownOverrideWarning._rendered_warnings(mock_logger) if "无消费者" in text
+            ]
+
+            assert warnings == [], "撤销项应静默丢弃而非触发无消费者告警"
+
+    @pytest.mark.unit
+    def test_merged_switch_defaults_enabled(self):
+        """确定性信号模块出厂默认开（实时注入侧原即为默认开，合并后延续）。"""
+        from src.python.config.features import get_feature_defaults
+
+        assert get_feature_defaults()["deterministic_signal"] is True

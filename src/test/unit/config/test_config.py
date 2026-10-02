@@ -99,7 +99,7 @@ class TestMergeLlmDefaults(unittest.TestCase):
         """debate 段缺失 → 默认值保留（schema 校验由 _load_debate_config 兜底）。"""
         merged = self._merge({})
         self.assertEqual(merged["debate"]["max_total_tokens_per_report"], 72000)
-        self.assertEqual(merged["debate"]["qa_concentration"]["threshold"], 0.20)
+        self.assertEqual(merged["debate"]["concentration_qa"]["threshold"], 0.20)
 
 
 class TestGetConfig(unittest.TestCase):

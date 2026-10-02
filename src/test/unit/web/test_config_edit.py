@@ -73,13 +73,13 @@ _EXPECTED_WHITELIST = {
     "enabled_llm.news_correlation",
     # 7 实验性功能开关（菜单 S 实验块；清单取自 features 注册表实验组）
     "llm_debate_procon",
-    "llm_debate_conditional",
-    "llm_debate_qa_concentration",
     "decision_reflection",
-    "signal_pre_digest",
+    "prosperity_framework",
+    # 7b 常规开关中的 LLM 增强（确定性信号模块：实时注入 + 跨期沉淀）
+    "deterministic_signal",
+    "llm_debate_conditional",
     "module_quality_gate",
     "decision_header_parse",
-    "signal_ledger",
     "datasource_credential_ready",
     # 8 常规开关（菜单 S 常规块；同为注册表成员，此前无任何界面入口）
     "metrics_sharpe",
@@ -200,22 +200,22 @@ class TestApplyFeaturesWrite:
         raw = open(_FEATURES_FILE, encoding="utf-8").read()
         assert '"decision_reflection": true' in raw
 
-    def test_signal_pre_digest_flag_write_takes_effect(self, app_client):
-        """signal_pre_digest 写：features.json 含覆写，运行时开关生效。"""
+    def test_deterministic_signal_flag_write_takes_effect(self, app_client):
+        """deterministic_signal 写：features.json 含覆写，运行时开关生效。"""
         from src.python.config.features import _FEATURES_FILE, is_feature_enabled
 
-        assert is_feature_enabled("signal_pre_digest") is True  # 转正后默认开
+        assert is_feature_enabled("deterministic_signal") is True  # 转正后默认开
 
         resp = app_client.post(
             "/api/config/edit",
-            json={"key": "signal_pre_digest", "value": False},
+            json={"key": "deterministic_signal", "value": False},
         )
         assert resp.status_code == 200
         assert resp.get_json()["data"]["value"] is False
-        assert is_feature_enabled("signal_pre_digest") is False
+        assert is_feature_enabled("deterministic_signal") is False
 
         raw = open(_FEATURES_FILE, encoding="utf-8").read()
-        assert '"signal_pre_digest": false' in raw
+        assert '"deterministic_signal": false' in raw
 
     def test_standard_switch_write_takes_effect(self, app_client):
         """常规开关（量化指标）写：features.json 含覆写，运行时开关生效。
