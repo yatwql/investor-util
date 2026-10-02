@@ -4,7 +4,7 @@
 #   P0（提交前）→ dev-verify 模式 — dev 分支每次推送
 #   P1（合入前）→ verify 模式   — master 分支 PR/推送
 #   P2（发布前）→ verify,regression 模式 — 版本标签推送
-#   guards      → 7 个 --ci 守护脚本（P0/P2 同源），阻塞；lint（ruff）非阻塞
+#   guards      → 8 个 --ci 守护脚本（P0/P2 同源），阻塞；lint（ruff）非阻塞
 #   portability → 非 UTF-8 locale + 隐式编码探针（PEP 597），阻塞
 
 name: CI
@@ -90,7 +90,7 @@ jobs:
         run: python -m ruff check
 
   guards:
-    # 7 个 --ci 守护脚本（与 P0/P2 门禁同源）：文档/编号/语义命名/需求追溯等一致性。
+    # 8 个 --ci 守护脚本（与 P0/P2 门禁同源）：文档/编号/语义命名/需求追溯/版本号等一致性。
     # 阻塞型（无 continue-on-error）——这些漂移必须当场修掉，否则会像“财报域备源静默失效”
     # 那样拖到线上才被发现。
     runs-on: ubuntu-latest
@@ -131,6 +131,9 @@ jobs:
 
       - name: 需求 ID 追溯（check-requirement-trace）
         run: python scripts/check-requirement-trace.py --ci
+
+      - name: 版本号一致性（check-version-consistency）
+        run: python scripts/check-version-consistency.py --ci
 
   portability:
     # 非 UTF-8 locale / 隐式编码门禁（阻塞）。test / format / guards 三个 job 全在 UTF-8 locale

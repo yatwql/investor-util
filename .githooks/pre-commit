@@ -10,6 +10,11 @@
 #    登记数字自动回写为实测值并加入暂存区 —— 治理「人工同步必漏」的
 #    最高频 CI 红源；同步后仍不一致（需人工判断的漂移）则中止提交。
 #
+# 3) 版本号全局一致性（check-version-consistency --ci）
+#    提交涉及版本受检文件（APP_VERSION / README / pyproject / 管理文档）时，
+#    校验 13 处版本号与 APP_VERSION 一致，防止单侧改版失步（CI guards 同源）。
+#    仅在暂存文件命中受检清单时触发，避免无关提交被误拦。
+#
 # 依赖 Python 在 PATH 或项目 .venv 中。需启用 core.hooksPath（install-hooks.sh）。
 
 set -e
@@ -49,6 +54,16 @@ if echo "$CHANGED" | grep -qE '^docs-stm/managements/|^src/test/'; then
         exit 1
     fi
     echo "[OK] pre-commit: 统计快照同步完成"
+fi
+
+# ── 3) 版本号一致性（仅提交涉及版本受检文件时）
+if echo "$CHANGED" | grep -qE '(^README\.md$|^pyproject\.toml$|^src/python/core/constants\.py$|^docs-stm/managements/(plan|technical|requirements|testplan|review-findings|llm-technical|folders|test-coverage|changelog|developer-guide)\.md$)'; then
+    echo "[..] pre-commit: 校验版本号一致性（涉及版本受检文件）"
+    if ! "$PY_CMD" scripts/check-version-consistency.py --ci; then
+        echo "[ERR] pre-commit: 版本号与 APP_VERSION 失步，请按提示同步 13 处受检文件后重试" >&2
+        exit 1
+    fi
+    echo "[OK] pre-commit: 版本号一致性通过"
 fi
 
 exit 0

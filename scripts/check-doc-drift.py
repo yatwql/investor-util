@@ -6,7 +6,7 @@
 逐条比对，使漂移在提交前暴露（与 check-doc-traces 的「历史痕迹」检查互补：
 那边管「不该写的内容」，这边管「写了但与实现不符的内容」）。
 
-十五项检查（权威源 → 受检文档）：
+十六项检查（权威源 → 受检文档）：
   1.  报告章节表        core/registry.py `_REPORT_SECTION_DEFAULT`      → manuals/reports-instruction.md
   2.  章节数量断言      同上（`页签编号 1~N` / `默认顺序（N 项` / `返回 result（N 项` / `N 个报告章节`）→ 全库文档
   3.  功能开关表        config/features.py `feature_switch_registry`    → manuals/how-to-config.md
@@ -22,12 +22,13 @@
   13. 管理文档分区纪律  未完成/已解决/已归档三分区互斥；现行 changelog 只允许一个 `-dev` 段头
   14. Extended Thinking 支持矩阵  手册对比表/「仅」式枚举/默认开思考提示 ↔ `llm/api_base` 前缀名单
   15. Provider Chain 降级表  `fetcher/chain.py` `_DEFAULT_CHAINS` → manuals/datasource-reliability.md（逐链双向）
+  16. 守护清单同源        developer-guide P0/P2 门禁块 + ci.yml guards steps + CLAUDE.md/testplan.md 清单四处 `check-*.py --ci` 引用集合两两一致
 
 按设计豁免的历史记录文档：`changelog.md` / `review-findings.md`（会如实引用旧数字作为变更记录）
 与 `docs-stm/archive/**`（版本快照）不参与第 2/4/5 项扫描。
 
 用法：
-  python scripts/check-doc-drift.py                  # 十五项全查
+  python scripts/check-doc-drift.py                  # 十六项全查
   python scripts/check-doc-drift.py -v               # 详细输出（打印解析明细）
   python scripts/check-doc-drift.py --ci             # CI 模式：仅输出 文件:描述，退出码 2
   python scripts/check-doc-drift.py --with-test-count # 附带 pytest 收集，核对「测试用例数」与 test-coverage.md 计数表
@@ -147,6 +148,8 @@ from _doc_drift import (  # noqa: E402,F401  # 原面 re-export（实现见 _doc
     _THINKING_FAMILY_LABELS,
     _thinking_families,
     check_thinking_support_matrix,
+    find_guard_parity,
+    check_guard_parity,
 )
 
 
@@ -168,6 +171,7 @@ def run_checks(with_test_count: bool = False) -> list[str]:
     findings += check_archive_index()
     findings += check_management_partitions()
     findings += check_thinking_support_matrix(docs.get(_THINKING_MANUAL))
+    findings += check_guard_parity()
     findings += check_project_stats(docs[_FOLDERS_MD], with_test_count=with_test_count, snapshot=snapshot)
     if with_test_count:
         findings += check_test_coverage_counts(docs[_TEST_COVERAGE_MD], snapshot)

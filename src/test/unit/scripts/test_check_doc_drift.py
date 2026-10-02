@@ -851,3 +851,52 @@ class TestProjectStatsSync:
         applied = _sync(test_count=documented)
         after = Path(_FOLDERS_MD).read_text(encoding="utf-8")
         assert applied == [] and after == original
+
+
+# ═══ 守护清单同源 ═══
+
+
+class TestGuardParity:
+    """`find_guard_parity` / `check_guard_parity`（四处守护清单脚本集合两两一致）。"""
+
+    @staticmethod
+    def _good(*names: str) -> str:
+        return "\n".join(f"run: python scripts/{n} --ci" for n in names)
+
+    def test_identical_sets_pass(self, drift):
+        src = {
+            "A": self._good("check-x.py", "check-y.py"),
+            "B": self._good("check-y.py", "check-x.py"),
+        }
+        assert drift.find_guard_parity(src) == []
+
+    def test_missing_script_reported(self, drift):
+        src = {
+            "A": self._good("check-x.py", "check-y.py"),
+            "B": self._good("check-x.py"),
+        }
+        findings = drift.find_guard_parity(src)
+        assert any("缺少" in f and "check-y.py" in f for f in findings)
+
+    def test_extra_script_reported(self, drift):
+        src = {
+            "A": self._good("check-x.py"),
+            "B": self._good("check-x.py", "check-extra.py"),
+        }
+        findings = drift.find_guard_parity(src)
+        assert any("多出" in f and "check-extra.py" in f for f in findings)
+
+    def test_unmatched_region_reported(self, drift):
+        src = {"A": self._good("check-x.py"), "B": None}
+        findings = drift.find_guard_parity(src)
+        assert any("未匹配到守护清单区域" in f for f in findings)
+
+    def test_empty_region_reported(self, drift):
+        src = {"A": self._good("check-x.py"), "B": "标题在但没有任何脚本引用"}
+        findings = drift.find_guard_parity(src)
+        assert any("未提取到" in f for f in findings)
+
+    def test_single_source_needs_no_comparison(self, drift):
+        # 单一成功来源不构成比较，但截取失败仍须单独报出
+        assert drift.find_guard_parity({"A": self._good("check-x.py")}) == []
+        assert drift.find_guard_parity({"A": None}) != []
