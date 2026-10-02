@@ -1,5 +1,10 @@
 # 投资复盘助手
 
+[![Release](https://img.shields.io/github/v/release/yatwql/investor-util)](https://github.com/yatwql/investor-util/releases)
+[![CI](https://github.com/yatwql/investor-util/actions/workflows/ci.yml/badge.svg)](https://github.com/yatwql/investor-util/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-%3E%3D3.11-3776AB?logo=python&logoColor=white)](https://www.python.org)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
+
 > **一份持仓 Excel，换来一份机构级的投资复盘报告。**
 
 面向个人投资者的**本地优先**投资分析引擎：实时行情 · 资产穿透 · 基金评级 · 量化风控 · LLM 智囊团深度复盘——全部跑在你自己的机器上，持仓数据不出本机，报告即开即用。
@@ -15,7 +20,7 @@
 - 🔁 **决策有闭环** — 建议 → 登记 → 真实行情结算命中率 → 教训回灌提示词，越用越懂你的组合
 - 🔒 **隐私优先** — 数据全部本地处理，支持 4 档匿名化，凭据永不落日志与报告
 
-> 当前版本：0.11.13-dev
+> 当前开发版本：0.11.13-dev（[版本历史](docs-stm/managements/changelog.md)）
 
 ## ✨ 核心亮点
 
@@ -36,6 +41,16 @@
 
 - **Python ≥ 3.11**（3.10 已于 2026‑10 终止支持）
 - **操作系统**：Windows 10/11、Linux、macOS
+
+## 三分钟上手
+
+```bash
+git clone https://github.com/yatwql/investor-util.git && cd investor-util
+./scripts/launch.sh        # Linux/macOS（首次自动建 venv、装依赖）
+# Windows： .\scripts\launch.ps1
+```
+
+启动后按提示放入持仓 Excel（格式：每张工作表一个账户，固定 4 列——名称/代码/份额/成本），几分钟内拿到双格式报告。更完整的首次使用指引见 [快速开始](docs-stm/manuals/how-to-start.md)。
 
 ## 启动方式
 
