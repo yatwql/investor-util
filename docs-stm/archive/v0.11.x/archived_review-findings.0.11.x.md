@@ -197,6 +197,7 @@
 
 | # | 优先级 | 问题与处置 |
 |---|--------|------------|
+| **rf-521** | 已修复（2026-10-02） | **高** | **报告层直连 providers（Provider Chain 必经约束）**。`report/financial_report_digest.py:25`（datasink）、`report/market_sentiment.py:21`（hithink）、`report/data_source_matrix.py:420`（datasink）、`report/news_correlation.py:492`（news_aggregator 状态查询）、`report/category.py:147`（akshare_extras 私有常量 `_DIVIDEND_FAILURE`）绕过 fetcher 网关直接 import `providers` 模块；`core/check_sources.py`（datasink/cninfo 探针）与 `core/trading_calendar.py:85`（hithink）亦直连 | 这些调用不激活熔断器、不产生 fallback 递补、不进链路审计日志——正是「Provider Chain 必经」约束列举的三重失效。其中 `financial_report_digest`/`market_sentiment` 是真实取数路径（非只读查询），在源抖动时会拖垮报告生成且熔断器无感知，用户看到的可用性矩阵与实际失败原因脱节；同源双路径（report 直连 + fetcher 走链路）还会让 cassette 回放覆盖出现缺口；修复明细见 changelog「自审修复（rf-521~527）」条目。 |
 | **rf-522** | 已修复（2026-10-02） | **两处手写「重试 + 退避」残留（重试退避唯一原语约束）**：`batch.py::retry_failed` 与 `index.py::fetch_us_indices` 迁移到 `retry_transient` + `RetryPolicy`，内联退避算式删除；详见 changelog 0.11.11-dev 条目。 |
 | **rf-523** | 已修复（2026-10-02） | **手写间隔节流散落（间隔节流唯一原语约束）**：eastmoney 分页 sleep 与 cninfo/datasink 429 退避等待分别收敛到 RateLimiter 与 interval_delay 唯一算式；详见 changelog 0.11.11-dev 条目。 |
 | **rf-524** | 已修复（2026-10-02） | **剩余自持原子写拷贝（缓存原子写唯一原语约束）**：`write_text_atomic/write_bytes_atomic` 补 `mode` 参数，新增 `write_bytes_atomic`/`copy_file_atomic` 原语，cassette/upload/holdings_update/config_edit 四处旁路全部委托；详见 changelog 0.11.11-dev 条目。 |
@@ -209,3 +210,22 @@
 ## v0.11.12-dev 批次（2026-10-02）
 
 > **rf-533**（2026-10-02，脚本超长硬上限）：**`scripts/check-code-traces.py` 1,016 行破「>800 必须拆分」硬上限**（唯一破纪律的脚本）——历史痕迹正则表、各语言注释剥离、排除/豁免清单、core 分层 AST 守卫与 CLI 全部揉在一个文件。处置：拆为内部实现包 `scripts/_traces_code/`（config / patterns / exemptions / extract / scan / layers 六模块），入口只留 CLI（185 行）与原面 re-export；`_traces_common.py` 并入包内 `exemptions.py`（兼容壳删除，测试改指向子模块）；顺带收编 check-task-numbering / check-test-markers / check-doc-traces 三脚本到 `_checklib` 契约（add_common_args / report / rel），17 处 sys.path 样板文本统一。测试：scripts 单测 428 例全通。
+
+### rf-528~531（2026-10-02，全仓技术债务审查 P2E 批次）
+
+> **rf-528**（渲染期模块级可变状态）：`web/handlers.py` 的 `_history_cache`/`_health_cache` 模块级 dict（5s/60s 性能缓存）在 `app.run(threaded=True)` 下无并发保护。处置：新增 `threading.Lock`（`_render_cache_lock`）保护两缓存的读写段，计算在锁外；语义保持单机单用户前端（同时 miss 重复计算可接受）。测试：`test_handlers.py::TestShortCacheConcurrency` 4 例（缓存命中跳过重载 / TTL 过期重算 / `?fresh=1` 绕过 / 8 线程并发写安全）。
+
+> **rf-529**（HHI 重复工具）：`analysis/whatif.py::_compute_hhi`（成本口径）与 `analysis/portfolio_evolution.py::_compute_hhi`（权重口径）重复实现 Σ权重²，`metrics_risk.py::hhi` 原语闲置。处置：两处 `_compute_hhi` 均收敛为 `metrics_risk.hhi` 唯一原语的薄委托（权重已归一时内部再归一为幂等；空/零权重退化语义一致 `0.0`）；`snapshot_diff.py` 经 portfolio_evolution 的委托间接受益，无面改动。测试：`test_stale_cache_helper.py::TestHHIConvergence` 3 例（同输入同输出 / 幂等归一 / 退化语义一致）。
+
+> **rf-530**（print 输出边界确认）：`report/progress.py::TuiProgressReporter` 属合法「交互式进度 print」豁免；`core/doctor.py` 本体零 print，CLI 体检命令输出走 `format_doctor_report` 结构化整块文本（带前缀/着色），唯一消费面 `cli.py::_handle_doctor` 单 print——属「CLI-only 交互输出」合法豁免面（TUI 走同款渲染、Web 走结构化数据路径，均不进产物）。处置：不改输出路径，在 `core/doctor.py` 模块 docstring 显式声明「输出边界：CLI-only 交互豁免面」注释锁定依据（复用 console helper 收益不抵改动风险）。测试：无需新增（守卫本就不拦截交互式 print）。
+
+> **rf-531**（过期缓存回写无语义版本）：`fetcher/index.py::fetch_us_indices` 手写「主链路→备用腾讯→过期缓存回写」四段流程，`cache_set` 回写过期数据未盖语义版本，是「缓存载荷语义版本」准入机制的版本缺失点（§1.4.5 尾部难覆盖区）。处置：`fetcher/chain.py` 新增 `write_stale_with_version(cache_key, data[, source])` 统一降级回写助手（标记来源 + 盖 `_payload_ver` 语义版本戳 + 回写缓存）与配套准入判据 `payload_version_current`（当前版本通过 / 旧戳作废 / 未盖戳不拦防无限重取）；`fetch_us_indices` 过期缓存段改调助手。测试：`test_stale_cache_helper.py::TestStaleCacheWriteHelper` 3 例（盖戳+回写 / 准入语义 / 链路过期段经助手路由）。
+
+### rf-539（2026-10-02，脚本收编扩展：probe 统一入口 + sampler 拆包）
+
+**rf-539**（scripts 工具重复与超长收尾）: ①`probe-push2.py` 与 `probe-csi-factor-indices.py` 是彼此无关联的诊断/探测脚本但无统一入口，新增探针需复制样板；②`llm-hallucination-sampler.py` 634 行超 500 行软上限，且内部 import `src.python.llm.fact_checker` 的 `_calc_portfolio_values`/`_strip_html` 已随 fact_checker 拆包失效（工具静默坏掉）。
+处置：
+- 新增 `scripts/probe.py`（registry 分发统一入口）+ `scripts/probes/`（`__init__.py` 注册表 / `csi.py` / `push2.py`），每个 target 实现 `PROBE_TARGET`/`build_parser()`/`run(args)` 契约面；新探针仅登记即用，入口不改。旧入口 `probe-csi-factor-indices.py`/`probe-push2.py` 保留为薄委托垫片（兼容旧命令用法）。
+- `csi.py` 状态语义变更：因子暴露分析已实施，docstring 状态改为「**周期性复核**（新机器/新窗口验证指数链路可用 + 停更预警）」，不再是「前置决策闸门」。
+- `llm-hallucination-sampler.py` 入口只留 CLI 与编排（239 行），实现拆到 `scripts/_halluc_sampler/`（holdings / llm_call / fact_check / report 四模块）；修复三处坏 import（`fact_checker._utils._calc_portfolio_values` / `fact_checker._utils._strip_html` / `fact_checker._runner.check_*` 4 元组正确解包并透出 `numerical_corrections` 键）。实测 dry-run 全链路恢复：71 校验项 / 9 告警 / 12.68%。
+测试：`src/test/unit/scripts/test_probe_entry.py` 8 例（入口分派/未知 target 退出 2/子模块契约面/sampler 4 元组解包/组合数值委托）。

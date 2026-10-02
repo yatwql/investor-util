@@ -9,6 +9,12 @@ LLM 凭据就位）、目录（持仓/缓存/输出可读写），最后复用 `
 否则「配置坏了」时用户看到的是 traceback，而这正是最需要诊断输出的场景。
 因此本模块刻意不 import pandas / reader 等重依赖——它们恰好可能是坏掉的那一环。
 
+输出边界（rf-530 处置留痕）：本模块只产出结构化结果项，唯一输出面是 CLI 体检
+命令一次性 ``print(format_doctor_report(...))``（结构化整块文本，带前缀/着色）——
+属「CLI-only 交互式输出」合法豁免面，不走 ``[..]``/``[OK]`` 逐项前缀样式；
+TUI/Web 均不再走非结构化 print（TUI 走 format_doctor_report 同款渲染，
+Web 走结构化数据路径），不进报告产物。
+
 用法::
 
     from src.python.core.doctor import run_doctor_checks

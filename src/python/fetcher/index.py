@@ -14,6 +14,7 @@ from typing import Any
 from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
+from src.python.fetcher.chain import write_stale_with_version
 from src.python.core.constants import CACHE_WEEKLY
 from src.python.core.retry import STRATEGY_FIXED, RetryPolicy, retry_transient
 from src.python.providers import sina, tencent
@@ -330,10 +331,9 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
     if still_missing and expired_cached:
         logger.info("美股指数全部 API 不可用，使用过期缓存数据")
         for code, data in expired_cached.items():
-            data["_source"] = "stale_cache"
-            indices[code] = data
-            cache_set(_index_cache_key(code), data)
-            logger.info("美股指数 %s 降级为缓存数据", code)
+            # 过期缓存回写走统一降级助手（盖语义版本戳，防旧语义载荷遮蔽修复）
+            indices[code] = write_stale_with_version(_index_cache_key(code), data)
+            logger.info("美股指数 %s 降级为过期缓存数据（经统一降级助手回写）", code)
     elif still_missing:
         logger.warning("美股指数全部获取失败（API + 缓存均无数据）")
 

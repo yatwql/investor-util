@@ -453,6 +453,42 @@ def fetch_with_fallback(
 
 
 # ═══════════════════════════════════════════════════════════════
+#  过期缓存降级回写（链外手写降级路径的统一出口）
+# ═══════════════════════════════════════════════════════════════
+
+# 载荷语义版本戳字段与当前版本。「语义已变更但结构未变」的载荷仅靠 TTL
+# 会在过期前持续遮蔽修复（fund ranking 实测教训，见 rank_payload_is_current）——
+# 任何过期缓存回写都必须盖戳，后续准入判据按字段比对自动作废旧语义条目。
+_CACHE_PAYLOAD_FIELD = "_payload_ver"
+_CACHE_PAYLOAD_VER = "1"
+
+
+def payload_version_current(payload: object) -> bool:
+    """缓存载荷是否由**当前语义版本**的回写端写出（准入判据用）。"""
+    if not isinstance(payload, dict) or _CACHE_PAYLOAD_FIELD not in payload:
+        return True  # 未盖戳的载荷（主链路成功回写等）不拦，拦了会无限重取
+    return payload[_CACHE_PAYLOAD_FIELD] == _CACHE_PAYLOAD_VER
+
+
+def write_stale_with_version(
+    cache_key: str,
+    data: dict[str, Any],
+    source: str = "stale_cache",
+) -> dict[str, Any]:
+    """过期缓存降级回写统一助手：标记来源 + 盖语义版本戳 + 回写缓存。
+
+    链外手写降级路径（如 fetcher/index.py 的手写判断链）回写过期数据时**必须**
+    经本助手——直接 ``cache_set`` 回写未盖戳载荷，语义版本机制上线后会成为
+    「版本缺失」的遮蔽点（rf-531）。返回盖戳后的载荷（调用方直接入结果字典）。
+    """
+    data = dict(data)
+    data["_source"] = source
+    data[_CACHE_PAYLOAD_FIELD] = _CACHE_PAYLOAD_VER
+    cache_set(cache_key, data)
+    return data
+
+
+# ═══════════════════════════════════════════════════════════════
 #  组合历史走势：增量合并 Fallback 路由
 # ═══════════════════════════════════════════════════════════════
 

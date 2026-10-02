@@ -817,15 +817,15 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
 | `check-requirement-trace.py` | 测试 | 需求 ID ↔ 验证载体追溯（单段 ID 全域覆盖 / 载体文件存在 / ID 双向一致） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
-| `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样 |
+| `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样（薄 CLI，实现在 `_halluc_sampler/` 包） |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
 | `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`--collect-only` 快照，供 test-coverage.md 更新） |
 | `smoke-web.py` | 测试 | Web 模式 HTTP 冒烟脚本（test_client 进程内全链路断言，可独立运行） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（发布前必跑） |
 | `perf-report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf-view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
-| `probe-csi-factor-indices.py` | 诊断 | CSI 风格指数可用性探测（风格因子回归前置决策闸门） |
-| `probe-push2.py` | 诊断 | 东方财富 push2 连通性探测（区分程序缺陷与网络环境拦截，熔断降级前置排障） |
+| `probe.py` | 诊断 | 探测统一入口（按 target 分发到 `probes/` 子模块；新探针实现契约面登记即用） |
+| `probe-csi-factor-indices.py` / `probe-push2.py` | 诊断 | 旧入口兼容垫片（薄委托到 `probes/csi.py` / `probes/push2.py`，用法不变） |
 | `check-svg.py` | 诊断 | README SVG 架构图检查（子命令 `geom` 几何 / `pixel` 像素 / `text-overflow` 文字色越界；像素子命令需 Pillow） |
 | `_checklib.py` | 内部 | 检查脚本共享设施（统一 `-v/--ci` 契约与 `[OK]`/`[ERR]` 输出、`rel()`、`report()`、文档区间与表格解析） |
 | `_test_runner/` | 内部 | 测试驱动内部实现包（paths / modes / pytest_env / machine_info / doc_writer / report_html / runner） |
@@ -1194,16 +1194,27 @@ sh .githooks/install-hooks.sh --off   # 停用
 
 **数据来源**：每次 `generate_report()` 调用时自动记录到 `data/state/perf_history.jsonl`，无需手动触发。
 
-**`probe-csi-factor-indices.py` — CSI 风格指数可用性探测**
+**`probe.py` — 探测统一入口（target 分发 registry）**
 
-CSI 风格指数可用性探测（风格因子回归前置决策闸门），决定风格因子回归是否可用。
+所有连通性/可用性探测统一走 `scripts/probe.py <target> [options…]`：target 实现在 `scripts/probes/<语义名>.py`（声明 `PROBE_TARGET` / `build_parser()` / `run(args)` 契约面并在 `probes/__init__.py` 登记），**全部纯只读**（不写缓存/熔断/降级记录，无副作用）；新探针只需新增子模块并登记，入口无需改动。现有 target：
+
+- `csi` — CSI 风格指数可用性探测（因子暴露分析已实施，现为**周期性复核**工具：新机器/新窗口验证指数链路与停更预警，条数+新鲜度双维度判定）
+- `push2` — 东方财富 push2 连通性诊断（见下）
+
+旧入口 `probe-csi-factor-indices.py` / `probe-push2.py` 保留为薄委托垫片，命令用法不变。
+
+**`csi` target — CSI 风格指数可用性**：判定全量 5 因子 / MVP 3 因子 / 不可行；建议数据回归前置运行一次。
+
+```bash
+.venv/bin/python scripts/probe.py csi --days 365
+```
 
 **`probe-push2.py` — 东方财富 push2 连通性诊断**
 
 东方财富 push2 连通性探测，用于区分「程序缺陷」与「网络环境拦截」。部分电脑运行报告时 push2 频繁出现 `Server disconnected without sending a response`（服务器接受 TCP 连接但未返回响应即断开），触发熔断退避（60s→300s→900s→3600s）后降级到备用链路——用此脚本可快速定位根因，决定是否需要调整代码或加速降级。
 
 ```bash
-.venv/bin/python scripts/probe-push2.py     # 默认探测 3 次
+.venv/bin/python scripts/probe.py push2     # 默认探测 3 次（旧命令 probe-push2.py 等效）
 ```
 
 判读：
