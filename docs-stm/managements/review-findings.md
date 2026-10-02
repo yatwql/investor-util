@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.12-dev
-> **编号源**：`rf-next = 540`（新增问题取此编号，完成后更新为 +1；已用最大 rf-538，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 540`（新增问题取此编号，完成后更新为 +1；已用最大 rf-539，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -45,8 +45,6 @@
 
 ### P2E — 全仓技术债务审查（2026-10-02，对照「架构设计约束」27 条与核心架构决策五项）
 
-> 本轮全仓源码审查（src/python ~7.8 万行），逐条对照 `technical.md`「## 架构设计约束」全部编号约束与「## 概要设计—核心架构决策」§1.4.1~1.4.5 排查历史技术债务。多数关键基线已达标（HTTP 客户端工厂零绕过、控制台着色与路径绝对化合规、凭据分离合规、LLM 模块缓存指纹单一事实来源无违例、时间距离交易日口径已收敛、语义命名守卫全过、原子写主路径已统一）。本轮发现的 rf-528~531 已全部修复并归档至「v0.11.12-dev 批次」。
-
 ### P2F — Windows 可移植性缺陷（2026-10-02，benchmark 失败用例驱动；**已全部修复**）
 
 > 由 benchmark 任务 13 例失败反查：均为 Windows 平台语义差异。其中 rf-534~537 为**真实生产缺陷**（非仅测试问题），rf-538 为测试断言可移植性。已修复并补回归用例，明细见 changelog 同版本段。
@@ -58,6 +56,7 @@
 | **rf-536** | `collect-test-coverage.py` GBK 输出 vs 消费方 UTF-8 解码 → `UnicodeDecodeError` | 已修复（子进程 `reconfigure(encoding="utf-8")`） |
 | **rf-537** | `_collect_test_snapshot` 未处理 `stdout=None` → `re.search(None)` `TypeError` 使 `--sync` 堆栈退出 | 已修复（`errors="replace"` + 空值降级 + 4 例回归） |
 | **rf-538** | 13 例测试断言的 Windows 不可移植（POSIX 权限位/geteuid/socketpair/`/tmp`/分隔符） | 已修复（5 跳过 + 8 跨平台改写，全绿） |
+| **rf-539** | `.githooks/pre-commit` 解释器探测只认 POSIX 布局，Windows 下回退系统 Python，统计快照回写错误用例数（7964 vs 8173） | 已修复（探测次序加 Windows `Scripts/python.exe` 优先；错误值已修正） |
 
 
 ## 已解决问题
