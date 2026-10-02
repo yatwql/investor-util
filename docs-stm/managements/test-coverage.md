@@ -10,20 +10,20 @@
 <!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **7870** | ~3min |
-| `standard` | **6853** | ~3min |
-| `scenario` | **250** | ~51s |
-| `regression` | **250** | ~1min |
-| `dev-verify` | **3480** | ~4min |
-| `verify` | **5554** | ~4min |
-| `integration` | **292** | ~2min |
-| `edge` | **949** | ~1min |
-| `data` | **70** | ~31s |
-| `all` | **8191** | ~4min |
-| `smoke` | **26** | ~28s |
-| `report` | **2010** | ~2min |
-| `all_no_unit` | **321** | ~1min |
-| `scenario_extreme` | **9** | ~32s |
+| `unit` | **7870** | ~30s |
+| `standard` | **6853** | ~29s |
+| `scenario` | **250** | ~5s |
+| `regression` | **250** | ~5s |
+| `dev-verify` | **3480** | ~22s |
+| `verify` | **5554** | ~18s |
+| `integration` | **292** | ~8s |
+| `edge` | **949** | ~11s |
+| `data` | **70** | ~3s |
+| `all` | **8191** | ~32s |
+| `smoke` | **26** | ~3s |
+| `report` | **2010** | ~25s |
+| `all_no_unit` | **321** | ~7s |
+| `scenario_extreme` | **9** | ~3s |
 <!-- mode-count-table:end -->
 
 > 注：典型耗时按 开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新模式对应测试量 + 下方两张环境耗时对照表。
@@ -62,20 +62,20 @@
 <!-- duration-table:start -->
 | `--mode` | dragonball（2026-10-02 实测） | stallman-NB1（2026-10-02 实测） |
 |:---------|:---------------------------:|:---:|
-| `unit` | ~31s | ~3min |
-| `standard` | ~20s | ~3min |
+| `unit` | ~30s | ~3min |
+| `standard` | ~29s | ~3min |
 | `scenario` | ~5s | ~51s |
 | `regression` | ~5s | ~1min |
 | `verify,regression` | ~23s（verify+regression 顺序之和） | ~5min（verify+regression 顺序之和） |
-| `dev-verify` | ~24s | ~4min |
+| `dev-verify` | ~22s | ~4min |
 | `verify` | ~18s | ~4min |
 | `integration` | ~8s | ~2min |
 | `edge` | ~11s | ~1min |
 | `data` | ~3s | ~31s |
-| `all` | ~33s | ~4min |
+| `all` | ~32s | ~4min |
 | `smoke` | ~3s | ~28s |
 | `report` | ~25s | ~2min |
-| `all_no_unit` | ~6s | ~1min |
+| `all_no_unit` | ~7s | ~1min |
 | `scenario_extreme` | ~3s | ~32s |
 | 数据更新时间 | 2026-10-02 | 2026-10-02 |
 <!-- duration-table:end -->
