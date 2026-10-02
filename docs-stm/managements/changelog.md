@@ -10,6 +10,11 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### CI 与测试维护（2026-10-02）
+
+- **修复持续 CI 红（9 个运行连红后收口）**：rf-521/526 重构改动的测试适配漏项——① `test_category.py` 分红失败登记用例仍 patch 旧属性 `providers.akshare_extras._DIVIDEND_FAILURE`，补同步 patch `fetcher.akshare._DIVIDEND_FAILURE`（hint 单一事实来源内置在本模块后旧属性失联 → 登记路径拿到空值退化为不登记）；② `test_market_value_strategy_edge.py` `_setup_registry()` 在 rf-526 后无参调用 `register_default_chains` 得空链路 → 策略回退 LIVE_FETCH 使「CACHE_ONLY 不发 HTTP」断言全红，改为从 `fetcher.chain` 显式取 `_DEFAULT_CHAINS` 传入；③ `scripts/_doc_drift/_shared.py` 子进程调用缺显式 `encoding="utf-8"`，cp936/严格编码档下触发 EncodingWarning 收敛（portability job 阻塞项）；④ ruff 全仓格式化收编 rf-523/526 期间落盘未格式化文件（format job 阻塞项）。推送 `e3c41784`/`4a77fee3` 后 CI 六 job（3×test/guards/portability/format）首次全绿。
+- **review-findings P2A 行数快照核对（2026-10-02 实测）**：8 长文件全部低于 800 硬上限、维持不拆结论；rf-75 704→716、rf-78 578→520（rf-522 收编后回落）、rf-79 605→671（rf-525 增补）、rf-85 551→555、rf-86 633→637，其余持平。
+
 ### 自审修复（rf-527）
 
 - **历时类字段统一交易日口径（rf-527）**：回撤事件 `duration_days`/`recovery_days`（`analysis/drawdown_events.py`）、危机标注恢复耗时（`analysis/crisis_annotation.py`）、基金经理任职天数（`fetcher/fund_manager.py::_calc_tenure_days`，归档页解析复用同一函数）与经理变更距今天数（`report/fund_manager_analysis.py`，1/3/6 月阈值 30/90/180 自然日 → 22/66/132 交易日）全部收敛到新增原语 `core/trading_calendar.py::elapsed_trading_days_with_natural_fallback`——正常路径按交易日历计（与「时间距离按交易日计」约束同口径），日历不可用时回退排除周末近似计数，日期不可解析回退自然日钳非负不再为 0。XIRR 年化按自然日属设计豁免不动。新增 `elapsed_trading_days_with_natural_fallback` 5 例单元测试与相关用例断言更新（46+ 例），folders.md 统计快照同步。
