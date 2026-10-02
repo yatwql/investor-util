@@ -2,7 +2,7 @@
 
 **把持仓 Excel 变成决策级投资洞察。** 一个面向个人投资者的本地投资分析引擎——实时行情 · 资产穿透 · 基金评级 · 量化风控 · LLM 智囊团深度复盘，双报告输出，让每一次投资决策都建立在数据之上。
 
-> 当前版本：0.11.10
+> 当前版本：0.11.11-dev
 
 ![](src/static/architecture.svg)
 
@@ -63,12 +63,12 @@
 .venv/bin/python -m src.python.cli doctor
 
 # 单次运行启用实验功能（仅本次生效，不写入 features.json）
-.venv/bin/python -m src.python.cli --experiment signal_ledger report --type full
+.venv/bin/python -m src.python.cli --experiment prosperity_framework report --type full
 ```
 
 完整命令参考（全局参数 / report / cache / whatif / check-sources / view-logs / doctor / 退出码 / 最佳实践；开发维护命令 `cassettes` 见开发者指南）见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)，定时任务见其 §13。
-`--experiment` 为全局参数，取值接受开关名（如 `signal_ledger`）、显示名或 `all`，可重复指定，只作用于**实验组**且只开不关。
-`--feature NAME=VALUE` 是它的补集：面向**全部 30 项功能开关**、**双向**（`=off` 亦可），仅本次运行、不写入 `features.json`，在其之后应用——`--experiment all --feature signal_ledger=off` 即「其余实验功能全开、只关信号沉淀」。
+`--experiment` 为全局参数，取值接受开关名（如 `prosperity_framework`）、显示名或 `all`，可重复指定，只作用于**实验组**且只开不关。
+`--feature NAME=VALUE` 是它的补集：面向**全部 28 项功能开关**、**双向**（`=off` 亦可），仅本次运行、不写入 `features.json`，在其之后应用——`--experiment all --feature prosperity_framework=off` 即「其余实验功能全开、只关景气度框架诊断」。
 
 ---
 
@@ -111,8 +111,7 @@
 - **事实校验** — 对 LLM 输出中的数值/品种/排名回查真实数据，自动纠正并记录修正处
 - **模块级质量分级**（常规开关，默认开，`module_quality_gate`）— 按**完整性 + 篇幅**评 A~F；评到 C/D/F 且「内容在但存在缺陷」者，章节头部追加 `【内容质量提示】` 横幅。**只标注、不阻断、不重试、不写回缓存**
 - **决策头结构化**（常规开关，默认开，`decision_header_parse`）— 提示词末尾追加机器可读决策头契约，抽取侧优先读结构化头、失败回落表格解析；两路共用同一套决策词归一判据（长词优先 + 否定守卫 + 复合词左边界 + 二义不猜），「不建议加仓」「加仓或减仓」不再被判反
-- **信号预消化**（常规开关，默认开，`signal_pre_digest`）— 把市场温度/估值分位/尾部风险预消化为 `信号：{指标} {结论}（{依据}）` 注入提示词，降低模型读裸数值自行推断方向的误判率
-- **确定性信号沉淀**（⚗ 实验，默认关，`signal_ledger`）— 五类确定性算法评级沉淀为 `data/state/signal_ledger.jsonl` 账本，每条附**实时/非实时**来源标签，统计与摘要默认只算实时记录
+- **确定性信号模块**（常规开关，默认开，`deterministic_signal`）— 双面：①把市场温度/估值分位/尾部风险预消化为 `信号：{指标} {结论}（{依据}）` 注入提示词，降低模型读裸数值自行推断方向的误判率；②五类确定性评级沉淀为 `data/state/signal_ledger.jsonl` 账本，每条附**实时/非实时**来源标签，统计与摘要默认只算实时记录
 - **决策跨期反思闭环**（⚗ 实验，默认关，`decision_reflection`）— 决策登记 → 真实行情结算命中率 → 教训回灌专家复盘提示词
 - **报告深度档位**（`config.json` 的 `llm_report_depth`：`brief` / `standard` / `deep`）— 一次选择即约束**参与模块集合**与**新闻采集规模**；只做上界收窄（不会打开你关掉的模块），缺省 `standard` 行为与既有版本逐字节一致
 - **生成后自检**（⚗ 实验，默认关，`self_review`）— 在四个分析模块之后追加一次模型层复核，输出【自检清单】（结论与数据是否矛盾 / 是否有未标注的推测 / 模块间是否互斥）作为报告附录；与确定性事实校验分层不重叠，失败不影响主内容

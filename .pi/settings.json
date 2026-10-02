@@ -4,5 +4,10 @@
   "tuiMode": "fullscreen",
   "terminal": {
     "clearOnShrink": false
+  },
+  "showCacheMissNotices": true,
+  "thinkingBudgets": {
+    "minimal": 512,
+    "low": 1024
   }
 }

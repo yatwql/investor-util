@@ -33,7 +33,7 @@ def detect_debate_mode(
     if not mode_label:
         if is_feature_enabled("llm_debate_procon"):
             mode_label = "🧪 辩论模式"
-        elif is_feature_enabled("llm_debate_conditional") or is_feature_enabled("llm_debate_qa_concentration"):
+        elif is_feature_enabled("llm_debate_conditional"):
             mode_label = "🧪 实验模式"
 
     if not mode_combination:
@@ -42,8 +42,6 @@ def detect_debate_mode(
             _comb_parts.append("正反辩论")
         if is_feature_enabled("llm_debate_conditional"):
             _comb_parts.append("条件推理")
-        if is_feature_enabled("llm_debate_qa_concentration"):
-            _comb_parts.append("集中度问答")
         mode_combination = "+".join(_comb_parts) if _comb_parts else None
 
     return mode_label, mode_combination

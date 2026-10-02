@@ -1,6 +1,6 @@
 """辩论模式集中度问答单元测试 — Mode 3 Q&A 块构建。
 
-测试 _build_qa_concentration_block() 集中度问答引导段落构建：
+测试 _build_concentration_qa_block() 集中度问答引导段落构建：
   - 单品种集中（>20%）
   - 全部低集中（<5%）
   - 前 3 品种合计集中（>60%）
@@ -27,10 +27,10 @@ def _call_qa_block(
     threshold: float = 0.20,
     industry_concentration: dict[str, float] | None = None,
 ) -> str:
-    """辅助调用 _build_qa_concentration_block。"""
-    from src.python.llm.prompts import _build_qa_concentration_block
+    """辅助调用 _build_concentration_qa_block。"""
+    from src.python.llm.prompts import _build_concentration_qa_block
 
-    return _build_qa_concentration_block(
+    return _build_concentration_qa_block(
         holdings,
         total_mv,
         threshold=threshold,
@@ -40,7 +40,7 @@ def _call_qa_block(
 
 @pytest.mark.unit_llm
 class TestDebateQaConcentration(unittest.TestCase):
-    """_build_qa_concentration_block 集中度反问段落构建。"""
+    """_build_concentration_qa_block 集中度反问段落构建。"""
 
     # ── test 1: 单品种 25% > 20% ─────────────────────────────
 

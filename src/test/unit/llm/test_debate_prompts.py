@@ -6,7 +6,7 @@
   - _SYSTEM_DEBATE_SYNTHESIS 白脸/黑脸占位符
   - _SYSTEM_DEBATE_CONDITIONAL_SCENARIO 条件推理情景模板
   - _build_debate_synthesis_prompt 签名与输出
-  - _build_qa_concentration_block 集中度反问逻辑
+  - _build_concentration_qa_block 集中度反问逻辑
 
 运行：
   pytest src/test/unit/llm/test_debate_prompts.py -v
@@ -171,41 +171,41 @@ class TestBuildSystemDebateSynthesis(unittest.TestCase):
 
 @pytest.mark.unit_llm
 class TestBuildQaConcentrationBlock(unittest.TestCase):
-    """_build_qa_concentration_block 集中度反问构建。"""
+    """_build_concentration_qa_block 集中度反问构建。"""
 
     def test_function_is_callable(self):
         """函数可调用。"""
-        from src.python.llm.prompts import _build_qa_concentration_block
+        from src.python.llm.prompts import _build_concentration_qa_block
 
-        self.assertTrue(callable(_build_qa_concentration_block))
+        self.assertTrue(callable(_build_concentration_qa_block))
 
     def test_empty_holdings_returns_empty(self):
         """空持仓（None / 空列表）返回空字符串。"""
-        from src.python.llm.prompts import _build_qa_concentration_block
+        from src.python.llm.prompts import _build_concentration_qa_block
 
-        self.assertEqual(_build_qa_concentration_block(None, 100_000), "")
-        self.assertEqual(_build_qa_concentration_block([], 100_000), "")
+        self.assertEqual(_build_concentration_qa_block(None, 100_000), "")
+        self.assertEqual(_build_concentration_qa_block([], 100_000), "")
 
     def test_zero_total_mv_returns_empty(self):
         """总市值为 0 时返回空字符串。"""
-        from src.python.llm.prompts import _build_qa_concentration_block
+        from src.python.llm.prompts import _build_concentration_qa_block
 
         details = [{"name": "A", "code": "000001", "mv": 100_000}]
-        self.assertEqual(_build_qa_concentration_block(details, 0), "")
+        self.assertEqual(_build_concentration_qa_block(details, 0), "")
 
     def test_single_holding_exceeds_threshold(self):
         """单品种超过阈值（默认 20%）时生成反问。"""
-        from src.python.llm.prompts import _build_qa_concentration_block
+        from src.python.llm.prompts import _build_concentration_qa_block
 
         details = [{"name": "贵州茅台", "code": "600519", "mv": 500_000}]
-        result = _build_qa_concentration_block(details, 1_000_000)
+        result = _build_concentration_qa_block(details, 1_000_000)
         self.assertIn("贵州茅台", result)
         self.assertIn("50.0%", result)
         self.assertIn("20%", result)
 
     def test_top3_exceeds_60_percent(self):
         """前 3 品种合计超过 60% 时生成反问。"""
-        from src.python.llm.prompts import _build_qa_concentration_block
+        from src.python.llm.prompts import _build_concentration_qa_block
 
         # 使用高 threshold (0.50) 避免单个品种触发，仅测试前 3 合计条件
         details = [
@@ -215,13 +215,13 @@ class TestBuildQaConcentrationBlock(unittest.TestCase):
             {"name": "丁", "code": "000004", "mv": 100_000},
         ]
         # top 3 = 400+300+200 = 900k / 1000k = 90% > 60%
-        result = _build_qa_concentration_block(details, 1_000_000, threshold=0.50)
+        result = _build_concentration_qa_block(details, 1_000_000, threshold=0.50)
         self.assertIn("前 3 大品种", result)
         self.assertIn("90.0%", result)
 
     def test_no_trigger_returns_empty(self):
         """无触发条件时返回空字符串。"""
-        from src.python.llm.prompts import _build_qa_concentration_block
+        from src.python.llm.prompts import _build_concentration_qa_block
 
         details = [
             {"name": "A", "code": "000001", "mv": 10_000},
@@ -229,27 +229,27 @@ class TestBuildQaConcentrationBlock(unittest.TestCase):
             {"name": "C", "code": "000003", "mv": 10_000},
         ]
         # 各品种占比均 < 20%，前 3 合计 30/100 = 30% < 60%
-        result = _build_qa_concentration_block(details, 100_000)
+        result = _build_concentration_qa_block(details, 100_000)
         self.assertEqual(result, "")
 
     def test_industry_concentration_exceeds_40_percent(self):
         """行业集中度超过 40% 时生成反问。"""
-        from src.python.llm.prompts import _build_qa_concentration_block
+        from src.python.llm.prompts import _build_concentration_qa_block
 
         details = [{"name": "A", "code": "000001", "mv": 10_000}]
         ind_conc = {"白酒": 0.45}
-        result = _build_qa_concentration_block(details, 50_000, industry_concentration=ind_conc)
+        result = _build_concentration_qa_block(details, 50_000, industry_concentration=ind_conc)
         self.assertIn("白酒", result)
         self.assertIn("45.0%", result)
         self.assertIn("40%", result)
 
     def test_industry_concentration_all_low_no_output(self):
         """行业集中度低于 40% 时不触发反问。"""
-        from src.python.llm.prompts import _build_qa_concentration_block
+        from src.python.llm.prompts import _build_concentration_qa_block
 
         details = [{"name": "A", "code": "000001", "mv": 10_000}]
         ind_conc = {"白酒": 0.25, "科技": 0.15}
-        result = _build_qa_concentration_block(details, 50_000, industry_concentration=ind_conc)
+        result = _build_concentration_qa_block(details, 50_000, industry_concentration=ind_conc)
         self.assertEqual(result, "")
 
 
@@ -267,7 +267,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
     # ── _build_debate_synthesis_prompt ──────────────────────────
 
     def test_synthesis_prompt_qa_enabled_appends_instruction(self):
-        """enable_qa_concentration=True 且命中触发时，合成 prompt 含集中度问答指令与问题。"""
+        """include_concentration_qa=True 且命中触发时，合成 prompt 含集中度问答指令与问题。"""
         from src.python.llm.prompts import _build_debate_synthesis_prompt
 
         holdings = [
@@ -277,7 +277,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         prompt = _build_debate_synthesis_prompt(
             "白脸",
             "黑脸",
-            enable_qa_concentration=True,
+            include_concentration_qa=True,
             holdings_details=holdings,
             total_mv=1_000_000,
         )
@@ -287,7 +287,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         self.assertIn("调仓建议", prompt)
 
     def test_synthesis_prompt_qa_disabled_no_instruction(self):
-        """enable_qa_concentration=False 时合成 prompt 不含集中度问答指令。"""
+        """include_concentration_qa=False 时合成 prompt 不含集中度问答指令。"""
         from src.python.llm.prompts import _build_debate_synthesis_prompt
 
         holdings = [
@@ -297,7 +297,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         prompt = _build_debate_synthesis_prompt(
             "白脸",
             "黑脸",
-            enable_qa_concentration=False,
+            include_concentration_qa=False,
             holdings_details=holdings,
             total_mv=1_000_000,
         )
@@ -312,7 +312,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         """
         from src.python.llm.prompts import _build_debate_synthesis_prompt
 
-        mock_get.return_value = {"debate": {"qa_concentration": {"threshold": 0.15}}}
+        mock_get.return_value = {"debate": {"concentration_qa": {"threshold": 0.15}}}
         # 单品种占比 18%（>15% 触发，但 <20% 默认阈值），前 3 合计 50.8% < 60%
         holdings = [
             {"name": "甲", "code": "000001", "mv": 180_000},
@@ -325,7 +325,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         prompt = _build_debate_synthesis_prompt(
             "白脸",
             "黑脸",
-            enable_qa_concentration=True,
+            include_concentration_qa=True,
             holdings_details=holdings,
             total_mv=1_000_000,
         )
@@ -338,7 +338,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         """合成阶段 threshold 读配置为 20% 时，18% 占比不触发集中度问答。"""
         from src.python.llm.prompts import _build_debate_synthesis_prompt
 
-        mock_get.return_value = {"debate": {"qa_concentration": {"threshold": 0.20}}}
+        mock_get.return_value = {"debate": {"concentration_qa": {"threshold": 0.20}}}
         holdings = [
             {"name": "甲", "code": "000001", "mv": 180_000},
             {"name": "乙", "code": "000002", "mv": 164_000},
@@ -350,7 +350,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         prompt = _build_debate_synthesis_prompt(
             "白脸",
             "黑脸",
-            enable_qa_concentration=True,
+            include_concentration_qa=True,
             holdings_details=holdings,
             total_mv=1_000_000,
         )
@@ -359,19 +359,19 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
     # ── _build_system_debate_synthesis ──────────────────────────
 
     def test_system_prompt_qa_appends_appendix(self):
-        """enable_qa_concentration=True 时 system prompt 追加集中度问答输出要求。"""
+        """include_concentration_qa=True 时 system prompt 追加集中度问答输出要求。"""
         from src.python.llm.prompts import _build_system_debate_synthesis
 
         result = _build_system_debate_synthesis(
             enable_conditional=False,
-            enable_qa_concentration=True,
+            include_concentration_qa=True,
         )
         self.assertIn("集中度问答（qa 模式）", result)
         self.assertIn("量化评估", result)
         self.assertIn("调仓建议", result)
 
     def test_system_prompt_qa_off_no_appendix(self):
-        """enable_qa_concentration=False 时 system prompt 不含 qa 附录。"""
+        """include_concentration_qa=False 时 system prompt 不含 qa 附录。"""
         from src.python.llm.prompts import _build_system_debate_synthesis
 
         result = _build_system_debate_synthesis(enable_conditional=False)
@@ -383,7 +383,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
 
         result = _build_system_debate_synthesis(
             enable_conditional=True,
-            enable_qa_concentration=True,
+            include_concentration_qa=True,
         )
         self.assertIn("情景分析纪律", result)
         self.assertIn("5. **情景分析**", result)
@@ -396,7 +396,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         """标准模式 expert_review 的 threshold 从配置读取（22% 占比 + 15% 阈值 → 触发）。"""
         from src.python.llm.prompts import _build_expert_review_prompt
 
-        mock_get.return_value = {"debate": {"qa_concentration": {"threshold": 0.15}}}
+        mock_get.return_value = {"debate": {"concentration_qa": {"threshold": 0.15}}}
         # 单品种占比 22%（>15% 触发，但 <30%），前 3 合计 53.2% < 60% → 仅触发器①按配置阈值判定
         details = [
             {"name": "甲", "code": "000001", "mv": 220_000, "cost": 200_000},
@@ -414,7 +414,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
             holdings_count=len(details),
             categories={},
             holdings_details=details,
-            enable_qa_concentration=True,
+            include_concentration_qa=True,
         )
         self.assertIn("### 集中度问答", prompt)
         self.assertIn("甲", prompt)
@@ -428,7 +428,7 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
         """
         from src.python.llm.prompts import _build_expert_review_prompt
 
-        mock_get.return_value = {"debate": {"qa_concentration": {"threshold": 0.30}}}
+        mock_get.return_value = {"debate": {"concentration_qa": {"threshold": 0.30}}}
         details = [
             {"name": "甲", "code": "000001", "mv": 220_000, "cost": 200_000},
             {"name": "乙", "code": "000002", "mv": 156_000, "cost": 140_000},
@@ -445,6 +445,6 @@ class TestDebateQaConcentrationConfig(unittest.TestCase):
             holdings_count=len(details),
             categories={},
             holdings_details=details,
-            enable_qa_concentration=True,
+            include_concentration_qa=True,
         )
         self.assertNotIn("### 集中度问答", prompt)

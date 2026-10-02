@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import threading as _threading
 import time
+from typing import Any
 
 logger = logging.getLogger("invest")
 
@@ -83,3 +84,35 @@ def get_circuit_status(endpoint: str) -> str:
     if _cb_is_open(endpoint):
         return "熔断中"
     return "正常"
+
+
+def circuit_status_snapshot() -> dict[str, dict[str, Any]]:
+    """端点熔断状态快照（core 网关经注册钩子取用，core 不反向 import 上层）。"""
+    now = time.time()
+    status: dict[str, dict[str, Any]] = {}
+    all_endpoints = set(list(_circuit_failures.keys()) + list(_circuit_open_until.keys()))
+    for ep in all_endpoints:
+        cooldown_remaining = 0.0
+        if ep in _circuit_open_until:
+            cooldown_remaining = max(0.0, _circuit_open_until[ep] - now)
+            _cb = cooldown_remaining > 0
+        else:
+            _cb = False
+        status[ep] = {
+            "circuit_broken": _cb,
+            "consecutive_failures": _circuit_failures.get(ep, 0),
+            "threshold": _CIRCUIT_BREAKER_THRESHOLD,
+            "cooldown_remaining": round(cooldown_remaining, 1),
+            "recovery_secs": _CIRCUIT_BREAKER_RECOVERY,
+        }
+    return status
+
+
+def _register_to_core_gateway() -> None:
+    """把 LLM 熔断快照注册进 core 网关（模块导入时执行一次）。"""
+    from src.python.core.circuit_breaker import register_breaker_status
+
+    register_breaker_status("llm", circuit_status_snapshot)
+
+
+_register_to_core_gateway()

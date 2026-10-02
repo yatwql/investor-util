@@ -597,3 +597,36 @@ class TestHostUnreachableShortCircuit:
         assert cn._is_host_unreachable("http://static.cninfo.com.cn/b.PDF") is True
         cn.reset_cninfo_unreachable()
         assert cn._is_host_unreachable("http://static.cninfo.com.cn/b.PDF") is False
+
+
+class TestRateLimitWaitFormula:
+    """429 退避等待经 interval_delay 唯一算式（间隔节流唯一原语约束）。"""
+
+    def test_429_wait_goes_through_interval_delay(self, monkeypatch, _isolate):
+        waits: list[float] = []
+        monkeypatch.setattr(cn, "interval_delay", lambda d: d)  # 算式原样透传，便于断言
+        monkeypatch.setattr(cn.time, "sleep", lambda s: waits.append(s))
+        monkeypatch.setattr(cn, "_is_host_unreachable", lambda url: False)
+
+        calls_counter = [0]
+
+        class TwoPhaseClient:
+            def __init__(self):
+                self.posts = []
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def post(self, *a, **k):
+                calls_counter[0] += 1
+                return _FakeResp(status_code=429 if calls_counter[0] == 1 else 200, payload={"keyBoardList": []})
+
+        client = TwoPhaseClient()
+        _patch_client(monkeypatch, client)
+        payload = cn._post_json("/topSearch/query", {})
+        assert payload == {"keyBoardList": []}  # 429 退避后重试成功
+        assert calls_counter[0] == 2
+        assert waits == [cn._RATE_LIMIT_POLICY.delay_for(1)]

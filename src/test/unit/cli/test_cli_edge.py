@@ -137,7 +137,7 @@ class TestCliEdge:
     def test_experiment_valid_then_invalid_rejected(self):
         """同一参数重复指定时，任一取值非法即整体报错（不部分生效）。"""
         with pytest.raises(SystemExit) as exc:
-            _build_parser().parse_args(["--experiment", "signal_ledger", "--experiment", "bad", "report"])
+            _build_parser().parse_args(["--experiment", "decision_reflection", "--experiment", "bad", "report"])
         assert exc.value.code == 2
 
     @pytest.mark.edge
@@ -145,7 +145,7 @@ class TestCliEdge:
         """all 与具体名称混用 → 解析结果去重，不产生重复启用。"""
         from src.python.config.features import GROUP_EXPERIMENTAL, switches_in_group
 
-        args = _build_parser().parse_args(["--experiment", "all", "--experiment", "signal_ledger", "report"])
+        args = _build_parser().parse_args(["--experiment", "all", "--experiment", "decision_reflection", "report"])
         flags = {flag for group in args.experiment for flag in group}
         assert flags == {flag for flag, _d in switches_in_group(GROUP_EXPERIMENTAL)}
 
@@ -154,9 +154,9 @@ class TestCliEdge:
         """重复分组不报错，开关按幂等处理。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "signal_pre_digest", False)
-        _apply_cli_experiments([("signal_pre_digest",), ("signal_pre_digest",)])
-        assert feat.FEATURE_FLAGS["signal_pre_digest"] is True
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "deterministic_signal", False)
+        _apply_cli_experiments([("deterministic_signal",), ("deterministic_signal",)])
+        assert feat.FEATURE_FLAGS["deterministic_signal"] is True
 
     @pytest.mark.edge
     def test_feature_blank_value_rejected(self):

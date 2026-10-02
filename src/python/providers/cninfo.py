@@ -35,8 +35,10 @@ from typing import Any
 from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
+from src.python.core.code_utils import get_exchange_category
 from src.python.core.http_client import make_http_client
 from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+from src.python.core.throttle import interval_delay  # 间隔+抖动唯一算式
 from src.python.providers._utils import set_last_reason, with_connect_retry
 
 logger = logging.getLogger("invest")
@@ -249,7 +251,7 @@ def _post_json(path: str, data: dict[str, Any]) -> dict[str, Any] | None:
     if resp is None:
         return None  # 失败原因已由 _with_transient_retry 写入 last-reason
     if resp.status_code == 429:
-        delay = _RATE_LIMIT_POLICY.delay_for(1)
+        delay = interval_delay(_RATE_LIMIT_POLICY.delay_for(1))  # 等待算式统一走 interval 原语
         logger.warning("[cninfo] 触发限速（HTTP 429），%.1fs 后重试一次", delay)
         time.sleep(delay)
         resp = _with_transient_retry(path, lambda: _post_once(url, data), url=url)
@@ -293,12 +295,8 @@ def _get_bytes(url: str) -> bytes | None:
 
 
 def _column_for_code(code: str) -> str:
-    """cninfo 查询的栏目参数：6 开头上交所，4/8 开头北交所，其余深交所。"""
-    if code.startswith("6"):
-        return "sse"
-    if code.startswith(("4", "8")):
-        return "third"
-    return "szse"
+    """cninfo 查询的栏目参数（映射收敛到 code_utils，与其余判定同表维护）。"""
+    return get_exchange_category(code)
 
 
 def resolve_org_id(code: str) -> str | None:

@@ -90,7 +90,7 @@ _DEBATE_CONFIG_DEFAULTS: dict[str, Any] = {
             {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"},
         ],
     },
-    "qa_concentration": {
+    "concentration_qa": {
         "threshold": 0.20,
     },
     "max_total_tokens_per_report": 72000,
@@ -144,14 +144,14 @@ def _load_debate_config(settings: dict) -> dict:
             else:
                 logger.warning("[debate] conditional.scenarios 全部无效，使用默认情景")
 
-    # qa_concentration（集中度问答配置）
-    raw_qa = raw_debate.get("qa_concentration")
+    # concentration_qa（集中度问答配置；辩论流程内建段落，阈值触发）
+    raw_qa = raw_debate.get("concentration_qa")
     if isinstance(raw_qa, dict):
         raw_threshold = raw_qa.get("threshold")
         if isinstance(raw_threshold, (int, float)) and 0.0 < raw_threshold < 1.0:
-            merged["qa_concentration"]["threshold"] = raw_threshold
+            merged["concentration_qa"]["threshold"] = raw_threshold
         elif raw_threshold is not None:
-            logger.warning("[debate] qa_concentration.threshold 应在 (0, 1) 范围，使用默认值 0.20")
+            logger.warning("[debate] concentration_qa.threshold 应在 (0, 1) 范围，使用默认值 0.20")
 
     # 顶层标量
     raw_total = raw_debate.get("max_total_tokens_per_report")

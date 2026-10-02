@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from _checklib import REPO_ROOT, rel
 
 from _doc_drift._shared import (
@@ -140,3 +141,90 @@ def check_project_stats(
         if got_lines is not None and got_lines != str(exp_lines):
             findings.append(f"{rel(_FOLDERS_MD)}:{line_no}: 「{label}」行数 {got_lines} 与实测 {exp_lines} 不一致")
     return findings
+
+
+def _reformat_number(value: int, style: str) -> str:
+    """按原单元格的数字风格回写：原带千分位 → 千分位，否则纯正整数。"""
+    return f"{value:,}" if "," in style else str(value)
+
+
+def sync_project_stats(
+    doc_path: Path | None = None,
+    *,
+    actual: dict[str, tuple[int, int]] | None = None,
+    test_count: int | None = None,
+) -> list[str]:
+    """把实测的统计表数字回写 `folders.md`（`check-doc-drift --sync` 自动同步）。
+
+    针对的是「统计表登记数字 vs 实测」类漂移 —— 该类漂移是全仓 CI 最高频的红源
+    （changelog/自审记录每补一行、测试用例每增删，实测行数即变，人工同步必漏）。
+    回写只替换数字单元格（保留千分位风格与其余文字），不改说明文字、不触碰版本
+    演进对照表（其标签口径不同，不会精确匹配）与任何需要人工判断的条目。
+
+    Args:
+        doc_path: `folders.md` 路径（默认仓库登记路径，测试注入临时路径）
+        actual: 实测 `(文件数, 行数)` 表(默认 `_stats_actual()`，测试注入 fixture)
+        test_count: pytest 收集的用例数（默认 `_collect_test_count()`，测试注入）
+
+    Returns:
+        逐条应用的变更描述（无漂移时为空列表）。
+    """
+    path = doc_path or _FOLDERS_MD
+    if not path.exists():
+        return []
+    live_actual = actual if actual is not None else _stats_actual()
+    live_test = test_count if test_count is not None else _collect_test_count()
+    lines_out: list[str] = []
+    applied: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
+        rows = _split_table_row(line)
+        if rows is None:
+            lines_out.append(line)
+            continue
+        label = rows[0].lstrip("├└─ ").strip()
+        if label in live_actual and len(rows) > 3:
+            exp_files, exp_lines = live_actual[label]
+            new_line = line
+            changed = False
+            for idx, exp_value in ((2, exp_files), (3, exp_lines)):
+                rows = _split_table_row(new_line)
+                if rows is None:
+                    break
+                got = _first_number(rows[idx])
+                if got is not None and got != str(exp_value):
+                    new_line = _sync_cell_number(new_line, idx, exp_value)
+                    changed = True
+                    applied.append(f"「{label}」{'文件数' if idx == 2 else '行数'} {got} → {exp_value}")
+            line = new_line
+            del changed
+        elif label == "测试用例" and live_test is not None and len(rows) > 3:
+            got = _first_number(rows[3])
+            if got is not None and got != str(live_test):
+                line = _sync_cell_number(line, 3, live_test)
+                applied.append(f"「{label}」用例数 {got} → {live_test}")
+        lines_out.append(line)
+    if applied:
+        path.write_text("".join(lines_out), encoding="utf-8")
+    return applied
+
+
+def _sync_cell_number(line: str, cell_idx: int, new_value: int) -> str:
+    """把表格行第 `cell_idx` 个单元格的首个数字替换为 `new_value`（保留原格式）。
+
+    直接对**原始行**做定位替换（不经过 `_split_table_row` 的粗体剥离），
+    保证 `**11**` / `11` / 带 `#` 注释等逐字风格原样保留。
+    """
+    suffix = "\n" if line.endswith("\n") else ""
+    body = line.rstrip("\n")
+    # 原始管道拆分（首尾去 `|`），位置与 _split_table_row 的单元格一致
+    raw_parts = body.strip().strip("|").split("|")
+    raw_parts = [p.strip() for p in raw_parts]
+    if len(raw_parts) <= cell_idx:
+        return line
+    old_cell = raw_parts[cell_idx]
+    num = re.search(r"[\d][\d,]*", old_cell)
+    if not num:
+        return line
+    replacement = _reformat_number(new_value, num.group(0))
+    raw_parts[cell_idx] = old_cell.replace(num.group(0), replacement, 1)
+    return "| " + " | ".join(raw_parts) + " |" + suffix

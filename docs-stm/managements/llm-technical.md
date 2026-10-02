@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.11.10
+> 文档版本：0.11.11
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -175,8 +175,8 @@ skeleton.py:generate_llm_content()
 | `fallback.py` | 基础设施 | 全模块失败时的降级占位模板；占位识别（`is_placeholder_content()` 按模板共有的稳定签名 `⚠️ 当前无法` 判定，供 `report/llm_quality.py` 等内容侧消费——签名常量与模板同文件，改模板即改签名） | `get_fallback_content()` / `get_placeholder_text()` / `is_placeholder_content()` |
 | `prompts_core.py` | 工具 | System Prompt 常量 + 上下文构建块（数据降级/收益归因/竞争语境/再平衡/概念板块/管线差异） | `_SYSTEM_*` 常量 + `_build_system_debate_synthesis()` |
 | `prompts_tables.py` | 工具 | 持仓/穿透/指标/情景/数据质量/汇率等数据块格式化为 Markdown | `_format_holdings_block()` / `_build_holdings_summary()` |
-| `prompts_action.py` | 工具 | 各模块 User Prompt 构建（global_macro / expert_review / health_check / penetration_deep / debate_synthesis）+ 集中度问答块 | `_build_expert_review_prompt()` / `_build_qa_concentration_block()` |
-| `prompts_signals.py` | 工具 | 信号预消化：行业资金流向段方向标注与分方向排名（无开关，默认路径）+ 算法评级信号块（市场温度/估值分位/尾部风险/持仓基本面/叙事与数字背离 → `信号：…` 行，`signal_pre_digest` 开关，判定收敛于缓存后缀函数保证读写键同源） | `_build_sector_flow_block()` / `_build_signal_digest_block()` / `_signal_digest_cache_suffix()` |
+| `prompts_action.py` | 工具 | 各模块 User Prompt 构建（global_macro / expert_review / health_check / penetration_deep / debate_synthesis）+ 集中度问答块 | `_build_expert_review_prompt()` / `_build_concentration_qa_block()` |
+| `prompts_signals.py` | 工具 | 信号预消化：行业资金流向段方向标注与分方向排名（无开关，默认路径）+ 算法评级信号块（市场温度/估值分位/尾部风险/持仓基本面/叙事与数字背离 → `信号：…` 行，`deterministic_signal` 开关（读侧注入面），判定收敛于缓存后缀函数保证读写键同源） | `_build_sector_flow_block()` / `_build_signal_digest_block()` / `_signal_digest_cache_suffix()` |
 | `fingerprint.py` | 工具 | LLM 缓存指纹计算、稳定性字段提取、TTL 查询 | `compute_fingerprint()` / `build_llm_fingerprint()` |
 | `module_fingerprint.py` | 工具 | **模块指纹的唯一事实来源（预检侧与写侧同源）**：四模块指纹构造器 + 输入闭包 + 注册表，两侧都调用同一函数，结构性消除「预检键 ≠ 写侧键」的漂移 | `MODULE_FINGERPRINT_BUILDERS` / `ModuleFingerprintInputs` / `*_fingerprint()` |
 | `session.py` | 工具 | 会话级 Token 累计、模块级记录、格式化输出 | `track_session_usage()` / `get_session_usage()` |
@@ -844,7 +844,7 @@ penetrated_assets ──→ extract_stable_penetration()
 
 **辩论三键（`debate_procon_fingerprint` / `debate_synthesis_fingerprint`）**：辩论模式绕过标准预检，其键族 `llm_debate_*` 与标准键不同，故**仅写侧**使用、不进 `MODULE_FINGERPRINT_BUILDERS`。其输入口径同样以辩论提示词实际包含的段落为准——含基础持仓 + 竞争语境块 + 量化指标 + 辩论增强后缀 + `pipeline_data` 派生的【环比变化】【数据质量降级】两段（白脸/黑脸复用 `_build_expert_review_prompt`，这两段随其进入提示词），**刻意不并入** `history_data` 与教训/信号摘要/结构化决策头后缀（辩论提示词不含这些段落，并入只会让白脸/黑脸/综合三次昂贵调用每份报告必 miss）。
 
-**辩论综合键（`debate_synthesis_fingerprint`）**：取「辩论基础指纹 + **综合提示词全文**」。综合提示词 = 白脸/黑脸**全文** + 条件推理情景段（`debate.conditional.scenarios` 驱动）+ 集中度问答段（`debate.qa_concentration.threshold` 驱动），由 `_build_debate_synthesis_prompt()` 一次性渲染。既然提示词就是这三者的函数，键直接取该渲染结果，无需逐项枚举入哈希的来源、也就不会漏项。此前本键另起一套：截取 pro/con **前 200 字符**摘要 + 开关位字母后缀，两处后果——正文差异落在 200 字符之后时键不动，仅改 config（情景名/描述、集中度阈值）而开关位不变时键同样不动；两种情形都命中按旧正文/旧配置生成的综合结论且不报错。
+**辩论综合键（`debate_synthesis_fingerprint`）**：取「辩论基础指纹 + **综合提示词全文**」。综合提示词 = 白脸/黑脸**全文** + 条件推理情景段（`debate.conditional.scenarios` 驱动）+ 集中度问答段（`debate.concentration_qa.threshold` 驱动，内建段落），由 `_build_debate_synthesis_prompt()` 一次性渲染。既然提示词就是这三者的函数，键直接取该渲染结果，无需逐项枚举入哈希的来源、也就不会漏项。此前本键另起一套：截取 pro/con **前 200 字符**摘要 + 开关位字母后缀，两处后果——正文差异落在 200 字符之后时键不动，仅改 config（情景名/描述、集中度阈值）而开关位不变时键同样不动；两种情形都命中按旧正文/旧配置生成的综合结论且不报错。
 
 **数据质量段的成本口径**：该段曾按「纳入后数据源抖动期间事件集持续变化会让该模块反复未命中（TTL 24h 下的重算成本）」的理由不纳入指纹；核查显示三点前提均不成立——① 事件集是**本进程内**的降级日志（`DegradationTracker._events` 只存内存、不落盘），该块因而是**本次运行的数据源画像**而非「一日累计」；② 该块已是聚合结果（仅失败源与计数，无时间戳/消息/`detail`）；③ 本模块指纹本就含 `total_today_profit`，交易日内持仓一有盈亏变化即换键，24h TTL 从不是真实驻留期。故纳入的边际额外失效接近零，而收益是消除一类**静默的错误结论**：源恢复后重出报告不再复用故障期间缓存的健康判断（详见 `review-findings.md` 已解决区）。
 
@@ -944,7 +944,7 @@ cache_get(optimistic_key, ttl) → 命中 → 直接返回（+ 缓存标记）
 
 **新闻关联分析** (`_SYSTEM_NEWS_CORRELATION`)：批量分析模式下使用的 System Prompt，要求 LLM 按 JSON 数组格式输出每条新闻与持仓组合的关联度评分、影响方向（正面/负面/中性）及简要理由。每批最多 10 条新闻，分析时需引用品种代码，禁止虚构数据。
 
-#### 确定性信号预消化（`signal_pre_digest`，默认开启）
+#### 确定性信号注入面（`deterministic_signal`，默认开启）
 
 把**算法已经算出、但此前只走渲染层**的确定性结论在进提示词前写成带方向标注的「结论行」，让模型读到方向判断而非裸数值自行解读。`prompts_signals.py` 只读既有数据契约、不写 pipeline_data、不新增键：
 
@@ -1242,7 +1242,7 @@ reload_pricing() → 合并 llm_settings.json → pricing
 
 所有键名由 `get_known_llm_settings_keys()` 统一校验。新增 LLM 模块只需在 registry.py 注册表中添加一行 `DataModuleDef`，无需修改 config 校验逻辑。
 
-> **辩论模块派生**：3 个辩论模块（`debate_pro`/`debate_con`/`debate_synthesis`，`settings_suffix` 同规则）同样按每模块 9 键派生（如 `model_debate_pro`、`system_prompt_debate_con`），使 `enabled_llm` 合法子键共 **9** 个（6 标准 + 3 辩论）。辩论开关实际由 `features.json` 的实验性 Flag（`llm_debate_procon`/`llm_debate_conditional`/`llm_debate_qa_concentration`）控制，`enabled_llm` 辩论子键仅属校验层合法键，不在菜单 [S] 展示（由 `tui_menu.LLM_MENU_HIDDEN_KEYS` 隐藏），注册表保留以维持缓存 TTL/前缀清理。
+> **辩论模块派生**：3 个辩论模块（`debate_pro`/`debate_con`/`debate_synthesis`，`settings_suffix` 同规则）同样按每模块 9 键派生（如 `model_debate_pro`、`system_prompt_debate_con`），使 `enabled_llm` 合法子键共 **9** 个（6 标准 + 3 辩论）。辩论开关实际由 `features.json` 的实验性 Flag（`llm_debate_procon`; 条件推理为常规开关 `llm_debate_conditional`）控制，集中度问答段内建于辩论流程，`enabled_llm` 辩论子键仅属校验层合法键，不在菜单 [S] 展示（由 `tui_menu.LLM_MENU_HIDDEN_KEYS` 隐藏），注册表保留以维持缓存 TTL/前缀清理。
 
 ### 12.3 报告深度档位（`llm_report_depth`）
 
@@ -1354,8 +1354,8 @@ LLM 集成层与系统其他组件的接口：
 | LLM 模块 | 依赖数据源 | 缓存指纹依赖 |
 |:---------|:----------|:------------|
 | `global_macro` | A股指数 + 美股指数 + 总市值+总盈亏 + 分类 + (可选)行业资金流向 | 指数收盘价 + 持仓汇总 + 竞争语境块（`competitive_context`） |
-| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + 组合历史走势 + 竞争语境块 + 量化指标 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要（`history_data` 的 max_drawdown_pct / annualized_volatility / total_return_pct / status）+ 竞争语境块（`competitive_context`）+ 量化指标（`metrics`）+ 辩论增强后缀（`llm_debate_conditional` / `llm_debate_qa_concentration`）+ pipeline_data 派生块后缀（【环比变化】【数据质量降级】两段）+ 实验开关后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要指纹 → `_sg`） |
-| `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要 + 数据质量详细状态块（`data_quality_text`，本次运行的降级事件画像）+ pipeline_data 派生块后缀（【环比变化】【数据质量降级】两段）+ 信号预消化后缀（`signal_pre_digest`） |
+| `expert_review` | 总市值/成本/盈亏 + 持仓数量 + 分类 + 穿透资产 + 持仓明细 + 组合历史走势 + 竞争语境块 + 量化指标 + (可选)pipeline_data | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要（`history_data` 的 max_drawdown_pct / annualized_volatility / total_return_pct / status）+ 竞争语境块（`competitive_context`）+ 量化指标（`metrics`）+ 辩论增强后缀（`llm_debate_conditional` → `_c`）+ pipeline_data 派生块后缀（【环比变化】【数据质量降级】两段）+ 开关类后缀（`decision_reflection` 教训区块指纹、`deterministic_signal` 信号块指纹与确定性信号摘要指纹 → `_sg`、`decision_header_parse` → `_dh`） |
+| `health_check` | 同 expert_review | 持仓品种/份额/成本（剔除行情波动）+ 组合风险信号摘要 + 数据质量详细状态块（`data_quality_text`，本次运行的降级事件画像）+ pipeline_data 派生块后缀（【环比变化】【数据质量降级】两段）+ 信号预消化后缀（`deterministic_signal`） |
 | `penetration_deep` | 同 expert_review + 穿透 TOP10（含行业/板块） | 同上 + 穿透 mv/ratio/sector（full_penetration=True） |
 | `news_correlation` | 过滤后的新闻列表 + 持仓摘要 + 穿透资产 + 行业/概念数据 | 标题前 80 字 + 持仓指纹 |
 
@@ -1367,7 +1367,7 @@ LLM 集成层与系统其他组件的接口：
 
 历史教训：该纪律此前靠「两侧注释声明同调」维持，每逢新增输入都要两处手工各改一遍，漏改即产生**读写键永不同源**——预检 read 落空、每次报告全量派发，不报错、只表现为静默的性能与日志噪声（`history_data` 风险信号与辩论增强后缀各发生过一次）。反方向的漏改则产生**覆盖不足**——输入进了提示词却没进指纹，键不变、预检命中旧键、复用按旧数据算出的结论，同样不报错（`competitive_context` / `metrics` 发生过一次）。故本条纪律的落实方式是**结构性收敛而非复查纪律**：任何一方若再自行拼接模块指纹、或对同一输入各自渲染，即属违规。
 
-开关类后缀（`decision_reflection` 教训区块指纹、`signal_pre_digest` 信号块指纹、`decision_header_parse` → `_dh`、`signal_ledger` 确定性信号摘要 → `_sg`、辩论增强 → `_c`/`_q`）**开关判定一律收敛在指纹构造器内部**：关闭时返回 `""`（键不变、不误伤旧缓存），开启时两侧同步换键——只改一侧会让预检命中旧键而跳过重生成，开关形同虚设。同源与覆盖保证由 `src/test/unit/llm/test_module_fingerprint.py` 锁定（断言预检键 == 写侧键、覆盖四模块 × 多场景；断言「进了提示词必须进键」与「未进提示词的模块不得被并入」），「一次渲染」由 `test_generate_all_llm.py::TestCompetitiveContextRenderedOnce` 与 `TestDataQualityBlockRenderedOnce` 以「渲染次数 == 1」+ 同一实例断言（`assertIs`）锁定。
+开关类后缀（`decision_reflection` 教训区块指纹、`deterministic_signal` 信号块指纹与确定性信号摘要 → `_sg`、`decision_header_parse` → `_dh`、辩论增强 → `_c`）**开关判定一律收敛在指纹构造器内部**：关闭时返回 `""`（键不变、不误伤旧缓存），开启时两侧同步换键——只改一侧会让预检命中旧键而跳过重生成，开关形同虚设。同源与覆盖保证由 `src/test/unit/llm/test_module_fingerprint.py` 锁定（断言预检键 == 写侧键、覆盖四模块 × 多场景；断言「进了提示词必须进键」与「未进提示词的模块不得被并入」），「一次渲染」由 `test_generate_all_llm.py::TestCompetitiveContextRenderedOnce` 与 `TestDataQualityBlockRenderedOnce` 以「渲染次数 == 1」+ 同一实例断言（`assertIs`）锁定。
 
 **结构化决策头（`decision_header_parse`，默认开）**：开启时 `_build_expert_review_prompt` 在「### 操作建议」表之后追加一行 `决策头：{"decisions":[{"code","action","priority"}]}` 契约（`core/decision_header.build_structured_header_instruction()`，与解析器同源、由测试锁定互读）；关闭时 append 空串，提示词**逐字节不变**。该段只在标准模式 expert_review 生效，辩论模式路径不追加。解析侧归一见 `technical.md` §4.15。
 

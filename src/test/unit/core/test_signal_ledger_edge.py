@@ -187,6 +187,8 @@ class TestSummaryBoundary:
     """摘要/后缀的边界态。"""
 
     def test_inactive_flag_beats_explicit_signals(self):
+        # 合并开关 deterministic_signal 出厂默认开：先显式关掉再验「开关关→静默」
+        set_feature_enabled(sl.FEATURE_FLAG, False)
         records = [_minimal() for _ in range(5)]
 
         assert sl.summary_block(records) == ""

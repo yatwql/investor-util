@@ -58,7 +58,7 @@ class TestDebateProconFlow(unittest.TestCase):
         from src.python.llm.prompts import (
             _SYSTEM_DEBATE_CON,
             _SYSTEM_DEBATE_PRO,
-            _SYSTEM_DEBATE_SYNTHESIS,
+            _build_system_debate_synthesis,
         )
         from src.python.llm.generators import generate_debate_procon
 
@@ -74,7 +74,11 @@ class TestDebateProconFlow(unittest.TestCase):
             self.assertEqual(mock_gen.call_count, 3)
             self.assertEqual(mock_gen.call_args_list[0].kwargs["system_prompt"], _SYSTEM_DEBATE_PRO)
             self.assertEqual(mock_gen.call_args_list[1].kwargs["system_prompt"], _SYSTEM_DEBATE_CON)
-            self.assertEqual(mock_gen.call_args_list[2].kwargs["system_prompt"], _SYSTEM_DEBATE_SYNTHESIS)
+            # 集中度问答段已内建于辩论流程：synthesis system prompt 恒带 QA 附录
+            self.assertEqual(
+                mock_gen.call_args_list[2].kwargs["system_prompt"],
+                _build_system_debate_synthesis(enable_conditional=False, include_concentration_qa=True),
+            )
 
     def test_system_prompt_uses_conditional_variant_when_enabled(self):
         """conditional 开启时 synthesis system prompt 使用强化版（不复述白脸/黑脸）。
@@ -84,7 +88,6 @@ class TestDebateProconFlow(unittest.TestCase):
         避免与基线版本"禁止插入情景分析段落"冲突导致重复复述。
         """
         from src.python.llm.prompts import (
-            _SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL,
             _build_system_debate_synthesis,
         )
         from src.python.llm.generators import generate_debate_procon
@@ -107,9 +110,10 @@ class TestDebateProconFlow(unittest.TestCase):
             self.assertEqual(mock_gen.call_count, 3)
             # synthesis（第 3 步）system_prompt 应为 conditional 强化版
             syn_prompt = mock_gen.call_args_list[2].kwargs["system_prompt"]
-            self.assertIs(syn_prompt, _SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL)
-            # 且与 _build_system_debate_synthesis(True) 一致
-            self.assertEqual(syn_prompt, _build_system_debate_synthesis(enable_conditional=True))
+            # 且与 _build_system_debate_synthesis(True, include_concentration_qa=True) 一致
+            self.assertEqual(
+                syn_prompt, _build_system_debate_synthesis(enable_conditional=True, include_concentration_qa=True)
+            )
             # conditional 强化版不应包含基线"禁止情景分析"的冲突断言
             self.assertNotIn("不要在综合权衡中再次插入情景分析段落", syn_prompt)
 

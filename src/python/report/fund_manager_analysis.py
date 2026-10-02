@@ -18,6 +18,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
+from src.python.core.trading_calendar import elapsed_trading_days_with_natural_fallback
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.fetcher.fund_manager import fetch_fund_manager
@@ -126,10 +127,13 @@ def detect_manager_changes(holdings: list[Holding]) -> list[dict[str, Any]]:
                 if start_date:
                     try:
                         change_date = datetime.strptime(start_date, "%Y-%m-%d")
-                        days_since = (today - change_date).days
-                        changed_1m = days_since <= 30
-                        changed_3m = days_since <= 90
-                        changed_6m = days_since <= 180
+                        # 距今按交易日计（与时间距离约束同口径；1/3/6 月 ≈ 22/66/132 个交易日）
+                        days_since = elapsed_trading_days_with_natural_fallback(
+                            change_date.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
+                        )
+                        changed_1m = days_since <= 22
+                        changed_3m = days_since <= 66
+                        changed_6m = days_since <= 132
                     except (ValueError, TypeError):
                         # 日期无法解析，保守处理
                         changed_1m = True
@@ -145,10 +149,12 @@ def detect_manager_changes(holdings: list[Holding]) -> list[dict[str, Any]]:
             if start_date:
                 try:
                     start = datetime.strptime(start_date, "%Y-%m-%d")
-                    days_since = (today - start).days
-                    changed_1m = days_since <= 30
-                    changed_3m = days_since <= 90
-                    changed_6m = days_since <= 180
+                    days_since = elapsed_trading_days_with_natural_fallback(  # 同上：交易日口径
+                        start.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
+                    )
+                    changed_1m = days_since <= 22
+                    changed_3m = days_since <= 66
+                    changed_6m = days_since <= 132
                 except (ValueError, TypeError):
                     pass
 

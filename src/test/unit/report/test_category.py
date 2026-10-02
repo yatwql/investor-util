@@ -216,6 +216,9 @@ class TestDividendStatusRecording:
 
         monkeypatch.setattr("src.python.fetcher.akshare.get_dividend_data", lambda codes: {})
         monkeypatch.setattr(extras, "_DIVIDEND_FAILURE", "connection")
+        monkeypatch.setattr(
+            "src.python.fetcher.akshare._DIVIDEND_FAILURE", "connection"
+        )  # hint 单一事实来源内置在本模块
         cat._load_dividend_data(self._holdings())
         events = self._events()
         assert events and events[-1]["success"] is False
@@ -227,6 +230,7 @@ class TestDividendStatusRecording:
 
         monkeypatch.setattr("src.python.fetcher.akshare.get_dividend_data", lambda codes: {})
         monkeypatch.setattr(extras, "_DIVIDEND_FAILURE", "")
+        monkeypatch.setattr("src.python.fetcher.akshare._DIVIDEND_FAILURE", "")  # 与 hint 同步
         cat._load_dividend_data(self._holdings())
         assert self._events() == []
 

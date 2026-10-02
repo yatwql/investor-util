@@ -545,7 +545,7 @@ def _signal_digest_cache_suffix(pipeline_data: dict | None) -> str:
     """
     from src.python.config.features import is_feature_enabled
 
-    if not is_feature_enabled("signal_pre_digest"):
+    if not is_feature_enabled("deterministic_signal"):
         return ""
     block = _build_signal_digest_block(pipeline_data)
     if not block:

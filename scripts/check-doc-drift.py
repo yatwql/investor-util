@@ -45,6 +45,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -130,6 +131,7 @@ from _doc_drift import (  # noqa: E402,F401  # 原面 re-export（实现见 _doc
     _STATS_ROW,
     _stats_actual,
     check_project_stats,
+    sync_project_stats,
     _RF_ID,
     _PLAN_ID,
     _CHANGELOG_HEADER,
@@ -182,7 +184,25 @@ def main() -> None:
         action="store_true",
         help="附带 pytest 收集快照，核对 folders.md 「测试用例」行与 test-coverage.md 各计数表（较慢）",
     )
+    parser.add_argument(
+        "--sync",
+        action="store_true",
+        help="把实测的统计表数字（文件数/行数/用例数）自动回写 folders.md（治理统计快照漂移；"
+        "其余类目漂移仍需人工修正）——回写后继续跑全部检查，仍有不一致则退出码 2",
+    )
     args = parser.parse_args()
+
+    if args.sync:
+        applied = sync_project_stats()
+        if applied:
+            for line in applied:
+                print(f"[sync] {rel(_FOLDERS_MD)}: {line}")
+        else:
+            print("[sync] 统计表数字与实测一致，无需回写")
+        # 同步后自动把回写结果加进 git 暂存区（pre-commit 钩子内使用），
+        # 非 git 环境或未在提交流程中调用时忽略错误
+        if applied:
+            subprocess.run(["git", "add", str(_FOLDERS_MD)], cwd=REPO_ROOT, check=False)
 
     findings = run_checks(with_test_count=args.with_test_count)
 

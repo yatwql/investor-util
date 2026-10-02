@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.python.fetcher import market_sentiment as fms
 from src.python.report import market_sentiment as ms
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
@@ -34,22 +35,18 @@ def _enable(monkeypatch, on: bool = True):
 
 
 def _patch_sources(monkeypatch, lhb=_LHB, ladder=_LADDER, cached=None, missing: bool = False):
+    """patch 报告层持有的网关函数绑定（调用点所在模块属忢，见 CLAUDE.md patch 纪律）。"""
     calls = {"lhb": 0, "ladder": 0}
     if missing:
-        monkeypatch.setattr(ms.hithink, "missing_credential", lambda _sid: object())
+        monkeypatch.setattr(ms, "_credential_missing", lambda: object())
     else:
-        monkeypatch.setattr(ms.hithink, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(ms, "_credential_missing", lambda: None)
+        monkeypatch.setattr(ms, "_fetch_dragon_tiger", lambda: calls.__setitem__("lhb", calls["lhb"] + 1) or lhb)
         monkeypatch.setattr(
-            ms.hithink, "fetch_dragon_tiger_list", lambda board="all": calls.__setitem__("lhb", calls["lhb"] + 1) or lhb
+            ms, "_fetch_limit_up_ladder", lambda: calls.__setitem__("ladder", calls["ladder"] + 1) or ladder
         )
-        monkeypatch.setattr(
-            ms.hithink, "fetch_limit_up_ladder", lambda: calls.__setitem__("ladder", calls["ladder"] + 1) or ladder
-        )
-    monkeypatch.setattr(ms, "cache_get", lambda key, ttl: (cached or {}).get(key))
-    written: dict = {}
-    monkeypatch.setattr(ms, "cache_set", lambda key, value: written.__setitem__(key, value))
     monkeypatch.setattr("src.python.report.data_status.mark_data_used", lambda key: None, raising=False)
-    return calls, written
+    return calls, {}
 
 
 class TestGates:
@@ -74,18 +71,30 @@ class TestAssembly:
         assert out["rows"][0]["holding_kind"] == "直接持有"
         assert out["summary"]["lhb_stock_count"] == 63
 
-    def test_sources_cached_after_first_fetch(self, monkeypatch):
-        """首次取数写缓存；缓存命中时不再请求（按 key 精确断言）。"""
+    def test_fetch_routed_via_gateway(self, monkeypatch):
+        """报告层不触缓存/链路细节，取数全部经 fetcher 网关函数（Provider Chain 必经约束）。"""
         _enable(monkeypatch, True)
-        calls, written = _patch_sources(monkeypatch)
+        calls, _ = _patch_sources(monkeypatch)
         ms.build_market_sentiment_data([_holding()], None)
         assert calls == {"lhb": 1, "ladder": 1}
-        assert ms._LHB_CACHE_KEY in written and ms._LADDER_CACHE_KEY in written
+        # 报告层已无取/缓存私有实现（取数细节收敛到 fetcher 内聚层）
+        assert not hasattr(ms, "_fetch_cached")
 
-        calls2, _ = _patch_sources(monkeypatch, cached={ms._LHB_CACHE_KEY: _LHB, ms._LADDER_CACHE_KEY: _LADDER})
-        out = ms.build_market_sentiment_data([_holding()], None)
-        assert calls2 == {"lhb": 0, "ladder": 0}
-        assert out["available"] is True
+    def test_gateway_caches_via_chain(self, monkeypatch):
+        """网关的缓存/熔断/降级由 fetch_with_fallback 承担（缓存命中不再发请求）。"""
+        calls: list[tuple] = []
+        monkeypatch.setattr(fms, "credential_missing", lambda: None)
+        monkeypatch.setattr("src.python.fetcher.market_sentiment.get_ttl", lambda data_type, key: 0.0, raising=False)
+
+        def _fake_fallback(data_type, fn_map, cache_key, cache_ttl, fn_kwargs=None, **_k):
+            calls.append((data_type, fn_map and list(fn_map), cache_key))
+            return {"cached": True}
+
+        monkeypatch.setattr("src.python.fetcher.chain.fetch_with_fallback", _fake_fallback)
+        assert fms.fetch_dragon_tiger() == {"cached": True}
+        assert calls[0][2] == fms.LHB_CACHE_KEY
+        assert fms.fetch_limit_up_ladder() == {"cached": True}
+        assert calls[1][2] == fms.LADDER_CACHE_KEY
 
     def test_no_hits_degrades(self, monkeypatch):
         _enable(monkeypatch, True)

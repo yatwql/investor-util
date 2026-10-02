@@ -18,6 +18,8 @@ from src.python.core.code_utils import (
     is_us_index_code,
     otc_redemption_days_default,
     to_fmp_symbol,
+    get_exchange_category,
+    to_exchange_symbol,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
@@ -272,3 +274,27 @@ class TestFmpSymbol:
         assert to_fmp_symbol("AAPL") == ""
         assert to_fmp_symbol("") == ""
         assert to_fmp_symbol("12345") == ""
+
+
+class TestToExchangeSymbolAndCategory:
+    """场内 ETF 交易所后缀与 cninfo 栏目判定（收敛到 code_utils 单点维护）。"""
+
+    def test_to_exchange_symbol_fund_segments(self):
+        assert to_exchange_symbol("510300") == "510300.SH"  # 沪市场内 ETF
+        assert to_exchange_symbol("159915") == "159915.SZ"  # 深市场内 ETF/LOF
+        # 非 6 位/非数字/带后缀的输入不落该判定
+        assert to_exchange_symbol("600519") is None
+        assert to_exchange_symbol("51030") is None
+        assert to_exchange_symbol("") is None
+
+    def test_to_exchange_symbol_symbol_input_passthrough(self):
+        # 带后缀视为已是符号格式，原样返回
+        assert to_exchange_symbol("510300.SH") == "510300.SH"
+        assert to_exchange_symbol("159915.SZ") == "159915.SZ"
+
+    def test_get_exchange_category(self):
+        assert get_exchange_category("600519") == "sse"
+        assert get_exchange_category("430047") == "third"
+        assert get_exchange_category("830799") == "third"
+        assert get_exchange_category("000001") == "szse"
+        assert get_exchange_category("300750") == "szse"

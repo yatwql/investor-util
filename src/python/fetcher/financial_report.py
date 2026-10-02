@@ -541,3 +541,13 @@ def fetch_symbol_report(
     """
     record, _reason = fetch_symbol_report_detailed(symbol, doc_types, sections, max_chars)
     return record
+
+
+def datasink_credential_missing() -> str | None:
+    """DataSinking 凭据就绪判定（只读透传；报告层取数一律经本模块）。"""
+    return datasink.missing_credential(datasink.SOURCE_ID)
+
+
+def datasink_billing_description(plan: str | None = None) -> str:
+    """DataSinking 套餐计费文案（只读透传，供数据源说明表按套餐呈现）。"""
+    return datasink.billing_description(plan)

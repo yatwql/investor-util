@@ -143,19 +143,19 @@ def _load_dividend_data(holdings: list) -> tuple[dict, bool]:
         (dividend_data, success) — success=False 表示 API 调用异常。
     """
     try:
-        from src.python.fetcher.akshare import get_dividend_data
-        from src.python.providers.akshare_extras import _DIVIDEND_FAILURE
+        from src.python.fetcher.akshare import dividend_failure_hint, get_dividend_data
 
         stock_codes = [h.code for h in holdings if is_a_share_stock(h.name, h.code.strip())]
         if not stock_codes:
             return {}, True
         data = get_dividend_data(stock_codes)
+        failure = dividend_failure_hint()
         if data:
             _record_dividend_status(True)
-        elif _DIVIDEND_FAILURE:
+        elif failure:
             # 源不可达/无返回 → 登记失败，使「分红」在数据源说明表与健康矩阵中如实可见；
             # 「本无分红」（``empty`` 且无故障）不登记，避免正常空结果被误报为源故障。
-            _record_dividend_status(False, _dividend_failure_hint(_DIVIDEND_FAILURE))
+            _record_dividend_status(False, _dividend_failure_hint(failure))
         return data, True
     except Exception:
         logger.warning("[category] 分红数据加载失败（非关键），年均股息率列显示 --", exc_info=True)

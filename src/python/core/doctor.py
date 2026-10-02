@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from typing import Any
 
 from src.python.core.constants import APP_NAME, APP_VERSION, PROJECT_ROOT
@@ -290,6 +291,80 @@ def _check_experimental_features() -> list[dict[str, Any]]:
     return [_item(GROUP_FEATURES, "实验功能", True, f"已启用 {len(enabled)} 项 — {detail}")]
 
 
+def _check_review_ledger_overview() -> list[dict[str, Any]]:
+    """复盘账本与实验功能使用统计的只读概览（信息性，不影响自检结论）。
+
+    实验功能长期缺真实数据就无法「转正 / 撤销」决策——本检查把两个账本的
+    积累规模与命中率、以及各实验开关的累计启用次数直接上屏，让用户与维护者
+    无需翻 data/state/ 下的 JSONL 文件即可判断实验功能的真实使用情况。
+    只读：不写入、不结算、不修改任何账本状态。
+    """
+    items: list[dict[str, Any]] = []
+    try:
+        from src.python.core import decision_ledger, experiment_stats, signal_ledger
+
+        # ── 决策跨期反思闭环账本 ──
+        try:
+            _fold = decision_ledger.fold_ledger()
+            _pending = _fold.get("pending_count", 0)
+            _settled = _fold.get("settled_count", 0)
+            _accuracy = _fold.get("direction_accuracy")
+            _sufficient = _fold.get("sample_sufficient")
+            if _settled == 0 and _pending == 0:
+                _msg = "账本为空（决策复盘实验功能尚未积累真实数据）"
+            else:
+                _acc_text = f"方向命中率 {_accuracy:.0%}" if _accuracy is not None else "方向样本不足"
+                _msg = f"已结算 {_settled} 条 / 待结算 {_pending} 条 — {_acc_text}"
+                if not _sufficient and _accuracy is not None:
+                    _msg += "（样本未达可信阈值，仅供观察）"
+            items.append(_item(GROUP_FEATURES, "决策复盘账本", True, _msg))
+        except Exception as exc:  # noqa: BLE001
+            items.append(_item(GROUP_FEATURES, "决策复盘账本", False, f"读取失败: {type(exc).__name__}: {exc}"))
+
+        # ── 确定性信号账本 ──
+        try:
+            _sig = signal_ledger.fold_signals(live_only=False)
+            _live = _sig.get("live_count", 0)
+            _demo = _sig.get("demo_count", 0)
+            _first = _sig.get("first_date") or "—"
+            _last = _sig.get("last_date") or "—"
+            if _live + _demo == 0:
+                _msg = "账本为空（确定性信号模块尚未沉淀任何评级）"
+            else:
+                _msg = f"累计 {_live + _demo} 条（实时 {_live} / 非实时 {_demo}）— 统计窗口 {_first} ~ {_last}"
+            items.append(_item(GROUP_FEATURES, "确定性信号账本", True, _msg))
+        except Exception as exc:  # noqa: BLE001
+            items.append(_item(GROUP_FEATURES, "确定性信号账本", False, f"读取失败: {type(exc).__name__}: {exc}"))
+
+        # ── 实验功能使用统计 ──
+        try:
+            _usage = experiment_stats.load_experiment_usage()
+            if not _usage:
+                _msg = "暂无统计（尚未有带实验功能生成报告的记录）"
+            else:
+                _parts = [
+                    f"{flag} 启用 {entry.get('enabled_count', 0)} 次（最近 {entry.get('last_enabled_date', '—')}）"
+                    for flag, entry in sorted(_usage.items())
+                ]
+                _msg = "；".join(_parts)
+            items.append(_item(GROUP_FEATURES, "实验功能使用统计", True, _msg))
+        except Exception as exc:  # noqa: BLE001
+            items.append(_item(GROUP_FEATURES, "实验功能使用统计", False, f"读取失败: {type(exc).__name__}: {exc}"))
+    except Exception as exc:  # noqa: BLE001
+        items.append(_item(GROUP_FEATURES, "复盘账本概览", False, f"初始化失败: {type(exc).__name__}: {exc}"))
+    return items
+
+
+#: 适配器巡检函数（fetcher/source_adapter 导入时经 register_adapter_survey 注入）
+_adapter_survey: Callable[[], list] | None = None
+
+
+def register_adapter_survey(fn: Callable[[], list]) -> None:
+    """注册上游模块的适配器巡检函数（fetcher/source_adapter 导入时调用）。"""
+    global _adapter_survey
+    _adapter_survey = fn
+
+
 def _check_source_adapters() -> list[dict[str, Any]]:
     """数据源适配契约自检（离线，不发起任何网络请求）。
 
@@ -298,9 +373,21 @@ def _check_source_adapters() -> list[dict[str, Any]]:
     """
     try:
         from src.python.config.features import is_feature_enabled
-        from src.python.fetcher.source_adapter import survey_adapters
 
-        reports = survey_adapters()
+        # 适配器巡检函数由 fetcher/source_adapter 导入时注册（core 不反向 import 上层）；
+        # 未注册（fetcher 未加载，如最小化 web 请求场景）→ 声明「未注册」不影响其余自检
+        from src.python.core.doctor import _adapter_survey
+
+        if _adapter_survey is None:
+            return [
+                _item(
+                    GROUP_ADAPTER,
+                    "适配契约",
+                    True,
+                    "适配器模块未加载（fetcher 未初始化），跳过适配契约自检",
+                )
+            ]
+        reports = _adapter_survey()
         enabled = is_feature_enabled("datasource_adapter")
     except Exception as exc:  # noqa: BLE001
         return [_item(GROUP_ADAPTER, "适配契约", False, f"执行失败: {type(exc).__name__}: {exc}")]
@@ -420,6 +507,7 @@ def run_doctor_checks(*, include_network: bool = True, max_timeout: float = 8.0)
     results.extend(_check_config())
     results.extend(_check_directories())
     results.extend(_check_experimental_features())
+    results.extend(_check_review_ledger_overview())
     results.extend(_check_source_adapters())
     results.extend(_check_datasource_credentials())
     if include_network:

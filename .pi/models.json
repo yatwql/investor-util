@@ -2,17 +2,154 @@
   "providers": {
     "deepseek": {
       "modelOverrides": {
-        "deepseek-v4-flash": {
+        "deepseek-flash": {
           "maxTokens": 65536,
           "samplingParams": {
-            "temperature": 0.0
+            "temperature": 0
+          },
+          "promptCache": {
+            "short": 300,
+            "long": 3600
           }
         },
         "deepseek-v4-pro": {
           "maxTokens": 65536,
           "samplingParams": {
-            "temperature": 0.0
+            "temperature": 0
+          },
+          "promptCache": {
+            "short": 300,
+            "long": 3600
           }
+        }
+      }
+    },
+    "kimi-coding": {
+      "modelOverrides": {
+        "k3": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "k3-256k": {
+          "maxTokens": 65536
+        },
+        "kimi-for-coding": {
+          "contextWindow": 262144
+        }
+      }
+    },
+    "opencode-go": {
+      "modelOverrides": {
+        "deepseek-v4-flash": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "deepseek-v4-flash-vision-exp": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "deepseek-v4-pro": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "deepseek-v4.1-flash": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "glm-5.2": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "glm-5.3": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "glm-5.3-flash": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "gpt-5.6-luna": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "gpt-6-luna": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "grok-4.6": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "grok-4.7": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "hy3": {
+          "maxTokens": 65536
+        },
+        "hy4-preview": {
+          "contextWindow": 262144
+        },
+        "kimi-k2.7-code": {
+          "maxTokens": 65536
+        },
+        "kimi-k3": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "longcat-2.0": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "longcat-2.5-preview-free": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "mimo-v2.5": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "mimo-v2.5-pro": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "mimo-v2.6-flash": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "mimo-v2.6-pro": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "minimax-m2.7": {
+          "maxTokens": 65536
+        },
+        "minimax-m3": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "muse-spark-1.2-contributor": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "muse-spark-1.3-contributor": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "qwen3.7-plus": {
+          "contextWindow": 262144
+        },
+        "qwen3.8-flash": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "qwen3.8-max": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
+        },
+        "space-bunny-free": {
+          "maxTokens": 65536,
+          "contextWindow": 262144
         }
       }
     }

@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import logging
+from src.python.core.trading_calendar import elapsed_trading_days_with_natural_fallback
 from datetime import date
 
 logger = logging.getLogger("invest")
@@ -109,18 +110,14 @@ def extract_drawdown_events(
 
 
 def _finalize_event(event: dict) -> None:
-    """补全事件派生字段（duration_days / recovery_days）。"""
-    try:
-        peak = _to_date(event["peak_date"])
-        trough = _to_date(event["trough_date"])
-        event["duration_days"] = (trough - peak).days
-    except (ValueError, TypeError):
-        event["duration_days"] = 0
+    """补全事件派生字段（duration_days / recovery_days，按-交易日-计）。"""
+    event["duration_days"] = elapsed_trading_days_with_natural_fallback(
+        str(event["peak_date"]), str(event["trough_date"])
+    )
     if event.get("recovered") and event.get("recovery_date"):
-        try:
-            event["recovery_days"] = (_to_date(event["recovery_date"]) - trough).days
-        except (ValueError, TypeError):
-            event["recovery_days"] = None
+        event["recovery_days"] = elapsed_trading_days_with_natural_fallback(
+            str(event["trough_date"]), str(event["recovery_date"])
+        )
     else:
         event["recovery_days"] = None
     event["drawdown_pct"] = round(event["drawdown_pct"], 2)

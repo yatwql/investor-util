@@ -32,6 +32,7 @@ from src.python.fetcher.fund_manager import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
+pytestmark.append(pytest.mark.usefixtures("offline_external_sources"))
 
 # ── HTML Fixtures ────────────────────────────────────────────────
 

@@ -235,13 +235,13 @@ class TestNameFallback:
 class TestContract:
     """数据契约键完整性。"""
 
-    def test_result_has_all_c19_keys(self):
+    def test_result_contains_contract_keys(self):
         x = _sin(80)
         y = [-v for v in x]
         res = compute_correlation_matrix({"a": _returns(x), "b": _returns(y)})
         assert set(res.keys()) >= _CONTRACT_KEYS
 
-    def test_unavailable_result_has_all_c19_keys(self):
+    def test_unavailable_result_carries_contract_keys(self):
         res = unavailable_result("insufficient", sample_count=10, insufficient_codes=["a"])
         assert set(res.keys()) >= _CONTRACT_KEYS
         assert res["available"] is False

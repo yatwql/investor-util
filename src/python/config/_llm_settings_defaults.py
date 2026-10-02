@@ -96,7 +96,7 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
                 {"name": "震荡", "change": 0.05, "desc": "如果未来市场窄幅震荡±5%"},
             ]
         },
-        "qa_concentration": {"threshold": 0.20},
+        "concentration_qa": {"threshold": 0.20},
         "max_total_tokens_per_report": 72000,
         "per_call_timeout_override": 90,
     },
@@ -227,8 +227,8 @@ def _get_default_llm_settings_template() -> str:
         lines.append(f"        {json.dumps(s, ensure_ascii=False)}{comma}")
     lines.append("      ]")
     lines.append("    },")
-    lines.append("    // 集中度问答 — 集中度风险问答块")
-    lines.append(f'    "qa_concentration": {json.dumps(debate["qa_concentration"])},')
+    lines.append("    // 集中度问答（辩论流程内建段落，阈值触发）")
+    lines.append(f'    "concentration_qa": {json.dumps(debate["concentration_qa"])},')
     lines.append("    // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）")
     lines.append(f'    "max_total_tokens_per_report": {debate["max_total_tokens_per_report"]},')
     lines.append("    // 辩论模式单次 API 调用超时覆盖（秒）")

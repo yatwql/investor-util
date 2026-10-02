@@ -104,18 +104,18 @@ class TestHithinkCalendarFallback:
 
     def test_official_series_used_when_akshare_fails(self, monkeypatch):
         from src.python.core import trading_calendar as tc
-        from src.python.providers import hithink
 
         monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
         written: list = []
         monkeypatch.setattr(tc.cache, "set", lambda key, value: written.append((key, value)))
         monkeypatch.setitem(sys.modules, "akshare", None)  # import akshare 触发 ImportError
-        monkeypatch.setattr(
-            hithink,
-            "fetch_trading_days",
-            lambda: {"item": [{"date": "2026-09-17"}, {"date": "2026-09-18"}]},
-        )
-        dates = tc._get_trading_calendar()
+        # 兜底经注册钩子注入（core 不反向 import providers）
+        original = tc._TRADING_DAYS_FALLBACK
+        tc.register_trading_days_fallback(lambda: {"item": [{"date": "2026-09-17"}, {"date": "2026-09-18"}]})
+        try:
+            dates = tc._get_trading_calendar()
+        finally:
+            tc._TRADING_DAYS_FALLBACK = original
         assert dates == {"2026-09-17", "2026-09-18"}
         assert written  # 官方序列同样写缓存
 
@@ -128,3 +128,76 @@ class TestHithinkCalendarFallback:
         monkeypatch.setitem(sys.modules, "akshare", None)
         monkeypatch.setattr(hithink, "fetch_trading_days", lambda: None)
         assert tc._get_trading_calendar() == set()
+
+
+class TestFallbackRegistration:
+    """官方序列兜底经注册钩子注入（core 不反向 import providers——分层纪律）。"""
+
+    def test_unregister_returns_empty_calendar(self, monkeypatch):
+        from src.python.core import trading_calendar as tc
+
+        monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
+        monkeypatch.setitem(sys.modules, "akshare", None)  # 阻断主链路（兜底已卸除）
+        original = tc._TRADING_DAYS_FALLBACK
+        tc._TRADING_DAYS_FALLBACK = None
+        try:
+            assert tc._get_trading_calendar() == set()
+        finally:
+            tc._TRADING_DAYS_FALLBACK = original
+
+    def test_fallback_exception_swallowed(self, monkeypatch):
+        """兜底函数抛异常 → 降级空集合（与官方源不可用同语义），不向上抛。"""
+        from src.python.core import trading_calendar as tc
+
+        monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
+        monkeypatch.setitem(sys.modules, "akshare", None)
+        original = tc._TRADING_DAYS_FALLBACK
+        tc.register_trading_days_fallback(lambda: (_ for _ in ()).throw(RuntimeError("down")))
+        try:
+            assert tc._get_trading_calendar() == set()
+        finally:
+            tc._TRADING_DAYS_FALLBACK = original
+
+
+class TestElapsedTradingDaysWithNaturalFallback:
+    """历时统计：正常按交易日计，日历/日期不可用回退自然日保底非负。"""
+
+    def test_unknown_dates_fall_back_to_weekday_exclusion(self, monkeypatch):
+        """日历不可用 → 回退「排除周六日」近似计数（2024-12-20(五)→12-27(五) 经 5 个工作日）。"""
+        from src.python.core import trading_calendar as tc
+
+        monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
+        monkeypatch.setitem(sys.modules, "akshare", None)
+        original = tc._TRADING_DAYS_FALLBACK
+        tc._TRADING_DAYS_FALLBACK = None
+        try:
+            assert tc.elapsed_trading_days_with_natural_fallback("2024-12-20", "2024-12-27") == 5
+        finally:
+            tc._TRADING_DAYS_FALLBACK = original
+
+    def test_negative_interval_clamped_to_zero(self):
+        """end 早于 start（异常数据）→ 差值钳为 0，不为负。"""
+        from src.python.core import trading_calendar as tc
+
+        tc.register_trading_days_fallback(lambda: None)
+        assert tc.elapsed_trading_days_with_natural_fallback("2024-12-27", "2024-12-20") == 0
+
+    def test_unparseable_dates_return_zero(self):
+        """两端日期均不可解析 → 0（不中断展示，且不会为零值误判崩溃）。"""
+        from src.python.core import trading_calendar as tc
+
+        tc.register_trading_days_fallback(lambda: None)
+        assert tc.elapsed_trading_days_with_natural_fallback("not-a-date", "2024-12-27") == 0
+        assert tc.elapsed_trading_days_with_natural_fallback("", None) == 0
+
+    def test_trading_calendar_available_counts_trading_days(self, monkeypatch):
+        """日历可用 → 按交易日计（扣除周末/节假日）。"""
+        from src.python.core import trading_calendar as tc
+
+        trading_days = {"2024-12-20", "2024-12-23", "2024-12-24", "2024-12-25", "2024-12-26", "2024-12-27"}
+        monkeypatch.setattr(
+            tc, "count_trading_days_elapsed", lambda s, e: 5 if (s, e) == ("2024-12-20", "2024-12-27") else None
+        )
+        monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
+        assert tc.elapsed_trading_days_with_natural_fallback("2024-12-20", "2024-12-27") == 5
+        del trading_days

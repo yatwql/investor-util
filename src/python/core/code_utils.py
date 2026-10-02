@@ -621,3 +621,51 @@ def _strip_prefix(code: str) -> str:
     if len(raw) == 6 and raw.isdigit():
         return raw
     return ""
+
+
+#: 场内 ETF/LOF 交易所后缀（6 位代码段 → 交易所）；判定口径单点维护
+_EXCHANGE_FUND_SUFFIXES: tuple[tuple[str, str], ...] = (
+    ("5", ".SH"),  # 沪市场内基金/ETF
+    ("1", ".SZ"),  # 深市场内基金/ETF（159xxxLOF 等同段）
+)
+
+
+def to_exchange_symbol(code: str) -> str | None:
+    """场内 ETF/LOF 6 位代码 → 带交易所后缀符号（``5xxxxx``→``.SH``、``1xxxxx``→``.SZ``）。
+
+    :func:`to_fmp_symbol` 只覆盖 A 股股票段；场内基金段的判定同样需要单点维护，
+    供同花顺 thscode 转换与后缀候选解析复用。非该两段（或非 6 位纯数字）返回
+    ``None``，调用方继续走自己的降级路径。
+
+    Args:
+        code: 待判定的代码（可含前缀/后缀，带 ``.`` 视为已是符号格式直接返回自身）
+
+    Returns:
+        ``f"{code}.SH/.SZ"``；不属于场内基金段 → ``None``
+    """
+    raw = (code or "").strip().upper()
+    if not raw:
+        return None
+    if "." in raw:
+        return raw
+    if len(raw) != 6 or not raw.isdigit():
+        return None
+    for prefix, suffix in _EXCHANGE_FUND_SUFFIXES:
+        if raw.startswith(prefix):
+            return f"{raw}{suffix}"
+    return None
+
+
+def get_exchange_category(code: str) -> str:
+    """6 位 A 股代码 → cninfo 栏目参数（``sse``/``szse``/``third``）。
+
+    上交所（``6`` 开头）→ ``sse``；北交所（``4``/``8`` 开头）→ ``third``；
+    其余（深市主板/创业板）→ ``szse``。栏目映射原散落在 cninfo provider 内，
+    收敛到 code_utils 与其余代码类型判定同表维护。
+    """
+    raw = (code or "").strip()
+    if raw.startswith("6"):
+        return "sse"
+    if raw.startswith(("4", "8")):
+        return "third"
+    return "szse"

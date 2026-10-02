@@ -431,15 +431,14 @@ def _dispatch_llm_workers(
         """构建当前启用的辩论模式组合标识字符串。
 
         Returns:
-            如 "正反辩论+条件推理" 或 "条件推理+集中度问答" 等形式。
+            如 "正反辩论+条件推理" 等形式。集中度问答段已内建于辩论流程
+            （阈值触发），不再作为组合维度。
         """
         _parts = []
         if is_feature_enabled("llm_debate_procon"):
             _parts.append("正反辩论")
         if is_feature_enabled("llm_debate_conditional"):
             _parts.append("条件推理")
-        if is_feature_enabled("llm_debate_qa_concentration"):
-            _parts.append("集中度问答")
         return "+".join(_parts) if _parts else ""
 
     if is_feature_enabled("llm_debate_procon") and needs.get("expert_review"):

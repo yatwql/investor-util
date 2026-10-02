@@ -369,7 +369,7 @@ class TestExcelExperimentalNotice(unittest.TestCase):
         from src.python.config.features import set_feature_enabled
 
         set_feature_enabled("llm_debate_procon", True)
-        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("decision_reflection", True)
         ws = self._make_ws()
 
         self._write_sheet(ws)
@@ -377,7 +377,7 @@ class TestExcelExperimentalNotice(unittest.TestCase):
         text = self._sheet_text(ws)
         self.assertIn("⚗ 本报告在 2 项实验性功能开启下生成", text)
         self.assertIn("辩论-正反辩论", text)
-        self.assertIn("确定性信号沉淀", text)
+        self.assertIn("决策跨期反思闭环", text)
         self.assertIn("实验功能输出质量可能不稳定，结论请自行复核", text)
 
     def test_notice_survives_empty_session_usage(self):
@@ -385,7 +385,7 @@ class TestExcelExperimentalNotice(unittest.TestCase):
         from src.python.config.features import set_feature_enabled
         from src.python.report.summary_llm_usage import write_llm_usage_sheet
 
-        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("decision_reflection", True)
         ws = self._make_ws()
 
         # 无用量 → _write_llm_summary_section 直接返回，不写「汇总数据」区
@@ -397,13 +397,13 @@ class TestExcelExperimentalNotice(unittest.TestCase):
 
         text = self._sheet_text(ws)
         self.assertNotIn("汇总数据", text)
-        self.assertIn("确定性信号沉淀", text)
+        self.assertIn("决策跨期反思闭环", text)
 
 
 class TestExcelSummaryFallbackNotice(unittest.TestCase):
     """LLM 用量页签缺席或为空时，清单须落到汇总页脚（否则 Excel 侧无痕）。
 
-    非 LLM 实验开关（确定性信号沉淀 / 数据源适配 / 决策跨期反思闭环）不依赖 LLM
+    非 LLM 实验开关（决策跨期反思闭环 / 数据源适配 / 决策跨期反思闭环）不依赖 LLM
     章节：整章关闭时用量页签根本不生成，清单若只挂在那个页签上，这批开关在 Excel
     产物上便完全无痕。
     """
@@ -420,7 +420,7 @@ class TestExcelSummaryFallbackNotice(unittest.TestCase):
         if usage:
             ws_usage = wb.create_sheet("19.LLM API 用量")
             if usage == "filled":
-                ws_usage.cell(row=1, column=1, value="⚗ 本报告在 1 项实验性功能开启下生成：确定性信号沉淀")
+                ws_usage.cell(row=1, column=1, value="⚗ 本报告在 1 项实验性功能开启下生成：决策跨期反思闭环")
             sheets["llm_usage"] = ws_usage
         return sheets
 
@@ -437,32 +437,32 @@ class TestExcelSummaryFallbackNotice(unittest.TestCase):
         """LLM 章节关闭（无用量页签）→ 汇总页脚出现清单与复核提示。"""
         from src.python.config.features import set_feature_enabled
 
-        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("decision_reflection", True)
         sheets = self._sheets()
 
         self._write(sheets)
 
         text = self._summary_text(sheets)
         self.assertIn("⚗ 本报告在 1 项实验性功能开启下生成", text)
-        self.assertIn("确定性信号沉淀", text)
+        self.assertIn("决策跨期反思闭环", text)
         self.assertIn("实验功能输出质量可能不稳定，结论请自行复核", text)
 
     def test_fallback_lands_when_usage_sheet_empty(self):
         """用量页签存在但为空（取数早退）→ 仍须兜底上屏。"""
         from src.python.config.features import set_feature_enabled
 
-        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("decision_reflection", True)
         sheets = self._sheets(usage="empty")
 
         self._write(sheets)
 
-        self.assertIn("确定性信号沉淀", self._summary_text(sheets))
+        self.assertIn("决策跨期反思闭环", self._summary_text(sheets))
 
     def test_no_fallback_when_usage_sheet_carries_notice(self):
         """清单已落在用量页签 → 汇总页脚不重复（同一事实说两遍会被当成两处来源）。"""
         from src.python.config.features import set_feature_enabled
 
-        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("decision_reflection", True)
         sheets = self._sheets(usage="filled")
 
         self._write(sheets)
@@ -481,7 +481,7 @@ class TestExcelSummaryFallbackNotice(unittest.TestCase):
         """无汇总页签 → 静默跳过，不抛异常（页签集合由可见性配置决定）。"""
         from src.python.config.features import set_feature_enabled
 
-        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("decision_reflection", True)
 
         sheets: dict = {}
         self._write(sheets)

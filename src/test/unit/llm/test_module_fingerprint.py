@@ -6,7 +6,7 @@
     竞争语境块、量化指标）
   - 风险信号（history_data）确实进入**写侧**指纹 —— 历史缺陷回归（写侧漏传
     history_data 而预检侧传了 → 两侧键永不同源、预检 read 永远落空）
-  - 辩论增强后缀（conditional / qa_concentration）两侧同时生效
+  - 辩论增强后缀（conditional）两侧同时生效；集中度问答段已内建于辩论流程（常量，不进键）
   - 不承接信号块的模块（穿透深度）不受 pipeline_data 影响
   - **提示词覆盖**：竞争语境块 / 量化指标 / 数据质量详细状态块进了提示词就必须
     进指纹（否则键不变、恒命中按旧数据算出的陈旧结论——数据质量块尤其严重：
@@ -91,7 +91,7 @@ _SCENARIOS: dict[str, dict] = {
     "no_history": {},
     "with_history": {"history_data": _HISTORY},
     "history_changed": {"history_data": _HISTORY_CHANGED},
-    "signal_digest_on": {"history_data": _HISTORY, "pipeline_data": _PIPELINE_RISK, "flags": ("signal_pre_digest",)},
+    "signal_digest_on": {"history_data": _HISTORY, "pipeline_data": _PIPELINE_RISK, "flags": ("deterministic_signal",)},
     "debate_enhance_on": {"history_data": _HISTORY, "flags": ("llm_debate_conditional",)},
     "debate_enhance_off": {"history_data": _HISTORY},
     "competitive_block": {"competitive_context": _COMPETITIVE_BLOCK},
@@ -310,7 +310,7 @@ def test_signal_suffix_only_affects_digest_modules():
     """信号预消化只进 expert_review / health_check 的键，穿透深度不受影响。"""
     from src.python.config.features import FEATURE_FLAGS
 
-    FEATURE_FLAGS["signal_pre_digest"] = True
+    FEATURE_FLAGS["deterministic_signal"] = True
     without_signal = _precheck_info(history_data=_HISTORY)
     with_signal = _precheck_info(history_data=_HISTORY, pipeline_data=_PIPELINE_RISK)
 
@@ -562,13 +562,13 @@ def test_debate_synthesis_fingerprint_covers_config_driven_prompt_text():
     _base_cfg = {
         "debate": {
             "conditional": {"scenarios": [{"name": "上涨", "desc": "上证站上 3500"}]},
-            "qa_concentration": {"threshold": 0.20},
+            "concentration_qa": {"threshold": 0.20},
         }
     }
     _changed_cfg = {
         "debate": {
             "conditional": {"scenarios": [{"name": "上涨", "desc": "上证站上 4000"}]},
-            "qa_concentration": {"threshold": 0.20},
+            "concentration_qa": {"threshold": 0.20},
         }
     }
 

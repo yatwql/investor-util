@@ -190,7 +190,7 @@ class TestSignalDigestCacheSuffixEdge:
         from src.python.config.features import FEATURE_FLAGS
         from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
-        FEATURE_FLAGS["signal_pre_digest"] = True
+        FEATURE_FLAGS["deterministic_signal"] = True
         assert _signal_digest_cache_suffix({"tail_risk_data": object()}) == ""
         assert _signal_digest_cache_suffix([1, 2]) == ""
 
@@ -199,7 +199,7 @@ class TestSignalDigestCacheSuffixEdge:
         from src.python.config.features import FEATURE_FLAGS
         from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
-        FEATURE_FLAGS["signal_pre_digest"] = True
+        FEATURE_FLAGS["deterministic_signal"] = True
         suffix = _signal_digest_cache_suffix({"tail_risk_data": {"available": True, "var95": 1.0}, "other": object()})
 
         assert suffix.startswith("_") and len(suffix) == 13

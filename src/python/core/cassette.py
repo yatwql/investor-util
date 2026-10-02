@@ -25,7 +25,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tempfile
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -35,6 +34,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 
+from src.python.core.atomic_write import write_text_atomic
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.http_client import make_transport, use_transport_factory
 
@@ -246,24 +246,23 @@ def load_cassette(name: str, directory: str | None = None) -> Cassette:
 
 
 def save_cassette(cassette: Cassette, directory: str | None = None) -> str:
-    """原子写盘（``tempfile.mkstemp`` + ``os.replace``），返回写入路径。"""
+    """原子写盘（经 core/atomic_write 唯一原语），返回写入路径。
+
+    失败时向上抛出（录制流程以显式失败终结，不再自持 mkstemp/replace 细节）。
+    """
     target_dir = directory or CASSETTE_DIR
     os.makedirs(target_dir, exist_ok=True)
     path = cassette_path(cassette.name, target_dir)
-    handle_fd, tmp_path = tempfile.mkstemp(dir=target_dir, prefix=".cassette-", suffix=".tmp")
-    try:
-        with os.fdopen(handle_fd, "w", encoding="utf-8") as handle:
-            json.dump(cassette.to_dict(), handle, ensure_ascii=False, indent=2)
-            handle.write("\n")
-        # mkstemp 建的是 0600；cassette 是入库夹具，按仓库常规权限落盘
-        os.chmod(tmp_path, 0o644)
-        os.replace(tmp_path, path)
-    except BaseException:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+    payload = json.dumps(cassette.to_dict(), ensure_ascii=False, indent=2) + "\n"
+    if not write_text_atomic(
+        path,
+        payload,
+        prefix=".cassette-",
+        log_tag="cassette",
+        noun="cassette",
+        mode=0o644,  # mkstemp 默认 0600；cassette 是入库夹具，按仓库常规权限落盘
+    ):
+        raise OSError(f"cassette 写盘失败: {path}")
     logger.info("[cassette] 已写盘 %s（%d 条交互）", path, len(cassette.interactions))
     return path
 

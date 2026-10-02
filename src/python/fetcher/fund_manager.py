@@ -20,6 +20,7 @@ from typing import Any
 
 import httpx
 
+from src.python.core.trading_calendar import elapsed_trading_days_with_natural_fallback
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
 from src.python.core.http_client import make_http_client
@@ -113,14 +114,12 @@ def _parse_text_fallback(html: str) -> str:
 
 
 def _calc_tenure_days(start_date: str) -> int:
-    """计算任职天数。"""
+    """计算任职天数（按交易日计；日历不可用回退自然日保底非零语义）。"""
     if not start_date:
         return 0
-    try:
-        start = datetime.strptime(start_date, "%Y-%m-%d")
-        return (datetime.now() - start).days
-    except (ValueError, TypeError):
-        return 0
+    today = datetime.now().strftime("%Y-%m-%d")
+    normalized = start_date.replace("/", "-")
+    return elapsed_trading_days_with_natural_fallback(normalized[:10], today[:10])
 
 
 def _extract_manager_history(html: str) -> list[dict]:
@@ -298,11 +297,7 @@ def _parse_manager_from_archive_page(code: str) -> dict[str, Any] | None:
 
     tenure_days = 0
     if start_date:
-        try:
-            start = datetime.strptime(start_date, "%Y-%m-%d")
-            tenure_days = (datetime.now() - start).days
-        except (ValueError, TypeError):
-            pass
+        tenure_days = _calc_tenure_days(start_date)  # 任职耗时统一按交易日计
 
     # 历任经理（从第二行起）
     history: list[dict] = []

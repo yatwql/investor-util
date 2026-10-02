@@ -107,21 +107,20 @@ class ModuleFingerprintInputs:
 
 
 def debate_feature_cache_suffix() -> str:
-    """辩论增强组合（条件推理 / 集中度问答）的缓存指纹后缀。
+    """辩论增强（条件推理）的缓存指纹后缀。
 
-    取各启用模式的代号字母排序后拼接（conditional=c，qa_concentration=q），
-    保证相同组合产生相同后缀、不同组合不串扰。非辩论模式下这些增强会改写
-    expert_review 的提示词（追加情景分析 / 反问引导段），故后缀必须参与
-    expert_review 指纹——否则同一持仓在开关切换前后会命中同一份缓存。
+    取启用模式的代号字母（conditional=c）。集中度问答段已内建于辩论流程
+    （阈值触发、不再受开关控制），属常量不进键。后缀保证相同组合产生相同
+    后缀、不同组合不串扰。非辩论模式下该增强会改写 expert_review 的提示词
+    （追加情景分析段），故后缀必须参与 expert_review 指纹——否则同一持仓在
+    开关切换前后会命中同一份缓存。
 
     Returns:
-        空字符串（无增强启用）或 "_c"、"_cq" 等后缀。
+        空字符串（未启用）或 "_c" 后缀。
     """
     _parts: list[str] = []
     if is_feature_enabled("llm_debate_conditional"):
         _parts.append("c")  # conditional
-    if is_feature_enabled("llm_debate_qa_concentration"):
-        _parts.append("q")  # qa_concentration
     return "_" + "".join(sorted(_parts)) if _parts else ""
 
 
@@ -247,7 +246,7 @@ def debate_synthesis_fingerprint(inputs: ModuleFingerprintInputs, synthesis_prom
     **仅写侧使用**（同 ``debate_procon_fingerprint``）。
 
     综合提示词 = 白脸/黑脸**全文** + 条件推理情景段（``debate.conditional.scenarios``
-    驱动）+ 集中度问答段（``debate.qa_concentration.threshold`` 驱动），由
+    驱动）+ 集中度问答段（``debate.concentration_qa.threshold`` 驱动，内建段落），由
     ``_build_debate_synthesis_prompt`` 一次性渲染。既然提示词就是这三者的函数，
     键直接取该渲染结果——无需逐项枚举入哈希的来源，也就不会漏项。
 

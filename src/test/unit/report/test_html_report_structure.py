@@ -1858,7 +1858,7 @@ class TestFooterExperimentalNotice(unittest.TestCase):
         from src.python.config.features import enabled_experimental_features, set_feature_enabled
         from src.python.report.experimental_notice import enabled_notice_line
 
-        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("decision_reflection", True)
         line = enabled_notice_line()
         self.assertIsNotNone(line)
 

@@ -24,19 +24,19 @@ def _holding(code="600519", name="贵州茅台"):
 
 class TestDegradedContracts:
     def test_missing_credential(self, monkeypatch):
-        monkeypatch.setattr(frd.datasink, "missing_credential", lambda _sid: object())
+        monkeypatch.setattr(frd, "datasink_credential_missing", lambda: object())
         result = frd.build_financial_report_digest([_holding()])
         assert result["available"] is False
         assert "API key" in result["reason"]
 
     def test_no_a_share_holdings(self, monkeypatch):
-        monkeypatch.setattr(frd.datasink, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(frd, "datasink_credential_missing", lambda: None)
         result = frd.build_financial_report_digest([_holding(code="016055", name="某联接基金")])
         assert result["available"] is False
         assert "无 A 股" in result["reason"]
 
     def test_all_uncovered(self, monkeypatch):
-        monkeypatch.setattr(frd.datasink, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(frd, "datasink_credential_missing", lambda: None)
         monkeypatch.setattr(frd, "fetch_symbol_report_detailed", lambda *a, **k: (None, "索引无该标的报告"))
         result = frd.build_financial_report_digest([_holding()])
         assert result["available"] is False
@@ -45,7 +45,7 @@ class TestDegradedContracts:
 
 class TestAssembly:
     def test_rows_with_labels_and_date(self, monkeypatch):
-        monkeypatch.setattr(frd.datasink, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(frd, "datasink_credential_missing", lambda: None)
         monkeypatch.setattr(
             frd,
             "fetch_symbol_report_detailed",
@@ -71,7 +71,7 @@ class TestAssembly:
         assert row["source"] == "巨潮资讯网 (cninfo)"
 
     def test_partial_failures_kept(self, monkeypatch):
-        monkeypatch.setattr(frd.datasink, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(frd, "datasink_credential_missing", lambda: None)
 
         def _fetch(symbol, doc_types, section, max_chars):
             if symbol == "000001.SZ":
@@ -90,7 +90,7 @@ class TestTargetSource:
     """穿透标的名称回填与来源标注（避免只显示 300274.SZ、无法区分持仓/穿透）。"""
 
     def test_penetrated_name_backfilled_and_source_labelled(self, monkeypatch):
-        monkeypatch.setattr(frd.datasink, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(frd, "datasink_credential_missing", lambda: None)
         monkeypatch.setattr(
             frd,
             "fetch_symbol_report_detailed",
@@ -110,7 +110,7 @@ class TestTargetSource:
         assert rows["600519"]["target_source"] == "直接持有"
 
     def test_penetrated_without_name_falls_back_to_symbol(self, monkeypatch):
-        monkeypatch.setattr(frd.datasink, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(frd, "datasink_credential_missing", lambda: None)
         monkeypatch.setattr(
             frd,
             "fetch_symbol_report_detailed",

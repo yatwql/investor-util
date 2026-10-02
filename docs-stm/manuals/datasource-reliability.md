@@ -230,7 +230,7 @@
 
 ### 4.2 Provider Chain 降级路径
 
-> 本表与 `fetcher/chain.py::_DEFAULT_CHAINS` **逐链对应**（13 条），由 `check-doc-drift.py` 第 15 项断言双向一致（漏链/幽灵链均报错）。
+> 本表与 `fetcher/chain.py::_DEFAULT_CHAINS` **逐链对应**（14 条），由 `check-doc-drift.py` 第 15 项断言双向一致（漏链/幽灵链均报错）。
 
 | 数据类型 | 主链路 | 备用链路 | provider id（机器可读，与 `_DEFAULT_CHAINS` 同序） | 回退条件 |
 |:---------|:-------|:---------|:----------------------------------------------|:---------|
@@ -247,6 +247,7 @@
 | `history_index` | 腾讯 K 线 | 东方财富 push2his（免 key 的独立厂商备源）→ 新浪 K 线 → 同花顺官方（需 key） | `tencent` → `eastmoney` → `sina` → `hithink` | 腾讯不可用（新浪 `getKLineData` 端点实测不可用，故东方财富为实际第二可用源） |
 | `history_index_us` | 新浪 K 线（实现存在，但端点对全部代码返回 404/空） | 腾讯 K 线（`gb_*` 代码支持有限，实际取数通常由此承担） | `sina` → `tencent` | 两源均返回空 → 该链路整体取空 |
 | `bond_yield` | akshare | —（配置兵底） | `akshare` | akshare 不可用时回落配置值 |
+| `sentiment` | 同花顺龙虎榜（需 key） | —（单源） | `hithink` | 缺 key 由链路预检跳过（报告写占位）；两源不可用或无命中 → 章节降级占位 |
 
 链路失败时逐段采集失败原因（`fetcher/chain.py` 的 `FailureDiagnostics`），以「展示名(原因)」形式随降级事件透传到报告的**数据源可用性矩阵**降级明细，例如 `腾讯财经(连接超时)；新浪财经(返回空)`——用户可直接看出是哪个源、为什么失败，不必翻日志。未采集到可读原因时回落原有的短标识（如 `transport`、`empty`），输出与既往一致。
 

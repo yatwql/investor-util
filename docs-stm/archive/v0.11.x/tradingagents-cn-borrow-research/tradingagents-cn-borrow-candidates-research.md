@@ -1,6 +1,6 @@
 # TradingAgents-CN 仓库研究：可借鉴设计分析
 
-> 文档性质：中间研究文档（docs-stm/plan，完成后归档）
+> 文档性质：完成态归档（原 `docs-stm/plan/` 中间研究文档，随借鉴批整体收口 plan-66/67/68 完成态归档；文件由 `tradingagents-cn-research.md` 依内容语义更名——研究对象为借鉴候选清单与现状比对，非仓库本体研究）
 > 研究对象：`TradingAgents-CN` 社区版 v3.0.0（commit 51060a7），克隆于 `docs-stm/tmp/TradingAgents-CN/`
 > 研究日期：2026-02（以会话日期为准）
 > 关联计划项：plan-59 ~ plan-68（10 项候选已各自独立立项于 `docs-stm/managements/plan.md`）

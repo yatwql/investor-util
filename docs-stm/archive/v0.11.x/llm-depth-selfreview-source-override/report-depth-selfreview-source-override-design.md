@@ -1,8 +1,8 @@
 # LLM 成本调节、生成后自检与调用级源指定：整体设计
 
-> 文档性质：中间设计文档（`docs-stm/plan/`，完成后随完成态归档）
+> 文档性质：完成态归档（原 `docs-stm/plan/` 中间设计文档，随 plan-63/64/65 实施完成归档于此；文件由 `llm-depth-selfreview-source-override-design.md` 依内容语义更名——「深度」实为报告深度档位）
 > 对应计划项：`plan-63`（报告深度档位）、`plan-64`（生成后自检）、`plan-65`（调用级源指定）
-> 前置：`docs-stm/plan/tradingagents-cn-research.md`（借鉴来源）
+> 前置：`../tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md`（借鉴来源，同批判归档）
 > 设计约束依据：`docs-stm/managements/technical.md` 「架构设计约束」章节与「功能语义命名表」章节
 > **实施状态**：plan-63 / plan-64 / plan-65 已全部实施完成（2026-10-01），实施记录见 changelog「新增」段与 `docs-stm/archive/v0.11.x/archived_plan.0.11.x.md`。实施中相对本设计的两处调整：① §3.4 新闻条数是**同一个采集旋钮**（同时影响新闻页签与 LLM 输入，见该节修订说明）；② plan-64 的产物交付由「扩宽 llm_content 元组」改为「运行作用域载体 + 报告层零参 pull」（详见 §4.6）。
 

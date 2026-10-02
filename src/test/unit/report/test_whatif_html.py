@@ -248,7 +248,7 @@ class TestWhatifHtmlPage(unittest.TestCase):
         self.assertIn("arrow-up", text)
         self.assertIn("24,000.00", text)  # 目标总成本（money 过滤器）
 
-    def test_charts_and_captions_c20(self):
+    def test_charts_have_captions_and_data_payload(self):
         """双环形图 canvas + 2 条 .chart-caption（图下说明）+ #whatif-chart-data JSON。"""
         import json
 

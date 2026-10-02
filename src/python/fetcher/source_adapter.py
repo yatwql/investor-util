@@ -353,3 +353,13 @@ def restore_adapters(snapshot: Mapping[str, Mapping[str, SourceAdapter]]) -> Non
     ADAPTER_REGISTRY.clear()
     for domain, adapters in snapshot.items():
         ADAPTER_REGISTRY[domain] = dict(adapters)
+
+
+def _register_to_core_doctor() -> None:
+    """把适配器巡检注册进 core doctor（模块导入时执行一次，core 不反向 import 上层）。"""
+    from src.python.core.doctor import register_adapter_survey
+
+    register_adapter_survey(survey_adapters)
+
+
+_register_to_core_doctor()

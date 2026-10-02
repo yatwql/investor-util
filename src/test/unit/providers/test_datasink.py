@@ -389,3 +389,39 @@ class TestEmptyReasonSelfReport:
         _prepare(monkeypatch, _FakeResp(status_code=500, payload={}))
         assert ds._request("/documents", {}) is None
         assert "500" in self._reason()
+
+
+class TestRateLimitWaitFormula:
+    """429 退避等待经 interval_delay 唯一算式（间隔节流唯一原语约束）。"""
+
+    def test_429_wait_goes_through_interval_delay(self, monkeypatch):
+        waits: list[float] = []
+        monkeypatch.setattr(ds, "interval_delay", lambda d: d)  # 算式原样透传，便于断言
+        monkeypatch.setattr(ds.time, "sleep", lambda s: waits.append(s))
+
+        counter = [0]
+
+        class TwoPhaseClient:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get(self, url, params=None, headers=None):
+                counter[0] += 1
+                return _FakeResp(status_code=429 if counter[0] == 1 else 200, payload={"ok": True})
+
+        client = TwoPhaseClient()
+        monkeypatch.setattr(ds, "make_http_client", lambda **_kw: client)
+        monkeypatch.setattr(ds, "credential_value", lambda _sid: "test-key")
+        monkeypatch.setattr(ds, "missing_credential", lambda _sid: None)
+        monkeypatch.setattr(ds, "resolve_daily_quota", lambda: 10)
+        monkeypatch.setattr(ds, "_read_quota", lambda: ("2000-01-01", 0))
+        monkeypatch.setattr(ds, "_QUOTA_FILE", "/dev/null")  # 配额写不进真实文件
+        result = ds._request("/documents", {"symbol": "x"})
+        assert result == {"ok": True}
+        assert counter[0] == 2
+        # 首个等待 = 429 退避（经 interval_delay 透传）；后续等待来自限速器（同模块共用 time，一并被记录）
+        assert waits and waits[0] == ds._RATE_LIMIT_POLICY.delay_for(1)
+        assert all(isinstance(w, float) for w in waits)

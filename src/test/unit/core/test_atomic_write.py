@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 import pytest
 
+from src.python.core import atomic_write as aw
 from src.python.core.atomic_write import write_json_atomic, write_text_atomic
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
@@ -151,3 +152,74 @@ class TestReplaceWindowsFallback:
 
         assert target.read_text(encoding="utf-8") == "new"
         assert calls["n"] == 1  # 回退走 os.rename，未二次调用 os.replace
+
+
+class TestWriteBytesAtomic:
+    """write_bytes_atomic —— 二进制原子写（rf：原子写唯一原语补齐后注册用例）。"""
+
+    def test_writes_bytes_and_creates_parents(self, tmp_path):
+        target = tmp_path / "dir" / "a.bin"
+        assert aw.write_bytes_atomic(str(target), b"\x00\xff\x01") is True
+        assert target.read_bytes() == b"\x00\xff\x01"
+
+    def test_mode_applied(self, tmp_path):
+        target = tmp_path / "a.bin"
+        assert aw.write_bytes_atomic(str(target), b"x", mode=0o644) is True
+        assert os.stat(target).st_mode & 0o777 == 0o644
+
+    def test_no_mode_keeps_mkstemp_default(self, tmp_path):
+        target = tmp_path / "a.bin"
+        assert aw.write_bytes_atomic(str(target), b"x") is True
+        assert os.stat(target).st_mode & 0o777 == 0o600  # mkstemp 默认
+
+    def test_keeps_old_content_on_write_failure(self, tmp_path):
+        target = tmp_path / "a.bin"
+        target.write_bytes(b"old")
+        import unittest.mock as mock
+
+        with mock.patch.object(aw, "_replace", side_effect=RuntimeError("boom")):
+            assert aw.write_bytes_atomic(str(target), b"new") is False
+        assert target.read_bytes() == b"old"
+        # 无 .tmp 残留
+        assert list(tmp_path.glob("*.tmp")) == []
+
+
+class TestCopyFileAtomic:
+    """copy_file_atomic —— 原子复制（rf：4 处旁路收编为唯一原语）。"""
+
+    def test_copies_content_and_metadata(self, tmp_path):
+        src = tmp_path / "a.bin"
+        src.write_bytes(b"payload")
+        dst = tmp_path / "sub" / "b.bin"
+        aw.copy_file_atomic(str(src), str(dst))
+        assert dst.read_bytes() == b"payload"
+
+    def test_temp_lives_in_dst_dir_and_cleaned(self, tmp_path, monkeypatch):
+        src = tmp_path / "a.bin"
+        src.write_bytes(b"payload")
+        dst = tmp_path / "b.bin"
+        seen: dict = {}
+
+        import shutil as _sh
+
+        real = _sh.copy2
+
+        def spy_copy2(s, d, **kw):
+            seen["tmp_dir"] = os.path.dirname(d)
+            return real(s, d, **kw)
+
+        # copy_file_atomic 内部经 module 级 shutil（自测点在其模块属性）
+        monkeypatch.setattr(aw.shutil, "copy2", spy_copy2)
+        aw.copy_file_atomic(str(src), str(dst))
+        assert seen["tmp_dir"] == str(tmp_path)
+        assert list(tmp_path.glob("*.tmp")) == []
+
+    def test_failure_cleans_tmp_and_raises(self, tmp_path, monkeypatch):
+        src = tmp_path / "a.bin"
+        src.write_bytes(b"payload")
+        dst = tmp_path / "b.bin"
+        monkeypatch.setattr(aw.shutil, "copy2", lambda s, d, **kw: (_ for _ in ()).throw(OSError("disk full")))
+        with pytest.raises(OSError):
+            aw.copy_file_atomic(str(src), str(dst))
+        assert not dst.exists()
+        assert list(tmp_path.glob("*.tmp")) == []

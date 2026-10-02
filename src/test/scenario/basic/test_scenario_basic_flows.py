@@ -168,7 +168,7 @@ class TestGenerateExcelReport(unittest.TestCase):
     def test_experimental_notice_lands_without_llm_chapter(self, mock_perf, mock_us_idx, mock_a_idx):
         """LLM 整章关闭（无用量页签）→ 清单仍须落在汇总页脚。
 
-        确定性信号沉淀等实验开关不依赖 LLM 章节：清单若只挂在用量页签上，LLM 整章
+        决策跨期反思闭环等实验开关不依赖 LLM 章节：清单若只挂在用量页签上，LLM 整章
         关闭时这批开关在 Excel 产物上完全无痕。两个开关按生产调用一并关闭——报告
         层同时传 include_llm 与 enable_llm，只关前者时页签仍会被创建（内容为空）。
         """
@@ -176,7 +176,7 @@ class TestGenerateExcelReport(unittest.TestCase):
 
         from src.python.config.features import set_feature_enabled
 
-        set_feature_enabled("signal_ledger", True)
+        set_feature_enabled("decision_reflection", True)
         mock_a_idx.return_value = {}
         mock_us_idx.return_value = {}
 
@@ -198,7 +198,7 @@ class TestGenerateExcelReport(unittest.TestCase):
             landed = [
                 ws.title
                 for ws in wb.worksheets
-                if "⚗ 本报告在 1 项实验性功能开启下生成：确定性信号沉淀" in self._sheet_text(ws)
+                if "⚗ 本报告在 1 项实验性功能开启下生成：决策跨期反思闭环" in self._sheet_text(ws)
             ]
             self.assertEqual(landed, ["1.投资分析汇总"], "清单须恰落在汇总页脚一处")
         finally:

@@ -21,6 +21,7 @@ from src.python.analysis.drawdown_events import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis, pytest.mark.edge]
+pytestmark.append(pytest.mark.usefixtures("offline_external_sources"))
 
 
 def _bars(values: list[float], start: str = "2026-01-01") -> list[dict]:

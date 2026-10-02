@@ -78,7 +78,7 @@ class TestWriteLlmSettings:
         mock_write.assert_called_once_with(settings, path)
 
 
-# 标准 LLM 模块（菜单 S 1~5），实验性功能编号紧随其后（6~9）
+# 标准 LLM 模块（菜单 S 1~5），实验性功能编号紧随其后（6~8）
 _STANDARD_LLM_MODULES = {
     "global_macro": "全球政经局势",
     "expert_review": "智囊团深度复盘",
@@ -93,13 +93,13 @@ class TestConfigLlmModulesExperimentalFlags:
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")
-    @patch("src.python.tui.handlers_config.input", side_effect=["8", "0"])
+    @patch("src.python.tui.handlers_config.input", side_effect=["7", "0"])
     @patch("src.python.config.features.save_feature_overrides")
     @patch("src.python.config.features.set_feature_enabled")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
     @patch("src.python.core.registry.get_llm_module_names")
     @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
-    def test_menu_number_eight_toggles_decision_reflection(
+    def test_menu_number_seven_toggles_decision_reflection(
         self,
         mock_read,
         mock_names,
@@ -110,10 +110,10 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_refresh,
         mock_press,
     ):
-        """输入 8 → 切换第 3 个实验开关（决策跨期反思闭环），持久化到 features.json。
+        """输入 7 → 切换第 2 个实验开关（决策跨期反思闭环），持久化到 features.json。
 
-        转正后实验块收窄为 4 项（6 正反辩论 / 7 集中度问答 / 8 决策跨期反思 /
-        9 确定性信号沉淀）——块内编号随注册表实验组即时重排。
+        实验块收窄为 3 项（6 正反辩论 / 7 决策跨期反思 / 8 景气度框架诊断；集中度问答
+        已并入辩论流程、信号沉淀已转正为常规开关）——块内编号随注册表实验组即时重排。
         """
         from src.python.tui.handlers_config import _cmd_config_llm_modules
 
@@ -125,13 +125,41 @@ class TestConfigLlmModulesExperimentalFlags:
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")
+    @patch("src.python.tui.handlers_config.input", side_effect=["8", "0"])
+    @patch("src.python.config.features.save_feature_overrides")
+    @patch("src.python.config.features.set_feature_enabled")
+    @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
+    @patch("src.python.core.registry.get_llm_module_names")
+    @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
+    def test_menu_number_eight_toggles_prosperity_framework(
+        self,
+        mock_read,
+        mock_names,
+        mock_filter,
+        mock_set_feature,
+        mock_save_overrides,
+        mock_input,
+        mock_refresh,
+        mock_press,
+    ):
+        """输入 8 → 切换实验块末项（景气度框架诊断），持久化到 features.json。"""
+        from src.python.tui.handlers_config import _cmd_config_llm_modules
+
+        _cmd_config_llm_modules()
+
+        mock_save_overrides.assert_called_once_with({"prosperity_framework": True})
+        mock_set_feature.assert_called_once_with("prosperity_framework", True)
+        mock_press.assert_called_once()
+
+    @patch("src.python.tui.handlers_config.press_any_key")
+    @patch("src.python.tui.handlers_config.refresh_config")
     @patch("src.python.tui.handlers_config.input", side_effect=["9", "0"])
     @patch("src.python.config.features.save_feature_overrides")
     @patch("src.python.config.features.set_feature_enabled")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
     @patch("src.python.core.registry.get_llm_module_names")
     @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
-    def test_menu_number_nine_toggles_signal_ledger(
+    def test_menu_number_nine_toggles_promoted_standard_switch(
         self,
         mock_read,
         mock_names,
@@ -142,45 +170,18 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_refresh,
         mock_press,
     ):
-        """输入 9 → 切换实验块末项（确定性信号沉淀），持久化到 features.json。"""
-        from src.python.tui.handlers_config import _cmd_config_llm_modules
+        """输入 9 → 常规块首项（确定性信号模块，转正后默认开）→ 切换即关闭。
 
-        _cmd_config_llm_modules()
-
-        mock_save_overrides.assert_called_once_with({"signal_ledger": True})
-        mock_set_feature.assert_called_once_with("signal_ledger", True)
-        mock_press.assert_called_once()
-
-    @patch("src.python.tui.handlers_config.press_any_key")
-    @patch("src.python.tui.handlers_config.refresh_config")
-    @patch("src.python.tui.handlers_config.input", side_effect=["11", "0"])
-    @patch("src.python.config.features.save_feature_overrides")
-    @patch("src.python.config.features.set_feature_enabled")
-    @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
-    @patch("src.python.core.registry.get_llm_module_names")
-    @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
-    def test_menu_number_eleven_toggles_promoted_standard_switch(
-        self,
-        mock_read,
-        mock_names,
-        mock_filter,
-        mock_set_feature,
-        mock_save_overrides,
-        mock_input,
-        mock_refresh,
-        mock_press,
-    ):
-        """输入 11 → 常规块首项（信号预消化，转正后默认开）→ 切换即关闭。
-
-        转正不丢入口、也不等于不可关：常规块编号自 11 起（紧随实验块：5 项辩论/反思/账本/景气度框架），
-        默认开故点一次写入 false。实验块新增开关时常规块编号整体顺延（编号由分组与块内顺序派生）。
+        转正不丢入口、也不等于不可关：常规块编号自 9 起（紧随实验块：3 项辩论/反思/
+        景气度框架），默认开故点一次写入 false。实验块新增开关时常规块编号整体顺延
+        （编号由分组与块内顺序派生）。
         """
         from src.python.tui.handlers_config import _cmd_config_llm_modules
 
         _cmd_config_llm_modules()
 
-        mock_save_overrides.assert_called_once_with({"signal_pre_digest": False})
-        mock_set_feature.assert_called_once_with("signal_pre_digest", False)
+        mock_save_overrides.assert_called_once_with({"deterministic_signal": False})
+        mock_set_feature.assert_called_once_with("deterministic_signal", False)
         mock_press.assert_called_once()
 
     @patch("src.python.tui.handlers_config.press_any_key")
@@ -211,13 +212,13 @@ class TestConfigLlmModulesExperimentalFlags:
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")
-    @patch("src.python.tui.handlers_config.input", side_effect=["16", "0"])
+    @patch("src.python.tui.handlers_config.input", side_effect=["14", "0"])
     @patch("src.python.config.features.save_feature_overrides")
     @patch("src.python.config.features.set_feature_enabled")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
     @patch("src.python.core.registry.get_llm_module_names")
     @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
-    def test_menu_number_sixteen_toggles_first_metrics_switch(
+    def test_menu_number_fourteen_toggles_first_metrics_switch(
         self,
         mock_read,
         mock_names,
@@ -228,10 +229,10 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_refresh,
         mock_press,
     ):
-        """输入 16 → 量化指标首项（夏普比率），持久化到 features.json。
+        """输入 14 → 量化指标首项（夏普比率），持久化到 features.json。
 
-        常规块编号自 11 起：11 信号预消化 / 12 模块级质量分级 / 13 决策头结构化 /
-        14 条件推理 / 15 数据源凭据就绪（转正项），16 起为量化指标七项。
+        常规块编号自 9 起：9 确定性信号模块 / 10 模块级质量分级 / 11 决策头结构化 /
+        12 条件推理 / 13 数据源凭据就绪（转正项），14 起为量化指标七项。
         """
         from src.python.tui.handlers_config import _cmd_config_llm_modules
 
@@ -242,7 +243,7 @@ class TestConfigLlmModulesExperimentalFlags:
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")
-    @patch("src.python.tui.handlers_config.input", side_effect=["24", "0"])
+    @patch("src.python.tui.handlers_config.input", side_effect=["22", "0"])
     @patch("src.python.config.features.save_feature_overrides")
     @patch("src.python.config.features.set_feature_enabled")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
@@ -261,7 +262,7 @@ class TestConfigLlmModulesExperimentalFlags:
     ):
         """系统自检（转正项）在常规块内可切换——转正不丢入口（回归）。
 
-        编号 24 = 5 标准模块 + 5 实验项 + 常规块序 14（doctor_check）。它此前只
+        编号 22 = 5 标准模块 + 3 实验项 + 常规块序 14（doctor_check）。它此前只
         能靠手改 features.json 关闭；本用例锁定它在面板内仍可关。
         """
         from src.python.tui.handlers_config import _cmd_config_llm_modules

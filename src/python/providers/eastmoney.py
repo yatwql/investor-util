@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-import time
+import threading
 from typing import Any
 
 import httpx
@@ -17,11 +17,30 @@ import httpx
 from src.python.core.code_utils import get_index_exchange_prefix, is_index_code, is_us_index_code
 from src.python.core.http_client import make_http_client
 from src.python.core.retry import STRATEGY_EXPONENTIAL, TRANSIENT_EXCEPTIONS, RetryPolicy, retry_transient
+from src.python.core.throttle import RateLimiter  # 间隔节流唯一原语（数据/调度/LLM 三层共用）
 from src.python.providers._utils import safe_float as _safe_float
 
 logger = logging.getLogger("invest")
 
 _FUND_API_URL = "https://api.fund.eastmoney.com/f10/lsjz"
+
+#: 历史净值分页请求最小间隔（秒）——间隔节流走 core/throttle 唯一原语
+_PAGER_LIMIT_KEY = "eastmoney_fund_pager"
+_PAGER_MIN_INTERVAL = 0.3
+_pager_limiter: RateLimiter | None = None
+_pager_limiter_lock = threading.Lock()
+
+
+def _get_pager_limiter() -> RateLimiter:
+    """分页限速器（惰性单例，页间间隔统一走 RateLimiter 表达）。"""
+    global _pager_limiter
+    if _pager_limiter is None:
+        with _pager_limiter_lock:
+            if _pager_limiter is None:
+                _pager_limiter = RateLimiter({_PAGER_LIMIT_KEY: _PAGER_MIN_INTERVAL})
+    return _pager_limiter
+
+
 _TIMEOUT = 15.0
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -227,7 +246,7 @@ def fetch_fund_nav_history(code: str) -> list[dict]:
             break
 
         page_index += 1
-        time.sleep(0.3)  # 页间延时防限流
+        _get_pager_limiter().acquire(_PAGER_LIMIT_KEY)  # 页间最小间隔（限流防触顶）
 
     if not all_records:
         logger.warning("[eastmoney] 无历史净值数据: %s", code)

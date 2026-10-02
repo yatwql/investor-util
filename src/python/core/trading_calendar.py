@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import logging
 
-from src.python.core.constants import BEIJING_TZ
-import threading
+from collections.abc import Callable
 from datetime import datetime, timedelta
+
+from src.python.core.constants import BEIJING_TZ
+
+import threading
 
 from src.python import cache
 
@@ -40,6 +43,8 @@ __all__ = [
     "_get_trading_calendar",
     "_is_trading_day",
     "count_trading_days_elapsed",
+    "register_trading_days_fallback",
+    "elapsed_trading_days_with_natural_fallback",
     "get_last_trading_day",
     "get_prev_trading_day",
 ]
@@ -79,25 +84,35 @@ def _get_trading_calendar() -> set[str]:
         except Exception as exc:
             logger.warning("获取交易日历失败: %s，尝试同花顺官方序列兜底", exc)
 
-    # akshare 不可用 → 官方近一年交易日序列兜底（需 key；缺凭据/失败则返回空集合，
-    # 由调用方回退简易周度判断）。**惰性导入**避免 core → providers 的层次反转。
+    # akshare 不可用 → 官方序列兜底（需 key；缺凭据/失败则返回空集合，
+    # 由调用方回退简易周度判断）。兜底函数由 fetcher 侧导入时经
+    # register_trading_days_fallback 注入（core 不反向 import providers）；
+    # 未注册 → 直接返回空集合（降级语义与兜底失败一致）。
     try:
-        from src.python.providers import hithink
-
-        data = hithink.fetch_trading_days() or {}
+        data = _TRADING_DAYS_FALLBACK() or {}
         dates = {
             str(item.get("date"))
             for item in (data.get("item") or [])
             if isinstance(item, dict) and str(item.get("date") or "").strip()
         }
-        if dates:
-            cache.set(_TRADING_CALENDAR_CACHE_KEY, sorted(dates))
-            logger.info("交易日历已更新（同花顺官方序列，%d 个交易日）", len(dates))
-            return dates
-    except Exception as exc:  # 官方源不可用同样降级，不抛
-        logger.warning("同花顺交易日历兜底失败: %s", exc)
-
+    except Exception as exc:  # 兜底源不可用同样降级，不抛
+        logger.warning("交易日历兜底失败: %s", exc)
+        return set()
+    if dates:
+        cache.set(_TRADING_CALENDAR_CACHE_KEY, sorted(dates))
+        logger.info("交易日历已更新（官方序列兜底，%d 个交易日）", len(dates))
+        return dates
     return set()
+
+
+#: 官方序列兜底函数（fetcher 侧导入时经 register_trading_days_fallback 注入）
+_TRADING_DAYS_FALLBACK: Callable[[], dict] | None = None
+
+
+def register_trading_days_fallback(fn: Callable[[], dict]) -> None:
+    """注册官方序列兜底取数函数（fetcher/chain 导入时调用，core 不反向 import 上层）。"""
+    global _TRADING_DAYS_FALLBACK
+    _TRADING_DAYS_FALLBACK = fn
 
 
 def _is_trading_day(date: datetime) -> bool:
@@ -239,3 +254,22 @@ def _count_trading_days_back(trading_day: str, nav_date: str) -> int | None:
         return None
     except (ValueError, TypeError):
         return None
+
+
+def elapsed_trading_days_with_natural_fallback(start: str, end: str) -> int:
+    """统计区间交易日数；日历/日期不可解析（None）时回退自然日差并保证非负。
+
+    供「历时多久」类展示（回撤持续/恢复、任职天数）使用：正常路径按交易日计
+    （标注「按交易日计」），不可用路径保底自然日——既不中断展示，也不为 0。
+
+    Returns:
+        交易日数；完全不可解析且自然日不可判 → 0
+    """
+    elapsed = count_trading_days_elapsed(start, end)
+    if elapsed is not None:
+        return elapsed
+    try:
+        natural = (datetime.strptime(str(end)[:10], "%Y-%m-%d") - datetime.strptime(str(start)[:10], "%Y-%m-%d")).days
+    except (ValueError, TypeError):
+        return 0
+    return max(0, natural)

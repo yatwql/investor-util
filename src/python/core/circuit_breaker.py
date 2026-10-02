@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from collections.abc import Callable
 from typing import Any
 
 logger = logging.getLogger("invest")
@@ -44,7 +45,35 @@ __all__ = [
     "get_llm_endpoint_status",
     "get_indicator_breaker_status",
     "BREAKER_CONFIG_DATA_SOURCE",
+    "register_breaker_status",
 ]
+
+# ═══════════════════════════════════════════════════════════════
+# 上游熔断状态注册（分层纪律：core 不反向 import 上层模块）
+# ═══════════════════════════════════════════════════════════════
+
+#: 上游模块（analysis / llm）在自模块导入时注册的熔断状态快照函数。
+#: key 与 circuit_breaker_status 的断路器分类一致："llm"（LLM 端点熔断状态）、
+#: "indicator"（指标断路器实例）。未注册 → 视为上游未加载，状态为空 dict / None。
+_BREAKER_SNAPSHOT_PROVIDERS: dict[str, Callable[[], Any]] = {}
+
+
+def register_breaker_status(category: str, provider: Callable[[], Any]) -> None:
+    """注册上游模块的熔断状态快照函数（上游模块导入时自行调用）。
+
+    Args:
+        category: 断路器分类（"llm" / "indicator"，供网关按名取用）
+        provider: 无参函数——"llm" 返回 {endpoint: {circuit_broken, ...}} 字典，
+            "indicator" 返回 IndicatorBreaker 实例（带 summary()）。
+    """
+    _BREAKER_SNAPSHOT_PROVIDERS[category] = provider
+
+
+def _breaker_snapshot(category: str) -> Any:
+    """取已注册的上游熔断快照；未注册返回 None（调用方按空态降级）。"""
+    provider = _BREAKER_SNAPSHOT_PROVIDERS.get(category)
+    return provider() if provider is not None else None
+
 
 # ═══════════════════════════════════════════════════════════════
 # 预设配置
@@ -114,9 +143,7 @@ class CircuitBreakerGateway:
         if name == "llm":
             return self._get_llm_status()
         if name == "indicator":
-            from src.python.analysis.circuit_breaker_wrapper import get_indicator_breaker
-
-            return get_indicator_breaker()
+            return _breaker_snapshot("indicator")
         logger.debug("CircuitBreakerGateway.get: 未知熔断器类型 '%s'", name)
         return None
 
@@ -172,42 +199,21 @@ class CircuitBreakerGateway:
 
     @staticmethod
     def _get_llm_status() -> dict[str, dict[str, Any]]:
-        """返回所有 LLM 端点的熔断状态报告。"""
-        from src.python.llm.circuit_breaker import (
-            _CIRCUIT_BREAKER_RECOVERY,
-            _CIRCUIT_BREAKER_THRESHOLD,
-            _circuit_failures,
-            _circuit_open_until,
-        )
+        """返回所有 LLM 端点的熔断状态报告。
 
-        now = __import__("time").time()
-        status: dict[str, dict[str, Any]] = {}
-        all_endpoints = set(list(_circuit_failures.keys()) + list(_circuit_open_until.keys()))
-        for ep in all_endpoints:
-            cooldown_remaining = 0.0
-            if ep in _circuit_open_until:
-                cooldown_remaining = max(0.0, _circuit_open_until[ep] - now)
-                _cb = cooldown_remaining > 0
-            else:
-                _cb = False
-            status[ep] = {
-                "circuit_broken": _cb,
-                "consecutive_failures": _circuit_failures.get(ep, 0),
-                "threshold": _CIRCUIT_BREAKER_THRESHOLD,
-                "cooldown_remaining": round(cooldown_remaining, 1),
-                "recovery_secs": _CIRCUIT_BREAKER_RECOVERY,
-            }
-        return status
+        状态快照由 llm/circuit_breaker 导入时注册（``register_breaker_status``）；
+        未注册 → LLM 侧未加载，返回空 dict（不可用态语义与空集合一致）。
+        """
+        return _breaker_snapshot("llm") or {}
 
     @staticmethod
     def _get_indicator_status() -> dict[str, dict[str, Any]]:
         """返回所有指标断路器的熔断状态报告。
 
-        委派给 analysis/circuit_breaker_wrapper.py::IndicatorBreaker.summary()。
+        委派给 analysis 侧注册的 IndicatorBreaker.summary()（core 不反向 import 上层）。
         """
-        from src.python.analysis.circuit_breaker_wrapper import get_indicator_breaker
-
-        return get_indicator_breaker().summary()
+        breaker = _breaker_snapshot("indicator")
+        return breaker.summary() if breaker is not None else {}
 
 
 # ── 模块级单例 ─────────────────────────────────────────

@@ -103,10 +103,9 @@ class FeatureSwitchDef:
 # 列出一个不改报告任何字节的开关，读者会推断内容受其影响。
 feature_switch_registry: dict[str, FeatureSwitchDef] = {
     # ── 实验性功能：辩论-正反辩论（换调用次数的深度模式，非常驻能力） ──
+    # 集中度问答段为本流程内建段落（见 prompts_action._build_concentration_qa_block），
+    # 其触发阈值配置在 llm_settings.json 的 debate.concentration_qa.threshold。
     "llm_debate_procon": FeatureSwitchDef("辩论-正反辩论", "三段式(白脸→黑脸→综合)", GROUP_EXPERIMENTAL, False, True),
-    "llm_debate_qa_concentration": FeatureSwitchDef(
-        "辩论-集中度问答", "集中度风险问答", GROUP_EXPERIMENTAL, False, True
-    ),
     # ── 实验性功能：LLM 输出增强（写盘积累账本，需真实数据积累验证） ──
     "decision_reflection": FeatureSwitchDef(
         "决策跨期反思闭环",
@@ -115,11 +114,13 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         False,
         True,
     ),
-    "signal_ledger": FeatureSwitchDef(
-        "确定性信号沉淀",
-        "确定性算法评级（温度/估值/尾部风险/风格/再平衡超限）沉淀为带实时-非实时标签的账本，统计默认只算实时",
-        GROUP_EXPERIMENTAL,
-        False,
+    # ── 常规开关：确定性信号（实时注入 + 跨期沉淀双面，账本已有真实积累故转正合并） ──
+    "deterministic_signal": FeatureSwitchDef(
+        "确定性信号模块",
+        "市场温度/估值分位/尾部风险等确定性评级的实时预消化信号行注入复盘与体检提示词，"
+        "并跨期沉淀为带实时-非实时标签的账本（统计默认只算实时），教训与命中率随摘要回灌提示词",
+        GROUP_STANDARD,
+        True,
         True,
     ),
     # ── 实验性功能：投资方法框架（借展开源骨架，需真实组合样本验证评分口径） ──
@@ -131,13 +132,6 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         True,
     ),
     # ── 常规开关：LLM 输出增强（只读侧注入，不增调用次数、不写盘） ──
-    "signal_pre_digest": FeatureSwitchDef(
-        "信号预消化",
-        "市场温度/估值分位/尾部风险预消化为带方向标注的信号行注入复盘与体检提示词",
-        GROUP_STANDARD,
-        True,
-        True,
-    ),
     "module_quality_gate": FeatureSwitchDef(
         "模块级质量分级",
         "按完整性/一致性给各 LLM 模块输出评 A~F 级，低评级随内容头部标注质量提示（不阻断不重试）",
@@ -271,6 +265,7 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
     ),
 }
 
+# ── 出厂默认值投影 ──────────────────────────────────────────
 # 出厂默认值投影：``get_feature_defaults()`` 与兼容既有引用的取值表
 _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {flag: d.default for flag, d in feature_switch_registry.items()}
 
@@ -317,7 +312,7 @@ def resolve_experiment_flags(names: list[str]) -> tuple[set[str], list[str]]:
     """将用户输入的实验功能名解析为开关名集合（注册表驱动）。
 
     接受三种写法（忽略首尾空白；开关名大小写不敏感）：
-      - 开关名：``signal_pre_digest``
+      - 开关名：``deterministic_signal``
       - 显示名：``信号预消化``
       - ``all``：全部实验功能
 
@@ -445,6 +440,15 @@ def log_experimental_features() -> None:
     for flag, name in enabled:
         logger.error("  ⚗ %s — %s", name, feature_switch_registry[flag].desc)
     logger.error(sep)
+
+    # 使用统计（尽力而为，绝不影响报告主链路）：每次生成报告时记录各实验开关
+    # 的累计启用次数与最近启用日期，供「转正 / 撤销」决策用客观数据支撑。
+    try:
+        from src.python.core.experiment_stats import record_experiment_usage
+
+        record_experiment_usage([flag for flag, _name in enabled])
+    except Exception:  # noqa: BLE001
+        logger.warning("[features] 实验功能使用统计记录失败（不影响报告生成）", exc_info=True)
 
 
 __all__ = [

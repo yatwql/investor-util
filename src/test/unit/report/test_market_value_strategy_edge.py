@@ -61,9 +61,11 @@ _QDII_DATA = {
 
 
 def _setup_registry() -> None:
-    """初始化 registry 的默认 chain。"""
+    """初始化 registry 的默认 chain（链路定义由 chain 模块加载后提供，需取链路字典显式传入）。"""
+    from src.python.fetcher.chain import _DEFAULT_CHAINS
+
     reg = get_registry()
-    reg.register_default_chains()
+    reg.register_default_chains(_DEFAULT_CHAINS)
 
 
 # ════════════════════════════════════════════════════════════

@@ -258,7 +258,7 @@ class TestSignalDigestCacheSuffix:
         from src.python.config.features import FEATURE_FLAGS
         from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
-        FEATURE_FLAGS["signal_pre_digest"] = False  # 转正后默认开，基准须显式关
+        FEATURE_FLAGS["deterministic_signal"] = False  # 转正后默认开，基准须显式关
         assert _signal_digest_cache_suffix(self._SIGNAL_DATA) == ""
 
     def test_enabled_without_signal_returns_empty(self):
@@ -266,7 +266,7 @@ class TestSignalDigestCacheSuffix:
         from src.python.config.features import FEATURE_FLAGS
         from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
-        FEATURE_FLAGS["signal_pre_digest"] = True
+        FEATURE_FLAGS["deterministic_signal"] = True
         assert _signal_digest_cache_suffix({}) == ""
 
     def test_enabled_with_signal_returns_deterministic_suffix(self):
@@ -274,7 +274,7 @@ class TestSignalDigestCacheSuffix:
         from src.python.config.features import FEATURE_FLAGS
         from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
-        FEATURE_FLAGS["signal_pre_digest"] = True
+        FEATURE_FLAGS["deterministic_signal"] = True
         first = _signal_digest_cache_suffix(self._SIGNAL_DATA)
         second = _signal_digest_cache_suffix(self._SIGNAL_DATA)
 
@@ -287,7 +287,7 @@ class TestSignalDigestCacheSuffix:
         from src.python.config.features import FEATURE_FLAGS
         from src.python.llm.prompts_signals import _signal_digest_cache_suffix
 
-        FEATURE_FLAGS["signal_pre_digest"] = True
+        FEATURE_FLAGS["deterministic_signal"] = True
         other = {"market_temperature_data": {"available": True, "tier": "高估", "score": 80.0}}
 
         assert _signal_digest_cache_suffix(self._SIGNAL_DATA) != _signal_digest_cache_suffix(other)
@@ -406,7 +406,7 @@ class TestGeneratorFingerprintWiring:
         """开关关闭：有无信号数据都不进指纹（键不变、不误伤旧缓存）。"""
         from src.python.config.features import FEATURE_FLAGS
 
-        FEATURE_FLAGS["signal_pre_digest"] = False  # 转正后默认开，基准须显式关
+        FEATURE_FLAGS["deterministic_signal"] = False  # 转正后默认开，基准须显式关
         without_signal = self._captured_fingerprints(generator_name, pipeline_data=None)
         with_signal = self._captured_fingerprints(generator_name, pipeline_data=_SIGNAL_PIPELINE_DATA)
 
@@ -417,7 +417,7 @@ class TestGeneratorFingerprintWiring:
         """开关开启：信号内容变 → 指纹变（提示词变了缓存键必须跟着变）。"""
         from src.python.config.features import FEATURE_FLAGS
 
-        FEATURE_FLAGS["signal_pre_digest"] = True
+        FEATURE_FLAGS["deterministic_signal"] = True
         high_risk = self._captured_fingerprints(generator_name, pipeline_data=_SIGNAL_PIPELINE_DATA)
         low_risk = self._captured_fingerprints(
             generator_name, pipeline_data={"tail_risk_data": {"available": True, "var95": 0.5}}
@@ -430,7 +430,7 @@ class TestGeneratorFingerprintWiring:
         from src.python.config.features import FEATURE_FLAGS
         from src.python.llm.generators_orchestrator import _compute_module_cache_info
 
-        FEATURE_FLAGS["signal_pre_digest"] = True
+        FEATURE_FLAGS["deterministic_signal"] = True
         high = _compute_module_cache_info(
             {},
             {},

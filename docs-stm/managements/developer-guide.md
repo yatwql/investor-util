@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.11.10
+> 文档版本：0.11.11
 
 ## 概述
 
@@ -18,18 +18,61 @@
 | **Python 环境** | 所有 Python 命令一律使用项目虚拟环境解释器——Linux/macOS 用 `.venv/bin/python`，Windows 用 `.venv\Scripts\python.exe`；**禁止**裸 `python3`/`python`/`pytest`（会命中系统解释器，缺失 pandas 等依赖）。运行测试、脚本、CLI 均同 |
 | **提交规范** | 约定式提交：`feat`/`fix`/`docs`/`refactor`/`test`/`chore`/`perf`/`ci` + 可选 scope；修复类可在标题标注对应任务编号 |
 | **日志** | `logging` → `logs/app.log` + console（INFO / WARNING / ERROR） |
-### pi 模型采样配置（DeepSeek 编程档）
+### pi 模型与服务配置（编程档采样 + 订阅端点节流 + 缓存/思考调优）
 
-仓库内 `.pi/models.json` 是本项目**版本受控**的 pi 模型配置（DeepSeek 编程档）：
+本项目**版本受控**的 pi 配置分两个文件，作用域机制不同：
+
+| 文件 | 作用域 | 生效条件 |
+|---|---|---|
+| `.pi/models.json` | 模型覆盖 | 软链到 `~/.pi/agent/models.json`（pi **不读**项目级 models.json） |
+| `.pi/settings.json` | 项目设置 | **pi 直接读项目级 settings.json**，但需 `~/.pi/agent/trust.json` 已授予该项目信任 |
+
+`.pi/models.json` 的覆盖分两类：
+
+**① 编程档采样（`deepseek` 按量端点）**
 
 | 覆盖项 | 值 | 为什么 |
 |---|---|---|
-| `samplingParams.temperature` | `0.0` | DeepSeek 官方参数建议：**代码生成/数学解题 用 0.0**（通用对话 1.3、创意写作 1.5）；低温让补丁/重构更确定、减少格式抖动。已实测该参数在 `deepseek-v4-flash` 的 OpenAI 兼容端点被接受（HTTP 200） |
-| `maxTokens` | `65536` | 内置目录值 384K 对编程偏大；收窄到 64K 仍远超常规补丁/文件写入需要，同时给单次响应设了成本上限。**注意思考（reasoning）与正文共享该预算**——预算被思考吃满时正文会被截断（与项目 LLM 层同一现象） |
+| `samplingParams.temperature` | `0.0` | DeepSeek 官方建议：**代码生成/数学解题用 0.0**（通用对话 1.3、创意写作 1.5）；低温让补丁/重构更确定、减少格式抖动 |
+| `maxTokens` | `65536` | 内置目录值 384K 对编程偏大；收窄到 64K 仍远超常规补丁/文件写入需要，同时给单次响应设成本上限。**注意思考（reasoning）与正文共享该预算**——预算被思考吃满时正文会被截断 |
 
-**未改动**：`thinkingLevelMap`（内置 `low/high/max` 已够用，用 `/thinking` 切档）、`compat`（`thinkingFormat: deepseek` 等由 pi 内置目录提供）、`contextWindow`（保持 1M 真实能力；若想更早触发压缩以降本，可自行下调，代价是上下文保留变少）、`input`（flash 为纯文本，视觉实验版另有一个模型）。
+> **覆盖键必须与目录当前模型 id 精确匹配**：id 不一致时该覆盖**不生效且无任何告警**（pi 侧按 `Unknown override IDs are ignored` 处理，静默忽略）。因此 **`pi --list-models` 是本文件的唯一验收手段**——JSON 已写入不等于生效；目录同步（内置目录升级、`/model` 重载）后须复核各覆盖仍命中，否则 `maxTokens`/`contextWindow` 会悄悄退回目录默认值。
 
-**为什么放在 `.pi/` 而要软链生效**：pi CLI **只读** `~/.pi/agent/models.json`（`getModelsPath() = getAgentDir() + "/models.json"`，`getAgentDir()` 只认 `PI_AGENT_DIR` 或 `~/.pi/agent`），**不读项目级 `.pi/models.json`**；项目级 `.pi/` 仅支持 `settings.json`/扩展/技能/主题。因此仓库文件是**唯一事实来源**，用软链挂到全局路径生效：
+**② 订阅端点节流（`kimi-coding` / `opencode-go`）**
+
+订阅制端点（Kimi Code / OpenCode Go）按**滚动时间窗**计量，窗口额度按「交互式 agentic coding」标定；而 pi 的自动压缩阈值是 `contextTokens > contextWindow − reserveTokens(默认 16K)`，目录里这些端点 `contextWindow` 高达 1M——**压缩几乎不触发，每轮请求要把近百万 tokens 的上下文发出去**，几个轮次就吃掉一个窗口。故对这两类端点统一收窄（**只降不升**，已低于上限的模型不写覆盖）：
+
+| 覆盖项 | 值 | 为什么 |
+|---|---|---|
+| `maxTokens` | `65536` | 目录值 128K~384K（如 `grok-4.6` 500K）对编程无必要，且思考与正文共享该预算 |
+| `contextWindow` | `262144` | 把「压缩触发点」从 ~1M 拉到 ~246K → **单轮输入封顶**，这是降窗口消耗的最大单项；代价是压缩更频繁、跨轮记忆略少 |
+
+**③ 思考档位（全局，不在本文件）**：`~/.pi/agent/settings.json` 的 `defaultThinkingLevel` 设为 `low`（原 `high`）。思考 token 计入 output，实测输出量≈输入量是其主因；需要时用 `/thinking` 临时提升。
+
+**④ 提示缓存保留（`PI_CACHE_RETENTION=long` + `promptCache` 声明）**
+
+缓存命中把重复前缀按缓存读价计费（DeepSeek 缓存读约为标准输入价的 1/10），所以要尽量让前缀「热着」。这条链需要**两个条件同时成立**，缺一即静默无效：
+
+| 环节 | 载体 | 作用 |
+|---|---|---|
+| 选择保留档 | shell 环境变量 `PI_CACHE_RETENTION=long`（`~/.bashrc`） | `getPromptCacheTtlMs` 按该值选 `long` 档；未设置则恒为 `short`。解析顺序：凭据块 `env` → `process.env` → Bun 沙箱回退 |
+| 声明生命周期 | `.pi/models.json` 覆盖项 `promptCache` | **目录里没有任何模型声明 `promptCache`**，未声明时 `getPromptCacheTtlMs` 返回 `undefined` → 该模型**无缓存保活资格**，环境变量设了也白设。故对 pi 实际使用的按量模型（`deepseek-flash`/`deepseek-v4-pro`）显式声明 `{short: 300, long: 3600}`（取已公布区间的保守端） |
+
+缓存保活本身**消耗额度但不占上下文**（保活请求以 1 token 输出重发，用量计入会话统计，不进模型上下文）；pi 仅在「模型声明了生命周期」且「估算避免的未命中成本 ≥ $0.05」时才保活，故不是盲目刷量。
+
+> **刻意不下发到订阅端点**：`kimi-coding`/`opencode-go` 按窗口计量，保活刷新会白吃窗口额度，而收益取决于端点是否真支持提示缓存（未实测）。这是**待测量项**，不在本配置内。
+
+**⑤ 思考预算（`thinkingBudgets`，`~/.pi/agent` 之外的 `.pi/settings.json`）**
+
+内置档位预算为 `minimal:1024 / low:2048 / medium:8192 / high:16384`（`xhigh`/`max` 亦 16384）。合并语义是 `{...内置默认, ...自定义}`（`thinkingBudgetForLevel`），**故只需写要改的档位**，未写档位继续用内置值。当前只压最低两档（`minimal:512`、`low:1024`），**`medium`/`high` 保持内置**——它们承担用 `/thinking` 提升后的复杂推理，压掉会让升档失效。
+
+**⑥ 诊断开关（`showCacheMissNotices: true`）**
+
+开启后上屏显著缓存未命中、缓存保活成功、**压缩用量**、provider 恢复四类通知。这是排查「额度去哪了」的主观测口：压缩一次要读整个上下文，其用量此前完全不可见。
+
+**未改动**：`thinkingLevelMap`（内置 `low/high/max` 已够用，用 `/thinking` 切档）、`compat`（`thinkingFormat` 等由 pi 内置目录提供）、`input`（flash 为纯文本，视觉实验版另有一个模型）、`samplingParams`（仅对 OpenAI 兼容传输生效；订阅端点走 Anthropic/兼容协议时该参数不适用，故未对它们下发）。
+
+**为什么模型覆盖放在 `.pi/` 而要软链生效**：pi CLI **只读** `~/.pi/agent/models.json`（`getModelsPath() = getAgentDir() + "/models.json"`，`getAgentDir()` 只认 `PI_AGENT_DIR` 或 `~/.pi/agent`），**不读项目级 `.pi/models.json`**；项目级 `.pi/` 仅支持 `settings.json`/扩展/技能/主题。因此模型覆盖的仓库文件是**唯一事实来源**，用软链挂到全局路径生效（`settings.json` 走项目级路径，无需软链）：
 
 ```bash
 ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
@@ -37,8 +80,10 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 验证与排查：
 
-- `pi --list-models | grep deepseek` → `max-out` 应显示 `65.5K`（覆盖已生效）；出现 `Warning: errors loading models.json` 说明 JSON/schema 有问题
-- `samplingParams` 只对 **OpenAI 兼容传输**生效（pi 内置 deepseek provider 即 `openai-completions`）✓
+- **`timeout 90 pi --list-models | grep -E 'deepseek|kimi|opencode'`**：`deepseek-flash` 应显示 `65.5K`、`kimi-coding`/`opencode-go` 应显示 `262.1K / 65.5K`；仍是 `1M / 384K` 即**覆盖键名已失效**（目录改名），按上文修正键名
+- 出现 `Warning: errors loading models.json` 说明 JSON/schema 有问题
+- **项目设置是否生效**：`.pi/settings.json` 依赖项目信任（`~/.pi/agent/trust.json` 里该项目为 `true`）；未授予信任时项目设置被整体忽略，而 `.pi/models.json` 因走软链不受影响——两者失效条件不同，排查时分开看
+- 订阅端点用量激增时的排查顺序：① `--list-models` 确认覆盖生效 → ② 会话是否超长（`/new` 分任务）→ ③ 思考档位是否被 `/thinking` 提升 → ④ 打开 `showCacheMissNotices` 看压缩用量与缓存命中
 - 若 `~/.pi/agent/models.json` 已是实体文件（例如以后 `/login` 或 `pi config` 写过），软链会失败：先备份再决定合并
 
 ## 三级门禁
@@ -146,7 +191,7 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 | **P0/P2 门禁** | 提交/发布前 `check-task-numbering.py --ci` | ✅ 零配置 |
 | **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
 | **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
-| **git pre-commit** | `git commit` 涉及编号文档时自动校验 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
+| **git pre-commit** | `git commit` 涉及编号文档时自动校验；提交涉及 `docs-stm/managements/` 或 `src/test/` 时自动同步统计快照（`check-doc-drift --sync`） | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
 | **CI guards job** | push / PR / tag 时自动校验（7 个 `--ci` 脚本之一） | ✅ 零配置 |
 
 > `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
@@ -768,7 +813,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
-| `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表） |
+| `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表；`--sync` 自动回写统计快照） |
 | `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
 | `check-requirement-trace.py` | 测试 | 需求 ID ↔ 验证载体追溯（单段 ID 全域覆盖 / 载体文件存在 / ID 双向一致） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
@@ -981,7 +1026,15 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 .venv/bin/python scripts/check-doc-drift.py -v                # 详细输出（打印解析结果与实测统计）
 .venv/bin/python scripts/check-doc-drift.py --ci              # CI 模式（只输出 文件:描述，退出码 2）
 .venv/bin/python scripts/check-doc-drift.py --with-test-count # 附带 pytest 收集，核对「测试用例」与 test-coverage.md 计数表
+.venv/bin/python scripts/check-doc-drift.py --sync             # 统计快照自动同步（实测数字回写 folders.md 并 git add，幂等）
 ```
+
+> **统计快照漂移的自动化治理**：第 10 项「项目统计表」的数字（文件数/行数/用例数）是随日常
+> 提交高频变化的派生量（changelog 每补一行、用例每增删即变），人工同步必漏，曾是 CI 最高频红源。
+> `--sync` 把实测值自动回写 `folders.md` 对应单元格（只改数字、保留千分位/粗体风格与说明文字，
+> 不触碰版本演进对照表），并把回写结果 `git add` 加入暂存区；git pre-commit 钩子在提交涉及
+> `docs-stm/managements/` 或 `src/test/` 时自动调用（见「install-hooks.sh」条）。其余类目
+> （清单/默认值/目录树/归档索引）的漂移仍需人工按提示修正。
 
 > 按设计豁免的文档：`changelog.md` / `review-findings.md`（如实引用旧数字作为变更记录）与
 > 版本快照类文档（历次发布的归档快照）不参与计数与默认值断言扫描。修正提示：报告里的数字就是
@@ -1039,7 +1092,7 @@ Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验�
 
 **`install-hooks.sh` — git pre-commit hook 激活脚本（`.githooks/`）**
 
-`.githooks/` 的 git pre-commit hook（任务编号一致性校验）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
+`.githooks/` 的 git pre-commit hook（任务编号一致性校验 + 统计快照自动同步）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
 
 ```bash
 sh .githooks/install-hooks.sh          # 启用（写入本机 core.hooksPath）
@@ -1537,11 +1590,11 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 
 > **提示词内容必须进指纹（唯一事实来源 `llm/module_fingerprint.py`）**：缓存键与提示词内容脱钩会静默复用陈旧结论（键不变 → 预检命中旧键 → 不重生成、不报错）。因此**凡进了提示词的段落都必须进该模块的指纹**：已渲染文本（`competitive_context` / `data_quality_text`）、量化指标（`metrics`）、以及 `pipeline_data` 派生的【环比变化】【数据质量降级】两段——**只进「提示词确实含该段」的模块**，不进提示词的模块并入即纯成本失效。判据与完整清单见 `llm-technical.md` §7.1。
 >
-> **开关改变提示词 → 同一后缀函数供两侧调用**：凡开关**会改变提示词内容**（`signal_pre_digest` 注入信号块、`decision_header_parse` 追加决策头契约、`signal_ledger` 注入确定性信号摘要、辩论增强后缀），其开关判定必须**收敛在后缀函数内部**，由 `module_fingerprint.py` 的构造器统一调用——写侧与预检侧只调用同一构造函数，不得任一环节自行拼接（自行拼接的后果是两侧结果永久不等：写侧照常写入、预检侧永不命中，表现为「开关看似生效但每次仍全量调用 LLM」）。后缀函数关闭时返回 `""`（键不变、不误伤既有缓存），开启时返回稳定短串（如 `"_dh"`）。**内容指纹型**后缀（如 `decision_ledger.lessons_cache_suffix`、`prompts_signals._signal_digest_cache_suffix`、`signal_ledger.summary_cache_suffix`）另取块内容 md5 作版本，使数值变化即换键。
+> **开关改变提示词 → 同一后缀函数供两侧调用**：凡开关**会改变提示词内容**（`deterministic_signal` 注入信号块与确定性信号摘要、`decision_header_parse` 追加决策头契约、辩论增强后缀），其开关判定必须**收敛在后缀函数内部**，由 `module_fingerprint.py` 的构造器统一调用——写侧与预检侧只调用同一构造函数，不得任一环节自行拼接（自行拼接的后果是两侧结果永久不等：写侧照常写入、预检侧永不命中，表现为「开关看似生效但每次仍全量调用 LLM」）。后缀函数关闭时返回 `""`（键不变、不误伤既有缓存），开启时返回稳定短串（如 `"_dh"`）。**内容指纹型**后缀（如 `decision_ledger.lessons_cache_suffix`、`prompts_signals._signal_digest_cache_suffix`、`signal_ledger.summary_cache_suffix`）另取块内容 md5 作版本，使数值变化即换键。
 
 > **追加型状态文件一律走共享原语 `core/jsonl_store.py`**：`perf`（性能历史）、`decision_ledger`（决策账本）、`signal_ledger`（信号账本）三者的「读全文 → 拼接 → 写临时文件 → `os.replace`」逻辑已抽为 `append_jsonl_atomic()` / `read_jsonl()`，**新增任何 JSONL 持久化都不得再抄一份**——各自只保留自己的序列化口径（如 `decision_ledger` 的 `sort_keys=True` + `ensure_ascii=False`）与 `prefix`/日志标签，行为逐字不变由 `test_jsonl_store.py::TestDelegationPreservesBehaviour` 锁定。新增持久化文件时**必须**在 `src/test/conftest.py` 的 `_isolate_sensitive_paths` 中把路径重定向到 `tmp_path`，不得依赖测试自行清理。
 
-> **统计类输出默认只算「实时」记录**：凡把历史记录折叠成统计/排行榜/提示词摘要的功能（如 `signal_ledger.fold_signals(live_only=True)`），必须给每条记录附来源标签并可区分「可证明为实时」与其余，**默认只统计实时记录**、且**不引入新的合成数据开关**——来源判定复用既有数据质量设施（逐品种 `data_freshness` + 降级事件），未识别的取值一律保守判非实时；确需乐观缺省时（无逐品种条目可证伪）必须显式写入理由字段，不得静默。
+> **统计类输出默认只算「实时」记录**：凡把历史记录折叠成统计/排行榜/提示词摘要的功能（如 `core/signal_ledger.py::fold_signals(live_only=True)`），必须给每条记录附来源标签并可区分「可证明为实时」与其余，**默认只统计实时记录**、且**不引入新的合成数据开关**——来源判定复用既有数据质量设施（逐品种 `data_freshness` + 降级事件），未识别的取值一律保守判非实时；确需乐观缺省时（无逐品种条目可证伪）必须显式写入理由字段，不得静默。
 
 ### 新增功能开关检查清单
 
@@ -1569,9 +1622,9 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 
 > **内部接缝类开关也应转正（第二类首例：`datasource_adapter`）**：判据与上一条同源但落在另一面——**开关两种取值下报告产物是否等价**。若等价（新实现只是把既有路径换成结构更清晰的等价实现，差异经等价性回归测试逐项锁定且不影响下游取值语义），则它既不是用户可感知的功能、也不是用户能做的选择，摆在用户面前只会让人误以为「开了有好处」，而默认关的实际代价是**生产路径从不执行新实现**、新数据源/新字段接入时才第一次实跑。此类开关转正为常规组、**默认开**：① 声明改到 `GROUP_STANDARD` 且 `default` 置 `True`；② 开关本身保留为**回退杠杆**（`features.json` 置 false 即回退既有实现）；③ 测试补四向——默认值、不在实验组、显式关闭仍走既有实现、默认配置下走新实现（见 `test_features.py::TestDatasourceAdapterPromotion`）。数据源适配契约（`datasource_adapter`）是此模式的首例。
 
-> **读侧增强类开关也应转正（第三类首例：`signal_pre_digest` / `module_quality_gate` / `decision_header_parse` / `llm_debate_conditional` / `datasource_credential_ready`）**：判据落在「**开启的代价是否只在读侧**」——只在既有提示词或既有产物流水线上追加一段由**已算出的**数据派生的内容，不新增 LLM 调用次数、不写新的持久化文件、无隐式网络与耗时；且该段内容有确定的收益（方向性结论替代裸数值、结构化契约替代表格猜测、质量分级提示读者降级参考、缺凭据时给可读指引）。此类开关默认关的实际代价是**机制在生产路径从不执行**，用户手上的产物看不到这层增强；用户若逐项去 `features.json` 里打开它，等于用配置承担了本该由默认值表达的取舍（转正前本项目的实测样本：9 项实验开关里 8 项被用户手工打开，即真实数据验证已经发生）。转正口径：① 声明改到 `GROUP_STANDARD` 且 `default` 置 `True`；② `affects_report` **照实答 `True`**——它们确实改变产物内容（`signal_pre_digest` 注入信号块、`module_quality_gate` 注入质量横幅、`decision_header_parse` 追加契约行、`llm_debate_conditional` 追加情景段、`datasource_credential_ready` 改变数据源就绪行为），故 Web 面板照常带「（影响报告）」标记；③ 开关保留为关闭杠杆，`features.json` 置 false 即回到「未引入本机制」的行为；④ 凡开关改变提示词者，其缓存后缀函数（`structured_header_cache_suffix()` → `_dh`、`debate_feature_cache_suffix()` → `_c`、`prompts_signals._signal_digest_cache_suffix()`）随之由「默认返回空」变为「默认返回非空」——**升级后首次运行会换键重生成一次**，属预期行为，须在变更记录中写明；⑤ 测试补四向——默认值、不在实验组、显式关闭仍走未引入前的路径（关闭基线必须**显式**置 false，不能再依赖 `reset_feature_flags()`，它现在返回的是已转正的默认值）、默认配置下走增强路径（见 `test_features.py::TestReadSidePromotion`）。
+> **读侧增强类开关也应转正（第三类首例：`deterministic_signal` / `module_quality_gate` / `decision_header_parse` / `llm_debate_conditional` / `datasource_credential_ready`）**：判据落在「**开启的代价是否只在读侧**」——只在既有提示词或既有产物流水线上追加一段由**已算出的**数据派生的内容，不新增 LLM 调用次数、不写新的持久化文件、无隐式网络与耗时；且该段内容有确定的收益（方向性结论替代裸数值、结构化契约替代表格猜测、质量分级提示读者降级参考、缺凭据时给可读指引）。此类开关默认关的实际代价是**机制在生产路径从不执行**，用户手上的产物看不到这层增强；用户若逐项去 `features.json` 里打开它，等于用配置承担了本该由默认值表达的取舍（转正判据的可观测量：见 core/experiment_stats.py 的启用次数统计与 doctor 账本概览）。转正口径：① 声明改到 `GROUP_STANDARD` 且 `default` 置 `True`；② `affects_report` **照实答 `True`**——它们确实改变产物内容（`deterministic_signal` 注入信号块、`module_quality_gate` 注入质量横幅、`decision_header_parse` 追加契约行、`llm_debate_conditional` 追加情景段、`datasource_credential_ready` 改变数据源就绪行为），故 Web 面板照常带「（影响报告）」标记；③ 开关保留为关闭杠杆，`features.json` 置 false 即回到「未引入本机制」的行为；④ 凡开关改变提示词者，其缓存后缀函数（`structured_header_cache_suffix()` → `_dh`、`debate_feature_cache_suffix()` → `_c`、`prompts_signals._signal_digest_cache_suffix()`、`core.signal_ledger.summary_cache_suffix()` → `_sg`）随之由「默认返回空」变为「默认返回非空」——**升级后首次运行会换键重生成一次**，属预期行为，须在变更记录中写明；⑤ 测试补四向——默认值、不在实验组、显式关闭仍走未引入前的路径（关闭基线必须**显式**置 false，不能再依赖 `reset_feature_flags()`，它现在返回的是已转正的默认值）、默认配置下走增强路径（见 `test_features.py::TestReadSidePromotion`）。
 >
-> **刻意不转正的两类（判据的反面）**：**写盘积累型**——`decision_reflection` / `signal_ledger` 会向 `data/state/*.jsonl` 落账，默认开启等于未经用户选择就让程序开始写持久化状态，须由用户在知情前提下开启；**调用次数放大型**——`llm_debate_procon` 把一次 `expert_review` 调用换成最多三次（pro → con → synthesis），默认开启直接改变费用与耗时量级。`llm_debate_qa_concentration` 触发面最窄（单品种占比 ≥20% 时才附加块）、测试覆盖最薄，留待有真实触发样本后再评估。
+> **刻意不转正的两类（判据的反面）**：**写盘积累型**——`decision_reflection` 仍留在实验组（账本结算样本尚不足以判转正，撤销死线见 plan.md）。`signal_ledger`（确定性信号沉淀）不再单独设开关：其真实积累已验证（账本有存量数据、写盘幂等开销可忽略），并入 `deterministic_signal` 转正为常规开关；**调用次数放大型**——`llm_debate_procon` 把一次 `expert_review` 调用换成最多三次（pro → con → synthesis），默认开启直接改变费用与耗时量级，留实验组由用户按需开启。集中度问答不再受开关控制（原 `llm_debate_qa_concentration` 已撤销），改为辩论流程内建段落（阈值触发）。实验功能的真实使用情况可用 `core/experiment_stats.py`（启用计数）加 `doctor` 账本概览观测，作为转正/撤销的客观数据。
 
 > **诊断类命令不得依赖 config 初始化**：`doctor` / `view-logs` / `check-sources` 三个子命令在 `main()` 中**先于 `init_config` 分派**——配置损坏正是它们要定位的场景，若先初始化配置再分派，用户会在最需要诊断能力时被配置错误挡在门外（死锁）。新增诊断类命令遵循同一模式：**先分派、后初始化**，并把「命令失败」（退出码 2）与「命令跑完但结论不佳」（退出码 1）用 `_EXIT_SUCCESS` / `_EXIT_PARTIAL` / `_EXIT_SEVERE` 常量区分开，不得写裸字面量。**诊断类命令自身永不抛异常**——任何内部异常都转成一条结果行，否则等于在最需要它的时刻失效（`core/doctor.py`）。
 

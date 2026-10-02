@@ -293,6 +293,8 @@ class TestSummaryBlock:
     """注入摘要文本。"""
 
     def test_inactive_flag_returns_empty(self):
+        # 合并开关 deterministic_signal 出厂默认开：先显式关再验「开关关→静默」
+        set_feature_enabled(sl.FEATURE_FLAG, False)
         assert sl.summary_block([_sig(sl.SIGNAL_TAIL_RISK, "尾部正常")] * 3) == ""
 
     def test_insufficient_sample_returns_empty(self):
@@ -333,6 +335,8 @@ class TestSummaryCacheSuffix:
     """缓存指纹后缀（读写两侧同源）。"""
 
     def test_inactive_flag_returns_empty(self):
+        # 合并开关 deterministic_signal 出厂默认开：先显式关再验「开关关→静默」
+        set_feature_enabled(sl.FEATURE_FLAG, False)
         assert sl.summary_cache_suffix([_sig(sl.SIGNAL_TAIL_RISK, "尾部正常")] * 3) == ""
 
     def test_insufficient_sample_returns_empty(self):
