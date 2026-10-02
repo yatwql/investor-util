@@ -192,12 +192,12 @@ class DataSourceRegistry:
     def register_default_chains(self, chains: dict[str, list[str]] | None = None) -> None:
         """注册默认 Provider Chain（链路定义由上游 chain 模块导入时传入）。
 
-       分层纪律：core 不反向 import fetcher——链路字典由 chain.py 在模块导入时
-        以参数传入（``register_default_chains(_DEFAULT_CHAINS)``）；未传入（上游
-        未加载，如独立使用 registry 的最小场景）→ 空注册，语义与无链路一致。
+        分层纪律：core 不反向 import fetcher——链路字典由 chain.py 在模块导入时
+         以参数传入（``register_default_chains(_DEFAULT_CHAINS)``）；未传入（上游
+         未加载，如独立使用 registry 的最小场景）→ 空注册，语义与无链路一致。
 
-        Args:
-            chains: {data_type: [provider_name, ...]} 链路定义（fetcher/chain 提供）
+         Args:
+             chains: {data_type: [provider_name, ...]} 链路定义（fetcher/chain 提供）
         """
         for _data_type, provider_list in (chains or {}).items():
             for name in provider_list:

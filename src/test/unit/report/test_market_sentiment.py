@@ -41,9 +41,7 @@ def _patch_sources(monkeypatch, lhb=_LHB, ladder=_LADDER, cached=None, missing: 
         monkeypatch.setattr(ms, "_credential_missing", lambda: object())
     else:
         monkeypatch.setattr(ms, "_credential_missing", lambda: None)
-        monkeypatch.setattr(
-            ms, "_fetch_dragon_tiger", lambda: calls.__setitem__("lhb", calls["lhb"] + 1) or lhb
-        )
+        monkeypatch.setattr(ms, "_fetch_dragon_tiger", lambda: calls.__setitem__("lhb", calls["lhb"] + 1) or lhb)
         monkeypatch.setattr(
             ms, "_fetch_limit_up_ladder", lambda: calls.__setitem__("ladder", calls["ladder"] + 1) or ladder
         )
@@ -86,9 +84,7 @@ class TestAssembly:
         """网关的缓存/熔断/降级由 fetch_with_fallback 承担（缓存命中不再发请求）。"""
         calls: list[tuple] = []
         monkeypatch.setattr(fms, "credential_missing", lambda: None)
-        monkeypatch.setattr(
-            "src.python.fetcher.market_sentiment.get_ttl", lambda data_type, key: 0.0, raising=False
-        )
+        monkeypatch.setattr("src.python.fetcher.market_sentiment.get_ttl", lambda data_type, key: 0.0, raising=False)
 
         def _fake_fallback(data_type, fn_map, cache_key, cache_ttl, fn_kwargs=None, **_k):
             calls.append((data_type, fn_map and list(fn_map), cache_key))
