@@ -345,8 +345,7 @@ def _build_expert_review_prompt(
 
             _cfg = get_llm_config()
             _debate_cfg = (_cfg or {}).get("debate", {})
-            # 现行键 concentration_qa；遗留键 qa_concentration 兜底兼容
-            _qa_cfg = _debate_cfg.get("concentration_qa") or _debate_cfg.get("qa_concentration") or {}
+            _qa_cfg = _debate_cfg.get("concentration_qa") or {}
             _threshold = _qa_cfg.get("threshold", 0.20)
         except Exception:
             _threshold = 0.20
@@ -581,8 +580,7 @@ def _build_debate_synthesis_prompt(
 
             _cfg = get_llm_config()
             _debate_cfg = (_cfg or {}).get("debate", {})
-            # 现行键 concentration_qa；遗留键 qa_concentration 兜底兼容
-            _qa_cfg = _debate_cfg.get("concentration_qa") or _debate_cfg.get("qa_concentration") or {}
+            _qa_cfg = _debate_cfg.get("concentration_qa") or {}
             _threshold = _qa_cfg.get("threshold", 0.20)
         except Exception:
             _threshold = 0.20

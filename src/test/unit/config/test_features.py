@@ -597,48 +597,8 @@ class TestUnknownOverrideWarning:
 
 
 @pytest.mark.unit
-class TestLegacyOverrideMigration:
-    """features.json 遗留开关名的载入迁移（确定性信号合并的升级兼容）。
-
-    signal_pre_digest 与 signal_ledger 已合并为 deterministic_signal 一个开关：
-    旧配置载入时旧名归并到新名、撤销项丢弃，用户升级后不需要手改 features.json。
-    """
-
-    @pytest.mark.unit
-    def test_legacy_names_migrate_to_merged_switch(self, tmp_path):
-        """两个旧名归并到新名（false 集合内旧名不覆盖新名已有值）。"""
-        fpath = tmp_path / "features.json"
-        fpath.write_text(json.dumps({"signal_pre_digest": False, "signal_ledger": True}), encoding="utf-8")
-
-        with (
-            patch("src.python.config.features._FEATURES_FILE", str(fpath)),
-            patch.dict(FEATURE_FLAGS, {}),
-        ):
-            load_feature_overrides()
-
-            # 新名尚未有值 → 先到的旧名生效；后到的旧名不再覆盖
-            assert FEATURE_FLAGS["deterministic_signal"] is False
-            # 旧名不再作为独立开关存在
-            assert "signal_pre_digest" not in FEATURE_FLAGS
-            assert "signal_ledger" not in FEATURE_FLAGS
-
-    @pytest.mark.unit
-    def test_dropped_switch_ignored_silently(self, tmp_path):
-        """已撤销开关（集中度问答独立开关）被丢弃，不落入无消费者告警。"""
-        fpath = tmp_path / "features.json"
-        fpath.write_text(json.dumps({"llm_debate_qa_concentration": True}), encoding="utf-8")
-
-        with (
-            patch("src.python.config.features._FEATURES_FILE", str(fpath)),
-            patch("src.python.config.features.logger") as mock_logger,
-            patch.dict(FEATURE_FLAGS, {}),
-        ):
-            load_feature_overrides()
-            warnings = [
-                text for text in TestUnknownOverrideWarning._rendered_warnings(mock_logger) if "无消费者" in text
-            ]
-
-            assert warnings == [], "撤销项应静默丢弃而非触发无消费者告警"
+class TestDeterministicSignalRegistry:
+    """确定性信号模块的注册表口径（读侧注入 + 跨期沉淀双面单一开关）。"""
 
     @pytest.mark.unit
     def test_merged_switch_defaults_enabled(self):

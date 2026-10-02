@@ -103,8 +103,8 @@ class FeatureSwitchDef:
 # 列出一个不改报告任何字节的开关，读者会推断内容受其影响。
 feature_switch_registry: dict[str, FeatureSwitchDef] = {
     # ── 实验性功能：辩论-正反辩论（换调用次数的深度模式，非常驻能力） ──
-    # 集中度问答段已并入本流程为内建段落（见 prompts_action._build_concentration_qa_block），
-    # 原独立开关 llm_debate_qa_concentration 已撤销，阈值配置迁至 debate.concentration_qa.threshold。
+    # 集中度问答段为本流程内建段落（见 prompts_action._build_concentration_qa_block），
+    # 其触发阈值配置在 llm_settings.json 的 debate.concentration_qa.threshold。
     "llm_debate_procon": FeatureSwitchDef("辩论-正反辩论", "三段式(白脸→黑脸→综合)", GROUP_EXPERIMENTAL, False, True),
     # ── 实验性功能：LLM 输出增强（写盘积累账本，需真实数据积累验证） ──
     "decision_reflection": FeatureSwitchDef(
@@ -268,18 +268,6 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
 # ── 出厂默认值投影 ──────────────────────────────────────────
 # 出厂默认值投影：``get_feature_defaults()`` 与兼容既有引用的取值表
 _FEATURE_FLAGS_DEFAULT: dict[str, bool] = {flag: d.default for flag, d in feature_switch_registry.items()}
-
-# ── 遗留开关名迁移 ──────────────────────────────────────────
-# 更名前开关名 → 现行开关名（signal_pre_digest 与 signal_ledger 转正合并为
-# deterministic_signal 一个开关）。载入 features.json 覆写时更名前键名归并到
-# 现名（现名已有值时以现名为准）；已撤销开关无对应现行名，静默丢弃并记 INFO
-# ——避免存量配置在更名后落入「无消费者开关」告警而无所适从。
-_LEGACY_FLAG_ALIASES: dict[str, str] = {
-    "signal_pre_digest": "deterministic_signal",
-    "signal_ledger": "deterministic_signal",
-}
-#: 已实现撤销、无对应现行开关的更名前开关名（迁移时丢弃）
-_LEGACY_FLAGS_DROPPED: frozenset[str] = frozenset({"llm_debate_qa_concentration"})
 
 # ── 注册表查询 ──────────────────────────────────────────────
 
@@ -558,20 +546,6 @@ def load_feature_overrides() -> None:
     if not isinstance(overrides, dict):
         logger.warning("[features] 覆写文件格式异常（应为 JSON object），忽略")
         return
-
-    # 遗留开关名迁移（旧名归并、撤销项丢弃）
-    _migrated: dict[str, Any] = {}
-    for _k, _v in overrides.items():
-        if _k in _LEGACY_FLAG_ALIASES:
-            _new_key = _LEGACY_FLAG_ALIASES[_k]
-            if _new_key not in _migrated:
-                _migrated[_new_key] = _v
-            continue
-        if _k in _LEGACY_FLAGS_DROPPED:
-            logger.info("[features] 跳过已撤销的历史开关 '%s'（其能力已并入现行功能）", _k)
-            continue
-        _migrated[_k] = _v
-    overrides = _migrated
 
     valid_count = 0
     changed = 0

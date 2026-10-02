@@ -1048,9 +1048,9 @@ LLM 五维度量化评分，每项满分 100：
 | 需求标识 | 需求描述 |
 |:---------|:---------|
 | R-LLM-DB-QA-CONCENTRATION-01 | 集中度问答段为辩论流程（`llm_debate_procon` / `llm_debate_conditional`）的内建段落，无独立 Feature Flag（原开关 `llm_debate_qa_concentration` 已撤销并入辩论流程） |
-| R-LLM-DB-QA-CONCENTRATION-02 | 系统自动检测持仓集中度，当单品种市值占比 ≥ threshold（默认 0.20，配置键 `debate.concentration_qa.threshold`，兼容更名前键名 `debate.qa_concentration.threshold`）时触发集中度问答块生成 |
+| R-LLM-DB-QA-CONCENTRATION-02 | 系统自动检测持仓集中度，当单品种市值占比 ≥ threshold（默认 0.20，配置键 `debate.concentration_qa.threshold`）时触发集中度问答块生成 |
 | R-LLM-DB-QA-CONCENTRATION-03 | 集中度问答块输出内容：集中度风险的量化评估、与分散化基准的定量对比、针对性的调仓建议 |
-| R-LLM-DB-QA-CONCENTRATION-04 | 集中度判定阈值通过 `llm_settings.json` 的 `debate.concentration_qa.threshold` 配置（兼容更名前键名 `debate.qa_concentration.threshold`），类型 float，范围 (0, 1)，默认 0.20 |
+| R-LLM-DB-QA-CONCENTRATION-04 | 集中度判定阈值通过 `llm_settings.json` 的 `debate.concentration_qa.threshold` 配置，类型 float，范围 (0, 1)，默认 0.20 |
 | R-LLM-DB-QA-CONCENTRATION-05 | 集中度问答块嵌入智囊团深度复盘输出中，位于辩论段落之后、调仓建议之前 |
 | R-LLM-DB-QA-CONCENTRATION-06 | 集中度问答不产生独立 LLM API 调用（内容由现有 prompt 模板的 `_build_concentration_qa_block()` 构建：辩论模式嵌在白脸/黑脸（expert_review prompt 复用）与综合权衡 synthesis 的 user prompt 中；标准模式不再注入） |
 

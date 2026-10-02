@@ -146,10 +146,6 @@ def _load_debate_config(settings: dict) -> dict:
 
     # concentration_qa（集中度问答配置；辩论流程内建段落，阈值触发）
     raw_qa = raw_debate.get("concentration_qa")
-    if raw_qa is None and isinstance(raw_debate.get("qa_concentration"), dict):
-        # 兼容更名前的键名：qa_concentration 在更名前承载同一配置，读取时提示更名
-        raw_qa = raw_debate.get("qa_concentration")
-        logger.info("[debate] 配置键 qa_concentration 已更名为 concentration_qa，请同步更新 llm_settings.json")
     if isinstance(raw_qa, dict):
         raw_threshold = raw_qa.get("threshold")
         if isinstance(raw_threshold, (int, float)) and 0.0 < raw_threshold < 1.0:
