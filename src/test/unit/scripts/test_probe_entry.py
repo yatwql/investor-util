@@ -19,8 +19,16 @@ from unittest.mock import patch
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-# sampler 是 scripts/ 下的扁平辅助包；契约测试直接导入时也要确保其父目录在路径中。
-sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+_SCRIPTS_DIR = _REPO_ROOT / "scripts"
+
+
+def _ensure_scripts_on_path() -> None:
+    """把 scripts/ 注入 sys.path（**幂等单点**；sampler 拆包后的扁平辅助包直接 import 需要）。"""
+    if str(_SCRIPTS_DIR) not in sys.path:
+        sys.path.insert(0, str(_SCRIPTS_DIR))
+
+
+_ensure_scripts_on_path()  # 模块级唯一注入点：契约测试在测试体内直接 import _halluc_sampler
 pytestmark = [pytest.mark.unit, pytest.mark.unit_scripts]
 
 
@@ -37,7 +45,7 @@ def _load_script(rel_path: str, mod_name: str):
 
 @pytest.fixture(scope="module")
 def probe_entry():
-    sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+    # 路径注入已在模块级单点完成（probe.py 加载时自身亦会插入同目录）——此处不再重复注入
     return _load_script("scripts/probe.py", "probe_entry")
 
 
@@ -144,3 +152,19 @@ class TestSamplerContract:
         )
         assert vals["total_mv"] == 10000.0
         assert vals["total_today_profit"] == 0.0
+
+
+# ═══ 路径注入单点契约 ═══
+
+
+class TestScriptsPathInjection:
+    def test_scripts_dir_on_path(self):
+        """sampler 契约测试依赖：scripts/ 已由模块级单点注入进 sys.path。"""
+        assert str(_SCRIPTS_DIR) in sys.path
+
+    def test_ensure_scripts_on_path_idempotent(self):
+        """重复调用注入辅助函数不向 sys.path 追加重复条目（幂等保护回归）。"""
+        before = sys.path.count(str(_SCRIPTS_DIR))
+        _ensure_scripts_on_path()
+        _ensure_scripts_on_path()
+        assert sys.path.count(str(_SCRIPTS_DIR)) == before

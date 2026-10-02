@@ -241,3 +241,9 @@
 - **rf-538**（13 例测试断言 Windows 不可移植）：POSIX 权限位（5 例 `skipif(os.name=="nt")`）、`os.geteuid`（1 例跳过）、`asyncio.ProactorEventLoop` socketpair 回环连接被网络守卫误阻（守卫加回环豁免 `127.0.0.0/8`/`::1`/`localhost`，外网仍阻断）、`/tmp` 断言（改 `Path` 结构断言/`is_relative_to(PROJECT_ROOT)`）、`endswith("a/b")` 反斜杠失配（改 `parts[-2:]`）。
 - **rf-538 后续**（`test_real_repo_sync_idempotent` xdist 假失败）：用例经 `_sync()` 触发嵌套全量 pytest 收集，在 xdist 并行下被资源争用采到不完整集合（7964 vs 完整 8173）致幂等断言假红。处置：从 `folders.md`「测试用例」行注入登记用例数，不再嵌套收集；真实 `_stats_actual()` 照常实测。
 - **rf-540**（pre-commit hook 解释器探测缺 Windows 布局）：只认 `.venv/bin/python`（POSIX），Windows 下静默回退系统 python（缺项目依赖、收集口径不同 7964 vs 8173），提交时把错误用例数回写进 `folders.md`——即 rf-538 追踪到的 7964 的真实来源。处置：探测次序加 Windows `.venv/Scripts/python.exe` 优先；错误值已修正回 8,173。
+
+### rf-541（2026-10-02，测试路径注入单点化）
+
+**rf-541**（测试 `sys.path` 重复注入）：`src/test/unit/scripts/test_probe_entry.py` 存在两处 `sys.path.insert(0, scripts/)`（模块级 + `probe_entry` fixture 内各一处）：① 重复注入——`probe.py` 加载时自身也会插入同一路径（`probe.py:23`），fixture 内那次必然多余；② 无幂等保护——`sys.path.insert` 每次调用都追加，重复注入会在 `sys.path` 头部累积重复条目，且属全局路径污染式 ad-hoc 写法（同类脚本测试 `test_checklib.py`/`test_check_doc_drift.py` 均无模块级 path 注入）。
+处置：合并为单一注入点——模块级保留 `_ensure_scripts_on_path()`（幂等保护 `if str(_SCRIPTS_DIR) not in sys.path`），fixture 内重复注入删除（probe.py 自插入不变）；注入逻辑提取为可测辅助函数。
+测试：`test_probe_entry.py::TestScriptsPathInjection` 2 例（scripts/ 已在 sys.path / 幂等调用不增条目），文件合计 10 例全通。

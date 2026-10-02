@@ -41,6 +41,7 @@
 - **rf-531（过期缓存回写统一降级助手）**：`fetch_us_indices` 过期缓存段裸 `cache_set` 未盖语义版本。处置：`fetcher/chain.py` 新增 `write_stale_with_version`（来源标记 + `_payload_ver` 语义版本戳 + 回写）与准入判据 `payload_version_current`，`fetch_us_indices` 改调助手。测试：`test_stale_cache_helper.py::TestStaleCacheWriteHelper` 3 例。
 
 - **rf-539（probe 统一入口 + 幻觉率采样拆包）**：新增 `scripts/probe.py`（registry 分发统一入口）+ `scripts/probes/`（`__init__` 注册表 / csi / push2，target 实现 PROBE_TARGET/build_parser/run 契约面，新探针登记即用）；旧入口两脚本保留为薄委托垫片（旧命令用法不变），`csi` 状态改「因子分析已实施 → 周期性复核」。`llm-hallucination-sampler.py` 634 行拆为入口薄 CLI（239 行）+ `scripts/_halluc_sampler/`（holdings/llm_call/fact_check/report），顺带修复三处随 fact_checker 拆包失效的坏 import（工具此前已静默坏掉）。测试：`test_probe_entry.py` 8 例。
+- **rf-541（测试路径注入单点化）**：`test_probe_entry.py` 两处 `sys.path.insert(scripts/)` 重复注入（fixture 内那次必然多余——`probe.py` 加载时自插入同一路径），且无幂等保护会向 `sys.path` 头部累积重复条目。处置：合并为模块级单点 `_ensure_scripts_on_path()`（幂等 guard），fixture 内重复注入删除；补 `TestScriptsPathInjection` 2 例回归（路径已注入 / 重复调用不增条目），文件 10 例全通。
 
 ## 归档
 
