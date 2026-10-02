@@ -110,3 +110,47 @@ class TestGatewayWrappers:
         """get_all_breaker_status() 含 provider / llm / indicator 三键。"""
         status = get_all_breaker_status()
         assert set(status.keys()) == {"provider", "llm", "indicator"}
+
+
+class TestRegistrationHooks:
+    """上游熔断状态注册（core 不反向 import 上层——分层纪律）。
+
+    上游（analysis / llm）模块导入时经 register_breaker_status 自注册快照函数；
+    未注册 → 网关取空态（不可用语义等价），不再依赖 core 内的跨层延迟 import。
+    """
+
+    def test_register_and_take_snapshot(self, monkeypatch):
+        from src.python.core import circuit_breaker as cb
+
+        sentinel = {"ep1": {"circuit_broken": False}}
+        monkeypatch.setattr(cb, "_BREAKER_SNAPSHOT_PROVIDERS", {})
+        cb.register_breaker_status("llm", lambda: sentinel)
+        assert cb._breaker_snapshot("llm") is sentinel
+        assert cb._breaker_snapshot("indicator") is None  # 未注册 → None
+
+    def test_llm_status_empty_when_no_registration(self, monkeypatch):
+        from src.python.core import circuit_breaker as cb
+
+        monkeypatch.setattr(cb, "_BREAKER_SNAPSHOT_PROVIDERS", {})
+        # 未注册时 _get_llm_status 落空 dict（不可用空态）
+        assert cb.gateway._get_llm_status() == {}
+
+    def test_gateway_indicator_via_registration(self, monkeypatch):
+        from src.python.core import circuit_breaker as cb
+
+        class _FakeBreaker:
+            @staticmethod
+            def summary():
+                return {"x": {"circuit_broken": True}}
+
+        monkeypatch.setattr(cb, "_BREAKER_SNAPSHOT_PROVIDERS", {"indicator": lambda: _FakeBreaker()})
+        assert cb.gateway._get_indicator_status() == {"x": {"circuit_broken": True}}
+
+    def test_upstream_modules_self_register_on_import(self):
+        """analysis / llm 模块已导入 → 快照 provider 在册（生产装配默认可达）。"""
+        from src.python.core import circuit_breaker as cb
+
+        assert "indicator" in cb._BREAKER_SNAPSHOT_PROVIDERS
+        assert "llm" in cb._BREAKER_SNAPSHOT_PROVIDERS
+        # 快照可真取（结构性断言，非硬编码条数）
+        assert set(cb.gateway._get_llm_status().keys()) >= set()

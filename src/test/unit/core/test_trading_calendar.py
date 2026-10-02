@@ -104,20 +104,24 @@ class TestHithinkCalendarFallback:
 
     def test_official_series_used_when_akshare_fails(self, monkeypatch):
         from src.python.core import trading_calendar as tc
-        from src.python.providers import hithink
 
         monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
         written: list = []
         monkeypatch.setattr(tc.cache, "set", lambda key, value: written.append((key, value)))
         monkeypatch.setitem(sys.modules, "akshare", None)  # import akshare 触发 ImportError
-        monkeypatch.setattr(
-            hithink,
-            "fetch_trading_days",
-            lambda: {"item": [{"date": "2026-09-17"}, {"date": "2026-09-18"}]},
+        # 兜底经注册钩子注入（core 不反向 import providers）
+        original = tc._TRADING_DAYS_FALLBACK
+        tc.register_trading_days_fallback(
+            lambda: {"item": [{"date": "2026-09-17"}, {"date": "2026-09-18"}]}
         )
-        dates = tc._get_trading_calendar()
+        try:
+            dates = tc._get_trading_calendar()
+        finally:
+            tc._TRADING_DAYS_FALLBACK = original
         assert dates == {"2026-09-17", "2026-09-18"}
         assert written  # 官方序列同样写缓存
+
+
 
     def test_both_sources_fail_returns_empty(self, monkeypatch):
         from src.python.core import trading_calendar as tc
@@ -128,3 +132,32 @@ class TestHithinkCalendarFallback:
         monkeypatch.setitem(sys.modules, "akshare", None)
         monkeypatch.setattr(hithink, "fetch_trading_days", lambda: None)
         assert tc._get_trading_calendar() == set()
+
+
+class TestFallbackRegistration:
+    """官方序列兜底经注册钩子注入（core 不反向 import providers——分层纪律）。"""
+
+    def test_unregister_returns_empty_calendar(self, monkeypatch):
+        from src.python.core import trading_calendar as tc
+
+        monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
+        monkeypatch.setitem(sys.modules, "akshare", None)  # 阻断主链路（兜底已卸除）
+        original = tc._TRADING_DAYS_FALLBACK
+        tc._TRADING_DAYS_FALLBACK = None
+        try:
+            assert tc._get_trading_calendar() == set()
+        finally:
+            tc._TRADING_DAYS_FALLBACK = original
+
+    def test_fallback_exception_swallowed(self, monkeypatch):
+        """兜底函数抛异常 → 降级空集合（与官方源不可用同语义），不向上抛。"""
+        from src.python.core import trading_calendar as tc
+
+        monkeypatch.setattr(tc.cache, "get", lambda *a, **k: None)
+        monkeypatch.setitem(sys.modules, "akshare", None)
+        original = tc._TRADING_DAYS_FALLBACK
+        tc.register_trading_days_fallback(lambda: (_ for _ in ()).throw(RuntimeError("down")))
+        try:
+            assert tc._get_trading_calendar() == set()
+        finally:
+            tc._TRADING_DAYS_FALLBACK = original

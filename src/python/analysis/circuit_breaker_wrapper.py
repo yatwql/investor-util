@@ -419,3 +419,13 @@ def reset_indicator_breaker() -> None:
         if _breaker_instance is not None:
             _breaker_instance.reset()
         _breaker_instance = None
+
+
+def _register_to_core_gateway() -> None:
+    """把指标断路器实例注册进 core 网关（模块导入时执行一次，core 不反向 import 上层）。"""
+    from src.python.core.circuit_breaker import register_breaker_status
+
+    register_breaker_status("indicator", get_indicator_breaker)
+
+
+_register_to_core_gateway()

@@ -1015,3 +1015,50 @@ class TestIdentifierExtraction:
         assert "B6" in names
         assert "chart" in names
         assert "draw" in names
+
+
+class TestCoreLayeringGuard:
+    """core → 上层反向 import 守卫（check-code-traces 分层纪律分支）。
+
+    装配契约：上游层通过注册钩子把状态快照注入 core（如
+    circuit_breaker.register_breaker_status / doctor.register_adapter_survey），
+    core 生产代码不得再 ``src.python.<上层>`` 反向 import（含函数内延迟 import）。
+    """
+
+    def test_core_reverse_import_flagged(self, code_traces, tmp_path):
+        core_dir = tmp_path / "src" / "python" / "core"
+        core_dir.mkdir(parents=True)
+        fpath = core_dir / "demo_module.py"
+        fpath.write_text(
+            "def bad():\n    from src.python.llm.circuit_breaker import _circuit_failures\n    return _circuit_failures\n",
+            encoding="utf-8",
+        )
+        hits = code_traces._scan_core_layering(fpath)
+        assert hits and hits[0][1] == "HIGH" and "llm" in hits[0][3]
+
+    def test_core_top_level_import_flagged(self, code_traces, tmp_path):
+        core_dir = tmp_path / "src" / "python" / "core"
+        core_dir.mkdir(parents=True, exist_ok=True)
+        fpath = core_dir / "demo_top_import.py"
+        fpath.write_text("from src.python.fetcher import chain\n", encoding="utf-8")
+        assert code_traces._scan_core_layering(fpath)
+
+    def test_non_core_and_tests_not_in_scope(self, code_traces, tmp_path):
+        fpath = tmp_path / "src" / "test" / "unit" / "core" / "test_x.py"
+        fpath.parent.mkdir(parents=True, exist_ok=True)
+        fpath.write_text("from src.python.fetcher.chain import _DEFAULT_CHAINS\n", encoding="utf-8")
+        assert code_traces._scan_core_layering(fpath) == []
+        # 测试文件位置的其他 core 目录同样不约束
+        other = tmp_path / "elsewhere" / "core" / "demo.py"
+        other.parent.mkdir(parents=True, exist_ok=True)
+        other.write_text("from src.python.report.foo import bar\n", encoding="utf-8")
+        assert code_traces._scan_core_layering(other) == []
+
+    def test_exempt_probe_file(self, code_traces, tmp_path):
+        core_dir = tmp_path / "src" / "python" / "core"
+        core_dir.mkdir(parents=True, exist_ok=True)
+        # 生产目录中的豁免文件名（探针网关薄透传，technical.md 已登记例外）
+        fpath = core_dir / "check_sources.py"
+        fpath.write_text("from src.python.fetcher.gw import x\n", encoding="utf-8")
+        assert code_traces._scan_core_layering(fpath) == []
+        del tmp_path

@@ -767,4 +767,16 @@ def _missing_trading_days(date1: str | None, date2: str | None) -> int:
 
 
 # 模块加载时自动注册默认 Provider Chain，使 registry.get_chain() 和策略选择器生效
-get_registry().register_default_chains()
+# 链路定义注入 core 注册表（core 不反向 import fetcher；传参而非 registry 自取）
+get_registry().register_default_chains(_DEFAULT_CHAINS)
+
+
+def _register_core_calendar_fallback() -> None:
+    """官方交易日序列兜底注入 core 交易日历（core 不反向 import providers）。"""
+    from src.python.providers import hithink
+    from src.python.core.trading_calendar import register_trading_days_fallback
+
+    register_trading_days_fallback(hithink.fetch_trading_days)
+
+
+_register_core_calendar_fallback()

@@ -17,6 +17,7 @@ from src.python.core.provider_registry import (
     get_registry,
 )
 from src.python.core._session_cache import _SESSION_CACHE_MAX_ENTRIES
+from src.python.fetcher.chain import _DEFAULT_CHAINS
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_core]
 
@@ -49,7 +50,7 @@ class TestProviderRegistration:
     def test_register_default_chains_populates_providers(self):
         """register_default_chains 从 _DEFAULT_CHAINS 注册所有 provider。"""
         r = _fresh_registry()
-        r.register_default_chains()
+        r.register_default_chains(_DEFAULT_CHAINS)
         # 常见的 provider 应已注册
         for expected in ("tencent", "eastmoney", "tiantian", "eastmoney_industry"):
             assert expected in r._providers
@@ -57,7 +58,7 @@ class TestProviderRegistration:
     def test_register_default_chains_sets_chains(self):
         """register_default_chains 写入 _chains。"""
         r = _fresh_registry()
-        r.register_default_chains()
+        r.register_default_chains(_DEFAULT_CHAINS)
         assert "price" in r._chains
         assert "industry" in r._chains
         assert r._chains["price"] == ["tencent", "eastmoney"]
@@ -476,7 +477,7 @@ class TestReset:
 
     def test_reset_clears_chains(self):
         r = _fresh_registry()
-        r.register_default_chains()
+        r.register_default_chains(_DEFAULT_CHAINS)
         r.reset()
         assert len(r._chains) == 0
 

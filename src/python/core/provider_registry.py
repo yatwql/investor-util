@@ -189,14 +189,17 @@ class DataSourceRegistry:
                     cooldown_secs=cooldown_secs or _PROVIDER_COOLDOWN_SECS,
                 )
 
-    def register_default_chains(self) -> None:
-        """注册默认 Provider Chain（从 _DEFAULT_CHAINS 派生）。
+    def register_default_chains(self, chains: dict[str, list[str]] | None = None) -> None:
+        """注册默认 Provider Chain（链路定义由上游 chain 模块导入时传入）。
 
-        可在模块导入时调用一次，消除分散在各文件中的 register_provider 调用。
+       分层纪律：core 不反向 import fetcher——链路字典由 chain.py 在模块导入时
+        以参数传入（``register_default_chains(_DEFAULT_CHAINS)``）；未传入（上游
+        未加载，如独立使用 registry 的最小场景）→ 空注册，语义与无链路一致。
+
+        Args:
+            chains: {data_type: [provider_name, ...]} 链路定义（fetcher/chain 提供）
         """
-        from src.python.fetcher.chain import _DEFAULT_CHAINS
-
-        for _data_type, provider_list in _DEFAULT_CHAINS.items():
+        for _data_type, provider_list in (chains or {}).items():
             for name in provider_list:
                 tier = 2 if name in ("tencent", "eastmoney") else 3
                 timeout = 10.0 if name in ("tencent", "eastmoney_industry") else 20.0

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from typing import Any
 
 from src.python.core.constants import APP_NAME, APP_VERSION, PROJECT_ROOT
@@ -354,6 +355,16 @@ def _check_review_ledger_overview() -> list[dict[str, Any]]:
     return items
 
 
+#: 适配器巡检函数（fetcher/source_adapter 导入时经 register_adapter_survey 注入）
+_adapter_survey: Callable[[], list] | None = None
+
+
+def register_adapter_survey(fn: Callable[[], list]) -> None:
+    """注册上游模块的适配器巡检函数（fetcher/source_adapter 导入时调用）。"""
+    global _adapter_survey
+    _adapter_survey = fn
+
+
 def _check_source_adapters() -> list[dict[str, Any]]:
     """数据源适配契约自检（离线，不发起任何网络请求）。
 
@@ -362,9 +373,21 @@ def _check_source_adapters() -> list[dict[str, Any]]:
     """
     try:
         from src.python.config.features import is_feature_enabled
-        from src.python.fetcher.source_adapter import survey_adapters
 
-        reports = survey_adapters()
+        # 适配器巡检函数由 fetcher/source_adapter 导入时注册（core 不反向 import 上层）；
+        # 未注册（fetcher 未加载，如最小化 web 请求场景）→ 声明「未注册」不影响其余自检
+        from src.python.core.doctor import _adapter_survey
+
+        if _adapter_survey is None:
+            return [
+                _item(
+                    GROUP_ADAPTER,
+                    "适配契约",
+                    True,
+                    "适配器模块未加载（fetcher 未初始化），跳过适配契约自检",
+                )
+            ]
+        reports = _adapter_survey()
         enabled = is_feature_enabled("datasource_adapter")
     except Exception as exc:  # noqa: BLE001
         return [_item(GROUP_ADAPTER, "适配契约", False, f"执行失败: {type(exc).__name__}: {exc}")]

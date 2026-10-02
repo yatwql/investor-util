@@ -306,3 +306,36 @@ class TestSummaryAndRender:
             [{"group": "G", "label": "x", "ok": True, "message": "m", "hint": ""}], use_color=True
         )
         assert "\033[" in text
+
+
+class TestAdapterSurveyRegistration:
+    """适配器巡检注册（core 不反向 import 上层——fetcher 导入时自注册）。"""
+
+    def test_unregister_returns_declared_skip(self):
+        from src.python.core import doctor as dr
+
+        original = dr._adapter_survey
+        dr._adapter_survey = None
+        try:
+            items = dr._check_source_adapters()
+            assert items, "无注册也应返回声明性条目"
+            assert "未加载" in items[0]["message"]
+        finally:
+            dr._adapter_survey = original
+
+    def test_registered_survey_called(self):
+        from src.python.core import doctor as dr
+
+        original = dr._adapter_survey
+        calls = []
+
+        def _fake_survey():
+            calls.append(1)
+            return [{"domain": "fund_hold", "display_name": "demo", "ok": True, "message": "ok"}]
+
+        dr._adapter_survey = _fake_survey
+        try:
+            dr._check_source_adapters()
+            assert calls == [1]
+        finally:
+            dr._adapter_survey = original
