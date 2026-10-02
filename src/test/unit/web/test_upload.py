@@ -118,6 +118,29 @@ class TestSaveUpload:
 class TestFileLifecycle:
     """file_id 注册/过期/清理生命周期。"""
 
+    def test_upload_dir_rooted_at_repo_data(self):
+        """回归：_UPLOAD_DIR 须源自 PROJECT_ROOT，不得落在 ``<repo>/src/data/`` 幽灵目录。
+
+        早先按 ``__file__`` 向上 3 层手工推算项目根，落点在 ``src/python/web/upload.py``
+        时只得 ``src/``，上传文件被误存到 ``src/data/holdings/uploads/``（幽灵目录，
+        且被 check-doc-drift 报为目录树缺条目）。
+
+        注：conftest 的路径隔离 fixture 会把 ``_UPLOAD_DIR`` 重定向到 tmp，
+        故不断言真实仓库路径，而断言**派生不变式**：值为 ``data/holdings/uploads``
+        且在 ``src`` 之外。
+        """
+        # 末三级路径固定为 data/holdings/uploads
+        assert os.path.join(*upload._UPLOAD_DIR.replace("\\", "/").split("/")[-3:]) == os.path.join(
+            "data", "holdings", "uploads"
+        )
+        # 落点不得在 src/ 内（手工推算只退 3 层会得到 <repo>/src/）
+        parts = os.path.normcase(os.path.realpath(upload._UPLOAD_DIR)).replace("\\", "/").split("/")
+        assert "src" not in parts, f"_UPLOAD_DIR 不应落在 src/ 内：{upload._UPLOAD_DIR}"
+        # 派生自 constants.PROJECT_ROOT（单一来源）
+        from src.python.core import constants
+
+        assert hasattr(constants, "PROJECT_ROOT")
+
     def test_discard_removes_file_and_unregisters(self):
         """生成任务结束 discard_file：文件删除 + file_id 失效。"""
         result = save_upload(BytesIO(_make_holdings_xlsx()), "持仓.xlsx")

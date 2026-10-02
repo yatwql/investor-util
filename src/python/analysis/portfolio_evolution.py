@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.python.analysis.metrics_risk import hhi
 from src.python.core.num_utils import finite_or
 
 logger = logging.getLogger("invest")
@@ -58,15 +59,15 @@ def _holding_weight(h: Any, total_mv: float, total_cost: float) -> float:
 
 
 def _compute_hhi(weights: list[float]) -> float:
-    """计算 HHI 集中度 = Σ(权重²)。
+    """计算 HHI 集中度——委托 metrics_risk.hhi 唯一原语（rf-529 收敛）。
 
     Args:
-        weights: 该期全部持仓权重列表
+        weights: 该期全部持仓权重列表（已归一，内部再归一为幂等）
 
     Returns:
         HHI 值（0~1），无有效权重时返回 0.0
     """
-    return round(sum(w * w for w in weights), 6)
+    return hhi(list(weights))
 
 
 def _dedup_by_date(snapshots: list[Any]) -> list[Any]:

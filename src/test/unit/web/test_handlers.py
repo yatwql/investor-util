@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from io import BytesIO
 from unittest.mock import patch
@@ -991,3 +992,95 @@ class TestSystemInfoDoctorGate:
 
         assert 'id="doctor-list"' in html
         assert 'title="实验功能 doctor_check"' not in html
+
+
+@pytest.fixture()
+def weak_app():
+    """仅建 app（不 redirect 产物目录），供短缓存用例 test_request_context 使用。"""
+    from src.python.web.runs import RunManager
+
+    return create_app(RunManager(executor=lambda *a, **k: 0))
+
+
+class TestShortCacheConcurrency:
+    """/api/runs/history 与 /api/health 的两级短缓存并发与命中语义。"""
+
+    def test_history_cache_hit_skips_reload(self, weak_app):
+        """两次连续调用（5s TTL 内）→ load_history 只执行一次，返回一致载荷。"""
+        from src.python.web import handlers as h
+
+        calls: list[int] = []
+        payload = [{"seq": 1}]
+
+        def fake_load_history():
+            calls.append(1)
+            return payload
+
+        with (
+            patch("src.python.core.perf.load_history", fake_load_history),
+            patch.dict(h._history_cache, {"ts": 0.0, "data": None}),
+        ):
+            with weak_app.test_request_context("/api/runs/history"):
+                r1 = h._handle_run_history()
+                r2 = h._handle_run_history()
+            assert r1["data"] is payload and r2["data"] is payload
+            assert len(calls) == 1  # 命中缓存不再读盘
+            h._history_cache["ts"] = 0.0
+            h._history_cache["data"] = None
+
+    def test_history_cache_respects_ttl_expiry(self, weak_app):
+        """超过 5s TTL → 重新执行 load_history。"""
+        from src.python.web import handlers as h
+
+        calls: list[int] = []
+        with (
+            patch("src.python.core.perf.load_history", lambda: calls.append(1) or []),
+            patch.dict(h._history_cache, {"ts": 0.0, "data": []}),
+        ):
+            with weak_app.test_request_context("/api/runs/history"):
+                h._handle_run_history()  # ts=0 → now 远大于 5s → 必 miss
+            assert len(calls) == 1
+            h._history_cache["ts"] = 0.0
+            h._history_cache["data"] = None
+
+    def test_health_fresh_bypasses_cache(self, weak_app):
+        """?fresh=1 → 跳过缓存直接真实探测。"""
+        from src.python.web import handlers as h
+
+        probe_calls: list[int] = []
+
+        def fake_probe(**kwargs):
+            probe_calls.append(1)
+            assert kwargs.get("max_timeout") == 12.0  # 预算口径不因 bypass 改变
+            return [{"name": "x"}]
+
+        with (
+            patch("src.python.core.check_sources.run_health_checks", fake_probe),
+            patch.dict(h._health_cache, {"ts": time.time(), "data": [{"name": "cached"}]}),
+        ):
+            with weak_app.test_request_context("/api/health?fresh=1"):
+                rv = h._handle_health()
+            assert len(probe_calls) == 1
+            assert rv["data"] == [{"name": "x"}]
+            h._health_cache["ts"] = 0.0
+            h._health_cache["data"] = None
+
+    def test_cache_writes_are_thread_safe(self, weak_app):
+        """多线程并发写缓存 dict（盲写不崩、终态单一）。"""
+        from src.python.web import handlers as h
+
+        def worker(_idx: int) -> None:
+            for _ in range(50):
+                with h._render_cache_lock:
+                    h._history_cache["ts"] = time.time()
+                    h._history_cache["data"] = [1, 2, 3]
+
+        with patch.dict(h._history_cache, {"ts": 0.0, "data": None}):
+            threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            assert h._history_cache["data"] == [1, 2, 3]
+        h._history_cache["ts"] = 0.0
+        h._history_cache["data"] = None

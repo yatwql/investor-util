@@ -1,12 +1,12 @@
-"""测试：scripts/_checklib.py 与 scripts/_traces_common.py — 检查脚本共享设施
+"""测试：scripts/_checklib.py 与 scripts/_traces_code/exemptions.py — 检查脚本共享设施
 
 覆盖：
-  - `rel()`：仓库内路径取相对、仓库外路径原样返回
+  - `rel()`：仓库内路径取相对（POSIX 分隔符）、仓库外路径原样返回（仅归一为 POSIX）
   - `report()`：通过返回 0 + `[OK]`；失败返回 2 + 逐条输出；`--ci` 只输出裸描述；`{n}` 占位
   - `extract_region()` / `replace_region()`：标记齐全取/替换、标记缺失返回 None
   - `extract_table_region()`：正常表格、marker 缺失、区域非表格、夹非表格行、缺分隔行
   - `replace_table_region()`：替换表体、标记缺失抛 ValueError
-  - `_traces_common`：章节/轮次合法计数表述豁免命中、非法引用不误豁免、编译缓存与函数一致
+  - `exemptions`：章节/轮次合法计数表述豁免命中、非法引用不误豁免、编译缓存与函数一致
 """
 
 from __future__ import annotations
@@ -45,7 +45,8 @@ def checklib():
 
 @pytest.fixture(scope="module")
 def traces_common():
-    return _load_script("_traces_common.py")
+    """章节/轮次豁免实现已迁至 `_traces_code/exemptions.py`（check-code-traces 拆包）。"""
+    return _load_script("_traces_code/exemptions.py")
 
 
 # ═══ rel ═══
@@ -55,10 +56,17 @@ class TestRel:
     def test_repo_path_is_relative(self, checklib):
         assert checklib.rel(_REPO_ROOT / "README.md") == "README.md"
 
-    def test_outside_path_returned_as_is(self, checklib, tmp_path):
+    def test_repo_path_uses_posix_separator(self, checklib):
+        """仓库内路径恒用 `/`（与文档目录树/引用口径一致，Windows 下不得为 `\\`）。"""
+        got = checklib.rel(_REPO_ROOT / "scripts" / "_checklib.py")
+        assert got == "scripts/_checklib.py"
+        assert "\\" not in got
+
+    def test_outside_path_returned_as_posix(self, checklib, tmp_path):
+        """仓库外路径原样返回（仅归一为 POSIX 分隔符，不重写为相对路径）。"""
         outside = tmp_path / "outside.md"
         outside.write_text("x", encoding="utf-8")
-        assert checklib.rel(outside) == str(outside)
+        assert checklib.rel(outside) == Path(outside).as_posix()
 
 
 # ═══ report ═══

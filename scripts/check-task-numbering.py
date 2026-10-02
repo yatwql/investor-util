@@ -36,7 +36,9 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享设施（_checklib）
+from _checklib import REPO_ROOT, add_common_args, report  # noqa: E402
+
 MANAGEMENTS_DIR = REPO_ROOT / "docs-stm" / "managements"
 ARCHIVE_DIR = REPO_ROOT / "docs-stm" / "archive"
 
@@ -86,7 +88,7 @@ def _max_number_in(paths: list[Path], pattern: str) -> int | None:
     return max(nums) if nums else None
 
 
-def check_kind(kind: str, ci_mode: bool) -> list[str]:
+def check_kind(kind: str, ci_mode: bool, verbose: bool = False) -> list[str]:
     """校验单个编号序列。返回违规列表（空=通过）。"""
     cfg = KINDS[kind]
     doc_path = MANAGEMENTS_DIR / cfg["doc"]
@@ -103,7 +105,7 @@ def check_kind(kind: str, ci_mode: bool) -> list[str]:
             f"{cfg['doc']}: `{cfg['marker']} = {next_val}` 不晚于已用最大 {kind}-{used_max}，"
             f"新增编号会与历史冲突——请修正为 {kind}-{used_max + 1}"
         )
-    elif not ci_mode:
+    elif verbose and not ci_mode:
         print(f"  [OK] {cfg['doc']} — {cfg['marker']} = {next_val} > 已用最大 {kind}-{used_max}")
     return violations
 
@@ -117,11 +119,7 @@ def main() -> int:
         choices=sorted(KINDS),
         help="仅检查指定编号序列（默认全部）",
     )
-    parser.add_argument(
-        "--ci",
-        action="store_true",
-        help="CI 模式（只输出错误，退出码非零即失败）",
-    )
+    add_common_args(parser)
     args = parser.parse_args()
 
     kinds = [args.kind] if args.kind else sorted(KINDS)
@@ -131,18 +129,9 @@ def main() -> int:
 
     all_violations: list[str] = []
     for kind in kinds:
-        all_violations.extend(check_kind(kind, ci_mode=args.ci))
+        all_violations.extend(check_kind(kind, ci_mode=args.ci, verbose=args.verbose))
 
-    if all_violations:
-        if not args.ci:
-            print("\n违规详情:")
-        for v in all_violations:
-            print(f"  [ERR] {v}")
-        return 2  # 契约：发现 finding → 退出码 2
-
-    if not args.ci:
-        print("[OK] 全部编号序列通过，无历史冲突风险")
-    return 0
+    return report(all_violations, "[OK] 全部编号序列通过，无历史冲突风险", ci=args.ci)
 
 
 if __name__ == "__main__":

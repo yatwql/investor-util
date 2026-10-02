@@ -144,6 +144,7 @@ class TestDirectoryChecks:
         assert ok is False
         assert "不存在" in message
 
+    @pytest.mark.skipif(os.name == "nt", reason="Windows 无 POSIX 权限位，只读目录仍可写")
     def test_readonly_directory_fails(self, tmp_path):
         if os.geteuid() == 0:
             pytest.skip("以 root 运行：权限位对 root 不生效，该场景无法构造")

@@ -27,7 +27,9 @@ import ast
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享设施（_checklib）
+from _checklib import REPO_ROOT, add_common_args, rel, report  # noqa: E402,F401
+
 TEST_DIR = REPO_ROOT / "src" / "test"
 
 # 期望的标记映射：子目录名 → 应含的标记名集合
@@ -157,7 +159,7 @@ def check_file(filepath: Path, verbose: bool, ci_mode: bool) -> list[str]:
     """检查单个文件的标记合规性。返回违规列表（空=通过）。"""
     violations: list[str] = []
     markers = _extract_markers_from_file(filepath)
-    rel_path = filepath.relative_to(REPO_ROOT)
+    rel_path = rel(filepath)
 
     # 检查已移除的标记
     deprecated_found = markers & DEPRECATED_MARKERS
@@ -192,17 +194,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="测试标记合规性检查",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="详细输出（含通过的检查）",
-    )
-    parser.add_argument(
-        "--ci",
-        action="store_true",
-        help="CI 模式（只输出错误，退出码非零即失败）",
-    )
+    add_common_args(parser)
     args = parser.parse_args()
 
     # 收集所有测试文件
@@ -225,16 +217,7 @@ def main() -> int:
         print(f"\n{'=' * 50}")
         print(f"检查完成: {passed} 通过, {failed} 违规")
 
-    if all_violations:
-        if not args.ci:
-            print("\n违规详情:")
-        for v in all_violations:
-            print(f"  [ERR] {v}")
-        return 2  # 契约：发现 finding → 退出码 2
-
-    if not args.ci:
-        print("全部通过。")
-    return 0
+    return report(all_violations, "全部通过。", ci=args.ci, fail_message=f"检查完成: {passed} 通过, {{n}} 违规")
 
 
 if __name__ == "__main__":

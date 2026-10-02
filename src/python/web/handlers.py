@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 from urllib.parse import urlparse
 
@@ -32,9 +33,13 @@ _LATEST_XLSX = "个人投资分析报告.xlsx"
 # 预览/下载扩展名白名单（.lower() 归一化后校验，防 .HTML/.XLSX 绕过）
 _ALLOWED_REPORT_EXT = {"html", "js", "map", "css", "png", "svg", "json", "xlsx"}
 
-# 短缓存（健康 60s / 历史 5s）——防频繁轮询重复读文件/重复真实探测
+# 短缓存（健康 60s / 历史 5s）——防频繁轮询重复读文件/重复真实探测。
+# 并发边界（rf-528）：server 为 threaded=True，两 dict 的读写由同一把锁保护——
+# 锁只保护「读缓存/写缓存」两段，真实计算在锁外；两请求同时 miss 时可能重
+# 复计算一次（本地单人 Web 的低风险余量，不引入检查时间内串行化代价）。
 _health_cache: dict = {"ts": 0.0, "data": None}
 _history_cache: dict = {"ts": 0.0, "data": None}
+_render_cache_lock = threading.Lock()
 
 
 # ── 响应信封辅助 ─────────────────────────────────────
@@ -507,11 +512,13 @@ def _handle_run_history():
     from src.python.core.perf import load_history
 
     now = time.time()
-    if _history_cache["data"] is not None and now - _history_cache["ts"] < 5:
-        return _ok(_history_cache["data"])
+    with _render_cache_lock:
+        if _history_cache["data"] is not None and now - _history_cache["ts"] < 5:
+            return _ok(_history_cache["data"])
     records = load_history()
-    _history_cache["ts"] = now
-    _history_cache["data"] = records
+    with _render_cache_lock:
+        _history_cache["ts"] = now
+        _history_cache["data"] = records
     return _ok(records)
 
 
@@ -563,14 +570,17 @@ def _handle_health():
     # （健康页「重新检测」按钮用，用户主动动作不计入缓存污染）
     fresh = request.args.get("fresh") == "1"
     now = time.time()
-    if not fresh and _health_cache["data"] is not None and now - _health_cache["ts"] < 60:
-        return _ok(_health_cache["data"])
+    if not fresh:
+        with _render_cache_lock:
+            if _health_cache["data"] is not None and now - _health_cache["ts"] < 60:
+                return _ok(_health_cache["data"])
     # 整体预算必须低于前端 /api/health 的 15s abort（留余量）。
     # 12s 覆盖正常网络下的全量检查（实测 ~10s），仅切断真正挂起的检查项，
     # 未完成项由 run_health_checks 标记"超时"返回，避免整接口超时被前端判失败。
     results = run_health_checks(max_timeout=12.0)
-    _health_cache["ts"] = now
-    _health_cache["data"] = results
+    with _render_cache_lock:
+        _health_cache["ts"] = now
+        _health_cache["data"] = results
     return _ok(results)
 
 

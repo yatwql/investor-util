@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 from src.python.core.atomic_write import write_bytes_atomic  # 原子写唯一原语
+from src.python.core.constants import PROJECT_ROOT  # 项目根单一来源（标记文件查找，不依赖目录深度）
 import logging
 import os
 import secrets
@@ -32,10 +33,11 @@ from typing import BinaryIO, Callable
 logger = logging.getLogger("invest")
 
 
-# 项目根目录（绝对化拼接，不依赖 CWD，对齐路径绝对化约束）
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# 上传临时目录（gitignore 排除；启动清理残留）
-_UPLOAD_DIR = os.path.join(_PROJECT_ROOT, "data", "holdings", "uploads")
+# 上传临时目录（相对项目根；gitignore 排除；启动清理残留）
+# 项目根取自 constants.PROJECT_ROOT：早先按 __file__ 向上 3 层手工推算，
+# 落点在 src/python/web/upload.py 时只得 `src/`，上传文件被误存到
+# src/data/holdings/uploads/（幽灵目录，且被 check-doc-drift 报为目录树缺条目）。
+_UPLOAD_DIR = os.path.join(PROJECT_ROOT, "data", "holdings", "uploads")
 
 # 扩展名白名单（.lower() 归一化后校验）
 _ALLOWED_EXT = {".xlsx"}

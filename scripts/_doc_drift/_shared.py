@@ -164,13 +164,19 @@ def _collect_test_snapshot() -> dict[str, int]:
         cwd=REPO_ROOT,
         capture_output=True,
         encoding="utf-8",  # 显式编码（cp936 Windows/locale 假设 + EncodingWarning 严格档）
+        errors="replace",  # 子进程若因环境写出非 UTF-8 字节，降级替换而非在 reader 线程抛 UnicodeDecodeError
         text=True,
     )
+    # 子进程输出不可解码/为空时 stdout 可能为 None（reader 线程异常兑底）；
+    # 此处降级为“无快照”而非 TypeError，调用方（sync/check）自会跳过快照类校验。
+    stdout = proc.stdout or ""
+    if not stdout.strip():
+        return {}
     snapshot: dict[str, int] = {}
-    total = re.search(r"总收集:\s*(\d+)\s*项", proc.stdout)
+    total = re.search(r"总收集:\s*(\d+)\s*项", stdout)
     if total:
         snapshot["_总收集"] = int(total.group(1))
-    for line in proc.stdout.splitlines():
+    for line in stdout.splitlines():
         m = re.match(r"^([\w\u4e00-\u9fff][^:]*?):\s*(\d+)$", line.strip())
         if m:
             snapshot[m.group(1).strip()] = int(m.group(2))

@@ -14,11 +14,19 @@
 
 set -e
 
-# 优先项目虚拟环境解释器（CLAUDE.md：Python 命令一律走 .venv）
-PY_CMD="python"
-command -v "$PY_CMD" >/dev/null 2>&1 || PY_CMD="python3"
-if [ -x ".venv/bin/python" ]; then
+# 优先项目虚拟环境解释器（CLAUDE.md：Python 命令一律走 .venv）。
+# Windows 布局（.venv/Scripts/python.exe）优先：裸 python/python3 会命中系统
+# 解释器，缺 pandas 等依赖且 pytest 收集口径不同（实测 7964 vs 8173），
+# 曾致 pre-commit 把错误用例数回写进 folders.md。
+PY_CMD=""
+if [ -x ".venv/Scripts/python.exe" ]; then
+    PY_CMD=".venv/Scripts/python.exe"
+elif [ -x ".venv/bin/python" ]; then
     PY_CMD=".venv/bin/python"
+elif command -v python >/dev/null 2>&1; then
+    PY_CMD="python"
+elif command -v python3 >/dev/null 2>&1; then
+    PY_CMD="python3"
 fi
 
 CHANGED=$(git diff --cached --name-only 2>/dev/null || true)
