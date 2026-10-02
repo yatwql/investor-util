@@ -329,7 +329,7 @@
 |:--|:--|:--:|
 <!-- requirement-trace:start -->
 | R-CCH-01 | `src/test/unit/core/test_cache_core.py` + `src/test/unit/cache/test_cache_io.py` | 批 1 |
-| R-CCH-02 | `src/test/unit/core/test_cache_format.py::test_small_file_not_gzipped` / `::test_large_file_auto_gzipped` / `::test_read_gzipped_file`；边界 `test_cache_edge.py::test_exact_100kb_boundary_not_gzip` | 批 1 |
+| R-CCH-02 | `src/test/unit/core/test_cache_format.py::test_small_data_not_gzip` / `::test_large_data_stored_as_gz`（gz 内铭文解析） / `::test_read_gz_transparently`（透明读取）；边界 `test_cache_edge.py::test_exact_100kb_boundary_not_gzip` | 批 1 |
 | R-CCH-03 | `src/test/unit/core/test_cache_core.py::test_key_with_slash_replaced` / `::test_key_with_backslash_replaced` / `::test_key_with_dotdot_replaced` | 批 1 |
 | R-CCH-04 | `src/test/unit/core/test_atomic_write.py` + `src/test/unit/cache/test_cache_io.py::test_write_atomic_json` / `::test_write_atomic_gzip` | 批 1 |
 | R-CCH-05 | `src/test/unit/core/test_cache_core.py::test_corrupted_json_deletes_file` / `::test_corrupted_json_io_error_returns_none`；`test_cache_edge.py::test_gz_corrupted_file_deleted_on_read`；`test_cache_cleanup.py::test_corrupted_file_deleted_in_cleanup` | 批 1 |
