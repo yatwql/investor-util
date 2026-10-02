@@ -19,10 +19,10 @@ from src.python.fetcher.financial_report import (
     DEFAULT_MAX_CHARS,
     DEFAULT_SECTIONS,
     collect_a_share_targets,
+    datasink_credential_missing,
     fetch_symbol_report_detailed,
     target_source_label,
 )
-from src.python.providers import datasink
 
 logger = logging.getLogger("invest")
 
@@ -63,7 +63,7 @@ def build_financial_report_digest(
         （直接持有 / 穿透：来源基金），失败行含具体原因（索引无报告 / 目标章节缺失）。
     """
     config = config or {}
-    if datasink.missing_credential(datasink.SOURCE_ID) is not None:
+    if datasink_credential_missing() is not None:
         return _empty("未配置 DataSinking API key（详见数据源可用性矩阵）")
 
     section_cfg = config.get("datasink") or {}

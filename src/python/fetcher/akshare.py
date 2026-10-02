@@ -26,6 +26,7 @@ from src.python.providers.akshare_extras import (
 from src.python.providers.akshare_extras import (
     get_profit_forecast_cache_key as _get_profit_forecast_cache_key,
 )
+from src.python.providers.akshare_extras import _DIVIDEND_FAILURE
 from src.python.providers.akshare_extras import (
     get_sector_fund_flow as _get_sector_fund_flow,
 )
@@ -35,7 +36,17 @@ __all__ = [
     "get_profit_forecast",
     "get_profit_forecast_cache_key",
     "get_sector_fund_flow",
+    "dividend_failure_hint",
 ]
+
+
+def dividend_failure_hint() -> str:
+    """最近一次分红取数的失败原因码（只读透传，报告层不得直连 provider）。
+
+    取值：``""``（无故障/未取数或正常空结果）、``"connection"``（源不可达）。
+    空串语义：本无分红不属故障，仅在失败码非空时才登记失败。
+    """
+    return _DIVIDEND_FAILURE
 
 
 def get_dividend_data(codes: list[str]) -> dict[str, dict]:

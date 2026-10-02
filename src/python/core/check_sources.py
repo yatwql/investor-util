@@ -136,9 +136,9 @@ def _check_datasink() -> tuple[str, float, str]:
     """
     start = time.perf_counter()
     try:
-        from src.python.providers import datasink
+        from src.python.fetcher.report_adapters import probe_datasink_documents
 
-        items = datasink.fetch_report_documents(_CRED_PROBE_FMP_SYMBOL, size=1)
+        items = probe_datasink_documents(_CRED_PROBE_FMP_SYMBOL, size=1)
     except Exception as e:  # 探针自身异常不得中断体检
         return _ERR, (time.perf_counter() - start) * 1000, str(e).split("\n")[0][:60]
     elapsed = (time.perf_counter() - start) * 1000
@@ -154,9 +154,9 @@ def _check_cninfo() -> tuple[str, float, str]:
     """
     start = time.perf_counter()
     try:
-        from src.python.providers import cninfo
+        from src.python.fetcher.report_adapters import probe_cninfo_orgid
 
-        org_id = cninfo.resolve_org_id(_CRED_PROBE_SYMBOL)
+        org_id = probe_cninfo_orgid(_CRED_PROBE_SYMBOL)
     except Exception as e:
         return _ERR, (time.perf_counter() - start) * 1000, str(e).split("\n")[0][:60]
     elapsed = (time.perf_counter() - start) * 1000

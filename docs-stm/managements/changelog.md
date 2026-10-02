@@ -20,6 +20,7 @@
 - **配套文档全面刷新**：README / how-to-config / how-to-use-tui-menu（开关分块与面板编号）/ how-to-use-cli-mode / how-to-config-llm / requirements（R-LLM-09 与 7.8.4）/ llm-technical / technical（语义命名表）/ developer-guide（转正判据段）/ folders / test-coverage（用例 8137 项）。
 
 ### 新增
+- **统计快照自动同步（A 方案，rf-532）**：① `check-doc-drift.py` 新增 `--sync` 模式——把实测的统计表数字（文件数/行数/pytest 用例数）自动回写 `folders.md` 对应单元格（只改首个数字，保留千分位/粗体风格与说明文字，不触碰版本演进对照表），回写后 `git add` 暂存，同步幂等（一致时零改动）；实现层新增 `scripts/_doc_drift/_tree.py::sync_project_stats`（测试注入 `actual`/`test_count`，4 例覆盖：漂移回写/一致幂等/缺文件/真实仓库幂等）；② `.githooks/pre-commit` 扩展——提交涉及 `docs-stm/managements/` 或 `src/test/` 时自动调用 `--sync --ci`，同步后仍不一致（清单/目录树等需人工判断项）才中止提交；钩子优先用项目 `.venv/bin/python`（原先 PATH 裸 python 不带依赖）。治理起因：`review-findings.md` 每补一行即让 `folders.md` 统计快照漂移，10-02 当日 6 次 CI 红全部同源，人工同步第 N+1 次被连续推送踩踏。
 
 - **plan/ 中间设计文件随完成态归档（含语义更名）**：借鉴批已收口的二份 plan/ 文档按「完成后随完成态移入对应版本归档子目录」纪律落位——`tradingagents-cn-research.md` → `archive/v0.11.x/tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md`（更名对齐内容：借鉴候选清单与现状比对，非仓库本体研究）；`llm-depth-selfreview-source-override-design.md` → `archive/v0.11.x/llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md`（更名对齐内容：「深度」实为报告深度档位）；文档头部归档说明/前置引用同步，plan.md 与归档文档「设计文档索引」行的引用改指新路径。plan/ 目录现仅存两份在办的 Jev 新闻关联判定文档（随 plan-55）。
 - **rf-520 修复：实验功能治理后的三处注释语境残留**——`depth_profile.py` 设计文档指引仍指已归档旧路径/旧名（更新为归档路径）；`excel_generator.py` 兜底注释仍以 `signal_ledger` 作实验开关示例（改为现行实验开关）；`_experimental_seams.py` 模块头「四个实验功能」与转正现状不符（中性化表述并标注转正）。

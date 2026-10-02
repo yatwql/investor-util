@@ -94,3 +94,13 @@ class CninfoReportAdapter(SourceAdapter):
 
 register_adapter(DataSinkReportAdapter())
 register_adapter(CninfoReportAdapter())
+
+
+def probe_datasink_documents(symbol: str, size: int = 1) -> list[dict[str, Any]] | None:
+    """DataSinking 健康探针取数（取元数据列表，轻量幂等；请求细节在 provider 内）。"""
+    return datasink.fetch_report_documents(symbol, size=size)
+
+
+def probe_cninfo_orgid(symbol: str) -> str | None:
+    """巨潮资讯健康探针（解析 orgId，结果按月缓存；一次搜索请求）。"""
+    return cninfo.resolve_org_id(symbol)

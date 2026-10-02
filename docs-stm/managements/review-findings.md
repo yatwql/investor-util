@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.11-dev
-> **编号源**：`rf-next = 532`（新增问题取此编号，完成后更新为 +1；已用最大 rf-531，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 533`（新增问题取此编号，完成后更新为 +1；已用最大 rf-532，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -64,6 +64,8 @@
 | **rf-529** | 低 | **双治理并行体系内的重复工具**。`analysis/whatif.py::_compute_hhi`（L88，成本口径）与 `analysis/portfolio_evolution.py::_compute_hhi`（L60，市值/成本兜底口径）各算 Σ权重²，`analysis/_silence.py`、`core/perf.py`、`core/decision_ledger.py` 对同一 `jsonl_store` 抽取逻辑保持 3 份薄包装（后两者为转发 OK，但静默其仍保留对`mkstemp` 语义的独立文档化） | 同一逻辑两张表达（whatif 与 portfolio_evolution 权重基数口径略有差异：成本合一 vs 市值优先），未来若加入 HHI 权重口径（如启用市值优先）两处需同步改，易漏 | whatif 复用 portfolio_evolution 的口径函数（或共享纯计算 `analysis/_hhi.py` 按口径参数化），差异仅体现在调用参数 |
 | **rf-530** | 低 | **print 输出规范边界确认（日志统一约束）**。`report/progress.py::TuiProgressReporter`（交互式进度，属合法「交互式 print」豁免）与 `core/check_sources.py::run_check_sources`（CLI 报告打印，属交互输出）合规；但 `core/doctor.py:16` 的 print 走的是自检 CLI 快路径，与同文件 `print(item["group"]...)` 复合、违背「若 doctor 需要嵌入 Web 报告」（`web/handlers.py` 已走结构化数据路径），该 print 仅命令行入口——它没走 `[..]`/`[OK]`/`[ERR]` 样式前缀规范，有各別字符流风险 | 无功能风险，仅一致性观察（`check-code-traces.py` 不阻止交互式 print） | 体检 CLI 输出亦可走统一带前缀/着色的 console helper（复用 `core/ansi_colors.py`），或显式标注「CLI-only，不进产物」注释声明豁免依据 |
 | **rf-531** | 低 | **过期缓存降级处置无统一入口（§1.4.5 尾部难覆盖区）**。`fetcher/index.py::fetch_us_indices` 手写「可正常缓存 → 主链路 → 备用腾讯 → 过期缓存 + `cache_set` 回写 + `_source=stale_cache`」四段流程，与 §1.4.5 的统一链路状态在语义上等价，但独立实现且 `cache_set` 回写过期数据时未盖语义版本，与「缓存载荷语义版本」词条的判据接入无关 | 该函数是「Provider Chain 必经」约束的唯一声明例外（技术原因），但例外声明只覆盖「不走 Chain」，未覆盖「手写降级回写」这一段；语义版本机制上线后此处（自动类别 restart）易成为版本缺失的缓存回写点 | 将「过期缓存回写」收敛为 `fetcher/chain.py` 提供的通用降级助手（常见语义版本盖戳），index.py 调用之；例外注释同步声明为「仅本次手写降级路径」 |
+
+**rf-532** | 已修复（2026-10-02） | **CI 统计快照漂移高频红源（流程性）**：日常提交高频改变 managements/ 文档行数与测试用例数，`folders.md` 统计表静态数字必漂移，人工同步被连续推送踩踏（当日 6 次红全同源）。已按 A 方案落地：`check-doc-drift.py --sync` 自动回写实测数字（幂等，保留格式），`git pre-commit` 钩子在提交涉及 managements/ 或 src/test/ 时自动同步；详见 changelog 0.11.11-dev 条目。
 
 ## 已解决问题
 

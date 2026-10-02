@@ -489,7 +489,7 @@ def build_news_data(
 
     # 补充各源状态（在 aggregate_news 之后获取）
     try:
-        from src.python.providers.news_aggregator import get_last_source_status as _glss
+        from src.python.fetcher.news import get_last_source_status as _glss
 
         meta["source_status"] = _glss()
     except Exception:

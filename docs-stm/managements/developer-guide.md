@@ -191,7 +191,7 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 | **P0/P2 门禁** | 提交/发布前 `check-task-numbering.py --ci` | ✅ 零配置 |
 | **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
 | **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
-| **git pre-commit** | `git commit` 涉及编号文档时自动校验 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
+| **git pre-commit** | `git commit` 涉及编号文档时自动校验；提交涉及 `docs-stm/managements/` 或 `src/test/` 时自动同步统计快照（`check-doc-drift --sync`） | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
 | **CI guards job** | push / PR / tag 时自动校验（7 个 `--ci` 脚本之一） | ✅ 零配置 |
 
 > `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
@@ -813,7 +813,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-task-numbering.py` | 测试 | 任务编号（plan-/rf-）全局一致性检查，防新增编号与历史归档冲突 |
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
-| `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表） |
+| `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表；`--sync` 自动回写统计快照） |
 | `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
 | `check-requirement-trace.py` | 测试 | 需求 ID ↔ 验证载体追溯（单段 ID 全域覆盖 / 载体文件存在 / ID 双向一致） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
@@ -1026,7 +1026,15 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 .venv/bin/python scripts/check-doc-drift.py -v                # 详细输出（打印解析结果与实测统计）
 .venv/bin/python scripts/check-doc-drift.py --ci              # CI 模式（只输出 文件:描述，退出码 2）
 .venv/bin/python scripts/check-doc-drift.py --with-test-count # 附带 pytest 收集，核对「测试用例」与 test-coverage.md 计数表
+.venv/bin/python scripts/check-doc-drift.py --sync             # 统计快照自动同步（实测数字回写 folders.md 并 git add，幂等）
 ```
+
+> **统计快照漂移的自动化治理**：第 10 项「项目统计表」的数字（文件数/行数/用例数）是随日常
+> 提交高频变化的派生量（changelog 每补一行、用例每增删即变），人工同步必漏，曾是 CI 最高频红源。
+> `--sync` 把实测值自动回写 `folders.md` 对应单元格（只改数字、保留千分位/粗体风格与说明文字，
+> 不触碰版本演进对照表），并把回写结果 `git add` 加入暂存区；git pre-commit 钩子在提交涉及
+> `docs-stm/managements/` 或 `src/test/` 时自动调用（见「install-hooks.sh」条）。其余类目
+> （清单/默认值/目录树/归档索引）的漂移仍需人工按提示修正。
 
 > 按设计豁免的文档：`changelog.md` / `review-findings.md`（如实引用旧数字作为变更记录）与
 > 版本快照类文档（历次发布的归档快照）不参与计数与默认值断言扫描。修正提示：报告里的数字就是
@@ -1084,7 +1092,7 @@ Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验�
 
 **`install-hooks.sh` — git pre-commit hook 激活脚本（`.githooks/`）**
 
-`.githooks/` 的 git pre-commit hook（任务编号一致性校验）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
+`.githooks/` 的 git pre-commit hook（任务编号一致性校验 + 统计快照自动同步）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
 
 ```bash
 sh .githooks/install-hooks.sh          # 启用（写入本机 core.hooksPath）

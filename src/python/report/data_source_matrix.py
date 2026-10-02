@@ -417,9 +417,9 @@ def _catalog_billing(cat: dict[str, Any], plan: str) -> str:
     if declared:
         return str(declared)
     if cat.get("billing_provider") == "datasink":
-        from src.python.providers import datasink as _datasink
+        from src.python.fetcher.financial_report import datasink_billing_description
 
-        return _datasink.billing_description(plan)
+        return datasink_billing_description(plan)
     return _FREE_BILLING
 
 

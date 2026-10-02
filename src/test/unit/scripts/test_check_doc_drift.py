@@ -716,3 +716,61 @@ class TestRealRepoSmoke:
     def test_current_repo_consistent(self, drift):
         findings = drift.run_checks()
         assert findings == []
+
+
+# ═══ 统计快照自动同步（--sync） ═══
+
+
+class TestProjectStatsSync:
+    """sync_project_stats —— 实测数字自动回写 folders.md 统计表。
+
+    治理「统计登记数字 vs 实测」类漂移（CI 最高频红源）：changelog/自审
+    每补一行、用例每增删，实测行数即变；人工同步必漏，故提供 --sync
+    由钩子自动回写并暂存。
+    """
+
+    _DOC = """# 标题
+
+| 类别 | 开发语言 | 文件数 | 代码行数 | 说明 |
+|---|---|---|---|---|
+| 主程序代码 | Python | **10** | **1,000** | src 代码 |
+| **测试用例** | — | — | **55 个** | collect 快照 |
+| **版本对照** | — | — | — | 固定基准不触碰 |
+"""
+
+    def test_syncs_drifted_numbers(self, drift, drift_parts, tmp_path):
+        doc = tmp_path / "folders.md"
+        doc.write_text(self._DOC, encoding="utf-8")
+        actual = {"主程序代码": (11, 1024)}
+        applied = drift_parts._tree.sync_project_stats(doc, actual=actual, test_count=60)
+        assert any("「主程序代码」文件数" in line for line in applied)
+        out = doc.read_text(encoding="utf-8")
+        # 数字已回写且千分位风格保留
+        assert "| 主程序代码 | Python | **11** | **1,024** |" in out.replace("\n", "").join([]) or "**11**" in out
+        assert "**1,024**" in out
+        # 用例数行同步回写
+        assert "**60 个**" in out
+        # 版本对照行不触碰（标签口径不同，不精确匹配实测键）
+        assert "**版本对照**" in out and "| — |" in out
+
+    def test_noop_when_consistent(self, drift, drift_parts, tmp_path):
+        doc = tmp_path / "folders.md"
+        doc.write_text(self._DOC, encoding="utf-8")
+        doc.write_text(doc.read_text(encoding="utf-8"), encoding="utf-8")
+        actual = {"主程序代码": (10, 1000)}  # 与登记一致
+        applied = drift_parts._tree.sync_project_stats(doc, actual=actual, test_count=55)
+        assert applied == []
+        assert doc.read_text(encoding="utf-8") == self._DOC
+
+    def test_missing_file_is_noop(self, drift, drift_parts, tmp_path):
+        applied = drift_parts._tree.sync_project_stats(tmp_path / "nope.md", actual={}, test_count=1)
+        assert applied == []
+
+    def test_real_repo_sync_idempotent(self, drift, drift_parts):
+        """真实仓库：同步是幂等的（当前一致 → 无应用项、文件零改动）。"""
+        from _doc_drift._tree import _FOLDERS_MD, sync_project_stats as _sync
+
+        original = Path(_FOLDERS_MD).read_text(encoding="utf-8")
+        applied = _sync()
+        after = Path(_FOLDERS_MD).read_text(encoding="utf-8")
+        assert applied == [] and after == original

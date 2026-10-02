@@ -72,6 +72,8 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     "history_index_us": ["sina", "tencent"],
     # 无风险利率：首选 akshare（bond_zh_us_rate），配置兜底
     "bond_yield": ["akshare"],
+    # 市场情绪与资金热点（龙虎榜/连板梯队，同花顺官方，需 key；报告层不得直连）
+    "sentiment": ["hithink"],
 }
 
 

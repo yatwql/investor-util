@@ -59,6 +59,7 @@ from _doc_drift._tree import (  # noqa: F401
     _STATS_ROW,
     _stats_actual,
     check_project_stats,
+    sync_project_stats,
 )
 from _doc_drift._ledger import (  # noqa: F401
     _RF_ID,
@@ -180,6 +181,7 @@ __all__ = [
     "_STATS_ROW",
     "_stats_actual",
     "check_project_stats",
+    "sync_project_stats",
     "_RF_ID",
     "_PLAN_ID",
     "_CHANGELOG_HEADER",
