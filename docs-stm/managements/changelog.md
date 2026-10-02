@@ -10,7 +10,7 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
-### 文档治理
+### 文档治理与脚本收编
 
 - **check-code-traces 拆包（rf-533）**：1,016 行破 800 硬上限的唯一脚本，按「模式表/扫描/守卫」拆为 `scripts/_traces_code/` 六模块包，入口只留 CLI（185 行）与原面 re-export；`_traces_common.py` 并入包内 `exemptions.py` 并删兼容壳（测试改指向子模块）；check-task-numbering / check-test-markers / check-doc-traces 三脚本迁移 `_checklib` 契约（补 `-v`、统一输出与退出码，17 处 sys.path 样板文本统一）。scripts 单测 428 例全通。
 
