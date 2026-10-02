@@ -30,7 +30,7 @@ import logging
 import threading
 from typing import Any
 
-from src.python.core.code_utils import to_fmp_symbol
+from src.python.core.code_utils import to_exchange_symbol, to_fmp_symbol
 from src.python.core.datasource_credential import (
     DEFAULT_DATA_KEY_FILE,
     CredentialSpec,
@@ -325,12 +325,10 @@ def to_thscode(code: str, *, is_fund: bool = False) -> str:
         return f"{fmp[:-3]}.SH"
     if fmp.endswith((".SZ", ".BJ")):
         return fmp
-    # 场内 ETF/LOF：沪市 5xxxxx、深市 1xxxxx（to_fmp_symbol 不覆盖这两段）
-    if len(raw) == 6 and raw.isdigit():
-        if raw.startswith("5"):
-            return f"{raw}.SH"
-        if raw.startswith("1"):
-            return f"{raw}.SZ"
+    # 场内 ETF/LOF 段：判定收敛到 code_utils（to_fmp_symbol 不覆盖这两段）
+    exchange = to_exchange_symbol(raw)
+    if exchange is not None:
+        return exchange
     return ""
 
 
@@ -505,10 +503,9 @@ def fund_thscode_candidates(code: str) -> list[str]:
     if not raw.isdigit():
         return []
     cands: list[str] = []
-    if len(raw) == 6 and raw.startswith("5"):
-        cands.append(f"{raw}.SH")
-    if len(raw) == 6 and raw.startswith("1"):
-        cands.append(f"{raw}.SZ")
+    exchange_cand = to_exchange_symbol(raw)  # 场内 ETF 段 → 单一后缀候选
+    if exchange_cand is not None and len(raw) == 6:
+        cands.append(exchange_cand)
     if len(raw) <= 6:
         cands.append(f"{raw.zfill(6)}.OF")
     return list(dict.fromkeys(cands))
