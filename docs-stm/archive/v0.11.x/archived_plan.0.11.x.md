@@ -5,7 +5,7 @@
 > 涵盖版本：v0.11.0（2026-09-15）/ v0.11.1（2026-09-18：plan-52 矩阵命中源列 / plan-53 去重校准体系修整 / plan-54 48 小时技术债整改）/ v0.11.2（2026-09-24：plan-47 基金重仓 ROE 加权 / plan-48 场外流动性类型默认档）/ v0.11.3（2026-09-24：plan-50 巨潮 cninfo 财报备源）
 > 归档内容：本迭代已实现的计划项完成态记录（plan-44 报告增强子模块并入功能开关注册表；plan-45 报告章节整合；plan-46 景气度框架诊断；plan-51 同花顺官方金融数据接入五阶段；plan-47 景气度框架②维基金 ROE 加权 / plan-48 ④维场外流动性类型默认档 / plan-50 财报域巨潮备源；plan-58 数据源稳定性提升——指数历史双备源 + 重试补齐 + 状态补全）；
 > plan-42 / plan-43 摘要见 `../v0.10.x/archived_plan.0.10.x.md`
-> 设计文档索引：plan-45 的设计层与实施层文档归档于 `section-consolidation/`；plan-46 的设计文档归档于 `prosperity-framework/`；plan-51 的设计文档归档于 `hithink-data-source/`（均见文末）
+> 设计文档索引：plan-45 的设计层与实施层文档归档于 `section-consolidation/`；plan-46 的设计文档归档于 `prosperity-framework/`；plan-51 的设计文档归档于 `hithink-data-source/`；plan-53 的复核归档于 `dedup-anchor-calibration/`；plan-59~65 借鉴批：候选研究归档于 `tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md`、整体设计归档于 `llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md`（均见文末）
 
 ---
 ### P1 — 已完成（plan-44 完成态，2026-09-15 归档）

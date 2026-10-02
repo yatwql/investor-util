@@ -18,10 +18,10 @@
 | **测试用例** | — | — | **8,119 个** | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | **用户文档** | Markdown | **11** | **5,503** | 含 README.md（221 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 5,280 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| **项目文档** | Markdown | **147** | **57,135** | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 4 + archive md 132），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,877 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 132 | 45,436 | 各版本 changelog/plan/review-findings 与设计文档归档（132 md 45,436 行） |
-| ├ plan/ | 中间设计文件 | 4 | 736 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 192 行）、TradingAgents-CN 仓库可借鉴设计研究（114 行）与本批落地的 LLM 成本调节/自检/源指定整体设计（257 行） |
+| **项目文档** | Markdown | **147** | **57,138** | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 2 + archive md 134），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,880 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 134 | 45,809 | 各版本 changelog/plan/review-findings 与设计文档归档（134 md 45,809 行，含借鉴批候选研究与 LLM 成本调节/自检/源指定设计） |
+| ├ plan/ | 中间设计文件 | 2 | 363 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 192 行） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 版本演进对照（最初版本 → 最新发布 → 当前开发版）
@@ -1113,8 +1113,8 @@ investor-util/
 │   │   │   └── qa-concentration-chart-optimization/ # 集中度问答 + 穿透柱状图优化修复设计
 │   │   │       └── plan-fix-qa-concentration-and-chart-optimization.md # 集中度问答 + 柱状图优化修复
 │   │   ├── v0.11.x/                         # v0.11.x 版本归档（0.11 系列首份）
-│   │   │   ├── archived_changelog.0.11.x.md # v0.11.0 ~ v0.11.9 已发布变更记录
-│   │   │   ├── archived_plan.0.11.x.md    # plan-42 ~ plan-58 完成态记录（含设计文档索引）
+│   │   │   ├── archived_changelog.0.11.x.md # v0.11.0 ~ v0.11.10 已发布变更记录
+│   │   │   ├── archived_plan.0.11.x.md    # plan-42 ~ plan-69 完成态记录（含设计文档索引）
 │   │   │   ├── archived_review-findings.0.11.x.md # rf-380 ~ rf-478 已修复记录（v0.11.0 ~ v0.11.9 批次）
 │   │   │   ├── section-consolidation/     # plan-45 报告章节整合设计归档（设计层 + 实施层）
 │   │   │   │   ├── section-consolidation-design.md    # 设计层：四项合并/可见性模型扩展/约束对照/验收标准
@@ -1123,8 +1123,12 @@ investor-util/
 │   │   │   │   └── prosperity-framework-design.md # 上游归属与许可/数据可得性映射/六维口径（含两轮修订）/契约/约束对照/验收
 │   │   │   ├── hithink-data-source/       # plan-51 同花顺官方数据接入设计归档（五阶段完成态）
 │   │   │       └── hithink-financial-data-design.md # 覆盖边界/四域接入方案/实测字段与限流/验证计划/架构约束自查标准
-│   │   │   └── dedup-anchor-calibration/  # plan-53 新闻去重锚点校准复核归档
-│   │   │       └── dedup-anchor-calibration.md # 锚点混代证据/当前规则重判分布/原建议逐条核对与处置
+│   │   │   ├── dedup-anchor-calibration/  # plan-53 新闻去重锚点校准复核归档
+│   │   │   │   └── dedup-anchor-calibration.md # 锚点混代证据/当前规则重判分布/原建议逐条核对与处置
+│   │   │   ├── tradingagents-cn-borrow-research/ # plan-59~68 借鉴批候选研究归档（现状比对 + 终态标注）
+│   │   │   │   └── tradingagents-cn-borrow-candidates-research.md # 10 项候选借鉴分析（立项 plan-59~68/终态 6 落地 3 未采纳/共性教训）
+│   │   │   └── llm-depth-selfreview-source-override/ # plan-63/64/65 整体设计归档（实施完成态）
+│   │   │       └── report-depth-selfreview-source-override-design.md # 报告深度档位/LLM 生成后自检/调用级源指定设计（形态/分层不重叠/运行作用域/约束对照）
 │   │   └── v0.10.x/                         # v0.10.x 版本归档（changelog/plan/review-findings + 设计文档）
 │   │   │   ├── archived_plan.0.10.x.md      #    实现计划归档 v0.10.x（含设计文档索引）
 │   │   │   ├── archived_changelog.0.10.x.md #    变更日志归档 v0.10.x
@@ -1182,9 +1186,7 @@ investor-util/
 │   │   │       └── financial-indicator-source-design.md # 标准字段契约/全文解析支路/真实估值分位(TTM)/底座门禁/LLM 注入
 │   └── plan/                          #   中间设计文件（在办设计文档，扁平存放）；完成后随完成态移入对应版本的归档子目录
 │       ├── jev-news-correlation-evaluation.md # 评测方案（三方对照：关键词/现网生成/Jev；预注册阈值与 go-no-go 判定）
-│       ├── jev-news-correlation-design.md # 设计草案（独立于对话链的类型化判定通道/模板理由/降级矩阵）
-│       ├── tradingagents-cn-research.md # TradingAgents-CN 仓库研究：可借鉴设计分析（候选借鉴项 10 条，各自立项 plan-59~plan-68）
-│       └── llm-depth-selfreview-source-override-design.md # LLM 成本调节/生成后自检/调用级源指定：整体设计（档位形态/分层不重叠/运行作用域覆盖/C 约束自检）
+│       └── jev-news-correlation-design.md # 设计草案（独立于对话链的类型化判定通道/模板理由/降级矩阵）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
