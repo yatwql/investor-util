@@ -805,7 +805,7 @@ Web 模式（浏览器界面）提供「配置编辑」面板，可修改的配�
 | 持仓匿名化 | `anonymization.mode`（off / code_display / full_anonymous / summary） | `[A]` |
 | 对比指数池 | `comparison_indices`（增 / 删 / 重置默认） | `[I]` |
 | LLM 分析章节 | `enabled_llm.global_macro` / `expert_review` / `health_check` / `penetration_deep` / `news_correlation` | `[S]` 标准模块 |
-| 实验性功能 | `llm_debate_procon` / `decision_reflection` / `prosperity_framework` | `[S]` 实验块（6-8） |
+| 实验性功能 | `llm_debate_procon` / `decision_reflection` / `prosperity_framework` | `[S]` 实验块（7-9） |
 | 常规开关 | `deterministic_signal` / `module_quality_gate` / `decision_header_parse` / `llm_debate_conditional` / `datasource_credential_ready` / `metrics_*`（6 项）/ `enable_interactive_charts` / `doctor_check` / `datasource_adapter` / `feeder_penetration` | `[S]` 常规块 |
 
 **写入行为**：

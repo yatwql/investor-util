@@ -542,7 +542,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
       ]
     },
     // 集中度问答阈值 — 辩论流程内建段落的触发线
-    "qa_concentration": {
+    "concentration_qa": {
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）

@@ -306,7 +306,7 @@ investor-util/
 │   │   │   ├── decision_llm_capture.py # 决策复盘·LLM 操作建议表结构化解析（表头识别→逐代码方向登记，同日去重）
 │   │   │   ├── decision_settlement.py #  决策复盘·结算服务（到期 pending 用真实后续行情结算，方向命中/超额 alpha）
 │   │   │   ├── decision_review_block.py # 决策复盘·「历史决策复盘」区块数据组装（available/免责声明/命中率/近期明细）
-│   │   │   ├── signal_record.py      #   确定性信号沉淀适配器（五类评级→账本记录，含实时-非实时来源标注，实验开关 signal_ledger）
+│   │   │   ├── signal_record.py      #   确定性信号沉淀适配器（五类评级→账本记录，含实时-非实时来源标注，开关 deterministic_signal）
 │   │   │   ├── portfolio_history.py  #   组合历史净值走势分析
 │   │   │   ├── portfolio_history_drawdown_sheet.py # 组合历史走势与回撤 Excel 页签（一章两区块：走势表 + 回撤矩阵 + 危机区间标注）
 │   │   │   ├── position_structure_sheet.py # 持仓结构与集中度 Excel 页签（一章三区块：重合度 + 相关性 + 集中度）
@@ -370,7 +370,7 @@ investor-util/
 │   │   │   ├── decision_header.py    #   决策头解析（决策词归一/优先级/代码提取/结构化决策头/缓存后缀），无 report/llm 依赖
 │   │   │   ├── decision_ledger.py    #   决策跨期反思账本（事件 JSONL 持久化/结算折叠/教训区块+缓存指纹/开关），无 report/llm 依赖
 │   │   │   ├── experiment_stats.py   #   实验功能使用统计（启用计数/最近启用日期，data/state/experiment_stats.json；为转正/撤销决策提供客观数据）
-│   │   │   ├── signal_ledger.py      #   确定性信号沉淀账本（五类评级登记/幂等去重/实时-非实时标签折叠/摘要+缓存指纹/开关），无 analysis 依赖
+│   │   │   ├── signal_ledger.py      #   确定性信号沉淀账本（五类评级登记/幂等去重/实时-非实时标签折叠/摘要+缓存指纹/开关 deterministic_signal），无 analysis 依赖
 │   │   │   ├── perf.py               #   性能收集（PerfCollector 计时 + 数据源健康检查持久化）
 │   │   │   ├── provider_registry.py  #   数据源注册中心（熔断器/会话缓存）
 │   │   │   ├── trading_calendar.py   #   交易日历原语（唯一实现：交易日判定/最近及前一交易日/交易日区间计数，akshare 日历缓存；各层共用，report/market_value.py 按原公共名重新导出）
