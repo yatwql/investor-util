@@ -39,7 +39,7 @@
   <rect x="670" y="224" width="310" height="4" rx="2" fill="#a78bfa"/>
   <text x="688" y="132" font-size="20">🤖</text>
   <text x="724" y="132" font-size="16" font-weight="700" fill="#e8f1fb">LLM 智囊团</text>
-  <text x="688" y="170" font-size="13" fill="#9fb6d0">圆桌复盘 · 正反辩论 · 多 Provider 链式分发</text>
+  <text x="688" y="170" font-size="13" fill="#9fb6d0">圆桌复盘 · 正反辩论 · 链式分发</text>
   <text x="688" y="194" font-size="13" fill="#9fb6d0">事实校验 · 质量分级 A~F · 指纹缓存</text>
 
   <!-- 卡4 量化风控 -->

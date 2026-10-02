@@ -48,7 +48,7 @@
   <rect x="40" y="262" width="168" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
   <text x="56" y="302" font-size="22">🤖</text>
   <text x="84" y="294" font-size="16" font-weight="700" fill="#e8f1fb">Claude</text>
-  <text x="84" y="316" font-size="11" fill="#9fb6d0">Anthropic · Opus/Sonnet</text>
+  <text x="84" y="316" font-size="11" fill="#9fb6d0">Anthropic 系列</text>
 
   <rect x="228" y="262" width="168" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
   <text x="244" y="302" font-size="22">🟢</text>
@@ -63,7 +63,7 @@
   <rect x="604" y="262" width="168" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
   <text x="620" y="302" font-size="22">🌙</text>
   <text x="648" y="294" font-size="16" font-weight="700" fill="#e8f1fb">Kimi</text>
-  <text x="648" y="316" font-size="11" fill="#9fb6d0">Anthropic 兼容端点</text>
+  <text x="648" y="316" font-size="11" fill="#9fb6d0">月之暗面 · 长文本</text>
 
   <rect x="792" y="262" width="168" height="74" rx="12" fill="#20375a" stroke="#33608c"/>
   <text x="808" y="302" font-size="22">✨</text>
