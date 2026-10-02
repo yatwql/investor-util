@@ -110,7 +110,7 @@
       ]
     },
     // 集中度问答 — 集中度风险问答块
-    "qa_concentration": {
+    "concentration_qa": {
       "threshold": 0.20
     },
     // 单次报告辩论模式总 token 预算上限（超出后回退标准模式）
