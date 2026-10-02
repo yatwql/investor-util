@@ -18,7 +18,7 @@
 
 - **测试用例的 Windows 可移植性修复（rf-538）**：13 例失败全部为断言不可移植（非生产缺陷）——POSIX 权限位断言（`os.chmod`/`st_mode` 在 Windows 无意义，5 例加 `skipif(os.name == "nt")`）、`os.geteuid` 仅 POSIX（1 例跳过）、`asyncio.ProactorEventLoop` 启动用 `socket.socketpair()`（内部退化为回环 `connect`）被网络守卫误阻（守卫加回环豁免：`127.0.0.0/8`、`::1`、`localhost` 放行，外网仍阻断；已加 sanity 验证）、`/tmp` 与 `/` 分隔符硬编码（改 `Path` 结构断言 / `is_relative_to(PROJECT_ROOT)`）、`endswith("a/b")` 反斜杠失配（改 `Path(path).parts[-2:]`）。
 
-- **pre-commit 统计快照回写错误用例数（rf-539）**：`.githooks/pre-commit` 的解释器探测只认 POSIX 布局（`.venv/bin/python`），Windows 下静默回退到系统 `python`（无项目依赖、pytest 收集口径不同，实测 7964 vs 完整 8173），提交时把错误用例数回写进 `folders.md`（正是 rf-538 追踪到的 7964 的真实来源）。修复探测次序（Windows `Scripts/python.exe` 优先），错误值已改回 8,173。
+- **pre-commit 统计快照回写错误用例数（rf-540）**：`.githooks/pre-commit` 的解释器探测只认 POSIX 布局（`.venv/bin/python`），Windows 下静默回退到系统 `python`（无项目依赖、pytest 收集口径不同，实测 7964 vs 完整 8173），提交时把错误用例数回写进 `folders.md`（正是 rf-538 追踪到的 7964 的真实来源；编号与远程另批修复撞号，本条重编为 rf-540）。修复探测次序（Windows `Scripts/python.exe` 优先），错误值已改回 8,173。
 
 - **`test_real_repo_sync_idempotent` 在 xdist 下的假失败修复（rf-538 后续）**：该用例经由 `_sync()` 触发嵌套全量 `pytest --collect-only`，在 xdist 并行套件运行中被资源争用采到不完整集合（实测 7964 vs 完整 8173），幂等断言假红。改为从 `folders.md`「测试用例」行注入登记用例数（`test_count=` 参数本就为测试暴露），真实 `_stats_actual()` 照常实测——同步逻辑的真实仓库幂等性照旧被覆盖，不再有嵌套收集脆弱性。附带将 `TestRel` 断言随 `rel()` 语义更新（POSIX 分隔符契约），并补一条 POSIX 分隔符钉桩用例。
 

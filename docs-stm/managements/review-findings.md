@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.12-dev
-> **编号源**：`rf-next = 540`（新增问题取此编号，完成后更新为 +1；已用最大 rf-539，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 541`（新增问题取此编号，完成后更新为 +1；已用最大 rf-540，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -56,7 +56,7 @@
 | **rf-536** | `collect-test-coverage.py` GBK 输出 vs 消费方 UTF-8 解码 → `UnicodeDecodeError` | 已修复（子进程 `reconfigure(encoding="utf-8")`） |
 | **rf-537** | `_collect_test_snapshot` 未处理 `stdout=None` → `re.search(None)` `TypeError` 使 `--sync` 堆栈退出 | 已修复（`errors="replace"` + 空值降级 + 4 例回归） |
 | **rf-538** | 13 例测试断言的 Windows 不可移植（POSIX 权限位/geteuid/socketpair/`/tmp`/分隔符） | 已修复（5 跳过 + 8 跨平台改写，全绿） |
-| **rf-539** | `.githooks/pre-commit` 解释器探测只认 POSIX 布局，Windows 下回退系统 Python，统计快照回写错误用例数（7964 vs 8173） | 已修复（探测次序加 Windows `Scripts/python.exe` 优先；错误值已修正） |
+| **rf-540** | `.githooks/pre-commit` 解释器探测只认 POSIX 布局，Windows 下回退系统 Python，统计快照回写错误用例数（7964 vs 8173） | 已修复（探测次序加 Windows `Scripts/python.exe` 优先；错误值已修正） |
 
 
 ## 已解决问题
