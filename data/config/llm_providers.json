@@ -33,9 +33,9 @@
       "timeout": 120
     },
     {
-      "name": "kimi-opencode-go",
+      "name": "opencode-go",
       "provider": "claude",
-      "credentials_ref": "kimi-opencode-go",
+      "credentials_ref": "opencode-go",
       "priority": 30,
       "timeout": 120,
       // 订阅制端点收紧节流（与按量端点放开相对）：最小间隔 1s + 在途并发 1
