@@ -10,6 +10,8 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
 import pytest
 
 from src.python.core import decision_ledger as dl
@@ -97,9 +99,12 @@ class TestAppendAndLoad:
         assert len(events) == 1
         # 确认不落到仓库真实 data/state 下
         from src.python.core import decision_ledger as mod
+        from src.python.core.constants import PROJECT_ROOT
 
         assert "decision_ledger.jsonl" in mod._DECISION_LEDGER_FILE
-        assert mod._DECISION_LEDGER_FILE.startswith("/tmp") or "tmp" in mod._DECISION_LEDGER_FILE
+        # 跨平台：重定向后的路径须落在仓库树之外（Linux 的 /tmp 与 Windows 的
+        # %TEMP% 同级语义；硬编码 "/tmp" 会在 Windows 上误报）
+        assert not Path(mod._DECISION_LEDGER_FILE).resolve().is_relative_to(Path(PROJECT_ROOT).resolve())
 
 
 class TestSameDayPending:

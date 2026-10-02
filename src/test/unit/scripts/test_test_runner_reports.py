@@ -63,12 +63,13 @@ class TestPhaseReportPath:
     def test_phased_gets_own_file(self):
         runner = _load_runner()
         path = runner._phase_report_path("dev-verify", "A")
-        assert path.endswith("dev-verify/report_phase_A.html")
-        assert runner._phase_report_path("dev-verify", "B").endswith("report_phase_B.html")
+        assert Path(path).parts[-2:] == ("dev-verify", "report_phase_A.html")
+        assert Path(runner._phase_report_path("dev-verify", "B")).name == "report_phase_B.html"
 
     def test_non_phased_keeps_plain_name(self):
         """非分阶段模式维持 report.html（既有文档/CI artifact 约定不变）。"""
-        assert _load_runner()._phase_report_path("unit").endswith("unit/report.html")
+        path = Path(_load_runner()._phase_report_path("unit"))
+        assert path.parts[-2:] == ("unit", "report.html")
 
     def test_build_args_uses_phase_path(self):
         runner = _load_runner()

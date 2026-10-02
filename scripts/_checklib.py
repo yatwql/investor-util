@@ -21,11 +21,17 @@ REPO_ROOT: Path = Path(__file__).resolve().parent.parent
 
 
 def rel(path: Path) -> str:
-    """仓库相对路径（非仓库内路径原样返回，便于单测传合成路径）。"""
+    """仓库相对路径，**POSIX 分隔符**（非仓库内路径原样返回，便于单测传合成路径）。
+
+    统一用 `/` 而非 OS 原生分隔符：仓库相对路径的消费方（`folders.md` 目录树、
+    文档内文件引用、CI 日志）一律是 POSIX 形式，Windows 下若返回 `\\`，
+    调用方的字符串比较/拼接会全部失配（`parse_tree_paths` 的 `/` 拼接
+    与 `_actual_files()` 的 `\\` 比对不上，导致“目录树缺全部条目”误报）。
+    """
     try:
-        return str(Path(path).resolve().relative_to(REPO_ROOT))
+        return Path(path).resolve().relative_to(REPO_ROOT).as_posix()
     except ValueError:
-        return str(path)
+        return Path(path).as_posix()
 
 
 def add_common_args(parser: argparse.ArgumentParser) -> None:

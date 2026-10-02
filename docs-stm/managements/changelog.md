@@ -18,6 +18,8 @@
 
 - **测试用例的 Windows 可移植性修复（rf-538）**：13 例失败全部为断言不可移植（非生产缺陷）——POSIX 权限位断言（`os.chmod`/`st_mode` 在 Windows 无意义，5 例加 `skipif(os.name == "nt")`）、`os.geteuid` 仅 POSIX（1 例跳过）、`asyncio.ProactorEventLoop` 启动用 `socket.socketpair()`（内部退化为回环 `connect`）被网络守卫误阻（守卫加回环豁免：`127.0.0.0/8`、`::1`、`localhost` 放行，外网仍阻断；已加 sanity 验证）、`/tmp` 与 `/` 分隔符硬编码（改 `Path` 结构断言 / `is_relative_to(PROJECT_ROOT)`）、`endswith("a/b")` 反斜杠失配（改 `Path(path).parts[-2:]`）。
 
+- **`test_real_repo_sync_idempotent` 在 xdist 下的假失败修复（rf-538 后续）**：该用例经由 `_sync()` 触发嵌套全量 `pytest --collect-only`，在 xdist 并行套件运行中被资源争用采到不完整集合（实测 7964 vs 完整 8173），幂等断言假红。改为从 `folders.md`「测试用例」行注入登记用例数（`test_count=` 参数本就为测试暴露），真实 `_stats_actual()` 照常实测——同步逻辑的真实仓库幂等性照旧被覆盖，不再有嵌套收集脆弱性。附带将 `TestRel` 断言随 `rel()` 语义更新（POSIX 分隔符契约），并补一条 POSIX 分隔符钉桩用例。
+
 ### 文档治理与脚本收编
 
 - **check-code-traces 拆包（rf-533）**：1,016 行破 800 硬上限的唯一脚本，按「模式表/扫描/守卫」拆为 `scripts/_traces_code/` 六模块包，入口只留 CLI（185 行）与原面 re-export；`_traces_common.py` 并入包内 `exemptions.py` 并删兼容壳（测试改指向子模块）；check-task-numbering / check-test-markers / check-doc-traces 三脚本迁移 `_checklib` 契约（补 `-v`、统一输出与退出码，17 处 sys.path 样板文本统一）。scripts 单测 428 例全通。

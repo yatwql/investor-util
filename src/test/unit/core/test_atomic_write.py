@@ -162,11 +162,13 @@ class TestWriteBytesAtomic:
         assert aw.write_bytes_atomic(str(target), b"\x00\xff\x01") is True
         assert target.read_bytes() == b"\x00\xff\x01"
 
+    @pytest.mark.skipif(os.name == "nt", reason="Windows 无 POSIX 权限位，chmod 不退化为 0644")
     def test_mode_applied(self, tmp_path):
         target = tmp_path / "a.bin"
         assert aw.write_bytes_atomic(str(target), b"x", mode=0o644) is True
         assert os.stat(target).st_mode & 0o777 == 0o644
 
+    @pytest.mark.skipif(os.name == "nt", reason="Windows 无 POSIX 权限位，stat 恒为 0o666")
     def test_no_mode_keeps_mkstemp_default(self, tmp_path):
         target = tmp_path / "a.bin"
         assert aw.write_bytes_atomic(str(target), b"x") is True

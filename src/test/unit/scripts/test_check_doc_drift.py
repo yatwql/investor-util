@@ -23,12 +23,23 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]  # 仓库根目录（src/test/unit/scripts 向上 4 级）
 _SCRIPTS_DIR = _REPO_ROOT / "scripts"
+
+
+def _documented_test_count(doc_text: str) -> int | None:
+    """从 folders.md 「测试用例」行的「N 个」取当前登记用例数（避免嵌套 pytest 收集）。"""
+    for line in doc_text.splitlines():
+        if line.startswith("|") and "测试用例" in line:
+            m = re.search(r"([\d,]+)\s*个", line)
+            if m:
+                return int(m.group(1).replace(",", ""))
+    return None
 
 
 def _load_script(name: str):
@@ -48,8 +59,11 @@ def drift():
 
 
 @pytest.fixture(scope="module")
-def drift_parts():
-    """实现包各子模块（补丁须打到**持有被替换符号的模块**，见 CLAUDE.md「scripts 共享设施」条）。"""
+def drift_parts(drift):
+    """实现包各子模块（补丁须打到**持有被替换符号的模块**，见 CLAUDE.md「scripts 共享设施」条）。
+
+    依赖 `drift`：入口模块加载时才会把 `scripts/` 加入 sys.path（`_doc_drift` 才可导入）。
+    """
     import _doc_drift
 
     return _doc_drift
@@ -642,6 +656,61 @@ class TestThinkingSupportMatrix:
         assert drift.check_thinking_support_matrix("") == []
 
 
+class TestCollectTestSnapshot:
+    """`_collect_test_snapshot` 子进程快照解析与编码降级（回归：Windows cp936 下快照崩溃）。
+
+    背景：`collect-test-coverage.py` 曾在中文 Windows 上按 GBK 写出中文分组名，
+    消费方按 UTF-8 解码 → reader 线程 `UnicodeDecodeError` → `proc.stdout` 为 None
+    → `re.search(..., None)` 抛 `TypeError`，`check-doc-drift.py --sync` 直接堆栈退出。
+    """
+
+    def test_parses_counts(self, drift_parts, monkeypatch):
+        """正常 UTF-8 输出 → 解析出总收集与各分组计数。"""
+
+        class _Proc:
+            stdout = "\n总收集: 8167 项\n\n### 模式对应测试量\nunit: 7846\nedge: 949\n"
+
+        monkeypatch.setattr(drift_parts._shared.subprocess, "run", lambda *a, **k: _Proc())
+        snap = drift_parts._shared._collect_test_snapshot()
+        assert snap["_总收集"] == 8167
+        assert snap["unit"] == 7846
+        assert snap["edge"] == 949
+
+    def test_none_stdout_degrades_without_crash(self, drift_parts, monkeypatch):
+        """stdout 为 None（reader 线程解码异常兑底）→ 返回空快照，不得抛 TypeError。"""
+
+        class _Proc:
+            stdout = None
+
+        monkeypatch.setattr(drift_parts._shared.subprocess, "run", lambda *a, **k: _Proc())
+        assert drift_parts._shared._collect_test_snapshot() == {}
+
+    def test_empty_stdout_degrades_without_crash(self, drift_parts, monkeypatch):
+        """stdout 为空字符串 → 返回空快照。"""
+
+        class _Proc:
+            stdout = "   \n"
+
+        monkeypatch.setattr(drift_parts._shared.subprocess, "run", lambda *a, **k: _Proc())
+        assert drift_parts._shared._collect_test_snapshot() == {}
+
+    def test_subprocess_run_uses_error_tolerant_encoding(self, drift_parts, monkeypatch):
+        """回归：调用 subprocess.run 必须带 errors="replace"（不因个别非法字节在 reader 线程崩）。"""
+        captured: dict = {}
+
+        class _Proc:
+            stdout = "总收集: 1 项\n"
+
+        def _fake_run(*args, **kwargs):
+            captured.update(kwargs)
+            return _Proc()
+
+        monkeypatch.setattr(drift_parts._shared.subprocess, "run", _fake_run)
+        drift_parts._shared._collect_test_snapshot()
+        assert captured.get("encoding") == "utf-8"
+        assert captured.get("errors") == "replace"
+
+
 class TestGeneratedArtifacts:
     """构建/缓存产物不得触发目录树误报（CI 的 `pip install -e` 会在 src/ 下生成 *.egg-info）。"""
 
@@ -673,7 +742,7 @@ class TestGeneratedArtifacts:
 
         def _fake_rel(path):
             try:
-                return str(Path(path).relative_to(tmp_path))
+                return Path(path).relative_to(tmp_path).as_posix()
             except ValueError:
                 return real_rel(path)
 
@@ -695,7 +764,7 @@ class TestGeneratedArtifacts:
 
         def _fake_rel(path):
             try:
-                return str(Path(path).relative_to(tmp_path))
+                return Path(path).relative_to(tmp_path).as_posix()
             except ValueError:
                 return real_rel(path)
 
@@ -767,10 +836,18 @@ class TestProjectStatsSync:
         assert applied == []
 
     def test_real_repo_sync_idempotent(self, drift, drift_parts):
-        """真实仓库：同步是幂等的（当前一致 → 无应用项、文件零改动）。"""
+        """真实仓库：同步是幂等的（当前一致 → 无应用项、文件零改动）。
+
+        test_count 显式注入（从 folders.md 「测试用例」行读当前登记值），**不触发
+        嵌套全量 pytest 收集**——测试运行在 xdist worker 内，嵌套收集会与并行套件
+        争用资源而采到不完整集合（实测 7964 vs 完整 8173），使幂等断言假失败。
+        真实 `_stats_actual()` 仍照常实测，故同步逻辑的真实仓库幂等性照旧被覆盖。
+        """
         from _doc_drift._tree import _FOLDERS_MD, sync_project_stats as _sync
 
         original = Path(_FOLDERS_MD).read_text(encoding="utf-8")
-        applied = _sync()
+        documented = _documented_test_count(original)
+        assert documented is not None, "folders.md 「测试用例」行缺少数量"
+        applied = _sync(test_count=documented)
         after = Path(_FOLDERS_MD).read_text(encoding="utf-8")
         assert applied == [] and after == original

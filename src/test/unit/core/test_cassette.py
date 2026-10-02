@@ -161,6 +161,7 @@ class TestSaveLoad:
         _write_cassette(tmp_path, "demo", [_interaction("https://a.b/x")])
         assert sorted(os.listdir(tmp_path)) == ["demo.json"]
 
+    @pytest.mark.skipif(os.name == "nt", reason="Windows 无 POSIX 权限位，chmod 不退化为 0644")
     def test_saved_file_is_group_readable(self, tmp_path):
         """落盘权限为 0644（入库夹具，非 mkstemp 默认的 0600）。"""
         _write_cassette(tmp_path, "demo", [_interaction("https://a.b/x")])

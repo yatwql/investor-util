@@ -29,6 +29,7 @@ def _write(path, content):
     return path
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows 无 POSIX 权限位，chmod 0o500 不限制写入，无法构造只读目录")
 def test_backup_failure_aborts_promote(tmp_path, monkeypatch):
     """backup 失败（备份目标不可写）→ 抛错，正式文件与 .bak 均完好（不继续 promote）。"""
     formal = _write(tmp_path / "holdings" / "持仓.xlsx", "旧持仓")

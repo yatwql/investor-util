@@ -640,6 +640,11 @@ def _block_external_network(monkeypatch, request):
       不是未 mock 的外网请求。
     - ``socket.socket`` 在 ``socket.py`` 中是 Python 类（继承 ``_socket.socket``），
       其 ``connect`` / ``connect_ex`` 可被 monkeypatch。
+    - **回环地址豁免**：``127.0.0.0/8``、``::1``、``localhost`` 的连接放行。回环
+      只在进程内部通信，到不了外部服务，不违背守卫意图；而 Windows 上
+      ``asyncio.ProactorEventLoop`` 启动即用 ``socket.socketpair()``（内部退化为
+      回环 ``connect``）建事件循环自管道，若一并阻断，任何 ``asyncio.run()`` 都会
+      在事件循环初始化阶段硬失败（与「未 mock 外网」无关）。
     """
     import socket as _socket
 
@@ -649,12 +654,38 @@ def _block_external_network(monkeypatch, request):
     if request.node.get_closest_marker("live") is not None:
         return
 
+    def _is_loopback(addr: object) -> bool:
+        """目标地址是否回环（unix socket 路径、None 等非 IP 目标不算）。"""
+        if not isinstance(addr, tuple) or len(addr) < 2:
+            return False
+        host = addr[0]
+        if not isinstance(host, str):
+            return False
+        if host in ("localhost", "::1"):
+            return True
+        return host.startswith("127.")
+
+    _real_connect = _socket.socket.connect
+    _real_connect_ex = _socket.socket.connect_ex
+    _real_create_connection = _socket.create_connection
+
+    def _guard(real):
+        """包装真实建连函数：回环放行，其余抛异常。"""
+
+        def _wrapped(*args, **kwargs):
+            if any(_is_loopback(arg) for arg in args):
+                return real(*args, **kwargs)
+            raise NetworkBlockedInTests(BLOCKED_NETWORK_MSG)
+
+        return _wrapped
+
+    monkeypatch.setattr(_socket.socket, "connect", _guard(_real_connect))
+    monkeypatch.setattr(_socket.socket, "connect_ex", _guard(_real_connect_ex))
+    monkeypatch.setattr(_socket, "create_connection", _guard(_real_create_connection))
+
     def _raise(*args, **kwargs):
         raise NetworkBlockedInTests(BLOCKED_NETWORK_MSG)
 
-    monkeypatch.setattr(_socket.socket, "connect", _raise)
-    monkeypatch.setattr(_socket.socket, "connect_ex", _raise)
-    monkeypatch.setattr(_socket, "create_connection", _raise)
     monkeypatch.setattr(_socket, "getaddrinfo", _raise)
 
 
