@@ -10,20 +10,20 @@
 <!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **7846** | ~31s |
-| `standard` | **6829** | ~20s |
-| `scenario` | **250** | ~5s |
-| `regression` | **250** | ~5s |
-| `dev-verify` | **3456** | ~24s |
-| `verify` | **5530** | ~18s |
-| `integration` | **292** | ~8s |
-| `edge` | **949** | ~11s |
-| `data` | **70** | ~3s |
-| `all` | **8167** | ~33s |
-| `smoke` | **26** | ~3s |
-| `report` | **2010** | ~25s |
-| `all_no_unit` | **321** | ~6s |
-| `scenario_extreme` | **9** | ~3s |
+| `unit` | **7870** | ~3min |
+| `standard` | **6853** | ~3min |
+| `scenario` | **250** | ~51s |
+| `regression` | **250** | ~1min |
+| `dev-verify` | **3480** | ~4min |
+| `verify` | **5554** | ~4min |
+| `integration` | **292** | ~2min |
+| `edge` | **949** | ~1min |
+| `data` | **70** | ~31s |
+| `all` | **8191** | ~4min |
+| `smoke` | **26** | ~28s |
+| `report` | **2010** | ~2min |
+| `all_no_unit` | **321** | ~1min |
+| `scenario_extreme` | **9** | ~32s |
 <!-- mode-count-table:end -->
 
 > 注：典型耗时按 2026-09-29 当前开发机实测（Linux x86_64，Intel i5-13500H，12 核 16 线程，46.8 GiB 内存；pytest-xdist worker=8，即 medium 级别 = 50% 核数）。**耗时与硬件/操作系统/并行度强相关**——OS（调度器/文件系统/进程创建开销/电源管理）、CPU 或并行度不同时各模式耗时可能数倍于此，仅作相对量级参考。跨机器回填可用 `--mode bench --update-docs` 自动更新模式对应测试量 + 下方两张环境耗时对照表。
@@ -39,7 +39,7 @@
 #### 采集环境属性
 
 <!-- env-table:start -->
-| 环境属性 | dragonball（2026-10-02 实测） | stallman-NB1（2026-08-06 实测） |
+| 环境属性 | dragonball（2026-10-02 实测） | stallman-NB1（2026-10-02 实测） |
 |:---------|:---------------------------|:---|
 | 操作系统 | Linux | Windows |
 | 系统版本 | 6.18.25-x64v3-xanmod1 | 11 |
@@ -54,30 +54,30 @@
 | Python 版本 | 3.13.5 | 3.13.0 |
 | 并行级别 | medium | medium |
 | worker 数 | 8 | 4 |
-| 采集日期 | 2026-10-02 | 2026-08-06 |
+| 采集日期 | 2026-10-02 | 2026-10-02 |
 <!-- env-table:end -->
 
 #### 各模式耗时对照
 
 <!-- duration-table:start -->
-| `--mode` | dragonball（2026-10-02 实测） | stallman-NB1（2026-08-06 实测） |
+| `--mode` | dragonball（2026-10-02 实测） | stallman-NB1（2026-10-02 实测） |
 |:---------|:---------------------------:|:---:|
-| `unit` | ~31s | ~4min |
-| `standard` | ~20s | ~4min |
-| `scenario` | ~5s | ~3min |
-| `regression` | ~5s | ~3min |
-| `verify,regression` | ~23s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
-| `dev-verify` | ~24s | ~2min |
-| `verify` | ~18s | ~46s |
-| `integration` | ~8s | ~1min |
-| `edge` | ~11s | ~32s |
-| `data` | ~3s | ~14s |
-| `all` | ~33s | ~3min |
-| `smoke` | ~3s | ~9s |
+| `unit` | ~31s | ~3min |
+| `standard` | ~20s | ~3min |
+| `scenario` | ~5s | ~51s |
+| `regression` | ~5s | ~1min |
+| `verify,regression` | ~23s（verify+regression 顺序之和） | ~5min（verify+regression 顺序之和） |
+| `dev-verify` | ~24s | ~4min |
+| `verify` | ~18s | ~4min |
+| `integration` | ~8s | ~2min |
+| `edge` | ~11s | ~1min |
+| `data` | ~3s | ~31s |
+| `all` | ~33s | ~4min |
+| `smoke` | ~3s | ~28s |
 | `report` | ~25s | ~2min |
 | `all_no_unit` | ~6s | ~1min |
-| `scenario_extreme` | ~3s | ~9s |
-| 数据更新时间 | 2026-10-02 | 2026-08-06 |
+| `scenario_extreme` | ~3s | ~32s |
+| 数据更新时间 | 2026-10-02 | 2026-10-02 |
 <!-- duration-table:end -->
 
 > 两机差距因模式而异：大多数模式 dragonball 较 stallman-NB1 快约 **2~13 倍**（如 `unit` ~28s vs ~4min、`all` ~39s vs ~3min、`data` ~3s vs ~14s），最接近的是 `verify`（~19s vs ~46s）与 `edge`（~19s vs ~32s）。差距为 CPU 代差 + OS 差异 + 并行度差异的叠加（未逐项归因）。dragonball worker=8（medium=50% 核数），stallman-NB1 worker=4。
