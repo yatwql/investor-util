@@ -373,8 +373,8 @@ class TestFetchIndexKline(unittest.TestCase):
 class TestPagingRateLimitDelegation(unittest.TestCase):
     """历史净值分页间隔走 RateLimiter 唯一原语。
 
-    回归背景：原实现为裸 ``time.sleep(0.3)``，间隔语义无法统一模拟与调优；
-    迁移后由模块级 RateLimiter 提供 elapsed 感知的最小间隔。
+    分页间隔语义由模块级 RateLimiter 提供（elapsed 感知的最小间隔，
+    与 cninfo/datasink/hithink 同模式）。
     """
 
     def test_pager_limiter_singleton_and_interval(self):

@@ -38,6 +38,7 @@ import contextlib
 import json
 import logging
 import os
+import shutil
 import tempfile
 from typing import Any
 
@@ -51,6 +52,7 @@ def write_text_atomic(
     prefix: str = ".atomic_",
     log_tag: str = "atomic",
     noun: str = "文件",
+    mode: int | None = None,
 ) -> bool:
     """原子写入文本文件（父目录不存在时自动创建）。
 
@@ -60,6 +62,7 @@ def write_text_atomic(
         prefix: 临时文件名前缀（各调用点保留原值，便于故障定位）
         log_tag: 日志标签（如 "breaker"）
         noun: 日志中对该文件的称谓（如 "静默期状态"）
+        mode: 可选权限位（如 ``0o644``）；mkstemp 默认 0600，需要放宽时显式给出
 
     Returns:
         是否落盘成功。写盘异常已在内部记日志并**不向上抛出**（本原语只负责尽力
@@ -81,6 +84,8 @@ def write_text_atomic(
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)
+        if mode is not None:
+            os.chmod(tmp_path, mode)
         _replace(tmp_path, path)
     except Exception:
         with contextlib.suppress(OSError):
@@ -132,3 +137,77 @@ def _replace(tmp_path: str, path: str) -> None:
         if os.path.exists(path):
             os.remove(path)
         os.rename(tmp_path, path)
+
+
+def write_bytes_atomic(
+    path: str,
+    data: bytes,
+    *,
+    prefix: str = ".atomic_",
+    log_tag: str = "atomic",
+    noun: str = "二进制文件",
+    mode: int | None = None,
+) -> bool:
+    """原子写入二进制文件（语义同 :func:`write_text_atomic`）。
+
+    Args:
+        path: 目标文件路径
+        data: 完整的目标二进制内容（覆盖式写入）
+        mode: 可选权限位（如 ``0o644``）；mkstemp 默认 0600，需要放宽时显式给出
+        其余参数同 :func:`write_text_atomic`
+
+    Returns:
+        是否落盘成功（语义同 :func:`write_text_atomic`）。
+    """
+    parent = os.path.dirname(path)
+    try:
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        fd, tmp_path = tempfile.mkstemp(dir=parent or ".", prefix=prefix, suffix=".tmp")
+    except OSError:
+        logger.exception("[%s] 准备写入失败（创建目录或临时文件）: %s", log_tag, path)
+        return False
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        if mode is not None:
+            os.chmod(tmp_path, mode)
+        _replace(tmp_path, path)
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.remove(tmp_path)
+        logger.exception("[%s] 写入%s失败: %s", log_tag, noun, path)
+        return False
+    return True
+
+
+def copy_file_atomic(
+    src: str,
+    dst: str,
+    *,
+    prefix: str = ".atomic_",
+    log_tag: str = "atomic",
+    noun: str = "文件",
+) -> None:
+    """原子复制：``shutil.copy2`` 到 dst 同目录临时文件 → :func:`_replace` 顶替 dst。
+
+    临时文件固定落在 dst 同目录（无论 src/dst 在什么位置，同文件系统保证
+    rename 原子），copy 中途失败不留半写态；Windows 目标被占用时经
+    :func:`_replace` 降级（先删再 rename）。
+
+    Raises:
+        OSError: copy/replace 失败（临时文件已清理后向上抛出，调用方自行降级）。
+    """
+    dst_dir = os.path.dirname(os.path.abspath(dst)) or "."
+    os.makedirs(dst_dir, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(dir=dst_dir, prefix=prefix, suffix=".tmp")
+    os.close(fd)
+    try:
+        shutil.copy2(src, tmp_path)
+        _replace(tmp_path, dst)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise

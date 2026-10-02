@@ -800,8 +800,8 @@ class TestBatchDispatcherRetry(unittest.TestCase):
 class TestBatchDispatcherRetryPolicyDelegation(unittest.TestCase):
     """retry_failed 退避走 core/retry 唯一原语（RetryPolicy + retry_transient）。
 
-    回归背景：原实现手写 ``for attempt`` + ``time.sleep(delay * (attempt + 2))``
-    退避算式，违反重试退避唯一原语约束；迁移后内部不应再有裸 sleep 循环。
+    退避算式统一收敛到 core/retry 原语：策略参数（attempts/linear/抖动）只在
+    RetryPolicy 一处表达，本接口不内联等待循环。
     """
 
     def setUp(self):
@@ -811,7 +811,7 @@ class TestBatchDispatcherRetryPolicyDelegation(unittest.TestCase):
         self.dispatcher.shutdown(wait=False)
 
     def test_multi_round_retry_recovers_progressively(self):
-        """max_retries=2：前两轮失败、第三轮成功 → 按轮次递补成功。"""
+        """max_retries=2：重试耗尽前补上成功 → 原地更新结果。"""
         attempts = [0]
 
         def task_factory(idx: int):
@@ -827,7 +827,7 @@ class TestBatchDispatcherRetryPolicyDelegation(unittest.TestCase):
         updated = self.dispatcher.retry_failed(results, task_factory, max_retries=2, delay=0.01, jitter=0.0)
         self.assertTrue(updated[0].success)
         self.assertEqual(updated[0].result, "recovered")
-        self.assertEqual(attempts[0], 3)  # 初轮 + 2 轮重试
+        self.assertEqual(attempts[0], 3)  # 尝试次数 = 1 + max_retries
 
     def test_retry_exhaustion_keeps_failed_result(self):
         """重试耗尽仍失败 → 原失败结果保留（不抛异常）。"""

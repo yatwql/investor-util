@@ -498,8 +498,8 @@ class TestFetchIndexHistory(unittest.TestCase):
 class TestFetchUsIndicesRetryPolicyDelegation(unittest.TestCase):
     """美股主链路重试走 core/retry 唯一原语（RetryPolicy + retry_transient）。
 
-    回归背景：原实现手写 ``for attempt in range(2)`` + 硬编码 ``time.sleep(1)``，
-    违反重试退避唯一原语约束；迁移后空响应同样计入「可重试结果」（轮空后落备链）。
+    主链路重试参数只在 RetryPolicy 一处表达（attempts=2/fixed/backoff=1s）；
+    空响应同样计入「可重试结果」，耗尽后落备链。
     """
 
     @patch("src.python.fetcher.index.cache_set")

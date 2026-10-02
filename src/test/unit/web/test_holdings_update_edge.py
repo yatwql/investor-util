@@ -53,6 +53,7 @@ def test_promote_copy_failure_keeps_old_and_bak(tmp_path, monkeypatch):
 
     # 原子写先 copy 到 .tmp 再 os.replace——copy2 目标恒为 .tmp。按调用次数触发：
     # 第 1 次 copy2 = 备份（放行，先落 .bak）；第 2 次 = promote 的 copy2（失败）
+    # （copy 迁入 core/atomic_write.copy_file_atomic 后，shutil 在该模块内使用，patch 对准其 import）
     real_copy2 = shutil.copy2
     calls = {"n": 0}
 
@@ -62,7 +63,7 @@ def test_promote_copy_failure_keeps_old_and_bak(tmp_path, monkeypatch):
             raise OSError("disk full")
         return real_copy2(src, dst)
 
-    with patch("src.python.web.holdings_update.shutil.copy2", side_effect=_flaky_copy2):
+    with patch("src.python.core.atomic_write.shutil.copy2", side_effect=_flaky_copy2):
         with pytest.raises(OSError):
             promote_upload_to_holdings(temp, formal)
 

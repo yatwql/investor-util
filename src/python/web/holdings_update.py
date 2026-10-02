@@ -12,33 +12,16 @@
 
 from __future__ import annotations
 
+from src.python.core.atomic_write import copy_file_atomic  # 原子复制唯一原语
 import logging
 import os
-import shutil
-import tempfile
 
 logger = logging.getLogger("invest")
 
 
 def _atomic_copy(src: str, dst: str) -> None:
-    """原子复制：mkstemp 到 dst 同目录 → os.replace 到 dst。
-
-    无论 src/dst 在哪个目录，临时文件都落在 dst 同目录（同文件系统，
-    os.replace 保证原子），避免跨文件系统 copy 出现半写态。
-    """
-    dst_dir = os.path.dirname(os.path.abspath(dst)) or "."
-    os.makedirs(dst_dir, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=dst_dir, prefix=".holdings-", suffix=".tmp")
-    os.close(fd)
-    try:
-        shutil.copy2(src, tmp_path)
-        os.replace(tmp_path, dst)
-    except Exception:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
-        raise
+    """原子复制（经 core/atomic_write 唯一原语：dst 同目录临时文件 + os.replace）。"""
+    copy_file_atomic(src, dst, prefix=".holdings-", log_tag="holdings", noun="持仓文件")
 
 
 def backup_holdings_file(holdings_path: str) -> str | None:

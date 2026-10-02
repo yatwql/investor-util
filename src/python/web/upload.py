@@ -21,15 +21,16 @@
 
 from __future__ import annotations
 
+from src.python.core.atomic_write import write_bytes_atomic  # 原子写唯一原语
 import logging
 import os
 import secrets
-import tempfile
 import threading
 import time
 from typing import BinaryIO, Callable
 
 logger = logging.getLogger("invest")
+
 
 # 项目根目录（绝对化拼接，不依赖 CWD，对齐路径绝对化约束）
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -164,18 +165,12 @@ def _read_and_validate_stream(stream: BinaryIO) -> bytes:
 
 
 def _persist_atomic(data: bytes) -> str:
-    """mkstemp 落盘 + os.replace 原子写为 {uuid}.xlsx。返回最终路径。"""
+    """上传文件原子落盘（经 core/atomic_write 唯一原语）为 {uuid}.xlsx。返回最终路径。"""
     os.makedirs(_UPLOAD_DIR, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=_UPLOAD_DIR, prefix=".upload-", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-    except Exception:
-        _remove_quiet(tmp_path)
-        raise
     final_name = f"{secrets.token_urlsafe(16)}.xlsx"
     final_path = os.path.join(_UPLOAD_DIR, final_name)
-    os.replace(tmp_path, final_path)
+    if not write_bytes_atomic(final_path, data, prefix=".upload-", log_tag="upload", noun="上传文件"):
+        raise OSError(f"上传文件落盘失败: {final_path}")
     return final_path
 
 
