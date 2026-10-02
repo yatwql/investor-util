@@ -16,6 +16,7 @@
 - **新增实验功能使用统计（`experiment_stats`）**：`src/python/core/experiment_stats.py` + `data/state/experiment_stats.json`——每次生成报告时记录各启用实验开关的**启用计数与最近启用日期**（报告入口 `log_experimental_features` 自动写入，写盘失败只告警不影响报告），为「转正 / 撤销」决策提供客观数据，不再靠代码行数与账本行数推测。入测试隔离（conftest 路径重定向）。
 - **doctor 复盘账本只读概览**：系统自检新增「决策复盘账本」（已结算/待结算计数与方向命中率）、「确定性信号账本」（实时/非实时累计与统计窗口）、「实验功能使用统计」（各开关累计启用次数）三行信息性检查——实验功能长期缺真实反馈就无法转正/撤销，这层可读视图让用户无需翻 data/state/ 即可看到积累状况。只读，不写不结算。
 - **验证死线与转正判据入 plan**：plan-70（decision_reflection 撤销死线与转正条件）、plan-71（prosperity_framework 转正判据）立项（观测手段即 `experiment_stats` + `doctor` 账本概览）。
+- **全量文档核对收尾（序号/面板编号/旧键名残留）**：逐份核对 10 份管理文档 + 11 份用户手册后共修 8 处不一致——① 用户手册面板编号残留旧布局（how-to-use-tui-menu.md 实验说明段、how-to-use-web-mode.md / how-to-config.md 的实验块范围 6-10/6-8 统一改为实验块 7-9）；② how-to-config-llm.md 示例 JSON 与 requirements.md R-LLM-DB-QA-CONCENTRATION-04 漏改的 `qa_concentration` 键名；③ folders.md 目录树 signal_record/signal_ledger 条目的「实验开关 signal_ledger」旧开关名；④ tui_menu.py 注释 Flag 列表、plan.md「当前迭代」漏列 plan-70/71、「四个 --ci」守卫数、plan-70 中非语义名 `problem_llm_capture`（实为 `decision_llm_capture`）。核对通过项：版本号一致性 13/13（0.11.11-dev）、编号源 plan-next=72 / rf-next=520 归档无冲突、7 个 --ci 守护脚本全绿、scripts 单测 421 通过。
 - **配套文档全面刷新**：README / how-to-config / how-to-use-tui-menu（开关分块与面板编号）/ how-to-use-cli-mode / how-to-config-llm / requirements（R-LLM-09 与 7.8.4）/ llm-technical / technical（语义命名表）/ developer-guide（转正判据段）/ folders / test-coverage（用例 8137 项）。
 
 ### 新增
