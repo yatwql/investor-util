@@ -44,6 +44,7 @@ __all__ = [
     "_is_trading_day",
     "count_trading_days_elapsed",
     "register_trading_days_fallback",
+    "elapsed_trading_days_with_natural_fallback",
     "get_last_trading_day",
     "get_prev_trading_day",
 ]
@@ -253,3 +254,22 @@ def _count_trading_days_back(trading_day: str, nav_date: str) -> int | None:
         return None
     except (ValueError, TypeError):
         return None
+
+
+def elapsed_trading_days_with_natural_fallback(start: str, end: str) -> int:
+    """统计区间交易日数；日历/日期不可解析（None）时回退自然日差并保证非负。
+
+    供「历时多久」类展示（回撤持续/恢复、任职天数）使用：正常路径按交易日计
+    （标注「按交易日计」），不可用路径保底自然日——既不中断展示，也不为 0。
+
+    Returns:
+        交易日数；完全不可解析且自然日不可判 → 0
+    """
+    elapsed = count_trading_days_elapsed(start, end)
+    if elapsed is not None:
+        return elapsed
+    try:
+        natural = (datetime.strptime(str(end)[:10], "%Y-%m-%d") - datetime.strptime(str(start)[:10], "%Y-%m-%d")).days
+    except (ValueError, TypeError):
+        return 0
+    return max(0, natural)

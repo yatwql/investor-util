@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+from src.python.core.trading_calendar import elapsed_trading_days_with_natural_fallback
 from datetime import date
 from typing import Any
 
@@ -246,10 +247,7 @@ def _compute_interval_stats(
             "recovered": False,
         }
 
-    try:
-        recovery_days = (date.fromisoformat(recovery_date) - date.fromisoformat(str(trough_date))).days
-    except (TypeError, ValueError):
-        recovery_days = None
+    recovery_days = elapsed_trading_days_with_natural_fallback(str(trough_date), str(recovery_date)) or None
     return {
         "interval_drawdown_pct": round(max_dd * 100, 2),
         "trough_date": trough_date,

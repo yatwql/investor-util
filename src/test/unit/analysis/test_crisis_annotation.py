@@ -26,6 +26,7 @@ from src.python.analysis.crisis_annotation import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
+pytestmark.append(pytest.mark.usefixtures("offline_external_sources"))
 
 
 def _bars(pairs: list[tuple[str, float]]) -> list[dict]:
@@ -106,7 +107,7 @@ class TestBuildCrisisAnnotation:
         assert it["in_range"] is True
         assert it["interval_drawdown_pct"] == 30.0
         assert it["trough_date"] == "2018-08-01"
-        assert it["recovery_days"] == 31
+        assert it["recovery_days"] == 22  # 恢复耗时按交易日计（自然日 31 天中扣除周末）
         assert it["recovered"] is True
         # 其余区间不重叠
         assert _interval(c, "2020 疫情冲击")["in_range"] is False
@@ -119,7 +120,7 @@ class TestBuildCrisisAnnotation:
         assert it["in_range"] is True
         assert it["interval_drawdown_pct"] == 40.0
         assert it["trough_date"] == "2020-03-05"
-        assert it["recovery_days"] == 15
+        assert it["recovery_days"] == 11  # 按交易日计
         assert it["recovered"] is True
 
     def test_window_spans_2018_and_2020_both_annotated(self):
@@ -160,7 +161,7 @@ class TestBuildCrisisAnnotation:
         it = _interval(c, "2018 贸易摩擦")
         assert it["in_range"] is True
         assert it["trough_date"] == "2018-08-01"
-        assert it["recovery_days"] == 31
+        assert it["recovery_days"] == 22  # 恢复耗时按交易日计（自然日 31 中扣除周末）
         assert it["recovered"] is True
 
     def test_data_end_missing_falls_back_to_last_bar(self):

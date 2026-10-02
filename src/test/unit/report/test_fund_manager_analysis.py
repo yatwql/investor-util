@@ -36,6 +36,7 @@ from src.python.report.fund_manager_analysis import (
 from src.python.core.models import Holding
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark.append(pytest.mark.usefixtures("offline_external_sources"))
 
 
 def _make_holding(code: str, name: str, account: str = "测试账户") -> Holding:

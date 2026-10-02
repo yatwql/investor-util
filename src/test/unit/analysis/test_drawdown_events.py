@@ -20,6 +20,7 @@ from src.python.analysis.drawdown_events import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_analysis]
+pytestmark.append(pytest.mark.usefixtures("offline_external_sources"))
 
 
 def _bars(values: list[float], start: str = "2026-01-01") -> list[dict]:
@@ -61,7 +62,7 @@ class TestExtractDrawdownEvents:
         assert e["recovery_date"] == ""
         assert e["recovered"] is False
         assert e["recovery_days"] is None
-        assert e["duration_days"] == 4
+        assert e["duration_days"] == 2  # 按交易日计（01-03/04 为周末，交易日内经过 2 日）
         assert e["drawdown_pct"] == 80.0  # (5-1)/5*100
 
     def test_full_recovery_event(self):
@@ -74,8 +75,8 @@ class TestExtractDrawdownEvents:
         assert e["recovery_date"] == "2026-01-07"
         assert e["recovered"] is True
         assert e["drawdown_pct"] == 33.33  # (12-8)/12*100
-        assert e["duration_days"] == 2  # 最深日 - 起峰日
-        assert e["recovery_days"] == 2  # 恢复日 - 最深日
+        assert e["duration_days"] == 1  # 最深日 - 起峰日（按交易日计，01-03/04 为周末）
+        assert e["recovery_days"] == 2  # 恢复日 - 最深日（按交易日计：01-06/01-07）
 
     def test_two_independent_events(self):
         """两个独立水下区间 → 各自恢复事件。"""
@@ -114,7 +115,7 @@ class TestExtractDrawdownEvents:
         assert e["recovery_date"] == ""
         assert e["recovery_days"] is None
         assert e["drawdown_pct"] == 33.33  # (12-8)/12*100
-        assert e["duration_days"] == 3
+        assert e["duration_days"] == 1  # 按交易日计（区间跨周末）
 
     def test_event_field_completeness(self):
         """事件 dict 字段完整：peak/trough/recovery + 派生时长字段。"""
@@ -174,4 +175,8 @@ class TestComputeRecoveryTimes:
         """days = 最深日 → 恢复日 日历天数。"""
         events = extract_drawdown_events(_bars([10, 12, 9, 13]))
         times = compute_recovery_times(events)
-        assert times[0] == {"start_date": "2026-01-03", "end_date": "2026-01-04", "days": 1}
+        assert times[0] == {
+            "start_date": "2026-01-03",
+            "end_date": "2026-01-04",
+            "days": 0,
+        }  # 按交易日计（01-03→01-04 间无交易日经过）

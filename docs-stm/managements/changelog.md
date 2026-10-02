@@ -10,6 +10,10 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 自审修复（rf-527）
+
+- **历时类字段统一交易日口径（rf-527）**：回撤事件 `duration_days`/`recovery_days`（`analysis/drawdown_events.py`）、危机标注恢复耗时（`analysis/crisis_annotation.py`）、基金经理任职天数（`fetcher/fund_manager.py::_calc_tenure_days`，归档页解析复用同一函数）与经理变更距今天数（`report/fund_manager_analysis.py`，1/3/6 月阈值 30/90/180 自然日 → 22/66/132 交易日）全部收敛到新增原语 `core/trading_calendar.py::elapsed_trading_days_with_natural_fallback`——正常路径按交易日历计（与「时间距离按交易日计」约束同口径），日历不可用时回退排除周末近似计数，日期不可解析回退自然日钳非负不再为 0。XIRR 年化按自然日属设计豁免不动。新增 `elapsed_trading_days_with_natural_fallback` 5 例单元测试与相关用例断言更新（46+ 例），folders.md 统计快照同步。
+
 ### 实验功能治理（合并/撤销/观测）
 
 - **实验功能瘦身与归并（开关 30→28 项）**：① **撤销**独立开关 `llm_debate_qa_concentration`——它触发面最窄、与已转正的辩论-条件推理同模式（既有调用内追加段落），改为**辩论流程内建段落**：集中度问答段不再受开关控制，正反辩论开启时白脸/黑脸/综合各阶段在单品种占比超阈值（原 20%）时自动附加集中度量化评估；阈值配置 `debate.qa_concentration.threshold` 更名为 `debate.concentration_qa.threshold`（更名前键名自动兼容并提示）；② **合并转正** `signal_pre_digest`（信号预消化）+ `signal_ledger`（确定性信号沉淀）→ 单开关 **`deterministic_signal`（确定性信号模块）**，常规组默认开——实时注入面保持原状，沉淀面不再要用户显式开启（账本有真实积累验证、写盘幂等可忽略）；features.json 中的更名前键名自动迁移到新键，配置零改动升级；相关函数命名同步：`_build_concentration_qa_block()`、参数 `include_concentration_qa`，辩论缓存后缀不再携带 `q` 位（升级后辩论缓存首次运行重生成一次，TTL 1天内自动收敛）；③ **实验组剩 3 项**（正反辩论 / 决策跨期反思闭环 / 景气度框架诊断）。
