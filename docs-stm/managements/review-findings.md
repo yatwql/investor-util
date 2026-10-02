@@ -37,33 +37,13 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui-implementation.md` §10 三阶段验收标准 + §6.5/§6.6 样式/响应式）。**勾选清单已备齐（2026-09-20）**：`docs-stm/archive/v0.10.x/web-ui/web-ui-verification-checklist.md`（从实际 `index.html` 七卡结构 + `how-to-use-web-mode.md` 手册导出 ①~⑤ 五类 UX 项，含逐步操作步骤与判定标准）。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
-### P2C — 文档与实现口径
-
-
-### P2D — 工程卫生
-
-
-### P2E — 全仓技术债务审查（2026-10-02，对照「架构设计约束」27 条与核心架构决策五项）
-
-### P2F — Windows 可移植性缺陷（2026-10-02，benchmark 失败用例驱动；**已全部修复**）
-
-> 由 benchmark 任务 13 例失败反查：均为 Windows 平台语义差异。其中 rf-534~537 为**真实生产缺陷**（非仅测试问题），rf-538 为测试断言可移植性。已修复并补回归用例，明细见 changelog 同版本段。
-
-| # | 摘要 | 状态 |
-|---|------|------|
-| **rf-534** | Web 上传目录项目根误算（`__file__` 向上 3 层 → `src/`，上传落 `src/data/holdings/uploads/` 幽灵目录） | 已修复（改 `constants.PROJECT_ROOT` + 回归用例） |
-| **rf-535** | `_checklib.rel()` 返回 `\\` 与文档目录树 `/` 失配 → Windows 下 1,600+ 误报 | 已修复（`.as_posix()`） |
-| **rf-536** | `collect-test-coverage.py` GBK 输出 vs 消费方 UTF-8 解码 → `UnicodeDecodeError` | 已修复（子进程 `reconfigure(encoding="utf-8")`） |
-| **rf-537** | `_collect_test_snapshot` 未处理 `stdout=None` → `re.search(None)` `TypeError` 使 `--sync` 堆栈退出 | 已修复（`errors="replace"` + 空值降级 + 4 例回归） |
-| **rf-538** | 13 例测试断言的 Windows 不可移植（POSIX 权限位/geteuid/socketpair/`/tmp`/分隔符） | 已修复（5 跳过 + 8 跨平台改写，全绿） |
-| **rf-540** | `.githooks/pre-commit` 解释器探测只认 POSIX 布局，Windows 下回退系统 Python，统计快照回写错误用例数（7964 vs 8173） | 已修复（探测次序加 Windows `Scripts/python.exe` 优先；错误值已修正） |
 
 
 ## 已解决问题
 
 ### 归档档案
 
-- [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.10  （2026-09-18 ~ 2026-10-01）
+- [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.11  （2026-09-18 ~ 2026-10-02）
 - [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.20（2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）

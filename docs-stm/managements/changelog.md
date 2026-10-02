@@ -24,6 +24,8 @@
 
 ### 文档治理与脚本收编
 
+- **已修复 P2F 批次记录迁移归档**：review-findings.md 新增的 P2F「Windows 可移植性缺陷」表（rf-534~538、rf-540，全部已修复）整节迁入 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.12-dev 批次」新段；主文件恢复纯待处理集纪律（P1 人工验证、P2A 长文件复核、P2B 用户复验）。
+
 - **rf-521 归档确认**：六个报告层/core 文件直连 providers 已零（改经 fetcher 网关 `fetch_with_fallback`/`report_adapters` 薄透传，commit 2e53f813），守卫 rc=0 佐证；主表行迁入 v0.11.x 归档「v0.11.11 批次」。
 
 - **check-code-traces 拆包（rf-533）**：1,016 行破 800 硬上限的唯一脚本，按「模式表/扫描/守卫」拆为 `scripts/_traces_code/` 六模块包，入口只留 CLI（185 行）与原面 re-export；`_traces_common.py` 并入包内 `exemptions.py` 并删兼容壳（测试改指向子模块）；check-task-numbering / check-test-markers / check-doc-traces 三脚本迁移 `_checklib` 契约（补 `-v`、统一输出与退出码，17 处 sys.path 样板文本统一）。scripts 单测 428 例全通。

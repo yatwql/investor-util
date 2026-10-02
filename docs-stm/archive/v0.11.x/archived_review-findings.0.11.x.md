@@ -229,3 +229,15 @@
 - `csi.py` 状态语义变更：因子暴露分析已实施，docstring 状态改为「**周期性复核**（新机器/新窗口验证指数链路可用 + 停更预警）」，不再是「前置决策闸门」。
 - `llm-hallucination-sampler.py` 入口只留 CLI 与编排（239 行），实现拆到 `scripts/_halluc_sampler/`（holdings / llm_call / fact_check / report 四模块）；修复三处坏 import（`fact_checker._utils._calc_portfolio_values` / `fact_checker._utils._strip_html` / `fact_checker._runner.check_*` 4 元组正确解包并透出 `numerical_corrections` 键）。实测 dry-run 全链路恢复：71 校验项 / 9 告警 / 12.68%。
 测试：`src/test/unit/scripts/test_probe_entry.py` 8 例（入口分派/未知 target 退出 2/子模块契约面/sampler 4 元组解包/组合数值委托）。
+
+### rf-534~538/540（2026-10-02，Windows 可移植性缺陷 P2F 批次，benchmark 失败用例驱动）
+
+> 13 例测试失败反查：rf-534~537、rf-540 为**真实生产缺陷**，rf-538 为测试断言可移植性。均已修复并补回归用例，明细见 `archived_changelog.0.11.x.md`/changelog 同版本段。
+
+- **rf-534**（Web 上传目录项目根误算）：`src/python/web/upload.py` 按 `__file__` 向上 3 层手工推算项目根，落点只得 `src/`，上传文件被误存进 `src/data/holdings/uploads/` 幽灵目录（本机实测残留 `*.xlsx`，被 check-doc-drift 报为目录树缺条目）。处置：改用 `constants.PROJECT_ROOT`（标记文件查找，不依赖目录深度）作单一来源；回归用例 `test_upload_dir_rooted_at_repo_data` 钉桩「落点不在 `src/` 内」。
+- **rf-535**（`_checklib.rel()` 分隔符失配）：返回 `\` 与 `folders.md` 目录树的 `/`、文档内文件引用全线失配 → Windows 下 1,600+ 真实文件全报「目录树缺条目」。处置：统一 `.as_posix()` 归一；`TestRel` 断言随语义更新并补 POSIX 分隔符钉桩用例。
+- **rf-536**（collect-test-coverage GBK 输出）：中文分组名在 cp936 Windows 按 GBK 写出，消费方按 UTF-8 解码 → reader 线程 `UnicodeDecodeError`。处置：子进程入口 `sys.stdout.reconfigure(encoding="utf-8")`。
+- **rf-537**（`_collect_test_snapshot` 空值降级）：decode 崩溃致 `proc.stdout` 为 None → `re.search(..., None)` 抛 `TypeError` 使 `--sync` 堆栈退出。处置：`errors="replace"` + stdout 空值降级为空快照；回归用例 4 例（`TestCollectTestSnapshot`）。
+- **rf-538**（13 例测试断言 Windows 不可移植）：POSIX 权限位（5 例 `skipif(os.name=="nt")`）、`os.geteuid`（1 例跳过）、`asyncio.ProactorEventLoop` socketpair 回环连接被网络守卫误阻（守卫加回环豁免 `127.0.0.0/8`/`::1`/`localhost`，外网仍阻断）、`/tmp` 断言（改 `Path` 结构断言/`is_relative_to(PROJECT_ROOT)`）、`endswith("a/b")` 反斜杠失配（改 `parts[-2:]`）。
+- **rf-538 后续**（`test_real_repo_sync_idempotent` xdist 假失败）：用例经 `_sync()` 触发嵌套全量 pytest 收集，在 xdist 并行下被资源争用采到不完整集合（7964 vs 完整 8173）致幂等断言假红。处置：从 `folders.md`「测试用例」行注入登记用例数，不再嵌套收集；真实 `_stats_actual()` 照常实测。
+- **rf-540**（pre-commit hook 解释器探测缺 Windows 布局）：只认 `.venv/bin/python`（POSIX），Windows 下静默回退系统 python（缺项目依赖、收集口径不同 7964 vs 8173），提交时把错误用例数回写进 `folders.md`——即 rf-538 追踪到的 7964 的真实来源。处置：探测次序加 Windows `.venv/Scripts/python.exe` 优先；错误值已修正回 8,173。
