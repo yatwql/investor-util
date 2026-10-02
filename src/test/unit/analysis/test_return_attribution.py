@@ -114,7 +114,7 @@ class TestComputeReturnAttribution:
 class TestBuildReturnAttribution:
     """「行动建议」章适配层：数据契约 + 净额合计摘要文案。"""
 
-    def test_contract_c19_compliant(self):
+    def test_pipeline_contract_keys_complete(self):
         """输出 `attribution` 契约键（available/盈利来源/亏损来源/summary）。"""
         data = build_return_attribution(_mixed_holdings())
         assert data is not None
