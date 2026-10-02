@@ -17,8 +17,6 @@
 
 ### P2A — 文件过长（>500 行，可选优化；**>800 行为硬上限必须拆分**）
 
-> `src/test/conftest.py` 曾达 872 行（超硬上限），已于 2026-09-26 拆分至 672 行 + 新模块 225 行（详见「已解决问题」rf-448）。
-
 | # | 文件 | 行数 | 状态 | 拆分建议 |
 |---|------|------|------|----------|
 | **rf-75** | `core/registry.py` | 704 | 维持现状（中央注册表被 56 文件引用，数据表内聚；2026-09-26 实测 704，较 2026-09-10 的 666 增长 38——plan-50 财报域槽位/plan-57 等注册项增补） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责（不拆） |
@@ -71,9 +69,7 @@
 
 ### 归档档案
 
-> 本轮（v0.11.10）无「已解决待归档」块——rf-479 ~ rf-519 已随发布移入下方 0.11.x 归档。
-
-- [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — rf-380 ~ rf-519（v0.11.0 ~ v0.11.9 批次：v0.11.1~v0.11.3 于 2026-09-18 / 2026-09-24 并入，v0.11.4~v0.11.6 批次（rf-428 ~ rf-456）于 2026-09-26 并入，v0.11.7 批次（rf-457 ~ rf-460）于 2026-09-27 并入，v0.11.8 批次（rf-461 ~ rf-470）于 2026-09-29 并入，v0.11.9 批次（rf-471 ~ rf-478）于 2026-09-30 并入）
+- [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.10  （2026-09-18 ~ 2026-10-01）
 - [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.20（2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_review-findings.0.8.x.md`](../archive/v0.8.x/archived_review-findings.0.8.x.md) — 0.8.0 ~ 0.8.10（2026-07-21 ~ 2026-07-30）
