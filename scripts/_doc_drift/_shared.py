@@ -163,6 +163,7 @@ def _collect_test_snapshot() -> dict[str, int]:
         [sys.executable, str(REPO_ROOT / "scripts" / "collect-test-coverage.py")],
         cwd=REPO_ROOT,
         capture_output=True,
+        encoding="utf-8",  # 显式编码（cp936 Windows/locale 假设 + EncodingWarning 严格档）
         text=True,
     )
     snapshot: dict[str, int] = {}
