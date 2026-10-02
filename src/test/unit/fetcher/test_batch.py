@@ -795,3 +795,50 @@ class TestBatchDispatcherRetry(unittest.TestCase):
         # skipped 的不重试
         self.assertTrue(updated[0].skipped)
         self.assertTrue(updated[0].error == "全链熔断")
+
+
+class TestBatchDispatcherRetryPolicyDelegation(unittest.TestCase):
+    """retry_failed 退避走 core/retry 唯一原语（RetryPolicy + retry_transient）。
+
+    回归背景：原实现手写 ``for attempt`` + ``time.sleep(delay * (attempt + 2))``
+    退避算式，违反重试退避唯一原语约束；迁移后内部不应再有裸 sleep 循环。
+    """
+
+    def setUp(self):
+        self.dispatcher = BatchDispatcher(max_workers=4, thread_name_prefix="test_retry_policy")
+
+    def tearDown(self):
+        self.dispatcher.shutdown(wait=False)
+
+    def test_multi_round_retry_recovers_progressively(self):
+        """max_retries=2：前两轮失败、第三轮成功 → 按轮次递补成功。"""
+        attempts = [0]
+
+        def task_factory(idx: int):
+            def _task():
+                attempts[0] += 1
+                if attempts[0] < 3:
+                    raise RuntimeError("still failing")
+                return "recovered"
+
+            return _task
+
+        results = [BatchResult(0, False, error="err")]
+        updated = self.dispatcher.retry_failed(results, task_factory, max_retries=2, delay=0.01, jitter=0.0)
+        self.assertTrue(updated[0].success)
+        self.assertEqual(updated[0].result, "recovered")
+        self.assertEqual(attempts[0], 3)  # 初轮 + 2 轮重试
+
+    def test_retry_exhaustion_keeps_failed_result(self):
+        """重试耗尽仍失败 → 原失败结果保留（不抛异常）。"""
+
+        def task_factory(idx: int):
+            def _task():
+                raise RuntimeError("always failing")
+
+            return _task
+
+        results = [BatchResult(0, False, error="err")]
+        updated = self.dispatcher.retry_failed(results, task_factory, max_retries=2, delay=0.01, jitter=0.0)
+        self.assertFalse(updated[0].success)
+        self.assertEqual(updated[0].error, "err")

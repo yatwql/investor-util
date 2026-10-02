@@ -15,6 +15,7 @@ from src.python.cache import get as cache_get
 from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.core.constants import CACHE_WEEKLY
+from src.python.core.retry import STRATEGY_FIXED, RetryPolicy, retry_transient
 from src.python.providers import sina, tencent
 
 logger = logging.getLogger("invest")
@@ -289,26 +290,32 @@ def fetch_us_indices() -> dict[str, dict[str, Any]]:
     if len(indices) == len(_US_INDEX_CODES):
         return indices
 
-    # 主链路：新浪财经（带 2 次重试）
-    import time as _time
+    # 主链路：新浪财经（瞬时重试走 core/retry 唯一原语：固定退避 1 次，2 次尝试；
+    # 耗尽后抛出的末次异常在此接住并落备链，与既往「异常告警后走备链」口径一致）
+    try:
+        sina_data = retry_transient(
+            sina.fetch_us_indices,
+            policy=RetryPolicy(attempts=2, strategy=STRATEGY_FIXED, base_backoff=1.0),
+            retry_if_result=lambda data: not data,  # 空/无响应视为可重试结果，耗尽后回末次结果
+            retry_on=lambda _exc: isinstance(_exc, Exception),  # 既往宽口径：任何异常均重试（退避后重试）
+            on_retry=lambda attempt, backoff, exc: logger.warning(
+                "美股指数新浪 API 请求失败（第 %d 次）: %s，退避 %.1fs 重试",
+                attempt,
+                exc,
+                backoff,
+            ),
+        )
+    except Exception as e:
+        logger.warning("美股指数新浪 API 请求失败（重试耗尽）: %s", e)
+        sina_data = {}
+    if sina_data:
+        for code, data in sina_data.items():
+            data["_source"] = "sina"
+            cache_set(_index_cache_key(code), data)
+            indices[code] = data
+        return indices  # 新浪链路成功即返回（部分命中也不走备链，与既往口径一致）
 
-    for attempt in range(2):
-        try:
-            sina_data = sina.fetch_us_indices()
-            if sina_data:
-                for code, data in sina_data.items():
-                    data["_source"] = "sina"
-                    cache_set(_index_cache_key(code), data)
-                    indices[code] = data
-                return indices
-        except Exception as e:  # noqa: PERF203
-            logger.warning("美股指数新浪 API 请求失败（第 %d 次）: %s", attempt + 1, e)
-            if attempt == 0:
-                _time.sleep(1)
-        else:
-            break
-
-    # 备用链路：腾讯财经
+    # 新浪链路完全失败（重试耗尽）→ 备用链路：腾讯财经
     missing = [c for c in _US_INDEX_CODES if c not in indices]
     if missing:
         logger.info("美股指数新浪链路失败，尝试腾讯备用链路: %s", missing)

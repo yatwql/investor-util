@@ -23,11 +23,11 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from src.python.core.retry import STRATEGY_LINEAR, RetryPolicy, retry_transient
 from src.python.core.throttle import RateLimiter  # 实现见 core/throttle.py（数据/调度/LLM 三层共用）
 
 logger = logging.getLogger("invest")
@@ -255,39 +255,43 @@ class BatchDispatcher:
 
         线程安全：
           - 复用 self._executor，不新建 TPE
-          - 重试前 sleep 等待，不持有锁
+          - 退避等待发生在轮间（首轮立即执行），不持有锁
           - self._executor 已 shutdown 时抛 RuntimeError
         """
-        import random
-
         failed_indices = [r.index for r in results if not r.success and not r.skipped]
         if not failed_indices:
             return results
 
-        actual_delay = delay + random.uniform(0, jitter)
-        logger.info(
-            "[batch] 重试 %d 个失败任务（delay=%.1fs）",
-            len(failed_indices),
-            actual_delay,
+        logger.info("[batch] 重试 %d 个失败任务（policy=linear base=%.1fs）", len(failed_indices), delay)
+
+        # 重试退避唯一原语（core/retry.py）：线性退避 + 抖动，策略参数集中在 RetryPolicy
+        retry_policy = RetryPolicy(
+            attempts=1 + max_retries,
+            strategy=STRATEGY_LINEAR,
+            base_backoff=delay,
+            jitter=jitter,
         )
-        time.sleep(actual_delay)
 
-        for attempt in range(max_retries):
-            retry_tasks = [task_factory(idx) for idx in failed_indices]
-            retry_results = self.execute(retry_tasks)
-
+        def _retry_round() -> list[int]:
+            """执行一轮重试，返回仍失败的原 index 列表（空列表 = 全部成功，哨兵结束）。"""
+            retry_results = self.execute([task_factory(idx) for idx in failed_indices])
             still_failed: list[int] = []
             for orig_idx, rr in zip(failed_indices, retry_results):
                 if rr.success:
                     results[orig_idx] = rr
                 else:
                     still_failed.append(orig_idx)
+            return still_failed
 
-            if not still_failed or attempt >= max_retries - 1:
-                break
-            # 还有失败且还有重试次数 → 继续
-            failed_indices = still_failed
-            time.sleep(delay * (attempt + 2))  # 退避递增
+        retry_transient(
+            _retry_round,
+            policy=retry_policy,
+            retry_on=lambda _exc: False,  # execute 已捕获任务异常为结果，仅按结果哨兵重试
+            retry_if_result=lambda still: len(still) > 0,
+            on_retry=lambda attempt, backoff, _exc: logger.info(
+                "[batch] 第 %d 轮重试后仍有失败，退避 %.2fs 后继续", attempt, backoff
+            ),
+        )
 
         return results
 

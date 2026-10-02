@@ -493,3 +493,26 @@ class TestFetchIndexHistory(unittest.TestCase):
 
         self.assertEqual(len(result), 1)
         mock_fetch.assert_called_once_with("history_index_us", "gb_inx", 200, diagnostics=ANY)
+
+
+class TestFetchUsIndicesRetryPolicyDelegation(unittest.TestCase):
+    """美股主链路重试走 core/retry 唯一原语（RetryPolicy + retry_transient）。
+
+    回归背景：原实现手写 ``for attempt in range(2)`` + 硬编码 ``time.sleep(1)``，
+    违反重试退避唯一原语约束；迁移后空响应同样计入「可重试结果」（轮空后落备链）。
+    """
+
+    @patch("src.python.fetcher.index.cache_set")
+    @patch("src.python.fetcher.index.cache_get", return_value=None)
+    @patch("src.python.fetcher.index.sina.fetch_us_indices")
+    def test_empty_sina_result_retried_then_backup(self, mock_sina, mock_cache_get, mock_cache_set):
+        """新浪返回空 → 计为可重试结果（重试耗尽）→ 腾讯备链。"""
+        mock_sina.return_value = {}
+
+        from src.python.fetcher.index import fetch_us_indices
+
+        with patch("src.python.fetcher.index.tencent.fetch_index_price", return_value=None):
+            result = fetch_us_indices()
+            # 空响应也重试：共 2 次尝试
+            self.assertEqual(mock_sina.call_count, 2)
+            self.assertIsInstance(result, dict)
