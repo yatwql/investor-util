@@ -10,19 +10,19 @@
 <!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **7809** | ~30s |
-| `standard` | **6792** | ~21s |
-| `scenario` | **250** | ~13s |
-| `regression` | **250** | ~14s |
-| `dev-verify` | **3420** | ~25s |
-| `verify` | **5494** | ~17s |
-| `integration` | **292** | ~11s |
-| `edge` | **949** | ~19s |
+| `unit` | **7846** | ~31s |
+| `standard` | **6829** | ~20s |
+| `scenario` | **250** | ~5s |
+| `regression` | **250** | ~5s |
+| `dev-verify` | **3456** | ~24s |
+| `verify` | **5530** | ~18s |
+| `integration` | **292** | ~8s |
+| `edge` | **949** | ~11s |
 | `data` | **70** | ~3s |
-| `all` | **8130** | ~33s |
-| `smoke` | **26** | ~2s |
-| `report` | **2009** | ~24s |
-| `all_no_unit` | **321** | ~11s |
+| `all` | **8167** | ~33s |
+| `smoke` | **26** | ~3s |
+| `report` | **2010** | ~25s |
+| `all_no_unit` | **321** | ~6s |
 | `scenario_extreme` | **9** | ~3s |
 <!-- mode-count-table:end -->
 
@@ -62,20 +62,20 @@
 <!-- duration-table:start -->
 | `--mode` | dragonball（2026-10-02 实测） | stallman-NB1（2026-08-06 实测） |
 |:---------|:---------------------------:|:---:|
-| `unit` | ~30s | ~4min |
-| `standard` | ~21s | ~4min |
-| `scenario` | ~13s | ~3min |
-| `regression` | ~14s | ~3min |
-| `verify,regression` | ~31s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
-| `dev-verify` | ~25s | ~2min |
-| `verify` | ~17s | ~46s |
-| `integration` | ~11s | ~1min |
-| `edge` | ~19s | ~32s |
+| `unit` | ~31s | ~4min |
+| `standard` | ~20s | ~4min |
+| `scenario` | ~5s | ~3min |
+| `regression` | ~5s | ~3min |
+| `verify,regression` | ~23s（verify+regression 顺序之和） | ~4min（verify+regression 顺序之和） |
+| `dev-verify` | ~24s | ~2min |
+| `verify` | ~18s | ~46s |
+| `integration` | ~8s | ~1min |
+| `edge` | ~11s | ~32s |
 | `data` | ~3s | ~14s |
 | `all` | ~33s | ~3min |
-| `smoke` | ~2s | ~9s |
-| `report` | ~24s | ~2min |
-| `all_no_unit` | ~11s | ~1min |
+| `smoke` | ~3s | ~9s |
+| `report` | ~25s | ~2min |
+| `all_no_unit` | ~6s | ~1min |
 | `scenario_extreme` | ~3s | ~9s |
 | 数据更新时间 | 2026-10-02 | 2026-08-06 |
 <!-- duration-table:end -->
