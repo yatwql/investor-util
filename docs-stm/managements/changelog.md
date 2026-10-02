@@ -10,8 +10,9 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### 文档治理
 
-## 归档
+- **已修复 rf 记录批量归档（发布后治理）**：review-findings.md 裁剪为纯待处理集——P2E 表 rf-522~527 六行已修复行与游离的 rf-532 行、P2C 的 rf-520 摘要引言原文迁入 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) 新增「v0.11.11 批次」段（rf-474 明细此前批次已在档）；归档头涵盖版本补 v0.11.11。主文件现仅存待处理项：P1 人工验证 rf-113/rf-114、P2A 八长文件复核行、P2B rf-257 用户复验、P2E rf-521 与 rf-528~531 五项。## 归档
 
 - [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0 ~ v0.11.11（2026-09-15 ~ 2026-10-02）
 - [`archived_changelog.0.10.x.md`](../archive/v0.10.x/archived_changelog.0.10.x.md) — v0.10.1 ~ v0.10.19（2026-08-04 ~ 2026-09-13）

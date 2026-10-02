@@ -1,8 +1,8 @@
 # 自我审查问题记录归档 — v0.11.x
 
-> 归档时间：2026-09-29 增补（v0.11.8 发布当日并入）；2026-09-27 增补（v0.11.7 发布当日并入）；2026-09-26 增补（v0.11.5、v0.11.6 发布当日并入）；2026-09-18（v0.11.1 发布当日并入，0.11 系列首份）；2026-09-24 增补（v0.11.2、v0.11.3 发布当日并入）；2026-09-26 增补（v0.11.4 批次 rf-428 ~ rf-430 补录、v0.11.5 发布当日并入）
+> 归档时间：2026-09-29 增补（v0.11.8 发布当日并入）；2026-09-27 增补（v0.11.7 发布当日并入）；2026-09-26 增补（v0.11.5、v0.11.6 发布当日并入）；2026-09-18（v0.11.1 发布当日并入，0.11 系列首份）；2026-09-24 增补（v0.11.2、v0.11.3 发布当日并入）；2026-09-26 增补（v0.11.4 批次 rf-428 ~ rf-430 补录、v0.11.5 发布当日并入；2026-10-02 增补（v0.11.11 发布后批次迁移并入））
 > 原始文件：`docs-stm/managements/review-findings.md`
-> 涵盖版本：v0.11.0（2026-09-15）~ v0.11.8（2026-09-29；v0.11.0 批次的变更记录见同版本归档的 `archived_changelog.0.11.x.md`）
+> 涵盖版本：v0.11.0（2026-09-15）~ v0.11.8（2026-09-29；v0.11.0 批次的变更记录见同版本归档的 `archived_changelog.0.11.x.md`) ~ v0.11.11（2026-10-02）
 > 归档内容：本迭代已修复的 rf 记录摘要行 + 修复方案（v0.11.8 批次 rf-461 ~ rf-470（传输级失败上抛/挂起不重试、00 重叠区场外基金价格串味与同源路由、两轮技术债、CI 修复）；rf-380 ~ rf-401；v0.11.2 批次 rf-379、rf-402 ~ rf-422；v0.11.3 批次 rf-423 ~ rf-427；v0.11.4 批次 rf-428 ~ rf-430；v0.11.5 批次 rf-431 ~ rf-443（归档索引误删、分区纪律断言、测试全量审计、手册 thinking 漏 Kimi、需求 ID 追溯链）；rf-354 ~ rf-378 属 v0.10.20-dev 批次，按开发版本线归入 `../v0.10.x/archived_review-findings.0.10.x.md`）
 
 ---
@@ -186,3 +186,21 @@
 > **rf-479 ~ rf-509**（2026-09-30，31 项）管理/用户文档一致性核对批次：章节序号与层级、交叉引用指错、内容数字口径、目录树/格式卫生——均已修复，详细变更见 [`changelog.md`](changelog.md)「文档一致性核对」条目。
 >
 > v0.11.9 批次 rf-471 ~ rf-478 已随发布归档至 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)）
+
+---
+
+## v0.11.11 批次（2026-10-02）
+
+> 以下为 v0.11.11 内已修复的自审发现（P2E 表行原文迁入；修复明细见同版本 [`archived_changelog.0.11.x.md`](archived_changelog.0.11.x.md) 与 [`../../../managements/changelog.md`](../../managements/changelog.md) 对应条目）。
+
+> **rf-520**：三处文档性劣化（depth_profile/excel_generator/experimental_seams 注释旧语境引用）已随实验功能治理修复；同日延伸核实全仓 410 个测试文件八项纪律，唯一实质违规（约束代号类用例名 5 处）已语义化改名。
+
+| # | 优先级 | 问题与处置 |
+|---|--------|------------|
+| **rf-522** | 已修复（2026-10-02） | **两处手写「重试 + 退避」残留（重试退避唯一原语约束）**：`batch.py::retry_failed` 与 `index.py::fetch_us_indices` 迁移到 `retry_transient` + `RetryPolicy`，内联退避算式删除；详见 changelog 0.11.11-dev 条目。 |
+| **rf-523** | 已修复（2026-10-02） | **手写间隔节流散落（间隔节流唯一原语约束）**：eastmoney 分页 sleep 与 cninfo/datasink 429 退避等待分别收敛到 RateLimiter 与 interval_delay 唯一算式；详见 changelog 0.11.11-dev 条目。 |
+| **rf-524** | 已修复（2026-10-02） | **剩余自持原子写拷贝（缓存原子写唯一原语约束）**：`write_text_atomic/write_bytes_atomic` 补 `mode` 参数，新增 `write_bytes_atomic`/`copy_file_atomic` 原语，cassette/upload/holdings_update/config_edit 四处旁路全部委托；详见 changelog 0.11.11-dev 条目。 |
+| **rf-525** | 已修复（2026-10-02） | **场内前缀判定漏中心化（代码类型判定中心化约束）**：`code_utils` 补 `to_exchange_symbol`/`get_exchange_category`，hithink 两处与 cninfo 栏目映射改薄委托；详见 changelog 0.11.11-dev 条目。 |
+| **rf-526** | 已修复（2026-10-02） | **core 层反向依赖（分层纪律缺口）**：circuit_breaker/provider_registry/doctor/trading_calendar 四处改注册钩子（上游模块导入时自注册），core 删除对 llm/analysis/fetcher/providers 的延迟 import；并新增 check-code-traces 分层守卫（core→上层 import 即 HIGH，豁免白名单现空）；详见 changelog 0.11.11-dev 条目。 |
+| **rf-527** | 已修复（2026-10-02） | **自然日差离散判定残留（时间距离按交易日计约束）**：回撤事件/危机标注/基金经理任职时长已收敛到交易日历口径（详见 changelog）
+| **rf-532** | 已修复（2026-10-02） | **CI 统计快照漂移高频红源（流程性）**：日常提交高频改变 managements/ 文档行数与测试用例数，`folders.md` 统计表静态数字必漂移，人工同步被连续推送踩踏（当日 6 次红全同源）。已按 A 方案落地：`check-doc-drift.py --sync` 自动回写实测数字（幂等，保留格式），`git pre-commit` 钩子在提交涉及 managements/ 或 src/test/ 时自动同步；详见 changelog 0.11.11-dev 条目。
