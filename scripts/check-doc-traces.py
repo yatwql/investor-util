@@ -77,8 +77,8 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_traces_common）
-from _traces_common import (  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享包（_traces_code）
+from _traces_code.exemptions import (  # noqa: E402
     _COMPILED_CHAPTER_EXCLUDE,
     _COMPILED_ROUND_EXCLUDE,
     _chapter_excludes,
@@ -87,7 +87,7 @@ from _traces_common import (  # noqa: E402
     _round_excludes,
 )
 
-#: 共享排除模式原面 re-export：测试与调用方仍按原脚本名访问（实现见 _traces_common）
+#: 共享排除模式原面 re-export：测试与调用方仍按原脚本名访问（实现见 _traces_code.exemptions）
 __all__ = [
     "_COMPILED_CHAPTER_EXCLUDE",
     "_COMPILED_ROUND_EXCLUDE",
@@ -97,7 +97,8 @@ __all__ = [
     "_round_excludes",
 ]
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from _checklib import REPO_ROOT, add_common_args, rel  # noqa: E402
+
 README_PATH = REPO_ROOT / "README.md"
 DOC_DIRS = [
     REPO_ROOT / "docs-stm" / "managements",
@@ -466,17 +467,7 @@ def _iter_docs(trace_exempt: bool = False) -> list[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="扫描文档中的历史变更痕迹")
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="详细输出（含豁免行信息）",
-    )
-    parser.add_argument(
-        "--ci",
-        action="store_true",
-        help="CI 模式：仅输出 文件名:行号，非零退出码",
-    )
+    add_common_args(parser)
     args = parser.parse_args()
 
     total_hits = 0
@@ -489,9 +480,9 @@ def main() -> int:
         nonlocal total_hits, high_count, low_count
         if not hits:
             return
-        rel = doc.relative_to(REPO_ROOT)
+        rel_path = rel(doc)
         if not args.ci:
-            print(f"\n  {rel}")
+            print(f"\n  {rel_path}")
 
         for lineno, cat, desc, text in hits:
             total_hits += 1
@@ -503,7 +494,7 @@ def main() -> int:
                 low_count += 1
 
             if args.ci:
-                print(f"{rel}:{lineno} [{cat}] {desc} — {text}")
+                print(f"{rel_path}:{lineno} [{cat}] {desc} — {text}")
             else:
                 marker = "[ERR]" if is_high else "[!]"
                 print(f"    {marker} L{lineno:>4} [{cat}] {desc}")

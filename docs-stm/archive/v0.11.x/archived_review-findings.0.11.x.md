@@ -204,3 +204,8 @@
 | **rf-526** | 已修复（2026-10-02） | **core 层反向依赖（分层纪律缺口）**：circuit_breaker/provider_registry/doctor/trading_calendar 四处改注册钩子（上游模块导入时自注册），core 删除对 llm/analysis/fetcher/providers 的延迟 import；并新增 check-code-traces 分层守卫（core→上层 import 即 HIGH，豁免白名单现空）；详见 changelog 0.11.11-dev 条目。 |
 | **rf-527** | 已修复（2026-10-02） | **自然日差离散判定残留（时间距离按交易日计约束）**：回撤事件/危机标注/基金经理任职时长已收敛到交易日历口径（详见 changelog）
 | **rf-532** | 已修复（2026-10-02） | **CI 统计快照漂移高频红源（流程性）**：日常提交高频改变 managements/ 文档行数与测试用例数，`folders.md` 统计表静态数字必漂移，人工同步被连续推送踩踏（当日 6 次红全同源）。已按 A 方案落地：`check-doc-drift.py --sync` 自动回写实测数字（幂等，保留格式），`git pre-commit` 钩子在提交涉及 managements/ 或 src/test/ 时自动同步；详见 changelog 0.11.11-dev 条目。
+---
+
+## v0.11.12-dev 批次（2026-10-02）
+
+> **rf-533**（2026-10-02，脚本超长硬上限）：**`scripts/check-code-traces.py` 1,016 行破「>800 必须拆分」硬上限**（唯一破纪律的脚本）——历史痕迹正则表、各语言注释剥离、排除/豁免清单、core 分层 AST 守卫与 CLI 全部揉在一个文件。处置：拆为内部实现包 `scripts/_traces_code/`（config / patterns / exemptions / extract / scan / layers 六模块），入口只留 CLI（185 行）与原面 re-export；`_traces_common.py` 并入包内 `exemptions.py`（兼容壳删除，测试改指向子模块）；顺带收编 check-task-numbering / check-test-markers / check-doc-traces 三脚本到 `_checklib` 契约（add_common_args / report / rel），17 处 sys.path 样板文本统一。测试：scripts 单测 428 例全通。

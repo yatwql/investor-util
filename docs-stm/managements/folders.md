@@ -12,15 +12,15 @@
 | 主程序代码 | Python | 300 | 78,602 | `src/` 下所有 `.py`（不含测试：`src/__init__.py` 顶层包标记 + `src/python/` 下 15 个 `__init__.py`，含 `web/` 服务层；近期新增 `core/jsonl_store.py` JSONL 原子原语 + `core/signal_ledger.py` 确定性信号账本 + `report/signal_record.py` 信号登记适配器 + `core/num_utils.py` 数值归一原语 + `core/doctor.py` 系统自检 + `core/cassette.py` 请求回放引擎 + `core/datasource_credential.py` 数据源凭据声明 + `fetcher/source_adapter.py` 适配契约 + `fetcher/quote_adapters.py` 行情域适配器 + `llm/module_fingerprint.py` 模块指纹唯一事实来源 + `report/_experimental_seams.py` 实验挂载点 + `report/holdings_freshness.py` 持仓报告期时效判定 + `report/experimental_notice.py` 实验功能清单语句单源 + `core/trading_calendar.py` 交易日历原语（时间距离一律以交易日计） + `providers/datasink.py` 全文本财报 provider（密钥/限速/配额） + `providers/hithink.py` 同花顺金融数据服务 provider（A 股行情/财务/基金/情绪面；凭据/qps 限速/信封错误码） + `fetcher/financial_report.py` 财报取数编排 + `fetcher/report_adapters.py` 财报域适配器 + `report/financial_report_digest.py` 财报摘要章节装配 + `providers/akshare_financial.py` 结构化财务指标主源 + `fetcher/financial_indicator_adapters.py` 财务指标域适配器 + `core/code_utils.py::to_fmp_symbol` 共享符号映射 + `providers/_utils.py::run_with_timeout` 共享取数超时原语 + `analysis/financial_indicator_extract.py` 财务指标全文解析（压平正文锚点提取，备用支路） + `fetcher/financial_indicator.py` 财务指标多期取数编排 + `analysis/financial_indicator.py` 财务指标派生（质量档/趋势/当前 PE·PB） + `report/financial_indicator.py` 财务指标章装配 + `report/holdings_detail_sheet.py` 持仓明细与分类 Excel 页签 + `report/position_structure_sheet.py` 持仓结构与集中度 Excel 页签 + `report/fundamental_snapshot_sheet.py` 持仓基本面 Excel 页签（三者均为章节合并写入器） + `llm/compliance.py` 合规声明集中注入（幂等叠加，单一漏斗覆盖全模块）） |
 | HTML 报告模板 | HTML | 5 | 4,254 | `src/static/tmpl/report_template.html` + `whatif_template.html`（调仓 What-if 独立 HTML 页）+ `partials/`（组合演进 `evolution_section.html` + 持仓基本面 `fundamental_snapshot_section.html` + 行动建议 `action_section.html` 章节 partial） |
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
-| 辅助脚本 | Python | 37 | 10,137 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
-| 源代码合计 | — | 345 | 93,308 | 主程序 + 模板 + 脚本 + SVG |
-| 测试代码 | Python | 410 | 122,345 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| 辅助脚本 | Python | 43 | 10,244 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
+| 源代码合计 | — | 351 | 93,415 | 主程序 + 模板 + 脚本 + SVG |
+| 测试代码 | Python | 410 | 122,346 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
 | 测试用例 | — | — | 8,167 个 | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | 用户文档 | Markdown | 11 | 5,504 | 含 README.md（221 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 5,281 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| 项目文档 | Markdown | 147 | 57,200 | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 2 + archive md 134），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 10,882 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 134 | 45,869 | 各版本 changelog/plan/review-findings 与设计文档归档（134 md 45,809 行，含借鉴批候选研究与 LLM 成本调节/自检/源指定设计） |
+| 项目文档 | Markdown | 147 | 57,213 | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 2 + archive md 134），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 10,890 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 134 | 45,874 | 各版本 changelog/plan/review-findings 与设计文档归档（134 md 45,809 行，含借鉴批候选研究与 LLM 成本调节/自检/源指定设计） |
 | ├ plan/ | 中间设计文件 | 2 | 363 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 192 行） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
@@ -939,7 +939,14 @@ investor-util/
 │   │   ├── _format.py                #       文档格式族检查（章节表 / 开关表 / 默认值 / 面板编号 / 测试覆盖计数）
 │   │   ├── _tree.py                  #       目录树与统计表检查（folders.md 双向比对 + 项目统计表核对）
 │   │   └── _ledger.py                #       台账族检查（归档索引 / 分区纪律 / Thinking 支持矩阵）
-│   ├── _traces_common.py             #   历史痕迹检查共享排除模式（章节计数 / 迭代轮次豁免）
+│   ├── _traces_code/                 #   check-code-traces 内部实现包（入口保留 CLI 与原面 re-export）
+│   │   ├── __init__.py               #       子包标记（原面 re-export）
+│   │   ├── config.py                 #       扫描域配置（仓库根/扫描目录/跳过文件/工具自身识别）
+│   │   ├── patterns.py               #       模式表与行级豁免（历史痕迹/标识符/暗号豁免）
+│   │   ├── exemptions.py             #       章节/轮次计数豁免（与 check-doc-traces 共用）
+│   │   ├── extract.py                #       注释抽取（per-language）与标识符提取
+│   │   ├── scan.py                   #       scan_file 调度（痕迹/标识符/分层三支路汇聚）
+│   │   └── layers.py                 #       core 反向依赖 AST 守卫
 │   ├── _test_runner/                 #   测试驱动内部实现包（入口 test-runner.py 仅留 CLI 与编排）
 │   │   ├── __init__.py               #       子包标记（并注入仓库根到 sys.path）
 │   │   ├── paths.py                  #       路径常量（项目根 / 报告目录 / 归档目录 / 源码目录）

@@ -828,7 +828,6 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `probe-push2.py` | 诊断 | 东方财富 push2 连通性探测（区分程序缺陷与网络环境拦截，熔断降级前置排障） |
 | `check-svg.py` | 诊断 | README SVG 架构图检查（子命令 `geom` 几何 / `pixel` 像素 / `text-overflow` 文字色越界；像素子命令需 Pillow） |
 | `_checklib.py` | 内部 | 检查脚本共享设施（统一 `-v/--ci` 契约与 `[OK]`/`[ERR]` 输出、`rel()`、`report()`、文档区间与表格解析） |
-| `_traces_common.py` | 内部 | 历史痕迹检查共享排除模式（两个 trace 检查脚本共用章节计数 / 迭代轮次豁免） |
 | `_test_runner/` | 内部 | 测试驱动内部实现包（paths / modes / pytest_env / machine_info / doc_writer / report_html / runner） |
 | `launch.sh` / `launch.ps1` | 启动 | Linux/macOS / Windows 一键启动脚本（无参数启动 TUI；`web` 子命令启动 Web 浏览器模式） |
 | `cli.sh` / `cli.ps1` | 启动 | Linux/macOS / Windows CLI 命令行包装（无参数默认生成报告） |
@@ -982,16 +981,16 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 .venv/bin/python scripts/check-semantic-index.py --ci  # CI 模式（只输出错误，退出码 2）
 ```
 
-**检查脚本的共享设施与统一契约（`_checklib.py` / `_traces_common.py` / `_test_runner/`）**
+**检查脚本的共享设施与统一契约（`_checklib.py` / `_traces_code/` / `_test_runner/`）**
 
 `scripts/` 下的检查脚本共用一套 CLI 契约与设施，避免每个脚本各写一份：
 
 - **统一契约**（`_checklib.add_common_args()` / `report()`）：`-v/--verbose` 详细输出、`--ci` 仅输出 `文件:描述`；**通过退出 0，发现 finding 退出 2**（`check-code-traces.py` 另有 HIGH=1 / LOW=3 的分级语义，属其自身约定）；通过打印 `[OK] …`，失败逐条 `[ERR] file:desc`（`--ci` 下为裸行）+ 汇总行
 - **共享原语**：`REPO_ROOT` / `rel()`（仓库相对路径，非仓库内路径原样返回）、`extract_region()` / `replace_region()`（标记区间）、`extract_table_region()` / `replace_table_region()`（表区域，带结构校验）
-- **`_traces_common.py`**：两个历史痕迹检查脚本共用的「章节计数豁免」与「迭代轮次豁免」模式（此前各维护一份，改动易漏同步）；两个脚本以原面 re-export 暴露这些名字，既有测试与调用方无需改动
+- **`_traces_code/`**：check-code-traces 内部实现包——`exemptions.py`（「章节计数豁免」与「迭代轮次豁免」，check-doc-traces 同共用）、`patterns.py`（模式表与行级豁免）、`extract.py`（注释/标识符抽取）、`scan.py`（扫描调度）、`layers.py`（core 反向依赖守卫）、`config.py`（扫描域配置）；check-code-traces.py 只留 CLI 与原面 re-export
 - **`_test_runner/`**：`test-runner.py` 的内部实现包（paths / modes / pytest_env / machine_info / doc_writer / report_html / runner），入口仅保留 CLI 与主流程并原面 re-export —— 既有测试访问 `test_runner._env_value` 等名字仍有效；**注意**：monkeypatch 内部状态（如 `_LATEST_DIR` / `_DOC_COVERAGE_PATH`）须指向持有它的子模块（`_test_runner.report_html` / `_test_runner.doc_writer`）
 
-> 新增检查脚本时直接复用 `_checklib`，不要自建 argparse/输出/退出样板；新增共享模式放 `_traces_common.py`。
+> 新增检查脚本时直接复用 `_checklib`，不要自建 argparse/输出/退出样板；新增共享模式放 `_traces_code/exemptions.py`。
 
 **`check-doc-drift.py` — 文档与实现一致性检查**
 
