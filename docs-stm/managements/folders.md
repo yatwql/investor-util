@@ -14,7 +14,7 @@
 | 架构图示 | SVG | 3 | 315 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 八大功能域总览） |
 | 辅助脚本 | Python | 52 | 10,457 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
 | 源代码合计 | — | 360 | 93,687 | 主程序 + 模板 + 脚本 + SVG |
-| 测试代码 | Python | 412 | 122,854 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| 测试代码 | Python | 412 | 122,856 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
 | 测试用例 | — | — | 8,191 个 | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | 用户文档 | Markdown | 11 | 5,504 | 含 README.md（221 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 5,281 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |

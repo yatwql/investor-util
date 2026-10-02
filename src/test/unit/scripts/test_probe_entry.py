@@ -19,6 +19,8 @@ from unittest.mock import patch
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
+# sampler 是 scripts/ 下的扁平辅助包；契约测试直接导入时也要确保其父目录在路径中。
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 pytestmark = [pytest.mark.unit, pytest.mark.unit_scripts]
 
 
