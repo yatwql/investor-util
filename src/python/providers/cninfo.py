@@ -37,6 +37,7 @@ from src.python.cache import get_ttl
 from src.python.cache import set as cache_set
 from src.python.core.http_client import make_http_client
 from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+from src.python.core.throttle import interval_delay  # 间隔+抖动唯一算式
 from src.python.providers._utils import set_last_reason, with_connect_retry
 
 logger = logging.getLogger("invest")
@@ -249,7 +250,7 @@ def _post_json(path: str, data: dict[str, Any]) -> dict[str, Any] | None:
     if resp is None:
         return None  # 失败原因已由 _with_transient_retry 写入 last-reason
     if resp.status_code == 429:
-        delay = _RATE_LIMIT_POLICY.delay_for(1)
+        delay = interval_delay(_RATE_LIMIT_POLICY.delay_for(1))  # 等待算式统一走 interval 原语
         logger.warning("[cninfo] 触发限速（HTTP 429），%.1fs 后重试一次", delay)
         time.sleep(delay)
         resp = _with_transient_retry(path, lambda: _post_once(url, data), url=url)

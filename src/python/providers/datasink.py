@@ -36,6 +36,7 @@ from typing import Any
 from src.python.core.atomic_write import write_json_atomic
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.retry import STRATEGY_FIXED, RetryPolicy
+from src.python.core.throttle import interval_delay  # 间隔+抖动唯一算式
 from src.python.providers._utils import set_last_reason, with_connect_retry
 from src.python.core.datasource_credential import (
     DEFAULT_DATA_KEY_FILE,
@@ -258,7 +259,7 @@ def _request(path: str, params: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if resp.status_code == 429:
         # 限速：等待一个限速窗口后**重试一次**（免费档 3 请求/秒，并发路径下仍可能触顶）
-        delay = _RATE_LIMIT_POLICY.delay_for(1)
+        delay = interval_delay(_RATE_LIMIT_POLICY.delay_for(1))  # 等待算式统一走 interval 原语
         logger.warning("[datasink] 触发限速（HTTP 429），%.1fs 后重试一次", delay)
         time.sleep(delay)
         resp = _get_with_transient_retry(path, query)

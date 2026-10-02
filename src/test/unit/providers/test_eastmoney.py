@@ -16,6 +16,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 import pytest
 
+from src.python.providers import eastmoney as em
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_providers]
 
 
@@ -366,3 +368,16 @@ class TestFetchIndexKline(unittest.TestCase):
 
         self.assertEqual(fetch_index_kline("gb_inx", 30), [])
         mock_json.assert_not_called()
+
+
+class TestPagingRateLimitDelegation(unittest.TestCase):
+    """历史净值分页间隔走 RateLimiter 唯一原语。
+
+    回归背景：原实现为裸 ``time.sleep(0.3)``，间隔语义无法统一模拟与调优；
+    迁移后由模块级 RateLimiter 提供 elapsed 感知的最小间隔。
+    """
+
+    def test_pager_limiter_singleton_and_interval(self):
+        limiter = em._get_pager_limiter()
+        self.assertIs(limiter, em._get_pager_limiter())  # 惰性单例
+        self.assertEqual(limiter._limits[em._PAGER_LIMIT_KEY], em._PAGER_MIN_INTERVAL)
