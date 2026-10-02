@@ -1,15 +1,16 @@
-"""`check-doc-drift` 守护清单族 —— P0/P2 门禁清单与 CI guards / CLAUDE.md / testplan.md 的同源校验。
+"""`check-doc-drift` 守护清单族 —— P0/P2 门禁清单与 CI guards / CLAUDE.md / testplan.md / pre-commit 钩子的同源校验。
 
-「守护脚本清单」被四处引用且各处都声称同源/全量：
+「守护脚本清单」被五处引用且各处都声称同源/全量：
 
 - `developer-guide.md` 的 **P0 提交前门禁** / **P2 发布门禁** 代码块
 - `.github/workflows/ci.yml` 的 `guards` job steps
 - `CLAUDE.md` 的「提交前门禁（P0）」/「发布门禁（P2）」条款
 - `testplan.md` 的「P0 全通」/「P2 已执行」清单行
+- `.githooks/pre-commit` 的八守护执行体（本地提交即跑，漏改会让钩子与门禁静默分叉）
 
 新增/移除守护脚本时任何一处漏改都会静默失真（该清单此前无校验）。
-本模块从四处各自截取清单区域，统一提取 ``scripts/check-*.py --ci`` 脚本名，
-断言七个区域（4 份文档 × P0/P2 视角）提取到的脚本集合两两一致。
+本模块从五处各自截取清单区域，统一提取 ``scripts/check-*.py --ci`` 脚本名，
+断言八个区域（4 份文档 × P0/P2 视角 + 钩子执行体单区域）提取到的脚本集合两两一致。
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ _GUIDE_MD = _REPO_ROOT / "docs-stm" / "managements" / "developer-guide.md"
 _CLAUDE_MD = _REPO_ROOT / "CLAUDE.md"
 _TESTPLAN_MD = _REPO_ROOT / "docs-stm" / "managements" / "testplan.md"
 _CI_YML = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
+_HOOK = _REPO_ROOT / ".githooks" / "pre-commit"
 
 
 def _region(text: str, start: str, end: str | None) -> str | None:
@@ -85,19 +87,19 @@ def _rel(path: Path) -> str:
     return path.relative_to(_REPO_ROOT).as_posix()
 
 
-def check_guard_parity() -> list[str]:
-    """读取四份权威源文件，执行守护清单同源校验。"""
-    try:
-        texts = {
-            _GUIDE_MD: _GUIDE_MD.read_text(encoding="utf-8"),
-            _CLAUDE_MD: _CLAUDE_MD.read_text(encoding="utf-8"),
-            _TESTPLAN_MD: _TESTPLAN_MD.read_text(encoding="utf-8"),
-            _CI_YML: _CI_YML.read_text(encoding="utf-8"),
-        }
-    except OSError as exc:  # 源文件缺失不应让检查崩溃
-        return [f"守护清单校验无法读取源文件: {exc}"]
-    guide, claude, testplan, ci = (texts[p] for p in (_GUIDE_MD, _CLAUDE_MD, _TESTPLAN_MD, _CI_YML))
-    sources = {
+def guard_parity_sources() -> dict[str, str | None]:
+    """读取五份权威源文件并按锚点截取清单区域（标签 → 区域文本；None = 锚点失配）。
+
+    钩子区域取 ``^set -e$`` 至 ``^exit 0$`` 的执行体：头注释只写脚本短名
+    （无 ``scripts/`` 前缀），不会被 ``scripts/check-*.py --ci`` 提取到。
+    源文件缺失向上抛 ``OSError``（由 ``check_guard_parity`` 转为 finding）。
+    """
+    guide = _GUIDE_MD.read_text(encoding="utf-8")
+    claude = _CLAUDE_MD.read_text(encoding="utf-8")
+    testplan = _TESTPLAN_MD.read_text(encoding="utf-8")
+    ci = _CI_YML.read_text(encoding="utf-8")
+    hook = _HOOK.read_text(encoding="utf-8")
+    sources: dict[str, str | None] = {
         f"{_rel(_GUIDE_MD)} P0 门禁块": _region(guide, r"^\*\*P0 提交前门禁\*\*", r"^\*\*P1 合入门禁\*\*"),
         f"{_rel(_GUIDE_MD)} P2 门禁块": _region(guide, r"^\*\*P2 发布门禁\*\*", r"^\*\*辅助（非阻塞）\*\*"),
         f"{_rel(_CI_YML)} guards job": _region(ci, r"^  guards:", r"^  [a-z][a-z_]*:$"),
@@ -107,5 +109,15 @@ def check_guard_parity() -> list[str]:
         f"{_rel(_CLAUDE_MD)} P2 条款": _region(claude, r"^ *- \*\*发布门禁（P2）\*\*", r"^- \*\*CI\*\*"),
         f"{_rel(_TESTPLAN_MD)} P0 行": _region(testplan, r"^9\. \*\*P0 全通\*\*", None),
         f"{_rel(_TESTPLAN_MD)} P2 行": _region(testplan, r"^11\. \*\*P2 已执行\*\*", None),
+        f"{_rel(_HOOK)} 守护清单": _region(hook, r"^set -e$", r"^exit 0$"),
     }
+    return sources
+
+
+def check_guard_parity() -> list[str]:
+    """读取五份权威源文件，执行守护清单同源校验。"""
+    try:
+        sources = guard_parity_sources()
+    except OSError as exc:  # 源文件缺失不应让检查崩溃
+        return [f"守护清单校验无法读取源文件: {exc}"]
     return find_guard_parity(sources)

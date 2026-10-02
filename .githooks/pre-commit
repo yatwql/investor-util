@@ -1,19 +1,19 @@
 #!/bin/sh
 # git pre-commit hook — 提交门禁自动化
 #
-# 1) 任务编号（plan-/rf-）全局一致性检查
-#    提交 plan.md / review-findings.md 时校验「编号源」标记（plan-next / rf-next）
-#    是否与全部历史归档无冲突，防止新增编号撞历史编号。
-#
-# 2) 统计快照自动同步（check-doc-drift --sync）
-#    提交涉及 managements/ 文档或测试代码时，把 folders.md 统计表的
-#    登记数字自动回写为实测值并加入暂存区 —— 治理「人工同步必漏」的
-#    最高频 CI 红源；同步后仍不一致（需人工判断的漂移）则中止提交。
-#
-# 3) 版本号全局一致性（check-version-consistency --ci）
-#    提交涉及版本受检文件（APP_VERSION / README / pyproject / 管理文档）时，
-#    校验 13 处版本号与 APP_VERSION 一致，防止单侧改版失步（CI guards 同源）。
-#    仅在暂存文件命中受检清单时触发，避免无关提交被误拦。
+# 1) 八守护全量（与 P0/P2 门禁清单、CI guards job 同源；check-doc-drift 第 16 项
+#    「守护清单同源」把本文件与 developer-guide / ci.yml / CLAUDE.md / testplan.md
+#    五处的 `scripts/check-*.py --ci` 引用集合两两比对，漏改任一处即报）
+#    - check-code-traces / check-doc-traces：代码与文档历史痕迹
+#    - check-task-numbering：任务编号（plan-/rf-）全局一致性
+#    - check-semantic-index：语义命名索引正反向校验
+#    - check-doc-drift：文档与实现一致性（统计快照自动回写 folders.md 并 git add）
+#    - check-test-redundancy：测试冗余与无效用例
+#    - check-requirement-trace：需求 ID ↔ 验证载体追溯
+#    - check-version-consistency：版本号 13 处一致
+#    约 4~5 秒；任一 finding 即中止提交。此前本钩子仅条件触发其中 3 项，
+#    曾致 README 痕迹与 folders 行数漂移在本地放行、到 CI 才红。
+#    dev-verify（P0 单测）不入钩子，仍为提交前手动纪律 + CI 兜底。
 #
 # 依赖 Python 在 PATH 或项目 .venv 中。需启用 core.hooksPath（install-hooks.sh）。
 
@@ -35,35 +35,37 @@ elif command -v python3 >/dev/null 2>&1; then
 fi
 
 CHANGED=$(git diff --cached --name-only 2>/dev/null || true)
+GUARD_FAILED=""
 
-# ── 1) 任务编号一致性（仅提交涉及编号管理文档时才校验）
-if echo "$CHANGED" | grep -qE '(^|/)plan\.md$|(^|/)review-findings\.md$'; then
-    echo "[..] pre-commit: 校验任务编号一致性（涉及编号管理文档）"
-    if ! "$PY_CMD" scripts/check-task-numbering.py --ci; then
-        echo "[ERR] pre-commit: 任务编号与历史归档冲突，请修正 plan-next / rf-next 标记后重试" >&2
-        exit 1
-    fi
-    echo "[OK] pre-commit: 任务编号一致性通过"
-fi
-
-# ── 2) 统计快照自动同步（涉及 managements/ 或测试代码时）
+# ── 1) 统计快照同步 + 文档漂移（涉及 managements/ 或 src/test/ 时 --sync 回写
+#      并由脚本自行 git add；其余提交纯 --ci 校验，README/手册漂移同样拦截）
 if echo "$CHANGED" | grep -qE '^docs-stm/managements/|^src/test/'; then
-    echo "[..] pre-commit: 统计快照同步（folders.md 数字自动回写）"
+    echo "[..] pre-commit: 统计快照同步 + 文档漂移（check-doc-drift --sync）"
     if ! "$PY_CMD" scripts/check-doc-drift.py --sync --ci; then
-        echo "[ERR] pre-commit: 文档与实现仍有不一致（同步已回写统计数字，其余项目请按提示修正）" >&2
-        exit 1
+        GUARD_FAILED="$GUARD_FAILED check-doc-drift"
     fi
-    echo "[OK] pre-commit: 统计快照同步完成"
+else
+    echo "[..] pre-commit: scripts/check-doc-drift.py --ci"
+    if ! "$PY_CMD" scripts/check-doc-drift.py --ci; then
+        GUARD_FAILED="$GUARD_FAILED check-doc-drift"
+    fi
 fi
 
-# ── 3) 版本号一致性（仅提交涉及版本受检文件时）
-if echo "$CHANGED" | grep -qE '(^README\.md$|^pyproject\.toml$|^src/python/core/constants\.py$|^docs-stm/managements/(plan|technical|requirements|testplan|review-findings|llm-technical|folders|test-coverage|changelog|developer-guide)\.md$)'; then
-    echo "[..] pre-commit: 校验版本号一致性（涉及版本受检文件）"
-    if ! "$PY_CMD" scripts/check-version-consistency.py --ci; then
-        echo "[ERR] pre-commit: 版本号与 APP_VERSION 失步，请按提示同步 13 处受检文件后重试" >&2
-        exit 1
-    fi
-    echo "[OK] pre-commit: 版本号一致性通过"
+# ── 2) 其余七个守护（无条件全量，与 CI guards job 逐步同源）
+echo "[..] pre-commit: 七守护全量校验"
+if ! "$PY_CMD" scripts/check-code-traces.py --ci; then GUARD_FAILED="$GUARD_FAILED check-code-traces"; fi
+if ! "$PY_CMD" scripts/check-doc-traces.py --ci; then GUARD_FAILED="$GUARD_FAILED check-doc-traces"; fi
+if ! "$PY_CMD" scripts/check-task-numbering.py --ci; then GUARD_FAILED="$GUARD_FAILED check-task-numbering"; fi
+if ! "$PY_CMD" scripts/check-semantic-index.py --ci; then GUARD_FAILED="$GUARD_FAILED check-semantic-index"; fi
+if ! "$PY_CMD" scripts/check-test-redundancy.py --ci; then GUARD_FAILED="$GUARD_FAILED check-test-redundancy"; fi
+if ! "$PY_CMD" scripts/check-requirement-trace.py --ci; then GUARD_FAILED="$GUARD_FAILED check-requirement-trace"; fi
+if ! "$PY_CMD" scripts/check-version-consistency.py --ci; then GUARD_FAILED="$GUARD_FAILED check-version-consistency"; fi
+
+if [ -n "$GUARD_FAILED" ]; then
+    echo "[ERR] pre-commit: 守护未通过:$GUARD_FAILED" >&2
+    echo "       按上方输出提示修复后重试（清单与 P0 门禁 / CI guards job 同源）" >&2
+    exit 1
 fi
 
+echo "[OK] pre-commit: 八守护全量通过"
 exit 0

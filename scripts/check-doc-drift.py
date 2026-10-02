@@ -22,7 +22,7 @@
   13. 管理文档分区纪律  未完成/已解决/已归档三分区互斥；现行 changelog 只允许一个 `-dev` 段头
   14. Extended Thinking 支持矩阵  手册对比表/「仅」式枚举/默认开思考提示 ↔ `llm/api_base` 前缀名单
   15. Provider Chain 降级表  `fetcher/chain.py` `_DEFAULT_CHAINS` → manuals/datasource-reliability.md（逐链双向）
-  16. 守护清单同源        developer-guide P0/P2 门禁块 + ci.yml guards steps + CLAUDE.md/testplan.md 清单四处 `check-*.py --ci` 引用集合两两一致
+  16. 守护清单同源        developer-guide P0/P2 门禁块 + ci.yml guards steps + CLAUDE.md/testplan.md 清单 + .githooks/pre-commit（五处）`check-*.py --ci` 引用集合两两一致
 
 按设计豁免的历史记录文档：`changelog.md` / `review-findings.md`（会如实引用旧数字作为变更记录）
 与 `docs-stm/archive/**`（版本快照）不参与第 2/4/5 项扫描。
@@ -150,6 +150,7 @@ from _doc_drift import (  # noqa: E402,F401  # 原面 re-export（实现见 _doc
     check_thinking_support_matrix,
     find_guard_parity,
     check_guard_parity,
+    guard_parity_sources,
 )
 
 

@@ -247,3 +247,11 @@
 **rf-541**（测试 `sys.path` 重复注入）：`src/test/unit/scripts/test_probe_entry.py` 存在两处 `sys.path.insert(0, scripts/)`（模块级 + `probe_entry` fixture 内各一处）：① 重复注入——`probe.py` 加载时自身也会插入同一路径（`probe.py:23`），fixture 内那次必然多余；② 无幂等保护——`sys.path.insert` 每次调用都追加，重复注入会在 `sys.path` 头部累积重复条目，且属全局路径污染式 ad-hoc 写法（同类脚本测试 `test_checklib.py`/`test_check_doc_drift.py` 均无模块级 path 注入）。
 处置：合并为单一注入点——模块级保留 `_ensure_scripts_on_path()`（幂等保护 `if str(_SCRIPTS_DIR) not in sys.path`），fixture 内重复注入删除（probe.py 自插入不变）；注入逻辑提取为可测辅助函数。
 测试：`test_probe_entry.py::TestScriptsPathInjection` 2 例（scripts/ 已在 sys.path / 幂等调用不增条目），文件合计 10 例全通。
+
+## v0.11.13-dev 批次（2026-10-02）
+
+### rf-542~544（2026-10-02，近 24 小时实现自审批次，当日登记当日修复）
+
+- **rf-542**（faq.md 调仓问答缺 Web 入口）：`faq.md` 两处「两份持仓文件对比」答案只写菜单 `W` / CLI `whatif`，未含当日新增的 Web「调仓模拟」页签（调仓 What-if 与缓存管理 Web 化落地后文档未同步）。处置：两处答案补 Web 页签入口（基准默认取配置正式持仓、可改上传，目标必传）并链到 `how-to-use-web-mode.md`。
+- **rf-543**（pre-commit 仅覆盖 3/8 守护 → CI 两度红）：当日 README 徽章/上手段提交与 folders 行数同步提交连续 CI 红——`check-doc-traces` 报 README 版本行痕迹、`check-doc-drift` 报 folders「用户文档」行数漂移，本地钩子因仅条件触发「编号/统计同步/版本」三项而未拦截（dev-verify 亦不在钩子内）。处置：`.githooks/pre-commit` 重写为八守护全量（约 4~5 秒：`check-doc-drift` 按暂存面选 `--sync`/`--ci`，其余七项无条件执行，任一 finding 中止提交）；`check-doc-drift` 第 16 项「守护清单同源」权威源扩为五处（`_guards.py` 新增 `.githooks/pre-commit` 区域锚点 `^set -e$`~`^exit 0$` 与 `guard_parity_sources()`，补 2 例真实源断言）；developer-guide 四层保障表 / item 16 / install-hooks 描述同步。dev-verify 仍不入钩子（提交前手动纪律 + CI 兜底）。
+- **rf-544**（CLAUDE.md 历史痕迹设施路径过时）：CLAUDE.md「scripts 共享设施」条仍指向 `scripts/_traces_common.py`，该文件当日已拆包为 `scripts/_traces_code/`（共享排除模式并入 exemptions）。处置：路径更新为 `scripts/_traces_code/`。

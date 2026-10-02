@@ -81,6 +81,7 @@ from _doc_drift._ledger import (  # noqa: F401
 from _doc_drift._guards import (  # noqa: F401
     find_guard_parity,
     check_guard_parity,
+    guard_parity_sources,
 )
 from _doc_drift._shared import (  # noqa: F401
     _RELIABILITY_MD,
@@ -203,4 +204,5 @@ __all__ = [
     "check_thinking_support_matrix",
     "find_guard_parity",
     "check_guard_parity",
+    "guard_parity_sources",
 ]

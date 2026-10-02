@@ -13,6 +13,7 @@
   - 项目统计表比对（文件数 / 行数）
   - 归档索引完整性（管理文档 ↔ `docs-stm/archive/` 双向对齐）
   - 管理文档分区纪律（未完成/已解决/已归档错置、现行 changelog 只允许开发段头）
+  - 守护清单同源（五处权威源的守护脚本集合两两一致，含 pre-commit 钩子执行体）
   - Extended Thinking 支持矩阵（手册对比表/「仅」式措辞/默认开思考提示 ↔ 代码前缀名单）
   - 真实仓库冒烟：当前文档与代码一致（run_checks() 为空）
 
@@ -857,7 +858,7 @@ class TestProjectStatsSync:
 
 
 class TestGuardParity:
-    """`find_guard_parity` / `check_guard_parity`（四处守护清单脚本集合两两一致）。"""
+    """`find_guard_parity` / `check_guard_parity`（五处守护清单脚本集合两两一致）。"""
 
     @staticmethod
     def _good(*names: str) -> str:
@@ -900,3 +901,12 @@ class TestGuardParity:
         # 单一成功来源不构成比较，但截取失败仍须单独报出
         assert drift.find_guard_parity({"A": self._good("check-x.py")}) == []
         assert drift.find_guard_parity({"A": None}) != []
+
+    def test_real_sources_include_precommit_hook(self, drift):
+        """真实源集合必须包含 pre-commit 钩子——锚点失配会截出 None 并被报出。"""
+        sources = drift.guard_parity_sources()
+        assert any(label.endswith(".githooks/pre-commit 守护清单") for label in sources)
+
+    def test_real_sources_guard_sets_match(self, drift):
+        """五份真实源（含钩子执行体）的守护集合两两一致——真实仓库断言。"""
+        assert drift.find_guard_parity(drift.guard_parity_sources()) == []

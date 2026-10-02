@@ -19,8 +19,13 @@
 
 ### Changed
 
+- **pre-commit 八守护全量**：钩子从「编号/统计同步/版本三项条件触发」重写为 8 个守护脚本全量校验（约 4~5 秒，`check-doc-drift` 按暂存面选 `--sync`/`--ci`），堵住「本地放行、CI 才红」缺口；`check-doc-drift` 第 16 项「守护清单同源」权威源扩为五处（新增 `.githooks/pre-commit`），钩子清单漏改即报。
 - Web 状态区网格由三列改自适应两列（760px 内容区下三列致名称/耗时竖排换行）。
 - 架构 SVG（capabilities / architecture / llm-chain）事实性修订（九大功能域、17 页签、5 provider / 6 输出模块）。
+
+### Fixed
+
+- `faq.md` 两处「两份持仓文件对比」答案补 Web「调仓模拟」页签入口；CLAUDE.md「scripts 共享设施」历史痕迹设施路径同步为 `scripts/_traces_code/`。
 
 ## 归档
 

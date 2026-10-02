@@ -190,10 +190,10 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 
 | 机制 | 触发 | 跨机器 |
 |:-----|:-----|:------|
-| **P0/P2 门禁** | 提交/发布前 `check-task-numbering.py --ci` | ✅ 零配置 |
+| **P0/P2 门禁** | 提交/发布前 8 个 `--ci` 守护脚本全量（清单见 P0/P2 门禁条款） | ✅ 零配置 |
 | **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
 | **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
-| **git pre-commit** | `git commit` 涉及编号文档时自动校验；提交涉及 `docs-stm/managements/` 或 `src/test/` 时自动同步统计快照（`check-doc-drift --sync`） | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
+| **git pre-commit** | `git commit` 全量执行 8 个守护脚本（与 P0/CI guards 同源，约 4~5 秒）；提交涉及 `docs-stm/managements/` 或 `src/test/` 时 `check-doc-drift --sync` 自动回写统计快照 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
 | **CI guards job** | push / PR / tag 时自动校验（8 个 `--ci` 脚本之一） | ✅ 零配置 |
 
 > `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
@@ -1022,7 +1022,7 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 15. Provider Chain 降级表：`fetcher/chain.py::_DEFAULT_CHAINS` 的 13 条链 ↔
     `datasource-reliability.md` §4.2 表逐链**双向**比对（漏链 → 「缺少链路」；幽灵行 → 「无此链」）
 16. 守护清单同源：developer-guide 的 P0/P2 门禁代码块、`ci.yml` guards steps、CLAUDE.md P0/P2 条款、
-    testplan P0/P2 清单行，四处的 `scripts/check-*.py --ci` 引用集合两两一致（新增守护脚本漏改任一处即报）
+    testplan P0/P2 清单行与 `.githooks/pre-commit` 执行体，五处的 `scripts/check-*.py --ci` 引用集合两两一致（新增守护脚本漏改任一处即报）
 
 ```bash
 .venv/bin/python scripts/check-doc-drift.py                   # 十六项全查
@@ -1095,7 +1095,7 @@ Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验�
 
 **`install-hooks.sh` — git pre-commit hook 激活脚本（`.githooks/`）**
 
-`.githooks/` 的 git pre-commit hook（任务编号一致性校验 + 统计快照自动同步）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
+`.githooks/` 的 git pre-commit hook（8 个守护脚本全量校验 + 统计快照自动同步）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
 
 ```bash
 sh .githooks/install-hooks.sh          # 启用（写入本机 core.hooksPath）
