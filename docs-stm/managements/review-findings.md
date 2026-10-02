@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.12-dev
-> **编号源**：`rf-next = 534`（新增问题取此编号，完成后更新为 +1；已用最大 rf-532，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 539`（新增问题取此编号，完成后更新为 +1；已用最大 rf-538，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -37,14 +37,11 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui-implementation.md` §10 三阶段验收标准 + §6.5/§6.6 样式/响应式）。**勾选清单已备齐（2026-09-20）**：`docs-stm/archive/v0.10.x/web-ui/web-ui-verification-checklist.md`（从实际 `index.html` 七卡结构 + `how-to-use-web-mode.md` 手册导出 ①~⑤ 五类 UX 项，含逐步操作步骤与判定标准）。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
-### P2C — 文档与实现口径（2026-10-02）
+### P2C — 文档与实现口径
 
 
-> 无待处理项（`rf-420` 已修复，见「已解决问题」区）。
+### P2D — 工程卫生
 
-### P2D — 工程卫生（2026-09-29）
-
-> 无待处理项（`rf-474` 已修复，见「已解决问题」区）。
 
 ### P2E — 全仓技术债务审查（2026-10-02，对照「架构设计约束」27 条与核心架构决策五项）
 
@@ -57,6 +54,18 @@
 | **rf-529** | 低 | **双治理并行体系内的重复工具**。`analysis/whatif.py::_compute_hhi`（L88，成本口径）与 `analysis/portfolio_evolution.py::_compute_hhi`（L60，市值/成本兜底口径）各算 Σ权重²，`analysis/_silence.py`、`core/perf.py`、`core/decision_ledger.py` 对同一 `jsonl_store` 抽取逻辑保持 3 份薄包装（后两者为转发 OK，但静默其仍保留对`mkstemp` 语义的独立文档化） | 同一逻辑两张表达（whatif 与 portfolio_evolution 权重基数口径略有差异：成本合一 vs 市值优先），未来若加入 HHI 权重口径（如启用市值优先）两处需同步改，易漏 | whatif 复用 portfolio_evolution 的口径函数（或共享纯计算 `analysis/_hhi.py` 按口径参数化），差异仅体现在调用参数 |
 | **rf-530** | 低 | **print 输出规范边界确认（日志统一约束）**。`report/progress.py::TuiProgressReporter`（交互式进度，属合法「交互式 print」豁免）与 `core/check_sources.py::run_check_sources`（CLI 报告打印，属交互输出）合规；但 `core/doctor.py:16` 的 print 走的是自检 CLI 快路径，与同文件 `print(item["group"]...)` 复合、违背「若 doctor 需要嵌入 Web 报告」（`web/handlers.py` 已走结构化数据路径），该 print 仅命令行入口——它没走 `[..]`/`[OK]`/`[ERR]` 样式前缀规范，有各別字符流风险 | 无功能风险，仅一致性观察（`check-code-traces.py` 不阻止交互式 print） | 体检 CLI 输出亦可走统一带前缀/着色的 console helper（复用 `core/ansi_colors.py`），或显式标注「CLI-only，不进产物」注释声明豁免依据 |
 | **rf-531** | 低 | **过期缓存降级处置无统一入口（§1.4.5 尾部难覆盖区）**。`fetcher/index.py::fetch_us_indices` 手写「可正常缓存 → 主链路 → 备用腾讯 → 过期缓存 + `cache_set` 回写 + `_source=stale_cache`」四段流程，与 §1.4.5 的统一链路状态在语义上等价，但独立实现且 `cache_set` 回写过期数据时未盖语义版本，与「缓存载荷语义版本」词条的判据接入无关 | 该函数是「Provider Chain 必经」约束的唯一声明例外（技术原因），但例外声明只覆盖「不走 Chain」，未覆盖「手写降级回写」这一段；语义版本机制上线后此处（自动类别 restart）易成为版本缺失的缓存回写点 | 将「过期缓存回写」收敛为 `fetcher/chain.py` 提供的通用降级助手（常见语义版本盖戳），index.py 调用之；例外注释同步声明为「仅本次手写降级路径」 |
+
+### P2F — Windows 可移植性缺陷（2026-10-02，benchmark 失败用例驱动；**已全部修复**）
+
+> 由 benchmark 任务 13 例失败反查：均为 Windows 平台语义差异。其中 rf-534~537 为**真实生产缺陷**（非仅测试问题），rf-538 为测试断言可移植性。已修复并补回归用例，明细见 changelog 同版本段。
+
+| # | 摘要 | 状态 |
+|---|------|------|
+| **rf-534** | Web 上传目录项目根误算（`__file__` 向上 3 层 → `src/`，上传落 `src/data/holdings/uploads/` 幽灵目录） | 已修复（改 `constants.PROJECT_ROOT` + 回归用例） |
+| **rf-535** | `_checklib.rel()` 返回 `\\` 与文档目录树 `/` 失配 → Windows 下 1,600+ 误报 | 已修复（`.as_posix()`） |
+| **rf-536** | `collect-test-coverage.py` GBK 输出 vs 消费方 UTF-8 解码 → `UnicodeDecodeError` | 已修复（子进程 `reconfigure(encoding="utf-8")`） |
+| **rf-537** | `_collect_test_snapshot` 未处理 `stdout=None` → `re.search(None)` `TypeError` 使 `--sync` 堆栈退出 | 已修复（`errors="replace"` + 空值降级 + 4 例回归） |
+| **rf-538** | 13 例测试断言的 Windows 不可移植（POSIX 权限位/geteuid/socketpair/`/tmp`/分隔符） | 已修复（5 跳过 + 8 跨平台改写，全绿） |
 
 
 ## 已解决问题

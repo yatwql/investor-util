@@ -10,6 +10,14 @@
 
 > 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
 
+### Windows 可移植性与测试失败修复
+
+- **Web 上传目录项目根误算（rf-534）**：`src/python/web/upload.py` 用 `__file__` 向上 3 层手工推算项目根，落点为 `src/python/web/upload.py` 时只得 `src/`，上传文件被误存进 `src/data/holdings/uploads/` 幽灵目录（本机实测残留 `*.xlsx`，并被 `check-doc-drift` 报为目录树缺条目）。改用 `constants.PROJECT_ROOT`（标记文件查找、不依赖目录深度）作单一来源；新增回归用例 `test_upload_dir_rooted_at_repo_data` 钉桩「落点不在 `src/` 内」。
+
+- **check-doc-drift 在 Windows 的三处失效（rf-535~537）**：(a) `_checklib.rel()` 返回 `\\`，与 `folders.md` 目录树的 `/` 拼接、文档内文件引用全线失配 → Windows 下把 1,600+ 真实文件全报「目录树缺条目」，改 `.as_posix()` 归一；(b) `collect-test-coverage.py` 中文分组名按 cp936 GBK 写出，消费方 `_doc_drift/_shared.py::_collect_test_snapshot` 按 UTF-8 解码 → reader 线程 `UnicodeDecodeError` → `proc.stdout` 为 None → `re.search(..., None)` 抛 `TypeError` 使 `--sync` 堆栈退出，双侧修复：子进程入口 `sys.stdout.reconfigure(encoding="utf-8")`，消费方补 `errors="replace"` + stdout 空值降级为空快照（新增 4 例回归）；(c) 同步刷新 `folders.md` 统计数字快照。
+
+- **测试用例的 Windows 可移植性修复（rf-538）**：13 例失败全部为断言不可移植（非生产缺陷）——POSIX 权限位断言（`os.chmod`/`st_mode` 在 Windows 无意义，5 例加 `skipif(os.name == "nt")`）、`os.geteuid` 仅 POSIX（1 例跳过）、`asyncio.ProactorEventLoop` 启动用 `socket.socketpair()`（内部退化为回环 `connect`）被网络守卫误阻（守卫加回环豁免：`127.0.0.0/8`、`::1`、`localhost` 放行，外网仍阻断；已加 sanity 验证）、`/tmp` 与 `/` 分隔符硬编码（改 `Path` 结构断言 / `is_relative_to(PROJECT_ROOT)`）、`endswith("a/b")` 反斜杠失配（改 `Path(path).parts[-2:]`）。
+
 ### 文档治理与脚本收编
 
 - **check-code-traces 拆包（rf-533）**：1,016 行破 800 硬上限的唯一脚本，按「模式表/扫描/守卫」拆为 `scripts/_traces_code/` 六模块包，入口只留 CLI（185 行）与原面 re-export；`_traces_common.py` 并入包内 `exemptions.py` 并删兼容壳（测试改指向子模块）；check-task-numbering / check-test-markers / check-doc-traces 三脚本迁移 `_checklib` 契约（补 `-v`、统一输出与退出码，17 处 sys.path 样板文本统一）。scripts 单测 428 例全通。
