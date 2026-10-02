@@ -4,6 +4,7 @@
 [![CI](https://github.com/yatwql/investor-util/actions/workflows/ci.yml/badge.svg)](https://github.com/yatwql/investor-util/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-%3E%3D3.11-3776AB?logo=python&logoColor=white)](https://www.python.org)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **一份持仓 Excel，换来一份机构级的投资复盘报告。**
 
@@ -20,7 +21,7 @@
 - 🔁 **决策有闭环** — 建议 → 登记 → 真实行情结算命中率 → 教训回灌提示词，越用越懂你的组合
 - 🔒 **隐私优先** — 数据全部本地处理，支持 4 档匿名化，凭据永不落日志与报告
 
-> 当前开发版本：0.11.13-dev（[版本历史](docs-stm/managements/changelog.md)）
+> 当前版本：0.11.13-dev（[版本历史](docs-stm/managements/changelog.md)）
 
 ## ✨ 核心亮点
 
@@ -36,6 +37,14 @@
 | **数据可信度可追溯** | 每个数据源都有主备链路与可读降级原因；报告内**数据源可用性矩阵**含「命中源」列（本次实际由谁服务）；**模块级质量分级**与**确定性信号沉淀**（实时/非实时来源标签）防止降级数据冒充战绩 |
 | **决策闭环** | 行动建议（再平衡 + 交易纪律 + 调仓建议 + 收益归因）→ 决策登记 → 真实行情结算命中率 → 教训回灌专家复盘提示词（实验开关 `decision_reflection`）——每一次判断都会被事后检验 |
 | **调仓 What-if 推演** | 双持仓 diff + 指定生效日时序回测（区间/年化收益、波动率、夏普、最大回撤），独立产物 `调仓模拟.xlsx` / `.html`，决策前先沙盘 |
+
+## 📸 实际报告效果
+
+由示例持仓（公开指数 ETF，本机真实行情）生成的 HTML 报告实景：
+
+![报告首屏：目录导航与盈亏汇总](src/static/report-overview.png)
+
+![交互图表：资产构成与穿透行业分布](src/static/report-charts.png)
 
 ## 环境要求
 
