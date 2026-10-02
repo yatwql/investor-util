@@ -522,6 +522,157 @@ def _handle_run_history():
     return _ok(records)
 
 
+# ── 调仓 What-if 模拟（同步执行，独立产物）────────────────
+
+# 同一时刻仅允许一个模拟（threaded 服务器下防止双写同名「调仓模拟.*」产物）
+_whatif_lock = threading.Lock()
+
+
+def _handle_whatif():
+    """调仓 What-if 模拟（POST /api/whatif，副作用，同源守卫）。
+
+    payload：
+      - candidate_file_id（必填）：目标持仓（调仓后/假设）上传 file_id
+      - base_file_id（可选）：基准持仓上传 file_id；缺省走 use_existing
+      - use_existing（默认 True）：无 base_file_id 时用配置默认持仓文件
+      - effective_date（可选 YYYY-MM-DD）：指定后追加时序回测（opt-in 联网）
+
+    全程同步执行（本地计算，与 CLI/TUI 同链 run_whatif_simulation），
+    成功返回产物 basename，前端经 /api/reports/<filename> 预览下载。
+    """
+    import datetime
+
+    from src.python.config import get_config
+    from src.python.core.reader import read_holdings
+    from src.python.report.whatif_operations import run_whatif_simulation
+    from src.python.web.upload import resolve_file
+
+    payload = request.get_json(silent=True) or {}
+    candidate_file_id = payload.get("candidate_file_id")
+    base_file_id = payload.get("base_file_id")
+    use_existing = payload.get("use_existing", True)
+    effective_date = payload.get("effective_date")
+
+    # ── 参数校验（BAD_PARAM）──
+    if not isinstance(candidate_file_id, str) or not candidate_file_id:
+        return _err("BAD_PARAM", "缺少目标持仓 file_id"), 400
+    if base_file_id is not None and (not isinstance(base_file_id, str) or not base_file_id):
+        return _err("BAD_PARAM", "基准持仓 file_id 不合法"), 400
+    if not isinstance(use_existing, bool):
+        return _err("BAD_PARAM", "输入来源参数不合法"), 400
+    if effective_date is not None:
+        if not isinstance(effective_date, str):
+            return _err("BAD_PARAM", "生效日格式不合法"), 400
+        effective_date = effective_date.strip() or None
+    if effective_date:
+        try:
+            parsed = datetime.date.fromisoformat(effective_date)
+        except ValueError:
+            return _err("BAD_PARAM", "生效日格式应为 YYYY-MM-DD"), 400
+        # 3.11 起 fromisoformat 宽容接受 20260701 等紧凑式，回写归一化严格格式
+        if parsed.isoformat() != effective_date:
+            return _err("BAD_PARAM", "生效日格式应为 YYYY-MM-DD"), 400
+        effective_date = parsed.isoformat()
+    # 副作用操作轻量同源校验
+    if not _is_same_origin():
+        return _err("BAD_PARAM", "同源校验失败，拒绝提交"), 403
+
+    # ── 文件来源解析（上传过期 → FILE_EXPIRED 404）──
+    candidate_path = resolve_file(candidate_file_id)
+    if candidate_path is None:
+        return _err("FILE_EXPIRED", "目标持仓文件已过期，请重新上传"), 404
+
+    if base_file_id:
+        base_path = resolve_file(base_file_id)
+        if base_path is None:
+            return _err("FILE_EXPIRED", "基准持仓文件已过期，请重新上传"), 404
+    elif use_existing:
+        config = get_config()
+        base_path = os.path.join(
+            config.get("holdings_dir", "data/holdings"),
+            config.get("holdings_filename", "个人投资持仓信息.xlsx"),
+        )
+    else:
+        return _err("BAD_PARAM", "缺少基准持仓来源"), 400
+
+    # ── 读取两侧持仓（空/读失败 → 422，对齐 CLI 退出码语义）──
+    base_holdings = read_holdings(base_path)
+    cand_holdings = read_holdings(candidate_path)
+    if not base_holdings:
+        return _err("WHATIF_UNAVAILABLE", f"基准持仓读取失败或为空: {os.path.basename(base_path)}"), 422
+    if not cand_holdings:
+        return _err("WHATIF_UNAVAILABLE", f"目标持仓读取失败或为空: {os.path.basename(candidate_path)}"), 422
+
+    # ── 互斥执行（忙碌 → 429）──
+    if not _whatif_lock.acquire(blocking=False):
+        return _err("WHATIF_BUSY", "已有调仓模拟在执行，请稍后再试"), 429
+    try:
+        output_dir = get_config().get("output_dir", "reports")
+        result = run_whatif_simulation(
+            base_holdings,
+            cand_holdings,
+            base_file=base_path,
+            candidate_file=candidate_path,
+            output_dir=output_dir,
+            reporter=None,
+            effective_date=effective_date,
+        )
+    except Exception:
+        logger.exception("调仓 What-if 模拟执行异常")
+        return _err("WHATIF_FAILED", "调仓模拟执行异常，请查看日志"), 500
+    finally:
+        _whatif_lock.release()
+
+    if not result.ok:
+        return _err("WHATIF_UNAVAILABLE", f"调仓对比数据不可用: {result.reason}"), 422
+    return _ok(
+        {
+            "excel": os.path.basename(result.excel),
+            "html": os.path.basename(result.html),
+            "base_count": len(base_holdings),
+            "candidate_count": len(cand_holdings),
+        }
+    )
+
+
+# ── 缓存管理（统计 + 清理过期）──────────────────────────
+
+
+def _handle_cache_stats():
+    """缓存统计（GET /api/cache，只读）：总量/前缀分布/命中率/过期预估。"""
+    from src.python.cache import cleanup_expired, get_cache_hit_rate, get_cache_stats as _raw_stats
+
+    raw = _raw_stats()
+    by_prefix: dict = raw.get("by_prefix", {}) or {}
+    # 前缀按文件数降序，以 [前缀, 数量] 数组下发——Flask JSON 默认 sort_keys
+    # 会重排 dict 键序，只有数组能保序；前端取前几行展示（防长尾撑乱卡片）
+    prefixes = sorted(by_prefix.items(), key=lambda kv: kv[1], reverse=True)
+    return _ok(
+        {
+            "total_files": raw.get("total_files", 0),
+            "total_size_bytes": raw.get("total_size_bytes", 0),
+            "by_prefix": [[k, v] for k, v in prefixes],
+            "top_by_size": raw.get("top_by_size", [])[:5],
+            "hit_rate": get_cache_hit_rate(),
+            "expired_count": cleanup_expired(dry_run=True),
+        }
+    )
+
+
+def _handle_cache_cleanup():
+    """清理过期缓存（POST /api/cache/cleanup，副作用，同源守卫）。
+
+    与 TUI `[3]` 同链（cache.cleanup_expired），仅删 TTL 已过期文件；
+    有效缓存不受影响，下次读取按需重建。
+    """
+    from src.python.cache import cleanup_expired
+
+    if not _is_same_origin():
+        return _err("BAD_PARAM", "同源校验失败，拒绝提交"), 403
+    removed = cleanup_expired(dry_run=False)
+    return _ok({"removed": removed})
+
+
 def _handle_config_edit():
     """配置编辑：GET 返回可编辑面，POST 应用单次编辑（副作用，同源守卫）。
 
@@ -693,6 +844,9 @@ def create_handlers(app, run_manager) -> None:
     )
 
     app.add_url_rule("/api/reports/<path:filename>", "serve_report", _handle_serve_report, methods=["GET"])
+    app.add_url_rule("/api/whatif", "whatif", _handle_whatif, methods=["POST"])
+    app.add_url_rule("/api/cache", "cache_stats", _handle_cache_stats, methods=["GET"])
+    app.add_url_rule("/api/cache/cleanup", "cache_cleanup", _handle_cache_cleanup, methods=["POST"])
     app.add_url_rule("/api/health", "health", _handle_health, methods=["GET"])
     app.add_url_rule("/api/health/history", "health_history", _handle_health_history, methods=["GET"])
     app.add_url_rule("/api/doctor", "doctor", _handle_doctor, methods=["GET"])

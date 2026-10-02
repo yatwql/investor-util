@@ -81,7 +81,7 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 .\scripts\launch.ps1 web  # Windows
 ```
 
-七步卡片式流程：① 上传持仓 → ② 生成报告 → ③ 配置编辑（与 TUI 菜单同源）→ ④ 实时进度 → ⑤ 结果预览/下载 → ⑥ 运行状态（系统信息 / 数据源健康 / 最近运行 / 系统自检）→ ⑦ 日志查看。详见 [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md)。
+标签页工作台（五区）：**生成报告**（① 上传 → ② 生成 → ④ 实时进度 → ⑤ 结果预览/下载）· **调仓模拟**（What-if 独立报告）· **配置**（③ 与 TUI 菜单同源）· **运行状态**（⑥ 系统信息 / 数据源健康 / 最近运行 / 系统自检 / 缓存管理）· **日志**（⑦）。详见 [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md)。
 
 ### CLI 命令行模式（定时任务驱动）
 
@@ -122,8 +122,8 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 | 📈 量化风控 | Beta 置信区间 + 统计检验、情景回撤推演、VaR 尾部风险、再平衡告警、流动性变现天数、币种敞口 | [报告文件结构](docs-stm/manuals/reports-instruction.md) |
 | 🏆 基金评价 | 5 级评级、经理变更监控、重合度矩阵、集中度与风格漂移、因子回归、候选基金比较 | [报告文件结构](docs-stm/manuals/reports-instruction.md) |
 | 📊 持仓基本面 | 财务指标 + 质量档、个股财报摘要（缺章节自动回溯）、穿透标的来源区分 | [报告文件结构](docs-stm/manuals/reports-instruction.md) |
-| 🔄 调仓模拟 | 双持仓 diff + 指定生效日时序回测，决策前先沙盘 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) |
-| ⚙️ 运维观测 | 系统自检、数据源健康探测、日志可视化、阶段耗时持久化 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) · [数据源可靠性文档](docs-stm/manuals/datasource-reliability.md) |
+| 🔄 调仓模拟 | 双持仓 diff + 指定生效日时序回测，决策前先沙盘 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) · [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) |
+| ⚙️ 运维观测 | 系统自检、数据源健康探测、日志可视化、缓存统计与清理、阶段耗时持久化 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) · [数据源可靠性文档](docs-stm/manuals/datasource-reliability.md) |
 | 🔒 隐私安全 | 4 档匿名化、凭据不落产物、缓存审查、本地状态隔离 | [常规配置指引](docs-stm/manuals/how-to-config.md) |
 
 > 数据从哪来、可靠性如何、挂了会怎样降级？见 [数据源可靠性文档](docs-stm/manuals/datasource-reliability.md)；想调开关、TTL、章节可见性，见 [常规配置指引](docs-stm/manuals/how-to-config.md)。
@@ -139,7 +139,7 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 | 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
 | 2 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解（含 `[D]` 目录配置子菜单）、报告内容对照、缓存管理 |
 | 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、全局参数（`--experiment` / `--feature`）、各子命令、退出码、定时任务 |
-| 4 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | Web 七步流程：上传→生成→配置→进度→结果→状态→日志 |
+| 4 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | 五区标签页工作台：生成报告 / 调仓模拟 / 配置 / 运行状态（含缓存管理）/ 日志 |
 | 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | `config.json` 字段说明、数据源、缓存 TTL、章节可见性、功能开关 |
 | 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、多 Provider 策略、端点级节流、定价 |
 | 7 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告逐章说明、基金业绩评价、投资知识点 |

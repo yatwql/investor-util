@@ -12,249 +12,350 @@
     <p class="subtitle">v{{ app_version }} · 上传持仓 Excel，选择报告格式，浏览器内生成并预览</p>
   </header>
 
+  <!-- 标签页工作台导航：五个工作区，一次只专注一件事 -->
+  <nav class="tab-bar" role="tablist" aria-label="工作区导航">
+    <div class="tab-bar-inner">
+      <button type="button" class="tab-btn" role="tab" id="tab-generate"
+              data-tab="generate" aria-controls="panel-generate" aria-selected="true">生成报告</button>
+      <button type="button" class="tab-btn" role="tab" id="tab-whatif"
+              data-tab="whatif" aria-controls="panel-whatif" aria-selected="false" tabindex="-1">调仓模拟</button>
+      <button type="button" class="tab-btn" role="tab" id="tab-config"
+              data-tab="config" aria-controls="panel-config" aria-selected="false" tabindex="-1">配置</button>
+      <button type="button" class="tab-btn" role="tab" id="tab-status"
+              data-tab="status" aria-controls="panel-status" aria-selected="false" tabindex="-1">运行状态</button>
+      <button type="button" class="tab-btn" role="tab" id="tab-logs"
+              data-tab="logs" aria-controls="panel-logs" aria-selected="false" tabindex="-1">日志</button>
+    </div>
+  </nav>
+
   <main class="app-main">
 
-    <!-- ① 上传区 -->
-    <section class="card" aria-labelledby="upload-heading">
-      <h2 id="upload-heading">① 上传持仓</h2>
-      <div class="upload-zone">
-        <label for="file-input" class="upload-label">
-          <span class="upload-icon" aria-hidden="true">⬆</span>
-          <span>选择或拖拽 .xlsx 文件到此处</span>
-        </label>
-        <!-- 视觉隐藏但保留可聚焦（键盘可达，对齐 a11y 要求） -->
-        <input type="file" id="file-input" accept=".xlsx" class="sr-only">
-        <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
-      </div>
-    </section>
+    <!-- ══ 工作区：生成报告（① 上传 → ② 生成 → ④ 进度 → ⑤ 结果）══ -->
+    <div class="tab-panel" id="panel-generate" role="tabpanel" aria-labelledby="tab-generate">
 
-    <!-- ② 生成区 -->
-    <section class="card" aria-labelledby="generate-heading">
-      <h2 id="generate-heading">② 生成报告</h2>
-      <form id="generate-form" class="generate-form">
-        <div class="field-row">
-          <label for="report-type">报告格式</label>
-          <select id="report-type" name="report_type">
-            <option value="basic">仅 Excel（约 1 分钟）</option>
-            <option value="both">HTML + Excel（约 2 分钟）</option>
-            <option value="full">全量含 LLM（约 5 分钟）</option>
-          </select>
+      <!-- ① 上传区 -->
+      <section class="card" aria-labelledby="upload-heading">
+        <h2 id="upload-heading">① 上传持仓</h2>
+        <div class="upload-zone">
+          <label for="file-input" class="upload-label">
+            <span class="upload-icon" aria-hidden="true">⬆</span>
+            <span>选择或拖拽 .xlsx 文件到此处</span>
+          </label>
+          <!-- 视觉隐藏但保留可聚焦（键盘可达，对齐 a11y 要求） -->
+          <input type="file" id="file-input" accept=".xlsx" class="sr-only">
+          <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
         </div>
-        <div class="field-check" role="group" aria-label="生成选项">
-          <label for="history-fetch" class="check-label">
-            <input type="checkbox" id="history-fetch" name="fetch_history" {% if history_checked %}checked{% endif %}>
-            <span>获取历史走势数据（{{ config_note }}，仅 both/full 有效）</span>
-          </label>
-          <label for="force-llm" class="check-label">
-            <input type="checkbox" id="force-llm" name="force_llm">
-            <span>强制重新生成 LLM 内容（跳过缓存）</span>
-          </label>
-        </div>
-        <div class="field-block" role="radiogroup" aria-label="生成用途">
-          <span class="field-label">生成用途</span>
-          <label class="radio-label">
-            <input type="radio" name="input_mode" value="trial" checked>
-            <span>临时试算（推荐）—— 不更新正式持仓，快照隔离，安全尝试</span>
-          </label>
-          <label class="radio-label">
-            <input type="radio" name="input_mode" value="formal">
-            <span>正式更新 —— 覆盖 {{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}，快照共享生效</span>
-          </label>
-        </div>
-        <div id="formal-options" class="field-block" hidden>
-          <div role="radiogroup" aria-label="输入来源">
-            <span class="field-label">输入来源</span>
-            <label class="radio-label">
-              <input type="radio" name="use_existing" value="upload" checked>
-              <span>上传新文件覆盖正式持仓（需已上传）</span>
+      </section>
+
+      <!-- ② 生成区 -->
+      <section class="card" aria-labelledby="generate-heading">
+        <h2 id="generate-heading">② 生成报告</h2>
+        <form id="generate-form" class="generate-form">
+          <div class="field-row">
+            <label for="report-type">报告格式</label>
+            <select id="report-type" name="report_type">
+              <option value="basic">仅 Excel（约 1 分钟）</option>
+              <option value="both">HTML + Excel（约 2 分钟）</option>
+              <option value="full">全量含 LLM（约 5 分钟）</option>
+            </select>
+          </div>
+          <div class="field-check" role="group" aria-label="生成选项">
+            <label for="history-fetch" class="check-label">
+              <input type="checkbox" id="history-fetch" name="fetch_history" {% if history_checked %}checked{% endif %}>
+              <span>获取历史走势数据（{{ config_note }}，仅 both/full 有效）</span>
             </label>
-            <label class="radio-label">
-              <input type="radio" name="use_existing" value="existing">
-              <span>直接用当前正式持仓文件（无需上传）</span>
+            <label for="force-llm" class="check-label">
+              <input type="checkbox" id="force-llm" name="force_llm">
+              <span>强制重新生成 LLM 内容（跳过缓存）</span>
             </label>
           </div>
-          <div id="formal-warning" class="formal-warning" role="alert"
-               data-holdings="{{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}">
-            将覆盖 {{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}，旧文件备份为 .bak，并写入共享快照时间线
+          <div class="field-block" role="radiogroup" aria-label="生成用途">
+            <span class="field-label">生成用途</span>
+            <label class="radio-label">
+              <input type="radio" name="input_mode" value="trial" checked>
+              <span>临时试算（推荐）—— 不更新正式持仓，快照隔离，安全尝试</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="input_mode" value="formal">
+              <span>正式更新 —— 覆盖 {{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}，快照共享生效</span>
+            </label>
           </div>
-          <p id="formal-hint" class="status-text status-busy" aria-live="polite"></p>
-          <label class="check-label">
-            <input type="checkbox" id="confirm-overwrite">
-            <span>我已知晓：正式更新会覆盖/使用正式持仓文件，并写入共享快照时间线</span>
-          </label>
+          <div id="formal-options" class="field-block" hidden>
+            <div role="radiogroup" aria-label="输入来源">
+              <span class="field-label">输入来源</span>
+              <label class="radio-label">
+                <input type="radio" name="use_existing" value="upload" checked>
+                <span>上传新文件覆盖正式持仓（需已上传）</span>
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="use_existing" value="existing">
+                <span>直接用当前正式持仓文件（无需上传）</span>
+              </label>
+            </div>
+            <div id="formal-warning" class="formal-warning" role="alert"
+                 data-holdings="{{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}">
+              将覆盖 {{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}，旧文件备份为 .bak，并写入共享快照时间线
+            </div>
+            <p id="formal-hint" class="status-text status-busy" aria-live="polite"></p>
+            <label class="check-label">
+              <input type="checkbox" id="confirm-overwrite">
+              <span>我已知晓：正式更新会覆盖/使用正式持仓文件，并写入共享快照时间线</span>
+            </label>
+          </div>
+          <button type="submit" id="generate-btn" class="btn btn-primary" disabled>生成报告</button>
+        </form>
+        <p id="generate-error" class="status-text status-error" role="alert" aria-live="polite"></p>
+      </section>
+
+      <!-- ④ 进度区 -->
+      <section class="card" id="progress-section" aria-labelledby="progress-heading" hidden>
+        <h2 id="progress-heading">④ 生成进度</h2>
+        <div class="progress-track">
+          <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="生成进度"></div>
         </div>
-        <button type="submit" id="generate-btn" class="btn btn-primary" disabled>生成报告</button>
-      </form>
-      <p id="generate-error" class="status-text status-error" role="alert" aria-live="polite"></p>
-    </section>
+        <p id="progress-phase" class="progress-phase" aria-live="polite">准备中...</p>
+        <ol id="progress-events" class="progress-events" aria-live="polite"></ol>
+      </section>
 
-    <!-- ③ 配置编辑（与 TUI 菜单一致，即改即存） -->
-    <section class="card" aria-labelledby="config-heading">
-      <h2 id="config-heading">③ 配置编辑（与 TUI 菜单一致）</h2>
-      <p class="config-note">配置修改立即写入共享配置文件（config.json / llm_settings.json / features.json），写前自动备份 .bak；TUI / CLI 下次读取即生效</p>
-      <div id="config-panel" aria-live="polite"></div>
-      <div class="config-actions">
-        <button type="button" id="config-reload" class="btn btn-secondary btn-sm">重新加载</button>
-      </div>
-    </section>
+      <!-- ⑤ 结果区 -->
+      <section class="card" id="result-section" aria-labelledby="result-heading" hidden>
+        <h2 id="result-heading">⑤ 生成结果</h2>
+        <div id="result-actions" class="result-actions"></div>
+        <div id="result-errors" class="result-errors" role="alert" aria-live="polite"></div>
+        <div id="result-footer" class="result-footer"></div>
+      </section>
+    </div>
 
-    <!-- ④ 进度区 -->
-    <section class="card" id="progress-section" aria-labelledby="progress-heading" hidden>
-      <h2 id="progress-heading">④ 生成进度</h2>
-      <div class="progress-track">
-        <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="生成进度"></div>
-      </div>
-      <p id="progress-phase" class="progress-phase" aria-live="polite">准备中...</p>
-      <ol id="progress-events" class="progress-events" aria-live="polite"></ol>
-    </section>
+    <!-- ══ 工作区：调仓 What-if 模拟（独立报告，不并入主报告）══ -->
+    <div class="tab-panel" id="panel-whatif" role="tabpanel" aria-labelledby="tab-whatif" hidden>
+      <section class="card" aria-labelledby="whatif-heading">
+        <h2 id="whatif-heading">调仓 What-if 模拟（独立报告）</h2>
+        <p class="config-note">对比基准（调仓前）与目标（调仓后/假设）两份持仓生成 diff 报告：全程本地计算，不更新正式持仓、不并入主报告；与 TUI [W] / CLI whatif 同链。</p>
+        <form id="whatif-form" class="generate-form whatif-form">
+          <div class="field-block" role="radiogroup" aria-label="基准持仓来源">
+            <span class="field-label">基准持仓（调仓前）</span>
+            <label class="radio-label">
+              <input type="radio" name="whatif_base" value="existing" checked>
+              <span>用当前正式持仓文件（{{ system_info.holdings_dir }}/{{ system_info.holdings_filename }}）</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="whatif_base" value="upload">
+              <span>上传基准文件（另一份 .xlsx）</span>
+            </label>
+          </div>
+          <div id="whatif-base-upload" class="field-row" hidden>
+            <label for="whatif-base-input">基准文件</label>
+            <input type="file" id="whatif-base-input" accept=".xlsx" class="file-input-plain">
+            <p id="whatif-base-status" class="status-text" role="status" aria-live="polite"></p>
+          </div>
+          <div class="field-row">
+            <label for="whatif-cand-input">目标持仓（调仓后）</label>
+            <input type="file" id="whatif-cand-input" accept=".xlsx" class="file-input-plain">
+            <p id="whatif-cand-status" class="status-text" role="status" aria-live="polite"></p>
+          </div>
+          <div class="field-row">
+            <label for="whatif-effective-date">生效日（可选）</label>
+            <input type="text" id="whatif-effective-date" placeholder="YYYY-MM-DD" maxlength="10"
+                   autocomplete="off" inputmode="numeric">
+            <p class="field-hint">留空仅做成本口径截面比较；填写后追加时序回测（需联网取历史行情，耗时稍长）</p>
+          </div>
+          <button type="submit" id="whatif-btn" class="btn btn-primary" disabled>开始模拟</button>
+        </form>
+        <p id="whatif-error" class="status-text status-error" role="alert" aria-live="polite"></p>
+        <div id="whatif-result" class="result-actions" hidden>
+          <a id="whatif-link-html" class="btn btn-secondary" href="#" target="_blank" rel="noopener">预览 HTML</a>
+          <a id="whatif-link-excel" class="btn btn-secondary" href="#">下载 Excel</a>
+          <span id="whatif-result-meta" class="result-tip"></span>
+        </div>
+      </section>
+    </div>
 
-    <!-- ⑤ 结果区 -->
-    <section class="card" id="result-section" aria-labelledby="result-heading" hidden>
-      <h2 id="result-heading">⑤ 生成结果</h2>
-      <div id="result-actions" class="result-actions"></div>
-      <div id="result-errors" class="result-errors" role="alert" aria-live="polite"></div>
-      <div id="result-footer" class="result-footer"></div>
-    </section>
+    <!-- ══ 工作区：配置 ══ -->
+    <div class="tab-panel" id="panel-config" role="tabpanel" aria-labelledby="tab-config" hidden>
+      <!-- ③ 配置编辑（与 TUI 菜单一致，即改即存） -->
+      <section class="card" aria-labelledby="config-heading">
+        <h2 id="config-heading">③ 配置编辑（与 TUI 菜单一致）</h2>
+        <p class="config-note">配置修改立即写入共享配置文件（config.json / llm_settings.json / features.json），写前自动备份 .bak；TUI / CLI 下次读取即生效</p>
+        <div id="config-panel" aria-live="polite"></div>
+        <div class="config-actions">
+          <button type="button" id="config-reload" class="btn btn-secondary btn-sm">重新加载</button>
+        </div>
+      </section>
+    </div>
 
-    <!-- ⑥ 状态区：系统信息 + 数据源健康 + 最近运行（单行摘要） -->
-    <section class="card" aria-labelledby="status-heading">
-      <h2 id="status-heading">⑥ 运行状态</h2>
-      <div class="status-grid status-grid-3">
-        <div class="status-card">
-          <h3>系统信息</h3>
-          <dl class="system-list">
-            <div class="system-row">
-              <dt>程序版本</dt>
-              <dd id="system-version">{{ system_info.app_version }}</dd>
+    <!-- ══ 工作区：运行状态 ══ -->
+    <div class="tab-panel" id="panel-status" role="tabpanel" aria-labelledby="tab-status" hidden>
+      <!-- ⑥ 状态区：系统信息 + 数据源健康 + 最近运行（单行摘要）+ 系统自检 + 缓存 -->
+      <section class="card" aria-labelledby="status-heading">
+        <h2 id="status-heading">⑥ 运行状态</h2>
+        <div class="status-grid status-grid-3">
+          <div class="status-card">
+            <h3>系统信息</h3>
+            <dl class="system-list">
+              <div class="system-row">
+                <dt>程序版本</dt>
+                <dd id="system-version">{{ system_info.app_version }}</dd>
+              </div>
+              <div class="system-row">
+                <dt>本机 IP</dt>
+                <dd id="system-ip">{{ system_info.machine_ip }}</dd>
+              </div>
+              <div class="system-row">
+                <dt>持仓目录</dt>
+                <dd id="system-holdings-dir">{{ system_info.holdings_dir }}</dd>
+              </div>
+              <div class="system-row">
+                <dt>持仓文件</dt>
+                <dd id="system-holdings-file">{{ system_info.holdings_filename }}</dd>
+              </div>
+              <div class="system-row">
+                <dt>输出目录</dt>
+                <dd id="system-output-dir">{{ system_info.output_dir }}</dd>
+              </div>
+              <div class="system-row">
+                <dt>新闻抓取上限</dt>
+                <dd id="system-news-top">{{ system_info.news_top_count }} 条</dd>
+              </div>
+              <div class="system-row">
+                <dt>状态</dt>
+                <dd>
+                  {% if system_info.holdings_ready %}
+                  <span class="system-status-ok">文件就绪</span>
+                  {% else %}
+                  <span class="system-status-err">文件未找到</span>
+                  {% endif %}
+                </dd>
+              </div>
+              <div class="system-row">
+                <dt>持仓匿名化</dt>
+                <dd id="system-anonymization">{{ system_info.anonymization }}</dd>
+              </div>
+              <div class="system-row">
+                <dt>隐私声明</dt>
+                <dd id="system-privacy">
+                  {% if system_info.privacy_shown %}已显示{% else %}待首次报告生成时显示{% endif %}
+                </dd>
+              </div>
+              <div class="system-row">
+                <dt>LLM</dt>
+                <dd id="system-llm">
+                  {% if not system_info.llm.configured %}
+                  <span class="system-llm-off">未配置</span>
+                  <span class="system-llm-hint">配置 llm_key.json 或 llm_providers.json 后生效</span>
+                  {% elif system_info.llm.mode == "multi" %}
+                  <span class="system-llm-on">已配置</span>
+                  <span class="system-llm-hint">策略：{{ system_info.llm.strategy }} · {{ system_info.llm.providers|length }} 个 provider</span>
+                  {% else %}
+                  <span class="system-llm-on">已配置</span>
+                  <span class="system-llm-hint">provider={{ system_info.llm.provider }} · model={{ system_info.llm.model }} · endpoint={{ system_info.llm.endpoint_display }}</span>
+                  {% endif %}
+                </dd>
+              </div>
+            </dl>
+            {% if system_info.llm.configured %}
+            <div id="system-llm-detail" class="system-llm-detail">
+              {% if system_info.llm.mode == "multi" %}
+              {% for p in system_info.llm.providers %}
+              <div class="health-row">
+                <span class="health-name">{{ p.name }}（{{ p.backend }}）</span>
+                <span class="health-status">{{ p.circuit }}</span>
+                <span class="health-meta">模型 {{ p.model }} · 优先级 {{ p.priority }}</span>
+              </div>
+              {% endfor %}
+              {% if system_info.llm.preferred %}
+              <p class="system-llm-hint">模块偏好：{{ system_info.llm.preferred|join(" / ") }}</p>
+              {% endif %}
+              {% else %}
+              {% if system_info.llm.circuit != "—" %}
+              <div class="health-row">
+                <span class="health-name">熔断状态</span>
+                <span class="health-status">{{ system_info.llm.circuit }}</span>
+              </div>
+              {% endif %}
+              {% if system_info.llm.route %}
+              <p class="system-llm-hint">模型路由：{{ system_info.llm.route|join(" / ") }}</p>
+              {% endif %}
+              {% endif %}
             </div>
-            <div class="system-row">
-              <dt>本机 IP</dt>
-              <dd id="system-ip">{{ system_info.machine_ip }}</dd>
-            </div>
-            <div class="system-row">
-              <dt>持仓目录</dt>
-              <dd id="system-holdings-dir">{{ system_info.holdings_dir }}</dd>
-            </div>
-            <div class="system-row">
-              <dt>持仓文件</dt>
-              <dd id="system-holdings-file">{{ system_info.holdings_filename }}</dd>
-            </div>
-            <div class="system-row">
-              <dt>输出目录</dt>
-              <dd id="system-output-dir">{{ system_info.output_dir }}</dd>
-            </div>
-            <div class="system-row">
-              <dt>新闻抓取上限</dt>
-              <dd id="system-news-top">{{ system_info.news_top_count }} 条</dd>
-            </div>
-            <div class="system-row">
-              <dt>状态</dt>
-              <dd>
-                {% if system_info.holdings_ready %}
-                <span class="system-status-ok">文件就绪</span>
-                {% else %}
-                <span class="system-status-err">文件未找到</span>
-                {% endif %}
-              </dd>
-            </div>
-            <div class="system-row">
-              <dt>持仓匿名化</dt>
-              <dd id="system-anonymization">{{ system_info.anonymization }}</dd>
-            </div>
-            <div class="system-row">
-              <dt>隐私声明</dt>
-              <dd id="system-privacy">
-                {% if system_info.privacy_shown %}已显示{% else %}待首次报告生成时显示{% endif %}
-              </dd>
-            </div>
-            <div class="system-row">
-              <dt>LLM</dt>
-              <dd id="system-llm">
-                {% if not system_info.llm.configured %}
-                <span class="system-llm-off">未配置</span>
-                <span class="system-llm-hint">配置 llm_key.json 或 llm_providers.json 后生效</span>
-                {% elif system_info.llm.mode == "multi" %}
-                <span class="system-llm-on">已配置</span>
-                <span class="system-llm-hint">策略：{{ system_info.llm.strategy }} · {{ system_info.llm.providers|length }} 个 provider</span>
-                {% else %}
-                <span class="system-llm-on">已配置</span>
-                <span class="system-llm-hint">provider={{ system_info.llm.provider }} · model={{ system_info.llm.model }} · endpoint={{ system_info.llm.endpoint_display }}</span>
-                {% endif %}
-              </dd>
-            </div>
-          </dl>
-          {% if system_info.llm.configured %}
-          <div id="system-llm-detail" class="system-llm-detail">
-            {% if system_info.llm.mode == "multi" %}
-            {% for p in system_info.llm.providers %}
-            <div class="health-row">
-              <span class="health-name">{{ p.name }}（{{ p.backend }}）</span>
-              <span class="health-status">{{ p.circuit }}</span>
-              <span class="health-meta">模型 {{ p.model }} · 优先级 {{ p.priority }}</span>
-            </div>
-            {% endfor %}
-            {% if system_info.llm.preferred %}
-            <p class="system-llm-hint">模块偏好：{{ system_info.llm.preferred|join(" / ") }}</p>
             {% endif %}
-            {% else %}
-            {% if system_info.llm.circuit != "—" %}
-            <div class="health-row">
-              <span class="health-name">熔断状态</span>
-              <span class="health-status">{{ system_info.llm.circuit }}</span>
+          </div>
+          <div class="status-card">
+            <h3>数据源健康</h3>
+            <div id="health-list" class="health-list" aria-live="polite">
+              <p class="status-text status-busy">正在检测...</p>
             </div>
-            {% endif %}
-            {% if system_info.llm.route %}
-            <p class="system-llm-hint">模型路由：{{ system_info.llm.route|join(" / ") }}</p>
-            {% endif %}
-            {% endif %}
+            <button type="button" id="health-refresh" class="btn btn-secondary btn-sm">重新检测</button>
+          </div>
+          <div class="status-card">
+            <h3>最近运行</h3>
+            <div id="history-list" class="history-list" aria-live="polite">
+              <p class="status-text status-busy">加载中...</p>
+            </div>
+          </div>
+          {% if system_info.doctor_enabled %}
+          <div class="status-card">
+            <h3>系统自检</h3>
+            <div id="doctor-list" class="health-list doctor-list" aria-live="polite">
+              <p class="status-text status-busy">点击下方按钮开始自检</p>
+            </div>
+            <button type="button" id="doctor-run" class="btn btn-secondary btn-sm">开始自检（含数据源联网检查）</button>
           </div>
           {% endif %}
-        </div>
-        <div class="status-card">
-          <h3>数据源健康</h3>
-          <div id="health-list" class="health-list" aria-live="polite">
-            <p class="status-text status-busy">正在检测...</p>
+          <!-- 缓存管理：统计 + 清理过期（对应 TUI [3][4]；更新缓存仍走 TUI/CLI） -->
+          <div class="status-card">
+            <h3>缓存</h3>
+            <dl class="system-list">
+              <div class="system-row">
+                <dt>文件数</dt>
+                <dd id="cache-total-files">—</dd>
+              </div>
+              <div class="system-row">
+                <dt>占用空间</dt>
+                <dd id="cache-total-size">—</dd>
+              </div>
+              <div class="system-row">
+                <dt>命中率</dt>
+                <dd id="cache-hit-rate">—</dd>
+              </div>
+              <div class="system-row">
+                <dt>过期文件</dt>
+                <dd id="cache-expired">—</dd>
+              </div>
+            </dl>
+            <div id="cache-prefix-list" class="health-list" aria-live="polite"></div>
+            <div class="status-card-actions">
+              <button type="button" id="cache-refresh" class="btn btn-secondary btn-sm">刷新</button>
+              <button type="button" id="cache-cleanup" class="btn btn-secondary btn-sm" aria-label="清理过期缓存文件">清理过期</button>
+            </div>
+            <div id="cache-status" class="status-text" role="status" aria-live="polite"></div>
           </div>
-          <button type="button" id="health-refresh" class="btn btn-secondary btn-sm">重新检测</button>
         </div>
-        <div class="status-card">
-          <h3>最近运行</h3>
-          <div id="history-list" class="history-list" aria-live="polite">
-            <p class="status-text status-busy">加载中...</p>
-          </div>
-        </div>
-        {% if system_info.doctor_enabled %}
-        <div class="status-card">
-          <h3>系统自检</h3>
-          <div id="doctor-list" class="health-list doctor-list" aria-live="polite">
-            <p class="status-text status-busy">点击下方按钮开始自检</p>
-          </div>
-          <button type="button" id="doctor-run" class="btn btn-secondary btn-sm">开始自检（含数据源联网检查）</button>
-        </div>
-        {% endif %}
-      </div>
-    </section>
+      </section>
+    </div>
 
-    <!-- ⑦ 日志查看：手动加载 + 级别筛选 + 原生折叠展示（大日志高 IO，不自动轮询） -->
-    <section class="card" aria-labelledby="logs-heading">
-      <h2 id="logs-heading">⑦ 日志查看</h2>
-      <div class="log-controls">
-        <label for="log-level">级别筛选</label>
-        <select id="log-level" class="log-level-select">
-          <option value="">全部</option>
-          <option value="DEBUG">DEBUG</option>
-          <option value="INFO">INFO</option>
-          <option value="WARNING">WARNING</option>
-          <option value="ERROR">ERROR</option>
-          <option value="CRITICAL">CRITICAL</option>
-        </select>
-        <button type="button" id="log-load" class="btn btn-secondary">加载日志</button>
-        <span id="log-status" class="log-status status-text"></span>
-      </div>
-      <div id="log-list" class="log-list" aria-live="polite">
-        <p class="status-text status-busy">点击「加载日志」查看最近运行日志</p>
-      </div>
-    </section>
+    <!-- ══ 工作区：日志 ══ -->
+    <div class="tab-panel" id="panel-logs" role="tabpanel" aria-labelledby="tab-logs" hidden>
+      <!-- ⑦ 日志查看：手动加载 + 级别筛选 + 原生折叠展示（大日志高 IO，不自动轮询） -->
+      <section class="card" aria-labelledby="logs-heading">
+        <h2 id="logs-heading">⑦ 日志查看</h2>
+        <div class="log-controls">
+          <label for="log-level">级别筛选</label>
+          <select id="log-level" class="log-level-select">
+            <option value="">全部</option>
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO">INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+            <option value="CRITICAL">CRITICAL</option>
+          </select>
+          <button type="button" id="log-load" class="btn btn-secondary">加载日志</button>
+          <span id="log-status" class="log-status status-text"></span>
+        </div>
+        <div id="log-list" class="log-list" aria-live="polite">
+          <p class="status-text status-busy">点击「加载日志」查看最近运行日志</p>
+        </div>
+      </section>
+    </div>
 
   </main>
 

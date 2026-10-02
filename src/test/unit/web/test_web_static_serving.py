@@ -72,3 +72,69 @@ class TestStaticServing:
         assert resp.status_code == 200
         body = resp.get_data(as_text=True)
         assert "DOMContentLoaded" in body and "init" in body
+
+
+class TestTabWorkbenchStructure:
+    """标签页工作台结构：五区页签 ↔ 面板配对、What-if 表单与缓存卡控件齐备。
+
+    纯 DOM 结构契约（页面排版重构的自动化载体）：新增/删除工作区必须同步
+    更新本断言集合，防止页签与面板静默脱节（如 aria-controls 指向不存在的面板）。
+    """
+
+    # 五区契约：生成 / 调仓 / 配置 / 状态 / 日志（集合相等，非写死条数）
+    _TABS = {"generate", "whatif", "config", "status", "logs"}
+
+    @pytest.fixture
+    def index_html(self, app_client):
+        resp = app_client.get("/")
+        assert resp.status_code == 200
+        return resp.get_data(as_text=True)
+
+    def test_tabs_and_panels_paired(self, index_html):
+        names = set(re.findall(r'data-tab="(\w+)"', index_html))
+        assert names == self._TABS, "页签集合漂移（新增/删除页签须同步面板与本断言）"
+        for name in names:
+            assert f'id="panel-{name}"' in index_html, f"缺少面板 panel-{name}"
+            assert f'aria-controls="panel-{name}"' in index_html, f"页签 {name} 的 aria-controls 失效"
+        # 默认仅生成区选中
+        btn = re.search(r'<button[^>]*aria-selected="true"[^>]*>', index_html)
+        assert btn and 'id="tab-generate"' in btn.group(0), "默认页签应为生成区"
+
+    def test_whatif_controls_present(self, index_html):
+        for elem_id in (
+            "whatif-form",
+            "whatif-base-upload",
+            "whatif-base-input",
+            "whatif-cand-input",
+            "whatif-effective-date",
+            "whatif-btn",
+            "whatif-error",
+            "whatif-result",
+            "whatif-link-html",
+            "whatif-link-excel",
+        ):
+            assert f'id="{elem_id}"' in index_html, f"What-if 控件缺失：{elem_id}"
+        # 结果行默认隐藏（未出结果前不显示链接）
+        m = re.search(r'id="whatif-result"[^>]*>', index_html)
+        assert m and "hidden" in m.group(0), "whatif-result 应默认 hidden"
+
+    def test_cache_card_controls_present(self, index_html):
+        for elem_id in (
+            "cache-total-files",
+            "cache-total-size",
+            "cache-hit-rate",
+            "cache-expired",
+            "cache-prefix-list",
+            "cache-refresh",
+            "cache-cleanup",
+            "cache-status",
+        ):
+            assert f'id="{elem_id}"' in index_html, f"缓存卡控件缺失：{elem_id}"
+
+    def test_main_js_wires_new_workspaces(self, app_client):
+        """main.js 接线：页签切换函数与两个新接口的调用存在。"""
+        body = app_client.get("/static/main.js").get_data(as_text=True)
+        assert "activateTab" in body
+        assert "/api/whatif" in body
+        assert "/api/cache" in body
+        assert "/api/cache/cleanup" in body

@@ -323,7 +323,7 @@
 
 ### 2.1 需求 ID ↔ 验证载体映射
 
-`requirements.md` 的**每条单段需求 ID**（34 域 / 281 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。**口径说明**：本表覆盖 `R-<域>-<序号>` 形式的单段 ID（脚本按此正则提取）；`requirements.md` §7.2–§7.8.4 另有一批双段子域 ID（如 `R-LLM-GM-01`、`R-LLM-DB-PROCON-01`，共 60 条），按现有约定不在本追溯表范围内、亦不参与门禁断言。
+`requirements.md` 的**每条单段需求 ID**（34 域 / 283 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。**口径说明**：本表覆盖 `R-<域>-<序号>` 形式的单段 ID（脚本按此正则提取）；`requirements.md` §7.2–§7.8.4 另有一批双段子域 ID（如 `R-LLM-GM-01`、`R-LLM-DB-PROCON-01`，共 60 条），按现有约定不在本追溯表范围内、亦不参与门禁断言。
 
 | 需求 ID | 验证载体（`测试文件::用例`，粗粒度时仅列文件） | 补全批次 |
 |:--|:--|:--:|
@@ -552,6 +552,8 @@
 | R-WEB-07 | `src/test/unit/web/test_upload.py` + `src/test/unit/web/test_runs.py` | 批 6 |
 | R-WEB-08 | `src/test/unit/web/test_config_edit.py` + `src/test/unit/web/test_config_edit_edge.py` | 批 6 |
 | R-WEB-09 | `src/test/unit/web/test_holdings_update.py` + `src/test/unit/web/test_holdings_update_edge.py` | 批 6 |
+| R-WEB-10 | `src/test/unit/web/test_whatif_api.py` + `src/test/unit/web/test_whatif_api_edge.py` | 批 6 |
+| R-WEB-11 | `src/test/unit/web/test_cache_api.py` | 批 6 |
 | R-TUI-01 | `src/test/unit/ui/test_tui_menu.py` | 批 6 |
 | R-TUI-02 | `src/test/unit/ui/test_tui_menu.py` + `src/test/unit/ui/test_tui_keys.py` | 批 6 |
 | R-TUI-06 | `src/test/unit/ui/test_tui_menu.py` + `src/test/unit/config/test_config.py` | 批 6 |
@@ -637,6 +639,9 @@
 | **报告文件管理** | 按日期归档、文件名含时间戳、不覆盖旧报告，自动清理 180 天前归档 | ✅ |
 | **首次运行引导** | 配置缺失时提示操作步骤而非直接报错 | ✅ | `test_config_firstrun_edge.py` |
 | **Web 配置编辑** | 配置面板 8 块可编辑项（7 个可编辑面，功能开关面拆成「实验性功能」「常规开关」两块）与 TUI 全集一致、即改即存、写前 `.bak` 备份、非法键 400 / 非同一来源 403、极端输入不落盘 | ✅ | `test_config_edit.py` / `test_config_edit_edge.py` / `smoke-web.py` 配置编辑检查（11 项断言） |
+| **Web 标签页工作台** | 五区页签（生成 / 调仓 / 配置 / 状态 / 日志）↔ 面板配对、默认选中生成区、What-if 表单与缓存卡控件齐备、main.js 接线齐 | ✅ | `test_web_static_serving.py::TestTabWorkbenchStructure` |
+| **Web 调仓 What-if** | 文件来源校验（过期 404）、生效日格式归一、同源 403、互斥 429、错误信封分支、产物 basename 归一 | ✅ | `test_whatif_api.py` / `test_whatif_api_edge.py` |
+| **Web 缓存管理** | 统计面只读（dry_run 预扫描）、前缀降序保序下发、清理 dry_run=False + 计数透传、同源 403 不执行 | ✅ | `test_cache_api.py` |
 
 ---
 
@@ -658,6 +663,7 @@
 | **P1** | 景气度框架诊断（实验性功能） | 分析框架/评分口径/关键词配置/行动建议章渲染变更 | `test_prosperity_framework.py`（六维计分、缺数据降级为未验证且不计分、总分口径与评级边界、配置覆盖）+ `test_prosperity_framework_edge.py`（空/None/零/异常类型/全防御/未知板块/极端集中度/负收益）+ `test_prosperity_framework_wiring.py`（开关关 → 契约缺席且双端无块；开 → 契约注入、Excel/HTML 块与契约一致）+ `test_fund_roe_estimate.py`（②维基金层扩展：重仓股 ROE 加权推演、报告期陈旧闸门、非 A 股过滤、known_roe 免重取）+ `test_liquidity_otc.py` 与 `test_code_utils.py::TestOtcRedemptionDaysDefault`（④维场外类型默认档：货币/短债 T+1、纯债 T+2、其他 T+3、QDII T+7，非实测标注与配置口径优先）。**回归防线**：开关关闭时报告必须逐字节不变；缺数据维度若被算成得分（臆造）立即失败 |
 | **P1** | HTML 报告渲染结构 | html_writer / template 变更 | `test_html_report_structure.py`（中文不乱码、章节锚点、LLM 条件消失/出现） |
 | **P1** | 缓存刷新/清理/统计（菜单 [1][2][3][4]） | cache / handlers / registry 变更 | `test_handlers_cache.py` / `test_tui_handlers.py`（刷新/清理/统计不崩溃） |
+| **P1** | Web 标签页工作台 / 调仓 What-if / 缓存卡 | `src/python/web/handlers.py`、`src/static/web/` 变更 | `test_whatif_api.py` / `test_whatif_api_edge.py` / `test_cache_api.py` / `test_web_static_serving.py`（页签配对、What-if 与缓存控件齐备、main.js 接线） |
 | **P1** | Provider 降级链路 | providers / fetcher 变更 | 熔断/回退/断网降级测试（S7/T15/T16 + provider edge 用例）；实际联通性由运行时 Provider Chain 回退 + 熔断治理，非门禁 |
 | **P1** | 基金持仓取数阶梯次序与联接基金穿透 | providers / fetcher / report 的持仓取数路径变更 | `test_tiantian.py` `TestFetchFundHoldingsLadder`（次序不变量：第 1 跳命中不发主页面请求、联接基金不可达第 3 跳）+ `test_fund_edge.py`（批量接缝幂等/异常不外抛）+ `test_penetration.py`（穿透来源登记）。**次序回归防线**：把无年份兜底提回与年份域并列，联接基金会被最早可得报告遮蔽，本组用例立刻失败 |
 | **P1** | 数据源**真实响应体**解析路径（cassette 离线回放） | providers / fetcher 的解析或归一路径变更 | `test_cassette_replay.py`（对上仓库录制的真实响应体做精确值断言，离线）；人工核验入口 `cassettes --verify`（解析器吃不下已录制响应体即报 `[ERR]` 并退出码 2）。上游字段改名/加前后缀/返回 HTML 错误页这类回归**只有真实响应体测得出**，手工构造的假响应测不出 |

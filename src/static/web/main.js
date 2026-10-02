@@ -80,6 +80,34 @@
     els.confirmOverwrite = $('confirm-overwrite');
     els.configPanel = $('config-panel');
 
+    // 标签页工作台：导航按钮 + 面板切换（点击 / 方向键 / hash 深链）
+    els.tabButtons = document.querySelectorAll('.tab-btn');
+
+    // 调仓 What-if：表单与控件
+    els.whatifForm = $('whatif-form');
+    els.whatifBaseUpload = $('whatif-base-upload');
+    els.whatifBaseInput = $('whatif-base-input');
+    els.whatifBaseStatus = $('whatif-base-status');
+    els.whatifCandInput = $('whatif-cand-input');
+    els.whatifCandStatus = $('whatif-cand-status');
+    els.whatifEffectiveDate = $('whatif-effective-date');
+    els.whatifBtn = $('whatif-btn');
+    els.whatifError = $('whatif-error');
+    els.whatifResult = $('whatif-result');
+    els.whatifLinkHtml = $('whatif-link-html');
+    els.whatifLinkExcel = $('whatif-link-excel');
+    els.whatifResultMeta = $('whatif-result-meta');
+
+    // 缓存卡：统计展示 + 清理
+    els.cacheTotalFiles = $('cache-total-files');
+    els.cacheTotalSize = $('cache-total-size');
+    els.cacheHitRate = $('cache-hit-rate');
+    els.cacheExpired = $('cache-expired');
+    els.cachePrefixList = $('cache-prefix-list');
+    els.cacheRefresh = $('cache-refresh');
+    els.cacheCleanup = $('cache-cleanup');
+    els.cacheStatus = $('cache-status');
+
     els.fileInput.addEventListener('change', onFileSelected);
     els.generateForm.addEventListener('submit', onSubmit);
     $('health-refresh').addEventListener('click', function () {
@@ -94,6 +122,41 @@
       loadConfigEdit();
     });
     $('log-load').addEventListener('click', loadLogs);
+
+    // 标签页工作台：五区切换（点击 + 方向键 + hash 深链）
+    els.tabButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        activateTab(btn.getAttribute('data-tab'));
+      });
+      btn.addEventListener('keydown', onTabKeydown);
+    });
+    window.addEventListener('hashchange', function () {
+      activateTab((window.location.hash || '').slice(1), false);
+    });
+    activateTab((window.location.hash || '').slice(1) || 'generate', false);
+
+    // 调仓 What-if：基准来源切换 + 双文件上传 + 提交
+    document.querySelectorAll('input[name="whatif_base"]').forEach(function (r) {
+      r.addEventListener('change', onWhatifBaseModeChange);
+    });
+    els.whatifBaseInput.addEventListener('change', function () {
+      uploadWhatifFile(els.whatifBaseInput, els.whatifBaseStatus, function (id) {
+        whatifState.baseFileId = id;
+      });
+    });
+    els.whatifCandInput.addEventListener('change', function () {
+      uploadWhatifFile(els.whatifCandInput, els.whatifCandStatus, function (id) {
+        whatifState.candFileId = id;
+      });
+    });
+    els.whatifForm.addEventListener('submit', onWhatifSubmit);
+
+    // 缓存卡：刷新 / 清理过期
+    els.cacheRefresh.addEventListener('click', function () {
+      setStatus(els.cacheStatus, '', null);
+      loadCacheStats();
+    });
+    els.cacheCleanup.addEventListener('click', onCacheCleanup);
 
     // 生成用途/输入来源模式切换：正式模式展开区 + 警示条 + 按钮态联动
     els.modeRadios.forEach(function (r) {
@@ -139,6 +202,9 @@
 
     // 配置编辑面板（与 TUI 菜单一致）
     safeRun(loadConfigEdit, [], els.configPanel, '配置加载失败，请稍后重试');
+
+    // 缓存统计（运行状态区卡片，服务端只读扫描）
+    safeRun(loadCacheStats, [], els.cacheStatus, '缓存统计加载失败');
 
     // 轮询节流：页面不可见时暂停轮询，恢复可见立即同步一次（省流量/省请求）
     document.addEventListener('visibilitychange', function () {
@@ -1341,6 +1407,238 @@
     }
     errEl.textContent = msg;
     errEl.hidden = false;
+  }
+
+  /* ── 标签页工作台（五区：生成 / 调仓 / 配置 / 状态 / 日志）──
+   * 一次只专注一个工作区；支持点击、方向键（WAI-ARIA tabs 模式）与
+   * #whatif 等 hash 深链（手册可直接链接到指定工作区）。
+   */
+  var TAB_NAMES = ['generate', 'whatif', 'config', 'status', 'logs'];
+
+  function activateTab(name, updateHash) {
+    if (TAB_NAMES.indexOf(name) === -1) {
+      name = 'generate';
+    }
+    TAB_NAMES.forEach(function (n) {
+      var btn = document.getElementById('tab-' + n);
+      var panel = document.getElementById('panel-' + n);
+      if (!btn || !panel) {
+        return;
+      }
+      var active = n === name;
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      btn.tabIndex = active ? 0 : -1;
+      panel.hidden = !active;
+    });
+    if (updateHash !== false && window.location.hash.slice(1) !== name) {
+      window.history.replaceState(null, '', '#' + name);
+    }
+  }
+
+  function onTabKeydown(e) {
+    var idx = TAB_NAMES.indexOf(this.getAttribute('data-tab'));
+    var next = null;
+    if (e.key === 'ArrowRight') {
+      next = (idx + 1) % TAB_NAMES.length;
+    } else if (e.key === 'ArrowLeft') {
+      next = (idx - 1 + TAB_NAMES.length) % TAB_NAMES.length;
+    } else if (e.key === 'Home') {
+      next = 0;
+    } else if (e.key === 'End') {
+      next = TAB_NAMES.length - 1;
+    }
+    if (next === null) {
+      return;
+    }
+    e.preventDefault();
+    activateTab(TAB_NAMES[next]);
+    document.getElementById('tab-' + TAB_NAMES[next]).focus();
+  }
+
+  /* ── 调仓 What-if 模拟（同步接口，独立产物）── */
+  var whatifState = { baseFileId: null, candFileId: null, running: false };
+
+  function whatifBaseMode() {
+    var mode = document.querySelector('input[name="whatif_base"]:checked');
+    return mode ? mode.value : 'existing';
+  }
+
+  function onWhatifBaseModeChange() {
+    els.whatifBaseUpload.hidden = whatifBaseMode() !== 'upload';
+    updateWhatifBtn();
+  }
+
+  function uploadWhatifFile(input, statusEl, onDone) {
+    var file = input.files && input.files[0];
+    if (!file) {
+      return;
+    }
+    setStatus(statusEl, '正在上传并校验 ' + file.name + ' ...', 'busy');
+    var fd = new FormData();
+    fd.append('file', file);
+    fetch('/api/upload', {
+      method: 'POST',
+      body: fd,
+      signal: AbortSignal.timeout(10000),
+    })
+      .then(handleResponse)
+      .then(function (data) {
+        onDone(data.file_id);
+        setStatus(statusEl, '已上传：共 ' + data.count + ' 条持仓', 'ok');
+        updateWhatifBtn();
+      })
+      .catch(function (err) {
+        onDone(null);
+        setStatus(statusEl, err.message, 'error');
+        updateWhatifBtn();
+      });
+  }
+
+  function updateWhatifBtn() {
+    var hasCand = !!whatifState.candFileId;
+    var hasBase = whatifBaseMode() === 'existing' || !!whatifState.baseFileId;
+    els.whatifBtn.disabled = whatifState.running || !hasCand || !hasBase;
+  }
+
+  function onWhatifSubmit(e) {
+    e.preventDefault();
+    if (els.whatifBtn.disabled) {
+      return;
+    }
+    whatifState.running = true;
+    updateWhatifBtn();
+    els.whatifBtn.textContent = '模拟中...';
+    els.whatifError.textContent = '';
+    els.whatifResult.hidden = true;
+
+    var mode = whatifBaseMode();
+    var body = {
+      candidate_file_id: whatifState.candFileId,
+      use_existing: mode === 'existing',
+    };
+    if (mode === 'upload') {
+      body.base_file_id = whatifState.baseFileId;
+    }
+    var eff = (els.whatifEffectiveDate.value || '').trim();
+    if (eff) {
+      body.effective_date = eff;
+    }
+
+    // 生效日回测需联网取历史行情，超时放宽到 3 分钟（本地截面比较通常数秒）
+    fetch('/api/whatif', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(180000),
+    })
+      .then(handleResponse)
+      .then(
+        function (data) {
+          els.whatifLinkHtml.href = '/api/reports/' + encodeURIComponent(data.html);
+          els.whatifLinkExcel.href = '/api/reports/' + encodeURIComponent(data.excel);
+          els.whatifResultMeta.textContent =
+            '基准 ' + data.base_count + ' 条 / 目标 ' + data.candidate_count +
+            ' 条 · 独立产物，不并入主报告';
+          els.whatifResult.hidden = false;
+          whatifDone();
+        },
+        function (err) {
+          if (err.errorCode === 'FILE_EXPIRED') {
+            // 上传文件已过期/服务重启：清空两侧文件引导重新上传
+            whatifState.baseFileId = null;
+            whatifState.candFileId = null;
+            setStatus(els.whatifBaseStatus, '', null);
+            setStatus(els.whatifCandStatus, '上传文件已过期，请重新选择', 'error');
+          }
+          els.whatifError.textContent = err.message;
+          whatifDone();
+        }
+      );
+  }
+
+  function whatifDone() {
+    whatifState.running = false;
+    els.whatifBtn.textContent = '开始模拟';
+    updateWhatifBtn();
+  }
+
+  /* ── 缓存卡：统计 + 清理过期（对应 TUI [3][4]）── */
+  function formatSize(bytes) {
+    if (bytes >= 1048576) {
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+    if (bytes >= 1024) {
+      return (bytes / 1024).toFixed(1) + ' KB';
+    }
+    return bytes + ' B';
+  }
+
+  function loadCacheStats() {
+    return fetch('/api/cache', { signal: AbortSignal.timeout(15000) })
+      .then(handleResponse)
+      .then(function (data) {
+        els.cacheTotalFiles.textContent = data.total_files + ' 个';
+        els.cacheTotalSize.textContent = formatSize(data.total_size_bytes || 0);
+        var hit = data.hit_rate || {};
+        els.cacheHitRate.textContent = hit.total > 0
+          ? Math.round((hit.rate || 0) * 100) + '%（' + hit.hits + '/' + hit.total + '）'
+          : '暂无观测';
+        els.cacheExpired.textContent = data.expired_count > 0
+          ? data.expired_count + ' 个（可清理）'
+          : '无';
+
+        // 前缀分布（服务端已按文件数降序，取前 6 行避免卡片过长）
+        els.cachePrefixList.textContent = '';
+        var pairs = Array.isArray(data.by_prefix) ? data.by_prefix : [];
+        var top = pairs.slice(0, 6);
+        if (!top.length) {
+          var empty = document.createElement('p');
+          empty.className = 'status-text';
+          empty.textContent = '暂无缓存文件';
+          els.cachePrefixList.appendChild(empty);
+          return;
+        }
+        top.forEach(function (pair) {
+          var row = document.createElement('div');
+          row.className = 'health-row';
+          var name = document.createElement('span');
+          name.className = 'health-name';
+          name.textContent = pair[0];
+          var meta = document.createElement('span');
+          meta.className = 'health-meta';
+          meta.textContent = pair[1] + ' 个';
+          row.appendChild(name);
+          row.appendChild(meta);
+          els.cachePrefixList.appendChild(row);
+        });
+      })
+      .catch(function (err) {
+        setStatus(els.cacheStatus, err.message, 'error');
+      });
+  }
+
+  function onCacheCleanup() {
+    els.cacheCleanup.disabled = true;
+    setStatus(els.cacheStatus, '正在清理过期缓存...', 'busy');
+    fetch('/api/cache/cleanup', {
+      method: 'POST',
+      signal: AbortSignal.timeout(30000),
+    })
+      .then(handleResponse)
+      .then(function (data) {
+        setStatus(
+          els.cacheStatus,
+          data.removed > 0 ? '已清理 ' + data.removed + ' 个过期文件' : '没有需要清理的过期文件',
+          data.removed > 0 ? 'ok' : ''
+        );
+        return loadCacheStats();
+      })
+      .catch(function (err) {
+        setStatus(els.cacheStatus, err.message, 'error');
+      })
+      .then(function () {
+        els.cacheCleanup.disabled = false;
+      });
   }
 
   document.addEventListener('DOMContentLoaded', init);
