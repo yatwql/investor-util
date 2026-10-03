@@ -39,7 +39,7 @@ GUARD_FAILED=""
 
 # ── 1) 统计快照同步 + 文档漂移（涉及 managements/ 或 src/test/ 时 --sync 回写
 #      并由脚本自行 git add；其余提交纯 --ci 校验，README/手册漂移同样拦截）
-if echo "$CHANGED" | grep -qE '^docs-stm/managements/|^src/test/'; then
+if echo "$CHANGED" | grep -qE '^docs/managements/|^src/test/'; then
     echo "[..] pre-commit: 统计快照同步 + 文档漂移（check-doc-drift --sync）"
     if ! "$PY_CMD" scripts/check-doc-drift.py --sync --ci; then
         GUARD_FAILED="$GUARD_FAILED check-doc-drift"

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "investor-util"
-version = "0.12.0"
+version = "0.12.1"
 description = "投资复盘助手：读取持仓 Excel，生成 Excel/HTML 投资分析报告（含行情、穿透、基金业绩、财经新闻热点关联分析与 LLM 深度复盘）"
 requires-python = ">=3.11"
 dependencies = [
@@ -41,8 +41,8 @@ required_plugins = ["pytest-mock>=3.15", "pytest-xdist>=3.6"]
 [tool.ruff]
 target-version = "py310"
 line-length = 120
-# docs-stm 下为归档快照（含历史脚本副本），冻结不再参与 lint / format
-extend-exclude = [".venv", "docs-stm"]
+# docs 下为归档快照（含历史脚本副本），冻结不再参与 lint / format
+extend-exclude = [".venv", "docs"]
 
 [tool.ruff.lint]
 # 显式声明基线选择项（等价于 ruff 默认集），避免默认集随版本升级静默漂移

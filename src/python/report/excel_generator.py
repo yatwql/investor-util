@@ -278,6 +278,9 @@ def generate_excel_report(
         position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
     )
 
+    # 章级：enabled_llm 模块禁用的 LLM 分析章不创建页签（与 HTML 端同函数同配置推导）
+    from src.python.llm.skeleton import get_llm_chapter_disabled
+
     sheets = create_sheets(
         wb,
         order,
@@ -289,6 +292,7 @@ def generate_excel_report(
         enable_action=enable_action,
         enable_llm=enable_llm,
         data_availability=data_availability,
+        llm_module_disabled=get_llm_chapter_disabled() if enable_llm else None,
     )
 
     # ── 行情市值 + 指数 ──

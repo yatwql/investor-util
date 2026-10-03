@@ -195,3 +195,106 @@ class TestBuildDataAvailability:
         avail = build_data_availability(include_news=True, include_llm=False)
         assert avail["news_data_available"] is True
         assert "llm_data_available" not in avail
+
+
+class TestLlmChapterGate:
+    """章级开关：enabled_llm 模块禁用 → 对应 LLM 分析章整章隐藏（HTML/Excel 同口径）。
+
+    回归目标：禁用模块后目录/正文/Excel 页签同步剔除该章且连续重编号保持 1..N，
+    而非保留章框架显示「待生成」占位；新闻关联（LLM 仅增强）不受章级影响。
+    """
+
+    @staticmethod
+    def _order() -> list[dict]:
+        return [
+            {"key": "summary", "name": "汇总", "number": 1, "type": "always", "data_flag": None},
+            {
+                "key": "news_correlation",
+                "name": "新闻",
+                "number": 2,
+                "type": "news",
+                "data_flag": "news_data_available",
+            },
+            {"key": "global_macro", "name": "政经", "number": 3, "type": "llm", "data_flag": "llm_data_available"},
+            {"key": "expert_review", "name": "智囊团", "number": 4, "type": "llm", "data_flag": "llm_data_available"},
+            {"key": "health_check", "name": "体检", "number": 5, "type": "llm", "data_flag": "llm_data_available"},
+        ]
+
+    @staticmethod
+    def _visibility(llm_module_disabled: dict | None = None) -> tuple[dict, dict]:
+        from src.python.report.html_writer_nav import _compute_section_visibility
+
+        numbers, visible, _ = _compute_section_visibility(
+            TestLlmChapterGate._order(),
+            None,
+            None,
+            None,
+            None,
+            include_news=True,
+            llm_enabled_flag=True,
+            enable_news=True,
+            enable_llm=True,
+            llm_module_disabled=llm_module_disabled,
+        )
+        return numbers, visible
+
+    def test_none_disabled_keeps_all_visible(self):
+        """缺省（不传/全未禁用）时 LLM 章全部可见——默认行为不回退。"""
+        numbers, visible = self._visibility(None)
+        assert all(visible.values())
+        assert sorted(numbers.values()) == list(range(1, len(numbers) + 1))
+
+    def test_disabled_module_hides_section_and_renumbers(self):
+        """禁用模块 → 该章隐藏且重编号连续（后章递进补位，无空洞）。"""
+        numbers, visible = self._visibility({"expert_review": True})
+        assert visible["expert_review"] is False
+        assert visible["global_macro"] is True and visible["health_check"] is True
+        assert sorted(numbers.values()) == list(range(1, len(numbers) + 1))
+        assert "expert_review" not in numbers
+
+    def test_explicit_false_flag_does_not_hide(self):
+        """dict 键存在但值为 False → 不隐藏（判定读值不读键）。"""
+        _, visible = self._visibility({"expert_review": False})
+        assert visible["expert_review"] is True
+
+    def test_news_chapter_not_gated_by_module_switch(self):
+        """新闻关联不在章级集合：即使禁用键存在，新闻章照常可见（LLM 仅二次增强）。"""
+        _, visible = self._visibility({"news_correlation": True})
+        assert visible["news_correlation"] is True
+
+    def test_excel_sheet_skipped_for_disabled_module(self):
+        """Excel 端同口径：禁用模块的页签不创建，可见集与 HTML 一致。"""
+        from openpyxl import Workbook
+
+        from src.python.report.excel_sheet_factory import create_sheets
+
+        disabled = {"expert_review": True, "global_macro": False, "health_check": False}
+        _, visible = self._visibility(disabled)
+        wb = Workbook()
+        sheets = create_sheets(
+            wb,
+            self._order(),
+            enable_news=True,
+            enable_llm=True,
+            data_availability={"news_data_available": True, "llm_data_available": True},
+            llm_module_disabled=disabled,
+        )
+        html_visible = {k for k, v in visible.items() if v}
+        assert set(sheets) == html_visible, "Excel 页签集必须与 HTML 可见集一致"
+        assert "expert_review" not in sheets
+
+    def test_get_llm_chapter_disabled_follows_config(self, monkeypatch: pytest.MonkeyPatch):
+        """推导函数：键集恒为章级集合，值 = 配置 enabled_llm 的取反（缺失键默认启用）。"""
+        from src.python.core.registry import LLM_MODULE_GATED_SECTIONS
+        from src.python.llm import skeleton
+
+        monkeypatch.setattr(
+            "src.python.config._llm_settings.get_llm_config",
+            lambda: {"enabled_llm": {"expert_review": False}},
+        )
+        disabled = skeleton.get_llm_chapter_disabled()
+        assert set(disabled) == set(LLM_MODULE_GATED_SECTIONS)
+        assert disabled["expert_review"] is True
+        for key, value in disabled.items():
+            if key != "expert_review":
+                assert value is False, f"默认启用的模块不应被禁用: {key}"

@@ -281,6 +281,37 @@ class TestTestFileMetaExemption:
         assert _code_hit(code_traces, "旧实现把 3.41/4.43 修正成 1.9") is not None
 
 
+# ── check-doc-traces：版本演进对照「最新发布」列 tag 名豁免 ───
+
+
+class TestReleaseTagExemption:
+    """版本演进对照「最新发布」列：tag 名是滚动读数（当前状态），行中版本叙述仍检出。"""
+
+    def test_release_tag_in_evolution_header_exempt(self, doc_traces):
+        assert _doc_hit(doc_traces, "| 最新发布（最近发布 tag v0.12.0 · 2026-10-03） |") is None
+
+    def test_release_tag_in_reading_note_exempt(self, doc_traces):
+        assert _doc_hit(doc_traces, "最新发布 = 最近一次发布 tag（v0.12.0 · 2026-10-03）；") is None
+
+    def test_version_in_prose_still_flagged(self, doc_traces):
+        """豁免不外溢：无「最近发布 tag」上下文的行中版本号叙述仍须检出。"""
+        assert _doc_hit(doc_traces, "该缺陷在 v0.12.0 中修复") is not None
+
+
+# ── check-doc-traces：版本演进对照「当前开发版」列头版本号豁免 ───
+
+
+class TestEvolutionDevVersionExemption:
+    """「当前开发版（」列头版本号豁免（evolution_head 断言强制与 APP_VERSION 同步）。"""
+
+    def test_dev_column_head_exempt(self, doc_traces):
+        assert _doc_hit(doc_traces, "| 当前开发版（0.99.0-dev · 本次重跑时的 HEAD · 2026-10-03） |") is None
+
+    def test_version_in_prose_still_flagged(self, doc_traces):
+        """豁免不外溢：无「当前开发版（」锚点的行中版本号叙述仍须检出。"""
+        assert _doc_hit(doc_traces, "该缺陷在 0.99.0 中已修复") is not None
+
+
 # ── check-doc-traces：补强模式能检出文档历史痕迹 ───────────
 
 
@@ -394,7 +425,7 @@ class TestDocTraceDetection:
     # ── 既有模式仍工作 ──
 
     def test_archive_reference(self, doc_traces):
-        assert _doc_hit(doc_traces, "见 docs-stm/archive/ 归档") is not None
+        assert _doc_hit(doc_traces, "见 docs/archive/ 归档") is not None
 
     def test_task_id(self, doc_traces):
         assert _doc_hit(doc_traces, "见 rf-117 修复") is not None
@@ -552,7 +583,7 @@ class TestDocRoundDetection:
     """正文用数字轮次（"第 N 轮"/"经 N 轮"/"N 轮"/"轮 N"）指代开发迭代历史须检出
     （迭代轮次是开发痕迹，正文须改用语义描述）；轮次数量/运行时表述（共 N 轮 /
     N 轮每轮 / 计划分 N 轮 / 轮询 / 轮动 / 第 N 轮循环）是合法计数或业务/运行时
-    概念，豁免。changelog/plan/review-findings 与 docs-stm/plan/ 不查本条
+    概念，豁免。changelog/plan/review-findings 与 docs/plan/ 不查本条
     （ROUND 不进 _CHAPTER_PATTERNS，trace-exempt 文档仅章节编号扫描）。"""
 
     def test_round_codes_flagged(self, doc_traces):

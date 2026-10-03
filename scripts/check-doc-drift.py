@@ -15,7 +15,7 @@
   6.  配置标量默认值表   config/_config_defaults.py `_DEFAULT_CONFIG`   → manuals/how-to-config.md
   7.  LLM 默认参数表     config/_llm_settings_defaults.py + 缓存 TTL 注册表 → managements/llm-technical.md
   8.  TUI 面板编号       `tui/handlers_config.py` 的派生规则（LLM 可见模块 + 三组顺序连续编号）→ manuals/how-to-use-tui-menu.md
-  9.  目录树           文件系统实测（src/、scripts/、docs-stm/{managements,manuals,plan}）→ managements/folders.md
+  9.  目录树           文件系统实测（src/、scripts/、docs/{managements,manuals,plan}）→ managements/folders.md
   10. 项目统计表        文件系统实测（文件数/行数）+ 可选 pytest 收集数 → managements/folders.md
   11. 测试覆盖计数表    `scripts/collect-test-coverage.py` 快照 → managements/test-coverage.md（仅 `--with-test-count`）
   12. 归档索引完整性    changelog / plan / review-findings 的「归档」索引 ↔ 归档目录 `archived_*` 文件（双向）
@@ -25,7 +25,7 @@
   16. 守护清单同源        developer-guide P0/P2 门禁块 + ci.yml guards steps + CLAUDE.md/testplan.md 清单 + .githooks/pre-commit（五处）`check-*.py --ci` 引用集合两两一致
 
 按设计豁免的历史记录文档：`changelog.md` / `review-findings.md`（会如实引用旧数字作为变更记录）
-与 `docs-stm/archive/**`（版本快照）不参与第 2/4/5 项扫描。
+与 `docs/archive/**`（版本快照）不参与第 2/4/5 项扫描。
 
 用法：
   python scripts/check-doc-drift.py                  # 十六项全查

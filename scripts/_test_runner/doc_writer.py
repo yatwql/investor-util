@@ -19,7 +19,7 @@ _DOC_DURATION_TABLE_MARKERS = ("<!-- duration-table:start -->", "<!-- duration-t
 _DOC_MODE_COUNT_MARKERS = ("<!-- mode-count-table:start -->", "<!-- mode-count-table:end -->")
 
 
-_DOC_COVERAGE_PATH = os.path.join(_PROJECT_ROOT, "docs-stm", "managements", "test-coverage.md")
+_DOC_COVERAGE_PATH = os.path.join(_PROJECT_ROOT, "docs", "managements", "test-coverage.md")
 
 
 def _find_machine_column(header_row: list[str], hostname: str) -> int | None:

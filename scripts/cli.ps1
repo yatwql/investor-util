@@ -27,7 +27,7 @@ if (-not (Test-Path $pythonBin)) {
 New-Item -ItemType Directory -Force -Path "data\holdings" | Out-Null
 New-Item -ItemType Directory -Force -Path "data\cache" | Out-Null
 New-Item -ItemType Directory -Force -Path "data\config" | Out-Null
-New-Item -ItemType Directory -Force -Path "docs-stm\tmp" | Out-Null
+New-Item -ItemType Directory -Force -Path "docs\tmp" | Out-Null
 New-Item -ItemType Directory -Force -Path "logs" | Out-Null
 
 # 4. 无参数 -> 默认生成报告（both，Excel+HTML 不含 LLM）；否则原样透传

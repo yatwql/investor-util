@@ -4,7 +4,7 @@
 仍决定该模块是否启用，档位只在其之上收窄可参与集合（``brief`` ⊂ ``standard``），
 因此档位**永远无法打开用户显式关闭的模块**。
 
-关键设计取舍（详见 ``docs-stm/archive/v0.11.x/llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md`` §3.3）：
+关键设计取舍（详见 ``docs/archive/v0.11.x/llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md`` §3.3）：
 档位**不写入提示词正文**——只作用于「哪些模块参与」与「新闻采集条数」。如此既有
 四个模块的提示词承载入参不变，``llm/module_fingerprint.py`` 的指纹构造无需并入档位
 （若档位进入提示词正文，两侧键必须同步并入该值，否则预检永不命中或档位形同虚设）。

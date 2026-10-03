@@ -145,7 +145,7 @@ Write-Host "正在创建数据目录 ..."
 New-Item -ItemType Directory -Force -Path "data\holdings" | Out-Null
 New-Item -ItemType Directory -Force -Path "data\cache" | Out-Null
 New-Item -ItemType Directory -Force -Path "data\config" | Out-Null
-New-Item -ItemType Directory -Force -Path "docs-stm\tmp" | Out-Null
+New-Item -ItemType Directory -Force -Path "docs\tmp" | Out-Null
 New-Item -ItemType Directory -Force -Path "logs" | Out-Null
 
 # 6. 启动主程序

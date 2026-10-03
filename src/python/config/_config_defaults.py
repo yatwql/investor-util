@@ -113,7 +113,7 @@ _DEFAULT_CONFIG = {
     },
     # ── M. 景气度框架诊断（实验性功能 `prosperity_framework`）──
     # 六维评分卡的关键词与目标值：方法骨架借鉴开源项目 zhengxi-views（MIT）；
-    # 详见 docs-stm/plan/prosperity-framework-design.md
+    # 详见 docs/plan/prosperity-framework-design.md
     "prosperity_framework": {
         # 景气/通胀方向关键词（匹配板块与概念；偏好供给端创造需求的科技通胀）
         "boom_keywords": [

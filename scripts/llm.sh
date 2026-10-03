@@ -30,7 +30,7 @@ if [ ! -f "$PYTHON_BIN" ]; then
 fi
 
 # 3. 创建所需数据目录（与 launch.sh 保持一致，非破坏性）
-mkdir -p data/holdings data/cache data/config docs-stm/tmp logs
+mkdir -p data/holdings data/cache data/config docs/tmp logs
 
 # 4. 完整报告 + 追加参数（报告级参数如 --force-llm / --history 追加在后）
 exec "$PYTHON_BIN" -m src.python.cli report --type full "$@"

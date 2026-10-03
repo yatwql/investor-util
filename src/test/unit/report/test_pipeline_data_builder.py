@@ -27,7 +27,7 @@ from src.python.report.pipeline_data_builder import (
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]  # 仓库根目录（src/test/unit/report 向上 4 级）
-_TECHNICAL_DOC = _REPO_ROOT / "docs-stm" / "managements" / "technical.md"
+_TECHNICAL_DOC = _REPO_ROOT / "docs" / "managements" / "technical.md"
 
 
 def _appendix_h_keys() -> set[str]:

@@ -15,10 +15,10 @@ from _checklib import REPO_ROOT, rel
 _README = REPO_ROOT / "README.md"
 
 
-_MANUALS = REPO_ROOT / "docs-stm" / "manuals"
+_MANUALS = REPO_ROOT / "docs" / "manuals"
 
 
-_MANAGEMENTS = REPO_ROOT / "docs-stm" / "managements"
+_MANAGEMENTS = REPO_ROOT / "docs" / "managements"
 
 
 _FOLDERS_MD = _MANAGEMENTS / "folders.md"
@@ -52,7 +52,7 @@ _REVIEW_FINDINGS_MD = _MANAGEMENTS / "review-findings.md"
 _HISTORY_DOCS = {_MANAGEMENTS / "changelog.md", _MANAGEMENTS / "review-findings.md"}
 
 
-_TREE_ROOTS = ("src", "scripts", "docs-stm/managements", "docs-stm/manuals", "docs-stm/plan")
+_TREE_ROOTS = ("src", "scripts", "docs/managements", "docs/manuals", "docs/plan")
 
 
 _GENERATED_DIRS = {
@@ -73,7 +73,7 @@ _GENERATED_SUFFIXES = (".egg-info", ".dist-info")
 _GENERATED_FILES = {".coverage"}
 
 
-_GENERATED_PREFIXES = ("docs-stm/tmp/",)
+_GENERATED_PREFIXES = ("docs/tmp/",)
 
 
 def _is_generated(rel: str) -> bool:
@@ -83,7 +83,7 @@ def _is_generated(rel: str) -> bool:
     会在 `src/` 下留下 `*.egg-info/`，若不排除会被误报为「目录树缺条目」。
 
     **例外**：`test-reports/` 的规范位置是仓库根（不在受检根内），故**不**豁免——受检目录
-    （`src/`、`scripts/`、`docs-stm/{managements,manuals,plan}`）下出现 `test-reports/`
+    （`src/`、`scripts/`、`docs/{managements,manuals,plan}`）下出现 `test-reports/`
     属误落（如入口把项目根算到了 `scripts/`），须由目录树检查报出。
     """
     if rel in _GENERATED_FILES or rel.startswith(_GENERATED_PREFIXES):

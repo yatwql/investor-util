@@ -25,6 +25,7 @@ import pytest
 from src.python.config.features import is_feature_enabled
 from src.python.report._report_generation import _build_chart_datasets_for_report
 from src.python.report.html_writer import _copy_js_assets, _inline_js_assets
+from src.python.report.html_writer_assets import JS_ASSETS
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
@@ -106,16 +107,8 @@ class TestInlineJsAssets:
     仅当 HTML 与 JS 同目录时图表才渲染。内嵌后单文件即可在任意位置浏览。
     """
 
-    _ALL_ASSETS = (
-        "chart.min.js",
-        "chart-print.js",
-        "chart-config.js",
-        "chart-export.js",
-        "chart-common.js",
-        "chart-init.js",
-        "toc.js",
-        "theme.js",
-    )
+    # 资产清单从生产代码派生（单一事实来源，新增资产无需改测试）
+    _ALL_ASSETS = JS_ASSETS
 
     @staticmethod
     def _static_dir() -> str:
@@ -124,7 +117,7 @@ class TestInlineJsAssets:
         return os.path.join(PROJECT_ROOT, "src", "static")
 
     def test_inline_replaces_all_external_script_tags(self) -> None:
-        """全部 8 个外链脚本内嵌为行内 <script>，且追加到 </body> 前（内容来自 src/static）。"""
+        """全部本地 bundle 外链脚本内嵌为行内 <script>，且追加到 </body> 前（内容来自 src/static）。"""
         html = (
             "<html><head>"
             + "".join(f'<script defer src="{a}"></script>' for a in self._ALL_ASSETS)

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """文档链接与结构一致性检查（死链 / 死锚点 / 重复标题 / 层级 / 编号序列 / § 引用）。
 
-扫描范围（当前文档；`docs-stm/archive/**` 为版本快照按设计豁免）：
+扫描范围（当前文档；`docs/archive/**` 为版本快照按设计豁免）：
   - `README.md`、`CLAUDE.md`
-  - `docs-stm/managements/*.md`（管理文档）
-  - `docs-stm/manuals/*.md`（用户手册）
-  - `docs-stm/plan/*.md`（中间计划）
+  - `docs/managements/*.md`（管理文档）
+  - `docs/manuals/*.md`（用户手册）
+  - `docs/plan/*.md`（中间计划）
 
 六类检查：
   1. 死文件链接：相对链接目标文件不存在
@@ -46,9 +46,9 @@ from _checklib import REPO_ROOT, add_common_args, rel, report  # noqa: E402
 _SCOPE_GLOBS = (
     "README.md",
     "CLAUDE.md",
-    "docs-stm/managements/*.md",
-    "docs-stm/manuals/*.md",
-    "docs-stm/plan/*.md",
+    "docs/managements/*.md",
+    "docs/manuals/*.md",
+    "docs/plan/*.md",
 )
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")

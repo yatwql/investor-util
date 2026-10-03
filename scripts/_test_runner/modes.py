@@ -35,7 +35,7 @@ MODES: dict[str, dict] = {
         "parallel": False,
     },
     "dev-verify": {
-        "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景；耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）",
+        "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景；耗时参考 docs/managements/test-coverage.md 环境耗时对照）",
         "order": 5,
         "preflight": [
             [sys.executable, "scripts/check-task-numbering.py", "--ci"],
@@ -51,7 +51,7 @@ MODES: dict[str, dict] = {
             },
             {
                 "marker": "scenario_basic",
-                "desc": "基础业务场景（耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）",
+                "desc": "基础业务场景（耗时参考 docs/managements/test-coverage.md 环境耗时对照）",
                 "timeout_sec": 300,
                 "parallel": True,
             },
@@ -101,7 +101,7 @@ MODES: dict[str, dict] = {
     },
     "smoke": {
         "marker": "smoke",
-        "desc": "冒烟测试（快速验证核心通路；耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）",
+        "desc": "冒烟测试（快速验证核心通路；耗时参考 docs/managements/test-coverage.md 环境耗时对照）",
         "timeout_sec": 60,
         "order": 11,
         "parallel": False,
@@ -115,7 +115,7 @@ MODES: dict[str, dict] = {
     },
     "scenario_extreme": {
         "marker": "scenario_extreme",
-        "desc": "极限场景测试（S0c 超多持仓 + S10 极端值，手工触发；耗时参考 docs-stm/managements/test-coverage.md 环境耗时对照）",
+        "desc": "极限场景测试（S0c 超多持仓 + S10 极端值，手工触发；耗时参考 docs/managements/test-coverage.md 环境耗时对照）",
         "timeout_sec": 600,
         "order": 13,
         "parallel": False,

@@ -1158,9 +1158,9 @@ class TestHtmlTocSidebar(unittest.TestCase):
         self.assertIn("toc.js", str(self.soup), "模板应加载 toc.js")
 
     def test_toc_links_follow_grouped_order(self):
-        """目录项按「基础信息/基金深度分析/行动建议/历史/LLM」分组顺序，组内按报告序号升序。"""
+        """目录项按分组聚合且展开后报告号严格递增（按报告号线性序扫描、同组连续段聚块，无跳号回跳）。"""
         links = self.soup.select("#toc-sidebar a[href^='#sec-']")
-        # 预期分组顺序（测试常量）：基础信息 → 基金深度分析 → 历史 → LLM（行动建议组空，跳过）
+        # 测试场景下组序（动态 min 排序）：基础信息 → 基金深度分析 → LLM → 历史 → 附录（LLM API 用量）
         expected_keys = [
             "summary",
             "holdings_detail",
@@ -1168,16 +1168,23 @@ class TestHtmlTocSidebar(unittest.TestCase):
             "fund_performance",
             "position_structure",
             "style_factor",
-            "portfolio_history_drawdown",
             "news_correlation",
             "global_macro",
             "expert_review",
             "health_check",
             "penetration_deep",
+            "portfolio_history_drawdown",
             "llm_usage",
         ]
         link_keys = [link.get("href").replace("#sec-", "") for link in links]
-        self.assertEqual(link_keys, expected_keys, "目录顺序应为五组分组顺序（组内按序号升序）")
+        self.assertEqual(link_keys, expected_keys, "目录顺序应为分组聚合顺序（组间按最小号、组内按号升序）")
+        # 结构不变式：展开后的报告号严格 1..N 连续递增 —— 目录展开序必须等于正文线性序
+        numbers = []
+        for link in links:
+            m = re.match(r"(\d+)、", link.get_text())
+            assert m, f"目录项应带报告号前缀: {link.get_text()!r}"
+            numbers.append(int(m.group(1)))
+        self.assertEqual(numbers, list(range(1, len(numbers) + 1)), "目录展开报告号应严格连续 1..N（无跳号回跳）")
 
 
 class TestHtmlTocVisibility(unittest.TestCase):
@@ -1274,10 +1281,10 @@ class TestSummaryDateTimeValueStyles(unittest.TestCase):
 
 
 class TestHtmlTocGroupedNav(unittest.TestCase):
-    """目录分组导航测试 — 「基础信息/基金深度分析/行动建议/历史/LLM」五组折叠。
+    """目录分组导航测试 — 「基础信息/基金深度分析/行动建议/历史/LLM/附录」六组折叠。
 
     覆盖导航收尾验收：分组渲染 / 折叠交互 / 移动端不溢出 / 键盘可达。
-    左侧目录（toc-sidebar）按五组折叠；窄屏横向 section-nav 保持扁平兜底。
+    左侧目录（toc-sidebar）按六组折叠；窄屏横向 section-nav 保持扁平兜底。
     """
 
     @classmethod
@@ -1292,15 +1299,15 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
     # ── 分组渲染 ──────────────────────────────────────────────
 
     def test_four_nonempty_group_details_rendered(self):
-        """目录按五组渲染 <details class='toc-group'>，非空组默认 open（展开）。"""
+        """目录按分组渲染 <details class='toc-group'>，非空组默认 open（展开）。"""
         details = self.soup.select("#toc-sidebar details.toc-group")
-        # 测试常量下：基础信息/基金深度分析/历史/LLM 四组有章节，行动建议组空跳过
-        self.assertEqual(len(details), 4, f"应有 4 个非空分组，实际 {len(details)}")
+        # 测试场景下：6 组中基础信息/基金深度分析/LLM/历史/附录五组非空（附录组仅 LLM API 用量），行动建议组空跳过
+        self.assertEqual(len(details), 5, f"应有 5 个非空分组，实际 {len(details)}")
         for d in details:
             self.assertIsNotNone(d.get("open"), "非空分组应默认展开（open 属性）")
 
     def test_group_renders_correct_sections(self):
-        """各组内渲染正确章节链接（组序固定，组内按报告序号升序）。"""
+        """各组内渲染正确章节链接（组间按最小号动态排序，组内按报告号升序）。"""
 
         def _group_keys(group_key: str) -> list[str]:
             d = self.soup.select_one(f"#toc-sidebar details.toc-group[data-group='{group_key}']")
@@ -1311,7 +1318,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
         self.assertEqual(
             _group_keys("basic"),
             ["summary", "holdings_detail", "penetration"],
-            "「基础信息」组应含 4 个基础章节",
+            "「基础信息」组应含 3 个基础章节",
         )
         self.assertEqual(
             _group_keys("fund_deep"),
@@ -1335,9 +1342,13 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 "expert_review",
                 "health_check",
                 "penetration_deep",
-                "llm_usage",
             ],
-            "「LLM」组应含新闻关联 + LLM 文本章 + API 用量",
+            "「LLM」组应含新闻关联 + LLM 文本四章（API 用量归附录组）",
+        )
+        self.assertEqual(
+            _group_keys("appendix"),
+            ["llm_usage"],
+            "「附录」组在本场景下含 LLM API 用量章",
         )
 
     def test_group_title_shows_name_and_count(self):
@@ -1354,7 +1365,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
             )
 
     def test_real_registry_group_mapping(self):
-        """真实注册表分组映射正确（含数据源可用性/组合演进/行动建议）。"""
+        """真实注册表分组映射正确（含附录组：数据源可用性/持仓基本面/API 用量）。"""
         from src.python.core.registry import get_report_section_order
         from src.python.report.html_writer import _build_section_nav_groups
 
@@ -1365,14 +1376,8 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
 
         self.assertEqual(
             by_key["basic"],
-            [
-                "summary",
-                "holdings_detail",
-                "penetration",
-                "data_source_status",
-                "fundamental_snapshot",
-            ],
-            "「基础信息」组应含数据源可用性矩阵与持仓基本面",
+            ["summary", "holdings_detail", "penetration"],
+            "「基础信息」组应含汇总/持仓明细/穿透三章",
         )
         self.assertEqual(
             by_key["fund_deep"],
@@ -1396,9 +1401,21 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
                 "expert_review",
                 "health_check",
                 "penetration_deep",
-                "llm_usage",
             ],
+            "「LLM」组应含新闻关联 + LLM 文本四章（API 用量归附录组）",
         )
+        self.assertEqual(
+            by_key["appendix"],
+            ["data_source_status", "fundamental_snapshot", "llm_usage"],
+            "「附录」组应含数据源可用性矩阵/持仓基本面/API 用量",
+        )
+        # 结构不变式：全部可见章节分组覆盖（每章恰属一组，无遗漏无重复）
+        flat = [s["key"] for g in groups for s in g["sections"]]
+        self.assertEqual(len(flat), len(set(flat)), "章节不应在多个分组中重复出现")
+        self.assertEqual(set(flat), set(numbers), "分组应覆盖全部章节")
+        # 结构不变式：默认注册序下展开报告号严格 1..N（目录展开序 == 正文线性序，无跳号回跳）
+        flat_numbers = [s["number"] for g in groups for s in g["sections"]]
+        self.assertEqual(flat_numbers, list(range(1, len(flat_numbers) + 1)), "展开报告号应严格连续 1..N")
 
     # ── 折叠交互 ──────────────────────────────────────────────
 
@@ -1557,6 +1574,67 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
     def _template_css(self) -> str:
         """读取渲染后 HTML 中全部 <style> 文本。"""
         return "\n".join(s.get_text() for s in self.soup.select("style"))
+
+
+class TestTocCrossGroupInterleave(unittest.TestCase):
+    """跨组交错回归：附录章插号段中间时目录展开仍严格线性 1..N（rf-561）。
+
+    分组投影按报告号线性连续段分块——组在号序断点处拆块、同组可出现多块，
+    展开序恒等于正文线性序（正文/Excel/锚点跳转不受分组影响）。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from src.python.core.registry import get_report_section_order
+
+        # 生产真值全集（文件内本地常量是 13 章最小场景，不含附录章）
+        cls.order = [dict(sec) for sec in get_report_section_order()]
+        # 数据源可用性矩阵（附录组）从尾部插到第 5 位（劈开基金深度分析号段），按配置序重编号
+        data_source = next(s for s in cls.order if s["key"] == "data_source_status")
+        cls.order.remove(data_source)
+        cls.order.insert(4, data_source)
+        for i, sec in enumerate(cls.order, 1):
+            sec["number"] = i
+        cls.numbers = {s["key"]: s["number"] for s in cls.order}
+        cls.sv_dict = {s["key"]: True for s in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+
+    def test_toc_expands_strictly_linear_after_interleave(self):
+        """展开序 = 正文线性序（key 逐位）且报告号严格 1..N——跨组插号无跳号回跳。"""
+        links = self.soup.select("#toc-sidebar a[href^='#sec-']")
+        link_keys = [a.get("href").replace("#sec-", "") for a in links]
+        self.assertEqual(
+            link_keys,
+            [s["key"] for s in self.order],
+            "目录展开序应等于正文线性序（配置序）",
+        )
+        numbers = []
+        for a in links:
+            m = re.match(r"(\d+)、", a.get_text())
+            assert m, f"目录项应带报告号前缀: {a.get_text()!r}"
+            numbers.append(int(m.group(1)))
+        self.assertEqual(
+            numbers,
+            list(range(1, len(numbers) + 1)),
+            "展开报告号应严格连续 1..N（无跳号回跳）",
+        )
+
+    def test_interleaved_groups_split_at_breakpoints(self):
+        """被插入点劈开的组拆为多块（同组可重复），块内拼接覆盖全部章节。"""
+        details = self.soup.select("#toc-sidebar details.toc-group")
+        block_keys = [d.get("data-group") for d in details]
+        # 插入点两侧：附录组尾部（基本面/API 用量）与基金深度组余部各自成块
+        self.assertGreaterEqual(block_keys.count("appendix"), 2, "附录组被插入点劈开应拆为多块")
+        self.assertGreaterEqual(block_keys.count("fund_deep"), 2, "基金深度分析组号段被楔入应拆为多块")
+        # 块拼接 = 线性序全覆盖（无遗漏、无重复）
+        flat = [a.get("href").replace("#sec-", "") for d in details for a in d.select("a[href^='#sec-']")]
+        self.assertEqual(
+            flat,
+            [s["key"] for s in self.order],
+            "分组块拼接应覆盖全部章节且顺序 = 线性序",
+        )
 
 
 class TestHtmlDataQualityBlocks(unittest.TestCase):
@@ -2022,6 +2100,64 @@ class TestHtmlReportPeriodAnnotations(unittest.TestCase):
         text = soup.select_one("#sec-fund_performance").get_text()
         self.assertNotIn("持仓报告期", text)
         self.assertNotIn("未计入重合度基准", text)
+
+
+class TestSectionFold(unittest.TestCase):
+    """正文大块默认折叠（details.section-fold）— 包裹结构 / fold.js 交互钩子。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+        with open(_TEMPLATE_PATH, encoding="utf-8") as f:
+            cls.template_src = f.read()
+
+    def test_history_section_wrapped_by_fold_details(self):
+        """历史走势章内容包在 details.section-fold 内且默认收起（无 open）。"""
+        section = self.soup.select_one("#sec-portfolio_history_drawdown")
+        self.assertIsNotNone(section, "历史走势章应存在")
+        details = section.select_one("details.section-fold")
+        self.assertIsNotNone(details, "历史走势章应含 details.section-fold 折叠块")
+        self.assertIsNone(details.get("open"), "折叠块应默认收起（不带 open 属性）")
+        summary = details.select_one(":scope > summary.section-fold-summary")
+        self.assertIsNotNone(summary, "折叠块应有 summary 提示条")
+        # summary 在内容之前（原生折叠结构：summary 为 details 首子元素）
+        children = [c for c in details.children if getattr(c, "name", None)]
+        self.assertEqual(children[0].name, "summary", "summary 应为折叠块第一个元素")
+
+    def test_fold_block_uses_native_details_no_js_dependency_for_toggle(self):
+        """折叠/展开用原生 details（键盘可达、无 JS 也能手动展开）。"""
+        details = self.soup.select_one("details.section-fold")
+        self.assertIsNotNone(details)
+        # 未引入自绘开关类（折叠靠原生 summary 点击）
+        self.assertIsNone(details.select_one(".fold-toggle-btn"))
+
+    def test_template_references_fold_js_and_assets_registered(self):
+        """模板引用 fold.js 且资产清单（单一事实来源）已登记。"""
+        from src.python.report.html_writer_assets import JS_ASSETS
+
+        self.assertIn('<script defer src="fold.js"></script>', self.template_src)
+        self.assertIn("fold.js", JS_ASSETS, "fold.js 应登记进 JS_ASSETS 内嵌清单")
+
+    def test_fold_js_interaction_hooks(self):
+        """fold.js 含锚点展开 / 打印展开恢复 / 图表 resize 钩子（源码结构断言）。"""
+        fold_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "fold.js"))
+        with open(fold_path, encoding="utf-8") as f:
+            fold_js = f.read()
+        self.assertIn("hashchange", fold_js, "锚点定位应自动展开目标章节折叠块")
+        self.assertIn("beforeprint", fold_js, "打印前应展开全部折叠块")
+        self.assertRegex(
+            fold_js,
+            r"beforeprint[\s\S]{0,400}?\},\s*true\)",
+            "beforeprint 应以捕获阶段注册（先于 chart-print 快照展开）",
+        )
+        self.assertIn("afterprint", fold_js, "打印后应恢复用户折叠状态")
+        self.assertIn("toggle", fold_js, "手动展开应绑定 toggle 钩子（图表 resize 兜底）")
+        self.assertIn("section-fold", fold_js, "钩子应作用于 details.section-fold")
 
 
 if __name__ == "__main__":

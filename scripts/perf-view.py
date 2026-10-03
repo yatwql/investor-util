@@ -6,7 +6,7 @@
 
 用法：
   python scripts/perf-view.py                          # 输出到 stdout
-  python scripts/perf-view.py --save                   # 同时写入 docs-stm/tmp/perf_trend.md
+  python scripts/perf-view.py --save                   # 同时写入 docs/tmp/perf_trend.md
   python scripts/perf-view.py --report-type full       # 仅查看 full 类型
   python scripts/perf-view.py --last 30                # 仅查看最近 30 条记录
 """
@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.WARNING, format="%(levelname)s:%(name)s:%(mess
 
 from src.python.core.perf import load_history
 
-_TMP_DIR = os.path.join(_PROJECT_ROOT, "docs-stm", "tmp")
+_TMP_DIR = os.path.join(_PROJECT_ROOT, "docs", "tmp")
 _TREND_REPORT_PATH = os.path.join(_TMP_DIR, "perf_trend.md")
 
 
@@ -175,7 +175,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="查看性能历史趋势")
     parser.add_argument("--report-type", choices=["basic", "both", "full"], help="仅查看指定报告类型")
     parser.add_argument("--last", type=int, default=None, help="仅查看最近 N 条记录")
-    parser.add_argument("--save", action="store_true", help="同时写入 docs-stm/tmp/perf_trend.md")
+    parser.add_argument("--save", action="store_true", help="同时写入 docs/tmp/perf_trend.md")
     args = parser.parse_args()
 
     records = load_history()

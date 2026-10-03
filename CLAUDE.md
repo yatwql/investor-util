@@ -40,39 +40,39 @@
   - **不依赖外部数据的用例显式声明离线**：报告/编排/集成类用例的**附带依赖**（交易日历、行业数据、行情、健康检查探针、akshare 直连路径等）并非其测试目标——这类文件在模块级加一行 `pytest.mark.usefixtures("offline_external_sources")`（`src/test/_network_guard.py::apply_offline_stubs`）即可：HTTP 出口换成即时失败的离线桩、交易日历回空集、链路瞬时重试退避置 0（不再等待）、akshare 换空桩。**需要验证某源真实行为的用例必须自行 mock 该源**，不得用本 fixture 遮掩
   - **测试目标源要 patch 对模块**：生产代码常在函数内 `from ... import`（如 `report/news_correlation.py` 从 `fetcher.news` 导入）——patch 必须指向**调用点所在模块**的属性，patch 上游 provider 模块的同名函数**不会**生效（该名字已在导入时绑定），否则用例会静默走真实链路
 - **调试失败用例流程**：测试失败后**禁止**重新跑全量测试套件。先用 `.venv/bin/python scripts/extract-test-failures.py` 提取失败用例名，修复后只跑该单个用例验证（`.venv/bin/python -m pytest <test_file>::<test_name> -v --tb=short`）。仅提交/发布前才需跑完整门禁。
-- **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs-stm/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs-stm/managements/changelog.md`。
+- **自审记录**：自查发现的所有问题 **必须** 先记录到 `docs/managements/review-findings.md`，标注状态（待处理/已完成）。待办区允许非空（有未修复问题属正常）。修复后 **立即** 从 review-findings.md 中移除该条详细说明（仅保留摘要行），变更记录移至 `docs/managements/changelog.md`。
 - **任务编号规范**：
   - `plan.md` 的待办任务：`plan-{全局递增序号}`（如 `plan-1`、`plan-2`），从 1 开始单调递增，已归档或已完成的序号不回收
   - `review-findings.md` 的自审问题：`rf-{全局递增序号}`（如 `rf-1`、`rf-2`），从 1 开始单调递增，已修复归档的序号不回收
   - 序号仅用于标识，**不编码优先级、不编码层级、不编码分类**。优先级信息在分类表头文字描述中表达
   - 跨文档引用时**必须带前缀**（`plan-`/`rf-`），避免歧义
   - 历史数据保持原名（如 `P3-09`、`P4-91`），不追溯重命名
-  - **编号源标记**：各管理文档头部维护「编号源」标记记录**下一个可用编号**——`plan.md` → `plan-next`、`review-findings.md` → `rf-next`。新增任务时**取当前值**作为编号，完成后**递增更新标记**（+1）。标记单调递增、绝不回退，保证与历史归档（含 `docs-stm/archive/*/`）编号不冲突。若标记遗漏递增或初值异常，`scripts/check-task-numbering.py --ci` 会扫描当前文档+全部归档报错并提示修正值（已用最大+1）
-- **语义化命名**：代码标识符（函数/变量/类/模块/config 键）与文档正文一律用**语义名**，**禁止用任务代号**（`plan-N`/`rf-N`/B 系列/F 系列等）。任务代号仅存在于内部计划表（`plan.md`/`review-findings.md`）作链接锚点，不扩散到实现层。新增功能**先定语义名再设计**（语义名即代码名），已实现功能的语义命名索引见技术设计文档（`docs-stm/managements/technical.md`）「功能语义命名表」章节（活索引；各轮设计文档中的原始表为历史快照，如归档 `docs-stm/archive/v0.10.x/investment-features/plan-investment-features.md` 的原始语义命名表），保证「代码标识符 = 文档中文描述」一致。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止：注释/标识符中出现任务编号、系列代号（`b_series`/`G系列`/`F4`/`B6`）、嵌入 `rf/plan`+数字 的命名均会被检出（IDENT/CODE，退出码 2））+ `scripts/check-semantic-index.py --ci`（正面校验「功能语义命名表」与代码正反向一致），已纳入技术设计文档「架构设计约束」章节的约束外参照。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（`C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。**测试文件的回归元描述豁免（旧实现/修复前等）不适用于任务编号**——注释/docstring 中残留 `rf-N`/`plan-N`/`R-N` 一律检出（`check-code-traces.py` 的任务编号硬禁止分支先于整行豁免判定）。
-- **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs-stm/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs-stm/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。该纪律由 `scripts/check-doc-drift.py --ci` 强制（目录树条目与实测文件双向比对 + 项目统计表数字核对）。`test-reports/` **只应出现在仓库根**——受检目录（`src/`、`scripts/`、`docs-stm/{managements,manuals,plan}`）下出现同名目录即为误落（典型成因：工具把「项目根」算成了 `scripts/`），目录树检查会报出
-- **管理文档**：`docs-stm/managements/`（plan.md, requirements.md, technical.md, llm-technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md, folders.md, developer-guide.md）
-- **用户文档**：`README.md`（总入口）+ `docs-stm/manuals/`（分册：how-to-start.md, how-to-use-web-mode.md, how-to-use-tui-menu.md, how-to-use-cli-mode.md, how-to-config.md, how-to-config-llm.md, reports-instruction.md, datasource.md, datasource-reliability.md, faq.md）
+  - **编号源标记**：各管理文档头部维护「编号源」标记记录**下一个可用编号**——`plan.md` → `plan-next`、`review-findings.md` → `rf-next`。新增任务时**取当前值**作为编号，完成后**递增更新标记**（+1）。标记单调递增、绝不回退，保证与历史归档（含 `docs/archive/*/`）编号不冲突。若标记遗漏递增或初值异常，`scripts/check-task-numbering.py --ci` 会扫描当前文档+全部归档报错并提示修正值（已用最大+1）
+- **语义化命名**：代码标识符（函数/变量/类/模块/config 键）与文档正文一律用**语义名**，**禁止用任务代号**（`plan-N`/`rf-N`/B 系列/F 系列等）。任务代号仅存在于内部计划表（`plan.md`/`review-findings.md`）作链接锚点，不扩散到实现层。新增功能**先定语义名再设计**（语义名即代码名），已实现功能的语义命名索引见技术设计文档（`docs/managements/technical.md`）「功能语义命名表」章节（活索引；各轮设计文档中的原始表为历史快照，如归档 `docs/archive/v0.10.x/investment-features/plan-investment-features.md` 的原始语义命名表），保证「代码标识符 = 文档中文描述」一致。该纪律由双脚本强制——`scripts/check-code-traces.py --ci`（负面禁止：注释/标识符中出现任务编号、系列代号（`b_series`/`G系列`/`F4`/`B6`）、嵌入 `rf/plan`+数字 的命名均会被检出（IDENT/CODE，退出码 2））+ `scripts/check-semantic-index.py --ci`（正面校验「功能语义命名表」与代码正反向一致），已纳入技术设计文档「架构设计约束」章节的约束外参照。注：小写短局部名（`h1/t1/f1`）与注释中裸"字母+数字"（`C20` 约束、Excel 单元格 `A1:B1`）属合法豁免。**测试文件的回归元描述豁免（旧实现/修复前等）不适用于任务编号**——注释/docstring 中残留 `rf-N`/`plan-N`/`R-N` 一律检出（`check-code-traces.py` 的任务编号硬禁止分支先于整行豁免判定）。
+- **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `docs/managements/folders.md` 中的目录树，并确保每个文件都有简短说明。排除项：`.git/`、`.claude/`、`.venv/`、`.pytest_cache/`、`data/cache/`、`docs/tmp/`、`logs/`、`reports/`。目录树使用 `├──`/`└──` 层级符号，`__init__.py` 标注为"包标记（空文件）"或"子包标记（空文件）"。`test-reports/` 是自动生成目录，只需在目录树中保留一行描述，不展开子目录。该纪律由 `scripts/check-doc-drift.py --ci` 强制（目录树条目与实测文件双向比对 + 项目统计表数字核对）。`test-reports/` **只应出现在仓库根**——受检目录（`src/`、`scripts/`、`docs/{managements,manuals,plan}`）下出现同名目录即为误落（典型成因：工具把「项目根」算成了 `scripts/`），目录树检查会报出
+- **管理文档**：`docs/managements/`（plan.md, requirements.md, technical.md, llm-technical.md, testplan.md, review-findings.md, changelog.md, test-coverage.md, folders.md, developer-guide.md）
+- **用户文档**：`README.md`（总入口）+ `docs/manuals/`（分册：how-to-start.md, how-to-use-web-mode.md, how-to-use-tui-menu.md, how-to-use-cli-mode.md, how-to-config.md, how-to-config-llm.md, reports-instruction.md, datasource.md, datasource-reliability.md, faq.md）
 - **文件归属三原则**：
-  - **中间计划文件**（设计方案、迭代计划、架构决策）→ `docs-stm/plan/`
-  - **运行时临时文件**（除log以外的临时输出、调试产物、缓存转储）→ `docs-stm/tmp/`
+  - **中间计划文件**（设计方案、迭代计划、架构决策）→ `docs/plan/`
+  - **运行时临时文件**（除log以外的临时输出、调试产物、缓存转储）→ `docs/tmp/`
   - **`.claude/` 全局目录** — 只存放 Claude Code 工具自动管理的运行时数据（sessions/tasks/file-history 等），**禁止主动写入**任何文件（包括记忆/memory/、计划/plans/、临时数据等）
 - **自检清单（文件写入前必答）**：
   1. 这个文件是项目源码/配置/文档？→ 放仓库对应路径
-  2. 是中间计划？→ `docs-stm/plan/`
-  3. 是运行时临时产物？→ `docs-stm/tmp/`
+  2. 是中间计划？→ `docs/plan/`
+  3. 是运行时临时产物？→ `docs/tmp/`
   4. 以上都不是，想放 `.claude/`？→ **停，不允许，重新分类**
-- **违规补救**：发现 `.claude/` 下出现本应放在 `docs-stm/` 的文件时，**必须立即迁移**，不留存待办
-- **注意**：`EnterPlanMode` 等工具自动写入 `.claude/plans/` 的行为不可控，使用后**必须手动迁移**到 `docs-stm/plan/`
+- **违规补救**：发现 `.claude/` 下出现本应放在 `docs/` 的文件时，**必须立即迁移**，不留存待办
+- **注意**：`EnterPlanMode` 等工具自动写入 `.claude/plans/` 的行为不可控，使用后**必须手动迁移**到 `docs/plan/`
 - **版本号一致**：发布版本时，先修改 `src/python/core/constants.py`（`APP_VERSION`），然后运行 `.venv/bin/python scripts/check-version-consistency.py`，按 [ERR] 提示逐个同步其余文件，直到全部 [OK] 再提交。受检文件：`pyproject.toml`、`README.md`、管理文档 10 份（`plan.md`/`technical.md`/`requirements.md`/`testplan.md`/`review-findings.md`/`llm-technical.md`/`folders.md`/`test-coverage.md`/`changelog.md`/`developer-guide.md`）。任何版本号变更均应全局覆盖，避免遗漏。
 - **发布数据文档刷新**：发布版本前，**必须**运行 `.venv/bin/python scripts/collect-test-coverage.py`，按实时收集结果核对/更新以下文档的数据快照（非版本号），保证统计与目录结构时效性：
-  - `docs-stm/managements/test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数
-  - `docs-stm/managements/folders.md` — 项目统计表（主程序/模板/脚本/测试代码行数、文件数、测试用例数）及目录树新增/重命名文件
-  - `docs-stm/manuals/datasource.md` + `datasource-reliability.md` — 数据源清单/路由归属/可靠性描述与实际代码配置一致
+  - `docs/managements/test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数
+  - `docs/managements/folders.md` — 项目统计表（主程序/模板/脚本/测试代码行数、文件数、测试用例数）及目录树新增/重命名文件
+  - `docs/manuals/datasource.md` + `datasource-reliability.md` — 数据源清单/路由归属/可靠性描述与实际代码配置一致
   数据快照更新与「版本号一致」的版本头同步可在同一次提交内完成。
 - **版本标签**：发布版本时，完成版本号更新并提交后，**必须**执行 `git tag v{版本号}` 打标签并 `git push origin --tags`，确保每次发布都可追溯。
 - **开发版本切换**：发布版本并打 tag 后，**立即**将 `APP_VERSION` 和所有管理文档版本头改为**下一个版本的 `-dev`**（如发布 v0.6.8 后即改为 v0.6.9-dev），运行 `check-version-consistency.py` 验证全链 [OK] 后提交，然后继续开发。开发期间版本号始终标识为下一个预期发布版本的 `-dev`。
 - **UI 输出前缀**：`[..]`（进行中）、`[OK]`（成功，绿色）、`[!]`（部分失败/告警，黄色）、`[ERR]`（错误，红色）。终端不支持颜色时自动降级。
-- **架构遵从**：所有模块必须遵守 `docs-stm/managements/technical.md` 中 `## 架构设计约束`（表格含 C1~C27 的设计目的/违反后果/适用范围）和 `## 概要设计--核心架构决策`（含数据降级治理体系补充说明）。**优先对照架构设计约束的表格逐条自检**——表格更完整（27 条约束 vs. 概要设计仅 5 项），且每项附带违反后果便于判断违规与否。当涉及数据降级/熔断相关逻辑时，需额外参考概要设计 1.4.5 节理解双重降级治理体系设计意图。新增/修改代码不得违反。
+- **架构遵从**：所有模块必须遵守 `docs/managements/technical.md` 中 `## 架构设计约束`（表格含 C1~C27 的设计目的/违反后果/适用范围）和 `## 概要设计--核心架构决策`（含数据降级治理体系补充说明）。**优先对照架构设计约束的表格逐条自检**——表格更完整（27 条约束 vs. 概要设计仅 5 项），且每项附带违反后果便于判断违规与否。当涉及数据降级/熔断相关逻辑时，需额外参考概要设计 1.4.5 节理解双重降级治理体系设计意图。新增/修改代码不得违反。
 - **执行效率（合并往返）**：凡「读多份」或「改多处」的操作**合并为少量往返**——需要读多份文件时一次并行读完；同类修改合并（一次多行替换或脚本批量应用），不做逐条 Edit。门禁分层跑：便宜检查（`.venv/bin/ruff`、四个 `--ci` 脚本）随改随跑，`dev-verify` 等完整门禁仅在收尾跑一次（与「调试失败用例流程」一致，不在小修小改后重复整套重跑）。**理由**：单轮墙钟主要由「往返次数」而非单次工具耗时决定，逐条操作会把 N 处小改放大成 N 轮完整生成。
 
 ## 持仓文件格式
