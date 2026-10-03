@@ -216,5 +216,35 @@ class TestRunWhatifSimulationBacktest(unittest.TestCase):
         self.assertNotIn("backtest", written)
 
 
+class TestNormalizeEffectiveDate(unittest.TestCase):
+    """normalize_effective_date：三渠道共享的生效日格式校验（Web 400 / TUI 重问 / CLI 类型错）。"""
+
+    def test_none_and_blank_yield_none(self):
+        from src.python.report.whatif_operations import normalize_effective_date
+
+        self.assertIsNone(normalize_effective_date(None))
+        self.assertIsNone(normalize_effective_date(""))
+        self.assertIsNone(normalize_effective_date("   "))
+
+    def test_strict_format_kept_and_stripped(self):
+        from src.python.report.whatif_operations import normalize_effective_date
+
+        self.assertEqual(normalize_effective_date("2026-07-01"), "2026-07-01")
+        self.assertEqual(normalize_effective_date("  2026-07-01  "), "2026-07-01")
+
+    def test_compact_format_rejected(self):
+        from src.python.report.whatif_operations import normalize_effective_date
+
+        with self.assertRaises(ValueError):
+            normalize_effective_date("20260101")
+
+    def test_partial_and_out_of_range_rejected(self):
+        from src.python.report.whatif_operations import normalize_effective_date
+
+        for bad in ("2026-7-1", "2026-13-01", "07-01-2026", "not-a-date"):
+            with self.assertRaises(ValueError):
+                normalize_effective_date(bad)
+
+
 if __name__ == "__main__":
     unittest.main()

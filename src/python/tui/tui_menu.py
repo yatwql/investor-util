@@ -16,6 +16,7 @@ import sys
 from collections.abc import Callable
 
 from src.python.core.ansi_colors import GREEN, RED, RESET, YELLOW
+from src.python.core.registry import LLM_HIDDEN_KEYS
 from src.python.config import get_config, get_llm_config
 
 # 每个菜单项：(快捷键, 显示标签, 回调函数, 是否退出项)
@@ -80,7 +81,7 @@ def get_config_cache() -> dict | None:
 # 辩论三模块（debate_pro/con/synthesis）在注册表中保留
 # （缓存 TTL/前缀清理仍依赖），但不在菜单/状态面板展示，避免误导为可开关模块。
 # 实际辩论开关由 features.json 控制（正反辩论为实验 Flag；条件推理为常规开关；集中度问答为流程内建段）。
-LLM_MENU_HIDDEN_KEYS: frozenset[str] = frozenset({"debate_pro", "debate_con", "debate_synthesis"})
+LLM_MENU_HIDDEN_KEYS: frozenset[str] = LLM_HIDDEN_KEYS
 
 
 def filter_menu_llm_modules(module_names: dict[str, str]) -> dict[str, str]:
@@ -134,11 +135,13 @@ def render_menu(sel: int) -> None:
 
 def show_config() -> None:
     """显示当前配置及 LLM 配置状态。"""
+    from src.python.config import get_default, resolve_holdings_path
+
     config = _config_cache if _config_cache is not None else refresh_config()
-    holdings_path = os.path.join(config.get("holdings_dir", ""), config.get("holdings_filename", ""))
+    holdings_path = resolve_holdings_path(config)
     print(f"  持仓目录: {config.get('holdings_dir', '未设置')}")
     print(f"  持仓文件: {config.get('holdings_filename', '未设置')}")
-    print(f"  输出目录: {config.get('output_dir', 'reports')}")
+    print(f"  输出目录: {config.get('output_dir') or get_default('output_dir')}")
     print(f"  新闻抓取上限: {config.get('news_top_count', '300')} 条")
     if os.path.exists(holdings_path):
         print("  状态: [OK] 文件就绪")
@@ -152,15 +155,15 @@ def show_config() -> None:
 def _show_privacy_and_security_status() -> None:
     """显示隐私提示和匿名化安全状态。"""
     from src.python.config.anonymizer import get_anonymization_mode
+    from src.python.core.system_info import anon_mode_label
 
     _anon_mode = get_anonymization_mode()
-    _anon_labels = {"off": "关闭", "code_display": "代码显示", "full_anonymous": "完全匿名", "summary": "汇总"}
-    _anon_display = _anon_labels.get(_anon_mode, _anon_mode)
+    _anon_display = anon_mode_label(_anon_mode)
 
     # 检查隐私提示是否已显示过（机器本地状态）
-    from src.python.config._local_state import get_flag
+    from src.python.config import get_local_flag
 
-    _privacy_shown = get_flag("_privacy_notice_shown")
+    _privacy_shown = get_local_flag("_privacy_notice_shown")
     _privacy_icon = f"{GREEN}✓{RESET}" if _privacy_shown else f"{YELLOW}待首次报告生成时显示{RESET}"
 
     print(f"  持仓匿名化: {_anon_display}")
@@ -170,8 +173,7 @@ def _show_privacy_and_security_status() -> None:
 
 def _show_llm_config_status() -> None:
     """显示 LLM 配置状态（绿色已配置 / 红色未配置），含多链详细信息。"""
-    from src.python.llm.circuit_breaker import get_circuit_status
-    from src.python.core.registry import get_llm_module_names
+    from src.python.core.system_info import circuit_display, model_route_labels, simplify_endpoint
 
     llm_config = get_llm_config()
     if llm_config is None:
@@ -193,20 +195,14 @@ def _show_llm_config_status() -> None:
     provider = llm_config["provider"]
     model = llm_config.get("model") or "默认"
     endpoint = llm_config.get("endpoint") or "默认"
-    ep_display = (
-        endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
-    )
+    ep_display = simplify_endpoint(endpoint)
 
     # 单 provider 熔断状态
-    cb_status = get_circuit_status(endpoint) if endpoint and endpoint != "默认" else "—"
+    cb_status = circuit_display(endpoint, default_as_none=True)
     cb_display = f" |  熔断: {cb_status}" if cb_status != "—" else ""
 
     print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}{cb_display}")
-    _route_parts = []
-    for _sfx, _name in filter_menu_llm_modules(get_llm_module_names()).items():
-        _mv = llm_config.get(f"model_{_sfx}") or model
-        _route_parts.append(f"{_name}={_mv}")
-    print(f"         模型路由: {' / '.join(_route_parts)}")
+    print(f"         模型路由: {' / '.join(model_route_labels(llm_config))}")
 
 
 def _show_multi_chain_status(llm_config: dict, provider_list: list[dict]) -> None:
@@ -215,52 +211,39 @@ def _show_multi_chain_status(llm_config: dict, provider_list: list[dict]) -> Non
     展示策略、各 Provider 的后端/模型/优先级/熔断状态。
     单独提取为函数以保持 _show_llm_config_status 清晰。
     """
-    from src.python.llm.circuit_breaker import get_circuit_status
     from src.python.core.registry import get_llm_module_names
+    from src.python.core.system_info import (
+        circuit_display,
+        priority_display,
+        resolve_provider_credentials,
+        strategy_label,
+    )
 
-    strategy_raw = llm_config.get("_strategy", "priority")
-    strategy_labels = {
-        "priority": "优先级排序",
-        "weighted": "加权随机",
-        "cost_first": "价格最低优先",
-        "fallback_only": "仅 Fallback",
-    }
-    strategy_label = strategy_labels.get(strategy_raw, strategy_raw)
+    strategy_display = strategy_label(llm_config.get("_strategy", "priority"))
 
     print(f"  LLM: {GREEN}已配置{RESET}")
-    print(f"  策略: {strategy_label}  |  多链服务 ({len(provider_list)} provider)")
+    print(f"  策略: {strategy_display}  |  多链服务 ({len(provider_list)} provider)")
 
     # 每个 provider 一行列表显示（含后端类型、模型、优先级、熔断状态）
     for i, entry in enumerate(provider_list, 1):
         name = entry.get("name", "?")
         backend = entry.get("provider", "?")
 
-        # 解析模型和 endpoint（优先 entry 内联，再查 _llm_credentials）
-        model = entry.get("model", "")
-        endpoint = entry.get("endpoint") or ""
-        creds_ref = entry.get("credentials_ref")
-        if creds_ref and (not model or not endpoint):
-            all_creds = llm_config.get("_llm_credentials", {})
-            ref_creds = all_creds.get(creds_ref, {})
-            if isinstance(ref_creds, dict):
-                if not model:
-                    model = ref_creds.get("model", "")
-                if not endpoint:
-                    endpoint = ref_creds.get("endpoint", "") or ""
+        # 解析模型和 endpoint（优先 entry 内联，再查 _llm_credentials，凭据回填单源）
+        model, endpoint = resolve_provider_credentials(entry, llm_config.get("_llm_credentials", {}) or {})
 
         model_display = model or "默认"
 
         # 优先级显示
-        raw_priority = entry.get("priority")
-        priority_display = str(raw_priority) if raw_priority is not None else "99（默认）"
+        priority = priority_display(entry.get("priority"))
 
         # 熔断状态
-        cb_status = get_circuit_status(endpoint) if endpoint else "—"
+        cb_status = circuit_display(endpoint)
         cb_icon = f"{GREEN}✓{RESET}" if cb_status == "正常" else f"{RED}⚠{RESET}"
 
         print(f"    [{i}] {name}  ({backend})")
         print(f"         模型: {model_display}")
-        print(f"         优先级: {priority_display}    熔断: {cb_icon} {cb_status}")
+        print(f"         优先级: {priority}    熔断: {cb_icon} {cb_status}")
 
     # 模块级 provider 偏好（如有）
     preferred = llm_config.get("_preferred_providers", {})

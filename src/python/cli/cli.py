@@ -62,6 +62,16 @@ def _feature_override(value: str) -> tuple[str, bool]:
         raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
+def _effective_date_arg(value: str) -> str:
+    """argparse 类型钩子：生效日归一化校验（委托共享层，与 Web/TUI 同一规则）。"""
+    from src.python.report.whatif_operations import normalize_effective_date
+
+    try:
+        return normalize_effective_date(value) or ""
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(str(e)) from e
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """构建 argparse 参数解析器。"""
     parser = argparse.ArgumentParser(
@@ -151,6 +161,7 @@ def _build_parser() -> argparse.ArgumentParser:
     whatif_p.add_argument(
         "--effective-date",
         metavar="YYYY-MM-DD",
+        type=_effective_date_arg,
         help="调仓生效日（可选）：指定后 opt-in 联网取生效日后行情，追加时序回测页（区间/年化收益、波动率、夏普、最大回撤）",
     )
     whatif_p.epilog = (
@@ -329,9 +340,9 @@ def _cli_resolve_holdings_file(config: dict) -> str | None:
 
     logger = logging.getLogger("invest")
 
-    holdings_dir = config.get("holdings_dir", "data/holdings")
-    holdings_filename = config.get("holdings_filename", "个人投资持仓信息.xlsx")
-    filepath = os.path.join(holdings_dir, holdings_filename)
+    from src.python.config import resolve_holdings_path
+
+    filepath = resolve_holdings_path(config)
 
     if not os.path.exists(filepath):
         logger.error(
@@ -534,6 +545,7 @@ def _handle_cache_update(update_type: str, config: dict, reporter) -> int:
     最终退出码取两者最大值。
     """
     from src.python.cache.operations import (
+        update_all_cache,
         update_basic_cache,
         update_position_cache,
     )
@@ -551,10 +563,8 @@ def _handle_cache_update(update_type: str, config: dict, reporter) -> int:
         return result.exit_code
 
     if update_type == "all":
-        # 最大努力模式：basic 失败后仍继续执行 position
-        basic_result = update_basic_cache(holdings, reporter)
-        pos_result = update_position_cache(holdings, reporter)
-        return max(basic_result.exit_code, pos_result.exit_code)
+        # 最大努力模式（下沉共享层：basic 失败仍继续 position，退出码取两者最大值）
+        return update_all_cache(holdings, reporter)
 
     return _EXIT_SEVERE
 
@@ -567,6 +577,7 @@ def _handle_whatif(args: argparse.Namespace, config: dict) -> int:
     业务链（build→校验→输出）委托共享层 run_whatif_simulation，
     本函数仅保留文件来源解析与退出码映射。
     """
+    from src.python.config import get_default, resolve_holdings_path
     from src.python.core.reader import read_holdings
     from src.python.report.cli_progress import CliProgressReporter
     from src.python.report.whatif_operations import run_whatif_simulation
@@ -578,10 +589,7 @@ def _handle_whatif(args: argparse.Namespace, config: dict) -> int:
     if base_file:
         base_holdings = read_holdings(base_file)
     else:
-        base_file = os.path.join(
-            config.get("holdings_dir", "data/holdings"),
-            config.get("holdings_filename", "个人投资持仓信息.xlsx"),
-        )
+        base_file = resolve_holdings_path(config)
         base_holdings = _cli_read_holdings(config)
     if not base_holdings:
         reporter.error(f"基准持仓读取失败或为空: {base_file}")
@@ -594,7 +602,7 @@ def _handle_whatif(args: argparse.Namespace, config: dict) -> int:
         reporter.error(f"目标持仓读取失败或为空: {cand_file}")
         return _EXIT_SEVERE
 
-    output_dir = args.output or config.get("output_dir", "reports")
+    output_dir = args.output or (config.get("output_dir") or get_default("output_dir"))
     result = run_whatif_simulation(
         base_holdings,
         cand_holdings,

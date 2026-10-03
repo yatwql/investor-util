@@ -63,19 +63,24 @@ class TestReadLlmSettings:
         assert result is None
 
 
-class TestWriteLlmSettings:
-    """_write_llm_settings: 委托共享 write_llm_settings（config 层写入原语）。"""
+class TestApplyEdit:
+    """_apply_edit: 写入委托共享 config.edit_ops.apply_config_edit（与 Web 同一编辑函数）。"""
 
-    @patch("src.python.config._llm_settings.write_llm_settings")
-    def test_delegates_to_shared_write(self, mock_write):
-        """TUI 写入委托共享 write_llm_settings，参数原样透传。"""
-        from src.python.tui.handlers_config import _write_llm_settings
+    @patch("src.python.config.edit_ops.apply_config_edit")
+    def test_delegates_to_shared_edit(self, mock_apply):
+        """TUI 写入经共享编辑层，payload 原样透传，成功返回 True。"""
+        from src.python.tui.handlers_config import _apply_edit
 
-        settings = {"enabled_llm": {"news_correlation": True}}
-        path = "/fake/path/llm_settings.json"
+        payload = {"key": "enabled_llm.news_correlation", "value": True}
+        assert _apply_edit(payload) is True
+        mock_apply.assert_called_once_with(payload)
 
-        _write_llm_settings(settings, path)
-        mock_write.assert_called_once_with(settings, path)
+    @patch("src.python.config.edit_ops.apply_config_edit", side_effect=ValueError("非法值"))
+    def test_shared_edit_failure_returns_false(self, mock_apply):
+        """共享层拒绝（校验/写入失败）→ 返回 False 不抛出，交由错误行呈现。"""
+        from src.python.tui.handlers_config import _apply_edit
+
+        assert _apply_edit({"key": "k", "value": "v"}) is False
 
 
 # 标准 LLM 模块（菜单 S 1~5），实验性功能编号紧随其后（6~8）
@@ -95,7 +100,6 @@ class TestConfigLlmModulesExperimentalFlags:
     @patch("src.python.tui.handlers_config.refresh_config")
     @patch("src.python.tui.handlers_config.input", side_effect=["7", "0"])
     @patch("src.python.config.features.save_feature_overrides")
-    @patch("src.python.config.features.set_feature_enabled")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
     @patch("src.python.core.registry.get_llm_module_names")
     @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
@@ -104,7 +108,6 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_read,
         mock_names,
         mock_filter,
-        mock_set_feature,
         mock_save_overrides,
         mock_input,
         mock_refresh,
@@ -120,14 +123,12 @@ class TestConfigLlmModulesExperimentalFlags:
         _cmd_config_llm_modules()
 
         mock_save_overrides.assert_called_once_with({"decision_reflection": True})
-        mock_set_feature.assert_called_once_with("decision_reflection", True)
         mock_press.assert_called_once()
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")
     @patch("src.python.tui.handlers_config.input", side_effect=["8", "0"])
     @patch("src.python.config.features.save_feature_overrides")
-    @patch("src.python.config.features.set_feature_enabled")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
     @patch("src.python.core.registry.get_llm_module_names")
     @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
@@ -136,7 +137,6 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_read,
         mock_names,
         mock_filter,
-        mock_set_feature,
         mock_save_overrides,
         mock_input,
         mock_refresh,
@@ -148,14 +148,12 @@ class TestConfigLlmModulesExperimentalFlags:
         _cmd_config_llm_modules()
 
         mock_save_overrides.assert_called_once_with({"prosperity_framework": True})
-        mock_set_feature.assert_called_once_with("prosperity_framework", True)
         mock_press.assert_called_once()
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")
     @patch("src.python.tui.handlers_config.input", side_effect=["9", "0"])
     @patch("src.python.config.features.save_feature_overrides")
-    @patch("src.python.config.features.set_feature_enabled")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
     @patch("src.python.core.registry.get_llm_module_names")
     @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
@@ -164,7 +162,6 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_read,
         mock_names,
         mock_filter,
-        mock_set_feature,
         mock_save_overrides,
         mock_input,
         mock_refresh,
@@ -181,7 +178,6 @@ class TestConfigLlmModulesExperimentalFlags:
         _cmd_config_llm_modules()
 
         mock_save_overrides.assert_called_once_with({"deterministic_signal": False})
-        mock_set_feature.assert_called_once_with("deterministic_signal", False)
         mock_press.assert_called_once()
 
     @patch("src.python.tui.handlers_config.press_any_key")
@@ -214,7 +210,6 @@ class TestConfigLlmModulesExperimentalFlags:
     @patch("src.python.tui.handlers_config.refresh_config")
     @patch("src.python.tui.handlers_config.input", side_effect=["14", "0"])
     @patch("src.python.config.features.save_feature_overrides")
-    @patch("src.python.config.features.set_feature_enabled")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
     @patch("src.python.core.registry.get_llm_module_names")
     @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
@@ -223,7 +218,6 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_read,
         mock_names,
         mock_filter,
-        mock_set_feature,
         mock_save_overrides,
         mock_input,
         mock_refresh,
@@ -239,13 +233,11 @@ class TestConfigLlmModulesExperimentalFlags:
         _cmd_config_llm_modules()
 
         mock_save_overrides.assert_called_once_with({"metrics_sharpe": False})
-        mock_set_feature.assert_called_once_with("metrics_sharpe", False)
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")
     @patch("src.python.tui.handlers_config.input", side_effect=["22", "0"])
     @patch("src.python.config.features.save_feature_overrides")
-    @patch("src.python.config.features.set_feature_enabled")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
     @patch("src.python.core.registry.get_llm_module_names")
     @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
@@ -254,7 +246,6 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_read,
         mock_names,
         mock_filter,
-        mock_set_feature,
         mock_save_overrides,
         mock_input,
         mock_refresh,
@@ -270,7 +261,6 @@ class TestConfigLlmModulesExperimentalFlags:
         _cmd_config_llm_modules()
 
         mock_save_overrides.assert_called_once_with({"doctor_check": False})
-        mock_set_feature.assert_called_once_with("doctor_check", False)
 
 
 # 报告增强子模块基准配置（与 config.json 默认一致：数据质量仪表盘默认开，其余默认关）

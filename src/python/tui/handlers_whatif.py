@@ -12,7 +12,7 @@ import os
 import shutil
 from datetime import datetime
 
-from src.python.config import get_config
+from src.python.config import get_config, get_default
 from src.python.core.logger import setup_logger
 from src.python.core.reader import get_xlsx_info, list_xlsx_files, read_holdings
 from src.python.report.progress import TuiProgressReporter
@@ -29,7 +29,7 @@ def _select_candidate_file(base_file: str) -> str | None:
     目录下无候选文件时引导选择目标（自动复制模板 / 手动输入完整路径）。
     """
     config = get_config_cache() or get_config()
-    dir_path = config.get("holdings_dir", "")
+    dir_path = config.get("holdings_dir") or get_default("holdings_dir")
     base_abs = os.path.abspath(base_file)
     files = [f for f in list_xlsx_files(dir_path) if os.path.abspath(f) != base_abs]
     if not files:
@@ -112,7 +112,7 @@ def _copy_base_as_template(base_file: str) -> str | None:
     用户已编辑的模板）。复制后提示编辑份额；当前副本对比为「无变动」。
     """
     config = get_config_cache() or get_config()
-    holdings_dir = config.get("holdings_dir", "")
+    holdings_dir = config.get("holdings_dir") or get_default("holdings_dir")
     if not holdings_dir or not os.path.isdir(holdings_dir):
         print(f"  [ERR] 持仓目录不可用: {holdings_dir or '未配置'}")
         return None
@@ -135,14 +135,23 @@ def _copy_base_as_template(base_file: str) -> str | None:
 def _prompt_effective_date() -> str:
     """提示输入调仓生效日（YYYY-MM-DD）；回车/中断返回空串。
 
-    仅做交互采集，**不校验格式**——格式错误由共享层 compute_backtest_days
-    降级处理，入口层不承载业务逻辑。
+    格式校验/归一化委托共享层 ``normalize_effective_date``（与 Web/CLI 同一规则），
+    非法则提示并重新询问——渠道层不自持日期规则。
     """
-    try:
-        return input("  [..] 调仓生效日 YYYY-MM-DD（可选，回车跳过以启用时序回测）: ").strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return ""
+    from src.python.report.whatif_operations import normalize_effective_date
+
+    while True:
+        try:
+            raw = input("  [..] 调仓生效日 YYYY-MM-DD（可选，回车跳过以启用时序回测）: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return ""
+        if not raw:
+            return ""
+        try:
+            return normalize_effective_date(raw) or ""
+        except ValueError as e:
+            print(f"  [!] {e}，请重新输入")
 
 
 def _cmd_whatif() -> None:
@@ -155,7 +164,7 @@ def _cmd_whatif() -> None:
 
     reporter = TuiProgressReporter()
     config = get_config_cache() or get_config()
-    output_dir = config.get("output_dir", "reports")
+    output_dir = config.get("output_dir") or get_default("output_dir")
 
     print("  [..] 调仓 What-if 模拟：先选择基准持仓（调仓前）")
     base_file = select_holdings_file()

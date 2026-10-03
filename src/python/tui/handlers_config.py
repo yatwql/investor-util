@@ -9,7 +9,6 @@ import json
 import os
 from collections.abc import Callable
 
-from src.python.config import set_config
 from src.python.core.constants import PROJECT_ROOT
 from src.python.core.logger import setup_logger
 from src.python.core.reader import list_xlsx_files
@@ -28,13 +27,39 @@ from src.python.tui.text_layout import display_width, pad_right, render_panel
 logger = setup_logger()
 
 
+def _apply_edit(payload: dict) -> bool:
+    """经共享编辑层（config.edit_ops）应用配置变更。
+
+    白名单校验、值规则与写入分派的唯一实现在共享层（与 Web 同一函数、同一强度）；
+    本函数仅做 TUI 错误呈现（校验失败 → 黄色提示行，写入失败 → 红色错误行）。
+
+    Args:
+        payload: 与 Web POST /api/config/edit 相同结构（key + value 或 action）。
+
+    Returns:
+        True = 写入成功。
+    """
+    from src.python.config.edit_ops import ConfigEditError, apply_config_edit
+
+    try:
+        apply_config_edit(payload)
+        return True
+    except ConfigEditError as e:
+        print(f"  {YELLOW}[!]{RESET} {e}")
+        return False
+    except Exception:
+        logger.exception("配置写入失败")
+        print(f"  {RED}[ERR]{RESET} 配置写入失败，详情请查看日志 logs/app.log")
+        return False
+
+
 def _read_llm_settings() -> tuple[dict, str] | None:
     """读取 llm_settings.json 配置（支持 JSON 注释）。
 
     Returns:
         (settings_dict, path) 成功时；失败时返回 None（已输出错误提示）
     """
-    from src.python.config import _strip_json_comments, get_config
+    from src.python.config import get_config, strip_json_comments
 
     config_path = get_config().get(
         "llm_settings_file",
@@ -43,22 +68,12 @@ def _read_llm_settings() -> tuple[dict, str] | None:
     try:
         with open(config_path, encoding="utf-8-sig") as f:
             raw = f.read()
-        settings = json.loads(_strip_json_comments(raw))
+        settings = json.loads(strip_json_comments(raw))
         return settings, config_path
     except (FileNotFoundError, json.JSONDecodeError):
         print(f"  {RED}[ERR]{RESET} 无法读取 llm_settings.json")
         press_any_key()
         return None
-
-
-def _write_llm_settings(settings: dict, path: str) -> None:
-    """写入 llm_settings.json 并刷新 LLM 配置缓存，保留文件中的注释。
-
-    委托 config 层共享写入原语 write_llm_settings（自本函数抽取），行为一致。
-    """
-    from src.python.config._llm_settings import write_llm_settings
-
-    write_llm_settings(settings, path)
 
 
 def _edit_single_config(key: str, label: str, default: str = "", *, pre_hook=None) -> None:
@@ -85,9 +100,9 @@ def _edit_single_config(key: str, label: str, default: str = "", *, pre_hook=Non
         print()
         return
     if new_val:
-        set_config(key, new_val)
-        refresh_config()
-        print(f"  {GREEN}[OK]{RESET} {label}已更新为: {new_val}")
+        if _apply_edit({"key": key, "value": new_val}):
+            refresh_config()
+            print(f"  {GREEN}[OK]{RESET} {label}已更新为: {new_val}")
     else:
         print("  未修改")
 
@@ -115,7 +130,7 @@ def _cmd_config_filename() -> None:
 
 def _cmd_config_output_dir() -> None:
     """配置报告输出目录。"""
-    _edit_single_config("output_dir", "报告输出目录", default="reports")
+    _edit_single_config("output_dir", "报告输出目录")
 
 
 def _cmd_config_dir_info() -> None:
@@ -167,8 +182,6 @@ def _cmd_config_llm_modules() -> None:
         GROUP_LABELS,
         GROUP_ORDER,
         is_feature_enabled,
-        save_feature_overrides,
-        set_feature_enabled,
         switches_in_group,
     )
     from src.python.core.registry import get_llm_module_names
@@ -176,7 +189,7 @@ def _cmd_config_llm_modules() -> None:
     result = _read_llm_settings()
     if result is None:
         return
-    settings, settings_path = result
+    settings = result[0]
 
     enabled_map = settings.get("enabled_llm", {})
     # 菜单层隐藏辩论三模块（注册表保留：缓存 TTL/前缀清理仍依赖）
@@ -252,16 +265,13 @@ def _cmd_config_llm_modules() -> None:
             if matched:
                 _, key, name, curr, kind = matched[0]
                 new_val = not curr
-                if kind == "llm":
-                    enabled_map[key] = new_val
-                    settings["enabled_llm"] = enabled_map
-                    _write_llm_settings(settings, settings_path)
-                else:
-                    set_feature_enabled(key, new_val)
-                    save_feature_overrides({key: new_val})
-                print(f"  {GREEN}[OK]{RESET} {name} 已{'开启' if new_val else '关闭'}")
-                # 刷新配置缓存
-                refresh_config()
+                payload_key = f"enabled_llm.{key}" if kind == "llm" else key
+                if _apply_edit({"key": payload_key, "value": new_val}):
+                    if kind == "llm":
+                        enabled_map[key] = new_val
+                    print(f"  {GREEN}[OK]{RESET} {name} 已{'开启' if new_val else '关闭'}")
+                    # 刷新配置缓存
+                    refresh_config()
             else:
                 print(f"  {YELLOW}[!]{RESET} 无效编号")
         except (ValueError, TypeError):
@@ -272,12 +282,12 @@ def _cmd_config_llm_modules() -> None:
 
 def _cmd_config_comparison_indices() -> None:
     """管理对比指数池（竞争语境中使用的多指数对比）。"""
-    from src.python.config._config_defaults import _DEFAULT_CONFIG
+    from src.python.config import get_default
 
     while True:
         refresh_config()
         config = get_config_cache() or {}
-        indices = config.get("comparison_indices", _DEFAULT_CONFIG.get("comparison_indices", {}))
+        indices = config.get("comparison_indices") or get_default("comparison_indices")
         rows: list[str | None] = ["自定义基准指数，用于报告中组合 vs 多指数对比", f"当前指数 ({len(indices)} 个):"]
         if indices:
             for i, (code, name) in enumerate(indices.items(), 1):
@@ -301,9 +311,8 @@ def _cmd_config_comparison_indices() -> None:
         elif choice == "D":
             _remove_comparison_index(indices)
         elif choice == "R":
-            default_pool = _DEFAULT_CONFIG.get("comparison_indices", {})
-            set_config("comparison_indices", dict(default_pool))
-            print(f"  {GREEN}[OK]{RESET} 对比指数池已重置为默认预设")
+            if _apply_edit({"key": "comparison_indices", "action": "reset"}):
+                print(f"  {GREEN}[OK]{RESET} 对比指数池已重置为默认预设")
         elif choice in ("A", "D", "R"):
             continue
         else:
@@ -323,9 +332,6 @@ def _add_comparison_index(indices: dict[str, str]) -> None:
     if not code:
         print(f"  {YELLOW}[!]{RESET} 代码不能为空")
         return
-    if code in indices:
-        print(f"  {YELLOW}[!]{RESET} 指数 {code} 已在对比池中")
-        return
     print("  请输入指数名称（如 中证500）:")
     try:
         name = input("  > ").strip()
@@ -335,10 +341,9 @@ def _add_comparison_index(indices: dict[str, str]) -> None:
     if not name:
         print(f"  {YELLOW}[!]{RESET} 名称不能为空")
         return
-    new_indices = dict(indices)
-    new_indices[code] = name
-    set_config("comparison_indices", new_indices)
-    print(f"  {GREEN}[OK]{RESET} 已添加 {code} ({name})")
+    # 重复/长度/字符等规则校验与写入全在共享层（与 Web 同一函数、同一强度）
+    if _apply_edit({"key": "comparison_indices", "action": "add", "code": code, "name": name}):
+        print(f"  {GREEN}[OK]{RESET} 已添加 {code} ({name})")
 
 
 def _remove_comparison_index(indices: dict[str, str]) -> None:
@@ -365,10 +370,8 @@ def _remove_comparison_index(indices: dict[str, str]) -> None:
         return
     if 1 <= idx <= len(items):
         code, name = items[idx - 1]
-        new_indices = dict(indices)
-        del new_indices[code]
-        set_config("comparison_indices", new_indices)
-        print(f"  {GREEN}[OK]{RESET} 已删除 {code} ({name})")
+        if _apply_edit({"key": "comparison_indices", "action": "remove", "code": code}):
+            print(f"  {GREEN}[OK]{RESET} 已删除 {code} ({name})")
     else:
         print(f"  {YELLOW}[!]{RESET} 编号超出范围")
 
@@ -386,7 +389,6 @@ def _cmd_config_report_boards() -> None:
         is_enable_history,
         is_enable_news,
         is_enable_portfolio_evolution,
-        set_config,
     )
 
     while True:
@@ -430,20 +432,20 @@ def _cmd_config_report_boards() -> None:
             break
 
         if choice == "1":
-            set_config("enable_fund_deep_analysis", not fund_deep_analysis)
-            print(f"  {GREEN}[OK]{RESET} 基金深度分析已{'禁用' if fund_deep_analysis else '启用'}")
+            if _apply_edit({"key": "enable_fund_deep_analysis", "value": not fund_deep_analysis}):
+                print(f"  {GREEN}[OK]{RESET} 基金深度分析已{'禁用' if fund_deep_analysis else '启用'}")
         elif choice == "2":
-            set_config("enable_news", not news)
-            print(f"  {GREEN}[OK]{RESET} 市场新闻已{'禁用' if news else '启用'}")
+            if _apply_edit({"key": "enable_news", "value": not news}):
+                print(f"  {GREEN}[OK]{RESET} 市场新闻已{'禁用' if news else '启用'}")
         elif choice == "3":
-            set_config("enable_history", not history)
-            print(f"  {GREEN}[OK]{RESET} 组合历史走势+回撤已{'禁用' if history else '启用'}")
+            if _apply_edit({"key": "enable_history", "value": not history}):
+                print(f"  {GREEN}[OK]{RESET} 组合历史走势+回撤已{'禁用' if history else '启用'}")
         elif choice == "4":
-            set_config("enable_portfolio_evolution", not portfolio_evolution)
-            print(f"  {GREEN}[OK]{RESET} 组合演进已{'禁用' if portfolio_evolution else '启用'}")
+            if _apply_edit({"key": "enable_portfolio_evolution", "value": not portfolio_evolution}):
+                print(f"  {GREEN}[OK]{RESET} 组合演进已{'禁用' if portfolio_evolution else '启用'}")
         elif choice == "5":
-            set_config("enable_action", not action)
-            print(f"  {GREEN}[OK]{RESET} 行动建议已{'禁用' if action else '启用'}")
+            if _apply_edit({"key": "enable_action", "value": not action}):
+                print(f"  {GREEN}[OK]{RESET} 行动建议已{'禁用' if action else '启用'}")
         elif choice == "6":
             print(f"  {YELLOW}[!]{RESET} 报告增强子模块与 LLM 分析章节请使用菜单 [S] 配置")
         else:
@@ -489,7 +491,6 @@ def _cmd_config_anonymization_mode() -> None:
     from src.python.config.anonymizer import (
         ANONYMIZATION_MODE_DESCRIPTIONS,
         get_anonymization_mode,
-        set_anonymization_mode,
     )
 
     # 定义显示顺序
@@ -524,8 +525,7 @@ def _cmd_config_anonymization_mode() -> None:
                 new_mode = _ORDERED_KEYS[idx - 1]
                 if new_mode == current:
                     print(f"  {YELLOW}[!]{RESET} 已是当前模式")
-                else:
-                    set_anonymization_mode(new_mode)
+                elif _apply_edit({"key": "anonymization.mode", "value": new_mode}):
                     print(f"  {GREEN}[OK]{RESET} 持仓匿名化已切换为: {new_mode}")
             else:
                 print(f"  {YELLOW}[!]{RESET} 无效编号")

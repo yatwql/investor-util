@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.13-dev
-> **编号源**：`rf-next = 548`（新增问题取此编号，完成后更新为 +1；已用最大 rf-547，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 556`（新增问题取此编号，完成后更新为 +1；已用最大 rf-555，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -48,6 +48,10 @@
 > **已修复归档摘要**：rf-545（plan.md 指向已归档研究文档的死链）、rf-546（technical.md 两处同名标题「内部线程池」锚点歧义）、rf-547（how-to-use-cli-mode.md 13.1/13.2 下两处同名标题「基础配置」锚点歧义），均 2026-10-02 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
 
 
+
+### P2E — 三渠道薄壳核查（2026-10-03，当日登记当日修复）
+
+> **已修复归档摘要**：rf-548（TUI 缓存预热编排下沉 `cache.operations.warm_new_asset_caches`）、rf-549（配置编辑收敛 `config/edit_ops.py` 共享层，Web/TUI 同一 `apply_config_edit` 函数）、rf-550（三渠道默认值字面量清除，`config.get_default`/`resolve_holdings_path` 单源）、rf-551（What-if 生效日三渠道共用 `normalize_effective_date`）、rf-552（历史走势策略 `resolve_fetch_history` 单源）、rf-553（系统状态组装与展示原语下沉 `core/system_info.py`）、rf-554（渠道私有符号引用改公开 API）、rf-555（`--update all` 聚合与 cache stats 载荷下沉 `cache.operations`），均 2026-10-03 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
 
 ## 已解决问题
 

@@ -558,15 +558,19 @@ class TestSystemInfo:
         assert info["llm"] == {"configured": False}
 
     def test_config_summary_defaults(self, monkeypatch):
-        """配置为空 dict：持仓目录/文件未设置、输出默认 reports、新闻 300、状态未就绪、匿名化关闭。"""
+        """配置为空 dict：持仓目录/文件未设置、输出取 get_default、新闻 300、匿名化关闭。"""
+        from src.python.config import get_default, resolve_holdings_path
+
         self._patch_llm(monkeypatch, config=None)
         self._patch_config(monkeypatch, config={})
         info = _build_system_info()
         assert info["holdings_dir"] == "未设置"
         assert info["holdings_filename"] == "未设置"
-        assert info["output_dir"] == "reports"
+        # 输出默认 = get_default（真值来源，单源解析；不写死字面量）
+        assert info["output_dir"] == get_default("output_dir")
         assert info["news_top_count"] == 300
-        assert info["holdings_ready"] is False
+        # 就绪判定反映 resolve_holdings_path 指向的真实文件（状态与生成链路同一路径口径）
+        assert info["holdings_ready"] is os.path.exists(resolve_holdings_path())
         assert info["anonymization"] == "关闭"
         assert info["privacy_shown"] is False
 

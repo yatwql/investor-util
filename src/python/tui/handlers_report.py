@@ -20,26 +20,27 @@ logger = setup_logger()
 
 
 def _prompt_history() -> bool:
-    """TUI 专属：决定是否获取历史走势数据。
+    """TUI 交互外壳：是否获取历史走势（fetch_mode 解析委托共享层）。
 
-    读取 config.history.fetch_mode（off/prompt/auto）：
-      - off    → False（不获取）
-      - auto   → True（自动获取）
-      - prompt → 询问用户后决定
+    - ``enable_history=False``（整章关闭）→ False；
+    - fetch_mode 三态由 ``report.history_policy.resolve_fetch_history`` 单源解析，
+      ``prompt`` 时注入本函数的 y/N 询问回调——渠道层不再自行分支三态。
     """
     from src.python.config import is_enable_history
+    from src.python.report.history_policy import resolve_fetch_history
 
     config = get_config_cache() or {}
     if not is_enable_history(config):
         return False
-    _fetch_mode = (config.get("history", {}) or {}).get("fetch_mode", "auto")
-    if _fetch_mode == "prompt":
+
+    def _ask_history() -> bool:
         try:
-            _resp = input("  [..] 是否获取组合历史走势数据（as-if 模拟）？(y/N): ").strip().lower()
+            resp = input("  [..] 是否获取组合历史走势数据（as-if 模拟）？(y/N): ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            _resp = "n"
-        return _resp == "y"
-    return _fetch_mode == "auto"
+            return False
+        return resp == "y"
+
+    return resolve_fetch_history(config, ask=_ask_history)
 
 
 def _prompt_force_llm(reporter: TuiProgressReporter) -> bool:

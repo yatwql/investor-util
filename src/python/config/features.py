@@ -33,7 +33,9 @@ logger = logging.getLogger("invest")
 
 # ── 路径常量 ────────────────────────────────────────────────
 
-_FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
+FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
+# 兼容别名：历史私有名（包内既有引用；渠道层一律用公开名 FEATURES_FILE）
+_FEATURES_FILE = FEATURES_FILE
 
 # ── 分组常量 ────────────────────────────────────────────────
 # 分组表达的是**生命周期的当前状态**，不是优先级、不是新旧：

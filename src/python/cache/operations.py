@@ -635,3 +635,106 @@ def get_cache_stats(reporter) -> CacheStats:
         stats.state_size_bytes = s_size
 
     return stats
+
+
+# 公开别名：展示提示文案（渠道层统一用此名；私有名保留供既有内部引用）
+sector_flow_hint = _sector_flow_hint
+
+
+def update_all_cache(holdings: list, reporter) -> int:
+    """基础 + 持仓全量缓存更新（最大努力模式，渠道无关）。
+
+    basic 失败仍继续 position；退出码取两者最大值（单调：失败等级越高越严重）。
+
+    Args:
+        holdings: 持仓列表
+        reporter: 进度报告接口
+
+    Returns:
+        退出码（max(basic, position)）
+    """
+    basic_result = update_basic_cache(holdings, reporter)
+    pos_result = update_position_cache(holdings, reporter)
+    return max(basic_result.exit_code, pos_result.exit_code)
+
+
+def warm_new_asset_caches(holdings: list, reporter) -> list[str]:
+    """持仓变更预热：检测新增资产并预取行情 / 基金业绩与持仓 / 行业分类。
+
+    变更检测委托 ``cache.check_and_refresh_caches``；预取编排属缓存域业务，
+    渠道层只负责进度呈现。全程异常不阻断后续生成。
+
+    Args:
+        holdings: 持仓列表
+        reporter: 进度报告接口（info/ok/warn）
+
+    Returns:
+        预热涉及的新增代码列表（无新增时为空表；异常中断时为已处理部分）
+    """
+    from src.python.cache import check_and_refresh_caches
+    from src.python.fetcher.fund import fetch_fund_holdings, fetch_fund_rankings
+    from src.python.fetcher.industry import batch_fetch_industry_data
+    from src.python.fetcher.price import fetch_market_data
+    from src.python.report.fund_performance import is_fund
+
+    new_codes: list[str] = []
+    try:
+        new_codes = check_and_refresh_caches(holdings)
+        if not new_codes:
+            return []
+
+        code_map = {h.code: h for h in holdings}
+        reporter.info(f"检测到 {len(new_codes)} 个新增资产，正在预热缓存...")
+        for code in new_codes:
+            h = code_map.get(code)
+            name = h.name if h else code
+            reporter.info(f"新增 {name} ({code}) — 获取行情...")
+            result = fetch_market_data(code, name)
+            if result and result.get("price", 0) > 0:
+                reporter.ok(f"行情 {name} {result['price']:.4f}")
+            else:
+                reporter.warn(f"行情 {name} 获取失败")
+            if h and is_fund(h):
+                perf = fetch_fund_rankings(code)
+                if perf:
+                    reporter.ok(f"业绩排名 {name}")
+                else:
+                    reporter.warn(f"业绩排名 {name} 获取失败")
+                holds = fetch_fund_holdings(code)
+                if holds and holds.get("holdings"):
+                    reporter.ok(f"持仓明细 {name} {len(holds['holdings'])} 条")
+                else:
+                    reporter.warn(f"持仓明细 {name} 无数据")
+            reporter.info(f"新增 {name} ({code}) — 获取行业分类...")
+            ind_map = batch_fetch_industry_data([code])
+            if ind_map and code in ind_map:
+                ind_name = ind_map[code].get("industry") or "未知"
+                reporter.ok(f"行业 {name} {ind_name}")
+            else:
+                reporter.warn(f"行业 {name} 无数据")
+        reporter.ok("新增资产缓存预热完成")
+    except Exception:
+        logger.warning("新资产预热过程异常，跳过（不影响后续生成）", exc_info=True)
+    return new_codes
+
+
+def get_cache_stats_payload() -> dict:
+    """缓存统计的结构化载荷（GET /api/cache 单源组装，前端契约不变）。
+
+    by_prefix 以 [前缀, 数量] 数组按文件数降序下发——Flask JSON 默认
+    sort_keys 会重排 dict 键序，只有数组能保序；top_by_size 截断前 5
+    （防长尾撑乱前端卡片）；过期数为 cleanup_expired(dry_run=True) 预估。
+    """
+    from src.python.cache import cleanup_expired, get_cache_hit_rate, get_cache_stats
+
+    raw = get_cache_stats()
+    by_prefix: dict = raw.get("by_prefix", {}) or {}
+    prefixes = sorted(by_prefix.items(), key=lambda kv: kv[1], reverse=True)
+    return {
+        "total_files": raw.get("total_files", 0),
+        "total_size_bytes": raw.get("total_size_bytes", 0),
+        "by_prefix": [[k, v] for k, v in prefixes],
+        "top_by_size": raw.get("top_by_size", [])[:5],
+        "hit_rate": get_cache_hit_rate(),
+        "expired_count": cleanup_expired(dry_run=True),
+    }

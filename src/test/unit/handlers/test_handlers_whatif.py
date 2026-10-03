@@ -421,5 +421,28 @@ class TestCmdWhatif(unittest.TestCase):
         mock_key.assert_called_once()
 
 
+class TestPromptEffectiveDate(unittest.TestCase):
+    """_prompt_effective_date：格式校验委托共享层，非法重新询问（TUI 只做交互外壳）。"""
+
+    @patch("builtins.input", side_effect=["20260101", "2026-07-01"])
+    def test_reasks_until_valid(self, mock_input):
+        from src.python.tui.handlers_whatif import _prompt_effective_date
+
+        self.assertEqual(_prompt_effective_date(), "2026-07-01")
+        self.assertEqual(mock_input.call_count, 2)
+
+    @patch("builtins.input", return_value="")
+    def test_blank_skips(self, mock_input):
+        from src.python.tui.handlers_whatif import _prompt_effective_date
+
+        self.assertEqual(_prompt_effective_date(), "")
+
+    @patch("builtins.input", side_effect=KeyboardInterrupt)
+    def test_interrupt_skips(self, mock_input):
+        from src.python.tui.handlers_whatif import _prompt_effective_date
+
+        self.assertEqual(_prompt_effective_date(), "")
+
+
 if __name__ == "__main__":
     unittest.main()

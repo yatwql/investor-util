@@ -20,6 +20,7 @@
 
 ### Changed
 
+- **三渠道薄壳化收敛（架构分层修复批次）**：业务规则/策略解析/数据组装/编排聚合一律下沉核心层，渠道只留交互/传输/渲染外壳——配置编辑收敛 `config/edit_ops.py` 共享层（白名单+值规则+写入分派+写前 .bak，Web `POST /api/config/edit` 与 TUI `_apply_edit` 外壳同一 `apply_config_edit` 函数，TUI 补上此前缺失的文件名分隔符/对比指数长度·字符·重复校验）；配置默认值单源 `config.get_default()`/`resolve_holdings_path()`（清除三渠道 11+ 处字面量回退）；系统状态组装与展示原语下沉 `core/system_info.py`（Web `_build_system_info` 变薄包装、TUI 展示同组原语）；历史走势策略单源 `report/history_policy.resolve_fetch_history`（TUI `_prompt_history` 注入 y/N 询问、orchestrator None 回退同源）；What-if 生效日三渠道共用 `normalize_effective_date`（TUI 非法重新询问、CLI argparse 解析期拒绝紧凑式）；缓存编排下沉 `cache.operations`（`update_all_cache` 最大努力聚合、`warm_new_asset_caches` 新资产预热、`get_cache_stats_payload` 统计载荷）；渠道私有符号引用全部改公开 API。新增三渠道薄壳纪律扫描（`test_channel_layering.py`：禁跨渠道私有导入/禁配置写原语/禁默认值字面量）与共享层回归测试共 59 例。
 - **pre-commit 八守护全量**：钩子从「编号/统计同步/版本三项条件触发」重写为 8 个守护脚本全量校验（约 4~5 秒，`check-doc-drift` 按暂存面选 `--sync`/`--ci`），堵住「本地放行、CI 才红」缺口；`check-doc-drift` 第 16 项「守护清单同源」权威源扩为五处（新增 `.githooks/pre-commit`），钩子清单漏改即报。
 - Web 状态区网格由三列改自适应两列（760px 内容区下三列致名称/耗时竖排换行）。
 - 架构 SVG（capabilities / architecture / llm-chain）事实性修订（九大功能域、17 页签、5 provider / 6 输出模块）。

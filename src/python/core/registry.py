@@ -394,6 +394,17 @@ def get_llm_module_names() -> dict[str, str]:
     return {m.settings_suffix: m.name for m in _MODULE_REGISTRY if m.is_llm and m.settings_suffix is not None}
 
 
+# 面板隐藏的 LLM 模块集合（单一事实来源）：辩论三模块保留在注册表
+# （缓存 TTL/前缀清理仍依赖），但不入状态面板/配置面板/编辑白名单。
+# TUI 菜单过滤、Web 状态面与配置编辑白名单均由此派生，禁止渠道自持副本。
+LLM_HIDDEN_KEYS: frozenset[str] = frozenset({"debate_pro", "debate_con", "debate_synthesis"})
+
+
+def visible_llm_module_names() -> dict[str, str]:
+    """面板可见的 LLM 标准模块映射（settings_suffix → 中文名，已剔除隐藏模块）。"""
+    return {k: v for k, v in get_llm_module_names().items() if k not in LLM_HIDDEN_KEYS}
+
+
 # ── 非 LLM 报表页签名称 ──────────────────────────────────
 # 对应 Excel 报告的各功能页签中文标题。
 # LLM 模块页签（global_macro/expert_review/health_check/penetration_deep）
