@@ -281,6 +281,23 @@ class TestTestFileMetaExemption:
         assert _code_hit(code_traces, "旧实现把 3.41/4.43 修正成 1.9") is not None
 
 
+# ── check-doc-traces：版本演进对照「最新发布」列 tag 名豁免 ───
+
+
+class TestReleaseTagExemption:
+    """版本演进对照「最新发布」列：tag 名是滚动读数（当前状态），行中版本叙述仍检出。"""
+
+    def test_release_tag_in_evolution_header_exempt(self, doc_traces):
+        assert _doc_hit(doc_traces, "| 最新发布（最近发布 tag v0.12.0 · 2026-10-03） |") is None
+
+    def test_release_tag_in_reading_note_exempt(self, doc_traces):
+        assert _doc_hit(doc_traces, "最新发布 = 最近一次发布 tag（v0.12.0 · 2026-10-03）；") is None
+
+    def test_version_in_prose_still_flagged(self, doc_traces):
+        """豁免不外溢：无「最近发布 tag」上下文的行中版本号叙述仍须检出。"""
+        assert _doc_hit(doc_traces, "该缺陷在 v0.12.0 中修复") is not None
+
+
 # ── check-doc-traces：补强模式能检出文档历史痕迹 ───────────
 
 
