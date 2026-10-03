@@ -26,6 +26,7 @@
 ### Fixed
 
 - `faq.md` 两处「两份持仓文件对比」答案补 Web「调仓模拟」页签入口；CLAUDE.md「scripts 共享设施」历史痕迹设施路径同步为 `scripts/_traces_code/`。
+- 文档全量核对（23 份管理/用户文档，序号/目录锚点/链接/标题机检）：修复 plan.md 指向已归档研究文档的死链；technical.md 与 how-to-use-cli-mode.md 各两处同名标题锚点歧义按父章节/平台消歧。
 
 ## 归档
 

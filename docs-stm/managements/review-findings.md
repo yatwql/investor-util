@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.11.13-dev
-> **编号源**：`rf-next = 545`（新增问题取此编号，完成后更新为 +1；已用最大 rf-544，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 548`（新增问题取此编号，完成后更新为 +1；已用最大 rf-547，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -42,6 +42,10 @@
 ### P2C — 近 24 小时实现自审（2026-10-02，当日登记当日修复）
 
 > **已修复归档摘要**：rf-542（`faq.md` 两处调仓问答缺 Web「调仓模拟」入口）、rf-543（pre-commit 仅条件触发 3/8 守护，README 痕迹与 folders 行数漂移两度漏拦至 CI 才红——已重写为八守护全量并纳入守护清单同源第五处）、rf-544（CLAUDE.md 历史痕迹共享设施路径仍指已拆包的 `_traces_common.py`），明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
+
+### P2D — 文档全量核对（2026-10-02，当日登记当日修复）
+
+> **已修复归档摘要**：rf-545（plan.md 指向已归档研究文档的死链）、rf-546（technical.md 两处同名标题「内部线程池」锚点歧义）、rf-547（how-to-use-cli-mode.md 13.1/13.2 下两处同名标题「基础配置」锚点歧义），均 2026-10-02 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
 
 
 

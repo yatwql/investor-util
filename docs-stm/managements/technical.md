@@ -1472,7 +1472,7 @@ class CacheStats:
 | `cleanup_cache(reporter) → int` | 扫描清理过期缓存 |
 | `get_cache_stats(reporter) → CacheStats` | 三目录统计（cache + snapshots + state） |
 
-#### 内部线程池
+#### 内部线程池（缓存操作共享层）
 
 `operations.py` 管理独立的 `cache_ops` 线程池（`max_workers=4`），与 orchestrator 的 `orch_prep`、`orch_llm_news` 池隔离：
 
@@ -1616,7 +1616,7 @@ TUI 环境使用 `TuiProgressReporter`（输出到终端），CLI 环境使用 `
 
 verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使用本地颜色常量（不依赖 `ansi_colors` 模块级常量，后者基于 `stdout.isatty()`）。
 
-#### 内部线程池
+#### 内部线程池（报告编排器）
 
 | 池名称 | 位置 | max_workers | 用途 |
 |:-------|:-----|:-----------|:------|

@@ -255,3 +255,11 @@
 - **rf-542**（faq.md 调仓问答缺 Web 入口）：`faq.md` 两处「两份持仓文件对比」答案只写菜单 `W` / CLI `whatif`，未含当日新增的 Web「调仓模拟」页签（调仓 What-if 与缓存管理 Web 化落地后文档未同步）。处置：两处答案补 Web 页签入口（基准默认取配置正式持仓、可改上传，目标必传）并链到 `how-to-use-web-mode.md`。
 - **rf-543**（pre-commit 仅覆盖 3/8 守护 → CI 两度红）：当日 README 徽章/上手段提交与 folders 行数同步提交连续 CI 红——`check-doc-traces` 报 README 版本行痕迹、`check-doc-drift` 报 folders「用户文档」行数漂移，本地钩子因仅条件触发「编号/统计同步/版本」三项而未拦截（dev-verify 亦不在钩子内）。处置：`.githooks/pre-commit` 重写为八守护全量（约 4~5 秒：`check-doc-drift` 按暂存面选 `--sync`/`--ci`，其余七项无条件执行，任一 finding 中止提交）；`check-doc-drift` 第 16 项「守护清单同源」权威源扩为五处（`_guards.py` 新增 `.githooks/pre-commit` 区域锚点 `^set -e$`~`^exit 0$` 与 `guard_parity_sources()`，补 2 例真实源断言）；developer-guide 四层保障表 / item 16 / install-hooks 描述同步。dev-verify 仍不入钩子（提交前手动纪律 + CI 兜底）。
 - **rf-544**（CLAUDE.md 历史痕迹设施路径过时）：CLAUDE.md「scripts 共享设施」条仍指向 `scripts/_traces_common.py`，该文件当日已拆包为 `scripts/_traces_code/`（共享排除模式并入 exemptions）。处置：路径更新为 `scripts/_traces_code/`。
+
+### rf-545~547（2026-10-02，文档全量核对批次，当日登记当日修复）
+
+> 应要求核对全部管理文档与用户文档（10 managements + 11 manuals + README + 2 plan，共 23 份）的序号/组织/内容：编号标题序列、目录锚点、文内与跨文档链接按 GitHub slug 规则全量机检。除下述 3 项外均无问题（数字/中文序号连续、目录与标题一致、链接全部有效；`as-if` 跨文件锚点经 `<a id>` 显式锚点核实为有效）。
+
+- **rf-545**（plan.md 死链）：P3 段「详细分析见 `tradingagents-cn-research.md`」指向 `../plan/tradingagents-cn-research.md`，该研究文档已完成并归档、plan/ 下已不存在。处置：链接改指 `../archive/v0.11.x/tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md` 并同步显示文件名。
+- **rf-546**（technical.md 重复标题）：`#### 内部线程池` 在 3.6 缓存操作共享层（行 1475）与 4.2 报告编排器（行 1619）下各出现一次，锚点 `#内部线程池` 只能命中首处。处置：按父章节消歧为「内部线程池（缓存操作共享层）」/「内部线程池（报告编排器）」（无任何入链，改名零波及）。
+- **rf-547**（CLI 手册重复标题）：`#### 基础配置` 在 13.1 Windows 任务计划程序与 13.2 Linux crontab 下各出现一次。处置：按平台消歧为「基础配置（Windows）」/「基础配置（Linux）」（无 TOC 条目与入链，改名零波及）。

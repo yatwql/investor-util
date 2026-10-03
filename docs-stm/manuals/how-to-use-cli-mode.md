@@ -372,7 +372,7 @@ CLI 模式配合操作系统定时任务可实现无人值守的自动报告生�
 
 ### 13.1 Windows 任务计划程序
 
-#### 基础配置
+#### 基础配置（Windows）
 
 使用 `schtasks` 命令创建定时任务，需指定 Python 解释器完整路径：
 
@@ -425,7 +425,7 @@ schtasks /CREATE /SC DAILY /TN "InvestReport" /TR "powershell -NoProfile -Comman
 
 ### 13.2 Linux crontab
 
-#### 基础配置
+#### 基础配置（Linux）
 
 ```bash
 # 编辑 crontab
