@@ -928,7 +928,7 @@ LLM 五维度量化评分，每项满分 100：
 | 需求标识 | 需求描述 |
 |:---------|:---------|
 | R-LLM-01 | LLM 分析是可选增强内容，仅在菜单 L 中触发 |
-| R-LLM-02 | 每个 LLM 模块可通过配置独立启停（enabled_llm.x） |
+| R-LLM-02 | 每个 LLM 模块可通过配置独立启停（enabled_llm.x）；禁用的分析模块（全球政经/智囊团/体检/穿透深度）对应 HTML 章节与 Excel 页签**整章隐藏**、后续章号连续递进（而非保留「待生成」占位）；新闻关联（LLM 仅二次增强）与 API 用量章不受章级影响 |
 | R-LLM-03 | **三类协议 + 厂商模型路由**：Provider 按协议分三类——`claude`（Anthropic 兼容消息端点）/ `openai`（Chat Completions 端点）/ `gemini`（generateContent 端点）；**厂商与模型由 `model` 字段指定**，包括 Anthropic、OpenAI、Google 以及**走兼容端点的第三方厂商**（DeepSeek 走 `claude` 或 `openai` 端点、Kimi（月之暗面）走 `claude` 兼容端点）。新增厂商只要提供兼容端点即接入，无需改代码。可通过 Multi-Provider Chain 配置多个备选 Provider 按策略自动切换 |
 | R-LLM-04 | Provider 不可用时自动按策略递补下一备选 Provider，全链失败时降级占位文本 |
 | R-LLM-05 | 所有 LLM 模块的 API 调用量（Token、费用、模块明细）需在报告中统计展示 |

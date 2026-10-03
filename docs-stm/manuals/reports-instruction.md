@@ -225,10 +225,11 @@
 
 ### 可见性规则总览
 
-两层可见性模型：
+可见性规则（两层 + 章级）：
 - **board 层**：用户配置的章节开关（`enable_fund_deep_analysis`/`enable_news`/`enable_history`/`enable_portfolio_evolution`/`enable_action`/`enabled_llm`），关闭则整个类型的章节完全隐藏
 - **data 层**：运行时数据可用性，某模块数据不可用时仅隐藏该模块自身
-- 两层 AND 关系：board 层关闭 → 隐藏全部；board 层开启但 data 层不可用 → 仅隐藏该模块
+- **章级**：`enabled_llm.<模块> = false` 时对应 LLM 分析章逐章隐藏（不入目录/正文/页签，后续章号连续递进），见上方「章级隐藏」
+- 判定关系：board 层关闭 → 隐藏全部；board 层开启但 data 层不可用 → 仅隐藏该模块；章级禁用 → 仅隐藏该分析章
 
 | type | board 层控制 | data 层条件 | 菜单来源 |
 |:-----|:------------|:------------|:---------|
