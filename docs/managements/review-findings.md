@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.2-dev
-> **编号源**：`rf-next = 563`（新增问题取此编号，完成后更新为 +1；已用最大 rf-562，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 564`（新增问题取此编号，完成后更新为 +1；已用最大 rf-563，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -41,6 +41,8 @@
 
 ## 已解决问题
 
+> **rf-563 已修复（2026-10-03）**：限购线文档一致性核对——`reports-instruction` 列数 15→16 与 What-if 提示块、`requirements` R-WIF-05/06 输出与网络语义、TUI/CLI 手册零网络表述、FAQ/README/`datasource-reliability` 补述（变更见 changelog「限购线文档一致性核对修正」）。
+>
 > **迁移说明**：已完成批次摘要（rf-557 ~ rf-562）已于 v0.12.1 发布（2026-10-03）随档迁入 [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)，本文件只保留未完成项与归档索引；更早批次（rf-541、rf-542 ~ rf-556）见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)。
 
 ### 归档档案

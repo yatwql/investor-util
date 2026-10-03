@@ -17,6 +17,7 @@
 ### Changed
 
 - 限购总表缓存显式注册进数据模块注册表（data_type `fund_purchase` + 精确键 `fund_purchase_status_table`，TTL 与官方净值同源 `CACHE_DAILY` 24h）：此前未注册、靠 `get_ttl` 回退巧合与净值同档，回退逻辑或常量一变即无声漂移；仍不入菜单刷新组（大表不随菜单强抓），`datasource.md` 脚注同步
+- **限购线文档一致性核对修正**：`reports-instruction.md` 持仓市值明细 15→16 列（申购状态条件列 + 脚注/时效/降级说明）与 What-if 申购受限提示块（页签表/产物/设计边界/功能对照表 4 处）；`requirements.md` R-WIF-05 输出描述与 R-WIF-06 网络语义（what-if 默认本地计算，提示经缓存链读限购总表：命中零联网/未命中现场取一次/失败静默兔底）；TUI/CLI 手册 What-if 段同源修正；FAQ 新增「申购状态」列问答；`datasource-reliability.md` 3.11 用途行补 What-if 消费方；README What-if 特性行补受限提示
 
 ## 归档
 
