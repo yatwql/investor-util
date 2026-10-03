@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.2-dev
-> **编号源**：`rf-next = 569`（新增问题取此编号，完成后更新为 +1；已用最大 rf-568，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 570`（新增问题取此编号，完成后更新为 +1；已用最大 rf-569，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -49,6 +49,7 @@
 
 > **rf-563 已修复（2026-10-03）**：限购线文档一致性核对——`reports-instruction` 列数 15→16 与 What-if 提示块、`requirements` R-WIF-05/06 输出与网络语义、TUI/CLI 手册零网络表述、FAQ/README/`datasource-reliability` 补述（变更见 changelog「限购线文档一致性核对修正」）。
 > **rf-564 ~ rf-567 已修复（2026-10-03）**：48 小时实现技术债自查批次——What-if 页面级断言编号同步（plan-74 改模板漏改）、P0/P1 门禁并入 `unit_report` 域（98 文件首次进门禁，modes/collect 双处 marker 同步）、changelog「兔底」错字、`constraint_block` 提取收敛单源 helper（变更见 changelog「门禁并入」「单源」两更）。
+> **rf-569 已修复（2026-10-03）**：全量文档核对补齐 plan-73 消费方——`llm-technical.md` 四处（§3.2 附录图第 4 段 / §4.1 提示词覆盖表 `purchase_constraint_block` 行 / §4.4 唯一提取点暴露段 / §8.2 统一附录四段）、`how-to-config.md` 开关消费方三合一、`datasource-reliability.md` 3.11 用途句 LLM 消费方、`how-to-config-llm.md` 约束上下文联动、`reports-instruction` ④节与 `README` 智囊团行（变更见 changelog「文档补齐」条）。
 >
 >
 > **迁移说明**：已完成批次摘要（rf-557 ~ rf-562）已于 v0.12.1 发布（2026-10-03）随档迁入 [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)，本文件只保留未完成项与归档索引；更早批次（rf-541、rf-542 ~ rf-556）见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)。
