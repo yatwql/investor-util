@@ -112,3 +112,39 @@ def _attach_valuation_to_penetration(
         top10.append(e)
     display["top10"] = top10
     return display
+
+
+def _build_purchase_status_display(
+    purchase_status_data: dict | None,
+    accounts: dict | None,
+) -> dict | None:
+    """申购状态列渲染上下文（数据契约 purchase_status_data → 模板变量）。
+
+    契约不可用（开关关闭 / 全链失败 available=False）或无持仓行时返回 None
+    （模板据条件渲染整列隐藏——两套渲染的列可见性判据与文案格式化全部
+    收敛在 report/purchase_status.py 单源，此处只做上下文装配）。
+    """
+    from src.python.report.purchase_status import (
+        format_purchase_status_cell,
+        purchase_column_visible,
+        purchase_status_footnote,
+        stale_level,
+    )
+
+    if not purchase_column_visible(purchase_status_data):
+        return None
+    if not accounts:
+        return None
+    level = stale_level((purchase_status_data or {}).get("fetched_at"))
+    codes = [
+        getattr(d, "code", None) or (d.get("code") if isinstance(d, dict) else None)
+        for details in accounts.values()
+        for d in details
+    ]
+    codes = [c for c in codes if c]
+    return {
+        # cells：代码 → 单元格文案（与 Excel 端同一函数，单一实现不发散）
+        "cells": {code: format_purchase_status_cell(purchase_status_data, code, level) for code in codes},
+        "level": level,
+        "footnote": purchase_status_footnote(purchase_status_data),
+    }

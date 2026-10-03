@@ -37,6 +37,7 @@ from src.python.report.html_writer_assets import _copy_js_assets, _inline_js_ass
 from src.python.report.html_writer_display import (  # noqa: F401
     _attach_valuation_to_penetration,
     _build_flow_display,
+    _build_purchase_status_display,
     _build_temperature_display,
 )
 from src.python.report.html_writer_nav import (  # noqa: F401
@@ -263,6 +264,7 @@ def _render_template(
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
     financial_report_digest_data: dict | None = None,  # 持仓个股财报摘要契约（None=开关关闭/无数据）
     financial_indicator_data: dict | None = None,  # 财务指标契约（None=开关关闭/无数据）
+    purchase_status_data: dict | None = None,  # 申购限购状态契约（None=开关关闭/无数据，申购状态列隐藏）
     data_source_catalog: list | None = None,  # 数据源说明表（实际使用清单 / 计费 / 凭据）
 ) -> str:
     """渲染 Jinja2 模板并返回 HTML。"""
@@ -278,11 +280,13 @@ def _render_template(
     valuation_real_basis = (valuation_data or {}).get("basis_mode") == "real_ttm"
     penetration_display = _attach_valuation_to_penetration(penetration, valuation_data)
     market_temperature = _build_temperature_display(market_temperature_data)
+    purchase_status_display = _build_purchase_status_display(purchase_status_data, accounts)
     # 目录分组导航：按「基础信息/基金深度分析/行动建议/历史/LLM/附录」六组折叠（_sv_fn 闭包过滤不可见章节）
     section_groups = _build_section_nav_groups(order, _sv_fn, section_numbers)
 
     return _ENV.get_template("report_template.html").render(
         flow_display=_build_flow_display(fund_flow_data),
+        purchase_status_display=purchase_status_display,
         section_groups=section_groups,
         llm_supported_sections=_LLM_SUPPORTED_SECTIONS,
         valuation_enabled=valuation_enabled,
@@ -423,6 +427,7 @@ def write_html_report(
     enable_fundamental_snapshot: bool = False,  # board 层：持仓基本面章（两功能开关任一开启）
     financial_report_digest_data: dict | None = None,  # data 层：财报摘要契约（None=无数据，章节隐藏）
     financial_indicator_data: dict | None = None,  # data 层：财务指标契约（None=无数据，章节隐藏）
+    purchase_status_data: dict | None = None,  # data 层：申购限购状态契约（None=无数据，申购状态列隐藏）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
@@ -635,6 +640,7 @@ def write_html_report(
         evolution_data=evolution_data,
         financial_report_digest_data=financial_report_digest_data,
         financial_indicator_data=financial_indicator_data,
+        purchase_status_data=purchase_status_data,
         drawdown_min_span=drawdown_min_span,
         llm_enabled_flag=llm_enabled_flag,
         global_macro_content=global_macro_content,

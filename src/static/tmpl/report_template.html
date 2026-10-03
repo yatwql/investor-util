@@ -1174,6 +1174,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <th>昨日价</th><th>取价方式</th><th>溢价率</th><th>份额</th><th>市值</th>
                         <th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>取价渠道</th>
                         {% if flow_display %}<th>资金加权成本</th>{% endif %}
+                        {% if purchase_status_display %}<th>申购状态</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -1203,6 +1204,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             {% set wac = flow_display.cost_map.get(d.code) %}
                             <td class="text-right">{% if wac is not none %}{{ wac | price }}{% else %}--{% endif %}</td>
                             {% endif %}
+                            {% if purchase_status_display %}
+                            <td class="text-left">{{ purchase_status_display.cells.get(d.code, "—") }}</td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                         {% set acc_tot = account_totals.get(acc_name, {}) %}
@@ -1217,6 +1221,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ acc_tot.get("today_profit", 0) | profit_color }}">{{ acc_tot.get("today_profit", 0) | money }}</td>
                             <td></td>
                             {% if flow_display %}<td></td>{% endif %}
+                            {% if purchase_status_display %}<td></td>{% endif %}
                         </tr>
                         {% set grand_mv.v = grand_mv.v + acc_tot.get("market_value", 0) %}
                         {% set grand_cost.v = grand_cost.v + acc_tot.get("cost", 0) %}
@@ -1235,9 +1240,13 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td class="text-right" style="color: {{ grand_today.v | profit_color }}">{{ grand_today.v | money }}</td>
                         <td></td>
                         {% if flow_display %}<td></td>{% endif %}
+                        {% if purchase_status_display %}<td></td>{% endif %}
                     </tr>
                 </tbody>
             </table>
+            {% if purchase_status_display %}
+            <div style="padding: 4px 8px; font-size: 12px; color: {% if purchase_status_display.level == 'stale' %}#B8860B; font-weight: bold;{% else %}#888888;{% endif %}">{{ purchase_status_display.footnote }}</div>
+            {% endif %}
         </div>
 
         <div class="block-title">二、持仓分类汇总</div>

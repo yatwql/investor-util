@@ -265,6 +265,13 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         False,
         True,
     ),
+    "fund_purchase_limit": FeatureSwitchDef(
+        "基金申购限购",
+        "「持仓明细与分类」市值明细追加「申购状态」列（天天基金渠道口径，含日限/下一开放日；数据不可用时静默隐列）",
+        GROUP_REPORT,
+        True,
+        True,
+    ),
 }
 
 # ── 出厂默认值投影 ──────────────────────────────────────────

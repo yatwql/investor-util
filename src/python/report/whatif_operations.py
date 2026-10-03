@@ -132,6 +132,27 @@ def build_whatif_backtest(
     )
 
 
+def _purchase_restricted_index(candidate_holdings: list[Holding]) -> dict[str, Any]:
+    """目标持仓申购受限索引（what-if 路径单点挂载：契约经缓存链取，异常兜底 → {}）。
+
+    取数语义（设计 §2.3）：经限购表缓存（TTL 24h）——命中零网络；未命中经
+    既有链一次；取契约异常兜底空索引，不阻断模拟（降级矩阵末行）。
+    观测：命中数/降级以统一 logger 打 debug（单点）。
+    """
+    from src.python.config import get_config
+    from src.python.report.orchestrator import compute_purchase_status_data
+    from src.python.report.purchase_status import build_restricted_index
+
+    try:
+        contract = compute_purchase_status_data(get_config())
+        index = build_restricted_index(contract, [h.code for h in candidate_holdings])
+    except Exception:  # noqa: BLE001 — 取契约异常不得阻断模拟（仅兜底 Exception，不吞 BaseException）
+        logger.debug("申购受限索引获取失败，what-if 提示降级缺席", exc_info=True)
+        return {}
+    logger.debug("what-if 申购受限索引命中 %d 个目标持仓标的", len(index))
+    return index
+
+
 def run_whatif_simulation(
     base_holdings: list[Holding],
     candidate_holdings: list[Holding],
@@ -165,6 +186,7 @@ def run_whatif_simulation(
         candidate_holdings,
         base_file=os.path.basename(base_file),
         candidate_file=os.path.basename(candidate_file),
+        restricted_index=_purchase_restricted_index(candidate_holdings),
     )
     if not data.get("available"):
         return WhatifRunResult(

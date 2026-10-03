@@ -179,6 +179,8 @@ class TestPrepareReportData:
             "financial_report_digest_data",
             # 财务指标契约（功能开关 financial_indicator 关闭时为 None）
             "financial_indicator_data",
+            # 申购限购状态契约（功能开关 fund_purchase_limit 关闭时为 None）
+            "purchase_status_data",
         }
         assert set(result.keys()) == expected_keys, f"缺少 key: {expected_keys - set(result.keys())}"
 

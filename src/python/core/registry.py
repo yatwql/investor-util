@@ -269,6 +269,12 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     DataModuleDef(
         "持仓跟踪", "tracking", exact_cache_keys=("holdings_tracking",), cache_ttl=CACHE_MONTHLY
     ),  # 无 cache_group，避免被手动清除
+    DataModuleDef(
+        "基金申购状态总表",
+        "fund_purchase",
+        exact_cache_keys=("fund_purchase_status_table",),
+        cache_ttl=CACHE_DAILY,  # 与官方净值（price 数据类型）同档，显式声明而非回退巧合
+    ),  # 无 cache_group：大表不随菜单刷新强抓，仅按 TTL 过期
     # ── 组合历史走势（无 cache_group — per-code 缓存，不因切换持仓文件而清除）──
     DataModuleDef("历史股票日线", "history_stock", cache_prefixes=("history_stock_",), cache_ttl=CACHE_WEEKLY),
     DataModuleDef("历史基金净值", "history_fund_otc", cache_prefixes=("history_fund_otc_",), cache_ttl=CACHE_MONTHLY),

@@ -190,3 +190,104 @@ def test_arrow_helper():
     assert _arrow(1.0) == "↑"
     assert _arrow(-1.0) == "↓"
     assert _arrow(0.0001) == "→"
+
+
+# ── 受限提示注入（restricted_index）──────────────────────────
+
+
+class TestFeasibilityInject:
+    """what-if 目标持仓受限提示：缺省等价、命中分支、降级无键。"""
+
+    def _pair(self):
+        """一对基础持仓（加仓腿：1000 → 3000 份 × 2.0 元）。"""
+        base = [_h("519674", "易方达蓝筹", 1000, 2.0)]
+        cand = [_h("519674", "易方达蓝筹", 3000, 2.0)]
+        return base, cand
+
+    def _index(self, status: str = "限大额", limit: float | None = 100.0, **over) -> dict:
+        entry = {
+            "code": "519674",
+            "status": status,
+            "limit": limit,
+            "limit_text": "限额未知" if limit is None else "100",
+            "next_open_text": "",
+            "level": "fresh",
+        }
+        entry.update(over)
+        return {"519674": entry}
+
+    def test_default_equals_empty_index(self):
+        """缺省 ≡ restricted_index={}：降级态输出逐字节一致（零回归）。"""
+        base, cand = self._pair()
+        assert build_whatif_data(base, cand) == build_whatif_data(base, cand, restricted_index={})
+        assert "feasibility" not in build_whatif_data(base, cand)
+
+    def test_added_restricted_target_note(self):
+        """目标新增受限标的 → 提示条目（金额 = 目标成本全额，天数正确）。"""
+        base = [_h("600900", "长江电力", 1000, 20.0)]
+        cand = [_h("519674", "易方达蓝筹", 500, 2.0)]  # 新增，cand_cost = 1000
+        d = build_whatif_data(base, cand, restricted_index=self._index())
+        notes = d["feasibility"]
+        assert len(notes) == 1
+        n = notes[0]
+        assert n["action"] == "新增"
+        assert n["kind"] == "limited"
+        assert n["amount"] == pytest.approx(1000.0)
+        assert n["days"] == 10
+        assert n["feasible"] is True
+        assert n["name"] == "易方达蓝筹"
+        assert "日限 100 元" in n["note_text"]
+        assert "估算" in n["note_text"]
+
+    def test_increased_amount_is_cost_diff(self):
+        """加仓腿金额口径 = 成本增量（cost_diff）。"""
+        base, cand = self._pair()  # +2000 份 × 2.0 → cost_diff 4000
+        d = build_whatif_data(base, cand, restricted_index=self._index(limit=1000.0))
+        n = d["feasibility"][0]
+        assert n["action"] == "加仓"
+        assert n["amount"] == pytest.approx(4000.0)
+        assert n["days"] == 4
+
+    def test_sell_side_not_judged(self):
+        """清仓为卖出腿 → 不判定（申购限购不约束卖出，零额外提示）。"""
+        base = [_h("519674", "易方达蓝筹", 3000, 2.0), _h("600900", "长江电力", 100, 20.0)]
+        cand = [_h("600900", "长江电力", 10, 20.0)]
+        d = build_whatif_data(base, cand, restricted_index=self._index())
+        assert "feasibility" not in d
+
+    def test_reduced_and_unchanged_not_judged(self):
+        """减仓/不变不动仓 → 不判定。"""
+        base, cand = self._pair()
+        cand = [_h("519674", "易方达蓝筹", 500, 2.0)]  # 减仓
+        d = build_whatif_data(base, cand, restricted_index=self._index())
+        assert "feasibility" not in d
+        d2 = build_whatif_data(base, [_h("519674", "易方达蓝筹", 1000, 2.0)], restricted_index=self._index())
+        assert "feasibility" not in d2
+
+    def test_base_restricted_target_free_no_note(self):
+        """基准受限、目标不含该标的 → 无提示。"""
+        base = [_h("600900", "长江电力", 100, 20.0)]
+        cand = [_h("600900", "长江电力", 100, 20.0), _h("511010", "国债ETF", 10, 11.0)]
+        d = build_whatif_data(base, cand, restricted_index=self._index())
+        assert "feasibility" not in d
+
+    def test_suspended_note_next_open(self):
+        """暂停申购 → 提示下一开放日。"""
+        base = [_h("600900", "长江电力", 100, 20.0)]
+        cand = [_h("519674", "易方达蓝筹", 500, 2.0)]
+        d = build_whatif_data(
+            base, cand, restricted_index=self._index(status="暂停申购", limit=None, next_open_text="10月15日")
+        )
+        n = d["feasibility"][0]
+        assert n["kind"] == "suspended"
+        assert "10月15日" in n["note_text"]
+
+    def test_unknown_limit_note_without_days(self):
+        """限额未知 → 提示存在但不给天数（宁缺毋错）。"""
+        base = [_h("600900", "长江电力", 100, 20.0)]
+        cand = [_h("519674", "易方达蓝筹", 500, 2.0)]
+        d = build_whatif_data(base, cand, restricted_index=self._index(limit=None))
+        n = d["feasibility"][0]
+        assert n["days"] is None
+        assert n["feasible"] is None
+        assert "无法估算" in n["note_text"]

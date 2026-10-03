@@ -183,8 +183,9 @@ class TestSwitchCounts:
         assert drift.check_switch_counts({Path("m.md"): text}) == []
 
     def test_total_mismatch(self, drift):
-        findings = drift.check_switch_counts({Path("m.md"): "提供 **29 项功能开关**的运行时覆写"})
-        assert len(findings) == 1 and "29 项功能开关" in findings[0]
+        wrong_total = len(drift.feature_switch_registry) + 1  # 故意写错的总数（与注册表同演进，不写死字面量）
+        findings = drift.check_switch_counts({Path("m.md"): f"提供 **{wrong_total} 项功能开关**的运行时覆写"})
+        assert len(findings) == 1 and f"{wrong_total} 项功能开关" in findings[0]
 
 
 class TestDefaultClaims:

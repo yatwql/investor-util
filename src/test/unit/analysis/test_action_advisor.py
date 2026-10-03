@@ -182,3 +182,37 @@ class TestBuildActionData:
         b = build_action_data(_concentrated_holdings(), 10000.0)
         assert a is not b
         assert a["rebalance_signals"] is not b["rebalance_signals"]
+
+
+class TestPurchaseRestrictionOutOfScope:
+    """未接线两面零改动断言：调仓建议与行动摘要不携带限购/可行性字段。
+
+    what-if 为唯一注入面——两面若有字段渗入，本组结构性断言先红。
+    """
+
+    def test_signatures_untouched(self):
+        """两函数签名零新增形参（接线波及面防回归）。"""
+        import inspect
+
+        from src.python.analysis.rebalance_advisor import build_rebalance_advice
+
+        for fn in (build_action_data, build_rebalance_advice):
+            params = inspect.signature(fn).parameters
+            assert "restricted_index" not in params
+            assert "feasibility" not in params
+
+    def test_no_restriction_keys_in_output(self):
+        """输出结构无受限/可行性键（词根级结构性断言，非写死键清单）。"""
+        forbidden = ("feasib", "restrict", "purchase")
+        data = build_action_data(_concentrated_holdings(), 10000.0)
+        for key in data:
+            assert not any(frag in key.lower() for frag in forbidden), f"顶层键渗入: {key}"
+        for entry in data["rebalance_advice"]:
+            for key in entry:
+                assert not any(frag in key.lower() for frag in forbidden), f"建议条目键渗入: {key}"
+
+    def test_summary_carries_no_subscription_text(self):
+        """行动摘要为计数拼接，无申购语义文本。"""
+        data = build_action_data(_concentrated_holdings(), 10000.0)
+        assert "申购" not in data["summary"]
+        assert "限购" not in data["summary"]

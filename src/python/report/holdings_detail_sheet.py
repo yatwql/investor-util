@@ -38,6 +38,12 @@ from src.python.report.category import (
     build_category_data_status,
     calc_yield_text,
 )
+from src.python.report.purchase_status import (
+    format_purchase_status_cell,
+    purchase_column_visible,
+    purchase_status_footnote,
+    stale_level,
+)
 from src.python.report.excel_writer import (
     _write_data_status_foot,
     auto_width,
@@ -84,6 +90,8 @@ _MV_NCOLS = len(_MV_HEADERS)
 # 成本流水子列（功能开关 `cost_lots` 开启时追加，默认关不渲染）
 _MV_EXTRA_HEADERS = ["资金加权成本"]
 _MV_NCOLS_WITH_FLOW = _MV_NCOLS + len(_MV_EXTRA_HEADERS)
+# 申购限购状态列（功能开关 `fund_purchase_limit`）：追加于市值明细区块末列
+_MV_PURCHASE_HEADERS = ["申购状态"]
 
 _PRICE_TYPE_COL = 7
 _NAME_COL = 2
@@ -154,8 +162,8 @@ def _detail_to_row_values(d: DetailRow) -> list[Any]:
     ]
 
 
-def _mv_num_formats(has_flow: bool = False) -> list[str | None]:
-    """区块①每列的 Excel 数字格式。"""
+def _mv_num_formats(has_flow: bool = False, has_purchase: bool = False) -> list[str | None]:
+    """区块①每列的 Excel 数字格式（15 列 + 可选资金加权成本 + 可选申购状态）。"""
     fmt = [
         "",  # 1  账户
         "",  # 2  名称
@@ -175,6 +183,8 @@ def _mv_num_formats(has_flow: bool = False) -> list[str | None]:
     ]
     if has_flow:
         fmt += [FMT_PRICE]  # 16 资金加权成本（批次成本价按份额加权）
+    if has_purchase:
+        fmt += [""]  # 申购状态（文本列，无数字格式）
     return fmt
 
 
@@ -240,6 +250,7 @@ def _write_account_groupings(
     details: list[DetailRow],
     data_start: int,
     fund_flow_data: dict | None = None,
+    purchase_status_data: dict | None = None,
 ) -> tuple[float, float, float, float, int]:
     """按账户分组写入明细行和小计，返回汇总数据及最终行号。
 
@@ -249,7 +260,9 @@ def _write_account_groupings(
         (grand_mv, grand_cost, grand_profit, grand_today, final_row)
     """
     has_flow = fund_flow_data is not None
-    ncols = _MV_NCOLS_WITH_FLOW if has_flow else _MV_NCOLS
+    show_purchase = purchase_column_visible(purchase_status_data)
+    purchase_level = stale_level((purchase_status_data or {}).get("fetched_at")) if show_purchase else None
+    ncols = _MV_NCOLS + (1 if has_flow else 0) + (1 if show_purchase else 0)
     cost_map = (fund_flow_data or {}).get("cost_tiers", {}).get("per_code", {})
 
     accounts: dict[str, list[DetailRow]] = {}
@@ -264,7 +277,12 @@ def _write_account_groupings(
             vals = _detail_to_row_values(d)
             if has_flow:
                 vals += [_weighted_avg_cost(cost_map.get(d.code))]
-            write_data_row(ws, row, vals, _mv_num_formats(has_flow))
+            if show_purchase:
+                # 补齐到申购状态列前的槽位（资金加权成本缺值时保持列对齐）
+                while len(vals) < ncols - 1:
+                    vals.append(None)
+                vals += [format_purchase_status_cell(purchase_status_data, d.code, purchase_level)]
+            write_data_row(ws, row, vals, _mv_num_formats(has_flow, show_purchase))
             row += 1
 
         acc_mv = sum(d.market_value for d in acc_details)
@@ -292,7 +310,11 @@ def _write_account_groupings(
         ]
         if has_flow:
             subtotal_vals += [""]  # 资金加权成本小计列留空（批次口径不跨账户聚合）
-        write_subtotal_row(ws, row, f"{acc_name} 小计", subtotal_vals[1:], ncols, _mv_num_formats(has_flow))
+        if show_purchase:
+            subtotal_vals += [""]  # 申购状态小计列留空（非可聚合指标）
+        write_subtotal_row(
+            ws, row, f"{acc_name} 小计", subtotal_vals[1:], ncols, _mv_num_formats(has_flow, show_purchase)
+        )
         row += 1
 
         grand_mv += acc_mv
@@ -308,11 +330,17 @@ def _write_market_value_block(
     details: list[DetailRow] | None,
     fund_flow_data: dict | None,
     start_row: int,
+    purchase_status_data: dict | None = None,
 ) -> tuple[float, float, float, float, list[DetailRow], int]:
     """写入区块①「市值核算明细」，返回 (汇总数据, 明细行, 下一可用行号)。"""
     has_flow = fund_flow_data is not None
-    ncols = _MV_NCOLS_WITH_FLOW if has_flow else _MV_NCOLS
-    headers = _MV_HEADERS + _MV_EXTRA_HEADERS if has_flow else _MV_HEADERS
+    show_purchase = purchase_column_visible(purchase_status_data)
+    ncols = _MV_NCOLS + (1 if has_flow else 0) + (1 if show_purchase else 0)
+    headers = _MV_HEADERS
+    if has_flow:
+        headers = headers + _MV_EXTRA_HEADERS
+    if show_purchase:
+        headers = headers + _MV_PURCHASE_HEADERS
     _details = details or []
 
     row = write_title_row(ws, start_row, _BLOCK_TITLE_MARKET_VALUE, ncols)
@@ -333,7 +361,7 @@ def _write_market_value_block(
 
     # 按账户分组写入明细 + 小计
     grand_mv, grand_cost, grand_profit, grand_today, row = _write_account_groupings(
-        ws, _details, data_start, fund_flow_data
+        ws, _details, data_start, fund_flow_data, purchase_status_data
     )
 
     # 总计
@@ -357,7 +385,9 @@ def _write_market_value_block(
     ]
     if has_flow:
         total_vals += [""]  # 资金加权成本总计列留空（批次口径不跨账户聚合）
-    write_total_row(ws, row, "总计", total_vals[1:], ncols, _mv_num_formats(has_flow))
+    if show_purchase:
+        total_vals += [""]  # 申购状态总计列留空（非可聚合指标）
+    write_total_row(ws, row, "总计", total_vals[1:], ncols, _mv_num_formats(has_flow, show_purchase))
 
     # 对盈亏列着色
     _apply_profit_colors(ws, data_start, row, profit_col=12, rate_col=13, today_col=14)
@@ -522,6 +552,7 @@ def write_holdings_detail_sheet(
     holdings: list[Holding] | None = None,
     details: list[DetailRow] | None = None,
     fund_flow_data: dict | None = None,
+    purchase_status_data: dict | None = None,
 ) -> tuple[float, float, float, float, list[DetailRow]]:
     """写入「持仓明细与分类」工作表（区块①市值明细 + 区块②分类汇总）。
 
@@ -531,18 +562,29 @@ def write_holdings_detail_sheet(
         details: 预计算明细行（必须传入，由编排器预计算）
         fund_flow_data: 成本流水数据契约（非 None 时两区块各追加子列；
             None 时保持既有 15 列 / 10 列输出）
+        purchase_status_data: 申购限购状态契约（开关 `fund_purchase_limit`；
+            None 或 available=False 时申购状态列不渲染——保持既有输出；
+            开启时市值明细区块末列追加「申购状态」，并在区块①下方空行写口径脚注）
 
     Returns:
         (总市值, 总成本, 总盈亏, 本日总盈亏, 明细行列表)
     """
     _details = details or []
     _holdings = holdings or []
+    show_purchase = purchase_column_visible(purchase_status_data)
+    title_cols = _MV_NCOLS_WITH_FLOW + (1 if show_purchase else 0)
 
-    row = write_title_row(ws, 1, get_report_sheet_name("holdings_detail"), _MV_NCOLS_WITH_FLOW)
+    row = write_title_row(ws, 1, get_report_sheet_name("holdings_detail"), title_cols)
 
     grand_mv, grand_cost, grand_profit, grand_today, _details, next_row = _write_market_value_block(
-        ws, _details, fund_flow_data, row
+        ws, _details, fund_flow_data, row, purchase_status_data
     )
+
+    # 口径脚注：占用区块①与区块②之间的空行（文案单源，与 HTML 端同一条）
+    if show_purchase:
+        foot = ws.cell(row=next_row, column=1, value=purchase_status_footnote(purchase_status_data))
+        foot.font = Font(size=9, color="999999")
+        ws.merge_cells(start_row=next_row, start_column=1, end_row=next_row, end_column=title_cols)
 
     _write_category_block(ws, _holdings, _details, fund_flow_data, next_row + 1)
 

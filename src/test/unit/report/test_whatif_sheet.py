@@ -247,6 +247,59 @@ class TestWhatifExcelSheets(unittest.TestCase):
 
     # ── 持仓变动明细页签 ─────────────────────────────────
 
+    def test_changes_sheet_feasibility_block_rendered(self):
+        """受限提示块命中 → 标题、话术、可行性列出现。"""
+        data = _whatif_data()
+        data["feasibility"] = [
+            {
+                "action": "新增",
+                "name": "易方达蓝筹",
+                "code": "519674",
+                "status": "限大额",
+                "kind": "limited",
+                "amount": 1000.0,
+                "days": 10,
+                "feasible": True,
+                "limit_text": "100",
+                "next_open_text": "",
+                "note_text": "限大额，日限 100 元，预计需 10 个交易日（估算·以渠道显示为准）",
+            }
+        ]
+        ws = self._write_sheet("write_whatif_changes_sheet", data)
+        flat = self._flat(ws)
+        self.assertTrue(any("申购受限提示" in v for v in flat), "应含提示块标题")
+        self.assertIn("限大额，日限 100 元，预计需 10 个交易日（估算·以渠道显示为准）", flat)
+        self.assertIn("可行", flat)
+        self.assertIn("519674", flat)
+
+    def test_changes_sheet_infeasible_flag(self):
+        """超阈值 → 可行性列「不可行」。"""
+        data = _whatif_data()
+        data["feasibility"] = [
+            {
+                "action": "新增",
+                "name": "易方达蓝筹",
+                "code": "519674",
+                "status": "限大额",
+                "kind": "limited",
+                "amount": 10_000_000.0,
+                "days": 100_000,
+                "feasible": False,
+                "limit_text": "100",
+                "next_open_text": "",
+                "note_text": "限大额，日限 100 元，预计需 100000 个交易日（> 60）路径不可行（估算·以渠道显示为准）",
+            }
+        ]
+        ws = self._write_sheet("write_whatif_changes_sheet", data)
+        flat = self._flat(ws)
+        self.assertIn("不可行", flat)
+
+    def test_changes_sheet_without_feasibility_unchanged(self):
+        """feasibility 缺席 → 提示块整块不写（降级态输出与现网逐字节一致）。"""
+        ws = self._write_sheet("write_whatif_changes_sheet", _whatif_data())
+        flat = self._flat(ws)
+        self.assertFalse(any("申购受限提示" in v for v in flat), "降级态不应出现提示块")
+
     def test_changes_sheet_full(self):
         """变动明细页：全部变动条目 + 动作列。"""
         ws = self._write_sheet("write_whatif_changes_sheet", _whatif_data())

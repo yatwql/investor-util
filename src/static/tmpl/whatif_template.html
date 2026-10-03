@@ -404,9 +404,44 @@
         </div>
     </div>
 
-    <!-- ⑦ 说明 -->
+    {% if _w.get("feasibility") %}
+    <!-- ⑦ 申购受限提示 -->
     <div class="section">
-        <div class="section-title">⑦ 说明</div>
+        <div class="section-title">⑦ 申购受限提示（目标持仓落地可行性）</div>
+        <div class="section-content">
+            <table>
+                <thead>
+                    <tr>
+                        <th>变动</th>
+                        <th>名称</th>
+                        <th>代码</th>
+                        <th>申购状态</th>
+                        <th>提示</th>
+                        <th>估算天数(交易日)</th>
+                        <th>可行性</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for n in _w.get("feasibility", []) %}
+                    <tr>
+                        <td>{{ n.get("action", "") }}</td>
+                        <td>{{ n.get("name", "") }}</td>
+                        <td>{{ n.get("code", "") }}</td>
+                        <td>{{ n.get("status", "") }}</td>
+                        <td>{{ n.get("note_text", "") }}</td>
+                        <td class="text-right">{{ n.get("days") if n.get("days") is not none else "—" }}</td>
+                        <td>{{ "—" if n.get("feasible") is none else ("可行" if n.get("feasible") else "不可行") }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ⑧ 说明 -->
+    <div class="section">
+        <div class="section-title">⑧ 说明</div>
         <div class="section-content">
             <div class="notice-banner">
                 <div>* 口径：权重基于成本 = 份额 × 每份成本（成本口径截面比较，本地计算、零网络请求）。</div>

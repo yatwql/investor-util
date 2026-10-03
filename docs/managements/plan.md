@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.12.2-dev
-> **编号源**：`plan-next = 72`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-71，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 75`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-74，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -55,13 +55,28 @@
 >
 > 剩余 P4 三项（plan-66 ~ plan-68）仍为候选；**立项前须先做本仓库现状比对**（rf-510 教训：plan-64 原立项前提「无生成后质检」即被 `llm/fact_checker` 既有实现部分推翻，最终按「分层不重叠」重新定位）。
 
-### P4 — 实验功能
+> **plan-72 已完成归档**（2026-10-03）：本期迭代 1~3（数据链路 → 展示集成 → 文档登记）P0 门禁十项全绿完成（手工真实抓取验收 HTTP 200 / 27,695 行 / `purchase_schema=1`），完成态见 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；迭代 4（合并/调仓联动）另立 `plan-74`，设计文档保留在在办区供其消费 §6/§8。
 
-> **本批 P4 已清空**：plan-66 / plan-67 / plan-68 经现状比对后**全部归档为「已评估未采纳」**（2026-10-01，见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)）——三项立项前提均被本仓库既有实现推翻（辩论模式已含「共识与分歧摘要」、prompt 已有 `system_prompt_*` 配置级整段覆盖、新闻已 5 源聚合 + 去重 + 反向标题检测）。TradingAgents-CN 借鉴批至此整体收口。
+#### 🔲 `plan-73` 限购信息接入 LLM 分析维度（智囊团复盘 / 穿透深析提示词扩展）
 
-### P3 — 预期实施（纪律项）
+**动机**：plan-72 落地的申购限购数据（`purchase_status_data` 契约：申购状态 / 日累计限额 / 下一开放日 / 数据时效）目前只服务持仓展示与（二期）合并联动；分析类章节的提示词不含该维度——智囊团深度复盘、穿透深度分析在评估 QDII / 场外基金的加仓、合并与配置建议时，看不到「目标基金限大额 / 暂停申购」这一**可执行性硬约束**，可能给出实际下不了单的建议（与合并联动同一风险面，落在文本分析维度）。
 
-> **plan-69 已完成归档**（2026-10-01）：比对清单已落 `developer-guide.md`「外部借鉴前置比对清单」节，完成态见归档文档。
+**前置**：plan-72 迭代 2 完成（`purchase_status_data` 契约注入 pipeline 后才有稳定数据可传）。
+
+**动作**：**本期只出设计文档**到 `docs/plan/`（同 plan-72 流程，2026-10-03 用户决策：先评审后实施）。设计文档需定清：
+
+1. **注入范围 = 全部 LLM 分析章节**（用户确认，2026-10-03）：智囊团深度复盘（`_build_expert_review_prompt`）与穿透深度分析（`_build_penetration_deep_prompt`）为首批点名对象，行动建议 / what-if 等其余分析章节逐一盘点接线点，全部复用**同一份确定性摘要渲染**（单源，不逐章各写一份）；
+2. **数据完备时**（契约 `available=true` 且开关 `fund_purchase_limit` 开）：以**确定性模板**渲染限购摘要（仅限大额 / 暂停申购的持仓：代码、状态、日限额、下一开放日 + 天天基金渠道口径声明），注入各章用户提示词；
+3. **数据不可用 / 开关关 / 时效超限 → 提示词逐字节不变**（降级零影响，与展示层同口径；绝不因数据缺失让 LLM 猜测限购状态）；
+4. 不新增模型调用、不建平行配置路径（开关复用 `fund_purchase_limit`）；prompt 变更对**模块指纹 / 缓存指纹**的影响按指纹唯一事实来源纪律处理，避免无谓全量重算或缓存失配。
+
+**预估成本**：低~中（一个确定性摘要渲染函数 + 两处 prompt 接线 + 单测）；**价值**：中（补齐分析建议的可执行性维度，QDII 限购是高频现实约束）。
+
+**产出**：设计文档 [`docs/plan/fund-purchase-limit-llm-context-design.md`](../plan/fund-purchase-limit-llm-context-design.md)（2026-10-03 提交，含现状比对/单源渲染/统一附录注入/指纹与降级矩阵/迭代拆分，**待评审**）；迭代实施按设计 §6 的**四迭代可验收结构**（渲染器+契约 → 主路径+指纹 → 覆盖面核验 → 文档门禁，每迭代独立出口检查与回滚）。
+
+**进度**：2026-10-03 设计完成，待评审；评审通过后按设计 §6 迭代 1→4 实施。
+
+> **plan-74 已完成归档**（2026-10-03）：四迭代（受限索引与判定原语 → What-if 接线 → 回归网与零改动断言 → 文档登记）P0 门禁十项全绿完成；What-if 目标持仓申购受限提示落地（`restricted_index` 契约字段 + `evaluate_purchase_feasibility` 判定 + Excel/HTML 双端提示块，降级态逐字节回退）。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-advice-design.md`](../plan/fund-purchase-limit-advice-design.md) 已改「设计 + 已实施」随归档留存。
 
 #### 🔲 `plan-70` 决策跨期反思闭环（decision_reflection）验证死线
 
@@ -77,6 +92,7 @@
 
 ## 归档
 
+- [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md) — v0.12.x 已完成项
 - [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项
 - [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项
 - [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项

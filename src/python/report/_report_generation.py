@@ -79,6 +79,7 @@ def _generate_full_html_report(
     financial_report_digest_data: dict | None = None,
     financial_indicator_data: dict | None = None,
     market_sentiment_data: dict | None = None,
+    purchase_status_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -168,6 +169,7 @@ def _generate_full_html_report(
             enable_fundamental_snapshot=enable_fundamental_snapshot,
             financial_report_digest_data=financial_report_digest_data,
             financial_indicator_data=financial_indicator_data,
+            purchase_status_data=purchase_status_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True
@@ -274,6 +276,13 @@ def _generate_report_both(
         financial_indicator_data = build_financial_indicator(
             holdings, config, reporter, prices=collect_price_map(details)
         )
+
+    # 申购限购状态（数据契约 purchase_status_data）：功能开关 `fund_purchase_limit`
+    # 开启时取全量表（会话内单次）；关闭时为 None（申购状态列隐藏），
+    # 全链失败为 available=False（静默隐列，不阻断报告生成）
+    from src.python.report.purchase_status import build_purchase_status_data
+
+    purchase_status_data = build_purchase_status_data(config)
 
     # ── 2. 快照对比（始终执行） ──
     perf.start("快照对比")
@@ -426,6 +435,7 @@ def _generate_report_both(
             enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
             financial_report_digest_data=financial_report_digest_data,
             financial_indicator_data=financial_indicator_data,
+            purchase_status_data=purchase_status_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -464,6 +474,7 @@ def _generate_report_both(
             enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
             financial_report_digest_data=financial_report_digest_data,
             financial_indicator_data=financial_indicator_data,
+            purchase_status_data=purchase_status_data,
         )
         reporter.ok("Excel 报告已生成")
         result.excel_ok = True
@@ -570,6 +581,9 @@ def _generate_report_full(
         pipeline_data["financial_report_digest_data"] = prep.get("financial_report_digest_data")
         # 财务指标（数据契约，prep 中已组装；开关关闭时为 None）
         pipeline_data["financial_indicator_data"] = prep.get("financial_indicator_data")
+        # 申购限购状态（数据契约，prep 中已组装；开关关闭时为 None、
+        # 全链失败时 available=False——渲染层据此静默隐列）
+        pipeline_data["purchase_status_data"] = prep.get("purchase_status_data")
     _validate_pipeline_snapshot(pipeline_data)
     # 2b. 组合演进数据（聚合多期快照，evolution_data；开关关闭时跳过计算）
     if _enable_portfolio_evolution:
@@ -733,6 +747,7 @@ def _generate_report_full(
         enable_fundamental_snapshot=_enable_financial_indicator or _enable_financial_report_digest,
         financial_report_digest_data=(pipeline_data or {}).get("financial_report_digest_data"),
         financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
+        purchase_status_data=(pipeline_data or {}).get("purchase_status_data"),
         market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
     )
 

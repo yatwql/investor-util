@@ -23,6 +23,16 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 class TestRunWhatifSimulation(unittest.TestCase):
     """run_whatif_simulation 共享业务核心。"""
 
+    def setUp(self) -> None:
+        # 申购受限索引为本层新增挂载：统一兜底空索引（索引行为由独立用例覆盖），
+        # 避免既有用例触发真实契约取数（测试隔离：whatif 路径 mock 契约获取）
+        patcher = patch(
+            "src.python.report.whatif_operations._purchase_restricted_index",
+            return_value={},
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @patch("src.python.report.whatif_operations.write_whatif_report")
     @patch("src.python.report.whatif_operations.build_whatif_data")
     def test_success_outputs_both_reports(
@@ -98,6 +108,15 @@ class TestRunWhatifSimulation(unittest.TestCase):
 
 class TestRunWhatifSimulationBacktest(unittest.TestCase):
     """run_whatif_simulation 指定生效日时序回测集成（mock build_whatif_backtest）。"""
+
+    def setUp(self) -> None:
+        # 同 TestRunWhatifSimulation：申购受限索引统一兜底空索引（隔离契约取数）
+        patcher = patch(
+            "src.python.report.whatif_operations._purchase_restricted_index",
+            return_value={},
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     @patch("src.python.report.whatif_operations.write_whatif_report")
     @patch("src.python.report.whatif_operations.build_whatif_data")
@@ -248,3 +267,67 @@ class TestNormalizeEffectiveDate(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPurchaseRestrictedIndex(unittest.TestCase):
+    """申购受限索引挂载（单点 helper：透传 / 异常兜底 / 接线存在性）。"""
+
+    def test_helper_builds_index_via_single_mount(self):
+        """helper 经缓存链契约 + 目标 codes 构索引（单点挂载，返回 build 结果）。"""
+        from src.python.report import whatif_operations as wop
+
+        contract = {"available": True, "rows": {}, "fetched_at": None}
+        with (
+            patch("src.python.config.get_config", return_value={}),
+            patch(
+                "src.python.report.orchestrator.compute_purchase_status_data",
+                return_value=contract,
+            ),
+            patch(
+                "src.python.report.purchase_status.build_restricted_index",
+                return_value={"519674": {"status": "限大额"}},
+            ) as m_build,
+        ):
+            index = wop._purchase_restricted_index([MagicMock(code="519674")])
+        self.assertEqual(index, {"519674": {"status": "限大额"}})
+        m_build.assert_called_once()
+        self.assertIs(m_build.call_args.args[0], contract)
+        self.assertEqual(m_build.call_args.args[1], ["519674"])
+
+    def test_helper_contract_failure_degrades_to_empty(self):
+        """取契约异常 → 兜底空索引（不阻断模拟；仅 Exception，不吞 BaseException）。"""
+        from src.python.report import whatif_operations as wop
+
+        with (
+            patch("src.python.config.get_config", return_value={}),
+            patch(
+                "src.python.report.orchestrator.compute_purchase_status_data",
+                side_effect=RuntimeError("boom"),
+            ),
+        ):
+            self.assertEqual(wop._purchase_restricted_index([]), {})
+
+    def test_restricted_index_passed_to_build(self):
+        """run_whatif_simulation 把索引透传给 build_whatif_data（接线存在性）。"""
+        from src.python.report.whatif_operations import run_whatif_simulation
+
+        fake_index = {"519674": {"status": "限大额"}}
+        with (
+            patch(
+                "src.python.report.whatif_operations._purchase_restricted_index",
+                return_value=fake_index,
+            ),
+            patch("src.python.report.whatif_operations.build_whatif_data") as m_build,
+            patch("src.python.report.whatif_operations.write_whatif_report") as m_write,
+        ):
+            m_build.return_value = {"available": True, "changes": []}
+            m_write.return_value = {"excel": "/r/e.xlsx", "html": "/r/h.html"}
+            result = run_whatif_simulation(
+                [MagicMock()],
+                [MagicMock()],
+                base_file="/x/基准.xlsx",
+                candidate_file="/x/目标.xlsx",
+                output_dir="reports",
+            )
+        self.assertTrue(result.ok)
+        self.assertIs(m_build.call_args.kwargs["restricted_index"], fake_index)

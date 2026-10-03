@@ -3298,6 +3298,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `financial_report_digest` | 持仓个股财报摘要（持仓基本面章区块二：A 股标的取最新年报章节原文摘要；数据源 DataSinking，需用户自备 key） | 持仓基本面 | 数据获取 | 功能开关 `financial_report_digest`（默认关） |
 | `financial_indicator` | 财务指标（数据域 + 持仓基本面章区块一：上市公司单报告期结构化指标 + 质量档 + 年度趋势 + 当前 PE/PB） | 持仓基本面 | 数据获取 | 功能开关 `financial_indicator`（默认关） |
 | `financial_indicator_data` | 财务指标数据契约（C19：available/reason/rows/failures/entry_count） | 持仓基本面 | 数据获取 | 无（契约） |
+| `fund_purchase_limit` | 基金申购限购状态列（持仓明细市值明细末列：申购状态 + 日限额/下一开放日，天天基金渠道口径；数据不可用静默隐列） | 持仓明细与分类 | 数据获取 | 功能开关 `fund_purchase_limit`（默认开） |
+| `purchase_status_data` | 申购限购状态数据契约（C19：available/reason/rows/fetched_at/source） | 持仓明细与分类 | 数据获取 | 无（契约） |
+| `purchase_status` | 申购状态展示装配与展示单源（`report/purchase_status.py`：契约构建/陈旧阶梯分档/单元格文案/口径脚注，Excel 与 HTML 共用） | 持仓明细与分类 | 报告输出 | 无（单源模块） |
 | `fundamental_snapshot` | 持仓基本面（合并章：财务指标区块 + 财报摘要区块同页签/同章节呈现；可见性 `data_flag_any` OR，块级开关各控各的） | 持仓基本面 | 报告输出 | `enable_fundamental_snapshot`（= 两功能开关任一开启） |
 | `fundamental_snapshot_sheet` | 合并章 Excel 写入器（`write_fundamental_snapshot_sheet`；区块写入器 `_write_indicator_block` / `_write_digest_block`） | 持仓基本面 | 报告输出 | 无（渲染） |
 | `compute_real_valuation` | 真实历史估值分位（TTM 口径：多期每股收益差分 × 历史收盘价 → 历史 PE/PB 序列 → 当前值分位） | 资产穿透TOP10 | 分析计算 | 无（纯计算） |
@@ -3413,6 +3416,16 @@ make_http_client(timeout=10.0) → httpx.Client
 | `estimated_fund_codes` | 推演集合判定唯一事实来源（有可用推演值且无直接 ROE 的基金代码集；评分侧与契约说明/持仓视角标注侧共用，两侧不得各自实现） | 行动建议（章内嵌块） | 分析计算 | 无 |
 | `otc_redemption_days_default` | 场外基金赎回天数类型默认档（货币/短债 T+1、纯债 T+2、其他场外 T+3、QDII T+7；非实测口径，未识别返回 None；供流动性维与场外赎回标签共用） | 行动建议（章内嵌块）/ 流动性风险 | 分析计算 | 无 |
 > **合并章代码标识符**：合并章 sheet key 统一为语义名——`holdings_detail`（持仓明细与分类，合并 `market_value` + `category`）、`position_structure`（持仓结构与集中度，合并 `position_relationship` + `fund_concentration`）、`fundamental_snapshot`（持仓基本面，合并 `financial_indicator` + `financial_report_digest`）、`portfolio_history_drawdown`（组合历史走势与回撤，合并 `portfolio_history` + `drawdown_analysis`）、`style_factor`（风格与因子分析，合并 `fund_style` + `factor_exposure`）；实现层（模块、函数、变量、注释）一律用语义名，禁止沿用旧 key、禁止用任务编号命名。
+| `purchase_status_data` | 申购限购状态数据契约（C19：available/reason/rows/fetched_at/source/restricted_index） | 持仓明细与分类 | 数据获取 | 无（契约） |
+| `restricted_index` | 受限标的预格式化索引（code → 状态/日限额数值与文案/下一开放日/时效档；准入不满足 → 空索引 = 消费方回退） | 持仓明细与分类 | 数据获取 | 无（契约字段） |
+| `build_restricted_index` | 受限标的预格式化索引渲染（持仓 ∩ 受限状态集，字段值与单元格同源格式化） | 持仓明细与分类 | 数据获取 | 无 |
+| `_filter_restricted_rows` | 受限行筛选共享单源（准入 + 格式化字段值，建议层只读消费） | 持仓明细与分类 | 数据获取 | 无 |
+| `evaluate_purchase_feasibility` | 申购可行性判定（限大额天数估算 / 暂停引用下一开放日 / 金额或限额未知不给天数，超阈值判不可行） | 行动建议 | 调仓 | 无 |
+| `FEASIBILITY_MAX_DAYS` | 可行性天数阈值（交易日；超阈值判路径不可行） | 行动建议 | 调仓 | 无 |
+| `describe_feasibility` | 受限提示话术（静态模板 + 索引字段值，含估算口径；Excel/HTML 单源） | 行动建议 | 报告输出 | 无 |
+| `feasibility` | What-if 契约受限提示字段组（仅受限存在时追加的条件键，降级缺席 = 逐字节回退） | 行动建议 | 报告输出 | 无（契约字段） |
+| `_purchase_restricted_index` | What-if 路径受限索引单点挂载（经缓存链取契约，异常兜底空索引） | 行动建议 | 数据获取 | 无 |
+| `_build_feasibility_notes` | What-if 买入腿提示生成（新增/加仓判定，金额口径目标成本/成本增量；卖出腿不判定） | 行动建议 | 调仓 | 无 |
 <!-- semantic-index:end -->
 
 > **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~17（章节合并后条目由 21 降为 17，序号整体重排；`llm_usage` 强制末位）。
@@ -3821,6 +3834,7 @@ investor-util/
 | market_temperature_data | dict | 是 | prepare_report_data |
 | financial_report_digest_data | dict | 是 | prepare_report_data；both 路径由 _generate_report_both 就地构建 |
 | financial_indicator_data | dict | 是 | prepare_report_data；both 路径由 _generate_report_both 就地构建 |
+| purchase_status_data | dict | 是 | prepare_report_data；both 路径由 _generate_report_both 就地构建 |
 | diff | dict | 是 | capture_snapshot |
 | decision_review_data | dict | 是 | record_llm_decisions_and_review_block |
 | prosperity_framework_data | dict | 是 | prepare_report_data（full/both）；basic 路径由 generate_excel_report 就地构建 |
@@ -3837,6 +3851,8 @@ investor-util/
 > `financial_report_digest_data`（持仓个股财报摘要，C19 契约，5 键）：`{"available": bool, "reason": str, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`symbol`/`report_period`/`doc_type`（中文标签）/`title`/`announcement_date`/`summary`/`source`/`adjunct_url`；`failures` 每项含 `code`/`name`/`reason`。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）的目标章节正文并按 `datasink.max_chars` 截断，由 `report/financial_report_digest.py::build_financial_report_digest` 装配（数据源 `providers/datasink.py`，取数编排 `fetcher/financial_report.py`）。开关 功能开关 `financial_report_digest` 默认关（关闭 → None → 章节隐藏）；缺凭据/无 A 股标的/全部无覆盖 → `available=False` 降级。合规：`source` 为披露平台归属，渲染层须保留。C7 注册：该契约并入合并章 `fundamental_snapshot` 的 `data_flag_any`（无独立 type）。消费方：Excel `report/fundamental_snapshot_sheet.py::_write_digest_block` 与 HTML `partials/fundamental_snapshot_section.html`（区块二）。
 >
 > `financial_indicator_data`（财务指标，C19 契约，5 键）：`{"available": bool, "reason": str, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`report_period`/`doc_type`/`doc_type_label`/`source_api`/`source`/`revenue`/`net_profit`/`revenue_yoy`/`net_profit_yoy`/`gross_margin`/`roe`/`debt_ratio`/`operating_cash_flow`/`eps`/`bvps`/`pe`/`pb`/`quality_grade`/`quality_score`/`trend`/`series`/`period_count`；`failures` 每项含 `code`/`name`/`reason`。对持仓 + 穿透中的 A 股标的取多期指标（`fetcher/financial_indicator.py`：主源 akshare 一次调用得多期；主源不可用时先由**同花顺官方合并报表派生多期**（`analysis/financial_statement_derive.py`，三张报表各一次请求即得多期），再退化为链路单期记录），由 `analysis/financial_indicator.py::quality_grade`/`trend_label`/`current_valuation` 派生质量档（ROE/毛利率/资产负债率/经营现金流对净利覆盖 四维均值启发式，**非投资建议、非评级**，阈值不区分行业）、年度趋势（相邻年报营收与净利）与当前 PE/PB（**官方 TTM/MRQ 口径优先**：数据源提供 `pe_ttm`/`pb_mrq` 时直接采用；缺失才回退「现价 ÷ 该报告期每股收益/每股净资产」，亏损或净资产非正留空——自算口径在半年报/季报上会明显虚高，两者混用会误导估值判断），由 `report/financial_indicator.py::build_financial_indicator` 装配（现价来自行情明细，经 `fetcher/financial_indicator.py::collect_price_map`）。开关 功能开关 `financial_indicator` 默认关（关闭 → None → 章节隐藏）；无 A 股标的/数据源不可用 → `available=False` 降级。历史 PE/PB 分位（TTM 口径）属后续阶段，本章只给当前值。C7 注册：该契约并入合并章 `fundamental_snapshot` 的 `data_flag_any`（无独立 type）。消费方：Excel `report/fundamental_snapshot_sheet.py::_write_indicator_block` 与 HTML `partials/fundamental_snapshot_section.html`（区块一）。
+
+> `purchase_status_data`（申购限购状态，C19 契约，6 键）：`{"available": bool, "reason": str\|None, "rows": dict, "fetched_at": str\|None, "source": str\|None, "restricted_index": dict}`。`restricted_index` 为受限标的预格式化索引（code → status/limit/limit_text/next_open_text/level，由 `purchase_status.py::build_restricted_index` 经 `_filter_restricted_rows` 单源筛选与格式化、`report/orchestrator.py` 编排层注入；准入不满足 → `{}`，消费方按缺席回退；What-if 路径经 `whatif_operations._purchase_restricted_index` 单点就地构建同名索引）。`rows` 为 `{代码: {purchase_status, redemption_status, next_open_date, daily_limit, min_purchase}}`（0 元/缺失限额在解析层已单点转 `daily_limit=None` → 展示「限额未知」）；由 `fetcher/fund_purchase.py::fetch_fund_purchase_status_cached` 取天天基金全量表（Provider Chain + `purchase_schema` 载荷准入 + 会话复用），`report/purchase_status.py::build_purchase_status_data` 装配。开关 功能开关 `fund_purchase_limit` 默认开（关闭 → None → 列隐藏）；全链失败 → `available=False` 静默隐列（不阻断主链路）。时效分档由 `purchase_status.py::stale_level` 按交易日历计（≤3 正常 / 4~7 展示并标数据陈旧 / >7 显示「—」，宁缺毋错，长假不计入）。单元格文案、口径脚注、列可见判据均单源于 `report/purchase_status.py`（Excel 与 HTML 共用，不发散）。消费方：HTML `report_template.html` 持仓市值明细条件列（`purchase_status_display`）与 Excel `report/holdings_detail_sheet.py`（市值明细末列追加 + 区块①下方口径脚注）；What-if 目标持仓受限提示（`analysis/whatif.py::build_whatif_data` 的 `restricted_index` 形参 → 契约条件键 `feasibility` → Excel 持仓变动明细尾部区块 + HTML⑦申购受限提示节）。
 
 > `style_factor_data`（风格与因子分析，C19 契约，13 键 + 内嵌 `industry_beta` 子键）：主键 `{"available": bool, "status": str, "betas": {factor: float}, "t_stats": {factor: float}, "significant": {factor: bool}, "style_allocation": {factor: float}, "baseline_betas": {factor: float}, "factor_correlations": {pair: float}, "correlation_note": str, "alpha": float, "window": int, "sample_count": int, "stale_factors": list[str]}`。MVP 3 因子（价值/成长/质量），由 `analysis/style_factor_regression.py` 计算、`report/orchestrator.py` 组装。子键 `industry_beta`（行业 Beta，`industry_beta.py::compute_industry_beta_analysis`，开关 功能开关 `industry_beta` 默认关；关闭 → None → 区块隐藏）：`{"available": bool, "exposure": {industry: float}, "index_codes": {industry: str}, "betas": {industry: float}, "t_stats": {industry: float}, "significant": {industry: bool}, "correlations": {industry: float}, "unmapped_industries": list[str]}`——行业暴露占比按持仓市值聚合，行业指数为中证行业指数（`INDUSTRY_INDEX_MAP`），β 复用 `compute_factor_exposure` 单因子 OLS。C7 注册见 §8.3（type=`fund_deep_analysis`、data_flag=`style_factor_data`），计算方案/架构约束/降级分支见 §4.8 风格与因子分析。
 
