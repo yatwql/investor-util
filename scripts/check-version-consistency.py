@@ -5,13 +5,13 @@
 
   - pyproject.toml          version = "X.Y.Z"
   - README.md               > 当前版本：X.Y.Z
-  - docs-stm/managements/plan.md, technical.md, requirements.md,
+  - docs/managements/plan.md, technical.md, requirements.md,
     testplan.md, review-findings.md, llm-technical.md,
     folders.md, test-coverage.md
                             最后更新：...（vX.Y.Z ...）
-  - docs-stm/managements/developer-guide.md
+  - docs/managements/developer-guide.md
                             最后更新：...（vX.Y.Z）
-  - docs-stm/managements/changelog.md
+  - docs/managements/changelog.md
                             ## [X.Y.Z]
 
 用法：
@@ -81,28 +81,28 @@ CHECKS.append((REPO_ROOT / "src" / "python" / "core" / "constants.py", "exact", 
 
 # Markdown 管理文档
 add_exact(REPO_ROOT / "README.md", r"> 当前版本：{v}")
-add_header(REPO_ROOT / "docs-stm" / "managements" / "plan.md")
-add_header(REPO_ROOT / "docs-stm" / "managements" / "technical.md")
-add_header(REPO_ROOT / "docs-stm" / "managements" / "requirements.md")
-add_header(REPO_ROOT / "docs-stm" / "managements" / "testplan.md")
-add_header(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md")
-add_header(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md")
-add_header(REPO_ROOT / "docs-stm" / "managements" / "folders.md")
+add_header(REPO_ROOT / "docs" / "managements" / "plan.md")
+add_header(REPO_ROOT / "docs" / "managements" / "technical.md")
+add_header(REPO_ROOT / "docs" / "managements" / "requirements.md")
+add_header(REPO_ROOT / "docs" / "managements" / "testplan.md")
+add_header(REPO_ROOT / "docs" / "managements" / "review-findings.md")
+add_header(REPO_ROOT / "docs" / "managements" / "llm-technical.md")
+add_header(REPO_ROOT / "docs" / "managements" / "folders.md")
 # folders.md 版本演进对照表「当前开发版」列头版本号（同文件第二条断言，
 # 与版本头双点同步——表头是文档化读数，漏改即报错）
-add_evolution_head(REPO_ROOT / "docs-stm" / "managements" / "folders.md")
+add_evolution_head(REPO_ROOT / "docs" / "managements" / "folders.md")
 # folders.md 版本演进「最新发布」列（表头 + 说明行）↔ changelog 发布指针单源
 CHECKS.append(
     (
-        REPO_ROOT / "docs-stm" / "managements" / "folders.md",
+        REPO_ROOT / "docs" / "managements" / "folders.md",
         "release_tag",
-        (REPO_ROOT / "docs-stm" / "managements" / "changelog.md",),
+        (REPO_ROOT / "docs" / "managements" / "changelog.md",),
     )
 )
-add_header(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md")
+add_header(REPO_ROOT / "docs" / "managements" / "test-coverage.md")
 # changelog 无「文档版本：」头，用 [X.Y.Z] 标题行 contains 校验
-add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md", "[{v}]")
-add_header(REPO_ROOT / "docs-stm" / "managements" / "developer-guide.md")
+add_contains(REPO_ROOT / "docs" / "managements" / "changelog.md", "[{v}]")
+add_header(REPO_ROOT / "docs" / "managements" / "developer-guide.md")
 
 
 # ── 校验逻辑 ────────────────────────────────────────────────

@@ -13,7 +13,7 @@
   - plan.md            → `plan-next = N`
   - review-findings.md → `rf-next = N`
 
-校验逻辑：扫描当前管理文档 + 全部历史归档（docs-stm/archive/*/），取该
+校验逻辑：扫描当前管理文档 + 全部历史归档（docs/archive/*/），取该
 前缀实际出现过的最大编号，断言 `next` 严格大于它（即 next 是真正未用的）。
 若 `next <= 已用最大` 或标记缺失，说明有人手工新增任务后忘了递增标记，
 或标记初值写小——报错提示把 next 修正为「已用最大 + 1」。
@@ -39,8 +39,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享设施（_checklib）
 from _checklib import REPO_ROOT, add_common_args, report  # noqa: E402
 
-MANAGEMENTS_DIR = REPO_ROOT / "docs-stm" / "managements"
-ARCHIVE_DIR = REPO_ROOT / "docs-stm" / "archive"
+MANAGEMENTS_DIR = REPO_ROOT / "docs" / "managements"
+ARCHIVE_DIR = REPO_ROOT / "docs" / "archive"
 
 # 每类编号的配置：当前管理文档 + 编号源标记名
 KINDS: dict[str, dict[str, str]] = {

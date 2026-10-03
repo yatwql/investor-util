@@ -7,7 +7,7 @@
   - 数字与中文数字编号序列连续性（连续放行 / 跳变检出）
   - `xxx.md §N` 跨文档章节引用：归属、失配检出、非编号文档不自归属
   - 真实仓库冒烟：当前文档集零 finding（run_checks() 为空）
-  - 扫描范围：归档（docs-stm/archive）豁免、README/CLAUDE.md 在列
+  - 扫描范围：归档（docs/archive）豁免、README/CLAUDE.md 在列
 
 测试通过脚本 import 方式直接复用检查函数，不运行真实 CLI。
 """
@@ -153,6 +153,6 @@ class TestRealRepo:
 
     def test_scope_excludes_archive_and_covers_entry_docs(self, links):
         targets = [p.as_posix() for p in links.default_targets()]
-        assert all("docs-stm/archive" not in t for t in targets)
+        assert all("docs/archive" not in t for t in targets)
         names = {Path(t).name for t in targets}
         assert {"README.md", "CLAUDE.md"} <= names

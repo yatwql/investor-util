@@ -8,7 +8,7 @@
   python scripts/perf-report.py
 
 输出：
-  docs-stm/tmp/better-investment-performance-test-report.md
+  docs/tmp/better-investment-performance-test-report.md
 
 目标：
   - basic 模式总耗时 < 60s
@@ -37,7 +37,7 @@ _TARGET_SECONDS = 60  # 性能基准目标
 _20_HOLDINGS_COUNT = 20
 _REPORT_OUTPUT_DIR = os.path.join(
     _PROJECT_ROOT,
-    "docs-stm",
+    "docs",
     "tmp",
 )
 _PERF_REPORT_PATH = os.path.join(_REPORT_OUTPUT_DIR, "better-investment-performance-test-report.md")

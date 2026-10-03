@@ -87,8 +87,8 @@ def _stats_actual() -> dict[str, tuple[int, int]]:
     svg = sorted((REPO_ROOT / "src" / "static").glob("*.svg"))
     manuals = sorted(_MANUALS.glob("*.md"))
     mgmt = sorted(_MANAGEMENTS.glob("*.md"))
-    archive = sorted((REPO_ROOT / "docs-stm" / "archive").rglob("*.md"))
-    plan = sorted((REPO_ROOT / "docs-stm" / "plan").glob("*.md"))
+    archive = sorted((REPO_ROOT / "docs" / "archive").rglob("*.md"))
+    plan = sorted((REPO_ROOT / "docs" / "plan").glob("*.md"))
     readme = [_README]
     claude = [REPO_ROOT / "CLAUDE.md"]
     actual = {

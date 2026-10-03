@@ -42,13 +42,13 @@ _ARCHIVE_INDEX_PAIRS: tuple[tuple[Path, str], ...] = (
 
 
 def check_archive_index(docs: dict[Path, str] | None = None) -> list[str]:
-    """校验管理文档的归档索引与 ``docs-stm/archive/`` 实际文件双向一致。
+    """校验管理文档的归档索引与 ``docs/archive/`` 实际文件双向一致。
 
     **不读传入的 docs 映射**：历史记录类（如 changelog）不在 `_scan_docs()` 的扫描面内
     （正是本次缺口所在），故本项直接读文件；``docs`` 参数仅作兼容占位（传入亦被忽略）。
     """
     findings: list[str] = []
-    archive_root = REPO_ROOT / "docs-stm" / "archive"
+    archive_root = REPO_ROOT / "docs" / "archive"
     for doc_path, prefix in _ARCHIVE_INDEX_PAIRS:
         if not doc_path.exists():
             continue
@@ -60,7 +60,7 @@ def check_archive_index(docs: dict[Path, str] | None = None) -> list[str]:
         # 反向：索引引用了不存在的归档文件名
         for name in sorted(re.findall(rf"{re.escape(prefix)}[0-9a-z.]+\.md", text)):
             if name not in on_disk:
-                findings.append(f"{rel(doc_path)}: 归档索引引用的 `{name}` 在 docs-stm/archive/ 下不存在")
+                findings.append(f"{rel(doc_path)}: 归档索引引用的 `{name}` 在 docs/archive/ 下不存在")
     return findings
 
 
@@ -130,7 +130,7 @@ def check_management_partitions() -> list[str]:
     def _read(path: Path) -> str:
         return path.read_text(encoding="utf-8") if path.exists() else ""
 
-    archive_root = REPO_ROOT / "docs-stm" / "archive"
+    archive_root = REPO_ROOT / "docs" / "archive"
     return audit_management_partitions(
         review_findings=_read(_REVIEW_FINDINGS_MD),
         plan=_read(_PLAN_MD),

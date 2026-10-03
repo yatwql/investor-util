@@ -25,7 +25,7 @@ data/config/data_key.json
 # ── 运行时生成 ───────────────────────────────────────
 logs/
 reports/
-docs-stm/tmp/
+docs/tmp/
 test-reports/
 
 # ── pytest ──────────────────────────────────────────

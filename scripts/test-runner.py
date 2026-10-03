@@ -138,7 +138,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--update-docs",
         action="store_true",
-        help="自动更新 docs-stm/managements/test-coverage.md 环境耗时对照（隐含 --machine-info）",
+        help="自动更新 docs/managements/test-coverage.md 环境耗时对照（隐含 --machine-info）",
     )
     parser.add_argument("--help", action="store_true", help="显示帮助")
     args = parser.parse_args()

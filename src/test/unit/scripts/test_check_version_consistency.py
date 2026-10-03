@@ -101,15 +101,15 @@ class TestDocHeaderRegistration:
     """管理文档 CHECKS 注册为 header 校验，防止退回全文 contains（回归场景）。"""
 
     HEADER_DOCS = [
-        "docs-stm/managements/plan.md",
-        "docs-stm/managements/technical.md",
-        "docs-stm/managements/requirements.md",
-        "docs-stm/managements/testplan.md",
-        "docs-stm/managements/review-findings.md",
-        "docs-stm/managements/llm-technical.md",
-        "docs-stm/managements/folders.md",
-        "docs-stm/managements/test-coverage.md",
-        "docs-stm/managements/developer-guide.md",
+        "docs/managements/plan.md",
+        "docs/managements/technical.md",
+        "docs/managements/requirements.md",
+        "docs/managements/testplan.md",
+        "docs/managements/review-findings.md",
+        "docs/managements/llm-technical.md",
+        "docs/managements/folders.md",
+        "docs/managements/test-coverage.md",
+        "docs/managements/developer-guide.md",
     ]
 
     def test_doc_header_docs_registered_as_header(self, version_script):
@@ -129,7 +129,7 @@ class TestDocHeaderRegistration:
         for path, assert_type, _args in version_script.CHECKS:
             rel = str(path.relative_to(version_script.REPO_ROOT)).replace("\\", "/")
             types.setdefault(rel, set()).add(assert_type)
-        assert "evolution_head" in types.get("docs-stm/managements/folders.md", set())
+        assert "evolution_head" in types.get("docs/managements/folders.md", set())
 
     def test_folders_release_tag_registered(self, version_script):
         """folders.md 须注册 release_tag 断言（发布列 == changelog 发布指针）。"""
@@ -137,7 +137,7 @@ class TestDocHeaderRegistration:
         for path, assert_type, _args in version_script.CHECKS:
             rel = str(path.relative_to(version_script.REPO_ROOT)).replace("\\", "/")
             types.setdefault(rel, set()).add(assert_type)
-        assert "release_tag" in types.get("docs-stm/managements/folders.md", set())
+        assert "release_tag" in types.get("docs/managements/folders.md", set())
 
 
 # ── release_tag：版本演进「最近发布」列 ↔ changelog 发布指针单源 ─────────

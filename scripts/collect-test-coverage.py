@@ -3,7 +3,7 @@
 
 只做 pytest --collect-only（收集测试项，**不执行测试**），
 按 test-runner.py MODES 的 marker 表达式本地归类计数，
-输出各模式/子标记的项数，供 docs-stm/managements/test-coverage.md 更新使用。
+输出各模式/子标记的项数，供 docs/managements/test-coverage.md 更新使用。
 
 用法：
   python scripts/collect-test-coverage.py        # 收集并输出全部分组统计

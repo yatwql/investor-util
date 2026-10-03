@@ -124,7 +124,7 @@ fi
 
 # 5. 创建所需目录
 echo "正在创建数据目录 ..."
-mkdir -p data/holdings data/cache data/config docs-stm/tmp logs
+mkdir -p data/holdings data/cache data/config docs/tmp logs
 
 # 6. 启动主程序
 # 注册退出处理：TUI 退出后自动退出虚拟环境（覆盖 Ctrl+C / 正常退出 / 错误）

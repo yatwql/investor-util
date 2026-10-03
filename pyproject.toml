@@ -41,8 +41,8 @@ required_plugins = ["pytest-mock>=3.15", "pytest-xdist>=3.6"]
 [tool.ruff]
 target-version = "py310"
 line-length = 120
-# docs-stm 下为归档快照（含历史脚本副本），冻结不再参与 lint / format
-extend-exclude = [".venv", "docs-stm"]
+# docs 下为归档快照（含历史脚本副本），冻结不再参与 lint / format
+extend-exclude = [".venv", "docs"]
 
 [tool.ruff.lint]
 # 显式声明基线选择项（等价于 ruff 默认集），避免默认集随版本升级静默漂移

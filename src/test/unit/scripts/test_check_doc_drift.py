@@ -11,7 +11,7 @@
   - TUI [S] 面板编号连续性、分组边界与报告块编号枚举
   - 目录树解析（按缩进还原仓库相对路径）
   - 项目统计表比对（文件数 / 行数）
-  - 归档索引完整性（管理文档 ↔ `docs-stm/archive/` 双向对齐）
+  - 归档索引完整性（管理文档 ↔ `docs/archive/` 双向对齐）
   - 管理文档分区纪律（未完成/已解决/已归档错置、现行 changelog 只允许开发段头）
   - 守护清单同源（五处权威源的守护脚本集合两两一致，含 pre-commit 钩子执行体）
   - Extended Thinking 支持矩阵（手册对比表/「仅」式措辞/默认开思考提示 ↔ 代码前缀名单）
@@ -397,7 +397,7 @@ class TestTestCoverageCounts:
 
 
 class TestArchiveIndex:
-    """归档索引完整性：管理文档须列全 ``docs-stm/archive/`` 下对应归档文件。
+    """归档索引完整性：管理文档须列全 ``docs/archive/`` 下对应归档文件。
 
     历史缺口：changelog 的 `## 归档` 索引曾因「发布切换时整段重写已发布段」被一并删除，
     当时无任何断言拦住；本类即该缺口的回归守卫。
@@ -433,7 +433,7 @@ class TestArchiveIndex:
         doc = drift._MANAGEMENTS / "changelog.md"
         ghost = tmp_path / "changelog.md"
         ghost.write_text(
-            doc.read_text(encoding="utf-8") + "\n[x](docs-stm/archive/v9.9.x/archived_changelog.9.9.x.md)\n",
+            doc.read_text(encoding="utf-8") + "\n[x](docs/archive/v9.9.x/archived_changelog.9.9.x.md)\n",
             encoding="utf-8",
         )
         monkeypatch.setattr(drift_parts._ledger, "_ARCHIVE_INDEX_PAIRS", ((ghost, "archived_changelog."),))
@@ -724,7 +724,7 @@ class TestGeneratedArtifacts:
             ("build/lib/python/mod.py", True),
             ("pkg/investor_util.dist-info/METADATA", True),
             (".coverage", True),
-            ("docs-stm/tmp/scratch.py", True),
+            ("docs/tmp/scratch.py", True),
             # test-reports 规范位置在仓库根（不在受检根内）→ 受检目录下出现属误落，须报出
             ("test-reports/latest/index.html", False),
             ("scripts/test-reports/index.html", False),

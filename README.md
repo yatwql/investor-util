@@ -21,7 +21,7 @@
 - 🔁 **决策有闭环** — 建议 → 登记 → 真实行情结算命中率 → 教训回灌提示词，越用越懂你的组合
 - 🔒 **隐私优先** — 数据全部本地处理，支持 4 档匿名化，凭据永不落日志与报告
 
-> 当前版本：0.12.1-dev（[版本历史](docs-stm/managements/changelog.md)）
+> 当前版本：0.12.1-dev（[版本历史](docs/managements/changelog.md)）
 
 ## ✨ 核心亮点
 
@@ -59,7 +59,7 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 # Windows： .\scripts\launch.ps1
 ```
 
-启动后按提示放入持仓 Excel（格式：每张工作表一个账户，固定 4 列——名称/代码/份额/成本），几分钟内拿到双格式报告。更完整的首次使用指引见 [快速开始](docs-stm/manuals/how-to-start.md)。
+启动后按提示放入持仓 Excel（格式：每张工作表一个账户，固定 4 列——名称/代码/份额/成本），几分钟内拿到双格式报告。更完整的首次使用指引见 [快速开始](docs/manuals/how-to-start.md)。
 
 ## 启动方式
 
@@ -72,7 +72,7 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 ./scripts/launch.sh     # Linux
 ```
 
-全键盘菜单：方向键导航 + 字母/数字快捷键，`[D]` 等入口带二级子菜单。各菜单详解见 [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md)。
+全键盘菜单：方向键导航 + 字母/数字快捷键，`[D]` 等入口带二级子菜单。各菜单详解见 [TUI 菜单操作手册](docs/manuals/how-to-use-tui-menu.md)。
 
 ### Web 浏览器模式
 
@@ -81,7 +81,7 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 .\scripts\launch.ps1 web  # Windows
 ```
 
-标签页工作台（五区）：**生成报告**（① 上传 → ② 生成 → ④ 实时进度 → ⑤ 结果预览/下载）· **调仓模拟**（What-if 独立报告）· **配置**（③ 与 TUI 菜单同源）· **运行状态**（⑥ 系统信息 / 数据源健康 / 最近运行 / 系统自检 / 缓存管理）· **日志**（⑦）。详见 [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md)。
+标签页工作台（五区）：**生成报告**（① 上传 → ② 生成 → ④ 实时进度 → ⑤ 结果预览/下载）· **调仓模拟**（What-if 独立报告）· **配置**（③ 与 TUI 菜单同源）· **运行状态**（⑥ 系统信息 / 数据源健康 / 最近运行 / 系统自检 / 缓存管理）· **日志**（⑦）。详见 [Web 浏览器模式使用指南](docs/manuals/how-to-use-web-mode.md)。
 
 ### CLI 命令行模式（定时任务驱动）
 
@@ -103,7 +103,7 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 .venv/bin/python -m src.python.cli --experiment prosperity_framework report --type full
 ```
 
-完整命令参考、退出码与定时任务配置见 [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md)。
+完整命令参考、退出码与定时任务配置见 [CLI 命令行模式使用指南](docs/manuals/how-to-use-cli-mode.md)。
 想单次试运行实验功能？加 `--experiment 开关名`（只开不关）或 `--feature 名称=on/off`（双向）——仅本次运行生效，不写配置，详见手册 §全局参数。
 
 ---
@@ -116,17 +116,17 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 
 | 能力域 | 一句话介绍 | 深入阅读 |
 |:---|:---|:---|
-| 📄 报告与行情 | 多账户核算、双格式报告（Excel 17 页签 + HTML 9 图）、智能缓存、主备链路与「命中源」可追溯 | [报告文件结构](docs-stm/manuals/reports-instruction.md) · [数据源一览](docs-stm/manuals/datasource.md) |
-| 📰 新闻增强 | 5 源财经新闻并行采集、去重、按持仓关键词关联；盈利预测、分红历史、市场情绪热点 | [报告文件结构](docs-stm/manuals/reports-instruction.md) |
-| 🤖 LLM 智囊团 | 圆桌复盘 + 正反辩论、事实校验、质量分级 A~F、多 Provider 链式分发、深度档位、幻觉率评估 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) · [LLM 技术要点](docs-stm/managements/llm-technical.md) |
-| 📈 量化风控 | Beta 置信区间 + 统计检验、情景回撤推演、VaR 尾部风险、再平衡告警、流动性变现天数、币种敞口 | [报告文件结构](docs-stm/manuals/reports-instruction.md) |
-| 🏆 基金评价 | 5 级评级、经理变更监控、重合度矩阵、集中度与风格漂移、因子回归、候选基金比较 | [报告文件结构](docs-stm/manuals/reports-instruction.md) |
-| 📊 持仓基本面 | 财务指标 + 质量档、个股财报摘要（缺章节自动回溯）、穿透标的来源区分 | [报告文件结构](docs-stm/manuals/reports-instruction.md) |
-| 🔄 调仓模拟 | 双持仓 diff + 指定生效日时序回测，决策前先沙盘 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) · [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) |
-| ⚙️ 运维观测 | 系统自检、数据源健康探测、日志可视化、缓存统计与清理、阶段耗时持久化 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) · [数据源可靠性文档](docs-stm/manuals/datasource-reliability.md) |
-| 🔒 隐私安全 | 4 档匿名化、凭据不落产物、缓存审查、本地状态隔离 | [常规配置指引](docs-stm/manuals/how-to-config.md) |
+| 📄 报告与行情 | 多账户核算、双格式报告（Excel 17 页签 + HTML 9 图）、智能缓存、主备链路与「命中源」可追溯 | [报告文件结构](docs/manuals/reports-instruction.md) · [数据源一览](docs/manuals/datasource.md) |
+| 📰 新闻增强 | 5 源财经新闻并行采集、去重、按持仓关键词关联；盈利预测、分红历史、市场情绪热点 | [报告文件结构](docs/manuals/reports-instruction.md) |
+| 🤖 LLM 智囊团 | 圆桌复盘 + 正反辩论、事实校验、质量分级 A~F、多 Provider 链式分发、深度档位、幻觉率评估 | [LLM 配置指引](docs/manuals/how-to-config-llm.md) · [LLM 技术要点](docs/managements/llm-technical.md) |
+| 📈 量化风控 | Beta 置信区间 + 统计检验、情景回撤推演、VaR 尾部风险、再平衡告警、流动性变现天数、币种敞口 | [报告文件结构](docs/manuals/reports-instruction.md) |
+| 🏆 基金评价 | 5 级评级、经理变更监控、重合度矩阵、集中度与风格漂移、因子回归、候选基金比较 | [报告文件结构](docs/manuals/reports-instruction.md) |
+| 📊 持仓基本面 | 财务指标 + 质量档、个股财报摘要（缺章节自动回溯）、穿透标的来源区分 | [报告文件结构](docs/manuals/reports-instruction.md) |
+| 🔄 调仓模拟 | 双持仓 diff + 指定生效日时序回测，决策前先沙盘 | [Web 浏览器模式使用指南](docs/manuals/how-to-use-web-mode.md) · [CLI 命令行模式使用指南](docs/manuals/how-to-use-cli-mode.md) |
+| ⚙️ 运维观测 | 系统自检、数据源健康探测、日志可视化、缓存统计与清理、阶段耗时持久化 | [TUI 菜单操作手册](docs/manuals/how-to-use-tui-menu.md) · [数据源可靠性文档](docs/manuals/datasource-reliability.md) |
+| 🔒 隐私安全 | 4 档匿名化、凭据不落产物、缓存审查、本地状态隔离 | [常规配置指引](docs/manuals/how-to-config.md) |
 
-> 数据从哪来、可靠性如何、挂了会怎样降级？见 [数据源可靠性文档](docs-stm/manuals/datasource-reliability.md)；想调开关、TTL、章节可见性，见 [常规配置指引](docs-stm/manuals/how-to-config.md)。
+> 数据从哪来、可靠性如何、挂了会怎样降级？见 [数据源可靠性文档](docs/manuals/datasource-reliability.md)；想调开关、TTL、章节可见性，见 [常规配置指引](docs/manuals/how-to-config.md)。
 
 ---
 
@@ -136,16 +136,16 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 
 | # | 文档 | 说明 |
 |:-:|:-----|:------|
-| 1 | [快速开始](docs-stm/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
-| 2 | [TUI 菜单操作手册](docs-stm/manuals/how-to-use-tui-menu.md) | 各菜单详解（含 `[D]` 目录配置子菜单）、报告内容对照、缓存管理 |
-| 3 | [CLI 命令行模式使用指南](docs-stm/manuals/how-to-use-cli-mode.md) | 命令结构、全局参数（`--experiment` / `--feature`）、各子命令、退出码、定时任务 |
-| 4 | [Web 浏览器模式使用指南](docs-stm/manuals/how-to-use-web-mode.md) | 五区标签页工作台：生成报告 / 调仓模拟 / 配置 / 运行状态（含缓存管理）/ 日志 |
-| 5 | [常规配置指引](docs-stm/manuals/how-to-config.md) | `config.json` 字段说明、数据源、缓存 TTL、章节可见性、功能开关 |
-| 6 | [LLM 配置指引](docs-stm/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、多 Provider 策略、端点级节流、定价 |
-| 7 | [报告文件结构](docs-stm/manuals/reports-instruction.md) | Excel/HTML 报告逐章说明、基金业绩评价、投资知识点 |
-| 8 | [数据源一览](docs-stm/manuals/datasource.md) | 数据源、缓存前缀、数据质量与常见问题 |
-| 9 | [数据源可靠性文档](docs-stm/manuals/datasource-reliability.md) | 运维视角：可靠度评级、降级策略、限流规则、已知问题 |
-| 10 | [常见问题解答](docs-stm/manuals/faq.md) | 使用中的高频问题，按类别组织 |
+| 1 | [快速开始](docs/manuals/how-to-start.md) | 启动方式、持仓格式、首次使用指引 |
+| 2 | [TUI 菜单操作手册](docs/manuals/how-to-use-tui-menu.md) | 各菜单详解（含 `[D]` 目录配置子菜单）、报告内容对照、缓存管理 |
+| 3 | [CLI 命令行模式使用指南](docs/manuals/how-to-use-cli-mode.md) | 命令结构、全局参数（`--experiment` / `--feature`）、各子命令、退出码、定时任务 |
+| 4 | [Web 浏览器模式使用指南](docs/manuals/how-to-use-web-mode.md) | 五区标签页工作台：生成报告 / 调仓模拟 / 配置 / 运行状态（含缓存管理）/ 日志 |
+| 5 | [常规配置指引](docs/manuals/how-to-config.md) | `config.json` 字段说明、数据源、缓存 TTL、章节可见性、功能开关 |
+| 6 | [LLM 配置指引](docs/manuals/how-to-config-llm.md) | 接入 LLM 分析、参数调优、多 Provider 策略、端点级节流、定价 |
+| 7 | [报告文件结构](docs/manuals/reports-instruction.md) | Excel/HTML 报告逐章说明、基金业绩评价、投资知识点 |
+| 8 | [数据源一览](docs/manuals/datasource.md) | 数据源、缓存前缀、数据质量与常见问题 |
+| 9 | [数据源可靠性文档](docs/manuals/datasource-reliability.md) | 运维视角：可靠度评级、降级策略、限流规则、已知问题 |
+| 10 | [常见问题解答](docs/manuals/faq.md) | 使用中的高频问题，按类别组织 |
 
 ## 🤝 参与贡献
 
@@ -156,15 +156,15 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 - ✅ **8,000+ 测试用例**（verify + regression 近 5,800 项）+ 场景化回归套件，改动有底气
 - ✅ **8 个 CI 守护脚本**把历史教训变成硬门禁：代码痕迹检查、文档一致性、需求追溯、语义命名索引、测试冗余审计、版本号一致性——文档与代码永不漂移
 - ✅ **P0/P1/P2 三级门禁**：提交、合并、发布各有明确的通过标准，CI 矩阵覆盖 Python 3.11/3.12/3.13 + Windows 可移植性 + 非 UTF-8 locale 探测
-- ✅ **清晰的协作契约**：[开发者指南](docs-stm/managements/developer-guide.md) 写明了工作流、任务编号规范与发布流程；[需求文档](docs-stm/managements/requirements.md) 与 [测试标准](docs-stm/managements/testplan.md) 让每个需求可追溯、每个缺陷有回归用例
+- ✅ **清晰的协作契约**：[开发者指南](docs/managements/developer-guide.md) 写明了工作流、任务编号规范与发布流程；[需求文档](docs/managements/requirements.md) 与 [测试标准](docs/managements/testplan.md) 让每个需求可追溯、每个缺陷有回归用例
 
-想动手？从 [开发者指南](docs-stm/managements/developer-guide.md) 开始，跑通 P0 门禁就是你第一个 PR 的起点。发现数据不准、报告缺章、LLM 结论离谱——都欢迎在 issue 中带着持仓样例来提。
+想动手？从 [开发者指南](docs/managements/developer-guide.md) 开始，跑通 P0 门禁就是你第一个 PR 的起点。发现数据不准、报告缺章、LLM 结论离谱——都欢迎在 issue 中带着持仓样例来提。
 
 ## 🔧 开发者参考
 
 | 文档 | 说明 |
 |:-----|:------|
-| [开发者指南](docs-stm/managements/developer-guide.md) | 开发环境与工作流、三级门禁（P0/P1/P2）、任务编号规范、测试驱动、辅助脚本速查、注册表使用、版本发布流程 |
+| [开发者指南](docs/managements/developer-guide.md) | 开发环境与工作流、三级门禁（P0/P1/P2）、任务编号规范、测试驱动、辅助脚本速查、注册表使用、版本发布流程 |
 
 ## 📋 项目内部文档
 
@@ -172,13 +172,13 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 
 | 文档 | 说明 |
 |------|------|
-| [迭代计划](docs-stm/managements/plan.md) | 迭代计划 |
-| [需求文档](docs-stm/managements/requirements.md) | 完整需求定义 |
-| [技术设计](docs-stm/managements/technical.md) | 技术设计与架构设计约束（含各约束的设计目的与违反后果） |
-| [LLM 技术要点](docs-stm/managements/llm-technical.md) | LLM 客户端架构与技术细节 |
-| [质量控制与测试标准](docs-stm/managements/testplan.md) | 质量控制与测试标准 |
-| [测试覆盖情况](docs-stm/managements/test-coverage.md) | 测试覆盖情况 |
-| [自审记录](docs-stm/managements/review-findings.md) | 自我审查问题记录 |
-| [变更日志](docs-stm/managements/changelog.md) | 版本更新记录 |
-| [目录结构及文件概览](docs-stm/managements/folders.md) | 目录结构及文件概览 |
+| [迭代计划](docs/managements/plan.md) | 迭代计划 |
+| [需求文档](docs/managements/requirements.md) | 完整需求定义 |
+| [技术设计](docs/managements/technical.md) | 技术设计与架构设计约束（含各约束的设计目的与违反后果） |
+| [LLM 技术要点](docs/managements/llm-technical.md) | LLM 客户端架构与技术细节 |
+| [质量控制与测试标准](docs/managements/testplan.md) | 质量控制与测试标准 |
+| [测试覆盖情况](docs/managements/test-coverage.md) | 测试覆盖情况 |
+| [自审记录](docs/managements/review-findings.md) | 自我审查问题记录 |
+| [变更日志](docs/managements/changelog.md) | 版本更新记录 |
+| [目录结构及文件概览](docs/managements/folders.md) | 目录结构及文件概览 |
 | [CLAUDE.md](CLAUDE.md) | AI 编程助手指引 |

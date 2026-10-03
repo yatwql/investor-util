@@ -11,7 +11,7 @@
   --dataset N[,N...]  仅测试指定数据集（序号从 1 开始，默认全部）
   --dry-run           不调用 LLM，只构建 prompt 并输出到 tmp 目录
   --force             跳过缓存，强制重新生成 LLM 输出
-  --output FILE       报告输出路径（默认 docs-stm/tmp/hallucination-report.md）
+  --output FILE       报告输出路径（默认 docs/tmp/hallucination-report.md）
 
 每次 prompt 重大修改后应重新运行此脚本，确保幻觉率 < 5%。
 
@@ -56,7 +56,7 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="不调用 LLM，只构建 prompt 验证结构")
     parser.add_argument("--force", action="store_true", help="跳过缓存强制重新生成")
     parser.add_argument(
-        "--output", type=str, default=None, help="报告输出路径（默认 docs-stm/tmp/hallucination-report.md）"
+        "--output", type=str, default=None, help="报告输出路径（默认 docs/tmp/hallucination-report.md）"
     )
     args = parser.parse_args()
 
@@ -73,7 +73,7 @@ def main():
     # 报告路径
     output_path = args.output
     if not output_path:
-        output_path = os.path.join(_PROJECT_ROOT, "docs-stm", "tmp", "hallucination-report.md")
+        output_path = os.path.join(_PROJECT_ROOT, "docs", "tmp", "hallucination-report.md")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     # ── 1. 加载数据集 ──
@@ -87,7 +87,7 @@ def main():
 
     # ── Dry-Run：保存 prompt 到 tmp ──
     if dry_run:
-        prompt_dir = os.path.join(_PROJECT_ROOT, "docs-stm", "tmp")
+        prompt_dir = os.path.join(_PROJECT_ROOT, "docs", "tmp")
         os.makedirs(prompt_dir, exist_ok=True)
         prompt_path = os.path.join(prompt_dir, f"hallucination-prompts-{module_name}.md")
         prompt_lines: list[str] = [

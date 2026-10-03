@@ -31,7 +31,7 @@ if (-not (Test-Path $pythonBin)) {
 New-Item -ItemType Directory -Force -Path "data\holdings" | Out-Null
 New-Item -ItemType Directory -Force -Path "data\cache" | Out-Null
 New-Item -ItemType Directory -Force -Path "data\config" | Out-Null
-New-Item -ItemType Directory -Force -Path "docs-stm\tmp" | Out-Null
+New-Item -ItemType Directory -Force -Path "docs\tmp" | Out-Null
 New-Item -ItemType Directory -Force -Path "logs" | Out-Null
 
 # 4. 完整报告 + 追加参数（报告级参数如 --force-llm / --history 追加在后）

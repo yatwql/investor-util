@@ -35,8 +35,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_checklib）
 from _checklib import REPO_ROOT, add_common_args, extract_region, rel, report  # noqa: E402
 
-_REQUIREMENTS_MD = REPO_ROOT / "docs-stm" / "managements" / "requirements.md"
-_TESTPLAN_MD = REPO_ROOT / "docs-stm" / "managements" / "testplan.md"
+_REQUIREMENTS_MD = REPO_ROOT / "docs" / "managements" / "requirements.md"
+_TESTPLAN_MD = REPO_ROOT / "docs" / "managements" / "testplan.md"
 
 _TRACE_START = "<!-- requirement-trace:start -->"
 _TRACE_END = "<!-- requirement-trace:end -->"

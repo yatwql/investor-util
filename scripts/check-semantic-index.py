@@ -40,7 +40,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_checklib）
 from _checklib import REPO_ROOT, add_common_args, extract_region, rel, report  # noqa: E402
 
-_TECHNICAL_MD = REPO_ROOT / "docs-stm" / "managements" / "technical.md"
+_TECHNICAL_MD = REPO_ROOT / "docs" / "managements" / "technical.md"
 _FEATURES_PY = REPO_ROOT / "src/python/config/features.py"
 _CONFIG_DEFAULTS = REPO_ROOT / "src" / "python" / "config" / "_config_defaults.py"
 _REGISTRY_PY = REPO_ROOT / "src" / "python" / "core" / "registry.py"

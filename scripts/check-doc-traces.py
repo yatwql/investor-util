@@ -9,14 +9,14 @@
      "当前是什么/做什么"。changelog.md / plan.md / review-findings.md
      例外（它们是历史/计划记录）。
   2. 除上述三个例外文档外，其他管理文档与用户文档的正文内容不得引用
-     归档文件（docs-stm/archive/ 下的目录或 archived_*.md）。
+     归档文件（docs/archive/ 下的目录或 archived_*.md）。
      例外：folders.md 的目录树（│ ├ └ 行）可引用 archive 目录及其
      文件名——目录树记录项目结构，archive/ 条目是结构的一部分。
   3. 章节编号引用：任何面向读者文档的正文不得用数字章节号（"N 章" /
      "第 N 章"）指代报告具体章节，须用语义章节名（「X」章），用户才能
      看懂。章节数量/序数表述（共 N 章 / N 章基线 / 减至 N 章 / 出现
      第 N 章等）是合法计数，豁免。该检查**同样适用于** changelog.md /
-     plan.md / review-findings.md 与 docs-stm/plan/ 目录——它们虽是
+     plan.md / review-findings.md 与 docs/plan/ 目录——它们虽是
      历史/计划记录（豁免版本号等历史痕迹），但数字章节暗号同样影响
      可读性，仅对它们应用本条章节编号检查。
   4. 迭代轮次引用：任何面向读者文档的正文不得用数字轮次（"第 N 轮" /
@@ -24,26 +24,26 @@
      轮次数量/运行时表述（共 N 轮 / 计划分 N 轮 / N 轮每轮 / 轮询 /
      轮动/轮换/轮番/轮涨/轮跌 / 第 N 轮循环）是合法计数或业务/运行时
      概念，豁免。该检查**不适用于** changelog.md / plan.md /
-     review-findings.md 与 docs-stm/plan/——它们作为历史/计划记录，
+     review-findings.md 与 docs/plan/——它们作为历史/计划记录，
      "轮 N"是正式记录载体（changelog 记"轮 N 落地"、迭代计划按轮排期）。
   5. 架构约束代号（C1~C25）：任何文档正文不得以代号引用架构约束（如
      "C19 契约""C20 图下说明""C21 指纹同源"），须用语义描述（数据契约/图下
      说明/缓存指纹同源等）。
      约束定义处（technical.md / llm-technical.md，CIPHER_EXEMPT_FILES）
      正文大量引用 C1~C25 属定义载体，豁免；其余文档（含 changelog.md /
-     plan.md / review-findings.md 与 docs-stm/plan/）一律禁。
+     plan.md / review-findings.md 与 docs/plan/）一律禁。
 
 受检范围：
   - 项目根 README.md
-  - docs-stm/managements/（排除 changelog.md / review-findings.md / plan.md）
-  - docs-stm/manuals/
+  - docs/managements/（排除 changelog.md / review-findings.md / plan.md）
+  - docs/manuals/
   - 章节编号检查另覆盖 changelog.md / review-findings.md / plan.md 与
-    docs-stm/plan/（仅章节编号模式，不检查其他历史痕迹）
+    docs/plan/（仅章节编号模式，不检查其他历史痕迹）
 
 豁免范围（历史/计划记录性质，允许历史痕迹与归档引用）：
-  - docs-stm/plan/ 中间计划文档（历史痕迹豁免，章节编号不豁免）
-  - docs-stm/archive/ 归档文档
-  - docs-stm/tmp/ 运行时临时产物
+  - docs/plan/ 中间计划文档（历史痕迹豁免，章节编号不豁免）
+  - docs/archive/ 归档文档
+  - docs/tmp/ 运行时临时产物
 
 豁免内容（当前状态 / 流程描述 / 结构记录，非历史痕迹）：
   - 管理文档版本头（"文档版本：0.9.10-dev"，版本号一致性要求，仅行首锚定豁免）
@@ -57,7 +57,7 @@
   - folders.md 统计表行（如 | ├ archive/ | 版本归档 |，记录目录计数）
   - 当前能力描述（暂不支持 / 不再支持 / 不正式支持）
   - 运行时产物归档描述（"归档版" / "归档目录" / "历史归档至 YYYYMMDD/"——
-    指 reports/ 下的报告文件按日期归档，非仓库 docs-stm/archive/）
+    指 reports/ 下的报告文件按日期归档，非仓库 docs/archive/）
   - 门禁与发布流程描述（发布版本前 / P0~P3 / --mode / git tag / git pull）
   - 工具使用场景（pytest --ff 等）
   - 模型/环境名（Gemini 旧版 / 旧版 Python）
@@ -105,8 +105,8 @@ from _checklib import REPO_ROOT, add_common_args, rel  # noqa: E402
 
 README_PATH = REPO_ROOT / "README.md"
 DOC_DIRS = [
-    REPO_ROOT / "docs-stm" / "managements",
-    REPO_ROOT / "docs-stm" / "manuals",
+    REPO_ROOT / "docs" / "managements",
+    REPO_ROOT / "docs" / "manuals",
 ]
 # 豁免文档：历史/计划记录性质（changelog/review-findings/plan 记录变更、自审与计划）
 SKIP_FILES = {"changelog.md", "review-findings.md", "plan.md"}
@@ -146,17 +146,17 @@ CIPHER_EXEMPT_FILES = {"technical.md", "llm-technical.md"}
 def _doc_patterns() -> list[tuple[str, str, str]]:
     """文档历史痕迹模式（针对 .md 全文语义）。"""
     return [
-        # ── ARCHIVE：归档引用（指向仓库 docs-stm/archive/ 的历史记录） ──
-        #  仓库归档路径引用（docs-stm/archive/、../archive/、裸 archive/）
-        (r"(?:docs-stm/|\.\./)?archive/", "ARCHIVE", "归档目录引用（archive/）"),
+        # ── ARCHIVE：归档引用（指向仓库 docs/archive/ 的历史记录） ──
+        #  仓库归档路径引用（docs/archive/、../archive/、裸 archive/）
+        (r"(?:docs/|\.\./)?archive/", "ARCHIVE", "归档目录引用（archive/）"),
         #  归档文件名引用（archived_*.md）
         (r"archived_[A-Za-z0-9._-]+", "ARCHIVE", "归档文件引用（archived_*）"),
         #  归档路径说明（"归档文件：`../archive/...`"）
         (r"归档文件\s*[:：]?\s*[`]?archive/", "ARCHIVE", "归档路径说明"),
         #  无显式 archive/ 前缀的归档引用（已/可/应 归档至 某目录），如
-        #  "已归档至 archive/"、"归档至 docs-stm/archive/"——须含"归档"动词 + 归档目标
+        #  "已归档至 archive/"、"归档至 docs/archive/"——须含"归档"动词 + 归档目标
         (
-            r"归档\s*(?:至|到|于|在|入|完成|处理)\s*[`]?(?:docs-stm/|\.\./)?archive",
+            r"归档\s*(?:至|到|于|在|入|完成|处理)\s*[`]?(?:docs/|\.\./)?archive",
             "ARCHIVE",
             "归档引用（归档至 archive/ 等）",
         ),
@@ -342,7 +342,7 @@ def _exclude_lines() -> list[re.Pattern]:
         re.compile(r"archive/\s*\|"),  # 统计表行（如 | ├ archive/ | 版本归档 |）
         # ── 工具自身说明（描述脚本跳过/豁免/禁止归档目录引用，而非引用归档内容） ──
         #  匹配"豁免/跳过/不扫描/排除/检查/不得/禁止 归档目录或归档引用"的工具说明行
-        #  （含"正文不得引用 docs-stm/archive/"这类规则叙述）；
+        #  （含"正文不得引用 docs/archive/"这类规则叙述）；
         #  可能只写"归档文件引用"而不含 archive/ 路径，故用"归档(?:目录|文件|引用|路径)"兼容
         re.compile(r"(?:豁免|跳过|不扫描|排除|检查|不得|禁止).*(?:archive/|归档(?:目录|文件|引用|路径))"),
         re.compile(r"版本头豁免"),  # 工具自身说明（描述版本头豁免规则，含示例版本号）
@@ -385,7 +385,7 @@ def scan_file(fpath: Path, verbose: bool, chapter_only: bool = False) -> list[tu
     不参与历史痕迹匹配（避免 `git tag v0.9.9`、`APP_VERSION` 示例误报）。
 
     chapter_only=True：仅应用 CHAPTER 章节编号模式（用于 changelog/plan/
-    review-findings 与 docs-stm/plan/ 等 trace-exempt 文档——它们是历史/计划
+    review-findings 与 docs/plan/ 等 trace-exempt 文档——它们是历史/计划
     记录，版本号等历史痕迹合法，但数字章节暗号仍影响可读性需检查；迭代轮次
     "轮 N"是这些记录文档的正式载体，ROUND 不纳入 trace-exempt 扫描）。
     架构约束代号（CIPHER）独立于 chapter_only：除约束定义处（technical.md /
@@ -449,7 +449,7 @@ def _iter_docs(trace_exempt: bool = False) -> list[Path]:
     未被豁免的 .md（历史痕迹全量检查）。
 
     trace_exempt=True：仅章节编号检查的文档——changelog.md / plan.md /
-    review-findings.md（SKIP_FILES）+ docs-stm/plan/ 目录。它们虽是历史/计划
+    review-findings.md（SKIP_FILES）+ docs/plan/ 目录。它们虽是历史/计划
     记录（版本号等历史痕迹豁免），但数字章节暗号影响可读性，需单独检查。
     不包含 archive/ 与 tmp/（归档/临时产物，历史痕迹与章节编号均不检查）。
     """
@@ -461,7 +461,7 @@ def _iter_docs(trace_exempt: bool = False) -> list[Path]:
             for fpath in sorted(doc_dir.rglob("*.md")):
                 if fpath.name in SKIP_FILES:
                     docs.append(fpath)
-        plan_dir = REPO_ROOT / "docs-stm" / "plan"
+        plan_dir = REPO_ROOT / "docs" / "plan"
         if plan_dir.exists():
             docs.extend(sorted(plan_dir.rglob("*.md")))
         return docs

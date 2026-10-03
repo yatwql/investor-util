@@ -425,7 +425,7 @@ class TestDocTraceDetection:
     # ── 既有模式仍工作 ──
 
     def test_archive_reference(self, doc_traces):
-        assert _doc_hit(doc_traces, "见 docs-stm/archive/ 归档") is not None
+        assert _doc_hit(doc_traces, "见 docs/archive/ 归档") is not None
 
     def test_task_id(self, doc_traces):
         assert _doc_hit(doc_traces, "见 rf-117 修复") is not None
@@ -583,7 +583,7 @@ class TestDocRoundDetection:
     """正文用数字轮次（"第 N 轮"/"经 N 轮"/"N 轮"/"轮 N"）指代开发迭代历史须检出
     （迭代轮次是开发痕迹，正文须改用语义描述）；轮次数量/运行时表述（共 N 轮 /
     N 轮每轮 / 计划分 N 轮 / 轮询 / 轮动 / 第 N 轮循环）是合法计数或业务/运行时
-    概念，豁免。changelog/plan/review-findings 与 docs-stm/plan/ 不查本条
+    概念，豁免。changelog/plan/review-findings 与 docs/plan/ 不查本条
     （ROUND 不进 _CHAPTER_PATTERNS，trace-exempt 文档仅章节编号扫描）。"""
 
     def test_round_codes_flagged(self, doc_traces):
