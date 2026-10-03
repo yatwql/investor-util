@@ -284,3 +284,27 @@
 > 应要求核查全部测试用例的冗余与有效性：`check-test-redundancy --ci` 五类（死用例/无断言/完全重复/自证/硬编码演进总数）全绿，marker 覆盖、edge 隔离、skip 有效性均无问题；门禁执行覆盖用 pytest 实测收集核对（CI 全并集 = dev-verify ∪ verify ∪ regression ∪ portability 单元套件 = 8242/8313）。除设计内手工档（perf/security/extreme 共 24 例、integration 套件 34 例均已在 modes/developer-guide 文档化）外，发现 1 项档位盲区：
 
 - **rf-556**（数据链路韧性 5 例不在任何常规档位）：`test_chain_resilience.py` 模块级 `pytestmark = [pytest.mark.scenario_resilience]`，而 `MODES` 中无任何模式表达式含 `scenario_resilience`（`scenario`/`regression` = `-m scenario`、`integration` = `scenario or integration`、dev-verify/verify 仅选 unit 子标记、portability 仅跑 `src/test/unit`）——5 例仅 `--mode all`/`all_no_unit` 可达，P0/P1/P2 门禁与 CI 全并集实测均不覆盖；而 testplan R-CON-07 将其列为验证载体、test-coverage 划入 scenario_resilience 家族（18 例）。处置：模块级 pytestmark 补 `pytest.mark.scenario`（5 例进 `scenario`/`regression`/`integration` 档与 P2 门禁），test-coverage.md 标记说明同步为「随 scenario/regression 档与 P2 门禁执行」、developer-guide scenario_resilience 分类描述补「数据链路韧性」条目。
+
+## 已修复归档摘要（自 review-findings.md 迁入，2026-10-03，v0.12.0 发布）
+
+> 主文件只保留未完成项与归档索引；以下为已完成批次摘要行原文迁移（明细见上文各批次）。
+
+> **已修复归档摘要**：rf-541（测试路径注入单点化，2026-10-02 当日登记当日修复）已迁入 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.12-dev 批次」，变更记录见 changelog 同版本段。
+
+### P2C — 近 24 小时实现自审（2026-10-02，当日登记当日修复）
+
+> **已修复归档摘要**：rf-542（`faq.md` 两处调仓问答缺 Web「调仓模拟」入口）、rf-543（pre-commit 仅条件触发 3/8 守护，README 痕迹与 folders 行数漂移两度漏拦至 CI 才红——已重写为八守护全量并纳入守护清单同源第五处）、rf-544（CLAUDE.md 历史痕迹共享设施路径仍指已拆包的 `_traces_common.py`），明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
+
+### P2D — 文档全量核对（2026-10-02，当日登记当日修复）
+
+> **已修复归档摘要**：rf-545（plan.md 指向已归档研究文档的死链）、rf-546（technical.md 两处同名标题「内部线程池」锚点歧义）、rf-547（how-to-use-cli-mode.md 13.1/13.2 下两处同名标题「基础配置」锚点歧义），均 2026-10-02 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
+
+
+
+### P2E — 三渠道薄壳核查（2026-10-03，当日登记当日修复）
+
+> **已修复归档摘要**：rf-548（TUI 缓存预热编排下沉 `cache.operations.warm_new_asset_caches`）、rf-549（配置编辑收敛 `config/edit_ops.py` 共享层，Web/TUI 同一 `apply_config_edit` 函数）、rf-550（三渠道默认值字面量清除，`config.get_default`/`resolve_holdings_path` 单源）、rf-551（What-if 生效日三渠道共用 `normalize_effective_date`）、rf-552（历史走势策略 `resolve_fetch_history` 单源）、rf-553（系统状态组装与展示原语下沉 `core/system_info.py`）、rf-554（渠道私有符号引用改公开 API）、rf-555（`--update all` 聚合与 cache stats 载荷下沉 `cache.operations`），均 2026-10-03 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
+
+### P2F — 测试用例核查（2026-10-03，当日登记当日修复）
+
+> **已修复归档摘要**：rf-556（`test_chain_resilience.py` 仅标 `scenario_resilience` 不标 `scenario`，`scenario`/`regression`/`integration` 档与 CI 全并集均选不中，5 例仅 `--mode all` 可达——模块级 pytestmark 补 `scenario` 进 regression/P2 档），2026-10-03 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。

@@ -1,5 +1,5 @@
 # 投资复盘助手 - 自我审查问题记录
-> 文档版本：0.11.13-dev
+> 文档版本：0.12.0
 > **编号源**：`rf-next = 557`（新增问题取此编号，完成后更新为 +1；已用最大 rf-556，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
@@ -37,27 +37,11 @@
 |---|------|----------|
 | **rf-257** | plan-8 Web 模式浏览器真机人工验收未做：冒烟测试为脚本化 HTTP 验证（9/9 过：页面渲染/健康检查/上传校验/运行 202/进度事件/完成态/产物下载/历史记录/产物目录隔离），但未在真实浏览器（Chrome/Edge 90+）人工走查——main.js/style.css 渲染、上传表单 UX、进度事件可视化、375px 响应式、按钮态 | 用户浏览器人工走查（对照 `plan-web-ui-implementation.md` §10 三阶段验收标准 + §6.5/§6.6 样式/响应式）。**勾选清单已备齐（2026-09-20）**：`docs-stm/archive/v0.10.x/web-ui/web-ui-verification-checklist.md`（从实际 `index.html` 七卡结构 + `how-to-use-web-mode.md` 手册导出 ①~⑤ 五类 UX 项，含逐步操作步骤与判定标准）。**2026-08-08 另机 Firefox 153 走查**：首次走查即发现阻断级缺陷 rf-274（`/static/main.js` 404 → JS/CSS 未加载，前端整页失效），已修复；其余 UX 项（渲染/上传/进度可视化/375px/按钮态）待用户在修复后版本上复验后回填 |
 
-> **已修复归档摘要**：rf-541（测试路径注入单点化，2026-10-02 当日登记当日修复）已迁入 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.12-dev 批次」，变更记录见 changelog 同版本段。
 
-### P2C — 近 24 小时实现自审（2026-10-02，当日登记当日修复）
-
-> **已修复归档摘要**：rf-542（`faq.md` 两处调仓问答缺 Web「调仓模拟」入口）、rf-543（pre-commit 仅条件触发 3/8 守护，README 痕迹与 folders 行数漂移两度漏拦至 CI 才红——已重写为八守护全量并纳入守护清单同源第五处）、rf-544（CLAUDE.md 历史痕迹共享设施路径仍指已拆包的 `_traces_common.py`），明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
-
-### P2D — 文档全量核对（2026-10-02，当日登记当日修复）
-
-> **已修复归档摘要**：rf-545（plan.md 指向已归档研究文档的死链）、rf-546（technical.md 两处同名标题「内部线程池」锚点歧义）、rf-547（how-to-use-cli-mode.md 13.1/13.2 下两处同名标题「基础配置」锚点歧义），均 2026-10-02 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
-
-
-
-### P2E — 三渠道薄壳核查（2026-10-03，当日登记当日修复）
-
-> **已修复归档摘要**：rf-548（TUI 缓存预热编排下沉 `cache.operations.warm_new_asset_caches`）、rf-549（配置编辑收敛 `config/edit_ops.py` 共享层，Web/TUI 同一 `apply_config_edit` 函数）、rf-550（三渠道默认值字面量清除，`config.get_default`/`resolve_holdings_path` 单源）、rf-551（What-if 生效日三渠道共用 `normalize_effective_date`）、rf-552（历史走势策略 `resolve_fetch_history` 单源）、rf-553（系统状态组装与展示原语下沉 `core/system_info.py`）、rf-554（渠道私有符号引用改公开 API）、rf-555（`--update all` 聚合与 cache stats 载荷下沉 `cache.operations`），均 2026-10-03 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
-
-### P2F — 测试用例核查（2026-10-03，当日登记当日修复）
-
-> **已修复归档摘要**：rf-556（`test_chain_resilience.py` 仅标 `scenario_resilience` 不标 `scenario`，`scenario`/`regression`/`integration` 档与 CI 全并集均选不中，5 例仅 `--mode all` 可达——模块级 pytestmark 补 `scenario` 进 regression/P2 档），2026-10-03 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
 
 ## 已解决问题
+
+> **迁移说明**：已完成批次摘要（rf-541、P2C~P2F / rf-542~556）已于 v0.12.0 发布（2026-10-03）随档迁入 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)，本文件只保留未完成项与归档索引。
 
 ### 归档档案
 

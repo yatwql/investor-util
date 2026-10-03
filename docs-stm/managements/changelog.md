@@ -2,38 +2,16 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/)。
 
-> **最近发布 [0.11.12]**（2026-10-02）——已发布版本段随发布移入 [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md)；本文件只保留当前开发版本段与归档索引。
+> **最近发布 [0.12.0]**（2026-10-03）——已发布版本段随发布移入 [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md)；本文件只保留当前开发版本段与归档索引。
 
 ---
 
-## [0.11.13-dev] - 开发中（未发布）
 
-> 本轮开发开始后逐条追加变更记录；发布时本段头改为 `## [x.y.z] - YYYY-MM-DD`。
-
-### Added
-
-- **Web 标签页工作台排版**：首页从 7 卡单列堆叠重构为五区标签页（生成报告 / 调仓模拟 / 配置 / 运行状态 / 日志），粘顶导航、方向键与 `#hash` 深链；运行状态区新增**缓存卡**（文件数 / 占用 / 命中率 / 过期数 / 前缀分布 + 刷新 / 清理过期，`GET /api/cache` + `POST /api/cache/cleanup`，同源校验）。
-- **Web 调仓 What-if 模拟区**（新页签 `POST /api/whatif`）：基准默认取配置正式持仓、可改上传，目标必传，生效日可选（联网回测 opt-in）；与 TUI `[W]` / CLI `whatif` 同链生成独立产物 `调仓模拟.xlsx` / `.html`，互斥锁 429，错误信封分支完整。
-- **README 定位改版**：营销向首屏（卖点、徽章、三分钟上手、实际报告效果截图、参与贡献）、功能地图九域表、MIT `LICENSE`。
-- **守护门禁升级（check-doc-links 纳入 P0/P2）**：新增文档链接与结构一致性机检（`scripts/check-doc-links.py`，六类：死文件链接 / 死锚点（GitHub slug 规则 + `<a id>` 显式锚点，行内代码等长遮罩、代码围栏跳过）/ 重复标题 / 标题层级跳变 / 数字与中文数字编号序列连续性 / 跨文档 `xxx.md §N` 章节引用失配），纳入 P0、P2、CI `guards` job 与 `.githooks/pre-commit`（守护脚本 8 → 9，五处清单同源校验通过）；新增 18 例单测。
-- **发布门禁升级**：`check-version-consistency --ci` 纳入 P0/P2 门禁与 CI `guards` job（7→8 个守护脚本），pre-commit 新增条件化版本一致性检查，`check-doc-drift` 新增「守护清单同源」断言。
-
-### Changed
-
-- **三渠道薄壳化收敛（架构分层修复批次）**：业务规则/策略解析/数据组装/编排聚合一律下沉核心层，渠道只留交互/传输/渲染外壳——配置编辑收敛 `config/edit_ops.py` 共享层（白名单+值规则+写入分派+写前 .bak，Web `POST /api/config/edit` 与 TUI `_apply_edit` 外壳同一 `apply_config_edit` 函数，TUI 补上此前缺失的文件名分隔符/对比指数长度·字符·重复校验）；配置默认值单源 `config.get_default()`/`resolve_holdings_path()`（清除三渠道 11+ 处字面量回退）；系统状态组装与展示原语下沉 `core/system_info.py`（Web `_build_system_info` 变薄包装、TUI 展示同组原语）；历史走势策略单源 `report/history_policy.resolve_fetch_history`（TUI `_prompt_history` 注入 y/N 询问、orchestrator None 回退同源）；What-if 生效日三渠道共用 `normalize_effective_date`（TUI 非法重新询问、CLI argparse 解析期拒绝紧凑式）；缓存编排下沉 `cache.operations`（`update_all_cache` 最大努力聚合、`warm_new_asset_caches` 新资产预热、`get_cache_stats_payload` 统计载荷）；渠道私有符号引用全部改公开 API。新增三渠道薄壳纪律扫描（`test_channel_layering.py`：禁跨渠道私有导入/禁配置写原语/禁默认值字面量）与共享层回归测试共 59 例。
-- **pre-commit 八守护全量**：钩子从「编号/统计同步/版本三项条件触发」重写为 8 个守护脚本全量校验（约 4~5 秒，`check-doc-drift` 按暂存面选 `--sync`/`--ci`），堵住「本地放行、CI 才红」缺口；`check-doc-drift` 第 16 项「守护清单同源」权威源扩为五处（新增 `.githooks/pre-commit`），钩子清单漏改即报。
-- Web 状态区网格由三列改自适应两列（760px 内容区下三列致名称/耗时竖排换行）。
-- 架构 SVG（capabilities / architecture / llm-chain）事实性修订（九大功能域、17 页签、5 provider / 6 输出模块）。
-
-### Fixed
-
-- `test_chain_resilience.py`（数据链路韧性 5 例）模块级 pytestmark 补 `scenario` 标记：原仅标 `scenario_resilience`，`--mode scenario`/`regression`/`integration` 与 CI 全并集（dev-verify ∪ verify ∪ regression ∪ portability）均选不中，仅 `--mode all` 可达——现随 scenario/regression 档与 P2 门禁执行；test-coverage 标记说明与 developer-guide 场景分类描述同步。
-- `faq.md` 两处「两份持仓文件对比」答案补 Web「调仓模拟」页签入口；CLAUDE.md「scripts 共享设施」历史痕迹设施路径同步为 `scripts/_traces_code/`。
-- 文档全量核对（23 份管理/用户文档，序号/目录锚点/链接/标题机检）：修复 plan.md 指向已归档研究文档的死链；technical.md 与 how-to-use-cli-mode.md 各两处同名标题锚点歧义按父章节/平台消歧。
+## [0.12.1-dev] - 开发中（未发布）
 
 ## 归档
 
-- [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0 ~ v0.11.12（2026-09-15 ~ 2026-10-02）
+- [`archived_changelog.0.11.x.md`](../archive/v0.11.x/archived_changelog.0.11.x.md) — v0.11.0 ~ v0.11.12 + v0.12.0（2026-09-15 ~ 2026-10-03）
 - [`archived_changelog.0.10.x.md`](../archive/v0.10.x/archived_changelog.0.10.x.md) — v0.10.1 ~ v0.10.19（2026-08-04 ~ 2026-09-13）
 - [`archived_changelog.0.9.x.md`](../archive/v0.9.x/archived_changelog.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
 - [`archived_changelog.0.8.x.md`](../archive/v0.8.x/archived_changelog.0.8.x.md) — v0.8.0 ~ v0.8.11（2026-07-21 ~ 2026-07-30）
