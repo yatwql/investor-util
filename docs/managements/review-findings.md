@@ -1,5 +1,5 @@
 # 投资复盘助手 - 自我审查问题记录
-> 文档版本：0.12.1-dev
+> 文档版本：0.12.1
 > **编号源**：`rf-next = 563`（新增问题取此编号，完成后更新为 +1；已用最大 rf-562，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
@@ -41,17 +41,11 @@
 
 ## 已解决问题
 
-- rf-560 版本演进「最新发布」列（表头 + 说明行）无一致性断言，发版后靠人工记忆刷新——已完成（`release_tag` 断言：发布列全部出现处 == changelog 头部「最近发布 [X.Y.Z]（日期）」发布指针单源，`--fix` 自动同步）
-- rf-561 目录语义分组跨组交错边界（跨组插号时组聚合与正文线性序不一致）——已完成（分组投影按线性连续段分块：组在号序断点拆块、同组可多块，展开恒等于正文线性序）
-- rf-557 报告目录分组固定组序 + 组成员跨号段，目录展开序与正文线性序不一致（「3→15→4」跳号回跳）——已完成（组间动态排序 + 「附录」组，展开严格 1..N）
-- rf-558 `enabled_llm` 禁用模块后 HTML 章节仍显示「待生成」占位（与用户手册「报告中不出现该页签」承诺漂移）——已完成（章级可见性：`LLM_MODULE_GATED_SECTIONS` 两端同口径整章隐藏）
-- rf-559 测试/实现质量杂项：`_JS_ASSETS` 两函数各持副本、打印隐藏断言取「第一个 @media print 块」的脆弱定位——已完成（模块级 `JS_ASSETS` 单一来源 + 跨块查找断言）
-- rf-562 实现残留过期描述与计数快照：「五组」注释×4（导航已六组）、technical.md JS 资产段旧名旧计数（`_JS_ASSETS`/8 个）、test-coverage 计数 6 处未随新增 13 用例刷新——已完成（注释改六组 / `JS_ASSETS` 9 个 / collect 全量回填）
-
-> **迁移说明**：已完成批次摘要（rf-541、P2C~P2F / rf-542~556）已于 v0.12.0 发布（2026-10-03）随档迁入 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)，本文件只保留未完成项与归档索引。
+> **迁移说明**：已完成批次摘要（rf-557 ~ rf-562）已于 v0.12.1 发布（2026-10-03）随档迁入 [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)，本文件只保留未完成项与归档索引；更早批次（rf-541、rf-542 ~ rf-556）见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)。
 
 ### 归档档案
 
+- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 批次（2026-10-03）
 - [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.11  （2026-09-18 ~ 2026-10-02）
 - [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.20（2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
