@@ -10,18 +10,18 @@
 <!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **8015** | ~30s |
-| `standard` | **6991** | ~29s |
+| `unit` | **8026** | ~30s |
+| `standard` | **7002** | ~29s |
 | `scenario` | **255** | ~5s |
 | `regression` | **255** | ~5s |
-| `dev-verify` | **3575** | ~25s |
-| `verify` | **5673** | ~20s |
+| `dev-verify` | **3584** | ~25s |
+| `verify` | **5682** | ~20s |
 | `integration` | **297** | ~7s |
 | `edge` | **956** | ~11s |
 | `data` | **70** | ~3s |
-| `all` | **8336** | ~32s |
+| `all` | **8347** | ~32s |
 | `smoke` | **26** | ~3s |
-| `report` | **2034** | ~23s |
+| `report` | **2036** | ~23s |
 | `all_no_unit` | **321** | ~7s |
 | `scenario_extreme` | **9** | ~2s |
 <!-- mode-count-table:end -->

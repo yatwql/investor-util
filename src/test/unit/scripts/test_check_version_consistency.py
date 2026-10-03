@@ -131,6 +131,81 @@ class TestDocHeaderRegistration:
             types.setdefault(rel, set()).add(assert_type)
         assert "evolution_head" in types.get("docs-stm/managements/folders.md", set())
 
+    def test_folders_release_tag_registered(self, version_script):
+        """folders.md 须注册 release_tag 断言（发布列 == changelog 发布指针）。"""
+        types: dict[str, set[str]] = {}
+        for path, assert_type, _args in version_script.CHECKS:
+            rel = str(path.relative_to(version_script.REPO_ROOT)).replace("\\", "/")
+            types.setdefault(rel, set()).add(assert_type)
+        assert "release_tag" in types.get("docs-stm/managements/folders.md", set())
+
+
+# ── release_tag：版本演进「最近发布」列 ↔ changelog 发布指针单源 ─────────
+
+_CHANGELOG_PTR = (
+    "> **最近发布 [0.12.0]**（2026-10-03）——已发布版本段随发布移入归档；"
+    "本文件只保留当前开发版本段与归档索引。\n## [0.12.1-dev] - 开发中（未发布）"
+)
+
+
+def _folders_release_text(ver: str = "0.12.0", date: str = "2026-10-03") -> str:
+    """构造 folders 版本演进发布列两处出现（说明行 + 表头）。"""
+    return (
+        f"> **三个读数**：最初版本 = 仓库首个提交（`项目初始基线`，2026-06-27）；"
+        f"最新发布 = 最近一次发布 tag（v{ver} · {date}）；**当前开发版 = 本次重跑时的 HEAD**。\n"
+        f"| 指标 | 最初版本 | 最新发布（最近发布 tag v{ver} · {date}） | 当前开发版（0.12.1-dev） |"
+    )
+
+
+class TestReleaseTagCheck:
+    """发布列（表头 + 说明行）== changelog 发布指针；任一处过期或指针缺失即拒绝。"""
+
+    def test_both_columns_match_changelog_pointer(self, version_script):
+        assert version_script._check_release_tag(_folders_release_text(), _CHANGELOG_PTR) is True
+
+    def test_stale_version_rejected(self, version_script):
+        text = _folders_release_text(ver="0.11.12", date="2026-10-01")
+        assert version_script._check_release_tag(text, _CHANGELOG_PTR) is False
+
+    def test_stale_date_rejected(self, version_script):
+        assert version_script._check_release_tag(_folders_release_text(date="2026-10-02"), _CHANGELOG_PTR) is False
+
+    def test_single_stale_occurrence_rejected(self, version_script):
+        """两处出现处之一过期即判未同步（表头与说明行都需刷）。"""
+        text = _folders_release_text().replace(
+            "最近一次发布 tag（v0.12.0 · 2026-10-03）",
+            "最近一次发布 tag（v0.11.12 · 2026-10-01）",
+        )
+        assert version_script._check_release_tag(text, _CHANGELOG_PTR) is False
+
+    def test_changelog_without_pointer_rejected(self, version_script):
+        assert version_script._check_release_tag(_folders_release_text(), "## [0.12.0] - 2026-10-03") is False
+
+    def test_missing_column_rejected(self, version_script):
+        assert version_script._check_release_tag("纯文本无发布列", _CHANGELOG_PTR) is False
+
+
+class TestAutoFixReleaseTag:
+    """--fix：两处出现处同步为 changelog 指针；已一致不动。"""
+
+    def test_syncs_both_occurrences(self, version_script, tmp_path):
+        p = tmp_path / "folders.md"
+        p.write_text(_folders_release_text(ver="0.11.12", date="2026-10-01"), encoding="utf-8")
+        c = tmp_path / "changelog.md"
+        c.write_text(_CHANGELOG_PTR, encoding="utf-8")
+        assert version_script._auto_fix_release_tag(p, c) is True
+        out = p.read_text(encoding="utf-8")
+        assert "v0.12.0 · 2026-10-03" in out, "说明行应同步为发布指针"
+        assert "最近发布 tag v0.12.0 · 2026-10-03" in out, "表头应同步为发布指针"
+        assert "0.11.12" not in out, "旧版本号不应残留"
+
+    def test_no_change_when_already_matching(self, version_script, tmp_path):
+        p = tmp_path / "folders.md"
+        p.write_text(_folders_release_text(), encoding="utf-8")
+        c = tmp_path / "changelog.md"
+        c.write_text(_CHANGELOG_PTR, encoding="utf-8")
+        assert version_script._auto_fix_release_tag(p, c) is False
+
 
 # ── evolution_head：版本演进对照「当前开发版」列头版本号 ───────────
 

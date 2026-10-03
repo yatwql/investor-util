@@ -15,8 +15,8 @@ from typing import Any
 # ── HTML 目录分组导航（「基础信息/基金深度分析/行动建议/历史/LLM/附录」六组，导航折叠收尾） ──
 
 # 导航分组注册表（组名, 组 key），空组不渲染。渲染顺序不在这里承诺——
-# `_build_section_nav_groups` 按组内最小报告号动态排序，保证目录展开序 == 正文线性序
-# （号是唯一排序权威；分组只做聚合视图，不重排）。
+# `_build_section_nav_groups` 按报告号线性序扫描、同组连续段聚块，
+# 保证目录展开序 == 正文线性序（号是唯一排序权威；分组只做聚合视图，不重排）。
 _NAV_GROUP_LABELS: list[tuple[str, str]] = [
     ("基础信息", "basic"),
     ("基金深度分析", "fund_deep"),
@@ -28,8 +28,9 @@ _NAV_GROUP_LABELS: list[tuple[str, str]] = [
 
 # 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础信息」组）。
 # 默认注册序下每组成员的号段连续（basic=1..3、fund_deep=4..6、action=7、llm=8..12、
-# history=13..14、appendix=15..17），目录组间按组内最小号动态排序后展开即严格 1..N，
-# 与正文（flex order = 报告号）逐位一致、无跳号回跳。
+# history=13..14、appendix=15..17），一块即一组、展开即严格 1..N；
+# 用户跨组插号（report_section_order）时组在号序断点处拆块（同组可出现多块），
+# 展开恒等于正文线性序，与正文（flex order = 报告号）逐位一致。
 _SECTION_NAV_GROUP_MAP: dict[str, str] = {
     # 基础信息：汇总/持仓明细与分类/穿透
     "summary": "basic",
@@ -182,34 +183,40 @@ def _build_section_nav_groups(
 ) -> list[dict]:
     """构建 HTML 目录分组导航数据（分组聚合视图，报告号是唯一排序权威）。
 
-    仅收录当前可见章节；组内按报告号升序，**组间按组内最小报告号动态排序**——
-    默认注册序下展开后严格跟随正文线性序（1..N），分组只聚合不重排，
-    不产生「组内尾号 → 下组头号」的跳号回跳；用户配置 report_section_order
-    后组序随之自适应（C7 序号可配置兼容）。
+    按报告号**线性序扫描**，同组连续段聚为一块——默认注册序下每组号段连续、
+    一块即一组，展开后严格 1..N 与正文逐位一致；用户配置 report_section_order
+    跨组插号时（如附录章插入号段中间），组在号序断点处自然拆块、同组可出现
+    多块，如实反映线性序，展开恒等于正文线性序（无跳号回跳，C7 序号可配置兼容）。
+    仅收录当前可见章节；空组保留在返回列表末尾，模板端跳过渲染（无 `<details>`）。
     返回 [{key, name, sections: [{key, number, name, llm_supported}, ...]}...]；
     llm_supported 标记该章节是否由 LLM 参与生成（🧠 标记，与导航分组解耦）；
-    空组（无可见章节）保留在返回列表末尾，模板端跳过渲染（无 `<details>`）。
+    同 key 块可能多于一个（仅跨组交错场景），消费方聚合时勿假设 key 唯一。
     """
-    groups: dict[str, list[dict]] = {gk: [] for _, gk in _NAV_GROUP_LABELS}
+    labels = {gk: lb for lb, gk in _NAV_GROUP_LABELS}
+    visible: list[dict] = []
     for sec in order:
         key = sec.get("key", "")
         if not section_visible(key):
             continue
-        group_key = _SECTION_NAV_GROUP_MAP.get(key, "basic")
-        groups.setdefault(group_key, []).append(
+        visible.append(
             {
                 "key": key,
                 "number": section_numbers.get(key, 0),
                 "name": sec.get("name", key),
                 "llm_supported": key in _LLM_SUPPORTED_SECTIONS,
+                "group": _SECTION_NAV_GROUP_MAP.get(key, "basic"),
             }
         )
-    built: list[dict] = []
-    for label, group_key in _NAV_GROUP_LABELS:
-        sections = sorted(groups.get(group_key, []), key=lambda s: s["number"])
-        built.append({"key": group_key, "name": label, "sections": sections})
-    # 组序动态：非空组按组内最小报告号升序（与正文序一致），空组无锚定位、排尾保留
-    nonempty = [g for g in built if g["sections"]]
-    empty = [g for g in built if not g["sections"]]
-    nonempty.sort(key=lambda g: min(s["number"] for s in g["sections"]))
-    return nonempty + empty
+    # 号是唯一排序权威：先按号排成正文线性序，再按同组连续段分块
+    visible.sort(key=lambda s: s["number"])
+    blocks: list[dict] = []
+    for sec in visible:
+        group_key = sec.pop("group")
+        if blocks and blocks[-1]["key"] == group_key:
+            blocks[-1]["sections"].append(sec)
+        else:
+            blocks.append({"key": group_key, "name": labels.get(group_key, group_key), "sections": [sec]})
+    # 空组（无可见章节）排尾保留，模板端跳过渲染（无 <details>）
+    appeared = {b["key"] for b in blocks}
+    empty = [{"key": gk, "name": lb, "sections": []} for lb, gk in _NAV_GROUP_LABELS if gk not in appeared]
+    return blocks + empty
