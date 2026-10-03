@@ -443,9 +443,11 @@ select:focus,
   font-size: 0.85rem;
 }
 
-/* ── 系统信息卡片（版本 / IP / LLM 状态，三列状态区） ── */
+/* ── 状态区网格（系统信息/健康/最近运行/自检/缓存，自适应两列） ── */
+/* 5+ 张卡时 760px 内容区下 3 列过窄（名称/耗时竖排换行），
+   改为自适应两列（minmax 300px），行宽充足、移动端降为单列 */
 .status-grid-3 {
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
 .system-list {
@@ -875,6 +877,131 @@ input[type='text']:focus {
   outline-offset: 1px;
 }
 
+/* ── 标签页工作台导航（五区切换，粘顶）── */
+.tab-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tab-bar-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 10px var(--space-card);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  appearance: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.tab-btn:hover {
+  background: rgba(31, 111, 176, 0.08);
+  color: var(--color-text);
+}
+
+.tab-btn[aria-selected='true'] {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.tab-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* 面板：仅当前标签可见；[hidden] 优先于 display:flex */
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tab-panel[hidden] {
+  display: none;
+}
+
+/* ── 调仓 What-if 表单（整列布局：各行满宽，按钮置左下）── */
+.whatif-form {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.whatif-form .field-row {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.whatif-form > .btn {
+  align-self: flex-start;
+}
+
+/* hidden 属性优先于 field-row/whatif-form 的 display:flex（否则基准上传行收不起来） */
+.field-row[hidden],
+.whatif-form .field-row[hidden] {
+  display: none;
+}
+
+/* 结果操作行：hidden 优先于 .result-actions 的 display:flex（未出结果前不显示链接） */
+.result-actions[hidden],
+.result-errors[hidden] {
+  display: none;
+}
+
+.whatif-form .field-row > p {
+  flex: 1 1 100%;
+  margin: 4px 0 0;
+}
+
+.file-input-plain {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 6px 8px;
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.file-input-plain:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.field-hint {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+/* ── 状态卡操作行（缓存统计等）── */
+.status-card-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.status-card-actions .btn-sm {
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
 /* ── 页脚 ── */
 .app-footer {
   max-width: 760px;
@@ -888,7 +1015,8 @@ input[type='text']:focus {
 @media (max-width: 480px) {
   .app-header,
   .app-main,
-  .app-footer {
+  .app-footer,
+  .tab-bar-inner {
     padding-left: 16px;
     padding-right: 16px;
   }

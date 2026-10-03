@@ -68,7 +68,7 @@ def _read_holdings_and_clear_cache(group_name: str) -> list | None:
 
 def _print_cache_refresh_report(result) -> None:
     """TUI 格式化输出缓存刷新结果（CacheUpdateResult → 终端颜色）。"""
-    from src.python.cache.operations import _sector_flow_hint
+    from src.python.cache.operations import sector_flow_hint
 
     funds_count = result.total_funds
     holdings_count = result.holdings_count
@@ -108,7 +108,7 @@ def _print_cache_refresh_report(result) -> None:
     if sf_ok:
         print(f"  {GREEN}[OK]{RESET} sector_flow.json               ({sf_ok} 个行业)")
     elif funds_count:
-        print(f"  {YELLOW}[!]{RESET} sector_flow.json               {_sector_flow_hint()}")
+        print(f"  {YELLOW}[!]{RESET} sector_flow.json               {sector_flow_hint()}")
     if news_ok:
         print(f"  {GREEN}[OK]{RESET} news_{{md5}}.json               ({news_ok} 条)")
     elif holdings_count:

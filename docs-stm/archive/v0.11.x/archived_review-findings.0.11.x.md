@@ -247,3 +247,64 @@
 **rf-541**（测试 `sys.path` 重复注入）：`src/test/unit/scripts/test_probe_entry.py` 存在两处 `sys.path.insert(0, scripts/)`（模块级 + `probe_entry` fixture 内各一处）：① 重复注入——`probe.py` 加载时自身也会插入同一路径（`probe.py:23`），fixture 内那次必然多余；② 无幂等保护——`sys.path.insert` 每次调用都追加，重复注入会在 `sys.path` 头部累积重复条目，且属全局路径污染式 ad-hoc 写法（同类脚本测试 `test_checklib.py`/`test_check_doc_drift.py` 均无模块级 path 注入）。
 处置：合并为单一注入点——模块级保留 `_ensure_scripts_on_path()`（幂等保护 `if str(_SCRIPTS_DIR) not in sys.path`），fixture 内重复注入删除（probe.py 自插入不变）；注入逻辑提取为可测辅助函数。
 测试：`test_probe_entry.py::TestScriptsPathInjection` 2 例（scripts/ 已在 sys.path / 幂等调用不增条目），文件合计 10 例全通。
+
+## v0.11.13-dev 批次（2026-10-02）
+
+### rf-542~544（2026-10-02，近 24 小时实现自审批次，当日登记当日修复）
+
+- **rf-542**（faq.md 调仓问答缺 Web 入口）：`faq.md` 两处「两份持仓文件对比」答案只写菜单 `W` / CLI `whatif`，未含当日新增的 Web「调仓模拟」页签（调仓 What-if 与缓存管理 Web 化落地后文档未同步）。处置：两处答案补 Web 页签入口（基准默认取配置正式持仓、可改上传，目标必传）并链到 `how-to-use-web-mode.md`。
+- **rf-543**（pre-commit 仅覆盖 3/8 守护 → CI 两度红）：当日 README 徽章/上手段提交与 folders 行数同步提交连续 CI 红——`check-doc-traces` 报 README 版本行痕迹、`check-doc-drift` 报 folders「用户文档」行数漂移，本地钩子因仅条件触发「编号/统计同步/版本」三项而未拦截（dev-verify 亦不在钩子内）。处置：`.githooks/pre-commit` 重写为八守护全量（约 4~5 秒：`check-doc-drift` 按暂存面选 `--sync`/`--ci`，其余七项无条件执行，任一 finding 中止提交）；`check-doc-drift` 第 16 项「守护清单同源」权威源扩为五处（`_guards.py` 新增 `.githooks/pre-commit` 区域锚点 `^set -e$`~`^exit 0$` 与 `guard_parity_sources()`，补 2 例真实源断言）；developer-guide 四层保障表 / item 16 / install-hooks 描述同步。dev-verify 仍不入钩子（提交前手动纪律 + CI 兜底）。
+- **rf-544**（CLAUDE.md 历史痕迹设施路径过时）：CLAUDE.md「scripts 共享设施」条仍指向 `scripts/_traces_common.py`，该文件当日已拆包为 `scripts/_traces_code/`（共享排除模式并入 exemptions）。处置：路径更新为 `scripts/_traces_code/`。
+
+### rf-545~547（2026-10-02，文档全量核对批次，当日登记当日修复）
+
+> 应要求核对全部管理文档与用户文档（10 managements + 11 manuals + README + 2 plan，共 23 份）的序号/组织/内容：编号标题序列、目录锚点、文内与跨文档链接按 GitHub slug 规则全量机检。除下述 3 项外均无问题（数字/中文序号连续、目录与标题一致、链接全部有效；`as-if` 跨文件锚点经 `<a id>` 显式锚点核实为有效）。
+
+- **rf-545**（plan.md 死链）：P3 段「详细分析见 `tradingagents-cn-research.md`」指向 `../plan/tradingagents-cn-research.md`，该研究文档已完成并归档、plan/ 下已不存在。处置：链接改指 `../archive/v0.11.x/tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md` 并同步显示文件名。
+- **rf-546**（technical.md 重复标题）：`#### 内部线程池` 在 3.6 缓存操作共享层（行 1475）与 4.2 报告编排器（行 1619）下各出现一次，锚点 `#内部线程池` 只能命中首处。处置：按父章节消歧为「内部线程池（缓存操作共享层）」/「内部线程池（报告编排器）」（无任何入链，改名零波及）。
+- **rf-547**（CLI 手册重复标题）：`#### 基础配置` 在 13.1 Windows 任务计划程序与 13.2 Linux crontab 下各出现一次。处置：按平台消歧为「基础配置（Windows）」/「基础配置（Linux）」（无 TOC 条目与入链，改名零波及）。
+
+### rf-548~555（2026-10-03，三渠道薄壳核查批次，当日登记当日修复）
+
+> 应要求按带建议的核查结论修复 8 项渠道分层问题：三渠道（Web/TUI/CLI）保持薄壳——业务规则、策略解析、数据组装、编排聚合一律下沉核心层，渠道只留交互/传输/渲染外壳；同步补渠道纪律扫描与共享层回归测试。
+
+- **rf-548**（TUI 渠道内缓存预热编排）：`tui_handlers.check_and_warm_for_new_assets` 自行编排 fetcher 取数与业务判断（`is_fund` / `price>0` 分支），仅 TUI 独有。处置：预取编排下沉 `cache/operations.warm_new_asset_caches(holdings, reporter)`（变更检测 → 行情 / 基金业绩与持仓 / 行业分类，全程 try/except 不阻断），TUI `prepare_holdings` 直调；回归测试 `unit/cache/test_cache_operations.py::TestWarmNewAssetCaches` 3 例（预热触发/无新增空表/异常不阻断）。
+- **rf-549**（配置编辑 Web/TUI 双实现且已分叉）：`web/config_edit.py` 自称「与 TUI 逐条等价」，但 TUI `_edit_single_config` 零校验（可写入含分隔符文件名）、对比池缺长度/非法字符/重复校验。处置：新建 `config/edit_ops.py` 共享编辑层（`config_edit_whitelist` 白名单 + `_apply_plain_value`/`_apply_comparison_action` 值规则 + `_dispatch_write` 写入分派 + `config_backup_file` 写前单槽备份），Web 模块改薄外观（再导出共享符号 + `get_config_edit_surface` 呈现面），TUI 经 `_apply_edit` 外壳调同一 `apply_config_edit`（校验失败黄色提示行、写入失败红色错误行）；测试 `unit/config/test_edit_ops.py` 17 例（白名单与注册表派生双向一致 / 各值规则 / 写入与 .bak 备份 / 对比指数增删重置往返）+ `test_handlers_config.py::TestApplyEdit` 2 例（委托透传 / 失败返回 False）。
+- **rf-550**（默认值字面量散布三渠道）：`"data/holdings"`、`"个人投资持仓信息.xlsx"`、`get("output_dir", "reports")` 等 11+ 处字面量回退，且 TUI 空串默认与 Web/CLI 字面量默认行为分叉。处置：核心 `config.get_default(key)` 与 `resolve_holdings_path(config=None)`（渠道可传入上下文配置，TUI/CLI 传入缓存配置）单源，三渠道 11 处全部改走；`test_channel_layering.py` 字面量扫描（带引号精确匹配，不误伤文档描述）防回退。
+- **rf-551**（生效日三渠道校验不一致）：Web `fromisoformat`+归一化、TUI 仅 `.strip()`、CLI argparse 原值透传。处置：`report/whatif_operations.normalize_effective_date()` 单源（None/空白 → None；非法或紧凑式 → ValueError「生效日格式应为 YYYY-MM-DD」）；Web 映射 400、TUI `_prompt_effective_date` 循环重新询问、CLI `type=_effective_date_arg` 解析期拒绝（退出 2，不进业务链）。
+- **rf-552**（历史走势策略双实现）：TUI `_prompt_history` 自解 off/prompt/auto 与 orchestrator `fetch_history=None` 回退并存。处置：`report/history_policy.resolve_fetch_history(config, ask)` 单源（off→False、prompt 有 ask 注入询问 / 无 ask 回退 True、其余→True），orchestrator None 分支与 TUI `_prompt_history`（`enable_history` 门禁保留 + 注入 y/N 回调）均改调；`test_history_policy.py` 10 例（含 off 优先于 ask、prompt 非交互回退、缺键/未知值按 auto）。
+- **rf-553**（状态组装双份）：Web `_build_system_info`（~170 行）与 TUI `tui_menu` 展示规则重复（策略标签 / credentials_ref 回填 / endpoint 简化算法 / 匿名化标签 / 隐藏模块集合）。处置：`core/system_info.py` 单源（`build_system_info` + `simplify_endpoint`/`circuit_display`/`strategy_label`/`priority_display`/`anon_mode_label`/`resolve_provider_credentials`/`model_route_labels` 展示原语 + registry `LLM_HIDDEN_KEYS`/`visible_llm_module_names`），Web 变薄包装、TUI 改用同组原语；`test_system_info.py` 9 例（原语逐个 + build 键结构/配置读取失败保守兕底/flat 结构）。
+- **rf-554**（渠道私有符号引用 9 处）：`_DEFAULT_CONFIG`/`_FEATURES_FILE`/`_get_machine_ip`/`_strip_json_comments`/`_sector_flow_hint`/`_timing_records`/`config._local_state.get_flag` 等。处置：公开 API/别名（`config.get_default`、`features.FEATURES_FILE`、`logger.get_machine_ip` 转发包装保测试 patch 点、`config.strip_json_comments`、`cache.operations.sector_flow_hint`、`report.progress.timing_records`、`config.get_local_flag`），渠道全部改公开名；`test_channel_layering.py` 导入面扫描（渠道内互相引用豁免，跨渠道 `_` 前缀/私有配置模块/配置写原语禁入）。
+- **rf-555**（P4：聚合与载荷在渠道）：CLI `--update all` 最大努力聚合与 Web cache stats 载荷形塑在渠道层。处置：`cache.operations.update_all_cache`（`max(basic, position)` 退出码，basic 失败仍继续）与 `get_cache_stats_payload`（保序二维数组 / top_by_size 截断 5 / 命中率 / 过期预估，契约键集不变）下沉，CLI/Web 改委托；`TestUpdateAllCache` 2 例 + `TestStatsPayload` 2 例。
+
+> 测试同步：新增 5 个测试文件（`test_edit_ops` / `test_system_info` / `test_cache_operations` / `test_history_policy` / `test_channel_layering`，50 例）+ 既有文件追加 9 例（CLI 生效日 argparse 2 / normalize 4 / TUI 重问 3）；dev-verify 3535 → 3562 全绿，九守护 + ruff 全过。
+
+### rf-556（2026-10-03，测试用例核查批次，当日登记当日修复）
+
+> 应要求核查全部测试用例的冗余与有效性：`check-test-redundancy --ci` 五类（死用例/无断言/完全重复/自证/硬编码演进总数）全绿，marker 覆盖、edge 隔离、skip 有效性均无问题；门禁执行覆盖用 pytest 实测收集核对（CI 全并集 = dev-verify ∪ verify ∪ regression ∪ portability 单元套件 = 8242/8313）。除设计内手工档（perf/security/extreme 共 24 例、integration 套件 34 例均已在 modes/developer-guide 文档化）外，发现 1 项档位盲区：
+
+- **rf-556**（数据链路韧性 5 例不在任何常规档位）：`test_chain_resilience.py` 模块级 `pytestmark = [pytest.mark.scenario_resilience]`，而 `MODES` 中无任何模式表达式含 `scenario_resilience`（`scenario`/`regression` = `-m scenario`、`integration` = `scenario or integration`、dev-verify/verify 仅选 unit 子标记、portability 仅跑 `src/test/unit`）——5 例仅 `--mode all`/`all_no_unit` 可达，P0/P1/P2 门禁与 CI 全并集实测均不覆盖；而 testplan R-CON-07 将其列为验证载体、test-coverage 划入 scenario_resilience 家族（18 例）。处置：模块级 pytestmark 补 `pytest.mark.scenario`（5 例进 `scenario`/`regression`/`integration` 档与 P2 门禁），test-coverage.md 标记说明同步为「随 scenario/regression 档与 P2 门禁执行」、developer-guide scenario_resilience 分类描述补「数据链路韧性」条目。
+
+## 已修复归档摘要（自 review-findings.md 迁入，2026-10-03，v0.12.0 发布）
+
+> 主文件只保留未完成项与归档索引；以下为已完成批次摘要行原文迁移（明细见上文各批次）。
+
+> **已修复归档摘要**：rf-541（测试路径注入单点化，2026-10-02 当日登记当日修复）已迁入 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.12-dev 批次」，变更记录见 changelog 同版本段。
+
+### P2C — 近 24 小时实现自审（2026-10-02，当日登记当日修复）
+
+> **已修复归档摘要**：rf-542（`faq.md` 两处调仓问答缺 Web「调仓模拟」入口）、rf-543（pre-commit 仅条件触发 3/8 守护，README 痕迹与 folders 行数漂移两度漏拦至 CI 才红——已重写为八守护全量并纳入守护清单同源第五处）、rf-544（CLAUDE.md 历史痕迹共享设施路径仍指已拆包的 `_traces_common.py`），明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
+
+### P2D — 文档全量核对（2026-10-02，当日登记当日修复）
+
+> **已修复归档摘要**：rf-545（plan.md 指向已归档研究文档的死链）、rf-546（technical.md 两处同名标题「内部线程池」锚点歧义）、rf-547（how-to-use-cli-mode.md 13.1/13.2 下两处同名标题「基础配置」锚点歧义），均 2026-10-02 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
+
+
+
+### P2E — 三渠道薄壳核查（2026-10-03，当日登记当日修复）
+
+> **已修复归档摘要**：rf-548（TUI 缓存预热编排下沉 `cache.operations.warm_new_asset_caches`）、rf-549（配置编辑收敛 `config/edit_ops.py` 共享层，Web/TUI 同一 `apply_config_edit` 函数）、rf-550（三渠道默认值字面量清除，`config.get_default`/`resolve_holdings_path` 单源）、rf-551（What-if 生效日三渠道共用 `normalize_effective_date`）、rf-552（历史走势策略 `resolve_fetch_history` 单源）、rf-553（系统状态组装与展示原语下沉 `core/system_info.py`）、rf-554（渠道私有符号引用改公开 API）、rf-555（`--update all` 聚合与 cache stats 载荷下沉 `cache.operations`），均 2026-10-03 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。
+
+### P2F — 测试用例核查（2026-10-03，当日登记当日修复）
+
+> **已修复归档摘要**：rf-556（`test_chain_resilience.py` 仅标 `scenario_resilience` 不标 `scenario`，`scenario`/`regression`/`integration` 档与 CI 全并集均选不中，5 例仅 `--mode all` 可达——模块级 pytestmark 补 `scenario` 进 regression/P2 档），2026-10-03 当日登记当日修复，明细见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)「v0.11.13-dev 批次」，变更记录见 changelog 同版本段。

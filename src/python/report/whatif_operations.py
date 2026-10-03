@@ -44,6 +44,33 @@ class WhatifRunResult:
     reason: str = ""
 
 
+def normalize_effective_date(value: str | None) -> str | None:
+    """归一化调仓生效日（YYYY-MM-DD）——三渠道共用的唯一格式校验。
+
+    None / 空白 → None（不启用时序回测）。
+    非法格式（含 ``20260701`` 等紧凑式）→ 抛 ``ValueError``，调用方映射各自契约
+    （Web 400 / TUI 重新询问 / CLI argparse 类型错误）。
+
+    Raises:
+        ValueError: 不是严格的 YYYY-MM-DD 日期。
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    from datetime import date
+
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError as e:
+        raise ValueError("生效日格式应为 YYYY-MM-DD") from e
+    # 3.11 起 fromisoformat 宽容接受 20260701 等紧凑式，回写归一化严格格式
+    if parsed.isoformat() != text:
+        raise ValueError("生效日格式应为 YYYY-MM-DD")
+    return parsed.isoformat()
+
+
 def build_whatif_backtest(
     base: list[Holding],
     candidate: list[Holding],

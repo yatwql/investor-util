@@ -4,7 +4,7 @@
 配置管理 → handlers_config.py。本文件保留：
   - 菜单执行调度（execute_item）
   - 通用辅助函数（_print_*、_check_*、prepare_holdings、select_holdings_file 等）
-  - 持仓变更检测与缓存预热（check_and_warm_for_new_assets）
+  - 持仓变更检测与缓存预热（委托 cache.operations.warm_new_asset_caches）
 """
 
 from __future__ import annotations
@@ -50,12 +50,12 @@ def print_llm_session_usage(usage: dict | None = None) -> None:
 
 def print_timing_summary() -> None:
     """输出本次运行时各模块耗时排行（委托至 TuiProgressReporter）。"""
-    from src.python.report.progress import _timing_records
+    from src.python.report.progress import timing_records
 
     reporter = TuiProgressReporter()
-    reporter._timing_records.extend(_timing_records)
+    reporter._timing_records.extend(timing_records)
     reporter.print_timing_summary()
-    _timing_records.clear()
+    timing_records.clear()
 
 
 def print_error_with_hint(e: Exception, prefix: str = "操作失败") -> None:
@@ -125,7 +125,9 @@ def prepare_holdings() -> "tuple[list, list, list] | None":
         print(f"  [OK] 成功读取 {len(holdings)} 条持仓记录")
         if parsed.transactions or parsed.dividends:
             print(f"     含交易流水 {len(parsed.transactions)} 条，分红流水 {len(parsed.dividends)} 条")
-        check_and_warm_for_new_assets(holdings)
+        from src.python.cache.operations import warm_new_asset_caches
+
+        warm_new_asset_caches(holdings, TuiProgressReporter())
         return holdings, parsed.transactions, parsed.dividends
     except Exception as e:
         print_error_with_hint(e, "读取持仓失败")
@@ -140,66 +142,19 @@ def finish_report(reporter: TuiProgressReporter) -> None:
     press_any_key()
 
 
-def check_and_warm_for_new_assets(holdings: list) -> None:
-    """检测持仓是否变化，若有新增资产则主动预热其缓存数据。"""
-    try:
-        from src.python.cache import check_and_refresh_caches
-        from src.python.fetcher.fund import fetch_fund_holdings, fetch_fund_rankings
-        from src.python.fetcher.industry import batch_fetch_industry_data
-        from src.python.fetcher.price import fetch_market_data
-        from src.python.report.fund_performance import is_fund
-
-        new_codes = check_and_refresh_caches(holdings)
-        if not new_codes:
-            return
-
-        code_map = {h.code: h for h in holdings}
-        print(f"  [..] 检测到 {len(new_codes)} 个新增资产，正在预热缓存...")
-
-        for code in new_codes:
-            h = code_map.get(code)
-            name = h.name if h else code
-            print(f"  [..]   新增 {name} ({code}) — 获取行情...", end="")
-            result = fetch_market_data(code, name)
-            if result and result.get("price", 0) > 0:
-                print(f" {result['price']:.4f}")
-            else:
-                print(" 失败")
-            if h and is_fund(h):
-                print(f"  [..]   新增基金 {name} ({code}) — 获取业绩排名...", end="")
-                perf = fetch_fund_rankings(code)
-                print(" OK" if perf else " 失败")
-                print(f"  [..]   新增基金 {name} ({code}) — 获取持仓明细...", end="")
-                holds = fetch_fund_holdings(code)
-                if holds and holds.get("holdings"):
-                    print(f" {len(holds['holdings'])} 条")
-                else:
-                    print(" 无数据")
-            print(f"  [..]   新增 {name} ({code}) — 获取行业分类...", end="")
-            _ind_map = batch_fetch_industry_data([code])
-            if _ind_map and code in _ind_map:
-                _idata = _ind_map[code]
-                ind_name = _idata.get("industry") or "未知"
-                conc_count = len(_idata.get("concepts", []))
-                print(f" {ind_name} ({conc_count} 个概念)")
-            else:
-                print(" 无数据")
-        print("  [OK] 新增资产缓存预热完成")
-    except Exception:
-        logger.warning("新资产预热过程异常，跳过（不影响后续生成）", exc_info=True)
-
-
 # ── 文件选择 ──────────────────────────────────────────────
 
 
 def select_holdings_file() -> str | None:
     """让用户选择持仓文件，返回绝对路径；未找到时返回 None。"""
+    from src.python.config import get_default, resolve_holdings_path
+
     refresh_config()
     config = get_config_cache() or {}
-    specific_path = os.path.join(config.get("holdings_dir", ""), config.get("holdings_filename", ""))
+    specific_path = resolve_holdings_path(config)
     if os.path.exists(specific_path):
         return os.path.abspath(specific_path)
-    dir_path = config.get("holdings_dir", "")
+    dir_path = config.get("holdings_dir") or get_default("holdings_dir")
     files = list_xlsx_files(dir_path)
     if not files:
         print(f"  [ERR] 目录 '{dir_path}' 下未找到 xlsx 文件")

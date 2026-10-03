@@ -1,5 +1,5 @@
 # 投资复盘助手 — 技术设计
-> 文档版本：0.11.12
+> 文档版本：0.12.0
 
 ## 目录
 
@@ -111,7 +111,7 @@
   │                        缓存层 (cache/)                              │
   │        泛用 JSON KV · TTL · 指纹失效 · 分组 · 原子写入             │
   │        大文件 gzip · 路径安全 · 文件损坏自恢复                      │
-  │        缓存操作共享层 (operations.py — TUI/CLI 共用)               │
+  │        缓存操作共享层 (operations.py — 三渠道共用)                 │
   └──────────────────────────────────┬────────────────────────────────┘
                                      │
                                      ▼
@@ -229,7 +229,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **数据获取** | Fetcher 调度 | Provider Chain 路由、数据获取 | `fetcher/price.py` 等 |
 | **数据获取** | 数据源 Provider | 外部 API 封装 | `providers/*.py` |
 | **缓存** | 缓存引擎 | 泛用 JSON KV、TTL、指纹、分组 | `cache/` |
-| **缓存** | 缓存操作共享层 | TUI/CLI 共用的业务级缓存操作 | `cache/operations.py` |
+| **缓存** | 缓存操作共享层 | 三渠道共用的业务级缓存操作 | `cache/operations.py` |
 | **编排** | 报告编排器 | 数据准备 → 管线编排 | `report/orchestrator.py` |
 | **报告** | Excel 管线 | openpyxl 写入 | `report/excel_generator.py` |
 | **报告** | HTML 管线 | Jinja2 模板渲染 | `report/html_writer.py` |
@@ -396,7 +396,7 @@ TUI（Text User Interface）是系统**主要交互渠道**：桌面终端内的
 | `tui/tui.py` | 主入口/主循环 | sys.path 注入、init_config、_bind_callbacks、启动清理/隐私提示/首次引导、方向键导航循环、LLM 会话统计 |
 | `tui/tui_menu.py` | 菜单定义与渲染 | MENU_ITEMS 列表、render_menu/print_header/show_config、index_by_key、press_any_key/exit_app |
 | `tui/tui_keys.py` | 键盘封装 | 跨平台（Windows msvcrt / Linux tty+termios+select），标准化键名 KEY_UP/DOWN/ENTER/CTRL_C |
-| `tui/handlers_report.py` | 报告生成外壳 | `_run_generate` 骨架、`_prompt_history`/`_prompt_force_llm` 交互询问、E/B/L 三命令 |
+| `tui/handlers_report.py` | 报告生成外壳 | `_run_generate` 骨架、`_prompt_history`（委托 resolve_fetch_history + 注入 y/N 询问）/`_prompt_force_llm` 交互询问、E/B/L 三命令 |
 | `tui/handlers_config.py` | 配置管理外壳 | 目录/文件名/输出目录/章节/指数池/匿名化/LLM 模块与功能开关/刷新等 8 项配置命令 |
 | `tui/handlers_cache.py` | 缓存管理外壳 | 更新基础/持仓缓存、清理过期、查看统计 4 项命令 |
 | `tui/handlers_whatif.py` | 调仓模拟外壳 | What-if 对话流程，委托 `report/whatif_operations.py`（§4.13） |
@@ -454,9 +454,9 @@ while True:
 
 `handlers_report.py` —— 三条生成命令（E/B/L）共用 `_run_generate(report_type, fetch_history, force_llm)` 骨架：
 
-1. **持仓准备**：`prepare_holdings()` → `select_holdings_file()`（交互式文件选择）→ `read_holdings_with_flows()`（主表 + 交易/分红流水）→ `check_and_warm_for_new_assets()`（新资产缓存预热）。
+1. **持仓准备**：`prepare_holdings()` → `select_holdings_file()`（交互式文件选择）→ `read_holdings_with_flows()`（主表 + 交易/分红流水）→ `warm_new_asset_caches()`（新资产缓存预热，委托 §3.6 缓存操作共享层）。
 2. **交互询问**（TUI 专属，CLI/Web 用参数/表单表达）：
-   - `_prompt_history()`：按 `history.fetch_mode` 三态决策——`off` 直接跳过、`auto` 直接获取、`prompt` 询问「是否获取组合历史走势数据（as-if 模拟）？(y/N)」。
+   - `_prompt_history()`：委托 `report/history_policy.resolve_fetch_history` 单源解析三态（`enable_history=False` 先行跳过），`prompt` 时注入「是否获取组合历史走势数据（as-if 模拟）？」y/N 询问——渠道层不自行分支 `fetch_mode`。
    - `_prompt_force_llm()`：询问「是否强制重新生成 LLM 内容（跳过缓存）？(y/N)」。
 3. **委托共享层**：`orchestrator.generate_report(holdings, config, reporter, report_type, ...)`（§4.2）——reporter 注入 `TuiProgressReporter`，管线代码零改动。
 4. **收尾**：`finish_report()` → `print_error_summary()`（非致命错误汇总）+ `print_timing_summary()`（耗时排行）+ `press_any_key()`（等待返回菜单）。
@@ -519,7 +519,7 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 #### 1.7.4 子命令处理器
 
 - **`_handle_report`**：`CliProgressReporter(verbose)` 注入 `generate_report`（§4.2）；`--output` 覆盖 `output_dir`，`--history` 为 None 时回退配置层解析；返回 `result.exit_code`。
-- **`_handle_cache`**：三分支——`--clean` 委托 `cleanup_cache`；`--stats` 委托 `get_cache_stats` + 打印 LLM 配置状态；`--update` 委托 `update_basic_cache`/`update_position_cache`（§3.6），`--update all` 采用**最大努力模式**（basic 失败仍继续 position，退出码取两者 max）。
+- **`_handle_cache`**：三分支——`--clean` 委托 `cleanup_cache`；`--stats` 委托 `get_cache_stats` + 打印 LLM 配置状态；`--update` 委托 `update_basic_cache`/`update_position_cache`（§3.6），`--update all` 委托 `update_all_cache` **最大努力模式**（basic 失败仍继续 position，退出码取两者 max）。
 - **`_handle_whatif`**：解析 `--base`/`--candidate` 两份持仓 → `run_whatif_simulation()`（§4.13）→ 结果 `ok` 判定，失败返回 2；`--effective-date` 触发时序回测扩展。
 - **`_handle_cassettes`**：无参数时经 `core/cassette.py::list_cassettes()` 列出已录制响应（来源/录制时间/交互数/大小）；`--verify` 时经 `fetcher/cassette_checks.py::CASSETTE_CHECKS` + `verify_cassettes()` 离线回放，有解析失败返回 `_EXIT_SEVERE`。纯只读展示层，不联网、不碰用户配置。
 - **`_handle_check_sources`**：`run_check_sources()`（内部 `sys.exit`）。
@@ -548,9 +548,9 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 |:-----|:-----|:---------|
 | `web/server.py` | 启动入口 | sys.path 注入、参数解析、端口检测、output_dir 写锁检测、init_config、app.run |
 | `web/app.py` | Flask 应用工厂 | 统一 JSON 错误处理、request_id 访问日志、注入 run_manager |
-| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康/日志/配置编辑；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 组装状态区系统信息（版本/本机 IP/LLM 状态/自检卡片可见性，对齐 TUI）；`_handle_logs`/`_handle_health_history` 薄展示（委托 `core/log_reader.py` + `core/perf.py`，无解析逻辑）；`_handle_doctor` 薄展示（委托 `core/doctor.py`）；`_handle_config_edit` 同源守卫（`_is_same_origin`） |
+| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康/日志/配置编辑；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 委托 `core/system_info.build_system_info` 单源组装状态区系统信息（版本/本机 IP/持仓输出摘要/LLM 含多链/自检卡片可见性，与 TUI 同组展示原语）；`_handle_logs`/`_handle_health_history` 薄展示（委托 `core/log_reader.py` + `core/perf.py`，无解析逻辑）；`_handle_doctor` 薄展示（委托 `core/doctor.py`）；`_handle_config_edit` 同源守卫（`_is_same_origin`） |
 | `web/upload.py` | 上传安全 | 服务端 uuid 重命名、扩展名白名单、大小上限、PK 魔数、原子落盘、TTL 清理 |
-| `web/config_edit.py` | 配置编辑 | `config_edit_whitelist` 白名单（唯一事实来源）+ `apply_config_edit`/`get_config_edit_surface` + `config_backup_file` 写前 .bak 备份；写入分派逐条等价 TUI |
+| `web/config_edit.py` | 配置编辑 | 薄外观：再导出共享层 `config/edit_ops.py` 符号（`apply_config_edit`/`config_edit_whitelist`/`config_backup_file`）+ `get_config_edit_surface` 组装呈现面；规则与写入单源在共享层，与 TUI 同一函数 |
 | `web/runs.py` | 运行管理 | RunManager 单 worker 串行队列 + run 状态/事件注册表（Lock 保护） |
 | `web/progress.py` | 进度报告 | WebProgressReporter（ProgressReporter 子类 → RunState 事件缓冲） |
 | `src/static/web/` | 前端单页 | 原生 ES6 无框架、上传表单/进度事件/状态区/历史记录/配置编辑面板 |
@@ -667,14 +667,14 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 
 #### 1.8.11 Web 配置编辑（完整镜像 TUI 可编辑全集）
 
-Web 配置编辑面板的职责边界：**「能改什么」由白名单唯一确定，「怎么改」逐条等价 TUI 写入路径**，不引入任何 TUI 之外的新配置项。核心实现 `web/config_edit.py`：
+配置编辑的职责边界：**「能改什么」由白名单唯一确定，「怎么改」由共享编辑层单源执行**——Web `POST /api/config/edit` 与 TUI 配置面板（`_apply_edit` 外壳）同走 `config/edit_ops.py::apply_config_edit`，两渠道同一函数、同一强度；不引入任何白名单之外的新配置项。核心实现 `config/edit_ops.py`（`web/config_edit.py` 仅保留 `get_config_edit_surface` 呈现面组装）：
 
-- **白名单 `config_edit_whitelist`**（小写模块级 dict，唯一事实来源）：点分键 → `{"kind", "target", "writer"}`。`kind` 取 `str`/`bool`/`enum`/`action`；`target` 取 `config`/`llm_settings`/`features`（落盘目标文件）；`writer` 取 `scalar`/`anonymization`/`llm`/`features`/`comparison_indices`（写入分派器）。全集 7 组 44 条（前端把第 7 组「功能开关」渲染成「实验性功能」「常规开关」两块，报告组另经 surface `report_switches` 成块，故界面共 8 块）：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、报告章节与增强 8（`report_switches`，与第 7 组同一批开关的独立视图）、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、功能开关 29（features.json 全注册表：实验 5 + 常规 16 + 报告 8；分组、默认值与显示名同源，面板显示名与「影响报告」标记由 surface 下发，前端不写字典）。
-- **写入分派逐条等价 TUI**：config.json 顶层标量 → `set_config`（`_PATH_CONFIG_KEYS` 路径键自动反绝对化）；嵌套 dict（comparison_indices）→ 读合并后 `set_config` 整块写；报告章节与增强开关（`GROUP_REPORT`）→ `save_feature_overrides`；`anonymization.mode` → `set_anonymization_mode`；`enabled_llm.*` → 共享 `write_llm_settings`（`config/_llm_settings.py` 公开原语，自 `tui/handlers_config.py` 抽取，TUI 改委托、行为零变化；保留注释 + mkstemp + `os.replace` 原子写 + `get_llm_config()` 缓存刷新）；功能开关（三组同一路径）→ `save_feature_overrides`（features.json）。
-- **类型/枚举校验**：`set_config` 不做值类型/模式验证，白名单在 Web 层自行校验——kind=str 拒绝含路径分隔符，kind=bool 仅接受 `True`/`False`（`1`/`"true"`/`0.0` 等一律 400），kind=enum 严格匹配合法枚举值（大小写/空白/非字符串拒绝），对比指数池 code 拒绝含路径分隔符（防 `../` 穿越）且 name 长度受限。校验失败统一 400 BAD_PARAM（服务端中文文案）。
-- **写前备份 `config_backup_file`**：写目标文件前单槽 `.bak` 备份（复用 `holdings_update._atomic_copy`），原文件不存在时返回 None（不备份）；仅备份一次（后续写入目标存在已有 `.bak` 不覆盖），供手动还原（`.bak` 改回原名）。
+- **白名单 `config_edit_whitelist`**（定义于 `config/edit_ops.py`，小写模块级 dict，唯一事实来源）：点分键 → `{"kind", "target", "writer"}`。`kind` 取 `str`/`bool`/`enum`/`action`；`target` 取 `config`/`llm_settings`/`features`（落盘目标文件）；`writer` 取 `scalar`/`anonymization`/`llm`/`features`/`comparison_indices`（写入分派器）。全集 7 组 44 条（前端把第 7 组「功能开关」渲染成「实验性功能」「常规开关」两块，报告组另经 surface `report_switches` 成块，故界面共 8 块）：自由文本路径 3（holdings_dir / holdings_filename / output_dir）、报告章节开关 5、报告章节与增强 8（`report_switches`，与第 7 组同一批开关的独立视图）、匿名化枚举 4 档、对比指数池（增/删/重置默认）、LLM 分析章节开关 5（enabled_llm，隐藏辩论三模块不展示）、功能开关 29（features.json 全注册表：实验 5 + 常规 16 + 报告 8；分组、默认值与显示名同源，面板显示名与「影响报告」标记由 surface 下发，前端不写字典）。
+- **写入分派（共享层 `_dispatch_write` 单点，两渠道无各自实现）**：config.json 顶层标量 → `set_config`（`_PATH_CONFIG_KEYS` 路径键自动反绝对化）；嵌套 dict（comparison_indices）→ 读合并后 `set_config` 整块写；报告章节与增强开关（`GROUP_REPORT`）→ `save_feature_overrides`；`anonymization.mode` → `set_anonymization_mode`；`enabled_llm.*` → 共享 `write_llm_settings`（`config/_llm_settings.py` 公开原语，自 `tui/handlers_config.py` 抽取，TUI 改委托、行为零变化；保留注释 + mkstemp + `os.replace` 原子写 + `get_llm_config()` 缓存刷新）；功能开关（三组同一路径）→ `save_feature_overrides`（features.json）。
+- **类型/枚举校验（共享层 `_apply_plain_value`/`_apply_comparison_action`，Web 400 / TUI 黄色提示行同一规则）**：`set_config` 不做值类型/模式验证，规则集中在共享编辑层——kind=str 须非空字符串（trim 后判空），`holdings_filename` 额外拒绝路径分隔符（防破坏文件定位）；kind=bool 仅接受 `True`/`False`（`1`/`"true"`/`0.0` 等一律拒绝）；kind=enum 严格匹配合法枚举值（大小写/空白/非字符串拒绝）；对比指数池 code 非空且长度 ≥3、拒绝路径分隔符（防 `../` 穿越）、拒绝重复入池，name 非空。校验失败 Web 统一 400 BAD_PARAM（服务端中文文案）。
+- **写前备份 `config_backup_file`**：写目标文件前单槽 `.bak` 备份（`core/atomic_write.copy_file_atomic` 原子复制），原文件不存在时返回 None（不备份）；单槽轮转——第二次写覆盖上一版 `.bak`，供手动还原（`.bak` 改回原名）。
 - **同源守卫**：`_handle_config_edit` POST 复用 `_is_same_origin()`（Sec-Fetch-Site + Origin 校验，同源或非浏览器放行）——Web 无内建认证/无 CSRF token，副作用写操作以此兜底跨站写请求，失败 403。
-- **匿名化读路径一致性**：TUI 隐私安全状态（`tui_menu._show_privacy_and_security_status`）与 Web 系统信息（`_build_system_info`）读顶层 `anonymization.mode`（非不存在的 `features.anonymization.mode`），两个面板匿名化状态显示与 `set_anonymization_mode` 写入键一致。
+- **匿名化读路径一致性**：TUI 隐私安全状态（`tui_menu._show_privacy_and_security_status`）与 Web 系统信息（`core/system_info.build_system_info`）读顶层 `anonymization.mode`（非不存在的 `features.anonymization.mode`），两个面板匿名化状态显示与 `set_anonymization_mode` 写入键一致。
 
 [↑ 回到顶部](#目录)
 
@@ -1238,7 +1238,7 @@ cache/
 ├── _groups.py         分组清理：clear_by_group()、clear_by_prefix()
 ├── _cleanup.py        过期清理：cleanup_expired()
 ├── _stats.py          统计：缓存命中率、命中/未命中计数
-├── operations.py      缓存操作共享层（TUI/CLI 共用业务逻辑）
+├── operations.py      缓存操作共享层（三渠道共用业务逻辑）
 └── services/
     └── holdings_tracker.py  持仓跟踪、指纹比对、增量刷新
 ```
@@ -1471,8 +1471,11 @@ class CacheStats:
 | `update_position_cache(holdings, reporter) → PositionCacheResult` | 持仓价格 + 指数并行获取 |
 | `cleanup_cache(reporter) → int` | 扫描清理过期缓存 |
 | `get_cache_stats(reporter) → CacheStats` | 三目录统计（cache + snapshots + state） |
+| `get_cache_stats_payload() → dict` | GET /api/cache 结构化载荷单源组装（保序数组/top 截断/命中率/过期预估，Web 只做传输封装） |
+| `update_all_cache(holdings, reporter) → int` | 基础 + 持仓全量更新（最大努力：basic 失败仍继续 position，退出码取 max；CLI `--update all` 委托） |
+| `warm_new_asset_caches(holdings, reporter) → list[str]` | 持仓变更预热：检测新增资产并预取行情/基金业绩与持仓/行业分类（TUI 生成前入口，异常不阻断） |
 
-#### 内部线程池
+#### 内部线程池（缓存操作共享层）
 
 `operations.py` 管理独立的 `cache_ops` 线程池（`max_workers=4`），与 orchestrator 的 `orch_prep`、`orch_llm_news` 池隔离：
 
@@ -1616,7 +1619,7 @@ TUI 环境使用 `TuiProgressReporter`（输出到终端），CLI 环境使用 `
 
 verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使用本地颜色常量（不依赖 `ansi_colors` 模块级常量，后者基于 `stdout.isatty()`）。
 
-#### 内部线程池
+#### 内部线程池（报告编排器）
 
 | 池名称 | 位置 | max_workers | 用途 |
 |:-------|:-----|:-----------|:------|
@@ -2586,8 +2589,8 @@ report/portfolio_history.py      # as-if 时序引擎：close×shares 综合走�
 report/whatif_operations.py      # 共享层编排：build_whatif_data → build_whatif_backtest（联网取历史）→ 写报告
 report/whatif_sheet.py           # Excel 3 页签 + 条件第 4 页签「时序回测」（指定生效日时）
 report/whatif_writer.py          # 编排双产物：调仓模拟.xlsx / .html（最新版固定名 + 日期目录归档版）+ Chart.js 资产复制/内嵌（单文件自包含）
-cli/cli.py                       # whatif 子命令：--candidate 必填、--base 可选（缺省用 config 持仓）、--effective-date 可选（只传参）
-tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互提示（_prompt_effective_date，只传参、不校验）
+cli/cli.py                       # whatif 子命令：--candidate 必填、--base 可选（缺省用 config 持仓）、--effective-date 可选（argparse 类型钩子经共享层 normalize_effective_date 前置校验）
+tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互提示（_prompt_effective_date，校验委托共享层、非法重新询问）
 ```
 
 **C19 契约 `whatif_data`（独立报告，非 pipeline_data 键）**：`{"available", "status", "base_file", "candidate_file", "base", "candidate", "summary", "categories", "changes", "stats", "reason", "backtest"?}`（`backtest` 仅指定生效日时存在）。两侧均为空 → `available=false` 降级；单侧为空视为合法的「全部清仓/全部新增」对比，仍可计算。`backtest` 子契约：`{"available", "status("ok"/"degraded"/"unavailable"), "reason", "effective_date", "metrics":[{key,label,unit("pct"/"ratio"),base,candidate,delta,arrow}]（5 行）, "series":{labels, base, candidate, base_drawdown, candidate_drawdown}}`，净值归一化到 100、回撤为负百分比。
@@ -3321,8 +3324,11 @@ make_http_client(timeout=10.0) → httpx.Client
 | `web_input_mode` | Web 输入模式（试算/正式） | Web 输入 | 输入隔离 | 无（run 级参数 `mode`） |
 | `use_existing` | 直接用正式持仓文件 | Web 输入 | 输入隔离 | 无（run 级参数） |
 | `holdings_update` | 正式持仓更新（备份 + 提升） | Web 输入 | 输入隔离 | 无 |
-| `config_edit` | Web 配置编辑（覆盖 TUI 可编辑全集） | Web 配置 | 配置编辑 | 无（功能面） |
-| `config_edit_whitelist` | 可编辑配置项白名单（键→类型/枚举→目标文件→写入原语） | Web 配置 | 配置编辑 | 无（校验面） |
+| `config_edit` | Web 配置编辑外观（再导出共享编辑层符号 + `get_config_edit_surface` 呈现面） | Web 配置 | 配置编辑 | 无（功能面） |
+| `config_edit_whitelist` | 可编辑配置项白名单（键→类型/枚举→目标文件→写入原语；定义于共享编辑层，Web/TUI 同源） | 配置管理 | 配置编辑 | 无（校验面） |
+| `edit_ops` | 配置编辑共享层（白名单 + 值规则 + 写入分派 + 写前备份，Web/TUI 唯一编辑通道） | 配置管理 | 配置编辑 | 无（校验面） |
+| `system_info` | 系统状态组装与展示原语（Web 状态卡 / TUI 首页共用数据源：熔断/路由/凭据回填/匿名化标签） | 核心基础设施 | 状态展示 | 无（展示面） |
+| `history_policy` | 历史走势获取策略解析（off/auto/prompt 单源，三渠道共用，TUI 注入询问回调） | 报告生成 | 组合历史走势 | `history.fetch_mode` |
 | `config_backup` | 配置写前备份（`.bak` 单槽轮转） | Web 配置 | 配置编辑 | 无（安全面） |
 | `report_section_order` | 报告模块序号配置（键=模块标识，值=序号；空对象用默认 17 项顺序） | 报告编排 | 报告配置 | 顶层配置键 `report_section_order`（`get_report_section_order()` 读取，`llm_usage` 强制末位） |
 | `generators_news` | 财经新闻 LLM 关联分析（新闻热词→持仓关联二次生成） | 财经新闻热点与持仓关联分析 | LLM 生成 | 随 `enable_news` + LLM 启用 |

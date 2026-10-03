@@ -22,7 +22,7 @@
 
   <!-- 标题区 -->
   <text x="500" y="52" text-anchor="middle" font-size="30" font-weight="700" fill="#e8f1fb">投资复盘助手</text>
-  <text x="500" y="80" text-anchor="middle" font-size="18" fill="#9fb6d0">把持仓 Excel 变成决策级投资洞察</text>
+  <text x="500" y="80" text-anchor="middle" font-size="18" fill="#9fb6d0">一份持仓 Excel，换来机构级投资复盘报告</text>
 
   <!-- 左列：三渠道入口 -->
   <!-- TUI -->
@@ -87,7 +87,7 @@
   <rect x="760" y="100" width="210" height="154" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
   <text x="865" y="138" text-anchor="middle" font-size="30">📗</text>
   <text x="865" y="170" text-anchor="middle" font-size="19" font-weight="700" fill="#34d399">Excel 报告</text>
-  <text x="865" y="194" text-anchor="middle" font-size="13" fill="#9fb6d0">19 个条件页签</text>
+  <text x="865" y="194" text-anchor="middle" font-size="13" fill="#9fb6d0">17 个条件页签</text>
   <text x="865" y="228" text-anchor="middle" font-size="12" fill="#6b87a5">页签专业 · 结构清晰</text>
 
   <!-- HTML -->

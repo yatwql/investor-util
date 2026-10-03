@@ -45,6 +45,17 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_cli]
 class TestArgparse:
     """CLI 参数解析测试。"""
 
+    def test_whatif_effective_date_accepts_strict_format(self):
+        """--effective-date 合法 YYYY-MM-DD → 解析保留归一化值（共享层规则）。"""
+        args = _build_parser().parse_args(["whatif", "--candidate", "c.xlsx", "--effective-date", "2026-07-01"])
+        assert args.effective_date == "2026-07-01"
+
+    def test_whatif_effective_date_rejects_compact_format(self):
+        """--effective-date 紧凑式（20260101）→ argparse 类型错误退出 2，不再进入业务链。"""
+        with pytest.raises(SystemExit) as exc:
+            _build_parser().parse_args(["whatif", "--candidate", "c.xlsx", "--effective-date", "20260101"])
+        assert exc.value.code == 2
+
     def test_global_help(self):
         """--help 输出主帮助信息。"""
         with pytest.raises(SystemExit) as exc:
@@ -675,8 +686,10 @@ class TestHandleWhatif:
             code = _handle_whatif(self._args(base="before.xlsx"), {})
         assert code == _EXIT_SUCCESS
         mock_run.assert_called_once()
+        from src.python.config import get_default
+
         assert mock_run.call_args.kwargs["base_file"] == "before.xlsx"
-        assert mock_run.call_args.kwargs["output_dir"] == "reports"
+        assert mock_run.call_args.kwargs["output_dir"] == get_default("output_dir")
 
     def test_success_config_default_base(self):
         """缺省 --base → 用 config 持仓文件（_cli_read_holdings）。"""

@@ -156,6 +156,11 @@ __all__ = [
     # LLM 配置
     "get_llm_config",
     "get_llm_settings_path",
+    # 渠道共享：默认值 / 持仓路径 / 本地状态 / 注释解析（公开 API）
+    "get_default",
+    "resolve_holdings_path",
+    "get_local_flag",
+    "strip_json_comments",
     "_KNOWN_LLM_SETTINGS_KEYS",
     "_llm_config_cache",
     "_llm_config_mtime",
@@ -164,3 +169,39 @@ __all__ = [
     "_ensure_llm_settings_file",
     "_check_unknown_llm_keys",
 ]
+
+
+# ── 渠道共享：默认值与持仓路径解析（单一事实来源，渠道层禁止字面量回退） ──
+
+
+def get_default(key: str):
+    """返回配置默认值表中的默认值（``_DEFAULT_CONFIG`` 单一来源）。"""
+    return _DEFAULT_CONFIG.get(key)
+
+
+def resolve_holdings_path(config: dict | None = None) -> str:
+    """解析持仓文件路径：``holdings_dir`` + ``holdings_filename``（未配置项回退默认值表）。
+
+    三渠道（CLI/TUI/Web）持仓定位的唯一入口——渠道层不得自行拼接或字面量回退。
+
+    Args:
+        config: 可选显式配置（渠道上下文传入其缓存配置）；不传时读全局配置。
+    """
+    import os
+
+    if config is None:
+        config = get_config()
+    holdings_dir = config.get("holdings_dir") or _DEFAULT_CONFIG.get("holdings_dir", "")
+    holdings_filename = config.get("holdings_filename") or _DEFAULT_CONFIG.get("holdings_filename", "")
+    return os.path.join(holdings_dir, holdings_filename)
+
+
+def get_local_flag(key: str) -> bool:
+    """读取机器本地状态标记（公开 API，替代 ``config._local_state`` 私有模块直引）。"""
+    from src.python.config._local_state import get_flag
+
+    return get_flag(key)
+
+
+# 评论解析公开别名（原私有名保留供包内既有引用）
+strip_json_comments = _strip_json_comments

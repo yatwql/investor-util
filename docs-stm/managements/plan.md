@@ -1,5 +1,5 @@
 # 投资复盘助手 — 实现计划
-> 文档版本：0.11.12
+> 文档版本：0.12.0
 > **编号源**：`plan-next = 72`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-71，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
@@ -51,7 +51,7 @@
 
 ### P3 — 预期实施，有空时安排
 
-> **本批 P3 已清空**。源 TradingAgents-CN 仓库研究的 10 项候选（详细分析见 [`tradingagents-cn-research.md`](../plan/tradingagents-cn-research.md)）中 plan-59 ~ plan-65 已完成（2026-10-01）：前四项见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-63/64/65 见同文档「LLM 成本调节 / 生成后自检 / 调用级源指定」段；整体设计见 [`report-depth-selfreview-source-override-design.md`](../archive/v0.11.x/llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md)。
+> **本批 P3 已清空**。源 TradingAgents-CN 仓库研究的 10 项候选（详细分析见 [`tradingagents-cn-borrow-candidates-research.md`](../archive/v0.11.x/tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md)）中 plan-59 ~ plan-65 已完成（2026-10-01）：前四项见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-63/64/65 见同文档「LLM 成本调节 / 生成后自检 / 调用级源指定」段；整体设计见 [`report-depth-selfreview-source-override-design.md`](../archive/v0.11.x/llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md)。
 >
 > 剩余 P4 三项（plan-66 ~ plan-68）仍为候选；**立项前须先做本仓库现状比对**（rf-510 教训：plan-64 原立项前提「无生成后质检」即被 `llm/fact_checker` 既有实现部分推翻，最终按「分层不重叠」重新定位）。
 

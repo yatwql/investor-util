@@ -153,7 +153,9 @@ def _run_generation(state, params: dict) -> int:
             dividends=parsed.dividends,
             snapshot_namespace=snapshot_namespace,
         )
-        state.output_dir = config.get("output_dir", "reports")
+        from src.python.config import get_default
+
+        state.output_dir = config.get("output_dir") or get_default("output_dir")
         state.errors = list(result.errors)
         return result.exit_code
     except Exception:
@@ -189,175 +191,15 @@ def _build_artifacts(params: dict, state) -> list[dict]:
 # ── 系统信息组装（版本 / 机器 IP / LLM 状态，对齐 TUI 状态面板）────────
 
 
-def _simplify_endpoint(endpoint: str) -> str:
-    """简化 endpoint 显示（取 URL 主机名），非 URL 原样返回。
-
-    对齐 TUI ``tui_menu._show_llm_config_status`` 的 endpoint 展示
-    （``endpoint.split('/')[2]`` 取主机名），避免页面显示过长 URL。
-    """
-    if not endpoint or endpoint == "默认":
-        return endpoint or "默认"
-    if "//" in endpoint:
-        parts = endpoint.split("/")
-        if len(parts) > 2:
-            return parts[2]
-    return endpoint
-
-
-# 状态面板隐藏的 LLM 模块后缀（对齐 tui_menu.LLM_MENU_HIDDEN_KEYS：辩论三模块
-# 在注册表保留供缓存 TTL 依赖，但不在状态面板展示，避免误导为可开关模块）。
-_LLM_STATUS_HIDDEN_SUFFIXES: frozenset[str] = frozenset({"debate_pro", "debate_con", "debate_synthesis"})
-
-
 def _build_system_info() -> dict:
-    """组装页面状态信息：版本号 / 机器 IP / 持仓与输出摘要 / LLM 配置状态。
+    """组装页面状态信息——委托共享层 core.system_info.build_system_info。
 
-    对齐 TUI 首页摘要（``tui_menu.show_config`` / ``_show_privacy_and_security_status``
-    / ``_show_llm_config_status`` / ``_show_multi_chain_status``）的信息面：
-    - 持仓目录 / 持仓文件 / 输出目录 / 新闻抓取上限 / 状态（文件是否就绪）；
-    - 持仓匿名化模式（顶层 anonymization.mode 中文映射）/ 隐私声明是否已显示；
-    - flat 单 provider：provider / model / endpoint（简化主机名）/ 熔断 / 模型路由；
-    - credentials_ref 多链：策略 / 各 provider（名称/后端/模型/优先级/熔断）/ 模块偏好；
-    - 未配置：configured=False（页面按未配置展示）。
-
-    配置读取失败按默认值兜底，不阻断页面渲染。
-
-    Returns:
-        dict，含 app_version / machine_ip / holdings 摘要字段 / llm（结构化状态）
+    共享单源：版本/机器IP/持仓输出摘要/匿名化/隐私提示/自检开关/LLM（含多链
+    provider 链路）状态；TUI ``tui_menu`` 展示同一组原语，渠道层只做传输封装。
     """
-    from src.python.config import get_config, get_llm_config
-    from src.python.config._local_state import get_flag
-    from src.python.config.anonymizer import get_anonymization_mode
-    from src.python.core.constants import APP_VERSION
-    from src.python.core.logger import _get_machine_ip
-    from src.python.core.registry import get_llm_module_names
-    from src.python.llm.circuit_breaker import get_circuit_status
+    from src.python.core.system_info import build_system_info
 
-    info = {
-        "app_version": APP_VERSION,
-        "machine_ip": _get_machine_ip(),
-        "llm": {"configured": False},
-    }
-
-    # ── 持仓 / 输出 / 新闻 / 匿名化 / 隐私（对齐 TUI 首页摘要） ──
-    try:
-        config = get_config()
-    except Exception:
-        logger.warning("读取配置失败，页面摘要按默认值展示", exc_info=True)
-        config = {}
-    if not isinstance(config, dict):
-        config = {}
-    holdings_dir = config.get("holdings_dir") or ""
-    holdings_filename = config.get("holdings_filename") or ""
-    info["holdings_dir"] = holdings_dir or "未设置"
-    info["holdings_filename"] = holdings_filename or "未设置"
-    info["output_dir"] = config.get("output_dir") or "reports"
-    info["news_top_count"] = config.get("news_top_count", 300)
-    holdings_path = os.path.join(holdings_dir, holdings_filename) if holdings_dir and holdings_filename else ""
-    holdings_ready = bool(holdings_path and os.path.exists(holdings_path))
-    info["holdings_ready"] = holdings_ready
-    # 正式文件 mtime（正式-用存量「读取当前正式持仓」提示用；未就绪为 None）
-    info["holdings_mtime"] = os.path.getmtime(holdings_path) if holdings_ready else None
-    anon_labels = {"off": "关闭", "code_display": "代码显示", "full_anonymous": "完全匿名", "summary": "汇总"}
-    try:
-        anon_mode = get_anonymization_mode()
-    except Exception:
-        logger.warning("读取匿名化模式失败，按关闭展示", exc_info=True)
-        anon_mode = "off"
-    info["anonymization"] = anon_labels.get(anon_mode, anon_mode)
-    info["privacy_shown"] = bool(get_flag("_privacy_notice_shown"))
-
-    # 系统自检卡片可见性（doctor_check 开关，与 TUI 菜单 D 同一开关；默认开启）
-    try:
-        from src.python.config.features import is_feature_enabled
-
-        info["doctor_enabled"] = is_feature_enabled("doctor_check")
-    except Exception:
-        logger.warning("读取功能开关失败，系统自检卡片按隐藏处理", exc_info=True)
-        info["doctor_enabled"] = False
-
-    try:
-        llm_config = get_llm_config()
-    except Exception:
-        logger.warning("读取 LLM 配置失败，页面按未配置展示", exc_info=True)
-        llm_config = None
-    if llm_config is None:
-        return info
-
-    provider_list = llm_config.get("_provider_list") or []
-
-    # ── credentials_ref 多链模式 ──
-    if provider_list and not llm_config.get("api_key"):
-        strategy_labels = {
-            "priority": "优先级排序",
-            "weighted": "加权随机",
-            "cost_first": "价格最低优先",
-            "fallback_only": "仅 Fallback",
-        }
-        strategy_raw = llm_config.get("_strategy", "priority")
-        all_creds = llm_config.get("_llm_credentials", {}) or {}
-        providers = []
-        for entry in provider_list:
-            name = entry.get("name", "?")
-            backend = entry.get("provider", "?")
-            model = entry.get("model", "")
-            endpoint = entry.get("endpoint") or ""
-            creds_ref = entry.get("credentials_ref")
-            if creds_ref and (not model or not endpoint):
-                ref_creds = all_creds.get(creds_ref, {})
-                if isinstance(ref_creds, dict):
-                    if not model:
-                        model = ref_creds.get("model", "")
-                    if not endpoint:
-                        endpoint = ref_creds.get("endpoint", "") or ""
-            raw_priority = entry.get("priority")
-            providers.append(
-                {
-                    "name": name,
-                    "backend": backend,
-                    "model": model or "默认",
-                    "endpoint": endpoint,
-                    "endpoint_display": _simplify_endpoint(endpoint),
-                    "priority": str(raw_priority) if raw_priority is not None else "99（默认）",
-                    "circuit": get_circuit_status(endpoint) if endpoint else "—",
-                }
-            )
-        preferred = []
-        for mk, pname in (llm_config.get("_preferred_providers", {}) or {}).items():
-            preferred.append(f"{get_llm_module_names().get(mk, mk)} → {pname}")
-        info["llm"] = {
-            "configured": True,
-            "mode": "multi",
-            "strategy": strategy_labels.get(strategy_raw, strategy_raw),
-            "providers": providers,
-            "preferred": preferred,
-        }
-        return info
-
-    # ── 传统 flat 模式：单 provider ──
-    if not llm_config.get("api_key") or not llm_config.get("provider"):
-        return info
-
-    provider = llm_config["provider"]
-    model = llm_config.get("model") or "默认"
-    endpoint = llm_config.get("endpoint") or "默认"
-    circuit = get_circuit_status(endpoint) if endpoint and endpoint != "默认" else "—"
-    route = []
-    for sfx, name in get_llm_module_names().items():
-        if sfx in _LLM_STATUS_HIDDEN_SUFFIXES:
-            continue
-        route.append(f"{name}={llm_config.get(f'model_{sfx}') or model}")
-    info["llm"] = {
-        "configured": True,
-        "mode": "flat",
-        "provider": provider,
-        "model": model,
-        "endpoint": endpoint,
-        "endpoint_display": _simplify_endpoint(endpoint),
-        "circuit": circuit,
-        "route": route,
-    }
-    return info
+    return build_system_info()
 
 
 # ── 同源校验（轻量，副作用操作用）────────────────────
@@ -522,6 +364,141 @@ def _handle_run_history():
     return _ok(records)
 
 
+# ── 调仓 What-if 模拟（同步执行，独立产物）────────────────
+
+# 同一时刻仅允许一个模拟（threaded 服务器下防止双写同名「调仓模拟.*」产物）
+_whatif_lock = threading.Lock()
+
+
+def _handle_whatif():
+    """调仓 What-if 模拟（POST /api/whatif，副作用，同源守卫）。
+
+    payload：
+      - candidate_file_id（必填）：目标持仓（调仓后/假设）上传 file_id
+      - base_file_id（可选）：基准持仓上传 file_id；缺省走 use_existing
+      - use_existing（默认 True）：无 base_file_id 时用配置默认持仓文件
+      - effective_date（可选 YYYY-MM-DD）：指定后追加时序回测（opt-in 联网）
+
+    全程同步执行（本地计算，与 CLI/TUI 同链 run_whatif_simulation），
+    成功返回产物 basename，前端经 /api/reports/<filename> 预览下载。
+    """
+    from src.python.config import get_config
+    from src.python.core.reader import read_holdings
+    from src.python.report.whatif_operations import run_whatif_simulation
+    from src.python.web.upload import resolve_file
+
+    payload = request.get_json(silent=True) or {}
+    candidate_file_id = payload.get("candidate_file_id")
+    base_file_id = payload.get("base_file_id")
+    use_existing = payload.get("use_existing", True)
+    effective_date = payload.get("effective_date")
+
+    # ── 参数校验（BAD_PARAM）──
+    if not isinstance(candidate_file_id, str) or not candidate_file_id:
+        return _err("BAD_PARAM", "缺少目标持仓 file_id"), 400
+    if base_file_id is not None and (not isinstance(base_file_id, str) or not base_file_id):
+        return _err("BAD_PARAM", "基准持仓 file_id 不合法"), 400
+    if not isinstance(use_existing, bool):
+        return _err("BAD_PARAM", "输入来源参数不合法"), 400
+    if effective_date is not None and not isinstance(effective_date, str):
+        return _err("BAD_PARAM", "生效日格式不合法"), 400
+    # 格式校验/归一化委托共享层 normalize_effective_date（与 CLI/TUI 同一规则）
+    from src.python.report.whatif_operations import normalize_effective_date
+
+    try:
+        effective_date = normalize_effective_date(effective_date)
+    except ValueError as e:
+        return _err("BAD_PARAM", str(e)), 400
+    # 副作用操作轻量同源校验
+    if not _is_same_origin():
+        return _err("BAD_PARAM", "同源校验失败，拒绝提交"), 403
+
+    # ── 文件来源解析（上传过期 → FILE_EXPIRED 404）──
+    candidate_path = resolve_file(candidate_file_id)
+    if candidate_path is None:
+        return _err("FILE_EXPIRED", "目标持仓文件已过期，请重新上传"), 404
+
+    if base_file_id:
+        base_path = resolve_file(base_file_id)
+        if base_path is None:
+            return _err("FILE_EXPIRED", "基准持仓文件已过期，请重新上传"), 404
+    elif use_existing:
+        from src.python.config import resolve_holdings_path
+
+        base_path = resolve_holdings_path()
+    else:
+        return _err("BAD_PARAM", "缺少基准持仓来源"), 400
+
+    # ── 读取两侧持仓（空/读失败 → 422，对齐 CLI 退出码语义）──
+    base_holdings = read_holdings(base_path)
+    cand_holdings = read_holdings(candidate_path)
+    if not base_holdings:
+        return _err("WHATIF_UNAVAILABLE", f"基准持仓读取失败或为空: {os.path.basename(base_path)}"), 422
+    if not cand_holdings:
+        return _err("WHATIF_UNAVAILABLE", f"目标持仓读取失败或为空: {os.path.basename(candidate_path)}"), 422
+
+    # ── 互斥执行（忙碌 → 429）──
+    if not _whatif_lock.acquire(blocking=False):
+        return _err("WHATIF_BUSY", "已有调仓模拟在执行，请稍后再试"), 429
+    try:
+        from src.python.config import get_default
+
+        output_dir = get_config().get("output_dir") or get_default("output_dir")
+        result = run_whatif_simulation(
+            base_holdings,
+            cand_holdings,
+            base_file=base_path,
+            candidate_file=candidate_path,
+            output_dir=output_dir,
+            reporter=None,
+            effective_date=effective_date,
+        )
+    except Exception:
+        logger.exception("调仓 What-if 模拟执行异常")
+        return _err("WHATIF_FAILED", "调仓模拟执行异常，请查看日志"), 500
+    finally:
+        _whatif_lock.release()
+
+    if not result.ok:
+        return _err("WHATIF_UNAVAILABLE", f"调仓对比数据不可用: {result.reason}"), 422
+    return _ok(
+        {
+            "excel": os.path.basename(result.excel),
+            "html": os.path.basename(result.html),
+            "base_count": len(base_holdings),
+            "candidate_count": len(cand_holdings),
+        }
+    )
+
+
+# ── 缓存管理（统计 + 清理过期）──────────────────────────
+
+
+def _handle_cache_stats():
+    """缓存统计（GET /api/cache，只读）：总量/前缀分布/命中率/过期预估。
+
+    结构化载荷由 ``cache.operations.get_cache_stats_payload`` 单源组装（保序
+    数组、top 截断、命中率与过期预估），Web 侧只做传输封装。
+    """
+    from src.python.cache.operations import get_cache_stats_payload
+
+    return _ok(get_cache_stats_payload())
+
+
+def _handle_cache_cleanup():
+    """清理过期缓存（POST /api/cache/cleanup，副作用，同源守卫）。
+
+    与 TUI `[3]` 同链（cache.cleanup_expired），仅删 TTL 已过期文件；
+    有效缓存不受影响，下次读取按需重建。
+    """
+    from src.python.cache import cleanup_expired
+
+    if not _is_same_origin():
+        return _err("BAD_PARAM", "同源校验失败，拒绝提交"), 403
+    removed = cleanup_expired(dry_run=False)
+    return _ok({"removed": removed})
+
+
 def _handle_config_edit():
     """配置编辑：GET 返回可编辑面，POST 应用单次编辑（副作用，同源守卫）。
 
@@ -553,13 +530,13 @@ def _handle_serve_report(filename: str):
     扩展名白名单先拦（防 .HTML/.XLSX 大小写绕过）；``send_from_directory``
     内置 ``..`` 净化（§6.2 防路径穿越）。
     """
-    from src.python.config import get_config
+    from src.python.config import get_default, get_config
 
     ext = os.path.splitext(filename)[1].lstrip(".").lower()
     if ext not in _ALLOWED_REPORT_EXT:
         return _err("BAD_PARAM", "不支持的文件类型"), 400
     config = get_config()
-    output_dir = config.get("output_dir", "reports")
+    output_dir = config.get("output_dir") or get_default("output_dir")
     return send_from_directory(output_dir, filename)
 
 
@@ -693,6 +670,9 @@ def create_handlers(app, run_manager) -> None:
     )
 
     app.add_url_rule("/api/reports/<path:filename>", "serve_report", _handle_serve_report, methods=["GET"])
+    app.add_url_rule("/api/whatif", "whatif", _handle_whatif, methods=["POST"])
+    app.add_url_rule("/api/cache", "cache_stats", _handle_cache_stats, methods=["GET"])
+    app.add_url_rule("/api/cache/cleanup", "cache_cleanup", _handle_cache_cleanup, methods=["POST"])
     app.add_url_rule("/api/health", "health", _handle_health, methods=["GET"])
     app.add_url_rule("/api/health/history", "health_history", _handle_health_history, methods=["GET"])
     app.add_url_rule("/api/doctor", "doctor", _handle_doctor, methods=["GET"])

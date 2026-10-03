@@ -144,7 +144,9 @@ def main() -> int:
         return 2
 
     # output_dir 写锁：被其他入口占用则警告（防止多进程共享输出目录互相覆盖产物）
-    output_dir = get_config().get("output_dir", "reports")
+    from src.python.config import get_default
+
+    output_dir = get_config().get("output_dir") or get_default("output_dir")
     output_lock = ensure_output_dir_lock(output_dir)
 
     try:

@@ -517,10 +517,11 @@ def generate_report(
     """
     result = ReportResult()
     if fetch_history is None:
-        # 未显式传参 → 跟随 config.json 的 history.fetch_mode（off/auto/prompt）。
-        # auto/prompt 均视为获取（prompt 为 TUI 交互询问，非交互场景按获取处理）。
-        _fetch_mode = (config.get("history", {}) or {}).get("fetch_mode") or "auto"
-        fetch_history = _fetch_mode != "off"
+        # 未显式传参 → 委托 history_policy 解析（off/auto/prompt 单一事实来源）：
+        # 非交互场景 prompt 按获取处理，TUI 通过注入 ask 回调交互询问。
+        from src.python.report.history_policy import resolve_fetch_history
+
+        fetch_history = resolve_fetch_history(config)
 
     # 实验性功能状态日志（红色高亮）
     from src.python.config.features import log_experimental_features

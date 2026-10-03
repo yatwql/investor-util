@@ -129,6 +129,12 @@ def _get_machine_ip() -> str:
         return "unknown"
 
 
+# 公开 API：渠道层/展示层统一使用此名（私有名保留供既有内部引用）
+def get_machine_ip() -> str:
+    """公开 API（转发包装：内部实现 ``_get_machine_ip`` 可被测试 patch，实时生效）。"""
+    return _get_machine_ip()
+
+
 def log_app_boundary(event: str, mode: str) -> None:
     """记录应用启动/关闭事件到日志。
 

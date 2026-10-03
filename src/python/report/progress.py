@@ -17,6 +17,8 @@ logger = logging.getLogger("invest")
 
 # ── 模块耗时记录（跨模块共享，供直接使用 Timer() 的场景） ──
 _timing_records: list[tuple[str, float]] = []
+# 公开别名：同一列表对象；渠道层统一用 timing_records（私有名保留供既有内部引用）
+timing_records = _timing_records
 
 
 class Timer:

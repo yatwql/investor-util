@@ -13,6 +13,7 @@
   - 项目统计表比对（文件数 / 行数）
   - 归档索引完整性（管理文档 ↔ `docs-stm/archive/` 双向对齐）
   - 管理文档分区纪律（未完成/已解决/已归档错置、现行 changelog 只允许开发段头）
+  - 守护清单同源（五处权威源的守护脚本集合两两一致，含 pre-commit 钩子执行体）
   - Extended Thinking 支持矩阵（手册对比表/「仅」式措辞/默认开思考提示 ↔ 代码前缀名单）
   - 真实仓库冒烟：当前文档与代码一致（run_checks() 为空）
 
@@ -851,3 +852,61 @@ class TestProjectStatsSync:
         applied = _sync(test_count=documented)
         after = Path(_FOLDERS_MD).read_text(encoding="utf-8")
         assert applied == [] and after == original
+
+
+# ═══ 守护清单同源 ═══
+
+
+class TestGuardParity:
+    """`find_guard_parity` / `check_guard_parity`（五处守护清单脚本集合两两一致）。"""
+
+    @staticmethod
+    def _good(*names: str) -> str:
+        return "\n".join(f"run: python scripts/{n} --ci" for n in names)
+
+    def test_identical_sets_pass(self, drift):
+        src = {
+            "A": self._good("check-x.py", "check-y.py"),
+            "B": self._good("check-y.py", "check-x.py"),
+        }
+        assert drift.find_guard_parity(src) == []
+
+    def test_missing_script_reported(self, drift):
+        src = {
+            "A": self._good("check-x.py", "check-y.py"),
+            "B": self._good("check-x.py"),
+        }
+        findings = drift.find_guard_parity(src)
+        assert any("缺少" in f and "check-y.py" in f for f in findings)
+
+    def test_extra_script_reported(self, drift):
+        src = {
+            "A": self._good("check-x.py"),
+            "B": self._good("check-x.py", "check-extra.py"),
+        }
+        findings = drift.find_guard_parity(src)
+        assert any("多出" in f and "check-extra.py" in f for f in findings)
+
+    def test_unmatched_region_reported(self, drift):
+        src = {"A": self._good("check-x.py"), "B": None}
+        findings = drift.find_guard_parity(src)
+        assert any("未匹配到守护清单区域" in f for f in findings)
+
+    def test_empty_region_reported(self, drift):
+        src = {"A": self._good("check-x.py"), "B": "标题在但没有任何脚本引用"}
+        findings = drift.find_guard_parity(src)
+        assert any("未提取到" in f for f in findings)
+
+    def test_single_source_needs_no_comparison(self, drift):
+        # 单一成功来源不构成比较，但截取失败仍须单独报出
+        assert drift.find_guard_parity({"A": self._good("check-x.py")}) == []
+        assert drift.find_guard_parity({"A": None}) != []
+
+    def test_real_sources_include_precommit_hook(self, drift):
+        """真实源集合必须包含 pre-commit 钩子——锚点失配会截出 None 并被报出。"""
+        sources = drift.guard_parity_sources()
+        assert any(label.endswith(".githooks/pre-commit 守护清单") for label in sources)
+
+    def test_real_sources_guard_sets_match(self, drift):
+        """五份真实源（含钩子执行体）的守护集合两两一致——真实仓库断言。"""
+        assert drift.find_guard_parity(drift.guard_parity_sources()) == []
