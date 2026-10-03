@@ -49,6 +49,8 @@
   - 管理文档版本头（"文档版本：0.9.10-dev"，版本号一致性要求，仅行首锚定豁免）
   - folders.md 版本演进对照「最新发布」列（"最近发布 tag v0.12.0 · 2026-10-03"，
     与日期同为随发布重跑刷新的滚动读数，上下文锚定豁免、行中叙述仍检出）
+  - folders.md 版本演进对照「当前开发版」列（"当前开发版（0.12.1-dev · ..."，
+    由 check-version-consistency 的 evolution_head 断言强制与 APP_VERSION 同步）
   - Markdown 围栏代码块（``` 包裹）内命令/配置示例，非文档叙述
   - 需求编号（requirements.md 的 R-LLM-ER-01 等需求条目 ID）
   - folders.md 目录树行（│ ├ └ 开头，记录目录结构，可含 archive/ 指向）
@@ -303,6 +305,11 @@ def _exclude_lines() -> list[re.Pattern]:
         # 上下文锚定「最近(一次)发布 tag」+ 版本号，不豁免行中叙述
         # （如"该缺陷在 v0.12.0 中修复"仍命中版本号模式）。
         re.compile(r"最近(?:一次)?发布\s*`?tag`?\s*[（(]?\s*`?v?\d+\.\d+\.\d+"),
+        # ── 版本演进对照「当前开发版」列（folders.md 滚动读数） ──
+        # 列头版本号由 check-version-consistency 的 evolution_head 断言强制
+        # 与 APP_VERSION 同步（发版漏改即报错），非写死后放任过期的历史痕迹；
+        # 上下文锚定「当前开发版（」+ 版本号，不豁免行中叙述。
+        re.compile(r"当前开发版（\s*`?v?\d+\.\d+\.\d+(?:-dev)?"),
         # ── 门禁 / 发布流程描述 ──
         re.compile(r"发布版本前"),
         re.compile(r"发布前|发布后|提交前|合并前|提交后"),

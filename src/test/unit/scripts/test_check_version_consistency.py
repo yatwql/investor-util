@@ -6,8 +6,11 @@
   - 头部版本行正确时通过、错误版本/缺失头部时判定不一致
   - --fix 自动修正头部版本行
   - 管理文档 CHECKS 注册为 header 校验，防止退回 contains
+  - folders.md 版本演进对照「当前开发版」列头版本号 evolution_head 锚定校验
+    （匹配/旧号/无列头拒绝 + --fix 自动同步 + 与 header 并存注册）
 
-测试通过脚本 import 方式直接复用 _check_header / _check_contains / _auto_fix_header，
+测试通过脚本 import 方式直接复用 _check_header / _check_contains /
+_auto_fix_header / _check_evolution_head / _auto_fix_evolution_head，
 不运行真实 CLI。
 """
 
@@ -111,10 +114,64 @@ class TestDocHeaderRegistration:
 
     def test_doc_header_docs_registered_as_header(self, version_script):
         # relative_to 在 Windows 返回反斜杠分隔，规范化 / 与 HEADER_DOCS 对齐
-        # （Linux/macOS 无副作用）。
-        types = {
-            str(path.relative_to(version_script.REPO_ROOT)).replace("\\", "/"): assert_type
-            for path, assert_type, _args in version_script.CHECKS
-        }
+        # （Linux/macOS 无副作用）。同文件可并存多条断言（如 folders.md 的
+        # header + evolution_head），按集合断言主校验 header 在列。
+        types: dict[str, set[str]] = {}
+        for path, assert_type, _args in version_script.CHECKS:
+            rel = str(path.relative_to(version_script.REPO_ROOT)).replace("\\", "/")
+            types.setdefault(rel, set()).add(assert_type)
         for rel in self.HEADER_DOCS:
-            assert types.get(rel) == "header", f"{rel} 应注册为 header 校验而非 contains"
+            assert "header" in types.get(rel, set()), f"{rel} 应注册为 header 校验而非 contains"
+
+    def test_folders_evolution_head_registered(self, version_script):
+        """folders.md 须另注册 evolution_head 断言（版本演进表头列版本号同步）。"""
+        types: dict[str, set[str]] = {}
+        for path, assert_type, _args in version_script.CHECKS:
+            rel = str(path.relative_to(version_script.REPO_ROOT)).replace("\\", "/")
+            types.setdefault(rel, set()).add(assert_type)
+        assert "evolution_head" in types.get("docs-stm/managements/folders.md", set())
+
+
+# ── evolution_head：版本演进对照「当前开发版」列头版本号 ───────────
+
+
+class TestEvolutionHeadCheck:
+    """「当前开发版（」列头版本号锚定校验：匹配/旧号/无列头拒绝/单点定位。"""
+
+    def test_matching_version_passes(self, version_script):
+        text = "| 当前开发版（0.11.12-dev · 本次重跑时的 HEAD · 2026-10-02） | 增长 |"
+        assert version_script._check_evolution_head(text, "0.11.12-dev") is True
+
+    def test_stale_version_rejected(self, version_script):
+        text = "| 当前开发版（0.11.11-dev · 本次重跑时的 HEAD · 2026-10-02） |"
+        assert version_script._check_evolution_head(text, "0.11.12-dev") is False
+
+    def test_missing_column_version_rejected(self, version_script):
+        text = "| 当前开发版（本次重跑时的 HEAD · 2026-10-03） |"
+        assert version_script._check_evolution_head(text, "0.11.12-dev") is False
+
+    def test_release_tag_column_not_mistaken_for_dev_column(self, version_script):
+        """「最近发布 tag」列的版本号不得被误当作「当前开发版」列头（单点锚定）。"""
+        text = "| 最新发布（最近发布 tag v0.11.10 · 2026-10-01） | 当前开发版（0.11.12-dev · HEAD） |"
+        assert version_script._check_evolution_head(text, "0.11.12-dev") is True
+
+
+class TestAutoFixEvolutionHead:
+    """--fix：列头旧号替换、无号插入、已一致不动。"""
+
+    def test_replaces_stale_version(self, version_script, tmp_path):
+        p = tmp_path / "doc.md"
+        p.write_text("| 当前开发版（0.11.11-dev · HEAD · 2026-10-02） |", encoding="utf-8")
+        assert version_script._auto_fix_evolution_head(p, "0.11.12-dev") is True
+        assert "0.11.12-dev" in p.read_text(encoding="utf-8")
+
+    def test_inserts_when_missing(self, version_script, tmp_path):
+        p = tmp_path / "doc.md"
+        p.write_text("| 当前开发版（本次重跑时的 HEAD · 2026-10-03） |", encoding="utf-8")
+        assert version_script._auto_fix_evolution_head(p, "0.11.12-dev") is True
+        assert "0.11.12-dev · 本次重跑" in p.read_text(encoding="utf-8")
+
+    def test_no_change_when_already_matching(self, version_script, tmp_path):
+        p = tmp_path / "doc.md"
+        p.write_text("| 当前开发版（0.11.12-dev · HEAD） |", encoding="utf-8")
+        assert version_script._auto_fix_evolution_head(p, "0.11.12-dev") is False

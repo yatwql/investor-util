@@ -51,6 +51,8 @@ def _get_app_version() -> str:
 #     "contains"    → 文件内容包含某子串
 #     "header"      → 「文档版本：」头部版本行精确匹配（行首锚定，
 #                     防止正文偶然出现的版本号导致全文 contains 误判）
+#     "evolution_head" → 版本演进对照表「当前开发版（」列头版本号锚定匹配
+#                     （folders.md 滚动读数，发版须随版本头同步刷新）
 
 CHECKS: list[tuple[Path, str, tuple[str, ...]]] = []
 
@@ -67,6 +69,10 @@ def add_header(path: Path):
     CHECKS.append((REPO_ROOT / path, "header", ()))
 
 
+def add_evolution_head(path: Path):
+    CHECKS.append((REPO_ROOT / path, "evolution_head", ()))
+
+
 # 代码文件
 CHECKS.append((REPO_ROOT / "pyproject.toml", "pyproject_version", ()))
 CHECKS.append((REPO_ROOT / "src" / "python" / "core" / "constants.py", "exact", (r'^APP_VERSION\s*=\s*"[^"]*"$',)))
@@ -80,6 +86,9 @@ add_header(REPO_ROOT / "docs-stm" / "managements" / "testplan.md")
 add_header(REPO_ROOT / "docs-stm" / "managements" / "review-findings.md")
 add_header(REPO_ROOT / "docs-stm" / "managements" / "llm-technical.md")
 add_header(REPO_ROOT / "docs-stm" / "managements" / "folders.md")
+# folders.md 版本演进对照表「当前开发版」列头版本号（同文件第二条断言，
+# 与版本头双点同步——表头是文档化读数，漏改即报错）
+add_evolution_head(REPO_ROOT / "docs-stm" / "managements" / "folders.md")
 add_header(REPO_ROOT / "docs-stm" / "managements" / "test-coverage.md")
 # changelog 无「文档版本：」头，用 [X.Y.Z] 标题行 contains 校验
 add_contains(REPO_ROOT / "docs-stm" / "managements" / "changelog.md", "[{v}]")
@@ -113,6 +122,38 @@ def _auto_fix_header(path: Path, version: str) -> bool:
         count=1,
         flags=re.MULTILINE,
     )
+    if count > 0 and new_text != text:
+        path.write_text(new_text, encoding="utf-8")
+        return True
+    return False
+
+
+def _check_evolution_head(text: str, version: str) -> bool:
+    """校验版本演进对照表「当前开发版（」列头版本号与目标版本一致。
+
+    锚定 `当前开发版（` 后的第一个版本号（单点定位，说明行用 `=` 不参与）；
+    列头缺失版本号或与目标不符均判未同步——该读数随版本头同步刷新。
+    """
+    m = re.search(r"当前开发版（\s*`?v?(\d+\.\d+\.\d+(?:-dev)?)", text)
+    return bool(m) and m.group(1) == version
+
+
+def _auto_fix_evolution_head(path: Path, version: str) -> bool:
+    """自动修正版本演进对照表「当前开发版（」列头版本号（无号则插入）。"""
+    text = path.read_text(encoding="utf-8")
+    new_text, count = re.subn(
+        r"(当前开发版（\s*`?v?)\d+\.\d+\.\d+(?:-dev)?",
+        lambda m: m.group(1) + version,
+        text,
+        count=1,
+    )
+    if count == 0:
+        new_text, count = re.subn(
+            r"(当前开发版（)",
+            lambda m: m.group(1) + version + " · ",
+            text,
+            count=1,
+        )
     if count > 0 and new_text != text:
         path.write_text(new_text, encoding="utf-8")
         return True
@@ -186,6 +227,13 @@ def main() -> None:
                     print(f"  [OK] {rel} — 已自动修正头部版本号为 {version}")
                     fixed += 1
                     ok = True
+        elif assert_type == "evolution_head":
+            ok = _check_evolution_head(text, version)
+            if not ok and do_fix:
+                if _auto_fix_evolution_head(full_path, version):
+                    print(f"  [OK] {rel} — 已自动修正版本演进表头版本号为 {version}")
+                    fixed += 1
+                    ok = True
         else:
             ok = False
 
@@ -198,6 +246,12 @@ def main() -> None:
                     f"{rel}: 头部版本行未同步，期望 `> 文档版本：{version}`"
                     if ci_mode
                     else f"  [ERR] {rel} — 头部版本行未同步，期望 `> 文档版本：{version}`"
+                )
+            elif assert_type == "evolution_head":
+                print(
+                    f"{rel}: 版本演进对照「当前开发版」列头版本号未同步，期望 `{version}`"
+                    if ci_mode
+                    else f"  [ERR] {rel} — 版本演进对照「当前开发版」列头版本号未同步，期望 `{version}`"
                 )
             else:
                 print(

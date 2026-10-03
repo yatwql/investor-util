@@ -1160,6 +1160,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 - `pyproject.toml`（`version` 字段，`--fix` 可自动同步）
 - `README.md`
 - 管理文档 10 份：`plan.md`、`technical.md`、`requirements.md`、`testplan.md`、`review-findings.md`、`llm-technical.md`、`folders.md`、`test-coverage.md`、`changelog.md`、`developer-guide.md`
+- `folders.md` 另含一条 `evolution_head` 断言：版本演进对照表「当前开发版（」列头版本号与 `APP_VERSION` 同步（与文档版本头双点校验，发版漏改即报错，`--fix` 可自动同步）
 
 ```bash
 # 无参数运行，逐项检查并报 [OK]/[ERR]

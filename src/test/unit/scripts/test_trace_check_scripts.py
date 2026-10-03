@@ -298,6 +298,20 @@ class TestReleaseTagExemption:
         assert _doc_hit(doc_traces, "该缺陷在 v0.12.0 中修复") is not None
 
 
+# ── check-doc-traces：版本演进对照「当前开发版」列头版本号豁免 ───
+
+
+class TestEvolutionDevVersionExemption:
+    """「当前开发版（」列头版本号豁免（evolution_head 断言强制与 APP_VERSION 同步）。"""
+
+    def test_dev_column_head_exempt(self, doc_traces):
+        assert _doc_hit(doc_traces, "| 当前开发版（0.99.0-dev · 本次重跑时的 HEAD · 2026-10-03） |") is None
+
+    def test_version_in_prose_still_flagged(self, doc_traces):
+        """豁免不外溢：无「当前开发版（」锚点的行中版本号叙述仍须检出。"""
+        assert _doc_hit(doc_traces, "该缺陷在 0.99.0 中已修复") is not None
+
+
 # ── check-doc-traces：补强模式能检出文档历史痕迹 ───────────
 
 
