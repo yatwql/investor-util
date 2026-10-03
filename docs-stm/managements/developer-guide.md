@@ -92,9 +92,9 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 | 门禁 | 触发点 | 命令 | 说明 |
 |:-----|:-------|:-----|:-----|
-| **P0** | 提交前 | `.venv/bin/python scripts/test-runner.py --mode dev-verify` + 8 个 check 脚本 | 阻塞提交，不得 commit |
+| **P0** | 提交前 | `.venv/bin/python scripts/test-runner.py --mode dev-verify` + 9 个 check 脚本 | 阻塞提交，不得 commit |
 | **P1** | 合入 master 前 | `.venv/bin/python scripts/test-runner.py --mode verify` | 阻塞合入，不得 merge |
-| **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode verify,regression` + 8 个 check 脚本 | 阻塞发布，不得 release |
+| **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode verify,regression` + 9 个 check 脚本 | 阻塞发布，不得 release |
 
 **P0 提交前门禁**（全部通过才可 commit）：
 
@@ -108,6 +108,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-test-redundancy.py --ci      # 测试用例冗余与无效（死用例/无断言/完全重复/自证用例/硬编码演进总数）
 .venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）
 .venv/bin/python scripts/check-version-consistency.py --ci   # 版本号全局一致性（APP_VERSION ↔ README/pyproject/管理文档 10 份）
+.venv/bin/python scripts/check-doc-links.py --ci              # 文档死链/死锚点/重复标题/层级/编号序列/§引用机检
 ```
 
 **P1 合入门禁**：`test-runner.py --mode verify`（核心模块单元测试），否则不得 merge。
@@ -124,11 +125,12 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-test-redundancy.py --ci
 .venv/bin/python scripts/check-requirement-trace.py --ci
 .venv/bin/python scripts/check-version-consistency.py --ci
+.venv/bin/python scripts/check-doc-links.py --ci
 ```
 
 **辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
 
-**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有三个独立 job：`guards`（**阻塞**，8 个 `--ci` 守护脚本，即上方 P0/P2 清单全量）、`portability`（**阻塞**，非 UTF-8 locale + 隐式编码双探针，见下方「编码/locale 自检」）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
+**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有三个独立 job：`guards`（**阻塞**，9 个 `--ci` 守护脚本，即上方 P0/P2 清单全量）、`portability`（**阻塞**，非 UTF-8 locale + 隐式编码双探针，见下方「编码/locale 自检」）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
 
 ### 编码/locale 自检（旧 pip 回退解码 / 隐式编码）
 
@@ -190,11 +192,11 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 
 | 机制 | 触发 | 跨机器 |
 |:-----|:-----|:------|
-| **P0/P2 门禁** | 提交/发布前 8 个 `--ci` 守护脚本全量（清单见 P0/P2 门禁条款） | ✅ 零配置 |
+| **P0/P2 门禁** | 提交/发布前 9 个 `--ci` 守护脚本全量（清单见 P0/P2 门禁条款） | ✅ 零配置 |
 | **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
 | **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
-| **git pre-commit** | `git commit` 全量执行 8 个守护脚本（与 P0/CI guards 同源，约 4~5 秒）；提交涉及 `docs-stm/managements/` 或 `src/test/` 时 `check-doc-drift --sync` 自动回写统计快照 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
-| **CI guards job** | push / PR / tag 时自动校验（8 个 `--ci` 脚本之一） | ✅ 零配置 |
+| **git pre-commit** | `git commit` 全量执行 9 个守护脚本（与 P0/CI guards 同源，约 5~6 秒）；提交涉及 `docs-stm/managements/` 或 `src/test/` 时 `check-doc-drift --sync` 自动回写统计快照 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
+| **CI guards job** | push / PR / tag 时自动校验（9 个 `--ci` 脚本之一） | ✅ 零配置 |
 
 > `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
 
@@ -816,6 +818,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-task-numbering-hook.py` | 测试 | Claude Code PostToolUse hook——编辑编号管理文档后自动校验编号一致性 |
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表；`--sync` 自动回写统计快照） |
+| `check-doc-links.py` | 测试 | 文档链接与结构一致性校验（死链/死锚点/重复标题/层级/编号序列/§引用） |
 | `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
 | `check-requirement-trace.py` | 测试 | 需求 ID ↔ 验证载体追溯（单段 ID 全域覆盖 / 载体文件存在 / ID 双向一致） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
@@ -1080,6 +1083,16 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
 > 覆盖口径：仅识别 `R-<域>-<序号>` 形式的**单段**需求 ID；`requirements.md` §7.2–§7.8.4 的双段子域 ID（如 `R-LLM-GM-01`）
 > 不在本脚本与追溯表范围内。
 
+**`check-doc-links.py` — 文档链接与结构一致性检查**
+
+校验当前文档集（`README.md` / `CLAUDE.md` / 管理 / 手册 / 计划；归档快照按设计豁免）六类问题：死文件链接、死锚点（GitHub slug 规则 + `<a id>` 显式锚点，行内代码等长遮罩、代码围栏跳过）、重复标题（锚点歧义）、标题层级跳变、编号序列跳变（数字按层级+父前缀分组，中文数字按层级分组）、`xxx.md §N` 跨文档章节引用失配（归属取同一行 § 前最近的 `.md` 记号；无文件名且文档使用编号章节时自归属）。
+
+```bash
+.venv/bin/python scripts/check-doc-links.py                          # 全量校验
+.venv/bin/python scripts/check-doc-links.py -v                       # 详细输出（打印扫描文档清单）
+.venv/bin/python scripts/check-doc-links.py --ci                     # CI 模式（只输出 文件:行:描述，退出码 2）
+```
+
 **`check-task-numbering-hook.py` — Claude Code PostToolUse hook**
 
 Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验，失败返回非零退出码中断编辑。读取 `__INJECTED_OBJECT__`（环境变量或命令行参数）识别目标文件；无 hook 上下文或非编号文档时放行。由 `.claude/settings.json` 的 PostToolUse 钩子调用（不随仓库同步，需 `install-claude-hook.py` 接线）。
@@ -1095,7 +1108,7 @@ Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验�
 
 **`install-hooks.sh` — git pre-commit hook 激活脚本（`.githooks/`）**
 
-`.githooks/` 的 git pre-commit hook（8 个守护脚本全量校验 + 统计快照自动同步）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
+`.githooks/` 的 git pre-commit hook（9 个守护脚本全量校验 + 统计快照自动同步）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
 
 ```bash
 sh .githooks/install-hooks.sh          # 启用（写入本机 core.hooksPath）

@@ -1,7 +1,7 @@
 #!/bin/sh
 # git pre-commit hook — 提交门禁自动化
 #
-# 1) 八守护全量（与 P0/P2 门禁清单、CI guards job 同源；check-doc-drift 第 16 项
+# 1) 九守护全量（与 P0/P2 门禁清单、CI guards job 同源；check-doc-drift 第 16 项
 #    「守护清单同源」把本文件与 developer-guide / ci.yml / CLAUDE.md / testplan.md
 #    五处的 `scripts/check-*.py --ci` 引用集合两两比对，漏改任一处即报）
 #    - check-code-traces / check-doc-traces：代码与文档历史痕迹
@@ -51,8 +51,8 @@ else
     fi
 fi
 
-# ── 2) 其余七个守护（无条件全量，与 CI guards job 逐步同源）
-echo "[..] pre-commit: 七守护全量校验"
+# ── 2) 其余八个守护（无条件全量，与 CI guards job 逐步同源）
+echo "[..] pre-commit: 八守护全量校验"
 if ! "$PY_CMD" scripts/check-code-traces.py --ci; then GUARD_FAILED="$GUARD_FAILED check-code-traces"; fi
 if ! "$PY_CMD" scripts/check-doc-traces.py --ci; then GUARD_FAILED="$GUARD_FAILED check-doc-traces"; fi
 if ! "$PY_CMD" scripts/check-task-numbering.py --ci; then GUARD_FAILED="$GUARD_FAILED check-task-numbering"; fi
@@ -60,6 +60,7 @@ if ! "$PY_CMD" scripts/check-semantic-index.py --ci; then GUARD_FAILED="$GUARD_F
 if ! "$PY_CMD" scripts/check-test-redundancy.py --ci; then GUARD_FAILED="$GUARD_FAILED check-test-redundancy"; fi
 if ! "$PY_CMD" scripts/check-requirement-trace.py --ci; then GUARD_FAILED="$GUARD_FAILED check-requirement-trace"; fi
 if ! "$PY_CMD" scripts/check-version-consistency.py --ci; then GUARD_FAILED="$GUARD_FAILED check-version-consistency"; fi
+if ! "$PY_CMD" scripts/check-doc-links.py --ci; then GUARD_FAILED="$GUARD_FAILED check-doc-links"; fi
 
 if [ -n "$GUARD_FAILED" ]; then
     echo "[ERR] pre-commit: 守护未通过:$GUARD_FAILED" >&2
@@ -67,5 +68,5 @@ if [ -n "$GUARD_FAILED" ]; then
     exit 1
 fi
 
-echo "[OK] pre-commit: 八守护全量通过"
+echo "[OK] pre-commit: 九守护全量通过"
 exit 0
