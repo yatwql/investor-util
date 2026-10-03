@@ -134,6 +134,7 @@ def _build_news_hooks(
     penetrated_assets: list | None,
     industry_data: dict[str, dict] | None,
     llm_config: dict | None,
+    purchase_constraint_block: str = "",
 ) -> tuple[Callable, Callable, Callable, str]:
     """构建批量处理 hooks。
 
@@ -154,7 +155,12 @@ def _build_news_hooks(
 
     def _batch_preparer():
         holdings_summary = [{"name": h.name, "code": h.code} for h in holdings[:20]]
-        holdings_fp = compute_fingerprint(holdings_summary, penetrated_assets)
+        if purchase_constraint_block:
+            # 条件并入：约束块进批量提示词 → 必进指纹（逐级影响逐条缓存键）；
+            # 块空 → 逐字节沿用原两参形态，存量缓存键不变
+            holdings_fp = compute_fingerprint(holdings_summary, penetrated_assets, purchase_constraint_block)
+        else:
+            holdings_fp = compute_fingerprint(holdings_summary, penetrated_assets)
         return top_news, holdings_fp
 
     def _per_item_cache(_idx: int, item: dict, context_fp: str) -> str:
@@ -165,11 +171,14 @@ def _build_news_hooks(
     def _batch_prompt(batch_items: list[dict], _context_fp: str) -> str:
         holdings_text = _build_holdings_summary(holdings, penetrated_assets, industry_data)
         news_text = _build_news_correlation_summary(batch_items)
-        return (
+        _prompt = (
             f"【持仓信息】\n{holdings_text}\n\n"
             f"【新闻列表】\n{news_text}\n\n"
             f"请分析以上每条新闻与持仓的关联性，输出JSON数组。"
         )
+        if purchase_constraint_block:
+            _prompt = f"{_prompt}\n\n{purchase_constraint_block}"
+        return _prompt
 
     return _batch_preparer, _per_item_cache, _batch_prompt, _model
 
@@ -280,6 +289,7 @@ def enhance_news_correlation(
     force: bool = False,
     _http_client: httpx.Client | None = None,
     llm_config: dict | None = None,
+    purchase_constraint_block: str = "",
 ) -> tuple[list[dict], bool, dict]:
     """使用 LLM 增强新闻与持仓的关联分析。
 
@@ -311,6 +321,7 @@ def enhance_news_correlation(
         penetrated_assets,
         industry_data,
         llm_config,
+        purchase_constraint_block,
     )
 
     results_map, all_cached, batch_usage, cached_count = generate_llm_module(

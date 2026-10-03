@@ -109,6 +109,7 @@ def _compute_module_cache_info(
     competitive_context: str = "",
     metrics: dict | None = None,
     data_quality_text: str = "",
+    purchase_constraint_block: str = "",
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
 
@@ -136,6 +137,7 @@ def _compute_module_cache_info(
         competitive_context=competitive_context,
         metrics=metrics,
         data_quality_text=data_quality_text,
+        purchase_block=purchase_constraint_block or "",
     )
     fp_global_macro = global_macro_fingerprint(_inputs)
     fp_expert_review = expert_review_fingerprint(_inputs)
@@ -241,6 +243,7 @@ def _build_module_fns(
     metrics: dict | None = None,
     data_quality_text: str = "",
     history_data: dict | None = None,
+    purchase_constraint_block: str = "",
 ) -> dict[str, Callable]:
     """构建 LLM 模块名称 → 生成函数闭包 的映射。
 
@@ -265,6 +268,7 @@ def _build_module_fns(
             llm_config=lc,
             competitive_context=competitive_context,
             holdings_details=holdings_details,
+            purchase_constraint_block=purchase_constraint_block,
         ),
         "expert_review": lambda c, lc: generate_expert_review(
             total_mv,
@@ -275,6 +279,7 @@ def _build_module_fns(
             categories,
             penetrated_assets,
             holdings_details=holdings_details,
+            purchase_constraint_block=purchase_constraint_block,
             force=force,
             http_client=c,
             llm_config=lc,
@@ -292,6 +297,7 @@ def _build_module_fns(
             categories,
             penetrated_assets,
             holdings_details=holdings_details,
+            purchase_constraint_block=purchase_constraint_block,
             force=force,
             http_client=c,
             llm_config=lc,
@@ -308,6 +314,7 @@ def _build_module_fns(
             categories,
             penetrated_assets,
             holdings_details=holdings_details,
+            purchase_constraint_block=purchase_constraint_block,
             force=force,
             http_client=c,
             llm_config=lc,
@@ -339,6 +346,7 @@ def _dispatch_llm_workers(
     history_data: dict | None = None,
     _debate_info_container: list | None = None,
     competitive_context: str = "",
+    purchase_constraint_block: str = "",
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。
 
@@ -422,6 +430,7 @@ def _dispatch_llm_workers(
         metrics=_metrics,
         data_quality_text=_data_quality_text,
         history_data=history_data,
+        purchase_constraint_block=purchase_constraint_block,
     )
 
     # ── 辩论模式路由：替换 expert_review 条目 ─────────────────
@@ -462,6 +471,7 @@ def _dispatch_llm_workers(
                     pipeline_data=pipeline_data,
                     competitive_context=competitive_context,
                     metrics=_metrics,
+                    purchase_constraint_block=purchase_constraint_block,
                 )
                 pro, con, synthesis = _result
                 if pro and con:
@@ -578,6 +588,20 @@ def generate_all_llm(
         degradation_events, (pipeline_data or {}).get("data_freshness")
     )
 
+    # ── 申购限购约束块：契约构建期（report 侧）已渲染一次，此处只提取同一实例——
+    #    同时交预检侧指纹与写侧提示词（进提示词必进指纹，见 module_fingerprint）。
+    #    缺席（契约 None/字段缺/降级）→ ""，提示词与键双不变（降级矩阵）。 ──
+    purchase_constraint_block = str(
+        ((pipeline_data or {}).get("purchase_status_data") or {}).get("constraint_block") or ""
+    )
+    if purchase_constraint_block:
+        logger.debug(
+            "申购限购约束块注入 LLM 分析章（含表头共 %d 行）",
+            purchase_constraint_block.count("\n") + 1,
+        )
+    else:
+        logger.debug("申购限购约束块缺席（准入未过/未产出），提示词与缓存键回退原样")
+
     cache_info = _compute_module_cache_info(
         llm_config,
         a_indices,
@@ -596,6 +620,7 @@ def generate_all_llm(
         competitive_context=competitive_context,
         metrics=metrics,
         data_quality_text=data_quality_text,
+        purchase_constraint_block=purchase_constraint_block,
     )
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
@@ -642,6 +667,7 @@ def generate_all_llm(
         history_data=history_data,
         _debate_info_container=_debate_info_container,
         competitive_context=competitive_context,
+        purchase_constraint_block=purchase_constraint_block,
     )
 
     # 合并预检结果 + 工作线程结果
@@ -738,6 +764,7 @@ def generate_all_llm(
         penetrated_assets,
         llm_config,
         force=force,
+        purchase_constraint_block=purchase_constraint_block,
     )
 
     logger.info(

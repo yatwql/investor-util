@@ -4,6 +4,8 @@
 
     {"available": bool, "reason": str | None, "rows": dict,
      "fetched_at": str | None, "source": str | None,
+     "constraint_block": str,     # 构建期渲染：申购限购约束块
+                                  # （准入不满足 → ""；不传持仓 → ""）
      "restricted_index": dict}   # 编排层注入：受限标的预格式化索引
                                  # （准入不满足 → {}；开关关时契约整体 None）
 
@@ -47,6 +49,7 @@ __all__ = [
     "purchase_status_footnote",
     "purchase_column_visible",
     "build_restricted_index",
+    "build_purchase_constraint_block",
 ]
 
 #: 时效第一档上限（交易日）：距抓取 ≤3 个交易日 → 正常展示
@@ -61,7 +64,10 @@ PURCHASE_STATUS_FOOTNOTE = (
 )
 
 
-def build_purchase_status_data(config: dict | None = None) -> dict | None:
+def build_purchase_status_data(
+    config: dict | None = None,
+    holdings_details: list[dict] | None = None,
+) -> dict | None:
     """构建申购状态数据契约（``purchase_status_data``）。
 
     流程：功能开关 ``fund_purchase_limit`` 关闭 → None（渲染层保持既有输出）；
@@ -69,11 +75,18 @@ def build_purchase_status_data(config: dict | None = None) -> dict | None:
     成功返回 ``available=True`` 契约，全链失败返回 ``available=False`` 降级契约
     （不抛异常、不阻断报告主链路）。
 
+    契约字段 ``constraint_block`` 在构建期由
+    :func:`build_purchase_constraint_block` 渲染一次（准入不过 → ""）。
+
     Args:
         config: 完整配置字典（开关读注册表，形参为与同类装配函数一致的签名兼容）
+        holdings_details: 持仓明细（渲染约束块用的最小形态，至少含 name/code；
+            缺省/空 → ``constraint_block=""``——无 LLM 消费方的路径
+            （both/basic/What-if 取契约）可不传，块缺席零开销）
 
     Returns:
-        ``{available, reason, rows, fetched_at, source}`` 或 None（开关关闭）
+        ``{available, reason, rows, fetched_at, source, constraint_block}`` 或 None
+        （开关关闭）
     """
     from src.python.config import is_enable_fund_purchase_limit
 
@@ -88,20 +101,23 @@ def build_purchase_status_data(config: dict | None = None) -> dict | None:
         logger.warning("申购状态取数异常，本列静默隐列", exc_info=True)
         payload = None
     if not payload:
-        return {
+        contract: dict = {
             "available": False,
             "reason": "申购状态全链路取数失败且无可用缓存",
             "rows": {},
             "fetched_at": None,
             "source": None,
         }
-    return {
-        "available": True,
-        "reason": None,
-        "rows": payload.get("rows") or {},
-        "fetched_at": payload.get("fetched_at"),
-        "source": payload.get("source"),
-    }
+    else:
+        contract = {
+            "available": True,
+            "reason": None,
+            "rows": payload.get("rows") or {},
+            "fetched_at": payload.get("fetched_at"),
+            "source": payload.get("source"),
+        }
+    contract["constraint_block"] = build_purchase_constraint_block(contract, holdings_details)
+    return contract
 
 
 def purchase_column_visible(purchase_status_data: dict | None) -> bool:
@@ -291,3 +307,67 @@ def build_restricted_index(
     if not filtered:
         return {}
     return {row["code"]: row for row in filtered}
+
+
+def build_purchase_constraint_block(
+    purchase_status_data: dict | None,
+    holdings_details: list[dict] | None,
+) -> str:
+    """申购限购约束块（进全部 LLM 分析章提示词的唯一渲染实现）。
+
+    准入（任一不满足 → ``""``，消费侧提示词逐字节回退）：
+
+    1. 契约非 None（开关 ``fund_purchase_limit`` 关闭时上游直接返 None）；
+    2. 契约 ``available=True``；
+    3. 时效非 ``expired``（同模块 :func:`stale_level`，与展示层同一判据）；
+    4. 持仓明细非空且持仓 ∩ 行集内存在受限标的（开放申购不入块——正向信息
+       不占 token；场内标的只以「总表查无此码」排除，不做代码前缀类型推测）。
+
+    纯函数——不触网、不触盘、不打日志。字段值经 :func:`_filter_restricted_rows`
+    与单元格文案同一数值解释（状态词 / 日限额千分位 / 下一开放日，单源）；
+    行序 = 持仓明细顺序（确定性）；缺名回退显示代码；stale 档附「⚠ 数据陈旧」注
+    （与展示层同语义）。
+    """
+    if not purchase_status_data or not holdings_details:
+        return ""
+    if not purchase_column_visible(purchase_status_data):
+        return ""
+    level = stale_level(purchase_status_data.get("fetched_at"))
+    if level == "expired":
+        return ""
+    codes = [str(h.get("code") or "").strip() for h in holdings_details]
+    restricted = {row["code"]: row for row in _filter_restricted_rows(purchase_status_data, codes)}
+    if not restricted:
+        return ""
+    lines: list[str] = []
+    for holding in holdings_details:
+        code = str(holding.get("code") or "").strip()
+        row = restricted.get(code)
+        if row is None:
+            continue
+        name = str(holding.get("name") or "").strip() or code  # 缺名回退代码
+        if row["status"] == "限大额":
+            detail = (
+                "限额未知（以实际下单渠道显示为准）"
+                if row["limit_text"] == "限额未知"
+                else f"单账户单日限购 {row['limit_text']} 元"
+            )
+        else:  # 暂停申购（RESTRICTED_PURCHASE_STATUSES 仅两态，未知状态已被筛选）
+            detail = f"下一开放日 {row['next_open_text']}" if row["next_open_text"] else "下一开放日未知"
+        lines.append(f"- {code} {name} {row['status']}：{detail}")
+    if not lines:
+        return ""
+    fetched_date = str(purchase_status_data.get("fetched_at") or "")[:10]
+    head = (
+        f"【申购限购约束】（天天基金渠道口径，数据抓取于 {fetched_date}；其他渠道限额可能不同，实际以下单渠道显示为准"
+    )
+    if level == "stale":
+        head += "；⚠ 数据陈旧"
+    head += "）"
+    return "\n".join(
+        [
+            head,
+            *lines,
+            "（以上为申购可执行性硬约束：给出加仓、申购、合并类建议时必须先核对本表；场内标的无申购语义不列。）",
+        ]
+    )

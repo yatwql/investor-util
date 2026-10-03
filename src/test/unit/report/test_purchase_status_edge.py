@@ -124,3 +124,104 @@ class TestTimestampEdgeCases:
         monkeypatch.setattr(ps, "stale_level", lambda *_args, **_kw: "expired")
         assert ps.format_purchase_status_cell(data, "600900") == "—"
         assert "宁缺毋错" in ps.purchase_status_footnote(data)
+
+
+class TestConstraintBlockEdge:
+    """申购限购约束块边缘样本（限额未知 / 缺名回退 / 缺开放日 / 缺时间戳 / 查无此码）。"""
+
+    def _holdings(self, *pairs: tuple[str, str]) -> list[dict]:
+        return [{"code": c, "name": n} for c, n in pairs]
+
+    @pytest.fixture(autouse=True)
+    def _pin_level(self, monkeypatch):
+        level = {"value": "fresh"}
+        monkeypatch.setattr(ps, "stale_level", lambda *_a, **_k: level["value"])
+        return level
+
+    @pytest.mark.edge
+    def test_zero_or_missing_limit_renders_unknown(self, _pin_level):
+        """0 元/缺失日限额（解析层已转 None）→ 「限额未知」，绝不渲染「日限 0 元」。"""
+        rows = {
+            "000043": {
+                "purchase_status": "限大额",
+                "redemption_status": "开放赎回",
+                "next_open_date": "",
+                "daily_limit": None,
+                "min_purchase": None,
+            }
+        }
+        block = ps.build_purchase_constraint_block(_contract(rows), self._holdings(("000043", "华安中小盘")))
+        assert "限大额：限额未知（以实际下单渠道显示为准）" in block
+        assert "日限 0" not in block
+
+    @pytest.mark.edge
+    def test_missing_name_falls_back_to_code(self, _pin_level):
+        """持仓明细缺名 → 该行以代码呈现（局部回退，块不缺席）。"""
+        rows = {
+            "110022": {
+                "purchase_status": "限大额",
+                "redemption_status": "开放赎回",
+                "next_open_date": "",
+                "daily_limit": 100.0,
+                "min_purchase": None,
+            },
+            "161725": {
+                "purchase_status": "暂停申购",
+                "redemption_status": "暂停赎回",
+                "next_open_date": "2026-10-15",
+                "daily_limit": None,
+                "min_purchase": None,
+            },
+        }
+        block = ps.build_purchase_constraint_block(_contract(rows), self._holdings(("110022", ""), ("161725", "   ")))
+        assert "- 110022 110022 限大额" in block
+        assert "- 161725 161725 暂停申购" in block
+
+    @pytest.mark.edge
+    def test_suspended_without_next_open_date(self, _pin_level):
+        """暂停申购但无下一开放日 → 「下一开放日未知」，不编造日期。"""
+        rows = {
+            "161005": {
+                "purchase_status": "暂停申购",
+                "redemption_status": "开放赎回",
+                "next_open_date": "",
+                "daily_limit": None,
+                "min_purchase": None,
+            }
+        }
+        block = ps.build_purchase_constraint_block(_contract(rows), self._holdings(("161005", "富国天惠")))
+        assert "暂停申购：下一开放日未知" in block
+
+    @pytest.mark.edge
+    def test_missing_fetched_at_expires_block(self):
+        """fetched_at 缺失（真实 stale_level → expired）→ 准入③不过、块缺席。"""
+        block = ps.build_purchase_constraint_block(
+            _contract({}, fetched_at=None), self._holdings(("110022", "安心债券"))
+        )
+        assert block == ""
+
+    @pytest.mark.edge
+    def test_code_absent_from_rows_not_listed(self, _pin_level):
+        """总表查无此码（场外新基金未入库）→ 不列该行（绝不默认开放、也不编造状态）。"""
+        rows = {
+            "512880": {
+                "purchase_status": "场内交易",
+                "redemption_status": "开放赎回",
+                "next_open_date": "",
+                "daily_limit": None,
+                "min_purchase": None,
+            },
+            "110022": {
+                "purchase_status": "限大额",
+                "redemption_status": "开放赎回",
+                "next_open_date": "",
+                "daily_limit": 100.0,
+                "min_purchase": None,
+            },
+        }
+        block = ps.build_purchase_constraint_block(
+            _contract(rows), self._holdings(("510300", "华泰柏瑞沪深300ETF"), ("110022", "安心债券"))
+        )
+        assert "510300" not in block
+        assert "512880" not in block
+        assert "110022" in block

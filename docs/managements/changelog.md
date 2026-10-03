@@ -12,6 +12,7 @@
 ### Added
 
 - **基金申购限购信息接入（`plan-72` 迭代 1~3）**：天天基金申购状态总表全量取数（直连解析 + akshare 备链 + `purchase_schema` 载荷准入 + 会话复用单次经链），持仓明细市值明细末列「申购状态」条件列（限大额日限额/暂停申购下一开放日，Excel 与 HTML 单源文案）+ 双端口径脚注（天天基金渠道口径）与按交易日历的 ≤3 / 4~7 / >7 交易日三档时效标注；功能开关 `fund_purchase_limit`（默认开，注册表报告组），数据全链失败 `available=False` 时静默隐列、四层降级不阻断报告生成（设计文档 `docs/plan/fund-purchase-limit-design.md`）
+- **申购限购约束块接入全部 LLM 分析章（`plan-73` 四迭代）**：单源渲染器 `build_purchase_constraint_block`（契约条件字段 `constraint_block`，准入四条任一不过 → 空串，行序 = 持仓序、字段值与单元格同源）→ `generate_all_llm` 提取同一实例交标准模式四模块统一 prompt 附录第 4 段（`_build_prompt_appendix` 组装守卫「任一段非空即返回」，缺省与空块逐字节一致）+ 指纹输入字段 `purchase_block` 条件并入（进提示词必进指纹，接线前录制四模块基线防分隔符换哈希）+ 辩论 pro/con/synthesis、生成后自检、新闻批量 hooks（批量提示词拼块 + `holdings_fp` 指纹并入逐级影响逐条缓存键）同源接线，6 函数透传链单测覆盖；both/basic/What-if 取契约路径块恒空零开销，降级态提示词与缓存键双不变（设计文档 `docs/plan/fund-purchase-limit-llm-context-design.md`）
 - **What-if 目标持仓申购受限提示（`plan-74` 四迭代）**：受限标的预格式化索引 `restricted_index`（契约条件字段，与单元格同源格式化，编排层注入 + What-if 路径单点挂载）+ 申购可行性判定 `evaluate_purchase_feasibility`（限大额 `ceil(金额÷日限额)` 交易日估算、超 60 交易日判不可行、暂停引用下一开放日、金额/限额未知不给天数）+ 目标持仓新增/加仓腿提示注入 `build_whatif_data(restricted_index=…)`（卖出腿不判定；条件键 `feasibility`，Excel 持仓变动明细尾部 + HTML⑦申购受限提示节）；降级态（开关关/不可用/时效超限/取契约异常）契约与输出逐字节回退现网行为，调仓建议与行动摘要零改动（设计文档 `docs/plan/fund-purchase-limit-advice-design.md`）
 
 ### Changed

@@ -175,8 +175,12 @@ def prepare_report_data(
     )
     # 申购限购状态（数据契约 purchase_status_data）：功能开关 `fund_purchase_limit`
     # 开启时取全量表（每日 1 次，会话内复用）；关闭时返回 None（申购状态列隐藏）；
-    # 全链失败返回 available=False 的降级契约（静默隐列，不阻断主链路）
-    purchase_status_data = compute_purchase_status_data(config)
+    # 全链失败返回 available=False 的降级契约（静默隐列，不阻断主链路）。
+    # holdings_details 最小形态（name/code）供构建期渲染 constraint_block 约束块
+    # （进 LLM 分析章提示词的唯一渲染点，一次渲染、提示词与指纹共享同一实例）
+    purchase_status_data = compute_purchase_status_data(
+        config, holdings_details=[{"name": d.name, "code": d.code} for d in details]
+    )
     # 受限标的预格式化索引（restricted_index 契约字段）：字段值由
     # report/purchase_status 单源渲染，供建议层可行性判定只读消费；
     # 准入不满足（开关关/不可用/时效超限/无受限持仓）→ {}（消费方按缺席回退）
@@ -362,17 +366,21 @@ def compute_financial_indicator_data(
 # _fetch_valuation_for_code（测试 patch 该路径），不可整体迁移。
 
 
-def compute_purchase_status_data(config: dict) -> dict | None:
+def compute_purchase_status_data(
+    config: dict,
+    holdings_details: list[dict] | None = None,
+) -> dict | None:
     """编排申购限购状态数据（`purchase_status_data` 数据契约）。
 
     功能开关 `fund_purchase_limit` 开启时取天天基金申购状态全量表
     （chain + 载荷准入 + 会话复用，报告一次生成内单次经链）；关闭返回 None
     （持仓明细「申购状态」列隐藏）；全链失败返回 available=False 降级契约
-    （静默隐列，不阻断主链路）。
+    （静默隐列，不阻断主链路）。`holdings_details` 供构建期渲染
+    `constraint_block` 约束块（进 LLM 分析章提示词；不传 → 块为 ""）。
     """
     from src.python.report.purchase_status import build_purchase_status_data
 
-    return build_purchase_status_data(config)
+    return build_purchase_status_data(config, holdings_details)
 
 
 def compute_valuation_data(

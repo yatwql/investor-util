@@ -49,6 +49,7 @@
 | `analysis/portfolio_evolution.py` | 多快照趋势聚合计算 | 多账户合并、快照缺市值回退成本权重、HHI 计算、TOP 持仓变迁、快照数不足 available=False、历史快照容错跳过 |
 | `report/evolution_sheet.py` + `report_template.html`（evolution 模块） | 组合演进双端呈现 | 汇总/总市值/HHI/TOP/账户流/说明顺序、多账户流表、单账户无流表、HHI 无效期记 "-"、available=False 占位、evolution_data=None 章节隐藏、enable_portfolio_evolution=False 章节隐藏（board 层）、3 图各带 .chart-caption（图下说明） |
 | `analysis/purchase_feasibility.py` | 申购可行性判定纯函数 | 判定矩阵逐分支（限大额已知/未知、暂停、无判定入口、59/60/61 阈值两侧、days 上取整关系、话术三态）+ 边缘（非正金额/限额、NaN/Inf、超大额不可行、极小 1 天）；全程无网 |
+| `llm/` 约束块注入链（`prompts_tables`/`skeleton`/`generators`/`generators_orchestrator`/`module_fingerprint`/`self_review`/`generators_news`/`_llm_news`/`news_correlation`） | 申购限购约束块接入全部 LLM 分析章（统一附录第 4 段 + 指纹条件并入 + 新闻批量同源） | 附录缺省 ≡ 空块逐字节、仅块非空组装守卫、四模块/辩论 pro/con/synthesis/自检/新闻批量「完备含块 vs 降级不含」成对、提取实例单源 6 函数透传、指纹三态与接线前基线（空块 = 黄金值）、预检/写两侧键同源；全程无网（`test_purchase_constraint_injection.py` 等） |
 | `analysis/whatif.py` | 双持仓成本口径 diff 计算 | 新增/清仓/加仓/减仓/不变识别、份额容差(<1e-3)、成本权重+HHI、汇总 delta+箭头、分类配置（_CATEGORY_ORDER 排序）、多账户合并、两侧空降级、单侧空=全清仓仍可算；受限提示（restricted_index 缺省≡空降级逐字节、新增/加仓金额口径、卖出腿不判定、暂停/限额未知分支、降级无 feasibility 键） |
 | `analysis/whatif_backtest.py` | 生效日时序回测纯计算 | 生效日→请求天数折算/钳位/坏格式/未来日期、并集+LOCF+锚点对齐、归一化/收益率/回撤序列数值、5 指标对比、数据不足/两侧空/不可对齐 available=False、status 降级传播 |
 | `report/whatif_operations.py` | whatif 共享层编排 | build_whatif_data→校验→写报告；未指定生效日不调用回测且无 backtest 键；指定生效日合并进 data；回测异常→ok=True 且 available=False；返回 None 不加键；受限索引单点挂载（透传至 build、取契约异常兜底空索引） |

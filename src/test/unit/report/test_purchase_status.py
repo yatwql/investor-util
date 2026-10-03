@@ -556,3 +556,121 @@ class TestRestrictedIndex:
         contract = _contract(self._restricted_rows())
         index = ps.build_restricted_index(contract, ["519674"])
         assert index["519674"]["level"] == "stale"
+
+
+class TestConstraintBlock:
+    """申购限购约束块渲染（constraint_block 契约字段，进 LLM 分析章提示词）。
+
+    准入四条（契约非 None / available / 非 expired / 存在受限持仓）+ 块内容
+    逐项 + 行序 = 持仓序 + 展示层零泄露。日历以 monkeypatch 注入（无网可复现）；
+    阶梯分档本身由陈旧阶梯既有用例锁定，此处不重测（只测准入三态）。
+    """
+
+    def _holdings(self, *pairs: tuple[str, str]) -> list[dict]:
+        return [{"code": c, "name": n} for c, n in pairs]
+
+    @pytest.fixture(autouse=True)
+    def _pin_level(self, monkeypatch):
+        """默认钉 fresh（确定性）；个别用例自行改钉。"""
+        level = {"value": "fresh"}
+        monkeypatch.setattr(ps, "stale_level", lambda *_a, **_k: level["value"])
+        return level
+
+    def test_admission_contract_none(self):
+        """准入①：契约 None（开关关）→ 块缺席。"""
+        assert ps.build_purchase_constraint_block(None, self._holdings(("110022", "安心债券"))) == ""
+
+    def test_admission_unavailable(self):
+        """准入②：available=False 降级契约 → 块缺席。"""
+        holdings = self._holdings(("110022", "安心债券"))
+        assert ps.build_purchase_constraint_block(_contract(available=False), holdings) == ""
+
+    def test_admission_expired(self, _pin_level):
+        """准入③：时效 expired → 块缺席（宁缺毋错，过时限购信息不误导模型）。"""
+        _pin_level["value"] = "expired"
+        holdings = self._holdings(("110022", "安心债券"))
+        assert ps.build_purchase_constraint_block(_contract(), holdings) == ""
+
+    def test_admission_no_holdings(self):
+        """准入④：持仓明细为空/None → 块缺席（降级矩阵同款）。"""
+        assert ps.build_purchase_constraint_block(_contract(), None) == ""
+        assert ps.build_purchase_constraint_block(_contract(), []) == ""
+
+    def test_admission_all_open_no_restricted(self):
+        """准入④：持仓全部「开放申购」→ 块缺席（正向信息不占 token）。"""
+        holdings = self._holdings(("600900", "长江电力"))
+        assert ps.build_purchase_constraint_block(_contract(), holdings) == ""
+
+    def test_block_content_fields_and_order(self):
+        """块内容逐项：头行口径与抓取日期、字段值同源、开放不列、行序=持仓序。"""
+        holdings = self._holdings(
+            ("110022", "易方达安心回馈债券"),
+            ("600900", "长江电力"),
+            ("161725", "景顺长城新兴成长混合"),
+        )
+        block = ps.build_purchase_constraint_block(_contract(fetched_at="2026-10-09T08:00:00+08:00"), holdings)
+        lines = block.split("\n")
+        assert lines[0].startswith("【申购限购约束】")
+        assert "天天基金渠道口径" in lines[0]
+        assert "数据抓取于 2026-10-09" in lines[0]
+        assert "⚠ 数据陈旧" not in lines[0]  # fresh 档无陈旧注
+        # 开放申购不入块；受限两行字段值与单元格同一数值解释
+        assert "- 110022 易方达安心回馈债券 限大额：单账户单日限购 100 元" in block
+        assert "- 161725 景顺长城新兴成长混合 暂停申购：下一开放日 10月9日" in block
+        assert "600900" not in block
+        # 行序 = 持仓明细顺序（110022 在 161725 前，与持仓序一致）
+        assert block.index("- 110022") < block.index("- 161725")
+        # 尾行硬约束声明
+        assert "申购可执行性硬约束" in lines[-1]
+        assert "场内标的无申购语义不列" in lines[-1]
+
+    def test_order_follows_holdings_not_sorted_codes(self, monkeypatch):
+        """行序取持仓明细顺序而非代码升序（筛选单源内部 sorted 不外泄）。"""
+        holdings = self._holdings(("161725", "景顺长城"), ("110022", "易方达"))
+        block = ps.build_purchase_constraint_block(_contract(), holdings)
+        assert block.index("- 161725") < block.index("- 110022")
+
+    def test_limit_thousand_separator(self):
+        """日限额千分位与单元格同源（10000 → 10,000）。"""
+        holdings = self._holdings(("000198", "国投瑞银"))
+        block = ps.build_purchase_constraint_block(_contract(), holdings)
+        assert "单账户单日限购 10,000 元" in block
+
+    def test_stale_level_renders_with_warning(self, _pin_level):
+        """stale 档（4~7 交易日）→ 仍出块 + 头行附「⚠ 数据陈旧」（与展示层同语义）。"""
+        _pin_level["value"] = "stale"
+        holdings = self._holdings(("110022", "安心债券"))
+        block = ps.build_purchase_constraint_block(_contract(), holdings)
+        assert "限大额" in block
+        assert "⚠ 数据陈旧" in block.split("\n")[0]
+
+    def test_contract_field_produced(self, monkeypatch, _pin_level):
+        """契约字段 constraint_block：传持仓且存在受限 → 非空 str；不传持仓 → ""。"""
+        payload = {"rows": _rows(), "fetched_at": _fresh_ts(), "source": "天天基金"}
+        monkeypatch.setattr("src.python.fetcher.fund_purchase.fetch_fund_purchase_status_cached", lambda: payload)
+        holdings = self._holdings(("110022", "安心债券"))
+        data = ps.build_purchase_status_data({}, holdings_details=holdings)
+        assert isinstance(data["constraint_block"], str)
+        assert "【申购限购约束】" in data["constraint_block"]
+        data_no_holding = ps.build_purchase_status_data({})
+        assert data_no_holding["constraint_block"] == ""
+
+    def test_contract_field_degraded_to_empty(self, monkeypatch):
+        """降级契约（available=False）→ constraint_block 恒为空串（字段在、值空）。"""
+        monkeypatch.setattr("src.python.fetcher.fund_purchase.fetch_fund_purchase_status_cached", lambda: None)
+        data = ps.build_purchase_status_data({}, holdings_details=self._holdings(("110022", "安心债券")))
+        assert data["available"] is False
+        assert data["constraint_block"] == ""
+
+    def test_display_layer_never_leaks_block(self):
+        """展示层零影响：单元格与脚注输出绝不含提示词块内容（展示只读既有字段）。"""
+        holdings = self._holdings(("110022", "安心债券"))
+        contract = _contract()
+        contract["constraint_block"] = ps.build_purchase_constraint_block(contract, holdings)
+        assert "【申购限购约束】" in contract["constraint_block"]
+        cell = ps.format_purchase_status_cell(contract, "110022")
+        footnote = ps.purchase_status_footnote(contract)
+        assert "【申购限购约束】" not in cell
+        assert "申购可执行性硬约束" not in cell
+        assert "【申购限购约束】" not in footnote
+        assert "申购可执行性硬约束" not in footnote

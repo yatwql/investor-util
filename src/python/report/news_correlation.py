@@ -336,6 +336,7 @@ def _apply_llm_enhancement(
     penetrated_assets: list[dict] | None,
     industry_data: dict[str, dict],
     meta: dict,
+    purchase_constraint_block: str = "",
 ) -> dict:
     """可选 LLM 增强：对新闻逐条判定关联度。
 
@@ -371,6 +372,7 @@ def _apply_llm_enhancement(
             news_items,
             holdings,
             penetrated_assets=penetrated_assets,
+            purchase_constraint_block=purchase_constraint_block,
             industry_data=industry_data,
         )
     except Exception:
@@ -414,6 +416,7 @@ def build_news_data(
     holdings: list[Holding],
     top_n: int = 100,
     penetrated_assets: list[dict] | None = None,
+    purchase_constraint_block: str = "",
 ) -> tuple[list[dict[str, Any]], dict]:
     """获取新闻数据并与持仓关联。
 
@@ -484,7 +487,9 @@ def build_news_data(
         sum(1 for n in news_items if n.get("matched_keywords")),
     )
 
-    meta = _apply_llm_enhancement(news_items, holdings, penetrated_assets, industry_data, meta)
+    meta = _apply_llm_enhancement(
+        news_items, holdings, penetrated_assets, industry_data, meta, purchase_constraint_block
+    )
     _enrich_news_keywords(news_items, holdings, penetrated_assets, industry_data)
 
     # 补充各源状态（在 aggregate_news 之后获取）

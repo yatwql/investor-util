@@ -589,3 +589,36 @@ class TestBuildPromptAppendix(unittest.TestCase):
         holdings = [self._make_holding("011506", "建信高端装备", 0, 0)]
         result = _build_prompt_appendix(holdings, 0, 0, 0)
         self.assertEqual(result, "")
+
+    # ── 第 4 段：申购限购约束块 ─────────────────────────────
+
+    def test_default_equals_empty_block(self):
+        """缺省 ≡ block=""：块缺席对附录输出零贡献（降级逐字节一致）。"""
+        from src.python.llm.prompts_tables import _build_prompt_appendix
+
+        holdings = [self._make_holding("011506", "建信高端装备", 60_000, 8.5)]
+        self.assertEqual(
+            _build_prompt_appendix(holdings, 60_000, 55_000, 5_000),
+            _build_prompt_appendix(holdings, 60_000, 55_000, 5_000, purchase_constraint_block=""),
+        )
+
+    def test_block_only_nonempty_returns_block(self):
+        """组装守卫：三防御全空而块非空 → 返回含块（不被整体空判吞掉）。"""
+        from src.python.llm.prompts_tables import _build_prompt_appendix
+
+        block = "【申购限购约束】\n- 110022 示例 限大额：单账户单日限购 100 元"
+        result = _build_prompt_appendix(None, 0, 0, 0, purchase_constraint_block=block)
+        self.assertIn("【申购限购约束】", result)
+        self.assertIn("- 110022", result)
+
+    def test_block_appended_after_three_defenses(self):
+        """非空块 = 既有附录 + "\n\n" + 块（构造性拼接证明，位置确定在三防御之后）。"""
+        from src.python.llm.prompts_tables import _build_prompt_appendix
+
+        block = "【申购限购约束】\n- 110022 示例 限大额：单账户单日限购 100 元"
+        holdings = [self._make_holding("011506", "建信高端装备", 60_000, 8.5)]
+        base = _build_prompt_appendix(holdings, 60_000, 55_000, 5_000)
+        self.assertEqual(
+            _build_prompt_appendix(holdings, 60_000, 55_000, 5_000, purchase_constraint_block=block),
+            base + "\n\n" + block,
+        )

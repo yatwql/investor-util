@@ -79,6 +79,7 @@ def run_self_review(
     penetrated_assets: list[dict] | None,
     llm_config: dict | None,
     force: bool = False,
+    purchase_constraint_block: str = "",
 ) -> bool:
     """生成后一遍：按开关执行自检，产出写入运行作用域载体。
 
@@ -113,6 +114,7 @@ def run_self_review(
             penetrated_assets,
             force=force,
             llm_config=llm_config,
+            purchase_constraint_block=purchase_constraint_block,
         )
     except Exception as e:  # noqa: BLE001 — 自检失败不得影响主内容（报告照常产出）
         logger.warning("生成后自检调用异常（不影响主内容）: %s", e)
