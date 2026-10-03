@@ -71,6 +71,20 @@ def is_llm_module_enabled(llm_config: dict | None, module_suffix: str) -> bool:
     return bool(enabled_map.get(module_suffix, True))
 
 
+def get_llm_chapter_disabled() -> dict[str, bool]:
+    """章级开关推导：enabled_llm.<key> → {章节 key: 是否禁用}。
+
+    HTML 与 Excel 可见性判定同调此函数（同一配置文件 + 同一推导逻辑 = 单一事实来源），
+    禁用的 LLM 分析章（core.registry.LLM_MODULE_GATED_SECTIONS）整章隐藏而非显示
+    「待生成」占位。读取 llm_settings.json 配置，缺失键默认启用。
+    """
+    from src.python.config._llm_settings import get_llm_config
+    from src.python.core.registry import LLM_MODULE_GATED_SECTIONS
+
+    cfg = get_llm_config()
+    return {key: not is_llm_module_enabled(cfg, key) for key in LLM_MODULE_GATED_SECTIONS}
+
+
 def _handle_cache_hit(
     cached: str,
     cache_key: str,

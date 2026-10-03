@@ -374,7 +374,9 @@
         .toc-list a.toc-llm.active { color: var(--orange-text); border-left-color: var(--orange-text); }
         .section-nav a.toc-llm { color: var(--orange-text); font-weight: 600; }
         .toc-llm-icon { margin-left: 4px; vertical-align: middle; }
-        /* 分组折叠：按「基础信息/基金深度分析/行动建议/历史/LLM」五组（<details>/<summary> 原生折叠，键盘可达） */
+        /* 分组折叠：按语义分组（<details>/<summary> 原生折叠，键盘可达），
+           组间按组内最小报告号动态排序，展开后与正文线性序一致；
+           正文大块默认折叠（<details class="section-fold">）同理。 */
         .toc-group { border-bottom: 1px solid var(--toc-border); }
         .toc-group:last-child { border-bottom: none; }
         .toc-group-title {
@@ -389,6 +391,28 @@
         .toc-group-count {
             font-size: 11px; color: var(--text-muted); font-weight: 400;
             background: var(--source-tag-bg); border-radius: 8px; padding: 1px 7px;
+        }
+        /* 正文大块默认折叠（.section-fold）：章标题常显，内容区原生 <details> 收起，
+           首屏聚焦 + 滚动减负；锚点定位与打印由 fold.js 自动展开。 */
+        details.section-fold { border: 1px solid var(--border-color, rgba(128,128,128,0.25)); border-radius: 8px; margin-top: 8px; background: var(--card-bg, transparent); }
+        details.section-fold > summary.section-fold-summary {
+            display: flex; align-items: center; gap: 6px;
+            padding: 9px 14px; font-size: 12.5px; color: var(--text-muted);
+            cursor: pointer; list-style: none; user-select: none;
+            background: var(--source-tag-bg, rgba(128,128,128,0.08));
+            border-radius: 8px;
+        }
+        details.section-fold > summary.section-fold-summary::-webkit-details-marker { display: none; }
+        details.section-fold > summary.section-fold-summary::before {
+            content: "▸"; font-size: 11px; transition: transform 0.15s;
+        }
+        details.section-fold[open] > summary.section-fold-summary::before { transform: rotate(90deg); }
+        details.section-fold > summary.section-fold-summary:hover { filter: brightness(0.96); }
+        details.section-fold > .section-content { padding-top: 8px; }
+        /* 打印时内容由 fold.js beforeprint 全展开，提示条不入打印稿 */
+        @media print {
+            details.section-fold > summary.section-fold-summary { display: none !important; }
+            details.section-fold { border: none; background: transparent; }
         }
         /* 收起状态：侧栏移出视口 + 浮动展开按钮 */
         .toc-toggle-btn {
@@ -909,6 +933,8 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 {% endif %}
 {# 左侧目录 TOC（独立于图表开关，始终加载；本地 bundle） #}
 <script defer src="toc.js"></script>
+{# 正文大块折叠交互（锚点/打印自动展开；beforeprint 用捕获阶段先于 chart-print 快照展开） #}
+<script defer src="fold.js"></script>
 {# 主题切换（暗色模式（主题切换），独立于图表开关，始终加载） #}
 <script defer src="theme.js"></script>
 </head>
@@ -2364,6 +2390,14 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">⚠ as-if 模拟（历史净值 × 当前份额）</span>
             {% endif %}
         </div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {% if history_data and history_data.status != "unavailable" %}
+                累计收益 {{ history_data.total_return_pct | change }} · 最大回撤 {{ history_data.max_drawdown_pct | abs | change }} · 年化波动 {{ history_data.annualized_volatility | change }} —— 点击展开/收起走势图表、指标卡、回撤矩阵与危机区间明细
+                {% else %}
+                组合历史走势与回撤 —— 点击展开明细
+                {% endif %}
+            </summary>
         {% if history_data and history_data.status != "unavailable" %}
         <div class="section-content">
             {% set _crisis_ok = crisis_annotation_data and crisis_annotation_data.available %}
@@ -2677,6 +2711,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
         </div>
         {% endif %}
+        </details>
         {{ render_data_status(data_status_history) }}
         {{ render_back_to_top() }}
     </div>

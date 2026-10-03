@@ -399,6 +399,16 @@ def get_llm_module_names() -> dict[str, str]:
 # TUI 菜单过滤、Web 状态面与配置编辑白名单均由此派生，禁止渠道自持副本。
 LLM_HIDDEN_KEYS: frozenset[str] = frozenset({"debate_pro", "debate_con", "debate_synthesis"})
 
+# 报告章级开关集合（单一事实来源）：这些 LLM 分析章由 llm_settings.json →
+# enabled_llm.<key> 逐模块独立控制，禁用时**整章隐藏**（目录/正文/Excel 页签与
+# 连续重编号同步剔除），而非显示「待生成」占位；HTML/Excel 两端可见性判定同由此派生，
+# 禁止两端自持副本。
+# 不在集合内的 LLM 相关章：news_correlation（LLM 仅二次增强，关键词模式仍可用，
+# 章不随模块隐藏）、llm_usage（用量统计随 board 总开关）。
+LLM_MODULE_GATED_SECTIONS: frozenset[str] = frozenset(
+    {"global_macro", "expert_review", "health_check", "penetration_deep"}
+)
+
 
 def visible_llm_module_names() -> dict[str, str]:
     """面板可见的 LLM 标准模块映射（settings_suffix → 中文名，已剔除隐藏模块）。"""

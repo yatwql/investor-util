@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.python.core.registry import LLM_MODULE_GATED_SECTIONS as _LLM_MODULE_GATED_SECTIONS
+
 
 def should_create_sheet(section: dict, data_availability: dict[str, bool] | None = None) -> bool:
     """纯 data 层：按注册表的 data_flag 判断模块数据是否就绪。
@@ -71,6 +73,7 @@ def create_sheets(
     enable_action: bool = False,  # board 层：行动建议（config 默认开）
     enable_llm: bool = True,  # board 层
     data_availability: dict[str, bool] | None = None,  # data 层
+    llm_module_disabled: dict[str, bool] | None = None,  # 章级：enabled_llm 模块禁用的 LLM 分析章不创建
 ) -> dict[str, Any]:
     """按配置顺序创建所有可见页签，返回 {key: ws} 字典。
 
@@ -87,6 +90,8 @@ def create_sheets(
         enable_action: board 层 — 行动建议章节是否开启（config 默认开）
         enable_llm: board 层 — LLM 分析章节是否开启
         data_availability: data 层 — 各模块 data_flag 的就绪状态
+        llm_module_disabled: 章级 — enabled_llm 逐模块禁用时，对应 LLM 分析章
+            （core.registry.LLM_MODULE_GATED_SECTIONS）不创建页签（与 HTML 端同口径）
     """
     # 内联 board_flags dict（与 HTML 端结构一致，行为一致性由集成测试保证）
     board_flags = {
@@ -110,6 +115,14 @@ def create_sheets(
     for sec in section_order:
         # 第 1 层：board 层预过滤
         if not board_flags.get(sec.get("type", ""), True):
+            continue
+
+        # 第 1.5 层：章级（enabled_llm.<key> 禁用 → LLM 分析章整章隐藏，与 HTML 端同口径）
+        if (
+            llm_module_disabled
+            and sec["key"] in _LLM_MODULE_GATED_SECTIONS
+            and llm_module_disabled.get(sec["key"], False)
+        ):
             continue
 
         # 第 2 层：data 层判断（查注册表的 data_flag）

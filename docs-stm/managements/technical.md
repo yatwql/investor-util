@@ -283,16 +283,17 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 **决策**：报告 17 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
-**两层可见性模型**：
+**两层可见性模型 + 章级维度**：
 
 ```
-section_visible = board_enabled(section.type) AND data_available(section.data_flag)
+section_visible = board_enabled(section.type) AND data_available(section.data_flag) AND NOT module_disabled(section.key)
 ```
 
 | 层级 | 含义 | 来源 |
 |:-----|:------|:------|
 | board 层 | 用户配置的章节开关 | `config.json`（`enable_fund_deep_analysis`/`enable_news`/`enable_history`/`enable_portfolio_evolution`） |
 | data 层 | 运行时数据可用性 | 各子模块返回值非 None 判定 |
+| 章级 | LLM 分析章逐模块启停 | `llm_settings.json → enabled_llm.<key>`（禁用的分析章整章隐藏而非显示「待生成」占位；集合 `core.registry.LLM_MODULE_GATED_SECTIONS` 单一来源，HTML/Excel 两端同调 `llm.skeleton.get_llm_chapter_disabled()` 同配置同逻辑推导；新闻关联（LLM 仅二次增强）与 API 用量章不入集合） |
 
 #### 1.4.5 数据降级治理体系
 

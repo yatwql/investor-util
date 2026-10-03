@@ -541,6 +541,10 @@ def write_html_report(
 
     # ── 10a) 报告模块序号 & 可见性 ──
     order = section_order or get_report_section_order()
+    # 章级：enabled_llm 模块禁用的 LLM 分析章整章隐藏（与 Excel 端同函数同配置推导）
+    from src.python.llm.skeleton import get_llm_chapter_disabled
+
+    llm_module_disabled = get_llm_chapter_disabled() if enable_llm else None
     section_numbers, section_visible_dict, _sv_fn = _compute_section_visibility(
         order,
         manager_analysis,
@@ -549,6 +553,7 @@ def write_html_report(
         style_analysis,
         include_news,
         llm_enabled_flag,
+        llm_module_disabled=llm_module_disabled,
         enable_news=enable_news,
         enable_fund_deep_analysis=enable_fund_deep_analysis,
         enable_history=enable_history,

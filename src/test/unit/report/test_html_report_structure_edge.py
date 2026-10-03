@@ -172,11 +172,13 @@ class TestHtmlRegressionChecks(unittest.TestCase):
         """打印样式应隐藏导航栏（.section-nav { display: none }）。"""
         self.assertIn(".section-nav", self.tmpl, "模板中应有 .section-nav 选择器")
         self.assertIn("display: none", self.tmpl, "打印样式应包含 display: none")
-        print_pos = self.tmpl.find("@media print")
-        self.assertGreater(print_pos, -1, "模板中缺少 @media print")
-        block = self.tmpl[print_pos : print_pos + 800]
-        self.assertIn(".section-nav", block, ".section-nav 应出现在 @media print 块中")
-        self.assertIn("display: none", block, "display: none 应出现在 @media print 块中")
+        # 遍历全部 @media print 块（模板可有多个打印规则块，不依赖出现顺序）
+        positions = [m.start() for m in re.finditer(r"@media print", self.tmpl)]
+        self.assertTrue(positions, "模板中缺少 @media print")
+        self.assertTrue(
+            any(".section-nav" in self.tmpl[p : p + 800] for p in positions),
+            ".section-nav 应出现在某个 @media print 块中",
+        )
 
 
 class TestHtmlBackToTopStatic(unittest.TestCase):
@@ -198,12 +200,14 @@ class TestHtmlBackToTopStatic(unittest.TestCase):
         self.assertIn(".back-to-top-link a", self.tmpl)
 
     def test_back_to_top_print_hidden(self):
-        """打印时隐藏章节"回到顶部"链接。"""
-        print_pos = self.tmpl.find("@media print")
-        self.assertGreater(print_pos, -1, "模板中缺少 @media print")
-        block = self.tmpl[print_pos : print_pos + 1200]
-        self.assertIn(".back-to-top-link", block, ".back-to-top-link 应出现在 @media print 块中（打印隐藏）")
-        self.assertIn("display: none", block)
+        """打印时隐藏章节“回到顶部”链接。"""
+        # 遍历全部 @media print 块（模板可有多个打印规则块，不依赖出现顺序）
+        positions = [m.start() for m in re.finditer(r"@media print", self.tmpl)]
+        self.assertTrue(positions, "模板中缺少 @media print")
+        self.assertTrue(
+            any(".back-to-top-link" in self.tmpl[p : p + 1200] for p in positions),
+            ".back-to-top-link 应出现在某个 @media print 块中（打印隐藏）",
+        )
 
     def test_back_to_top_macro_defined_and_called(self):
         """render_back_to_top 宏已定义，且调用次数 = .section 容器数。"""

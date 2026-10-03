@@ -286,7 +286,7 @@ class TestSwitchAndWiring:
     def test_nav_group_and_template_include(self):
         from src.python.report.html_writer_nav import _SECTION_NAV_GROUP_MAP
 
-        assert _SECTION_NAV_GROUP_MAP["fundamental_snapshot"] == "basic"
+        assert _SECTION_NAV_GROUP_MAP["fundamental_snapshot"] == "appendix"
 
         tmpl_dir = Path(__file__).resolve().parents[3] / "static" / "tmpl"
         template = (tmpl_dir / "report_template.html").read_text(encoding="utf-8")
