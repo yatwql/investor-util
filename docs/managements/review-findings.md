@@ -1,10 +1,16 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.2-dev
-> **编号源**：`rf-next = 564`（新增问题取此编号，完成后更新为 +1；已用最大 rf-563，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 569`（新增问题取此编号，完成后更新为 +1；已用最大 rf-568，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
 ## 当前待处理问题
+
+### P3 — 48 小时实现技术债务自查（2026-10-03，plan-72/73/74 三线）
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-568** | `test_debate_prompts.py::test_system_debate_conditional_scenario_exists` 条件 skip 十余次跑全空过：预留常量 `_SYSTEM_DEBATE_CONDITIONAL_SCENARIO` 全仓不存在，条件推理实际实现走 `_SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL` + 配置情景分支——测试验证目标与实现失配，形同虚设 | **待议**：预留常量的语义（模式 2 自动生成情景？）需设计确认后再改测试指向真实符号或实现该常量，不盲改 |
 
 ### P1 — plan-1 交互图表遗留技术债（2026-08-02）
 
@@ -42,6 +48,8 @@
 ## 已解决问题
 
 > **rf-563 已修复（2026-10-03）**：限购线文档一致性核对——`reports-instruction` 列数 15→16 与 What-if 提示块、`requirements` R-WIF-05/06 输出与网络语义、TUI/CLI 手册零网络表述、FAQ/README/`datasource-reliability` 补述（变更见 changelog「限购线文档一致性核对修正」）。
+> **rf-564 ~ rf-567 已修复（2026-10-03）**：48 小时实现技术债自查批次——What-if 页面级断言编号同步（plan-74 改模板漏改）、P0/P1 门禁并入 `unit_report` 域（98 文件首次进门禁，modes/collect 双处 marker 同步）、changelog「兔底」错字、`constraint_block` 提取收敛单源 helper（变更见 changelog「门禁并入」「单源」两更）。
+>
 >
 > **迁移说明**：已完成批次摘要（rf-557 ~ rf-562）已于 v0.12.1 发布（2026-10-03）随档迁入 [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)，本文件只保留未完成项与归档索引；更早批次（rf-541、rf-542 ~ rf-556）见 [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md)。
 

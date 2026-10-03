@@ -17,8 +17,10 @@
 
 ### Changed
 
+- **P0/P1 门禁并入 `unit_report` 域（rf-564 / rf-565）**：报告生成域（98 文件 / 2,120 用例）此前不在 `dev-verify`、`verify`、`verify,regression` 任何档（modes.py `report` 专用模式零调用方），What-if 页面级测试「⑦/⑧ 说明」编号漂移因此带病提交——`dev-verify`（3,638→5,454）与 `verify`（5,796→7,917）marker 并入 `unit_report`，`test-runner modes.py` 与 `collect-test-coverage.py` 双处 marker 定义同步并互注防漂移；`test_whatif_html.py` 断言与 `whatif_template.html` 编号同步（「⑦ 说明」→「⑧ 说明」+ ⑦受限节缺席断言）
+- **`constraint_block` 提取收敛单源 helper（rf-567）**：编排层与新闻链两处相同的字典路径表达式收敛为 `llm.extract_purchase_constraint_block(pipeline_data)`（唯一提取点，契约键/嵌套调整只改此处，防漏改一处致块静默缺席），两侧调用同一实现并补三态单测
 - 限购总表缓存显式注册进数据模块注册表（data_type `fund_purchase` + 精确键 `fund_purchase_status_table`，TTL 与官方净值同源 `CACHE_DAILY` 24h）：此前未注册、靠 `get_ttl` 回退巧合与净值同档，回退逻辑或常量一变即无声漂移；仍不入菜单刷新组（大表不随菜单强抓），`datasource.md` 脚注同步
-- **限购线文档一致性核对修正**：`reports-instruction.md` 持仓市值明细 15→16 列（申购状态条件列 + 脚注/时效/降级说明）与 What-if 申购受限提示块（页签表/产物/设计边界/功能对照表 4 处）；`requirements.md` R-WIF-05 输出描述与 R-WIF-06 网络语义（what-if 默认本地计算，提示经缓存链读限购总表：命中零联网/未命中现场取一次/失败静默兔底）；TUI/CLI 手册 What-if 段同源修正；FAQ 新增「申购状态」列问答；`datasource-reliability.md` 3.11 用途行补 What-if 消费方；README What-if 特性行补受限提示
+- **限购线文档一致性核对修正**：`reports-instruction.md` 持仓市值明细 15→16 列（申购状态条件列 + 脚注/时效/降级说明）与 What-if 申购受限提示块（页签表/产物/设计边界/功能对照表 4 处）；`requirements.md` R-WIF-05 输出描述与 R-WIF-06 网络语义（what-if 默认本地计算，提示经缓存链读限购总表：命中零联网/未命中现场取一次/失败静默兜底）；TUI/CLI 手册 What-if 段同源修正；FAQ 新增「申购状态」列问答；`datasource-reliability.md` 3.11 用途行补 What-if 消费方；README What-if 特性行补受限提示
 
 ## 归档
 

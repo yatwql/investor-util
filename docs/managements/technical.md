@@ -3430,6 +3430,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `constraint_block` | 契约条件字段（构建期渲染一次，llm 层只读数据，both/basic/What-if 路径恒空零开销） | 申购限购 | LLM 生成 | 无 |
 | `purchase_constraint_block` | 约束块透传形参（提取同一实例交统一附录 / 指纹 / 新闻批量 hooks，全程不重拼） | 申购限购 | LLM 生成 | 无 |
 | `purchase_block` | 指纹输入字段（条件并入：进提示词必进指纹，块空不追加 part 逐字节回退，接线前基线锁定） | 申购限购 | LLM 生成 | 无 |
+| `extract_purchase_constraint_block` | 约束块提取唯一单源（编排层与新闻链两侧共用，契约键/嵌套调整只改此处） | 申购限购 | LLM 生成 | 无 |
 <!-- semantic-index:end -->
 
 > **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~17（章节合并后条目由 21 降为 17，序号整体重排；`llm_usage` 强制末位）。

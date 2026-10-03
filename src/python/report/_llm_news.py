@@ -184,11 +184,11 @@ def _fetch_llm_and_news(
 
     pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="orch_llm_news")
     try:
-        # 申购限购约束块：与 generate_all_llm 同源读取同一契约字段（纯读幂等），
-        # 供新闻关联批量判定与缓存指纹；缺席（降级/未产出）→ ""（回退原样）。
-        purchase_constraint_block = str(
-            ((pipeline_data or {}).get("purchase_status_data") or {}).get("constraint_block") or ""
-        )
+        # 申购限购约束块：与 generate_all_llm 共用同一提取单源（供新闻关联批量
+        # 判定与缓存指纹）；缺席（降级/未产出）→ ""（回退原样）。
+        from src.python.llm import extract_purchase_constraint_block
+
+        purchase_constraint_block = extract_purchase_constraint_block(pipeline_data)
         _news_fut = _submit_news_future(pool, holdings, prep_data, enable_news, purchase_constraint_block)
         _llm_fut = _submit_llm_future(
             pool,

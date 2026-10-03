@@ -450,3 +450,12 @@ class TestAbsentBlockFallbackPair(unittest.TestCase):
             v for v in mock_content.call_args.kwargs.values() if isinstance(v, str)
         ]
         assert not any("【申购限购约束】" in s for s in texts), "缺席时自检 prompt 意外含块"
+
+    def test_extract_helper_three_states(self, mock_cfg, mock_content):
+        """提取单源三态：契约在 → 原文；字段缺 / pipeline None → ""（两侧共用同一实现）。"""
+        from src.python.llm import extract_purchase_constraint_block
+
+        assert extract_purchase_constraint_block({"purchase_status_data": {"constraint_block": _BLOCK}}) == _BLOCK
+        assert extract_purchase_constraint_block({"purchase_status_data": {}}) == ""
+        assert extract_purchase_constraint_block({}) == ""
+        assert extract_purchase_constraint_block(None) == ""

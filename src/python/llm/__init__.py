@@ -27,6 +27,7 @@ from src.python.llm.generators_news import (  # noqa: F401
     enhance_news_correlation,
 )
 from src.python.llm.generators_orchestrator import (  # noqa: F401
+    extract_purchase_constraint_block,
     generate_all_llm,
     run_news_correlation_safe,
 )

@@ -35,7 +35,7 @@ MODES: dict[str, dict] = {
         "parallel": False,
     },
     "dev-verify": {
-        "desc": "开发期快速验证（core/providers/fetcher/analysis 单元 + 基础场景；耗时参考 docs/managements/test-coverage.md 环境耗时对照）",
+        "desc": "开发期快速验证（core/providers/fetcher/analysis/report 单元 + 基础场景；耗时参考 docs/managements/test-coverage.md 环境耗时对照）",
         "order": 5,
         "preflight": [
             [sys.executable, "scripts/check-task-numbering.py", "--ci"],
@@ -44,7 +44,7 @@ MODES: dict[str, dict] = {
         ],
         "phases": [
             {
-                "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web) and not (edge or data)",
+                "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web or unit_report) and not (edge or data)",
                 "desc": "核心模块单元测试",
                 "timeout_sec": 300,
                 "parallel": True,
@@ -58,8 +58,8 @@ MODES: dict[str, dict] = {
         ],
     },
     "verify": {
-        "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts or unit_web",
-        "desc": "合入验证（核心/配置/新闻/LLM 模块单元测试，不含场景——场景由 P0+P2 覆盖）",
+        "marker": "unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts or unit_web or unit_report",
+        "desc": "合入验证（核心/配置/新闻/LLM/报告模块单元测试，不含场景——场景由 P0+P2 覆盖）",
         "timeout_sec": 300,
         "order": 6,
         "parallel": True,

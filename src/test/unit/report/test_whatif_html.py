@@ -2,7 +2,8 @@
 
 覆盖：
   - available=True → ①对比文件 + ②汇总指标 + ③资产配置对比图 + ⑤分类对比 +
-    ⑥持仓变动明细 + ⑦说明 六段齐全（未指定生效日时④时序回测隐藏）
+    ⑥持仓变动明细 + ⑧说明 六段齐全（未指定生效日时④时序回测隐藏、⑦申购受限节
+    在无受限标的时整节不出现）
   - 指定生效日 → ④时序回测出现：指标卡 + 2 张线图 canvas + 2 条 .chart-caption
     （图下说明）+ #whatif-backtest-chart-data JSON（数据最小化）
   - 双环形图 canvas + 2 条 .chart-caption（图下说明）+ #whatif-chart-data JSON
@@ -152,10 +153,11 @@ class TestWhatifHtmlPage(unittest.TestCase):
         return render_whatif_html(whatif_data, "2026-08-03 12:00:00")
 
     def test_full_rendering_sections_without_backtest(self):
-        """available=True 且未指定生效日 → ①~⑦ 六段齐全（④时序回测隐藏）。"""
+        """available=True 且未指定生效日 → ①②③⑤⑥⑧ 六段齐全（④回测隐藏、⑦受限节缺席）。"""
         text = self._render(_whatif_data())
-        for heading in ("① 对比文件", "② 汇总指标对比", "③ 资产配置对比", "⑤ 分类配置对比", "⑥ 持仓变动明细", "⑦ 说明"):
+        for heading in ("① 对比文件", "② 汇总指标对比", "③ 资产配置对比", "⑤ 分类配置对比", "⑥ 持仓变动明细", "⑧ 说明"):
             self.assertIn(heading, text, f"缺章节 {heading}")
+        self.assertNotIn("⑦ 申购受限", text, "无受限标的时⑦受限节应整节不出现")
         self.assertNotIn("④ 时序回测", text, "未指定生效日时④时序回测不应出现")
 
     def test_backtest_section_rendered(self):

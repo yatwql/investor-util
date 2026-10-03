@@ -520,6 +520,22 @@ def _dispatch_llm_workers(
     return results_dict
 
 
+def extract_purchase_constraint_block(pipeline_data: dict | None) -> str:
+    """从管线数据提取申购限购约束块（契约字段 ``constraint_block`` 的唯一提取点）。
+
+    消费方两处必须同源读取：本编排层（LLM 分析章统一附录与指纹）与报告侧新闻
+    批量链（``report/_llm_news.py``）。契约键名或嵌套调整只改此处，避免两份
+    表达式漏改一处导致块静默缺席（降级面被误触）。
+
+    Args:
+        pipeline_data: 管线数据字典（可为 None，如无管线上下文的直调路径）。
+
+    Returns:
+        约束块原文；契约缺席（None/字段缺/降级产出空串）→ ``""``（提示词与缓存键回退原样）。
+    """
+    return str(((pipeline_data or {}).get("purchase_status_data") or {}).get("constraint_block") or "")
+
+
 def generate_all_llm(
     a_indices: dict[str, dict[str, Any]],
     us_indices: dict[str, dict[str, Any]],
@@ -591,9 +607,7 @@ def generate_all_llm(
     # ── 申购限购约束块：契约构建期（report 侧）已渲染一次，此处只提取同一实例——
     #    同时交预检侧指纹与写侧提示词（进提示词必进指纹，见 module_fingerprint）。
     #    缺席（契约 None/字段缺/降级）→ ""，提示词与键双不变（降级矩阵）。 ──
-    purchase_constraint_block = str(
-        ((pipeline_data or {}).get("purchase_status_data") or {}).get("constraint_block") or ""
-    )
+    purchase_constraint_block = extract_purchase_constraint_block(pipeline_data)
     if purchase_constraint_block:
         logger.debug(
             "申购限购约束块注入 LLM 分析章（含表头共 %d 行）",
