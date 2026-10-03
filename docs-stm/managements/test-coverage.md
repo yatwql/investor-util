@@ -12,11 +12,11 @@
 |:------------|:--------:|:--------:|
 | `unit` | **7992** | ~30s |
 | `standard` | **6968** | ~29s |
-| `scenario` | **250** | ~5s |
-| `regression` | **250** | ~5s |
+| `scenario` | **255** | ~5s |
+| `regression` | **255** | ~5s |
 | `dev-verify` | **3562** | ~25s |
 | `verify` | **5660** | ~20s |
-| `integration` | **292** | ~7s |
+| `integration` | **297** | ~7s |
 | `edge` | **956** | ~11s |
 | `data` | **70** | ~3s |
 | `all` | **8313** | ~32s |
@@ -109,13 +109,13 @@
 | **TUI 交互** | `tui/tui*.py`, `tui/handlers*.py`, `tui/tui_keys.py`, `tui/text_layout.py` | `unit/ui/test_{tui_keys,tui_handlers,tui_menu}.py` + `test_text_layout.py`（显示宽度口径 + 盒线面板等宽不变式）+ `test_handlers_log.py`（日志可视化 + 系统自检）+ `test_tui_edge.py` + `unit/startup/test_startup_wizard.py`（unit_ui 标记） | 176 |
 | **CLI 命令行模式** | `cli/cli.py`, `cli/__main__.py`, `report/cli_progress.py` | `unit/cli/test_cli*.py`（含 doctor 子命令解析/处理/分派、模块入口退出码传递、报告完成后 LLM 成本与缓存命中率摘要调用、**调用级源指定 `--prefer-source` / `--exclude-source` 参数解析与覆盖作用域接入**/生效日 `--effective-date` argparse 类型钩子（共享层归一化前置校验）） | 132 |
 | **Web 服务** | `web/`(server, app, handlers, config_edit, upload, progress, runs) | `unit/web/test_{upload,upload_edge,progress,runs,handlers,server}.py` + `test_config_edit.py`/`test_config_edit_edge.py`（启动防护 output_dir 写锁/端口占用、上传安全、进度事件缓冲、RunManager 运行管理、Flask 路由全链路、配置编辑：白名单完备/写分派/校验守卫/写前备份/极端输入）+ `test_smoke_web.py`（11 项全链路断言）+ `test_handlers.py` 日志/健康历史/自检端点（/api/logs + /api/health/history + /api/doctor）+ `test_health_credential.py`（健康检查凭据跳过态与就绪摘要）+ `test_handlers.py` 短缓存并发安全（线程锁读写段/TTL/?fresh=1/8 线程并发写）+ `test_whatif_api.py`/`test_whatif_api_edge.py`（调仓 What-if 接口：成功链路/参数校验/错误信封/同源 403/互斥 429/生效日容错）+ `test_cache_api.py`（缓存管理接口：统计只读 dry_run/前缀降序保序/清理计数透传/同源 403）+ `test_web_static_serving.py` 五区页签结构契约（页签↔面板配对/What-if 控件/缓存控件/main.js 接线） | 251 |
-| **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组，含 `scenario_extreme` 单列) + `integration/test_cli_integration.py` | 292 |
+| **端到端业务场景** | 多模块组合（菜单 E/B/L → 读取 → 计算 → 报告 → LLM） | `scenario/`(basic/datetime/llm/perf/resilience/security 六子组，含 `scenario_extreme` 单列) + `integration/test_cli_integration.py` | 297 |
 
 ## 场景测试分组（scenario）
 
 | 标记 | 覆盖场景 | 覆盖项数 | 参考测试类 |
 |:-------|:---------|:--------:|:-----------|
-| `scenario`（父标记） | 基础业务链路（S0a-S0d、S1-S33，其中基准指数对比由单元测试覆盖）+ 日期时间（T1-T21）+ LLM 场景/韧性场景子集 | **250** | 见下 |
+| `scenario`（父标记） | 基础业务链路（S0a-S0d、S1-S33，其中基准指数对比由单元测试覆盖）+ 日期时间（T1-T21）+ LLM 场景/韧性场景子集 | **255** | 见下 |
 | ├─ `scenario_basic` | 基础业务链路（S1-S5 + S0a/S0b/S0d + S21-S33 + C-P1b + 穿透分析 + 管线冒烟/指标注入 + 因子暴露管线） | **153** | |
 | │  ├ `scenario_stock` | S1: 纯股票组合 | 3 | `test_scenario_basic_flows.py::TestScenarioStock` |
 | │  ├ `scenario_fund` | S2: 纯基金组合 | 2 | `test_scenario_basic_flows.py::TestScenarioFund` |
@@ -128,7 +128,7 @@
 | │  ├ `scenario_network_down` | S7: 网络中断降级 | 3 | `test_scenario_resilience_flows.py::TestScenarioNetworkDown` |
 | │  ├ `scenario_single_holding` | S8: 单账户单持仓 | 3 | `test_scenario_resilience_flows.py::TestScenarioSingleHolding` |
 | │  ├ `scenario_zero_cost` | S9: 零成本持仓 | 4 | `test_scenario_resilience_flows.py::TestScenarioZeroCost` |
-| │  └ `test_chain_resilience.py` | 数据链路韧性（仅含 `scenario_resilience` 标记，不含 `scenario`） | 5 | `test_chain_resilience.py` |
+| │  └ `test_chain_resilience.py` | 数据链路韧性（`scenario_resilience` + `scenario`，随 scenario/regression 档与 P2 门禁执行） | 5 | `test_chain_resilience.py` |
 | ├─ `scenario_llm` | LLM 场景组合 S11-S20（含 `scenario` 标记项 + 仅 `scenario_llm` 标记项） | **43** | `scenario/llm/test_llm_*.py` |
 | └─ `scenario_datetime` | 日期/时间场景 T1-T21（跨月/跨年/调休/港股通假期/交易时段 TTL） | **41** | `test_datetime_scenarios.py` |
 | `scenario_perf`（独立标记） | 端到端性能基准 | **5** | `test_e2e_perf.py` |

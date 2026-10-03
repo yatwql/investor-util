@@ -278,3 +278,9 @@
 - **rf-555**（P4：聚合与载荷在渠道）：CLI `--update all` 最大努力聚合与 Web cache stats 载荷形塑在渠道层。处置：`cache.operations.update_all_cache`（`max(basic, position)` 退出码，basic 失败仍继续）与 `get_cache_stats_payload`（保序二维数组 / top_by_size 截断 5 / 命中率 / 过期预估，契约键集不变）下沉，CLI/Web 改委托；`TestUpdateAllCache` 2 例 + `TestStatsPayload` 2 例。
 
 > 测试同步：新增 5 个测试文件（`test_edit_ops` / `test_system_info` / `test_cache_operations` / `test_history_policy` / `test_channel_layering`，50 例）+ 既有文件追加 9 例（CLI 生效日 argparse 2 / normalize 4 / TUI 重问 3）；dev-verify 3535 → 3562 全绿，九守护 + ruff 全过。
+
+### rf-556（2026-10-03，测试用例核查批次，当日登记当日修复）
+
+> 应要求核查全部测试用例的冗余与有效性：`check-test-redundancy --ci` 五类（死用例/无断言/完全重复/自证/硬编码演进总数）全绿，marker 覆盖、edge 隔离、skip 有效性均无问题；门禁执行覆盖用 pytest 实测收集核对（CI 全并集 = dev-verify ∪ verify ∪ regression ∪ portability 单元套件 = 8242/8313）。除设计内手工档（perf/security/extreme 共 24 例、integration 套件 34 例均已在 modes/developer-guide 文档化）外，发现 1 项档位盲区：
+
+- **rf-556**（数据链路韧性 5 例不在任何常规档位）：`test_chain_resilience.py` 模块级 `pytestmark = [pytest.mark.scenario_resilience]`，而 `MODES` 中无任何模式表达式含 `scenario_resilience`（`scenario`/`regression` = `-m scenario`、`integration` = `scenario or integration`、dev-verify/verify 仅选 unit 子标记、portability 仅跑 `src/test/unit`）——5 例仅 `--mode all`/`all_no_unit` 可达，P0/P1/P2 门禁与 CI 全并集实测均不覆盖；而 testplan R-CON-07 将其列为验证载体、test-coverage 划入 scenario_resilience 家族（18 例）。处置：模块级 pytestmark 补 `pytest.mark.scenario`（5 例进 `scenario`/`regression`/`integration` 档与 P2 门禁），test-coverage.md 标记说明同步为「随 scenario/regression 档与 P2 门禁执行」、developer-guide scenario_resilience 分类描述补「数据链路韧性」条目。
