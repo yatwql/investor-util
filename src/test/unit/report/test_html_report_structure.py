@@ -1281,10 +1281,10 @@ class TestSummaryDateTimeValueStyles(unittest.TestCase):
 
 
 class TestHtmlTocGroupedNav(unittest.TestCase):
-    """目录分组导航测试 — 「基础信息/基金深度分析/行动建议/历史/LLM」五组折叠。
+    """目录分组导航测试 — 「基础信息/基金深度分析/行动建议/历史/LLM/附录」六组折叠。
 
     覆盖导航收尾验收：分组渲染 / 折叠交互 / 移动端不溢出 / 键盘可达。
-    左侧目录（toc-sidebar）按五组折叠；窄屏横向 section-nav 保持扁平兜底。
+    左侧目录（toc-sidebar）按六组折叠；窄屏横向 section-nav 保持扁平兜底。
     """
 
     @classmethod
@@ -1301,7 +1301,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
     def test_four_nonempty_group_details_rendered(self):
         """目录按分组渲染 <details class='toc-group'>，非空组默认 open（展开）。"""
         details = self.soup.select("#toc-sidebar details.toc-group")
-        # 测试场景下：基础信息/基金深度分析/LLM/历史/附录（LLM API 用量）五组有章节，行动建议组空跳过
+        # 测试场景下：6 组中基础信息/基金深度分析/LLM/历史/附录五组非空（附录组仅 LLM API 用量），行动建议组空跳过
         self.assertEqual(len(details), 5, f"应有 5 个非空分组，实际 {len(details)}")
         for d in details:
             self.assertIsNotNone(d.get("open"), "非空分组应默认展开（open 属性）")

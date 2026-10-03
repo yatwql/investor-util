@@ -12,10 +12,9 @@ from __future__ import annotations
 from typing import Any
 
 
-# ── HTML 目录分组导航（「基础信息/基金深度分析/行动建议/历史/LLM」五组，导航折叠收尾） ──
+# ── HTML 目录分组导航（「基础信息/基金深度分析/行动建议/历史/LLM/附录」六组，导航折叠收尾） ──
 
-# 分组展示顺序（组名, 组 key），空组不渲染
-# 导航分组注册表（组名, 组 key）。渲染顺序不在这里承诺——
+# 导航分组注册表（组名, 组 key），空组不渲染。渲染顺序不在这里承诺——
 # `_build_section_nav_groups` 按组内最小报告号动态排序，保证目录展开序 == 正文线性序
 # （号是唯一排序权威；分组只做聚合视图，不重排）。
 _NAV_GROUP_LABELS: list[tuple[str, str]] = [

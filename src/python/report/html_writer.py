@@ -278,7 +278,7 @@ def _render_template(
     valuation_real_basis = (valuation_data or {}).get("basis_mode") == "real_ttm"
     penetration_display = _attach_valuation_to_penetration(penetration, valuation_data)
     market_temperature = _build_temperature_display(market_temperature_data)
-    # 目录分组导航：按「基础信息/基金深度分析/行动建议/历史/LLM」五组折叠（_sv_fn 闭包过滤不可见章节）
+    # 目录分组导航：按「基础信息/基金深度分析/行动建议/历史/LLM/附录」六组折叠（_sv_fn 闭包过滤不可见章节）
     section_groups = _build_section_nav_groups(order, _sv_fn, section_numbers)
 
     return _ENV.get_template("report_template.html").render(

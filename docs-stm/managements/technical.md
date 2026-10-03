@@ -2616,7 +2616,7 @@ tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互�
 
 **打印协调**：暗色下 `@media print` 的 CSS 覆盖只影响非 canvas 部分，canvas 像素仍暗色。`theme.js` 用**捕获阶段**监听 `beforeprint`（`addEventListener('beforeprint', fn, true)`——捕获先于 chart-print.js 的冒泡阶段快照执行）：若暗色，先移除 `data-theme` + 重读变量 + 遍历图表 `update()`（同步渲染浅色像素）→ chart-print.js 快照抓到浅色；`afterprint` 捕获阶段恢复暗色 + 重绘（`restoreAfterPrint` 标志记录状态）。`@media print` 同时隐藏 `.theme-toggle-btn`。
 
-**JS 资产**：`html_writer_assets.py::_JS_ASSETS` 增加 `theme.js`（第 8 个本地 bundle），whatif 复用同一复制函数；两模板均在 `toc.js` 之后以 `defer` 加载（DOMContentLoaded 前执行，无 FOUC）。**单文件自包含**：`html_writer_assets.py::_inline_js_assets` 在保存前把 8 个资产内容内嵌——移除 head 区 `<script defer src="X.js">` 外链标签，按 bundle 依赖顺序追加为行内 `<script>` 到 `</body>` 前（复刻 defer 时序：DOM 解析完后、DOMContentLoaded 前按序执行，chart-init 能取到已解析 canvas/chart-data、toc.js/theme.js 内部 DOMContentLoaded 监听仍触发），报告 HTML 单文件完全自包含（Web 下载到其他目录/单发移动端浏览不依赖同目录松散 JS）；`_copy_js_assets` 保留作兜底（资产缺失/读取失败/含 `</script` 序列时该资产外链标签保留原位，松散文件仍可加载）。
+**JS 资产**：`html_writer_assets.py::JS_ASSETS` 资产清单（9 个本地 bundle，含主题 `theme.js` 与正文折叠 `fold.js`），whatif 复用同一复制函数；两模板均在 `toc.js` 之后以 `defer` 加载（DOMContentLoaded 前执行，无 FOUC）。**单文件自包含**：`html_writer_assets.py::_inline_js_assets` 在保存前把 9 个资产内容内嵌——移除 head 区 `<script defer src="X.js">` 外链标签，按 bundle 依赖顺序追加为行内 `<script>` 到 `</body>` 前（复刻 defer 时序：DOM 解析完后、DOMContentLoaded 前按序执行，chart-init 能取到已解析 canvas/chart-data、toc.js/theme.js 内部 DOMContentLoaded 监听仍触发），报告 HTML 单文件完全自包含（Web 下载到其他目录/单发移动端浏览不依赖同目录松散 JS）；`_copy_js_assets` 保留作兜底（资产缺失/读取失败/含 `</script` 序列时该资产外链标签保留原位，松散文件仍可加载）。
 
 **架构约束遵从**：
 
