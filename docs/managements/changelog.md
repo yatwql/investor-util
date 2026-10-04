@@ -17,6 +17,7 @@
 
 ### Changed
 
+- **第二轮全量文档核对（2026-10-03）两处更新 + rf-570 处置**：`faq.md` 报告理解节补「LLM 分析×限购约束上下文」问答（约束块注入面、开关回退行为、self_review 为下游独立复核不影响分析章约束——源自用户真实疑问）；`developer-guide.md` P0 门禁节补 `--sync` 统计快照口径警示（工作区 vs committed 分叉坑，rf-570 纪律条款处置）；核对结论：其余管理/用户文档与实现一致（config-llm 联动句已在模块启停节、上轮九处未回退、testplan 计数外置）
 - **管理/用户文档补齐 plan-73 限购约束块消费方（rf-569，全量核对）**：`llm-technical.md` 补注入链四处（§3.2 附录图第 4 段、§4.1 提示词覆盖表 `purchase_constraint_block` 行、§4.4 `extract_purchase_constraint_block` 唯一提取点、§8.2 统一附录四段与组装守卫）；`how-to-config.md` `fund_purchase_limit` 消费方补 What-if 提示与 LLM 约束上下文（关＝三者同时失效）；`datasource-reliability` §3.11 用途句补 LLM 消费方；`how-to-config-llm.md` 模块启停节补约束上下文联动；`reports-instruction` ④节与 `README` 智囊团行补可执行性约束说明；核对结论：其余管理/用户文档与实现一致（`datasource.md` 路由表无消费方列、testplan 计数外置 test-coverage、developer-guide 现状描述准确，均无须改）
 - **P0/P1 门禁并入 `unit_report` 域（rf-564 / rf-565）**：报告生成域（98 文件 / 2,120 用例）此前不在 `dev-verify`、`verify`、`verify,regression` 任何档（modes.py `report` 专用模式零调用方），What-if 页面级测试「⑦/⑧ 说明」编号漂移因此带病提交——`dev-verify`（3,638→5,454）与 `verify`（5,796→7,917）marker 并入 `unit_report`，`test-runner modes.py` 与 `collect-test-coverage.py` 双处 marker 定义同步并互注防漂移；`test_whatif_html.py` 断言与 `whatif_template.html` 编号同步（「⑦ 说明」→「⑧ 说明」+ ⑦受限节缺席断言）
 - **`constraint_block` 提取收敛单源 helper（rf-567）**：编排层与新闻链两处相同的字典路径表达式收敛为 `llm.extract_purchase_constraint_block(pipeline_data)`（唯一提取点，契约键/嵌套调整只改此处，防漏改一处致块静默缺席），两侧调用同一实现并补三态单测

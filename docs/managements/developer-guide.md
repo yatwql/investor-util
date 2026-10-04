@@ -111,6 +111,8 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-doc-links.py --ci              # 文档死链/死锚点/重复标题/层级/编号序列/§引用机检
 ```
 
+> **`--sync` 统计快照口径（CI 分叉坑）**：`check-doc-drift --sync`（及 pre-commit 自动回写）按**工作区**实测写入 `folders.md` 行数，而 CI 的 `check-doc-drift` 按 **committed** 树实测——若受检目录存在**长期不提交的修改**（本地游离改动），本地已同步的数字会在 CI 上判「不一致」，连带 guards / test / portability 三个 job 同时红。提交前确认受检文件全部纳入本次提交；有长期游离修改时先提交它们、再 `--sync`。
+
 **P1 合入门禁**：`test-runner.py --mode verify`（核心模块单元测试），否则不得 merge。
 
 **P2 发布门禁**：
