@@ -1,5 +1,5 @@
 # 投资复盘助手 - 自我审查问题记录
-> 文档版本：0.12.3-dev
+> 文档版本：0.12.3
 > **编号源**：`rf-next = 579`（新增问题取此编号，完成后更新为 +1；已用最大 rf-578，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
@@ -41,17 +41,9 @@
 
 ## 已解决问题
 
-| # | 摘要 | 状态 |
-|---|------|------|
-| **rf-575** | 多链调用漏传 `endpoint_key` → provider 条目声明的 `pacing`（kimi-main 等在途并发上限）全链空转、429 提示也回显不出端点配置 | 已修复 2026-10-04（`_call_provider_entry` 补传条目名 + api 层下传/重试骨架到达两级回归用例，变异实测拦截） |
-| **rf-576** | `pacing._ensure_loaded()` 惰性装载引用不存在的访问器 `src.python.config.get_llm_providers` → 必然 ImportError 被 debug 吞掉，未经配置加载的入口（单测/脚本/doctor 概览）拿不到策略、静默按无约束 | 已修复 2026-10-04（改读 `get_llm_config()._provider_list`，与生产装载同源；两条惰性装载回归用例，变异实测拦截） |
-| **rf-577** | 全仓「要求调整配置值」日志排查：思考耗尽提示（`api_base._extract_content`）、Thinking 安全网日志（`_api_claude`）、截断重试耗尽（`skeleton._handle_truncation`）三处只说「请增大 max_tokens/降 effort」却不给当前值，读者要翻配置才知道基数 | 已修复 2026-10-04（三处回显 `<config_field>=<值>`/思考配置现值/「当前 X → 已试 Y」，密钥类保持只给文件名；新增 4 条回归用例均变异实测拦截；口径固化到 developer-guide「日志回显纪律」节） |
-| **rf-578** | 安全基线密钥权限清单 `scenario/security/test_security.py::_SECRET_FILES` 只列 `llm_key.json`，漏掉同样持有密钥本体的 `data/config/data_key.json`（datasink/hithink 内联明文 `api_key`、未跟踪、实测 644 world-readable）；同时本机 `llm_key.json` 已被外部改写为 644，基线用例在 bench 汇总中报 4 处失败（末轮 summary 定位到本用例，该基线随 scenario/regression/verify/all 多轮重复执行） | 已修复 2026-10-04（两密钥文件 chmod 600；`_SECRET_FILES` 补 `data_key.json` 并同步注释；文件不存在时用例仍跳过，CI 干净检出不受影响；变异实测：把 `data_key.json` 改回 644 即红） |
-| **rf-574** | `data/config/llm_key.json` 实际权限 644（other 可读），安全基线 `test_key_file_permissions_unix` 本机红（与代码改动无关，已 stash 验证） | 已修复 2026-10-04（随密钥权限基线整改一并 `chmod 600`，用例转绿；与 rf-578 同批） |
-| **rf-568** | `test_debate_prompts.py::test_system_debate_conditional_scenario_exists` 条件 skip 十余次跑全空过：其瞄准的预留常量 `_SYSTEM_DEBATE_CONDITIONAL_SCENARIO` 全仓不存在，而条件推理实际实现是「情景注入 user prompt（`debate.conditional.scenarios` 的 name/desc 渲染）+ `_SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL` 切换 system prompt」——测试验证目标与实现失配，形同虚设 | 已修复 2026-10-04（经确认该预留常量非计划功能，改为断言真实行为的 `TestConditionalScenarioInjection` 4 例：name/desc 渲染进综合与标准两条路径、空配置回退、开关门控、`skip_scenarios` 跳过；删除死用例与 docstring 引用，两处注入点变异实测均拦截） |
-| **rf-571** | 429 并发回显缺 `endpoint_key` 透传接线用例（去掉透传无人发现） | 已修复 2026-10-04（补 `test_429_log_carries_endpoint_key_to_attempt`，变异 M4 拦截） |
-| **rf-572** | `test_capture_snapshot_holdings_lookup` 断言与用例目标不符（只 `assert compute.called`） | 已修复 2026-10-04（断言落到快照对象：未匹配 `shares/cost_price == 0.0`，变异 M5 拦截） |
-| **rf-573** | `test_capture_snapshot_data_creation` 断言与用例目标不符（只 `assert compute.called`） | 已修复 2026-10-04（断言聚合三字段求和 + 账户持仓清单，变异 M6 拦截） |
+> **本迭代已修复记录（rf-568、rf-571 ~ rf-578 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
+>
+>
 
 > **本迭代已修复记录（rf-563 ~ rf-570 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
 >
@@ -60,7 +52,7 @@
 
 ### 归档档案
 
-- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 批次（2026-10-03）
+- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.3 批次（2026-10-03 ~ 2026-10-05）
 - [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.11  （2026-09-18 ~ 2026-10-02）
 - [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.20（2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
