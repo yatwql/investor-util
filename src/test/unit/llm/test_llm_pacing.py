@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import threading
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -168,6 +169,24 @@ class TestPacingGate:
         assert PacingGate("paid").is_noop
         register_policies([{"name": "paid", "pacing": {"min_interval": 1}}])
         assert not PacingGate("paid").is_noop
+
+
+class TestLazyLoad:
+    """惰性装载：未经 register_policies 的入口从配置同源取策略。"""
+
+    def test_lazy_load_reads_provider_list_from_llm_config(self):
+        """从 get_llm_config()._provider_list 装载（引用不存在的访问器会 ImportError、静默按无约束）。"""
+        fake = {"_provider_list": [{"name": "kimi-main", "pacing": {"max_concurrency": 1, "min_interval": 2}}]}
+        with patch("src.python.config.get_llm_config", return_value=fake):
+            policy = get_policy("kimi-main")
+        assert policy is not None
+        assert policy.max_concurrency == 1
+        assert policy.min_interval == 2.0
+
+    def test_lazy_load_without_provider_list_is_noop(self):
+        """配置无 _provider_list（单 Provider 模式）→ 无策略可载，按无约束而非报错。"""
+        with patch("src.python.config.get_llm_config", return_value={}):
+            assert get_policy("kimi-main") is None
 
 
 class TestQuotaFailureReason:

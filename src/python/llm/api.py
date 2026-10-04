@@ -225,6 +225,9 @@ def _call_provider_entry(
             config_field=config_field,
             temperature=temperature,
             llm_config=llm_config,
+            # 条目名 = 端点节流策略键（pacing）与 429 并发回显的唯一钥匙：
+            # 不传则下游 PacingGate("") 空转，llm_providers.json 的 pacing 声明全部失效
+            endpoint_key=name,
         )
 
     result, usage = _do_call(system_prompt, user_prompt)

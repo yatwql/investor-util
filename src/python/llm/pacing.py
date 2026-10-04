@@ -122,13 +122,18 @@ def register_policies(providers: list[dict[str, Any]] | None) -> None:
 
 
 def _ensure_loaded() -> None:
-    """惰性装载（供未显式调用 register_policies 的入口，如单测/脚本）。"""
+    """惰性装载（供未显式调用 register_policies 的入口，如单测/脚本）。
+
+    策略与 ``_provider_list`` 同源：生产路径在 ``get_llm_config`` 组装时已调用
+    :func:`register_policies`，此处只兑底未经过配置加载的入口，故直接读同一份
+    ``_provider_list``（引用不存在的访问器会 ImportError → 静默按无约束处理）。
+    """
     if _LOADED:
         return
     try:
-        from src.python.config import get_llm_providers
+        from src.python.config import get_llm_config
 
-        register_policies(get_llm_providers())
+        register_policies((get_llm_config() or {}).get("_provider_list"))
     except Exception as e:  # 配置层不可用不应影响调用主链路
         logger.debug("[llm/pacing] 策略惰性装载失败，按无约束处理: %s", e)
 

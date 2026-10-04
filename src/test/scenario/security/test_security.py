@@ -91,7 +91,8 @@ class TestSecurityBaseline:
     #: `credentials_ref` 指针（真凭据在 `llm_key.json` 对应节），且**故意跟踪入仓**
     #: （`.gitignore` 对它显式 `!` 放行）；纳入本断言必然失败——git 索引记录
     #: `100644`，任何干净检出的权限都是 `644`。新增密钥文件时加到这里即可。
-    _SECRET_FILES = ("data/config/llm_key.json",)
+    #: `data_key.json` 同为未跟踪且内联明文 `api_key`（datasink/hithink），故同列。
+    _SECRET_FILES = ("data/config/llm_key.json", "data/config/data_key.json")
 
     @pytest.mark.scenario_security
     @pytest.mark.skipif(sys.platform == "win32", reason="Windows 权限模型不同，此项为软检查")
