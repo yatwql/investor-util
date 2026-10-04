@@ -61,7 +61,7 @@
 
 > **plan-74 已完成归档**（2026-10-03）：四迭代（受限索引与判定原语 → What-if 接线 → 回归网与零改动断言 → 文档登记）P0 门禁十项全绿完成；What-if 目标持仓申购受限提示落地（`restricted_index` 契约字段 + `evaluate_purchase_feasibility` 判定 + Excel/HTML 双端提示块，降级态逐字节回退）。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-advice-design.md`](../plan/fund-purchase-limit-advice-design.md) 已改「设计 + 已实施」随归档留存。
 
-> **plan-75 已完成归档**（2026-10-03）：持仓分类汇总区块（区块②）末列追加「申购状态」条件列——与区块①同一套单源原语（`purchase_column_visible` 判据 / `format_purchase_status_cell` 文案 / `stale_level` 时效），小计与总计行留空，开关复用 `fund_purchase_limit` 不新增；新增 6 用例，P0 门禁十项全绿。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)。
+> **plan-75 已完成归档**（2026-10-03）：持仓分类汇总（Excel 区块②末列 + HTML 持仓分类表条件列，两端一致）追加「申购状态」——与区块①同一套单源原语（`purchase_column_visible` 判据 / `format_purchase_status_cell` 文案 / `stale_level` 时效），小计与总计行留空，开关复用 `fund_purchase_limit` 不新增；新增 6 用例，P0 门禁十项全绿。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)。
 
 #### 🔲 `plan-70` 决策跨期反思闭环（decision_reflection）验证死线
 

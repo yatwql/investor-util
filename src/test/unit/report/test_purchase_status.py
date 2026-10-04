@@ -674,3 +674,105 @@ class TestConstraintBlock:
         assert "申购可执行性硬约束" not in cell
         assert "【申购限购约束】" not in footnote
         assert "申购可执行性硬约束" not in footnote
+
+
+# ════════════════════════════════════════════════════════════
+#  模板条件渲染（report_template.html 持仓分类汇总区块）
+# ════════════════════════════════════════════════════════════
+
+
+class TestCategoryPurchaseTemplate:
+    """真实模板分类表片段在 purchase_status_display 开/关下的渲染结果。
+
+    与区块①（市值明细）共用同一 display 对象——列可见性、单元格文案
+    与 Excel 端全部单源于 report/purchase_status.py，两端一致。
+    """
+
+    def setup_method(self):
+        from jinja2 import Environment
+
+        from src.python.report.html_jinja_env import (
+            _jinja_money,
+            _jinja_pct,
+            _jinja_price,
+            _jinja_profit_color,
+        )
+
+        self.env = Environment(autoescape=True)
+        self.env.filters.update(
+            {
+                "money": _jinja_money,
+                "pct": _jinja_pct,
+                "price": _jinja_price,
+                "profit_color": _jinja_profit_color,
+            }
+        )
+        tmpl_path = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html")
+        )
+        with open(tmpl_path, encoding="utf-8") as f:
+            self.html = f.read()
+
+    def _row(self, marker: str) -> str:
+        """截取 marker 所在的整行 <tr>…</tr> 片段。"""
+        pos = self.html.find(marker)
+        assert pos != -1, f"模板中未找到标记: {marker}"
+        start = self.html.rfind("<tr", 0, pos)
+        assert start != -1, "标记不在任何 <tr> 行内"
+        end = self.html.find("</tr>", pos)
+        assert end != -1, "行未闭合"
+        return self.html[start : end + len("</tr>")]
+
+    @staticmethod
+    def _render(env, fragment: str, **ctx) -> str:
+        return env.from_string(fragment).render(**ctx)
+
+    def test_category_header_column_appended(self):
+        """分类表头：display 存在 → 追加「申购状态」th；缺席 → 整列隐。"""
+        frag = self._row("<th>年均股息率</th>")
+        assert "<th>申购状态</th>" in self._render(self.env, frag, purchase_status_display={"cells": {}})
+        assert "<th>申购状态</th>" not in self._render(self.env, frag, purchase_status_display=None)
+
+    def test_category_detail_cell_from_cells_map(self):
+        """分类明细行单元格取自同一 cells 映射（与 Excel 同一文案函数产出）。"""
+        frag = self._row('{{ group["property"] }}')
+        group = {"property": "基金", "sub_category": "被动"}
+        item = {
+            "name": "电池ETF",
+            "code": "561910",
+            "market_value": 1000.0,
+            "cost": 100.0,
+            "profit": 900.0,
+            "profit_rate": 9.0,
+            "today_profit": 50.0,
+            "yield_text": "--",
+        }
+        display = {"cells": {"561910": "🟡 限大额 日限 100 元"}}
+        html = self._render(self.env, frag, purchase_status_display=display, group=group, item=item)
+        assert "🟡 限大额 日限 100 元" in html
+        html_off = self._render(self.env, frag, purchase_status_display=None, group=group, item=item)
+        assert "🟡 限大额" not in html_off
+
+    def test_category_subtotal_row_has_blank_cell(self):
+        """分类小计行：display 存在 → 比缺席多一个空 td（非可聚合指标）。"""
+        frag = self._row('- {{ group["sub_category"] }} 小计')
+        group = {
+            "property": "基金",
+            "sub_category": "被动",
+            "sub_mv": 1.0,
+            "sub_cost": 1.0,
+            "sub_profit": 0.0,
+            "sub_rate": 0.0,
+            "sub_today": 0.0,
+        }
+        on = self._render(self.env, frag, purchase_status_display={"cells": {}}, group=group)
+        off = self._render(self.env, frag, purchase_status_display=None, group=group)
+        assert on.count("<td") == off.count("<td") + 1
+
+    def test_category_grand_total_row_has_blank_cell(self):
+        """分类总计行：片段在 flow 条件后含申购状态空 td 条件块（结构断言）。"""
+        frag = self._row("{{ cat_grand_today.v | money }}")  # 分类表总计行独有（区块①总计行不含 cat_grand_*）
+        block = "{% if purchase_status_display %}<td></td>{% endif %}"
+        flow_block = "{% if flow_display %}<td></td><td></td>{% endif %}"
+        assert block in frag
+        assert frag.index(flow_block) < frag.index(block)

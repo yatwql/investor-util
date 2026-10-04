@@ -1257,6 +1257,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <th>资产属性</th><th>投资分类</th><th>名称</th><th>代码</th>
                         <th>市值</th><th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>年均股息率</th>
                         {% if flow_display %}<th>成本分档</th><th>分红累计</th>{% endif %}
+                        {% if purchase_status_display %}<th>申购状态</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -1281,6 +1282,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td>{{ flow_display.tier_map.get(item["code"], "--") }}</td>
                             <td class="text-right">{{ flow_display.div_map.get(item["code"], 0.0) | money }}</td>
                             {% endif %}
+                            {% if purchase_status_display %}
+                            <td class="text-left">{{ purchase_status_display.cells.get(item["code"], "—") }}</td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                         <tr class="subtotal-row">
@@ -1293,6 +1297,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                             <td class="text-right" style="color: {{ group["sub_today"] | profit_color }}">{{ group["sub_today"] | money }}</td>
                             <td></td>
                             {% if flow_display %}<td></td><td></td>{% endif %}
+                            {% if purchase_status_display %}<td></td>{% endif %}
                         </tr>
                         </tr>
                         {% set cat_grand_mv.v = cat_grand_mv.v + group["sub_mv"] %}
@@ -1310,6 +1315,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
                         <td class="text-right" style="color: {{ cat_grand_today.v | profit_color }}">{{ cat_grand_today.v | money }}</td>
                         <td></td>
                         {% if flow_display %}<td></td><td></td>{% endif %}
+                        {% if purchase_status_display %}<td></td>{% endif %}
                     </tr>
                 </tbody>
             </table>
