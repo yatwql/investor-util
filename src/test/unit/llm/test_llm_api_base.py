@@ -246,6 +246,19 @@ class TestAttemptApiCall(unittest.TestCase):
         self.assertEqual(kind, "retryable")
         self.assertEqual(info, 429)
 
+    def test_rate_limit_429_log_hints_both_concurrency_knobs(self) -> None:
+        """429 日志同时给出全局（llm_max_concurrency）与端点级（pacing.max_concurrency）两个旋钮。"""
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with self.assertLogs(level="WARNING") as cm:
+            self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0)
+        log_text = "\n".join(cm.output)
+        self.assertIn("llm_max_concurrency", log_text)
+        self.assertIn("pacing.max_concurrency", log_text)
+
     def test_service_unavailable_503(self) -> None:
         """503 → ('retryable', 503)。"""
         mock_client = MagicMock(spec=httpx.Client)

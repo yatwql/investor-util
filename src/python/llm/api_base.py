@@ -559,7 +559,8 @@ def _attempt_api_call(
         if resp.status_code in (429, 503):
             if resp.status_code == 429:
                 logger.warning(
-                    "%s API 返回 429 Too Many Requests（API 限速），建议调低 llm_max_concurrency（当前并发数可能过高）",
+                    "%s API 返回 429 Too Many Requests（API 限速），建议调低 llm_max_concurrency（当前并发数可能过高），"
+                    "或为该 provider 条目配置 pacing.max_concurrency 按端点限流",
                     _sanitize_endpoint(url),
                 )
             return ("retryable", resp.status_code)
