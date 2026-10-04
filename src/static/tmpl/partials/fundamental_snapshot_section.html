@@ -29,6 +29,15 @@
         <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">持仓 A 股基本面（指标 + 财报摘要）</span>
     </div>
 
+    <details class="section-fold">
+        <summary class="section-fold-summary">
+            {% set _fi_fold = financial_indicator_data or {} %}
+            {% set _frd_fold = financial_report_digest_data or {} %}
+            {% if _fi_fold.get("available") or _frd_fold.get("available") %}
+            {% if _fi_fold.get("available") %}财务指标 {{ _fi_fold.get("entry_count", 0) }} 只{% endif %}{% if _fi_fold.get("available") and _frd_fold.get("available") %} · {% endif %}{% if _frd_fold.get("available") %}财报摘要 {{ _frd_fold.get("entry_count", 0) }} 只{% endif %}
+            {% else %}持仓基本面数据暂不可用{% endif %} —— 点击展开/收起{% if financial_indicator_data and financial_report_digest_data %}财务指标与财报摘要明细{% elif financial_indicator_data %}财务指标明细{% elif financial_report_digest_data %}财报摘要明细{% else %}明细{% endif %}
+        </summary>
+
     {# ── 区块① 财务指标（功能开关 financial_indicator；None=关闭，整块不渲染）── #}
     {% if financial_indicator_data %}
     {% set _fi = financial_indicator_data or {} %}
@@ -190,6 +199,7 @@
     </div>
     {% endif %}
     {% endif %}
+    </details>
 
     <div class="back-to-top-link"><a href="#report-top" title="回到报告顶部">↑ 回到顶部</a></div>
 </div>

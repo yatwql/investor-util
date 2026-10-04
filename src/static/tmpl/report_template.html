@@ -2121,6 +2121,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-news_correlation" style="order: {{ section_numbers['news_correlation'] }};">
         <div class="section-title">{{ section_numbers['news_correlation'] }}、财经新闻热点与持仓关联分析</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {% if news_data %}共 {{ news_data | length }} 条关联新闻{% else %}暂无关联新闻{% endif %} —— 点击展开/收起新闻列表与关联分析
+            </summary>
         {% if news_data %}
         <div class="section-content" style="padding: 0;">
             <table class="news-table">
@@ -2221,6 +2225,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         <div class="empty-section">📭 暂无关联新闻</div>
         {% endif %}
         {% endif %}
+        </details>
         {{ render_back_to_top() }}
     </div>
 
