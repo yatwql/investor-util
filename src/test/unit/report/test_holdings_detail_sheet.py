@@ -1373,3 +1373,113 @@ class TestAllZeroPriceRegression(unittest.TestCase):
         data_row = next((r for r in range(1, ws.max_row + 1) if ws.cell(row=r, column=2).value == "贵州茅台"), None)
         self.assertIsNotNone(data_row, "全零场景仍应写出数据行")
         self.assertGreater(data_row, warn_row, "数据行必须在提示行之后")
+
+
+# ═══════════════════════════════════════════════════════════
+#  区块②申购状态条件列（与区块①同开关同判据，fund_purchase_limit）
+# ═══════════════════════════════════════════════════════════
+
+
+class TestCategoryPurchaseColumn(unittest.TestCase):
+    """区块②「申购状态」条件列（purchase_status_data 契约 → 分类汇总末列）。
+
+    判据单源：列可见性 = purchase_column_visible、文案 = format_purchase_status_cell、
+    时效 = stale_level —— 与区块①同一套原语，开关联动 `fund_purchase_limit` 不新增。
+    """
+
+    def setUp(self):
+        self.wb = Workbook()
+        self.ws = self.wb.active
+        self.holding = Holding(account="证券账户", name="电池ETF", code="561910", shares=100, cost_price=1.0)
+        self.detail = hds.DetailRow(
+            account="证券账户",
+            name="电池ETF",
+            code="561910",
+            price=10.0,
+            nav_date="2026-06-26",
+            yesterday_close=9.5,
+            price_type="场内收盘价(T)",
+            premium="--",
+            shares=100.0,
+            market_value=1000.0,
+            cost=100.0,
+            profit=900.0,
+            profit_rate=9.0,
+            today_profit=50.0,
+            source="腾讯财经",
+            source_api="tencent",
+        )
+
+    @staticmethod
+    def _contract(available: bool = True) -> dict:
+        return {
+            "available": available,
+            "reason": None if available else "全链路失败",
+            "rows": {
+                "561910": {
+                    "purchase_status": "限大额",
+                    "redemption_status": "开放赎回",
+                    "next_open_date": "",
+                    "daily_limit": 100.0,
+                    "min_purchase": 10.0,
+                }
+            },
+            "fetched_at": "2099-01-01T08:00:00+08:00",
+            "source": "天天基金",
+        }
+
+    def _write(self, contract: dict | None = None, flow: dict | None = None) -> None:
+        # mock 分红 API 加载（测试隔离，避免真实网络请求）
+        with patch("src.python.report.category._load_dividend_data", return_value=({}, True)):
+            hds._write_category_block(self.ws, [self.holding], [self.detail], flow, 1, contract)
+
+    @staticmethod
+    def _headers(ws, count: int, row: int = 2) -> list:
+        return [ws.cell(row=row, column=c).value for c in range(1, count + 1)]
+
+    def test_header_appended_when_available(self):
+        """available=True → 区块②表头第 11 列「申购状态」，原 10 列保持不变。"""
+        self._write(self._contract())
+        headers = self._headers(self.ws, 11)
+        self.assertEqual(headers[9], "年均股息率")
+        self.assertEqual(headers[10], "申购状态")
+
+    def test_cell_text_from_single_source(self):
+        """分类明细行单元格文案与单源函数逐字一致（level 取值同式对齐）。"""
+        from src.python.report.purchase_status import format_purchase_status_cell, stale_level
+
+        contract = self._contract()
+        self._write(contract)
+        expected = format_purchase_status_cell(contract, "561910", stale_level(contract["fetched_at"]))
+        self.assertEqual(self.ws.cell(row=3, column=11).value, expected)
+        self.assertIn("限大额", expected)
+
+    def test_subtotal_and_total_cell_blank(self):
+        """分组小计行与总计行申购状态列留空（非可聚合指标，与区块①同语义）。"""
+        self._write(self._contract())
+        for row in (4, 5):  # 行3 明细 / 行4 分组小计 / 行5 总计
+            self.assertIn(self.ws.cell(row=row, column=11).value, (None, ""))
+
+    def test_hidden_when_contract_none(self):
+        """契约缺席（开关关）→ 与既有基线一致的 10 列，无申购状态。"""
+        self._write(None)
+        headers = self._headers(self.ws, 11)
+        self.assertEqual(headers[9], "年均股息率")
+        self.assertEqual(headers[10], None)
+        self.assertNotIn("申购状态", [h for h in headers if h])
+
+    def test_hidden_when_unavailable(self):
+        """available=False（全链失败）→ 静默隐列：保持既有 10 列。"""
+        self._write(self._contract(available=False))
+        headers = self._headers(self.ws, 11)
+        self.assertNotIn("申购状态", [h for h in headers if h])
+
+    def test_flow_and_purchase_coexist(self):
+        """成本流水 + 申购状态同时开启 → 13 列，申购状态在末列。"""
+        flow = {"available": True, "cost_tiers": {"per_code": {}}, "dividends": {"per_code": {}}}
+        self._write(self._contract(), flow=flow)
+        headers = self._headers(self.ws, 13)
+        self.assertEqual(headers[10], "成本分档")
+        self.assertEqual(headers[11], "分红累计")
+        self.assertEqual(headers[12], "申购状态")
+        self.assertIn("限大额", self.ws.cell(row=3, column=13).value)

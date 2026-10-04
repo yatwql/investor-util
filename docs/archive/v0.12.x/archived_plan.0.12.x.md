@@ -41,6 +41,13 @@
 
 ## plan-73 限购信息接入 LLM 分析维度（智囊团复盘 / 穿透深析提示词扩展）— ✅ 已完成（2026-10-03）
 
+## plan-75 持仓分类汇总区块追加申购状态列 — ✅ 已完成（2026-10-03）
+
+**动机**：区块①（市值核算明细）在 plan-72 已有申购状态列，区块②（持仓分类汇总）分类视角缺可申购性。
+
+**完成摘要**：`report/holdings_detail_sheet.py` 区块②末列追加「申购状态」（`_CAT_PURCHASE_HEADERS`，与 `cost_lots` 可选列组合保持末列次序）；明细行经 `format_purchase_status_cell` 单源渲染、分组小计/总计行留空（非可聚合指标，与区块①同语义）；判据 `purchase_column_visible` 单源，开关复用 `fund_purchase_limit` 不新增；降级（关 / `available=False`）列缺席逐字节回退；口径脚注复用区块①②之间既有那一行（位置天然覆盖两块）；HTML 持仓分类表不在本次范围。新增 `test_holdings_detail_sheet.py::TestCategoryPurchaseColumn` 6 用例；文档同步（reports-instruction 特性行 / how-to-config 开关行 / technical 附录 H 两处 / faq 问答）。
+
+
 > 设计文档：[`docs/plan/fund-purchase-limit-llm-context-design.md`](../../plan/fund-purchase-limit-llm-context-design.md)（设计 + 已实施）。
 
 **完成摘要**（四迭代，每迭代独立可回滚）：
