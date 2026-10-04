@@ -63,6 +63,7 @@ __all__ = [
     "_log_token_usage",
     "_get_retry_max",
     "_sanitize_endpoint",
+    "_concurrency_hint",
     "_check_circuit_breaker",
     "_process_success_response",
     "_attempt_api_call",
@@ -90,6 +91,26 @@ _thinking_exhausted_local = threading.local()
 def _set_last_thinking_exhausted(value: bool) -> None:
     """设置当前线程的思考耗尽标志。"""
     _thinking_exhausted_local.last = value
+
+
+# 提取上下文（config_field / max_tokens）同走线程局部：诊断日志在 _extract_content 内
+# 发出，而配置值只在调用链上层可见——由 _process_success_response 置入后，
+# 「思考耗尽」提示能回显当前配置值，读者不必翻 llm_settings.json 就知道要从多少调到多少。
+_extract_ctx_local = threading.local()
+
+
+def _set_extract_ctx(config_field: str, max_tokens: int) -> None:
+    """记录当前线程本次调用的配置字段与上限（仅供诊断日志回显）。"""
+    _extract_ctx_local.config_field = config_field or ""
+    _extract_ctx_local.max_tokens = max_tokens or 0
+
+
+def _get_extract_ctx() -> tuple[str, int]:
+    """返回 (config_field, max_tokens)；未记录时为 ("", 0)。"""
+    return (
+        str(getattr(_extract_ctx_local, "config_field", "")),
+        int(getattr(_extract_ctx_local, "max_tokens", 0) or 0),
+    )
 
 
 def clear_last_llm_failure() -> None:
@@ -381,10 +402,20 @@ def _extract_content(data: dict) -> str | None:
         #   2) 其他 → 内容可能被过滤拦截，同样视为无可用文本，返回 None。
         if data.get("stop_reason") == "max_tokens":
             _set_last_thinking_exhausted(True)
-            logger.warning(
-                "LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本"
-                "（建议增大对应 max_tokens 配置或降低 reasoning_effort）"
-            )
+            _field, _budget = _get_extract_ctx()
+            if _field and _budget:
+                logger.warning(
+                    "LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本"
+                    "（当前 %s=%d；建议增大 llm_settings.json 中的 %s，或降低 reasoning_effort/thinking_budget）",
+                    _field,
+                    _budget,
+                    _field,
+                )
+            else:
+                logger.warning(
+                    "LLM 输出思考部分耗尽 max_tokens 预算，未生成最终文本"
+                    "（建议增大 llm_settings.json 中对应 max_tokens 配置，或降低 reasoning_effort/thinking_budget）"
+                )
         else:
             # 记录响应结构供诊断：空 content 不必然等于"内容被过滤"——DeepSeek 强制推理
             # 模型在并发/异常下可能返回 HTTP 200 但 content 为空（区别于思考耗尽的
@@ -511,6 +542,7 @@ def _process_success_response(
     url: str,
 ) -> tuple[str | None, dict | None]:
     """处理成功响应：内容提取、截断检测、Token 日志。"""
+    _set_extract_ctx(config_field, max_tokens)  # 供 _extract_content 诊断日志回显当前配置值
     content = extract_fn(data)
     if content is None:
         logger.warning("%s API 响应格式异常", label)
@@ -540,14 +572,87 @@ def _process_success_response(
     return (content, usage)
 
 
+def _concurrency_hint(endpoint_key: str = "") -> str:
+    """429 诊断：回显当前两级并发配置，并按「还有没有下降空间」给可执行建议。
+
+    单纯建议「调低并发」在端点已配到 ``pacing.max_concurrency=1`` 时是无法执行的空话，
+    故这里先回显全局 ``llm_max_concurrency`` 与该 provider 条目的 ``pacing.max_concurrency``
+    、``pacing.min_interval`` 现值（凡建议「加大 min_interval」处都带当前值，读者不用翻配置），
+    再按三种情形分别给建议：未声明端点约束 / 端点仍有下降空间 / 两级并发均已到底
+    （此时 429 更可能来自配额或风控，应转向请求间隔与调用批次）。
+
+    Args:
+        endpoint_key: provider 条目名（端点策略键）；空串表示本次调用未绑定条目。
+
+    Returns:
+        拼接好的日志片段（配置回显 + 建议）；读取配置失败时回退为默认文案。
+    """
+    try:
+        from src.python.config import get_llm_config
+
+        global_limit = int((get_llm_config() or {}).get("llm_max_concurrency", 3))
+    except Exception:  # 配置层不可用不应阻断诊断日志
+        global_limit = 3
+
+    endpoint_limit = 0
+    min_interval = 0.0
+    policy = None
+    if endpoint_key:
+        try:
+            from src.python.llm.pacing import get_policy
+
+            policy = get_policy(endpoint_key)
+            if policy is not None:
+                endpoint_limit = policy.max_concurrency
+                min_interval = policy.min_interval
+        except Exception:  # 策略装载失败按「无约束」提示，不影响重试链路
+            endpoint_limit = 0
+
+    if endpoint_limit > 0:
+        endpoint_text = str(endpoint_limit)
+    else:
+        endpoint_text = "未配置（不限流）"
+    interval_text = f"{min_interval:g}s" if policy is not None else "未配置"
+    shown = f"当前配置：全局 llm_max_concurrency={global_limit}"
+    if endpoint_key:
+        shown += (
+            f"；provider[{endpoint_key}] pacing.max_concurrency={endpoint_text}、pacing.min_interval={interval_text}"
+        )
+
+    if endpoint_limit <= 0:
+        advice = "建议调低 llm_max_concurrency（当前并发可能过高），或为该 provider 条目配置 pacing.max_concurrency 按端点限流"
+    elif endpoint_limit > 1:
+        advice = (
+            f"建议调低 provider[{endpoint_key}] 的 pacing.max_concurrency（当前 {endpoint_limit}，最低 1），"
+            f"或调低全局 llm_max_concurrency（当前 {global_limit}）"
+        )
+    elif global_limit > 1:
+        advice = (
+            f"该端点 pacing.max_concurrency 已为最低 1、无可再降；建议调低全局 llm_max_concurrency（当前 {global_limit}），"
+            f"或加大 pacing.min_interval（当前 {min_interval:g}s）"
+        )
+    else:
+        advice = (
+            f"两级并发均已到底（全局 {global_limit} / 端点 {endpoint_limit}），再调低并发已无益——"
+            f"429 更可能来自配额（RPM/TPM）或风控而非并发：建议加大 pacing.min_interval（当前 {min_interval:g}s）、"
+            "减少同时发起的生成任务，或切换 provider（退避重试会自动生效）"
+        )
+    return f"{shown}；{advice}"
+
+
 def _attempt_api_call(
     client: httpx.Client,
     url: str,
     headers: dict,
     payload: dict,
     timeout: float,
+    endpoint_key: str = "",
 ) -> tuple[str, Any]:
     """执行一次 LLM API 调用，返回 (kind, info)。
+
+    Args:
+        endpoint_key: provider 条目名，仅用于 429 时回显该端点的并发配置（见
+            :func:`_concurrency_hint`）；不影响调用行为。
 
     Returns:
         ("success", data) — 调用成功，data 为解析后的 JSON
@@ -559,8 +664,9 @@ def _attempt_api_call(
         if resp.status_code in (429, 503):
             if resp.status_code == 429:
                 logger.warning(
-                    "%s API 返回 429 Too Many Requests（API 限速），建议调低 llm_max_concurrency（当前并发数可能过高）",
+                    "%s API 返回 429 Too Many Requests（API 限速），%s",
                     _sanitize_endpoint(url),
+                    _concurrency_hint(endpoint_key),
                 )
             return ("retryable", resp.status_code)
         if resp.status_code == 403:
@@ -643,7 +749,7 @@ def call_llm_with_retry(
     def _attempt() -> tuple[str, Any]:
         # 端点级节流：仅在配置声明了 pacing 时生效（无声明 → 零开销直通）
         with PacingGate(endpoint_key):
-            result = _attempt_api_call(client, url, headers, payload, timeout)
+            result = _attempt_api_call(client, url, headers, payload, timeout, endpoint_key)
         last["result"] = result
         return result
 

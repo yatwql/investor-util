@@ -2160,5 +2160,125 @@ class TestSectionFold(unittest.TestCase):
         self.assertIn("section-fold", fold_js, "钩子应作用于 details.section-fold")
 
 
+class TestSectionFoldMoreChapters(unittest.TestCase):
+    """正文默认折叠扩展到的三章（财经新闻关联 / 组合演进 / 持仓基本面）。
+
+    与「组合历史走势与回撤」同构：章标题常显于折叠块外，内容包在
+    ``details.section-fold`` 内且默认收起（无 ``open``），``summary`` 为折叠块
+    首子元素并携带关键摘要；「回到顶部」留在折叠块外（收起态仍可点）。
+    锚点定位/打印展开由 fold.js 统一处理（对全部 ``details.section-fold`` 生效）。
+    """
+
+    _FOLD_KEYS = ("news_correlation", "portfolio_evolution", "fundamental_snapshot")
+
+    @classmethod
+    def setUpClass(cls):
+        from src.python.core.registry import get_report_section_order
+
+        order = [dict(sec) for sec in get_report_section_order()]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        # 全部章节可见（行动建议章的呈现由 test_action_html 覆盖，不在本用例范围）
+        sv_dict = {sec["key"]: True for sec in order}
+        sv_dict["action"] = False
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["evolution_data"] = {
+            "available": True,
+            "snapshot_count": 5,
+            "min_snapshots": 3,
+            "periods": ["07-01", "07-02"],
+            "total_value": [100000.0, 110000.0],
+            "total_cost": [90000.0, 90000.0],
+            "total_pnl": [10000.0, 20000.0],
+            "holding_counts": [2, 2],
+            "account_flows": {"账户A": [60.0, 40.0]},
+            "hhi": [0.52, 0.58],
+            "top_holdings": [],
+        }
+        data["financial_indicator_data"] = {
+            "available": True,
+            "entry_count": 8,
+            "rows": [],
+            "failures": [],
+        }
+        data["financial_report_digest_data"] = {
+            "available": True,
+            "entry_count": 3,
+            "rows": [],
+            "failures": [],
+        }
+        # 非空新闻列表：空表会被模板判为「暂无新闻」分支（无 .section-content）
+        data["news_data"] = [
+            {
+                "url": "https://example.com/n1",
+                "title": "示例新闻",
+                "intro": "摘要",
+                "media_name": "示例媒体",
+                "ctime": "2026-10-04 09:00:00",
+                "matched_keywords": ["示例关键词"],
+            }
+        ]
+        cls.soup = _render_template(data)
+
+    def _fold_of(self, key: str):
+        """取章节的折叠块，顺带断言章节与折叠块存在（供各用例复用）。"""
+        section = self.soup.select_one(f"#sec-{key}")
+        self.assertIsNotNone(section, f"{key} 章应存在")
+        details = section.select_one("details.section-fold")
+        self.assertIsNotNone(details, f"{key} 章内容应包在 details.section-fold 内")
+        return section, details
+
+    def test_content_wrapped_and_collapsed_by_default(self):
+        """三章内容均包在 details.section-fold 内且默认收起（无 open 属性）。"""
+        for key in self._FOLD_KEYS:
+            with self.subTest(section=key):
+                _section, details = self._fold_of(key)
+                self.assertIsNone(details.get("open"), f"{key} 章折叠块应默认收起")
+                self.assertIsNotNone(
+                    details.select_one(".section-content"),
+                    f"{key} 章内容区应在折叠块内（收起即隐藏正文）",
+                )
+
+    def test_summary_is_first_child_and_tells_how_to_toggle(self):
+        """summary 为折叠块首子元素，且文案自带展开/收起指引（原生可键盘操作）。"""
+        for key in self._FOLD_KEYS:
+            with self.subTest(section=key):
+                _section, details = self._fold_of(key)
+                summary = details.select_one(":scope > summary.section-fold-summary")
+                self.assertIsNotNone(summary, f"{key} 章折叠块应有 summary 提示条")
+                children = [c for c in details.children if getattr(c, "name", None)]
+                self.assertEqual(
+                    children[0].name,
+                    "summary",
+                    f"{key} 章 summary 应为折叠块第一个元素（原生折叠结构）",
+                )
+                self.assertIn("展开", summary.get_text(), "提示条应说明点击可展开")
+                self.assertIn("收起", summary.get_text(), "提示条应说明点击可收起")
+
+    def test_section_title_and_back_to_top_stay_outside_fold(self):
+        """章标题与「回到顶部」在折叠块外——收起态下标题常显、仍可回顶。"""
+        for key in self._FOLD_KEYS:
+            with self.subTest(section=key):
+                section, details = self._fold_of(key)
+                title = section.select_one(".section-title")
+                self.assertIsNotNone(title, f"{key} 章应有标题")
+                self.assertIsNot(title.parent, details, f"{key} 章标题应在折叠块外")
+                back = section.select_one(".back-to-top-link")
+                self.assertIsNotNone(back, f"{key} 章应有「回到顶部」")
+                self.assertNotIn(details, back.parents, f"{key} 章「回到顶部」应在折叠块外")
+
+    def test_summary_carries_headline_stats(self):
+        """提示条带该章关键摘要（条数/快照数/两区块标的数），收起态也有信息量。"""
+        expectations = {
+            "news_correlation": "条关联新闻",
+            "portfolio_evolution": "份快照",
+            "fundamental_snapshot": "财务指标",
+        }
+        for key, needle in expectations.items():
+            with self.subTest(section=key):
+                _section, details = self._fold_of(key)
+                text = details.select_one("summary").get_text()
+                self.assertIn(needle, text, f"{key} 章提示条应携带关键摘要")
+
+
 if __name__ == "__main__":
     unittest.main()

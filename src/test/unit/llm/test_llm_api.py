@@ -301,6 +301,28 @@ class TestCallClaudeThinkingDegradation(unittest.TestCase):
     @patch("src.python.llm._api_claude.call_llm_with_retry")
     @patch("src.python.llm._api_claude._get_last_thinking_exhausted")
     @patch("src.python.llm._api_claude.clear_last_thinking_exhausted")
+    def test_thinking_exhausted_log_echoes_current_budget(
+        self, mock_clear: MagicMock, mock_get: MagicMock, mock_retry: MagicMock
+    ) -> None:
+        """安全网日志回显当前 config_field=值 与思考配置（要求改配置处必须给出现值）。"""
+        mock_get.side_effect = [True, False]
+        mock_retry.side_effect = [(None, None), ("recovered", {"output_tokens": 5})]
+        with self.assertLogs(level="WARNING") as cm:
+            result, _usage = call_claude(
+                **self.base_kw,
+                model="DeepSeek-V4-Flash",
+                config_field="max_tokens_global_macro",
+                llm_config=self.llm_config,
+                temperature=0.3,
+            )
+        self.assertEqual(result, "recovered")
+        text = "\n".join(cm.output)
+        self.assertIn("max_tokens_global_macro=800", text, "应回显当前 max_tokens 值")
+        self.assertIn("思考配置=", text, "应回显思考配置现值")
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    @patch("src.python.llm._api_claude._get_last_thinking_exhausted")
+    @patch("src.python.llm._api_claude.clear_last_thinking_exhausted")
     def test_deepseek_empty_content_retries_with_disabled(
         self, mock_clear: MagicMock, mock_get: MagicMock, mock_retry: MagicMock
     ) -> None:

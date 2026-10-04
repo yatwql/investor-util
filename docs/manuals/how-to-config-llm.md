@@ -198,6 +198,7 @@ LLM 配置由三个独立文件管理：
 - **与全局并发叠加**：`llm_max_concurrency` 仍限制总线程数（默认 3）；`pacing.max_concurrency` 是**额外**的每端点上限，两者同时生效。例如全局 3 线程 + 订阅制端点 `max_concurrency: 1` ⇒ 该端点始终串行，其余端点可达 3 路并行。
 - **失败分类与重试**：端点返回 **403**（配额/风控拒绝，如 `You've reached your 5-hour usage limit` / `concurrent request limit`）时**不重试**——这类限制按时间窗口滚动、重试无益且会加剧风控画像；报告将显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**429 / 503** 仍按 `max_retries` 重试。
 - **抖动与间隔的线程安全**：同一端点的间隔串行与在途计数均为线程安全（per-端点锁 + 信号量），不同端点互不阻塞。
+- **429 诊断回显**：端点返回 429 时日志**先回显两级实际配置再给建议**——`当前配置：全局 llm_max_concurrency=…；provider[条目] pacing.max_concurrency=…、pacing.min_interval=…`（端点约束未声明标「未配置（不限流）」、间隔未声明标「未配置」），再按「还有没有下降空间」分支：已配到 `1` 就不再叫你调低它，改推全局并发或请求间隔；两级并发与间隔均已到底时会明确提示「429 更可能来自配额（RPM/TPM）或风控而非并发」。凡建议调整处均带当前值，不必翻配置找基数。
 
 ### 切换策略
 
@@ -671,7 +672,7 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 **思考耗尽自动兜底**：开启 Extended Thinking 时若出现"思考部分耗尽 max_tokens 预算"，程序会**自动关闭 thinking 同 Provider 重试一次**（`call_claude` 层安全网，日志 `关闭 thinking 重试一次，避免模块整体失败`），保证有正文产出；重试仍失败才切换下一 Provider。因此正常情况下不再因思考耗尽直接丢模块内容。
 
-**调参建议**：若日志仍频繁出现 `LLM 输出思考部分耗尽 max_tokens 预算`，请**增大对应模块的 `max_tokens_{module}`**（DeepSeek 为 thinking + 正文共享预算，需 > `thinking_budget` + 正文余量）或**降低 `reasoning_effort_{module}`**。当前默认 expert_review 36000 / health_check 24000（对应 thinking_budget 24000/18000 + 正文余量，DeepSeek V4 输出上限 384K 无 API 拒绝风险；2026-09-16 全模块整体上调 50%），配合自动兜底双重保障。
+**调参建议**：若日志仍频繁出现 `LLM 输出思考部分耗尽 max_tokens 预算`，请**增大对应模块的 `max_tokens_{module}`**（DeepSeek 为 thinking + 正文共享预算，需 > `thinking_budget` + 正文余量）或**降低 `reasoning_effort_{module}`**。日志会**直接回显具体字段名与当前值**（如 `max_tokens_expert_review=8192`、安全网日志的思考配置现值），照提示的字段调即可，不必自己对应模块。当前默认 expert_review 36000 / health_check 24000（对应 thinking_budget 24000/18000 + 正文余量，DeepSeek V4 输出上限 384K 无 API 拒绝风险；2026-09-16 全模块整体上调 50%），配合自动兜底双重保障。
 
 ### 效果参考
 

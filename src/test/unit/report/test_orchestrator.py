@@ -1597,7 +1597,7 @@ class TestCaptureSnapshot:
 
         with (
             patch("src.python.report.history_snapshot.load_latest", return_value=None),
-            patch("src.python.report.history_snapshot.save"),
+            patch("src.python.report.history_snapshot.save") as mock_save,
             patch("src.python.fetcher.history_diff.HistoryDiff") as mock_hd,
             patch("src.python.report.history_snapshot.prune"),
         ):
@@ -1605,18 +1605,23 @@ class TestCaptureSnapshot:
             mock_diff.is_first_check = True
             mock_hd.compute.return_value = mock_diff
 
+            # 持仓列表不含 detail 的代码 → 走「无匹配」分支，份额/成本应回落默认值
+            # （匹配分支的回填由 test_capture_snapshot_holding_mapping 覆盖）
             capture_snapshot(
-                [self._make_mock_holding(code="SH600001", shares=200, cost_price=12.0)],
+                [self._make_mock_holding(code="SZ000001", shares=200, cost_price=12.0)],
                 [detail],
                 config,
                 mock_reporter,
             )
 
-        # HistoryDiff.compute 被调用，说明 holdings 回查未抛出异常
-        assert mock_hd.compute.called
+        # 断言落在 save() 收到的快照对象上（只看 compute.called 无法证明默认值生效）
+        holding = mock_save.call_args.args[0].accounts[0].holdings[0]
+        assert holding.code == "SH600001"
+        assert holding.shares == 0.0
+        assert holding.cost_price == 0.0
 
     def test_capture_snapshot_data_creation(self):
-        """SnapshotData 聚合计算正确。"""
+        """SnapshotData 聚合计算正确（多明细求和 + 账户内持仓清单）。"""
         mock_reporter = MagicMock()
         details = [
             self._make_mock_detail(code="SH600001", mv=1200.0, cost=1000.0, profit=200.0),
@@ -1626,7 +1631,7 @@ class TestCaptureSnapshot:
 
         with (
             patch("src.python.report.history_snapshot.load_latest", return_value=None),
-            patch("src.python.report.history_snapshot.save"),
+            patch("src.python.report.history_snapshot.save") as mock_save,
             patch("src.python.fetcher.history_diff.HistoryDiff") as mock_hd,
             patch("src.python.report.history_snapshot.prune"),
         ):
@@ -1641,8 +1646,12 @@ class TestCaptureSnapshot:
                 mock_reporter,
             )
 
-        # HistoryDiff.compute 被正确传入 SnapshotData
-        assert mock_hd.compute.called
+        snapshot = mock_save.call_args.args[0]
+        assert snapshot.accounts[0].account_name == "全部"
+        assert [h.code for h in snapshot.accounts[0].holdings] == ["SH600001", "SH600002"]
+        assert snapshot.total_value == 3600.0  # 1200 + 2400
+        assert snapshot.total_cost == 3000.0  # 1000 + 2000
+        assert snapshot.total_pnl == 600.0  # 200 + 400
 
     def test_capture_snapshot_diff_compute(self):
         """HistoryDiff.compute 被调用，diff 结果含四个子列表。"""

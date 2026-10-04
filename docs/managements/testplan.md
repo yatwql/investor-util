@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.12.2
+> 文档版本：0.12.3
 
 ---
 
@@ -530,7 +530,7 @@
 | R-LLM-11 | `src/test/unit/llm/test_depth_profile.py` + `src/test/unit/report/test_summary.py` | 批 5 |
 | R-LLM-12 | `src/test/unit/llm/test_self_review.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
 | R-DATA-08 | `src/test/unit/fetcher/test_chain_overrides.py` | 批 5 |
-| R-LLM-10 | `src/test/unit/llm/test_llm_pacing.py`（策略解析/容错/注册/零开销直通/间隔/抖动/并发上限/异常释放/403 不重试）+ `src/test/unit/config/test_config_llm_multi.py`（pacing 透传/缺省不注入/非对象忽略） | 批 5 |
+| R-LLM-10 | `src/test/unit/llm/test_llm_pacing.py`（策略解析/容错/注册/惰性装载兜底/零开销直通/间隔/抖动/并发上限/异常释放/403 不重试）+ `src/test/unit/config/test_config_llm_multi.py`（pacing 透传/缺省不注入/非对象忽略）+ `src/test/unit/llm/test_llm_api_multi.py`（`endpoint_key` 逐层下传并到达重试骨架——漏传则 `PacingGate` 拿空键、端点节流空转） | 批 5 |
 | R-LLM-08 | `src/test/unit/llm/test_llm_api.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
 | R-PF-01 | `src/test/unit/config/test_features.py` + `src/test/unit/report/test_section_visibility.py` | 批 5 |
 | R-PF-02 | `src/test/unit/analysis/test_prosperity_framework.py` | 批 5 |

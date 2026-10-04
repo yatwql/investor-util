@@ -4,7 +4,7 @@
   - _SYSTEM_DEBATE_PRO 正面关键词
   - _SYSTEM_DEBATE_CON 四个风险维度
   - _SYSTEM_DEBATE_SYNTHESIS 白脸/黑脸占位符
-  - _SYSTEM_DEBATE_CONDITIONAL_SCENARIO 条件推理情景模板
+  - 条件推理情景注入（`debate.conditional.scenarios` → user prompt：name/desc 渲染、空配置回退、开关门控）
   - _build_debate_synthesis_prompt 签名与输出
   - _build_concentration_qa_block 集中度反问逻辑
 
@@ -57,19 +57,94 @@ class TestDebateSystemPrompts(unittest.TestCase):
         # 应包含 "共识与分歧摘要" 输出结构
         self.assertIn("共识与分歧摘要", _SYSTEM_DEBATE_SYNTHESIS)
 
-    def test_system_debate_conditional_scenario_exists(self):
-        """_SYSTEM_DEBATE_CONDITIONAL_SCENARIO 模板存在且包含 {name}/{desc} 占位符。
 
-        条件推理情景模板（模式 2）用于在提示词中注入预设上/下行情景。
-               该常量未在 prompts_core.py 中定义时跳过测试。
-        """
-        try:
-            from src.python.llm.prompts import _SYSTEM_DEBATE_CONDITIONAL_SCENARIO as SCENARIO
-        except (ImportError, AttributeError):
-            self.skipTest("_SYSTEM_DEBATE_CONDITIONAL_SCENARIO 未在 prompts 模块中定义，定义后此测试将自动生效。")
-        self.assertIsInstance(SCENARIO, str)
-        self.assertIn("{name}", SCENARIO)
-        self.assertIn("{desc}", SCENARIO)
+@pytest.mark.unit_llm
+class TestConditionalScenarioInjection(unittest.TestCase):
+    """条件推理情景注入 — `debate.conditional.scenarios` 到 user prompt 的真实行为。
+
+    情景按需求 R-LLM-DB-CONDITIONAL-02/04 注入 **user prompt**（仅改内容、不改调用次数），
+    渲染形态为 `**{name}情景（{desc}）**`；R-LLM-DB-CONDITIONAL-05 要求 scenarios 为空时
+    条件推理不生效、回退标准 prompt。
+    """
+
+    @mock.patch("src.python.config._llm_settings.get_llm_config")
+    def test_scenarios_rendered_into_synthesis_prompt(self, mock_get):
+        """开关开启时，每条情景的 name/desc 都渲染进综合阶段 user prompt。"""
+        from src.python.llm.prompts import _build_debate_synthesis_prompt
+
+        scenarios = [
+            {"name": "上涨", "change": 0.2, "desc": "指数上涨20%"},
+            {"name": "下跌", "change": -0.2, "desc": "指数下跌20%"},
+        ]
+        mock_get.return_value = {"debate": {"conditional": {"scenarios": scenarios}}}
+
+        result = _build_debate_synthesis_prompt("白脸正文", "黑脸正文", enable_conditional=True)
+
+        self.assertIn("### 情景分析", result)
+        for sc in scenarios:
+            self.assertIn(
+                f"**{sc['name']}情景（{sc['desc']}）**",
+                result,
+                f"情景 {sc['name']} 应以 name/desc 渲染进 user prompt",
+            )
+
+    @mock.patch("src.python.config._llm_settings.get_llm_config")
+    def test_empty_scenarios_falls_back_to_baseline(self, mock_get):
+        """scenarios 为空 → 条件推理不生效，综合 prompt 不含情景段（回退基线）。"""
+        from src.python.llm.prompts import _build_debate_synthesis_prompt
+
+        mock_get.return_value = {"debate": {"conditional": {"scenarios": []}}}
+
+        result = _build_debate_synthesis_prompt("白脸正文", "黑脸正文", enable_conditional=True)
+
+        self.assertNotIn("### 情景分析", result)
+        self.assertIn("白脸原始分析", result)
+
+    @mock.patch("src.python.config._llm_settings.get_llm_config")
+    def test_flag_off_ignores_configured_scenarios(self, mock_get):
+        """开关关闭时即使配置了情景也不注入（开关是条件推理的唯一门）。"""
+        from src.python.llm.prompts import _build_debate_synthesis_prompt
+
+        mock_get.return_value = {
+            "debate": {
+                "conditional": {
+                    "scenarios": [
+                        {"name": "上涨", "change": 0.2, "desc": "指数上涨20%"},
+                    ]
+                }
+            }
+        }
+
+        result = _build_debate_synthesis_prompt("白脸正文", "黑脸正文", enable_conditional=False)
+
+        self.assertNotIn("### 情景分析", result)
+        self.assertNotIn("上涨情景（指数上涨20%）", result)
+
+    @mock.patch("src.python.config._llm_settings.get_llm_config")
+    def test_scenarios_rendered_into_expert_review_prompt(self, mock_get):
+        """标准路径同样注入情景；`skip_scenarios=True` 时辩论 pro/con 跳过。"""
+        from src.python.llm.prompts import _build_expert_review_prompt
+
+        scenarios = [{"name": "震荡", "change": 0.05, "desc": "指数震荡±5%"}]
+        mock_get.return_value = {"debate": {"conditional": {"scenarios": scenarios}}}
+        base_kwargs = dict(
+            total_mv=1_000_000,
+            total_cost=900_000,
+            total_profit=100_000,
+            total_today_profit=5_000,
+            holdings_count=2,
+            categories={"股票": 1_000_000},
+        )
+
+        with_conditional = _build_expert_review_prompt(**base_kwargs, enable_conditional=True)
+        self.assertIn("**震荡情景（指数震荡±5%）**", with_conditional)
+
+        skipped = _build_expert_review_prompt(
+            **base_kwargs,
+            enable_conditional=True,
+            skip_scenarios=True,
+        )
+        self.assertNotIn("**震荡情景（指数震荡±5%）**", skipped)
 
 
 @pytest.mark.unit_llm

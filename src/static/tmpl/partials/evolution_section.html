@@ -23,6 +23,10 @@
         {{ section_numbers['portfolio_evolution'] }}、组合演进
         <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">多期快照趋势追踪</span>
     </div>
+    <details class="section-fold">
+        <summary class="section-fold-summary">
+            {% if _evo.get("available") %}已聚合 {{ _evo.get("snapshot_count", 0) }} 份快照 · {{ _evo.get("periods", []) | length }} 个有效观察日{% else %}组合演进数据不足{% endif %} —— 点击展开/收起趋势图表与明细表
+        </summary>
     {% if _evo.get("available") %}
     {% set _evo_periods = _evo.get("periods", []) %}
     {% set _evo_n = _evo_periods | length %}
@@ -188,6 +192,7 @@
         </div>
     </div>
     {% endif %}
+    </details>
     <div class="back-to-top-link"><a href="#report-top" title="回到报告顶部">↑ 回到顶部</a></div>
 </div>
 {% endif %}

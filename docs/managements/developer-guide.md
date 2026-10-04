@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.12.2
+> 文档版本：0.12.3
 
 ## 概述
 
@@ -154,6 +154,15 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 > 为何不直接跑 Windows runner：GitHub 的 `windows-latest` 是 en-US/cp1252（单字节，只会乱码不会报错），装不住 GBK 类 locale 回退；为何不在 ubuntu 上装 GB18030 跑全套件：中文**文件名**在 POSIX `fsencoding=ascii` 下会失败（18 处中文报表文件名），而 cp936 Windows 反而正常——那是探测方法的伪影，不是缺陷。两道探针因此取「精确模拟消费方」而非「换整个 locale 跑全套件」。
 
 > P1/P2 的完整要求（含手动验证项）见 [testplan.md](testplan.md) → 回归测试清单 / 门禁章节。
+
+### 日志回显纪律（要求改配置必给现值）
+
+凡日志 / CLI / TUI 输出**要求读者调整某个配置值**（并发、间隔、上限、超时、重试、开关等），必须**同时回显该项的当前值与配置项名/所在文件**，使读者不翻配置即可知道「从多少调到多少」：
+
+- **回显形态**：`<config_field>=<值>`、`（当前 X → 已试 Y）`、`provider[<条目>] pacing.max_concurrency=<值>、pacing.min_interval=<值>`；配置里**未声明**时标「未配置」而非留空（避免误读为 0/已配）。
+- **密钥/凭据类豁免**：涉及 `api_key` / `llm_key.json` / `data_key.json` / token / password 的提示只回显**文件名、条目名、路径**，绝不回显密钥本体或其片段（对齐 `scenario_security` 的「日志不记录完整密钥」基线）。
+- **已覆盖点**：429 诊断 `api_base._concurrency_hint`（两级并发 + 间隔）、截断提示 `api_base._check_*_truncation`、思考耗尽 `api_base._extract_content`（配置上下文由 `_process_success_response` 经线程局部注入）与 `_api_claude` 安全网日志、截断重试耗尽 `skeleton._handle_truncation`、worker 钳位 `fetcher/batch.py`、阈值超限 `providers/news_dedup.py`。
+- **回归用例**：`test_llm_api_base.py::TestThinkingExhaustedConfigEcho` + 同文件 429 回显组、`test_llm_api_base.py::test_rate_limit_429_log_echoes_min_interval_value_when_advised`、`test_skeleton.py::test_exhausted_retry_log_names_config_field_and_both_values`、`test_llm_api.py::test_thinking_exhausted_log_echoes_current_budget`。新增此类日志时按本节口径补回显与用例。
 
 ## 任务编号规范与自动保障
 

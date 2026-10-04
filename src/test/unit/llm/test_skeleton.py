@@ -79,6 +79,36 @@ class TestHandleTruncation(unittest.TestCase):
         self.assertEqual(r, "")
         self.assertIs(u, usage)
 
+    def test_exhausted_retry_log_names_config_field_and_both_values(self):
+        """自动放大仍截断 → 日志点名 config_field 与「当前 → 已试」两个值。"""
+        from unittest.mock import patch
+
+        from src.python.llm.api_base import TRUNCATION_MARKER
+        from src.python.llm.skeleton import _handle_truncation
+
+        truncated = f"<p>{TRUNCATION_MARKER}</p>"
+        with patch(
+            "src.python.llm.skeleton.call_llm",
+            return_value=(truncated, {"output_tokens": 9}, {"name": "kimi-main"}),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                _handle_truncation(
+                    truncated,
+                    {},
+                    4096,
+                    "sys",
+                    "usr",
+                    {},
+                    60,
+                    None,
+                    "max_tokens_global_macro",
+                    None,
+                    "",
+                )
+        text = "\n".join(cm.output)
+        self.assertIn("max_tokens_global_macro：当前 4096 → 已试 6144", text)
+        self.assertIn("请手动增大 llm_settings.json 的 max_tokens_global_macro", text)
+
 
 class TestHandleCacheHit(unittest.TestCase):
     """_handle_cache_hit — 缓存命中处理（通过 _generate_llm_content 间接测试）。

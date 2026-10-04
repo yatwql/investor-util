@@ -1,16 +1,10 @@
 # 投资复盘助手 - 自我审查问题记录
-> 文档版本：0.12.2
-> **编号源**：`rf-next = 571`（新增问题取此编号，完成后更新为 +1；已用最大 rf-570，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.12.3
+> **编号源**：`rf-next = 579`（新增问题取此编号，完成后更新为 +1；已用最大 rf-578，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
 ## 当前待处理问题
-
-### P3 — 48 小时实现技术债务自查（2026-10-03，plan-72/73/74 三线）
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-568** | `test_debate_prompts.py::test_system_debate_conditional_scenario_exists` 条件 skip 十余次跑全空过：预留常量 `_SYSTEM_DEBATE_CONDITIONAL_SCENARIO` 全仓不存在，条件推理实际实现走 `_SYSTEM_DEBATE_SYNTHESIS_CONDITIONAL` + 配置情景分支——测试验证目标与实现失配，形同虚设 | **待议**：预留常量的语义（模式 2 自动生成情景？）需设计确认后再改测试指向真实符号或实现该常量，不盲改 |
 
 ### P1 — plan-1 交互图表遗留技术债（2026-08-02）
 
@@ -47,6 +41,10 @@
 
 ## 已解决问题
 
+> **本迭代已修复记录（rf-568、rf-571 ~ rf-578 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
+>
+>
+
 > **本迭代已修复记录（rf-563 ~ rf-570 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
 >
 >
@@ -54,7 +52,7 @@
 
 ### 归档档案
 
-- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 批次（2026-10-03）
+- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.3 批次（2026-10-03 ~ 2026-10-05）
 - [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.11  （2026-09-18 ~ 2026-10-02）
 - [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.20（2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）

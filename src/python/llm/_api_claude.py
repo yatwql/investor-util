@@ -115,8 +115,13 @@ def call_claude(
     _thinking_exhausted = _get_last_thinking_exhausted()
     if call_result[0] is None and (_is_forced_reasoning or (_thinking_exhausted and thinking_was_enabled)):
         if _thinking_exhausted:
+            _think_cfg = payload.get("thinking") or payload.get("output_config") or payload.get("reasoning_effort")
             logger.warning(
                 "Extended Thinking 思考部分耗尽 max_tokens 预算（无正文），关闭 thinking 重试一次，避免模块整体失败"
+                "（当前 %s=%d，思考配置=%s）",
+                config_field,
+                max_tokens,
+                _think_cfg if _think_cfg is not None else "未显式设置",
             )
         else:
             logger.warning(

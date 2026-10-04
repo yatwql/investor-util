@@ -389,5 +389,49 @@ class TestModulePreferredRouting(unittest.TestCase):
         self.assertEqual(pn2["name"], "openai-fallback")
 
 
+class TestChainEndpointKeyWiring(unittest.TestCase):
+    """多链把 provider 条目名作为 endpoint_key 一路下传到重试骨架。
+
+    端点节流（pacing）与 429 并发回显都以条目名为唯一钥匙：链路上任何一跳
+    漏传（默认空串），下游 PacingGate("") 即空转、provider 条目声明的
+    pacing.max_concurrency 形同虚设，日志里也看不到端点配置。
+    """
+
+    @patch("src.python.llm.api.call_single_provider")
+    def test_call_llm_passes_entry_name_as_endpoint_key(self, mock_call: MagicMock) -> None:
+        """多链入口 call_llm 把当前链目名作为 endpoint_key 下传。"""
+        from src.python.llm.api import call_llm
+
+        mock_call.return_value = ("ok", {"input_tokens": 1})
+        config = {"_provider_list": [{"name": "kimi-main", "provider": "claude", "api_key": "sk-x"}]}
+
+        content, usage, info = call_llm("sys", "user", config)
+
+        self.assertEqual(content, "ok")
+        self.assertEqual(mock_call.call_args.kwargs["endpoint_key"], "kimi-main")
+        self.assertEqual(info["name"], "kimi-main")
+
+    def test_entry_key_reaches_retry_skeleton(self) -> None:
+        """条目名深至 call_llm_with_retry（PacingGate 门与 429 回显取 key 处）。"""
+        from src.python.llm.api import _call_provider_entry
+
+        entry = {
+            "name": "kimi-main",
+            "provider": "claude",
+            "api_key": "sk-x",
+            "endpoint": "https://api.moonshot.cn/anthropic/v1/messages",
+        }
+        with patch(
+            "src.python.llm._api_claude.call_llm_with_retry",
+            return_value=("ok", {}),
+        ) as mock_retry:
+            content, usage = _call_provider_entry(
+                entry, "sys", "usr", 2500, 30.0, 2, MagicMock(), "max_tokens", None, {}
+            )
+
+        self.assertEqual(content, "ok")
+        self.assertEqual(mock_retry.call_args.kwargs["endpoint_key"], "kimi-main")
+
+
 if __name__ == "__main__":
     unittest.main()

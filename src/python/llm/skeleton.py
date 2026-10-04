@@ -211,7 +211,13 @@ def _handle_truncation(
     )
     if result2:
         if TRUNCATION_MARKER in result2:
-            logger.warning("增大 max_tokens=%d 后仍被截断，请手动增大配置", new_max)
+            logger.warning(
+                "增大 max_tokens 后仍被截断（%s：当前 %d → 已试 %d），请手动增大 llm_settings.json 的 %s",
+                config_field or "max_tokens",
+                max_tokens,
+                new_max,
+                config_field or "max_tokens",
+            )
         return result2, usage2
     return result, None
 

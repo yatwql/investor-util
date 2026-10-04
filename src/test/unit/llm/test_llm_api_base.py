@@ -246,6 +246,126 @@ class TestAttemptApiCall(unittest.TestCase):
         self.assertEqual(kind, "retryable")
         self.assertEqual(info, 429)
 
+    def test_rate_limit_429_log_hints_both_concurrency_knobs(self) -> None:
+        """429 日志同时给出全局（llm_max_concurrency）与端点级（pacing.max_concurrency）两个旋钮。"""
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with self.assertLogs(level="WARNING") as cm:
+            self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0)
+        log_text = "\n".join(cm.output)
+        self.assertIn("llm_max_concurrency", log_text)
+        self.assertIn("pacing.max_concurrency", log_text)
+
+    def test_rate_limit_429_log_echoes_configured_values(self) -> None:
+        """429 日志回显实际配置值：全局 llm_max_concurrency 与该 provider 的 pacing.max_concurrency。"""
+        from src.python.llm.pacing import PacingPolicy
+
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with (
+            patch("src.python.config.get_llm_config", return_value={"llm_max_concurrency": 5}),
+            patch(
+                "src.python.llm.pacing.get_policy",
+                return_value=PacingPolicy(min_interval=1.0, max_concurrency=2),
+            ),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0, "kimi-main")
+        log_text = "\n".join(cm.output)
+        self.assertIn("llm_max_concurrency=5", log_text)
+        self.assertIn("pacing.max_concurrency=2", log_text)
+        self.assertIn("provider[kimi-main]", log_text)
+
+    def test_rate_limit_429_log_echoes_min_interval_value_when_advised(self) -> None:
+        """建议「加大 pacing.min_interval」时回显现值（配置行 + 建议句双处可见）。"""
+        from src.python.llm.pacing import PacingPolicy
+
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with (
+            patch("src.python.config.get_llm_config", return_value={"llm_max_concurrency": 3}),
+            patch(
+                "src.python.llm.pacing.get_policy",
+                return_value=PacingPolicy(min_interval=1.5, max_concurrency=1),
+            ),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0, "kimi-main")
+        log_text = "\n".join(cm.output)
+        self.assertIn("pacing.min_interval=1.5s", log_text, "配置回显行应带 min_interval 现值")
+        self.assertIn("min_interval（当前 1.5s）", log_text, "建议句应带 min_interval 现值")
+
+    def test_rate_limit_429_log_marks_min_interval_unconfigured(self) -> None:
+        """该端点未声明 pacing 时 min_interval 显式标「未配置」，不留空误导。"""
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with (
+            patch("src.python.config.get_llm_config", return_value={"llm_max_concurrency": 3}),
+            patch("src.python.llm.pacing.get_policy", return_value=None),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0, "deepseek-main")
+        log_text = "\n".join(cm.output)
+        self.assertIn("pacing.min_interval=未配置", log_text)
+
+    def test_rate_limit_429_endpoint_already_at_floor_skips_lowering_endpoint_advice(self) -> None:
+        """端点 pacing.max_concurrency 已为 1（最低）时，不再叫用户调低端点并发，改推全局/间隔旋钮。"""
+        from src.python.llm.pacing import PacingPolicy
+
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with (
+            patch("src.python.config.get_llm_config", return_value={"llm_max_concurrency": 3}),
+            patch(
+                "src.python.llm.pacing.get_policy",
+                return_value=PacingPolicy(min_interval=0.0, max_concurrency=1),
+            ),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0, "kimi-main")
+        log_text = "\n".join(cm.output)
+        self.assertIn("pacing.max_concurrency=1", log_text)
+        self.assertIn("无可再降", log_text)
+        self.assertNotIn("按端点限流", log_text)
+
+    def test_rate_limit_429_both_knobs_at_floor_points_to_quota(self) -> None:
+        """全局与端点并发均为 1（均无下降空间）时，提示并发已到底、429 更可能来自配额/风控。"""
+        from src.python.llm.pacing import PacingPolicy
+
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with (
+            patch("src.python.config.get_llm_config", return_value={"llm_max_concurrency": 1}),
+            patch(
+                "src.python.llm.pacing.get_policy",
+                return_value=PacingPolicy(min_interval=1.0, max_concurrency=1),
+            ),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0, "kimi-main")
+        log_text = "\n".join(cm.output)
+        self.assertIn("再调低并发已无益", log_text)
+        self.assertIn("配额", log_text)
+        self.assertNotIn("按端点限流", log_text)
+
     def test_service_unavailable_503(self) -> None:
         """503 → ('retryable', 503)。"""
         mock_client = MagicMock(spec=httpx.Client)
@@ -714,6 +834,28 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
 
     @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")
+    def test_429_log_carries_endpoint_key_to_attempt(self, mock_sleep, mock_failure):
+        """endpoint_key 必须透传到 _attempt_api_call，否则 429 日志丢 provider 条目名。"""
+        from src.python.llm.api_base import call_llm_with_retry
+        from src.python.llm.pacing import PacingPolicy
+
+        self.client.post.return_value = _make_mock_response(429)
+        kw = dict(self.base_kw, endpoint_key="kimi-main")
+        with (
+            patch("src.python.config.get_llm_config", return_value={"llm_max_concurrency": 3}),
+            patch("src.python.llm.pacing.get_policy", return_value=PacingPolicy(max_concurrency=1)),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                result, usage = call_llm_with_retry(**kw)
+
+        self.assertIsNone(result)
+        self.assertIsNone(usage)
+        log_text = "\n".join(cm.output)
+        self.assertIn("provider[kimi-main]", log_text)
+        self.assertIn("pacing.max_concurrency=1", log_text)
+
+    @patch("src.python.llm.api_base._cb_record_failure")
+    @patch("time.sleep")
     def test_retry_on_429_all_fail(self, mock_sleep, mock_failure):
         """429 全部重试失败 → (None, None)。"""
         from src.python.llm.api_base import call_llm_with_retry
@@ -925,3 +1067,47 @@ class TestCallLlmWithRetryTruncation(unittest.TestCase):
         self.assertIn("max_tokens_expert_review", result)
         self.assertIn(TRUNCATION_MARKER, result)
         self.assertIn("部分内容", result)
+
+
+class TestThinkingExhaustedConfigEcho(unittest.TestCase):
+    """「思考耗尽」提示回显当前配置值——要求读者改配置处必须给出现值。
+
+    配置值由 `_process_success_response` 经线程局部注入 `_extract_content`，
+    提示句直接点名 `config_field=值`；未注入时（直接调用/旧路径）回退为不含
+    具体数值的通用建议，不显示过期/错误的值。
+    """
+
+    def setUp(self) -> None:
+        from src.python.llm.api_base import _set_extract_ctx
+
+        _set_extract_ctx("", 0)
+
+    def tearDown(self) -> None:
+        from src.python.llm.api_base import _set_extract_ctx
+
+        _set_extract_ctx("", 0)
+
+    def test_echoes_current_config_field_and_budget(self) -> None:
+        """已注入上下文 → 提示句带 `config_field=值` 与配置文件路径。"""
+        from src.python.llm.api_base import _extract_content, _set_extract_ctx
+
+        _set_extract_ctx("max_tokens_expert_review", 8192)
+        with self.assertLogs(level="WARNING") as cm:
+            out = _extract_content({"content": [], "stop_reason": "max_tokens"})
+
+        self.assertIsNone(out)
+        text = "\n".join(cm.output)
+        self.assertIn("max_tokens_expert_review=8192", text, "应回显当前配置值")
+        self.assertIn("llm_settings.json 中的 max_tokens_expert_review", text, "应回点配置项名")
+
+    def test_no_ctx_falls_back_to_generic_advice_without_value(self) -> None:
+        """未注入上下文 → 不编造数值，只给通用建议。"""
+        from src.python.llm.api_base import _extract_content
+
+        with self.assertLogs(level="WARNING") as cm:
+            out = _extract_content({"content": [], "stop_reason": "max_tokens"})
+
+        self.assertIsNone(out)
+        text = "\n".join(cm.output)
+        self.assertIn("对应 max_tokens", text)
+        self.assertNotRegex(text, r"max_tokens\w*=\d+", "无上下文时不得显示任何数值")
