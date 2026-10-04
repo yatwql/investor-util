@@ -27,6 +27,7 @@ from src.python.analysis.rebalance import (
     _CATEGORY_ORDER,
     classify_holding,
 )
+from src.python.analysis.purchase_feasibility import describe_feasibility, evaluate_purchase_feasibility
 from src.python.core.models import Holding
 from src.python.core.num_utils import finite_or
 
@@ -113,11 +114,42 @@ def _category_stats(
     return buckets
 
 
+def _build_feasibility_notes(
+    changes: list[dict[str, Any]],
+    restricted_index: dict[str, dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """目标持仓受限判定 → 落地受阻提示字段组（仅买入腿：新增/加仓）。
+
+    金额口径：新增 → 目标成本全额（cand_cost）；加仓 → 成本增量（cost_diff）；
+    不可得 → None（evaluate 归一为不给天数，宁缺毋错）。清仓/减仓/不变为
+    卖出腿——申购限购不约束卖出，不判定（零额外提示）。
+    """
+    if not restricted_index:
+        return []
+    notes: list[dict[str, Any]] = []
+    for c in changes:
+        action = c.get("action")
+        if action == "新增":
+            amount = c.get("cand_cost") or None
+        elif action == "加仓":
+            amount = c.get("cost_diff") or None
+        else:
+            continue
+        result = evaluate_purchase_feasibility(str(c.get("code") or ""), amount, restricted_index)
+        if result is None:
+            continue
+        note = {**result, "name": c.get("name", ""), "action": action}
+        note["note_text"] = describe_feasibility(note)
+        notes.append(note)
+    return notes
+
+
 def build_whatif_data(
     base: list[Holding],
     candidate: list[Holding],
     base_file: str = "",
     candidate_file: str = "",
+    restricted_index: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """构建调仓 What-if 对比数据契约 dict。
 
@@ -126,6 +158,8 @@ def build_whatif_data(
         candidate: 目标持仓（调仓后/假设）
         base_file: 基准文件显示名（用于报告展示）
         candidate_file: 目标文件显示名
+        restricted_index: 受限标的预格式化索引（契约字段；缺省/空 → 无提示，
+            契约与输出逐字节回退现网行为）
 
     Returns:
         whatif_data 契约 dict：
@@ -140,6 +174,8 @@ def build_whatif_data(
                         base_cost, cand_cost, cost_diff, base_weight, cand_weight,
                         weight_delta_pct}] 按 新增→清仓→加仓→减仓→不变 排序
           - stats: {added, removed, increased, decreased, unchanged}
+          - feasibility（仅受限存在时追加键）: [{code, name, action, status, kind,
+                        amount, days, feasible, limit_text, next_open_text, note_text}]
     """
     base_idx = _merge_holdings(base)
     cand_idx = _merge_holdings(candidate)
@@ -283,7 +319,7 @@ def build_whatif_data(
     for r in changes:
         stats[_action_to_stat[r["action"]]] += 1
 
-    return {
+    data: dict[str, Any] = {
         "available": True,
         "status": "ok",
         "base_file": base_file,
@@ -296,3 +332,8 @@ def build_whatif_data(
         "stats": stats,
         "reason": "",
     }
+    # 受限提示仅在命中时追加键——降级态契约与现网逐字节一致（§3.4）
+    notes = _build_feasibility_notes(changes, restricted_index)
+    if notes:
+        data["feasibility"] = notes
+    return data

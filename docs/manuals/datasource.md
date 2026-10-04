@@ -11,6 +11,7 @@
 | 基金业绩排名 | 天天基金 `fund.eastmoney.com`（`pingzhongdata/{code}.js` JS 变量解析） | — | `fund_perf_` | 基础类 |
 | 基金持仓数据 | 天天基金 `fund.eastmoney.com/{code}.html`（HTML 解析） | 天天基金 `fundf10.eastmoney.com`（季报 API `FundArchivesDatas.aspx`，回溯 4 个季度）→ **同花顺金融数据**（官方披露持仓，需 key；联接基金直返目标 ETF） | `fund_hold_` | 基础类 |
 | 基金经理数据 | 天天基金 `fund.eastmoney.com/{code}.html`（HTML 解析，与基金业绩排名同源） | 天天基金 `fundf10.eastmoney.com/jjjl_{code}.html`（档案页） | `fund_manager_` | 基础类 |
+| 基金申购状态总表（限购） | 天天基金 `fund.eastmoney.com`（`Fund_JJJZ_Data.aspx` 全量表，`purchase_schema` 载荷准入） | akshare `fund_purchase_em` 封装（同一上游端点，解析器冗余）→ 过期缓存兜底 | `fund_purchase_status_table`（单键全量） | — |
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业 + 概念板块归属） | 东方财富 REST 行情页（仅行业，无概念） | `industry_` | 基础类 |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `profit_forecast_` | 基础类 |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `sector_flow_` | 基础类 |
@@ -29,7 +30,7 @@
 
 > **缓存前缀**列对应 `data/cache/` 目录下的文件名前缀，同一前缀的文件按 TTL 统一管理。持仓重合度为运行时推导模块（复用 `fund_hold_` 缓存），无独立缓存前缀。
 > ¹ `bond_yield_rf` 为精确缓存键名（`exact_cache_keys`），非前缀匹配，单独管理。
-> 表中仅含具有 `cache_prefixes` 或 `exact_cache_keys` 的数据模块。此外还有少数 `exact_cache_keys` 模块，使用具体键名而非前缀匹配，不受 TTL 扫描清除影响（如 `trading_calendar`、`fund_benchmarks`、`holdings_tracking`、`fund_concentration_snapshot`、`fund_style_snapshot`、`fund_manager_snapshot`）。其中 `fund_benchmarks`、`fund_manager_snapshot` 等仍归属于缓存分组，可通过菜单 `[1]` 刷新。
+> 表中仅含具有 `cache_prefixes` 或 `exact_cache_keys` 的数据模块。此外还有少数 `exact_cache_keys` 模块，使用具体键名而非前缀匹配，不受 TTL 扫描清除影响（如 `trading_calendar`、`fund_benchmarks`、`holdings_tracking`、`fund_concentration_snapshot`、`fund_style_snapshot`、`fund_manager_snapshot`、`fund_purchase_status_table`）。其中 `fund_benchmarks`、`fund_manager_snapshot` 等仍归属于缓存分组，可通过菜单 `[1]` 刷新。申购状态总表为单键全量缓存（键 `fund_purchase_status_table`，data_type `fund_purchase` 已登记 `exact_cache_keys`，TTL 与官方净值同源 `CACHE_DAILY` 24h），未登记 `cache_prefixes`、不入菜单刷新组（大表不随菜单 `[1]`/`[2]` 强抓），按 TTL 过期；单次报告生成内经会话缓存只经链 1 次。
 > **分组**列对应菜单 `[1]`（基础类）/ `[2]`（持仓类）的缓存刷新范围。历史走势类不受菜单缓存命令影响，仅按 TTL 过期。
 > **行业名归一化**：行业分类数据在入库时剥离行业名末尾的申万层级后缀（Ⅰ/Ⅱ/Ⅲ/Ⅳ，如「银行Ⅱ」「白酒Ⅱ」）——该后缀是申万分层命名标记，对零售报告读者是纯噪声，报告展示统一用剥离后的行业名（如「银行」「白酒」）。
 > **财报全文两级缓存**：索引（`report_datasink_index_` 主源 / `report_cninfo_index_` 备源；TTL 一月）/ 正文（`report_datasink_doc_` / `report_cninfo_text_`；TTL 一月）；两者均归「基础类」，随菜单 `[1]` 与 TTL 管理。备源另有 orgId 缓存 `report_cninfo_orgid_`（与正文同档，TTL 一月）。

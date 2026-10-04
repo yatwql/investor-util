@@ -2,12 +2,14 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/)。
 
-> **最近发布 [0.12.1]**（2026-10-03）——已发布版本段随发布移入 [`archived_changelog.0.12.x.md`](../archive/v0.12.x/archived_changelog.0.12.x.md)；本文件只保留当前开发版本段与归档索引。
+> **最近发布 [0.12.2]**（2026-10-04）——已发布版本段随发布移入 [`archived_changelog.0.12.x.md`](../archive/v0.12.x/archived_changelog.0.12.x.md)；本文件只保留当前开发版本段与归档索引。
 
 ---
 
 
-## [0.12.2-dev] - 开发中（未发布）
+## [0.12.3-dev] - 开发中（未发布）
+
+（本次发布内容见下方归档索引）
 
 ## 归档
 

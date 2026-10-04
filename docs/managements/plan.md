@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
-> 文档版本：0.12.1
-> **编号源**：`plan-next = 72`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-71，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.12.2
+> **编号源**：`plan-next = 76`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-75，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -55,13 +55,13 @@
 >
 > 剩余 P4 三项（plan-66 ~ plan-68）仍为候选；**立项前须先做本仓库现状比对**（rf-510 教训：plan-64 原立项前提「无生成后质检」即被 `llm/fact_checker` 既有实现部分推翻，最终按「分层不重叠」重新定位）。
 
-### P4 — 实验功能
+> **plan-72 已完成归档**（2026-10-03）：本期迭代 1~3（数据链路 → 展示集成 → 文档登记）P0 门禁十项全绿完成（手工真实抓取验收 HTTP 200 / 27,695 行 / `purchase_schema=1`），完成态见 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；迭代 4（合并/调仓联动）另立 `plan-74`，设计文档保留在在办区供其消费 §6/§8。
 
-> **本批 P4 已清空**：plan-66 / plan-67 / plan-68 经现状比对后**全部归档为「已评估未采纳」**（2026-10-01，见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)）——三项立项前提均被本仓库既有实现推翻（辩论模式已含「共识与分歧摘要」、prompt 已有 `system_prompt_*` 配置级整段覆盖、新闻已 5 源聚合 + 去重 + 反向标题检测）。TradingAgents-CN 借鉴批至此整体收口。
+> **plan-73 已完成归档**（2026-10-03）：四迭代（单源渲染器与契约字段 → 主路径四模块接线与指纹 → 辩论/自检/新闻批量覆盖核验 → 文档登记）P0 门禁十项全绿完成；全部 LLM 分析章（标准四模块 + 辩论 pro/con/synthesis + 生成后自检 + 新闻批量）的提示词与缓存指纹同源携带申购限购约束块（`constraint_block` 契约字段，`generate_all_llm` 提取同一实例交统一附录第 4 段），降级态提示词与缓存键双不变。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-llm-context-design.md`](../plan/fund-purchase-limit-llm-context-design.md) 已改「设计 + 已实施」随归档留存。
 
-### P3 — 预期实施（纪律项）
+> **plan-74 已完成归档**（2026-10-03）：四迭代（受限索引与判定原语 → What-if 接线 → 回归网与零改动断言 → 文档登记）P0 门禁十项全绿完成；What-if 目标持仓申购受限提示落地（`restricted_index` 契约字段 + `evaluate_purchase_feasibility` 判定 + Excel/HTML 双端提示块，降级态逐字节回退）。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-advice-design.md`](../plan/fund-purchase-limit-advice-design.md) 已改「设计 + 已实施」随归档留存。
 
-> **plan-69 已完成归档**（2026-10-01）：比对清单已落 `developer-guide.md`「外部借鉴前置比对清单」节，完成态见归档文档。
+> **plan-75 已完成归档**（2026-10-03）：持仓分类汇总（Excel 区块②末列 + HTML 持仓分类表条件列，两端一致）追加「申购状态」——与区块①同一套单源原语（`purchase_column_visible` 判据 / `format_purchase_status_cell` 文案 / `stale_level` 时效），小计与总计行留空，开关复用 `fund_purchase_limit` 不新增；新增 6 用例，P0 门禁十项全绿。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)。
 
 #### 🔲 `plan-70` 决策跨期反思闭环（decision_reflection）验证死线
 
@@ -77,6 +77,7 @@
 
 ## 归档
 
+- [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md) — v0.12.x 已完成项
 - [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) — v0.11.x 已完成项
 - [`archived_plan.0.10.x.md`](../archive/v0.10.x/archived_plan.0.10.x.md) — v0.10.x 已完成项
 - [`archived_plan.0.9.x.md`](../archive/v0.9.x/archived_plan.0.9.x.md) — v0.9.x 已完成项

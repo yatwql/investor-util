@@ -64,7 +64,8 @@ def main() -> None:
     def count(sel) -> int:
         return sum(1 for _, m in collected if sel(m))
 
-    # ── 模式对应测试量（对齐 test-runner.py MODES marker 表达式）──
+    # ── 模式对应测试量（对齐 test-runner.py MODES marker 表达式；
+    #    双处定义——modes.py 门禁 marker 变更必须同步本字典，否则计数表口径漂移）──
     modes = {
         "unit": lambda m: "unit" in m,
         "standard": lambda m: "unit" in m and "edge" not in m and "data" not in m,
@@ -81,6 +82,7 @@ def main() -> None:
             "unit_analysis",
             "unit_scripts",
             "unit_web",
+            "unit_report",
         ),
         "dev-verify": lambda m: (
             (
@@ -92,6 +94,7 @@ def main() -> None:
                     "unit_analysis",
                     "unit_scripts",
                     "unit_web",
+                    "unit_report",
                 )
                 and "edge" not in m
                 and "data" not in m

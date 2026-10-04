@@ -208,6 +208,44 @@ class TestRenderWhatifHtmlContext:
         assert tmpl.render.call_args.kwargs["whatif_backtest_chart_data"] is None
 
 
+class TestWhatifFeasibilitySection:
+    """HTML 申购受限提示节（⑦）：命中渲染、缺席整节不出现。"""
+
+    def _data(self, with_note: bool) -> dict:
+        data = {"available": True, "changes": [], "summary": [], "categories": [], "stats": {}}
+        if with_note:
+            data["feasibility"] = [
+                {
+                    "code": "519674",
+                    "name": "易方达蓝筹",
+                    "action": "新增",
+                    "status": "限大额",
+                    "kind": "limited",
+                    "amount": 1000.0,
+                    "days": 10,
+                    "feasible": True,
+                    "limit_text": "100",
+                    "next_open_text": "",
+                    "note_text": "限大额，日限 100 元，预计需 10 个交易日（估算·以渠道显示为准）",
+                }
+            ]
+        return data
+
+    def test_note_section_rendered_when_present(self):
+        from src.python.report.whatif_writer import render_whatif_html
+
+        html = render_whatif_html(self._data(with_note=True), "2026-10-03 00:00:00")
+        assert "申购受限提示" in html
+        assert "易方达蓝筹" in html
+        assert "预计需 10 个交易日" in html
+
+    def test_note_section_absent_when_degraded(self):
+        from src.python.report.whatif_writer import render_whatif_html
+
+        html = render_whatif_html(self._data(with_note=False), "2026-10-03 00:00:00")
+        assert "申购受限提示" not in html
+
+
 class TestWriteWhatifHtml:
     """write_whatif_html 最新版固定名 + 日期目录归档。"""
 

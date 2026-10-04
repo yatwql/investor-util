@@ -101,6 +101,7 @@ def _submit_news_future(
     holdings: list,
     prep_data: dict,
     enable_news: bool,
+    purchase_constraint_block: str = "",
 ) -> object | None:
     """向线程池提交新闻获取任务，返回 Future 或 None。"""
     if not enable_news:
@@ -112,6 +113,7 @@ def _submit_news_future(
         holdings,
         prep_data["news_top_count"],
         prep_data["penetrated_assets"],
+        purchase_constraint_block,
     )
 
 
@@ -182,7 +184,12 @@ def _fetch_llm_and_news(
 
     pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="orch_llm_news")
     try:
-        _news_fut = _submit_news_future(pool, holdings, prep_data, enable_news)
+        # 申购限购约束块：与 generate_all_llm 共用同一提取单源（供新闻关联批量
+        # 判定与缓存指纹）；缺席（降级/未产出）→ ""（回退原样）。
+        from src.python.llm import extract_purchase_constraint_block
+
+        purchase_constraint_block = extract_purchase_constraint_block(pipeline_data)
+        _news_fut = _submit_news_future(pool, holdings, prep_data, enable_news, purchase_constraint_block)
         _llm_fut = _submit_llm_future(
             pool,
             holdings,

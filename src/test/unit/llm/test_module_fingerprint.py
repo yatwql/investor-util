@@ -115,6 +115,7 @@ def _precheck_info(
     competitive_context: str = "",
     metrics=None,
     data_quality_text: str = "",
+    purchase_constraint_block: str = "",
 ) -> dict[str, dict]:
     """调用预检侧拿到各模块缓存信息（与生产同一入口）。"""
     return _compute_module_cache_info(
@@ -135,6 +136,7 @@ def _precheck_info(
         competitive_context=competitive_context,
         metrics=metrics,
         data_quality_text=data_quality_text,
+        purchase_constraint_block=purchase_constraint_block,
     )
 
 
@@ -145,6 +147,7 @@ def _write_kwargs(
     competitive_context: str = "",
     metrics=None,
     data_quality_text: str = "",
+    purchase_constraint_block: str = "",
 ) -> dict:
     """按模块签名构造写侧生成函数的实参。
 
@@ -182,6 +185,8 @@ def _write_kwargs(
         kwargs["metrics"] = metrics
     if module_key == "health_check":
         kwargs["data_quality_text"] = data_quality_text
+    # 四个生成函数均有该形参（约束块经统一附录进入各模块提示词）
+    kwargs["purchase_constraint_block"] = purchase_constraint_block
     return kwargs
 
 
@@ -192,6 +197,7 @@ def _write_fingerprint(
     competitive_context: str = "",
     metrics=None,
     data_quality_text: str = "",
+    purchase_constraint_block: str = "",
 ) -> str:
     """调用写侧生成函数并取回其指纹闭包输出（skeleton 入口被 mock，不触网）。"""
     generator_fn = {
@@ -203,7 +209,15 @@ def _write_fingerprint(
     with patch.object(generators, "generate_llm_module") as mock_gen:
         mock_gen.return_value = ("内容", False)
         generator_fn(
-            **_write_kwargs(module_key, history_data, pipeline_data, competitive_context, metrics, data_quality_text)
+            **_write_kwargs(
+                module_key,
+                history_data,
+                pipeline_data,
+                competitive_context,
+                metrics,
+                data_quality_text,
+                purchase_constraint_block,
+            )
         )
     return mock_gen.call_args.kwargs["fingerprint_fn"]()
 
@@ -596,3 +610,53 @@ def test_debate_fingerprint_carries_debate_feature_suffix():
     on = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK))
 
     assert off != on, "辩论增强后缀未进入辩论指纹"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  申购限购约束块（purchase_block）：接线前基线 + 三态 + 预检/写同源
+# ═══════════════════════════════════════════════════════════════
+
+_PURCHASE_BLOCK = (
+    "【申购限购约束】（天天基金渠道口径，数据抓取于 2026-10-01；其他渠道限额可能不同，实际以下单渠道显示为准）\n"
+    "- 110022 示例安心债券 限大额：单账户单日限购 100 元\n"
+    "（以上为申购可执行性硬约束：给出加仓、申购、合并类建议时必须先核对本表；场内标的无申购语义不列。）"
+)
+_PURCHASE_BLOCK_CHANGED = _PURCHASE_BLOCK.replace("100 元", "200 元")
+
+# 接线前（purchase_block 字段引入之前）以本文件样例输入录制的四模块指纹基线。
+# 唯一目的：抓「空串 + 分隔符改变哈希」陷阱——块空时键必须与引入前逐字节一致，
+# 否则存量缓存无谓全量失效。后缀逻辑有意变更时应同步更新本表（黄金值例外登记）。
+_PRE_WIRE_BASELINE = {
+    "global_macro": "3747bc3fcd8e",
+    "expert_review": "bb1a6f3fee5b_c_dh",
+    "health_check": "7cf5353be158",
+    "penetration_deep": "f249188b5f27",
+}
+
+
+def test_purchase_block_empty_equals_pre_wire_baseline():
+    """空块 = 接线前基线摘要（防分隔符陷阱：条件并入，空串不追加 part）。"""
+    for module_key, expected in _PRE_WIRE_BASELINE.items():
+        assert _write_fingerprint(module_key) == expected, f"{module_key}: 空块指纹偏离接线前基线"
+
+
+@pytest.mark.parametrize("module_key", sorted(_MODULE_KEYS))
+def test_purchase_block_enters_fingerprint(module_key: str):
+    """块非空 ⇒ 键变；块内容变 ⇒ 键再变（三态，防预检/写两侧键文脱钩）。"""
+    empty = _write_fingerprint(module_key)
+    with_block = _write_fingerprint(module_key, purchase_constraint_block=_PURCHASE_BLOCK)
+    changed = _write_fingerprint(module_key, purchase_constraint_block=_PURCHASE_BLOCK_CHANGED)
+
+    assert empty != with_block, f"{module_key}: 块未进指纹（换文不换键 → 复用旧结论）"
+    assert with_block != changed, f"{module_key}: 块内容变化未换键"
+
+
+@pytest.mark.parametrize("module_key", sorted(_MODULE_KEYS))
+def test_purchase_block_enters_precheck_key_not_only_write_side(module_key: str):
+    """预检侧同样随块换键，且与写侧逐字符同源（单源构造，非两处手拼）。"""
+    baseline = _precheck_info()[module_key]["key"]
+    with_block = _precheck_info(purchase_constraint_block=_PURCHASE_BLOCK)[module_key]["key"]
+    write_fp = _write_fingerprint(module_key, purchase_constraint_block=_PURCHASE_BLOCK)
+
+    assert baseline != with_block, f"{module_key}: 预检侧未随块换键"
+    assert with_block == CACHE_PREFIX_LLM + f"{module_key}_{write_fp}", f"{module_key}: 两侧键不同源"

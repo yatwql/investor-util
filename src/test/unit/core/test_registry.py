@@ -595,3 +595,20 @@ class TestComputationRegistry:
         m = ComputModuleDef(name="测试", module_key="analytics_test", label="test")
         with pytest.raises(AttributeError):
             m.module_key = "changed"  # type: ignore[misc]
+
+
+def test_fund_purchase_cache_registered_ttl_aligned_with_nav():
+    """申购状态总表缓存显式注册：TTL 与官方净值(price)同源、精确键登记、不入菜单刷新组。
+
+    回归点：未注册时 get_ttl 回退 CACHE_DAILY 属隐式巧合——回退逻辑或常量一变，
+    限购表 TTL 会无声漂移；本用例把「与官方净值一致」钉成显式关系断言（不写死数值）。
+    """
+    by_type = {m.data_type: m for m in get_registry()}
+    purchase = by_type["fund_purchase"]
+    assert "fund_purchase_status_table" in purchase.exact_cache_keys
+    # TTL 与官方净值（price 数据类型，场外净值走 price_ 前缀）同源——关系断言
+    assert purchase.cache_ttl == by_type["price"].cache_ttl
+    # 大表不入菜单刷新组（菜单 [1]/[2] 不强抓全量表）
+    assert not set(purchase.cache_groups) & {"refresh", "preload"}
+    # 类型映射：过期清理与派生查询认识该精确键
+    assert get_exact_type_map()["fund_purchase_status_table"] == "fund_purchase"

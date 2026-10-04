@@ -1046,17 +1046,23 @@ class TestReportGroupSwitches:
         "financial_indicator",
     )
 
-    def test_registry_group_covers_exactly_these_keys(self):
+    def test_known_report_keys_stay_in_group(self):
+        """已知报告组开关不得静默移出分组（子集断言：新增报告开关不要求改本清单）。"""
         from src.python.config.features import GROUP_REPORT, switches_in_group
 
-        assert tuple(flag for flag, _d in switches_in_group(GROUP_REPORT)) == self.KEYS
+        flags = {flag for flag, _d in switches_in_group(GROUP_REPORT)}
+        assert set(self.KEYS) <= flags
 
     def test_accessor_matches_registry_default(self):
-        """每个开关的访问器取值 == 注册表默认值（缺键回落由注册表统一表达）。"""
+        """注册表报告组**每个**开关都有访问器，且访问器取值 == 注册表默认值（缺键回落由注册表统一表达）。"""
         from src.python.config import _core
-        from src.python.config.features import feature_switch_registry
+        from src.python.config.features import (
+            GROUP_REPORT,
+            feature_switch_registry,
+            switches_in_group,
+        )
 
-        for flag in self.KEYS:
+        for flag, _d in switches_in_group(GROUP_REPORT):
             accessor = getattr(_core, f"is_enable_{flag}")
             assert accessor() is bool(feature_switch_registry[flag].default), flag
 

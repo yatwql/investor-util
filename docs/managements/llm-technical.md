@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.12.1
+> 文档版本：0.12.2
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -283,6 +283,7 @@ _run_standard_mode()
 │ 注入 Prompt Appendix（防御统一注入）      │
 │ _build_prompt_appendix() → 追加至尾部     │
 │  TOP3 排名 + 数据速查表 + 代码白名单       │
+│  + 申购限购约束块（第4段，块空不占位）     │
 └──────────────────┬───────────────────────┘
            │
            ▼
@@ -497,6 +498,8 @@ if not any(needs.values()):
 ### 4.4 pipeline_data 注入与 history_data 暴露
 
 `pipeline_data`（组合历史走势时间维度上下文，含快照 diff 差异摘要）可选传递给 `expert_review` 和 `health_check`，使 LLM 能感知持仓环比变化（新增/清仓/加仓/减仓品种、总市值/总盈亏变化百分比）。
+
+**申购限购约束块暴露**：`generate_all_llm()` 经 `extract_purchase_constraint_block(pipeline_data)` 从契约字段 `constraint_block` 提取**一次**（report 构建期渲染，llm 层只读数据、不反向依赖 `report/`），同一实例交预检侧（`_compute_module_cache_info` 的 `purchase_block`）与写侧（各生成函数 → 统一附录第 4 段）——两侧共用唯一提取点，契约键名或嵌套调整只改此处，防两份表达式漏改一处致块静默缺席；缺席（契约 None/字段缺/降级）→ `""`，提示词与缓存键双不变。新闻批量路径由 `report/_llm_news.py::_fetch_llm_and_news` 调同一提取函数（report → llm 方向合法），交 `generators_news` 批量 hooks 的提示词与缓存指纹。both/basic/What-if 取契约路径不传 `holdings_details` → 块恒空零开销。
 
 **history_data 暴露**：`generate_all_llm()` 接收 `history_data` 参数，包含组合历史日收益率序列、基准指数日收益率序列等时间序列数据。该数据在 prompt 中以紧凑图表形式注入，使 LLM 能感知组合的历史波动特征和相对大盘表现，增强智囊团深度复盘和持仓体检报告中的趋势分析能力。
 
@@ -836,6 +839,7 @@ penetrated_assets ──→ extract_stable_penetration()
 | `metrics` | `expert_review` / 辩论三键 | 提示词正文（【量化指标】/ 情景分析 / 风格一致性） | 量化指标字典 |
 | `data_quality_text` | `health_check` | `prompts_tables._build_data_quality_detail_block()` | 数据质量详细状态块（【数据质量详细状态】：净值新鲜度基准 + 净值滞后/无有效行情清单 + 连接失败 / 数据为空 / 触发降级计数），由 `degradation_events`（本进程内的降级事件日志）与 `data_freshness` 契约（交易日 + 逐品种新鲜度）共同渲染而成 |
 | `pipeline_data` 派生的【环比变化】【数据质量降级】两段 | `expert_review` / `health_check` / 辩论三键 | `prompts_core._build_difpipeline_data_block()` / `_build_data_degradation_block()` | 由 `_pipeline_block_cache_suffix()` 调用**提示词侧同一构建器**取文本再哈希——「进键的文本」与「进提示词的文本」同源 |
+| `purchase_constraint_block`（申购限购约束块） | 标准四模块 + 辩论三键 + `self_review` | `prompts_tables._build_prompt_appendix()` 第 4 段 | 由 `extract_purchase_constraint_block(pipeline_data)` **唯一提取点**取契约字段 `constraint_block`（report 构建期渲染一次），同一实例交预检侧 `purchase_block` 与写侧附录；块空不进提示词也不进键（接线前录制四模块基线，断言空块 == 引入前黄金值，防「空串+分隔符」换哈希）；新闻批量路径 `_batch_prompt` 拼块 + `_batch_preparer` 并入 `context_fp` 同源 |
 
 **两个结构性保证**：
 
@@ -991,6 +995,8 @@ _build_global_macro_prompt()
 **差异上下文注入**（`_build_difpipeline_data_block`）：仅 `expert_review` / `health_check` 使用，从 `pipeline_data.diff` 提取环比变化（新增/清仓/加仓/减仓/市值变化/盈亏变化），以紧凑格式注入提示词。首次运行输出"暂无历史对比数据"。
 
 **国别/币种分布**（`_calc_country_exposure`）：从持仓明细代码前缀推断（sh/sz/bj→A股，hk→港股，us→美股），并计算各国家/地区的市值合计。
+
+**统一 Prompt 附录（四段）**：`_build_prompt_appendix()` 由 skeleton 在 user_prompt 选择之后**单点注入**（全仓唯一调用点），依次为 TOP3 排名 + 数据速查表 + 代码白名单 + **申购限购约束块（第 4 段）**；组装守卫「任一段非空即返回」——块单独非空而三防御为空时不得被整体空判吞掉。块空 → 附录输出与不含该段逐字节一致（缺省形参 `purchase_constraint_block=""`）。标准四模块、辩论 pro/con/synthesis、生成后自检共用该链（各自 `generate_llm_module` 调用传参；synthesis 未传附录数据时第 4 段经守卫独立成段）。
 
 [↑ 回到顶部](#目录)
 

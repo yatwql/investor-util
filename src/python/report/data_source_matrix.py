@@ -46,6 +46,12 @@ _SOURCE_CATEGORIES: list[dict[str, Any]] = [
     {"key": "fund_rank", "name": "基金排名", "prefixes": ["fund_rank_", "perf_rank"], "data_types": ["fund_rank"]},
     {"key": "fund_hold", "name": "基金持仓", "prefixes": ["fund_hold_"], "data_types": ["fund_hold"]},
     {
+        "key": "fund_purchase",
+        "name": "基金申购状态",
+        "prefixes": ["fund_purchase"],
+        "data_types": ["fund_purchase"],
+    },
+    {
         "key": "industry",
         "name": "行业分类",
         "prefixes": ["industry_", "penetration_industry"],

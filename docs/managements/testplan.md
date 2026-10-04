@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.12.1
+> 文档版本：0.12.2
 
 ---
 
@@ -33,6 +33,9 @@
 | `cache/` 子包 | 过期判断、读写、清理 | 原子写入、损坏恢复、TTL 边界（0s/1s/过期1s）、前缀匹配、并发 access、gzip 透明解压 |
 | `providers/*.py` | mock HTTP + 异常 | 200 正常 / 空数据 / 超时 / 429 / 503 / JSON 格式错误 / HTML 而非 JSON / 空响应 / 字段缺失 / 编码异常 |
 | `providers/tiantian_holdings.py` | 三跳阶梯次序 + 锚点解析 | **次序不变量**：第 1 跳命中即不请求主页面、第 2 跳请求失败即返 None 不落第 3 跳、第 3 跳仅在「第 2 跳无持仓且无目标 ETF 锚点」时到达、联接基金在第 2 跳即返回故第 3 跳**不可达**（回归锁定「兜底不得遮蔽联接基金」）；第 2 跳 `date=""`（报告期不从主页面取）；`parse_feeder_target_etf` 正反例——**常规 ETF 页的反向链接「查看相关ETF联接」必须被拒**（两重区分各测一遍）、锚点指向自身、目标非场内代码、无标签链接；`_extract_fund_name` 无括号标题返回空串 |
+| `providers/tiantian_purchase.py` | 四类代表行契约解析 + 载荷准入 + 降级 | 真实响应样本 fixture（`var reData=` 前缀）四类代表行逐字段断言；`purchase_schema` 准入（行数骤降/字段缺失判失败且不污染旧缓存）；0 元限额 → `None`；传输桩回放直连抓取；akshare 备链字段映射（`test_tiantian_purchase*.py`，异常样本入 `*_edge.py` 带 `@pytest.mark.edge`） |
+| `fetcher/fund_purchase.py` | 链注册同构 + 四级降级阶梯 | 链注册与 `_DEFAULT_CHAINS` 同构；主链 → 备链 → 过期缓存 → 暂不可用逐级断言；会话缓存同会话只经链 1 次；`data_status` 成败记录（`test_fund_purchase.py`） |
+| `report/purchase_status.py` + 展示层 | 陈旧阶梯三档 + 单源文案 + 双端条件列 | ≤3 / 4~7 / >7 交易日（按交易日历，含长假不计）；单元格各状态分支；0 元限额 →「限额未知」；口径脚注 Excel/HTML 同源；开关关 15 列基线不变；受限索引 restricted_index 准入四条（契约/可用/时效/受限交集）与字段值同源断言、stale 档仍准入；`available=False` 静默隐列 + 契约注入管线冒烟（`test_purchase_status*.py` / `test_holdings_detail_sheet.py` / `test_pipeline_purchase_status.py`） |
 | `llm/` 包 | 全路径覆盖 | API 路由、Provider 回退、截断检测+自动重试、空内容安抚重试、熔断器、缓存命中/未命中、Extended Thinking 注入/降级、thinking 耗尽自动重试（关闭 thinking 同 provider 重试一次，仍失败才切换）、thinking 并发信号量（`llm_max_thinking_concurrency` 串行化，`TestThinkingConcurrencyLimit`）、指纹确定性 |
 | `llm/` — 辩论模式 | 6 文件专项覆盖 | `test_debate_generators.py`（三段生成流程 pro→con→synthesis 控制）、`test_debate_prompts.py`（提示词模板/合成提示/集中度问答块）、`test_debate_token_budget.py`（Token 预算守卫 1×/2× 阈值）、`test_debate_edge.py`（边缘测试文件隔离 合规边缘场景 11 项）、`test_debate_conditional.py`（条件推理场景注入）、`test_debate_qa.py`（集中度问答阈值触发） |
 | `report/*.py` | 正常 + 空数据 + 边界 | 单条持仓、最大 100 条持仓、零成本/零市值、全亏损、全盈利、混合账户 |
@@ -45,11 +48,13 @@
 | `report/report_template.html`（correlation 模块） | 相关性章节 HTML 呈现 | 汇总卡+相关度最高+热力矩阵+配对明细、单元格样式分支（强正/强负/不显著/N/A）、不足品种提示、available=False 降级占位、correlation_data=None 章节隐藏 |
 | `analysis/portfolio_evolution.py` | 多快照趋势聚合计算 | 多账户合并、快照缺市值回退成本权重、HHI 计算、TOP 持仓变迁、快照数不足 available=False、历史快照容错跳过 |
 | `report/evolution_sheet.py` + `report_template.html`（evolution 模块） | 组合演进双端呈现 | 汇总/总市值/HHI/TOP/账户流/说明顺序、多账户流表、单账户无流表、HHI 无效期记 "-"、available=False 占位、evolution_data=None 章节隐藏、enable_portfolio_evolution=False 章节隐藏（board 层）、3 图各带 .chart-caption（图下说明） |
-| `analysis/whatif.py` | 双持仓成本口径 diff 计算 | 新增/清仓/加仓/减仓/不变识别、份额容差(<1e-3)、成本权重+HHI、汇总 delta+箭头、分类配置（_CATEGORY_ORDER 排序）、多账户合并、两侧空降级、单侧空=全清仓仍可算 |
+| `analysis/purchase_feasibility.py` | 申购可行性判定纯函数 | 判定矩阵逐分支（限大额已知/未知、暂停、无判定入口、59/60/61 阈值两侧、days 上取整关系、话术三态）+ 边缘（非正金额/限额、NaN/Inf、超大额不可行、极小 1 天）；全程无网 |
+| `llm/` 约束块注入链（`prompts_tables`/`skeleton`/`generators`/`generators_orchestrator`/`module_fingerprint`/`self_review`/`generators_news`/`_llm_news`/`news_correlation`） | 申购限购约束块接入全部 LLM 分析章（统一附录第 4 段 + 指纹条件并入 + 新闻批量同源） | 附录缺省 ≡ 空块逐字节、仅块非空组装守卫、四模块/辩论 pro/con/synthesis/自检/新闻批量「完备含块 vs 降级不含」成对、提取实例单源 6 函数透传、指纹三态与接线前基线（空块 = 黄金值）、预检/写两侧键同源；全程无网（`test_purchase_constraint_injection.py` 等） |
+| `analysis/whatif.py` | 双持仓成本口径 diff 计算 | 新增/清仓/加仓/减仓/不变识别、份额容差(<1e-3)、成本权重+HHI、汇总 delta+箭头、分类配置（_CATEGORY_ORDER 排序）、多账户合并、两侧空降级、单侧空=全清仓仍可算；受限提示（restricted_index 缺省≡空降级逐字节、新增/加仓金额口径、卖出腿不判定、暂停/限额未知分支、降级无 feasibility 键） |
 | `analysis/whatif_backtest.py` | 生效日时序回测纯计算 | 生效日→请求天数折算/钳位/坏格式/未来日期、并集+LOCF+锚点对齐、归一化/收益率/回撤序列数值、5 指标对比、数据不足/两侧空/不可对齐 available=False、status 降级传播 |
-| `report/whatif_operations.py` | whatif 共享层编排 | build_whatif_data→校验→写报告；未指定生效日不调用回测且无 backtest 键；指定生效日合并进 data；回测异常→ok=True 且 available=False；返回 None 不加键 |
-| `report/whatif_sheet.py` | 调仓 What-if Excel 页签呈现 | 摘要(文件对比+变动统计+汇总+箭头)、分类配置权重%、变动明细行底色（新增绿/清仓红/加仓黄/减仓蓝/不变灰）、时序回测页签（指标表+净值/回撤序列+占位）、available=False/None 占位 |
-| `report/whatif_writer.py` + `whatif_template.html` | 调仓 What-if 独立 HTML 页 | ①~⑦ 段齐全（未指定生效日④时序回测隐藏）、双环形图+回测 2 折线图各带 .chart-caption（图下说明）+#whatif-chart-data/#whatif-backtest-chart-data JSON（R9 最小化）、行动作行 class + badge、箭头类、available=False 占位 |
+| `report/whatif_operations.py` | whatif 共享层编排 | build_whatif_data→校验→写报告；未指定生效日不调用回测且无 backtest 键；指定生效日合并进 data；回测异常→ok=True 且 available=False；返回 None 不加键；受限索引单点挂载（透传至 build、取契约异常兜底空索引） |
+| `report/whatif_sheet.py` | 调仓 What-if Excel 页签呈现 | 摘要(文件对比+变动统计+汇总+箭头)、分类配置权重%、变动明细行底色（新增绿/清仓红/加仓黄/减仓蓝/不变灰）、时序回测页签（指标表+净值/回撤序列+占位）、受限提示块（命中渲染/不可行标红/缺席不写）、available=False/None 占位 |
+| `report/whatif_writer.py` + `whatif_template.html` | 调仓 What-if 独立 HTML 页 | ①~⑧ 段齐全（含⑦申购受限提示条件节，缺席整节不出现；未指定生效日④时序回测隐藏）、双环形图+回测 2 折线图各带 .chart-caption（图下说明）+#whatif-chart-data/#whatif-backtest-chart-data JSON（R9 最小化）、行动作行 class + badge、箭头类、available=False 占位 |
 | `cli/cli.py`（whatif 子命令） | whatif argparse + 处理器 | --candidate 必填、--base 可选、--effective-date 解析并透传、_handle_whatif 委托（显式 base/config 默认/读取失败/目标失败/不可用数据不写报告）、main 透传 |
 
 ### 1.2 数据边界 Edge Case 强制清单（通用规范）

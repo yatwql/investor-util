@@ -72,6 +72,10 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     # 财务指标：持仓 A 股基本面（功能开关 `financial_indicator`，
     # 由 report/financial_indicator.build_financial_indicator 组装；开关关闭时为 None）
     "financial_indicator_data",
+    # 申购限购状态：持仓明细「申购状态」列数据源（功能开关 `fund_purchase_limit`，
+    # 由 report/purchase_status.build_purchase_status_data 组装；开关关闭时为 None、
+    # 全链失败时 available=False 静默隐列）
+    "purchase_status_data",
 }
 
 # ── 已知 prep 顶层键（用于 build_prep() 类型校验） ──
@@ -112,6 +116,9 @@ _PREP_KNOWN_KEYS: set[str] = {
     # 财务指标：持仓 A 股基本面（功能开关 `financial_indicator`，
     # 由 prepare_report_data 组装；开关关闭时为 None）
     "financial_indicator_data",
+    # 申购限购状态：持仓明细「申购状态」列数据源（功能开关 `fund_purchase_limit`，
+    # 由 prepare_report_data 组装；开关关闭时为 None、全链失败时 available=False）
+    "purchase_status_data",
 }
 
 # ── 类型映射（用于自动类型断言） ──
@@ -135,6 +142,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "decision_review_data": (dict, type(None)),
     "financial_report_digest_data": (dict, type(None)),
     "financial_indicator_data": (dict, type(None)),
+    "purchase_status_data": (dict, type(None)),
     "prosperity_framework_data": dict,
     "market_sentiment_data": dict,
 }
@@ -162,6 +170,7 @@ _PREP_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "market_temperature_data": dict,
     "financial_report_digest_data": dict,
     "financial_indicator_data": dict,
+    "purchase_status_data": (dict, type(None)),
 }
 
 

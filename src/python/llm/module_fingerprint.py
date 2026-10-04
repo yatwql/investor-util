@@ -21,12 +21,14 @@
     过度失效，漏算则导致内容与键脱钩的陈旧缓存）。
   - **覆盖以「提示词是否真的含该段」为准**：进了提示词的内容必须进指纹
     （``competitive_context`` / ``metrics`` / ``data_quality_text`` /
-    ``pipeline_data`` 派生的【环比变化】【数据质量降级】两段），不进提示词的
-    段落不并入（纯成本失效）。
+    ``purchase_block`` / ``pipeline_data`` 派生的【环比变化】【数据质量降级】
+    两段），不进提示词的段落不并入（纯成本失效）。
   - **一次渲染、两侧共享同一实例**：``competitive_context`` 与
     ``data_quality_text`` 由调用方（``generate_all_llm``）渲染一次后同时交给预检侧
     与写侧，两边不得各自渲染——两次渲染会让「进键的文本」与「进提示词的文本」
-    退化为靠纪律对齐。
+    退化为靠纪律对齐。``purchase_block`` 同理：契约构建期（report 侧）渲染一次，
+    两侧只读透传；且**仅在非空时条件并入**——空串不追加 part（无条件拼接会把
+    空串与分隔符写进哈希输入，「块空键不变」静默失效、存量缓存无谓全量失效）。
   - 返回值为**指纹本体**（不含 ``CACHE_PREFIX_LLM + 模块名`` 前缀），缓存键由两侧
     按同一形态自行拼装。
 """
@@ -88,6 +90,9 @@ class ModuleFingerprintInputs:
         data_quality_text: **已渲染**的数据质量详细状态文本块，由调用方渲染一次后
             与提示词共享**同一实例**（仅提示词含该段的模块使用——目前仅
             health_check）
+        purchase_block: **已渲染**的申购限购约束块（契约字段 ``constraint_block``，
+            经统一 prompt 附录进入各分析章提示词）；仅非空时条件并入哈希
+            （空串不追加 part，见模块 docstring 纪律）
     """
 
     total_mv: float = 0.0
@@ -104,6 +109,7 @@ class ModuleFingerprintInputs:
     competitive_context: str = ""
     metrics: dict | None = None
     data_quality_text: str = ""
+    purchase_block: str = ""
 
 
 def debate_feature_cache_suffix() -> str:
@@ -162,14 +168,17 @@ def global_macro_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     否则「组合未动、基准指数已动」时键不变，预检命中旧键后复用按旧指数算出的
     对比结论。该块为**已渲染文本**，与注入提示词的实例同一（见模块 docstring）。
     """
-    return compute_fingerprint(
+    _parts = [
         inputs.a_indices,
         inputs.us_indices,
         inputs.total_mv,
         inputs.total_profit,
         inputs.categories,
         inputs.competitive_context,
-    )
+    ]
+    if inputs.purchase_block:
+        _parts.append(inputs.purchase_block)
+    return compute_fingerprint(*_parts)
 
 
 def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
@@ -183,7 +192,7 @@ def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     【指标对比】/【量化指标】/情景分析），连同 ``pipeline_data`` 派生的【环比
     变化】【数据质量降级】两段（见 ``_pipeline_block_cache_suffix``）一并纳入哈希。
     """
-    _fp = compute_fingerprint(
+    _parts = [
         build_llm_fingerprint(
             total_mv=inputs.total_mv,
             total_cost=inputs.total_cost,
@@ -196,7 +205,10 @@ def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
         ),
         inputs.competitive_context,
         inputs.metrics,
-    )
+    ]
+    if inputs.purchase_block:
+        _parts.append(inputs.purchase_block)
+    _fp = compute_fingerprint(*_parts)
     _fp += debate_feature_cache_suffix()
     if decision_ledger.is_active():
         _fp += decision_ledger.lessons_cache_suffix()
@@ -277,7 +289,7 @@ def health_check_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     同理由纳入 ``pipeline_data`` 派生的【环比变化】【数据质量降级】两段（体检
     提示词同样承载它们，见 ``_pipeline_block_cache_suffix``）。
     """
-    _fp = compute_fingerprint(
+    _parts = [
         build_llm_fingerprint(
             total_mv=inputs.total_mv,
             total_cost=inputs.total_cost,
@@ -289,15 +301,18 @@ def health_check_fingerprint(inputs: ModuleFingerprintInputs) -> str:
             history_data=inputs.history_data,
         ),
         inputs.data_quality_text,
-    )
+    ]
+    if inputs.purchase_block:
+        _parts.append(inputs.purchase_block)
+    _fp = compute_fingerprint(*_parts)
     _fp += _signal_digest_cache_suffix(inputs.pipeline_data)
     _fp += _pipeline_block_cache_suffix(inputs.pipeline_data)
     return _fp
 
 
 def penetration_deep_fingerprint(inputs: ModuleFingerprintInputs) -> str:
-    """穿透深度分析：基础指纹（穿透资产含 mv/sector/ratio 全字段）。"""
-    return build_llm_fingerprint(
+    """穿透深度分析：基础指纹（穿透资产含 mv/sector/ratio 全字段）+ 条件并入约束块。"""
+    _base = build_llm_fingerprint(
         total_mv=inputs.total_mv,
         total_cost=inputs.total_cost,
         total_profit=inputs.total_profit,
@@ -308,12 +323,16 @@ def penetration_deep_fingerprint(inputs: ModuleFingerprintInputs) -> str:
         full_penetration=True,
         history_data=inputs.history_data,
     )
+    if inputs.purchase_block:
+        return compute_fingerprint(_base, inputs.purchase_block)
+    return _base
 
 
 def self_review_fingerprint(
     module_outputs: dict[str, str | None] | None,
     holdings_details: list[dict] | None = None,
     penetrated_assets: list[dict] | None = None,
+    purchase_block: str = "",
 ) -> str:
     """生成后自检：**内容寻址**指纹——各模块产出文本 + 数据摘要。
 
@@ -328,17 +347,23 @@ def self_review_fingerprint(
         module_outputs: 模块名 → HTML 产出（None/空串按缺失处理）。
         holdings_details: 持仓明细（仅取 name/code/市值稳定字段）。
         penetrated_assets: 穿透资产列表。
+        purchase_block: 申购限购约束块（非空 → 提示词附录含块，故进键；
+            块空 → 逐字节沿用不带该段的原形态，键与引入前一致）。
     """
     normalized = {
         key: (text or "")
         for key, text in sorted((module_outputs or {}).items())
         if isinstance(text, str) and text.strip()
     }
-    return compute_fingerprint(
+    _parts = [
         normalized,
         extract_stable_holdings(holdings_details),
         extract_stable_penetration(penetrated_assets),
-    )
+    ]
+    if purchase_block:
+        # 条件并入：进提示词必进指纹；块空不追加 part（逐字节回退）
+        _parts.append(purchase_block)
+    return compute_fingerprint(*_parts)
 
 
 # 模块标识 → 指纹构造器。预检侧按键取指纹建缓存键，写侧闭包按同一函数现算，

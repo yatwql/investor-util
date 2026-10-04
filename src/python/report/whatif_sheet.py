@@ -241,6 +241,38 @@ def write_whatif_changes_sheet(ws: Worksheet, whatif_data: dict[str, Any] | None
             ws.cell(row=_row - 1, column=1).font = font
         row = _row
 
+    # 申购受限提示（目标持仓落地可行性）：feasibility 缺席 → 不写任何行
+    # （降级态输出与现网逐字节一致，分支仅由命中触发）
+    feasibility = whatif_data.get("feasibility") or []
+    if feasibility:
+        row += 1
+        row = write_title_row(ws, row, "申购受限提示（目标持仓落地可行性）", ncols=_ncols)
+        row = write_header_row(
+            ws,
+            row,
+            ["变动", "名称", "代码", "申购状态", "提示", "估算天数(交易日)", "可行性"],
+        )
+        for note in feasibility:
+            days = note.get("days")
+            feasible = note.get("feasible")
+            _row = write_data_row(
+                ws,
+                row,
+                [
+                    note.get("action", ""),
+                    note.get("name", ""),
+                    note.get("code", ""),
+                    note.get("status", ""),
+                    note.get("note_text", ""),
+                    days if days is not None else "—",
+                    "—" if feasible is None else ("可行" if feasible else "不可行"),
+                ],
+            )
+            if feasible is False:
+                for col in range(1, _ncols + 1):
+                    ws.cell(row=_row - 1, column=col).fill = _ACTION_FILL.get("清仓", PatternFill())
+            row = _row
+
     freeze_header(ws, row=2)
     auto_width(ws, min_width=8, max_width=26)
     logger.info("持仓变动明细页签写入完成: %d 条", len(whatif_data.get("changes", [])))

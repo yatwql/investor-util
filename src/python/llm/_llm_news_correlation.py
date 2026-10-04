@@ -36,6 +36,7 @@ def run_news_correlation_safe(
     penetrated_assets: list[dict] | None = None,
     industry_data: dict[str, dict] | None = None,
     force: bool = False,
+    purchase_constraint_block: str = "",
 ) -> tuple[list[dict], bool, dict]:
     """安全执行新闻关联 LLM 分析，提供一致缓存/失败处理/日志。
 
@@ -71,6 +72,7 @@ def run_news_correlation_safe(
             industry_data=industry_data,
             force=force,
             llm_config=llmc,
+            purchase_constraint_block=purchase_constraint_block,
         )
         LLM_MODULE_FAILURE.pop("news_correlation", None)
         logger.info("%s生成完成%s", _MN("news_correlation"), "（缓存）" if cached else "")
