@@ -16,6 +16,7 @@
 ### Changed
 
 - **HTML**：正文大块折叠「打开报告缺省一律收起」——原 `fold.js` 初始 load 无条件执行锚点展开，浏览器恢复会话/地址带 `#sec-…` 打开报告会把目标章折叠块自动展开；改为初始 load 不执行锚点展开（模板本就无 `open` 属性，缺省收起不依赖 JS），会话内点击目录原生锚点链接（hashchange）仍自动展开目标章保证跳转可见，打印展开/恢复与手动展开 resize 不变；新增结构回归用例（初始 load 不得执行锚点展开），`reports-instruction` ④节同步
+- **文档**：折叠覆盖章节在管理文档表述——`technical.md` 新增 §4.21（覆盖章节清单表、缺省收起/锚点/打印/resize 语义与模板测试载体）、`requirements.md` 新增 `R-OUT-12` + `testplan.md` 同步载体行（`test_html_report_structure.py`，需求追溯双向一致）
 
 ### Fixed
 

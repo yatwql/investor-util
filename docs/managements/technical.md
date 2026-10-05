@@ -48,6 +48,7 @@
   - [4.18 决策跨期反思闭环](#418-决策跨期反思闭环)
   - [4.19 持仓基本面（财务指标 + 持仓个股财报摘要）](#419-持仓基本面财务指标--持仓个股财报摘要一章两区块)
   - [4.20 景气度框架诊断（实验性功能 prosperity_framework）](#420-景气度框架诊断实验性功能-prosperity_framework)
+  - [4.21 正文大块默认折叠（HTML 报告）](#421-正文大块默认折叠html-报告)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -2895,6 +2896,25 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 **配置**：顶层键 `prosperity_framework`（`boom_keywords` / `global_edge_keywords` / `defensive_keywords` / `concentration_target_pct`，手动编辑）。
 
 **开关**：实验组 `prosperity_framework`（默认关、`affects_report=True`）；关闭时报告与未引入时逐字节一致。
+
+### 4.21 正文大块默认折叠（HTML 报告）
+
+**定位**：长内容章节的正文整体包进原生 `<details class="section-fold">`，章标题与「回到顶部」留在折叠块外常显；`summary.section-fold-summary` 提示条携带该章关键摘要并自带「点击展开/收起」指引（原生键盘可达，无 JS 也能收放）。折叠覆盖章节（结构回归 `test_html_report_structure.py` 的 `_FOLD_KEYS` 为单源，后续新增折叠章只需改清单即逐章生效）：
+
+| 章节 | sheet key | 提示条关键摘要 |
+|:--|:--|:--|
+| 组合历史走势与回撤 | `portfolio_history_drawdown` | 累计收益/最大回撤/年化波动 |
+| 财经新闻热点与持仓关联分析 | `news_correlation` | 关联新闻条数 |
+| 组合演进 | `portfolio_evolution` | 快照数与观察日数 |
+| 持仓基本面 | `fundamental_snapshot` | 财务指标/财报摘标的数 |
+| 持仓结构与集中度 | `position_structure` | 基金数与组合对数 |
+| 风格与因子分析 | `style_factor` | 基金风格数 |
+| 数据源可用性矩阵 | `data_source_status` | 数据源数 |
+
+- **缺省一律收起**：模板不写 `open` 属性（收起是原生行为、不依赖 JS）；`fold.js` 初始 load 不执行锚点展开——打开报告（地址带 `#sec-…` / 浏览器恢复会话）全部收起，仅会话内 `hashchange`（点击目录原生锚点链接）自动展开目标章折叠块保证跳转后可见；回归用例 `test_fold_js_keeps_collapsed_on_initial_load` 锁死初始不展开。
+- **打印**：`beforeprint` 以捕获阶段注册（先于 chart-print.js 快照）全展开 + 同步 resize 内部 Chart.js 图表（收起态 canvas 为 0 尺寸），`afterprint` 恢复用户原折叠状态；`@media print` 隐藏 `summary` 提示条并去边框/背景，打印稿不显示提示条。
+- **手动展开**：`details` 的 `toggle` 事件逐块绑定，展开时对内部 canvas `resize()`（ResizeObserver 兜底）。
+- **载体**：`details.section-fold` 共 7 处（主模板 `report_template.html` 5 处：历史走势/新闻关联/持仓结构/风格因子/数据源矩阵；`partials/evolution_section.html` 与 `partials/fundamental_snapshot_section.html` 各 1 处）；结构回归 `TestSectionFold`（历史章）+ `TestSectionFoldMoreChapters`（其余折叠章节逐章遍历五类断言：包裹收起/summary 首元素/标题回顶在外/关键摘要/初始收起）。需求 `R-OUT-12`。
 
 ## 5. LLM 集成层（概要设计）
 
