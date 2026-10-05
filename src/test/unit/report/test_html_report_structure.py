@@ -2159,6 +2159,23 @@ class TestSectionFold(unittest.TestCase):
         self.assertIn("toggle", fold_js, "手动展开应绑定 toggle 钩子（图表 resize 兜底）")
         self.assertIn("section-fold", fold_js, "钩子应作用于 details.section-fold")
 
+    def test_fold_js_keeps_collapsed_on_initial_load(self) -> None:
+        """打开报告（初始 load，含地址带 #锚点/浏览器恢复会话）缺省一律收起。
+
+        回归：旧实现 init 时无条件执行锚点展开，浏览器恢复会话带 #sec-…
+        打开报告会把目标章折叠块自动展开，违背「打开缺省收起」；
+        会话内点击目录触发 hashchange 仍展开（跳转可见性不受影响）。
+        """
+        fold_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "fold.js"))
+        with open(fold_path, encoding="utf-8") as f:
+            fold_js = f.read()
+        self.assertNotIn(
+            "handleHash();",
+            fold_js,
+            "初始 load 不得执行锚点展开（打开报告时所有折叠块必须缺省收起）",
+        )
+        self.assertIn("addEventListener('hashchange'", fold_js, "会话内锚点跳转仍应自动展开目标章")
+
 
 class TestSectionFoldMoreChapters(unittest.TestCase):
     """正文默认折叠扩展到的三章（财经新闻关联 / 组合演进 / 持仓基本面）。

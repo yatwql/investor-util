@@ -15,8 +15,8 @@
       "credentials_ref": "kimi-main",
       "priority": 10,
       "timeout": 120,
-      // 主端点（优先级最高）在途并发上限 1：429 自保护
-      "pacing": { "max_concurrency": 1 }
+      // 主端点（优先级最高）在途并发上限 1 + 最小间隔 1s：429 自保护
+      "pacing": { "min_interval": 1, "max_concurrency": 1 }
     },
     {
       "name": "kimi-code",
