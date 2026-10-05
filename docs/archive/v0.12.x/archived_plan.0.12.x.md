@@ -4,7 +4,7 @@
 > 原始文件：`docs/managements/plan.md（当前迭代部分）`
 > 涵盖版本：v0.12.2-dev（2026-10-03：plan-72 基金申购限购信息接入·持仓展示面）
 > 归档内容：plan-72 完成态记录（数据链路 → 展示集成 → 文档登记三迭代，P0 门禁十项全绿）
-> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](../../../plan/fund-purchase-limit-design.md) **保留在在办区**——plan-74（迭代 4 合并/调仓联动）仍消费其 §6 方案与 §8 验收，随 plan-74 完成一并归档；plan-73 的 LLM 上下文设计见 `../../../plan/fund-purchase-limit-llm-context-design.md`（待评审）
+> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）
 
 ---
 
@@ -14,7 +14,7 @@
 
 **动机**：QDII 等基金大量处于「限大额 / 暂停申购」状态（实测 QDII/海外股票类 738 只中 445 只限购），持仓界面无从得知；限购也直接影响「同类持仓合并」可行性——目标基金限购时申购合并路径不成立。数据源已实测可用（天天基金申购状态总表，27,695 行，含申购状态与日累计限定金额）。
 
-**动作**：按 [`fund-purchase-limit-design.md`](../../../plan/fund-purchase-limit-design.md) 实施——**本期 = 迭代 1~3**（数据链路 → 展示集成 → 文档登记，每迭代验收标准见设计文档 §8）；合并/调仓分析联动为**迭代 4（二期）**（设计文档 §6），已另立 `plan-74`。**评审前提**：稳定性优先（「数据需要稳定，才有意义」），四层保障（§3.4）为硬约束。
+**动作**：按 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) 实施——**本期 = 迭代 1~3**（数据链路 → 展示集成 → 文档登记，每迭代验收标准见设计文档 §8）；合并/调仓分析联动为**迭代 4（二期）**（设计文档 §6），已另立 `plan-74`。**评审前提**：稳定性优先（「数据需要稳定，才有意义」），四层保障（§3.4）为硬约束。
 
 **完成态（2026-10-03）**：
 
@@ -28,7 +28,7 @@
 
 ## plan-74 基金申购限购合并/调仓联动（plan-72 迭代 4）— ✅ 已完成（2026-10-03）
 
-> 设计文档：[`docs/plan/fund-purchase-limit-advice-design.md`](../../plan/fund-purchase-limit-advice-design.md)（设计 + 已实施）。
+> 设计文档：[`docs/archive/v0.12.x/fund-purchase-limit/fund-purchase-limit-advice-design.md`](fund-purchase-limit/fund-purchase-limit-advice-design.md)（设计 + 已实施）。
 
 **完成摘要**（四迭代，每迭代独立可回滚）：
 
@@ -48,7 +48,7 @@
 **完成摘要**：两端一致交付——`report/holdings_detail_sheet.py` 区块②末列追加「申购状态」（`_CAT_PURCHASE_HEADERS`，与 `cost_lots` 可选列组合保持末列次序）+ `report_template.html` 持仓分类表表头/明细行/小计/总计四处条件块（复用同一 `purchase_status_display`，cells 文案与 Excel 逐字一致）；明细行经 `format_purchase_status_cell` 单源渲染、分组小计/总计行留空（非可聚合指标，与区块①同语义）；判据 `purchase_column_visible` 单源，开关复用 `fund_purchase_limit` 不新增；降级（关 / `available=False`）列缺席逐字节回退；口径脚注复用区块①②之间既有那一行（位置天然覆盖两块）；HTML 持仓分类表不在本次范围。新增 `test_holdings_detail_sheet.py::TestCategoryPurchaseColumn` 6 用例 + `test_purchase_status.py::TestCategoryPurchaseTemplate` 4 用例（表头/明细文案/小计空格/总计结构）；文档同步（reports-instruction 特性行 / how-to-config 开关行 / technical 附录 H 两处 / faq 问答）。
 
 
-> 设计文档：[`docs/plan/fund-purchase-limit-llm-context-design.md`](../../plan/fund-purchase-limit-llm-context-design.md)（设计 + 已实施）。
+> 设计文档：[`docs/archive/v0.12.x/fund-purchase-limit/fund-purchase-limit-llm-context-design.md`](fund-purchase-limit/fund-purchase-limit-llm-context-design.md)（设计 + 已实施）。
 
 **完成摘要**（四迭代，每迭代独立可回滚）：
 

@@ -55,11 +55,11 @@
 >
 > 剩余 P4 三项（plan-66 ~ plan-68）仍为候选；**立项前须先做本仓库现状比对**（rf-510 教训：plan-64 原立项前提「无生成后质检」即被 `llm/fact_checker` 既有实现部分推翻，最终按「分层不重叠」重新定位）。
 
-> **plan-72 已完成归档**（2026-10-03）：本期迭代 1~3（数据链路 → 展示集成 → 文档登记）P0 门禁十项全绿完成（手工真实抓取验收 HTTP 200 / 27,695 行 / `purchase_schema=1`），完成态见 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；迭代 4（合并/调仓联动）另立 `plan-74`，设计文档保留在在办区供其消费 §6/§8。
+> **plan-72 已完成归档**（2026-10-03）：本期迭代 1~3（数据链路 → 展示集成 → 文档登记）P0 门禁十项全绿完成（手工真实抓取验收 HTTP 200 / 27,695 行 / `purchase_schema=1`），完成态见 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；迭代 4（合并/调仓联动）另立 `plan-74`（已完成归档），设计文档随完成态移入 [`fund-purchase-limit/`](../archive/v0.12.x/fund-purchase-limit/)。
 
-> **plan-73 已完成归档**（2026-10-03）：四迭代（单源渲染器与契约字段 → 主路径四模块接线与指纹 → 辩论/自检/新闻批量覆盖核验 → 文档登记）P0 门禁十项全绿完成；全部 LLM 分析章（标准四模块 + 辩论 pro/con/synthesis + 生成后自检 + 新闻批量）的提示词与缓存指纹同源携带申购限购约束块（`constraint_block` 契约字段，`generate_all_llm` 提取同一实例交统一附录第 4 段），降级态提示词与缓存键双不变。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-llm-context-design.md`](../plan/fund-purchase-limit-llm-context-design.md) 已改「设计 + 已实施」随归档留存。
+> **plan-73 已完成归档**（2026-10-03）：四迭代（单源渲染器与契约字段 → 主路径四模块接线与指纹 → 辩论/自检/新闻批量覆盖核验 → 文档登记）P0 门禁十项全绿完成；全部 LLM 分析章（标准四模块 + 辩论 pro/con/synthesis + 生成后自检 + 新闻批量）的提示词与缓存指纹同源携带申购限购约束块（`constraint_block` 契约字段，`generate_all_llm` 提取同一实例交统一附录第 4 段），降级态提示词与缓存键双不变。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-llm-context-design.md`](../archive/v0.12.x/fund-purchase-limit/fund-purchase-limit-llm-context-design.md) 已改「设计 + 已实施」随归档留存。
 
-> **plan-74 已完成归档**（2026-10-03）：四迭代（受限索引与判定原语 → What-if 接线 → 回归网与零改动断言 → 文档登记）P0 门禁十项全绿完成；What-if 目标持仓申购受限提示落地（`restricted_index` 契约字段 + `evaluate_purchase_feasibility` 判定 + Excel/HTML 双端提示块，降级态逐字节回退）。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-advice-design.md`](../plan/fund-purchase-limit-advice-design.md) 已改「设计 + 已实施」随归档留存。
+> **plan-74 已完成归档**（2026-10-03）：四迭代（受限索引与判定原语 → What-if 接线 → 回归网与零改动断言 → 文档登记）P0 门禁十项全绿完成；What-if 目标持仓申购受限提示落地（`restricted_index` 契约字段 + `evaluate_purchase_feasibility` 判定 + Excel/HTML 双端提示块，降级态逐字节回退）。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-advice-design.md`](../archive/v0.12.x/fund-purchase-limit/fund-purchase-limit-advice-design.md) 已改「设计 + 已实施」随归档留存。
 
 > **plan-75 已完成归档**（2026-10-03）：持仓分类汇总（Excel 区块②末列 + HTML 持仓分类表条件列，两端一致）追加「申购状态」——与区块①同一套单源原语（`purchase_column_visible` 判据 / `format_purchase_status_cell` 文案 / `stale_level` 时效），小计与总计行留空，开关复用 `fund_purchase_limit` 不新增；新增 6 用例，P0 门禁十项全绿。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)。
 
