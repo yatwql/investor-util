@@ -469,13 +469,13 @@ A: **技术上可以，但官方条款有明确风险，不推荐用于批量报
 
 **Q: LLM API 返回 429（请求过多）怎么办？**
 
-A: 说明触发了端点的速率限制（RPM/TPM 配额或风控）。程序内置重试机制（`max_retries` 默认 2 次，间隔自动递增）。**先看日志**——429 时会先回显当前两级配置再给建议：`当前配置：全局 llm_max_concurrency=3；provider[条目] pacing.max_concurrency=…、pacing.min_interval=…`（未声明的项标「未配置」），并按「还有没有下降空间」分支给可执行建议。可调的旋钮：
+A: 说明触发了端点的速率限制（RPM/TPM 配额或风控）。程序内置重试机制（`max_retries` 默认 2 次，间隔自动递增）。**先看日志**——429 时会先回显当前两级配置再给建议：`当前配置：全局 llm_max_concurrency=3；provider[条目] pacing.max_concurrency=…、pacing.min_interval=…`（未声明的项标「未配置」），并按**生效并发 = min(全局, 端点)** 分支给可执行建议（哪级是绑定项就只建议调哪级，避免无效调整）。可调的旋钮：
 
-1. **调低全局并发**：`llm_settings.json` 的 `llm_max_concurrency`（默认 3，设 1 完全串行）——全局上限，影响所有端点；
+1. **调低全局并发**：`llm_settings.json` 的 `llm_max_concurrency`（默认 3，设 1 完全串行）——全局上限，影响所有端点；**仅当它 ≤ 端点 pacing 值（即它绑定生效并发）时调低才立即生效**；
 2. **只收紧这个端点**：该 provider 条目内加 `"pacing": { "max_concurrency": 1, "min_interval": 20 }`（只约束本端点，其余端点不受影响），字段含义与推荐值见 [LLM 配置指引](how-to-config-llm.md) → 「端点级节流（`pacing`）」；
-3. **拉大请求间隔**：已有 `pacing` 时把 `min_interval` 提到 `30~60` 秒（日志建议「加大 min_interval」时会带当前值）。
+3. **拉大请求间隔**：已有 `pacing` 时把 `min_interval` 提到 `30~60` 秒（日志建议「加大 min_interval」时会带当前值）——**端点并发已到 1 时这是唯一有效的并发类旋钮**（在途已串行，再调任何并发值都不减少该端点请求）。
 
-若日志显示**两级并发与间隔均已到底**仍持续 429，说明并发侧已无可调、超出的是套餐配额——升级套餐或切换到 `fallback_provider`。注意：单纯增大 `timeout_{模块键}` 对 429 无效（超时管的是单次请求等待，不是速率限制）；`max_tokens_{模块键}` 调低可减轻 TPM 压力但收益有限。
+若日志显示**生效并发已压至下限**（min(全局, 端点)=1）仍持续 429，说明并发侧已无可调、超出的是套餐配额或请求速率——升级套餐或切换到 `fallback_provider`。注意：单纯增大 `timeout_{模块键}` 对 429 无效（超时管的是单次请求等待，不是速率限制）；`max_tokens_{模块键}` 调低可减轻 TPM 压力但收益有限。
 
 **Q: 是否支持本地部署的 LLM（如 Ollama、vLLM）？**
 

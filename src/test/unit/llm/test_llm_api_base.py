@@ -321,7 +321,11 @@ class TestAttemptApiCall(unittest.TestCase):
         self.assertIn("pacing.min_interval=未配置", log_text)
 
     def test_rate_limit_429_endpoint_already_at_floor_skips_lowering_endpoint_advice(self) -> None:
-        """端点 pacing.max_concurrency 已为 1（最低）时，不再叫用户调低端点并发，改推全局/间隔旋钮。"""
+        """端点=1（生效并发=min(全局,端点)=1）时：不叫调低端点，也不叫调低全局——只推 min_interval。
+
+        回归场景：全局 3 / 端点 1 时，调低全局（3→2→1）对 min(3,1)=1 毫无影响，
+        旧文案「建议调低全局 llm_max_concurrency（当前 3）」是恒无效的空话建议。
+        """
         from src.python.llm.pacing import PacingPolicy
 
         mock_client = MagicMock(spec=httpx.Client)
@@ -342,6 +346,78 @@ class TestAttemptApiCall(unittest.TestCase):
         self.assertIn("pacing.max_concurrency=1", log_text)
         self.assertIn("无可再降", log_text)
         self.assertNotIn("按端点限流", log_text)
+        self.assertNotIn("建议调低全局", log_text, "端点=1 时调低全局不减少该端点在途并发，不得作为建议给出")
+        self.assertIn("不减少该端点在途并发", log_text, "应解释为何调低全局无效")
+        self.assertIn("min_interval（当前 0s）", log_text, "应改推带当前值的间隔旋钮")
+
+    def test_rate_limit_429_endpoint_binding_suggests_only_endpoint_knob(self) -> None:
+        """端点 < 全局（端点绑定生效并发）时：只建议调低端点，不笼统叫调低全局。"""
+        from src.python.llm.pacing import PacingPolicy
+
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with (
+            patch("src.python.config.get_llm_config", return_value={"llm_max_concurrency": 5}),
+            patch(
+                "src.python.llm.pacing.get_policy",
+                return_value=PacingPolicy(min_interval=1.0, max_concurrency=2),
+            ),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0, "kimi-main")
+        log_text = "\n".join(cm.output)
+        self.assertIn("由端点绑定", log_text)
+        self.assertNotIn("或调低全局 llm_max_concurrency", log_text, "全局非绑定项，不得并列作建议")
+        self.assertIn("调低全局（当前 5）须低于端点值才生效", log_text, "如提及全局须说明生效条件")
+
+    def test_rate_limit_429_global_binding_suggests_only_global_knob(self) -> None:
+        """全局 < 端点（全局绑定生效并发）时：只建议调低全局，不叫人调无效的端点值。"""
+        from src.python.llm.pacing import PacingPolicy
+
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with (
+            patch("src.python.config.get_llm_config", return_value={"llm_max_concurrency": 2}),
+            patch(
+                "src.python.llm.pacing.get_policy",
+                return_value=PacingPolicy(min_interval=1.0, max_concurrency=5),
+            ),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0, "kimi-main")
+        log_text = "\n".join(cm.output)
+        self.assertIn("建议调低全局 llm_max_concurrency（当前 2）", log_text)
+        self.assertNotIn("建议调低 provider", log_text, "端点 5 高于全局，逐步调低它不改变生效并发")
+        self.assertIn("由全局绑定", log_text)
+
+    def test_rate_limit_429_equal_knobs_suggests_both(self) -> None:
+        """两级相等（均为绑定项）时：两个旋钮都列出，调低任一生效并发即降。"""
+        from src.python.llm.pacing import PacingPolicy
+
+        mock_client = MagicMock(spec=httpx.Client)
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_client.post.return_value = mock_response
+
+        with (
+            patch("src.python.config.get_llm_config", return_value={"llm_max_concurrency": 3}),
+            patch(
+                "src.python.llm.pacing.get_policy",
+                return_value=PacingPolicy(min_interval=1.0, max_concurrency=3),
+            ),
+        ):
+            with self.assertLogs(level="WARNING") as cm:
+                self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0, "kimi-main")
+        log_text = "\n".join(cm.output)
+        self.assertIn("两级相等均为绑定项", log_text)
+        self.assertIn("pacing.max_concurrency（当前 3，最低 1）", log_text)
+        self.assertIn("llm_max_concurrency（当前 3）", log_text)
 
     def test_rate_limit_429_both_knobs_at_floor_points_to_quota(self) -> None:
         """全局与端点并发均为 1（均无下降空间）时，提示并发已到底、429 更可能来自配额/风控。"""
@@ -365,6 +441,7 @@ class TestAttemptApiCall(unittest.TestCase):
         self.assertIn("再调低并发已无益", log_text)
         self.assertIn("配额", log_text)
         self.assertNotIn("按端点限流", log_text)
+        self.assertNotIn("建议调低", log_text, "生效并发=1 时不得给出任何调低并发类建议")
 
     def test_service_unavailable_503(self) -> None:
         """503 → ('retryable', 503)。"""
