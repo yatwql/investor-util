@@ -11,6 +11,8 @@
 
 ### Added
 
+- **工程门禁**：新增单文件行数红线守护 `scripts/check-file-length.py --ci`（复用 `_checklib`：主程序 >800 行 / 测试 >1200 行即 finding 退出 2；既有超限项豁免登记与 `review-findings` 挂账同步、拆分后自动提示移除；`-v` 输出 >500/>800 警告区全集清单作登记表派生源，人肉快照退役），入 CI `guards` job + pre-commit 十守护 + CLAUDE.md/developer-guide/testplan 门禁清单（`check-doc-drift` 第 16 项五处同源校验）；15 项回归用例入 `test_check_file_length.py`；首跑全仓查出 `cli/cli.py` 910 行与 5 个未登记测试文件超 1200 行红线，已分别挂账 rf-585/rf-583（rf-584 归档已解决）
+
 - **HTML**：正文大块折叠新增「持仓结构与集中度」「风格与因子分析」「数据源可用性矩阵」三个章节——与既有折叠章同构（章标题与「回到顶部」常显于折叠块外、内容包 `details.section-fold`、`summary` 提示条带该章关键摘要：基金数与组合对数 / 基金风格数 / 数据源数，文案自带展开/收起指引，原生键盘可达），缺省一律收起且打开报告（含带 `#锚点`）不自动展开；结构回归用例 `_FOLD_KEYS` 扩展至六个折叠章节（包裹/默认收起/summary 首元素/标题回顶在外/摘要五类断言逐章遍历，`unit_report` 域 2135 项全绿）；`reports-instruction` ④节折叠章清单同步
 
 ### Changed

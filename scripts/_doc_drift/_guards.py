@@ -6,7 +6,7 @@
 - `.github/workflows/ci.yml` 的 `guards` job steps
 - `CLAUDE.md` 的「提交前门禁（P0）」/「发布门禁（P2）」条款
 - `testplan.md` 的「P0 全通」/「P2 已执行」清单行
-- `.githooks/pre-commit` 的八守护执行体（本地提交即跑，漏改会让钩子与门禁静默分叉）
+- `.githooks/pre-commit` 的十守护执行体（本地提交即跑，漏改会让钩子与门禁静默分叉）
 
 新增/移除守护脚本时任何一处漏改都会静默失真（该清单此前无校验）。
 本模块从五处各自截取清单区域，统一提取 ``scripts/check-*.py --ci`` 脚本名，

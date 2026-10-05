@@ -4,7 +4,7 @@
 #   P0（提交前）→ dev-verify 模式 — dev 分支每次推送
 #   P1（合入前）→ verify 模式   — master 分支 PR/推送
 #   P2（发布前）→ verify,regression 模式 — 版本标签推送
-#   guards      → 9 个 --ci 守护脚本（P0/P2 同源），阻塞；lint（ruff）非阻塞
+#   guards      → 10 个 --ci 守护脚本（P0/P2 同源），阻塞；lint（ruff）非阻塞
 #   portability → 非 UTF-8 locale + 隐式编码探针（PEP 597），阻塞
 
 name: CI
@@ -136,6 +136,8 @@ jobs:
         run: python scripts/check-version-consistency.py --ci
       - name: 文档链接与结构一致性（check-doc-links）
         run: python scripts/check-doc-links.py --ci
+      - name: 单文件行数红线（check-file-length）
+        run: python scripts/check-file-length.py --ci
 
   portability:
     # 非 UTF-8 locale / 隐式编码门禁（阻塞）。test / format / guards 三个 job 全在 UTF-8 locale

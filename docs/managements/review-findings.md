@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.4-dev
-> **编号源**：`rf-next = 585`（新增问题取此编号，完成后更新为 +1；已用最大 rf-584，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 586`（新增问题取此编号，完成后更新为 +1；已用最大 rf-585，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -17,18 +17,21 @@
 
 ### P2A — 文件过长（>500 行，可选优化；**>800 行为硬上限必须拆分**）
 
+> **派生源（2026-10-05 起，人肉快照退役）**：行数与全集以 `scripts/check-file-length.py -v` 输出为真值（该输出列出全部 >500 行主程序文件）；红线（>800 行）由 `check-file-length.py --ci` 自动拦截（豁免路径与本表挂账同步），不再依赖本表人工发现新破线者。本表仅登记需跟踪/决策的文件。
+
 | # | 文件 | 行数 | 状态 | 拆分建议 |
 |---|------|------|------|----------|
-| **rf-75** | `core/registry.py` | 716 | 维持现状（中央注册表被 56 文件引用，数据表内聚；2026-10-02 实测 716，较 2026-09-10 的 666 增长 50——plan-50 财报域槽位/plan-57 等注册项增补） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责（不拆） |
+| **rf-75** | `core/registry.py` | 743 | 维持现状（中央注册表被 56 文件引用，数据表内聚；2026-10-05 脚本实测 743，较 2026-10-02 的 716 增长 27——plan-50 财报域槽位/plan-57 等注册项增补） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责（不拆） |
 | **rf-78** | `fetcher/batch.py` | 520 | 维持现状（BatchDispatcher 本身内聚，复核确认不拆；2026-10-02 实测 520，回落至登记值附近（rf-522 重试退避原语收编后下降）） | BatchDispatcher 本身内聚，可维持现状（不拆） |
 | **rf-79** | `core/code_utils.py` | 671 | 维持现状（仍在 500-800 区间内聚；2026-10-02 实测 671，较登记值 542 增长 129，主要为符号映射/判定函数增补） | 可考虑将 `estimate_market_cap_by_prefix()` 等非核心判定函数移出（不拆） |
 | **rf-80** | `report/data_status.py` | 621 | 维持现状（DegradationTracker 单类，内部职责内聚；2026-10-02 实测 621，较 2026-09-10 的 544 增长 77——provider 归属登记与失败原因可读化增补） | DegradationTracker 单类偏大（不拆） |
 | **rf-81** | `report/html_renderers.py` | 556 | 维持现状（render 函数属同一渲染域；2026-10-02 实测 556，较 2026-09-10 的 521 增长 35） | 所有 HTML render 函数揉合一体（不拆） |
 | **rf-85** | `fetcher/fund.py` | 555 | **已跨入 500-800 可选优化区间**（2026-10-02 实测 555，较 2026-09-10 的 405 增长 150——同花顺官方源备源、基准多源判定等增补）；暂维持现状，若再增则按职责拆分 | 排名/持仓/基准三职责可拆分为子模块（后续择机） |
-| **rf-86** | `cache/operations.py` | 637 | 500-800 可选优化区间（2026-10-02 实测 637，与 2026-09-10 基本持平） | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
-| **rf-89** | `report/excel_generator.py` | 574 | **已跨入 500-800 可选优化区间**（2026-10-02 实测 574，较 2026-09-10 的 427 增长 147——持仓基本面合并页签等增补）；暂维持现状 | 页签编排可进一步下沉到独立 writer（后续择机） |
+| **rf-86** | `cache/operations.py` | 740 | 500-800 可选优化区间（2026-10-05 脚本实测 740，较 2026-10-02 的 637 增长 103，临近 800 须关注） | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
+| **rf-89** | `report/excel_generator.py` | 585 | **已跨入 500-800 可选优化区间**（2026-10-05 脚本实测 585，较 2026-10-02 的 574 增长 11——持仓基本面合并页签等增补）；暂维持现状 | 页签编排可进一步下沉到独立 writer（后续择机） |
 | **rf-581** | `fetcher/chain.py` | 822 | **已跨过 800 硬上限（必须拆分）且长期未登记本表**：2026-10-05 实测 822（窗口前已 818，限购/数据链路实现又 +4）；P2A 表为 2026-10-02 快照，既漏登本文件也漏登已跨红线的 api_base.py（见 rf-580/rf-584） | 链定义（`_DEFAULT_CHAINS`）/ `fetch_with_fallback` 路由 / 增量合并三职责可拆为子模块（择机执行，拆前先跑 P1 门禁） |
 | **rf-582** | `llm/generators_orchestrator.py`（798）、`report/_report_generation.py`（786） | 798 / 786 | **临界：距 800 硬上限分别仅 2 / 14 行**（2026-10-05 实测；本窗口分别 +41 / +15，再一轮小改即破线） | 破线前先拆：orchestrator 可下沉并发调度/进度回调，_report_generation 可下沉产物落盘/元数据汇总 |
+| **rf-585** | `cli/cli.py` | 910 | **已跨过 800 硬上限（必须拆分）**：2026-10-05 `check-file-length.py` 首跑全仓即查出（人肉登记表从未覆盖）；已豁免入脚本 EXEMPTIONS 挂账本行，超限由 `--ci` 拦截待拆分 | parser 构建（`_build_parser` 约 170 行）与 `_handle_*` 子命令处理器、持仓读入辅助可分别下沉 `cli/_parser.py` / `cli/_handlers.py`（拆后同步移除脚本豁免） |
 
 
 ### P2B — Web 模式遗留技术债（2026-08-06）
@@ -41,24 +44,17 @@
 
 ### P2C — 测试文件膨胀（阈值：行数 >800 警告 / >1200 红线；测试项 >80 警告 / >120 红线）
 
-> 阈值见 `developer-guide.md`「文件膨胀阈值」表；本表登记已越线或临近越线的测试文件（2026-10-05 实测）。
+> 阈值见 `developer-guide.md`「文件膨胀阈值」表；本表登记已越线或临近越线的测试文件（2026-10-05 实测；全集清单以 `scripts/check-file-length.py -v` 为准，>1200 行红线由 `--ci` 拦截）。
 
 | # | 文件 | 现状 | 状态 / 修复方向 |
 |---|------|------|----------|
-| **rf-583** | `unit/report/test_html_report_structure.py`（2313 行 / 110 项）、`unit/report/test_orchestrator.py`（1963 行）、`unit/report/test_holdings_detail_sheet.py`（1485 行，近期 +239） | **三个文件均超 1200 行红线**；`test_html_report_structure.py` 110 项超 80 警告线（红线 120）；另 `unit/scripts/test_check_doc_drift.py` 94 项、`unit/config/test_config.py` 89 项、`unit/llm/test_llm_api_base.py` 1190 行（距 1200 红线仅 10 行）为警告级 | 按「被测函数 / 场景类型」拆分子文件（如 `_structure_*.py`）；拆分时同步刷新 `test-coverage.md` / `folders.md` 用例计数。本次新增用例已避开 `test_llm_api_base.py`（防当场破线，改落 `test_llm_pacing.py`） |
-
-### P2D — 行数红线门禁缺口（2026-10-05 自审查出）
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-584** | **>800 主程序 / >1200 测试文件行数红线没有任何 `--ci` 脚本强制**：api_base.py 破线至 831 行期间，9 个守护脚本照样全绿；且 P2A 登记表是 2026-10-02 人肉快照，既不覆盖全部 >500 行文件，也不自动发现新破线者（chain.py 818 起、api_base.py 699→831 均未登记） | 新增行数守护脚本（复用 `_checklib`，主程序 >800 / 测试 >1200 报 finding 退出 2），入 `guards` job 与 CLAUDE.md 门禁清单；同时刷新 P2A 登记为脚本输出派生（人肉快照退役） |
-
-
+| **rf-583** | **超 1200 行红线 8 个（2026-10-05 `check-file-length.py -v` 全仓实测，均已豁免入脚本 EXEMPTIONS 挂账本行）**：`unit/report/test_html_report_structure.py`（2313 行 / 110 项）、`unit/llm/test_fact_checker.py`（1846）、`unit/report/test_orchestrator.py`（1963）、`unit/report/test_market_value.py`（1746）、`unit/report/test_html_writer.py`（1661）、`unit/report/test_holdings_detail_sheet.py`（1485，近期 +239）、`unit/cli/test_cli.py`（1410）、`unit/report/test_summary.py`（1344） | **八个文件均超 1200 行红线**；`test_html_report_structure.py` 110 项超 80 警告线（红线 120）；另 `unit/scripts/test_check_doc_drift.py` 94 项、`unit/config/test_config.py` 89 项、`unit/llm/test_llm_api_base.py` 1190 行（距红线仅 10 行）为警告级 | 按「被测函数 / 场景类型」拆分子文件（如 `_structure_*.py`）；拆分时同步刷新 `test-coverage.md` / `folders.md` 用例计数并移除脚本豁免。本次新增用例已避开 `test_llm_api_base.py`（防当场破线，改落 `test_llm_pacing.py`） |
 
 ## 已解决问题
 
 | # | 摘要 | 状态 |
 |---|------|------|
+| **rf-584** | >800 主程序 / >1200 测试文件行数红线无任何 `--ci` 脚本强制，且 P2A 登记表为人肉快照（api_base.py 699→831、chain.py 破线均未登记即放行） | 已修复 2026-10-05（新增 `scripts/check-file-length.py --ci`：复用 `_checklib`，主程序 >800 / 测试 >1200 即 finding 退出 2；豁免登记与本表挂账同步、拆分后自动提示移除；`-v` 输出警告区全集清单作 P2A/P2C 派生源；入 CI guards + pre-commit 十守护 + CLAUDE.md/developer-guide/testplan 五处清单同源校验（check-doc-drift 第 16 项）；15 项回归用例入 `test_check_file_length.py`；首跑全仓查出 cli.py 910 与 5 个未登记测试文件超限，已分别挂账 rf-585/rf-583；P2A/P2C 行数刷新为脚本派生） |
 | **rf-580** | `llm/api_base.py` 在 36 小时实现窗口内从 699 → 831 行，跨过本文件 P2A「>800 行硬上限必须拆分」（增长主要为 429 诊断建议函数与 pacing 整改回显），且未登记 P2A 表、无门禁拦截 | 已修复 2026-10-05（`_concurrency_hint` 整体移入其功能文档本就归属的 `llm/pacing.py` §4.2.1，api_base 回落 737 行；归属一致性 + 800 行上限回归用例入 `test_llm_pacing.py`；`llm-technical` / `developer-guide` 两处符号指针同步） |
 | **rf-579** | 429 诊断「端点已=1 而全局 >1 → 建议调低全局」是恒无效建议：生效并发 = min(全局, 端点)，端点已钳到 1 时调低全局（3→2→1）从不减少该端点在途并发；「端点>1」分支并列建议调低非绑定项（如全局 5 > 端点 2 时叫调低全局）同样绕路；「两级均到底」建议含无效的「减少同时发起的生成任务」 | 已修复 2026-10-05（按生效并发绑定项给建议：>1 只列绑定项、=1 不给任何并发类建议改推 min_interval + 配额/风控；4 条用例变异实测改前全红，三处文档同步） |
 
