@@ -35,9 +35,8 @@ MAIN_SOURCE_ROOT = "src/python"
 TEST_SOURCE_ROOT = "src/test"
 
 #: 既有破线豁免：相对路径 → 挂账说明（review-findings 待处理区须有对应条目）。
-EXEMPTIONS: dict[str, str] = {
-    "src/python/cli/cli.py": "已挂账 review-findings 主程序超限待处理区（须拆分）",
-}
+#: 空 = 当前无挂账破线项；新破线须先拆分，无法立即拆分时在此登记并同步挂账。
+EXEMPTIONS: dict[str, str] = {}
 
 
 def collect_line_counts(root: Path) -> list[tuple[str, str, int]]:

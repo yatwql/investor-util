@@ -500,7 +500,7 @@ class TestCliReadHoldingsWithFlows:
         mock_parsed.transactions = [MagicMock()]
         mock_parsed.dividends = [MagicMock()]
         with (
-            patch("src.python.cli.cli._cli_resolve_holdings_file", return_value="/tmp/h.xlsx"),
+            patch("src.python.cli._handlers._cli_resolve_holdings_file", return_value="/tmp/h.xlsx"),
             patch("src.python.core.reader.read_holdings_with_flows", return_value=mock_parsed),
         ):
             result = _cli_read_holdings_with_flows({"holdings_dir": "/tmp", "holdings_filename": "h.xlsx"})
@@ -517,7 +517,7 @@ class TestCliReadHoldingsWithFlows:
         mock_parsed.transactions = []
         mock_parsed.dividends = []
         with (
-            patch("src.python.cli.cli._cli_resolve_holdings_file", return_value="/tmp/h.xlsx"),
+            patch("src.python.cli._handlers._cli_resolve_holdings_file", return_value="/tmp/h.xlsx"),
             patch("src.python.core.reader.read_holdings_with_flows", return_value=mock_parsed),
         ):
             result = _cli_read_holdings_with_flows({})
@@ -533,7 +533,7 @@ class TestCliReadHoldingsWithFlows:
         mock_parsed = MagicMock()
         mock_parsed.holdings = []
         with (
-            patch("src.python.cli.cli._cli_resolve_holdings_file", return_value="/tmp/h.xlsx"),
+            patch("src.python.cli._handlers._cli_resolve_holdings_file", return_value="/tmp/h.xlsx"),
             patch("src.python.core.reader.read_holdings_with_flows", return_value=mock_parsed),
         ):
             result = _cli_read_holdings_with_flows({})
@@ -551,7 +551,7 @@ class TestHandleReport:
         mock_result.exit_code = 0
         with (
             patch(
-                "src.python.cli.cli._cli_read_holdings_with_flows",
+                "src.python.cli._handlers._cli_read_holdings_with_flows",
                 return_value=([MagicMock()], [MagicMock()], [MagicMock()]),
             ),
             patch("src.python.report.cli_progress.CliProgressReporter"),
@@ -573,7 +573,7 @@ class TestHandleReport:
     def test_none_holdings_returns_severe(self):
         """持仓读取失败 → 返回 SEVERE 且不调用 generate_report。"""
         with (
-            patch("src.python.cli.cli._cli_read_holdings_with_flows", return_value=None),
+            patch("src.python.cli._handlers._cli_read_holdings_with_flows", return_value=None),
             patch("src.python.report.orchestrator.generate_report") as mock_gen,
         ):
             args = MagicMock()
@@ -589,7 +589,7 @@ class TestHandleReport:
         mock_reporter = MagicMock()
         with (
             patch(
-                "src.python.cli.cli._cli_read_holdings_with_flows",
+                "src.python.cli._handlers._cli_read_holdings_with_flows",
                 return_value=([MagicMock()], [], []),
             ),
             patch("src.python.report.cli_progress.CliProgressReporter", return_value=mock_reporter),
@@ -622,7 +622,7 @@ class TestHandleCacheUpdate:
         mock_result.exit_code = 0
 
         with (
-            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli._handlers._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.cache.operations.update_basic_cache", return_value=mock_result),
         ):
             code = _handle_cache_update("basic", {}, MagicMock())
@@ -634,7 +634,7 @@ class TestHandleCacheUpdate:
         mock_result.exit_code = 0
 
         with (
-            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli._handlers._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.cache.operations.update_position_cache", return_value=mock_result),
         ):
             code = _handle_cache_update("position", {}, MagicMock())
@@ -648,7 +648,7 @@ class TestHandleCacheUpdate:
         mock_pos.exit_code = 0
 
         with (
-            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli._handlers._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.cache.operations.update_basic_cache", return_value=mock_basic),
             patch("src.python.cache.operations.update_position_cache", return_value=mock_pos),
         ):
@@ -657,7 +657,7 @@ class TestHandleCacheUpdate:
 
     def test_holdings_none_returns_severe(self):
         """持仓为 None 时返回 _EXIT_SEVERE。"""
-        with patch("src.python.cli.cli._cli_read_holdings", return_value=None):
+        with patch("src.python.cli._handlers._cli_read_holdings", return_value=None):
             code = _handle_cache_update("basic", {}, MagicMock())
         assert code == _EXIT_SEVERE
 
@@ -692,7 +692,7 @@ class TestHandleWhatif:
     def test_success_config_default_base(self):
         """缺省 --base → 用 config 持仓文件（_cli_read_holdings）。"""
         with (
-            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli._handlers._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.core.reader.read_holdings", return_value=[MagicMock()]),
             patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
         ):
@@ -704,7 +704,7 @@ class TestHandleWhatif:
     def test_base_read_failure_severe(self):
         """基准持仓读取失败 → 返回 _EXIT_SEVERE，不触发共享层。"""
         with (
-            patch("src.python.cli.cli._cli_read_holdings", return_value=None),
+            patch("src.python.cli._handlers._cli_read_holdings", return_value=None),
             patch("src.python.core.reader.read_holdings", return_value=None),
             patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
         ):
@@ -715,7 +715,7 @@ class TestHandleWhatif:
     def test_candidate_read_failure_severe(self):
         """目标持仓读取失败 → 返回 _EXIT_SEVERE，不触发共享层。"""
         with (
-            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli._handlers._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.core.reader.read_holdings", return_value=None),
             patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
         ):
@@ -726,7 +726,7 @@ class TestHandleWhatif:
     def test_unavailable_data_severe(self):
         """共享层返回不可用 → 返回 _EXIT_SEVERE。"""
         with (
-            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli._handlers._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.core.reader.read_holdings", return_value=[MagicMock()]),
             patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
         ):
@@ -740,7 +740,7 @@ class TestHandleWhatif:
         with (
             # 基准持仓（未传 --base）走 _cli_read_holdings，目标持仓走 read_holdings；
             # 两者都要 stub，否则会真读 data/holdings/ 而依赖开发机本地文件
-            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli._handlers._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.core.reader.read_holdings", side_effect=[[MagicMock()], [MagicMock()]]),
             patch("src.python.report.whatif_operations.run_whatif_simulation") as mock_run,
         ):

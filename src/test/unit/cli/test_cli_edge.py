@@ -32,7 +32,7 @@ class TestCliEdge:
             # 必须打在真实调用点：_handle_report 走的是 _cli_read_holdings_with_flows；
             # 只 patch _cli_read_holdings 会静默回退到真实文件读取，依赖开发机 data/holdings/
             patch(
-                "src.python.cli.cli._cli_read_holdings_with_flows",
+                "src.python.cli._handlers._cli_read_holdings_with_flows",
                 return_value=(mock_holdings, [], []),
             ),
             patch("src.python.report.orchestrator.generate_report") as mock_gen,
@@ -55,7 +55,7 @@ class TestCliEdge:
         mock_result.exit_code = _EXIT_SUCCESS
 
         with (
-            patch("src.python.cli.cli._cli_read_holdings", return_value=[MagicMock()]),
+            patch("src.python.cli._handlers._cli_read_holdings", return_value=[MagicMock()]),
             patch("src.python.cache.operations.update_basic_cache", return_value=mock_result),
         ):
             code = _handle_cache_update("basic", {}, MagicMock())
@@ -75,7 +75,7 @@ class TestCliEdge:
     def test_holdings_dir_is_none(self):
         """holdings_dir 缺失时使用默认值。"""
         # 使用不存在的路径但 holdings_dir 取默认值
-        with patch("src.python.cli.cli.os.path.exists", return_value=False):
+        with patch("src.python.cli._handlers.os.path.exists", return_value=False):
             result = _cli_read_holdings({})
         assert result is None
 

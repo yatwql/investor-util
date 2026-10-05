@@ -188,7 +188,7 @@ def test_cli_handle_report_applies_overrides(monkeypatch):
     """_handle_report 把解析结果落到覆盖作用域，退出后即恢复。"""
     from types import SimpleNamespace
 
-    from src.python.cli import cli as cli_module
+    from src.python.cli import _handlers as cli_handlers
     from src.python.cli.cli import _handle_report
 
     captured: dict[str, object] = {}
@@ -199,7 +199,7 @@ def test_cli_handle_report_applies_overrides(monkeypatch):
 
     monkeypatch.setattr("src.python.report.orchestrator.generate_report", _fake_generate_report)
     monkeypatch.setattr(
-        cli_module,
+        cli_handlers,
         "_cli_read_holdings_with_flows",
         lambda config: ([], [], []),
     )

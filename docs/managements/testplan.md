@@ -55,7 +55,7 @@
 | `report/whatif_operations.py` | whatif 共享层编排 | build_whatif_data→校验→写报告；未指定生效日不调用回测且无 backtest 键；指定生效日合并进 data；回测异常→ok=True 且 available=False；返回 None 不加键；受限索引单点挂载（透传至 build、取契约异常兜底空索引） |
 | `report/whatif_sheet.py` | 调仓 What-if Excel 页签呈现 | 摘要(文件对比+变动统计+汇总+箭头)、分类配置权重%、变动明细行底色（新增绿/清仓红/加仓黄/减仓蓝/不变灰）、时序回测页签（指标表+净值/回撤序列+占位）、受限提示块（命中渲染/不可行标红/缺席不写）、available=False/None 占位 |
 | `report/whatif_writer.py` + `whatif_template.html` | 调仓 What-if 独立 HTML 页 | ①~⑧ 段齐全（含⑦申购受限提示条件节，缺席整节不出现；未指定生效日④时序回测隐藏）、双环形图+回测 2 折线图各带 .chart-caption（图下说明）+#whatif-chart-data/#whatif-backtest-chart-data JSON（R9 最小化）、行动作行 class + badge、箭头类、available=False 占位 |
-| `cli/cli.py`（whatif 子命令） | whatif argparse + 处理器 | --candidate 必填、--base 可选、--effective-date 解析并透传、_handle_whatif 委托（显式 base/config 默认/读取失败/目标失败/不可用数据不写报告）、main 透传 |
+| `cli/_parser.py` + `cli/_handlers.py`（whatif 子命令） | whatif argparse + 处理器 | --candidate 必填、--base 可选、--effective-date 解析并透传、_handle_whatif 委托（显式 base/config 默认/读取失败/目标失败/不可用数据不写报告）、main 透传 |
 
 ### 1.2 数据边界 Edge Case 强制清单（通用规范）
 

@@ -489,7 +489,7 @@ while True:
 
 ### 1.7 CLI 渠道详细设计
 
-CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定时任务（cron/计划任务）、批量生成、what-if 调仓、数据源健康检查。`cli/cli.py` 为 argparse 主入口，单次执行后退出，退出码供外部脚本判定成败。与 TUI 差异在**无交互**——持仓通过 config 定位而非文件选择器，进度默认写日志（`--verbose` 才输出到 stderr）。
+CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定时任务（cron/计划任务）、批量生成、what-if 调仓、数据源健康检查。`cli/cli.py` 为 argparse 主入口，单次执行后退出，退出码供外部脚本判定成败。**模块职责拆分**（守住单文件 800 行红线）：`cli/_parser.py` 承载解析器构建与 type 回调，`cli/_handlers.py` 承载子命令处理器、持仓读入辅助与 `_EXIT_*` 退出码契约，`cli/cli.py` 为门面——保留 `main()`/`run_cli()` 主流程与命令行功能开关应用，并 re-export 上述符号（`__all__` 显式声明），保证 `src.python.cli` 包导入与测试 patch 点（`cli.cli._handle_*`）稳定。与 TUI 差异在**无交互**——持仓通过 config 定位而非文件选择器，进度默认写日志（`--verbose` 才输出到 stderr）。
 
 #### 1.7.1 退出码约定
 
@@ -501,7 +501,7 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 
 #### 1.7.2 argparse 结构
 
-`_build_parser()`：`prog="investor-util"`，全局参数 + 7 个子命令。
+`_build_parser()`（`cli/_parser.py`）：`prog="investor-util"`，全局参数 + 7 个子命令。
 
 - **全局参数**：`--config`（备用配置文件路径）、`--output`（报告输出目录，覆盖 config 的 output_dir）、`--verbose`（进度同步到 stderr，默认仅写 logs/app.log）、`--non-interactive`（跳过首次运行交互式引导，定时任务/脚本使用）、`--experiment NAME`（可重复；启用实验性功能且**仅本次运行生效、不写盘**。NAME 取开关名或显示名，`all` = 全部启用。取值经 `_experiment_name` argparse type 回调即时校验：空串/未知名即报错，可选值由 `features.describe_experiment_flags()` 生成）、`--feature NAME=VALUE`（可重复；**全部**功能开关的双向一次性开关，同样是仅本次运行、不写盘。VALUE 取 `on/off/true/false/1/0`（大小写不敏感），NAME 取注册表键名。取值经 `_feature_override` argparse type 回调即时校验：非 `NAME=VALUE` 形态、未知开关名、不可识别取值均即报错并列出可选值；同名后者覆盖前者。两者共用一个应用原语，`--feature` 在 `--experiment` 之后应用，故显式取值可覆盖 `--experiment` 的隐式「置开」）、`--version`。
 - **`report`**：`--type basic/both/full`（默认 basic）、`--history auto/off`（未指定回退配置层 `history.fetch_mode`，仅 both/full 有效）、`--force-llm`。
@@ -518,7 +518,7 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 
 **持仓定位差异**：CLI 不经过 TUI 文件选择器——`_cli_resolve_holdings_file()` 通过 config 的 `holdings_dir + holdings_filename` 直接定位；若该路径为目录则自动选第一个 `.xlsx`（多个时告警）。`_cli_read_holdings()` / `_cli_read_holdings_with_flows()` 分别读主表与「主表+流水」，与 TUI 读取路径对齐。
 
-#### 1.7.4 子命令处理器
+#### 1.7.4 子命令处理器（`cli/_handlers.py`）
 
 - **`_handle_report`**：`CliProgressReporter(verbose)` 注入 `generate_report`（§4.2）；`--output` 覆盖 `output_dir`，`--history` 为 None 时回退配置层解析；返回 `result.exit_code`。
 - **`_handle_cache`**：三分支——`--clean` 委托 `cleanup_cache`；`--stats` 委托 `get_cache_stats` + 打印 LLM 配置状态；`--update` 委托 `update_basic_cache`/`update_position_cache`（§3.6），`--update all` 委托 `update_all_cache` **最大努力模式**（basic 失败仍继续 position，退出码取两者 max）。
@@ -2594,7 +2594,7 @@ report/portfolio_history.py      # as-if 时序引擎：close×shares 综合走�
 report/whatif_operations.py      # 共享层编排：build_whatif_data → build_whatif_backtest（联网取历史）→ 写报告
 report/whatif_sheet.py           # Excel 3 页签 + 条件第 4 页签「时序回测」（指定生效日时）
 report/whatif_writer.py          # 编排双产物：调仓模拟.xlsx / .html（最新版固定名 + 日期目录归档版）+ Chart.js 资产复制/内嵌（单文件自包含）
-cli/cli.py                       # whatif 子命令：--candidate 必填、--base 可选（缺省用 config 持仓）、--effective-date 可选（argparse 类型钩子经共享层 normalize_effective_date 前置校验）
+cli/_handlers.py               # whatif 子命令处理器（_handle_whatif）：--candidate 必填、--base 可选（缺省用 config 持仓）、--effective-date 透传（argparse 定义与类型钩子在 cli/_parser.py，钩子经共享层 normalize_effective_date 前置校验）
 tui/handlers_whatif.py           # [W] 入口：文件选择 + 生效日交互提示（_prompt_effective_date，校验委托共享层、非法重新询问）
 ```
 
