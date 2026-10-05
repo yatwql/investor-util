@@ -22,6 +22,7 @@ from src.python.llm.circuit_breaker import (
     _cb_record_failure,
     _cb_record_success,
 )
+from src.python.llm.pacing import _concurrency_hint
 from src.python.llm.pricing import estimate_cost
 from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
@@ -63,7 +64,6 @@ __all__ = [
     "_log_token_usage",
     "_get_retry_max",
     "_sanitize_endpoint",
-    "_concurrency_hint",
     "_check_circuit_breaker",
     "_process_success_response",
     "_attempt_api_call",
@@ -572,100 +572,6 @@ def _process_success_response(
     return (content, usage)
 
 
-def _concurrency_hint(endpoint_key: str = "") -> str:
-    """429 诊断：回显当前两级并发配置，并按「生效并发还有没有下降空间」给可执行建议。
-
-    判定基准是**生效并发 = min(全局 llm_max_concurrency, 端点 pacing.max_concurrency)**
-    （端点未配置时即全局值）——只有绑定项（等于生效并发的那一级）调低才立即使该端点
-    在途并发下降：端点已配到 1 时生效并发恒为 1，再建议「调低全局」永远不会有效果
-    （对端点=1/全局=3 的实测场景，这类空话会让诊断日志失信），此时除回显外只推
-    ``pacing.min_interval``（改请求速率）与配额/风控判断；生效并发 ≥ 2 时只列绑定项，
-    非绑定项注明「须低于对方现值才生效」，避免叫人调一个不咬合的旋钮。
-
-    Args:
-        endpoint_key: provider 条目名（端点策略键）；空串表示本次调用未绑定条目。
-
-    Returns:
-        拼接好的日志片段（配置回显 + 建议）；读取配置失败时回退为默认文案。
-    """
-    try:
-        from src.python.config import get_llm_config
-
-        global_limit = int((get_llm_config() or {}).get("llm_max_concurrency", 3))
-    except Exception:  # 配置层不可用不应阻断诊断日志
-        global_limit = 3
-
-    endpoint_limit = 0
-    min_interval = 0.0
-    policy = None
-    if endpoint_key:
-        try:
-            from src.python.llm.pacing import get_policy
-
-            policy = get_policy(endpoint_key)
-            if policy is not None:
-                endpoint_limit = policy.max_concurrency
-                min_interval = policy.min_interval
-        except Exception:  # 策略装载失败按「无约束」提示，不影响重试链路
-            endpoint_limit = 0
-
-    if endpoint_limit > 0:
-        endpoint_text = str(endpoint_limit)
-    else:
-        endpoint_text = "未配置（不限流）"
-    interval_text = f"{min_interval:g}s" if policy is not None else "未配置"
-    shown = f"当前配置：全局 llm_max_concurrency={global_limit}"
-    if endpoint_key:
-        shown += (
-            f"；provider[{endpoint_key}] pacing.max_concurrency={endpoint_text}、pacing.min_interval={interval_text}"
-        )
-
-    # 生效并发：该端点实际可能的在途并发上限 = min(全局, 端点)；端点未配置时即全局值。
-    # 建议只针对绑定项——非绑定项调低不改变 min()，端点已到底时调低全局更是恒无效。
-    effective = min(global_limit, endpoint_limit) if endpoint_limit > 0 else global_limit
-
-    if effective > 1:
-        if endpoint_limit <= 0:
-            advice = "建议调低 llm_max_concurrency（当前并发可能过高），或为该 provider 条目配置 pacing.max_concurrency 按端点限流"
-        elif endpoint_limit == global_limit:
-            advice = (
-                f"建议调低 provider[{endpoint_key}] 的 pacing.max_concurrency（当前 {endpoint_limit}，最低 1）"
-                f"或全局 llm_max_concurrency（当前 {global_limit}）——两级相等均为绑定项，调低任一生效并发即降"
-            )
-        elif endpoint_limit < global_limit:
-            advice = (
-                f"建议调低 provider[{endpoint_key}] 的 pacing.max_concurrency（当前 {endpoint_limit}，最低 1）"
-                f"——生效并发 = min(全局, 端点) = {effective} 由端点绑定，调低全局（当前 {global_limit}）须低于端点值才生效"
-            )
-        else:  # global_limit < endpoint_limit：全局绑定
-            advice = (
-                f"建议调低全局 llm_max_concurrency（当前 {global_limit}）"
-                f"——生效并发 = min(全局, 端点) = {effective} 由全局绑定，调低端点（当前 {endpoint_limit}）须低于全局值才生效"
-            )
-    elif endpoint_limit > 0 and global_limit > 1:
-        # 端点=1 绑定：生效并发恒为 1，调低全局对「该端点」的在途并发毫无影响——
-        # 不再给无效建议，改推请求速率（min_interval）与配额/风控判断。
-        advice = (
-            f"该端点 pacing.max_concurrency 已为最低 1、无可再降；生效并发 = min(全局, 端点) = 1，"
-            f"调低全局（当前 {global_limit}）不减少该端点在途并发、再调低并发已无益——"
-            f"429 更可能来自请求速率或配额（RPM/TPM）/风控：建议加大 pacing.min_interval（当前 {min_interval:g}s），"
-            "或切换 provider（退避重试会自动生效）"
-        )
-    elif endpoint_limit > 0:
-        advice = (
-            f"生效并发已压至下限（全局 {global_limit} / 端点 {endpoint_limit}），再调低并发已无益——"
-            f"429 更可能来自配额（RPM/TPM）或风控而非并发：建议加大 pacing.min_interval（当前 {min_interval:g}s），"
-            "或切换 provider（退避重试会自动生效）"
-        )
-    else:
-        advice = (
-            f"全局 llm_max_concurrency 已为下限（当前 {global_limit}）、该端点未配置 pacing，再调低并发已无益——"
-            "429 更可能来自配额（RPM/TPM）或风控：建议为该 provider 条目配置 pacing.min_interval 加大请求间隔，"
-            "或切换 provider（退避重试会自动生效）"
-        )
-    return f"{shown}；{advice}"
-
-
 def _attempt_api_call(
     client: httpx.Client,
     url: str,
@@ -678,7 +584,7 @@ def _attempt_api_call(
 
     Args:
         endpoint_key: provider 条目名，仅用于 429 时回显该端点的并发配置（见
-            :func:`_concurrency_hint`）；不影响调用行为。
+            :func:`pacing._concurrency_hint`）；不影响调用行为。
 
     Returns:
         ("success", data) — 调用成功，data 为解析后的 JSON

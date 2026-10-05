@@ -7,6 +7,7 @@
   - 最小间隔生效（含抖动路径）
   - 在途并发上限生效（多线程压测峰值 == 上限）
   - 403 配额/风控拒绝 → 不重试且不计入「网络类」失败原因
+  - 429 诊断建议的归属（pacing 提供、api_base 重试骨架复用）与 api_base 行数硬上限
 
 回归背景：全局常量 `llm_max_concurrency` 无法表达「同一程序、不同端点不同策略」——
 订阅制编码端点需要低频串行，按量付费端点可放开并发。本机制把策略声明化到
@@ -208,3 +209,23 @@ class TestQuotaFailureReason:
         from src.python.llm.prompts_core import FAIL_REASON_QUOTA_EXCEEDED as c
 
         assert a == b == c == "quota_exceeded"
+
+
+class TestConcurrencyHintPlacement:
+    """429 诊断建议函数（_concurrency_hint）的归属与调用方文件行数硬上限。"""
+
+    def test_api_base_reuses_pacing_owned_hint(self):
+        """api_base 重试骨架用的 429 诊断建议必须是 pacing 持有的同一实现（防两处漂移）。"""
+        import src.python.llm.api_base as api_base_mod
+        from src.python.llm import pacing as pacing_mod
+
+        assert api_base_mod._concurrency_hint is pacing_mod._concurrency_hint
+
+    def test_api_base_file_within_hard_line_limit(self):
+        """api_base.py 单文件行数不得超过管理文档「文件过长」红线（硬上限 800 行）。"""
+        from pathlib import Path
+
+        import src.python.llm.api_base as api_base_mod
+
+        lines = Path(api_base_mod.__file__).read_text(encoding="utf-8").splitlines()
+        assert len(lines) <= 800, f"api_base.py 已 {len(lines)} 行，超 800 行硬上限，须拆分"
