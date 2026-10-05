@@ -245,7 +245,7 @@
 
 ### 4.2 Provider Chain 降级路径
 
-> 本表与 `fetcher/chain.py::_DEFAULT_CHAINS` **逐链对应**（15 条），由 `check-doc-drift.py` 第 15 项断言双向一致（漏链/幽灵链均报错）。
+> 本表与 `fetcher/chain_config.py::_DEFAULT_CHAINS` **逐链对应**（15 条），由 `check-doc-drift.py` 第 15 项断言双向一致（漏链/幽灵链均报错）。
 
 | 数据类型 | 主链路 | 备用链路 | provider id（机器可读，与 `_DEFAULT_CHAINS` 同序） | 回退条件 |
 |:---------|:-------|:---------|:----------------------------------------------|:---------|
@@ -265,7 +265,7 @@
 | `bond_yield` | akshare | —（配置兵底） | `akshare` | akshare 不可用时回落配置值 |
 | `sentiment` | 同花顺龙虎榜（需 key） | —（单源） | `hithink` | 缺 key 由链路预检跳过（报告写占位）；两源不可用或无命中 → 章节降级占位 |
 
-链路失败时逐段采集失败原因（`fetcher/chain.py` 的 `FailureDiagnostics`），以「展示名(原因)」形式随降级事件透传到报告的**数据源可用性矩阵**降级明细，例如 `腾讯财经(连接超时)；新浪财经(返回空)`——用户可直接看出是哪个源、为什么失败，不必翻日志。未采集到可读原因时回落原有的短标识（如 `transport`、`empty`），输出与既往一致。
+链路失败时逐段采集失败原因（`fetcher/chain_diagnostics.py` 的 `FailureDiagnostics`，经 `fetcher/chain.py` 门面 re-export），以「展示名(原因)」形式随降级事件透传到报告的**数据源可用性矩阵**降级明细，例如 `腾讯财经(连接超时)；新浪财经(返回空)`——用户可直接看出是哪个源、为什么失败，不必翻日志。未采集到可读原因时回落原有的短标识（如 `transport`、`empty`），输出与既往一致。
 
 > **持仓价格缓存按路由分域**：`price_stock_{code}` 与 `price_fund_otc_{code}` 互不共用（`002943` 等 `00` 重叠区代码的股票价不会污染场外基金净值）。路由由「代码 + 名称」决定（名称命中基金特征词即走场外链路），详见 `datasource.md`「持仓行情路由」。
 

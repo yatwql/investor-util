@@ -37,7 +37,6 @@ TEST_SOURCE_ROOT = "src/test"
 #: 既有破线豁免：相对路径 → 挂账说明（review-findings 待处理区须有对应条目）。
 EXEMPTIONS: dict[str, str] = {
     "src/python/cli/cli.py": "已挂账 review-findings 主程序超限待处理区（须拆分）",
-    "src/python/fetcher/chain.py": "已挂账 review-findings 主程序超限待处理区（须拆分）",
 }
 
 

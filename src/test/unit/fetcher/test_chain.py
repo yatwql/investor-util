@@ -16,12 +16,12 @@ from unittest.mock import MagicMock, patch
 from src.python.fetcher import chain
 from src.python.fetcher.chain import (
     _call_history_provider,
-    _missing_trading_days,
     fetch_with_incremental_fallback,
     fetch_with_fallback,
     _get_chain,
     reset_provider_skip,
 )
+from src.python.fetcher.chain_incremental import _missing_trading_days
 import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
@@ -45,7 +45,7 @@ class TestGetChain(unittest.TestCase):
         chain = _get_chain("nonexistent")
         self.assertEqual(chain, [])
 
-    @patch("src.python.fetcher.chain.get_config")
+    @patch("src.python.fetcher.chain_config.get_config")
     def test_preferred_moves_to_front(self, mock_config):
         """preferred_provider.price = eastmoney → eastmoney 前置。"""
         mock_config.return_value = {"preferred_provider": {"price": "eastmoney"}}
@@ -53,28 +53,28 @@ class TestGetChain(unittest.TestCase):
         self.assertEqual(chain[0], "eastmoney")
         self.assertEqual(chain, ["eastmoney", "tencent"])
 
-    @patch("src.python.fetcher.chain.get_config")
+    @patch("src.python.fetcher.chain_config.get_config")
     def test_preferred_already_first(self, mock_config):
         """preferred 已在首位 → 顺序不变。"""
         mock_config.return_value = {"preferred_provider": {"price": "tencent"}}
         chain = _get_chain("price")
         self.assertEqual(chain, ["tencent", "eastmoney"])
 
-    @patch("src.python.fetcher.chain.get_config")
+    @patch("src.python.fetcher.chain_config.get_config")
     def test_preferred_not_in_chain(self, mock_config):
         """preferred 不在默认 chain 中 → 忽略，返回原顺序。"""
         mock_config.return_value = {"preferred_provider": {"price": "alibaba"}}
         chain = _get_chain("price")
         self.assertEqual(chain, ["tencent", "eastmoney"])
 
-    @patch("src.python.fetcher.chain.get_config")
+    @patch("src.python.fetcher.chain_config.get_config")
     def test_no_preferred_provider_key(self, mock_config):
         """config 中没有 preferred_provider 键 → 返回默认。"""
         mock_config.return_value = {}
         chain = _get_chain("price")
         self.assertEqual(chain, ["tencent", "eastmoney"])
 
-    @patch("src.python.fetcher.chain.get_config")
+    @patch("src.python.fetcher.chain_config.get_config")
     def test_config_raises_key_error(self, mock_config):
         """get_config 抛出异常 → 安全返回默认 chain。"""
         mock_config.side_effect = KeyError("test")
@@ -555,7 +555,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
     def setUp(self):
         reset_provider_skip()
 
-    @patch("src.python.fetcher.chain._get_chain")
+    @patch("src.python.fetcher.chain_config._get_chain")
     def test_all_skipped(self, mock_chain):
         """全部 provider 在熔断中 → True。"""
         from src.python.fetcher.chain import is_provider_chain_broken
@@ -573,7 +573,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         reg.record_failure("p2", "test")
         self.assertTrue(is_provider_chain_broken("test"))
 
-    @patch("src.python.fetcher.chain._get_chain")
+    @patch("src.python.fetcher.chain_config._get_chain")
     def test_partial_skipped(self, mock_chain):
         """仅部分 provider 熔断 → False。"""
         from src.python.fetcher.chain import is_provider_chain_broken
@@ -589,7 +589,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         reg.record_failure("p1", "test")
         self.assertFalse(is_provider_chain_broken("test"))
 
-    @patch("src.python.fetcher.chain._get_chain")
+    @patch("src.python.fetcher.chain_config._get_chain")
     def test_none_skipped(self, mock_chain):
         """无 provider 熔断 → False。"""
         from src.python.fetcher.chain import is_provider_chain_broken
@@ -601,7 +601,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         reg.register_provider("p2", 2)
         self.assertFalse(is_provider_chain_broken("test"))
 
-    @patch("src.python.fetcher.chain._get_chain")
+    @patch("src.python.fetcher.chain_config._get_chain")
     def test_empty_chain(self, mock_chain):
         """空链 → True（无可用 provider）。"""
         from src.python.fetcher.chain import is_provider_chain_broken
@@ -609,7 +609,7 @@ class TestIsProviderChainBroken(unittest.TestCase):
         mock_chain.return_value = []
         self.assertTrue(is_provider_chain_broken("test"))
 
-    @patch("src.python.fetcher.chain._get_chain")
+    @patch("src.python.fetcher.chain_config._get_chain")
     def test_single_provider_skipped(self, mock_chain):
         """单 provider 链且已熔断 → True。"""
         from src.python.fetcher.chain import is_provider_chain_broken
@@ -704,9 +704,9 @@ class TestHistoryIndexChain(unittest.TestCase):
 
         # mock 所有 provider 返回空
         with (
-            patch("src.python.fetcher.chain.cache_get") as mock_cache_get,
-            patch("src.python.fetcher.chain.cache_set") as mock_cache_set,
-            patch("src.python.fetcher.chain._try_providers") as mock_try,
+            patch("src.python.fetcher.chain_incremental.cache_get") as mock_cache_get,
+            patch("src.python.fetcher.chain_incremental.cache_set") as mock_cache_set,
+            patch("src.python.fetcher.chain_incremental._try_providers") as mock_try,
         ):
             mock_cache_get.return_value = []
             mock_try.return_value = []  # 全链路失败

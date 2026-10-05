@@ -1,27 +1,53 @@
-"""Provider Chain 定义与通用 Fallback 获取器。
+"""Provider Chain 通用 Fallback 路由执行（对外门面）。
 
-每类数据（price/index/rank/holding）对应一个 Provider Chain，
-chain 中按优先级列出 provider，主链路失败后自动递补。
-用户可通过 config.json 的 preferred_provider 手动指定首选链路。
+每类数据（price/index/rank/holding）对应一个 Provider Chain，chain 中按优先级列出 provider，
+主链路失败后自动递补；传输级瞬时失败先同源重试一次再落槽。
+
+职责拆分（本文件只保留「路由执行」，其余职责下沉子模块并经本模块 re-export 对外，
+既有 ``from ...fetcher.chain import X`` 调用方零改动）：
+
+  - 链定义与覆盖、链健康判定 → ``fetcher/chain_config.py``
+  - 失败诊断与命中归属登记   → ``fetcher/chain_diagnostics.py``
+  - 历史序列增量合并         → ``fetcher/chain_incremental.py``
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterable
-from contextlib import contextmanager
-from dataclasses import dataclass, field
+from collections.abc import Callable
 from typing import Any, cast
 
 from src.python.cache import clear as cache_clear
 from src.python.cache import get as cache_get
 from src.python.cache import set as cache_set
-from src.python.config import get_config
 from src.python.core.constants import CACHE_WEEKLY
-from src.python.core.retry import STRATEGY_EXPONENTIAL, RetryPolicy, retry_transient
-from src.python.core.datasource_credential import credential_hint, credential_ready_enabled, missing_credential
+from src.python.core.datasource_credential import (
+    credential_hint,
+    credential_ready_enabled,
+    missing_credential,
+)
 from src.python.core.provider_registry import TRANSPORT_FAILURE, get_registry
-from src.python.core.trading_calendar import count_trading_days_elapsed
+from src.python.core.retry import STRATEGY_EXPONENTIAL, RetryPolicy, retry_transient
+from src.python.fetcher.chain_config import (
+    _DEFAULT_CHAINS,
+    _get_chain,
+    chain_overrides,
+    is_provider_chain_broken,
+    known_provider_names,
+    reset_chain_overrides,
+    reset_provider_skip,
+)
+from src.python.fetcher.chain_diagnostics import FailureDiagnostics, _brief_reason, _mark_provider_used
+from src.python.fetcher.chain_incremental import (
+    _CACHE_PAYLOAD_FIELD,
+    _HISTORY_PROVIDER_MAP,
+    _call_history_provider,
+    _try_providers,
+    fetch_with_incremental_fallback,
+    payload_version_current,
+    write_stale_with_version,
+)
+
 
 # ── 传输级瞬时失败的同源重试 ────────────────────────────────
 # 仅对**传输级**失败（超时/断连/远端断开/5xx）重试：这类错误多为瞬时抖动，
@@ -32,211 +58,10 @@ from src.python.core.trading_calendar import count_trading_days_elapsed
 _TRANSIENT_RETRY_ATTEMPTS = 1  # 同源额外重试次数
 _TRANSIENT_RETRY_BACKOFF = 0.6  # 首次重试基础退避（秒），指数增长 + 抖动
 
+
 logger = logging.getLogger("invest")
 
-# ── Provider Chain 定义 ──────────────────────────────────────
-
-_DEFAULT_CHAINS: dict[str, list[str]] = {
-    # 行情：腾讯 → 新浪 → 同花顺（需 key）
-    "price_stock": ["tencent", "sina", "hithink"],
-    # 场外基金净值：东财基金 API 主源 → 新浪基金接口备源（跨厂商，故障域独立）
-    "price_fund_otc": ["eastmoney", "sina_fund"],
-    "price": ["tencent", "eastmoney"],
-    "fund_rank": ["tiantian"],
-    # 基金披露持仓：天天基金为主，同花顺官方源为备（官方源需 key，未配置时链路自动跳过）
-    "fund_hold": ["tiantian", "hithink"],
-    # 基金申购限购状态总表（全量单键、每日 1 次）：天天基金直连为主，
-    # akshare 封装为备——两者共享同一上游端点，提供的是**解析器冗余**而非源冗余，
-    # 端点整体不可用时真正的可用性兜底是最外层过期缓存（载荷带 fetched_at 供陈旧阶梯判定）
-    "fund_purchase": ["tiantian", "akshare_purchase"],
-    "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
-    # 全文本财报（持仓基本面章·区块②）：DataSinking 主源 + 巨潮资讯网备源。
-    # 两源经财报域适配器注册（fetcher/report_adapters.py），以 ``source_hint`` 做命名空间
-    # 隔离（异源候选被异源适配器立即拒服务）——因此**两个源都必须在本链的槽位里**：
-    # 编排层从巨潮索引/备源列表构造的候选带 ``source_hint=cninfo``，若链上只有主源槽，
-    # 它们会被主源适配器拒后无处可去 → 备源正文永远取不到（日志表现为“尝试 DataSinking
-    # 财报 → datasink 返回空 → 全链路失败”且无任何 `[datasink]` 请求日志）。
-    "financial_report": ["datasink", "cninfo"],
-    # 结构化财务指标（akshare 主源；备用支路 datasink_indicator 从财报全文解析）
-    # 财务指标：akshare 主源 → DataSinking 章节解析支路 → 同花顺官方报表派生（需 key）
-    "financial_indicator": ["akshare_financial", "datasink_indicator", "hithink"],
-    # 组合历史走势：历史数据 chains（复用现有 provider name，熔断器共享）
-    # 历史日 K：腾讯（前复权）→ 新浪 → 同花顺官方（前复权，需 key）
-    "history_stock": ["tencent", "sina", "hithink"],
-    "history_fund_otc": ["tiantian", "eastmoney"],
-    # 指数历史日 K：腾讯（前复权）→ 东方财富 push2his（免 key 的独立厂商备源）→
-    # 新浪（``getKLineData`` 端点实测不可用，留作代码级备用）→ 同花顺官方（需 key）。
-    # 新浪单靠不住，故补东方财富作为**可用**的第二源——避免整链退化为事实单源后
-    # 「抖动即整链空」（历史链无链级重试，重试在各 provider 内，见 tencent/eastmoney）。
-    "history_index": ["tencent", "eastmoney", "sina", "hithink"],
-    # 美股指数历史日线：新浪实现 fetch_index_kline（providers/sina_kline.py，经
-    # providers/sina.py 重导出），但其 getKLineData 端点对全部代码返回 404/空，
-    # 故实际取数通常由腾讯完成；腾讯 K 线接口对 gb_* 代码支持有限，该链可能整链
-    # 取空——空结果按正常降级记录，不视作配置错误。
-    "history_index_us": ["sina", "tencent"],
-    # 无风险利率：首选 akshare（bond_zh_us_rate），配置兜底
-    "bond_yield": ["akshare"],
-    # 市场情绪与资金热点（龙虎榜/连板梯队，同花顺官方，需 key；报告层不得直连）
-    "sentiment": ["hithink"],
-}
-
-
-def _get_chain(data_type: str) -> list[str]:
-    """获取指定数据类型的 Provider Chain（考虑用户配置与本次运行覆盖）。
-
-    优先级（高到低）：调用级覆盖（:func:`chain_overrides`）> 配置级
-    ``config.json → preferred_provider.<data_type>`` > 默认链。
-    两者都只是**排序/过滤**：既不新增链上源，也不绕过熔断与凭据就绪预检。
-    """
-    chain = list(_DEFAULT_CHAINS.get(data_type, []))
-    try:
-        config = get_config()
-        preferred = (config.get("preferred_provider") or {}).get(data_type)
-        if preferred and preferred in chain and chain[0] != preferred:
-            chain.remove(preferred)
-            chain.insert(0, preferred)
-            logger.info("%s Provider Chain: 根据配置首选 '%s'", data_type, preferred)
-    except (KeyError, TypeError):
-        logger.debug("[chain] preferred_provider 配置解析失败，使用默认链")
-    return _apply_overrides(chain, data_type)
-
-
-# ── 调用级源覆盖（本次运行作用域） ──────────────────────────
-#
-# 语义：进程内的一次报告运行 = 一个覆盖作用域（非线程局部——报告管线在取数阶段存在
-# 并行，线程局部变量不会传播到工作线程，会造成「同一次运行内部分请求生效」的隐式
-# 不一致）。生命周期由上下文管理器保证：退出即恢复，长驻进程（Web 模式）不留残留。
-_override_preferred: str | None = None
-_override_exclude: frozenset[str] = frozenset()
-
-
-def known_provider_names() -> set[str]:
-    """全部已登记 provider 名（由默认链并集派生，不另写清单）。"""
-    names: set[str] = set()
-    for chain in _DEFAULT_CHAINS.values():
-        names.update(chain)
-    return names
-
-
-@contextmanager
-def chain_overrides(
-    preferred: str | None = None,
-    exclude: Iterable[str] | None = None,
-):
-    """本次运行作用域内覆盖源链排序/过滤（可嵌套，退出即恢复）。
-
-    Args:
-        preferred: 首选源名；不在该数据类型链上或不是已知 provider 时仅告警、不生效。
-        exclude: 需排除的源名集合（仅本次运行）。
-    """
-    global _override_preferred, _override_exclude
-    previous = (_override_preferred, _override_exclude)
-    _override_preferred = preferred
-    _override_exclude = frozenset(exclude or ())
-    try:
-        yield
-    finally:
-        _override_preferred, _override_exclude = previous
-
-
-def reset_chain_overrides() -> None:
-    """清空调用级覆盖（测试隔离用；生产路径由上下文管理器负责恢复）。"""
-    global _override_preferred, _override_exclude
-    _override_preferred = None
-    _override_exclude = frozenset()
-
-
-def _apply_overrides(chain: list[str], data_type: str) -> list[str]:
-    """按调用级覆盖过滤/重排链（不改变链上源的集合，除显式 exclude）。"""
-    if _override_exclude:
-        filtered = [p for p in chain if p not in _override_exclude]
-        if filtered != chain:
-            logger.info("%s Provider Chain: 本次运行排除 %s", data_type, "、".join(sorted(_override_exclude)))
-        chain = filtered
-
-    preferred = _override_preferred
-    if preferred:
-        if preferred not in known_provider_names():
-            logger.warning("未知 provider 名 '%s'（本次运行首选不生效）", preferred)
-        elif preferred not in chain:
-            logger.warning("%s Provider Chain: 本次运行首选 '%s' 不在该链上，忽略", data_type, preferred)
-        elif chain[0] != preferred:
-            chain.remove(preferred)
-            chain.insert(0, preferred)
-            logger.info("%s Provider Chain: 本次运行首选 '%s'", data_type, preferred)
-    return chain
-
-
-# ── 会话级 Provider 熔断（委托 DataSourceRegistry） ──────
-# 熔断逻辑集中在 provider_registry.py：
-#   - 连续 3 次传输级失败 → 熔断 300s → 冷却期满自动恢复
-#   - record_failure(provider, context) / record_success(provider)
-#   - is_circuit_broken(provider) → bool
-#   - is_chain_broken(chain) → bool
-
-
-def reset_provider_skip() -> None:
-    """重置 Provider 熔断状态（测试用）。委托 DataSourceRegistry.reset()。"""
-    get_registry().reset()
-
-
-def is_provider_chain_broken(data_type: str) -> bool:
-    """检查指定数据类型的全部 Provider 是否都已熔断。
-
-    batch 入口调用一次即可预判全链不可用，避免逐条重复尝试。
-
-    Returns:
-        True — 链上所有 provider 均在熔断中，全链不可用
-        False — 至少有一个 provider 可用
-    """
-    chain = _get_chain(data_type)
-    if not chain:
-        return True
-    return get_registry().is_chain_broken(chain)
-
-
 _ProviderFunc = Callable[..., dict[str, Any] | None]
-
-# TRANSPORT_FAILURE sentinel 定义于 provider_registry.py，
-# 跨模块共享用于 _try_provider_fetch 的传输级异常标记。
-
-
-# ── 通用带缓存的 Fallback 调用 ──────────────────────────────
-
-# 失败原因短句截断长度（诊断可读性优先，不追求完整 traceback）
-_REASON_MAX_LEN = 60
-
-
-def _brief_reason(text: str) -> str:
-    """把异常信息压成一行短原因（诊断展示用）。"""
-    flat = " ".join(str(text).split())
-    return flat if len(flat) <= _REASON_MAX_LEN else flat[: _REASON_MAX_LEN - 1] + "…"
-
-
-@dataclass
-class FailureDiagnostics:
-    """单次链路调用的失败原因收集器（「错误即 UX」）。
-
-    链路失败时，调用方拿到的只有 ``None``／``[]``，失败原因此前只存在于
-    logger 输出里、用户可见面见不到。本对象把「哪个 provider、为什么失败」
-    沉淀为可读短句，供调用方写入降级事件、由报告的数据源可用性矩阵上屏。
-
-    可选出参：不传时链路零采集、零开销（保持既有行为逐字不变）。
-    """
-
-    attempts: list[tuple[str, str]] = field(default_factory=list)
-
-    def add(self, provider: str, reason: str) -> None:
-        """记录一次 provider 失败（provider 为展示名，reason 为可读短句）。"""
-        self.attempts.append((provider, reason))
-
-    @property
-    def has_failure(self) -> bool:
-        return bool(self.attempts)
-
-    def summary(self) -> str:
-        """人类可读的失败原因汇总，如 ``腾讯财经(连接超时)；新浪财经(返回空)``。"""
-        return "；".join(f"{name}({reason})" for name, reason in self.attempts)
 
 
 def _try_provider_fetch(
@@ -456,367 +281,25 @@ def fetch_with_fallback(
     return None
 
 
-# ═══════════════════════════════════════════════════════════════
-#  过期缓存降级回写（链外手写降级路径的统一出口）
-# ═══════════════════════════════════════════════════════════════
-
-# 载荷语义版本戳字段与当前版本。「语义已变更但结构未变」的载荷仅靠 TTL
-# 会在过期前持续遮蔽修复（fund ranking 实测教训，见 rank_payload_is_current）——
-# 任何过期缓存回写都必须盖戳，后续准入判据按字段比对自动作废旧语义条目。
-_CACHE_PAYLOAD_FIELD = "_payload_ver"
-_CACHE_PAYLOAD_VER = "1"
-
-
-def payload_version_current(payload: object) -> bool:
-    """缓存载荷是否由**当前语义版本**的回写端写出（准入判据用）。"""
-    if not isinstance(payload, dict) or _CACHE_PAYLOAD_FIELD not in payload:
-        return True  # 未盖戳的载荷（主链路成功回写等）不拦，拦了会无限重取
-    return payload[_CACHE_PAYLOAD_FIELD] == _CACHE_PAYLOAD_VER
-
-
-def write_stale_with_version(
-    cache_key: str,
-    data: dict[str, Any],
-    source: str = "stale_cache",
-) -> dict[str, Any]:
-    """过期缓存降级回写统一助手：标记来源 + 盖语义版本戳 + 回写缓存。
-
-    链外手写降级路径（如 fetcher/index.py 的手写判断链）回写过期数据时**必须**
-    经本助手——直接 ``cache_set`` 回写未盖戳载荷，语义版本机制上线后会成为
-    「版本缺失」的遮蔽点（rf-531）。返回盖戳后的载荷（调用方直接入结果字典）。
-    """
-    data = dict(data)
-    data["_source"] = source
-    data[_CACHE_PAYLOAD_FIELD] = _CACHE_PAYLOAD_VER
-    cache_set(cache_key, data)
-    return data
-
-
-# ═══════════════════════════════════════════════════════════════
-#  组合历史走势：增量合并 Fallback 路由
-# ═══════════════════════════════════════════════════════════════
-
-
-def _try_providers(
-    providers: list[str],
-    registry: Any,
-    chain_name: str,
-    code: str,
-    days: int,
-    start_from: str | None,
-    diagnostics: FailureDiagnostics | None = None,
-) -> list[dict]:
-    """遍历 providers 获取数据，返回第一个非空结果。
-
-    Args:
-        providers: provider 名称列表（按优先级排序）
-        registry: DataSourceRegistry（熔断检测用）
-        chain_name: chain 名称
-        code: 证券代码
-        days: 获取天数
-        start_from: 起始日期，None 时获取完整 days 条数据
-        diagnostics: 可选的失败原因收集器（不传则零采集）
-
-    Returns:
-        list[dict] 或 []（全部链路失败时）
-    """
-    for provider_name in providers:
-        if registry.is_circuit_broken(provider_name):
-            logger.debug("[%s] %s 已被熔断，跳过", chain_name, provider_name)
-            if diagnostics is not None:
-                diagnostics.add(provider_name, "已被熔断跳过")
-            continue
-        # 凭据就绪预检：与 fetch_with_fallback 同一判定（见彼处注释——配置级
-        # 问题不计入熔断）。历史 chain 若缺此分支，需 key 的源会在此被当作
-        # 「不可达」反复重试并累计熔断，正是本机制要消除的行为。
-        _spec = missing_credential(provider_name) if credential_ready_enabled() else None
-        if _spec is not None:
-            logger.info("[%s] %s 缺少凭据，跳过（%s）", chain_name, provider_name, _spec.env_var)
-            if diagnostics is not None:
-                diagnostics.add(provider_name, credential_hint(_spec))
-            continue
-        logger.info("[%s] 尝试 %s（code=%s, days=%d）", chain_name, provider_name, code, days)
-        try:
-            data = _call_history_provider(provider_name, chain_name, code, days, start_from)
-            if not data:
-                logger.info("[%s] %s 返回空数据（无此品种历史数据），尝试下一链路", chain_name, provider_name)
-                if diagnostics is not None:
-                    diagnostics.add(provider_name, "返回空")
-                continue
-            registry.record_success(provider_name)
-            _mark_provider_used(chain_name, provider_name, _history_provider_label(provider_name))
-            return data
-        except Exception as e:
-            reason = _brief_reason(f"{type(e).__name__}: {e}")
-            registry.record_failure(provider_name, f"{chain_name}: {reason}")
-            if diagnostics is not None:
-                diagnostics.add(provider_name, reason)
-            continue
-    return []
-
-
-def fetch_with_incremental_fallback(
-    chain_name: str,
-    code: str,
-    days: int = 30,
-    diagnostics: FailureDiagnostics | None = None,
-) -> list[dict]:
-    """增量合并版 Fallback 路由（历史数据用）。
-
-    当检测到新旧数据重叠时，自动全量刷新缓存，确保历史修正被正确覆盖。
-
-    - chain 层管理缓存读/写/合并
-    - Provider 函数只负责纯数据获取（不碰缓存层）
-    - 熔断器预检、fallback 遍历与 fetch_with_fallback() 共享
-
-    Args:
-        chain_name: chain 名称（如 "history_stock"、"history_fund_otc"）
-        code: 证券代码
-        days: 获取天数（默认 30）
-        diagnostics: 可选的失败原因收集器（不传则零采集）
-
-    Returns:
-        list[dict]: 按日期升序排列的数据列表，至少返回 days 条。
-        全链路失败时返回空列表（不使用过期缓存——走势数据降级后显示占位文本）。
-    """
-    cache_key = f"history_{chain_name}_{code}"
-    cached = cache_get(cache_key, CACHE_WEEKLY) or []
-    last_cached_date = cached[-1]["date"] if cached else None
-
-    registry = get_registry()
-    providers = _get_chain(chain_name)
-
-    # 第一轮：增量获取（从 last_cached_date 开始）
-    new_data = _try_providers(providers, registry, chain_name, code, days, last_cached_date, diagnostics)
-
-    if new_data:
-        # 判断 provider 是否实际支持增量获取。
-        # 若新数据起点 ≤ 缓存起点，说明 provider 未按 start_from 过滤
-        # （如 OTC 基金 fetch_fund_nav_history 始终全量返回），
-        # 直接写入新数据，跳过合并与重叠检测。
-        if cached and new_data and new_data[0].get("date", "") <= cached[0].get("date", ""):
-            logger.debug("[%s] %s provider 全量返回，直接使用新数据", chain_name, code)
-            cache_set(cache_key, new_data)
-            return new_data[-days:]
-
-        merged = _merge_by_date(cached, new_data)
-        needs_refresh = False
-        try:
-            needs_refresh = _validate_continuity(cached, new_data, cache_key)
-        except Exception:
-            logger.warning("[%s] 连续性校验异常（不影响合并）", cache_key)
-
-        if needs_refresh and cached:
-            # 检测到历史修正（如除权除息回溯调整）：旧缓存中非重叠部分已过时
-            # 自动全量刷新：删旧缓存，不带 start_from 重新获取完整历史
-            logger.info("[%s] 检测到历史修正 → 自动全量刷新", chain_name)
-            cache_clear(cache_key)
-            full_data = _try_providers(providers, registry, chain_name, code, days, None, diagnostics)
-            if full_data:
-                cache_set(cache_key, full_data)
-                return full_data[-days:]
-            logger.warning("[%s] 全量刷新失败，使用增量合并数据（仅修正重叠窗口）", chain_name)
-
-        cache_set(cache_key, merged)
-        return merged[-days:]
-    elif cached:
-        # 有缓存但无新数据 — 返回已有缓存
-        return cached[-days:]
-
-    return []
-
-
-_HISTORY_PROVIDER_MAP: dict[str, str] = {
-    "tencent": "src.python.providers.tencent",
-    "sina": "src.python.providers.sina",
-    "tiantian": "src.python.providers.tiantian_nav",
-    "eastmoney": "src.python.providers.eastmoney",
-    "hithink": "src.python.providers.hithink",
-}
-
-#: 历史链路 provider 展示名——模块未声明 ``DISPLAY_NAME`` 者在此补齐（声明了的以模块为准）
-_HISTORY_PROVIDER_LABELS: dict[str, str] = {
-    "tencent": "腾讯财经",
-    "sina": "新浪财经",
-    "tiantian": "天天基金",
-    "eastmoney": "东方财富",
-}
-
-
-def _mark_provider_used(data_type: str, provider_name: str, display_name: str) -> None:
-    """登记「本次该数据类别由此 provider 服务」（矩阵「命中源」列的归属来源）。
-
-    延迟导入 ``report.data_status``：链路层不依赖报告层观测设施（避免模块级循环），
-    观测失败也不得影响取数。
-    """
-    try:
-        from src.python.report.data_status import mark_provider_used
-
-        mark_provider_used(data_type, provider_name, display_name)
-    except Exception:  # 观测失败不影响主链路
-        logger.debug("[chain] provider 归属登记失败（非关键）: %s/%s", data_type, provider_name, exc_info=True)
-
-
-def _history_provider_label(provider_name: str) -> str:
-    """历史链路 provider → 展示名（模块 ``DISPLAY_NAME`` 优先；其次本表；末位回退标识）。"""
-    module_path = _HISTORY_PROVIDER_MAP.get(provider_name)
-    if module_path:
-        try:
-            import importlib
-
-            declared = getattr(importlib.import_module(module_path), "DISPLAY_NAME", "")
-            if declared:
-                return str(declared)
-        except Exception:  # 展示名解析失败不影响取数
-            logger.debug("[history] provider 展示名解析失败: %s", provider_name, exc_info=True)
-    return _HISTORY_PROVIDER_LABELS.get(provider_name, provider_name)
-
-
-# 新旧 K 线之间缺失的交易日数超过此值 → 判定数据跳空（部分历史不可达）
-_MAX_GAP_TRADING_DAYS: int = 5
-
-
-def _call_history_provider(
-    provider_name: str,
-    chain_name: str,
-    code: str,
-    days: int,
-    start_from: str | None,
-) -> list[dict]:
-    """动态调用对应 provider 的历史数据获取函数。
-
-    通过 _HISTORY_PROVIDER_MAP 实现惰性导入，避免模块加载时的循环依赖。
-
-    Args:
-        provider_name: provider 名称（如 "tencent"、"sina"、"tiantian"）
-        chain_name: chain 名称（决定调用 fetch_kline 还是 fetch_fund_nav_history）
-        code: 证券代码
-        days: 获取天数
-        start_from: 起始日期（YYYY-MM-DD），增量获取参数
-
-    Returns:
-        list[dict] 或 []（失败时）
-    """
-    import importlib
-
-    module_path = _HISTORY_PROVIDER_MAP.get(provider_name)
-    if not module_path:
-        logger.warning("[history] 未知 Provider: %s", provider_name)
-        return []
-
-    try:
-        mod = importlib.import_module(module_path)
-    except ImportError as e:
-        logger.warning("[history] 导入 %s 失败: %s", module_path, e)
-        return []
-
-    if chain_name == "history_fund_otc":
-        fn = getattr(mod, "fetch_fund_nav_history", None)
-        if fn:
-            return fn(code)
-    elif chain_name in ("history_index", "history_index_us"):
-        # 两条链共用指数 K 线函数：命中 provider 有实现才真正发起请求，
-        # 无实现者落到末尾的统一告警。
-        fn = getattr(mod, "fetch_index_kline", None)
-        if fn:
-            return fn(code, days=days, start_from=start_from)
-    elif chain_name == "history_stock":
-        fn = getattr(mod, "fetch_kline", None)
-        if fn:
-            return fn(code, days=days, start_from=start_from)
-
-    fn_name = {
-        "history_stock": "fetch_kline",
-        "history_index": "fetch_index_kline",
-        "history_index_us": "fetch_index_kline",
-        "history_fund_otc": "fetch_fund_nav_history",
-    }.get(chain_name, "未知函数")
-    logger.warning("[history] %s 无 %s 函数", provider_name, fn_name)
-    return []
-
-
-def _merge_by_date(cached: list[dict], new_data: list[dict]) -> list[dict]:
-    """按日期合并去重，new_data 中同天数据覆盖 cached（修正感知）。
-
-    Args:
-        cached: 已有的缓存数据列表（按日期升序）
-        new_data: 新获取的数据列表（按日期升序）
-
-    Returns:
-        合并后的完整数据列表（按日期升序）
-    """
-    seen = {d["date"] for d in cached}
-    merged = list(cached)
-    for d in new_data:
-        if d["date"] in seen:
-            # 覆盖旧数据（处理历史修正）
-            _replace_by_date(merged, d)
-        else:
-            merged.append(d)
-    return sorted(merged, key=lambda x: x["date"])
-
-
-def _replace_by_date(data: list[dict], item: dict) -> None:
-    """在已排序列表中用同日期项替换。"""
-    for i, existing in enumerate(data):
-        if existing["date"] == item["date"]:
-            data[i] = item
-            break
-
-
-def _validate_continuity(cached: list[dict], new_data: list[dict], cache_key: str) -> bool:
-    """校验新旧数据连续性，检测历史修正信号。
-
-    注意：此函数为纯检测/日志用途，异常不影响主流程。
-    调用方应在 try/except 中包装。
-
-    Returns:
-        True 检测到数据重叠（可能为历史修正，调用方可据此触发全量刷新）
-        False 无重叠或数据不足
-    """
-    if not cached or not new_data:
-        return False
-    last_old = cached[-1]
-    first_new = new_data[0]
-
-    # 检测日期重叠：新数据首日早于旧数据末日（非相等，相等=API 包含边界日），说明有修正
-    if first_new.get("date") < last_old.get("date"):
-        logger.warning("[%s] 新旧数据重叠——可能是历史修正，自动全量刷新", cache_key)
-        cache_set(f"{cache_key}_correction_flag", True)
-        return True
-    else:
-        gap = _missing_trading_days(last_old.get("date"), first_new.get("date"))
-        if gap > _MAX_GAP_TRADING_DAYS:
-            logger.warning("[%s] 数据跳空 %d 个交易日——部分历史不可达", cache_key, gap)
-    return False
-
-
-def _missing_trading_days(date1: str | None, date2: str | None) -> int:
-    """计算两个 K 线日期之间**缺失**的交易日数（不含两端）。
-
-    以交易日而非自然日计——周末与长假会放大自然日差（如国庆前后相邻的两个
-    交易日相差 10 个自然日），按自然日判定会把正常连续的 K 线误判为跳空。
-    相邻交易日 → 0；两端相等/逆序、日期为空或格式非法 → 0。
-    """
-    if not date1 or not date2:
-        return 0
-    elapsed = count_trading_days_elapsed(date1, date2)
-    if elapsed is None or elapsed <= 0:
-        return 0
-    return elapsed - 1
-
-
-# 模块加载时自动注册默认 Provider Chain，使 registry.get_chain() 和策略选择器生效
-# 链路定义注入 core 注册表（core 不反向 import fetcher；传参而非 registry 自取）
-get_registry().register_default_chains(_DEFAULT_CHAINS)
-
-
-def _register_core_calendar_fallback() -> None:
-    """官方交易日序列兜底注入 core 交易日历（core 不反向 import providers）。"""
-    from src.python.providers import hithink
-    from src.python.core.trading_calendar import register_trading_days_fallback
-
-    register_trading_days_fallback(hithink.fetch_trading_days)
-
-
-_register_core_calendar_fallback()
+# ── 对外门面：链定义 / 诊断 / 增量合并三子模块的符号经此 re-export ──
+__all__ = [
+    # 路由执行（本模块）
+    "FailureDiagnostics",
+    "fetch_with_fallback",
+    # 链定义与覆盖（chain_config）
+    "_DEFAULT_CHAINS",
+    "_get_chain",
+    "chain_overrides",
+    "is_provider_chain_broken",
+    "known_provider_names",
+    "reset_chain_overrides",
+    "reset_provider_skip",
+    # 增量合并（chain_incremental）
+    "_CACHE_PAYLOAD_FIELD",
+    "_HISTORY_PROVIDER_MAP",
+    "_call_history_provider",
+    "_try_providers",
+    "fetch_with_incremental_fallback",
+    "payload_version_current",
+    "write_stale_with_version",
+]

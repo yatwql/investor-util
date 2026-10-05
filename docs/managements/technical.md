@@ -877,7 +877,7 @@ Provider Chain 采用**职责链（Chain of Responsibility）模式**：每个�
 
 #### Chain 自动注册
 
-`fetcher/chain.py` 在模块加载时自动调用 `get_registry().register_default_chains()`，从 `_DEFAULT_CHAINS` 配置注册所有 provider 和 chain。在 `register_default_chains()` 中 per-provider 配置 tier/timeout/failure_threshold/cooldown_secs（如 eastmoney_industry 阈值 6 次/冷却 120s）。
+`fetcher/chain_config.py`（模块加载注册，符号经 `fetcher/chain.py` 门面 re-export）在模块加载时自动调用 `get_registry().register_default_chains()`，从 `_DEFAULT_CHAINS` 配置注册所有 provider 和 chain。在 `register_default_chains()` 中 per-provider 配置 tier/timeout/failure_threshold/cooldown_secs（如 eastmoney_industry 阈值 6 次/冷却 120s）。
 
 #### 策略选择器
 
@@ -964,7 +964,10 @@ fetcher/
 ├── fund.py             基金排名/持仓/基准（天天基金数据 + 同花顺官方备源）
 ├── fund_manager.py     基金经理数据（天天基金 HTML 解析）
 ├── industry.py         行业分类+概念板块（push2 双链路）
-├── chain.py            Provider 优先链定义 + fallback 路由 + 增量合并
+├── chain.py            fallback 路由执行 + 对外门面（子模块符号经此 re-export）
+├── chain_config.py     Provider 优先链定义 + 覆盖（preferred/exclude）+ 链健康判定
+├── chain_diagnostics.py  链路失败诊断（失败原因短句）+ 命中归属登记
+├── chain_incremental.py  历史序列增量合并（payload 版本闸门 + 按日合并/连续性校验）
 ├── batch.py            批量并行调度（BatchDispatcher；间隔限速实现见 core/throttle.py）
 ├── akshare.py          AKShare 数据获取（备用数据源）
 ├── bond_yield.py       债券收益率数据
@@ -1205,7 +1208,7 @@ fetch_index_data(code)
 | 组成 | 位置 | 职责 |
 |:-----|:-----|:-----|
 | 声明与判定 | `core/datasource_credential.py` | `CredentialSpec` 冻结 dataclass + `CREDENTIAL_SPECS` 注册表（声明即数据：源模块导入即注册，未声明的源免凭据）；`missing_credential` 判定就绪（**空白串视为缺失**，源未声明 → `None` 即不需凭据）；`credential_hint` 可读指引；`credential_readiness` 就绪矩阵（**自身不抛异常**，供体检复用）；就绪解析顺序「环境变量优先 → 密钥文件」（密钥文件以 provider 名为节，见 `data_key_file`） |
-| 链路预检跳过 | `fetcher/chain.py` | `fetch_with_fallback` 的 provider 循环内、熔断检查之后；历史 chain 的 `_try_providers` 遍历循环同样受控——两处都是「能取数的路径」，只堵一处等于机制半应用 |
+| 链路预检跳过 | `fetcher/chain.py` + `fetcher/chain_incremental.py` | `fetch_with_fallback` 的 provider 循环内、熔断检查之后；历史 chain 的 `_try_providers` 遍历循环同样受控——两处都是「能取数的路径」，只堵一处等于机制半应用 |
 | 健康检查跳过 | `core/check_sources.py` | `_checks` 由三元组扩为 `(source_id, 显示名, 用途, 探测函数)`；缺失凭据**不发起探测**，直接产出 `skipped` 项（复用既有 `_SKIP` 符号 `⏭️`），末尾追加就绪摘要行 |
 | 体检分组 | `core/doctor.py` | 新增 `GROUP_CREDENTIAL`「数据源凭据」组，插在「数据源适配」与「数据源」之间 |
 
@@ -3706,8 +3709,8 @@ investor-util/
 | 股票历史分红 | akshare 无参全量拉取后按代码过滤（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
 | 基金经理数据 | 天天基金 HTML 解析（主）→ 档案页回退 | `fetcher/fund_manager.py` |
 | 无风险利率（Rf） | akshare `bond_zh_us_rate`（Sina 国债收益率）→ 手动配置兜底 | `fetcher/bond_yield.py` |
-| 个股/ETF 历史 K 线 | 腾讯财经 K 线 → 新浪财经 K 线（双链路 fallback） | `fetcher/chain.py`（`tencent.py` / `sina.py`） |
-| 场外基金历史净值 | 天天基金 `pingzhongdata` → 东方财富净值分页 | `fetcher/chain.py` |
+| 个股/ETF 历史 K 线 | 腾讯财经 K 线 → 新浪财经 K 线（双链路 fallback） | `fetcher/chain_incremental.py`（`tencent.py` / `sina.py`） |
+| 场外基金历史净值 | 天天基金 `pingzhongdata` → 东方财富净值分页 | `fetcher/chain_incremental.py` |
 | 指数历史 K 线（A 股指数） | 腾讯财经 K 线 → 东方财富 push2his 指数 K 线 → 新浪财经 K 线 → 同花顺官方（需 key） | `fetcher/index.py` |
 | 指数历史 K 线（美股指数） | 新浪财经 K 线 → 腾讯财经 K 线 | `fetcher/index.py` |
 

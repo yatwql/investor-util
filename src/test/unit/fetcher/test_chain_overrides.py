@@ -33,7 +33,7 @@ _DATA_TYPE = "price_stock"  # 默认链：tencent → sina → hithink
 
 def _no_config_preferred():
     """隔离配置层 preferred_provider（本用例只测调用级）。"""
-    return patch("src.python.fetcher.chain.get_config", return_value={})
+    return patch("src.python.fetcher.chain_config.get_config", return_value={})
 
 
 # ── known_provider_names ──────────────────────────────────────
@@ -127,7 +127,7 @@ def test_reset_clears_overrides():
 def test_call_level_overrides_config_level():
     """两层同时存在时调用级优先；两者都只是排序，不改变链上源集合。"""
     with patch(
-        "src.python.fetcher.chain.get_config",
+        "src.python.fetcher.chain_config.get_config",
         return_value={"preferred_provider": {_DATA_TYPE: "hithink"}},
     ):
         assert _get_chain(_DATA_TYPE)[0] == "hithink"
