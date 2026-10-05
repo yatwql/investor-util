@@ -121,12 +121,17 @@ class TestExemptionRegistry:
             assert path.startswith(scope_prefixes), f"豁免路径超出检查域: {path}"
             assert (_REPO_ROOT / path).is_file(), f"豁免路径不存在: {path}"
 
-    def test_registry_separates_main_and_test_domains(self, length_script):
-        """主程序/测试两个检查域在登记表中都有对应挂账（结构性关系，不写死条数）。"""
-        main_scope = length_script.MAIN_SOURCE_ROOT + "/"
-        test_scope = length_script.TEST_SOURCE_ROOT + "/"
-        assert any(p.startswith(main_scope) for p in length_script.EXEMPTIONS)
-        assert any(p.startswith(test_scope) for p in length_script.EXEMPTIONS)
+    def test_registry_exemptions_not_stale(self, length_script):
+        """登记的豁免当前必须仍超限——回落即为过期豁免，须与 review-findings 挂账同步移除。"""
+        records = {path: lines for _kind, path, lines in length_script.collect_line_counts(length_script.REPO_ROOT)}
+        for path in length_script.EXEMPTIONS:
+            lines = records[path]
+            limit = (
+                length_script.TEST_SOURCE_LIMIT
+                if path.startswith(length_script.TEST_SOURCE_ROOT + "/")
+                else length_script.MAIN_SOURCE_LIMIT
+            )
+            assert lines > limit, f"豁免 {path} 已回落至 {limit} 行内（实测 {lines} 行），应移除豁免登记"
 
 
 class TestCliContract:

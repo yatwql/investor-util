@@ -17,6 +17,8 @@
 
 ### Changed
 
+- **测试/工程**：8 个超 1200 行红线测试文件按「被测函数 / 场景类型」拆分为同目录兄弟文件（**rf-583** 归档已解决）——`test_html_report_structure.py`（2313 行/110 项）→ +`_toc` +`_content`、`test_orchestrator.py`（1963）→ +`_generate_report`、`test_fact_checker.py`（1846）→ +`_context`、`test_market_value.py`（1746）→ +`_premium`、`test_html_writer.py`（1661）→ +`_contents`、`test_holdings_detail_sheet.py`（1485）→ +`_categories`、`test_cli.py`（1410）→ +`_subcommands`、`test_summary.py`（1344）→ +`_module_rows`；原文件一律保留为分片（共享常量/助手仍从原模块导入，6 个外部文件既有导入不受影响），拆分前后 8 文件用例数逐份求和不变（749 项）且 17 份全绿、最长回落 1056 行、`test_html_report_structure.py` 回落至 31 项；`check-file-length.py` EXEMPTIONS 的 8 条测试豁免移除（违规 0 项，`cli.py`/`chain.py` 两条主程序豁免仍在），`test_check_file_length.py`「两域均有挂账」断言改为「豁免不得过期」；`folders.md` 目录树 +9 条与统计快照、`testplan.md` 8 处载体行补登新分片，警告级清单转挂 **rf-586**（rf-next → 587）
+
 - **HTML**：正文大块折叠「打开报告缺省一律收起」——原 `fold.js` 初始 load 无条件执行锚点展开，浏览器恢复会话/地址带 `#sec-…` 打开报告会把目标章折叠块自动展开；改为初始 load 不执行锚点展开（模板本就无 `open` 属性，缺省收起不依赖 JS），会话内点击目录原生锚点链接（hashchange）仍自动展开目标章保证跳转可见，打印展开/恢复与手动展开 resize 不变；新增结构回归用例（初始 load 不得执行锚点展开），`reports-instruction` ④节同步
 - **文档**：折叠覆盖章节在管理文档表述——`technical.md` 新增 §4.21（覆盖章节清单表、缺省收起/锚点/打印/resize 语义与模板测试载体）、`requirements.md` 新增 `R-OUT-12` + `testplan.md` 同步载体行（`test_html_report_structure.py`，需求追溯双向一致）
 

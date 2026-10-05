@@ -38,14 +38,6 @@ TEST_SOURCE_ROOT = "src/test"
 EXEMPTIONS: dict[str, str] = {
     "src/python/cli/cli.py": "已挂账 review-findings 主程序超限待处理区（须拆分）",
     "src/python/fetcher/chain.py": "已挂账 review-findings 主程序超限待处理区（须拆分）",
-    "src/test/unit/cli/test_cli.py": "已挂账 review-findings 测试超限待处理区（须拆分）",
-    "src/test/unit/llm/test_fact_checker.py": "已挂账 review-findings 测试超限待处理区（须拆分）",
-    "src/test/unit/report/test_html_report_structure.py": "已挂账 review-findings 测试超限待处理区（须拆分）",
-    "src/test/unit/report/test_html_writer.py": "已挂账 review-findings 测试超限待处理区（须拆分）",
-    "src/test/unit/report/test_holdings_detail_sheet.py": "已挂账 review-findings 测试超限待处理区（须拆分）",
-    "src/test/unit/report/test_market_value.py": "已挂账 review-findings 测试超限待处理区（须拆分）",
-    "src/test/unit/report/test_orchestrator.py": "已挂账 review-findings 测试超限待处理区（须拆分）",
-    "src/test/unit/report/test_summary.py": "已挂账 review-findings 测试超限待处理区（须拆分）",
 }
 
 

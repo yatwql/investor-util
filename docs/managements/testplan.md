@@ -320,7 +320,7 @@
 | **三维度分类聚合一致**：资产属性/投资分类/账户的小计各自 = 总计 | 三类分类各自独立聚合，交叉验证无遗漏/无重复 | ✅ `test_data_integrity.py` |
 | **穿透行业占比归一化**：各行业占比之和 ≤ 100% | 穿透行业分布验证 | ✅ `test_data_integrity.py` |
 | **指数行情数值合理**：上证≈3000、沪深300≈4000、恒指≈20000、标普≈5000 | 数量级确认，非精确值 | ✅ `test_data_integrity.py` |
-| **非人民币计价品种市值核算**：按数据源价格 × 份额直接计市值（程序不做汇率折算） | 构造 QDII / 港股通持仓，验证市值与币种敞口分类 | ✅ `test_data_integrity.py` + `test_market_value.py` |
+| **非人民币计价品种市值核算**：按数据源价格 × 份额直接计市值（程序不做汇率折算） | 构造 QDII / 港股通持仓，验证市值与币种敞口分类 | ✅ `test_data_integrity.py` + `test_market_value.py` + `test_market_value_premium.py` |
 | **QDII 估值净值 vs 官方净值关系**：估值净值 ≥ 0，官方净值延迟 T-2 | 双列数值关系合理性断言 | ✅ `test_data_integrity.py` |
 | **基金业绩排名数据合理性**：排名/收益率在 0-100% 范围内 | 天天基金排名数值验证 | ✅ `test_data_integrity.py` |
 
@@ -387,10 +387,10 @@
 | R-ERR-14 | `src/test/unit/report/test_portfolio_history.py` + `src/test/unit/config/test_config.py` | 批 2 |
 | R-ERR-15 | `src/test/unit/analysis/test_snapshot_diff_edge.py` | 批 2 |
 | R-ERR-16 | `src/test/unit/analysis/test_snapshot_diff_edge.py` | 批 2 |
-| R-DIAG-01 | `src/test/unit/cli/test_cli.py` + `src/test/unit/core/test_log_reader.py` | 批 2 |
+| R-DIAG-01 | `src/test/unit/cli/test_cli.py` + `src/test/unit/cli/test_cli_subcommands.py` + `src/test/unit/core/test_log_reader.py` | 批 2 |
 | R-DIAG-02 | `src/test/unit/ui/test_handlers_log.py` + `src/test/unit/ui/test_tui_menu.py` | 批 2 |
 | R-DIAG-03 | `src/test/unit/web/test_handlers.py` + `src/test/unit/web/test_health_credential.py` | 批 2 |
-| R-DIAG-04 | `src/test/unit/cli/test_cli.py` + `src/test/unit/core/test_doctor.py` | 批 2 |
+| R-DIAG-04 | `src/test/unit/cli/test_cli_subcommands.py` + `src/test/unit/core/test_doctor.py` | 批 2 |
 | R-DIAG-05 | `src/test/unit/ui/test_tui_menu.py` + `src/test/unit/config/test_features.py` | 批 2 |
 | R-DIAG-06 | `src/test/unit/web/test_handlers.py` + `src/test/unit/core/test_doctor.py` | 批 2 |
 | R-DIAG-07 | `src/test/unit/core/test_doctor.py` + `src/test/unit/config/test_features.py` | 批 2 |
@@ -448,10 +448,10 @@
 | R-IDX-01 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_tencent.py` | 批 3 |
 | R-IDX-02 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_sina.py` | 批 3 |
 | R-IDX-03 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/fetcher/test_chain.py` | 批 3 |
-| R-OUT-01 | `src/test/unit/report/test_orchestrator.py` | 批 4 |
+| R-OUT-01 | `src/test/unit/report/test_orchestrator.py` + `src/test/unit/report/test_orchestrator_generate_report.py` | 批 4 |
 | R-OUT-02 | `src/test/unit/report/test_excel_writer.py` | 批 4 |
 | R-OUT-03 | `src/test/unit/report/test_excel_generator.py` | 批 4 |
-| R-OUT-04 | `src/test/unit/report/test_html_writer.py` | 批 4 |
+| R-OUT-04 | `src/test/unit/report/test_html_writer.py` + `src/test/unit/report/test_html_writer_contents.py` | 批 4 |
 | R-OUT-05 | `src/test/unit/report/test_excel_report_structure.py` | 批 4 |
 | R-OUT-06 | `src/test/unit/report/test_html_report_structure.py` | 批 4 |
 | R-OUT-07 | `src/test/unit/report/test_orchestrator.py` + `src/test/unit/config/test_config.py` | 批 4 |
@@ -528,7 +528,7 @@
 | R-LLM-06 | `src/test/unit/llm/test_llm_chain_strategies.py` + `src/test/unit/llm/test_strategy.py` | 批 5 |
 | R-LLM-07 | `src/test/unit/config/test_llm_settings.py` + `src/test/unit/config/test_config_llm_multi.py` | 批 5 |
 | R-LLM-09 | `src/test/unit/llm/test_prompts_signals.py` | 批 5 |
-| R-LLM-11 | `src/test/unit/llm/test_depth_profile.py` + `src/test/unit/report/test_summary.py` | 批 5 |
+| R-LLM-11 | `src/test/unit/llm/test_depth_profile.py` + `src/test/unit/report/test_summary.py` + `src/test/unit/report/test_summary_module_rows.py` | 批 5 |
 | R-LLM-12 | `src/test/unit/llm/test_self_review.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
 | R-DATA-08 | `src/test/unit/fetcher/test_chain_overrides.py` | 批 5 |
 | R-LLM-10 | `src/test/unit/llm/test_llm_pacing.py`（策略解析/容错/注册/惰性装载兜底/零开销直通/间隔/抖动/并发上限/异常释放/403 不重试）+ `src/test/unit/config/test_config_llm_multi.py`（pacing 透传/缺省不注入/非对象忽略）+ `src/test/unit/llm/test_llm_api_multi.py`（`endpoint_key` 逐层下传并到达重试骨架——漏传则 `PacingGate` 拿空键、端点节流空转） | 批 5 |
@@ -665,9 +665,9 @@
 | **P0** | 测试隔离验证：`.venv/bin/python -m pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
 | **P1** | 报告生成完整性（菜单 E/B/L 全链路） | config / report / html / llm 变更 | `scenario_basic` 管线冒烟/指标注入 + 场景测试（Excel 页签完整、不崩溃） |
 | **P1** | Excel 报告视觉质量 | 颜色/格式/样式相关变更 | `test_excel_writer.py` / `test_summary.py`（盈亏着色、评级色、LLM 状态色、冻结首行） |
-| **P1** | 报告章节合并（同页签多区块 + 多契约 OR 可见性 + 块级开关） | 注册表条目 / 章节键 / 页签写入器 / HTML 模板或 partial / board_flags 变更 | `test_holdings_detail_sheet.py` / `test_position_structure_sheet.py` / `test_fundamental_snapshot_sheet.py`（各合并章：章名与区块小节标题同页签、区块行值与独立写入**逐格等价**、契约 None 的块级门控）+ `test_section_visibility.py`（`data_flag_any` 多契约 OR：单契约就绪即可见、两者皆无隐藏）+ `test_section_type_flag_consistency.py`（注册表 type ↔ 两侧 board_flags ↔ 写入器装配键一致，防旧 type/旧模块键残留）+ `test_report_chapter_consistency.py`（Excel 页签与 HTML 章节两侧可见集合一致）+ `test_fund_performance_manager_block.py`（经理变更块随基金深度分析门控）。**回归防线**：合并章若漏改任一侧可见性、装配键或 board_flags，两侧一致性/一致性守卫用例立刻失败（实施期即由此捕获 `rf-367`） |
+| **P1** | 报告章节合并（同页签多区块 + 多契约 OR 可见性 + 块级开关） | 注册表条目 / 章节键 / 页签写入器 / HTML 模板或 partial / board_flags 变更 | `test_holdings_detail_sheet.py` / `test_holdings_detail_categories.py` / `test_position_structure_sheet.py` / `test_fundamental_snapshot_sheet.py`（各合并章：章名与区块小节标题同页签、区块行值与独立写入**逐格等价**、契约 None 的块级门控）+ `test_section_visibility.py`（`data_flag_any` 多契约 OR：单契约就绪即可见、两者皆无隐藏）+ `test_section_type_flag_consistency.py`（注册表 type ↔ 两侧 board_flags ↔ 写入器装配键一致，防旧 type/旧模块键残留）+ `test_report_chapter_consistency.py`（Excel 页签与 HTML 章节两侧可见集合一致）+ `test_fund_performance_manager_block.py`（经理变更块随基金深度分析门控）。**回归防线**：合并章若漏改任一侧可见性、装配键或 board_flags，两侧一致性/一致性守卫用例立刻失败（实施期即由此捕获 `rf-367`） |
 | **P1** | 景气度框架诊断（实验性功能） | 分析框架/评分口径/关键词配置/行动建议章渲染变更 | `test_prosperity_framework.py`（六维计分、缺数据降级为未验证且不计分、总分口径与评级边界、配置覆盖）+ `test_prosperity_framework_edge.py`（空/None/零/异常类型/全防御/未知板块/极端集中度/负收益）+ `test_prosperity_framework_wiring.py`（开关关 → 契约缺席且双端无块；开 → 契约注入、Excel/HTML 块与契约一致）+ `test_fund_roe_estimate.py`（②维基金层扩展：重仓股 ROE 加权推演、报告期陈旧闸门、非 A 股过滤、known_roe 免重取）+ `test_liquidity_otc.py` 与 `test_code_utils.py::TestOtcRedemptionDaysDefault`（④维场外类型默认档：货币/短债 T+1、纯债 T+2、其他 T+3、QDII T+7，非实测标注与配置口径优先）。**回归防线**：开关关闭时报告必须逐字节不变；缺数据维度若被算成得分（臆造）立即失败 |
-| **P1** | HTML 报告渲染结构 | html_writer / template 变更 | `test_html_report_structure.py`（中文不乱码、章节锚点、LLM 条件消失/出现） |
+| **P1** | HTML 报告渲染结构 | html_writer / template 变更 | `test_html_report_structure.py`（中文不乱码、章节锚点、LLM 条件消失/出现）+ `test_html_report_structure_toc.py`（返回顶部与目录）+ `test_html_report_structure_content.py`（交互图表/主题/数据质量块/页脚/期间标注） |
 | **P1** | 缓存刷新/清理/统计（菜单 [1][2][3][4]） | cache / handlers / registry 变更 | `test_handlers_cache.py` / `test_tui_handlers.py`（刷新/清理/统计不崩溃） |
 | **P1** | Web 标签页工作台 / 调仓 What-if / 缓存卡 | `src/python/web/handlers.py`、`src/static/web/` 变更 | `test_whatif_api.py` / `test_whatif_api_edge.py` / `test_cache_api.py` / `test_web_static_serving.py`（页签配对、What-if 与缓存控件齐备、main.js 接线） |
 | **P1** | Provider 降级链路 | providers / fetcher 变更 | 熔断/回退/断网降级测试（S7/T15/T16 + provider edge 用例）；实际联通性由运行时 Provider Chain 回退 + 熔断治理，非门禁 |

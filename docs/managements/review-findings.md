@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.4-dev
-> **编号源**：`rf-next = 586`（新增问题取此编号，完成后更新为 +1；已用最大 rf-585，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 587`（新增问题取此编号，完成后更新为 +1；已用最大 rf-586，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -48,13 +48,14 @@
 
 | # | 文件 | 现状 | 状态 / 修复方向 |
 |---|------|------|----------|
-| **rf-583** | **超 1200 行红线 8 个（2026-10-05 `check-file-length.py -v` 全仓实测，均已豁免入脚本 EXEMPTIONS 挂账本行）**：`unit/report/test_html_report_structure.py`（2313 行 / 110 项）、`unit/llm/test_fact_checker.py`（1846）、`unit/report/test_orchestrator.py`（1963）、`unit/report/test_market_value.py`（1746）、`unit/report/test_html_writer.py`（1661）、`unit/report/test_holdings_detail_sheet.py`（1485，近期 +239）、`unit/cli/test_cli.py`（1410）、`unit/report/test_summary.py`（1344） | **八个文件均超 1200 行红线**；`test_html_report_structure.py` 110 项超 80 警告线（红线 120）；另 `unit/scripts/test_check_doc_drift.py` 94 项、`unit/config/test_config.py` 89 项、`unit/llm/test_llm_api_base.py` 1190 行（距红线仅 10 行）为警告级 | 按「被测函数 / 场景类型」拆分子文件（如 `_structure_*.py`）；拆分时同步刷新 `test-coverage.md` / `folders.md` 用例计数并移除脚本豁免。本次新增用例已避开 `test_llm_api_base.py`（防当场破线，改落 `test_llm_pacing.py`） |
+| **rf-586** | **警告级（未越红线）跟踪——红线 8 个已随 rf-583 拆分清零，2026-10-05 `check-file-length.py -v` 派生**：行数最贴红线的 `unit/llm/test_llm_api_base.py`（1190 行，距 1200 仅 10 行）、`unit/report/test_penetration.py`（1141）、`unit/config/test_config.py`（1112）；用例数最贴 120 项红线的 `unit/scripts/test_check_doc_drift.py`（94 项）、`unit/config/test_config.py`（89 项）；`test_html_report_structure.py` 拆分后回落至 31 项，原 110 项警告解除 | 无门禁动作（800~1200 行 / 80~120 项仅 `-v` 清单）；再增内容前先跑 `check-file-length.py -v`，逼近红线时按「被测函数 / 场景类型」拆分并同步刷新 `test-coverage.md` / `folders.md` 用例计数 |
 
 ## 已解决问题
 
 | # | 摘要 | 状态 |
 |---|------|------|
 | **rf-584** | >800 主程序 / >1200 测试文件行数红线无任何 `--ci` 脚本强制，且 P2A 登记表为人肉快照（api_base.py 699→831、chain.py 破线均未登记即放行） | 已修复 2026-10-05（新增 `scripts/check-file-length.py --ci`：复用 `_checklib`，主程序 >800 / 测试 >1200 即 finding 退出 2；豁免登记与本表挂账同步、拆分后自动提示移除；`-v` 输出警告区全集清单作 P2A/P2C 派生源；入 CI guards + pre-commit 十守护 + CLAUDE.md/developer-guide/testplan 五处清单同源校验（check-doc-drift 第 16 项）；15 项回归用例入 `test_check_file_length.py`；首跑全仓查出 cli.py 910 与 5 个未登记测试文件超限，已分别挂账 rf-585/rf-583；P2A/P2C 行数刷新为脚本派生） |
+| **rf-583** | 超 1200 行红线测试文件 8 个（`test_html_report_structure.py` 2313 行 / 110 项、`test_orchestrator.py` 1963、`test_fact_checker.py` 1846、`test_market_value.py` 1746、`test_html_writer.py` 1661、`test_holdings_detail_sheet.py` 1485、`test_cli.py` 1410、`test_summary.py` 1344），且长期以人肉快照登记 | 已修复 2026-10-05（按「被测函数 / 场景类型」拆为同目录兄弟文件：structure → +`_toc`/`_content`、fact_checker → +`_context`、orchestrator → +`_generate_report`、market_value → +`_premium`、html_writer → +`_contents`、holdings_detail_sheet → +`_categories`、cli → +`_subcommands`、summary → +`_module_rows`；原文件全部保留为分片，testplan 载体路径有效；拆分前后 8 文件用例数逐份求和不变、17 份全绿，最长回落至 1056 行；脚本 EXEMPTIONS 8 条测试豁免移除、`check-file-length --ci` 违规 0 项，`test_check_file_length.py` 「两域均有挂账」断言改为「豁免不得过期」；`folders.md` 目录树 9 条 + 统计、`testplan.md` 8 处载体同步；警告级清单转挂 **rf-586**） |
 | **rf-580** | `llm/api_base.py` 在 36 小时实现窗口内从 699 → 831 行，跨过本文件 P2A「>800 行硬上限必须拆分」（增长主要为 429 诊断建议函数与 pacing 整改回显），且未登记 P2A 表、无门禁拦截 | 已修复 2026-10-05（`_concurrency_hint` 整体移入其功能文档本就归属的 `llm/pacing.py` §4.2.1，api_base 回落 737 行；归属一致性 + 800 行上限回归用例入 `test_llm_pacing.py`；`llm-technical` / `developer-guide` 两处符号指针同步） |
 | **rf-579** | 429 诊断「端点已=1 而全局 >1 → 建议调低全局」是恒无效建议：生效并发 = min(全局, 端点)，端点已钳到 1 时调低全局（3→2→1）从不减少该端点在途并发；「端点>1」分支并列建议调低非绑定项（如全局 5 > 端点 2 时叫调低全局）同样绕路；「两级均到底」建议含无效的「减少同时发起的生成任务」 | 已修复 2026-10-05（按生效并发绑定项给建议：>1 只列绑定项、=1 不给任何并发类建议改推 min_interval + 配额/风控；4 条用例变异实测改前全红，三处文档同步） |
 
