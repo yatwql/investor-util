@@ -244,7 +244,7 @@ class TestGeneratorFunctions(unittest.TestCase):
 
     def test_llm_client_settings_have_http2(self):
         """默认 LLM 客户端配置包含 HTTP/2。"""
-        from src.python.llm.generators_orchestrator import _LLM_CLIENT_SETTINGS
+        from src.python.llm._llm_dispatch import _LLM_CLIENT_SETTINGS
 
         self.assertTrue(_LLM_CLIENT_SETTINGS.get("http2"))
         self.assertIn("limits", _LLM_CLIENT_SETTINGS)

@@ -161,7 +161,7 @@ def test_module_not_in_parallel_dispatch_table():
     该断言是「防注册漂移」的锁：若后续维护者按「注册即编排」把它加进
     ``_build_module_fns``，本用例即变红（模块注册纪律要求移除无独立调度语义的注册分支）。
     """
-    from src.python.llm.generators_orchestrator import _build_module_fns
+    from src.python.llm._llm_dispatch import _build_module_fns
 
     fns = _build_module_fns(
         a_indices={},

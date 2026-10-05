@@ -29,10 +29,10 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_llm, pytest.mark.llm]
 # ═══════════════════════════════════════════════════════════
 
 
-@patch("src.python.llm.generators_orchestrator.generate_penetration_deep_analysis")
-@patch("src.python.llm.generators_orchestrator.generate_health_check")
-@patch("src.python.llm.generators_orchestrator.generate_global_macro")
-@patch("src.python.llm.generators_orchestrator.generate_expert_review")
+@patch("src.python.llm._llm_dispatch.generate_penetration_deep_analysis")
+@patch("src.python.llm._llm_dispatch.generate_health_check")
+@patch("src.python.llm._llm_dispatch.generate_global_macro")
+@patch("src.python.llm._llm_dispatch.generate_expert_review")
 class TestGenerateAllLlm(unittest.TestCase):
     """测试并行生成函数。"""
 
@@ -50,9 +50,9 @@ class TestGenerateAllLlm(unittest.TestCase):
             },
         )
         cls._cfg_patcher.start()
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm._llm_dispatch.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm._llm_dispatch.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
@@ -173,9 +173,9 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm._llm_dispatch.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm._llm_dispatch.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
@@ -280,10 +280,10 @@ class TestGenerateFunctionsAcceptLlmConfig(unittest.TestCase):
 # ═══════════════════════════════════════════════════════════
 
 
-@patch("src.python.llm.generators_orchestrator.generate_penetration_deep_analysis")
-@patch("src.python.llm.generators_orchestrator.generate_health_check")
-@patch("src.python.llm.generators_orchestrator.generate_global_macro")
-@patch("src.python.llm.generators_orchestrator.generate_expert_review")
+@patch("src.python.llm._llm_dispatch.generate_penetration_deep_analysis")
+@patch("src.python.llm._llm_dispatch.generate_health_check")
+@patch("src.python.llm._llm_dispatch.generate_global_macro")
+@patch("src.python.llm._llm_dispatch.generate_expert_review")
 class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
     """测试 generate_all_llm 缓存预检行为。"""
 
@@ -301,9 +301,9 @@ class TestGenerateAllLlmCachePrecheck(unittest.TestCase):
             },
         )
         cls._cfg_patcher.start()
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm._llm_dispatch.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm._llm_dispatch.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
@@ -560,6 +560,7 @@ class TestDataQualityBlockRenderedOnce(unittest.TestCase):
 
     def test_block_rendered_once_and_shared_by_fingerprint_and_prompt(self) -> None:
         from src.python.llm import generators_orchestrator as orch
+        from src.python.llm import _llm_dispatch as disp  # 并发分发子模块（消费方迁移后 patch 点）
 
         rendered: list[str] = []
 
@@ -580,9 +581,9 @@ class TestDataQualityBlockRenderedOnce(unittest.TestCase):
             patch.object(orch, "_build_competitive_context_block", return_value=""),
             patch.object(orch, "_build_data_quality_detail_block", side_effect=_fake_render),
             patch.object(orch, "_compute_module_cache_info", wraps=orch._compute_module_cache_info) as mock_info,
-            patch.object(orch, "generate_health_check", return_value=("<p>体检</p>", False)) as mock_health,
-            patch.object(orch, "ThreadPoolExecutor", new=SynchronousExecutor),
-            patch.object(orch, "make_http_client", return_value=MagicMock()),
+            patch.object(disp, "generate_health_check", return_value=("<p>体检</p>", False)) as mock_health,
+            patch.object(disp, "ThreadPoolExecutor", new=SynchronousExecutor),
+            patch.object(disp, "make_http_client", return_value=MagicMock()),
         ):
             generate_all_llm(
                 [],
@@ -626,6 +627,7 @@ class TestCompetitiveContextRenderedOnce(unittest.TestCase):
 
     def test_block_rendered_once_and_shared_by_fingerprint_and_prompt(self) -> None:
         from src.python.llm import generators_orchestrator as orch
+        from src.python.llm import _llm_dispatch as disp  # 并发分发子模块（消费方迁移后 patch 点）
 
         rendered: list[str] = []
 
@@ -645,12 +647,12 @@ class TestCompetitiveContextRenderedOnce(unittest.TestCase):
             patch.object(orch, "get_llm_config", return_value=llm_config),
             patch.object(orch, "_build_competitive_context_block", side_effect=_fake_render),
             patch.object(orch, "_compute_module_cache_info", wraps=orch._compute_module_cache_info) as mock_info,
-            patch.object(orch, "generate_global_macro", return_value=("<p>宏</p>", False)) as mock_macro,
-            patch.object(orch, "generate_expert_review", return_value=("<p>复盘</p>", False)) as mock_expert,
-            patch.object(orch, "generate_health_check", return_value=("<p>体检</p>", False)),
-            patch.object(orch, "generate_penetration_deep_analysis", return_value=("<p>穿透</p>", False)),
-            patch.object(orch, "ThreadPoolExecutor", new=SynchronousExecutor),
-            patch.object(orch, "make_http_client", return_value=MagicMock()),
+            patch.object(disp, "generate_global_macro", return_value=("<p>宏</p>", False)) as mock_macro,
+            patch.object(disp, "generate_expert_review", return_value=("<p>复盘</p>", False)) as mock_expert,
+            patch.object(disp, "generate_health_check", return_value=("<p>体检</p>", False)),
+            patch.object(disp, "generate_penetration_deep_analysis", return_value=("<p>穿透</p>", False)),
+            patch.object(disp, "ThreadPoolExecutor", new=SynchronousExecutor),
+            patch.object(disp, "make_http_client", return_value=MagicMock()),
         ):
             generate_all_llm([], [], 100000.0, 90000.0, 10000.0, 500.0, 1, {"股票": 100000.0}, force=True)
 
@@ -673,6 +675,7 @@ class TestCompetitiveContextRenderedOnce(unittest.TestCase):
     def test_expert_review_prompt_receives_metrics(self) -> None:
         """量化指标同样只在提示词与指纹之间共享同一份数据（不得各自重算）。"""
         from src.python.llm import generators_orchestrator as orch
+        from src.python.llm import _llm_dispatch as disp  # 并发分发子模块（消费方迁移后 patch 点）
 
         metrics = {"sharpe_ratio": 1.2, "hhi": 0.3}
         llm_config = {"enabled_llm": {"global_macro": False, "expert_review": True}}
@@ -680,9 +683,9 @@ class TestCompetitiveContextRenderedOnce(unittest.TestCase):
         with (
             patch.object(orch, "get_llm_config", return_value=llm_config),
             patch.object(orch, "_build_competitive_context_block", return_value=""),
-            patch.object(orch, "generate_expert_review", return_value=("<p>复盘</p>", False)) as mock_expert,
-            patch.object(orch, "ThreadPoolExecutor", new=SynchronousExecutor),
-            patch.object(orch, "make_http_client", return_value=MagicMock()),
+            patch.object(disp, "generate_expert_review", return_value=("<p>复盘</p>", False)) as mock_expert,
+            patch.object(disp, "ThreadPoolExecutor", new=SynchronousExecutor),
+            patch.object(disp, "make_http_client", return_value=MagicMock()),
         ):
             generate_all_llm(
                 [], [], 100000.0, 90000.0, 10000.0, 500.0, 1, {"股票": 100000.0}, force=True, metrics=metrics
@@ -737,9 +740,9 @@ class TestThinkingConcurrencyLimit(unittest.TestCase):
         }
 
         with (
-            patch("src.python.llm.generators_orchestrator._build_module_fns", return_value=fns),
+            patch("src.python.llm._llm_dispatch._build_module_fns", return_value=fns),
             patch("src.python.llm.generators_orchestrator._build_competitive_context_block", return_value=""),
-            patch("src.python.llm.generators_orchestrator.make_http_client", return_value=MagicMock()),
+            patch("src.python.llm._llm_dispatch.make_http_client", return_value=MagicMock()),
         ):
             result = _dispatch_llm_workers(needs, llm_config, False, {}, {}, 0, 0, 0, 0, 0, {}, None, None, None)
 
@@ -784,9 +787,9 @@ class TestNewsCorrelationNotOrchestrated(unittest.TestCase):
         needs = dict.fromkeys(keys, True)
 
         with (
-            patch("src.python.llm.generators_orchestrator._build_module_fns", return_value=fns),
+            patch("src.python.llm._llm_dispatch._build_module_fns", return_value=fns),
             patch("src.python.llm.generators_orchestrator._build_competitive_context_block", return_value=""),
-            patch("src.python.llm.generators_orchestrator.make_http_client", return_value=MagicMock()),
+            patch("src.python.llm._llm_dispatch.make_http_client", return_value=MagicMock()),
         ):
             result = _dispatch_llm_workers(needs, {}, False, {}, {}, 0, 0, 0, 0, 0, {}, None, None, None)
 

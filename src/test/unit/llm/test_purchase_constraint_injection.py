@@ -40,10 +40,10 @@ _ENABLED = {
 # ═══════════════════════════════════════════════════════════════
 
 
-@patch("src.python.llm.generators_orchestrator.generate_penetration_deep_analysis")
-@patch("src.python.llm.generators_orchestrator.generate_health_check")
-@patch("src.python.llm.generators_orchestrator.generate_global_macro")
-@patch("src.python.llm.generators_orchestrator.generate_expert_review")
+@patch("src.python.llm._llm_dispatch.generate_penetration_deep_analysis")
+@patch("src.python.llm._llm_dispatch.generate_health_check")
+@patch("src.python.llm._llm_dispatch.generate_global_macro")
+@patch("src.python.llm._llm_dispatch.generate_expert_review")
 class TestExtractFromPipelineData(unittest.TestCase):
     """提取层：契约字段 → 四模块形参。"""
 
@@ -51,9 +51,9 @@ class TestExtractFromPipelineData(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls._cfg_patcher = patch("src.python.llm.generators_orchestrator.get_llm_config", return_value=dict(_ENABLED))
         cls._cfg_patcher.start()
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm._llm_dispatch.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm._llm_dispatch.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
