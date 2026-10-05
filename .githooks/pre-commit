@@ -53,7 +53,7 @@ else
 fi
 
 # ── 2) 其余八个守护（无条件全量，与 CI guards job 逐步同源）
-echo "[..] pre-commit: 八守护全量校验"
+echo "[..] pre-commit: 十守护全量校验"
 if ! "$PY_CMD" scripts/check-code-traces.py --ci; then GUARD_FAILED="$GUARD_FAILED check-code-traces"; fi
 if ! "$PY_CMD" scripts/check-doc-traces.py --ci; then GUARD_FAILED="$GUARD_FAILED check-doc-traces"; fi
 if ! "$PY_CMD" scripts/check-task-numbering.py --ci; then GUARD_FAILED="$GUARD_FAILED check-task-numbering"; fi
@@ -70,5 +70,5 @@ if [ -n "$GUARD_FAILED" ]; then
     exit 1
 fi
 
-echo "[OK] pre-commit: 九守护全量通过"
+echo "[OK] pre-commit: 十守护全量通过"
 exit 0
