@@ -1632,6 +1632,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% set _corr_pairs = _corr_data.get("pairs", []) %}
     <div class="section" id="sec-position_structure" style="order: {{ section_numbers['position_structure'] }};">
         <div class="section-title">{{ section_numbers['position_structure'] }}、持仓结构与集中度</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {{ _funds | length }} 只基金、{{ _pairs | length }} 对组合 —— 点击展开/收起重合度矩阵、相关性矩阵与集中度监控
+            </summary>
         <div class="section-content">
             <!-- 区块一：持仓重合度矩阵 -->
             <div class="block-title">一、持仓重合度矩阵</div>
@@ -1930,6 +1934,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="empty-section">📭 暂无持仓集中度数据（未检测到基金持仓或 API 返回为空）</div>
             {% endif %}
         </div>
+        </details>
         {{ render_back_to_top() }}
     </div>
     {% endif %}
@@ -1943,6 +1948,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% set ind_beta = sf_data.get("industry_beta") if sf_data else none %}
     <div class="section" id="sec-style_factor" style="order: {{ section_numbers['style_factor'] }};">
         <div class="section-title">{{ section_numbers['style_factor'] }}、风格与因子分析</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {{ (style_results or []) | length }} 只基金风格 —— 点击展开/收起基金风格表、风格因子回归与行业 Beta
+            </summary>
         <div class="section-content">
             <!-- 区块一：基金风格表 -->
             <div class="block-title">一、基金风格表</div>
@@ -2110,6 +2119,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             {% endif %}
             {% endif %}
         </div>
+        </details>
         {{ render_back_to_top() }}
     </div>
     {% endif %}
@@ -2749,6 +2759,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-data_source_status" style="order: {{ section_numbers['data_source_status'] }};">
         <div class="section-title">{{ section_numbers['data_source_status'] }}、数据源可用性矩阵</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {{ (data_source_matrix or []) | length }} 个数据源 · 状态/命中源/降级明细 —— 点击展开/收起数据源可用性矩阵与降级明细
+            </summary>
         <div class="section-content">
             {% if data_source_matrix %}
             <table>
@@ -2918,6 +2932,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
             {% endif %}
         </div>
+        </details>
         {{ render_back_to_top() }}
     </div>
     {% endif %}

@@ -2178,15 +2178,24 @@ class TestSectionFold(unittest.TestCase):
 
 
 class TestSectionFoldMoreChapters(unittest.TestCase):
-    """正文默认折叠扩展到的三章（财经新闻关联 / 组合演进 / 持仓基本面）。
+    """正文默认折叠的扩展章（财经新闻关联 / 组合演进 / 持仓基本面 / 持仓结构与集中度 /
+    风格与因子分析 / 数据源可用性矩阵）。
 
     与「组合历史走势与回撤」同构：章标题常显于折叠块外，内容包在
     ``details.section-fold`` 内且默认收起（无 ``open``），``summary`` 为折叠块
     首子元素并携带关键摘要；「回到顶部」留在折叠块外（收起态仍可点）。
-    锚点定位/打印展开由 fold.js 统一处理（对全部 ``details.section-fold`` 生效）。
+    锚点定位/打印展开由 fold.js 统一处理（对全部 ``details.section-fold`` 生效），
+    打开报告（含带 #锚点）缺省一律收起（初始 load 不执行锚点展开）。
     """
 
-    _FOLD_KEYS = ("news_correlation", "portfolio_evolution", "fundamental_snapshot")
+    _FOLD_KEYS = (
+        "news_correlation",
+        "portfolio_evolution",
+        "fundamental_snapshot",
+        "position_structure",
+        "style_factor",
+        "data_source_status",
+    )
 
     @classmethod
     def setUpClass(cls):
@@ -2245,7 +2254,7 @@ class TestSectionFoldMoreChapters(unittest.TestCase):
         return section, details
 
     def test_content_wrapped_and_collapsed_by_default(self):
-        """三章内容均包在 details.section-fold 内且默认收起（无 open 属性）。"""
+        """各章内容均包在 details.section-fold 内且默认收起（无 open 属性）。"""
         for key in self._FOLD_KEYS:
             with self.subTest(section=key):
                 _section, details = self._fold_of(key)
@@ -2284,11 +2293,14 @@ class TestSectionFoldMoreChapters(unittest.TestCase):
                 self.assertNotIn(details, back.parents, f"{key} 章「回到顶部」应在折叠块外")
 
     def test_summary_carries_headline_stats(self):
-        """提示条带该章关键摘要（条数/快照数/两区块标的数），收起态也有信息量。"""
+        """提示条带该章关键摘要（条数/快照数/区块标的数/矩阵行数），收起态也有信息量。"""
         expectations = {
             "news_correlation": "条关联新闻",
             "portfolio_evolution": "份快照",
             "fundamental_snapshot": "财务指标",
+            "position_structure": "只基金",
+            "style_factor": "只基金风格",
+            "data_source_status": "个数据源",
         }
         for key, needle in expectations.items():
             with self.subTest(section=key):
