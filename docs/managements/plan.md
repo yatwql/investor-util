@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.12.4-dev
-> **编号源**：`plan-next = 79`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-78，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 81`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-80，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批已立项：plan-76/77/78**（交易日志复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
+**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批已立项：plan-76/77/78**（交易日志复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批已立项：plan-79/80**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -94,6 +94,22 @@
 **先决门槛（评测即本文档本体）**：25 个代表因子三项指标——A 字段可得率 ≥80%、B 与既有信号增量 ≥30% 低相关、C 耗时增量 ≤20%；任一不过即归档「已评估未采纳」，评测产物落 `docs/tmp/`。详见 [`factor-zoo-catalog-design.md`](../plan/factor-zoo-catalog-design.md)。
 
 **预估成本**：低（纯评测脚本）；**价值**：中（评测过才谈得上实施）。
+
+#### 🔲 `plan-79` 事件窗量化对照（event_window_impact）
+
+**动机**：新闻关联只有文本/LLM 侧判定，无「事件日前后 N 交易日真实收益」的数据侧互证——LLM 说利好而事件窗为负的分歧点正是复盘最该暴露的，也是 fact_checker 的事实锚。参照 gs-quant `timeseries/event_study.py` 的对齐/切窗/影响度量纯函数拆分（本仓库全仓实测无任何事件窗能力）。
+
+**先决门槛（未过归档未采纳）**：① 新闻日期字段结构化可用率 ≥80%；② 窗口口径（事件日→交易日映射、±5 交易日、基准对齐、LOCF）唯一可判定；③ 10 例样本量化结论与文本判定「方向一致或分歧可解释」≥7（人工比对）。详见 [`event-window-impact-design.md`](../plan/event-window-impact-design.md)。
+
+**预估成本**：中；**价值**：中高（数据×文本互证，复盘可信度下沉）。
+
+#### 🔲 `plan-80` 调仓纪律回放（rebalance_schedule_replay）
+
+**动机**：`rebalance.py` 管「能不能调」、`whatif_backtest` 管「单次调了会怎样」，缺「长期坚持某纪律（定期/阈值触发）会怎样 vs 买入持有」的多期回放——「纪律 vs 放任」的量化回答。参照 gs-quant `backtests/` 的规则触发/成本分层/分期分解语义（只借语义不搬引擎）。
+
+**先决门槛（未过归档未采纳）**：① 指标原语可全量复用 `metrics*`/`whatif_backtest`（不新造引擎）；② 成本联动软依赖 plan-77（未落地则出「未计成本」标注版，不双实现）；③ 2 个真实规则回放样例经用户确认「有启发、想持续看」。详见 [`rebalance-schedule-replay-design.md`](../plan/rebalance-schedule-replay-design.md)。
+
+**预估成本**：中；**价值**：中高（行动建议章获得最有说服力的证据类型）。
 
 #### 🔲 `plan-71` 景气度框架诊断（prosperity_framework）转正判据明确化
 

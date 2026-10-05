@@ -1,7 +1,7 @@
 # What-if 回放成本建模与基准对比设计 —— plan-77
 
 > **状态**：设计 + 待评测（先决门槛未过不实施）。
-> **参照**：Vibe-Trading `agent/backtest/factor_costs.py`（成本因子）+ `benchmark.py`（基准对比面板）+ `constraints.py`。
+> **参照**：Vibe-Trading `agent/backtest/factor_costs.py`（成本因子）+ `benchmark.py`（基准对比面板）+ `constraints.py`；成本分层（Constant/Scaled/Aggregate）与 PnL 分解语义参照 gs-quant `backtests/backtest_objects.py`（`TransactionModel`/`PnlAttribute`，见 gs-quant 借鉴批研究文档）。
 > **研究背景**：见 `vibe-trading-borrow-candidates-research.md` §2.1。
 
 ## 1. 动机与问题

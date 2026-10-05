@@ -18,10 +18,10 @@
 | 测试用例 | — | — | 8,601 个 | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | 用户文档 | Markdown | 11 | 5,534 | 含 README.md（184 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 5,350 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| 项目文档 | Markdown | 158 | 58,953 | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 10 + archive md 134），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 11,114 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| 项目文档 | Markdown | 161 | 59,134 | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 13 + archive md 134），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 11,133 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 137 | 46,209 | 各版本 changelog/plan/review-findings 与设计文档归档（134 md 45,809 行，含借鉴批候选研究与 LLM 成本调节/自检/源指定设计） |
-| ├ plan/ | 中间设计文件 | 10 | 1544 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 198 行）+ 基金申购限购接入设计 305 行 + Vibe-Trading 借鉴批五份（候选研究 + 交易日志复盘 / What-if 成本基准 / 决策反思闭环 / 因子目录评测设计） |
+| ├ plan/ | 中间设计文件 | 13 | 1706 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 198 行）+ 基金申购限购接入设计 305 行 + Vibe-Trading 借鉴批五份（候选研究 + 交易日志复盘 / What-if 成本基准 / 决策反思闭环 / 因子目录评测设计）+ gs-quant 借鉴批三份（候选研究 + 事件窗量化对照 / 调仓纪律回放设计） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 版本演进对照（最初版本 → 最新发布 → 当前开发版）
@@ -1252,7 +1252,10 @@ investor-util/
 │       ├── trade-journal-review-design.md # 交易日志复盘设计（journal 契约/先决门槛/五迭代，plan-76）
 │       ├── whatif-cost-benchmark-design.md # What-if 回放成本建模与基准对比设计（先决门槛/四迭代，plan-77）
 │       ├── decision-reflection-shadow-design.md # 决策跨期反思闭环设计（Vibe 影子账户参照/转正路径，plan-70）
-│       └── factor-zoo-catalog-design.md # 因子动物园目录评测设计（25 因子三项指标 go-no-go，plan-78）
+│       ├── factor-zoo-catalog-design.md # 因子动物园目录评测设计（25 因子三项指标 go-no-go，plan-78）
+│       ├── gs-quant-borrow-candidates-research.md # gs-quant 借鉴候选研究（高盛量化库剖析 + 2 立项/1 参照/10 不采纳，plan-79/80 立项依据）
+│       ├── event-window-impact-design.md # 事件窗量化对照设计（event_study 参照/先决门槛/四迭代，plan-79）
+│       └── rebalance-schedule-replay-design.md # 调仓纪律回放设计（回测引擎语义参照/成本软依赖 plan-77/四迭代，plan-80）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
