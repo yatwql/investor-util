@@ -103,6 +103,7 @@ SIGNAL_VALUATION = "valuation_percentile"
 SIGNAL_TAIL_RISK = "tail_risk"
 SIGNAL_STYLE_FACTOR = "style_factor"
 SIGNAL_REBALANCE_OVERFLOW = "rebalance_overflow"
+SIGNAL_FACTOR_CATALOG = "factor_catalog"
 
 SIGNAL_TYPE_LABELS: dict[str, str] = {
     SIGNAL_MARKET_TEMPERATURE: "市场温度",
@@ -110,6 +111,7 @@ SIGNAL_TYPE_LABELS: dict[str, str] = {
     SIGNAL_TAIL_RISK: "尾部风险",
     SIGNAL_STYLE_FACTOR: "风格因子",
     SIGNAL_REBALANCE_OVERFLOW: "再平衡超限",
+    SIGNAL_FACTOR_CATALOG: "因子目录",
 }
 
 # 摘要块/统计的稳定输出顺序（增删信号类型时同步维护，保证输出可预期）
@@ -119,6 +121,7 @@ SIGNAL_TYPE_ORDER: tuple[str, ...] = (
     SIGNAL_TAIL_RISK,
     SIGNAL_STYLE_FACTOR,
     SIGNAL_REBALANCE_OVERFLOW,
+    SIGNAL_FACTOR_CATALOG,
 )
 
 # 摘要注入的 live 样本门槛（低于该值不产出摘要块，防噪声误导——

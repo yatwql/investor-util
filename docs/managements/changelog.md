@@ -11,6 +11,8 @@
 
 ### Added
 
+- **报告/信号**：**因子目录**落地（`factor_catalog` 实验开关，默认关；「风格与因子分析」章内新增**区块四**，关态产物逐字节不变）——四组件按门槛判定书冻结清单实施：① `schemas/factor_catalog.py` 冻结目录（25 条五来源族各 5，slug/族/类别/所需字段/中性点/出处，版本随代码）+ 中性点字典 + 字段类型路由；② `fetcher/factor_catalog_loader.py` 装载前完整性校验（拒载降级不进计算）+ 四类输入备数（日K/基准指数/估值/财务指标，逐类型失败入 `unavailable` 带原因不外抛，测试可注入探针）；③ `analysis/_factor_formulas.py` 25 因子公式纯计算原语（无 I/O，相关性复用 `_pearson_pvalue`）；④ `analysis/factor_evaluator.py` 池构造（直接持仓 A 股名称+代码双维 ∪ 穿透 top10 code/codes 递归收集）→ 逐因子池内横截面（均值，有效码数 <3 不出值；基本面族按码级标量取估值/财务字段）→ 中性相对与评级摘要（`N/M 中性上方`），全链 fail-soft（逐因子降级不截断整表，目录拒载/池空/备数异常出 `available=false` 占位不抛）；`signal_ledger` 新增第 6 类 `factor_catalog`（标签「因子目录」，每日单条组合级快照，detail 携带目录版本+可算计数+可算因子横截面值，关态/降级态零记录）；双端呈现面同源三态（None 不渲染 / `available=false` 标题+原因占位 / 可用全量：表头/因子行/相对中性/不可算原因/说明区版本+评级，顺序固定在行业 Beta 之后）——Excel `_write_catalog_block` + HTML 模板块；开关第 33 项入实验组（实验 7），TUI 实验段 8~14 与后续编号顺延；需求 **R-FCT-01~05** 入 §6.14、testplan 批 9 载体、technical 语义命名表 5 条与 `factor_catalog_data` 契约附录、`reports-instruction`/`how-to-config`/`how-to-use-tui-menu` 计数与区块描述、folders/test-coverage 快照同步；三个新测试文件（loader / evaluator / evaluator_edge）+ 四个既有文件（style sheet / signal record / html structure / features）用例扩充 | plan-81
+
 - **调研**：**LLM 调用链 token 消耗优化空间调研**（`docs/plan/llm-token-optimization-research.md`）——基于 12 次真实运行日志聚合（完整运行输入 ≈25k / 输出 ≈18-25k / 9 调用 / 大运行 system 缓存命中 0%）与调用链逐层核对：既有省 token 机制盘点（指纹跳过/新闻批量化/system 缓存/输入预算护栏等 8 项）→ 9 类候选逐项评估 → 共享前缀前移专项（机制图解 + 输入侧 30~60% 收益量化 + 三类风险）→ provider 四层差异度 + pacing 双缝隙分析；按「不降低调用效果」硬前提**判定维持现状**，附两个重启触发条件与影子 A/B 预案；唯一行动项为计量修复 rf-596
 
 - **工程效能**：**plan-82 流程耗时优化**落地（执行纪律 + 收尾触点清单 + 顺序依赖二分工具；不降低任何检查强度，只收敛往返次数）——① `CLAUDE.md` 执行纪律修订：`ruff`/`check-file-length` 随每批代码改动跑、**编辑与 `--sync`/检查类脚本永不同批**（防竞态，先完成全部编辑再 sync）、**提交前免重复十守护**（pre-commit 钩子内含 `--sync`+十守护全量，失败即中止，手动只补 ruff+测试门禁）、**收尾一次性枚举全量 finding 批量修**（不做改一处跑一轮的串行试探），并修正旧文案「四个 `--ci` 脚本」与现行十守护不符；② `developer-guide.md` 新增「**计划收尾：文档触点清单与一次性枚举**」（按任务类型列触点全集 + 三步工作流）与「**定位顺序依赖失败 — `find-order-dependent-test.py`**」两节及速查表行；③ 新脚本 `scripts/find-order-dependent-test.py`：单跑绿合跑红的顺序依赖污染源二分定位（单跑确认 → 收集参考顺序 → 复现门 → 最小失败前缀二分（记忆化，每次判定 = 一次真实 pytest）→ 单文件配对确认/预算内精简 → 最小复现命令，`--candidates` 限定提速、`--dry-run`、`--max-runs` 硬上限），22 项单测含临时目录端到端泄漏复现；④ guard 类测试写死派生量全仓审计：「断言+关键词+数字」扫描命中 12 处逐一核验均为合成夹具/固定内容/结构不变量，无遗留（已知的 `test_check_doc_drift` 静态章节计数参数已动态化） | plan-82
@@ -49,6 +51,8 @@
 - **文档**：折叠覆盖章节在管理文档表述——`technical.md` 新增 §4.21（覆盖章节清单表、缺省收起/锚点/打印/resize 语义与模板测试载体）、`requirements.md` 新增 `R-OUT-12` + `testplan.md` 同步载体行（`test_html_report_structure.py`，需求追溯双向一致）
 
 ### Fixed
+
+- **数据源复核**：push2 扩展字段（动态 PE / 总市值 / PB）空值复核结论（**rf-592**）——评测期响应正常但 `f9/f20/f23` 全空、复核时 `api/qt/stock/get` 端点直接断连（双探针均远端断开），判**源侧字段策略变更/暂不可用**；消费方 `fetch_valuation_fields` 本就按空值降级为 None，`factor_evaluator` 对 `fund_pb`/`fund_size_log_cap` 判「估值字段不可得」逐因子降级、冻结目录条目保留待源恢复；换端点属数据源路由事项留待后续 | rf-592
 
 - requirements §11.5 功能开关节陈旧——正文计数 30 项（实验 5 / 常规 16 / 报告 9）→ 注册表实数 32（6/16/10）、「两组可切换」→ 三组、转正定义句随本次扩展同改、表前补非全集声明；根因（`check-doc-drift` 计数受检面未覆盖 requirements）挂 rf-598 待处理 | rf-597
 

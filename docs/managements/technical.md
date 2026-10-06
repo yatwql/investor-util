@@ -1733,7 +1733,7 @@ for sec in section_order:
 | `position_relationship_data` | `overlap_matrix is not None or position_relationship_data is not None` | `fund_deep_analysis` | 持仓结构与集中度·区块一/二（重合度 + 相关性） |
 | `concentration_data` | `concentration_analysis is not None` | `fund_deep_analysis` | 持仓结构与集中度·区块三（集中度） |
 | （`position_structure` 用 `data_flag_any`） | 上述两者任一就绪（OR，悲观判定） | `fund_deep_analysis` | 合并章节：任一区块有数据即显示（见「持仓结构与集中度」） |
-| `style_factor_data` | `style_factor_data is not None or style_analysis is not None` | `fund_deep_analysis` | 风格与因子分析（风格表 + 因子回归 + 行业 Beta 一章三区块） |
+| `style_factor_data` | `style_factor_data is not None or style_analysis is not None` | `fund_deep_analysis` | 风格与因子分析（风格表 + 因子回归 + 行业 Beta + 因子目录，一章四区块） |
 | `evolution_data` | `evolution_data is not None` | `evolution` | 组合演进（多快照趋势） |
 | `news_data_available` | `include_news` flag（新闻数据可用） | `news` | 新闻关联分析 |
 | `llm_data_available` | `llm_enabled_flag`（LLM 生成成功） | `llm` | LLM 全部 5 模块 |
@@ -2079,9 +2079,9 @@ Excel 热力图着色：
 - **环比以报告期推进为前提**：快照增记 `period`（基金持仓报告期）。本次报告期与上期相同时，两次读的是同一份报告，环比恒为 0——报 0 会被读成「持仓结构没变化」，实为「没有新数据可比」，故改标「无对比意义」并注明原因，快照条目**原样沿用**（含 `check_date`），不刷新成一次新观察；报告期推进时照常对比。旧快照无 `period` 字段时维持原对比行为。页签含「报告期」列，陈旧者带「（陈旧）」后缀（保留数据 + 标注，区别于重合度矩阵的剔除口径）。
 - 快照使用精确键名（`fund_concentration_snapshot`），月级 TTL
 
-#### 风格与因子分析（一章三区块：风格表 + 因子回归 + 行业 Beta）
+#### 风格与因子分析（一章四区块：风格表 + 因子回归 + 行业 Beta + 因子目录）
 
-> **章节结构说明**：「风格与因子分析」章节（section key=`style_factor`，type=`fund_deep_analysis`、data_flag=`style_factor_data`）一章三区块：一、基金风格表（每只基金截面分类）；二、风格因子回归（组合整体时间序列回归）；三、行业 Beta 子表（组合对各行业指数敏感性，开关 功能开关 `industry_beta` 默认关）。区块间数据独立降级，任一块无数据不影响其余区块。C7 注册见 §8.3，序号为注册表 19 模块之一（连续编号）。
+> **章节结构说明**：「风格与因子分析」章节（section key=`style_factor`，type=`fund_deep_analysis`、data_flag=`style_factor_data`）一章三区块：一、基金风格表（每只基金截面分类）；二、风格因子回归（组合整体时间序列回归）；三、行业 Beta 子表（组合对各行业指数敏感性，开关 功能开关 `industry_beta` 默认关）；四、因子目录（25 因子五来源族池内横截面与评级，实验开关 `factor_catalog` 默认关、数据契约 `factor_catalog_data`）。区块间数据独立降级，任一块无数据不影响其余区块。C7 注册见 §8.3，序号为注册表 19 模块之一（连续编号）。
 
 ##### 区块一：基金风格表
 
@@ -2179,7 +2179,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 |:-----|:---------|
 | **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定；因子指数**不作为 `_A_INDICES` 成员**（避免污染实时指数行情循环与报告"指数对比"章节噪声），代码集合定义为分析模块内部常量 |
 | **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "eastmoney", "sina", "hithink"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（降级接受），故补东方财富 push2his 为实际可用的第二源；腾讯与东方财富均故障时因子章节落 §1.4.5 数据不足分支 |
-| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 18 个模块序号连续（1~18），`style_factor` 为基金深度分析一章三区块（风格表 + 风格因子回归 + 行业 Beta 子表） |
+| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 18 个模块序号连续（1~18），`style_factor` 为基金深度分析一章四区块（风格表 + 风格因子回归 + 行业 Beta 子表 + 因子目录区块） |
 | **C14** (渲染期数据不可写入模块级全局变量) | 风格与因子数据通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
 | **C19** (pipeline_data Schema 契约) | 新增 `style_factor_data` 键（类型 `dict`，内嵌 `industry_beta` 子键），键结构见附录 H，先定义类型再使用 |
 | **§1.4.5** (数据降级治理) | 区分两分支：① **数据不足**——因子指数历史不足 36 期或有效样本 < 36，标记 `style_factor_data.available=false`，显示"数据不足"占位文本，**不走 DegradationTracker**（系数据量不足，非故障）；② **数据源故障**——`fetch_index_history` 返回空（chain 全失败），走 DegradationTracker 记录 T2 降级事件，显示"数据源暂不可用"，与数据不足文案区分。行业 Beta 子表独立降级（`industry_beta=None` 开关关闭隐藏 / `available=false` 标题+占位），**绝不输出误导性数字** |
@@ -2677,7 +2677,7 @@ report/decision_llm_capture.py   # 抽取：结构化优先 → 表格兜底
 
 ### 4.16 确定性数值信号沉淀与实时/非实时标签纪律
 
-市场温度、估值分位、尾部风险、风格因子、再平衡超限这五类评级由确定性算法算出，此前只活在一次报告生成的内存里与当页展示中——报告落盘即散失，跨期无法回答「上期判高估，事后对不对」。本项把这五类评级沉淀为追加型账本 `data/state/signal_ledger.jsonl`，并给每条记录附**实时/非实时**来源标签，统计与提示词摘要**默认只算实时记录**（借鉴 augur `backtest.py` 的 `data_source` 标签与排行榜默认 `live_only` 纪律），防非实时数据算出的评级冒充真实战绩。
+市场温度、估值分位、尾部风险、风格因子、再平衡超限这五类评级由确定性算法算出，此前只活在一次报告生成的内存里与当页展示中——报告落盘即散失，跨期无法回答「上期判高估，事后对不对」。本项把这五类评级沉淀为追加型账本 `data/state/signal_ledger.jsonl`（因子目录随实验开关 `factor_catalog` 追加为第 6 类），并给每条记录附**实时/非实时**来源标签，统计与提示词摘要**默认只算实时记录**（借鉴 augur `backtest.py` 的 `data_source` 标签与排行榜默认 `live_only` 纪律），防非实时数据算出的评级冒充真实战绩。
 
 **分层（`core/` 为共享层，两个消费方向都无环）**：
 
@@ -2688,7 +2688,7 @@ core/perf.py               # 性能历史
 core/decision_ledger.py    # 决策账本（序列化口径：键排序 + ensure_ascii=False）
 core/signal_ledger.py      # 信号账本：登记/幂等/折叠/摘要；不 import analysis
     ↑ 单向依赖（仅借 core.decision_ledger 的方向常量作单一事实来源）
-report/signal_record.py    # 适配器：五类评级 → 记录（唯一持有 analysis 词表映射的一侧）
+report/signal_record.py    # 适配器：各信号类型评级 → 记录（唯一持有 analysis 词表映射的一侧）
 llm/skeleton.py            # 摘要注入 expert_review 提示词（开关门控）
 ```
 
@@ -3374,6 +3374,10 @@ make_http_client(timeout=10.0) → httpx.Client
 | `inject_event_impact_data` | 事件窗量化对照挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供；新闻先行串行段内注入，供分歧例附录块同轮进 LLM） | 事件窗量化对照（报告独立章，type=event_impact） | 报告输出 | 实验开关 `event_window_impact`（默认关） |
 | `event_impact_panel` | 事件窗对照表数据编排与双端单源展示（事件行/降级/占位 + view 与页签同文 + 分歧例附录块） | 事件窗量化对照 | 报告输出 | 随 `event_window_impact` |
 | `event_window_impact` | 事件窗量化对照（新闻事件 → 交易日映射的严格 ±5 交易日窗收益 vs 文本极性方向比对，分歧例进 LLM 统一附录） | 事件窗量化对照 | 报告输出 | 实验开关 `event_window_impact`（默认关） |
+| `factor_catalog` | 因子目录注册表（25 因子五来源族冻结清单：slug/族/类别/所需字段/中性点/出处，版本随代码；含中性点字典与字段类型路由常量） | 风格与因子分析（章内区块四） | 数据契约 | 实验开关 `factor_catalog`（默认关） |
+| `factor_catalog_loader` | 因子目录装载与冻结校验（拒载降级）+ 四类输入备数（日K/基准指数/估值/财务指标，逐类型失败入 unavailable 不外抛） | 风格与因子分析 | 数据获取 | 随 `factor_catalog` |
+| `factor_evaluator` | 因子目录计算编排（池构造：直接持仓 ∪ 穿透 A 股 → 逐因子池内横截面 → 中性相对与评级摘要，全链 fail-soft） | 风格与因子分析 | 报告输出 | 随 `factor_catalog` |
+| `_factor_formulas` | 25 因子公式纯计算原语（技术族逐因子序列与基本面标量分发，无 I/O、不进报告层） | 风格与因子分析 | 数据获取 | 随 `factor_catalog` |
 | `holding_change_review` | 持仓变动复盘（快照事件级：差分事件清单 + 频率/结构/贡献分解 + 意图对账 + 账户结构重排标注 + LLM 归因） | 持仓变动复盘 | 报告输出 | 实验开关 `holding_change_review`（默认关） |
 | `module_fingerprint` | LLM 模块缓存指纹唯一事实来源（预检侧与写侧同源） | LLM 生成 | LLM 生成 | 无（模块级） |
 | `decision_reflection` | 决策跨期反思闭环（登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词） | 行动建议 | 监控 | 实验开关 `decision_reflection`（默认关） |
@@ -3384,9 +3388,9 @@ make_http_client(timeout=10.0) → httpx.Client
 | `decision_review_block` | 「历史决策复盘」区块数据契约（结构稳定，HTML/Excel 双端消费） | 行动建议 | 监控 | 随 `decision_reflection` |
 | `decision_header_parse` | 决策头结构化 + 确定性解析兜底（词边界纪律归一解析器） | 行动建议 | 监控 | 开关 `decision_header_parse`（默认开，非实验项） |
 | `decision_header` | 决策词归一解析器（标签优先/长词优先/否定守卫/复合词左边界/二义不猜） | 行动建议 | 监控 | 随 `decision_header_parse`（A 通道无开关） |
-| `deterministic_signal` | 确定性信号模块（实时注入 + 跨期沉淀双面：温度/分位/尾部风险预消化信号行 + 五类评级账本沉淀；原 `signal_pre_digest`/`signal_ledger` 两开关合并转正） | LLM 生成 | LLM 生成 | 开关 `deterministic_signal`（默认开，常规组） |
+| `deterministic_signal` | 确定性信号模块（实时注入 + 跨期沉淀双面：温度/分位/尾部风险预消化信号行 + 确定性评级账本沉淀，内置五类、因子目录随实验开关追加第 6 类；原 `signal_pre_digest`/`signal_ledger` 两开关合并转正） | LLM 生成 | LLM 生成 | 开关 `deterministic_signal`（默认开，常规组） |
 | `prompts_signals` | 信号预消化提示词块（开关判定收敛于缓存后缀函数） | LLM 生成 | LLM 生成 | 随 `deterministic_signal` |
-| `signal_ledger` | 确定性数值信号沉淀（五类评级登记 + live/demo 来源标签，排行榜默认 live_only） | LLM 生成 | 监控 | 随 `deterministic_signal` |
+| `signal_ledger` | 确定性数值信号沉淀（各信号类型评级登记 + live/demo 来源标签，排行榜默认 live_only） | LLM 生成 | 监控 | 随 `deterministic_signal` |
 | `signal_record` | 确定性信号登记适配器（唯一持有语义词表映射，`core/` 不依赖 `analysis/`） | LLM 生成 | 监控 | 随 `deterministic_signal` |
 | `experiment_stats` | 实验功能使用统计（启用计数/最近启用日期，data/state/experiment_stats.json；报告入口自动记录，doctor 上屏；为转正/撤销决策提供客观数据） | 诊断 | 监控 | 无（观测设施） |
 | `module_quality_gate` | 模块级质量分级（4 个 LLM 模块按完整性/篇幅评 A~F，低评级注入质量横幅，只标注不阻断） | LLM 生成 | LLM 生成 | 开关 `module_quality_gate`（默认开，非实验项） |
@@ -3879,6 +3883,7 @@ investor-util/
 | decision_review_data | dict | 是 | record_llm_decisions_and_review_block |
 | holding_change_data | dict | 是 | inject_holding_change_data（实验开关 holding_change_review，默认关） |
 | event_impact_data | dict | 是 | inject_event_impact_data（实验开关 event_window_impact，默认关） |
+| factor_catalog_data | dict | 是 | prepare_report_data（实验开关 factor_catalog，默认关；键值可为 None，None/缺失均不渲染区块） |
 | prosperity_framework_data | dict | 是 | prepare_report_data（full/both）；basic 路径由 generate_excel_report 就地构建 |
 | market_sentiment_data | dict | 是 | 行动建议章内嵌块（full/both 由编排层注入；basic 路径由 generate_excel_report 就地构建） |
 
@@ -3887,6 +3892,8 @@ investor-util/
 > `decision_review_data`（决策复盘区块，C19 契约，实验功能「决策跨期反思闭环」开启时才有）：行动章内嵌复盘表数据，由 `report/decision_review_block.py::build_review_block(report_date=...)` 从决策账本（`core/decision_ledger`）装配，在 `report/_experimental_seams.py::record_llm_decisions_and_review_block` 注入（开关关闭或区块为空 → 键缺席，两条输出路径保持既有输出）。消费方：HTML `partials/action_section.html` 与 Excel `report/action_sheet.py`（均按 `.get()` 消费，键缺席即不渲染）。类型校验：`report/pipeline_data_builder.py::_PIPELINE_DATA_TYPE_MAP`。
 
 > `holding_change_data`（持仓变动复盘，C19 契约，实验开关 `holding_change_review` 默认关）：快照差分事件清单 + 频率/结构/贡献分解指标 + 意图对账（决策账本只读对照）+「区间净额推断、非逐笔」局限标注，由 `report/holding_change_panel.py::build_holding_change_panel` 装配（事件抽取 `analysis/holding_change_events.py` + 纯计算 `analysis/holding_change_metrics.py`），在 `report/_experimental_seams.py::inject_holding_change_data` 注入（开关关闭 → 键缺席 → 注册表 `holding_change` 章 data_flag False → 整章隐藏，两条输出路径保持既有输出）。消费方：HTML `partials/holding_change_section.html` 与 Excel `report/holding_change_panel.py::write_holding_change_sheet`（均经 `build_holding_change_view` 取双端单源预格式化行）。类型校验：`report/pipeline_data_builder.py::_PIPELINE_DATA_TYPE_MAP`。
+
+> `factor_catalog_data`（因子目录，C19 契约，实验开关 `factor_catalog` 默认关）：25 因子五来源族逐因子横截面（`slug`/`family`/`family_label`/`label`/`value`/`neutral`/`above`/`codes_ok`/`computable`/`reason`）+ 池与评级摘要（`pool_size`/`computed`/`neutral_above`/`neutral_total`/`rating`/`version`/`catalog_size`）+ 逐类型不可得原因 `unavailable`，由 `analysis/factor_evaluator.py::build_factor_catalog_data` 编排（冻结目录 `schemas/factor_catalog.py` + 装载 `fetcher/factor_catalog_loader.py` + 公式原语 `analysis/_factor_formulas.py`），在 `report/orchestrator.py::prepare_report_data` 注入（开关关闭 → 键为 None → 区块不渲染、信号零记录；计算失败降级 `available=false` 占位，两条输出路径保持既有输出）。消费方：HTML `report_template.html` 风格与因子分析区区块四与 Excel `report/style_factor_sheet.py::write_style_factor_sheet`（`_write_catalog_block`）；信号消费方 `report/signal_record.py`（每日单条快照）。类型校验：`report/pipeline_data_builder.py::_PIPELINE_DATA_TYPE_MAP`。
 
 > `valuation_data`（估值分位，C19 契约，3 键 + 内嵌 `by_code` 子键）：`{"available": bool, "status": str, "by_code": {code: {"pe": float\|None, "pb": float\|None, "price_percentile": float\|None, "tier": str\|None, "sample_count": int, "percentile_available": bool}}}`。当前 PE/PB 由 `fetcher/industry.py::fetch_valuation_fields`（网关入口；东财 push2 扩展字段 f9/f23 与行业分类同属一次请求，经 Provider Chain + 文件/会话缓存取用，报告层不得直连 provider）；`price_percentile` 为历史 K 线价格分位代理（0~100，`analysis/valuation_percentile.py`，MIN_SAMPLES=60），非真实历史估值分位（盈利增长未纳入，渲染层必须展示 `DISCLAIMER`"价格分位代理，非真实历史估值分位"）。由 `report/orchestrator.py::compute_valuation_data` 计算（开关 功能开关 `valuation_percentile` 默认关；关闭 → None → 「资产穿透TOP10」估值列隐藏；PE/PB 与 K 线皆不可得 → available=False 落 §1.4.5 占位）。消费方：穿透 TOP10 Excel `penetration_sheet` 估值分位列（ncols 10→11 + 表尾免责）与 HTML `report_template.html` 条件列（`valuation_enabled`）。**真实历史估值分位（TTM 口径，后续增强）**：`by_code` 另含 `real`（子契约：`available`/`pe_ttm`/`pb`/`pe_percentile`/`pb_percentile`/`tier`/`basis`/`sample_count`/`report_period`/`reason`）与 `real_available`，由 `analysis/valuation_percentile.py::compute_real_valuation` 用「多期 TTM 每股收益（年报直取、季报累计差分）× 该日已生效最新一期基本面 × 历史收盘价」构造历史 PE/PB 序列后取当前值分位（生效日取法定披露截止日以避免前视偏差；PE 优先、PB 兜底；样本下限 60）。多期基本面来自 `fetcher/financial_indicator.py::fetch_indicator_series`；渲染层**优先展示真实分位并标注 basis，无基本面覆盖时回落价格分位代理**（分别对应 `DISCLAIMER_REAL` / `DISCLAIMER_PROXY`，两者不得混口径展示）。**数据底座门禁**：真实分位以 `config.datasink_feature_ready`（`datasink.enabled` 开启 且 凭据就绪，纯本地判定）为前提——未就绪时 `_fetch_valuation_for_code` 不做任何取数与计算，`compute_valuation_data` 置 `basis_mode="proxy_only"`，估值列文案与免责语**逐字回退到引入前的原样**（Excel `penetration_sheet.valuation_footer_note` / HTML `valuation_real_basis` 同一判据）；就绪时为 `basis_mode="real_ttm"`。
 

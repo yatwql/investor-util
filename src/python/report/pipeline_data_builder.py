@@ -32,6 +32,8 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "risk_metrics",
     # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键）
     "style_factor_data",
+    # 因子目录（实验性功能 factor_catalog；关态为 None → 区块/信号全链无感）
+    "factor_catalog_data",
     "position_relationship_data",
     "evolution_data",
     # 品种覆盖诊断：数据质量仪表盘品种覆盖区块数据源
@@ -136,6 +138,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "data_degradation": list,
     "risk_metrics": dict,
     "style_factor_data": (dict, type(None)),
+    "factor_catalog_data": (dict, type(None)),
     "position_relationship_data": (dict, type(None)),
     "evolution_data": (dict, type(None)),
     "position_status": (dict, type(None)),

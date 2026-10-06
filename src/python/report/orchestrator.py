@@ -236,6 +236,19 @@ def prepare_report_data(
     # 深度档位：新闻采集条数按档位下界修正（延迟导入避免报告层与 LLM 层在导入期互相牵连）
     from src.python.llm.depth_profile import effective_news_limit, resolve_depth_profile
 
+    # 因子目录（实验开关 factor_catalog；关闭时不计算 → 键为 None，下游全链无感）
+    from src.python.config.features import is_feature_enabled
+
+    factor_catalog_data: dict[str, Any] | None = None
+    if is_feature_enabled("factor_catalog"):
+        try:
+            from src.python.analysis.factor_evaluator import build_factor_catalog_data, derive_factor_pool
+
+            factor_catalog_data = build_factor_catalog_data(derive_factor_pool(details, penetrated_assets)["codes"])
+        except Exception as exc:
+            logger.warning("[factor_catalog] 因子目录计算失败，降级为不可用占位: %s", exc)
+            factor_catalog_data = {"available": False, "reason": f"计算异常: {type(exc).__name__}"}
+
     return {
         "details": details,
         "total_mv": total_mv,
@@ -255,6 +268,8 @@ def prepare_report_data(
         # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键；
         # 基金深度分析关闭时为 None）
         "style_factor_data": factor_exposure,
+        # 因子目录（数据契约 factor_catalog_data；开关关闭为 None，计算失败为不可用占位）
+        "factor_catalog_data": factor_catalog_data,
         # 持仓关系矩阵（数据契约 position_relationship_data——相关性区块；基金深度分析关闭时为 None）
         "position_relationship_data": correlation_data,
         # 品种覆盖诊断（数据契约 position_status；品种级数据状态标注）

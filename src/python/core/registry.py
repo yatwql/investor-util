@@ -610,6 +610,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── 风格与因子分析（「基金风格表 + 风格因子回归」两区块 + 行业 Beta 子表） ──
     # 区块一：基金风格表（渲染期派生）· 区块二：风格因子回归（style_factor_data 子键）
     # · 区块三：行业 Beta 子表（style_factor_data.industry_beta，功能开关 industry_beta 默认关）
+    # · 区块四：因子目录（factor_catalog_data 主键，实验开关 factor_catalog 默认关）
     {
         "key": "style_factor",
         "name": "风格与因子分析",

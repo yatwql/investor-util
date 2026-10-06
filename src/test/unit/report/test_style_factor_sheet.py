@@ -246,3 +246,110 @@ class TestStyleFactorSheet(unittest.TestCase):
             for c in row
         }
         self.assertTrue(any("FF8C00" in str(col) for col in colors if col), "中度漂移橙色应应用")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 因子目录区块（区块四，实验性功能 factor_catalog）
+# ═══════════════════════════════════════════════════════════════
+
+
+def _factor_catalog(**extra) -> dict:
+    """可用的因子目录契约样例（含可算/不可算两类因子）。"""
+    data = {
+        "available": True,
+        "reason": None,
+        "version": "2026.10.06.1",
+        "catalog_size": 2,
+        "computed": 1,
+        "neutral_above": 0,
+        "neutral_total": 1,
+        "rating": "0/1 中性上方",
+        "pool_size": 4,
+        "factors": [
+            {
+                "slug": "qlib_rsi_14",
+                "family": "qlib158",
+                "family_label": "qlib158 技术因子族",
+                "label": "RSI(14)",
+                "value": 0.0,
+                "neutral": 50.0,
+                "above": False,
+                "codes_ok": 4,
+                "computable": True,
+                "reason": None,
+            },
+            {
+                "slug": "amihud_20",
+                "family": "academic",
+                "family_label": "学术因子族",
+                "label": "Amihud 非流动性",
+                "value": None,
+                "neutral": None,
+                "above": None,
+                "codes_ok": 0,
+                "computable": False,
+                "reason": "日K不可得",
+            },
+        ],
+    }
+    data.update(extra)
+    return data
+
+
+class TestFactorCatalogBlock(unittest.TestCase):
+    """因子目录区块（R-FCT-04 载体）渲染与关态无感。"""
+
+    def _write(self, **kwargs) -> "object":
+        from openpyxl import Workbook
+
+        from src.python.report.style_factor_sheet import write_style_factor_sheet
+
+        wb = Workbook()
+        ws = wb.active
+        write_style_factor_sheet(ws, **kwargs)
+        return ws
+
+    def _flat(self, ws) -> list[str]:
+        return [str(c.value) if c.value is not None else "" for row in ws.iter_rows() for c in row]
+
+    def test_switch_off_block_absent(self):
+        """开关关闭（None）→ 区块标题不出现，不报错。"""
+        ws = self._write(style_data=_style_results())
+        flat = self._flat(ws)
+        self.assertFalse(any("四、因子目录" in v for v in flat), "关态不应出现区块四标题")
+        self.assertFalse(any("RSI(14)" in v for v in flat), "关态不应出现明细")
+
+    def test_unavailable_writes_placeholder(self):
+        """available=False → 标题 + 原因占位，不写明细。"""
+        ws = self._write(
+            style_data=_style_results(),
+            factor_catalog_data=_factor_catalog(available=False, reason="股票池为空"),
+        )
+        flat = self._flat(ws)
+        self.assertTrue(any("四、因子目录" in v for v in flat), "占位态应有标题")
+        self.assertTrue(any("因子目录数据不足（股票池为空）" in v for v in flat), "原因占位应含具体原因")
+        self.assertFalse(any("RSI(14)" in v for v in flat), "占位态不应写明细行")
+
+    def test_available_renders_rows_and_notes(self):
+        """available=True → 表头/因子行/相对中性/原因列/说明区全渲染。"""
+        ws = self._write(style_data=_style_results(), factor_catalog_data=_factor_catalog())
+        flat = self._flat(ws)
+        self.assertTrue(any("四、因子目录" in v for v in flat))
+        self.assertIn("来源族", flat, "表头应渲染")
+        self.assertTrue(any("RSI(14)" in v for v in flat))
+        self.assertTrue(any("▼ 中性下方" in v for v in flat), "低于中性点应标▼")
+        self.assertTrue(any("（日K不可得）" in v for v in flat), "不可算因子应带原因")
+        self.assertTrue(any("目录版本 2026.10.06.1" in v for v in flat), "说明区应含版本")
+        self.assertTrue(any("0/1 中性上方" in v for v in flat), "评级应在说明区")
+
+    def test_block_order_after_industry_beta(self):
+        """区块四位于行业 Beta 之后（同章顺序）。"""
+        ws = self._write(
+            style_data=_style_results(),
+            industry_beta=_industry_beta(),
+            factor_catalog_data=_factor_catalog(),
+        )
+        flat = self._flat(ws)
+        idx3 = next(i for i, v in enumerate(flat) if "三、行业 Beta" in v)
+        idx4 = next(i for i, v in enumerate(flat) if "四、因子目录" in v)
+        self.assertLess(idx3, idx4, "区块四应在区块三之后")

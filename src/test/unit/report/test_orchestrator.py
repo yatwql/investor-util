@@ -147,6 +147,8 @@ class TestPrepareReportData:
             "news_top_count",
             "risk_metrics",
             "style_factor_data",
+            # 因子目录契约（实验开关 factor_catalog 关闭时为 None）
+            "factor_catalog_data",
             "position_relationship_data",
             # 品种覆盖诊断：品种级数据状态标注契约
             "position_status",

@@ -439,6 +439,7 @@ def _generate_report_full(
     # 注入 pipeline_data 供 HTML/Excel 消费；capture_snapshot 在降级路径可能返回 None，需判空
     if pipeline_data is not None:
         pipeline_data["style_factor_data"] = prep.get("style_factor_data")
+        pipeline_data["factor_catalog_data"] = prep.get("factor_catalog_data")
         pipeline_data["position_relationship_data"] = prep.get("position_relationship_data")
         pipeline_data["position_status"] = prep.get("position_status")
         pipeline_data["data_freshness"] = prep.get("data_freshness")
@@ -600,6 +601,7 @@ def _generate_report_full(
         result,
         _metrics,
         prep.get("style_factor_data"),
+        prep.get("factor_catalog_data"),
         prep.get("position_relationship_data"),
         (pipeline_data or {}).get("evolution_data"),
         _enable_portfolio_evolution,

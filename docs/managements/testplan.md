@@ -626,6 +626,11 @@
 | R-HCR-04 | `src/test/unit/analysis/test_holding_change_metrics.py` + `src/test/unit/report/test_holding_change_panel.py` | 批 7 |
 | R-HCR-05 | `src/test/unit/llm/test_holding_change_injection.py` | 批 7 |
 | R-HCR-06 | `src/test/unit/analysis/test_holding_change_metrics.py` + `src/test/unit/report/test_holding_change_panel.py` | 批 7 |
+| R-FCT-01 | `src/test/unit/fetcher/test_factor_catalog_loader.py` + `src/test/unit/analysis/test_factor_evaluator.py` | 批 9 |
+| R-FCT-02 | `src/test/unit/analysis/test_factor_evaluator.py` + `src/test/unit/analysis/test_factor_evaluator_edge.py` + `src/test/unit/fetcher/test_factor_catalog_loader.py` | 批 9 |
+| R-FCT-03 | `src/test/unit/report/test_signal_record.py` | 批 9 |
+| R-FCT-04 | `src/test/unit/report/test_style_factor_sheet.py` + `src/test/unit/report/test_html_report_structure.py` | 批 9 |
+| R-FCT-05 | `src/test/unit/config/test_features.py` + `src/test/unit/analysis/test_factor_evaluator.py` | 批 9 |
 <!-- requirement-trace:end -->
 ---
 

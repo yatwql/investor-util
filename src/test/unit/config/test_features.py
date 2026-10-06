@@ -606,3 +606,34 @@ class TestDeterministicSignalRegistry:
         from src.python.config.features import get_feature_defaults
 
         assert get_feature_defaults()["deterministic_signal"] is True
+
+
+@pytest.mark.unit
+class TestFactorCatalogSwitch:
+    """因子目录实验开关（R-FCT-05 载体）：实验组、默认关、可被 experiment 覆写。"""
+
+    @pytest.mark.unit
+    def test_registered_in_experiment_group_default_off(self):
+        """注册于实验组，出厂默认关，面板可见，开启影响产物自述。"""
+        from src.python.config.features import GROUP_EXPERIMENTAL, feature_switch_registry
+
+        switch = feature_switch_registry["factor_catalog"]
+        assert switch.group == GROUP_EXPERIMENTAL
+        assert switch.default is False
+        assert switch.affects_report is True
+
+    @pytest.mark.unit
+    def test_experiment_token_resolves(self):
+        """--experiment factor_catalog 令牌可解析（不产生未知令牌告警）。"""
+        from src.python.config.features import resolve_experiment_flags
+
+        on, unknown = resolve_experiment_flags(["factor_catalog"])
+        assert on == {"factor_catalog"}
+        assert unknown == []
+
+    @pytest.mark.unit
+    def test_switch_label_present(self):
+        """面板显示名登记（语义名与文档一致）。"""
+        from src.python.config.features import feature_switch_registry
+
+        assert feature_switch_registry["factor_catalog"].label == "因子目录"

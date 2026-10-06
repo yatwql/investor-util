@@ -395,7 +395,7 @@ def generate_excel_report(
             pipeline_data = {**(pipeline_data or {})}
             pipeline_data["prosperity_framework_data"] = _pf
     # 风格与因子分析：数据契约 数据在编排层注入 pipeline_data（style_factor_data 主键），
-    # 此处透传页签写入（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
+    # 此处透传页签写入（一章四区块：风格表 + 因子回归 + 行业 Beta 子表 + 因子目录）
     write_fund_deep_analysis_sheets(
         sheets,
         holdings,
@@ -404,6 +404,7 @@ def generate_excel_report(
         modules,
         prog,
         style_factor_data=(pipeline_data or {}).get("style_factor_data"),
+        factor_catalog_data=(pipeline_data or {}).get("factor_catalog_data"),
         position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
     )
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）

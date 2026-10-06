@@ -183,7 +183,7 @@ def apply_module_quality_banners(llm_content: tuple, reporter: ProgressReporter)
 
 
 def record_deterministic_signals(pipeline_data: dict | None, prep: dict, reporter: ProgressReporter) -> None:
-    """确定性数值信号沉淀：抽取五类确定性评级并打来源标签后入账。
+    """确定性数值信号沉淀：抽取各类型确定性评级并打来源标签后入账。
 
     五类为市场温度 / 估值分位 / 尾部风险 / 风格因子 / 再平衡超限；幂等（同日同
     类型同标的只记一次）。开关关闭 → ``signal_ledger.is_active()`` 为假 → 不读不写。

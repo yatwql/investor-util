@@ -56,14 +56,6 @@
 |---|------|----------|
 | **rf-598** | `check-doc-drift` 的开关计数校验未覆盖 `requirements.md` §11.5 正文的「N 项 / 实验 X / 报告 Y」计数，该节自 plan-75 起连续多个版本增项未同步而守护不报 | 把 requirements 计数纳入 `check-doc-drift` 受检面（与配置指引同口径派生注册表实数），补单测；纳入后 rf-597 类漂移由守护直接拦出 |
 
-### rf-592 — push2 扩展字段（PE/总市值/PB）空值复核（2026-10-06）
-
-> 因子目录评测（plan-78）期间发现；不阻塞已完成的门槛判定（字段可得率按实测 92% 过），影响估值链路消费方。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-592** | 东财 push2 `f9/f20/f23`（动态 PE / 总市值 / PB）当前返回空：`fetcher/industry.fetch_valuation_fields` 对 601398/600900 实时取数 `pe/pb/market_cap` 全 `None`（同响应行业字段正常），单发 raw 请求同样只见 `f57/f58`——`valuation_percentile` 真实估值 PE/PB 列与 `market_cap` 消费方取不到值，评测中 `fund_pb`/`fund_size_log_cap` 两因子按实测判不可得 | 复核 push2 上游字段策略/请求参数（fltt/invt/字段白名单是否变更、是否需换端点），确认后复评两因子并回填评测产物；若为源侧永久下线，按数据源降级治理改口径 |
-
 ### rf-593 — 辩论指纹未并入统一附录块（2026-10-06）
 
 > plan-79 实施期间发现；**pre-existing**（申购限购/持仓变动两块同缺，事件窗块沿同一模式接入后三块同缺），不阻塞本轮交付——仅当「只有附录块变化、其余指纹输入不变」时辩论缓存键才失配，实际多伴随持仓/行情变化换键。
@@ -80,6 +72,7 @@
 | **rf-595** | 事件窗接线测试的日历注入 fixture 为独立 autouse，先于 `offline_external_sources` 装配——offline 桩把日历 MagicMock 存为「原值」并在逆序终化时还原出来（patch 泄漏到后续用例，实测把 `test_market_value` 并发串行化用例打红） | 已修复 2026-10-06（`_calendar` 显式依赖 `offline_external_sources` 强制装配序；回归用例 `TestCalendarFixtureStackOrder` 锁依赖声明与逐层还原） |
 | **rf-596** | OpenAI/Gemini 协议分支缓存命中计量缺口：`_log_token_usage` 与 `track_session_usage` 非 claude 分支 `cache_hit = 0` 硬编码，`prompt_tokens_details.cached_tokens` 未读——OpenAI 系端点「缓存命中」恒 0、费用按全价 input 估算（低估折扣）、会话 `cache_hit_tokens` 少计 | 已修复 2026-10-06（单源 `_normalize_usage_tokens` 三字段归一，`session` 持有、`api_base` 复用本就存在的依赖方向；回归 7 用例覆盖 claude/openai×有无 details/Gemini 归一形/空值/会话累计；纯读数修复不改任何 prompt 与调用行为） |
 | **rf-597** | `requirements.md` §11.5 功能开关节陈旧：正文计数 30 项（实验 5 / 常规 16 / 报告 9）与注册表实数 32（6/16/10）不符（plan-75 起增项未同步）、同段「两组…可切换」应为三组、转正定义仍是旧口径，表列非全集且无声明 | 已修复 2026-10-06（计数/三组/转正定义按注册表与本次目标组定义扩展刷新；表前补「非全集，完整清单见配置指引」声明；根因：`check-doc-drift` 开关计数受检面未含 requirements → 守护面扩展挂 **rf-598**） |
+| **rf-592** | 东财 push2 `f9/f20/f23`（动态 PE / 总市值 / PB）返回空：`fetch_valuation_fields` 实时取数 `pe/pb/market_cap` 全 `None`（同响应行业字段正常），评测中 `fund_pb`/`fund_size_log_cap` 两因子按实测判不可得 | 已解决 2026-10-06（两次实测：评测期响应正常但 `f9/f20/f23` 空、复核时 `api/qt/stock/get` 端点直接断连 → 判源侧字段策略变更/暂不可用；消费方本就空值降级为 None，`factor_evaluator` 对两因子判「估值字段不可得」逐因子降级、冻结目录条目保留待源恢复；换端点属数据源路由事项留待后续，复核与降级结论记 changelog **rf-592**） |
 | **rf-591** | 评测脚本对数市值字段 `json_cap_log` 未防非有限值（`+inf` 会以 `Infinity` 漏进 JSON 产物；`nan`/非正仅靠比较守卫间接挡住） | 已修复 2026-10-06（`factor_zoo_eval.py` 补 `math.isfinite` + 非正拒绝 → 一律返回 None；回归用例 `test_json_cap_log_invalid_and_nonfinite` 覆盖 0/负/None/非数/±inf/nan） |
 | **rf-590** | `analysis/trade_cost_model.py` 跨 800 行主程序红线（plan-77 迭代 1 产出 835 行，`check-file-length --ci` 拦出） | 已修复 2026-10-05（按职责拆出 `analysis/fee_schedule_model.py` 承载费率表文本解析/单档与配置构建/金额与交易日持有期选档（381 行），`trade_cost_model` 保留 FIFO 批次重放与聚合（509 行）；依赖单向无环，`EXEMPTIONS` 不新增、违规清零；消费方与测试导入指向持有者子模块，folders 目录树同步） |
 | **rf-589** | `core/registry.py` 新增 `fund_fee` 模块缺 `cache_groups=("refresh",)`（前缀缓存模块必须入菜单刷新组的形不变量 `test_cache_prefix_modules_have_groups` 拦出） | 已修复 2026-10-05（补 `cache_groups=("refresh",)`，`fund_fee_{code}` 前缀可经菜单 [1] 刷新） |

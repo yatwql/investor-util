@@ -158,6 +158,15 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         False,
         True,
     ),
+    # ── 实验性功能：因子目录信号源（门槛评测通过，25 因子五族横截面信号入账 +
+    # 风格与因子分析区「因子目录」区块；待真实报告验证后择机转正） ──
+    "factor_catalog": FeatureSwitchDef(
+        "因子目录",
+        "25 因子五来源族横截面信号入账与风格与因子分析区「因子目录」区块",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
     # ── 常规开关：LLM 输出增强（只读侧注入，不增调用次数、不写盘） ──
     "module_quality_gate": FeatureSwitchDef(
         "模块级质量分级",

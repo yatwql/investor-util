@@ -757,3 +757,87 @@ class TestSectionFoldMoreChapters(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 因子目录区块（风格与因子分析区，实验性功能 factor_catalog）
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestFactorCatalogSection(unittest.TestCase):
+    """HTML 端区块四（R-FCT-04 载体）：关态无感 / 可用渲染 / 占位。"""
+
+    _FC_DATA = {
+        "available": True,
+        "reason": None,
+        "version": "2026.10.06.1",
+        "catalog_size": 2,
+        "computed": 1,
+        "neutral_above": 1,
+        "neutral_total": 1,
+        "rating": "1/1 中性上方",
+        "pool_size": 4,
+        "factors": [
+            {
+                "slug": "qlib_rsi_14",
+                "family": "qlib158",
+                "family_label": "qlib158 技术因子族",
+                "label": "RSI(14)",
+                "value": 61.2,
+                "neutral": 50.0,
+                "above": True,
+                "codes_ok": 4,
+                "computable": True,
+                "reason": None,
+            },
+            {
+                "slug": "amihud_20",
+                "family": "academic",
+                "family_label": "学术因子族",
+                "label": "Amihud 非流动性",
+                "value": None,
+                "neutral": None,
+                "above": None,
+                "codes_ok": 0,
+                "computable": False,
+                "reason": "日K不可得",
+            },
+        ],
+    }
+
+    @staticmethod
+    def _render(fc_data=None, inject=True):
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        if inject:
+            data["factor_catalog_data"] = fc_data
+        return _render_template(data)
+
+    def test_absent_key_no_block(self):
+        """键缺失（旧管线/关态透传前）→ 区块不渲染，不报错。"""
+        soup = self._render(inject=False)
+        assert "四、因子目录" not in soup.get_text()
+
+    def test_none_data_no_block(self):
+        """数据为 None（开关关闭）→ 区块不渲染。"""
+        soup = self._render(fc_data=None)
+        assert "四、因子目录" not in soup.get_text()
+
+    def test_available_renders_block(self):
+        """可用数据 → 标题/摘要/因子行/相对中性全渲染。"""
+        soup = self._render(fc_data=dict(self._FC_DATA))
+        text = soup.get_text()
+        assert "四、因子目录" in text
+        assert "RSI(14)" in text
+        assert "中性上方" in text
+        assert "（日K不可得）" in text
+
+    def test_unavailable_shows_placeholder(self):
+        """available=False → 占位文案含具体原因。"""
+        soup = self._render(fc_data={"available": False, "reason": "股票池为空", "factors": []})
+        text = soup.get_text()
+        assert "四、因子目录" in text
+        assert "因子目录数据不足（股票池为空）" in text
+        assert "RSI(14)" not in text
