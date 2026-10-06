@@ -29,6 +29,8 @@
 
 ### Changed
 
+- **配置纪律**：**转正定义扩展**——「转正 = 移出实验组，目标组按功能形态选：常驻读侧/诊断/接缝类 → 常规组（默认开），章节/页签类 → 报告章节与增强组（默认关、按需开）」，同步 `features.py` 模块 docstring 与分组注释、`how-to-use-tui-menu` 面板说明（目标块 + 「编号不位移」推广）、`how-to-config` 面板布局句、`developer-guide` 转正判据区（新增第四类转正模式：默认产物字节不变 / `--experiment` 取值域随实验组身份退出 / 自述与统计随转正移除）、`requirements` R-FRD；`how-to-config` 实验组表新增「状态 / 判据」列（生命周期速览，不硬编码启用次数）；`plan.md` 登记 plan-83 章节类实验转正批次（plan-next → 84） | plan-83
+
 - **工程/兼容清理（全兼容清理复检）**：移除两处旧结构兼容——① `config/features.py` 私有别名 `_FEATURES_FILE` 删除（15 处引用全部改用公开名 `FEATURES_FILE` 单源，含 `_path_isolation`/CLI/开关/配置编辑测试）；② `analysis/circuit_breaker_wrapper.py` 旧路径迁移 `_migrate_legacy_file`/`_LEGACY_METRICS_BREAKER_FILE` 删除（`data/cache/metrics_breaker.json` 旧路径自动迁移逻辑与 2 项迁移用例移除，`_path_isolation` 同步摘除旧路径 patch；本机旧文件不存在、新文件已在 `data/state/`）；全仓 `data/cache` 369 个缓存文件前缀逐一比对**无孤儿文件**（全部有在产代码生产者），`deepseek-chat/reasoner` 定价条目/whatif `_copy_js_assets`/自检 `_drop_legacy_cached_payload`/单链路 `_call_llm_legacy`/fund_manager 源格式回退经复检属在产能力（历史成本渲染/失效器/降级路径）予以保留；唯一可删文件 `data/config/features.json.bak`（开关覆写旧备份）已提报用户手动删除
 
 - **plan/工程**：plan-76 路线改为**快照事件级**（持仓变动复盘，`holding_change_review`）——原「手工交易日志 xlsx」路线经可行性评估废弃：持仓快照历史与差异引擎已内建（`data/history/snapshots/` + `fetcher/history_diff`，2026-10 实测本机 87 期），连续快照差分即得变动事件，零手工；设计文档更名 `trade-journal-review-design.md` → `holding-change-review-design.md` 并按新路线全量修订（语义命名 `change_event`/`holding_change_events`/`_metrics`/`_panel`/`_llm_review`；先决门槛改「去重后有效快照 ≥12 期且变动事件 ≥10 个 / 事件口径唯一且局限显式标注 / 结构级结论人工认可」；五迭代改四迭代；预估成本中 → 低-中；能力边界诚实声明——结构级精度，不承诺逐笔胜率与精确持有期，沿用 `snapshot_diff` 不虚构边界）；plan.md 概述与 plan-70/76 条目、vibe 研究文档 7 处、decision 设计数据来源节、folders 目录树与统计同步
@@ -47,6 +49,8 @@
 - **文档**：折叠覆盖章节在管理文档表述——`technical.md` 新增 §4.21（覆盖章节清单表、缺省收起/锚点/打印/resize 语义与模板测试载体）、`requirements.md` 新增 `R-OUT-12` + `testplan.md` 同步载体行（`test_html_report_structure.py`，需求追溯双向一致）
 
 ### Fixed
+
+- requirements §11.5 功能开关节陈旧——正文计数 30 项（实验 5 / 常规 16 / 报告 9）→ 注册表实数 32（6/16/10）、「两组可切换」→ 三组、转正定义句随本次扩展同改、表前补非全集声明；根因（`check-doc-drift` 计数受检面未覆盖 requirements）挂 rf-598 待处理 | rf-597
 
 - **LLM/计量**：OpenAI/Gemini 系端点缓存命中计量缺口（**rf-596**）——`_log_token_usage` 与 `track_session_usage` 的非 claude 分支 `cache_hit = 0` 硬编码，`prompt_tokens_details.cached_tokens` 未读取：OpenAI 系端点「缓存命中」恒 0、费用估算按全价 input（低估缓存折扣）、会话统计 `cache_hit_tokens` 少计。抽单源 `_normalize_usage_tokens`（`session` 持有、`api_base` 沿既有依赖方向复用，无环）两处同改：非 claude 分支读 `details.cached_tokens`（字段缺失/None 回退 0，Gemini 归一形不受影响）；回归 7 用例（claude/openai×有无 details/Gemini 归一形/None 空值/会话累计）。纯读数修复，不改任何 prompt 与调用行为；同批新增用例把 `test_llm_api_base.py` 推过 1200 行红线 → `TestLogTokenUsage` 整类拆出 `test_llm_token_usage.py`（原文件回落 1147 行，豁免保持 0 项）
 

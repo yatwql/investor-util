@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.12.4-dev
-> **编号源**：`plan-next = 83`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-82，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 84`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-83，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76/77/78 已完成归档（先决门槛全过；plan-76/77 四迭代落地、plan-78 三指标评测判定转正立项 → plan-81）**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批：plan-79 已完成归档（先决门槛三段全过、四迭代落地）、plan-80 已立项**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）；**工程效能批：plan-82 已完成归档**（流程耗时优化：收尾触点清单、顺序依赖二分工具、执行纪律修订）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
+**当前迭代**：在办 **plan-49 / plan-55 / plan-83**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76/77/78 已完成归档（先决门槛全过；plan-76/77 四迭代落地、plan-78 三指标评测判定转正立项 → plan-81）**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批：plan-79 已完成归档（先决门槛三段全过、四迭代落地）、plan-80 已立项**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）；**工程效能批：plan-82 已完成归档**（流程耗时优化：收尾触点清单、顺序依赖二分工具、执行纪律修订）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -96,6 +96,12 @@
 **落地设计**：按 [`factor-zoo-catalog-design.md`](../archive/v0.12.x/factor-zoo-catalog/factor-zoo-catalog-design.md) §3 语义命名预案实施 `factor_catalog`（因子目录注册表）/ `factor_catalog_loader`（加载与冻结校验）/ `factor_evaluator`（指标原语接入），接 `signal_ledger` 信号源与报告呈现面；实施设计另起评审后执行，push2 估值字段空值复核结论（rf-592）作为实施前置输入。
 
 **预估成本**：中；**价值**：中（信号源边际成本从手写算子降为目录登记，门槛已过）。
+
+#### 🔲 `plan-83` 章节类实验转正批次（holding_change_review / whatif_trade_cost / event_window_impact）
+
+**动机**：三项章节级实验（plan-76/77/79 落地）先决门槛均已过审，但 `experiment_stats` 无真实报告启用记录、按「启用次数支撑观察」判据不足以转正；且旧转正定义对章节类形态过于激进（实验组转常规组即默认永远出章）。
+
+**动作**：转正定义已扩展为「**移出实验组、目标组按功能形态选**——常驻读侧增强→常规组（默认开），章节/页签类→报告章节与增强组（默认关、按需开）」（注册表注释与三份手册同步）；待真实报告启用积累且用户确认产物质量后，三项分批执行注册表迁移（每批一次注册表改动 + TUI/Web 编号与分组行、`--experiment` 取值域、报告自述与需求条目同步；转正后产物自述与启用统计随实验组身份移除）。
 
 #### 🔲 `plan-71` 景气度框架诊断（prosperity_framework）转正判据明确化
 
