@@ -744,49 +744,6 @@ class TestTruncationWarning(unittest.TestCase):
         self.assertIn("max_tokens", warning)
 
 
-class TestLogTokenUsage(unittest.TestCase):
-    """_log_token_usage — Token 用量日志（info 行内容与 silent 分支）。"""
-
-    def test_claude_usage_logged(self) -> None:
-        """Claude 格式用量 → info 日志含输入/输出/缓存命中，不抛异常。"""
-        from src.python.llm.api_base import _log_token_usage
-
-        usage = {"input_tokens": 100, "output_tokens": 50, "cache_read_input_tokens": 10}
-        with self.assertLogs("invest", level="INFO") as cm:
-            _log_token_usage("claude", usage, "test_label", model_name="test-model")
-        joined = "".join(cm.output)
-        self.assertIn("输入 100", joined)
-        self.assertIn("输出 50", joined)
-        self.assertIn("缓存命中 10", joined)
-        self.assertIn("test_label", joined)
-
-    def test_openai_usage_logged(self) -> None:
-        """OpenAI 格式用量 → info 日志含输入/输出（无缓存命中字段）。"""
-        from src.python.llm.api_base import _log_token_usage
-
-        usage = {"prompt_tokens": 200, "completion_tokens": 100}
-        with self.assertLogs("invest", level="INFO") as cm:
-            _log_token_usage("openai", usage, "test_label", model_name="test-model")
-        joined = "".join(cm.output)
-        self.assertIn("输入 200", joined)
-        self.assertIn("输出 100", joined)
-        self.assertNotIn("缓存命中", joined)
-
-    def test_none_usage_ignored(self) -> None:
-        """usage 为 None → 提前返回，不产生 info 日志。"""
-        from src.python.llm.api_base import _log_token_usage
-
-        with self.assertNoLogs("invest", level="INFO"):
-            _log_token_usage("claude", None, "test_label")
-
-    def test_empty_usage_ignored(self) -> None:
-        """usage 为空 dict（falsy）→ 提前返回，不产生 info 日志。"""
-        from src.python.llm.api_base import _log_token_usage
-
-        with self.assertNoLogs("invest", level="INFO"):
-            _log_token_usage("claude", {}, "test_label")
-
-
 # ═══════════════════════════════════════════════════════════════
 #  call_llm_with_retry — HTTP 错误码/内容过滤/截断
 #  使用 mock Response 对象构造，覆盖具体 HTTP 错误码场景

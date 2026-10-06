@@ -31,7 +31,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_QUOTA_EXCEEDED,
     FAIL_REASON_TIMEOUT,
 )
-from src.python.llm.session import record_per_module, track_session_usage
+from src.python.llm.session import _normalize_usage_tokens, record_per_module, track_session_usage
 
 logger = logging.getLogger("invest")
 
@@ -484,14 +484,7 @@ def _log_token_usage(provider: str, usage: dict | None, label: str, model_name: 
     """
     if not usage:
         return
-    if provider == "claude":
-        inp = usage.get("input_tokens", 0)
-        out = usage.get("output_tokens", 0)
-        cache_hit = usage.get("cache_read_input_tokens", 0)
-    else:
-        inp = usage.get("prompt_tokens", 0)
-        out = usage.get("completion_tokens", 0)
-        cache_hit = 0
+    inp, out, cache_hit = _normalize_usage_tokens(provider, usage)
     total = inp + out
     msg = f"  [LLM] {label}: 输入 {inp:,} + 输出 {out:,} = {total:,} tokens"
     if model_name:
