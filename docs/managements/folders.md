@@ -18,10 +18,10 @@
 | 测试用例 | — | — | 9,138 个 | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | 用户文档 | Markdown | 11 | 5,606 | 含 README.md（184 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 5,422 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| 项目文档 | Markdown | null | 60,567 | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 10 + archive md 137），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 11,405 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
-| ├ archive/ | 版本归档 | 144 | 47,919 | 各版本 changelog/plan/review-findings 与设计文档归档（137 md 46,659 行，含借鉴批候选研究、基金申购限购三份设计与 LLM 成本调节/自检/源指定设计） |
-| ├ plan/ | 中间设计文件 | 7 | 1157 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 198 行）+ Vibe-Trading 借鉴批五份（候选研究 + 持仓变动复盘 / What-if 成本基准 / 决策反思闭环 / 因子目录评测设计）+ gs-quant 借鉴批三份（候选研究 + 事件窗量化对照 / 调仓纪律回放设计） |
+| 项目文档 | Markdown | null | 60,576 | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 10 + archive md 138），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 11,398 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| ├ archive/ | 版本归档 | 145 | 48,106 | 各版本 changelog/plan/review-findings 与设计文档归档（138 md 46,846 行，含借鉴批候选研究、基金申购限购三份设计与 LLM 成本调节/自检/源指定设计） |
+| ├ plan/ | 中间设计文件 | 6 | 986 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 198 行）+ Vibe-Trading 借鉴批五份（候选研究 + 持仓变动复盘 / What-if 成本基准 / 决策反思闭环 / 因子目录评测设计）+ gs-quant 借鉴批候选研究一份（事件窗与调仓回放两立项依据）+ LLM token 优化调研 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
 
 ## 版本演进对照（最初版本 → 最新发布 → 当前开发版）
@@ -1252,6 +1252,8 @@ investor-util/
 │   │   │       ├── factor-zoo-catalog-design.md    # 因子动物园目录评测设计（25 因子五族 × A/B/C 三指标 go-no-go，已评测·判定转正立项，§13 判定记录）
 │   │   │   ├── event-window-impact/                # plan-79 事件窗量化对照设计归档（随任务完成移入）
 │   │   │       ├── event-window-impact-design.md # 事件窗量化对照设计（event_study 参照/先决门槛/四迭代，已实施，§14 判定记录）
+│   │   │   └── rebalance-schedule-replay/         # plan-80 调仓纪律回放设计归档（随任务完成移入）
+│   │   │       └── rebalance-schedule-replay-design.md # 调仓纪律回放设计（规则契约/成本软依赖/四迭代，已实施，§14 实施与门槛判定记录）
 │   │   ├── v0.11.x/                         # v0.11.x 版本归档（0.11 系列首份）
 │   │   │   ├── archived_changelog.0.11.x.md # v0.11.0 ~ v0.11.10 已发布变更记录
 │   │   │   ├── archived_plan.0.11.x.md    # plan-42 ~ plan-69 完成态记录（含设计文档索引）
@@ -1330,8 +1332,7 @@ investor-util/
 │       ├── vibe-trading-borrow-candidates-research.md # Vibe-Trading 借鉴候选研究（项目剖析 + 4 立项/6 不采纳清单，plan-76/77/78 立项依据）
 │       ├── decision-reflection-shadow-design.md # 决策跨期反思闭环设计（Vibe 影子账户参照/转正路径，plan-70）
 │       ├── gs-quant-borrow-candidates-research.md # gs-quant 借鉴候选研究（高盛量化库剖析 + 2 立项/1 参照/10 不采纳，plan-79/80 立项依据）
-│       ├── llm-token-optimization-research.md # LLM token 消耗优化空间调研（真实运行画像 + 共享前缀前移评估 + provider/pacing 差异 → 维持现状，行动项 rf-596）
-│       └── rebalance-schedule-replay-design.md # 调仓纪律回放设计（回测引擎语义参照/成本软依赖 plan-77/四迭代，plan-80）
+│       └── llm-token-optimization-research.md # LLM token 消耗优化空间调研（真实运行画像 + 共享前缀前移评估 + provider/pacing 差异 → 维持现状，行动项 rf-596）
 │
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）

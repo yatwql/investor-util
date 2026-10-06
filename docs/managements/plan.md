@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 **plan-49 / plan-55 / plan-83**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76/77/78/81 已完成归档（先决门槛全过；plan-76/77 四迭代落地、plan-78 三指标评测判定转正立项 → plan-81 转正实施落地）**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测与实施，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批：plan-79 已完成归档（先决门槛三段全过、四迭代落地）、plan-80 已立项**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）；**工程效能批：plan-82 已完成归档**（流程耗时优化：收尾触点清单、顺序依赖二分工具、执行纪律修订）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
+**当前迭代**：在办 **plan-49 / plan-55 / plan-83**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76/77/78/81 已完成归档（先决门槛全过；plan-76/77 四迭代落地、plan-78 三指标评测判定转正立项 → plan-81 转正实施落地）**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测与实施，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批：plan-79/80 已完成归档（先决门槛三段全过、四迭代落地）**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）；**工程效能批：plan-82 已完成归档**（流程耗时优化：收尾触点清单、顺序依赖二分工具、执行纪律修订）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -83,15 +83,7 @@
 
 > **plan-81 已完成归档**（2026-10-06）：按设计 §3 语义命名落地四组件——`schemas/factor_catalog.py`（25 条五来源族冻结目录 + 中性点字典 + 字段类型路由，装载前完整性校验）、`fetcher/factor_catalog_loader.py`（装载校验拒载降级 + 四类输入备数逐类型失败入 unavailable 不外抛）、`analysis/_factor_formulas.py`（25 因子公式纯计算原语，无 I/O）、`analysis/factor_evaluator.py`（池构造：直接持仓 ∪ 穿透 A 股 → 逐因子池内横截面 → 中性相对与评级，全链 fail-soft）；`signal_ledger` 第 6 类 `factor_catalog`（「因子目录」，每日单条组合级快照）+ 报告呈现「风格与因子分析」章内**区块四**（Excel `_write_catalog_block` + HTML 模板块同源三态，关态产物逐字节不变）。开关第 33 项入实验组（实验 7），TUI 实验段 8~14、后续编号顺延；需求 **R-FCT-01~05** 入 §6.14、testplan 批 9 载体、三个新测试文件 + 四个既有文件用例扩充。前置 rf-592 复核结论入档（源侧字段策略变更 + 端点断连两次实测，`fund_pb`/`fund_size_log_cap` 判不可得-降级、目录条目保留待源恢复，归档已解决）。
 
-#### 🔲 `plan-80` 调仓纪律回放（rebalance_schedule_replay）
-
-**动机**：`rebalance.py` 管「能不能调」、`whatif_backtest` 管「单次调了会怎样」，缺「长期坚持某纪律（定期/阈值触发）会怎样 vs 买入持有」的多期回放——「纪律 vs 放任」的量化回答。参照 gs-quant `backtests/` 的规则触发/成本分层/分期分解语义（只借语义不搬引擎）。
-
-**先决门槛（未过归档未采纳）**：① 指标原语可全量复用 `metrics*`/`whatif_backtest`（不新造引擎）；② 成本联动软依赖 plan-77（未落地则出「未计成本」标注版，不双实现）；③ 2 个真实规则回放样例经用户确认「有启发、想持续看」。详见 [`rebalance-schedule-replay-design.md`](../plan/rebalance-schedule-replay-design.md)。
-
-**预估成本**：中；**价值**：中高（行动建议章获得最有说服力的证据类型）。
-
-**进度（2026-10-05）**：迭代 1~4 已完成——四迭代代码（契约/回放纯计算/成本软接入/双端面板 + LLM 统一附录引用段）、58 项新测试 + 19 处既有用例同步（单测全量 3452 passed）、十守护 `--ci` 全绿、文档同步（requirements §6.15 R-SR-01~05、testplan 批 10、changelog、各手册计数与实验行、folders/test-coverage 快照）；**先决门槛 3 执行中**：2 个真实回放样例待用户确认「有启发、想持续看」，确认后标完成并归档设计文档（实施记录见设计文档 §14）。
+> **plan-80 已完成归档**（2026-10-07）：先决门槛三段全过（① 指标原语复用核对 ≥3 处——LOCF/归一/指标/日历经 `whatif_backtest` 公共出口与 `metrics*`/`trading_calendar` 复用，零新造引擎；② 成本软依赖 `trade_cost_model` 声明并落地两态（可得逐笔 FIFO 计入 / 不可用「未计成本」双回显）；③ 真实样例 2 组——支付宝场外账户 7 只近 12 个月回放（A 月度定期 37.16% / B 阈值 5pp 38.78% vs 买入持有 32.85%，夏普 1.25/1.27 vs 1.14，缺口 ≤0.4%），用户判定「有启发、想持续看」）；四迭代落地（`replay_schedule` 契约与 `schedule_replay` 回放纯计算 → 成本软接入 → `schedule_replay_panel` 双端面板 + LLM 统一附录引用段 → 文档与门禁）P0 门禁全绿（`dev-verify` 5868 passed、十守护 0 finding）。开关 **34 项（实验 8）**、TUI 实验段 **8~15**、报告章节序列新增 `schedule_replay` 章（附录三项顺延至 18/19/20，隐藏章不消耗连续编号）。需求 **R-SR-01~05**、测试 58 项新用例 + 19 处既有同步。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`rebalance-schedule-replay-design.md`](../archive/v0.12.x/rebalance-schedule-replay/rebalance-schedule-replay-design.md) 为「已实施」状态随归档留存（含 §14 实施与门槛判定记录）。
 
 #### 🔲 `plan-83` 章节类实验转正批次（holding_change_review / whatif_trade_cost / event_window_impact）
 

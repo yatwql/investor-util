@@ -8,7 +8,8 @@
 > 追加归档：2026-10-05 plan-77 What-if 回放交易成本建模与基准对比（whatif_trade_cost）四迭代完成（见文末章节）
 > 追加归档：2026-10-06 plan-78 因子动物园目录评测（factor_zoo_catalog）先决门槛三指标评测判定转正立项（见文末章节）
 > 追加归档：2026-10-06 plan-79 事件窗量化对照（event_window_impact）先决门槛三段通过并四迭代完成（见文末章节）
-> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）
+> 追加归档：2026-10-07 plan-80 调仓纪律回放（rebalance_schedule_replay）先决门槛三段通过并四迭代完成（见文末章节）
+> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）；plan-80 的调仓纪律回放设计在本目录 `rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施，§14 实施与门槛判定记录）
 
 ---
 
@@ -123,6 +124,21 @@
 4. **回归网**：纯计算 33 + 编排 25 + 注入链路/接线 39 项新用例（关态回退哈希、双端单元格同文、新闻先行串行时序、分歧例召回 100%、章隐藏不消耗编号、日历 fixture 装配栈序）全绿。
 
 **测试与文档**：开关 32 项（实验 6）、TUI 实验段 8~13；手册章节表/可见性总览/语义命名表/附录 H/目录树与统计同步；自审 rf-594（Web 面板配置项表实验行缺 whatif 与编号段陈旧）修复入网、rf-593（辩论指纹未并入统一附录块，pre-existing）挂待处理；P0 `dev-verify` + 十守护 `--ci` 全绿。
+
+## plan-80 调仓纪律回放（rebalance_schedule_replay）— ✅ 已完成（2026-10-07）
+
+> 设计文档：[`docs/archive/v0.12.x/rebalance-schedule-replay/rebalance-schedule-replay-design.md`](rebalance-schedule-replay/rebalance-schedule-replay-design.md)（已实施，含 §14 实施与门槛判定记录）。
+
+**先决门槛（三段全过）**：① 指标原语复用核对 ≥3 处——交易日对齐与 LOCF 归一经 `whatif_backtest` 公共出口（`locf_forward`/`normalize_to_basis`/`returns_from_values`）、指标经 `metrics_returns`、日历经 `trading_calendar`，零新造引擎；② 成本软依赖 plan-77 `trade_cost_model` 声明并落地两态——可得逐笔 FIFO 档位计入、不可得 `cost_note="未计成本"` 面板与日志双回显，零第二套实现；③ 真实样例 2 组（支付宝场外基金账户 7 只、窗口 2025-09-04~2026-09-29 259 净值日、缺口全部 ≤0.4% ≪ 30% 失真线）：A 月度定期再平衡 **37.16%**（12 次调仓/成本 153.85 元）、B 阈值 5pp **38.78%**（2 次调仓/成本 215.66 元）vs 买入持有 **32.85%**，夏普 1.25/1.27 vs 1.14，用户判定「有启发、想持续看」通过（样例 `docs/tmp/gate3_examples.md`）。
+
+**完成摘要**：
+
+1. **规则契约与纯计算**：`schemas/replay_schedule.py`（月度定期/阈值偏离两规则解析、目标权重归一、版本与指纹校验）+ `analysis/schedule_replay.py`（交易日历对齐逐期回放、月度纪律日历不变量优先、阈值纪律窗内触发去重、调仓差按目标权重摊净额、验收下限 `available=false`，零 I/O）。
+2. **成本软接入**：`trade_cost_model` 函数内 import 软接入，逐期 FIFO 档位逐笔计入；不可得分支 `cost_note` 面板与日志双回显；两态输出差异用例锁定。
+3. **报告双端 + LLM 引用**：开关 `rebalance_schedule_replay`（实验组第 8 项，默认关）；注册表 `schedule_replay` 章（数据源/基本面/LLM 用量顺延 18/19/20，隐藏不消耗连续编号）；seam `inject_schedule_replay_data`（新闻/事件 seam 之后）；`schedule_replay_panel` 契约 → view 双端同文（Excel 页签 + HTML partial + chart-init 双线图）；回放结论 `prompt_block` 经统一附录随四模块+辩论+自检携带，指纹非空条件并入、空块逐字节不变。
+4. **回归网**：纯计算 26 + 接线 22 + 注入 11 项新用例 + 19 处既有用例同步（关态回退、双端同文、seam 次序、模板/chart-init 接线、契约装配）全绿。
+
+**测试与文档**：开关 34 项（实验 8）、TUI 实验段 8~15、需求 R-SR-01~05（§6.15）、testplan 批 10；手册章节表 20 章 11 组 / 语义命名表 / 目录树与统计 / test-coverage 快照同步；P0 `dev-verify` 5868 passed + 十守护 `--ci` 全绿。
 
 ## plan-82 流程耗时优化（执行纪律 + 收尾触点清单 + 顺序依赖二分工具）— ✅ 已完成（2026-10-06）
 

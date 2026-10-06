@@ -70,7 +70,7 @@
 | 立项 | 设计文档 |
 |---|---|
 | plan-79 | `docs/plan/event-window-impact-design.md` |
-| plan-80 | `docs/plan/rebalance-schedule-replay-design.md` |
+| plan-80 | `docs/archive/v0.12.x/rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施） |
 
 ## 5. 架构定位与落点边界（2 项立项 + 1 项参照输入）
 
@@ -150,7 +150,7 @@
 | 立项 | 外部数据依赖 | 稳定性考察要点 | 专项节位置 |
 |---|---|---|---|
 | plan-79 | 窗口行情（含基准指数）、上游新闻日期字段质量 | 窗口缺失率 >30% 不出行；日期可用率 ≥80% 首轮 + 迭代 2 复测；运行期跳过计数监测源漂移 | `event-window-impact-design.md` 外部数据节 |
-| plan-80 | 长窗口历史行情（≥12 个月）、可选成本费率 | 缺口率 >30% 章隐藏；成本软依赖缺席时显式标注；失真样例不得用于价值门槛确认 | `rebalance-schedule-replay-design.md` 外部数据节 |
+| plan-80 | 长窗口历史行情（≥12 个月）、可选成本费率 | 缺口率 >30% 章隐藏；成本软依赖缺席时显式标注；失真样例不得用于价值门槛确认 | `../archive/v0.12.x/rebalance-schedule-replay/rebalance-schedule-replay-design.md` 外部数据节 |
 
 **参照物稳定性（本批次自身）**：gs-quant 参照为 tarball 冻结快照（克隆日期见头部），结论可复现、不随上游漂移；`docs/tmp/` 克隆物不入库，研究判定以冻结快照为准。
 
