@@ -166,6 +166,29 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 - **已覆盖点**：429 诊断 `pacing._concurrency_hint`（两级并发 + 间隔，由 `api_base` 重试骨架复用）、截断提示 `api_base._check_*_truncation`、思考耗尽 `api_base._extract_content`（配置上下文由 `_process_success_response` 经线程局部注入）与 `_api_claude` 安全网日志、截断重试耗尽 `skeleton._handle_truncation`、worker 钳位 `fetcher/batch.py`、阈值超限 `providers/news_dedup.py`。
 - **回归用例**：`test_llm_api_base.py::TestThinkingExhaustedConfigEcho` + 同文件 429 回显组、`test_llm_api_base.py::test_rate_limit_429_log_echoes_min_interval_value_when_advised`、`test_skeleton.py::test_exhausted_retry_log_names_config_field_and_both_values`、`test_llm_api.py::test_thinking_exhausted_log_echoes_current_budget`。新增此类日志时按本节口径补回显与用例。
 
+### 计划收尾：文档触点清单与一次性枚举
+
+任务收尾的墙钟主因是「文档触点 × 往返轮次」——触点靠守护报错被动驱动时，每轮报错就是一次完整往返。按任务类型对照下表**主动扫一遍触点**，再按三步工作流收敛：
+
+**触点清单（按任务类型）**：
+
+| 任务类型 | 必同步触点 |
+|:---------|:-----------|
+| 新报告章节 | `registry.py` 注册表 → `reports-instruction.md`（目录/章节表/分组表/可见性总表/页签上限）→ `requirements.md` 章清单 → `technical.md`（结果区计数/`report_section_order`）→ `how-to-use-tui-menu.md`（报告块编号段）→ `folders.md`（新 partial/模板）→ `report_template.html` include |
+| 新功能开关 | `features.py` 注册表 → `how-to-config.md`（开关表+计数+实验/常规分列+Web 面板行）→ `how-to-use-tui-menu.md`（开关区行与编号）→ `technical.md`（语义命名表/开关计数）→ `testplan.md`（若涉门禁） |
+| 新文件/目录 | `folders.md` 目录树（`check-doc-drift --sync` 回写统计表）→ 若为 `scripts/*`：本文件「辅助脚本速查」一览与分类段 |
+| 新测试 | `conftest.py` marker 注册（若需）→ `.venv/bin/python scripts/collect-test-coverage.py` 刷新 `test-coverage.md` → 边缘用例入 `*_edge.py` |
+| 新 LLM 模块/seam | `registry.py` + 统一附录（`skeleton._build_prompt_appendix`）+ `technical.md`（语义命名表/seam 表/附录 H）→ 指纹条件并入用例 |
+| 每个计划收尾（通用） | `plan.md`（状态翻转+归档 note）→ 当期计划归档文档（归档段+设计文档索引，入 0.12 期归档）→ `review-findings.md`（rf 登记，rf-next 递增）→ `changelog.md`（含 rf token）→ `test-coverage.md`/`folders.md` 计数刷新 → 涉版本时 `check-version-consistency` |
+
+**三步工作流**：
+
+1. **一次枚举**：编辑全部完成后先跑 `check-doc-drift.py --sync`（回写统计/目录树），再一次跑齐十守护 `--ci`，收集**全量** finding（不边改边跑）。
+2. **批量修复**：按上表 + 守护 finding 一次性修完，同一文件多处改动合并为一次 edit。
+3. **单次复核**：再跑十守护复核 + `ruff` + 测试门禁；`git commit` 交给 pre-commit 钩子（内含 `--sync` + 十守护，失败即中止）。
+
+**红线**：编辑批次与 `--sync`/检查类脚本**永不同批**（sync 写文件，与编辑并行会竞态）；`ruff` / `check-file-length` 随每批代码改动跑，不留到收尾才爆。
+
 ## 任务编号规范与自动保障
 
 ### 编号规则
@@ -618,6 +641,23 @@ test-reports/latest/
 
 > 脚本自动定位 `test-reports/latest/all/report.html` 等常用路径，无需每次指定路径。
 
+### 定位顺序依赖失败 — `find-order-dependent-test.py`
+
+当某个用例**单跑通过、与全套一起跑却失败**（典型：fixture / 模块级 patch 泄漏到后续用例，如日历注入与离线桩的装配栈序错误），手工二分需要 10+ 轮 pytest 往返。本脚本自动完成：单跑确认 → 收集参考顺序 → 复现门（前置合跑必须让目标失败，含无关失败即中止）→ 最小失败前缀二分 → 单文件配对确认（不成立则预算内精简）→ 输出污染源与最小复现命令。
+
+```bash
+# 默认在 src/test 收集顺序，对目标之前的全部文件做二分
+.venv/bin/python scripts/find-order-dependent-test.py "src/test/unit/report/test_market_value.py::TestClass::test_name"
+
+# 已知大概范围时限定候选（大幅提速，推荐）
+.venv/bin/python scripts/find-order-dependent-test.py "<目标>" --candidates "src/test/unit/report/test_event_impact_wiring.py"
+
+# 只做单跑确认与候选枚举（不执行二分）
+.venv/bin/python scripts/find-order-dependent-test.py "<目标>" --dry-run
+```
+
+退出码：0 = 已定位；1 = 目标单跑即失败（非顺序依赖，请直接调试该用例）；2 = 无法复现/前置含无关失败/用法错误。前置条件：全套除目标外全绿；`--max-runs`（默认 40）限制 pytest 运行次数硬上限。定位后优先修**泄漏方**（fixture 栈序 / 未恢复的 patch），而非给受害用例加隔离。
+
 ### 标记选择运行速查
 
 以 `.venv/bin/python -m pytest -m "<表达式>"` 形式快速选取特定标记组合，适合开发调试中定向验证。
@@ -826,6 +866,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 |:-----|:-----|:-------|
 | `test-runner.py` | 测试 | pytest 标记模式封装驱动，支持 17 种 `--mode` |
 | `extract-test-failures.py` | 测试 | 从 pytest-html 报告提取失败用例详情 |
+| `find-order-dependent-test.py` | 测试 | 单跑绿合跑红的顺序依赖污染源二分定位 |
 | `check-code-traces.py` | 测试 | 代码注释/文档字符串中历史变更痕迹检查 |
 | `check-doc-traces.py` | 测试 | 面向读者文档（.md）中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
@@ -888,6 +929,10 @@ pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。
 **`extract-test-failures.py` — 失败用例提取**
 
 见上文「快速定位失败用例」章节。
+
+**`find-order-dependent-test.py` — 顺序依赖污染源二分**
+
+见上文「定位顺序依赖失败」章节。
 
 **`smoke-web.py` — Web 模式 HTTP 冒烟脚本**
 
