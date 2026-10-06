@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.12.4-dev
-> **编号源**：`plan-next = 81`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-80，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 82`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-81，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76/77 已完成归档（先决门槛全过、四迭代落地）、plan-78 已立项**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批已立项：plan-79/80**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
+**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76/77/78 已完成归档（先决门槛全过；plan-76/77 四迭代落地、plan-78 三指标评测判定转正立项 → plan-81）**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批已立项：plan-79/80**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -75,13 +75,7 @@
 
 **落地设计**：若判定转正，按 [`decision-reflection-shadow-design.md`](../plan/decision-reflection-shadow-design.md) 四迭代执行（决策条目结构化 → 到期结算器 → doctor 概览增强 → 报告内反思块），该设计以 Vibe-Trading `shadow_account`（extract→backtest→render）为参照；死线未过前不实施。plan-76 持仓变动复盘落地后与其构成「意图 vs 成交」对账（只读，不互写）。
 
-#### 🔲 `plan-78` 因子动物园目录评测（factor_zoo_catalog）
-
-**动机**：`signal_ledger` 信号源全靠手写注册，边际成本高；Vibe-Trading Alpha Zoo 可借鉴的是「目录+元数据」形态（462 因子五来源族），不是算子代码本身（数据口径不同，移植即埋雷）。
-
-**先决门槛（评测即本文档本体）**：25 个代表因子三项指标——A 字段可得率 ≥80%、B 与既有信号增量 ≥30% 低相关、C 耗时增量 ≤20%；任一不过即归档「已评估未采纳」，评测产物落 `docs/tmp/`。详见 [`factor-zoo-catalog-design.md`](../plan/factor-zoo-catalog-design.md)。
-
-**预估成本**：低（纯评测脚本）；**价值**：中（评测过才谈得上实施）。
+> **plan-78 已完成归档**（2026-10-06）：先决门槛即评测本体，评测脚本 `scripts/factor_zoo_eval.py` 五阶段（目录冻结 → 字段可得 → 信号相关 → 耗时基线 → 判定汇总）实测三指标全过——**A 23/25 = 92% ≥ 80%、B 19/23 = 82.6% ≥ 30%（分母 23 ≥ 10，`rebalance_overflow` 族按设计降级）、C 冷启动 12.831s ÷ 报告基线 446.255s = 2.9% ≤ 20%** → **判定：转正立项**（评测产物 `docs/tmp/factor-zoo/`，判定书口径预注册与复算说明）；25 因子五族目录与门槛口径冻结于设计文档，40 项脚本单测入网；设计文档 [`factor-zoo-catalog-design.md`](../archive/v0.12.x/factor-zoo-catalog/factor-zoo-catalog-design.md) 为「已评测·判定转正立项」状态随归档留存（含 §13 判定记录）。实施转 **plan-81**；评测期自审 rf-591（对数市值非有限值）已修复、rf-592（push2 扩展字段空值待复核）挂待处理。
 
 #### 🔲 `plan-79` 事件窗量化对照（event_window_impact）
 
@@ -98,6 +92,14 @@
 **先决门槛（未过归档未采纳）**：① 指标原语可全量复用 `metrics*`/`whatif_backtest`（不新造引擎）；② 成本联动软依赖 plan-77（未落地则出「未计成本」标注版，不双实现）；③ 2 个真实规则回放样例经用户确认「有启发、想持续看」。详见 [`rebalance-schedule-replay-design.md`](../plan/rebalance-schedule-replay-design.md)。
 
 **预估成本**：中；**价值**：中高（行动建议章获得最有说服力的证据类型）。
+
+#### 🔲 `plan-81` 因子目录转正实施（factor_catalog）
+
+**动机**：plan-78 评测三指标全过（A 92% / B 82.6% / C 2.9%），25 因子五族「目录+元数据」形态经真实池验证可用，按「先评测后立项」转实施——`signal_ledger` 信号源从手写算子降为目录登记。
+
+**落地设计**：按 [`factor-zoo-catalog-design.md`](../archive/v0.12.x/factor-zoo-catalog/factor-zoo-catalog-design.md) §3 语义命名预案实施 `factor_catalog`（因子目录注册表）/ `factor_catalog_loader`（加载与冻结校验）/ `factor_evaluator`（指标原语接入），接 `signal_ledger` 信号源与报告呈现面；实施设计另起评审后执行，push2 估值字段空值复核结论（rf-592）作为实施前置输入。
+
+**预估成本**：中；**价值**：中（信号源边际成本从手写算子降为目录登记，门槛已过）。
 
 #### 🔲 `plan-71` 景气度框架诊断（prosperity_framework）转正判据明确化
 

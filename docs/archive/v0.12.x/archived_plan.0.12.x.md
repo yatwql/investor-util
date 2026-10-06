@@ -6,7 +6,8 @@
 > 归档内容：plan-72 完成态记录（数据链路 → 展示集成 → 文档登记三迭代，P0 门禁十项全绿）
 > 追加归档：2026-10-05 plan-76 持仓变动复盘（快照事件级）四迭代完成（见文末章节）
 > 追加归档：2026-10-05 plan-77 What-if 回放交易成本建模与基准对比（whatif_trade_cost）四迭代完成（见文末章节）
-> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）
+> 追加归档：2026-10-06 plan-78 因子动物园目录评测（factor_zoo_catalog）先决门槛三指标评测判定转正立项（见文末章节）
+> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）
 
 ---
 
@@ -91,3 +92,18 @@
 4. **回归网与文档**：关态 sha256 黄金断言（与产出前 `git HEAD` 模板同数据渲染逐字节一致）+ 换手翻转回归 + Excel/HTML 双端数值一致；`trade_cost_model.py` 835 行超红线按拆分纪律下沉 `fee_schedule_model.py`（`EXEMPTIONS` 不新增）。
 
 **测试与文档**：需求 **R-WIF-12~14**（requirements §6.11）、testplan 批 8 载体、reports-instruction 条件页签与产物描述、TUI 菜单 12-28 号与开关 31 项（实验 5）、datasource(-reliability) `fund_fee` 链/缓存行、how-to-config 两个配置键、technical 语义命名表 7 条、folders/test-coverage 快照同步；P0 `dev-verify` + 十守护 `--ci` 全绿。
+
+## plan-78 因子动物园目录评测（factor_zoo_catalog）— ✅ 已完成（2026-10-06）
+
+> 设计文档：[`docs/archive/v0.12.x/factor-zoo-catalog/factor-zoo-catalog-design.md`](factor-zoo-catalog/factor-zoo-catalog-design.md)（已评测·判定转正立项，含 §13 判定记录）。
+
+**先决门槛（即评测本体，三指标全过）**：A 字段可得率 **23/25 = 92% ≥ 80%**（未过 2 项 `fund_pb`/`fund_size_log_cap` 因 push2 扩展字段空值判源侧暂不可用，挂 rf-592 可复评）；B 低相关占比 **19/23 = 82.6% ≥ 30%**（分母 23 ≥ 10，`rebalance_overflow` 族按设计降级；高相关 4 项均为市场方向类因子 vs 市场温度族：vwma_dev_20 0.61 / bias_60 0.61 / ma_cross 0.60 / rsv_9 0.54）；C 冷启动估算 **12.831s ÷ 报告基线 446.255s = 2.9% ≤ 20%**（池外冷样本均延迟 × 请求数，温态 0.217s 不作判据；基线 = perf 近 5 次 full 中位数）。**判定：转正立项** → 实施转 plan-81。
+
+**完成摘要**：
+
+1. **评测脚本**：`scripts/factor_zoo_eval.py`（阶段 `catalog|fields|signals|timing|verdict|all`；25 因子五来源族目录冻结、门槛口径预注册入判定书；生产代码零改动、无 report/llm 导入、字段取数仅经既有链路、相关性复用 `analysis/correlation._pearson_pvalue`、产物只落 `docs/tmp/factor-zoo/`）。
+2. **股票池只读复用**：穿透 `compute_penetration_top10` 按 `codes` 列表形状递归抽取 ∪ 直接 A 股持仓（`is_a_share_stock` 名称+代码双维排除 00 前缀重叠场外基金）——实测直接 3 + 穿透 9 = 9 只。
+3. **相关性口径**：Δ 一阶差分去趋势 Pearson；季频/阶跃信号（Δ 非零占比 <5%）按结构性不相关 ρ=0；不可评估 fail-closed 不计低相关；族对齐对数 <30 剔除。
+4. **回归网**：40 项脚本单测（A/B/C 阈值恰等边界、判定三态、基线读取、相关性口径、注入探针全离线；edge 空输入/退化数据/极端值 fail-closed）。
+
+**测试与文档**：folders 目录树/统计、test-coverage 快照、vibe 研究文档与归档索引链接同步；评测期自审 rf-591（对数市值非有限值）修复入网、rf-592（push2 扩展字段空值）挂待处理；P0 `dev-verify` + 十守护 `--ci` 全绿。

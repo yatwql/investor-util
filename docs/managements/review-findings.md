@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.4-dev
-> **编号源**：`rf-next = 591`（新增问题取此编号，完成后更新为 +1；已用最大 rf-590，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 593`（新增问题取此编号，完成后更新为 +1；已用最大 rf-592，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -48,10 +48,19 @@
 | **rf-587** | `docs/plan/` 八份文档（除 jev 两份）十轮复盘新增内容曾同时违两道机检：① 架构约束对照等新增节使用约束代号（CIPHER 规则：代号仅技术设计约束定义处可用，须语义描述替代）共 321 处；② 4 份文件「外部数据/风险」两节误插文档中段致序号跳变 | 已修复 2026-10-06（C 代号全量语义化为约束语义描述、4 份节序调整至文末，`check-doc-traces --ci`/`check-doc-links --ci` 全绿） |
 | **rf-586** | **警告级（未越红线）跟踪——红线 8 个已随 rf-583 拆分清零，2026-10-05 `check-file-length.py -v` 派生**：行数最贴红线的 `unit/llm/test_llm_api_base.py`（1190 行，距 1200 仅 10 行）、`unit/report/test_penetration.py`（1141）、`unit/config/test_config.py`（1112）；用例数最贴 120 项红线的 `unit/scripts/test_check_doc_drift.py`（94 项）、`unit/config/test_config.py`（89 项）；`test_html_report_structure.py` 拆分后回落至 31 项，原 110 项警告解除 | 无门禁动作（800~1200 行 / 80~120 项仅 `-v` 清单）；再增内容前先跑 `check-file-length.py -v`，逼近红线时按「被测函数 / 场景类型」拆分并同步刷新 `test-coverage.md` / `folders.md` 用例计数 |
 
+### rf-592 — push2 扩展字段（PE/总市值/PB）空值复核（2026-10-06）
+
+> 因子目录评测（plan-78）期间发现；不阻塞已完成的门槛判定（字段可得率按实测 92% 过），影响估值链路消费方。
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-592** | 东财 push2 `f9/f20/f23`（动态 PE / 总市值 / PB）当前返回空：`fetcher/industry.fetch_valuation_fields` 对 601398/600900 实时取数 `pe/pb/market_cap` 全 `None`（同响应行业字段正常），单发 raw 请求同样只见 `f57/f58`——`valuation_percentile` 真实估值 PE/PB 列与 `market_cap` 消费方取不到值，评测中 `fund_pb`/`fund_size_log_cap` 两因子按实测判不可得 | 复核 push2 上游字段策略/请求参数（fltt/invt/字段白名单是否变更、是否需换端点），确认后复评两因子并回填评测产物；若为源侧永久下线，按数据源降级治理改口径 |
+
 ## 已解决问题
 
 | # | 摘要 | 状态 |
 |---|------|------|
+| **rf-591** | 评测脚本对数市值字段 `json_cap_log` 未防非有限值（`+inf` 会以 `Infinity` 漏进 JSON 产物；`nan`/非正仅靠比较守卫间接挡住） | 已修复 2026-10-06（`factor_zoo_eval.py` 补 `math.isfinite` + 非正拒绝 → 一律返回 None；回归用例 `test_json_cap_log_invalid_and_nonfinite` 覆盖 0/负/None/非数/±inf/nan） |
 | **rf-590** | `analysis/trade_cost_model.py` 跨 800 行主程序红线（plan-77 迭代 1 产出 835 行，`check-file-length --ci` 拦出） | 已修复 2026-10-05（按职责拆出 `analysis/fee_schedule_model.py` 承载费率表文本解析/单档与配置构建/金额与交易日持有期选档（381 行），`trade_cost_model` 保留 FIFO 批次重放与聚合（509 行）；依赖单向无环，`EXEMPTIONS` 不新增、违规清零；消费方与测试导入指向持有者子模块，folders 目录树同步） |
 | **rf-589** | `core/registry.py` 新增 `fund_fee` 模块缺 `cache_groups=("refresh",)`（前缀缓存模块必须入菜单刷新组的形不变量 `test_cache_prefix_modules_have_groups` 拦出） | 已修复 2026-10-05（补 `cache_groups=("refresh",)`，`fund_fee_{code}` 前缀可经菜单 [1] 刷新） |
 | **rf-588** | `report/data_source_matrix.py` 缺 `fund_fee` 数据类型归类与目录行（链路已注册但矩阵漏登记，`test_every_chain_data_type_is_mapped` 形不变量拦出——链有 data_type 而矩阵无分类即报） | 已修复 2026-10-05（`_SOURCE_CATEGORIES` 加 `fund_fee` 前缀组 + `_SOURCE_CATALOG` 行：天天基金 F10 → akshare → 过期缓存） |

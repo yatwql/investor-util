@@ -70,7 +70,7 @@ Vibe-Trading 是港大 HKUDS 出品的「金融研究工具包」，以 MCP serv
 | plan-76 | `docs/archive/v0.12.x/holding-change-review/holding-change-review-design.md`（已实施，随完成态归档） |
 | plan-77 | `docs/archive/v0.12.x/whatif-cost-benchmark/whatif-cost-benchmark-design.md` |
 | plan-70 | `docs/plan/decision-reflection-shadow-design.md` |
-| plan-78 | `docs/plan/factor-zoo-catalog-design.md` |
+| plan-78 | `docs/archive/v0.12.x/factor-zoo-catalog/factor-zoo-catalog-design.md` |
 
 ## 5. 架构定位与落点边界（4 项立项）
 
@@ -153,7 +153,7 @@ Vibe-Trading 是港大 HKUDS 出品的「金融研究工具包」，以 MCP serv
 |---|---|---|---|
 | plan-76 | 无新增源；本机自产快照 + 既有 LLM 链 | 有效快照期数/最早跨度回显、60 天滚动截断监测、LLM 降级矩阵 | `holding-change-review-design.md` 数据源稳定性节 |
 | plan-77 | 申赎费率（天天基金链路）、基准指数行情 | 取得率 ≥80%、页面改版解析失败计数、cassette 回放防漂移、语义版本缓存 | `whatif-cost-benchmark-design.md` 外部数据节 |
-| plan-78 | 行情/财务字段（评测期考察） | 字段可得率 ≥80% 与不可得原因分类（区分口径不可得 vs 源暂不可用） | `factor-zoo-catalog-design.md` 外部数据节 |
+| plan-78 | 行情/财务字段（评测期考察） | 字段可得率 ≥80% 与不可得原因分类（区分口径不可得 vs 源暂不可用） | `../archive/v0.12.x/factor-zoo-catalog/factor-zoo-catalog-design.md` 外部数据节 |
 | plan-70 | 建议日窗口行情（既有链） | 窗口缺口率 >30% 判不足、未结算积压趋势作为稳定性前置信号 | `decision-reflection-shadow-design.md` 外部数据节 |
 
 **批次级判定动作**：任何一项评测（go-no-go）不得在数据缺口失真状态下出结论；稳定性监测指标与门槛数值一并写入判定记录，缺则判定无效。

@@ -1,6 +1,6 @@
 # 因子动物园目录评测（factor_zoo_catalog）设计 —— plan-78
 
-> **状态**：评测方案（先评测后立项；未达阈值归档为「已评估未采纳」）。
+> **状态**：**已评测 · 判定转正立项**（2026-10-06 实测 A 92% / B 82.6% / C 2.9% 三指标全过 → 实施转 plan-81；判定记录见 §13）。
 > **参照**：Vibe-Trading `agent/src/factors/zoo`（462 个预置 alpha 的目录与元数据：
 > qlib158 / alpha101 / gtja191 / academic / fundamental 五个来源族）。
 > **研究背景**：见 `vibe-trading-borrow-candidates-research.md` §2.1。
@@ -145,3 +145,21 @@
 **回滚策略**：评测期生产侧零改动，**无需功能回滚**——不过门槛时的「回滚」就是归档结论 + 保持现状；若已转正立项，则回滚策略由届时实现计划按「开关关闭逐字节不变」同一模式给出。
 
 **文档同步义务（每迭代同回同）**：判定结论回填本文档与 `plan.md`；若转正立项，同步 `requirements.md`/`technical.md`/`testplan.md`/`changelog.md` 与 `folders.md`/`test-coverage.md` 计数；完成判据 = `check-doc-drift --ci` 0 finding。
+
+## 13. 判定记录（2026-10-06 实测）
+
+> 评测输入与产物冻结于 `docs/tmp/factor-zoo/`（`factor_catalog` / `stock_pool` / `fields_report` / `probe_cache` / `signals_report` / `timing_report` / `verdict`）；口径与阈值先于计算写入判定书。
+
+| 指标 | 实测 | 阈值 | 判定 |
+|---|---|---|---|
+| A 字段可得率 | **23/25 = 92.0%**（未过 2 项：`fund_pb`、`fund_size_log_cap`——`fetch_valuation_fields` 对池内码 `pe/pb/market_cap` 实时取数全空（push2 `f9/f20/f23` 不返回、行业字段正常），按 §11 判**源侧暂不可用**，挂 rf-592 可复评） | ≥80%（恰等过） | ✅ 过 |
+| B 低相关占比 | **19/23 = 82.6%**（分母 23 ≥ 10；`rebalance_overflow` 族为持仓快照域按 §9 降级不参与；高相关 4 项均为市场方向类因子 vs 市场温度族：`alpha_vwma_dev_20` 0.61、`gtja_bias_60` 0.61、`qlib_ma_cross` 0.60、`gtja_rsv_9` 0.54——与既有信号确实重叠，正是 B 要拦的类型） | ≥30%（恰等过；分母 <10 样本不足不通过） | ✅ 过 |
+| C 耗时预算 | **冷启动估算 12.831s ÷ 基线 446.255s = 2.9%**（冷 = 池外样本 600519/000858/300750 实测冷请求均延迟 × 9 码 × 3 字段类型 + 指数探测；温态在跑 0.217s 不作判据；基线 = `perf_history` 近 5 次 full 报告 `total_seconds` 中位数，非 LLM 副口径一并记录） | ≤20%（恰等过；冷/基线不可测 fail-closed） | ✅ 过 |
+
+**判定：A/B/C 全过 → 转正立项**。实施转 plan-81（`factor_catalog` / `factor_catalog_loader` / `factor_evaluator` 语义命名预案由 §3 转入实施设计）。
+
+**复算说明**：`factor_zoo_eval.py all` 重跑后 A/B 的分子分母与判定须逐字段一致；C 秒数为实测快照（网络波动允许漂移），复算以判定结论一致为准。
+
+**股票池实况**：直接 3 + 穿透 9 = 9 只（穿透 top10 按 `codes` 列表形状递归抽取 ∪ `is_a_share_stock` 名称+代码双维过滤掉 00 前缀重叠区场外基金）。
+
+**评测期发现**：rf-591（对数市值非有限值，已修复并入回归用例）、rf-592（push2 扩展字段空值待复核）。
