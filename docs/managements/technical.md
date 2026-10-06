@@ -1789,7 +1789,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（18 项，key/number/type/data_flag）
+返回 result（19 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -3364,13 +3364,16 @@ make_http_client(timeout=10.0) → httpx.Client
 | `system_info` | 系统状态组装与展示原语（Web 状态卡 / TUI 首页共用数据源：熔断/路由/凭据回填/匿名化标签） | 核心基础设施 | 状态展示 | 无（展示面） |
 | `history_policy` | 历史走势获取策略解析（off/auto/prompt 单源，三渠道共用，TUI 注入询问回调） | 报告生成 | 组合历史走势 | `history.fetch_mode` |
 | `config_backup` | 配置写前备份（`.bak` 单槽轮转） | Web 配置 | 配置编辑 | 无（安全面） |
-| `report_section_order` | 报告模块序号配置（键=模块标识，值=序号；空对象用默认 18 项顺序） | 报告编排 | 报告配置 | 顶层配置键 `report_section_order`（`get_report_section_order()` 读取，`llm_usage` 强制末位） |
+| `report_section_order` | 报告模块序号配置（键=模块标识，值=序号；空对象用默认 19 项顺序） | 报告编排 | 报告配置 | 顶层配置键 `report_section_order`（`get_report_section_order()` 读取，`llm_usage` 强制末位） |
 | `generators_news` | 财经新闻 LLM 关联分析（新闻热词→持仓关联二次生成） | 财经新闻热点与持仓关联分析 | LLM 生成 | 随 `enable_news` + LLM 启用 |
 | `_pair_similarity` | 标题相似度口径的唯一实现（归一化 → 日期剥离 → 英文分桶占位 → 双向 ratio + 实体 bigram 交集；链路判定与校准工具共用，防两套口径漂移） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
 | `anchor_rules_version` | 锚点规则时代指纹字段（`_rules_fingerprint()` 由阈值/模板词表/方向词对/正则 + 行为探针派生，规则一改自动变，供校准工具区分时代） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
 | `news_dedup_rules` | 去重规则原语模块（阈值常量 / 模板词表与掩码 / 标题归一化 / 实体 bigram / 相似度口径 / 方向词对 / 规则指纹的唯一实现） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
 | `record_prosperity_diagnosis` | 景气度框架诊断挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供） | 行动建议（章内嵌块） | 报告输出 | 实验开关 `prosperity_framework`（默认关） |
 | `inject_holding_change_data` | 持仓变动复盘挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供） | 持仓变动复盘（报告独立章，type=holding_change） | 报告输出 | 实验开关 `holding_change_review`（默认关） |
+| `inject_event_impact_data` | 事件窗量化对照挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供；新闻先行串行段内注入，供分歧例附录块同轮进 LLM） | 事件窗量化对照（报告独立章，type=event_impact） | 报告输出 | 实验开关 `event_window_impact`（默认关） |
+| `event_impact_panel` | 事件窗对照表数据编排与双端单源展示（事件行/降级/占位 + view 与页签同文 + 分歧例附录块） | 事件窗量化对照 | 报告输出 | 随 `event_window_impact` |
+| `event_window_impact` | 事件窗量化对照（新闻事件 → 交易日映射的严格 ±5 交易日窗收益 vs 文本极性方向比对，分歧例进 LLM 统一附录） | 事件窗量化对照 | 报告输出 | 实验开关 `event_window_impact`（默认关） |
 | `holding_change_review` | 持仓变动复盘（快照事件级：差分事件清单 + 频率/结构/贡献分解 + 意图对账 + 账户结构重排标注 + LLM 归因） | 持仓变动复盘 | 报告输出 | 实验开关 `holding_change_review`（默认关） |
 | `module_fingerprint` | LLM 模块缓存指纹唯一事实来源（预检侧与写侧同源） | LLM 生成 | LLM 生成 | 无（模块级） |
 | `decision_reflection` | 决策跨期反思闭环（登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词） | 行动建议 | 监控 | 实验开关 `decision_reflection`（默认关） |
@@ -3875,6 +3878,7 @@ investor-util/
 | diff | dict | 是 | capture_snapshot |
 | decision_review_data | dict | 是 | record_llm_decisions_and_review_block |
 | holding_change_data | dict | 是 | inject_holding_change_data（实验开关 holding_change_review，默认关） |
+| event_impact_data | dict | 是 | inject_event_impact_data（实验开关 event_window_impact，默认关） |
 | prosperity_framework_data | dict | 是 | prepare_report_data（full/both）；basic 路径由 generate_excel_report 就地构建 |
 | market_sentiment_data | dict | 是 | 行动建议章内嵌块（full/both 由编排层注入；basic 路径由 generate_excel_report 就地构建） |
 

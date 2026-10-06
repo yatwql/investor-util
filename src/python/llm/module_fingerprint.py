@@ -96,6 +96,9 @@ class ModuleFingerprintInputs:
         holding_change_block: **已渲染**的持仓变动复盘提示词块（契约字段
             ``prompt_block``，同样经统一 prompt 附录进入提示词）；仅非空时条件
             并入哈希（空串不追加 part，键与引入前逐字节一致）
+        event_impact_block: **已渲染**的事件窗分歧例块（契约字段 ``prompt_block``，
+            同样经统一 prompt 附录进入提示词）；仅非空时条件并入哈希
+            （空串不追加 part，键与引入前逐字节一致）
     """
 
     total_mv: float = 0.0
@@ -114,6 +117,7 @@ class ModuleFingerprintInputs:
     data_quality_text: str = ""
     purchase_block: str = ""
     holding_change_block: str = ""
+    event_impact_block: str = ""
 
 
 def debate_feature_cache_suffix() -> str:
@@ -184,6 +188,8 @@ def global_macro_fingerprint(inputs: ModuleFingerprintInputs) -> str:
         _parts.append(inputs.purchase_block)
     if inputs.holding_change_block:
         _parts.append(inputs.holding_change_block)
+    if inputs.event_impact_block:
+        _parts.append(inputs.event_impact_block)
     return compute_fingerprint(*_parts)
 
 
@@ -216,6 +222,8 @@ def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
         _parts.append(inputs.purchase_block)
     if inputs.holding_change_block:
         _parts.append(inputs.holding_change_block)
+    if inputs.event_impact_block:
+        _parts.append(inputs.event_impact_block)
     _fp = compute_fingerprint(*_parts)
     _fp += debate_feature_cache_suffix()
     if decision_ledger.is_active():
@@ -314,6 +322,8 @@ def health_check_fingerprint(inputs: ModuleFingerprintInputs) -> str:
         _parts.append(inputs.purchase_block)
     if inputs.holding_change_block:
         _parts.append(inputs.holding_change_block)
+    if inputs.event_impact_block:
+        _parts.append(inputs.event_impact_block)
     _fp = compute_fingerprint(*_parts)
     _fp += _signal_digest_cache_suffix(inputs.pipeline_data)
     _fp += _pipeline_block_cache_suffix(inputs.pipeline_data)
@@ -333,7 +343,7 @@ def penetration_deep_fingerprint(inputs: ModuleFingerprintInputs) -> str:
         full_penetration=True,
         history_data=inputs.history_data,
     )
-    _extra = [part for part in (inputs.purchase_block, inputs.holding_change_block) if part]
+    _extra = [part for part in (inputs.purchase_block, inputs.holding_change_block, inputs.event_impact_block) if part]
     if _extra:
         # 条件并入：进提示词必进指纹；两块均空时不追加 part（逐字节回退）
         return compute_fingerprint(_base, *_extra)
@@ -346,6 +356,7 @@ def self_review_fingerprint(
     penetrated_assets: list[dict] | None = None,
     purchase_block: str = "",
     holding_change_block: str = "",
+    event_impact_block: str = "",
 ) -> str:
     """生成后自检：**内容寻址**指纹——各模块产出文本 + 数据摘要。
 
@@ -381,6 +392,9 @@ def self_review_fingerprint(
     if holding_change_block:
         # 条件并入：进提示词必进指纹；块空不追加 part（逐字节回退）
         _parts.append(holding_change_block)
+    if event_impact_block:
+        # 条件并入：进提示词必进指纹；块空不追加 part（逐字节回退）
+        _parts.append(event_impact_block)
     return compute_fingerprint(*_parts)
 
 

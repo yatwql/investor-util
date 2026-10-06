@@ -136,6 +136,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
                 "action",
                 "fundamental_snapshot",
                 "holding_change",
+                "event_impact",
             },
         )
         self.assertEqual(type_counts["always"], 5)

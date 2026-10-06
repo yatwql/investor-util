@@ -279,6 +279,7 @@ def generate_excel_report(
         financial_indicator_data=financial_indicator_data,
         position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
         holding_change_data=(pipeline_data or {}).get("holding_change_data"),
+        event_impact_data=(pipeline_data or {}).get("event_impact_data"),
     )
 
     # 章级：enabled_llm 模块禁用的 LLM 分析章不创建页签（与 HTML 端同函数同配置推导）
@@ -457,6 +458,18 @@ def generate_excel_report(
             write_holding_change_sheet(ws_hc, (pipeline_data or {}).get("holding_change_data"))
         except Exception:
             logger.debug("[excel] 持仓变动复盘页签写入失败（非关键）", exc_info=True)
+
+    # ── 事件窗量化对照页签（新闻事件窗口收益与文本极性对照；实验开关
+    #      event_window_impact 默认关，键缺席时页签不创建，此处自然不触发） ──
+    ws_ev = sheets.get("event_impact")
+    if ws_ev is not None:
+        prog.info("正在写入事件窗量化对照页签...")
+        try:
+            from src.python.report.event_impact_panel import write_event_impact_sheet
+
+            write_event_impact_sheet(ws_ev, (pipeline_data or {}).get("event_impact_data"))
+        except Exception:
+            logger.debug("[excel] 事件窗量化对照页签写入失败（非关键）", exc_info=True)
 
     # ── 持仓基本面页签（财务指标 + 财报摘要，一章两区块） ──
     ws_fs = sheets.get("fundamental_snapshot")

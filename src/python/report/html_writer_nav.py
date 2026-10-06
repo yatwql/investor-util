@@ -28,7 +28,7 @@ _NAV_GROUP_LABELS: list[tuple[str, str]] = [
 
 # 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础信息」组）。
 # 默认注册序下每组成员的号段连续（basic=1..3、fund_deep=4..6、action=7、llm=8..12、
-# history=13..14、appendix=15..17），一块即一组、展开即严格 1..N；
+# history=13..16、appendix=17..19），一块即一组、展开即严格 1..N；
 # 用户跨组插号（report_section_order）时组在号序断点处拆块（同组可出现多块），
 # 展开恒等于正文线性序，与正文（flex order = 报告号）逐位一致。
 _SECTION_NAV_GROUP_MAP: dict[str, str] = {
@@ -42,10 +42,11 @@ _SECTION_NAV_GROUP_MAP: dict[str, str] = {
     "style_factor": "fund_deep",
     # 行动建议：再平衡信号/交易纪律/调仓建议/收益归因（决策建议，非风险章节）
     "action": "action",
-    # 历史：组合历史走势与回撤 + 组合演进 + 持仓变动复盘（快照事件级）
+    # 历史：组合历史走势与回撤 + 组合演进 + 持仓变动复盘（快照事件级）+ 事件窗量化对照
     "portfolio_history_drawdown": "history",
     "portfolio_evolution": "history",
     "holding_change": "history",
+    "event_impact": "history",
     # LLM：新闻关联 + LLM 文本分析系列（号段 8..12 连续）
     "news_correlation": "llm",
     "global_macro": "llm",
@@ -94,6 +95,7 @@ def _compute_section_visibility(
     position_relationship_data: dict | None = None,  # data 层：持仓关系矩阵 dict（相关性区块数据源）
     evolution_data: dict | None = None,  # data 层：组合演进 dict（None=无数据，章节隐藏）
     holding_change_data: dict | None = None,  # data 层：持仓变动复盘 dict（None=开关关闭/无数据，整章隐藏）
+    event_impact_data: dict | None = None,  # data 层：事件窗量化对照 dict（None=开关关闭/无数据，整章隐藏）
     financial_report_digest_data: dict | None = None,  # data 层：财报摘要 dict（None=无数据，章节隐藏）
     financial_indicator_data: dict | None = None,  # data 层：财务指标 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
@@ -117,6 +119,8 @@ def _compute_section_visibility(
         # 持仓变动复盘：实验章无 board 层开关（恒 True），可见性由 data 层
         # data_flag（holding_change_data，seam 注入）控制——与 Excel 端同口径
         "holding_change": True,
+        # 事件窗量化对照：同持仓变动复盘（实验章无 board 层开关，data 层控制）
+        "event_impact": True,
         "fundamental_snapshot": enable_fundamental_snapshot,  # ← board 层：持仓基本面章
         "action": enable_action,  # ← board 层：行动建议（config 默认开）
         "llm": enable_llm,  # ← board 层
@@ -139,6 +143,9 @@ def _compute_section_visibility(
         # 持仓变动复盘：实验开关 holding_change_review 经 seam 注入（缺席=None）→
         # 整章隐藏；注入但 available=False 时模板写占位（双端同口径）
         "holding_change_data": holding_change_data is not None,
+        # 事件窗量化对照：实验开关 event_window_impact 经 seam 注入（缺席=None）→
+        # 整章隐藏；注入但 available=False 时模板写占位（双端同口径）
+        "event_impact_data": event_impact_data is not None,
         "financial_report_digest_data": financial_report_digest_data is not None,
         "financial_indicator_data": financial_indicator_data is not None,
     }

@@ -46,6 +46,7 @@ from src.python.config.features import is_feature_enabled
 from src.python.core.decision_header import structured_header_cache_suffix
 from src.python.llm._hallucination_filter import _filter_hallucinated_codes
 from src.python.llm.skeleton import generate_llm_module
+from src.python.llm.holding_change_review import generate_holding_change_review
 
 logger = logging.getLogger("invest")
 
@@ -56,6 +57,7 @@ __all__ = [
     "generate_penetration_deep_analysis",
     "generate_self_review",
     "generate_debate_procon",
+    "generate_holding_change_review",
     "_filter_hallucinated_codes",
 ]
 
@@ -75,6 +77,7 @@ def generate_global_macro(
     holdings_details: list[dict] | None = None,
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
+    event_impact_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成全球政经局势。
 
@@ -94,6 +97,7 @@ def generate_global_macro(
         competitive_context=competitive_context or "",
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
+        event_impact_block=event_impact_block or "",
     )
 
     def _fingerprint():
@@ -128,6 +132,7 @@ def generate_global_macro(
         total_profit=total_profit,
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
+        event_impact_block=event_impact_block,
     )
 
 
@@ -175,6 +180,7 @@ def generate_expert_review(
     history_data: dict | None = None,
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
+    event_impact_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成智囊团深度复盘。
 
@@ -211,6 +217,7 @@ def generate_expert_review(
         metrics=metrics,
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
+        event_impact_block=event_impact_block or "",
     )
 
     def _fingerprint():
@@ -251,6 +258,7 @@ def generate_expert_review(
         total_profit=total_profit,
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
+        event_impact_block=event_impact_block,
     )
 
 
@@ -271,6 +279,7 @@ def generate_health_check(
     history_data: dict | None = None,
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
+    event_impact_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。
 
@@ -293,6 +302,7 @@ def generate_health_check(
         data_quality_text=data_quality_text or "",
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
+        event_impact_block=event_impact_block or "",
     )
 
     def _fingerprint():
@@ -330,6 +340,7 @@ def generate_health_check(
         total_profit=total_profit,
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
+        event_impact_block=event_impact_block,
     )
 
 
@@ -348,6 +359,7 @@ def generate_penetration_deep_analysis(
     history_data: dict | None = None,
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
+    event_impact_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成穿透深度分析。"""
     # 穿透深度分析的提示词不含信号块，指纹无后缀；风险信号摘要与其余
@@ -363,6 +375,7 @@ def generate_penetration_deep_analysis(
         history_data=history_data,
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
+        event_impact_block=event_impact_block or "",
     )
 
     def _fingerprint():
@@ -396,6 +409,7 @@ def generate_penetration_deep_analysis(
         total_profit=total_profit,
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
+        event_impact_block=event_impact_block,
     )
 
 
@@ -419,6 +433,7 @@ def generate_debate_procon(
     metrics: dict | None = None,
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
+    event_impact_block: str = "",
     *,  # 以下为关键字参数
     session_cache: dict | None = None,
 ) -> tuple[str | None, str | None, str | None]:
@@ -480,6 +495,7 @@ def generate_debate_procon(
         metrics=metrics,
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
+        event_impact_block=event_impact_block or "",
     )
     _fingerprint = debate_procon_fingerprint(_fp_inputs)
 
@@ -549,6 +565,7 @@ def generate_debate_procon(
             fingerprint_fn=lambda: f"{_fingerprint}_debate_pro",
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
+            event_impact_block=event_impact_block,
             system_prompt_default=_SYSTEM_DEBATE_PRO,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -602,6 +619,7 @@ def generate_debate_procon(
             fingerprint_fn=lambda: f"{_fingerprint}_debate_con",
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
+            event_impact_block=event_impact_block,
             system_prompt_default=_SYSTEM_DEBATE_CON,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -675,6 +693,7 @@ def generate_debate_procon(
             fingerprint_fn=lambda: f"{_syn_fingerprint}_debate_syn",
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
+            event_impact_block=event_impact_block,
             system_prompt_default=_synthesis_system,
             prompt_builder=lambda: _synthesis_user,
             max_tokens_default=_max_tokens,
@@ -706,6 +725,7 @@ def generate_self_review(
     llm_config: dict | None = None,
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
+    event_impact_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成后自检：对本次各分析模块产出做一次模型层复核。
 
@@ -722,6 +742,7 @@ def generate_self_review(
             penetrated_assets,
             purchase_block=purchase_constraint_block or "",
             holding_change_block=holding_change_block or "",
+            event_impact_block=event_impact_block or "",
         )
 
     def _prompt():
@@ -741,52 +762,5 @@ def generate_self_review(
         holdings_details=holdings_details,
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
-    )
-
-
-def generate_holding_change_review(
-    context_block: str,
-    signal_block: str = "",
-    holdings_details: list[dict] | None = None,
-    force: bool = False,
-    http_client: Any = None,
-    llm_config: dict | None = None,
-    purchase_constraint_block: str = "",
-    holding_change_block: str = "",
-) -> tuple[str | None, bool]:
-    """生成持仓变动复盘归因（章内 LLM 归因块）。
-
-    走与其余模块相同的骨架（``generate_llm_module``）——缓存键、TTL、尾部标识行、
-    失败原因登记全部复用既有机制；档位/开关判定在调用侧
-    （``llm/holding_change_review.py``）。输入是报告契约渲染好的事实块，
-    内容寻址由 ``holding_change_review_fingerprint`` 保证（进提示词必进指纹）。
-    """
-    from src.python.llm.module_fingerprint import holding_change_review_fingerprint
-    from src.python.llm.prompts import _SYSTEM_HOLDING_CHANGE_REVIEW, _build_holding_change_review_prompt
-
-    def _fingerprint():
-        return holding_change_review_fingerprint(
-            context_block,
-            signal_block=signal_block,
-            holdings_details=holdings_details,
-            purchase_block=purchase_constraint_block or "",
-        )
-
-    def _prompt():
-        return _build_holding_change_review_prompt(context_block, signal_block)
-
-    return generate_llm_module(
-        llm_config,
-        "holding_change",
-        force=force,
-        http_client=http_client,
-        fingerprint_fn=_fingerprint,
-        system_prompt_default=_SYSTEM_HOLDING_CHANGE_REVIEW,
-        prompt_builder=_prompt,
-        max_tokens_default=2048,
-        timeout_default=90.0,
-        output_brief_limit=200,
-        holdings_details=holdings_details,
-        purchase_constraint_block=purchase_constraint_block,
-        holding_change_block=holding_change_block,
+        event_impact_block=event_impact_block,
     )

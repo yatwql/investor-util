@@ -304,6 +304,7 @@ def _generate_report_both(
             financial_indicator_data=financial_indicator_data,
             purchase_status_data=purchase_status_data,
             holding_change_data=(pipeline_data or {}).get("holding_change_data"),
+            event_impact_data=(pipeline_data or {}).get("event_impact_data"),
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -621,6 +622,7 @@ def _generate_report_full(
         purchase_status_data=(pipeline_data or {}).get("purchase_status_data"),
         market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
         holding_change_data=(pipeline_data or {}).get("holding_change_data"),
+        event_impact_data=(pipeline_data or {}).get("event_impact_data"),
     )
 
     # ── 7. Excel 报告 ──

@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.4-dev
-> **编号源**：`rf-next = 593`（新增问题取此编号，完成后更新为 +1；已用最大 rf-592，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 596`（新增问题取此编号，完成后更新为 +1；已用最大 rf-595，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -56,10 +56,20 @@
 |---|------|----------|
 | **rf-592** | 东财 push2 `f9/f20/f23`（动态 PE / 总市值 / PB）当前返回空：`fetcher/industry.fetch_valuation_fields` 对 601398/600900 实时取数 `pe/pb/market_cap` 全 `None`（同响应行业字段正常），单发 raw 请求同样只见 `f57/f58`——`valuation_percentile` 真实估值 PE/PB 列与 `market_cap` 消费方取不到值，评测中 `fund_pb`/`fund_size_log_cap` 两因子按实测判不可得 | 复核 push2 上游字段策略/请求参数（fltt/invt/字段白名单是否变更、是否需换端点），确认后复评两因子并回填评测产物；若为源侧永久下线，按数据源降级治理改口径 |
 
+### rf-593 — 辩论指纹未并入统一附录块（2026-10-06）
+
+> plan-79 实施期间发现；**pre-existing**（申购限购/持仓变动两块同缺，事件窗块沿同一模式接入后三块同缺），不阻塞本轮交付——仅当「只有附录块变化、其余指纹输入不变」时辩论缓存键才失配，实际多伴随持仓/行情变化换键。
+
+| # | 问题 | 修复方向 |
+|---|------|----------|
+| **rf-593** | `module_fingerprint.debate_procon_fingerprint` 输入口径刻意不含统一附录块（申购限购/持仓变动/事件窗三块），而白脸/黑脸经同一 `generate_llm_module` → skeleton 追加附录——当仅附录块内容变化（如新闻关联极性/申购状态更新）而其余指纹输入不变时，辩论缓存键不换，可能回放带旧附录上下文的旧输出 | 将三块以「非空才并入」条件追加进辩论指纹 part（与四标准模块同构），同步 docstring「输入口径」清单；补回归用例：块非空改变辩论键、空块逐字节不变 |
+
 ## 已解决问题
 
 | # | 摘要 | 状态 |
 |---|------|------|
+| **rf-594** | `how-to-config.md` Web 面板配置项对照表「实验性功能」行缺 `whatif_trade_cost` 且编号段 `8-11` 陈旧（Web 白名单按注册表自动全收，行内容为文档滞留） | 已修复 2026-10-06（该行补 whatif/事件窗两键、编号段更正 `8-13`，随 plan-79 开关同步；`check-doc-drift --ci` 复核通过） |
+| **rf-595** | 事件窗接线测试的日历注入 fixture 为独立 autouse，先于 `offline_external_sources` 装配——offline 桩把日历 MagicMock 存为「原值」并在逆序终化时还原出来（patch 泄漏到后续用例，实测把 `test_market_value` 并发串行化用例打红） | 已修复 2026-10-06（`_calendar` 显式依赖 `offline_external_sources` 强制装配序；回归用例 `TestCalendarFixtureStackOrder` 锁依赖声明与逐层还原） |
 | **rf-591** | 评测脚本对数市值字段 `json_cap_log` 未防非有限值（`+inf` 会以 `Infinity` 漏进 JSON 产物；`nan`/非正仅靠比较守卫间接挡住） | 已修复 2026-10-06（`factor_zoo_eval.py` 补 `math.isfinite` + 非正拒绝 → 一律返回 None；回归用例 `test_json_cap_log_invalid_and_nonfinite` 覆盖 0/负/None/非数/±inf/nan） |
 | **rf-590** | `analysis/trade_cost_model.py` 跨 800 行主程序红线（plan-77 迭代 1 产出 835 行，`check-file-length --ci` 拦出） | 已修复 2026-10-05（按职责拆出 `analysis/fee_schedule_model.py` 承载费率表文本解析/单档与配置构建/金额与交易日持有期选档（381 行），`trade_cost_model` 保留 FIFO 批次重放与聚合（509 行）；依赖单向无环，`EXEMPTIONS` 不新增、违规清零；消费方与测试导入指向持有者子模块，folders 目录树同步） |
 | **rf-589** | `core/registry.py` 新增 `fund_fee` 模块缺 `cache_groups=("refresh",)`（前缀缓存模块必须入菜单刷新组的形不变量 `test_cache_prefix_modules_have_groups` 拦出） | 已修复 2026-10-05（补 `cache_groups=("refresh",)`，`fund_fee_{code}` 前缀可经菜单 [1] 刷新） |

@@ -7,7 +7,8 @@
 > 追加归档：2026-10-05 plan-76 持仓变动复盘（快照事件级）四迭代完成（见文末章节）
 > 追加归档：2026-10-05 plan-77 What-if 回放交易成本建模与基准对比（whatif_trade_cost）四迭代完成（见文末章节）
 > 追加归档：2026-10-06 plan-78 因子动物园目录评测（factor_zoo_catalog）先决门槛三指标评测判定转正立项（见文末章节）
-> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）
+> 追加归档：2026-10-06 plan-79 事件窗量化对照（event_window_impact）先决门槛三段通过并四迭代完成（见文末章节）
+> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）
 
 ---
 
@@ -107,3 +108,18 @@
 4. **回归网**：40 项脚本单测（A/B/C 阈值恰等边界、判定三态、基线读取、相关性口径、注入探针全离线；edge 空输入/退化数据/极端值 fail-closed）。
 
 **测试与文档**：folders 目录树/统计、test-coverage 快照、vibe 研究文档与归档索引链接同步；评测期自审 rf-591（对数市值非有限值）修复入网、rf-592（push2 扩展字段空值）挂待处理；P0 `dev-verify` + 十守护 `--ci` 全绿。
+
+## plan-79 事件窗量化对照（event_window_impact）— ✅ 已完成（2026-10-06）
+
+> 设计文档：[`docs/archive/v0.12.x/event-window-impact/event-window-impact-design.md`](event-window-impact/event-window-impact-design.md)（已实施，含 §14 判定记录）。
+
+**先决门槛（三段全过）**：① 新闻日期字段结构化可用率 **100%（22/22）≥ 80%**（`ctime` 全可解析；`llm_news_item_*` 极性资产 22 条三元组：利好 14 / 中性 7 / 利空 1）；② 窗口口径唯一可判定——严格 ±5 单源经 8 例「窗口超出行情范围」降级实证，半窗截断评估后否决（维持设计唯一口径，23 条严格可用事件已足门槛 3）；③ 真实链路采样（4 份既有报告新闻 × 当前持仓穿透 × 真实行情/基准，零 LLM 调用）10 例人工比对 **9/10 ≥ 7**（一致 3 + 分歧可解释 6 + 中性不判 1 不入分子），用户判定「通过」，采样产物 `docs/tmp/event_gate3_sample.json`。
+
+**完成摘要**：
+
+1. **纯计算**：`analysis/event_window_impact.py`（事件日→交易日映射、±5 交易日切窗 LOCF 对齐、超额与方向比对，零 I/O）；手算对照与边界用例入网。
+2. **事件表编排**：`report/event_impact_panel.py`（新闻→事件行组装、品种关键词索引、注入式行情/基准取数、逐事件降级计数不截断、`available=false` 传导、分歧例 `prompt_block` 只收「比对=分歧」行、view 与页签同文写入）。
+3. **报告双端 + LLM 注入**：开关 `event_window_impact`（实验组第 6 项，默认关）；注册表新增 `event_impact` 章（附录三项顺延）；seam `inject_event_impact_data` 经**新闻先行串行段**注入（新闻 collect → 注入事件表 → 提交 LLM，解决「极性由 LLM 产出、分歧例须同轮进 LLM」的鸡生蛋）；分歧例块进**统一 prompt 附录**随四模块+辩论+自检携带，指纹非空条件并入、空块逐字节不变；HTML partial + Excel 页签双端消费同一 view；关态走原并行路径逐字节不变。
+4. **回归网**：纯计算 33 + 编排 25 + 注入链路/接线 39 项新用例（关态回退哈希、双端单元格同文、新闻先行串行时序、分歧例召回 100%、章隐藏不消耗编号、日历 fixture 装配栈序）全绿。
+
+**测试与文档**：开关 32 项（实验 6）、TUI 实验段 8~13；手册章节表/可见性总览/语义命名表/附录 H/目录树与统计同步；自审 rf-594（Web 面板配置项表实验行缺 whatif 与编号段陈旧）修复入网、rf-593（辩论指纹未并入统一附录块，pre-existing）挂待处理；P0 `dev-verify` + 十守护 `--ci` 全绿。

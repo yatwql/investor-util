@@ -189,6 +189,43 @@ def _fetch_llm_and_news(
         from src.python.llm import extract_purchase_constraint_block
 
         purchase_constraint_block = extract_purchase_constraint_block(pipeline_data)
+
+        # ── 事件窗对照（实验开关 event_window_impact，默认关）：开启时新闻先行 ──
+        # 事件表须以本次新闻（含逐条 LLM 判定极性）装配，装配完成再提交 LLM 生成，
+        # 分歧例块才进分析章提示词与指纹（news 与 LLM 并行会引入装配竞态，故此处
+        # 改为串行）；开关关闭 → 走下方并行原路径，行为逐字节不变。
+        from src.python.config.features import is_feature_enabled
+
+        if is_feature_enabled("event_window_impact") and enable_news:
+            _news_fut = _submit_news_future(pool, holdings, prep_data, enable_news, purchase_constraint_block)
+            news_data, news_llm_meta, news_ok = _collect_news_future_result(_news_fut, reporter)
+            from src.python.report._experimental_seams import inject_event_impact_data
+
+            inject_event_impact_data(
+                pipeline_data,
+                reporter,
+                news_data=news_data,
+                holdings=holdings,
+                penetrated_assets=prep_data.get("penetrated_assets"),
+                comparison_indices=comparison_indices,
+            )
+            if enable_llm:
+                _llm_fut = _submit_llm_future(
+                    pool,
+                    holdings,
+                    prep_data,
+                    sector_flow,
+                    force_llm,
+                    pipeline_data,
+                    enable_llm,
+                    history_data=history_data,
+                    comparison_indices=comparison_indices,
+                    metrics=metrics,
+                )
+                if _llm_fut is not None:
+                    llm_content, debate_info = _collect_llm_future_result(_llm_fut, reporter)
+            return llm_content, news_data, news_llm_meta, news_ok, debate_info
+
         _news_fut = _submit_news_future(pool, holdings, prep_data, enable_news, purchase_constraint_block)
         _llm_fut = _submit_llm_future(
             pool,

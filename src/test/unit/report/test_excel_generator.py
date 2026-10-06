@@ -882,10 +882,11 @@ class TestCreateSheets(unittest.TestCase):
             enable_fund_deep_analysis=False,
             enable_news=False,
             enable_llm=False,
-            data_availability={"holding_change_data": False},
+            data_availability={"holding_change_data": False, "event_impact_data": False},
         )
         self.assertEqual(len(sheets), 7)
         self.assertNotIn("holding_change", sheets)
+        self.assertNotIn("event_impact", sheets)
         expected_titles = {
             "summary": "1.投资分析汇总",
             "holdings_detail": "2.持仓明细与分类",
@@ -928,12 +929,13 @@ class TestCreateSheets(unittest.TestCase):
             enable_fund_deep_analysis=False,
             enable_news=True,
             enable_llm=False,
-            data_availability={"news_data_available": True, "holding_change_data": False},
+            data_availability={"news_data_available": True, "holding_change_data": False, "event_impact_data": False},
         )
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
         # always(5) + history(1) + evolution(1) + news(1) = 8
         self.assertEqual(len(sheets), 8)
         self.assertNotIn("holding_change", sheets)
+        self.assertNotIn("event_impact", sheets)
         for key in news_keys:
             self.assertIn(key, sheets)
 
@@ -951,7 +953,7 @@ class TestCreateSheets(unittest.TestCase):
             enable_news=False,
             enable_llm=False,
             enable_portfolio_evolution=False,
-            data_availability={"holding_change_data": False},
+            data_availability={"holding_change_data": False, "event_impact_data": False},
         )
         self.assertEqual(len(sheets), 6)
         self.assertNotIn("portfolio_evolution", sheets)
@@ -971,7 +973,7 @@ class TestCreateSheets(unittest.TestCase):
             enable_fund_deep_analysis=False,
             enable_news=False,
             enable_llm=False,
-            data_availability={"holding_change_data": False},
+            data_availability={"holding_change_data": False, "event_impact_data": False},
         )
         self.assertEqual(len(sheets), 7)
         self.assertIn("portfolio_evolution", sheets)

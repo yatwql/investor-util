@@ -102,16 +102,18 @@ class TestSectionTable:
 
 class TestSectionCounts:
     @pytest.mark.parametrize(
-        "line",
+        "template",
         [
-            "| R-OUT-05 | Excel 格式：页签编号 1~19，数字前缀保证排序 |",
-            "> 空对象使用默认顺序（19 项）",
-            "返回 result（19 项，key/number/type/data_flag）",
-            "报告章节表（19 个报告章节）",
+            "| R-OUT-05 | Excel 格式：页签编号 1~{n}，数字前缀保证排序 |",
+            "> 空对象使用默认顺序（{n} 项）",
+            "返回 result（{n} 项，key/number/type/data_flag）",
+            "报告章节表（{n} 个报告章节）",
         ],
     )
-    def test_stale_count_flagged(self, drift, line):
-        findings = drift.check_section_counts({Path("manual.md"): line})
+    def test_stale_count_flagged(self, drift, template):
+        # 样本数取「当前注册表章数 + 1」动态构造——与真值同源，随章数演进不腐化
+        n = len(drift._REPORT_SECTION_DEFAULT) + 1
+        findings = drift.check_section_counts({Path("manual.md"): template.format(n=n)})
         assert len(findings) == 1 and "章节数量断言" in findings[0]
 
     def test_correct_count_passes(self, drift):

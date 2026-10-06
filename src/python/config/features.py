@@ -147,6 +147,14 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         False,
         True,
     ),
+    # ── 实验性功能：事件窗量化对照（新闻事件 × 持仓行情窗口比对，先决门槛过审后择机转正） ──
+    "event_window_impact": FeatureSwitchDef(
+        "事件窗量化对照",
+        "新闻事件映射交易日后 ±5 交易日窗口：品种收益/超额收益与文本极性同表对照，分歧例进 LLM 分析章",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
     # ── 常规开关：LLM 输出增强（只读侧注入，不增调用次数、不写盘） ──
     "module_quality_gate": FeatureSwitchDef(
         "模块级质量分级",

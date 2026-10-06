@@ -91,13 +91,13 @@ class TestHtmlCssStructure(unittest.TestCase):
             self.assertIn('style="order:', sec_tag, f"section div 缺少 order 样式: {sec_tag}")
 
     def test_section_count(self):
-        """模板 + partials 应共含 17 个 .section 容器（含 style_factor、position_structure、
-        portfolio_evolution、financial_report_digest、financial_indicator、action）。
+        """模板 + partials 应共含 19 个 .section 容器（含 style_factor、position_structure、
+        portfolio_evolution、financial_report_digest、financial_indicator、action、event_impact）。
 
-        组合演进/行动建议/持仓个股财报摘要/财务指标章节已拆入 partials/evolution_section.html、
-        partials/action_section.html、partials/financial_report_section.html 与
-        partials/financial_indicator_section.html
-        （经 include 引入），因此统计需覆盖 tmpl/partials/ 下的 partial 文件。
+        组合演进/行动建议/持仓个股财报摘要/财务指标/事件窗量化对照章节已拆入
+        partials/evolution_section.html、partials/action_section.html、
+        partials/financial_report_section.html、partials/financial_indicator_section.html 与
+        partials/event_impact_section.html（经 include 引入），因此统计需覆盖 tmpl/partials/ 下的 partial 文件。
         """
         sections = re.findall(r'<div\s+class="section"[^>]*>', self.tmpl)
         partials_dir = os.path.join(os.path.dirname(_TEMPLATE_PATH), "partials")
@@ -110,8 +110,8 @@ class TestHtmlCssStructure(unittest.TestCase):
                     extra += len(re.findall(r'<div\s+class="section"[^>]*>', f.read()))
         self.assertEqual(
             len(sections) + extra,
-            18,
-            f"应有 18 个 .section 容器（主模板 {len(sections)} + partial {extra}），实际 {len(sections) + extra}",
+            19,
+            f"应有 19 个 .section 容器（主模板 {len(sections)} + partial {extra}），实际 {len(sections) + extra}",
         )
 
     # ── section-title pattern ──────────────────────────────────

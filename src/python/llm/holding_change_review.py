@@ -22,6 +22,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.python.llm.skeleton import generate_llm_module
+
 logger = logging.getLogger("invest")
 
 HOLDING_CHANGE_MODULE_KEY = "holding_change"
@@ -168,3 +170,59 @@ __all__ = [
     "REVIEW_FIELD",
     "run_holding_change_review",
 ]
+
+
+# ── 提示词侧生成器（自 llm/generators.py 迁入，re-export 见彼处） ──
+
+
+def generate_holding_change_review(
+    context_block: str,
+    signal_block: str = "",
+    holdings_details: list[dict] | None = None,
+    force: bool = False,
+    http_client: Any = None,
+    llm_config: dict | None = None,
+    purchase_constraint_block: str = "",
+    holding_change_block: str = "",
+    event_impact_block: str = "",
+) -> tuple[str | None, bool]:
+    """生成持仓变动复盘归因（章内 LLM 归因块）。
+
+    走与其余模块相同的骨架（``generate_llm_module``）——缓存键、TTL、尾部标识行、
+    失败原因登记全部复用既有机制；档位/开关判定在调用侧
+    （``llm/holding_change_review.py``）。输入是报告契约渲染好的事实块，
+    内容寻址由 ``holding_change_review_fingerprint`` 保证（进提示词必进指纹）。
+
+    实现自 ``llm/generators.py`` 迁入（串行归因入口与实现同居一模块；
+    ``generators`` 保留 re-export，既有 import 面与测试 patch 面不变）。
+    """
+    from src.python.llm.module_fingerprint import holding_change_review_fingerprint
+    from src.python.llm.prompts import _SYSTEM_HOLDING_CHANGE_REVIEW, _build_holding_change_review_prompt
+
+    def _fingerprint():
+        return holding_change_review_fingerprint(
+            context_block,
+            signal_block=signal_block,
+            holdings_details=holdings_details,
+            purchase_block=purchase_constraint_block or "",
+        )
+
+    def _prompt():
+        return _build_holding_change_review_prompt(context_block, signal_block)
+
+    return generate_llm_module(
+        llm_config,
+        "holding_change",
+        force=force,
+        http_client=http_client,
+        fingerprint_fn=_fingerprint,
+        system_prompt_default=_SYSTEM_HOLDING_CHANGE_REVIEW,
+        prompt_builder=_prompt,
+        max_tokens_default=2048,
+        timeout_default=90.0,
+        output_brief_limit=200,
+        holdings_details=holdings_details,
+        purchase_constraint_block=purchase_constraint_block,
+        holding_change_block=holding_change_block,
+        event_impact_block=event_impact_block,
+    )

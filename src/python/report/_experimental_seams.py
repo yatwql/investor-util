@@ -1,8 +1,8 @@
 """报告管线实验功能挂载点（seam）—— 同一守护语义只实现一次。
 
-五个挂载点（决策跨期反思闭环 / 模块级质量分级 / 确定性信号沉淀 / 景气度框架诊断 /
-持仓变动复盘；其中前四者已随读侧判定转正为常规组开关（景气度框架诊断除外），
-但守护语义与挂载形态不变）在报告管线固定工序位置插入挂载点。决策/横幅/信号三个位于
+六个挂载点（决策跨期反思闭环 / 模块级质量分级 / 确定性信号沉淀 / 景气度框架诊断 /
+持仓变动复盘 / 事件窗量化对照；其中前四者已随读侧判定转正为常规组开关
+（景气度框架诊断除外），但守护语义与挂载形态不变）在报告管线固定工序位置插入挂载点。决策/横幅/信号三个位于
 ``_report_generation._generate_report_full`` 的工序序列内；景气度框架诊断（产出
 ``prosperity_framework_data`` 契约）经 :func:`record_prosperity_diagnosis` 接入两条 HTML
 生成路径，注入点须晚于基本面契约（个股 ROE）与历史走势就绪；持仓变动复盘（产出
@@ -29,6 +29,9 @@
   4. **持仓变动复盘晚于快照捕获**：事件清单由本次 ``capture_snapshot`` 落盘后的
      快照目录差分产出，前置注入会漏掉当期变动；对账读的是历史区间内已落档的
      决策事件，当次新登记（3.6/5b）属未来动作、不应入账。
+  5. **事件窗量化对照晚于新闻获取**：事件表须以本次新闻（含逐条 LLM 关联判定
+     极性）为输入，由 ``_llm_news._fetch_llm_and_news`` 在新闻收集完成后调用
+     ``inject_event_impact_data``（开关开启时新闻先行串行，避免装配竞态）。
 
 依赖：本模块属 report 层，只调用 ``core`` 与 report 各子模块的公开入口。导入时机
 分两类，按「开关关闭时是否值得付出成本」判定：
@@ -287,8 +290,57 @@ def inject_holding_change_data(
     _guarded("持仓变动复盘（事件清单装配）", "holding_change_review", reporter, _action, None)
 
 
+def inject_event_impact_data(
+    pipeline_data: dict | None,
+    reporter: ProgressReporter,
+    *,
+    news_data: list[dict[str, Any]] | None = None,
+    holdings: list | None = None,
+    penetrated_assets: list[dict] | None = None,
+    comparison_indices: dict[str, str] | None = None,
+) -> None:
+    """事件窗量化对照（实验性功能，新闻获取后注入）：装配事件表并注入 ``pipeline_data``。
+
+    事件表须以**本次新闻**（含逐条 LLM 关联判定极性）为输入，故挂载点位于新闻
+    收集完成之后（调用方 ``_llm_news._fetch_llm_and_news`` 保证顺序；开关开启时
+    新闻先行串行）。基准三阶映射的配置覆盖经全局配置读取（``whatif_benchmark_index``，
+    与 What-if 同源口径）。开关关闭 → 零行为（不装配、不注入，键缺席 = 整章隐藏）；
+    装配异常 → 一条告警 + 契约缺席（渲染层不出现该章，其余章节零影响）。
+
+    Args:
+        pipeline_data: 管线数据（None 直接返回，与其余挂载点同口径）
+        reporter: 进度上报器（异常告警）
+        news_data: ``build_news_data`` 输出（含 llm_analysis 极性）
+        holdings: 持仓清单（基准映射与关键词索引）
+        penetrated_assets: 穿透 TOP10 资产（关键词索引）
+        comparison_indices: 宽基指数池（基准三阶映射第二阶）
+    """
+    if pipeline_data is None:
+        return
+
+    def _action() -> None:
+        from src.python.config import get_config
+        from src.python.config.features import is_feature_enabled
+
+        if not is_feature_enabled("event_window_impact"):
+            return
+        from src.python.report.event_impact_panel import build_event_impact_panel
+
+        _config = get_config() or {}
+        pipeline_data["event_impact_data"] = build_event_impact_panel(
+            holdings or [],
+            news_data or [],
+            penetrated_assets,
+            comparison_indices=comparison_indices,
+            benchmark_override=str(_config.get("whatif_benchmark_index") or "") or None,
+        )
+
+    _guarded("事件窗量化对照（事件表装配）", "event_window_impact", reporter, _action, None)
+
+
 __all__ = [
     "apply_module_quality_banners",
+    "inject_event_impact_data",
     "inject_holding_change_data",
     "record_deterministic_decisions",
     "record_deterministic_signals",

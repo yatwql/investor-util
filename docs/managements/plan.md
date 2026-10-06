@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76/77/78 已完成归档（先决门槛全过；plan-76/77 四迭代落地、plan-78 三指标评测判定转正立项 → plan-81）**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批已立项：plan-79/80**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
+**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76/77/78 已完成归档（先决门槛全过；plan-76/77 四迭代落地、plan-78 三指标评测判定转正立项 → plan-81）**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批：plan-79 已完成归档（先决门槛三段全过、四迭代落地）、plan-80 已立项**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -77,13 +77,7 @@
 
 > **plan-78 已完成归档**（2026-10-06）：先决门槛即评测本体，评测脚本 `scripts/factor_zoo_eval.py` 五阶段（目录冻结 → 字段可得 → 信号相关 → 耗时基线 → 判定汇总）实测三指标全过——**A 23/25 = 92% ≥ 80%、B 19/23 = 82.6% ≥ 30%（分母 23 ≥ 10，`rebalance_overflow` 族按设计降级）、C 冷启动 12.831s ÷ 报告基线 446.255s = 2.9% ≤ 20%** → **判定：转正立项**（评测产物 `docs/tmp/factor-zoo/`，判定书口径预注册与复算说明）；25 因子五族目录与门槛口径冻结于设计文档，40 项脚本单测入网；设计文档 [`factor-zoo-catalog-design.md`](../archive/v0.12.x/factor-zoo-catalog/factor-zoo-catalog-design.md) 为「已评测·判定转正立项」状态随归档留存（含 §13 判定记录）。实施转 **plan-81**；评测期自审 rf-591（对数市值非有限值）已修复、rf-592（push2 扩展字段空值待复核）挂待处理。
 
-#### 🔲 `plan-79` 事件窗量化对照（event_window_impact）
-
-**动机**：新闻关联只有文本/LLM 侧判定，无「事件日前后 N 交易日真实收益」的数据侧互证——LLM 说利好而事件窗为负的分歧点正是复盘最该暴露的，也是 fact_checker 的事实锚。参照 gs-quant `timeseries/event_study.py` 的对齐/切窗/影响度量纯函数拆分（本仓库全仓实测无任何事件窗能力）。
-
-**先决门槛（未过归档未采纳）**：① 新闻日期字段结构化可用率 ≥80%；② 窗口口径（事件日→交易日映射、±5 交易日、基准对齐、LOCF）唯一可判定；③ 10 例样本量化结论与文本判定「方向一致或分歧可解释」≥7（人工比对）。详见 [`event-window-impact-design.md`](../plan/event-window-impact-design.md)。
-
-**预估成本**：中；**价值**：中高（数据×文本互证，复盘可信度下沉）。
+> **plan-79 已完成归档**（2026-10-06）：先决门槛三段全过（① 日期可用率 **100%（22/22）≥ 80%**；② 严格 ±5 单源口径经 8 例窗口越界降级实证、半窗截断否决；③ 真实链路采样 10 例人工比对 **9/10 ≥ 7**，用户判定通过）；四迭代落地（`event_window_impact` 纯计算 → `event_impact_panel` 事件表编排 → 报告双端 + LLM 注入 → 文档与门禁）P0 门禁全绿。分歧例块经**统一 prompt 附录**随四模块+辩论+自检携带（开关开启时新闻先行串行注入，解决「极性由 LLM 产出、同轮须进 LLM」的鸡生蛋）；关态逐字节回退、隐藏章不消耗连续编号。开关 **32 项（实验 6）**、TUI 实验段 **8~13**、报告章节序列新增 `event_impact` 章（附录三项顺延）。自审 **rf-594**（Web 面板配置项表实验行缺 whatif 与编号段陈旧）已修复、**rf-593**（`debate_procon_fingerprint` 未并入统一附录块，pre-existing）挂待处理。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`event-window-impact-design.md`](../archive/v0.12.x/event-window-impact/event-window-impact-design.md) 为「已实施」状态随归档留存（含 §14 判定记录）。
 
 #### 🔲 `plan-80` 调仓纪律回放（rebalance_schedule_replay）
 
