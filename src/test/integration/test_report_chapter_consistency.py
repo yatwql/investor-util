@@ -37,6 +37,7 @@ class TestReportChapterConsistency(unittest.TestCase):
         evolution=True,
         holding_change=True,
         event_impact=True,
+        schedule_replay=True,
         action=False,
         llm=True,
         financial_report=False,
@@ -66,6 +67,7 @@ class TestReportChapterConsistency(unittest.TestCase):
                 financial_indicator_data={} if financial_indicator else None,
                 holding_change_data={} if holding_change else None,
                 event_impact_data={} if event_impact else None,
+                schedule_replay_data={} if schedule_replay else None,
             )
         sheets = create_sheets(
             wb,
@@ -91,6 +93,7 @@ class TestReportChapterConsistency(unittest.TestCase):
         evolution=True,
         holding_change=True,
         event_impact=True,
+        schedule_replay=True,
         action=False,
         llm=True,
         financial_report=False,
@@ -126,6 +129,7 @@ class TestReportChapterConsistency(unittest.TestCase):
             evolution_data={} if evolution else None,
             holding_change_data={} if holding_change else None,
             event_impact_data={} if event_impact else None,
+            schedule_replay_data={} if schedule_replay else None,
             enable_fundamental_snapshot=financial_report or financial_indicator,
             financial_report_digest_data={} if financial_report else None,
             financial_indicator_data={} if financial_indicator else None,
@@ -192,6 +196,7 @@ class TestReportChapterConsistency(unittest.TestCase):
             evolution_data={},
             holding_change_data={},
             event_impact_data={},
+            schedule_replay_data={},
             enable_fundamental_snapshot=True,
             financial_report_digest_data={},
             financial_indicator_data={},
@@ -227,6 +232,7 @@ class TestReportChapterConsistency(unittest.TestCase):
             ("组合演进关闭", {"evolution": False, "action": True}),
             ("持仓变动复盘关闭", {"holding_change": False, "action": True}),
             ("事件窗对照关闭", {"event_impact": False, "action": True}),
+            ("调仓纪律回放关闭", {"schedule_replay": False, "action": True}),
             ("历史关闭", {"history": False, "action": True}),
             ("行动建议关闭(默认)", {"action": False}),
             ("多开关组合", {"fund_deep": False, "news": False, "llm": False, "action": False}),
@@ -263,6 +269,7 @@ class TestReportChapterConsistency(unittest.TestCase):
             "evolution_data": False,
             "holding_change_data": False,
             "event_impact_data": False,
+            "schedule_replay_data": False,
             "news_data_available": True,
             "llm_data_available": True,
         }
@@ -292,6 +299,7 @@ class TestReportChapterConsistency(unittest.TestCase):
             "portfolio_evolution",
             "holding_change",
             "event_impact",
+            "schedule_replay",
         ):
             self.assertNotIn(hidden, excel_keys, f"Excel 不应创建缺数据页签 {hidden}")
             self.assertNotIn(hidden, html_keys, f"HTML 不应显示缺数据章节 {hidden}")

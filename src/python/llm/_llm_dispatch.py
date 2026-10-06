@@ -67,6 +67,7 @@ def _build_module_fns(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> dict[str, Callable]:
     """构建 LLM 模块名称 → 生成函数闭包 的映射。
 
@@ -94,6 +95,7 @@ def _build_module_fns(
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
             event_impact_block=event_impact_block,
+            schedule_replay_block=schedule_replay_block,
         ),
         "expert_review": lambda c, lc: generate_expert_review(
             total_mv,
@@ -107,6 +109,7 @@ def _build_module_fns(
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
             event_impact_block=event_impact_block,
+            schedule_replay_block=schedule_replay_block,
             force=force,
             http_client=c,
             llm_config=lc,
@@ -127,6 +130,7 @@ def _build_module_fns(
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
             event_impact_block=event_impact_block,
+            schedule_replay_block=schedule_replay_block,
             force=force,
             http_client=c,
             llm_config=lc,
@@ -146,6 +150,7 @@ def _build_module_fns(
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
             event_impact_block=event_impact_block,
+            schedule_replay_block=schedule_replay_block,
             force=force,
             http_client=c,
             llm_config=lc,
@@ -180,6 +185,7 @@ def _dispatch_llm_workers(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> dict[str, dict]:
     """对缓存未命中的模块提交线程池任务，返回结果字典。
 
@@ -266,6 +272,7 @@ def _dispatch_llm_workers(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )
 
     # ── 辩论模式路由：替换 expert_review 条目 ─────────────────
@@ -309,6 +316,7 @@ def _dispatch_llm_workers(
                     purchase_constraint_block=purchase_constraint_block,
                     holding_change_block=holding_change_block,
                     event_impact_block=event_impact_block,
+                    schedule_replay_block=schedule_replay_block,
                 )
                 pro, con, synthesis = _result
                 if pro and con:

@@ -47,6 +47,7 @@ _SECTION_NAV_GROUP_MAP: dict[str, str] = {
     "portfolio_evolution": "history",
     "holding_change": "history",
     "event_impact": "history",
+    "schedule_replay": "history",
     # LLM：新闻关联 + LLM 文本分析系列（号段 8..12 连续）
     "news_correlation": "llm",
     "global_macro": "llm",
@@ -96,6 +97,7 @@ def _compute_section_visibility(
     evolution_data: dict | None = None,  # data 层：组合演进 dict（None=无数据，章节隐藏）
     holding_change_data: dict | None = None,  # data 层：持仓变动复盘 dict（None=开关关闭/无数据，整章隐藏）
     event_impact_data: dict | None = None,  # data 层：事件窗量化对照 dict（None=开关关闭/无数据，整章隐藏）
+    schedule_replay_data: dict | None = None,  # data 层：调仓纪律回放 dict（None=开关关闭/无数据，整章隐藏）
     financial_report_digest_data: dict | None = None,  # data 层：财报摘要 dict（None=无数据，章节隐藏）
     financial_indicator_data: dict | None = None,  # data 层：财务指标 dict（None=无数据，章节隐藏）
 ) -> tuple[dict[str, int], dict[str, bool], Any]:
@@ -121,6 +123,8 @@ def _compute_section_visibility(
         "holding_change": True,
         # 事件窗量化对照：同持仓变动复盘（实验章无 board 层开关，data 层控制）
         "event_impact": True,
+        # 调仓纪律回放：同事件窗（实验章无 board 层开关，data 层控制）
+        "schedule_replay": True,
         "fundamental_snapshot": enable_fundamental_snapshot,  # ← board 层：持仓基本面章
         "action": enable_action,  # ← board 层：行动建议（config 默认开）
         "llm": enable_llm,  # ← board 层
@@ -146,6 +150,8 @@ def _compute_section_visibility(
         # 事件窗量化对照：实验开关 event_window_impact 经 seam 注入（缺席=None）→
         # 整章隐藏；注入但 available=False 时模板写占位（双端同口径）
         "event_impact_data": event_impact_data is not None,
+        # 调仓纪律回放：同事件窗（实验开关经 seam 注入，缺席=None → 整章隐藏）
+        "schedule_replay_data": schedule_replay_data is not None,
         "financial_report_digest_data": financial_report_digest_data is not None,
         "financial_indicator_data": financial_indicator_data is not None,
     }

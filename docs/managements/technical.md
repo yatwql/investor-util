@@ -1789,7 +1789,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（19 项，key/number/type/data_flag）
+返回 result（20 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -3372,8 +3372,11 @@ make_http_client(timeout=10.0) → httpx.Client
 | `record_prosperity_diagnosis` | 景气度框架诊断挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供） | 行动建议（章内嵌块） | 报告输出 | 实验开关 `prosperity_framework`（默认关） |
 | `inject_holding_change_data` | 持仓变动复盘挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供） | 持仓变动复盘（报告独立章，type=holding_change） | 报告输出 | 实验开关 `holding_change_review`（默认关） |
 | `inject_event_impact_data` | 事件窗量化对照挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供；新闻先行串行段内注入，供分歧例附录块同轮进 LLM） | 事件窗量化对照（报告独立章，type=event_impact） | 报告输出 | 实验开关 `event_window_impact`（默认关） |
+| `inject_schedule_replay_data` | 调仓纪律回放挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供；快照与持仓变动注入后串行装配，回放引用 `prompt_block` 经统一附录进 LLM） | 调仓纪律回放（报告独立章，type=schedule_replay） | 报告输出 | 实验开关 `rebalance_schedule_replay`（默认关） |
 | `event_impact_panel` | 事件窗对照表数据编排与双端单源展示（事件行/降级/占位 + view 与页签同文 + 分歧例附录块） | 事件窗量化对照 | 报告输出 | 随 `event_window_impact` |
 | `event_window_impact` | 事件窗量化对照（新闻事件 → 交易日映射的严格 ±5 交易日窗收益 vs 文本极性方向比对，分歧例进 LLM 统一附录） | 事件窗量化对照 | 报告输出 | 实验开关 `event_window_impact`（默认关） |
+| `schedule_replay_panel` | 调仓纪律回放数据装配与双端单源展示（回放契约 + view 与页签同文 + 回放引用 prompt_block） | 调仓纪律回放 | 报告输出 | 随 `rebalance_schedule_replay` |
+| `rebalance_schedule_replay` | 调仓纪律回放（月度定期/阈值偏离纪律多期回放 vs 买入持有，双线图与逐期成本表，回放结论进 LLM 统一附录） | 调仓纪律回放 | 报告输出 | 实验开关 `rebalance_schedule_replay`（默认关） |
 | `factor_catalog` | 因子目录注册表（25 因子五来源族冻结清单：slug/族/类别/所需字段/中性点/出处，版本随代码；含中性点字典与字段类型路由常量） | 风格与因子分析（章内区块四） | 数据契约 | 实验开关 `factor_catalog`（默认关） |
 | `factor_catalog_loader` | 因子目录装载与冻结校验（拒载降级）+ 四类输入备数（日K/基准指数/估值/财务指标，逐类型失败入 unavailable 不外抛） | 风格与因子分析 | 数据获取 | 随 `factor_catalog` |
 | `factor_evaluator` | 因子目录计算编排（池构造：直接持仓 ∪ 穿透 A 股 → 逐因子池内横截面 → 中性相对与评级摘要，全链 fail-soft） | 风格与因子分析 | 报告输出 | 随 `factor_catalog` |
@@ -3883,6 +3886,7 @@ investor-util/
 | decision_review_data | dict | 是 | record_llm_decisions_and_review_block |
 | holding_change_data | dict | 是 | inject_holding_change_data（实验开关 holding_change_review，默认关） |
 | event_impact_data | dict | 是 | inject_event_impact_data（实验开关 event_window_impact，默认关） |
+| schedule_replay_data | dict | 是 | inject_schedule_replay_data（实验开关 rebalance_schedule_replay，默认关） |
 | factor_catalog_data | dict | 是 | prepare_report_data（实验开关 factor_catalog，默认关；键值可为 None，None/缺失均不渲染区块） |
 | prosperity_framework_data | dict | 是 | prepare_report_data（full/both）；basic 路径由 generate_excel_report 就地构建 |
 | market_sentiment_data | dict | 是 | 行动建议章内嵌块（full/both 由编排层注入；basic 路径由 generate_excel_report 就地构建） |

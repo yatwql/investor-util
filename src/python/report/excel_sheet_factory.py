@@ -41,6 +41,7 @@ def build_data_availability(
     position_relationship_data: dict | None = None,
     holding_change_data: dict | None = None,
     event_impact_data: dict | None = None,
+    schedule_replay_data: dict | None = None,
 ) -> dict[str, bool]:
     """构造 data 层可用性字典（章节可见性的单一事实来源）。
 
@@ -54,6 +55,8 @@ def build_data_availability(
       - 事件窗量化对照：契约非 None 即就绪（None = 实验开关 `event_window_impact`
         关闭/未注入，页签不创建；available=False 时页签写占位）
         关闭 → 键显式 False，页签不创建——与 HTML 端 data_flags 同口径）
+      - 调仓纪律回放：契约非 None 即就绪（None = 实验开关 `rebalance_schedule_replay`
+        关闭/未注入，页签不创建；available=False 时页签写占位）
       - 持仓结构与集中度（合并章，两契约 OR）：基金深度分析开启时，重合度与集中度
         均由下游计算（数据不足时区块各自写占位）→ 两契约视为就绪；关闭时由 board 层隐藏
     """
@@ -68,6 +71,7 @@ def build_data_availability(
     # 与 HTML 端 data_flags 悲观缺省 False 在键缺席时两端可见性不一致
     availability["holding_change_data"] = holding_change_data is not None
     availability["event_impact_data"] = event_impact_data is not None
+    availability["schedule_replay_data"] = schedule_replay_data is not None
     availability["position_relationship_data"] = enable_fund_deep_analysis or position_relationship_data is not None
     availability["concentration_data"] = enable_fund_deep_analysis
     return availability
@@ -116,6 +120,8 @@ def create_sheets(
         "holding_change": True,
         # 事件窗量化对照：同持仓变动复盘（实验章无 board 层开关，data 层控制）
         "event_impact": True,
+        # 调仓纪律回放：同事件窗（实验章无 board 层开关，data 层控制）
+        "schedule_replay": True,
         "fundamental_snapshot": enable_fundamental_snapshot,
         "action": enable_action,
         "llm": enable_llm,

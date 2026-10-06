@@ -631,6 +631,11 @@
 | R-FCT-03 | `src/test/unit/report/test_signal_record.py` | 批 9 |
 | R-FCT-04 | `src/test/unit/report/test_style_factor_sheet.py` + `src/test/unit/report/test_html_report_structure.py` | 批 9 |
 | R-FCT-05 | `src/test/unit/config/test_features.py` + `src/test/unit/analysis/test_factor_evaluator.py` | 批 9 |
+| R-SR-01 | `src/test/unit/analysis/test_schedule_replay.py` + `src/test/unit/analysis/test_schedule_replay_edge.py` | 批 10 |
+| R-SR-02 | `src/test/unit/analysis/test_schedule_replay.py` | 批 10 |
+| R-SR-03 | `src/test/unit/report/test_schedule_replay_wiring.py` + `src/test/integration/test_report_chapter_consistency.py` + `src/test/scenario/basic/test_scenario_section_order.py` | 批 10 |
+| R-SR-04 | `src/test/unit/llm/test_schedule_replay_injection.py` | 批 10 |
+| R-SR-05 | `src/test/unit/report/test_schedule_replay_wiring.py` + `src/test/unit/report/test_experimental_seams.py` | 批 10 |
 <!-- requirement-trace:end -->
 ---
 

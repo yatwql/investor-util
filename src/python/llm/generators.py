@@ -78,6 +78,7 @@ def generate_global_macro(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成全球政经局势。
 
@@ -98,6 +99,7 @@ def generate_global_macro(
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
         event_impact_block=event_impact_block or "",
+        schedule_replay_block=schedule_replay_block or "",
     )
 
     def _fingerprint():
@@ -133,6 +135,7 @@ def generate_global_macro(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )
 
 
@@ -181,6 +184,7 @@ def generate_expert_review(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成智囊团深度复盘。
 
@@ -218,6 +222,7 @@ def generate_expert_review(
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
         event_impact_block=event_impact_block or "",
+        schedule_replay_block=schedule_replay_block or "",
     )
 
     def _fingerprint():
@@ -259,6 +264,7 @@ def generate_expert_review(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )
 
 
@@ -280,6 +286,7 @@ def generate_health_check(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。
 
@@ -303,6 +310,7 @@ def generate_health_check(
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
         event_impact_block=event_impact_block or "",
+        schedule_replay_block=schedule_replay_block or "",
     )
 
     def _fingerprint():
@@ -341,6 +349,7 @@ def generate_health_check(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )
 
 
@@ -360,6 +369,7 @@ def generate_penetration_deep_analysis(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成穿透深度分析。"""
     # 穿透深度分析的提示词不含信号块，指纹无后缀；风险信号摘要与其余
@@ -376,6 +386,7 @@ def generate_penetration_deep_analysis(
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
         event_impact_block=event_impact_block or "",
+        schedule_replay_block=schedule_replay_block or "",
     )
 
     def _fingerprint():
@@ -410,6 +421,7 @@ def generate_penetration_deep_analysis(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )
 
 
@@ -434,6 +446,7 @@ def generate_debate_procon(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
     *,  # 以下为关键字参数
     session_cache: dict | None = None,
 ) -> tuple[str | None, str | None, str | None]:
@@ -496,6 +509,7 @@ def generate_debate_procon(
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
         event_impact_block=event_impact_block or "",
+        schedule_replay_block=schedule_replay_block or "",
     )
     _fingerprint = debate_procon_fingerprint(_fp_inputs)
 
@@ -566,6 +580,7 @@ def generate_debate_procon(
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
             event_impact_block=event_impact_block,
+            schedule_replay_block=schedule_replay_block,
             system_prompt_default=_SYSTEM_DEBATE_PRO,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -620,6 +635,7 @@ def generate_debate_procon(
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
             event_impact_block=event_impact_block,
+            schedule_replay_block=schedule_replay_block,
             system_prompt_default=_SYSTEM_DEBATE_CON,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -694,6 +710,7 @@ def generate_debate_procon(
             purchase_constraint_block=purchase_constraint_block,
             holding_change_block=holding_change_block,
             event_impact_block=event_impact_block,
+            schedule_replay_block=schedule_replay_block,
             system_prompt_default=_synthesis_system,
             prompt_builder=lambda: _synthesis_user,
             max_tokens_default=_max_tokens,
@@ -726,6 +743,7 @@ def generate_self_review(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成后自检：对本次各分析模块产出做一次模型层复核。
 
@@ -743,6 +761,7 @@ def generate_self_review(
             purchase_block=purchase_constraint_block or "",
             holding_change_block=holding_change_block or "",
             event_impact_block=event_impact_block or "",
+            schedule_replay_block=schedule_replay_block or "",
         )
 
     def _prompt():
@@ -763,4 +782,5 @@ def generate_self_review(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )

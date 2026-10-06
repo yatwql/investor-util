@@ -37,6 +37,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 # 持仓变动复盘在 2b2 段注入，早于 3.6 结算——快照差分须晚于本次快照捕获）
 _SEAM_ORDER = [
     "inject_holding_change_data",
+    "inject_schedule_replay_data",
     "record_deterministic_decisions",
     "record_llm_decisions_and_review_block",
     "apply_module_quality_banners",
@@ -463,7 +464,7 @@ class TestHoldingChangeMount:
 
 
 class TestFacadeWiringOrder:
-    """挂载点接线守卫 —— 四个挂载点被调用，且相对次序与顺序约束一致。"""
+    """挂载点接线守卫 —— ``_SEAM_ORDER`` 全部挂载点被调用，且相对次序与顺序约束一致。"""
 
     def _seam_call_order(self) -> list[str]:
         source = (Path(PROJECT_ROOT) / "src" / "python" / "report" / "_report_generation.py").read_text(
@@ -484,7 +485,7 @@ class TestFacadeWiringOrder:
         return [name for _, name in calls]
 
     def test_all_seams_wired_in_documented_order(self):
-        """五个挂载点均已接线，且次序满足「结算先于 LLM 拉取」等顺序约束。"""
+        """``_SEAM_ORDER`` 全部挂载点均已接线，且次序满足「结算先于 LLM 拉取」等顺序约束。"""
         assert self._seam_call_order() == _SEAM_ORDER
 
     def test_functional_submodules_are_imported_lazily(self):

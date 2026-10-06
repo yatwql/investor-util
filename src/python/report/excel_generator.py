@@ -280,6 +280,7 @@ def generate_excel_report(
         position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
         holding_change_data=(pipeline_data or {}).get("holding_change_data"),
         event_impact_data=(pipeline_data or {}).get("event_impact_data"),
+        schedule_replay_data=(pipeline_data or {}).get("schedule_replay_data"),
     )
 
     # 章级：enabled_llm 模块禁用的 LLM 分析章不创建页签（与 HTML 端同函数同配置推导）
@@ -471,6 +472,18 @@ def generate_excel_report(
             write_event_impact_sheet(ws_ev, (pipeline_data or {}).get("event_impact_data"))
         except Exception:
             logger.debug("[excel] 事件窗量化对照页签写入失败（非关键）", exc_info=True)
+
+    # ── 调仓纪律回放页签（多期规则回放 vs 买入持有；实验开关
+    #      rebalance_schedule_replay 默认关，键缺席时页签不创建，此处自然不触发） ──
+    ws_sr = sheets.get("schedule_replay")
+    if ws_sr is not None:
+        prog.info("正在写入调仓纪律回放页签...")
+        try:
+            from src.python.report.schedule_replay_panel import write_schedule_replay_sheet
+
+            write_schedule_replay_sheet(ws_sr, (pipeline_data or {}).get("schedule_replay_data"))
+        except Exception:
+            logger.debug("[excel] 调仓纪律回放页签写入失败（非关键）", exc_info=True)
 
     # ── 持仓基本面页签（财务指标 + 财报摘要，一章两区块） ──
     ws_fs = sheets.get("fundamental_snapshot")

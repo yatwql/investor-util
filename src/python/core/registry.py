@@ -458,6 +458,7 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "portfolio_evolution": "组合演进",
     "holding_change": "持仓变动复盘",
     "event_impact": "事件窗量化对照",
+    "schedule_replay": "调仓纪律回放",
     "action": "行动建议",
     "data_source_status": "数据源可用性矩阵",
     "fundamental_snapshot": "持仓基本面",
@@ -685,21 +686,29 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "event_impact",
         "data_flag": "event_impact_data",
     },
+    # ── schedule_replay 类型（实验开关 rebalance_schedule_replay 控制，经实验挂载点注入）：调仓纪律回放——月度定期/阈值偏离纪律多期回放 vs 买入持有；data_flag 控制双端可见性（关态键缺席隐藏 / 开启但数据不足双端占位） ──
+    {
+        "key": "schedule_replay",
+        "name": "调仓纪律回放",
+        "number": 17,
+        "type": "schedule_replay",
+        "data_flag": "schedule_replay_data",
+    },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 17, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always", "data_flag": None},
     # ── fundamental_snapshot 类型（两功能开关各控一块，默认关）──
     # 持仓基本面 = 财务指标（financial_indicator）+ 持仓个股财报摘要（financial_report_digest）；
     # 两契约 OR 决定章节可见性（任一块就绪即显示，块级开关各控各的渲染）
     {
         "key": "fundamental_snapshot",
         "name": "持仓基本面",
-        "number": 18,
+        "number": 19,
         "type": "fundamental_snapshot",
         "data_flag": None,
         "data_flag_any": ("financial_indicator_data", "financial_report_digest_data"),
     },
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 20, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 

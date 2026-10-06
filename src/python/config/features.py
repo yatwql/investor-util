@@ -167,6 +167,15 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         False,
         True,
     ),
+    # ── 实验性功能：调仓纪律回放（先决门槛三项过审：指标原语复用 / 成本联动 /
+    # 2 个真实样例价值确认；验证通过后择机转正） ──
+    "rebalance_schedule_replay": FeatureSwitchDef(
+        "调仓纪律回放",
+        "月度定期/阈值偏离纪律多期回放 vs 买入持有（含成本），回放章双线与逐期成本表",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
     # ── 常规开关：LLM 输出增强（只读侧注入，不增调用次数、不写盘） ──
     "module_quality_gate": FeatureSwitchDef(
         "模块级质量分级",

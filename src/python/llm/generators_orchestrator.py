@@ -64,6 +64,7 @@ __all__ = [
     "_dispatch_llm_workers",
     "extract_holding_change_block",
     "extract_event_impact_block",
+    "extract_schedule_replay_block",
     "generate_all_llm",
     "run_news_correlation_safe",
 ]
@@ -91,6 +92,7 @@ def _compute_module_cache_info(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> dict[str, dict]:
     """预计算各模块指纹/缓存键/TTL/可缓存性，返回数据结构。
 
@@ -121,6 +123,7 @@ def _compute_module_cache_info(
         purchase_block=purchase_constraint_block or "",
         holding_change_block=holding_change_block or "",
         event_impact_block=event_impact_block or "",
+        schedule_replay_block=schedule_replay_block or "",
     )
     fp_global_macro = global_macro_fingerprint(_inputs)
     fp_expert_review = expert_review_fingerprint(_inputs)
@@ -255,6 +258,22 @@ def extract_event_impact_block(pipeline_data: dict | None) -> str:
     return str(((pipeline_data or {}).get("event_impact_data") or {}).get("prompt_block") or "")
 
 
+def extract_schedule_replay_block(pipeline_data: dict | None) -> str:
+    """从管线数据提取调仓纪律回放引用提示词块（契约字段 ``prompt_block`` 的唯一提取点）。
+
+    契约（``schedule_replay_data``）由报告 seam 装配（快照与持仓变动注入后），
+    构建期已渲染一次；此处只提取同一实例，同时交预检侧指纹与写侧提示词（进提示词
+    必进指纹，见 module_fingerprint）。
+
+    Args:
+        pipeline_data: 管线数据字典（可为 None，如无管线上下文的直调路径）。
+
+    Returns:
+        块原文；契约缺席（开关关闭/回放数据不足/字段缺）→ ``""``（提示词与缓存键回退原样）。
+    """
+    return str(((pipeline_data or {}).get("schedule_replay_data") or {}).get("prompt_block") or "")
+
+
 def generate_all_llm(
     a_indices: dict[str, dict[str, Any]],
     us_indices: dict[str, dict[str, Any]],
@@ -359,6 +378,18 @@ def generate_all_llm(
     else:
         logger.debug("事件窗分歧例块缺席（开关关闭/无分歧例），提示词与缓存键回退原样")
 
+    # ── 调仓纪律回放引用块：与事件窗块同构——契约构建期渲染一次，此处只提取同一
+    #    实例（同进预检指纹与写侧附录）。开关关闭/契约缺席 → ""，键与提示词双不变
+    #    （关态逐字节回退）。 ──
+    schedule_replay_block = extract_schedule_replay_block(pipeline_data)
+    if schedule_replay_block:
+        logger.debug(
+            "调仓纪律回放引用块注入 LLM 分析章（含表头共 %d 行）",
+            schedule_replay_block.count("\n") + 1,
+        )
+    else:
+        logger.debug("调仓纪律回放引用块缺席（开关关闭/回放数据不足），提示词与缓存键回退原样")
+
     cache_info = _compute_module_cache_info(
         llm_config,
         a_indices,
@@ -380,6 +411,7 @@ def generate_all_llm(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )
 
     precheck_results = _precheck_all_modules(llm_config, cache_info, force)
@@ -429,6 +461,7 @@ def generate_all_llm(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )
 
     # 合并预检结果 + 工作线程结果
@@ -528,6 +561,7 @@ def generate_all_llm(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )
 
     # ── 持仓变动复盘归因（章内块；与自检同为串行后置调用）──

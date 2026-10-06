@@ -338,10 +338,44 @@ def inject_event_impact_data(
     _guarded("事件窗量化对照（事件表装配）", "event_window_impact", reporter, _action, None)
 
 
+def inject_schedule_replay_data(
+    pipeline_data: dict | None,
+    reporter: ProgressReporter,
+    *,
+    holdings: list | None = None,
+) -> None:
+    """调仓纪律回放（实验性功能）：装配回放契约并注入 ``pipeline_data``。
+
+    回放仅依赖持仓与历史净值（不依赖新闻/LLM），挂载点位于快照与持仓变动注入
+    之后、历史走势之前（调用方 ``_report_generation._generate_report_full``）。
+    开关关闭 → 零行为（不装配、不注入，键缺席 = 整章隐藏）；装配异常 → 一条告警
+    + 契约缺席（渲染层不出现该章，其余章节零影响）。
+
+    Args:
+        pipeline_data: 管线数据（None 直接返回，与其余挂载点同口径）
+        reporter: 进度上报器（异常告警）
+        holdings: 持仓清单（回放输入快照化，含每份成本）
+    """
+    if pipeline_data is None:
+        return
+
+    def _action() -> None:
+        from src.python.config.features import is_feature_enabled
+
+        if not is_feature_enabled("rebalance_schedule_replay"):
+            return
+        from src.python.report.schedule_replay_panel import build_schedule_replay_panel
+
+        pipeline_data["schedule_replay_data"] = build_schedule_replay_panel(holdings or [])
+
+    _guarded("调仓纪律回放（回放装配）", "rebalance_schedule_replay", reporter, _action, None)
+
+
 __all__ = [
     "apply_module_quality_banners",
     "inject_event_impact_data",
     "inject_holding_change_data",
+    "inject_schedule_replay_data",
     "record_deterministic_decisions",
     "record_deterministic_signals",
     "record_llm_decisions_and_review_block",

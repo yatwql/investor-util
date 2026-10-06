@@ -337,8 +337,8 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
         self.assertEqual(by_key["action"], ["action"], "「行动建议」组应含行动建议章")
         self.assertEqual(
             by_key["history"],
-            ["portfolio_history_drawdown", "portfolio_evolution", "holding_change", "event_impact"],
-            "「历史」组应含组合历史走势与回撤 + 组合演进 + 持仓变动复盘 + 事件窗量化对照",
+            ["portfolio_history_drawdown", "portfolio_evolution", "holding_change", "event_impact", "schedule_replay"],
+            "「历史」组应含组合历史走势与回撤 + 组合演进 + 持仓变动复盘 + 事件窗量化对照 + 调仓纪律回放",
         )
         self.assertEqual(
             by_key["llm"],

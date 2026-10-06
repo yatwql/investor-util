@@ -185,6 +185,7 @@ def generate_holding_change_review(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成持仓变动复盘归因（章内 LLM 归因块）。
 
@@ -225,4 +226,5 @@ def generate_holding_change_review(
         purchase_constraint_block=purchase_constraint_block,
         holding_change_block=holding_change_block,
         event_impact_block=event_impact_block,
+        schedule_replay_block=schedule_replay_block,
     )

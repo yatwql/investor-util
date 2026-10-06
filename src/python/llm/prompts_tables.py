@@ -570,8 +570,9 @@ def _build_prompt_appendix(
     purchase_constraint_block: str = "",
     holding_change_block: str = "",
     event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> str:
-    """构建统一 prompt 附录（TOP3 + 数据速查表 + 代码白名单 + 申购限购约束块 + 持仓变动复盘块 + 事件窗分歧例块）。
+    """构建统一 prompt 附录（TOP3 + 数据速查表 + 代码白名单 + 申购限购约束块 + 持仓变动复盘块 + 事件窗分歧例块 + 调仓纪律回放引用块）。
 
     由 generate_llm_module 统一注入到每个模块的 user prompt 末尾，
     各模块无需手动调用。确保新模块自动获得防御段。
@@ -591,6 +592,8 @@ def _build_prompt_appendix(
             同源渲染一次的同一实例）；空 → 附录输出与不含该段时逐字节一致。
         event_impact_block: 事件窗分歧例块（契约 ``prompt_block`` 字段，同源渲染
             一次的同一实例）；空 → 附录输出与不含该段时逐字节一致。
+        schedule_replay_block: 调仓纪律回放引用块（契约 ``prompt_block`` 字段，
+            同源渲染一次的同一实例）；空 → 附录输出与不含该段时逐字节一致。
 
     Returns:
         格式化的附录文本块，无数据时返回空字符串。
@@ -611,6 +614,8 @@ def _build_prompt_appendix(
         parts.append(holding_change_block)
     if event_impact_block:
         parts.append(event_impact_block)
+    if schedule_replay_block:
+        parts.append(schedule_replay_block)
     return "\n\n" + "\n\n".join(parts) if parts else ""
 
 

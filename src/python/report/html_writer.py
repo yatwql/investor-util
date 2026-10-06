@@ -265,6 +265,7 @@ def _render_template(
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
     holding_change_view: dict | None = None,  # 持仓变动复盘双端单源视图（预格式化行；None=章隐藏）
     event_impact_view: dict | None = None,  # 事件窗量化对照双端单源视图（预格式化行；None=章隐藏）
+    schedule_replay_view: dict | None = None,  # 调仓纪律回放双端单源视图（预格式化行；None=章隐藏）
     financial_report_digest_data: dict | None = None,  # 持仓个股财报摘要契约（None=开关关闭/无数据）
     financial_indicator_data: dict | None = None,  # 财务指标契约（None=开关关闭/无数据）
     purchase_status_data: dict | None = None,  # 申购限购状态契约（None=开关关闭/无数据，申购状态列隐藏）
@@ -379,6 +380,7 @@ def _render_template(
         decision_review_data=decision_review_data,
         holding_change_view=holding_change_view,
         event_impact_view=event_impact_view,
+        schedule_replay_view=schedule_replay_view,
         financial_report_digest_data=financial_report_digest_data,
         financial_indicator_data=financial_indicator_data,
     )
@@ -440,6 +442,8 @@ def write_html_report(
     | None = None,  # data 层：持仓变动复盘契约（实验开关 `holding_change_review`，None=键缺席→整章隐藏）
     event_impact_data: dict
     | None = None,  # data 层：事件窗量化对照契约（实验开关 `event_window_impact`，None=键缺席→整章隐藏）
+    schedule_replay_data: dict
+    | None = None,  # data 层：调仓纪律回放契约（实验开关 `rebalance_schedule_replay`，None=键缺席→整章隐藏）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -571,6 +575,13 @@ def write_html_report(
         from src.python.report.event_impact_panel import build_event_impact_view
 
         event_impact_view = build_event_impact_view(event_impact_data)
+    # 调仓纪律回放视图（双端单源）：与 Excel 页签消费同一份预格式化字符串；
+    # 契约缺席（开关关闭/未注入）→ None → 章隐藏，逐字节回退既有输出
+    schedule_replay_view = None
+    if schedule_replay_data:
+        from src.python.report.schedule_replay_panel import build_schedule_replay_view
+
+        schedule_replay_view = build_schedule_replay_view(schedule_replay_data)
     # 章级：enabled_llm 模块禁用的 LLM 分析章整章隐藏（与 Excel 端同函数同配置推导）
     from src.python.llm.skeleton import get_llm_chapter_disabled
 
@@ -595,6 +606,7 @@ def write_html_report(
         evolution_data=evolution_data,
         holding_change_data=holding_change_data,
         event_impact_data=event_impact_data,
+        schedule_replay_data=schedule_replay_data,
         enable_fundamental_snapshot=enable_fundamental_snapshot,
         financial_report_digest_data=financial_report_digest_data,
         financial_indicator_data=financial_indicator_data,
@@ -712,6 +724,7 @@ def write_html_report(
         decision_review_data=decision_review_data,
         holding_change_view=holding_change_view,
         event_impact_view=event_impact_view,
+        schedule_replay_view=schedule_replay_view,
     )
 
     if enable_interactive_charts:

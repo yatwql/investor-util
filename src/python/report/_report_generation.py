@@ -14,6 +14,7 @@ from __future__ import annotations
 from src.python.report._experimental_seams import (
     apply_module_quality_banners,
     inject_holding_change_data,
+    inject_schedule_replay_data,
     record_deterministic_decisions,
     record_deterministic_signals,
     record_llm_decisions_and_review_block,
@@ -305,6 +306,7 @@ def _generate_report_both(
             purchase_status_data=purchase_status_data,
             holding_change_data=(pipeline_data or {}).get("holding_change_data"),
             event_impact_data=(pipeline_data or {}).get("event_impact_data"),
+            schedule_replay_data=(pipeline_data or {}).get("schedule_replay_data"),
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -464,6 +466,9 @@ def _generate_report_full(
     # 2b2. 持仓变动复盘（实验开关 holding_change_review，默认关；独立于演进开关）：
     #      事件清单差分须晚于本次快照捕获；开关关闭时键缺席 → 整章隐藏（见 seams）
     inject_holding_change_data(pipeline_data, config, reporter, snapshot_namespace=snapshot_namespace)
+    # 2b3. 调仓纪律回放（实验开关 rebalance_schedule_replay，默认关）：多期规则回放
+    #     装配（持仓 + 历史净值 + 成本两态）；开关关闭时键缺席 → 整章隐藏（见 seams）
+    inject_schedule_replay_data(pipeline_data, reporter, holdings=holdings)
     perf.stop()
 
     # ── 3. 历史走势 + 全量量化指标 ──
@@ -625,6 +630,7 @@ def _generate_report_full(
         market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
         holding_change_data=(pipeline_data or {}).get("holding_change_data"),
         event_impact_data=(pipeline_data or {}).get("event_impact_data"),
+        schedule_replay_data=(pipeline_data or {}).get("schedule_replay_data"),
     )
 
     # ── 7. Excel 报告 ──

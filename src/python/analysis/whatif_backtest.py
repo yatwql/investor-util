@@ -159,6 +159,24 @@ def _drawdown_series(norm: list[float]) -> list[float]:
     return series
 
 
+# ── 同源公共出口（单实现，供跨模块复用；语义与私有实现逐字一致）────
+
+
+def locf_forward(dates: list[str], value_map: dict[str, float]) -> list[float | None]:
+    """LOCF 前值填充公共出口（与 ``_locf`` 同源，多期回放等新消费方复用同一套对齐）。"""
+    return _locf(dates, value_map)
+
+
+def normalize_to_basis(vals: list[float], anchor_val: float) -> list[float]:
+    """归一到 100 基点公共出口（与 ``_normalize`` 同源，保证与 what-if 同一基点约定）。"""
+    return _normalize(vals, anchor_val)
+
+
+def returns_from_values(norm: list[float]) -> list[float]:
+    """归一值序列 → 日收益率公共出口（与 ``_returns_from_values`` 同源）。"""
+    return _returns_from_values(norm)
+
+
 # ── 指标构建 ──────────────────────────────────────────
 
 

@@ -44,6 +44,11 @@ def _is_unmodeled(name: str, code: str) -> bool:
     return is_a_share_stock(name, code) or is_exchange_fund_code(code) or is_index_code(code)
 
 
+def is_unmodeled_cost_code(name: str, code: str) -> bool:
+    """场内不建模判定公共出口（与 ``_is_unmodeled`` 同源；调仓纪律回放面板复用，防口径双源）。"""
+    return _is_unmodeled(name, code)
+
+
 def _load_snapshots() -> list[Any]:
     """本机持仓快照历史（批次重放输入）；加载失败 → 空列表（卖出腿费率判未知）。"""
     try:

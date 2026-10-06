@@ -30,6 +30,7 @@ from src.python.llm.generators_orchestrator import (  # noqa: F401
     extract_event_impact_block,
     extract_holding_change_block,
     extract_purchase_constraint_block,
+    extract_schedule_replay_block,
     generate_all_llm,
     run_news_correlation_safe,
 )

@@ -170,6 +170,14 @@ def _consume_fifo(code_lots: list[dict[str, Any]], shares: float) -> None:
     code_lots[:] = [lot for lot in kept if lot["shares"] > _SHARES_EPS]
 
 
+def consume_fifo_shares(code_lots: list[dict[str, Any]], shares: float) -> None:
+    """FIFO 批次扣减公共出口（与 ``_consume_fifo`` 同源，多期回放推进模拟批次时复用）。
+
+    语义与内部实现逐字一致：自最早批次起就地扣减，余量 ≤ 容差的批次移除。
+    """
+    _consume_fifo(code_lots, shares)
+
+
 def _consume_lots(
     code_lots: list[dict[str, Any]],
     shares: float,

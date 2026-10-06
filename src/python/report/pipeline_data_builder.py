@@ -76,6 +76,10 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     # `event_window_impact`，由 report/_experimental_seams.inject_event_impact_data
     # 注入；开关关闭时键缺席，整章隐藏）
     "event_impact_data",
+    # 调仓纪律回放：多期规则回放 vs 买入持有（实验开关
+    # `rebalance_schedule_replay`，由 report/_experimental_seams.inject_schedule_replay_data
+    # 注入；开关关闭时键缺席，整章隐藏）
+    "schedule_replay_data",
     # 持仓个股财报摘要：A 股标的的财报章节摘要（功能开关 `financial_report_digest`，
     # 由 report/financial_report_digest.build_financial_report_digest 组装；开关关闭时为 None）
     "financial_report_digest_data",
@@ -153,6 +157,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "decision_review_data": (dict, type(None)),
     "holding_change_data": (dict, type(None)),
     "event_impact_data": (dict, type(None)),
+    "schedule_replay_data": (dict, type(None)),
     "financial_report_digest_data": (dict, type(None)),
     "financial_indicator_data": (dict, type(None)),
     "purchase_status_data": (dict, type(None)),
