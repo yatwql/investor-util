@@ -43,14 +43,13 @@
 
 > 阈值见 `developer-guide.md`「文件膨胀阈值」表；本表登记已越线或临近越线的测试文件（2026-10-05 实测；全集清单以 `scripts/check-file-length.py -v` 为准，>1200 行红线由 `--ci` 拦截）。
 
-| # | 文件 | 现状 | 状态 / 修复方向 |
-|---|------|------|----------|
-| **rf-586** | **警告级（未越红线）跟踪——红线 8 个已随 rf-583 拆分清零，2026-10-05 `check-file-length.py -v` 派生**：行数最贴红线的 `unit/llm/test_llm_api_base.py`（1190 行，距 1200 仅 10 行）、`unit/report/test_penetration.py`（1141）、`unit/config/test_config.py`（1112）；用例数最贴 120 项红线的 `unit/scripts/test_check_doc_drift.py`（94 项）、`unit/config/test_config.py`（89 项）；`test_html_report_structure.py` 拆分后回落至 31 项，原 110 项警告解除 | 无门禁动作（800~1200 行 / 80~120 项仅 `-v` 清单）；再增内容前先跑 `check-file-length.py -v`，逼近红线时按「被测函数 / 场景类型」拆分并同步刷新 `test-coverage.md` / `folders.md` 用例计数 |
+> **当前无挂账项**（贴线跟踪 rf-586 的拆分已完成并转入下方已解决区）。警告级全集（测试 >800 行 / >80 项）以 `scripts/check-file-length.py -v` 为派生源，不做人肉快照；逼近红线（1200 行 / 120 项）时按「被测函数 / 场景类型」拆分为同目录兄弟分片，并同步刷新 `test-coverage.md` / `folders.md` 用例计数。
 
 ## 已解决问题
 
 | # | 摘要 | 状态 |
 |---|------|------|
+| **rf-586** | **警告级（未越红线）贴线测试文件跟踪**：行数贴 1200 行红线的 `unit/llm/test_llm_api_base.py`（修复时实测 1147）、`unit/report/test_penetration.py`（1141）、`unit/config/test_config.py`（1112）；用例数贴 120 项红线的 `unit/scripts/test_check_doc_drift.py`（修复时实测收集 118 项，距红线仅 2 项）、`unit/config/test_config.py`（89 项） | 已修复 2026-10-07（按「被测函数 / 场景类型」拆为同目录兄弟分片：llm_api_base → +`test_llm_api_attempt.py`（单次调用尝试与重试策略表，含 429 诊断回显组）+`test_llm_api_retry_errors.py`（call_llm_with_retry HTTP/响应/内容过滤/截断分支与响应桩助手），penetration → +`test_penetration_classify.py`（分类与名称判定）+`test_penetration_report_periods.py`（报告期场景：不可得剔除/陈旧闸门/联接来源登记），config → +`test_config_consistency.py`（模板与声明一致性）+`test_config_feature_gates.py`（功能开关与访问器），check_doc_drift → +`test_check_doc_drift_crosscheck.py`（文档↔代码交叉校验：链路表/Thinking 矩阵/收集快照/生成产物/真库冒烟/统计回写/守护同源）；拆分前后 4 文件用例数逐份求和不变（71/58/89/118 = 336）且 11 份全绿，最长回落 563 行、单项最高 72 项，全部脱离 >800 行 / >80 项警告带；`folders.md` 目录树 7 条、`testplan.md` 4 处载体、`developer-guide.md` 回显用例指针、`test-coverage.md` 报告行同步；警告级跟踪退役——贴线全集以 `check-file-length.py -v` 为派生源，逼近红线时再拆） |
 | **rf-598** | `check-doc-drift` 开关计数校验未覆盖 `requirements.md` §11.5 正文写法（`分**实验组**（N 项` / `提供 N 项功能开关` / `完整 N 项与分组清单`），该节增项未同步而守护不报（plan-80 增项后 33→34、实验 7→8 漂移未拦出） | 已修复 2026-10-07（`_GROUPED_COUNT` 容忍加粗组名与「报告章节与增强组」全名、`_TOTAL_COUNT` 增补未加粗「提供」式与「完整 N 项与分组清单」式，计数仍派生注册表实数；纳入即拦出并刷新 requirements 两处陈旧计数；补 3 项模式单测；`check-doc-drift --ci` 全绿） |
 | **rf-599** | demo/临时持仓经报告管线写入真实快照历史（10-02 CLI 以 `/tmp/demo/holdings/示例持仓.xlsx` 运行 4 次，`capture_snapshot` 始终执行 → 4 份幻影快照混入 `data/history/snapshots/`，持仓变动复盘把未持有品种报成清仓） | 已修复 2026-10-07（新增 `config.is_formal_holdings_source` 持仓源守卫：共享主目录只接受 `data/holdings/` 正式源，非正式源 capture 返回 None 不落盘不比对、命名空间域不受限、解析异常 fail-closed；删除 4 份污染快照；回归用例 `test_snapshot_source_guard(_edge).py` 11 项，web 正式模式两用例显式声明正式源） |
 | **rf-593** | `module_fingerprint.debate_procon_fingerprint` 输入口径刻意不含统一附录块（申购限购/持仓变动/事件窗/调仓回放四块），而白脸/黑脸经同一 `generate_llm_module` → skeleton 追加附录——仅附录块内容变化（如申购状态更新）而其余指纹输入不变时辩论缓存键不换，回放带旧附录上下文的旧输出 | 已修复 2026-10-07（四块「非空才并入」条件追加进辩论 part，与四标准模块同构，综合键自动覆盖；docstring 与 `llm-technical` 输入口径清单同步；回归用例 5 项：四块三态换键 + 空块接线前黄金值逐字节不变） |

@@ -192,7 +192,7 @@
 | **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ✅ | `test_tui_routing.py` |
 | **辩论管线集成**：orchestrator 辩论路由 _debate_wrapper → _debate_info_container → 8/9 元组返回 → HTML/Excel 渲染 | ✅ | `test_debate_pipeline.py` |
 | **Provider 降级链路**：断网/超时/异常响应 → 回退/熔断/降级占位（真实联通性由运行时治理，非门禁） | ✅ | `test_scenario_resilience_flows.py`（S7）/ T15/T16 / provider edge |
-| **联接基金穿透跨接缝**：取数层解析目标 ETF → fetcher 层以目标持仓代理 → 报告层登记来源并标注报告期 | ✅ | `test_fund.py` `TestWithFeederPenetration` + `test_penetration.py` / `test_penetration_sheet.py` |
+| **联接基金穿透跨接缝**：取数层解析目标 ETF → fetcher 层以目标持仓代理 → 报告层登记来源并标注报告期 | ✅ | `test_fund.py` `TestWithFeederPenetration` + `test_penetration_report_periods.py` / `test_penetration_sheet.py` |
 | **缓存预检接缝**：批量取数缓存命中时任务不执行，穿透仍须生效（幂等后处理在两处接缝调用） | ✅ | `test_fund.py` `TestFetchFundHoldingsBatch.test_penetration_applied_on_cache_hit` |
 
 ### 1.6 异常场景全覆盖
@@ -444,7 +444,7 @@
 | R-DATA-04 | `src/test/unit/core/test_cache_edge.py::test_market_open_uses_short_ttl` / `::test_market_closed_uses_static_ttl` | 批 3 |
 | R-DATA-05 | `src/test/unit/core/test_data_freshness.py` | 批 3 |
 | R-DATA-06 | `src/test/unit/core/test_code_utils.py`（`TestIsOtcFundByName` + `TestIsAShareStock`） + `src/test/unit/core/test_code_utils_classification.py` + `src/test/unit/fetcher/test_fund.py` + `src/test/unit/fetcher/test_fetcher_price.py`（价格缓存按路由分域 / 名称消歧 / 降级首跳键） + `src/test/unit/report/test_portfolio_history.py`（OTC 名称直接走净值链路） + `src/test/integration/test_cache_consistency.py` | 批 3 |
-| R-DATA-07 | `src/test/unit/core/test_retry.py` + `src/test/unit/core/test_throttle.py` + `src/test/unit/providers/test_provider_utils.py` + `src/test/unit/providers/test_cninfo.py` + `src/test/unit/providers/test_datasink.py` + `src/test/unit/providers/test_hithink.py` + `src/test/unit/providers/test_akshare_financial.py` + `src/test/unit/fetcher/test_financial_report.py` + `src/test/unit/fetcher/test_financial_indicator.py` + `src/test/unit/fetcher/test_financial_indicator_hithink.py` + `src/test/unit/llm/test_llm_api_base.py` | 批 4 |
+| R-DATA-07 | `src/test/unit/core/test_retry.py` + `src/test/unit/core/test_throttle.py` + `src/test/unit/providers/test_provider_utils.py` + `src/test/unit/providers/test_cninfo.py` + `src/test/unit/providers/test_datasink.py` + `src/test/unit/providers/test_hithink.py` + `src/test/unit/providers/test_akshare_financial.py` + `src/test/unit/fetcher/test_financial_report.py` + `src/test/unit/fetcher/test_financial_indicator.py` + `src/test/unit/fetcher/test_financial_indicator_hithink.py` + `src/test/unit/llm/test_llm_api_base.py` + `src/test/unit/llm/test_llm_api_attempt.py` + `src/test/unit/llm/test_llm_api_retry_errors.py` | 批 4 |
 | R-IDX-01 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_tencent.py` | 批 3 |
 | R-IDX-02 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_sina.py` | 批 3 |
 | R-IDX-03 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/fetcher/test_chain.py` | 批 3 |
@@ -454,7 +454,7 @@
 | R-OUT-04 | `src/test/unit/report/test_html_writer.py` + `src/test/unit/report/test_html_writer_contents.py` | 批 4 |
 | R-OUT-05 | `src/test/unit/report/test_excel_report_structure.py` | 批 4 |
 | R-OUT-06 | `src/test/unit/report/test_html_report_structure.py` | 批 4 |
-| R-OUT-07 | `src/test/unit/report/test_orchestrator.py` + `src/test/unit/config/test_config.py` | 批 4 |
+| R-OUT-07 | `src/test/unit/report/test_orchestrator.py` + `src/test/unit/config/test_config_consistency.py` + `src/test/unit/config/test_config_feature_gates.py` | 批 4 |
 | R-OUT-08 | `src/test/unit/report/test_excel_report_structure.py` | 批 4 |
 | R-OUT-09 | `src/test/unit/report/test_section_visibility.py` | 批 4 |
 | R-OUT-10 | `src/test/unit/report/test_html_report_structure.py` + `src/test/unit/report/test_feature_interactive.py` | 批 4 |
@@ -690,7 +690,7 @@
 | **P1** | 缓存刷新/清理/统计（菜单 [1][2][3][4]） | cache / handlers / registry 变更 | `test_handlers_cache.py` / `test_tui_handlers.py`（刷新/清理/统计不崩溃） |
 | **P1** | Web 标签页工作台 / 调仓 What-if / 缓存卡 | `src/python/web/handlers.py`、`src/static/web/` 变更 | `test_whatif_api.py` / `test_whatif_api_edge.py` / `test_cache_api.py` / `test_web_static_serving.py`（页签配对、What-if 与缓存控件齐备、main.js 接线） |
 | **P1** | Provider 降级链路 | providers / fetcher 变更 | 熔断/回退/断网降级测试（S7/T15/T16 + provider edge 用例）；实际联通性由运行时 Provider Chain 回退 + 熔断治理，非门禁 |
-| **P1** | 基金持仓取数阶梯次序与联接基金穿透 | providers / fetcher / report 的持仓取数路径变更 | `test_tiantian.py` `TestFetchFundHoldingsLadder`（次序不变量：第 1 跳命中不发主页面请求、联接基金不可达第 3 跳）+ `test_fund_edge.py`（批量接缝幂等/异常不外抛）+ `test_penetration.py`（穿透来源登记）。**次序回归防线**：把无年份兜底提回与年份域并列，联接基金会被最早可得报告遮蔽，本组用例立刻失败 |
+| **P1** | 基金持仓取数阶梯次序与联接基金穿透 | providers / fetcher / report 的持仓取数路径变更 | `test_tiantian.py` `TestFetchFundHoldingsLadder`（次序不变量：第 1 跳命中不发主页面请求、联接基金不可达第 3 跳）+ `test_fund_edge.py`（批量接缝幂等/异常不外抛）+ `test_penetration_report_periods.py`（穿透来源登记）。**次序回归防线**：把无年份兜底提回与年份域并列，联接基金会被最早可得报告遮蔽，本组用例立刻失败 |
 | **P1** | 数据源**真实响应体**解析路径（cassette 离线回放） | providers / fetcher 的解析或归一路径变更 | `test_cassette_replay.py`（对上仓库录制的真实响应体做精确值断言，离线）；人工核验入口 `cassettes --verify`（解析器吃不下已录制响应体即报 `[ERR]` 并退出码 2）。上游字段改名/加前后缀/返回 HTML 错误页这类回归**只有真实响应体测得出**，手工构造的假响应测不出 |
 | **P1** | 真实历史估值分位（TTM 口径） | `analysis/valuation_percentile`（`compute_real_valuation`/`ttm_eps_by_period`/`disclosure_date`）、`report/orchestrator`（`_fetch_valuation_for_code`）、`report/penetration_sheet` 估值文案变更 | `test_valuation_percentile.py`（TTM 四类差分/披露生效日/落盘对齐**无前视**/PB 时点/亏损剔除/分位与档位/各类降级）+ `test_valuation_percentile_edge.py`（脏值/非正与不可解析价格/生效日边界/空序列）+ `test_valuation_temperature_wiring.py`（真实分位优先与口径标注、无基本面回落代理、取数异常收敛）。**关键回归**：生效日之前的历史价格**不得**参与估值序列（前视偏差是本口径最大的正确性风险）；数据底座未就绪时估值列文案与免责语须**逐字回原样**且不取数。另有提示词侧 `test_prompts_signals.py`（五路信号：基本面分布与方向、叙事-数字背离双向命中与「无背离不得出现要求行」、信号块指纹随内容变化） |
 | **P1** | 财务指标取数（主源 + 全文解析备用支路） | `providers/akshare_financial`、`analysis/financial_indicator_extract`、`fetcher/financial_indicator_adapters`、`fetcher/chain_config`（`financial_indicator` 链）变更 | `test_akshare_financial.py`（宽表归一/百分数换算/同名指标优先/降级）+ `test_financial_indicator_extract.py`（真实年报夹具逐字段复现：营收 862.42 亿、归母净利 345.03 亿、经营现金流 605.63 亿、EPS 1.4101、ROE 15.90%、同比 2.07%/6.17%；另有行文变体/单位换算/精度切分/扣非排除）+ `test_financial_indicator_extract_edge.py`（取值窗口边界/异常幅度/越界比率/零基数同比/截断正文）+ `test_financial_indicator.py`（链路顺序与降级、解析适配器逐章节试取与源身份注入、多期序列主源/退化单期/缓存/非 A 股不发请求/价格映射）+ 报告消费层 `test_financial_indicator.py`（契约键与 C19 登记、降级保留失败清单、质量档/趋势/PE·PB 装配、开关访问器、C7 注册与导航分组与模板 include、编排接缝开关关闭返 None 与现价贯通、穿透代码透传）+ `test_fundamental_snapshot_sheet.py`（页签数值格式与「—」占位、不可用原因与失败清单）+ 派生层 `test_financial_indicator.py`/`test_financial_indicator_edge.py`（四维阈值阶梯/缺维跳过/脏值不计分/分档边界/零基数与期数不足趋势/非正现价）。**隔离防线**：akshare 接口与 `financial_report.fetch_symbol_report` 均 mock，禁真实网络与真实密钥 |

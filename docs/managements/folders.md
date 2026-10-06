@@ -14,12 +14,12 @@
 | 架构图示 | SVG | 3 | 337 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 九大功能域总览）+ 报告实景截图 2 张 PNG（`report-overview`/`report-charts`，不计入本行） |
 | 辅助脚本 | Python | 57 | 13,143 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
 | 源代码合计 | — | 400 | 106,460 | 主程序 + 模板 + 脚本 + SVG |
-| 测试代码 | Python | 473 | 138,371 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| 测试代码 | Python | 480 | 138,541 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
 | 测试用例 | — | — | 9,157 个 | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | 用户文档 | Markdown | 11 | 5,595 | 含 README.md（184 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 5,411 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| 项目文档 | Markdown | null | 60,571 | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 10 + archive md 138），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 11,393 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| 项目文档 | Markdown | null | 60,579 | 含 CLAUDE.md（86 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 10 + archive md 138），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 11,401 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 145 | 48,106 | 各版本 changelog/plan/review-findings 与设计文档归档（138 md 46,846 行，含借鉴批候选研究、基金申购限购三份设计与 LLM 成本调节/自检/源指定设计） |
 | ├ plan/ | 中间设计文件 | 6 | 986 | 在办设计文档（扁平存放，完成后随完成态移入归档主题子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 198 行）+ Vibe-Trading 借鉴批五份（候选研究 + 持仓变动复盘 / What-if 成本基准 / 决策反思闭环 / 因子目录评测设计）+ gs-quant 借鉴批候选研究一份（事件窗与调仓回放两立项依据）+ LLM token 优化调研 |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -568,7 +568,9 @@ investor-util/
 │       │   │   ├── test_config.py            #   配置管理核心测试
 │       │   │   ├── test_config_atomic.py     #   配置原子操作测试
 │       │   │   ├── test_config_atomic_edge.py #   配置原子操作边缘场景
+│       │   │   ├── test_config_consistency.py #   配置模板与声明一致性测试（LLM 设置键/批处理键/报告节顺序/原子写崩溃恢复）
 │       │   │   ├── test_config_edge.py       #   配置管理边缘场景
+│       │   │   ├── test_config_feature_gates.py # 功能开关与访问器测试（组合进化/候选比较/动作开关/数据沉降/报告组开关）
 │       │   │   ├── test_config_firstrun_edge.py #   首次运行配置边缘场景
 │       │   │   ├── test_config_llm_multi.py      #   LLM 多配置测试
 │       │   │   ├── test_config_llm_multi_edge.py #   LLM 多配置边缘场景
@@ -690,6 +692,7 @@ investor-util/
 │       │   │   ├── test_module_fingerprint.py  #   模块缓存指纹读写同源测试
 │       │   │   ├── test_llm_analysis.py       #   LLM 分析测试
 │       │   │   ├── test_llm_api.py            #   LLM API 主入口测试
+│       │   │   ├── test_llm_api_attempt.py    #   单次调用尝试与重试策略表测试（200/429/503/超时/HTTP 异常与 429 诊断回显）
 │       │   │   ├── test_llm_api_base.py       #   LLM API 基类测试
 │       │   │   ├── test_llm_token_usage.py     #   Token 用量日志计量口径（跨协议归一/缓存命中回显）
 │       │   │   ├── test_llm_pacing.py         #   端点级节流/并发治理测试（策略解析/注册/间隔/并发上限/403 不重试/429 诊断归属与行数上限）
@@ -697,6 +700,7 @@ investor-util/
 │       │   │   ├── test_llm_api_edge.py       #   API 边缘场景
 │       │   │   ├── test_llm_api_multi.py      #   多 Provider API 测试
 │       │   │   ├── test_llm_api_multi_edge.py #   多 Provider 边缘场景
+│       │   │   ├── test_llm_api_retry_errors.py # call_llm_with_retry 错误分支测试（HTTP/响应/内容过滤/截断与响应桩助手）
 │       │   │   ├── test_llm_content.py        #   LLM 内容写入测试
 │       │   │   ├── test_llm_fallback.py       #   LLM 降级回退策略
 │       │   │   ├── test_generate_all_llm.py     #   generate_all_llm 编排入口
@@ -846,8 +850,10 @@ investor-util/
 │       │   │   ├── test_market_value_strategy_edge.py # 市值策略边缘场景
 │       │   │   ├── test_news_correlation.py       #   新闻关联报告测试
 │       │   │   ├── test_news_degradation_edge.py  #   新闻降级边缘场景
-│       │   │   ├── test_penetration.py            #   穿透分析测试
+│       │   │   ├── test_penetration.py            #   穿透分析测试（合并/排序/TOP10 与比值归一）
+│       │   │   ├── test_penetration_classify.py   #   穿透分类与名称判定测试（classify/债券/联接/类型标签/名称归一化）
 │       │   │   ├── test_penetration_edge.py       #   穿透分析边缘场景
+│       │   │   ├── test_penetration_report_periods.py # 穿透报告期场景测试（不可得剔除/陈旧闸门/联接来源登记）
 │       │   │   ├── test_penetration_sheet.py      #   穿透页签写入测试（剔除原因与各基金报告期备注）
 │       │   │   ├── test_pipeline_data_builder.py    #   管线数据上下文组装测试（crisis_annotation/tail_risk/snapshot_diff 三键注册）
 │       │       ├── test_purchase_status.py          # 申购限购状态展示层测试（契约/陈旧阶梯/单元格/脚注/模板条件渲染）
@@ -881,7 +887,8 @@ investor-util/
 │       │   │   ├── test_calibrate_dedup_threshold.py # 去重校准工具：分支重判/锚点压缩幂等/报告口径与过时建议回归
 │       │   │   ├── test_script_encoding.py  #   *.ps1/requirements.txt 编码与 *.sh 可执行位约定回归
 │       │   │   ├── test_check_semantic_index.py  #   语义命名索引正反向校验脚本测试
-│       │   │   ├── test_check_doc_drift.py  #   文档与实现一致性检查脚本测试（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵）
+│       │   │   ├── test_check_doc_drift.py  #   文档与实现一致性检查脚本测试（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律）
+│       │   │   ├── test_check_doc_drift_crosscheck.py # 文档↔代码交叉校验分片（链路表/Thinking 支持矩阵/收集快照/生成产物/真库冒烟/统计回写/守护同源）
 │       │   │   ├── test_check_doc_links.py  #   文档链接与结构一致性检查脚本测试（死链/死锚点/重复标题/层级/编号序列/§引用）
 │       │   │   ├── test_check_file_length.py  #   单文件行数红线守护脚本测试（阈值边界/豁免登记/--ci 退出码契约/-v 清单派生）
 │       │   │   ├── test_check_requirement_trace.py  #   需求 ID ↔ 验证载体追溯检查脚本测试（解析/五项断言/真实仓库冒烟）

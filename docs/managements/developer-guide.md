@@ -164,7 +164,7 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 - **回显形态**：`<config_field>=<值>`、`（当前 X → 已试 Y）`、`provider[<条目>] pacing.max_concurrency=<值>、pacing.min_interval=<值>`；配置里**未声明**时标「未配置」而非留空（避免误读为 0/已配）。
 - **密钥/凭据类豁免**：涉及 `api_key` / `llm_key.json` / `data_key.json` / token / password 的提示只回显**文件名、条目名、路径**，绝不回显密钥本体或其片段（对齐 `scenario_security` 的「日志不记录完整密钥」基线）。
 - **已覆盖点**：429 诊断 `pacing._concurrency_hint`（两级并发 + 间隔，由 `api_base` 重试骨架复用）、截断提示 `api_base._check_*_truncation`、思考耗尽 `api_base._extract_content`（配置上下文由 `_process_success_response` 经线程局部注入）与 `_api_claude` 安全网日志、截断重试耗尽 `skeleton._handle_truncation`、worker 钳位 `fetcher/batch.py`、阈值超限 `providers/news_dedup.py`。
-- **回归用例**：`test_llm_api_base.py::TestThinkingExhaustedConfigEcho` + 同文件 429 回显组、`test_llm_api_base.py::test_rate_limit_429_log_echoes_min_interval_value_when_advised`、`test_skeleton.py::test_exhausted_retry_log_names_config_field_and_both_values`、`test_llm_api.py::test_thinking_exhausted_log_echoes_current_budget`。新增此类日志时按本节口径补回显与用例。
+- **回归用例**：`test_llm_api_base.py::TestThinkingExhaustedConfigEcho`、`test_llm_api_attempt.py::TestAttemptApiCall` 429 回显组（含 `test_rate_limit_429_log_echoes_min_interval_value_when_advised`）、`test_llm_api_retry_errors.py` 429 重试链、`test_skeleton.py::test_exhausted_retry_log_names_config_field_and_both_values`、`test_llm_api.py::test_thinking_exhausted_log_echoes_current_budget`。新增此类日志时按本节口径补回显与用例。
 
 ### 计划收尾：文档触点清单与一次性枚举
 
