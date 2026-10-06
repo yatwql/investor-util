@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.4-dev
-> **编号源**：`rf-next = 587`（新增问题取此编号，完成后更新为 +1；已用最大 rf-586，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 588`（新增问题取此编号，完成后更新为 +1；已用最大 rf-587，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -45,6 +45,7 @@
 
 | # | 文件 | 现状 | 状态 / 修复方向 |
 |---|------|------|----------|
+| **rf-587** | `docs/plan/` 八份文档（除 jev 两份）十轮复盘新增内容曾同时违两道机检：① 架构约束对照等新增节使用约束代号（CIPHER 规则：代号仅技术设计约束定义处可用，须语义描述替代）共 321 处；② 4 份文件「外部数据/风险」两节误插文档中段致序号跳变 | 已修复 2026-10-06（C 代号全量语义化为约束语义描述、4 份节序调整至文末，`check-doc-traces --ci`/`check-doc-links --ci` 全绿；十轮复盘记录落各文档终检节） |
 | **rf-586** | **警告级（未越红线）跟踪——红线 8 个已随 rf-583 拆分清零，2026-10-05 `check-file-length.py -v` 派生**：行数最贴红线的 `unit/llm/test_llm_api_base.py`（1190 行，距 1200 仅 10 行）、`unit/report/test_penetration.py`（1141）、`unit/config/test_config.py`（1112）；用例数最贴 120 项红线的 `unit/scripts/test_check_doc_drift.py`（94 项）、`unit/config/test_config.py`（89 项）；`test_html_report_structure.py` 拆分后回落至 31 项，原 110 项警告解除 | 无门禁动作（800~1200 行 / 80~120 项仅 `-v` 清单）；再增内容前先跑 `check-file-length.py -v`，逼近红线时按「被测函数 / 场景类型」拆分并同步刷新 `test-coverage.md` / `folders.md` 用例计数 |
 
 ## 已解决问题
