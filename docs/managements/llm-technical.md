@@ -163,8 +163,9 @@ skeleton.py:generate_llm_content()
 |:-----|:-----|:------|:---------|
 | `generators_orchestrator.py` | 编排门面 | 缓存预检查（`_compute_module_cache_info` / `_precheck_*`）+ 主编排入口与**生成后一遍**（事实锚定校验 + 可选生成后自检）；worker 装配与线程池分发下沉 `_llm_dispatch.py` 并经本门面 re-export（`_dispatch_llm_workers`，patch 点不变） | `generate_all_llm()` |
 | `_llm_dispatch.py` | 编排层 | 4+1 模块并行调度：`_build_module_fns` 模块→生成函数映射（`_MODULE_FNS`）、`ThreadPoolExecutor` 分发与进度回调、thinking 串行上限与辩论模式 `_debate_wrapper` 路由、`_LLM_CLIENT_SETTINGS` HTTP 客户端设置 | `_dispatch_llm_workers()` |
-| `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 + `generate_self_review()`（生成后自检） | 各 `generate_*()` |
+| `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 + `generate_self_review()`（生成后自检）+ `generate_holding_change_review()`（持仓变动复盘归因） | 各 `generate_*()` |
 | `self_review.py` | 运行作用域 | 生成后自检的开关判定/输入存在性判定/失败隔离与运行作用域载体（报告层零参 pull；**不经** `_MODULE_FNS` 并行调度） | `run_self_review()` / `get_self_review_block()` |
+| `holding_change_review.py` | 运行作用域 | 持仓变动复盘归因的契约准入（feature + 快照准入 + 事实块非空）/失败隔离，结果写回契约 `llm_review`（**不经** `_MODULE_FNS` 并行调度，编排层串行后置调用） | `run_holding_change_review()` |
 | `depth_profile.py` | 配置层 | 报告深度档位表（唯一事实来源）：档位只**收窄**模块集合与新闻采集规模，不进提示词正文 | `resolve_depth_profile()` / `depth_gate()` |
 | `generators_news.py` | 生成层 | 新闻 LLM 二次关联分析（批量模式 7 函数） | `enhance_news_correlation()` |
 | `_llm_news_correlation.py` | 私有 | 新闻关联安全直调入口（返回类型 `(list[dict], bool, dict)` 与其余四模块的 `(str, bool)` 不同，**不经编排层线程池**，由 `report/news_correlation.py` 直接调用），由 `generators_orchestrator.py`（聚合门面）re-export 对外提供 | `run_news_correlation_safe()` |
@@ -842,7 +843,8 @@ penetrated_assets ──→ extract_stable_penetration()
 | `metrics` | `expert_review` / 辩论三键 | 提示词正文（【量化指标】/ 情景分析 / 风格一致性） | 量化指标字典 |
 | `data_quality_text` | `health_check` | `prompts_tables._build_data_quality_detail_block()` | 数据质量详细状态块（【数据质量详细状态】：净值新鲜度基准 + 净值滞后/无有效行情清单 + 连接失败 / 数据为空 / 触发降级计数），由 `degradation_events`（本进程内的降级事件日志）与 `data_freshness` 契约（交易日 + 逐品种新鲜度）共同渲染而成 |
 | `pipeline_data` 派生的【环比变化】【数据质量降级】两段 | `expert_review` / `health_check` / 辩论三键 | `prompts_core._build_difpipeline_data_block()` / `_build_data_degradation_block()` | 由 `_pipeline_block_cache_suffix()` 调用**提示词侧同一构建器**取文本再哈希——「进键的文本」与「进提示词的文本」同源 |
-| `purchase_constraint_block`（申购限购约束块） | 标准四模块 + 辩论三键 + `self_review` | `prompts_tables._build_prompt_appendix()` 第 4 段 | 由 `extract_purchase_constraint_block(pipeline_data)` **唯一提取点**取契约字段 `constraint_block`（report 构建期渲染一次），同一实例交预检侧 `purchase_block` 与写侧附录；块空不进提示词也不进键（接线前录制四模块基线，断言空块 == 引入前黄金值，防「空串+分隔符」换哈希）；新闻批量路径 `_batch_prompt` 拼块 + `_batch_preparer` 并入 `context_fp` 同源 |
+| `purchase_constraint_block`（申购限购约束块） | 标准四模块 + 辩论三键 + `self_review` | `prompts_tables._build_prompt_appendix()` 第 4 段 |
+| `holding_change_block`（持仓变动复盘提示词块） | 标准四模块 + 辩论三键 + `self_review`（附录形态与 purchase 块平行） | `prompts_tables._build_prompt_appendix()` 第 5 段 | 由 `extract_holding_change_block(pipeline_data)` **唯一提取点**取契约字段 `prompt_block`（report 构建期经展示视图同源渲染一次），同一实例交预检侧 `holding_change_block` 与写侧附录；块空不进提示词也不进键（关态逐字节回退）；章内归因块另走 `holding_change_review_fingerprint` 内容寻址 | 由 `extract_purchase_constraint_block(pipeline_data)` **唯一提取点**取契约字段 `constraint_block`（report 构建期渲染一次），同一实例交预检侧 `purchase_block` 与写侧附录；块空不进提示词也不进键（接线前录制四模块基线，断言空块 == 引入前黄金值，防「空串+分隔符」换哈希）；新闻批量路径 `_batch_prompt` 拼块 + `_batch_preparer` 并入 `context_fp` 同源 |
 
 **两个结构性保证**：
 
@@ -1221,7 +1223,7 @@ reload_pricing() → 合并 llm_settings.json → pricing
 
 ### 12.2 注册表键名派生
 
-在 `core/registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`、`self_review`（生成后自检，出厂默认关；生成后一遍执行、不经并行调度），外加 3 个辩论模块 `debate_pro`/`debate_con`/`debate_synthesis`），自动派生 `llm_settings.json` 的所有合法键名：
+在 `core/registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`、`self_review`（生成后自检，出厂默认关；生成后一遍执行、不经并行调度）、`holding_change`（持仓变动复盘归因，`enabled_llm` 默认开；章本体由 feature `holding_change_review` 控制，不经并行调度），外加 3 个辩论模块 `debate_pro`/`debate_con`/`debate_synthesis`），自动派生 `llm_settings.json` 的所有合法键名：
 
 ```
 已知 LLM Settings 键名（每个模块 9 个）：
@@ -1251,7 +1253,7 @@ reload_pricing() → 合并 llm_settings.json → pricing
 
 所有键名由 `get_known_llm_settings_keys()` 统一校验。新增 LLM 模块只需在 registry.py 注册表中添加一行 `DataModuleDef`，无需修改 config 校验逻辑。
 
-> **辩论模块派生**：3 个辩论模块（`debate_pro`/`debate_con`/`debate_synthesis`，`settings_suffix` 同规则）同样按每模块 9 键派生（如 `model_debate_pro`、`system_prompt_debate_con`），使 `enabled_llm` 合法子键共 **9** 个（6 标准 + 3 辩论）。辩论开关实际由 `features.json` 的实验性 Flag（`llm_debate_procon`; 条件推理为常规开关 `llm_debate_conditional`）控制，集中度问答段内建于辩论流程，`enabled_llm` 辩论子键仅属校验层合法键，不在菜单 [S] 展示（由 `tui_menu.LLM_MENU_HIDDEN_KEYS` 隐藏），注册表保留以维持缓存 TTL/前缀清理。
+> **辩论模块派生**：3 个辩论模块（`debate_pro`/`debate_con`/`debate_synthesis`，`settings_suffix` 同规则）同样按每模块 9 键派生（如 `model_debate_pro`、`system_prompt_debate_con`），使 `enabled_llm` 合法子键共 **10** 个（7 标准 + 3 辩论）。辩论开关实际由 `features.json` 的实验性 Flag（`llm_debate_procon`; 条件推理为常规开关 `llm_debate_conditional`）控制，集中度问答段内建于辩论流程，`enabled_llm` 辩论子键仅属校验层合法键，不在菜单 [S] 展示（由 `tui_menu.LLM_MENU_HIDDEN_KEYS` 隐藏），注册表保留以维持缓存 TTL/前缀清理。
 
 ### 12.3 报告深度档位（`llm_report_depth`）
 

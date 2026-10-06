@@ -216,7 +216,7 @@ A: 编辑 `data/config/config.json` 的 `report_section_order` 字段，格式�
 }
 ```
 
-空对象 `{}` 或缺失此字段时使用 17 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
+空对象 `{}` 或缺失此字段时使用 18 项默认顺序。完整模块标识列表见 [配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
 **Q: 菜单 P（配置报告可选章节）是做什么的？**
 
@@ -517,7 +517,7 @@ A: 执行 B 或 L 菜单生成报告时，程序会自动保存一份持仓快�
 
 另：**组合演进**页签顶部还有**自上次快照变化摘要**区块，同样是基于快照数据，但对比的是最近两期快照，输出新增/移除品种、集中度 HHI 变化和超限持仓项，与 summary 页签的环比对比定位互补。
 
-快照保留天数通过 `config.json` 的 `history.snapshot_retention_days` 配置（默认 60 天），超期自动清理。`reports/` 中的历史归档报告不受影响。
+快照保留天数通过 `config.json` 的 `history.snapshot_retention_days` 配置（默认 180 天，覆盖持仓变动复盘 ≥12 个周频观察期门槛），超期自动清理。`reports/` 中的历史归档报告不受影响。
 
 **Q: 报告数据感觉不完整？**
 
@@ -527,7 +527,7 @@ A: 先试菜单 `[1]` 更新基础缓存，再试 `[2]` 更新持仓缓存，最
 
 A: 默认使用固定顺序（投资分析汇总 → LLM API 用量），但可通过 `config.json` 的 `report_section_order` 字段自定义各模块的序号和排列顺序。未配置时保持默认行为。详见[配置指南](how-to-config.md#report_section_order-报告序号配置)。
 
-菜单 E/B/L 生成范围不同：E 为基础页签（始终显示的 5 个核心模块，另含组合演进页签——开启 `enable_portfolio_evolution` 时显示；行动建议页签——`enable_action`（默认开启）控制时显示；不含基金深度分析、不含新闻、不含历史走势），B 在 E 基础上加基金深度分析+新闻+历史走势（不含 LLM 分析模块），L 为全量（1~17）。各菜单对应的页签范围详见[TUI 菜单操作手册](how-to-use-tui-menu.md#报告内容对照)。
+菜单 E/B/L 生成范围不同：E 为基础页签（始终显示的 5 个核心模块，另含组合演进页签——开启 `enable_portfolio_evolution` 时显示；行动建议页签——`enable_action`（默认开启）控制时显示；不含基金深度分析、不含新闻、不含历史走势），B 在 E 基础上加基金深度分析+新闻+历史走势（不含 LLM 分析模块），L 为全量（1~18）。各菜单对应的页签范围详见[TUI 菜单操作手册](how-to-use-tui-menu.md#报告内容对照)。
 
 **Q: 为什么总市值和各账户小计之和有时对不上？**
 

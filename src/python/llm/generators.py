@@ -74,6 +74,7 @@ def generate_global_macro(
     competitive_context: str | None = None,
     holdings_details: list[dict] | None = None,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成全球政经局势。
 
@@ -92,6 +93,7 @@ def generate_global_macro(
         categories=categories,
         competitive_context=competitive_context or "",
         purchase_block=purchase_constraint_block or "",
+        holding_change_block=holding_change_block or "",
     )
 
     def _fingerprint():
@@ -125,6 +127,7 @@ def generate_global_macro(
         total_cost=total_cost,
         total_profit=total_profit,
         purchase_constraint_block=purchase_constraint_block,
+        holding_change_block=holding_change_block,
     )
 
 
@@ -171,6 +174,7 @@ def generate_expert_review(
     metrics: dict | None = None,
     history_data: dict | None = None,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成智囊团深度复盘。
 
@@ -206,6 +210,7 @@ def generate_expert_review(
         competitive_context=competitive_context or "",
         metrics=metrics,
         purchase_block=purchase_constraint_block or "",
+        holding_change_block=holding_change_block or "",
     )
 
     def _fingerprint():
@@ -245,6 +250,7 @@ def generate_expert_review(
         total_cost=total_cost,
         total_profit=total_profit,
         purchase_constraint_block=purchase_constraint_block,
+        holding_change_block=holding_change_block,
     )
 
 
@@ -264,6 +270,7 @@ def generate_health_check(
     data_quality_text: str | None = None,
     history_data: dict | None = None,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成持仓体检报告。
 
@@ -285,6 +292,7 @@ def generate_health_check(
         pipeline_data=pipeline_data,
         data_quality_text=data_quality_text or "",
         purchase_block=purchase_constraint_block or "",
+        holding_change_block=holding_change_block or "",
     )
 
     def _fingerprint():
@@ -321,6 +329,7 @@ def generate_health_check(
         total_cost=total_cost,
         total_profit=total_profit,
         purchase_constraint_block=purchase_constraint_block,
+        holding_change_block=holding_change_block,
     )
 
 
@@ -338,6 +347,7 @@ def generate_penetration_deep_analysis(
     llm_config: dict | None = None,
     history_data: dict | None = None,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成穿透深度分析。"""
     # 穿透深度分析的提示词不含信号块，指纹无后缀；风险信号摘要与其余
@@ -352,6 +362,7 @@ def generate_penetration_deep_analysis(
         categories=categories,
         history_data=history_data,
         purchase_block=purchase_constraint_block or "",
+        holding_change_block=holding_change_block or "",
     )
 
     def _fingerprint():
@@ -384,6 +395,7 @@ def generate_penetration_deep_analysis(
         total_cost=total_cost,
         total_profit=total_profit,
         purchase_constraint_block=purchase_constraint_block,
+        holding_change_block=holding_change_block,
     )
 
 
@@ -406,6 +418,7 @@ def generate_debate_procon(
     competitive_context: str | None = None,
     metrics: dict | None = None,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
     *,  # 以下为关键字参数
     session_cache: dict | None = None,
 ) -> tuple[str | None, str | None, str | None]:
@@ -466,6 +479,7 @@ def generate_debate_procon(
         competitive_context=competitive_context or "",
         metrics=metrics,
         purchase_block=purchase_constraint_block or "",
+        holding_change_block=holding_change_block or "",
     )
     _fingerprint = debate_procon_fingerprint(_fp_inputs)
 
@@ -534,6 +548,7 @@ def generate_debate_procon(
             http_client=http_client,
             fingerprint_fn=lambda: f"{_fingerprint}_debate_pro",
             purchase_constraint_block=purchase_constraint_block,
+            holding_change_block=holding_change_block,
             system_prompt_default=_SYSTEM_DEBATE_PRO,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -586,6 +601,7 @@ def generate_debate_procon(
             http_client=http_client,
             fingerprint_fn=lambda: f"{_fingerprint}_debate_con",
             purchase_constraint_block=purchase_constraint_block,
+            holding_change_block=holding_change_block,
             system_prompt_default=_SYSTEM_DEBATE_CON,
             prompt_builder=lambda: _user,
             max_tokens_default=_max_tokens,
@@ -658,6 +674,7 @@ def generate_debate_procon(
             http_client=http_client,
             fingerprint_fn=lambda: f"{_syn_fingerprint}_debate_syn",
             purchase_constraint_block=purchase_constraint_block,
+            holding_change_block=holding_change_block,
             system_prompt_default=_synthesis_system,
             prompt_builder=lambda: _synthesis_user,
             max_tokens_default=_max_tokens,
@@ -688,6 +705,7 @@ def generate_self_review(
     http_client: Any = None,
     llm_config: dict | None = None,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
 ) -> tuple[str | None, bool]:
     """生成后自检：对本次各分析模块产出做一次模型层复核。
 
@@ -699,7 +717,11 @@ def generate_self_review(
 
     def _fingerprint():
         return self_review_fingerprint(
-            module_outputs, holdings_details, penetrated_assets, purchase_block=purchase_constraint_block or ""
+            module_outputs,
+            holdings_details,
+            penetrated_assets,
+            purchase_block=purchase_constraint_block or "",
+            holding_change_block=holding_change_block or "",
         )
 
     def _prompt():
@@ -718,4 +740,53 @@ def generate_self_review(
         output_brief_limit=200,
         holdings_details=holdings_details,
         purchase_constraint_block=purchase_constraint_block,
+        holding_change_block=holding_change_block,
+    )
+
+
+def generate_holding_change_review(
+    context_block: str,
+    signal_block: str = "",
+    holdings_details: list[dict] | None = None,
+    force: bool = False,
+    http_client: Any = None,
+    llm_config: dict | None = None,
+    purchase_constraint_block: str = "",
+    holding_change_block: str = "",
+) -> tuple[str | None, bool]:
+    """生成持仓变动复盘归因（章内 LLM 归因块）。
+
+    走与其余模块相同的骨架（``generate_llm_module``）——缓存键、TTL、尾部标识行、
+    失败原因登记全部复用既有机制；档位/开关判定在调用侧
+    （``llm/holding_change_review.py``）。输入是报告契约渲染好的事实块，
+    内容寻址由 ``holding_change_review_fingerprint`` 保证（进提示词必进指纹）。
+    """
+    from src.python.llm.module_fingerprint import holding_change_review_fingerprint
+    from src.python.llm.prompts import _SYSTEM_HOLDING_CHANGE_REVIEW, _build_holding_change_review_prompt
+
+    def _fingerprint():
+        return holding_change_review_fingerprint(
+            context_block,
+            signal_block=signal_block,
+            holdings_details=holdings_details,
+            purchase_block=purchase_constraint_block or "",
+        )
+
+    def _prompt():
+        return _build_holding_change_review_prompt(context_block, signal_block)
+
+    return generate_llm_module(
+        llm_config,
+        "holding_change",
+        force=force,
+        http_client=http_client,
+        fingerprint_fn=_fingerprint,
+        system_prompt_default=_SYSTEM_HOLDING_CHANGE_REVIEW,
+        prompt_builder=_prompt,
+        max_tokens_default=2048,
+        timeout_default=90.0,
+        output_brief_limit=200,
+        holdings_details=holdings_details,
+        purchase_constraint_block=purchase_constraint_block,
+        holding_change_block=holding_change_block,
     )

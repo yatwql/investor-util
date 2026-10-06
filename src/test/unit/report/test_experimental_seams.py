@@ -1,7 +1,7 @@
 """报告管线实验挂载点（seam）单元测试 — 守护语义与开关判定。
 
-三个实验功能挂载点共享同一契约：**实验功能自身的异常绝不中断报告主链路**。
-抽取为 ``report/_experimental_seams`` 之前，四个挂载点各自内联
+各实验功能挂载点共享同一契约：**实验功能自身的异常绝不中断报告主链路**。
+抽取为 ``report/_experimental_seams`` 之前，挂载点各自内联
 ``try/except``，只能靠驱动整条报告管线间接覆盖 —— 开关判定与数据注入因此
 长期无任何直接断言。本模块按开关组合直接断言三类契约：
 
@@ -33,8 +33,10 @@ from src.python.report.progress import ProgressReporter
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
-# 四个挂载点按调用方保证的语义顺序（与模块文档字符串「顺序约束」一致）
+# 五个挂载点按调用方保证的语义顺序（与模块文档字符串「顺序约束」一致；
+# 持仓变动复盘在 2b2 段注入，早于 3.6 结算——快照差分须晚于本次快照捕获）
 _SEAM_ORDER = [
+    "inject_holding_change_data",
     "record_deterministic_decisions",
     "record_llm_decisions_and_review_block",
     "apply_module_quality_banners",
@@ -388,6 +390,75 @@ class TestProsperityDiagnosisMount:
         assert "景气度框架诊断" in reporter.warns()[0]
 
 
+# ── ⑥ 持仓变动复盘 ────────────────────────────────────────
+
+
+class TestHoldingChangeMount:
+    """持仓变动复盘挂载点（实验组开关，产出 ``holding_change_data`` 契约）。
+
+    与其余挂载点共享同一守护契约：开关关闭零行为、下游异常只告警不外抛；
+    另锁两条本章特有口径：契约经注入点整体写入（缺席 = 章隐藏），
+    决策跨期反思闭环关闭时对账按**空列表口径**（不读残留账本）。
+    """
+
+    _PANEL_BUILD = "src.python.report.holding_change_panel.build_holding_change_panel"
+
+    def test_flag_off_is_inert(self, reporter):
+        """开关关闭 → 不装配、不注入、不告警（零导入零成本）。"""
+        pipeline_data: dict = {}
+        with patch("src.python.config.features.is_feature_enabled", return_value=False):
+            seams.inject_holding_change_data(pipeline_data, {}, reporter)
+        assert pipeline_data == {}
+        assert reporter.warns() == []
+
+    def test_flag_on_injects_contract(self, reporter):
+        """开关打开 → 契约写入 ``pipeline_data``，命名空间透传。"""
+        pipeline_data: dict = {}
+        with (
+            patch("src.python.config.features.is_feature_enabled", return_value=True),
+            patch(self._PANEL_BUILD, return_value={"available": True}) as build,
+        ):
+            seams.inject_holding_change_data(pipeline_data, {"history": {}}, reporter, snapshot_namespace="ns")
+        assert pipeline_data["holding_change_data"] == {"available": True}
+        assert build.call_args.kwargs["snapshot_namespace"] == "ns"
+
+    def test_ledger_closed_uses_empty_list_caliber(self, reporter):
+        """决策跨期反思闭环关闭 → 对账按空列表口径（不为已关功能虚构对照）。"""
+        pipeline_data: dict = {}
+
+        def _flag(name: str) -> bool:
+            return name == "holding_change_review"
+
+        with (
+            patch("src.python.config.features.is_feature_enabled", side_effect=_flag),
+            patch(self._PANEL_BUILD, return_value={"available": True}) as build,
+        ):
+            seams.inject_holding_change_data(pipeline_data, {}, reporter)
+        assert pipeline_data["holding_change_data"] == {"available": True}
+        assert build.call_args.kwargs["ledger_events"] == []
+
+    def test_none_pipeline_data_does_not_raise(self, reporter):
+        """``pipeline_data=None``（干跑）不得因注入而抛异常。"""
+        with (
+            patch("src.python.config.features.is_feature_enabled", return_value=True),
+            patch(self._PANEL_BUILD, return_value={"available": True}),
+        ):
+            seams.inject_holding_change_data(None, {}, reporter)
+        assert reporter.warns() == []
+
+    def test_downstream_exception_warns_only(self, reporter):
+        """下游异常 → 一条告警 + 契约缺席，不外抛、不中断报告。"""
+        pipeline_data: dict = {}
+        with (
+            patch("src.python.config.features.is_feature_enabled", return_value=True),
+            patch(self._PANEL_BUILD, side_effect=RuntimeError("boom")),
+        ):
+            seams.inject_holding_change_data(pipeline_data, {}, reporter)
+        assert pipeline_data == {}
+        assert len(reporter.warns()) == 1
+        assert "持仓变动复盘" in reporter.warns()[0]
+
+
 # ── 接线守卫 ─────────────────────────────────────────────────
 
 
@@ -413,7 +484,7 @@ class TestFacadeWiringOrder:
         return [name for _, name in calls]
 
     def test_all_seams_wired_in_documented_order(self):
-        """四个挂载点均已接线，且次序满足「结算先于 LLM 拉取」等三条顺序约束。"""
+        """五个挂载点均已接线，且次序满足「结算先于 LLM 拉取」等顺序约束。"""
         assert self._seam_call_order() == _SEAM_ORDER
 
     def test_functional_submodules_are_imported_lazily(self):

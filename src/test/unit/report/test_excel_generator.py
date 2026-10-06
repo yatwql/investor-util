@@ -875,10 +875,17 @@ class TestCreateSheets(unittest.TestCase):
 
         wb = self._make_wb()
         # always(5) + history(1) + evolution(1) = 7 个页签，连续编号 1-7（组合演进为独立 evolution 类型）
+        # 持仓变动复盘为实验章：data 层契约缺席（键显式 False）→ 页签不创建
         sheets = create_sheets(
-            wb, _REPORT_SECTION_DEFAULT, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False
+            wb,
+            _REPORT_SECTION_DEFAULT,
+            enable_fund_deep_analysis=False,
+            enable_news=False,
+            enable_llm=False,
+            data_availability={"holding_change_data": False},
         )
         self.assertEqual(len(sheets), 7)
+        self.assertNotIn("holding_change", sheets)
         expected_titles = {
             "summary": "1.投资分析汇总",
             "holdings_detail": "2.持仓明细与分类",
@@ -921,11 +928,12 @@ class TestCreateSheets(unittest.TestCase):
             enable_fund_deep_analysis=False,
             enable_news=True,
             enable_llm=False,
-            data_availability={"news_data_available": True},
+            data_availability={"news_data_available": True, "holding_change_data": False},
         )
         news_keys = {s["key"] for s in _REPORT_SECTION_DEFAULT if s["type"] == "news"}
         # always(5) + history(1) + evolution(1) + news(1) = 8
         self.assertEqual(len(sheets), 8)
+        self.assertNotIn("holding_change", sheets)
         for key in news_keys:
             self.assertIn(key, sheets)
 
@@ -943,6 +951,7 @@ class TestCreateSheets(unittest.TestCase):
             enable_news=False,
             enable_llm=False,
             enable_portfolio_evolution=False,
+            data_availability={"holding_change_data": False},
         )
         self.assertEqual(len(sheets), 6)
         self.assertNotIn("portfolio_evolution", sheets)
@@ -957,7 +966,12 @@ class TestCreateSheets(unittest.TestCase):
 
         wb = self._make_wb()
         sheets = create_sheets(
-            wb, _REPORT_SECTION_DEFAULT, enable_fund_deep_analysis=False, enable_news=False, enable_llm=False
+            wb,
+            _REPORT_SECTION_DEFAULT,
+            enable_fund_deep_analysis=False,
+            enable_news=False,
+            enable_llm=False,
+            data_availability={"holding_change_data": False},
         )
         self.assertEqual(len(sheets), 7)
         self.assertIn("portfolio_evolution", sheets)

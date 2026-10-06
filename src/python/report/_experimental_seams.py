@@ -1,16 +1,18 @@
 """报告管线实验功能挂载点（seam）—— 同一守护语义只实现一次。
 
-四个挂载点（决策跨期反思闭环 / 模块级质量分级 / 确定性信号沉淀 / 景气度框架诊断；
-其中后三者已随读侧判定转正为常规组开关，但守护语义与挂载形态不变）
-在报告管线固定工序位置插入挂载点。前三个位于 ``_report_generation._generate_report_full``
-的工序序列内；景气度框架诊断（产出 ``prosperity_framework_data`` 契约）经
-:func:`record_prosperity_diagnosis` 接入两条 HTML 生成路径，注入点须晚于基本面契约
-（个股 ROE）与历史走势就绪。它们共享同一契约：**实验功能自身的异常绝不中断报告
+五个挂载点（决策跨期反思闭环 / 模块级质量分级 / 确定性信号沉淀 / 景气度框架诊断 /
+持仓变动复盘；其中前四者已随读侧判定转正为常规组开关（景气度框架诊断除外），
+但守护语义与挂载形态不变）在报告管线固定工序位置插入挂载点。决策/横幅/信号三个位于
+``_report_generation._generate_report_full`` 的工序序列内；景气度框架诊断（产出
+``prosperity_framework_data`` 契约）经 :func:`record_prosperity_diagnosis` 接入两条 HTML
+生成路径，注入点须晚于基本面契约（个股 ROE）与历史走势就绪；持仓变动复盘（产出
+``holding_change_data`` 契约）经 :func:`inject_holding_change_data` 接入 both/full 两条路径，
+紧邻演进快照注入（2b 后），须晚于快照捕获。它们共享同一契约：**实验功能自身的异常绝不中断报告
 主链路**——单条实验逻辑出错只降级为一条告警，报告按既有输出继续生成。
 
 抽出本模块的两个理由：
 
-  - **守护语义只有一份**：此前四个挂载点各自内联 ``try/except Exception`` +
+  - **守护语义只有一份**：此前各挂载点各自内联 ``try/except Exception`` +
     ``reporter.warn`` + ``logger.exception``，告警文案与日志标签逐处重写；改一处
     必漏三处，与缓存指纹「读写两份拼接」属同一病根（判据复制即漂移温床）。
   - **挂载点可单测**：内联在管线函数中时只能靠驱动整条报告管线覆盖，故开关判定
@@ -24,6 +26,9 @@
   2. **质量横幅晚于决策登记**：横幅会改写模块内容文本，须避开操作建议表解析。
   3. **信号沉淀晚于 LLM 生成**：尾部风险等 A 通道键在 LLM 生成阶段才注入
      ``pipeline_data``，过早登记会漏采（适配器对缺失键逐项跳过，不构成硬依赖）。
+  4. **持仓变动复盘晚于快照捕获**：事件清单由本次 ``capture_snapshot`` 落盘后的
+     快照目录差分产出，前置注入会漏掉当期变动；对账读的是历史区间内已落档的
+     决策事件，当次新登记（3.6/5b）属未来动作、不应入账。
 
 依赖：本模块属 report 层，只调用 ``core`` 与 report 各子模块的公开入口。导入时机
 分两类，按「开关关闭时是否值得付出成本」判定：
@@ -243,8 +248,48 @@ def record_prosperity_diagnosis(
         pipeline_data["prosperity_framework_data"] = data
 
 
+def inject_holding_change_data(
+    pipeline_data: dict | None,
+    config: dict,
+    reporter: ProgressReporter,
+    *,
+    snapshot_namespace: str | None = None,
+) -> None:
+    """持仓变动复盘（实验性功能，2b 后注入）：装配事件契约并注入 ``pipeline_data``。
+
+    事件清单由本次快照捕获后的目录差分产出（须晚于 ``capture_snapshot``，
+    顺序约束见模块文档字符串）；意图对账只读 ``decision_ledger`` 历史事件，
+    绝不回写——决策跨期反思闭环开关关闭时按**空列表口径**（对账全部落
+    「无意图记录」，不为已关功能的残留账本虚构对照）。开关关闭 → 零行为
+    （不读快照、不注入，键缺席 = 整章隐藏）；装配异常 → 一条告警 + 契约缺席
+    （渲染层不出现该章，其余章节零影响）。
+
+    开关判定在动作内先做一次（经 ``features.is_feature_enabled``），
+    开关关闭时不付出快照加载与决策账本读取成本。
+    """
+    if pipeline_data is None:
+        return
+
+    def _action() -> None:
+        from src.python.config.features import is_feature_enabled
+
+        if not is_feature_enabled("holding_change_review"):
+            return
+        from src.python.core import decision_ledger as _ledger
+        from src.python.report.holding_change_panel import build_holding_change_panel
+
+        pipeline_data["holding_change_data"] = build_holding_change_panel(
+            config,
+            snapshot_namespace=snapshot_namespace,
+            ledger_events=_ledger.load_events() if _ledger.is_active() else [],
+        )
+
+    _guarded("持仓变动复盘（事件清单装配）", "holding_change_review", reporter, _action, None)
+
+
 __all__ = [
     "apply_module_quality_banners",
+    "inject_holding_change_data",
     "record_deterministic_decisions",
     "record_deterministic_signals",
     "record_llm_decisions_and_review_block",

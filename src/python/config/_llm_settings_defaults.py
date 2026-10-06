@@ -25,6 +25,9 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
         "penetration_deep": True,
         "news_correlation": False,
         "self_review": False,
+        # 持仓变动复盘归因：章本体由 feature holding_change_review 控制（默认关），
+        # 此开关仅在章本体开启后决定是否额外调用一次 LLM 做归因（默认开）
+        "holding_change": True,
     },
     "system_prompt_global_macro": None,
     "model_global_macro": None,
@@ -77,6 +80,17 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     "thinking_enabled_self_review": False,
     "thinking_budget_self_review": 6000,
     "reasoning_effort_self_review": "low",
+    # ── 持仓变动复盘归因（实验能力，章本体由 feature holding_change_review 控制）──
+    "system_prompt_holding_change": None,
+    "model_holding_change": None,
+    "temperature_holding_change": 0.2,
+    "max_tokens_holding_change": 2048,
+    "timeout_holding_change": 90,
+    "cache_enabled_holding_change": True,
+    "output_brief_holding_change": False,
+    "thinking_enabled_holding_change": False,
+    "thinking_budget_holding_change": 6000,
+    "reasoning_effort_holding_change": "low",
     "system_prompt_news_correlation": None,
     "model_news_correlation": None,
     "temperature_news_correlation": 0.1,
@@ -196,6 +210,8 @@ def _get_default_llm_settings_template() -> str:
     _module_block("penetration_deep")
     # 生成后自检：实验能力，出厂默认关（enabled_llm.self_review = false）
     _module_block("self_review")
+    # 持仓变动复盘归因：实验能力，章本体由 feature holding_change_review 控制
+    _module_block("holding_change")
 
     # ── news_correlation ──
     # 该模块无 output_brief 键（llm_settings_keys 已按后缀自动排除），故不走

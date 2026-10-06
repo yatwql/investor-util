@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批已立项：plan-76/77/78**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批已立项：plan-79/80**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
+**当前迭代**：在办 **plan-49 / plan-55**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76 已完成归档（先决门槛全过、四迭代落地）、plan-77/78 已立项**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批已立项：plan-79/80**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -63,6 +63,8 @@
 
 > **plan-75 已完成归档**（2026-10-03）：持仓分类汇总（Excel 区块②末列 + HTML 持仓分类表条件列，两端一致）追加「申购状态」——与区块①同一套单源原语（`purchase_column_visible` 判据 / `format_purchase_status_cell` 文案 / `stale_level` 时效），小计与总计行留空，开关复用 `fund_purchase_limit` 不新增；新增 6 用例，P0 门禁十项全绿。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)。
 
+> **plan-76 已完成归档**（2026-10-05）：四迭代（快照事件抽取与契约 + 快照保留 60 → 180 天 → 指标纯计算与意图对账 + `detect_account_reorder` 账户重排双形态识别 → 双端复盘面板接线（Excel/HTML 单源，缺省关态逐字节不变）→ LLM 归因双轨（附录第 5 段随四模块+辩论+自检携带 / 串行模块 `holding_change_review` 写章内归因块））P0 门禁全绿；先决门槛三段全过（28 有效期 / 71 事件 / 结论人工认可「有启发」，10-02 全量清仓→10-03 同名新增判定为**疑似账户结构变更**、不作交易结论）。需求 R-HCR-01~06、测试 88 项。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`holding-change-review-design.md`](../archive/v0.12.x/holding-change-review/holding-change-review-design.md) 为「已实施」状态随归档留存（含 §15 实施与验收记录）。
+
 #### 🔲 `plan-70` 决策跨期反思闭环（decision_reflection）验证死线
 
 **动机**：实验功能默认靠「真实数据验证后择机转正」，但 decision_reflection 的真实账本积累极少，闭环从未被真实数据跑通；长期挂着默认关的开关是纯维护成本。
@@ -70,14 +72,6 @@
 **动作**：在后续 2 个发布周期内（以 experiment_stats 启用计数与账本结算数为准）观察，若：① experiment_stats 中 decision_reflection 的启用次数未增长，或 ② `data/state/decision_ledger.jsonl` 已结算样本仍 <10 条（折叠统计 direction_accuracy 无法给出可信命中率），则撤销该实验功能（含 LLM 决策登记（`decision_llm_capture`）/行动章复盘块注入与对应需求条目）；若满足可信样本则据 doctor 账本概览评估转正。观测手段已就绪：`experiment_stats` 启用计数 + `doctor` 复盘账本概览（本批落地）。
 
 **落地设计**：若判定转正，按 [`decision-reflection-shadow-design.md`](../plan/decision-reflection-shadow-design.md) 四迭代执行（决策条目结构化 → 到期结算器 → doctor 概览增强 → 报告内反思块），该设计以 Vibe-Trading `shadow_account`（extract→backtest→render）为参照；死线未过前不实施。plan-76 持仓变动复盘落地后与其构成「意图 vs 成交」对账（只读，不互写）。
-
-#### 🔲 `plan-76` 持仓变动复盘（holding_change_review，快照事件级）
-
-**动机**：输入只有持仓快照，买卖历史从未被结构化复盘——LLM 复盘缺「你的具体操作」这一侧。原「手工交易日志」路线经可行性评估改为**快照事件级**：快照历史与差异引擎已内建（`data/history/snapshots/` + `fetcher/history_diff`，2026-10 实测本机 87 期），连续快照差分即得变动事件，零手工；精度为**结构级**（事件清单/频率/结构演变/意图对账），不承诺逐笔胜率与精确持有期。参照 Vibe-Trading trade-journal 技能 + shadow_account 闭环形态。
-
-**先决门槛（未过归档未采纳）**：① 去重后有效快照 ≥12 期且累计变动事件 ≥10 个；② 事件口径唯一可判定（份额净变动分类 + 同期重复报告按日去重；净额塌缩、分红再投混入等已知局限显式标注，结论限定结构级）；③ 结构级结论经用户人工认可「有启发」。详细设计与迭代划分见 [`holding-change-review-design.md`](../plan/holding-change-review-design.md)。
-
-**预估成本**：低-中（事件抽取/指标纯计算/双端报告/LLM 归因四迭代）；**价值**：中（操作侧结构化复盘 + plan-70 成交侧数据源；结构级精度，不含逐笔指标）。
 
 #### 🔲 `plan-77` What-if 回放交易成本建模与基准对比（whatif_trade_cost）
 

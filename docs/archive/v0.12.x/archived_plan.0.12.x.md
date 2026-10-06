@@ -4,7 +4,8 @@
 > 原始文件：`docs/managements/plan.md（当前迭代部分）`
 > 涵盖版本：v0.12.2-dev（2026-10-03：plan-72 基金申购限购信息接入·持仓展示面）
 > 归档内容：plan-72 完成态记录（数据链路 → 展示集成 → 文档登记三迭代，P0 门禁十项全绿）
-> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）
+> 追加归档：2026-10-05 plan-76 持仓变动复盘（快照事件级）四迭代完成（见文末章节）
+> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）
 
 ---
 
@@ -58,3 +59,18 @@
 4. **测试与文档登记**：`test_purchase_constraint_injection.py` 18 用例（四模块/辩论三章/自检/新闻批量「完备含块 vs 降级不含」成对、提取单源 6 函数透传、指纹三态）+ 指纹基线与预检/写同源 + 附录组装守卫与缺省等价 + 渲染器契约与边缘样本；`technical.md` §6.7 语义表 4 行与附录 H 消费方锚、`testplan.md` §1.1 模块行、`folders.md`/`test-coverage.md` 计数、`changelog.md` 条目。
 
 **范围决策**：both/basic 路径无 LLM 章（契约路径块恒空零开销）；实验缝与规则层/数值层不构造分析 prompt（按分派规则排除）；新闻批量接线不裁剪（§3.2 预留裁剪项未启用，无须用户确认缩减）。
+
+## plan-76 持仓变动复盘（holding_change_review，快照事件级）— ✅ 已完成（2026-10-05）
+
+> 设计文档：[`docs/archive/v0.12.x/holding-change-review/holding-change-review-design.md`](holding-change-review/holding-change-review-design.md)（已实施，含 §15 实施与验收记录）。
+
+**先决门槛（三段全过）**：① 复盘窗口 28 个有效期（≥12）/ 71 个变动事件（≥10）真实快照实测；② 「区间净额推断、非逐笔」局限标注与事件表在 Excel/HTML 两端同源常驻（测试锁定）；③ 结论经人工认可有启发——10-02 全量清仓→10-03 同名新增（13 代码、净市值≈原组合）判定为**疑似账户结构/数据结构变更**，不作交易结论，已固化 `detect_account_reorder` 双形态识别（清仓→新增优先，≥5 代码阈值）。
+
+**完成摘要**（四迭代）：
+
+1. **事件抽取与契约**：`analysis/holding_change_events.py`（`extract_change_events`/`build_holding_change_events`，快照按日去重 + 逐对差分 + 份额净变动分类 + 缺字段降级不虚构，`change_event` 契约字段）；**快照保留 60 → 180 天**（`core/constants.py`/`config/_config_defaults.py`/`report/_snapshot.py`/`data/config/config.json` 四处同步）。
+2. **指标纯计算**：`analysis/holding_change_metrics.py`（变动频率/加减清仓结构/意图对账 `build_intent_reconciliation`/交易日模式 + `detect_account_reorder` 账户重排双形态识别）。
+3. **双端报告接线**：`report/holding_change_panel.py`（契约装配 → view → Excel sheet + HTML partial 单源渲染，章默认序在数据源可用性矩阵/基本面快照/LLM 用量面板之前，`LIMITATIONS_NOTE` 两端常驻，关态逐字节不变）+ 管线缝 `inject_holding_change_data`（both/full）+ 章节可见性/目录/TOC/注册表测试同步。
+4. **LLM 归因（双轨）**：附录**第 5 段** `holding_change_block`（prompt_block 与展示文本同源渲染）随四模块 + 辩论 pro/con/synthesis + 生成后自检携带，`ModuleFingerprintInputs.holding_change_block` 按段条件并入（空块逐字节不变）；注册表串行模块 `holding_change_review`（`llm/holding_change_review.py`：准入闸门 → 信号窗 top10 → `holding_change_review_fingerprint` 内容寻址 → 结果写 `holding_change_data.llm_review`，失败登记不外抛），`enabled_llm.holding_change` 默认开（章由实验开关门控）。
+
+**测试与文档**：测试 88 项（events 9+edge 7 / metrics 15 / injection 23 / panel 26+edge 8）；需求 **R-HCR-01~06**（requirements §6.13）、reports-instruction 18 页签 9 组、TUI 菜单 8-11 号、technical 语义命名与附录 H、testplan 批 7 映射、folders/test-coverage 快照同步；P0 `dev-verify` + 十守护 `--ci` 全绿。

@@ -74,12 +74,13 @@ def capture_snapshot(
         _old = load_latest(snapshot_namespace)
         _diff = HistoryDiff.compute(_snapshot, _old)
         save(_snapshot, snapshot_namespace)
+        from src.python.core.constants import HISTORY_SNAPSHOT_MAX_COUNT, HISTORY_SNAPSHOT_RETENTION_DAYS
         from src.python.report.history_snapshot import prune as _prune_snapshots
 
         _history_cfg = (config or {}).get("history", {})
         _prune_snapshots(
-            retention_days=_history_cfg.get("snapshot_retention_days", 60),
-            max_count=_history_cfg.get("snapshot_max_count", 365),
+            retention_days=_history_cfg.get("snapshot_retention_days", HISTORY_SNAPSHOT_RETENTION_DAYS),
+            max_count=_history_cfg.get("snapshot_max_count", HISTORY_SNAPSHOT_MAX_COUNT),
             namespace=snapshot_namespace,
         )
         if not _diff.is_first_check:

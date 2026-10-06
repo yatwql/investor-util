@@ -93,6 +93,9 @@ class ModuleFingerprintInputs:
         purchase_block: **已渲染**的申购限购约束块（契约字段 ``constraint_block``，
             经统一 prompt 附录进入各分析章提示词）；仅非空时条件并入哈希
             （空串不追加 part，见模块 docstring 纪律）
+        holding_change_block: **已渲染**的持仓变动复盘提示词块（契约字段
+            ``prompt_block``，同样经统一 prompt 附录进入提示词）；仅非空时条件
+            并入哈希（空串不追加 part，键与引入前逐字节一致）
     """
 
     total_mv: float = 0.0
@@ -110,6 +113,7 @@ class ModuleFingerprintInputs:
     metrics: dict | None = None
     data_quality_text: str = ""
     purchase_block: str = ""
+    holding_change_block: str = ""
 
 
 def debate_feature_cache_suffix() -> str:
@@ -178,6 +182,8 @@ def global_macro_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     ]
     if inputs.purchase_block:
         _parts.append(inputs.purchase_block)
+    if inputs.holding_change_block:
+        _parts.append(inputs.holding_change_block)
     return compute_fingerprint(*_parts)
 
 
@@ -208,6 +214,8 @@ def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     ]
     if inputs.purchase_block:
         _parts.append(inputs.purchase_block)
+    if inputs.holding_change_block:
+        _parts.append(inputs.holding_change_block)
     _fp = compute_fingerprint(*_parts)
     _fp += debate_feature_cache_suffix()
     if decision_ledger.is_active():
@@ -304,6 +312,8 @@ def health_check_fingerprint(inputs: ModuleFingerprintInputs) -> str:
     ]
     if inputs.purchase_block:
         _parts.append(inputs.purchase_block)
+    if inputs.holding_change_block:
+        _parts.append(inputs.holding_change_block)
     _fp = compute_fingerprint(*_parts)
     _fp += _signal_digest_cache_suffix(inputs.pipeline_data)
     _fp += _pipeline_block_cache_suffix(inputs.pipeline_data)
@@ -323,8 +333,10 @@ def penetration_deep_fingerprint(inputs: ModuleFingerprintInputs) -> str:
         full_penetration=True,
         history_data=inputs.history_data,
     )
-    if inputs.purchase_block:
-        return compute_fingerprint(_base, inputs.purchase_block)
+    _extra = [part for part in (inputs.purchase_block, inputs.holding_change_block) if part]
+    if _extra:
+        # 条件并入：进提示词必进指纹；两块均空时不追加 part（逐字节回退）
+        return compute_fingerprint(_base, *_extra)
     return _base
 
 
@@ -333,6 +345,7 @@ def self_review_fingerprint(
     holdings_details: list[dict] | None = None,
     penetrated_assets: list[dict] | None = None,
     purchase_block: str = "",
+    holding_change_block: str = "",
 ) -> str:
     """生成后自检：**内容寻址**指纹——各模块产出文本 + 数据摘要。
 
@@ -349,6 +362,8 @@ def self_review_fingerprint(
         penetrated_assets: 穿透资产列表。
         purchase_block: 申购限购约束块（非空 → 提示词附录含块，故进键；
             块空 → 逐字节沿用不带该段的原形态，键与引入前一致）。
+        holding_change_block: 持仓变动复盘提示词块（非空 → 提示词附录含块，
+            故进键；块空 → 键与引入前一致）。
     """
     normalized = {
         key: (text or "")
@@ -360,6 +375,38 @@ def self_review_fingerprint(
         extract_stable_holdings(holdings_details),
         extract_stable_penetration(penetrated_assets),
     ]
+    if purchase_block:
+        # 条件并入：进提示词必进指纹；块空不追加 part（逐字节回退）
+        _parts.append(purchase_block)
+    if holding_change_block:
+        # 条件并入：进提示词必进指纹；块空不追加 part（逐字节回退）
+        _parts.append(holding_change_block)
+    return compute_fingerprint(*_parts)
+
+
+def holding_change_review_fingerprint(
+    context_block: str,
+    signal_block: str = "",
+    holdings_details: list[dict] | None = None,
+    purchase_block: str = "",
+) -> str:
+    """持仓变动复盘归因：**内容寻址**指纹——事实块 + 信号对账块 + 持仓摘要 + 附录约束块。
+
+    **仅写侧使用**（与自检/辩论三键同形）：编排层串行调用，无预检侧提前算键需求。
+
+    覆盖判据仍是「提示词是否真的含该段」：事实块与信号块都直接拼进 user prompt，
+    附录约束块经统一 prompt 附录进入——故均进键；块空时不追加 part（键与不带
+    该段时逐字节一致）。
+
+    Args:
+        context_block: 契约 ``prompt_block`` 事实块（模块存在的理由，恒进键）。
+        signal_block: 窗口内历史信号对账块（非空 → 进键）。
+        holdings_details: 持仓明细（仅取 name/code/市值稳定字段）。
+        purchase_block: 申购限购约束块（非空 → 附录含块，故进键）。
+    """
+    _parts: list = [context_block or "", extract_stable_holdings(holdings_details)]
+    if signal_block:
+        _parts.append(signal_block)
     if purchase_block:
         # 条件并入：进提示词必进指纹；块空不追加 part（逐字节回退）
         _parts.append(purchase_block)

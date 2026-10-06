@@ -82,6 +82,7 @@ _COVERED_DOMAINS: tuple[str, ...] = (
     "R-CON",
     "R-ADP",
     "R-HST",
+    "R-HCR",
 )
 
 #: requirements.md 中全部需求域前缀（真值来源；与 `_COVERED_DOMAINS` 比对即得覆盖进度）
@@ -120,6 +121,7 @@ _ALL_DOMAINS: tuple[str, ...] = (
     "R-CON",
     "R-ADP",
     "R-HST",
+    "R-HCR",
 )
 
 

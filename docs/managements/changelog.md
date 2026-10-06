@@ -11,11 +11,15 @@
 
 ### Added
 
+- **报告/LLM**：**持仓变动复盘**落地（快照事件级，`holding_change_review` 实验开关，默认关）——四迭代：① `analysis/holding_change_events.py` 快照序列按日去重 + 逐对差分出 `change_event` 事件表（份额净变动分类，缺字段降级不虚构）+ 快照保留 **60 → 180 天**（`core/constants.py`/`_config_defaults.py`/`_snapshot.py`/`config.json` 四处同步）；② `analysis/holding_change_metrics.py` 纯计算（变动频率/加减清仓结构/意图对账/交易日模式 + `detect_account_reorder` **账户重排双形态识别**：清仓→新增优先、≥5 代码阈值）；③ `report/holding_change_panel.py` Excel/HTML 双端单源面板（默认序在数据源可用性矩阵/基本面快照/LLM 用量面板之前——该三项随之顺延，事件表+「区间净额推断、非逐笔」局限标注两端同源常驻，关态逐字节不变）；④ LLM 归因**双轨**——附录**第 5 段** `holding_change_block` 随四模块+辩论 pro/con/synthesis+自检携带（指纹按段条件并入，空块逐字节不变）+ 注册表串行模块 `holding_change_review`（镜像 `self_review`：准入闸门/信号窗 top10/结果写 `holding_change_data.llm_review`/失败登记不外抛），`enabled_llm.holding_change` 默认开（章由实验开关门控）；需求 **R-HCR-01~06** 入 §6.13、`reports-instruction` 18 个报告页签与 9 组分组导航、TUI 菜单 8-11 号、测试 88 项（events 9+edge 7 / metrics 15 / injection 23 / panel 26+edge 8）；先决门槛三段全过（28 期/71 事件/人工认可），结构级结论与「账户结构变更」边界记入设计文档 §15 验收记录
+
 - **工程门禁**：新增单文件行数红线守护 `scripts/check-file-length.py --ci`（复用 `_checklib`：主程序 >800 行 / 测试 >1200 行即 finding 退出 2；既有超限项豁免登记与 `review-findings` 挂账同步、拆分后自动提示移除；`-v` 输出 >500/>800 警告区全集清单作登记表派生源，人肉快照退役），入 CI `guards` job + pre-commit 十守护 + CLAUDE.md/developer-guide/testplan 门禁清单（`check-doc-drift` 第 16 项五处同源校验）；15 项回归用例入 `test_check_file_length.py`；首跑全仓查出 `cli/cli.py` 910 行与 5 个未登记测试文件超 1200 行红线，已分别挂账 rf-585/rf-583（rf-584 归档已解决）
 
 - **HTML**：正文大块折叠新增「持仓结构与集中度」「风格与因子分析」「数据源可用性矩阵」三个章节——与既有折叠章同构（章标题与「回到顶部」常显于折叠块外、内容包 `details.section-fold`、`summary` 提示条带该章关键摘要：基金数与组合对数 / 基金风格数 / 数据源数，文案自带展开/收起指引，原生键盘可达），缺省一律收起且打开报告（含带 `#锚点`）不自动展开；结构回归用例 `_FOLD_KEYS` 扩展至六个折叠章节（包裹/默认收起/summary 首元素/标题回顶在外/摘要五类断言逐章遍历，`unit_report` 域 2135 项全绿）；`reports-instruction` ④节折叠章清单同步
 
 ### Changed
+
+- **工程/兼容清理（全兼容清理复检）**：移除两处旧结构兼容——① `config/features.py` 私有别名 `_FEATURES_FILE` 删除（15 处引用全部改用公开名 `FEATURES_FILE` 单源，含 `_path_isolation`/CLI/开关/配置编辑测试）；② `analysis/circuit_breaker_wrapper.py` 旧路径迁移 `_migrate_legacy_file`/`_LEGACY_METRICS_BREAKER_FILE` 删除（`data/cache/metrics_breaker.json` 旧路径自动迁移逻辑与 2 项迁移用例移除，`_path_isolation` 同步摘除旧路径 patch；本机旧文件不存在、新文件已在 `data/state/`）；全仓 `data/cache` 369 个缓存文件前缀逐一比对**无孤儿文件**（全部有在产代码生产者），`deepseek-chat/reasoner` 定价条目/whatif `_copy_js_assets`/自检 `_drop_legacy_cached_payload`/单链路 `_call_llm_legacy`/fund_manager 源格式回退经复检属在产能力（历史成本渲染/失效器/降级路径）予以保留；唯一可删文件 `data/config/features.json.bak`（开关覆写旧备份）已提报用户手动删除
 
 - **plan/工程**：plan-76 路线改为**快照事件级**（持仓变动复盘，`holding_change_review`）——原「手工交易日志 xlsx」路线经可行性评估废弃：持仓快照历史与差异引擎已内建（`data/history/snapshots/` + `fetcher/history_diff`，2026-10 实测本机 87 期），连续快照差分即得变动事件，零手工；设计文档更名 `trade-journal-review-design.md` → `holding-change-review-design.md` 并按新路线全量修订（语义命名 `change_event`/`holding_change_events`/`_metrics`/`_panel`/`_llm_review`；先决门槛改「去重后有效快照 ≥12 期且变动事件 ≥10 个 / 事件口径唯一且局限显式标注 / 结构级结论人工认可」；五迭代改四迭代；预估成本中 → 低-中；能力边界诚实声明——结构级精度，不承诺逐笔胜率与精确持有期，沿用 `snapshot_diff` 不虚构边界）；plan.md 概述与 plan-70/76 条目、vibe 研究文档 7 处、decision 设计数据来源节、folders 目录树与统计同步
 

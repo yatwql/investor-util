@@ -453,6 +453,7 @@ def _run_standard_mode(
     total_cost: float = 0.0,
     total_profit: float = 0.0,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
     raw_filter_fn: Any = None,
 ) -> tuple[str | None, bool]:
     """标准 LLM 单篇生成模式：缓存 → 调用 → 处理结果。
@@ -481,7 +482,7 @@ def _run_standard_mode(
     # ── 统一注入 prompt 附录（TOP3 + 数据速查表 + 代码白名单 + 申购限购约束块） ──
     if _user:
         appendix = _build_prompt_appendix(
-            holdings_details, total_mv, total_cost, total_profit, purchase_constraint_block
+            holdings_details, total_mv, total_cost, total_profit, purchase_constraint_block, holding_change_block
         )
         if appendix:
             _user = _user + "\n\n" + appendix
@@ -556,6 +557,7 @@ def generate_llm_module(
     total_cost: float = 0.0,
     total_profit: float = 0.0,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
     # ── LLM 原始输出过滤钩子（辩论模式虚构代码过滤） ──
     raw_filter_fn: Any = None,  # fn(原始文本) → 过滤后文本，在 markdown_to_html 之前应用
 ) -> Any:
@@ -626,6 +628,7 @@ def generate_llm_module(
         total_cost=total_cost,
         total_profit=total_profit,
         purchase_constraint_block=purchase_constraint_block,
+        holding_change_block=holding_change_block,
         raw_filter_fn=raw_filter_fn,
     )
 

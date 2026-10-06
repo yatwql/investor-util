@@ -262,6 +262,7 @@ def _render_template(
     market_temperature_data: dict
     | None = None,  # 市场温度数据契约 market_temperature_data（汇总温度行，None=开关关闭）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
+    holding_change_view: dict | None = None,  # 持仓变动复盘双端单源视图（预格式化行；None=章隐藏）
     financial_report_digest_data: dict | None = None,  # 持仓个股财报摘要契约（None=开关关闭/无数据）
     financial_indicator_data: dict | None = None,  # 财务指标契约（None=开关关闭/无数据）
     purchase_status_data: dict | None = None,  # 申购限购状态契约（None=开关关闭/无数据，申购状态列隐藏）
@@ -373,6 +374,7 @@ def _render_template(
         tail_risk_data=tail_risk_data,
         snapshot_diff_data=snapshot_diff_data,
         decision_review_data=decision_review_data,
+        holding_change_view=holding_change_view,
         financial_report_digest_data=financial_report_digest_data,
         financial_indicator_data=financial_indicator_data,
     )
@@ -429,6 +431,8 @@ def write_html_report(
     financial_indicator_data: dict | None = None,  # data 层：财务指标契约（None=无数据，章节隐藏）
     purchase_status_data: dict | None = None,  # data 层：申购限购状态契约（None=无数据，申购状态列隐藏）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
+    holding_change_data: dict
+    | None = None,  # data 层：持仓变动复盘契约（实验开关 `holding_change_review`，None=键缺席→整章隐藏）
 ) -> str:
     """生成 HTML 分析报告并保存到文件。
 
@@ -546,6 +550,13 @@ def write_html_report(
 
     # ── 10a) 报告模块序号 & 可见性 ──
     order = section_order or get_report_section_order()
+    # 持仓变动复盘视图（双端单源）：与 Excel 页签消费同一份预格式化字符串；
+    # 契约缺席（开关关闭）→ None → 章隐藏，逐字节回退既有输出
+    holding_change_view = None
+    if holding_change_data:
+        from src.python.report.holding_change_panel import build_holding_change_view
+
+        holding_change_view = build_holding_change_view(holding_change_data)
     # 章级：enabled_llm 模块禁用的 LLM 分析章整章隐藏（与 Excel 端同函数同配置推导）
     from src.python.llm.skeleton import get_llm_chapter_disabled
 
@@ -568,6 +579,7 @@ def write_html_report(
         style_factor_data=style_factor_data,
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
+        holding_change_data=holding_change_data,
         enable_fundamental_snapshot=enable_fundamental_snapshot,
         financial_report_digest_data=financial_report_digest_data,
         financial_indicator_data=financial_indicator_data,
@@ -682,6 +694,7 @@ def write_html_report(
         valuation_data=valuation_data,
         market_temperature_data=market_temperature_data,
         decision_review_data=decision_review_data,
+        holding_change_view=holding_change_view,
     )
 
     if enable_interactive_charts:

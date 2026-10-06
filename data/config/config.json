@@ -66,7 +66,7 @@
 
   // ── E. 行为调优 ──
   "default_menu_key": "L",
-  "report_section_order": {"summary": 1, "holdings_detail": 2, "penetration": 3, "fund_performance": 4, "position_structure": 5, "style_factor": 6, "action": 7, "news_correlation": 8, "global_macro": 9, "expert_review": 10, "health_check": 11, "penetration_deep": 12, "portfolio_history_drawdown": 13, "portfolio_evolution": 14, "data_source_status": 15, "fundamental_snapshot": 16},
+  "report_section_order": {"summary": 1, "holdings_detail": 2, "penetration": 3, "fund_performance": 4, "position_structure": 5, "style_factor": 6, "action": 7, "news_correlation": 8, "global_macro": 9, "expert_review": 10, "health_check": 11, "penetration_deep": 12, "portfolio_history_drawdown": 13, "portfolio_evolution": 14, "holding_change": 15, "data_source_status": 16, "fundamental_snapshot": 17},
   "degradation": {
     "t2": {
       "unreachable_threshold": 2,
@@ -97,7 +97,7 @@
   "history": {
     "fetch_mode": "auto",  // 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
     "lookback_days": 90,  // 历史走势取数窗口（K 线条数/交易日），需≥60（回撤分析最少交易日）才计算回撤分析，上限 365
-    "snapshot_retention_days": 60,
+    "snapshot_retention_days": 180,
     "snapshot_max_count": 365,
     "coverage_threshold": 0.8,
     "benchmark_indices": {

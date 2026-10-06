@@ -110,8 +110,8 @@ class TestHtmlCssStructure(unittest.TestCase):
                     extra += len(re.findall(r'<div\s+class="section"[^>]*>', f.read()))
         self.assertEqual(
             len(sections) + extra,
-            17,
-            f"应有 17 个 .section 容器（主模板 {len(sections)} + partial {extra}），实际 {len(sections) + extra}",
+            18,
+            f"应有 18 个 .section 容器（主模板 {len(sections)} + partial {extra}），实际 {len(sections) + extra}",
         )
 
     # ── section-title pattern ──────────────────────────────────

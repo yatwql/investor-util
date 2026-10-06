@@ -568,8 +568,9 @@ def _build_prompt_appendix(
     total_cost: float,
     total_profit: float,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
 ) -> str:
-    """构建统一 prompt 附录（TOP3 + 数据速查表 + 代码白名单 + 申购限购约束块）。
+    """构建统一 prompt 附录（TOP3 + 数据速查表 + 代码白名单 + 申购限购约束块 + 持仓变动复盘块）。
 
     由 generate_llm_module 统一注入到每个模块的 user prompt 末尾，
     各模块无需手动调用。确保新模块自动获得防御段。
@@ -585,6 +586,8 @@ def _build_prompt_appendix(
         total_profit: 持仓总盈亏。
         purchase_constraint_block: 申购限购约束块（契约 ``constraint_block`` 字段，
             调用方提取一次的同一实例）；空 → 附录输出与不含该段时逐字节一致。
+        holding_change_block: 持仓变动复盘提示词块（契约 ``prompt_block`` 字段，
+            同源渲染一次的同一实例）；空 → 附录输出与不含该段时逐字节一致。
 
     Returns:
         格式化的附录文本块，无数据时返回空字符串。
@@ -601,6 +604,8 @@ def _build_prompt_appendix(
         parts.append(whitelist)
     if purchase_constraint_block:
         parts.append(purchase_constraint_block)
+    if holding_change_block:
+        parts.append(holding_change_block)
     return "\n\n" + "\n\n".join(parts) if parts else ""
 
 

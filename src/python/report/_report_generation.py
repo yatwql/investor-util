@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from src.python.report._experimental_seams import (
     apply_module_quality_banners,
+    inject_holding_change_data,
     record_deterministic_decisions,
     record_deterministic_signals,
     record_llm_decisions_and_review_block,
@@ -162,6 +163,9 @@ def _generate_report_both(
         # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
         pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
+    # 2b2. 持仓变动复盘（实验开关 holding_change_review，默认关；独立于演进开关）：
+    #      事件清单差分须晚于本次快照捕获；开关关闭时键缺席 → 整章隐藏（见 seams）
+    inject_holding_change_data(pipeline_data, config, reporter, snapshot_namespace=snapshot_namespace)
     # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
     #    （position_status + data_freshness）
     from src.python.core.data_freshness import build_freshness_summary
@@ -299,6 +303,7 @@ def _generate_report_both(
             financial_report_digest_data=financial_report_digest_data,
             financial_indicator_data=financial_indicator_data,
             purchase_status_data=purchase_status_data,
+            holding_change_data=(pipeline_data or {}).get("holding_change_data"),
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -454,6 +459,9 @@ def _generate_report_full(
         # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
         pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
+    # 2b2. 持仓变动复盘（实验开关 holding_change_review，默认关；独立于演进开关）：
+    #      事件清单差分须晚于本次快照捕获；开关关闭时键缺席 → 整章隐藏（见 seams）
+    inject_holding_change_data(pipeline_data, config, reporter, snapshot_namespace=snapshot_namespace)
     perf.stop()
 
     # ── 3. 历史走势 + 全量量化指标 ──
@@ -612,6 +620,7 @@ def _generate_report_full(
         financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
         purchase_status_data=(pipeline_data or {}).get("purchase_status_data"),
         market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
+        holding_change_data=(pipeline_data or {}).get("holding_change_data"),
     )
 
     # ── 7. Excel 报告 ──

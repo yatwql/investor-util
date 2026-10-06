@@ -278,6 +278,7 @@ def generate_excel_report(
         financial_report_digest_data=financial_report_digest_data,
         financial_indicator_data=financial_indicator_data,
         position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
+        holding_change_data=(pipeline_data or {}).get("holding_change_data"),
     )
 
     # 章级：enabled_llm 模块禁用的 LLM 分析章不创建页签（与 HTML 端同函数同配置推导）
@@ -444,6 +445,18 @@ def generate_excel_report(
             )
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
+
+    # ── 持仓变动复盘页签（快照事件级，holding_change_data；实验开关默认关，
+    #      键缺席时页签不创建，此处自然不触发） ──
+    ws_hc = sheets.get("holding_change")
+    if ws_hc is not None:
+        prog.info("正在写入持仓变动复盘页签...")
+        try:
+            from src.python.report.holding_change_panel import write_holding_change_sheet
+
+            write_holding_change_sheet(ws_hc, (pipeline_data or {}).get("holding_change_data"))
+        except Exception:
+            logger.debug("[excel] 持仓变动复盘页签写入失败（非关键）", exc_info=True)
 
     # ── 持仓基本面页签（财务指标 + 财报摘要，一章两区块） ──
     ws_fs = sheets.get("fundamental_snapshot")

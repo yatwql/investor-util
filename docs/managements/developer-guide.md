@@ -1574,7 +1574,7 @@ from src.python.core.registry import (
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
 - `get_report_section_number("position_structure")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
-- `get_report_section_keys()` → 全部 17 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
+- `get_report_section_keys()` → 全部 18 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
 
 **计算模块查询**：
 

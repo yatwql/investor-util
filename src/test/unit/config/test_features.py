@@ -567,7 +567,7 @@ class TestUnknownOverrideWarning:
         # patch.dict 传空值：进入时不预置任何键（预置会让「未知开关」在加载时变成
         # 已知而绕过告警），退出时按快照还原，顺带清掉本次加载新增的键。
         with (
-            patch("src.python.config.features._FEATURES_FILE", str(fpath)),
+            patch("src.python.config.features.FEATURES_FILE", str(fpath)),
             patch("src.python.config.features.logger") as mock_logger,
             patch.dict(FEATURE_FLAGS, {}),
         ):
@@ -585,7 +585,7 @@ class TestUnknownOverrideWarning:
         fpath.write_text(json.dumps({"metrics_hhi": False}), encoding="utf-8")
 
         with (
-            patch("src.python.config.features._FEATURES_FILE", str(fpath)),
+            patch("src.python.config.features.FEATURES_FILE", str(fpath)),
             patch("src.python.config.features.logger") as mock_logger,
             patch.dict(FEATURE_FLAGS, {}),
         ):

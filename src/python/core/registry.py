@@ -194,6 +194,20 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         settings_suffix="self_review",
         cache_groups=("preload",),
     ),
+    # ── 持仓变动复盘归因（实验能力，章本体由 feature holding_change_review 控制；
+    #    章内 LLM 归因块，串行后置执行）──
+    # 登记目的同生成后自检：显示名/缓存前缀/TTL/用量统计/失败原因载体复用既有机制。
+    # **刻意不进 generators_orchestrator._MODULE_FNS**：输入是报告 seam 注入的契约
+    # （holding_change_data），必须在报告管线内串行取用，不属线程池并行调度
+    # （见 llm/holding_change_review.py 模块说明）。
+    DataModuleDef(
+        "持仓变动复盘归因",
+        "llm_holding_change",
+        cache_prefixes=("llm_holding_change_",),
+        cache_ttl=7200,
+        settings_suffix="holding_change",
+        cache_groups=("preload",),
+    ),
     # ── 辩论模式（preload 组，实验功能）──
     DataModuleDef(
         "辩论白脸",
@@ -435,6 +449,7 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "style_factor": "风格与因子分析",
     "portfolio_history_drawdown": "组合历史走势与回撤",
     "portfolio_evolution": "组合演进",
+    "holding_change": "持仓变动复盘",
     "action": "行动建议",
     "data_source_status": "数据源可用性矩阵",
     "fundamental_snapshot": "持仓基本面",
@@ -637,21 +652,33 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "evolution",
         "data_flag": "evolution_data",
     },
+    # ── holding_change 类型（实验开关 holding_change_review 控制，经实验挂载点注入） ──
+    # 持仓变动复盘：快照差分事件级操作侧复盘（事件清单/频率/结构演变/意图对账 +
+    # LLM 归因块）。data_flag 控制双端可见性：开关关闭（默认）时
+    # pipeline_data 键缺席 → 标志 False → 整章隐藏，两条输出路径保持既有输出；
+    # 开关注入但数据不足时双端写占位
+    {
+        "key": "holding_change",
+        "name": "持仓变动复盘",
+        "number": 15,
+        "type": "holding_change",
+        "data_flag": "holding_change_data",
+    },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 15, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 16, "type": "always", "data_flag": None},
     # ── fundamental_snapshot 类型（两功能开关各控一块，默认关）──
     # 持仓基本面 = 财务指标（financial_indicator）+ 持仓个股财报摘要（financial_report_digest）；
     # 两契约 OR 决定章节可见性（任一块就绪即显示，块级开关各控各的渲染）
     {
         "key": "fundamental_snapshot",
         "name": "持仓基本面",
-        "number": 16,
+        "number": 17,
         "type": "fundamental_snapshot",
         "data_flag": None,
         "data_flag_any": ("financial_indicator_data", "financial_report_digest_data"),
     },
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 17, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 18, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 

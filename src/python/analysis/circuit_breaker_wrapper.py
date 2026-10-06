@@ -39,15 +39,7 @@ __all__ = [
 # ── 常量 ────────────────────────────────────────────────
 
 _METRICS_BREAKER_FILE = os.path.join(PROJECT_ROOT, "data/state/metrics_breaker.json")
-"""指标断路状态持久化文件路径（data/state/ 运行时状态目录）。
-
-早期版本持久化在 data/cache/metrics_breaker.json（随缓存清理被误删），
-迁移到 data/state/ 后不随缓存清理。旧路径文件在加载时自动迁移（见
-``IndicatorBreaker._migrate_legacy_file``）。
-"""
-
-_LEGACY_METRICS_BREAKER_FILE = os.path.join(PROJECT_ROOT, "data/cache/metrics_breaker.json")
-"""旧版指标断路状态持久化路径（v0.10.5 前），迁移用。"""
+"""指标断路状态持久化文件路径（data/state/ 运行时状态目录，不随缓存清理）。"""
 
 _DEFAULT_MAX_FAILURES = 3
 """单个指标连续失败多少次后触发断路。"""
@@ -89,38 +81,8 @@ class IndicatorBreaker:
     def _state_path(self) -> str:
         return self._persist_path
 
-    def _migrate_legacy_file(self) -> None:
-        """将旧持久化路径（data/cache/metrics_breaker.json）改写至新的持久化位置。
-
-        仅当新路径不存在且旧路径存在时执行；完成后删除旧文件，
-        避免旧文件残留被后续缓存清理误扫。
-        """
-        legacy = _LEGACY_METRICS_BREAKER_FILE
-        path = self._state_path()
-        if path == legacy:
-            return
-        if not os.path.exists(legacy) or os.path.exists(path):
-            return
-        try:
-            with open(legacy, encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            logger.debug("[breaker] 旧状态文件迁移失败，跳过", exc_info=True)
-            return
-        # 顺序不可颠倒：新路径写入成功前不得删除旧文件——写失败时旧文件是
-        # 唯一的数据源，先删即断路状态永久丢失（原子写返回成败供此处判定）。
-        if not write_json_atomic(path, data, log_tag="breaker", noun="断路状态"):
-            return
-        try:
-            os.remove(legacy)
-        except OSError:
-            # 新文件已在，迁移本身已完成；残留旧文件仅影响缓存清理口径
-            logger.warning("[breaker] 旧状态文件删除失败，残留: %s", legacy, exc_info=True)
-        logger.info("[breaker] 已从旧路径迁移状态文件 → %s", path)
-
     def _load_state(self) -> None:
         """从 JSON 加载持久化的断路状态，超过 TTL 的条目自动清理。"""
-        self._migrate_legacy_file()
         path = self._state_path()
         if not os.path.exists(path):
             return

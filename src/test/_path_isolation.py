@@ -70,14 +70,10 @@ def seed_sensitive_path_isolation(monkeypatch, tmp_path, _doctor_probe_targets) 
         "src.python.config._local_state._LOCAL_STATE_FILE",
         str(tmp_path / "data/state/local_state.json"),
     )
-    # 指标熔断器持久化文件隔离（data/state/ 运行时状态目录 + 旧 data/cache/ 路径）
+    # 指标熔断器持久化文件隔离（data/state/ 运行时状态目录）
     monkeypatch.setattr(
         "src.python.analysis.circuit_breaker_wrapper._METRICS_BREAKER_FILE",
         str(tmp_path / "data/state/metrics_breaker.json"),
-    )
-    monkeypatch.setattr(
-        "src.python.analysis.circuit_breaker_wrapper._LEGACY_METRICS_BREAKER_FILE",
-        str(tmp_path / "data/cache/metrics_breaker.json"),
     )
     # perf_history.jsonl 性能历史文件隔离
     monkeypatch.setattr(
@@ -131,7 +127,7 @@ def seed_sensitive_path_isolation(monkeypatch, tmp_path, _doctor_probe_targets) 
     )
     # features.json 功能开关覆写文件隔离（save_feature_overrides 写入）
     monkeypatch.setattr(
-        "src.python.config.features._FEATURES_FILE",
+        "src.python.config.features.FEATURES_FILE",
         str(tmp_path / "data/config/features.json"),
     )
     # Web 上传临时目录隔离（data/holdings/uploads/ —— 上传文件落盘/清理的靶目录）

@@ -942,8 +942,8 @@ class TestMainEarlyExitExperiments:
 
         from src.python.config import features
 
-        os.makedirs(os.path.dirname(features._FEATURES_FILE), exist_ok=True)
-        with open(features._FEATURES_FILE, "w", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(features.FEATURES_FILE), exist_ok=True)
+        with open(features.FEATURES_FILE, "w", encoding="utf-8") as f:
             json.dump({"decision_reflection": True}, f)
 
         seen = self._enabled_during_dispatch(["cli.py", "doctor"], "src.python.cli.cli._handle_doctor")

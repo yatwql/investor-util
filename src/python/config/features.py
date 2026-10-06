@@ -35,7 +35,7 @@ logger = logging.getLogger("invest")
 
 FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
 # 兼容别名：历史私有名（包内既有引用；渠道层一律用公开名 FEATURES_FILE）
-_FEATURES_FILE = FEATURES_FILE
+FEATURES_FILE = FEATURES_FILE
 
 # ── 分组常量 ────────────────────────────────────────────────
 # 分组表达的是**生命周期的当前状态**，不是优先级、不是新旧：
@@ -129,6 +129,14 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
     "prosperity_framework": FeatureSwitchDef(
         "景气度框架诊断",
         "六维评分卡（景气方向/ROE 低位弹性/全球比较优势/流动性/集中度与周期拼接/业绩回撤印证）评估组合契合度，缺数据维度标记需核实",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
+    # ── 实验性功能：持仓变动复盘（快照差分事件级，需结构级结论人工认可后择机转正） ──
+    "holding_change_review": FeatureSwitchDef(
+        "持仓变动复盘",
+        "快照差分出新增/加仓/减仓/清仓事件清单与频率/结构演变/意图对账（区间净额推断，结构级）+ LLM 归因块",
         GROUP_EXPERIMENTAL,
         False,
         True,
@@ -543,10 +551,10 @@ def load_feature_overrides() -> None:
         "metrics_hhi": true
       }
     """
-    if not os.path.exists(_FEATURES_FILE):
+    if not os.path.exists(FEATURES_FILE):
         return
     try:
-        with open(_FEATURES_FILE, encoding="utf-8") as f:
+        with open(FEATURES_FILE, encoding="utf-8") as f:
             overrides = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("[features] 加载覆写文件失败: %s", e)
@@ -602,9 +610,9 @@ def save_feature_overrides(overrides: dict[str, bool], merge: bool = True) -> No
         merge: True = 合并到现有覆写（覆盖同名键），False = 完全替换
     """
     existing: dict[str, Any] = {}
-    if merge and os.path.exists(_FEATURES_FILE):
+    if merge and os.path.exists(FEATURES_FILE):
         try:
-            with open(_FEATURES_FILE, encoding="utf-8") as f:
+            with open(FEATURES_FILE, encoding="utf-8") as f:
                 existing = json.load(f)
         except (json.JSONDecodeError, OSError):
             existing = {}
@@ -618,7 +626,7 @@ def save_feature_overrides(overrides: dict[str, bool], merge: bool = True) -> No
     # 并返回 False——开关覆写属尽力持久化：写不进盘不影响本次运行（内存态随后同步），
     # 也不应因此中断调用链。
     if write_json_atomic(
-        _FEATURES_FILE,
+        FEATURES_FILE,
         cleaned,
         prefix=".features_",
         log_tag="features",

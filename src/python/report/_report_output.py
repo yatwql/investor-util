@@ -132,6 +132,7 @@ def _generate_full_html_report(
     financial_indicator_data: dict | None = None,
     market_sentiment_data: dict | None = None,
     purchase_status_data: dict | None = None,
+    holding_change_data: dict | None = None,
 ) -> bool:
     """full 路径的 HTML 报告生成，返回是否成功。
 
@@ -222,6 +223,7 @@ def _generate_full_html_report(
             financial_report_digest_data=financial_report_digest_data,
             financial_indicator_data=financial_indicator_data,
             purchase_status_data=purchase_status_data,
+            holding_change_data=holding_change_data,
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         return True

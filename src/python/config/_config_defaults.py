@@ -101,7 +101,7 @@ _DEFAULT_CONFIG = {
         "fetch_mode": "auto",  # 历史走势获取模式: off=关闭 / prompt=报告后询问 / auto=自动获取
         # 历史走势取数窗口（K 线条数/交易日），需 ≥ drawdown MIN_SPAN(60) 才能计算回撤分析
         "lookback_days": 90,
-        "snapshot_retention_days": 60,
+        "snapshot_retention_days": 180,
         "snapshot_max_count": 365,
         "coverage_threshold": 0.8,
         "benchmark_indices": {"sh000300": "沪深300"},

@@ -282,7 +282,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.4 报告配置化
 
-**决策**：报告 17 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
+**决策**：报告 18 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
 **两层可见性模型 + 章级维度**：
 
@@ -1745,7 +1745,7 @@ for sec in section_order:
 
 ### 4.6 报告序号可配置
 
-报告 17 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
+报告 18 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
 #### 注册表结构
 
@@ -1761,7 +1761,7 @@ for sec in section_order:
 }
 ```
 
-17 个模块分布：`always`×5、`fund_deep_analysis`×2、`news`×1、`llm`×5、`history`×1、`evolution`×1、`action`×1、`fundamental_snapshot`×1。
+18 个模块分布：`always`×5、`fund_deep_analysis`×2、`news`×1、`llm`×5、`history`×1、`evolution`×1、`action`×1、`fundamental_snapshot`×1、`holding_change`×1。
 
 #### 合并规则流程
 
@@ -1771,7 +1771,7 @@ get_report_section_order(config)
     ▼
 ┌────────────────────────┐
 │ config 中有             │
-│ report_section_order?  │── NO ──→ 返回完整 17 项默认顺序
+│ report_section_order?  │── NO ──→ 返回完整 18 项默认顺序
 └───────────┬────────────┘
            YES
             │
@@ -1789,7 +1789,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（17 项，key/number/type/data_flag）
+返回 result（18 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -1984,7 +1984,7 @@ save():
     tempfile.mkstemp + os.replace（符合 C3 约束）
 
 prune()：两阶段自动清理
-    ① 时间优先：删除超过 HISTORY_SNAPSHOT_RETENTION_DAYS（默认 60d）
+    ① 时间优先：删除超过 HISTORY_SNAPSHOT_RETENTION_DAYS（默认 180d）
                  可通过 config.json history.snapshot_retention_days 配置
     ② 数量兜底：剩余文件超过 HISTORY_SNAPSHOT_MAX_COUNT（默认 365）
                  可通过 config.json history.snapshot_max_count 配置
@@ -2179,7 +2179,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 |:-----|:---------|
 | **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定；因子指数**不作为 `_A_INDICES` 成员**（避免污染实时指数行情循环与报告"指数对比"章节噪声），代码集合定义为分析模块内部常量 |
 | **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "eastmoney", "sina", "hithink"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（降级接受），故补东方财富 push2his 为实际可用的第二源；腾讯与东方财富均故障时因子章节落 §1.4.5 数据不足分支 |
-| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 17 个模块序号连续（1~17），`style_factor` 为基金深度分析一章三区块（风格表 + 风格因子回归 + 行业 Beta 子表） |
+| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 18 个模块序号连续（1~18），`style_factor` 为基金深度分析一章三区块（风格表 + 风格因子回归 + 行业 Beta 子表） |
 | **C14** (渲染期数据不可写入模块级全局变量) | 风格与因子数据通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
 | **C19** (pipeline_data Schema 契约) | 新增 `style_factor_data` 键（类型 `dict`，内嵌 `industry_beta` 子键），键结构见附录 H，先定义类型再使用 |
 | **§1.4.5** (数据降级治理) | 区分两分支：① **数据不足**——因子指数历史不足 36 期或有效样本 < 36，标记 `style_factor_data.available=false`，显示"数据不足"占位文本，**不走 DegradationTracker**（系数据量不足，非故障）；② **数据源故障**——`fetch_index_history` 返回空（chain 全失败），走 DegradationTracker 记录 T2 降级事件，显示"数据源暂不可用"，与数据不足文案区分。行业 Beta 子表独立降级（`industry_beta=None` 开关关闭隐藏 / `available=false` 标题+占位），**绝不输出误导性数字** |
@@ -2564,7 +2564,7 @@ report/ 渲染                      # Excel 页签 + HTML 章节（模板 contex
 | 约束 | 适配方式 |
 |:-----|:---------|
 | **C3** (缓存原子写入) | 快照写入沿用既有原子写（temp + rename），聚合读取对缺文件/损坏 JSON 容错跳过 |
-| **C7** (报告序号可配置) | `portfolio_evolution` 注册于 `_REPORT_SECTION_DEFAULT`（type=`evolution`、data_flag=`evolution_data`、number=14），序号/名称可配置，不硬编码；独立开关 `enable_portfolio_evolution` 控制 board 层可见性。本仓库 `config.json` 的 `report_section_order` 显式列出完整 16 项（`llm_usage` 强制末位、不列入本表；合计 17 个模块）且与出厂默认同序（`action`=7、组合演进=14） |
+| **C7** (报告序号可配置) | `portfolio_evolution` 注册于 `_REPORT_SECTION_DEFAULT`（type=`evolution`、data_flag=`evolution_data`、number=14），序号/名称可配置，不硬编码；独立开关 `enable_portfolio_evolution` 控制 board 层可见性。本仓库 `config.json` 的 `report_section_order` 显式列出完整 17 项（`llm_usage` 强制末位、不列入本表；合计 18 个模块）且与出厂默认同序（`action`=7、组合演进=14、持仓变动复盘=15） |
 | **C14** (渲染期数据不可写入模块级全局变量) | evolution_data 通过模板 `render()` context 传递，不写 `_ENV.globals` |
 | **C19** (pipeline_data Schema 契约) | 新增 `evolution_data` 键（类型 `dict`），键结构见附录 H，先定义类型再使用 |
 | **C20** (HTML 图表图下说明强制) | 3 张 Chart.js 图各配 `.chart-caption` 图下说明，随 canvas 渲染分支同步出现 |
@@ -3357,12 +3357,14 @@ make_http_client(timeout=10.0) → httpx.Client
 | `system_info` | 系统状态组装与展示原语（Web 状态卡 / TUI 首页共用数据源：熔断/路由/凭据回填/匿名化标签） | 核心基础设施 | 状态展示 | 无（展示面） |
 | `history_policy` | 历史走势获取策略解析（off/auto/prompt 单源，三渠道共用，TUI 注入询问回调） | 报告生成 | 组合历史走势 | `history.fetch_mode` |
 | `config_backup` | 配置写前备份（`.bak` 单槽轮转） | Web 配置 | 配置编辑 | 无（安全面） |
-| `report_section_order` | 报告模块序号配置（键=模块标识，值=序号；空对象用默认 17 项顺序） | 报告编排 | 报告配置 | 顶层配置键 `report_section_order`（`get_report_section_order()` 读取，`llm_usage` 强制末位） |
+| `report_section_order` | 报告模块序号配置（键=模块标识，值=序号；空对象用默认 18 项顺序） | 报告编排 | 报告配置 | 顶层配置键 `report_section_order`（`get_report_section_order()` 读取，`llm_usage` 强制末位） |
 | `generators_news` | 财经新闻 LLM 关联分析（新闻热词→持仓关联二次生成） | 财经新闻热点与持仓关联分析 | LLM 生成 | 随 `enable_news` + LLM 启用 |
 | `_pair_similarity` | 标题相似度口径的唯一实现（归一化 → 日期剥离 → 英文分桶占位 → 双向 ratio + 实体 bigram 交集；链路判定与校准工具共用，防两套口径漂移） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
 | `anchor_rules_version` | 锚点规则时代指纹字段（`_rules_fingerprint()` 由阈值/模板词表/方向词对/正则 + 行为探针派生，规则一改自动变，供校准工具区分时代） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
 | `news_dedup_rules` | 去重规则原语模块（阈值常量 / 模板词表与掩码 / 标题归一化 / 实体 bigram / 相似度口径 / 方向词对 / 规则指纹的唯一实现） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
 | `record_prosperity_diagnosis` | 景气度框架诊断挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供） | 行动建议（章内嵌块） | 报告输出 | 实验开关 `prosperity_framework`（默认关） |
+| `inject_holding_change_data` | 持仓变动复盘挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供） | 持仓变动复盘（报告独立章，type=holding_change） | 报告输出 | 实验开关 `holding_change_review`（默认关） |
+| `holding_change_review` | 持仓变动复盘（快照事件级：差分事件清单 + 频率/结构/贡献分解 + 意图对账 + 账户结构重排标注 + LLM 归因） | 持仓变动复盘 | 报告输出 | 实验开关 `holding_change_review`（默认关） |
 | `module_fingerprint` | LLM 模块缓存指纹唯一事实来源（预检侧与写侧同源） | LLM 生成 | LLM 生成 | 无（模块级） |
 | `decision_reflection` | 决策跨期反思闭环（登记决策 → 真实行情结算命中率 → 教训回灌专家复盘提示词） | 行动建议 | 监控 | 实验开关 `decision_reflection`（默认关） |
 | `decision_ledger` | 决策账本（append-only JSONL，pending/settled 折叠统计） | 行动建议 | 监控 | 随 `decision_reflection` |
@@ -3456,7 +3458,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `extract_purchase_constraint_block` | 约束块提取唯一单源（编排层与新闻链两侧共用，契约键/嵌套调整只改此处） | 申购限购 | LLM 生成 | 无 |
 <!-- semantic-index:end -->
 
-> **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~17（章节合并后条目由 21 降为 17，序号整体重排；`llm_usage` 强制末位）。
+> **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~18（章节合并后条目曾由 21 降为 17，后新增持仓变动复盘至 18，序号整体重排；`llm_usage` 强制末位）。
 
 [↑ 回到顶部](#目录)
 
@@ -3574,7 +3576,7 @@ web/ (Web 服务层，薄入口)
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号与显示名不可硬编码** — 报告 17 个模块的章节顺序/可见性由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，页签显示名由同文件的 `_REPORT_SHEET_NAMES` 注册表驱动（两表键一一对应、同名显示名由测试锁定，页签名一律经 `get_report_sheet_name()` 取用），均支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号；显示名散落在写入层则重命名页签必须全局搜索，两处清单一旦不同步便出现「配置里叫一个名、页签上叫另一个名」 | 序号配置失效、用户自定义顺序不生效；页签显示名与注册表/配置脱节 | report/ 编排器与写入层（excel_generator.py、html_writer.py、fund_style_classify.py 等）；任何写入页签名的模块均须经 `get_report_sheet_name()`，不得直接写中文字面量 |
+| **C7** | **报告序号与显示名不可硬编码** — 报告 18 个模块的章节顺序/可见性由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，页签显示名由同文件的 `_REPORT_SHEET_NAMES` 注册表驱动（两表键一一对应、同名显示名由测试锁定，页签名一律经 `get_report_sheet_name()` 取用），均支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号；显示名散落在写入层则重命名页签必须全局搜索，两处清单一旦不同步便出现「配置里叫一个名、页签上叫另一个名」 | 序号配置失效、用户自定义顺序不生效；页签显示名与注册表/配置脱节 | report/ 编排器与写入层（excel_generator.py、html_writer.py、fund_style_classify.py 等）；任何写入页签名的模块均须经 `get_report_sheet_name()`，不得直接写中文字面量 |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在附录 H（pipeline_data Schema 定义）中预定义类型、可选性、写入/消费模块后，才能在代码中使用该键 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |
@@ -3865,12 +3867,15 @@ investor-util/
 | purchase_status_data | dict | 是 | prepare_report_data；both 路径由 _generate_report_both 就地构建 |
 | diff | dict | 是 | capture_snapshot |
 | decision_review_data | dict | 是 | record_llm_decisions_and_review_block |
+| holding_change_data | dict | 是 | inject_holding_change_data（实验开关 holding_change_review，默认关） |
 | prosperity_framework_data | dict | 是 | prepare_report_data（full/both）；basic 路径由 generate_excel_report 就地构建 |
 | market_sentiment_data | dict | 是 | 行动建议章内嵌块（full/both 由编排层注入；basic 路径由 generate_excel_report 就地构建） |
 
 > `diff`（环比对比差异，C19 契约，9 键）：`{"is_first_check": bool, "total_value_diff": float, "total_value_diff_pct": float, "total_pnl_diff": float, "days_since_last_report": int, "added": list[dict], "removed": list[dict], "increased": list[dict], "decreased": list[dict]}`。四组明细每项含 `name`/`code`/`action`/`shares_diff`/`value_diff`（新增/清仓/加仓/减仓）。由 `capture_snapshot()`（`report/_snapshot.py`）基于**同快照域**上一份快照用 `fetcher/history_diff.HistoryDiff` 计算；首次运行（`is_first_check`）或异常时整个 `pipeline_data` 为 None（键缺席，下游按 `.get()` 判空）。校验入口 `report/pipeline_data_builder.py::build(diff=...)`（`_validate_diff` 子键深层类型校验）。消费方：汇总 Excel 环比 δ 列（`report/excel_generator.py`）、行动章环比上下文（`report/_report_helpers.py`）、LLM 环比差异段落（`llm/prompts_core.py`）。
 
 > `decision_review_data`（决策复盘区块，C19 契约，实验功能「决策跨期反思闭环」开启时才有）：行动章内嵌复盘表数据，由 `report/decision_review_block.py::build_review_block(report_date=...)` 从决策账本（`core/decision_ledger`）装配，在 `report/_experimental_seams.py::record_llm_decisions_and_review_block` 注入（开关关闭或区块为空 → 键缺席，两条输出路径保持既有输出）。消费方：HTML `partials/action_section.html` 与 Excel `report/action_sheet.py`（均按 `.get()` 消费，键缺席即不渲染）。类型校验：`report/pipeline_data_builder.py::_PIPELINE_DATA_TYPE_MAP`。
+
+> `holding_change_data`（持仓变动复盘，C19 契约，实验开关 `holding_change_review` 默认关）：快照差分事件清单 + 频率/结构/贡献分解指标 + 意图对账（决策账本只读对照）+「区间净额推断、非逐笔」局限标注，由 `report/holding_change_panel.py::build_holding_change_panel` 装配（事件抽取 `analysis/holding_change_events.py` + 纯计算 `analysis/holding_change_metrics.py`），在 `report/_experimental_seams.py::inject_holding_change_data` 注入（开关关闭 → 键缺席 → 注册表 `holding_change` 章 data_flag False → 整章隐藏，两条输出路径保持既有输出）。消费方：HTML `partials/holding_change_section.html` 与 Excel `report/holding_change_panel.py::write_holding_change_sheet`（均经 `build_holding_change_view` 取双端单源预格式化行）。类型校验：`report/pipeline_data_builder.py::_PIPELINE_DATA_TYPE_MAP`。
 
 > `valuation_data`（估值分位，C19 契约，3 键 + 内嵌 `by_code` 子键）：`{"available": bool, "status": str, "by_code": {code: {"pe": float\|None, "pb": float\|None, "price_percentile": float\|None, "tier": str\|None, "sample_count": int, "percentile_available": bool}}}`。当前 PE/PB 由 `fetcher/industry.py::fetch_valuation_fields`（网关入口；东财 push2 扩展字段 f9/f23 与行业分类同属一次请求，经 Provider Chain + 文件/会话缓存取用，报告层不得直连 provider）；`price_percentile` 为历史 K 线价格分位代理（0~100，`analysis/valuation_percentile.py`，MIN_SAMPLES=60），非真实历史估值分位（盈利增长未纳入，渲染层必须展示 `DISCLAIMER`"价格分位代理，非真实历史估值分位"）。由 `report/orchestrator.py::compute_valuation_data` 计算（开关 功能开关 `valuation_percentile` 默认关；关闭 → None → 「资产穿透TOP10」估值列隐藏；PE/PB 与 K 线皆不可得 → available=False 落 §1.4.5 占位）。消费方：穿透 TOP10 Excel `penetration_sheet` 估值分位列（ncols 10→11 + 表尾免责）与 HTML `report_template.html` 条件列（`valuation_enabled`）。**真实历史估值分位（TTM 口径，后续增强）**：`by_code` 另含 `real`（子契约：`available`/`pe_ttm`/`pb`/`pe_percentile`/`pb_percentile`/`tier`/`basis`/`sample_count`/`report_period`/`reason`）与 `real_available`，由 `analysis/valuation_percentile.py::compute_real_valuation` 用「多期 TTM 每股收益（年报直取、季报累计差分）× 该日已生效最新一期基本面 × 历史收盘价」构造历史 PE/PB 序列后取当前值分位（生效日取法定披露截止日以避免前视偏差；PE 优先、PB 兜底；样本下限 60）。多期基本面来自 `fetcher/financial_indicator.py::fetch_indicator_series`；渲染层**优先展示真实分位并标注 basis，无基本面覆盖时回落价格分位代理**（分别对应 `DISCLAIMER_REAL` / `DISCLAIMER_PROXY`，两者不得混口径展示）。**数据底座门禁**：真实分位以 `config.datasink_feature_ready`（`datasink.enabled` 开启 且 凭据就绪，纯本地判定）为前提——未就绪时 `_fetch_valuation_for_code` 不做任何取数与计算，`compute_valuation_data` 置 `basis_mode="proxy_only"`，估值列文案与免责语**逐字回退到引入前的原样**（Excel `penetration_sheet.valuation_footer_note` / HTML `valuation_real_basis` 同一判据）；就绪时为 `basis_mode="real_ttm"`。
 
@@ -3906,7 +3911,7 @@ investor-util/
 >
 > `market_sentiment_data`（市场情绪与持仓热点，C19 契约，报告增强开关 `market_sentiment` 默认关）：`{"available": bool, "reason": str, "trade_date": str, "summary": {"board_caps": dict[str, int|None], "lhb_stock_count": int|None, "ladder_date": str}, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`holding_kind`（直接持有/穿透）/`event_type`（龙虎榜/连板梯队）/`event_date`/`net_value_yi`/`hot_money_net_value_yi`/`org_net_value_yi`/`hot_rank`/`range_days`/`limit_reason`/`concepts`/`board_label`/`board_num`/`seal_nextday`；**只保留命中持仓/穿透标的代码的事件行**（不做概念联想）。数据来源为同花顺官方（龙虎榜 `dragon-tiger-list` + 连板梯队 `limit-up-ladder`），取数带 1 小时缓存（`sentiment_dragon_tiger` / `sentiment_ladder`）；缺凭据/两源不可用/无命中 → `available=False` 降级。消费方：行动建议章内嵌块（Excel `report/action_sheet.py::_write_market_sentiment_block` / HTML `partials/action_section.html` ⑦）。
 
-> `action_data`（行动建议，C19 契约，单源计算两处呈现）：`{"available": bool, "summary": str, "rebalance_signals": list[dict], "discipline_signals": list[dict], "rebalance_advice": list[dict], "attribution": dict\|None}`。`rebalance_signals` 每项含 code/name/weight/threshold/action（超警戒线品种再平衡信号）；`discipline_signals` 每项含 code/name/rule/value/status_label/triggered/distance_pct/action（止盈/止损/回撤触发信号，输出「触发 + 距触发幅度 + 建议动作」，由 `analysis/trade_discipline.py::compute_discipline_signals` 计算，复用 `analysis/_silence.py` 静默期机制）；`rebalance_advice` 每项含 code/name/operation/shares/amount/fee/cash_after（可执行调仓建议清单，由 `analysis/rebalance_advisor.py::build_rebalance_advice` 可行化层计算——把再平衡/纪律触发信号转成订单，份额取整一手（A 股/场内基金 100 份，场外基金整数份，复用 `core/code_utils.py` 判定，并按持仓渠道 channel 优先——场外渠道强制整数份、覆盖 16/11 开头代码被场内前缀误判的场外持有场景，C1 合规）、费用估算（本地静态费率表：佣金/印花税仅 A 股/赎回费仅场外基金，场外渠道优先计收赎回费）、现金缓冲防负值、按优先级 止损 > 部分止盈 > 卖出减仓 排序）；`attribution` 为收益归因结果 `{"available": bool, "盈利来源": list[dict], "亏损来源": list[dict], "summary": str}`——TOP5 品种按贡献占比（pp，非收益率）排序、正负分列 + 净额合计摘要，每项含 name/code/profit/contribution_pp（全精度浮点，渲染层格式化展示 +pp / +,），由 `analysis/return_attribution.py::build_return_attribution` 适配（复用共享纯计算 `compute_return_attribution`，与智囊团深度复盘提示词段落 `llm/prompts_core._build_profit_attribution_block` 同一数据两处呈现，零新增外部依赖）；无盈亏（Σ|profit|==0）或无持仓时 attribution=None，渲染层写「待生成」占位。由 `analysis/action_advisor.py::build_action_data` 计算（纯计算层，不依赖 report/），`report/orchestrator.py::prepare_report_data` 组装（full 路径 holdings_details 含 shares/price/channel——渠道上下文，按账户关键词 `is_offsite_fund` 判定场外/场内——供可行化层计算卖出份额与费用），both 路径在 `_report_generation.py` 直接以 `build_action_data` 注入。三路径的组装口径：both/full 由编排层在历史走势就绪后组装（可带组合历史峰值市值），basic 不经编排层，由 `report/excel_generator.py` 在行情明细落成后就地构建——持仓明细统一经 `report/_report_helpers.py::_action_holdings_details` 投影（basic/both 共用同一字段子集，含 shares/price/channel），basic 无历史走势故 `portfolio_peak_mv` 缺省（组合级回撤纪律按「峰值未知」处理，不激活；止盈/止损等其余纪律不受影响）。消费方（同一对象两处呈现，C14/C19）：行动建议（HTML `partials/action_section.html`，Excel `report/action_sheet.py`）+ 智囊团深度复盘「行动摘要」子块；无持仓数据或开关关闭时 available=False / 不渲染，落 §1.4.5 降级占位。C7 注册：`action` 注册于 `_REPORT_SECTION_DEFAULT`（type=`action`、data_flag=`None`、number=7），独立顶层开关 `enable_action`（默认开，菜单 P 可切换）控制 board 层可见性，序号/名称可配置，不硬编码。本仓库 `config.json` 的 `report_section_order` 显式列出完整 16 项（`llm_usage` 强制末位、不列入本表；合计 17 个模块）且与出厂默认同序（`action`=7）；清空为 `{}` 效果相同。
+> `action_data`（行动建议，C19 契约，单源计算两处呈现）：`{"available": bool, "summary": str, "rebalance_signals": list[dict], "discipline_signals": list[dict], "rebalance_advice": list[dict], "attribution": dict\|None}`。`rebalance_signals` 每项含 code/name/weight/threshold/action（超警戒线品种再平衡信号）；`discipline_signals` 每项含 code/name/rule/value/status_label/triggered/distance_pct/action（止盈/止损/回撤触发信号，输出「触发 + 距触发幅度 + 建议动作」，由 `analysis/trade_discipline.py::compute_discipline_signals` 计算，复用 `analysis/_silence.py` 静默期机制）；`rebalance_advice` 每项含 code/name/operation/shares/amount/fee/cash_after（可执行调仓建议清单，由 `analysis/rebalance_advisor.py::build_rebalance_advice` 可行化层计算——把再平衡/纪律触发信号转成订单，份额取整一手（A 股/场内基金 100 份，场外基金整数份，复用 `core/code_utils.py` 判定，并按持仓渠道 channel 优先——场外渠道强制整数份、覆盖 16/11 开头代码被场内前缀误判的场外持有场景，C1 合规）、费用估算（本地静态费率表：佣金/印花税仅 A 股/赎回费仅场外基金，场外渠道优先计收赎回费）、现金缓冲防负值、按优先级 止损 > 部分止盈 > 卖出减仓 排序）；`attribution` 为收益归因结果 `{"available": bool, "盈利来源": list[dict], "亏损来源": list[dict], "summary": str}`——TOP5 品种按贡献占比（pp，非收益率）排序、正负分列 + 净额合计摘要，每项含 name/code/profit/contribution_pp（全精度浮点，渲染层格式化展示 +pp / +,），由 `analysis/return_attribution.py::build_return_attribution` 适配（复用共享纯计算 `compute_return_attribution`，与智囊团深度复盘提示词段落 `llm/prompts_core._build_profit_attribution_block` 同一数据两处呈现，零新增外部依赖）；无盈亏（Σ|profit|==0）或无持仓时 attribution=None，渲染层写「待生成」占位。由 `analysis/action_advisor.py::build_action_data` 计算（纯计算层，不依赖 report/），`report/orchestrator.py::prepare_report_data` 组装（full 路径 holdings_details 含 shares/price/channel——渠道上下文，按账户关键词 `is_offsite_fund` 判定场外/场内——供可行化层计算卖出份额与费用），both 路径在 `_report_generation.py` 直接以 `build_action_data` 注入。三路径的组装口径：both/full 由编排层在历史走势就绪后组装（可带组合历史峰值市值），basic 不经编排层，由 `report/excel_generator.py` 在行情明细落成后就地构建——持仓明细统一经 `report/_report_helpers.py::_action_holdings_details` 投影（basic/both 共用同一字段子集，含 shares/price/channel），basic 无历史走势故 `portfolio_peak_mv` 缺省（组合级回撤纪律按「峰值未知」处理，不激活；止盈/止损等其余纪律不受影响）。消费方（同一对象两处呈现，C14/C19）：行动建议（HTML `partials/action_section.html`，Excel `report/action_sheet.py`）+ 智囊团深度复盘「行动摘要」子块；无持仓数据或开关关闭时 available=False / 不渲染，落 §1.4.5 降级占位。C7 注册：`action` 注册于 `_REPORT_SECTION_DEFAULT`（type=`action`、data_flag=`None`、number=7），独立顶层开关 `enable_action`（默认开，菜单 P 可切换）控制 board 层可见性，序号/名称可配置，不硬编码。本仓库 `config.json` 的 `report_section_order` 显式列出完整 16 项（`llm_usage` 强制末位、不列入本表；合计 18 个模块）且与出厂默认同序（`action`=7）；清空为 `{}` 效果相同。
 
 ### 附录 I：配置文件矩阵
 
