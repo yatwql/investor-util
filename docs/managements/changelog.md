@@ -17,6 +17,8 @@
 
 ### Changed
 
+- **plan/工程**：plan-76 路线改为**快照事件级**（持仓变动复盘，`holding_change_review`）——原「手工交易日志 xlsx」路线经可行性评估废弃：持仓快照历史与差异引擎已内建（`data/history/snapshots/` + `fetcher/history_diff`，2026-10 实测本机 87 期），连续快照差分即得变动事件，零手工；设计文档更名 `trade-journal-review-design.md` → `holding-change-review-design.md` 并按新路线全量修订（语义命名 `change_event`/`holding_change_events`/`_metrics`/`_panel`/`_llm_review`；先决门槛改「去重后有效快照 ≥12 期且变动事件 ≥10 个 / 事件口径唯一且局限显式标注 / 结构级结论人工认可」；五迭代改四迭代；预估成本中 → 低-中；能力边界诚实声明——结构级精度，不承诺逐笔胜率与精确持有期，沿用 `snapshot_diff` 不虚构边界）；plan.md 概述与 plan-70/76 条目、vibe 研究文档 7 处、decision 设计数据来源节、folders 目录树与统计同步
+
 - **文档/计划**：`docs/plan/` 除 jev 两份外 8 份设计/研究文档完成十轮复盘增强——每份补齐：架构定位与依赖方向、架构约束逐条对照（语义化表述，不使用代号）、共享能力复用清单（防双实现）、技术债防线、迭代表格化（迭代/范围/前置依赖/产出物）、按迭代测试策略（marker/edge/隔离/patch 纪律）、迭代级量化验收（每迭代可量化阈值与门禁命令）、外部数据依赖与稳定性考察（数据项/监测指标/降级防护/判定动作）、风险回滚与文档同步义务；终检修正约束代号 321 处全量语义化与 4 份节序跳变（**rf-587** 归档已解决），`check-doc-traces`/`check-doc-links` 全绿；复盘过程记录不入库，文档仅保留最新状态的迭代设计与计划内容
 
 - **CLI/工程**：`cli/cli.py` 910 行按职责拆分（**rf-585** 归档已解决）——按挂账建议拆为 `cli/_parser.py`（argparse 解析器构建与 type 回调，226 行）与 `cli/_handlers.py`（`_handle_*` 子命令处理器 + 持仓读入辅助 + `_EXIT_*` 退出码契约，521 行），`cli.py` 保留 `main()`/`run_cli()` 主流程与命令行功能开关应用并 re-export 全部对外符号（`__all__` 显式声明，`src.python.cli` 包导入与测试 patch 点 `cli.cli._handle_*` 零改动），910 → 243 行；测试 patch 目标随消费方迁移 4 文件（读者辅助 `_cli_read_holdings*`/`_cli_resolve_holdings_file`/`os.path.exists` → `src.python.cli._handlers.*`，含 `test_chain_overrides` 的 `monkeypatch.setattr` 改作用 `_handlers` 模块对象），156 项 CLI/源覆盖测试全绿；`check-file-length.py` EXEMPTIONS 移除 `cli.py`（豁免清空、违规 0 项）；`technical.md` §1.7 与 whatif 模块树、`folders.md` 目录树+统计、`testplan.md`/`test-coverage.md` 载体同步

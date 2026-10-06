@@ -2,7 +2,7 @@
 
 > **性质**：借鉴批候选分析（对标 TradingAgents-CN 借鉴批的方法论：先研究 → 候选清单 → 立项前做本仓库现状比对，rf-510 教训）。
 > **分析对象**：HKUDS/Vibe-Trading（2026-10-05 克隆于 `docs/tmp/Vibe-Trading`，1889 个 py 文件 / 46.5 万行）。
-> **结论速览**：4 项立项（plan-76 交易日志复盘 / plan-77 What-if 回放成本与基准 / plan-70 决策反思补设计 / plan-78 因子目录评测），6 项评估后不采纳。
+> **结论速览**：4 项立项（plan-76 持仓变动复盘 / plan-77 What-if 回放成本与基准 / plan-70 决策反思补设计 / plan-78 因子目录评测），6 项评估后不采纳。
 
 ## 1. 项目概况
 
@@ -35,7 +35,7 @@ Vibe-Trading 是港大 HKUDS 出品的「金融研究工具包」，以 MCP serv
 
 | 候选 | Vibe-Trading 参照物 | 本仓库现状 | 立项 |
 |---|---|---|---|
-| 交易日志复盘 | `skills/trade-journal`（journal schema + 归因分析） | **无**：输入只有持仓快照 Excel，买卖历史从未被结构化复盘（decision_ledger 是 LLM 决策登记，非成交记录） | **plan-76**（trade_journal_review） |
+| 持仓变动复盘 | `skills/trade-journal`（journal schema + 归因分析） | **部分**：输入只有持仓快照 Excel，但快照历史与差异引擎已内建（`data/history/snapshots/` + `HistoryDiff`）——买卖变动可由快照差分推断（decision_ledger 是 LLM 决策登记，非成交记录） | **plan-76**（holding_change_review，快照事件级） |
 | 回放成本/基准 | `factor_costs.py` + `benchmark.py` + `constraints.py` | `whatif_backtest.py` 已有生效日窗口回测（收益/夏普/回撤），但 **不计申赎成本**（高估调仓收益）、**无基准对比面板** | **plan-77**（whatif 成本建模 + 基准对比） |
 | 决策跨期反思 | `shadow_account`（extract→backtest→render 影子闭环） | plan-70 已立项但只是「撤销死线」，无落地设计；decision_reflection 实验真实账本积累极少 | **plan-70** 补设计文档（decision-reflection-shadow-design.md） |
 | 因子目录 | `factors/zoo`（462 预置 alpha 元数据） | `signal_ledger`（确定性信号账本）+ 风格因子分析已有，但**信号源靠手写注册**，无外部因子目录蓝本 | **plan-78**（factor_zoo_catalog，评测先决） |
@@ -67,7 +67,7 @@ Vibe-Trading 是港大 HKUDS 出品的「金融研究工具包」，以 MCP serv
 
 | 立项 | 设计文档 |
 |---|---|
-| plan-76 | `docs/plan/trade-journal-review-design.md` |
+| plan-76 | `docs/plan/holding-change-review-design.md` |
 | plan-77 | `docs/plan/whatif-cost-benchmark-design.md` |
 | plan-70 | `docs/plan/decision-reflection-shadow-design.md` |
 | plan-78 | `docs/plan/factor-zoo-catalog-design.md` |
@@ -76,7 +76,7 @@ Vibe-Trading 是港大 HKUDS 出品的「金融研究工具包」，以 MCP serv
 
 | 立项 | 生产落点层 | 依赖方向 | 不越界声明 |
 |---|---|---|---|
-| plan-76 交易日志复盘 | fetcher（本地解析）+ analysis + report + llm | report→analysis←loader；llm 只消费 pipeline_data 摘要 | 不写 decision_ledger/signal_ledger（只读对账）；本地解析零网络，不进 provider 链路 |
+| plan-76 持仓变动复盘 | analysis（快照读取 + 事件抽取/指标）+ report + llm | report→analysis；llm 只消费 pipeline_data 摘要 | 快照只读消费不自建存储；不写 decision_ledger/signal_ledger（只读对账）；读本地快照零网络，不进 provider 链路 |
 | plan-77 What-if 成本与基准 | analysis + report + fetcher 扩展 | 只扩展 `whatif_backtest` 消费侧，不改其纯计算契约 | 不复制限购判定（plan-74 只读复用）；不新建第二套费率配置入口 |
 | plan-70 决策反思 | core（账本写侧）+ analysis + report | report/doctor→analysis.decision_settlement；实验期经 `_experimental_seams` 挂载点 | 观测期零实施；转正前不进 `core/registry.py` 章节注册 |
 | plan-78 因子目录 | 评测期仅 `scripts/`；转正后 analysis | 评测脚本→fetcher 网关；生产侧未过门槛零改动 | 评测产物只落 `docs/tmp/`；不搬算子代码 |
@@ -109,7 +109,7 @@ Vibe-Trading 是港大 HKUDS 出品的「金融研究工具包」，以 MCP serv
 | 取数与降级 | `fetch_with_fallback()` + `cache/` | 一切新增取数经 chain，缓存经 `cache/` 接口 | 设计评审时核对：新代码不得出现 `requests.`/`providers.` 直连 |
 | 交易日计数 | `core/trading_calendar.py` | 持有期/窗口/对账时点全交易日计 | 禁自然日差表达式入代码 |
 | 指标计算 | `analysis/metrics*` + `whatif_backtest` | 胜率外的收益/回撤/窗口指标一律原语拼装 | 新模块内不得出现第二套 sharpe/回撤实现 |
-| diff/对账 | `analysis/whatif.py`（多账户合并、变动分类） | plan-76 日志↔持仓对账、plan-70 意图↔成交对账复用其合并原语 | 禁自写第二套持仓合并 |
+| diff/对账 | `analysis/whatif.py`（多账户合并、变动分类） | plan-70 意图↔成交对账（成交侧 = plan-76 变动事件）复用其合并原语 | 禁自写第二套持仓合并 |
 | LLM 指纹与降级 | `module_fingerprint.py` + `skeleton.py` 降级矩阵 | 归因/反思块指纹单源、降级形态同构 | 指纹片段禁在生成器内手拼 |
 | 报告接入 | `_experimental_seams.py` + `core/registry.py` | 实验期挂载点、转正后注册表 | 禁内联 try/except 守护、禁硬编码序号 |
 | 开关登记 | `config/features.py` | 每项新增开关仅此一处登记 | 渠道/文档清单由注册表驱动，禁另写 |
@@ -138,7 +138,7 @@ Vibe-Trading 是港大 HKUDS 出品的「金融研究工具包」，以 MCP serv
 
 | 立项 | 门槛与验收量化值（判定只认这些数字） |
 |---|---|
-| plan-76 交易日志复盘 | 门槛：真实样本 ≥20 笔、字段缺失率 ≤20%、指标人工认可；迭代验收：解析/指标手算容差 0、对账列出率 100%、降级逐字节回退 |
+| plan-76 持仓变动复盘 | 门槛：去重后有效快照 ≥12 期且变动事件 ≥10 个、事件口径唯一且局限显式标注、结构级结论人工认可；迭代验收：差分事件/指标手算容差 0、「非逐笔」标注常驻、降级逐字节回退 |
 | plan-77 What-if 成本与基准 | 门槛：抽 20 只费率取得率 ≥80%、FIFO 口径可判定、方向性翻转 ≥1；迭代验收：档位手算容差 0、关态哈希不变、未知费率不出伪数字 |
 | plan-78 因子目录评测 | 门槛：A ≥80%（≥20/25）、B ≥30%、C ≤20%；迭代验收：判定值可复算且与入库结论逐字段一致 |
 | plan-70 决策跨期反思 | 死线：已结算样本 ≥10 条方可谈转正；迭代验收：结算手算容差 0、关态哈希不变、异常注入不中断主链路 |
@@ -151,7 +151,7 @@ Vibe-Trading 是港大 HKUDS 出品的「金融研究工具包」，以 MCP serv
 
 | 立项 | 外部数据依赖 | 稳定性考察要点 | 专项节位置 |
 |---|---|---|---|
-| plan-76 | 无新增源；用户日志文件 + 既有 LLM 链 | 样本 ≥20 笔/缺失率 ≤20% 持续监测、行级跳过计数回显、LLM 降级矩阵 | `trade-journal-review-design.md` 外部数据节 |
+| plan-76 | 无新增源；本机自产快照 + 既有 LLM 链 | 有效快照期数/最早跨度回显、60 天滚动截断监测、LLM 降级矩阵 | `holding-change-review-design.md` 数据源稳定性节 |
 | plan-77 | 申赎费率（天天基金链路）、基准指数行情 | 取得率 ≥80%、页面改版解析失败计数、cassette 回放防漂移、语义版本缓存 | `whatif-cost-benchmark-design.md` 外部数据节 |
 | plan-78 | 行情/财务字段（评测期考察） | 字段可得率 ≥80% 与不可得原因分类（区分口径不可得 vs 源暂不可用） | `factor-zoo-catalog-design.md` 外部数据节 |
 | plan-70 | 建议日窗口行情（既有链） | 窗口缺口率 >30% 判不足、未结算积压趋势作为稳定性前置信号 | `decision-reflection-shadow-design.md` 外部数据节 |
