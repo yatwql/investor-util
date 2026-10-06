@@ -55,6 +55,7 @@
 
 ### Fixed
 
+- **LLM/缓存**：辩论指纹并入统一附录块（**rf-593**）——`debate_procon_fingerprint` 此前不含申购限购/持仓变动/事件窗/调仓回放四块，而白脸/黑脸经同一 `generate_llm_module` → skeleton 追加附录：仅附录内容变化（如申购状态更新）而其余输入不变时辩论缓存键不换，回放带旧附录上下文的旧输出；四块以「非空才并入」条件追加进辩论 part（与四标准模块同构，综合键经「基础指纹 + 综合提示词全文」自动覆盖），docstring 与 `llm-technical` 输入口径清单同步；回归用例 5 项（四块非空换键/内容变化再换键 + 空块接线前黄金值逐字节不变） | rf-593
 - **报告/快照**：持仓快照污染根治（**rf-599**）——demo/临时持仓（路径不在 `data/holdings/` 正式目录下）经报告管线 `capture_snapshot`（始终执行）把幻影持仓写进用户真实快照历史（实测 10-02 CLI 以 `/tmp/demo/holdings/示例持仓.xlsx` 运行 4 次混入 4 份），持仓变动复盘因此把未持有品种报成清仓；新增 `config.is_formal_holdings_source` 持仓源守卫：共享主目录（namespace=None）只接受正式持仓源（含排除 `data/holdings/uploads/` 上传暂存区），非正式源 capture 直接返回 None——不落盘、不与真实历史比对，下游历史章随 pipeline_data 缺席同首次运行口径隐藏；命名空间域（web 试算）域内闭环不受限，解析异常 fail-closed；已删除 4 份污染快照（历史复归真实持仓序列）；回归用例 `test_snapshot_source_guard.py` 8 项 + `_edge.py` 3 项，web 正式模式两用例以 tmp 目录模拟正式源显式声明 | rf-599
 
 - **数据源复核**：push2 扩展字段（动态 PE / 总市值 / PB）空值复核结论（**rf-592**）——评测期响应正常但 `f9/f20/f23` 全空、复核时 `api/qt/stock/get` 端点直接断连（双探针均远端断开），判**源侧字段策略变更/暂不可用**；消费方 `fetch_valuation_fields` 本就按空值降级为 None，`factor_evaluator` 对 `fund_pb`/`fund_size_log_cap` 判「估值字段不可得」逐因子降级、冻结目录条目保留待源恢复；换端点属数据源路由事项留待后续 | rf-592

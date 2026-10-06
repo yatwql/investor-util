@@ -55,19 +55,12 @@
 |---|------|----------|
 | **rf-598** | `check-doc-drift` 的开关计数校验未覆盖 `requirements.md` §11.5 正文的「N 项 / 实验 X / 报告 Y」计数，该节自 plan-75 起连续多个版本增项未同步而守护不报 | 把 requirements 计数纳入 `check-doc-drift` 受检面（与配置指引同口径派生注册表实数），补单测；纳入后 rf-597 类漂移由守护直接拦出 |
 
-### rf-593 — 辩论指纹未并入统一附录块（2026-10-06）
-
-> plan-79 实施期间发现；**pre-existing**（申购限购/持仓变动两块同缺，事件窗块沿同一模式接入后三块同缺），不阻塞本轮交付——仅当「只有附录块变化、其余指纹输入不变」时辩论缓存键才失配，实际多伴随持仓/行情变化换键。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-593** | `module_fingerprint.debate_procon_fingerprint` 输入口径刻意不含统一附录块（申购限购/持仓变动/事件窗三块），而白脸/黑脸经同一 `generate_llm_module` → skeleton 追加附录——当仅附录块内容变化（如新闻关联极性/申购状态更新）而其余指纹输入不变时，辩论缓存键不换，可能回放带旧附录上下文的旧输出 | 将三块以「非空才并入」条件追加进辩论指纹 part（与四标准模块同构），同步 docstring「输入口径」清单；补回归用例：块非空改变辩论键、空块逐字节不变 |
-
 ## 已解决问题
 
 | # | 摘要 | 状态 |
 |---|------|------|
 | **rf-599** | demo/临时持仓经报告管线写入真实快照历史（10-02 CLI 以 `/tmp/demo/holdings/示例持仓.xlsx` 运行 4 次，`capture_snapshot` 始终执行 → 4 份幻影快照混入 `data/history/snapshots/`，持仓变动复盘把未持有品种报成清仓） | 已修复 2026-10-07（新增 `config.is_formal_holdings_source` 持仓源守卫：共享主目录只接受 `data/holdings/` 正式源，非正式源 capture 返回 None 不落盘不比对、命名空间域不受限、解析异常 fail-closed；删除 4 份污染快照；回归用例 `test_snapshot_source_guard(_edge).py` 11 项，web 正式模式两用例显式声明正式源） |
+| **rf-593** | `module_fingerprint.debate_procon_fingerprint` 输入口径刻意不含统一附录块（申购限购/持仓变动/事件窗/调仓回放四块），而白脸/黑脸经同一 `generate_llm_module` → skeleton 追加附录——仅附录块内容变化（如申购状态更新）而其余指纹输入不变时辩论缓存键不换，回放带旧附录上下文的旧输出 | 已修复 2026-10-07（四块「非空才并入」条件追加进辩论 part，与四标准模块同构，综合键自动覆盖；docstring 与 `llm-technical` 输入口径清单同步；回归用例 5 项：四块三态换键 + 空块接线前黄金值逐字节不变） |
 | **rf-594** | `how-to-config.md` Web 面板配置项对照表「实验性功能」行缺 `whatif_trade_cost` 且编号段 `8-11` 陈旧（Web 白名单按注册表自动全收，行内容为文档滞留） | 已修复 2026-10-06（该行补 whatif/事件窗两键、编号段更正 `8-13`，随 plan-79 开关同步；`check-doc-drift --ci` 复核通过） |
 | **rf-595** | 事件窗接线测试的日历注入 fixture 为独立 autouse，先于 `offline_external_sources` 装配——offline 桩把日历 MagicMock 存为「原值」并在逆序终化时还原出来（patch 泄漏到后续用例，实测把 `test_market_value` 并发串行化用例打红） | 已修复 2026-10-06（`_calendar` 显式依赖 `offline_external_sources` 强制装配序；回归用例 `TestCalendarFixtureStackOrder` 锁依赖声明与逐层还原） |
 | **rf-596** | OpenAI/Gemini 协议分支缓存命中计量缺口：`_log_token_usage` 与 `track_session_usage` 非 claude 分支 `cache_hit = 0` 硬编码，`prompt_tokens_details.cached_tokens` 未读——OpenAI 系端点「缓存命中」恒 0、费用按全价 input 估算（低估折扣）、会话 `cache_hit_tokens` 少计 | 已修复 2026-10-06（单源 `_normalize_usage_tokens` 三字段归一，`session` 持有、`api_base` 复用本就存在的依赖方向；回归 7 用例覆盖 claude/openai×有无 details/Gemini 归一形/空值/会话累计；纯读数修复不改任何 prompt 与调用行为） |

@@ -492,7 +492,9 @@ def test_pipeline_block_enters_precheck_key_not_only_write_side(module_key: str)
 # ═══════════════════════════════════════════════════════════════
 
 
-def _debate_inputs(competitive_context: str = "", metrics=None, pipeline_data=None) -> ModuleFingerprintInputs:
+def _debate_inputs(
+    competitive_context: str = "", metrics=None, pipeline_data=None, **appendix_blocks: str
+) -> ModuleFingerprintInputs:
     return ModuleFingerprintInputs(
         total_mv=_TOTAL_MV,
         total_cost=_TOTAL_COST,
@@ -503,6 +505,7 @@ def _debate_inputs(competitive_context: str = "", metrics=None, pipeline_data=No
         competitive_context=competitive_context,
         metrics=metrics,
         pipeline_data=pipeline_data,
+        **appendix_blocks,
     )
 
 
@@ -610,6 +613,47 @@ def test_debate_fingerprint_carries_debate_feature_suffix():
     on = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK))
 
     assert off != on, "辩论增强后缀未进入辩论指纹"
+
+
+# ═══════════════════════════════════════════════════════════════
+#  统一 prompt 附录四块 → 辩论键：非空条件并入 + 接线前基线
+#  （白脸/黑脸经 generate_llm_module → skeleton 追加附录，进提示词必进指纹）
+# ═══════════════════════════════════════════════════════════════
+
+_DEBATE_APPENDIX_SAMPLES = {
+    "purchase_block": "【申购限购约束】\n- 110022 示例安心债券 限大额：单账户单日限购 100 元",
+    "holding_change_block": "【持仓变动复盘】\n- 区间净额推断：600900 净增持 +2,000 份",
+    "event_impact_block": "【事件窗分歧例】\n- 2026-09-18 513100 文本判利好 / 窗口方向下",
+    "schedule_replay_block": "【调仓纪律回放引用】\n- 月度定期 37.16% vs 买入持有 32.85%",
+}
+
+# 条件并入之前以本文件样例输入录制的辩论基础指纹（四块皆空时键必须与引入前
+# 逐字节一致——抓「空串 + 分隔符改变哈希」陷阱，存量辩论缓存不无谓失效）。
+# 后缀逻辑有意变更时应同步更新（黄金值例外登记）。
+_DEBATE_PRE_WIRE_BASELINE = "402a4fb71050_c"
+
+
+def test_debate_appendix_blocks_empty_equals_pre_wire_baseline():
+    """四块皆空 = 接线前基线（条件并入，空串不追加 part，存量缓存不失效）。"""
+    from src.python.llm.module_fingerprint import debate_procon_fingerprint
+
+    assert debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK, _METRICS)) == _DEBATE_PRE_WIRE_BASELINE
+
+
+@pytest.mark.parametrize("block_field", sorted(_DEBATE_APPENDIX_SAMPLES))
+def test_debate_appendix_block_enters_fingerprint(block_field):
+    """统一附录块非空 ⇒ 辩论键变；块内容变 ⇒ 键再变（防回放带旧附录上下文）。"""
+    from src.python.llm.module_fingerprint import debate_procon_fingerprint
+
+    block = _DEBATE_APPENDIX_SAMPLES[block_field]
+    baseline = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK, _METRICS))
+    with_block = debate_procon_fingerprint(_debate_inputs(_COMPETITIVE_BLOCK, _METRICS, **{block_field: block}))
+    changed = debate_procon_fingerprint(
+        _debate_inputs(_COMPETITIVE_BLOCK, _METRICS, **{block_field: block + "（更新）"})
+    )
+
+    assert baseline != with_block, f"{block_field}: 附录块未进辩论指纹（换附录不换键 → 复用旧上下文）"
+    assert with_block != changed, f"{block_field}: 附录块内容变化未换键"
 
 
 # ═══════════════════════════════════════════════════════════════

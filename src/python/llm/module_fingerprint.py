@@ -244,33 +244,47 @@ def expert_review_fingerprint(inputs: ModuleFingerprintInputs) -> str:
 
 
 def debate_procon_fingerprint(inputs: ModuleFingerprintInputs) -> str:
-    """辩论白脸 / 黑脸两键共用的基础指纹 + 辩论增强后缀 + 环比与降级块后缀。
+    """辩论白脸 / 黑脸两键共用的基础指纹 + 统一附录四块 + 辩论增强后缀 + 环比与降级块后缀。
 
     **仅写侧使用**：辩论模式绕过标准预检（其缓存键族 ``llm_debate_*`` 与标准
     ``llm_expert_review_*`` 不同），故不进 ``MODULE_FINGERPRINT_BUILDERS``。
 
     输入口径以其提示词实际包含的段落为准——基础持仓 + 竞争语境块 + 量化指标 +
     辩论增强后缀 + ``pipeline_data`` 派生的【环比变化】【数据质量降级】两段
-    （白脸/黑脸复用 ``_build_expert_review_prompt``，这两段随之进入其提示词）。
+    （白脸/黑脸复用 ``_build_expert_review_prompt``，这两段随之进入其提示词）+
+    统一 prompt 附录四块（申购限购 / 持仓变动复盘 / 事件窗分歧例 / 调仓纪律回放；
+    白脸/黑脸经 ``generate_llm_module`` → skeleton 追加附录，故与四标准模块同形
+    **非空才并入**——否则仅附录内容变化（如申购状态更新）时键不动，回放带旧
+    附录上下文的旧输出；空串不追加 part，键与引入前逐字节一致）。
 
     **刻意不并入** ``history_data`` 与决策教训、信号摘要、结构化决策头后缀：
     辩论提示词不含这些段落（不传 ``history_data``、不开信号预消化与结构化决策头），
     并入只会让每次运行都换键 —— 白脸/黑脸两次昂贵调用每份报告必 miss。
     """
+    _parts = [
+        build_llm_fingerprint(
+            total_mv=inputs.total_mv,
+            total_cost=inputs.total_cost,
+            total_profit=inputs.total_profit,
+            total_today_profit=inputs.total_today_profit,
+            holdings_details=inputs.holdings_details,
+            penetrated_assets=inputs.penetrated_assets,
+            categories=inputs.categories,
+        ),
+        inputs.competitive_context,
+        inputs.metrics,
+    ]
+    # 条件并入：进提示词必进指纹；块空不追加 part（逐字节回退，不误伤存量缓存）
+    if inputs.purchase_block:
+        _parts.append(inputs.purchase_block)
+    if inputs.holding_change_block:
+        _parts.append(inputs.holding_change_block)
+    if inputs.event_impact_block:
+        _parts.append(inputs.event_impact_block)
+    if inputs.schedule_replay_block:
+        _parts.append(inputs.schedule_replay_block)
     return (
-        compute_fingerprint(
-            build_llm_fingerprint(
-                total_mv=inputs.total_mv,
-                total_cost=inputs.total_cost,
-                total_profit=inputs.total_profit,
-                total_today_profit=inputs.total_today_profit,
-                holdings_details=inputs.holdings_details,
-                penetrated_assets=inputs.penetrated_assets,
-                categories=inputs.categories,
-            ),
-            inputs.competitive_context,
-            inputs.metrics,
-        )
+        compute_fingerprint(*_parts)
         + debate_feature_cache_suffix()
         + _pipeline_block_cache_suffix(inputs.pipeline_data)
     )
