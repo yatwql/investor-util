@@ -47,18 +47,11 @@
 |---|------|------|----------|
 | **rf-586** | **警告级（未越红线）跟踪——红线 8 个已随 rf-583 拆分清零，2026-10-05 `check-file-length.py -v` 派生**：行数最贴红线的 `unit/llm/test_llm_api_base.py`（1190 行，距 1200 仅 10 行）、`unit/report/test_penetration.py`（1141）、`unit/config/test_config.py`（1112）；用例数最贴 120 项红线的 `unit/scripts/test_check_doc_drift.py`（94 项）、`unit/config/test_config.py`（89 项）；`test_html_report_structure.py` 拆分后回落至 31 项，原 110 项警告解除 | 无门禁动作（800~1200 行 / 80~120 项仅 `-v` 清单）；再增内容前先跑 `check-file-length.py -v`，逼近红线时按「被测函数 / 场景类型」拆分并同步刷新 `test-coverage.md` / `folders.md` 用例计数 |
 
-### rf-598 — check-doc-drift 开关计数受检面未覆盖 requirements（2026-10-06）
-
-> rf-597 修复期间发现；其余受检面（配置指引 / TUI 手册 / 技术设计计数）均在守护内且全绿。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-598** | `check-doc-drift` 的开关计数校验未覆盖 `requirements.md` §11.5 正文的「N 项 / 实验 X / 报告 Y」计数，该节自 plan-75 起连续多个版本增项未同步而守护不报 | 把 requirements 计数纳入 `check-doc-drift` 受检面（与配置指引同口径派生注册表实数），补单测；纳入后 rf-597 类漂移由守护直接拦出 |
-
 ## 已解决问题
 
 | # | 摘要 | 状态 |
 |---|------|------|
+| **rf-598** | `check-doc-drift` 开关计数校验未覆盖 `requirements.md` §11.5 正文写法（`分**实验组**（N 项` / `提供 N 项功能开关` / `完整 N 项与分组清单`），该节增项未同步而守护不报（plan-80 增项后 33→34、实验 7→8 漂移未拦出） | 已修复 2026-10-07（`_GROUPED_COUNT` 容忍加粗组名与「报告章节与增强组」全名、`_TOTAL_COUNT` 增补未加粗「提供」式与「完整 N 项与分组清单」式，计数仍派生注册表实数；纳入即拦出并刷新 requirements 两处陈旧计数；补 3 项模式单测；`check-doc-drift --ci` 全绿） |
 | **rf-599** | demo/临时持仓经报告管线写入真实快照历史（10-02 CLI 以 `/tmp/demo/holdings/示例持仓.xlsx` 运行 4 次，`capture_snapshot` 始终执行 → 4 份幻影快照混入 `data/history/snapshots/`，持仓变动复盘把未持有品种报成清仓） | 已修复 2026-10-07（新增 `config.is_formal_holdings_source` 持仓源守卫：共享主目录只接受 `data/holdings/` 正式源，非正式源 capture 返回 None 不落盘不比对、命名空间域不受限、解析异常 fail-closed；删除 4 份污染快照；回归用例 `test_snapshot_source_guard(_edge).py` 11 项，web 正式模式两用例显式声明正式源） |
 | **rf-593** | `module_fingerprint.debate_procon_fingerprint` 输入口径刻意不含统一附录块（申购限购/持仓变动/事件窗/调仓回放四块），而白脸/黑脸经同一 `generate_llm_module` → skeleton 追加附录——仅附录块内容变化（如申购状态更新）而其余指纹输入不变时辩论缓存键不换，回放带旧附录上下文的旧输出 | 已修复 2026-10-07（四块「非空才并入」条件追加进辩论 part，与四标准模块同构，综合键自动覆盖；docstring 与 `llm-technical` 输入口径清单同步；回归用例 5 项：四块三态换键 + 空块接线前黄金值逐字节不变） |
 | **rf-594** | `how-to-config.md` Web 面板配置项对照表「实验性功能」行缺 `whatif_trade_cost` 且编号段 `8-11` 陈旧（Web 白名单按注册表自动全收，行内容为文档滞留） | 已修复 2026-10-06（该行补 whatif/事件窗两键、编号段更正 `8-13`，随 plan-79 开关同步；`check-doc-drift --ci` 复核通过） |

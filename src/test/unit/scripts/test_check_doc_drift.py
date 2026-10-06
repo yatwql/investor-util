@@ -189,6 +189,29 @@ class TestSwitchCounts:
         findings = drift.check_switch_counts({Path("m.md"): f"提供 **{wrong_total} 项功能开关**的运行时覆写"})
         assert len(findings) == 1 and f"{wrong_total} 项功能开关" in findings[0]
 
+    def test_bold_grouped_triple_from_requirements(self, drift):
+        """requirements §11.5 加粗组名写法（分**实验组**（N 项…）与**报告章节与增强组**）同样受检。"""
+        counts = drift._group_counts()
+        _wrong_exp = counts["experimental"] + 1  # 仅实验组写错（计数从注册表现算，禁写死演进总数）
+        text = (
+            f"开关分**实验组**（{_wrong_exp} 项，默认关）、**常规组**（{counts['standard']} 项，默认开）"
+            f"与**报告章节与增强组**（{counts['report']} 项，多数默认关）三块"
+        )
+        findings = drift.check_switch_counts({Path("m.md"): text})
+        assert len(findings) == 1 and f"**实验组**（{_wrong_exp} 项" in findings[0]
+
+    def test_provide_unbolded_total_mismatch(self, drift):
+        """「提供 N 项功能开关」（未加粗）合计写法受检（requirements §11.5 正文原式）。"""
+        wrong_total = len(drift.feature_switch_registry) + 1
+        findings = drift.check_switch_counts({Path("m.md"): f"提供 {wrong_total} 项功能开关的运行时覆写"})
+        assert len(findings) == 1 and f"提供 {wrong_total} 项功能开关" in findings[0]
+
+    def test_complete_items_list_total_form(self, drift):
+        """「完整 N 项与分组清单」指引式合计（含加粗形态）与注册表一致时零 finding。"""
+        total = len(drift.feature_switch_registry)
+        text = f"下表列常用开关（完整 {total} 项与分组清单见配置指引）\n完整 **{total} 项**与分组清单见上表"
+        assert drift.check_switch_counts({Path("m.md"): text}) == []
+
 
 class TestDefaultClaims:
     def test_stale_default_flagged(self, drift):

@@ -55,6 +55,8 @@
 
 ### Fixed
 
+- **守护/文档**：`check-doc-drift` 开关计数受检面扩展至 requirements §11.5 正文写法（**rf-598**）——`_GROUPED_COUNT` 容忍加粗组名与「报告章节与增强组」全名、`_TOTAL_COUNT` 增补未加粗「提供 N 项功能开关」与「完整 N 项与分组清单」两式（计数仍派生注册表实数），纳入即拦出 plan-80 增项后未同步的两处陈旧计数（33→34、实验 7→8）并随修复刷新；补 3 项模式单测（计数从注册表现算） | rf-598
+
 - **LLM/缓存**：辩论指纹并入统一附录块（**rf-593**）——`debate_procon_fingerprint` 此前不含申购限购/持仓变动/事件窗/调仓回放四块，而白脸/黑脸经同一 `generate_llm_module` → skeleton 追加附录：仅附录内容变化（如申购状态更新）而其余输入不变时辩论缓存键不换，回放带旧附录上下文的旧输出；四块以「非空才并入」条件追加进辩论 part（与四标准模块同构，综合键经「基础指纹 + 综合提示词全文」自动覆盖），docstring 与 `llm-technical` 输入口径清单同步；回归用例 5 项（四块非空换键/内容变化再换键 + 空块接线前黄金值逐字节不变） | rf-593
 - **报告/快照**：持仓快照污染根治（**rf-599**）——demo/临时持仓（路径不在 `data/holdings/` 正式目录下）经报告管线 `capture_snapshot`（始终执行）把幻影持仓写进用户真实快照历史（实测 10-02 CLI 以 `/tmp/demo/holdings/示例持仓.xlsx` 运行 4 次混入 4 份），持仓变动复盘因此把未持有品种报成清仓；新增 `config.is_formal_holdings_source` 持仓源守卫：共享主目录（namespace=None）只接受正式持仓源（含排除 `data/holdings/uploads/` 上传暂存区），非正式源 capture 直接返回 None——不落盘、不与真实历史比对，下游历史章随 pipeline_data 缺席同首次运行口径隐藏；命名空间域（web 试算）域内闭环不受限，解析异常 fail-closed；已删除 4 份污染快照（历史复归真实持仓序列）；回归用例 `test_snapshot_source_guard.py` 8 项 + `_edge.py` 3 项，web 正式模式两用例以 tmp 目录模拟正式源显式声明 | rf-599
 
