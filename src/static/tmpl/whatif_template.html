@@ -439,9 +439,126 @@
     </div>
     {% endif %}
 
-    <!-- ⑧ 说明 -->
+{% if _w.get("cost") %}
+    {% set _cost = _w.get("cost") %}
+    {% set _tc = _cost.get("trade_cost", {}) %}
+    {% set _src_map = {"f10_tier": "F10 阶梯", "table_single": "全量表单档", "config": "配置", "unknown": "未知", "unmodeled": "未建模"} %}
+    {% set _side_map = {"buy": "买入", "sell": "卖出", "unmodeled": "未建模"} %}
+    <!-- ⑧ 交易成本对比（开关 whatif_trade_cost，出厂关；缺席 = 关闭/降级） -->
     <div class="section">
-        <div class="section-title">⑧ 说明</div>
+        <div class="section-title">⑧ 交易成本对比（调仓回放，申赎成本口径）</div>
+        <div class="section-content">
+            {% if not _tc.get("available") %}
+            <div class="empty-note placeholder-note"><p>{{ _tc.get("reason") or _cost.get("reason") or "交易成本对比暂不可用" }}</p></div>
+            {% else %}
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h3>申购费合计</h3>
+                    <div class="value">{{ _tc.get("purchase_total", 0) | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>赎回费合计</h3>
+                    <div class="value">{{ _tc.get("redemption_total", 0) | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>交易总成本</h3>
+                    <div class="value">{{ _tc.get("total_cost", 0) | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>费率完整性</h3>
+                    <div class="value">{{ "全知" if _tc.get("fees_complete") else "有未知" }}</div>
+                    <div class="meta">未知 {{ _tc.get("unknown_legs", 0) }} 腿 · 未建模 {{ _tc.get("unmodeled_legs", 0) }} 腿</div>
+                </div>
+            </div>
+            <table style="margin-top:16px;">
+                <thead>
+                    <tr>
+                        <th>变动</th>
+                        <th>名称</th>
+                        <th>代码</th>
+                        <th>方向</th>
+                        <th>份额</th>
+                        <th>金额(元)</th>
+                        <th>费率</th>
+                        <th>费用(元)</th>
+                        <th>持有期(交易日)</th>
+                        <th>费率来源</th>
+                        <th>入账日</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for leg in _tc.get("legs", []) %}
+                    {% set _slug = _action_slug.get(leg.get('action', ''), 'unchanged') %}
+                    <tr class="whatif-{{ _slug }}">
+                        <td><span class="action-badge badge-{{ _slug }}">{{ leg.get("action", "") }}</span></td>
+                        <td class="text-left">{{ leg.get("name", "") }}</td>
+                        <td>{{ leg.get("code", "") }}</td>
+                        <td>{{ _side_map.get(leg.get("side"), leg.get("side", "")) }}</td>
+                        <td class="text-right">{{ "%.2f" | format(leg.get("shares", 0.0)) }}</td>
+                        <td class="text-right">{{ "%.2f" | format(leg.get("amount", 0.0)) }}</td>
+                        <td class="text-right">{{ "—" if leg.get("rate") is none else ("%.3f%%" | format(leg.get("rate") * 100)) }}</td>
+                        <td class="text-right">{% if leg.get("fee") is not none %}{{ "%.2f" | format(leg.get("fee")) }}{% elif leg.get("flat_fee") is not none %}每笔 {{ "%.2f" | format(leg.get("flat_fee")) }}{% else %}—{% endif %}</td>
+                        <td class="text-right">{{ "%.1f" | format(leg.get("holding_days")) if leg.get("holding_days") is not none else "—" }}</td>
+                        <td>{{ _src_map.get(leg.get("rate_source"), leg.get("rate_source", "")) }}</td>
+                        <td>{{ leg.get("booked_date") or "—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if _tc.get("notes") %}
+            <div class="notice-banner" style="margin-top:12px;">
+                {% for n in _tc.get("notes", []) %}<div>* {{ n }}</div>{% endfor %}
+            </div>
+            {% endif %}
+            {% endif %}
+
+            {% if _cost.get("impact") %}
+            <div style="margin:16px 0 8px; font-weight:600;">成本前 / 成本后（生效日 t0 一次性扣费，收益相对 100 基点基线）</div>
+            <table>
+                <thead>
+                    <tr><th>指标</th><th>数值</th><th>说明</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="text-left">交易成本合计</td>
+                        <td class="text-right">{{ "%.2f" | format(_cost.impact.get("fee_total", 0.0)) }} 元</td>
+                        <td class="text-left">占目标组合成本 {{ "%.4f" | format(_cost.impact.get("t0_ratio", 0.0) * 100) }}%（{{ "%.2f" | format(_cost.impact.get("cand_t0_value", 0.0)) }} 元）</td>
+                    </tr>
+                    <tr>
+                        <td class="text-left">成本前收益</td>
+                        <td class="text-right">{{ "%.2f" | format(_cost.impact.get("return_before_pct", 0.0)) }}%</td>
+                        <td class="text-left">回测窗口，未扣交易成本</td>
+                    </tr>
+                    <tr>
+                        <td class="text-left">成本后收益</td>
+                        <td class="text-right">{{ "%.2f" | format(_cost.impact.get("return_after_pct", 0.0)) }}%</td>
+                        <td class="text-left">生效日 t0 扣除交易成本后</td>
+                    </tr>
+                    <tr>
+                        <td class="text-left">收益差</td>
+                        <td class="text-right">{% if _cost.impact.get("delta_pct_points", 0) < 0 %}▼{% elif _cost.impact.get("delta_pct_points", 0) > 0 %}▲{% else %}={% endif %} {{ "%.2f" | format(_cost.impact.get("delta_pct_points", 0.0)) }} 个百分点</td>
+                        <td class="text-left">成本后 − 成本前；费率未知时不出本表</td>
+                    </tr>
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if _cost.get("chart") and whatif_cost_chart_data %}
+            <div class="chart-box" style="height:300px; margin-top:16px;">
+                <canvas id="chart_whatif_cost_nav" width="400" height="280" style="width:100%;height:100%;" aria-label="基准持仓与目标成本后净值及业绩基准指数三线对比（100 基点）" role="img">图表无法显示，数据见 Excel 交易成本对比页签</canvas>
+            </div>
+            <div class="chart-caption">基准持仓 vs 目标（成本后）{% if _cost.get("benchmark") %} vs {{ _cost.benchmark.get("name", "业绩基准") }}{% endif %} — 归一化 100 基点</div>
+            <script type="application/json" id="whatif-cost-chart-data">{{ whatif_cost_chart_data | tojson }}</script>
+            {% endif %}
+
+            {% if _cost.get("benchmark") %}
+            <div class="chart-caption">业绩基准：{{ _cost.benchmark.get("name", "") }}（{{ _cost.benchmark.get("code", "") }}，映射来源：{{ {"config": "配置覆盖", "holdings": "持仓基准文本匹配", "default": "宽基默认"}.get(_cost.benchmark.get("source"), _cost.benchmark.get("source", "")) }}）{% if _cost.benchmark.get("status") != "ok" %} — 指数行情暂缺，仅出成本后对比{% endif %}</div>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}    <!-- ⑧ 说明 -->
+    <div class="section">
+        {% if _w.get("cost") %}<div class="section-title">⑨ 说明</div>{% else %}<div class="section-title">⑧ 说明</div>{% endif %}
         <div class="section-content">
             <div class="notice-banner">
                 <div>* 口径：权重基于成本 = 份额 × 每份成本（成本口径截面比较，本地计算、零网络请求）。</div>
@@ -559,7 +676,39 @@
         }, '回撤（%）');
       }
     }
-  });
+{% if whatif_cost_chart_data %}
+    /* ── 交易成本三线图（基准 / 目标·成本后 / 业绩基准）─ 基准缺失/费率未知时按现有数据降级 ── */
+    var costDataEl = document.getElementById('whatif-cost-chart-data');
+    if (costDataEl) {
+      var costData;
+      try { costData = JSON.parse(costDataEl.textContent || '{}'); } catch (e) { costData = null; }
+      if (costData && costData.labels && costData.labels.length) {
+        var costCanvas = document.getElementById('chart_whatif_cost_nav');
+        if (costCanvas) {
+          var costDatasets = [
+            { label: '基准持仓', data: costData.base, borderColor: '#2E75B6', backgroundColor: 'rgba(46,117,182,0.08)', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.1 }
+          ];
+          if (costData.candidate_after && costData.candidate_after.length) {
+            costDatasets.push({ label: '目标（成本后）', data: costData.candidate_after, borderColor: '#E68A00', backgroundColor: 'rgba(230,138,0,0.08)', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.1 });
+          } else if (costData.candidate_before && costData.candidate_before.length) {
+            costDatasets.push({ label: '目标（成本未计）', data: costData.candidate_before, borderColor: '#E68A00', backgroundColor: 'rgba(230,138,0,0.08)', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.1 });
+          }
+          if (costData.benchmark && costData.benchmark.length) {
+            costDatasets.push({ label: costData.benchmark_name || '业绩基准', data: costData.benchmark, borderColor: '#2E7D32', backgroundColor: 'rgba(46,125,50,0.06)', borderWidth: 2, borderDash: [6, 4], pointRadius: 0, fill: false, tension: 0.1 });
+          }
+          try {
+            window.ChartCommon.trackChart(new Chart(costCanvas, {
+              type: 'line',
+              data: { labels: costData.labels, datasets: costDatasets },
+              options: window.ChartCommon.lineOptions('归一化净值（100 基点）')
+            }), 'chart_whatif_cost_nav');
+          } catch (err) {
+            console.warn('[whatif] 成本图表初始化失败: ', err);
+          }
+        }
+      }
+    }
+{% endif %}  });
 })();
 </script>
 </body>

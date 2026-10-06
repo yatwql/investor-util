@@ -434,3 +434,137 @@ class TestWhatifBacktestSheet(unittest.TestCase):
         ws = self._write(_whatif_data(backtest=bt))
         flat = self._flat(ws)
         self.assertTrue(any("生效日后数据不足" in v for v in flat), "应写回测 reason")
+
+
+def _cost_data() -> dict:
+    """完整成本面板契约（成本块 + impact + benchmark 三段齐全）。"""
+    return {
+        "available": True,
+        "cost": {
+            "available": True,
+            "reason": "",
+            "trade_cost": {
+                "available": True,
+                "legs": [
+                    {
+                        "code": "002943",
+                        "name": "广发多因子灵活配置混合",
+                        "action": "新增",
+                        "side": "buy",
+                        "shares": 500.0,
+                        "amount": 10000.0,
+                        "rate": 0.0015,
+                        "fee": 15.0,
+                        "flat_fee": None,
+                        "rate_source": "f10_tier",
+                        "booked_date": "2026-10-01",
+                        "holding_days": None,
+                    },
+                    {
+                        "code": "096001",
+                        "name": "某债券基金",
+                        "action": "清仓",
+                        "side": "sell",
+                        "shares": 2000.0,
+                        "amount": 20000.0,
+                        "rate": 0.005,
+                        "fee": 100.0,
+                        "flat_fee": None,
+                        "rate_source": "f10_tier",
+                        "booked_date": "2026-10-01",
+                        "holding_days": 60.0,
+                    },
+                    {
+                        "code": "600900",
+                        "name": "长江电力",
+                        "action": "减仓",
+                        "side": "unmodeled",
+                        "shares": 600.0,
+                        "amount": 18000.0,
+                        "rate": None,
+                        "fee": None,
+                        "flat_fee": None,
+                        "rate_source": "unmodeled",
+                        "booked_date": "2026-10-01",
+                        "holding_days": None,
+                    },
+                ],
+                "purchase_total": 15.0,
+                "redemption_total": 100.0,
+                "total_cost": 115.0,
+                "unknown_legs": 0,
+                "unmodeled_legs": 1,
+                "leg_count": 3,
+                "fees_complete": True,
+                "notes": ["口径1：持有期按交易日计", "股票/场内腿不建模申赎费"],
+            },
+            "impact": {
+                "fee_total": 115.0,
+                "cand_t0_value": 99000.0,
+                "t0_ratio": 0.001162,
+                "return_before_pct": 5.0,
+                "return_after_pct": 4.88,
+                "delta_pct_points": -0.12,
+            },
+            "benchmark": {
+                "code": "sh000300",
+                "name": "沪深300",
+                "source": "holdings",
+                "status": "ok",
+                "values": [100.0, 110.0],
+            },
+            "chart": {
+                "labels": ["2026-10-01", "2026-10-06"],
+                "base": [100.0, 101.0],
+                "candidate_after": [99.8838, 104.878],
+                "candidate_before": [100.0, 105.0],
+                "benchmark": [100.0, 110.0],
+            },
+        },
+    }
+
+
+class TestWhatifCostSheet(unittest.TestCase):
+    """交易成本对比页签 Excel 呈现测试。"""
+
+    def _write(self, whatif_data) -> "object":
+        from openpyxl import Workbook
+
+        from src.python.report.whatif_sheet import write_whatif_cost_sheet
+
+        wb = Workbook()
+        ws = wb.active
+        write_whatif_cost_sheet(ws, whatif_data)
+        return ws
+
+    def _flat(self, ws) -> list[str]:
+        return [str(c.value) if c.value is not None else "" for row in ws.iter_rows() for c in row]
+
+    def test_cost_sheet_full_content(self):
+        """全量面板 → 汇总 + 逐腿明细（含未建模方向/来源映射）+ impact + 基准 + 说明。"""
+        flat = self._flat(self._write(_cost_data()))
+        self.assertTrue(any("交易成本对比" in v for v in flat), "应含页标题")
+        self.assertTrue(any("申购费合计" in v for v in flat))
+        self.assertTrue(any("交易腿明细" in v for v in flat))
+        self.assertTrue(any(v == "买入" for v in flat), "方向应中文映射")
+        self.assertTrue(any(v == "未建模" for v in flat), "未建模腿应显式标注")
+        self.assertTrue(any(v == "F10 阶梯" for v in flat), "来源应中文映射")
+        self.assertTrue(any("每笔" not in v and "15.00" in v for v in flat), "应含买入费用")
+        self.assertTrue(any("成本前 / 成本后" in v for v in flat), "应含 impact 段标题")
+        self.assertTrue(any("-0.12 个百分点" in v for v in flat), "应含收益差")
+        self.assertTrue(any("业绩基准指数" in v for v in flat), "应含基准段")
+        self.assertTrue(any("sh000300" in v for v in flat))
+        self.assertTrue(any("持有期按交易日" in v for v in flat), "notes 应入说明段")
+        self.assertTrue(any("不构成交易实际费用承诺" in v for v in flat), "应含局限标注")
+
+    def test_cost_sheet_without_cost_key_placeholder(self):
+        """cost 键缺席（开关关闭）→ 占位文案。"""
+        flat = self._flat(self._write({"available": True}))
+        self.assertTrue(any("未启用" in v for v in flat), "应写未启用占位")
+
+    def test_cost_sheet_unavailable_placeholder(self):
+        """面板 available=False → 写 trade_cost reason 占位。"""
+        data = _cost_data()
+        data["cost"]["trade_cost"] = {"available": False, "reason": "无交易腿"}
+        flat = self._flat(self._write(data))
+        self.assertTrue(any("无交易腿" in v for v in flat), "应写 reason")

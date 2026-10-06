@@ -5,7 +5,8 @@
 > 涵盖版本：v0.12.2-dev（2026-10-03：plan-72 基金申购限购信息接入·持仓展示面）
 > 归档内容：plan-72 完成态记录（数据链路 → 展示集成 → 文档登记三迭代，P0 门禁十项全绿）
 > 追加归档：2026-10-05 plan-76 持仓变动复盘（快照事件级）四迭代完成（见文末章节）
-> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）
+> 追加归档：2026-10-05 plan-77 What-if 回放交易成本建模与基准对比（whatif_trade_cost）四迭代完成（见文末章节）
+> 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）
 
 ---
 
@@ -74,3 +75,19 @@
 4. **LLM 归因（双轨）**：附录**第 5 段** `holding_change_block`（prompt_block 与展示文本同源渲染）随四模块 + 辩论 pro/con/synthesis + 生成后自检携带，`ModuleFingerprintInputs.holding_change_block` 按段条件并入（空块逐字节不变）；注册表串行模块 `holding_change_review`（`llm/holding_change_review.py`：准入闸门 → 信号窗 top10 → `holding_change_review_fingerprint` 内容寻址 → 结果写 `holding_change_data.llm_review`，失败登记不外抛），`enabled_llm.holding_change` 默认开（章由实验开关门控）。
 
 **测试与文档**：测试 88 项（events 9+edge 7 / metrics 15 / injection 23 / panel 26+edge 8）；需求 **R-HCR-01~06**（requirements §6.13）、reports-instruction 18 页签 9 组、TUI 菜单 8-11 号、technical 语义命名与附录 H、testplan 批 7 映射、folders/test-coverage 快照同步；P0 `dev-verify` + 十守护 `--ci` 全绿。
+
+
+## plan-77 What-if 回放交易成本建模与基准对比（whatif_trade_cost）— ✅ 已完成（2026-10-05）
+
+> 设计文档：[`docs/archive/v0.12.x/whatif-cost-benchmark/whatif-cost-benchmark-design.md`](whatif-cost-benchmark/whatif-cost-benchmark-design.md)（已实施，含 §14 门槛与验收记录）。
+
+**先决门槛（三段全过）**：① 20 只样本（10 持仓 + 10 随机种子 20261006）经真实管线 `fetch_fee_index` 复测两费率侧均 **95% ≥ 80%**（唯一未覆盖 561910 为场内 ETF 无申赎费，归入未建模口径）；② 交易日持有期（「N年」×250 保守）/ FIFO 首见日下界 / 场内腿不建模三项口径经用户拍板；③ 换手 30% × ≈19.5bp 成本翻转案例（成本前 100.55>100.40 → 成本后 100.35<100.40）人工复核入网。
+
+**完成摘要**（四迭代）：
+
+1. **成本模型**：`analysis/trade_cost_model.py`（快照事件 FIFO 批次重放：期初批首见日下界 + 逐批判档加权 + 腿级费用聚合 → `trade_cost` 契约，纯计算零 I/O；未建模腿显式标注、未知 `fees_complete=False` 不冒充 0）；费率表选档与文本解析下沉 `analysis/fee_schedule_model.py`（金额分档/交易日持有期阶梯/单档与配置构建，边界左闭右开）。
+2. **费率数据三级可得性**：`providers/tiantian_fund_fee.py`（F10 费用页直连 + `FEE_SCHEMA` 载荷准入）→ `fetcher/fund_fee.py::fetch_fee_index`（链注册 `fund_fee` = `tiantian_f10` → `akshare_fee` 备链 + 过期缓存，`refresh` 缓存组）→ 申购侧 F10 优惠档与申购状态全量表「手续费」列（`table_single`/`table_multi`）→ `fund_fee_fallback` 配置兜底（仅补在线不可得侧，不覆盖）。
+3. **基准映射与双端面板**：`analysis/benchmark_index_resolver.py`（config `whatif_benchmark_index` → 目标持仓基准文本反查 `comparison_indices` → 默认 sh000300，源标注零 I/O）+ `report/whatif_cost_panel.py`（成本汇总/逐腿 11 列 + t0 一次性扣费成本前/后差对原 100 基线 + 基准曲线 LOCF 对齐归一，分阶段降级）；Excel 第 5 页签「交易成本对比」+ HTML⑧ 区（图表负载裁剪契约、说明区条件重编号⑨/⑧）；开关 `whatif_trade_cost` 实验组默认关。
+4. **回归网与文档**：关态 sha256 黄金断言（与产出前 `git HEAD` 模板同数据渲染逐字节一致）+ 换手翻转回归 + Excel/HTML 双端数值一致；`trade_cost_model.py` 835 行超红线按拆分纪律下沉 `fee_schedule_model.py`（`EXEMPTIONS` 不新增）。
+
+**测试与文档**：需求 **R-WIF-12~14**（requirements §6.11）、testplan 批 8 载体、reports-instruction 条件页签与产物描述、TUI 菜单 12-28 号与开关 31 项（实验 5）、datasource(-reliability) `fund_fee` 链/缓存行、how-to-config 两个配置键、technical 语义命名表 7 条、folders/test-coverage 快照同步；P0 `dev-verify` + 十守护 `--ci` 全绿。

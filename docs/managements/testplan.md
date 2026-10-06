@@ -481,6 +481,9 @@
 | R-WIF-09 | `src/test/unit/analysis/test_whatif_backtest.py` | 批 4 |
 | R-WIF-10 | `src/test/unit/analysis/test_whatif_backtest.py` | 批 4 |
 | R-WIF-11 | `src/test/unit/analysis/test_whatif_backtest_edge.py` + `src/test/unit/report/test_whatif_sheet.py` | 批 4 |
+| R-WIF-12 | `src/test/unit/analysis/test_trade_cost_model.py` + `src/test/unit/analysis/test_trade_cost_model_edge.py` + `src/test/unit/fetcher/test_fund_fee.py` + `src/test/unit/providers/test_tiantian_fund_fee.py` + `src/test/unit/providers/test_tiantian_fund_fee_edge.py` | 批 8 |
+| R-WIF-13 | `src/test/unit/report/test_whatif_cost_panel.py` + `src/test/unit/report/test_whatif_cost_panel_edge.py` + `src/test/unit/report/test_whatif_sheet.py` + `src/test/unit/report/test_whatif_writer.py` + `src/test/unit/report/test_whatif_html.py` + `src/test/unit/report/test_whatif_operations.py` | 批 8 |
+| R-WIF-14 | `src/test/unit/analysis/test_benchmark_index_resolver.py` + `src/test/unit/report/test_whatif_cost_panel.py` + `src/test/unit/report/test_whatif_cost_panel_edge.py` | 批 8 |
 | R-ACT-01 | `src/test/unit/report/test_action_sheet.py` + `src/test/unit/config/test_features.py` | 批 4 |
 | R-ACT-02 | `src/test/unit/report/test_action_sheet.py` + `src/test/integration/test_module_contract.py` | 批 4 |
 | R-ACT-03 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |

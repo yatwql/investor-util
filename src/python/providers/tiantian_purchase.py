@@ -12,6 +12,11 @@
   [0]基金代码 [1]基金简称 [2]基金类型 [3]最新净值 [4]净值报告日 [5]申购状态
   [6]赎回状态 [7]下一开放日 [8]购买起点 [9]日累计限定金额 [10]- [11]- [12]手续费
 
+  - [12] 手续费 = **单档申购费率（天天基金优惠）**，如 ``0.15%`` → 载荷
+    ``purchase_fee_rate``（小数 0.0015；``0.00%`` 为已知 0，空/不可解析为未知
+    None）。它是 whatif 交易成本申购腿在 F10 优惠档不可得时的单档来源
+    （``table_single``），语义与准入随 :data:`PURCHASE_SCHEMA` 一同演进。
+
 稳定性四层保障（设计文档 §3.4，硬约束）中的「载荷准入校验」由
 :func:`purchase_status_payload_is_valid` 承担——写侧（provider 成功后、入缓存前）
 与读侧（含过期缓存展示）同用一份判据；值域体检（代码 6 位数字 / 申购状态枚举 /
@@ -50,8 +55,9 @@ _TIMEOUT = 15.0
 
 #: 载荷语义版本——写入缓存时随载荷同存，读侧以 :func:`purchase_status_payload_is_valid`
 #: 为准入判据：版本不符即视为未命中、丢弃重取（与 ``rank_schema``/``hold_schema`` 同习语）。
+#: v2（2026-10-06）：新增 ``purchase_fee_rate``（col12 手续费，小数）；v1 旧缓存自动作废。
 PURCHASE_SCHEMA_FIELD = "purchase_schema"
-PURCHASE_SCHEMA = 1
+PURCHASE_SCHEMA = 2
 
 #: 载荷准入的最少行数（实测全量约 2.7 万行，骤降即异常——行数不足判失败走降级）
 MIN_ACCEPT_ROWS = 20_000
@@ -73,6 +79,7 @@ _RE_BARE_KEY = re.compile(r"([{,])\s*([A-Za-z_][A-Za-z0-9_]*)\s*:")
 # 原始行位置索引（0-based，见模块 docstring 列序）
 _COL_CODE, _COL_NAME, _COL_STATUS, _COL_REDEMPTION = 0, 1, 5, 6
 _COL_NEXT_OPEN, _COL_MIN_PURCHASE, _COL_DAILY_LIMIT = 7, 8, 9
+_COL_FEE = 12
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -85,7 +92,8 @@ def stamp_purchase_payload(rows: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
     Args:
         rows: ``{基金代码: {"purchase_status", "redemption_status",
-            "next_open_date", "daily_limit", "min_purchase"}}``
+            "next_open_date", "daily_limit", "min_purchase",
+            "purchase_fee_rate"}}``（``purchase_fee_rate`` 小数，None=未知）
 
     Returns:
         ``{"rows", "fetched_at", purchase_schema}``；``fetched_at`` 为北京时区
@@ -133,16 +141,27 @@ def _optional_float(raw: Any) -> float | None:
     return value if math.isfinite(value) else None
 
 
+def _fee_percent(text: str) -> float | None:
+    """col12 手续费文本（``0.15%``）→ 小数费率；空/``---``/不合理 → None（未知）。
+
+    单档来源复用 ``trade_cost_model.parse_fee_percent`` 单源（含 ≥100% 拒绝）——
+    ``0.00%`` 合法返回 0.0（**已知 0**，与未知 None 严格区分）。
+    """
+    from src.python.analysis.fee_schedule_model import parse_fee_percent
+
+    return parse_fee_percent(text)
+
+
 def purchase_status_payload_is_valid(payload: object) -> bool:
     """载荷准入校验（``cache_validate`` 与写侧 ``validate`` 共用同一判据）。
 
     校验项（设计文档 §3.4-3）：
       1. 可解析且行数 ≥ :data:`MIN_ACCEPT_ROWS`（正常 2.7 万，骤降即异常）；
       2. 载荷携带语义版本字段 ``purchase_schema`` 且等于当前版本；
-      3. 必需字段齐全（每行五键契约）；
+      3. 必需字段齐全（每行六键契约）；
       4. 值域体检（防位置错位整体误过）：基金代码 100% 为 6 位数字、
          申购/赎回状态 ∈ 已知枚举、日累计限定金额为 None 或非负有限数值、
-         下一开放日为空或 ``YYYY-MM-DD``。
+         下一开放日为空或 ``YYYY-MM-DD``、申购费率为 None 或 [0,1) 有限小数。
 
     任一不满足 → 本次抓取/缓存读取判定失败（走降级，旧缓存不被污染；
     损坏/截断的缓存体不得流入展示层）。
@@ -154,7 +173,14 @@ def purchase_status_payload_is_valid(payload: object) -> bool:
     rows = payload.get("rows")
     if not isinstance(rows, dict) or len(rows) < MIN_ACCEPT_ROWS:
         return False
-    required = ("purchase_status", "redemption_status", "next_open_date", "daily_limit", "min_purchase")
+    required = (
+        "purchase_status",
+        "redemption_status",
+        "next_open_date",
+        "daily_limit",
+        "min_purchase",
+        "purchase_fee_rate",
+    )
     for code, row in rows.items():
         if not (isinstance(code, str) and len(code) == 6 and code.isdigit()):
             return False
@@ -166,6 +192,11 @@ def purchase_status_payload_is_valid(payload: object) -> bool:
             return False
         limit = row["daily_limit"]
         if limit is not None and not (isinstance(limit, (int, float)) and math.isfinite(limit) and limit >= 0):
+            return False
+        fee = row["purchase_fee_rate"]
+        if fee is not None and not (
+            isinstance(fee, (int, float)) and not isinstance(fee, bool) and math.isfinite(fee) and 0 <= fee < 1
+        ):
             return False
         next_open = row["next_open_date"]
         if not isinstance(next_open, str) or (next_open and not _RE_NEXT_OPEN.match(next_open)):
@@ -219,6 +250,7 @@ def parse_purchase_table(text: str) -> dict[str, Any] | None:
             "next_open_date": str(raw_row[_COL_NEXT_OPEN]).strip(),
             "daily_limit": daily_limit,
             "min_purchase": _optional_float(raw_row[_COL_MIN_PURCHASE]),
+            "purchase_fee_rate": _fee_percent(str(raw_row[_COL_FEE])),
         }
     return stamp_purchase_payload(rows)
 
@@ -252,6 +284,8 @@ def fetch_fund_purchase_table_via_akshare() -> dict[str, Any] | None:
 
     akshare 侧 ``errors="coerce"`` 把不可解析数值归为 NaN，此处归 None
     （限额未知），故备链路对数值脏数据更宽松；空 DataFrame/None 视为取不到。
+    ``手续费`` 列 akshare 已剥 ``%`` 并转数值（百分数，如 0.15），此处折为小数；
+    NaN/缺列/不可解析 → None（未知）。
     """
     import akshare as ak
 
@@ -276,5 +310,17 @@ def fetch_fund_purchase_table_via_akshare() -> dict[str, Any] | None:
             "next_open_date": str(next_open or "")[:10],
             "daily_limit": limit_val,
             "min_purchase": _optional_float(record.get("购买起点")),
+            "purchase_fee_rate": _percent_number_to_rate(record.get("手续费")),
         }
     return stamp_purchase_payload(rows)
+
+
+def _percent_number_to_rate(raw: Any) -> float | None:
+    """akshare 百分数数值（0.15）→ 小数费率 0.0015；NaN/不可解析 → None。"""
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value) or value < 0 or value >= 100:
+        return None
+    return round(value / 100.0, 6)

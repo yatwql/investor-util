@@ -124,6 +124,20 @@ class TestParsePurchaseTable:
         assert row["daily_limit"] == pytest.approx(100_000_000_000.0)
         assert row["min_purchase"] == pytest.approx(10.0)
 
+    def test_fee_rate_col12_parsed_to_fraction(self):
+        """col12 手续费（"0.15%"）→ purchase_fee_rate 小数 0.0015（单档申购费率）。"""
+        payload = parse_purchase_table(_fixture_text())
+        assert payload is not None
+        rows = payload["rows"]
+        assert rows["000001"]["purchase_fee_rate"] == pytest.approx(0.0015)
+        assert rows["000005"]["purchase_fee_rate"] == pytest.approx(0.0008)
+
+    def test_fee_rate_zero_is_known_zero(self):
+        """ "0.00%" → 0.0（已知 0 费率，与未知 None 严格区分——C 类无申购费）。"""
+        payload = parse_purchase_table(_fixture_text())
+        assert payload is not None
+        assert payload["rows"]["000013"]["purchase_fee_rate"] == 0.0
+
     def test_limited_rows_with_daily_caps(self):
         """代表行②：限大额 + 正常日限金额（QDII 主场景，两只不同档位）。"""
         payload = parse_purchase_table(_fixture_text())
@@ -197,7 +211,7 @@ class TestAkshareBackupParse:
         monkeypatch.setitem(sys.modules, "akshare", _FakeAkshare(df))
 
     def test_maps_record_fields(self, monkeypatch: pytest.MonkeyPatch):
-        """中文列名 → 五键契约；日限 0 → None、下一开放日截到 10 位。"""
+        """中文列名 → 六键契约；日限 0 → None、下一开放日截到 10 位。"""
         df = _FakeDataFrame(
             [
                 {
@@ -226,6 +240,24 @@ class TestAkshareBackupParse:
         assert payload["rows"]["000041"]["min_purchase"] == pytest.approx(10.0)
         assert payload["rows"]["000013"]["daily_limit"] is None  # 0 → 限额未知
         assert payload["rows"]["000013"]["next_open_date"] == ""
+
+    def test_maps_fee_rate_percent_number(self, monkeypatch: pytest.MonkeyPatch):
+        """akshare「手续费」列（已剥 % 的百分数 0.15）→ 小数 0.0015；缺列/脏值 → None。"""
+        df = _FakeDataFrame(
+            [
+                {"基金代码": "000001", "申购状态": "开放申购", "手续费": 0.15},
+                {"基金代码": "000013", "申购状态": "开放申购", "手续费": 0.0},
+                {"基金代码": "000041", "申购状态": "限大额"},  # 缺列 → 未知
+                {"基金代码": "000043", "申购状态": "开放申购", "手续费": float("nan")},
+            ]
+        )
+        self._stub_akshare(monkeypatch, df)
+        payload = tp.fetch_fund_purchase_table_via_akshare()
+        assert payload is not None
+        assert payload["rows"]["000001"]["purchase_fee_rate"] == pytest.approx(0.0015)
+        assert payload["rows"]["000013"]["purchase_fee_rate"] == 0.0
+        assert payload["rows"]["000041"]["purchase_fee_rate"] is None
+        assert payload["rows"]["000043"]["purchase_fee_rate"] is None
 
     def test_empty_frame_returns_none(self, monkeypatch: pytest.MonkeyPatch):
         """空 DataFrame 视为取不到（返回 None 走下一槽位）。"""

@@ -35,6 +35,10 @@ _DEFAULT_CHAINS: dict[str, list[str]] = {
     # akshare 封装为备——两者共享同一上游端点，提供的是**解析器冗余**而非源冗余，
     # 端点整体不可用时真正的可用性兜底是最外层过期缓存（载荷带 fetched_at 供陈旧阶梯判定）
     "fund_purchase": ["tiantian", "akshare_purchase"],
+    # 基金申赎费率（F10 交易费率页，按代码分键、低频）：天天基金 F10 直连为主，
+    # akshare fund_fee_em 封装为备（同上游页面族、解析器冗余；备链路仅覆盖赎回
+    # 阶梯，申购档位由全量申购状态表单档/配置兑底承接），真正可用性兑底是过期缓存
+    "fund_fee": ["tiantian_f10", "akshare_fee"],
     "industry": ["eastmoney_industry", "eastmoney_industry_rest"],
     # 全文本财报（持仓基本面章·区块②）：DataSinking 主源 + 巨潮资讯网备源。
     # 两源经财报域适配器注册（fetcher/report_adapters.py），以 ``source_hint`` 做命名空间

@@ -1,6 +1,6 @@
 # What-if 回放成本建模与基准对比设计 —— plan-77
 
-> **状态**：设计 + 待评测（先决门槛未过不实施）。
+> **状态**：已实施（四迭代完成，先决门槛三段全过；判定与验收记录见 §14）。
 > **参照**：Vibe-Trading `agent/backtest/factor_costs.py`（成本因子）+ `benchmark.py`（基准对比面板）+ `constraints.py`；成本分层（Constant/Scaled/Aggregate）与 PnL 分解语义参照 gs-quant `backtests/backtest_objects.py`（`TransactionModel`/`PnlAttribute`，见 gs-quant 借鉴批研究文档）。
 > **研究背景**：见 `vibe-trading-borrow-candidates-research.md` §2.1。
 
@@ -28,12 +28,16 @@ Vibe-Trading 的 factor_costs（成本计入回放）与 benchmark（自动选�
 3. **增益验证**：成本计入后，对既有 fixture 场景回测结论发生「方向性翻转」的
    案例 ≥1 个且经人工复核合理（证明不是无感装饰）。
 
+> **判定（实施后补记，2026-10-05）**：三段全过——① 20 只样本经真实管线复测两费率侧均 **95% ≥ 80%**；② 交易日持有期 / FIFO 首见日下界 / 场内腿不建模三项口径经用户拍板；③ 换手 30% × ≈19.5bp 成本翻转案例人工复核后入回归网。证据见 §14。
+
 ## 3. 语义命名
 
 | 语义名 | 层 | 说明 |
 |---|---|---|
 | `redemption_fee_schedule` | 契约 | 赎回费阶梯（持有期下界 → 费率）+ 申购费率 |
-| `trade_cost_model` | analysis | 纯计算：给定买卖明细+费率表 → 成本金额/成本后收益序列 |
+| `fee_schedule_model` | analysis | 费率表模型：F10 费用表文本解析 / 单档与配置构建 / 金额与交易日持有期选档（边界左闭右开） |
+| `trade_cost_model` | analysis | 纯计算：给定买卖明细+费率表 → 成本金额/成本后收益序列（FIFO 批次重放，选档下沉 `fee_schedule_model`） |
+| `fund_fee` | fetcher | 申赎费率取数编排（F10 → akshare 备链 → 过期缓存 → 配置兑底；`fetch_fee_index` 持仓级索引，`FEE_SCHEMA` 载荷准入） |
 | `benchmark_index_resolver` | analysis | 目标持仓 → 基准指数映射（宽基默认，可配置覆盖） |
 | `whatif_cost_panel` | report | 成本对比面板（成本前/后收益差 + 基准三线图数据） |
 | 开关 `whatif_trade_cost` | config | 默认关；成本不计入时行为逐字节不变 |
@@ -166,3 +170,18 @@ Vibe-Trading 的 factor_costs（成本计入回放）与 benchmark（自动选�
 **回滚策略**：① 迭代级——每迭代独立提交、独立验收，未过不合入，出问题单次 revert。② 功能级——`whatif_trade_cost` 开关关闭即回现状（关态逐字节不变已由验收锁定，零改动断言长期驻留回归网）。③ 数据级——费率缓存语义版本保证回滚后旧条目被正确丢弃，不误读。
 
 **文档同步义务（每迭代同回同）**：`requirements.md`、`technical.md`（语义命名表 + 约束落点 + FIFO 口径文档化）、`testplan.md`（载体）、`changelog.md`、`folders.md`/`test-coverage.md`（计数）；完成判据 = `check-doc-drift --ci` 0 finding。
+
+## 14. 先决门槛与验收记录（实施后补记）
+
+### 14.1 先决门槛判定
+
+| # | 门槛（§2） | 判定 | 证据 |
+|---|---|---|---|
+| 1 | 费率字段取得率 ≥80%（抽样 20 只、两费率侧） | ✅ 通过（2026-10） | 20 只样本（10 只持仓 + 10 只随机种子 20261006）经**真实管线** `fetch_fee_index` 复测：申购侧 19/20、赎回侧 19/20、双侧 19/20 = **95% ≥ 80%**；唯一未覆盖 `561910` 为场内 ETF（无申赎费，归入未建模口径）；命中来源全部 `f10_tier`，未出现回退 `purchase_table_single` 的隐性精度降级。故未触发「降级为用户配置表单源」 |
+| 2 | FIFO 档位口径可判定且文档化 | ✅ 通过（用户拍板） | 持有期一律**交易日**计（档位边界按交易日解释、「N年」标签 ×250，保守偏差入面板 notes 与说明区）；期初批 = 快照事件 FIFO **首见日下界估计**（费率真值可能更低，随数字标注）；股票/场内基金/指数腿**标注未建模**不冒充 0 费率。三项口径均经用户确认，选档单源 `fee_schedule_model`（边界左闭右开、不含起点交易日） |
+| 3 | 成本计入产生 ≥1 个方向性翻转且人工复核 | ✅ 通过（2026-10-05） | 换手 30% ×（卖出 60 交易日档 0.50% + 买入 0.15%）≈ **19.5bp**（<20bp 边界压力）：成本前目标组合领先（100.55 > 100.40），t0 一次性扣费后落后（100.35 < 100.40）**方向翻转**；手算 `t0_ratio = round(195/99000, 6) = 0.00197` 复核无误后入回归网 `TestCostFlipRegression`（`src/test/unit/report/test_whatif_cost_panel.py`） |
+
+### 14.2 迭代验收与文档同步
+
+- **迭代 1~3**：成本模型手算对照与临界边界（≥8 例）、`fund_fee` 链路（链注册同构/四级降级/载荷准入/会话复用）、基准映射与面板装配单测全绿；`trade_cost_model.py` 超 800 行红线按拆分纪律下沉 `fee_schedule_model.py`（依赖单向、`EXEMPTIONS` 不新增）。
+- **迭代 4**：关态逐字节一致（`TestSwitchOffGoldenBaseline` 两例 sha256 与产出前 `git HEAD` 模板同数据渲染一致）、换手翻转回归、Excel/HTML 双端数值一致用例全绿；`check-doc-drift --ci` 0 finding；文档全量同步——requirements **R-WIF-12~14**、technical 语义命名表 7 条、testplan 批 8 载体、changelog、folders 目录树与统计、test-coverage 快照、reports-instruction 条件页签与产物描述、how-to-config 开关 31 项与 `fund_fee_fallback`/`whatif_benchmark_index` 两个配置键、TUI 菜单 12-28 号与 features.json 映射、datasource 与 datasource-reliability 的 `fund_fee` 链/缓存行。

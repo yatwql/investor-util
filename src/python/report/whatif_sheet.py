@@ -1,10 +1,12 @@
 """调仓 What-if 模拟 Excel 页签写入模块。
 
-输出 3 个固定页签 + 1 个条件页签：
+输出 3 个固定页签 + 2 个条件页签：
   1. 调仓摘要 — 基准/目标文件 + 变动统计 + 汇总指标对比（含箭头）
   2. 分类配置对比 — 资产大类成本权重基准 vs 目标（成本口径）
   3. 持仓变动明细 — 新增/清仓/加仓/减仓/不变，行底色按变动类型标注
   4. 时序回测（条件）— 指定调仓生效日时追加；未指定或数据不足时写占位文本
+  5. 交易成本对比（条件）— 开关 whatif_trade_cost 开启且面板装配成功时追加
+    （成本汇总 + 逐腿明细 + 成本前/后差 + 业绩基准三线，降级写占位文本）
 
 数据不足（whatif_data=None 或 available=False）时摘要页写占位文本
 （§1.4.5 数据降级治理）。
@@ -374,3 +376,169 @@ def write_whatif_backtest_sheet(ws: Worksheet, whatif_data: dict[str, Any] | Non
     freeze_header(ws, row=2)
     auto_width(ws, min_width=10, max_width=40)
     logger.info("时序回测页签写入完成: %s", eff)
+
+
+# 逐腿明细的展示映射（键取自 analysis.trade_cost_model 的方向/来源常量，避免拼写漂移）
+_SIDE_LABELS = {"buy": "买入", "sell": "卖出", "unmodeled": "未建模"}
+_SOURCE_LABELS = {
+    "f10_tier": "F10 阶梯",
+    "table_single": "全量表单档",
+    "config": "配置",
+    "unknown": "未知",
+    "unmodeled": "未建模",
+}
+
+
+def write_whatif_cost_sheet(ws: Worksheet, whatif_data: dict[str, Any] | None) -> None:
+    """写入「交易成本对比」页签（开关 whatif_trade_cost 开启且面板装配成功时追加）。
+
+    结构：状态行（费率完整性/入账日）+ 成本汇总 + 逐腿明细（11 列，方向/来源
+    经展示映射）+ 成本前/后对比（仅回测可用且费率全知时）+ 业绩基准三线（仅
+    指数解析成功时）+ 口径与局限说明（trade_cost.notes 与面板口径同源常驻）。
+    cost 键缺席/面板不可用 → 占位文本（不阻塞主报告）。
+
+    Args:
+        ws: openpyxl Worksheet 对象
+        whatif_data: 数据契约 dict（含可选 cost 键）
+    """
+    _ncols = 11
+    write_title_row(ws, 1, "交易成本对比（调仓回放，申赎成本口径）", ncols=_ncols)
+
+    cost = (whatif_data or {}).get("cost") if whatif_data else None
+    if not cost:
+        _write_placeholder(
+            ws,
+            "交易成本对比未启用（whatif_trade_cost 开关关闭）",
+            row=3,
+            max_cols=_ncols,
+        )
+        freeze_header(ws, row=2)
+        auto_width(ws)
+        return
+    tc = cost.get("trade_cost") or {}
+    if not tc.get("available"):
+        _write_placeholder(
+            ws,
+            tc.get("reason") or cost.get("reason") or "交易成本对比暂不可用",
+            row=3,
+            max_cols=_ncols,
+        )
+        freeze_header(ws, row=2)
+        auto_width(ws)
+        return
+
+    row = 2
+    integrity = (
+        "费率全知（可出成本后数字）"
+        if tc.get("fees_complete")
+        else f"有未知（未知 {tc.get('unknown_legs', 0)} 腿 / 未建模 {tc.get('unmodeled_legs', 0)} 腿，不出成本后数字）"
+    )
+    _legs = tc.get("legs") or []
+    booked = (_legs[0].get("booked_date") or "未指定") if _legs else "未指定"
+    row = write_data_row(
+        ws,
+        row,
+        [f"费率口径：{integrity}；入账日：{booked}"] + [""] * (_ncols - 1),
+    )
+
+    # ── 成本汇总 ──
+    row += 1
+    row = write_title_row(ws, row, "成本汇总（成本口径，元）", ncols=2)
+    row = write_header_row(ws, row, ["指标", "数值"])
+    for label, key in (
+        ("申购费合计", "purchase_total"),
+        ("赎回费合计", "redemption_total"),
+        ("交易总成本", "total_cost"),
+    ):
+        row = write_data_row(ws, row, [label, tc.get(key, 0.0)], formats=[None, FMT_MONEY])
+    row = write_data_row(ws, row, ["费率完整性", integrity])
+
+    # ── 逐腿明细 ──
+    row += 1
+    row = write_title_row(ws, row, "交易腿明细", ncols=_ncols)
+    row = write_header_row(
+        ws,
+        row,
+        [
+            "变动",
+            "名称",
+            "代码",
+            "方向",
+            "份额",
+            "金额(元)",
+            "费率",
+            "费用(元)",
+            "持有期(交易日)",
+            "费率来源",
+            "入账日",
+        ],
+    )
+    for leg in tc.get("legs", []):
+        rate = leg.get("rate")
+        fee = leg.get("fee")
+        flat = leg.get("flat_fee")
+        fee_text = f"{fee:.2f}" if fee is not None else (f"每笔 {flat:.2f}" if flat is not None else "—")
+        days = leg.get("holding_days")
+        row = write_data_row(
+            ws,
+            row,
+            [
+                leg.get("action", ""),
+                leg.get("name", ""),
+                leg.get("code", ""),
+                _SIDE_LABELS.get(leg.get("side"), leg.get("side", "")),
+                leg.get("shares"),
+                leg.get("amount"),
+                rate if rate is not None else "—",
+                fee_text,
+                days if days is not None else "—",
+                _SOURCE_LABELS.get(leg.get("rate_source"), leg.get("rate_source", "")),
+                leg.get("booked_date") or "—",
+            ],
+            formats=[None, None, None, None, FMT_SHARES, FMT_MONEY, "0.0000%", None, "0.0", None, None],
+        )
+
+    # ── 成本前/后对比（仅回测可用且费率全知时）──
+    impact = cost.get("impact")
+    if impact:
+        row += 1
+        row = write_title_row(ws, row, "成本前 / 成本后（生效日 t0 一次性扣费）", ncols=3)
+        row = write_header_row(ws, row, ["指标", "数值", "说明"])
+        rows = [
+            (
+                "交易成本合计",
+                f"{impact.get('fee_total', 0.0):.2f} 元",
+                f"占目标组合成本 {impact.get('t0_ratio', 0.0) * 100:.4f}%（{impact.get('cand_t0_value', 0.0):.2f} 元）",
+            ),
+            ("成本前收益", f"{impact.get('return_before_pct', 0.0):.2f}%", "回测窗口，未扣交易成本"),
+            ("成本后收益", f"{impact.get('return_after_pct', 0.0):.2f}%", "生效日 t0 扣除交易成本后"),
+            ("收益差", f"{impact.get('delta_pct_points', 0.0):.2f} 个百分点", "成本后 − 成本前；费率未知时不出本表"),
+        ]
+        for label, value, note in rows:
+            row = write_data_row(ws, row, [label, value, note])
+
+    # ── 业绩基准三线参照（仅指数解析成功时）──
+    bench = cost.get("benchmark")
+    if bench:
+        row += 1
+        row = write_title_row(ws, row, "业绩基准指数", ncols=4)
+        row = write_header_row(ws, row, ["指数代码", "名称", "映射来源", "状态"])
+        source_label = {"config": "配置覆盖", "holdings": "持仓基准文本匹配", "default": "宽基默认"}.get(
+            bench.get("source"), bench.get("source", "")
+        )
+        status_label = "行情可用" if bench.get("status") == "ok" else "指数行情暂缺（仅出成本后对比）"
+        row = write_data_row(ws, row, [bench.get("code", ""), bench.get("name", ""), source_label, status_label])
+
+    # ── 说明 ──
+    row += 1
+    row = write_title_row(ws, row, "说明", ncols=_ncols)
+    notes = list(tc.get("notes") or [])
+    if impact:
+        notes.append("成本后口径：生效日 t0 一次性扣费，成本后曲线 = 成本前曲线 ×（1 − 费用/目标组合成本）")
+    notes.append("局限：估算口径，不构成交易实际费用承诺；费率未知/未建模腿显式计数，不冒充 0")
+    for n in notes:
+        row = write_data_row(ws, row, [n] + [""] * (_ncols - 1))
+
+    freeze_header(ws, row=2)
+    auto_width(ws, min_width=10, max_width=40)
+    logger.info("交易成本对比页签写入完成: %d 腿", len(tc.get("legs", [])))

@@ -3324,6 +3324,13 @@ make_http_client(timeout=10.0) → httpx.Client
 | `fund_purchase_limit` | 基金申购限购状态列（持仓明细两端——Excel 市值明细/分类汇总两区块末列 + HTML 市值明细/持仓分类表条件列：申购状态 + 日限额/下一开放日，天天基金渠道口径；数据不可用静默隐列） | 持仓明细与分类 | 数据获取 | 功能开关 `fund_purchase_limit`（默认开） |
 | `purchase_status_data` | 申购限购状态数据契约（C19：available/reason/rows/fetched_at/source） | 持仓明细与分类 | 数据获取 | 无（契约） |
 | `purchase_status` | 申购状态展示装配与展示单源（`report/purchase_status.py`：契约构建/陈旧阶梯分档/单元格文案/口径脚注，Excel 与 HTML 共用） | 持仓明细与分类 | 报告输出 | 无（单源模块） |
+| `whatif_trade_cost` | What-if 交易成本对比（回放计入申赎成本：FIFO 快照批次交易日持有期阶梯 + 金额分档申购；t0 一次性扣费成本前/后差 + 业绩基准三线；费率未知/场内品种显式标注不出成本后数字） | 调仓 What-if | 报告输出 | 实验开关 `whatif_trade_cost`（默认关） |
+| `trade_cost_model` | 调仓交易成本模型唯一实现（快照事件 FIFO 批次重放：期初批首见日下界 + 逐批判档加权 + 腿级费用聚合 → `trade_cost` 契约，纯计算零 I/O；表选档下沉 `fee_schedule_model`） | 调仓 What-if | 分析计算 | 随 `whatif_trade_cost` |
+| `fee_schedule_model` | 申赎费率表模型唯一实现（F10 费用表文本解析 / 单档与配置构建 / 金额与交易日持有期选档，边界左闭右开） | 调仓 What-if | 数据获取 | 随 `whatif_trade_cost` |
+| `benchmark_index_resolver` | 业绩基准指数映射（config 覆盖 → 持仓基准文本反查对比指数池 → 宽基默认，源标注零 I/O） | 调仓 What-if | 分析计算 | 随 `whatif_trade_cost` |
+| `whatif_cost_panel` | 交易成本面板装配（成本本体 + t0 扣费成本前/后差 + 基准曲线 LOCF 对齐归一 + 图表负载裁剪，分阶段降级） | 调仓 What-if | 报告输出 | 随 `whatif_trade_cost` |
+| `fund_fee` | 基金申赎费率取数编排（F10 费用页 → akshare 备链 → 过期缓存 → 配置兜底；`FEE_SCHEMA` 载荷准入） | 调仓 What-if | 数据获取 | 随 `whatif_trade_cost` |
+| `fetch_fee_index` | 持仓级费率索引装配（仅非未建模腿经链取数、会话复用；未知侧计数 → `fees_complete` 判据） | 调仓 What-if | 数据获取 | 随 `whatif_trade_cost` |
 | `fundamental_snapshot` | 持仓基本面（合并章：财务指标区块 + 财报摘要区块同页签/同章节呈现；可见性 `data_flag_any` OR，块级开关各控各的） | 持仓基本面 | 报告输出 | `enable_fundamental_snapshot`（= 两功能开关任一开启） |
 | `fundamental_snapshot_sheet` | 合并章 Excel 写入器（`write_fundamental_snapshot_sheet`；区块写入器 `_write_indicator_block` / `_write_digest_block`） | 持仓基本面 | 报告输出 | 无（渲染） |
 | `compute_real_valuation` | 真实历史估值分位（TTM 口径：多期每股收益差分 × 历史收盘价 → 历史 PE/PB 序列 → 当前值分位） | 资产穿透TOP10 | 分析计算 | 无（纯计算） |

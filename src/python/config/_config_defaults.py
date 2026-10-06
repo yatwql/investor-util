@@ -93,6 +93,12 @@ _DEFAULT_CONFIG = {
     # ── F. 业绩基准与无风险利率 ──
     "risk_free_rate": None,  # Rf 手动配置（None=自动获取，填小数如0.0174或百分比如1.74）
     "user_fund_benchmarks": {},
+    # 申赎费率配置兑底（code → {purchase_rate: 小数单档申购费率,
+    #   redemption_tiers: [{"max_days": 上界交易日|null, "rate": 小数}]}）；
+    # 仅当 F10/全量表在线来源不可得时生效（兑底不覆盖），形态见 how-to-config
+    "fund_fee_fallback": {},
+    # What-if 业绩基准指数覆盖（如 "sh000905"；空 = 自动：持仓基准文本 → 沪深300 默认）
+    "whatif_benchmark_index": "",
     # 竞争语境对比指数池（默认沪深300+中证500+中证全债）
     "comparison_indices": {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"},
     "comparison_candidates": [],  # 候选基金比较子表候选（6 位基金代码列表，≤10；配合功能开关 candidate_compare）
@@ -287,6 +293,8 @@ def _build_template_from_defaults() -> str:
         "  // ── F. 业绩基准与无风险利率 ──",
         f'  "risk_free_rate": {json.dumps(d["risk_free_rate"])},  // Rf 手动配置（None=自动获取，填小数如0.0174或百分比如1.74）',
         f'  "user_fund_benchmarks": {json.dumps(d["user_fund_benchmarks"])},',
+        f'  "fund_fee_fallback": {json.dumps(d["fund_fee_fallback"])},  // 申赎费率配置兑底（code → {{purchase_rate, redemption_tiers}}；仅在线来源不可得时生效）',
+        f'  "whatif_benchmark_index": {json.dumps(d["whatif_benchmark_index"])},  // What-if 业绩基准指数覆盖（如 sh000905；空 = 自动映射）',
         "  // 竞争语境对比指数池（默认沪深300+中证500+中证全债）",
         f'  "comparison_indices": {json.dumps(d["comparison_indices"], ensure_ascii=False)},',
         "  // 候选基金比较子表候选（6 位基金代码列表，≤10；配合功能开关 candidate_compare）",

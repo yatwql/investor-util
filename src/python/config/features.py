@@ -34,8 +34,6 @@ logger = logging.getLogger("invest")
 # ── 路径常量 ────────────────────────────────────────────────
 
 FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
-# 兼容别名：历史私有名（包内既有引用；渠道层一律用公开名 FEATURES_FILE）
-FEATURES_FILE = FEATURES_FILE
 
 # ── 分组常量 ────────────────────────────────────────────────
 # 分组表达的是**生命周期的当前状态**，不是优先级、不是新旧：
@@ -137,6 +135,14 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
     "holding_change_review": FeatureSwitchDef(
         "持仓变动复盘",
         "快照差分出新增/加仓/减仓/清仓事件清单与频率/结构演变/意图对账（区间净额推断，结构级）+ LLM 归因块",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
+    # ── 实验性功能：What-if 交易成本与基准对比（需费率/指数数据，先决门槛过审后择机转正） ──
+    "whatif_trade_cost": FeatureSwitchDef(
+        "What-if 交易成本对比",
+        "调仓回放计入申赎成本（FIFO 持有期阶梯）+ 成本前后收益差与业绩基准三线参照",
         GROUP_EXPERIMENTAL,
         False,
         True,

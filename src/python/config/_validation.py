@@ -256,6 +256,44 @@ def _validate_user_fund_benchmarks(config: dict, issues: int) -> int:
     return issues
 
 
+def _validate_fund_fee_fallback(config: dict, issues: int) -> int:
+    """校验申赎费率配置兑底表（fund_fee_fallback，非法条目运行期按未知丢弃）。"""
+    fb, issues = _section(config, "fund_fee_fallback", dict, "费率兑底将被忽略", issues)
+    if fb is _MISSING:
+        return issues
+    from src.python.analysis.fee_schedule_model import build_config_fee_schedules
+
+    for code, entry in fb.items():
+        if not (isinstance(code, str) and len(code) == 6 and code.isdigit()):
+            logger.warning("config.json fund_fee_fallback 键 %r 不是 6 位基金代码，该条忽略", code)
+            issues += 1
+            continue
+        if build_config_fee_schedules(entry) is None:
+            logger.warning(
+                "config.json fund_fee_fallback.%s 非法（purchase_rate 为 0≤r<1 小数；"
+                "redemption_tiers 按交易日上界升序、末档 max_days 为 null、rate 为 0≤r<1 小数），该条忽略",
+                code,
+            )
+            issues += 1
+    return issues
+
+
+def _validate_whatif_benchmark_index(config: dict, issues: int) -> int:
+    """What-if 业绩基准指数覆盖值：非空时必须是合法指数代码（否则运行期回落默认）。"""
+    value = config.get("whatif_benchmark_index")
+    if value is None or value == "":
+        return issues
+    from src.python.core.code_utils import is_index_code
+
+    if not isinstance(value, str) or not is_index_code(value.strip()):
+        logger.warning(
+            "config.json whatif_benchmark_index = %r 不是合法指数代码（如 sh000300），将回落自动映射",
+            value,
+        )
+        issues += 1
+    return issues
+
+
 def _validate_enable_boards(config: dict, issues: int) -> int:
     """验证章节可见性配置（enable_fund_deep_analysis / enable_news / enable_history /
     enable_portfolio_evolution / enable_action）。
@@ -658,6 +696,8 @@ def validate_config(config: dict | None = None) -> int:
     issues = _validate_news_sources(config, issues)
     issues = _validate_preferred_provider(config, issues)
     issues = _validate_user_fund_benchmarks(config, issues)
+    issues = _validate_fund_fee_fallback(config, issues)
+    issues = _validate_whatif_benchmark_index(config, issues)
     issues = _validate_enable_boards(config, issues)
     issues = _validate_market_hours(config, issues)
     issues = _validate_report_section_order(config, issues)

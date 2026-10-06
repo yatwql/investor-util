@@ -231,6 +231,18 @@
 - **已知限制**：响应体不含数据自身日期（仅净值报告时间），数据时效以「抓取时间 + 交易日历」近似推算（≤3 / 4~7 / >7 交易日三档展示）；口径为**天天基金渠道**，其他渠道（直销/银行等）限额可能不同，展示层固定附口径脚注。
 - **状态**：**已实测通过（2026-10-03，本机直连 HTTP 200、解析 27,695 行、载荷含 `purchase_schema=1`）**；链路 `providers/tiantian_purchase.py`（主）+ akshare 备链，编排 `fetcher/fund_purchase.py`，链注册 `_DEFAULT_CHAINS["fund_purchase"]`，展示单源 `report/purchase_status.py`。
 
+### 3.12 天天基金申赎费率（F10 费用页）<a id="312-天天基金申赎费率f10费用页"></a>
+
+- **用途**：场外基金申购/赎回费率阶梯——What-if 调仓回放交易成本估算（功能开关 `whatif_trade_cost`，出厂关）的费率来源：申购按**金额分档**（优惠费率优先，含「每笔N元」固定费）、赎回按**持有期阶梯**（交易日计）；仅服务成本估算，不进主报告。费率不可得品种显式标注「费率未知」，**不出成本后数字**（不冒充 0）。
+- **端点**：`GET https://fund.eastmoney.com/f10/jjfl_{code}.html`（基金费用页；申购表 `适用金额|费率` 或 `适用金额|原费率|优惠费率`，赎回表 `适用期限|赎回费率`）；载荷准入 `FEE_SCHEMA`（赎回行非空 + 行形齐备 + `fetched_at`），申购侧表缺失（如场内品种）整载荷判无效不落缓存。
+- **可靠度**：★★★★☆——天天基金公开页同源，无需鉴权；上游改版风险由载荷准入兜底（不合规即丢弃，不污染旧缓存）。
+- **鉴权**：无需 key。
+- **限流**：无官方公开限流声明；本程序侧按代码缓存（TTL 周档 + 抖动）与会话缓存，单次报告生成每代码只经链 1 次，且仅在 `whatif_trade_cost` 开启时触发。
+- **重试与失败分类**：F10 直连解析失败 → akshare `fund_fee_em` 备链（同上游页族解析器冗余，仅赎回表；`申购费率（前端）` 等 h4 表名因基金而异，KeyError 视为该侧无表）→ 过期缓存（`fetched_at` 随载荷返回）→ `config.json fund_fee_fallback` 配置兜底（仅补在线不可得侧，不覆盖）→ 费率未知。申购侧另按 F10 优惠档 → 申购状态全量表「手续费」列单档（`table_single`）→ 配置 → 未知四级。
+- **降级目标**：逐侧独立降级（申购/赎回可不同源，费率表自带 `source`）；终不可得 → 未知腿计数、`fees_complete=False`，报告不出成本后数字。
+- **已知限制**：场内品种（股票/场外无表的 ETF/LOF）不建模申赎费，显式标注（佣金/印花税等另计）；赎回费持有期以**交易日**计（档位边界按交易日解释、「N年」标签 ×250，成本偏保守）；期初批次建仓日 = 快照首见日，为持有期**下界估计**（真实费率可能更低），随数字标注。
+- **状态**：**已实测通过（2026-10）**——先决门槛抽样 20 只基金经真实链路 `fetch_fee_index` 复测，申购侧 19/20、赎回侧 19/20、双侧 19/20（95% ≥ 80% 门槛；唯一未覆盖为场内 ETF 无申赎费，归入未建模口径）；链路 `providers/tiantian_fund_fee.py`（主）+ akshare 备链，编排 `fetcher/fund_fee.py`，链注册 `_DEFAULT_CHAINS["fund_fee"]`，兜底键 `fund_fee_fallback`（`refresh` 缓存组）。
+
 ## 4. 降级与熔断
 
 ### 4.1 三级熔断体系
@@ -245,7 +257,7 @@
 
 ### 4.2 Provider Chain 降级路径
 
-> 本表与 `fetcher/chain_config.py::_DEFAULT_CHAINS` **逐链对应**（15 条），由 `check-doc-drift.py` 第 15 项断言双向一致（漏链/幽灵链均报错）。
+> 本表与 `fetcher/chain_config.py::_DEFAULT_CHAINS` **逐链对应**（16 条），由 `check-doc-drift.py` 第 15 项断言双向一致（漏链/幽灵链均报错）。
 
 | 数据类型 | 主链路 | 备用链路 | provider id（机器可读，与 `_DEFAULT_CHAINS` 同序） | 回退条件 |
 |:---------|:-------|:---------|:----------------------------------------------|:---------|
@@ -255,6 +267,7 @@
 | `fund_rank` | 天天基金 | —（单源） | `tiantian` | 不可用时基金业绩排名域标记降级 |
 | `fund_hold` | 天天基金 | 同花顺官方（需 key，未配置时链路自动跳过） | `tiantian` → `hithink` | 天天基金取不到披露持仓 |
 | `fund_purchase` | 天天基金申购状态总表（直连解析） | akshare `fund_purchase_em` 封装（**解析器冗余**，与主链共享同一上游端点） | `tiantian` → `akshare_purchase` | 直连解析失败/载荷不过 `purchase_schema` 准入 → 备链路；全链失败 → 过期缓存（`fetched_at` 随载荷返回，供展示层按交易日时效分档） |
+| `fund_fee` | 天天基金 F10 基金费用页（申购/赎回费率表直连解析） | akshare `fund_fee_em` 封装（**解析器冗余**，同一上游页族，仅赎回表） | `tiantian_f10` → `akshare_fee` | F10 解析失败/赎回表缺失 → 备链路；全链失败 → 过期缓存（`fetched_at` 随载荷返回）；申购侧另有申购状态全量表「手续费」列单档（`table_single`）与 `fund_fee_fallback` 配置兜底，终不可得 → 费率未知标注（不出成本后数字） |
 | `industry` | 东方财富 push2 | REST 行情页 | `eastmoney_industry` → `eastmoney_industry_rest` | push2 超时/熔断 |
 | `financial_report` | DataSinking（需用户自备 key） | 巨潮资讯网（公开无需凭据） | `datasink` → `cninfo` | 主源索引为空/失败，或索引正常但**正文不可得** |
 | `financial_indicator` | akshare | DataSinking 章节解析 → 同花顺官方合并报表派生（需 key） | `akshare_financial` → `datasink_indicator` → `hithink` | 上游不可用/解析无命中（逐槽递补） |

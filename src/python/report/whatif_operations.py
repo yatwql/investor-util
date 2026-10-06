@@ -7,6 +7,10 @@
 联网取生效日后行情，用 as-if 市值对比基准/目标组合曲线。回测失败/数据不足
 → 降级 available:False，不阻塞主报告。
 
+开关 ``whatif_trade_cost``（实验组，出厂关）开启时追加 whatif_data["cost"]
+（whatif_cost_panel 装配：成本本体 + 成本前/后差 + 业绩基准三线）；关闭 →
+键缺席 → whatif 双端输出与开关引入前逐字节一致（零变更红线）。
+
 CLI（_handle_whatif）与 TUI（_cmd_whatif）仅保留入口渠道差异化逻辑：
 文件来源解析、错误呈现、退出码/路径输出（设计边界见 technical.md §4.13）。
 """
@@ -20,8 +24,10 @@ from typing import Any
 
 from src.python.analysis.whatif import _merge_holdings, build_whatif_data
 from src.python.analysis.whatif_backtest import compute_backtest_days, compute_backtest_metrics
+from src.python.config.features import is_feature_enabled
 from src.python.core.models import Holding
 from src.python.report.portfolio_history import PortfolioHistoryCalculator
+from src.python.report.whatif_cost_panel import build_whatif_cost_panel
 from src.python.report.whatif_writer import write_whatif_report
 
 logger = logging.getLogger("invest")
@@ -212,6 +218,14 @@ def run_whatif_simulation(
             }
         if backtest is not None:
             data = {**data, "backtest": backtest}
+
+    # ── 交易成本对比面板（开关 whatif_trade_cost，出厂关；关闭 → 无 cost 键 →
+    #    whatif 双端输出与开关引入前逐字节一致）──
+    if is_feature_enabled("whatif_trade_cost"):
+        try:
+            data = {**data, "cost": build_whatif_cost_panel(data, effective_date=effective_date)}
+        except Exception:  # noqa: BLE001 — 面板装配异常降级缺席，不阻断主报告（不吞 BaseException）
+            logger.warning("交易成本对比面板装配失败（面板缺席）", exc_info=True)
 
     paths = write_whatif_report(data, output_dir=output_dir, reporter=reporter)
     return WhatifRunResult(ok=True, excel=paths["excel"], html=paths["html"])

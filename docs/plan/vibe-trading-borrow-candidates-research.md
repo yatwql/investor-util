@@ -68,7 +68,7 @@ Vibe-Trading 是港大 HKUDS 出品的「金融研究工具包」，以 MCP serv
 | 立项 | 设计文档 |
 |---|---|
 | plan-76 | `docs/archive/v0.12.x/holding-change-review/holding-change-review-design.md`（已实施，随完成态归档） |
-| plan-77 | `docs/plan/whatif-cost-benchmark-design.md` |
+| plan-77 | `docs/archive/v0.12.x/whatif-cost-benchmark/whatif-cost-benchmark-design.md` |
 | plan-70 | `docs/plan/decision-reflection-shadow-design.md` |
 | plan-78 | `docs/plan/factor-zoo-catalog-design.md` |
 
